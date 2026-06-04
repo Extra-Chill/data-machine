@@ -78,6 +78,7 @@ final class AgentBundleRunner {
 		$initial_data['agent_slug']   = (string) ( $manifest['agent']['slug'] ?? '' );
 		$initial_data['job_source']   = (string) ( $input['job_source'] ?? 'agent_bundle' );
 		$initial_data['job_label']    = (string) ( $input['job_label'] ?? ( $selection['flow_name'] ?? 'Agent Bundle Workflow' ) );
+		$this->apply_runtime_model_config( $initial_data, $input );
 
 		if ( ! empty( $input['dry_run'] ) ) {
 			return $this->response(
@@ -151,6 +152,34 @@ final class AgentBundleRunner {
 		$response['export_refs']        = $this->export_refs( $response );
 
 		return $response;
+	}
+
+	/**
+	 * Project explicit headless model config into the job snapshot.
+	 *
+	 * @param array<string,mixed> $initial_data Initial workflow engine data.
+	 * @param array<string,mixed> $input Bundle run input.
+	 */
+	private function apply_runtime_model_config( array &$initial_data, array $input ): void {
+		$provider = sanitize_text_field( (string) ( $input['provider'] ?? '' ) );
+		$model    = sanitize_text_field( (string) ( $input['model'] ?? '' ) );
+		if ( '' === $provider || '' === $model ) {
+			return;
+		}
+
+		$job_snapshot = is_array( $initial_data['job'] ?? null ) ? $initial_data['job'] : array();
+		$mode_models  = is_array( $job_snapshot['mode_models'] ?? null ) ? $job_snapshot['mode_models'] : array();
+
+		$job_snapshot['default_provider']         = $provider;
+		$job_snapshot['default_model']            = $model;
+		$mode_models['pipeline']                  = array(
+			'provider' => $provider,
+			'model'    => $model,
+		);
+		$job_snapshot['mode_models']              = $mode_models;
+		$initial_data['job']                      = $job_snapshot;
+		$initial_data['agent_bundle']['provider'] = $provider;
+		$initial_data['agent_bundle']['model']    = $model;
 	}
 
 	private function status_from_response( array $response ): string {

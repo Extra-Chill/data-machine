@@ -29,6 +29,7 @@ function datamachine_bundle_runner_contains( string $source, string $needle, str
 $abilities = (string) file_get_contents( $root . '/inc/Abilities/AgentAbilities.php' );
 $cli       = (string) file_get_contents( $root . '/inc/Cli/Commands/AgentBundleCommand.php' );
 $runner    = (string) file_get_contents( $root . '/inc/Engine/Bundle/AgentBundleRunner.php' );
+$ai_step   = (string) file_get_contents( $root . '/inc/Core/Steps/AI/AIStep.php' );
 $bootstrap = (string) file_get_contents( $root . '/inc/bootstrap.php' );
 
 echo "agent-bundle-runner-contract-smoke\n";
@@ -81,7 +82,21 @@ foreach ( array(
 	datamachine_bundle_runner_contains( $cli, $needle, $label, $failures, $passes );
 }
 
-echo "\n[4] Boundary stays generic\n";
+echo "\n[4] Runner supports run-scoped provider/model config\n";
+foreach ( array(
+	"'provider'            => array("                                           => 'run-agent-bundle schema accepts provider',
+	"'model'               => array("                                           => 'run-agent-bundle schema accepts model',
+	'apply_runtime_model_config'                                              => 'runner projects provider/model into initial data',
+	"\$job_snapshot['default_provider']"                                      => 'runner stamps job-scoped default provider',
+	"\$job_snapshot['default_model']"                                         => 'runner stamps job-scoped default model',
+	"\$mode_models['pipeline']"                                               => 'runner stamps pipeline mode model config',
+	'resolveModelFromJobSnapshot'                                             => 'AI step reads run-scoped model config',
+	'resolveModelForExecutionModes( $agent_id, $execution_modes, $job_snapshot )' => 'AI validation uses job-scoped model config',
+) as $needle => $label ) {
+	datamachine_bundle_runner_contains( $abilities . $runner . $ai_step, $needle, $label, $failures, $passes );
+}
+
+echo "\n[5] Boundary stays generic\n";
 foreach ( array( 'homeboy', 'wp-codebox' ) as $forbidden ) {
 	datamachine_bundle_runner_assert( false === stripos( $runner, $forbidden ), "runner does not mention {$forbidden}", $failures, $passes );
 }

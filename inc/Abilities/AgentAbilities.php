@@ -1531,6 +1531,14 @@ class AgentAbilities {
 					'type'        => 'object',
 					'description' => 'Initial engine data merged into the ephemeral workflow job.',
 				),
+				'provider'            => array(
+					'type'        => 'string',
+					'description' => 'Optional wp-ai-client provider slug to use as the run-scoped pipeline model default.',
+				),
+				'model'               => array(
+					'type'        => 'string',
+					'description' => 'Optional wp-ai-client model slug to use as the run-scoped pipeline model default.',
+				),
 				'timestamp'           => array(
 					'type'        => array( 'integer', 'null' ),
 					'description' => 'Future Unix timestamp for delayed execution. Omit for immediate execution.',
