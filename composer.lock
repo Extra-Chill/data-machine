@@ -818,12 +818,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/Automattic/agents-api.git",
-                "reference": "21987be9b4d68d02040df9df6de2ec3fa2d9bbd0"
+                "reference": "989a90a0365d608fba75f20b0d38aec4409751fa"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/Automattic/agents-api/zipball/21987be9b4d68d02040df9df6de2ec3fa2d9bbd0",
-                "reference": "21987be9b4d68d02040df9df6de2ec3fa2d9bbd0",
+                "url": "https://api.github.com/repos/Automattic/agents-api/zipball/989a90a0365d608fba75f20b0d38aec4409751fa",
+                "reference": "989a90a0365d608fba75f20b0d38aec4409751fa",
                 "shasum": ""
             },
             "require": {
@@ -903,6 +903,7 @@
                     "php tests/conversation-loop-completion-policy-smoke.php",
                     "php tests/conversation-loop-transcript-persister-smoke.php",
                     "php tests/conversation-loop-events-smoke.php",
+                    "php tests/tool-declaration-rejection-smoke.php",
                     "php tests/conversation-loop-interrupt-source-smoke.php",
                     "php tests/iteration-budget-smoke.php",
                     "php tests/conversation-loop-budgets-smoke.php",
@@ -938,7 +939,7 @@
                 "issues": "https://github.com/Automattic/agents-api/issues",
                 "source": "https://github.com/Automattic/agents-api"
             },
-            "time": "2026-06-04T14:41:00+00:00"
+            "time": "2026-06-04T21:05:48+00:00"
         }
     ],
     "packages-dev": [
