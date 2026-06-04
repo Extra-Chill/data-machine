@@ -1770,16 +1770,15 @@ class InternalLinkingAbilities {
 
 		if ( ! empty( $specific_ids ) ) {
 			$id_placeholders = implode( ',', array_fill( 0, count( $specific_ids ), '%d' ) );
-			// phpcs:ignore WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare,WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			// phpcs:disable WordPress.DB.PreparedSQL, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Placeholders built dynamically from a known-int ID batch; table name from $wpdb->posts, not user input.
 			$rows = $wpdb->get_results(
 				$wpdb->prepare(
-					// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 					"SELECT ID, post_title FROM {$wpdb->posts}
 					WHERE ID IN ($id_placeholders) AND post_status = %s",
 					array_merge( $specific_ids, array( 'publish' ) )
 				)
 			);
-			// phpcs:enable WordPress.DB.PreparedSQL
+			// phpcs:enable WordPress.DB.PreparedSQL, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 			return is_array( $rows ) ? $rows : array();
 		}
 
@@ -1838,16 +1837,15 @@ class InternalLinkingAbilities {
 		}
 
 		$id_placeholders = implode( ',', array_fill( 0, count( $id_batch ), '%d' ) );
-		// phpcs:ignore WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare,WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		// phpcs:disable WordPress.DB.PreparedSQL, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Placeholders built dynamically from a known-int ID batch; table name from $wpdb->posts, not user input.
 		$rows = $wpdb->get_results(
 			$wpdb->prepare(
-				// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 				"SELECT ID, post_content FROM {$wpdb->posts}
 				WHERE ID IN ($id_placeholders)",
 				$id_batch
 			)
 		);
-		// phpcs:enable WordPress.DB.PreparedSQL
+		// phpcs:enable WordPress.DB.PreparedSQL, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 
 		return is_array( $rows ) ? $rows : array();
 	}
