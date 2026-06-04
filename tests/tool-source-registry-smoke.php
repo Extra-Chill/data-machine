@@ -83,8 +83,26 @@ function did_action( string $hook ): int {
 	return 1;
 }
 
+function doing_action( string $hook ): bool {
+	unset( $hook );
+	return false;
+}
+
 function current_action(): string {
 	return '';
+}
+
+function is_user_logged_in(): bool {
+	return true;
+}
+
+function get_current_user_id(): int {
+	return 1;
+}
+
+function user_can( int $user_id, string $capability ): bool {
+	unset( $user_id, $capability );
+	return true;
 }
 
 function get_option( string $key, $default_value = false ) {
@@ -118,6 +136,7 @@ require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Tools/class-wp-agent
 require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Tools/class-wp-agent-tool-policy.php';
 require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Tools/class-wp-agent-tool-source-registry.php';
 require_once __DIR__ . '/../inc/Core/AbilityResult.php';
+require_once __DIR__ . '/../inc/Abilities/PermissionHelper.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/ToolManager.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/Execution/ToolExecutionCore.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/ToolExecutor.php';

@@ -21,6 +21,9 @@ use AgentsAPI\AI\WP_Agent_Transcript_Persister;
 use AgentsAPI\AI\WP_Agent_Message;
 use AgentsAPI\AI\WP_Agent_Null_Transcript_Persister;
 use AgentsAPI\AI\WP_Agent_Provider_Turn_Request;
+use AgentsAPI\AI\WP_Agent_Runtime_Tool_Request;
+use AgentsAPI\AI\WP_Agent_Runtime_Tool_Request_Store;
+use AgentsAPI\AI\WP_Agent_Runtime_Tool_Result;
 use AgentsAPI\AI\Tools\WP_Agent_Tool_Executor;
 use DataMachine\Core\JobArtifacts;
 use DataMachine\Core\PluginSettings;
@@ -1220,33 +1223,40 @@ function datamachine_defer_runtime_tool_call( array $request, array $payload ): 
 	$request_id      = 'runtime_tool_' . (int) $job_id;
 	$client_context  = is_array( $payload['client_context'] ?? null ) ? $payload['client_context'] : array();
 	$timeout_seconds = max( 5, (int) ( $client_context['runtime_tool_timeout'] ?? 300 ) );
-	$pending_request = array(
-		'request_id'      => $request_id,
-		'job_id'          => (int) $job_id,
-		'status'          => 'pending',
-		'tool_name'       => (string) ( $request['tool_name'] ?? '' ),
-		'call_id'         => (string) ( $request['call_id'] ?? '' ),
-		'parameters'      => is_array( $request['parameters'] ?? null ) ? $request['parameters'] : array(),
-		'turn_count'      => (int) ( $request['turn_count'] ?? 0 ),
-		'session_id'      => (string) ( $request['session_id'] ?? '' ),
-		'user_id'         => (int) ( $payload['user_id'] ?? 0 ),
-		'agent_id'        => (int) ( $payload['agent_id'] ?? 0 ),
-		'mode'            => (string) ( $request['mode'] ?? '' ),
-		'modes'           => is_array( $request['modes'] ?? null ) ? $request['modes'] : array(),
-		'created_at'      => gmdate( 'c' ),
-		'expires_at'      => gmdate( 'c', time() + $timeout_seconds ),
-		'timeout_seconds' => $timeout_seconds,
+	$created_at      = gmdate( 'c' );
+	$expires_at      = gmdate( 'c', time() + $timeout_seconds );
+	$pending_request = WP_Agent_Runtime_Tool_Request::normalize(
+		array(
+			'request_id'   => $request_id,
+			'tool_name'    => (string) ( $request['tool_name'] ?? '' ),
+			'tool_call_id' => (string) ( $request['call_id'] ?? $request_id ),
+			'parameters'   => is_array( $request['parameters'] ?? null ) ? $request['parameters'] : array(),
+			'run_id'       => (string) ( $request['session_id'] ?? '' ),
+			'timeout_at'   => $expires_at,
+			'runtime'      => array(
+				'executor' => 'client',
+				'scope'    => 'run',
+			),
+			'metadata'     => array(
+				'datamachine' => array(
+					'job_id'             => (int) $job_id,
+					'persistence_status' => 'pending',
+					'session_id'         => (string) ( $request['session_id'] ?? '' ),
+					'user_id'            => (int) ( $payload['user_id'] ?? 0 ),
+					'agent_id'           => (int) ( $payload['agent_id'] ?? 0 ),
+					'mode'               => (string) ( $request['mode'] ?? '' ),
+					'modes'              => is_array( $request['modes'] ?? null ) ? $request['modes'] : array(),
+					'turn_count'         => (int) ( $request['turn_count'] ?? 0 ),
+					'created_at'         => $created_at,
+					'expires_at'         => $expires_at,
+					'timeout_seconds'    => $timeout_seconds,
+				),
+			),
+		)
 	);
 
 	$jobs_db->start_job( (int) $job_id, 'pending_runtime_tool' );
-	$jobs_db->store_engine_data(
-		(int) $job_id,
-		array(
-			'task_type'            => 'runtime_tool_request',
-			'runtime_tool_request' => $pending_request,
-		)
-	);
-	datamachine_store_runtime_tool_request_on_session( $pending_request );
+	datamachine_runtime_tool_request_store()->create( $pending_request );
 
 	if ( function_exists( 'as_schedule_single_action' ) ) {
 		as_schedule_single_action( time() + $timeout_seconds, 'datamachine_runtime_tool_timeout', array( $request_id ), 'datamachine-runtime-tools' );
@@ -1265,13 +1275,107 @@ function datamachine_defer_runtime_tool_call( array $request, array $payload ): 
 	);
 }
 
+/** Return Data Machine's Agents API runtime-tool request store adapter. */
+function datamachine_runtime_tool_request_store(): WP_Agent_Runtime_Tool_Request_Store {
+	static $store = null;
+
+	if ( ! $store instanceof WP_Agent_Runtime_Tool_Request_Store ) {
+		$store = new class() implements WP_Agent_Runtime_Tool_Request_Store {
+			public function create( array $request ): void {
+				$job_id = datamachine_runtime_tool_job_id_from_request( $request );
+				if ( $job_id <= 0 ) {
+					return;
+				}
+
+				$jobs_db = new \DataMachine\Core\Database\Jobs\Jobs();
+				$jobs_db->store_engine_data(
+					$job_id,
+					array(
+						'task_type'            => 'runtime_tool_request',
+						'runtime_tool_request' => $request,
+					)
+				);
+				datamachine_store_runtime_tool_request_on_session( $request );
+			}
+
+			public function get( string $request_id ): ?array {
+				$job_id = datamachine_runtime_tool_job_id_from_request_id( $request_id );
+				if ( $job_id <= 0 ) {
+					return null;
+				}
+
+				$engine_data = ( new \DataMachine\Core\Database\Jobs\Jobs() )->retrieve_engine_data( $job_id );
+				$request     = is_array( $engine_data['runtime_tool_request'] ?? null )
+					? datamachine_normalize_stored_runtime_tool_request( $engine_data['runtime_tool_request'] )
+					: null;
+				if ( empty( $request ) ) {
+					return null;
+				}
+
+				return $request;
+			}
+
+			public function complete( string $request_id, array $result ): void {
+				$job_id = datamachine_runtime_tool_job_id_from_request_id( $request_id );
+				if ( $job_id <= 0 ) {
+					return;
+				}
+
+				$jobs_db     = new \DataMachine\Core\Database\Jobs\Jobs();
+				$engine_data = $jobs_db->retrieve_engine_data( $job_id );
+				$request     = is_array( $engine_data['runtime_tool_request'] ?? null ) ? $engine_data['runtime_tool_request'] : array();
+				if ( empty( $request ) ) {
+					return;
+				}
+
+				$datamachine_metadata                       = datamachine_runtime_tool_datamachine_metadata( $request );
+				$datamachine_metadata['persistence_status'] = ! empty( $result['success'] ) ? 'fulfilled' : 'failed';
+				$datamachine_metadata['fulfilled_at']       = gmdate( 'c' );
+				$datamachine_metadata['result']             = $result;
+				$request['metadata']['datamachine']         = $datamachine_metadata;
+				$engine_data['runtime_tool_request']        = $request;
+
+				$jobs_db->store_engine_data( $job_id, $engine_data );
+				$jobs_db->complete_job( $job_id, ! empty( $result['success'] ) ? 'completed' : 'failed' );
+			}
+
+			public function timeout( string $request_id ): void {
+				$request = $this->get( $request_id );
+				if ( null === $request ) {
+					return;
+				}
+
+				$this->complete(
+					$request_id,
+					WP_Agent_Runtime_Tool_Result::normalize(
+						array(
+							'request_id' => $request_id,
+							'tool_name'  => (string) ( $request['tool_name'] ?? '' ),
+							'success'    => false,
+							'error'      => 'Client runtime tool request timed out.',
+							'metadata'   => array(
+								'datamachine' => array(
+									'code' => WP_Agent_Runtime_Tool_Request::STATUS_TIMEOUT,
+								),
+							),
+						)
+					)
+				);
+			}
+		};
+	}
+
+	return $store;
+}
+
 /**
  * Store pending runtime tool request metadata on the owning chat session.
  *
  * @param array<string,mixed> $pending_request Pending request metadata.
  */
 function datamachine_store_runtime_tool_request_on_session( array $pending_request ): void {
-	$session_id = (string) ( $pending_request['session_id'] ?? '' );
+	$datamachine_metadata = datamachine_runtime_tool_datamachine_metadata( $pending_request );
+	$session_id           = (string) ( $datamachine_metadata['session_id'] ?? '' );
 	if ( '' === $session_id || ! class_exists( \DataMachine\Core\Database\Chat\ConversationStoreFactory::class ) ) {
 		return;
 	}
@@ -1308,20 +1412,20 @@ function datamachine_store_runtime_tool_request_on_session( array $pending_reque
  * @return array<string,mixed>|\WP_Error Submission result.
  */
 function datamachine_submit_runtime_tool_result( string $request_id, $result ): array|\WP_Error {
-	$job_id = datamachine_runtime_tool_job_id_from_request_id( $request_id );
-	if ( $job_id <= 0 ) {
+	$store   = datamachine_runtime_tool_request_store();
+	$request = $store->get( $request_id );
+	if ( null === $request ) {
 		return new \WP_Error( 'runtime_tool_request_invalid', 'Runtime tool request id is invalid.' );
 	}
 
-	$jobs_db     = new \DataMachine\Core\Database\Jobs\Jobs();
-	$engine_data = $jobs_db->retrieve_engine_data( $job_id );
-	$request     = is_array( $engine_data['runtime_tool_request'] ?? null ) ? $engine_data['runtime_tool_request'] : array();
-	if ( empty( $request ) || 'pending' !== (string) ( $request['status'] ?? '' ) ) {
+	$datamachine_metadata = datamachine_runtime_tool_datamachine_metadata( $request );
+	if ( 'pending' !== (string) ( $datamachine_metadata['persistence_status'] ?? '' ) ) {
 		return new \WP_Error( 'runtime_tool_request_not_pending', 'Runtime tool request is not pending.' );
 	}
 
-	$tool_result = datamachine_normalize_runtime_tool_result( (string) ( $request['tool_name'] ?? '' ), $result );
-	$session_id  = (string) ( $request['session_id'] ?? '' );
+	$canonical_result = datamachine_normalize_runtime_tool_submission( $request_id, (string) ( $request['tool_name'] ?? '' ), $result );
+	$tool_result      = datamachine_runtime_tool_result_for_transcript( $canonical_result );
+	$session_id       = (string) ( $datamachine_metadata['session_id'] ?? '' );
 	if ( '' === $session_id || ! class_exists( \DataMachine\Core\Database\Chat\ConversationStoreFactory::class ) ) {
 		return new \WP_Error( 'runtime_tool_session_missing', 'Runtime tool request has no resumable chat session.' );
 	}
@@ -1338,14 +1442,19 @@ function datamachine_submit_runtime_tool_result( string $request_id, $result ): 
 		$tool_result,
 		is_array( $request['parameters'] ?? null ) ? $request['parameters'] : array(),
 		false,
-		(int) ( $request['turn_count'] ?? 0 )
+		(int) ( $datamachine_metadata['turn_count'] ?? 0 )
 	);
 
 	$metadata = is_array( $session['metadata'] ?? null ) ? $session['metadata'] : array();
 	if ( is_array( $metadata['runtime_tool_requests'] ?? null ) && isset( $metadata['runtime_tool_requests'][ $request_id ] ) ) {
-		$metadata['runtime_tool_requests'][ $request_id ]['status']       = ! empty( $tool_result['success'] ) ? 'fulfilled' : 'failed';
-		$metadata['runtime_tool_requests'][ $request_id ]['fulfilled_at'] = gmdate( 'c' );
-		$metadata['runtime_tool_requests'][ $request_id ]['result']       = $tool_result;
+		$session_request                        = $metadata['runtime_tool_requests'][ $request_id ];
+		$request_metadata                       = datamachine_runtime_tool_datamachine_metadata( $session_request );
+		$request_metadata['persistence_status'] = ! empty( $tool_result['success'] ) ? 'fulfilled' : 'failed';
+		$request_metadata['fulfilled_at']       = gmdate( 'c' );
+		$request_metadata['result']             = $canonical_result;
+
+		$session_request['metadata']['datamachine']       = $request_metadata;
+		$metadata['runtime_tool_requests'][ $request_id ] = $session_request;
 	}
 	$metadata['runtime_tool_last_result'] = array(
 		'request_id' => $request_id,
@@ -1365,12 +1474,7 @@ function datamachine_submit_runtime_tool_result( string $request_id, $result ): 
 		(string) ( $session['model'] ?? '' )
 	);
 
-	$request['status']                   = ! empty( $tool_result['success'] ) ? 'fulfilled' : 'failed';
-	$request['fulfilled_at']             = gmdate( 'c' );
-	$request['result']                   = $tool_result;
-	$engine_data['runtime_tool_request'] = $request;
-	$jobs_db->store_engine_data( $job_id, $engine_data );
-	$jobs_db->complete_job( $job_id, ! empty( $tool_result['success'] ) ? 'completed' : 'failed' );
+	$store->complete( $request_id, $canonical_result );
 
 	if ( function_exists( 'as_enqueue_async_action' ) ) {
 		as_enqueue_async_action( 'datamachine_runtime_tool_resume', array( $request_id ), 'datamachine-runtime-tools' );
@@ -1381,40 +1485,41 @@ function datamachine_submit_runtime_tool_result( string $request_id, $result ): 
 	return array(
 		'success'    => true,
 		'request_id' => $request_id,
-		'job_id'     => $job_id,
+		'job_id'     => datamachine_runtime_tool_job_id_from_request_id( $request_id ),
 		'scheduled'  => function_exists( 'as_enqueue_async_action' ),
 	);
 }
 
 /** Resume a deferred runtime tool conversation. */
 function datamachine_resume_runtime_tool_request( string $request_id ): void {
-	$job_id = datamachine_runtime_tool_job_id_from_request_id( $request_id );
-	if ( $job_id <= 0 || ! class_exists( \DataMachine\Api\Chat\ChatOrchestrator::class ) ) {
+	if ( ! class_exists( \DataMachine\Api\Chat\ChatOrchestrator::class ) ) {
 		return;
 	}
 
-	$engine_data = ( new \DataMachine\Core\Database\Jobs\Jobs() )->retrieve_engine_data( $job_id );
-	$request     = is_array( $engine_data['runtime_tool_request'] ?? null ) ? $engine_data['runtime_tool_request'] : array();
-	if ( empty( $request ) || 'pending' === (string) ( $request['status'] ?? '' ) ) {
+	$request = datamachine_runtime_tool_request_store()->get( $request_id );
+	if ( null === $request ) {
+		return;
+	}
+	$datamachine_metadata = datamachine_runtime_tool_datamachine_metadata( $request );
+	if ( 'pending' === (string) ( $datamachine_metadata['persistence_status'] ?? '' ) ) {
 		return;
 	}
 
 	\DataMachine\Api\Chat\ChatOrchestrator::processContinue(
-		(string) ( $request['session_id'] ?? '' ),
-		(int) ( $request['user_id'] ?? 0 )
+		(string) ( $datamachine_metadata['session_id'] ?? '' ),
+		(int) ( $datamachine_metadata['user_id'] ?? 0 )
 	);
 }
 
 /** Fail and resume an expired runtime tool request. */
 function datamachine_timeout_runtime_tool_request( string $request_id ): void {
-	$job_id = datamachine_runtime_tool_job_id_from_request_id( $request_id );
-	if ( $job_id <= 0 ) {
+	$request = datamachine_runtime_tool_request_store()->get( $request_id );
+	if ( null === $request ) {
 		return;
 	}
 
-	$engine_data = ( new \DataMachine\Core\Database\Jobs\Jobs() )->retrieve_engine_data( $job_id );
-	$request     = is_array( $engine_data['runtime_tool_request'] ?? null ) ? $engine_data['runtime_tool_request'] : array();
-	if ( empty( $request ) || 'pending' !== (string) ( $request['status'] ?? '' ) ) {
+	$datamachine_metadata = datamachine_runtime_tool_datamachine_metadata( $request );
+	if ( 'pending' !== (string) ( $datamachine_metadata['persistence_status'] ?? '' ) ) {
 		return;
 	}
 
@@ -1427,7 +1532,7 @@ function datamachine_timeout_runtime_tool_request( string $request_id ): void {
 /** @param array<string,mixed> $metadata Session metadata. */
 function datamachine_session_has_pending_runtime_tools( array $metadata ): bool {
 	foreach ( (array) ( $metadata['runtime_tool_requests'] ?? array() ) as $request ) {
-		if ( is_array( $request ) && 'pending' === (string) ( $request['status'] ?? '' ) ) {
+		if ( is_array( $request ) && 'pending' === (string) ( datamachine_runtime_tool_datamachine_metadata( $request )['persistence_status'] ?? '' ) ) {
 			return true;
 		}
 	}
@@ -1441,6 +1546,89 @@ function datamachine_runtime_tool_job_id_from_request_id( string $request_id ): 
 	}
 
 	return max( 0, (int) substr( $request_id, strlen( 'runtime_tool_' ) ) );
+}
+
+/** @param array<string,mixed> $request Canonical runtime tool request. */
+function datamachine_runtime_tool_job_id_from_request( array $request ): int {
+	$metadata = datamachine_runtime_tool_datamachine_metadata( $request );
+	$job_id   = (int) ( $metadata['job_id'] ?? 0 );
+
+	return $job_id > 0 ? $job_id : datamachine_runtime_tool_job_id_from_request_id( (string) ( $request['request_id'] ?? '' ) );
+}
+
+/**
+ * Normalize a stored runtime-tool request, including rows persisted before the canonical request contract.
+ *
+ * @param array<string,mixed> $request Stored request payload.
+ * @return array<string,mixed>|null Canonical request or null when invalid.
+ */
+function datamachine_normalize_stored_runtime_tool_request( array $request ): ?array {
+	$metadata             = is_array( $request['metadata'] ?? null ) ? $request['metadata'] : array();
+	$datamachine_metadata = datamachine_runtime_tool_datamachine_metadata( $request );
+	$legacy_status        = is_string( $request['status'] ?? null ) ? $request['status'] : '';
+
+	foreach ( array( 'job_id', 'session_id', 'user_id', 'agent_id', 'mode', 'modes', 'turn_count', 'created_at', 'expires_at', 'timeout_seconds', 'fulfilled_at', 'result' ) as $key ) {
+		if ( ! array_key_exists( $key, $datamachine_metadata ) && array_key_exists( $key, $request ) ) {
+			$datamachine_metadata[ $key ] = $request[ $key ];
+		}
+	}
+
+	if ( ! isset( $datamachine_metadata['persistence_status'] ) && '' !== $legacy_status ) {
+		$datamachine_metadata['persistence_status'] = WP_Agent_Runtime_Tool_Request::STATUS_PENDING === $legacy_status ? 'pending' : $legacy_status;
+	}
+
+	$metadata['datamachine'] = $datamachine_metadata;
+
+	try {
+		return WP_Agent_Runtime_Tool_Request::normalize(
+			array(
+				'request_id'   => (string) ( $request['request_id'] ?? '' ),
+				'tool_name'    => (string) ( $request['tool_name'] ?? '' ),
+				'tool_call_id' => (string) ( $request['tool_call_id'] ?? $request['call_id'] ?? $request['request_id'] ?? '' ),
+				'parameters'   => is_array( $request['parameters'] ?? null ) ? $request['parameters'] : array(),
+				'run_id'       => (string) ( $request['run_id'] ?? $request['session_id'] ?? '' ),
+				'timeout_at'   => (string) ( $request['timeout_at'] ?? $request['expires_at'] ?? '' ),
+				'runtime'      => is_array( $request['runtime'] ?? null ) ? $request['runtime'] : array(
+					'executor' => 'client',
+					'scope'    => 'run',
+				),
+				'metadata'     => $metadata,
+			)
+		);
+	} catch ( \InvalidArgumentException $e ) {
+		unset( $e );
+		return null;
+	}
+}
+
+/**
+ * Read Data Machine-owned metadata from a canonical runtime-tool payload.
+ *
+ * @param array<string,mixed> $payload Canonical runtime-tool request or result.
+ * @return array<string,mixed>
+ */
+function datamachine_runtime_tool_datamachine_metadata( array $payload ): array {
+	$metadata = is_array( $payload['metadata'] ?? null ) ? $payload['metadata'] : array();
+	if ( is_array( $metadata['datamachine'] ?? null ) ) {
+		return $metadata['datamachine'];
+	}
+
+	$legacy = array();
+	foreach ( array( 'job_id', 'session_id', 'user_id', 'agent_id', 'mode', 'modes', 'turn_count', 'created_at', 'expires_at', 'timeout_seconds', 'fulfilled_at', 'result' ) as $key ) {
+		if ( array_key_exists( $key, $payload ) ) {
+			$legacy[ $key ] = $payload[ $key ];
+		}
+	}
+
+	if ( isset( $payload['status'] ) && is_string( $payload['status'] ) ) {
+		$legacy['persistence_status'] = WP_Agent_Runtime_Tool_Request::STATUS_PENDING === $payload['status'] ? 'pending' : $payload['status'];
+	}
+
+	if ( ! empty( $legacy ) ) {
+		return $legacy;
+	}
+
+	return array();
 }
 
 if ( function_exists( 'add_action' ) ) {
@@ -1492,6 +1680,99 @@ function datamachine_normalize_runtime_tool_result( string $tool_name, $result )
 		'executor'  => 'client',
 		'result'    => $result,
 	);
+}
+
+/**
+ * Normalize an async client-submitted runtime tool result through Agents API.
+ *
+ * @param string $request_id Canonical request id.
+ * @param string $tool_name Tool name.
+ * @param mixed  $result Raw client result.
+ * @return array<string,mixed> Canonical runtime tool result.
+ */
+function datamachine_normalize_runtime_tool_submission( string $request_id, string $tool_name, $result ): array {
+	$datamachine_metadata = array();
+
+	if ( $result instanceof \WP_Error ) {
+		$datamachine_metadata['code'] = $result->get_error_code();
+		return WP_Agent_Runtime_Tool_Result::normalize(
+			array(
+				'request_id' => $request_id,
+				'tool_name'  => $tool_name,
+				'success'    => false,
+				'error'      => $result->get_error_message(),
+				'metadata'   => array( 'datamachine' => $datamachine_metadata ),
+			)
+		);
+	}
+
+	if ( null === $result ) {
+		$datamachine_metadata['code'] = 'runtime_tool_unfulfilled';
+		return WP_Agent_Runtime_Tool_Result::normalize(
+			array(
+				'request_id' => $request_id,
+				'tool_name'  => $tool_name,
+				'success'    => false,
+				'error'      => sprintf( 'Client runtime tool "%s" did not return a result.', $tool_name ),
+				'metadata'   => array( 'datamachine' => $datamachine_metadata ),
+			)
+		);
+	}
+
+	if ( is_array( $result ) ) {
+		$success = array_key_exists( 'success', $result ) ? (bool) $result['success'] : true;
+		$payload = $result['result'] ?? $result['data'] ?? $result;
+		$error   = $result['error'] ?? 'Runtime tool execution failed.';
+		if ( isset( $result['code'] ) && is_string( $result['code'] ) ) {
+			$datamachine_metadata['code'] = $result['code'];
+		}
+
+		return WP_Agent_Runtime_Tool_Result::normalize(
+			array(
+				'request_id' => $request_id,
+				'tool_name'  => is_string( $result['tool_name'] ?? null ) ? $result['tool_name'] : $tool_name,
+				'success'    => $success,
+				'result'     => $payload,
+				'error'      => $error,
+				'metadata'   => array( 'datamachine' => $datamachine_metadata ),
+			)
+		);
+	}
+
+	return WP_Agent_Runtime_Tool_Result::normalize(
+		array(
+			'request_id' => $request_id,
+			'tool_name'  => $tool_name,
+			'success'    => true,
+			'result'     => $result,
+			'metadata'   => array( 'datamachine' => $datamachine_metadata ),
+		)
+	);
+}
+
+/**
+ * Convert a canonical async result into Data Machine's transcript tool result.
+ *
+ * @param array<string,mixed> $canonical_result Canonical runtime tool result.
+ * @return array<string,mixed> Transcript-compatible tool result.
+ */
+function datamachine_runtime_tool_result_for_transcript( array $canonical_result ): array {
+	$tool_result = array(
+		'success'   => ! empty( $canonical_result['success'] ),
+		'tool_name' => (string) ( $canonical_result['tool_name'] ?? '' ),
+		'executor'  => 'client',
+		'result'    => is_array( $canonical_result['result'] ?? null ) ? $canonical_result['result'] : ( $canonical_result['result'] ?? array() ),
+	);
+
+	if ( empty( $tool_result['success'] ) ) {
+		$tool_result['error'] = (string) ( $canonical_result['error'] ?? 'Runtime tool execution failed.' );
+		$metadata             = datamachine_runtime_tool_datamachine_metadata( $canonical_result );
+		if ( isset( $metadata['code'] ) && is_string( $metadata['code'] ) ) {
+			$tool_result['code'] = $metadata['code'];
+		}
+	}
+
+	return $tool_result;
 }
 
 /** @return array<int,string> */
