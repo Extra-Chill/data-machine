@@ -21,15 +21,15 @@ use DataMachine\Core\PluginSettings;
 
 class RetentionCleanup {
 
-	public const TASK_COMPLETED_JOBS   = 'retention_completed_jobs';
-	public const TASK_FAILED_JOBS      = 'retention_failed_jobs';
-	public const TASK_LOGS             = 'retention_logs';
-	public const TASK_PROCESSED_ITEMS  = 'retention_processed_items';
-	public const TASK_AS_ACTIONS       = 'retention_as_actions';
-	public const TASK_STALE_CLAIMS     = 'retention_stale_claims';
-	public const TASK_FILES            = 'retention_files';
-	public const TASK_CHAT_SESSIONS    = 'retention_chat_sessions';
-	public const TASK_JOB_ARTIFACTS    = 'retention_job_artifacts';
+	public const TASK_COMPLETED_JOBS  = 'retention_completed_jobs';
+	public const TASK_FAILED_JOBS     = 'retention_failed_jobs';
+	public const TASK_LOGS            = 'retention_logs';
+	public const TASK_PROCESSED_ITEMS = 'retention_processed_items';
+	public const TASK_AS_ACTIONS      = 'retention_as_actions';
+	public const TASK_STALE_CLAIMS    = 'retention_stale_claims';
+	public const TASK_FILES           = 'retention_files';
+	public const TASK_CHAT_SESSIONS   = 'retention_chat_sessions';
+	public const TASK_JOB_ARTIFACTS   = 'retention_job_artifacts';
 
 	public static function completedJobsMaxAgeDays(): int {
 		return self::positiveDays( apply_filters( 'datamachine_completed_jobs_max_age_days', 30 ), 30 );
@@ -466,11 +466,11 @@ class RetentionCleanup {
 		$table                     = Chat::get_prefixed_table_name();
 		$retention_days            = self::chatRetentionDays();
 		$transcript_retention_days = self::transcriptRetentionDays();
-		$session_cutoff            = gmdate( 'Y-m-d H:i:s', strtotime( "-{$retention_days} days" ) );
+		$session_cutoff            = gmdate( 'Y-m-d H:i:s', time() - ( $retention_days * DAY_IN_SECONDS ) );
 		$transcript_count          = 0;
 
 		if ( $transcript_retention_days > 0 ) {
-			$transcript_cutoff = gmdate( 'Y-m-d H:i:s', strtotime( "-{$transcript_retention_days} days" ) );
+			$transcript_cutoff = gmdate( 'Y-m-d H:i:s', time() - ( $transcript_retention_days * DAY_IN_SECONDS ) );
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 			$transcript_count = (int) $wpdb->get_var(
 				$wpdb->prepare(

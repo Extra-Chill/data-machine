@@ -155,9 +155,11 @@ class FileCleanup {
 
 		// Traverse: pipeline → flow → files
 		$pipeline_dirs = glob( "{$base}/pipeline-*", GLOB_ONLYDIR );
+		$pipeline_dirs = is_array( $pipeline_dirs ) ? $pipeline_dirs : array();
 
 		foreach ( $pipeline_dirs as $pipeline_dir ) {
 			$flow_dirs = glob( "{$pipeline_dir}/flow-*", GLOB_ONLYDIR );
+			$flow_dirs = is_array( $flow_dirs ) ? $flow_dirs : array();
 
 			foreach ( $flow_dirs as $flow_dir ) {
 				// Clean up flow files (not context!)
@@ -166,6 +168,7 @@ class FileCleanup {
 
 				if ( is_dir( $files_dir ) ) {
 					$files = glob( "{$files_dir}/*" );
+					$files = is_array( $files ) ? $files : array();
 					foreach ( $files as $file ) {
 						if ( is_file( $file ) && filemtime( $file ) < $cutoff_time && wp_delete_file( $file ) ) {
 							++$deleted_count;
@@ -183,8 +186,10 @@ class FileCleanup {
 
 				if ( is_dir( $jobs_dir ) ) {
 					$job_dirs = glob( "{$jobs_dir}/job-*", GLOB_ONLYDIR );
+					$job_dirs = is_array( $job_dirs ) ? $job_dirs : array();
 					foreach ( $job_dirs as $job_dir ) {
 						$files   = glob( "{$job_dir}/*" );
+						$files   = is_array( $files ) ? $files : array();
 						$all_old = true;
 
 						foreach ( $files as $file ) {

@@ -233,6 +233,10 @@ class JobArtifactSurfaces {
 	}
 
 	private static function filter( string $hook, mixed $value ): mixed {
+		if ( '' === $hook ) {
+			return $value;
+		}
+
 		return function_exists( 'apply_filters' ) ? apply_filters( $hook, $value ) : $value;
 	}
 
@@ -262,7 +266,8 @@ class JobArtifactSurfaces {
 
 	private static function url( mixed $value ): string {
 		$value = (string) $value;
-		return function_exists( 'esc_url_raw' ) ? esc_url_raw( $value ) : filter_var( $value, FILTER_SANITIZE_URL );
+		$url   = function_exists( 'esc_url_raw' ) ? esc_url_raw( $value ) : filter_var( $value, FILTER_SANITIZE_URL );
+		return is_string( $url ) ? $url : '';
 	}
 
 	/**
