@@ -102,22 +102,22 @@ class AgentsChatHandler {
 			sanitize_text_field( $model ),
 			$user_id,
 			array(
-				'session_id'           => $input['session_id'] ?? null,
-				'selected_pipeline_id' => (int) ( $input['selected_pipeline_id'] ?? 0 ),
-				'max_turns'            => $input['max_turns'] ?? null,
-				'request_id'           => $input['request_id'] ?? null,
-				'interrupt_source'     => is_callable( $input['interrupt_source'] ?? null ) ? $input['interrupt_source'] : null,
-				'modes'                => $modes,
-				'agent_id'             => $agent_id,
-				'agent_slug'           => $identity ? $identity->agent_slug : '',
-				'attachments'          => $input['attachments'] ?? array(),
-				'client_context'       => $client_context,
-				'tool_policy'          => is_array( $input['tool_policy'] ?? null ) ? $input['tool_policy'] : null,
-				'allow_only'           => is_array( $input['allow_only'] ?? null ) ? $input['allow_only'] : null,
+				'session_id'            => $input['session_id'] ?? null,
+				'selected_pipeline_id'  => (int) ( $input['selected_pipeline_id'] ?? 0 ),
+				'max_turns'             => $input['max_turns'] ?? null,
+				'request_id'            => $input['request_id'] ?? null,
+				'interrupt_source'      => is_callable( $input['interrupt_source'] ?? null ) ? $input['interrupt_source'] : null,
+				'modes'                 => $modes,
+				'agent_id'              => $agent_id,
+				'agent_slug'            => $identity ? $identity->agent_slug : '',
+				'attachments'           => $input['attachments'] ?? array(),
+				'client_context'        => $client_context,
+				'tool_policy'           => is_array( $input['tool_policy'] ?? null ) ? $input['tool_policy'] : null,
+				'allow_only'            => is_array( $input['allow_only'] ?? null ) ? $input['allow_only'] : null,
 				'completion_assertions' => is_array( $input['completion_assertions'] ?? null ) ? $input['completion_assertions'] : null,
 				'event_sink'            => $input['event_sink'] ?? null,
-				'session_owner'        => is_array( $input['session_owner'] ?? null ) ? $input['session_owner'] : null,
-				'transcript_owner'     => is_array( $input['transcript_owner'] ?? null ) ? $input['transcript_owner'] : null,
+				'session_owner'         => is_array( $input['session_owner'] ?? null ) ? $input['session_owner'] : null,
+				'transcript_owner'      => is_array( $input['transcript_owner'] ?? null ) ? $input['transcript_owner'] : null,
 			)
 		);
 
@@ -253,10 +253,10 @@ class AgentsChatHandler {
 
 		$datamachine_metadata['input_controls'] = array_filter(
 			array(
-				'has_tool_policy'              => is_array( $input['tool_policy'] ?? null ),
-				'tool_policy_mode'             => is_scalar( $tool_policy['mode'] ?? null ) ? (string) $tool_policy['mode'] : null,
-				'tool_policy_tools'            => is_array( $tool_policy['tools'] ?? null ) ? array_values( array_map( 'strval', $tool_policy['tools'] ) ) : null,
-				'allow_only'                   => is_array( $input['allow_only'] ?? null ) ? array_values( array_map( 'strval', $input['allow_only'] ) ) : null,
+				'has_tool_policy'                => is_array( $input['tool_policy'] ?? null ),
+				'tool_policy_mode'               => is_scalar( $tool_policy['mode'] ?? null ) ? (string) $tool_policy['mode'] : null,
+				'tool_policy_tools'              => is_array( $tool_policy['tools'] ?? null ) ? array_values( array_map( 'strval', $tool_policy['tools'] ) ) : null,
+				'allow_only'                     => is_array( $input['allow_only'] ?? null ) ? array_values( array_map( 'strval', $input['allow_only'] ) ) : null,
 				'completion_required_tool_names' => is_array( $assertions['required_tool_names'] ?? null ) ? array_values( array_map( 'strval', $assertions['required_tool_names'] ) ) : null,
 			),
 			static fn( $value ): bool => null !== $value
