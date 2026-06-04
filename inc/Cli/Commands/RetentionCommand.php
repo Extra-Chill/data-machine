@@ -242,35 +242,35 @@ class RetentionCommand extends BaseCommand {
 	 */
 	private function get_retention_policies(): array {
 		return array(
-			'Completed jobs'  => array(
+			'Completed jobs'   => array(
 				'retention' => apply_filters( 'datamachine_completed_jobs_max_age_days', 30 ) . ' days',
 				'filter'    => 'datamachine_completed_jobs_max_age_days',
 			),
-			'Failed jobs'     => array(
+			'Failed jobs'      => array(
 				'retention' => apply_filters( 'datamachine_failed_jobs_max_age_days', 30 ) . ' days',
 				'filter'    => 'datamachine_failed_jobs_max_age_days',
 			),
-			'Pipeline logs'   => array(
+			'Pipeline logs'    => array(
 				'retention' => apply_filters( 'datamachine_log_max_age_days', 7 ) . ' days',
 				'filter'    => 'datamachine_log_max_age_days',
 			),
-			'Processed items' => array(
+			'Processed items'  => array(
 				'retention' => apply_filters( 'datamachine_processed_items_max_age_days', 30 ) . ' days',
 				'filter'    => 'datamachine_processed_items_max_age_days',
 			),
-			'AS actions'      => array(
+			'AS actions'       => array(
 				'retention' => apply_filters( 'datamachine_as_actions_max_age_days', 7 ) . ' days',
 				'filter'    => 'datamachine_as_actions_max_age_days',
 			),
-			'Stale claims'    => array(
+			'Stale claims'     => array(
 				'retention' => round( apply_filters( 'datamachine_stale_claim_max_age', DAY_IN_SECONDS ) / 3600 ) . ' hours',
 				'filter'    => 'datamachine_stale_claim_max_age',
 			),
-			'Chat sessions'   => array(
+			'Chat sessions'    => array(
 				'retention' => \DataMachine\Core\PluginSettings::get( 'chat_retention_days', 90 ) . ' days',
 				'filter'    => 'setting: chat_retention_days',
 			),
-			'File cleanup'    => array(
+			'File cleanup'     => array(
 				'retention' => \DataMachine\Core\PluginSettings::get( 'file_retention_days', 7 ) . ' days',
 				'filter'    => 'setting: file_retention_days',
 			),

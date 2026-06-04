@@ -11,10 +11,10 @@ defined( 'ABSPATH' ) || exit;
 
 class CorpusJobSurfaces {
 
-	public const WORKLOAD_TYPE = 'corpus_indexing';
+	public const WORKLOAD_TYPE   = 'corpus_indexing';
 	public const RETENTION_SCOPE = 'corpus_indexing';
 
-	private const SUMMARY_SCHEMA_VERSION = 1;
+	private const SUMMARY_SCHEMA_VERSION  = 1;
 	private const ARTIFACT_SCHEMA_VERSION = 1;
 
 	private const CORPUS_COUNT_KEYS = array(
@@ -61,13 +61,13 @@ class CorpusJobSurfaces {
 		return self::filterEmpty(
 			array(
 				'schema_version' => self::SUMMARY_SCHEMA_VERSION,
-				'workload_type'   => self::WORKLOAD_TYPE,
-				'headline'        => self::boundedText( $summary['headline'] ?? ( $summary['summary'] ?? ( $corpus['headline'] ?? ( $corpus['summary'] ?? '' ) ) ), 280 ),
-				'status'          => isset( $job['status'] ) ? (string) $job['status'] : null,
-				'counts'          => $counts,
-				'artifact_refs'   => self::artifactRefs( $engine_data ),
-				'notes'           => self::boundedText( $summary['notes'] ?? ( $corpus['notes'] ?? '' ), 1000 ),
-				'updated_at'      => self::text( $summary['updated_at'] ?? ( $corpus['updated_at'] ?? '' ) ),
+				'workload_type'  => self::WORKLOAD_TYPE,
+				'headline'       => self::boundedText( $summary['headline'] ?? ( $summary['summary'] ?? ( $corpus['headline'] ?? ( $corpus['summary'] ?? '' ) ) ), 280 ),
+				'status'         => isset( $job['status'] ) ? (string) $job['status'] : null,
+				'counts'         => $counts,
+				'artifact_refs'  => self::artifactRefs( $engine_data ),
+				'notes'          => self::boundedText( $summary['notes'] ?? ( $corpus['notes'] ?? '' ), 1000 ),
+				'updated_at'     => self::text( $summary['updated_at'] ?? ( $corpus['updated_at'] ?? '' ) ),
 			)
 		);
 	}
@@ -258,7 +258,8 @@ class CorpusJobSurfaces {
 			return sanitize_key( $value );
 		}
 
-		return preg_replace( '/[^a-z0-9_\-]/', '', strtolower( $value ) ) ?: '';
+		$key = preg_replace( '/[^a-z0-9_\-]/', '', strtolower( $value ) );
+		return '' !== $key ? $key : '';
 	}
 
 	private static function text( mixed $value ): string {
@@ -267,7 +268,7 @@ class CorpusJobSurfaces {
 			return sanitize_text_field( $value );
 		}
 
-		return trim( strip_tags( $value ) );
+		return trim( preg_replace( '/<[^>]*>/', '', $value ) ?? '' );
 	}
 
 	private static function boundedText( mixed $value, int $max_chars ): string {
