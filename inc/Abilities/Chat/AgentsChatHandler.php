@@ -53,7 +53,7 @@ class AgentsChatHandler {
 
 		$identity = $this->resolveAgentIdentity( $agent );
 		if ( $identity instanceof WP_Error || ! class_exists( '\WP_Agent_Access' ) || ! class_exists( '\WP_Agent_Access_Grant' ) ) {
-			return false;
+			return $allowed;
 		}
 
 		return $allowed || \WP_Agent_Access::can_current_principal_access_agent( $identity->agent_slug, \WP_Agent_Access_Grant::ROLE_VIEWER );
