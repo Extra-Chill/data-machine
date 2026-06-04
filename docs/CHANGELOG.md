@@ -2,6 +2,12 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.139.17] - 2026-06-04
+
+### Changed
+- Update Agents API provider-turn contract
+- Use provider-turn adapter for wp-ai-client dispatch
+
 ## [0.139.16] - 2026-06-04
 
 ### Changed
