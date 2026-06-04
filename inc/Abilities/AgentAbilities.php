@@ -20,6 +20,7 @@ use DataMachine\Core\FilesRepository\DirectoryManager;
 use DataMachine\Engine\Bundle\AgentBundleDirectory;
 use DataMachine\Engine\Bundle\AgentBundleAbilityService;
 use DataMachine\Engine\Bundle\AgentBundleArtifactRebase;
+use DataMachine\Engine\Bundle\AgentBundleRunner;
 use DataMachine\Engine\Bundle\BundleSource;
 use DataMachine\Engine\Bundle\BundleSourceAuth;
 use DataMachine\Engine\Bundle\BundleValidationException;
@@ -562,6 +563,27 @@ class AgentAbilities {
 					'execute_callback'    => array( self::class, 'resolveAgentBundleUpgradeAction' ),
 					'permission_callback' => fn() => PermissionHelper::can_manage(),
 					'meta'                => array( 'show_in_rest' => true ),
+				)
+			);
+
+			self::registerAbility(
+				'datamachine/run-agent-bundle',
+				array(
+					'label'               => 'Run Agent Bundle',
+					'description'         => 'Run a flow from a portable agent bundle as a headless ephemeral workflow without requiring callers to synthesize Data Machine internals.',
+					'category'            => 'datamachine-agent',
+					'input_schema'        => self::runAgentBundleInputSchema(),
+					'output_schema'       => array( 'type' => 'object' ),
+					'execute_callback'    => array( self::class, 'runAgentBundle' ),
+					'permission_callback' => fn() => PermissionHelper::can_manage(),
+					'meta'                => array(
+						'show_in_rest' => true,
+						'annotations'  => array(
+							'readonly'    => false,
+							'destructive' => false,
+							'idempotent'  => false,
+						),
+					),
 				)
 			);
 
@@ -1443,8 +1465,68 @@ class AgentAbilities {
 		return self::bundleLifecycleService()->apply_pending_action( (string) ( $input['pending_action_id'] ?? $input['action_id'] ?? '' ) );
 	}
 
+	/**
+	 * Run a bundle flow through Data Machine's headless workflow contract.
+	 *
+	 * @param array $input Ability input.
+	 * @return array<string,mixed>
+	 */
+	public static function runAgentBundle( array $input ): array {
+		return ( new AgentBundleRunner() )->run( $input );
+	}
+
 	private static function bundleLifecycleService(): AgentBundleAbilityService {
 		return new AgentBundleAbilityService();
+	}
+
+	/** @return array<string,mixed> */
+	private static function runAgentBundleInputSchema(): array {
+		return array(
+			'type'       => 'object',
+			'required'   => array( 'source' ),
+			'properties' => array(
+				'source'       => array(
+					'type'        => 'string',
+					'description' => 'Bundle source: local path (directory, .zip, .json) or remote URL.',
+				),
+				'flow'         => array(
+					'type'        => 'string',
+					'description' => 'Optional bundle flow slug. Defaults to the first flow in the bundle.',
+				),
+				'flow_slug'    => array(
+					'type'        => 'string',
+					'description' => 'Alias for flow.',
+				),
+				'initial_data' => array(
+					'type'        => 'object',
+					'description' => 'Initial engine data merged into the ephemeral workflow job.',
+				),
+				'timestamp'    => array(
+					'type'        => array( 'integer', 'null' ),
+					'description' => 'Future Unix timestamp for delayed execution. Omit for immediate execution.',
+				),
+				'dry_run'      => array(
+					'type'        => 'boolean',
+					'description' => 'Return the projected workflow and initial_data without creating a job.',
+				),
+				'token'        => array(
+					'type'        => 'string',
+					'description' => 'Auth token for private archive downloads. Used for this single resolve(); never persisted or logged.',
+				),
+				'token_env'    => array(
+					'type'        => 'string',
+					'description' => 'Environment variable or PHP constant name to read the auth token from.',
+				),
+				'job_source'   => array(
+					'type'        => 'string',
+					'description' => 'Optional job source label. Defaults to agent_bundle.',
+				),
+				'job_label'    => array(
+					'type'        => 'string',
+					'description' => 'Optional job label. Defaults to the selected flow name.',
+				),
+			),
+		);
 	}
 
 	private static function bundleLifecycleInputSchema( bool $include_rebase = false ): array {
