@@ -2,6 +2,14 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.139.23] - 2026-06-04
+
+### Changed
+- Expose semantic bundle run outputs
+
+### Fixed
+- Fix bundle output assignment alignment
+
 ## [0.139.22] - 2026-06-04
 
 ### Changed
