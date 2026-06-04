@@ -2,6 +2,26 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.139.18] - 2026-06-04
+
+### Changed
+- Add headless agent bundle runner
+- Update Agents API runtime tool contracts
+- Update Agents API provider-turn contract
+- gate substrate top-up on cheap canary check, fix docblocks
+- Use provider-turn adapter for wp-ai-client dispatch
+
+### Fixed
+- clear release lint blockers
+- bump agents-api lock to restore host tool visibility
+- don't rely on $wp_filesystem global in MediaAbilitiesTest
+- align runtime tool contract formatting
+- preserve legacy runtime tool requests
+- adapt runtime tool broker contracts
+- bound internal-linking graph build to avoid 512MB OOM
+- unconditionally top up agents-api substrate to prevent hasher fatal
+- keep processed-item conventions generic
+
 ## [0.139.16] - 2026-06-04
 
 ### Changed
