@@ -1239,17 +1239,17 @@ function datamachine_defer_runtime_tool_call( array $request, array $payload ): 
 			),
 			'metadata'     => array(
 				'datamachine' => array(
-					'job_id'          => (int) $job_id,
+					'job_id'             => (int) $job_id,
 					'persistence_status' => 'pending',
-					'session_id'      => (string) ( $request['session_id'] ?? '' ),
-					'user_id'         => (int) ( $payload['user_id'] ?? 0 ),
-					'agent_id'        => (int) ( $payload['agent_id'] ?? 0 ),
-					'mode'            => (string) ( $request['mode'] ?? '' ),
-					'modes'           => is_array( $request['modes'] ?? null ) ? $request['modes'] : array(),
-					'turn_count'      => (int) ( $request['turn_count'] ?? 0 ),
-					'created_at'      => $created_at,
-					'expires_at'      => $expires_at,
-					'timeout_seconds' => $timeout_seconds,
+					'session_id'         => (string) ( $request['session_id'] ?? '' ),
+					'user_id'            => (int) ( $payload['user_id'] ?? 0 ),
+					'agent_id'           => (int) ( $payload['agent_id'] ?? 0 ),
+					'mode'               => (string) ( $request['mode'] ?? '' ),
+					'modes'              => is_array( $request['modes'] ?? null ) ? $request['modes'] : array(),
+					'turn_count'         => (int) ( $request['turn_count'] ?? 0 ),
+					'created_at'         => $created_at,
+					'expires_at'         => $expires_at,
+					'timeout_seconds'    => $timeout_seconds,
 				),
 			),
 		)
@@ -1332,8 +1332,8 @@ function datamachine_runtime_tool_request_store(): WP_Agent_Runtime_Tool_Request
 				$datamachine_metadata['persistence_status'] = ! empty( $result['success'] ) ? 'fulfilled' : 'failed';
 				$datamachine_metadata['fulfilled_at']       = gmdate( 'c' );
 				$datamachine_metadata['result']             = $result;
-				$request['metadata']['datamachine']          = $datamachine_metadata;
-				$engine_data['runtime_tool_request']         = $request;
+				$request['metadata']['datamachine']         = $datamachine_metadata;
+				$engine_data['runtime_tool_request']        = $request;
 
 				$jobs_db->store_engine_data( $job_id, $engine_data );
 				$jobs_db->complete_job( $job_id, ! empty( $result['success'] ) ? 'completed' : 'failed' );
@@ -1447,11 +1447,14 @@ function datamachine_submit_runtime_tool_result( string $request_id, $result ): 
 
 	$metadata = is_array( $session['metadata'] ?? null ) ? $session['metadata'] : array();
 	if ( is_array( $metadata['runtime_tool_requests'] ?? null ) && isset( $metadata['runtime_tool_requests'][ $request_id ] ) ) {
-		$request_metadata                                          = datamachine_runtime_tool_datamachine_metadata( $metadata['runtime_tool_requests'][ $request_id ] );
-		$request_metadata['persistence_status']                    = ! empty( $tool_result['success'] ) ? 'fulfilled' : 'failed';
-		$request_metadata['fulfilled_at']                          = gmdate( 'c' );
-		$request_metadata['result']                                = $canonical_result;
-		$metadata['runtime_tool_requests'][ $request_id ]['metadata']['datamachine'] = $request_metadata;
+		$session_request                        = $metadata['runtime_tool_requests'][ $request_id ];
+		$request_metadata                       = datamachine_runtime_tool_datamachine_metadata( $session_request );
+		$request_metadata['persistence_status'] = ! empty( $tool_result['success'] ) ? 'fulfilled' : 'failed';
+		$request_metadata['fulfilled_at']       = gmdate( 'c' );
+		$request_metadata['result']             = $canonical_result;
+
+		$session_request['metadata']['datamachine']       = $request_metadata;
+		$metadata['runtime_tool_requests'][ $request_id ] = $session_request;
 	}
 	$metadata['runtime_tool_last_result'] = array(
 		'request_id' => $request_id,
