@@ -62,6 +62,33 @@ $assert(
 );
 
 $assert(
+	false !== strpos( $agent_abilities, 'runtimeAgentBundleImportInput' ),
+	'Data Machine normalizes runtime bundle import specs before canonical import'
+);
+
+$conversation_loop = file_get_contents( $root . '/inc/Engine/AI/conversation-loop.php' );
+
+$assert(
+	false !== strpos( $conversation_loop, 'WP_Agent_Conversation_Loop::run(' ) && false !== strpos( $conversation_loop, "'provider_turn_adapter' => \$provider_turn_adapter" ),
+	'Data Machine passes its provider turn adapter through the Agents API loop options'
+);
+
+$assert(
+	false !== strpos( $conversation_loop, "WP_Agent_Conversation_Loop::run(\n\t\t\t\$messages,\n\t\t\tnull," ),
+	'Data Machine lets the Agents API loop wrap the provider turn adapter'
+);
+
+$assert(
+	false !== strpos( $conversation_loop, 'static function ( $provider_turn_request, array $turn_context = array() )' ),
+	'Data Machine provider turn adapter accepts both legacy array turns and request-object turns'
+);
+
+$assert(
+	false !== strpos( $conversation_loop, '$provider_turn_request->runtimeContext()' ),
+	'Data Machine provider turn adapter reads runtime context from provider turn request objects'
+);
+
+$assert(
 	false === strpos( $chat_orchestrator, 'Fallback: direct store access' ),
 	'ChatOrchestrator does not keep a direct-store fallback path'
 );

@@ -20,7 +20,6 @@ use AgentsAPI\AI\WP_Agent_Conversation_Result;
 use AgentsAPI\AI\WP_Agent_Transcript_Persister;
 use AgentsAPI\AI\WP_Agent_Message;
 use AgentsAPI\AI\WP_Agent_Null_Transcript_Persister;
-use AgentsAPI\AI\WP_Agent_Provider_Turn_Request;
 use AgentsAPI\AI\WP_Agent_Provider_Turn_Result;
 use AgentsAPI\AI\WP_Agent_Runtime_Tool_Request;
 use AgentsAPI\AI\WP_Agent_Runtime_Tool_Request_Store;
@@ -507,7 +506,7 @@ function datamachine_build_loop_tool_executor( array $tools, array $loop_payload
 		public function executeWP_Agent_Tool_Call( array $tool_call, array $tool_definition, array $context = array() ): array {
 			unset( $tool_definition );
 
-			$tool_name      = (string) ( $tool_call['tool_name'] ?? '' );
+			$tool_name      = (string) ( $tool_call['tool_name'] ?? $tool_call['name'] ?? '' );
 			$parameters     = is_array( $tool_call['parameters'] ?? null ) ? $tool_call['parameters'] : array();
 			$prior_results  = is_array( $context['prior_tool_results'] ?? null ) ? $context['prior_tool_results'] : array();
 			$tool_payload   = datamachine_payload_with_inflight_run_artifacts( $this->loop_payload, $prior_results );
@@ -545,7 +544,7 @@ function datamachine_build_loop_tool_executor( array $tools, array $loop_payload
  */
 function datamachine_build_pre_tool_mediator( array $tools, array $loop_payload, string $mode, array $modes, DataMachineToolRuntimeRules $tool_runtime_rules, LoopEventSinkInterface $event_sink, array $base_log_context ): callable {
 	return static function ( array $context ) use ( $tools, $loop_payload, $mode, $modes, $tool_runtime_rules, $event_sink, $base_log_context ): array {
-		$tool_name       = (string) ( $context['tool_name'] ?? '' );
+		$tool_name       = (string) ( $context['tool_name'] ?? $context['name'] ?? '' );
 		$tool_parameters = is_array( $context['parameters'] ?? null ) ? $context['parameters'] : array();
 		$messages        = is_array( $context['messages'] ?? null ) ? $context['messages'] : array();
 		$policy_messages = datamachine_messages_before_current_tool_call( $messages, (string) ( $context['tool_call_id'] ?? '' ) );
@@ -695,7 +694,7 @@ function datamachine_enrich_mediated_tool_results( array $tool_results, array $t
 			continue;
 		}
 
-		$tool_name  = (string) ( $tool_result_entry['tool_name'] ?? '' );
+		$tool_name  = (string) ( $tool_result_entry['tool_name'] ?? $tool_result_entry['name'] ?? '' );
 		$parameters = is_array( $tool_result_entry['parameters'] ?? null ) ? $tool_result_entry['parameters'] : array();
 		$result     = is_array( $tool_result_entry['result'] ?? null ) ? $tool_result_entry['result'] : array();
 		$metadata   = is_array( $result['metadata'] ?? null ) ? $result['metadata'] : array();
@@ -707,10 +706,11 @@ function datamachine_enrich_mediated_tool_results( array $tool_results, array $t
 			$result                      = array_merge( $result['result'], $result );
 			$tool_result_entry['result'] = $result;
 		}
-		$turn_count      = (int) ( $tool_result_entry['turn_count'] ?? 0 );
-		$tool_def        = is_array( $tools[ $tool_name ] ?? null ) ? $tools[ $tool_name ] : null;
-		$started_at      = microtime( true );
-		$normalized_call = array(
+		$tool_result_entry['tool_name'] = $tool_name;
+		$turn_count                     = (int) ( $tool_result_entry['turn_count'] ?? 0 );
+		$tool_def                       = is_array( $tools[ $tool_name ] ?? null ) ? $tools[ $tool_name ] : null;
+		$started_at                     = microtime( true );
+		$normalized_call                = array(
 			'name'       => $tool_name,
 			'parameters' => $parameters,
 		);
@@ -776,7 +776,7 @@ function datamachine_build_provider_turn_adapter(
 	WP_Agent_Conversation_Completion_Policy $completion_policy,
 	array &$completion_nudges
 ): callable {
-	return static function ( WP_Agent_Provider_Turn_Request $provider_turn_request ) use (
+	return static function ( $provider_turn_request, array $turn_context = array() ) use (
 		$tools,
 		$provider,
 		$model,
@@ -793,8 +793,18 @@ function datamachine_build_provider_turn_adapter(
 		&$latest_turn_count,
 		&$completion_nudges
 	): array {
-		$messages     = $provider_turn_request->messages();
-		$turn_context = $provider_turn_request->context();
+		$messages = is_array( $provider_turn_request ) ? $provider_turn_request : array();
+		if ( is_object( $provider_turn_request ) ) {
+			if ( method_exists( $provider_turn_request, 'messages' ) ) {
+				$messages = $provider_turn_request->messages();
+			}
+			if ( method_exists( $provider_turn_request, 'runtimeContext' ) ) {
+				$request_context = $provider_turn_request->runtimeContext();
+				if ( is_array( $request_context ) ) {
+					$turn_context = array_merge( $request_context, $turn_context );
+				}
+			}
+		}
 
 		// The upstream loop provides the turn number via turn_context.
 		$turn_count        = (int) ( $turn_context['turn'] ?? 1 );
@@ -1899,7 +1909,454 @@ function datamachine_completion_nudge_diagnostic( array $decision_context, int $
  * @return array<int, array{name:string,parameters:array,id:mixed}>
  */
 function datamachine_extract_tool_calls( $result ): array {
-	return WP_Agent_Provider_Turn_Result::extract_tool_calls( $result );
+	$tool_calls = array();
+	$candidates = $result->getCandidates();
+	if ( empty( $candidates ) ) {
+		return $tool_calls;
+	}
+
+	foreach ( $candidates[0]->getMessage()->getParts() as $part ) {
+		$function_call = $part->getFunctionCall();
+		if ( null === $function_call ) {
+			continue;
+		}
+
+		$tool_calls[] = array(
+			'name'       => (string) $function_call->getName(),
+			'parameters' => datamachine_normalize_function_args( $function_call->getArgs() ),
+			'id'         => $function_call->getId(),
+		);
+	}
+
+	if ( empty( $tool_calls ) ) {
+		foreach ( $candidates[0]->getMessage()->getParts() as $part ) {
+			$text = $part->getText();
+			if ( ! is_string( $text ) || '' === trim( $text ) ) {
+				continue;
+			}
+
+			$tool_calls = array_merge( $tool_calls, datamachine_extract_xml_tool_calls( $text ), datamachine_extract_json_tool_calls( $text ), datamachine_extract_tag_tool_calls( $text ), datamachine_extract_named_text_tool_calls( $text ) );
+		}
+	}
+
+	return datamachine_dedupe_tool_calls( $tool_calls );
+}
+
+/**
+ * Remove exact duplicate tool calls produced by fallback text parsers.
+ *
+ * @param array<int, array{name:string,parameters:array,id:mixed}> $tool_calls Tool calls.
+ * @return array<int, array{name:string,parameters:array,id:mixed}>
+ */
+function datamachine_dedupe_tool_calls( array $tool_calls ): array {
+	$seen   = array();
+	$result = array();
+	foreach ( $tool_calls as $tool_call ) {
+		$key = ( $tool_call['name'] ?? '' ) . ':' . wp_json_encode( $tool_call['parameters'] ?? array() );
+		if ( isset( $seen[ $key ] ) ) {
+			continue;
+		}
+
+		$seen[ $key ] = true;
+		$result[]     = $tool_call;
+	}
+
+	return $result;
+}
+
+/**
+ * Extract XML-style tool calls emitted as plain text by some providers/models.
+ *
+ * @param string $text Text candidate content.
+ * @return array<int, array{name:string,parameters:array,id:mixed}>
+ */
+function datamachine_extract_xml_tool_calls( string $text ): array {
+	if ( ! str_contains( $text, '<function_calls>' ) || ! preg_match_all( '/<invoke\s+name=["\']([^"\']+)["\']\s*>(.*?)<\/invoke>/is', $text, $matches, PREG_SET_ORDER ) ) {
+		return array();
+	}
+
+	$tool_calls = array();
+	foreach ( $matches as $index => $match ) {
+		$name = sanitize_key( (string) $match[1] );
+		if ( '' === $name ) {
+			continue;
+		}
+
+		$parameters = array();
+		if ( preg_match_all( '/<parameter\s+name=["\']([^"\']+)["\']\s*>(.*?)<\/parameter>/is', (string) $match[2], $parameter_matches, PREG_SET_ORDER ) ) {
+			foreach ( $parameter_matches as $parameter_match ) {
+				$parameter_name = sanitize_key( (string) $parameter_match[1] );
+				if ( '' === $parameter_name ) {
+					continue;
+				}
+
+				$parameter_value               = function_exists( '\wp_strip_all_tags' )
+					? \wp_strip_all_tags( (string) $parameter_match[2] )
+					: (string) preg_replace( '/<[^>]*>/', '', (string) $parameter_match[2] );
+				$parameters[ $parameter_name ] = html_entity_decode( trim( $parameter_value ), ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+			}
+		}
+
+		$tool_calls[] = array(
+			'name'       => $name,
+			'parameters' => $parameters,
+			'id'         => 'xml-tool-call-' . ( $index + 1 ),
+		);
+	}
+
+	return $tool_calls;
+}
+
+/**
+ * Extract named tool calls emitted as plain text by models that do not use the
+ * provider's structured tool-call transport.
+ *
+ * @param string $text Text candidate content.
+ * @return array<int, array{name:string,parameters:array,id:mixed}>
+ */
+function datamachine_extract_named_text_tool_calls( string $text ): array {
+	$tool_calls = array();
+
+	$patterns = array(
+		'/<(?P<name>[a-zA-Z][a-zA-Z0-9_\-]*)\s+(?P<attrs>[^<>]*?)\s*\/?>(?:\s*<\/\1>)?/s',
+		'/\[(?P<name>[a-zA-Z][a-zA-Z0-9_\-]*)\s+(?P<attrs>[^\]]*?)\](?:.*?\[\/\1\])?/s',
+	);
+	foreach ( $patterns as $pattern ) {
+		if ( ! preg_match_all( $pattern, $text, $matches, PREG_SET_ORDER ) ) {
+			continue;
+		}
+
+		foreach ( $matches as $match ) {
+			$name       = sanitize_key( (string) $match['name'] );
+			$parameters = datamachine_parse_text_tool_attributes( (string) $match['attrs'] );
+			if ( ! datamachine_is_plausible_text_tool_name( $name ) || empty( $parameters ) || ! datamachine_text_tool_parameters_complete( $name, $parameters ) ) {
+				continue;
+			}
+
+			$tool_calls[] = array(
+				'name'       => $name,
+				'parameters' => $parameters,
+				'id'         => 'text-tool-call-' . ( count( $tool_calls ) + 1 ),
+			);
+		}
+	}
+
+	if ( preg_match_all( '/<tool\s+name=["\']([^"\']+)["\']\s*>(.*?)<\/tool>/is', $text, $matches, PREG_SET_ORDER ) ) {
+		foreach ( $matches as $match ) {
+			$name       = sanitize_key( (string) $match[1] );
+			$parameters = array();
+			if ( preg_match_all( '/<param\s+name=["\']([^"\']+)["\']\s*>(.*?)<\/param>/is', (string) $match[2], $parameter_matches, PREG_SET_ORDER ) ) {
+				foreach ( $parameter_matches as $parameter_match ) {
+					$parameter_name = sanitize_key( (string) $parameter_match[1] );
+					if ( '' === $parameter_name ) {
+						continue;
+					}
+
+					$parameter_value               = function_exists( '\wp_strip_all_tags' )
+						? \wp_strip_all_tags( (string) $parameter_match[2] )
+						: (string) preg_replace( '/<[^>]*>/', '', (string) $parameter_match[2] );
+					$parameters[ $parameter_name ] = html_entity_decode( trim( $parameter_value ), ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+				}
+			}
+
+			if ( ! datamachine_is_plausible_text_tool_name( $name ) || empty( $parameters ) || ! datamachine_text_tool_parameters_complete( $name, $parameters ) ) {
+				continue;
+			}
+
+			$tool_calls[] = array(
+				'name'       => $name,
+				'parameters' => $parameters,
+				'id'         => 'text-tool-call-' . ( count( $tool_calls ) + 1 ),
+			);
+		}
+	}
+
+	if ( preg_match_all( '/(?:^|\s)to=(?P<name>[a-zA-Z][a-zA-Z0-9_\-]*)\s+(?P<json>\{.*?\})(?=\s|$)/s', $text, $matches, PREG_SET_ORDER ) ) {
+		foreach ( $matches as $match ) {
+			$name       = sanitize_key( (string) $match['name'] );
+			$parameters = json_decode( (string) $match['json'], true );
+			if ( ! datamachine_is_plausible_text_tool_name( $name ) || ! is_array( $parameters ) || ! datamachine_text_tool_parameters_complete( $name, $parameters ) ) {
+				continue;
+			}
+
+			$tool_calls[] = array(
+				'name'       => $name,
+				'parameters' => $parameters,
+				'id'         => 'text-tool-call-' . ( count( $tool_calls ) + 1 ),
+			);
+		}
+	}
+
+	if ( preg_match_all( '/```(?P<name>[a-zA-Z][a-zA-Z0-9_\-]*)\s*(?P<json>\{.*?\})\s*```/is', $text, $matches, PREG_SET_ORDER ) ) {
+		foreach ( $matches as $match ) {
+			$name       = sanitize_key( (string) $match['name'] );
+			$parameters = json_decode( (string) $match['json'], true );
+			if ( ! datamachine_is_plausible_text_tool_name( $name ) || ! is_array( $parameters ) || ! datamachine_text_tool_parameters_complete( $name, $parameters ) ) {
+				continue;
+			}
+
+			$tool_calls[] = array(
+				'name'       => $name,
+				'parameters' => $parameters,
+				'id'         => 'text-tool-call-' . ( count( $tool_calls ) + 1 ),
+			);
+		}
+	}
+
+	if ( preg_match_all( '/(?P<name>[a-zA-Z][a-zA-Z0-9_\-]*)\((?P<value>["\']?[^\)]*?["\']?)\)/', $text, $matches, PREG_SET_ORDER ) ) {
+		foreach ( $matches as $match ) {
+			$name       = sanitize_key( (string) $match['name'] );
+			$value      = trim( (string) $match['value'], " \t\n\r\0\x0B\"'" );
+			$parameters = array( 'path' => html_entity_decode( $value, ENT_QUOTES | ENT_HTML5, 'UTF-8' ) );
+			if ( ! datamachine_is_plausible_text_tool_name( $name ) || '' === $value || ! datamachine_text_tool_parameters_complete( $name, $parameters ) ) {
+				continue;
+			}
+
+			$tool_calls[] = array(
+				'name'       => $name,
+				'parameters' => $parameters,
+				'id'         => 'text-tool-call-' . ( count( $tool_calls ) + 1 ),
+			);
+		}
+	}
+
+	if ( preg_match_all( '/(?:^|\s)(?P<name>[a-zA-Z][a-zA-Z0-9_\-]*)\s+(?P<attrs>(?:[a-zA-Z_][a-zA-Z0-9_\-]*=(?:"[^"]*"|\'[^\']*\'|\S+)\s*)+)/s', $text, $matches, PREG_SET_ORDER ) ) {
+		foreach ( $matches as $match ) {
+			$name       = sanitize_key( (string) $match['name'] );
+			$parameters = datamachine_parse_text_tool_attributes( (string) $match['attrs'] );
+			if ( ! datamachine_is_plausible_text_tool_name( $name ) || empty( $parameters ) || ! datamachine_text_tool_parameters_complete( $name, $parameters ) ) {
+				continue;
+			}
+
+			$tool_calls[] = array(
+				'name'       => $name,
+				'parameters' => $parameters,
+				'id'         => 'text-tool-call-' . ( count( $tool_calls ) + 1 ),
+			);
+		}
+	}
+
+	return $tool_calls;
+}
+
+/**
+ * Determine whether a bare text token looks like a tool name, not wrapper text.
+ *
+ * @param string $name Sanitized candidate tool name.
+ * @return bool
+ */
+function datamachine_is_plausible_text_tool_name( string $name ): bool {
+	if ( '' === $name || ! str_contains( $name, '_' ) ) {
+		return false;
+	}
+
+	return ! in_array( $name, array( 'function_calls', 'tool_call' ), true );
+}
+
+/**
+ * Avoid executing malformed partial calls extracted from prose-like text.
+ *
+ * @param string $name       Tool name.
+ * @param array  $parameters Parsed parameters.
+ * @return bool
+ */
+function datamachine_text_tool_parameters_complete( string $name, array $parameters ): bool {
+	if ( str_starts_with( $name, 'workspace_' ) && empty( $parameters['path'] ) ) {
+		return false;
+	}
+
+	if ( 'workspace_grep' === $name && empty( $parameters['pattern'] ) ) {
+		return false;
+	}
+
+	if ( 'workspace_write' === $name && ! array_key_exists( 'content', $parameters ) ) {
+		return false;
+	}
+
+	if ( 'workspace_edit' === $name ) {
+		$has_old_new        = array_key_exists( 'old', $parameters ) && array_key_exists( 'new', $parameters );
+		$has_old_string_new = array_key_exists( 'old_string', $parameters ) && array_key_exists( 'new_string', $parameters );
+		$has_search_replace = array_key_exists( 'search', $parameters ) && array_key_exists( 'replace', $parameters );
+		return $has_old_new || $has_old_string_new || $has_search_replace;
+	}
+
+	return true;
+}
+
+/**
+ * Parse key=value attributes from text tool-call forms.
+ *
+ * @param string $attributes Attribute text.
+ * @return array<string, string>
+ */
+function datamachine_parse_text_tool_attributes( string $attributes ): array {
+	$parameters = array();
+	if ( ! preg_match_all( '/([a-zA-Z_][a-zA-Z0-9_\-]*)=("[^"]*"|\'[^\']*\'|[^\s>\]]+)/', $attributes, $matches, PREG_SET_ORDER ) ) {
+		return $parameters;
+	}
+
+	foreach ( $matches as $match ) {
+		$name = sanitize_key( (string) $match[1] );
+		if ( '' === $name ) {
+			continue;
+		}
+
+		$value = trim( (string) $match[2] );
+		if ( ( str_starts_with( $value, '"' ) && str_ends_with( $value, '"' ) ) || ( str_starts_with( $value, "'" ) && str_ends_with( $value, "'" ) ) ) {
+			$value = substr( $value, 1, -1 );
+		}
+
+		$parameters[ $name ] = html_entity_decode( $value, ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+	}
+
+	return $parameters;
+}
+
+/**
+ * Extract JSON tool calls emitted as text by some providers/models.
+ *
+ * @param string $text Text candidate content.
+ * @return array<int, array{name:string,parameters:array,id:mixed}>
+ */
+function datamachine_extract_json_tool_calls( string $text ): array {
+	$payloads = array();
+	if ( str_contains( $text, '<tool_call>' ) && preg_match_all( '/<tool_call>\s*(.*?)\s*<\/tool_call>/is', $text, $matches, PREG_SET_ORDER ) ) {
+		foreach ( $matches as $match ) {
+			$payloads[] = (string) $match[1];
+		}
+	}
+
+	if ( str_contains( $text, '```' ) && preg_match_all( '/```(?:json)?\s*(\{.*?\})\s*```/is', $text, $matches, PREG_SET_ORDER ) ) {
+		foreach ( $matches as $match ) {
+			$payloads[] = (string) $match[1];
+		}
+	}
+
+	if ( empty( $payloads ) ) {
+		return array();
+	}
+
+	$tool_calls = array();
+	foreach ( $payloads as $index => $raw_payload ) {
+		$payload = json_decode( html_entity_decode( trim( $raw_payload ), ENT_QUOTES | ENT_HTML5, 'UTF-8' ), true );
+		if ( ! is_array( $payload ) ) {
+			continue;
+		}
+
+		$calls = isset( $payload['tool_calls'] ) && is_array( $payload['tool_calls'] ) ? $payload['tool_calls'] : array( $payload );
+		foreach ( $calls as $call_index => $call ) {
+			if ( ! is_array( $call ) ) {
+				continue;
+			}
+
+			$function   = isset( $call['function'] ) && is_array( $call['function'] ) ? $call['function'] : array();
+			$name       = sanitize_key( (string) ( $function['name'] ?? ( $call['name'] ?? '' ) ) );
+			$parameters = $function['arguments'] ?? ( $call['arguments'] ?? ( $call['parameters'] ?? array() ) );
+			if ( '' === $name ) {
+				continue;
+			}
+
+			$tool_calls[] = array(
+				'name'       => $name,
+				'parameters' => is_array( $parameters ) ? $parameters : datamachine_normalize_function_args( $parameters ),
+				'id'         => $call['id'] ?? ( 'json-tool-call-' . ( $index + 1 ) . '-' . ( $call_index + 1 ) ),
+			);
+		}
+	}
+
+	return $tool_calls;
+}
+
+/**
+ * Extract tag-style tool calls emitted as plain text by some providers/models.
+ *
+ * Supports compact forms such as `<workspace_read path="README.md" />` and
+ * `<tool_call name="workspace_read">{"path":"README.md"}</tool_call>`.
+ *
+ * @param string $text Text candidate content.
+ * @return array<int, array{name:string,parameters:array,id:mixed}>
+ */
+function datamachine_extract_tag_tool_calls( string $text ): array {
+	$tool_calls = array();
+	$index      = 0;
+
+	if ( preg_match_all( '/<(?:tool|tool_call)\s+name=["\']([^"\']+)["\']\s*>(.*?)<\/(?:tool|tool_call)>/is', $text, $matches, PREG_SET_ORDER ) ) {
+		foreach ( $matches as $match ) {
+			$name = sanitize_key( (string) $match[1] );
+			if ( '' === $name ) {
+				continue;
+			}
+
+			$body       = html_entity_decode( trim( (string) $match[2] ), ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+			$parameters = datamachine_normalize_function_args( $body );
+			if ( '' !== $body && empty( $parameters ) ) {
+				continue;
+			}
+			if ( ! datamachine_text_tool_parameters_complete( $name, $parameters ) ) {
+				continue;
+			}
+			++$index;
+			$tool_calls[] = array(
+				'name'       => $name,
+				'parameters' => $parameters,
+				'id'         => 'tag-tool-call-' . $index,
+			);
+		}
+	}
+
+	if ( preg_match_all( '/<([a-zA-Z][a-zA-Z0-9_-]*)\s+([^<>]*?)\/>/s', $text, $matches, PREG_SET_ORDER ) ) {
+		foreach ( $matches as $match ) {
+			$name = sanitize_key( (string) $match[1] );
+			if ( '' === $name || ! str_contains( $name, '_' ) ) {
+				continue;
+			}
+
+			$parameters = array();
+			if ( preg_match_all( '/([a-zA-Z][a-zA-Z0-9_-]*)\s*=\s*(["\'])(.*?)\2/s', (string) $match[2], $attribute_matches, PREG_SET_ORDER ) ) {
+				foreach ( $attribute_matches as $attribute_match ) {
+					$parameter_name = sanitize_key( (string) $attribute_match[1] );
+					if ( '' === $parameter_name ) {
+						continue;
+					}
+					$parameters[ $parameter_name ] = html_entity_decode( (string) $attribute_match[3], ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+				}
+			}
+			if ( ! datamachine_text_tool_parameters_complete( $name, $parameters ) ) {
+				continue;
+			}
+
+			++$index;
+			$tool_calls[] = array(
+				'name'       => $name,
+				'parameters' => $parameters,
+				'id'         => 'tag-tool-call-' . $index,
+			);
+		}
+	}
+
+	return $tool_calls;
+}
+
+/**
+ * Coerce wp-ai-client function call args into tool parameters.
+ *
+ * @param mixed $args Args from FunctionCall::getArgs().
+ * @return array
+ */
+function datamachine_normalize_function_args( $args ): array {
+	if ( is_array( $args ) ) {
+		return $args;
+	}
+	if ( is_string( $args ) && '' !== $args ) {
+		$decoded = json_decode( $args, true );
+		if ( is_array( $decoded ) ) {
+			return $decoded;
+		}
+	}
+	if ( is_object( $args ) ) {
+		return (array) $args;
+	}
+	return array();
 }
 
 /**

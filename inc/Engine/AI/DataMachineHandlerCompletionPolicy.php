@@ -50,9 +50,9 @@ class DataMachineHandlerCompletionPolicy implements WP_Agent_Conversation_Comple
 		);
 
 		$is_handler_tool = is_array( $tool_def ) && isset( $tool_def['handler'] );
-		$mode            = (string) ( $runtime_context['mode'] ?? '' );
+		$modes           = is_array( $runtime_context['modes'] ?? null ) ? $runtime_context['modes'] : array( (string) ( $runtime_context['mode'] ?? '' ) );
 
-		if ( 'pipeline' !== $mode || ! $is_handler_tool || ! ( $tool_result['success'] ?? false ) ) {
+		if ( ! in_array( 'pipeline', $modes, true ) || ! $is_handler_tool || ! ( $tool_result['success'] ?? false ) ) {
 			$completed_assertions = $this->completedAssertionsDecision( $runtime_context, $turn_count, $tool_name );
 			if ( null !== $completed_assertions ) {
 				return $completed_assertions;

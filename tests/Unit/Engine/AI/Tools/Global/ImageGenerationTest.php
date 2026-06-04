@@ -100,13 +100,10 @@ class ImageGenerationTest extends WP_UnitTestCase {
 
 	public function test_get_tool_definition_has_required_keys(): void {
 		$def = $this->tool->getToolDefinition();
-		$this->assertArrayHasKey( 'class', $def );
-		$this->assertArrayHasKey( 'method', $def );
 		$this->assertArrayHasKey( 'description', $def );
 		$this->assertArrayHasKey( 'requires_config', $def );
 		$this->assertArrayHasKey( 'parameters', $def );
 		$this->assertTrue( $def['requires_config'] );
-		$this->assertSame( 'handle_tool_call', $def['method'] );
 	}
 
 	public function test_handle_tool_call_error_when_prompt_empty(): void {
@@ -123,9 +120,11 @@ class ImageGenerationTest extends WP_UnitTestCase {
 		$this->assertStringContainsString( 'not configured', $result['error'] );
 	}
 
-	public function test_tool_registers_in_unified_registry(): void {
-		$tools = apply_filters( 'datamachine_tools', [] );
+	public function test_tool_registers_ability_projection(): void {
+		$tools = apply_filters( 'datamachine_ability_tool_projections', [] );
 		$this->assertArrayHasKey( 'image_generation', $tools );
+		$this->assertSame( 'datamachine/generate-image', $tools['image_generation']['ability'] );
+		$this->assertSame( array( 'chat', 'pipeline' ), $tools['image_generation']['modes'] );
 	}
 
 	public function test_config_option_key(): void {

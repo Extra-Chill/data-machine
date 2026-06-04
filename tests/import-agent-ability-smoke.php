@@ -48,6 +48,25 @@ namespace {
 		}
 	}
 
+	class WP_Ability {
+		public static array $last_execute = array();
+
+		public function execute( array $input ): array {
+			self::$last_execute = $input;
+
+			return array(
+				'success'    => true,
+				'agent_id'   => 123,
+				'agent_slug' => (string) ( $input['slug'] ?? $input['bundle']['agent']['agent_slug'] ?? '' ),
+			);
+		}
+	}
+
+	function __( string $text, string $domain = 'default' ): string {
+		unset( $domain );
+		return $text;
+	}
+
 	function sanitize_title( string $title ): string {
 		$title = strtolower( trim( $title ) );
 		$title = preg_replace( '/[^a-z0-9]+/', '-', $title ) ?? '';
@@ -85,24 +104,31 @@ namespace {
 		return new WP_Error( 'no_stub', 'download_url is not stubbed.' );
 	}
 
-
-
+	function wp_get_ability( string $name ): ?WP_Ability {
+		return 'datamachine/import-agent' === $name ? new WP_Ability() : null;
+	}
 	eval(
 		<<<'PHP'
 		namespace DataMachine\Core\Agents;
 
 		class AgentBundler {
 			public static array $last_import = array();
+			public static int $from_directory_calls = 0;
+			public static int $from_zip_calls = 0;
+			public static int $from_json_calls = 0;
 
 			public function from_directory( string $source ): ?array {
+				++self::$from_directory_calls;
 				return null;
 			}
 
 			public function from_zip( string $source ): ?array {
+				++self::$from_zip_calls;
 				return null;
 			}
 
 			public function from_json( string $json ): ?array {
+				++self::$from_json_calls;
 				$bundle = json_decode( $json, true );
 				return is_array( $bundle ) ? $bundle : null;
 			}
@@ -142,6 +168,24 @@ namespace {
 	);
 
 	eval( 'namespace DataMachine\\Core\\FilesRepository; class DirectoryManager {}' );
+
+	eval(
+		<<<'PHP'
+		namespace DataMachine\Abilities;
+
+		class PermissionHelper {
+			public static array $context = array();
+
+			public static function set_agent_context( int $agent_id, int $owner_id, array $scope, ?int $token_id = null ): void {
+				self::$context = compact( 'agent_id', 'owner_id', 'scope', 'token_id' );
+			}
+
+			public static function clear_agent_context(): void {
+				self::$context = array();
+			}
+		}
+		PHP
+	);
 }
 
 namespace DataMachine\Engine\Bundle {
@@ -213,11 +257,20 @@ namespace {
 	$reset = function (): void {
 		// @phpstan-ignore-next-line smoke-test stub property shadows production class.
 		AgentBundler::$last_import                   = array();
+		AgentBundler::$from_directory_calls          = 0;
+		AgentBundler::$from_zip_calls                = 0;
+		AgentBundler::$from_json_calls               = 0;
 		// @phpstan-ignore-next-line smoke-test stub property shadows production class.
 		Agents::$by_slug                             = array();
+		WP_Ability::$last_execute                    = array();
 		$GLOBALS['datamachine_test_current_user_id'] = 42;
 		$GLOBALS['datamachine_test_auth_resolver']   = null;
 	};
+
+	$agent_abilities_source = file_get_contents( dirname( __DIR__ ) . '/inc/Abilities/AgentAbilities.php' );
+	$assert( 'import-agent schema accepts either source or bundle', false !== strpos( $agent_abilities_source, "array( 'required' => array( 'source' ) )" ) && false !== strpos( $agent_abilities_source, "array( 'required' => array( 'bundle' ) )" ) );
+	$assert( 'import-agent schema exposes inline bundle input', false !== strpos( $agent_abilities_source, "'bundle'      => array(" ) && false !== strpos( $agent_abilities_source, 'Already-parsed portable Data Machine agent bundle array' ) );
+	$assert( 'runtime importer does not stage bundles through temp files', false === strpos( $agent_abilities_source, 'tempnam' ) && false === strpos( $agent_abilities_source, 'wp_tempnam' ) );
 
 	echo "=== Import Agent Ability Behavior Smoke (#1306) ===\n";
 
@@ -290,7 +343,55 @@ namespace {
 	// @phpstan-ignore-next-line smoke-test stub property shadows production class.
 	$assert( 'ability lets bundler use rewritten bundle slug, not new_slug', null === AgentBundler::$last_import['new_slug'] );
 
-	echo "\n[3] Auth ref resolution\n";
+	echo "\n[3] Inline bundle import path\n";
+	$reset();
+	$result = AgentAbilities::importAgent(
+		array(
+			'bundle'   => $base_bundle( 'inline-agent' ),
+			'slug'     => 'Inline Runtime Agent',
+			'owner_id' => 101,
+		)
+	);
+	$assert( 'inline bundle import succeeds through public ability', true === $result['success'] );
+	// @phpstan-ignore-next-line smoke-test stub property shadows production class.
+	$assert( 'inline bundle import reaches bundler import', ! empty( AgentBundler::$last_import ) );
+	// @phpstan-ignore-next-line smoke-test stub property shadows production class.
+	$assert( 'inline bundle import does not use source loaders', 0 === AgentBundler::$from_directory_calls && 0 === AgentBundler::$from_zip_calls && 0 === AgentBundler::$from_json_calls );
+	// @phpstan-ignore-next-line smoke-test stub property shadows production class.
+	$assert( 'inline bundle slug override rewrites bundle before import', 'inline-runtime-agent' === AgentBundler::$last_import['bundle']['agent']['agent_slug'] );
+
+	echo "\n[4] Runtime bundle importer normalization\n";
+	$reset();
+	$runtime_bundle = $base_bundle( 'runtime-inline-agent' );
+	$result         = AgentAbilities::importRuntimeAgentBundle(
+		null,
+		array(
+			'slug'        => 'runtime-inline-agent',
+			'on_conflict' => 'upgrade',
+			'bundle'      => $runtime_bundle,
+			'token_env'   => 'DATAMACHINE_TEST_TOKEN',
+			'junk'        => 'ignored',
+		),
+		array(
+			'owner_id'  => 202,
+			'dry_run'   => true,
+			'source'    => '/tmp/should-not-win.json',
+			'token'     => 'one-shot-token',
+			'extra_key' => 'ignored',
+		),
+		0
+	);
+	$assert( 'runtime inline import succeeds through canonical ability', true === $result['success'] );
+	$assert( 'runtime importer passes inline bundle through canonical ability', $runtime_bundle === WP_Ability::$last_execute['bundle'] );
+	$assert( 'runtime importer preserves canonical slug', 'runtime-inline-agent' === WP_Ability::$last_execute['slug'] );
+	$assert( 'runtime importer preserves owner_id from import defaults', 202 === WP_Ability::$last_execute['owner_id'] );
+	$assert( 'runtime importer preserves on_conflict from spec', 'upgrade' === WP_Ability::$last_execute['on_conflict'] );
+	$assert( 'runtime importer preserves dry_run from import defaults', true === WP_Ability::$last_execute['dry_run'] );
+	$assert( 'runtime importer passes token fields only when present', 'one-shot-token' === WP_Ability::$last_execute['token'] && 'DATAMACHINE_TEST_TOKEN' === WP_Ability::$last_execute['token_env'] );
+	$assert( 'runtime importer does not fabricate source for inline bundles', ! isset( WP_Ability::$last_execute['source'] ) );
+	$assert( 'runtime importer drops non-canonical fields', ! isset( WP_Ability::$last_execute['junk'] ) && ! isset( WP_Ability::$last_execute['extra_key'] ) );
+
+	echo "\n[5] Auth ref resolution\n";
 	$reset();
 	$GLOBALS['datamachine_test_auth_resolver'] = function ( array $handler_config, string $handler_slug ): array|WP_Error {
 		if ( 'resolvable' === $handler_slug ) {
