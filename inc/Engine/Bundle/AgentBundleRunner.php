@@ -257,9 +257,10 @@ final class AgentBundleRunner {
 		}
 
 		$import_input = is_array( $input['runtime_import'] ?? null ) ? $input['runtime_import'] : array();
+		$owner_id     = get_current_user_id();
 		$import_input = array_merge(
 			array(
-				'owner_id' => get_current_user_id() ?: 1,
+				'owner_id' => 0 !== $owner_id ? $owner_id : 1,
 			),
 			$import_input
 		);
@@ -380,7 +381,7 @@ final class AgentBundleRunner {
 
 				return $tools;
 			};
-			$filters[] = array( 'datamachine_resolved_tools', $tool_filter, 100 );
+			$filters[]   = array( 'datamachine_resolved_tools', $tool_filter, 100 );
 			add_filter( 'datamachine_resolved_tools', $tool_filter, 100, 1 );
 		}
 
