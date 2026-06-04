@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.139.19] - 2026-06-04
+
+### Fixed
+- prevent RecurringScheduler from creating duplicate recurring chains when AS datastore not ready
+
 ## [0.139.18] - 2026-06-04
 
 ### Changed
