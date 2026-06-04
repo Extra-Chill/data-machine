@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.139.20] - 2026-06-04
+
+### Changed
+- Allow agent bundle runs to return final engine data
+
 ## [0.139.19] - 2026-06-04
 
 ### Fixed
