@@ -48,6 +48,12 @@ if ( ! class_exists( 'ActionScheduler' ) ) {
 	require_once __DIR__ . '/vendor/woocommerce/action-scheduler/action-scheduler.php';
 }
 
+add_action(
+	'action_scheduler_init',
+	array( \DataMachine\Core\ActionScheduler\GroupRegistrar::class, 'ensureDataMachineGroup' ),
+	0
+);
+
 if ( function_exists( 'wp_installing' ) && wp_installing() ) {
 	add_action( 'wp_loaded', 'datamachine_skip_action_scheduler_migration_during_install', 0 );
 }

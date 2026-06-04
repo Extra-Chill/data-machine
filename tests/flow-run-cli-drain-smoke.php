@@ -54,6 +54,7 @@ assert_drain_contains( 'hookWhereSql( $hooks, $job_ids )', $drain_src, 'drain su
 assert_drain_contains( 'a.args LIKE %s', $drain_src, 'drain can filter pending actions by serialized job_id args' );
 assert_drain_contains( '"parent_job_id":', $drain_src, 'drain can filter batch actions by serialized parent_job_id args' );
 assert_drain_contains( "a.status = \\'pending\\'", $drain_src, 'drain queries pending actions in the Data Machine group' );
+assert_drain_contains( 'GroupRegistrar::ensureDataMachineGroup()', $drain_src, 'drain ensures Action Scheduler can resolve the Data Machine group before claiming' );
 assert_drain_contains( 'runActionSchedulerTimeoutCleanup( $store )', $drain_src, 'drain resets stale Action Scheduler claims before claiming work' );
 assert_drain_contains( 'stake_claim( $claim_size, null, $hooks ?? array(), self::GROUP )', $drain_src, 'drain claims due Data Machine actions through Action Scheduler' );
 assert_drain_contains( 'claimSizeForScope( $batch_size, $hooks, $job_ids, $lane )', $drain_src, 'drain sizes claims using the requested job and lane scope' );
