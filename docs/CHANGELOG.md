@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.139.26] - 2026-06-04
+
+### Changed
+- Preserve runtime chat permission grants
+
 ## [0.139.25] - 2026-06-04
 
 ### Changed
