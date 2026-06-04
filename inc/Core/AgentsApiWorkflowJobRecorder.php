@@ -115,8 +115,8 @@ class AgentsApiWorkflowJobRecorder implements WP_Agent_Workflow_Run_Recorder {
 	 * @return WP_Agent_Workflow_Run_Result[]
 	 */
 	public function recent( array $args = array() ): array {
-		$limit  = max( 1, min( 100, (int) ( $args['limit'] ?? 10 ) ) );
-		$offset = max( 0, (int) ( $args['offset'] ?? 0 ) );
+		$limit   = max( 1, min( 100, (int) ( $args['limit'] ?? 10 ) ) );
+		$offset  = max( 0, (int) ( $args['offset'] ?? 0 ) );
 		$markers = array();
 
 		if ( is_string( $args['workflow_id'] ?? null ) && '' !== $args['workflow_id'] ) {
