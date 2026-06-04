@@ -10,6 +10,7 @@ namespace DataMachine\Engine\Bundle;
 use DataMachine\Abilities\Job\ExecuteWorkflowAbility;
 use DataMachine\Abilities\Engine\DrainJobAbility;
 use DataMachine\Core\Agents\AgentBundler;
+use DataMachine\Core\Agents\AgentIdentityResolver;
 use DataMachine\Core\Database\Jobs\Jobs;
 
 defined( 'ABSPATH' ) || exit;
@@ -95,6 +96,12 @@ final class AgentBundleRunner {
 				$selection
 			);
 		}
+
+		$identity = $this->ensure_runtime_agent_identity( $bundle, $input );
+		if ( empty( $identity['success'] ) ) {
+			return $this->response( $identity, $input, $runtime_imports, $selection );
+		}
+		$this->stamp_runtime_agent_identity( $initial_data, $identity );
 
 		$response = $this->with_runtime_controls(
 			$input,
@@ -424,6 +431,95 @@ final class AgentBundleRunner {
 		return array_values( array_filter( is_array( $specs ) ? $specs : array(), 'is_array' ) );
 	}
 
+	/** @return array<string,mixed> */
+	private function ensure_runtime_agent_identity( array $bundle, array $input ): array {
+		$slug = sanitize_title( (string) ( $bundle['agent']['agent_slug'] ?? '' ) );
+		if ( '' === $slug ) {
+			return array(
+				'success' => false,
+				'error'   => 'Bundle agent slug is required for runtime execution.',
+			);
+		}
+
+		try {
+			$identity = ( new AgentIdentityResolver() )->resolve_agent_identity( $slug );
+			return array_merge( array( 'success' => true ), $identity->to_array() );
+		} catch ( \InvalidArgumentException $e ) {
+			// A directory-backed runtime bundle can be valid without already
+			// being installed on the disposable site. Import it to give queued
+			// AI execution a real agent owner while still running the loaded
+			// bundle workflow from source.
+			unset( $e );
+		}
+
+		$owner_id = $this->runtime_import_owner_id( $input );
+		$result   = $this->bundler->import(
+			$bundle,
+			null,
+			$owner_id,
+			false,
+			array(
+				'is_upgrade'        => true,
+				'reconcile_runtime' => true,
+			)
+		);
+		if ( empty( $result['success'] ) ) {
+			return array(
+				'success' => false,
+				'error'   => (string) ( $result['error'] ?? 'Failed to import runtime bundle agent.' ),
+				'import'  => $result,
+			);
+		}
+
+		$summary = is_array( $result['summary'] ?? null ) ? $result['summary'] : array();
+		return array(
+			'success'    => true,
+			'agent_id'   => (int) ( $summary['agent_id'] ?? 0 ),
+			'agent_slug' => (string) ( $summary['agent_slug'] ?? $slug ),
+			'owner_id'   => (int) ( $summary['owner_id'] ?? $owner_id ),
+			'import'     => $result,
+		);
+	}
+
+	private function runtime_import_owner_id( array $input ): int {
+		$runtime_import = is_array( $input['runtime_import'] ?? null ) ? $input['runtime_import'] : array();
+		$owner_id       = (int) ( $runtime_import['owner_id'] ?? $input['owner_id'] ?? 0 );
+		if ( $owner_id > 0 ) {
+			return $owner_id;
+		}
+
+		$current_user_id = get_current_user_id();
+		return $current_user_id > 0 ? $current_user_id : 1;
+	}
+
+	private function stamp_runtime_agent_identity( array &$initial_data, array $identity ): void {
+		$agent_id   = (int) ( $identity['agent_id'] ?? 0 );
+		$agent_slug = (string) ( $identity['agent_slug'] ?? '' );
+		$owner_id   = (int) ( $identity['owner_id'] ?? 0 );
+
+		if ( $agent_id > 0 ) {
+			$initial_data['agent_id'] = $agent_id;
+		}
+		if ( '' !== $agent_slug ) {
+			$initial_data['agent_slug'] = $agent_slug;
+		}
+		if ( $owner_id > 0 ) {
+			$initial_data['user_id'] = $owner_id;
+		}
+
+		$job_snapshot = is_array( $initial_data['job'] ?? null ) ? $initial_data['job'] : array();
+		if ( $agent_id > 0 ) {
+			$job_snapshot['agent_id'] = $agent_id;
+		}
+		if ( '' !== $agent_slug ) {
+			$job_snapshot['agent_slug'] = $agent_slug;
+		}
+		if ( $owner_id > 0 ) {
+			$job_snapshot['user_id'] = $owner_id;
+		}
+		$initial_data['job'] = $job_snapshot;
+	}
+
 	private function first_runtime_bundle_source( array $input ): string {
 		foreach ( $this->runtime_bundle_specs( $input ) as $spec ) {
 			$source = trim( (string) ( $spec['source'] ?? '' ) );
@@ -487,8 +583,12 @@ final class AgentBundleRunner {
 		$filters = array();
 
 		if ( ! empty( $input['disable_datamachine_directives'] ) || ! empty( $input['disable_directives'] ) ) {
-			$filters[] = array( 'datamachine_directives_enabled', '__return_false', 100 );
-			add_filter( 'datamachine_directives_enabled', '__return_false', 100, 3 );
+			$disable_directives = static function ( $value = null, $context = null, $input = null ): bool {
+				unset( $value, $context, $input );
+				return false;
+			};
+			$filters[]          = array( 'datamachine_directives_enabled', $disable_directives, 100 );
+			add_filter( 'datamachine_directives_enabled', $disable_directives, 100, 3 );
 		}
 
 		$runtime_tools = is_array( $input['runtime_tools'] ?? null ) ? $input['runtime_tools'] : ( is_array( $input['tools'] ?? null ) ? $input['tools'] : array() );
