@@ -80,9 +80,9 @@ class UpdateTaxonomyTermAbility extends AbstractTaxonomyAbility {
 	 * Execute update taxonomy term ability.
 	 *
 	 * @param array $input Input parameters.
-	 * @return array Result with updated taxonomy term data.
+	 * @return array|\WP_Error Result with updated taxonomy term data or failure.
 	 */
-	public function execute( array $input ): array {
+	public function execute( array $input ): array|\WP_Error {
 		$term_identifier = $input['term'] ?? null;
 		$taxonomy        = $input['taxonomy'] ?? null;
 		$name            = $input['name'] ?? null;
@@ -92,41 +92,26 @@ class UpdateTaxonomyTermAbility extends AbstractTaxonomyAbility {
 
 		// Validate required fields
 		if ( empty( $term_identifier ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'term parameter is required',
-			);
+			return $this->abilityError( 'term_required', 'term parameter is required', 400 );
 		}
 
 		if ( empty( $taxonomy ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'taxonomy parameter is required',
-			);
+			return $this->abilityError( 'taxonomy_required', 'taxonomy parameter is required', 400 );
 		}
 
 		// Validate taxonomy
 		if ( ! taxonomy_exists( $taxonomy ) ) {
-			return array(
-				'success' => false,
-				'error'   => "Taxonomy '{$taxonomy}' does not exist",
-			);
+			return $this->abilityError( 'taxonomy_not_found', "Taxonomy '{$taxonomy}' does not exist", 404 );
 		}
 
 		if ( TaxonomyHandler::shouldSkipTaxonomy( $taxonomy ) ) {
-			return array(
-				'success' => false,
-				'error'   => "Taxonomy '{$taxonomy}' is a system taxonomy and cannot be modified",
-			);
+			return $this->abilityError( 'taxonomy_not_modifiable', "Taxonomy '{$taxonomy}' is a system taxonomy and cannot be modified", 403 );
 		}
 
 		// Find the term using centralized resolver
 		$resolved = ResolveTermAbility::resolve( $term_identifier, $taxonomy, false );
 		if ( ! $resolved['success'] ) {
-			return array(
-				'success' => false,
-				'error'   => $resolved['error'] ?? "Term '{$term_identifier}' not found in taxonomy '{$taxonomy}'",
-			);
+			return $this->abilityError( 'term_not_found', $resolved['error'] ?? "Term '{$term_identifier}' not found in taxonomy '{$taxonomy}'", 404 );
 		}
 		$term = get_term( $resolved['term_id'], $taxonomy );
 
@@ -208,19 +193,17 @@ class UpdateTaxonomyTermAbility extends AbstractTaxonomyAbility {
 		$result = wp_update_term( $term->term_id, $taxonomy, $args );
 
 		if ( is_wp_error( $result ) ) {
-			return array(
-				'success' => false,
-				'error'   => $result->get_error_message(),
-			);
+			return $result;
 		}
 
 		$updated_term = get_term( $term->term_id, $taxonomy );
 
 		if ( ! $updated_term || is_wp_error( $updated_term ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'Failed to retrieve updated term',
-			);
+			if ( is_wp_error( $updated_term ) ) {
+				return $updated_term;
+			}
+
+			return $this->abilityError( 'term_retrieval_failed', 'Failed to retrieve updated term', 500 );
 		}
 
 		do_action(

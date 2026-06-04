@@ -31,6 +31,18 @@ abstract class AbstractTaxonomyAbility {
 	 */
 	abstract protected function getAbilityArgs(): array;
 
+	/**
+	 * Build a native Abilities API failure.
+	 *
+	 * @param string $code    Machine-readable error code.
+	 * @param string $message Human-readable error message.
+	 * @param int    $status  HTTP status for REST presentation.
+	 * @return \WP_Error
+	 */
+	protected function abilityError( string $code, string $message, int $status = 400 ): \WP_Error {
+		return new \WP_Error( $code, $message, array( 'status' => $status ) );
+	}
+
 	private function registerAbility(): void {
 		$register_callback = function () {
 			wp_register_ability( $this->getAbilityName(), $this->getAbilityArgs() );
