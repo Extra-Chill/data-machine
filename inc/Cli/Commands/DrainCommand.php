@@ -9,6 +9,7 @@ namespace DataMachine\Cli\Commands;
 
 use DataMachine\Cli\BaseCommand;
 use DataMachine\Cli\WorkerLock;
+use DataMachine\Core\ActionScheduler\GroupRegistrar;
 use WP_CLI;
 
 defined( 'ABSPATH' ) || exit;
@@ -356,6 +357,7 @@ class DrainCommand extends BaseCommand {
 		$processed   = 0;
 
 		try {
+			GroupRegistrar::ensureDataMachineGroup();
 			self::runActionSchedulerTimeoutCleanup( $store );
 			$claim = $store->stake_claim( $claim_size, null, $hooks ?? array(), self::GROUP );
 		} catch ( \Throwable $throwable ) {
