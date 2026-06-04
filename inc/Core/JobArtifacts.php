@@ -62,6 +62,8 @@ class JobArtifacts {
 			'status'                 => (string) ( $job['status'] ?? '' ),
 			'agent_id'               => $agent['agent_id'],
 			'agent_slug'             => $agent['agent_slug'],
+			'job_summary'            => CorpusJobSurfaces::summary( $job, $engine_data ),
+			'corpus_artifacts'       => CorpusJobSurfaces::artifactRefs( $engine_data ),
 			'disposition_diagnostic' => $this->disposition_diagnostic( $engine_data ),
 			'required_tool_names'    => $this->tool_names_from_assertions( $engine_data['completion_assertions_required'] ?? array() ),
 			'satisfied_tool_names'   => $this->tool_names_from_assertions( $engine_data['completion_assertions_satisfied'] ?? array() ),
@@ -242,22 +244,23 @@ class JobArtifacts {
 		$artifact_files = is_array( $engine_data['artifact_files'] ?? null ) ? $engine_data['artifact_files'] : array();
 		$out            = array();
 
-		foreach ( array( 'transcript', 'tool_trace' ) as $key ) {
-			if ( ! is_array( $artifact_files[ $key ] ?? null ) ) {
+		foreach ( $artifact_files as $key => $artifact_file ) {
+			if ( ! is_string( $key ) || ! is_array( $artifact_file ) ) {
 				continue;
 			}
 
 			$out[ $key ] = $this->filter_empty(
 				array(
-					'artifact_type'  => isset( $artifact_files[ $key ]['artifact_type'] ) ? sanitize_key( (string) $artifact_files[ $key ]['artifact_type'] ) : null,
-					'artifact_ref'   => isset( $artifact_files[ $key ]['artifact_ref'] ) ? sanitize_text_field( (string) $artifact_files[ $key ]['artifact_ref'] ) : null,
-					'relative_path'  => isset( $artifact_files[ $key ]['relative_path'] ) ? sanitize_text_field( (string) $artifact_files[ $key ]['relative_path'] ) : null,
-					'path'           => isset( $artifact_files[ $key ]['path'] ) ? (string) $artifact_files[ $key ]['path'] : null,
-					'url'            => isset( $artifact_files[ $key ]['url'] ) ? esc_url_raw( (string) $artifact_files[ $key ]['url'] ) : null,
-					'sha256'         => isset( $artifact_files[ $key ]['sha256'] ) ? sanitize_text_field( (string) $artifact_files[ $key ]['sha256'] ) : null,
-					'payload_sha256' => isset( $artifact_files[ $key ]['payload_sha256'] ) ? sanitize_text_field( (string) $artifact_files[ $key ]['payload_sha256'] ) : null,
-					'bytes'          => isset( $artifact_files[ $key ]['bytes'] ) ? (int) $artifact_files[ $key ]['bytes'] : null,
-					'written_at'     => isset( $artifact_files[ $key ]['written_at'] ) ? sanitize_text_field( (string) $artifact_files[ $key ]['written_at'] ) : null,
+					'artifact_type'   => isset( $artifact_file['artifact_type'] ) ? sanitize_key( (string) $artifact_file['artifact_type'] ) : null,
+					'artifact_ref'    => isset( $artifact_file['artifact_ref'] ) ? sanitize_text_field( (string) $artifact_file['artifact_ref'] ) : null,
+					'retention_scope' => isset( $artifact_file['retention_scope'] ) ? sanitize_key( (string) $artifact_file['retention_scope'] ) : null,
+					'relative_path'   => isset( $artifact_file['relative_path'] ) ? sanitize_text_field( (string) $artifact_file['relative_path'] ) : null,
+					'path'            => isset( $artifact_file['path'] ) ? (string) $artifact_file['path'] : null,
+					'url'             => isset( $artifact_file['url'] ) ? esc_url_raw( (string) $artifact_file['url'] ) : null,
+					'sha256'          => isset( $artifact_file['sha256'] ) ? sanitize_text_field( (string) $artifact_file['sha256'] ) : null,
+					'payload_sha256'  => isset( $artifact_file['payload_sha256'] ) ? sanitize_text_field( (string) $artifact_file['payload_sha256'] ) : null,
+					'bytes'           => isset( $artifact_file['bytes'] ) ? (int) $artifact_file['bytes'] : null,
+					'written_at'      => isset( $artifact_file['written_at'] ) ? sanitize_text_field( (string) $artifact_file['written_at'] ) : null,
 				)
 			);
 		}
