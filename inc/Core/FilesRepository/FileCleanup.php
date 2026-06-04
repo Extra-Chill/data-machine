@@ -11,6 +11,8 @@
 
 namespace DataMachine\Core\FilesRepository;
 
+use DataMachine\Core\CorpusJobSurfaces;
+
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
@@ -208,5 +210,87 @@ class FileCleanup {
 		}
 
 		return $deleted_count;
+	}
+
+	/**
+	 * Count old artifact files for a retention scope.
+	 *
+	 * @param string $retention_scope Retention scope to match.
+	 * @param int    $retention_days  Files older than this many days are eligible.
+	 * @return int Eligible artifact file count.
+	 */
+	public function count_old_job_artifacts( string $retention_scope, int $retention_days ): int {
+		return $this->walk_old_job_artifacts( $retention_scope, $retention_days, false );
+	}
+
+	/**
+	 * Clean up old artifact files for a retention scope.
+	 *
+	 * @param string $retention_scope Retention scope to match.
+	 * @param int    $retention_days  Files older than this many days are eligible.
+	 * @return int Deleted artifact file count.
+	 */
+	public function cleanup_old_job_artifacts( string $retention_scope, int $retention_days ): int {
+		return $this->walk_old_job_artifacts( $retention_scope, $retention_days, true );
+	}
+
+	private function walk_old_job_artifacts( string $retention_scope, int $retention_days, bool $delete ): int {
+		$upload_dir      = wp_upload_dir();
+		$base            = trailingslashit( $upload_dir['basedir'] ) . 'datamachine-artifacts/jobs';
+		$cutoff_time     = time() - ( $retention_days * DAY_IN_SECONDS );
+		$retention_scope = sanitize_key( $retention_scope );
+		$count           = 0;
+
+		if ( '' === $retention_scope || ! is_dir( $base ) ) {
+			return 0;
+		}
+
+		$job_dirs = glob( trailingslashit( $base ) . '*', GLOB_ONLYDIR );
+		if ( false === $job_dirs ) {
+			return 0;
+		}
+
+		foreach ( $job_dirs as $job_dir ) {
+			$files = glob( trailingslashit( $job_dir ) . '*.json' );
+			if ( false === $files ) {
+				continue;
+			}
+
+			foreach ( $files as $file ) {
+				if ( ! is_file( $file ) || filemtime( $file ) >= $cutoff_time || ! $this->artifact_matches_retention_scope( $file, $retention_scope ) ) {
+					continue;
+				}
+
+				if ( ! $delete || wp_delete_file( $file ) ) {
+					++$count;
+				}
+			}
+
+			if ( $delete && empty( glob( trailingslashit( $job_dir ) . '*' ) ) ) {
+				$this->remove_directory( $job_dir );
+			}
+		}
+
+		return $count;
+	}
+
+	private function artifact_matches_retention_scope( string $file_path, string $retention_scope ): bool {
+		$contents = file_get_contents( $file_path ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
+		if ( ! is_string( $contents ) || '' === $contents ) {
+			return false;
+		}
+
+		$payload = json_decode( $contents, true );
+		if ( ! is_array( $payload ) ) {
+			return false;
+		}
+
+		$scope = isset( $payload['retention_scope'] ) ? sanitize_key( (string) $payload['retention_scope'] ) : '';
+		if ( $retention_scope === $scope ) {
+			return true;
+		}
+
+		$artifact_type = isset( $payload['artifact_type'] ) ? sanitize_key( (string) $payload['artifact_type'] ) : '';
+		return CorpusJobSurfaces::RETENTION_SCOPE === $retention_scope && in_array( $artifact_type, CorpusJobSurfaces::corpusArtifactTypes(), true );
 	}
 }
