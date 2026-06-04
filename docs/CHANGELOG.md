@@ -2,6 +2,14 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.139.15] - 2026-06-04
+
+### Changed
+- Add generic corpus system tasks
+
+### Fixed
+- Fix corpus system task lint
+
 ## [0.139.14] - 2026-06-04
 
 ### Fixed
