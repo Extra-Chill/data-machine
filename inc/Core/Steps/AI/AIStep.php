@@ -91,7 +91,7 @@ class AIStep extends Step {
 		// Model/provider resolved exclusively via mode system (agent → site → network).
 		// Pipeline-level model/provider fields are ignored — mode_models is the authority.
 		$execution_modes = self::resolveExecutionModes( $pipeline_step_config, $this->flow_step_config );
-		$mode_model      = self::resolveModelForExecutionModes( $agent_id, $execution_modes );
+		$mode_model      = self::resolveModelForExecutionModes( $agent_id, $execution_modes, $job_snapshot );
 		$provider_name   = $mode_model['provider'];
 		if ( empty( $provider_name ) ) {
 			do_action(
@@ -181,7 +181,7 @@ class AIStep extends Step {
 		$execution_modes      = self::resolveExecutionModes( $pipeline_step_config, $this->flow_step_config );
 
 		// Model/provider resolved exclusively via mode system — pipeline config is ignored.
-		$mode_model    = self::resolveModelForExecutionModes( $agent_id, $execution_modes );
+		$mode_model    = self::resolveModelForExecutionModes( $agent_id, $execution_modes, $job_snapshot );
 		$provider_name = $mode_model['provider'];
 		$model_name    = $mode_model['model'];
 		$mode_label    = implode( ',', $execution_modes );
@@ -782,8 +782,54 @@ class AIStep extends Step {
 	 * @param array $modes    Active mode slugs.
 	 * @return array{provider:string,model:string}
 	 */
-	private static function resolveModelForExecutionModes( int $agent_id, array $modes ): array {
+	private static function resolveModelForExecutionModes( int $agent_id, array $modes, array $job_snapshot = array() ): array {
+		$job_model = self::resolveModelFromJobSnapshot( $job_snapshot, $modes );
+		if ( '' !== $job_model['provider'] && '' !== $job_model['model'] ) {
+			return $job_model;
+		}
+
 		return PluginSettings::resolveModelForAgentModes( $agent_id, $modes, ToolPolicyResolver::MODE_PIPELINE );
+	}
+
+	/**
+	 * Resolve run-scoped model config from the job snapshot.
+	 *
+	 * @param array $job_snapshot Portable job snapshot from engine data.
+	 * @param array $modes Active mode slugs.
+	 * @return array{provider:string,model:string}
+	 */
+	private static function resolveModelFromJobSnapshot( array $job_snapshot, array $modes ): array {
+		$mode_models = is_array( $job_snapshot['mode_models'] ?? null ) ? $job_snapshot['mode_models'] : array();
+		$modes       = array_values( array_unique( array_map( 'sanitize_key', $modes ) ) );
+
+		foreach ( $modes as $mode ) {
+			$mode_config = is_array( $mode_models[ $mode ] ?? null ) ? $mode_models[ $mode ] : array();
+			$provider    = sanitize_text_field( (string) ( $mode_config['provider'] ?? '' ) );
+			$model       = sanitize_text_field( (string) ( $mode_config['model'] ?? '' ) );
+			if ( '' !== $provider && '' !== $model ) {
+				return array(
+					'provider' => $provider,
+					'model'    => $model,
+				);
+			}
+		}
+
+		$pipeline_config = is_array( $mode_models[ ToolPolicyResolver::MODE_PIPELINE ] ?? null ) ? $mode_models[ ToolPolicyResolver::MODE_PIPELINE ] : array();
+		$provider        = sanitize_text_field( (string) ( $pipeline_config['provider'] ?? '' ) );
+		$model           = sanitize_text_field( (string) ( $pipeline_config['model'] ?? '' ) );
+		if ( '' !== $provider && '' !== $model ) {
+			return array(
+				'provider' => $provider,
+				'model'    => $model,
+			);
+		}
+
+		$provider = sanitize_text_field( (string) ( $job_snapshot['default_provider'] ?? '' ) );
+		$model    = sanitize_text_field( (string) ( $job_snapshot['default_model'] ?? '' ) );
+		return array(
+			'provider' => $provider,
+			'model'    => $model,
+		);
 	}
 
 	/**
