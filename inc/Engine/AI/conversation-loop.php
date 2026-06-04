@@ -20,7 +20,6 @@ use AgentsAPI\AI\WP_Agent_Conversation_Result;
 use AgentsAPI\AI\WP_Agent_Transcript_Persister;
 use AgentsAPI\AI\WP_Agent_Message;
 use AgentsAPI\AI\WP_Agent_Null_Transcript_Persister;
-use AgentsAPI\AI\WP_Agent_Provider_Turn_Request;
 use AgentsAPI\AI\WP_Agent_Provider_Turn_Result;
 use AgentsAPI\AI\WP_Agent_Runtime_Tool_Request;
 use AgentsAPI\AI\WP_Agent_Runtime_Tool_Request_Store;
@@ -241,7 +240,7 @@ function datamachine_run_conversation(
 	try {
 		$result = WP_Agent_Conversation_Loop::run(
 			$messages,
-			$provider_turn_adapter,
+			null,
 			array(
 				'max_turns'             => $max_turns,
 				'budgets'               => array( $turn_budget ),
