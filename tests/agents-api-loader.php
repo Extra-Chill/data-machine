@@ -26,6 +26,14 @@ function datamachine_tests_require_agents_api(): void {
 	if ( ! function_exists( 'add_action' ) ) {
 		function add_action( string $_hook, callable $_callback, int $_priority = 10, int $_accepted_args = 1 ): void {}
 	}
+	if ( ! function_exists( 'add_filter' ) ) {
+		function add_filter( string $_hook, callable $_callback, int $_priority = 10, int $_accepted_args = 1 ): void {}
+	}
+	if ( ! function_exists( 'apply_filters' ) ) {
+		function apply_filters( string $_hook, $value, ...$_args ) {
+			return $value;
+		}
+	}
 
 	require_once datamachine_tests_agents_api_bootstrap_path();
 }

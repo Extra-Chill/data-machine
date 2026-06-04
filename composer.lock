@@ -818,12 +818,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/Automattic/agents-api.git",
-                "reference": "989a90a0365d608fba75f20b0d38aec4409751fa"
+                "reference": "1325b46960a30db624c47a6bece06aef54f62f8a"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/Automattic/agents-api/zipball/989a90a0365d608fba75f20b0d38aec4409751fa",
-                "reference": "989a90a0365d608fba75f20b0d38aec4409751fa",
+                "url": "https://api.github.com/repos/Automattic/agents-api/zipball/1325b46960a30db624c47a6bece06aef54f62f8a",
+                "reference": "1325b46960a30db624c47a6bece06aef54f62f8a",
                 "shasum": ""
             },
             "require": {
@@ -939,7 +939,7 @@
                 "issues": "https://github.com/Automattic/agents-api/issues",
                 "source": "https://github.com/Automattic/agents-api"
             },
-            "time": "2026-06-04T21:05:48+00:00"
+            "time": "2026-06-04T22:12:12+00:00"
         }
     ],
     "packages-dev": [
@@ -1635,6 +1635,6 @@
     "platform": {
         "php": ">=8.2"
     },
-    "platform-dev": [],
-    "plugin-api-version": "2.6.0"
+    "platform-dev": {},
+    "plugin-api-version": "2.9.0"
 }
