@@ -11,6 +11,14 @@ $root     = dirname( __DIR__ );
 $failures = array();
 $passes   = 0;
 
+defined( 'ABSPATH' ) || define( 'ABSPATH', $root . '/' );
+
+if ( ! function_exists( 'sanitize_key' ) ) {
+	function sanitize_key( string $key ): string {
+		return preg_replace( '/[^a-z0-9_\-]/', '', strtolower( $key ) ) ?? '';
+	}
+}
+
 function datamachine_bundle_runner_assert( bool $condition, string $label, array &$failures, int &$passes ): void {
 	if ( $condition ) {
 		++$passes;
@@ -38,6 +46,7 @@ echo "\n[1] Ability exposes the headless runner contract\n";
 foreach ( array(
 	'datamachine/run-agent-bundle' => 'run-agent-bundle ability registered',
 	'runAgentBundleInputSchema'    => 'dedicated input schema declared',
+	'runAgentBundleOutputSchema'   => 'dedicated output schema declared',
 	'AgentBundleRunner'            => 'ability delegates to runner service',
 	'runRuntimeAgentBundle'        => 'generic runtime run adapter declared',
 	"'show_in_rest' => true"      => 'ability is REST-visible for headless callers',
@@ -58,6 +67,8 @@ foreach ( array(
 	"apply_filters( 'wp_agent_runtime_import_bundle'" => 'runner falls back to generic runtime bundle import filter',
 	"'runtime_imports'"                         => 'runner returns runtime import diagnostics',
 	"'completion_outcome'"                      => 'runner returns completion outcome summary',
+	"'outputs'"                                 => 'runner returns semantic output map',
+	"'output_diagnostics'"                      => 'runner returns semantic output diagnostics',
 	"'transcript_refs'"                         => 'runner returns transcript references',
 	"'export_refs'"                             => 'runner returns export references',
 	'datamachine_directives_enabled'             => 'runner owns directive controls inside Data Machine',
@@ -70,8 +81,35 @@ foreach ( array(
 ) as $needle => $label ) {
 	datamachine_bundle_runner_contains( $runner, $needle, $label, $failures, $passes );
 }
+datamachine_bundle_runner_contains( $abilities, "'outputs'", 'ability output schema advertises semantic outputs', $failures, $passes );
+datamachine_bundle_runner_contains( $abilities, "'output_diagnostics'", 'ability output schema advertises semantic output diagnostics', $failures, $passes );
 
-echo "\n[3] WP-CLI wraps the same ability instead of duplicating runner internals\n";
+echo "\n[3] Runner exposes semantic outputs without hiding raw engine data\n";
+require_once $root . '/inc/Engine/Bundle/AgentBundleRunner.php';
+$runner_reflection = new ReflectionClass( DataMachine\Engine\Bundle\AgentBundleRunner::class );
+$runner_instance   = $runner_reflection->newInstanceWithoutConstructor();
+$output_projection = $runner_reflection->getMethod( 'output_projection' );
+$projected_outputs = $output_projection->invoke(
+	$runner_instance,
+	array(
+		'engine_data' => array(
+			'completion_assertions_required' => array( 'engine_data_keys' => array( 'issue_number', 'issue_url', 'missing_result_url' ) ),
+			'issue_number'                   => 123,
+			'issue_url'                      => 'https://github.com/Extra-Chill/data-machine/issues/2519',
+			'result_path'                    => 'artifacts/result.json',
+			'agent_id'                       => 7,
+			'outputs'                        => array( 'summary_title' => 'semantic output projection' ),
+		),
+	)
+);
+datamachine_bundle_runner_assert( 123 === ( $projected_outputs['outputs']['issue_number'] ?? null ), 'declared issue_number output is projected', $failures, $passes );
+datamachine_bundle_runner_assert( 'https://github.com/Extra-Chill/data-machine/issues/2519' === ( $projected_outputs['outputs']['issue_url'] ?? null ), 'declared issue_url output is projected', $failures, $passes );
+datamachine_bundle_runner_assert( 'artifacts/result.json' === ( $projected_outputs['outputs']['result_path'] ?? null ), 'common scalar task output is projected', $failures, $passes );
+datamachine_bundle_runner_assert( 'semantic output projection' === ( $projected_outputs['outputs']['summary_title'] ?? null ), 'explicit outputs map is projected', $failures, $passes );
+datamachine_bundle_runner_assert( ! isset( $projected_outputs['outputs']['agent_id'] ), 'runtime identity fields are not projected as outputs', $failures, $passes );
+datamachine_bundle_runner_assert( array( 'missing_result_url' ) === ( $projected_outputs['diagnostics']['missing_outputs'] ?? null ), 'missing declared outputs are diagnosed semantically', $failures, $passes );
+
+echo "\n[4] WP-CLI wraps the same ability instead of duplicating runner internals\n";
 foreach ( array(
 	'@subcommand run-bundle'       => 'run-bundle subcommand declared',
 	'AgentAbilities::runAgentBundle' => 'CLI calls ability callback',
@@ -82,7 +120,7 @@ foreach ( array(
 	datamachine_bundle_runner_contains( $cli, $needle, $label, $failures, $passes );
 }
 
-echo "\n[4] Runner supports run-scoped provider/model config\n";
+echo "\n[5] Runner supports run-scoped provider/model config\n";
 foreach ( array(
 	"'provider'            => array("                                           => 'run-agent-bundle schema accepts provider',
 	"'model'               => array("                                           => 'run-agent-bundle schema accepts model',
@@ -96,7 +134,7 @@ foreach ( array(
 	datamachine_bundle_runner_contains( $abilities . $runner . $ai_step, $needle, $label, $failures, $passes );
 }
 
-echo "\n[5] Boundary stays generic\n";
+echo "\n[6] Boundary stays generic\n";
 foreach ( array( 'homeboy', 'wp-codebox' ) as $forbidden ) {
 	datamachine_bundle_runner_assert( false === stripos( $runner, $forbidden ), "runner does not mention {$forbidden}", $failures, $passes );
 }

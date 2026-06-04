@@ -150,6 +150,9 @@ final class AgentBundleRunner {
 		$response['completion_outcome'] = $this->completion_outcome( $response );
 		$response['transcript_refs']    = $this->transcript_refs( $response );
 		$response['export_refs']        = $this->export_refs( $response );
+		$output_projection              = $this->output_projection( $response );
+		$response['outputs']            = $output_projection['outputs'];
+		$response['output_diagnostics'] = $output_projection['diagnostics'];
 
 		return $response;
 	}
@@ -241,6 +244,100 @@ final class AgentBundleRunner {
 				'exports'       => is_array( $engine_data['exports'] ?? null ) ? $engine_data['exports'] : null,
 			)
 		);
+	}
+
+	/** @return array{outputs:array<string,mixed>,diagnostics:array<string,mixed>} */
+	private function output_projection( array $response ): array {
+		$engine_data = is_array( $response['engine_data'] ?? null ) ? $response['engine_data'] : array();
+		$declared    = $this->declared_output_keys( $engine_data );
+		$outputs     = array();
+
+		foreach ( $declared as $key ) {
+			if ( $this->has_output_value( $engine_data[ $key ] ?? null ) ) {
+				$outputs[ $key ] = $engine_data[ $key ];
+			}
+		}
+
+		if ( is_array( $engine_data['outputs'] ?? null ) ) {
+			foreach ( $engine_data['outputs'] as $key => $value ) {
+				$key = sanitize_key( (string) $key );
+				if ( '' !== $key && $this->has_output_value( $value ) ) {
+					$outputs[ $key ] = $value;
+				}
+			}
+		}
+
+		foreach ( $engine_data as $key => $value ) {
+			$key = (string) $key;
+			if ( ! isset( $outputs[ $key ] ) && $this->is_common_output_key( $key ) && $this->has_output_value( $value ) ) {
+				$outputs[ $key ] = $value;
+			}
+		}
+
+		$present = array_keys( $outputs );
+		$missing = array_values( array_diff( $declared, $present ) );
+
+		return array(
+			'outputs'     => $outputs,
+			'diagnostics' => self::compact_response_array(
+				array(
+					'declared_outputs' => $declared,
+					'present_outputs'  => $present,
+					'missing_outputs'  => $missing,
+				)
+			),
+		);
+	}
+
+	/** @return array<int,string> */
+	private function declared_output_keys( array $engine_data ): array {
+		$keys = array();
+		foreach ( array( 'completion_assertions_required', 'completion_assertions_satisfied' ) as $group ) {
+			$assertions = is_array( $engine_data[ $group ] ?? null ) ? $engine_data[ $group ] : array();
+			if ( is_array( $assertions['engine_data_keys'] ?? null ) ) {
+				$keys = array_merge( $keys, $assertions['engine_data_keys'] );
+			}
+		}
+
+		$missing = is_array( $engine_data['completion_assertions_missing'] ?? null ) ? $engine_data['completion_assertions_missing'] : array();
+		if ( is_array( $missing['engine_data_keys'] ?? null ) ) {
+			$keys = array_merge( $keys, $missing['engine_data_keys'] );
+		}
+
+		$keys = array_map( static fn( $key ): string => sanitize_key( (string) $key ), $keys );
+		$keys = array_filter( $keys, static fn( string $key ): bool => '' !== $key );
+
+		return array_values( array_unique( $keys ) );
+	}
+
+	private function has_output_value( mixed $value ): bool {
+		return null !== $value && '' !== $value && array() !== $value;
+	}
+
+	private function is_common_output_key( string $key ): bool {
+		$key = sanitize_key( $key );
+		if ( '' === $key ) {
+			return false;
+		}
+
+		$internal_keys = array(
+			'action_id',
+			'agent_id',
+			'agent_slug',
+			'flow_id',
+			'flow_step_id',
+			'job_id',
+			'parent_job_id',
+			'pipeline_id',
+			'pipeline_step_id',
+			'post_id',
+			'user_id',
+		);
+		if ( in_array( $key, $internal_keys, true ) ) {
+			return false;
+		}
+
+		return 1 === preg_match( '/(^|_)(id|ids|number|path|paths|slug|title|url|urls)$/', $key );
 	}
 
 	/** @return array<string,mixed> */

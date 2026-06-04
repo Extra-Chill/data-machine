@@ -573,7 +573,7 @@ class AgentAbilities {
 					'description'         => 'Run a flow from a portable agent bundle as a headless ephemeral workflow without requiring callers to synthesize Data Machine internals.',
 					'category'            => 'datamachine-agent',
 					'input_schema'        => self::runAgentBundleInputSchema(),
-					'output_schema'       => array( 'type' => 'object' ),
+					'output_schema'       => self::runAgentBundleOutputSchema(),
 					'execute_callback'    => array( self::class, 'runAgentBundle' ),
 					'permission_callback' => fn() => PermissionHelper::can_manage(),
 					'meta'                => array(
@@ -1609,6 +1609,31 @@ class AgentAbilities {
 					'type'        => 'string',
 					'description' => 'Optional job label. Defaults to the selected flow name.',
 				),
+			),
+		);
+	}
+
+	/** @return array<string,mixed> */
+	private static function runAgentBundleOutputSchema(): array {
+		return array(
+			'type'       => 'object',
+			'properties' => array(
+				'success'            => array( 'type' => 'boolean' ),
+				'status'             => array( 'type' => 'string' ),
+				'job_id'             => array( 'type' => 'integer' ),
+				'outputs'            => array(
+					'type'        => 'object',
+					'description' => 'Semantic output map projected from declared or common task outputs in engine data.',
+				),
+				'output_diagnostics' => array(
+					'type'        => 'object',
+					'description' => 'Declared, present, and missing semantic output keys for downstream diagnostics.',
+				),
+				'engine_data'        => array(
+					'type'        => 'object',
+					'description' => 'Raw final engine data retained for diagnostics when wait_for_completion is used.',
+				),
+				'diagnostics'        => array( 'type' => 'object' ),
 			),
 		);
 	}
