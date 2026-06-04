@@ -35,8 +35,20 @@ datamachine_runtime_async_assert(
 	$passes
 );
 datamachine_runtime_async_assert(
+	str_contains( $loop_source, 'WP_Agent_Runtime_Tool_Request::normalize' ) && str_contains( $loop_source, 'WP_Agent_Runtime_Tool_Request_Store' ),
+	'pending runtime tool requests normalize through the Agents API request/store contracts',
+	$failures,
+	$passes
+);
+datamachine_runtime_async_assert(
 	str_contains( $loop_source, "'source'      => 'runtime_tool'" ) && str_contains( $loop_source, "'pending_runtime_tool'" ),
 	'deferred runtime tool requests are represented as Data Machine jobs',
+	$failures,
+	$passes
+);
+datamachine_runtime_async_assert(
+	str_contains( $loop_source, "'metadata'     => array" ) && str_contains( $loop_source, "'datamachine' => array" ) && str_contains( $loop_source, "'persistence_status' => 'pending'" ),
+	'Data Machine runtime tool request metadata is namespaced under metadata.datamachine',
 	$failures,
 	$passes
 );
@@ -53,8 +65,20 @@ datamachine_runtime_async_assert(
 	$passes
 );
 datamachine_runtime_async_assert(
+	str_contains( $loop_source, 'WP_Agent_Runtime_Tool_Result::normalize' ) && str_contains( $loop_source, 'datamachine_normalize_runtime_tool_submission' ),
+	'submitted runtime tool results normalize through the Agents API result contract',
+	$failures,
+	$passes
+);
+datamachine_runtime_async_assert(
 	str_contains( $loop_source, 'as_enqueue_async_action' ) && str_contains( $loop_source, 'datamachine_runtime_tool_resume' ),
 	'submitted runtime tool results enqueue async conversation resume',
+	$failures,
+	$passes
+);
+datamachine_runtime_async_assert(
+	str_contains( $loop_source, 'public function create( array $request ): void' ) && str_contains( $loop_source, 'public function get( string $request_id ): ?array' ) && str_contains( $loop_source, 'public function complete( string $request_id, array $result ): void' ) && str_contains( $loop_source, 'public function timeout( string $request_id ): void' ),
+	'Data Machine provides a complete Agents API runtime tool request store adapter',
 	$failures,
 	$passes
 );
