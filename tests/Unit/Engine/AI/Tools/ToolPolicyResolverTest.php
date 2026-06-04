@@ -115,22 +115,20 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 		// filter. Only the use_tools cap is stripped here — chat remains.
 		add_filter( 'user_has_cap', array( $this, 'deny_use_tools_cap' ), 10, 4 );
 
-		add_filter(
-			'datamachine_tools',
-			function ( $tools ) {
-				$tools['test_authenticated_tool'] = array(
-					'label'        => 'Test Authenticated Tool',
-					'description'  => 'Visible to authenticated users.',
-					'class'        => 'NonExistentClass',
-					'method'       => 'handle_tool_call',
-					'parameters'   => array(),
-					'modes'        => array( 'chat' ),
-					'access_level' => 'authenticated',
-				);
+		$tools_filter = function ( $tools ) {
+			$tools['test_authenticated_tool'] = array(
+				'label'        => 'Test Authenticated Tool',
+				'description'  => 'Visible to authenticated users.',
+				'class'        => 'NonExistentClass',
+				'method'       => 'handle_tool_call',
+				'parameters'   => array(),
+				'modes'        => array( 'chat' ),
+				'access_level' => 'authenticated',
+			);
 
-				return $tools;
-			}
-		);
+			return $tools;
+		};
+		add_filter( 'datamachine_tools', $tools_filter );
 
 		ToolManager::clearCache();
 
@@ -146,7 +144,7 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 		$this->assertArrayHasKey( 'test_authenticated_tool', $tools );
 
 		remove_filter( 'user_has_cap', array( $this, 'deny_use_tools_cap' ), 10 );
-		remove_all_filters( 'datamachine_tools' );
+		remove_filter( 'datamachine_tools', $tools_filter );
 		wp_set_current_user( 0 );
 		ToolManager::clearCache();
 	}
@@ -155,22 +153,20 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 		add_filter( 'user_has_cap', array( $this, 'deny_all_datamachine_caps' ), 10, 4 );
 		add_filter( 'datamachine_require_use_tools_for_chat_tools', '__return_true' );
 
-		add_filter(
-			'datamachine_tools',
-			function ( $tools ) {
-				$tools['test_authenticated_tool'] = array(
-					'label'        => 'Test Authenticated Tool',
-					'description'  => 'Visible to authenticated users.',
-					'class'        => 'NonExistentClass',
-					'method'       => 'handle_tool_call',
-					'parameters'   => array(),
-					'modes'        => array( 'chat' ),
-					'access_level' => 'authenticated',
-				);
+		$tools_filter = function ( $tools ) {
+			$tools['test_authenticated_tool'] = array(
+				'label'        => 'Test Authenticated Tool',
+				'description'  => 'Visible to authenticated users.',
+				'class'        => 'NonExistentClass',
+				'method'       => 'handle_tool_call',
+				'parameters'   => array(),
+				'modes'        => array( 'chat' ),
+				'access_level' => 'authenticated',
+			);
 
-				return $tools;
-			}
-		);
+			return $tools;
+		};
+		add_filter( 'datamachine_tools', $tools_filter );
 
 		ToolManager::clearCache();
 
@@ -187,7 +183,7 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 
 		remove_filter( 'user_has_cap', array( $this, 'deny_all_datamachine_caps' ), 10 );
 		remove_filter( 'datamachine_require_use_tools_for_chat_tools', '__return_true' );
-		remove_all_filters( 'datamachine_tools' );
+		remove_filter( 'datamachine_tools', $tools_filter );
 		wp_set_current_user( 0 );
 		ToolManager::clearCache();
 	}
@@ -195,22 +191,20 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 	public function test_chat_allows_public_tools_for_anonymous_users(): void {
 		wp_set_current_user( 0 );
 
-		add_filter(
-			'datamachine_tools',
-			function ( $tools ) {
-				$tools['test_public_tool'] = array(
-					'label'        => 'Test Public Tool',
-					'description'  => 'Visible without login.',
-					'class'        => 'NonExistentClass',
-					'method'       => 'handle_tool_call',
-					'parameters'   => array(),
-					'modes'        => array( 'chat' ),
-					'access_level' => 'public',
-				);
+		$tools_filter = function ( $tools ) {
+			$tools['test_public_tool'] = array(
+				'label'        => 'Test Public Tool',
+				'description'  => 'Visible without login.',
+				'class'        => 'NonExistentClass',
+				'method'       => 'handle_tool_call',
+				'parameters'   => array(),
+				'modes'        => array( 'chat' ),
+				'access_level' => 'public',
+			);
 
-				return $tools;
-			}
-		);
+			return $tools;
+		};
+		add_filter( 'datamachine_tools', $tools_filter );
 
 		ToolManager::clearCache();
 
@@ -222,28 +216,26 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 
 		$this->assertArrayHasKey( 'test_public_tool', $tools );
 
-		remove_all_filters( 'datamachine_tools' );
+		remove_filter( 'datamachine_tools', $tools_filter );
 		ToolManager::clearCache();
 	}
 
 	public function test_chat_keeps_untagged_tools_admin_only_for_anonymous_users(): void {
 		wp_set_current_user( 0 );
 
-		add_filter(
-			'datamachine_tools',
-			function ( $tools ) {
-				$tools['test_untagged_tool'] = array(
-					'label'       => 'Test Untagged Tool',
-					'description' => 'No access metadata.',
-					'class'       => 'NonExistentClass',
-					'method'      => 'handle_tool_call',
-					'parameters'  => array(),
-					'modes'       => array( 'chat' ),
-				);
+		$tools_filter = function ( $tools ) {
+			$tools['test_untagged_tool'] = array(
+				'label'       => 'Test Untagged Tool',
+				'description' => 'No access metadata.',
+				'class'       => 'NonExistentClass',
+				'method'      => 'handle_tool_call',
+				'parameters'  => array(),
+				'modes'       => array( 'chat' ),
+			);
 
-				return $tools;
-			}
-		);
+			return $tools;
+		};
+		add_filter( 'datamachine_tools', $tools_filter );
 
 		ToolManager::clearCache();
 
@@ -255,7 +247,7 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 
 		$this->assertArrayNotHasKey( 'test_untagged_tool', $tools );
 
-		remove_all_filters( 'datamachine_tools' );
+		remove_filter( 'datamachine_tools', $tools_filter );
 		ToolManager::clearCache();
 	}
 
@@ -336,20 +328,18 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 	}
 
 	public function test_system_includes_system_context_tools(): void {
-		add_filter(
-			'datamachine_tools',
-			function ( $tools ) {
-				$tools['test_system_tool'] = array(
-					'label'       => 'Test System Tool',
-					'description' => 'Only available to system tasks.',
-					'class'       => 'NonExistentClass',
-					'method'      => 'handle_tool_call',
-					'parameters'  => array(),
-					'modes'       => array( 'system' ),
-				);
-				return $tools;
-			}
-		);
+		$tools_filter = function ( $tools ) {
+			$tools['test_system_tool'] = array(
+				'label'       => 'Test System Tool',
+				'description' => 'Only available to system tasks.',
+				'class'       => 'NonExistentClass',
+				'method'      => 'handle_tool_call',
+				'parameters'  => array(),
+				'modes'       => array( 'system' ),
+			);
+			return $tools;
+		};
+		add_filter( 'datamachine_tools', $tools_filter );
 
 		ToolManager::clearCache();
 
@@ -361,7 +351,7 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 
 		$this->assertArrayHasKey( 'test_system_tool', $tools );
 
-		remove_all_filters( 'datamachine_tools' );
+		remove_filter( 'datamachine_tools', $tools_filter );
 		ToolManager::clearCache();
 	}
 
@@ -507,20 +497,18 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 	public function test_custom_context_resolves_registered_tools(): void {
 		// Third parties can register tools with custom contexts and
 		// resolve them through the same path as built-in contexts.
-		add_filter(
-			'datamachine_tools',
-			function ( $tools ) {
-				$tools['custom_automation_tool'] = array(
-					'label'       => 'Custom Automation Tool',
-					'description' => 'Only available in the automation context.',
-					'class'       => 'NonExistentClass',
-					'method'      => 'handle_tool_call',
-					'parameters'  => array(),
-					'modes'       => array( 'automation' ),
-				);
-				return $tools;
-			}
-		);
+		$tools_filter = function ( $tools ) {
+			$tools['custom_automation_tool'] = array(
+				'label'       => 'Custom Automation Tool',
+				'description' => 'Only available in the automation context.',
+				'class'       => 'NonExistentClass',
+				'method'      => 'handle_tool_call',
+				'parameters'  => array(),
+				'modes'       => array( 'automation' ),
+			);
+			return $tools;
+		};
+		add_filter( 'datamachine_tools', $tools_filter );
 
 		ToolManager::clearCache();
 
@@ -535,7 +523,7 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 		// Built-in tools that don't declare 'automation' are excluded.
 		$this->assertArrayNotHasKey( 'web_fetch', $tools );
 
-		remove_all_filters( 'datamachine_tools' );
+		remove_filter( 'datamachine_tools', $tools_filter );
 		ToolManager::clearCache();
 	}
 
