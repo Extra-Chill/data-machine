@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.139.30] - 2026-06-05
+
+### Fixed
+- Fix declared tool context bindings
+
 ## [0.139.29] - 2026-06-04
 
 ### Changed
