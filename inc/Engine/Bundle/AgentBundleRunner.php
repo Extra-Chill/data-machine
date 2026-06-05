@@ -138,6 +138,7 @@ final class AgentBundleRunner {
 	private function response( array $response, array $input, array $runtime_imports = array(), array $selection = array() ): array {
 		$response['schema'] ??= 'datamachine/agent-bundle-run/v1';
 		$response['status']   = $this->status_from_response( $response );
+		$response['success']  = ! empty( $response['success'] ) && self::is_success_status( $response['status'] );
 
 		if ( ! empty( $runtime_imports ) ) {
 			$response['runtime_imports'] = $runtime_imports;
@@ -214,11 +215,15 @@ final class AgentBundleRunner {
 			array(
 				'status'      => $status,
 				'completed'   => 'completed' === $status,
-				'success'     => ! empty( $response['success'] ) && 'failed' !== $status,
+				'success'     => ! empty( $response['success'] ) && self::is_success_status( $status ),
 				'error'       => (string) ( $response['error'] ?? $engine_data['error_message'] ?? '' ),
 				'token_usage' => is_array( $engine_data['token_usage'] ?? null ) ? $engine_data['token_usage'] : null,
 			)
 		);
+	}
+
+	private static function is_success_status( string $status ): bool {
+		return ! in_array( $status, array( 'failed', 'completed_no_items', 'cancelled', 'timed_out', 'timeout' ), true );
 	}
 
 	/** @return array<string,mixed> */
