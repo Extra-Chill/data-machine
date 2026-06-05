@@ -171,6 +171,20 @@ $patched_workflow          = $workflow_from_bundle_flow->invoke(
 datamachine_bundle_runner_assert( 429 === ( $patched_workflow['steps'][0]['handler_configs']['github']['issue_number'] ?? null ), 'flow step patch merges nested handler config', $failures, $passes );
 datamachine_bundle_runner_assert( 'chubes4/wp-site-generator' === ( $patched_workflow['steps'][0]['handler_configs']['github']['repo'] ?? null ), 'flow step patch preserves existing handler config', $failures, $passes );
 
+echo "\n[3c] Runner does not treat no-item terminal states as success\n";
+$response_method = $runner_reflection->getMethod( 'response' );
+$no_item_response = $response_method->invoke(
+	$runner_instance,
+	array(
+		'success'    => true,
+		'job_status' => 'completed_no_items',
+	),
+	array( 'wait_for_completion' => true )
+);
+datamachine_bundle_runner_assert( 'completed_no_items' === ( $no_item_response['status'] ?? null ), 'no-item terminal status is preserved', $failures, $passes );
+datamachine_bundle_runner_assert( false === ( $no_item_response['success'] ?? null ), 'no-item terminal status is not a successful bundle run', $failures, $passes );
+datamachine_bundle_runner_assert( false === ( $no_item_response['completion_outcome']['success'] ?? null ), 'no-item completion outcome is not successful', $failures, $passes );
+
 echo "\n[4] WP-CLI wraps the same ability instead of duplicating runner internals\n";
 foreach ( array(
 	'@subcommand run-bundle'       => 'run-bundle subcommand declared',
