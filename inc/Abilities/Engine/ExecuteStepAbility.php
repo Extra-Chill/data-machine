@@ -252,7 +252,7 @@ class ExecuteStepAbility {
 					'packet_count' => $execution_result['packet_count'],
 					'status'       => $recorded_status,
 					'reason'       => $result['reason'] ?? ( $execution_result['reason'] ?? ( $result['error'] ?? null ) ),
-					'error'        => $result['error'] ?? null,
+					'error'        => $result['error'] ?? ( $execution_result['error'] ?? null ),
 				)
 			);
 
