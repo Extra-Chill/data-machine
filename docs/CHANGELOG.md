@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.139.35] - 2026-06-05
+
+### Changed
+- Preserve step execution error messages
+
 ## [0.139.34] - 2026-06-05
 
 ### Changed
