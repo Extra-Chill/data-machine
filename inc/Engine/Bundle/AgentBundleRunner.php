@@ -157,7 +157,7 @@ final class AgentBundleRunner {
 		$response['completion_outcome'] = $this->completion_outcome( $response );
 		$response['transcript_refs']    = $this->transcript_refs( $response );
 		$response['export_refs']        = $this->export_refs( $response );
-		$output_projection              = $this->output_projection( $response );
+		$output_projection              = $this->output_projection( $response, $input );
 		$response['outputs']            = $output_projection['outputs'];
 		$response['output_diagnostics'] = $output_projection['diagnostics'];
 
@@ -254,13 +254,21 @@ final class AgentBundleRunner {
 	}
 
 	/** @return array{outputs:array<string,mixed>,diagnostics:array<string,mixed>} */
-	private function output_projection( array $response ): array {
+	private function output_projection( array $response, array $input = array() ): array {
 		$engine_data = is_array( $response['engine_data'] ?? null ) ? $response['engine_data'] : array();
-		$declared    = $this->declared_output_keys( $engine_data );
+		$mappings    = $this->declared_output_mappings( $input );
+		$declared    = array_values( array_unique( array_merge( $this->declared_output_keys( $engine_data ), array_keys( $mappings ) ) ) );
 		$outputs     = array();
 
+		foreach ( $mappings as $key => $path ) {
+			$value = $this->mapped_output_value( $response, $path );
+			if ( $this->has_output_value( $value ) ) {
+				$outputs[ $key ] = $value;
+			}
+		}
+
 		foreach ( $declared as $key ) {
-			if ( $this->has_output_value( $engine_data[ $key ] ?? null ) ) {
+			if ( ! isset( $outputs[ $key ] ) && $this->has_output_value( $engine_data[ $key ] ?? null ) ) {
 				$outputs[ $key ] = $engine_data[ $key ];
 			}
 		}
@@ -294,6 +302,45 @@ final class AgentBundleRunner {
 				)
 			),
 		);
+	}
+
+	/** @return array<string,string> */
+	private function declared_output_mappings( array $input ): array {
+		$mappings = is_array( $input['engine_data_outputs'] ?? null ) ? $input['engine_data_outputs'] : array();
+		$outputs  = array();
+
+		foreach ( $mappings as $key => $path ) {
+			$key  = sanitize_key( (string) $key );
+			$path = is_scalar( $path ) ? trim( (string) $path ) : '';
+			if ( '' !== $key && '' !== $path ) {
+				$outputs[ $key ] = $path;
+			}
+		}
+
+		return $outputs;
+	}
+
+	private function mapped_output_value( array $response, string $path ): mixed {
+		$engine_data = is_array( $response['engine_data'] ?? null ) ? $response['engine_data'] : array();
+		$source      = array(
+			'metadata'    => array( 'engine_data' => $engine_data ),
+			'engine_data' => $engine_data,
+			'response'    => $response,
+		);
+
+		return $this->path_value( $source, $path );
+	}
+
+	private function path_value( array $source, string $path ): mixed {
+		$value = $source;
+		foreach ( array_filter( explode( '.', $path ), static fn( string $part ): bool => '' !== $part ) as $part ) {
+			if ( ! is_array( $value ) || ! array_key_exists( $part, $value ) ) {
+				return null;
+			}
+			$value = $value[ $part ];
+		}
+
+		return $value;
 	}
 
 	/** @return array<int,string> */
