@@ -231,6 +231,12 @@ $patched_workflow          = $workflow_from_bundle_flow->invoke(
 					),
 				),
 			),
+			array(
+				'flow_step_id'     => 'publish-static-site',
+				'pipeline_step_id' => 'publish-pipeline',
+				'step_position'    => 1,
+				'step_type'        => 'ai',
+			),
 		),
 	),
 	array(
@@ -238,6 +244,11 @@ $patched_workflow          = $workflow_from_bundle_flow->invoke(
 			array(
 				'step_position' => 0,
 				'step_type'     => 'fetch',
+				'step_config'   => array( 'queue_mode' => 'static' ),
+			),
+			array(
+				'step_position' => 1,
+				'step_type'     => 'ai',
 				'step_config'   => array( 'queue_mode' => 'static' ),
 			),
 		),
@@ -253,10 +264,20 @@ $patched_workflow          = $workflow_from_bundle_flow->invoke(
 				),
 			),
 		),
+		'tool_recorders'     => array(
+			array(
+				'tool'   => 'github_pull_request_publish',
+				'record' => array(
+					'engine_key' => 'static_site_agent',
+					'fields'     => array( 'branch' => 'data.head' ),
+				),
+			),
+		),
 	)
 );
 datamachine_bundle_runner_assert( 429 === ( $patched_workflow['steps'][0]['handler_configs']['github']['issue_number'] ?? null ), 'flow step patch merges nested handler config', $failures, $passes );
 datamachine_bundle_runner_assert( 'chubes4/wp-site-generator' === ( $patched_workflow['steps'][0]['handler_configs']['github']['repo'] ?? null ), 'flow step patch preserves existing handler config', $failures, $passes );
+datamachine_bundle_runner_assert( 'github_pull_request_publish' === ( $patched_workflow['steps'][1]['tool_recorders'][0]['tool'] ?? null ), 'run-scoped tool recorders are projected onto AI workflow steps', $failures, $passes );
 
 echo "\n[3c] Runner does not treat no-item terminal states as success\n";
 $response_method = $runner_reflection->getMethod( 'response' );

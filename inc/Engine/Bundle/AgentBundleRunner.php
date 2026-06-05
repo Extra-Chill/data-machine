@@ -805,8 +805,30 @@ final class AgentBundleRunner {
 		}
 
 		$this->apply_flow_step_patches( $workflow_steps, is_array( $input['flow_step_patches'] ?? null ) ? $input['flow_step_patches'] : array() );
+		$this->apply_run_tool_recorders( $workflow_steps, $input );
 
 		return array( 'steps' => $workflow_steps );
+	}
+
+	/**
+	 * @param array<int,array<string,mixed>> $workflow_steps Workflow steps to mutate.
+	 * @param array<string,mixed>            $input          Bundle run input.
+	 */
+	private function apply_run_tool_recorders( array &$workflow_steps, array $input ): void {
+		$recorders = array_values( array_filter( is_array( $input['tool_recorders'] ?? null ) ? $input['tool_recorders'] : array(), 'is_array' ) );
+		if ( empty( $recorders ) ) {
+			return;
+		}
+
+		foreach ( $workflow_steps as &$workflow_step ) {
+			if ( 'ai' !== (string) ( $workflow_step['step_type'] ?? '' ) ) {
+				continue;
+			}
+
+			$existing                        = is_array( $workflow_step['tool_recorders'] ?? null ) ? $workflow_step['tool_recorders'] : array();
+			$workflow_step['tool_recorders'] = array_merge( $existing, $recorders );
+		}
+		unset( $workflow_step );
 	}
 
 	/**
