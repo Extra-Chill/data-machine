@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.139.31] - 2026-06-05
+
+### Changed
+- Project declared bundle outputs
+
 ## [0.139.30] - 2026-06-05
 
 ### Fixed
