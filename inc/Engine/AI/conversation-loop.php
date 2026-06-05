@@ -1957,7 +1957,7 @@ function datamachine_record_tool_results_to_engine_data( array $loop_payload, ar
 		}
 
 		foreach ( $recorders as $recorder ) {
-			if ( ! is_array( $recorder ) || $tool_name !== (string) ( $recorder['tool'] ?? '' ) ) {
+			if ( ! is_array( $recorder ) || (string) ( $recorder['tool'] ?? '' ) !== $tool_name ) {
 				continue;
 			}
 
