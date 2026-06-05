@@ -2,6 +2,14 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.139.37] - 2026-06-05
+
+### Changed
+- Record tool results into bundle engine data
+
+### Fixed
+- Fix tool recorder lint
+
 ## [0.139.36] - 2026-06-05
 
 ### Changed
