@@ -126,6 +126,51 @@ datamachine_bundle_runner_assert( 'https://github.com/chubes4/wp-site-generator/
 datamachine_bundle_runner_assert( ! isset( $projected_outputs['outputs']['agent_id'] ), 'runtime identity fields are not projected as outputs', $failures, $passes );
 datamachine_bundle_runner_assert( array( 'missing_result_url', 'missing_store_url' ) === ( $projected_outputs['diagnostics']['missing_outputs'] ?? null ), 'missing declared outputs are diagnosed semantically', $failures, $passes );
 
+echo "\n[3b] Runner applies run-scoped flow step patches\n";
+$workflow_from_bundle_flow = $runner_reflection->getMethod( 'workflow_from_bundle_flow' );
+$patched_workflow          = $workflow_from_bundle_flow->invoke(
+	$runner_instance,
+	array(
+		'steps' => array(
+			array(
+				'flow_step_id'     => 'fetch-issue',
+				'pipeline_step_id' => 'fetch-pipeline',
+				'step_position'    => 0,
+				'step_type'        => 'fetch',
+				'handler_configs'  => array(
+					'github' => array(
+						'repo'   => 'chubes4/wp-site-generator',
+						'labels' => 'status:idea-ready',
+					),
+				),
+			),
+		),
+	),
+	array(
+		'steps' => array(
+			array(
+				'step_position' => 0,
+				'step_type'     => 'fetch',
+				'step_config'   => array( 'queue_mode' => 'static' ),
+			),
+		),
+	),
+	array(
+		'flow_step_patches' => array(
+			array(
+				'step_type' => 'fetch',
+				'merge'     => array(
+					'handler_configs' => array(
+						'github' => array( 'issue_number' => 429 ),
+					),
+				),
+			),
+		),
+	)
+);
+datamachine_bundle_runner_assert( 429 === ( $patched_workflow['steps'][0]['handler_configs']['github']['issue_number'] ?? null ), 'flow step patch merges nested handler config', $failures, $passes );
+datamachine_bundle_runner_assert( 'chubes4/wp-site-generator' === ( $patched_workflow['steps'][0]['handler_configs']['github']['repo'] ?? null ), 'flow step patch preserves existing handler config', $failures, $passes );
+
 echo "\n[4] WP-CLI wraps the same ability instead of duplicating runner internals\n";
 foreach ( array(
 	'@subcommand run-bundle'       => 'run-bundle subcommand declared',

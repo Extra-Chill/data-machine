@@ -64,7 +64,7 @@ final class AgentBundleRunner {
 			return $this->response( $selection, $input, $runtime_imports );
 		}
 
-		$workflow     = $this->workflow_from_bundle_flow( $selection['flow'], $selection['pipeline'] );
+		$workflow     = $this->workflow_from_bundle_flow( $selection['flow'], $selection['pipeline'], $input );
 		$initial_data = is_array( $input['initial_data'] ?? null ) ? $input['initial_data'] : array();
 		$manifest     = $directory->manifest()->to_array();
 
@@ -776,7 +776,7 @@ final class AgentBundleRunner {
 	}
 
 	/** @return array<string,array<int,array<string,mixed>>> */
-	private function workflow_from_bundle_flow( array $flow, array $pipeline ): array {
+	private function workflow_from_bundle_flow( array $flow, array $pipeline, array $input = array() ): array {
 		$pipeline_steps = array();
 		foreach ( $pipeline['steps'] ?? array() as $step ) {
 			$pipeline_steps[ (int) ( $step['step_position'] ?? 0 ) ] = is_array( $step ) ? $step : array();
@@ -799,6 +799,84 @@ final class AgentBundleRunner {
 			);
 		}
 
+		$this->apply_flow_step_patches( $workflow_steps, is_array( $input['flow_step_patches'] ?? null ) ? $input['flow_step_patches'] : array() );
+
 		return array( 'steps' => $workflow_steps );
+	}
+
+	/**
+	 * @param array<int,array<string,mixed>> $workflow_steps Workflow steps to mutate.
+	 * @param array<int,mixed>               $patches Run-scoped step patch definitions.
+	 */
+	private function apply_flow_step_patches( array &$workflow_steps, array $patches ): void {
+		foreach ( $patches as $patch ) {
+			if ( ! is_array( $patch ) ) {
+				continue;
+			}
+
+			$payload = $this->flow_step_patch_payload( $patch );
+			if ( empty( $payload ) ) {
+				continue;
+			}
+
+			foreach ( $workflow_steps as &$workflow_step ) {
+				if ( ! $this->flow_step_patch_matches( $workflow_step, $patch ) ) {
+					continue;
+				}
+
+				$workflow_step = $this->recursive_array_merge( $workflow_step, $payload );
+			}
+			unset( $workflow_step );
+		}
+	}
+
+	/** @return array<string,mixed> */
+	private function flow_step_patch_payload( array $patch ): array {
+		foreach ( array( 'merge', 'config', 'patch' ) as $payload_key ) {
+			if ( isset( $patch[ $payload_key ] ) && is_array( $patch[ $payload_key ] ) ) {
+				return $patch[ $payload_key ];
+			}
+		}
+
+		$payload = $patch;
+		foreach ( array( 'flow_step_id', 'pipeline_step_id', 'step_type', 'slug' ) as $selector_key ) {
+			unset( $payload[ $selector_key ] );
+		}
+
+		return $payload;
+	}
+
+	/** @param array<string,mixed> $workflow_step */
+	private function flow_step_patch_matches( array $workflow_step, array $patch ): bool {
+		foreach ( array( 'flow_step_id', 'pipeline_step_id', 'step_type' ) as $selector_key ) {
+			if ( isset( $patch[ $selector_key ] ) && (string) $patch[ $selector_key ] !== (string) ( $workflow_step[ $selector_key ] ?? '' ) ) {
+				return false;
+			}
+		}
+
+		if ( isset( $patch['slug'] ) ) {
+			$slug = (string) $patch['slug'];
+			return in_array( $slug, array( (string) ( $workflow_step['flow_step_id'] ?? '' ), (string) ( $workflow_step['pipeline_step_id'] ?? '' ) ), true );
+		}
+
+		return isset( $patch['flow_step_id'] ) || isset( $patch['pipeline_step_id'] ) || isset( $patch['step_type'] );
+	}
+
+	/** @return array<string,mixed> */
+	private function recursive_array_merge( array $base, array $overrides ): array {
+		foreach ( $overrides as $key => $value ) {
+			if ( is_array( $value ) && isset( $base[ $key ] ) && is_array( $base[ $key ] ) && self::is_associative_array( $value ) && self::is_associative_array( $base[ $key ] ) ) {
+				$base[ $key ] = $this->recursive_array_merge( $base[ $key ], $value );
+				continue;
+			}
+
+			$base[ $key ] = $value;
+		}
+
+		return $base;
+	}
+
+	private static function is_associative_array( array $value ): bool {
+		return array_keys( $value ) !== range( 0, count( $value ) - 1 );
 	}
 }
