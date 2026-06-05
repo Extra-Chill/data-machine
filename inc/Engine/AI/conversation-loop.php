@@ -323,6 +323,7 @@ function datamachine_run_conversation(
 		);
 		if ( ! empty( $tool_execution_results ) ) {
 			$result['tool_execution_results'] = $tool_execution_results;
+			datamachine_record_tool_results_to_engine_data( $loop_payload, $tool_execution_results );
 			datamachine_persist_inflight_tool_summary( $loop_payload, $tool_execution_results );
 		}
 	} catch ( \InvalidArgumentException $e ) {
@@ -1928,6 +1929,131 @@ function datamachine_persist_inflight_tool_summary( array $loop_payload, array $
 			'tool_execution_summary' => datamachine_summarize_tool_execution_results( $tool_execution_results, true ),
 		)
 	);
+}
+
+/**
+ * Record configured successful tool result fields into job engine_data.
+ *
+ * @param array<string,mixed>            $loop_payload           Loop payload.
+ * @param array<int,array<string,mixed>> $tool_execution_results Tool execution results accumulated by the loop.
+ */
+function datamachine_record_tool_results_to_engine_data( array $loop_payload, array $tool_execution_results ): void {
+	$job_id    = (int) ( $loop_payload['job_id'] ?? 0 );
+	$recorders = is_array( $loop_payload['tool_recorders'] ?? null ) ? $loop_payload['tool_recorders'] : array();
+	if ( $job_id <= 0 || empty( $recorders ) || ! function_exists( '\datamachine_merge_engine_data' ) ) {
+		return;
+	}
+
+	$engine_data = array();
+	foreach ( $tool_execution_results as $entry ) {
+		if ( ! is_array( $entry ) ) {
+			continue;
+		}
+
+		$tool_name = (string) ( $entry['tool_name'] ?? $entry['name'] ?? '' );
+		$result    = is_array( $entry['result'] ?? null ) ? $entry['result'] : array();
+		if ( '' === $tool_name || empty( $result['success'] ) ) {
+			continue;
+		}
+
+		foreach ( $recorders as $recorder ) {
+			if ( ! is_array( $recorder ) || (string) ( $recorder['tool'] ?? '' ) !== $tool_name ) {
+				continue;
+			}
+
+			$record = is_array( $recorder['record'] ?? null ) ? $recorder['record'] : array();
+			$key    = sanitize_key( (string) ( $record['engine_key'] ?? '' ) );
+			$fields = is_array( $record['fields'] ?? null ) ? $record['fields'] : array();
+			if ( '' === $key || empty( $fields ) ) {
+				continue;
+			}
+
+			$values = datamachine_tool_result_record_values( $result, $fields );
+			if ( ! empty( $values ) ) {
+				$engine_data[ $key ] = array_merge( is_array( $engine_data[ $key ] ?? null ) ? $engine_data[ $key ] : array(), $values );
+			}
+		}
+	}
+
+	if ( ! empty( $engine_data ) ) {
+		\datamachine_merge_engine_data( $job_id, $engine_data );
+	}
+}
+
+/**
+ * @param array<string,mixed> $result Tool result.
+ * @param array<string,mixed> $fields Field mapping config.
+ * @return array<string,mixed>
+ */
+function datamachine_tool_result_record_values( array $result, array $fields ): array {
+	$values = array();
+	$source = array(
+		'data'     => is_array( $result['data'] ?? null ) ? $result['data'] : array(),
+		'result'   => $result,
+		'metadata' => is_array( $result['metadata'] ?? null ) ? $result['metadata'] : array(),
+	);
+
+	foreach ( $fields as $field => $selector ) {
+		$field = sanitize_key( (string) $field );
+		if ( '' === $field ) {
+			continue;
+		}
+
+		$value = datamachine_tool_result_record_value( $source, $selector );
+		if ( null !== $value && '' !== $value && array() !== $value ) {
+			$values[ $field ] = $value;
+		}
+	}
+
+	return $values;
+}
+
+/**
+ * @param array<string,mixed> $source   Tool result source map.
+ * @param mixed               $selector Field selector.
+ * @return mixed
+ */
+function datamachine_tool_result_record_value( array $source, mixed $selector ): mixed {
+	if ( is_scalar( $selector ) ) {
+		return datamachine_tool_result_path_value( $source, (string) $selector );
+	}
+
+	if ( ! is_array( $selector ) ) {
+		return null;
+	}
+
+	$paths = is_array( $selector['paths'] ?? null ) ? $selector['paths'] : array();
+	foreach ( $paths as $path ) {
+		if ( ! is_scalar( $path ) ) {
+			continue;
+		}
+
+		$value = datamachine_tool_result_path_value( $source, (string) $path );
+		if ( null === $value || '' === $value || array() === $value ) {
+			continue;
+		}
+
+		if ( is_scalar( $value ) && is_scalar( $selector['strip_prefix'] ?? null ) ) {
+			$prefix = (string) $selector['strip_prefix'];
+			$value  = str_starts_with( (string) $value, $prefix ) ? substr( (string) $value, strlen( $prefix ) ) : $value;
+		}
+
+		return $value;
+	}
+
+	return null;
+}
+
+function datamachine_tool_result_path_value( array $source, string $path ): mixed {
+	$value = $source;
+	foreach ( array_filter( explode( '.', $path ), static fn( string $part ): bool => '' !== $part ) as $part ) {
+		if ( ! is_array( $value ) || ! array_key_exists( $part, $value ) ) {
+			return null;
+		}
+		$value = $value[ $part ];
+	}
+
+	return $value;
 }
 
 /**
