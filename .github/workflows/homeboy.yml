@@ -5,12 +5,11 @@ on:
     branches: [main]
   push:
     branches: [main]
-    tags: ['v*']
   workflow_dispatch:
 
 concurrency:
   group: homeboy-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: true
 
 permissions:
   contents: write
@@ -19,10 +18,11 @@ permissions:
 
 jobs:
   homeboy:
+    if: ${{ github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'release:') }}
     uses: Extra-Chill/homeboy-action/.github/workflows/ci.yml@v2
     with:
-      commands: audit,lint,test
-      expected-commands: audit,lint,test
-      autofix: 'true'
+      commands: ${{ github.event_name == 'pull_request' && 'audit,lint,test' || github.event_name == 'workflow_dispatch' && 'audit,lint,test' || 'test' }}
+      expected-commands: ${{ github.event_name == 'pull_request' && 'audit,lint,test' || github.event_name == 'workflow_dispatch' && 'audit,lint,test' || 'test' }}
+      autofix: ${{ github.event_name == 'pull_request' && 'true' || 'false' }}
       autofix-commands: 'lint --fix'
     secrets: inherit

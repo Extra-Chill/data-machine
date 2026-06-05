@@ -33,6 +33,7 @@ jobs:
   # ── Step 1: Check for releasable commits ──
   check:
     name: Check for releasable commits
+    if: ${{ github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'release:') }}
     runs-on: ubuntu-latest
     outputs:
       should-release: ${{ steps.check.outputs.should-release }}
@@ -50,8 +51,43 @@ jobs:
           restore-keys: |
             release-last-failed-${{ github.ref_name }}-
 
+      - name: Check failed release marker
+        id: failed-release
+        run: |
+          HEAD_SHA="$(git rev-parse HEAD)"
+          FAILURE_MARKER="${RUNNER_TEMP}/homeboy-release-last-failed"
+          if [ -f "${FAILURE_MARKER}" ]; then
+            LAST_FAILED="$(tr -d '[:space:]' < "${FAILURE_MARKER}")"
+            if [ "${HEAD_SHA}" = "${LAST_FAILED}" ]; then
+              echo "::notice::HEAD ${HEAD_SHA:0:8} matches last failed release attempt — skipping until new commits"
+              echo "blocked=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          fi
+
+          echo "blocked=false" >> "$GITHUB_OUTPUT"
+
+      - name: Check for releasable commit messages
+        id: commit-check
+        if: steps.failed-release.outputs.blocked != 'true'
+        run: |
+          LAST_TAG="$(git describe --tags --match 'v[0-9]*' --abbrev=0 2>/dev/null || true)"
+          if [ -n "${LAST_TAG}" ]; then
+            RANGE="${LAST_TAG}..HEAD"
+          else
+            RANGE="HEAD"
+          fi
+
+          if git log --format=%B "${RANGE}" | grep -Eq '^(feat|fix)(\([^)]+\))?!?:|^BREAKING CHANGE:'; then
+            echo "could-release=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::No releasable conventional commits in ${RANGE}"
+            echo "could-release=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Dry-run release check
         id: release-check
+        if: steps.commit-check.outputs.could-release == 'true'
         uses: Extra-Chill/homeboy-action@v2
         with:
           commands: release
@@ -61,14 +97,15 @@ jobs:
         id: check
         run: |
           HEAD_SHA="$(git rev-parse HEAD)"
-          FAILURE_MARKER="${RUNNER_TEMP}/homeboy-release-last-failed"
-          if [ -f "${FAILURE_MARKER}" ]; then
-            LAST_FAILED="$(tr -d '[:space:]' < "${FAILURE_MARKER}")"
-            if [ "${HEAD_SHA}" = "${LAST_FAILED}" ]; then
-              echo "::notice::HEAD ${HEAD_SHA:0:8} matches last failed release attempt — skipping until new commits"
-              echo "should-release=false" >> "$GITHUB_OUTPUT"
-              exit 0
-            fi
+          if [ "${{ steps.failed-release.outputs.blocked }}" = "true" ]; then
+            echo "should-release=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [ "${{ steps.commit-check.outputs.could-release }}" != "true" ]; then
+            echo "should-release=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::No releasable commits at HEAD ${HEAD_SHA:0:8}"
+            exit 0
           fi
 
           RELEASE_VERSION="${{ steps.release-check.outputs.release-version }}"
