@@ -351,6 +351,14 @@ class AIStep extends Step {
 				$payload['tool_runtime_rules'] = $tool_runtime_rules;
 			}
 
+			$tool_recorders = self::mergeListConfigField(
+				is_array( $pipeline_step_config['tool_recorders'] ?? null ) ? $pipeline_step_config['tool_recorders'] : array(),
+				is_array( $this->flow_step_config['tool_recorders'] ?? null ) ? $this->flow_step_config['tool_recorders'] : array()
+			);
+			if ( ! empty( $tool_recorders ) ) {
+				$payload['tool_recorders'] = $tool_recorders;
+			}
+
 			// Tool categories can be specified at the pipeline step level or pipeline level.
 			// This allows pipelines to declare which ability categories are relevant,
 			// reducing tool bloat by excluding irrelevant tools from the AI context.

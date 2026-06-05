@@ -19,6 +19,16 @@ if ( ! function_exists( 'sanitize_key' ) ) {
 	}
 }
 
+if ( ! function_exists( 'datamachine_merge_engine_data' ) ) {
+	function datamachine_merge_engine_data( int $job_id, array $data ): bool {
+		$GLOBALS['datamachine_bundle_runner_engine_data_merges'][] = array(
+			'job_id' => $job_id,
+			'data'   => $data,
+		);
+		return true;
+	}
+}
+
 function datamachine_bundle_runner_assert( bool $condition, string $label, array &$failures, int &$passes ): void {
 	if ( $condition ) {
 		++$passes;
@@ -87,6 +97,7 @@ foreach ( array(
 }
 datamachine_bundle_runner_contains( $abilities, "'outputs'", 'ability output schema advertises semantic outputs', $failures, $passes );
 datamachine_bundle_runner_contains( $abilities, "'output_diagnostics'", 'ability output schema advertises semantic output diagnostics', $failures, $passes );
+datamachine_bundle_runner_contains( $ai_step, "\$payload['tool_recorders']", 'AI step forwards configured tool recorders to the loop', $failures, $passes );
 
 echo "\n[3] Runner exposes semantic outputs without hiding raw engine data\n";
 require_once $root . '/inc/Engine/Bundle/AgentBundleRunner.php';
@@ -125,6 +136,48 @@ datamachine_bundle_runner_assert( 456 === ( $projected_outputs['outputs']['store
 datamachine_bundle_runner_assert( 'https://github.com/chubes4/wp-site-generator/issues/456' === ( $projected_outputs['outputs']['store_issue_url'] ?? null ), 'declared nested engine_data output URL is projected', $failures, $passes );
 datamachine_bundle_runner_assert( ! isset( $projected_outputs['outputs']['agent_id'] ), 'runtime identity fields are not projected as outputs', $failures, $passes );
 datamachine_bundle_runner_assert( array( 'missing_result_url', 'missing_store_url' ) === ( $projected_outputs['diagnostics']['missing_outputs'] ?? null ), 'missing declared outputs are diagnosed semantically', $failures, $passes );
+
+echo "\n[3a] Successful tool results can be recorded into engine data\n";
+require_once $root . '/inc/Engine/AI/conversation-loop.php';
+$GLOBALS['datamachine_bundle_runner_engine_data_merges'] = array();
+\DataMachine\Engine\AI\datamachine_record_tool_results_to_engine_data(
+	array(
+		'job_id'         => 77,
+		'tool_recorders' => array(
+			array(
+				'tool'   => 'github_pull_request_publish',
+				'record' => array(
+					'engine_key' => 'static_site_agent',
+					'fields'     => array(
+						'branch' => 'data.head',
+						'pr_url' => 'data.html_url',
+						'slug'   => array(
+							'paths'        => array( 'data.head' ),
+							'strip_prefix' => 'static/',
+						),
+					),
+				),
+			),
+		),
+	),
+	array(
+		array(
+			'tool_name' => 'github_pull_request_publish',
+			'result'    => array(
+				'success' => true,
+				'data'    => array(
+					'head'     => 'static/issue-460-design-direction',
+					'html_url' => 'https://github.com/chubes4/wp-site-generator/pull/461',
+				),
+			),
+		),
+	)
+);
+$recorded_merge = $GLOBALS['datamachine_bundle_runner_engine_data_merges'][0] ?? array();
+datamachine_bundle_runner_assert( 77 === ( $recorded_merge['job_id'] ?? null ), 'tool recorder writes to the owning job', $failures, $passes );
+datamachine_bundle_runner_assert( 'static/issue-460-design-direction' === ( $recorded_merge['data']['static_site_agent']['branch'] ?? null ), 'tool recorder maps branch from result data', $failures, $passes );
+datamachine_bundle_runner_assert( 'https://github.com/chubes4/wp-site-generator/pull/461' === ( $recorded_merge['data']['static_site_agent']['pr_url'] ?? null ), 'tool recorder maps PR URL from result data', $failures, $passes );
+datamachine_bundle_runner_assert( 'issue-460-design-direction' === ( $recorded_merge['data']['static_site_agent']['slug'] ?? null ), 'tool recorder applies strip_prefix transforms', $failures, $passes );
 
 echo "\n[3b] Runner applies run-scoped flow step patches\n";
 $workflow_from_bundle_flow = $runner_reflection->getMethod( 'workflow_from_bundle_flow' );
