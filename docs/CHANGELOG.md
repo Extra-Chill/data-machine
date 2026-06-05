@@ -2,6 +2,14 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.139.32] - 2026-06-05
+
+### Changed
+- Apply agent bundle flow step patches
+
+### Fixed
+- Fix agent bundle patch lint
+
 ## [0.139.31] - 2026-06-05
 
 ### Changed
