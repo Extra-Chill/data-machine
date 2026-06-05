@@ -825,7 +825,7 @@ final class AgentBundleRunner {
 				continue;
 			}
 
-			$existing = is_array( $workflow_step['tool_recorders'] ?? null ) ? $workflow_step['tool_recorders'] : array();
+			$existing                         = is_array( $workflow_step['tool_recorders'] ?? null ) ? $workflow_step['tool_recorders'] : array();
 			$workflow_step['tool_recorders'] = array_merge( $existing, $recorders );
 		}
 		unset( $workflow_step );
