@@ -252,12 +252,23 @@ class FetchHandlerDataPacketTest extends TestCase {
 		$this->assertTrue( $reflection->isSubclassOf( \DataMachine\Core\Steps\Step::class ) );
 	}
 
-	public function test_fetchstep_execute_handler_returns_array(): void {
+	public function test_fetchstep_execute_handler_returns_array_or_error(): void {
 		$method = new ReflectionMethod( \DataMachine\Core\Steps\Fetch\FetchStep::class, 'execute_handler' );
 		$this->assertTrue( $method->isPrivate() );
 
 		$return_type = $method->getReturnType();
 		$this->assertNotNull( $return_type );
+
+		if ( $return_type instanceof \ReflectionUnionType ) {
+			$type_names = array_map(
+				static fn ( \ReflectionNamedType $type ): string => $type->getName(),
+				$return_type->getTypes()
+			);
+			$this->assertContains( 'array', $type_names );
+			$this->assertContains( 'WP_Error', $type_names );
+			return;
+		}
+
 		$this->assertSame( 'array', $return_type->getName() );
 	}
 

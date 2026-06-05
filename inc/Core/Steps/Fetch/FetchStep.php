@@ -226,6 +226,31 @@ class FetchStep extends Step {
 
 		$packets = $this->execute_handler_as_owner( $handler, $handler_settings, (string) $this->job_id, $owner_user_id );
 
+		if ( is_wp_error( $packets ) ) {
+			$this->log( 'error', 'Fetch handler failed: ' . $packets->get_error_message() );
+			RunMetrics::recordStepResult(
+				$this->job_id,
+				$this->flow_step_id,
+				array_merge(
+					$this->extractHandlerOutcomeIds( $handler_settings ),
+					array(
+						'step_type'    => 'fetch',
+						'result'       => 'failed',
+						'handler_slug' => (string) $handler,
+						'packet_count' => 0,
+						'reason'       => 'handler_failed',
+						'error'        => $packets->get_error_message(),
+					)
+				)
+			);
+
+			return array(
+				'status'  => 'failed',
+				'packets' => $this->dataPackets,
+				'reason'  => 'handler_failed',
+			);
+		}
+
 		if ( empty( $packets ) ) {
 			$this->log( 'error', 'Fetch handler returned no content' );
 			RunMetrics::recordStepResult(
@@ -284,9 +309,9 @@ class FetchStep extends Step {
 	 * @param string $handler_name    Handler slug.
 	 * @param array  $handler_settings Handler settings (includes pipeline_id, flow_id).
 	 * @param string $job_id          Job ID.
-	 * @return DataPacket[] Array of DataPackets, or empty array on failure.
+	 * @return DataPacket[]|\WP_Error Array of DataPackets, or error on handler failure.
 	 */
-	private function execute_handler( string $handler_name, array $handler_settings, string $job_id ): array {
+	private function execute_handler( string $handler_name, array $handler_settings, string $job_id ): array|\WP_Error {
 		$handler = $this->get_handler_object( $handler_name );
 		if ( ! $handler ) {
 			$this->log(
@@ -296,7 +321,7 @@ class FetchStep extends Step {
 					'handler' => $handler_name,
 				)
 			);
-			return array();
+			return new \WP_Error( 'fetch_handler_not_found', sprintf( 'Fetch handler "%s" was not found.', $handler_name ) );
 		}
 
 		try {
@@ -304,7 +329,7 @@ class FetchStep extends Step {
 
 			if ( empty( $pipeline_id ) ) {
 				$this->log( 'error', 'Pipeline ID not found in handler settings' );
-				return array();
+				return new \WP_Error( 'fetch_handler_missing_pipeline_id', 'Pipeline ID not found in handler settings.' );
 			}
 
 			return $handler->get_fetch_data( $pipeline_id, $handler_settings, $job_id );
@@ -317,7 +342,7 @@ class FetchStep extends Step {
 					'exception' => $e->getMessage(),
 				)
 			);
-			return array();
+			return new \WP_Error( 'fetch_handler_execution_failed', $e->getMessage() );
 		}
 	}
 
@@ -333,9 +358,9 @@ class FetchStep extends Step {
 	 * @param array  $handler_settings Handler settings.
 	 * @param string $job_id Job ID.
 	 * @param int    $owner_user_id Flow owner user ID.
-	 * @return DataPacket[] Array of DataPackets, or empty array on failure.
+	 * @return DataPacket[]|\WP_Error Array of DataPackets, or error on handler failure.
 	 */
-	private function execute_handler_as_owner( string $handler_name, array $handler_settings, string $job_id, int $owner_user_id ): array {
+	private function execute_handler_as_owner( string $handler_name, array $handler_settings, string $job_id, int $owner_user_id ): array|\WP_Error {
 		if ( $owner_user_id <= 0 || ! function_exists( 'wp_set_current_user' ) || ! function_exists( 'get_current_user_id' ) ) {
 			return $this->execute_handler( $handler_name, $handler_settings, $job_id );
 		}
