@@ -43,6 +43,11 @@ assert_fetch_handler_failure_status(
 );
 
 assert_fetch_handler_failure_status(
+	'FetchStep preserves handler failure messages in explicit results',
+	str_contains( $file, "'error'   => \$packets->get_error_message()," )
+);
+
+assert_fetch_handler_failure_status(
 	'execute_handler preserves handler exceptions as WP_Error',
 	str_contains( $file, "new \\WP_Error( 'fetch_handler_execution_failed', \$e->getMessage() )" )
 );
