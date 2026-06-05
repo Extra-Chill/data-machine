@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.139.38] - 2026-06-05
+
+### Changed
+- Record wrapped tool result data
+
 ## [0.139.37] - 2026-06-05
 
 ### Changed
