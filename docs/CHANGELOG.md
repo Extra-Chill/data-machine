@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.139.33] - 2026-06-05
+
+### Changed
+- Fail agent bundle no-item outcomes
+
 ## [0.139.32] - 2026-06-05
 
 ### Changed
