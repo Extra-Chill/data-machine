@@ -849,7 +849,7 @@ final class AgentBundleRunner {
 	/** @param array<string,mixed> $workflow_step */
 	private function flow_step_patch_matches( array $workflow_step, array $patch ): bool {
 		foreach ( array( 'flow_step_id', 'pipeline_step_id', 'step_type' ) as $selector_key ) {
-			if ( isset( $patch[ $selector_key ] ) && (string) $patch[ $selector_key ] !== (string) ( $workflow_step[ $selector_key ] ?? '' ) ) {
+			if ( isset( $patch[ $selector_key ] ) && (string) ( $workflow_step[ $selector_key ] ?? '' ) !== (string) $patch[ $selector_key ] ) {
 				return false;
 			}
 		}
