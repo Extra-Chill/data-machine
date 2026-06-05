@@ -2,6 +2,15 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.139.39] - 2026-06-05
+
+### Changed
+- Align tool recorder projection assignment
+- Project bundle tool recorders onto AI steps
+
+### Fixed
+- Fix tool recorder projection lint
+
 ## [0.139.38] - 2026-06-05
 
 ### Changed
