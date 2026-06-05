@@ -101,6 +101,11 @@ datamachine_bundle_runner_contains( $ai_step, "\$payload['tool_recorders']", 'AI
 
 echo "\n[3] Runner exposes semantic outputs without hiding raw engine data\n";
 require_once $root . '/inc/Engine/Bundle/AgentBundleRunner.php';
+require_once $root . '/inc/Abilities/Flow/FlowHelpers.php';
+require_once $root . '/inc/Abilities/Flow/QueueAbility.php';
+require_once $root . '/inc/Core/Steps/FlowStepConfig.php';
+require_once $root . '/inc/Core/Steps/FlowStepConfigFactory.php';
+require_once $root . '/inc/Core/Steps/WorkflowConfigFactory.php';
 $runner_reflection = new ReflectionClass( DataMachine\Engine\Bundle\AgentBundleRunner::class );
 $runner_instance   = $runner_reflection->newInstanceWithoutConstructor();
 $output_projection = $runner_reflection->getMethod( 'output_projection' );
@@ -278,6 +283,10 @@ $patched_workflow          = $workflow_from_bundle_flow->invoke(
 datamachine_bundle_runner_assert( 429 === ( $patched_workflow['steps'][0]['handler_configs']['github']['issue_number'] ?? null ), 'flow step patch merges nested handler config', $failures, $passes );
 datamachine_bundle_runner_assert( 'chubes4/wp-site-generator' === ( $patched_workflow['steps'][0]['handler_configs']['github']['repo'] ?? null ), 'flow step patch preserves existing handler config', $failures, $passes );
 datamachine_bundle_runner_assert( 'github_pull_request_publish' === ( $patched_workflow['steps'][1]['tool_recorders'][0]['tool'] ?? null ), 'run-scoped tool recorders are projected onto AI workflow steps', $failures, $passes );
+
+$ephemeral_configs = DataMachine\Core\Steps\WorkflowConfigFactory::buildEphemeralConfigs( $patched_workflow );
+datamachine_bundle_runner_assert( 'github_pull_request_publish' === ( $ephemeral_configs['flow_config']['ephemeral_step_1']['tool_recorders'][0]['tool'] ?? null ), 'ephemeral flow config preserves AI tool recorders', $failures, $passes );
+datamachine_bundle_runner_assert( 'github_pull_request_publish' === ( $ephemeral_configs['pipeline_config']['ephemeral_pipeline_1']['tool_recorders'][0]['tool'] ?? null ), 'ephemeral pipeline config preserves AI tool recorders', $failures, $passes );
 
 echo "\n[3c] Runner does not treat no-item terminal states as success\n";
 $response_method = $runner_reflection->getMethod( 'response' );

@@ -147,7 +147,7 @@ class WorkflowConfigFactory {
 			if ( ! empty( $agent_modes ) ) {
 				$pipeline_step['agent_modes'] = $agent_modes;
 			}
-			foreach ( array( 'completion_assertions', 'tool_runtime_rules', 'tool_categories' ) as $field ) {
+			foreach ( array( 'completion_assertions', 'tool_runtime_rules', 'tool_categories', 'tool_recorders' ) as $field ) {
 				if ( is_array( $step[ $field ] ?? null ) ) {
 					$pipeline_step[ $field ] = 'completion_assertions' === $field
 						? $step[ $field ]
