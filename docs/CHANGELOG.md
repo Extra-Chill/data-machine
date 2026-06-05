@@ -2,6 +2,12 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.139.34] - 2026-06-05
+
+### Changed
+- Update fetch handler return contract tests
+- Fail fetch steps on handler errors
+
 ## [0.139.33] - 2026-06-05
 
 ### Changed
