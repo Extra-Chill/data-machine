@@ -525,12 +525,16 @@ assert_source_equals(
 );
 
 $executor_source = (string) file_get_contents( __DIR__ . '/../inc/Engine/AI/Tools/ToolExecutor.php' );
+$loop_source     = (string) file_get_contents( __DIR__ . '/../inc/Engine/AI/conversation-loop.php' );
 $client_guard    = strpos( $executor_source, "'client' === (string) ( $" . "tool_def['executor'] ?? '' )" );
 $policy_resolver = strpos( $executor_source, 'new ActionPolicyResolver()' );
 $direct_execute  = strpos( $executor_source, 'executePreparedTool' );
 assert_source_equals( true, false !== $client_guard, 'ToolExecutor has an explicit client-executor guard', $failures, $passes );
 assert_source_equals( true, false !== $client_guard && false !== $policy_resolver && $client_guard < $policy_resolver, 'client-executor guard runs before action-policy/direct execution setup', $failures, $passes );
 assert_source_equals( true, false !== $client_guard && false !== $direct_execute && $client_guard < $direct_execute, 'client-executor guard runs before direct PHP tool execution', $failures, $passes );
+assert_source_equals( true, false !== strpos( $executor_source, 'applyDeclaredContextBindings' ), 'ToolExecutor reapplies explicit context bindings before execution', $failures, $passes );
+assert_source_equals( true, false !== strpos( $executor_source, "tool_def['client_context_bindings']" ), 'ToolExecutor reads declared client_context_bindings only', $failures, $passes );
+assert_source_equals( true, false !== strpos( $loop_source, 'datamachine_payload_with_client_context_bindings' ), 'conversation loop mirrors safe run fields into client_context', $failures, $passes );
 
 $client_execution = ToolExecutor::executeTool(
 	'client/select_block',

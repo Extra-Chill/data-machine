@@ -73,7 +73,9 @@ function datamachine_run_conversation(
 	$interrupt_source     = is_callable( $payload['interrupt_source'] ?? null ) ? $payload['interrupt_source'] : null;
 
 	// Strip runtime objects from the loop payload before passing to tools/requests.
-	$loop_payload = datamachine_payload_without_runtime_objects( $payload );
+	$loop_payload = datamachine_payload_with_client_context_bindings(
+		datamachine_payload_without_runtime_objects( $payload )
+	);
 
 	// Build the turns budget through DM's registry (site-config-aware ceiling
 	// resolution). The upstream loop owns increment + exceeded checks.
@@ -2512,6 +2514,41 @@ function datamachine_payload_with_inflight_run_artifacts( array $payload, array 
 	}
 
 	$payload['run_artifacts'] = $artifact_result['artifacts'];
+	return $payload;
+}
+
+/**
+ * Mirror safe run context into client_context for declared tool bindings.
+ *
+ * Agents API only satisfies tool parameters through explicit
+ * `client_context_bindings`, but Data Machine pipeline context historically
+ * stores run identifiers at the top level of the loop payload. Keep the
+ * binding source auditable by copying only the fields tools already declare as
+ * context-bindable instead of matching arbitrary parameter names.
+ *
+ * @param array $payload Clean loop payload.
+ * @return array Payload with context-bindable run fields in client_context.
+ */
+function datamachine_payload_with_client_context_bindings( array $payload ): array {
+	$client_context = is_array( $payload['client_context'] ?? null ) ? $payload['client_context'] : array();
+
+	foreach ( array( 'job_id', 'flow_step_id', 'step_id', 'user_id', 'agent_id', 'agent_slug' ) as $key ) {
+		if ( array_key_exists( $key, $client_context ) || ! array_key_exists( $key, $payload ) ) {
+			continue;
+		}
+
+		$value = $payload[ $key ];
+		if ( null === $value || '' === $value || is_array( $value ) || is_object( $value ) ) {
+			continue;
+		}
+
+		$client_context[ $key ] = $value;
+	}
+
+	if ( ! empty( $client_context ) ) {
+		$payload['client_context'] = $client_context;
+	}
+
 	return $payload;
 }
 
