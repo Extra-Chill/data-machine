@@ -179,6 +179,40 @@ datamachine_bundle_runner_assert( 'static/issue-460-design-direction' === ( $rec
 datamachine_bundle_runner_assert( 'https://github.com/chubes4/wp-site-generator/pull/461' === ( $recorded_merge['data']['static_site_agent']['pr_url'] ?? null ), 'tool recorder maps PR URL from result data', $failures, $passes );
 datamachine_bundle_runner_assert( 'issue-460-design-direction' === ( $recorded_merge['data']['static_site_agent']['slug'] ?? null ), 'tool recorder applies strip_prefix transforms', $failures, $passes );
 
+$GLOBALS['datamachine_bundle_runner_engine_data_merges'] = array();
+\DataMachine\Engine\AI\datamachine_record_tool_results_to_engine_data(
+	array(
+		'job_id'         => 78,
+		'tool_recorders' => array(
+			array(
+				'tool'   => 'github_pull_request_publish',
+				'record' => array(
+					'engine_key' => 'static_site_agent',
+					'fields'     => array(
+						'branch' => 'data.head',
+						'pr_url' => 'data.html_url',
+					),
+				),
+			),
+		),
+	),
+	array(
+		array(
+			'tool_name'        => 'github_pull_request_publish',
+			'result'           => array( 'success' => true ),
+			'tool_result_data' => array(
+				'data' => array(
+					'head'     => 'static/issue-468-design-direction',
+					'html_url' => 'https://github.com/chubes4/wp-site-generator/pull/470',
+				),
+			),
+		),
+	)
+);
+$recorded_envelope_merge = $GLOBALS['datamachine_bundle_runner_engine_data_merges'][0] ?? array();
+datamachine_bundle_runner_assert( 'static/issue-468-design-direction' === ( $recorded_envelope_merge['data']['static_site_agent']['branch'] ?? null ), 'tool recorder maps branch from wrapped tool_result_data', $failures, $passes );
+datamachine_bundle_runner_assert( 'https://github.com/chubes4/wp-site-generator/pull/470' === ( $recorded_envelope_merge['data']['static_site_agent']['pr_url'] ?? null ), 'tool recorder maps PR URL from wrapped tool_result_data', $failures, $passes );
+
 echo "\n[3b] Runner applies run-scoped flow step patches\n";
 $workflow_from_bundle_flow = $runner_reflection->getMethod( 'workflow_from_bundle_flow' );
 $patched_workflow          = $workflow_from_bundle_flow->invoke(

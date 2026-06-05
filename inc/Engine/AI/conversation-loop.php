@@ -1968,7 +1968,7 @@ function datamachine_record_tool_results_to_engine_data( array $loop_payload, ar
 				continue;
 			}
 
-			$values = datamachine_tool_result_record_values( $result, $fields );
+			$values = datamachine_tool_result_record_values( $entry, $fields );
 			if ( ! empty( $values ) ) {
 				$engine_data[ $key ] = array_merge( is_array( $engine_data[ $key ] ?? null ) ? $engine_data[ $key ] : array(), $values );
 			}
@@ -1981,16 +1981,24 @@ function datamachine_record_tool_results_to_engine_data( array $loop_payload, ar
 }
 
 /**
- * @param array<string,mixed> $result Tool result.
+ * @param array<string,mixed> $entry  Tool result entry.
  * @param array<string,mixed> $fields Field mapping config.
  * @return array<string,mixed>
  */
-function datamachine_tool_result_record_values( array $result, array $fields ): array {
-	$values = array();
-	$source = array(
-		'data'     => is_array( $result['data'] ?? null ) ? $result['data'] : array(),
-		'result'   => $result,
-		'metadata' => is_array( $result['metadata'] ?? null ) ? $result['metadata'] : array(),
+function datamachine_tool_result_record_values( array $entry, array $fields ): array {
+	$values               = array();
+	$result               = is_array( $entry['result'] ?? null ) ? $entry['result'] : $entry;
+	$nested_result        = is_array( $result['result'] ?? null ) ? $result['result'] : array();
+	$tool_result_data     = is_array( $entry['tool_result_data'] ?? null ) ? $entry['tool_result_data'] : ( is_array( $result['tool_result_data'] ?? null ) ? $result['tool_result_data'] : array() );
+	$tool_result_envelope = is_array( $entry['tool_result_envelope'] ?? null ) ? $entry['tool_result_envelope'] : ( is_array( $result['tool_result_envelope'] ?? null ) ? $result['tool_result_envelope'] : array() );
+	$envelope_result      = is_array( $tool_result_envelope['result'] ?? null ) ? $tool_result_envelope['result'] : array();
+	$source               = array(
+		'data'                 => datamachine_first_tool_result_data( $result, $nested_result, $tool_result_data, $tool_result_envelope, $envelope_result ),
+		'entry'                => $entry,
+		'result'               => $result,
+		'tool_result_data'     => $tool_result_data,
+		'tool_result_envelope' => $tool_result_envelope,
+		'metadata'             => is_array( $result['metadata'] ?? null ) ? $result['metadata'] : array(),
 	);
 
 	foreach ( $fields as $field => $selector ) {
@@ -2006,6 +2014,20 @@ function datamachine_tool_result_record_values( array $result, array $fields ): 
 	}
 
 	return $values;
+}
+
+/**
+ * @param array<string,mixed> ...$candidates Candidate result containers.
+ * @return array<string,mixed>
+ */
+function datamachine_first_tool_result_data( array ...$candidates ): array {
+	foreach ( $candidates as $candidate ) {
+		if ( is_array( $candidate['data'] ?? null ) && ! empty( $candidate['data'] ) ) {
+			return $candidate['data'];
+		}
+	}
+
+	return array();
 }
 
 /**
