@@ -575,6 +575,23 @@ assert_source_equals(
 	$passes
 );
 
+echo "\n[9] handler-class tools auto-bind job_id context:\n";
+$tool_manager_source = (string) file_get_contents( __DIR__ . '/../inc/Engine/AI/Tools/ToolManager.php' );
+assert_source_equals(
+	true,
+	false !== strpos( $tool_manager_source, "'handle_tool_call' === ( \$tool_def['method'] ?? '' )" ),
+	'ToolManager auto-binds job_id for handler-class tools (handle_tool_call method)',
+	$failures,
+	$passes
+);
+assert_source_equals(
+	true,
+	false !== strpos( $tool_manager_source, "\$tool_def['client_context_bindings'] = \$existing" ),
+	'ToolManager writes the resolved client_context_bindings back onto handler tool defs',
+	$failures,
+	$passes
+);
+
 if ( $failures ) {
 	echo "\nFAILED: " . count( $failures ) . " tool source assertions failed.\n";
 	exit( 1 );
