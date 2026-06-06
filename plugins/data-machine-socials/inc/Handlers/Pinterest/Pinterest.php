@@ -66,7 +66,8 @@ class Pinterest extends PublishHandler {
 
 				return array(
 					'pinterest_publish' => array(
-						'class'       => self::class,
+						'class'                   => self::class,
+						'client_context_bindings' => array( 'job_id' ),
 						'method'      => 'handle_tool_call',
 						'handler'     => $handler_slug,
 						'description' => 'Pin content to Pinterest with image, title, description, and link.',

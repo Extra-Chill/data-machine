@@ -47,7 +47,8 @@ class Facebook extends PublishHandler {
 			function ( $handler_slug, $handler_config, $engine_data ) {
 				return array(
 					'facebook_publish' => array(
-						'class'       => self::class,
+						'class'                   => self::class,
+						'client_context_bindings' => array( 'job_id' ),
 						'method'      => 'handle_tool_call',
 						'handler'     => $handler_slug,
 						'description' => 'Post content to a Facebook Page. Supports text and images.',
