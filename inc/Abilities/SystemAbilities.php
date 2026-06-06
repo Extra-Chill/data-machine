@@ -19,6 +19,7 @@ use DataMachine\Core\Database\Chat\ConversationStoreFactory;
 use DataMachine\Core\Database\Flows\Flows;
 use DataMachine\Core\Database\Pipelines\Pipelines;
 use DataMachine\Core\PluginSettings;
+use DataMachine\Engine\Tasks\RecurringRejectionTracker;
 use DataMachine\Engine\Tasks\RecurringScheduler;
 use DataMachine\Engine\Tasks\TaskScheduler;
 use DataMachine\Engine\Tasks\TaskRegistry;
@@ -253,24 +254,57 @@ class SystemAbilities {
 		$due             = $this->getActionSchedulerGroupStats( 'pending', true );
 		$daily_memory    = $this->getActionSchedulerHookStats( 'datamachine_recurring_daily_memory_generation' );
 
+		// Recurring bindings rejected by TaskScheduler::schedule() on every
+		// tick are a silent, permanent failure: the task never runs and the
+		// only signal is N identical error rows. RecurringRejectionTracker
+		// correlates those rejections per schedule_id; a degraded schedule
+		// here is the worst scheduler state, so it outranks 'stale'.
+		$rejected_schedules = RecurringRejectionTracker::degraded();
+
 		$status = 'ok';
 		if ( ! function_exists( 'as_get_scheduled_actions' ) || ! class_exists( '\\ActionScheduler' ) ) {
 			$status = 'unavailable';
+		} elseif ( ! empty( $rejected_schedules ) ) {
+			$status = 'failing';
 		} elseif ( $due['count'] > 0 || ( null !== $wp_cron_overdue && $wp_cron_overdue > $stale_threshold ) ) {
 			$status = 'stale';
 		}
 
 		$message = match ( $status ) {
 			'ok'          => __( 'scheduler current', 'data-machine' ),
+			'failing'     => sprintf(
+				/* translators: %d: number of recurring schedules rejected on every tick. */
+				_n(
+					'%d recurring schedule rejected on every tick and never running',
+					'%d recurring schedules rejected on every tick and never running',
+					count( $rejected_schedules ),
+					'data-machine'
+				),
+				count( $rejected_schedules )
+			),
 			'stale'       => __( 'scheduler has overdue work; invoke WordPress cron or run wp datamachine drain', 'data-machine' ),
 			'unavailable' => __( 'Action Scheduler is unavailable', 'data-machine' ),
 			default       => __( 'scheduler status unknown', 'data-machine' ),
 		};
 
+		// Compact, render-friendly view of each persistently-rejected binding.
+		$rejected_report = array();
+		foreach ( $rejected_schedules as $schedule_id => $entry ) {
+			$rejected_report[] = array(
+				'schedule_id'        => $schedule_id,
+				'task_type'          => $entry['task_type'] ?? '',
+				'consecutive_count'  => (int) ( $entry['count'] ?? 0 ),
+				'reason'             => $entry['reason'] ?? '',
+				'first_rejected_gmt' => $entry['first_rejected_gmt'] ?? null,
+				'last_rejected_gmt'  => $entry['last_rejected_gmt'] ?? null,
+			);
+		}
+
 		return array(
 			'status'                  => $status,
 			'message'                 => $message,
 			'stale_threshold_seconds' => $stale_threshold,
+			'rejected_schedules'      => $rejected_report,
 			'action_scheduler'        => array(
 				'available'        => function_exists( 'as_get_scheduled_actions' ),
 				'class_loaded'     => class_exists( '\\ActionScheduler' ),
@@ -290,9 +324,11 @@ class SystemAbilities {
 				'next_pending_gmt' => $daily_memory['pending']['oldest_gmt'],
 				'last_attempt_gmt' => $daily_memory['complete']['last_attempt_gmt'],
 			),
-			'recommendation'          => 'stale' === $status
-				? __( 'For local or low-traffic installs, schedule an external wake-up such as wp cron event run --due-now or wp datamachine drain.', 'data-machine' )
-				: null,
+			'recommendation'          => match ( $status ) {
+				'failing' => __( 'One or more recurring schedules are rejected on every tick and never run. Inspect them with wp datamachine logs (filter error_code recurring_schedule_persistently_rejected) and fix the binding or its prerequisites (agent ownership, task registration, ability availability).', 'data-machine' ),
+				'stale'   => __( 'For local or low-traffic installs, schedule an external wake-up such as wp cron event run --due-now or wp datamachine drain.', 'data-machine' ),
+				default   => null,
+			},
 		);
 	}
 
