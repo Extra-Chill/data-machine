@@ -105,12 +105,13 @@ class EventUpsertFilters {
 		$parameters = self::composeCanonicalParameters( $fragments );
 
 		return array(
-			'class'          => EventUpsert::class,
-			'method'         => 'handle_tool_call',
-			'handler'        => 'upsert_event',
-			'description'    => 'Create or update WordPress event post. Automatically finds existing events by title, venue, and date. Updates if data changed, skips if unchanged, creates if new.',
-			'parameters'     => $parameters,
-			'handler_config' => $ue_config,
+			'class'                   => EventUpsert::class,
+			'client_context_bindings' => array( 'job_id' ),
+			'method'                  => 'handle_tool_call',
+			'handler'                 => 'upsert_event',
+			'description'             => 'Create or update WordPress event post. Automatically finds existing events by title, venue, and date. Updates if data changed, skips if unchanged, creates if new.',
+			'parameters'              => $parameters,
+			'handler_config'          => $ue_config,
 		);
 	}
 
