@@ -360,6 +360,7 @@ assert_ability_tool_source_equals( true, isset( $tools['summarize_demo'] ), 'cha
 assert_ability_tool_source_equals( true, isset( $tools['helper_demo'] ), 'helper projection feeds ability tool source', $failures, $passes );
 assert_ability_tool_source_equals( true, isset( $tools['legacy_alias_demo'] ), 'legacy ability tools filter remains supported', $failures, $passes );
 assert_ability_tool_source_equals( 'demo/summarize', $tools['summarize_demo']['ability'] ?? '', 'generated tool links ability slug', $failures, $passes );
+assert_ability_tool_source_equals( 'demo/summarize', $tools['summarize_demo']['execution_ability'] ?? '', 'generated tool declares explicit direct-execution ability marker', $failures, $passes );
 assert_ability_tool_source_equals( 'Summarize Demo', $tools['summarize_demo']['label'] ?? '', 'generated tool carries ability label', $failures, $passes );
 assert_ability_tool_source_equals( 'demo-category', $tools['summarize_demo']['ability_category'] ?? '', 'generated tool carries ability category', $failures, $passes );
 assert_ability_tool_source_equals( 'Model-facing summary override.', $tools['summarize_demo']['description'] ?? '', 'definition filter can override model-facing description', $failures, $passes );

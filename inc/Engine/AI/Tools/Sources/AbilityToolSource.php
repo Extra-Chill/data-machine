@@ -4,7 +4,8 @@
  *
  * Exposes selected registered WordPress abilities as model-facing tools without
  * requiring hand-written BaseTool wrappers. Execution remains ability-native via
- * ToolExecutionCore because generated declarations include the `ability` key.
+ * ToolExecutionCore because generated declarations include the explicit
+ * `execution_ability` marker.
  *
  * @package DataMachine\Engine\AI\Tools\Sources
  */
@@ -142,13 +143,14 @@ final class AbilityToolSource {
 		$annotations = is_array( $meta['annotations'] ?? null ) ? $meta['annotations'] : array();
 
 		$tool = array(
-			'ability'          => $ability_slug,
-			'ability_category' => method_exists( $ability, 'get_category' ) ? (string) $ability->get_category() : '',
-			'annotations'      => $annotations,
-			'description'      => method_exists( $ability, 'get_description' ) ? (string) $ability->get_description() : '',
-			'label'            => method_exists( $ability, 'get_label' ) ? (string) $ability->get_label() : $tool_name,
-			'modes'            => array( ToolPolicyResolver::MODE_CHAT ),
-			'parameters'       => method_exists( $ability, 'get_input_schema' ) ? $ability->get_input_schema() : array(),
+			'ability'           => $ability_slug,
+			'execution_ability' => $ability_slug,
+			'ability_category'  => method_exists( $ability, 'get_category' ) ? (string) $ability->get_category() : '',
+			'annotations'       => $annotations,
+			'description'       => method_exists( $ability, 'get_description' ) ? (string) $ability->get_description() : '',
+			'label'             => method_exists( $ability, 'get_label' ) ? (string) $ability->get_label() : $tool_name,
+			'modes'             => array( ToolPolicyResolver::MODE_CHAT ),
+			'parameters'        => method_exists( $ability, 'get_input_schema' ) ? $ability->get_input_schema() : array(),
 		);
 
 		foreach ( self::OVERRIDE_KEYS as $key ) {
