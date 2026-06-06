@@ -328,6 +328,27 @@ class ToolManager {
 					$tool_def['handler_config'] = $handler_config;
 				}
 
+				// Auto-attach the job_id context binding for handler-class
+				// tools. Handler tools route through the *Handler base classes
+				// (Upsert/Publish/Fetch) via handle_tool_call(), all of which
+				// require the run's job_id to load engine_data — and after the
+				// explicit-context-bindings migration, job_id only reaches a
+				// tool when it is named in client_context_bindings. Defaulting
+				// the binding here means satellite plugins (events, socials,
+				// business, third parties) no longer have to declare it
+				// per-tool-def and cannot silently regress into rejecting
+				// every tool call. Tools that explicitly declare their own
+				// bindings keep them untouched.
+				if ( 'handle_tool_call' === ( $tool_def['method'] ?? '' ) ) {
+					$existing = is_array( $tool_def['client_context_bindings'] ?? null )
+						? $tool_def['client_context_bindings']
+						: array();
+					if ( ! in_array( 'job_id', $existing, true ) && ! array_key_exists( 'job_id', $existing ) ) {
+						$existing[]                          = 'job_id';
+						$tool_def['client_context_bindings'] = $existing;
+					}
+				}
+
 				// Apply registry-level meta unless the resolved tool
 				// explicitly overrides.
 				if ( ! isset( $tool_def['modes'] ) ) {
