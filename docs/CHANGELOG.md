@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.140.1] - 2026-06-06
+
+### Fixed
+- auto-bind job_id for handler-class tools so satellite handlers can't drop it (#2560)
+
 ## [0.140.0] - 2026-06-06
 
 ### Added
