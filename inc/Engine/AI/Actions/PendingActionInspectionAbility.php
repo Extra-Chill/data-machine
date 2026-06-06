@@ -154,7 +154,7 @@ final class PendingActionInspectionAbility {
 
 		return array(
 			'success' => true,
-			'actions' => is_array( $result['actions'] ?? null ) ? $result['actions'] : array(),
+			'actions' => self::normalize_action_rows( is_array( $result['actions'] ?? null ) ? $result['actions'] : array() ),
 		);
 	}
 
@@ -195,8 +195,69 @@ final class PendingActionInspectionAbility {
 
 		return array(
 			'success' => true,
-			'action'  => $action,
+			'action'  => self::normalize_action_row( $action ),
 		);
+	}
+
+	/**
+	 * Normalize action rows for frontend/CLI inspection.
+	 *
+	 * @param array<int,array<string,mixed>> $actions Canonical action rows.
+	 * @return array<int,array<string,mixed>> Rows with stable flattened Data Machine fields.
+	 */
+	public static function normalize_action_rows( array $actions ): array {
+		return array_map( array( self::class, 'normalize_action_row' ), array_values( array_filter( $actions, 'is_array' ) ) );
+	}
+
+	/**
+	 * Normalize one canonical pending-action row for frontend/CLI inspection.
+	 *
+	 * Agents API rows are intentionally generic. Data Machine consumers also need
+	 * stable scalar fields for table output, filtering evidence, and review UIs.
+	 *
+	 * @param array<string,mixed> $action Canonical action row.
+	 * @return array<string,mixed> Normalized action row.
+	 */
+	public static function normalize_action_row( array $action ): array {
+		$metadata    = isset( $action['metadata'] ) && is_array( $action['metadata'] ) ? $action['metadata'] : array();
+		$datamachine = isset( $metadata['datamachine'] ) && is_array( $metadata['datamachine'] ) ? $metadata['datamachine'] : array();
+		$context     = isset( $datamachine['context'] ) && is_array( $datamachine['context'] ) ? $datamachine['context'] : array();
+		$workspace   = isset( $action['workspace'] ) && is_array( $action['workspace'] ) ? $action['workspace'] : array();
+
+		$action['preview_data']      = $action['preview'] ?? $action['preview_data'] ?? array();
+		$action['agent_id']          = isset( $datamachine['agent_id'] ) ? (int) $datamachine['agent_id'] : self::id_from_canonical_ref( $action['agent'] ?? null, 'agent' );
+		$action['created_by']        = isset( $datamachine['created_by'] ) ? (int) $datamachine['created_by'] : self::id_from_canonical_ref( $action['creator'] ?? null, 'user' );
+		$action['context']           = $context;
+		$action['workspace_type']    = isset( $workspace['workspace_type'] ) ? (string) $workspace['workspace_type'] : null;
+		$action['workspace_id']      = isset( $workspace['workspace_id'] ) ? (string) $workspace['workspace_id'] : null;
+		$action['created_at_iso']    = isset( $action['created_at'] ) ? (string) $action['created_at'] : null;
+		$action['expires_at_iso']    = isset( $action['expires_at'] ) ? $action['expires_at'] : null;
+		$action['resolved_at_iso']   = isset( $action['resolved_at'] ) ? $action['resolved_at'] : null;
+		$action['audit_context']     = isset( $datamachine['audit_context'] ) && is_array( $datamachine['audit_context'] ) ? $datamachine['audit_context'] : array();
+		$action['principal_context'] = isset( $action['audit_context']['principal_context'] ) && is_array( $action['audit_context']['principal_context'] ) ? $action['audit_context']['principal_context'] : array();
+		$action['resolve_with']      = isset( $datamachine['resolve_with'] ) ? (string) $datamachine['resolve_with'] : 'resolve_pending_action';
+		$action['resolve_params']    = array(
+			'action_id' => (string) ( $action['action_id'] ?? '' ),
+			'decision'  => '<accepted|rejected>',
+		);
+
+		return $action;
+	}
+
+	/**
+	 * Extract numeric IDs from canonical refs such as agent:7 or user:12.
+	 *
+	 * @param mixed  $value  Canonical ref.
+	 * @param string $prefix Expected prefix.
+	 * @return int Positive ID or 0.
+	 */
+	private static function id_from_canonical_ref( $value, string $prefix ): int {
+		if ( ! is_string( $value ) ) {
+			return 0;
+		}
+
+		$match = array();
+		return preg_match( '/^' . preg_quote( $prefix, '/' ) . ':(\d+)$/', $value, $match ) ? (int) $match[1] : 0;
 	}
 
 	/**

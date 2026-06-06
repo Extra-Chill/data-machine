@@ -65,6 +65,7 @@ class PendingActionHelper {
 		$context      = isset( $args['context'] ) && is_array( $args['context'] ) ? $args['context'] : array();
 		$action_id    = isset( $args['action_id'] ) ? (string) $args['action_id'] : '';
 		$grants       = isset( $args['resolver_grants'] ) && is_array( $args['resolver_grants'] ) ? $args['resolver_grants'] : array();
+		$metadata     = isset( $args['metadata'] ) && is_array( $args['metadata'] ) ? $args['metadata'] : array();
 
 		if ( '' === $kind ) {
 			return array(
@@ -91,6 +92,18 @@ class PendingActionHelper {
 		$grants = apply_filters( 'datamachine_pending_action_resolver_grants', $grants, $args );
 		$grants = is_array( $grants ) ? array_values( array_filter( $grants, 'is_array' ) ) : array();
 
+		$datamachine_metadata = isset( $metadata['datamachine'] ) && is_array( $metadata['datamachine'] ) ? $metadata['datamachine'] : array();
+		$metadata['datamachine'] = array_merge(
+			$datamachine_metadata,
+			array(
+				'agent_id'        => $agent_id,
+				'created_by'      => $user_id,
+				'context'         => $context,
+				'resolver_grants' => $grants,
+				'resolve_with'    => 'resolve_pending_action',
+			)
+		);
+
 		$payload = array(
 			'kind'            => $kind,
 			'summary'         => wp_strip_all_tags( $summary ),
@@ -102,15 +115,7 @@ class PendingActionHelper {
 			'created_by'      => $user_id,
 			'creator'         => $user_id > 0 ? 'user:' . $user_id : null,
 			'context'         => $context,
-			'metadata'        => array(
-				'datamachine' => array(
-					'agent_id'        => $agent_id,
-					'created_by'      => $user_id,
-					'context'         => $context,
-					'resolver_grants' => $grants,
-					'resolve_with'    => 'resolve_pending_action',
-				),
-			),
+			'metadata'        => $metadata,
 		);
 		if ( isset( $args['ttl'] ) ) {
 			$payload['ttl'] = (int) $args['ttl'];

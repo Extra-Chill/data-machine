@@ -14,6 +14,7 @@ namespace DataMachine\Engine\AI\Tools;
 use AgentsAPI\AI\Tools\WP_Agent_Action_Policy;
 use AgentsAPI\AI\Tools\WP_Agent_Tool_Execution_Core;
 use AgentsAPI\Core\Workspace\WP_Agent_Workspace_Scope;
+use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Core\Workspace\WordPressWorkspaceScope;
 use DataMachine\Core\WordPress\PostTracking;
 use DataMachine\Engine\AI\Actions\ActionPolicyResolver;
@@ -72,6 +73,7 @@ class ToolExecutor {
 		$tool_def            = $prepared['tool_def'];
 		$tool_call           = $prepared['tool_call'];
 		$complete_parameters = is_array( $tool_call['parameters'] ?? null ) ? $tool_call['parameters'] : array();
+		$audit_context       = self::buildToolAuditContext( $tool_name, $complete_parameters, $tool_def, $payload, $agent_id, $client_context );
 
 		if ( 'client' === (string) ( $tool_def['executor'] ?? '' ) || ! empty( $tool_def['external_executor'] ) ) {
 			return array(
@@ -98,11 +100,14 @@ class ToolExecutor {
 		);
 
 		if ( WP_Agent_Action_Policy::refusesExecution( $policy ) ) {
+			self::dispatchToolAudit( array_merge( $audit_context, array( 'result_status' => 'forbidden' ) ) );
+
 			return array(
 				'success'        => false,
 				'error'          => sprintf( 'Tool "%s" is not permitted in the current context (action_policy=forbidden).', $tool_name ),
 				'tool_name'      => $tool_name,
 				'action_policy'  => $policy,
+				'audit_context'  => array_merge( $audit_context, array( 'result_status' => 'forbidden' ) ),
 			);
 		}
 
@@ -139,6 +144,7 @@ class ToolExecutor {
 						'apply_input'  => $complete_parameters,
 						'preview_data' => self::buildActionPreviewData( $complete_parameters, $tool_def ),
 						'agent_id'     => $agent_id,
+						'user_id'      => self::resolveActingUserId( $payload, $client_context ),
 						'context'      => array_filter(
 							array(
 								'mode'           => $mode,
@@ -149,8 +155,14 @@ class ToolExecutor {
 							),
 							fn( $v ) => null !== $v && '' !== $v
 						),
+						'metadata'     => array(
+							'datamachine' => array(
+								'audit_context' => array_merge( $audit_context, array( 'result_status' => 'staged' ) ),
+							),
+						),
 					)
 				);
+				self::dispatchToolAudit( array_merge( $audit_context, array( 'result_status' => ! empty( $staged['staged'] ) ? 'staged' : 'stage_failed' ) ) );
 
 				return array_merge(
 					array(
@@ -165,6 +177,8 @@ class ToolExecutor {
 
 		// Policy is 'direct' — execute the tool normally.
 		$tool_result = $core->executePreparedTool( $tool_call, $tool_def, $execution, $tool_context );
+		$tool_result = self::attachToolAuditContext( $tool_result, array_merge( $audit_context, array( 'result_status' => ! empty( $tool_result['success'] ) ? 'success' : 'error' ) ) );
+		self::dispatchToolAudit( $tool_result['metadata']['datamachine']['audit_context'] ?? array_merge( $audit_context, array( 'result_status' => ! empty( $tool_result['success'] ) ? 'success' : 'error' ) ) );
 
 		// Automatic post origin tracking — applies to every tool whose result
 		// contains an extractable post_id. This covers both handler tools
@@ -183,6 +197,194 @@ class ToolExecutor {
 		}
 
 		return $tool_result;
+	}
+
+	/**
+	 * Build safe audit metadata for a tool invocation.
+	 *
+	 * @param string $tool_name       Tool name.
+	 * @param array  $parameters      Complete tool parameters.
+	 * @param array  $tool_def        Tool definition.
+	 * @param array  $payload         Data Machine loop payload.
+	 * @param int    $agent_id        Acting agent ID.
+	 * @param array  $client_context  Client context.
+	 * @return array<string,mixed>
+	 */
+	private static function buildToolAuditContext( string $tool_name, array $parameters, array $tool_def, array $payload, int $agent_id, array $client_context ): array {
+		return array_filter(
+			array(
+				'tool_name'           => $tool_name,
+				'tool_source'         => self::toolSourceSummary( $tool_def ),
+				'principal_context'   => self::buildSafePrincipalContext( $payload, $agent_id, $client_context ),
+				'parameters_redacted' => self::redactForAudit( $parameters ),
+				'executed_at'         => gmdate( 'c' ),
+			),
+			static fn( $value ): bool => null !== $value && array() !== $value && '' !== $value
+		);
+	}
+
+	/**
+	 * Attach audit metadata to a tool result without replacing existing metadata.
+	 *
+	 * @param array $tool_result   Tool result.
+	 * @param array $audit_context Safe audit context.
+	 * @return array<string,mixed>
+	 */
+	private static function attachToolAuditContext( array $tool_result, array $audit_context ): array {
+		$metadata                        = is_array( $tool_result['metadata'] ?? null ) ? $tool_result['metadata'] : array();
+		$datamachine                     = is_array( $metadata['datamachine'] ?? null ) ? $metadata['datamachine'] : array();
+		$datamachine['audit_context']    = $audit_context;
+		$metadata['datamachine']         = $datamachine;
+		$tool_result['metadata']         = $metadata;
+		$tool_result['audit_context']    = $audit_context;
+
+		return $tool_result;
+	}
+
+	/**
+	 * Emit a generic audit hook for integrations that persist external logs.
+	 *
+	 * @param array $audit_context Safe audit context.
+	 */
+	private static function dispatchToolAudit( array $audit_context ): void {
+		if ( ! function_exists( 'do_action' ) ) {
+			return;
+		}
+
+		do_action( 'datamachine_tool_execution_audit', $audit_context );
+	}
+
+	/**
+	 * Build a non-secret principal summary for audit and review surfaces.
+	 *
+	 * @param array $payload        Loop payload.
+	 * @param int   $agent_id       Acting agent ID.
+	 * @param array $client_context Client context.
+	 * @return array<string,mixed>
+	 */
+	private static function buildSafePrincipalContext( array $payload, int $agent_id, array $client_context ): array {
+		$principal = class_exists( PermissionHelper::class ) ? PermissionHelper::get_execution_principal() : null;
+		$context   = array();
+
+		if ( null !== $principal ) {
+			$owner = $principal->conversation_owner();
+			$context = array_filter(
+				array(
+					'principal_class'    => $principal->auth_source,
+					'auth_source'        => $principal->auth_source,
+					'request_context'    => $principal->request_context,
+					'effective_agent_id' => $principal->effective_agent_id,
+					'acting_user_id'     => $principal->acting_user_id > 0 ? $principal->acting_user_id : null,
+					'token_id'           => $principal->token_id,
+					'workspace_id'       => $principal->workspace_id,
+					'client_id'          => $principal->client_id,
+					'owner_type'         => is_array( $owner ) ? ( $owner['type'] ?? null ) : null,
+				),
+				static fn( $value ): bool => null !== $value && '' !== $value
+			);
+		}
+
+		$user_id = self::resolveActingUserId( $payload, $client_context );
+		if ( $user_id > 0 && empty( $context['acting_user_id'] ) ) {
+			$context['acting_user_id'] = $user_id;
+		}
+
+		if ( $agent_id > 0 && empty( $context['effective_agent_id'] ) ) {
+			$context['effective_agent_id'] = 'agent:' . $agent_id;
+		}
+
+		if ( empty( $context['principal_class'] ) ) {
+			$context['principal_class'] = class_exists( PermissionHelper::class ) && PermissionHelper::in_agent_context() ? 'agent_token' : ( $user_id > 0 ? 'user' : 'system' );
+		}
+		$context['credential_scope'] = self::credentialScopeForPrincipalClass( (string) $context['principal_class'] );
+
+		foreach ( array( 'session_id', 'transcript_session_id', 'request_id' ) as $key ) {
+			$value = self::firstNonEmptyString( $payload, $client_context, $key );
+			if ( '' !== $value ) {
+				$context[ $key ] = $value;
+			}
+		}
+
+		return $context;
+	}
+
+	/**
+	 * Map principal classes to generic credential scopes.
+	 *
+	 * @param string $principal_class Principal/auth source.
+	 * @return string Generic credential scope.
+	 */
+	private static function credentialScopeForPrincipalClass( string $principal_class ): string {
+		return match ( $principal_class ) {
+			'agent_token' => 'agent',
+			'user', 'application_password' => 'user',
+			'runtime', 'audience' => 'runtime',
+			default => 'site',
+		};
+	}
+
+	/**
+	 * Return a stable source/provider summary for a tool definition.
+	 *
+	 * @param array $tool_def Tool definition.
+	 * @return array<string,string>|null
+	 */
+	private static function toolSourceSummary( array $tool_def ): ?array {
+		$source = array();
+		foreach ( array( 'source', 'provider', 'category', 'class', 'method', 'ability', 'handler' ) as $key ) {
+			if ( isset( $tool_def[ $key ] ) && is_scalar( $tool_def[ $key ] ) && '' !== trim( (string) $tool_def[ $key ] ) ) {
+				$source[ $key ] = (string) $tool_def[ $key ];
+			}
+		}
+
+		return empty( $source ) ? null : $source;
+	}
+
+	/**
+	 * Redact secrets and oversized values from audit metadata.
+	 *
+	 * @param mixed $value Value to redact.
+	 * @param string $key Current key.
+	 * @return mixed Redacted value.
+	 */
+	private static function redactForAudit( $value, string $key = '' ) {
+		if ( '' !== $key && preg_match( '/(token|secret|password|pass|cookie|authorization|auth|key|credential|nonce|session)/i', $key ) ) {
+			return '[redacted]';
+		}
+
+		if ( is_array( $value ) ) {
+			$redacted = array();
+			foreach ( $value as $child_key => $child_value ) {
+				$redacted[ $child_key ] = self::redactForAudit( $child_value, is_scalar( $child_key ) ? (string) $child_key : '' );
+			}
+			return $redacted;
+		}
+
+		if ( is_string( $value ) && strlen( $value ) > 500 ) {
+			return substr( $value, 0, 500 ) . '... [truncated]';
+		}
+
+		return is_scalar( $value ) || null === $value ? $value : '[' . gettype( $value ) . ']';
+	}
+
+	/**
+	 * Resolve the acting user ID from explicit context or PermissionHelper.
+	 *
+	 * @param array $payload        Loop payload.
+	 * @param array $client_context Client context.
+	 * @return int Acting user ID, or 0.
+	 */
+	private static function resolveActingUserId( array $payload, array $client_context ): int {
+		$user_id = self::firstPositiveInt( $payload, $client_context, 'acting_user_id', 'calling_user_id', 'user_id' );
+		if ( $user_id > 0 ) {
+			return $user_id;
+		}
+
+		if ( class_exists( PermissionHelper::class ) ) {
+			return PermissionHelper::acting_user_id();
+		}
+
+		return function_exists( 'get_current_user_id' ) ? (int) get_current_user_id() : 0;
 	}
 
 	/**
