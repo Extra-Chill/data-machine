@@ -92,7 +92,7 @@ class PendingActionHelper {
 		$grants = apply_filters( 'datamachine_pending_action_resolver_grants', $grants, $args );
 		$grants = is_array( $grants ) ? array_values( array_filter( $grants, 'is_array' ) ) : array();
 
-		$datamachine_metadata = isset( $metadata['datamachine'] ) && is_array( $metadata['datamachine'] ) ? $metadata['datamachine'] : array();
+		$datamachine_metadata    = isset( $metadata['datamachine'] ) && is_array( $metadata['datamachine'] ) ? $metadata['datamachine'] : array();
 		$metadata['datamachine'] = array_merge(
 			$datamachine_metadata,
 			array(
