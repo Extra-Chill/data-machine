@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.40.8] - 2026-06-06
+
+### Fixed
+- bind job_id context to upsert_event tool so event writes succeed (#2560)
+
 ## [0.40.7] - 2026-06-01
 
 ### Fixed
