@@ -2,6 +2,16 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.140.0] - 2026-06-06
+
+### Added
+- escalate recurring schedules rejected on every tick
+
+### Changed
+- Harden tool ability execution contract
+- Preserve workflow tool recorders in step configs
+- reduce no-op release checks
+
 ## [0.139.39] - 2026-06-05
 
 ### Changed
