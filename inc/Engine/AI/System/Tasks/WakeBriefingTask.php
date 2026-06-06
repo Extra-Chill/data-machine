@@ -152,7 +152,7 @@ class WakeBriefingTask extends SystemTask {
 	 * @return string Markdown content.
 	 */
 	private function render( array $signals, int $window_hours ): string {
-		$header = "# Wake Briefing\n\n";
+		$header  = "# Wake Briefing\n\n";
 		$header .= sprintf( "_What changed in the last %dh (recomputed each session; not personal to one session)._\n\n", $window_hours );
 
 		if ( empty( $signals ) ) {
