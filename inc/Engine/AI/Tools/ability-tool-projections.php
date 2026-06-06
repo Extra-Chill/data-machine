@@ -11,9 +11,10 @@ if ( ! function_exists( 'datamachine_register_ability_tool' ) ) {
 	/**
 	 * Register an ability as a model-facing tool projection.
 	 *
-	 * The declaration must include an `ability` slug. Optional keys such as
-	 * `modes`, `description`, `parameters`, `requires_opt_in`, `action_policy`,
-	 * and `runtime` are passed through AbilityToolSource.
+	 * The declaration must include an `ability` slug. AbilityToolSource uses that
+	 * slug as both permission metadata and the explicit direct-execution marker.
+	 * Optional keys such as `modes`, `description`, `parameters`,
+	 * `requires_opt_in`, `action_policy`, and `runtime` are passed through.
 	 *
 	 * @param string $tool_name   Model-facing tool name.
 	 * @param array  $declaration Ability projection declaration.

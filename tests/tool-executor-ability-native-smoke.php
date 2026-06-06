@@ -218,6 +218,26 @@ namespace DataMachine\Tests\ToolExecutorAbilityNativeSmoke {
 		}
 	}
 
+	class CompositeIssueTool {
+		public static int $calls = 0;
+
+		public function execute( array $parameters, array $tool_def ): array {
+			++self::$calls;
+			$action       = (string) ( $parameters['action'] ?? 'update' );
+			$ability_slug = 'comment' === $action ? 'datamachine/comment-issue' : 'datamachine/update-issue';
+			$ability      = \WP_Abilities_Registry::get_instance()->get_registered( $ability_slug );
+
+			return $ability->execute(
+				array(
+					'action'    => $action,
+					'issue'     => $parameters['issue'] ?? 0,
+					'body'      => $parameters['body'] ?? '',
+					'tool_name' => $tool_def['name'] ?? 'composite_issue_tool',
+				)
+			);
+		}
+	}
+
 	function execute_tool( string $tool_name, array $tool_parameters, array $tool_def, array $payload = array() ): array {
 		return ToolExecutor::executeTool(
 			$tool_name,
@@ -254,9 +274,10 @@ namespace DataMachine\Tests\ToolExecutorAbilityNativeSmoke {
 		'ability_only_tool',
 		array( 'message' => 'hello' ),
 		array(
-			'ability'     => 'datamachine/smoke-ability',
-			'description' => 'Ability-only smoke tool',
-			'parameters'  => array(
+			'ability'           => 'datamachine/smoke-ability',
+			'execution_ability' => 'datamachine/smoke-ability',
+			'description'       => 'Ability-only smoke tool',
+			'parameters'        => array(
 				'message' => array(
 					'type'     => 'string',
 					'required' => true,
@@ -284,6 +305,7 @@ namespace DataMachine\Tests\ToolExecutorAbilityNativeSmoke {
 		array( 'message' => 'hello' ),
 		array(
 			'ability'                 => 'datamachine/bound-ability',
+			'execution_ability'       => 'datamachine/bound-ability',
 			'client_context_bindings' => array( 'job_id' ),
 			'parameters'              => array(
 				'message' => array(
@@ -313,8 +335,9 @@ namespace DataMachine\Tests\ToolExecutorAbilityNativeSmoke {
 		'runtime_keys_tool',
 		array( 'message' => 'hello' ),
 		array(
-			'ability'    => 'datamachine/runtime-keys-ability',
-			'parameters' => array(
+			'ability'           => 'datamachine/runtime-keys-ability',
+			'execution_ability' => 'datamachine/runtime-keys-ability',
+			'parameters'        => array(
 				'message'      => array(
 					'type'     => 'string',
 					'required' => true,
@@ -364,8 +387,9 @@ namespace DataMachine\Tests\ToolExecutorAbilityNativeSmoke {
 		array( 'message' => 'core' ),
 		array(
 			'core_ability_tool' => array(
-				'ability'    => 'datamachine/core-ability',
-				'parameters' => array(
+				'ability'           => 'datamachine/core-ability',
+				'execution_ability' => 'datamachine/core-ability',
+				'parameters'        => array(
 					'message' => array(
 						'type'     => 'string',
 						'required' => true,
@@ -396,10 +420,11 @@ namespace DataMachine\Tests\ToolExecutorAbilityNativeSmoke {
 		'preview_tool',
 		array( 'message' => 'needs approval' ),
 		array(
-			'ability'       => 'datamachine/preview-ability',
-			'action_policy' => ActionPolicyResolver::POLICY_PREVIEW,
-			'action_kind'   => 'preview_kind',
-			'parameters'    => array(
+			'ability'           => 'datamachine/preview-ability',
+			'execution_ability' => 'datamachine/preview-ability',
+			'action_policy'     => ActionPolicyResolver::POLICY_PREVIEW,
+			'action_kind'       => 'preview_kind',
+			'parameters'        => array(
 				'message' => array(
 					'type'     => 'string',
 					'required' => true,
@@ -424,9 +449,10 @@ namespace DataMachine\Tests\ToolExecutorAbilityNativeSmoke {
 		'preview_missing_metadata_tool',
 		array( 'message' => 'needs approval' ),
 		array(
-			'ability'       => 'datamachine/missing-metadata-ability',
-			'action_policy' => ActionPolicyResolver::POLICY_PREVIEW,
-			'parameters'    => array(
+			'ability'           => 'datamachine/missing-metadata-ability',
+			'execution_ability' => 'datamachine/missing-metadata-ability',
+			'action_policy'     => ActionPolicyResolver::POLICY_PREVIEW,
+			'parameters'        => array(
 				'message' => array(
 					'type'     => 'string',
 					'required' => true,
@@ -439,28 +465,91 @@ namespace DataMachine\Tests\ToolExecutorAbilityNativeSmoke {
 	assert_smoke( 'preview without action_kind does not stage ambiguous action', 0 === count( PendingActionHelper::$staged ) );
 	assert_smoke( 'preview without action_kind does not execute ability directly', 0 === ability_execute_count( $missing_metadata_ability ) );
 
-	echo "\n[ability:2] Linked ability takes precedence over class/method metadata\n";
+	echo "\n[ability:2] Class/method tool executes wrapper when ability metadata is present\n";
 	LegacyTool::$calls = 0;
 	$result            = execute_tool(
-		'ability_precedence_tool',
-		array( 'message' => 'ability' ),
+		'wrapper_with_ability_metadata_tool',
+		array( 'message' => 'wrapper' ),
 		array(
-			'name'    => 'ability_precedence_tool',
+			'name'    => 'wrapper_with_ability_metadata_tool',
 			'class'   => LegacyTool::class,
 			'method'  => 'execute',
 			'ability' => 'datamachine/smoke-ability',
 		)
 	);
-	assert_smoke( 'ability precedence result succeeds', true === ( $result['success'] ?? false ) );
-	assert_smoke( 'linked ability wins over class/method metadata', true === ( $result['result']['ability'] ?? false ) );
-	assert_smoke( 'class/method fallback is not called when ability exists', 0 === LegacyTool::$calls );
+	assert_smoke( 'wrapper-with-ability-metadata result succeeds', true === ( $result['success'] ?? false ) );
+	assert_smoke( 'class/method wrapper wins over permission ability metadata', true === ( $result['result']['legacy'] ?? false ) );
+	assert_smoke( 'ability metadata does not bypass class/method wrapper', 1 === LegacyTool::$calls );
+	assert_smoke( 'permission ability is not executed directly for wrapper tool', 1 === ability_execute_count( $ability ) );
+
+	echo "\n[ability:2b] Composite wrapper routes based on arguments despite ability metadata\n";
+	$update_issue = new \Ability_Native_Smoke_Ability(
+		fn( $input ) => true,
+		fn( $input ) => array(
+			'success' => true,
+			'route'   => 'update',
+			'input'   => $input,
+		)
+	);
+	$comment_issue = new \Ability_Native_Smoke_Ability(
+		fn( $input ) => true,
+		fn( $input ) => array(
+			'success' => true,
+			'route'   => 'comment',
+			'input'   => $input,
+		)
+	);
+	$registry->register_for_smoke( 'datamachine/update-issue', $update_issue );
+	$registry->register_for_smoke( 'datamachine/comment-issue', $comment_issue );
+	CompositeIssueTool::$calls = 0;
+	$result                    = execute_tool(
+		'manage_issue_tool',
+		array(
+			'action' => 'comment',
+			'issue'  => 487,
+			'body'   => 'regression smoke',
+		),
+		array(
+			'name'       => 'manage_issue_tool',
+			'class'      => CompositeIssueTool::class,
+			'method'     => 'execute',
+			'ability'    => 'datamachine/update-issue',
+			'parameters' => array(
+				'action' => array( 'type' => 'string' ),
+				'issue'  => array( 'type' => 'integer' ),
+				'body'   => array( 'type' => 'string' ),
+			),
+		)
+	);
+	assert_smoke( 'composite wrapper result succeeds', true === ( $result['success'] ?? false ) );
+	assert_smoke( 'composite wrapper selected comment route', 'comment' === ( $result['result']['route'] ?? null ) );
+	assert_smoke( 'composite wrapper executed exactly once', 1 === CompositeIssueTool::$calls );
+	assert_smoke( 'permission metadata ability was not executed as the route', 0 === ability_execute_count( $update_issue ) );
+	assert_smoke( 'routed comment ability executed exactly once', 1 === ability_execute_count( $comment_issue ) );
+
+	echo "\n[ability:2c] Ambiguous ability metadata without execution marker is rejected\n";
+	$ambiguous = new \Ability_Native_Smoke_Ability(
+		fn( $input ) => true,
+		fn( $input ) => array( 'success' => true )
+	);
+	$registry->register_for_smoke( 'datamachine/ambiguous-ability', $ambiguous );
+	$result = execute_tool(
+		'ambiguous_ability_metadata_tool',
+		array(),
+		array(
+			'ability' => 'datamachine/ambiguous-ability',
+		)
+	);
+	assert_smoke( 'ambiguous ability-only metadata fails closed', false === ( $result['success'] ?? true ) );
+	assert_smoke( 'ambiguous ability-only metadata reports stable error type', 'ambiguous_tool_execution_contract' === ( $result['metadata']['error_type'] ?? null ) );
+	assert_smoke( 'ambiguous ability-only metadata does not execute ability', 0 === ability_execute_count( $ambiguous ) );
 
 	echo "\n[ability:3] Missing ability returns a clear failure\n";
 	$result = execute_tool(
 		'missing_ability_tool',
 		array(),
 		array(
-			'ability' => 'datamachine/not-registered',
+			'execution_ability' => 'datamachine/not-registered',
 		)
 	);
 	assert_smoke( 'missing ability fails', false === ( $result['success'] ?? true ) );
@@ -476,7 +565,8 @@ namespace DataMachine\Tests\ToolExecutorAbilityNativeSmoke {
 		'denied_ability_tool',
 		array(),
 		array(
-			'ability' => 'datamachine/denied-ability',
+			'ability'           => 'datamachine/denied-ability',
+			'execution_ability' => 'datamachine/denied-ability',
 		)
 	);
 	assert_smoke( 'permission-denied ability fails', false === ( $result['success'] ?? true ) );

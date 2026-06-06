@@ -33,8 +33,19 @@ class ToolExecutionCore implements WP_Agent_Tool_Executor {
 		$tool_name  = (string) ( $tool_call['tool_name'] ?? '' );
 		$parameters = is_array( $tool_call['parameters'] ?? null ) ? $tool_call['parameters'] : array();
 
-		if ( ! empty( $tool_definition['ability'] ) ) {
+		if ( ! empty( $tool_definition['execution_ability'] ) ) {
 			return $this->executeAbilityTool( $tool_name, $parameters, $tool_definition );
+		}
+
+		if ( empty( $tool_definition['class'] ) && ( ! empty( $tool_definition['ability'] ) || ! empty( $tool_definition['abilities'] ) ) ) {
+			return array(
+				'success'   => false,
+				'error'     => sprintf( "Tool '%s' declares ability permission metadata but does not declare 'execution_ability' or a class/method wrapper.", $tool_name ),
+				'tool_name' => $tool_name,
+				'metadata'  => array(
+					'error_type' => 'ambiguous_tool_execution_contract',
+				),
+			);
 		}
 
 		return $this->executeClassMethodTool( $tool_name, $parameters, $tool_definition );
@@ -49,7 +60,7 @@ class ToolExecutionCore implements WP_Agent_Tool_Executor {
 	 * @return array Tool execution result.
 	 */
 	private function executeAbilityTool( string $tool_name, array $parameters, array $tool_definition ): array {
-		$ability_slug = (string) $tool_definition['ability'];
+		$ability_slug = (string) $tool_definition['execution_ability'];
 		if ( ! class_exists( '\\WP_Abilities_Registry' ) ) {
 			return array(
 				'success'   => false,

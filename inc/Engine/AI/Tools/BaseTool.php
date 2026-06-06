@@ -32,8 +32,10 @@ abstract class BaseTool {
 	 *
 	 * Tools should also declare which ability they wrap via the `ability` key
 	 * (or `abilities` for composed tools). The ToolPolicyResolver uses this to
-	 * check the ability's permission_callback before offering the tool to AI agents.
-	 * Tools without an ability declaration default to admin-only access.
+	 * check the ability's permission_callback before offering the tool to AI agents;
+	 * class/method tools still execute their wrapper methods. Direct ability-backed
+	 * tools must declare the explicit `execution_ability` marker. Tools without an
+	 * ability declaration default to admin-only access.
 	 *
 	 * Tools may also expose top-level `runtime` metadata in their definition to
 	 * describe loop behavior without hardcoding tool names in core. Supported keys
@@ -56,7 +58,8 @@ abstract class BaseTool {
 	 * @param array|callable $toolDefinition Tool definition array OR callable that returns it.
 	 * @param array          $modes          Agent modes where this tool is available (e.g. ['chat', 'pipeline']).
 	 * @param array          $meta           Optional metadata for permission resolution. {
-	 *     @type string   $ability      Single ability slug this tool wraps (e.g. 'datamachine/local-search').
+	 *     @type string   $ability      Single ability slug this tool wraps for permission checks (e.g. 'datamachine/local-search').
+	 *     @type string   $execution_ability Ability slug to execute directly instead of a class/method wrapper.
 	 *     @type string[] $abilities    Multiple ability slugs for composed tools. ALL must pass permission check.
 	 *     @type string   $access_level Fallback for tools without a linked ability.
 	 *                                  One of: 'public', 'authenticated', 'author', 'editor', 'admin'. Default: 'admin'.
@@ -84,6 +87,9 @@ abstract class BaseTool {
 				// Merge permission metadata into the tool entry.
 				if ( ! empty( $meta['ability'] ) ) {
 					$tools[ $toolName ]['ability'] = $meta['ability'];
+				}
+				if ( ! empty( $meta['execution_ability'] ) ) {
+					$tools[ $toolName ]['execution_ability'] = $meta['execution_ability'];
 				}
 				if ( ! empty( $meta['abilities'] ) ) {
 					$tools[ $toolName ]['abilities'] = $meta['abilities'];
