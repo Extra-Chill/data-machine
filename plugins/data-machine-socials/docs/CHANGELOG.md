@@ -4,6 +4,21 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.14.0] - 2026-06-06
+
+### Added
+- declare preview shape on SocialPlatformConfig (#140)
+
+### Changed
+- extract AbstractSocialAbility + AbstractSocialTool (closes #149)
+- centralize Meta Graph API version (closes #150)
+- add WP Codebox crop-modal interaction smoke test
+- modernize to React 19 @wordpress/* release train
+
+### Fixed
+- bind job_id context to social publish tools (#2560)
+- drop /wp-json/ prefix from REST_BASE so apiFetch paths resolve
+
 ## [0.13.2] - 2026-05-09
 
 ### Changed
