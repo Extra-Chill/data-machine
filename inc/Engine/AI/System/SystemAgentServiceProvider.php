@@ -41,6 +41,7 @@ use DataMachine\Engine\AI\System\Tasks\Retention\RetentionProcessedItemsTask;
 use DataMachine\Engine\AI\System\Tasks\Retention\RetentionStaleClaimsTask;
 use DataMachine\Engine\AI\System\Tasks\SourceInventoryTask;
 use DataMachine\Engine\AI\System\Tasks\SystemTask;
+use DataMachine\Engine\Tasks\RecurringRejectionTracker;
 use DataMachine\Engine\Tasks\RecurringScheduleRegistry;
 use DataMachine\Engine\Tasks\RecurringScheduler;
 use DataMachine\Engine\Tasks\TaskRegistry;
@@ -312,9 +313,21 @@ class SystemAgentServiceProvider {
 								'error_code'  => 'recurring_task_agent_context_required',
 							)
 						);
+						// A persistent "no agents" condition is the same class of
+						// silent recurring-binding failure as a gate rejection:
+						// nothing ever runs. Track it so it escalates.
+						RecurringRejectionTracker::record_rejection(
+							$schedule_id,
+							$task_type,
+							'recurring_task_agent_context_required'
+						);
 						return;
 					}
 
+					// For per-agent schedules, a tick "ran" if at least one
+					// agent fan-out was accepted. Only when every fan-out is
+					// rejected is the recurring binding effectively dead.
+					$any_scheduled = false;
 					foreach ( $agents as $agent ) {
 						$agent_id = (int) ( $agent['agent_id'] ?? 0 );
 						$owner_id = (int) ( $agent['owner_id'] ?? 0 );
@@ -327,7 +340,7 @@ class SystemAgentServiceProvider {
 						$agent_params['agent_id'] = $agent_id;
 						$agent_params['user_id']  = $owner_id;
 
-						TaskScheduler::schedule(
+						$scheduled = TaskScheduler::schedule(
 							$task_type,
 							$agent_params,
 							array(
@@ -335,11 +348,33 @@ class SystemAgentServiceProvider {
 								'user_id'  => $owner_id,
 							)
 						);
+						if ( false !== $scheduled ) {
+							$any_scheduled = true;
+						}
+					}
+
+					if ( $any_scheduled ) {
+						RecurringRejectionTracker::record_success( $schedule_id );
+					} else {
+						RecurringRejectionTracker::record_rejection(
+							$schedule_id,
+							$task_type,
+							'task_scheduler_rejected'
+						);
 					}
 					return;
 				}
 
-				TaskScheduler::schedule( $task_type, $params );
+				$scheduled = TaskScheduler::schedule( $task_type, $params );
+				if ( false === $scheduled ) {
+					RecurringRejectionTracker::record_rejection(
+						$schedule_id,
+						$task_type,
+						'task_scheduler_rejected'
+					);
+				} else {
+					RecurringRejectionTracker::record_success( $schedule_id );
+				}
 			};
 
 			add_action( $hook, $dispatch_schedule );

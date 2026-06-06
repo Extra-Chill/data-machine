@@ -131,6 +131,20 @@ class SystemCommand extends BaseCommand {
 					WP_CLI::log( sprintf( '  Daily memory:   last attempted %s GMT', $daily_memory['last_attempt_gmt'] ) );
 				}
 			}
+			if ( ! empty( $check_result['rejected_schedules'] ) && is_array( $check_result['rejected_schedules'] ) ) {
+				WP_CLI::log( sprintf( '  Rejected schedules: %d (rejected every tick, never running)', count( $check_result['rejected_schedules'] ) ) );
+				foreach ( $check_result['rejected_schedules'] as $rejected ) {
+					WP_CLI::log(
+						sprintf(
+							'    - %s (task %s): %d consecutive rejections since %s GMT',
+							$rejected['schedule_id'] ?? '?',
+							$rejected['task_type'] ?? '?',
+							(int) ( $rejected['consecutive_count'] ?? 0 ),
+							$rejected['first_rejected_gmt'] ?? '?'
+						)
+					);
+				}
+			}
 			if ( isset( $check_result['unowned_pipelines'] ) || isset( $check_result['unowned_flows'] ) ) {
 				WP_CLI::log( sprintf( '  Unowned pipelines: %d', (int) ( $check_result['unowned_pipelines'] ?? 0 ) ) );
 				WP_CLI::log( sprintf( '  Unowned flows:     %d', (int) ( $check_result['unowned_flows'] ?? 0 ) ) );
