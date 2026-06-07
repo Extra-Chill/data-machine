@@ -398,6 +398,37 @@ class FlowStepConfig {
 	}
 
 	/**
+	 * Whether an AI step explicitly configured its enabled_tools allowlist.
+	 *
+	 * Distinguishes "the operator deselected every optional tool"
+	 * (`enabled_tools` present and an array, possibly empty) from "this step
+	 * predates the field and was never configured" (`enabled_tools` absent or
+	 * not an array). The two collapse to the same value under
+	 * getEnabledTools(), but they carry opposite policy intent:
+	 *
+	 *   - Explicit (even empty) => allowlist mode: only the named optional tools
+	 *     (none, for an empty list) survive alongside mandatory plumbing tools.
+	 *   - Absent => preset mode: the context's default tool pool applies.
+	 *
+	 * Without this distinction an explicitly-empty enabled_tools silently falls
+	 * through to the full preset, exposing global research tools (web_fetch,
+	 * local_search, ...) the operator meant to exclude.
+	 *
+	 * @since 0.139.13
+	 *
+	 * @param array $step_config Flow step configuration array.
+	 * @return bool True when an AI step has an explicit enabled_tools array.
+	 */
+	public static function isEnabledToolsExplicit( array $step_config ): bool {
+		if ( 'ai' !== ( $step_config['step_type'] ?? '' ) ) {
+			return false;
+		}
+
+		return array_key_exists( 'enabled_tools', $step_config )
+			&& is_array( $step_config['enabled_tools'] );
+	}
+
+	/**
 	 * Resolve capability flags for a step config.
 	 *
 	 * @param array $step_config Step configuration array.
