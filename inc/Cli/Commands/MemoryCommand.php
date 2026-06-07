@@ -1052,6 +1052,75 @@ class MemoryCommand extends BaseCommand {
 		return $directory_manager->get_agent_identity_directory_for_user( $user_id );
 	}
 
+	/**
+	 * List the memory files registered for injection for an agent.
+	 *
+	 * Returns the files Data Machine marks for injection into an agent's
+	 * context — resolved to absolute on-disk paths plus layer metadata. This
+	 * is a generic read surface over Data Machine's own registry; it is
+	 * agnostic to how the list is consumed.
+	 *
+	 * ## OPTIONS
+	 *
+	 * [--agent=<slug>]
+	 * : Agent slug or numeric ID. Defaults to the effective context.
+	 *
+	 * [--format=<format>]
+	 * : Output format.
+	 * ---
+	 * default: table
+	 * options:
+	 *   - table
+	 *   - json
+	 *   - csv
+	 *   - yaml
+	 * ---
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     # List injectable files for an agent as JSON
+	 *     wp datamachine memory injectable-files --agent=extra-chill-bot --format=json
+	 *
+	 *     # List for the effective context as a table
+	 *     wp datamachine memory injectable-files
+	 *
+	 * @subcommand injectable-files
+	 *
+	 * @param array $args       Positional arguments.
+	 * @param array $assoc_args Associative arguments.
+	 */
+	public function injectable_files( array $args, array $assoc_args ): void {
+		$ability = wp_get_ability( 'datamachine/list-injectable-memory-files' );
+		if ( ! $ability ) {
+			WP_CLI::error( 'Ability datamachine/list-injectable-memory-files is not available.' );
+		}
+
+		$scoping = $this->resolveMemoryScoping( $assoc_args );
+		$result  = $ability->execute( $scoping );
+
+		if ( is_wp_error( $result ) ) {
+			WP_CLI::error( $result->get_error_message() );
+		}
+
+		if ( empty( $result['success'] ) ) {
+			WP_CLI::error( $result['message'] ?? 'Failed to list injectable memory files.' );
+		}
+
+		$files  = $result['files'] ?? array();
+		$format = $assoc_args['format'] ?? 'table';
+
+		if ( empty( $files ) ) {
+			if ( 'json' === $format ) {
+				WP_CLI::line( '[]' );
+				return;
+			}
+			WP_CLI::log( 'No injectable memory files found.' );
+			return;
+		}
+
+		WP_CLI\Utils\format_items( $format, $files, array( 'filename', 'layer', 'priority', 'path' ) );
+	}
+
 	// =========================================================================
 	// Composable files
 	// =========================================================================

@@ -211,6 +211,7 @@ function datamachine_run_datamachine_plugin() {
 	require_once __DIR__ . '/inc/Abilities/AgentRemoteCallAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/AgentAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/AgentMemoryAbilities.php';
+	require_once __DIR__ . '/inc/Abilities/InjectableMemoryFilesAbility.php';
 	require_once __DIR__ . '/inc/Abilities/DailyMemoryAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/ChatAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/InternalLinkingAbilities.php';
@@ -320,6 +321,7 @@ function datamachine_run_datamachine_plugin() {
 	new \DataMachine\Abilities\AgentAbilities();
 	new \DataMachine\Abilities\AgentTokenAbilities();
 	new \DataMachine\Abilities\AgentMemoryAbilities();
+	new \DataMachine\Abilities\InjectableMemoryFilesAbility();
 	new \DataMachine\Abilities\DailyMemoryAbilities();
 	new \DataMachine\Abilities\ChatAbilities();
 	new \DataMachine\Abilities\InternalLinkingAbilities();
