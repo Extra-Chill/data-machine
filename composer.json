@@ -7,7 +7,7 @@
 		"php": ">=8.2",
 		"wordpress/agents-api": "dev-main",
 		"woocommerce/action-scheduler": "^3.9",
-		"chubes4/block-format-bridge": "^0.6"
+		"chubes4/block-format-bridge": "^0.8"
 	},
 	"require-dev": {
 		"php-stubs/wordpress-stubs": "^6.9",
