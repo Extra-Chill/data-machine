@@ -243,7 +243,7 @@ function datamachine_run_conversation(
 	try {
 		$result = WP_Agent_Conversation_Loop::run(
 			$messages,
-			null,
+			$provider_turn_adapter,
 			array(
 				'max_turns'             => $max_turns,
 				'budgets'               => array( $turn_budget ),
