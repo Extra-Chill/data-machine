@@ -103,6 +103,7 @@ class SettingsAbilities {
 						'jobs_per_page'                  => array( 'type' => 'integer' ),
 						'site_context_enabled'           => array( 'type' => 'boolean' ),
 						'daily_memory_enabled'           => array( 'type' => 'boolean' ),
+						'wake_briefing_enabled'          => array( 'type' => 'boolean' ),
 						'default_provider'               => array( 'type' => 'string' ),
 						'default_model'                  => array( 'type' => 'string' ),
 						'mode_models'                    => array(
@@ -369,6 +370,7 @@ class SettingsAbilities {
 				'jobs_per_page'                           => $settings['jobs_per_page'] ?? 50,
 				'site_context_enabled'                    => $settings['site_context_enabled'] ?? false,
 				'daily_memory_enabled'                    => $settings['daily_memory_enabled'] ?? false,
+				'wake_briefing_enabled'                   => $settings['wake_briefing_enabled'] ?? false,
 				'default_provider'                        => $settings['default_provider'] ?? '',
 				'default_model'                           => $settings['default_model'] ?? '',
 				'mode_models'                             => $settings['mode_models'] ?? array(),
@@ -449,6 +451,11 @@ class SettingsAbilities {
 		if ( isset( $input['daily_memory_enabled'] ) ) {
 			$all_settings['daily_memory_enabled'] = (bool) $input['daily_memory_enabled'];
 			$handled_keys[]                       = 'daily_memory_enabled';
+		}
+
+		if ( isset( $input['wake_briefing_enabled'] ) ) {
+			$all_settings['wake_briefing_enabled'] = (bool) $input['wake_briefing_enabled'];
+			$handled_keys[]                        = 'wake_briefing_enabled';
 		}
 
 		if ( isset( $input['default_provider'] ) ) {
