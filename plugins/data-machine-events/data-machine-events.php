@@ -98,6 +98,11 @@ require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Core/performance.php';
 // Load retention policy overrides (tightens Data Machine core defaults for this site's volume).
 require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Core/retention.php';
 
+// Short-circuit AI web_fetch requests to bot-blocked ticketing domains before they
+// burn a billed model turn returning HTTP 403 (Ticketmaster, TicketWeb, AXS, etc.).
+require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Core/web-fetch-guard.php';
+\DataMachineEvents\Core\register_web_fetch_guard();
+
 	// Load REST API routes (modular)
 if ( file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Api/Routes.php' ) ) {
 	require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Api/Routes.php';
