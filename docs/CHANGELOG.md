@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.141.3] - 2026-06-07
+
+### Fixed
+- record direct tool result envelopes
+
 ## [0.141.2] - 2026-06-07
 
 ### Fixed
