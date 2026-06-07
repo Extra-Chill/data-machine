@@ -1,0 +1,810 @@
+<?php
+// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange -- Data Machine owns custom operational tables and these paths require fresh runtime state or one-time schema mutation.
+/**
+ * Daily Memory Task
+ *
+ * System agent task that maintains MEMORY.md — the persistent memory file
+ * injected into every AI session. Reads the current MEMORY.md, gathers
+ * available activity context, and uses a single AI call to:
+ *
+ * - Move day-specific/session-specific content to a daily archive file
+ * - Compress and clean: remove redundancies, outdated info, verbose language
+ * - Preserve all persistent knowledge without losing anything important
+ *
+ * Runs once daily via Action Scheduler when daily_memory_enabled is active.
+ *
+ * @package DataMachine\Engine\AI\System\Tasks
+ * @since 0.32.0
+ * @since 0.72.0 Migrated to getWorkflow() + executeTask() contract.
+ * @see https://github.com/Extra-Chill/data-machine/issues/357
+ */
+
+namespace DataMachine\Engine\AI\System\Tasks;
+
+defined( 'ABSPATH' ) || exit;
+
+use DataMachine\Core\Database\Chat\ConversationStoreFactory;
+use DataMachine\Core\PluginSettings;
+use DataMachine\Core\FilesRepository\AgentMemory;
+use DataMachine\Core\FilesRepository\DailyMemory;
+use DataMachine\Engine\AI\RequestBuilder;
+use AgentsAPI\AI\WP_Agent_Compaction_Conservation;
+use AgentsAPI\AI\WP_Agent_Markdown_Section_Compaction_Adapter;
+
+class DailyMemoryTask extends SystemTask {
+
+	/**
+	 * Execute daily memory maintenance.
+	 *
+	 * @param int   $jobId  Job ID from DM Jobs table.
+	 * @param array $params Task parameters from engine_data.
+	 */
+	public function executeTask( int $jobId, array $params ): void {
+		if ( ! PluginSettings::get( 'daily_memory_enabled', false ) ) {
+			$this->completeJob(
+				$jobId,
+				array(
+					'skipped' => true,
+					'reason'  => 'Daily memory is disabled.',
+				)
+			);
+			return;
+		}
+
+		$date     = $params['date'] ?? gmdate( 'Y-m-d' );
+		$user_id  = (int) ( $params['user_id'] ?? 0 );
+		$agent_id = (int) ( $params['agent_id'] ?? 0 );
+
+		$system_defaults = $this->resolveSystemModel( $params );
+		$provider        = $system_defaults['provider'];
+		$model           = $system_defaults['model'];
+
+		// Treat an unresolvable model as a no-op skip rather than a hard
+		// failure. The resolution chain checks five locations
+		// (agent.mode_models[system], agent.default_*, site.mode_models,
+		// site.default_*, network.default_*); if all five are empty the
+		// install simply hasn't picked a system model yet. That's a
+		// configuration state, not a runtime fault, so it should not
+		// generate failed-job noise or cascade through the engine as
+		// "empty_data_packet_returned". Once a model is configured
+		// anywhere in the chain, the next tick proceeds normally with
+		// no migration or manual reset needed. Mirrors the
+		// daily_memory_enabled = false branch above.
+		if ( empty( $provider ) || empty( $model ) ) {
+			$this->completeJob(
+				$jobId,
+				array(
+					'skipped' => true,
+					'reason'  => sprintf(
+						'No AI model resolvable for agent_id=%d in system mode. Configure mode_models.system or default_model at agent, site, or network level.',
+						$agent_id
+					),
+				)
+			);
+			return;
+		}
+
+		$daily = new DailyMemory( $user_id, $agent_id );
+
+		// Read current MEMORY.md.
+		$memory = new AgentMemory( $user_id, $agent_id );
+		$result = $memory->get_all();
+
+		if ( empty( $result['success'] ) || empty( $result['content'] ) ) {
+			$this->completeJob(
+				$jobId,
+				array(
+					'skipped' => true,
+					'reason'  => 'MEMORY.md not found or empty.',
+				)
+			);
+			return;
+		}
+
+		$memory_content = $result['content'];
+		$original_size  = strlen( $memory_content );
+
+		$overflow_result = $this->maybeHandleDeterministicOverflow( $jobId, $memory, $daily, $memory_content, $original_size, $date );
+		if ( null !== $overflow_result ) {
+			if ( empty( $overflow_result['success'] ) ) {
+				$this->failJob( $jobId, $overflow_result['message'] ?? 'Daily memory overflow split failed.' );
+				return;
+			}
+
+			$this->completeJob( $jobId, $overflow_result );
+			return;
+		}
+
+		// Skip if MEMORY.md is within the recommended threshold and no activity context.
+		$context = $this->gatherContext( $params );
+		if ( $original_size <= AgentMemory::MAX_FILE_SIZE && empty( $context ) ) {
+			$this->completeJob(
+				$jobId,
+				array(
+					'skipped'       => true,
+					'reason'        => 'MEMORY.md within size threshold and no activity to process.',
+					'original_size' => $original_size,
+				)
+			);
+			return;
+		}
+
+		// Build prompt with all available context.
+		$max_size         = size_format( AgentMemory::MAX_FILE_SIZE );
+		$activity_section = '';
+		if ( ! empty( $context ) ) {
+			$activity_section = "## Today's Activity\n\n" . $context . "\n\n";
+		}
+
+		$prompt = $this->buildPromptFromTemplate(
+			'daily_memory',
+			array(
+				'memory_content'   => $memory_content,
+				'date'             => $date,
+				'max_size'         => $max_size,
+				'activity_section' => $activity_section,
+			)
+		);
+
+		$messages = array(
+			\DataMachine\Engine\AI\ConversationManager::buildConversationMessage( 'user', $prompt ),
+		);
+
+		$ai_payload = array(
+			// System task — no human caller. See MetaDescriptionTask for rationale.
+			'calling_user_id' => 0,
+		);
+		if ( $agent_id > 0 ) {
+			$ai_payload['agent_id'] = $agent_id;
+		}
+		if ( $user_id > 0 ) {
+			$ai_payload['user_id'] = $user_id;
+		}
+
+		$response = RequestBuilder::build(
+			$messages,
+			$provider,
+			$model,
+			array(),
+			array( 'system' ),
+			$ai_payload
+		);
+
+		if ( $response instanceof \WP_Error ) {
+			do_action(
+				'datamachine_log',
+				'warning',
+				'Daily memory AI request failed: ' . $response->get_error_message(),
+				array( 'date' => $date )
+			);
+			$this->failJob( $jobId, 'AI request failed: ' . $response->get_error_message() );
+			return;
+		}
+
+		$ai_output = trim( RequestBuilder::resultText( $response ) );
+		$ai_output = str_replace( '\n', "\n", $ai_output );
+
+		if ( empty( $ai_output ) ) {
+			$this->failJob( $jobId, 'AI returned empty response.' );
+			return;
+		}
+
+		// Parse and validate the AI output through the Agents API memory
+		// compaction contract. Data Machine still owns the prompt, model call,
+		// and file writes; Agents API owns the generic markdown item projection,
+		// conservation metadata, and fail-closed compaction decision.
+		$plan = $this->planMemoryCompaction( $memory_content, $ai_output, $date, $jobId, $provider, $model );
+		if ( empty( $plan['success'] ) ) {
+			$this->failJob( $jobId, $plan['message'] ?? 'Daily memory compaction failed.' );
+			return;
+		}
+
+		$parsed = $plan['parsed'];
+
+		if ( empty( $parsed['persistent'] ) ) {
+			do_action(
+				'datamachine_log',
+				'warning',
+				'Daily memory parse failed -- no persistent section found. MEMORY.md unchanged.',
+				array(
+					'date'             => $date,
+					'ai_output_length' => strlen( $ai_output ),
+				)
+			);
+			$this->failJob( $jobId, 'Could not parse AI response -- persistent section missing.' );
+			return;
+		}
+
+		// Write the cleaned MEMORY.md.
+		$new_content   = $parsed['persistent'];
+		$new_size      = strlen( $new_content );
+		$archived_text = $parsed['archived'] ?? '';
+		$archived_size = strlen( $archived_text );
+
+		// Safety check: don't write if the new content is suspiciously small.
+		$target_size     = AgentMemory::MAX_FILE_SIZE;
+		$oversize_factor = $original_size / max( $target_size, 1 );
+
+		if ( $oversize_factor > 2 ) {
+			$min_size = intval( $target_size * 0.5 );
+		} else {
+			$min_size = intval( $original_size * 0.10 );
+		}
+
+		if ( $new_size < $min_size ) {
+			do_action(
+				'datamachine_log',
+				'warning',
+				sprintf(
+					'Daily memory aborted -- new content (%s) is below minimum (%s). AI may have been too aggressive.',
+					size_format( $new_size ),
+					size_format( $min_size )
+				),
+				array(
+					'date'          => $date,
+					'original_size' => $original_size,
+					'new_size'      => $new_size,
+					'min_size'      => $min_size,
+				)
+			);
+			$this->failJob( $jobId, 'Output too small -- safety check prevented write.' );
+			return;
+		}
+
+		$write_result = $memory->replace_all( $new_content );
+		if ( empty( $write_result['success'] ) ) {
+			$this->failJob( $jobId, $write_result['message'] );
+			return;
+		}
+
+		// Archive extracted content to the daily file. $archived_size
+		// is already computed above (was needed for the conservation
+		// check).
+		$parts = explode( '-', $date );
+
+		if ( $archived_size > 0 ) {
+			$archive_context = array(
+				'persistent'    => $parsed['persistent'],
+				'original_size' => $original_size,
+				'new_size'      => $new_size,
+				'archived_size' => $archived_size,
+				'job_id'        => $jobId,
+			);
+
+			/** This filter is documented in DailyMemoryTask.php */
+			$handled = apply_filters(
+				'datamachine_daily_memory_pre_archive',
+				false,
+				$archived_text,
+				$date,
+				$archive_context
+			);
+
+			if ( ! $handled ) {
+				$archive_header = "\n### Archived from MEMORY.md\n\n";
+				$archive_body   = $archive_header . $archived_text . "\n";
+
+				$daily->append( $parts[0], $parts[1], $parts[2], $archive_body );
+			}
+		}
+
+		do_action(
+			'datamachine_log',
+			'info',
+			sprintf(
+				'Daily memory complete: %s -> %s (%s archived to daily/%s)',
+				size_format( $original_size ),
+				size_format( $new_size ),
+				size_format( $archived_size ),
+				$date
+			),
+			array(
+				'date'          => $date,
+				'original_size' => $original_size,
+				'new_size'      => $new_size,
+				'archived_size' => $archived_size,
+			)
+		);
+
+		$this->completeJob(
+			$jobId,
+			array(
+				'date'              => $date,
+				'original_size'     => $original_size,
+				'new_size'          => $new_size,
+				'archived_size'     => $archived_size,
+				'compaction'        => $plan['metadata'],
+				'compaction_events' => $plan['events'],
+			)
+		);
+	}
+
+	/**
+	 * Plan AI-produced MEMORY.md compaction through Agents API primitives.
+	 *
+	 * Data Machine supplies the model output and owns persistence. Agents API
+	 * supplies the markdown item projection and conservation contract so the
+	 * fail-closed decision is shared with the broader agent runtime substrate.
+	 *
+	 * @param string $original_content Current MEMORY.md content.
+	 * @param string $ai_output        Raw AI output.
+	 * @param string $date             Archive date.
+	 * @param int    $jobId            Job ID.
+	 * @param string $provider         Summary provider.
+	 * @param string $model            Summary model.
+	 * @return array{success: bool, parsed: array{persistent: string|null, archived: string|null}, metadata: array<string, mixed>, events: array<int, array<string, mixed>>, message?: string}
+	 */
+	private function planMemoryCompaction( string $original_content, string $ai_output, string $date, int $jobId, string $provider, string $model ): array {
+		$parsed = $this->parseCleanupResponse( $ai_output );
+		if ( empty( $parsed['persistent'] ) ) {
+			return array(
+				'success'  => true,
+				'parsed'   => $parsed,
+				'metadata' => array(),
+				'events'   => array(),
+			);
+		}
+
+		$persistent_text = $parsed['persistent'];
+		$archived_text   = $parsed['archived'] ?? '';
+
+		$original_items  = WP_Agent_Markdown_Section_Compaction_Adapter::parse( $original_content );
+		$compacted_items = WP_Agent_Markdown_Section_Compaction_Adapter::parse( $persistent_text );
+		$archived_items  = '' === trim( $archived_text ) ? array() : WP_Agent_Markdown_Section_Compaction_Adapter::parse( $archived_text );
+		$original_size   = strlen( $original_content );
+		$new_size        = strlen( $persistent_text );
+		$archived_size   = strlen( $archived_text );
+		$combined_size   = $new_size + $archived_size;
+
+		/**
+		 * Filter the conservation threshold for daily memory compaction.
+		 *
+		 * The persistent section plus the archived section must together
+		 * account for at least this fraction of the original MEMORY.md
+		 * size. Below the threshold the task fails rather than commit a
+		 * lossy split. Set to 0 to disable the check.
+		 *
+		 * @since 0.80.3
+		 *
+		 * @param float $threshold Default 0.85.
+		 * @param array $context   date, original_size, new_size, archived_size, job_id.
+		 */
+		$conservation_threshold = (float) apply_filters(
+			'datamachine_daily_memory_conservation_threshold',
+			0.85,
+			array(
+				'date'          => $date,
+				'original_size' => $original_size,
+				'new_size'      => $new_size,
+				'archived_size' => $archived_size,
+				'job_id'        => $jobId,
+			)
+		);
+
+		$policy = array(
+			'conservation_enabled'         => $conservation_threshold > 0,
+			'minimum_conserved_byte_ratio' => $conservation_threshold,
+			'fail_on_conservation_failure' => true,
+			'summary_provider'             => $provider,
+			'summary_model'                => $model,
+		);
+
+		$metadata = WP_Agent_Compaction_Conservation::metadata(
+			$policy,
+			$original_items,
+			$compacted_items,
+			array(),
+			$archived_items,
+			array(
+				'status'        => 'compacted',
+				'strategy'      => 'ai_markdown_memory_compaction',
+				'date'          => $date,
+				'job_id'        => $jobId,
+				'combined_size' => $combined_size,
+			),
+			array(
+				'item_count' => count( $original_items ),
+				'byte_count' => $original_size,
+			),
+			array(
+				'item_count' => count( $compacted_items ),
+				'byte_count' => $new_size,
+			),
+			null,
+			array(
+				'item_count' => count( $archived_items ),
+				'byte_count' => $archived_size,
+			)
+		);
+
+		if ( WP_Agent_Compaction_Conservation::failed_closed( $metadata ) ) {
+			$discarded = max( 0, $original_size - $combined_size );
+			do_action(
+				'datamachine_log',
+				'warning',
+				sprintf(
+					'Daily memory aborted -- conservation check failed: persistent (%s) + archived (%s) = %s, expected at least %s of %s original (~%s discarded). AI ignored the "NEVER discard information" rule.',
+					size_format( $new_size ),
+					size_format( $archived_size ),
+					size_format( $combined_size ),
+					size_format( (int) ( $metadata['conservation']['required_byte_count'] ?? 0 ) ),
+					size_format( $original_size ),
+					size_format( $discarded )
+				),
+				array(
+					'date'           => $date,
+					'original_size'  => $original_size,
+					'new_size'       => $new_size,
+					'archived_size'  => $archived_size,
+					'combined_size'  => $combined_size,
+					'min_combined'   => (int) ( $metadata['conservation']['required_byte_count'] ?? 0 ),
+					'discarded_size' => $discarded,
+					'threshold'      => $conservation_threshold,
+					'compaction'     => $metadata,
+				)
+			);
+
+			$metadata['status'] = 'failed';
+			return array(
+				'success'  => false,
+				'parsed'   => $parsed,
+				'metadata' => $metadata,
+				'events'   => array(
+					array(
+						'type'     => 'compaction_failed',
+						'metadata' => $metadata,
+					),
+				),
+				'message'  => 'Conservation check failed -- AI emitted a lossy split. MEMORY.md unchanged.',
+			);
+		}
+
+		return array(
+			'success'  => true,
+			'parsed'   => $parsed,
+			'metadata' => $metadata,
+			'events'   => array(
+				array(
+					'type'     => 'compaction_completed',
+					'metadata' => $metadata,
+				),
+			),
+		);
+	}
+
+	/**
+	 * Deterministically split very large MEMORY.md files before invoking AI.
+	 *
+	 * Extremely large memory files can exceed the practical request envelope for
+	 * non-streaming provider calls. This path archives whole tail sections verbatim
+	 * and leaves a small persistent file with an archive pointer, preserving every
+	 * byte without asking the model to process the entire oversized file.
+	 *
+	 * @param int         $jobId          Job ID.
+	 * @param AgentMemory $memory         Agent memory facade.
+	 * @param DailyMemory $daily          Daily memory facade.
+	 * @param string      $memory_content Current MEMORY.md content.
+	 * @param int         $original_size  Original byte size.
+	 * @param string      $date           Archive date.
+	 * @return array|null Result array when handled, null when normal AI compaction should proceed.
+	 */
+	private function maybeHandleDeterministicOverflow( int $jobId, AgentMemory $memory, DailyMemory $daily, string $memory_content, int $original_size, string $date ): ?array {
+		$threshold = (int) apply_filters(
+			'datamachine_daily_memory_overflow_threshold',
+			AgentMemory::MAX_FILE_SIZE * 4,
+			array(
+				'job_id'        => $jobId,
+				'date'          => $date,
+				'original_size' => $original_size,
+			)
+		);
+
+		if ( $threshold <= 0 || $original_size <= $threshold ) {
+			return null;
+		}
+
+		$target_size = (int) apply_filters(
+			'datamachine_daily_memory_overflow_target_size',
+			AgentMemory::MAX_FILE_SIZE,
+			array(
+				'job_id'        => $jobId,
+				'date'          => $date,
+				'original_size' => $original_size,
+			)
+		);
+		$target_size = max( 1024, $target_size );
+
+		$split = self::planMemoryOverflowArchive( $memory_content, $target_size, $date );
+		if ( empty( $split['archived'] ) ) {
+			return null;
+		}
+
+		$write_result = $memory->replace_all( $split['persistent'] );
+		if ( empty( $write_result['success'] ) ) {
+			return array(
+				'success' => false,
+				'message' => $write_result['message'],
+			);
+		}
+
+		$parts        = explode( '-', $date );
+		$archive_body = "\n### Archived from oversized MEMORY.md\n\n" . $split['archived'] . "\n";
+		$append       = $daily->append( $parts[0], $parts[1], $parts[2], $archive_body );
+		if ( empty( $append['success'] ) ) {
+			return array(
+				'success' => false,
+				'message' => $append['message'],
+			);
+		}
+
+		$archived_size = strlen( $split['archived'] );
+		$new_size      = strlen( $split['persistent'] );
+
+		do_action(
+			'datamachine_log',
+			'info',
+			sprintf(
+				'Daily memory overflow split complete: %s -> %s (%s archived verbatim to daily/%s)',
+				size_format( $original_size ),
+				size_format( $new_size ),
+				size_format( $archived_size ),
+				$date
+			),
+			array(
+				'date'              => $date,
+				'original_size'     => $original_size,
+				'new_size'          => $new_size,
+				'archived_size'     => $archived_size,
+				'archived_blocks'   => $split['archived_blocks'],
+				'persistent_blocks' => $split['persistent_blocks'],
+			)
+		);
+
+		return array(
+			'success'           => true,
+			'date'              => $date,
+			'original_size'     => $original_size,
+			'new_size'          => $new_size,
+			'archived_size'     => $archived_size,
+			'overflow_split'    => true,
+			'archived_blocks'   => $split['archived_blocks'],
+			'persistent_blocks' => $split['persistent_blocks'],
+		);
+	}
+
+	/**
+	 * Plan a deterministic overflow archive through Agents API compaction primitives.
+	 *
+	 * @param string $content     Full MEMORY.md content.
+	 * @param int    $target_size Target persistent size in bytes.
+	 * @param string $date        Archive date.
+	 * @return array{persistent: string, archived: string, persistent_blocks: int, archived_blocks: int}
+	 */
+	private static function planMemoryOverflowArchive( string $content, int $target_size, string $date ): array {
+		$items = WP_Agent_Markdown_Section_Compaction_Adapter::parse( $content );
+		$split = WP_Agent_Markdown_Section_Compaction_Adapter::split_for_overflow(
+			$items,
+			array(
+				'target_bytes'         => $target_size,
+				'pointer_destination'  => 'daily/' . str_replace( '-', '/', $date ) . '.md',
+				'pointer_heading'      => 'Archived Memory Overflow',
+				'pointer_content'      => self::buildOverflowArchivePointerContent( $date ),
+				'conservation_enabled' => true,
+			)
+		);
+
+		if ( WP_Agent_Markdown_Section_Compaction_Adapter::STATUS_ARCHIVED !== ( $split['status'] ?? '' ) || empty( $split['archive_items'] ) ) {
+			return array(
+				'persistent'        => $content,
+				'archived'          => '',
+				'persistent_blocks' => count( $items ),
+				'archived_blocks'   => 0,
+			);
+		}
+		return array(
+			'persistent'        => WP_Agent_Markdown_Section_Compaction_Adapter::reconstruct( $split['retained_items'] ),
+			'archived'          => WP_Agent_Markdown_Section_Compaction_Adapter::reconstruct( $split['archive_items'] ),
+			'persistent_blocks' => count( $split['retained_items'] ),
+			'archived_blocks'   => count( $split['archive_items'] ),
+		);
+	}
+
+	/**
+	 * Build the Data Machine-owned overflow archive pointer body.
+	 *
+	 * @param string $date Archive date.
+	 * @return string Pointer content.
+	 */
+	private static function buildOverflowArchivePointerContent( string $date ): string {
+		return sprintf(
+			"\nOn %s, Daily Memory archived older MEMORY.md sections verbatim to `daily/%s`. Use daily memory search/read when those details are needed.\n",
+			$date,
+			str_replace( '-', '/', $date ) . '.md'
+		);
+	}
+
+	/**
+	 * {@inheritDoc}
+	 */
+	public function getTaskType(): string {
+		return 'daily_memory_generation';
+	}
+
+	/**
+	 * {@inheritDoc}
+	 */
+	public static function getTaskMeta(): array {
+		return array(
+			'label'           => 'Daily Memory',
+			'description'     => 'Automated MEMORY.md maintenance -- archives session-specific content to daily files, compresses and cleans persistent knowledge.',
+			'setting_key'     => 'daily_memory_enabled',
+			'default_enabled' => false,
+			'supports_run'    => true,
+		);
+	}
+
+	/**
+	 * @return array
+	 * @since 0.41.0
+	 */
+	public function getPromptDefinitions(): array {
+		return array(
+			'daily_memory' => array(
+				'label'       => __( 'Daily Memory Prompt', 'data-machine' ),
+				'description' => __( 'Prompt for automated MEMORY.md maintenance. Cleans, compresses, and archives session-specific content.', 'data-machine' ),
+				'default'     => "You are maintaining an AI agent's MEMORY.md file. This file is injected into every AI context window, so it must stay lean -- only persistent knowledge that helps across all future sessions.\n\n"
+					. "## Principle\n\n"
+					. "For each piece of content ask: \"Would a fresh session need this to do its job?\" If yes, keep it. If it only makes sense in the context of a specific session or time period, archive it.\n\n"
+					. "## Your Task\n\n"
+					. "Split the MEMORY.md content below into two parts:\n\n"
+					. "### PERSISTENT -- stays in MEMORY.md\n"
+					. "Knowledge useful regardless of when or why the next session runs:\n"
+					. "- How things work (architecture, patterns, conventions)\n"
+					. "- Where things are (paths, URLs, config locations, tool names)\n"
+					. "- Current state of ongoing work (just the status, not the journey)\n"
+					. "- Rules and constraints learned from experience\n"
+					. "- Relationships between systems, people, and services\n\n"
+					. "When condensing, prefer the **lasting fact** over the **story of how we learned it**. Merge overlapping entries. Remove detail that duplicates what is already in daily files or source code.\n\n"
+					. "### ARCHIVED -- moves to the daily file for {{date}}\n"
+					. "Content tied to a specific session, investigation, or moment in time:\n"
+					. "- Play-by-play narratives of what happened in a session\n"
+					. "- Debugging traces and investigation logs\n"
+					. "- Temporary state that will be outdated soon\n"
+					. "- Detail already captured by a condensed persistent entry\n\n"
+					. "## Output Format\n\n"
+					. "Respond in EXACTLY this format:\n\n"
+					. "===PERSISTENT===\n"
+					. "(cleaned MEMORY.md content -- preserve existing section structure)\n\n"
+					. "===ARCHIVED===\n"
+					. "(extracted session-specific content, organized by topic)\n\n"
+					. "## Rules\n"
+					. "- NEVER discard information -- everything goes to either PERSISTENT or ARCHIVED\n"
+					. "- Target size for persistent section: under {{max_size}}\n"
+					. "- Preserve the document's existing heading structure\n"
+					. "- If a section is entirely temporal, archive the whole section\n"
+					. "- If a section mixes persistent facts with session detail, keep the facts and archive the detail\n\n"
+					. '{{activity_section}}'
+					. "---\n\n"
+					. "## Current MEMORY.md Content\n\n"
+					. '{{memory_content}}',
+				'variables'   => array(
+					'memory_content'   => 'Current full content of MEMORY.md',
+					'date'             => 'Target date for archival context (YYYY-MM-DD)',
+					'max_size'         => 'Recommended maximum file size (human-readable, e.g. "8 KB")',
+					'activity_section' => 'Activity context section (jobs and chat sessions from the day, if any)',
+				),
+			),
+		);
+	}
+
+	/**
+	 * @param string $ai_output Raw AI response text.
+	 * @return array{persistent: string|null, archived: string|null}
+	 */
+	private function parseCleanupResponse( string $ai_output ): array {
+		$persistent = null;
+		$archived   = null;
+
+		$persistent_pos = strpos( $ai_output, '===PERSISTENT===' );
+		$archived_pos   = strpos( $ai_output, '===ARCHIVED===' );
+
+		if ( false !== $persistent_pos && false !== $archived_pos ) {
+			$persistent_start = $persistent_pos + strlen( '===PERSISTENT===' );
+
+			if ( $archived_pos > $persistent_pos ) {
+				$persistent = trim( substr( $ai_output, $persistent_start, $archived_pos - $persistent_start ) );
+				$archived   = trim( substr( $ai_output, $archived_pos + strlen( '===ARCHIVED===' ) ) );
+			} else {
+				$archived_start = $archived_pos + strlen( '===ARCHIVED===' );
+				$archived       = trim( substr( $ai_output, $archived_start, $persistent_pos - $archived_start ) );
+				$persistent     = trim( substr( $ai_output, $persistent_start ) );
+			}
+		} elseif ( false !== $persistent_pos ) {
+			$persistent = trim( substr( $ai_output, $persistent_pos + strlen( '===PERSISTENT===' ) ) );
+		}
+
+		return array(
+			'persistent' => $persistent,
+			'archived'   => $archived,
+		);
+	}
+
+	/**
+	 * @param array $params Task params.
+	 * @return string Combined context text.
+	 */
+	private function gatherContext( array $params ): string {
+		$date  = $params['date'] ?? gmdate( 'Y-m-d' );
+		$parts = array();
+
+		$jobs_context = $this->getJobsContext( $date );
+		if ( ! empty( $jobs_context ) ) {
+			$parts[] = "## Jobs completed on {$date}\n\n{$jobs_context}";
+		}
+
+		$chat_context = $this->getChatContext( $date );
+		if ( ! empty( $chat_context ) ) {
+			$parts[] = "## Chat sessions on {$date}\n\n{$chat_context}";
+		}
+
+		return implode( "\n\n", $parts );
+	}
+
+	/**
+	 * @param string $date Date string (Y-m-d).
+	 * @return string
+	 */
+	private function getJobsContext( string $date ): string {
+		global $wpdb;
+		$table = $wpdb->prefix . 'datamachine_jobs';
+
+		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
+		$jobs = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT job_id, pipeline_id, flow_id, source, label, status,
+						created_at, completed_at
+				 FROM {$table}
+				 WHERE DATE(created_at) = %s
+				 ORDER BY job_id ASC",
+				$date
+			),
+			ARRAY_A
+		);
+		// phpcs:enable WordPress.DB.PreparedSQL
+
+		if ( empty( $jobs ) ) {
+			return '';
+		}
+
+		$lines = array();
+		foreach ( $jobs as $job ) {
+			$label   = $job['label'] ? $job['label'] : "Job #{$job['job_id']}";
+			$status  = $job['status'];
+			$source  = $job['source'];
+			$lines[] = "- [{$source}] {$label}: {$status}";
+		}
+
+		return implode( "\n", $lines );
+	}
+
+	/**
+	 * @param string $date Date string (Y-m-d).
+	 * @return string
+	 */
+	private function getChatContext( string $date ): string {
+		$sessions = ConversationStoreFactory::get()->list_sessions_for_day( $date );
+
+		if ( empty( $sessions ) ) {
+			return '';
+		}
+
+		$lines = array();
+		foreach ( $sessions as $session ) {
+			$title   = ! empty( $session['title'] ) ? $session['title'] : 'Untitled session';
+			$mode    = $session['mode'] ?? 'chat';
+			$lines[] = "- [{$mode}] {$title}";
+		}
+
+		return implode( "\n", $lines );
+	}
+}

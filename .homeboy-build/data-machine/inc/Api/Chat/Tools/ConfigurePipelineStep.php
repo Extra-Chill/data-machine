@@ -1,0 +1,92 @@
+<?php
+/**
+ * Configure Pipeline Step Tool
+ *
+ * Tool for configuring pipeline-level AI step settings including
+ * system prompt and tool policy fields.
+ * Delegates to Abilities API for core logic.
+ *
+ * @package DataMachine\Api\Chat\Tools
+ */
+
+namespace DataMachine\Api\Chat\Tools;
+
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
+use DataMachine\Engine\AI\Tools\BaseTool;
+
+class ConfigurePipelineStep extends BaseTool {
+
+	public function __construct() {
+		$this->registerTool( 'configure_pipeline_step', array( $this, 'getToolDefinition' ), array( 'pipeline_editor' ), array( 'ability' => 'datamachine/update-pipeline-step' ) );
+	}
+
+	/**
+	 * Get tool definition.
+	 * Called lazily when tool is first accessed to ensure translations are loaded.
+	 *
+	 * @return array Tool definition array
+	 */
+	public function getToolDefinition(): array {
+		return array(
+			'class'       => self::class,
+			'method'      => 'handle_tool_call',
+			'description' => 'Configure pipeline-level AI step settings: system prompt, execution modes, and tool policy. Model/provider are managed via the mode_models site setting, not per-pipeline. For flow-level settings (handler, handler_config, user_message), use configure_flow_steps instead.',
+			'parameters'  => array(
+				'type'       => 'object',
+				'properties' => array(
+					'pipeline_step_id' => array(
+						'type'        => 'string',
+						'description' => 'Pipeline step ID to configure (e.g., "123_uuid4")',
+					),
+					'system_prompt'    => array(
+						'type'        => 'string',
+						'description' => 'System prompt for the AI step - defines the AI persona and instructions',
+					),
+					'agent_modes'      => array(
+						'type'        => 'array',
+						'items'       => array( 'type' => 'string' ),
+						'description' => 'Agent execution modes for this AI step. Defaults to pipeline.',
+					),
+					'disabled_tools'   => array(
+						'type'        => 'array',
+						'items'       => array( 'type' => 'string' ),
+						'description' => 'Array of tool slugs to disable for this AI step',
+					),
+					'tool_categories'  => array(
+						'type'        => 'array',
+						'items'       => array( 'type' => 'string' ),
+						'description' => 'Array of ability categories allowed for this AI step',
+					),
+				),
+				'required'   => array( 'pipeline_step_id' ),
+			),
+		);
+	}
+
+	public function handle_tool_call( array $parameters, array $tool_def = array() ): array {
+		$ability = wp_get_ability( 'datamachine/update-pipeline-step' );
+		if ( ! $ability ) {
+			return array(
+				'success'   => false,
+				'error'     => 'Update pipeline step ability not available',
+				'tool_name' => 'configure_pipeline_step',
+			);
+		}
+
+		$result = $ability->execute( $parameters );
+
+		if ( ! $this->isAbilitySuccess( $result ) ) {
+			$error = $this->getAbilityError( $result, 'Failed to configure pipeline step' );
+			return $this->buildErrorResponse( $error, 'configure_pipeline_step' );
+		}
+
+		return array(
+			'success'   => true,
+			'data'      => $result,
+			'tool_name' => 'configure_pipeline_step',
+		);
+	}
+}

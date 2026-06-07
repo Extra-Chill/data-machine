@@ -1,0 +1,17 @@
+/**
+ * Chat Input Styles
+ *
+ * Input container only. Textarea and send button are handled by the
+ * @extrachill/chat library components.
+ */
+
+/* ===== INPUT CONTAINER ===== */
+
+.datamachine-chat-input {
+	padding: 12px;
+	border-top: 1px solid #ddd;
+	display: flex;
+	gap: 8px;
+	align-items: flex-end;
+	flex-shrink: 0;
+}

@@ -1,0 +1,75 @@
+/**
+ * External dependencies
+ */
+import React from 'react';
+/**
+ * Internal dependencies
+ */
+import { MODAL_TYPES } from '../../utils/constants';
+import {
+	ImportExportModal,
+	StepSelectionModal,
+	FlowScheduleModal,
+	FlowQueueModal,
+	HandlerSelectionModal,
+	HandlerSettingsModal,
+	OAuthAuthenticationModal,
+	ContextFilesModal,
+	MemoryFilesModal,
+	FlowMemoryFilesModal,
+} from '../modals';
+
+export default function ModalSwitch( { activeModal, baseProps } ) {
+	if ( ! activeModal ) {
+		return null;
+	}
+
+	switch ( activeModal ) {
+		case MODAL_TYPES.IMPORT_EXPORT:
+			return <ImportExportModal { ...baseProps } />;
+
+		case MODAL_TYPES.STEP_SELECTION:
+			return <StepSelectionModal { ...baseProps } />;
+
+		case MODAL_TYPES.FLOW_SCHEDULE:
+			return <FlowScheduleModal { ...baseProps } />;
+
+		case MODAL_TYPES.FLOW_QUEUE:
+			return <FlowQueueModal { ...baseProps } />;
+
+		case MODAL_TYPES.HANDLER_SELECTION:
+			return (
+				<HandlerSelectionModal
+					{ ...baseProps }
+					handlers={ baseProps.handlers }
+					existingHandlerSlugs={ baseProps.addMode ? ( baseProps.handlerSlugs || [] ) : [] }
+				/>
+			);
+
+		case MODAL_TYPES.HANDLER_SETTINGS:
+			return (
+				<HandlerSettingsModal
+					{ ...baseProps }
+					handlerDetails={ baseProps.handlerDetails }
+					onChangeHandler={ baseProps.onChangeHandler }
+					onOAuthConnect={ baseProps.onOAuthConnect }
+				/>
+			);
+
+		case MODAL_TYPES.OAUTH:
+			return <OAuthAuthenticationModal { ...baseProps } />;
+
+		case MODAL_TYPES.CONTEXT_FILES:
+			return <ContextFilesModal { ...baseProps } />;
+
+		case MODAL_TYPES.MEMORY_FILES:
+			return <MemoryFilesModal { ...baseProps } />;
+
+		case MODAL_TYPES.FLOW_MEMORY_FILES:
+			return <FlowMemoryFilesModal { ...baseProps } />;
+
+		default:
+			console.warn( `Unknown modal type: ${ activeModal }` );
+			return null;
+	}
+}

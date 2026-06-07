@@ -1,0 +1,579 @@
+<?php
+// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange -- Data Machine owns custom operational tables and these paths require fresh runtime state or one-time schema mutation.
+/**
+ * System REST API Endpoint
+ *
+ * System infrastructure operations for Data Machine.
+ *
+ * @package DataMachine\Api\System
+ * @since   0.13.7
+ */
+
+namespace DataMachine\Api\System;
+
+use DataMachine\Abilities\PermissionHelper;
+use WP_REST_Server;
+use WP_REST_Request;
+use WP_Error;
+use DataMachine\Engine\Tasks\TaskRegistry;
+use DataMachine\Engine\AI\System\Tasks\SystemTask;
+use DataMachine\Engine\AI\System\SystemTaskPromptRegistry;
+
+if ( ! defined('ABSPATH') ) {
+	exit;
+}
+
+/**
+ * System API Handler
+ */
+class System {
+
+
+	/**
+	 * Register REST API routes
+	 */
+	public static function register() {
+		add_action('rest_api_init', array( self::class, 'register_routes' ));
+	}
+
+	/**
+	 * Register system endpoints
+	 */
+	public static function register_routes() {
+		// System status endpoint - could be useful for monitoring
+		register_rest_route(
+			'datamachine/v1',
+			'/system/status',
+			array(
+				'methods'             => WP_REST_Server::READABLE,
+				'callback'            => array( self::class, 'get_status' ),
+				'permission_callback' => function () {
+					return PermissionHelper::can( 'manage_settings' );
+				},
+			)
+		);
+
+		// System tasks registry for admin UI.
+		register_rest_route(
+			'datamachine/v1',
+			'/system/tasks',
+			array(
+				'methods'             => WP_REST_Server::READABLE,
+				'callback'            => array( self::class, 'get_tasks' ),
+				'permission_callback' => function () {
+					return PermissionHelper::can( 'manage_settings' );
+				},
+			)
+		);
+
+		// Run a system task immediately.
+		register_rest_route(
+			'datamachine/v1',
+			'/system/tasks/(?P<task_type>[a-z_]+)/run',
+			array(
+				'methods'             => WP_REST_Server::CREATABLE,
+				'callback'            => array( self::class, 'run_task' ),
+				'permission_callback' => function () {
+					return PermissionHelper::can( 'manage_settings' );
+				},
+				'args'                => array(
+					'task_type' => array(
+						'required'          => true,
+						'type'              => 'string',
+						'sanitize_callback' => 'sanitize_key',
+					),
+				),
+			)
+		);
+
+		// System task prompt definitions — list all editable prompts across tasks.
+		register_rest_route(
+			'datamachine/v1',
+			'/system/tasks/prompts',
+			array(
+				'methods'             => WP_REST_Server::READABLE,
+				'callback'            => array( self::class, 'get_prompts' ),
+				'permission_callback' => function () {
+					return PermissionHelper::can( 'manage_settings' );
+				},
+			)
+		);
+
+		// Get/set/reset a specific prompt override.
+		register_rest_route(
+			'datamachine/v1',
+			'/system/tasks/prompts/(?P<task_type>[a-z_]+)/(?P<prompt_key>[a-z_]+)',
+			array(
+				array(
+					'methods'             => WP_REST_Server::READABLE,
+					'callback'            => array( self::class, 'get_prompt' ),
+					'permission_callback' => function () {
+						return PermissionHelper::can( 'manage_settings' );
+					},
+					'args'                => array(
+						'task_type'  => array(
+							'required'          => true,
+							'type'              => 'string',
+							'sanitize_callback' => 'sanitize_key',
+						),
+						'prompt_key' => array(
+							'required'          => true,
+							'type'              => 'string',
+							'sanitize_callback' => 'sanitize_key',
+						),
+					),
+				),
+				array(
+					'methods'             => 'PUT',
+					'callback'            => array( self::class, 'set_prompt' ),
+					'permission_callback' => function () {
+						return PermissionHelper::can( 'manage_settings' );
+					},
+					'args'                => array(
+						'task_type'  => array(
+							'required'          => true,
+							'type'              => 'string',
+							'sanitize_callback' => 'sanitize_key',
+						),
+						'prompt_key' => array(
+							'required'          => true,
+							'type'              => 'string',
+							'sanitize_callback' => 'sanitize_key',
+						),
+						'prompt'     => array(
+							'required'    => true,
+							'type'        => 'string',
+							'description' => __( 'The prompt override text.', 'data-machine' ),
+						),
+					),
+				),
+				array(
+					'methods'             => WP_REST_Server::DELETABLE,
+					'callback'            => array( self::class, 'reset_prompt' ),
+					'permission_callback' => function () {
+						return PermissionHelper::can( 'manage_settings' );
+					},
+					'args'                => array(
+						'task_type'  => array(
+							'required'          => true,
+							'type'              => 'string',
+							'sanitize_callback' => 'sanitize_key',
+						),
+						'prompt_key' => array(
+							'required'          => true,
+							'type'              => 'string',
+							'sanitize_callback' => 'sanitize_key',
+						),
+					),
+				),
+			)
+		);
+	}
+
+	/**
+	 * Get system status
+	 *
+	 * @param  WP_REST_Request $request Request object
+	 * @return array|WP_Error Response data or error
+	 */
+	public static function get_status( WP_REST_Request $request ) {
+		unset( $request );
+		return rest_ensure_response(
+			array(
+				'success' => true,
+				'data'    => array(
+					'status'    => 'operational',
+					'version'   => defined('DATAMACHINE_VERSION') ? DATAMACHINE_VERSION : 'unknown',
+					'timestamp' => current_time('mysql', true),
+				),
+			)
+		);
+	}
+
+	/**
+	 * Get system tasks registry with metadata and last-run info.
+	 *
+	 * @param WP_REST_Request $request Request object.
+	 * @return \WP_REST_Response
+	 * @since 0.32.0
+	 */
+	public static function get_tasks( WP_REST_Request $request ) {
+		unset( $request );
+		$registry  = TaskRegistry::getRegistry();
+		$last_runs = self::get_last_runs( array_keys( $registry ) );
+
+		// Merge last-run data into each task entry.
+		$tasks = array();
+		foreach ( $registry as $task_type => $meta ) {
+			$last_run = $last_runs[ $task_type ] ?? null;
+
+			$tasks[] = array_merge( $meta, array(
+				'last_run_at' => $last_run ? $last_run['completed_at'] : null,
+				'last_status' => $last_run ? $last_run['status'] : null,
+				'run_count'   => $last_run ? ( $last_run['run_count'] ?? 0 ) : 0,
+			) );
+		}
+
+		return rest_ensure_response( array(
+			'success' => true,
+			'data'    => $tasks,
+		) );
+	}
+
+	/**
+	 * Run a system task immediately via the run-task ability.
+	 *
+	 * @param WP_REST_Request $request Request with task_type.
+	 * @return \WP_REST_Response|WP_Error
+	 * @since 0.42.0
+	 */
+	public static function run_task( WP_REST_Request $request ) {
+		$task_type = $request->get_param( 'task_type' );
+
+		$ability = wp_get_ability( 'datamachine/run-task' );
+
+		if ( ! $ability ) {
+			return new WP_Error(
+				'ability_not_found',
+				__( 'The run-task ability is not registered.', 'data-machine' ),
+				array( 'status' => 500 )
+			);
+		}
+
+		$result = $ability->execute( array( 'task_type' => $task_type ) );
+
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+
+		if ( empty( $result['success'] ) ) {
+			return new WP_Error(
+				'run_task_failed',
+				$result['error'] ?? __( 'Failed to run task.', 'data-machine' ),
+				array( 'status' => 400 )
+			);
+		}
+
+		return rest_ensure_response( array(
+			'success' => true,
+			'data'    => $result,
+		) );
+	}
+
+	/**
+	 * Get all prompt definitions across all system tasks.
+	 *
+	 * Returns each task's editable prompts with their defaults,
+	 * current overrides (if any), and available template variables.
+	 *
+	 * @param WP_REST_Request $request Request object.
+	 * @return \WP_REST_Response
+	 * @since 0.41.0
+	 */
+	public static function get_prompts( WP_REST_Request $request ) {
+		unset( $request );
+		$handlers  = TaskRegistry::getHandlers();
+		$overrides = SystemTask::getAllPromptOverrides();
+
+		$prompts = array();
+
+		foreach ( $handlers as $task_type => $handler_class ) {
+			if ( ! class_exists( $handler_class ) ) {
+				continue;
+			}
+
+			$task = new $handler_class();
+			if ( ! $task instanceof SystemTask ) {
+				continue;
+			}
+
+			$definitions = $task->getPromptDefinitions();
+
+			if ( empty( $definitions ) ) {
+				continue;
+			}
+
+			foreach ( $definitions as $prompt_key => $definition ) {
+				$has_override = isset( $overrides[ $task_type ][ $prompt_key ] )
+					&& '' !== $overrides[ $task_type ][ $prompt_key ];
+
+				/**
+				 * Filter prompt variable definitions for the admin UI.
+				 *
+				 * Allows site code that registers runtime variables via
+				 * `datamachine_task_prompt_variables` to also declare them
+				 * here so the UI shows them as available placeholders.
+				 *
+				 * @since 0.44.0
+				 * @param array  $variables  Variable name => description map.
+				 * @param string $task_type  The system task type.
+				 * @param string $prompt_key The prompt key within the task.
+				 */
+				$variables = apply_filters(
+					'datamachine_task_prompt_variable_definitions',
+					$definition['variables'],
+					$task_type,
+					$prompt_key
+				);
+
+				$prompts[] = self::format_prompt_response(
+					$task_type,
+					$prompt_key,
+					array_merge( $definition, array( 'variables' => $variables ) ),
+					$has_override ? $overrides[ $task_type ][ $prompt_key ] : null
+				);
+			}
+		}
+
+		return rest_ensure_response( array(
+			'success' => true,
+			'data'    => $prompts,
+		) );
+	}
+
+	/**
+	 * Get a specific prompt's definition and current value.
+	 *
+	 * @param WP_REST_Request $request Request with task_type and prompt_key.
+	 * @return \WP_REST_Response|WP_Error|array
+	 * @since 0.41.0
+	 */
+	public static function get_prompt( WP_REST_Request $request ) {
+		$task_type  = $request->get_param( 'task_type' );
+		$prompt_key = $request->get_param( 'prompt_key' );
+
+		$definition = self::resolve_prompt_definition( $task_type, $prompt_key );
+
+		if ( $definition instanceof WP_Error ) {
+			return $definition;
+		}
+
+		$overrides    = SystemTask::getAllPromptOverrides();
+		$has_override = isset( $overrides[ $task_type ][ $prompt_key ] )
+			&& '' !== $overrides[ $task_type ][ $prompt_key ];
+
+		return rest_ensure_response( array(
+			'success' => true,
+			'data'    => self::format_prompt_response( $task_type, $prompt_key, $definition, $has_override ? $overrides[ $task_type ][ $prompt_key ] : null ),
+		) );
+	}
+
+	/**
+	 * Format a system task prompt response with versioned artifact metadata.
+	 *
+	 * @param string      $task_type   Task type identifier.
+	 * @param string      $prompt_key  Prompt key within the task.
+	 * @param array       $definition  Prompt definition.
+	 * @param string|null $override    Local override content.
+	 * @return array<string,mixed>
+	 */
+	private static function format_prompt_response( string $task_type, string $prompt_key, array $definition, ?string $override ): array {
+		$artifact = SystemTaskPromptRegistry::artifact_from_definition( $task_type, $prompt_key, $definition );
+		$resolved = SystemTaskPromptRegistry::resolve_effective_prompt( $task_type, $prompt_key, $artifact, $override );
+
+		return array(
+			'task_type'            => $task_type,
+			'prompt_key'           => $prompt_key,
+			'label'                => $definition['label'],
+			'description'          => $definition['description'],
+			'default'              => $definition['default'],
+			'variables'            => $definition['variables'],
+			'has_override'         => null !== $override && '' !== $override,
+			'override'             => $override,
+			'effective'            => $resolved['content'],
+			'effective_source'     => $resolved['source'],
+			'effective_hash'       => $resolved['content_hash'],
+			'artifact_id'          => $resolved['artifact_id'],
+			'artifact_type'        => $artifact ? $artifact->artifact_type() : 'prompt',
+			'artifact_version'     => $resolved['version'],
+			'artifact_source_path' => $artifact ? $artifact->source_path() : '',
+			'artifact_hash'        => $artifact ? $artifact->content_hash() : '',
+			'artifact_changelog'   => $artifact ? $artifact->version_metadata()['changelog'] : '',
+		);
+	}
+
+	/**
+	 * Set a prompt override for a specific task prompt.
+	 *
+	 * @param WP_REST_Request $request Request with task_type, prompt_key, and prompt.
+	 * @return \WP_REST_Response|WP_Error|array
+	 * @since 0.41.0
+	 */
+	public static function set_prompt( WP_REST_Request $request ) {
+		$task_type  = $request->get_param( 'task_type' );
+		$prompt_key = $request->get_param( 'prompt_key' );
+		$prompt     = $request->get_param( 'prompt' );
+
+		$definition = self::resolve_prompt_definition( $task_type, $prompt_key );
+
+		if ( $definition instanceof WP_Error ) {
+			return $definition;
+		}
+
+		if ( empty( $prompt ) ) {
+			return new WP_Error(
+				'empty_prompt',
+				__( 'Prompt text cannot be empty. Use DELETE to reset to default.', 'data-machine' ),
+				array( 'status' => 400 )
+			);
+		}
+
+		$saved = SystemTask::setPromptOverride( $task_type, $prompt_key, $prompt );
+
+		return rest_ensure_response( array(
+			'success' => $saved,
+			'data'    => array(
+				'task_type'  => $task_type,
+				'prompt_key' => $prompt_key,
+				'override'   => $prompt,
+			),
+		) );
+	}
+
+	/**
+	 * Reset a prompt override to default (remove the override).
+	 *
+	 * @param WP_REST_Request $request Request with task_type and prompt_key.
+	 * @return \WP_REST_Response|WP_Error|array
+	 * @since 0.41.0
+	 */
+	public static function reset_prompt( WP_REST_Request $request ) {
+		$task_type  = $request->get_param( 'task_type' );
+		$prompt_key = $request->get_param( 'prompt_key' );
+
+		$definition = self::resolve_prompt_definition( $task_type, $prompt_key );
+
+		if ( $definition instanceof WP_Error ) {
+			return $definition;
+		}
+
+		// Set empty string to remove override.
+		$reset = SystemTask::setPromptOverride( $task_type, $prompt_key, '' );
+
+		return rest_ensure_response( array(
+			'success' => $reset,
+			'data'    => array(
+				'task_type'  => $task_type,
+				'prompt_key' => $prompt_key,
+				'default'    => $definition['default'],
+			),
+		) );
+	}
+
+	/**
+	 * Resolve and validate a prompt definition by task_type and prompt_key.
+	 *
+	 * @param string $task_type  Task type identifier.
+	 * @param string $prompt_key Prompt key within the task.
+	 * @return array|WP_Error The prompt definition or error.
+	 * @since 0.41.0
+	 */
+	private static function resolve_prompt_definition( string $task_type, string $prompt_key ) {
+		$handlers = TaskRegistry::getHandlers();
+
+		if ( ! isset( $handlers[ $task_type ] ) ) {
+			return new WP_Error(
+				'invalid_task_type',
+			// translators: %s: task type identifier.
+				sprintf( __( 'Unknown task type: %s', 'data-machine' ), $task_type ),
+				array( 'status' => 404 )
+			);
+		}
+
+		$handler_class = $handlers[ $task_type ];
+
+		if ( ! class_exists( $handler_class ) ) {
+			return new WP_Error(
+				'task_class_missing',
+			// translators: %s: fully-qualified task handler class name.
+				sprintf( __( 'Task handler class not found: %s', 'data-machine' ), $handler_class ),
+				array( 'status' => 500 )
+			);
+		}
+
+		$task = new $handler_class();
+		if ( ! $task instanceof SystemTask ) {
+			return new WP_Error(
+				'invalid_task_class',
+			// translators: %s: fully-qualified task handler class name.
+				sprintf( __( 'Task handler class is not a SystemTask: %s', 'data-machine' ), $handler_class ),
+				array( 'status' => 500 )
+			);
+		}
+
+		$definitions = $task->getPromptDefinitions();
+
+		if ( ! isset( $definitions[ $prompt_key ] ) ) {
+			return new WP_Error(
+				'invalid_prompt_key',
+			// translators: 1: prompt key name, 2: task type identifier.
+				sprintf( __( 'Unknown prompt key "%1$s" for task type "%2$s".', 'data-machine' ), $prompt_key, $task_type ),
+				array( 'status' => 404 )
+			);
+		}
+
+		return $definitions[ $prompt_key ];
+	}
+
+	/**
+	 * Get the most recent job and total run count for each task type.
+	 *
+	 * Queries both system and pipeline_system_task sources so the UI
+	 * reflects all task executions regardless of trigger path.
+	 *
+	 * @param array $task_types List of task type identifiers.
+	 * @return array<string, array> Task type => { last job row + run_count }.
+	 * @since 0.32.0
+	 */
+	private static function get_last_runs( array $task_types ): array {
+		if ( empty( $task_types ) ) {
+			return array();
+		}
+
+		global $wpdb;
+		$table   = $wpdb->prefix . 'datamachine_jobs';
+		$results = array();
+
+		foreach ( $task_types as $task_type ) {
+			// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
+			$row = $wpdb->get_row(
+				$wpdb->prepare(
+					"SELECT job_id, status, created_at, completed_at
+					 FROM {$table}
+					 WHERE source IN ('system', 'pipeline_system_task')
+					 AND task_type = %s
+					 ORDER BY job_id DESC
+					 LIMIT 1",
+					$task_type
+				),
+				ARRAY_A
+			);
+
+			$count = $wpdb->get_var(
+				$wpdb->prepare(
+					"SELECT COUNT(*)
+					 FROM {$table}
+					 WHERE source IN ('system', 'pipeline_system_task')
+					 AND task_type = %s",
+					$task_type
+				)
+			);
+			// phpcs:enable WordPress.DB.PreparedSQL
+
+			if ( $row ) {
+				$row['run_count']      = (int) $count;
+				$results[ $task_type ] = $row;
+			} elseif ( $count > 0 ) {
+				$results[ $task_type ] = array(
+					'job_id'       => null,
+					'status'       => null,
+					'created_at'   => null,
+					'completed_at' => null,
+					'run_count'    => (int) $count,
+				);
+			}
+		}
+
+		return $results;
+	}
+}

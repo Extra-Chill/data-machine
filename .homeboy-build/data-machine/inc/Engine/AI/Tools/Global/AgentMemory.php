@@ -1,0 +1,316 @@
+<?php
+/**
+ * Agent Memory AI Tool - Persistent memory management for AI agents
+ *
+ * Delegates to AgentMemoryAbilities for section-level read/write operations
+ * on any agent file. Provides persistent knowledge storage
+ * across sessions for all agent types.
+ *
+ * @package DataMachine\Engine\AI\Tools\Global
+ * @since   0.30.0
+ * @since   0.45.0 Added file parameter for any-file support.
+ */
+
+	namespace DataMachine\Engine\AI\Tools\Global;
+
+defined( 'ABSPATH' ) || exit;
+
+use DataMachine\Engine\AI\Tools\BaseTool;
+use DataMachine\Engine\AI\Tools\ToolPolicyResolver;
+use DataMachine\Core\FilesRepository\DirectoryManager;
+use DataMachine\Abilities\PermissionHelper;
+
+class AgentMemory extends BaseTool {
+
+	public function __construct() {
+		$this->registerTool( 'agent_memory', array( $this, 'getToolDefinition' ), array( 'chat', ToolPolicyResolver::MODE_PIPELINE ), array( 'abilities' => array( 'datamachine/get-agent-memory', 'datamachine/update-agent-memory', 'datamachine/list-agent-memory-sections' ), 'requires_opt_in' => true ) );
+	}
+
+	/**
+	 * Handle tool call by routing to the appropriate ability.
+	 *
+	 * @param array $parameters Tool parameters from AI.
+	 * @param array $tool_def   Tool definition context.
+	 * @return array Response array.
+	 */
+	public function handle_tool_call( array $parameters, array $tool_def = array() ): array {
+		$action = $parameters['action'] ?? '';
+
+		return match ( $action ) {
+			'get'           => $this->handleGet( $parameters ),
+			'update'        => $this->handleUpdate( $parameters ),
+			'list_sections' => $this->handleListSections( $parameters ),
+			default         => $this->buildErrorResponse(
+				'Invalid action "' . $action . '". Use "get", "update", or "list_sections".',
+				'agent_memory'
+			),
+		};
+	}
+
+	/**
+	 * Read full file or a specific section.
+	 *
+	 * @param array $parameters Tool parameters.
+	 * @return array Response.
+	 */
+	private function handleGet( array $parameters ): array {
+		$ability = wp_get_ability( 'datamachine/get-agent-memory' );
+		$scope   = $this->resolve_scope( $parameters );
+
+		if ( ! $ability ) {
+			return $this->buildErrorResponse(
+				'Agent Memory ability not registered. Ensure WordPress 6.9+ and AgentMemoryAbilities is loaded.',
+				'agent_memory'
+			);
+		}
+
+		$input = array(
+			'user_id'  => $scope['user_id'],
+			'agent_id' => $scope['agent_id'],
+			'section'  => $parameters['section'] ?? '',
+		);
+
+		if ( ! empty( $parameters['file'] ) ) {
+			$input['file'] = $parameters['file'];
+		}
+
+		$result = $ability->execute( $input );
+
+		if ( is_wp_error( $result ) ) {
+			return $this->buildErrorResponse( $result->get_error_message(), 'agent_memory' );
+		}
+
+		if ( ! $this->isAbilitySuccess( $result ) ) {
+			return $this->buildErrorResponse(
+				$this->getAbilityError( $result, 'Failed to read agent memory.' ),
+				'agent_memory'
+			);
+		}
+
+		return array(
+			'success'   => true,
+			'data'      => $result,
+			'scope'     => $scope,
+			'tool_name' => 'agent_memory',
+		);
+	}
+
+	/**
+	 * Write to a section — set (replace) or append.
+	 *
+	 * @param array $parameters Tool parameters.
+	 * @return array Response.
+	 */
+	private function handleUpdate( array $parameters ): array {
+		$section = $parameters['section'] ?? '';
+		$content = $parameters['content'] ?? '';
+		$mode    = $parameters['mode'] ?? 'set';
+		$scope   = $this->resolve_scope( $parameters );
+
+		if ( '' === $section ) {
+			return $this->buildErrorResponse(
+				'Parameter "section" is required for update action.',
+				'agent_memory'
+			);
+		}
+
+		if ( '' === $content ) {
+			return $this->buildErrorResponse(
+				'Parameter "content" is required for update action.',
+				'agent_memory'
+			);
+		}
+
+		$ability = wp_get_ability( 'datamachine/update-agent-memory' );
+
+		if ( ! $ability ) {
+			return $this->buildErrorResponse(
+				'Agent Memory ability not registered. Ensure WordPress 6.9+ and AgentMemoryAbilities is loaded.',
+				'agent_memory'
+			);
+		}
+
+		$input = array(
+			'user_id'  => $scope['user_id'],
+			'agent_id' => $scope['agent_id'],
+			'section'  => $section,
+			'content'  => $content,
+			'mode'     => $mode,
+		);
+
+		if ( ! empty( $parameters['file'] ) ) {
+			$input['file'] = $parameters['file'];
+		}
+
+		$result = $ability->execute( $input );
+
+		if ( is_wp_error( $result ) ) {
+			return $this->buildErrorResponse( $result->get_error_message(), 'agent_memory' );
+		}
+
+		if ( ! $this->isAbilitySuccess( $result ) ) {
+			return $this->buildErrorResponse(
+				$this->getAbilityError( $result, 'Failed to update agent file.' ),
+				'agent_memory'
+			);
+		}
+
+		return array(
+			'success'   => true,
+			'data'      => $result,
+			'scope'     => $scope,
+			'tool_name' => 'agent_memory',
+		);
+	}
+
+	/**
+	 * List all section headers.
+	 *
+	 * @return array Response.
+	 */
+	private function handleListSections( array $parameters = array() ): array {
+		$ability = wp_get_ability( 'datamachine/list-agent-memory-sections' );
+		$scope   = $this->resolve_scope( $parameters );
+
+		if ( ! $ability ) {
+			return $this->buildErrorResponse(
+				'Agent Memory ability not registered. Ensure WordPress 6.9+ and AgentMemoryAbilities is loaded.',
+				'agent_memory'
+			);
+		}
+
+		$input = array(
+			'user_id'  => $scope['user_id'],
+			'agent_id' => $scope['agent_id'],
+		);
+
+		if ( ! empty( $parameters['file'] ) ) {
+			$input['file'] = $parameters['file'];
+		}
+
+		$result = $ability->execute( $input );
+
+		if ( is_wp_error( $result ) ) {
+			return $this->buildErrorResponse( $result->get_error_message(), 'agent_memory' );
+		}
+
+		if ( ! $this->isAbilitySuccess( $result ) ) {
+			return $this->buildErrorResponse(
+				$this->getAbilityError( $result, 'Failed to list memory sections.' ),
+				'agent_memory'
+			);
+		}
+
+		return array(
+			'success'   => true,
+			'data'      => $result,
+			'scope'     => $scope,
+			'tool_name' => 'agent_memory',
+		);
+	}
+
+	/**
+	 * Tool definition for AI agent discovery.
+	 *
+	 * @return array Tool schema.
+	 */
+	public function getToolDefinition(): array {
+		return array(
+			'class'           => __CLASS__,
+			'method'          => 'handle_tool_call',
+			'description'     => 'Manage persistent agent files with section-level operations. Works on any agent file: MEMORY.md (default), SOUL.md, USER.md, etc. Stored as markdown with ## section headers. Use "list_sections" to see what exists, "get" to read content, and "update" to write. Use "append" mode to add new information without losing existing content. Use "set" mode to replace a section entirely. For session activity and temporal events, use agent_daily_memory instead.',
+			'requires_config' => false,
+			'parameters'      => array(
+				'type'       => 'object',
+				'properties' => array(
+					'user_id' => array(
+						'type'        => 'integer',
+						'description' => 'Optional WordPress user ID for layered memory context. Defaults to current user context.',
+					),
+					'agent_id' => array(
+						'type'        => 'integer',
+						'description' => 'Optional agent ID for agent-scoped memory. In agent context, the executing agent scope is used.',
+					),
+					'action'  => array(
+						'type'        => 'string',
+						'description' => 'Action to perform: "get" (read file/section), "update" (write to section), or "list_sections" (show all section headers).',
+					),
+					'file'    => array(
+						'type'        => 'string',
+						'description' => 'Target file. Defaults to MEMORY.md. Use SOUL.md, USER.md, SITE.md, etc. for other agent files.',
+					),
+					'section' => array(
+						'type'        => 'string',
+						'description' => 'Section name without "##" prefix. Required for "update". Optional for "get" (omit to read full file).',
+					),
+					'content' => array(
+						'type'        => 'string',
+						'description' => 'Content to write. Required for "update" action.',
+					),
+					'mode'    => array(
+						'type'        => 'string',
+						'description' => 'Write mode for "update": "set" replaces section content (default), "append" adds to end of section.',
+						'enum'        => array( 'set', 'append' ),
+					),
+				),
+				'required'   => array( 'action' ),
+			),
+		);
+	}
+
+	/**
+	 * Resolve scoped user and agent IDs from tool parameters.
+	 *
+	 * @param array $parameters Tool parameters.
+	 * @return array{user_id:int, agent_id:int}
+	 */
+	private function resolve_scope( array $parameters ): array {
+		$directory_manager = new DirectoryManager();
+
+		if ( PermissionHelper::in_agent_context() ) {
+			return array(
+				'user_id'  => PermissionHelper::acting_user_id(),
+				'agent_id' => PermissionHelper::get_acting_agent_id() ?? 0,
+			);
+		}
+
+		$raw_user_id = (int) ( $parameters['user_id'] ?? 0 );
+		$agent_id    = (int) ( $parameters['agent_id'] ?? 0 );
+
+		if ( $raw_user_id > 0 ) {
+			$user_id = $directory_manager->get_effective_user_id( $raw_user_id );
+		} else {
+			$current_user_id = get_current_user_id();
+			$user_id         = $current_user_id > 0 ? $directory_manager->get_effective_user_id( $current_user_id ) : $directory_manager->get_effective_user_id( 0 );
+		}
+
+		return array(
+			'user_id'  => $user_id,
+			'agent_id' => $agent_id,
+		);
+	}
+
+	/**
+	 * Always configured — no external dependencies.
+	 *
+	 * @return bool
+	 */
+	public static function is_configured(): bool {
+		return true;
+	}
+
+	/**
+	 * Configuration check filter handler.
+	 *
+	 * @param bool   $configured Current configuration state.
+	 * @param string $tool_id    Tool identifier.
+	 * @return bool
+	 */
+	public function check_configuration( $configured, $tool_id ) {
+		if ( 'agent_memory' !== $tool_id ) {
+			return $configured;
+		}
+
+		return self::is_configured();
+	}
+}

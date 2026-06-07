@@ -2,6 +2,13 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.141.1] - 2026-06-07
+
+### Fixed
+- fix Agents API conversation turn runner
+- treat explicitly-empty enabled_tools as deny-all-optional (#2573)
+- Fix inline runtime agent bundle imports
+
 ## [0.141.0] - 2026-06-07
 
 ### Added

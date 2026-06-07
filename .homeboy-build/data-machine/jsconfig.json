@@ -1,0 +1,10 @@
+{
+	"compilerOptions": {
+		"baseUrl": ".",
+		"paths": {
+			"@shared/*": [ "inc/Core/Admin/shared/*" ]
+		}
+	},
+	"include": [ "inc/Core/Admin/**/*" ],
+	"exclude": [ "node_modules", "build" ]
+}

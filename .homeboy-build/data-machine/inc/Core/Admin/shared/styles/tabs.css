@@ -1,0 +1,48 @@
+/**
+ * Shared TabPanel styles
+ *
+ * Common styling for @wordpress/components TabPanel across all admin pages.
+ * Apply the class `datamachine-tabs` to each <TabPanel>.
+ */
+
+.datamachine-tabs {
+	background: #fff;
+	border: 1px solid #c3c4c7;
+	box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
+}
+
+.datamachine-tabs .components-tab-panel__tabs {
+	background: #f6f7f7;
+	border-bottom: 1px solid #c3c4c7;
+	margin: 0;
+	padding: 0;
+}
+
+.datamachine-tabs .components-tab-panel__tabs-item {
+	padding: 12px 20px;
+	font-size: 14px;
+	font-weight: 500;
+	color: #1e1e1e;
+	border: none;
+	background: transparent;
+	cursor: pointer;
+	position: relative;
+}
+
+.datamachine-tabs .components-tab-panel__tabs-item:hover {
+	background: #fff;
+}
+
+.datamachine-tabs .components-tab-panel__tabs-item.is-active {
+	background: #fff;
+	box-shadow: inset 0 -3px 0 0 #3858e9;
+}
+
+.datamachine-tabs .components-tab-panel__tabs-item:focus {
+	box-shadow: inset 0 0 0 1.5px #3858e9;
+	outline: none;
+}
+
+.datamachine-tabs .components-tab-panel__tab-content {
+	padding: 20px;
+}
