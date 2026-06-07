@@ -41,6 +41,21 @@ function get_enabled_tools_for_test( array $step_config ): array {
 	return array_values( $enabled );
 }
 
+/**
+ * Inline reimplementation of FlowStepConfig::isEnabledToolsExplicit().
+ *
+ * Mirrors inc/Core/Steps/FlowStepConfig.php. Diverging here means the real
+ * file regressed.
+ */
+function is_enabled_tools_explicit_for_test( array $step_config ): bool {
+	if ( 'ai' !== ( $step_config['step_type'] ?? '' ) ) {
+		return false;
+	}
+
+	return array_key_exists( 'enabled_tools', $step_config )
+		&& is_array( $step_config['enabled_tools'] );
+}
+
 $failures = array();
 $passes   = 0;
 
@@ -114,6 +129,55 @@ $config = array(
 	'enabled_tools' => 'not_an_array',
 );
 assert_equals( array(), get_enabled_tools_for_test( $config ), 'non-array enabled_tools → empty (no fatal)', $failures, $passes );
+
+// ----- FlowStepConfig::isEnabledToolsExplicit() -----
+
+echo "\n[7] explicit detection — populated enabled_tools is explicit:\n";
+assert_equals(
+	true,
+	is_enabled_tools_explicit_for_test( array( 'step_type' => 'ai', 'enabled_tools' => array( 'intelligence/search' ) ) ),
+	'populated array => explicit',
+	$failures,
+	$passes
+);
+
+echo "\n[8] explicit detection — present-but-EMPTY enabled_tools is explicit:\n";
+// This is the footgun case: the operator deselected every tool. It must be
+// distinguishable from an absent key so the runtime can deny all optional tools.
+assert_equals(
+	true,
+	is_enabled_tools_explicit_for_test( array( 'step_type' => 'ai', 'enabled_tools' => array() ) ),
+	'present empty array => explicit (deny all optional)',
+	$failures,
+	$passes
+);
+
+echo "\n[9] explicit detection — absent key is NOT explicit (legacy preset):\n";
+assert_equals(
+	false,
+	is_enabled_tools_explicit_for_test( array( 'step_type' => 'ai' ) ),
+	'absent key => not explicit (preset applies)',
+	$failures,
+	$passes
+);
+
+echo "\n[10] explicit detection — non-array enabled_tools is NOT explicit:\n";
+assert_equals(
+	false,
+	is_enabled_tools_explicit_for_test( array( 'step_type' => 'ai', 'enabled_tools' => 'nope' ) ),
+	'non-array => not explicit',
+	$failures,
+	$passes
+);
+
+echo "\n[11] explicit detection — non-AI step is never explicit:\n";
+assert_equals(
+	false,
+	is_enabled_tools_explicit_for_test( array( 'step_type' => 'publish', 'enabled_tools' => array() ) ),
+	'publish step => not explicit',
+	$failures,
+	$passes
+);
 
 echo "\n---------------------------------------\n";
 $total = $passes + count( $failures );

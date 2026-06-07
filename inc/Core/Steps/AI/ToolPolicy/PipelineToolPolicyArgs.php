@@ -21,16 +21,26 @@ class PipelineToolPolicyArgs {
 	 * direct workflows use synthetic IDs, and historical jobs must inspect the
 	 * policy that existed when they ran.
 	 *
+	 * An explicitly-configured enabled_tools list (even an empty one) switches
+	 * the step into allowlist mode: only the named optional tools survive
+	 * alongside mandatory plumbing. An empty explicit list therefore denies all
+	 * optional/global tools. When the field is absent (legacy steps that predate
+	 * it) no allow_only constraint is emitted and the context preset applies.
+	 *
 	 * @param array $flow_step_config     Current flow step config snapshot.
 	 * @param array $pipeline_step_config Current pipeline step config snapshot.
 	 * @return array Resolver args containing allow_only/deny when configured.
 	 */
 	public static function fromConfigs( array $flow_step_config, array $pipeline_step_config ): array {
-		$args          = array();
-		$enabled_tools = FlowStepConfig::getEnabledTools( $flow_step_config );
+		$args = array();
 
-		if ( ! empty( $enabled_tools ) ) {
-			$args['allow_only'] = self::sanitizeToolList( $enabled_tools );
+		if ( FlowStepConfig::isEnabledToolsExplicit( $flow_step_config ) ) {
+			$args['allow_only'] = self::sanitizeToolList( FlowStepConfig::getEnabledTools( $flow_step_config ) );
+
+			// Allowlist mode is meaningful even when empty: it means "no optional
+			// tools." The generic substrate only applies a non-empty allow_only,
+			// so flag the explicit-empty case for the resolver to enforce.
+			$args['allow_only_explicit'] = true;
 		}
 
 		$deny = array_merge(

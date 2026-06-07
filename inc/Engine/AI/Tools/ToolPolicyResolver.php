@@ -129,6 +129,17 @@ class ToolPolicyResolver {
 
 		$tools = $this->tool_policy->resolve( $tools, $policy_context );
 
+		// An explicitly-empty allow_only means "no optional tools." The generic
+		// substrate only applies a non-empty allow_only, so it would otherwise
+		// fall through to the full preset. Enforce the empty allowlist here while
+		// preserving mandatory plumbing tools (adjacent handler + completion).
+		if ( ! empty( $args['allow_only_explicit'] ) ) {
+			$allow_only = $this->policy_filter->string_list( $args['allow_only'] ?? array() );
+			if ( empty( $allow_only ) ) {
+				$tools = $this->filterByAllowOnlyPreservingHandlerTools( $tools, array() );
+			}
+		}
+
 		// 7. Allow external filtering of resolved tools.
 		// @phpstan-ignore-next-line WordPress apply_filters accepts additional hook arguments.
 		$filter_mode = 1 === count( $modes ) ? $modes[0] : $modes;

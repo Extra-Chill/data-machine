@@ -175,12 +175,17 @@ $tools   = resolve_policy_tools_for_test(
 assert_policy_equals( array( 'agent_daily_memory', 'agent_memory' ), array_keys( $tools ), 'allowlist can intentionally grant policy-controlled memory tools', $failures, $passes );
 assert_policy_equals( array(), $manager->availability_contexts, 'opt-in memory tools avoid per-step availability context lookups', $failures, $passes );
 
-echo "\n[2] ephemeral workflow disabled_tools deny from snapshot:\n";
+echo "\n[2] ephemeral explicit-empty enabled_tools denies all optional tools:\n";
+// An explicitly-empty enabled_tools means "no optional tools." The factory
+// always writes the enabled_tools key for AI steps, so this is the explicit
+// case: every optional preset tool is stripped (none here are mandatory
+// plumbing). This is the footgun fix — previously these fell through to the
+// full preset minus only the disabled_tools entry.
 $ephemeral = WorkflowConfigFactory::buildEphemeralConfigs(
 	array(
 		'steps' => array(
 			array(
-				'type'           => 'ai',
+				'step_type'      => 'ai',
 				'enabled_tools'  => array(),
 				'disabled_tools' => array( 'danger_tool' ),
 			),
@@ -191,14 +196,14 @@ $flow_step_config     = $ephemeral['flow_config']['ephemeral_step_0'];
 $pipeline_step_config = $ephemeral['pipeline_config']['ephemeral_pipeline_0'];
 $manager              = new SnapshotPolicyToolManager();
 $tools                = resolve_policy_tools_for_test( $flow_step_config, $pipeline_step_config, $manager );
-assert_policy_equals( array( 'alpha_tool', 'beta_tool' ), array_keys( $tools ), 'ephemeral disabled_tools removes denied tool without DB row and does not auto-grant daily memory', $failures, $passes );
+assert_policy_equals( array(), array_keys( $tools ), 'explicit-empty enabled_tools strips every optional preset tool', $failures, $passes );
 assert_policy_equals( array(), $manager->availability_contexts, 'ephemeral policy never re-reads by synthetic pipeline step ID', $failures, $passes );
 
-echo "\n[3] persistent workflow disabled_tools still apply from snapshot:\n";
+echo "\n[3] persistent explicit-empty enabled_tools denies all optional tools:\n";
 $workflow = array(
 	'steps' => array(
 		array(
-			'type'           => 'ai',
+			'step_type'      => 'ai',
 			'enabled_tools'  => array(),
 			'disabled_tools' => array( 'beta_tool' ),
 		),
@@ -210,8 +215,23 @@ $pipeline_step_id     = array_key_first( $pipeline_config );
 $flow_step_id         = array_key_first( $flow_config );
 $manager              = new SnapshotPolicyToolManager();
 $tools                = resolve_policy_tools_for_test( $flow_config[ $flow_step_id ], $pipeline_config[ $pipeline_step_id ], $manager );
-assert_policy_equals( array( 'alpha_tool', 'danger_tool' ), array_keys( $tools ), 'persistent disabled_tools removes denied tool', $failures, $passes );
+assert_policy_equals( array(), array_keys( $tools ), 'persistent explicit-empty enabled_tools strips every optional preset tool', $failures, $passes );
 assert_policy_equals( array(), $manager->availability_contexts, 'persistent policy does not re-read persisted step config', $failures, $passes );
+
+echo "\n[3b] absent enabled_tools (legacy step) keeps the preset:\n";
+// When the enabled_tools key was never configured (legacy, pre-field steps),
+// the step must keep the context preset for back-compat — no allowlist.
+$manager = new SnapshotPolicyToolManager();
+$tools   = resolve_policy_tools_for_test(
+	array(
+		'step_type'        => 'ai',
+		'pipeline_step_id' => 'ephemeral_pipeline_0',
+		// no enabled_tools key at all.
+	),
+	array( 'disabled_tools' => array( 'danger_tool' ) ),
+	$manager
+);
+assert_policy_equals( array( 'alpha_tool', 'beta_tool' ), array_keys( $tools ), 'absent enabled_tools keeps preset minus explicit deny', $failures, $passes );
 
 echo "\n[4] RequestInspector and AIStep share policy input helper:\n";
 $ai_step_source   = file_get_contents( __DIR__ . '/../inc/Core/Steps/AI/AIStep.php' ) ?: '';
@@ -232,11 +252,47 @@ $args = PipelineToolPolicyArgs::fromConfigs(
 );
 assert_policy_equals(
 	array(
-		'allow_only' => array( 'alpha_tool', 'beta_tool' ),
-		'deny'       => array( 'pipeline_denied', 'shared_denied', 'flow_denied' ),
+		'allow_only'          => array( 'alpha_tool', 'beta_tool' ),
+		'allow_only_explicit' => true,
+		'deny'                => array( 'pipeline_denied', 'shared_denied', 'flow_denied' ),
 	),
 	$args,
 	'enabled_tools and disabled_tools map to allow_only and deny args with original ordering',
+	$failures,
+	$passes
+);
+
+echo "\n[6] explicit-empty enabled_tools emits an empty allow_only + explicit flag:\n";
+$args = PipelineToolPolicyArgs::fromConfigs(
+	array(
+		'step_type'     => 'ai',
+		'enabled_tools' => array(),
+	),
+	array()
+);
+assert_policy_equals(
+	array(
+		'allow_only'          => array(),
+		'allow_only_explicit' => true,
+	),
+	$args,
+	'empty explicit enabled_tools => empty allow_only flagged explicit (deny all optional)',
+	$failures,
+	$passes
+);
+
+echo "\n[7] absent enabled_tools (legacy) emits no allow_only constraint:\n";
+$args = PipelineToolPolicyArgs::fromConfigs(
+	array(
+		'step_type' => 'ai',
+		// no enabled_tools key.
+	),
+	array()
+);
+assert_policy_equals(
+	array(),
+	$args,
+	'absent enabled_tools => no allow_only / allow_only_explicit (preset applies)',
 	$failures,
 	$passes
 );
