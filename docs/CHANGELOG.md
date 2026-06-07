@@ -2,6 +2,15 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.141.0] - 2026-06-07
+
+### Added
+- expose registered injectable memory files as a queryable list
+- wake_briefing — felt agent continuity on wake
+
+### Fixed
+- correct stale AIStep comments implying per-step model fields exist
+
 ## [0.140.1] - 2026-06-06
 
 ### Fixed
