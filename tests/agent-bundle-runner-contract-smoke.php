@@ -218,6 +218,42 @@ $recorded_envelope_merge = $GLOBALS['datamachine_bundle_runner_engine_data_merge
 datamachine_bundle_runner_assert( 'static/issue-468-design-direction' === ( $recorded_envelope_merge['data']['static_site_agent']['branch'] ?? null ), 'tool recorder maps branch from wrapped tool_result_data', $failures, $passes );
 datamachine_bundle_runner_assert( 'https://github.com/chubes4/wp-site-generator/pull/470' === ( $recorded_envelope_merge['data']['static_site_agent']['pr_url'] ?? null ), 'tool recorder maps PR URL from wrapped tool_result_data', $failures, $passes );
 
+$GLOBALS['datamachine_bundle_runner_engine_data_merges'] = array();
+\DataMachine\Engine\AI\datamachine_record_tool_results_to_engine_data(
+	array(
+		'job_id'         => 79,
+		'tool_recorders' => array(
+			array(
+				'tool'   => 'create_github_issue',
+				'record' => array(
+					'engine_key' => 'design_agent',
+					'fields'     => array(
+						'issue_number' => 'tool_result_data.issue_number',
+						'issue_url'    => 'tool_result_data.issue_url',
+					),
+				),
+			),
+		),
+	),
+	array(
+		array(
+			'tool_name' => 'create_github_issue',
+			'result'    => array(
+				'success'  => true,
+				'metadata' => array(
+					'tool_result_data' => array(
+						'issue_number' => 516,
+						'issue_url'    => 'https://github.com/chubes4/wp-site-generator/issues/516',
+					),
+				),
+			),
+		),
+	)
+);
+$recorded_direct_tool_merge = $GLOBALS['datamachine_bundle_runner_engine_data_merges'][0] ?? array();
+datamachine_bundle_runner_assert( 516 === ( $recorded_direct_tool_merge['data']['design_agent']['issue_number'] ?? null ), 'tool recorder maps issue number from direct tool metadata payload', $failures, $passes );
+datamachine_bundle_runner_assert( 'https://github.com/chubes4/wp-site-generator/issues/516' === ( $recorded_direct_tool_merge['data']['design_agent']['issue_url'] ?? null ), 'tool recorder maps issue URL from direct tool metadata payload', $failures, $passes );
+
 echo "\n[3b] Runner applies run-scoped flow step patches\n";
 $workflow_from_bundle_flow = $runner_reflection->getMethod( 'workflow_from_bundle_flow' );
 $patched_workflow          = $workflow_from_bundle_flow->invoke(
