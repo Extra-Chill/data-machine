@@ -1993,7 +1993,8 @@ function datamachine_tool_result_record_values( array $entry, array $fields ): a
 	$tool_result_data     = datamachine_first_tool_result_data_container(
 		is_array( $entry['tool_result_data'] ?? null ) ? $entry['tool_result_data'] : array(),
 		is_array( $result['tool_result_data'] ?? null ) ? $result['tool_result_data'] : array(),
-		is_array( $metadata['tool_result_data'] ?? null ) ? $metadata['tool_result_data'] : array()
+		is_array( $metadata['tool_result_data'] ?? null ) ? $metadata['tool_result_data'] : array(),
+		$nested_result
 	);
 	$tool_result_envelope = is_array( $entry['tool_result_envelope'] ?? null ) ? $entry['tool_result_envelope'] : ( is_array( $result['tool_result_envelope'] ?? null ) ? $result['tool_result_envelope'] : array() );
 	$envelope_result      = is_array( $tool_result_envelope['result'] ?? null ) ? $tool_result_envelope['result'] : array();
