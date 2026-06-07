@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.140.2] - 2026-06-07
+
+### Fixed
+- correct stale AIStep comments implying per-step model fields exist
+
 ## [0.140.1] - 2026-06-06
 
 ### Fixed
