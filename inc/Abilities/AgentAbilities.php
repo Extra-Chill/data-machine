@@ -344,17 +344,13 @@ class AgentAbilities {
 					'category'            => 'datamachine-agent',
 					'input_schema'        => array(
 						'type'       => 'object',
-						'anyOf'      => array(
-							array( 'required' => array( 'source' ) ),
-							array( 'required' => array( 'bundle' ) ),
-						),
 						'properties' => array(
 							'source'      => array(
 								'type'        => 'string',
 								'description' => 'Bundle source: local path (directory, .zip, .json) or remote URL (HTTPS to a .zip/.json or a GitHub blob/tree/archive URL).',
 							),
 							'bundle'      => array(
-								'type'        => 'object',
+								'type'        => array( 'object', 'array' ),
 								'description' => 'Already-parsed portable Data Machine agent bundle array.',
 							),
 							'slug'        => array(

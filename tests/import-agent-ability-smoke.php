@@ -268,7 +268,7 @@ namespace {
 	};
 
 	$agent_abilities_source = file_get_contents( dirname( __DIR__ ) . '/inc/Abilities/AgentAbilities.php' );
-	$assert( 'import-agent schema accepts either source or bundle', false !== strpos( $agent_abilities_source, "array( 'required' => array( 'source' ) )" ) && false !== strpos( $agent_abilities_source, "array( 'required' => array( 'bundle' ) )" ) );
+	$assert( 'import-agent execution validates source-or-bundle requirement', false !== strpos( $agent_abilities_source, 'Bundle source or inline bundle is required.' ) && false === strpos( $agent_abilities_source, "array( 'required' => array( 'bundle' ) )" ) );
 	$assert( 'import-agent schema exposes inline bundle input', false !== strpos( $agent_abilities_source, "'bundle'      => array(" ) && false !== strpos( $agent_abilities_source, 'Already-parsed portable Data Machine agent bundle array' ) );
 	$assert( 'runtime importer does not stage bundles through temp files', false === strpos( $agent_abilities_source, 'tempnam' ) && false === strpos( $agent_abilities_source, 'wp_tempnam' ) );
 
