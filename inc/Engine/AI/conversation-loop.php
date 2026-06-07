@@ -1989,7 +1989,12 @@ function datamachine_tool_result_record_values( array $entry, array $fields ): a
 	$values               = array();
 	$result               = is_array( $entry['result'] ?? null ) ? $entry['result'] : $entry;
 	$nested_result        = is_array( $result['result'] ?? null ) ? $result['result'] : array();
-	$tool_result_data     = is_array( $entry['tool_result_data'] ?? null ) ? $entry['tool_result_data'] : ( is_array( $result['tool_result_data'] ?? null ) ? $result['tool_result_data'] : array() );
+	$metadata             = is_array( $result['metadata'] ?? null ) ? $result['metadata'] : array();
+	$tool_result_data     = datamachine_first_tool_result_data_container(
+		is_array( $entry['tool_result_data'] ?? null ) ? $entry['tool_result_data'] : array(),
+		is_array( $result['tool_result_data'] ?? null ) ? $result['tool_result_data'] : array(),
+		is_array( $metadata['tool_result_data'] ?? null ) ? $metadata['tool_result_data'] : array()
+	);
 	$tool_result_envelope = is_array( $entry['tool_result_envelope'] ?? null ) ? $entry['tool_result_envelope'] : ( is_array( $result['tool_result_envelope'] ?? null ) ? $result['tool_result_envelope'] : array() );
 	$envelope_result      = is_array( $tool_result_envelope['result'] ?? null ) ? $tool_result_envelope['result'] : array();
 	$source               = array(
@@ -1998,7 +2003,7 @@ function datamachine_tool_result_record_values( array $entry, array $fields ): a
 		'result'               => $result,
 		'tool_result_data'     => $tool_result_data,
 		'tool_result_envelope' => $tool_result_envelope,
-		'metadata'             => is_array( $result['metadata'] ?? null ) ? $result['metadata'] : array(),
+		'metadata'             => $metadata,
 	);
 
 	foreach ( $fields as $field => $selector ) {
@@ -2014,6 +2019,20 @@ function datamachine_tool_result_record_values( array $entry, array $fields ): a
 	}
 
 	return $values;
+}
+
+/**
+ * @param array<string,mixed> ...$candidates Candidate tool result data containers.
+ * @return array<string,mixed>
+ */
+function datamachine_first_tool_result_data_container( array ...$candidates ): array {
+	foreach ( $candidates as $candidate ) {
+		if ( ! empty( $candidate ) ) {
+			return $candidate;
+		}
+	}
+
+	return array();
 }
 
 /**
