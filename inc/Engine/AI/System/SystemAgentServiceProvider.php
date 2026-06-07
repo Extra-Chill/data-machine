@@ -41,6 +41,7 @@ use DataMachine\Engine\AI\System\Tasks\Retention\RetentionProcessedItemsTask;
 use DataMachine\Engine\AI\System\Tasks\Retention\RetentionStaleClaimsTask;
 use DataMachine\Engine\AI\System\Tasks\SourceInventoryTask;
 use DataMachine\Engine\AI\System\Tasks\SystemTask;
+use DataMachine\Engine\AI\System\Tasks\WakeBriefingTask;
 use DataMachine\Engine\Tasks\RecurringRejectionTracker;
 use DataMachine\Engine\Tasks\RecurringScheduleRegistry;
 use DataMachine\Engine\Tasks\RecurringScheduler;
@@ -94,6 +95,7 @@ class SystemAgentServiceProvider {
 		$tasks['alt_text_generation']                    = AltTextTask::class;
 		$tasks['internal_linking']                       = InternalLinkingTask::class;
 		$tasks['daily_memory_generation']                = DailyMemoryTask::class;
+		$tasks['wake_briefing']                          = WakeBriefingTask::class;
 		$tasks['meta_description_generation']            = MetaDescriptionTask::class;
 		$tasks[ RetentionCleanup::TASK_COMPLETED_JOBS ]  = RetentionCompletedJobsTask::class;
 		$tasks[ RetentionCleanup::TASK_FAILED_JOBS ]     = RetentionFailedJobsTask::class;
@@ -131,6 +133,22 @@ class SystemAgentServiceProvider {
 			'per_agent'            => true,
 			'task_params_callback' => static function () {
 				return array( 'date' => gmdate( 'Y-m-d' ) );
+			},
+		);
+
+		$schedules['wake_briefing'] = array(
+			'task_type'            => 'wake_briefing',
+			'interval'             => 'hourly',
+			'enabled_setting'      => 'wake_briefing_enabled',
+			'default_enabled'      => false,
+			'label'                => 'Hourly — composes WAKE.md continuity digest',
+			// Each agent owns its own WAKE.md (the "recent sessions" pulse is
+			// agent-scoped), so fan out one composition per active agent. The
+			// task itself opts out of the agent-context gate, but per_agent
+			// still supplies identity so each agent's file is written.
+			'per_agent'            => true,
+			'task_params_callback' => static function () {
+				return array();
 			},
 		);
 

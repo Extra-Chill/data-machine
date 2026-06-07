@@ -248,6 +248,19 @@ function datamachine_register_default_memory_files(): void {
 		'label'              => 'Agent Memory',
 		'description'        => 'Accumulated knowledge. Injected when the mode activates agent memory.',
 	) );
+	// Wake briefing — a terse, stateless rolling-window continuity digest
+	// composed by WakeBriefingTask and overwritten each run. Injected with
+	// agent memory so a fresh session opens already holding a glance at
+	// anything red that happened recently. Read-only: it is machine-written,
+	// never hand-edited. Priority 35 places it just after MEMORY.md.
+	MemoryFileRegistry::register( 'WAKE.md', 35, array(
+		'layer'              => MemoryFileRegistry::LAYER_AGENT,
+		'protected'          => true,
+		'editable'           => false,
+		'injection_contexts' => array( 'agent_memory' ),
+		'label'              => 'Wake Briefing',
+		'description'        => 'Auto-generated rolling-window digest of recent threshold-crossing activity. Machine-written by the wake_briefing task; not hand-editable.',
+	) );
 
 	// User layer — human preferences, network-scoped on multisite.
 	// Only injected in interactive modes where a human is present.
