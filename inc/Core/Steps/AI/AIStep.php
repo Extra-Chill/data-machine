@@ -88,8 +88,10 @@ class AIStep extends Step {
 		$job_snapshot         = is_array( $job_snapshot ) ? $job_snapshot : array();
 		$agent_id             = $this->resolveAgentIdFromJobSnapshot( $job_snapshot );
 
-		// Model/provider resolved exclusively via mode system (agent → site → network).
-		// Pipeline-level model/provider fields are ignored — mode_models is the authority.
+		// Model/provider are resolved exclusively via the mode system
+		// (agent mode_models → site → network → default). There are no
+		// per-pipeline-step model/provider fields: the editor does not write
+		// them (see Api\Pipelines\PipelineSteps) and AIStep does not read them.
 		$execution_modes = self::resolveExecutionModes( $pipeline_step_config, $this->flow_step_config );
 		$mode_model      = self::resolveModelForExecutionModes( $agent_id, $execution_modes, $job_snapshot );
 		$provider_name   = $mode_model['provider'];
@@ -180,7 +182,9 @@ class AIStep extends Step {
 		$pipeline_step_config = $this->engine->getPipelineStepConfig( $pipeline_step_id );
 		$execution_modes      = self::resolveExecutionModes( $pipeline_step_config, $this->flow_step_config );
 
-		// Model/provider resolved exclusively via mode system — pipeline config is ignored.
+		// Model/provider are resolved exclusively via the mode system. There is no
+		// per-pipeline-step model override — pipeline_config carries only modes,
+		// prompts, and tool policy, never a model/provider field.
 		$mode_model    = self::resolveModelForExecutionModes( $agent_id, $execution_modes, $job_snapshot );
 		$provider_name = $mode_model['provider'];
 		$model_name    = $mode_model['model'];
