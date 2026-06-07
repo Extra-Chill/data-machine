@@ -74,8 +74,8 @@ $assert(
 );
 
 $assert(
-	false !== strpos( $conversation_loop, "WP_Agent_Conversation_Loop::run(\n\t\t\t\$messages,\n\t\t\tnull," ),
-	'Data Machine lets the Agents API loop wrap the provider turn adapter'
+	false !== strpos( $conversation_loop, "WP_Agent_Conversation_Loop::run(\n\t\t\t\$messages,\n\t\t\t\$provider_turn_adapter," ),
+	'Data Machine passes its callable provider turn adapter to the Agents API loop'
 );
 
 $assert(
