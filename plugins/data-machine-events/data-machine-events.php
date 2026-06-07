@@ -137,6 +137,7 @@ if ( defined( 'WP_CLI' ) && WP_CLI ) {
 	\WP_CLI::add_command( 'data-machine-events check merge-duplicate-venues', \DataMachineEvents\Cli\Check\CheckMergeDuplicateVenuesCommand::class );
 	\WP_CLI::add_command( 'data-machine-events check missing-venue-addresses', \DataMachineEvents\Cli\Check\CheckMissingVenueAddressesCommand::class );
 	\WP_CLI::add_command( 'data-machine-events check orphan-venues', \DataMachineEvents\Cli\Check\CheckOrphanVenuesCommand::class );
+	\WP_CLI::add_command( 'data-machine-events check orphan-pipelines', \DataMachineEvents\Cli\Check\CheckOrphanPipelinesCommand::class );
 	\WP_CLI::add_command( 'data-machine-events check quality', \DataMachineEvents\Cli\Check\CheckQualityCommand::class );
 	\WP_CLI::add_command( 'data-machine-events check all', \DataMachineEvents\Cli\Check\CheckAllCommand::class );
 }
