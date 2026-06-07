@@ -65,13 +65,6 @@ class ArtistUrlImportAbilities {
 	private const ARTIST_FUZZY_MATCH_THRESHOLD = 85;
 
 	/**
-	 * Default AI provider/model for the pipeline AI step. Mirrors the
-	 * defaults used by CityAbilities so behavior stays consistent.
-	 */
-	private const DEFAULT_AI_PROVIDER = 'openai';
-	private const DEFAULT_AI_MODEL    = 'gpt-5-mini';
-
-	/**
 	 * Default author for events published by an approved pipeline.
 	 */
 	private const DEFAULT_POST_AUTHOR = 32;
@@ -1016,7 +1009,8 @@ class ArtistUrlImportAbilities {
 
 	/**
 	 * Configure the pipeline AI step with an artist-scoped system
-	 * prompt. Mirrors CityAbilities::configurePipelineAiStep().
+	 * prompt. Does not set a provider/model — those are resolved by
+	 * AIStep from agent_config and site settings at runtime.
 	 *
 	 * @param int    $pipeline_id
 	 * @param string $artist_name
@@ -1042,11 +1036,11 @@ class ArtistUrlImportAbilities {
 
 		foreach ( $config as &$step ) {
 			if ( ( $step['step_type'] ?? '' ) === 'ai' ) {
-				$step['provider']      = self::DEFAULT_AI_PROVIDER;
-				$step['model']         = self::DEFAULT_AI_MODEL;
-				$step['providers']     = array(
-					self::DEFAULT_AI_PROVIDER => array( 'model' => self::DEFAULT_AI_MODEL ),
-				);
+				// Do NOT write a provider/model into the pipeline AI step.
+				// AIStep resolves the model/provider from agent_config and
+				// site settings at runtime; baking a literal here silently
+				// overrides the operator's configured model on every
+				// approved artist pipeline.
 				$step['system_prompt'] = sprintf(
 					'You process events from %1$s\'s tour/events page for the Extra Chill events feed. The artist is %1$s and is already pre-selected — do not change the artist binding. Identify the venue, city/location, and festival (if any) for each event based on the available information. Skip WordPress categories and post tags entirely.',
 					$artist_name
