@@ -315,14 +315,14 @@ class RequestBuilderMultimodalTest extends TestCase {
 		$function_call = $context['history'][1]->getParts()[0]->getFunctionCall();
 		$this->assertNotNull( $function_call, 'Assistant tool call converts to a function call part' );
 		$this->assertSame( 'call_123', $function_call->getId() );
-		$this->assertSame( 'client/filesystem-write', $function_call->getName() );
+		$this->assertSame( 'client_filesystem-write', $function_call->getName() );
 		$this->assertSame( array( 'path' => 'index.html' ), $function_call->getArgs() );
 
 		$this->assertCount( 1, $context['prompt_parts'], 'Latest tool result becomes the current prompt part' );
 		$function_response = $context['prompt_parts'][0]->getFunctionResponse();
 		$this->assertNotNull( $function_response, 'Tool result converts to a function response part' );
 		$this->assertSame( 'call_123', $function_response->getId() );
-		$this->assertSame( 'client/filesystem-write', $function_response->getName() );
+		$this->assertSame( 'client_filesystem-write', $function_response->getName() );
 		$this->assertTrue( $function_response->getResponse()['success'] );
 	}
 

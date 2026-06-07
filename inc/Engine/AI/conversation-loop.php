@@ -869,7 +869,7 @@ function datamachine_build_provider_turn_adapter(
 
 		/** @var \WordPress\AiClient\Results\DTO\GenerativeAiResult $ai_result */
 		$ai_result       = $ai_response;
-		$tool_calls      = datamachine_extract_tool_calls( $ai_result );
+		$tool_calls      = datamachine_restore_canonical_tool_call_names( datamachine_extract_tool_calls( $ai_result ), $tools );
 		$ai_content      = RequestBuilder::resultText( $ai_result );
 		$last_tool_calls = $tool_calls;
 		foreach ( $tool_calls as $tool_call ) {
@@ -990,6 +990,7 @@ function datamachine_build_provider_turn_adapter(
 
 		return array(
 			'content'               => $ai_content,
+			'tool_calls'            => array(),
 			'continuation_messages' => $continuation_messages,
 			'request_metadata'      => $request_metadata,
 			'usage'                 => $turn_usage,
@@ -2140,6 +2141,30 @@ function datamachine_extract_tool_calls( $result ): array {
 	}
 
 	return datamachine_dedupe_tool_calls( $tool_calls );
+}
+
+/**
+ * Restore canonical tool names after provider-safe aliases return from wp-ai-client.
+ *
+ * @param array<int,array{name:string,parameters:array,id:mixed}> $tool_calls Tool calls from the provider result.
+ * @param array<string,array<string,mixed>>                      $tools      Canonical tool declarations.
+ * @return array<int,array{name:string,parameters:array,id:mixed}> Tool calls keyed to canonical runtime tool names.
+ */
+function datamachine_restore_canonical_tool_call_names( array $tool_calls, array $tools ): array {
+	if ( empty( $tool_calls ) || empty( $tools ) ) {
+		return $tool_calls;
+	}
+
+	$provider_to_canonical = array_flip( RequestBuilder::providerToolNameMap( $tools ) );
+	foreach ( $tool_calls as &$tool_call ) {
+		$provider_name = (string) ( $tool_call['name'] ?? '' );
+		if ( isset( $provider_to_canonical[ $provider_name ] ) ) {
+			$tool_call['name'] = $provider_to_canonical[ $provider_name ];
+		}
+	}
+	unset( $tool_call );
+
+	return $tool_calls;
 }
 
 /**

@@ -52,14 +52,14 @@ datamachine_request_builder_tool_transcript_assert( $context['history'][1] insta
 $function_call = $context['history'][1]->getParts()[0]->getFunctionCall();
 datamachine_request_builder_tool_transcript_assert( null !== $function_call, 'Assistant tool call converts to a function call part.' );
 datamachine_request_builder_tool_transcript_assert( 'call_123' === $function_call->getId(), 'Function call id is preserved.' );
-datamachine_request_builder_tool_transcript_assert( 'client/filesystem-write' === $function_call->getName(), 'Function call name is preserved.' );
+datamachine_request_builder_tool_transcript_assert( 'client_filesystem-write' === $function_call->getName(), 'Function call name is provider-safe.' );
 datamachine_request_builder_tool_transcript_assert( array( 'path' => 'index.html' ) === $function_call->getArgs(), 'Function call parameters are preserved.' );
 
 datamachine_request_builder_tool_transcript_assert( 1 === count( $context['prompt_parts'] ), 'Latest tool result becomes the current prompt part.' );
 $function_response = $context['prompt_parts'][0]->getFunctionResponse();
 datamachine_request_builder_tool_transcript_assert( null !== $function_response, 'Tool result converts to a function response part.' );
 datamachine_request_builder_tool_transcript_assert( 'call_123' === $function_response->getId(), 'Function response id is preserved.' );
-datamachine_request_builder_tool_transcript_assert( 'client/filesystem-write' === $function_response->getName(), 'Function response name is preserved.' );
+datamachine_request_builder_tool_transcript_assert( 'client_filesystem-write' === $function_response->getName(), 'Function response name is provider-safe.' );
 datamachine_request_builder_tool_transcript_assert( true === $function_response->getResponse()['success'], 'Function response payload is preserved.' );
 
 echo "RequestBuilder tool transcript smoke passed.\n";

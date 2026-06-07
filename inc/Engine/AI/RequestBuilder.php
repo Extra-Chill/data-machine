@@ -58,12 +58,13 @@ class RequestBuilder {
 		$mode_label       = implode( ',', $modes );
 		$assembled        = self::assemble( $messages, $provider, $model, $tools, $modes, $payload );
 		$request          = $assembled['request'];
-		$provider_request = ProviderRequestAssembler::toProviderRequest( $request );
-		$prompt_context   = self::wpAiClientPromptContext( $request['messages'] ?? array() );
+		$structured_tools        = $assembled['structured_tools'];
+		$provider_tool_name_map  = self::providerToolNameMap( $structured_tools );
+		$provider_request        = ProviderRequestAssembler::toProviderRequest( $request );
+		$prompt_context          = self::wpAiClientPromptContext( $request['messages'] ?? array(), $provider_tool_name_map );
 		if ( '' !== $prompt_context['prompt'] ) {
 			$provider_request['prompt'] = $prompt_context['prompt'];
 		}
-		$structured_tools   = $assembled['structured_tools'];
 		$applied_directives = $assembled['applied_directives'];
 		$directive_metadata = $assembled['directive_metadata'];
 
@@ -249,9 +250,10 @@ class RequestBuilder {
 				if ( '' === $name ) {
 					continue;
 				}
+				$provider_name = $provider_tool_name_map[ $name ] ?? self::providerSafeToolName( $name );
 
 				$function_declarations[] = new \WordPress\AiClient\Tools\DTO\FunctionDeclaration(
-					$name,
+					$provider_name,
 					(string) ( $tool_config['description'] ?? '' ),
 					self::normalizeToolSchema( $tool_config['parameters'] ?? array() )
 				);
@@ -294,6 +296,54 @@ class RequestBuilder {
 	}
 
 	/**
+	 * Build provider-safe aliases for canonical tool names.
+	 *
+	 * Data Machine tool IDs may include namespace separators such as `/`; OpenAI
+	 * function names only allow letters, numbers, underscores, and hyphens.
+	 *
+	 * @param array<string,array<string,mixed>> $tools Tool declarations keyed by canonical name.
+	 * @return array<string,string> Map of canonical tool name to provider-safe alias.
+	 */
+	public static function providerToolNameMap( array $tools ): array {
+		$map  = array();
+		$used = array();
+
+		foreach ( $tools as $tool_name => $tool_config ) {
+			$canonical_name = (string) ( is_array( $tool_config ) ? ( $tool_config['name'] ?? $tool_name ) : $tool_name );
+			if ( '' === $canonical_name ) {
+				continue;
+			}
+
+			$provider_name = self::providerSafeToolName( $canonical_name );
+			if ( isset( $used[ $provider_name ] ) && $used[ $provider_name ] !== $canonical_name ) {
+				$provider_name .= '_' . substr( hash( 'sha256', $canonical_name ), 0, 8 );
+			}
+
+			$map[ $canonical_name ]       = $provider_name;
+			$used[ $provider_name ]       = $canonical_name;
+		}
+
+		return $map;
+	}
+
+	/**
+	 * Convert a canonical tool name into a provider-safe function name.
+	 *
+	 * @param string $tool_name Canonical tool name.
+	 * @return string Provider-safe function name.
+	 */
+	public static function providerSafeToolName( string $tool_name ): string {
+		$safe_name = (string) preg_replace( '/[^a-zA-Z0-9_-]+/', '_', $tool_name );
+		$safe_name = trim( $safe_name, '_' );
+
+		if ( '' !== $safe_name ) {
+			return $safe_name;
+		}
+
+		return 'tool_' . substr( hash( 'sha256', $tool_name ), 0, 12 );
+	}
+
+	/**
 	 * Convert Data Machine's canonical provider-message array into a wp-ai-client message DTO.
 	 *
 	 * Walks all content blocks (text, file, image_url) and builds a full
@@ -306,9 +356,9 @@ class RequestBuilder {
 	 * @param array $message Provider-message array.
 	 * @return \WordPress\AiClient\Messages\DTO\Message|null Message DTO, or null when the shape is unsupported.
 	 */
-	private static function wpAiClientHistoryMessage( array $message ): ?\WordPress\AiClient\Messages\DTO\Message {
+	private static function wpAiClientHistoryMessage( array $message, array $provider_tool_name_map = array() ): ?\WordPress\AiClient\Messages\DTO\Message {
 		$role  = (string) ( $message['role'] ?? '' );
-		$parts = self::wpAiClientMessagePartsFromMessage( $message );
+		$parts = self::wpAiClientMessagePartsFromMessage( $message, $provider_tool_name_map );
 		if ( empty( $parts ) ) {
 			return null;
 		}
@@ -340,7 +390,7 @@ class RequestBuilder {
 	 * @param array $messages Canonical message envelopes.
 	 * @return array{prompt:string,prompt_parts:array<int,\WordPress\AiClient\Messages\DTO\MessagePart>,system_parts:array<int,string>,history:array<int,\WordPress\AiClient\Messages\DTO\Message>}
 	 */
-	private static function wpAiClientPromptContext( array $messages ): array {
+	private static function wpAiClientPromptContext( array $messages, array $provider_tool_name_map = array() ): array {
 		$prompt_index = null;
 		$prompt       = '';
 		$prompt_parts = array();
@@ -363,7 +413,7 @@ class RequestBuilder {
 				continue;
 			}
 
-			$candidate_parts = self::wpAiClientMessagePartsFromMessage( $message );
+			$candidate_parts = self::wpAiClientMessagePartsFromMessage( $message, $provider_tool_name_map );
 			if ( ! empty( $candidate_parts ) ) {
 				$prompt_index = $index;
 				$prompt_parts = $candidate_parts;
@@ -377,7 +427,7 @@ class RequestBuilder {
 				continue;
 			}
 
-			$history_message = self::wpAiClientHistoryMessage( $message );
+			$history_message = self::wpAiClientHistoryMessage( $message, $provider_tool_name_map );
 			if ( null !== $history_message ) {
 				$history[] = $history_message;
 			}
@@ -397,7 +447,7 @@ class RequestBuilder {
 	 * @param array $message Canonical message envelope or legacy role/content message.
 	 * @return array<int,\WordPress\AiClient\Messages\DTO\MessagePart>
 	 */
-	private static function wpAiClientMessagePartsFromMessage( array $message ): array {
+	private static function wpAiClientMessagePartsFromMessage( array $message, array $provider_tool_name_map = array() ): array {
 		try {
 			$envelope = \AgentsAPI\AI\WP_Agent_Message::normalize( $message );
 		} catch ( \Throwable $e ) {
@@ -410,6 +460,7 @@ class RequestBuilder {
 
 		if ( \AgentsAPI\AI\WP_Agent_Message::TYPE_TOOL_CALL === $type ) {
 			$tool_name = isset( $payload['tool_name'] ) ? (string) $payload['tool_name'] : '';
+			$provider_tool_name = '' !== $tool_name ? ( $provider_tool_name_map[ $tool_name ] ?? self::providerSafeToolName( $tool_name ) ) : '';
 			$call_id   = isset( $metadata['tool_call_id'] ) ? (string) $metadata['tool_call_id'] : '';
 			if ( '' === $call_id ) {
 				$call_id = isset( $payload['tool_call_id'] ) ? (string) $payload['tool_call_id'] : '';
@@ -423,7 +474,7 @@ class RequestBuilder {
 				new \WordPress\AiClient\Messages\DTO\MessagePart(
 					new \WordPress\AiClient\Tools\DTO\FunctionCall(
 						'' !== $call_id ? $call_id : null,
-						'' !== $tool_name ? $tool_name : null,
+						'' !== $provider_tool_name ? $provider_tool_name : null,
 						$parameters
 					)
 				),
@@ -432,6 +483,7 @@ class RequestBuilder {
 
 		if ( \AgentsAPI\AI\WP_Agent_Message::TYPE_TOOL_RESULT === $type ) {
 			$tool_name = isset( $payload['tool_name'] ) ? (string) $payload['tool_name'] : '';
+			$provider_tool_name = '' !== $tool_name ? ( $provider_tool_name_map[ $tool_name ] ?? self::providerSafeToolName( $tool_name ) ) : '';
 			$call_id   = isset( $metadata['tool_call_id'] ) ? (string) $metadata['tool_call_id'] : '';
 			if ( '' === $call_id ) {
 				$call_id = isset( $payload['tool_call_id'] ) ? (string) $payload['tool_call_id'] : '';
@@ -444,7 +496,7 @@ class RequestBuilder {
 				new \WordPress\AiClient\Messages\DTO\MessagePart(
 					new \WordPress\AiClient\Tools\DTO\FunctionResponse(
 						'' !== $call_id ? $call_id : null,
-						'' !== $tool_name ? $tool_name : null,
+						'' !== $provider_tool_name ? $provider_tool_name : null,
 						$payload
 					)
 				),
