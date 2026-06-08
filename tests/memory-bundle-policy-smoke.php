@@ -15,6 +15,10 @@ if ( ! defined( 'HOUR_IN_SECONDS' ) ) {
 	define( 'HOUR_IN_SECONDS', 3600 );
 }
 
+if ( ! defined( 'DATAMACHINE_PENDING_ACTION_TRANSIENT_FALLBACK' ) ) {
+	define( 'DATAMACHINE_PENDING_ACTION_TRANSIENT_FALLBACK', true );
+}
+
 $GLOBALS['datamachine_memory_policy_filters']    = array();
 $GLOBALS['datamachine_memory_policy_actions']    = array();
 $GLOBALS['datamachine_memory_policy_transients'] = array();
@@ -182,9 +186,34 @@ if ( ! function_exists( 'did_action' ) ) {
 }
 
 if ( ! function_exists( 'is_wp_error' ) ) {
-	function is_wp_error( $_thing ): bool {
-		unset( $_thing );
-		return false;
+	function is_wp_error( $thing ): bool {
+		return $thing instanceof WP_Error;
+	}
+}
+
+if ( ! class_exists( 'WP_Error' ) ) {
+	class WP_Error {
+		private string $code;
+		private string $message;
+		private $data;
+
+		public function __construct( string $code = '', string $message = '', $data = null ) {
+			$this->code    = $code;
+			$this->message = $message;
+			$this->data    = $data;
+		}
+
+		public function get_error_code(): string {
+			return $this->code;
+		}
+
+		public function get_error_message(): string {
+			return $this->message;
+		}
+
+		public function get_error_data() {
+			return $this->data;
+		}
 	}
 }
 
@@ -201,6 +230,7 @@ use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_Scope;
 use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_Store_Capabilities;
 use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_Store;
 use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_Write_Result;
+use DataMachine\Core\FilesRepository\AgentMemory;
 use DataMachine\Engine\AI\Actions\PendingActionStore;
 use DataMachine\Engine\AI\Actions\ResolvePendingActionAbility;
 use DataMachine\Engine\AI\Memory\MemorySectionArtifact;
@@ -277,10 +307,15 @@ add_filter(
 	2
 );
 MemorySectionPendingAction::register();
+add_filter( 'wp_agent_pending_action_store', static fn() => PendingActionStore::adapter() );
+add_filter( 'wp_agent_pending_action_resolver', static fn() => ResolvePendingActionAbility::adapter() );
 PermissionHelper::set_agent_context( 42, 7 );
 
-$scope_key                  = 'agent:site:1:7:42:MEMORY.md';
-$store->files[ $scope_key ] = "# MEMORY.md\n\n## Source quirks\nExisting note.\n";
+$memory_seed = new AgentMemory( 7, 42, 'MEMORY.md' );
+$seed_result = $memory_seed->replace_all( "# MEMORY.md\n\n## Source quirks\nExisting note.\n" );
+memory_policy_assert( true === $seed_result['success'], 'memory seed writes through active memory store' );
+$scope_key = array_key_first( $store->files );
+memory_policy_assert( is_string( $scope_key ), 'memory seed creates a scope key' );
 
 echo "\n[1] Memory sections are bundle artifacts with ownership/status metadata\n";
 $manifest = AgentBundleManifest::from_array(
@@ -368,8 +403,9 @@ $staged = SelfMemoryWritePolicy::execute(
 );
 memory_policy_assert( true === $staged['staged'], 'bundle-owned overwrite is staged instead of applied' );
 memory_policy_assert( ! str_contains( $store->files[ $scope_key ], 'super-secret-value' ), 'staged overwrite does not mutate memory immediately' );
-memory_policy_assert( str_contains( $staged['preview']['diff'], '[redacted]' ), 'preview diff redacts secret-like values' );
-memory_policy_assert( ! str_contains( $staged['preview']['diff'], 'super-secret-value' ), 'preview diff does not expose secret-like value' );
+$staged_preview = $staged['payload']['pending_action']['preview'] ?? array();
+memory_policy_assert( str_contains( $staged_preview['diff'] ?? '', '[redacted]' ), 'preview diff redacts secret-like values' );
+memory_policy_assert( ! str_contains( $staged_preview['diff'] ?? '', 'super-secret-value' ), 'preview diff does not expose secret-like value' );
 
 $payload = PendingActionStore::get( $staged['action_id'] );
 memory_policy_assert( is_array( $payload ) && MemorySectionPendingAction::KIND === $payload['kind'], 'pending action stores memory section kind' );
