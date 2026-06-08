@@ -312,9 +312,9 @@ function datamachine_agent_memory_events_matching( string $hook ): array {
 
 $store = new AgentMemoryEventsFakeStore();
 add_filter(
-	'agents_api_memory_store',
-	function ( $_default, WP_Agent_Memory_Scope $_scope ) use ( $store ) {
-		unset( $_default, $_scope );
+	'wp_agent_memory_store',
+	function ( $_default, array $_context ) use ( $store ) {
+		unset( $_default, $_context );
 		return $store;
 	},
 	10,

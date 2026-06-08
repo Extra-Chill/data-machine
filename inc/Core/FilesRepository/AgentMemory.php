@@ -7,7 +7,7 @@
  * on any agent file (MEMORY.md, SOUL.md, USER.md, etc.).
  *
  * Persistence is delegated to an {@see WP_Agent_Memory_Store} resolved
- * via the `agents_api_memory_store` filter. The default store
+ * via the canonical Agents API memory store resolver. The default store
  * ({@see DiskAgentMemoryStore}) preserves the byte-for-byte filesystem
  * behavior the codebase used before the store seam was introduced.
  *

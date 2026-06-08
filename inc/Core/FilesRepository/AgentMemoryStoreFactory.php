@@ -4,11 +4,9 @@
  *
  * Resolves the active {@see WP_Agent_Memory_Store} implementation.
  *
- * This is Data Machine's in-place resolver for a generic agent-memory
- * persistence contract. It intentionally keeps one public swap point using
- * Agents API vocabulary: the `agents_api_memory_store` filter. The previous
- * `datamachine_memory_store` name is not mirrored at runtime; consumers should
- * migrate to the new hook instead of relying on a permanent alias.
+ * Data Machine delegates host-provided store discovery to the canonical
+ * Agents API resolver/filter and falls back to the built-in disk store when
+ * no host store is available.
  *
  * Single resolution point so every Data Machine consumer (AgentMemory, DailyMemory,
  * AgentFileAbilities, CoreMemoryFilesDirective) gets the same swap mechanism
@@ -27,6 +25,7 @@ namespace DataMachine\Core\FilesRepository;
 
 use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_Scope;
 use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_Store;
+use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_Stores;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -44,31 +43,11 @@ class AgentMemoryStoreFactory {
 	 * @return WP_Agent_Memory_Store
 	 */
 	public static function for_scope( WP_Agent_Memory_Scope $scope ): WP_Agent_Memory_Store {
-		/**
-		 * Filter: swap the agent memory persistence backend.
-		 *
-		 * Return an {@see WP_Agent_Memory_Store} instance to short-circuit
-		 * the default disk-backed store. Return null (the default) to use the
-		 * built-in {@see DiskAgentMemoryStore}.
-		 *
-		 * This is the only runtime filter for memory-store replacement. It replaces
-		 * the earlier `datamachine_memory_store` name in-place so the seam already
-		 * uses Agents API vocabulary before physical extraction. Data Machine does
-		 * not call both names because a dual-hook ladder would become permanent API.
-		 *
-		 * The disk default preserves byte-for-byte the behavior Data Machine
-		 * had before this seam was introduced — self-hosted users see no
-		 * change. Managed-host consumers (e.g. Intelligence on WordPress.com)
-		 * can register a DB-backed implementation.
-		 *
-		 * @since next
-		 *
-		 * @param WP_Agent_Memory_Store|null $store Null to use the disk default,
-		 *                                              or a swap implementation.
-		 * @param WP_Agent_Memory_Scope               $scope The scope being acted on.
-		 */
-		// @phpstan-ignore-next-line WordPress apply_filters accepts additional hook arguments.
-		$store = apply_filters( 'agents_api_memory_store', null, $scope );
+		$store = WP_Agent_Memory_Stores::get_store(
+			array(
+				'scope' => $scope,
+			)
+		);
 
 		if ( $store instanceof WP_Agent_Memory_Store ) {
 			return $store;

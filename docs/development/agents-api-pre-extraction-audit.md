@@ -174,7 +174,7 @@ in place:
 
 - `agents_api_conversation_runner`
 - `datamachine_conversation_store`
-- `agents_api_memory_store`
+- `wp_agent_memory_store`
 - `agents_api_tool_sources`
 - `agents_api_tool_sources_for_mode`
 - `wp_agents_api_init`
@@ -222,8 +222,8 @@ Target shape:
 
 Current in-place migration:
 
-- `agents_api_memory_store` remains the active memory-store resolver hook through Data Machine's factory.
-- The previous `datamachine_memory_store` hook is intentionally not mirrored; pre-1.0 consumers should register on `agents_api_memory_store`.
+- Data Machine delegates memory-store resolution to the canonical Agents API `WP_Agent_Memory_Stores::get_store()` resolver and `wp_agent_memory_store` filter.
+- The previous `agents_api_memory_store` and `datamachine_memory_store` hooks are intentionally not mirrored; consumers should register on `wp_agent_memory_store`.
 - `DiskAgentMemoryStore` keeps its class name until a physical Agents API package decides whether disk/markdown memory is part of the public product.
 
 ### 6. Tool Registry And Execution

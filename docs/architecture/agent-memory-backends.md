@@ -39,7 +39,8 @@ CoreMemoryFilesDirective
         |
         v
 AgentMemoryStoreFactory
-  agents_api_memory_store filter
+  WP_Agent_Memory_Stores::get_store()
+  -> wp_agent_memory_store filter
         |
         +--> DiskAgentMemoryStore (default)
         |
@@ -62,19 +63,17 @@ The disk store intentionally does not implement compare-and-swap writes; it acce
 
 ## Backend Selection
 
-Data Machine resolves memory persistence through one current Agents API-shaped filter:
+Data Machine resolves memory persistence through the canonical Agents API resolver/filter:
 
 ```php
-apply_filters(
-    'agents_api_memory_store',
-    null,
-    WP_Agent_Memory_Scope $scope
+WP_Agent_Memory_Stores::get_store(
+    array( 'scope' => WP_Agent_Memory_Scope $scope )
 );
 ```
 
-Return an `WP_Agent_Memory_Store` implementation to replace the disk default for the given scope. Return `null` to keep `DiskAgentMemoryStore`.
+The resolver honors a direct `$context['memory_store']` value or an implementation returned by the `wp_agent_memory_store` filter. Data Machine passes the current scope as `$context['scope']`. Return `null` to keep `DiskAgentMemoryStore`.
 
-`agents_api_memory_store` replaces the earlier `datamachine_memory_store` name in-place. Data Machine intentionally does not call both filters; consumers should migrate to the Agents API-shaped hook rather than relying on a permanent alias.
+Data Machine intentionally does not call the previous `agents_api_memory_store` or `datamachine_memory_store` hooks because a dual-hook ladder would become permanent API. Consumers should register on the canonical Agents API hook.
 
 Backend selection should be capability-driven:
 
@@ -95,7 +94,7 @@ DMC should be treated as a projection provider, not the memory model:
 | Logical memory identity and access | Data Machine (`WP_Agent_Memory_Scope`, `AgentMemory`) |
 | Registered memory files and mode-aware injection | Data Machine (`MemoryFileRegistry`, directives) |
 | Disk file projection for local coding agents | DMC + `DiskAgentMemoryStore` environment capability |
-| Managed-host alternate backend | Consumer plugin via `agents_api_memory_store` |
+| Managed-host alternate backend | Consumer plugin via `wp_agent_memory_store` |
 
 `MEMORY.md` is not deprecated. On disk-capable installs it remains the agent's persistent knowledge file. On hosts without disk, the same logical `MEMORY.md` may be represented by another backend while still appearing to Data Machine as `(agent, user_id, agent identity, MEMORY.md)`.
 
