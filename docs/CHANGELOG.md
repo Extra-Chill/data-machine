@@ -2,6 +2,14 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.141.4] - 2026-06-08
+
+### Changed
+- update block format bridge dependency
+
+### Fixed
+- register wake_briefing_enabled in the settings allowlist
+
 ## [0.141.3] - 2026-06-07
 
 ### Fixed
