@@ -180,9 +180,9 @@ function datamachine_agent_memory_section_assert( bool $condition, string $messa
 
 $store = new AgentMemorySectionBodyFakeStore();
 add_filter(
-	'agents_api_memory_store',
-	function ( $_default, WP_Agent_Memory_Scope $_scope ) use ( $store ) {
-		unset( $_default, $_scope );
+	'wp_agent_memory_store',
+	function ( $_default, array $_context ) use ( $store ) {
+		unset( $_default, $_context );
 		return $store;
 	},
 	10,

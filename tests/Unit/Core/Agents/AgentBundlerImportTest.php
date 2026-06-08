@@ -151,7 +151,7 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 		remove_all_actions( 'datamachine_bundle_import_pre_commit' );
 		remove_all_actions( 'datamachine_bundle_import_post_claim_started' );
 		if ( null !== $this->memory_store_filter ) {
-			remove_filter( 'agents_api_memory_store', $this->memory_store_filter, 10 );
+			remove_filter( 'wp_agent_memory_store', $this->memory_store_filter, 10 );
 			$this->memory_store_filter = null;
 		}
 		PermissionHelper::clear_agent_context();
@@ -444,8 +444,8 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 
 	public function test_import_seeds_agent_daily_memory_into_runtime_store(): void {
 		$store                     = new DailyMemoryImportFakeStore();
-		$this->memory_store_filter = static fn( $default, WP_Agent_Memory_Scope $scope ) => $store;
-		add_filter( 'agents_api_memory_store', $this->memory_store_filter, 10, 2 );
+		$this->memory_store_filter = static fn( $default, array $context ) => $store;
+		add_filter( 'wp_agent_memory_store', $this->memory_store_filter, 10, 2 );
 
 		$bundle = $this->fixture_bundle( 'daily-memory-agent' );
 		$bundle['files']['daily/2026/05/09.md'] = "# Daily Memory: 2026-05-09\n\nImported bundle memory with alpha-sentinel.\n";

@@ -185,7 +185,7 @@ The first physical extraction PR is not complete until these checks pass:
 | Product boundary | Static smoke proves standalone `agents-api/` imports no `DataMachine\` namespaces and registers no admin menus, settings screens, REST routes, cron hooks, jobs, flows, queues, handlers, retention tasks, Data Machine pending-action implementations, or content operations. |
 | Data Machine pipeline behavior | A focused Data Machine AI/pipeline smoke still runs through `AIStep`, tool policy, provider request assembly, transcript persistence, and handler-completion behavior after Data Machine consumes the external plugin. |
 | Intelligence wiki behavior | Intelligence wiki create/read/update or wiki-generator smoke still works with Data Machine plus external Agents API. Wiki behavior must remain Intelligence/Data Machine product behavior, not Agents API vocabulary. |
-| Memory store seam | Existing memory store smoke proves `agents_api_memory_store` resolution, guideline-backed memory if available, and Data Machine default memory behavior still work after contracts move out. |
+| Memory store seam | Existing memory store smoke proves canonical `wp_agent_memory_store` resolution, guideline-backed memory if available, and Data Machine default memory behavior still work after contracts move out. |
 | wp-ai-client gate | A focused runtime gate smoke proves no `ai-http-client` or `chubes_ai_request` fallback is introduced by the skeleton/dependency cut. |
 
 ## Blockers Before #1596 Can Start

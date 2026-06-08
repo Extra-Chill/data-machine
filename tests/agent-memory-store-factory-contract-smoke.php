@@ -2,7 +2,7 @@
 /**
  * Pure-PHP smoke tests for the agent memory store resolver contract.
  *
- * Verifies that Data Machine still has one active Agents API store seam, invalid filter
+ * Verifies that Data Machine uses the canonical Agents API store seam, invalid filter
  * returns do not replace the default, and callers can operate against the
  * interface without knowing which backing store is active.
  */
@@ -167,9 +167,9 @@ datamachine_agent_memory_store_contract_reset_filters();
 $fake_store       = new AgentMemoryStoreContractFakeStore();
 $filter_arguments = array();
 add_filter(
-	'agents_api_memory_store',
-	static function ( $store, WP_Agent_Memory_Scope $filter_scope ) use ( $fake_store, &$filter_arguments ) {
-		$filter_arguments[] = array( $store, $filter_scope );
+	'wp_agent_memory_store',
+	static function ( $store, array $context ) use ( $fake_store, &$filter_arguments ) {
+		$filter_arguments[] = array( $store, $context );
 		return $fake_store;
 	},
 	10,
@@ -177,10 +177,10 @@ add_filter(
 );
 
 $selected_store = AgentMemoryStoreFactory::for_scope( $scope );
-datamachine_agent_memory_store_contract_assert( $fake_store === $selected_store, 'factory selects a valid store from agents_api_memory_store' );
+datamachine_agent_memory_store_contract_assert( $fake_store === $selected_store, 'factory selects a valid store from wp_agent_memory_store' );
 datamachine_agent_memory_store_contract_assert( 1 === count( $filter_arguments ), 'store filter is invoked once for one resolution' );
 datamachine_agent_memory_store_contract_assert( null === $filter_arguments[0][0], 'store filter receives null as the default candidate' );
-datamachine_agent_memory_store_contract_assert( $scope === $filter_arguments[0][1], 'store filter receives the scope being resolved' );
+datamachine_agent_memory_store_contract_assert( $scope === ( $filter_arguments[0][1]['scope'] ?? null ), 'store filter context receives the scope being resolved' );
 
 $read = datamachine_agent_memory_store_contract_round_trip( $selected_store, $scope );
 datamachine_agent_memory_store_contract_assert( true === $read->exists, 'selected store returns content through the interface contract' );
@@ -188,13 +188,25 @@ datamachine_agent_memory_store_contract_assert( "# Memory\n" === $read->content,
 
 datamachine_agent_memory_store_contract_reset_filters();
 add_filter(
-	'agents_api_memory_store',
+	'wp_agent_memory_store',
 	static fn( $_store, $_scope ) => new stdClass(),
 	10,
 	2
 );
 $invalid_store = AgentMemoryStoreFactory::for_scope( $scope );
 datamachine_agent_memory_store_contract_assert( $invalid_store instanceof DiskAgentMemoryStore, 'factory ignores non-WP_Agent_Memory_Store filter returns' );
+
+datamachine_agent_memory_store_contract_reset_filters();
+add_filter(
+	'agents_api_memory_store',
+	static function ( $_store, $_scope ) use ( $fake_store ) {
+		return $fake_store;
+	},
+	10,
+	2
+);
+$previous_agents_api_filter_store = AgentMemoryStoreFactory::for_scope( $scope );
+datamachine_agent_memory_store_contract_assert( $previous_agents_api_filter_store instanceof DiskAgentMemoryStore, 'previous agents_api_memory_store filter is not mirrored as a runtime alias' );
 
 datamachine_agent_memory_store_contract_reset_filters();
 add_filter(

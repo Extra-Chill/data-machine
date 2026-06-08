@@ -5,7 +5,7 @@
  * Contract for daily memory storage backends used by the Daily Memory
  * abilities. The default implementation is {@see DailyMemory}, which
  * delegates persistence to the active {@see WP_Agent_Memory_Store}
- * resolved through `agents_api_memory_store`.
+ * resolved through the canonical Agents API memory store resolver.
  *
  * `datamachine_daily_memory_storage` is a narrower escape hatch for
  * replacing the ability-level daily memory backend entirely. When that

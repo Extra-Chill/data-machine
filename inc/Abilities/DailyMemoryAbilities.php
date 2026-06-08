@@ -8,14 +8,14 @@
  * Ability-level storage is resolved via the
  * `datamachine_daily_memory_storage` filter. The default implementation
  * is DailyMemory, which persists through the unified
- * `agents_api_memory_store` seam as agent-layer files under
+ * canonical Agents API memory store seam as agent-layer files under
  * `daily/YYYY/MM/DD.md`.
  *
  * Precedence: a valid DailyMemoryStorage returned by
  * `datamachine_daily_memory_storage` replaces the backend for these
  * abilities. If that filter is absent or returns an invalid value,
  * DailyMemory remains active and the active WP_Agent_Memory_Store
- * selected by `agents_api_memory_store` handles persistence.
+ * selected by the canonical Agents API memory store resolver handles persistence.
  *
  * @package DataMachine\Abilities
  * @since 0.32.0
@@ -49,7 +49,7 @@ class DailyMemoryAbilities {
 	 *
 	 * Returns the default DailyMemory unless a plugin provides an
 	 * alternative via the `datamachine_daily_memory_storage` filter.
-	 * DailyMemory itself writes through `agents_api_memory_store`; the
+	 * DailyMemory itself writes through the canonical Agents API memory store resolver; the
 	 * daily-specific filter is only for replacing the whole ability backend.
 	 *
 	 * @since 0.47.0
@@ -69,7 +69,7 @@ class DailyMemoryAbilities {
 		 * daily memory ability operations (read, write, append, list, search,
 		 * delete) will use the returned backend.
 		 *
-		 * This filter is narrower than `agents_api_memory_store`: it bypasses
+		 * This filter is narrower than `wp_agent_memory_store`: it bypasses
 		 * the default DailyMemory implementation rather than swapping the
 		 * underlying whole-memory persistence store.
 		 *

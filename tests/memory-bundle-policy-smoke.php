@@ -268,9 +268,9 @@ function memory_policy_assert( bool $condition, string $message ): void {
 
 $store = new MemoryPolicyFakeStore();
 add_filter(
-	'agents_api_memory_store',
-	static function ( $_default, WP_Agent_Memory_Scope $_scope ) use ( $store ) {
-		unset( $_default, $_scope );
+	'wp_agent_memory_store',
+	static function ( $_default, array $_context ) use ( $store ) {
+		unset( $_default, $_context );
 		return $store;
 	},
 	10,

@@ -1635,32 +1635,29 @@ default ([`DiskAgentMemoryStore`](../../../inc/Core/FilesRepository/DiskAgentMem
 preserves byte-for-byte the filesystem behavior the codebase used before this
 seam was introduced.
 
-**Current filter: `agents_api_memory_store`**
+**Current resolver/filter: `WP_Agent_Memory_Stores::get_store()` / `wp_agent_memory_store`**
 
 ```php
-apply_filters(
-    'agents_api_memory_store',
-    null,                       // Return WP_Agent_Memory_Store to short-circuit
-    WP_Agent_Memory_Scope $scope     // Identifies (layer, user_id, agent identity, filename)
+WP_Agent_Memory_Stores::get_store(
+    array( 'scope' => WP_Agent_Memory_Scope $scope )
 );
 ```
 
-Return an `WP_Agent_Memory_Store`
-implementation to replace the disk default for this scope. Return `null` (the
-default) to let Data Machine read and write through the filesystem.
+The canonical resolver returns a direct `$context['memory_store']` value or an
+`WP_Agent_Memory_Store` implementation provided through the `wp_agent_memory_store`
+filter. Data Machine passes the current scope as `$context['scope']`. Return `null`
+(the default) to let Data Machine read and write through the filesystem.
 
-This is the only runtime filter in Data Machine today. It replaces the earlier
-`datamachine_memory_store` name in-place so the memory-store seam already uses
-Agents API vocabulary before physical extraction. Data Machine does not mirror
-the old name under a second alias because that would create a permanent
-compatibility ladder instead of moving ownership.
+Data Machine does not mirror the previous `agents_api_memory_store` or
+`datamachine_memory_store` hooks because that would create a permanent
+compatibility ladder instead of using the Agents API-owned seam.
 
 **Use case**: managed-host environments where the local filesystem is not
 writable (e.g. WordPress.com, VIP). A consumer plugin (e.g. Intelligence)
 ships a DB-backed implementation and registers it conditionally:
 
 ```php
-add_filter( 'agents_api_memory_store', function ( $store, $scope ) {
+add_filter( 'wp_agent_memory_store', function ( $store, $context ) {
     if ( $store instanceof WP_Agent_Memory_Store ) {
         return $store;  // someone else already swapped
     }
