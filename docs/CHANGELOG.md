@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.142.0] - 2026-06-08
+
+### Added
+- per-agent network scope for wake_briefing on multisite
+
 ## [0.141.4] - 2026-06-08
 
 ### Changed
