@@ -25,12 +25,6 @@ define( 'DATAMACHINE_URL', plugin_dir_url( __FILE__ ) );
 require_once __DIR__ . '/vendor/autoload.php';
 require_once __DIR__ . '/vendor/wordpress/agents-api/agents-api.php';
 
-// Guard against agents-api dual-load version skew. When an older standalone copy of the
-// substrate won the load race, its coarse AGENTS_API_LOADED guard prevents our newer
-// bundled copy from loading its newer classes — self-heal where safe, fail loud otherwise.
-require_once __DIR__ . '/inc/agents-api-guardrail.php';
-datamachine_agents_api_run_guardrail( __DIR__ . '/vendor/wordpress/agents-api' );
-
 // WP-CLI integration
 // @phpstan-ignore-next-line Runtime constant may be defined false outside PHPStan's configured CLI context.
 if ( defined( 'WP_CLI' ) && (bool) constant( 'WP_CLI' ) ) {

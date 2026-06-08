@@ -15,13 +15,11 @@ defined( 'ABSPATH' ) || exit;
  */
 class DependencyChecker {
 
-	public const CHECK_AGENTS_API_ACCESS_STORE = 'agents_api_access_store';
-	public const CHECK_ACTION_SCHEDULER        = 'action_scheduler';
-	public const CHECK_FILESYSTEM_WRITES       = 'filesystem_writes';
-	public const CHECK_IMAP                    = 'imap';
-	public const CHECK_PENDING_ACTION_OBSERVER = 'pending_action_observer';
-	public const CHECK_WORDPRESS_ABILITIES     = 'wordpress_abilities';
-	public const CHECK_ZIP_ARCHIVE             = 'zip_archive';
+	public const CHECK_ACTION_SCHEDULER    = 'action_scheduler';
+	public const CHECK_FILESYSTEM_WRITES   = 'filesystem_writes';
+	public const CHECK_IMAP                = 'imap';
+	public const CHECK_WORDPRESS_ABILITIES = 'wordpress_abilities';
+	public const CHECK_ZIP_ARCHIVE         = 'zip_archive';
 
 	/**
 	 * Run a named dependency/capability check.
@@ -31,24 +29,13 @@ class DependencyChecker {
 	 */
 	public static function has( string $check ): bool {
 		return match ( $check ) {
-			self::CHECK_AGENTS_API_ACCESS_STORE => self::has_agents_api_access_store_contracts(),
-			self::CHECK_ACTION_SCHEDULER        => self::has_action_scheduler(),
-			self::CHECK_FILESYSTEM_WRITES       => self::has_filesystem_writes(),
-			self::CHECK_IMAP                    => self::has_imap(),
-			self::CHECK_PENDING_ACTION_OBSERVER => self::has_pending_action_observer_contract(),
-			self::CHECK_WORDPRESS_ABILITIES     => self::has_wordpress_abilities(),
-			self::CHECK_ZIP_ARCHIVE             => self::has_zip_archive(),
-			default                             => false,
+			self::CHECK_ACTION_SCHEDULER    => self::has_action_scheduler(),
+			self::CHECK_FILESYSTEM_WRITES   => self::has_filesystem_writes(),
+			self::CHECK_IMAP                => self::has_imap(),
+			self::CHECK_WORDPRESS_ABILITIES => self::has_wordpress_abilities(),
+			self::CHECK_ZIP_ARCHIVE         => self::has_zip_archive(),
+			default                         => false,
 		};
-	}
-
-	/**
-	 * Determine whether the Agents API access-store contracts are available.
-	 *
-	 * @return bool True when the adapter can safely register.
-	 */
-	public static function has_agents_api_access_store_contracts(): bool {
-		return interface_exists( 'WP_Agent_Access_Store' ) && interface_exists( 'WP_Agent_Principal_Access_Store' );
 	}
 
 	/**
@@ -83,15 +70,6 @@ class DependencyChecker {
 	 */
 	public static function has_imap(): bool {
 		return function_exists( 'imap_open' );
-	}
-
-	/**
-	 * Determine whether the Agents API pending-action observer contract is available.
-	 *
-	 * @return bool True when observer implementations can safely register.
-	 */
-	public static function has_pending_action_observer_contract(): bool {
-		return interface_exists( '\AgentsAPI\AI\Approvals\WP_Agent_Pending_Action_Observer' );
 	}
 
 	/**

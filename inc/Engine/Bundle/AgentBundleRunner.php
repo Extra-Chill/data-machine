@@ -450,11 +450,7 @@ final class AgentBundleRunner {
 			$import_input
 		);
 
-		if ( function_exists( 'wp_agent_import_runtime_bundles' ) ) {
-			$imports = wp_agent_import_runtime_bundles( $bundle_specs, $import_input );
-		} else {
-			$imports = $this->import_runtime_bundles_via_filter( $bundle_specs, $import_input );
-		}
+		$imports = wp_agent_import_runtime_bundles( $bundle_specs, $import_input );
 
 		$failed = array_values(
 			array_filter(
@@ -581,53 +577,6 @@ final class AgentBundleRunner {
 		}
 
 		return '';
-	}
-
-	/** @return array<int,array<string,mixed>> */
-	private function import_runtime_bundles_via_filter( array $bundle_specs, array $defaults ): array {
-		$imports = array();
-		foreach ( $bundle_specs as $index => $spec ) {
-			$input = array_merge(
-				array(
-					'on_conflict' => (string) ( $spec['on_conflict'] ?? 'upgrade' ),
-				),
-				$defaults
-			);
-
-			foreach ( array( 'source', 'slug', 'token_env' ) as $field ) {
-				if ( isset( $spec[ $field ] ) && '' !== trim( (string) $spec[ $field ] ) ) {
-					$input[ $field ] = trim( (string) $spec[ $field ] );
-				}
-			}
-
-			if ( isset( $spec['import_principal'] ) && is_array( $spec['import_principal'] ) ) {
-				$input['import_principal'] = $spec['import_principal'];
-			}
-
-			$result = apply_filters( 'wp_agent_runtime_import_bundle', null, $spec, $input, $index );
-			if ( is_wp_error( $result ) ) {
-				$imports[] = array(
-					'success' => false,
-					'index'   => $index,
-					'error'   => array(
-						'code'    => $result->get_error_code(),
-						'message' => $result->get_error_message(),
-						'data'    => $result->get_error_data(),
-					),
-				);
-				continue;
-			}
-
-			$imports[] = array_merge(
-				array(
-					'success' => is_array( $result ) && ! empty( $result['success'] ),
-					'index'   => $index,
-				),
-				is_array( $result ) ? $result : array( 'result' => $result )
-			);
-		}
-
-		return $imports;
 	}
 
 	/** @param callable():array<string,mixed> $callback */
