@@ -2,6 +2,14 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.142.6] - 2026-06-08
+
+### Changed
+- cover host context binding precedence
+
+### Fixed
+- alias provider tool names
+
 ## [0.142.5] - 2026-06-08
 
 ### Changed
