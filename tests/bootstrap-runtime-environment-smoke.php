@@ -47,6 +47,11 @@ namespace {
 	);
 
 	$assert(
+		'identity-store adapter registration no longer gates on Agents API presence checks',
+		! str_contains( $bootstrap, 'DependencyChecker::CHECK_AGENTS_API_IDENTITY_STORE' )
+	);
+
+	$assert(
 		'core named dependency checks exist',
 		DependencyChecker::CHECK_ACTION_SCHEDULER === 'action_scheduler'
 			&& DependencyChecker::CHECK_FILESYSTEM_WRITES === 'filesystem_writes'

@@ -11,8 +11,7 @@
  * candidate. {@see WP_Agent_Conversation_Store} is the narrow generic
  * transcript CRUD seam. The other composed interfaces are Data Machine chat
  * product surfaces today: session switcher indexes, read state, retention
- * cleanup, and reporting/metrics. They may become optional Agents API
- * contracts later, but they are not required for a transcript-only backend.
+	 * cleanup, and reporting/metrics. They are not required for a transcript-only backend.
  * Existing chat UI, REST, CLI, and retention callers still request the
  * aggregate via {@see ConversationStoreFactory::get()}, so this split is a
  * contract clarification with no behavior change.
