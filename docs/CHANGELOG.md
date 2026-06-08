@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.142.1] - 2026-06-08
+
+### Fixed
+- prioritize Data Machine runtime bundle imports
+
 ## [0.142.0] - 2026-06-08
 
 ### Added
