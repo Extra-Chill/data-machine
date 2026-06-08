@@ -869,7 +869,7 @@ function datamachine_build_provider_turn_adapter(
 
 		/** @var \WordPress\AiClient\Results\DTO\GenerativeAiResult $ai_result */
 		$ai_result       = $ai_response;
-		$tool_calls      = datamachine_extract_tool_calls( $ai_result );
+		$tool_calls      = datamachine_apply_provider_tool_name_aliases( datamachine_extract_tool_calls( $ai_result ), $request_metadata );
 		$ai_content      = RequestBuilder::resultText( $ai_result );
 		$last_tool_calls = $tool_calls;
 		foreach ( $tool_calls as $tool_call ) {
@@ -2130,6 +2130,31 @@ function datamachine_completion_nudge_diagnostic( array $decision_context, int $
  */
 function datamachine_extract_tool_calls( $result ): array {
 	return \AgentsAPI\AI\WP_Agent_Provider_Turn_Result::extract_tool_calls( $result );
+}
+
+/**
+ * Map provider-safe function names back to Data Machine/Agents API logical names.
+ *
+ * @param array<int,array<string,mixed>> $tool_calls Tool calls extracted from the provider result.
+ * @param array<string,mixed>            $request_metadata Request metadata emitted by RequestBuilder.
+ * @return array<int,array<string,mixed>> Tool calls with logical names restored where aliases exist.
+ */
+function datamachine_apply_provider_tool_name_aliases( array $tool_calls, array $request_metadata ): array {
+	$aliases = $request_metadata['tool_name_aliases']['provider_to_logical'] ?? array();
+	if ( empty( $aliases ) || ! is_array( $aliases ) ) {
+		return $tool_calls;
+	}
+
+	foreach ( $tool_calls as &$tool_call ) {
+		$name = is_string( $tool_call['name'] ?? null ) ? $tool_call['name'] : '';
+		if ( isset( $aliases[ $name ] ) && is_string( $aliases[ $name ] ) && '' !== $aliases[ $name ] ) {
+			$tool_call['provider_name'] = $name;
+			$tool_call['name']          = $aliases[ $name ];
+		}
+	}
+	unset( $tool_call );
+
+	return $tool_calls;
 }
 
 /**
