@@ -126,19 +126,30 @@ class WP_Abilities_Registry {
 require_once __DIR__ . '/../inc/Core/PluginSettings.php';
 require_once __DIR__ . '/../inc/Core/Steps/FlowStepConfig.php';
 require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Tools/class-wp-agent-tool-access-policy.php';
+require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Approvals/class-wp-agent-approval-memory-store.php';
+require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Approvals/class-wp-agent-null-approval-memory-store.php';
+require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Workspace/class-wp-agent-workspace-scope.php';
+require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Runtime/class-wp-agent-citation-metadata.php';
 require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Tools/class-wp-agent-tool-declaration.php';
 require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Tools/class-wp-agent-tool-parameters.php';
 require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Tools/class-wp-agent-tool-call.php';
 require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Tools/class-wp-agent-tool-result.php';
+require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Tools/class-wp-agent-action-policy.php';
+require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Tools/class-wp-agent-action-policy-provider.php';
+require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Tools/class-wp-agent-action-policy-resolver.php';
 require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Tools/class-wp-agent-tool-executor.php';
 require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Tools/class-wp-agent-tool-execution-core.php';
 require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Tools/class-wp-agent-tool-policy-filter.php';
 require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Tools/class-wp-agent-tool-policy.php';
 require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Tools/class-wp-agent-tool-source-registry.php';
 require_once __DIR__ . '/../inc/Core/AbilityResult.php';
+require_once __DIR__ . '/../inc/Core/WordPress/PostTracking.php';
+require_once __DIR__ . '/../inc/Core/Workspace/WordPressWorkspaceScope.php';
 require_once __DIR__ . '/../inc/Abilities/PermissionHelper.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/ToolManager.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/Execution/ToolExecutionCore.php';
+require_once __DIR__ . '/../inc/Engine/AI/Actions/DataMachineModeActionPolicyProvider.php';
+require_once __DIR__ . '/../inc/Engine/AI/Actions/ActionPolicyResolver.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/ToolExecutor.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/Policy/DataMachineAgentToolPolicyProvider.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/Policy/DataMachineMandatoryToolPolicy.php';
@@ -197,6 +208,19 @@ class SourcePolicyToolManager extends ToolManager {
 		}
 
 		return array();
+	}
+}
+
+class SourceSmokeBoundContextTool {
+	public function handle_tool_call( array $parameters, array $tool_def = array() ): array {
+		unset( $tool_def );
+
+		return array(
+			'success' => true,
+			'data'    => array(
+				'query' => $parameters['query'] ?? '',
+			),
+		);
 	}
 }
 
@@ -532,9 +556,57 @@ $direct_execute  = strpos( $executor_source, 'executePreparedTool' );
 assert_source_equals( true, false !== $client_guard, 'ToolExecutor has an explicit client-executor guard', $failures, $passes );
 assert_source_equals( true, false !== $client_guard && false !== $policy_resolver && $client_guard < $policy_resolver, 'client-executor guard runs before action-policy/direct execution setup', $failures, $passes );
 assert_source_equals( true, false !== $client_guard && false !== $direct_execute && $client_guard < $direct_execute, 'client-executor guard runs before direct PHP tool execution', $failures, $passes );
-assert_source_equals( true, false !== strpos( $executor_source, 'applyDeclaredContextBindings' ), 'ToolExecutor reapplies explicit context bindings before execution', $failures, $passes );
-assert_source_equals( true, false !== strpos( $executor_source, "tool_def['client_context_bindings']" ), 'ToolExecutor reads declared client_context_bindings only', $failures, $passes );
+assert_source_equals( false, false !== strpos( $executor_source, 'applyDeclaredContextBindings' ), 'ToolExecutor does not duplicate Agents API context binding application', $failures, $passes );
+assert_source_equals( false, false !== strpos( $executor_source, "tool_def['client_context_bindings']" ), 'ToolExecutor does not read client_context_bindings locally', $failures, $passes );
 assert_source_equals( true, false !== strpos( $loop_source, 'datamachine_payload_with_client_context_bindings' ), 'conversation loop mirrors safe run fields into client_context', $failures, $passes );
+
+$bound_server_tools = array(
+	'bound_context_tool'   => array(
+		'class'                   => SourceSmokeBoundContextTool::class,
+		'method'                  => 'handle_tool_call',
+		'parameters'              => array(
+			'query' => array(
+				'type'     => 'string',
+				'required' => true,
+			),
+		),
+		'client_context_bindings' => array( 'query' => 'search_query' ),
+	),
+	'unbound_context_tool' => array(
+		'class'      => SourceSmokeBoundContextTool::class,
+		'method'     => 'handle_tool_call',
+		'parameters' => array(
+			'query' => array(
+				'type'     => 'string',
+				'required' => true,
+			),
+		),
+	),
+);
+
+$bound_server_execution = ToolExecutor::executeTool(
+	'bound_context_tool',
+	array(),
+	$bound_server_tools,
+	array(),
+	ToolPolicyResolver::MODE_CHAT,
+	0,
+	array( 'search_query' => 'from client context' )
+);
+assert_source_equals( true, $bound_server_execution['success'] ?? null, 'declared client_context_bindings satisfy required parameters through Agents API', $failures, $passes );
+assert_source_equals( 'from client context', $bound_server_execution['result']['data']['query'] ?? null, 'bound client context value reaches server tool parameters', $failures, $passes );
+
+$unbound_server_execution = ToolExecutor::executeTool(
+	'unbound_context_tool',
+	array(),
+	$bound_server_tools,
+	array(),
+	ToolPolicyResolver::MODE_CHAT,
+	0,
+	array( 'query' => 'ambient context value' )
+);
+assert_source_equals( false, $unbound_server_execution['success'] ?? null, 'ambient context keys do not satisfy required parameters without explicit bindings', $failures, $passes );
+assert_source_equals( 'missing_required_parameters', $unbound_server_execution['metadata']['error_type'] ?? null, 'unbound ambient context produces the required-parameter error', $failures, $passes );
 
 $client_execution = ToolExecutor::executeTool(
 	'client/select_block',

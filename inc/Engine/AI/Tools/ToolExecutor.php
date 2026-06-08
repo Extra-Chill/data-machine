@@ -60,10 +60,10 @@ class ToolExecutor {
 		int $agent_id = 0,
 		array $client_context = array()
 	): array {
-		$core            = new WP_Agent_Tool_Execution_Core();
-		$execution       = new ToolExecutionCore();
-		$tool_parameters = self::applyDeclaredContextBindings( $tool_name, $tool_parameters, $available_tools, $payload, $client_context );
-		$prepared        = $core->prepareWP_Agent_Tool_Call( $tool_name, $tool_parameters, $available_tools, $payload );
+		$core           = new WP_Agent_Tool_Execution_Core();
+		$execution      = new ToolExecutionCore();
+		$tool_context   = array_merge( $payload, $client_context );
+		$prepared       = $core->prepareWP_Agent_Tool_Call( $tool_name, $tool_parameters, $available_tools, $tool_context );
 		if ( empty( $prepared['ready'] ) ) {
 			unset( $prepared['ready'] );
 			return $prepared;
@@ -164,7 +164,7 @@ class ToolExecutor {
 		}
 
 		// Policy is 'direct' — execute the tool normally.
-		$tool_result = $core->executePreparedTool( $tool_call, $tool_def, $execution, $payload );
+		$tool_result = $core->executePreparedTool( $tool_call, $tool_def, $execution, $tool_context );
 
 		// Automatic post origin tracking — applies to every tool whose result
 		// contains an extractable post_id. This covers both handler tools
@@ -183,51 +183,6 @@ class ToolExecutor {
 		}
 
 		return $tool_result;
-	}
-
-	/**
-	 * Apply explicit client_context_bindings from Data Machine invocation context.
-	 *
-	 * Agents API also applies this contract, but Data Machine may receive a
-	 * prepared tool call from the substrate after host-only fields have been
-	 * normalized. Re-applying the same explicit declaration against the original
-	 * Data Machine payload keeps handler tools from depending on model-supplied
-	 * job identifiers without falling back to ambient key-name matching.
-	 *
-	 * @param string $tool_name       Tool name to execute.
-	 * @param array  $tool_parameters Parameters from the model/substrate.
-	 * @param array  $available_tools Available tool definitions.
-	 * @param array  $payload         Data Machine loop payload.
-	 * @param array  $client_context  Nested client context from the payload.
-	 * @return array Parameters with declared context bindings applied.
-	 */
-	private static function applyDeclaredContextBindings( string $tool_name, array $tool_parameters, array $available_tools, array $payload, array $client_context ): array {
-		$tool_def = is_array( $available_tools[ $tool_name ] ?? null ) ? $available_tools[ $tool_name ] : array();
-		$bindings = is_array( $tool_def['client_context_bindings'] ?? null ) ? $tool_def['client_context_bindings'] : array();
-		if ( empty( $bindings ) ) {
-			return $tool_parameters;
-		}
-
-		$context = array_merge( $payload, $client_context );
-		foreach ( $bindings as $parameter_name => $context_key ) {
-			if ( is_int( $parameter_name ) ) {
-				$parameter_name = $context_key;
-			}
-
-			if ( ! is_string( $parameter_name ) || '' === $parameter_name || ! is_string( $context_key ) || '' === $context_key ) {
-				continue;
-			}
-			if ( array_key_exists( $parameter_name, $tool_parameters ) && null !== $tool_parameters[ $parameter_name ] && '' !== $tool_parameters[ $parameter_name ] ) {
-				continue;
-			}
-			if ( ! array_key_exists( $context_key, $context ) || null === $context[ $context_key ] || '' === $context[ $context_key ] ) {
-				continue;
-			}
-
-			$tool_parameters[ $parameter_name ] = $context[ $context_key ];
-		}
-
-		return $tool_parameters;
 	}
 
 	/**
