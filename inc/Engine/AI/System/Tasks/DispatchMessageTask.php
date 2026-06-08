@@ -75,9 +75,9 @@ class DispatchMessageTask extends SystemTask {
 	 * Execute dispatch message task.
 	 *
 	 * Resolves the canonical `agents/dispatch-message` ability and forwards
-	 * the configured `params`. Fails the job cleanly when the substrate is
-	 * missing (agents-api not installed or too old) or when the ability
-	 * returns a WP_Error. On success, stores the canonical output
+	 * the configured `params`. Fails the job cleanly when the ability is not
+	 * registered or when the ability returns a WP_Error. On success, stores
+	 * the canonical output
 	 * (`sent`, `channel`, `recipient`, `message_id`, `metadata`) in the
 	 * job result envelope alongside a `completed_at` timestamp — mirroring
 	 * AgentCallTask's success shape.
@@ -86,19 +86,11 @@ class DispatchMessageTask extends SystemTask {
 	 * @param array $params Task params with `channel`, `recipient`, `message` and optional passthrough fields.
 	 */
 	public function executeTask( int $jobId, array $params ): void {
-		if ( ! function_exists( 'wp_get_ability' ) ) {
-			$this->failJob(
-				$jobId,
-				sprintf( 'Ability %s not registered — agents-api missing or too old.', self::ABILITY_SLUG )
-			);
-			return;
-		}
-
 		$ability = wp_get_ability( self::ABILITY_SLUG );
 		if ( ! $ability ) {
 			$this->failJob(
 				$jobId,
-				sprintf( 'Ability %s not registered — agents-api missing or too old.', self::ABILITY_SLUG )
+				sprintf( 'Ability %s not registered.', self::ABILITY_SLUG )
 			);
 			return;
 		}

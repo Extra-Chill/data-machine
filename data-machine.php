@@ -23,10 +23,7 @@ define( 'DATAMACHINE_PATH', plugin_dir_path( __FILE__ ) );
 define( 'DATAMACHINE_URL', plugin_dir_url( __FILE__ ) );
 
 require_once __DIR__ . '/vendor/autoload.php';
-
-if ( ! defined( 'AGENTS_API_LOADED' ) ) {
-	require_once __DIR__ . '/vendor/automattic/agents-api/agents-api.php';
-}
+require_once __DIR__ . '/vendor/automattic/agents-api/agents-api.php';
 
 // WP-CLI integration
 // @phpstan-ignore-next-line Runtime constant may be defined false outside PHPStan's configured CLI context.
@@ -320,10 +317,7 @@ function datamachine_run_datamachine_plugin() {
 	// ActionPolicy + unified pending-action resolver. Content abilities register
 	// themselves on `datamachine_pending_action_handlers` via
 	// inc/Abilities/Content/ContentActionHandlers.php (required above).
-	if ( interface_exists( '\AgentsAPI\AI\Approvals\WP_Agent_Pending_Action_Observer' ) ) {
-		// @phpstan-ignore-next-line Scoped analysis sees the observer implementation before the conditional interface load.
-		\DataMachine\Engine\AI\Actions\PendingActionObservers::register( new \DataMachine\Engine\AI\Actions\WordPressActionDispatchObserver() );
-	}
+	\DataMachine\Engine\AI\Actions\PendingActionObservers::register( new \DataMachine\Engine\AI\Actions\WordPressActionDispatchObserver() );
 	new \DataMachine\Engine\AI\Actions\PendingActionInspectionAbility();
 	new \DataMachine\Engine\AI\Actions\SignPendingActionResolutionAbility();
 	new \DataMachine\Engine\AI\Actions\ResolvePendingActionAbility();

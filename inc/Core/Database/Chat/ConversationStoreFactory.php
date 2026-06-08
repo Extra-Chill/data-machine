@@ -111,18 +111,10 @@ class ConversationStoreFactory {
 	/**
 	 * Create the default MySQL-backed store.
 	 *
-	 * The principal-owner transcript interface is an optional Agents API contract.
-	 * Use the principal-aware subclass only when that interface is loaded, so
-	 * activation remains safe with older dependency checkouts.
-	 *
 	 * @return ConversationStoreInterface
 	 */
 	private static function default_store(): ConversationStoreInterface {
-		if ( interface_exists( 'AgentsAPI\\Core\\Database\\Chat\\WP_Agent_Principal_Conversation_Session_Reader' ) ) {
-			return new PrincipalChat();
-		}
-
-		return new Chat();
+		return new PrincipalChat();
 	}
 
 	/**

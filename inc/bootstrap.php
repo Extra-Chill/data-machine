@@ -101,9 +101,7 @@ add_filter(
 	2
 );
 
-if ( interface_exists( 'WP_Agent_Access_Store' ) && interface_exists( 'WP_Agent_Principal_Access_Store' ) ) {
-	AgentAccessStoreAdapter::register();
-}
+AgentAccessStoreAdapter::register();
 
 add_filter(
 	'wp_agent_conversation_store',

@@ -50,8 +50,8 @@ $dev_packages     = array_column( $lock['packages-dev'] ?? array(), 'name' );
 datamachine_release_bundle_assert( in_array( 'automattic/agents-api', $runtime_packages, true ), 'composer.lock keeps automattic/agents-api in runtime packages', $failures, $passes );
 datamachine_release_bundle_assert( ! in_array( 'automattic/agents-api', $dev_packages, true ), 'composer.lock keeps automattic/agents-api out of dev packages', $failures, $passes );
 
-echo "\n[2] Runtime bootstrap is idempotent with standalone Agents API:\n";
-datamachine_release_bundle_assert( false !== strpos( $plugin_source, "defined( 'AGENTS_API_LOADED' )" ), 'Data Machine checks the Agents API loaded sentinel before bundling', $failures, $passes );
+echo "\n[2] Runtime bootstrap loads the bundled Agents API directly:\n";
+datamachine_release_bundle_assert( false === strpos( $plugin_source, "defined( 'AGENTS_API_LOADED' )" ), 'Data Machine does not fall back to an external Agents API bootstrap', $failures, $passes );
 datamachine_release_bundle_assert( false !== strpos( $plugin_source, "vendor/automattic/agents-api/agents-api.php" ), 'Data Machine loads the bundled Agents API bootstrap', $failures, $passes );
 datamachine_release_bundle_assert( is_file( $root . '/vendor/automattic/agents-api/agents-api.php' ), 'local bundled Agents API bootstrap exists for package validation', $failures, $passes );
 

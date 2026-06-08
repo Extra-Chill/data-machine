@@ -43,7 +43,7 @@ class AgentsChatHandler {
 		}
 
 		$agent = sanitize_title( (string) ( $input['agent'] ?? '' ) );
-		if ( '' === $agent || ! class_exists( '\WP_Agent_Access' ) || ! class_exists( '\WP_Agent_Access_Grant' ) ) {
+		if ( '' === $agent ) {
 			return false;
 		}
 
@@ -172,7 +172,7 @@ class AgentsChatHandler {
 		}
 
 		$agent_slug = sanitize_title( $agent );
-		if ( '' === $agent_slug || ! class_exists( '\WP_Agent_Access' ) || ! class_exists( '\WP_Agent_Access_Grant' ) ) {
+		if ( '' === $agent_slug ) {
 			return 0;
 		}
 
