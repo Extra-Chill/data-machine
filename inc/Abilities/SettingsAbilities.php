@@ -104,6 +104,7 @@ class SettingsAbilities {
 						'site_context_enabled'           => array( 'type' => 'boolean' ),
 						'daily_memory_enabled'           => array( 'type' => 'boolean' ),
 						'wake_briefing_enabled'          => array( 'type' => 'boolean' ),
+						'wake_briefing_scope'            => array( 'type' => 'string' ),
 						'default_provider'               => array( 'type' => 'string' ),
 						'default_model'                  => array( 'type' => 'string' ),
 						'mode_models'                    => array(
@@ -371,6 +372,7 @@ class SettingsAbilities {
 				'site_context_enabled'                    => $settings['site_context_enabled'] ?? false,
 				'daily_memory_enabled'                    => $settings['daily_memory_enabled'] ?? false,
 				'wake_briefing_enabled'                   => $settings['wake_briefing_enabled'] ?? false,
+				'wake_briefing_scope'                     => $settings['wake_briefing_scope'] ?? 'site',
 				'default_provider'                        => $settings['default_provider'] ?? '',
 				'default_model'                           => $settings['default_model'] ?? '',
 				'mode_models'                             => $settings['mode_models'] ?? array(),
@@ -456,6 +458,12 @@ class SettingsAbilities {
 		if ( isset( $input['wake_briefing_enabled'] ) ) {
 			$all_settings['wake_briefing_enabled'] = (bool) $input['wake_briefing_enabled'];
 			$handled_keys[]                        = 'wake_briefing_enabled';
+		}
+
+		if ( isset( $input['wake_briefing_scope'] ) ) {
+			$scope                               = 'network' === $input['wake_briefing_scope'] ? 'network' : 'site';
+			$all_settings['wake_briefing_scope'] = $scope;
+			$handled_keys[]                      = 'wake_briefing_scope';
 		}
 
 		if ( isset( $input['default_provider'] ) ) {
