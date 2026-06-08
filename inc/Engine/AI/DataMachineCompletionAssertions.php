@@ -77,6 +77,11 @@ class DataMachineCompletionAssertions {
 			$tool_result['_parameters']                    = $tool_parameters;
 			$this->executed_tool_names[]                   = $tool_name;
 			$this->successful_tool_results[ $tool_name ][] = $tool_result;
+
+			foreach ( $this->toolAliases( $tool_name, $tool_def ) as $alias ) {
+				$this->executed_tool_names[]               = $alias;
+				$this->successful_tool_results[ $alias ][] = $tool_result;
+			}
 		}
 
 		$is_handler_tool = is_array( $tool_def ) && isset( $tool_def['handler'] );
@@ -197,7 +202,54 @@ class DataMachineCompletionAssertions {
 			return array();
 		}
 
-		return array_values( array_diff( array_values( array_unique( $required_tool_names ) ), array_keys( $tools ) ) );
+		return array_values( array_diff( array_values( array_unique( $required_tool_names ) ), self::availableToolNames( $tools ) ) );
+	}
+
+	/**
+	 * Return logical and runtime/provider-safe names available for completion assertions.
+	 *
+	 * @param array $tools Available tools keyed by logical tool name.
+	 * @return array<int, string>
+	 */
+	private static function availableToolNames( array $tools ): array {
+		$names = array();
+		foreach ( $tools as $tool_name => $tool_def ) {
+			$logical_name = (string) $tool_name;
+			if ( '' !== $logical_name ) {
+				$names[] = $logical_name;
+			}
+
+			if ( is_array( $tool_def ) ) {
+				foreach ( self::toolAliases( $logical_name, $tool_def ) as $alias ) {
+					$names[] = $alias;
+				}
+			}
+		}
+
+		return array_values( array_unique( array_filter( $names ) ) );
+	}
+
+	/**
+	 * Return assertion aliases for one tool definition.
+	 *
+	 * @param string     $tool_name Logical tool name.
+	 * @param array|null $tool_def Tool definition.
+	 * @return array<int, string>
+	 */
+	private static function toolAliases( string $tool_name, ?array $tool_def ): array {
+		if ( ! is_array( $tool_def ) ) {
+			return array();
+		}
+
+		$aliases = array();
+		foreach ( array( 'name', 'runtime_tool_id' ) as $key ) {
+			$value = is_string( $tool_def[ $key ] ?? null ) ? trim( (string) $tool_def[ $key ] ) : '';
+			if ( '' !== $value && $value !== $tool_name ) {
+				$aliases[] = $value;
+			}
+		}
+
+		return array_values( array_unique( $aliases ) );
 	}
 
 	/**
@@ -335,7 +387,7 @@ class DataMachineCompletionAssertions {
 	private function hasAvailableOutcomePath( array $tools ): bool {
 		foreach ( $this->complete_when_any as $outcome ) {
 			$names = array_map( static fn( array $tool ): string => $tool['name'], $outcome['tools'] );
-			if ( empty( array_diff( $names, array_keys( $tools ) ) ) ) {
+			if ( empty( array_diff( $names, self::availableToolNames( $tools ) ) ) ) {
 				return true;
 			}
 		}
