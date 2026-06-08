@@ -2,6 +2,14 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.142.4] - 2026-06-08
+
+### Changed
+- repair memory bundle policy smoke
+
+### Fixed
+- degrade orphaned-pipeline and external HTTP failures to warning
+
 ## [0.142.3] - 2026-06-08
 
 ### Fixed
