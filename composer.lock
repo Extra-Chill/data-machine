@@ -814,12 +814,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/Automattic/agents-api.git",
-                "reference": "1325b46960a30db624c47a6bece06aef54f62f8a"
+                "reference": "995e94571dc26ffd3d0fe3eda95ddf25ff1fe215"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/Automattic/agents-api/zipball/1325b46960a30db624c47a6bece06aef54f62f8a",
-                "reference": "1325b46960a30db624c47a6bece06aef54f62f8a",
+                "url": "https://api.github.com/repos/Automattic/agents-api/zipball/995e94571dc26ffd3d0fe3eda95ddf25ff1fe215",
+                "reference": "995e94571dc26ffd3d0fe3eda95ddf25ff1fe215",
                 "shasum": ""
             },
             "require": {
@@ -874,12 +874,14 @@
                     "php tests/approval-resolver-contract-smoke.php",
                     "php tests/pending-action-abilities-smoke.php",
                     "php tests/identity-smoke.php",
+                    "php tests/identity-store-materialization-smoke.php",
                     "php tests/memory-metadata-contract-smoke.php",
                     "php tests/memory-store-resolver-smoke.php",
                     "php tests/ability-lifecycle-bridge-smoke.php",
                     "php tests/pre-execute-approval-smoke.php",
                     "php tests/approval-action-value-shape-smoke.php",
                     "php tests/workspace-scope-smoke.php",
+                    "php tests/safe-execution-workspace-smoke.php",
                     "php tests/compaction-item-smoke.php",
                     "php tests/compaction-conservation-smoke.php",
                     "php tests/conversation-runner-contracts-smoke.php",
@@ -905,6 +907,7 @@
                     "php tests/conversation-loop-budgets-smoke.php",
                     "php tests/channels-smoke.php",
                     "php tests/chat-run-control-smoke.php",
+                    "php tests/task-execution-smoke.php",
                     "php tests/frontend-chat-rest-smoke.php",
                     "php tests/agents-chat-jsonrpc-route-smoke.php",
                     "php tests/agents-dispatch-message-ability-smoke.php",
@@ -935,7 +938,7 @@
                 "issues": "https://github.com/Automattic/agents-api/issues",
                 "source": "https://github.com/Automattic/agents-api"
             },
-            "time": "2026-06-04T22:12:12+00:00"
+            "time": "2026-06-08T03:16:09+00:00"
         }
     ],
     "packages-dev": [

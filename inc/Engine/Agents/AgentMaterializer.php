@@ -10,9 +10,8 @@
 
 namespace DataMachine\Engine\Agents;
 
-use DataMachine\Abilities\File\ScaffoldAbilities;
-use DataMachine\Core\Database\Agents\AgentAccess;
-use DataMachine\Core\Database\Agents\Agents;
+use AgentsAPI\Core\Identity\WP_Agent_Identity_Scope;
+use DataMachine\Core\Identity\AgentIdentityStoreAdapter;
 use DataMachine\Core\FilesRepository\DirectoryManager;
 
 defined( 'ABSPATH' ) || exit;
@@ -46,74 +45,50 @@ class AgentMaterializer {
 			'skipped'  => array(),
 		);
 
-		if ( ! class_exists( Agents::class ) ) {
+		if ( ! function_exists( 'wp_get_agent' ) || ! function_exists( 'wp_materialize_agent_identity' ) || ! class_exists( AgentIdentityStoreAdapter::class ) ) {
 			return $summary;
 		}
 
-		$repo = new Agents();
+		$store = new AgentIdentityStoreAdapter();
 
 		foreach ( $definitions as $slug => $def ) {
-			$existing = $repo->get_by_slug( $slug );
-			if ( $existing ) {
-				$summary['existing'][] = $slug;
-				continue;
-			}
-
 			$owner_id = self::resolve_owner( $def );
 			if ( $owner_id <= 0 ) {
 				$summary['skipped'][] = $slug;
 				continue;
 			}
 
-			$agent_id = $repo->create_if_missing(
-				$slug,
-				$def['label'],
-				$owner_id,
-				$def['default_config']
-			);
+			$scope = new WP_Agent_Identity_Scope( $slug, $owner_id );
+			if ( null !== $store->resolve( $scope ) ) {
+				$summary['existing'][] = $slug;
+				continue;
+			}
 
-			if ( $agent_id <= 0 ) {
+			$agent = wp_get_agent( $slug );
+			if ( ! $agent instanceof \WP_Agent ) {
 				$summary['skipped'][] = $slug;
 				continue;
 			}
 
-			// Bootstrap owner access (mirrors AgentAbilities::createAgent()).
-			if ( class_exists( AgentAccess::class ) ) {
-				( new AgentAccess() )->bootstrap_owner_access( $agent_id, $owner_id );
-			}
+			$identity = wp_materialize_agent_identity(
+				$agent,
+				$store,
+				array(
+					'owner_user_id' => $owner_id,
+					'meta'          => array_merge(
+						is_array( $def['meta'] ?? null ) ? $def['meta'] : array(),
+						array(
+							'label'                  => (string) ( $def['label'] ?? $slug ),
+							'datamachine_definition' => $def,
+						)
+					),
+				)
+			);
 
-			// Ensure agent directory exists.
-			if ( class_exists( DirectoryManager::class ) ) {
-				$dir_mgr   = new DirectoryManager();
-				$agent_dir = $dir_mgr->get_agent_identity_directory( $slug );
-				$dir_mgr->ensure_directory_exists( $agent_dir );
+			if ( ! $identity instanceof \AgentsAPI\Core\Identity\WP_Agent_Materialized_Identity ) {
+				$summary['skipped'][] = $slug;
+				continue;
 			}
-
-			// Scaffold agent-layer memory files (SOUL.md, MEMORY.md, etc.).
-			// The scaffold filter consults AgentRegistry for a matching
-			// `memory_seeds` entry per filename and substitutes bundled
-			// content when present.
-			$scaffold = ScaffoldAbilities::get_ability();
-			if ( $scaffold ) {
-				$scaffold->execute(
-					array(
-						'layer'      => 'agent',
-						'agent_slug' => $slug,
-						'agent_id'   => $agent_id,
-					)
-				);
-			}
-
-			/**
-			 * Fires after a registered agent is materialized into the database.
-			 *
-			 * @since 0.71.0
-			 *
-			 * @param int    $agent_id Newly created agent row ID.
-			 * @param string $slug     Registered slug.
-			 * @param array  $def      Full registration definition.
-			 */
-			do_action( 'datamachine_registered_agent_reconciled', $agent_id, $slug, $def );
 
 			$summary['created'][] = $slug;
 		}

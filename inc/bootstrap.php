@@ -78,6 +78,7 @@ use DataMachine\Core\Content\ContentFormat;
 use DataMachine\Core\Database\Chat\ConversationStoreFactory;
 use DataMachine\Core\Auth\AgentAccessStoreAdapter;
 use DataMachine\Core\Bootstrap\DependencyChecker;
+use DataMachine\Core\Identity\AgentIdentityStoreAdapter;
 use DataMachine\Core\OAuth\HttpBasicAuthProvider;
 use DataMachine\Core\PluginSettings;
 
@@ -111,6 +112,10 @@ add_filter(
 
 if ( DependencyChecker::has( DependencyChecker::CHECK_AGENTS_API_ACCESS_STORE ) ) {
 	AgentAccessStoreAdapter::register();
+}
+
+if ( DependencyChecker::has( DependencyChecker::CHECK_AGENTS_API_IDENTITY_STORE ) ) {
+	AgentIdentityStoreAdapter::register();
 }
 
 add_filter(
