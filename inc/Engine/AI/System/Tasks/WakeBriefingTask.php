@@ -91,6 +91,98 @@ class WakeBriefingTask extends SystemTask {
 		$window_hours = (int) apply_filters( 'datamachine_wake_briefing_window_hours', $window_hours, $params );
 		$since        = gmdate( 'Y-m-d H:i:s', time() - ( $window_hours * HOUR_IN_SECONDS ) );
 
+		$agent_id = (int) ( $params['agent_id'] ?? 0 );
+		$user_id  = (int) ( $params['user_id'] ?? 0 );
+		$scope    = $this->resolveScope( $params, $agent_id );
+
+		$signals = ( 'network' === $scope )
+			? $this->gatherNetworkSignals( $since )
+			: $this->gatherSiteSignals( $since );
+
+		/**
+		 * Filter the composed wake-briefing signal lines before rendering.
+		 *
+		 * Each entry is a single terse markdown line. Integrations may append
+		 * their own threshold-crossing signals (e.g. deploy drift) here.
+		 *
+		 * @param string[] $signals      Threshold-crossing signal lines.
+		 * @param string   $since        Window start (UTC `Y-m-d H:i:s`).
+		 * @param int      $window_hours Window size in hours.
+		 */
+		$signals = (array) apply_filters( 'datamachine_wake_briefing_signals', $signals, $since, $window_hours );
+
+		$content = $this->render( $signals, $window_hours, $scope );
+
+		$memory = new AgentMemory( $user_id, $agent_id, self::BRIEFING_FILENAME );
+		$write  = $memory->replace_all( $content );
+
+		if ( empty( $write['success'] ) ) {
+			$this->failJob( $jobId, $write['message'] ?? 'Failed to write wake briefing.' );
+			return;
+		}
+
+		$this->completeJob(
+			$jobId,
+			array(
+				'window_hours' => $window_hours,
+				'scope'        => $scope,
+				'signal_count' => count( $signals ),
+				'bytes'        => strlen( $content ),
+			)
+		);
+	}
+
+	/**
+	 * Resolve the briefing scope (`site` | `network`) for this run.
+	 *
+	 * Resolution order: explicit param → per-agent config → global setting →
+	 * default `site`. `network` is only honored on multisite; on single-site
+	 * installs it falls back to `site`. This keeps the task multisite-agnostic
+	 * by default — single-site installs are never affected — while letting a
+	 * network-managing agent opt into a whole-network briefing.
+	 *
+	 * @param array $params   Task params.
+	 * @param int   $agent_id Owning agent ID (0 when none).
+	 * @return string `site` or `network`.
+	 */
+	private function resolveScope( array $params, int $agent_id ): string {
+		$scope = '';
+
+		if ( isset( $params['scope'] ) && is_string( $params['scope'] ) ) {
+			$scope = $params['scope'];
+		}
+
+		if ( '' === $scope && $agent_id > 0 ) {
+			$agent  = ( new \DataMachine\Core\Database\Agents\Agents() )->get_agent( $agent_id );
+			$config = is_array( $agent['agent_config'] ?? null ) ? $agent['agent_config'] : array();
+			if ( isset( $config['wake_briefing_scope'] ) && is_string( $config['wake_briefing_scope'] ) ) {
+				$scope = $config['wake_briefing_scope'];
+			}
+		}
+
+		if ( '' === $scope ) {
+			$global = \DataMachine\Core\PluginSettings::get( 'wake_briefing_scope', '' );
+			if ( is_string( $global ) ) {
+				$scope = $global;
+			}
+		}
+
+		$scope = 'network' === $scope ? 'network' : 'site';
+
+		if ( 'network' === $scope && ! is_multisite() ) {
+			$scope = 'site';
+		}
+
+		return $scope;
+	}
+
+	/**
+	 * Gather threshold-crossing signal lines for the current blog only.
+	 *
+	 * @param string $since Window start (UTC).
+	 * @return string[] Terse signal lines (may be empty).
+	 */
+	private function gatherSiteSignals( string $since ): array {
 		$signals = array();
 
 		$failing = $this->getRepeatedJobFailures( $since );
@@ -108,39 +200,64 @@ class WakeBriefingTask extends SystemTask {
 			$signals[] = $errors;
 		}
 
-		/**
-		 * Filter the composed wake-briefing signal lines before rendering.
-		 *
-		 * Each entry is a single terse markdown line. Integrations may append
-		 * their own threshold-crossing signals (e.g. deploy drift) here.
-		 *
-		 * @param string[] $signals      Threshold-crossing signal lines.
-		 * @param string   $since        Window start (UTC `Y-m-d H:i:s`).
-		 * @param int      $window_hours Window size in hours.
-		 */
-		$signals = (array) apply_filters( 'datamachine_wake_briefing_signals', $signals, $since, $window_hours );
+		return $signals;
+	}
 
-		$content = $this->render( $signals, $window_hours );
+	/**
+	 * Gather signals across every site in the network, one labeled line per
+	 * site that has anything to report.
+	 *
+	 * Runs the same per-site pulse queries under switch_to_blog() and collapses
+	 * each site's signals into a single site-tagged line. Sites with nothing to
+	 * report are omitted (the network briefing should not list quiet sites — it
+	 * would defeat the 3-second-glance bar on a large network).
+	 *
+	 * @param string $since Window start (UTC).
+	 * @return string[] Per-site signal lines (may be empty when the whole
+	 *                  network is quiet).
+	 */
+	private function gatherNetworkSignals( string $since ): array {
+		$lines = array();
 
-		$user_id  = (int) ( $params['user_id'] ?? 0 );
-		$agent_id = (int) ( $params['agent_id'] ?? 0 );
-
-		$memory = new AgentMemory( $user_id, $agent_id, self::BRIEFING_FILENAME );
-		$write  = $memory->replace_all( $content );
-
-		if ( empty( $write['success'] ) ) {
-			$this->failJob( $jobId, $write['message'] ?? 'Failed to write wake briefing.' );
-			return;
-		}
-
-		$this->completeJob(
-			$jobId,
+		$sites = get_sites(
 			array(
-				'window_hours' => $window_hours,
-				'signal_count' => count( $signals ),
-				'bytes'        => strlen( $content ),
+				'number'   => 0,
+				'fields'   => 'ids',
+				'spam'     => 0,
+				'deleted'  => 0,
+				'archived' => 0,
 			)
 		);
+
+		foreach ( $sites as $blog_id ) {
+			$blog_id = (int) $blog_id;
+			switch_to_blog( $blog_id );
+			try {
+				$site_signals = $this->gatherSiteSignals( $since );
+				$label        = $this->siteLabel( $blog_id );
+			} finally {
+				restore_current_blog();
+			}
+
+			if ( empty( $site_signals ) ) {
+				continue;
+			}
+
+			$lines[] = sprintf( '**%s** — %s', $label, implode( ' · ', $site_signals ) );
+		}
+
+		return $lines;
+	}
+
+	/**
+	 * Human-readable site label (host, falling back to blog id).
+	 *
+	 * @param int $blog_id Blog ID (must be the current switched blog).
+	 * @return string
+	 */
+	private function siteLabel( int $blog_id ): string {
+		$host = wp_parse_url( home_url(), PHP_URL_HOST );
+		return is_string( $host ) && '' !== $host ? $host : ( 'blog ' . $blog_id );
 	}
 
 	/**
@@ -151,12 +268,14 @@ class WakeBriefingTask extends SystemTask {
 	 * @param int      $window_hours Window size in hours.
 	 * @return string Markdown content.
 	 */
-	private function render( array $signals, int $window_hours ): string {
+	private function render( array $signals, int $window_hours, string $scope = 'site' ): string {
+		$reach   = 'network' === $scope ? 'across the network' : 'on this site';
 		$header  = "# Wake Briefing\n\n";
-		$header .= sprintf( "_What changed in the last %dh (recomputed each session; not personal to one session)._\n\n", $window_hours );
+		$header .= sprintf( "_What changed in the last %dh %s (recomputed each session; not personal to one session)._\n\n", $window_hours, $reach );
 
 		if ( empty( $signals ) ) {
-			return $header . "Nothing notable in the last {$window_hours}h.\n";
+			$where = 'network' === $scope ? 'across the network' : 'here';
+			return $header . "Nothing notable in the last {$window_hours}h {$where}.\n";
 		}
 
 		return $header . implode( "\n", array_map( static fn( $line ) => '- ' . $line, $signals ) ) . "\n";
