@@ -11,6 +11,7 @@ require_once __DIR__ . '/bootstrap-unit.php';
 require_once __DIR__ . '/Unit/Support/WpAiClientTestDoubles.php';
 
 use AgentsAPI\AI\WP_Agent_Message;
+use DataMachine\Engine\AI\DataMachineCompletionAssertions;
 use DataMachine\Engine\AI\RequestBuilder;
 use WordPress\AiClient\Messages\DTO\ModelMessage;
 
@@ -85,5 +86,22 @@ if ( function_exists( 'DataMachine\\Engine\\AI\\datamachine_apply_provider_tool_
 	datamachine_request_builder_tool_transcript_assert( 'client/filesystem-write' === $restored[0]['name'], 'Provider-safe tool calls are restored to logical names before execution.' );
 	datamachine_request_builder_tool_transcript_assert( 'filesystem_write' === $restored[0]['provider_name'], 'Restored calls retain the provider alias for diagnostics.' );
 }
+
+$assertions = new DataMachineCompletionAssertions(
+	array(
+		'required_tool_names' => array( 'filesystem_write' ),
+	)
+);
+$tools      = array(
+	'client/filesystem-write' => array(
+		'name'            => 'client/filesystem-write',
+		'runtime_tool_id' => 'filesystem_write',
+	),
+);
+datamachine_request_builder_tool_transcript_assert( array() === $assertions->unavailableRequiredToolNames( $tools ), 'Completion assertions accept provider-safe runtime tool aliases as available.' );
+$assertions->recordToolResult( 'client/filesystem-write', $tools['client/filesystem-write'], array( 'success' => true ), array( 'path' => 'index.html' ) );
+$evaluation = $assertions->evaluate( array(), '' );
+datamachine_request_builder_tool_transcript_assert( true === $evaluation['complete'], 'Completion assertions are satisfied when the logical tool executes for a runtime alias requirement.' );
+datamachine_request_builder_tool_transcript_assert( array( 'filesystem_write' ) === ( $evaluation['satisfied']['tool_names'] ?? array() ), 'Satisfied assertions report the requested runtime alias name.' );
 
 echo "RequestBuilder tool transcript smoke passed.\n";
