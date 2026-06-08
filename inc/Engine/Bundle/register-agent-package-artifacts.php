@@ -17,10 +17,6 @@ add_action( 'wp_agent_package_artifacts_init', __NAMESPACE__ . '\register_datama
  * @return void
  */
 function register_datamachine_agent_package_artifact_types(): void {
-	if ( ! function_exists( 'wp_register_agent_package_artifact_type' ) ) {
-		return;
-	}
-
 	foreach ( datamachine_agent_package_artifact_type_definitions() as $type => $args ) {
 		wp_register_agent_package_artifact_type( $type, $args );
 	}

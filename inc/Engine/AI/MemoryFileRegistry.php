@@ -159,13 +159,7 @@ class MemoryFileRegistry {
 
 		self::$files[ $filename ] = $metadata;
 
-		// Mirror into the Agents API source registry. When the substrate is
-		// missing (Homeboy playground bootstrap), DM runs degraded with the
-		// local self::$files map only — see agents_api_loaded() docblock.
-		if ( ! self::agents_api_loaded() ) {
-			return;
-		}
-
+		// Mirror into the Agents API source registry.
 		WP_Agent_Memory_Registry::register(
 			self::source_id_for_filename( $filename ),
 			array(
@@ -194,16 +188,10 @@ class MemoryFileRegistry {
 	/**
 	 * Resolve the default retrieval policy for a registration.
 	 *
-	 * Mirrors `WP_Agent_Context_Injection_Policy::NEVER` / `::ALWAYS` while
-	 * tolerating the substrate being absent at bootstrap.
-	 *
 	 * @param bool $modes_empty Whether the registration declared no modes.
 	 * @return string Canonical policy slug.
 	 */
 	private static function default_retrieval_policy( bool $modes_empty ): string {
-		if ( ! self::agents_api_loaded() ) {
-			return $modes_empty ? 'never' : 'always';
-		}
 		return $modes_empty
 			? WP_Agent_Context_Injection_Policy::NEVER
 			: WP_Agent_Context_Injection_Policy::ALWAYS;
@@ -212,17 +200,10 @@ class MemoryFileRegistry {
 	/**
 	 * Normalize a retrieval policy string.
 	 *
-	 * Delegates to the substrate when present; otherwise falls back to a
-	 * local allowlist matching `WP_Agent_Context_Injection_Policy::values()`.
-	 *
 	 * @param string $policy Raw policy value.
 	 * @return string Canonical policy slug.
 	 */
 	private static function normalize_retrieval_policy( string $policy ): string {
-		if ( ! self::agents_api_loaded() ) {
-			$valid = array( 'always', 'on_intent', 'on_tool_need', 'manual', 'never' );
-			return in_array( $policy, $valid, true ) ? $policy : 'always';
-		}
 		return WP_Agent_Context_Injection_Policy::normalize( $policy );
 	}
 
@@ -265,9 +246,7 @@ class MemoryFileRegistry {
 	public static function deregister( string $filename ): void {
 		$filename = sanitize_file_name( $filename );
 		unset( self::$files[ $filename ] );
-		if ( self::agents_api_loaded() ) {
-			WP_Agent_Memory_Registry::unregister( self::source_id_for_filename( $filename ) );
-		}
+		WP_Agent_Memory_Registry::unregister( self::source_id_for_filename( $filename ) );
 	}
 
 	/**
@@ -501,16 +480,12 @@ class MemoryFileRegistry {
 			return self::get_resolved();
 		}
 
-		$agents_api_loaded = self::agents_api_loaded();
-
 		return array_filter(
 			self::get_resolved(),
-			function ( $meta ) use ( $modes, $injection_contexts, $agents_api_loaded ) {
-				$default_policy   = $agents_api_loaded ? WP_Agent_Context_Injection_Policy::ALWAYS : 'always';
+			function ( $meta ) use ( $modes, $injection_contexts ) {
+				$default_policy   = WP_Agent_Context_Injection_Policy::ALWAYS;
 				$retrieval_policy = $meta['retrieval_policy'] ?? $default_policy;
-				$is_always        = $agents_api_loaded
-					? WP_Agent_Context_Injection_Policy::is_always_injected( $retrieval_policy )
-					: ( 'always' === $retrieval_policy );
+				$is_always        = WP_Agent_Context_Injection_Policy::is_always_injected( $retrieval_policy );
 				if ( ! $is_always ) {
 					return false;
 				}
@@ -604,9 +579,7 @@ class MemoryFileRegistry {
 	public static function reset(): void {
 		self::$files          = array();
 		self::$filter_applied = false;
-		if ( self::agents_api_loaded() ) {
-			WP_Agent_Memory_Registry::reset();
-		}
+		WP_Agent_Memory_Registry::reset();
 	}
 
 	/**
@@ -635,11 +608,7 @@ class MemoryFileRegistry {
 			self::$filter_applied = true;
 		}
 
-		// When the Agents API substrate is missing, the local self::$files map
-		// is the single source of truth. See agents_api_loaded() docblock.
-		$files = self::agents_api_loaded()
-			? array_replace( self::from_agents_api_sources( WP_Agent_Memory_Registry::get_all() ), self::$files )
-			: self::$files;
+		$files = array_replace( self::from_agents_api_sources( WP_Agent_Memory_Registry::get_all() ), self::$files );
 		uasort(
 			$files,
 			function ( $a, $b ) {
@@ -694,63 +663,17 @@ class MemoryFileRegistry {
 	}
 
 	/**
-	 * Whether the Agents API runtime classes are loaded.
-	 *
-	 * DM core declares `agents-api` as a `Requires Plugins` dependency, so under
-	 * normal WordPress activation flows the substrate is always present. The
-	 * Homeboy playground bootstrap (used by `homeboy test` / `homeboy release`)
-	 * loads plugins via `require_once` and bypasses that gate, which means DM
-	 * core can boot in an environment where these classes do not exist.
-	 *
-	 * When that happens, every site that touches `MemoryFileRegistry::register()`
-	 * during `muplugins_loaded` fatals before plugin code runs. To keep the
-	 * registry usable in that degraded mode we mirror the data locally in
-	 * `self::$files` and skip the Agents API mirror calls. Production behavior
-	 * (where the substrate is loaded) is unchanged.
-	 *
-	 * The result is cached per request — class loading state is immutable
-	 * within a single PHP process for our purposes.
-	 *
-	 * @return bool
-	 */
-	private static function agents_api_loaded(): bool {
-		static $loaded = null;
-		if ( null === $loaded ) {
-			$loaded = class_exists( WP_Agent_Memory_Layer::class )
-				&& class_exists( WP_Agent_Memory_Registry::class )
-				&& class_exists( WP_Agent_Context_Injection_Policy::class )
-				&& class_exists( '\\AgentsAPI\\AI\\Context\\WP_Agent_Context_Authority_Tier' );
-		}
-		return $loaded;
-	}
-
-	/**
 	 * Normalize a raw layer string.
-	 *
-	 * Delegates to {@see WP_Agent_Memory_Layer::normalize()} when the Agents API
-	 * substrate is loaded. When the substrate is missing (Homeboy playground
-	 * bootstrap, isolated tests), falls back to a local allowlist of the four
-	 * DM-canonical layers and defaults to {@see self::LAYER_AGENT}.
 	 *
 	 * @param string $layer Raw layer identifier.
 	 * @return string Normalized layer slug.
 	 */
 	private static function normalize_layer( string $layer ): string {
-		if ( ! self::agents_api_loaded() ) {
-			$valid = array( self::LAYER_SHARED, self::LAYER_AGENT, self::LAYER_USER, self::LAYER_NETWORK );
-			return in_array( $layer, $valid, true ) ? $layer : self::LAYER_AGENT;
-		}
 		return WP_Agent_Memory_Layer::normalize( $layer, self::LAYER_AGENT );
 	}
 
 	/**
 	 * Default authority tier for a layer/filename pair.
-	 *
-	 * When the Agents API substrate is missing, returns the canonical string
-	 * literals that `WP_Agent_Context_Authority_Tier` would otherwise resolve
-	 * to ({@see WP_Agent_Context_Authority_Tier::ordered()}). Keeping the
-	 * fallbacks in sync with the substrate's vocabulary is intentional —
-	 * downstream consumers compare these as plain strings.
 	 *
 	 * @param string $layer    Normalized layer slug.
 	 * @param string $filename Filename being registered.

@@ -52,7 +52,7 @@ class AgentsChatHandler {
 		}
 
 		$identity = $this->resolveAgentIdentity( $agent );
-		if ( $identity instanceof WP_Error || ! class_exists( '\WP_Agent_Access' ) || ! class_exists( '\WP_Agent_Access_Grant' ) ) {
+		if ( $identity instanceof WP_Error ) {
 			return $allowed;
 		}
 
@@ -210,7 +210,7 @@ class AgentsChatHandler {
 			return $user_id;
 		}
 
-		if ( ! $identity || ! class_exists( '\WP_Agent_Access' ) || ! class_exists( '\WP_Agent_Access_Grant' ) ) {
+		if ( ! $identity ) {
 			return 0;
 		}
 

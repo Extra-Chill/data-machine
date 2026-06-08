@@ -23,10 +23,7 @@ define( 'DATAMACHINE_PATH', plugin_dir_path( __FILE__ ) );
 define( 'DATAMACHINE_URL', plugin_dir_url( __FILE__ ) );
 
 require_once __DIR__ . '/vendor/autoload.php';
-
-if ( ! defined( 'AGENTS_API_LOADED' ) ) {
-	require_once __DIR__ . '/vendor/wordpress/agents-api/agents-api.php';
-}
+require_once __DIR__ . '/vendor/wordpress/agents-api/agents-api.php';
 
 // Guard against agents-api dual-load version skew. When an older standalone copy of the
 // substrate won the load race, its coarse AGENTS_API_LOADED guard prevents our newer
@@ -334,14 +331,7 @@ function datamachine_run_datamachine_plugin() {
 	// ActionPolicy + unified pending-action resolver. Content abilities register
 	// themselves on `datamachine_pending_action_handlers` via
 	// inc/Abilities/Content/ContentActionHandlers.php (required above).
-	if (
-		\DataMachine\Core\Bootstrap\DependencyChecker::has(
-			\DataMachine\Core\Bootstrap\DependencyChecker::CHECK_PENDING_ACTION_OBSERVER
-		)
-	) {
-		// @phpstan-ignore-next-line Scoped analysis sees the observer implementation before the conditional interface load.
-		\DataMachine\Engine\AI\Actions\PendingActionObservers::register( new \DataMachine\Engine\AI\Actions\WordPressActionDispatchObserver() );
-	}
+	\DataMachine\Engine\AI\Actions\PendingActionObservers::register( new \DataMachine\Engine\AI\Actions\WordPressActionDispatchObserver() );
 	new \DataMachine\Engine\AI\Actions\PendingActionInspectionAbility();
 	new \DataMachine\Engine\AI\Actions\SignPendingActionResolutionAbility();
 	new \DataMachine\Engine\AI\Actions\ResolvePendingActionAbility();
