@@ -64,6 +64,7 @@ foreach ( array(
 ) as $needle => $label ) {
 	datamachine_bundle_runner_contains( $abilities, $needle, $label, $failures, $passes );
 }
+datamachine_bundle_runner_contains( $bootstrap, "add_filter( 'wp_agent_runtime_import_bundle', array( AgentAbilities::class, 'importRuntimeAgentBundle' ), 5, 4 )", 'Data Machine importer runs before generic runtime bundle fallback', $failures, $passes );
 datamachine_bundle_runner_contains( $bootstrap, "add_filter( 'wp_agent_runtime_run_bundle'", 'Data Machine registers generic runtime run seam', $failures, $passes );
 
 echo "\n[2] Runner projects bundles to ephemeral workflows\n";
