@@ -179,6 +179,64 @@ class ToolExecutorValidationTest extends WP_UnitTestCase {
 		$this->assertStringContainsString( 'query', $result['error'] );
 	}
 
+	public function test_execute_tool_uses_agents_api_for_declared_client_context_bindings(): void {
+		$available_tools = array(
+			'bound_context_tool' => array(
+				'class'                   => TestToolHandler::class,
+				'method'                  => 'handle_tool_call',
+				'parameters'              => array(
+					'query' => array(
+						'type'     => 'string',
+						'required' => true,
+					),
+				),
+				'client_context_bindings' => array( 'query' => 'search_query' ),
+			),
+		);
+
+		$result = ToolExecutor::executeTool(
+			'bound_context_tool',
+			array(),
+			$available_tools,
+			array(),
+			'chat',
+			0,
+			array( 'search_query' => 'from client context' )
+		);
+
+		$this->assertTrue( $result['success'] );
+		$this->assertSame( 'from client context', $result['result']['data']['query'] ?? null );
+	}
+
+	public function test_execute_tool_does_not_satisfy_required_params_from_ambient_context_keys(): void {
+		$available_tools = array(
+			'unbound_context_tool' => array(
+				'class'      => TestToolHandler::class,
+				'method'     => 'handle_tool_call',
+				'parameters' => array(
+					'query' => array(
+						'type'     => 'string',
+						'required' => true,
+					),
+				),
+			),
+		);
+
+		$result = ToolExecutor::executeTool(
+			'unbound_context_tool',
+			array(),
+			$available_tools,
+			array(),
+			'chat',
+			0,
+			array( 'query' => 'ambient context value' )
+		);
+
+		$this->assertFalse( $result['success'] );
+		$this->assertSame( 'missing_required_parameters', $result['metadata']['error_type'] ?? null );
+		$this->assertSame( array( 'query' ), $result['metadata']['missing_parameters'] ?? array() );
+	}
+
 	public function test_execute_tool_returns_error_for_missing_tool(): void {
 		$result = ToolExecutor::executeTool(
 			'missing_tool',
