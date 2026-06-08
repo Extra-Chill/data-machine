@@ -16,6 +16,7 @@ defined( 'ABSPATH' ) || exit;
 class DependencyChecker {
 
 	public const CHECK_AGENTS_API_ACCESS_STORE = 'agents_api_access_store';
+	public const CHECK_AGENTS_API_IDENTITY_STORE = 'agents_api_identity_store';
 	public const CHECK_ACTION_SCHEDULER        = 'action_scheduler';
 	public const CHECK_FILESYSTEM_WRITES       = 'filesystem_writes';
 	public const CHECK_IMAP                    = 'imap';
@@ -32,6 +33,7 @@ class DependencyChecker {
 	public static function has( string $check ): bool {
 		return match ( $check ) {
 			self::CHECK_AGENTS_API_ACCESS_STORE => self::has_agents_api_access_store_contracts(),
+			self::CHECK_AGENTS_API_IDENTITY_STORE => self::has_agents_api_identity_store_contracts(),
 			self::CHECK_ACTION_SCHEDULER        => self::has_action_scheduler(),
 			self::CHECK_FILESYSTEM_WRITES       => self::has_filesystem_writes(),
 			self::CHECK_IMAP                    => self::has_imap(),
@@ -49,6 +51,15 @@ class DependencyChecker {
 	 */
 	public static function has_agents_api_access_store_contracts(): bool {
 		return interface_exists( 'WP_Agent_Access_Store' ) && interface_exists( 'WP_Agent_Principal_Access_Store' );
+	}
+
+	/**
+	 * Determine whether the Agents API identity-store contracts are available.
+	 *
+	 * @return bool True when the adapter can safely register.
+	 */
+	public static function has_agents_api_identity_store_contracts(): bool {
+		return interface_exists( '\AgentsAPI\Core\Identity\WP_Agent_Identity_Store' ) && class_exists( '\AgentsAPI\Core\Identity\WP_Agent_Materialized_Identity' );
 	}
 
 	/**
