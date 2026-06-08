@@ -208,6 +208,35 @@ class ToolExecutorValidationTest extends WP_UnitTestCase {
 		$this->assertSame( 'from client context', $result['result']['data']['query'] ?? null );
 	}
 
+	public function test_execute_tool_prefers_host_payload_for_declared_context_bindings(): void {
+		$available_tools = array(
+			'bound_context_tool' => array(
+				'class'                   => TestToolHandler::class,
+				'method'                  => 'handle_tool_call',
+				'parameters'              => array(
+					'query' => array(
+						'type'     => 'string',
+						'required' => true,
+					),
+				),
+				'client_context_bindings' => array( 'query' => 'job_id' ),
+			),
+		);
+
+		$result = ToolExecutor::executeTool(
+			'bound_context_tool',
+			array(),
+			$available_tools,
+			array( 'job_id' => 42 ),
+			'chat',
+			0,
+			array( 'job_id' => 7 )
+		);
+
+		$this->assertTrue( $result['success'] );
+		$this->assertSame( 42, $result['result']['data']['query'] ?? null );
+	}
+
 	public function test_execute_tool_does_not_satisfy_required_params_from_ambient_context_keys(): void {
 		$available_tools = array(
 			'unbound_context_tool' => array(
