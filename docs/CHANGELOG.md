@@ -2,6 +2,16 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.142.5] - 2026-06-08
+
+### Changed
+- opt-in ability tools resolve for sandbox runs
+- Require bundled Agents API runtime
+- Use Agents API identity store for agent materialization
+
+### Fixed
+- rely on bundled Agents API runtime
+
 ## [0.142.4] - 2026-06-08
 
 ### Changed
