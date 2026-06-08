@@ -30,6 +30,10 @@ $assert(
 	false !== strpos( (string) $loop_source, 'WP_Agent_Provider_Turn_Result::extract_tool_calls( $result )' ),
 	'Data Machine delegates provider-turn tool extraction to Agents API'
 );
+$assert(
+	false === strpos( (string) $loop_source, 'class_exists( \'\\AgentsAPI\\AI\\WP_Agent_Provider_Turn_Result\'' ),
+	'Data Machine does not fall back when Agents API extraction is unavailable'
+);
 
 foreach (
 	array(

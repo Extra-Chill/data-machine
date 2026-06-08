@@ -14,7 +14,7 @@ use AgentsAPI\Core\Database\Chat\WP_Agent_Principal_Conversation_Session_Reader;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Adds the optional Agents API principal-owner marker to the default store.
+ * Adds the Agents API principal-owner marker to the default store.
  *
  * Keep the base {@see Chat} class free of this optional interface so Data
  * Machine can activate cleanly when an older Agents API dependency has not yet
