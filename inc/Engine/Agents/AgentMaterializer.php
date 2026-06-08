@@ -45,10 +45,6 @@ class AgentMaterializer {
 			'skipped'  => array(),
 		);
 
-		if ( ! function_exists( 'wp_get_agent' ) || ! function_exists( 'wp_materialize_agent_identity' ) || ! class_exists( AgentIdentityStoreAdapter::class ) ) {
-			return $summary;
-		}
-
 		$store = new AgentIdentityStoreAdapter();
 
 		foreach ( $definitions as $slug => $def ) {
@@ -64,24 +60,21 @@ class AgentMaterializer {
 				continue;
 			}
 
-			$agent = wp_get_agent( $slug );
+			$agent = \wp_get_agent( $slug );
 			if ( ! $agent instanceof \WP_Agent ) {
 				$summary['skipped'][] = $slug;
 				continue;
 			}
 
-			$identity = wp_materialize_agent_identity(
-				$agent,
-				$store,
-				array(
-					'owner_user_id' => $owner_id,
-					'meta'          => array_merge(
-						is_array( $def['meta'] ?? null ) ? $def['meta'] : array(),
-						array(
-							'label'                  => (string) ( $def['label'] ?? $slug ),
-							'datamachine_definition' => $def,
-						)
-					),
+			$identity = $store->materialize(
+				$scope,
+				$agent->get_default_config(),
+				array_merge(
+					is_array( $def['meta'] ?? null ) ? $def['meta'] : array(),
+					array(
+						'label'                  => (string) ( $def['label'] ?? $slug ),
+						'datamachine_definition' => $def,
+					)
 				)
 			);
 

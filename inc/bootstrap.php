@@ -77,7 +77,6 @@ use DataMachine\Abilities\AgentAbilities;
 use DataMachine\Core\Content\ContentFormat;
 use DataMachine\Core\Database\Chat\ConversationStoreFactory;
 use DataMachine\Core\Auth\AgentAccessStoreAdapter;
-use DataMachine\Core\Bootstrap\DependencyChecker;
 use DataMachine\Core\Identity\AgentIdentityStoreAdapter;
 use DataMachine\Core\OAuth\HttpBasicAuthProvider;
 use DataMachine\Core\PluginSettings;
@@ -110,13 +109,8 @@ add_filter(
 	2
 );
 
-if ( DependencyChecker::has( DependencyChecker::CHECK_AGENTS_API_ACCESS_STORE ) ) {
-	AgentAccessStoreAdapter::register();
-}
-
-if ( DependencyChecker::has( DependencyChecker::CHECK_AGENTS_API_IDENTITY_STORE ) ) {
-	AgentIdentityStoreAdapter::register();
-}
+AgentAccessStoreAdapter::register();
+AgentIdentityStoreAdapter::register();
 
 add_filter(
 	'wp_agent_conversation_store',

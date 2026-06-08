@@ -110,7 +110,6 @@ final class AgentBundleArtifactState {
 			)
 		);
 	}
-
 	/**
 	 * Build safe per-artifact failure context.
 	 *

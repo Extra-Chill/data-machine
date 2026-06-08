@@ -28,10 +28,6 @@ class PersistedAgentProjector {
 	 * @return string[] Registered slugs.
 	 */
 	public static function register_persisted_agents( ?Agents $agents_repository = null ): array {
-		if ( ! function_exists( 'wp_register_agent' ) || ! function_exists( 'wp_has_agent' ) ) {
-			return array();
-		}
-
 		if ( ! class_exists( Agents::class ) ) {
 			return array();
 		}

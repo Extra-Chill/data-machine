@@ -34,22 +34,16 @@ namespace {
 	};
 
 	$plugin_root = dirname( __DIR__ );
-	$bootstrap   = file_get_contents( $plugin_root . '/inc/bootstrap.php' );
-	$plugin_file = file_get_contents( $plugin_root . '/data-machine.php' );
+	$bootstrap = file_get_contents( $plugin_root . '/inc/bootstrap.php' );
 
-	if ( false === $bootstrap || false === $plugin_file ) {
+	if ( false === $bootstrap ) {
 		fwrite( STDERR, "FAIL: bootstrap source is not readable\n" );
 		exit( 1 );
 	}
 
 	$assert(
-		'access-store adapter registration uses centralized contract check',
-		str_contains( $bootstrap, 'DependencyChecker::CHECK_AGENTS_API_ACCESS_STORE' )
-	);
-
-	$assert(
-		'pending-action observer registration uses centralized contract check',
-		str_contains( $plugin_file, 'DependencyChecker::CHECK_PENDING_ACTION_OBSERVER' )
+		'access-store adapter registration no longer gates on Agents API presence checks',
+		! str_contains( $bootstrap, 'DependencyChecker::CHECK_AGENTS_API_ACCESS_STORE' )
 	);
 
 	$assert(
@@ -61,33 +55,10 @@ namespace {
 			&& DependencyChecker::CHECK_ZIP_ARCHIVE === 'zip_archive'
 	);
 
-	if ( ! interface_exists( 'WP_Agent_Access_Store' ) ) {
-		interface WP_Agent_Access_Store {}
-	}
-
-	if ( ! interface_exists( 'WP_Agent_Principal_Access_Store' ) ) {
-		interface WP_Agent_Principal_Access_Store {}
-	}
-}
-
-namespace AgentsAPI\AI\Approvals {
-	if ( ! interface_exists( WP_Agent_Pending_Action_Observer::class ) ) {
-		interface WP_Agent_Pending_Action_Observer {}
-	}
 }
 
 namespace {
 	use DataMachine\Core\Bootstrap\DependencyChecker;
-
-	$assert(
-		'access-store contracts are detected after stubs load',
-		DependencyChecker::has( DependencyChecker::CHECK_AGENTS_API_ACCESS_STORE )
-	);
-
-	$assert(
-		'pending-action observer contract is detected after stub loads',
-		DependencyChecker::has( DependencyChecker::CHECK_PENDING_ACTION_OBSERVER )
-	);
 
 	$assert(
 		'unknown dependency checks fail closed',

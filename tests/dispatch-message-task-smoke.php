@@ -9,8 +9,8 @@
  *
  *   1. The task is registered for task id `dispatch_message` and the
  *      DispatchMessageTask class file/import shape lives in the provider.
- *   2. When the ability is not registered (agents-api missing), the
- *      task fails the job with a clear error message — no fatals.
+ *   2. When the ability is not registered, the task fails the job with a
+ *      clear error message.
  *   3. When a handler returns canonical output, the task completes the
  *      job and surfaces `sent / channel / recipient / message_id /
  *      metadata` in the result envelope.
@@ -250,7 +250,6 @@ namespace {
 	dispatch_assert_equals( 1, count( $base::$failed ), 'ability missing: job failed once' );
 	dispatch_assert_equals( 101, $base::$failed[0]['job_id'], 'ability missing: failed job id propagated' );
 	dispatch_assert_contains( 'agents/dispatch-message', $base::$failed[0]['message'], 'ability missing: error mentions ability slug' );
-	dispatch_assert_contains( 'agents-api', $base::$failed[0]['message'], 'ability missing: error mentions agents-api substrate' );
 
 	echo "\n[4] handler success path completes the job with canonical output:\n";
 

@@ -350,7 +350,7 @@ final class AgentBundleAbilityService {
 	}
 
 	public static function capability_report( \WP_Agent_Package $package ): \WP_Agent_Package_Capability_Report {
-		if ( function_exists( 'wp_get_agent_package_artifact_types' ) && function_exists( 'do_action' ) && ( ! function_exists( 'did_action' ) || 0 === did_action( 'wp_agent_package_artifacts_init' ) ) ) {
+		if ( 0 === did_action( 'wp_agent_package_artifacts_init' ) ) {
 			do_action( 'wp_agent_package_artifacts_init' );
 		}
 

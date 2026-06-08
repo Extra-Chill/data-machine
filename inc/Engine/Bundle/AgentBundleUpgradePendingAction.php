@@ -222,10 +222,6 @@ final class AgentBundleUpgradePendingAction {
 	 * @param array<int,array<string,mixed>> $targets Bundle target artifacts.
 	 */
 	private static function ensure_package_artifact_types( array $targets ): void {
-		if ( ! function_exists( 'wp_has_agent_package_artifact_type' ) || ! function_exists( 'wp_register_agent_package_artifact_type' ) ) {
-			return;
-		}
-
 		foreach ( AgentBundleAdoptionStateStore::package_artifact_rows( $targets ) as $target ) {
 			wp_has_agent_package_artifact_type( (string) $target['artifact_type'] );
 		}
