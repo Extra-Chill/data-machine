@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.142.2] - 2026-06-08
+
+### Fixed
+- use canonical agent memory store resolver
+
 ## [0.142.1] - 2026-06-08
 
 ### Fixed
