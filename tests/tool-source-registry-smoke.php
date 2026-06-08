@@ -596,6 +596,23 @@ $bound_server_execution = ToolExecutor::executeTool(
 assert_source_equals( true, $bound_server_execution['success'] ?? null, 'declared client_context_bindings satisfy required parameters through Agents API', $failures, $passes );
 assert_source_equals( 'from client context', $bound_server_execution['result']['data']['query'] ?? null, 'bound client context value reaches server tool parameters', $failures, $passes );
 
+$payload_host_execution = ToolExecutor::executeTool(
+	'bound_context_tool',
+	array(),
+	array(
+		'bound_context_tool' => array_merge(
+			$bound_server_tools['bound_context_tool'],
+			array( 'client_context_bindings' => array( 'query' => 'job_id' ) )
+		),
+	),
+	array( 'job_id' => 42 ),
+	ToolPolicyResolver::MODE_CHAT,
+	0,
+	array( 'job_id' => 7 )
+);
+assert_source_equals( true, $payload_host_execution['success'] ?? null, 'declared binding can read host payload context values', $failures, $passes );
+assert_source_equals( 42, $payload_host_execution['result']['data']['query'] ?? null, 'host payload values win over same-named client_context values', $failures, $passes );
+
 $unbound_server_execution = ToolExecutor::executeTool(
 	'unbound_context_tool',
 	array(),
