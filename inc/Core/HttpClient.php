@@ -405,9 +405,13 @@ class HttpClient {
 			$error_message .= ': ' . $error_details;
 		}
 
+		// A received-but-non-2xx response is expected external attrition when probing
+		// third-party sites (403 bot-blocks, 404 moved pages, 5xx origin-down) and is
+		// not a Data-Machine-side fault. Log it at `warning`; true transport failures
+		// (no response at all) are handled separately in handleWpError() and stay `error`.
 		do_action(
 			'datamachine_log',
-			'error',
+			'warning',
 			'HTTP Request: Error response',
 			array(
 				'context'      => $context,

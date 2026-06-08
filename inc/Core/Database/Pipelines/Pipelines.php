@@ -688,13 +688,23 @@ class Pipelines extends BaseRepository {
 		$pipeline_config = $pipeline['pipeline_config'] ?? array();
 
 		if ( ! isset( $pipeline_config[ $pipeline_step_id ] ) ) {
+			// A flow referencing a step that is absent from the pipeline config is a
+			// recoverable config state, not a runtime fault — most commonly an
+			// orphaned flow whose pipeline lost its step definitions (empty config)
+			// while the flow kept firing. Degrade gracefully and log at `warning`
+			// rather than emitting a per-run `error` on every scheduled lookup.
+			$is_orphaned_empty_config = empty( $pipeline_config );
+
 			do_action(
 				'datamachine_log',
-				'error',
-				'Pipeline step not found in pipeline config',
+				'warning',
+				$is_orphaned_empty_config
+					? 'Pipeline config empty, flow orphaned — skipping step lookup'
+					: 'Pipeline step not found in pipeline config',
 				array(
 					'pipeline_step_id' => $pipeline_step_id,
 					'pipeline_id'      => $pipeline_id,
+					'empty_config'     => $is_orphaned_empty_config,
 				)
 			);
 			return array();
