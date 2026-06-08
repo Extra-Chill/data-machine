@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.142.7] - 2026-06-08
+
+### Fixed
+- honor runtime tool aliases in completion assertions
+
 ## [0.142.6] - 2026-06-08
 
 ### Changed
