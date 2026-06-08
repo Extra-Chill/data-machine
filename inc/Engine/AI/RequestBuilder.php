@@ -58,12 +58,13 @@ class RequestBuilder {
 		$mode_label       = implode( ',', $modes );
 		$assembled        = self::assemble( $messages, $provider, $model, $tools, $modes, $payload );
 		$request          = $assembled['request'];
-		$provider_request = ProviderRequestAssembler::toProviderRequest( $request );
-		$prompt_context   = self::wpAiClientPromptContext( $request['messages'] ?? array() );
+		$structured_tools       = $assembled['structured_tools'];
+		$provider_tool_aliases  = self::providerToolNameAliases( $structured_tools );
+		$provider_request       = ProviderRequestAssembler::toProviderRequest( $request );
+		$prompt_context         = self::wpAiClientPromptContext( $request['messages'] ?? array(), $provider_tool_aliases['logical_to_provider'] );
 		if ( '' !== $prompt_context['prompt'] ) {
 			$provider_request['prompt'] = $prompt_context['prompt'];
 		}
-		$structured_tools   = $assembled['structured_tools'];
 		$applied_directives = $assembled['applied_directives'];
 		$directive_metadata = $assembled['directive_metadata'];
 
@@ -75,6 +76,9 @@ class RequestBuilder {
 			$model,
 			$mode_label
 		);
+		if ( ! empty( $provider_tool_aliases['logical_to_provider'] ) ) {
+			$request_metadata['tool_name_aliases'] = $provider_tool_aliases;
+		}
 		RequestMetadata::warn_if_oversized( $request_metadata, $payload );
 
 		do_action(
@@ -249,9 +253,10 @@ class RequestBuilder {
 				if ( '' === $name ) {
 					continue;
 				}
+				$provider_name = $provider_tool_aliases['logical_to_provider'][ $name ] ?? $name;
 
 				$function_declarations[] = new \WordPress\AiClient\Tools\DTO\FunctionDeclaration(
-					$name,
+					$provider_name,
 					(string) ( $tool_config['description'] ?? '' ),
 					self::normalizeToolSchema( $tool_config['parameters'] ?? array() )
 				);
@@ -306,9 +311,9 @@ class RequestBuilder {
 	 * @param array $message Provider-message array.
 	 * @return \WordPress\AiClient\Messages\DTO\Message|null Message DTO, or null when the shape is unsupported.
 	 */
-	private static function wpAiClientHistoryMessage( array $message ): ?\WordPress\AiClient\Messages\DTO\Message {
+	private static function wpAiClientHistoryMessage( array $message, array $tool_name_aliases = array() ): ?\WordPress\AiClient\Messages\DTO\Message {
 		$role  = (string) ( $message['role'] ?? '' );
-		$parts = self::wpAiClientMessagePartsFromMessage( $message );
+		$parts = self::wpAiClientMessagePartsFromMessage( $message, $tool_name_aliases );
 		if ( empty( $parts ) ) {
 			return null;
 		}
@@ -340,7 +345,7 @@ class RequestBuilder {
 	 * @param array $messages Canonical message envelopes.
 	 * @return array{prompt:string,prompt_parts:array<int,\WordPress\AiClient\Messages\DTO\MessagePart>,system_parts:array<int,string>,history:array<int,\WordPress\AiClient\Messages\DTO\Message>}
 	 */
-	private static function wpAiClientPromptContext( array $messages ): array {
+	private static function wpAiClientPromptContext( array $messages, array $tool_name_aliases = array() ): array {
 		$prompt_index = null;
 		$prompt       = '';
 		$prompt_parts = array();
@@ -363,7 +368,7 @@ class RequestBuilder {
 				continue;
 			}
 
-			$candidate_parts = self::wpAiClientMessagePartsFromMessage( $message );
+			$candidate_parts = self::wpAiClientMessagePartsFromMessage( $message, $tool_name_aliases );
 			if ( ! empty( $candidate_parts ) ) {
 				$prompt_index = $index;
 				$prompt_parts = $candidate_parts;
@@ -377,7 +382,7 @@ class RequestBuilder {
 				continue;
 			}
 
-			$history_message = self::wpAiClientHistoryMessage( $message );
+			$history_message = self::wpAiClientHistoryMessage( $message, $tool_name_aliases );
 			if ( null !== $history_message ) {
 				$history[] = $history_message;
 			}
@@ -397,7 +402,7 @@ class RequestBuilder {
 	 * @param array $message Canonical message envelope or legacy role/content message.
 	 * @return array<int,\WordPress\AiClient\Messages\DTO\MessagePart>
 	 */
-	private static function wpAiClientMessagePartsFromMessage( array $message ): array {
+	private static function wpAiClientMessagePartsFromMessage( array $message, array $tool_name_aliases = array() ): array {
 		try {
 			$envelope = \AgentsAPI\AI\WP_Agent_Message::normalize( $message );
 		} catch ( \Throwable $e ) {
@@ -410,6 +415,7 @@ class RequestBuilder {
 
 		if ( \AgentsAPI\AI\WP_Agent_Message::TYPE_TOOL_CALL === $type ) {
 			$tool_name = isset( $payload['tool_name'] ) ? (string) $payload['tool_name'] : '';
+			$tool_name = $tool_name_aliases[ $tool_name ] ?? $tool_name;
 			$call_id   = isset( $metadata['tool_call_id'] ) ? (string) $metadata['tool_call_id'] : '';
 			if ( '' === $call_id ) {
 				$call_id = isset( $payload['tool_call_id'] ) ? (string) $payload['tool_call_id'] : '';
@@ -432,6 +438,7 @@ class RequestBuilder {
 
 		if ( \AgentsAPI\AI\WP_Agent_Message::TYPE_TOOL_RESULT === $type ) {
 			$tool_name = isset( $payload['tool_name'] ) ? (string) $payload['tool_name'] : '';
+			$tool_name = $tool_name_aliases[ $tool_name ] ?? $tool_name;
 			$call_id   = isset( $metadata['tool_call_id'] ) ? (string) $metadata['tool_call_id'] : '';
 			if ( '' === $call_id ) {
 				$call_id = isset( $payload['tool_call_id'] ) ? (string) $payload['tool_call_id'] : '';
@@ -748,6 +755,104 @@ class RequestBuilder {
 			'request_options_used'            => false,
 			'curl_hook_installed'             => false,
 		);
+	}
+
+	/**
+	 * Build provider-safe function-name aliases for wp-ai-client tool declarations.
+	 *
+	 * Data Machine and Agents API use slash-bearing logical tool names such as
+	 * `client/filesystem-write`. OpenAI-compatible providers reject those names, so
+	 * the wp-ai-client boundary uses a request-local alias while the conversation
+	 * loop maps returned calls back to the logical tool name before execution.
+	 *
+	 * @param array<string,array<string,mixed>> $tools Structured logical tools.
+	 * @return array{logical_to_provider:array<string,string>,provider_to_logical:array<string,string>}
+	 */
+	public static function providerToolNameAliases( array $tools ): array {
+		$logical_to_provider = array();
+		$provider_to_logical = array();
+		$used               = array();
+
+		foreach ( $tools as $tool_name => $tool_config ) {
+			$logical_name = (string) ( $tool_config['name'] ?? $tool_name );
+			if ( '' === $logical_name ) {
+				continue;
+			}
+
+			$provider_name = self::providerToolName( $logical_name, $tool_config );
+			if ( isset( $used[ $provider_name ] ) && $used[ $provider_name ] !== $logical_name ) {
+				$provider_name = self::uniqueProviderToolName( $provider_name, $logical_name, $used );
+			}
+
+			$used[ $provider_name ] = $logical_name;
+			if ( $provider_name !== $logical_name ) {
+				$logical_to_provider[ $logical_name ] = $provider_name;
+				$provider_to_logical[ $provider_name ] = $logical_name;
+			}
+		}
+
+		return array(
+			'logical_to_provider' => $logical_to_provider,
+			'provider_to_logical' => $provider_to_logical,
+		);
+	}
+
+	/**
+	 * Resolve the provider-facing tool name for one logical tool declaration.
+	 *
+	 * @param string $logical_name Logical tool name.
+	 * @param array<string,mixed> $tool_config Tool declaration.
+	 * @return string Provider-safe tool name.
+	 */
+	private static function providerToolName( string $logical_name, array $tool_config ): string {
+		$runtime_tool_id = is_string( $tool_config['runtime_tool_id'] ?? null ) ? trim( (string) $tool_config['runtime_tool_id'] ) : '';
+		if ( self::isProviderSafeToolName( $runtime_tool_id ) ) {
+			return $runtime_tool_id;
+		}
+
+		if ( self::isProviderSafeToolName( $logical_name ) ) {
+			return $logical_name;
+		}
+
+		$provider_name = preg_replace( '/[^a-zA-Z0-9_-]+/', '_', $logical_name );
+		$provider_name = is_string( $provider_name ) ? trim( $provider_name, '_' ) : '';
+		if ( '' === $provider_name || ! preg_match( '/^[a-zA-Z0-9_]/', $provider_name ) ) {
+			$provider_name = 'tool_' . $provider_name;
+		}
+
+		return self::isProviderSafeToolName( $provider_name ) ? $provider_name : 'tool_' . substr( sha1( $logical_name ), 0, 12 );
+	}
+
+	/**
+	 * Ensure an aliased provider tool name is unique within one request.
+	 *
+	 * @param string $provider_name Base provider name.
+	 * @param string $logical_name Logical tool name.
+	 * @param array<string,string> $used Provider names already assigned.
+	 * @return string Unique provider-safe tool name.
+	 */
+	private static function uniqueProviderToolName( string $provider_name, string $logical_name, array $used ): string {
+		$suffix = '_' . substr( sha1( $logical_name ), 0, 8 );
+		$base   = substr( $provider_name, 0, max( 1, 64 - strlen( $suffix ) ) );
+		$unique = $base . $suffix;
+		$count  = 2;
+		while ( isset( $used[ $unique ] ) ) {
+			$extra  = '_' . $count;
+			$unique = substr( $base, 0, max( 1, 64 - strlen( $suffix ) - strlen( $extra ) ) ) . $suffix . $extra;
+			++$count;
+		}
+
+		return $unique;
+	}
+
+	/**
+	 * Check the OpenAI-compatible provider function-name grammar.
+	 *
+	 * @param string $name Candidate name.
+	 * @return bool Whether the name can be sent as a provider tool/function name.
+	 */
+	private static function isProviderSafeToolName( string $name ): bool {
+		return '' !== $name && 1 === preg_match( '/^[a-zA-Z0-9_-]+$/', $name );
 	}
 
 	/**

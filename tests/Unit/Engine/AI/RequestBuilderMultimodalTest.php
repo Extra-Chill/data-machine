@@ -208,7 +208,16 @@ class RequestBuilderMultimodalTest extends TestCase {
 			),
 		);
 
-		$context = $this->invokePrivate( 'wpAiClientPromptContext', array( $messages ) );
+		$aliases = RequestBuilder::providerToolNameAliases(
+			array(
+				'client/filesystem-write' => array(
+					'name'            => 'client/filesystem-write',
+					'runtime_tool_id' => 'filesystem_write',
+				),
+			)
+		);
+
+		$context = $this->invokePrivate( 'wpAiClientPromptContext', array( $messages, $aliases['logical_to_provider'] ) );
 
 		$this->assertSame( array( 'You are an alt-text writer.' ), $context['system_parts'] );
 		$this->assertCount( 1, $context['history'], 'Earlier user turn becomes history' );
@@ -315,15 +324,16 @@ class RequestBuilderMultimodalTest extends TestCase {
 		$function_call = $context['history'][1]->getParts()[0]->getFunctionCall();
 		$this->assertNotNull( $function_call, 'Assistant tool call converts to a function call part' );
 		$this->assertSame( 'call_123', $function_call->getId() );
-		$this->assertSame( 'client/filesystem-write', $function_call->getName() );
+		$this->assertSame( 'filesystem_write', $function_call->getName() );
 		$this->assertSame( array( 'path' => 'index.html' ), $function_call->getArgs() );
 
 		$this->assertCount( 1, $context['prompt_parts'], 'Latest tool result becomes the current prompt part' );
 		$function_response = $context['prompt_parts'][0]->getFunctionResponse();
 		$this->assertNotNull( $function_response, 'Tool result converts to a function response part' );
 		$this->assertSame( 'call_123', $function_response->getId() );
-		$this->assertSame( 'client/filesystem-write', $function_response->getName() );
+		$this->assertSame( 'filesystem_write', $function_response->getName() );
 		$this->assertTrue( $function_response->getResponse()['success'] );
+		$this->assertSame( 'client/filesystem-write', $aliases['provider_to_logical']['filesystem_write'] );
 	}
 
 	/**
