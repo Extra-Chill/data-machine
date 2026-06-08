@@ -74,6 +74,16 @@ namespace DataMachine\Core\Database\Agents {
 			return self::$rows[ $agent_slug ] ?? null;
 		}
 
+		public function get_agent( int $agent_id ): ?array {
+			foreach ( self::$rows as $row ) {
+				if ( (int) ( $row['agent_id'] ?? 0 ) === $agent_id ) {
+					return $row;
+				}
+			}
+
+			return null;
+		}
+
 		public function create_if_missing( string $agent_slug, string $agent_name, int $owner_id, array $agent_config = array() ): int {
 			if ( isset( self::$rows[ $agent_slug ] ) ) {
 				return (int) self::$rows[ $agent_slug ]['agent_id'];
@@ -89,6 +99,22 @@ namespace DataMachine\Core\Database\Agents {
 			);
 
 			return $agent_id;
+		}
+
+		public function update_agent( int $agent_id, array $data ): bool {
+			foreach ( self::$rows as &$row ) {
+				if ( (int) ( $row['agent_id'] ?? 0 ) !== $agent_id ) {
+					continue;
+				}
+
+				if ( array_key_exists( 'agent_config', $data ) ) {
+					$row['agent_config'] = $data['agent_config'];
+				}
+
+				return true;
+			}
+
+			return false;
 		}
 	}
 
@@ -149,6 +175,7 @@ namespace DataMachine\Abilities\File {
 namespace {
 	require_once __DIR__ . '/agents-api-loader.php';
 	datamachine_tests_require_agents_api();
+	require_once __DIR__ . '/../inc/Core/Identity/AgentIdentityStoreAdapter.php';
 	require_once __DIR__ . '/../inc/Engine/Agents/AgentMaterializer.php';
 	require_once __DIR__ . '/../inc/Engine/Agents/AgentRegistry.php';
 	require_once __DIR__ . '/../inc/Engine/Agents/datamachine-register-agents.php';
@@ -284,14 +311,16 @@ namespace {
 	assert_agent_materializer_equals( 1, count( ScaffoldAbilities::$ability->calls ), 'existing row does not scaffold again', $failures, $passes );
 
 	echo "\n[4] materializer owns Data Machine side-effect dependencies:\n";
-	$registration_source = (string) file_get_contents( AGENTS_API_PATH . 'inc/register-agents.php' );
+	$registration_source = (string) file_get_contents( AGENTS_API_PATH . 'src/Registry/register-agents.php' );
 	$registry_source     = (string) file_get_contents( __DIR__ . '/../inc/Engine/Agents/AgentRegistry.php' );
 	$materializer_source = (string) file_get_contents( __DIR__ . '/../inc/Engine/Agents/AgentMaterializer.php' );
 	assert_agent_materializer_equals( false, false !== strpos( $registration_source, 'datamachine_register_agent' ), 'Agents API registration helper does not define Data Machine legacy wrapper', $failures, $passes );
 	assert_agent_materializer_equals( false, false !== strpos( $registry_source, 'Core\\Database\\Agents' ), 'registry no longer imports agent database repositories', $failures, $passes );
 	assert_agent_materializer_equals( false, false !== strpos( $registry_source, 'ScaffoldAbilities' ), 'registry no longer imports scaffold ability', $failures, $passes );
-	assert_agent_materializer_equals( true, false !== strpos( $materializer_source, 'Core\\Database\\Agents' ), 'materializer owns agent database repositories', $failures, $passes );
-	assert_agent_materializer_equals( true, false !== strpos( $materializer_source, 'ScaffoldAbilities' ), 'materializer owns scaffold ability', $failures, $passes );
+	$identity_store_source = (string) file_get_contents( __DIR__ . '/../inc/Core/Identity/AgentIdentityStoreAdapter.php' );
+	assert_agent_materializer_equals( false, false !== strpos( $materializer_source, 'Core\\Database\\Agents' ), 'materializer delegates database storage to identity store adapter', $failures, $passes );
+	assert_agent_materializer_equals( true, false !== strpos( $identity_store_source, 'Core\\Database\\Agents' ), 'identity store adapter owns agent database repositories', $failures, $passes );
+	assert_agent_materializer_equals( true, false !== strpos( $identity_store_source, 'ScaffoldAbilities' ), 'identity store adapter owns scaffold ability', $failures, $passes );
 
 	if ( $failures ) {
 		echo "\nFAILED: " . count( $failures ) . " agent registry/materializer assertions failed.\n";
