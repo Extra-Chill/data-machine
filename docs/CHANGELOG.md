@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.142.3] - 2026-06-08
+
+### Fixed
+- delegate context bindings to Agents API
+
 ## [0.142.2] - 2026-06-08
 
 ### Fixed
