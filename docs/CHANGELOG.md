@@ -2,6 +2,16 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.142.8] - 2026-06-12
+
+### Changed
+- Persist fail-job diagnostics in engine data
+- Preserve failed tool diagnostics
+
+### Fixed
+- terminal disposition tools end the conversation and never overwrite each other
+- Fix recovered tool result classification
+
 ## [0.142.7] - 2026-06-08
 
 ### Fixed
