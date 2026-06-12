@@ -49,6 +49,22 @@ if ( ! function_exists( 'datamachine_merge_engine_data' ) ) {
 	}
 }
 
+// Under a real WordPress runtime (e.g. the wp-codebox smoke harness) the
+// do_action stub above is never defined, so bridge the hooks this test
+// observes into the same capture buffer via real add_action.
+if ( defined( 'WPINC' ) ) {
+	foreach ( array( 'datamachine_log', 'datamachine_ai_completion_nudge_added' ) as $runtime_policy_captured_hook ) {
+		add_action(
+			$runtime_policy_captured_hook,
+			static function ( ...$args ) use ( $runtime_policy_captured_hook ): void {
+				$GLOBALS['datamachine_runtime_policy_logs'][] = array_merge( array( $runtime_policy_captured_hook ), $args );
+			},
+			10,
+			10
+		);
+	}
+}
+
 if ( ! function_exists( 'wp_json_encode' ) ) {
 	function wp_json_encode( $data, int $flags = 0 ) {
 		return json_encode( $data, $flags );
