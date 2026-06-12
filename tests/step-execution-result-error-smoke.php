@@ -56,9 +56,14 @@ $metadata_error_result = StepExecutionResult::classify(
 		array(
 			'type'     => 'handler_result',
 			'metadata' => array(
-				'tool_success'   => false,
-				'failure_reason' => 'handler_failed',
-				'error_message'  => 'GitHub App installation token exchange failed.',
+				'tool_name'            => 'create_github_pull_request',
+				'tool_success'         => false,
+				'failure_reason'       => 'handler_failed',
+				'tool_result_envelope' => array(
+					'success' => false,
+					'code'    => 'not_found',
+					'message' => 'GitHub App installation token exchange failed.',
+				),
 			),
 		),
 	),
@@ -68,6 +73,21 @@ $metadata_error_result = StepExecutionResult::classify(
 assert_step_execution_result_error(
 	'packet metadata errors propagate to execution result',
 	'GitHub App installation token exchange failed.' === $metadata_error_result['error']
+);
+
+assert_step_execution_result_error(
+	'failed tool diagnostic preserves tool name',
+	'create_github_pull_request' === ( $metadata_error_result['diagnostics']['tool_name'] ?? '' )
+);
+
+assert_step_execution_result_error(
+	'failed tool diagnostic preserves envelope code',
+	'not_found' === ( $metadata_error_result['diagnostics']['tool_result']['code'] ?? '' )
+);
+
+assert_step_execution_result_error(
+	'failed tool diagnostic preserves envelope message',
+	'GitHub App installation token exchange failed.' === ( $metadata_error_result['diagnostics']['tool_result']['message'] ?? '' )
 );
 
 if ( $failed > 0 ) {

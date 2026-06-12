@@ -384,6 +384,7 @@ class ExecuteStepAbility {
 					'status'       => $execution_result['status'] ?? 'failed',
 					'reason'       => $execution_result['reason'] ?? 'step_execution_failed',
 					'packet_count' => $execution_result['packet_count'] ?? 0,
+					'diagnostics'  => is_array( $execution_result['diagnostics'] ?? null ) ? $execution_result['diagnostics'] : array(),
 				)
 			);
 		}
@@ -690,15 +691,23 @@ class ExecuteStepAbility {
 		);
 		$empty_packet_reason = $this->getFailureReasonFromPackets( $dataPackets, $execution_result['reason'] ?? 'empty_data_packet_returned' );
 
+		$failure_context = array(
+			'flow_step_id' => $flow_step_id,
+			'class'        => $step_class,
+			'reason'       => $empty_packet_reason,
+		);
+		if ( ! empty( $execution_result['diagnostics'] ) && is_array( $execution_result['diagnostics'] ) ) {
+			$failure_context['diagnostics'] = $execution_result['diagnostics'];
+		}
+		if ( ! empty( $execution_result['error'] ) ) {
+			$failure_context['error_message'] = $execution_result['error'];
+		}
+
 		do_action(
 			'datamachine_fail_job',
 			$job_id,
 			'step_execution_failure',
-			array(
-				'flow_step_id' => $flow_step_id,
-				'class'        => $step_class,
-				'reason'       => $empty_packet_reason,
-			)
+			$failure_context
 		);
 
 		return array(

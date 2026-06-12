@@ -144,6 +144,44 @@ $invoke_empty_ai_route = function ( string $status ) use ( $build_ability ): arr
 	);
 };
 
+$invoke_failed_tool_route = function () use ( $build_ability ): array {
+	list( $ability, $route ) = $build_ability( 'processing' );
+
+	$packets = array(
+		array(
+			'type'     => 'tool_result',
+			'metadata' => array(
+				'tool_name'            => 'create_github_pull_request',
+				'tool_success'         => false,
+				'tool_result_envelope' => array(
+					'success' => false,
+					'code'    => 'not_found',
+					'message' => 'GitHub App installation token exchange failed.',
+				),
+			),
+		),
+	);
+	$execution_result = \DataMachine\Core\StepExecutionResult::classify( $packets, 'ai' );
+
+	return $route->invoke(
+		$ability,
+		123,
+		'ai_step',
+		9,
+		array(
+			'pipeline_id' => 3,
+			'step_type'   => 'ai',
+		),
+		'ai',
+		'DataMachine\\Core\\Steps\\AI\\AIStep',
+		$packets,
+		array( 'data' => $packets ),
+		false,
+		null,
+		$execution_result
+	);
+};
+
 $invoke_empty_fetch_route = function ( string $status ) use ( $build_ability ): array {
 	list( $ability, $route ) = $build_ability( $status );
 
@@ -262,6 +300,21 @@ $assert( 'fetch route surfaces provider failure status', 'failed - mcp_provider_
 $assert( 'fetch route does not emit a second fail-job action', empty( $failed_jobs ) );
 $assert( 'fetch route does not complete failed job as no-items', null === $completed_status );
 $assert( 'fetch route logs the short-circuit message', 1 <= count( $debug_logs ) );
+
+echo "\n[6] failed tool packets preserve diagnostics in fail-job context\n";
+$datamachine_action_log       = datamachine_empty_action_log();
+$datamachine_test_engine_data = array();
+$result                       = $invoke_failed_tool_route();
+$failed_jobs                  = $actions_by_hook( 'datamachine_fail_job' );
+$last_failure                 = end( $failed_jobs );
+$failure_context              = is_array( $last_failure ) ? ( $last_failure['args'][2] ?? array() ) : array();
+
+$assert( 'failed tool packet route still fails', 'failed' === ( $result['outcome'] ?? '' ) );
+$assert( 'failed tool emits fail-job action', 1 === count( $failed_jobs ) );
+$assert( 'failed tool route uses tool_result_failed reason', 'tool_result_failed' === ( $failure_context['reason'] ?? '' ) );
+$assert( 'failed tool context preserves tool name', 'create_github_pull_request' === ( $failure_context['diagnostics']['tool_name'] ?? '' ) );
+$assert( 'failed tool context preserves envelope message', 'GitHub App installation token exchange failed.' === ( $failure_context['diagnostics']['tool_result']['message'] ?? '' ) );
+$assert( 'failed tool context exposes human error message', 'GitHub App installation token exchange failed.' === ( $failure_context['error_message'] ?? '' ) );
 
 if ( $failures > 0 ) {
 	echo "\n=== ai-error-status-propagation-smoke: {$failures} FAILURE(S) / {$total} assertions ===\n";
