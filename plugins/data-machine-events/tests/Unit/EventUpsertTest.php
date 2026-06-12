@@ -250,8 +250,8 @@ class EventUpsertTest extends WP_UnitTestCase {
 	 *
 	 * @see https://github.com/Extra-Chill/data-machine-events/issues/349
 	 */
-	public function test_is_rejected_title_refuses_colon_prefix(): void {
-		$method = new \ReflectionMethod( $this->handler, 'isRejectedTitle' );
+	public function test_is_junk_title_refuses_colon_prefix(): void {
+		$method = new \ReflectionMethod( $this->handler, 'isJunkTitle' );
 		$method->setAccessible( true );
 
 		$this->assertTrue(
@@ -271,8 +271,8 @@ class EventUpsertTest extends WP_UnitTestCase {
 	 *
 	 * @see https://github.com/Extra-Chill/data-machine-events/issues/349
 	 */
-	public function test_is_rejected_title_refuses_dash_prefix(): void {
-		$method = new \ReflectionMethod( $this->handler, 'isRejectedTitle' );
+	public function test_is_junk_title_refuses_dash_prefix(): void {
+		$method = new \ReflectionMethod( $this->handler, 'isJunkTitle' );
 		$method->setAccessible( true );
 
 		$this->assertTrue(
@@ -282,13 +282,111 @@ class EventUpsertTest extends WP_UnitTestCase {
 	}
 
 	/**
-	 * A normal event title is NOT treated as a rejected item, including titles
-	 * that merely contain the word "rejected" elsewhere.
+	 * Dedup-marker prefixes ("Duplicate:", "Consolidate:") and dash/em-dash
+	 * variants are refused.
+	 *
+	 * @see https://github.com/Extra-Chill/data-machine-events/issues/367
+	 */
+	public function test_is_junk_title_refuses_dedup_prefixes(): void {
+		$method = new \ReflectionMethod( $this->handler, 'isJunkTitle' );
+		$method->setAccessible( true );
+
+		$this->assertTrue(
+			$method->invoke( $this->handler, 'Duplicate: ÉLA-Vated Saturdays (merged)' ),
+			'A title starting with "Duplicate:" must be refused.'
+		);
+
+		$this->assertTrue(
+			$method->invoke( $this->handler, 'Duplicate — Dan Spencer / Drip Fed / Tied Up (canonical moved)' ),
+			'A title starting with "Duplicate —" (em dash) must be refused.'
+		);
+
+		$this->assertTrue(
+			$method->invoke( $this->handler, 'Consolidate: Smokedope2016 duplicates' ),
+			'A title starting with "Consolidate:" must be refused.'
+		);
+	}
+
+	/**
+	 * Parenthesized dedup markers anywhere in the title are refused.
+	 *
+	 * @see https://github.com/Extra-Chill/data-machine-events/issues/367
+	 */
+	public function test_is_junk_title_refuses_paren_markers(): void {
+		$method = new \ReflectionMethod( $this->handler, 'isJunkTitle' );
+		$method->setAccessible( true );
+
+		$this->assertTrue(
+			$method->invoke( $this->handler, 'Kev G Mor (duplicate)' ),
+			'A title with a "(duplicate)" suffix must be refused.'
+		);
+
+		$this->assertTrue(
+			$method->invoke( $this->handler, 'Kinky Coffee  NEW (Duplicate)' ),
+			'A title with a "(Duplicate)" suffix must be refused.'
+		);
+
+		$this->assertTrue(
+			$method->invoke( $this->handler, 'Some Event (merged)' ),
+			'A title with a "(merged)" marker must be refused.'
+		);
+
+		$this->assertTrue(
+			$method->invoke( $this->handler, 'Some Event (Duplicate — Consolidated)' ),
+			'A title with a compound "(Duplicate — Consolidated)" marker must be refused.'
+		);
+	}
+
+	/**
+	 * The "see canonical" marker substring is refused.
+	 *
+	 * @see https://github.com/Extra-Chill/data-machine-events/issues/367
+	 */
+	public function test_is_junk_title_refuses_see_canonical(): void {
+		$method = new \ReflectionMethod( $this->handler, 'isJunkTitle' );
+		$method->setAccessible( true );
+
+		$this->assertTrue(
+			$method->invoke( $this->handler, 'Tommy Stinson (duplicate) — see canonical listing' ),
+			'A title containing "see canonical" must be refused.'
+		);
+
+		$this->assertTrue(
+			$method->invoke( $this->handler, 'Some Event — See Canonical Listing' ),
+			'A title containing "See Canonical" (any case) must be refused.'
+		);
+	}
+
+	/**
+	 * Titles containing control characters or null bytes are refused
+	 * unconditionally.
+	 *
+	 * @see https://github.com/Extra-Chill/data-machine-events/issues/367
+	 */
+	public function test_is_junk_title_refuses_control_characters(): void {
+		$method = new \ReflectionMethod( $this->handler, 'isJunkTitle' );
+		$method->setAccessible( true );
+
+		$this->assertTrue(
+			$method->invoke( $this->handler, "Duplicate: \0\0\0ÉLA-Vated Saturdays (merged)" ),
+			'A title containing null bytes must be refused.'
+		);
+
+		$this->assertTrue(
+			$method->invoke( $this->handler, "Innocuous Title\x01 With Control Char" ),
+			'A title containing any control character must be refused.'
+		);
+	}
+
+	/**
+	 * A normal event title is NOT treated as junk, including titles that
+	 * merely contain guarded words in legitimate positions.
 	 *
 	 * @see https://github.com/Extra-Chill/data-machine-events/issues/349
+	 * @see https://github.com/Extra-Chill/data-machine-events/issues/367
 	 */
-	public function test_is_rejected_title_allows_normal_title(): void {
-		$method = new \ReflectionMethod( $this->handler, 'isRejectedTitle' );
+	public function test_is_junk_title_allows_normal_title(): void {
+		$method = new \ReflectionMethod( $this->handler, 'isJunkTitle' );
 		$method->setAccessible( true );
 
 		$this->assertFalse(
@@ -299,6 +397,18 @@ class EventUpsertTest extends WP_UnitTestCase {
 		$this->assertFalse(
 			$method->invoke( $this->handler, 'Eggy at Charleston Pour House' ),
 			'A normal event title must NOT be refused.'
+		);
+
+		// "Duplicate" as a band/title word without a separator is fine.
+		$this->assertFalse(
+			$method->invoke( $this->handler, 'Duplicate Minds at The Sinkhole' ),
+			'A title beginning with the word "Duplicate" but no marker separator must NOT be refused.'
+		);
+
+		// Em dashes and parens in normal titles are fine.
+		$this->assertFalse(
+			$method->invoke( $this->handler, 'Dan Spencer / Drip Fed / Tied Up — The Royal American (late show)' ),
+			'A normal title with em dash and parenthetical must NOT be refused.'
 		);
 	}
 }

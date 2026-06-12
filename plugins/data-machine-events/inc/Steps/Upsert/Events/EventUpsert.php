@@ -81,19 +81,22 @@ class EventUpsert extends UpsertHandler {
 			);
 		}
 
-		// Belt-and-suspenders guard against "Rejected:" leakage (see issue #349).
+		// Belt-and-suspenders guard against junk-title leakage (see issues #349, #367).
 		//
 		// When the AI recognizes a source item is not a real, attendable event
-		// (e.g. season-ticket packages, parking passes), it is supposed to call
-		// the reject_source disposition tool. If the per-pipeline prompt lacks
-		// rejection guidance, the model sometimes improvises by publishing the
-		// item with a "Rejected:" prefix in the title instead — leaking junk
-		// onto the public calendar. This guard refuses to create/update any
-		// post whose title starts with "Rejected:" or "Rejected -" so a prompt
-		// regression can never silently publish a rejected item again.
-		if ( $this->isRejectedTitle( $title ) ) {
+		// (e.g. season-ticket packages, parking passes) or is a duplicate of an
+		// existing event, it is supposed to call the reject_source disposition
+		// tool. If the per-pipeline prompt lacks rejection/dedup guidance, the
+		// model sometimes improvises by publishing the item with a marker in
+		// the title instead — "Rejected:" prefixes (#349) or dedup markers like
+		// "(duplicate)", "Duplicate:", "Consolidate:", "(merged)", "see
+		// canonical listing" (#367) — leaking junk onto the public calendar.
+		// This guard refuses to create/update any post whose title carries such
+		// a marker (or any control characters / null bytes) so a prompt
+		// regression can never silently publish a junk item again.
+		if ( $this->isJunkTitle( $title ) ) {
 			return $this->errorResponse(
-				'Refusing to upsert event with a "Rejected:" title; the AI should call reject_source instead of publishing a rejected item (see issue #349)',
+				'Refusing to upsert event with a junk marker title (Rejected/Duplicate/Consolidate/merged/see canonical, or control characters); the AI should call reject_source instead of publishing a marked item (see issues #349, #367)',
 				array(
 					'title' => $title,
 				)
@@ -140,21 +143,50 @@ class EventUpsert extends UpsertHandler {
 	}
 
 	/**
-	 * Determine whether an event title indicates a rejected source item.
+	 * Determine whether an event title is a junk-marker leak.
 	 *
-	 * Matches titles that begin with "Rejected:" or "Rejected -" (case-insensitive,
-	 * after trimming surrounding whitespace). The AI is meant to call the
-	 * reject_source disposition tool for non-events; when a stale prompt omits
-	 * rejection guidance it can instead improvise a "Rejected:" prefixed title and
-	 * publish the junk item. See issue #349.
+	 * The AI is meant to call the reject_source disposition tool for non-events
+	 * and discovered duplicates; when a stale prompt omits that guidance it can
+	 * instead improvise a marker in the title and publish the junk item. This
+	 * catches (case-insensitive, after trimming surrounding whitespace):
+	 *
+	 * - "Rejected:" / "Rejected -" / "Rejected —" prefixes (issue #349)
+	 * - "Duplicate:" / "Consolidate:" prefixes and their dash variants (issue #367)
+	 * - "(duplicate)" / "(merged)" / "(consolidated)" markers anywhere in the title
+	 * - "see canonical" substring (e.g. "— see canonical listing")
+	 * - Any control characters or null bytes (unconditionally rejected)
+	 *
+	 * See issues #349 and #367.
 	 *
 	 * @param string $title Event title.
-	 * @return bool True if the title is a rejected-item leak.
+	 * @return bool True if the title is a junk-marker leak.
 	 */
-	private function isRejectedTitle( string $title ): bool {
+	private function isJunkTitle( string $title ): bool {
+		// Control characters / null bytes are never legitimate in a title.
+		if ( preg_match( '/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', $title ) ) {
+			return true;
+		}
+
 		$trimmed = trim( $title );
 
-		return (bool) preg_match( '/^rejected\s*[:\-]/i', $trimmed );
+		// "Rejected:" / "Duplicate:" / "Consolidate:" prefixes with colon,
+		// hyphen, en dash, or em dash separators (issue #349, #367).
+		if ( preg_match( '/^(rejected|duplicate|consolidate)\s*[:\-\x{2013}\x{2014}]/iu', $trimmed ) ) {
+			return true;
+		}
+
+		// "(duplicate)" / "(merged)" / "(consolidated)" markers anywhere,
+		// including compound forms like "(Duplicate — Consolidated)".
+		if ( preg_match( '/\(\s*(duplicate|merged|consolidated)\b[^)]*\)/i', $trimmed ) ) {
+			return true;
+		}
+
+		// "see canonical" substring (e.g. "— see canonical listing").
+		if ( false !== stripos( $trimmed, 'see canonical' ) ) {
+			return true;
+		}
+
+		return false;
 	}
 
 	/**
