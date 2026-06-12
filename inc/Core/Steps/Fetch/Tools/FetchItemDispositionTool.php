@@ -74,6 +74,12 @@ class FetchItemDispositionTool {
 			);
 		}
 
+		// Dispositions are first-write-wins: never overwrite an earlier terminal disposition.
+		$existing = $this->existingDisposition( $job_id );
+		if ( null !== $existing ) {
+			return $this->alreadyDispositionedResult( $tool_name, $existing, $job_id );
+		}
+
 		// Get engine data for item identification.
 		$engine = $this->resolveEngineData( $parameters, $job_id );
 		if ( ! $engine ) {
@@ -211,6 +217,13 @@ class FetchItemDispositionTool {
 			);
 		}
 
+		// Dispositions are first-write-wins: defer_item must never downgrade an
+		// earlier rejection (agent_skipped - source-rejected) to a failed status.
+		$existing = $this->existingDisposition( $job_id );
+		if ( null !== $existing ) {
+			return $this->alreadyDispositionedResult( $tool_name, $existing, $job_id );
+		}
+
 		$engine = $this->resolveEngineData( $parameters, $job_id );
 		if ( ! $engine ) {
 			return array(
@@ -285,6 +298,82 @@ class FetchItemDispositionTool {
 			'disposition'     => self::DISPOSITION_DEFER_ITEM,
 			'reason'          => $reason,
 			'released'        => $released,
+		);
+	}
+
+	/**
+	 * Return the disposition already recorded for a job, if any.
+	 *
+	 * Reads the persisted engine snapshot rather than the runtime engine object
+	 * because the runtime snapshot may predate an earlier disposition call in
+	 * the same conversation.
+	 *
+	 * @param int $job_id Job ID.
+	 * @return array{disposition:string,job_status:string,reason:string}|null
+	 */
+	private function existingDisposition( int $job_id ): ?array {
+		$engine_data = EngineData::retrieve( $job_id );
+
+		$diagnostic  = is_array( $engine_data['disposition_diagnostic'] ?? null ) ? $engine_data['disposition_diagnostic'] : array();
+		$disposition = (string) ( $diagnostic['disposition'] ?? '' );
+
+		if ( '' === $disposition && isset( $engine_data['source_rejection'] ) ) {
+			$disposition = self::DISPOSITION_REJECT_SOURCE;
+		}
+
+		if ( '' === $disposition && isset( $engine_data['item_deferral'] ) ) {
+			$disposition = self::DISPOSITION_DEFER_ITEM;
+		}
+
+		if ( '' === $disposition ) {
+			return null;
+		}
+
+		$record = self::DISPOSITION_DEFER_ITEM === $disposition
+			? ( is_array( $engine_data['item_deferral'] ?? null ) ? $engine_data['item_deferral'] : array() )
+			: ( is_array( $engine_data['source_rejection'] ?? null ) ? $engine_data['source_rejection'] : array() );
+
+		return array(
+			'disposition' => $disposition,
+			'job_status'  => (string) ( $engine_data['job_status'] ?? '' ),
+			'reason'      => (string) ( $record['reason'] ?? $diagnostic['reason'] ?? '' ),
+		);
+	}
+
+	/**
+	 * Build the idempotent success result for an already-dispositioned job.
+	 *
+	 * Returned as success so the model is not pushed into error-retry loops;
+	 * the original disposition remains authoritative (first-write-wins).
+	 *
+	 * @param string                                              $tool_name Tool that attempted the second disposition.
+	 * @param array{disposition:string,job_status:string,reason:string} $existing  Existing disposition record.
+	 * @param int                                                 $job_id    Job ID.
+	 * @return array Tool result.
+	 */
+	private function alreadyDispositionedResult( string $tool_name, array $existing, int $job_id ): array {
+		$label = self::DISPOSITION_DEFER_ITEM === $existing['disposition'] ? 'item-deferred' : 'source-rejected';
+
+		do_action(
+			'datamachine_log',
+			'info',
+			'FetchItemDispositionTool: Ignoring repeat disposition call - job already dispositioned',
+			array(
+				'job_id'               => $job_id,
+				'attempted_tool'       => $tool_name,
+				'existing_disposition' => $existing['disposition'],
+				'existing_job_status'  => $existing['job_status'],
+			)
+		);
+
+		return array(
+			'success'              => true,
+			'message'              => "Item already dispositioned ({$label}); no further action needed.",
+			'status'               => $existing['job_status'],
+			'tool_name'            => $tool_name,
+			'disposition'          => $existing['disposition'],
+			'reason'               => $existing['reason'],
+			'already_dispositioned' => true,
 		);
 	}
 

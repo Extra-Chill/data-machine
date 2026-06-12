@@ -241,6 +241,56 @@ $natural_before_handler_decision = $natural_before_handler_policy->recordNatural
 assert_runtime_policy( ! $natural_before_handler_decision->isComplete(), 'handler policy rejects natural completion before configured handlers fire' );
 assert_runtime_policy( array( 'wiki_upsert' ) === ( $natural_before_handler_decision->context()['remaining_handlers'] ?? null ), 'handler policy reports remaining handlers on natural completion' );
 
+// 1b. Tools declaring runtime completion_signal=terminal complete the conversation
+// even when configured handlers never execute (e.g. legitimate item dispositions, #2609).
+$terminal_signal_policy   = new DataMachineHandlerCompletionPolicy( array( 'upsert_event' ) );
+$terminal_signal_decision = $terminal_signal_policy->recordToolResult(
+	'reject_source',
+	array(
+		'handler' => 'ticketmaster',
+		'runtime' => array( 'completion_signal' => 'terminal' ),
+	),
+	array( 'success' => true ),
+	array( 'mode' => 'pipeline' ),
+	1
+);
+assert_runtime_policy( $terminal_signal_decision->isComplete(), 'terminal completion signal completes despite unexecuted configured handlers' );
+assert_runtime_policy( 'terminal' === ( $terminal_signal_decision->context()['completion_signal'] ?? '' ), 'terminal completion decision reports completion_signal context' );
+
+$terminal_natural_decision = $terminal_signal_policy->recordNaturalCompletion(
+	array( array( 'role' => 'user', 'content' => 'process the event' ) ),
+	'Item rejected as non-music.',
+	array( 'mode' => 'pipeline' ),
+	2
+);
+assert_runtime_policy( $terminal_natural_decision->isComplete(), 'natural completion after terminal signal does not nudge' );
+
+$terminal_failed_policy   = new DataMachineHandlerCompletionPolicy( array( 'upsert_event' ) );
+$terminal_failed_decision = $terminal_failed_policy->recordToolResult(
+	'reject_source',
+	array(
+		'handler' => 'ticketmaster',
+		'runtime' => array( 'completion_signal' => 'terminal' ),
+	),
+	array( 'success' => false ),
+	array( 'mode' => 'pipeline' ),
+	1
+);
+assert_runtime_policy( ! $terminal_failed_decision->isComplete(), 'failed terminal-signal tool does not complete the conversation' );
+
+$terminal_result_policy   = new DataMachineHandlerCompletionPolicy( array( 'upsert_event' ) );
+$terminal_result_decision = $terminal_result_policy->recordToolResult(
+	'defer_item',
+	array( 'handler' => 'ticketmaster' ),
+	array(
+		'success' => true,
+		'runtime' => array( 'completion_signal' => 'terminal' ),
+	),
+	array( 'mode' => 'pipeline' ),
+	1
+);
+assert_runtime_policy( $terminal_result_decision->isComplete(), 'terminal completion signal in tool result completes the conversation' );
+
 // 2. Injected completion/transcript collaborators steer the loop without leaking into provider payloads.
 $natural_dispatch_count = 0;
 WpAiClientTestDouble::reset();
