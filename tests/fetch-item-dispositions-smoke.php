@@ -29,38 +29,66 @@ namespace {
 	$GLOBALS['fetch_disposition_smoke_released']  = array();
 	$GLOBALS['fetch_disposition_smoke_engine']    = array();
 
-	function do_action( string $hook, ...$args ): void {
-		if ( 'datamachine_mark_item_processed' === $hook ) {
-			$GLOBALS['fetch_disposition_smoke_processed'][] = $args;
+	if ( ! function_exists( 'do_action' ) ) {
+		function do_action( string $hook, ...$args ): void {
+			if ( 'datamachine_mark_item_processed' === $hook ) {
+				$GLOBALS['fetch_disposition_smoke_processed'][] = $args;
+			}
 		}
 	}
 
-	function datamachine_merge_engine_data( int $job_id, array $data ): void {
-		$GLOBALS['fetch_disposition_smoke_engine'][ $job_id ] = array_merge(
-			$GLOBALS['fetch_disposition_smoke_engine'][ $job_id ] ?? array(),
-			$data
+	// Under a real WordPress runtime (e.g. the wp-codebox smoke harness) the
+	// do_action stub above never installs, so bridge the observed hook into the
+	// same capture buffer via real add_action.
+	if ( defined( 'WPINC' ) ) {
+		add_action(
+			'datamachine_mark_item_processed',
+			static function ( ...$args ): void {
+				$GLOBALS['fetch_disposition_smoke_processed'][] = $args;
+			},
+			10,
+			10
 		);
-
-		// Mirror into the persisted snapshot so EngineData::retrieve() sees
-		// merged data, matching production EngineData::merge() behavior.
-		$GLOBALS['fetch_disposition_smoke_persisted_engine'][ $job_id ] = array_merge(
-			$GLOBALS['fetch_disposition_smoke_persisted_engine'][ $job_id ] ?? array(),
-			$data
-		);
 	}
 
-	function wp_cache_get( $key, string $group = '' ) {
-		unset( $key, $group );
-		return false;
+	if ( ! function_exists( 'datamachine_merge_engine_data' ) ) {
+		function datamachine_merge_engine_data( int $job_id, array $data ): void {
+			$GLOBALS['fetch_disposition_smoke_engine'][ $job_id ] = array_merge(
+				$GLOBALS['fetch_disposition_smoke_engine'][ $job_id ] ?? array(),
+				$data
+			);
+
+			// Mirror into the persisted snapshot so EngineData::retrieve() sees
+			// merged data, matching production EngineData::merge() behavior.
+			$GLOBALS['fetch_disposition_smoke_persisted_engine'][ $job_id ] = array_merge(
+				$GLOBALS['fetch_disposition_smoke_persisted_engine'][ $job_id ] ?? array(),
+				$data
+			);
+
+			// Keep the (possibly real) object cache coherent with the snapshot
+			// so EngineData::retrieve() never serves a stale pre-merge value.
+			wp_cache_set( $job_id, $GLOBALS['fetch_disposition_smoke_persisted_engine'][ $job_id ], 'datamachine_engine_data' );
+		}
 	}
 
-	function wp_cache_set( $key, $value, string $group = '' ): bool {
-		unset( $key, $value, $group );
-		return true;
+	if ( ! function_exists( 'wp_cache_get' ) ) {
+		function wp_cache_get( $key, string $group = '' ) {
+			unset( $key, $group );
+			return false;
+		}
 	}
 
-	function wp_strip_all_tags( string $text ): string {
-		return strip_tags( $text );
+	if ( ! function_exists( 'wp_cache_set' ) ) {
+		function wp_cache_set( $key, $value, string $group = '' ): bool {
+			unset( $key, $value, $group );
+			return true;
+		}
+	}
+
+	if ( ! function_exists( 'wp_strip_all_tags' ) ) {
+		function wp_strip_all_tags( string $text ): string {
+			return strip_tags( $text );
+		}
 	}
 }
 
