@@ -23,6 +23,9 @@ class DataMachineHandlerCompletionPolicy implements WP_Agent_Conversation_Comple
 	/** @var array Handler slugs that have completed successfully. */
 	private array $executed_handler_slugs = array();
 
+	/** @var bool Whether a successful tool declared a terminal completion signal. */
+	private bool $terminal_signal_recorded = false;
+
 	/** @var DataMachineCompletionAssertions Generic completion assertions. */
 	private DataMachineCompletionAssertions $assertions;
 
@@ -48,6 +51,19 @@ class DataMachineHandlerCompletionPolicy implements WP_Agent_Conversation_Comple
 			$tool_result,
 			! empty( $mediated_tool_parameters ) ? $mediated_tool_parameters : ( is_array( $runtime_context['tool_parameters'] ?? null ) ? $runtime_context['tool_parameters'] : array() )
 		);
+
+		if ( ( $tool_result['success'] ?? false ) && $this->hasTerminalCompletionSignal( $tool_def, $tool_result ) ) {
+			$this->terminal_signal_recorded = true;
+
+			return WP_Agent_Conversation_Completion_Decision::complete(
+				'AIConversationLoop: Tool declared terminal completion signal, ending conversation',
+				array(
+					'tool_name'         => $tool_name,
+					'turn_count'        => $turn_count,
+					'completion_signal' => 'terminal',
+				)
+			);
+		}
 
 		$is_handler_tool = is_array( $tool_def ) && isset( $tool_def['handler'] );
 		$modes           = is_array( $runtime_context['modes'] ?? null ) ? $runtime_context['modes'] : array( (string) ( $runtime_context['mode'] ?? '' ) );
@@ -117,6 +133,16 @@ class DataMachineHandlerCompletionPolicy implements WP_Agent_Conversation_Comple
 	 * @inheritDoc
 	 */
 	public function recordNaturalCompletion( array $messages, string $assistant_text, array $runtime_context, int $turn_count ): WP_Agent_Conversation_Completion_Decision {
+		if ( $this->terminal_signal_recorded ) {
+			return WP_Agent_Conversation_Completion_Decision::complete(
+				'AIConversationLoop: Terminal completion signal already recorded, ending conversation',
+				array(
+					'turn_count'        => $turn_count,
+					'completion_signal' => 'terminal',
+				)
+			);
+		}
+
 		$remaining_handlers = $this->remainingConfiguredHandlers();
 		if ( ! empty( $remaining_handlers ) ) {
 			return WP_Agent_Conversation_Completion_Decision::incomplete(
@@ -151,6 +177,26 @@ class DataMachineHandlerCompletionPolicy implements WP_Agent_Conversation_Comple
 				'continuation_message' => DataMachineCompletionAssertions::buildNudge( $evaluation['missing'], $messages ),
 			)
 		);
+	}
+
+	/**
+	 * Whether a tool definition/result pair declares a terminal completion signal.
+	 *
+	 * Tools can declare `runtime => array( 'completion_signal' => 'terminal' )`
+	 * in their definition (or result) to mark a successful execution as a
+	 * terminal pipeline outcome — e.g. an explicit item disposition — without
+	 * this policy hardcoding tool names.
+	 *
+	 * @param array|null $tool_def    Tool definition.
+	 * @param array      $tool_result Tool execution result.
+	 * @return bool
+	 */
+	private function hasTerminalCompletionSignal( ?array $tool_def, array $tool_result ): bool {
+		$definition_runtime = is_array( $tool_def['runtime'] ?? null ) ? $tool_def['runtime'] : array();
+		$result_runtime     = is_array( $tool_result['runtime'] ?? null ) ? $tool_result['runtime'] : array();
+		$runtime            = array_merge( $definition_runtime, $result_runtime );
+
+		return 'terminal' === (string) ( $runtime['completion_signal'] ?? '' );
 	}
 
 	/**

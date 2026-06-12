@@ -29,31 +29,66 @@ namespace {
 	$GLOBALS['fetch_disposition_smoke_released']  = array();
 	$GLOBALS['fetch_disposition_smoke_engine']    = array();
 
-	function do_action( string $hook, ...$args ): void {
-		if ( 'datamachine_mark_item_processed' === $hook ) {
-			$GLOBALS['fetch_disposition_smoke_processed'][] = $args;
+	if ( ! function_exists( 'do_action' ) ) {
+		function do_action( string $hook, ...$args ): void {
+			if ( 'datamachine_mark_item_processed' === $hook ) {
+				$GLOBALS['fetch_disposition_smoke_processed'][] = $args;
+			}
 		}
 	}
 
-	function datamachine_merge_engine_data( int $job_id, array $data ): void {
-		$GLOBALS['fetch_disposition_smoke_engine'][ $job_id ] = array_merge(
-			$GLOBALS['fetch_disposition_smoke_engine'][ $job_id ] ?? array(),
-			$data
+	// Under a real WordPress runtime (e.g. the wp-codebox smoke harness) the
+	// do_action stub above never installs, so bridge the observed hook into the
+	// same capture buffer via real add_action.
+	if ( defined( 'WPINC' ) ) {
+		add_action(
+			'datamachine_mark_item_processed',
+			static function ( ...$args ): void {
+				$GLOBALS['fetch_disposition_smoke_processed'][] = $args;
+			},
+			10,
+			10
 		);
 	}
 
-	function wp_cache_get( $key, string $group = '' ) {
-		unset( $key, $group );
-		return false;
+	if ( ! function_exists( 'datamachine_merge_engine_data' ) ) {
+		function datamachine_merge_engine_data( int $job_id, array $data ): void {
+			$GLOBALS['fetch_disposition_smoke_engine'][ $job_id ] = array_merge(
+				$GLOBALS['fetch_disposition_smoke_engine'][ $job_id ] ?? array(),
+				$data
+			);
+
+			// Mirror into the persisted snapshot so EngineData::retrieve() sees
+			// merged data, matching production EngineData::merge() behavior.
+			$GLOBALS['fetch_disposition_smoke_persisted_engine'][ $job_id ] = array_merge(
+				$GLOBALS['fetch_disposition_smoke_persisted_engine'][ $job_id ] ?? array(),
+				$data
+			);
+
+			// Keep the (possibly real) object cache coherent with the snapshot
+			// so EngineData::retrieve() never serves a stale pre-merge value.
+			wp_cache_set( $job_id, $GLOBALS['fetch_disposition_smoke_persisted_engine'][ $job_id ], 'datamachine_engine_data' );
+		}
 	}
 
-	function wp_cache_set( $key, $value, string $group = '' ): bool {
-		unset( $key, $value, $group );
-		return true;
+	if ( ! function_exists( 'wp_cache_get' ) ) {
+		function wp_cache_get( $key, string $group = '' ) {
+			unset( $key, $group );
+			return false;
+		}
 	}
 
-	function wp_strip_all_tags( string $text ): string {
-		return strip_tags( $text );
+	if ( ! function_exists( 'wp_cache_set' ) ) {
+		function wp_cache_set( $key, $value, string $group = '' ): bool {
+			unset( $key, $value, $group );
+			return true;
+		}
+	}
+
+	if ( ! function_exists( 'wp_strip_all_tags' ) ) {
+		function wp_strip_all_tags( string $text ): string {
+			return strip_tags( $text );
+		}
 	}
 }
 
@@ -185,6 +220,47 @@ namespace {
 	);
 	assert_fetch_disposition_smoke( 'reject_source succeeds with persisted engine data', true === ( $reject_hydrated['success'] ?? false ) );
 	assert_fetch_disposition_smoke( 'persisted engine data marks processed source identity', array( 'fetch-step_8', 'mcp', 'source-456', 1816 ) === ( $GLOBALS['fetch_disposition_smoke_processed'][0] ?? null ) );
+
+	echo "Case 2c: dispositions are first-write-wins (#2609)\n";
+	$GLOBALS['fetch_disposition_smoke_processed'] = array();
+	$GLOBALS['fetch_disposition_smoke_released']  = array();
+	$defer_after_reject = $tool->handle_tool_call(
+		array(
+			'job_id'       => 1814,
+			'flow_step_id' => 'ai-step_7',
+			'engine'       => $engine,
+			'data'         => $data_packets,
+			'reason'       => 'already rejected; nothing left to do',
+		),
+		array( 'disposition' => 'defer_item' )
+	);
+	assert_fetch_disposition_smoke( 'second disposition returns success (no error-retry loop)', true === ( $defer_after_reject['success'] ?? false ) );
+	assert_fetch_disposition_smoke( 'second disposition reports already_dispositioned', true === ( $defer_after_reject['already_dispositioned'] ?? false ) );
+	assert_fetch_disposition_smoke( 'second disposition message references existing disposition', str_contains( $defer_after_reject['message'] ?? '', 'already dispositioned (source-rejected)' ) );
+	assert_fetch_disposition_smoke( 'defer_item does not downgrade source-rejected status', 'agent_skipped - source-rejected' === ( $GLOBALS['fetch_disposition_smoke_engine'][1814]['job_status'] ?? '' ) );
+	assert_fetch_disposition_smoke( 'second disposition preserves original disposition record', 'reject_source' === ( $GLOBALS['fetch_disposition_smoke_engine'][1814]['disposition_diagnostic']['disposition'] ?? '' ) );
+	assert_fetch_disposition_smoke( 'second disposition does not write item_deferral record', ! isset( $GLOBALS['fetch_disposition_smoke_engine'][1814]['item_deferral'] ) );
+	assert_fetch_disposition_smoke( 'second disposition does not release the processed claim', array() === $GLOBALS['fetch_disposition_smoke_released'] );
+	assert_fetch_disposition_smoke( 'second disposition does not re-mark processed', array() === $GLOBALS['fetch_disposition_smoke_processed'] );
+
+	$reject_after_defer = $tool->handle_tool_call(
+		array(
+			'job_id'       => 1815,
+			'flow_step_id' => 'ai-step_7',
+			'engine'       => $engine,
+			'data'         => $data_packets,
+			'reason'       => 'second thoughts',
+		),
+		array( 'disposition' => 'reject_source' )
+	);
+	assert_fetch_disposition_smoke( 'reject_source after defer_item returns success', true === ( $reject_after_defer['success'] ?? false ) );
+	assert_fetch_disposition_smoke( 'reject_source after defer_item reports already_dispositioned', true === ( $reject_after_defer['already_dispositioned'] ?? false ) );
+	assert_fetch_disposition_smoke( 'reject_source does not overwrite item-deferred status', 'failed - item-deferred' === ( $GLOBALS['fetch_disposition_smoke_engine'][1815]['job_status'] ?? '' ) );
+	assert_fetch_disposition_smoke( 'reject_source after defer does not mark processed', array() === $GLOBALS['fetch_disposition_smoke_processed'] );
+
+	echo "Case 2d: disposition tools declare terminal completion signal (#2609)\n";
+	$fetch_handler_src = file_get_contents( __DIR__ . '/../inc/Core/Steps/Fetch/Handlers/FetchHandler.php' );
+	assert_fetch_disposition_smoke( 'both disposition tool definitions declare runtime completion_signal terminal', 2 === substr_count( $fetch_handler_src, "'runtime'                 => array( 'completion_signal' => 'terminal' )" ) );
 
 	echo "Case 3: production tool surface exposes positive affordances\n";
 	$fetch_handler = file_get_contents( __DIR__ . '/../inc/Core/Steps/Fetch/Handlers/FetchHandler.php' );

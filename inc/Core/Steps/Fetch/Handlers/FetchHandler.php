@@ -474,6 +474,7 @@ abstract class FetchHandler {
 			'method'                  => 'handle_tool_call',
 			'handler'                 => $handler_slug,
 			'disposition'             => 'reject_source',
+			'runtime'                 => array( 'completion_signal' => 'terminal' ),
 			'description'             => 'Reject this fetched source item after reasoned content/source evaluation. Use when the source itself is irrelevant, too thin, duplicate, noisy, spammy, or otherwise fails the pipeline quality or relevance criteria. The source item will be marked as processed and will not normally be refetched.',
 			'parameters'              => array(
 				'type'       => 'object',
@@ -504,6 +505,7 @@ abstract class FetchHandler {
 			'method'                  => 'handle_tool_call',
 			'handler'                 => $handler_slug,
 			'disposition'             => 'defer_item',
+			'runtime'                 => array( 'completion_signal' => 'terminal' ),
 			'description'             => 'Defer this fetched source item when the agent cannot safely complete processing now because of runtime failures, tool errors, missing context, uncertainty, or temporary limitations. The source claim will be released and the item will remain eligible to be fetched and retried later; it will not be marked processed.',
 			'parameters'              => array(
 				'type'       => 'object',
