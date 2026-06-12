@@ -89,6 +89,7 @@ class StepExecutionResult {
 
 		$successful_handlers = self::collectSuccessfulHandlerTools( $data_packets );
 		$has_success_packet  = false;
+		$failed_tool_packet  = null;
 
 		foreach ( $data_packets as $packet ) {
 			$metadata = is_array( $packet['metadata'] ?? null ) ? $packet['metadata'] : array();
@@ -117,12 +118,19 @@ class StepExecutionResult {
 					continue;
 				}
 
-				return self::buildResult( self::STATUS_FAILED, $data_packets, self::sanitizeReason( $metadata['failure_reason'] ?? 'tool_result_failed' ), null, self::errorFromMetadata( $metadata ), self::diagnosticsFromMetadata( $metadata ) );
+				$failed_tool_packet ??= $packet;
+				continue;
 			}
 
 			if ( ! isset( self::NON_SUCCESS_PACKET_TYPES[ $type ] ) ) {
 				$has_success_packet = true;
 			}
+		}
+
+		if ( ! $has_success_packet && null !== $failed_tool_packet ) {
+			$metadata = is_array( $failed_tool_packet['metadata'] ?? null ) ? $failed_tool_packet['metadata'] : array();
+
+			return self::buildResult( self::STATUS_FAILED, $data_packets, self::sanitizeReason( $metadata['failure_reason'] ?? 'tool_result_failed' ), null, self::errorFromMetadata( $metadata ), self::diagnosticsFromMetadata( $metadata ) );
 		}
 
 		return self::buildResult(

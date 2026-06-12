@@ -119,6 +119,43 @@ $result = StepExecutionResult::classify(
 $assert( 'non-fatal failed tool packet is retained without failing step', 'succeeded' === $result['status'] );
 $assert( 'successful later tool packet determines AI success', true === $result['success'] );
 
+echo "\n[6] recovered failed runtime tool packet does not fail successful AI step\n";
+$result = StepExecutionResult::classify(
+	array(
+		array(
+			'type'     => 'tool_result',
+			'metadata' => array(
+				'tool_name'            => 'workspace_read',
+				'tool_success'         => false,
+				'tool_result_envelope' => array(
+					'success' => false,
+					'code'    => 'file_too_large',
+					'message' => 'File exceeds max_size.',
+				),
+			),
+		),
+		array(
+			'type'     => 'tool_result',
+			'metadata' => array(
+				'tool_name'    => 'workspace_read',
+				'tool_success' => true,
+			),
+		),
+		array(
+			'type'     => 'tool_result',
+			'metadata' => array(
+				'tool_name'    => 'workspace_write',
+				'tool_success' => true,
+			),
+		),
+	),
+	'ai'
+);
+
+$assert( 'recovered failed runtime tool does not fail final step', 'succeeded' === $result['status'] );
+$assert( 'recovered failed runtime tool packet remains in audit packets', false === ( $result['packets'][0]['metadata']['tool_success'] ?? null ) );
+$assert( 'recovered failed runtime tool diagnostics remain in packet history', 'file_too_large' === ( $result['packets'][0]['metadata']['tool_result_envelope']['code'] ?? '' ) );
+
 if ( $failures > 0 ) {
 	echo "\n=== step-execution-result-contract-smoke: {$failures} FAILURE(S) / {$total} assertions ===\n";
 	exit( 1 );
