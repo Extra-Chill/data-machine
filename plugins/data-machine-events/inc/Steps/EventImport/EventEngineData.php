@@ -282,11 +282,11 @@ class EventEngineData {
 	}
 
 	/**
-	 * Store item context in engine data for skip_item tool.
+	 * Store item context in engine data for the fetch disposition tools.
 	 *
-	 * This enables the skip_item tool to mark items as processed even when
-	 * the AI decides to skip them. Without this, skipped items would be
-	 * refetched on subsequent runs.
+	 * This enables reject_source to mark items as processed even when the AI
+	 * decides to reject them. Without this, rejected items would be refetched
+	 * on subsequent runs.
 	 *
 	 * @param int $job_id Job ID
 	 * @param string $item_identifier Item identifier (event_identifier, uid, etc.)

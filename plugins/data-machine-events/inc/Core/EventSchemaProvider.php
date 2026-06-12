@@ -76,7 +76,7 @@ class EventSchemaProvider {
 		'startTime'       => array(
 			'type'            => 'string',
 			'required'        => true,
-			'description'     => 'Event start time (HH:MM 24-hour format). REQUIRED. If not provided in structured data, extract from the event title or description (e.g., "6-9pm" → "18:00", "doors at 7" → "19:00", "starts 8pm" → "20:00"). If no start time can be determined from any source, use skip_item instead — do not publish events without a start time.',
+			'description'     => 'Event start time (HH:MM 24-hour format). REQUIRED. If not provided in structured data, extract from the event title or description (e.g., "6-9pm" → "18:00", "doors at 7" → "19:00", "starts 8pm" → "20:00"). If no start time can be determined from any source, reject this item via the rejection disposition tool instead — do not publish events without a start time.',
 			'schema_property' => null,
 		),
 		'endTime'         => array(

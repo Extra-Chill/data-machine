@@ -165,7 +165,8 @@ abstract class EventImportHandler extends FetchHandler {
 	 * Called by FetchHandler::dedup() after marking an item as processed.
 	 *
 	 * Stores item context (item_identifier + source_type) in engine data so the
-	 * skip_item AI tool can find and mark items correctly.
+	 * fetch disposition tools (reject_source / defer_item) can find and mark
+	 * items correctly.
 	 *
 	 * @param ExecutionContext $context Execution context.
 	 * @param array            $item    The item that was just marked as processed.
