@@ -53,16 +53,19 @@ class FailJobHandler {
 		// Persist structured error context into engine_data so it is
 		// available from `wp datamachine jobs show` without grepping PHP logs.
 		$error_data = array(
-			'error_reason'  => $specific_reason,
-			'error_step_id' => $context_data['flow_step_id'] ?? null,
-			'error_message' => $context_data['exception_message']
+			'error_reason'      => $specific_reason,
+			'error_step_id'     => $context_data['flow_step_id'] ?? null,
+			'error_message'     => $context_data['exception_message']
 				?? $context_data['error_message']
 				?? $context_data['ai_error']
 				?? $reason,
-			'error_trace'   => isset( $context_data['exception_trace'] )
+			'error_diagnostics' => is_array( $context_data['diagnostics'] ?? null )
+				? $context_data['diagnostics']
+				: null,
+			'error_trace'       => isset( $context_data['exception_trace'] )
 				? mb_substr( $context_data['exception_trace'], 0, 2000 )
 				: null,
-			'retry_result'  => $retry_result,
+			'retry_result'      => $retry_result,
 		);
 		// Strip null values so we only store keys that carry information.
 		$error_data = array_filter( $error_data, fn( $v ) => null !== $v );
