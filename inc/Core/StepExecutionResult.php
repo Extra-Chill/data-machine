@@ -40,7 +40,7 @@ class StepExecutionResult {
 	 *
 	 * @param mixed  $step_output Step return value.
 	 * @param string $step_type   Step type identifier.
-	 * @return array{status: string, packets: array, reason: string, error: ?string, terminal_status: ?string, success: bool, packet_count: int}
+	 * @return array{status: string, packets: array, reason: string, error: ?string, diagnostics: array, terminal_status: ?string, success: bool, packet_count: int}
 	 */
 	public static function fromStepOutput( $step_output, string $step_type = '' ): array {
 		if ( self::isExplicitResult( $step_output ) ) {
@@ -73,7 +73,7 @@ class StepExecutionResult {
 	 *
 	 * @param array  $data_packets Returned data packets.
 	 * @param string $step_type    Step type identifier.
-	 * @return array{status: string, packets: array, reason: string, error: ?string, terminal_status: ?string, success: bool, packet_count: int}
+	 * @return array{status: string, packets: array, reason: string, error: ?string, diagnostics: array, terminal_status: ?string, success: bool, packet_count: int}
 	 */
 	public static function classify( array $data_packets, string $step_type = '' ): array {
 		$data_packets = self::normalizePackets( $data_packets );
@@ -96,7 +96,7 @@ class StepExecutionResult {
 
 			if ( array_key_exists( 'step_execution_success', $metadata ) ) {
 				if ( false === (bool) $metadata['step_execution_success'] ) {
-					return self::buildResult( self::STATUS_FAILED, $data_packets, self::sanitizeReason( $metadata['failure_reason'] ?? 'step_execution_failed' ), null, self::errorFromMetadata( $metadata ) );
+					return self::buildResult( self::STATUS_FAILED, $data_packets, self::sanitizeReason( $metadata['failure_reason'] ?? 'step_execution_failed' ), null, self::errorFromMetadata( $metadata ), self::diagnosticsFromMetadata( $metadata ) );
 				}
 
 				$has_success_packet = true;
@@ -104,7 +104,7 @@ class StepExecutionResult {
 			}
 
 			if ( isset( $metadata['success'] ) && false === $metadata['success'] ) {
-				return self::buildResult( self::STATUS_FAILED, $data_packets, self::sanitizeReason( $metadata['failure_reason'] ?? 'packet_failure' ), null, self::errorFromMetadata( $metadata ) );
+				return self::buildResult( self::STATUS_FAILED, $data_packets, self::sanitizeReason( $metadata['failure_reason'] ?? 'packet_failure' ), null, self::errorFromMetadata( $metadata ), self::diagnosticsFromMetadata( $metadata ) );
 			}
 
 			if ( isset( $metadata['tool_success'] ) && false === $metadata['tool_success'] ) {
@@ -117,7 +117,7 @@ class StepExecutionResult {
 					continue;
 				}
 
-				return self::buildResult( self::STATUS_FAILED, $data_packets, self::sanitizeReason( $metadata['failure_reason'] ?? 'tool_result_failed' ), null, self::errorFromMetadata( $metadata ) );
+				return self::buildResult( self::STATUS_FAILED, $data_packets, self::sanitizeReason( $metadata['failure_reason'] ?? 'tool_result_failed' ), null, self::errorFromMetadata( $metadata ), self::diagnosticsFromMetadata( $metadata ) );
 			}
 
 			if ( ! isset( self::NON_SUCCESS_PACKET_TYPES[ $type ] ) ) {
@@ -133,7 +133,7 @@ class StepExecutionResult {
 		);
 	}
 
-	private static function buildResult( string $status, array $packets, string $reason, ?string $terminal_status, ?string $error = null ): array {
+	private static function buildResult( string $status, array $packets, string $reason, ?string $terminal_status, ?string $error = null, array $diagnostics = array() ): array {
 		$status = self::normalizeStatus( $status );
 		if ( '' === $status ) {
 			$status = self::STATUS_FAILED;
@@ -144,6 +144,7 @@ class StepExecutionResult {
 			'packets'         => $packets,
 			'reason'          => self::sanitizeReason( $reason ),
 			'error'           => self::normalizeError( $error ),
+			'diagnostics'     => $diagnostics,
 			'terminal_status' => $terminal_status,
 			'success'         => self::STATUS_SUCCEEDED === $status,
 			'packet_count'    => count( $packets ),
@@ -151,7 +152,49 @@ class StepExecutionResult {
 	}
 
 	private static function errorFromMetadata( array $metadata ): ?string {
-		return self::normalizeError( $metadata['error'] ?? ( $metadata['error_message'] ?? null ) );
+		$error = self::normalizeError( $metadata['error'] ?? ( $metadata['error_message'] ?? null ) );
+		if ( null !== $error ) {
+			return $error;
+		}
+
+		$envelope = is_array( $metadata['tool_result_envelope'] ?? null ) ? $metadata['tool_result_envelope'] : array();
+		return self::normalizeError( $envelope['error'] ?? ( $envelope['error_message'] ?? ( $envelope['message'] ?? null ) ) );
+	}
+
+	private static function diagnosticsFromMetadata( array $metadata ): array {
+		$diagnostics = array_filter(
+			array(
+				'tool_name'      => self::normalizeDiagnosticScalar( $metadata['tool_name'] ?? null ),
+				'handler_tool'   => self::normalizeDiagnosticScalar( $metadata['handler_tool'] ?? null ),
+				'failure_reason' => self::normalizeDiagnosticScalar( $metadata['failure_reason'] ?? null ),
+				'error'          => self::errorFromMetadata( $metadata ),
+			),
+			fn( $value ) => null !== $value && '' !== $value
+		);
+
+		$envelope = is_array( $metadata['tool_result_envelope'] ?? null ) ? $metadata['tool_result_envelope'] : array();
+		if ( array() !== $envelope ) {
+			$diagnostics['tool_result'] = array_filter(
+				array(
+					'success' => isset( $envelope['success'] ) ? (bool) $envelope['success'] : null,
+					'status'  => self::normalizeDiagnosticScalar( $envelope['status'] ?? null ),
+					'code'    => self::normalizeDiagnosticScalar( $envelope['code'] ?? ( $envelope['error_code'] ?? null ) ),
+					'message' => self::normalizeDiagnosticScalar( $envelope['message'] ?? ( $envelope['error_message'] ?? ( $envelope['error'] ?? null ) ) ),
+				),
+				fn( $value ) => null !== $value && '' !== $value
+			);
+		}
+
+		return $diagnostics;
+	}
+
+	private static function normalizeDiagnosticScalar( $value ): ?string {
+		if ( ! is_scalar( $value ) ) {
+			return null;
+		}
+
+		$value = trim( (string) $value );
+		return '' !== $value ? $value : null;
 	}
 
 	private static function normalizeError( $error ): ?string {
