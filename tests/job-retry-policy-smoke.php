@@ -138,6 +138,7 @@ assert_retry_policy_smoke( 'policy records retry metadata', str_contains( $polic
 assert_retry_policy_smoke( 'policy records retry classification metadata', str_contains( $policy_src, "'retry_class'" ) );
 assert_retry_policy_smoke( 'policy records poison item isolation metadata', str_contains( $policy_src, "'poison_item'" ) );
 assert_retry_policy_smoke( 'fail handler tries retry before final failure', strpos( $fail_src, 'maybeRetry' ) < strpos( $fail_src, 'complete_job' ) );
+assert_retry_policy_smoke( 'fail handler persists structured diagnostics', str_contains( $fail_src, "'error_diagnostics'" ) && str_contains( $fail_src, "\$context_data['diagnostics']" ) );
 assert_retry_policy_smoke( 'AI failures pass retry and transport context', str_contains( $ai_src, "'retry_after'" ) && str_contains( $ai_src, "'headers'" ) && str_contains( $ai_src, "'transport_profile'" ) );
 
 echo "\nJob retry policy smoke complete: {$total} assertions, {$failed} failures.\n";
