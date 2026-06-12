@@ -2,9 +2,12 @@
 node_modules/
 vendor/
 
-# Build files (keep build/ for distribution)
-# Uncomment if you want to exclude build files from git:
-# build/
+# Build artifacts — never track. Release assets and deploys come from the
+# GitHub release pipeline, not from git. A tracked build/*.zip caused the
+# v0.14.0 stale-asset incident (#169): a March-era 0.8.1 zip blob was
+# restored by `git checkout --` during release recovery and uploaded as
+# the v0.14.0 release asset, silently rolling production back for 6 days.
+build/
 
 # OS files
 .DS_Store
