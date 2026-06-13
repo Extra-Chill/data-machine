@@ -54,6 +54,7 @@ WP_CLI::add_command( 'datamachine retention', Commands\RetentionCommand::class )
 WP_CLI::add_command( 'datamachine test', Commands\TestCommand::class );
 WP_CLI::add_command( 'datamachine fetch test', Commands\TestCommand::class );
 WP_CLI::add_command( 'datamachine external', Commands\ExternalCommand::class );
+WP_CLI::add_command( 'datamachine fixtures', Commands\FixturesCommand::class );
 
 // Aliases for AI agent compatibility (singular/plural variants).
 WP_CLI::add_command( 'datamachine setting', Commands\SettingsCommand::class );
