@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.144.1] - 2026-06-13
+
+### Changed
+- style(agents-md): align equals sign in CliCommandIntrospector to clear phpcs lint warning
+
 ## [0.144.0] - 2026-06-13
 
 ### Added
