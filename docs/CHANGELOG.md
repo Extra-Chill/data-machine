@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.144.0] - 2026-06-13
+
+### Added
+- feat(agents-md): context-safe CLI command-tree introspection helper for section generators (#2613)
+
 ## [0.143.0] - 2026-06-13
 
 ### Added
