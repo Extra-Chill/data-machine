@@ -184,12 +184,12 @@ function datamachine_admin_scale_fixture_cleanup( string $seed_slug ): array {
 			}
 
 			if ( $flows->delete_flow( (int) $flow['flow_id'] ) ) {
-				$deleted_flows++;
+				++$deleted_flows;
 			}
 		}
 
 		if ( $pipelines->delete_pipeline( $pipeline_id ) ) {
-			$deleted_pipelines++;
+			++$deleted_pipelines;
 		}
 	}
 
@@ -291,7 +291,7 @@ function datamachine_admin_scale_fixture_seed_slug( string $seed_slug ): string 
 function datamachine_admin_scale_fixture_bounded_int( mixed $value, int $min, int $max, string $field ): int {
 	$value = is_numeric( $value ) ? (int) $value : $min;
 	if ( $value < $min || $value > $max ) {
-		throw new InvalidArgumentException( sprintf( '%s must be between %d and %d.', $field, $min, $max ) );
+		throw new InvalidArgumentException( sprintf( '%s must be between %d and %d.', esc_html( $field ), esc_html( (string) $min ), esc_html( (string) $max ) ) );
 	}
 
 	return $value;
