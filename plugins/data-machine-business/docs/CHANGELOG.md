@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 Homeboy maintains this file from conventional commits at release time —
 do not edit by hand.
 
+## [0.6.0] - 2026-06-13
+
+### Added
+- add GA4 path_sequence action for true ordered cross-host journeys
+
 ## [0.5.0] - 2026-05-30
 
 ### Added
