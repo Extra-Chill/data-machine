@@ -2,6 +2,16 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.40.9] - 2026-06-13
+
+### Fixed
+- remove stale skip_item references; describe behavior not tool name
+- broaden junk-title guard to dedup markers and control characters
+- add check orphan-pipelines repair command for empty pipeline_config (#363)
+- block AI web_fetch to bot-blocked ticketing domains (#362)
+- stop hardcoding AI model in approved artist pipelines
+- stop Load More from killing its own button on append
+
 ## [0.40.8] - 2026-06-06
 
 ### Fixed
