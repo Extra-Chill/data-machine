@@ -2,6 +2,15 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.143.0] - 2026-06-13
+
+### Added
+- add admin scale fixture command
+
+### Fixed
+- satisfy benchmark fixture lint
+- move admin scale setup to benchmark fixture
+
 ## [0.142.8] - 2026-06-12
 
 ### Changed
