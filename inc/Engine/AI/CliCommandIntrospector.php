@@ -120,12 +120,12 @@ class CliCommandIntrospector {
 	 *
 	 * @since x.y.z
 	 *
-	 * @param string                     $namespace WP-CLI namespace label (e.g. 'datamachine'). Informational; echoed back.
-	 * @param class-string|class-string[] $classes  One class or a list of classes that compose the namespace.
-	 * @param array                      $args      Optional. Passed through to {@see self::describe_class()}.
+	 * @param string                      $cli_namespace WP-CLI namespace label (e.g. 'datamachine'). Informational; echoed back.
+	 * @param class-string|class-string[] $classes       One class or a list of classes that compose the namespace.
+	 * @param array                       $args          Optional. Passed through to {@see self::describe_class()}.
 	 * @return array{namespace: string, subcommands: array<int, array{name: string, description: string}>}
 	 */
-	public static function describe( string $namespace, $classes, array $args = array() ): array {
+	public static function describe( string $cli_namespace, $classes, array $args = array() ): array {
 		$classes     = is_array( $classes ) ? $classes : array( $classes );
 		$subcommands = array();
 
@@ -142,7 +142,7 @@ class CliCommandIntrospector {
 		ksort( $subcommands, SORT_STRING );
 
 		return array(
-			'namespace'   => $namespace,
+			'namespace'   => $cli_namespace,
 			'subcommands' => array_values( $subcommands ),
 		);
 	}
@@ -163,12 +163,12 @@ class CliCommandIntrospector {
 	 *
 	 * @since x.y.z
 	 *
-	 * @param string                      $namespace WP-CLI namespace label (e.g. 'datamachine').
-	 * @param array<string, class-string> $command_map Map of command label => command class.
-	 * @param array                       $args        Optional. Passed through to {@see self::describe_class()}.
+	 * @param string                      $cli_namespace WP-CLI namespace label (e.g. 'datamachine').
+	 * @param array<string, class-string> $command_map   Map of command label => command class.
+	 * @param array                       $args          Optional. Passed through to {@see self::describe_class()}.
 	 * @return array{namespace: string, commands: array<int, array{command: string, subcommands: array<int, array{name: string, description: string}>}>}
 	 */
-	public static function describe_namespace_map( string $namespace, array $command_map, array $args = array() ): array {
+	public static function describe_namespace_map( string $cli_namespace, array $command_map, array $args = array() ): array {
 		$commands = array();
 
 		foreach ( $command_map as $command => $class ) {
@@ -183,7 +183,7 @@ class CliCommandIntrospector {
 		}
 
 		return array(
-			'namespace' => $namespace,
+			'namespace' => $cli_namespace,
 			'commands'  => $commands,
 		);
 	}
