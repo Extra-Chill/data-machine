@@ -89,7 +89,7 @@ class CliCommandIntrospector {
 			}
 
 			$name        = self::subcommand_name( $method, $doc_comment );
-			$description  = self::short_description( $doc_comment );
+			$description = self::short_description( $doc_comment );
 
 			// De-duplicate: multiple methods can never share a subcommand name,
 			// but defensive against an aliased class being passed twice.
