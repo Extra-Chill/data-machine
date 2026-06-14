@@ -102,6 +102,23 @@ $assert(
 // ============================================================
 // Behavioral simulation: load class under three stubbed states
 // ============================================================
+//
+// The stubs below (doing_action/did_action/add_action/wp_register_ability) are
+// only installed when the real functions are absent, so under a real WordPress
+// runtime — e.g. the wp-codebox host-smoke harness — they are inert and the
+// simulation cannot control `doing_action()`, making state 1 fail spuriously.
+// The source-string assertions above lock the real contract in every backend
+// and the behavioral path is covered in the pure-PHP / PHPUnit context, so skip
+// the stub-driven simulation under a real WordPress runtime.
+if ( defined( 'WPINC' ) ) {
+	if ( $failed > 0 ) {
+		fwrite( STDERR, "\nabilities-image-template-load-order-smoke: {$failed}/{$total} assertions failed\n" );
+		exit( 1 );
+	}
+
+	echo "\nAll {$total} abilities-image-template-load-order source-string assertions passed (behavioral simulation skipped under real WordPress).\n";
+	return;
+}
 
 if ( ! defined( 'ABSPATH' ) ) {
 	define( 'ABSPATH', '/tmp/' );

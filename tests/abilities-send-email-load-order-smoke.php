@@ -83,6 +83,23 @@ foreach ( array( 'send-email' => $send_source, 'send-email-queued' => $queue_sou
 	);
 }
 
+// The behavioral simulation below stubs WordPress lifecycle functions, which
+// are only installed when the real ones are absent. Under a real WordPress
+// runtime — e.g. the wp-codebox host-smoke harness — those stubs are inert and
+// the simulation cannot control `doing_action()`, making state 1 fail
+// spuriously. The source-string assertions above lock the real contract in
+// every backend and the behavioral path is covered in the pure-PHP / PHPUnit
+// context, so skip the stub-driven simulation under a real WordPress runtime.
+if ( defined( 'WPINC' ) ) {
+	if ( $failed > 0 ) {
+		fwrite( STDERR, "\nabilities-send-email-load-order-smoke: {$failed}/{$total} assertions failed\n" );
+		exit( 1 );
+	}
+
+	echo "\nAll {$total} abilities-send-email-load-order source-string assertions passed (behavioral simulation skipped under real WordPress).\n";
+	return;
+}
+
 if ( ! defined( 'ABSPATH' ) ) {
 	define( 'ABSPATH', '/tmp/' );
 }
