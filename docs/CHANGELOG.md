@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.145.0] - 2026-06-14
+
+### Added
+- batch Action Scheduler retention + per-hook age + opt-in OPTIMIZE
+
 ## [0.144.1] - 2026-06-13
 
 ### Changed
