@@ -2,6 +2,15 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.146.0] - 2026-06-14
+
+### Added
+- shed engine_data from terminal jobs via retention (#2622)
+
+### Changed
+- skip stub-driven load-order simulation under real WordPress
+- fix stale tool-name alias assertion in RequestBuilderMultimodalTest
+
 ## [0.145.1] - 2026-06-14
 
 ### Fixed
