@@ -316,7 +316,37 @@ class RequestBuilderMultimodalTest extends TestCase {
 			),
 		);
 
-		$context = $this->invokePrivate( 'wpAiClientPromptContext', array( $messages ) );
+		// The slashed logical tool name is not provider-safe (OpenAI/Responses
+		// require ^[a-zA-Z0-9_-]+$). The provider declares it with a safe name
+		// (e.g. wp-codebox normalises `client/filesystem-write` → `filesystem_write`),
+		// and RequestBuilder carries that mapping via the alias table built from
+		// the structured tool declarations. The transcript converter must rewrite
+		// the logical name to the provider-safe alias so replayed function call /
+		// response parts match the tool actually declared to the provider.
+		$aliases = RequestBuilder::providerToolNameAliases(
+			array(
+				'client/filesystem-write' => array(
+					'name'            => 'client/filesystem-write',
+					'runtime_tool_id' => 'filesystem_write',
+				),
+			)
+		);
+
+		$this->assertSame(
+			'filesystem_write',
+			$aliases['logical_to_provider']['client/filesystem-write'],
+			'Slashed logical tool name aliases to the provider-safe name'
+		);
+		$this->assertSame(
+			'client/filesystem-write',
+			$aliases['provider_to_logical']['filesystem_write'],
+			'Reverse alias maps the provider-safe name back to the logical name'
+		);
+
+		$context = $this->invokePrivate(
+			'wpAiClientPromptContext',
+			array( $messages, $aliases['logical_to_provider'] )
+		);
 
 		$this->assertCount( 2, $context['history'], 'Initial user prompt and assistant tool call remain in history' );
 		$this->assertInstanceOf( ModelMessage::class, $context['history'][1] );
@@ -324,16 +354,15 @@ class RequestBuilderMultimodalTest extends TestCase {
 		$function_call = $context['history'][1]->getParts()[0]->getFunctionCall();
 		$this->assertNotNull( $function_call, 'Assistant tool call converts to a function call part' );
 		$this->assertSame( 'call_123', $function_call->getId() );
-		$this->assertSame( 'filesystem_write', $function_call->getName() );
+		$this->assertSame( 'filesystem_write', $function_call->getName(), 'Function call name is rewritten to the provider-safe alias' );
 		$this->assertSame( array( 'path' => 'index.html' ), $function_call->getArgs() );
 
 		$this->assertCount( 1, $context['prompt_parts'], 'Latest tool result becomes the current prompt part' );
 		$function_response = $context['prompt_parts'][0]->getFunctionResponse();
 		$this->assertNotNull( $function_response, 'Tool result converts to a function response part' );
 		$this->assertSame( 'call_123', $function_response->getId() );
-		$this->assertSame( 'filesystem_write', $function_response->getName() );
+		$this->assertSame( 'filesystem_write', $function_response->getName(), 'Function response name is rewritten to the provider-safe alias' );
 		$this->assertTrue( $function_response->getResponse()['success'] );
-		$this->assertSame( 'client/filesystem-write', $aliases['provider_to_logical']['filesystem_write'] );
 	}
 
 	/**
