@@ -63,6 +63,7 @@ foreach ( $legacy_files as $legacy_file ) {
 $task_classes = array(
 	'RetentionCompletedJobsTask',
 	'RetentionFailedJobsTask',
+	'RetentionEngineDataTask',
 	'RetentionLogsTask',
 	'RetentionProcessedItemsTask',
 	'RetentionActionSchedulerTask',
@@ -84,6 +85,7 @@ foreach ( $task_classes as $task_class ) {
 $task_constants = array(
 	'TASK_COMPLETED_JOBS',
 	'TASK_FAILED_JOBS',
+	'TASK_ENGINE_DATA',
 	'TASK_LOGS',
 	'TASK_PROCESSED_ITEMS',
 	'TASK_AS_ACTIONS',

@@ -33,6 +33,7 @@ use DataMachine\Engine\AI\System\Tasks\Retention\RetentionActionSchedulerTask;
 use DataMachine\Engine\AI\System\Tasks\Retention\RetentionChatSessionsTask;
 use DataMachine\Engine\AI\System\Tasks\Retention\RetentionCleanup;
 use DataMachine\Engine\AI\System\Tasks\Retention\RetentionCompletedJobsTask;
+use DataMachine\Engine\AI\System\Tasks\Retention\RetentionEngineDataTask;
 use DataMachine\Engine\AI\System\Tasks\Retention\RetentionFailedJobsTask;
 use DataMachine\Engine\AI\System\Tasks\Retention\RetentionFilesTask;
 use DataMachine\Engine\AI\System\Tasks\Retention\RetentionJobArtifactsTask;
@@ -99,6 +100,7 @@ class SystemAgentServiceProvider {
 		$tasks['meta_description_generation']            = MetaDescriptionTask::class;
 		$tasks[ RetentionCleanup::TASK_COMPLETED_JOBS ]  = RetentionCompletedJobsTask::class;
 		$tasks[ RetentionCleanup::TASK_FAILED_JOBS ]     = RetentionFailedJobsTask::class;
+		$tasks[ RetentionCleanup::TASK_ENGINE_DATA ]     = RetentionEngineDataTask::class;
 		$tasks[ RetentionCleanup::TASK_LOGS ]            = RetentionLogsTask::class;
 		$tasks[ RetentionCleanup::TASK_PROCESSED_ITEMS ] = RetentionProcessedItemsTask::class;
 		$tasks[ RetentionCleanup::TASK_AS_ACTIONS ]      = RetentionActionSchedulerTask::class;
@@ -184,6 +186,16 @@ class SystemAgentServiceProvider {
 					'enabled_setting' => 'retention_failed_jobs_enabled',
 					'default_enabled' => true,
 					'label'           => 'Daily failed-jobs cleanup',
+				)
+			),
+			RetentionCleanup::TASK_ENGINE_DATA     => array_merge(
+				$daily_first_run,
+				array(
+					'task_type'       => RetentionCleanup::TASK_ENGINE_DATA,
+					'interval'        => 'daily',
+					'enabled_setting' => 'retention_engine_data_enabled',
+					'default_enabled' => true,
+					'label'           => 'Daily terminal-job engine_data shedding',
 				)
 			),
 			RetentionCleanup::TASK_LOGS            => array_merge(

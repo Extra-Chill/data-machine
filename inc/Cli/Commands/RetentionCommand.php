@@ -166,6 +166,7 @@ class RetentionCommand extends BaseCommand {
 		);
 
 		$this->report_action_scheduler_detail( $assoc_args );
+		$this->report_engine_data_detail();
 
 		if ( ! $dry_run ) {
 			$total = array_sum( array_column( $results, 'eligible' ) );
@@ -239,6 +240,47 @@ class RetentionCommand extends BaseCommand {
 	}
 
 	/**
+	 * Report terminal-job engine_data shedding detail: eligible rows, the short
+	 * terminal window, and the reclaimable blob bytes a shed pass would free.
+	 *
+	 * engine_data shedding runs asynchronously via a scheduled SystemTask, so
+	 * the actual jobs-updated / OPTIMIZE outcome is logged via `datamachine_log`
+	 * (and stored on the job result) when the task runs. This summary makes the
+	 * planned behaviour visible from the CLI.
+	 */
+	private function report_engine_data_detail(): void {
+		$days = RetentionCleanup::engineDataTerminalMaxAgeDays();
+
+		WP_CLI::log( '' );
+		WP_CLI::log( WP_CLI::colorize( '%BTerminal-job engine_data shedding%n' ) );
+		WP_CLI::log( '' );
+
+		if ( $days <= 0 ) {
+			WP_CLI::log( 'Shedding:        disabled (filter datamachine_engine_data_terminal_max_age_days)' );
+			return;
+		}
+
+		$eligible    = RetentionCleanup::countEngineDataTerminalJobs();
+		$reclaimable = RetentionCleanup::countEngineDataReclaimableBytes();
+
+		WP_CLI::log( sprintf( 'Terminal window: %s after completion', $this->format_days( $days ) ) );
+		WP_CLI::log( sprintf( 'Eligible jobs:   %d (row kept, engine_data blob shed)', $eligible ) );
+		WP_CLI::log( sprintf( 'Reclaimable:     %.1f MB of engine_data blob', $reclaimable / 1024 / 1024 ) );
+		WP_CLI::log( sprintf( 'Batch size:      %d rows/iteration', RetentionCleanup::actionSchedulerBatchSize() ) );
+
+		if ( RetentionCleanup::actionSchedulerOptimizeEnabled() ) {
+			WP_CLI::log(
+				sprintf(
+					'OPTIMIZE TABLE:  enabled (threshold %d rows changed)',
+					RetentionCleanup::actionSchedulerOptimizeThreshold()
+				)
+			);
+		} else {
+			WP_CLI::log( 'OPTIMIZE TABLE:  disabled (filter datamachine_retention_optimize_tables)' );
+		}
+	}
+
+	/**
 	 * Format a fractional-day window for human-readable CLI output.
 	 *
 	 * @param float $days Window in days (may be fractional, e.g. 0.25).
@@ -270,6 +312,12 @@ class RetentionCommand extends BaseCommand {
 				'task_type' => RetentionCleanup::TASK_FAILED_JOBS,
 				'threshold' => RetentionCleanup::failedJobsMaxAgeDays() . ' days',
 				'count'     => array( RetentionCleanup::class, 'countFailedJobs' ),
+			),
+			array(
+				'label'     => 'Terminal engine_data',
+				'task_type' => RetentionCleanup::TASK_ENGINE_DATA,
+				'threshold' => $this->format_days( RetentionCleanup::engineDataTerminalMaxAgeDays() ),
+				'count'     => array( RetentionCleanup::class, 'countEngineDataTerminalJobs' ),
 			),
 			array(
 				'label'     => 'Pipeline logs',
@@ -323,40 +371,44 @@ class RetentionCommand extends BaseCommand {
 	 */
 	private function get_retention_policies(): array {
 		return array(
-			'Completed jobs'  => array(
+			'Completed jobs'       => array(
 				'retention' => apply_filters( 'datamachine_completed_jobs_max_age_days', 30 ) . ' days',
 				'filter'    => 'datamachine_completed_jobs_max_age_days',
 			),
-			'Failed jobs'     => array(
+			'Failed jobs'          => array(
 				'retention' => apply_filters( 'datamachine_failed_jobs_max_age_days', 30 ) . ' days',
 				'filter'    => 'datamachine_failed_jobs_max_age_days',
 			),
-			'Pipeline logs'   => array(
+			'Terminal engine_data' => array(
+				'retention' => $this->format_days( RetentionCleanup::engineDataTerminalMaxAgeDays() ),
+				'filter'    => 'datamachine_engine_data_terminal_max_age_days',
+			),
+			'Pipeline logs'        => array(
 				'retention' => apply_filters( 'datamachine_log_max_age_days', 7 ) . ' days',
 				'filter'    => 'datamachine_log_max_age_days',
 			),
-			'Processed items' => array(
+			'Processed items'      => array(
 				'retention' => apply_filters( 'datamachine_processed_items_max_age_days', 30 ) . ' days',
 				'filter'    => 'datamachine_processed_items_max_age_days',
 			),
-			'AS actions'      => array(
+			'AS actions'           => array(
 				'retention' => apply_filters( 'datamachine_as_actions_max_age_days', 7 ) . ' days'
 					. ( empty( RetentionCleanup::actionSchedulerHookMaxAgeDays() ) ? '' : ' (+per-hook)' ),
 				'filter'    => 'datamachine_as_actions_max_age_days',
 			),
-			'Stale claims'    => array(
+			'Stale claims'         => array(
 				'retention' => round( apply_filters( 'datamachine_stale_claim_max_age', DAY_IN_SECONDS ) / 3600 ) . ' hours',
 				'filter'    => 'datamachine_stale_claim_max_age',
 			),
-			'Chat sessions'   => array(
+			'Chat sessions'        => array(
 				'retention' => \DataMachine\Core\PluginSettings::get( 'chat_retention_days', 90 ) . ' days',
 				'filter'    => 'setting: chat_retention_days',
 			),
-			'File cleanup'    => array(
+			'File cleanup'         => array(
 				'retention' => \DataMachine\Core\PluginSettings::get( 'file_retention_days', 7 ) . ' days',
 				'filter'    => 'setting: file_retention_days',
 			),
-			'Job artifacts'   => array(
+			'Job artifacts'        => array(
 				'retention' => RetentionCleanup::jobArtifactsMaxAgeDays() . ' days',
 				'filter'    => 'datamachine_job_artifacts_max_age_days',
 			),
