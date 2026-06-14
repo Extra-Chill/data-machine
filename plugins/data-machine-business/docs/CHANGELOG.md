@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 Homeboy maintains this file from conventional commits at release time —
 do not edit by hand.
 
+## [0.6.1] - 2026-06-14
+
+### Fixed
+- filter network_density GA report to in-network referrers server-side (closes #36)
+
 ## [0.6.0] - 2026-06-13
 
 ### Added
