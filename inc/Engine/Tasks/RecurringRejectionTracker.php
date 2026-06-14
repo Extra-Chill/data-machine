@@ -111,7 +111,7 @@ class RecurringRejectionTracker {
 			$entry['first_rejected_gmt'] = $now;
 		}
 
-		$threshold     = self::threshold();
+		$threshold      = self::threshold();
 		$just_escalated = false;
 		if ( $entry['count'] >= $threshold && empty( $entry['escalated'] ) ) {
 			$entry['escalated'] = true;

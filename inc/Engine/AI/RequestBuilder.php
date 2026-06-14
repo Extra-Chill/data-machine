@@ -54,14 +54,14 @@ class RequestBuilder {
 	) {
 		WpAiClientCache::install();
 
-		$modes            = self::normalizeModes( $modes );
-		$mode_label       = implode( ',', $modes );
-		$assembled        = self::assemble( $messages, $provider, $model, $tools, $modes, $payload );
-		$request          = $assembled['request'];
-		$structured_tools       = $assembled['structured_tools'];
-		$provider_tool_aliases  = self::providerToolNameAliases( $structured_tools );
-		$provider_request       = ProviderRequestAssembler::toProviderRequest( $request );
-		$prompt_context         = self::wpAiClientPromptContext( $request['messages'] ?? array(), $provider_tool_aliases['logical_to_provider'] );
+		$modes                 = self::normalizeModes( $modes );
+		$mode_label            = implode( ',', $modes );
+		$assembled             = self::assemble( $messages, $provider, $model, $tools, $modes, $payload );
+		$request               = $assembled['request'];
+		$structured_tools      = $assembled['structured_tools'];
+		$provider_tool_aliases = self::providerToolNameAliases( $structured_tools );
+		$provider_request      = ProviderRequestAssembler::toProviderRequest( $request );
+		$prompt_context        = self::wpAiClientPromptContext( $request['messages'] ?? array(), $provider_tool_aliases['logical_to_provider'] );
 		if ( '' !== $prompt_context['prompt'] ) {
 			$provider_request['prompt'] = $prompt_context['prompt'];
 		}
