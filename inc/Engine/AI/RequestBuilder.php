@@ -771,7 +771,7 @@ class RequestBuilder {
 	public static function providerToolNameAliases( array $tools ): array {
 		$logical_to_provider = array();
 		$provider_to_logical = array();
-		$used               = array();
+		$used                = array();
 
 		foreach ( $tools as $tool_name => $tool_config ) {
 			$logical_name = (string) ( $tool_config['name'] ?? $tool_name );
@@ -786,7 +786,7 @@ class RequestBuilder {
 
 			$used[ $provider_name ] = $logical_name;
 			if ( $provider_name !== $logical_name ) {
-				$logical_to_provider[ $logical_name ] = $provider_name;
+				$logical_to_provider[ $logical_name ]  = $provider_name;
 				$provider_to_logical[ $provider_name ] = $logical_name;
 			}
 		}
