@@ -36,7 +36,14 @@ namespace {
 	$failed = 0;
 	$total  = 0;
 
+	// Filter override registry. Works in both the pure-PHP path (shimmed
+	// apply_filters reads it) and under real WordPress (a single real
+	// add_filter per hook returns the latest registered override). Keeping
+	// the registry keyed by hook lets eds_set_filter() change the value
+	// repeatedly without stacking duplicate WP callbacks.
 	$GLOBALS['__retention_filters'] = array();
+
+	$using_real_wp = function_exists( 'apply_filters' ) && function_exists( 'add_filter' );
 
 	if ( ! function_exists( 'apply_filters' ) ) {
 		function apply_filters( string $hook, $value ) {
@@ -55,8 +62,25 @@ namespace {
 		}
 	}
 
+	$GLOBALS['__retention_real_wp']       = $using_real_wp;
+	$GLOBALS['__retention_bound_filters'] = array();
+
 	function eds_set_filter( string $hook, $value ): void {
 		$GLOBALS['__retention_filters'][ $hook ] = $value;
+
+		// Under real WordPress, bind one persistent callback per hook that
+		// always returns the current registry value (so repeated set calls
+		// just update the registry, never stack callbacks).
+		if ( ! empty( $GLOBALS['__retention_real_wp'] ) && empty( $GLOBALS['__retention_bound_filters'][ $hook ] ) ) {
+			add_filter(
+				$hook,
+				static function () use ( $hook ) {
+					return $GLOBALS['__retention_filters'][ $hook ];
+				},
+				99
+			);
+			$GLOBALS['__retention_bound_filters'][ $hook ] = true;
+		}
 	}
 
 	function assert_eds( string $name, bool $condition, string $detail = '' ): void {
