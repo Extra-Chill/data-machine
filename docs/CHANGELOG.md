@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.145.1] - 2026-06-14
+
+### Fixed
+- clear PHPCS lint debt from AS retention cleanup + neighbouring alignment
+
 ## [0.145.0] - 2026-06-14
 
 ### Added
