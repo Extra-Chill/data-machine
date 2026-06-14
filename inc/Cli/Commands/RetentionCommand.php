@@ -165,10 +165,91 @@ class RetentionCommand extends BaseCommand {
 			$assoc_args
 		);
 
+		$this->report_action_scheduler_detail( $assoc_args );
+
 		if ( ! $dry_run ) {
 			$total = array_sum( array_column( $results, 'eligible' ) );
 			WP_CLI::success( sprintf( 'Retention cleanup scheduled. %d total eligible rows/items found.', $total ) );
 		}
+	}
+
+	/**
+	 * Report Action Scheduler cleanup detail: per-table eligible rows and the
+	 * batching / OPTIMIZE configuration that a cleanup pass will apply.
+	 *
+	 * Action Scheduler cleanup runs asynchronously via a scheduled SystemTask,
+	 * so actual rows-deleted and OPTIMIZE outcome are logged via
+	 * `datamachine_log` (and stored on the job result) when the task runs. This
+	 * summary makes the planned behaviour visible from the CLI.
+	 *
+	 * @param array $assoc_args Associative arguments (for --format).
+	 */
+	private function report_action_scheduler_detail( array $assoc_args ): void {
+		$breakdown = RetentionCleanup::countActionSchedulerBreakdown();
+
+		$rows = array(
+			array(
+				'table'    => 'actionscheduler_actions',
+				'eligible' => $breakdown['actions'],
+			),
+			array(
+				'table'    => 'actionscheduler_logs',
+				'eligible' => $breakdown['logs'],
+			),
+		);
+
+		WP_CLI::log( '' );
+		WP_CLI::log( WP_CLI::colorize( '%BAction Scheduler — per-table eligible rows%n' ) );
+		WP_CLI::log( '' );
+
+		$this->format_items( $rows, array( 'table', 'eligible' ), $assoc_args );
+
+		$hook_windows = array();
+		foreach ( RetentionCleanup::actionSchedulerHookMaxAgeDays() as $hook => $days ) {
+			$hook_windows[] = sprintf( '%s=%s', $hook, $this->format_days( $days ) );
+		}
+
+		WP_CLI::log( '' );
+		WP_CLI::log( sprintf( 'Global window:   %d days', RetentionCleanup::actionSchedulerMaxAgeDays() ) );
+		WP_CLI::log(
+			sprintf(
+				'Per-hook window: %s',
+				empty( $hook_windows ) ? '(none)' : implode( ', ', $hook_windows )
+			)
+		);
+		WP_CLI::log( sprintf( 'Batch size:      %d rows/iteration', RetentionCleanup::actionSchedulerBatchSize() ) );
+		WP_CLI::log(
+			sprintf(
+				'Safety caps:     %d iterations / %ds wall-clock per pass',
+				RetentionCleanup::actionSchedulerMaxIterations(),
+				RetentionCleanup::actionSchedulerMaxRuntimeSeconds()
+			)
+		);
+
+		if ( RetentionCleanup::actionSchedulerOptimizeEnabled() ) {
+			WP_CLI::log(
+				sprintf(
+					'OPTIMIZE TABLE:  enabled (threshold %d rows deleted)',
+					RetentionCleanup::actionSchedulerOptimizeThreshold()
+				)
+			);
+		} else {
+			WP_CLI::log( 'OPTIMIZE TABLE:  disabled (filter datamachine_retention_optimize_tables)' );
+		}
+	}
+
+	/**
+	 * Format a fractional-day window for human-readable CLI output.
+	 *
+	 * @param float $days Window in days (may be fractional, e.g. 0.25).
+	 * @return string Human-readable label (e.g. "6h" or "7d").
+	 */
+	private function format_days( float $days ): string {
+		if ( $days < 1 ) {
+			return sprintf( '%dh', (int) round( $days * 24 ) );
+		}
+
+		return sprintf( '%sd', rtrim( rtrim( sprintf( '%.2f', $days ), '0' ), '.' ) );
 	}
 
 	/**
@@ -259,7 +340,8 @@ class RetentionCommand extends BaseCommand {
 				'filter'    => 'datamachine_processed_items_max_age_days',
 			),
 			'AS actions'      => array(
-				'retention' => apply_filters( 'datamachine_as_actions_max_age_days', 7 ) . ' days',
+				'retention' => apply_filters( 'datamachine_as_actions_max_age_days', 7 ) . ' days'
+					. ( empty( RetentionCleanup::actionSchedulerHookMaxAgeDays() ) ? '' : ' (+per-hook)' ),
 				'filter'    => 'datamachine_as_actions_max_age_days',
 			),
 			'Stale claims'    => array(
