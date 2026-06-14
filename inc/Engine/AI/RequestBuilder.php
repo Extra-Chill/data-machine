@@ -54,14 +54,14 @@ class RequestBuilder {
 	) {
 		WpAiClientCache::install();
 
-		$modes            = self::normalizeModes( $modes );
-		$mode_label       = implode( ',', $modes );
-		$assembled        = self::assemble( $messages, $provider, $model, $tools, $modes, $payload );
-		$request          = $assembled['request'];
-		$structured_tools       = $assembled['structured_tools'];
-		$provider_tool_aliases  = self::providerToolNameAliases( $structured_tools );
-		$provider_request       = ProviderRequestAssembler::toProviderRequest( $request );
-		$prompt_context         = self::wpAiClientPromptContext( $request['messages'] ?? array(), $provider_tool_aliases['logical_to_provider'] );
+		$modes                 = self::normalizeModes( $modes );
+		$mode_label            = implode( ',', $modes );
+		$assembled             = self::assemble( $messages, $provider, $model, $tools, $modes, $payload );
+		$request               = $assembled['request'];
+		$structured_tools      = $assembled['structured_tools'];
+		$provider_tool_aliases = self::providerToolNameAliases( $structured_tools );
+		$provider_request      = ProviderRequestAssembler::toProviderRequest( $request );
+		$prompt_context        = self::wpAiClientPromptContext( $request['messages'] ?? array(), $provider_tool_aliases['logical_to_provider'] );
 		if ( '' !== $prompt_context['prompt'] ) {
 			$provider_request['prompt'] = $prompt_context['prompt'];
 		}
@@ -771,7 +771,7 @@ class RequestBuilder {
 	public static function providerToolNameAliases( array $tools ): array {
 		$logical_to_provider = array();
 		$provider_to_logical = array();
-		$used               = array();
+		$used                = array();
 
 		foreach ( $tools as $tool_name => $tool_config ) {
 			$logical_name = (string) ( $tool_config['name'] ?? $tool_name );
@@ -786,7 +786,7 @@ class RequestBuilder {
 
 			$used[ $provider_name ] = $logical_name;
 			if ( $provider_name !== $logical_name ) {
-				$logical_to_provider[ $logical_name ] = $provider_name;
+				$logical_to_provider[ $logical_name ]  = $provider_name;
 				$provider_to_logical[ $provider_name ] = $logical_name;
 			}
 		}
