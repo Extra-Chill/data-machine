@@ -166,6 +166,7 @@ class RetentionCommand extends BaseCommand {
 		);
 
 		$this->report_action_scheduler_detail( $assoc_args );
+		$this->report_engine_data_detail();
 
 		if ( ! $dry_run ) {
 			$total = array_sum( array_column( $results, 'eligible' ) );
@@ -239,6 +240,47 @@ class RetentionCommand extends BaseCommand {
 	}
 
 	/**
+	 * Report terminal-job engine_data shedding detail: eligible rows, the short
+	 * terminal window, and the reclaimable blob bytes a shed pass would free.
+	 *
+	 * engine_data shedding runs asynchronously via a scheduled SystemTask, so
+	 * the actual jobs-updated / OPTIMIZE outcome is logged via `datamachine_log`
+	 * (and stored on the job result) when the task runs. This summary makes the
+	 * planned behaviour visible from the CLI.
+	 */
+	private function report_engine_data_detail(): void {
+		$days = RetentionCleanup::engineDataTerminalMaxAgeDays();
+
+		WP_CLI::log( '' );
+		WP_CLI::log( WP_CLI::colorize( '%BTerminal-job engine_data shedding%n' ) );
+		WP_CLI::log( '' );
+
+		if ( $days <= 0 ) {
+			WP_CLI::log( 'Shedding:        disabled (filter datamachine_engine_data_terminal_max_age_days)' );
+			return;
+		}
+
+		$eligible    = RetentionCleanup::countEngineDataTerminalJobs();
+		$reclaimable = RetentionCleanup::countEngineDataReclaimableBytes();
+
+		WP_CLI::log( sprintf( 'Terminal window: %s after completion', $this->format_days( $days ) ) );
+		WP_CLI::log( sprintf( 'Eligible jobs:   %d (row kept, engine_data blob shed)', $eligible ) );
+		WP_CLI::log( sprintf( 'Reclaimable:     %.1f MB of engine_data blob', $reclaimable / 1024 / 1024 ) );
+		WP_CLI::log( sprintf( 'Batch size:      %d rows/iteration', RetentionCleanup::actionSchedulerBatchSize() ) );
+
+		if ( RetentionCleanup::actionSchedulerOptimizeEnabled() ) {
+			WP_CLI::log(
+				sprintf(
+					'OPTIMIZE TABLE:  enabled (threshold %d rows changed)',
+					RetentionCleanup::actionSchedulerOptimizeThreshold()
+				)
+			);
+		} else {
+			WP_CLI::log( 'OPTIMIZE TABLE:  disabled (filter datamachine_retention_optimize_tables)' );
+		}
+	}
+
+	/**
 	 * Format a fractional-day window for human-readable CLI output.
 	 *
 	 * @param float $days Window in days (may be fractional, e.g. 0.25).
@@ -270,6 +312,12 @@ class RetentionCommand extends BaseCommand {
 				'task_type' => RetentionCleanup::TASK_FAILED_JOBS,
 				'threshold' => RetentionCleanup::failedJobsMaxAgeDays() . ' days',
 				'count'     => array( RetentionCleanup::class, 'countFailedJobs' ),
+			),
+			array(
+				'label'     => 'Terminal engine_data',
+				'task_type' => RetentionCleanup::TASK_ENGINE_DATA,
+				'threshold' => $this->format_days( RetentionCleanup::engineDataTerminalMaxAgeDays() ),
+				'count'     => array( RetentionCleanup::class, 'countEngineDataTerminalJobs' ),
 			),
 			array(
 				'label'     => 'Pipeline logs',
@@ -330,6 +378,10 @@ class RetentionCommand extends BaseCommand {
 			'Failed jobs'     => array(
 				'retention' => apply_filters( 'datamachine_failed_jobs_max_age_days', 30 ) . ' days',
 				'filter'    => 'datamachine_failed_jobs_max_age_days',
+			),
+			'Terminal engine_data' => array(
+				'retention' => $this->format_days( RetentionCleanup::engineDataTerminalMaxAgeDays() ),
+				'filter'    => 'datamachine_engine_data_terminal_max_age_days',
 			),
 			'Pipeline logs'   => array(
 				'retention' => apply_filters( 'datamachine_log_max_age_days', 7 ) . ' days',

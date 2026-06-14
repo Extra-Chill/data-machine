@@ -24,6 +24,7 @@ class RetentionCleanup {
 
 	public const TASK_COMPLETED_JOBS  = 'retention_completed_jobs';
 	public const TASK_FAILED_JOBS     = 'retention_failed_jobs';
+	public const TASK_ENGINE_DATA     = 'retention_engine_data';
 	public const TASK_LOGS            = 'retention_logs';
 	public const TASK_PROCESSED_ITEMS = 'retention_processed_items';
 	public const TASK_AS_ACTIONS      = 'retention_as_actions';
@@ -38,6 +39,33 @@ class RetentionCleanup {
 
 	public static function failedJobsMaxAgeDays(): int {
 		return self::positiveDays( apply_filters( 'datamachine_failed_jobs_max_age_days', 30 ), 30 );
+	}
+
+	/**
+	 * Age (in days) after a job goes terminal before its engine_data is shed.
+	 *
+	 * engine_data is the engine's working memory for a job (data packets, AI
+	 * tool-call context, intermediate step results). It is required *while the
+	 * job runs*, but carries no value once the job is terminal — yet it is the
+	 * single heaviest column on the jobs table (a multi-KB longtext per row).
+	 * On high-volume installs that is hundreds of MB of dead blob resident for
+	 * the entire whole-row retention window (14-30d).
+	 *
+	 * This is a *short* window (hours, not days) measured against
+	 * `completed_at`: shed the blob soon after the job finishes while KEEPING
+	 * the row (status, timing, counts, promoted handler_slug) for
+	 * stats/history/dedup. The longer whole-row deletion windows
+	 * (completedJobsMaxAgeDays / failedJobsMaxAgeDays) are untouched.
+	 *
+	 * Fractional days are allowed so operators can express sub-day windows
+	 * (e.g. `0.25` for 6h). Default is 1 day. A value of `0` (or less) disables
+	 * engine_data shedding entirely.
+	 *
+	 * @return float Window in days (>= 0; 0 disables shedding).
+	 */
+	public static function engineDataTerminalMaxAgeDays(): float {
+		$days = (float) apply_filters( 'datamachine_engine_data_terminal_max_age_days', 1.0 );
+		return $days > 0 ? $days : 0.0;
 	}
 
 	public static function logsMaxAgeDays(): int {
@@ -247,6 +275,164 @@ class RetentionCleanup {
 		);
 	}
 
+	/**
+	 * Count terminal jobs whose engine_data is eligible to be shed.
+	 *
+	 * Terminal == `completed_at` is set (every final status path stamps it).
+	 * Eligible == still carrying a non-empty engine_data blob older than the
+	 * short terminal window. Returns 0 when shedding is disabled.
+	 *
+	 * @return int Eligible job count.
+	 */
+	public static function countEngineDataTerminalJobs(): int {
+		global $wpdb;
+
+		$days = self::engineDataTerminalMaxAgeDays();
+		if ( $days <= 0 ) {
+			return 0;
+		}
+
+		$table  = $wpdb->prefix . 'datamachine_jobs';
+		$cutoff = gmdate( 'Y-m-d H:i:s', time() - (int) round( $days * DAY_IN_SECONDS ) );
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		return (int) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COUNT(*) FROM %i WHERE completed_at IS NOT NULL AND completed_at < %s AND engine_data IS NOT NULL AND engine_data != ''",
+				$table,
+				$cutoff
+			)
+		);
+	}
+
+	/**
+	 * Estimate reclaimable engine_data bytes on eligible terminal jobs.
+	 *
+	 * Powers CLI dry-run reporting. Uses CHAR_LENGTH so the figure reflects
+	 * the live blob weight that the shed will free inside the tablespace.
+	 * Skipped (returns 0) on SQLite, where the byte sizing functions and the
+	 * disk-reclaim concern do not apply.
+	 *
+	 * @return int Reclaimable bytes (approximate).
+	 */
+	public static function countEngineDataReclaimableBytes(): int {
+		global $wpdb;
+
+		$days = self::engineDataTerminalMaxAgeDays();
+		if ( $days <= 0 ) {
+			return 0;
+		}
+
+		if ( class_exists( BaseRepository::class ) && BaseRepository::is_sqlite() ) {
+			return 0;
+		}
+
+		$table  = $wpdb->prefix . 'datamachine_jobs';
+		$cutoff = gmdate( 'Y-m-d H:i:s', time() - (int) round( $days * DAY_IN_SECONDS ) );
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		return (int) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COALESCE(SUM(LENGTH(engine_data)), 0) FROM %i WHERE completed_at IS NOT NULL AND completed_at < %s AND engine_data IS NOT NULL AND engine_data != ''",
+				$table,
+				$cutoff
+			)
+		);
+	}
+
+	/**
+	 * Shed engine_data from terminal jobs older than the short window.
+	 *
+	 * Sets `engine_data = NULL` on jobs that have been terminal for longer than
+	 * engineDataTerminalMaxAgeDays(), KEEPING the row. The heavy working-state
+	 * blob is the only thing dropped; status, timing, counts and the promoted
+	 * handler_slug column survive for stats/history/dedup. Whole-row deletion
+	 * (cleanupCompletedJobs/cleanupFailedJobs) handles the longer window.
+	 *
+	 * The UPDATE is batched by id (bounded LIMIT per pass, shared iteration +
+	 * wall-clock caps) so it never locks or times out on a multi-hundred-K-row
+	 * table — the same batching contract #2617 introduced for AS deletes. Disk
+	 * reclaim reuses the opt-in OPTIMIZE path (an UPDATE frees space inside the
+	 * tablespace but not to the OS without a rebuild).
+	 *
+	 * @return array Result summary.
+	 */
+	public static function cleanupEngineData(): array {
+		global $wpdb;
+
+		$days = self::engineDataTerminalMaxAgeDays();
+		if ( $days <= 0 ) {
+			return array(
+				'updated'      => 0,
+				'max_age_days' => 0,
+				'batch_size'   => 0,
+				'iterations'   => 0,
+				'hit_limit'    => false,
+				'optimized'    => array(),
+			);
+		}
+
+		$table          = $wpdb->prefix . 'datamachine_jobs';
+		$cutoff         = gmdate( 'Y-m-d H:i:s', time() - (int) round( $days * DAY_IN_SECONDS ) );
+		$batch_size     = self::actionSchedulerBatchSize();
+		$max_iterations = self::actionSchedulerMaxIterations();
+		$max_runtime    = self::actionSchedulerMaxRuntimeSeconds();
+		$deadline       = microtime( true ) + $max_runtime;
+		$iterations     = 0;
+		$hit_limit      = false;
+		$updated        = 0;
+
+		do {
+			if ( $iterations >= $max_iterations || microtime( true ) >= $deadline ) {
+				$hit_limit = true;
+				break;
+			}
+			++$iterations;
+
+			// Bound each UPDATE by selecting a batch of eligible ids and
+			// updating by primary key — reliable and index-fast, never a
+			// single unbounded UPDATE across the whole table.
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			$affected = $wpdb->query(
+				$wpdb->prepare(
+					"UPDATE %i SET engine_data = NULL WHERE job_id IN ( SELECT job_id FROM ( SELECT job_id FROM %i WHERE completed_at IS NOT NULL AND completed_at < %s AND engine_data IS NOT NULL AND engine_data != '' LIMIT %d ) AS tmp )",
+					$table,
+					$table,
+					$cutoff,
+					$batch_size
+				)
+			);
+
+			$affected = false !== $affected ? (int) $affected : 0;
+			$updated += $affected;
+		} while ( $affected > 0 );
+
+		$optimized = self::maybeOptimizeTables( array( $table => $updated ) );
+
+		if ( $updated > 0 || $hit_limit ) {
+			self::log(
+				'Scheduled cleanup: shed engine_data from terminal jobs',
+				array(
+					'jobs_updated' => $updated,
+					'max_age_days' => $days,
+					'batch_size'   => $batch_size,
+					'iterations'   => $iterations,
+					'hit_limit'    => $hit_limit,
+					'optimized'    => $optimized,
+				)
+			);
+		}
+
+		return array(
+			'updated'      => $updated,
+			'max_age_days' => $days,
+			'batch_size'   => $batch_size,
+			'iterations'   => $iterations,
+			'hit_limit'    => $hit_limit,
+			'optimized'    => $optimized,
+		);
+	}
+
 	public static function countLogs(): int {
 		global $wpdb;
 
@@ -448,7 +634,7 @@ class RetentionCleanup {
 		// InnoDB never returns DELETE-freed space to the OS; only a table
 		// rebuild does. Optionally OPTIMIZE the tables when a pass deleted
 		// enough rows to justify the lock/temp-space cost.
-		$optimized = self::maybeOptimizeActionSchedulerTables(
+		$optimized = self::maybeOptimizeTables(
 			array(
 				$actions_table => $actions_deleted,
 				$logs_table    => $logs_deleted,
@@ -665,16 +851,19 @@ class RetentionCleanup {
 	}
 
 	/**
-	 * Optionally OPTIMIZE Action Scheduler tables after a cleanup pass.
+	 * Optionally OPTIMIZE tables after a cleanup pass to reclaim disk.
 	 *
-	 * Opt-in (`datamachine_retention_optimize_tables`, default off) and gated by
-	 * a per-table row-count threshold so the rebuild only runs when enough rows
-	 * were deleted to reclaim meaningful disk. Skipped entirely on SQLite.
+	 * Generic across cleanup passes (Action Scheduler deletes, engine_data
+	 * shedding) — InnoDB never returns DELETE/UPDATE-freed space to the OS;
+	 * only a table rebuild does. Opt-in (`datamachine_retention_optimize_tables`,
+	 * default off) and gated by a per-table row-count threshold so the rebuild
+	 * only runs when enough rows changed to justify the lock/temp-space cost.
+	 * Skipped entirely on SQLite.
 	 *
-	 * @param array<string, int> $tables_deleted Map of table name => rows deleted.
+	 * @param array<string, int> $tables_affected Map of table name => rows changed.
 	 * @return array<int, string> Names of tables that were optimized.
 	 */
-	private static function maybeOptimizeActionSchedulerTables( array $tables_deleted ): array {
+	private static function maybeOptimizeTables( array $tables_affected ): array {
 		global $wpdb;
 
 		if ( ! self::actionSchedulerOptimizeEnabled() ) {
@@ -688,8 +877,8 @@ class RetentionCleanup {
 		$threshold = self::actionSchedulerOptimizeThreshold();
 		$optimized = array();
 
-		foreach ( $tables_deleted as $table => $deleted ) {
-			if ( (int) $deleted < $threshold ) {
+		foreach ( $tables_affected as $table => $affected ) {
+			if ( (int) $affected < $threshold ) {
 				continue;
 			}
 
@@ -700,7 +889,7 @@ class RetentionCleanup {
 
 		if ( ! empty( $optimized ) ) {
 			self::log(
-				'Scheduled cleanup: optimized Action Scheduler tables to reclaim disk',
+				'Scheduled cleanup: optimized tables to reclaim disk',
 				array(
 					'tables_optimized' => $optimized,
 					'threshold'        => $threshold,

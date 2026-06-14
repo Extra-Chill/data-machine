@@ -209,10 +209,10 @@ class Jobs extends BaseRepository {
 		if ( ! empty( $args['handler'] ) ) {
 			$handler = sanitize_key( (string) $args['handler'] );
 			if ( '' !== $handler ) {
-				$where_clauses[] = '(engine_data LIKE %s OR engine_data LIKE %s OR engine_data LIKE %s)';
-				$where_values[]  = '%' . $this->wpdb->esc_like( '"handler_slug":"' . $handler . '"' ) . '%';
-				$where_values[]  = '%' . $this->wpdb->esc_like( '"handler":"' . $handler . '"' ) . '%';
-				$where_values[]  = '%' . $this->wpdb->esc_like( '"handler_slugs":["' . $handler . '"' ) . '%';
+				// Match the promoted handler_slug column so filtering survives
+				// engine_data being shed from terminal jobs by retention.
+				$where_clauses[] = 'handler_slug = %s';
+				$where_values[]  = $handler;
 			}
 		}
 
@@ -320,10 +320,10 @@ class Jobs extends BaseRepository {
 		if ( ! empty( $args['handler'] ) ) {
 			$handler = sanitize_key( (string) $args['handler'] );
 			if ( '' !== $handler ) {
-				$where_clauses[] = '(' . $prefix . 'engine_data LIKE %s OR ' . $prefix . 'engine_data LIKE %s OR ' . $prefix . 'engine_data LIKE %s)';
-				$where_values[]  = '%' . $this->wpdb->esc_like( '"handler_slug":"' . $handler . '"' ) . '%';
-				$where_values[]  = '%' . $this->wpdb->esc_like( '"handler":"' . $handler . '"' ) . '%';
-				$where_values[]  = '%' . $this->wpdb->esc_like( '"handler_slugs":["' . $handler . '"' ) . '%';
+				// Match the promoted handler_slug column so filtering survives
+				// engine_data being shed from terminal jobs by retention.
+				$where_clauses[] = $prefix . 'handler_slug = %s';
+				$where_values[]  = $handler;
 			}
 		}
 
@@ -447,22 +447,21 @@ class Jobs extends BaseRepository {
 			);
 		}
 
+		// Aggregate from the promoted handler_slug column rather than scanning
+		// engine_data. This keeps handler summaries correct even after
+		// retention sheds engine_data from terminal jobs (the column survives).
 		$handler_where = '' === $where_sql
-			? 'WHERE j.engine_data LIKE %s'
-			: $where_sql . ' AND j.engine_data LIKE %s';
-		$values        = array_merge( $where_values, array( '%"handler_slug":"%' ) );
+			? "WHERE j.handler_slug IS NOT NULL AND j.handler_slug != ''"
+			: $where_sql . " AND j.handler_slug IS NOT NULL AND j.handler_slug != ''";
 
 		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
 		$query = $this->wpdb->prepare(
-			"SELECT
-				SUBSTRING_INDEX(SUBSTRING_INDEX(REGEXP_SUBSTR(j.engine_data, '\"handler_slug\":\"[^\"]+\"'), ':\"', -1), '\"', 1) AS handler_slug,
-				COUNT(*) AS count
+			"SELECT j.handler_slug AS handler_slug, COUNT(*) AS count
 			 FROM %i j
 			 {$handler_where}
-			 GROUP BY handler_slug
-			 HAVING handler_slug IS NOT NULL AND handler_slug != ''
+			 GROUP BY j.handler_slug
 			 ORDER BY count DESC",
-			array_merge( array( $this->table_name ), $values )
+			array_merge( array( $this->table_name ), $where_values )
 		);
 		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
 
@@ -597,10 +596,10 @@ class Jobs extends BaseRepository {
 		if ( ! empty( $args['handler'] ) ) {
 			$handler = sanitize_key( (string) $args['handler'] );
 			if ( '' !== $handler ) {
-				$where_clauses[] = '(j.engine_data LIKE %s OR j.engine_data LIKE %s OR j.engine_data LIKE %s)';
-				$where_values[]  = '%' . $this->wpdb->esc_like( '"handler_slug":"' . $handler . '"' ) . '%';
-				$where_values[]  = '%' . $this->wpdb->esc_like( '"handler":"' . $handler . '"' ) . '%';
-				$where_values[]  = '%' . $this->wpdb->esc_like( '"handler_slugs":["' . $handler . '"' ) . '%';
+				// Match the promoted handler_slug column so filtering survives
+				// engine_data being shed from terminal jobs by retention.
+				$where_clauses[] = 'j.handler_slug = %s';
+				$where_values[]  = $handler;
 			}
 		}
 
@@ -1073,6 +1072,17 @@ class Jobs extends BaseRepository {
 			$format[]                 = '%s';
 		}
 
+		// Promote the first handler_slug to its own column so handler
+		// summaries / filtering survive engine_data being shed from terminal
+		// jobs by retention (see RetentionCleanup::cleanupEngineData()).
+		// Extracted from the encoded blob so the column matches exactly what
+		// the legacy REGEXP_SUBSTR( engine_data, ... ) aggregation produced.
+		$handler_slug = self::extract_handler_slug( is_string( $encoded ) ? $encoded : '' );
+		if ( '' !== $handler_slug ) {
+			$update_data['handler_slug'] = $handler_slug;
+			$format[]                    = '%s';
+		}
+
 		$result = $this->wpdb->update(
 			$this->table_name,
 			$update_data,
@@ -1120,6 +1130,30 @@ class Jobs extends BaseRepository {
 		}
 
 		return array();
+	}
+
+	/**
+	 * Extract the first handler_slug from an encoded engine_data blob.
+	 *
+	 * Mirrors the legacy `REGEXP_SUBSTR( engine_data, '"handler_slug":"[^"]+"' )`
+	 * aggregation so the promoted handler_slug column carries the exact value
+	 * the handler-summary query used to derive on the fly. Promoting it lets
+	 * retention shed the heavy engine_data blob from terminal jobs without
+	 * losing handler stats/filtering (see RetentionCleanup::cleanupEngineData()).
+	 *
+	 * @param string $encoded JSON-encoded engine_data.
+	 * @return string Handler slug, or '' when none present.
+	 */
+	private static function extract_handler_slug( string $encoded ): string {
+		if ( '' === $encoded || ! str_contains( $encoded, '"handler_slug"' ) ) {
+			return '';
+		}
+
+		if ( preg_match( '/"handler_slug":"([^"]+)"/', $encoded, $matches ) ) {
+			return sanitize_key( $matches[1] );
+		}
+
+		return '';
 	}
 
 	// ---------------------------------------------------------------------
@@ -1432,6 +1466,7 @@ class Jobs extends BaseRepository {
             parent_job_id bigint(20) unsigned NULL DEFAULT NULL,
             status varchar(255) NOT NULL,
             engine_data longtext NULL,
+            handler_slug varchar(100) NULL DEFAULT NULL,
             created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
             completed_at datetime NULL DEFAULT NULL,
             PRIMARY KEY  (job_id),
@@ -1451,6 +1486,7 @@ class Jobs extends BaseRepository {
 
 		self::migrate_columns( $table_name );
 		self::migrate_task_type_column( $table_name );
+		self::migrate_handler_slug_column( $table_name );
 		self::migrate_indexes( $table_name );
 
 		do_action(
@@ -1738,6 +1774,108 @@ class Jobs extends BaseRepository {
 	}
 
 	/**
+	 * Add handler_slug column for indexed handler summaries / filtering.
+	 *
+	 * Promotes the first `"handler_slug":"..."` value out of the engine_data
+	 * blob into a dedicated indexed column. This lets retention shed the heavy
+	 * engine_data longtext from terminal jobs without losing the handler stats
+	 * and filtering that previously REGEXP_SUBSTR-scanned the blob (#2622).
+	 *
+	 * The column is populated by store_engine_data() going forward and
+	 * backfilled here from existing engine_data on migration. Backfill runs in
+	 * bounded id-ranged chunks so it never loads or rewrites the whole table at
+	 * once on large installs.
+	 *
+	 * @since TBD
+	 *
+	 * @param string $table_name Fully qualified table name.
+	 */
+	private static function migrate_handler_slug_column( string $table_name ): void {
+		global $wpdb;
+
+		if ( BaseRepository::column_exists( $table_name, 'handler_slug', $wpdb ) ) {
+			return;
+		}
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.SchemaChange
+		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
+		// `AFTER <col>` is MySQL-only; SQLite (Studio) rejects it.
+		$result = $wpdb->query(
+			"ALTER TABLE {$table_name}
+			 ADD COLUMN handler_slug varchar(100) NULL DEFAULT NULL,
+			 ADD KEY idx_handler_slug (handler_slug)"
+		);
+		// phpcs:enable WordPress.DB.PreparedSQL
+
+		if ( false === $result ) {
+			do_action(
+				'datamachine_log',
+				'error',
+				'Failed to add handler_slug column to jobs table',
+				array(
+					'table_name' => $table_name,
+					'db_error'   => $wpdb->last_error,
+				)
+			);
+			return;
+		}
+
+		// Backfill handler_slug from engine_data in bounded id-ranged chunks.
+		// Uses PHP regex (not MySQL REGEXP) for SQLite compatibility, and walks
+		// job_id ranges so memory stays flat regardless of table size.
+		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
+		$max_id     = (int) $wpdb->get_var( "SELECT MAX(job_id) FROM {$table_name}" );
+		$chunk_size = 5000;
+		// phpcs:enable WordPress.DB.PreparedSQL
+
+		for ( $start = 0; $start < $max_id; $start += $chunk_size ) {
+			$end = $start + $chunk_size;
+
+			// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
+			$rows = $wpdb->get_results(
+				$wpdb->prepare(
+					"SELECT job_id, engine_data
+					 FROM {$table_name}
+					 WHERE job_id > %d AND job_id <= %d
+					 AND engine_data IS NOT NULL
+					 AND engine_data LIKE %s
+					 AND handler_slug IS NULL",
+					$start,
+					$end,
+					'%' . $wpdb->esc_like( '"handler_slug"' ) . '%'
+				)
+			);
+			// phpcs:enable WordPress.DB.PreparedSQL
+
+			if ( empty( $rows ) ) {
+				continue;
+			}
+
+			foreach ( $rows as $row ) {
+				$handler_slug = self::extract_handler_slug( (string) $row->engine_data );
+				if ( '' === $handler_slug ) {
+					continue;
+				}
+
+				$wpdb->update(
+					$table_name,
+					array( 'handler_slug' => $handler_slug ),
+					array( 'job_id' => $row->job_id ),
+					array( '%s' ),
+					array( '%d' )
+				);
+			}
+		}
+
+		do_action(
+			'datamachine_log',
+			'info',
+			'Added handler_slug column to jobs table for indexed handler summaries',
+			array( 'table_name' => $table_name )
+		);
+	}
+
+	/**
 	 * Ensure performance indexes exist on the jobs table.
 	 *
 	 * dbDelta() is unreliable at adding indexes to existing tables, so this
@@ -1769,6 +1907,7 @@ class Jobs extends BaseRepository {
 			'idx_flow_created'   => '(flow_id, created_at)',
 			'idx_status_created' => '(status(50), created_at)',
 			'idx_source_created' => '(source, created_at)',
+			'idx_handler_slug'   => '(handler_slug)',
 		);
 
 		$added = array();
