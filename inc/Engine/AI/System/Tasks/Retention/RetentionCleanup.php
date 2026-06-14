@@ -332,42 +332,62 @@ class RetentionCleanup {
 		$logs_count    = 0;
 
 		foreach ( self::actionSchedulerCleanupWindows() as $window ) {
-			$cutoff    = $window['cutoff'];
-			$hook      = $window['hook'];
-			$hook_args = null === $hook ? array() : array( $hook );
+			$cutoff = $window['cutoff'];
+			$hook   = $window['hook'];
 
-			$actions_args = array_merge(
-				array( $actions_table, 'complete', 'failed', 'canceled', $cutoff ),
-				$hook_args
-			);
+			if ( null === $hook ) {
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+				$actions_count += (int) $wpdb->get_var(
+					$wpdb->prepare(
+						'SELECT COUNT(*) FROM %i WHERE status IN (%s, %s, %s) AND last_attempt_gmt < %s',
+						$actions_table,
+						'complete',
+						'failed',
+						'canceled',
+						$cutoff
+					)
+				);
 
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-			$actions_count += (int) $wpdb->get_var(
-				$wpdb->prepare(
-					'SELECT COUNT(*) FROM %i
-					WHERE status IN (%s, %s, %s)
-					AND last_attempt_gmt < %s'
-					. ( null === $hook ? '' : ' AND hook = %s' ),
-					$actions_args
-				)
-			);
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+				$logs_count += (int) $wpdb->get_var(
+					$wpdb->prepare(
+						'SELECT COUNT(*) FROM %i l INNER JOIN %i a ON l.action_id = a.action_id WHERE a.status IN (%s, %s, %s) AND a.last_attempt_gmt < %s',
+						$logs_table,
+						$actions_table,
+						'complete',
+						'failed',
+						'canceled',
+						$cutoff
+					)
+				);
+			} else {
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+				$actions_count += (int) $wpdb->get_var(
+					$wpdb->prepare(
+						'SELECT COUNT(*) FROM %i WHERE status IN (%s, %s, %s) AND last_attempt_gmt < %s AND hook = %s',
+						$actions_table,
+						'complete',
+						'failed',
+						'canceled',
+						$cutoff,
+						$hook
+					)
+				);
 
-			$logs_args = array_merge(
-				array( $logs_table, $actions_table, 'complete', 'failed', 'canceled', $cutoff ),
-				$hook_args
-			);
-
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-			$logs_count += (int) $wpdb->get_var(
-				$wpdb->prepare(
-					'SELECT COUNT(*) FROM %i l
-					INNER JOIN %i a ON l.action_id = a.action_id
-					WHERE a.status IN (%s, %s, %s)
-					AND a.last_attempt_gmt < %s'
-					. ( null === $hook ? '' : ' AND a.hook = %s' ),
-					$logs_args
-				)
-			);
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+				$logs_count += (int) $wpdb->get_var(
+					$wpdb->prepare(
+						'SELECT COUNT(*) FROM %i l INNER JOIN %i a ON l.action_id = a.action_id WHERE a.status IN (%s, %s, %s) AND a.last_attempt_gmt < %s AND a.hook = %s',
+						$logs_table,
+						$actions_table,
+						'complete',
+						'failed',
+						'canceled',
+						$cutoff,
+						$hook
+					)
+				);
+			}
 		}
 
 		return array(
@@ -380,17 +400,16 @@ class RetentionCleanup {
 	public static function cleanupActionSchedulerActions(): array {
 		global $wpdb;
 
-		$max_age_days     = self::actionSchedulerMaxAgeDays();
-		$batch_size       = self::actionSchedulerBatchSize();
-		$max_iterations   = self::actionSchedulerMaxIterations();
-		$max_runtime      = self::actionSchedulerMaxRuntimeSeconds();
-		$actions_table    = $wpdb->prefix . 'actionscheduler_actions';
-		$logs_table       = $wpdb->prefix . 'actionscheduler_logs';
-		$started_at       = microtime( true );
-		$deadline         = $started_at + $max_runtime;
-		$iterations_used  = 0;
-		$hit_limit        = false;
-
+		$max_age_days    = self::actionSchedulerMaxAgeDays();
+		$batch_size      = self::actionSchedulerBatchSize();
+		$max_iterations  = self::actionSchedulerMaxIterations();
+		$max_runtime     = self::actionSchedulerMaxRuntimeSeconds();
+		$actions_table   = $wpdb->prefix . 'actionscheduler_actions';
+		$logs_table      = $wpdb->prefix . 'actionscheduler_logs';
+		$started_at      = microtime( true );
+		$deadline        = $started_at + $max_runtime;
+		$iterations_used = 0;
+		$hit_limit       = false;
 		$logs_deleted    = 0;
 		$actions_deleted = 0;
 
@@ -524,8 +543,7 @@ class RetentionCleanup {
 	): int {
 		global $wpdb;
 
-		$deleted   = 0;
-		$hook_args = null === $hook ? array() : array( $hook );
+		$deleted = 0;
 
 		do {
 			if ( $iterations_used >= $max_iterations || microtime( true ) >= $deadline ) {
@@ -534,28 +552,38 @@ class RetentionCleanup {
 			}
 			++$iterations_used;
 
-			$query_args = array_merge(
-				array( $logs_table, $logs_table, $actions_table, 'complete', 'failed', 'canceled', $cutoff ),
-				$hook_args,
-				array( $batch_size )
-			);
-
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-			$affected = $wpdb->query(
-				$wpdb->prepare(
-					'DELETE FROM %i WHERE log_id IN (
-						SELECT log_id FROM (
-							SELECT l.log_id FROM %i l
-							INNER JOIN %i a ON l.action_id = a.action_id
-							WHERE a.status IN (%s, %s, %s)
-							AND a.last_attempt_gmt < %s'
-							. ( null === $hook ? '' : ' AND a.hook = %s' ) .
-							' LIMIT %d
-						) AS tmp
-					)',
-					$query_args
-				)
-			);
+			if ( null === $hook ) {
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+				$affected = $wpdb->query(
+					$wpdb->prepare(
+						'DELETE FROM %i WHERE log_id IN ( SELECT log_id FROM ( SELECT l.log_id FROM %i l INNER JOIN %i a ON l.action_id = a.action_id WHERE a.status IN (%s, %s, %s) AND a.last_attempt_gmt < %s LIMIT %d ) AS tmp )',
+						$logs_table,
+						$logs_table,
+						$actions_table,
+						'complete',
+						'failed',
+						'canceled',
+						$cutoff,
+						$batch_size
+					)
+				);
+			} else {
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+				$affected = $wpdb->query(
+					$wpdb->prepare(
+						'DELETE FROM %i WHERE log_id IN ( SELECT log_id FROM ( SELECT l.log_id FROM %i l INNER JOIN %i a ON l.action_id = a.action_id WHERE a.status IN (%s, %s, %s) AND a.last_attempt_gmt < %s AND a.hook = %s LIMIT %d ) AS tmp )',
+						$logs_table,
+						$logs_table,
+						$actions_table,
+						'complete',
+						'failed',
+						'canceled',
+						$cutoff,
+						$hook,
+						$batch_size
+					)
+				);
+			}
 
 			$affected = false !== $affected ? (int) $affected : 0;
 			$deleted += $affected;
@@ -589,8 +617,7 @@ class RetentionCleanup {
 	): int {
 		global $wpdb;
 
-		$deleted   = 0;
-		$hook_args = null === $hook ? array() : array( $hook );
+		$deleted = 0;
 
 		do {
 			if ( $iterations_used >= $max_iterations || microtime( true ) >= $deadline ) {
@@ -599,27 +626,36 @@ class RetentionCleanup {
 			}
 			++$iterations_used;
 
-			$query_args = array_merge(
-				array( $actions_table, $actions_table, 'complete', 'failed', 'canceled', $cutoff ),
-				$hook_args,
-				array( $batch_size )
-			);
-
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-			$affected = $wpdb->query(
-				$wpdb->prepare(
-					'DELETE FROM %i WHERE action_id IN (
-						SELECT action_id FROM (
-							SELECT a.action_id FROM %i a
-							WHERE a.status IN (%s, %s, %s)
-							AND a.last_attempt_gmt < %s'
-							. ( null === $hook ? '' : ' AND a.hook = %s' ) .
-							' LIMIT %d
-						) AS tmp
-					)',
-					$query_args
-				)
-			);
+			if ( null === $hook ) {
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+				$affected = $wpdb->query(
+					$wpdb->prepare(
+						'DELETE FROM %i WHERE action_id IN ( SELECT action_id FROM ( SELECT a.action_id FROM %i a WHERE a.status IN (%s, %s, %s) AND a.last_attempt_gmt < %s LIMIT %d ) AS tmp )',
+						$actions_table,
+						$actions_table,
+						'complete',
+						'failed',
+						'canceled',
+						$cutoff,
+						$batch_size
+					)
+				);
+			} else {
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+				$affected = $wpdb->query(
+					$wpdb->prepare(
+						'DELETE FROM %i WHERE action_id IN ( SELECT action_id FROM ( SELECT a.action_id FROM %i a WHERE a.status IN (%s, %s, %s) AND a.last_attempt_gmt < %s AND a.hook = %s LIMIT %d ) AS tmp )',
+						$actions_table,
+						$actions_table,
+						'complete',
+						'failed',
+						'canceled',
+						$cutoff,
+						$hook,
+						$batch_size
+					)
+				);
+			}
 
 			$affected = false !== $affected ? (int) $affected : 0;
 			$deleted += $affected;
