@@ -395,6 +395,60 @@ class GoogleAnalyticsAbilities {
 			);
 		}
 
+		// In-network referrer filter for network_density.
+		//
+		// network_density groups by hostName x pageReferrer. pageReferrer is a
+		// near-unbounded, high-cardinality dimension, so the single-page GA4 row
+		// cap fills with the largest external/"(other)" referrer buckets and the
+		// small in-network EC->EC referrer rows fall off the end — silently
+		// under-counting in-network referrals. Constrain pageReferrer to EC hosts
+		// server-side so GA4 only returns in-network rows BEFORE the cap applies,
+		// keeping it one cheap API call (there are far fewer than the row cap of
+		// distinct in-network referrer buckets) and making the result
+		// volume-independent.
+		if ( 'network_density' === $action ) {
+			// Source the EC host set from a filter so it lives in one place
+			// rather than as a brittle inline literal at the call site.
+			$network_hosts = apply_filters(
+				'datamachine_network_density_hosts',
+				array( 'extrachill.com', 'extrachill.link' )
+			);
+
+			$host_expressions = array();
+			foreach ( (array) $network_hosts as $host ) {
+				$host = sanitize_text_field( $host );
+				if ( '' === $host ) {
+					continue;
+				}
+				// CONTAINS covers the apex host and every subdomain
+				// (e.g. "extrachill.com" matches both "extrachill.com" and
+				// "community.extrachill.com"), so wildcard subdomains are
+				// implicit and do not need separate patterns.
+				$host_expressions[] = array(
+					'filter' => array(
+						'fieldName'    => 'pageReferrer',
+						'stringFilter' => array(
+							'matchType' => 'CONTAINS',
+							'value'     => $host,
+						),
+					),
+				);
+			}
+
+			if ( ! empty( $host_expressions ) ) {
+				// A single OR group of pageReferrer CONTAINS expressions is one
+				// filter expression, so it composes with any hostname filter via
+				// the existing 1-vs-andGroup path below.
+				$filters[] = count( $host_expressions ) === 1
+					? $host_expressions[0]
+					: array(
+						'orGroup' => array(
+							'expressions' => $host_expressions,
+						),
+					);
+			}
+		}
+
 		if ( count( $filters ) === 1 ) {
 			$request_body['dimensionFilter'] = $filters[0];
 		} elseif ( count( $filters ) > 1 ) {

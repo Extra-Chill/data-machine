@@ -229,6 +229,128 @@ class GoogleAnalyticsAbilitiesTest extends WP_UnitTestCase {
 		$this->assertSame( 156, $users['next_users'] );
 	}
 
+	/**
+	 * network_density must constrain pageReferrer to the in-network EC hosts
+	 * server-side so the GA4 row cap can't truncate the in-network referrer
+	 * long tail. With no other filter, the single dimensionFilter is the OR
+	 * group of pageReferrer CONTAINS expressions for the default host set.
+	 */
+	public function test_network_density_filters_referrer_to_in_network_hosts(): void {
+		$body = GoogleAnalyticsAbilities::buildReportRequestBody(
+			array(
+				'start_date' => '2026-01-01',
+				'end_date'   => '2026-01-31',
+			),
+			'network_density'
+		);
+
+		$this->assertArrayHasKey(
+			'dimensionFilter',
+			$body,
+			'network_density must emit an in-network pageReferrer dimensionFilter'
+		);
+		$this->assertArrayHasKey(
+			'orGroup',
+			$body['dimensionFilter'],
+			'Default multi-host set must produce an orGroup of pageReferrer expressions'
+		);
+
+		$expressions = $body['dimensionFilter']['orGroup']['expressions'];
+		$this->assertCount( 2, $expressions, 'Default EC host set has two hosts' );
+
+		foreach ( $expressions as $expr ) {
+			$filter = $expr['filter'];
+			$this->assertSame( 'pageReferrer', $filter['fieldName'] );
+			$this->assertSame( 'CONTAINS', $filter['stringFilter']['matchType'] );
+		}
+
+		$values = array_map(
+			static fn( $e ) => $e['filter']['stringFilter']['value'],
+			$expressions
+		);
+		$this->assertContains( 'extrachill.com', $values );
+		$this->assertContains( 'extrachill.link', $values );
+	}
+
+	/**
+	 * The in-network host set is config/filter-driven, not an inline literal.
+	 */
+	public function test_network_density_hosts_are_filterable(): void {
+		$callback = static fn() => array( 'example.test' );
+		add_filter( 'datamachine_network_density_hosts', $callback );
+
+		try {
+			$body = GoogleAnalyticsAbilities::buildReportRequestBody(
+				array(
+					'start_date' => '2026-01-01',
+					'end_date'   => '2026-01-31',
+				),
+				'network_density'
+			);
+		} finally {
+			remove_filter( 'datamachine_network_density_hosts', $callback );
+		}
+
+		// A single host collapses to one (non-grouped) filter expression.
+		$filter = $body['dimensionFilter']['filter'];
+		$this->assertSame( 'pageReferrer', $filter['fieldName'] );
+		$this->assertSame( 'example.test', $filter['stringFilter']['value'] );
+	}
+
+	/**
+	 * The network_density referrer filter ANDs with an explicit hostname filter
+	 * so a per-site density request stays scoped to that host while still only
+	 * counting in-network referrers.
+	 */
+	public function test_network_density_referrer_filter_ands_with_hostname(): void {
+		$body = GoogleAnalyticsAbilities::buildReportRequestBody(
+			array(
+				'hostname'   => 'extrachill.com',
+				'start_date' => '2026-01-01',
+				'end_date'   => '2026-01-31',
+			),
+			'network_density'
+		);
+
+		$this->assertArrayHasKey( 'andGroup', $body['dimensionFilter'] );
+		$expressions = $body['dimensionFilter']['andGroup']['expressions'];
+		$this->assertCount( 2, $expressions );
+
+		$has_hostname = false;
+		$has_referrer_group = false;
+		foreach ( $expressions as $expr ) {
+			if ( isset( $expr['filter'] ) && 'hostName' === $expr['filter']['fieldName'] ) {
+				$has_hostname = true;
+			}
+			if ( isset( $expr['orGroup'] ) ) {
+				$referrer_fields = array_map(
+					static fn( $e ) => $e['filter']['fieldName'],
+					$expr['orGroup']['expressions']
+				);
+				$has_referrer_group = array( 'pageReferrer', 'pageReferrer' ) === $referrer_fields;
+			}
+		}
+
+		$this->assertTrue( $has_hostname, 'hostName EXACT filter must be present' );
+		$this->assertTrue( $has_referrer_group, 'in-network pageReferrer orGroup must be present' );
+	}
+
+	/**
+	 * network_density is the only report that gets the in-network referrer
+	 * filter — other actions must not emit a pageReferrer dimensionFilter.
+	 */
+	public function test_other_actions_do_not_get_referrer_filter(): void {
+		$body = GoogleAnalyticsAbilities::buildReportRequestBody(
+			array(
+				'start_date' => '2026-01-01',
+				'end_date'   => '2026-01-31',
+			),
+			'date_stats'
+		);
+
+		$this->assertArrayNotHasKey( 'dimensionFilter', $body );
+	}
+
 	public static function all_filterable_actions(): array {
 		return array(
 			'page_stats'        => array( 'page_stats' ),
