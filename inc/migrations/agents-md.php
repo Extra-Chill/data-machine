@@ -241,16 +241,16 @@ function datamachine_agents_md_render_datamachine_section(): string {
  * @return array<string, string[]> Command label => ordered subcommand names.
  */
 function datamachine_agents_md_command_groups(): array {
-	$groups   = array();
-	$seen     = array();
+	$groups = array();
+	$seen   = array();
 
-	foreach ( CommandRegistry::map() as $command => $class ) {
-		if ( isset( $seen[ $class ] ) ) {
+	foreach ( CommandRegistry::map() as $command => $command_class ) {
+		if ( isset( $seen[ $command_class ] ) ) {
 			continue;
 		}
-		$seen[ $class ] = true;
+		$seen[ $command_class ] = true;
 
-		$groups[ $command ] = datamachine_agents_md_subcommand_names( $class );
+		$groups[ $command ] = datamachine_agents_md_subcommand_names( $command_class );
 	}
 
 	return $groups;
@@ -259,14 +259,14 @@ function datamachine_agents_md_command_groups(): array {
 /**
  * Resolve a command class's subcommand names, preferring the shared helper.
  *
- * @param class-string $class Command class.
+ * @param class-string $command_class Command class.
  * @return string[] Ordered subcommand names ('__default' omitted).
  */
-function datamachine_agents_md_subcommand_names( string $class ): array {
+function datamachine_agents_md_subcommand_names( string $command_class ): array {
 	$introspector = '\\DataMachine\\Engine\\AI\\CliCommandIntrospector';
 
 	if ( class_exists( $introspector ) && method_exists( $introspector, 'describe_class' ) ) {
-		$subcommands = call_user_func( array( $introspector, 'describe_class' ), $class );
+		$subcommands = call_user_func( array( $introspector, 'describe_class' ), $command_class );
 		$names       = array();
 		foreach ( (array) $subcommands as $sub ) {
 			$name = is_array( $sub ) ? ( $sub['name'] ?? '' ) : '';
@@ -284,7 +284,7 @@ function datamachine_agents_md_subcommand_names( string $class ): array {
 		}
 	}
 
-	return datamachine_agents_md_reflect_subcommand_names( $class );
+	return datamachine_agents_md_reflect_subcommand_names( $command_class );
 }
 
 /**
@@ -296,16 +296,16 @@ function datamachine_agents_md_subcommand_names( string $class ): array {
  * name; magic methods are skipped except `__invoke`, which maps to the namespace
  * itself ('__default') and is therefore omitted from the documented list.
  *
- * @param class-string $class Command class.
+ * @param class-string $command_class Command class.
  * @return string[] Ordered subcommand names.
  */
-function datamachine_agents_md_reflect_subcommand_names( string $class ): array {
-	if ( ! class_exists( $class ) ) {
+function datamachine_agents_md_reflect_subcommand_names( string $command_class ): array {
+	if ( ! class_exists( $command_class ) ) {
 		return array();
 	}
 
 	try {
-		$reflection = new \ReflectionClass( $class );
+		$reflection = new \ReflectionClass( $command_class );
 	} catch ( \Throwable $e ) {
 		return array();
 	}
