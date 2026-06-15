@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.146.2] - 2026-06-15
+
+### Fixed
+- classify failed bundle statuses
+
 ## [0.146.1] - 2026-06-15
 
 ### Fixed
