@@ -43,7 +43,7 @@ class RuntimeEnvironment {
 	 * @return bool True when full runtime registration should run.
 	 */
 	public static function should_load_full_runtime(): bool {
-		if ( self::is_wp_codebox_agent_runtime() ) {
+		if ( self::is_agent_runtime() ) {
 			return true;
 		}
 
@@ -70,12 +70,12 @@ class RuntimeEnvironment {
 	}
 
 	/**
-	 * Determine whether WP Codebox is executing an agent/runtime task.
+	 * Determine whether a host is executing an agent/runtime task.
 	 *
 	 * @return bool True when the host-owned execution context requires full runtime registration.
 	 */
-	private static function is_wp_codebox_agent_runtime(): bool {
-		$value = getenv( 'WP_CODEBOX_AGENT_RUNTIME' );
+	private static function is_agent_runtime(): bool {
+		$value = getenv( 'WP_AGENT_RUNTIME' );
 
 		return is_string( $value ) && in_array( strtolower( trim( $value ) ), array( '1', 'true', 'yes', 'on' ), true );
 	}

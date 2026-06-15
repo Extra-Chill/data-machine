@@ -105,21 +105,21 @@ namespace {
 
 	$_SERVER['REQUEST_URI'] = '/frontend-page/';
 	unset( $_GET['rest_route'] );
-	putenv( 'WP_CODEBOX_AGENT_RUNTIME' );
+	putenv( 'WP_AGENT_RUNTIME' );
 
 	$assert(
 		'normal frontend request remains lazy by default',
 		! RuntimeEnvironment::should_load_full_runtime()
 	);
 
-	putenv( 'WP_CODEBOX_AGENT_RUNTIME=1' );
+	putenv( 'WP_AGENT_RUNTIME=1' );
 
 	$assert(
-		'wp codebox agent runtime signal loads full runtime',
+		'agent runtime signal loads full runtime',
 		RuntimeEnvironment::should_load_full_runtime()
 	);
 
-	putenv( 'WP_CODEBOX_AGENT_RUNTIME' );
+	putenv( 'WP_AGENT_RUNTIME' );
 
 }
 
