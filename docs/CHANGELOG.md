@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.148.0] - 2026-06-15
+
+### Added
+- gate AGENTS.md composition in core behind DATAMACHINE_COMPOSE_AGENTS_MD
+
 ## [0.147.0] - 2026-06-15
 
 ### Added
