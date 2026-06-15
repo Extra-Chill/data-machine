@@ -38,13 +38,21 @@ class CliCommandIntrospector {
 	/**
 	 * Describe all subcommands exposed by one WP-CLI command class.
 	 *
-	 * Reflects over the class's public, non-static methods (excluding magic
-	 * methods like `__construct`/`__invoke`) and returns each as a subcommand.
-	 * The subcommand name is taken from the method's `@subcommand <name>`
-	 * annotation when present, otherwise the method name (matching WP-CLI's own
+	 * Reflects over the class's public, non-static methods and returns each as a
+	 * subcommand. The subcommand name is taken from the method's
+	 * `@subcommand <name>` annotation when present, otherwise the method name
+	 * with underscores converted to hyphens (matching WP-CLI's own
 	 * `CommandFactory` fallback). The description is the PHPDoc short
 	 * description — the first non-tag line of the method docblock — exactly as
 	 * WP-CLI parses it for `--help`.
+	 *
+	 * A class whose only public command method is `__invoke` (the dominant
+	 * "flat command" shape — `wp extrachill venues`, `wp intelligence wiki
+	 * brain`, every `datamachine analytics *` command) is the namespace's
+	 * directly-invokable command. It reflects to a single `__default`
+	 * pseudo-subcommand carrying the `__invoke` docblock's short description,
+	 * so consumers can render it as the namespace headline. Other magic methods
+	 * (`__construct`, `__destruct`, …) are always skipped.
 	 *
 	 * @since x.y.z
 	 *
@@ -59,7 +67,8 @@ class CliCommandIntrospector {
 	 * }
 	 * @return array<int, array{name: string, description: string}> List of
 	 *         subcommands sorted by name, each with `name` and `description`.
-	 *         Empty array when the class does not exist.
+	 *         A single `__default` entry for an `__invoke`-only command. Empty
+	 *         array when the class does not exist.
 	 */
 	public static function describe_class( string $command_class, array $args = array() ): array {
 		if ( ! class_exists( $command_class ) ) {
@@ -161,6 +170,11 @@ class CliCommandIntrospector {
 	 * mapping from its WP-CLI bootstrap) so this helper never needs the live
 	 * WP-CLI runner.
 	 *
+	 * This is the canonical path for consumers that own a `command-string =>
+	 * class` map (the extrachill-cli / intelligence shape). A flat `__invoke`
+	 * command surfaces as a single `__default` subcommand entry; consumers
+	 * render that as the command's own headline rather than a sub-verb.
+	 *
 	 * @since x.y.z
 	 *
 	 * @param string                      $cli_namespace WP-CLI namespace label (e.g. 'datamachine').
@@ -191,24 +205,45 @@ class CliCommandIntrospector {
 	/**
 	 * Determine whether a reflected method is a WP-CLI subcommand candidate.
 	 *
-	 * Mirrors WP-CLI's `CommandFactory::is_good_method()`: public, non-static,
-	 * and not a magic method (`__construct`, `__invoke`, etc.).
+	 * Mirrors WP-CLI's `CommandFactory::is_good_method()` with one deliberate
+	 * addition: `__invoke` IS a subcommand candidate. WP-CLI registers a class
+	 * whose handler is `__invoke` as a directly-invokable command (the flat
+	 * "one command, no sub-verbs" shape). It is reflected here as the
+	 * `__default` pseudo-subcommand (see {@see self::subcommand_name()}).
+	 *
+	 * All other magic methods (`__construct`, `__destruct`, `__get`, …) and
+	 * static methods are not subcommands and are skipped.
 	 *
 	 * @param ReflectionMethod $method Reflected method.
 	 * @return bool
 	 */
 	private static function is_subcommand_method( ReflectionMethod $method ): bool {
-		return $method->isPublic()
-			&& ! $method->isStatic()
-			&& 0 !== strpos( $method->getName(), '__' );
+		if ( ! $method->isPublic() || $method->isStatic() ) {
+			return false;
+		}
+
+		$name = $method->getName();
+
+		// `__invoke` is the directly-invokable command handler — keep it.
+		if ( '__invoke' === $name ) {
+			return true;
+		}
+
+		// Skip every other magic method (`__construct`, `__destruct`, etc.).
+		return 0 !== strpos( $name, '__' );
 	}
 
 	/**
 	 * Resolve the subcommand name for a method.
 	 *
-	 * Uses the `@subcommand <name>` annotation when present, otherwise falls
-	 * back to the method name — matching WP-CLI's `CommandFactory` resolution
-	 * order (`@subcommand` tag, then `$reflection->name`).
+	 * Resolution order mirrors WP-CLI's `CommandFactory`:
+	 *
+	 * 1. The `@subcommand <name>` annotation when present.
+	 * 2. For `__invoke` (with no annotation), the `__default` pseudo-subcommand
+	 *    — the namespace's directly-invokable command, which consumers render as
+	 *    the namespace headline rather than a sub-verb.
+	 * 3. Otherwise the method name with underscores converted to hyphens, which
+	 *    is exactly how WP-CLI derives a subcommand name from a method name.
 	 *
 	 * @param ReflectionMethod $method      Reflected method.
 	 * @param string           $doc_comment Raw doc comment.
@@ -217,7 +252,15 @@ class CliCommandIntrospector {
 	private static function subcommand_name( ReflectionMethod $method, string $doc_comment ): string {
 		$tag = self::get_tag( $doc_comment, 'subcommand' );
 
-		return '' !== $tag ? $tag : $method->getName();
+		if ( '' !== $tag ) {
+			return $tag;
+		}
+
+		if ( '__invoke' === $method->getName() ) {
+			return '__default';
+		}
+
+		return str_replace( '_', '-', $method->getName() );
 	}
 
 	/**
