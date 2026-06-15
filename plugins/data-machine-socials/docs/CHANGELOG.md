@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.14.1] - 2026-06-15
+
+### Fixed
+- guard ability category registration against double-fire _doing_it_wrong notice
+- untrack build/ artifacts so stale zips can never ship as release assets
+
 ## [0.14.0] - 2026-06-06
 
 ### Added
