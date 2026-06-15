@@ -2,6 +2,14 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.147.0] - 2026-06-15
+
+### Added
+- make CliCommandIntrospector handle __invoke/__default commands
+
+### Changed
+- remove google-analytics CLI command from core
+
 ## [0.146.4] - 2026-06-15
 
 ### Fixed
