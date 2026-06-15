@@ -158,6 +158,33 @@ function datamachine_socials_bootstrap() {
 }
 add_action( 'plugins_loaded', 'datamachine_socials_bootstrap', 20 );
 
+/**
+ * Register the Data Machine Socials CLI section in the composable AGENTS.md
+ * file so external agent runtimes discover the social CLI surface
+ * automatically.
+ *
+ * Runs outside the WP_CLI guard because compose/auto-regeneration may fire in
+ * non-CLI WordPress contexts (web/cron). The section generator reflects over
+ * the command class files directly (resolved from disk via CommandRegistry),
+ * so it never depends on the live WP-CLI runner being loaded.
+ */
+function datamachine_socials_register_agents_md_section() {
+	if ( ! class_exists( '\DataMachine\Engine\AI\SectionRegistry' ) ) {
+		return;
+	}
+
+	$wp = 'wp --allow-root --path=' . ABSPATH;
+
+	\DataMachine\Engine\AI\SectionRegistry::register( 'AGENTS.md', 'data-machine-socials', 60, function () use ( $wp ) {
+		return \DataMachineSocials\Cli\AgentsMdSection::render( $wp );
+	}, array(
+		'label'       => 'Data Machine Socials CLI',
+		'description' => 'Cross-platform social media WP-CLI commands.',
+		'freshness'   => 'generated',
+	) );
+}
+add_action( 'plugins_loaded', 'datamachine_socials_register_agents_md_section', 22 );
+
 // Temp file cleanup runs independently (doesn't need DM core)
 \DataMachineSocials\Cleanup::register();
 
@@ -218,26 +245,13 @@ add_action( 'admin_enqueue_scripts', 'datamachine_socials_enqueue_assets' );
  * Register WP-CLI commands.
  */
 if ( defined( 'WP_CLI' ) && WP_CLI ) {
-	require_once DATAMACHINE_SOCIALS_PATH . 'inc/Cli/Commands/PinterestCommand.php';
-	require_once DATAMACHINE_SOCIALS_PATH . 'inc/Cli/Commands/RedditCommand.php';
-	require_once DATAMACHINE_SOCIALS_PATH . 'inc/Cli/Commands/InstagramCommand.php';
-	require_once DATAMACHINE_SOCIALS_PATH . 'inc/Cli/Commands/ThreadsCommand.php';
-	require_once DATAMACHINE_SOCIALS_PATH . 'inc/Cli/Commands/FacebookCommand.php';
-	require_once DATAMACHINE_SOCIALS_PATH . 'inc/Cli/Commands/TwitterCommand.php';
-	require_once DATAMACHINE_SOCIALS_PATH . 'inc/Cli/Commands/BlueskyCommand.php';
-	require_once DATAMACHINE_SOCIALS_PATH . 'inc/Cli/Commands/LinkedInCommand.php';
-	require_once DATAMACHINE_SOCIALS_PATH . 'inc/Cli/Commands/SharesCommand.php';
-	require_once DATAMACHINE_SOCIALS_PATH . 'inc/Cli/Commands/CommentsCommand.php';
-	WP_CLI::add_command( 'datamachine-socials comments', \DataMachineSocials\Cli\Commands\CommentsCommand::class );
-	WP_CLI::add_command( 'datamachine-socials linkedin', \DataMachineSocials\Cli\Commands\LinkedInCommand::class );
-	WP_CLI::add_command( 'datamachine-socials pinterest', \DataMachineSocials\Cli\Commands\PinterestCommand::class );
-	WP_CLI::add_command( 'datamachine-socials reddit', \DataMachineSocials\Cli\Commands\RedditCommand::class );
-	WP_CLI::add_command( 'datamachine-socials instagram', \DataMachineSocials\Cli\Commands\InstagramCommand::class );
-	WP_CLI::add_command( 'datamachine-socials threads', \DataMachineSocials\Cli\Commands\ThreadsCommand::class );
-	WP_CLI::add_command( 'datamachine-socials facebook', \DataMachineSocials\Cli\Commands\FacebookCommand::class );
-	WP_CLI::add_command( 'datamachine-socials twitter', \DataMachineSocials\Cli\Commands\TwitterCommand::class );
-	WP_CLI::add_command( 'datamachine-socials bluesky', \DataMachineSocials\Cli\Commands\BlueskyCommand::class );
-	WP_CLI::add_command( 'datamachine-socials shares', \DataMachineSocials\Cli\Commands\SharesCommand::class );
+	// Single source of truth: CommandRegistry maps every command string to its
+	// class. The AGENTS.md section generator reads the same map, so the
+	// documented CLI surface can never drift from what is registered here.
+	foreach ( \DataMachineSocials\Cli\CommandRegistry::map() as $command => $class ) {
+		require_once \DataMachineSocials\Cli\CommandRegistry::file_for_class( $class );
+		WP_CLI::add_command( $command, $class );
+	}
 }
 
 /**
