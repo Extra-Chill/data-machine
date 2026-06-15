@@ -149,6 +149,164 @@ class ToolPolicyResolver {
 	}
 
 	/**
+	 * Resolve tools and return bounded evidence for required-tool diagnostics.
+	 *
+	 * @param array $args                 Resolution arguments.
+	 * @param array $required_tool_names  Completion assertion required tool names.
+	 * @param array $requested_tool_names Requested/enabled tool names from the step config.
+	 * @return array{tools: array<string,array<string,mixed>>, evidence: array<string,mixed>}
+	 */
+	public function resolveWithEvidence( array $args, array $required_tool_names = array(), array $requested_tool_names = array() ): array {
+		$tools    = $this->resolve( $args );
+		$evidence = $this->buildResolutionEvidence( $args, $tools, $required_tool_names, $requested_tool_names );
+
+		return array(
+			'tools'    => $tools,
+			'evidence' => $evidence,
+		);
+	}
+
+	/**
+	 * Build the local Data Machine view of requested, required, gathered, and resolved tools.
+	 *
+	 * @param array $args                 Resolution arguments.
+	 * @param array $resolved_tools       Final resolved tools keyed by name.
+	 * @param array $required_tool_names  Completion assertion required tool names.
+	 * @param array $requested_tool_names Requested/enabled tool names from the step config.
+	 * @return array<string,mixed>
+	 */
+	private function buildResolutionEvidence( array $args, array $resolved_tools, array $required_tool_names, array $requested_tool_names ): array {
+		$modes                = self::normalizeModes( $args['modes'] ?? ( array_key_exists( 'mode', $args ) ? array( $args['mode'] ) : array( self::MODE_PIPELINE ) ) );
+		$requested_tool_names = $this->policy_filter->string_list( $requested_tool_names );
+		if ( empty( $requested_tool_names ) && ! empty( $args['allow_only_explicit'] ) ) {
+			$requested_tool_names = $this->policy_filter->string_list( $args['allow_only'] ?? array() );
+		}
+		$required_tool_names = $this->policy_filter->string_list( $required_tool_names );
+		$resolved_tool_names = array_keys( $resolved_tools );
+
+		$source_snapshot = $this->tool_source_registry->gatherWithMetadata(
+			$modes,
+			array_merge(
+				$args,
+				array(
+					'modes'               => $modes,
+					'include_unavailable' => true,
+				)
+			)
+		);
+		$source_tools    = is_array( $source_snapshot['tools'] ?? null ) ? $source_snapshot['tools'] : array();
+		$sources         = is_array( $source_snapshot['sources'] ?? null ) ? $source_snapshot['sources'] : array();
+
+		$source_by_tool = array();
+		foreach ( $sources as $source ) {
+			if ( ! is_array( $source ) ) {
+				continue;
+			}
+			$source_slug = is_string( $source['source'] ?? null ) ? $source['source'] : '';
+			foreach ( $source['accepted_tool_names'] ?? array() as $tool_name ) {
+				if ( is_string( $tool_name ) && '' !== $tool_name && ! isset( $source_by_tool[ $tool_name ] ) ) {
+					$source_by_tool[ $tool_name ] = $source_slug;
+				}
+			}
+		}
+
+		$available_names              = $this->availableToolNamesForEvidence( $resolved_tools );
+		$unavailable_required_tools   = array_values( array_diff( array_values( array_unique( $required_tool_names ) ), $available_names ) );
+		$required_resolution_evidence = array();
+		foreach ( $required_tool_names as $tool_name ) {
+			$resolved_name = $this->resolvedToolNameForEvidence( $tool_name, $resolved_tools );
+			if ( '' !== $resolved_name ) {
+				$required_resolution_evidence[] = array(
+					'tool_name'     => $tool_name,
+					'status'        => 'resolved',
+					'reason'        => 'resolved',
+					'resolved_name' => $resolved_name,
+					'source'        => $source_by_tool[ $resolved_name ] ?? ( $resolved_tools[ $resolved_name ]['source'] ?? 'unknown' ),
+				);
+				continue;
+			}
+
+			$reason = 'unknown';
+			if ( in_array( $tool_name, $this->policy_filter->string_list( $args['deny'] ?? array() ), true ) ) {
+				$reason = 'tool_disabled';
+			} elseif ( isset( $source_tools[ $tool_name ] ) ) {
+				$reason = 'policy_filtered';
+			}
+
+			$required_resolution_evidence[] = array(
+				'tool_name' => $tool_name,
+				'status'    => 'unavailable',
+				'reason'    => $reason,
+				'source'    => $source_by_tool[ $tool_name ] ?? null,
+			);
+		}
+
+		return array(
+			'schema_version'                  => 1,
+			'modes'                           => $modes,
+			'requested_tool_names'            => $requested_tool_names,
+			'required_tool_names'             => $required_tool_names,
+			'resolved_tool_ids'               => $resolved_tool_names,
+			'unavailable_required_tool_names' => $unavailable_required_tools,
+			'available_tool_sources'          => $sources,
+			'required_tool_resolution'        => $required_resolution_evidence,
+			'filtering'                       => array_filter(
+				array(
+					'allow_only'          => $this->policy_filter->string_list( $args['allow_only'] ?? array() ),
+					'allow_only_explicit' => ! empty( $args['allow_only_explicit'] ),
+					'deny'                => $this->policy_filter->string_list( $args['deny'] ?? array() ),
+					'categories'          => $this->policy_filter->string_list( $args['categories'] ?? array() ),
+					'tool_policy'         => is_array( $args['tool_policy'] ?? null ) ? array(
+						'mode'       => is_string( $args['tool_policy']['mode'] ?? null ) ? $args['tool_policy']['mode'] : '',
+						'tools'      => $this->policy_filter->string_list( $args['tool_policy']['tools'] ?? array() ),
+						'categories' => $this->policy_filter->string_list( $args['tool_policy']['categories'] ?? array() ),
+					) : null,
+				),
+				static fn( $value ) => null !== $value && array() !== $value
+			),
+		);
+	}
+
+	/**
+	 * @param array<string,array<string,mixed>> $tools Tools keyed by logical name.
+	 * @return array<int,string>
+	 */
+	private function availableToolNamesForEvidence( array $tools ): array {
+		$names = array();
+		foreach ( $tools as $tool_name => $tool_def ) {
+			$names[] = (string) $tool_name;
+			foreach ( array( 'name', 'runtime_tool_id' ) as $key ) {
+				$value = is_string( $tool_def[ $key ] ?? null ) ? trim( (string) $tool_def[ $key ] ) : '';
+				if ( '' !== $value ) {
+					$names[] = $value;
+				}
+			}
+		}
+
+		return array_values( array_unique( array_filter( $names ) ) );
+	}
+
+	/**
+	 * @param string $required_name Required assertion tool name.
+	 * @param array  $tools         Tools keyed by logical name.
+	 */
+	private function resolvedToolNameForEvidence( string $required_name, array $tools ): string {
+		foreach ( $tools as $tool_name => $tool_def ) {
+			if ( $required_name === $tool_name ) {
+				return (string) $tool_name;
+			}
+
+			foreach ( array( 'name', 'runtime_tool_id' ) as $key ) {
+				if ( $required_name === ( $tool_def[ $key ] ?? null ) ) {
+					return (string) $tool_name;
+				}
+			}
+		}
+
+		return '';
+	}
+
+	/**
 	 * Gather tools by mode preset.
 	 *
 	 * @param array $modes Agent mode slugs.

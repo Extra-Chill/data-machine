@@ -370,22 +370,28 @@ class AIStep extends Step {
 				?? $this->engine->get( 'pipeline_tool_categories' )
 				?? array();
 
-			$resolver        = new ToolPolicyResolver();
-			$available_tools = $resolver->resolve(
-				array_merge(
-					array(
-						'modes'                => $execution_modes,
-						'agent_id'             => $agent_id,
-						'agent_slug'           => $agent_slug,
-						'previous_step_config' => $previous_step_config,
-						'next_step_config'     => $next_step_config,
-						'pipeline_step_id'     => $pipeline_step_id,
-						'engine_data'          => $engine_data,
-						'categories'           => $tool_categories,
-					),
-					PipelineToolPolicyArgs::fromConfigs( $this->flow_step_config, $pipeline_step_config )
-				)
+			$resolver                 = new ToolPolicyResolver();
+			$tool_resolution_args     = array_merge(
+				array(
+					'modes'                => $execution_modes,
+					'agent_id'             => $agent_id,
+					'agent_slug'           => $agent_slug,
+					'previous_step_config' => $previous_step_config,
+					'next_step_config'     => $next_step_config,
+					'pipeline_step_id'     => $pipeline_step_id,
+					'engine_data'          => $engine_data,
+					'categories'           => $tool_categories,
+				),
+				PipelineToolPolicyArgs::fromConfigs( $this->flow_step_config, $pipeline_step_config )
 			);
+			$tool_resolution          = $resolver->resolveWithEvidence(
+				$tool_resolution_args,
+				self::completionAssertionRequiredToolNames( $completion_assertions ),
+				FlowStepConfig::getEnabledTools( $this->flow_step_config )
+			);
+			$available_tools          = $tool_resolution['tools'];
+			$tool_resolution_evidence = $tool_resolution['evidence'];
+			self::persistToolResolutionEvidence( $this->job_id, $tool_resolution_evidence );
 
 			// Required adjacent handler tools are flow plumbing, not optional research
 			// tools. If a publish/upsert handler required by the flow shape cannot be
@@ -404,6 +410,7 @@ class AIStep extends Step {
 							'required_handler_slugs'       => $required_handler_slugs,
 							'missing_required_handler_slugs' => $missing_handler_slugs,
 							'available_handler_tool_slugs' => FlowStepConfig::getAvailableRequiredHandlerSlugsForAi( $required_handler_slugs, $available_tools ),
+							'tool_resolution_evidence'     => $tool_resolution_evidence,
 							'error_message'                => 'AI step requires adjacent handler tools that are not available to the model.',
 						)
 					);
@@ -497,6 +504,7 @@ class AIStep extends Step {
 						'ai_error'                        => $loop_result['error'],
 						'error_code'                      => $loop_result['error_code'] ?? null,
 						'unavailable_required_tool_names' => is_array( $loop_result['unavailable_required_tool_names'] ?? null ) ? $loop_result['unavailable_required_tool_names'] : array(),
+						'tool_resolution_evidence'        => $tool_resolution_evidence,
 						'ai_provider'                     => $provider_name,
 						'request_metadata'                => $request_metadata,
 						'transport_profile'               => is_array( $request_metadata['transport'] ?? null ) ? $request_metadata['transport'] : array(),
@@ -536,6 +544,7 @@ class AIStep extends Step {
 			if ( $this->job_id > 0 ) {
 				$artifact_engine_data                           = datamachine_get_engine_data( $this->job_id );
 				$artifact_engine_data['tool_execution_summary'] = self::summarizeToolExecutions( $loop_result );
+				$artifact_engine_data['tool_resolution_evidence'] = $tool_resolution_evidence;
 				if ( isset( $loop_result['runtime_provenance'] ) && is_array( $loop_result['runtime_provenance'] ) ) {
 					$artifact_engine_data['runtime_provenance'] = $loop_result['runtime_provenance'];
 				}
@@ -724,6 +733,36 @@ class AIStep extends Step {
 		}
 
 		return $merged;
+	}
+
+	/**
+	 * Extract required tool names from merged completion assertions.
+	 *
+	 * @param array $completion_assertions Merged assertion config.
+	 * @return array<int,string>
+	 */
+	private static function completionAssertionRequiredToolNames( array $completion_assertions ): array {
+		return self::normalizeCompletionAssertionList( $completion_assertions['required_tool_names'] ?? array() );
+	}
+
+	/**
+	 * Persist required-tool resolution evidence where job artifacts can surface it.
+	 *
+	 * @param int   $job_id   Job ID.
+	 * @param array $evidence Tool resolution evidence.
+	 * @return void
+	 */
+	private static function persistToolResolutionEvidence( int $job_id, array $evidence ): void {
+		if ( $job_id <= 0 || empty( $evidence ) || ! function_exists( 'datamachine_merge_engine_data' ) ) {
+			return;
+		}
+
+		datamachine_merge_engine_data(
+			$job_id,
+			array(
+				'tool_resolution_evidence' => $evidence,
+			)
+		);
 	}
 
 	/**

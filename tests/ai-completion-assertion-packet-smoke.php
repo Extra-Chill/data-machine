@@ -63,6 +63,7 @@ require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Tools/class-wp-agent
 require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Tools/class-wp-agent-tool-policy.php';
 require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Tools/class-wp-agent-tool-source-registry.php';
 require_once __DIR__ . '/../inc/Engine/AI/ConversationManager.php';
+require_once __DIR__ . '/../inc/Engine/AI/conversation-loop.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/ToolManager.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/Policy/DataMachineAgentToolPolicyProvider.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/Policy/DataMachineMandatoryToolPolicy.php';
@@ -98,14 +99,18 @@ $missing_method = new ReflectionMethod( AIStep::class, 'missingCompletionAsserti
 
 $result = $method->invoke(
 	null,
-	array(
-		'messages'                       => array(),
-		'tool_execution_results'         => array(),
-		'completion_assertions_complete'  => true,
-		'completion_assertions_satisfied' => array(
-			'complete_when_any' => array( 'design_comment_and_labels' ),
+	\DataMachine\Engine\AI\datamachine_with_conversation_metadata(
+		array(
+			'messages'               => array(),
+			'tool_execution_results' => array(),
 		),
-		'completion_assertions_missing'   => array(),
+		array(
+			'completion_assertions_complete'  => true,
+			'completion_assertions_satisfied' => array(
+				'complete_when_any' => array( 'design_comment_and_labels' ),
+			),
+			'completion_assertions_missing'   => array(),
+		)
 	),
 	array(
 		array(
@@ -124,6 +129,7 @@ assert_completion_packet( array( 'design_comment_and_labels' ) === ( $result[0][
 
 $missing_failure = $missing_method->invoke(
 	null,
+	array(),
 	array(
 		'completion_assertions_complete'  => false,
 		'completion_assertions_missing'   => array( 'tool_names' => array( 'comment_github_pull_request' ) ),
@@ -138,6 +144,7 @@ assert_completion_packet( array( 'comment_github_pull_request' ) === ( $missing_
 
 $complete_failure = $missing_method->invoke(
 	null,
+	array(),
 	array(
 		'completion_assertions_complete'  => true,
 		'completion_assertions_missing'   => array(),
