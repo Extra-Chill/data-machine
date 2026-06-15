@@ -11,6 +11,7 @@ declare( strict_types = 1 );
 
 namespace {
 	use DataMachine\Core\Bootstrap\DependencyChecker;
+	use DataMachine\Core\Bootstrap\RuntimeEnvironment;
 
 	if ( ! defined( 'ABSPATH' ) ) {
 		define( 'ABSPATH', '/tmp/' );
@@ -59,6 +60,66 @@ namespace {
 			&& DependencyChecker::CHECK_WORDPRESS_ABILITIES === 'wordpress_abilities'
 			&& DependencyChecker::CHECK_ZIP_ARCHIVE === 'zip_archive'
 	);
+
+	if ( ! function_exists( 'is_admin' ) ) {
+		function is_admin(): bool {
+			return false;
+		}
+	}
+
+	if ( ! function_exists( 'wp_doing_ajax' ) ) {
+		function wp_doing_ajax(): bool {
+			return false;
+		}
+	}
+
+	if ( ! function_exists( 'wp_doing_cron' ) ) {
+		function wp_doing_cron(): bool {
+			return false;
+		}
+	}
+
+	if ( ! function_exists( 'sanitize_text_field' ) ) {
+		function sanitize_text_field( $value ): string {
+			return is_scalar( $value ) ? (string) $value : '';
+		}
+	}
+
+	if ( ! function_exists( 'wp_unslash' ) ) {
+		function wp_unslash( $value ) {
+			return $value;
+		}
+	}
+
+	if ( ! function_exists( 'wp_parse_url' ) ) {
+		function wp_parse_url( string $url, int $component = -1 ) {
+			return parse_url( $url, $component );
+		}
+	}
+
+	if ( ! function_exists( 'apply_filters' ) ) {
+		function apply_filters( string $hook_name, $value ) {
+			return $value;
+		}
+	}
+
+	$_SERVER['REQUEST_URI'] = '/frontend-page/';
+	unset( $_GET['rest_route'] );
+	putenv( 'WP_AGENT_RUNTIME' );
+
+	$assert(
+		'normal frontend request remains lazy by default',
+		! RuntimeEnvironment::should_load_full_runtime()
+	);
+
+	putenv( 'WP_AGENT_RUNTIME=1' );
+
+	$assert(
+		'agent runtime signal loads full runtime',
+		RuntimeEnvironment::should_load_full_runtime()
+	);
+
+	putenv( 'WP_AGENT_RUNTIME' );
 
 }
 
