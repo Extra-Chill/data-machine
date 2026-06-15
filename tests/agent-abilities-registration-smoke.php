@@ -15,7 +15,7 @@ namespace {
 	if ( function_exists( 'wp_get_ability' ) ) {
 		$ability = wp_get_ability( 'datamachine/run-agent-bundle' );
 		if ( ! $ability || ! method_exists( $ability, 'execute' ) ) {
-			fwrite( STDERR, "FAIL: datamachine/run-agent-bundle is not registered in WordPress runtime\n" );
+			echo "FAIL: datamachine/run-agent-bundle is not registered in WordPress runtime\n";
 			exit( 1 );
 		}
 
@@ -89,7 +89,7 @@ namespace {
 
 	function agent_abilities_assert( $condition, $message ) {
 		if ( ! $condition ) {
-			fwrite( STDERR, "FAIL: {$message}\n" );
+			echo "FAIL: {$message}\n";
 			exit( 1 );
 		}
 	}
