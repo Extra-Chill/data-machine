@@ -13,6 +13,26 @@ namespace {
 	}
 
 	if ( function_exists( 'wp_get_ability' ) ) {
+		// Real WordPress runtime (e.g. the wp-codebox host-smoke-wp backend).
+		// The harness boots a bare WordPress with the plugin DIRECTORY mounted
+		// but NOT activated, so Data Machine's normal `plugins_loaded`
+		// registration never runs. This mirrors the WP Codebox sandbox case the
+		// fix targets: a runtime task that needs `datamachine/run-agent-bundle`
+		// must be able to register it on demand, regardless of request shape.
+		//
+		// Load the agent ability registration the same unconditional way
+		// data-machine.php does at file scope, then assert the ability resolves.
+		// `wp_get_ability()` lazily fires `wp_abilities_api_init`; the classes
+		// handle every timing state (hook before the fire, register during it,
+		// or register late through the registry instance after it).
+		if ( ! class_exists( '\DataMachine\Abilities\AgentAbilities' ) ) {
+			require_once dirname( __DIR__ ) . '/vendor/autoload.php';
+			require_once dirname( __DIR__ ) . '/inc/Abilities/AbilityCategories.php';
+			require_once dirname( __DIR__ ) . '/inc/Abilities/AgentAbilities.php';
+		}
+		\DataMachine\Abilities\AbilityCategories::ensure_registered();
+		new \DataMachine\Abilities\AgentAbilities();
+
 		$ability = wp_get_ability( 'datamachine/run-agent-bundle' );
 		if ( ! $ability || ! method_exists( $ability, 'execute' ) ) {
 			echo "FAIL: datamachine/run-agent-bundle is not registered in WordPress runtime\n";
@@ -126,8 +146,14 @@ namespace {
 }
 
 namespace DataMachine\Abilities {
-	class AbilityCategories {
-		public static function ensure_registered(): void {}
+	// Conditional so it is NOT compile-time hoisted: the real-WP branch at the
+	// top of this file requires the real AbilityCategories class and returns
+	// before reaching the pure-PHP harness below, so this stub must never clash
+	// with it.
+	if ( ! class_exists( __NAMESPACE__ . '\\AbilityCategories' ) ) {
+		class AbilityCategories {
+			public static function ensure_registered(): void {}
+		}
 	}
 }
 
