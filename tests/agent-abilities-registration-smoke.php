@@ -12,52 +12,79 @@ namespace {
 		define( 'ABSPATH', __DIR__ );
 	}
 
-	class WP_Ability {}
+	if ( function_exists( 'wp_get_ability' ) ) {
+		$ability = wp_get_ability( 'datamachine/run-agent-bundle' );
+		if ( ! $ability || ! method_exists( $ability, 'execute' ) ) {
+			fwrite( STDERR, "FAIL: datamachine/run-agent-bundle is not registered in WordPress runtime\n" );
+			exit( 1 );
+		}
+
+		echo "OK: agent bundle ability is registered in WordPress runtime\n";
+		return;
+	}
+
+	if ( ! class_exists( 'WP_Ability' ) ) {
+		class WP_Ability {}
+	}
 
 	$GLOBALS['agent_abilities_actions']              = array();
 	$GLOBALS['agent_abilities_doing_action']         = false;
 	$GLOBALS['agent_abilities_did_action']           = false;
 	$GLOBALS['agent_abilities_registered_abilities'] = array();
 
-	function __( $text, $domain = 'default' ) {
-		return $text;
+	if ( ! function_exists( '__' ) ) {
+		function __( $text, $domain = 'default' ) {
+			return $text;
+		}
 	}
 
-	function doing_action( $hook ) {
-		return 'wp_abilities_api_init' === $hook && $GLOBALS['agent_abilities_doing_action'];
+	if ( ! function_exists( 'doing_action' ) ) {
+		function doing_action( $hook ) {
+			return 'wp_abilities_api_init' === $hook && $GLOBALS['agent_abilities_doing_action'];
+		}
 	}
 
-	function did_action( $hook ) {
-		return 'wp_abilities_api_init' === $hook && $GLOBALS['agent_abilities_did_action'] ? 1 : 0;
+	if ( ! function_exists( 'did_action' ) ) {
+		function did_action( $hook ) {
+			return 'wp_abilities_api_init' === $hook && $GLOBALS['agent_abilities_did_action'] ? 1 : 0;
+		}
 	}
 
-	function add_action( $hook, $callback ) {
-		$GLOBALS['agent_abilities_actions'][ $hook ][] = $callback;
+	if ( ! function_exists( 'add_action' ) ) {
+		function add_action( $hook, $callback ) {
+			$GLOBALS['agent_abilities_actions'][ $hook ][] = $callback;
+		}
 	}
 
-	function add_filter( $hook, $callback, $priority = 10, $accepted_args = 1 ) {
-		$GLOBALS['agent_abilities_filters'][ $hook ][ $priority ][] = compact( 'callback', 'accepted_args' );
+	if ( ! function_exists( 'add_filter' ) ) {
+		function add_filter( $hook, $callback, $priority = 10, $accepted_args = 1 ) {
+			$GLOBALS['agent_abilities_filters'][ $hook ][ $priority ][] = compact( 'callback', 'accepted_args' );
+		}
 	}
 
-	function apply_filters( $hook, $value, ...$args ) {
-		if ( empty( $GLOBALS['agent_abilities_filters'][ $hook ] ) ) {
+	if ( ! function_exists( 'apply_filters' ) ) {
+		function apply_filters( $hook, $value, ...$args ) {
+			if ( empty( $GLOBALS['agent_abilities_filters'][ $hook ] ) ) {
+				return $value;
+			}
+
+			ksort( $GLOBALS['agent_abilities_filters'][ $hook ] );
+			foreach ( $GLOBALS['agent_abilities_filters'][ $hook ] as $callbacks ) {
+				foreach ( $callbacks as $entry ) {
+					$accepted = (int) $entry['accepted_args'];
+					$value    = call_user_func_array( $entry['callback'], array_slice( array_merge( array( $value ), $args ), 0, $accepted ) );
+				}
+			}
+
 			return $value;
 		}
-
-		ksort( $GLOBALS['agent_abilities_filters'][ $hook ] );
-		foreach ( $GLOBALS['agent_abilities_filters'][ $hook ] as $callbacks ) {
-			foreach ( $callbacks as $entry ) {
-				$accepted = (int) $entry['accepted_args'];
-				$value    = call_user_func_array( $entry['callback'], array_slice( array_merge( array( $value ), $args ), 0, $accepted ) );
-			}
-		}
-
-		return $value;
 	}
 
-	function wp_register_ability( $name, $args ) {
-		$GLOBALS['agent_abilities_registered_abilities'][ $name ] = $args;
-		return new WP_Ability();
+	if ( ! function_exists( 'wp_register_ability' ) ) {
+		function wp_register_ability( $name, $args ) {
+			$GLOBALS['agent_abilities_registered_abilities'][ $name ] = $args;
+			return new WP_Ability();
+		}
 	}
 
 	function agent_abilities_assert( $condition, $message ) {
