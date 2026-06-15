@@ -11,6 +11,11 @@ if ( ! defined( 'ABSPATH' ) ) {
 	define( 'ABSPATH', __DIR__ . '/wordpress/' );
 }
 
+if ( defined( 'WPINC' ) ) {
+	echo "action-scheduler-group-registration-smoke: skipped under real WordPress; standalone stubs drive this contract.\n";
+	exit( 0 );
+}
+
 class ActionSchedulerGroupRegistrationWpdb {
 	public string $prefix = 'wp_';
 	public string $actionscheduler_groups = 'wp_actionscheduler_groups';
@@ -49,20 +54,26 @@ class ActionSchedulerGroupRegistrationWpdb {
 	}
 }
 
-function taxonomy_exists( string $taxonomy ): bool {
-	return 'action-group' === $taxonomy;
+if ( ! function_exists( 'taxonomy_exists' ) ) {
+	function taxonomy_exists( string $taxonomy ): bool {
+		return 'action-group' === $taxonomy;
+}
 }
 
-function term_exists( string $term, string $taxonomy ): bool {
-	unset( $taxonomy );
-	return in_array( $term, $GLOBALS['action_scheduler_group_terms'] ?? array(), true );
+if ( ! function_exists( 'term_exists' ) ) {
+	function term_exists( string $term, string $taxonomy ): bool {
+		unset( $taxonomy );
+		return in_array( $term, $GLOBALS['action_scheduler_group_terms'] ?? array(), true );
+	}
 }
 
-function wp_insert_term( string $term, string $taxonomy, array $args = array() ): array {
-	unset( $taxonomy, $args );
-	$GLOBALS['action_scheduler_group_terms'][] = $term;
+if ( ! function_exists( 'wp_insert_term' ) ) {
+	function wp_insert_term( string $term, string $taxonomy, array $args = array() ): array {
+		unset( $taxonomy, $args );
+		$GLOBALS['action_scheduler_group_terms'][] = $term;
 
-	return array( 'term_id' => count( $GLOBALS['action_scheduler_group_terms'] ) );
+		return array( 'term_id' => count( $GLOBALS['action_scheduler_group_terms'] ) );
+	}
 }
 
 $GLOBALS['wpdb']                         = new ActionSchedulerGroupRegistrationWpdb();

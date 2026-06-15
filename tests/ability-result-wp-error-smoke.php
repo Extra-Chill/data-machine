@@ -13,6 +13,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 	define( 'ABSPATH', __DIR__ . '/' );
 }
 
+if ( ! defined( 'STDERR' ) ) {
+	define( 'STDERR', fopen( 'php://stderr', 'w' ) );
+}
+
 if ( ! class_exists( 'WP_Error' ) ) {
 	class WP_Error {
 		private string $code;
@@ -67,6 +71,14 @@ $assert = static function ( string $label, bool $condition ) use ( &$failed, &$t
 
 	++$failed;
 	echo "FAIL: {$label}\n";
+};
+
+$rest_payload = static function ( $response ) {
+	if ( is_object( $response ) && method_exists( $response, 'get_data' ) ) {
+		return $response->get_data();
+	}
+
+	return $response;
 };
 
 $wp_error_result = AbilityResult::normalize(
@@ -193,6 +205,7 @@ $rest_item = AbilityResult::rest_item_response(
 	array( 'job_id' => 9 ),
 	array( 'message' => 'ok' )
 );
+$rest_item = $rest_payload( $rest_item );
 $assert( 'REST item presenter wraps single resource data', 9 === ( $rest_item['data']['job_id'] ?? null ) );
 $assert( 'REST item presenter includes explicit top-level extras', 'ok' === ( $rest_item['message'] ?? null ) );
 
@@ -203,6 +216,7 @@ $item_rest = AbilityResult::rest_item_response(
 		'paused'  => 3,
 	)
 );
+$item_rest = $rest_payload( $item_rest );
 $assert( 'REST item presenter preserves success flag', true === ( $item_rest['success'] ?? null ) );
 $assert( 'REST item presenter wraps mutation fields under data', 3 === ( $item_rest['data']['paused'] ?? null ) );
 

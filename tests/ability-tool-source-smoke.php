@@ -11,7 +11,14 @@ if ( ! defined( 'ABSPATH' ) ) {
 	define( 'ABSPATH', __DIR__ . '/' );
 }
 
-$__filters = array();
+if ( defined( 'WPINC' ) ) {
+	echo "ability-tool-source-smoke: skipped under real WordPress; standalone stubs drive this contract.\n";
+	exit( 0 );
+}
+
+if ( ! isset( $GLOBALS['__filters'] ) ) {
+	$GLOBALS['__filters'] = array();
+}
 
 function ability_tool_smoke_filter_id( callable $callback ): string {
 	if ( is_array( $callback ) ) {
@@ -26,47 +33,62 @@ function ability_tool_smoke_filter_id( callable $callback ): string {
 	return is_string( $callback ) ? $callback : spl_object_hash( (object) $callback );
 }
 
-function add_filter( string $hook, callable $callback, int $priority = 10, int $accepted_args = 1 ): void {
-	$GLOBALS['__filters'][ $hook ][ $priority ][ ability_tool_smoke_filter_id( $callback ) ] = array( $callback, $accepted_args );
+if ( ! function_exists( 'add_filter' ) ) {
+	function add_filter( string $hook, callable $callback, int $priority = 10, int $accepted_args = 1 ): void {
+		$GLOBALS['__filters'][ $hook ][ $priority ][ ability_tool_smoke_filter_id( $callback ) ] = array( $callback, $accepted_args );
+	}
 }
 
-function apply_filters( string $hook, $value, ...$args ) {
-	if ( empty( $GLOBALS['__filters'][ $hook ] ) ) {
+if ( ! function_exists( 'apply_filters' ) ) {
+	function apply_filters( string $hook, $value, ...$args ) {
+		if ( empty( $GLOBALS['__filters'][ $hook ] ) ) {
+			return $value;
+		}
+
+		ksort( $GLOBALS['__filters'][ $hook ] );
+		foreach ( $GLOBALS['__filters'][ $hook ] as $callbacks ) {
+			foreach ( $callbacks as $entry ) {
+				$callback      = $entry[0];
+				$accepted_args = $entry[1];
+				$call_args     = array_slice( array_merge( array( $value ), $args ), 0, $accepted_args );
+				$value         = $callback( ...$call_args );
+			}
+		}
+
 		return $value;
 	}
+}
 
-	ksort( $GLOBALS['__filters'][ $hook ] );
-	foreach ( $GLOBALS['__filters'][ $hook ] as $callbacks ) {
-		foreach ( $callbacks as $entry ) {
-			$callback      = $entry[0];
-			$accepted_args = $entry[1];
-			$call_args     = array_slice( array_merge( array( $value ), $args ), 0, $accepted_args );
-			$value         = $callback( ...$call_args );
-		}
+if ( ! function_exists( 'do_action' ) ) {
+	function do_action( string $hook, ...$args ): void {}
+}
+
+if ( ! function_exists( 'did_action' ) ) {
+	function did_action( string $hook ): int {
+		return 1;
 	}
-
-	return $value;
 }
 
-function do_action( string $hook, ...$args ): void {}
-
-function did_action( string $hook ): int {
-	return 1;
+if ( ! function_exists( 'current_action' ) ) {
+	function current_action(): string {
+		return '';
+	}
 }
 
-function current_action(): string {
-	return '';
+if ( ! function_exists( 'get_option' ) ) {
+	function get_option( string $key, $default_value = false ) {
+		return $default_value;
+	}
 }
 
-function get_option( string $key, $default_value = false ) {
-	return $default_value;
+if ( ! function_exists( 'is_wp_error' ) ) {
+	function is_wp_error( $value ): bool {
+		return false;
+	}
 }
 
-function is_wp_error( $value ): bool {
-	return false;
-}
-
-class WP_Abilities_Registry {
+if ( ! class_exists( 'WP_Abilities_Registry' ) ) {
+	class WP_Abilities_Registry {
 	/** @var array<string, Ability_Tool_Source_Smoke_Ability> */
 	private static array $abilities = array();
 
@@ -89,6 +111,7 @@ class WP_Abilities_Registry {
 	public function get_registered( string $slug ) {
 		return self::$abilities[ $slug ] ?? null;
 	}
+}
 }
 
 class Ability_Tool_Source_Smoke_Ability {
