@@ -2,6 +2,12 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.146.3] - 2026-06-15
+
+### Fixed
+- emit required tool resolution evidence
+- Fix agent bundle ability registration for sandbox runs
+
 ## [0.146.2] - 2026-06-15
 
 ### Fixed
