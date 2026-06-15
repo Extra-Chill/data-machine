@@ -72,10 +72,6 @@ function datamachine_business_load_handlers() {
 	// Global AI tools.
 	new \DataMachineBusiness\Engine\AI\Tools\Global\GoogleAnalytics();
 
-	if ( defined( 'WP_CLI' ) && WP_CLI ) {
-		\WP_CLI::add_command( 'datamachine analytics ga', \DataMachineBusiness\Cli\GoogleAnalyticsCommand::class );
-	}
-
 	// Google Sheets
 	new \DataMachineBusiness\Abilities\GoogleSheets\FetchGoogleSheetsAbility();
 	new \DataMachineBusiness\Abilities\GoogleSheets\PublishGoogleSheetsAbility();
@@ -97,10 +93,6 @@ function datamachine_business_load_handlers() {
 	new \DataMachineBusiness\Tools\PageSpeedTool();
 	\DataMachineBusiness\Api\PageSpeedAnalytics::register();
 
-	if ( defined( 'WP_CLI' ) && WP_CLI ) {
-		\WP_CLI::add_command( 'datamachine analytics pagespeed', \DataMachineBusiness\Cli\PageSpeedCommand::class );
-	}
-
 	// Google Custom Search API tool.
 	new \DataMachineBusiness\Tools\GoogleSearch();
 
@@ -108,10 +100,6 @@ function datamachine_business_load_handlers() {
 	// existing service-account configuration is adopted without migration.
 	new \DataMachineBusiness\Tools\GoogleSearchConsole();
 	\DataMachineBusiness\Api\GoogleSearchConsoleAnalytics::register();
-
-	if ( defined( 'WP_CLI' ) && WP_CLI ) {
-		\WP_CLI::add_command( 'datamachine analytics gsc', \DataMachineBusiness\Cli\GoogleSearchConsoleCommand::class );
-	}
 
 	// Slack
 	new \DataMachineBusiness\Abilities\Slack\PostMessageSlackAbility();
@@ -138,10 +126,6 @@ function datamachine_business_load_handlers() {
 
 	// Media Hygiene — orphan files + unused attachments.
 	new \DataMachineBusiness\Abilities\MediaHygiene\MediaHygieneAbility();
-
-	if ( defined( 'WP_CLI' ) && WP_CLI ) {
-		\WP_CLI::add_command( 'datamachine media', \DataMachineBusiness\Cli\MediaHygieneCommand::class );
-	}
 }
 
 // Hook into plugins_loaded to ensure Data Machine core is loaded first
@@ -168,13 +152,19 @@ add_filter( 'datamachine_analytics_ability_map', function ( array $ability_map )
 
 /**
  * Register business-owned WP-CLI commands.
+ *
+ * The command-string => class map in DataMachineBusiness\Cli\CommandRegistry is
+ * the single source of truth shared with the AGENTS.md section generator, so
+ * the documented command surface can never drift from what is registered.
  */
 add_action( 'plugins_loaded', function (): void {
 	if ( ! defined( 'WP_CLI' ) || ! WP_CLI || ! class_exists( 'DataMachine\\Cli\\BaseCommand' ) ) {
 		return;
 	}
 
-	\WP_CLI::add_command( 'datamachine analytics bing', \DataMachineBusiness\Cli\Commands\BingWebmasterCommand::class );
+	foreach ( \DataMachineBusiness\Cli\CommandRegistry::map() as $command => $command_class ) {
+		\WP_CLI::add_command( $command, $command_class );
+	}
 }, 21 );
 
 /**
