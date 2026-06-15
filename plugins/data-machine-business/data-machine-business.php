@@ -72,6 +72,10 @@ function datamachine_business_load_handlers() {
 	// Global AI tools.
 	new \DataMachineBusiness\Engine\AI\Tools\Global\GoogleAnalytics();
 
+	if ( defined( 'WP_CLI' ) && WP_CLI ) {
+		\WP_CLI::add_command( 'datamachine analytics ga', \DataMachineBusiness\Cli\GoogleAnalyticsCommand::class );
+	}
+
 	// Google Sheets
 	new \DataMachineBusiness\Abilities\GoogleSheets\FetchGoogleSheetsAbility();
 	new \DataMachineBusiness\Abilities\GoogleSheets\PublishGoogleSheetsAbility();
@@ -144,9 +148,20 @@ function datamachine_business_load_handlers() {
 add_action( 'plugins_loaded', 'datamachine_business_load_handlers', 20 );
 
 /**
+ * Register the Data Machine Business AGENTS.md section.
+ *
+ * Runs in every context (web/cron compose, not only WP-CLI) so the generated
+ * AGENTS.md always reflects this plugin's registered command surface.
+ */
+add_action( 'plugins_loaded', function (): void {
+	\DataMachineBusiness\Runtime\AgentsMdSections::register();
+}, 21 );
+
+/**
  * Register business-owned analytics routes with Data Machine core.
  */
 add_filter( 'datamachine_analytics_ability_map', function ( array $ability_map ): array {
+	$ability_map['ga']   = 'datamachine/google-analytics';
 	$ability_map['bing'] = 'datamachine/bing-webmaster';
 	return $ability_map;
 } );
