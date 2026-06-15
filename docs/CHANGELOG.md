@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.146.1] - 2026-06-15
+
+### Fixed
+- make add_processed_item race-safe with atomic upsert
+
 ## [0.146.0] - 2026-06-14
 
 ### Added
