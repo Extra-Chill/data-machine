@@ -39,6 +39,7 @@ $assert( 'admin-ajax-cron-get-full-runtime', str_contains( $runtime, 'is_admin()
 $assert( 'rest-path-gets-full-runtime', str_contains( $runtime, 'str_starts_with( $path, \'/wp-json/\' )' ) );
 $assert( 'oauth-callback-gets-full-runtime', str_contains( $runtime, 'str_starts_with( $path, \'/datamachine-auth/\' )' ) );
 $assert( 'plain-permalink-rest-route-gets-full-runtime', str_contains( $runtime, 'isset( $_GET[\'rest_route\'] )' ) );
+$assert( 'wp-codebox-agent-runtime-gets-full-runtime', str_contains( $runtime, "getenv( 'WP_CODEBOX_AGENT_RUNTIME' )" ) );
 $assert( 'extensions-can-opt-in', str_contains( $runtime, "apply_filters( 'datamachine_should_load_full_runtime'" ) );
 $assert( 'frontend-default-is-lazy', str_contains( $runtime, "apply_filters( 'datamachine_should_load_full_runtime', false" ) );
 
