@@ -2,6 +2,12 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.146.4] - 2026-06-15
+
+### Fixed
+- load runtime for agent execution contexts
+- load runtime for WP Codebox agent tasks
+
 ## [0.146.3] - 2026-06-15
 
 ### Fixed
