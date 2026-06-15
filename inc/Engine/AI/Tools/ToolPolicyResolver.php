@@ -189,15 +189,18 @@ class ToolPolicyResolver {
 			array_merge(
 				$args,
 				array(
-					'modes'               => $modes,
-					'include_unavailable' => true,
+					'modes'                             => $modes,
+					'include_unavailable'               => true,
+					'include_source_rejection_metadata' => true,
+					'diagnostic_tool_names'             => array_values( array_unique( array_merge( $required_tool_names, $requested_tool_names ) ) ),
 				)
 			)
 		);
 		$source_tools    = is_array( $source_snapshot['tools'] ?? null ) ? $source_snapshot['tools'] : array();
 		$sources         = is_array( $source_snapshot['sources'] ?? null ) ? $source_snapshot['sources'] : array();
 
-		$source_by_tool = array();
+		$source_by_tool    = array();
+		$rejection_by_tool = array();
 		foreach ( $sources as $source ) {
 			if ( ! is_array( $source ) ) {
 				continue;
@@ -207,6 +210,13 @@ class ToolPolicyResolver {
 				if ( is_string( $tool_name ) && '' !== $tool_name && ! isset( $source_by_tool[ $tool_name ] ) ) {
 					$source_by_tool[ $tool_name ] = $source_slug;
 				}
+			}
+			foreach ( $source['rejected_tools'] ?? array() as $tool_name => $rejection ) {
+				if ( ! is_string( $tool_name ) || '' === $tool_name || isset( $rejection_by_tool[ $tool_name ] ) || ! is_array( $rejection ) ) {
+					continue;
+				}
+				$rejection['source']              = $source_slug;
+				$rejection_by_tool[ $tool_name ] = $rejection;
 			}
 		}
 
@@ -226,19 +236,31 @@ class ToolPolicyResolver {
 				continue;
 			}
 
+			$source = null;
 			$reason = 'unknown';
 			if ( in_array( $tool_name, $this->policy_filter->string_list( $args['deny'] ?? array() ), true ) ) {
 				$reason = 'tool_disabled';
+				$source = $source_by_tool[ $tool_name ] ?? null;
 			} elseif ( isset( $source_tools[ $tool_name ] ) ) {
 				$reason = 'policy_filtered';
+				$source = $source_by_tool[ $tool_name ] ?? null;
+			} elseif ( isset( $rejection_by_tool[ $tool_name ] ) ) {
+				$reason = is_string( $rejection_by_tool[ $tool_name ]['reason'] ?? null ) ? $rejection_by_tool[ $tool_name ]['reason'] : 'unknown';
+				$source = is_string( $rejection_by_tool[ $tool_name ]['source'] ?? null ) ? $rejection_by_tool[ $tool_name ]['source'] : null;
 			}
 
-			$required_resolution_evidence[] = array(
+			$evidence = array(
 				'tool_name' => $tool_name,
 				'status'    => 'unavailable',
 				'reason'    => $reason,
-				'source'    => $source_by_tool[ $tool_name ] ?? null,
+				'source'    => $source,
 			);
+			foreach ( array( 'ability', 'tool_modes', 'active_modes' ) as $key ) {
+				if ( array_key_exists( $key, $rejection_by_tool[ $tool_name ] ?? array() ) ) {
+					$evidence[ $key ] = $rejection_by_tool[ $tool_name ][ $key ];
+				}
+			}
+			$required_resolution_evidence[] = $evidence;
 		}
 
 		return array(

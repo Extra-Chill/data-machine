@@ -100,7 +100,13 @@ class ToolSourceRegistry {
 					$source_tools = apply_filters( 'agents_api_tool_source_tools', $source_tools, $source_slug, $context, $this->registry );
 				}
 
-				$source_tools   = is_array( $source_tools ) ? $source_tools : array();
+				$source_tools      = is_array( $source_tools ) ? $source_tools : array();
+				$source_rejections = array();
+				if ( isset( $source_tools[ AbilityToolSource::REJECTION_METADATA_KEY ] ) && is_array( $source_tools[ AbilityToolSource::REJECTION_METADATA_KEY ] ) ) {
+					$source_rejections = $source_tools[ AbilityToolSource::REJECTION_METADATA_KEY ];
+					unset( $source_tools[ AbilityToolSource::REJECTION_METADATA_KEY ] );
+				}
+
 				$produced_names = array_values( array_filter( array_keys( $source_tools ), 'is_string' ) );
 				$accepted_names = array();
 				foreach ( $source_tools as $tool_name => $tool_definition ) {
@@ -118,6 +124,7 @@ class ToolSourceRegistry {
 					'produced_tool_names'  => $produced_names,
 					'accepted_tool_names'  => $accepted_names,
 					'filtered_tool_names'  => array_values( array_diff( $produced_names, $accepted_names ) ),
+					'rejected_tools'        => $source_rejections,
 					'produced_tool_count'  => count( $produced_names ),
 					'accepted_tool_count'  => count( $accepted_names ),
 				);
