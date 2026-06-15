@@ -37,6 +37,28 @@ namespace {
 		$GLOBALS['datamachine_test_state']->registered[ $name ] = $args;
 		return new WP_Ability();
 	}
+
+	// Minimal fake of the abilities registry so the late-registration path
+	// (headless / WP Codebox sandbox load order, where the plugin file is
+	// included AFTER `wp_abilities_api_init` has already fired) can be
+	// exercised. Mirrors core: `WP_Abilities_Registry::register()` has NO
+	// lifecycle guard — only the `wp_register_ability()` wrapper does.
+	class WP_Abilities_Registry {
+		private static ?WP_Abilities_Registry $instance = null;
+		public static function get_instance(): self {
+			if ( null === self::$instance ) {
+				self::$instance = new self();
+			}
+			return self::$instance;
+		}
+		public function is_registered( string $name ): bool {
+			return isset( $GLOBALS['datamachine_test_state']->registered[ $name ] );
+		}
+		public function register( string $name, array $args ): WP_Ability {
+			$GLOBALS['datamachine_test_state']->registered[ $name ] = $args;
+			return new WP_Ability();
+		}
+	}
 }
 
 namespace DataMachine\Engine\Bundle {
@@ -81,8 +103,9 @@ namespace {
 	echo "=== AgentAbilities Registration Timing Smoke (#2523) ===\n";
 
 	$source = file_get_contents( dirname( __DIR__ ) . '/inc/Abilities/AgentAbilities.php' ) ?: '';
-	$assert( 'agent abilities avoid direct WP_Abilities_Registry registration', ! str_contains( $source, 'WP_Abilities_Registry::get_instance()' ) );
-	$assert( 'agent abilities document lifecycle-scoped registration', str_contains( $source, 'official lifecycle' ) );
+	$assert( 'agent abilities support a late registry-backed registration path for headless runtimes', str_contains( $source, 'WP_Abilities_Registry::get_instance()' ) );
+	$assert( 'late path is guarded by is_registered() for idempotency', str_contains( $source, 'is_registered' ) );
+	$assert( 'agent abilities document the headless / sandbox load order', str_contains( $source, 'sandbox' ) );
 
 	$reset_state();
 	new AgentAbilities();
@@ -99,10 +122,18 @@ namespace {
 	$registered = array_keys( $GLOBALS['datamachine_test_state']->registered );
 	$assert( 'normal bootstrap registers agent bundle/import abilities during wp_abilities_api_init', in_array( 'datamachine/import-agent', $registered, true ) && in_array( 'datamachine/run-agent-bundle', $registered, true ) );
 
+	// Headless / WP Codebox sandbox load order: `run-php` boots WordPress
+	// through `wp-load.php` (firing the one-shot `wp_abilities_api_init`) and
+	// only THEN includes the plugin file. The constructor must register
+	// immediately through the registry instance — NOT silently no-op, which was
+	// the original bug that left `datamachine/run-agent-bundle` unregistered for
+	// sandbox runs (Extra-Chill/data-machine#2629).
 	$reset_state();
 	$GLOBALS['datamachine_test_state']->did = 1;
 	new AgentAbilities();
-	$assert( 'post-action constructor does not call wp_register_ability after wp_abilities_api_init has fired', array() === $GLOBALS['datamachine_test_state']->registered );
+	$post_registered = array_keys( $GLOBALS['datamachine_test_state']->registered );
+	$assert( 'post-action constructor registers run-agent-bundle via the registry (headless sandbox load order)', in_array( 'datamachine/run-agent-bundle', $post_registered, true ) );
+	$assert( 'post-action constructor registers import-agent via the registry', in_array( 'datamachine/import-agent', $post_registered, true ) );
 	$assert( 'post-action constructor does not defer to an already-fired action', array() === $GLOBALS['datamachine_test_state']->added_actions );
 
 	$plugin_source   = file_get_contents( dirname( __DIR__ ) . '/data-machine.php' ) ?: '';

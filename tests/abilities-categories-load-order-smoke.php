@@ -90,14 +90,14 @@ $assert(
 );
 
 $assert(
-	'ensure_registered() avoids post-action registry writes',
-	! str_contains( $categories, 'WP_Ability_Categories_Registry::get_instance()' )
-		&& ! str_contains( $categories, '$registry->register(' )
+	'register() supports a late registry-backed path for headless runtimes',
+	str_contains( $categories, 'WP_Ability_Categories_Registry::get_instance()' )
+		&& str_contains( $categories, '$registry->register(' )
 );
 
 $assert(
-	'ensure_registered() documents missing late category registration surface',
-	str_contains( $categories, 'does not expose a late category-registration' )
+	'ensure_registered() documents the headless / sandbox late-registration path',
+	str_contains( $categories, 'sandbox' )
 );
 
 $assert(
@@ -180,6 +180,32 @@ if ( ! function_exists( 'wp_register_ability_category' ) ) {
 	}
 }
 
+// Minimal fake of the category registry so the late-registration path
+// (headless / WP Codebox sandbox load order — plugin included AFTER the
+// one-shot `wp_abilities_api_categories_init` fired) can be exercised. Mirrors
+// core: `WP_Ability_Categories_Registry::register()` has NO lifecycle guard —
+// only the `wp_register_ability_category()` wrapper does.
+if ( ! class_exists( 'WP_Ability_Categories_Registry' ) ) {
+	class WP_Ability_Categories_Registry {
+		private static ?WP_Ability_Categories_Registry $instance = null;
+		public static function get_instance(): self {
+			if ( null === self::$instance ) {
+				self::$instance = new self();
+			}
+			return self::$instance;
+		}
+		public function is_registered( $slug ): bool {
+			global $dm_2287_state;
+			return isset( $dm_2287_state->registered[ $slug ] );
+		}
+		public function register( $slug, $args ): bool {
+			global $dm_2287_state;
+			$dm_2287_state->registered[ $slug ] = $args;
+			return true;
+		}
+	}
+}
+
 $GLOBALS['dm_2287_state'] = $state;
 
 require_once $plugin_root . '/inc/Abilities/AbilityCategories.php';
@@ -223,23 +249,29 @@ $assert(
 		&& empty( $state->registered )
 );
 
-// --- State 3: post-action — no-op instead of mutating registry internals.
+// --- State 3: post-action (headless / WP Codebox sandbox load order).
+// The one-shot `wp_abilities_api_categories_init` already fired during
+// `wp-load.php` before `run-php` included the plugin file. Categories must
+// register late via the registry instance so category-bound abilities (e.g.
+// `datamachine/run-agent-bundle`) are not silently dropped by core's
+// category-exists check. See Extra-Chill/data-machine#2629.
 $reset();
 $state->doing = false;
 $state->did   = 1; // action has fired and completed
 \DataMachine\Abilities\AbilityCategories::ensure_registered();
 $assert(
-	'state 3: when action already fired, categories do not register late',
-	empty( $state->registered )
+	'state 3: when action already fired, categories register late via the registry instance',
+	isset( $state->registered['datamachine-agent'] )
+		&& isset( $state->registered['datamachine-publishing'] )
 );
 
 $assert(
-	'state 3: no-op path does not call wp_register_ability_category() (which would fire _doing_it_wrong)',
+	'state 3: late path does not call wp_register_ability_category() (which would fire _doing_it_wrong)',
 	0 === ( $state->doing_it_wrong ?? 0 )
 );
 
 $assert(
-	'state 3: no-op path does not double-hook the action',
+	'state 3: late path does not hook the already-fired action',
 	empty( $state->hooked )
 );
 

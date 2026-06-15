@@ -32,6 +32,31 @@ namespace {
 	$GLOBALS['agent_abilities_did_action']           = false;
 	$GLOBALS['agent_abilities_registered_abilities'] = array();
 
+	// Minimal fake of the WordPress abilities registry so the late-registration
+	// path (used in headless / WP Codebox sandbox load order, where the plugin
+	// is included AFTER `wp_abilities_api_init` has already fired) can be
+	// exercised without a full WordPress runtime. Mirrors how
+	// `WP_Abilities_Registry::register()` has NO lifecycle guard — only the
+	// `wp_register_ability()` wrapper does.
+	if ( ! class_exists( 'WP_Abilities_Registry' ) ) {
+		class WP_Abilities_Registry {
+			private static ?WP_Abilities_Registry $instance = null;
+			public static function get_instance(): self {
+				if ( null === self::$instance ) {
+					self::$instance = new self();
+				}
+				return self::$instance;
+			}
+			public function is_registered( $name ) {
+				return isset( $GLOBALS['agent_abilities_registered_abilities'][ $name ] );
+			}
+			public function register( $name, $args ) {
+				$GLOBALS['agent_abilities_registered_abilities'][ $name ] = $args;
+				return new WP_Ability();
+			}
+		}
+	}
+
 	if ( ! function_exists( '__' ) ) {
 		function __( $text, $domain = 'default' ) {
 			return $text;
@@ -122,19 +147,34 @@ namespace {
 	$GLOBALS['agent_abilities_doing_action'] = false;
 	agent_abilities_assert( isset( $GLOBALS['agent_abilities_registered_abilities']['datamachine/run-agent-bundle'] ), 'run-agent-bundle registers during wp_abilities_api_init' );
 
+	// Headless / WP Codebox sandbox load order: `run-php` boots WordPress
+	// through `wp-load.php` (firing the one-shot `wp_abilities_api_init`) and
+	// only THEN includes the plugin file. The constructor sees the action has
+	// already completed and must register immediately through the registry
+	// instance, NOT silently no-op (the original bug that left
+	// `datamachine/run-agent-bundle` unregistered for sandbox runs).
 	$GLOBALS['agent_abilities_actions']              = array();
 	$GLOBALS['agent_abilities_registered_abilities'] = array();
+	$GLOBALS['agent_abilities_doing_action']         = false;
 	$GLOBALS['agent_abilities_did_action']           = true;
 	agent_abilities_reset_registered_guard();
 
 	new \DataMachine\Abilities\AgentAbilities();
-	agent_abilities_assert( array() === $GLOBALS['agent_abilities_registered_abilities'], 'late construction does not register outside the abilities lifecycle' );
+	agent_abilities_assert(
+		isset( $GLOBALS['agent_abilities_registered_abilities']['datamachine/run-agent-bundle'] ),
+		'late construction (post-init, headless sandbox load order) registers run-agent-bundle via the registry'
+	);
 
-	$GLOBALS['agent_abilities_doing_action'] = true;
+	// Re-constructing after a successful late registration must remain
+	// idempotent — the registry `is_registered()` guard prevents duplicate
+	// registration and a `_doing_it_wrong()` notice.
+	$already = $GLOBALS['agent_abilities_registered_abilities']['datamachine/run-agent-bundle'];
 	agent_abilities_reset_registered_guard();
 	new \DataMachine\Abilities\AgentAbilities();
-	$GLOBALS['agent_abilities_doing_action'] = false;
-	agent_abilities_assert( isset( $GLOBALS['agent_abilities_registered_abilities']['datamachine/run-agent-bundle'] ), 'late no-op construction does not poison a later in-lifecycle registration' );
+	agent_abilities_assert(
+		$already === $GLOBALS['agent_abilities_registered_abilities']['datamachine/run-agent-bundle'],
+		'repeat late construction is idempotent (registry is_registered guard holds)'
+	);
 
 	echo "OK: agent abilities registration lifecycle smoke passed\n";
 }

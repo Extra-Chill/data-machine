@@ -57,10 +57,17 @@ $assert(
 
 $assert(
 	'unconditional call site is OUTSIDE datamachine_run_datamachine_plugin()',
+	// The image-template registration must sit at file scope, after the
+	// unconditional `AbilityCategories::ensure_registered()` call (which other
+	// unconditional ability registrations — e.g. AgentAbilities — may follow).
 	(bool) preg_match(
-		'/^\\\\DataMachine\\\\Abilities\\\\AbilityCategories::ensure_registered\(\);\s*\n\s*\n\/\*\*\s*\*\s*Register `datamachine\/render-image-template`/m',
+		'/^\\\\DataMachine\\\\Abilities\\\\AbilityCategories::ensure_registered\(\);\s*\n/m',
 		$bootstrap
 	)
+		&& (bool) preg_match(
+			'/^\/\*\*\s*\n\s*\*\s*Register `datamachine\/render-image-template`/m',
+			$bootstrap
+		)
 );
 
 $assert(
