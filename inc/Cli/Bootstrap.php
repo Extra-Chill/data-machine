@@ -66,7 +66,6 @@ WP_CLI::add_command( 'datamachine links', Commands\LinksCommand::class );
 WP_CLI::add_command( 'datamachine link', Commands\LinksCommand::class );
 WP_CLI::add_command( 'datamachine blocks', Commands\BlocksCommand::class );
 WP_CLI::add_command( 'datamachine block', Commands\BlocksCommand::class );
-WP_CLI::add_command( 'datamachine analytics', Commands\AnalyticsCommand::class );
 WP_CLI::add_command( 'datamachine meta-description', Commands\MetaDescriptionCommand::class );
 WP_CLI::add_command( 'datamachine indexnow', Commands\IndexNowCommand::class );
 WP_CLI::add_command( 'datamachine chat', Commands\ChatCommand::class );
