@@ -8,7 +8,7 @@
  */
 
 $worker_file = __DIR__ . '/../inc/Cli/Commands/WorkerCommand.php';
-$boot_file   = __DIR__ . '/../inc/Cli/Bootstrap.php';
+$boot_file   = __DIR__ . '/../inc/Cli/CommandRegistry.php';
 $lock_file   = __DIR__ . '/../inc/Cli/WorkerLock.php';
 $worker_src  = file_get_contents( $worker_file ) ?: '';
 $boot_src    = file_get_contents( $boot_file ) ?: '';
@@ -33,7 +33,7 @@ function assert_worker_not_contains( string $needle, string $haystack, string $m
 	assert_worker_true( false === strpos( $haystack, $needle ), $message );
 }
 
-assert_worker_contains( "WP_CLI::add_command( 'datamachine worker'", $boot_src, 'worker command is registered' );
+assert_worker_contains( "'datamachine worker'", $boot_src, 'worker command is registered' );
 assert_worker_contains( 'class WorkerCommand extends BaseCommand', $worker_src, 'worker follows CLI command pattern' );
 assert_worker_contains( '@subcommand run', $worker_src, 'worker exposes run subcommand' );
 assert_worker_contains( '@subcommand status', $worker_src, 'worker exposes status subcommand' );

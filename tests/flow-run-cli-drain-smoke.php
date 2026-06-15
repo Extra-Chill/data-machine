@@ -9,7 +9,7 @@
 
 $flows_file = __DIR__ . '/../inc/Cli/Commands/Flows/FlowsCommand.php';
 $drain_file = __DIR__ . '/../inc/Cli/Commands/DrainCommand.php';
-$boot_file  = __DIR__ . '/../inc/Cli/Bootstrap.php';
+$boot_file  = __DIR__ . '/../inc/Cli/CommandRegistry.php';
 $src        = file_get_contents( $flows_file ) ?: '';
 $drain_src  = file_get_contents( $drain_file ) ?: '';
 $boot_src   = file_get_contents( $boot_file ) ?: '';
@@ -36,7 +36,7 @@ assert_drain_contains( 'DrainCommand::drain(', $src, 'immediate run calls first-
 assert_drain_contains( "'hooks' => array(", $src, 'immediate flow run scopes its internal drain' );
 assert_drain_contains( 'DrainCommand::HOOK_BATCH_CHUNK', $src, 'immediate flow run drains pipeline batch chunks' );
 assert_drain_contains( 'DrainCommand::HOOK_EXECUTE_STEP', $src, 'immediate flow run drains pipeline steps' );
-assert_drain_contains( "WP_CLI::add_command( 'datamachine drain'", $boot_src, 'first-class datamachine drain command is registered' );
+assert_drain_contains( "'datamachine drain'", $boot_src, 'first-class datamachine drain command is registered' );
 assert_drain_contains( "datamachine_pipeline_batch_chunk'", $drain_src, 'drain includes pipeline batch chunk hook' );
 assert_drain_contains( "datamachine_execute_step'", $drain_src, 'drain includes execute step hook' );
 assert_drain_contains( '[--job-id=<ids>]', $drain_src, 'drain documents optional job-id scope' );

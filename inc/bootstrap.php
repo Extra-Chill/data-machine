@@ -284,6 +284,14 @@ function datamachine_register_default_memory_files(): void {
 			'description' => 'Auto-generated multisite network topology. Composable — extend via SectionRegistry.',
 		) );
 	}
+
+	// AGENTS.md — gated default-OFF behind DATAMACHINE_COMPOSE_AGENTS_MD.
+	// Registration is a no-op when the constant is unset/false, so installs
+	// with no coding agent keep zero AGENTS.md footprint. Defined in
+	// inc/migrations/agents-md.php (required via inc/migrations/load.php).
+	if ( function_exists( 'datamachine_register_agents_md_file' ) ) {
+		datamachine_register_agents_md_file();
+	}
 }
 
 if ( did_action( 'plugins_loaded' ) ) {
