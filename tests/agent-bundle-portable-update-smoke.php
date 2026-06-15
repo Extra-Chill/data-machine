@@ -265,7 +265,7 @@ assert_bundle_update_equals( 'existing stale flow payload normalizes pipeline me
 $agent_bundler_source = file_get_contents( dirname( __DIR__ ) . '/inc/Core/Agents/AgentBundler.php' ) ?: '';
 $pipelines_source     = file_get_contents( dirname( __DIR__ ) . '/inc/Core/Database/Pipelines/Pipelines.php' ) ?: '';
 $flows_source         = file_get_contents( dirname( __DIR__ ) . '/inc/Core/Database/Flows/Flows.php' ) ?: '';
-$bootstrap_source     = file_get_contents( dirname( __DIR__ ) . '/inc/Cli/Bootstrap.php' ) ?: '';
+$bootstrap_source     = file_get_contents( dirname( __DIR__ ) . '/inc/Cli/CommandRegistry.php' ) ?: '';
 $agents_cli_source    = file_get_contents( dirname( __DIR__ ) . '/inc/Cli/Commands/AgentsCommand.php' ) ?: '';
 $bundle_cli_source    = file_get_contents( dirname( __DIR__ ) . '/inc/Cli/Commands/AgentBundleCommand.php' ) ?: '';
 assert_bundle_update( 'importer resolves existing pipelines by portable slug', str_contains( $agent_bundler_source, 'get_by_portable_slug( $agent_id, $portable_slug )' ) );
@@ -274,7 +274,7 @@ assert_bundle_update( 'importer resolves existing flows by portable slug', str_c
 assert_bundle_update( 'importer updates existing flows instead of duplicating', str_contains( $agent_bundler_source, 'update_flow(' ) );
 assert_bundle_update( 'pipelines repository exposes portable slug lookup', str_contains( $pipelines_source, 'function get_by_portable_slug' ) );
 assert_bundle_update( 'flows repository exposes portable slug lookup', str_contains( $flows_source, 'function get_by_portable_slug' ) );
-assert_bundle_update( 'agent command is registered', str_contains( $bootstrap_source, "WP_CLI::add_command( 'datamachine agent', Commands\\AgentsCommand::class );" ) );
+assert_bundle_update( 'agent command is registered', str_contains( $bootstrap_source, "'datamachine agent'" ) && str_contains( $bootstrap_source, 'Commands\\AgentsCommand::class' ) );
 assert_bundle_update( 'top-level agent-bundle command is not registered', ! str_contains( $bootstrap_source, 'datamachine agent-bundle' ) );
 assert_bundle_update( 'agent CLI inherits package lifecycle helper', str_contains( $agents_cli_source, 'class AgentsCommand extends AgentBundleCommand' ) );
 assert_bundle_update( 'package CLI exposes install command', str_contains( $bundle_cli_source, 'function install(' ) );

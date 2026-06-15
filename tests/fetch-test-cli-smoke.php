@@ -14,9 +14,9 @@
 $root = dirname( __DIR__ );
 
 $files = array(
-	'bootstrap' => file_get_contents( $root . '/inc/Cli/Bootstrap.php' ) ?: '',
-	'test'      => file_get_contents( $root . '/inc/Cli/Commands/TestCommand.php' ) ?: '',
-	'handlers'  => file_get_contents( $root . '/inc/Cli/Commands/HandlersCommand.php' ) ?: '',
+	'registry' => file_get_contents( $root . '/inc/Cli/CommandRegistry.php' ) ?: '',
+	'test'     => file_get_contents( $root . '/inc/Cli/Commands/TestCommand.php' ) ?: '',
+	'handlers' => file_get_contents( $root . '/inc/Cli/Commands/HandlersCommand.php' ) ?: '',
 );
 
 $failed = 0;
@@ -42,8 +42,9 @@ function fetch_cli_failed_count(): int {
 echo "=== fetch-test-cli-smoke ===\n";
 
 assert_fetch_cli(
-	'Bootstrap registers datamachine fetch test alias',
-	str_contains( $files['bootstrap'], "WP_CLI::add_command( 'datamachine fetch test', Commands\\TestCommand::class );" )
+	'CommandRegistry registers datamachine fetch test alias',
+	str_contains( $files['registry'], "'datamachine fetch test'" )
+		&& str_contains( $files['registry'], 'Commands\\TestCommand::class' )
 );
 
 assert_fetch_cli(
