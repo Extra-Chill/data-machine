@@ -108,101 +108,50 @@ if ( file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Api/Routes.php' ) ) {
 	require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Api/Routes.php';
 }
 
-	// WP-CLI commands (optional)
-if ( defined( 'WP_CLI' ) && WP_CLI && file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/UniversalWebScraperTestCommand.php' ) ) {
-	require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/UniversalWebScraperTestCommand.php';
-	\WP_CLI::add_command( 'data-machine-events test-event-scraper', \DataMachineEvents\Cli\UniversalWebScraperTestCommand::class );
-}
+/*
+|--------------------------------------------------------------------------
+| AGENTS.md — composable file section registration
+|--------------------------------------------------------------------------
+| Registers the Data Machine Events CLI section in the AGENTS.md composable
+| file so external agent runtimes discover this (largest extension) CLI
+| surface automatically. Runs outside the WP_CLI guard below because compose
+| and auto-regeneration fire in non-CLI (web/cron) contexts where the
+| WP-CLI runner / PSR-4 autoloader are not loaded — the section generator
+| resolves command class files from disk and reflects over them.
+*/
+add_action( 'plugins_loaded', function () {
+	if ( ! class_exists( '\DataMachine\Engine\AI\SectionRegistry' ) ) {
+		return;
+	}
 
-if ( defined( 'WP_CLI' ) && WP_CLI && file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/SettingsCommand.php' ) ) {
-	require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/SettingsCommand.php';
-	\WP_CLI::add_command( 'data-machine-events settings', \DataMachineEvents\Cli\SettingsCommand::class );
-}
+	require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/CommandRegistry.php';
+	require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/AgentsMdSection.php';
 
-if ( defined( 'WP_CLI' ) && WP_CLI && file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/GetVenueEventsCommand.php' ) ) {
-	require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/GetVenueEventsCommand.php';
-	\WP_CLI::add_command( 'data-machine-events get-venue-events', \DataMachineEvents\Cli\GetVenueEventsCommand::class );
-}
+	$wp = 'wp --allow-root --path=' . ABSPATH;
 
-// check subcommands (replaces health-check monolith)
+	\DataMachine\Engine\AI\SectionRegistry::register( 'AGENTS.md', 'data-machine-events', 55, function () use ( $wp ) {
+		return \DataMachineEvents\Cli\AgentsMdSection::render( $wp );
+	}, array(
+		'label'       => 'Data Machine Events CLI',
+		'description' => 'Event + venue data-quality and maintenance WP-CLI commands.',
+		'freshness'   => 'generated',
+	) );
+}, 22 );
+
+// WP-CLI commands — registered from the single-source-of-truth CommandRegistry
+// map, which also drives the AGENTS.md section generator above so the
+// documented surface can never drift from what is actually registered here.
 if ( defined( 'WP_CLI' ) && WP_CLI ) {
-	\WP_CLI::add_command( 'data-machine-events check times', \DataMachineEvents\Cli\Check\CheckTimesCommand::class );
-	\WP_CLI::add_command( 'data-machine-events check venues', \DataMachineEvents\Cli\Check\CheckVenuesCommand::class );
-	\WP_CLI::add_command( 'data-machine-events check encoding', \DataMachineEvents\Cli\Check\CheckEncodingCommand::class );
-	\WP_CLI::add_command( 'data-machine-events check meta-sync', \DataMachineEvents\Cli\Check\CheckMetaSyncCommand::class );
-	\WP_CLI::add_command( 'data-machine-events check duration', \DataMachineEvents\Cli\Check\CheckDurationCommand::class );
-	\WP_CLI::add_command( 'data-machine-events check duplicates', \DataMachineEvents\Cli\Check\CheckDuplicatesCommand::class );
-	\WP_CLI::add_command( 'data-machine-events check clean-duplicates', \DataMachineEvents\Cli\Check\CleanDuplicatesCommand::class );
-	\WP_CLI::add_command( 'data-machine-events check merged-bills', \DataMachineEvents\Cli\Check\CheckMergedBillsCommand::class );
-	\WP_CLI::add_command( 'data-machine-events check merge-duplicate-venues', \DataMachineEvents\Cli\Check\CheckMergeDuplicateVenuesCommand::class );
-	\WP_CLI::add_command( 'data-machine-events check missing-venue-addresses', \DataMachineEvents\Cli\Check\CheckMissingVenueAddressesCommand::class );
-	\WP_CLI::add_command( 'data-machine-events check orphan-venues', \DataMachineEvents\Cli\Check\CheckOrphanVenuesCommand::class );
-	\WP_CLI::add_command( 'data-machine-events check orphan-pipelines', \DataMachineEvents\Cli\Check\CheckOrphanPipelinesCommand::class );
-	\WP_CLI::add_command( 'data-machine-events check quality', \DataMachineEvents\Cli\Check\CheckQualityCommand::class );
-	\WP_CLI::add_command( 'data-machine-events check all', \DataMachineEvents\Cli\Check\CheckAllCommand::class );
-}
+	require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/CommandRegistry.php';
 
-if ( defined( 'WP_CLI' ) && WP_CLI ) {
-	\WP_CLI::add_command( 'datamachine-events backfill-event-dates', function( $args, $assoc_args ) {
-		\DataMachineEvents\Core\EventDatesTable::create_table();
-		\WP_CLI::log( 'Table ensured. Starting backfill...' );
-
-		$total = \DataMachineEvents\Core\EventDatesTable::backfill(
-			500,
-			function( $count ) {
-				if ( $count % 500 === 0 ) {
-					\WP_CLI::log( "Backfilled {$count} events..." );
-				}
-			}
-		);
-
-		\WP_CLI::success( "Backfilled {$total} events into datamachine_event_dates table." );
-	});
-}
-
-if ( defined( 'WP_CLI' ) && WP_CLI && file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/UpdateEventCommand.php' ) ) {
-	require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/UpdateEventCommand.php';
-	\WP_CLI::add_command( 'data-machine-events update-event', \DataMachineEvents\Cli\UpdateEventCommand::class );
-}
-
-if ( defined( 'WP_CLI' ) && WP_CLI && file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/BatchTimeFixCommand.php' ) ) {
-	require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/BatchTimeFixCommand.php';
-	\WP_CLI::add_command( 'data-machine-events batch-time-fix', \DataMachineEvents\Cli\BatchTimeFixCommand::class );
-}
-
-if ( defined( 'WP_CLI' ) && WP_CLI && file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/EncodingFixCommand.php' ) ) {
-	require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/EncodingFixCommand.php';
-	\WP_CLI::add_command( 'data-machine-events fix-encoding', \DataMachineEvents\Cli\EncodingFixCommand::class );
-}
-
-if ( defined( 'WP_CLI' ) && WP_CLI && file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/TicketUrlResyncCommand.php' ) ) {
-	require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/TicketUrlResyncCommand.php';
-	\WP_CLI::add_command( 'data-machine-events resync-ticket-urls', \DataMachineEvents\Cli\TicketUrlResyncCommand::class );
-}
-
-if ( defined( 'WP_CLI' ) && WP_CLI && file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/ResyncMetaCommand.php' ) ) {
-	require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/ResyncMetaCommand.php';
-	\WP_CLI::add_command( 'data-machine-events resync-meta', \DataMachineEvents\Cli\ResyncMetaCommand::class );
-}
-
-if ( defined( 'WP_CLI' ) && WP_CLI && file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/TicketmasterTestCommand.php' ) ) {
-	require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/TicketmasterTestCommand.php';
-	\WP_CLI::add_command( 'data-machine-events test-ticketmaster', \DataMachineEvents\Cli\TicketmasterTestCommand::class );
-}
-
-if ( defined( 'WP_CLI' ) && WP_CLI && file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/DiceFmTestCommand.php' ) ) {
-	require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/DiceFmTestCommand.php';
-	\WP_CLI::add_command( 'data-machine-events test-dice-fm', \DataMachineEvents\Cli\DiceFmTestCommand::class );
-}
-
-if ( defined( 'WP_CLI' ) && WP_CLI && file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/GeocodeVenuesCommand.php' ) ) {
-	require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/GeocodeVenuesCommand.php';
-	\WP_CLI::add_command( 'data-machine-events geocode-venues', \DataMachineEvents\Cli\GeocodeVenuesCommand::class );
-}
-
-if ( defined( 'WP_CLI' ) && WP_CLI && file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/AuditVenuesCommand.php' ) ) {
-	require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/AuditVenuesCommand.php';
-	\WP_CLI::add_command( 'data-machine-events audit-venues', \DataMachineEvents\Cli\AuditVenuesCommand::class );
+	foreach ( \DataMachineEvents\Cli\CommandRegistry::map() as $command => $entry ) {
+		if ( isset( $entry['file'] ) && is_readable( $entry['file'] ) ) {
+			require_once $entry['file'];
+		}
+		if ( isset( $entry['class'] ) && class_exists( $entry['class'] ) ) {
+			\WP_CLI::add_command( $command, $entry['class'] );
+		}
+	}
 }
 
 /**

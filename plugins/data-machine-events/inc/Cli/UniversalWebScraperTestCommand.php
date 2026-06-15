@@ -9,6 +9,22 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 class UniversalWebScraperTestCommand {
+
+	/**
+	 * Test the universal web scraper against a target events URL.
+	 *
+	 * ## OPTIONS
+	 *
+	 * [--target_url=<url>]
+	 * : The events page URL to scrape.
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp data-machine-events test-event-scraper --target_url=https://venue.com/shows
+	 *
+	 * @param array $args       Positional arguments.
+	 * @param array $assoc_args Named arguments.
+	 */
 	public function __invoke( array $args, array $assoc_args ): void {
 		if ( ! defined( 'WP_CLI' ) || ! WP_CLI ) {
 			return;

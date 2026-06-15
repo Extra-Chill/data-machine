@@ -16,6 +16,28 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class GetVenueEventsCommand {
 
+	/**
+	 * List events for a venue.
+	 *
+	 * ## OPTIONS
+	 *
+	 * [<venue>]
+	 * : Venue name or term. May also be passed via --venue.
+	 *
+	 * [--limit=<number>]
+	 * : Max events to return (default: 25).
+	 *
+	 * [--status=<status>]
+	 * : Post status filter (default: any).
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp data-machine-events get-venue-events "The Royal American"
+	 *     wp data-machine-events get-venue-events --venue="Exit/In" --limit=50
+	 *
+	 * @param array $args       Positional arguments.
+	 * @param array $assoc_args Named arguments.
+	 */
 	public function __invoke( array $args, array $assoc_args ): void {
 		if ( ! defined( 'WP_CLI' ) || ! WP_CLI ) {
 			return;

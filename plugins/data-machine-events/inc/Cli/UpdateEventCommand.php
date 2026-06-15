@@ -18,6 +18,34 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class UpdateEventCommand {
 
+	/**
+	 * Update one or more events' date, time, venue, and other fields.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <event_ids>
+	 * : One or more event IDs (comma-separated).
+	 *
+	 * [--startDate=<date>]
+	 * : New start date.
+	 *
+	 * [--startTime=<time>]
+	 * : New start time.
+	 *
+	 * [--venue=<venue>]
+	 * : New venue.
+	 *
+	 * [--format=<format>]
+	 * : Output format (default: table).
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp data-machine-events update-event 123 --startTime=20:00
+	 *     wp data-machine-events update-event 123,456 --venue="The Pour House"
+	 *
+	 * @param array $args       Positional arguments.
+	 * @param array $assoc_args Named arguments.
+	 */
 	public function __invoke( array $args, array $assoc_args ): void {
 		if ( ! defined( 'WP_CLI' ) || ! WP_CLI ) {
 			return;
