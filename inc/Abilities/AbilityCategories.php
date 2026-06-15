@@ -59,7 +59,7 @@ class AbilityCategories {
 			return;
 		}
 
-		$late = ! doing_action( 'wp_abilities_api_categories_init' )
+		$late     = ! doing_action( 'wp_abilities_api_categories_init' )
 			&& did_action( 'wp_abilities_api_categories_init' )
 			&& class_exists( '\WP_Ability_Categories_Registry' );
 		$registry = $late ? \WP_Ability_Categories_Registry::get_instance() : null;
