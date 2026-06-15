@@ -458,6 +458,16 @@ require_once __DIR__ . '/inc/Abilities/AbilityCategories.php';
 \DataMachine\Abilities\AbilityCategories::ensure_registered();
 
 /**
+ * Register agent identity and bundle execution abilities unconditionally.
+ *
+ * WP Codebox sandbox runs can execute a portable agent bundle from a runtime
+ * task before a request shape has loaded the full Data Machine runtime. The
+ * ability definitions are cheap callback/schema wiring; execution still loads
+ * the bundle runner only when `datamachine/run-agent-bundle` is called.
+ */
+new \DataMachine\Abilities\AgentAbilities();
+
+/**
  * Register `datamachine/render-image-template` and
  * `datamachine/list-image-templates` unconditionally on every request.
  *

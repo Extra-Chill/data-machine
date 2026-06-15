@@ -58,10 +58,11 @@ class AgentAbilities {
 
 		if ( doing_action( 'wp_abilities_api_init' ) ) {
 			$this->registerAbilities();
+			self::$registered = true;
 		} elseif ( ! did_action( 'wp_abilities_api_init' ) ) {
 			add_action( 'wp_abilities_api_init', array( $this, 'registerAbilities' ) );
+			self::$registered = true;
 		}
-		self::$registered = true;
 	}
 
 	public function registerAbilities(): void {
