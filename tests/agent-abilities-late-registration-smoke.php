@@ -3,9 +3,32 @@
  * Smoke test for AgentAbilities registration timing.
  *
  * Run with: php tests/agent-abilities-late-registration-smoke.php
+ *
+ * Runs in two modes:
+ *  - Real WordPress runtime (e.g. the wp-codebox host-smoke-wp backend, which
+ *    boots WordPress and includes the plugin): assert the canonical
+ *    `datamachine/run-agent-bundle` ability is registered. This is the headless
+ *    sandbox load order (`run-php` boots WP, then includes the plugin file) that
+ *    must resolve the ability — see Extra-Chill/data-machine#2629.
+ *  - Standalone pure-PHP (`php tests/...`): drive the three registration timing
+ *    states with stubbed WordPress lifecycle functions.
  */
 
 namespace {
+	// Real WordPress runtime: the lifecycle functions and registry already
+	// exist, so the pure-PHP stubs below must NOT be declared (they would fatal
+	// with "Cannot redeclare"). Assert the real registration outcome and return.
+	if ( function_exists( 'wp_get_ability' ) ) {
+		$ability = wp_get_ability( 'datamachine/run-agent-bundle' );
+		if ( ! $ability || ! method_exists( $ability, 'execute' ) ) {
+			echo "FAIL: datamachine/run-agent-bundle is not registered in WordPress runtime\n";
+			exit( 1 );
+		}
+
+		echo "OK: agent bundle ability is registered in WordPress runtime\n";
+		return;
+	}
+
 	define( 'ABSPATH', sys_get_temp_dir() . '/datamachine-agent-abilities-late-registration/' );
 
 	$GLOBALS['datamachine_test_state'] = (object) array(
@@ -15,27 +38,41 @@ namespace {
 		'added_actions' => array(),
 	);
 
-	class WP_Ability {}
-
-	function doing_action( string $hook = '' ): bool {
-		return 'wp_abilities_api_init' === $hook && $GLOBALS['datamachine_test_state']->doing;
+	// All stubs below are declared conditionally so they never clash with a
+	// real WordPress runtime. (The real-WP runtime is handled by the early
+	// return above; these conditionals are belt-and-suspenders so the file is
+	// always safe to include.)
+	if ( ! class_exists( 'WP_Ability' ) ) {
+		class WP_Ability {}
 	}
 
-	function did_action( string $hook = '' ): int {
-		return 'wp_abilities_api_init' === $hook ? $GLOBALS['datamachine_test_state']->did : 0;
-	}
-
-	function add_action( string $hook, callable $callback ): void {
-		$GLOBALS['datamachine_test_state']->added_actions[] = array( $hook, $callback );
-	}
-
-	function wp_register_ability( string $name, array $args ): ?WP_Ability {
-		if ( ! doing_action( 'wp_abilities_api_init' ) ) {
-			return null;
+	if ( ! function_exists( 'doing_action' ) ) {
+		function doing_action( string $hook = '' ): bool {
+			return 'wp_abilities_api_init' === $hook && $GLOBALS['datamachine_test_state']->doing;
 		}
+	}
 
-		$GLOBALS['datamachine_test_state']->registered[ $name ] = $args;
-		return new WP_Ability();
+	if ( ! function_exists( 'did_action' ) ) {
+		function did_action( string $hook = '' ): int {
+			return 'wp_abilities_api_init' === $hook ? $GLOBALS['datamachine_test_state']->did : 0;
+		}
+	}
+
+	if ( ! function_exists( 'add_action' ) ) {
+		function add_action( string $hook, callable $callback ): void {
+			$GLOBALS['datamachine_test_state']->added_actions[] = array( $hook, $callback );
+		}
+	}
+
+	if ( ! function_exists( 'wp_register_ability' ) ) {
+		function wp_register_ability( string $name, array $args ): ?WP_Ability {
+			if ( ! doing_action( 'wp_abilities_api_init' ) ) {
+				return null;
+			}
+
+			$GLOBALS['datamachine_test_state']->registered[ $name ] = $args;
+			return new WP_Ability();
+		}
 	}
 
 	// Minimal fake of the abilities registry so the late-registration path
@@ -43,28 +80,32 @@ namespace {
 	// included AFTER `wp_abilities_api_init` has already fired) can be
 	// exercised. Mirrors core: `WP_Abilities_Registry::register()` has NO
 	// lifecycle guard — only the `wp_register_ability()` wrapper does.
-	class WP_Abilities_Registry {
-		private static ?WP_Abilities_Registry $instance = null;
-		public static function get_instance(): self {
-			if ( null === self::$instance ) {
-				self::$instance = new self();
+	if ( ! class_exists( 'WP_Abilities_Registry' ) ) {
+		class WP_Abilities_Registry {
+			private static ?WP_Abilities_Registry $instance = null;
+			public static function get_instance(): self {
+				if ( null === self::$instance ) {
+					self::$instance = new self();
+				}
+				return self::$instance;
 			}
-			return self::$instance;
-		}
-		public function is_registered( string $name ): bool {
-			return isset( $GLOBALS['datamachine_test_state']->registered[ $name ] );
-		}
-		public function register( string $name, array $args ): WP_Ability {
-			$GLOBALS['datamachine_test_state']->registered[ $name ] = $args;
-			return new WP_Ability();
+			public function is_registered( string $name ): bool {
+				return isset( $GLOBALS['datamachine_test_state']->registered[ $name ] );
+			}
+			public function register( string $name, array $args ): WP_Ability {
+				$GLOBALS['datamachine_test_state']->registered[ $name ] = $args;
+				return new WP_Ability();
+			}
 		}
 	}
 }
 
 namespace DataMachine\Engine\Bundle {
-	class AgentBundleArtifactRebase {
-		public const POLICY_CONSERVATIVE = 'conservative';
-		public const POLICY_BURN_IN_SAFE = 'burn-in-safe';
+	if ( ! class_exists( __NAMESPACE__ . '\\AgentBundleArtifactRebase' ) ) {
+		class AgentBundleArtifactRebase {
+			public const POLICY_CONSERVATIVE = 'conservative';
+			public const POLICY_BURN_IN_SAFE = 'burn-in-safe';
+		}
 	}
 }
 
