@@ -11,6 +11,11 @@ if ( ! defined( 'ABSPATH' ) ) {
 	define( 'ABSPATH', __DIR__ . '/' );
 }
 
+if ( defined( 'WPINC' ) ) {
+	echo "ability-tool-source-smoke: skipped under real WordPress; standalone stubs drive this contract.\n";
+	exit( 0 );
+}
+
 $__filters = array();
 
 function ability_tool_smoke_filter_id( callable $callback ): string {
