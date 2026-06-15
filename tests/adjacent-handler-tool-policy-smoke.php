@@ -18,6 +18,11 @@ namespace {
 		define( 'ABSPATH', __DIR__ . '/' );
 	}
 
+	if ( defined( 'WPINC' ) ) {
+		echo "adjacent-handler-tool-policy-smoke: skipped under real WordPress; standalone stubs drive this contract.\n";
+		exit( 0 );
+	}
+
 	function do_action( string $_hook, ...$_args ): void {}
 
 	function apply_filters( string $hook, $value ) {
