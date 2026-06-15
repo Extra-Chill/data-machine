@@ -32,6 +32,17 @@ require_once __DIR__ . '/vendor/autoload.php';
  * available before any social abilities are registered.
  */
 function datamachine_socials_register_ability_category() {
+	if ( ! function_exists( 'wp_register_ability_category' ) ) {
+		return;
+	}
+
+	// wp_abilities_api_categories_init can fire more than once per request on
+	// multisite; guard against re-registering an already-registered category,
+	// which trips a _doing_it_wrong notice in core's categories registry.
+	if ( function_exists( 'wp_has_ability_category' ) && wp_has_ability_category( 'datamachine-socials' ) ) {
+		return;
+	}
+
 	wp_register_ability_category(
 		'datamachine-socials',
 		array(
