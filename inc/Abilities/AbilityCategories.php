@@ -59,7 +59,24 @@ class AbilityCategories {
 			return;
 		}
 
+		$late     = ! doing_action( 'wp_abilities_api_categories_init' )
+			&& did_action( 'wp_abilities_api_categories_init' )
+			&& class_exists( '\WP_Ability_Categories_Registry' );
+		$registry = $late ? \WP_Ability_Categories_Registry::get_instance() : null;
+
 		foreach ( self::get_category_definitions() as $slug => $args ) {
+			if ( $late ) {
+				// Late path: the categories-init action has already completed
+				// (headless / WP Codebox sandbox load order — see
+				// ensure_registered()). The public helper would
+				// `_doing_it_wrong()`, so register through the registry
+				// instance directly, which core permits any time after `init`.
+				if ( null !== $registry && ! $registry->is_registered( $slug ) ) {
+					$registry->register( $slug, $args );
+				}
+				continue;
+			}
+
 			wp_register_ability_category( $slug, $args );
 		}
 
@@ -77,11 +94,15 @@ class AbilityCategories {
 	 *      land in this same dispatch pass.
 	 *   2. `! did_action( wp_abilities_api_categories_init )` — the action
 	 *      has not fired yet. Attach a hook for the lazy fire.
-	 *   3. otherwise — the action has already fired and completed. Do not
-	 *      register; the public `wp_register_ability_category()` helper
-	 *      intentionally enforces this lifecycle, and Data Machine must not
-	 *      bypass it by writing through `WP_Ability_Categories_Registry`
-	 *      directly.
+	 *   3. otherwise — the action has already fired and completed. This happens
+	 *      in headless runtimes (WP Codebox sandbox / WordPress Playground)
+	 *      where `run-php` boots WordPress through `wp-load.php` — firing the
+	 *      one-shot `wp_abilities_api_categories_init` — and only THEN includes
+	 *      the plugin file. Register through the registry instance directly via
+	 *      `register()`'s late path so category-bound abilities (e.g.
+	 *      `datamachine/run-agent-bundle`) are not silently dropped. Core only
+	 *      enforces the lifecycle in the `wp_register_ability_category()`
+	 *      wrapper, not in `WP_Ability_Categories_Registry::register()`.
 	 *
 	 * @return void
 	 */
@@ -100,8 +121,10 @@ class AbilityCategories {
 			return;
 		}
 
-		// The public Abilities API does not expose a late category-registration
-		// surface. Once the init action has fired, avoid mutating registry internals.
+		// Post-lifecycle: register categories late via the registry instance so
+		// abilities included after the categories-init fire still resolve their
+		// category. register() detects this state and uses the registry directly.
+		self::register();
 	}
 
 	/**

@@ -33,22 +33,51 @@ class AgentAbilities {
 	private const ACTIVE_AGENT_META_KEY = 'datamachine_active_agent_slug';
 
 	/**
-	 * Register an ability only during the public Abilities API init lifecycle.
+	 * Register an ability, supporting late registration in headless runtimes.
 	 *
-	 * WordPress' public helper is intentionally scoped to
-	 * `wp_abilities_api_init`. Data Machine must not bypass that lifecycle by
-	 * writing through `WP_Abilities_Registry` directly.
+	 * The public `wp_register_ability()` helper only works while
+	 * `wp_abilities_api_init` is firing. That is the right path for normal
+	 * requests, where this class hooks `registerAbilities()` onto the action
+	 * before it fires.
+	 *
+	 * WP Codebox sandbox runs (WordPress Playground) load Data Machine in a
+	 * fundamentally different order: `run-php` boots WordPress through
+	 * `wp-load.php` — which fires `init` and lazily initializes the abilities
+	 * registry, completing the one-shot `wp_abilities_api_init` action — and
+	 * only THEN `require_once`s the plugin file. By the time this class is
+	 * instantiated, the public registration window has already closed, so
+	 * `wp_register_ability()` would `_doing_it_wrong()` and return null,
+	 * leaving `datamachine/run-agent-bundle` unregistered for the very sandbox
+	 * runs that need it.
+	 *
+	 * WordPress core only enforces the lifecycle in the `wp_register_ability()`
+	 * wrapper; `WP_Abilities_Registry::register()` itself has no such guard and
+	 * is safe to call once the registry exists (after `init`). So when the
+	 * action has already completed, register through the registry instance
+	 * directly. The `is_registered()` guard keeps this idempotent.
 	 *
 	 * @param string $name Ability name.
 	 * @param array  $args Ability arguments.
-	 * @return \WP_Ability|null Registered ability, or null when called outside the official lifecycle.
+	 * @return \WP_Ability|null Registered ability, or null when registration is not currently possible.
 	 */
 	private static function registerAbility( string $name, array $args ): ?\WP_Ability {
-		if ( ! doing_action( 'wp_abilities_api_init' ) ) {
+		if ( doing_action( 'wp_abilities_api_init' ) ) {
+			return \wp_register_ability( $name, $args );
+		}
+
+		// Late path: the init action has already fired (headless / sandbox
+		// load order). Register through the registry instance directly, which
+		// WordPress core permits any time after `init`.
+		if ( ! did_action( 'wp_abilities_api_init' ) || ! class_exists( '\WP_Abilities_Registry' ) ) {
 			return null;
 		}
 
-		return \wp_register_ability( $name, $args );
+		$registry = \WP_Abilities_Registry::get_instance();
+		if ( null === $registry || $registry->is_registered( $name ) ) {
+			return null;
+		}
+
+		return $registry->register( $name, $args );
 	}
 
 	public function __construct() {
@@ -57,11 +86,21 @@ class AgentAbilities {
 		}
 
 		if ( doing_action( 'wp_abilities_api_init' ) ) {
+			// In-lifecycle: register now.
 			$this->registerAbilities();
+			self::$registered = true;
 		} elseif ( ! did_action( 'wp_abilities_api_init' ) ) {
+			// Pre-lifecycle: hook the init action.
 			add_action( 'wp_abilities_api_init', array( $this, 'registerAbilities' ) );
+			self::$registered = true;
+		} else {
+			// Post-lifecycle (headless / WP Codebox sandbox load order): the
+			// init action has already fired before this plugin file was
+			// included, so neither the in-lifecycle nor the hook path will run.
+			// Register immediately via the late path in registerAbility().
+			$this->registerAbilities();
+			self::$registered = true;
 		}
-		self::$registered = true;
 	}
 
 	public function registerAbilities(): void {
