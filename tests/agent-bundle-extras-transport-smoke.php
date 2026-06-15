@@ -75,6 +75,14 @@ if ( ! function_exists( 'add_action' ) ) {
 	}
 }
 
+if ( ! function_exists( 'add_filter' ) ) {
+	function add_filter( $hook, $callback, $priority = 10, $accepted_args = 1 ) {
+		unset( $priority, $accepted_args );
+		$GLOBALS['__bundle_smoke_filters'][ $hook ][] = $callback;
+		return true;
+	}
+}
+
 // Lightweight filter/action registry for the export filter assertion. The bundle
 // codebase guards filter usage behind function_exists() / fallbacks, but the
 // AgentBundler::collect_export_extras path requires real apply_filters semantics.
@@ -120,7 +128,7 @@ require_once dirname( __DIR__ ) . '/vendor/autoload.php';
 
 use DataMachine\Engine\Bundle\AgentBundleDirectory;
 use DataMachine\Engine\Bundle\AgentBundleFlowFile;
-use DataMachine\Engine\Bundle\AgentBundleLegacyAdapter;
+use DataMachine\Engine\Bundle\AgentBundleArrayAdapter;
 use DataMachine\Engine\Bundle\AgentBundleManifest;
 use DataMachine\Engine\Bundle\AgentBundlePipelineFile;
 use DataMachine\Engine\Bundle\BundleSchema;
@@ -433,14 +441,14 @@ assert_extras_equals( 'round-trip wiki extra path preserved', "# Page\n", $round
 assert_extras_equals( 'round-trip datasets extra path preserved', '{"a":1}', $round_extras['datasets']['datasets/seed.json'] ?? '' );
 
 // ---------------------------------------------------------------------------
-// [9] Legacy adapter round-trip preserves extras
+// [9] Array adapter round-trip preserves extras
 // ---------------------------------------------------------------------------
 echo "\n[9] Legacy bundle array round-trip preserves extras\n";
-$legacy = AgentBundleLegacyAdapter::to_legacy_bundle( $with_extras );
+$legacy = AgentBundleArrayAdapter::to_array_bundle( $with_extras );
 assert_extras( 'legacy bundle array contains extras key', isset( $legacy['extras'] ) );
 assert_extras_equals( 'legacy extras roundtrip wiki', "# Page\n", $legacy['extras']['wiki']['wiki/page.md'] ?? '' );
 
-$rebuilt = AgentBundleLegacyAdapter::from_legacy_bundle( $legacy );
+$rebuilt = AgentBundleArrayAdapter::from_array_bundle( $legacy );
 assert_extras_equals( 'legacy → directory → extras preserved', $with_extras->extras(), $rebuilt->extras() );
 
 // ---------------------------------------------------------------------------
@@ -450,13 +458,13 @@ echo "\n[10] AgentBundler::from_directory and from_zip carry extras through\n";
 
 // We can construct AgentBundler (its constructor instantiates DB classes that
 // inherit from base classes which don't run anything dangerous in pure-PHP).
-// Instead, drive AgentBundleLegacyAdapter directly which is what AgentBundler
+// Instead, drive AgentBundleArrayAdapter directly which is what AgentBundler
 // uses under the hood, then verify the same shape via the directory adapter.
 rm_tree( $tmp );
 $with_extras->write( $tmp );
 
 // Equivalent of AgentBundler::from_directory():
-$dir_bundle = AgentBundleLegacyAdapter::to_legacy_bundle( AgentBundleDirectory::read( $tmp ) );
+$dir_bundle = AgentBundleArrayAdapter::to_array_bundle( AgentBundleDirectory::read( $tmp ) );
 assert_extras( 'from_directory equivalent: bundle has extras key', isset( $dir_bundle['extras'] ) );
 assert_extras_equals( 'from_directory equivalent: wiki/page.md preserved', "# Page\n", $dir_bundle['extras']['wiki']['wiki/page.md'] ?? '' );
 
@@ -487,7 +495,7 @@ if ( true === $zip2->open( $zip_path ) ) {
 	$zip2->extractTo( $extract_dir );
 	$zip2->close();
 }
-$zip_bundle = AgentBundleLegacyAdapter::to_legacy_bundle( AgentBundleDirectory::read( $extract_dir ) );
+$zip_bundle = AgentBundleArrayAdapter::to_array_bundle( AgentBundleDirectory::read( $extract_dir ) );
 assert_extras_equals( 'zip round-trip preserves wiki extra', "# Page\n", $zip_bundle['extras']['wiki']['wiki/page.md'] ?? '' );
 
 // ---------------------------------------------------------------------------
