@@ -280,59 +280,35 @@ class ProcessedItems extends BaseRepository {
 	public function add_processed_item( string $flow_step_id, string $source_type, string $item_identifier, int $job_id ): bool {
 		$now = current_time( 'mysql', true );
 
-		// Convert an existing in-flight claim to final processed state, or refresh
-		// an existing processed row idempotently. The unique key guarantees one row
-		// per source item, so this is safe across child-job races.
+		// Single atomic upsert keyed on the `flow_source_item` unique index. This
+		// records a fresh processed row, OR — when an in-flight claim or an
+		// already-processed row exists — converts it to final processed state with
+		// the latest job_id/timestamp and clears any claim. A bare INSERT (or a
+		// check-then-insert) races between concurrent Action Scheduler workers and
+		// makes the loser log a hard "Duplicate entry" DB error on every collision.
+		// INSERT ... ON DUPLICATE KEY UPDATE turns that race into a normal no-op:
+		// the unique key still guarantees exactly one row per source item, and no
+		// duplicate-key error is ever raised.
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared -- Prepared with %i table placeholder.
-		$updated = $this->wpdb->query(
+		$result = $this->wpdb->query(
 			$this->wpdb->prepare(
-				'UPDATE %i SET job_id = %d, status = %s, processed_timestamp = %s, claim_expires_at = NULL WHERE flow_step_id = %s AND source_type = %s AND item_identifier = %s',
+				'INSERT INTO %i (flow_step_id, source_type, item_identifier, job_id, status, processed_timestamp, claim_expires_at)
+				VALUES (%s, %s, %s, %d, %s, %s, NULL)
+				ON DUPLICATE KEY UPDATE job_id = VALUES(job_id), status = VALUES(status), processed_timestamp = VALUES(processed_timestamp), claim_expires_at = NULL',
 				$this->table_name,
-				$job_id,
-				self::STATUS_PROCESSED,
-				$now,
 				$flow_step_id,
 				$source_type,
-				$item_identifier
+				$item_identifier,
+				$job_id,
+				self::STATUS_PROCESSED,
+				$now
 			)
 		);
 		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
 
-		if ( false !== $updated && $updated > 0 ) {
-			return true;
-		}
-
-        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-		$result = $this->wpdb->insert(
-			$this->table_name,
-			array(
-				'flow_step_id'    => $flow_step_id,
-				'source_type'     => $source_type,
-				'item_identifier' => $item_identifier,
-				'job_id'          => $job_id,
-				'status'          => self::STATUS_PROCESSED,
-				// processed_timestamp defaults to NOW().
-			),
-			array(
-				'%s', // flow_step_id
-				'%s', // source_type
-				'%s', // item_identifier
-				'%d', // job_id
-				'%s', // status
-			)
-		);
-
 		if ( false === $result ) {
-			// Log error - but check if it's a duplicate key error first
-			$db_error = $this->wpdb->last_error;
-
-			// If it's a duplicate key error, treat as success (race condition handling)
-			if ( false !== strpos( $db_error, 'Duplicate entry' ) ) {
-				return true; // Treat duplicate as success
-			}
-
-			// Use Logger Service if available for actual errors
+			// A genuine failure (not a duplicate — the upsert never raises one).
 			do_action(
 				'datamachine_log',
 				'error',
@@ -342,7 +318,7 @@ class ProcessedItems extends BaseRepository {
 					'source_type'     => $source_type,
 					'item_identifier' => substr( $item_identifier, 0, 100 ) . '...', // Avoid logging potentially huge identifiers
 					'job_id'          => $job_id,
-					'db_error'        => $db_error,
+					'db_error'        => $this->wpdb->last_error,
 				)
 			);
 			return false;
