@@ -223,7 +223,14 @@ final class AgentBundleRunner {
 	}
 
 	private static function is_success_status( string $status ): bool {
-		return ! in_array( $status, array( 'failed', 'completed_no_items', 'cancelled', 'timed_out', 'timeout' ), true );
+		$status = trim( $status );
+		foreach ( array( 'failed', 'completed_no_items', 'cancelled', 'timed_out', 'timeout' ) as $failure_status ) {
+			if ( $failure_status === $status || str_starts_with( $status, $failure_status . ' - ' ) ) {
+				return false;
+			}
+		}
+
+		return true;
 	}
 
 	/** @return array<string,mixed> */

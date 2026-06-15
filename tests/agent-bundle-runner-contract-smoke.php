@@ -75,7 +75,7 @@ foreach ( array(
 	'ExecuteWorkflowAbility'                     => 'runner reuses existing headless workflow executor',
 	'DrainJobAbility'                            => 'runner can drain jobs for final result callers',
 	'wp_agent_import_runtime_bundles'            => 'runner uses generic runtime bundle import helper when available',
-	"apply_filters( 'wp_agent_runtime_import_bundle'" => 'runner falls back to generic runtime bundle import filter',
+	'wp_agent_import_runtime_bundles( $bundle_specs, $import_input )' => 'runner delegates runtime imports through the generic helper seam',
 	"'runtime_imports'"                         => 'runner returns runtime import diagnostics',
 	"'completion_outcome'"                      => 'runner returns completion outcome summary',
 	"'outputs'"                                 => 'runner returns semantic output map',
@@ -143,7 +143,13 @@ datamachine_bundle_runner_assert( 'https://github.com/chubes4/wp-site-generator/
 datamachine_bundle_runner_assert( ! isset( $projected_outputs['outputs']['agent_id'] ), 'runtime identity fields are not projected as outputs', $failures, $passes );
 datamachine_bundle_runner_assert( array( 'missing_result_url', 'missing_store_url' ) === ( $projected_outputs['diagnostics']['missing_outputs'] ?? null ), 'missing declared outputs are diagnosed semantically', $failures, $passes );
 
-echo "\n[3a] Successful tool results can be recorded into engine data\n";
+echo "\n[3a] Failed terminal status families are not successful\n";
+$success_status = $runner_reflection->getMethod( 'is_success_status' );
+datamachine_bundle_runner_assert( false === $success_status->invoke( null, 'failed - ai_response_without_tool_result' ), 'failed-prefixed status is terminal failure', $failures, $passes );
+datamachine_bundle_runner_assert( false === $success_status->invoke( null, 'cancelled - operator aborted' ), 'cancelled-prefixed status is terminal failure', $failures, $passes );
+datamachine_bundle_runner_assert( true === $success_status->invoke( null, 'completed' ), 'completed status remains successful', $failures, $passes );
+
+echo "\n[3b] Successful tool results can be recorded into engine data\n";
 require_once $root . '/inc/Engine/AI/conversation-loop.php';
 $GLOBALS['datamachine_bundle_runner_engine_data_merges'] = array();
 \DataMachine\Engine\AI\datamachine_record_tool_results_to_engine_data(
