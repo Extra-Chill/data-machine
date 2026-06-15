@@ -19,6 +19,25 @@ namespace {
 	// exist, so the pure-PHP stubs below must NOT be declared (they would fatal
 	// with "Cannot redeclare"). Assert the real registration outcome and return.
 	if ( function_exists( 'wp_get_ability' ) ) {
+		// TEMP DIAGNOSTIC (#2629): dump registry/lifecycle state to understand
+		// the real Playground load order before the wp_get_ability() check.
+		echo 'DIAG did_action(init)=' . did_action( 'init' )
+			. ' did_action(wp_abilities_api_categories_init)=' . did_action( 'wp_abilities_api_categories_init' )
+			. ' did_action(wp_abilities_api_init)=' . did_action( 'wp_abilities_api_init' ) . "\n";
+		echo 'DIAG class_exists(AgentAbilities)=' . ( class_exists( '\DataMachine\Abilities\AgentAbilities' ) ? '1' : '0' )
+			. ' function_exists(datamachine_run)=' . ( function_exists( 'datamachine_run_datamachine_plugin' ) ? '1' : '0' )
+			. ' DATAMACHINE_VERSION=' . ( defined( 'DATAMACHINE_VERSION' ) ? DATAMACHINE_VERSION : 'undef' ) . "\n";
+		echo 'DIAG has_category(datamachine-agent)=' . ( function_exists( 'wp_has_ability_category' ) && wp_has_ability_category( 'datamachine-agent' ) ? '1' : '0' ) . "\n";
+		if ( class_exists( '\WP_Abilities_Registry' ) ) {
+			$reg = \WP_Abilities_Registry::get_instance();
+			if ( $reg && method_exists( $reg, 'get_all_registered' ) ) {
+				$all = array_keys( $reg->get_all_registered() );
+				$dm  = array_values( array_filter( $all, static fn( $n ) => str_starts_with( (string) $n, 'datamachine/' ) ) );
+				echo 'DIAG registered_total=' . count( $all ) . ' datamachine_count=' . count( $dm ) . "\n";
+				echo 'DIAG datamachine_abilities=' . implode( ',', array_slice( $dm, 0, 40 ) ) . "\n";
+			}
+		}
+
 		$ability = wp_get_ability( 'datamachine/run-agent-bundle' );
 		if ( ! $ability || ! method_exists( $ability, 'execute' ) ) {
 			echo "FAIL: datamachine/run-agent-bundle is not registered in WordPress runtime\n";
