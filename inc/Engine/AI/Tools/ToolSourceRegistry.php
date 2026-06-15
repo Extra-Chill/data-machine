@@ -65,6 +65,76 @@ class ToolSourceRegistry {
 	}
 
 	/**
+	 * Gather tools with bounded source-level metadata for diagnostics.
+	 *
+	 * @param array $modes Agent mode slugs.
+	 * @param array $args  Full resolution arguments.
+	 * @return array{tools: array<string,array<string,mixed>>, sources: array<int,array<string,mixed>>}
+	 */
+	public function gatherWithMetadata( array $modes, array $args ): array {
+		$context  = array_merge(
+			$args,
+			array(
+				'modes'        => $modes,
+				'tool_manager' => $this->tool_manager,
+			)
+		);
+		$callback = array( $this, 'orderSourcesForContext' );
+		if ( function_exists( 'add_filter' ) ) {
+			add_filter( 'agents_api_tool_source_order', $callback, 5, 3 );
+		}
+
+		try {
+			$sources = $this->registry->getSources( $context );
+			$order   = array_keys( $sources );
+			if ( function_exists( 'apply_filters' ) ) {
+				$order = apply_filters( 'agents_api_tool_source_order', $order, $context, $this->registry, $sources );
+			}
+			$order = is_array( $order ) ? array_values( array_filter( $order, static fn( $source ): bool => is_string( $source ) && isset( $sources[ $source ] ) ) ) : array();
+
+			$tools           = array();
+			$source_metadata = array();
+			foreach ( $order as $source_slug ) {
+				$source_tools = call_user_func( $sources[ $source_slug ], $context, $this->registry );
+				if ( function_exists( 'apply_filters' ) ) {
+					$source_tools = apply_filters( 'agents_api_tool_source_tools', $source_tools, $source_slug, $context, $this->registry );
+				}
+
+				$source_tools   = is_array( $source_tools ) ? $source_tools : array();
+				$produced_names = array_values( array_filter( array_keys( $source_tools ), 'is_string' ) );
+				$accepted_names = array();
+				foreach ( $source_tools as $tool_name => $tool_definition ) {
+					if ( ! is_string( $tool_name ) || isset( $tools[ $tool_name ] ) || ! is_array( $tool_definition ) ) {
+						continue;
+					}
+
+					$tools[ $tool_name ] = $tool_definition;
+					$accepted_names[]    = $tool_name;
+				}
+
+				$source_metadata[] = array(
+					'source'              => $source_slug,
+					'consulted'           => true,
+					'produced_tool_names'  => $produced_names,
+					'accepted_tool_names'  => $accepted_names,
+					'filtered_tool_names'  => array_values( array_diff( $produced_names, $accepted_names ) ),
+					'produced_tool_count'  => count( $produced_names ),
+					'accepted_tool_count'  => count( $accepted_names ),
+				);
+			}
+
+			return array(
+				'tools'   => $tools,
+				'sources' => $source_metadata,
+			);
+		} finally {
+			if ( function_exists( 'remove_filter' ) ) {
+				remove_filter( 'agents_api_tool_source_order', $callback, 5 );
+			}
+		}
+	}
+
+	/**
 	 * Register Data Machine-owned sources with the Agents API source registry.
 	 *
 	 * @return void

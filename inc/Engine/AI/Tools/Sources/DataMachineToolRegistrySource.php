@@ -41,6 +41,8 @@ final class DataMachineToolRegistrySource {
 				continue;
 			}
 
+			$include_unavailable = ! empty( $args['include_unavailable'] );
+
 			// Handler-wrapper tools belong to the adjacent-handler source.
 			// Skip them here regardless of mode so they cannot leak into
 			// the static-registry surface — including via mode inheritance.
@@ -48,12 +50,17 @@ final class DataMachineToolRegistrySource {
 				continue;
 			}
 
-			if ( ! ToolPolicyResolver::isOptInToolAllowed( $tool_config, $tool_name, $args ) ) {
+			if ( ! $include_unavailable && ! ToolPolicyResolver::isOptInToolAllowed( $tool_config, $tool_name, $args ) ) {
 				continue;
 			}
 
 			// Tools with requires_config go through availability checks.
 			// Tools without it are always available unless globally disabled.
+			if ( $include_unavailable ) {
+				$available_tools[ $tool_name ] = $tool_config;
+				continue;
+			}
+
 			if ( ! empty( $tool_config['requires_config'] ) ) {
 				if ( ! $this->tool_manager->is_tool_available( $tool_name, null ) ) {
 					continue;

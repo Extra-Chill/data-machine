@@ -67,6 +67,7 @@ class JobArtifacts {
 			'disposition_diagnostic' => $this->disposition_diagnostic( $engine_data ),
 			'required_tool_names'    => $this->tool_names_from_assertions( $engine_data['completion_assertions_required'] ?? array() ),
 			'satisfied_tool_names'   => $this->tool_names_from_assertions( $engine_data['completion_assertions_satisfied'] ?? array() ),
+			'tool_resolution_evidence' => is_array( $engine_data['tool_resolution_evidence'] ?? null ) ? $engine_data['tool_resolution_evidence'] : array(),
 			'successful_tool_calls'  => $tool_calls,
 			'tool_trace'             => $this->tool_trace( $engine_data, $additional_tool_summaries ),
 			'transcript'             => $this->transcript_metadata( $job_id, $engine_data ),

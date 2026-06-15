@@ -146,6 +146,27 @@ function resolve_policy_tools_for_test( array $flow_step_config, array $pipeline
 	);
 }
 
+function resolve_policy_tools_with_evidence_for_test( array $flow_step_config, array $pipeline_step_config, SnapshotPolicyToolManager $manager, array $required_tool_names ): array {
+	$resolver = new ToolPolicyResolver( $manager );
+
+	return $resolver->resolveWithEvidence(
+		array_merge(
+			array(
+				'mode'                 => ToolPolicyResolver::MODE_PIPELINE,
+				'agent_id'             => 0,
+				'previous_step_config' => null,
+				'next_step_config'     => null,
+				'pipeline_step_id'     => (string) ( $flow_step_config['pipeline_step_id'] ?? '' ),
+				'engine_data'          => array(),
+				'categories'           => array(),
+			),
+			PipelineToolPolicyArgs::fromConfigs( $flow_step_config, $pipeline_step_config )
+		),
+		$required_tool_names,
+		is_array( $flow_step_config['enabled_tools'] ?? null ) ? $flow_step_config['enabled_tools'] : array()
+	);
+}
+
 echo "pipeline-tool-policy-snapshot-smoke\n";
 
 echo "\n[1] non-empty enabled_tools narrows pipeline tools:\n";
@@ -296,6 +317,40 @@ assert_policy_equals(
 	$failures,
 	$passes
 );
+
+echo "\n[8] required-tool evidence reports policy-filtered unavailable tools:\n";
+$resolution = resolve_policy_tools_with_evidence_for_test(
+	array(
+		'step_type'        => 'ai',
+		'pipeline_step_id' => 'ephemeral_pipeline_0',
+		'enabled_tools'    => array( 'beta_tool' ),
+	),
+	array(),
+	new SnapshotPolicyToolManager(),
+	array( 'alpha_tool' )
+);
+assert_policy_equals( array( 'beta_tool' ), array_keys( $resolution['tools'] ), 'evidence test allowlist resolves enabled tool only', $failures, $passes );
+assert_policy_equals( array( 'beta_tool' ), $resolution['evidence']['requested_tool_names'] ?? null, 'evidence preserves requested tool names', $failures, $passes );
+assert_policy_equals( array( 'alpha_tool' ), $resolution['evidence']['required_tool_names'] ?? null, 'evidence preserves required tool names', $failures, $passes );
+assert_policy_equals( array( 'alpha_tool' ), $resolution['evidence']['unavailable_required_tool_names'] ?? null, 'evidence reports unavailable required tool names', $failures, $passes );
+assert_policy_equals( 'policy_filtered', $resolution['evidence']['required_tool_resolution'][0]['reason'] ?? null, 'evidence categorizes gathered-but-filtered required tool', $failures, $passes );
+assert_policy_equals( 'static_registry', $resolution['evidence']['required_tool_resolution'][0]['source'] ?? null, 'evidence identifies source for filtered required tool', $failures, $passes );
+
+echo "\n[9] required-tool evidence reports resolved tools:\n";
+$resolution = resolve_policy_tools_with_evidence_for_test(
+	array(
+		'step_type'        => 'ai',
+		'pipeline_step_id' => 'ephemeral_pipeline_0',
+		'enabled_tools'    => array( 'alpha_tool' ),
+	),
+	array(),
+	new SnapshotPolicyToolManager(),
+	array( 'alpha_tool' )
+);
+assert_policy_equals( array( 'alpha_tool' ), array_keys( $resolution['tools'] ), 'resolved evidence keeps required tool', $failures, $passes );
+assert_policy_equals( array(), $resolution['evidence']['unavailable_required_tool_names'] ?? null, 'resolved evidence has no unavailable required tools', $failures, $passes );
+assert_policy_equals( 'resolved', $resolution['evidence']['required_tool_resolution'][0]['status'] ?? null, 'resolved evidence marks required tool resolved', $failures, $passes );
+assert_policy_equals( 'alpha_tool', $resolution['evidence']['required_tool_resolution'][0]['resolved_name'] ?? null, 'resolved evidence preserves resolved logical name', $failures, $passes );
 
 if ( $failures ) {
 	echo "\nFAILED: " . count( $failures ) . " pipeline policy assertions failed.\n";
