@@ -236,7 +236,10 @@ class AnalyticsCommand extends BaseCommand {
 	 * Flatten a result row for table display.
 	 *
 	 * Converts nested arrays (like GA4 dimension/metric values) into flat key-value pairs.
-	 * Arrays within rows become comma-separated strings.
+	 * Scalar arrays (like GSC's 'keys') become comma-separated strings. Arrays whose
+	 * elements are themselves arrays/objects (like path_sequence's 'next_hosts') are
+	 * rendered readably rather than blindly imploded, which would otherwise trigger
+	 * "Array to string conversion" warnings.
 	 *
 	 * @param array $row Result row.
 	 * @return array Flat row.
@@ -245,13 +248,53 @@ class AnalyticsCommand extends BaseCommand {
 		$flat = array();
 		foreach ( $row as $key => $value ) {
 			if ( is_array( $value ) ) {
-				// For arrays like GSC's 'keys', join them.
-				$flat[ $key ] = implode( ', ', array_map( 'strval', $value ) );
+				$flat[ $key ] = $this->stringify_cell( $value );
 			} else {
 				$flat[ $key ] = $value;
 			}
 		}
 		return $flat;
+	}
+
+	/**
+	 * Render an array cell value as a readable string for table/CSV output.
+	 *
+	 * Scalar arrays are comma-joined (preserving the GSC 'keys' behavior). Arrays
+	 * containing nested arrays/objects are rendered as compact, readable summaries:
+	 * arrays of {next_host, users} pairs (path_sequence's 'next_hosts') become
+	 * "host:users; host:users", and any other non-scalar structure falls back to a
+	 * JSON encoding so the cell never triggers an "Array to string conversion" warning.
+	 *
+	 * @param array $value Array cell value.
+	 * @return string Readable string representation.
+	 */
+	private function stringify_cell( array $value ): string {
+		$has_nested = false;
+		foreach ( $value as $element ) {
+			if ( is_array( $element ) || is_object( $element ) ) {
+				$has_nested = true;
+				break;
+			}
+		}
+
+		// Scalar arrays (e.g. GSC's 'keys'): join as before.
+		if ( ! $has_nested ) {
+			return implode( ', ', array_map( 'strval', $value ) );
+		}
+
+		// Targeted rendering for path_sequence's next_host/users pairs.
+		$pairs = array();
+		foreach ( $value as $element ) {
+			$element = (array) $element;
+			if ( isset( $element['next_host'] ) && isset( $element['users'] ) ) {
+				$pairs[] = $element['next_host'] . ':' . $element['users'];
+			} else {
+				// Unknown nested shape: fall back to JSON for the whole cell.
+				return (string) wp_json_encode( $value );
+			}
+		}
+
+		return implode( '; ', $pairs );
 	}
 
 	/**
