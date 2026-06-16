@@ -312,6 +312,161 @@ agent_bundle_slug_matcher_assert(
 	$passes
 );
 
+// ---- 10. Pipeline-scoped fallback: source label is unique within a pipeline.
+// Reproduces the events-bot live-origin shape end to end: N city pipelines,
+// each with a same-named "Ticketmaster" AND "Dice.fm" live flow (portable_slug
+// NULL, flow_name the bare source label). The bundle flow carries the UNIQUE
+// slug ("ticketmaster-63"), which the global slug pass can never match against a
+// slugless live row. The pipeline-scoped fallback re-keys both sides on the
+// normalized source label WITHIN the bounded pipeline, where it is unique.
+//
+// Mirror of the adopt() matching loop: pipelines match first, then each bundle
+// flow is bounded to its matched live pipeline; the unique-slug pass misses, so
+// the name-key fallback resolves it.
+$scoped_pipelines = array(
+	101 => array(
+		array( 'flow_id' => 1, 'pipeline_id' => 101, 'flow_name' => 'Ticketmaster', 'portable_slug' => null ),
+		array( 'flow_id' => 2, 'pipeline_id' => 101, 'flow_name' => 'Dice.fm', 'portable_slug' => null ),
+	),
+	102 => array(
+		array( 'flow_id' => 3, 'pipeline_id' => 102, 'flow_name' => 'Ticketmaster', 'portable_slug' => null ),
+		array( 'flow_id' => 4, 'pipeline_id' => 102, 'flow_name' => 'Dice.fm', 'portable_slug' => null ),
+	),
+	103 => array(
+		array( 'flow_id' => 5, 'pipeline_id' => 103, 'flow_name' => 'Ticketmaster', 'portable_slug' => null ),
+		array( 'flow_id' => 6, 'pipeline_id' => 103, 'flow_name' => 'Dice.fm', 'portable_slug' => null ),
+	),
+);
+
+// Bundle flows: each carries the UNIQUE deduped slug in portable_slug (exactly
+// what AgentBundleArrayAdapter writes) and the bare source label in flow_name.
+// original_pipeline_id maps to a matched live pipeline (id == live id here).
+$scoped_bundle_flows = array(
+	array( 'original_pipeline_id' => 101, 'flow_name' => 'Ticketmaster', 'portable_slug' => 'ticketmaster' ),
+	array( 'original_pipeline_id' => 101, 'flow_name' => 'Dice.fm', 'portable_slug' => 'dice-fm' ),
+	array( 'original_pipeline_id' => 102, 'flow_name' => 'Ticketmaster', 'portable_slug' => 'ticketmaster-2' ),
+	array( 'original_pipeline_id' => 102, 'flow_name' => 'Dice.fm', 'portable_slug' => 'dice-fm-2' ),
+	array( 'original_pipeline_id' => 103, 'flow_name' => 'Ticketmaster', 'portable_slug' => 'ticketmaster-3' ),
+	array( 'original_pipeline_id' => 103, 'flow_name' => 'Dice.fm', 'portable_slug' => 'dice-fm-3' ),
+);
+
+$scoped_matched   = 0;
+$scoped_unmatched = 0;
+$scoped_ambiguous = 0;
+$matched_flow_ids = array();
+foreach ( $scoped_bundle_flows as $bundle_flow ) {
+	$live_pipeline = (int) $bundle_flow['original_pipeline_id'];
+	$slug_key      = AgentBundleSlugMatcher::bundle_slug( $bundle_flow, 'flow_name', 'flow' );
+	$scoped_rows   = $scoped_pipelines[ $live_pipeline ] ?? array();
+
+	// Global unique-slug pass: misses, because live rows have no slug.
+	$slug_index = AgentBundleSlugMatcher::index_existing( $scoped_rows, 'flow_name', 'flow' );
+	$live       = $slug_index['matched'][ $slug_key ] ?? null;
+
+	// Pipeline-scoped fallback: re-key both sides on the source label.
+	if ( null === $live ) {
+		$name_key   = AgentBundleSlugMatcher::bundle_name_key( $bundle_flow, 'flow_name', 'flow' );
+		$name_index = AgentBundleSlugMatcher::index_existing_by_name( $scoped_rows, 'flow_name', 'flow' );
+		if ( isset( $name_index['ambiguous'][ $name_key ] ) ) {
+			++$scoped_ambiguous;
+			continue;
+		}
+		$live = $name_index['matched'][ $name_key ] ?? null;
+	}
+
+	if ( null === $live ) {
+		++$scoped_unmatched;
+		continue;
+	}
+
+	++$scoped_matched;
+	$matched_flow_ids[ $slug_key ] = (int) $live['flow_id'];
+}
+
+agent_bundle_slug_matcher_assert(
+	6 === $scoped_matched && 0 === $scoped_unmatched && 0 === $scoped_ambiguous,
+	'pipeline-scoped: all same-named live-origin flows match, 0 unmatched, 0 ambiguous',
+	$failures,
+	$passes
+);
+agent_bundle_slug_matcher_assert(
+	1 === ( $matched_flow_ids['ticketmaster'] ?? 0 )
+		&& 3 === ( $matched_flow_ids['ticketmaster-2'] ?? 0 )
+		&& 5 === ( $matched_flow_ids['ticketmaster-3'] ?? 0 ),
+	'pipeline-scoped: each Ticketmaster slug binds to the row in its OWN pipeline',
+	$failures,
+	$passes
+);
+agent_bundle_slug_matcher_assert(
+	2 === ( $matched_flow_ids['dice-fm'] ?? 0 )
+		&& 4 === ( $matched_flow_ids['dice-fm-2'] ?? 0 )
+		&& 6 === ( $matched_flow_ids['dice-fm-3'] ?? 0 ),
+	'pipeline-scoped: each Dice.fm slug binds to the row in its OWN pipeline',
+	$failures,
+	$passes
+);
+
+// ---- 11. Pipeline-scoped fallback STILL refuses a genuine in-pipeline tie. --
+// Two live flows with the SAME normalized source label inside ONE pipeline:
+// there is no unique signal, so the name fallback must surface ambiguous and
+// NEVER guess — preserving the #2668 guarantee at the per-pipeline scope.
+$tie_rows = array(
+	array( 'flow_id' => 11, 'pipeline_id' => 200, 'flow_name' => 'Ticketmaster', 'portable_slug' => null ),
+	array( 'flow_id' => 12, 'pipeline_id' => 200, 'flow_name' => 'Ticketmaster', 'portable_slug' => null ),
+);
+$tie_bundle = array( 'original_pipeline_id' => 200, 'flow_name' => 'Ticketmaster', 'portable_slug' => 'ticketmaster-77' );
+
+$tie_slug_key   = AgentBundleSlugMatcher::bundle_slug( $tie_bundle, 'flow_name', 'flow' );
+$tie_slug_index = AgentBundleSlugMatcher::index_existing( $tie_rows, 'flow_name', 'flow' );
+$tie_live       = $tie_slug_index['matched'][ $tie_slug_key ] ?? null;
+$tie_refused    = false;
+if ( null === $tie_live ) {
+	$tie_name_key   = AgentBundleSlugMatcher::bundle_name_key( $tie_bundle, 'flow_name', 'flow' );
+	$tie_name_index = AgentBundleSlugMatcher::index_existing_by_name( $tie_rows, 'flow_name', 'flow' );
+	$tie_refused    = isset( $tie_name_index['ambiguous'][ $tie_name_key ] )
+		&& ! isset( $tie_name_index['matched'][ $tie_name_key ] );
+}
+agent_bundle_slug_matcher_assert(
+	$tie_refused,
+	'pipeline-scoped: two same-named flows in ONE pipeline stay ambiguous (no guess)',
+	$failures,
+	$passes
+);
+
+// ---- 12. index_existing_by_name ignores portable_slug (keys on label only). -
+// Distinct from index_existing(): a row WITH a stored portable_slug is still
+// keyed under its normalized name here, because the per-pipeline fallback's only
+// stable cross-side signal is the source label.
+$name_only = AgentBundleSlugMatcher::index_existing_by_name(
+	array(
+		array( 'flow_id' => 1, 'flow_name' => 'Ticketmaster', 'portable_slug' => 'some-stored-slug' ),
+		array( 'flow_id' => 2, 'flow_name' => 'Dice.fm', 'portable_slug' => null ),
+	),
+	'flow_name',
+	'flow'
+);
+agent_bundle_slug_matcher_assert(
+	isset( $name_only['matched']['ticketmaster'] )
+		&& 1 === ( $name_only['matched']['ticketmaster']['flow_id'] ?? 0 )
+		&& isset( $name_only['matched']['dice-fm'] ),
+	'index_existing_by_name keys on normalized name regardless of portable_slug',
+	$failures,
+	$passes
+);
+
+// ---- 13. bundle_name_key keys on the source label, never the unique slug. ---
+$label_key = AgentBundleSlugMatcher::bundle_name_key(
+	array( 'flow_name' => 'Ticketmaster', 'portable_slug' => 'ticketmaster-63', 'slug' => 'ticketmaster-63' ),
+	'flow_name',
+	'flow'
+);
+agent_bundle_slug_matcher_assert(
+	'ticketmaster' === $label_key,
+	'bundle_name_key resolves the source label, ignoring the unique slug',
+	$failures,
+	$passes
+);
+
 if ( $failures ) {
 	echo "\nFAILED: " . count( $failures ) . " agent bundle slug matcher assertions failed.\n";
 	exit( 1 );

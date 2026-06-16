@@ -80,6 +80,93 @@ final class AgentBundleSlugMatcher {
 	}
 
 	/**
+	 * Index a set of existing rows by their normalized display NAME (label).
+	 *
+	 * Where {@see self::index_existing()} keys on the row IDENTITY (stored
+	 * `portable_slug` first, name only as a fallback), this keys purely on the
+	 * normalized display name and ignores `portable_slug` entirely. It exists
+	 * for the pipeline-scoped flow fallback in adopt: a live-origin flow row has
+	 * no slug column, so its only stable identity WITHIN an already-matched
+	 * parent pipeline is its source label (`flow_name` = "Ticketmaster",
+	 * "Dice.fm"). Within one city pipeline that label is unique, so keying on it
+	 * is unambiguous; across the whole agent it is not, which is why callers must
+	 * only ever hand this the live rows of a SINGLE matched pipeline.
+	 *
+	 * The ambiguity guarantee is preserved: when two rows in the bounded set
+	 * resolve to the same normalized name (a genuine in-pipeline collision), the
+	 * name is surfaced in `ambiguous` and omitted from `matched` so the caller
+	 * still refuses to guess.
+	 *
+	 * @param array<int,array<string,mixed>> $rows     Existing rows for ONE pipeline.
+	 * @param string                         $name_key Display-name field (flow_name).
+	 * @param string                         $fallback PortableSlug fallback (flow).
+	 * @return array{
+	 *     matched: array<string,array<string,mixed>>,
+	 *     ambiguous: array<string,array<int,array<string,mixed>>>
+	 * }
+	 */
+	public static function index_existing_by_name( array $rows, string $name_key, string $fallback ): array {
+		$by_name = array();
+
+		foreach ( $rows as $row ) {
+			if ( ! is_array( $row ) ) {
+				continue;
+			}
+
+			$name = trim( (string) ( $row[ $name_key ] ?? '' ) );
+			if ( '' === $name ) {
+				continue;
+			}
+
+			$key = PortableSlug::normalize( $name, $fallback );
+			if ( '' === $key ) {
+				continue;
+			}
+
+			$by_name[ $key ][] = $row;
+		}
+
+		$matched   = array();
+		$ambiguous = array();
+		foreach ( $by_name as $key => $candidates ) {
+			if ( 1 === count( $candidates ) ) {
+				$matched[ $key ] = $candidates[0];
+				continue;
+			}
+
+			$ambiguous[ $key ] = $candidates;
+		}
+
+		return array(
+			'matched'   => $matched,
+			'ambiguous' => $ambiguous,
+		);
+	}
+
+	/**
+	 * Compute the normalized source-label key for a bundle artifact.
+	 *
+	 * Unlike {@see self::bundle_slug()} (which prefers the artifact's UNIQUE
+	 * `slug`/`portable_slug`), this keys purely on the display name — the source
+	 * label ("Ticketmaster", "Dice.fm"). It is the bundle-side counterpart to
+	 * {@see self::index_existing_by_name()} and is used only for the
+	 * pipeline-scoped flow fallback: within a single matched pipeline the source
+	 * label uniquely identifies the flow, and the live row carries no slug to key
+	 * on, so both sides must meet on the normalized label. The unique slug is
+	 * then backfilled onto the matched live row by the caller.
+	 *
+	 * @param array<string,mixed> $artifact Bundle flow entry.
+	 * @param string              $name_key Display-name field (flow_name).
+	 * @param string              $fallback PortableSlug fallback (flow).
+	 * @return string Normalized source-label key.
+	 */
+	public static function bundle_name_key( array $artifact, string $name_key, string $fallback ): string {
+		$candidate = (string) ( $artifact[ $name_key ] ?? $fallback );
+
+		return PortableSlug::normalize( $candidate, $fallback );
+	}
+
+	/**
 	 * Compute the effective normalized slug for a single existing row.
 	 *
 	 * The stored `portable_slug` is the row's IDENTITY; the display name is only
