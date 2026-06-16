@@ -2,6 +2,12 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.148.4] - 2026-06-16
+
+### Fixed
+- reject duplicate daily memory archives
+- cook stale main issue backlog
+
 ## [0.148.3] - 2026-06-16
 
 ### Changed
