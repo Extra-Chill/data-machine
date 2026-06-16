@@ -190,7 +190,7 @@ class DailyMemoryTask extends SystemTask {
 					'date'        => $date,
 					'job_id'      => $jobId,
 					'status'      => $response['status'] ?? '',
-					'turn_count' => $response['turn_count'] ?? 0,
+					'turn_count'  => $response['turn_count'] ?? 0,
 					'datamachine' => $datamachine_metadata,
 					'error'       => $response['error'] ?? null,
 				)
