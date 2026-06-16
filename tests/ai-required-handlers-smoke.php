@@ -11,23 +11,27 @@ if ( ! defined( 'ABSPATH' ) ) {
 	define( 'ABSPATH', __DIR__ . '/' );
 }
 
-function do_action( string $hook, ...$args ): void {
-	$GLOBALS['__ai_required_handlers_actions'][] = array( $hook, $args );
+if ( ! function_exists( 'do_action' ) ) {
+    function do_action( string $hook, ...$args ): void {
+    	$GLOBALS['__ai_required_handlers_actions'][] = array( $hook, $args );
+    }
 }
 
-function apply_filters( string $hook, $value ) {
-	if ( 'datamachine_step_types' !== $hook ) {
-		return $value;
-	}
+if ( ! function_exists( 'apply_filters' ) ) {
+    function apply_filters( string $hook, $value ) {
+    	if ( 'datamachine_step_types' !== $hook ) {
+    		return $value;
+    	}
 
-	return array(
-		'ai'           => array( 'uses_handler' => false, 'multi_handler' => false ),
-		'system_task'  => array( 'uses_handler' => false, 'multi_handler' => false ),
-		'webhook_gate' => array( 'uses_handler' => false, 'multi_handler' => false ),
-		'fetch'        => array( 'uses_handler' => true, 'multi_handler' => false ),
-		'publish'      => array( 'uses_handler' => true, 'multi_handler' => true ),
-		'upsert'       => array( 'uses_handler' => true, 'multi_handler' => true ),
-	);
+    	return array(
+    		'ai'           => array( 'uses_handler' => false, 'multi_handler' => false ),
+    		'system_task'  => array( 'uses_handler' => false, 'multi_handler' => false ),
+    		'webhook_gate' => array( 'uses_handler' => false, 'multi_handler' => false ),
+    		'fetch'        => array( 'uses_handler' => true, 'multi_handler' => false ),
+    		'publish'      => array( 'uses_handler' => true, 'multi_handler' => true ),
+    		'upsert'       => array( 'uses_handler' => true, 'multi_handler' => true ),
+    	);
+    }
 }
 
 require_once __DIR__ . '/../inc/Core/Steps/FlowStepConfig.php';

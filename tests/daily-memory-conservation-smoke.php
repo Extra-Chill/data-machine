@@ -35,8 +35,10 @@ if ( ! function_exists( 'size_format' ) ) {
 if ( ! function_exists( 'add_filter' ) ) {
 	$GLOBALS['datamachine_daily_memory_conservation_smoke_filters'] = array();
 
-	function add_filter( $hook, $callback ): void {
-		$GLOBALS['datamachine_daily_memory_conservation_smoke_filters'][ $hook ] = $callback;
+	if ( ! function_exists( 'add_filter' ) ) {
+		function add_filter( $hook, $callback ): void {
+			$GLOBALS['datamachine_daily_memory_conservation_smoke_filters'][ $hook ] = $callback;
+		}
 	}
 }
 

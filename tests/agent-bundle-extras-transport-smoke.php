@@ -116,6 +116,13 @@ function bundle_smoke_clear_hooks(): void {
 	$GLOBALS['__bundle_smoke_actions'] = array();
 }
 
+if ( ! function_exists( 'add_filter' ) ) {
+	function add_filter( ...$args ) {
+		// no-op stub for standalone smoke runs.
+	}
+}
+
+
 require_once dirname( __DIR__ ) . '/vendor/autoload.php';
 
 use DataMachine\Engine\Bundle\AgentBundleDirectory;

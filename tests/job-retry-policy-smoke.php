@@ -24,19 +24,25 @@ function assert_retry_policy_smoke( string $name, bool $cond, string $detail = '
 	++$failed;
 }
 
-function apply_filters( string $hook, mixed $value, mixed ...$args ): mixed {
-	$args;
-	return $value;
+if ( ! function_exists( 'apply_filters' ) ) {
+    function apply_filters( string $hook, mixed $value, mixed ...$args ): mixed {
+    	$args;
+    	return $value;
+    }
 }
 
-function do_action( string $hook, mixed ...$args ): void {
-	$hook;
-	$args;
+if ( ! function_exists( 'do_action' ) ) {
+    function do_action( string $hook, mixed ...$args ): void {
+    	$hook;
+    	$args;
+    }
 }
 
-function wp_rand( int $min, int $max ): int {
-	$max;
-	return $min;
+if ( ! function_exists( 'wp_rand' ) ) {
+    function wp_rand( int $min, int $max ): int {
+    	$max;
+    	return $min;
+    }
 }
 
 $merged_engine_data = array();

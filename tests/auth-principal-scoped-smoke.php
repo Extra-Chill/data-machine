@@ -22,69 +22,95 @@ $GLOBALS['datamachine_auth_scope_transients'] = array();
 $GLOBALS['datamachine_auth_scope_user_id']    = 0;
 $GLOBALS['datamachine_auth_scope_filters']    = array();
 
-function __( $text, $domain = null ) {
-	unset( $domain );
-	return $text;
+if ( ! function_exists( '__' ) ) {
+    function __( $text, $domain = null ) {
+    	unset( $domain );
+    	return $text;
+    }
 }
 
-function esc_html( $text ) {
-	return $text;
+if ( ! function_exists( 'esc_html' ) ) {
+    function esc_html( $text ) {
+    	return $text;
+    }
 }
 
-function absint( $value ) {
-	return abs( (int) $value );
+if ( ! function_exists( 'absint' ) ) {
+    function absint( $value ) {
+    	return abs( (int) $value );
+    }
 }
 
 function wp_salt( $scheme = 'auth' ) {
 	return 'principal-scoped-auth-smoke-' . $scheme;
 }
 
-function maybe_serialize( $value ) {
-	return serialize( $value );
+if ( ! function_exists( 'maybe_serialize' ) ) {
+    function maybe_serialize( $value ) {
+    	return serialize( $value );
+    }
 }
 
-function get_site_option( $name, $default = false ) {
-	return $GLOBALS['datamachine_auth_scope_options'][ $name ] ?? $default;
+if ( ! function_exists( 'get_site_option' ) ) {
+    function get_site_option( $name, $default = false ) {
+    	return $GLOBALS['datamachine_auth_scope_options'][ $name ] ?? $default;
+    }
 }
 
-function update_site_option( $name, $value ) {
-	$GLOBALS['datamachine_auth_scope_options'][ $name ] = $value;
-	return true;
+if ( ! function_exists( 'update_site_option' ) ) {
+    function update_site_option( $name, $value ) {
+    	$GLOBALS['datamachine_auth_scope_options'][ $name ] = $value;
+    	return true;
+    }
 }
 
-function get_current_user_id() {
-	return (int) $GLOBALS['datamachine_auth_scope_user_id'];
+if ( ! function_exists( 'get_current_user_id' ) ) {
+    function get_current_user_id() {
+    	return (int) $GLOBALS['datamachine_auth_scope_user_id'];
+    }
 }
 
-function apply_filters( $hook, $value, ...$args ) {
-	foreach ( $GLOBALS['datamachine_auth_scope_filters'][ $hook ] ?? array() as $callback ) {
-		$value = $callback( $value, ...$args );
-	}
-	return $value;
+if ( ! function_exists( 'apply_filters' ) ) {
+    function apply_filters( $hook, $value, ...$args ) {
+    	foreach ( $GLOBALS['datamachine_auth_scope_filters'][ $hook ] ?? array() as $callback ) {
+    		$value = $callback( $value, ...$args );
+    	}
+    	return $value;
+    }
 }
 
-function add_filter( $hook, $callback, $priority = 10, $accepted_args = 1 ) {
-	unset( $priority, $accepted_args );
-	$GLOBALS['datamachine_auth_scope_filters'][ $hook ][] = $callback;
+if ( ! function_exists( 'add_filter' ) ) {
+    function add_filter( $hook, $callback, $priority = 10, $accepted_args = 1 ) {
+    	unset( $priority, $accepted_args );
+    	$GLOBALS['datamachine_auth_scope_filters'][ $hook ][] = $callback;
+    }
 }
 
-function do_action( $hook, ...$args ) {
-	unset( $hook, $args );
+if ( ! function_exists( 'do_action' ) ) {
+    function do_action( $hook, ...$args ) {
+    	unset( $hook, $args );
+    }
 }
 
-function set_transient( $key, $value, $expiration = 0 ) {
-	unset( $expiration );
-	$GLOBALS['datamachine_auth_scope_transients'][ $key ] = $value;
-	return true;
+if ( ! function_exists( 'set_transient' ) ) {
+    function set_transient( $key, $value, $expiration = 0 ) {
+    	unset( $expiration );
+    	$GLOBALS['datamachine_auth_scope_transients'][ $key ] = $value;
+    	return true;
+    }
 }
 
-function get_transient( $key ) {
-	return $GLOBALS['datamachine_auth_scope_transients'][ $key ] ?? false;
+if ( ! function_exists( 'get_transient' ) ) {
+    function get_transient( $key ) {
+    	return $GLOBALS['datamachine_auth_scope_transients'][ $key ] ?? false;
+    }
 }
 
-function delete_transient( $key ) {
-	unset( $GLOBALS['datamachine_auth_scope_transients'][ $key ] );
-	return true;
+if ( ! function_exists( 'delete_transient' ) ) {
+    function delete_transient( $key ) {
+    	unset( $GLOBALS['datamachine_auth_scope_transients'][ $key ] );
+    	return true;
+    }
 }
 
 require_once dirname( __DIR__ ) . '/inc/Core/OAuth/OAuthRedirects.php';

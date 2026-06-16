@@ -13,19 +13,25 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 $GLOBALS['__agents_api_transcript_smoke_actions'] = array();
 
-function sanitize_title( string $value ): string {
-	$value = strtolower( $value );
-	$value = preg_replace( '/[^a-z0-9]+/', '-', $value );
-	return trim( (string) $value, '-' );
+if ( ! function_exists( 'sanitize_title' ) ) {
+    function sanitize_title( string $value ): string {
+    	$value = strtolower( $value );
+    	$value = preg_replace( '/[^a-z0-9]+/', '-', $value );
+    	return trim( (string) $value, '-' );
+    }
 }
 
-function sanitize_file_name( string $value ): string {
-	return basename( $value );
+if ( ! function_exists( 'sanitize_file_name' ) ) {
+    function sanitize_file_name( string $value ): string {
+    	return basename( $value );
+    }
 }
 
-function add_action( string $hook, callable $callback, int $priority = 10, int $accepted_args = 1 ): void {
-	unset( $accepted_args );
-	$GLOBALS['__agents_api_transcript_smoke_actions'][ $hook ][ $priority ][] = $callback;
+if ( ! function_exists( 'add_action' ) ) {
+    function add_action( string $hook, callable $callback, int $priority = 10, int $accepted_args = 1 ): void {
+    	unset( $accepted_args );
+    	$GLOBALS['__agents_api_transcript_smoke_actions'][ $hook ][ $priority ][] = $callback;
+    }
 }
 
 require_once __DIR__ . '/agents-api-loader.php';

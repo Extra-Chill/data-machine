@@ -39,37 +39,45 @@ class DataMachineAIBackpressureSmokeAction {
 	}
 }
 
-function get_option( string $name, mixed $default_value = false ): mixed {
-	return array_key_exists( $name, $GLOBALS['datamachine_ai_backpressure_options'] )
-		? $GLOBALS['datamachine_ai_backpressure_options'][ $name ]
-		: $default_value;
+if ( ! function_exists( 'get_option' ) ) {
+    function get_option( string $name, mixed $default_value = false ): mixed {
+    	return array_key_exists( $name, $GLOBALS['datamachine_ai_backpressure_options'] )
+    		? $GLOBALS['datamachine_ai_backpressure_options'][ $name ]
+    		: $default_value;
+    }
 }
 
-function add_option( string $name, mixed $value = '', mixed $deprecated = '', mixed $autoload = null ): bool {
-	unset( $deprecated, $autoload );
-	if ( array_key_exists( $name, $GLOBALS['datamachine_ai_backpressure_options'] ) ) {
-		return false;
-	}
+if ( ! function_exists( 'add_option' ) ) {
+    function add_option( string $name, mixed $value = '', mixed $deprecated = '', mixed $autoload = null ): bool {
+    	unset( $deprecated, $autoload );
+    	if ( array_key_exists( $name, $GLOBALS['datamachine_ai_backpressure_options'] ) ) {
+    		return false;
+    	}
 
-	$GLOBALS['datamachine_ai_backpressure_options'][ $name ] = $value;
-	return true;
+    	$GLOBALS['datamachine_ai_backpressure_options'][ $name ] = $value;
+    	return true;
+    }
 }
 
-function delete_option( string $name ): bool {
-	$existed = array_key_exists( $name, $GLOBALS['datamachine_ai_backpressure_options'] );
-	unset( $GLOBALS['datamachine_ai_backpressure_options'][ $name ] );
-	return $existed;
+if ( ! function_exists( 'delete_option' ) ) {
+    function delete_option( string $name ): bool {
+    	$existed = array_key_exists( $name, $GLOBALS['datamachine_ai_backpressure_options'] );
+    	unset( $GLOBALS['datamachine_ai_backpressure_options'][ $name ] );
+    	return $existed;
+    }
 }
 
-function apply_filters( string $hook, mixed $value, mixed ...$args ): mixed {
-	unset( $args );
-	if ( 'datamachine_pipeline_ai_concurrency_limit' === $hook ) {
-		return 1;
-	}
-	if ( 'datamachine_pipeline_ai_throttle_delay' === $hook ) {
-		return 7;
-	}
-	return $value;
+if ( ! function_exists( 'apply_filters' ) ) {
+    function apply_filters( string $hook, mixed $value, mixed ...$args ): mixed {
+    	unset( $args );
+    	if ( 'datamachine_pipeline_ai_concurrency_limit' === $hook ) {
+    		return 1;
+    	}
+    	if ( 'datamachine_pipeline_ai_throttle_delay' === $hook ) {
+    		return 7;
+    	}
+    	return $value;
+    }
 }
 
 function as_get_scheduled_actions( array $query = array(), string $return_format = 'OBJECT' ): array {
@@ -95,8 +103,10 @@ function did_action( string $hook ): int {
 	return 'action_scheduler_init' === $hook ? 1 : 0;
 }
 
-function sanitize_key( string $key ): string {
-	return strtolower( preg_replace( '/[^a-zA-Z0-9_\-]/', '', $key ) ?? '' );
+if ( ! function_exists( 'sanitize_key' ) ) {
+    function sanitize_key( string $key ): string {
+    	return strtolower( preg_replace( '/[^a-zA-Z0-9_\-]/', '', $key ) ?? '' );
+    }
 }
 
 require_once __DIR__ . '/../inc/Core/NetworkSettings.php';

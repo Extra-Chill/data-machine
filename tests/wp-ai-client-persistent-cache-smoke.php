@@ -39,44 +39,54 @@ namespace {
 	$GLOBALS['datamachine_cache_smoke_options']    = array();
 	$GLOBALS['datamachine_cache_smoke_now']        = 1_700_000_000;
 
-	function get_transient( string $key ) {
-		$entry = $GLOBALS['datamachine_cache_smoke_transients'][ $key ] ?? null;
-		if ( ! is_array( $entry ) ) {
-			return false;
-		}
+	if ( ! function_exists( 'get_transient' ) ) {
+		function get_transient( string $key ) {
+			$entry = $GLOBALS['datamachine_cache_smoke_transients'][ $key ] ?? null;
+			if ( ! is_array( $entry ) ) {
+				return false;
+			}
 
-		if ( 0 !== $entry['expires'] && $entry['expires'] <= $GLOBALS['datamachine_cache_smoke_now'] ) {
+			if ( 0 !== $entry['expires'] && $entry['expires'] <= $GLOBALS['datamachine_cache_smoke_now'] ) {
+				unset( $GLOBALS['datamachine_cache_smoke_transients'][ $key ] );
+				return false;
+			}
+
+			return $entry['value'];
+		}
+	}
+
+	if ( ! function_exists( 'set_transient' ) ) {
+		function set_transient( string $key, $value, int $expiration = 0 ): bool {
+			$GLOBALS['datamachine_cache_smoke_transients'][ $key ] = array(
+				'value'   => $value,
+				'expires' => $expiration > 0 ? $GLOBALS['datamachine_cache_smoke_now'] + $expiration : 0,
+			);
+
+			return true;
+		}
+	}
+
+	if ( ! function_exists( 'delete_transient' ) ) {
+		function delete_transient( string $key ): bool {
 			unset( $GLOBALS['datamachine_cache_smoke_transients'][ $key ] );
-			return false;
+
+			return true;
 		}
-
-		return $entry['value'];
 	}
 
-	function set_transient( string $key, $value, int $expiration = 0 ): bool {
-		$GLOBALS['datamachine_cache_smoke_transients'][ $key ] = array(
-			'value'   => $value,
-			'expires' => $expiration > 0 ? $GLOBALS['datamachine_cache_smoke_now'] + $expiration : 0,
-		);
-
-		return true;
+	if ( ! function_exists( 'get_option' ) ) {
+		function get_option( string $name, $default_value = false ) {
+			return $GLOBALS['datamachine_cache_smoke_options'][ $name ] ?? $default_value;
+		}
 	}
 
-	function delete_transient( string $key ): bool {
-		unset( $GLOBALS['datamachine_cache_smoke_transients'][ $key ] );
+	if ( ! function_exists( 'update_option' ) ) {
+		function update_option( string $name, $value, bool $autoload = true ): bool {
+			unset( $autoload );
+			$GLOBALS['datamachine_cache_smoke_options'][ $name ] = $value;
 
-		return true;
-	}
-
-	function get_option( string $name, $default_value = false ) {
-		return $GLOBALS['datamachine_cache_smoke_options'][ $name ] ?? $default_value;
-	}
-
-	function update_option( string $name, $value, bool $autoload = true ): bool {
-		unset( $autoload );
-		$GLOBALS['datamachine_cache_smoke_options'][ $name ] = $value;
-
-		return true;
+			return true;
+		}
 	}
 
 	require_once __DIR__ . '/../inc/Engine/AI/WpAiClientCache.php';

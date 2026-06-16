@@ -12,18 +12,22 @@ $datamachine_test_did_actions   = array();
 $datamachine_test_translations  = 0;
 $datamachine_test_registered    = array();
 
-function __( $text, $domain = 'default' ) {
-	global $datamachine_test_translations;
-	if ( 'data-machine' === $domain ) {
-		$datamachine_test_translations++;
-	}
-	return $text;
+if ( ! function_exists( '__' ) ) {
+    function __( $text, $domain = 'default' ) {
+    	global $datamachine_test_translations;
+    	if ( 'data-machine' === $domain ) {
+    		$datamachine_test_translations++;
+    	}
+    	return $text;
+    }
 }
 
-function add_action( $hook_name, $callback, $priority = 10, $accepted_args = 1 ) {
-	global $datamachine_test_actions;
-	$datamachine_test_actions[ $hook_name ][] = $callback;
-	return true;
+if ( ! function_exists( 'add_action' ) ) {
+    function add_action( $hook_name, $callback, $priority = 10, $accepted_args = 1 ) {
+    	global $datamachine_test_actions;
+    	$datamachine_test_actions[ $hook_name ][] = $callback;
+    	return true;
+    }
 }
 
 function doing_action( $hook_name = null ) {

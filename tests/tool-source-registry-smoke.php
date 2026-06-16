@@ -27,56 +27,64 @@ function source_smoke_filter_id( callable $callback ): string {
 	return is_string( $callback ) ? $callback : spl_object_hash( (object) $callback );
 }
 
-function add_filter( string $hook, callable $callback, int $priority = 10, int $accepted_args = 1 ): void {
-	$GLOBALS['__filters'][ $hook ][ $priority ][ source_smoke_filter_id( $callback ) ] = array( $callback, $accepted_args );
+if ( ! function_exists( 'add_filter' ) ) {
+    function add_filter( string $hook, callable $callback, int $priority = 10, int $accepted_args = 1 ): void {
+    	$GLOBALS['__filters'][ $hook ][ $priority ][ source_smoke_filter_id( $callback ) ] = array( $callback, $accepted_args );
+    }
 }
 
-function remove_filter( string $hook, callable $callback, int $priority = 10 ): void {
-	$callback_id = source_smoke_filter_id( $callback );
-	unset( $GLOBALS['__filters'][ $hook ][ $priority ][ $callback_id ] );
-	if ( empty( $GLOBALS['__filters'][ $hook ][ $priority ] ) ) {
-		unset( $GLOBALS['__filters'][ $hook ][ $priority ] );
-	}
-	if ( empty( $GLOBALS['__filters'][ $hook ] ) ) {
-		unset( $GLOBALS['__filters'][ $hook ] );
-	}
+if ( ! function_exists( 'remove_filter' ) ) {
+    function remove_filter( string $hook, callable $callback, int $priority = 10 ): void {
+    	$callback_id = source_smoke_filter_id( $callback );
+    	unset( $GLOBALS['__filters'][ $hook ][ $priority ][ $callback_id ] );
+    	if ( empty( $GLOBALS['__filters'][ $hook ][ $priority ] ) ) {
+    		unset( $GLOBALS['__filters'][ $hook ][ $priority ] );
+    	}
+    	if ( empty( $GLOBALS['__filters'][ $hook ] ) ) {
+    		unset( $GLOBALS['__filters'][ $hook ] );
+    	}
+    }
 }
 
 function remove_all_filters_for_source_smoke(): void {
 	$GLOBALS['__filters'] = array();
 }
 
-function apply_filters( string $hook, $value, ...$args ) {
-	if ( 'datamachine_step_types' === $hook && empty( $GLOBALS['__filters'][ $hook ] ) ) {
-		return array(
-			'ai'      => array( 'uses_handler' => false, 'multi_handler' => false ),
-			'fetch'   => array( 'uses_handler' => true, 'multi_handler' => false ),
-			'publish' => array( 'uses_handler' => true, 'multi_handler' => true ),
-			'upsert'  => array( 'uses_handler' => true, 'multi_handler' => true ),
-		);
-	}
+if ( ! function_exists( 'apply_filters' ) ) {
+    function apply_filters( string $hook, $value, ...$args ) {
+    	if ( 'datamachine_step_types' === $hook && empty( $GLOBALS['__filters'][ $hook ] ) ) {
+    		return array(
+    			'ai'      => array( 'uses_handler' => false, 'multi_handler' => false ),
+    			'fetch'   => array( 'uses_handler' => true, 'multi_handler' => false ),
+    			'publish' => array( 'uses_handler' => true, 'multi_handler' => true ),
+    			'upsert'  => array( 'uses_handler' => true, 'multi_handler' => true ),
+    		);
+    	}
 
-	if ( empty( $GLOBALS['__filters'][ $hook ] ) ) {
-		return $value;
-	}
+    	if ( empty( $GLOBALS['__filters'][ $hook ] ) ) {
+    		return $value;
+    	}
 
-	ksort( $GLOBALS['__filters'][ $hook ] );
-	foreach ( $GLOBALS['__filters'][ $hook ] as $callbacks ) {
-		foreach ( $callbacks as $entry ) {
-			$callback      = $entry[0];
-			$accepted_args = $entry[1];
-			$call_args     = array_slice( array_merge( array( $value ), $args ), 0, $accepted_args );
-			$value         = $callback( ...$call_args );
-		}
-	}
+    	ksort( $GLOBALS['__filters'][ $hook ] );
+    	foreach ( $GLOBALS['__filters'][ $hook ] as $callbacks ) {
+    		foreach ( $callbacks as $entry ) {
+    			$callback      = $entry[0];
+    			$accepted_args = $entry[1];
+    			$call_args     = array_slice( array_merge( array( $value ), $args ), 0, $accepted_args );
+    			$value         = $callback( ...$call_args );
+    		}
+    	}
 
-	return $value;
+    	return $value;
+    }
 }
 
-function do_action( string $hook, ...$args ): void {
-	if ( 'datamachine_log' === $hook ) {
-		$GLOBALS['__datamachine_log_entries'][] = $args;
-	}
+if ( ! function_exists( 'do_action' ) ) {
+    function do_action( string $hook, ...$args ): void {
+    	if ( 'datamachine_log' === $hook ) {
+    		$GLOBALS['__datamachine_log_entries'][] = $args;
+    	}
+    }
 }
 
 function did_action( string $hook ): int {
@@ -96,8 +104,10 @@ function is_user_logged_in(): bool {
 	return true;
 }
 
-function get_current_user_id(): int {
-	return 1;
+if ( ! function_exists( 'get_current_user_id' ) ) {
+    function get_current_user_id(): int {
+    	return 1;
+    }
 }
 
 function user_can( int $user_id, string $capability ): bool {
@@ -105,12 +115,16 @@ function user_can( int $user_id, string $capability ): bool {
 	return true;
 }
 
-function get_option( string $key, $default_value = false ) {
-	return $default_value;
+if ( ! function_exists( 'get_option' ) ) {
+    function get_option( string $key, $default_value = false ) {
+    	return $default_value;
+    }
 }
 
-function wp_json_encode( $value, int $flags = 0, int $depth = 512 ) {
-	return json_encode( $value, $flags, $depth );
+if ( ! function_exists( 'wp_json_encode' ) ) {
+    function wp_json_encode( $value, int $flags = 0, int $depth = 512 ) {
+    	return json_encode( $value, $flags, $depth );
+    }
 }
 
 class WP_Abilities_Registry {

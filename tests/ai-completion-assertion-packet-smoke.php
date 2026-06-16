@@ -13,30 +13,36 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 $__filters = array();
 
-function add_filter( string $hook, callable $callback, int $priority = 10, int $accepted_args = 1 ): void {
-	$GLOBALS['__filters'][ $hook ][ $priority ][] = array( $callback, $accepted_args );
+if ( ! function_exists( 'add_filter' ) ) {
+    function add_filter( string $hook, callable $callback, int $priority = 10, int $accepted_args = 1 ): void {
+    	$GLOBALS['__filters'][ $hook ][ $priority ][] = array( $callback, $accepted_args );
+    }
 }
 
-function apply_filters( string $hook, $value, ...$args ) {
-	if ( empty( $GLOBALS['__filters'][ $hook ] ) ) {
-		return $value;
-	}
+if ( ! function_exists( 'apply_filters' ) ) {
+    function apply_filters( string $hook, $value, ...$args ) {
+    	if ( empty( $GLOBALS['__filters'][ $hook ] ) ) {
+    		return $value;
+    	}
 
-	ksort( $GLOBALS['__filters'][ $hook ] );
-	foreach ( $GLOBALS['__filters'][ $hook ] as $callbacks ) {
-		foreach ( $callbacks as $entry ) {
-			$callback      = $entry[0];
-			$accepted_args = $entry[1];
-			$call_args     = array_slice( array_merge( array( $value ), $args ), 0, $accepted_args );
-			$value         = $callback( ...$call_args );
-		}
-	}
+    	ksort( $GLOBALS['__filters'][ $hook ] );
+    	foreach ( $GLOBALS['__filters'][ $hook ] as $callbacks ) {
+    		foreach ( $callbacks as $entry ) {
+    			$callback      = $entry[0];
+    			$accepted_args = $entry[1];
+    			$call_args     = array_slice( array_merge( array( $value ), $args ), 0, $accepted_args );
+    			$value         = $callback( ...$call_args );
+    		}
+    	}
 
-	return $value;
+    	return $value;
+    }
 }
 
-function do_action( string $hook, ...$args ): void {
-	$GLOBALS['__actions'][] = array( $hook, $args );
+if ( ! function_exists( 'do_action' ) ) {
+    function do_action( string $hook, ...$args ): void {
+    	$GLOBALS['__actions'][] = array( $hook, $args );
+    }
 }
 
 function did_action( string $hook ): int {
@@ -47,8 +53,10 @@ function current_action(): string {
 	return '';
 }
 
-function get_option( string $key, $default_value = false ) {
-	return $default_value;
+if ( ! function_exists( 'get_option' ) ) {
+    function get_option( string $key, $default_value = false ) {
+    	return $default_value;
+    }
 }
 
 require_once __DIR__ . '/../inc/Core/DataPacket.php';

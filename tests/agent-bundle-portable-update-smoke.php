@@ -49,6 +49,24 @@ if ( ! function_exists( 'add_action' ) ) {
 	}
 }
 
+if ( ! function_exists( 'add_filter' ) ) {
+	function add_filter( ...$args ) {
+		// no-op
+	}
+}
+
+if ( ! function_exists( 'apply_filters' ) ) {
+	function apply_filters( $hook, $value = null, ...$args ) {
+		return $value;
+	}
+}
+
+if ( ! function_exists( 'do_action' ) ) {
+	function do_action( ...$args ) {
+		// no-op
+	}
+}
+
 require_once dirname( __DIR__ ) . '/vendor/autoload.php';
 
 use DataMachine\Core\Agents\AgentBundler;
@@ -134,8 +152,7 @@ $directory = new AgentBundleDirectory(
 			array(
 				array(
 					'step_position'       => 0,
-					'handler_slug'        => 'mcp',
-					'handler_config'      => array( 'provider' => 'mgs' ),
+					'handler_slugs'       => array( 'mcp' ),
 					'handler_configs'     => array( 'mcp' => array( 'provider' => 'mgs' ) ),
 					'config_patch_queue'  => array( array( 'patch' => array( 'query' => 'WooCommerce' ), 'added_at' => '2026-04-27T00:00:00Z' ) ),
 					'queue_mode'          => 'loop',
@@ -174,8 +191,8 @@ assert_bundle_update_equals( 'artifact classifier labels changed payload modifie
 
 $incoming_flow_config = array(
 	'flow-step-1' => array(
-		'handler_slug'       => 'mcp',
-		'handler_config'     => array( 'provider' => 'mgs', 'query' => 'New seed' ),
+		'handler_slugs'      => array( 'mcp' ),
+		'handler_configs'    => array( 'mcp' => array( 'provider' => 'mgs', 'query' => 'New seed' ) ),
 		'config_patch_queue' => array( array( 'patch' => array( 'query' => 'New seed' ), 'added_at' => '2026-04-27T00:00:00Z' ) ),
 		'queue_mode'         => 'drain',
 	),

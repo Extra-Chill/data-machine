@@ -130,10 +130,12 @@ namespace {
 		}
 	}
 
-	function current_time( string $type, bool $gmt = false ): string {
-		unset( $type, $gmt );
+	if ( ! function_exists( 'current_time' ) ) {
+		function current_time( string $type, bool $gmt = false ): string {
+			unset( $type, $gmt );
 
-		return gmdate( 'Y-m-d H:i:s' );
+			return gmdate( 'Y-m-d H:i:s' );
+		}
 	}
 
 	$GLOBALS['datamachine_runtime_tool_scheduled'] = array();
@@ -147,12 +149,16 @@ namespace {
 		$GLOBALS['datamachine_runtime_tool_enqueued'][] = compact( 'hook', 'args', 'group' );
 	}
 
-	function do_action( string $hook, ...$args ): void {
-		unset( $hook, $args );
+	if ( ! function_exists( 'do_action' ) ) {
+		function do_action( string $hook, ...$args ): void {
+			unset( $hook, $args );
+		}
 	}
 
-	function add_action( string $hook, callable|string $callback ): void {
-		unset( $hook, $callback );
+	if ( ! function_exists( 'add_action' ) ) {
+		function add_action( string $hook, callable|string $callback ): void {
+			unset( $hook, $callback );
+		}
 	}
 
 	require __DIR__ . '/../vendor/wordpress/agents-api/src/Runtime/class-wp-agent-citation-metadata.php';
