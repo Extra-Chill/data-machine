@@ -12,8 +12,10 @@
  * written. After this fix the task verifies that
  * persistent_size + archived_size ≈ original_size before writing.
  *
- * The check is filterable via
- * `datamachine_daily_memory_conservation_threshold` (default 0.85).
+ * The lower-bound check is filterable via
+ * `datamachine_daily_memory_conservation_threshold` (default 0.85). The
+ * upper-bound expansion check is filterable via
+ * `datamachine_daily_memory_max_combined_ratio` (default 1.10).
  *
  * The guard now delegates to Agents API conservation metadata while keeping
  * Data Machine-owned raw MEMORY.md byte accounting. This smoke exercises the
@@ -70,12 +72,20 @@ function evaluate_conservation(
 	int $original_size,
 	int $persistent_size,
 	int $archived_size,
-	float $threshold = 0.85
+	float $threshold = 0.85,
+	float $max_combined_ratio = 1.10
 ): array {
 	add_filter(
 		'datamachine_daily_memory_conservation_threshold',
 		static function () use ( $threshold ): float {
 			return $threshold;
+		}
+	);
+
+	add_filter(
+		'datamachine_daily_memory_max_combined_ratio',
+		static function () use ( $max_combined_ratio ): float {
+			return $max_combined_ratio;
 		}
 	);
 
@@ -183,12 +193,24 @@ echo "\n[8] no-op case (persistent == original, archive empty):\n";
 $result = evaluate_conservation( 5000, 5000, 0 );
 assert_committed( true, $result, 'no-op compaction commits', $failures, $passes );
 
-// Test 9: combined > original (AI duplicated content into both
-// sections). Should still commit — we only enforce the lower bound.
-// Filtering for double-write would belong elsewhere.
+// Test 9: combined substantially exceeds original (AI duplicated content into
+// both sections). This used to commit, yielding logs such as
+// "9 KB -> 9 KB (2 KB archived)" while MEMORY.md stayed oversized.
 echo "\n[9] combined > original (AI duplicated into both sections):\n";
 $result = evaluate_conservation( 1000, 800, 600 );
-assert_committed( true, $result, 'duplicate split commits (only lower bound enforced)', $failures, $passes );
+assert_committed( false, $result, 'duplicate split rejects by default', $failures, $passes );
+
+// Test 10: small expansion is allowed for headings, bullets, and formatting
+// churn in otherwise valid model output.
+echo "\n[10] small formatting expansion is allowed:\n";
+$result = evaluate_conservation( 1000, 700, 375 );
+assert_committed( true, $result, '7.5% expansion commits', $failures, $passes );
+
+// Test 11: the expansion guard can be disabled independently for installs
+// that intentionally tolerate larger rewritten output.
+echo "\n[11] max combined ratio = 0 disables expansion check:\n";
+$result = evaluate_conservation( 1000, 800, 600, 0.85, 0.0 );
+assert_committed( true, $result, 'disabled expansion check lets duplicate split through', $failures, $passes );
 
 echo "\n-------------------------------\n";
 $total = $passes + count( $failures );
