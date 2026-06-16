@@ -15,6 +15,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 	define( 'ABSPATH', __DIR__ . '/' );
 }
 
+require_once __DIR__ . '/fixtures/namespaced-wp-fn-stubs.php';
+
 $failed = 0;
 $total  = 0;
 

@@ -13,6 +13,7 @@
  * @package DataMachine\Tests
  */
 
+require_once __DIR__ . '/fixtures/namespaced-wp-fn-stubs.php';
 require_once __DIR__ . '/bootstrap-unit.php';
 
 use AgentsAPI\AI\WP_Agent_Message;
