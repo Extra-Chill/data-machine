@@ -155,7 +155,11 @@ class FlowsCommand extends BaseCommand {
 	 * : Jaccard similarity threshold 0.0-1.0 (validate subcommand). Default: 0.65.
 	 *
 	 * [--dry-run]
-	 * : Validate without creating (create subcommand).
+	 * : Validate and preview without writing. For the create subcommand this
+	 *   validates the new flow without creating it. For the update subcommand
+	 *   it validates every requested change (name, scheduling, agent,
+	 *   set-user-message, handler-config) and prints a "[dry-run] would update
+	 *   ..." preview while making ZERO database writes.
 	 *
 	 * [--pipeline=<id>]
 	 * : Pipeline ID for pause/resume scoping.
@@ -1093,10 +1097,15 @@ class FlowsCommand extends BaseCommand {
 	}
 
 	/**
-	 * Update a flow's name or scheduling.
+	 * Update a flow's name, scheduling, agent, user message, or handler config.
+	 *
+	 * Honors --dry-run on every write sub-path: when set, each requested change
+	 * is validated and previewed ("[dry-run] would update ...") but NO database
+	 * write occurs. Validation (bad JSON, unknown handler, step resolution)
+	 * still runs in dry-run mode, so it is a full validate + preview.
 	 *
 	 * @param int   $flow_id    Flow ID to update.
-	 * @param array $assoc_args Associative arguments (--name, --scheduling).
+	 * @param array $assoc_args Associative arguments (--name, --scheduling, --agent, --set-user-message, --handler-config, --dry-run).
 	 */
 	private function updateFlow( int $flow_id, array $assoc_args ): void {
 		if ( $flow_id <= 0 ) {
@@ -1113,6 +1122,7 @@ class FlowsCommand extends BaseCommand {
 			return;
 		}
 
+		$dry_run      = isset( $assoc_args['dry-run'] );
 		$name         = $assoc_args['name'] ?? null;
 		$scheduling   = $assoc_args['scheduling'] ?? null;
 		$scheduled_at = $assoc_args['scheduled-at'] ?? null;
@@ -1159,15 +1169,19 @@ class FlowsCommand extends BaseCommand {
 				return;
 			}
 
-			$flows_repo = new \DataMachine\Core\Database\Flows\Flows();
-			$success    = $flows_repo->update_flow( $flow_id, array( 'agent_id' => $new_agent_id ) );
+			if ( $dry_run ) {
+				WP_CLI::log( sprintf( '[dry-run] would set flow %d agent to agent_id=%d; no changes written', $flow_id, $new_agent_id ) );
+			} else {
+				$flows_repo = new \DataMachine\Core\Database\Flows\Flows();
+				$success    = $flows_repo->update_flow( $flow_id, array( 'agent_id' => $new_agent_id ) );
 
-			if ( ! $success ) {
-				WP_CLI::error( 'Failed to update flow agent_id.' );
-				return;
+				if ( ! $success ) {
+					WP_CLI::error( 'Failed to update flow agent_id.' );
+					return;
+				}
+
+				WP_CLI::success( sprintf( 'Flow %d agent set to agent_id=%d.', $flow_id, $new_agent_id ) );
 			}
-
-			WP_CLI::success( sprintf( 'Flow %d agent set to agent_id=%d.', $flow_id, $new_agent_id ) );
 		}
 
 		// Validate step resolution BEFORE any writes (atomic: fail fast, change nothing).
@@ -1205,45 +1219,60 @@ class FlowsCommand extends BaseCommand {
 		}
 
 		if ( null !== $name || null !== $scheduling ) {
-			$ability = wp_get_ability( 'datamachine/update-flow' );
-			$result  = $ability->execute( $input );
+			if ( $dry_run ) {
+				$preview = array();
+				if ( null !== $name ) {
+					$preview[] = sprintf( 'flow_name → "%s"', $name );
+				}
+				if ( null !== $scheduling ) {
+					$preview[] = sprintf( 'scheduling → %s', $scheduling );
+				}
+				WP_CLI::log( sprintf( '[dry-run] would update flow %d: %s; no changes written', $flow_id, implode( ', ', $preview ) ) );
+			} else {
+				$ability = wp_get_ability( 'datamachine/update-flow' );
+				$result  = $ability->execute( $input );
 
-			if ( is_wp_error( $result ) ) {
-				WP_CLI::error( $result->get_error_message() );
-			}
+				if ( is_wp_error( $result ) ) {
+					WP_CLI::error( $result->get_error_message() );
+				}
 
-			if ( ! $result['success'] ) {
-				WP_CLI::error( $result['error'] ?? 'Failed to update flow' );
-				return;
-			}
+				if ( ! $result['success'] ) {
+					WP_CLI::error( $result['error'] ?? 'Failed to update flow' );
+					return;
+				}
 
-			WP_CLI::success( sprintf( 'Flow %d updated.', $flow_id ) );
-			WP_CLI::log( sprintf( 'Name: %s', $result['flow_name'] ?? '' ) );
+				WP_CLI::success( sprintf( 'Flow %d updated.', $flow_id ) );
+				WP_CLI::log( sprintf( 'Name: %s', $result['flow_name'] ?? '' ) );
 
-			$sched = $result['flow_data']['scheduling_config'] ?? array();
-			if ( 'cron' === ( $sched['interval'] ?? '' ) && ! empty( $sched['cron_expression'] ) ) {
-				WP_CLI::log( sprintf( 'Scheduling: cron (%s)', $sched['cron_expression'] ) );
-			} elseif ( isset( $sched['interval'] ) ) {
-				WP_CLI::log( sprintf( 'Scheduling: %s', $sched['interval'] ) );
+				$sched = $result['flow_data']['scheduling_config'] ?? array();
+				if ( 'cron' === ( $sched['interval'] ?? '' ) && ! empty( $sched['cron_expression'] ) ) {
+					WP_CLI::log( sprintf( 'Scheduling: cron (%s)', $sched['cron_expression'] ) );
+				} elseif ( isset( $sched['interval'] ) ) {
+					WP_CLI::log( sprintf( 'Scheduling: %s', $sched['interval'] ) );
+				}
 			}
 		}
 
 		// Phase 2: Step-level updates (user_message, handler config).
 		if ( null !== $user_message ) {
-			$step_ability = new \DataMachine\Abilities\FlowStep\UpdateFlowStepAbility();
-			$step_result  = $step_ability->execute(
-				array(
-					'flow_step_id' => $message_step,
-					'user_message' => $user_message,
-				)
-			);
+			if ( $dry_run ) {
+				WP_CLI::log( sprintf( '[dry-run] would update user_message for step %s (%d chars); no changes written', $message_step, mb_strlen( $user_message ) ) );
+			} else {
+				$step_ability = new \DataMachine\Abilities\FlowStep\UpdateFlowStepAbility();
+				$step_result  = $step_ability->execute(
+					array(
+						'flow_step_id' => $message_step,
+						'user_message' => $user_message,
+					)
+				);
 
-			if ( ! $step_result['success'] ) {
-				WP_CLI::error( $step_result['error'] ?? 'Failed to update user_message' );
-				return;
+				if ( ! $step_result['success'] ) {
+					WP_CLI::error( $step_result['error'] ?? 'Failed to update user_message' );
+					return;
+				}
+
+				WP_CLI::success( 'User message updated for step: ' . $message_step );
 			}
-
-			WP_CLI::success( 'User message updated for step: ' . $message_step );
 		}
 
 		if ( $has_handler_config ) {
@@ -1282,16 +1311,21 @@ class FlowsCommand extends BaseCommand {
 				$step_input['handler_slug'] = $handler_slug;
 			}
 
-			$step_ability = new \DataMachine\Abilities\FlowStep\UpdateFlowStepAbility();
-			$step_result  = $step_ability->execute( $step_input );
-
-			if ( ! $step_result['success'] ) {
-				WP_CLI::error( $step_result['error'] ?? 'Failed to update handler config' );
-				return;
-			}
-
 			$updated_keys = implode( ', ', array_keys( $unwrapped_config ) );
-			WP_CLI::success( sprintf( 'Handler config updated for step %s: %s', $handler_step, $updated_keys ) );
+
+			if ( $dry_run ) {
+				WP_CLI::log( sprintf( '[dry-run] would update handler_config for step %s: %s; no changes written', $handler_step, $updated_keys ) );
+			} else {
+				$step_ability = new \DataMachine\Abilities\FlowStep\UpdateFlowStepAbility();
+				$step_result  = $step_ability->execute( $step_input );
+
+				if ( ! $step_result['success'] ) {
+					WP_CLI::error( $step_result['error'] ?? 'Failed to update handler config' );
+					return;
+				}
+
+				WP_CLI::success( sprintf( 'Handler config updated for step %s: %s', $handler_step, $updated_keys ) );
+			}
 		}
 	}
 
