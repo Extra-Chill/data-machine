@@ -381,6 +381,31 @@ class DailyMemoryTask extends SystemTask {
 			)
 		);
 
+		/**
+		 * Filter the maximum combined size ratio for daily memory compaction.
+		 *
+		 * The persistent section plus archived section should account for the
+		 * original MEMORY.md without substantially exceeding it. A large expansion
+		 * indicates the model duplicated content into both sections, which makes the
+		 * archive log misleading and leaves MEMORY.md bloated.
+		 *
+		 * @since 0.148.4
+		 *
+		 * @param float $threshold Default 1.10. Set to 0 to disable.
+		 * @param array $context   date, original_size, new_size, archived_size, job_id.
+		 */
+		$max_combined_ratio = (float) apply_filters(
+			'datamachine_daily_memory_max_combined_ratio',
+			1.10,
+			array(
+				'date'          => $date,
+				'original_size' => $original_size,
+				'new_size'      => $new_size,
+				'archived_size' => $archived_size,
+				'job_id'        => $jobId,
+			)
+		);
+
 		$policy = array(
 			'conservation_enabled'         => $conservation_threshold > 0,
 			'minimum_conserved_byte_ratio' => $conservation_threshold,
@@ -457,6 +482,48 @@ class DailyMemoryTask extends SystemTask {
 				),
 				'message'  => 'Conservation check failed -- AI emitted a lossy split. MEMORY.md unchanged.',
 			);
+		}
+
+		if ( $conservation_threshold > 0 && $max_combined_ratio > 0 ) {
+			$max_combined_size = (int) ceil( $original_size * $max_combined_ratio );
+			if ( $combined_size > $max_combined_size ) {
+				do_action(
+					'datamachine_log',
+					'warning',
+					sprintf(
+						'Daily memory aborted -- compaction expanded content: persistent (%s) + archived (%s) = %s, allowed at most %s of %s original. AI likely duplicated archived content instead of moving it.',
+						size_format( $new_size ),
+						size_format( $archived_size ),
+						size_format( $combined_size ),
+						size_format( $max_combined_size ),
+						size_format( $original_size )
+					),
+					array(
+						'date'              => $date,
+						'original_size'     => $original_size,
+						'new_size'          => $new_size,
+						'archived_size'     => $archived_size,
+						'combined_size'     => $combined_size,
+						'max_combined_size' => $max_combined_size,
+						'max_ratio'         => $max_combined_ratio,
+						'compaction'        => $metadata,
+					)
+				);
+
+				$metadata['status'] = 'failed';
+				return array(
+					'success'  => false,
+					'parsed'   => $parsed,
+					'metadata' => $metadata,
+					'events'   => array(
+						array(
+							'type'     => 'compaction_failed',
+							'metadata' => $metadata,
+						),
+					),
+					'message'  => 'Compaction expanded content -- AI likely duplicated archived content. MEMORY.md unchanged.',
+				);
+			}
 		}
 
 		return array(
