@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.148.1] - 2026-06-16
+
+### Changed
+- guard core-function polyfills in smokes against real-WordPress redeclare fatals
+
 ## [0.148.0] - 2026-06-15
 
 ### Added
