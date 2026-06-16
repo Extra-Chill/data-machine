@@ -334,7 +334,15 @@ trait FlowStepHelpers {
 		// Sanitize incoming values via handler's settings class before merge.
 		$handler_settings = $this->sanitizeHandlerConfig( $effective_slug, $handler_settings );
 
-		$merged_config = array_merge( $existing_handler_config, $handler_settings );
+		// Deep-merge so a partial update of a nested config object (e.g. a
+		// system_task step's `params` map) cannot silently drop the sibling
+		// keys it didn't mention. A shallow array_merge() replaces the whole
+		// `params` array, which is exactly how a `{"params":{"message":"..."}}`
+		// edit truncated a flow's stored message: channel/recipient vanished
+		// because they weren't restated. Recursive merge keeps unmentioned
+		// nested keys intact (#2673). Numeric-keyed lists are still replaced
+		// wholesale — partial list patching has no well-defined semantics.
+		$merged_config = self::deepMergeConfig( $existing_handler_config, $handler_settings );
 		$stored_config = $this->handler_abilities->applyDefaults( $effective_slug, $merged_config );
 
 		if ( ! $uses_handler ) {
@@ -523,6 +531,60 @@ trait FlowStepHelpers {
 		unset( $step );
 
 		return $this->db_flows->update_flow( $flow_id, array( 'flow_config' => $flow_config ) );
+	}
+
+	/**
+	 * Recursively merge an incoming config patch onto an existing config.
+	 *
+	 * Behaves like array_merge() for top-level scalar keys, but when both the
+	 * existing and incoming value for a key are associative arrays it recurses
+	 * so a partial nested patch keeps the existing sibling keys it didn't
+	 * restate. Numeric-keyed (list) arrays are replaced wholesale because
+	 * positional list merging has no unambiguous meaning.
+	 *
+	 * This is what makes a `{"params":{"message":"..."}}` handler-config update
+	 * atomic for the rest of the `params` object: channel/recipient survive
+	 * even though they weren't included in the patch (#2673).
+	 *
+	 * @param array $existing Existing stored config.
+	 * @param array $patch    Incoming patch values.
+	 * @return array Deep-merged config.
+	 */
+	protected static function deepMergeConfig( array $existing, array $patch ): array {
+		foreach ( $patch as $key => $value ) {
+			if (
+				is_string( $key )
+				&& isset( $existing[ $key ] )
+				&& is_array( $existing[ $key ] )
+				&& is_array( $value )
+				&& self::isAssociativeArray( $existing[ $key ] )
+				&& self::isAssociativeArray( $value )
+			) {
+				$existing[ $key ] = self::deepMergeConfig( $existing[ $key ], $value );
+				continue;
+			}
+
+			$existing[ $key ] = $value;
+		}
+
+		return $existing;
+	}
+
+	/**
+	 * Determine whether an array is associative (string keys) vs a list.
+	 *
+	 * An empty array is treated as associative so an empty incoming patch
+	 * object doesn't clobber an existing nested map.
+	 *
+	 * @param array $value Array to inspect.
+	 * @return bool True when the array has no sequential integer keys.
+	 */
+	private static function isAssociativeArray( array $value ): bool {
+		if ( array() === $value ) {
+			return true;
+		}
+
+		return array_keys( $value ) !== range( 0, count( $value ) - 1 );
 	}
 
 	/**
