@@ -2,6 +2,14 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.150.0] - 2026-06-16
+
+### Added
+- multisite-aware block-content abilities via optional blog_id
+
+### Fixed
+- use Yoda conditions in BlogContext for WordPress lint
+
 ## [0.149.0] - 2026-06-16
 
 ### Added
