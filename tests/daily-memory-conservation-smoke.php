@@ -15,7 +15,7 @@
  * The lower-bound check is filterable via
  * `datamachine_daily_memory_conservation_threshold` (default 0.85). The
  * upper-bound expansion check is filterable via
- * `datamachine_daily_memory_max_combined_ratio` (default 1.10).
+ * `datamachine_daily_memory_max_combined_ratio` (default 1.15).
  *
  * The guard now delegates to Agents API conservation metadata while keeping
  * Data Machine-owned raw MEMORY.md byte accounting. This smoke exercises the
@@ -75,7 +75,7 @@ function evaluate_conservation(
 	int $persistent_size,
 	int $archived_size,
 	float $threshold = 0.85,
-	float $max_combined_ratio = 1.10
+	float $max_combined_ratio = 1.15
 ): array {
 	add_filter(
 		'datamachine_daily_memory_conservation_threshold',
@@ -129,7 +129,7 @@ function evaluate_completion_policy(
 	add_filter(
 		'datamachine_daily_memory_max_combined_ratio',
 		static function (): float {
-			return 1.10;
+			return 1.15;
 		}
 	);
 
@@ -253,6 +253,9 @@ assert_committed( false, $result, 'duplicate split rejects by default', $failure
 echo "\n[10] small formatting expansion is allowed:\n";
 $result = evaluate_conservation( 1000, 700, 375 );
 assert_committed( true, $result, '7.5% expansion commits', $failures, $passes );
+
+$result = evaluate_conservation( 9233, 4091, 6178 );
+assert_committed( true, $result, 'live compact archive shape within 15% expansion commits', $failures, $passes );
 
 // Test 11: the expansion guard can be disabled independently for installs
 // that intentionally tolerate larger rewritten output.
