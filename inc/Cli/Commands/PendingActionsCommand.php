@@ -78,7 +78,7 @@ class PendingActionsCommand extends BaseCommand {
 			WP_CLI::error( $result->get_error_message() );
 		}
 
-		$rows = is_array( $result['actions'] ?? null ) ? $result['actions'] : array();
+		$rows = PendingActionInspectionAbility::normalize_action_rows( is_array( $result['actions'] ?? null ) ? $result['actions'] : array() );
 
 		$fields = array( 'action_id', 'kind', 'summary', 'status', 'agent_id', 'created_by', 'created_at_iso', 'expires_at_iso' );
 		$this->format_items( $rows, $fields, $assoc_args, 'action_id' );
@@ -124,6 +124,7 @@ class PendingActionsCommand extends BaseCommand {
 			WP_CLI::error( 'Pending action not found.' );
 		}
 
+		$action = PendingActionInspectionAbility::normalize_action_row( $action );
 		$format = $assoc_args['format'] ?? 'json';
 		WP_CLI\Utils\format_items( $format, array( $action ), array_keys( $action ) );
 	}
