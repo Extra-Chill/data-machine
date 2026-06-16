@@ -236,6 +236,9 @@ class SystemCommand extends BaseCommand {
 	 * [--params=<json>]
 	 * : JSON object of structured task params.
 	 *
+	 * [--agent=<agent>]
+	 * : Agent ID or slug for agent-scoped tasks.
+	 *
 	 * [--dry-run]
 	 * : Request preview mode for tasks that support it.
 	 *
@@ -253,7 +256,7 @@ class SystemCommand extends BaseCommand {
 	 *
 	 * ## EXAMPLES
 	 *
-	 *     wp datamachine system run daily_memory_generation
+	 *     wp datamachine system run daily_memory_generation --agent=intelligence-chubes4
 	 *     wp datamachine system run alt_text_generation --format=json
 	 *     wp datamachine system run retention_logs --dry-run
 	 *
@@ -325,6 +328,13 @@ class SystemCommand extends BaseCommand {
 				return array( 'error' => '--param key cannot be empty.' );
 			}
 			$params[ trim( $key ) ] = self::coerceRunTaskParamValue( $value );
+		}
+
+		if ( array_key_exists( 'agent', $assoc_args ) ) {
+			if ( '' === trim( (string) $assoc_args['agent'] ) ) {
+				return array( 'error' => '--agent cannot be empty.' );
+			}
+			$params['agent'] = self::coerceRunTaskParamValue( (string) $assoc_args['agent'] );
 		}
 
 		if ( ! empty( $assoc_args['dry-run'] ) && ! empty( $assoc_args['apply'] ) ) {

@@ -658,6 +658,17 @@ class SystemAbilities {
 	 */
 	private static function extractRunTaskContext( array &$params ): array {
 		$context = array();
+		if ( array_key_exists( 'agent', $params ) ) {
+			$agent = $params['agent'];
+			unset( $params['agent'] );
+
+			if ( is_int( $agent ) || ( is_string( $agent ) && is_numeric( $agent ) ) ) {
+				$context['agent_id'] = (int) $agent;
+			} elseif ( null !== $agent && '' !== trim( (string) $agent ) ) {
+				$context['agent_slug'] = (string) $agent;
+			}
+		}
+
 		foreach ( array( 'agent_id', 'agent_slug' ) as $key ) {
 			if ( array_key_exists( $key, $params ) ) {
 				$context[ $key ] = $params[ $key ];
