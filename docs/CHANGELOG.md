@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.148.10] - 2026-06-16
+
+### Fixed
+- clarify daily memory conservation retries
+
 ## [0.148.9] - 2026-06-16
 
 ### Fixed
