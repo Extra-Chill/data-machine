@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.148.6] - 2026-06-16
+
+### Fixed
+- mark unsatisfied natural completion incomplete
+
 ## [0.148.5] - 2026-06-16
 
 ### Fixed
