@@ -79,6 +79,7 @@ final class AgentBundleRunner {
 		$initial_data['agent_slug']   = (string) ( $manifest['agent']['slug'] ?? '' );
 		$initial_data['job_source']   = (string) ( $input['job_source'] ?? 'agent_bundle' );
 		$initial_data['job_label']    = (string) ( $input['job_label'] ?? ( $selection['flow_name'] ?? 'Agent Bundle Workflow' ) );
+		$this->apply_runtime_ability_tools( $initial_data, $input );
 		$this->apply_runtime_model_config( $initial_data, $input );
 
 		if ( ! empty( $input['dry_run'] ) ) {
@@ -191,6 +192,23 @@ final class AgentBundleRunner {
 		$initial_data['job']                      = $job_snapshot;
 		$initial_data['agent_bundle']['provider'] = $provider;
 		$initial_data['agent_bundle']['model']    = $model;
+	}
+
+	/**
+	 * Project run-scoped ability tool declarations into the job snapshot.
+	 *
+	 * @param array<string,mixed> $initial_data Initial workflow engine data.
+	 * @param array<string,mixed> $input Bundle run input.
+	 */
+	private function apply_runtime_ability_tools( array &$initial_data, array $input ): void {
+		$ability_tools = is_array( $input['ability_tools'] ?? null ) ? $input['ability_tools'] : array();
+		if ( empty( $ability_tools ) ) {
+			return;
+		}
+
+		$job_snapshot                  = is_array( $initial_data['job'] ?? null ) ? $initial_data['job'] : array();
+		$job_snapshot['ability_tools'] = $ability_tools;
+		$initial_data['job']           = $job_snapshot;
 	}
 
 	private function status_from_response( array $response ): string {

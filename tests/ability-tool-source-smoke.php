@@ -410,6 +410,40 @@ $resolved = resolve_ability_source_tools( 'pipeline', array( 'allow_only' => arr
 assert_ability_tool_source_equals( array( 'collision_tool', 'summarize_demo' ), array_keys( $resolved ), 'static registry wins generated ability tool name collisions', $failures, $passes );
 assert_ability_tool_source_equals( 'static', $resolved['collision_tool']['origin'] ?? '', 'collision preserves static declaration', $failures, $passes );
 
+$runtime_declared = resolve_ability_source_tools(
+	'pipeline',
+	array(
+		'ability_tools' => array(
+			array(
+				'name'    => 'runtime_summarize_demo',
+				'ability' => 'demo/summarize',
+				'modes'   => array( 'pipeline' ),
+			),
+		),
+		'allow_only'    => array( 'runtime_summarize_demo' ),
+	)
+);
+assert_ability_tool_source_equals( true, isset( $runtime_declared['runtime_summarize_demo'] ), 'resolver context ability_tools list exposes runtime ability tool', $failures, $passes );
+assert_ability_tool_source_equals( 'demo/summarize', $runtime_declared['runtime_summarize_demo']['execution_ability'] ?? '', 'runtime ability tool keeps direct execution marker', $failures, $passes );
+
+$job_declared = resolve_ability_source_tools(
+	'pipeline',
+	array(
+		'engine_data' => array(
+			'job' => array(
+				'ability_tools' => array(
+					'job_summarize_demo' => array(
+						'ability' => 'demo/summarize',
+						'modes'   => array( 'pipeline' ),
+					),
+				),
+			),
+		),
+		'allow_only'  => array( 'job_summarize_demo' ),
+	)
+);
+assert_ability_tool_source_equals( true, isset( $job_declared['job_summarize_demo'] ), 'job snapshot ability_tools map exposes runtime ability tool', $failures, $passes );
+
 echo "\n[4] generated declaration executes through ability-native ToolExecutionCore:\n";
 $result = ToolExecutor::executeTool(
 	'summarize_demo',

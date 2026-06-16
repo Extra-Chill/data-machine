@@ -395,10 +395,14 @@ echo "\n[5] Runner supports run-scoped provider/model config\n";
 foreach ( array(
 	"'provider'            => array("                                           => 'run-agent-bundle schema accepts provider',
 	"'model'               => array("                                           => 'run-agent-bundle schema accepts model',
+	"'ability_tools'       => array("                                           => 'run-agent-bundle schema accepts runtime ability tools',
 	'apply_runtime_model_config'                                              => 'runner projects provider/model into initial data',
+	'apply_runtime_ability_tools'                                             => 'runner projects ability tools into initial data',
+	"\$job_snapshot['ability_tools']"                                         => 'runner stamps job-scoped ability tool declarations',
 	"\$job_snapshot['default_provider']"                                      => 'runner stamps job-scoped default provider',
 	"\$job_snapshot['default_model']"                                         => 'runner stamps job-scoped default model',
 	"\$mode_models['pipeline']"                                               => 'runner stamps pipeline mode model config',
+	"'ability_tools'        => is_array( \$job_snapshot['ability_tools'] ?? null )" => 'AI step passes job-scoped ability tools to resolver',
 	'resolveModelFromJobSnapshot'                                             => 'AI step reads run-scoped model config',
 	'resolveModelForExecutionModes( $agent_id, $execution_modes, $job_snapshot )' => 'AI validation uses job-scoped model config',
 ) as $needle => $label ) {
