@@ -583,6 +583,20 @@ class AgentAbilities {
 			);
 
 			self::registerAbility(
+				'datamachine/adopt-agent-bundle',
+				array(
+					'label'               => 'Adopt Agent Bundle',
+					'description'         => 'Bind an already-live agent to a bundle without re-importing: backfill portable_slug, write the bundle header, and seed the artifact ledger from current live state so later upgrades diff cleanly instead of duplicating.',
+					'category'            => 'datamachine-agent',
+					'input_schema'        => self::bundleLifecycleInputSchema(),
+					'output_schema'       => array( 'type' => 'object' ),
+					'execute_callback'    => array( self::class, 'adoptAgentBundle' ),
+					'permission_callback' => fn() => PermissionHelper::can_manage(),
+					'meta'                => array( 'show_in_rest' => true ),
+				)
+			);
+
+			self::registerAbility(
 				'datamachine/resolve-agent-bundle-upgrade-action',
 				array(
 					'label'               => 'Resolve Agent Bundle Upgrade Action',
@@ -1501,6 +1515,16 @@ class AgentAbilities {
 	 */
 	public static function applyAgentBundleUpgrade( array $input ): array {
 		return self::bundleLifecycleService()->upgrade( $input );
+	}
+
+	/**
+	 * Bind an already-live agent to a bundle (one-time, idempotent adopt).
+	 *
+	 * @param array $input Ability input.
+	 * @return array<string,mixed>
+	 */
+	public static function adoptAgentBundle( array $input ): array {
+		return self::bundleLifecycleService()->adopt( $input );
 	}
 
 	/**

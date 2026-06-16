@@ -254,6 +254,245 @@ final class AgentBundleAbilityService {
 		return $response;
 	}
 
+	/**
+	 * Bind an already-live agent to a bundle without re-importing its data.
+	 *
+	 * Live-origin agents (built in the UI/CLI, then exported into a bundle)
+	 * carry no package provenance: pipeline/flow rows have portable_slug NULL,
+	 * the bundle_artifacts ledger is empty, and agent_config has no
+	 * datamachine_bundle header. A subsequent `upgrade` therefore matches zero
+	 * artifacts and would INSERT a full duplicate set.
+	 *
+	 * adopt() is the one-time, idempotent bind that:
+	 * - matches each bundle pipeline/flow to the live row by normalized
+	 *   portable_slug-or-name (refusing to guess on ambiguous name collisions),
+	 * - backfills portable_slug on each matched live row,
+	 * - writes the datamachine_bundle header onto agent_config,
+	 * - populates the ledger with installed_hash = current_hash = hash of the
+	 *   CURRENT live state, so the next upgrade diffs cleanly.
+	 *
+	 * @param array<string,mixed> $input { source, slug, dry_run, token, token_env }.
+	 * @return array<string,mixed>
+	 */
+	public function adopt( array $input ): array {
+		$loaded = $this->load_bundle_from_input( $input );
+		if ( empty( $loaded['success'] ) ) {
+			return $loaded;
+		}
+
+		$bundle  = $loaded['bundle'];
+		$slug    = (string) ( $input['slug'] ?? '' );
+		$dry_run = ! empty( $input['dry_run'] );
+
+		$agent = $this->resolve_bundle_agent( $bundle, $slug );
+		if ( ! $agent ) {
+			return array(
+				'success' => false,
+				'error'   => sprintf(
+					'No live agent found for slug "%s". adopt binds an existing live agent to a bundle; use import to create a new one.',
+					'' !== $slug ? sanitize_title( $slug ) : sanitize_title( (string) ( $bundle['agent']['agent_slug'] ?? '' ) )
+				),
+			);
+		}
+
+		$agent_id  = (int) $agent['agent_id'];
+		$summary   = $this->bundle_summary( $bundle, $slug );
+		$matched   = array();
+		$unmatched = array();
+		$ambiguous = array();
+
+		// ---- Pipelines: match bundle entries to live rows by normalized slug.
+		$pipeline_rows  = $this->pipelines->get_all_pipelines( null, $agent_id );
+		$pipeline_index = AgentBundleSlugMatcher::index_existing( $pipeline_rows, 'pipeline_name', 'pipeline' );
+
+		// Map original bundle pipeline id -> live pipeline id so flows can be
+		// scoped to the right live pipeline.
+		$pipeline_id_map = array();
+
+		foreach ( $bundle['pipelines'] ?? array() as $bundle_pipeline ) {
+			if ( ! is_array( $bundle_pipeline ) ) {
+				continue;
+			}
+			$slug_key = AgentBundleSlugMatcher::bundle_slug( $bundle_pipeline, 'pipeline_name', 'pipeline' );
+
+			if ( isset( $pipeline_index['ambiguous'][ $slug_key ] ) ) {
+				$ambiguous[] = array(
+					'artifact_type' => 'pipeline',
+					'artifact_id'   => $slug_key,
+					'reason'        => sprintf( '%d live pipelines resolve to slug "%s".', count( $pipeline_index['ambiguous'][ $slug_key ] ), $slug_key ),
+				);
+				continue;
+			}
+
+			$live = $pipeline_index['matched'][ $slug_key ] ?? null;
+			if ( null === $live ) {
+				$unmatched[] = array(
+					'artifact_type' => 'pipeline',
+					'artifact_id'   => $slug_key,
+				);
+				continue;
+			}
+
+			$live_id = (int) ( $live['pipeline_id'] ?? 0 );
+
+			$pipeline_id_map[ (int) ( $bundle_pipeline['original_id'] ?? 0 ) ] = $live_id;
+
+			$matched[] = array(
+				'artifact_type'  => 'pipeline',
+				'artifact_id'    => $slug_key,
+				'record_id'      => $live_id,
+				'needs_backfill' => '' === trim( (string) ( $live['portable_slug'] ?? '' ) ),
+				'payload'        => AgentBundleArtifactPayloads::pipeline_payload( $live, $slug_key ),
+			);
+		}
+
+		// ---- Flows: scope each to its matched live pipeline, match by slug.
+		$flow_rows         = $this->flows->get_all_flows( null, $agent_id );
+		$flows_by_pipeline = array();
+		foreach ( $flow_rows as $flow_row ) {
+			if ( ! is_array( $flow_row ) ) {
+				continue;
+			}
+			$flows_by_pipeline[ (int) ( $flow_row['pipeline_id'] ?? 0 ) ][] = $flow_row;
+		}
+
+		foreach ( $bundle['flows'] ?? array() as $bundle_flow ) {
+			if ( ! is_array( $bundle_flow ) ) {
+				continue;
+			}
+			$slug_key        = AgentBundleSlugMatcher::bundle_slug( $bundle_flow, 'flow_name', 'flow' );
+			$old_pipeline_id = (int) ( $bundle_flow['original_pipeline_id'] ?? 0 );
+			$live_pipeline   = (int) ( $pipeline_id_map[ $old_pipeline_id ] ?? 0 );
+
+			if ( $live_pipeline <= 0 ) {
+				$unmatched[] = array(
+					'artifact_type' => 'flow',
+					'artifact_id'   => $slug_key,
+					'reason'        => 'parent pipeline unmatched',
+				);
+				continue;
+			}
+
+			$flow_index = AgentBundleSlugMatcher::index_existing( $flows_by_pipeline[ $live_pipeline ] ?? array(), 'flow_name', 'flow' );
+
+			if ( isset( $flow_index['ambiguous'][ $slug_key ] ) ) {
+				$ambiguous[] = array(
+					'artifact_type' => 'flow',
+					'artifact_id'   => $slug_key,
+					'reason'        => sprintf( '%d live flows on pipeline %d resolve to slug "%s".', count( $flow_index['ambiguous'][ $slug_key ] ), $live_pipeline, $slug_key ),
+				);
+				continue;
+			}
+
+			$live = $flow_index['matched'][ $slug_key ] ?? null;
+			if ( null === $live ) {
+				$unmatched[] = array(
+					'artifact_type' => 'flow',
+					'artifact_id'   => $slug_key,
+				);
+				continue;
+			}
+
+			$matched[] = array(
+				'artifact_type'  => 'flow',
+				'artifact_id'    => $slug_key,
+				'record_id'      => (int) ( $live['flow_id'] ?? 0 ),
+				'needs_backfill' => '' === trim( (string) ( $live['portable_slug'] ?? '' ) ),
+				'payload'        => AgentBundleArtifactPayloads::flow_payload( $live, $slug_key ),
+			);
+		}
+
+		$result = array(
+			'success'    => true,
+			'dry_run'    => $dry_run,
+			'agent_id'   => $agent_id,
+			'agent_slug' => (string) $agent['agent_slug'],
+			'bundle'     => $summary,
+			'counts'     => array(
+				'matched'   => count( $matched ),
+				'unmatched' => count( $unmatched ),
+				'ambiguous' => count( $ambiguous ),
+			),
+			'matched'    => $matched,
+			'unmatched'  => $unmatched,
+			'ambiguous'  => $ambiguous,
+		);
+
+		if ( ! empty( $ambiguous ) ) {
+			$result['success'] = false;
+			$result['error']   = sprintf(
+				'Refusing to adopt: %d artifact slug(s) are ambiguous (duplicate names collide). Rename or disambiguate the live rows, then retry.',
+				count( $ambiguous )
+			);
+			return $result;
+		}
+
+		if ( $dry_run ) {
+			return $result;
+		}
+
+		// ---- Write provenance: backfill slugs, ledger, bundle header. -------
+		$ledger_rows = array();
+		foreach ( $matched as $entry ) {
+			$type      = (string) $entry['artifact_type'];
+			$slug_key  = (string) $entry['artifact_id'];
+			$record_id = (int) $entry['record_id'];
+			$hash      = AgentBundleArtifactHasher::hash( $entry['payload'] );
+
+			if ( ! empty( $entry['needs_backfill'] ) && $record_id > 0 ) {
+				if ( 'pipeline' === $type ) {
+					$this->pipelines->update_pipeline( $record_id, array( 'portable_slug' => $slug_key ) );
+				} else {
+					$this->flows->update_flow( $record_id, array( 'portable_slug' => $slug_key ) );
+				}
+			}
+
+			$ledger_rows[] = array(
+				'bundle_slug'       => (string) $summary['bundle_slug'],
+				'bundle_version'    => (string) $summary['bundle_version'],
+				'artifact_type'     => $type,
+				'artifact_id'       => $slug_key,
+				'source_path'       => ( 'pipeline' === $type ? 'pipelines/' : 'flows/' ) . $slug_key . '.json',
+				'installed_hash'    => $hash,
+				'current_hash'      => $hash,
+				'installed_payload' => $entry['payload'],
+				'installed_at'      => current_time( 'mysql', true ),
+				'updated_at'        => current_time( 'mysql', true ),
+			);
+		}
+
+		$persisted = AgentBundleArtifactState::persist_for_agent_result( $agent_id, $ledger_rows );
+		if ( is_wp_error( $persisted ) ) {
+			return array(
+				'success' => false,
+				'error'   => $persisted->get_error_message(),
+			);
+		}
+
+		$config = is_array( $agent['agent_config'] ?? null ) ? $agent['agent_config'] : array();
+		if ( ! isset( $config['datamachine_bundle'] ) || ! is_array( $config['datamachine_bundle'] ) ) {
+			$config['datamachine_bundle'] = array();
+		}
+		$header = is_array( $bundle['agent']['agent_config']['datamachine_bundle'] ?? null ) ? $bundle['agent']['agent_config']['datamachine_bundle'] : array();
+
+		$config['datamachine_bundle']['bundle_slug']      = (string) $summary['bundle_slug'];
+		$config['datamachine_bundle']['bundle_version']   = (string) $summary['bundle_version'];
+		$config['datamachine_bundle']['template_slug']    = (string) ( $header['template_slug'] ?? $summary['bundle_slug'] );
+		$config['datamachine_bundle']['template_version'] = (string) ( $header['template_version'] ?? $summary['bundle_version'] );
+		$config['datamachine_bundle']['source_ref']       = (string) ( $bundle['source_ref'] ?? $header['source_ref'] ?? '' );
+		$config['datamachine_bundle']['source_revision']  = (string) ( $bundle['source_revision'] ?? $header['source_revision'] ?? '' );
+		$config['datamachine_bundle']['adopted']          = true;
+
+		if ( ! $this->agents->update_agent( $agent_id, array( 'agent_config' => $config ) ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'Ledger written, but updating the agent_config bundle header failed.',
+			);
+		}
+
+		return $result;
+	}
+
 	/** @return array<string,mixed> */
 	public function apply_pending_action( string $action_id ): array {
 		$action_id = function_exists( 'sanitize_text_field' ) ? sanitize_text_field( $action_id ) : trim( $action_id );
@@ -420,20 +659,35 @@ final class AgentBundleAbilityService {
 
 	/** @return array<int,array<string,mixed>> */
 	private function runtime_drifts_for_bundle( array $bundle, array $agent, string $decision ): array {
-		$agent_id                   = (int) ( $agent['agent_id'] ?? 0 );
-		$pipeline_id_map            = array();
-		$existing_pipelines_by_slug = array();
-		$drifts                     = array();
+		$agent_id        = (int) ( $agent['agent_id'] ?? 0 );
+		$pipeline_id_map = array();
+		$drifts          = array();
 
-		foreach ( $this->pipelines->get_all_pipelines( null, $agent_id ) as $pipeline ) {
-			$existing_pipelines_by_slug[ (string) ( $pipeline['portable_slug'] ?? '' ) ] = $pipeline;
+		// Key existing pipelines under the SAME normalized slug the bundle side
+		// uses, falling back to the normalized pipeline_name when portable_slug
+		// is empty. Without this fallback, live-origin agents (portable_slug
+		// NULL on every row) never match and every artifact is misclassified.
+		$existing_pipelines_by_slug = AgentBundleSlugMatcher::index_existing(
+			$this->pipelines->get_all_pipelines( null, $agent_id ),
+			'pipeline_name',
+			'pipeline'
+		)['matched'];
+
+		// Index existing flows per pipeline once, with the same name fallback,
+		// so flow rows with NULL portable_slug still resolve.
+		$existing_flows_by_pipeline = array();
+		foreach ( $this->flows->get_all_flows( null, $agent_id ) as $existing_flow_row ) {
+			if ( ! is_array( $existing_flow_row ) ) {
+				continue;
+			}
+			$existing_flows_by_pipeline[ (int) ( $existing_flow_row['pipeline_id'] ?? 0 ) ][] = $existing_flow_row;
 		}
 
 		foreach ( $bundle['pipelines'] ?? array() as $pipeline ) {
 			if ( ! is_array( $pipeline ) ) {
 				continue;
 			}
-			$slug = PortableSlug::normalize( (string) ( $pipeline['portable_slug'] ?? ( $pipeline['pipeline_name'] ?? 'pipeline' ) ), 'pipeline' );
+			$slug = AgentBundleSlugMatcher::bundle_slug( $pipeline, 'pipeline_name', 'pipeline' );
 			if ( isset( $existing_pipelines_by_slug[ $slug ] ) ) {
 				$pipeline_id_map[ (int) ( $pipeline['original_id'] ?? 0 ) ] = (int) ( $existing_pipelines_by_slug[ $slug ]['pipeline_id'] ?? 0 );
 			}
@@ -448,9 +702,10 @@ final class AgentBundleAbilityService {
 			if ( $new_pipeline_id <= 0 ) {
 				continue;
 			}
-			$flow_slug     = PortableSlug::normalize( (string) ( $flow['portable_slug'] ?? ( $flow['flow_name'] ?? 'flow' ) ), 'flow' );
-			$existing_flow = $this->flows->get_by_portable_slug( $new_pipeline_id, $flow_slug );
-			if ( ! $existing_flow ) {
+			$flow_slug      = AgentBundleSlugMatcher::bundle_slug( $flow, 'flow_name', 'flow' );
+			$flow_index     = AgentBundleSlugMatcher::index_existing( $existing_flows_by_pipeline[ $new_pipeline_id ] ?? array(), 'flow_name', 'flow' );
+			$existing_flow  = $flow_index['matched'][ $flow_slug ] ?? null;
+			if ( null === $existing_flow ) {
 				continue;
 			}
 			$target_flow = array_merge(

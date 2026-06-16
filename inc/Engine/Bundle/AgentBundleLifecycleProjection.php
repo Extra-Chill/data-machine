@@ -32,6 +32,7 @@ final class AgentBundleLifecycleProjection {
 		$agent_id                   = is_array( $agent ) ? (int) ( $agent['agent_id'] ?? 0 ) : 0;
 		$pipeline_id_map            = array();
 		$existing_pipelines_by_slug = array();
+		$existing_flows_by_pipeline = array();
 		$incoming_config            = is_array( $bundle['agent']['agent_config'] ?? null ) ? $bundle['agent']['agent_config'] : array();
 
 		$artifacts[] = array(
@@ -42,8 +43,20 @@ final class AgentBundleLifecycleProjection {
 		);
 
 		if ( $agent_id > 0 ) {
-			foreach ( $this->pipelines()->get_all_pipelines( null, $agent_id ) as $pipeline ) {
-				$existing_pipelines_by_slug[ (string) ( $pipeline['portable_slug'] ?? '' ) ] = $pipeline;
+			// Mirror the bundle-side key: prefer stored portable_slug, fall back
+			// to the normalized pipeline_name. Live-origin agents (portable_slug
+			// NULL) only become matchable through the name fallback.
+			$existing_pipelines_by_slug = AgentBundleSlugMatcher::index_existing(
+				$this->pipelines()->get_all_pipelines( null, $agent_id ),
+				'pipeline_name',
+				'pipeline'
+			)['matched'];
+
+			foreach ( $this->flows()->get_all_flows( null, $agent_id ) as $existing_flow_row ) {
+				if ( ! is_array( $existing_flow_row ) ) {
+					continue;
+				}
+				$existing_flows_by_pipeline[ (int) ( $existing_flow_row['pipeline_id'] ?? 0 ) ][] = $existing_flow_row;
 			}
 		}
 
@@ -52,7 +65,7 @@ final class AgentBundleLifecycleProjection {
 				continue;
 			}
 
-			$slug = PortableSlug::normalize( (string) ( $pipeline['portable_slug'] ?? ( $pipeline['pipeline_name'] ?? 'pipeline' ) ), 'pipeline' );
+			$slug = AgentBundleSlugMatcher::bundle_slug( $pipeline, 'pipeline_name', 'pipeline' );
 			if ( isset( $existing_pipelines_by_slug[ $slug ] ) ) {
 				$old_id = (int) ( $pipeline['original_id'] ?? 0 );
 				$new_id = (int) ( $existing_pipelines_by_slug[ $slug ]['pipeline_id'] ?? 0 );
@@ -78,10 +91,14 @@ final class AgentBundleLifecycleProjection {
 				continue;
 			}
 
-			$slug            = PortableSlug::normalize( (string) ( $flow['portable_slug'] ?? ( $flow['flow_name'] ?? 'flow' ) ), 'flow' );
+			$slug            = AgentBundleSlugMatcher::bundle_slug( $flow, 'flow_name', 'flow' );
 			$old_pipeline_id = (int) ( $flow['original_pipeline_id'] ?? 0 );
 			$new_pipeline_id = (int) ( $pipeline_id_map[ $old_pipeline_id ] ?? 0 );
-			$existing_flow   = $new_pipeline_id > 0 ? $this->flows()->get_by_portable_slug( $new_pipeline_id, $slug ) : null;
+			$existing_flow   = null;
+			if ( $new_pipeline_id > 0 ) {
+				$flow_index    = AgentBundleSlugMatcher::index_existing( $existing_flows_by_pipeline[ $new_pipeline_id ] ?? array(), 'flow_name', 'flow' );
+				$existing_flow = $flow_index['matched'][ $slug ] ?? null;
+			}
 
 			if ( $existing_flow ) {
 				$flow['flow_config'] = BundleStepIdRemapper::remap_flow_step_ids(
