@@ -79,7 +79,7 @@ final class AgentBundleRunner {
 		$initial_data['agent_slug']   = (string) ( $manifest['agent']['slug'] ?? '' );
 		$initial_data['job_source']   = (string) ( $input['job_source'] ?? 'agent_bundle' );
 		$initial_data['job_label']    = (string) ( $input['job_label'] ?? ( $selection['flow_name'] ?? 'Agent Bundle Workflow' ) );
-		$this->apply_runtime_ability_tools( $initial_data, $input );
+		$this->apply_runtime_ability_tools( $initial_data, $input, $bundle );
 		$this->apply_runtime_model_config( $initial_data, $input );
 
 		if ( ! empty( $input['dry_run'] ) ) {
@@ -199,9 +199,14 @@ final class AgentBundleRunner {
 	 *
 	 * @param array<string,mixed> $initial_data Initial workflow engine data.
 	 * @param array<string,mixed> $input Bundle run input.
+	 * @param array<string,mixed> $bundle Loaded bundle document.
 	 */
-	private function apply_runtime_ability_tools( array &$initial_data, array $input ): void {
+	private function apply_runtime_ability_tools( array &$initial_data, array $input, array $bundle = array() ): void {
 		$ability_tools = is_array( $input['ability_tools'] ?? null ) ? $input['ability_tools'] : array();
+		if ( empty( $ability_tools ) ) {
+			$metadata_tools = $this->path_value( $bundle, 'metadata.codebox.agent_runtime.bundle.ability_tools' );
+			$ability_tools  = is_array( $metadata_tools ) ? $metadata_tools : array();
+		}
 		if ( empty( $ability_tools ) ) {
 			return;
 		}

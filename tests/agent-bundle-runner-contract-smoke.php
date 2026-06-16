@@ -398,6 +398,7 @@ foreach ( array(
 	"'ability_tools'       => array("                                           => 'run-agent-bundle schema accepts runtime ability tools',
 	'apply_runtime_model_config'                                              => 'runner projects provider/model into initial data',
 	'apply_runtime_ability_tools'                                             => 'runner projects ability tools into initial data',
+	'metadata.codebox.agent_runtime.bundle.ability_tools'                     => 'runner consumes bundle metadata ability tools fallback',
 	"\$job_snapshot['ability_tools']"                                         => 'runner stamps job-scoped ability tool declarations',
 	"\$job_snapshot['default_provider']"                                      => 'runner stamps job-scoped default provider',
 	"\$job_snapshot['default_model']"                                         => 'runner stamps job-scoped default model',
