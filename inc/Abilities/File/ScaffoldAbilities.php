@@ -113,12 +113,7 @@ class ScaffoldAbilities {
 	 * @return \WP_Ability|null The scaffold ability, or null if not available.
 	 */
 	public static function get_ability(): ?\WP_Ability {
-		if ( ! class_exists( '\WP_Abilities_Registry' ) || ! function_exists( 'wp_get_ability' ) ) {
-			return null;
-		}
-
-		$registry = \WP_Abilities_Registry::get_instance();
-		if ( ! $registry || ! method_exists( $registry, 'is_registered' ) || ! $registry->is_registered( 'datamachine/scaffold-memory-file' ) ) {
+		if ( ! function_exists( 'wp_get_ability' ) || ! did_action( 'init' ) ) {
 			return null;
 		}
 
