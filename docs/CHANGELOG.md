@@ -2,6 +2,12 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.148.7] - 2026-06-16
+
+### Fixed
+- align bundle output lint
+- enforce required bundle run outputs
+
 ## [0.148.6] - 2026-06-16
 
 ### Fixed
