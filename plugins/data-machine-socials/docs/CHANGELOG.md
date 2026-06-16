@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.15.0] - 2026-06-16
+
+### Added
+- register reflected AGENTS.md section for the socials CLI surface
+
 ## [0.14.1] - 2026-06-15
 
 ### Fixed
