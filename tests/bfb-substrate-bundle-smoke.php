@@ -201,41 +201,77 @@ foreach ( $h2bc_globals as $class_name ) {
 	assert_bfb_bundle( "global-{$class_name}-not-created", ! class_exists( $class_name, false ) );
 }
 
-$registered_actions = $GLOBALS['__bfb_bundle_actions'];
-/** @var array<int, array{hook:string, callback:mixed}> $registered_actions */
-foreach ( $registered_actions as $action ) {
-	if ( 'wp_abilities_api_categories_init' === $action['hook'] && is_callable( $action['callback'] ) ) {
-		call_user_func( $action['callback'] );
-	}
-}
-
-$registered_actions = $GLOBALS['__bfb_bundle_actions'];
-/** @var array<int, array{hook:string, callback:mixed}> $registered_actions */
-foreach ( $registered_actions as $action ) {
-	if ( 'wp_abilities_api_init' === $action['hook'] && is_callable( $action['callback'] ) ) {
-		call_user_func( $action['callback'] );
-	}
-}
-
-$registered_ability_categories = $GLOBALS['__bfb_bundle_ability_categories'];
-$registered_abilities          = $GLOBALS['__bfb_bundle_abilities'];
-/** @var array<string, array<string, mixed>> $registered_ability_categories */
-/** @var array<string, array<string, mixed>> $registered_abilities */
-
-assert_bfb_bundle( 'bfb-ability-category-registered', isset( $registered_ability_categories['block-format-bridge'] ) );
-
 $bfb_ability_names = array(
 	'block-format-bridge/get-capabilities',
 	'block-format-bridge/convert',
 	'block-format-bridge/normalize',
 );
 
-foreach ( $bfb_ability_names as $ability_name ) {
-	assert_bfb_bundle( "{$ability_name}-registered", isset( $registered_abilities[ $ability_name ] ) );
-	assert_bfb_bundle(
-		"{$ability_name}-has-category",
-		'block-format-bridge' === ( $registered_abilities[ $ability_name ]['category'] ?? null )
-	);
+/*
+ * The ability-registration assertions below check that loading the bundled BFB
+ * substrate registers the `block-format-bridge` ability category and abilities.
+ *
+ * This smoke supports two execution contexts:
+ *
+ *  - Pure-PHP (standalone `php tests/...`): WordPress is not loaded, so the smoke
+ *    provides global recording stubs for `add_action` / `wp_register_ability*`
+ *    that capture registrations into `$GLOBALS` arrays. We fire the bundle's
+ *    registration callbacks by hand and assert against those recorders.
+ *
+ *  - Real WordPress (wp-codebox CI harness): WP core defines the abilities API and
+ *    fires `wp_abilities_api_*_init` during normal init, so the BFB bundle has
+ *    already registered into WP's real registry before this smoke runs. The
+ *    pure-PHP recorders are never populated (registrations go through core), so we
+ *    assert against the real registry instead.
+ *
+ * `wp_get_ability_category()` is a real WP-core abilities-API function that this
+ * smoke does not stub, so its presence is a reliable "running under real WP"
+ * marker.
+ */
+$is_real_wp = function_exists( 'wp_get_ability_category' );
+
+if ( $is_real_wp ) {
+	assert_bfb_bundle( 'bfb-ability-category-registered', wp_has_ability_category( 'block-format-bridge' ) );
+
+	foreach ( $bfb_ability_names as $ability_name ) {
+		$ability = wp_get_ability( $ability_name );
+		assert_bfb_bundle( "{$ability_name}-registered", null !== $ability );
+		assert_bfb_bundle(
+			"{$ability_name}-has-category",
+			null !== $ability && 'block-format-bridge' === $ability->get_category()
+		);
+	}
+} else {
+	$registered_actions = $GLOBALS['__bfb_bundle_actions'];
+	/** @var array<int, array{hook:string, callback:mixed}> $registered_actions */
+	foreach ( $registered_actions as $action ) {
+		if ( 'wp_abilities_api_categories_init' === $action['hook'] && is_callable( $action['callback'] ) ) {
+			call_user_func( $action['callback'] );
+		}
+	}
+
+	$registered_actions = $GLOBALS['__bfb_bundle_actions'];
+	/** @var array<int, array{hook:string, callback:mixed}> $registered_actions */
+	foreach ( $registered_actions as $action ) {
+		if ( 'wp_abilities_api_init' === $action['hook'] && is_callable( $action['callback'] ) ) {
+			call_user_func( $action['callback'] );
+		}
+	}
+
+	$registered_ability_categories = $GLOBALS['__bfb_bundle_ability_categories'];
+	$registered_abilities          = $GLOBALS['__bfb_bundle_abilities'];
+	/** @var array<string, array<string, mixed>> $registered_ability_categories */
+	/** @var array<string, array<string, mixed>> $registered_abilities */
+
+	assert_bfb_bundle( 'bfb-ability-category-registered', isset( $registered_ability_categories['block-format-bridge'] ) );
+
+	foreach ( $bfb_ability_names as $ability_name ) {
+		assert_bfb_bundle( "{$ability_name}-registered", isset( $registered_abilities[ $ability_name ] ) );
+		assert_bfb_bundle(
+			"{$ability_name}-has-category",
+			'block-format-bridge' === ( $registered_abilities[ $ability_name ]['category'] ?? null )
+		);
+	}
 }
 
 echo "\nBFB substrate bundle smoke: {$total} assertions, {$failed} failures.\n";
