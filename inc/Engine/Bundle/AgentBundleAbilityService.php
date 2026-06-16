@@ -373,7 +373,8 @@ final class AgentBundleAbilityService {
 				continue;
 			}
 
-			$flow_index = AgentBundleSlugMatcher::index_existing( $flows_by_pipeline[ $live_pipeline ] ?? array(), 'flow_name', 'flow' );
+			$scoped_rows = $flows_by_pipeline[ $live_pipeline ] ?? array();
+			$flow_index  = AgentBundleSlugMatcher::index_existing( $scoped_rows, 'flow_name', 'flow' );
 
 			if ( isset( $flow_index['ambiguous'][ $slug_key ] ) ) {
 				$ambiguous[] = array(
@@ -385,6 +386,32 @@ final class AgentBundleAbilityService {
 			}
 
 			$live = $flow_index['matched'][ $slug_key ] ?? null;
+
+			// Pipeline-scoped fallback: live-origin flow rows carry no slug, so a
+			// bundle flow keyed on its UNIQUE slug (e.g. "ticketmaster-63") never
+			// meets the live row keyed on its source label ("ticketmaster"). The
+			// global pass above already bounded the candidates to this flow's
+			// matched parent pipeline, where the source label IS unique. So when
+			// the slug key misses, re-key BOTH sides on the normalized source
+			// label within this single pipeline. A unique match there is
+			// unambiguous; the unique bundle slug is still what gets backfilled
+			// onto the row. A genuine in-pipeline name collision stays ambiguous.
+			if ( null === $live ) {
+				$name_key   = AgentBundleSlugMatcher::bundle_name_key( $bundle_flow, 'flow_name', 'flow' );
+				$name_index = AgentBundleSlugMatcher::index_existing_by_name( $scoped_rows, 'flow_name', 'flow' );
+
+				if ( isset( $name_index['ambiguous'][ $name_key ] ) ) {
+					$ambiguous[] = array(
+						'artifact_type' => 'flow',
+						'artifact_id'   => $slug_key,
+						'reason'        => sprintf( '%d live flows on pipeline %d resolve to source label "%s".', count( $name_index['ambiguous'][ $name_key ] ), $live_pipeline, $name_key ),
+					);
+					continue;
+				}
+
+				$live = $name_index['matched'][ $name_key ] ?? null;
+			}
+
 			if ( null === $live ) {
 				$unmatched[] = array(
 					'artifact_type' => 'flow',
