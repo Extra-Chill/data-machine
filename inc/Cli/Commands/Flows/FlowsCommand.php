@@ -127,8 +127,13 @@ class FlowsCommand extends BaseCommand {
 	 *   --set-system-prompt`.
 	 *
 	 * [--handler-config=<json>]
-	 * : JSON object of handler config key-value pairs to update (merged with existing config).
-	 *   Requires --step to identify the target flow step.
+	 * : JSON object of config key-value pairs to update (deep-merged with existing config).
+	 *   For handler-backed steps (fetch/publish), key the object by handler slug, e.g.
+	 *   {"reddit":{"subreddit":"music"}}. For handler-free steps (system_task/dispatch),
+	 *   nest settings under `params`, e.g. {"params":{"message":"..."}}. The flat shape
+	 *   shown by `flows get` is also accepted and auto-wrapped into `params`. Partial
+	 *   `params` updates are deep-merged, so sibling keys (channel/recipient) are preserved.
+	 *   Resolves to the flow's sole handler step when --step is omitted.
 	 *
 	 * [--step=<flow_step_id>]
 	 * : Target a specific flow step for prompt update or handler config update (auto-resolved if flow has exactly one handler step).
@@ -203,8 +208,19 @@ class FlowsCommand extends BaseCommand {
 	 *     # Update flow name
 	 *     wp datamachine flows update 141 --name="New Name"
 	 *
-	 *     # Update per-flow user message (stored as a 1-entry static prompt_queue)
+	 *     # Update per-flow user message for an AI step (stored as a 1-entry static prompt_queue)
 	 *     wp datamachine flows update 42 --set-user-message="New user message"
+	 *
+	 *     # Update a system_task / dispatch step's message (handler-free step).
+	 *     # Settings live under a `params` wrapper; partial params are deep-merged
+	 *     # so sibling keys (channel, recipient) survive. The flat shape shown by
+	 *     # `flows get` is also accepted and auto-wrapped into params.
+	 *     wp datamachine flows update 42 --step=<flow_step_id> \
+	 *       --handler-config='{"params":{"message":"New message body"}}'
+	 *
+	 *     # Update a handler-backed (fetch/publish) step: key the JSON by handler slug
+	 *     wp datamachine flows update 42 --step=<flow_step_id> \
+	 *       --handler-config='{"reddit":{"subreddit":"music"}}'
 	 *
 	 *     # Add a handler to a flow step
 	 *     wp datamachine flows add-handler 42 --handler=rss
@@ -1097,29 +1113,40 @@ class FlowsCommand extends BaseCommand {
 			return;
 		}
 
-		$name           = $assoc_args['name'] ?? null;
-		$scheduling     = $assoc_args['scheduling'] ?? null;
-		$scheduled_at   = $assoc_args['scheduled-at'] ?? null;
-		$has_agent      = isset( $assoc_args['agent'] );
-		$user_message   = isset( $assoc_args['set-user-message'] )
+		$name         = $assoc_args['name'] ?? null;
+		$scheduling   = $assoc_args['scheduling'] ?? null;
+		$scheduled_at = $assoc_args['scheduled-at'] ?? null;
+		$has_agent    = isset( $assoc_args['agent'] );
+		$user_message = isset( $assoc_args['set-user-message'] )
 			? wp_kses_post( wp_unslash( $assoc_args['set-user-message'] ) )
 			: null;
-		$handler_config = isset( $assoc_args['handler-config'] )
-			? json_decode( wp_unslash( $assoc_args['handler-config'] ), true )
-			: null;
-		$step           = $assoc_args['step'] ?? null;
+		$step         = $assoc_args['step'] ?? null;
+
+		// Track whether --handler-config was *passed* separately from whether it
+		// decoded to a usable object. A provided-but-malformed flag must report
+		// the real reason (bad JSON / wrong shape) instead of falling through to
+		// the generic "no flag provided" guard below, which sent a user down a
+		// wrong diagnosis when the JSON shape was the actual problem (#2673).
+		$has_handler_config = isset( $assoc_args['handler-config'] );
+		$handler_config     = null;
+		if ( $has_handler_config ) {
+			$handler_config = json_decode( wp_unslash( $assoc_args['handler-config'] ), true );
+			if ( ! is_array( $handler_config ) ) {
+				WP_CLI::error(
+					'Invalid JSON in --handler-config. Must be a JSON object, e.g. '
+					. "--handler-config='{\"params\":{\"message\":\"...\"}}' for a system_task/dispatch step, "
+					. "or --handler-config='{\"<handler_slug>\":{\"<field>\":\"<value>\"}}' for a fetch/publish handler."
+				);
+				return;
+			}
+		}
 
 		// --scheduled-at implies --scheduling=one_time.
 		if ( $scheduled_at && null === $scheduling ) {
 			$scheduling = 'one_time';
 		}
 
-		if ( null !== $handler_config && ! is_array( $handler_config ) ) {
-			WP_CLI::error( 'Invalid JSON in --handler-config. Must be a JSON object.' );
-			return;
-		}
-
-		if ( null === $name && null === $scheduling && null === $user_message && null === $handler_config && ! $has_agent ) {
+		if ( null === $name && null === $scheduling && null === $user_message && ! $has_handler_config && ! $has_agent ) {
 			WP_CLI::error( 'Must provide --name, --scheduling, --set-user-message, --scheduled-at, --handler-config, or --agent to update' );
 			return;
 		}
@@ -1157,7 +1184,7 @@ class FlowsCommand extends BaseCommand {
 			$message_step = $resolved['step_id'];
 		}
 
-		if ( null !== $handler_config && null === $handler_step ) {
+		if ( $has_handler_config && null === $handler_step ) {
 			$resolved = $this->resolveHandlerStep( $flow_id );
 			if ( ! empty( $resolved['error'] ) ) {
 				WP_CLI::error( $resolved['error'] );
@@ -1219,18 +1246,31 @@ class FlowsCommand extends BaseCommand {
 			WP_CLI::success( 'User message updated for step: ' . $message_step );
 		}
 
-		if ( null !== $handler_config ) {
-			// --handler-config accepts handler-keyed JSON, e.g. {"reddit":{"subreddit":"test"}}.
-			// Unwrap: the key is the handler slug, the value is the config.
-			$handler_slug        = null;
-			$unwrapped_config    = $handler_config;
-			$handler_config_keys = array_keys( $handler_config );
+		if ( $has_handler_config ) {
+			$step_config = $this->loadFlowStepConfig( $flow_id, (string) $handler_step );
+			$handler_slug     = null;
+			$unwrapped_config = $handler_config;
 
-			// If the top-level keys look like handler slugs (single key wrapping a config object),
-			// unwrap the handler slug from the JSON structure.
-			if ( count( $handler_config_keys ) === 1 && is_array( $handler_config[ $handler_config_keys[0] ] ) ) {
-				$handler_slug     = $handler_config_keys[0];
-				$unwrapped_config = $handler_config[ $handler_slug ];
+			if ( null !== $step_config && ! FlowStepConfig::usesHandler( $step_config ) ) {
+				// Handler-free step (e.g. system_task / dispatch). Its valid
+				// settings fields are a fixed set (task_type, params), so we do
+				// NOT treat a single wrapping key as a handler slug — that
+				// heuristic is for fetch/publish handlers and would corrupt a
+				// `{"params":{...}}` payload by flattening away the params
+				// wrapper. Instead, accept the flat displayed shape from
+				// `flows get` (top-level message/channel/recipient) by
+				// auto-wrapping any non-reserved top-level keys into `params`,
+				// so input matches output (#2673).
+				$unwrapped_config = $this->normalizeHandlerFreeConfig( $handler_step, $handler_config );
+			} else {
+				// Handler-backed step: --handler-config accepts handler-keyed
+				// JSON, e.g. {"reddit":{"subreddit":"test"}}. Unwrap: the single
+				// top-level key is the handler slug, the value is its config.
+				$handler_config_keys = array_keys( $handler_config );
+				if ( count( $handler_config_keys ) === 1 && is_array( $handler_config[ $handler_config_keys[0] ] ) ) {
+					$handler_slug     = $handler_config_keys[0];
+					$unwrapped_config = $handler_config[ $handler_slug ];
+				}
 			}
 
 			$step_input = array(
@@ -1253,6 +1293,87 @@ class FlowsCommand extends BaseCommand {
 			$updated_keys = implode( ', ', array_keys( $unwrapped_config ) );
 			WP_CLI::success( sprintf( 'Handler config updated for step %s: %s', $handler_step, $updated_keys ) );
 		}
+	}
+
+	/**
+	 * Load a single flow step's config array from storage.
+	 *
+	 * @param int    $flow_id      Flow ID.
+	 * @param string $flow_step_id Flow step ID.
+	 * @return array|null Step config, or null when not found.
+	 */
+	private function loadFlowStepConfig( int $flow_id, string $flow_step_id ): ?array {
+		if ( '' === $flow_step_id ) {
+			return null;
+		}
+
+		$flow = ( new \DataMachine\Core\Database\Flows\Flows() )->get_flow( $flow_id );
+		if ( ! $flow ) {
+			return null;
+		}
+
+		$flow_config = $flow['flow_config'] ?? array();
+		$step        = $flow_config[ $flow_step_id ] ?? null;
+
+		return is_array( $step ) ? $step : null;
+	}
+
+	/**
+	 * Normalize a handler-free step's --handler-config payload.
+	 *
+	 * Handler-free steps (system_task / dispatch) store their settings under a
+	 * fixed field set — for system_task that's `task_type` and `params`. The
+	 * `flows get` output shows the live values flat under `params`, so callers
+	 * intuitively pass the same flat keys back. This wraps any top-level key
+	 * that is NOT a reserved settings field into `params`, so both the flat
+	 * displayed shape and the explicit `{"params":{...}}` shape are accepted and
+	 * land in the same place (#2673). Reserved fields (`task_type`, an explicit
+	 * `params` object) pass through untouched.
+	 *
+	 * @param string $flow_step_id Flow step ID (used only to resolve the slug).
+	 * @param array  $config       Raw --handler-config payload.
+	 * @return array Normalized config keyed by valid settings fields.
+	 */
+	private function normalizeHandlerFreeConfig( string $flow_step_id, array $config ): array {
+		// Resolve the settings slug for this handler-free step (its step_type).
+		$parts   = apply_filters( 'datamachine_split_flow_step_id', null, $flow_step_id );
+		$flow_id = is_array( $parts ) ? (int) ( $parts['flow_id'] ?? 0 ) : 0;
+		$step    = $flow_id ? $this->loadFlowStepConfig( $flow_id, $flow_step_id ) : null;
+		$slug    = is_array( $step ) ? FlowStepConfig::getEffectiveSlug( $step ) : '';
+
+		$valid_fields = $slug
+			? array_keys( ( new \DataMachine\Abilities\HandlerAbilities() )->getConfigFields( $slug ) )
+			: array();
+
+		// No schema to map against — pass the payload through unchanged.
+		if ( empty( $valid_fields ) ) {
+			return $config;
+		}
+
+		$normalized = array();
+		$params     = array();
+
+		if ( isset( $config['params'] ) && is_array( $config['params'] ) ) {
+			$params = $config['params'];
+		}
+
+		foreach ( $config as $key => $value ) {
+			if ( 'params' === $key ) {
+				continue; // Folded in above.
+			}
+			if ( in_array( $key, $valid_fields, true ) ) {
+				$normalized[ $key ] = $value; // Reserved field (e.g. task_type).
+				continue;
+			}
+			// Non-reserved top-level key → fold into params (flat shape support).
+			$params[ $key ] = $value;
+		}
+
+		if ( ! empty( $params ) || array_key_exists( 'params', $config ) ) {
+			$normalized['params'] = $params;
+		}
+
+		return $normalized;
 	}
 
 	/**
@@ -1287,17 +1408,28 @@ class FlowsCommand extends BaseCommand {
 			);
 		}
 
-		$ai_steps = array();
+		$ai_steps      = array();
+		$non_ai_steps  = array();
 		foreach ( $flow_config as $step_id => $step_data ) {
-			if ( 'ai' === ( $step_data['step_type'] ?? '' ) ) {
+			if ( ! is_array( $step_data ) || ! isset( $step_data['step_type'] ) ) {
+				continue;
+			}
+			if ( 'ai' === $step_data['step_type'] ) {
 				$ai_steps[] = $step_id;
+			} else {
+				$non_ai_steps[ $step_id ] = $step_data;
 			}
 		}
 
 		if ( empty( $ai_steps ) ) {
+			// --set-user-message only targets AI steps. When the flow has none,
+			// point the user at the path that DOES update a non-AI step's
+			// message instead of the bare "Flow has no AI steps" dead end
+			// (#2673). For a single system_task/dispatch step we name the exact
+			// command; otherwise we describe the general --handler-config form.
 			return array(
 				'step_id' => null,
-				'error'   => 'Flow has no AI steps',
+				'error'   => self::describeNoAiStepError( $non_ai_steps ),
 			);
 		}
 
@@ -1314,6 +1446,55 @@ class FlowsCommand extends BaseCommand {
 		return array(
 			'step_id' => $ai_steps[0],
 			'error'   => null,
+		);
+	}
+
+	/**
+	 * Build a helpful error for --set-user-message when a flow has no AI step.
+	 *
+	 * --set-user-message only writes to an AI step's prompt_queue. Non-AI steps
+	 * (system_task / dispatch / handler-backed) carry their "message" inside
+	 * their own config, so the correct path is --handler-config. This produces a
+	 * pointer to that path — naming the exact command for a single system_task
+	 * step — instead of the bare "Flow has no AI steps" dead end (#2673).
+	 *
+	 * @param array<string, array> $non_ai_steps Non-AI steps keyed by flow_step_id.
+	 * @return string Error message with a remediation pointer.
+	 */
+	private static function describeNoAiStepError( array $non_ai_steps ): string {
+		if ( empty( $non_ai_steps ) ) {
+			return '--set-user-message targets an AI step, but this flow has no AI steps.';
+		}
+
+		// Single non-AI step: name the exact --handler-config command for it.
+		if ( 1 === count( $non_ai_steps ) ) {
+			$step_id   = (string) array_key_first( $non_ai_steps );
+			$step_data = $non_ai_steps[ $step_id ];
+			$step_type = (string) ( $step_data['step_type'] ?? 'non-AI' );
+			$task_type = '';
+			$settings  = FlowStepConfig::getPrimaryHandlerConfig( $step_data );
+			if ( isset( $settings['task_type'] ) && is_string( $settings['task_type'] ) ) {
+				$task_type = $settings['task_type'];
+			}
+
+			$descriptor = '' !== $task_type
+				? sprintf( '"%s" %s', $task_type, $step_type )
+				: sprintf( '"%s"', $step_type );
+
+			return sprintf(
+				'--set-user-message only updates AI steps. This step is a %s step; update its message with '
+				. "--handler-config '{\"params\":{\"message\":\"...\"}}' --step=%s "
+				. '(partial params are deep-merged, so sibling keys like channel/recipient are preserved).',
+				$descriptor,
+				$step_id
+			);
+		}
+
+		// Multiple non-AI steps: describe the general path + list candidates.
+		return sprintf(
+			'--set-user-message only updates AI steps, and this flow has none. To update a non-AI step\'s message use '
+			. "--handler-config '{\"params\":{\"message\":\"...\"}}' --step=<flow_step_id>. Available steps: %s",
+			implode( ', ', array_keys( $non_ai_steps ) )
 		);
 	}
 
