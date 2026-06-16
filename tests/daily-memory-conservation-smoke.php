@@ -175,6 +175,12 @@ echo "-------------------------------\n";
 
 assert_committed( true, array( 'committed' => str_contains( $source, 'WP_Agent_Compaction_Conservation::metadata' ), 'reason' => 'source check' ), 'production task uses Agents API conservation metadata', $failures, $passes );
 assert_committed( true, array( 'committed' => str_contains( $source, 'WP_Agent_Compaction_Conservation::failed_closed' ), 'reason' => 'source check' ), 'production task uses Agents API fail-closed decision', $failures, $passes );
+assert_committed( true, array( 'committed' => str_contains( $source, 'Produce a true partition of the current MEMORY.md' ), 'reason' => 'prompt contract' ), 'default prompt asks for a true persistent/archive partition', $failures, $passes );
+assert_committed( true, array( 'committed' => str_contains( $source, 'Each fact or detail from the source appears in exactly one output section' ), 'reason' => 'prompt contract' ), 'default prompt prevents duplicate persistent/archive content', $failures, $passes );
+assert_committed( true, array( 'committed' => str_contains( $source, 'PERSISTENT is under {{max_size}}' ), 'reason' => 'prompt contract' ), 'default prompt makes the target size an acceptance criterion', $failures, $passes );
+assert_committed( true, array( 'committed' => str_contains( $source, 'headings may be merged, renamed, or removed' ), 'reason' => 'prompt contract' ), 'default prompt allows restructuring to satisfy compaction', $failures, $passes );
+assert_committed( false, array( 'committed' => str_contains( $source, 'NEVER discard information' ), 'reason' => 'prompt contract' ), 'default prompt no longer demands preserve-everything wording', $failures, $passes );
+assert_committed( false, array( 'committed' => str_contains( $source, 'preserve existing section structure' ), 'reason' => 'prompt contract' ), 'default prompt no longer locks the original heading structure', $failures, $passes );
 
 // Test 1: real-world reproducer from intelligence-chubes4 2026-04-25.
 // 55KB original, 20KB persistent, 335B archived. Should reject.

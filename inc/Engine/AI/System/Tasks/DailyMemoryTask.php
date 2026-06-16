@@ -466,7 +466,7 @@ class DailyMemoryTask extends SystemTask {
 				'datamachine_log',
 				'warning',
 				sprintf(
-					'Daily memory aborted -- conservation check failed: persistent (%s) + archived (%s) = %s, expected at least %s of %s original (~%s discarded). AI ignored the "NEVER discard information" rule.',
+					'Daily memory aborted -- conservation check failed: persistent (%s) + archived (%s) = %s, expected at least %s of %s original (~%s discarded). AI output did not satisfy the persistent/archive partition contract.',
 					size_format( $new_size ),
 					size_format( $archived_size ),
 					size_format( $combined_size ),
@@ -830,37 +830,36 @@ class DailyMemoryTask extends SystemTask {
 			'daily_memory' => array(
 				'label'       => __( 'Daily Memory Prompt', 'data-machine' ),
 				'description' => __( 'Prompt for automated MEMORY.md maintenance. Cleans, compresses, and archives session-specific content.', 'data-machine' ),
-				'default'     => "You are maintaining an AI agent's MEMORY.md file. This file is injected into every AI context window, so it must stay lean -- only persistent knowledge that helps across all future sessions.\n\n"
-					. "## Principle\n\n"
-					. "For each piece of content ask: \"Would a fresh session need this to do its job?\" If yes, keep it. If it only makes sense in the context of a specific session or time period, archive it.\n\n"
-					. "## Your Task\n\n"
-					. "Split the MEMORY.md content below into two parts:\n\n"
-					. "### PERSISTENT -- stays in MEMORY.md\n"
-					. "Knowledge useful regardless of when or why the next session runs:\n"
-					. "- How things work (architecture, patterns, conventions)\n"
-					. "- Where things are (paths, URLs, config locations, tool names)\n"
-					. "- Current state of ongoing work (just the status, not the journey)\n"
-					. "- Rules and constraints learned from experience\n"
-					. "- Relationships between systems, people, and services\n\n"
-					. "When condensing, prefer the **lasting fact** over the **story of how we learned it**. Merge overlapping entries. Remove detail that duplicates what is already in daily files or source code.\n\n"
-					. "### ARCHIVED -- moves to the daily file for {{date}}\n"
-					. "Content tied to a specific session, investigation, or moment in time:\n"
-					. "- Play-by-play narratives of what happened in a session\n"
-					. "- Debugging traces and investigation logs\n"
-					. "- Temporary state that will be outdated soon\n"
-					. "- Detail already captured by a condensed persistent entry\n\n"
+				'default'     => "You are maintaining an AI agent's MEMORY.md file. This file is injected into every AI context window, so the PERSISTENT output must stay lean and fit under {{max_size}}.\n\n"
+					. "## Goal\n\n"
+					. "Produce a true partition of the current MEMORY.md:\n"
+					. "- PERSISTENT becomes the new MEMORY.md. It contains compact durable facts needed in future sessions.\n"
+					. "- ARCHIVED is appended to the daily file for {{date}}. It contains the original detail that was moved out of MEMORY.md.\n"
+					. "- Each fact or detail from the source appears in exactly one output section. If a detail is archived, leave only a short durable summary or archive pointer in PERSISTENT.\n\n"
+					. "## What Belongs In PERSISTENT\n\n"
+					. "Keep concise facts that remain useful regardless of when the next session runs:\n"
+					. "- Current architecture, APIs, command surfaces, paths, URLs, credentials locations without secrets, and ownership facts.\n"
+					. "- Stable preferences, rules, naming conventions, and operational constraints.\n"
+					. "- Current project state summarized as outcome and next action, not the investigation story.\n"
+					. "- Cross-system relationships that prevent future rediscovery.\n\n"
+					. "Use compact bullets. Merge overlapping entries. Replace long historical sections with short durable summaries plus archive pointers.\n\n"
+					. "## What Belongs In ARCHIVED\n\n"
+					. "Move details that future sessions can retrieve from daily memory instead of loading every time:\n"
+					. "- Session play-by-play, troubleshooting traces, command transcripts, old release state, and temporary blockers.\n"
+					. "- Background stories that led to a durable fact.\n"
+					. "- Long lists where PERSISTENT only needs the current canonical pointer or summary.\n"
+					. "- Repeated facts already captured by a shorter persistent entry.\n\n"
+					. "## Acceptance Criteria\n\n"
+					. "- PERSISTENT is under {{max_size}}.\n"
+					. "- PERSISTENT and ARCHIVED are a partition: content moved to ARCHIVED is absent from PERSISTENT except for a concise summary or pointer.\n"
+					. "- PERSISTENT remains a valid MEMORY.md document with useful headings, but headings may be merged, renamed, or removed to meet the size target.\n"
+					. "- ARCHIVED preserves moved detail well enough that daily memory search/read can recover it later.\n\n"
 					. "## Output Format\n\n"
 					. "Respond in EXACTLY this format:\n\n"
 					. "===PERSISTENT===\n"
-					. "(cleaned MEMORY.md content -- preserve existing section structure)\n\n"
+					. "(new MEMORY.md content, compact and under {{max_size}})\n\n"
 					. "===ARCHIVED===\n"
-					. "(extracted session-specific content, organized by topic)\n\n"
-					. "## Rules\n"
-					. "- NEVER discard information -- everything goes to either PERSISTENT or ARCHIVED\n"
-					. "- Target size for persistent section: under {{max_size}}\n"
-					. "- Preserve the document's existing heading structure\n"
-					. "- If a section is entirely temporal, archive the whole section\n"
-					. "- If a section mixes persistent facts with session detail, keep the facts and archive the detail\n\n"
+					. "(details moved out of MEMORY.md, organized by topic)\n\n"
 					. '{{activity_section}}'
 					. "---\n\n"
 					. "## Current MEMORY.md Content\n\n"
