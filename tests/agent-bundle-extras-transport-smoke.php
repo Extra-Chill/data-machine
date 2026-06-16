@@ -112,14 +112,33 @@ if ( ! function_exists( 'do_action' ) ) {
 }
 
 function bundle_smoke_register_filter( string $hook, callable $callback ): void {
+	if ( function_exists( 'add_filter' ) ) {
+		add_filter( $hook, $callback, 10, 3 );
+		return;
+	}
+
 	$GLOBALS['__bundle_smoke_filters'][ $hook ][] = $callback;
 }
 
 function bundle_smoke_register_action( string $hook, callable $callback ): void {
+	if ( function_exists( 'add_action' ) ) {
+		add_action( $hook, $callback, 10, 3 );
+		return;
+	}
+
 	$GLOBALS['__bundle_smoke_actions'][ $hook ][] = $callback;
 }
 
 function bundle_smoke_clear_hooks(): void {
+	foreach ( array( 'datamachine_bundle_export_extras', 'datamachine_bundle_install_succeeded' ) as $hook ) {
+		if ( function_exists( 'remove_all_filters' ) ) {
+			remove_all_filters( $hook );
+		}
+		if ( function_exists( 'remove_all_actions' ) ) {
+			remove_all_actions( $hook );
+		}
+	}
+
 	$GLOBALS['__bundle_smoke_filters'] = array();
 	$GLOBALS['__bundle_smoke_actions'] = array();
 }
