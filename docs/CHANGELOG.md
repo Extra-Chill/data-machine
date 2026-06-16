@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.148.11] - 2026-06-16
+
+### Fixed
+- relax daily memory expansion cap
+
 ## [0.148.10] - 2026-06-16
 
 ### Fixed
