@@ -25,6 +25,7 @@ import AgentFileEditor from './components/AgentFileEditor';
 import AgentEmptyState from './components/AgentEmptyState';
 import AgentSettings from './components/AgentSettings';
 import AgentToolsTab from './components/AgentToolsTab';
+import AgentBundlesTab from './components/AgentBundlesTab';
 import AgentEditView from './components/AgentEditView';
 import SystemTasksTab from './components/SystemTasksTab';
 import { useAgentFiles } from './queries/agentFiles';
@@ -35,6 +36,7 @@ const TABS = [
 	{ name: 'manage', title: 'Manage' },
 	{ name: 'system-tasks', title: 'System Tasks' },
 	{ name: 'tools', title: 'Tools' },
+	{ name: 'bundles', title: 'Bundles' },
 	{ name: 'configuration', title: 'Configuration' },
 ];
 
@@ -159,6 +161,10 @@ const AgentApp = () => {
 							);
 						}
 						return <AgentToolsTab />;
+					}
+
+					if ( tab.name === 'bundles' ) {
+						return <AgentBundlesTab />;
 					}
 
 					// Configuration tab works without agent selection (global config)

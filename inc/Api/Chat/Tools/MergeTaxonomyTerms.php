@@ -131,22 +131,15 @@ class MergeTaxonomyTerms extends BaseTool {
 			);
 		}
 
-		// Get all posts with source term
-		$posts = get_posts(
-			array(
-				'post_type'      => 'any',
-				'post_status'    => 'any',
-				'tax_query'      => array(
-					array(
-						'taxonomy' => $taxonomy,
-						'field'    => 'term_id',
-						'terms'    => $source_term->term_id,
-					),
-				),
-				'posts_per_page' => -1,
-				'fields'         => 'ids',
-			)
-		);
+		$posts = get_objects_in_term( $source_term->term_id, $taxonomy );
+		if ( is_wp_error( $posts ) ) {
+			return array(
+				'success'   => false,
+				'error'     => $posts->get_error_message(),
+				'tool_name' => 'merge_taxonomy_terms',
+			);
+		}
+		$posts = array_values( array_filter( array_map( 'absint', (array) $posts ) ) );
 
 		$posts_reassigned = 0;
 

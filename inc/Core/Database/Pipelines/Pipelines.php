@@ -1,4 +1,5 @@
 <?php
+// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange -- Data Machine owns the datamachine_pipelines custom table; repository reads require fresh workflow state and schema methods perform one-time table maintenance.
 /**
  * Pipeline Database Operations
  *

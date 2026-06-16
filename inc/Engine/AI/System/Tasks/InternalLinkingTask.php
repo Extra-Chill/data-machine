@@ -382,21 +382,23 @@ class InternalLinkingTask extends SystemTask {
 		$query = new \WP_Query( array(
 			'post_type'      => 'post',
 			'post_status'    => 'publish',
-			'post__not_in'   => array( $post_id ),
-			'posts_per_page' => 50,
+			'posts_per_page' => 51,
+			// phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_tax_query -- Related-post discovery intentionally matches shared categories/tags.
 			'tax_query'      => $tax_query,
 			'fields'         => 'ids',
 			'no_found_rows'  => true,
 		) );
 
-		if ( empty( $query->posts ) ) {
+		$candidate_ids = array_slice( array_values( array_filter( array_map( 'absint', $query->posts ), static fn( int $candidate_id ): bool => $candidate_id !== $post_id ) ), 0, 50 );
+
+		if ( empty( $candidate_ids ) ) {
 			return array();
 		}
 
 		$source_words = $this->extractTitleWords( $source_title );
 
 		$candidate_titles = array();
-		foreach ( $query->posts as $candidate_id ) {
+		foreach ( $candidate_ids as $candidate_id ) {
 			$candidate_titles[ $candidate_id ] = get_the_title( $candidate_id );
 		}
 
@@ -404,7 +406,7 @@ class InternalLinkingTask extends SystemTask {
 
 		$scored = array();
 
-		foreach ( $query->posts as $candidate_id ) {
+		foreach ( $candidate_ids as $candidate_id ) {
 			$score          = 0;
 			$candidate_cats = wp_get_post_categories( $candidate_id, array( 'fields' => 'ids' ) );
 			$candidate_tags = wp_get_post_tags( $candidate_id, array( 'fields' => 'ids' ) );

@@ -44,6 +44,7 @@ class ToolSourceRegistry {
 	public function gather( array $modes, array $args ): array {
 		$callback = array( $this, 'orderSourcesForContext' );
 		if ( function_exists( 'add_filter' ) ) {
+			// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- Canonical Agents API tool-source compatibility hook.
 			add_filter( 'agents_api_tool_source_order', $callback, 5, 3 );
 		}
 
@@ -59,6 +60,7 @@ class ToolSourceRegistry {
 			);
 		} finally {
 			if ( function_exists( 'remove_filter' ) ) {
+				// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- Canonical Agents API tool-source compatibility hook.
 				remove_filter( 'agents_api_tool_source_order', $callback, 5 );
 			}
 		}
@@ -81,6 +83,7 @@ class ToolSourceRegistry {
 		);
 		$callback = array( $this, 'orderSourcesForContext' );
 		if ( function_exists( 'add_filter' ) ) {
+			// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- Canonical Agents API tool-source compatibility hook.
 			add_filter( 'agents_api_tool_source_order', $callback, 5, 3 );
 		}
 
@@ -88,6 +91,7 @@ class ToolSourceRegistry {
 			$sources = $this->registry->getSources( $context );
 			$order   = array_keys( $sources );
 			if ( function_exists( 'apply_filters' ) ) {
+				// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- Canonical Agents API tool-source compatibility hook.
 				$order = apply_filters( 'agents_api_tool_source_order', $order, $context, $this->registry, $sources );
 			}
 			$order = is_array( $order ) ? array_values( array_filter( $order, static fn( $source ): bool => is_string( $source ) && isset( $sources[ $source ] ) ) ) : array();
@@ -97,6 +101,7 @@ class ToolSourceRegistry {
 			foreach ( $order as $source_slug ) {
 				$source_tools = call_user_func( $sources[ $source_slug ], $context, $this->registry );
 				if ( function_exists( 'apply_filters' ) ) {
+					// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- Canonical Agents API tool-source compatibility hook.
 					$source_tools = apply_filters( 'agents_api_tool_source_tools', $source_tools, $source_slug, $context, $this->registry );
 				}
 
@@ -136,6 +141,7 @@ class ToolSourceRegistry {
 			);
 		} finally {
 			if ( function_exists( 'remove_filter' ) ) {
+				// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- Canonical Agents API tool-source compatibility hook.
 				remove_filter( 'agents_api_tool_source_order', $callback, 5 );
 			}
 		}

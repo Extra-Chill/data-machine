@@ -7,14 +7,14 @@
 /**
  * WordPress dependencies
  */
-import { useState, useEffect, useCallback, useRef } from '@wordpress/element';
+import { useState, useEffect, useCallback } from '@wordpress/element';
 import { TextControl, Button } from '@wordpress/components';
 import { __ } from '@wordpress/i18n';
 /**
  * Internal dependencies
  */
 import { useUpdateFlowTitle } from '../../queries/flows';
-import { AUTO_SAVE_DELAY } from '../../utils/constants';
+import useDebouncedAutosave from '@shared/hooks/useDebouncedAutosave';
 
 /**
  * Flow Header Component.
@@ -43,7 +43,6 @@ export default function FlowHeader( {
 	runSuccess = false,
 } ) {
 	const [ localName, setLocalName ] = useState( flowName );
-	const saveTimeout = useRef( null );
 	const updateFlowTitleMutation = useUpdateFlowTitle();
 
 	/**
@@ -78,6 +77,7 @@ export default function FlowHeader( {
 		},
 		[ flowId, flowName, onNameChange, updateFlowTitleMutation ]
 	);
+	const scheduleSaveName = useDebouncedAutosave( saveName );
 
 	/**
 	 * Handle name change with debouncing
@@ -85,18 +85,9 @@ export default function FlowHeader( {
 	const handleNameChange = useCallback(
 		( value ) => {
 			setLocalName( value );
-
-			// Clear existing timeout
-			if ( saveTimeout.current ) {
-				clearTimeout( saveTimeout.current );
-			}
-
-			// Set new timeout for debounced save
-			saveTimeout.current = setTimeout( () => {
-				saveName( value );
-			}, AUTO_SAVE_DELAY );
+			scheduleSaveName( value );
 		},
-		[ saveName ]
+		[ scheduleSaveName ]
 	);
 
 	/**
@@ -112,17 +103,6 @@ export default function FlowHeader( {
 			onDelete( flowId );
 		}
 	}, [ flowId, onDelete ] );
-
-	/**
-	 * Cleanup timeout on unmount
-	 */
-	useEffect( () => {
-		return () => {
-			if ( saveTimeout.current ) {
-				clearTimeout( saveTimeout.current );
-			}
-		};
-	}, [] );
 
 	return (
 		<div className="datamachine-flow-header">

@@ -381,14 +381,19 @@ class DirectoryManager {
 			return $default_id;
 		}
 
-		// First admin user.
-		$admins = get_users( array(
-			'role'    => 'administrator',
-			'number'  => 1,
-			'orderby' => 'ID',
-			'order'   => 'ASC',
-			'fields'  => 'ID',
-		) );
+
+		// Activation can run before the users table exists in WP-PHPUnit/Playground bootstraps.
+		try {
+			$admins = get_users( array(
+				'role'    => 'administrator',
+				'number'  => 1,
+				'orderby' => 'ID',
+				'order'   => 'ASC',
+				'fields'  => 'ID',
+			) );
+		} catch ( \Throwable $e ) {
+			$admins = array();
+		}
 
 		$default_id = ! empty( $admins ) ? absint( $admins[0] ) : 1;
 		return $default_id;

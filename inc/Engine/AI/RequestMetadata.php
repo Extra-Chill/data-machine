@@ -153,6 +153,7 @@ class RequestMetadata {
 	}
 
 	private static function threshold( string $filter, int $default_value ): int {
+		// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.DynamicHooknameFound -- Filter names are selected from warning_thresholds() and all use datamachine_ prefixes.
 		$value = (int) apply_filters( $filter, $default_value );
 		return max( 0, $value );
 	}

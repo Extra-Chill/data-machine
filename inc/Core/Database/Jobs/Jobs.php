@@ -1,4 +1,5 @@
 <?php
+// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange -- Data Machine owns the datamachine_jobs custom table; job lifecycle reads require fresh queue state and schema methods perform one-time table maintenance.
 /**
  * Jobs Database Repository
  *

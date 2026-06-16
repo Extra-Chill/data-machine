@@ -7,7 +7,7 @@
 /**
  * WordPress dependencies
  */
-import { useState, useEffect, useCallback, useRef } from '@wordpress/element';
+import { useState, useEffect, useCallback } from '@wordpress/element';
 import { TextControl, Button } from '@wordpress/components';
 import { __ } from '@wordpress/i18n';
 /**
@@ -15,7 +15,7 @@ import { __ } from '@wordpress/i18n';
  */
 import { updatePipelineTitle } from '../../utils/api';
 import { useDeletePipeline } from '../../queries/pipelines';
-import { AUTO_SAVE_DELAY } from '../../utils/constants';
+import useDebouncedAutosave from '@shared/hooks/useDebouncedAutosave';
 
 /**
  * Pipeline Header Component
@@ -38,7 +38,6 @@ export default function PipelineHeader( {
 	onOpenMemoryFiles,
 } ) {
 	const [ localName, setLocalName ] = useState( pipelineName );
-	const saveTimeout = useRef( null );
 
 	// Use mutation hook for pipeline deletion
 	const deletePipelineMutation = useDeletePipeline();
@@ -71,6 +70,7 @@ export default function PipelineHeader( {
 		},
 		[ pipelineId, pipelineName, onNameChange ]
 	);
+	const scheduleSaveName = useDebouncedAutosave( saveName );
 
 	/**
 	 * Handle name input change with debouncing
@@ -78,18 +78,9 @@ export default function PipelineHeader( {
 	const handleNameChange = useCallback(
 		( value ) => {
 			setLocalName( value );
-
-			// Clear existing timeout
-			if ( saveTimeout.current ) {
-				clearTimeout( saveTimeout.current );
-			}
-
-			// Set new timeout for debounced save
-			saveTimeout.current = setTimeout( () => {
-				saveName( value );
-			}, AUTO_SAVE_DELAY );
+			scheduleSaveName( value );
 		},
-		[ saveName ]
+		[ scheduleSaveName ]
 	);
 
 	/**
@@ -124,17 +115,6 @@ export default function PipelineHeader( {
 			);
 		}
 	}, [ pipelineId, onDelete, deletePipelineMutation ] );
-
-	/**
-	 * Cleanup timeout on unmount
-	 */
-	useEffect( () => {
-		return () => {
-			if ( saveTimeout.current ) {
-				clearTimeout( saveTimeout.current );
-			}
-		};
-	}, [] );
 
 	return (
 		<div className="datamachine-pipeline-header">

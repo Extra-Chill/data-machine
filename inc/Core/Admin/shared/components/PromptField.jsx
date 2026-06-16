@@ -16,9 +16,9 @@ import { TextareaControl, Notice } from '@wordpress/components';
 import { __ } from '@wordpress/i18n';
 
 /**
- * Auto-save delay in milliseconds.
+ * Internal dependencies
  */
-const AUTO_SAVE_DELAY = 500;
+import useDebouncedAutosave from '@shared/hooks/useDebouncedAutosave';
 
 /**
  * PromptField Component
@@ -49,7 +49,6 @@ export default function PromptField( {
 	const [ localValue, setLocalValue ] = useState( value );
 	const [ isSaving, setIsSaving ] = useState( false );
 	const [ error, setError ] = useState( null );
-	const saveTimeout = useRef( null );
 	const lastSavedValue = useRef( value );
 
 	/**
@@ -103,6 +102,7 @@ export default function PromptField( {
 		},
 		[ onSave ]
 	);
+	const scheduleSave = useDebouncedAutosave( saveValue );
 
 	/**
 	 * Handle value change with debouncing
@@ -116,31 +116,12 @@ export default function PromptField( {
 				onChange( newValue );
 			}
 
-			// Clear existing timeout
-			if ( saveTimeout.current ) {
-				clearTimeout( saveTimeout.current );
-			}
-
-			// Set new timeout for debounced save
 			if ( onSave ) {
-				saveTimeout.current = setTimeout( () => {
-					saveValue( newValue );
-				}, AUTO_SAVE_DELAY );
+				scheduleSave( newValue );
 			}
 		},
-		[ onChange, onSave, saveValue ]
+		[ onChange, onSave, scheduleSave ]
 	);
-
-	/**
-	 * Cleanup timeout on unmount
-	 */
-	useEffect( () => {
-		return () => {
-			if ( saveTimeout.current ) {
-				clearTimeout( saveTimeout.current );
-			}
-		};
-	}, [] );
 
 	/**
 	 * Get help text with saving indicator

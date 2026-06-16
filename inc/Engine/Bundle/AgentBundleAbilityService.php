@@ -351,6 +351,7 @@ final class AgentBundleAbilityService {
 
 	public static function capability_report( \WP_Agent_Package $package ): \WP_Agent_Package_Capability_Report {
 		if ( 0 === did_action( 'wp_agent_package_artifacts_init' ) ) {
+			// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- Canonical wp-agent package artifact registry hook.
 			do_action( 'wp_agent_package_artifacts_init' );
 		}
 

@@ -19,7 +19,7 @@ import { useState, useCallback, useRef, useEffect, useMemo } from '@wordpress/el
 import HandlerSettingField from '../modals/handler-settings/HandlerSettingField';
 import { useHandlerDetails } from '../../queries/handlers';
 import { useUpdateFlowStepConfig } from '../../queries/flows';
-import { AUTO_SAVE_DELAY } from '../../utils/constants';
+import useDebouncedAutosave from '@shared/hooks/useDebouncedAutosave';
 
 /**
  * InlineStepConfig Component.
@@ -70,7 +70,6 @@ export default function InlineStepConfig( {
 
 	// Local state for controlled inputs, initialized from derived values.
 	const [ localValues, setLocalValues ] = useState( initialValues );
-	const saveTimeout = useRef( null );
 	const localValuesRef = useRef( localValues );
 
 	const updateConfigMutation = useUpdateFlowStepConfig();
@@ -87,14 +86,33 @@ export default function InlineStepConfig( {
 		localValuesRef.current = localValues;
 	}, [ localValues ] );
 
-	// Cleanup on unmount.
-	useEffect( () => {
-		return () => {
-			if ( saveTimeout.current ) {
-				clearTimeout( saveTimeout.current );
+	const saveField = useCallback(
+		async ( fieldKey, value ) => {
+			try {
+				const currentValues = {
+					...localValuesRef.current,
+					[ fieldKey ]: value,
+				};
+				const response = await updateConfigMutation.mutateAsync( {
+					flowStepId,
+					config: { handler_config: currentValues },
+					pipelineId,
+					flowId,
+				} );
+				if ( ! response?.success && onError ) {
+					onError( response?.message || 'Failed to save settings' );
+				}
+			} catch ( err ) {
+				// eslint-disable-next-line no-console
+				console.error( 'Inline config save error:', err );
+				if ( onError ) {
+					onError( err.message || 'An error occurred' );
+				}
 			}
-		};
-	}, [] );
+		},
+		[ flowStepId, pipelineId, flowId, onError, updateConfigMutation ]
+	);
+	const scheduleSaveField = useDebouncedAutosave( saveField );
 
 	/**
 	 * Handle field change with debounced save.
@@ -102,38 +120,9 @@ export default function InlineStepConfig( {
 	const handleFieldChange = useCallback(
 		( fieldKey, value ) => {
 			setLocalValues( ( prev ) => ( { ...prev, [ fieldKey ]: value } ) );
-
-			if ( saveTimeout.current ) {
-				clearTimeout( saveTimeout.current );
-			}
-
-			saveTimeout.current = setTimeout( async () => {
-				try {
-					const currentValues = {
-						...localValuesRef.current,
-						[ fieldKey ]: value,
-					};
-					const response = await updateConfigMutation.mutateAsync( {
-						flowStepId,
-						config: { handler_config: currentValues },
-						pipelineId,
-						flowId,
-					} );
-					if ( ! response?.success && onError ) {
-						onError(
-							response?.message || 'Failed to save settings'
-						);
-					}
-				} catch ( err ) {
-					// eslint-disable-next-line no-console
-					console.error( 'Inline config save error:', err );
-					if ( onError ) {
-						onError( err.message || 'An error occurred' );
-					}
-				}
-			}, AUTO_SAVE_DELAY );
+			scheduleSaveField( fieldKey, value );
 		},
-		[ flowStepId, pipelineId, flowId, onError, updateConfigMutation ]
+		[ scheduleSaveField ]
 	);
 
 	// Don't render until we have the field schema.

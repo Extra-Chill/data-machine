@@ -50,6 +50,7 @@ require_once __DIR__ . '/Api/Providers.php';
 require_once __DIR__ . '/Api/StepTypes.php';
 require_once __DIR__ . '/Api/Handlers.php';
 require_once __DIR__ . '/Api/Tools.php';
+require_once __DIR__ . '/Api/AgentBundles.php';
 require_once __DIR__ . '/Api/Chat/ChatFilters.php';
 require_once __DIR__ . '/Engine/Bundle/register-agent-package-artifacts.php';
 require_once __DIR__ . '/Engine/Bundle/AgentBundleUpgradeActionHandlers.php';
