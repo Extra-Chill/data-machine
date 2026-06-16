@@ -301,9 +301,14 @@ function datamachine_run_conversation(
 	// Normalize the substrate result and augment with DM-specific fields.
 	try {
 		$result = WP_Agent_Conversation_Result::normalize( $result );
+		$completion_policy_stopped = false;
 		foreach ( is_array( $result['events'] ?? null ) ? $result['events'] : array() as $event ) {
 			if ( ! is_array( $event ) || ! in_array( (string) ( $event['type'] ?? '' ), array( 'completion_policy_stop', 'completion_policy_continue' ), true ) ) {
 				continue;
+			}
+
+			if ( 'completion_policy_stop' === (string) ( $event['type'] ?? '' ) ) {
+				$completion_policy_stopped = true;
 			}
 
 			$event_metadata = is_array( $event['metadata'] ?? null ) ? $event['metadata'] : array();
@@ -387,6 +392,14 @@ function datamachine_run_conversation(
 		$datamachine_metadata['completion_assertions_required']  = $latest_nudge['completion_assertions_required'] ?? array();
 		$datamachine_metadata['completion_assertions_missing']   = $latest_nudge['completion_assertions_missing'] ?? array();
 		$datamachine_metadata['completion_assertions_satisfied'] = $latest_nudge['completion_assertions_satisfied'] ?? array();
+		if ( ! $completion_policy_stopped && (int) ( $result['turn_count'] ?? 0 ) >= $turn_budget->ceiling() ) {
+			$datamachine_metadata['completed']         = false;
+			$datamachine_metadata['max_turns_reached'] = true;
+			$datamachine_metadata['warning']           = sprintf(
+				'Maximum conversation turns (%d) reached before completion policy was satisfied.',
+				$turn_budget->ceiling()
+			);
+		}
 	}
 	if ( $assertions->hasAssertions() ) {
 		$evaluation = $assertions->evaluate( $loop_payload, $result['final_content'] ?? '' );

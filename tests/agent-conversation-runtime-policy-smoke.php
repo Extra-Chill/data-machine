@@ -466,6 +466,40 @@ assert_runtime_policy( str_contains( wp_json_encode( $nudge_transcript->calls[0]
 assert_runtime_policy( 1 === ( $GLOBALS['datamachine_runtime_engine_merges'][4242][0]['completion_nudge_count'] ?? 0 ), 'job engine_data merge includes nudge count' );
 assert_runtime_policy( array( 'runtime_policy_tool' ) === ( $GLOBALS['datamachine_runtime_engine_merges'][4242][0]['completion_assertions_missing']['tool_names'] ?? null ), 'job engine_data merge includes missing assertions' );
 
+$exhausted_dispatch_count = 0;
+WpAiClientTestDouble::reset();
+WpAiClientTestDouble::set_response_callback(
+	function () use ( &$exhausted_dispatch_count ) {
+		++$exhausted_dispatch_count;
+
+		return array(
+			'success' => true,
+			'data'    => array(
+				'content'    => 'Still not the required output.',
+				'tool_calls' => array(),
+			),
+		);
+	}
+);
+
+$exhausted_result = datamachine_run_conversation(
+	array( array( 'role' => 'user', 'content' => 'finish only with the missing packet type' ) ),
+	array(),
+	'openai',
+	'gpt-smoke',
+	array( 'system' ),
+	array(
+		'completion_assertions' => array(
+			'required_output_packet_types' => array( 'impossible_packet_type' ),
+		),
+	),
+	2
+);
+$exhausted_metadata = datamachine_conversation_metadata( $exhausted_result );
+assert_runtime_policy( 2 === $exhausted_dispatch_count, 'unsatisfied natural completion policy uses full turn budget' );
+assert_runtime_policy( false === ( $exhausted_metadata['completed'] ?? true ), 'unsatisfied natural completion policy marks run incomplete at max turns' );
+assert_runtime_policy( true === ( $exhausted_metadata['max_turns_reached'] ?? null ), 'unsatisfied natural completion policy sets max-turn diagnostic' );
+
 $minimum_count_dispatch_count = 0;
 WpAiClientTestDouble::reset();
 WpAiClientTestDouble::set_response_callback(
