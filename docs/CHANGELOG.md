@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.148.8] - 2026-06-16
+
+### Fixed
+- tighten daily memory archive prompt
+
 ## [0.148.7] - 2026-06-16
 
 ### Fixed
