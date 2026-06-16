@@ -24,6 +24,14 @@ if ( ! function_exists( 'wp_json_encode' ) ) {
 	}
 }
 
+if ( ! class_exists( 'WP_Agent_Package_Artifact_Hasher' ) ) {
+	class WP_Agent_Package_Artifact_Hasher {
+		public static function hash( $artifact ): string {
+			return hash( 'sha256', (string) wp_json_encode( $artifact, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE ) );
+		}
+	}
+}
+
 // Use direct requires (not the composer autoloader) to avoid pulling in
 // vendor packages that need a full WordPress environment to bootstrap.
 require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/BundleSchema.php';
