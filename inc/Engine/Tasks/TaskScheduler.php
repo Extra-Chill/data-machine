@@ -44,6 +44,39 @@ class TaskScheduler {
 	public const BATCH_CONTEXT = 'task';
 
 	/**
+	 * Details for the last failed schedule() call in this request.
+	 *
+	 * @var array{error:string,message:string,error_code?:string}|null
+	 */
+	private static ?array $last_schedule_error = null;
+
+	/**
+	 * Return details for the last failed schedule() call in this request.
+	 *
+	 * @return array{error:string,message:string,error_code?:string}|null
+	 */
+	public static function getLastScheduleError(): ?array {
+		return self::$last_schedule_error;
+	}
+
+	/**
+	 * Store scheduler failure details while preserving schedule()'s int|false API.
+	 *
+	 * @param string $message    Human-readable failure message.
+	 * @param string $error_code Machine-readable error code.
+	 */
+	private static function recordScheduleError( string $message, string $error_code = '' ): void {
+		self::$last_schedule_error = array(
+			'error'   => '' !== $error_code ? $error_code : 'Failed to schedule task.',
+			'message' => $message,
+		);
+
+		if ( '' !== $error_code ) {
+			self::$last_schedule_error['error_code'] = $error_code;
+		}
+	}
+
+	/**
 	 * Schedule an async task via the workflow engine.
 	 *
 	 * Resolves the task handler, calls getWorkflow() to build the step
@@ -56,11 +89,14 @@ class TaskScheduler {
 	 * @return int|false Job ID on success, false on failure.
 	 */
 	public static function schedule( string $taskType, array $params, array $context = array(), int $parentJobId = 0 ): int|false {
+		self::$last_schedule_error = null;
+
 		if ( ! TaskRegistry::isRegistered( $taskType ) ) {
+			$message = "TaskScheduler: Unknown task type '{$taskType}'";
 			do_action(
 				'datamachine_log',
 				'error',
-				"TaskScheduler: Unknown task type '{$taskType}'",
+				$message,
 				array(
 					'task_type' => $taskType,
 					'context'   => 'system',
@@ -68,6 +104,7 @@ class TaskScheduler {
 					'route'     => $context,
 				)
 			);
+			self::recordScheduleError( $message, 'task_scheduler_unknown_task_type' );
 			return false;
 		}
 
@@ -75,44 +112,50 @@ class TaskScheduler {
 		$handler_class = TaskRegistry::getHandler( $taskType );
 
 		if ( ! $handler_class || ! class_exists( $handler_class ) ) {
+			$message = "TaskScheduler: Handler class not found for '{$taskType}'";
 			do_action(
 				'datamachine_log',
 				'error',
-				"TaskScheduler: Handler class not found for '{$taskType}'",
+				$message,
 				array(
 					'task_type'     => $taskType,
 					'handler_class' => $handler_class,
 				)
 			);
+			self::recordScheduleError( $message, 'task_scheduler_handler_not_found' );
 			return false;
 		}
 
 		$handler = new $handler_class();
 		if ( ! $handler instanceof SystemTask ) {
+			$message = "TaskScheduler: Handler class for '{$taskType}' must extend SystemTask";
 			do_action(
 				'datamachine_log',
 				'error',
-				"TaskScheduler: Handler class for '{$taskType}' must extend SystemTask",
+				$message,
 				array(
 					'task_type'     => $taskType,
 					'handler_class' => $handler_class,
 				)
 			);
+			self::recordScheduleError( $message, 'task_scheduler_invalid_handler' );
 			return false;
 		}
 
 		$workflow = $handler->getWorkflow( $params );
 
 		if ( empty( $workflow['steps'] ) ) {
+			$message = "TaskScheduler: getWorkflow() returned empty steps for '{$taskType}'";
 			do_action(
 				'datamachine_log',
 				'error',
-				"TaskScheduler: getWorkflow() returned empty steps for '{$taskType}'",
+				$message,
 				array(
 					'task_type' => $taskType,
 					'params'    => $params,
 				)
 			);
+			self::recordScheduleError( $message, 'task_scheduler_empty_workflow' );
 			return false;
 		}
 
@@ -120,12 +163,14 @@ class TaskScheduler {
 		$ability = wp_get_ability( 'datamachine/execute-workflow' );
 
 		if ( ! $ability ) {
+			$message = 'TaskScheduler: datamachine/execute-workflow ability not available';
 			do_action(
 				'datamachine_log',
 				'error',
-				'TaskScheduler: datamachine/execute-workflow ability not available',
+				$message,
 				array( 'task_type' => $taskType )
 			);
+			self::recordScheduleError( $message, 'task_scheduler_execute_workflow_unavailable' );
 			return false;
 		}
 
@@ -144,10 +189,11 @@ class TaskScheduler {
 				$context_agent_id   = $identity->agent_id;
 				$context_agent_slug = $identity->agent_slug;
 			} catch ( \InvalidArgumentException $e ) {
+				$message = 'TaskScheduler: queued task received invalid agent context';
 				do_action(
 					'datamachine_log',
 					'error',
-					'TaskScheduler: queued task received invalid agent context',
+					$message,
 					array(
 						'task_type'  => $taskType,
 						'context'    => 'system',
@@ -156,13 +202,15 @@ class TaskScheduler {
 						'error_code' => 'task_scheduler_invalid_agent_context',
 					)
 				);
+				self::recordScheduleError( $message, 'task_scheduler_invalid_agent_context' );
 				return false;
 			}
 		} elseif ( $requires_agent_context ) {
+			$message = 'TaskScheduler: queued task requires agent context';
 			do_action(
 				'datamachine_log',
 				'error',
-				'TaskScheduler: queued task requires agent context',
+				$message,
 				array(
 					'task_type'      => $taskType,
 					'context'        => 'system',
@@ -171,6 +219,7 @@ class TaskScheduler {
 					'recommendation' => 'Provide agent_id or agent_slug, or reassign unowned flows/pipelines with --where-null before scheduling queued work.',
 				)
 			);
+			self::recordScheduleError( $message, 'task_scheduler_agent_context_required' );
 			return false;
 		}
 
@@ -212,16 +261,19 @@ class TaskScheduler {
 		) ) );
 
 		if ( empty( $result['success'] ) ) {
+			$message    = 'TaskScheduler: Workflow execution failed for ' . $taskType . ': ' . ( $result['error'] ?? 'Unknown error' );
+			$error_code = is_string( $result['error'] ?? null ) && '' !== $result['error'] ? $result['error'] : 'task_scheduler_workflow_execution_failed';
 			do_action(
 				'datamachine_log',
 				'error',
-				'TaskScheduler: Workflow execution failed for ' . $taskType . ': ' . ( $result['error'] ?? 'Unknown error' ),
+				$message,
 				array(
 					'task_type' => $taskType,
 					'context'   => 'system',
 					'error'     => $result['error'] ?? '',
 				)
 			);
+			self::recordScheduleError( $message, $error_code );
 			return false;
 		}
 
