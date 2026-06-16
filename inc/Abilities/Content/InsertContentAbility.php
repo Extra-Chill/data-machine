@@ -52,6 +52,10 @@ class InsertContentAbility {
 								'type'        => 'integer',
 								'description' => 'The post to insert content into.',
 							),
+							'blog_id'               => array(
+								'type'        => 'integer',
+								'description' => 'Optional. Multisite blog ID the post lives on. Omit to use the current site. The insertion (and its preview/apply) runs in that blog\'s context.',
+							),
 							'content'               => array(
 								'type'        => 'string',
 								'description' => 'The new content to insert (will be wrapped in WordPress paragraph blocks).',
@@ -121,6 +125,10 @@ class InsertContentAbility {
 					'type'        => 'integer',
 					'description' => 'The post ID to insert content into.',
 				),
+				'blog_id'               => array(
+					'type'        => 'integer',
+					'description' => 'Optional multisite blog ID the post lives on. Omit for the current site.',
+				),
 				'content'               => array(
 					'type'        => 'string',
 					'description' => 'The new content to insert (wrapped in paragraph blocks automatically).',
@@ -158,7 +166,35 @@ class InsertContentAbility {
 	 * @return array Result with canonical diff preview data.
 	 */
 	public static function execute( array $input ): array {
+		// Resolve the target blog. On multisite the post may live on another
+		// site than the one this request landed on; switch to it so the read,
+		// the edit_post capability check, the preview staging, and the eventual
+		// apply all target the right post. blog_id rides inside apply_input
+		// below so the resolve replay re-enters the same context.
+		$ctx = BlogContext::enter( $input );
+		if ( is_wp_error( $ctx ) ) {
+			return array(
+				'success' => false,
+				'error'   => $ctx->get_error_message(),
+			);
+		}
+
+		try {
+			return self::execute_in_context( $input );
+		} finally {
+			BlogContext::leave( $ctx );
+		}
+	}
+
+	/**
+	 * Execute the insertion within the (already-resolved) blog context.
+	 *
+	 * @param array $input Input parameters.
+	 * @return array Result with canonical diff preview data.
+	 */
+	private static function execute_in_context( array $input ): array {
 		$post_id               = absint( $input['post_id'] ?? 0 );
+		$blog_id               = absint( $input['blog_id'] ?? 0 );
 		$content               = $input['content'] ?? '';
 		$position              = $input['position'] ?? 'end';
 		$target_paragraph_text = $input['target_paragraph_text'] ?? '';
@@ -295,14 +331,17 @@ class InsertContentAbility {
 				'action_id'    => $action_id,
 				'kind'         => 'insert_content',
 				'summary'      => sprintf( 'Preview content insertion %s on post #%d.', $insertion_point, $post_id ),
-				'apply_input'  => array(
-					'post_id'               => $post_id,
-					'content'               => $content,
-					'position'              => $position,
-					'target_paragraph_text' => $target_paragraph_text,
+				'apply_input'  => BlogContext::with_blog_id(
+					array(
+						'post_id'               => $post_id,
+						'content'               => $content,
+						'position'              => $position,
+						'target_paragraph_text' => $target_paragraph_text,
+					),
+					$blog_id
 				),
 				'preview_data' => $diff,
-				'context'      => array( 'post_id' => $post_id ),
+				'context'      => BlogContext::with_blog_id( array( 'post_id' => $post_id ), $blog_id ),
 			)
 		);
 
