@@ -60,7 +60,7 @@ class BlogContext {
 			return 0;
 		}
 
-		if ( $blog_id === get_current_blog_id() ) {
+		if ( get_current_blog_id() === $blog_id ) {
 			return 0;
 		}
 
@@ -85,7 +85,7 @@ class BlogContext {
 
 		// Refuse archived/deleted/spam sites — there is no legitimate
 		// content-edit target there.
-		if ( (int) $site->archived === 1 || (int) $site->deleted === 1 || (int) $site->spam === 1 ) {
+		if ( 1 === (int) $site->archived || 1 === (int) $site->deleted || 1 === (int) $site->spam ) {
 			return false;
 		}
 
