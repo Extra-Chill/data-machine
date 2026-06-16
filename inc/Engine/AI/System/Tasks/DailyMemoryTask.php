@@ -187,12 +187,12 @@ class DailyMemoryTask extends SystemTask {
 				'warning',
 				'Daily memory AI conversation did not satisfy completion policy.',
 				array(
-					'date'         => $date,
-					'job_id'       => $jobId,
-					'status'       => $response['status'] ?? '',
-					'turn_count'   => $response['turn_count'] ?? 0,
-					'datamachine'  => $datamachine_metadata,
-					'error'        => $response['error'] ?? null,
+					'date'        => $date,
+					'job_id'      => $jobId,
+					'status'      => $response['status'] ?? '',
+					'turn_count' => $response['turn_count'] ?? 0,
+					'datamachine' => $datamachine_metadata,
+					'error'       => $response['error'] ?? null,
 				)
 			);
 			$this->failJob( $jobId, $response['error'] ?? 'Daily memory completion policy was not satisfied. MEMORY.md unchanged.' );
