@@ -17,30 +17,36 @@ namespace {
 	$GLOBALS['__agent_materializer_current'] = array();
 	$GLOBALS['__agent_materializer_done']    = array();
 
-	function sanitize_title( string $value ): string {
-		$value = strtolower( $value );
-		$value = preg_replace( '/[^a-z0-9]+/', '-', $value );
-		return trim( (string) $value, '-' );
-	}
-
-	function sanitize_file_name( string $value ): string {
-		return basename( $value );
-	}
-
-	function do_action( string $hook, ...$args ): void {
-		$GLOBALS['__agent_materializer_current'][] = $hook;
-		$GLOBALS['__agent_materializer_actions'][ $hook ][] = $args;
-		$callbacks = $GLOBALS['__agent_materializer_hooks'][ $hook ] ?? array();
-		ksort( $callbacks );
-
-		foreach ( $callbacks as $priority_callbacks ) {
-			foreach ( $priority_callbacks as $callback ) {
-				call_user_func_array( $callback, $args );
-			}
+	if ( ! function_exists( 'sanitize_title' ) ) {
+		function sanitize_title( string $value ): string {
+			$value = strtolower( $value );
+			$value = preg_replace( '/[^a-z0-9]+/', '-', $value );
+			return trim( (string) $value, '-' );
 		}
+	}
 
-		array_pop( $GLOBALS['__agent_materializer_current'] );
-		$GLOBALS['__agent_materializer_done'][ $hook ] = ( $GLOBALS['__agent_materializer_done'][ $hook ] ?? 0 ) + 1;
+	if ( ! function_exists( 'sanitize_file_name' ) ) {
+		function sanitize_file_name( string $value ): string {
+			return basename( $value );
+		}
+	}
+
+	if ( ! function_exists( 'do_action' ) ) {
+		function do_action( string $hook, ...$args ): void {
+			$GLOBALS['__agent_materializer_current'][] = $hook;
+			$GLOBALS['__agent_materializer_actions'][ $hook ][] = $args;
+			$callbacks = $GLOBALS['__agent_materializer_hooks'][ $hook ] ?? array();
+			ksort( $callbacks );
+
+			foreach ( $callbacks as $priority_callbacks ) {
+				foreach ( $priority_callbacks as $callback ) {
+					call_user_func_array( $callback, $args );
+				}
+			}
+
+			array_pop( $GLOBALS['__agent_materializer_current'] );
+			$GLOBALS['__agent_materializer_done'][ $hook ] = ( $GLOBALS['__agent_materializer_done'][ $hook ] ?? 0 ) + 1;
+		}
 	}
 
 	function doing_action( string $hook ): bool {
@@ -51,17 +57,23 @@ namespace {
 		return (int) ( $GLOBALS['__agent_materializer_done'][ $hook ] ?? 0 );
 	}
 
-	function esc_html( string $value ): string {
-		return htmlspecialchars( $value, ENT_QUOTES, 'UTF-8' );
+	if ( ! function_exists( 'esc_html' ) ) {
+		function esc_html( string $value ): string {
+			return htmlspecialchars( $value, ENT_QUOTES, 'UTF-8' );
+		}
 	}
 
-	function add_action( string $hook, callable $callback, int $priority = 10, int $accepted_args = 1 ): void {
-		unset( $accepted_args );
-		$GLOBALS['__agent_materializer_hooks'][ $hook ][ $priority ][] = $callback;
+	if ( ! function_exists( 'add_action' ) ) {
+		function add_action( string $hook, callable $callback, int $priority = 10, int $accepted_args = 1 ): void {
+			unset( $accepted_args );
+			$GLOBALS['__agent_materializer_hooks'][ $hook ][ $priority ][] = $callback;
+		}
 	}
 
-	function add_filter( string $hook, callable $callback, int $priority = 10, int $accepted_args = 1 ): void {
-		add_action( $hook, $callback, $priority, $accepted_args );
+	if ( ! function_exists( 'add_filter' ) ) {
+		function add_filter( string $hook, callable $callback, int $priority = 10, int $accepted_args = 1 ): void {
+			add_action( $hook, $callback, $priority, $accepted_args );
+		}
 	}
 }
 

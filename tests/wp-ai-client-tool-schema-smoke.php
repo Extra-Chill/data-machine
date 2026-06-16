@@ -43,34 +43,48 @@ require_once $root . '/inc/Core/PluginSettings.php';
 require_once $root . '/inc/Engine/AI/WpAiClientProviderAdmin.php';
 require_once $root . '/inc/Engine/AI/RequestBuilder.php';
 
-function add_filter( string $tag, callable $callback, int $priority = 10, int $accepted_args = 1 ): void {
-	unset( $tag, $callback, $priority, $accepted_args );
+if ( ! function_exists( 'add_filter' ) ) {
+    function add_filter( string $tag, callable $callback, int $priority = 10, int $accepted_args = 1 ): void {
+    	unset( $tag, $callback, $priority, $accepted_args );
+    }
 }
 
-function apply_filters( string $tag, $value, ...$args ) {
-	unset( $tag, $args );
-	return $value;
+if ( ! function_exists( 'apply_filters' ) ) {
+    function apply_filters( string $tag, $value, ...$args ) {
+    	unset( $tag, $args );
+    	return $value;
+    }
 }
 
-function do_action( string $tag, ...$args ): void {
-	unset( $tag, $args );
+if ( ! function_exists( 'do_action' ) ) {
+    function do_action( string $tag, ...$args ): void {
+    	unset( $tag, $args );
+    }
 }
 
-function wp_json_encode( $data, int $flags = 0 ) {
-	return json_encode( $data, $flags );
+if ( ! function_exists( 'wp_json_encode' ) ) {
+    function wp_json_encode( $data, int $flags = 0 ) {
+    	return json_encode( $data, $flags );
+    }
 }
 
-function size_format( $bytes ): string {
-	return $bytes . ' B';
+if ( ! function_exists( 'size_format' ) ) {
+    function size_format( $bytes ): string {
+    	return $bytes . ' B';
+    }
 }
 
-function sanitize_key( $key ): string {
-	return strtolower( preg_replace( '/[^a-zA-Z0-9_\-]/', '', (string) $key ) ?? '' );
+if ( ! function_exists( 'sanitize_key' ) ) {
+    function sanitize_key( $key ): string {
+    	return strtolower( preg_replace( '/[^a-zA-Z0-9_\-]/', '', (string) $key ) ?? '' );
+    }
 }
 
-function get_option( string $option, $default_value = false ) {
-	unset( $option );
-	return $default_value;
+if ( ! function_exists( 'get_option' ) ) {
+    function get_option( string $option, $default_value = false ) {
+    	unset( $option );
+    	return $default_value;
+    }
 }
 
 $captured_request = array();

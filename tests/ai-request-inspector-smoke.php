@@ -16,29 +16,37 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 $test_filters = array();
 
-function add_filter( string $hook, callable $callback, int $priority = 10, int $_accepted_args = 1 ): void {
-	global $test_filters;
-	$test_filters[ $hook ][ $priority ][] = $callback;
+if ( ! function_exists( 'add_filter' ) ) {
+    function add_filter( string $hook, callable $callback, int $priority = 10, int $_accepted_args = 1 ): void {
+    	global $test_filters;
+    	$test_filters[ $hook ][ $priority ][] = $callback;
+    }
 }
 
-function apply_filters( string $hook, $value, ...$args ) {
-	global $test_filters;
-	if ( empty( $test_filters[ $hook ] ) ) {
-		return $value;
-	}
-	ksort( $test_filters[ $hook ] );
-	foreach ( $test_filters[ $hook ] as $callbacks ) {
-		foreach ( $callbacks as $callback ) {
-			$value = $callback( $value, ...$args );
-		}
-	}
-	return $value;
+if ( ! function_exists( 'apply_filters' ) ) {
+    function apply_filters( string $hook, $value, ...$args ) {
+    	global $test_filters;
+    	if ( empty( $test_filters[ $hook ] ) ) {
+    		return $value;
+    	}
+    	ksort( $test_filters[ $hook ] );
+    	foreach ( $test_filters[ $hook ] as $callbacks ) {
+    		foreach ( $callbacks as $callback ) {
+    			$value = $callback( $value, ...$args );
+    		}
+    	}
+    	return $value;
+    }
 }
 
-function do_action( string $_hook, ...$args ): void {}
+if ( ! function_exists( 'do_action' ) ) {
+    function do_action( string $_hook, ...$args ): void {}
+}
 
-function wp_json_encode( $value, int $flags = 0 ) {
-	return json_encode( $value, $flags );
+if ( ! function_exists( 'wp_json_encode' ) ) {
+    function wp_json_encode( $value, int $flags = 0 ) {
+    	return json_encode( $value, $flags );
+    }
 }
 
 require_once __DIR__ . '/../inc/Engine/AI/Directives/DirectiveInterface.php';

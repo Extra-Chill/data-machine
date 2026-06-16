@@ -14,36 +14,48 @@ namespace {
 		return true;
 	}
 
-	function sanitize_key( $key ): string {
-		$key = strtolower( (string) $key );
-		return preg_replace( '/[^a-z0-9_\-]/', '', $key ) ?? '';
-	}
-
-	function sanitize_text_field( $value ): string {
-		return trim( (string) $value );
-	}
-
-	function get_option( string $name, $default_value = false ) {
-		return $GLOBALS['datamachine_provider_admin_options'][ $name ] ?? $default_value;
-	}
-
-	function update_option( string $name, $value, bool $autoload = true ): bool {
-		$GLOBALS['datamachine_provider_admin_options'][ $name ] = $value;
-		$GLOBALS['datamachine_provider_admin_updates'][]        = array( $name, $value, $autoload );
-		return true;
-	}
-
-	function get_site_option( string $name, $default_value = false ) {
-		return $GLOBALS['datamachine_provider_admin_site_options'][ $name ] ?? $default_value;
-	}
-
-	function maybe_unserialize( $value ) {
-		if ( ! is_string( $value ) ) {
-			return $value;
+	if ( ! function_exists( 'sanitize_key' ) ) {
+		function sanitize_key( $key ): string {
+			$key = strtolower( (string) $key );
+			return preg_replace( '/[^a-z0-9_\-]/', '', $key ) ?? '';
 		}
+	}
 
-		$decoded = @unserialize( $value );
-		return false === $decoded && 'b:0;' !== $value ? $value : $decoded;
+	if ( ! function_exists( 'sanitize_text_field' ) ) {
+		function sanitize_text_field( $value ): string {
+			return trim( (string) $value );
+		}
+	}
+
+	if ( ! function_exists( 'get_option' ) ) {
+		function get_option( string $name, $default_value = false ) {
+			return $GLOBALS['datamachine_provider_admin_options'][ $name ] ?? $default_value;
+		}
+	}
+
+	if ( ! function_exists( 'update_option' ) ) {
+		function update_option( string $name, $value, bool $autoload = true ): bool {
+			$GLOBALS['datamachine_provider_admin_options'][ $name ] = $value;
+			$GLOBALS['datamachine_provider_admin_updates'][]        = array( $name, $value, $autoload );
+			return true;
+		}
+	}
+
+	if ( ! function_exists( 'get_site_option' ) ) {
+		function get_site_option( string $name, $default_value = false ) {
+			return $GLOBALS['datamachine_provider_admin_site_options'][ $name ] ?? $default_value;
+		}
+	}
+
+	if ( ! function_exists( 'maybe_unserialize' ) ) {
+		function maybe_unserialize( $value ) {
+			if ( ! is_string( $value ) ) {
+				return $value;
+			}
+
+			$decoded = @unserialize( $value );
+			return false === $decoded && 'b:0;' !== $value ? $value : $decoded;
+		}
 	}
 
 	function wp_get_connector( string $id ): ?array {

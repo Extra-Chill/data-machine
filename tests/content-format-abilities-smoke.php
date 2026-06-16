@@ -75,85 +75,117 @@ namespace {
 	$GLOBALS['__content_ability_conversions'] = array();
 	$GLOBALS['__content_ability_meta']        = array();
 
-	function add_filter( string $hook, callable $callback, int $priority = 10, int $accepted_args = 1 ): void {
-		$GLOBALS['__content_ability_filters'][ $hook ][ $priority ][] = array( $callback, $accepted_args );
+	if ( ! function_exists( 'add_filter' ) ) {
+		function add_filter( string $hook, callable $callback, int $priority = 10, int $accepted_args = 1 ): void {
+			$GLOBALS['__content_ability_filters'][ $hook ][ $priority ][] = array( $callback, $accepted_args );
+		}
 	}
 
-	function apply_filters( string $hook, $value, ...$args ) {
-		if ( empty( $GLOBALS['__content_ability_filters'][ $hook ] ) ) {
+	if ( ! function_exists( 'apply_filters' ) ) {
+		function apply_filters( string $hook, $value, ...$args ) {
+			if ( empty( $GLOBALS['__content_ability_filters'][ $hook ] ) ) {
+				return $value;
+			}
+
+			ksort( $GLOBALS['__content_ability_filters'][ $hook ] );
+			foreach ( $GLOBALS['__content_ability_filters'][ $hook ] as $callbacks ) {
+				foreach ( $callbacks as $registered_callback ) {
+					list( $callback, $accepted_args ) = $registered_callback;
+					$value                            = $callback( ...array_slice( array_merge( array( $value ), $args ), 0, $accepted_args ) );
+				}
+			}
 			return $value;
 		}
+	}
 
-		ksort( $GLOBALS['__content_ability_filters'][ $hook ] );
-		foreach ( $GLOBALS['__content_ability_filters'][ $hook ] as $callbacks ) {
-			foreach ( $callbacks as $registered_callback ) {
-				list( $callback, $accepted_args ) = $registered_callback;
-				$value                            = $callback( ...array_slice( array_merge( array( $value ), $args ), 0, $accepted_args ) );
-			}
+	if ( ! function_exists( 'sanitize_key' ) ) {
+		function sanitize_key( $key ): string {
+			return strtolower( preg_replace( '/[^a-zA-Z0-9_\-]/', '', (string) $key ) );
 		}
-		return $value;
 	}
 
-	function sanitize_key( $key ): string {
-		return strtolower( preg_replace( '/[^a-zA-Z0-9_\-]/', '', (string) $key ) );
+	if ( ! function_exists( 'sanitize_title' ) ) {
+		function sanitize_title( $title ): string {
+			return strtolower( trim( preg_replace( '/[^a-zA-Z0-9]+/', '-', (string) $title ), '-' ) );
+		}
 	}
 
-	function sanitize_title( $title ): string {
-		return strtolower( trim( preg_replace( '/[^a-zA-Z0-9]+/', '-', (string) $title ), '-' ) );
-	}
-
-	function sanitize_text_field( $value ): string {
-		return trim( (string) $value );
+	if ( ! function_exists( 'sanitize_text_field' ) ) {
+		function sanitize_text_field( $value ): string {
+			return trim( (string) $value );
+		}
 	}
 
 	function esc_url_raw( $url ): string {
 		return trim( (string) $url );
 	}
 
-	function esc_url( $url ): string {
-		return trim( (string) $url );
+	if ( ! function_exists( 'esc_url' ) ) {
+		function esc_url( $url ): string {
+			return trim( (string) $url );
+		}
 	}
 
-	function absint( $value ): int {
-		return max( 0, (int) $value );
+	if ( ! function_exists( 'absint' ) ) {
+		function absint( $value ): int {
+			return max( 0, (int) $value );
+		}
 	}
 
-	function is_wp_error( $thing ): bool {
-		return $thing instanceof WP_Error;
+	if ( ! function_exists( 'is_wp_error' ) ) {
+		function is_wp_error( $thing ): bool {
+			return $thing instanceof WP_Error;
+		}
 	}
 
-	function wp_kses_post( $content ): string {
-		return (string) $content;
+	if ( ! function_exists( 'wp_kses_post' ) ) {
+		function wp_kses_post( $content ): string {
+			return (string) $content;
+		}
 	}
 
-	function wp_unslash( $value ) {
-		return $value;
+	if ( ! function_exists( 'wp_unslash' ) ) {
+		function wp_unslash( $value ) {
+			return $value;
+		}
 	}
 
-	function __( $text, $domain = 'default' ) {
-		unset( $domain );
-		return $text;
+	if ( ! function_exists( '__' ) ) {
+		function __( $text, $domain = 'default' ) {
+			unset( $domain );
+			return $text;
+		}
 	}
 
-	function do_action( ...$args ): void {
-		$GLOBALS['__content_ability_actions'][] = $args;
+	if ( ! function_exists( 'do_action' ) ) {
+		function do_action( ...$args ): void {
+			$GLOBALS['__content_ability_actions'][] = $args;
+		}
 	}
 
-	function get_post( int $post_id ) {
-		return $GLOBALS['__content_ability_posts'][ $post_id ] ?? null;
+	if ( ! function_exists( 'get_post' ) ) {
+		function get_post( int $post_id ) {
+			return $GLOBALS['__content_ability_posts'][ $post_id ] ?? null;
+		}
 	}
 
-	function get_permalink( int $post_id ): string {
-		return "https://example.test/?p={$post_id}";
+	if ( ! function_exists( 'get_permalink' ) ) {
+		function get_permalink( int $post_id ): string {
+			return "https://example.test/?p={$post_id}";
+		}
 	}
 
-	function get_post_meta( int $post_id, string $key, bool $single = false ) {
-		$value = $GLOBALS['__content_ability_meta'][ $post_id ][ $key ] ?? '';
-		return $single ? $value : array( $value );
+	if ( ! function_exists( 'get_post_meta' ) ) {
+		function get_post_meta( int $post_id, string $key, bool $single = false ) {
+			$value = $GLOBALS['__content_ability_meta'][ $post_id ][ $key ] ?? '';
+			return $single ? $value : array( $value );
+		}
 	}
 
-	function update_post_meta( int $post_id, string $key, $value ): void {
-		$GLOBALS['__content_ability_meta'][ $post_id ][ $key ] = $value;
+	if ( ! function_exists( 'update_post_meta' ) ) {
+		function update_post_meta( int $post_id, string $key, $value ): void {
+			$GLOBALS['__content_ability_meta'][ $post_id ][ $key ] = $value;
+		}
 	}
 
 	function get_date_from_gmt( string $date ): string {
@@ -165,40 +197,44 @@ namespace {
 		return false;
 	}
 
-	function wp_update_post( array $post_data, bool $wp_error = false ) {
-		unset( $wp_error );
-		$id = (int) ( $post_data['ID'] ?? 0 );
-		if ( empty( $GLOBALS['__content_ability_posts'][ $id ] ) ) {
-			return new WP_Error( 'missing', 'Missing post.' );
-		}
-
-		foreach ( $post_data as $key => $value ) {
-			if ( 'ID' !== $key ) {
-				$GLOBALS['__content_ability_posts'][ $id ]->{$key} = $value;
+	if ( ! function_exists( 'wp_update_post' ) ) {
+		function wp_update_post( array $post_data, bool $wp_error = false ) {
+			unset( $wp_error );
+			$id = (int) ( $post_data['ID'] ?? 0 );
+			if ( empty( $GLOBALS['__content_ability_posts'][ $id ] ) ) {
+				return new WP_Error( 'missing', 'Missing post.' );
 			}
+
+			foreach ( $post_data as $key => $value ) {
+				if ( 'ID' !== $key ) {
+					$GLOBALS['__content_ability_posts'][ $id ]->{$key} = $value;
+				}
+			}
+			return $id;
 		}
-		return $id;
 	}
 
-	function wp_insert_post( array $post_data, bool $wp_error = false ) {
-		unset( $wp_error );
-		$id = (int) ( $post_data['ID'] ?? 0 );
-		if ( $id <= 0 ) {
-			$id = $GLOBALS['__content_ability_next_id']++;
-		}
-
-		$existing = $GLOBALS['__content_ability_posts'][ $id ] ?? (object) array( 'ID' => $id );
-		foreach ( $post_data as $key => $value ) {
-			if ( 'meta_input' !== $key ) {
-				$existing->{$key} = $value;
+	if ( ! function_exists( 'wp_insert_post' ) ) {
+		function wp_insert_post( array $post_data, bool $wp_error = false ) {
+			unset( $wp_error );
+			$id = (int) ( $post_data['ID'] ?? 0 );
+			if ( $id <= 0 ) {
+				$id = $GLOBALS['__content_ability_next_id']++;
 			}
+
+			$existing = $GLOBALS['__content_ability_posts'][ $id ] ?? (object) array( 'ID' => $id );
+			foreach ( $post_data as $key => $value ) {
+				if ( 'meta_input' !== $key ) {
+					$existing->{$key} = $value;
+				}
+			}
+			foreach ( $post_data['meta_input'] ?? array() as $key => $value ) {
+				$GLOBALS['__content_ability_meta'][ $id ][ $key ] = $value;
+			}
+			$existing->ID                              = $id;
+			$GLOBALS['__content_ability_posts'][ $id ] = $existing;
+			return $id;
 		}
-		foreach ( $post_data['meta_input'] ?? array() as $key => $value ) {
-			$GLOBALS['__content_ability_meta'][ $id ][ $key ] = $value;
-		}
-		$existing->ID                              = $id;
-		$GLOBALS['__content_ability_posts'][ $id ] = $existing;
-		return $id;
 	}
 
 	function bfb_convert( string $content, string $from, string $to ) {

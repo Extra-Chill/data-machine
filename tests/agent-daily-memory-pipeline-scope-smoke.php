@@ -52,8 +52,10 @@ namespace {
 	$agent_daily_memory_ability_inputs = array();
 	$agent_daily_memory_current_user_id = 0;
 
-	function add_filter( string $tag, callable $callback, int $priority = 10, int $accepted_args = 1 ): void {
-		// Tool registration is not under test here.
+	if ( ! function_exists( 'add_filter' ) ) {
+		function add_filter( string $tag, callable $callback, int $priority = 10, int $accepted_args = 1 ): void {
+			// Tool registration is not under test here.
+		}
 	}
 
 	function wp_get_ability( string $name ) {
@@ -73,13 +75,17 @@ namespace {
 		};
 	}
 
-	function is_wp_error( $value ): bool {
-		return false;
+	if ( ! function_exists( 'is_wp_error' ) ) {
+		function is_wp_error( $value ): bool {
+			return false;
+		}
 	}
 
-	function get_current_user_id(): int {
-		global $agent_daily_memory_current_user_id;
-		return $agent_daily_memory_current_user_id;
+	if ( ! function_exists( 'get_current_user_id' ) ) {
+		function get_current_user_id(): int {
+			global $agent_daily_memory_current_user_id;
+			return $agent_daily_memory_current_user_id;
+		}
 	}
 
 	require_once __DIR__ . '/../inc/Engine/AI/Tools/BaseTool.php';

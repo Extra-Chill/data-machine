@@ -69,15 +69,29 @@ defined( 'ABSPATH' ) || define( 'ABSPATH', __DIR__ . '/' );
 		public function get_error_data() { return $this->data; }
 	}
 
-	function is_wp_error( $value ): bool { return $value instanceof WP_Error; }
-	function __( string $text, string $domain = 'default' ): string { unset( $domain ); return $text; }
+	if ( ! function_exists( 'is_wp_error' ) ) {
+		function is_wp_error( $value ): bool { return $value instanceof WP_Error; }
+	}
+	if ( ! function_exists( '__' ) ) {
+		function __( string $text, string $domain = 'default' ): string { unset( $domain ); return $text; }
+	}
 	function doing_action( string $hook ): bool { unset( $hook ); return false; }
 	function did_action( string $hook ): int { unset( $hook ); return 1; }
-	function add_action( string $hook, callable $callback, int $priority = 10, int $accepted_args = 1 ): void { unset( $hook, $callback, $priority, $accepted_args ); }
-	function apply_filters( string $hook, $value ) { unset( $hook ); return $value; }
-	function get_current_user_id(): int { return 7; }
-	function current_time( string $type, bool $gmt = false ): string { unset( $type, $gmt ); return '2026-05-28 00:00:00'; }
-	function wp_json_encode( $value ): string { return json_encode( $value ); }
+	if ( ! function_exists( 'add_action' ) ) {
+		function add_action( string $hook, callable $callback, int $priority = 10, int $accepted_args = 1 ): void { unset( $hook, $callback, $priority, $accepted_args ); }
+	}
+	if ( ! function_exists( 'apply_filters' ) ) {
+		function apply_filters( string $hook, $value ) { unset( $hook ); return $value; }
+	}
+	if ( ! function_exists( 'get_current_user_id' ) ) {
+		function get_current_user_id(): int { return 7; }
+	}
+	if ( ! function_exists( 'current_time' ) ) {
+		function current_time( string $type, bool $gmt = false ): string { unset( $type, $gmt ); return '2026-05-28 00:00:00'; }
+	}
+	if ( ! function_exists( 'wp_json_encode' ) ) {
+		function wp_json_encode( $value ): string { return json_encode( $value ); }
+	}
 
 	$GLOBALS['__abilities'] = array();
 	function wp_get_ability( string $name ) { return $GLOBALS['__abilities'][ $name ] ?? null; }

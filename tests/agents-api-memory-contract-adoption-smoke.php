@@ -63,6 +63,13 @@ if ( ! function_exists( 'apply_filters' ) ) {
 	}
 }
 
+if ( ! function_exists( 'add_filter' ) ) {
+	function add_filter( ...$args ) {
+		// no-op stub for standalone smoke runs.
+	}
+}
+
+
 require_once __DIR__ . '/../vendor/wordpress/agents-api/agents-api.php';
 require_once __DIR__ . '/../inc/Engine/AI/MemoryFileRegistry.php';
 require_once __DIR__ . '/../inc/Engine/AI/SectionRegistry.php';

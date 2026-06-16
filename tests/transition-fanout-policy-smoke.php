@@ -11,11 +11,15 @@ if ( ! defined( 'ABSPATH' ) ) {
 	define( 'ABSPATH', __DIR__ . '/' );
 }
 
-function apply_filters( string $hook, $value ) {
-	return $value;
+if ( ! function_exists( 'apply_filters' ) ) {
+    function apply_filters( string $hook, $value ) {
+    	return $value;
+    }
 }
 
-function do_action( string $hook, ...$args ): void {}
+if ( ! function_exists( 'do_action' ) ) {
+    function do_action( string $hook, ...$args ): void {}
+}
 
 require_once __DIR__ . '/../inc/Core/DataPacket.php';
 require_once __DIR__ . '/../inc/Core/StepExecutionResult.php';

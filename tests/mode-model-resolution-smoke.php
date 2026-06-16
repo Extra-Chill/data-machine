@@ -20,21 +20,29 @@ namespace {
 		define( 'ABSPATH', __DIR__ );
 	}
 
-	function get_option( string $key, mixed $default_value = false ): mixed {
-		return $GLOBALS['datamachine_mode_model_options'][ $key ] ?? $default_value;
+	if ( ! function_exists( 'get_option' ) ) {
+		function get_option( string $key, mixed $default_value = false ): mixed {
+			return $GLOBALS['datamachine_mode_model_options'][ $key ] ?? $default_value;
+		}
 	}
 
-	function get_site_option( string $key, mixed $default_value = false ): mixed {
-		return $GLOBALS['datamachine_mode_model_site_options'][ $key ] ?? $default_value;
+	if ( ! function_exists( 'get_site_option' ) ) {
+		function get_site_option( string $key, mixed $default_value = false ): mixed {
+			return $GLOBALS['datamachine_mode_model_site_options'][ $key ] ?? $default_value;
+		}
 	}
 
-	function sanitize_text_field( mixed $value ): string {
-		return trim( (string) $value );
+	if ( ! function_exists( 'sanitize_text_field' ) ) {
+		function sanitize_text_field( mixed $value ): string {
+			return trim( (string) $value );
+		}
 	}
 
-	function sanitize_key( mixed $value ): string {
-		$value = strtolower( (string) $value );
-		return preg_replace( '/[^a-z0-9_\-]/', '', $value ) ?? '';
+	if ( ! function_exists( 'sanitize_key' ) ) {
+		function sanitize_key( mixed $value ): string {
+			$value = strtolower( (string) $value );
+			return preg_replace( '/[^a-z0-9_\-]/', '', $value ) ?? '';
+		}
 	}
 
 	require_once __DIR__ . '/../inc/Core/NetworkSettings.php';

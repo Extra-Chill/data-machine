@@ -62,68 +62,88 @@ function rpbp_insert_post( string $slug, int $parent_id, string $title = '' ): i
 	return $post->ID;
 }
 
-function get_posts( array $args ): array {
-	$out = array();
-	foreach ( $GLOBALS['__rpbp_posts'] as $post ) {
-		if ( ( $args['post_type'] ?? '' ) !== $post->post_type ) {
-			continue;
-		}
-		if ( isset( $args['name'] ) && (string) $args['name'] !== $post->post_name ) {
-			continue;
-		}
-		if ( isset( $args['post_parent'] ) && (int) $args['post_parent'] !== $post->post_parent ) {
-			continue;
-		}
-		$out[] = 'ids' === ( $args['fields'] ?? '' ) ? $post->ID : $post;
-	}
-	return $out;
+if ( ! function_exists( 'get_posts' ) ) {
+    function get_posts( array $args ): array {
+    	$out = array();
+    	foreach ( $GLOBALS['__rpbp_posts'] as $post ) {
+    		if ( ( $args['post_type'] ?? '' ) !== $post->post_type ) {
+    			continue;
+    		}
+    		if ( isset( $args['name'] ) && (string) $args['name'] !== $post->post_name ) {
+    			continue;
+    		}
+    		if ( isset( $args['post_parent'] ) && (int) $args['post_parent'] !== $post->post_parent ) {
+    			continue;
+    		}
+    		$out[] = 'ids' === ( $args['fields'] ?? '' ) ? $post->ID : $post;
+    	}
+    	return $out;
+    }
 }
 
-function wp_parse_args( array $args, array $defaults ): array { return array_merge( $defaults, $args ); }
-function is_wp_error( $value ): bool { return $value instanceof WP_Error; }
-
-function add_option( string $name, $value = '', $deprecated = '', $autoload = null ): bool {
-	unset( $deprecated, $autoload );
-	if ( array_key_exists( $name, $GLOBALS['__rpbp_options'] ) ) {
-		return false;
-	}
-	$GLOBALS['__rpbp_options'][ $name ] = $value;
-	return true;
+if ( ! function_exists( 'wp_parse_args' ) ) {
+    function wp_parse_args( array $args, array $defaults ): array { return array_merge( $defaults, $args ); }
+}
+if ( ! function_exists( 'is_wp_error' ) ) {
+    function is_wp_error( $value ): bool { return $value instanceof WP_Error; }
 }
 
-function delete_option( string $name ): bool {
-	unset( $GLOBALS['__rpbp_options'][ $name ] );
-	return true;
+if ( ! function_exists( 'add_option' ) ) {
+    function add_option( string $name, $value = '', $deprecated = '', $autoload = null ): bool {
+    	unset( $deprecated, $autoload );
+    	if ( array_key_exists( $name, $GLOBALS['__rpbp_options'] ) ) {
+    		return false;
+    	}
+    	$GLOBALS['__rpbp_options'][ $name ] = $value;
+    	return true;
+    }
 }
 
-function get_option( string $name, $default = false ) { return $GLOBALS['__rpbp_options'][ $name ] ?? $default; }
-
-function wp_insert_post( array $post_data, bool $wp_error = false ) {
-	unset( $wp_error );
-	$slug      = (string) ( $post_data['post_name'] ?? '' );
-	$parent_id = (int) ( $post_data['post_parent'] ?? 0 );
-
-	if ( $GLOBALS['__rpbp_race_slug'] === $slug && ! $GLOBALS['__rpbp_race_fired'] ) {
-		$GLOBALS['__rpbp_race_fired'] = true;
-		rpbp_insert_post( $slug, $parent_id, 'Canonical Race Winner' );
-	}
-
-	if ( ! empty( get_posts( array( 'post_type' => (string) $post_data['post_type'], 'name' => $slug, 'post_parent' => $parent_id, 'fields' => 'ids' ) ) ) ) {
-		$slug .= '-2';
-	}
-
-	return rpbp_insert_post( $slug, $parent_id, (string) ( $post_data['post_title'] ?? '' ) );
+if ( ! function_exists( 'delete_option' ) ) {
+    function delete_option( string $name ): bool {
+    	unset( $GLOBALS['__rpbp_options'][ $name ] );
+    	return true;
+    }
 }
 
-function get_post( int $post_id ) { return $GLOBALS['__rpbp_posts'][ $post_id ] ?? null; }
-
-function wp_delete_post( int $post_id, bool $force_delete = false ) {
-	unset( $force_delete );
-	unset( $GLOBALS['__rpbp_posts'][ $post_id ] );
-	return true;
+if ( ! function_exists( 'get_option' ) ) {
+    function get_option( string $name, $default = false ) { return $GLOBALS['__rpbp_options'][ $name ] ?? $default; }
 }
 
-function update_post_meta( int $post_id, string $key, $value ): void { $GLOBALS['__rpbp_meta'][ $post_id ][ $key ] = $value; }
+if ( ! function_exists( 'wp_insert_post' ) ) {
+    function wp_insert_post( array $post_data, bool $wp_error = false ) {
+    	unset( $wp_error );
+    	$slug      = (string) ( $post_data['post_name'] ?? '' );
+    	$parent_id = (int) ( $post_data['post_parent'] ?? 0 );
+
+    	if ( $GLOBALS['__rpbp_race_slug'] === $slug && ! $GLOBALS['__rpbp_race_fired'] ) {
+    		$GLOBALS['__rpbp_race_fired'] = true;
+    		rpbp_insert_post( $slug, $parent_id, 'Canonical Race Winner' );
+    	}
+
+    	if ( ! empty( get_posts( array( 'post_type' => (string) $post_data['post_type'], 'name' => $slug, 'post_parent' => $parent_id, 'fields' => 'ids' ) ) ) ) {
+    		$slug .= '-2';
+    	}
+
+    	return rpbp_insert_post( $slug, $parent_id, (string) ( $post_data['post_title'] ?? '' ) );
+    }
+}
+
+if ( ! function_exists( 'get_post' ) ) {
+    function get_post( int $post_id ) { return $GLOBALS['__rpbp_posts'][ $post_id ] ?? null; }
+}
+
+if ( ! function_exists( 'wp_delete_post' ) ) {
+    function wp_delete_post( int $post_id, bool $force_delete = false ) {
+    	unset( $force_delete );
+    	unset( $GLOBALS['__rpbp_posts'][ $post_id ] );
+    	return true;
+    }
+}
+
+if ( ! function_exists( 'update_post_meta' ) ) {
+    function update_post_meta( int $post_id, string $key, $value ): void { $GLOBALS['__rpbp_meta'][ $post_id ][ $key ] = $value; }
+}
 }
 
 namespace {

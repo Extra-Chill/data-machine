@@ -18,25 +18,29 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 $test_filters_for_pipeline_modes = array();
 
-function add_filter( string $tag, callable $callback, int $priority = 10, int $accepted_args = 1 ): void {
-	global $test_filters_for_pipeline_modes;
-	$test_filters_for_pipeline_modes[ $tag ][ $priority ][] = $callback;
+if ( ! function_exists( 'add_filter' ) ) {
+    function add_filter( string $tag, callable $callback, int $priority = 10, int $accepted_args = 1 ): void {
+    	global $test_filters_for_pipeline_modes;
+    	$test_filters_for_pipeline_modes[ $tag ][ $priority ][] = $callback;
+    }
 }
 
-function apply_filters( string $tag, $value ) {
-	global $test_filters_for_pipeline_modes;
-	if ( empty( $test_filters_for_pipeline_modes[ $tag ] ) ) {
-		return $value;
-	}
+if ( ! function_exists( 'apply_filters' ) ) {
+    function apply_filters( string $tag, $value ) {
+    	global $test_filters_for_pipeline_modes;
+    	if ( empty( $test_filters_for_pipeline_modes[ $tag ] ) ) {
+    		return $value;
+    	}
 
-	ksort( $test_filters_for_pipeline_modes[ $tag ] );
-	foreach ( $test_filters_for_pipeline_modes[ $tag ] as $callbacks ) {
-		foreach ( $callbacks as $callback ) {
-			$value = $callback( $value );
-		}
-	}
+    	ksort( $test_filters_for_pipeline_modes[ $tag ] );
+    	foreach ( $test_filters_for_pipeline_modes[ $tag ] as $callbacks ) {
+    		foreach ( $callbacks as $callback ) {
+    			$value = $callback( $value );
+    		}
+    	}
 
-	return $value;
+    	return $value;
+    }
 }
 
 require_once __DIR__ . '/../inc/Engine/AI/Tools/BaseTool.php';

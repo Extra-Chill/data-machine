@@ -19,21 +19,27 @@ namespace {
 	$GLOBALS['datamachine_test_options'] = array();
 	$GLOBALS['datamachine_test_filters'] = array();
 
-	function apply_filters( string $hook, mixed $value, mixed ...$args ): mixed {
-		$override = $GLOBALS['datamachine_test_filters'][ $hook ] ?? null;
-		if ( is_callable( $override ) ) {
-			return $override( $value, ...$args );
+	if ( ! function_exists( 'apply_filters' ) ) {
+		function apply_filters( string $hook, mixed $value, mixed ...$args ): mixed {
+			$override = $GLOBALS['datamachine_test_filters'][ $hook ] ?? null;
+			if ( is_callable( $override ) ) {
+				return $override( $value, ...$args );
+			}
+			return $value;
 		}
-		return $value;
 	}
 
-	function add_filter( string $hook, callable $cb, int $priority = 10, int $accepted_args = 1 ): bool {
-		$GLOBALS['datamachine_test_added_filters'][ $hook ][] = $cb;
-		return true;
+	if ( ! function_exists( 'add_filter' ) ) {
+		function add_filter( string $hook, callable $cb, int $priority = 10, int $accepted_args = 1 ): bool {
+			$GLOBALS['datamachine_test_added_filters'][ $hook ][] = $cb;
+			return true;
+		}
 	}
 
-	function get_option( string $key, mixed $default = false ): mixed {
-		return $GLOBALS['datamachine_test_options'][ $key ] ?? $default;
+	if ( ! function_exists( 'get_option' ) ) {
+		function get_option( string $key, mixed $default = false ): mixed {
+			return $GLOBALS['datamachine_test_options'][ $key ] ?? $default;
+		}
 	}
 
 	function wp_parse_url( string $url, int $component = -1 ): mixed {

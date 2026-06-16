@@ -13,49 +13,61 @@ $GLOBALS['datamachine_worker_lock_options'] = array();
 $GLOBALS['datamachine_worker_lock_delete_noop'] = false;
 $GLOBALS['datamachine_worker_lock_get_after_delete_default'] = false;
 
-function get_option( string $name, mixed $default = false ): mixed {
-	if ( ! empty( $GLOBALS['datamachine_worker_lock_get_after_delete_default'] ) ) {
-		$GLOBALS['datamachine_worker_lock_get_after_delete_default'] = false;
-		return $default;
-	}
+if ( ! function_exists( 'get_option' ) ) {
+    function get_option( string $name, mixed $default = false ): mixed {
+    	if ( ! empty( $GLOBALS['datamachine_worker_lock_get_after_delete_default'] ) ) {
+    		$GLOBALS['datamachine_worker_lock_get_after_delete_default'] = false;
+    		return $default;
+    	}
 
-	return $GLOBALS['datamachine_worker_lock_options'][ $name ] ?? $default;
+    	return $GLOBALS['datamachine_worker_lock_options'][ $name ] ?? $default;
+    }
 }
 
-function add_option( string $name, mixed $value, string $deprecated = '', string $autoload = 'yes' ): bool {
-	unset( $deprecated, $autoload );
-	if ( array_key_exists( $name, $GLOBALS['datamachine_worker_lock_options'] ) ) {
-		return false;
-	}
+if ( ! function_exists( 'add_option' ) ) {
+    function add_option( string $name, mixed $value, string $deprecated = '', string $autoload = 'yes' ): bool {
+    	unset( $deprecated, $autoload );
+    	if ( array_key_exists( $name, $GLOBALS['datamachine_worker_lock_options'] ) ) {
+    		return false;
+    	}
 
-	$GLOBALS['datamachine_worker_lock_options'][ $name ] = $value;
-	return true;
+    	$GLOBALS['datamachine_worker_lock_options'][ $name ] = $value;
+    	return true;
+    }
 }
 
-function update_option( string $name, mixed $value, string|bool|null $autoload = null ): bool {
-	unset( $autoload );
-	$GLOBALS['datamachine_worker_lock_options'][ $name ] = $value;
-	return true;
+if ( ! function_exists( 'update_option' ) ) {
+    function update_option( string $name, mixed $value, string|bool|null $autoload = null ): bool {
+    	unset( $autoload );
+    	$GLOBALS['datamachine_worker_lock_options'][ $name ] = $value;
+    	return true;
+    }
 }
 
-function delete_option( string $name ): bool {
-	if ( ! empty( $GLOBALS['datamachine_worker_lock_delete_noop'] ) ) {
-		$GLOBALS['datamachine_worker_lock_get_after_delete_default'] = true;
-		return false;
-	}
+if ( ! function_exists( 'delete_option' ) ) {
+    function delete_option( string $name ): bool {
+    	if ( ! empty( $GLOBALS['datamachine_worker_lock_delete_noop'] ) ) {
+    		$GLOBALS['datamachine_worker_lock_get_after_delete_default'] = true;
+    		return false;
+    	}
 
-	unset( $GLOBALS['datamachine_worker_lock_options'][ $name ] );
-	return true;
+    	unset( $GLOBALS['datamachine_worker_lock_options'][ $name ] );
+    	return true;
+    }
 }
 
-function wp_generate_uuid4(): string {
-	static $i = 0;
-	++$i;
-	return 'worker-lock-token-' . $i;
+if ( ! function_exists( 'wp_generate_uuid4' ) ) {
+    function wp_generate_uuid4(): string {
+    	static $i = 0;
+    	++$i;
+    	return 'worker-lock-token-' . $i;
+    }
 }
 
-function sanitize_text_field( string $text ): string {
-	return trim( $text );
+if ( ! function_exists( 'sanitize_text_field' ) ) {
+    function sanitize_text_field( string $text ): string {
+    	return trim( $text );
+    }
 }
 
 require_once __DIR__ . '/../inc/Cli/WorkerLock.php';

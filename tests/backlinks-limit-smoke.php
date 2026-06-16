@@ -89,33 +89,47 @@ class Datamachine_Backlinks_Limit_Wpdb {
 
 $GLOBALS['wpdb'] = new Datamachine_Backlinks_Limit_Wpdb();
 
-function absint( $value ): int {
-	return max( 0, (int) $value );
+if ( ! function_exists( 'absint' ) ) {
+    function absint( $value ): int {
+    	return max( 0, (int) $value );
+    }
 }
 
-function sanitize_text_field( $value ): string {
-	return trim( (string) $value );
+if ( ! function_exists( 'sanitize_text_field' ) ) {
+    function sanitize_text_field( $value ): string {
+    	return trim( (string) $value );
+    }
 }
 
-function sanitize_key( $value ): string {
-	return strtolower( preg_replace( '/[^a-z0-9_\-]/', '', (string) $value ) );
+if ( ! function_exists( 'sanitize_key' ) ) {
+    function sanitize_key( $value ): string {
+    	return strtolower( preg_replace( '/[^a-z0-9_\-]/', '', (string) $value ) );
+    }
 }
 
-function get_transient( string $_key ) {
-	return $GLOBALS['datamachine_link_graph'];
+if ( ! function_exists( 'get_transient' ) ) {
+    function get_transient( string $_key ) {
+    	return $GLOBALS['datamachine_link_graph'];
+    }
 }
 
-function set_transient( string $_key, $_value, int $_ttl ): bool {
-	return true;
+if ( ! function_exists( 'set_transient' ) ) {
+    function set_transient( string $_key, $_value, int $_ttl ): bool {
+    	return true;
+    }
 }
 
-function get_permalink( $post_id ) {
-	$GLOBALS['datamachine_permalink_calls'][] = (int) $post_id;
-	return 'https://example.test/wiki/' . (int) $post_id . '/';
+if ( ! function_exists( 'get_permalink' ) ) {
+    function get_permalink( $post_id ) {
+    	$GLOBALS['datamachine_permalink_calls'][] = (int) $post_id;
+    	return 'https://example.test/wiki/' . (int) $post_id . '/';
+    }
 }
 
-function home_url( string $path = '' ): string {
-	return 'https://example.test' . $path;
+if ( ! function_exists( 'home_url' ) ) {
+    function home_url( string $path = '' ): string {
+    	return 'https://example.test' . $path;
+    }
 }
 
 function wp_parse_url( string $url, int $component = -1 ) {
@@ -129,20 +143,26 @@ function wp_parse_url( string $url, int $component = -1 ) {
 	return null;
 }
 
-function untrailingslashit( string $value ): string {
-	return rtrim( $value, '/' );
+if ( ! function_exists( 'untrailingslashit' ) ) {
+    function untrailingslashit( string $value ): string {
+    	return rtrim( $value, '/' );
+    }
 }
 
-function trailingslashit( string $value ): string {
-	return rtrim( $value, '/' ) . '/';
+if ( ! function_exists( 'trailingslashit' ) ) {
+    function trailingslashit( string $value ): string {
+    	return rtrim( $value, '/' ) . '/';
+    }
 }
 
 function url_to_postid( string $url ): int {
 	return false !== strpos( $url, '/wiki/100' ) ? 100 : 0;
 }
 
-function apply_filters( string $tag, $value ) {
-	return $GLOBALS['datamachine_filters'][ $tag ] ?? $value;
+if ( ! function_exists( 'apply_filters' ) ) {
+    function apply_filters( string $tag, $value ) {
+    	return $GLOBALS['datamachine_filters'][ $tag ] ?? $value;
+    }
 }
 
 function datamachine_assert( bool $condition, string $message ): void {

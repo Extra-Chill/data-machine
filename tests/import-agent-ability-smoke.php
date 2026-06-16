@@ -62,36 +62,48 @@ namespace {
 		}
 	}
 
-	function __( string $text, string $domain = 'default' ): string {
-		unset( $domain );
-		return $text;
-	}
-
-	function sanitize_title( string $title ): string {
-		$title = strtolower( trim( $title ) );
-		$title = preg_replace( '/[^a-z0-9]+/', '-', $title ) ?? '';
-		return trim( $title, '-' );
-	}
-
-	function get_current_user_id(): int {
-		return (int) ( $GLOBALS['datamachine_test_current_user_id'] ?? 0 );
-	}
-
-	function get_option( string $name, mixed $default_value = false ): mixed {
-		return $GLOBALS['datamachine_test_options'][ $name ] ?? $default_value;
-	}
-
-	function apply_filters( string $hook_name, mixed $value, mixed ...$args ): mixed {
-		if ( 'datamachine_auth_ref_to_handler_config' !== $hook_name ) {
-			return $value;
+	if ( ! function_exists( '__' ) ) {
+		function __( string $text, string $domain = 'default' ): string {
+			unset( $domain );
+			return $text;
 		}
-
-		$resolver = $GLOBALS['datamachine_test_auth_resolver'] ?? null;
-		return is_callable( $resolver ) ? $resolver( $value, ...$args ) : $value;
 	}
 
-	function is_wp_error( mixed $thing ): bool {
-		return $thing instanceof WP_Error;
+	if ( ! function_exists( 'sanitize_title' ) ) {
+		function sanitize_title( string $title ): string {
+			$title = strtolower( trim( $title ) );
+			$title = preg_replace( '/[^a-z0-9]+/', '-', $title ) ?? '';
+			return trim( $title, '-' );
+		}
+	}
+
+	if ( ! function_exists( 'get_current_user_id' ) ) {
+		function get_current_user_id(): int {
+			return (int) ( $GLOBALS['datamachine_test_current_user_id'] ?? 0 );
+		}
+	}
+
+	if ( ! function_exists( 'get_option' ) ) {
+		function get_option( string $name, mixed $default_value = false ): mixed {
+			return $GLOBALS['datamachine_test_options'][ $name ] ?? $default_value;
+		}
+	}
+
+	if ( ! function_exists( 'apply_filters' ) ) {
+		function apply_filters( string $hook_name, mixed $value, mixed ...$args ): mixed {
+			if ( 'datamachine_auth_ref_to_handler_config' !== $hook_name ) {
+				return $value;
+			}
+
+			$resolver = $GLOBALS['datamachine_test_auth_resolver'] ?? null;
+			return is_callable( $resolver ) ? $resolver( $value, ...$args ) : $value;
+		}
+	}
+
+	if ( ! function_exists( 'is_wp_error' ) ) {
+		function is_wp_error( mixed $thing ): bool {
+			return $thing instanceof WP_Error;
+		}
 	}
 
 	function wp_delete_file( string $path ): void {
