@@ -177,4 +177,46 @@ class BlogContext {
 			restore_current_blog();
 		}
 	}
+
+	/**
+	 * Run a callback in the ORIGIN (calling) blog, temporarily leaving the
+	 * target blog entered by enter().
+	 *
+	 * The content abilities switch to the target blog to read/write the post,
+	 * but pending-action **staging** must happen on the calling blog: the
+	 * pending-action store is `$wpdb->prefix`-scoped (per-blog), and both the
+	 * propose turn and the later accept/resolve turn run on the calling blog.
+	 * Staging inside the target-blog switch would persist the action in the
+	 * wrong blog's table, and the resolve — running on the calling blog — would
+	 * never find it (the cross-site accept would silently fail).
+	 *
+	 * When no switch is active (single-site, same-blog, or invalid-target
+	 * no-op token), this simply runs the callback in place. Otherwise it pops
+	 * back to the origin blog for the duration of the callback and re-enters
+	 * the target blog afterward, so the surrounding `leave()` still balances.
+	 *
+	 * @template T
+	 * @param array|\WP_Error $ctx      Context token from enter().
+	 * @param callable        $callback Work to run on the origin blog.
+	 * @return mixed The callback's return value.
+	 */
+	public static function run_on_origin( $ctx, callable $callback ) {
+		$switched = is_array( $ctx ) && ! empty( $ctx['switched'] );
+
+		if ( ! $switched ) {
+			return $callback();
+		}
+
+		$target = (int) $ctx['blog_id'];
+
+		// Pop back to the origin blog for the staging write.
+		restore_current_blog();
+		try {
+			return $callback();
+		} finally {
+			// Re-enter the target blog so the caller's `leave()` still balances
+			// the original enter().
+			switch_to_blog( $target );
+		}
+	}
 }

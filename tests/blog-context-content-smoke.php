@@ -192,6 +192,50 @@ $assert( 'resolve replay re-enters the stamped target blog', 1 === get_current_b
 BlogContext::leave( $ctx_replay );
 $assert( 'resolve replay restores the calling blog', 12 === get_current_blog_id() );
 
+// --- run_on_origin: STAGING happens on the calling blog, not the target -----
+//
+// Regression guard for the cross-site staging bug (data-machine#2678): the
+// content abilities enter() the target blog for the post read/apply, but the
+// pending-action store is per-blog and the accept/resolve turn runs on the
+// CALLING blog. Staging inside the target-blog switch persists the action in
+// the wrong blog's table, so the resolve never finds it and the accept fails.
+// run_on_origin() must execute the staging callback with the ORIGIN blog
+// active, then restore the target blog so the surrounding leave() balances.
+
+// Cross-site: chat on blog 12, post on blog 1.
+$GLOBALS['__test_current_blog'] = 12;
+$ctx_stage                      = BlogContext::enter( array( 'blog_id' => 1 ) );
+$assert( 'enter() switched to the target blog for the read', 1 === get_current_blog_id() );
+
+$blog_seen_during_stage = null;
+$stage_return           = BlogContext::run_on_origin(
+	$ctx_stage,
+	static function () use ( &$blog_seen_during_stage ) {
+		$blog_seen_during_stage = get_current_blog_id();
+		return 'staged';
+	}
+);
+$assert( 'run_on_origin runs the staging callback on the ORIGIN blog (12), not the target (1)', 12 === $blog_seen_during_stage );
+$assert( 'run_on_origin returns the callback value', 'staged' === $stage_return );
+$assert( 'run_on_origin re-enters the target blog afterward (leave stays balanced)', 1 === get_current_blog_id() );
+
+BlogContext::leave( $ctx_stage );
+$assert( 'leave() after run_on_origin restores the calling blog', 12 === get_current_blog_id() );
+
+// Same-blog / single-site: run_on_origin is a transparent pass-through.
+$GLOBALS['__test_current_blog'] = 1;
+$ctx_same                       = BlogContext::enter( array( 'blog_id' => 1 ) ); // target == current -> no switch
+$blog_seen_same                 = null;
+BlogContext::run_on_origin(
+	$ctx_same,
+	static function () use ( &$blog_seen_same ) {
+		$blog_seen_same = get_current_blog_id();
+	}
+);
+$assert( 'run_on_origin no-op (same blog) runs in place on blog 1', 1 === $blog_seen_same );
+BlogContext::leave( $ctx_same );
+$assert( 'same-blog run_on_origin leaves the blog unchanged', 1 === get_current_blog_id() );
+
 if ( $failed > 0 ) {
 	echo "=== blog-context-content-smoke: {$failed} FAIL of {$total} ===\n";
 	exit( 1 );

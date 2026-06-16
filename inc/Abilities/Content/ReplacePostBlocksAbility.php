@@ -185,10 +185,15 @@ class ReplacePostBlocksAbility {
 	 */
 	public static function execute( array $input ): array {
 		// Resolve the target blog. On multisite the post may live on another
-		// site than the one this request landed on; switch to it so the read,
-		// the preview staging, and the eventual apply all target the right
-		// post. blog_id rides inside apply_input below so the resolve replay
-		// re-enters the same context.
+		// site than the one this request landed on; switch to it so the post
+		// read and the eventual apply target the right post. blog_id rides
+		// inside apply_input below so the resolve replay re-enters the same
+		// context.
+		//
+		// IMPORTANT: pending-action STAGING must NOT happen inside this switch
+		// — the store is per-blog and the resolve runs on the calling blog, so
+		// staging is bracketed back to the origin blog via
+		// BlogContext::run_on_origin() in the preview branch.
 		$ctx = BlogContext::enter( $input );
 		if ( is_wp_error( $ctx ) ) {
 			return array(
@@ -198,7 +203,7 @@ class ReplacePostBlocksAbility {
 		}
 
 		try {
-			return self::execute_in_context( $input );
+			return self::execute_in_context( $input, $ctx );
 		} finally {
 			BlogContext::leave( $ctx );
 		}
@@ -207,10 +212,11 @@ class ReplacePostBlocksAbility {
 	/**
 	 * Execute the replacement within the (already-resolved) blog context.
 	 *
-	 * @param array $input Ability input.
+	 * @param array           $input Ability input.
+	 * @param array|\WP_Error $ctx   Blog context token from BlogContext::enter().
 	 * @return array
 	 */
-	private static function execute_in_context( array $input ): array {
+	private static function execute_in_context( array $input, $ctx ): array {
 		$post_id      = absint( $input['post_id'] ?? 0 );
 		$blog_id      = absint( $input['blog_id'] ?? 0 );
 		$replacements = $input['replacements'] ?? array();
@@ -349,21 +355,29 @@ class ReplacePostBlocksAbility {
 				)
 			);
 
-			$envelope = PendingActionHelper::stage(
-				array(
-					'action_id'    => $action_id,
-					'kind'         => 'replace_post_blocks',
-					'summary'      => sprintf( 'Preview block replacements on post #%d.', $post_id ),
-					'apply_input'  => BlogContext::with_blog_id(
+			// Stage on the ORIGIN (calling) blog — see EditPostBlocksAbility for
+			// the full rationale: the per-blog pending-action store must hold
+			// the action where the accept/resolve turn will look for it.
+			$envelope = BlogContext::run_on_origin(
+				$ctx,
+				static function () use ( $action_id, $post_id, $replacements, $blog_id, $diff ) {
+					return PendingActionHelper::stage(
 						array(
-							'post_id'      => $post_id,
-							'replacements' => $replacements,
-						),
-						$blog_id
-					),
-					'preview_data' => $diff,
-					'context'      => BlogContext::with_blog_id( array( 'post_id' => $post_id ), $blog_id ),
-				)
+							'action_id'    => $action_id,
+							'kind'         => 'replace_post_blocks',
+							'summary'      => sprintf( 'Preview block replacements on post #%d.', $post_id ),
+							'apply_input'  => BlogContext::with_blog_id(
+								array(
+									'post_id'      => $post_id,
+									'replacements' => $replacements,
+								),
+								$blog_id
+							),
+							'preview_data' => $diff,
+							'context'      => BlogContext::with_blog_id( array( 'post_id' => $post_id ), $blog_id ),
+						)
+					);
+				}
 			);
 
 			if ( empty( $envelope['staged'] ) ) {
