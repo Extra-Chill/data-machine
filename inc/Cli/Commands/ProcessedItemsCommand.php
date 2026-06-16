@@ -1,4 +1,5 @@
 <?php
+// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- This CLI command reports and repairs Data Machine custom-table state; fresh reads are required.
 /**
  * WP-CLI Processed Items Command
  *

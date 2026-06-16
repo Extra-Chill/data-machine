@@ -158,6 +158,7 @@ class WordPress extends FetchHandler {
 			'exclude_keywords'  => trim( $config['exclude_keywords'] ?? '' ),
 			'randomize'         => ! empty( $config['randomize_selection'] ),
 			'posts_per_page'    => 10,
+			// phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_tax_query -- Handler-level taxonomy filters are passed to QueryWordPressPostsAbility intentionally.
 			'tax_query'         => $tax_query,
 			'include_file_info' => true,
 		);

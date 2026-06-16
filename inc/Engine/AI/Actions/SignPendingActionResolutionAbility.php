@@ -58,9 +58,12 @@ final class SignPendingActionResolutionAbility {
 			);
 		};
 
+		// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- External WordPress Abilities API registration hook.
 		if ( doing_action( 'wp_abilities_api_init' ) ) {
 			$register();
+		// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- External WordPress Abilities API registration hook.
 		} elseif ( ! did_action( 'wp_abilities_api_init' ) ) {
+			// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- External WordPress Abilities API registration hook.
 			add_action( 'wp_abilities_api_init', $register );
 		}
 	}
@@ -69,6 +72,7 @@ final class SignPendingActionResolutionAbility {
 	 * Register the public resolution endpoint.
 	 */
 	private function register_rest_route(): void {
+		// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- WordPress core REST API registration hook.
 		add_action(
 			'rest_api_init',
 			function () {
@@ -96,6 +100,7 @@ final class SignPendingActionResolutionAbility {
 	 * Serve browser confirmation responses as raw HTML instead of JSON strings.
 	 */
 	private function register_html_response_sender(): void {
+		// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- WordPress core REST response filter.
 		add_filter(
 			'rest_pre_serve_request',
 			static function ( bool $served, $result, \WP_REST_Request $request ): bool {

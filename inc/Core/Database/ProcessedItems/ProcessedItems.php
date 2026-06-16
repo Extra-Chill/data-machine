@@ -1,4 +1,5 @@
 <?php
+// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange -- Data Machine owns the datamachine_processed_items custom table; duplicate/claim checks require fresh state and schema methods perform one-time table maintenance.
 /**
  * ProcessedItems database service - prevents duplicate processing at flow step level.
  *

@@ -408,6 +408,7 @@ class GuidelineAgentMemoryStore implements WP_Agent_Memory_Store {
 				'post_status'    => 'any',
 				'posts_per_page' => -1,
 				'no_found_rows'  => true,
+				// phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_tax_query -- Guideline-backed memory files are isolated by the Data Machine memory term.
 				'tax_query'      => array(
 					array(
 						'taxonomy' => self::TAXONOMY,
@@ -415,7 +416,7 @@ class GuidelineAgentMemoryStore implements WP_Agent_Memory_Store {
 						'terms'    => array( self::TERM_MEMORY ),
 					),
 				),
-				// phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query
+				// phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query -- Agent/file scope is stored as guideline metadata by this backend.
 				'meta_query'     => $meta_query,
 				'orderby'        => 'ID',
 				'order'          => 'ASC',

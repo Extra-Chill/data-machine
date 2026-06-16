@@ -8,7 +8,7 @@
 /**
  * WordPress dependencies
  */
-import { useState, useEffect, useCallback, useRef } from '@wordpress/element';
+import { useState, useEffect, useCallback } from '@wordpress/element';
 import { Button, TextareaControl } from '@wordpress/components';
 import { __ } from '@wordpress/i18n';
 
@@ -16,7 +16,7 @@ import { __ } from '@wordpress/i18n';
  * Internal dependencies
  */
 import { useUpdateQueueItem, useAddToQueue } from '../../queries/queue';
-import { AUTO_SAVE_DELAY } from '../../utils/constants';
+import useDebouncedAutosave from '@shared/hooks/useDebouncedAutosave';
 
 /**
  * QueueablePromptField Component.
@@ -60,7 +60,6 @@ export default function QueueablePromptField( {
 		firstQueuePrompt || prompt || ''
 	);
 	const [ isSaving, setIsSaving ] = useState( false );
-	const saveTimeout = useRef( null );
 
 	const updateQueueItemMutation = useUpdateQueueItem();
 	const addToQueueMutation = useAddToQueue();
@@ -69,15 +68,6 @@ export default function QueueablePromptField( {
 	useEffect( () => {
 		setLocalValue( firstQueuePrompt || prompt || '' );
 	}, [ firstQueuePrompt, prompt ] );
-
-	// Cleanup timeout on unmount.
-	useEffect( () => {
-		return () => {
-			if ( saveTimeout.current ) {
-				clearTimeout( saveTimeout.current );
-			}
-		};
-	}, [] );
 
 	/**
 	 * Save to queue (add or update index 0).
@@ -149,6 +139,13 @@ export default function QueueablePromptField( {
 			onError,
 		]
 	);
+	const scheduleSave = useDebouncedAutosave( ( value ) => {
+		if ( shouldUseQueue ) {
+			saveToQueue( value );
+		} else if ( onSave ) {
+			onSave( value );
+		}
+	} );
 
 	/**
 	 * Handle value change with debounced save.
@@ -156,20 +153,9 @@ export default function QueueablePromptField( {
 	const handleChange = useCallback(
 		( value ) => {
 			setLocalValue( value );
-
-			if ( saveTimeout.current ) {
-				clearTimeout( saveTimeout.current );
-			}
-
-			saveTimeout.current = setTimeout( () => {
-				if ( shouldUseQueue ) {
-					saveToQueue( value );
-				} else if ( onSave ) {
-					onSave( value );
-				}
-			}, AUTO_SAVE_DELAY );
+			scheduleSave( value );
 		},
-		[ shouldUseQueue, saveToQueue, onSave ]
+		[ scheduleSave ]
 	);
 
 	/**

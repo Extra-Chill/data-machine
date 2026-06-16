@@ -170,6 +170,7 @@ class QueryWordPressPostsAbility {
 		);
 
 		if ( ! empty( $tax_query ) ) {
+			// phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_tax_query -- Fetch configurations intentionally support taxonomy filters.
 			$query_args['tax_query'] = $tax_query;
 		}
 
