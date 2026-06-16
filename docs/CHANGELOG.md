@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.150.2] - 2026-06-16
+
+### Fixed
+- key bundle artifact matcher + adopt backfill on the unique slug
+
 ## [0.150.1] - 2026-06-16
 
 ### Fixed
