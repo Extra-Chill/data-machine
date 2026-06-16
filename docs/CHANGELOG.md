@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.148.5] - 2026-06-16
+
+### Fixed
+- iterate daily memory until completion
+
 ## [0.148.4] - 2026-06-16
 
 ### Fixed
