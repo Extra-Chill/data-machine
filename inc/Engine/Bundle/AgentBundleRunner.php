@@ -335,11 +335,11 @@ final class AgentBundleRunner {
 			'outputs'     => $outputs,
 			'diagnostics' => self::compact_response_array(
 				array(
-					'declared_outputs'  => $declared,
-					'required_outputs'  => $required,
+					'declared_outputs'   => $declared,
+					'required_outputs'   => $required,
 					'required_artifacts' => $artifacts,
-					'present_outputs'   => $present,
-					'missing_outputs'   => $missing,
+					'present_outputs'    => $present,
+					'missing_outputs'    => $missing,
 				)
 			),
 		);
@@ -373,12 +373,12 @@ final class AgentBundleRunner {
 			return $response;
 		}
 
-		$response['success'] = false;
-		$response['error']   = sprintf( 'Agent bundle run completed without required semantic outputs: %s.', implode( ', ', $missing ) );
+		$response['success']            = false;
+		$response['error']              = sprintf( 'Agent bundle run completed without required semantic outputs: %s.', implode( ', ', $missing ) );
 		$response['output_diagnostics'] = array_merge(
 			$diagnostics,
 			array(
-				'enforcement'     => 'failed_missing_required_outputs',
+				'enforcement'      => 'failed_missing_required_outputs',
 				'missing_required' => $missing,
 			)
 		);

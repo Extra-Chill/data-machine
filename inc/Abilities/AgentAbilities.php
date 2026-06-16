@@ -1583,7 +1583,7 @@ class AgentAbilities {
 					'type'        => array( 'array', 'object' ),
 					'description' => 'Semantic output keys that must be present and non-empty when a completed bundle run is returned.',
 				),
-				'required_artifacts'   => array(
+				'required_artifacts'  => array(
 					'type'        => array( 'array', 'object' ),
 					'description' => 'Typed artifact output keys that must be present and non-empty when a completed bundle run is returned.',
 				),
