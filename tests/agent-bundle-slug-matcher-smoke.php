@@ -190,6 +190,128 @@ agent_bundle_slug_matcher_assert(
 	$passes
 );
 
+// ---- 7. bundle_slug() prefers the artifact's UNIQUE slug over display name. -
+// Mirrors events-bot: hundreds of flows share the display name "Ticketmaster"
+// but each bundle flow artifact carries a DISTINCT unique `slug`
+// (ticketmaster, ticketmaster-4, ...). Keying on the unique slug instead of the
+// non-unique name means they resolve to distinct keys → 0 ambiguous, all match.
+$same_name_flows = array(
+	array( 'original_id' => 1, 'flow_name' => 'Ticketmaster', 'slug' => 'ticketmaster' ),
+	array( 'original_id' => 2, 'flow_name' => 'Ticketmaster', 'slug' => 'ticketmaster-4' ),
+	array( 'original_id' => 3, 'flow_name' => 'Ticketmaster', 'slug' => 'ticketmaster-9' ),
+	array( 'original_id' => 4, 'flow_name' => 'Dice.fm', 'slug' => 'dice-fm' ),
+	array( 'original_id' => 5, 'flow_name' => 'Dice.fm', 'slug' => 'dice-fm-2' ),
+);
+
+$bundle_slugs = array();
+foreach ( $same_name_flows as $bundle_flow ) {
+	$bundle_slugs[] = AgentBundleSlugMatcher::bundle_slug( $bundle_flow, 'flow_name', 'flow' );
+}
+
+agent_bundle_slug_matcher_assert(
+	array( 'ticketmaster', 'ticketmaster-4', 'ticketmaster-9', 'dice-fm', 'dice-fm-2' ) === $bundle_slugs,
+	'same-named flows with distinct slugs resolve to distinct bundle slugs',
+	$failures,
+	$passes
+);
+agent_bundle_slug_matcher_assert(
+	count( array_unique( $bundle_slugs ) ) === count( $bundle_slugs ),
+	'no two same-named flows collapse onto the same bundle slug (0 ambiguous)',
+	$failures,
+	$passes
+);
+
+// The matching live rows: NULL portable_slug, duplicate flow_name, but the
+// adopt backfill will write each unique bundle slug into portable_slug. Index
+// the POST-backfill rows (portable_slug = the unique bundle slug) and confirm
+// every bundle artifact resolves to exactly one live row.
+$post_backfill_live = array();
+foreach ( $same_name_flows as $i => $bundle_flow ) {
+	$post_backfill_live[] = array(
+		'flow_id'       => 100 + $i,
+		'flow_name'     => $bundle_flow['flow_name'],
+		'portable_slug' => $bundle_slugs[ $i ],
+	);
+}
+$post_index   = AgentBundleSlugMatcher::index_existing( $post_backfill_live, 'flow_name', 'flow' );
+$matched_all  = 0;
+$ambiguous_ct = count( $post_index['ambiguous'] );
+foreach ( $bundle_slugs as $key ) {
+	if ( isset( $post_index['matched'][ $key ] ) ) {
+		++$matched_all;
+	}
+}
+agent_bundle_slug_matcher_assert(
+	5 === $matched_all && 0 === $ambiguous_ct,
+	'events-bot shape: all 5 same-named flows match their unique slug, 0 ambiguous',
+	$failures,
+	$passes
+);
+
+// ---- 8. Degenerate fallback: NO slug + duplicate names still refuses. -------
+// Preserves #2668's four-"Ticketmaster" guarantee for the genuinely slug-less
+// case — when there is nothing unique to key on, adopt must still refuse.
+$slugless_dupes = array(
+	array( 'flow_id' => 1, 'flow_name' => 'Ticketmaster', 'portable_slug' => null ),
+	array( 'flow_id' => 2, 'flow_name' => 'Ticketmaster', 'portable_slug' => null ),
+	array( 'flow_id' => 3, 'flow_name' => 'Ticketmaster', 'portable_slug' => null ),
+	array( 'flow_id' => 4, 'flow_name' => 'Ticketmaster', 'portable_slug' => null ),
+);
+$slugless_index = AgentBundleSlugMatcher::index_existing( $slugless_dupes, 'flow_name', 'flow' );
+agent_bundle_slug_matcher_assert(
+	isset( $slugless_index['ambiguous']['ticketmaster'] ) && ! isset( $slugless_index['matched']['ticketmaster'] ),
+	'degenerate (no slug + duplicate names) still refuses as ambiguous',
+	$failures,
+	$passes
+);
+// And the slug-less bundle artifact (no portable_slug, no slug) keys on name.
+$slugless_artifact = AgentBundleSlugMatcher::bundle_slug(
+	array( 'flow_name' => 'Ticketmaster' ),
+	'flow_name',
+	'flow'
+);
+agent_bundle_slug_matcher_assert(
+	'ticketmaster' === $slugless_artifact,
+	'slug-less bundle artifact falls back to the normalized display name',
+	$failures,
+	$passes
+);
+
+// ---- 9. bundle_slug() precedence: portable_slug > slug > display_name. ------
+$precedence_all = AgentBundleSlugMatcher::bundle_slug(
+	array( 'flow_name' => 'Display Name', 'slug' => 'from-slug', 'portable_slug' => 'from-portable' ),
+	'flow_name',
+	'flow'
+);
+agent_bundle_slug_matcher_assert(
+	'from-portable' === $precedence_all,
+	'precedence: portable_slug wins over slug and display name',
+	$failures,
+	$passes
+);
+$precedence_slug = AgentBundleSlugMatcher::bundle_slug(
+	array( 'flow_name' => 'Display Name', 'slug' => 'from-slug', 'portable_slug' => '' ),
+	'flow_name',
+	'flow'
+);
+agent_bundle_slug_matcher_assert(
+	'from-slug' === $precedence_slug,
+	'precedence: slug wins over display name when portable_slug is empty',
+	$failures,
+	$passes
+);
+$precedence_name = AgentBundleSlugMatcher::bundle_slug(
+	array( 'flow_name' => 'Display Name', 'slug' => '', 'portable_slug' => '' ),
+	'flow_name',
+	'flow'
+);
+agent_bundle_slug_matcher_assert(
+	'display-name' === $precedence_name,
+	'precedence: display name used only when both portable_slug and slug are empty',
+	$failures,
+	$passes
+);
+
 if ( $failures ) {
 	echo "\nFAILED: " . count( $failures ) . " agent bundle slug matcher assertions failed.\n";
 	exit( 1 );

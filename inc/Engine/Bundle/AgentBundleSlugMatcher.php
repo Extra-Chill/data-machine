@@ -13,14 +13,17 @@ defined( 'ABSPATH' ) || exit;
  * Builds a normalized lookup of existing pipeline/flow rows that mirrors the
  * key the bundle (target) side uses.
  *
- * The bundle side already keys artifacts by
- * `PortableSlug::normalize( portable_slug ?: display_name )`. The existing /
- * live side historically keyed only by the stored `portable_slug`, so rows with
- * a NULL/empty `portable_slug` (every row on a live-origin agent exported into a
+ * The bundle side keys artifacts by
+ * `PortableSlug::normalize( portable_slug ?: slug ?: display_name )` — the
+ * artifact's UNIQUE `slug` is preferred over the non-unique display name, the
+ * same identity the upgrade planner keys its ledger on. The existing / live
+ * side historically keyed only by the stored `portable_slug`, so rows with a
+ * NULL/empty `portable_slug` (every row on a live-origin agent exported into a
  * bundle) were keyed under `''` and never matched. This helper closes that
  * asymmetry: it keys each existing row under the SAME normalized slug the bundle
  * side computes, falling back to the normalized display name when the stored
- * `portable_slug` is empty.
+ * `portable_slug` is empty. Once adopt backfills the bundle's unique slug into
+ * `portable_slug`, both sides agree on the unique identity.
  *
  * Pure and persistence-free so it can be unit-tested directly.
  */
@@ -79,8 +82,13 @@ final class AgentBundleSlugMatcher {
 	/**
 	 * Compute the effective normalized slug for a single existing row.
 	 *
-	 * Mirrors the bundle-side key: prefer the stored `portable_slug`, fall back
-	 * to the normalized display name when it is empty.
+	 * The stored `portable_slug` is the row's IDENTITY; the display name is only
+	 * a LABEL (and for flows it is non-unique by design). So this prefers the
+	 * stored `portable_slug` and only falls back to the normalized display name
+	 * when it is empty. After a correct {@see AgentBundleAbilityService::adopt()}
+	 * backfills `portable_slug` from the bundle artifact's unique
+	 * {@see self::bundle_slug()} value, this and `bundle_slug()` resolve to the
+	 * same unique identity, so the round-trip matches deterministically.
 	 *
 	 * @param array<string,mixed> $row      Existing pipeline or flow row.
 	 * @param string              $name_key Display-name field.
@@ -104,13 +112,33 @@ final class AgentBundleSlugMatcher {
 	/**
 	 * Compute the normalized slug the bundle (target) side uses for an artifact.
 	 *
+	 * Precedence: `portable_slug` -> `slug` -> display name. The bundle flow /
+	 * pipeline file carries a UNIQUE `slug` (the portable identity, e.g.
+	 * `ticketmaster`, `ticketmaster-4`) that the upgrade planner already keys
+	 * the ledger on. The display name is a NON-UNIQUE label — for flows it is
+	 * the source/handler ("Ticketmaster", "Dice.fm"), shared by hundreds of
+	 * rows — so keying on it collapses distinct artifacts into one slug and
+	 * makes adopt refuse them as ambiguous. Preferring the artifact's own
+	 * `slug` before the display name keeps the bundle side keyed on the same
+	 * unique identity the ledger uses, so same-named flows match deterministically.
+	 *
 	 * @param array<string,mixed> $artifact Bundle pipeline or flow entry.
 	 * @param string              $name_key Display-name field (pipeline_name / flow_name).
 	 * @param string              $fallback PortableSlug fallback (pipeline / flow).
 	 * @return string Normalized slug.
 	 */
 	public static function bundle_slug( array $artifact, string $name_key, string $fallback ): string {
-		$candidate = (string) ( $artifact['portable_slug'] ?? ( $artifact[ $name_key ] ?? $fallback ) );
+		$portable = trim( (string) ( $artifact['portable_slug'] ?? '' ) );
+		if ( '' !== $portable ) {
+			return PortableSlug::normalize( $portable, $fallback );
+		}
+
+		$slug = trim( (string) ( $artifact['slug'] ?? '' ) );
+		if ( '' !== $slug ) {
+			return PortableSlug::normalize( $slug, $fallback );
+		}
+
+		$candidate = (string) ( $artifact[ $name_key ] ?? $fallback );
 
 		return PortableSlug::normalize( $candidate, $fallback );
 	}
