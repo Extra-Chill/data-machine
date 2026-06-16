@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.41.0] - 2026-06-16
+
+### Added
+- register reflected AGENTS.md section for the events CLI surface
+
 ## [0.40.9] - 2026-06-13
 
 ### Fixed
