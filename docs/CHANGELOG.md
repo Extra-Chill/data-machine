@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.148.2] - 2026-06-16
+
+### Fixed
+- support agent-scoped manual system tasks
+
 ## [0.148.1] - 2026-06-16
 
 ### Changed
