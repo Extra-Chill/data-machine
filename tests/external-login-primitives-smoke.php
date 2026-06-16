@@ -37,24 +37,48 @@ namespace {
 	$GLOBALS['wpdb'] = new DataMachine_External_Login_WPDB_Smoke();
 	$GLOBALS['datamachine_external_login_providers'] = array();
 
-	function __( $text, $domain = null ) { unset( $domain ); return $text; }
-	function esc_html__( $text, $domain = null ) { unset( $domain ); return $text; }
-	function is_wp_error( $value ): bool { return $value instanceof WP_Error; }
-	function sanitize_key( $value ): string { return preg_replace( '/[^a-z0-9_\-]/', '', strtolower( (string) $value ) ); }
-	function sanitize_text_field( $value ): string { return trim( (string) $value ); }
-	function wp_unslash( $value ) { return $value; }
+	if ( ! function_exists( '__' ) ) {
+		function __( $text, $domain = null ) { unset( $domain ); return $text; }
+	}
+	if ( ! function_exists( 'esc_html__' ) ) {
+		function esc_html__( $text, $domain = null ) { unset( $domain ); return $text; }
+	}
+	if ( ! function_exists( 'is_wp_error' ) ) {
+		function is_wp_error( $value ): bool { return $value instanceof WP_Error; }
+	}
+	if ( ! function_exists( 'sanitize_key' ) ) {
+		function sanitize_key( $value ): string { return preg_replace( '/[^a-z0-9_\-]/', '', strtolower( (string) $value ) ); }
+	}
+	if ( ! function_exists( 'sanitize_text_field' ) ) {
+		function sanitize_text_field( $value ): string { return trim( (string) $value ); }
+	}
+	if ( ! function_exists( 'wp_unslash' ) ) {
+		function wp_unslash( $value ) { return $value; }
+	}
 	function wp_parse_url( string $url, int $component = -1 ) { return parse_url( $url, $component ); }
-	function untrailingslashit( string $value ): string { return rtrim( $value, '/' ); }
-	function site_url( string $path = '' ): string { return 'https://example.test' . $path; }
-	function home_url( string $path = '' ): string { return 'https://example.test' . $path; }
-	function add_action() {}
-	function add_filter() {}
+	if ( ! function_exists( 'untrailingslashit' ) ) {
+		function untrailingslashit( string $value ): string { return rtrim( $value, '/' ); }
+	}
+	if ( ! function_exists( 'site_url' ) ) {
+		function site_url( string $path = '' ): string { return 'https://example.test' . $path; }
+	}
+	if ( ! function_exists( 'home_url' ) ) {
+		function home_url( string $path = '' ): string { return 'https://example.test' . $path; }
+	}
+	if ( ! function_exists( 'add_action' ) ) {
+		function add_action() {}
+	}
+	if ( ! function_exists( 'add_filter' ) ) {
+		function add_filter() {}
+	}
 	function add_rewrite_rule() {}
-	function apply_filters( string $hook, $value ) {
-		if ( 'datamachine_external_login_providers' === $hook ) {
-			return $GLOBALS['datamachine_external_login_providers'];
+	if ( ! function_exists( 'apply_filters' ) ) {
+		function apply_filters( string $hook, $value ) {
+			if ( 'datamachine_external_login_providers' === $hook ) {
+				return $GLOBALS['datamachine_external_login_providers'];
+			}
+			return $value;
 		}
-		return $value;
 	}
 }
 

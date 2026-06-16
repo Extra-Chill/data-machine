@@ -20,22 +20,30 @@ if ( ! defined( 'WPINC' ) ) {
 }
 
 // Minimal WP stubs so the helper file can load.
-function __( $text, $domain = null ) {
-	unset( $domain );
-	return $text;
+if ( ! function_exists( '__' ) ) {
+    function __( $text, $domain = null ) {
+    	unset( $domain );
+    	return $text;
+    }
 }
 
-function do_action( $hook, ...$args ) {
-	unset( $hook, $args );
+if ( ! function_exists( 'do_action' ) ) {
+    function do_action( $hook, ...$args ) {
+    	unset( $hook, $args );
+    }
 }
 
-function apply_filters( $hook, $value, ...$args ) {
-	unset( $hook, $args );
-	return $value;
+if ( ! function_exists( 'apply_filters' ) ) {
+    function apply_filters( $hook, $value, ...$args ) {
+    	unset( $hook, $args );
+    	return $value;
+    }
 }
 
-function add_filter( $hook, $callback, $priority = 10, $accepted_args = 1 ) {
-	unset( $hook, $callback, $priority, $accepted_args );
+if ( ! function_exists( 'add_filter' ) ) {
+    function add_filter( $hook, $callback, $priority = 10, $accepted_args = 1 ) {
+    	unset( $hook, $callback, $priority, $accepted_args );
+    }
 }
 
 // The helper file pulls in agents-api and substrate classes that we don't

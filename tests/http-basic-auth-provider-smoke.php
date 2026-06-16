@@ -12,33 +12,43 @@ if ( ! defined( 'ABSPATH' ) ) {
 	define( 'ABSPATH', dirname( __DIR__ ) . '/' );
 }
 
-function __( string $text, string $domain = '' ): string {
-	unset( $domain );
-	return $text;
+if ( ! function_exists( '__' ) ) {
+    function __( string $text, string $domain = '' ): string {
+    	unset( $domain );
+    	return $text;
+    }
 }
 
-function get_site_option( string $name, mixed $default = false ): mixed {
-	return $GLOBALS['datamachine_http_basic_options'][ $name ] ?? $default;
+if ( ! function_exists( 'get_site_option' ) ) {
+    function get_site_option( string $name, mixed $default = false ): mixed {
+    	return $GLOBALS['datamachine_http_basic_options'][ $name ] ?? $default;
+    }
 }
 
-function update_site_option( string $name, mixed $value ): bool {
-	$GLOBALS['datamachine_http_basic_options'][ $name ] = $value;
-	return true;
+if ( ! function_exists( 'update_site_option' ) ) {
+    function update_site_option( string $name, mixed $value ): bool {
+    	$GLOBALS['datamachine_http_basic_options'][ $name ] = $value;
+    	return true;
+    }
 }
 
 function wp_salt( string $scheme = 'auth' ): string {
 	return 'http-basic-smoke-salt-' . $scheme;
 }
 
-function apply_filters( string $hook, mixed $value, mixed ...$args ): mixed {
-	if ( 'datamachine_auth_encrypted_fields' === $hook && 'http_basic' === ( $args[0] ?? '' ) ) {
-		$value[] = 'password';
-	}
-	return $value;
+if ( ! function_exists( 'apply_filters' ) ) {
+    function apply_filters( string $hook, mixed $value, mixed ...$args ): mixed {
+    	if ( 'datamachine_auth_encrypted_fields' === $hook && 'http_basic' === ( $args[0] ?? '' ) ) {
+    		$value[] = 'password';
+    	}
+    	return $value;
+    }
 }
 
-function is_wp_error( mixed $thing ): bool {
-	return $thing instanceof \WP_Error;
+if ( ! function_exists( 'is_wp_error' ) ) {
+    function is_wp_error( mixed $thing ): bool {
+    	return $thing instanceof \WP_Error;
+    }
 }
 
 class WP_Error {

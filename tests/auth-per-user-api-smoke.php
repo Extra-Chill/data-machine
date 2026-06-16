@@ -25,69 +25,95 @@ $GLOBALS['datamachine_auth_per_user_options'] = array();
 $GLOBALS['datamachine_auth_per_user_filters'] = array();
 $GLOBALS['datamachine_auth_per_user_logs']    = array();
 
-function __( $text, $domain = null ) {
-	unset( $domain );
-	return $text;
+if ( ! function_exists( '__' ) ) {
+    function __( $text, $domain = null ) {
+    	unset( $domain );
+    	return $text;
+    }
 }
 
-function esc_html( $text ) {
-	return $text;
+if ( ! function_exists( 'esc_html' ) ) {
+    function esc_html( $text ) {
+    	return $text;
+    }
 }
 
-function absint( $value ) {
-	return abs( (int) $value );
+if ( ! function_exists( 'absint' ) ) {
+    function absint( $value ) {
+    	return abs( (int) $value );
+    }
 }
 
 function wp_salt( $scheme = 'auth' ) {
 	return 'auth-per-user-smoke-' . $scheme;
 }
 
-function maybe_serialize( $value ) {
-	return serialize( $value );
+if ( ! function_exists( 'maybe_serialize' ) ) {
+    function maybe_serialize( $value ) {
+    	return serialize( $value );
+    }
 }
 
-function get_site_option( $name, $default = false ) {
-	return $GLOBALS['datamachine_auth_per_user_options'][ $name ] ?? $default;
+if ( ! function_exists( 'get_site_option' ) ) {
+    function get_site_option( $name, $default = false ) {
+    	return $GLOBALS['datamachine_auth_per_user_options'][ $name ] ?? $default;
+    }
 }
 
-function update_site_option( $name, $value ) {
-	$GLOBALS['datamachine_auth_per_user_options'][ $name ] = $value;
-	return true;
+if ( ! function_exists( 'update_site_option' ) ) {
+    function update_site_option( $name, $value ) {
+    	$GLOBALS['datamachine_auth_per_user_options'][ $name ] = $value;
+    	return true;
+    }
 }
 
-function get_current_user_id() {
-	return 0;
+if ( ! function_exists( 'get_current_user_id' ) ) {
+    function get_current_user_id() {
+    	return 0;
+    }
 }
 
-function apply_filters( $hook, $value, ...$args ) {
-	foreach ( $GLOBALS['datamachine_auth_per_user_filters'][ $hook ] ?? array() as $callback ) {
-		$value = $callback( $value, ...$args );
-	}
-	return $value;
+if ( ! function_exists( 'apply_filters' ) ) {
+    function apply_filters( $hook, $value, ...$args ) {
+    	foreach ( $GLOBALS['datamachine_auth_per_user_filters'][ $hook ] ?? array() as $callback ) {
+    		$value = $callback( $value, ...$args );
+    	}
+    	return $value;
+    }
 }
 
-function add_filter( $hook, $callback, $priority = 10, $accepted_args = 1 ) {
-	unset( $priority, $accepted_args );
-	$GLOBALS['datamachine_auth_per_user_filters'][ $hook ][] = $callback;
+if ( ! function_exists( 'add_filter' ) ) {
+    function add_filter( $hook, $callback, $priority = 10, $accepted_args = 1 ) {
+    	unset( $priority, $accepted_args );
+    	$GLOBALS['datamachine_auth_per_user_filters'][ $hook ][] = $callback;
+    }
 }
 
-function do_action( $hook, ...$args ) {
-	$GLOBALS['datamachine_auth_per_user_logs'][] = array( $hook, $args );
+if ( ! function_exists( 'do_action' ) ) {
+    function do_action( $hook, ...$args ) {
+    	$GLOBALS['datamachine_auth_per_user_logs'][] = array( $hook, $args );
+    }
 }
 
-function set_transient( $key, $value, $expiration = 0 ) {
-	unset( $key, $value, $expiration );
-	return true;
+if ( ! function_exists( 'set_transient' ) ) {
+    function set_transient( $key, $value, $expiration = 0 ) {
+    	unset( $key, $value, $expiration );
+    	return true;
+    }
 }
 
-function get_transient( $key ) {
-	unset( $key );
-	return false;
+if ( ! function_exists( 'get_transient' ) ) {
+    function get_transient( $key ) {
+    	unset( $key );
+    	return false;
+    }
 }
 
-function delete_transient( $key ) {
-	unset( $key );
-	return true;
+if ( ! function_exists( 'delete_transient' ) ) {
+    function delete_transient( $key ) {
+    	unset( $key );
+    	return true;
+    }
 }
 
 require_once dirname( __DIR__ ) . '/inc/Core/OAuth/OAuthRedirects.php';

@@ -36,31 +36,39 @@ if ( ! class_exists( 'WP_Error' ) ) {
 	}
 }
 
-function is_wp_error( $thing ): bool {
-	return $thing instanceof WP_Error;
+if ( ! function_exists( 'is_wp_error' ) ) {
+    function is_wp_error( $thing ): bool {
+    	return $thing instanceof WP_Error;
+    }
 }
 
-function add_filter( string $tag, callable $callback, int $priority = 10, int $accepted_args = 1 ): void {
-	$GLOBALS['datamachine_test_filters'][ $tag ][ $priority ][] = array( $callback, $accepted_args );
+if ( ! function_exists( 'add_filter' ) ) {
+    function add_filter( string $tag, callable $callback, int $priority = 10, int $accepted_args = 1 ): void {
+    	$GLOBALS['datamachine_test_filters'][ $tag ][ $priority ][] = array( $callback, $accepted_args );
+    }
 }
 
-function apply_filters( string $tag, $value, ...$args ) {
-	$callbacks = $GLOBALS['datamachine_test_filters'][ $tag ] ?? array();
-	ksort( $callbacks );
-	foreach ( $callbacks as $priority_callbacks ) {
-		foreach ( $priority_callbacks as $entry ) {
-			$callback      = $entry[0];
-			$accepted_args = $entry[1];
-			$value         = $callback( ...array_slice( array_merge( array( $value ), $args ), 0, $accepted_args ) );
-		}
-	}
-	return $value;
+if ( ! function_exists( 'apply_filters' ) ) {
+    function apply_filters( string $tag, $value, ...$args ) {
+    	$callbacks = $GLOBALS['datamachine_test_filters'][ $tag ] ?? array();
+    	ksort( $callbacks );
+    	foreach ( $callbacks as $priority_callbacks ) {
+    		foreach ( $priority_callbacks as $entry ) {
+    			$callback      = $entry[0];
+    			$accepted_args = $entry[1];
+    			$value         = $callback( ...array_slice( array_merge( array( $value ), $args ), 0, $accepted_args ) );
+    		}
+    	}
+    	return $value;
+    }
 }
 
-function do_action( string $tag, ...$args ): void {
-	if ( 'datamachine_log' === $tag ) {
-		$GLOBALS['datamachine_test_logs'][] = $args;
-	}
+if ( ! function_exists( 'do_action' ) ) {
+    function do_action( string $tag, ...$args ): void {
+    	if ( 'datamachine_log' === $tag ) {
+    		$GLOBALS['datamachine_test_logs'][] = $args;
+    	}
+    }
 }
 
 function did_action( string $hook = '' ): int {
@@ -71,16 +79,22 @@ function doing_action( string $hook = '' ): bool {
 	return false;
 }
 
-function add_action( string $hook, callable $callback, int $priority = 10, int $accepted_args = 1 ): void {
-	// no-op
+if ( ! function_exists( 'add_action' ) ) {
+    function add_action( string $hook, callable $callback, int $priority = 10, int $accepted_args = 1 ): void {
+    	// no-op
+    }
 }
 
-function wp_json_encode( $data, int $flags = 0 ) {
-	return json_encode( $data, $flags );
+if ( ! function_exists( 'wp_json_encode' ) ) {
+    function wp_json_encode( $data, int $flags = 0 ) {
+    	return json_encode( $data, $flags );
+    }
 }
 
-function size_format( $bytes ): string {
-	return $bytes . ' B';
+if ( ! function_exists( 'size_format' ) ) {
+    function size_format( $bytes ): string {
+    	return $bytes . ' B';
+    }
 }
 
 require_once __DIR__ . '/agents-api-loader.php';

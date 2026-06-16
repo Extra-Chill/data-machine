@@ -27,31 +27,39 @@ function assert_content_format( string $name, bool $condition ): void {
 
 $GLOBALS['__content_format_filters'] = array();
 
-function add_filter( string $hook, callable $callback, int $priority = 10, int $accepted_args = 1 ): void {
-	$GLOBALS['__content_format_filters'][ $hook ][ $priority ][] = array( $callback, $accepted_args );
+if ( ! function_exists( 'add_filter' ) ) {
+    function add_filter( string $hook, callable $callback, int $priority = 10, int $accepted_args = 1 ): void {
+    	$GLOBALS['__content_format_filters'][ $hook ][ $priority ][] = array( $callback, $accepted_args );
+    }
 }
 
-function apply_filters( string $hook, $value, ...$args ) {
-	if ( empty( $GLOBALS['__content_format_filters'][ $hook ] ) ) {
-		return $value;
-	}
+if ( ! function_exists( 'apply_filters' ) ) {
+    function apply_filters( string $hook, $value, ...$args ) {
+    	if ( empty( $GLOBALS['__content_format_filters'][ $hook ] ) ) {
+    		return $value;
+    	}
 
-	ksort( $GLOBALS['__content_format_filters'][ $hook ] );
-	foreach ( $GLOBALS['__content_format_filters'][ $hook ] as $callbacks ) {
-		foreach ( $callbacks as $registered_callback ) {
-			list( $callback, $accepted_args ) = $registered_callback;
-			$value                            = $callback( ...array_slice( array_merge( array( $value ), $args ), 0, $accepted_args ) );
-		}
-	}
-	return $value;
+    	ksort( $GLOBALS['__content_format_filters'][ $hook ] );
+    	foreach ( $GLOBALS['__content_format_filters'][ $hook ] as $callbacks ) {
+    		foreach ( $callbacks as $registered_callback ) {
+    			list( $callback, $accepted_args ) = $registered_callback;
+    			$value                            = $callback( ...array_slice( array_merge( array( $value ), $args ), 0, $accepted_args ) );
+    		}
+    	}
+    	return $value;
+    }
 }
 
-function sanitize_key( $key ): string {
-	return strtolower( preg_replace( '/[^a-zA-Z0-9_\-]/', '', (string) $key ) );
+if ( ! function_exists( 'sanitize_key' ) ) {
+    function sanitize_key( $key ): string {
+    	return strtolower( preg_replace( '/[^a-zA-Z0-9_\-]/', '', (string) $key ) );
+    }
 }
 
-function is_wp_error( $thing ): bool {
-	return $thing instanceof WP_Error;
+if ( ! function_exists( 'is_wp_error' ) ) {
+    function is_wp_error( $thing ): bool {
+    	return $thing instanceof WP_Error;
+    }
 }
 
 class WP_Error {

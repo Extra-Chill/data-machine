@@ -37,22 +37,26 @@ if ( ! function_exists( 'is_wp_error' ) ) {
 
 if ( ! function_exists( 'apply_filters' ) ) {
 	$GLOBALS['export_agent_smoke_filters'] = array();
-	function add_filter( $hook, $callback, $priority = 10, $accepted_args = 1 ) {
-		$GLOBALS['export_agent_smoke_filters'][ $hook ][ $priority ][] = array( $callback, $accepted_args );
+	if ( ! function_exists( 'add_filter' ) ) {
+		function add_filter( $hook, $callback, $priority = 10, $accepted_args = 1 ) {
+			$GLOBALS['export_agent_smoke_filters'][ $hook ][ $priority ][] = array( $callback, $accepted_args );
+		}
 	}
-	function apply_filters( $hook, $value, ...$args ) {
-		if ( empty( $GLOBALS['export_agent_smoke_filters'][ $hook ] ) ) {
+	if ( ! function_exists( 'apply_filters' ) ) {
+		function apply_filters( $hook, $value, ...$args ) {
+			if ( empty( $GLOBALS['export_agent_smoke_filters'][ $hook ] ) ) {
+				return $value;
+			}
+			ksort( $GLOBALS['export_agent_smoke_filters'][ $hook ], SORT_NUMERIC );
+			foreach ( $GLOBALS['export_agent_smoke_filters'][ $hook ] as $callbacks ) {
+				foreach ( $callbacks as $callback_entry ) {
+					$callback      = $callback_entry[0];
+					$accepted_args = $callback_entry[1];
+					$value = $callback( ...array_slice( array_merge( array( $value ), $args ), 0, $accepted_args ) );
+				}
+			}
 			return $value;
 		}
-		ksort( $GLOBALS['export_agent_smoke_filters'][ $hook ], SORT_NUMERIC );
-		foreach ( $GLOBALS['export_agent_smoke_filters'][ $hook ] as $callbacks ) {
-			foreach ( $callbacks as $callback_entry ) {
-				$callback      = $callback_entry[0];
-				$accepted_args = $callback_entry[1];
-				$value = $callback( ...array_slice( array_merge( array( $value ), $args ), 0, $accepted_args ) );
-			}
-		}
-		return $value;
 	}
 }
 

@@ -50,9 +50,20 @@ if ( ! function_exists( 'add_action' ) ) {
 
 if ( ! function_exists( 'add_filter' ) ) {
 	function add_filter( ...$args ) {
-		// no-op
+		// no-op stub for standalone smoke runs.
 	}
 }
+if ( ! function_exists( 'apply_filters' ) ) {
+	function apply_filters( $hook, $value = null, ...$args ) {
+		return $value;
+	}
+}
+if ( ! function_exists( 'do_action' ) ) {
+	function do_action( ...$args ) {
+		// no-op stub for standalone smoke runs.
+	}
+}
+
 
 require_once dirname( __DIR__ ) . '/vendor/autoload.php';
 

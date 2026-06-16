@@ -77,6 +77,26 @@ if ( ! function_exists( 'dbDelta' ) ) {
 	}
 }
 
+if ( ! function_exists( 'add_filter' ) ) {
+	function add_filter( ...$args ) {
+		// no-op stub for standalone smoke runs.
+	}
+}
+if ( ! function_exists( 'apply_filters' ) ) {
+	function apply_filters( $hook, $value = null, ...$args ) {
+		return $value;
+	}
+}
+
+if ( ! function_exists( 'sanitize_title' ) ) {
+	function sanitize_title( $title ) {
+		$title = strtolower( (string) $title );
+		$title = preg_replace( '/[^a-z0-9]+/', '-', $title );
+		return trim( (string) $title, '-' );
+	}
+}
+
+
 require_once dirname( __DIR__ ) . '/vendor/autoload.php';
 
 use DataMachine\Core\Database\BundleArtifacts\InstalledBundleArtifacts;

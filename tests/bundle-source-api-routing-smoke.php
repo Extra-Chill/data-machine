@@ -59,8 +59,10 @@ namespace {
 		}
 	}
 
-	function is_wp_error( mixed $thing ): bool {
-		return $thing instanceof WP_Error;
+	if ( ! function_exists( 'is_wp_error' ) ) {
+		function is_wp_error( mixed $thing ): bool {
+			return $thing instanceof WP_Error;
+		}
 	}
 
 	$GLOBALS['datamachine_test_filters']     = array();
@@ -69,29 +71,35 @@ namespace {
 	$GLOBALS['datamachine_test_responses']   = array();
 	$GLOBALS['datamachine_test_call_log']    = array();
 
-	function apply_filters( string $hook, mixed $value, mixed ...$args ): mixed {
-		// Run real registered filters (e.g. BundleSourceAuth::inject_github_auth).
-		if ( ! empty( $GLOBALS['datamachine_test_added_hooks'][ $hook ] ) ) {
-			foreach ( $GLOBALS['datamachine_test_added_hooks'][ $hook ] as $cb ) {
-				$value = $cb( $value, ...$args );
+	if ( ! function_exists( 'apply_filters' ) ) {
+		function apply_filters( string $hook, mixed $value, mixed ...$args ): mixed {
+			// Run real registered filters (e.g. BundleSourceAuth::inject_github_auth).
+			if ( ! empty( $GLOBALS['datamachine_test_added_hooks'][ $hook ] ) ) {
+				foreach ( $GLOBALS['datamachine_test_added_hooks'][ $hook ] as $cb ) {
+					$value = $cb( $value, ...$args );
+				}
 			}
+			// Then apply per-test override on top so individual tests can mutate
+			// the result without unhooking the auth filter.
+			$override = $GLOBALS['datamachine_test_filters'][ $hook ] ?? null;
+			if ( is_callable( $override ) ) {
+				return $override( $value, ...$args );
+			}
+			return $value;
 		}
-		// Then apply per-test override on top so individual tests can mutate
-		// the result without unhooking the auth filter.
-		$override = $GLOBALS['datamachine_test_filters'][ $hook ] ?? null;
-		if ( is_callable( $override ) ) {
-			return $override( $value, ...$args );
-		}
-		return $value;
 	}
 
-	function add_filter( string $hook, callable $cb, int $priority = 10, int $accepted_args = 1 ): bool {
-		$GLOBALS['datamachine_test_added_hooks'][ $hook ][] = $cb;
-		return true;
+	if ( ! function_exists( 'add_filter' ) ) {
+		function add_filter( string $hook, callable $cb, int $priority = 10, int $accepted_args = 1 ): bool {
+			$GLOBALS['datamachine_test_added_hooks'][ $hook ][] = $cb;
+			return true;
+		}
 	}
 
-	function get_option( string $key, mixed $default = false ): mixed {
-		return $GLOBALS['datamachine_test_options'][ $key ] ?? $default;
+	if ( ! function_exists( 'get_option' ) ) {
+		function get_option( string $key, mixed $default = false ): mixed {
+			return $GLOBALS['datamachine_test_options'][ $key ] ?? $default;
+		}
 	}
 
 	function wp_parse_url( string $url, int $component = -1 ): mixed {
@@ -125,54 +133,60 @@ namespace {
 	 * If a response has 'redirect_to', return a 302 with Location header.
 	 * Otherwise return the configured ('code', 'headers', 'body').
 	 */
-	function wp_safe_remote_get( string $url, array $args = array() ): mixed {
-		$GLOBALS['datamachine_test_call_log'][] = array(
-			'url'  => $url,
-			'args' => $args,
-		);
+	if ( ! function_exists( 'wp_safe_remote_get' ) ) {
+		function wp_safe_remote_get( string $url, array $args = array() ): mixed {
+			$GLOBALS['datamachine_test_call_log'][] = array(
+				'url'  => $url,
+				'args' => $args,
+			);
 
-		foreach ( $GLOBALS['datamachine_test_responses'] as $prefix => $resp ) {
-			if ( 0 !== strpos( $url, $prefix ) ) {
-				continue;
-			}
+			foreach ( $GLOBALS['datamachine_test_responses'] as $prefix => $resp ) {
+				if ( 0 !== strpos( $url, $prefix ) ) {
+					continue;
+				}
 
-			if ( ! empty( $resp['redirect_to'] ) ) {
+				if ( ! empty( $resp['redirect_to'] ) ) {
+					return array(
+						'response' => array( 'code' => $resp['code'] ?? 302 ),
+						'headers'  => array( 'location' => $resp['redirect_to'] ),
+					);
+				}
+
+				$code = (int) ( $resp['code'] ?? 200 );
+				if ( $code >= 200 && $code < 300 && ! empty( $args['filename'] ) ) {
+					file_put_contents( $args['filename'], $resp['body'] ?? 'PK' );
+				}
+
 				return array(
-					'response' => array( 'code' => $resp['code'] ?? 302 ),
-					'headers'  => array( 'location' => $resp['redirect_to'] ),
+					'response' => array( 'code' => $code ),
+					'headers'  => $resp['headers'] ?? array(),
 				);
 			}
 
-			$code = (int) ( $resp['code'] ?? 200 );
-			if ( $code >= 200 && $code < 300 && ! empty( $args['filename'] ) ) {
-				file_put_contents( $args['filename'], $resp['body'] ?? 'PK' );
+			return new WP_Error( 'no_stub', 'wp_safe_remote_get not stubbed for ' . $url );
+		}
+	}
+
+	if ( ! function_exists( 'wp_remote_retrieve_response_code' ) ) {
+		function wp_remote_retrieve_response_code( $response ): int {
+			if ( is_array( $response ) && isset( $response['response']['code'] ) ) {
+				return (int) $response['response']['code'];
 			}
-
-			return array(
-				'response' => array( 'code' => $code ),
-				'headers'  => $resp['headers'] ?? array(),
-			);
+			return 0;
 		}
-
-		return new WP_Error( 'no_stub', 'wp_safe_remote_get not stubbed for ' . $url );
 	}
 
-	function wp_remote_retrieve_response_code( $response ): int {
-		if ( is_array( $response ) && isset( $response['response']['code'] ) ) {
-			return (int) $response['response']['code'];
-		}
-		return 0;
-	}
-
-	function wp_remote_retrieve_header( $response, string $name ): string {
-		if ( is_array( $response ) && isset( $response['headers'] ) && is_array( $response['headers'] ) ) {
-			foreach ( $response['headers'] as $k => $v ) {
-				if ( 0 === strcasecmp( (string) $k, $name ) ) {
-					return (string) $v;
+	if ( ! function_exists( 'wp_remote_retrieve_header' ) ) {
+		function wp_remote_retrieve_header( $response, string $name ): string {
+			if ( is_array( $response ) && isset( $response['headers'] ) && is_array( $response['headers'] ) ) {
+				foreach ( $response['headers'] as $k => $v ) {
+					if ( 0 === strcasecmp( (string) $k, $name ) ) {
+						return (string) $v;
+					}
 				}
 			}
+			return '';
 		}
-		return '';
 	}
 
 	if ( ! defined( 'DATAMACHINE_VERSION' ) ) {

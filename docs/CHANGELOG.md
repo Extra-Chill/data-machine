@@ -2,6 +2,29 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.148.2] - 2026-06-16
+
+### Fixed
+- support agent-scoped manual system tasks
+
+## [0.148.1] - 2026-06-16
+
+### Changed
+- guard core-function polyfills in smokes against real-WordPress redeclare fatals
+
+## [0.148.0] - 2026-06-15
+
+### Added
+- gate AGENTS.md composition in core behind DATAMACHINE_COMPOSE_AGENTS_MD
+
+## [0.147.0] - 2026-06-15
+
+### Added
+- make CliCommandIntrospector handle __invoke/__default commands
+
+### Changed
+- remove google-analytics CLI command from core
+
 ## [0.146.4] - 2026-06-15
 
 ### Fixed

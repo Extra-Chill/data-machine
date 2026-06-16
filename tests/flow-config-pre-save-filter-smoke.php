@@ -26,41 +26,57 @@ class WP_Error {
 	}
 }
 
-function add_filter( string $hook_name, callable $callback, int $priority = 10, int $accepted_args = 1 ): void {
-	unset( $priority, $accepted_args );
-	$GLOBALS['datamachine_flow_config_pre_save_filters'][ $hook_name ][] = $callback;
+if ( ! function_exists( 'add_filter' ) ) {
+    function add_filter( string $hook_name, callable $callback, int $priority = 10, int $accepted_args = 1 ): void {
+    	unset( $priority, $accepted_args );
+    	$GLOBALS['datamachine_flow_config_pre_save_filters'][ $hook_name ][] = $callback;
+    }
 }
 
-function apply_filters( string $hook_name, $value, ...$args ) {
-	foreach ( $GLOBALS['datamachine_flow_config_pre_save_filters'][ $hook_name ] ?? array() as $callback ) {
-		$value = $callback( $value, ...$args );
-	}
+if ( ! function_exists( 'apply_filters' ) ) {
+    function apply_filters( string $hook_name, $value, ...$args ) {
+    	foreach ( $GLOBALS['datamachine_flow_config_pre_save_filters'][ $hook_name ] ?? array() as $callback ) {
+    		$value = $callback( $value, ...$args );
+    	}
 
-	return $value;
+    	return $value;
+    }
 }
 
-function do_action( string $hook_name, ...$args ): void {
-	$GLOBALS['datamachine_flow_config_pre_save_logs'][] = array( $hook_name, $args );
+if ( ! function_exists( 'do_action' ) ) {
+    function do_action( string $hook_name, ...$args ): void {
+    	$GLOBALS['datamachine_flow_config_pre_save_logs'][] = array( $hook_name, $args );
+    }
 }
 
-function is_wp_error( $value ): bool {
-	return $value instanceof WP_Error;
+if ( ! function_exists( 'is_wp_error' ) ) {
+    function is_wp_error( $value ): bool {
+    	return $value instanceof WP_Error;
+    }
 }
 
-function wp_json_encode( $value ): string {
-	return json_encode( $value );
+if ( ! function_exists( 'wp_json_encode' ) ) {
+    function wp_json_encode( $value ): string {
+    	return json_encode( $value );
+    }
 }
 
-function sanitize_text_field( $value ): string {
-	return trim( (string) $value );
+if ( ! function_exists( 'sanitize_text_field' ) ) {
+    function sanitize_text_field( $value ): string {
+    	return trim( (string) $value );
+    }
 }
 
-function sanitize_title( $value ): string {
-	return strtolower( preg_replace( '/[^a-z0-9-]+/i', '-', trim( (string) $value ) ) );
+if ( ! function_exists( 'sanitize_title' ) ) {
+    function sanitize_title( $value ): string {
+    	return strtolower( preg_replace( '/[^a-z0-9-]+/i', '-', trim( (string) $value ) ) );
+    }
 }
 
-function absint( $value ): int {
-	return max( 0, (int) $value );
+if ( ! function_exists( 'absint' ) ) {
+    function absint( $value ): int {
+    	return max( 0, (int) $value );
+    }
 }
 
 final class DataMachineFlowConfigPreSaveFakeWpdb {

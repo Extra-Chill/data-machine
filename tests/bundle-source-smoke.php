@@ -50,16 +50,20 @@ namespace {
 		}
 	}
 
-	function is_wp_error( mixed $thing ): bool {
-		return $thing instanceof WP_Error;
+	if ( ! function_exists( 'is_wp_error' ) ) {
+		function is_wp_error( mixed $thing ): bool {
+			return $thing instanceof WP_Error;
+		}
 	}
 
-	function apply_filters( string $hook, mixed $value, mixed ...$args ): mixed {
-		$override = $GLOBALS['datamachine_test_filters'][ $hook ] ?? null;
-		if ( is_callable( $override ) ) {
-			return $override( $value, ...$args );
+	if ( ! function_exists( 'apply_filters' ) ) {
+		function apply_filters( string $hook, mixed $value, mixed ...$args ): mixed {
+			$override = $GLOBALS['datamachine_test_filters'][ $hook ] ?? null;
+			if ( is_callable( $override ) ) {
+				return $override( $value, ...$args );
+			}
+			return $value;
 		}
-		return $value;
 	}
 
 	function wp_delete_file( string $path ): void {
@@ -73,31 +77,37 @@ namespace {
 		return $tmp ?: '';
 	}
 
-	function wp_safe_remote_get( string $url, array $args = array() ): mixed {
-		$override = $GLOBALS['datamachine_test_safe_remote_get'] ?? null;
-		if ( is_callable( $override ) ) {
-			return $override( $url, $args );
-		}
+	if ( ! function_exists( 'wp_safe_remote_get' ) ) {
+		function wp_safe_remote_get( string $url, array $args = array() ): mixed {
+			$override = $GLOBALS['datamachine_test_safe_remote_get'] ?? null;
+			if ( is_callable( $override ) ) {
+				return $override( $url, $args );
+			}
 
-		return new WP_Error( 'no_stub', 'wp_safe_remote_get is not stubbed in this test.' );
+			return new WP_Error( 'no_stub', 'wp_safe_remote_get is not stubbed in this test.' );
+		}
 	}
 
-	function wp_remote_retrieve_response_code( $response ): int {
-		if ( is_array( $response ) && isset( $response['response']['code'] ) ) {
-			return (int) $response['response']['code'];
+	if ( ! function_exists( 'wp_remote_retrieve_response_code' ) ) {
+		function wp_remote_retrieve_response_code( $response ): int {
+			if ( is_array( $response ) && isset( $response['response']['code'] ) ) {
+				return (int) $response['response']['code'];
+			}
+			return 0;
 		}
-		return 0;
 	}
 
-	function wp_remote_retrieve_header( $response, string $name ): string {
-		if ( is_array( $response ) && isset( $response['headers'] ) && is_array( $response['headers'] ) ) {
-			foreach ( $response['headers'] as $k => $v ) {
-				if ( 0 === strcasecmp( (string) $k, $name ) ) {
-					return (string) $v;
+	if ( ! function_exists( 'wp_remote_retrieve_header' ) ) {
+		function wp_remote_retrieve_header( $response, string $name ): string {
+			if ( is_array( $response ) && isset( $response['headers'] ) && is_array( $response['headers'] ) ) {
+				foreach ( $response['headers'] as $k => $v ) {
+					if ( 0 === strcasecmp( (string) $k, $name ) ) {
+						return (string) $v;
+					}
 				}
 			}
+			return '';
 		}
-		return '';
 	}
 
 	if ( ! defined( 'DATAMACHINE_VERSION' ) ) {

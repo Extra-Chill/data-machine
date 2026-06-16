@@ -76,69 +76,91 @@ namespace {
         return 1;
     }
 
-    function add_filter( string $hook, callable $callback, int $priority = 10, int $accepted_args = 1 ): void {
-        $GLOBALS['__publish_format_filters'][ $hook ][ $priority ][] = array( $callback, $accepted_args );
+    if ( ! function_exists( 'add_filter' ) ) {
+        function add_filter( string $hook, callable $callback, int $priority = 10, int $accepted_args = 1 ): void {
+            $GLOBALS['__publish_format_filters'][ $hook ][ $priority ][] = array( $callback, $accepted_args );
+        }
     }
 
-    function apply_filters( string $hook, $value, ...$args ) {
-        if ( empty( $GLOBALS['__publish_format_filters'][ $hook ] ) ) {
+    if ( ! function_exists( 'apply_filters' ) ) {
+        function apply_filters( string $hook, $value, ...$args ) {
+            if ( empty( $GLOBALS['__publish_format_filters'][ $hook ] ) ) {
+                return $value;
+            }
+
+            ksort( $GLOBALS['__publish_format_filters'][ $hook ] );
+            foreach ( $GLOBALS['__publish_format_filters'][ $hook ] as $callbacks ) {
+                foreach ( $callbacks as $registered_callback ) {
+                    list( $callback, $accepted_args ) = $registered_callback;
+                    $value                            = $callback( ...array_slice( array_merge( array( $value ), $args ), 0, $accepted_args ) );
+                }
+            }
             return $value;
         }
+    }
 
-        ksort( $GLOBALS['__publish_format_filters'][ $hook ] );
-        foreach ( $GLOBALS['__publish_format_filters'][ $hook ] as $callbacks ) {
-            foreach ( $callbacks as $registered_callback ) {
-                list( $callback, $accepted_args ) = $registered_callback;
-                $value                            = $callback( ...array_slice( array_merge( array( $value ), $args ), 0, $accepted_args ) );
-            }
+    if ( ! function_exists( 'sanitize_key' ) ) {
+        function sanitize_key( $key ): string {
+            return strtolower( preg_replace( '/[^a-zA-Z0-9_\-]/', '', (string) $key ) );
         }
-        return $value;
     }
 
-    function sanitize_key( $key ): string {
-        return strtolower( preg_replace( '/[^a-zA-Z0-9_\-]/', '', (string) $key ) );
+    if ( ! function_exists( 'sanitize_text_field' ) ) {
+        function sanitize_text_field( $value ): string {
+            return trim( (string) $value );
+        }
     }
 
-    function sanitize_text_field( $value ): string {
-        return trim( (string) $value );
+    if ( ! function_exists( 'wp_unslash' ) ) {
+        function wp_unslash( $value ) {
+            return $value;
+        }
     }
 
-    function wp_unslash( $value ) {
-        return $value;
-    }
-
-    function wp_strip_all_tags( $value ): string {
-        return strip_tags( (string) $value );
+    if ( ! function_exists( 'wp_strip_all_tags' ) ) {
+        function wp_strip_all_tags( $value ): string {
+            return strip_tags( (string) $value );
+        }
     }
 
     function wp_filter_post_kses( $content ): string {
         return (string) $content;
     }
 
-    function esc_url( $url ): string {
-        $sanitized = filter_var( (string) $url, FILTER_SANITIZE_URL );
-        return is_string( $sanitized ) ? $sanitized : '';
+    if ( ! function_exists( 'esc_url' ) ) {
+        function esc_url( $url ): string {
+            $sanitized = filter_var( (string) $url, FILTER_SANITIZE_URL );
+            return is_string( $sanitized ) ? $sanitized : '';
+        }
     }
 
     function esc_url_raw( $url ): string {
         return esc_url( $url );
     }
 
-    function esc_html( $text ): string {
-        return htmlspecialchars( (string) $text, ENT_QUOTES, 'UTF-8' );
+    if ( ! function_exists( 'esc_html' ) ) {
+        function esc_html( $text ): string {
+            return htmlspecialchars( (string) $text, ENT_QUOTES, 'UTF-8' );
+        }
     }
 
-    function __( $text, $domain = 'default' ) {
-        unset( $domain );
-        return $text;
+    if ( ! function_exists( '__' ) ) {
+        function __( $text, $domain = 'default' ) {
+            unset( $domain );
+            return $text;
+        }
     }
 
-    function is_wp_error( $thing ): bool {
-        return $thing instanceof WP_Error;
+    if ( ! function_exists( 'is_wp_error' ) ) {
+        function is_wp_error( $thing ): bool {
+            return $thing instanceof WP_Error;
+        }
     }
 
-    function get_current_user_id(): int {
-        return 0;
+    if ( ! function_exists( 'get_current_user_id' ) ) {
+        function get_current_user_id(): int {
+            return 0;
+        }
     }
 
     function get_users( array $args = array() ): array {
@@ -146,22 +168,28 @@ namespace {
         return array( 1 );
     }
 
-    function wp_insert_post( array $post_data, bool $wp_error = false ) {
-        unset( $wp_error );
-        $id = $GLOBALS['__publish_format_next_id']++;
+    if ( ! function_exists( 'wp_insert_post' ) ) {
+        function wp_insert_post( array $post_data, bool $wp_error = false ) {
+            unset( $wp_error );
+            $id = $GLOBALS['__publish_format_next_id']++;
 
-        $post_data['ID']                          = $id;
-        $GLOBALS['__publish_format_posts'][ $id ] = (object) $post_data;
+            $post_data['ID']                          = $id;
+            $GLOBALS['__publish_format_posts'][ $id ] = (object) $post_data;
 
-        return $id;
+            return $id;
+        }
     }
 
-    function get_permalink( int $post_id ): string {
-        return "https://example.test/?p={$post_id}";
+    if ( ! function_exists( 'get_permalink' ) ) {
+        function get_permalink( int $post_id ): string {
+            return "https://example.test/?p={$post_id}";
+        }
     }
 
-    function update_post_meta( int $post_id, string $key, $value ): void {
-        $GLOBALS['__publish_format_meta'][ $post_id ][ $key ] = $value;
+    if ( ! function_exists( 'update_post_meta' ) ) {
+        function update_post_meta( int $post_id, string $key, $value ): void {
+            $GLOBALS['__publish_format_meta'][ $post_id ][ $key ] = $value;
+        }
     }
 
     function bfb_convert( string $content, string $from, string $to ) {

@@ -92,6 +92,13 @@ function smoke_parse_run_task_params( array $assoc_args, array $argv = array() )
 		$params[ trim( $key ) ] = smoke_coerce_run_task_param_value( $value );
 	}
 
+	if ( array_key_exists( 'agent', $assoc_args ) ) {
+		if ( '' === trim( (string) $assoc_args['agent'] ) ) {
+			return array( 'error' => '--agent cannot be empty.' );
+		}
+		$params['agent'] = smoke_coerce_run_task_param_value( (string) $assoc_args['agent'] );
+	}
+
 	if ( ! empty( $assoc_args['dry-run'] ) && ! empty( $assoc_args['apply'] ) ) {
 		return array( 'error' => 'Use either --dry-run or --apply, not both.' );
 	}
@@ -104,6 +111,29 @@ function smoke_parse_run_task_params( array $assoc_args, array $argv = array() )
 	}
 
 	return $params;
+}
+
+function smoke_extract_run_task_context( array &$params ): array {
+	$context = array();
+	if ( array_key_exists( 'agent', $params ) ) {
+		$agent = $params['agent'];
+		unset( $params['agent'] );
+
+		if ( is_int( $agent ) || ( is_string( $agent ) && is_numeric( $agent ) ) ) {
+			$context['agent_id'] = (int) $agent;
+		} elseif ( null !== $agent && '' !== trim( (string) $agent ) ) {
+			$context['agent_slug'] = (string) $agent;
+		}
+	}
+
+	foreach ( array( 'agent_id', 'agent_slug' ) as $key ) {
+		if ( array_key_exists( $key, $params ) ) {
+			$context[ $key ] = $params[ $key ];
+			unset( $params[ $key ] );
+		}
+	}
+
+	return $context;
 }
 
 function smoke_string_list( mixed $value ): array {
@@ -233,6 +263,14 @@ $assert( 'raw argv preserves repeated pending_decision_limit param', 20 === $par
 
 $params = smoke_parse_run_task_params(
 	array(
+		'agent' => 'intelligence-chubes4',
+	)
+);
+$assert( '--agent stores agent alias before ability extraction', 'intelligence-chubes4' === $params['agent'] );
+$assert( 'empty --agent rejected', isset( smoke_parse_run_task_params( array( 'agent' => '' ) )['error'] ) );
+
+$params = smoke_parse_run_task_params(
+	array(
 		'params' => '{"root_path":"woocommerce","limit":10}',
 		'apply'  => true,
 	)
@@ -266,6 +304,16 @@ $assert( 'accepted params reject unknown keys', false === $result['success'] );
 $readonly_result = smoke_validate_run_task_params( 'daily_memory_generation', array( 'params_schema' => array() ), array() );
 $assert( 'read-only/simple task remains schedulable', true === $readonly_result['success'] );
 
+$params  = array( 'agent' => 'intelligence-chubes4', 'date' => '2026-06-15' );
+$context = smoke_extract_run_task_context( $params );
+$assert( 'agent alias becomes scheduler agent_slug context', 'intelligence-chubes4' === $context['agent_slug'] );
+$assert( 'agent alias removed before task param validation', ! array_key_exists( 'agent', $params ) );
+$assert( 'other task params preserved after agent extraction', '2026-06-15' === $params['date'] );
+
+$params  = array( 'agent' => 7 );
+$context = smoke_extract_run_task_context( $params );
+$assert( 'numeric agent alias becomes scheduler agent_id context', 7 === $context['agent_id'] );
+
 echo "\n[3] Scheduler + SystemTask propagation\n";
 $scheduled_params = array(
 	'root_path' => 'woocommerce',
@@ -290,8 +338,10 @@ $assert( 'CLI avoids invalid --param key=value synopsis placeholder', ! str_cont
 $assert( 'CLI avoids WP-CLI-invalid repeatable --param synopsis placeholder', ! str_contains( $system_command, '[--param=<param>]...' ) );
 $assert( 'CLI documents valid --param synopsis placeholder', str_contains( $system_command, '[--param=<param>]' ) );
 $assert( 'CLI documents --param key=value semantics', str_contains( $system_command, 'Structured task param as key=value. Repeatable.' ) );
+$assert( 'CLI documents agent option for agent-scoped tasks', str_contains( $system_command, '[--agent=<agent>]' ) && str_contains( $system_command, 'Agent ID or slug for agent-scoped tasks.' ) );
 $assert( 'CLI forwards task_params to runTask', str_contains( $system_command, "'task_params' => $" . 'params' ) );
 $assert( 'run-task ability schema accepts task_params', str_contains( $abilities, "'task_params' => array" ) );
+$assert( 'run-task ability extracts agent alias before validation', str_contains( $abilities, "array_key_exists( 'agent', $" . 'params' ) && str_contains( $abilities, "'agent_slug'" ) );
 $assert( 'run-task ability schedules merged task params', str_contains( $abilities, 'array_merge( $task_params' ) );
 $assert( 'TaskRegistry exposes mutates metadata', str_contains( $registry, "'mutates'" ) );
 $assert( 'TaskRegistry exposes requires_scope metadata', str_contains( $registry, "'requires_scope'" ) );

@@ -11,33 +11,45 @@ if ( ! defined( 'ABSPATH' ) ) {
 	define( 'ABSPATH', __DIR__ . '/' );
 }
 
-function sanitize_key( string $value ): string {
-	return preg_replace( '/[^a-z0-9_\-]/', '', strtolower( $value ) );
+if ( ! function_exists( 'sanitize_key' ) ) {
+    function sanitize_key( string $value ): string {
+    	return preg_replace( '/[^a-z0-9_\-]/', '', strtolower( $value ) );
+    }
 }
 
-function sanitize_text_field( string $value ): string {
-	return trim( preg_replace( '/[\r\n\t]+/', ' ', $value ) );
+if ( ! function_exists( 'sanitize_text_field' ) ) {
+    function sanitize_text_field( string $value ): string {
+    	return trim( preg_replace( '/[\r\n\t]+/', ' ', $value ) );
+    }
 }
 
-function __( string $text, string $domain = 'default' ): string {
-	unset( $domain );
-	return $text;
+if ( ! function_exists( '__' ) ) {
+    function __( string $text, string $domain = 'default' ): string {
+    	unset( $domain );
+    	return $text;
+    }
 }
 
-function absint( $value ): int {
-	return abs( (int) $value );
+if ( ! function_exists( 'absint' ) ) {
+    function absint( $value ): int {
+    	return abs( (int) $value );
+    }
 }
 
-function get_current_user_id(): int {
-	return 0;
+if ( ! function_exists( 'get_current_user_id' ) ) {
+    function get_current_user_id(): int {
+    	return 0;
+    }
 }
 
 function is_user_logged_in(): bool {
 	return false;
 }
 
-function is_wp_error( $value ): bool {
-	return $value instanceof WP_Error;
+if ( ! function_exists( 'is_wp_error' ) ) {
+    function is_wp_error( $value ): bool {
+    	return $value instanceof WP_Error;
+    }
 }
 
 class WP_Error {

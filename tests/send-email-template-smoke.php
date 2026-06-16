@@ -43,37 +43,45 @@ $GLOBALS['ec_scheduled']       = array();
 $GLOBALS['ec_abilities']       = array();
 $GLOBALS['ec_action_id_seq']   = 1000;
 
-function add_filter( string $hook, callable $cb, int $priority = 10, int $accepted_args = 1 ): bool {
-	$GLOBALS['ec_filters'][ $hook ][ $priority ][] = $cb;
-	return true;
+if ( ! function_exists( 'add_filter' ) ) {
+    function add_filter( string $hook, callable $cb, int $priority = 10, int $accepted_args = 1 ): bool {
+    	$GLOBALS['ec_filters'][ $hook ][ $priority ][] = $cb;
+    	return true;
+    }
 }
 
-function apply_filters( string $hook, $value, ...$args ) {
-	if ( empty( $GLOBALS['ec_filters'][ $hook ] ) ) {
-		return $value;
-	}
-	ksort( $GLOBALS['ec_filters'][ $hook ] );
-	foreach ( $GLOBALS['ec_filters'][ $hook ] as $callbacks ) {
-		foreach ( $callbacks as $cb ) {
-			$value = $cb( $value, ...$args );
-		}
-	}
-	return $value;
+if ( ! function_exists( 'apply_filters' ) ) {
+    function apply_filters( string $hook, $value, ...$args ) {
+    	if ( empty( $GLOBALS['ec_filters'][ $hook ] ) ) {
+    		return $value;
+    	}
+    	ksort( $GLOBALS['ec_filters'][ $hook ] );
+    	foreach ( $GLOBALS['ec_filters'][ $hook ] as $callbacks ) {
+    		foreach ( $callbacks as $cb ) {
+    			$value = $cb( $value, ...$args );
+    		}
+    	}
+    	return $value;
+    }
 }
 
-function add_action( string $hook, callable $cb, int $priority = 10, int $accepted_args = 1 ): bool {
-	$GLOBALS['ec_actions'][ $hook ][] = $cb;
-	return true;
+if ( ! function_exists( 'add_action' ) ) {
+    function add_action( string $hook, callable $cb, int $priority = 10, int $accepted_args = 1 ): bool {
+    	$GLOBALS['ec_actions'][ $hook ][] = $cb;
+    	return true;
+    }
 }
 
-function do_action( string $hook, ...$args ): void {
-	if ( 'datamachine_log' === $hook ) {
-		$GLOBALS['ec_logs'][] = $args;
-		return;
-	}
-	foreach ( $GLOBALS['ec_actions'][ $hook ] ?? array() as $cb ) {
-		$cb( ...$args );
-	}
+if ( ! function_exists( 'do_action' ) ) {
+    function do_action( string $hook, ...$args ): void {
+    	if ( 'datamachine_log' === $hook ) {
+    		$GLOBALS['ec_logs'][] = $args;
+    		return;
+    	}
+    	foreach ( $GLOBALS['ec_actions'][ $hook ] ?? array() as $cb ) {
+    		$cb( ...$args );
+    	}
+    }
 }
 
 function doing_action( string $hook ): bool {
@@ -106,60 +114,76 @@ function wp_get_ability( string $id ) {
 	};
 }
 
-function is_email( $email ) {
-	if ( ! is_string( $email ) ) {
-		return false;
-	}
-	return preg_match( '/^[^@\s]+@[^@\s]+\.[^@\s]+$/', $email ) ? $email : false;
+if ( ! function_exists( 'is_email' ) ) {
+    function is_email( $email ) {
+    	if ( ! is_string( $email ) ) {
+    		return false;
+    	}
+    	return preg_match( '/^[^@\s]+@[^@\s]+\.[^@\s]+$/', $email ) ? $email : false;
+    }
 }
 
-function get_bloginfo( string $key ) {
-	return 'Test Site';
+if ( ! function_exists( 'get_bloginfo' ) ) {
+    function get_bloginfo( string $key ) {
+    	return 'Test Site';
+    }
 }
 
-function get_option( string $key, $default_value = null ) {
-	if ( 'admin_email' === $key ) {
-		return 'admin@example.com';
-	}
-	if ( 'date_format' === $key ) {
-		return 'Y-m-d';
-	}
-	return $default_value;
+if ( ! function_exists( 'get_option' ) ) {
+    function get_option( string $key, $default_value = null ) {
+    	if ( 'admin_email' === $key ) {
+    		return 'admin@example.com';
+    	}
+    	if ( 'date_format' === $key ) {
+    		return 'Y-m-d';
+    	}
+    	return $default_value;
+    }
 }
 
 function wp_date( string $format, ?int $timestamp = null ): string {
 	return gmdate( $format, $timestamp ?? time() );
 }
 
-function wp_mail( $to, $subject, $body, $headers = array(), $attachments = array() ): bool {
-	$GLOBALS['ec_wp_mail_calls'][] = array(
-		'to'          => $to,
-		'subject'     => $subject,
-		'body'        => $body,
-		'headers'     => $headers,
-		'attachments' => $attachments,
-		'blog'        => $GLOBALS['ec_current_blog'],
-	);
-	return (bool) $GLOBALS['ec_wp_mail_result'];
+if ( ! function_exists( 'wp_mail' ) ) {
+    function wp_mail( $to, $subject, $body, $headers = array(), $attachments = array() ): bool {
+    	$GLOBALS['ec_wp_mail_calls'][] = array(
+    		'to'          => $to,
+    		'subject'     => $subject,
+    		'body'        => $body,
+    		'headers'     => $headers,
+    		'attachments' => $attachments,
+    		'blog'        => $GLOBALS['ec_current_blog'],
+    	);
+    	return (bool) $GLOBALS['ec_wp_mail_result'];
+    }
 }
 
-function is_multisite(): bool {
-	return (bool) $GLOBALS['ec_is_multisite'];
+if ( ! function_exists( 'is_multisite' ) ) {
+    function is_multisite(): bool {
+    	return (bool) $GLOBALS['ec_is_multisite'];
+    }
 }
 
-function get_blog_details( $id ) {
-	return in_array( (int) $id, $GLOBALS['ec_known_blogs'], true ) ? (object) array( 'blog_id' => (int) $id ) : false;
+if ( ! function_exists( 'get_blog_details' ) ) {
+    function get_blog_details( $id ) {
+    	return in_array( (int) $id, $GLOBALS['ec_known_blogs'], true ) ? (object) array( 'blog_id' => (int) $id ) : false;
+    }
 }
 
-function switch_to_blog( int $id ): bool {
-	$GLOBALS['ec_switch_history'][] = $id;
-	$GLOBALS['ec_current_blog']     = $id;
-	return true;
+if ( ! function_exists( 'switch_to_blog' ) ) {
+    function switch_to_blog( int $id ): bool {
+    	$GLOBALS['ec_switch_history'][] = $id;
+    	$GLOBALS['ec_current_blog']     = $id;
+    	return true;
+    }
 }
 
-function restore_current_blog(): bool {
-	$GLOBALS['ec_current_blog'] = 1;
-	return true;
+if ( ! function_exists( 'restore_current_blog' ) ) {
+    function restore_current_blog(): bool {
+    	$GLOBALS['ec_current_blog'] = 1;
+    	return true;
+    }
 }
 
 function as_schedule_single_action( int $timestamp, string $hook, array $args = array(), string $group = '' ): int {
@@ -174,8 +198,10 @@ function as_enqueue_async_action( string $hook, array $args = array(), string $g
 	return $id;
 }
 
-function __( string $s, string $domain = '' ): string {
-	return $s;
+if ( ! function_exists( '__' ) ) {
+    function __( string $s, string $domain = '' ): string {
+    	return $s;
+    }
 }
 
 /* ---------------------------------------------------------------------------
@@ -203,8 +229,10 @@ if ( ! class_exists( 'WP_Error' ) ) {
 	}
 }
 
-function is_wp_error( $thing ): bool {
-	return $thing instanceof WP_Error;
+if ( ! function_exists( 'is_wp_error' ) ) {
+    function is_wp_error( $thing ): bool {
+    	return $thing instanceof WP_Error;
+    }
 }
 
 /* ---------------------------------------------------------------------------

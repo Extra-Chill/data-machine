@@ -48,7 +48,7 @@ $adapter_source     = datamachine_pending_actions_source( 'inc/Engine/AI/Actions
 $resolver_adapter   = datamachine_pending_actions_source( 'inc/Engine/AI/Actions/PendingActionResolverAdapter.php' );
 $resolver_source    = datamachine_pending_actions_source( 'inc/Engine/AI/Actions/ResolvePendingActionAbility.php' );
 $inspection_source  = datamachine_pending_actions_source( 'inc/Engine/AI/Actions/PendingActionInspectionAbility.php' );
-$cli_bootstrap      = datamachine_pending_actions_source( 'inc/Cli/Bootstrap.php' );
+$cli_bootstrap      = datamachine_pending_actions_source( 'inc/Cli/CommandRegistry.php' );
 $cli_command_source = datamachine_pending_actions_source( 'inc/Cli/Commands/PendingActionsCommand.php' );
 $plugin_source      = datamachine_pending_actions_source( 'data-machine.php' );
 $runtime_source     = datamachine_pending_actions_source( 'inc/migrations/runtime.php' );
@@ -275,6 +275,13 @@ if ( ! function_exists( 'wp_generate_uuid4' ) ) {
 		return '11111111-2222-4333-8444-555555555555';
 	}
 }
+
+if ( ! function_exists( 'add_filter' ) ) {
+	function add_filter( ...$args ) {
+		// no-op stub for standalone smoke runs.
+	}
+}
+
 
 require_once dirname( __DIR__ ) . '/vendor/wordpress/agents-api/agents-api.php';
 require_once dirname( __DIR__ ) . '/inc/Abilities/PermissionHelper.php';

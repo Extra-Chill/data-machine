@@ -18,12 +18,16 @@ function doing_action( string $hook = '' ): bool {
 	return false;
 }
 
-function add_action( string $hook, callable $callback, int $priority = 10, int $accepted_args = 1 ): void {
-	// no-op
+if ( ! function_exists( 'add_action' ) ) {
+    function add_action( string $hook, callable $callback, int $priority = 10, int $accepted_args = 1 ): void {
+    	// no-op
+    }
 }
 
-function add_filter( string $tag, callable $callback, int $priority = 10, int $accepted_args = 1 ): void {
-	// no-op
+if ( ! function_exists( 'add_filter' ) ) {
+    function add_filter( string $tag, callable $callback, int $priority = 10, int $accepted_args = 1 ): void {
+    	// no-op
+    }
 }
 
 require_once __DIR__ . '/agents-api-loader.php';
