@@ -12,6 +12,7 @@ namespace DataMachine\Cli\Commands;
 
 use WP_CLI;
 use DataMachine\Cli\BaseCommand;
+use DataMachine\Abilities\Engine\DrainJobAbility;
 use DataMachine\Abilities\SystemAbilities;
 use DataMachine\Engine\Tasks\TaskRegistry;
 use DataMachine\Engine\AI\System\Tasks\SystemTask;
@@ -245,6 +246,22 @@ class SystemCommand extends BaseCommand {
 	 * [--apply]
 	 * : Request apply mode for mutating tasks.
 	 *
+	 * [--wait]
+	 * : After scheduling, synchronously drain only the created job. Does not drain
+	 * unrelated overdue Data Machine work.
+	 *
+	 * [--step-budget=<number>]
+	 * : Maximum due job actions to execute with --wait.
+	 * ---
+	 * default: 50
+	 * ---
+	 *
+	 * [--time-budget-ms=<milliseconds>]
+	 * : Maximum wall-clock milliseconds to drain with --wait.
+	 * ---
+	 * default: 300000
+	 * ---
+	 *
 	 * [--format=<format>]
 	 * : Output format.
 	 * ---
@@ -257,6 +274,8 @@ class SystemCommand extends BaseCommand {
 	 * ## EXAMPLES
 	 *
 	 *     wp datamachine system run daily_memory_generation --agent=intelligence-chubes4
+	 *     wp datamachine system run daily_memory_generation
+	 *     wp datamachine system run daily_memory_generation --param=agent_slug=my-agent --wait
 	 *     wp datamachine system run alt_text_generation --format=json
 	 *     wp datamachine system run retention_logs --dry-run
 	 *
@@ -284,17 +303,55 @@ class SystemCommand extends BaseCommand {
 			)
 		);
 
+		if ( ! $result['success'] ) {
+			if ( 'json' === $format ) {
+				WP_CLI::line( (string) wp_json_encode( $result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+				return;
+			}
+
+			WP_CLI::error( $result['error'] ?? $result['message'] ?? 'Failed to run task.' );
+			return;
+		}
+
+		if ( ! empty( $assoc_args['wait'] ) ) {
+			$step_budget    = isset( $assoc_args['step-budget'] ) ? max( 1, (int) $assoc_args['step-budget'] ) : 50;
+			$time_budget_ms = isset( $assoc_args['time-budget-ms'] ) ? max( 1, (int) $assoc_args['time-budget-ms'] ) : 300000;
+
+			$result['drain'] = ( new DrainJobAbility() )->execute(
+				array(
+					'job_id'         => (int) ( $result['job_id'] ?? 0 ),
+					'step_budget'    => $step_budget,
+					'time_budget_ms' => $time_budget_ms,
+				)
+			);
+		}
+
 		if ( 'json' === $format ) {
 			WP_CLI::line( (string) wp_json_encode( $result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
 			return;
 		}
 
-		if ( ! $result['success'] ) {
-			WP_CLI::error( $result['error'] ?? $result['message'] ?? 'Failed to run task.' );
-			return;
-		}
-
 		WP_CLI::success( $result['message'] );
+		if ( isset( $result['drain'] ) ) {
+			$drain = $result['drain'];
+			if ( ! empty( $drain['success'] ) ) {
+				WP_CLI::success(
+					sprintf(
+						'Job #%d drained to %s.',
+						(int) ( $drain['job_id'] ?? 0 ),
+						(string) ( $drain['terminal_state'] ?? 'terminal' )
+					)
+				);
+				return;
+			}
+
+			WP_CLI::error(
+				$drain['error'] ?? sprintf(
+					'Job #%d did not reach a terminal state before the wait budget was exhausted.',
+					(int) ( $drain['job_id'] ?? 0 )
+				)
+			);
+		}
 	}
 
 	/**

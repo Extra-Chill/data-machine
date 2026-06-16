@@ -33,7 +33,10 @@ datamachine_scheduler_health_assert_contains( "'scheduler' => array", $system_ab
 datamachine_scheduler_health_assert_contains( "wp_next_scheduled( 'action_scheduler_run_queue' )", $system_abilities, 'WP-Cron runner lag is inspected' );
 datamachine_scheduler_health_assert_contains( 'RecurringScheduler::GROUP', $system_abilities, 'diagnostics scope to Data Machine actions' );
 datamachine_scheduler_health_assert_contains( 'wp datamachine drain', $system_abilities, 'stale scheduler output recommends an explicit drain' );
+datamachine_scheduler_health_assert_contains( 'wp datamachine system run daily_memory_generation --param=agent_slug=<slug> --wait', $system_abilities, 'stale scheduler output recommends scoped daily memory remediation' );
 datamachine_scheduler_health_assert_contains( 'Due now:', $system_command, 'CLI table output shows due Action Scheduler work' );
 datamachine_scheduler_health_assert_contains( 'Daily memory:', $system_command, 'CLI table output shows daily memory schedule state' );
+datamachine_scheduler_health_assert_contains( '[--wait]', $system_command, 'system run exposes a job-scoped wait option' );
+datamachine_scheduler_health_assert_contains( 'DrainJobAbility', $system_command, 'system run drains only the created job when waiting' );
 
 echo "\nAll scheduler health smoke assertions passed.\n";
