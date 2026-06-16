@@ -282,7 +282,7 @@ class SystemAbilities {
 				),
 				count( $rejected_schedules )
 			),
-			'stale'       => __( 'scheduler has overdue work; invoke WordPress cron or run wp datamachine drain', 'data-machine' ),
+			'stale'       => __( 'scheduler has overdue work; invoke WordPress cron, run wp datamachine drain, or run a specific task with wp datamachine system run <task_type> --wait', 'data-machine' ),
 			'unavailable' => __( 'Action Scheduler is unavailable', 'data-machine' ),
 			default       => __( 'scheduler status unknown', 'data-machine' ),
 		};
@@ -326,7 +326,7 @@ class SystemAbilities {
 			),
 			'recommendation'          => match ( $status ) {
 				'failing' => __( 'One or more recurring schedules are rejected on every tick and never run. Inspect them with wp datamachine logs (filter error_code recurring_schedule_persistently_rejected) and fix the binding or its prerequisites (agent ownership, task registration, ability availability).', 'data-machine' ),
-				'stale'   => __( 'For local or low-traffic installs, schedule an external wake-up such as wp cron event run --due-now or wp datamachine drain.', 'data-machine' ),
+				'stale'   => __( 'For local or low-traffic installs, schedule an external wake-up such as wp cron event run --due-now. To remediate only daily memory for an affected agent, run wp datamachine system run daily_memory_generation --param=agent_slug=<slug> --wait; for all overdue work, run wp datamachine drain.', 'data-machine' ),
 				default   => null,
 			},
 		);
