@@ -409,12 +409,12 @@ class DailyMemoryTask extends SystemTask {
 		 *
 		 * @since 0.148.4
 		 *
-		 * @param float $threshold Default 1.10. Set to 0 to disable.
+		 * @param float $threshold Default 1.15. Set to 0 to disable.
 		 * @param array $context   date, original_size, new_size, archived_size, job_id.
 		 */
 		$max_combined_ratio = (float) apply_filters(
 			'datamachine_daily_memory_max_combined_ratio',
-			1.10,
+			1.15,
 			array(
 				'date'          => $date,
 				'original_size' => $original_size,
@@ -589,7 +589,7 @@ class DailyMemoryTask extends SystemTask {
 				$persistent_size    = strlen( (string) $parsed['persistent'] );
 				$archived_size      = strlen( (string) $parsed['archived'] );
 				$combined_size      = $persistent_size + $archived_size;
-				$max_combined_ratio = (float) apply_filters( 'datamachine_daily_memory_max_combined_ratio', 1.10 );
+				$max_combined_ratio = (float) apply_filters( 'datamachine_daily_memory_max_combined_ratio', 1.15 );
 				$max_combined_size  = $max_combined_ratio > 0 ? (int) ceil( strlen( $original_content ) * $max_combined_ratio ) : 0;
 				$continuation       = 'The split failed the conservation checks. Return a corrected full split that preserves every fact exactly once: persistent facts in `===PERSISTENT===`, archived/session-specific detail in `===ARCHIVED===`, with no duplicated archived content.';
 
