@@ -53,6 +53,7 @@ require_once dirname( __DIR__ ) . '/vendor/wordpress/agents-api/src/Packages/cla
 require_once dirname( __DIR__ ) . '/vendor/wordpress/agents-api/src/Packages/class-wp-agent-package-artifact-hasher.php';
 require_once dirname( __DIR__ ) . '/vendor/wordpress/agents-api/src/Packages/class-wp-agent-package-artifact-status.php';
 require_once dirname( __DIR__ ) . '/vendor/wordpress/agents-api/src/Packages/class-wp-agent-package-installed-artifact.php';
+require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/AgentBundleArtifactDefinitions.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/AgentBundleArtifactExtensions.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/AgentBundleArtifactHasher.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/AgentBundleArtifactStatus.php';

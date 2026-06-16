@@ -48,6 +48,12 @@ if ( ! function_exists( 'add_action' ) ) {
 	}
 }
 
+if ( ! function_exists( 'add_filter' ) ) {
+	function add_filter( ...$args ) {
+		// no-op
+	}
+}
+
 require_once dirname( __DIR__ ) . '/vendor/autoload.php';
 
 use DataMachine\Engine\Bundle\AgentBundleArtifactHasher;
