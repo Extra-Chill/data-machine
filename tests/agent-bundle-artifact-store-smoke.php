@@ -21,9 +21,28 @@ if ( ! function_exists( 'wp_json_encode' ) ) {
 	}
 }
 
+if ( ! function_exists( 'apply_filters' ) ) {
+	function apply_filters( $hook, $value, ...$args ) {
+		return $value;
+	}
+}
+
+if ( ! function_exists( 'add_filter' ) ) {
+	function add_filter( ...$args ) {
+		// no-op.
+	}
+}
+
 if ( ! function_exists( 'esc_html' ) ) {
 	function esc_html( $text ) {
 		return htmlspecialchars( (string) $text, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8' );
+	}
+}
+
+if ( ! function_exists( 'sanitize_title' ) ) {
+	function sanitize_title( $title ): string {
+		$slug = strtolower( preg_replace( '/[^a-zA-Z0-9_-]+/', '-', (string) $title ) ?? '' );
+		return trim( $slug, '-' );
 	}
 }
 
@@ -237,12 +256,12 @@ foreach ( array( 'datamachine_bundle_artifacts', 'agent_id', 'bundle_slug', 'bun
 }
 assert_bundle_artifact_store( 'schema has stable artifact identity key', str_contains( $sql, 'UNIQUE KEY artifact_identity (agent_id, bundle_slug, artifact_type, artifact_id)' ) );
 
-echo "\n[2] Install records store hashes, not payloads or secrets\n";
+echo "\n[2] Install records store hashes and rebase-safe payload snapshots\n";
 $installed_payload = array(
 	'name'   => 'Historical digest',
 	'config' => array(
-		'query'     => 'WordPress.com launch',
-		'api_token' => 'super-secret-token',
+		'query'    => 'WordPress.com launch',
+		'auth_ref' => 'bundle-auth:wpcom-history',
 	),
 );
 $installed         = $store->record_install( $manifest, 'prompt', 'launch-history', 'prompts/launch-history.md', $installed_payload, 42, '2026-04-28 00:00:00' );
@@ -252,7 +271,7 @@ assert_bundle_artifact_store_equals( 'agent id scopes installed row', 42, $store
 assert_bundle_artifact_store_equals( 'bundle slug normalized in stored row', 'wpcom-history', $stored_row['bundle_slug'] );
 assert_bundle_artifact_store_equals( 'installed hash persisted', AgentBundleArtifactHasher::hash( $installed_payload ), $stored_row['installed_hash'] );
 assert_bundle_artifact_store( 'raw payload is not stored', ! array_key_exists( 'payload', $stored_row ) );
-assert_bundle_artifact_store( 'secret value is not stored', ! str_contains( json_encode( $stored_row ) ?: '', 'super-secret-token' ) );
+assert_bundle_artifact_store_equals( 'installed payload snapshot persisted for rebase', wp_json_encode( $installed_payload ), $stored_row['installed_payload'] );
 
 echo "\n[3] Refreshing current payload distinguishes clean, modified, and missing\n";
 $clean = $store->refresh_current_payload( 'wpcom-history', 'prompt', 'launch-history', $installed_payload, 42, '2026-04-28 01:00:00' );

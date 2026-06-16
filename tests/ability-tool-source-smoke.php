@@ -423,5 +423,30 @@ assert_ability_tool_source_equals( 1, $ability->execute_count, 'ability execute 
 assert_ability_tool_source_equals( 'hello', $result['result']['received']['message'] ?? '', 'AI parameter reached ability input', $failures, $passes );
 assert_ability_tool_source_equals( 123, $result['result']['received']['job_id'] ?? 0, 'payload context reached ability input through existing binding path', $failures, $passes );
 
+echo "\n[5] required-tool evidence reports ability projection rejection reasons:\n";
+$resolver_evidence = ( new ToolPolicyResolver( new AbilityToolSourceSmokeManager() ) )->resolveWithEvidence(
+	array(
+		'modes'                => array( 'pipeline' ),
+		'agent_id'             => 0,
+		'previous_step_config' => null,
+		'next_step_config'     => null,
+		'engine_data'          => array(),
+		'categories'           => array(),
+	),
+	array( 'missing_ability_tool', 'unprojected_required_tool' ),
+	array()
+);
+$required_evidence = array();
+foreach ( $resolver_evidence['evidence']['required_tool_resolution'] ?? array() as $entry ) {
+	if ( is_array( $entry ) && is_string( $entry['tool_name'] ?? null ) ) {
+		$required_evidence[ $entry['tool_name'] ] = $entry;
+	}
+}
+assert_ability_tool_source_equals( 'ability_tools', $required_evidence['missing_ability_tool']['source'] ?? null, 'required missing ability projection reports ability_tools source', $failures, $passes );
+assert_ability_tool_source_equals( 'missing_ability', $required_evidence['missing_ability_tool']['reason'] ?? null, 'required missing ability projection reports missing_ability reason', $failures, $passes );
+assert_ability_tool_source_equals( 'demo/missing', $required_evidence['missing_ability_tool']['ability'] ?? null, 'required missing ability projection reports ability slug', $failures, $passes );
+assert_ability_tool_source_equals( 'ability_tools', $required_evidence['unprojected_required_tool']['source'] ?? null, 'required unprojected tool reports ability_tools diagnostic source', $failures, $passes );
+assert_ability_tool_source_equals( 'no_projection', $required_evidence['unprojected_required_tool']['reason'] ?? null, 'required unprojected tool reports no_projection reason', $failures, $passes );
+
 echo "\nAssertions: {$passes} passed, " . count( $failures ) . ' failed, ' . ( $passes + count( $failures ) ) . " total\n";
 exit( count( $failures ) );
