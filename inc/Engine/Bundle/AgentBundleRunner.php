@@ -138,8 +138,6 @@ final class AgentBundleRunner {
 	/** @return array<string,mixed> */
 	private function response( array $response, array $input, array $runtime_imports = array(), array $selection = array() ): array {
 		$response['schema'] ??= 'datamachine/agent-bundle-run/v1';
-		$response['status']   = $this->status_from_response( $response );
-		$response['success']  = ! empty( $response['success'] ) && self::is_success_status( $response['status'] );
 
 		if ( ! empty( $runtime_imports ) ) {
 			$response['runtime_imports'] = $runtime_imports;
@@ -162,6 +160,10 @@ final class AgentBundleRunner {
 		$output_projection              = $this->output_projection( $response, $input );
 		$response['outputs']            = $output_projection['outputs'];
 		$response['output_diagnostics'] = $output_projection['diagnostics'];
+		$response                       = $this->enforce_required_outputs( $response, $input );
+		$response['status']             = $this->status_from_response( $response );
+		$response['success']            = ! empty( $response['success'] ) && self::is_success_status( $response['status'] );
+		$response['completion_outcome'] = $this->completion_outcome( $response );
 
 		return $response;
 	}
@@ -292,7 +294,9 @@ final class AgentBundleRunner {
 	private function output_projection( array $response, array $input = array() ): array {
 		$engine_data = is_array( $response['engine_data'] ?? null ) ? $response['engine_data'] : array();
 		$mappings    = $this->declared_output_mappings( $input );
-		$declared    = array_values( array_unique( array_merge( $this->declared_output_keys( $engine_data ), array_keys( $mappings ) ) ) );
+		$required    = $this->required_output_keys( $engine_data, $input );
+		$artifacts   = $this->required_artifact_keys( $input );
+		$declared    = array_values( array_unique( array_merge( $required, $artifacts, array_keys( $mappings ) ) ) );
 		$outputs     = array();
 
 		foreach ( $mappings as $key => $path ) {
@@ -331,12 +335,68 @@ final class AgentBundleRunner {
 			'outputs'     => $outputs,
 			'diagnostics' => self::compact_response_array(
 				array(
-					'declared_outputs' => $declared,
-					'present_outputs'  => $present,
-					'missing_outputs'  => $missing,
+					'declared_outputs'  => $declared,
+					'required_outputs'  => $required,
+					'required_artifacts' => $artifacts,
+					'present_outputs'   => $present,
+					'missing_outputs'   => $missing,
 				)
 			),
 		);
+	}
+
+	/** @return array<string,mixed> */
+	private function enforce_required_outputs( array $response, array $input ): array {
+		$diagnostics = is_array( $response['output_diagnostics'] ?? null ) ? $response['output_diagnostics'] : array();
+		$required    = array_values(
+			array_unique(
+				array_merge(
+					is_array( $diagnostics['required_outputs'] ?? null ) ? $diagnostics['required_outputs'] : array(),
+					is_array( $diagnostics['required_artifacts'] ?? null ) ? $diagnostics['required_artifacts'] : array()
+				)
+			)
+		);
+		if ( empty( $required ) || empty( $response['success'] ) || ! $this->can_enforce_required_outputs( $response, $input ) ) {
+			return $response;
+		}
+
+		$outputs = is_array( $response['outputs'] ?? null ) ? $response['outputs'] : array();
+		$missing = array_values(
+			array_filter(
+				$required,
+				function ( string $key ) use ( $outputs ): bool {
+					return ! array_key_exists( $key, $outputs ) || ! $this->has_output_value( $outputs[ $key ] );
+				}
+			)
+		);
+		if ( empty( $missing ) ) {
+			return $response;
+		}
+
+		$response['success'] = false;
+		$response['error']   = sprintf( 'Agent bundle run completed without required semantic outputs: %s.', implode( ', ', $missing ) );
+		$response['output_diagnostics'] = array_merge(
+			$diagnostics,
+			array(
+				'enforcement'     => 'failed_missing_required_outputs',
+				'missing_required' => $missing,
+			)
+		);
+
+		return $response;
+	}
+
+	private function can_enforce_required_outputs( array $response, array $input ): bool {
+		if ( ! empty( $response['dry_run'] ) ) {
+			return false;
+		}
+
+		if ( ! empty( $response['wait_for_completion'] ) || ! empty( $input['wait_for_completion'] ) || ! empty( $input['wait'] ) ) {
+			return true;
+		}
+
+		$status = (string) ( $response['status'] ?? $response['job_status'] ?? '' );
+		return '' !== $status && 'scheduled' !== $status && 'pending' !== $status;
 	}
 
 	/** @return array<string,string> */
@@ -379,14 +439,15 @@ final class AgentBundleRunner {
 	}
 
 	/** @return array<int,string> */
-	private function declared_output_keys( array $engine_data ): array {
+	private function required_output_keys( array $engine_data, array $input = array() ): array {
 		$keys = array();
-		foreach ( array( 'completion_assertions_required', 'completion_assertions_satisfied' ) as $group ) {
+		foreach ( array( 'completion_assertions_required' ) as $group ) {
 			$assertions = is_array( $engine_data[ $group ] ?? null ) ? $engine_data[ $group ] : array();
 			if ( is_array( $assertions['engine_data_keys'] ?? null ) ) {
 				$keys = array_merge( $keys, $assertions['engine_data_keys'] );
 			}
 		}
+		$keys = array_merge( $keys, $this->normalize_required_key_list( $input['required_outputs'] ?? array() ) );
 
 		$missing = is_array( $engine_data['completion_assertions_missing'] ?? null ) ? $engine_data['completion_assertions_missing'] : array();
 		if ( is_array( $missing['engine_data_keys'] ?? null ) ) {
@@ -395,6 +456,29 @@ final class AgentBundleRunner {
 
 		$keys = array_map( static fn( $key ): string => sanitize_key( (string) $key ), $keys );
 		$keys = array_filter( $keys, static fn( string $key ): bool => '' !== $key );
+
+		return array_values( array_unique( $keys ) );
+	}
+
+	/** @return array<int,string> */
+	private function required_artifact_keys( array $input ): array {
+		return $this->normalize_required_key_list( $input['required_artifacts'] ?? array() );
+	}
+
+	/** @return array<int,string> */
+	private function normalize_required_key_list( mixed $raw ): array {
+		if ( ! is_array( $raw ) ) {
+			return array();
+		}
+
+		$keys = array();
+		foreach ( $raw as $key => $value ) {
+			$candidate = is_string( $key ) ? $key : ( is_scalar( $value ) ? (string) $value : '' );
+			$candidate = sanitize_key( $candidate );
+			if ( '' !== $candidate ) {
+				$keys[] = $candidate;
+			}
+		}
 
 		return array_values( array_unique( $keys ) );
 	}

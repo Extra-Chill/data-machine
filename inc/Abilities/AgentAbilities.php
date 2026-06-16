@@ -1579,6 +1579,18 @@ class AgentAbilities {
 					'type'        => 'object',
 					'description' => 'Initial engine data merged into the ephemeral workflow job.',
 				),
+				'required_outputs'    => array(
+					'type'        => array( 'array', 'object' ),
+					'description' => 'Semantic output keys that must be present and non-empty when a completed bundle run is returned.',
+				),
+				'required_artifacts'   => array(
+					'type'        => array( 'array', 'object' ),
+					'description' => 'Typed artifact output keys that must be present and non-empty when a completed bundle run is returned.',
+				),
+				'engine_data_outputs' => array(
+					'type'        => 'object',
+					'description' => 'Map semantic output keys to engine_data/response paths for stable caller-facing outputs.',
+				),
 				'provider'            => array(
 					'type'        => 'string',
 					'description' => 'Optional wp-ai-client provider slug to use as the run-scoped pipeline model default.',
