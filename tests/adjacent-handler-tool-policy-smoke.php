@@ -22,20 +22,28 @@ namespace {
 		function do_action( string $_hook, ...$_args ): void {}
 	}
 
-	if ( ! function_exists( 'apply_filters' ) ) {
+	$datamachine_step_types = static function ( $value ) {
+		return array(
+			'ai'           => array( 'uses_handler' => false, 'multi_handler' => false ),
+			'system_task'  => array( 'uses_handler' => false, 'multi_handler' => false ),
+			'webhook_gate' => array( 'uses_handler' => false, 'multi_handler' => false ),
+			'fetch'        => array( 'uses_handler' => true, 'multi_handler' => false ),
+			'publish'      => array( 'uses_handler' => true, 'multi_handler' => true ),
+			'upsert'       => array( 'uses_handler' => true, 'multi_handler' => true ),
+		);
+	};
+
+	if ( function_exists( 'add_filter' ) ) {
+		add_filter( 'datamachine_step_types', $datamachine_step_types );
+	} elseif ( ! function_exists( 'apply_filters' ) ) {
+		$GLOBALS['datamachine_step_types_filter'] = $datamachine_step_types;
+
 		function apply_filters( string $hook, $value ) {
 			if ( 'datamachine_step_types' !== $hook ) {
 				return $value;
 			}
 
-			return array(
-				'ai'           => array( 'uses_handler' => false, 'multi_handler' => false ),
-				'system_task'  => array( 'uses_handler' => false, 'multi_handler' => false ),
-				'webhook_gate' => array( 'uses_handler' => false, 'multi_handler' => false ),
-				'fetch'        => array( 'uses_handler' => true, 'multi_handler' => false ),
-				'publish'      => array( 'uses_handler' => true, 'multi_handler' => true ),
-				'upsert'       => array( 'uses_handler' => true, 'multi_handler' => true ),
-			);
+			return $GLOBALS['datamachine_step_types_filter']( $value );
 		}
 	}
 
