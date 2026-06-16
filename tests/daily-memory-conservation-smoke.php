@@ -126,6 +126,13 @@ function evaluate_completion_policy(
 	int $persistent_size,
 	int $archived_size
 ): array {
+	add_filter(
+		'datamachine_daily_memory_max_combined_ratio',
+		static function (): float {
+			return 1.10;
+		}
+	);
+
 	$task   = new DataMachine\Engine\AI\System\Tasks\DailyMemoryTask();
 	$method = new ReflectionMethod( $task, 'buildCleanupCompletionPolicy' );
 	$policy = $method->invoke(
@@ -263,6 +270,16 @@ assert_committed( true, array( 'committed' => ! empty( $policy_result['context']
 
 $policy_result = evaluate_completion_policy( 9301, 7600, 1700 );
 assert_committed( true, array( 'committed' => $policy_result['complete'], 'reason' => $policy_result['message'] ), 'under-target persistent output completes', $failures, $passes );
+
+// Test 13: live prompt-follow-up shape after the partition prompt improved the
+// persistent size but over-expanded archived detail. The continuation must give
+// the model an explicit combined-output budget, otherwise it keeps producing a
+// valid-sized MEMORY.md plus an oversized archive split until max turns.
+echo "\n[13] conservation nudge includes combined-output budget:\n";
+$policy_result = evaluate_completion_policy( 9233, 4120, 8964 );
+assert_committed( false, array( 'committed' => $policy_result['complete'], 'reason' => $policy_result['message'] ), 'expanded archive output requests another turn', $failures, $passes );
+assert_committed( true, array( 'committed' => str_contains( (string) ( $policy_result['context']['continuation_message'] ?? '' ), 'allowed combined maximum' ), 'reason' => 'continuation context' ), 'expanded archive nudge includes allowed combined maximum', $failures, $passes );
+assert_committed( true, array( 'committed' => str_contains( (string) ( $policy_result['context']['continuation_message'] ?? '' ), 'Condense ARCHIVED into compact retrievable notes' ), 'reason' => 'continuation context' ), 'expanded archive nudge tells model to condense archive detail', $failures, $passes );
 
 assert_committed( true, array( 'committed' => method_exists( $task ?? new DataMachine\Engine\AI\System\Tasks\DailyMemoryTask(), 'runAiConversation' ), 'reason' => 'system task helper' ), 'system tasks expose generic AI conversation loop helper', $failures, $passes );
 

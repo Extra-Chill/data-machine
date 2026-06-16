@@ -586,12 +586,35 @@ class DailyMemoryTask extends SystemTask {
 
 			$plan = $this->planMemoryCompaction( $original_content, $assistant_text, $date, $jobId, $provider, $model );
 			if ( empty( $plan['success'] ) ) {
+				$persistent_size    = strlen( (string) $parsed['persistent'] );
+				$archived_size      = strlen( (string) $parsed['archived'] );
+				$combined_size      = $persistent_size + $archived_size;
+				$max_combined_ratio = (float) apply_filters( 'datamachine_daily_memory_max_combined_ratio', 1.10 );
+				$max_combined_size  = $max_combined_ratio > 0 ? (int) ceil( strlen( $original_content ) * $max_combined_ratio ) : 0;
+				$continuation       = 'The split failed the conservation checks. Return a corrected full split that preserves every fact exactly once: persistent facts in `===PERSISTENT===`, archived/session-specific detail in `===ARCHIVED===`, with no duplicated archived content.';
+
+				if ( $max_combined_size > 0 && $combined_size > $max_combined_size ) {
+					$continuation = sprintf(
+						'The split failed because total output expanded too much: `===PERSISTENT===` is %s, `===ARCHIVED===` is %s, combined is %s, and the allowed combined maximum is %s. Return a corrected full split with `===PERSISTENT===` at or below %s and combined PERSISTENT + ARCHIVED at or below %s. Condense ARCHIVED into compact retrievable notes instead of preserving verbose prose or duplicated context.',
+						size_format( $persistent_size ),
+						size_format( $archived_size ),
+						size_format( $combined_size ),
+						size_format( $max_combined_size ),
+						size_format( AgentMemory::MAX_FILE_SIZE ),
+						size_format( $max_combined_size )
+					);
+				}
+
 				return WP_Agent_Conversation_Completion_Decision::incomplete(
 					'Daily memory completion policy: conservation check failed.',
 					array(
 						'turn_count'           => $turn_count,
 						'plan_message'         => $plan['message'] ?? 'Compaction failed conservation checks.',
-						'continuation_message' => 'The split failed the conservation checks. Return a corrected full split that preserves every fact exactly once: persistent facts in `===PERSISTENT===`, archived/session-specific detail in `===ARCHIVED===`, with no duplicated archived content.',
+						'persistent_size'      => $persistent_size,
+						'archived_size'        => $archived_size,
+						'combined_size'        => $combined_size,
+						'max_combined_size'    => $max_combined_size,
+						'continuation_message' => $continuation,
 					)
 				);
 			}
