@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.149.0] - 2026-06-16
+
+### Added
+- add agent adopt + symmetric bundle artifact matching
+
 ## [0.148.11] - 2026-06-16
 
 ### Fixed
