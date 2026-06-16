@@ -2,6 +2,12 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.150.1] - 2026-06-16
+
+### Fixed
+- use public ability lookup after init
+- defer scaffold ability lookup during activation
+
 ## [0.150.0] - 2026-06-16
 
 ### Added
