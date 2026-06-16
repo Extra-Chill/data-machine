@@ -59,6 +59,8 @@ if ( ! function_exists( 'do_action' ) ) {
 
 require_once __DIR__ . '/agents-api-loader.php';
 datamachine_tests_require_agents_api();
+require_once __DIR__ . '/../inc/Core/FilesRepository/AgentMemory.php';
+require_once __DIR__ . '/../inc/Engine/AI/NaturalCompletionPolicyInterface.php';
 require_once __DIR__ . '/../inc/Engine/AI/System/Tasks/SystemTask.php';
 require_once __DIR__ . '/../inc/Engine/AI/System/Tasks/DailyMemoryTask.php';
 
@@ -113,6 +115,39 @@ function evaluate_conservation(
 		'committed' => true,
 		'reason'    => 'conservation ok',
 		'plan'      => $plan,
+	);
+}
+
+/**
+ * Evaluate the daily-memory natural completion policy for synthetic output.
+ */
+function evaluate_completion_policy(
+	int $original_size,
+	int $persistent_size,
+	int $archived_size
+): array {
+	$task   = new DataMachine\Engine\AI\System\Tasks\DailyMemoryTask();
+	$method = new ReflectionMethod( $task, 'buildCleanupCompletionPolicy' );
+	$policy = $method->invoke(
+		$task,
+		str_repeat( 'o', $original_size ),
+		'2026-05-01',
+		123,
+		'openai',
+		'gpt-test'
+	);
+
+	$decision = $policy->recordNaturalCompletion(
+		array(),
+		"===PERSISTENT===\n" . str_repeat( 'p', $persistent_size ) . "\n===ARCHIVED===\n" . str_repeat( 'a', $archived_size ),
+		array(),
+		1
+	);
+
+	return array(
+		'complete' => $decision->isComplete(),
+		'message'  => $decision->message(),
+		'context'  => $decision->context(),
 	);
 }
 
@@ -211,6 +246,19 @@ assert_committed( true, $result, '7.5% expansion commits', $failures, $passes );
 echo "\n[11] max combined ratio = 0 disables expansion check:\n";
 $result = evaluate_conservation( 1000, 800, 600, 0.85, 0.0 );
 assert_committed( true, $result, 'disabled expansion check lets duplicate split through', $failures, $passes );
+
+// Test 12: system task conversation completion policy rejects a cleanup that
+// remains over MEMORY.md's target size. This covers the live follow-up shape:
+// 9301B original -> 9233B persistent + 643B archived should iterate, not commit.
+echo "\n[12] daily-memory completion policy enforces target size:\n";
+$policy_result = evaluate_completion_policy( 9301, 9233, 643 );
+assert_committed( false, array( 'committed' => $policy_result['complete'], 'reason' => $policy_result['message'] ), 'oversized persistent output requests another turn', $failures, $passes );
+assert_committed( true, array( 'committed' => ! empty( $policy_result['context']['continuation_message'] ), 'reason' => 'continuation context' ), 'oversized output includes continuation nudge', $failures, $passes );
+
+$policy_result = evaluate_completion_policy( 9301, 7600, 1700 );
+assert_committed( true, array( 'committed' => $policy_result['complete'], 'reason' => $policy_result['message'] ), 'under-target persistent output completes', $failures, $passes );
+
+assert_committed( true, array( 'committed' => method_exists( $task ?? new DataMachine\Engine\AI\System\Tasks\DailyMemoryTask(), 'runAiConversation' ), 'reason' => 'system task helper' ), 'system tasks expose generic AI conversation loop helper', $failures, $passes );
 
 echo "\n-------------------------------\n";
 $total = $passes + count( $failures );

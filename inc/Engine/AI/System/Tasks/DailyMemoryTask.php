@@ -27,8 +27,10 @@ use DataMachine\Core\Database\Chat\ConversationStoreFactory;
 use DataMachine\Core\PluginSettings;
 use DataMachine\Core\FilesRepository\AgentMemory;
 use DataMachine\Core\FilesRepository\DailyMemory;
-use DataMachine\Engine\AI\RequestBuilder;
+use DataMachine\Engine\AI\NaturalCompletionPolicyInterface;
 use AgentsAPI\AI\WP_Agent_Compaction_Conservation;
+use AgentsAPI\AI\WP_Agent_Conversation_Completion_Decision;
+use AgentsAPI\AI\WP_Agent_Conversation_Completion_Policy;
 use AgentsAPI\AI\WP_Agent_Markdown_Section_Compaction_Adapter;
 
 class DailyMemoryTask extends SystemTask {
@@ -161,27 +163,43 @@ class DailyMemoryTask extends SystemTask {
 			$ai_payload['user_id'] = $user_id;
 		}
 
-		$response = RequestBuilder::build(
+		$response = $this->runAiConversation(
 			$messages,
 			$provider,
 			$model,
-			array(),
-			array( 'system' ),
-			$ai_payload
+			$ai_payload,
+			$this->buildCleanupCompletionPolicy( $memory_content, $date, $jobId, $provider, $model ),
+			(int) apply_filters(
+				'datamachine_daily_memory_max_turns',
+				3,
+				array(
+					'job_id'        => $jobId,
+					'date'          => $date,
+					'original_size' => $original_size,
+				)
+			)
 		);
 
-		if ( $response instanceof \WP_Error ) {
+		$datamachine_metadata = is_array( $response['metadata']['datamachine'] ?? null ) ? $response['metadata']['datamachine'] : array();
+		if ( empty( $datamachine_metadata['completed'] ) ) {
 			do_action(
 				'datamachine_log',
 				'warning',
-				'Daily memory AI request failed: ' . $response->get_error_message(),
-				array( 'date' => $date )
+				'Daily memory AI conversation did not satisfy completion policy.',
+				array(
+					'date'         => $date,
+					'job_id'       => $jobId,
+					'status'       => $response['status'] ?? '',
+					'turn_count'   => $response['turn_count'] ?? 0,
+					'datamachine'  => $datamachine_metadata,
+					'error'        => $response['error'] ?? null,
+				)
 			);
-			$this->failJob( $jobId, 'AI request failed: ' . $response->get_error_message() );
+			$this->failJob( $jobId, $response['error'] ?? 'Daily memory completion policy was not satisfied. MEMORY.md unchanged.' );
 			return;
 		}
 
-		$ai_output = trim( RequestBuilder::resultText( $response ) );
+		$ai_output = trim( (string) ( $response['final_content'] ?? '' ) );
 		$ai_output = str_replace( '\n', "\n", $ai_output );
 
 		if ( empty( $ai_output ) ) {
@@ -537,6 +555,99 @@ class DailyMemoryTask extends SystemTask {
 				),
 			),
 		);
+	}
+
+	/**
+	 * Build a completion policy for daily memory cleanup responses.
+	 *
+	 * The model may need more than one pass to satisfy a size target without
+	 * losing information. This policy keeps iteration inside the shared Agents API
+	 * conversation loop instead of hand-rolling retries in the task.
+	 *
+	 * @param string $original_content Current MEMORY.md content.
+	 * @param string $date             Archive date.
+	 * @param int    $jobId            Job ID.
+	 * @param string $provider         Summary provider.
+	 * @param string $model            Summary model.
+	 * @return WP_Agent_Conversation_Completion_Policy
+	 */
+	private function buildCleanupCompletionPolicy( string $original_content, string $date, int $jobId, string $provider, string $model ): WP_Agent_Conversation_Completion_Policy {
+		$validator = function ( string $assistant_text, int $turn_count ) use ( $original_content, $date, $jobId, $provider, $model ): WP_Agent_Conversation_Completion_Decision {
+			$parsed = $this->parseCleanupResponse( $assistant_text );
+			if ( empty( $parsed['persistent'] ) ) {
+				return WP_Agent_Conversation_Completion_Decision::incomplete(
+					'Daily memory completion policy: missing persistent section.',
+					array(
+						'turn_count'           => $turn_count,
+						'continuation_message' => 'Your response must use the exact required format with both `===PERSISTENT===` and `===ARCHIVED===`. Return the full corrected split now.',
+					)
+				);
+			}
+
+			$plan = $this->planMemoryCompaction( $original_content, $assistant_text, $date, $jobId, $provider, $model );
+			if ( empty( $plan['success'] ) ) {
+				return WP_Agent_Conversation_Completion_Decision::incomplete(
+					'Daily memory completion policy: conservation check failed.',
+					array(
+						'turn_count'           => $turn_count,
+						'plan_message'         => $plan['message'] ?? 'Compaction failed conservation checks.',
+						'continuation_message' => 'The split failed the conservation checks. Return a corrected full split that preserves every fact exactly once: persistent facts in `===PERSISTENT===`, archived/session-specific detail in `===ARCHIVED===`, with no duplicated archived content.',
+					)
+				);
+			}
+
+			$persistent_size = strlen( (string) $parsed['persistent'] );
+			$original_size   = strlen( $original_content );
+			if ( $original_size > AgentMemory::MAX_FILE_SIZE && $persistent_size > AgentMemory::MAX_FILE_SIZE ) {
+				return WP_Agent_Conversation_Completion_Decision::incomplete(
+					'Daily memory completion policy: persistent memory remains oversized.',
+					array(
+						'turn_count'           => $turn_count,
+						'original_size'        => $original_size,
+						'persistent_size'      => $persistent_size,
+						'max_size'             => AgentMemory::MAX_FILE_SIZE,
+						'continuation_message' => sprintf(
+							'The `===PERSISTENT===` section is still %s, above the target %s. Return a corrected full split. Keep durable facts, archive session-specific detail, condense overlapping entries, and ensure `===PERSISTENT===` is at or below %s without discarding information.',
+							size_format( $persistent_size ),
+							size_format( AgentMemory::MAX_FILE_SIZE ),
+							size_format( AgentMemory::MAX_FILE_SIZE )
+						),
+					)
+				);
+			}
+
+			return WP_Agent_Conversation_Completion_Decision::complete(
+				'Daily memory completion policy satisfied.',
+				array(
+					'turn_count'      => $turn_count,
+					'original_size'   => $original_size,
+					'persistent_size' => $persistent_size,
+					'max_size'        => AgentMemory::MAX_FILE_SIZE,
+				)
+			);
+		};
+
+		return new class( $validator ) implements WP_Agent_Conversation_Completion_Policy, NaturalCompletionPolicyInterface {
+			/** @var callable */
+			private $validator;
+
+			/** @param callable $validator Completion validator. */
+			public function __construct( callable $validator ) {
+				$this->validator = $validator;
+			}
+
+			/** @inheritDoc */
+			public function recordToolResult( string $tool_name, ?array $tool_def, array $tool_result, array $runtime_context, int $turn_count ): WP_Agent_Conversation_Completion_Decision {
+				unset( $tool_name, $tool_def, $tool_result, $runtime_context, $turn_count );
+				return WP_Agent_Conversation_Completion_Decision::incomplete();
+			}
+
+			/** @inheritDoc */
+			public function recordNaturalCompletion( array $messages, string $assistant_text, array $runtime_context, int $turn_count ): WP_Agent_Conversation_Completion_Decision {
+				unset( $messages, $runtime_context );
+				return call_user_func( $this->validator, $assistant_text, $turn_count );
+			}
+		};
 	}
 
 	/**

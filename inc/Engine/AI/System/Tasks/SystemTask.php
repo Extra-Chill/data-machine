@@ -46,6 +46,7 @@ use DataMachine\Abilities\Flow\QueueAbility;
 use DataMachine\Core\Database\Jobs\Jobs;
 use DataMachine\Core\PluginSettings;
 use DataMachine\Engine\AI\System\SystemTaskPromptRegistry;
+use AgentsAPI\AI\WP_Agent_Conversation_Completion_Policy;
 
 abstract class SystemTask {
 
@@ -113,6 +114,45 @@ abstract class SystemTask {
 	 * @return string Task type identifier.
 	 */
 	abstract public function getTaskType(): string;
+
+	/**
+	 * Run a system-task AI conversation through Data Machine's conversation loop.
+	 *
+	 * System tasks historically used one-shot RequestBuilder calls. Tasks that
+	 * need bounded iteration, completion policies, transcript events, or runtime
+	 * loop diagnostics should use this helper instead of open-coding retries.
+	 *
+	 * @param array                                     $messages          Initial canonical message envelopes.
+	 * @param string                                    $provider          AI provider identifier.
+	 * @param string                                    $model             AI model identifier.
+	 * @param array                                     $payload           System-task payload / runtime context.
+	 * @param WP_Agent_Conversation_Completion_Policy|null $completion_policy Optional completion policy.
+	 * @param int|null                                  $max_turns         Optional maximum turns.
+	 * @return array Normalized Data Machine conversation result.
+	 */
+	protected function runAiConversation( array $messages, string $provider, string $model, array $payload = array(), ?WP_Agent_Conversation_Completion_Policy $completion_policy = null, ?int $max_turns = null ): array {
+		$payload = array_merge(
+			array(
+				'task_type' => $this->getTaskType(),
+			),
+			$payload
+		);
+
+		if ( null !== $completion_policy ) {
+			$payload['completion_policy'] = $completion_policy;
+		}
+
+		return \DataMachine\Engine\AI\datamachine_run_conversation(
+			$messages,
+			array(),
+			$provider,
+			$model,
+			array( 'system' ),
+			$payload,
+			$max_turns ?? PluginSettings::DEFAULT_MAX_TURNS,
+			false
+		);
+	}
 
 	/**
 	 * Get task metadata for registry, UI display, and manual-run safety.
