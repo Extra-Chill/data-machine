@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 Homeboy maintains this file from conventional commits at release time —
 do not edit by hand.
 
+## [0.7.0] - 2026-06-16
+
+### Added
+- own the google-analytics CLI command in business
+
+### Changed
+- reflect DMB AGENTS.md CLI surface via shared introspector
+
 ## [0.6.1] - 2026-06-14
 
 ### Fixed
