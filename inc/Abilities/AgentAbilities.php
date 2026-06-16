@@ -1641,6 +1641,10 @@ class AgentAbilities {
 					'type'        => 'object',
 					'description' => 'Runtime-scoped Data Machine tool definitions merged through datamachine_resolved_tools only for this run.',
 				),
+				'ability_tools'       => array(
+					'type'        => array( 'object', 'array' ),
+					'description' => 'Runtime-scoped generic ability-backed tools. Accepts a keyed map or list entries with name and ability, e.g. [{"name":"my_tool","ability":"plugin/ability"}].',
+				),
 				'tools'               => array(
 					'type'        => array( 'object', 'array' ),
 					'description' => 'Alias for runtime_tools; accepts keyed tool definitions or a list with name/tool fields.',

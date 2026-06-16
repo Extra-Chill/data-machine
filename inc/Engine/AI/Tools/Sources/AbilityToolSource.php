@@ -112,7 +112,8 @@ final class AbilityToolSource {
 			);
 		}
 
-		$declared = apply_filters( 'datamachine_ability_tool_projections', array(), $args );
+		$declared = $this->declarationsFromContext( $args );
+		$declared = apply_filters( 'datamachine_ability_tool_projections', $declared, $args );
 		$declared = apply_filters( 'datamachine_ability_tools', $declared, $args );
 		if ( ! is_array( $declared ) ) {
 			foreach ( $diagnostic_tool_names as $tool_name ) {
@@ -190,6 +191,51 @@ final class AbilityToolSource {
 			'tools'      => $tools,
 			'rejections' => $rejections,
 		);
+	}
+
+	/**
+	 * Extract run-scoped ability tool declarations from resolver context.
+	 *
+	 * Accepts keyed maps and list entries with a `name` field:
+	 *
+	 *     array( 'my_tool' => array( 'ability' => 'plugin/ability' ) )
+	 *     array( array( 'name' => 'my_tool', 'ability' => 'plugin/ability' ) )
+	 *
+	 * @param array $args Full resolution arguments.
+	 * @return array<string,array<string,mixed>> Declarations keyed by model-facing tool name.
+	 */
+	private function declarationsFromContext( array $args ): array {
+		$sets = array( $args['ability_tools'] ?? null );
+
+		$engine_data = is_array( $args['engine_data'] ?? null ) ? $args['engine_data'] : array();
+		$job_snapshot = is_array( $engine_data['job'] ?? null ) ? $engine_data['job'] : array();
+		$sets[] = $job_snapshot['ability_tools'] ?? null;
+
+		$client_context = is_array( $args['client_context'] ?? null ) ? $args['client_context'] : array();
+		$sets[] = $client_context['ability_tools'] ?? null;
+
+		$declared = array();
+		foreach ( $sets as $set ) {
+			if ( ! is_array( $set ) ) {
+				continue;
+			}
+
+			foreach ( $set as $name => $declaration ) {
+				if ( ! is_array( $declaration ) ) {
+					continue;
+				}
+
+				$tool_name = is_string( $name ) && '' !== $name ? $name : (string) ( $declaration['name'] ?? '' );
+				if ( '' === $tool_name ) {
+					continue;
+				}
+
+				unset( $declaration['name'] );
+				$declared[ $tool_name ] = $declaration;
+			}
+		}
+
+		return $declared;
 	}
 
 	/**
