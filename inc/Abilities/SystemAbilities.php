@@ -633,6 +633,15 @@ class SystemAbilities {
 		) ), $task_context );
 
 		if ( ! $job_id ) {
+			$scheduler_error = TaskScheduler::getLastScheduleError();
+			if ( is_array( $scheduler_error ) && ! empty( $scheduler_error['message'] ) ) {
+				return array(
+					'success' => false,
+					'error'   => $scheduler_error['error'],
+					'message' => $scheduler_error['message'],
+				);
+			}
+
 			return array(
 				'success' => false,
 				'error'   => 'Failed to schedule task.',

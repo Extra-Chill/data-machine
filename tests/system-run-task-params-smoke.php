@@ -228,6 +228,22 @@ function smoke_default_system_task_workflow( string $task_type, array $params ):
 	);
 }
 
+function smoke_system_run_schedule_failure_response( ?array $scheduler_error ): array {
+	if ( is_array( $scheduler_error ) && ! empty( $scheduler_error['message'] ) ) {
+		return array(
+			'success' => false,
+			'error'   => $scheduler_error['error'],
+			'message' => $scheduler_error['message'],
+		);
+	}
+
+	return array(
+		'success' => false,
+		'error'   => 'Failed to schedule task.',
+		'message' => 'TaskScheduler returned false — check logs for details.',
+	);
+}
+
 echo "\n[1] CLI structured params parse\n";
 $params = smoke_parse_run_task_params(
 	array(
@@ -328,6 +344,19 @@ $assert( 'SystemTask workflow stores params in flow_step_settings', $scheduled_p
 $assert( 'SystemTask workflow stores canonical task_type', 'wiki_maintain' === $workflow['steps'][0]['flow_step_settings']['task_type'] );
 $assert( 'SystemTask workflow does not store legacy task alias', ! array_key_exists( 'task', $workflow['steps'][0]['flow_step_settings'] ) );
 
+echo "\n[3b] Scheduler rejection details surface in run response\n";
+$response = smoke_system_run_schedule_failure_response(
+	array(
+		'error'      => 'task_scheduler_agent_context_required',
+		'error_code' => 'task_scheduler_agent_context_required',
+		'message'    => 'TaskScheduler: queued task requires agent context',
+	)
+);
+$assert( 'scheduler error code becomes run error', 'task_scheduler_agent_context_required' === $response['error'] );
+$assert( 'scheduler log message becomes run message', 'TaskScheduler: queued task requires agent context' === $response['message'] );
+$response = smoke_system_run_schedule_failure_response( null );
+$assert( 'missing scheduler details preserve generic fallback', 'Failed to schedule task.' === $response['error'] );
+
 echo "\n[4] Source tripwires\n";
 $system_command = file_get_contents( __DIR__ . '/../inc/Cli/Commands/SystemCommand.php' );
 $abilities      = file_get_contents( __DIR__ . '/../inc/Abilities/SystemAbilities.php' );
@@ -343,9 +372,11 @@ $assert( 'CLI forwards task_params to runTask', str_contains( $system_command, "
 $assert( 'run-task ability schema accepts task_params', str_contains( $abilities, "'task_params' => array" ) );
 $assert( 'run-task ability extracts agent alias before validation', str_contains( $abilities, "array_key_exists( 'agent', $" . 'params' ) && str_contains( $abilities, "'agent_slug'" ) );
 $assert( 'run-task ability schedules merged task params', str_contains( $abilities, 'array_merge( $task_params' ) );
+$assert( 'run-task ability surfaces scheduler errors', str_contains( $abilities, 'TaskScheduler::getLastScheduleError()' ) );
 $assert( 'TaskRegistry exposes mutates metadata', str_contains( $registry, "'mutates'" ) );
 $assert( 'TaskRegistry exposes requires_scope metadata', str_contains( $registry, "'requires_scope'" ) );
 $assert( 'TaskScheduler passes system job source to execute-workflow', str_contains( $scheduler, "'job_source'    => 'system'" ) );
+$assert( 'TaskScheduler records rejection details for callers', str_contains( $scheduler, 'recordScheduleError' ) && str_contains( $scheduler, 'getLastScheduleError' ) );
 $assert( 'execute-workflow honors caller job source', str_contains( $workflow_ability, "'source'      => $" . 'job_source' ) );
 
 echo "\nAssertions: {$total}, Failures: {$failures}\n";
