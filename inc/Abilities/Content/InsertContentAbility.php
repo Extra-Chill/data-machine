@@ -168,9 +168,14 @@ class InsertContentAbility {
 	public static function execute( array $input ): array {
 		// Resolve the target blog. On multisite the post may live on another
 		// site than the one this request landed on; switch to it so the read,
-		// the edit_post capability check, the preview staging, and the eventual
-		// apply all target the right post. blog_id rides inside apply_input
-		// below so the resolve replay re-enters the same context.
+		// the edit_post capability check, and the eventual apply target the
+		// right post. blog_id rides inside apply_input below so the resolve
+		// replay re-enters the same context.
+		//
+		// IMPORTANT: pending-action STAGING must NOT happen inside this switch
+		// — the store is per-blog and the resolve runs on the calling blog, so
+		// staging is bracketed back to the origin blog via
+		// BlogContext::run_on_origin() in the preview branch.
 		$ctx = BlogContext::enter( $input );
 		if ( is_wp_error( $ctx ) ) {
 			return array(
@@ -180,7 +185,7 @@ class InsertContentAbility {
 		}
 
 		try {
-			return self::execute_in_context( $input );
+			return self::execute_in_context( $input, $ctx );
 		} finally {
 			BlogContext::leave( $ctx );
 		}
@@ -189,10 +194,11 @@ class InsertContentAbility {
 	/**
 	 * Execute the insertion within the (already-resolved) blog context.
 	 *
-	 * @param array $input Input parameters.
+	 * @param array           $input Input parameters.
+	 * @param array|\WP_Error $ctx   Blog context token from BlogContext::enter().
 	 * @return array Result with canonical diff preview data.
 	 */
-	private static function execute_in_context( array $input ): array {
+	private static function execute_in_context( array $input, $ctx ): array {
 		$post_id               = absint( $input['post_id'] ?? 0 );
 		$blog_id               = absint( $input['blog_id'] ?? 0 );
 		$content               = $input['content'] ?? '';
@@ -326,23 +332,31 @@ class InsertContentAbility {
 			)
 		);
 
-		$envelope = PendingActionHelper::stage(
-			array(
-				'action_id'    => $action_id,
-				'kind'         => 'insert_content',
-				'summary'      => sprintf( 'Preview content insertion %s on post #%d.', $insertion_point, $post_id ),
-				'apply_input'  => BlogContext::with_blog_id(
+		// Stage on the ORIGIN (calling) blog — see EditPostBlocksAbility for the
+		// full rationale: the per-blog pending-action store must hold the action
+		// where the accept/resolve turn will look for it.
+		$envelope = BlogContext::run_on_origin(
+			$ctx,
+			static function () use ( $action_id, $insertion_point, $post_id, $content, $position, $target_paragraph_text, $blog_id, $diff ) {
+				return PendingActionHelper::stage(
 					array(
-						'post_id'               => $post_id,
-						'content'               => $content,
-						'position'              => $position,
-						'target_paragraph_text' => $target_paragraph_text,
-					),
-					$blog_id
-				),
-				'preview_data' => $diff,
-				'context'      => BlogContext::with_blog_id( array( 'post_id' => $post_id ), $blog_id ),
-			)
+						'action_id'    => $action_id,
+						'kind'         => 'insert_content',
+						'summary'      => sprintf( 'Preview content insertion %s on post #%d.', $insertion_point, $post_id ),
+						'apply_input'  => BlogContext::with_blog_id(
+							array(
+								'post_id'               => $post_id,
+								'content'               => $content,
+								'position'              => $position,
+								'target_paragraph_text' => $target_paragraph_text,
+							),
+							$blog_id
+						),
+						'preview_data' => $diff,
+						'context'      => BlogContext::with_blog_id( array( 'post_id' => $post_id ), $blog_id ),
+					)
+				);
+			}
 		);
 
 		if ( empty( $envelope['staged'] ) ) {
