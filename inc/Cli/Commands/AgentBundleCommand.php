@@ -27,7 +27,7 @@ use DataMachine\Engine\Bundle\BundleStepIdRemapper;
 use DataMachine\Engine\Bundle\BundleValidationException;
 use DataMachine\Engine\Bundle\BundleSource;
 use DataMachine\Engine\Bundle\BundleSourceAuth;
-use DataMachine\Engine\Bundle\PortableSlug;
+use DataMachine\Engine\Bundle\AgentBundleSlugMatcher;
 use WP_CLI;
 
 defined( 'ABSPATH' ) || exit;
@@ -406,6 +406,66 @@ class AgentBundleCommand extends BaseCommand {
 	}
 
 	/**
+	 * Bind an already-live agent to a bundle without re-importing its data.
+	 *
+	 * Live-origin agents (built in the UI/CLI then exported) have no package
+	 * provenance: pipeline/flow rows have portable_slug NULL, the ledger is
+	 * empty, and agent_config has no bundle header — so `upgrade` matches zero
+	 * artifacts and would insert a full duplicate set. `adopt` is the one-time,
+	 * idempotent bind: it backfills portable_slug on each matched row, writes
+	 * the bundle header, and seeds the ledger from current live state so the
+	 * next `upgrade` diffs cleanly instead of duplicating. Ambiguous name
+	 * collisions are surfaced and refused, never silently mismatched.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <path>
+	 * : Package path (.zip, .json, or directory) or remote URL.
+	 *
+	 * [--agent=<slug>]
+	 * : Target live agent slug. Defaults to the bundle's agent slug.
+	 *
+	 * [--slug=<slug>]
+	 * : Alias for --agent.
+	 *
+	 * [--dry-run]
+	 * : Report matched / unmatched / ambiguous counts without writing.
+	 *
+	 * [--token=<token>]
+	 * : Auth token for private archive downloads. Used for this single resolve(); never persisted, never logged.
+	 *
+	 * [--token-env=<varname>]
+	 * : Environment variable (or PHP constant) name to read the auth token from. Preferred over --token for shell-history hygiene.
+	 *
+	 * [--format=<format>]
+	 * : Output format.
+	 * ---
+	 * default: table
+	 * options:
+	 *   - table
+	 *   - json
+	 * ---
+	 */
+	public function adopt( array $args, array $assoc_args ): void {
+		$input            = $this->bundle_ability_input( $args, $assoc_args );
+		$input['dry_run'] = \WP_CLI\Utils\get_flag_value( $assoc_args, 'dry-run', false );
+		if ( isset( $assoc_args['agent'] ) && '' === (string) ( $assoc_args['slug'] ?? '' ) ) {
+			$input['slug'] = (string) $assoc_args['agent'];
+		}
+
+		$response = AgentAbilities::adoptAgentBundle( $input );
+		if ( empty( $response['success'] ) ) {
+			if ( 'json' === ( $assoc_args['format'] ?? 'table' ) ) {
+				WP_CLI::line( (string) wp_json_encode( $response, JSON_PRETTY_PRINT ) );
+			}
+			WP_CLI::error( (string) ( $response['error'] ?? 'Bundle adopt failed.' ) );
+			return;
+		}
+
+		$this->output_adopt( $response, $assoc_args );
+	}
+
+	/**
 	 * Resolve a staged package PendingAction.
 	 *
 	 * ## OPTIONS
@@ -660,20 +720,35 @@ class AgentBundleCommand extends BaseCommand {
 
 	/** @return array<int,array<string,mixed>> */
 	private function runtime_drifts_for_bundle( array $bundle, array $agent, string $decision ): array {
-		$agent_id                   = (int) ( $agent['agent_id'] ?? 0 );
-		$pipeline_id_map            = array();
-		$existing_pipelines_by_slug = array();
-		$drifts                     = array();
+		$agent_id        = (int) ( $agent['agent_id'] ?? 0 );
+		$pipeline_id_map = array();
+		$drifts          = array();
 
-		foreach ( $this->pipelines()->get_all_pipelines( null, $agent_id ) as $pipeline ) {
-			$existing_pipelines_by_slug[ (string) ( $pipeline['portable_slug'] ?? '' ) ] = $pipeline;
+		// Key existing pipelines under the SAME normalized slug the bundle side
+		// uses, falling back to the normalized pipeline_name when portable_slug
+		// is empty. Without this fallback, live-origin agents (portable_slug
+		// NULL on every row) never match and every artifact is misclassified.
+		$existing_pipelines_by_slug = AgentBundleSlugMatcher::index_existing(
+			$this->pipelines()->get_all_pipelines( null, $agent_id ),
+			'pipeline_name',
+			'pipeline'
+		)['matched'];
+
+		// Index existing flows per pipeline once, with the same name fallback,
+		// so flow rows with NULL portable_slug still resolve.
+		$existing_flows_by_pipeline = array();
+		foreach ( $this->flows()->get_all_flows( null, $agent_id ) as $existing_flow_row ) {
+			if ( ! is_array( $existing_flow_row ) ) {
+				continue;
+			}
+			$existing_flows_by_pipeline[ (int) ( $existing_flow_row['pipeline_id'] ?? 0 ) ][] = $existing_flow_row;
 		}
 
 		foreach ( $bundle['pipelines'] ?? array() as $pipeline ) {
 			if ( ! is_array( $pipeline ) ) {
 				continue;
 			}
-			$slug = PortableSlug::normalize( (string) ( $pipeline['portable_slug'] ?? ( $pipeline['pipeline_name'] ?? 'pipeline' ) ), 'pipeline' );
+			$slug = AgentBundleSlugMatcher::bundle_slug( $pipeline, 'pipeline_name', 'pipeline' );
 			if ( isset( $existing_pipelines_by_slug[ $slug ] ) ) {
 				$pipeline_id_map[ (int) ( $pipeline['original_id'] ?? 0 ) ] = (int) ( $existing_pipelines_by_slug[ $slug ]['pipeline_id'] ?? 0 );
 			}
@@ -688,9 +763,10 @@ class AgentBundleCommand extends BaseCommand {
 			if ( $new_pipeline_id <= 0 ) {
 				continue;
 			}
-			$flow_slug     = PortableSlug::normalize( (string) ( $flow['portable_slug'] ?? ( $flow['flow_name'] ?? 'flow' ) ), 'flow' );
-			$existing_flow = $this->flows()->get_by_portable_slug( $new_pipeline_id, $flow_slug );
-			if ( ! $existing_flow ) {
+			$flow_slug     = AgentBundleSlugMatcher::bundle_slug( $flow, 'flow_name', 'flow' );
+			$flow_index    = AgentBundleSlugMatcher::index_existing( $existing_flows_by_pipeline[ $new_pipeline_id ] ?? array(), 'flow_name', 'flow' );
+			$existing_flow = $flow_index['matched'][ $flow_slug ] ?? null;
+			if ( null === $existing_flow ) {
 				continue;
 			}
 			$target_flow = array_merge(
@@ -942,6 +1018,36 @@ class AgentBundleCommand extends BaseCommand {
 
 		if ( $rows ) {
 			$this->format_items( $rows, array( 'bucket', 'artifact_key', 'reason', 'summary' ), array( 'format' => 'table' ) );
+		}
+	}
+
+	private function output_adopt( array $response, array $assoc_args ): void {
+		if ( 'json' === ( $assoc_args['format'] ?? 'table' ) ) {
+			WP_CLI::line( (string) wp_json_encode( $response, JSON_PRETTY_PRINT ) );
+			return;
+		}
+
+		$counts = $response['counts'] ?? array();
+		WP_CLI::log( sprintf( 'Agent:     %s (#%d)', (string) ( $response['agent_slug'] ?? '' ), (int) ( $response['agent_id'] ?? 0 ) ) );
+		WP_CLI::log( sprintf( 'Mode:      %s', ! empty( $response['dry_run'] ) ? 'dry-run (no writes)' : 'applied' ) );
+		WP_CLI::log( sprintf( 'Matched:   %d', (int) ( $counts['matched'] ?? 0 ) ) );
+		WP_CLI::log( sprintf( 'Unmatched: %d', (int) ( $counts['unmatched'] ?? 0 ) ) );
+		WP_CLI::log( sprintf( 'Ambiguous: %d', (int) ( $counts['ambiguous'] ?? 0 ) ) );
+
+		$rows = array();
+		foreach ( array( 'matched', 'unmatched', 'ambiguous' ) as $bucket ) {
+			foreach ( $response[ $bucket ] ?? array() as $entry ) {
+				$rows[] = array(
+					'bucket'        => $bucket,
+					'artifact_type' => (string) ( $entry['artifact_type'] ?? '' ),
+					'artifact_id'   => (string) ( $entry['artifact_id'] ?? '' ),
+					'reason'        => (string) ( $entry['reason'] ?? '' ),
+				);
+			}
+		}
+
+		if ( $rows ) {
+			$this->format_items( $rows, array( 'bucket', 'artifact_type', 'artifact_id', 'reason' ), array( 'format' => 'table' ) );
 		}
 	}
 
