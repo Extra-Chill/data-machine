@@ -98,6 +98,9 @@ foreach ( array(
 }
 datamachine_bundle_runner_contains( $abilities, "'outputs'", 'ability output schema advertises semantic outputs', $failures, $passes );
 datamachine_bundle_runner_contains( $abilities, "'output_diagnostics'", 'ability output schema advertises semantic output diagnostics', $failures, $passes );
+datamachine_bundle_runner_contains( $abilities, "'required_outputs'", 'ability input schema accepts required semantic outputs', $failures, $passes );
+datamachine_bundle_runner_contains( $abilities, "'required_artifacts'", 'ability input schema accepts required typed artifacts', $failures, $passes );
+datamachine_bundle_runner_contains( $abilities, "'engine_data_outputs'", 'ability input schema accepts semantic output mappings', $failures, $passes );
 datamachine_bundle_runner_contains( $ai_step, "\$payload['tool_recorders']", 'AI step forwards configured tool recorders to the loop', $failures, $passes );
 
 echo "\n[3] Runner exposes semantic outputs without hiding raw engine data\n";
@@ -127,6 +130,8 @@ $projected_outputs = $output_projection->invoke(
 		),
 	),
 	array(
+		'required_outputs'    => array( 'issue_number', 'issue_url' ),
+		'required_artifacts'   => array( 'concept_packet' ),
 		'engine_data_outputs' => array(
 			'store_issue_number' => 'metadata.engine_data.store_idea_agent.issue_number',
 			'store_issue_url'    => 'metadata.engine_data.store_idea_agent.issue_url',
@@ -141,7 +146,9 @@ datamachine_bundle_runner_assert( 'semantic output projection' === ( $projected_
 datamachine_bundle_runner_assert( 456 === ( $projected_outputs['outputs']['store_issue_number'] ?? null ), 'declared nested engine_data output number is projected', $failures, $passes );
 datamachine_bundle_runner_assert( 'https://github.com/chubes4/wp-site-generator/issues/456' === ( $projected_outputs['outputs']['store_issue_url'] ?? null ), 'declared nested engine_data output URL is projected', $failures, $passes );
 datamachine_bundle_runner_assert( ! isset( $projected_outputs['outputs']['agent_id'] ), 'runtime identity fields are not projected as outputs', $failures, $passes );
-datamachine_bundle_runner_assert( array( 'missing_result_url', 'missing_store_url' ) === ( $projected_outputs['diagnostics']['missing_outputs'] ?? null ), 'missing declared outputs are diagnosed semantically', $failures, $passes );
+datamachine_bundle_runner_assert( array( 'issue_number', 'issue_url', 'missing_result_url' ) === ( $projected_outputs['diagnostics']['required_outputs'] ?? null ), 'required semantic outputs are diagnosed', $failures, $passes );
+datamachine_bundle_runner_assert( array( 'concept_packet' ) === ( $projected_outputs['diagnostics']['required_artifacts'] ?? null ), 'required typed artifacts are diagnosed', $failures, $passes );
+datamachine_bundle_runner_assert( array( 'missing_result_url', 'concept_packet', 'missing_store_url' ) === ( $projected_outputs['diagnostics']['missing_outputs'] ?? null ), 'missing declared outputs are diagnosed semantically', $failures, $passes );
 
 echo "\n[3a] Failed terminal status families are not successful\n";
 $success_status = $runner_reflection->getMethod( 'is_success_status' );
@@ -379,6 +386,57 @@ $no_item_response = $response_method->invoke(
 datamachine_bundle_runner_assert( 'completed_no_items' === ( $no_item_response['status'] ?? null ), 'no-item terminal status is preserved', $failures, $passes );
 datamachine_bundle_runner_assert( false === ( $no_item_response['success'] ?? null ), 'no-item terminal status is not a successful bundle run', $failures, $passes );
 datamachine_bundle_runner_assert( false === ( $no_item_response['completion_outcome']['success'] ?? null ), 'no-item completion outcome is not successful', $failures, $passes );
+
+echo "\n[3d] Completed bundle runs enforce required semantic outputs\n";
+$missing_artifact_response = $response_method->invoke(
+	$runner_instance,
+	array(
+		'success'     => true,
+		'job_status'  => 'completed',
+		'engine_data' => array(
+			'outputs' => array(
+				'concept_packet' => array(),
+			),
+		),
+	),
+	array(
+		'wait_for_completion' => true,
+		'required_artifacts'   => array( 'concept_packet' ),
+	)
+);
+datamachine_bundle_runner_assert( false === ( $missing_artifact_response['success'] ?? null ), 'empty required artifact output fails a completed run', $failures, $passes );
+datamachine_bundle_runner_assert( array( 'concept_packet' ) === ( $missing_artifact_response['output_diagnostics']['missing_required'] ?? null ), 'missing required artifact is identified', $failures, $passes );
+datamachine_bundle_runner_assert( false !== strpos( (string) ( $missing_artifact_response['error'] ?? '' ), 'concept_packet' ), 'failure message names missing artifact output', $failures, $passes );
+
+$present_artifact_response = $response_method->invoke(
+	$runner_instance,
+	array(
+		'success'     => true,
+		'job_status'  => 'completed',
+		'engine_data' => array(
+			'outputs' => array(
+				'concept_packet' => array( 'title' => 'Concept Packet' ),
+			),
+		),
+	),
+	array(
+		'wait_for_completion' => true,
+		'required_artifacts'   => array( 'concept_packet' ),
+	)
+);
+datamachine_bundle_runner_assert( true === ( $present_artifact_response['success'] ?? null ), 'non-empty required artifact output keeps completed run successful', $failures, $passes );
+
+$scheduled_required_response = $response_method->invoke(
+	$runner_instance,
+	array(
+		'success' => true,
+	),
+	array(
+		'required_outputs' => array( 'future_result_url' ),
+	)
+);
+datamachine_bundle_runner_assert( true === ( $scheduled_required_response['success'] ?? null ), 'required outputs do not fail an async scheduled run before completion', $failures, $passes );
+datamachine_bundle_runner_assert( array( 'future_result_url' ) === ( $scheduled_required_response['output_diagnostics']['missing_outputs'] ?? null ), 'async scheduled run still exposes missing output diagnostics', $failures, $passes );
 
 echo "\n[4] WP-CLI wraps the same ability instead of duplicating runner internals\n";
 foreach ( array(
