@@ -2,6 +2,30 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.148.3] - 2026-06-16
+
+### Changed
+- Add generic pending-action audit context
+- stub artifact hasher in rebase smoke
+- register adjacent handler smoke fixture in WordPress
+- guard agents api smoke helpers
+- add namespaced WP-fn stubs so smokes resolve unqualified core calls (#2643)
+- load installed artifact smoke dependencies
+- use runtime hooks in extras smoke
+- update extras smoke bundle adapter
+- align artifact store smoke with snapshots
+- load package hasher in rebase smoke
+- guard adjacent handler smoke stubs
+- skip adjacent handler smoke in WordPress
+
+### Fixed
+- read bundle metadata ability tools
+- align pending action metadata assignment
+- surface scheduler run failures
+- consume runtime ability tools in bundle runs
+- add scoped daily memory remediation
+- diagnose missing ability tool projections
+
 ## [0.148.2] - 2026-06-16
 
 ### Fixed
