@@ -2,6 +2,12 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.150.3] - 2026-06-16
+
+### Fixed
+- pipeline-scoped flow disambiguation for agent adopt
+- make flows update --handler-config discoverable + atomic for system_task steps
+
 ## [0.150.2] - 2026-06-16
 
 ### Fixed
