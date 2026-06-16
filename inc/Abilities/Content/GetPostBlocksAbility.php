@@ -47,6 +47,10 @@ class GetPostBlocksAbility {
 								'type'        => 'integer',
 								'description' => __( 'Post ID to parse', 'data-machine' ),
 							),
+							'blog_id'     => array(
+								'type'        => 'integer',
+								'description' => __( 'Optional. Multisite blog ID the post lives on. Omit to use the current site. The read runs in that blog\'s context.', 'data-machine' ),
+							),
 							'block_types' => array(
 								'type'        => 'array',
 								'items'       => array( 'type' => 'string' ),
@@ -122,6 +126,11 @@ class GetPostBlocksAbility {
 					'required'    => true,
 					'description' => 'Post ID to parse',
 				),
+				'blog_id'     => array(
+					'type'        => 'integer',
+					'required'    => false,
+					'description' => 'Optional multisite blog ID the post lives on. Omit for the current site.',
+				),
 				'block_types' => array(
 					'type'        => 'array',
 					'items'       => array( 'type' => 'string' ),
@@ -173,56 +182,70 @@ class GetPostBlocksAbility {
 			);
 		}
 
-		$post = get_post( $post_id );
-		if ( ! $post ) {
+		// Resolve the target blog. On multisite the post may live on another
+		// site than the one this request landed on; switch to it for the read.
+		$ctx = BlogContext::enter( $input );
+		if ( is_wp_error( $ctx ) ) {
 			return array(
 				'success' => false,
-				'error'   => sprintf( 'Post #%d does not exist', $post_id ),
+				'error'   => $ctx->get_error_message(),
 			);
 		}
 
-		$block_content = ContentFormat::storedToBlocks( (string) $post->post_content, (string) $post->post_type );
-		if ( is_wp_error( $block_content ) ) {
+		try {
+			$post = get_post( $post_id );
+			if ( ! $post ) {
+				return array(
+					'success' => false,
+					'error'   => sprintf( 'Post #%d does not exist', $post_id ),
+				);
+			}
+
+			$block_content = ContentFormat::storedToBlocks( (string) $post->post_content, (string) $post->post_type );
+			if ( is_wp_error( $block_content ) ) {
+				return array(
+					'success' => false,
+					'error'   => $block_content->get_error_message(),
+				);
+			}
+
+			$blocks  = parse_blocks( $block_content );
+			$results = array();
+
+			foreach ( $blocks as $index => $block ) {
+				// Skip empty/freeform blocks with no content.
+				$block_name = $block['blockName'] ?? null;
+				$inner_html = $block['innerHTML'] ?? '';
+
+				if ( null === $block_name && '' === trim( $inner_html ) ) {
+					continue;
+				}
+
+				// Filter by block type if specified.
+				if ( ! empty( $block_types ) && ! in_array( $block_name, $block_types, true ) ) {
+					continue;
+				}
+
+				// Filter by search text if specified.
+				if ( '' !== $search && false === stripos( $inner_html, $search ) ) {
+					continue;
+				}
+
+				$results[] = array(
+					'index'      => $index,
+					'block_name' => $block_name ?? 'core/freeform',
+					'inner_html' => $inner_html,
+				);
+			}
+
 			return array(
-				'success' => false,
-				'error'   => $block_content->get_error_message(),
+				'success'      => true,
+				'post_id'      => $post_id,
+				'total_blocks' => count( $blocks ),
+				'blocks'       => $results,
 			);
+		} finally {
+			BlogContext::leave( $ctx );
 		}
-
-		$blocks  = parse_blocks( $block_content );
-		$results = array();
-
-		foreach ( $blocks as $index => $block ) {
-			// Skip empty/freeform blocks with no content.
-			$block_name = $block['blockName'] ?? null;
-			$inner_html = $block['innerHTML'] ?? '';
-
-			if ( null === $block_name && '' === trim( $inner_html ) ) {
-				continue;
-			}
-
-			// Filter by block type if specified.
-			if ( ! empty( $block_types ) && ! in_array( $block_name, $block_types, true ) ) {
-				continue;
-			}
-
-			// Filter by search text if specified.
-			if ( '' !== $search && false === stripos( $inner_html, $search ) ) {
-				continue;
-			}
-
-			$results[] = array(
-				'index'      => $index,
-				'block_name' => $block_name ?? 'core/freeform',
-				'inner_html' => $inner_html,
-			);
-		}
-
-		return array(
-			'success'      => true,
-			'post_id'      => $post_id,
-			'total_blocks' => count( $blocks ),
-			'blocks'       => $results,
-		);
 	}
 }

@@ -49,6 +49,10 @@ class EditPostBlocksAbility {
 								'type'        => 'integer',
 								'description' => __( 'Post ID to edit', 'data-machine' ),
 							),
+							'blog_id' => array(
+								'type'        => 'integer',
+								'description' => __( 'Optional. Multisite blog ID the post lives on. Omit to use the current site. The edit (and its preview/apply) runs in that blog\'s context.', 'data-machine' ),
+							),
 							'edits'   => array(
 								'type'        => 'array',
 								'description' => __( 'Array of edit operations', 'data-machine' ),
@@ -134,6 +138,11 @@ class EditPostBlocksAbility {
 					'required'    => true,
 					'description' => 'Post ID to edit',
 				),
+				'blog_id' => array(
+					'type'        => 'integer',
+					'required'    => false,
+					'description' => 'Optional multisite blog ID the post lives on. Omit for the current site.',
+				),
 				'edits'   => array(
 					'type'        => 'array',
 					'items'       => array(
@@ -181,7 +190,35 @@ class EditPostBlocksAbility {
 	 * @return array
 	 */
 	public static function execute( array $input ): array {
+		// Resolve the target blog. On multisite the post may live on another
+		// site than the one this request landed on; switch to it so the read,
+		// the preview staging, and the eventual apply all target the right
+		// post. blog_id rides inside apply_input below so the resolve replay
+		// re-enters the same context.
+		$ctx = BlogContext::enter( $input );
+		if ( is_wp_error( $ctx ) ) {
+			return array(
+				'success' => false,
+				'error'   => $ctx->get_error_message(),
+			);
+		}
+
+		try {
+			return self::execute_in_context( $input );
+		} finally {
+			BlogContext::leave( $ctx );
+		}
+	}
+
+	/**
+	 * Execute the edit within the (already-resolved) blog context.
+	 *
+	 * @param array $input Ability input.
+	 * @return array
+	 */
+	private static function execute_in_context( array $input ): array {
 		$post_id = absint( $input['post_id'] ?? 0 );
+		$blog_id = absint( $input['blog_id'] ?? 0 );
 		$edits   = $input['edits'] ?? array();
 		$preview = ! empty( $input['preview'] );
 
@@ -337,12 +374,15 @@ class EditPostBlocksAbility {
 					'action_id'    => $action_id,
 					'kind'         => 'edit_post_blocks',
 					'summary'      => sprintf( 'Preview edits to post #%d.', $post_id ),
-					'apply_input'  => array(
-						'post_id' => $post_id,
-						'edits'   => $edits,
+					'apply_input'  => BlogContext::with_blog_id(
+						array(
+							'post_id' => $post_id,
+							'edits'   => $edits,
+						),
+						$blog_id
 					),
 					'preview_data' => $diff,
-					'context'      => array( 'post_id' => $post_id ),
+					'context'      => BlogContext::with_blog_id( array( 'post_id' => $post_id ), $blog_id ),
 				)
 			);
 

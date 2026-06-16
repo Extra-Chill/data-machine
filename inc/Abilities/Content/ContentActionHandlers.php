@@ -91,17 +91,32 @@ class ContentActionHandlers {
 			);
 		}
 
-		if ( $user_id > 0 ) {
-			if ( user_can( $user_id, 'edit_post', $post_id ) ) {
-				return true;
-			}
-		} elseif ( current_user_can( 'edit_post', $post_id ) ) {
-			return true;
+		// On multisite the staged post may live on another blog than the one
+		// the resolve request landed on. The `edit_post` meta-capability is
+		// mapped against the post (and its author) on the blog the post lives
+		// on, so the check must run in that blog's context — otherwise it
+		// evaluates against the wrong post id on the wrong site. blog_id was
+		// stamped into apply_input at staging time (see the content abilities).
+		$ctx = BlogContext::enter( $apply_input );
+		if ( is_wp_error( $ctx ) ) {
+			return $ctx;
 		}
 
-		return new \WP_Error(
-			'datamachine_forbidden',
-			__( 'You do not have permission to edit this post.', 'data-machine' )
-		);
+		try {
+			if ( $user_id > 0 ) {
+				if ( user_can( $user_id, 'edit_post', $post_id ) ) {
+					return true;
+				}
+			} elseif ( current_user_can( 'edit_post', $post_id ) ) {
+				return true;
+			}
+
+			return new \WP_Error(
+				'datamachine_forbidden',
+				__( 'You do not have permission to edit this post.', 'data-machine' )
+			);
+		} finally {
+			BlogContext::leave( $ctx );
+		}
 	}
 }
