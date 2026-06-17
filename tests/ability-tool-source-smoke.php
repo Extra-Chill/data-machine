@@ -195,6 +195,7 @@ require_once __DIR__ . '/../inc/Engine/AI/Tools/ability-tool-projections.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/Policy/DataMachineAgentToolPolicyProvider.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/Policy/DataMachineMandatoryToolPolicy.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/Policy/DataMachineToolAccessPolicy.php';
+require_once __DIR__ . '/../inc/Engine/AI/ToolSchemaNormalizer.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/Sources/RuntimeToolSource.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/Sources/DataMachineToolRegistrySource.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/Sources/AdjacentHandlerToolSource.php';
@@ -272,13 +273,10 @@ $ability  = new Ability_Tool_Source_Smoke_Ability(
 	'Summarize a demo payload.',
 	'demo-category',
 	array(
-		'type'       => 'object',
-		'required'   => array( 'message' ),
-		'properties' => array(
-			'message' => array(
-				'type'        => 'string',
-				'description' => 'Message to summarize.',
-			),
+		'message' => array(
+			'type'        => 'string',
+			'description' => 'Message to summarize.',
+			'required'    => true,
 		),
 	),
 	array(
@@ -388,6 +386,8 @@ assert_ability_tool_source_equals( 'Summarize Demo', $tools['summarize_demo']['l
 assert_ability_tool_source_equals( 'demo-category', $tools['summarize_demo']['ability_category'] ?? '', 'generated tool carries ability category', $failures, $passes );
 assert_ability_tool_source_equals( 'Model-facing summary override.', $tools['summarize_demo']['description'] ?? '', 'definition filter can override model-facing description', $failures, $passes );
 assert_ability_tool_source_equals( array( 'message' ), $tools['summarize_demo']['parameters']['required'] ?? array(), 'generated parameters come from ability input schema', $failures, $passes );
+assert_ability_tool_source_equals( 'object', $tools['summarize_demo']['parameters']['type'] ?? '', 'ability input schema is normalized to root object schema', $failures, $passes );
+assert_ability_tool_source_equals( false, isset( $tools['summarize_demo']['parameters']['properties']['message']['required'] ), 'ability input schema strips property-level required flag', $failures, $passes );
 assert_ability_tool_source_equals( true, $tools['summarize_demo']['annotations']['readonly'] ?? false, 'generated tool carries ability annotations', $failures, $passes );
 
 echo "\n[2] source policy handles opt-in, missing abilities, config, and modes:\n";

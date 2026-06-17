@@ -12,6 +12,7 @@
 
 namespace DataMachine\Engine\AI\Tools\Sources;
 
+use DataMachine\Engine\AI\ToolSchemaNormalizer;
 use DataMachine\Engine\AI\Tools\ToolManager;
 use DataMachine\Engine\AI\Tools\ToolPolicyResolver;
 use DataMachine\Core\PluginSettings;
@@ -274,7 +275,7 @@ final class AbilityToolSource {
 			'description'       => method_exists( $ability, 'get_description' ) ? (string) $ability->get_description() : '',
 			'label'             => method_exists( $ability, 'get_label' ) ? (string) $ability->get_label() : $tool_name,
 			'modes'             => array( ToolPolicyResolver::MODE_CHAT ),
-			'parameters'        => method_exists( $ability, 'get_input_schema' ) ? $ability->get_input_schema() : array(),
+			'parameters'        => ToolSchemaNormalizer::normalize( method_exists( $ability, 'get_input_schema' ) ? $ability->get_input_schema() : array() ),
 		);
 
 		foreach ( self::OVERRIDE_KEYS as $key ) {
@@ -286,6 +287,7 @@ final class AbilityToolSource {
 		if ( ! is_array( $tool['parameters'] ?? null ) ) {
 			$tool['parameters'] = array();
 		}
+		$tool['parameters'] = ToolSchemaNormalizer::normalize( $tool['parameters'] );
 
 		$tool['modes'] = ToolPolicyResolver::normalizeModes( $tool['modes'] ?? array( ToolPolicyResolver::MODE_CHAT ) );
 
