@@ -90,7 +90,12 @@ class PersistedAgentProjector {
 	 * @param array<string,mixed> $config Agent config.
 	 */
 	private static function description_from_row( array $row, array $config ): string {
-		foreach ( array( $config, $config['intelligence_wiki_brain'] ?? null ) as $source ) {
+		$sources = array( $config );
+		if ( function_exists( 'apply_filters' ) ) {
+			$sources = apply_filters( 'datamachine_persisted_agent_description_sources', $sources, $row, $config );
+		}
+
+		foreach ( $sources as $source ) {
 			if ( ! is_array( $source ) ) {
 				continue;
 			}
@@ -114,15 +119,63 @@ class PersistedAgentProjector {
 	 * @return array<string,mixed>
 	 */
 	private static function meta_from_row( array $row, array $config ): array {
-		$bundle = is_array( $config['datamachine_bundle'] ?? null ) ? $config['datamachine_bundle'] : array();
-		$brain  = is_array( $config['intelligence_wiki_brain'] ?? null ) ? $config['intelligence_wiki_brain'] : array();
-
 		$meta = array(
 			'source_plugin'        => 'data-machine',
 			'source_type'          => 'persisted-agent',
 			'datamachine_agent_id' => (int) ( $row['agent_id'] ?? 0 ),
 			'datamachine_owner_id' => (int) ( $row['owner_id'] ?? 0 ),
 		);
+
+		foreach ( self::metadata_projectors( $row, $config ) as $projector ) {
+			if ( is_callable( $projector ) ) {
+				$projected = call_user_func( $projector, $row, $config );
+				if ( is_array( $projected ) ) {
+					$meta = array_merge( $meta, $projected );
+				}
+			}
+		}
+
+		if ( function_exists( 'apply_filters' ) ) {
+			$meta = apply_filters( 'datamachine_persisted_agent_projection_meta', $meta, $row, $config );
+		}
+
+		return is_array( $meta ) ? $meta : array();
+	}
+
+	/**
+	 * Return metadata projectors for persisted agent rows.
+	 *
+	 * Extensions can register domain-specific projectors without Data Machine core
+	 * knowing their config shape.
+	 *
+	 * @param array<string,mixed> $row    Data Machine agent row.
+	 * @param array<string,mixed> $config Agent config.
+	 * @return array<int,callable>
+	 */
+	private static function metadata_projectors( array $row, array $config ): array {
+		$projectors = array(
+			static fn( array $projector_row, array $projector_config ): array => self::bundle_metadata_from_config( $projector_row, $projector_config ),
+		);
+
+		if ( function_exists( 'apply_filters' ) ) {
+			$projectors = apply_filters( 'datamachine_persisted_agent_metadata_projectors', $projectors, $row, $config );
+		}
+
+		return is_array( $projectors ) ? $projectors : array();
+	}
+
+	/**
+	 * Project generic Data Machine bundle metadata.
+	 *
+	 * @param array<string,mixed> $row    Data Machine agent row.
+	 * @param array<string,mixed> $config Agent config.
+	 * @return array<string,mixed>
+	 */
+	private static function bundle_metadata_from_config( array $row, array $config ): array {
+		unset( $row );
+
+		$bundle = is_array( $config['datamachine_bundle'] ?? null ) ? $config['datamachine_bundle'] : array();
+		$meta   = array();
 
 		foreach ( array( 'bundle_slug', 'bundle_version', 'source_ref', 'source_revision' ) as $key ) {
 			$value = trim( (string) ( $bundle[ $key ] ?? '' ) );
@@ -133,13 +186,6 @@ class PersistedAgentProjector {
 
 		if ( ! empty( $bundle['bundle_slug'] ) ) {
 			$meta['source_package'] = (string) $bundle['bundle_slug'];
-		}
-
-		foreach ( array( 'domain', 'wiki_slug', 'source_slug', 'brain_slug', 'bundle_slug' ) as $key ) {
-			$value = trim( (string) ( $brain[ $key ] ?? '' ) );
-			if ( '' !== $value ) {
-				$meta[ 'intelligence_wiki_brain_' . $key ] = $value;
-			}
 		}
 
 		return $meta;
