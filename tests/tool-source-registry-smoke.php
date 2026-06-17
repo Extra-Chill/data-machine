@@ -161,6 +161,8 @@ require_once __DIR__ . '/../inc/Core/WordPress/PostTracking.php';
 require_once __DIR__ . '/../inc/Core/Workspace/WordPressWorkspaceScope.php';
 require_once __DIR__ . '/../inc/Abilities/PermissionHelper.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/ToolManager.php';
+require_once __DIR__ . '/../inc/Engine/AI/ToolSchemaNormalizer.php';
+require_once __DIR__ . '/../inc/Engine/AI/Tools/AbilityToolAdapter.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/Execution/ToolExecutionCore.php';
 require_once __DIR__ . '/../inc/Engine/AI/Actions/DataMachineModeActionPolicyProvider.php';
 require_once __DIR__ . '/../inc/Engine/AI/Actions/ActionPolicyResolver.php';

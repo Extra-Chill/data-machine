@@ -63,6 +63,8 @@ namespace {
 
 		public int $execute_count = 0;
 
+		public mixed $last_input = null;
+
 		public function __construct( callable $permission_callback, callable $execute_callback ) {
 			$this->permission_callback = $permission_callback;
 			$this->execute_callback    = $execute_callback;
@@ -74,6 +76,7 @@ namespace {
 
 		public function execute( $input = null ) {
 			++$this->execute_count;
+			$this->last_input = $input;
 			return call_user_func( $this->execute_callback, $input );
 		}
 	}
@@ -167,6 +170,8 @@ namespace DataMachine\Tests\ToolExecutorAbilityNativeSmoke {
 	require_once dirname( __DIR__ ) . '/vendor/wordpress/agents-api/src/Workspace/class-wp-agent-workspace-scope.php';
 	require_once dirname( __DIR__ ) . '/inc/Core/AbilityResult.php';
 	require_once dirname( __DIR__ ) . '/inc/Core/Workspace/WordPressWorkspaceScope.php';
+	require_once dirname( __DIR__ ) . '/inc/Engine/AI/ToolSchemaNormalizer.php';
+	require_once dirname( __DIR__ ) . '/inc/Engine/AI/Tools/AbilityToolAdapter.php';
 	require_once dirname( __DIR__ ) . '/inc/Engine/AI/Tools/Execution/ToolExecutionCore.php';
 	require_once dirname( __DIR__ ) . '/inc/Engine/AI/Tools/ToolExecutor.php';
 
@@ -404,6 +409,37 @@ namespace DataMachine\Tests\ToolExecutorAbilityNativeSmoke {
 	assert_smoke( 'core scalar envelope does not mirror result into data', ! array_key_exists( 'data', $core_result ) );
 	assert_smoke( 'core result includes ability slug metadata', 'datamachine/core-ability' === ( $core_result['metadata']['ability'] ?? null ) );
 	assert_smoke( 'core path does not perform post tracking decoration', 0 === post_tracking_count() );
+
+	echo "\n[core:1b] Ability maps route through the central adapter\n";
+	$mapped_ability = new \Ability_Native_Smoke_Ability(
+		fn( $input ) => true,
+		fn( $input ) => array(
+			'success' => true,
+			'visible' => $input['visible'] ?? '',
+			'_cache'  => 'internal',
+		)
+	);
+	$registry->register_for_smoke( 'datamachine/mapped-ability', $mapped_ability );
+	$mapped_result = ( new \AgentsAPI\AI\Tools\WP_Agent_Tool_Execution_Core() )->executeTool(
+		'mapped_ability_tool',
+		array(
+			'action'  => 'route',
+			'visible' => 'kept',
+		),
+		array(
+			'mapped_ability_tool' => array(
+				'ability'                    => 'datamachine/mapped-ability',
+				'ability_map'                => array( 'route' => 'datamachine/mapped-ability' ),
+				'strip_action_parameter'     => true,
+				'strip_internal_result_keys' => true,
+			),
+		),
+		new ToolExecutionCore()
+	);
+	assert_smoke( 'ability map result succeeds', true === ( $mapped_result['success'] ?? false ) );
+	assert_smoke( 'ability map strips action before execution', ! array_key_exists( 'action', $mapped_ability->last_input ?? array() ) );
+	assert_smoke( 'ability map preserves public result keys', 'kept' === ( $mapped_result['result']['visible'] ?? null ) );
+	assert_smoke( 'ability map strips internal result keys when requested', ! array_key_exists( '_cache', $mapped_result['result'] ?? array() ) );
 
 	echo "\n[decorator:1] ToolExecutor still stages pending actions before direct execution\n";
 	// @phpstan-ignore-next-line smoke-test stub property shadows production class.

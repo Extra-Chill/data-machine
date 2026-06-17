@@ -11,6 +11,16 @@ $root     = dirname( __DIR__ );
 $failures = array();
 $passes   = 0;
 
+if ( ! defined( 'ABSPATH' ) ) {
+	define( 'ABSPATH', __DIR__ . '/' );
+}
+
+if ( ! function_exists( 'add_filter' ) ) {
+	function add_filter( string $hook, callable $callback, int $priority = 10, int $accepted_args = 1 ): void {
+		unset( $hook, $callback, $priority, $accepted_args );
+	}
+}
+
 function assert_global_projection( bool $condition, string $message, array &$failures, int &$passes ): void {
 	if ( $condition ) {
 		++$passes;
@@ -29,9 +39,16 @@ function read_global_tool_source( string $relative_path, string $root ): string 
 
 echo "global-ability-projections-smoke\n";
 
+require_once $root . '/inc/Engine/AI/Tools/BaseTool.php';
+require_once $root . '/inc/Engine/AI/Tools/ability-tool-projections.php';
+require_once $root . '/inc/Engine/AI/Tools/Global/InternalLinkAudit.php';
+new \DataMachine\Engine\AI\Tools\Global\InternalLinkAudit();
+assert_global_projection( true, 'internal_link_audit class loads and registers without parse errors', $failures, $passes );
+
 $migrated = array(
 	'inc/Engine/AI/Tools/Global/LocalSearch.php'         => array( 'local_search', 'datamachine/local-search' ),
 	'inc/Engine/AI/Tools/Global/ImageGeneration.php'     => array( 'image_generation', 'datamachine/generate-image' ),
+	'inc/Engine/AI/Tools/Global/InternalLinkAudit.php'   => array( 'internal_link_audit', 'datamachine/audit-internal-links' ),
 	'inc/Engine/AI/Tools/Global/WordPressPostReader.php' => array( 'wordpress_post_reader', 'datamachine/get-wordpress-post' ),
 );
 
@@ -49,7 +66,6 @@ foreach ( $migrated as $path => $expectations ) {
 $exceptions = array(
 	'inc/Engine/AI/Tools/Global/AgentMemory.php'       => 'agent_memory',
 	'inc/Engine/AI/Tools/Global/AgentDailyMemory.php'  => 'agent_daily_memory',
-	'inc/Engine/AI/Tools/Global/InternalLinkAudit.php' => 'internal_link_audit',
 	'inc/Engine/AI/Tools/Global/QueueValidator.php'    => 'queue_validator',
 	'inc/Engine/AI/Tools/Global/WebFetch.php'          => 'web_fetch',
 );
