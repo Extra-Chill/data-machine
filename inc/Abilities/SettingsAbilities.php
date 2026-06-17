@@ -649,8 +649,7 @@ class SettingsAbilities {
 		$all_settings = $filtered['settings'] ?? $all_settings;
 		$handled_keys = $filtered['handled_keys'] ?? $handled_keys;
 
-		update_option( 'datamachine_settings', $all_settings );
-		PluginSettings::clearCache();
+		PluginSettings::update( $all_settings );
 
 		// Identify unhandled keys so callers know if something was ignored.
 		$input_keys = array_keys( $input );
