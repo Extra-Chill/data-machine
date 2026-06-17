@@ -35,70 +35,81 @@ class GetJobsAbility {
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(
-							'job_id'      => array(
+							'job_id'              => array(
 								'type'        => array( 'integer', 'null' ),
 								'description' => __( 'Get a specific job by ID (ignores pagination/filters when provided)', 'data-machine' ),
 							),
-							'user_id'     => array(
+							'user_id'             => array(
 								'type'        => 'integer',
 								'description' => __( 'Filter jobs by WordPress user ID.', 'data-machine' ),
 							),
-							'agent_id'    => array(
+							'agent_id'            => array(
 								'type'        => array( 'integer', 'null' ),
 								'description' => __( 'Filter jobs by agent ID. Takes priority over user_id when provided.', 'data-machine' ),
 							),
-							'flow_id'     => array(
+							'flow_id'             => array(
 								'type'        => array( 'integer', 'string', 'null' ),
 								'description' => __( 'Filter jobs by flow ID (integer or "direct")', 'data-machine' ),
 							),
-							'pipeline_id' => array(
+							'pipeline_id'         => array(
 								'type'        => array( 'integer', 'string', 'null' ),
 								'description' => __( 'Filter jobs by pipeline ID (integer or "direct")', 'data-machine' ),
 							),
-							'status'      => array(
+							'status'              => array(
 								'type'        => array( 'string', 'null' ),
 								'description' => __( 'Filter jobs by status (pending, processing, completed, failed, completed_no_items, agent_skipped)', 'data-machine' ),
 							),
-							'source'      => array(
+							'source'              => array(
 								'type'        => array( 'string', 'null' ),
 								'description' => __( 'Filter jobs by source (pipeline, chat, system, api, direct)', 'data-machine' ),
 							),
-							'handler'     => array(
+							'handler'             => array(
 								'type'        => array( 'string', 'null' ),
 								'description' => __( 'Filter jobs by generic handler slug recorded in job outcome metadata.', 'data-machine' ),
 							),
-							'per_page'    => array(
+							'per_page'            => array(
 								'type'        => 'integer',
 								'default'     => self::DEFAULT_PER_PAGE,
 								'minimum'     => 1,
 								'maximum'     => 100,
 								'description' => __( 'Number of jobs per page', 'data-machine' ),
 							),
-							'offset'      => array(
+							'offset'              => array(
 								'type'        => 'integer',
 								'default'     => 0,
 								'minimum'     => 0,
 								'description' => __( 'Offset for pagination', 'data-machine' ),
 							),
-							'orderby'     => array(
+							'orderby'             => array(
 								'type'        => 'string',
 								'default'     => 'j.job_id',
 								'description' => __( 'Column to order by', 'data-machine' ),
 							),
-							'order'       => array(
+							'order'               => array(
 								'type'        => 'string',
 								'enum'        => array( 'ASC', 'DESC' ),
 								'default'     => 'DESC',
 								'description' => __( 'Sort order', 'data-machine' ),
 							),
-							'since'       => array(
+							'since'               => array(
 								'type'        => array( 'string', 'null' ),
 								'description' => __( 'Filter jobs created at or after this datetime (Y-m-d H:i:s)', 'data-machine' ),
 							),
-							'fields'      => array(
+							'fields'              => array(
 								'type'        => 'array',
 								'items'       => array( 'type' => 'string' ),
 								'description' => __( 'Optional database field projection for low-memory list output.', 'data-machine' ),
+							),
+							'metadata'            => array(
+								'type'        => 'object',
+								'description' => __( 'Exact metadata filters keyed by engine_data dot-path, for generic execution lookups.', 'data-machine' ),
+							),
+							'metadata_scan_limit' => array(
+								'type'        => 'integer',
+								'default'     => 1000,
+								'minimum'     => 1,
+								'maximum'     => 5000,
+								'description' => __( 'Maximum candidate jobs to scan when applying exact metadata filters.', 'data-machine' ),
 							),
 						),
 					),
@@ -145,6 +156,7 @@ class GetJobsAbility {
 		$orderby     = $input['orderby'] ?? 'j.job_id';
 		$order       = $input['order'] ?? 'DESC';
 		$fields      = $input['fields'] ?? null;
+		$metadata    = \DataMachine\Core\ExecutionQuery::normalize_metadata_filters( $input['metadata'] ?? array() );
 
 		// Direct job lookup by ID - bypasses pagination and filters.
 		if ( $job_id ) {
@@ -242,15 +254,25 @@ class GetJobsAbility {
 			$filters_applied['hide_children'] = true;
 		}
 
-		$jobs  = $this->db_jobs->get_jobs_for_list_table( $args );
-		$total = $this->db_jobs->get_jobs_count( $args );
+		$metadata_query = array();
+		if ( ! empty( $metadata ) ) {
+			$args['metadata']            = $metadata;
+			$args['metadata_scan_limit'] = (int) ( $input['metadata_scan_limit'] ?? 1000 );
+			$metadata_query              = $this->db_jobs->query_executions_by_metadata( $args );
+			$jobs                        = $metadata_query['jobs'];
+			$total                       = $metadata_query['total'];
+			$filters_applied['metadata'] = $metadata;
+		} else {
+			$jobs  = $this->db_jobs->get_jobs_for_list_table( $args );
+			$total = $this->db_jobs->get_jobs_count( $args );
+		}
 
 		if ( empty( $args['fields'] ) ) {
 			$jobs = $this->enrichJobNames( $jobs );
 		}
 		$jobs = array_map( array( $this, 'addDisplayFields' ), $jobs );
 
-		return array(
+		$result = array(
 			'success'         => true,
 			'jobs'            => $jobs,
 			'total'           => $total,
@@ -258,5 +280,14 @@ class GetJobsAbility {
 			'offset'          => $offset,
 			'filters_applied' => $filters_applied,
 		);
+
+		if ( ! empty( $metadata_query ) ) {
+			$result['metadata_query'] = array(
+				'scanned'    => $metadata_query['scanned'],
+				'scan_limit' => $metadata_query['scan_limit'],
+			);
+		}
+
+		return $result;
 	}
 }
