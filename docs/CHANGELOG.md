@@ -2,6 +2,14 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.150.5] - 2026-06-17
+
+### Changed
+- satisfy typed artifact assertion lint
+
+### Fixed
+- support typed artifact output assertions
+
 ## [0.150.4] - 2026-06-17
 
 ### Changed
