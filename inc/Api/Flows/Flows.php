@@ -11,6 +11,8 @@
 namespace DataMachine\Api\Flows;
 
 use DataMachine\Api\RestAccessGuard;
+use DataMachine\Api\RestAbilityExecutor;
+use DataMachine\Api\RestResultSpec;
 use DataMachine\Core\AbilityResult;
 use WP_REST_Server;
 
@@ -353,11 +355,6 @@ class Flows {
 	 * Handle flow creation request
 	 */
 	public static function handle_create_flow( $request ) {
-		$ability = wp_get_ability( 'datamachine/create-flow' );
-		if ( ! $ability ) {
-			return new \WP_Error( 'ability_not_found', 'Ability not found', array( 'status' => 500 ) );
-		}
-
 		$input = array(
 			'pipeline_id' => (int) $request->get_param( 'pipeline_id' ),
 			'flow_name'   => $request->get_param( 'flow_name' ) ?? 'Flow',
@@ -377,9 +374,11 @@ class Flows {
 			$input['scheduling_config'] = $request->get_param( 'scheduling_config' );
 		}
 
-		$result = $ability->execute( $input );
-
-		return AbilityResult::rest_item_response( $result, null, array(), 'flow_creation_failed', __( 'Failed to create flow.', 'data-machine' ), 400 );
+		return RestAbilityExecutor::execute(
+			'datamachine/create-flow',
+			$input,
+			RestResultSpec::item( null, null, 'flow_creation_failed', __( 'Failed to create flow.', 'data-machine' ), 400 )
+		);
 	}
 
 	/**
@@ -398,18 +397,13 @@ class Flows {
 			return $access;
 		}
 
-		$ability = wp_get_ability( 'datamachine/delete-flow' );
-		if ( ! $ability ) {
-			return new \WP_Error( 'ability_not_found', 'Ability not found', array( 'status' => 500 ) );
-		}
-
-		$result = $ability->execute(
+		return RestAbilityExecutor::execute(
+			'datamachine/delete-flow',
 			array(
 				'flow_id' => $flow_id,
-			)
+			),
+			RestResultSpec::item( null, null, 'flow_deletion_failed', __( 'Failed to delete flow.', 'data-machine' ), 400 )
 		);
-
-		return AbilityResult::rest_item_response( $result, null, array(), 'flow_deletion_failed', __( 'Failed to delete flow.', 'data-machine' ), 400 );
 	}
 
 	/**
@@ -428,19 +422,14 @@ class Flows {
 			return $access;
 		}
 
-		$ability = wp_get_ability( 'datamachine/duplicate-flow' );
-		if ( ! $ability ) {
-			return new \WP_Error( 'ability_not_found', 'Ability not found', array( 'status' => 500 ) );
-		}
-
-		$result = $ability->execute(
+		return RestAbilityExecutor::execute(
+			'datamachine/duplicate-flow',
 			array(
 				'source_flow_id' => $flow_id,
 				'user_id'        => RestAccessGuard::for_action( 'manage_flows' )->acting_user_id(),
-			)
+			),
+			RestResultSpec::item( null, null, 'flow_duplication_failed', __( 'Failed to duplicate flow.', 'data-machine' ), 400 )
 		);
-
-		return AbilityResult::rest_item_response( $result, null, array(), 'flow_duplication_failed', __( 'Failed to duplicate flow.', 'data-machine' ), 400 );
 	}
 
 	/**
@@ -589,14 +578,11 @@ class Flows {
 	public static function handle_pause_flow( $request ) {
 		$flow_id = (int) $request->get_param( 'flow_id' );
 
-		$ability = wp_get_ability( 'datamachine/pause-flow' );
-		if ( ! $ability ) {
-			return new \WP_Error( 'ability_not_found', 'Ability not found', array( 'status' => 500 ) );
-		}
-
-		$result = $ability->execute( array( 'flow_id' => $flow_id ) );
-
-		return AbilityResult::rest_item_response( $result, null, array(), 'pause_failed', __( 'Failed to pause flow.', 'data-machine' ), 400 );
+		return RestAbilityExecutor::execute(
+			'datamachine/pause-flow',
+			array( 'flow_id' => $flow_id ),
+			RestResultSpec::item( null, null, 'pause_failed', __( 'Failed to pause flow.', 'data-machine' ), 400 )
+		);
 	}
 
 	/**
@@ -609,14 +595,11 @@ class Flows {
 	public static function handle_resume_flow( $request ) {
 		$flow_id = (int) $request->get_param( 'flow_id' );
 
-		$ability = wp_get_ability( 'datamachine/resume-flow' );
-		if ( ! $ability ) {
-			return new \WP_Error( 'ability_not_found', 'Ability not found', array( 'status' => 500 ) );
-		}
-
-		$result = $ability->execute( array( 'flow_id' => $flow_id ) );
-
-		return AbilityResult::rest_item_response( $result, null, array(), 'resume_failed', __( 'Failed to resume flow.', 'data-machine' ), 400 );
+		return RestAbilityExecutor::execute(
+			'datamachine/resume-flow',
+			array( 'flow_id' => $flow_id ),
+			RestResultSpec::item( null, null, 'resume_failed', __( 'Failed to resume flow.', 'data-machine' ), 400 )
+		);
 	}
 
 	/**
@@ -638,11 +621,6 @@ class Flows {
 			);
 		}
 
-		$ability = wp_get_ability( 'datamachine/pause-flow' );
-		if ( ! $ability ) {
-			return new \WP_Error( 'ability_not_found', 'Ability not found', array( 'status' => 500 ) );
-		}
-
 		$input = array();
 		if ( $pipeline_id ) {
 			$input['pipeline_id'] = (int) $pipeline_id;
@@ -651,9 +629,11 @@ class Flows {
 			$input['agent_id'] = (int) $agent_id;
 		}
 
-		$result = $ability->execute( $input );
-
-		return AbilityResult::rest_item_response( $result, null, array(), 'bulk_pause_failed', __( 'Failed to pause flows.', 'data-machine' ), 400 );
+		return RestAbilityExecutor::execute(
+			'datamachine/pause-flow',
+			$input,
+			RestResultSpec::item( null, null, 'bulk_pause_failed', __( 'Failed to pause flows.', 'data-machine' ), 400 )
+		);
 	}
 
 	/**
@@ -675,11 +655,6 @@ class Flows {
 			);
 		}
 
-		$ability = wp_get_ability( 'datamachine/resume-flow' );
-		if ( ! $ability ) {
-			return new \WP_Error( 'ability_not_found', 'Ability not found', array( 'status' => 500 ) );
-		}
-
 		$input = array();
 		if ( $pipeline_id ) {
 			$input['pipeline_id'] = (int) $pipeline_id;
@@ -688,9 +663,11 @@ class Flows {
 			$input['agent_id'] = (int) $agent_id;
 		}
 
-		$result = $ability->execute( $input );
-
-		return AbilityResult::rest_item_response( $result, null, array(), 'bulk_resume_failed', __( 'Failed to resume flows.', 'data-machine' ), 400 );
+		return RestAbilityExecutor::execute(
+			'datamachine/resume-flow',
+			$input,
+			RestResultSpec::item( null, null, 'bulk_resume_failed', __( 'Failed to resume flows.', 'data-machine' ), 400 )
+		);
 	}
 
 	/**
