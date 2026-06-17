@@ -49,6 +49,7 @@ require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/BundleValidationException.
 require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/BundleSchema.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/PortableSlug.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/AgentBundleArtifactExtensions.php';
+require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/AgentConfigArtifactProjector.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/AgentBundleAgentConfig.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/AgentBundleArtifactHasher.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/AgentBundleArtifactStatus.php';

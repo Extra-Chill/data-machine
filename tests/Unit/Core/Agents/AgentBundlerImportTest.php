@@ -820,7 +820,7 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 		);
 	}
 
-	public function test_upgrade_preserves_locally_modified_agent_config_and_reports_conflict(): void {
+	public function test_upgrade_preserves_projection_excluded_agent_config_without_conflict(): void {
 		$bundle = $this->fixture_bundle( 'context-agent' );
 		$bundle['agent']['agent_config'] = array(
 			'intelligence' => array(
@@ -869,15 +869,7 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 		);
 
 		$this->assertTrue( (bool) $second['success'], 'Upgrade succeeds so clean artifacts can apply.' );
-		$this->assertSame(
-			array(
-				'artifact_type' => 'agent_config',
-				'artifact_id'   => 'config',
-				'reason'        => 'local_modified',
-			),
-			$second['summary']['conflicts'][0] ?? null,
-			'Locally modified agent config is reported as a conflict.'
-		);
+		$this->assertSame( array(), $second['summary']['conflicts'], 'Projection-excluded agent config does not report a bundle conflict.' );
 
 		$after = $this->agents_repo->get_by_slug( 'context-agent' );
 		$this->assertSame(

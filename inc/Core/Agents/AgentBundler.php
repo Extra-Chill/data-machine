@@ -33,6 +33,7 @@ use DataMachine\Engine\Bundle\AgentBundleArrayAdapter;
 use DataMachine\Engine\Bundle\AgentBundleManifest;
 use DataMachine\Engine\Bundle\AgentBundleRuntimeDrift;
 use DataMachine\Engine\Bundle\AgentBundlePipelineFile;
+use DataMachine\Engine\Bundle\AgentConfigArtifactProjector;
 use DataMachine\Engine\Bundle\AgentTemplateMetadata;
 use DataMachine\Engine\Bundle\AgentPackageProjection;
 use DataMachine\Engine\Bundle\BundleSchema;
@@ -683,6 +684,9 @@ class AgentBundler {
 			$config = is_array( $existing['agent_config'] ?? null )
 				? array_merge( $existing['agent_config'], $incoming_config )
 				: $incoming_config;
+			if ( $existing ) {
+				$config = AgentConfigArtifactProjector::preserve_local_paths( $config, is_array( $existing['agent_config'] ?? null ) ? $existing['agent_config'] : array() );
+			}
 
 			$config['datamachine_bundle'] = array_merge(
 				$existing_bundle_state,

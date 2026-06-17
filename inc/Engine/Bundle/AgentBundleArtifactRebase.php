@@ -449,10 +449,11 @@ final class AgentBundleArtifactRebase {
 			return $local;
 		}
 
-		if ( self::is_runtime_local_agent_config_path( $path ) ) {
+		$preserve_policy = AgentConfigArtifactProjector::preserve_local_policy_for_path( $path );
+		if ( null !== $preserve_policy ) {
 			$decisions[ $path ] = array(
 				'source' => 'local',
-				'reason' => 'burn_in_preserve_runtime_agent_config',
+				'reason' => (string) ( $preserve_policy['reason'] ?? 'preserve_runtime_agent_config' ),
 			);
 			return $local_exists ? $local : $base;
 		}
@@ -510,29 +511,6 @@ final class AgentBundleArtifactRebase {
 		}
 
 		return $remote_exists ? $remote : $local;
-	}
-
-	/**
-	 * Whether an agent_config path is runtime-local and should preserve local state.
-	 *
-	 * @param string $path Dot path.
-	 */
-	private static function is_runtime_local_agent_config_path( string $path ): bool {
-		$prefixes = array(
-			'intelligence.context_servers',
-			'intelligence.auth_refs',
-			'allowed_redirect_uris',
-			'model',
-			'provider',
-		);
-
-		foreach ( $prefixes as $prefix ) {
-			if ( $path === $prefix || str_starts_with( $path, $prefix . '.' ) ) {
-				return true;
-			}
-		}
-
-		return false;
 	}
 
 	/**

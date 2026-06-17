@@ -37,10 +37,12 @@ if ( ! class_exists( 'WP_Agent_Package_Artifact_Hasher' ) ) {
 require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/BundleSchema.php';
 require_once dirname( __DIR__ ) . '/vendor/wordpress/agents-api/src/Packages/class-wp-agent-package-artifact-hasher.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/AgentBundleArtifactExtensions.php';
+require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/AgentConfigArtifactProjector.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/AgentBundleArtifactHasher.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/AgentBundleArtifactRebase.php';
 
 use DataMachine\Engine\Bundle\AgentBundleArtifactRebase;
+use DataMachine\Engine\Bundle\AgentConfigArtifactProjector;
 
 $failures = 0;
 $total    = 0;
@@ -149,8 +151,11 @@ rebase_assert( 'agent_config rebase is unambiguous for runtime-local plus bundle
 rebase_assert_equals( 'agent_config preserves local context server URL', 'https://local-tunnel.example.test/mcp', $agent_config_result['merged']['intelligence']['context_servers']['a8c']['url'] ?? null );
 rebase_assert_equals( 'agent_config preserves local auth header', 'Bearer local-token', $agent_config_result['merged']['intelligence']['context_servers']['a8c']['headers']['Authorization'] ?? null );
 rebase_assert_equals( 'agent_config takes remote graph alias', array( 'strategy-signal' ), $agent_config_result['merged']['intelligence_wiki_brain']['graph_config']['entity_types']['strategic-signal']['aliases'] ?? null );
-rebase_assert_equals( 'agent_config records runtime-local decision', 'burn_in_preserve_runtime_agent_config', $agent_config_result['decisions']['intelligence.context_servers']['reason'] ?? null );
+rebase_assert_equals( 'agent_config records runtime-local decision', 'preserve_plugin_owned_agent_config', $agent_config_result['decisions']['intelligence.context_servers']['reason'] ?? null );
 rebase_assert_equals( 'agent_config records bundle-owned remote decision', 'local_unchanged_from_base', $agent_config_result['decisions']['intelligence_wiki_brain.graph_config.entity_types.strategic-signal.aliases']['reason'] ?? null );
+$tracked_agent_config = AgentConfigArtifactProjector::tracked_payload( $local_agent_config );
+rebase_assert_equals( 'tracked agent_config excludes Intelligence context servers', false, isset( $tracked_agent_config['intelligence']['context_servers'] ) );
+rebase_assert_equals( 'tracked agent_config keeps bundle-owned Intelligence wiki brain config', 'Strategic signal', $tracked_agent_config['intelligence_wiki_brain']['graph_config']['entity_types']['strategic-signal']['label'] ?? null );
 
 // ---------------------------------------------------------------------------
 // [3] burn-in-safe takes remote source-shape, keeps local throttles.

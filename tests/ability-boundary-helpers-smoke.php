@@ -7,41 +7,65 @@
  * @package DataMachine\Tests
  */
 
-if ( ! defined( 'ABSPATH' ) ) {
-	define( 'ABSPATH', __DIR__ . '/' );
+namespace DataMachine\Abilities {
+	function doing_action( $hook = '' ) {
+		global $datamachine_test_doing_action;
+		return 'wp_abilities_api_init' === $hook && $datamachine_test_doing_action;
+	}
+
+	function did_action( $hook = '' ) {
+		global $datamachine_test_did_action;
+		return 'wp_abilities_api_init' === $hook ? $datamachine_test_did_action : 0;
+	}
+
+	function add_action( $hook, $callback ) {
+		global $datamachine_test_actions;
+		$datamachine_test_actions[ $hook ][] = $callback;
+	}
 }
 
-$failed = 0;
-$total  = 0;
+namespace DataMachine\Cli {
+	function wp_get_ability( string $name ) {
+		global $datamachine_test_abilities;
+		return $datamachine_test_abilities[ $name ] ?? null;
+	}
 
-$datamachine_test_doing_action = false;
-$datamachine_test_did_action   = 0;
-$datamachine_test_actions      = array();
-$datamachine_test_abilities    = array();
-
-function doing_action( $hook = '' ) {
-	global $datamachine_test_doing_action;
-	return 'wp_abilities_api_init' === $hook && $datamachine_test_doing_action;
+	function is_wp_error( $value ) {
+		return false;
+	}
 }
 
-function did_action( $hook = '' ) {
-	global $datamachine_test_did_action;
-	return 'wp_abilities_api_init' === $hook ? $datamachine_test_did_action : 0;
+namespace DataMachine\Core {
+
+	function is_wp_error( $value ) {
+		return false;
+	}
 }
 
-function add_action( $hook, $callback ) {
-	global $datamachine_test_actions;
-	$datamachine_test_actions[ $hook ][] = $callback;
-}
+namespace {
+	if ( ! defined( 'ABSPATH' ) ) {
+		define( 'ABSPATH', __DIR__ . '/' );
+	}
 
-function wp_get_ability( string $name ) {
-	global $datamachine_test_abilities;
-	return $datamachine_test_abilities[ $name ] ?? null;
-}
+	$failed = 0;
+	$total  = 0;
 
-function is_wp_error( $value ) {
-	return false;
-}
+	$datamachine_test_doing_action = false;
+	$datamachine_test_did_action   = 0;
+	$datamachine_test_actions      = array();
+	$datamachine_test_abilities    = array();
+
+	if ( ! function_exists( 'wp_get_ability' ) ) {
+		function wp_get_ability( string $name ) {
+			return \DataMachine\Cli\wp_get_ability( $name );
+		}
+	}
+
+	if ( ! function_exists( 'is_wp_error' ) ) {
+		function is_wp_error( $value ) {
+			return false;
+		}
+	}
 
 class Datamachine_Test_Ability {
 	public function execute( $input = null ) {
@@ -108,3 +132,4 @@ if ( $failed > 0 ) {
 }
 
 echo "\nAll {$total} checks passed.\n";
+}

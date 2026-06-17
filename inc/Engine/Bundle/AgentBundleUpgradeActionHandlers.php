@@ -109,6 +109,7 @@ final class AgentBundleCoreArtifactApply {
 			return new \WP_Error( 'datamachine_bundle_agent_missing', sprintf( 'Agent ID %d was not found.', $agent_id ) );
 		}
 		$current_config = is_array( $agent['agent_config'] ?? null ) ? $agent['agent_config'] : array();
+		$payload        = AgentConfigArtifactProjector::preserve_local_paths( $payload, $current_config );
 		if ( ! empty( $current_config['datamachine_bundle'] ) && ! isset( $payload['datamachine_bundle'] ) ) {
 			$payload['datamachine_bundle'] = $current_config['datamachine_bundle'];
 		}
