@@ -234,14 +234,14 @@ class ImageGeneration extends BaseTool {
 				'label'       => __( 'Default Provider', 'data-machine' ),
 				'placeholder' => __( 'Provider id', 'data-machine' ),
 				'required'    => false,
-				'description' => __( 'wp-ai-client provider identifier. Leave empty only when a provider integration supplies an image-generation default.', 'data-machine' ),
+				'description' => __( 'wp-ai-client provider identifier used when an image-generation request does not provide one.', 'data-machine' ),
 			),
 			'default_model'             => array(
 				'type'        => 'text',
 				'label'       => __( 'Default Model', 'data-machine' ),
 				'placeholder' => __( 'Model id', 'data-machine' ),
 				'required'    => false,
-				'description' => __( 'wp-ai-client image model identifier. Leave empty only when a provider integration supplies an image-generation default. AI agents can override per-call.', 'data-machine' ),
+				'description' => __( 'wp-ai-client image model identifier used when an image-generation request does not provide one.', 'data-machine' ),
 			),
 			'default_aspect_ratio'      => array(
 				'type'        => 'select',
