@@ -13,6 +13,7 @@
 namespace DataMachine\Cli\Commands;
 
 use WP_CLI;
+use DataMachine\Cli\AbilityRunner;
 use DataMachine\Cli\BaseCommand;
 use DataMachine\Cli\AgentResolver;
 use DataMachine\Cli\UserResolver;
@@ -110,7 +111,8 @@ class JobsCommand extends BaseCommand {
 		$timeout = isset( $assoc_args['timeout'] ) ? max( 1, (int) $assoc_args['timeout'] ) : 2;
 		$format  = $assoc_args['format'] ?? 'table';
 
-		$result = ( new RecoverStuckJobsAbility() )->execute(
+		$result = AbilityRunner::execute(
+			'datamachine/recover-stuck-jobs',
 			array(
 				'dry_run'       => $dry_run,
 				'flow_id'       => $flow_id,
@@ -1265,7 +1267,7 @@ class JobsCommand extends BaseCommand {
 			$input['fields'] = $this->get_database_fields_for_job_list_fields( $fields );
 		}
 
-		$result = ( new GetJobsAbility() )->execute( $input );
+		$result = AbilityRunner::execute( 'datamachine/get-jobs', $input );
 
 		if ( ! $result['success'] ) {
 			WP_CLI::error( $result['error'] ?? 'Unknown error occurred' );

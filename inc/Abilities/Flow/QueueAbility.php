@@ -32,6 +32,7 @@
 
 namespace DataMachine\Abilities\Flow;
 
+use DataMachine\Abilities\AbilityRegistration;
 use DataMachine\Core\Database\Flows\Flows as DB_Flows;
 use DataMachine\Core\Database\Pipelines\Pipelines as DB_Pipelines;
 use DataMachine\Abilities\DuplicateCheck\DuplicateCheckAbility;
@@ -108,11 +109,7 @@ class QueueAbility {
 			$this->registerConfigPatchMove();
 		};
 
-		if ( doing_action( 'wp_abilities_api_init' ) ) {
-			$register_callback();
-		} elseif ( ! did_action( 'wp_abilities_api_init' ) ) {
-			add_action( 'wp_abilities_api_init', $register_callback );
-		}
+		AbilityRegistration::on_abilities_api_init( $register_callback );
 	}
 
 	/**

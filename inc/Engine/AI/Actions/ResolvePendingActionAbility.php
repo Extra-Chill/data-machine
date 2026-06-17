@@ -42,6 +42,7 @@ use AgentsAPI\AI\Approvals\WP_Agent_Approval_Decision;
 use AgentsAPI\AI\Approvals\WP_Agent_Pending_Action;
 use AgentsAPI\AI\Approvals\WP_Agent_Pending_Action_Handler;
 use AgentsAPI\AI\Approvals\WP_Agent_Pending_Action_Status;
+use DataMachine\Abilities\AbilityRegistration;
 use DataMachine\Abilities\PermissionHelper;
 
 defined( 'ABSPATH' ) || exit;
@@ -135,11 +136,7 @@ class ResolvePendingActionAbility {
 			);
 		};
 
-		if ( doing_action( 'wp_abilities_api_init' ) ) {
-			$register();
-		} elseif ( ! did_action( 'wp_abilities_api_init' ) ) {
-			add_action( 'wp_abilities_api_init', $register );
-		}
+		AbilityRegistration::on_abilities_api_init( $register );
 	}
 
 	/**
