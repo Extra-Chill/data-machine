@@ -27,30 +27,30 @@ final class AgentConfigArtifactProjector {
 	 */
 	public static function policies(): array {
 		$policies = array(
-			'datamachine_bundle'            => array(
+			'datamachine_bundle'           => array(
 				'tracking' => 'exclude',
 				'merge'    => 'preserve_local',
 				'reason'   => 'preserve_runtime_bundle_metadata',
 			),
-			'intelligence.context_servers'  => array(
+			'intelligence.context_servers' => array(
 				'tracking' => 'exclude',
 				'merge'    => 'preserve_local',
 				'reason'   => 'preserve_plugin_owned_agent_config',
 			),
-			'intelligence.auth_refs'        => array(
+			'intelligence.auth_refs'       => array(
 				'tracking' => 'exclude',
 				'merge'    => 'preserve_local',
 				'reason'   => 'preserve_plugin_owned_agent_config',
 			),
-			'allowed_redirect_uris'         => array(
+			'allowed_redirect_uris'        => array(
 				'merge'  => 'preserve_local',
 				'reason' => 'preserve_runtime_agent_config',
 			),
-			'model'                         => array(
+			'model'                        => array(
 				'merge'  => 'preserve_local',
 				'reason' => 'preserve_runtime_agent_config',
 			),
-			'provider'                      => array(
+			'provider'                     => array(
 				'merge'  => 'preserve_local',
 				'reason' => 'preserve_runtime_agent_config',
 			),
@@ -111,6 +111,24 @@ final class AgentConfigArtifactProjector {
 		return null;
 	}
 
+	/**
+	 * Restore preserve-local config paths before writing a projected payload live.
+	 *
+	 * @param array<string,mixed> $payload        Projected bundle payload.
+	 * @param array<string,mixed> $current_config Current live agent config.
+	 * @return array<string,mixed>
+	 */
+	public static function preserve_local_paths( array $payload, array $current_config ): array {
+		foreach ( self::policies() as $path => $policy ) {
+			if ( 'preserve_local' !== ( $policy['merge'] ?? '' ) || ! self::path_exists( $current_config, $path ) ) {
+				continue;
+			}
+			self::set_path( $payload, $path, self::get_path( $current_config, $path ) );
+		}
+
+		return $payload;
+	}
+
 	/** @param array<string,array<string,mixed>> $policies */
 	private static function normalize_policies( array $policies ): array {
 		$normalized = array();
@@ -136,7 +154,10 @@ final class AgentConfigArtifactProjector {
 
 		uksort(
 			$normalized,
-			static fn( string $a, string $b ): int => substr_count( $b, '.' ) <=> substr_count( $a, '.' ) ?: strcmp( $a, $b )
+			static function ( string $a, string $b ): int {
+				$depth_compare = substr_count( $b, '.' ) <=> substr_count( $a, '.' );
+				return 0 !== $depth_compare ? $depth_compare : strcmp( $a, $b );
+			}
 		);
 		return $normalized;
 	}
