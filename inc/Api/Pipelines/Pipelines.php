@@ -17,6 +17,8 @@ use DataMachine\Abilities\Pipeline\DeletePipelineAbility;
 use DataMachine\Abilities\Pipeline\GetPipelinesAbility;
 use DataMachine\Abilities\Pipeline\ImportExportAbility;
 use DataMachine\Abilities\Pipeline\UpdatePipelineAbility;
+use DataMachine\Api\RestAbilityExecutor;
+use DataMachine\Api\RestResultSpec;
 use DataMachine\Core\Admin\DateFormatter;
 use DataMachine\Core\AbilityResult;
 use WP_REST_Server;
@@ -542,26 +544,24 @@ class Pipelines {
 			);
 		}
 
-		$result = ( new UpdatePipelineAbility() )->execute(
+		return RestAbilityExecutor::execute(
+			new UpdatePipelineAbility(),
 			array(
 				'pipeline_id'   => $pipeline_id,
 				'pipeline_name' => $params['pipeline_name'],
-			)
-		);
-
-		$error = AbilityResult::failure_to_wp_error( $result, 'update_failed', __( 'Failed to save pipeline title', 'data-machine' ) );
-		if ( $error ) {
-			return $error;
-		}
-
-		return rest_ensure_response(
-			array(
-				'success' => true,
-				'data'    => array(
-					'pipeline_id'   => $result['pipeline_id'],
-					'pipeline_name' => $result['pipeline_name'],
-				),
-				'message' => $result['message'] ?? __( 'Pipeline title saved successfully', 'data-machine' ),
+			),
+			RestResultSpec::item(
+				static function ( array $result ): array {
+					return array(
+						'pipeline_id'   => $result['pipeline_id'],
+						'pipeline_name' => $result['pipeline_name'],
+					);
+				},
+				static function ( array $result ): array {
+					return array( 'message' => $result['message'] ?? __( 'Pipeline title saved successfully', 'data-machine' ) );
+				},
+				'update_failed',
+				__( 'Failed to save pipeline title', 'data-machine' )
 			)
 		);
 	}

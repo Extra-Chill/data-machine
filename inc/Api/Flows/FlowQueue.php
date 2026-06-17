@@ -11,6 +11,8 @@
 namespace DataMachine\Api\Flows;
 
 use DataMachine\Abilities\PermissionHelper;
+use DataMachine\Api\RestAbilityExecutor;
+use DataMachine\Api\RestResultSpec;
 use WP_REST_Server;
 
 if ( ! defined( 'WPINC' ) ) {
@@ -235,45 +237,27 @@ class FlowQueue {
 	 * @return \WP_REST_Response|\WP_Error
 	 */
 	public static function handle_list_queue( $request ) {
-		$ability = wp_get_ability( 'datamachine/queue-list' );
-		if ( ! $ability ) {
-			return new \WP_Error( 'ability_not_found', 'Ability not found', array( 'status' => 500 ) );
-		}
-
-		$result = $ability->execute(
+		return RestAbilityExecutor::execute(
+			'datamachine/queue-list',
 			array(
 				'flow_id'      => (int) $request->get_param( 'flow_id' ),
 				'flow_step_id' => sanitize_text_field( $request->get_param( 'flow_step_id' ) ),
-			)
-		);
-
-		if ( is_wp_error( $result ) ) {
-			return $result;
-		}
-
-		if ( ! $result['success'] ) {
-			$status = 400;
-			if ( false !== strpos( $result['error'] ?? '', 'not found' ) ) {
-				$status = 404;
-			}
-
-			return new \WP_Error(
+			),
+			RestResultSpec::item(
+				static function ( array $result ): array {
+					return array(
+						'flow_id'      => $result['flow_id'],
+						'flow_step_id' => $result['flow_step_id'],
+						'queue'        => $result['queue'],
+						'count'        => $result['count'],
+						'queue_mode'   => $result['queue_mode'],
+					);
+				},
+				null,
 				'queue_list_failed',
-				$result['error'] ?? __( 'Failed to list queue.', 'data-machine' ),
-				array( 'status' => $status )
-			);
-		}
-
-		return rest_ensure_response(
-			array(
-				'success' => true,
-				'data'    => array(
-					'flow_id'      => $result['flow_id'],
-					'flow_step_id' => $result['flow_step_id'],
-					'queue'        => $result['queue'],
-					'count'        => $result['count'],
-					'queue_mode'   => $result['queue_mode'],
-				),
+				__( 'Failed to list queue.', 'data-machine' ),
+				400,
+				array( self::class, 'queue_failure_status' )
 			)
 		);
 	}
@@ -352,23 +336,26 @@ class FlowQueue {
 			}
 		}
 
-		return rest_ensure_response(
-			array(
-				'success' => true,
-				'data'    => array(
+		return RestResultSpec::item(
+			static function () use ( $flow_id, $flow_step_id, $added_count, $queue_length ): array {
+				return array(
 					'flow_id'      => $flow_id,
 					'flow_step_id' => $flow_step_id,
 					'added_count'  => $added_count,
 					'queue_length' => $queue_length,
-				),
-				'message' => sprintf(
+				);
+			},
+			static function () use ( $added_count, $queue_length ): array {
+				return array(
+					'message' => sprintf(
 					/* translators: %1$d: number of prompts added, %2$d: total queue length */
 					__( 'Added %1$d prompt(s). Queue now has %2$d item(s).', 'data-machine' ),
 					$added_count,
 					$queue_length
-				),
-			)
-		);
+					),
+				);
+			}
+		)->response( array( 'success' => true ) );
 	}
 
 	/**
@@ -380,44 +367,27 @@ class FlowQueue {
 	 * @return \WP_REST_Response|\WP_Error
 	 */
 	public static function handle_clear_queue( $request ) {
-		$ability = wp_get_ability( 'datamachine/queue-clear' );
-		if ( ! $ability ) {
-			return new \WP_Error( 'ability_not_found', 'Ability not found', array( 'status' => 500 ) );
-		}
-
-		$result = $ability->execute(
+		return RestAbilityExecutor::execute(
+			'datamachine/queue-clear',
 			array(
 				'flow_id'      => (int) $request->get_param( 'flow_id' ),
 				'flow_step_id' => sanitize_text_field( $request->get_param( 'flow_step_id' ) ),
-			)
-		);
-
-		if ( is_wp_error( $result ) ) {
-			return $result;
-		}
-
-		if ( ! $result['success'] ) {
-			$status = 400;
-			if ( false !== strpos( $result['error'] ?? '', 'not found' ) ) {
-				$status = 404;
-			}
-
-			return new \WP_Error(
+			),
+			RestResultSpec::item(
+				static function ( array $result ): array {
+					return array(
+						'flow_id'       => $result['flow_id'],
+						'flow_step_id'  => $result['flow_step_id'],
+						'cleared_count' => $result['cleared_count'],
+					);
+				},
+				static function ( array $result ): array {
+					return array( 'message' => $result['message'] );
+				},
 				'queue_clear_failed',
-				$result['error'] ?? __( 'Failed to clear queue.', 'data-machine' ),
-				array( 'status' => $status )
-			);
-		}
-
-		return rest_ensure_response(
-			array(
-				'success' => true,
-				'data'    => array(
-					'flow_id'       => $result['flow_id'],
-					'flow_step_id'  => $result['flow_step_id'],
-					'cleared_count' => $result['cleared_count'],
-				),
-				'message' => $result['message'],
+				__( 'Failed to clear queue.', 'data-machine' ),
+				400,
+				array( self::class, 'queue_failure_status' )
 			)
 		);
 	}
@@ -431,46 +401,29 @@ class FlowQueue {
 	 * @return \WP_REST_Response|\WP_Error
 	 */
 	public static function handle_remove_from_queue( $request ) {
-		$ability = wp_get_ability( 'datamachine/queue-remove' );
-		if ( ! $ability ) {
-			return new \WP_Error( 'ability_not_found', 'Ability not found', array( 'status' => 500 ) );
-		}
-
-		$result = $ability->execute(
+		return RestAbilityExecutor::execute(
+			'datamachine/queue-remove',
 			array(
 				'flow_id'      => (int) $request->get_param( 'flow_id' ),
 				'flow_step_id' => sanitize_text_field( $request->get_param( 'flow_step_id' ) ),
 				'index'        => (int) $request->get_param( 'index' ),
-			)
-		);
-
-		if ( is_wp_error( $result ) ) {
-			return $result;
-		}
-
-		if ( ! $result['success'] ) {
-			$status = 400;
-			if ( false !== strpos( $result['error'] ?? '', 'not found' ) ) {
-				$status = 404;
-			}
-
-			return new \WP_Error(
+			),
+			RestResultSpec::item(
+				static function ( array $result ): array {
+					return array(
+						'flow_id'        => $result['flow_id'],
+						'flow_step_id'   => $result['flow_step_id'],
+						'removed_prompt' => $result['removed_prompt'],
+						'queue_length'   => $result['queue_length'],
+					);
+				},
+				static function ( array $result ): array {
+					return array( 'message' => $result['message'] );
+				},
 				'queue_remove_failed',
-				$result['error'] ?? __( 'Failed to remove from queue.', 'data-machine' ),
-				array( 'status' => $status )
-			);
-		}
-
-		return rest_ensure_response(
-			array(
-				'success' => true,
-				'data'    => array(
-					'flow_id'        => $result['flow_id'],
-					'flow_step_id'   => $result['flow_step_id'],
-					'removed_prompt' => $result['removed_prompt'],
-					'queue_length'   => $result['queue_length'],
-				),
-				'message' => $result['message'],
+				__( 'Failed to remove from queue.', 'data-machine' ),
+				400,
+				array( self::class, 'queue_failure_status' )
 			)
 		);
 	}
@@ -484,47 +437,30 @@ class FlowQueue {
 	 * @return \WP_REST_Response|\WP_Error
 	 */
 	public static function handle_update_queue_item( $request ) {
-		$ability = wp_get_ability( 'datamachine/queue-update' );
-		if ( ! $ability ) {
-			return new \WP_Error( 'ability_not_found', 'Ability not found', array( 'status' => 500 ) );
-		}
-
-		$result = $ability->execute(
+		return RestAbilityExecutor::execute(
+			'datamachine/queue-update',
 			array(
 				'flow_id'      => (int) $request->get_param( 'flow_id' ),
 				'flow_step_id' => sanitize_text_field( $request->get_param( 'flow_step_id' ) ),
 				'index'        => (int) $request->get_param( 'index' ),
 				'prompt'       => $request->get_param( 'prompt' ),
-			)
-		);
-
-		if ( is_wp_error( $result ) ) {
-			return $result;
-		}
-
-		if ( ! $result['success'] ) {
-			$status = 400;
-			if ( false !== strpos( $result['error'] ?? '', 'not found' ) ) {
-				$status = 404;
-			}
-
-			return new \WP_Error(
+			),
+			RestResultSpec::item(
+				static function ( array $result ): array {
+					return array(
+						'flow_id'      => $result['flow_id'],
+						'flow_step_id' => $result['flow_step_id'],
+						'index'        => $result['index'],
+						'queue_length' => $result['queue_length'],
+					);
+				},
+				static function ( array $result ): array {
+					return array( 'message' => $result['message'] );
+				},
 				'queue_update_failed',
-				$result['error'] ?? __( 'Failed to update queue item.', 'data-machine' ),
-				array( 'status' => $status )
-			);
-		}
-
-		return rest_ensure_response(
-			array(
-				'success' => true,
-				'data'    => array(
-					'flow_id'      => $result['flow_id'],
-					'flow_step_id' => $result['flow_step_id'],
-					'index'        => $result['index'],
-					'queue_length' => $result['queue_length'],
-				),
-				'message' => $result['message'],
+				__( 'Failed to update queue item.', 'data-machine' ),
+				400,
+				array( self::class, 'queue_failure_status' )
 			)
 		);
 	}
@@ -538,46 +474,36 @@ class FlowQueue {
 	 * @return \WP_REST_Response|\WP_Error
 	 */
 	public static function handle_update_queue_mode( $request ) {
-		$ability = wp_get_ability( 'datamachine/queue-mode' );
-		if ( ! $ability ) {
-			return new \WP_Error( 'ability_not_found', 'Ability not found', array( 'status' => 500 ) );
-		}
-
-		$result = $ability->execute(
+		return RestAbilityExecutor::execute(
+			'datamachine/queue-mode',
 			array(
 				'flow_id'      => (int) $request->get_param( 'flow_id' ),
 				'flow_step_id' => sanitize_text_field( $request->get_param( 'flow_step_id' ) ),
 				'mode'         => sanitize_text_field( $request->get_param( 'mode' ) ),
-			)
-		);
-
-		if ( is_wp_error( $result ) ) {
-			return $result;
-		}
-
-		if ( ! $result['success'] ) {
-			$status = 400;
-			if ( false !== strpos( $result['error'] ?? '', 'not found' ) ) {
-				$status = 404;
-			}
-
-			return new \WP_Error(
+			),
+			RestResultSpec::item(
+				static function ( array $result ): array {
+					return array(
+						'flow_id'      => $result['flow_id'],
+						'flow_step_id' => $result['flow_step_id'],
+						'queue_mode'   => $result['queue_mode'],
+					);
+				},
+				static function ( array $result ): array {
+					return array( 'message' => $result['message'] ?? __( 'Queue mode updated.', 'data-machine' ) );
+				},
 				'queue_mode_failed',
-				$result['error'] ?? __( 'Failed to update queue mode.', 'data-machine' ),
-				array( 'status' => $status )
-			);
-		}
-
-		return rest_ensure_response(
-			array(
-				'success' => true,
-				'data'    => array(
-					'flow_id'      => $result['flow_id'],
-					'flow_step_id' => $result['flow_step_id'],
-					'queue_mode'   => $result['queue_mode'],
-				),
-				'message' => $result['message'] ?? __( 'Queue mode updated.', 'data-machine' ),
+				__( 'Failed to update queue mode.', 'data-machine' ),
+				400,
+				array( self::class, 'queue_failure_status' )
 			)
 		);
+	}
+
+	/**
+	 * Preserve queue endpoints' historical not-found status mapping.
+	 */
+	public static function queue_failure_status( array $result ): int {
+		return false !== strpos( $result['error'] ?? '', 'not found' ) ? 404 : 400;
 	}
 }
