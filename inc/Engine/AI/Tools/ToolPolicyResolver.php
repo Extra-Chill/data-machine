@@ -255,7 +255,7 @@ class ToolPolicyResolver {
 				'reason'    => $reason,
 				'source'    => $source,
 			);
-			foreach ( array( 'ability', 'tool_modes', 'active_modes' ) as $key ) {
+			foreach ( array( 'ability', 'tool_modes', 'active_modes', 'execution_location' ) as $key ) {
 				if ( array_key_exists( $key, $rejection_by_tool[ $tool_name ] ?? array() ) ) {
 					$evidence[ $key ] = $rejection_by_tool[ $tool_name ][ $key ];
 				}
