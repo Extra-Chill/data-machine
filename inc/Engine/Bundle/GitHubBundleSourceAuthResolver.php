@@ -36,7 +36,7 @@ final class GitHubBundleSourceAuthResolver implements BundleSourceAuthResolverIn
 		}
 
 		$is_github = $this->is_github_host( $host );
-		$is_ghe = ! $is_github && array_key_exists( $host, BundleSourceAuth::ghe_hosts() );
+		$is_ghe    = ! $is_github && array_key_exists( $host, BundleSourceAuth::ghe_hosts() );
 		if ( ! $is_github && ! $is_ghe ) {
 			return $args;
 		}
@@ -105,6 +105,7 @@ final class GitHubBundleSourceAuthResolver implements BundleSourceAuthResolverIn
 	}
 
 	private function host_for( string $url ): string {
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.parse_url_parse_url -- wp_parse_url() is unavailable in standalone smoke contexts.
 		$host = function_exists( 'wp_parse_url' ) ? wp_parse_url( $url, PHP_URL_HOST ) : parse_url( $url, PHP_URL_HOST );
 		if ( ! is_string( $host ) || '' === $host ) {
 			return '';
