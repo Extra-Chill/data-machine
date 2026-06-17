@@ -42,38 +42,8 @@ class ToolSourceRegistry {
 	 * @return array Tools keyed by tool name.
 	 */
 	public function gather( array $modes, array $args ): array {
-		if ( ! empty( $args['capture_trace'] ) ) {
-			$trace = $this->gatherTrace( $modes, $args );
-			return $trace['tools'];
-		}
-
-		$order_callback       = array( $this, 'orderSourcesForContext' );
-		$host_policy_callback = array( $this, 'filterSourceToolsForHostPolicy' );
-		if ( function_exists( 'add_filter' ) ) {
-			// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- Canonical Agents API tool-source compatibility hook.
-			add_filter( 'agents_api_tool_source_order', $order_callback, 5, 3 );
-			// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- Canonical Agents API tool-source compatibility hook.
-			add_filter( 'agents_api_tool_source_tools', $host_policy_callback, PHP_INT_MAX, 4 );
-		}
-
-		try {
-			return $this->registry->gather(
-				array_merge(
-					$args,
-					array(
-						'modes'        => $modes,
-						'tool_manager' => $this->tool_manager,
-					)
-				)
-			);
-		} finally {
-			if ( function_exists( 'remove_filter' ) ) {
-				// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- Canonical Agents API tool-source compatibility hook.
-				remove_filter( 'agents_api_tool_source_order', $order_callback, 5 );
-				// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- Canonical Agents API tool-source compatibility hook.
-				remove_filter( 'agents_api_tool_source_tools', $host_policy_callback, PHP_INT_MAX );
-			}
-		}
+		$trace = $this->gatherTrace( $modes, $args );
+		return $trace['tools'];
 	}
 
 	/**
@@ -184,7 +154,7 @@ class ToolSourceRegistry {
 			self::SOURCE_RUNTIME_TOOLS,
 			function ( array $context ) use ( $runtime_source ): array {
 				$modes = ToolPolicyResolver::normalizeModes( $context['modes'] ?? array() );
-				return $this->applyHostToolPolicy( $runtime_source( $modes, $context ), self::SOURCE_RUNTIME_TOOLS, $context );
+				return $runtime_source( $modes, $context );
 			}
 		);
 
@@ -192,7 +162,7 @@ class ToolSourceRegistry {
 			self::SOURCE_ADJACENT_HANDLERS,
 			function ( array $context ) use ( $handler_source ): array {
 				$modes = ToolPolicyResolver::normalizeModes( $context['modes'] ?? array() );
-				return $this->applyHostToolPolicy( $handler_source( $modes, $context, $this->tool_manager ), self::SOURCE_ADJACENT_HANDLERS, $context );
+				return $handler_source( $modes, $context, $this->tool_manager );
 			}
 		);
 
@@ -200,7 +170,7 @@ class ToolSourceRegistry {
 			self::SOURCE_STATIC_REGISTRY,
 			function ( array $context ) use ( $static_source ): array {
 				$modes = ToolPolicyResolver::normalizeModes( $context['modes'] ?? array() );
-				return $this->applyHostToolPolicy( $static_source( $modes, $context ), self::SOURCE_STATIC_REGISTRY, $context );
+				return $static_source( $modes, $context );
 			}
 		);
 
@@ -208,7 +178,7 @@ class ToolSourceRegistry {
 			self::SOURCE_ABILITY_TOOLS,
 			function ( array $context ) use ( $ability_source ): array {
 				$modes = ToolPolicyResolver::normalizeModes( $context['modes'] ?? array() );
-				return $this->applyHostToolPolicy( $ability_source( $modes, $context ), self::SOURCE_ABILITY_TOOLS, $context );
+				return $ability_source( $modes, $context );
 			}
 		);
 	}
@@ -237,14 +207,20 @@ class ToolSourceRegistry {
 				continue;
 			}
 
-			if ( $policy->isLocallyRunnable( $tool_name ) ) {
+			$execution_location = $policy->executionLocation( $tool_name );
+			if ( 'runner' === $execution_location ) {
+				continue;
+			}
+
+			if ( 'control_plane' === $execution_location ) {
+				$source_tools[ $tool_name ] = $this->delegateHostToolToControlPlane( $tool_definition, $tool_name, $source_slug );
 				continue;
 			}
 
 			$rejections[ $tool_name ] = array(
 				'tool_name'           => $tool_name,
 				'reason'              => 'host_tool_policy',
-				'execution_location'  => $policy->executionLocation( $tool_name ),
+				'execution_location'  => $execution_location,
 				'source'              => $source_slug,
 			);
 			unset( $source_tools[ $tool_name ] );
@@ -257,6 +233,34 @@ class ToolSourceRegistry {
 		}
 
 		return $source_tools;
+	}
+
+	/**
+	 * Convert a host-owned tool into a delegated runtime tool declaration.
+	 *
+	 * @param array<string,mixed> $tool_definition Original source tool definition.
+	 * @param string              $tool_name       Tool name.
+	 * @param string              $source_slug     Source slug.
+	 * @return array<string,mixed>
+	 */
+	private function delegateHostToolToControlPlane( array $tool_definition, string $tool_name, string $source_slug ): array {
+		$runtime = is_array( $tool_definition['runtime'] ?? null ) ? $tool_definition['runtime'] : array();
+
+		$tool_definition['name']              = is_string( $tool_definition['name'] ?? null ) && '' !== trim( (string) $tool_definition['name'] ) ? (string) $tool_definition['name'] : $tool_name;
+		$tool_definition['executor']          = 'client';
+		$tool_definition['external_executor'] = true;
+		$tool_definition['runtime_tool']      = true;
+		$tool_definition['runtime']           = array_merge(
+			$runtime,
+			array(
+				'environment'        => 'control_plane',
+				'capability_scope'   => 'control_plane',
+				'execution_location' => 'control_plane',
+				'source'             => $source_slug,
+			)
+		);
+
+		return $tool_definition;
 	}
 
 	/**

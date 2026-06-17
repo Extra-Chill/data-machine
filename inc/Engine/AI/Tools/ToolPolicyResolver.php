@@ -105,14 +105,9 @@ class ToolPolicyResolver {
 
 		// 1. Gather tools from Data Machine-owned sources.
 		$args['modes'] = $modes;
-		$source_trace  = null;
-		if ( ! empty( $args['capture_trace'] ) ) {
-			$source_trace = $this->tool_source_registry->gatherTrace( $modes, $args );
-			$tools        = $source_trace['tools'];
-		} else {
-			$tools = $this->gatherByModes( $modes, $args );
-		}
-		$tools        = $this->filterRuntimeToolsByPolicyOptIn( $tools, $args, $agent_policy );
+		$source_trace  = $this->tool_source_registry->gatherTrace( $modes, $args );
+		$tools         = $this->filterRuntimeToolsByPolicyOptIn( $source_trace['tools'], $args, $agent_policy );
+		$gathered_tools = $tools;
 
 		// 2. Delegate generic mode/allow/deny/category policy resolution to Agents API.
 		$policy_context = array_merge(
@@ -136,9 +131,8 @@ class ToolPolicyResolver {
 		}
 
 		$tools = $this->tool_policy->resolve( $tools, $policy_context );
-		if ( is_array( $source_trace ) ) {
-			$this->last_source_trace = $source_trace;
-		}
+		$tools = $this->restoreExplicitDelegatedRuntimeTools( $tools, $gathered_tools, $args, $agent_policy );
+		$this->last_source_trace = $source_trace;
 
 		// An explicitly-empty allow_only means "no optional tools." The generic
 		// substrate only applies a non-empty allow_only, so it would otherwise
@@ -392,6 +386,42 @@ class ToolPolicyResolver {
 		foreach ( $runtime_tool_names as $name ) {
 			if ( ! isset( $allowed[ $name ] ) ) {
 				unset( $tools[ $name ] );
+			}
+		}
+
+		return $tools;
+	}
+
+	/**
+	 * Restore explicit host-delegated runtime tools after generic policy filtering.
+	 *
+	 * The generic policy layer may drop minimal client-executed declarations that do
+	 * not look like local PHP tools. Host-delegated tools are still safe to expose
+	 * when the caller explicitly opted into them; execution is mediated by the
+	 * runtime-tool path rather than local PHP handlers.
+	 *
+	 * @param array      $tools          Resolved tools after generic policy filtering.
+	 * @param array      $gathered_tools Tools gathered before generic policy filtering.
+	 * @param array      $args           Resolver args.
+	 * @param array|null $agent_policy   Optional persisted agent policy.
+	 * @return array Resolved tools with explicit delegated runtime tools restored.
+	 */
+	private function restoreExplicitDelegatedRuntimeTools( array $tools, array $gathered_tools, array $args, ?array $agent_policy ): array {
+		$allowed = $this->policy_filter->string_list( $args['allow_only'] ?? array() );
+		foreach ( array( $agent_policy, $args['tool_policy'] ?? null ) as $policy ) {
+			if ( is_array( $policy ) && \WP_Agent_Tool_Policy::MODE_ALLOW === ( $policy['mode'] ?? \WP_Agent_Tool_Policy::MODE_DENY ) ) {
+				$allowed = array_merge( $allowed, $this->policy_filter->string_list( $policy['tools'] ?? array() ) );
+			}
+		}
+
+		foreach ( array_values( array_unique( $allowed ) ) as $tool_name ) {
+			if ( isset( $tools[ $tool_name ] ) || ! is_array( $gathered_tools[ $tool_name ] ?? null ) ) {
+				continue;
+			}
+
+			$tool = $gathered_tools[ $tool_name ];
+			if ( ! empty( $tool['runtime_tool'] ) && 'client' === (string) ( $tool['executor'] ?? '' ) && 'control_plane' === (string) ( $tool['runtime']['execution_location'] ?? '' ) ) {
+				$tools[ $tool_name ] = $tool;
 			}
 		}
 
