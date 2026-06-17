@@ -41,7 +41,7 @@ Extras rules:
 - Empty extras directories are dropped on read.
 - Hidden entries (names starting with `.`), symlinks that escape the bundle root, and binary files (NUL-byte heuristic) are skipped on read with a logged warning.
 - Data Machine does NOT auto-extract extras to disk on install. Consumers persist extras themselves via the post-install hook below.
-- Data Machine does NOT parse or validate OKF, Markdown frontmatter profiles, or any other knowledge corpus format inside extras.
+- Data Machine does NOT parse or validate Markdown frontmatter profiles or any other knowledge corpus format inside extras.
 
 If a bundle wants to advertise how a consumer should interpret an extra, keep that metadata extension-owned and generic. For example, an extension artifact can describe a profile hint without asking Data Machine core to understand the format:
 
@@ -49,15 +49,15 @@ If a bundle wants to advertise how a consumer should interpret an extra, keep th
 {
   "artifact_type": "knowledge_corpus",
   "artifact_id": "wiki",
-  "source_path": "extensions/intelligence/knowledge-corpus-wiki.json",
+  "source_path": "extensions/example-plugin/knowledge-corpus-wiki.json",
   "payload": {
     "extras_key": "wiki",
-    "profile": "okf"
+    "profile": "example-profile"
   }
 }
 ```
 
-In that example, Data Machine transports `wiki/` as opaque extras and normalizes the extension artifact envelope. The extension that owns `artifact_type: knowledge_corpus` decides what `profile: okf` means and how to import or validate those files.
+In that example, Data Machine transports `wiki/` as opaque extras and normalizes the extension artifact envelope. The extension that owns `artifact_type: knowledge_corpus` decides what `profile: example-profile` means and how to import or validate those files.
 
 ### Consumer Pattern
 
@@ -94,7 +94,7 @@ add_action(
 
 The hook fires after the install/upgrade transaction commits — never on dry-run, never on failure. Listener exceptions are caught, logged, and suppressed; they do not roll back the install.
 
-See `Automattic/intelligence#850` and `Automattic/markdown-database-integration#112` for consumers coordinating wiki/brain corpus and Markdown/frontmatter profile semantics outside Data Machine core.
+Consumer plugins coordinate corpus and Markdown/frontmatter profile semantics outside Data Machine core.
 
 ## Manifest Schema
 
