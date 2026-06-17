@@ -48,7 +48,7 @@ $assert( str_contains( $task, 'image_data_uri' ), 'system task consumes inline g
 $assert( ! str_contains( $task, 'HttpClient::get' ), 'system task no longer polls direct provider HTTP status' );
 $assert( ! str_contains( $task, 'api.replicate.com' ), 'system task has no Replicate API endpoint' );
 $assert( str_contains( $tool, 'default_provider' ), 'tool settings collect provider id instead of provider API key' );
-$assert( str_contains( $ability, 'datamachine_ai_capability_defaults' ), 'image ability resolves provider defaults through generic capability contract' );
+$assert( ! str_contains( $ability, 'datamachine_ai_capability_defaults' ), 'image ability has no Data Machine provider-default hook contract' );
 $assert( ! str_contains( $ability, 'DEFAULT_PROVIDER' ), 'image ability has no provider-specific default constant' );
 $assert( ! str_contains( $ability, 'DEFAULT_MODEL' ), 'image ability has no model-specific default constant' );
 $assert( ! str_contains( $ability, 'gpt-image-1' ), 'image ability has no OpenAI image model default' );

@@ -148,10 +148,9 @@ class ImageGenerationAbilities {
 			);
 		}
 
-		$config = self::get_config();
-		$defaults = self::resolve_capability_defaults( $config );
-		$provider = ! empty( $input['provider'] ) ? sanitize_text_field( $input['provider'] ) : ( $config['default_provider'] ?? $defaults['provider'] );
-		$model    = ! empty( $input['model'] ) ? sanitize_text_field( $input['model'] ) : ( $config['default_model'] ?? $defaults['model'] );
+		$config   = self::get_config();
+		$provider = ! empty( $input['provider'] ) ? sanitize_text_field( $input['provider'] ) : ( $config['default_provider'] ?? '' );
+		$model    = ! empty( $input['model'] ) ? sanitize_text_field( $input['model'] ) : ( $config['default_model'] ?? '' );
 
 		if ( empty( $provider ) || empty( $model ) ) {
 			return array(
@@ -465,45 +464,11 @@ class ImageGenerationAbilities {
 	 * @return bool
 	 */
 	public static function is_configured(): bool {
-		$config = self::get_config();
-		$defaults = self::resolve_capability_defaults( $config );
-
-		$provider = $config['default_provider'] ?? $defaults['provider'];
-		$model    = $config['default_model'] ?? $defaults['model'];
+		$config   = self::get_config();
+		$provider = $config['default_provider'] ?? '';
+		$model    = $config['default_model'] ?? '';
 
 		return ! empty( $provider ) && ! empty( $model ) && null === RequestBuilder::wpAiClientUnavailableReason( (string) $provider );
-	}
-
-	/**
-	 * Resolve provider-neutral defaults for the image generation capability.
-	 *
-	 * Data Machine core intentionally supplies no provider/model defaults here.
-	 * Provider integrations may opt in through the generic capability contract.
-	 *
-	 * @param array $config Stored image generation config.
-	 * @return array{provider:string,model:string}
-	 */
-	public static function resolve_capability_defaults( array $config ): array {
-		$defaults = apply_filters(
-			'datamachine_ai_capability_defaults',
-			array(
-				'provider' => '',
-				'model'    => '',
-			),
-			'image_generation',
-			array(
-				'config' => $config,
-			)
-		);
-
-		if ( ! is_array( $defaults ) ) {
-			$defaults = array();
-		}
-
-		return array(
-			'provider' => sanitize_text_field( (string) ( $defaults['provider'] ?? '' ) ),
-			'model'    => sanitize_text_field( (string) ( $defaults['model'] ?? '' ) ),
-		);
 	}
 
 	/**
