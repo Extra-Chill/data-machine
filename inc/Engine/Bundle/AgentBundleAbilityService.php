@@ -760,9 +760,9 @@ final class AgentBundleAbilityService {
 			if ( $new_pipeline_id <= 0 ) {
 				continue;
 			}
-			$flow_slug      = AgentBundleSlugMatcher::bundle_slug( $flow, 'flow_name', 'flow' );
-			$flow_index     = AgentBundleSlugMatcher::index_existing( $existing_flows_by_pipeline[ $new_pipeline_id ] ?? array(), 'flow_name', 'flow' );
-			$existing_flow  = $flow_index['matched'][ $flow_slug ] ?? null;
+			$flow_slug     = AgentBundleSlugMatcher::bundle_slug( $flow, 'flow_name', 'flow' );
+			$flow_index    = AgentBundleSlugMatcher::index_existing( $existing_flows_by_pipeline[ $new_pipeline_id ] ?? array(), 'flow_name', 'flow' );
+			$existing_flow = $flow_index['matched'][ $flow_slug ] ?? null;
 			if ( null === $existing_flow ) {
 				continue;
 			}
