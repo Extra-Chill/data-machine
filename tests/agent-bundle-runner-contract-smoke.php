@@ -117,7 +117,16 @@ $projected_outputs = $output_projection->invoke(
 	$runner_instance,
 	array(
 		'engine_data' => array(
-			'completion_assertions_required' => array( 'engine_data_keys' => array( 'issue_number', 'issue_url', 'missing_result_url' ) ),
+			'completion_assertions_required' => array(
+				'engine_data_keys' => array( 'issue_number', 'issue_url', 'missing_result_url' ),
+				'artifact_outputs' => array(
+					array(
+						'output_key' => 'concept_packet',
+						'schema'     => 'wp-site-generator/ConceptPacket/v1',
+						'artifact'   => 'ConceptPacket',
+					),
+				),
+			),
 			'issue_number'                   => 123,
 			'issue_url'                      => 'https://github.com/Extra-Chill/data-machine/issues/2519',
 			'result_path'                    => 'artifacts/result.json',
@@ -126,16 +135,26 @@ $projected_outputs = $output_projection->invoke(
 				'issue_number' => 456,
 				'issue_url'    => 'https://github.com/chubes4/wp-site-generator/issues/456',
 			),
-			'outputs'                        => array( 'summary_title' => 'semantic output projection' ),
+			'outputs'                        => array(
+				'summary_title'    => 'semantic output projection',
+				'typed_artifacts'  => array(
+					'concept_packet' => array(
+						'schema'   => 'wp-site-generator/ConceptPacket/v1',
+						'artifact' => 'ConceptPacket',
+						'payload'  => array( 'title' => 'Projected typed artifact' ),
+					),
+				),
+			),
 		),
 	),
 	array(
 		'required_outputs'    => array( 'issue_number', 'issue_url' ),
-		'required_artifacts'   => array( 'concept_packet' ),
+		'required_artifacts'   => array(),
 		'engine_data_outputs' => array(
 			'store_issue_number' => 'metadata.engine_data.store_idea_agent.issue_number',
 			'store_issue_url'    => 'metadata.engine_data.store_idea_agent.issue_url',
 			'missing_store_url'  => 'metadata.engine_data.store_idea_agent.missing_url',
+			'concept_packet'     => 'metadata.engine_data.outputs.typed_artifacts.concept_packet.payload',
 		),
 	)
 );
@@ -145,10 +164,11 @@ datamachine_bundle_runner_assert( 'artifacts/result.json' === ( $projected_outpu
 datamachine_bundle_runner_assert( 'semantic output projection' === ( $projected_outputs['outputs']['summary_title'] ?? null ), 'explicit outputs map is projected', $failures, $passes );
 datamachine_bundle_runner_assert( 456 === ( $projected_outputs['outputs']['store_issue_number'] ?? null ), 'declared nested engine_data output number is projected', $failures, $passes );
 datamachine_bundle_runner_assert( 'https://github.com/chubes4/wp-site-generator/issues/456' === ( $projected_outputs['outputs']['store_issue_url'] ?? null ), 'declared nested engine_data output URL is projected', $failures, $passes );
+datamachine_bundle_runner_assert( array( 'title' => 'Projected typed artifact' ) === ( $projected_outputs['outputs']['concept_packet'] ?? null ), 'declared typed artifact payload path is projected', $failures, $passes );
 datamachine_bundle_runner_assert( ! isset( $projected_outputs['outputs']['agent_id'] ), 'runtime identity fields are not projected as outputs', $failures, $passes );
 datamachine_bundle_runner_assert( array( 'issue_number', 'issue_url', 'missing_result_url' ) === ( $projected_outputs['diagnostics']['required_outputs'] ?? null ), 'required semantic outputs are diagnosed', $failures, $passes );
 datamachine_bundle_runner_assert( array( 'concept_packet' ) === ( $projected_outputs['diagnostics']['required_artifacts'] ?? null ), 'required typed artifacts are diagnosed', $failures, $passes );
-datamachine_bundle_runner_assert( array( 'missing_result_url', 'concept_packet', 'missing_store_url' ) === ( $projected_outputs['diagnostics']['missing_outputs'] ?? null ), 'missing declared outputs are diagnosed semantically', $failures, $passes );
+datamachine_bundle_runner_assert( array( 'missing_result_url', 'missing_store_url' ) === ( $projected_outputs['diagnostics']['missing_outputs'] ?? null ), 'missing declared outputs are diagnosed semantically', $failures, $passes );
 
 echo "\n[3a] Failed terminal status families are not successful\n";
 $success_status = $runner_reflection->getMethod( 'is_success_status' );

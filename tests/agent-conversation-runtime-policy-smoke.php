@@ -1204,6 +1204,55 @@ $failed_required_tool_decision = $failed_required_tool_policy->recordNaturalComp
 assert_runtime_policy( ! $failed_required_tool_decision->isComplete(), 'failed required tool does not satisfy completion assertion' );
 assert_runtime_policy( array( 'workspace_edit', 'workspace_git_commit' ) === ( $failed_required_tool_decision->context()['missing']['tool_names'] ?? null ), 'failed required tool remains in missing assertion list' );
 
+$typed_artifact_assertions = new \DataMachine\Engine\AI\DataMachineCompletionAssertions(
+	array(
+		'required_artifact_outputs' => array(
+			array(
+				'output_key' => 'concept_packet',
+				'schema'     => 'wp-site-generator/ConceptPacket/v1',
+				'artifact'   => 'ConceptPacket',
+			),
+		),
+	)
+);
+$typed_artifact_evaluation = $typed_artifact_assertions->evaluate(
+	array(
+		'engine_data' => array(
+			'outputs' => array(
+				'typed_artifacts' => array(
+					'concept_packet' => array(
+						'schema'   => 'wp-site-generator/ConceptPacket/v1',
+						'artifact' => 'ConceptPacket',
+						'payload'  => array( 'title' => 'Test concept' ),
+					),
+				),
+			),
+		),
+	),
+	''
+);
+assert_runtime_policy( $typed_artifact_evaluation['complete'], 'required_artifact_outputs completes from outputs.typed_artifacts.<key>.payload' );
+assert_runtime_policy( array( 'concept_packet' ) === ( $typed_artifact_evaluation['satisfied']['artifact_outputs'] ?? null ), 'required_artifact_outputs reports satisfied output key' );
+
+$missing_typed_artifact_evaluation = $typed_artifact_assertions->evaluate(
+	array(
+		'engine_data' => array(
+			'outputs' => array(
+				'typed_artifacts' => array(
+					'concept_packet' => array(
+						'schema'   => 'wp-site-generator/ConceptPacket/v2',
+						'artifact' => 'ConceptPacket',
+						'payload'  => array( 'title' => 'Wrong schema' ),
+					),
+				),
+			),
+		),
+	),
+	''
+);
+assert_runtime_policy( ! $missing_typed_artifact_evaluation['complete'], 'required_artifact_outputs rejects mismatched typed artifact schema' );
+assert_runtime_policy( array( 'concept_packet' ) === ( $missing_typed_artifact_evaluation['missing']['artifact_outputs'] ?? null ), 'required_artifact_outputs reports missing output key on schema mismatch' );
+
 $outcome_assertions_config = array(
 	'complete_when_any' => array(
 		array(

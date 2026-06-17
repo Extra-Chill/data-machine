@@ -402,7 +402,19 @@ function datamachine_run_conversation(
 		}
 	}
 	if ( $assertions->hasAssertions() ) {
-		$evaluation = $assertions->evaluate( $loop_payload, $result['final_content'] ?? '' );
+		$evaluation_context = $loop_payload;
+		$typed_artifacts    = datamachine_normalize_typed_artifact_outputs( $result );
+		if ( ! empty( $typed_artifacts ) ) {
+			$evaluation_engine_data            = is_array( $evaluation_context['engine_data'] ?? null ) ? $evaluation_context['engine_data'] : array();
+			$evaluation_engine_data['outputs'] = is_array( $evaluation_engine_data['outputs'] ?? null ) ? $evaluation_engine_data['outputs'] : array();
+			$evaluation_engine_data['outputs']['typed_artifacts'] = array_replace_recursive(
+				is_array( $evaluation_engine_data['outputs']['typed_artifacts'] ?? null ) ? $evaluation_engine_data['outputs']['typed_artifacts'] : array(),
+				$typed_artifacts
+			);
+			$evaluation_context['engine_data']                    = $evaluation_engine_data;
+		}
+
+		$evaluation = $assertions->evaluate( $evaluation_context, $result['final_content'] ?? '' );
 		$datamachine_metadata['completion_assertions_required']  = $assertions->required();
 		$datamachine_metadata['completion_assertions_missing']   = $evaluation['missing'];
 		$datamachine_metadata['completion_assertions_satisfied'] = $evaluation['satisfied'];
@@ -490,6 +502,53 @@ function datamachine_conversation_metadata_top_level_keys(): array {
 function datamachine_conversation_metadata( array $result ): array {
 	$metadata = is_array( $result['metadata'] ?? null ) ? $result['metadata'] : array();
 	return is_array( $metadata['datamachine'] ?? null ) ? $metadata['datamachine'] : array();
+}
+
+/**
+ * Normalize typed artifact outputs from runtime result shapes into engine-data output shape.
+ *
+ * @param array $result Conversation result.
+ * @return array<string,array<string,mixed>> Typed artifacts keyed by output key.
+ */
+function datamachine_normalize_typed_artifact_outputs( array $result ): array {
+	$sources = array();
+	if ( is_array( $result['outputs']['typed_artifacts'] ?? null ) ) {
+		$sources[] = $result['outputs']['typed_artifacts'];
+	}
+	if ( is_array( $result['typed_artifacts'] ?? null ) ) {
+		$sources[] = $result['typed_artifacts'];
+	}
+
+	$typed_artifacts = array();
+	foreach ( $sources as $source ) {
+		foreach ( $source as $key => $entry ) {
+			if ( ! is_array( $entry ) ) {
+				continue;
+			}
+
+			$output_key = trim( (string) ( $entry['output_key'] ?? $entry['key'] ?? ( is_string( $key ) ? $key : '' ) ) );
+			if ( '' === $output_key ) {
+				continue;
+			}
+
+			$payload = $entry['payload'] ?? $entry['data'] ?? $entry['content'] ?? null;
+			if ( null === $payload || '' === $payload || array() === $payload ) {
+				continue;
+			}
+
+			$normalized = array( 'payload' => $payload );
+			foreach ( array( 'schema', 'artifact' ) as $field ) {
+				$value = trim( (string) ( $entry[ $field ] ?? '' ) );
+				if ( '' !== $value ) {
+					$normalized[ $field ] = $value;
+				}
+			}
+
+			$typed_artifacts[ $output_key ] = $normalized;
+		}
+	}
+
+	return $typed_artifacts;
 }
 
 /**
