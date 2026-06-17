@@ -211,9 +211,6 @@ final class AbilityToolSource {
 		$job_snapshot = is_array( $engine_data['job'] ?? null ) ? $engine_data['job'] : array();
 		$sets[] = $job_snapshot['ability_tools'] ?? null;
 
-		$client_context = is_array( $args['client_context'] ?? null ) ? $args['client_context'] : array();
-		$sets[] = $client_context['ability_tools'] ?? null;
-
 		$declared = array();
 		foreach ( $sets as $set ) {
 			if ( ! is_array( $set ) ) {

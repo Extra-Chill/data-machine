@@ -122,6 +122,28 @@ $assert( 'tool scalar result is wrapped as success', true === $tool_scalar_resul
 $assert( 'tool scalar result payload uses tool result key', 'ok' === $tool_scalar_result['result'] );
 $assert( 'tool scalar result does not mirror payload into data key', ! array_key_exists( 'data', $tool_scalar_result ) );
 
+$tool_envelope = AbilityResult::normalize_tool_envelope(
+	array(
+		'success' => true,
+		'custom'  => 'value',
+	),
+	'demo_tool',
+	array( 'ability' => 'datamachine/demo' )
+);
+$assert( 'tool envelope fills missing tool name', 'demo_tool' === $tool_envelope['tool_name'] );
+$assert( 'tool envelope stores ability metadata', 'datamachine/demo' === ( $tool_envelope['metadata']['ability'] ?? null ) );
+$assert( 'tool envelope preserves successful payload under result', 'value' === ( $tool_envelope['result']['custom'] ?? null ) );
+
+$failed_tool_envelope = AbilityResult::normalize_tool_envelope(
+	array(
+		'success' => false,
+		'error'   => 'Denied.',
+	),
+	'demo_tool',
+	array( 'ability' => 'datamachine/demo' )
+);
+$assert( 'failed tool envelope does not synthesize result payload', ! array_key_exists( 'result', $failed_tool_envelope ) );
+
 $legacy_error = AbilityResult::legacy_failure_to_wp_error(
 	array(
 		'success' => false,
