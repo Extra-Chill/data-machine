@@ -254,13 +254,14 @@ final class BundleSchema {
 			return array();
 		}
 
-		$normalized = array();
+		$allowed_targets = BundleEgressTargetRegistry::targets();
+		$normalized      = array();
 		foreach ( $targets as $target ) {
 			if ( ! is_string( $target ) ) {
 				continue;
 			}
 			$target = self::sanitize_key( $target );
-			if ( in_array( $target, self::RUN_ARTIFACT_EGRESS_TARGETS, true ) ) {
+			if ( in_array( $target, $allowed_targets, true ) ) {
 				$normalized[] = $target;
 			}
 		}

@@ -84,9 +84,9 @@ final class BundleSource {
 			return $source;
 		}
 
-		$fetch_url = self::normalize_github_url( $source, $context );
+		$fetch_url = self::normalize_remote_url( $source, $context );
 
-		if ( ! preg_match( '#\.(zip|json)(\?.*)?$#i', $fetch_url ) && ! self::is_github_api_zipball_url( $fetch_url ) ) {
+		if ( ! preg_match( '#\.(zip|json)(\?.*)?$#i', $fetch_url ) && ! self::resolver_accepts_fetch_url( $fetch_url ) ) {
 			return new WP_Error(
 				'datamachine_bundle_source_invalid',
 				sprintf(
@@ -146,8 +146,8 @@ final class BundleSource {
 		// api.github.com/repos/<o>/<r>/zipball/<ref> URLs have no .zip
 		// suffix but always produce a zip archive.
 		$expected_ext = preg_match( '#\.(zip|json)(\?.*)?$#i', $fetch_url, $m ) ? strtolower( $m[1] ) : '';
-		if ( '' === $expected_ext && self::is_github_api_zipball_url( $fetch_url ) ) {
-			$expected_ext = 'zip';
+		if ( '' === $expected_ext ) {
+			$expected_ext = self::resolver_expected_extension( $fetch_url );
 		}
 		if ( '' !== $expected_ext ) {
 			$with_ext = $temp_file . '.' . $expected_ext;
@@ -333,7 +333,7 @@ final class BundleSource {
 		}
 
 		$etag = (string) wp_remote_retrieve_header( $response, 'etag' );
-		$sha  = self::parse_sha_from_etag( $etag );
+		$sha  = self::revision_from_etag( $current_url, $etag );
 
 		return array(
 			'path' => $temp_path,
@@ -507,105 +507,55 @@ final class BundleSource {
 	 * @return string Normalized URL.
 	 */
 	public static function normalize_github_url( string $url, array $context = array() ): string {
+		return ( new GitHubBundleSourceResolver() )->normalize( $url, $context ) ?? trim( $url );
+	}
+
+	/**
+	 * Normalize a remote URL through registered source resolvers.
+	 *
+	 * @param string $url     URL to normalize.
+	 * @param array  $context Resolution context.
+	 * @return string
+	 */
+	public static function normalize_remote_url( string $url, array $context = array() ): string {
 		$url = trim( $url );
-
-		if ( ! preg_match( '#^https?://github\.com/#i', $url ) && ! preg_match( '#^https?://raw\.githubusercontent\.com/#i', $url ) ) {
-			return $url;
-		}
-
-		// Already a raw.githubusercontent.com URL — pass through.
-		if ( preg_match( '#^https?://raw\.githubusercontent\.com/#i', $url ) ) {
-			return $url;
-		}
-
-		// archive/refs/heads/<branch>.zip → API zipball when token configured.
-		if ( preg_match( '#^https?://github\.com/([^/]+)/([^/]+)/archive/refs/heads/(.+)\.zip$#i', $url, $m ) ) {
-			return self::route_github_archive( $m[1], $m[2], $m[3], $url, $context );
-		}
-
-		// archive/<sha>.zip → API zipball when token configured.
-		if ( preg_match( '#^https?://github\.com/([^/]+)/([^/]+)/archive/([0-9a-f]{7,40})\.zip$#i', $url, $m ) ) {
-			return self::route_github_archive( $m[1], $m[2], $m[3], $url, $context );
-		}
-
-		// blob/<ref>/<path> → raw URL.
-		if ( preg_match( '#^https?://github\.com/([^/]+)/([^/]+)/blob/(.+)$#i', $url, $m ) ) {
-			return "https://raw.githubusercontent.com/{$m[1]}/{$m[2]}/{$m[3]}";
-		}
-
-		// raw/<ref>/<path> → raw URL.
-		if ( preg_match( '#^https?://github\.com/([^/]+)/([^/]+)/raw/(.+)$#i', $url, $m ) ) {
-			return "https://raw.githubusercontent.com/{$m[1]}/{$m[2]}/{$m[3]}";
-		}
-
-		// tree/<branch> → API zipball when token configured, else web-host archive.
-		if ( preg_match( '#^https?://github\.com/([^/]+)/([^/]+)/tree/([^/]+)/?$#i', $url, $m ) ) {
-			return self::route_github_archive( $m[1], $m[2], $m[3], $url, $context );
+		foreach ( BundleSourceResolverRegistry::source_resolvers() as $resolver ) {
+			$normalized = $resolver->normalize( $url, $context );
+			if ( is_string( $normalized ) && '' !== $normalized ) {
+				return $normalized;
+			}
 		}
 
 		return $url;
 	}
 
-	/**
-	 * Choose between API and web-host endpoints for a github.com archive.
-	 *
-	 * Returns the API endpoint when a token is available for
-	 * `api.github.com` (CLI/env/constant/option/filter). Falls back to the
-	 * web-host archive URL otherwise so unauthenticated public installs
-	 * keep using the same shape they always have.
-	 *
-	 * @param string $owner       Repo owner (URL segment, not validated).
-	 * @param string $repo        Repo name (URL segment, not validated).
-	 * @param string $ref         Branch name or commit SHA.
-	 * @param string $original    Original web-host URL — returned as the
-	 *                            fallback when no token is available.
-	 * @param array  $context     Resolution context.
-	 * @return string
-	 */
-	private static function route_github_archive( string $owner, string $repo, string $ref, string $original, array $context ): string {
-		// BundleSourceAuth lives in the same namespace and loads via the
-		// PSR-4 autoloader. Use class_exists() to keep the dependency
-		// soft for any consumer that imports BundleSource without the
-		// auth helper (e.g. test harnesses).
-		if ( class_exists( BundleSourceAuth::class ) ) {
-			$token = BundleSourceAuth::token_for( 'https://api.github.com/', $context );
-			if ( null !== $token && '' !== $token ) {
-				return sprintf(
-					'https://api.github.com/repos/%s/%s/zipball/%s',
-					$owner,
-					$repo,
-					$ref
-				);
+	private static function resolver_accepts_fetch_url( string $url ): bool {
+		foreach ( BundleSourceResolverRegistry::source_resolvers() as $resolver ) {
+			if ( $resolver->accepts_fetch_url( $url ) ) {
+				return true;
 			}
 		}
-
-		// Default to the web-host archive shape (works unauthenticated for
-		// public repos, matches the long-standing behavior).
-		if ( preg_match( '#/archive/refs/heads/.+\.zip$#i', $original )
-			|| preg_match( '#/archive/[0-9a-f]{7,40}\.zip$#i', $original )
-		) {
-			return $original;
-		}
-
-		return sprintf(
-			'https://github.com/%s/%s/archive/refs/heads/%s.zip',
-			$owner,
-			$repo,
-			$ref
-		);
+		return false;
 	}
 
-	/**
-	 * Is this URL the api.github.com zipball endpoint?
-	 *
-	 * @param string $url URL to test.
-	 * @return bool
-	 */
-	private static function is_github_api_zipball_url( string $url ): bool {
-		return (bool) preg_match(
-			'#^https?://api\.github\.com/repos/[^/]+/[^/]+/(zipball|tarball)(/|$)#i',
-			$url
-		);
+	private static function resolver_expected_extension( string $url ): string {
+		foreach ( BundleSourceResolverRegistry::source_resolvers() as $resolver ) {
+			$extension = $resolver->expected_extension( $url );
+			if ( '' !== $extension ) {
+				return $extension;
+			}
+		}
+		return '';
+	}
+
+	private static function revision_from_etag( string $url, string $etag ): ?string {
+		foreach ( BundleSourceResolverRegistry::source_resolvers() as $resolver ) {
+			$revision = $resolver->revision_from_etag( $url, $etag );
+			if ( null !== $revision && '' !== $revision ) {
+				return $revision;
+			}
+		}
+		return null;
 	}
 
 	/**
