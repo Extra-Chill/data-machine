@@ -106,6 +106,23 @@ class PluginSettings {
 	}
 
 	/**
+	 * Merge settings into the per-site plugin settings option.
+	 *
+	 * Callers remain responsible for sanitizing values before writing.
+	 *
+	 * @param array<string,mixed> $patch Settings to merge.
+	 * @return bool Whether the option value changed.
+	 */
+	public static function update( array $patch ): bool {
+		$settings = array_merge( self::all(), $patch );
+		$updated  = update_option( 'datamachine_settings', $settings );
+
+		self::clearCache();
+
+		return $updated;
+	}
+
+	/**
 	 * Resolve a setting with network fallback.
 	 *
 	 * Resolution order for network-eligible keys:

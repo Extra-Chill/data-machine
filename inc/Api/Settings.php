@@ -178,13 +178,9 @@ class Settings {
 	 */
 	public static function handle_generate_ping_secret( $request ) {
 		$request;
-		$secret   = wp_generate_password( 32, false );
-		$settings = get_option( 'datamachine_settings', array() );
+		$secret = wp_generate_password( 32, false );
 
-		$settings['chat_ping_secret'] = $secret;
-		update_option( 'datamachine_settings', $settings );
-
-		\DataMachine\Core\PluginSettings::clearCache();
+		\DataMachine\Core\PluginSettings::update( array( 'chat_ping_secret' => $secret ) );
 
 		return rest_ensure_response(
 			array(
