@@ -249,6 +249,39 @@ class ProcessedItemsTest extends WP_UnitTestCase {
 	}
 
 	// -----------------------------------------------------------------
+	// Claims
+	// -----------------------------------------------------------------
+
+	public function test_claim_item_converts_existing_processed_row_to_claim(): void {
+		global $wpdb;
+
+		$this->db->add_processed_item( $this->flow_step_id, $this->source_type, 'claim-existing', 10 );
+
+		$this->assertTrue( $this->db->claim_item( $this->flow_step_id, $this->source_type, 'claim-existing', 11 ) );
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
+		$row = $wpdb->get_row(
+			$wpdb->prepare(
+				'SELECT status, job_id, claim_expires_at FROM %i WHERE flow_step_id = %s AND source_type = %s AND item_identifier = %s',
+				$this->db->get_table_name(),
+				$this->flow_step_id,
+				$this->source_type,
+				'claim-existing'
+			),
+			ARRAY_A
+		);
+
+		$this->assertSame( ProcessedItems::STATUS_CLAIMED, $row['status'] );
+		$this->assertSame( '11', $row['job_id'] );
+		$this->assertNotEmpty( $row['claim_expires_at'] );
+	}
+
+	public function test_claim_item_does_not_steal_active_claim(): void {
+		$this->assertTrue( $this->db->claim_item( $this->flow_step_id, $this->source_type, 'active-claim', 10 ) );
+		$this->assertFalse( $this->db->claim_item( $this->flow_step_id, $this->source_type, 'active-claim', 11 ) );
+	}
+
+	// -----------------------------------------------------------------
 	// Index / schema
 	// -----------------------------------------------------------------
 
