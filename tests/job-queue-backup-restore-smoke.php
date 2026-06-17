@@ -7,7 +7,18 @@
  * @package DataMachine\Tests
  */
 
-require_once __DIR__ . '/bootstrap-unit.php';
+if ( ! defined( 'ABSPATH' ) ) {
+	define( 'ABSPATH', '/tmp/' );
+}
+
+if ( ! defined( 'WPINC' ) ) {
+	define( 'WPINC', 'wp-includes' );
+}
+
+require_once __DIR__ . '/../inc/Engine/ExecutionPlan.php';
+require_once __DIR__ . '/../inc/Abilities/Flow/FlowHelpers.php';
+require_once __DIR__ . '/../inc/Abilities/Flow/QueueAbility.php';
+require_once __DIR__ . '/../inc/Abilities/Job/JobHelpers.php';
 
 $failed = 0;
 $total  = 0;
@@ -61,8 +72,11 @@ assert_job_queue_restore_smoke( 'loop config patch queue tail is still the consu
 echo "Case 2: manual retry and recover-stuck use the shared helper\n";
 $retry_src   = file_get_contents( __DIR__ . '/../inc/Abilities/Job/RetryJobAbility.php' ) ?: '';
 $recover_src = file_get_contents( __DIR__ . '/../inc/Abilities/Job/RecoverStuckJobsAbility.php' ) ?: '';
+$fail_src    = file_get_contents( __DIR__ . '/../inc/Engine/Actions/Handlers/FailJobHandler.php' ) ?: '';
 assert_job_queue_restore_smoke( 'manual retry calls restoreQueuedPromptBackup()', str_contains( $retry_src, 'restoreQueuedPromptBackup( $job_flow_id, $backup )' ) );
 assert_job_queue_restore_smoke( 'recover-stuck calls restoreQueuedPromptBackup()', str_contains( $recover_src, 'restoreQueuedPromptBackup( $job_flow_id, $backup )' ) );
+assert_job_queue_restore_smoke( 'fail-job uses slot-aware queue restore primitive', str_contains( $fail_src, 'QueueAbility::restoreConsumedEntryBackup' ) );
+assert_job_queue_restore_smoke( 'fail-job no longer calls prompt-only queue add', ! str_contains( $fail_src, 'executeQueueAdd' ) );
 assert_job_queue_restore_smoke( 'manual retry no longer appends queue backups inline', ! str_contains( $retry_src, '$flow_config[ $step_id ][ $slot ][] = $entry;' ) );
 assert_job_queue_restore_smoke( 'recover-stuck no longer appends queue backups inline', ! str_contains( $recover_src, '$flow_config[ $step_id ][ $slot ][] = $entry;' ) );
 
@@ -139,6 +153,27 @@ $restored    = $helper->apply(
 );
 assert_job_queue_restore_smoke( 'static prompt restore returns false', false === $restored );
 assert_job_queue_restore_smoke( 'static prompt queue is unchanged', 1 === count( $flow_config['step1']['prompt_queue'] ) );
+
+echo "Case 6: backup creation is drain-mode and slot-aware\n";
+$backup = DataMachine\Abilities\Flow\QueueAbility::createConsumedEntryBackup(
+	123,
+	'step1',
+	DataMachine\Abilities\Flow\QueueAbility::SLOT_CONFIG_PATCH_QUEUE,
+	'drain',
+	array( 'patch' => array( 'slug' => 'first' ), 'added_at' => 't0' )
+);
+assert_job_queue_restore_smoke( 'drain config patch backup is created', is_array( $backup ) );
+assert_job_queue_restore_smoke( 'drain config patch backup keeps slot', DataMachine\Abilities\Flow\QueueAbility::SLOT_CONFIG_PATCH_QUEUE === ( $backup['slot'] ?? null ) );
+assert_job_queue_restore_smoke( 'drain config patch backup keeps patch', 'first' === ( $backup['patch']['slug'] ?? null ) );
+
+$backup = DataMachine\Abilities\Flow\QueueAbility::createConsumedEntryBackup(
+	123,
+	'step1',
+	DataMachine\Abilities\Flow\QueueAbility::SLOT_PROMPT_QUEUE,
+	'loop',
+	array( 'prompt' => 'first', 'added_at' => 't0' )
+);
+assert_job_queue_restore_smoke( 'loop prompt backup is not created', null === $backup );
 
 echo "\nJob queue backup restore smoke complete: {$total} assertions, {$failed} failures.\n";
 if ( $failed > 0 ) {

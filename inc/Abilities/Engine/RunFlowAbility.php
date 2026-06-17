@@ -367,32 +367,13 @@ class RunFlowAbility {
 	 * @return array{flow_step_id:string,queue_mode:string,reason:string}|null
 	 */
 	private function getEmptyDrainQueueSkip( array $flow_config ): ?array {
-		try {
-			$first_flow_step_id = ExecutionPlan::from_flow_config( $flow_config )->first_step_id();
-		} catch ( \InvalidArgumentException $e ) {
-			return null;
-		}
-
-		if ( ! $first_flow_step_id || ! isset( $flow_config[ $first_flow_step_id ] ) || ! is_array( $flow_config[ $first_flow_step_id ] ) ) {
-			return null;
-		}
-
-		$first_step = $flow_config[ $first_flow_step_id ];
-		if ( 'fetch' !== (string) ( $first_step['step_type'] ?? '' ) ) {
-			return null;
-		}
-
-		if ( 'drain' !== (string) ( $first_step['queue_mode'] ?? 'static' ) ) {
-			return null;
-		}
-
-		$queue = $first_step[ QueueAbility::SLOT_CONFIG_PATCH_QUEUE ] ?? array();
-		if ( is_array( $queue ) && ! empty( $queue ) ) {
+		$availability = QueueAbility::firstDrainQueueWorkAvailability( $flow_config );
+		if ( null === $availability || true === $availability['has_work'] ) {
 			return null;
 		}
 
 		return array(
-			'flow_step_id' => (string) $first_flow_step_id,
+			'flow_step_id' => $availability['flow_step_id'],
 			'queue_mode'   => 'drain',
 			'reason'       => 'empty_drain_queue',
 		);

@@ -209,17 +209,7 @@ trait JobHelpers {
 	 * @return bool Whether the backup was restored to the flow config.
 	 */
 	protected function restoreQueuedPromptBackup( int $flow_id, array $backup ): bool {
-		$flow = $this->db_flows->get_flow( $flow_id );
-		if ( ! $flow || ! isset( $flow['flow_config'] ) || ! is_array( $flow['flow_config'] ) ) {
-			return false;
-		}
-
-		$flow_config = $flow['flow_config'];
-		if ( ! $this->restoreQueuedPromptBackupToFlowConfig( $flow_config, $backup ) ) {
-			return false;
-		}
-
-		return (bool) $this->db_flows->update_flow( $flow_id, array( 'flow_config' => $flow_config ) );
+		return QueueAbility::restoreConsumedEntryBackup( $flow_id, $backup, $this->db_flows );
 	}
 
 	/**
@@ -230,43 +220,7 @@ trait JobHelpers {
 	 * @return bool Whether an entry was appended.
 	 */
 	protected function restoreQueuedPromptBackupToFlowConfig( array &$flow_config, array $backup ): bool {
-		$mode = $backup['mode'] ?? 'drain';
-		if ( 'drain' !== $mode || empty( $backup['flow_step_id'] ) ) {
-			return false;
-		}
-
-		$step_id = $backup['flow_step_id'];
-		if ( ! isset( $flow_config[ $step_id ] ) || ! is_array( $flow_config[ $step_id ] ) ) {
-			return false;
-		}
-
-		$slot  = $backup['slot'] ?? QueueAbility::SLOT_PROMPT_QUEUE;
-		$entry = null;
-
-		if ( QueueAbility::SLOT_CONFIG_PATCH_QUEUE === $slot && isset( $backup['patch'] ) && is_array( $backup['patch'] ) ) {
-			$entry = array(
-				'patch'    => $backup['patch'],
-				'added_at' => $backup['added_at'] ?? gmdate( 'c' ),
-			);
-		} elseif ( isset( $backup['prompt'] ) ) {
-			$slot  = QueueAbility::SLOT_PROMPT_QUEUE;
-			$entry = array(
-				'prompt'   => $backup['prompt'],
-				'added_at' => $backup['added_at'] ?? gmdate( 'c' ),
-			);
-		}
-
-		if ( null === $entry ) {
-			return false;
-		}
-
-		if ( ! isset( $flow_config[ $step_id ][ $slot ] ) || ! is_array( $flow_config[ $step_id ][ $slot ] ) ) {
-			$flow_config[ $step_id ][ $slot ] = array();
-		}
-
-		$flow_config[ $step_id ][ $slot ][] = $entry;
-
-		return true;
+		return QueueAbility::restoreConsumedEntryBackupToFlowConfig( $flow_config, $backup );
 	}
 
 	/**
