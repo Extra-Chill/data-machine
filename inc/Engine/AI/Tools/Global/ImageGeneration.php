@@ -197,11 +197,11 @@ class ImageGeneration extends BaseTool {
 	 * @return array
 	 */
 	protected function validate_and_build_config( array $config_data ): array {
-		$provider = sanitize_text_field( $config_data['default_provider'] ?? ImageGenerationAbilities::DEFAULT_PROVIDER );
-		$model    = sanitize_text_field( $config_data['default_model'] ?? ImageGenerationAbilities::DEFAULT_MODEL );
+		$provider = sanitize_text_field( $config_data['default_provider'] ?? '' );
+		$model    = sanitize_text_field( $config_data['default_model'] ?? '' );
 
-		if ( empty( $provider ) || empty( $model ) ) {
-			return array( 'error' => __( 'wp-ai-client provider and model are required', 'data-machine' ) );
+		if ( ( '' === $provider ) !== ( '' === $model ) ) {
+			return array( 'error' => __( 'wp-ai-client provider and model must be configured together', 'data-machine' ) );
 		}
 
 		return array(
@@ -232,16 +232,16 @@ class ImageGeneration extends BaseTool {
 			'default_provider'          => array(
 				'type'        => 'text',
 				'label'       => __( 'Default Provider', 'data-machine' ),
-				'placeholder' => ImageGenerationAbilities::DEFAULT_PROVIDER,
-				'required'    => true,
-				'description' => __( 'wp-ai-client provider identifier. API keys are configured through the provider settings, not this tool.', 'data-machine' ),
+				'placeholder' => __( 'Provider id', 'data-machine' ),
+				'required'    => false,
+				'description' => __( 'wp-ai-client provider identifier. Leave empty only when a provider integration supplies an image-generation default.', 'data-machine' ),
 			),
 			'default_model'             => array(
 				'type'        => 'text',
 				'label'       => __( 'Default Model', 'data-machine' ),
-				'placeholder' => ImageGenerationAbilities::DEFAULT_MODEL,
+				'placeholder' => __( 'Model id', 'data-machine' ),
 				'required'    => false,
-				'description' => __( 'wp-ai-client image model identifier. AI agents can override per-call.', 'data-machine' ),
+				'description' => __( 'wp-ai-client image model identifier. Leave empty only when a provider integration supplies an image-generation default. AI agents can override per-call.', 'data-machine' ),
 			),
 			'default_aspect_ratio'      => array(
 				'type'        => 'select',

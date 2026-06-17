@@ -17,6 +17,9 @@ class ImageGenerationAbilitiesTest extends WP_UnitTestCase {
 
 	private ImageGenerationAbilities $abilities;
 
+	/** @var callable|null */
+	private $defaults_filter = null;
+
 	public function set_up(): void {
 		parent::set_up();
 
@@ -32,6 +35,10 @@ class ImageGenerationAbilitiesTest extends WP_UnitTestCase {
 
 	public function tear_down(): void {
 		delete_site_option( 'datamachine_image_generation_config' );
+		if ( null !== $this->defaults_filter ) {
+			remove_filter( 'datamachine_ai_capability_defaults', $this->defaults_filter, 10 );
+			$this->defaults_filter = null;
+		}
 		WpAiClientTestDouble::reset();
 		parent::tear_down();
 	}
@@ -73,6 +80,57 @@ class ImageGenerationAbilitiesTest extends WP_UnitTestCase {
 
 		$this->assertFalse( $result['success'] );
 		$this->assertStringContainsString( 'not configured', $result['error'] );
+	}
+
+	public function test_generate_image_uses_generic_capability_defaults_when_no_config(): void {
+		$this->defaults_filter = function ( array $defaults, string $capability ): array {
+			if ( 'image_generation' !== $capability ) {
+				return $defaults;
+			}
+
+			return array(
+				'provider' => 'openai',
+				'model'    => 'gpt-image-1',
+			);
+		};
+		add_filter( 'datamachine_ai_capability_defaults', $this->defaults_filter, 10, 2 );
+
+		$captured_request = null;
+		WpAiClientTestDouble::set_response_callback( function ( array $request ) use ( &$captured_request ): array {
+			$captured_request = $request;
+			return array(
+				'success' => true,
+				'data'    => array( 'image_url' => 'https://example.com/generated.png' ),
+			);
+		} );
+
+		$result = ImageGenerationAbilities::generateImage( array( 'prompt' => 'Test prompt' ) );
+
+		$this->assertTrue( $result['success'] );
+		$this->assertSame( 'openai', $captured_request['provider'] ?? '' );
+		$this->assertSame( 'gpt-image-1', $captured_request['model'] ?? '' );
+	}
+
+	public function test_generate_image_explicit_config_overrides_capability_defaults(): void {
+		update_site_option( 'datamachine_image_generation_config', array( 'default_provider' => 'openai', 'default_model' => 'configured-model' ) );
+		$this->defaults_filter = fn( array $defaults, string $capability ): array => 'image_generation' === $capability
+			? array( 'provider' => 'openai', 'model' => 'filtered-model' )
+			: $defaults;
+		add_filter( 'datamachine_ai_capability_defaults', $this->defaults_filter, 10, 2 );
+
+		$captured_request = null;
+		WpAiClientTestDouble::set_response_callback( function ( array $request ) use ( &$captured_request ): array {
+			$captured_request = $request;
+			return array(
+				'success' => true,
+				'data'    => array( 'image_url' => 'https://example.com/generated.png' ),
+			);
+		} );
+
+		$result = ImageGenerationAbilities::generateImage( array( 'prompt' => 'Test prompt' ) );
+
+		$this->assertTrue( $result['success'] );
+		$this->assertSame( 'configured-model', $captured_request['model'] ?? '' );
 	}
 
 	public function test_generate_image_unregistered_provider(): void {
@@ -139,6 +197,15 @@ class ImageGenerationAbilitiesTest extends WP_UnitTestCase {
 	public function test_is_configured_false_when_provider_unavailable(): void {
 		update_site_option( 'datamachine_image_generation_config', array( 'default_provider' => 'missing-provider', 'default_model' => 'gpt-image-1' ) );
 		$this->assertFalse( ImageGenerationAbilities::is_configured() );
+	}
+
+	public function test_is_configured_true_when_capability_defaults_available(): void {
+		$this->defaults_filter = fn( array $defaults, string $capability ): array => 'image_generation' === $capability
+			? array( 'provider' => 'openai', 'model' => 'gpt-image-1' )
+			: $defaults;
+		add_filter( 'datamachine_ai_capability_defaults', $this->defaults_filter, 10, 2 );
+
+		$this->assertTrue( ImageGenerationAbilities::is_configured() );
 	}
 
 	public function test_is_configured_true_when_provider_and_model_available(): void {

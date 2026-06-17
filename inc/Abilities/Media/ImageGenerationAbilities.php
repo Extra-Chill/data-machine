@@ -32,20 +32,6 @@ class ImageGenerationAbilities {
 	const CONFIG_OPTION = 'datamachine_image_generation_config';
 
 	/**
-	 * Default provider identifier for wp-ai-client image generation.
-	 *
-	 * @var string
-	 */
-	const DEFAULT_PROVIDER = 'openai';
-
-	/**
-	 * Default model identifier for wp-ai-client image generation.
-	 *
-	 * @var string
-	 */
-	const DEFAULT_MODEL = 'gpt-image-1';
-
-	/**
 	 * Default aspect ratio for generated images.
 	 *
 	 * @var string
@@ -163,15 +149,9 @@ class ImageGenerationAbilities {
 		}
 
 		$config = self::get_config();
-		if ( empty( $config ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'Image generation not configured. Select a wp-ai-client provider and model in Settings.',
-			);
-		}
-
-		$provider = ! empty( $input['provider'] ) ? sanitize_text_field( $input['provider'] ) : ( $config['default_provider'] ?? self::DEFAULT_PROVIDER );
-		$model    = ! empty( $input['model'] ) ? sanitize_text_field( $input['model'] ) : ( $config['default_model'] ?? self::DEFAULT_MODEL );
+		$defaults = self::resolve_capability_defaults( $config );
+		$provider = ! empty( $input['provider'] ) ? sanitize_text_field( $input['provider'] ) : ( $config['default_provider'] ?? $defaults['provider'] );
+		$model    = ! empty( $input['model'] ) ? sanitize_text_field( $input['model'] ) : ( $config['default_model'] ?? $defaults['model'] );
 
 		if ( empty( $provider ) || empty( $model ) ) {
 			return array(
@@ -486,14 +466,44 @@ class ImageGenerationAbilities {
 	 */
 	public static function is_configured(): bool {
 		$config = self::get_config();
-		if ( empty( $config ) ) {
-			return false;
-		}
+		$defaults = self::resolve_capability_defaults( $config );
 
-		$provider = $config['default_provider'] ?? self::DEFAULT_PROVIDER;
-		$model    = $config['default_model'] ?? self::DEFAULT_MODEL;
+		$provider = $config['default_provider'] ?? $defaults['provider'];
+		$model    = $config['default_model'] ?? $defaults['model'];
 
 		return ! empty( $provider ) && ! empty( $model ) && null === RequestBuilder::wpAiClientUnavailableReason( (string) $provider );
+	}
+
+	/**
+	 * Resolve provider-neutral defaults for the image generation capability.
+	 *
+	 * Data Machine core intentionally supplies no provider/model defaults here.
+	 * Provider integrations may opt in through the generic capability contract.
+	 *
+	 * @param array $config Stored image generation config.
+	 * @return array{provider:string,model:string}
+	 */
+	public static function resolve_capability_defaults( array $config ): array {
+		$defaults = apply_filters(
+			'datamachine_ai_capability_defaults',
+			array(
+				'provider' => '',
+				'model'    => '',
+			),
+			'image_generation',
+			array(
+				'config' => $config,
+			)
+		);
+
+		if ( ! is_array( $defaults ) ) {
+			$defaults = array();
+		}
+
+		return array(
+			'provider' => sanitize_text_field( (string) ( $defaults['provider'] ?? '' ) ),
+			'model'    => sanitize_text_field( (string) ( $defaults['model'] ?? '' ) ),
+		);
 	}
 
 	/**
