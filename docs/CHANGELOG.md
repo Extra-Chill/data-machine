@@ -2,6 +2,18 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.150.9] - 2026-06-17
+
+### Changed
+- satisfy drain service lint
+- satisfy tool schema lint
+- satisfy bundle boundary lint
+
+### Fixed
+- share scoped Action Scheduler drain service
+- normalize tool schemas consistently
+- clean up bundle portable boundaries
+
 ## [0.150.8] - 2026-06-17
 
 ### Fixed
