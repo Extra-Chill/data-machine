@@ -12,6 +12,7 @@ use DataMachine\Abilities\Engine\DrainJobAbility;
 use DataMachine\Core\Agents\AgentBundler;
 use DataMachine\Core\Agents\AgentIdentityResolver;
 use DataMachine\Core\Database\Jobs\Jobs;
+use DataMachine\Core\JobStatus;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -206,8 +207,11 @@ final class AgentBundleRunner {
 	private function apply_runtime_ability_tools( array &$initial_data, array $input, array $bundle = array() ): void {
 		$ability_tools = is_array( $input['ability_tools'] ?? null ) ? $input['ability_tools'] : array();
 		if ( empty( $ability_tools ) ) {
-			$metadata_tools = $this->path_value( $bundle, 'metadata.codebox.agent_runtime.bundle.ability_tools' );
-			$ability_tools  = is_array( $metadata_tools ) ? $metadata_tools : array();
+			$metadata_tools = $this->path_value( $bundle, 'metadata.agent_runtime.ability_tools' );
+			if ( ! is_array( $metadata_tools ) ) {
+				$metadata_tools = $this->path_value( $bundle, 'metadata.codebox.agent_runtime.bundle.ability_tools' );
+			}
+			$ability_tools = is_array( $metadata_tools ) ? $metadata_tools : array();
 		}
 		if ( empty( $ability_tools ) ) {
 			return;
@@ -249,7 +253,15 @@ final class AgentBundleRunner {
 
 	private static function is_success_status( string $status ): bool {
 		$status = trim( $status );
-		foreach ( array( 'failed', 'completed_no_items', 'cancelled', 'timed_out', 'timeout' ) as $failure_status ) {
+		if ( JobStatus::isStatusSuccess( $status ) ) {
+			return true;
+		}
+
+		if ( JobStatus::isStatusFailure( $status ) ) {
+			return false;
+		}
+
+		foreach ( array( 'cancelled', 'timed_out', 'timeout' ) as $failure_status ) {
 			if ( $failure_status === $status || str_starts_with( $status, $failure_status . ' - ' ) ) {
 				return false;
 			}

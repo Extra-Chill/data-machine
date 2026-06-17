@@ -104,6 +104,7 @@ datamachine_bundle_runner_contains( $abilities, "'engine_data_outputs'", 'abilit
 datamachine_bundle_runner_contains( $ai_step, "\$payload['tool_recorders']", 'AI step forwards configured tool recorders to the loop', $failures, $passes );
 
 echo "\n[3] Runner exposes semantic outputs without hiding raw engine data\n";
+require_once $root . '/inc/Core/JobStatus.php';
 require_once $root . '/inc/Engine/Bundle/AgentBundleRunner.php';
 require_once $root . '/inc/Abilities/Flow/FlowHelpers.php';
 require_once $root . '/inc/Abilities/Flow/QueueAbility.php';
@@ -175,8 +176,57 @@ $success_status = $runner_reflection->getMethod( 'is_success_status' );
 datamachine_bundle_runner_assert( false === $success_status->invoke( null, 'failed - ai_response_without_tool_result' ), 'failed-prefixed status is terminal failure', $failures, $passes );
 datamachine_bundle_runner_assert( false === $success_status->invoke( null, 'cancelled - operator aborted' ), 'cancelled-prefixed status is terminal failure', $failures, $passes );
 datamachine_bundle_runner_assert( true === $success_status->invoke( null, 'completed' ), 'completed status remains successful', $failures, $passes );
+datamachine_bundle_runner_assert( true === $success_status->invoke( null, 'completed_no_items' ), 'completed_no_items follows JobStatus success semantics', $failures, $passes );
+datamachine_bundle_runner_assert( true === $success_status->invoke( null, 'agent_skipped - no matching source items' ), 'agent_skipped-prefixed status follows JobStatus success semantics', $failures, $passes );
 
-echo "\n[3b] Successful tool results can be recorded into engine data\n";
+echo "\n[3b] Runtime ability tools prefer generic metadata\n";
+$apply_runtime_ability_tools = $runner_reflection->getMethod( 'apply_runtime_ability_tools' );
+$initial_data                = array();
+$apply_runtime_ability_tools->invokeArgs(
+	$runner_instance,
+	array(
+		&$initial_data,
+		array(),
+		array(
+			'metadata' => array(
+				'agent_runtime' => array(
+					'ability_tools' => array( array( 'name' => 'datamachine/generic-tool' ) ),
+				),
+				'codebox'       => array(
+					'agent_runtime' => array(
+						'bundle' => array(
+							'ability_tools' => array( array( 'name' => 'datamachine/codebox-tool' ) ),
+						),
+					),
+				),
+			),
+		)
+	)
+);
+datamachine_bundle_runner_assert( 'datamachine/generic-tool' === ( $initial_data['job']['ability_tools'][0]['name'] ?? null ), 'generic agent_runtime ability tools win over deprecated codebox metadata', $failures, $passes );
+
+$initial_data = array();
+$apply_runtime_ability_tools->invokeArgs(
+	$runner_instance,
+	array(
+		&$initial_data,
+		array(),
+		array(
+			'metadata' => array(
+				'codebox' => array(
+					'agent_runtime' => array(
+						'bundle' => array(
+							'ability_tools' => array( array( 'name' => 'datamachine/codebox-tool' ) ),
+						),
+					),
+				),
+			),
+		)
+	)
+);
+datamachine_bundle_runner_assert( 'datamachine/codebox-tool' === ( $initial_data['job']['ability_tools'][0]['name'] ?? null ), 'deprecated codebox ability tools remain compatible fallback', $failures, $passes );
+
+echo "\n[3c] Successful tool results can be recorded into engine data\n";
 require_once $root . '/inc/Engine/AI/conversation-loop.php';
 $GLOBALS['datamachine_bundle_runner_engine_data_merges'] = array();
 \DataMachine\Engine\AI\datamachine_record_tool_results_to_engine_data(
@@ -323,7 +373,7 @@ $recorded_direct_envelope_merge = $GLOBALS['datamachine_bundle_runner_engine_dat
 datamachine_bundle_runner_assert( 522 === ( $recorded_direct_envelope_merge['data']['design_agent']['issue_number'] ?? null ), 'tool recorder maps issue number from direct result envelope payload', $failures, $passes );
 datamachine_bundle_runner_assert( 'https://github.com/chubes4/wp-site-generator/issues/522' === ( $recorded_direct_envelope_merge['data']['design_agent']['issue_url'] ?? null ), 'tool recorder maps issue URL from direct result envelope payload', $failures, $passes );
 
-echo "\n[3b] Runner applies run-scoped flow step patches\n";
+echo "\n[3d] Runner applies run-scoped flow step patches\n";
 $workflow_from_bundle_flow = $runner_reflection->getMethod( 'workflow_from_bundle_flow' );
 $patched_workflow          = $workflow_from_bundle_flow->invoke(
 	$runner_instance,
@@ -393,7 +443,7 @@ $ephemeral_configs = DataMachine\Core\Steps\WorkflowConfigFactory::buildEphemera
 datamachine_bundle_runner_assert( 'github_pull_request_publish' === ( $ephemeral_configs['flow_config']['ephemeral_step_1']['tool_recorders'][0]['tool'] ?? null ), 'ephemeral flow config preserves AI tool recorders', $failures, $passes );
 datamachine_bundle_runner_assert( 'github_pull_request_publish' === ( $ephemeral_configs['pipeline_config']['ephemeral_pipeline_1']['tool_recorders'][0]['tool'] ?? null ), 'ephemeral pipeline config preserves AI tool recorders', $failures, $passes );
 
-echo "\n[3c] Runner does not treat no-item terminal states as success\n";
+echo "\n[3e] Runner treats no-item terminal states as JobStatus success\n";
 $response_method = $runner_reflection->getMethod( 'response' );
 $no_item_response = $response_method->invoke(
 	$runner_instance,
@@ -404,10 +454,10 @@ $no_item_response = $response_method->invoke(
 	array( 'wait_for_completion' => true )
 );
 datamachine_bundle_runner_assert( 'completed_no_items' === ( $no_item_response['status'] ?? null ), 'no-item terminal status is preserved', $failures, $passes );
-datamachine_bundle_runner_assert( false === ( $no_item_response['success'] ?? null ), 'no-item terminal status is not a successful bundle run', $failures, $passes );
-datamachine_bundle_runner_assert( false === ( $no_item_response['completion_outcome']['success'] ?? null ), 'no-item completion outcome is not successful', $failures, $passes );
+datamachine_bundle_runner_assert( true === ( $no_item_response['success'] ?? null ), 'no-item terminal status is a successful bundle run', $failures, $passes );
+datamachine_bundle_runner_assert( true === ( $no_item_response['completion_outcome']['success'] ?? null ), 'no-item completion outcome is successful', $failures, $passes );
 
-echo "\n[3d] Completed bundle runs enforce required semantic outputs\n";
+echo "\n[3f] Completed bundle runs enforce required semantic outputs\n";
 $missing_artifact_response = $response_method->invoke(
 	$runner_instance,
 	array(
