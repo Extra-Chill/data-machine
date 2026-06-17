@@ -8,6 +8,7 @@
 
 namespace DataMachine\Engine\Agents;
 
+use DataMachine\Core\Agents\AgentConfigFactory;
 use DataMachine\Core\Database\Agents\Agents;
 
 defined( 'ABSPATH' ) || exit;
@@ -34,16 +35,19 @@ class PersistedAgentProjector {
 
 		$agents_repository = $agents_repository ?? new Agents();
 		$registered        = array();
+		$existing_agents   = wp_get_agents();
 
 		foreach ( $agents_repository->get_all() as $row ) {
 			$slug = sanitize_title( (string) ( $row['agent_slug'] ?? '' ) );
-			if ( '' === $slug || wp_has_agent( $slug ) ) {
+			if ( '' === $slug || isset( $existing_agents[ $slug ] ) || wp_has_agent( $slug ) ) {
 				continue;
 			}
 
 			$agent = wp_register_agent( $slug, self::definition_from_row( $row ) );
 			if ( $agent instanceof \WP_Agent ) {
-				$registered[] = $agent->get_slug();
+				$registered_slug                     = $agent->get_slug();
+				$registered[]                        = $registered_slug;
+				$existing_agents[ $registered_slug ] = $agent;
 			}
 		}
 
@@ -57,7 +61,7 @@ class PersistedAgentProjector {
 	 * @return array<string,mixed>
 	 */
 	public static function definition_from_row( array $row ): array {
-		$config   = is_array( $row['agent_config'] ?? null ) ? $row['agent_config'] : array();
+		$config   = AgentConfigFactory::normalize( is_array( $row['agent_config'] ?? null ) ? $row['agent_config'] : array() );
 		$owner_id = (int) ( $row['owner_id'] ?? 0 );
 
 		return array(

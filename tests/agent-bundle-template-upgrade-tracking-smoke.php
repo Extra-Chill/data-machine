@@ -48,6 +48,9 @@ if ( ! class_exists( 'WP_CLI' ) ) {
 require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/BundleValidationException.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/BundleSchema.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/PortableSlug.php';
+require_once dirname( __DIR__ ) . '/vendor/wordpress/agents-api/src/Packages/class-wp-agent-package-artifact-hasher.php';
+require_once dirname( __DIR__ ) . '/vendor/wordpress/agents-api/src/Packages/class-wp-agent-package-artifact-status.php';
+require_once dirname( __DIR__ ) . '/inc/Core/Agents/AgentConfigFactory.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/AgentBundleArtifactExtensions.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/AgentConfigArtifactProjector.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/AgentBundleAgentConfig.php';
@@ -60,6 +63,7 @@ require_once dirname( __DIR__ ) . '/inc/Cli/Commands/AgentBundleCommand.php';
 use DataMachine\Cli\Commands\AgentBundleCommand;
 use DataMachine\Engine\Bundle\AgentBundleAgentConfig;
 use DataMachine\Engine\Bundle\AgentBundleArtifactHasher;
+use DataMachine\Engine\Bundle\AgentBundleArtifactExtensions;
 use DataMachine\Engine\Bundle\AgentBundleArtifactStatus;
 use DataMachine\Engine\Bundle\AgentTemplateMetadata;
 
@@ -89,7 +93,34 @@ final class TemplateTrackingCommand extends AgentBundleCommand {
 	}
 
 	public function expose_status( array $agent ): array {
-		return $this->installed_status( $agent );
+		$bundle    = $agent['agent_config']['datamachine_bundle'] ?? array();
+		$installed = is_array( $bundle['artifacts'] ?? null ) ? array_values( $bundle['artifacts'] ) : array();
+		$current   = array();
+		foreach ( $this->current as $artifact ) {
+			$key             = AgentBundleArtifactExtensions::artifact_key( (string) ( $artifact['artifact_type'] ?? '' ), (string) ( $artifact['artifact_id'] ?? '' ) );
+			$current[ $key ] = $artifact;
+		}
+		$artifacts = array();
+		foreach ( $installed as $record ) {
+			$key                    = AgentBundleArtifactExtensions::artifact_key( (string) ( $record['artifact_type'] ?? '' ), (string) ( $record['artifact_id'] ?? '' ) );
+			$current_hash           = isset( $current[ $key ] ) ? AgentBundleArtifactHasher::hash( $current[ $key ]['payload'] ?? null ) : null;
+			$record['current_hash'] = $current_hash;
+			$record['status']       = AgentBundleArtifactStatus::classify( (string) ( $record['installed_hash'] ?? '' ), $current_hash );
+			$artifacts[]            = $record;
+		}
+
+		return array(
+			'agent_id'         => (int) $agent['agent_id'],
+			'agent_slug'       => (string) $agent['agent_slug'],
+			'template_slug'    => (string) ( $bundle['template_slug'] ?? $bundle['bundle_slug'] ?? '' ),
+			'template_version' => (string) ( $bundle['template_version'] ?? $bundle['bundle_version'] ?? '' ),
+			'bundle_slug'      => (string) ( $bundle['bundle_slug'] ?? '' ),
+			'bundle_version'   => (string) ( $bundle['bundle_version'] ?? '' ),
+			'source_ref'       => (string) ( $bundle['source_ref'] ?? '' ),
+			'source_revision'  => (string) ( $bundle['source_revision'] ?? '' ),
+			'artifact_count'   => count( $artifacts ),
+			'artifacts'        => $artifacts,
+		);
 	}
 
 	protected function current_artifacts( array $agent, array $installed ): array {
@@ -118,7 +149,7 @@ template_tracking_assert_equals( 'bundle version remains distinct', '1.2.3', $me
 template_tracking_assert_equals( 'source revision is preserved', 'etag-abc123', $metadata['source_revision'] );
 
 echo "\n[2] Installed status reports source/version and live local modification state\n";
-$installed_agent_config = array( 'model' => 'openai/gpt-5.5' );
+$installed_agent_config = array( 'default_model' => 'openai/gpt-5.5' );
 $installed_pipeline     = array(
 	'portable_slug'   => 'daily-sync',
 	'pipeline_name'   => 'Daily Sync',
@@ -134,7 +165,7 @@ $agent = array(
 	'agent_id'     => 123,
 	'agent_slug'   => 'wordpress-com-brain',
 	'agent_config' => array(
-		'model'              => 'openai/gpt-5.5',
+		'default_model'      => 'openai/gpt-5.5',
 		'datamachine_bundle' => array(
 			'template_slug'    => 'domain-wiki-template',
 			'template_version' => '4.5.6',

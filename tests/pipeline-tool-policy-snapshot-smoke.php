@@ -405,20 +405,25 @@ assert_policy_equals( array(), $resolution['evidence']['unavailable_required_too
 assert_policy_equals( 'resolved', $resolution['evidence']['required_tool_resolution'][0]['status'] ?? null, 'resolved evidence marks required tool resolved', $failures, $passes );
 assert_policy_equals( 'alpha_tool', $resolution['evidence']['required_tool_resolution'][0]['resolved_name'] ?? null, 'resolved evidence preserves resolved logical name', $failures, $passes );
 
-echo "\n[10] host tool policy excludes non-runner local tools from every source:\n";
+echo "\n[10] required-tool evidence reuses captured source trace:\n";
+$resolver_source = file_get_contents( __DIR__ . '/../inc/Engine/AI/Tools/ToolPolicyResolver.php' ) ?: '';
+assert_policy_equals( 0, substr_count( $resolver_source, 'gatherWithMetadata(' ), 'evidence no longer manually replays metadata-only source gathering', $failures, $passes );
+assert_policy_equals( true, str_contains( $resolver_source, '$args[\'source_trace\'] = $this->last_source_trace' ), 'evidence builder receives captured trace metadata', $failures, $passes );
+
+echo "\n[11] host tool policy excludes non-runner local tools from every source:\n";
 $previous_policy_env = getenv( 'DATAMACHINE_HOST_TOOL_POLICY_JSON' );
 putenv(
 	'DATAMACHINE_HOST_TOOL_POLICY_JSON=' . json_encode(
 		array(
 			'schema'                     => 'datamachine/host-tool-policy/v1',
 			'default_execution_location' => 'disabled',
-			'tools'            => array(
-				'alpha_tool'            => array( 'execution_location' => 'control_plane' ),
-				'beta_tool'             => array( 'execution_location' => 'runner' ),
+			'tools'                      => array(
+				'alpha_tool'                   => array( 'execution_location' => 'control_plane' ),
+				'beta_tool'                    => array( 'execution_location' => 'runner' ),
 				'client/control_plane_runtime' => array( 'execution_location' => 'control_plane' ),
 				'client/runner_runtime'        => array( 'execution_location' => 'runner' ),
-				'control_plane_ability' => array( 'execution_location' => 'control_plane' ),
-				'runner_ability'        => array( 'execution_location' => 'runner' ),
+				'control_plane_ability'        => array( 'execution_location' => 'control_plane' ),
+				'runner_ability'               => array( 'execution_location' => 'runner' ),
 			),
 		)
 	)

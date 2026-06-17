@@ -198,13 +198,7 @@ final class AgentBundleInstalledArtifact {
 	}
 
 	private static function normalize_source_path( string $path ): string {
-		$path = str_replace( '\\', '/', self::non_empty_string( $path, 'source_path' ) );
-		$path = ltrim( $path, '/' );
-		if ( str_contains( $path, '..' ) ) {
-			throw new BundleValidationException( 'installed bundle artifact source_path must be bundle-local.' );
-		}
-
-		return $path;
+		return BundlePath::normalize_relative( $path, 'source_path', 'installed bundle artifact' );
 	}
 
 	private static function build_package_artifact( string $bundle_slug, string $bundle_version, string $artifact_type, string $artifact_id, string $source_path, ?string $installed_hash, ?string $current_hash, string $installed_at, string $updated_at, mixed $installed_payload ): object {

@@ -142,13 +142,7 @@ final class PromptArtifact {
 	}
 
 	private static function normalize_source_path( string $path ): string {
-		$path = str_replace( '\\', '/', self::non_empty_string( $path, 'source_path' ) );
-		$path = ltrim( $path, '/' );
-		if ( str_contains( $path, '..' ) ) {
-			throw new BundleValidationException( 'prompt artifact source_path must be bundle-local.' );
-		}
-
-		return $path;
+		return BundlePath::normalize_relative( $path, 'source_path', 'prompt artifact' );
 	}
 
 	private static function normalize_metadata( array $metadata ): array {

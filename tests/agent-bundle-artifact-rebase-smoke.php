@@ -36,6 +36,7 @@ if ( ! class_exists( 'WP_Agent_Package_Artifact_Hasher' ) ) {
 // vendor packages that need a full WordPress environment to bootstrap.
 require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/BundleSchema.php';
 require_once dirname( __DIR__ ) . '/vendor/wordpress/agents-api/src/Packages/class-wp-agent-package-artifact-hasher.php';
+require_once dirname( __DIR__ ) . '/inc/Core/Agents/AgentConfigFactory.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/AgentBundleArtifactExtensions.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/AgentConfigArtifactProjector.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/AgentBundleArtifactHasher.php';

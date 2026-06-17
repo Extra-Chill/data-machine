@@ -7,6 +7,8 @@
 
 namespace DataMachine\Engine\Bundle;
 
+use DataMachine\Core\Agents\AgentConfigFactory;
+
 defined( 'ABSPATH' ) || exit;
 
 /**
@@ -24,6 +26,6 @@ final class AgentBundleAgentConfig {
 	 * @return array<string,mixed>
 	 */
 	public static function tracked_payload( array $config ): array {
-		return AgentConfigArtifactProjector::tracked_payload( $config );
+		return AgentConfigArtifactProjector::tracked_payload( AgentConfigFactory::normalize( $config ) );
 	}
 }

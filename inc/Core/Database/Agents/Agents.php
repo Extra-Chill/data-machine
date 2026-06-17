@@ -11,6 +11,7 @@
 
 namespace DataMachine\Core\Database\Agents;
 
+use DataMachine\Core\Agents\AgentConfigFactory;
 use DataMachine\Core\Database\BaseRepository;
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -111,9 +112,7 @@ class Agents extends BaseRepository {
 			return null;
 		}
 
-		if ( ! empty( $row['agent_config'] ) ) {
-			$row['agent_config'] = json_decode( $row['agent_config'], true ) ? json_decode( $row['agent_config'], true ) : array();
-		}
+		$row['agent_config'] = self::decode_agent_config( $row['agent_config'] ?? null );
 
 		return $row;
 	}
@@ -143,9 +142,7 @@ class Agents extends BaseRepository {
 			return null;
 		}
 
-		if ( ! empty( $row['agent_config'] ) ) {
-			$row['agent_config'] = json_decode( $row['agent_config'], true ) ? json_decode( $row['agent_config'], true ) : array();
-		}
+		$row['agent_config'] = self::decode_agent_config( $row['agent_config'] ?? null );
 
 		return $row;
 	}
@@ -183,10 +180,7 @@ class Agents extends BaseRepository {
 		}
 
 		foreach ( $rows as &$row ) {
-			if ( ! empty( $row['agent_config'] ) ) {
-				$decoded             = json_decode( $row['agent_config'], true );
-				$row['agent_config'] = is_array( $decoded ) ? $decoded : array();
-			}
+			$row['agent_config'] = self::decode_agent_config( $row['agent_config'] ?? null );
 		}
 
 		return $rows;
@@ -236,10 +230,7 @@ class Agents extends BaseRepository {
 		}
 
 		foreach ( $rows as &$row ) {
-			if ( ! empty( $row['agent_config'] ) ) {
-				$decoded             = json_decode( $row['agent_config'], true );
-				$row['agent_config'] = is_array( $decoded ) ? $decoded : array();
-			}
+			$row['agent_config'] = self::decode_agent_config( $row['agent_config'] ?? null );
 		}
 
 		return $rows;
@@ -267,9 +258,7 @@ class Agents extends BaseRepository {
 			return null;
 		}
 
-		if ( ! empty( $row['agent_config'] ) ) {
-			$row['agent_config'] = json_decode( $row['agent_config'], true ) ? json_decode( $row['agent_config'], true ) : array();
-		}
+		$row['agent_config'] = self::decode_agent_config( $row['agent_config'] ?? null );
 
 		return $row;
 	}
@@ -319,7 +308,7 @@ class Agents extends BaseRepository {
 			}
 
 			if ( 'agent_config' === $field ) {
-				$update[ $field ] = is_array( $data[ $field ] ) ? wp_json_encode( $data[ $field ] ) : (string) $data[ $field ];
+				$update[ $field ] = is_array( $data[ $field ] ) ? wp_json_encode( AgentConfigFactory::normalize( $data[ $field ] ) ) : (string) $data[ $field ];
 				$formats[]        = '%s';
 			} else {
 				$update[ $field ] = (string) $data[ $field ];
@@ -408,10 +397,7 @@ class Agents extends BaseRepository {
 		}
 
 		foreach ( $rows as &$row ) {
-			if ( ! empty( $row['agent_config'] ) ) {
-				$decoded             = json_decode( $row['agent_config'], true );
-				$row['agent_config'] = is_array( $decoded ) ? $decoded : array();
-			}
+			$row['agent_config'] = self::decode_agent_config( $row['agent_config'] ?? null );
 		}
 
 		return $rows;
@@ -440,11 +426,20 @@ class Agents extends BaseRepository {
 				'agent_slug'   => $agent_slug,
 				'agent_name'   => $agent_name,
 				'owner_id'     => $owner_id,
-				'agent_config' => wp_json_encode( $agent_config ),
+				'agent_config' => wp_json_encode( AgentConfigFactory::normalize( $agent_config ) ),
 			),
 			array( '%s', '%s', '%d', '%s' )
 		);
 
 		return (int) $this->wpdb->insert_id;
+	}
+
+	private static function decode_agent_config( mixed $value ): array {
+		if ( is_array( $value ) ) {
+			return AgentConfigFactory::normalize( $value );
+		}
+
+		$decoded = is_string( $value ) && '' !== $value ? json_decode( $value, true ) : array();
+		return AgentConfigFactory::normalize( is_array( $decoded ) ? $decoded : array() );
 	}
 }
