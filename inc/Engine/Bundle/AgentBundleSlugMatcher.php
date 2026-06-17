@@ -167,6 +167,212 @@ final class AgentBundleSlugMatcher {
 	}
 
 	/**
+	 * Compute the normalized HANDLER-identity key for a bundle flow.
+	 *
+	 * The display name is mutable: extrachill-event-bundles#5 renamed every
+	 * colliding bundle flow `name` from the bare source label ("Dice.fm") to
+	 * "<Source> — <City>" ("Dice.fm — Austin"), and the export-time global
+	 * dedupe appends a numeric suffix to the slug ("dice-fm-101"). Neither the
+	 * renamed name nor the deduped slug can meet the unchanged live `flow_name`
+	 * ("Dice.fm"). The flow's SOURCE handler, however, is rename-proof: the first
+	 * non-AI/non-output step's handler slug ("dice_fm", "ticketmaster",
+	 * "bandsintown") is the stable per-source identity that survives every UI
+	 * rename. Within a single city pipeline a given import source appears once
+	 * (per-venue scrapers all share `universal_web_scraper`, but those resolve on
+	 * the unique slug pass BEFORE this fallback is reached), so the handler key is
+	 * unambiguous there. This is the bundle-side counterpart to
+	 * {@see self::index_existing_by_handler()}.
+	 *
+	 * A bundle flow carries its steps in one of two equivalent shapes depending
+	 * on how it was loaded: the on-disk document shape exposes an ordered
+	 * `steps[]` list (each entry with `step_type` / `handler_slugs`), while the
+	 * in-memory array-bundle shape produced by
+	 * {@see AgentBundleArrayAdapter::to_array_bundle()} (what `adopt()` actually
+	 * loads) carries the same data as a `flow_config` map keyed by step id. Both
+	 * are scanned identically — the live row uses the very same `flow_config`
+	 * shape — so the bundle and live sides always derive the same handler key.
+	 *
+	 * @param array<string,mixed> $flow     Bundle flow entry.
+	 * @param string              $fallback PortableSlug fallback (flow).
+	 * @return string Normalized handler key, or '' when no handler step exists.
+	 */
+	public static function bundle_handler_key( array $flow, string $fallback ): string {
+		if ( is_array( $flow['steps'] ?? null ) && array() !== $flow['steps'] ) {
+			// On-disk document shape: an ordered steps[] list.
+			return self::handler_key_from_steps( $flow['steps'], $fallback, false );
+		}
+
+		// In-memory array-bundle shape: a flow_config map keyed by step id, the
+		// same shape a live row carries.
+		return self::handler_key_from_steps( self::flow_config_steps( $flow ), $fallback, true );
+	}
+
+	/**
+	 * Index a set of existing flow rows by their normalized HANDLER identity.
+	 *
+	 * The live row keeps its source handler in `flow_config[<step_id>]` — the
+	 * same `handler_slugs` / `handler_configs` shape the bundle flow carries in
+	 * `steps[]`. This keys each row under the first non-AI/non-output step's
+	 * normalized handler slug so a renamed/deduped bundle flow can still meet its
+	 * live row on the rename-proof source identity. Like
+	 * {@see self::index_existing_by_name()}, it must only ever be handed the live
+	 * rows of a SINGLE matched pipeline, and it preserves the genuine-ambiguity
+	 * guarantee: two rows with the same handler in one pipeline surface as
+	 * `ambiguous` and are omitted from `matched`.
+	 *
+	 * @param array<int,array<string,mixed>> $rows     Existing flow rows for ONE pipeline.
+	 * @param string                         $fallback PortableSlug fallback (flow).
+	 * @return array{
+	 *     matched: array<string,array<string,mixed>>,
+	 *     ambiguous: array<string,array<int,array<string,mixed>>>
+	 * }
+	 */
+	public static function index_existing_by_handler( array $rows, string $fallback ): array {
+		$by_handler = array();
+
+		foreach ( $rows as $row ) {
+			if ( ! is_array( $row ) ) {
+				continue;
+			}
+
+			$steps = self::flow_config_steps( $row );
+			$key   = self::handler_key_from_steps( $steps, $fallback, true );
+			if ( '' === $key ) {
+				continue;
+			}
+
+			$by_handler[ $key ][] = $row;
+		}
+
+		$matched   = array();
+		$ambiguous = array();
+		foreach ( $by_handler as $key => $candidates ) {
+			if ( 1 === count( $candidates ) ) {
+				$matched[ $key ] = $candidates[0];
+				continue;
+			}
+
+			$ambiguous[ $key ] = $candidates;
+		}
+
+		return array(
+			'matched'   => $matched,
+			'ambiguous' => $ambiguous,
+		);
+	}
+
+	/**
+	 * Resolve a flow's import handler slug from an ordered list of steps.
+	 *
+	 * Both the bundle flow `steps[]` and the live `flow_config` express a step
+	 * the same way: a `step_type`, an ordered position, and either a
+	 * `handler_slugs` list or a `handler_configs` map keyed by handler slug. The
+	 * SOURCE of a flow is its first non-AI / non-output step — the fetch/import
+	 * handler that defines what the flow pulls. AI and output (upsert/publish)
+	 * steps are skipped because they are shared boilerplate across every flow and
+	 * carry no per-source identity.
+	 *
+	 * @param array<int,array<string,mixed>> $steps        Ordered step entries.
+	 * @param string                         $fallback     PortableSlug fallback.
+	 * @param bool                           $sort_by_order Sort steps by execution_order before scanning (live rows are unordered maps).
+	 * @return string Normalized handler slug, or '' when none is present.
+	 */
+	private static function handler_key_from_steps( array $steps, string $fallback, bool $sort_by_order ): string {
+		$steps = array_values(
+			array_filter(
+				$steps,
+				static function ( $step ) {
+					return is_array( $step );
+				}
+			)
+		);
+
+		if ( $sort_by_order ) {
+			usort(
+				$steps,
+				static function ( array $a, array $b ): int {
+					return (int) ( $a['execution_order'] ?? 0 ) <=> (int) ( $b['execution_order'] ?? 0 );
+				}
+			);
+		}
+
+		foreach ( $steps as $step ) {
+			$type = (string) ( $step['step_type'] ?? '' );
+			if ( in_array( $type, array( 'ai', 'upsert', 'publish' ), true ) ) {
+				continue;
+			}
+
+			$slug = self::handler_slug_from_step( $step );
+			if ( '' !== $slug ) {
+				return PortableSlug::normalize( $slug, $fallback );
+			}
+		}
+
+		return '';
+	}
+
+	/**
+	 * Extract the handler slug from a single step entry.
+	 *
+	 * Prefers the explicit `handler_slugs` list, falling back to the first key of
+	 * the `handler_configs` map (both sides store the handler config keyed by its
+	 * slug). Returns '' when the step declares no handler.
+	 *
+	 * @param array<string,mixed> $step Step entry.
+	 * @return string Raw handler slug, or '' when absent.
+	 */
+	private static function handler_slug_from_step( array $step ): string {
+		$slugs = $step['handler_slugs'] ?? null;
+		if ( is_array( $slugs ) && array() !== $slugs ) {
+			$first = reset( $slugs );
+			if ( is_string( $first ) && '' !== trim( $first ) ) {
+				return trim( $first );
+			}
+		}
+
+		$configs = $step['handler_configs'] ?? null;
+		if ( is_array( $configs ) && array() !== $configs ) {
+			$keys  = array_keys( $configs );
+			$first = (string) reset( $keys );
+			if ( '' !== trim( $first ) ) {
+				return trim( $first );
+			}
+		}
+
+		return '';
+	}
+
+	/**
+	 * Normalize a live flow row's `flow_config` into a list of step arrays.
+	 *
+	 * `flow_config` is a map keyed by `<pipeline>_<uuid>_<flow>` step ids; this
+	 * returns just the step value arrays so {@see self::handler_key_from_steps()}
+	 * can scan them the same way it scans a bundle flow's `steps[]` list.
+	 *
+	 * @param array<string,mixed> $row Existing flow row.
+	 * @return array<int,array<string,mixed>> Step value arrays.
+	 */
+	private static function flow_config_steps( array $row ): array {
+		$config = $row['flow_config'] ?? null;
+		if ( is_string( $config ) ) {
+			$decoded = json_decode( $config, true );
+			$config  = is_array( $decoded ) ? $decoded : array();
+		}
+		if ( ! is_array( $config ) ) {
+			return array();
+		}
+
+		return array_values(
+			array_filter(
+				$config,
+				static function ( $step ) {
+					return is_array( $step );
+				}
+			)
+		);
+	}
+
+	/**
 	 * Compute the effective normalized slug for a single existing row.
 	 *
 	 * The stored `portable_slug` is the row's IDENTITY; the display name is only

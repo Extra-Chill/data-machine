@@ -306,7 +306,10 @@ final class AgentBundleAbilityService {
 		$pipeline_index = AgentBundleSlugMatcher::index_existing( $pipeline_rows, 'pipeline_name', 'pipeline' );
 
 		// Map original bundle pipeline id -> live pipeline id so flows can be
-		// scoped to the right live pipeline.
+		// scoped to the right live pipeline. The in-memory bundle adopt loads
+		// (AgentBundleArrayAdapter::to_array_bundle) synthesizes `original_id` on
+		// every pipeline and `original_pipeline_id` on every flow, so this keys
+		// the scope correctly for live-origin bundles.
 		$pipeline_id_map = array();
 
 		foreach ( $bundle['pipelines'] ?? array() as $bundle_pipeline ) {
@@ -387,15 +390,43 @@ final class AgentBundleAbilityService {
 
 			$live = $flow_index['matched'][ $slug_key ] ?? null;
 
-			// Pipeline-scoped fallback: live-origin flow rows carry no slug, so a
-			// bundle flow keyed on its UNIQUE slug (e.g. "ticketmaster-63") never
-			// meets the live row keyed on its source label ("ticketmaster"). The
-			// global pass above already bounded the candidates to this flow's
-			// matched parent pipeline, where the source label IS unique. So when
-			// the slug key misses, re-key BOTH sides on the normalized source
-			// label within this single pipeline. A unique match there is
-			// unambiguous; the unique bundle slug is still what gets backfilled
-			// onto the row. A genuine in-pipeline name collision stays ambiguous.
+			// Pipeline-scoped handler fallback (primary): the unique-slug pass
+			// above misses for live-origin source flows because the bundle's slug
+			// was deduped at export ("dice-fm-101") and its `name` was renamed to
+			// "<Source> — <City>" (event-bundles#5), while the live row still
+			// carries the bare source label ("Dice.fm"). Neither editable label
+			// can meet the live row. The flow's import HANDLER, however, is
+			// rename-proof: within this already-matched parent pipeline a given
+			// source ("dice_fm", "ticketmaster") appears once — per-venue scrapers
+			// share `universal_web_scraper` but already resolved on the unique
+			// slug pass before reaching here. So re-key BOTH sides on the
+			// normalized handler identity (bundle `steps[]` vs live `flow_config`).
+			// A unique match is unambiguous; a genuine in-pipeline handler
+			// collision stays ambiguous and is never guessed.
+			if ( null === $live ) {
+				$handler_key = AgentBundleSlugMatcher::bundle_handler_key( $bundle_flow, 'flow' );
+				if ( '' !== $handler_key ) {
+					$handler_index = AgentBundleSlugMatcher::index_existing_by_handler( $scoped_rows, 'flow' );
+
+					if ( isset( $handler_index['ambiguous'][ $handler_key ] ) ) {
+						$ambiguous[] = array(
+							'artifact_type' => 'flow',
+							'artifact_id'   => $slug_key,
+							'reason'        => sprintf( '%d live flows on pipeline %d resolve to handler "%s".', count( $handler_index['ambiguous'][ $handler_key ] ), $live_pipeline, $handler_key ),
+						);
+						continue;
+					}
+
+					$live = $handler_index['matched'][ $handler_key ] ?? null;
+				}
+			}
+
+			// Pipeline-scoped name fallback (last resort): when a flow carries no
+			// usable handler signal, fall back to the normalized source label
+			// within this single pipeline. Preserved for flows whose only stable
+			// cross-side identity is the (unrenamed) display name; the unique
+			// bundle slug is still what gets backfilled. A genuine in-pipeline
+			// name collision stays ambiguous.
 			if ( null === $live ) {
 				$name_key   = AgentBundleSlugMatcher::bundle_name_key( $bundle_flow, 'flow_name', 'flow' );
 				$name_index = AgentBundleSlugMatcher::index_existing_by_name( $scoped_rows, 'flow_name', 'flow' );
@@ -729,9 +760,9 @@ final class AgentBundleAbilityService {
 			if ( $new_pipeline_id <= 0 ) {
 				continue;
 			}
-			$flow_slug      = AgentBundleSlugMatcher::bundle_slug( $flow, 'flow_name', 'flow' );
-			$flow_index     = AgentBundleSlugMatcher::index_existing( $existing_flows_by_pipeline[ $new_pipeline_id ] ?? array(), 'flow_name', 'flow' );
-			$existing_flow  = $flow_index['matched'][ $flow_slug ] ?? null;
+			$flow_slug     = AgentBundleSlugMatcher::bundle_slug( $flow, 'flow_name', 'flow' );
+			$flow_index    = AgentBundleSlugMatcher::index_existing( $existing_flows_by_pipeline[ $new_pipeline_id ] ?? array(), 'flow_name', 'flow' );
+			$existing_flow = $flow_index['matched'][ $flow_slug ] ?? null;
 			if ( null === $existing_flow ) {
 				continue;
 			}
