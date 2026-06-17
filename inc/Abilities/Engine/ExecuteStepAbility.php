@@ -15,7 +15,6 @@
 namespace DataMachine\Abilities\Engine;
 
 use DataMachine\Abilities\StepTypeAbilities;
-use DataMachine\Core\Database\ProcessedItems\ProcessedItems;
 use DataMachine\Core\EngineData;
 use DataMachine\Core\FilesRepository\FileCleanup;
 use DataMachine\Core\FilesRepository\FileRetrieval;
@@ -442,13 +441,10 @@ class ExecuteStepAbility {
 
 		// Status override: complete with override status and clean up.
 		if ( $status_override ) {
-			// Mark item as processed if the override indicates successful completion
-			// (e.g. agent_skipped is intentional, completed is success).
-			// Failed overrides should NOT mark items as processed.
 			if ( str_starts_with( $status_override, JobStatus::FAILED ) === false ) {
-				$this->markCompletedItemProcessed( $job_id );
+				$this->handleStepLifecycleCompleted( $job_id );
 			} else {
-				$this->releaseInFlightItemClaim( $job_id );
+				$this->handleStepLifecycleFailed( $job_id );
 			}
 			$this->db_jobs->complete_job( $job_id, $status_override );
 
@@ -533,23 +529,7 @@ class ExecuteStepAbility {
 				// producing one packet per event). A single packet is just
 				// the same job continuing to the next step.
 				if ( 'inline' === $transition_route['mode'] || $packet_count <= 1 ) {
-					// For fetch/event_import steps with a single item (inline continuation),
-					// seed dedup context into engine_data so markCompletedItemProcessed()
-					// can find it when the last step completes. For fan-out children this
-					// is handled in PipelineBatchScheduler::createChildJob().
-					if ( in_array( $step_type, array( 'fetch', 'event_import' ), true ) && ! empty( $routed_packets ) ) {
-						$packet_meta = $routed_packets[0]['metadata'] ?? array();
-						$seed_data   = array();
-						if ( ! empty( $packet_meta['item_identifier'] ) ) {
-							$seed_data['item_identifier'] = $packet_meta['item_identifier'];
-						}
-						if ( ! empty( $packet_meta['source_type'] ) ) {
-							$seed_data['source_type'] = $packet_meta['source_type'];
-						}
-						if ( ! empty( $seed_data ) ) {
-							datamachine_merge_engine_data( $job_id, $seed_data );
-						}
-					}
+					$this->handleStepLifecycleInlineContinuation( $job_id, $flow_step_config, $routed_packets );
 
 					do_action(
 						'datamachine_schedule_next_step',
@@ -584,10 +564,8 @@ class ExecuteStepAbility {
 				);
 			}
 
-			// Mark this item as processed now that the full pipeline succeeded.
-			// Deferred from the fetch step to prevent "dropped events" where
-			// an item is marked processed but a downstream step fails.
-			$this->markCompletedItemProcessed( $job_id );
+			// Notify lifecycle handlers after the full pipeline succeeds.
+			$this->handleStepLifecycleCompleted( $job_id );
 
 			$this->db_jobs->complete_job( $job_id, JobStatus::COMPLETED );
 			$cleanup = new FileCleanup();
@@ -804,105 +782,32 @@ class ExecuteStepAbility {
 	}
 
 	/**
-	 * Mark a completed job's source item as processed.
+	 * Notify step lifecycle handlers that a step is continuing inline.
 	 *
-	 * Called when the LAST step in a pipeline completes successfully.
-	 * Reads the dedup key (item_identifier), source type, and fetch step ID
-	 * from the job's engine_data — these were seeded during fetch and
-	 * propagated through fan-out child creation.
-	 *
-	 * This deferred approach prevents "dropped events" where the fetch
-	 * step marks an item as processed but a downstream step (AI, update)
-	 * fails. Without this, the item would never be retried because the
-	 * dedup filter would skip it on the next fetch run.
-	 *
-	 * @since 0.58.1
-	 * @param int $job_id The completing job ID.
+	 * @param int   $job_id           Job ID.
+	 * @param array $flow_step_config Current flow step configuration.
+	 * @param array $routed_packets   Packets routed to the next step.
 	 */
-	private function markCompletedItemProcessed( int $job_id ): void {
-		$engine_data = datamachine_get_engine_data( $job_id );
-
-		$item_identifier = $engine_data['item_identifier'] ?? null;
-		$source_type     = $engine_data['source_type'] ?? null;
-
-		if ( empty( $item_identifier ) || empty( $source_type ) ) {
-			return;
-		}
-
-		// Find the fetch/event_import step's flow_step_id from flow_config.
-		// The processed items table is keyed by flow_step_id, so we need the
-		// fetch step's ID (not the current step's) for dedup to work correctly.
-		$fetch_flow_step_id = null;
-		$flow_config        = $engine_data['flow_config'] ?? array();
-
-		foreach ( $flow_config as $step_id => $config ) {
-			$step_type = $config['step_type'] ?? '';
-			if ( in_array( $step_type, array( 'fetch', 'event_import' ), true ) ) {
-				$fetch_flow_step_id = $step_id;
-				break;
-			}
-		}
-
-		if ( empty( $fetch_flow_step_id ) ) {
-			return;
-		}
-
-		do_action(
-			'datamachine_mark_item_processed',
-			$fetch_flow_step_id,
-			$source_type,
-			$item_identifier,
-			$job_id
-		);
-
-		do_action(
-			'datamachine_log',
-			'debug',
-			'Deferred mark-as-processed on pipeline completion',
-			array(
-				'job_id'             => $job_id,
-				'item_identifier'    => $item_identifier,
-				'source_type'        => $source_type,
-				'fetch_flow_step_id' => $fetch_flow_step_id,
-			)
-		);
+	private function handleStepLifecycleInlineContinuation( int $job_id, array $flow_step_config, array $routed_packets ): void {
+		do_action( 'datamachine_step_lifecycle_inline_continuation', $job_id, $flow_step_config, $routed_packets );
 	}
 
 	/**
-	 * Release this job's in-flight source claim after a failed status override.
+	 * Notify step lifecycle handlers that a job completed successfully.
 	 *
-	 * Most failures flow through datamachine_fail_job, whose handler releases
-	 * claims centrally. Failed status overrides complete the job directly, so
-	 * they need the same release here.
+	 * @param int $job_id Completed job ID.
+	 */
+	private function handleStepLifecycleCompleted( int $job_id ): void {
+		do_action( 'datamachine_step_lifecycle_completed', $job_id, datamachine_get_engine_data( $job_id ) );
+	}
+
+	/**
+	 * Notify step lifecycle handlers that a job failed outside datamachine_fail_job.
 	 *
 	 * @param int $job_id Failed job ID.
 	 */
-	private function releaseInFlightItemClaim( int $job_id ): void {
-		$engine_data = datamachine_get_engine_data( $job_id );
-
-		$item_identifier = $engine_data['item_identifier'] ?? null;
-		$source_type     = $engine_data['source_type'] ?? null;
-
-		if ( empty( $item_identifier ) || empty( $source_type ) ) {
-			return;
-		}
-
-		$fetch_flow_step_id = null;
-		$flow_config        = $engine_data['flow_config'] ?? array();
-
-		foreach ( $flow_config as $step_id => $config ) {
-			$step_type = $config['step_type'] ?? '';
-			if ( in_array( $step_type, array( 'fetch', 'event_import' ), true ) ) {
-				$fetch_flow_step_id = $step_id;
-				break;
-			}
-		}
-
-		if ( empty( $fetch_flow_step_id ) ) {
-			return;
-		}
-
-		( new ProcessedItems() )->release_claim( $fetch_flow_step_id, (string) $source_type, (string) $item_identifier );
+	private function handleStepLifecycleFailed( int $job_id ): void {
+		do_action( 'datamachine_step_lifecycle_failed', $job_id, datamachine_get_engine_data( $job_id ) );
 	}
 
 	/**
