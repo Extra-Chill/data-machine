@@ -7,6 +7,7 @@
 
 namespace DataMachine\Engine\AI;
 
+use DataMachine\Core\OptionLeaseStore;
 use DataMachine\Core\PluginSettings;
 
 defined( 'ABSPATH' ) || exit;
@@ -19,6 +20,7 @@ class PipelineAIConcurrencyLimiter {
 	private const DEFAULT_LIMIT          = 1;
 	private const DEFAULT_THROTTLE_DELAY = 10;
 	private const DEFAULT_TTL            = 600;
+	private const OPTION_PREFIX          = 'datamachine_pipeline_ai_lease_';
 	private const EXECUTE_STEP_HOOK      = 'datamachine_execute_step';
 	private const ACTION_SCHEDULER_GROUP = 'data-machine';
 
@@ -115,53 +117,25 @@ class PipelineAIConcurrencyLimiter {
 	 * @return array{acquired:bool,limit:int,active:int,option_name?:string}
 	 */
 	private static function acquireScope( string $scope, int $limit, string $token, string $provider, array $context ): array {
-		$active = 0;
-		$now    = time();
+		$now = time();
+		$ttl = self::ttl( $provider, $context );
+		$lease = array(
+			'token'        => $token,
+			'provider'     => $provider,
+			'created_at'   => $now,
+			'expires_at'   => $now + $ttl,
+			'job_id'       => (int) ( $context['job_id'] ?? 0 ),
+			'flow_step_id' => (string) ( $context['flow_step_id'] ?? '' ),
+		);
 
-		for ( $slot = 1; $slot <= $limit; ++$slot ) {
-			$option_name = self::optionName( $scope, $slot );
-			$existing    = get_option( $option_name, false );
-
-			if ( is_array( $existing ) && (int) ( $existing['expires_at'] ?? 0 ) <= $now ) {
-				delete_option( $option_name );
-				$existing = false;
-			}
-
-			if ( is_array( $existing ) && self::isAdvancedOwnerLease( $existing ) ) {
-				delete_option( $option_name );
-				$existing = false;
-			}
-
-			if ( false !== $existing ) {
-				++$active;
-				continue;
-			}
-
-			$lease = array(
-				'token'        => $token,
-				'provider'     => $provider,
-				'created_at'   => $now,
-				'expires_at'   => $now + self::ttl( $provider, $context ),
-				'job_id'       => (int) ( $context['job_id'] ?? 0 ),
-				'flow_step_id' => (string) ( $context['flow_step_id'] ?? '' ),
-			);
-
-			if ( add_option( $option_name, $lease, '', 'no' ) ) {
-				return array(
-					'acquired'    => true,
-					'limit'       => $limit,
-					'active'      => $active + 1,
-					'option_name' => $option_name,
-				);
-			}
-
-			++$active;
-		}
-
-		return array(
-			'acquired' => false,
-			'limit'    => $limit,
-			'active'   => $active,
+		return OptionLeaseStore::acquireSlot(
+			self::OPTION_PREFIX,
+			$scope,
+			$limit,
+			$lease,
+			$ttl,
+			$now,
+			static fn( array $existing ): bool => self::isAdvancedOwnerLease( $existing )
 		);
 	}
 
@@ -193,13 +167,6 @@ class PipelineAIConcurrencyLimiter {
 		 * @param array  $context  Execution context.
 		 */
 		return max( 30, (int) apply_filters( 'datamachine_pipeline_ai_concurrency_lease_ttl', self::DEFAULT_TTL, $provider, $context ) );
-	}
-
-	/**
-	 * Build option name for a slot.
-	 */
-	private static function optionName( string $scope, int $slot ): string {
-		return 'datamachine_pipeline_ai_lease_' . md5( $scope ) . '_' . $slot;
 	}
 
 	/**

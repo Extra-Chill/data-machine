@@ -70,6 +70,7 @@ if ( ! function_exists( 'sanitize_text_field' ) ) {
     }
 }
 
+require_once __DIR__ . '/../inc/Core/OptionLeaseStore.php';
 require_once __DIR__ . '/../inc/Cli/WorkerLock.php';
 
 use DataMachine\Cli\WorkerLock;

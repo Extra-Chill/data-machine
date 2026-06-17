@@ -7,6 +7,8 @@
 
 namespace DataMachine\Cli;
 
+use DataMachine\Core\OptionLeaseStore;
+
 defined( 'ABSPATH' ) || exit;
 
 /**
@@ -47,26 +49,8 @@ class WorkerLock {
 			'lane'       => self::normalizeLane( $lane ),
 		);
 
-		if ( 'stale' === $existing['lock_status'] ) {
-			delete_option( $option_name );
-			if ( add_option( $option_name, $payload, '', false ) ) {
-				return self::formatSnapshot( $payload, $now, 'held', true );
-			}
-
-			$after_delete = self::snapshot( $now, $ttl, $lane );
-			if ( 'held' !== $after_delete['lock_status'] && update_option( $option_name, $payload, false ) ) {
-				$current = get_option( $option_name, array() );
-				if ( is_array( $current ) && hash_equals( $token, (string) ( $current['token'] ?? '' ) ) ) {
-					return self::formatSnapshot( $payload, $now, 'held', true );
-				}
-			}
-
-			$existing             = self::snapshot( $now, $ttl, $lane );
-			$existing['acquired'] = false;
-			return $existing;
-		}
-
-		if ( add_option( $option_name, $payload, '', false ) ) {
+		$result = OptionLeaseStore::acquire( $option_name, $payload, $ttl, $now, null, true );
+		if ( $result['acquired'] ) {
 			return self::formatSnapshot( $payload, $now, 'held', true );
 		}
 
@@ -86,11 +70,7 @@ class WorkerLock {
 			return;
 		}
 
-		$option_name = self::optionName( $lane );
-		$payload     = get_option( $option_name, array() );
-		if ( is_array( $payload ) && hash_equals( (string) ( $payload['token'] ?? '' ), $token ) ) {
-			delete_option( $option_name );
-		}
+		OptionLeaseStore::release( self::optionName( $lane ), $token );
 	}
 
 	/**
@@ -104,7 +84,8 @@ class WorkerLock {
 	public static function snapshot( ?int $now = null, int $ttl = self::DEFAULT_TTL, string $lane = '' ): array {
 		$now     = $now ?? time();
 		$ttl     = max( 60, $ttl );
-		$payload = get_option( self::optionName( $lane ), array() );
+		$snapshot = OptionLeaseStore::snapshot( self::optionName( $lane ), $ttl, $now );
+		$payload  = $snapshot['payload'];
 		$lane    = self::normalizeLane( $lane );
 
 		if ( ! is_array( $payload ) || empty( $payload['started_at'] ) ) {
@@ -119,11 +100,7 @@ class WorkerLock {
 			);
 		}
 
-		$started_at = (int) $payload['started_at'];
-		$expires_at = (int) ( $payload['expires_at'] ?? ( $started_at + $ttl ) );
-		$status     = $expires_at <= $now ? 'stale' : 'held';
-
-		return self::formatSnapshot( $payload, $now, $status, false );
+		return self::formatSnapshot( $payload, $now, $snapshot['status'], false );
 	}
 
 	/**
