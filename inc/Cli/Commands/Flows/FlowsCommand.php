@@ -1276,7 +1276,7 @@ class FlowsCommand extends BaseCommand {
 		}
 
 		if ( $has_handler_config ) {
-			$step_config = $this->loadFlowStepConfig( $flow_id, (string) $handler_step );
+			$step_config      = $this->loadFlowStepConfig( $flow_id, (string) $handler_step );
 			$handler_slug     = null;
 			$unwrapped_config = $handler_config;
 
@@ -1442,8 +1442,8 @@ class FlowsCommand extends BaseCommand {
 			);
 		}
 
-		$ai_steps      = array();
-		$non_ai_steps  = array();
+		$ai_steps     = array();
+		$non_ai_steps = array();
 		foreach ( $flow_config as $step_id => $step_data ) {
 			if ( ! is_array( $step_data ) || ! isset( $step_data['step_type'] ) ) {
 				continue;
