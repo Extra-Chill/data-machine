@@ -16,6 +16,30 @@ defined( 'ABSPATH' ) || exit;
 class RuntimeEnvironment {
 
 	/**
+	 * Whether a host plugin has explicitly requested the full runtime.
+	 *
+	 * @var bool
+	 */
+	private static bool $full_runtime_requested = false;
+
+	/**
+	 * Request full runtime loading for the current request.
+	 *
+	 * @param string $reason Optional caller-readable reason for diagnostics.
+	 * @return void
+	 */
+	public static function request_full_runtime( string $reason = '' ): void {
+		self::$full_runtime_requested = true;
+
+		/**
+		 * Fires when a host requests the full Data Machine runtime for the request.
+		 *
+		 * @param string $reason Caller-readable activation reason.
+		 */
+		do_action( 'datamachine_full_runtime_requested', $reason );
+	}
+
+	/**
 	 * Determine whether the current request is a WordPress test bootstrap.
 	 *
 	 * @return bool True when the request is running under WordPress tests.
@@ -43,6 +67,10 @@ class RuntimeEnvironment {
 	 * @return bool True when full runtime registration should run.
 	 */
 	public static function should_load_full_runtime(): bool {
+		if ( self::$full_runtime_requested ) {
+			return true;
+		}
+
 		if ( self::is_agent_runtime() ) {
 			return true;
 		}
