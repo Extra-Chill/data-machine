@@ -36,7 +36,7 @@ final class GitHubBundleSourceAuthResolver implements BundleSourceAuthResolverIn
 		}
 
 		$is_github = $this->is_github_host( $host );
-		$is_ghe    = ! $is_github && array_key_exists( $host, BundleSourceAuth::ghe_hosts() );
+		$is_ghe = ! $is_github && array_key_exists( $host, BundleSourceAuth::ghe_hosts() );
 		if ( ! $is_github && ! $is_ghe ) {
 			return $args;
 		}
