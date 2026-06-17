@@ -55,8 +55,25 @@ if ( ! function_exists( 'rest_ensure_response' ) ) {
 	}
 }
 
-require_once __DIR__ . '/../inc/Core/AbilityResult.php';
+if ( ! function_exists( '__' ) ) {
+	function __( $text, $domain = null ) {
+		unset( $domain );
+		return $text;
+	}
+}
 
+if ( ! function_exists( 'wp_get_ability' ) ) {
+	function wp_get_ability( string $slug ) {
+		return $GLOBALS['datamachine_test_abilities'][ $slug ] ?? null;
+	}
+}
+
+require_once __DIR__ . '/../inc/Core/AbilityResult.php';
+require_once __DIR__ . '/../inc/Api/RestResultSpec.php';
+require_once __DIR__ . '/../inc/Api/RestAbilityExecutor.php';
+
+use DataMachine\Api\RestAbilityExecutor;
+use DataMachine\Api\RestResultSpec;
 use DataMachine\Core\AbilityResult;
 
 $failed = 0;
@@ -241,6 +258,67 @@ $item_rest = AbilityResult::rest_item_response(
 $item_rest = $rest_payload( $item_rest );
 $assert( 'REST item presenter preserves success flag', true === ( $item_rest['success'] ?? null ) );
 $assert( 'REST item presenter wraps mutation fields under data', 3 === ( $item_rest['data']['paused'] ?? null ) );
+
+$rest_spec_response = RestResultSpec::item(
+	static function ( array $result ): array {
+		return array( 'queue_length' => $result['queue_length'] );
+	},
+	static function ( array $result ): array {
+		return array( 'message' => $result['message'] );
+	},
+	'queue_update_failed',
+	'Failed to update queue item.',
+	400
+)->response(
+	array(
+		'success'      => true,
+		'queue_length' => 4,
+		'message'      => 'Queue updated.',
+	)
+);
+$rest_spec_response = $rest_payload( $rest_spec_response );
+$assert( 'REST result spec maps success data', 4 === ( $rest_spec_response['data']['queue_length'] ?? null ) );
+$assert( 'REST result spec maps top-level extras', 'Queue updated.' === ( $rest_spec_response['message'] ?? null ) );
+
+$rest_spec_error = RestResultSpec::item(
+	null,
+	null,
+	'queue_list_failed',
+	'Failed to list queue.',
+	400,
+	static function ( array $result ): int {
+		return false !== strpos( $result['error'] ?? '', 'not found' ) ? 404 : 400;
+	}
+)->response(
+	array(
+		'success' => false,
+		'error'   => 'Flow not found.',
+	)
+);
+$assert( 'REST result spec applies failure status callback', 404 === ( $rest_spec_error->get_error_data()['status'] ?? null ) );
+
+$GLOBALS['datamachine_test_abilities']['datamachine/test-rest'] = new class() {
+	public function execute( array $input ): array {
+		return array(
+			'success' => true,
+			'value'   => $input['value'],
+		);
+	}
+};
+$executor_response = RestAbilityExecutor::execute(
+	'datamachine/test-rest',
+	array( 'value' => 'ok' ),
+	RestResultSpec::item(
+		static function ( array $result ): array {
+			return array( 'value' => $result['value'] );
+		}
+	)
+);
+$executor_response = $rest_payload( $executor_response );
+$assert( 'REST ability executor resolves ability slug and applies spec', 'ok' === ( $executor_response['data']['value'] ?? null ) );
+
+$missing_ability_error = RestAbilityExecutor::execute( 'datamachine/missing', array(), RestResultSpec::item() );
+$assert( 'REST ability executor returns WP_Error for missing abilities', $missing_ability_error instanceof WP_Error );
 
 $cli_rows = array(
 	array(

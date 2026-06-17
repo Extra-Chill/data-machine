@@ -16,6 +16,8 @@ use DataMachine\Abilities\FlowStep\GetFlowStepsAbility;
 use DataMachine\Abilities\FlowStep\UpdateFlowStepAbility;
 use DataMachine\Abilities\HandlerAbilities;
 use DataMachine\Abilities\StepTypeAbilities;
+use DataMachine\Api\RestAbilityExecutor;
+use DataMachine\Api\RestResultSpec;
 
 
 if ( ! defined( 'WPINC' ) ) {
@@ -195,20 +197,18 @@ class FlowSteps {
 			$input['user_message'] = $user_message;
 		}
 
-		$result = ( new UpdateFlowStepAbility() )->execute( $input );
-
-		if ( ! $result['success'] ) {
-			return new \WP_Error(
+		return RestAbilityExecutor::execute(
+			new UpdateFlowStepAbility(),
+			$input,
+			RestResultSpec::item(
+				static function (): array {
+					return array();
+				},
+				static function ( array $result ): array {
+					return array( 'message' => $result['message'] ?? __( 'Flow step updated successfully', 'data-machine' ) );
+				},
 				'update_failed',
-				$result['error'] ?? __( 'Failed to update flow step', 'data-machine' ),
-				array( 'status' => 500 )
-			);
-		}
-
-		return rest_ensure_response(
-			array(
-				'success' => true,
-				'message' => $result['message'] ?? __( 'Flow step updated successfully', 'data-machine' ),
+				__( 'Failed to update flow step', 'data-machine' )
 			)
 		);
 	}
@@ -235,29 +235,26 @@ class FlowSteps {
 	public static function handle_get_flow_config( $request ) {
 		$flow_id = (int) $request->get_param( 'flow_id' );
 
-		$result = ( new GetFlowStepsAbility() )->execute( array( 'flow_id' => $flow_id ) );
+		return RestAbilityExecutor::execute(
+			new GetFlowStepsAbility(),
+			array( 'flow_id' => $flow_id ),
+			RestResultSpec::item(
+				static function ( array $result ) use ( $flow_id ): array {
+					$flow_config = array();
+					foreach ( $result['steps'] as $step ) {
+						$flow_step_id                 = $step['flow_step_id'];
+						$flow_config[ $flow_step_id ] = $step;
+					}
 
-		if ( ! $result['success'] ) {
-			return new \WP_Error(
-				'flow_not_found',
-				$result['error'] ?? __( 'Flow not found.', 'data-machine' ),
-				array( 'status' => 404 )
-			);
-		}
-
-		$flow_config = array();
-		foreach ( $result['steps'] as $step ) {
-			$flow_step_id                 = $step['flow_step_id'];
-			$flow_config[ $flow_step_id ] = $step;
-		}
-
-		return rest_ensure_response(
-			array(
-				'success' => true,
-				'data'    => array(
+					return array(
 					'flow_id'     => $flow_id,
 					'flow_config' => $flow_config,
-				),
+					);
+				},
+				null,
+				'flow_not_found',
+				__( 'Flow not found.', 'data-machine' ),
+				404
 			)
 		);
 	}
@@ -276,23 +273,20 @@ class FlowSteps {
 			);
 		}
 
-		$result = ( new GetFlowStepsAbility() )->execute( array( 'flow_step_id' => $flow_step_id ) );
-
-		if ( ! $result['success'] ) {
-			return new \WP_Error(
-				'flow_step_not_found',
-				$result['error'] ?? __( 'Flow step configuration not found.', 'data-machine' ),
-				array( 'status' => 404 )
-			);
-		}
-
-		return rest_ensure_response(
-			array(
-				'success' => true,
-				'data'    => array(
+		return RestAbilityExecutor::execute(
+			new GetFlowStepsAbility(),
+			array( 'flow_step_id' => $flow_step_id ),
+			RestResultSpec::item(
+				static function ( array $result ) use ( $flow_step_id ): array {
+					return array(
 					'flow_step_id' => $flow_step_id,
 					'step_config'  => $result['steps'][0] ?? array(),
-				),
+					);
+				},
+				null,
+				'flow_step_not_found',
+				__( 'Flow step configuration not found.', 'data-machine' ),
+				404
 			)
 		);
 	}
@@ -424,26 +418,21 @@ class FlowSteps {
 		$flow_step_id = sanitize_text_field( $request->get_param( 'flow_step_id' ) );
 		$user_message = sanitize_textarea_field( $request->get_param( 'user_message' ) );
 
-		$result = ( new UpdateFlowStepAbility() )->execute(
+		return RestAbilityExecutor::execute(
+			new UpdateFlowStepAbility(),
 			array(
 				'flow_step_id' => $flow_step_id,
 				'user_message' => $user_message,
-			)
-		);
-
-		if ( ! $result['success'] ) {
-			return new \WP_Error(
+			),
+			RestResultSpec::item(
+				static function (): array {
+					return array();
+				},
+				static function (): array {
+					return array( 'message' => __( 'User message saved successfully', 'data-machine' ) );
+				},
 				'update_failed',
-				$result['error'] ?? __( 'Failed to update user message.', 'data-machine' ),
-				array( 'status' => 500 )
-			);
-		}
-
-		return rest_ensure_response(
-			array(
-				'success' => true,
-				'data'    => array(),
-				'message' => __( 'User message saved successfully', 'data-machine' ),
+				__( 'Failed to update user message.', 'data-machine' )
 			)
 		);
 	}
