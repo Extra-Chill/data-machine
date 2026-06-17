@@ -444,6 +444,44 @@ $job_declared = resolve_ability_source_tools(
 );
 assert_ability_tool_source_equals( true, isset( $job_declared['job_summarize_demo'] ), 'job snapshot ability_tools map exposes runtime ability tool', $failures, $passes );
 
+$client_context_override = resolve_ability_source_tools(
+	'pipeline',
+	array(
+		'ability_tools'   => array(
+			'context_boundary_demo' => array(
+				'ability' => 'demo/summarize',
+				'modes'   => array( 'pipeline' ),
+			),
+		),
+		'client_context'  => array(
+			'ability_tools' => array(
+				'context_boundary_demo' => array(
+					'ability'                 => 'demo/missing',
+					'modes'                   => array( 'pipeline' ),
+					'client_context_bindings' => array( 'user_id' ),
+					'parameters'              => array(
+						'type'       => 'object',
+						'required'   => array( 'user_id' ),
+						'properties' => array(
+							'user_id' => array( 'type' => 'integer' ),
+						),
+					),
+				),
+				'client_only_demo' => array(
+					'ability' => 'demo/summarize',
+					'modes'   => array( 'pipeline' ),
+				),
+			),
+		),
+		'allow_only'      => array( 'context_boundary_demo', 'client_only_demo' ),
+	)
+);
+assert_ability_tool_source_equals( true, isset( $client_context_override['context_boundary_demo'] ), 'server ability_tools declaration remains available when client context carries same name', $failures, $passes );
+assert_ability_tool_source_equals( 'demo/summarize', $client_context_override['context_boundary_demo']['execution_ability'] ?? '', 'client context cannot override server ability slug', $failures, $passes );
+assert_ability_tool_source_equals( array( 'message' ), $client_context_override['context_boundary_demo']['parameters']['required'] ?? array(), 'client context cannot override server ability schema', $failures, $passes );
+assert_ability_tool_source_equals( array(), $client_context_override['context_boundary_demo']['client_context_bindings'] ?? array(), 'client context cannot introduce runtime bindings on server ability tool', $failures, $passes );
+assert_ability_tool_source_equals( false, isset( $client_context_override['client_only_demo'] ), 'client context ability_tools cannot introduce new ability tools', $failures, $passes );
+
 echo "\n[4] generated declaration executes through ability-native ToolExecutionCore:\n";
 $result = ToolExecutor::executeTool(
 	'summarize_demo',

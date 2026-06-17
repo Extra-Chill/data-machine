@@ -109,7 +109,7 @@ class ToolExecutionCore implements WP_Agent_Tool_Executor {
 			);
 		}
 
-		return $this->normalizeDataMachineResult(
+		return AbilityResult::normalize_tool_envelope(
 			AbilityResult::normalize_tool_result( $ability->execute( $parameters ), $tool_name, $ability_slug ),
 			$tool_name,
 			array( 'ability' => $ability_slug )
@@ -159,37 +159,6 @@ class ToolExecutionCore implements WP_Agent_Tool_Executor {
 		}
 
 		$tool_handler = new $class_name();
-		return $this->normalizeDataMachineResult( $tool_handler->$method( $parameters, $tool_definition ), $tool_name );
-	}
-
-	/**
-	 * Put Data Machine handler output into the Agents API result envelope.
-	 *
-	 * @param array  $result    Raw handler result.
-	 * @param string $tool_name Tool name.
-	 * @param array  $metadata  Additional metadata.
-	 * @return array Tool execution result.
-	 */
-	private function normalizeDataMachineResult( array $result, string $tool_name, array $metadata = array() ): array {
-		$result['tool_name'] = is_string( $result['tool_name'] ?? null ) && '' !== $result['tool_name'] ? $result['tool_name'] : $tool_name;
-		if ( ! isset( $result['success'] ) ) {
-			$result['success'] = true;
-		}
-
-		if ( ! empty( $metadata ) ) {
-			$result['metadata'] = array_merge( $metadata, is_array( $result['metadata'] ?? null ) ? $result['metadata'] : array() );
-		}
-
-		if ( ! $result['success'] ) {
-			return $result;
-		}
-
-		if ( ! array_key_exists( 'result', $result ) ) {
-			$payload = $result;
-			unset( $payload['success'], $payload['tool_name'], $payload['metadata'], $payload['runtime'] );
-			$result['result'] = $payload;
-		}
-
-		return $result;
+		return AbilityResult::normalize_tool_envelope( $tool_handler->$method( $parameters, $tool_definition ), $tool_name );
 	}
 }
