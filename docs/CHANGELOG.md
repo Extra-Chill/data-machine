@@ -2,6 +2,24 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.150.10] - 2026-06-17
+
+### Changed
+- align REST result arrays
+- align job artifact output payload
+- Add bundle source resolver registries
+- centralize ability-backed tool adapter
+- centralize output contract helpers
+- centralize REST ability result handling
+- Add REST execution access guard
+- Add reusable lifecycle state transition helper
+
+### Fixed
+- preserve projected agent config paths
+- satisfy job status transition checks
+- centralize agent bundle projection ownership
+- centralize job status transitions
+
 ## [0.150.9] - 2026-06-17
 
 ### Changed
