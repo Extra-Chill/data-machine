@@ -7,6 +7,8 @@
 
 namespace DataMachine\Engine\Bundle;
 
+use DataMachine\Engine\PortableFlowStepFields;
+
 defined( 'ABSPATH' ) || exit;
 
 /**
@@ -132,123 +134,10 @@ final class AgentBundleFlowFile {
 	}
 
 	private static function normalize_optional_step_field( string $field, $value ) {
-		if ( 'step_type' === $field ) {
-			return (string) $value;
+		try {
+			return PortableFlowStepFields::normalize_field( $field, $value, 'flow file' );
+		} catch ( \InvalidArgumentException $e ) {
+			throw new BundleValidationException( $e->getMessage() );
 		}
-
-		if ( 'enabled' === $field ) {
-			return (bool) $value;
-		}
-
-		if ( 'flow_step_settings' === $field ) {
-			if ( ! is_array( $value ) ) {
-				throw new BundleValidationException( sprintf( 'flow file %s must be an object.', esc_html( $field ) ) );
-			}
-			return $value;
-		}
-
-		if ( 'completion_assertions' === $field ) {
-			if ( ! is_array( $value ) ) {
-				throw new BundleValidationException( 'flow file completion_assertions must be an object.' );
-			}
-			return $value;
-		}
-
-		if ( 'tool_runtime_rules' === $field ) {
-			if ( ! is_array( $value ) || ! array_is_list( $value ) ) {
-				throw new BundleValidationException( 'flow file tool_runtime_rules must be a list.' );
-			}
-			return $value;
-		}
-
-		if ( in_array( $field, array( 'handler_slugs', 'enabled_tools', 'disabled_tools' ), true ) ) {
-			return self::normalize_string_list( $field, $value );
-		}
-
-		if ( 'prompt_queue' === $field ) {
-			return self::normalize_prompt_queue( $value );
-		}
-
-		if ( 'config_patch_queue' === $field ) {
-			return self::normalize_config_patch_queue( $value );
-		}
-
-		if ( 'queue_mode' === $field ) {
-			if ( ! in_array( $value, array( 'drain', 'loop', 'static' ), true ) ) {
-				throw new BundleValidationException( 'flow file queue_mode must be one of drain, loop, static.' );
-			}
-			return $value;
-		}
-
-		return $value;
-	}
-
-	/**
-	 * Normalize portable string-list fields.
-	 */
-	private static function normalize_string_list( string $field, $value ): array {
-		if ( ! is_array( $value ) || ! array_is_list( $value ) ) {
-			throw new BundleValidationException( sprintf( 'flow file %s must be a list of strings.', esc_html( $field ) ) );
-		}
-
-		$normalized = array();
-		foreach ( $value as $item ) {
-			if ( ! is_string( $item ) ) {
-				throw new BundleValidationException( sprintf( 'flow file %s must be a list of strings.', esc_html( $field ) ) );
-			}
-			$normalized[] = $item;
-		}
-
-		return $normalized;
-	}
-
-	/**
-	 * Normalize AI prompt queue seed entries.
-	 */
-	private static function normalize_prompt_queue( $value ): array {
-		if ( ! is_array( $value ) || ! array_is_list( $value ) ) {
-			throw new BundleValidationException( 'flow file prompt_queue must be a list of objects.' );
-		}
-
-		$normalized = array();
-		foreach ( $value as $entry ) {
-			if ( ! is_array( $entry ) ) {
-				throw new BundleValidationException( 'flow file prompt_queue must be a list of objects.' );
-			}
-			if ( ! array_key_exists( 'prompt', $entry ) || ! is_string( $entry['prompt'] ) ) {
-				throw new BundleValidationException( 'flow file prompt_queue entries must include a string prompt.' );
-			}
-			if ( array_key_exists( 'added_at', $entry ) && ! is_string( $entry['added_at'] ) ) {
-				throw new BundleValidationException( 'flow file prompt_queue added_at must be a string when present.' );
-			}
-			$normalized[] = $entry;
-		}
-
-		return $normalized;
-	}
-
-	/**
-	 * Normalize fetch config-patch queue seed entries.
-	 */
-	private static function normalize_config_patch_queue( $value ): array {
-		if ( ! is_array( $value ) || ! array_is_list( $value ) ) {
-			throw new BundleValidationException( 'flow file config_patch_queue must be a list of objects.' );
-		}
-
-		$normalized = array();
-		foreach ( $value as $entry ) {
-			if ( ! is_array( $entry ) ) {
-				throw new BundleValidationException( 'flow file config_patch_queue must be a list of objects.' );
-			}
-			if ( ! array_key_exists( 'patch', $entry ) || ! is_array( $entry['patch'] ) ) {
-				throw new BundleValidationException( 'flow file config_patch_queue entries must include an object patch.' );
-			}
-			if ( array_key_exists( 'added_at', $entry ) && ! is_string( $entry['added_at'] ) ) {
-				throw new BundleValidationException( 'flow file config_patch_queue added_at must be a string when present.' );
-			}
-			$normalized[] = $entry;
-		}
-
-		return $normalized;
 	}
 }
