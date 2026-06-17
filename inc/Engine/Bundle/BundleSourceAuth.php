@@ -1,13 +1,10 @@
 <?php
 /**
- * Built-in GitHub.com / GHE auth helper for BundleSource downloads.
+ * BundleSource download auth facade.
  *
- * Hooks into datamachine_bundle_source_download_args to attach an
- * Authorization: Bearer header when:
- *
- *   - The fetch URL host is github.com or raw.githubusercontent.com, OR
- *   - The fetch URL host matches an entry in the
- *     datamachine_bundle_source_ghe_hosts filter map.
+ * Hooks registered auth resolvers into datamachine_bundle_source_download_args.
+ * The built-in resolver preserves GitHub.com / GHE token behavior while other
+ * providers can register resolvers via datamachine_bundle_source_auth_resolvers.
  *
  * Token resolution chain (first hit wins):
  *
@@ -100,12 +97,27 @@ final class BundleSourceAuth {
 		}
 		$registered = true;
 
-		add_filter(
-			'datamachine_bundle_source_download_args',
-			array( self::class, 'inject_github_auth' ),
-			10,
-			3
-		);
+		add_filter( 'datamachine_bundle_source_download_args', array( self::class, 'inject_auth' ), 10, 3 );
+	}
+
+	/**
+	 * Filter callback — apply registered auth resolvers to request args.
+	 *
+	 * @param array  $args      Request args.
+	 * @param string $source    Original source string.
+	 * @param string $fetch_url Normalized URL.
+	 * @return array
+	 */
+	public static function inject_auth( array $args, string $source, string $fetch_url ): array {
+		$context = is_array( $args['datamachine_bundle_source']['context'] ?? null )
+			? (array) $args['datamachine_bundle_source']['context']
+			: array();
+
+		foreach ( BundleSourceResolverRegistry::auth_resolvers() as $resolver ) {
+			$args = $resolver->apply( $args, $source, $fetch_url, $context );
+		}
+
+		return $args;
 	}
 
 	/**
@@ -118,41 +130,10 @@ final class BundleSourceAuth {
 	 * @return array
 	 */
 	public static function inject_github_auth( array $args, string $source, string $fetch_url ): array {
-		unset( $source );
-
-		$host = self::host_for( $fetch_url );
-		if ( '' === $host ) {
-			return $args;
-		}
-
-		// Already-configured Authorization header? Respect it; some
-		// callers manage their own token chain via the filter directly.
-		if ( ! empty( $args['headers']['Authorization'] ) || ! empty( $args['headers']['authorization'] ) ) {
-			return $args;
-		}
-
 		$context   = is_array( $args['datamachine_bundle_source']['context'] ?? null )
 			? (array) $args['datamachine_bundle_source']['context']
 			: array();
-		$is_github = self::is_github_host( $host );
-		$is_ghe    = ! $is_github && array_key_exists( $host, self::ghe_hosts() );
-
-		if ( ! $is_github && ! $is_ghe ) {
-			return $args;
-		}
-
-		$token = self::token_for( $fetch_url, $context );
-		if ( null === $token || '' === $token ) {
-			return $args;
-		}
-
-		if ( ! is_array( $args['headers'] ?? null ) ) {
-			$args['headers'] = array();
-		}
-
-		$args['headers']['Authorization'] = 'Bearer ' . $token;
-
-		return $args;
+		return ( new GitHubBundleSourceAuthResolver() )->apply( $args, $source, $fetch_url, $context );
 	}
 
 	/**
@@ -170,56 +151,11 @@ final class BundleSourceAuth {
 	 * @return string|null
 	 */
 	public static function token_for( string $fetch_url, array $context = array() ): ?string {
-		$host = self::host_for( $fetch_url );
-
-		// 1. CLI-supplied token short-circuits everything.
-		if ( ! empty( $context['cli_token'] ) ) {
-			$cli_token = trim( (string) $context['cli_token'] );
-			if ( '' !== $cli_token ) {
-				return $cli_token;
+		foreach ( BundleSourceResolverRegistry::auth_resolvers() as $resolver ) {
+			$token = $resolver->token_for( $fetch_url, $context );
+			if ( null !== $token && '' !== $token ) {
+				return $token;
 			}
-		}
-
-		$env_var = self::env_var_for_host( $host );
-
-		// 2. Environment variable.
-		if ( '' !== $env_var ) {
-			$from_env = getenv( $env_var );
-			if ( is_string( $from_env ) && '' !== trim( $from_env ) ) {
-				return trim( $from_env );
-			}
-		}
-
-		// 3. PHP constant of the same name.
-		if ( '' !== $env_var && defined( $env_var ) ) {
-			$from_const = constant( $env_var );
-			if ( is_string( $from_const ) && '' !== trim( $from_const ) ) {
-				return trim( $from_const );
-			}
-		}
-
-		// 4. WP option (github.com only).
-		if ( self::is_github_host( $host ) && function_exists( 'get_option' ) ) {
-			$from_option = (string) get_option( self::GITHUB_TOKEN_OPTION, '' );
-			if ( '' !== trim( $from_option ) ) {
-				return trim( $from_option );
-			}
-		}
-
-		/**
-		 * Filter fallback for callers that store secrets elsewhere
-		 * (sigillo, AWS Secrets Manager, etc.).
-		 *
-		 * Return null/empty to leave the resolution unresolved.
-		 *
-		 * @param string|null $token     Current candidate token (always null when this fires).
-		 * @param string      $fetch_url Normalized URL.
-		 * @param string      $host      Lower-cased host.
-		 * @param array       $context   Resolution context.
-		 */
-		$filtered = apply_filters( 'datamachine_bundle_source_token_for_url', null, $fetch_url, $host, $context );
-		if ( is_string( $filtered ) && '' !== trim( $filtered ) ) {
-			return trim( $filtered );
 		}
 
 		return null;
@@ -248,7 +184,7 @@ final class BundleSourceAuth {
 		 *
 		 * @param array<string,string> $hosts Host → env/constant name map.
 		 */
-		$hosts = (array) apply_filters( 'datamachine_bundle_source_ghe_hosts', array() );
+		$hosts = function_exists( 'apply_filters' ) ? (array) apply_filters( 'datamachine_bundle_source_ghe_hosts', array() ) : array();
 
 		$normalized = array();
 		foreach ( $hosts as $host => $env_var ) {
@@ -281,59 +217,5 @@ final class BundleSourceAuth {
 		unset( $args['datamachine_bundle_source'] );
 
 		return $args;
-	}
-
-	/**
-	 * Lower-cased host portion of a URL, or '' on parse failure.
-	 *
-	 * @param string $url URL.
-	 * @return string
-	 */
-	private static function host_for( string $url ): string {
-		$host = wp_parse_url( $url, PHP_URL_HOST );
-		if ( ! is_string( $host ) || '' === $host ) {
-			return '';
-		}
-		return strtolower( $host );
-	}
-
-	/**
-	 * Is the given host one of the built-in github.com hosts?
-	 *
-	 * Includes the API host (`api.github.com`) so the same
-	 * `DATAMACHINE_GITHUB_TOKEN` env/constant/option slot covers all
-	 * three endpoints used by the bundle resolver.
-	 *
-	 * @param string $host Lower-cased host.
-	 * @return bool
-	 */
-	private static function is_github_host( string $host ): bool {
-		return 'github.com' === $host
-			|| 'raw.githubusercontent.com' === $host
-			|| 'api.github.com' === $host;
-	}
-
-	/**
-	 * Resolve the env var / constant name to read for tokens scoped to
-	 * a given host. Returns '' when the host has no configured slot.
-	 *
-	 * @param string $host Lower-cased host.
-	 * @return string
-	 */
-	private static function env_var_for_host( string $host ): string {
-		if ( '' === $host ) {
-			return '';
-		}
-
-		if ( self::is_github_host( $host ) ) {
-			return self::GITHUB_TOKEN_ENV;
-		}
-
-		$ghe_hosts = self::ghe_hosts();
-		if ( array_key_exists( $host, $ghe_hosts ) ) {
-			return $ghe_hosts[ $host ];
-		}
-
-		return '';
 	}
 }

@@ -66,6 +66,12 @@ namespace {
 		}
 	}
 
+	if ( ! function_exists( 'wp_parse_url' ) ) {
+		function wp_parse_url( string $url, int $component = -1 ): mixed {
+			return parse_url( $url, $component );
+		}
+	}
+
 	function wp_delete_file( string $path ): void {
 		if ( file_exists( $path ) ) {
 			unlink( $path ); // phpcs:ignore
@@ -117,6 +123,12 @@ namespace {
 }
 
 namespace DataMachine\Engine\Bundle {
+	require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/BundleSourceAuthResolverInterface.php';
+	require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/BundleSourceResolverInterface.php';
+	require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/GitHubBundleSourceAuthResolver.php';
+	require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/GitHubBundleSourceResolver.php';
+	require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/BundleSourceResolverRegistry.php';
+	require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/BundleSourceAuth.php';
 	require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/BundleSource.php';
 }
 
@@ -212,6 +224,34 @@ namespace {
 	$assert(
 		'bare repo URL is unchanged (caller rejects)',
 		$bare === BundleSource::normalize_github_url( $bare )
+	);
+
+	$reset_stubs();
+	$GLOBALS['datamachine_test_filters']['datamachine_bundle_source_resolvers'] = function ( array $resolvers ) {
+		$resolvers[] = new class implements \DataMachine\Engine\Bundle\BundleSourceResolverInterface {
+			public function normalize( string $source, array $context = array() ): ?string {
+				unset( $context );
+				return 'https://packages.example/agent' === $source ? 'https://packages.example/download/agent' : null;
+			}
+
+			public function accepts_fetch_url( string $fetch_url ): bool {
+				return 'https://packages.example/download/agent' === $fetch_url;
+			}
+
+			public function expected_extension( string $fetch_url ): string {
+				return 'https://packages.example/download/agent' === $fetch_url ? 'zip' : '';
+			}
+
+			public function revision_from_etag( string $fetch_url, string $etag ): ?string {
+				unset( $fetch_url );
+				return '"custom-revision"' === $etag ? 'custom-revision' : null;
+			}
+		};
+		return $resolvers;
+	};
+	$assert(
+		'custom source resolver can normalize provider URL',
+		'https://packages.example/download/agent' === BundleSource::normalize_remote_url( 'https://packages.example/agent' )
 	);
 
 	echo "\n[3] resolve() — local paths\n";

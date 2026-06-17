@@ -201,6 +201,11 @@ namespace {
 }
 
 namespace DataMachine\Engine\Bundle {
+	require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/BundleSourceAuthResolverInterface.php';
+	require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/BundleSourceResolverInterface.php';
+	require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/GitHubBundleSourceAuthResolver.php';
+	require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/GitHubBundleSourceResolver.php';
+	require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/BundleSourceResolverRegistry.php';
 	require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/BundleSourceAuth.php';
 	require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/BundleSource.php';
 }

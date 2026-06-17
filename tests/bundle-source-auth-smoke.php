@@ -56,6 +56,11 @@ namespace {
 }
 
 namespace DataMachine\Engine\Bundle {
+	require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/BundleSourceAuthResolverInterface.php';
+	require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/BundleSourceResolverInterface.php';
+	require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/GitHubBundleSourceAuthResolver.php';
+	require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/GitHubBundleSourceResolver.php';
+	require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/BundleSourceResolverRegistry.php';
 	require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/BundleSourceAuth.php';
 }
 
@@ -207,6 +212,31 @@ namespace {
 	$assert(
 		'pre-set Authorization header is preserved',
 		'Bearer manual' === $out['headers']['Authorization']
+	);
+
+	$reset();
+	$GLOBALS['datamachine_test_filters']['datamachine_bundle_source_auth_resolvers'] = function ( array $resolvers ) {
+		$resolvers[] = new class implements \DataMachine\Engine\Bundle\BundleSourceAuthResolverInterface {
+			public function apply( array $args, string $source, string $fetch_url, array $context = array() ): array {
+				unset( $source, $context );
+				if ( 'https://packages.example/private.zip' === $fetch_url ) {
+					$args['headers']['X-Package-Auth'] = 'custom-token';
+				}
+				return $args;
+			}
+
+			public function token_for( string $fetch_url, array $context = array() ): ?string {
+				unset( $context );
+				return 'https://packages.example/private.zip' === $fetch_url ? 'custom-token' : null;
+			}
+		};
+		return $resolvers;
+	};
+	$args = array( 'headers' => array(), 'datamachine_bundle_source' => array( 'context' => array() ) );
+	$out  = BundleSourceAuth::inject_auth( $args, 'https://packages.example/private.zip', 'https://packages.example/private.zip' );
+	$assert(
+		'custom auth resolver can attach provider header',
+		'custom-token' === ( $out['headers']['X-Package-Auth'] ?? '' )
 	);
 
 	// Non-github host with no GHE config → no injection.
