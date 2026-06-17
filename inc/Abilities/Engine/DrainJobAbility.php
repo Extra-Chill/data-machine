@@ -106,11 +106,11 @@ class DrainJobAbility {
 	 * @return array Result with terminal status and drain stats.
 	 */
 	public function execute( array $input ): array {
-		$job_id          = (int) ( $input['job_id'] ?? 0 );
-		$step_budget     = max( 1, (int) ( $input['step_budget'] ?? self::DEFAULT_STEP_BUDGET ) );
-		$time_budget_ms  = max( 1, (int) ( $input['time_budget_ms'] ?? self::DEFAULT_TIME_BUDGET_MS ) );
-		$started_at = microtime( true );
-		$last_error = null;
+		$job_id         = (int) ( $input['job_id'] ?? 0 );
+		$step_budget    = max( 1, (int) ( $input['step_budget'] ?? self::DEFAULT_STEP_BUDGET ) );
+		$time_budget_ms = max( 1, (int) ( $input['time_budget_ms'] ?? self::DEFAULT_TIME_BUDGET_MS ) );
+		$started_at     = microtime( true );
+		$last_error     = null;
 
 		if ( $job_id <= 0 ) {
 			return array(
@@ -165,8 +165,8 @@ class DrainJobAbility {
 
 		$terminal_state = (string) ( $drain_stats['terminal_state'] ?? '' );
 		if ( '' === $terminal_state ) {
-			$job    = $this->db_jobs->get_job( $job_id );
-			$status = (string) ( $job['status'] ?? '' );
+			$job            = $this->db_jobs->get_job( $job_id );
+			$status         = (string) ( $job['status'] ?? '' );
 			$terminal_state = JobStatus::isStatusFinal( $status ) ? $status : '';
 		}
 

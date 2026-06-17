@@ -922,6 +922,7 @@ class ScopedDrainService {
 	 */
 	private function getStatusCounts( ?array $hooks = null, array $job_ids = array(), string $lane = '' ): array {
 		global $wpdb;
+		unset( $lane );
 
 		$actions_table = $wpdb->prefix . 'actionscheduler_actions';
 		$groups_table  = $wpdb->prefix . 'actionscheduler_groups';
