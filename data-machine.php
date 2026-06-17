@@ -490,63 +490,41 @@ if ( did_action( 'plugins_loaded' ) ) {
 require_once __DIR__ . '/inc/Abilities/AbilityCategories.php';
 \DataMachine\Abilities\AbilityCategories::ensure_registered();
 
-/**
- * Register agent identity and bundle execution abilities unconditionally.
- *
- * WP Codebox sandbox runs can execute a portable agent bundle from a runtime
- * task before a request shape has loaded the full Data Machine runtime. The
- * ability definitions are cheap callback/schema wiring; execution still loads
- * the bundle runner only when `datamachine/run-agent-bundle` is called.
- */
-new \DataMachine\Abilities\AgentAbilities();
+require_once __DIR__ . '/inc/Abilities/AbilityManifest.php';
+\DataMachine\Abilities\AbilityManifest::register( datamachine_lightweight_ability_manifest() );
 
 /**
- * Register `datamachine/render-image-template` and
- * `datamachine/list-image-templates` unconditionally on every request.
+ * Declare Data Machine abilities whose schemas are cheap enough for lite requests.
  *
- * These abilities have consumers that fire on lite frontend page views —
- * specifically `extrachill-multisite`'s OG-card generation task and
- * `extrachill-events`'s event-roundup handler — neither of which runs in
- * a request shape that flips `datamachine_should_load_full_runtime()` to
- * true. Previously the class was only instantiated inside
- * `datamachine_run_datamachine_plugin()`, so on a normal frontend page view
- * the constructor never ran, the abilities never registered, and consumers
- * got a `_doing_it_wrong` notice plus a `null` return from
- * `wp_get_ability( 'datamachine/render-image-template' )`. The downstream
- * effect was silent OG-card generation failures on subsite pages and a
- * notice flood in debug.log. See: Extra-Chill/data-machine#2290.
+ * These abilities have frontend, sandbox, or helper consumers that can resolve
+ * them before the full runtime gate opens. The declarations load only schema and
+ * callback owners; execution callbacks lazily activate the full runtime.
  *
- * Registration is cheap (two ability definitions, both schema-only until
- * actually executed). The class's `ensure_registered()` uses the public
- * Abilities API lifecycle only: register during `wp_abilities_api_init`, hook
- * before it fires, and no-op after it has fired instead of mutating registry
- * internals.
+ * @return array<int, array{file:string,class:string,method?:string}>
  */
-require_once __DIR__ . '/inc/Abilities/Media/ImageTemplateAbilities.php';
-\DataMachine\Abilities\Media\ImageTemplateAbilities::ensure_registered();
-
-/**
- * Register `datamachine/send-email` and `datamachine/send-email-queued`
- * unconditionally on every request.
- *
- * These abilities have proven consumers that can fire on lite frontend page
- * views. `extrachill-multisite` exposes `ec_send_email()` and
- * `ec_send_email_queued()` as generic mail helpers, so form handlers or other
- * frontend hooks can resolve these abilities without a REST, Ajax, admin, cron,
- * or CLI request shape. If the classes stay behind
- * `datamachine_should_load_full_runtime()`, those helpers can trigger the lazy
- * Abilities API registry before Data Machine attaches its ability hooks,
- * causing `wp_get_ability()` to return `null` on normal frontend requests.
- * See: Extra-Chill/data-machine#2303.
- *
- * Registration remains cheap: the immediate ability definitions are schema and
- * callback wiring only, and the queued worker hook is a single no-op listener
- * until Action Scheduler dispatches its specific hook.
- */
-require_once __DIR__ . '/inc/Abilities/Publish/SendEmailAbility.php';
-require_once __DIR__ . '/inc/Abilities/Publish/SendEmailQueuedAbility.php';
-\DataMachine\Abilities\Publish\SendEmailAbility::ensure_registered();
-\DataMachine\Abilities\Publish\SendEmailQueuedAbility::ensure_registered();
+function datamachine_lightweight_ability_manifest(): array {
+	return array(
+		array(
+			'file'  => __DIR__ . '/inc/Abilities/AgentAbilities.php',
+			'class' => \DataMachine\Abilities\AgentAbilities::class,
+		),
+		array(
+			'file'   => __DIR__ . '/inc/Abilities/Media/ImageTemplateAbilities.php',
+			'class'  => \DataMachine\Abilities\Media\ImageTemplateAbilities::class,
+			'method' => 'ensure_registered',
+		),
+		array(
+			'file'   => __DIR__ . '/inc/Abilities/Publish/SendEmailAbility.php',
+			'class'  => \DataMachine\Abilities\Publish\SendEmailAbility::class,
+			'method' => 'ensure_registered',
+		),
+		array(
+			'file'   => __DIR__ . '/inc/Abilities/Publish/SendEmailQueuedAbility.php',
+			'class'  => \DataMachine\Abilities\Publish\SendEmailQueuedAbility::class,
+			'method' => 'ensure_registered',
+		),
+	);
+}
 
 
 /**

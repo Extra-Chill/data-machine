@@ -47,10 +47,13 @@ class ToolSourceRegistry {
 			return $trace['tools'];
 		}
 
-		$callback = array( $this, 'orderSourcesForContext' );
+		$order_callback       = array( $this, 'orderSourcesForContext' );
+		$host_policy_callback = array( $this, 'filterSourceToolsForHostPolicy' );
 		if ( function_exists( 'add_filter' ) ) {
 			// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- Canonical Agents API tool-source compatibility hook.
-			add_filter( 'agents_api_tool_source_order', $callback, 5, 3 );
+			add_filter( 'agents_api_tool_source_order', $order_callback, 5, 3 );
+			// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- Canonical Agents API tool-source compatibility hook.
+			add_filter( 'agents_api_tool_source_tools', $host_policy_callback, PHP_INT_MAX, 4 );
 		}
 
 		try {
@@ -66,7 +69,9 @@ class ToolSourceRegistry {
 		} finally {
 			if ( function_exists( 'remove_filter' ) ) {
 				// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- Canonical Agents API tool-source compatibility hook.
-				remove_filter( 'agents_api_tool_source_order', $callback, 5 );
+				remove_filter( 'agents_api_tool_source_order', $order_callback, 5 );
+				// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- Canonical Agents API tool-source compatibility hook.
+				remove_filter( 'agents_api_tool_source_tools', $host_policy_callback, PHP_INT_MAX );
 			}
 		}
 	}
@@ -122,6 +127,7 @@ class ToolSourceRegistry {
 				}
 
 				$source_tools      = is_array( $source_tools ) ? $source_tools : array();
+				$source_tools      = $this->applyHostToolPolicy( $source_tools, $source_slug, $context );
 				$source_rejections = array();
 				if ( isset( $source_tools[ AbilityToolSource::REJECTION_METADATA_KEY ] ) && is_array( $source_tools[ AbilityToolSource::REJECTION_METADATA_KEY ] ) ) {
 					$source_rejections = $source_tools[ AbilityToolSource::REJECTION_METADATA_KEY ];
@@ -176,9 +182,9 @@ class ToolSourceRegistry {
 
 		$this->registry->registerSource(
 			self::SOURCE_RUNTIME_TOOLS,
-			static function ( array $context ) use ( $runtime_source ): array {
+			function ( array $context ) use ( $runtime_source ): array {
 				$modes = ToolPolicyResolver::normalizeModes( $context['modes'] ?? array() );
-				return $runtime_source( $modes, $context );
+				return $this->applyHostToolPolicy( $runtime_source( $modes, $context ), self::SOURCE_RUNTIME_TOOLS, $context );
 			}
 		);
 
@@ -186,25 +192,88 @@ class ToolSourceRegistry {
 			self::SOURCE_ADJACENT_HANDLERS,
 			function ( array $context ) use ( $handler_source ): array {
 				$modes = ToolPolicyResolver::normalizeModes( $context['modes'] ?? array() );
-				return $handler_source( $modes, $context, $this->tool_manager );
+				return $this->applyHostToolPolicy( $handler_source( $modes, $context, $this->tool_manager ), self::SOURCE_ADJACENT_HANDLERS, $context );
 			}
 		);
 
 		$this->registry->registerSource(
 			self::SOURCE_STATIC_REGISTRY,
-			static function ( array $context ) use ( $static_source ): array {
+			function ( array $context ) use ( $static_source ): array {
 				$modes = ToolPolicyResolver::normalizeModes( $context['modes'] ?? array() );
-				return $static_source( $modes, $context );
+				return $this->applyHostToolPolicy( $static_source( $modes, $context ), self::SOURCE_STATIC_REGISTRY, $context );
 			}
 		);
 
 		$this->registry->registerSource(
 			self::SOURCE_ABILITY_TOOLS,
-			static function ( array $context ) use ( $ability_source ): array {
+			function ( array $context ) use ( $ability_source ): array {
 				$modes = ToolPolicyResolver::normalizeModes( $context['modes'] ?? array() );
-				return $ability_source( $modes, $context );
+				return $this->applyHostToolPolicy( $ability_source( $modes, $context ), self::SOURCE_ABILITY_TOOLS, $context );
 			}
 		);
+	}
+
+	/**
+	 * Apply host-owned execution policy to one source's locally runnable tools.
+	 *
+	 * @param array<string,mixed> $source_tools Tools keyed by name, optionally with source rejections.
+	 * @param string              $source_slug  Source slug.
+	 * @param array<string,mixed> $context      Resolver context.
+	 * @return array<string,mixed> Filtered tools with source-level rejection metadata.
+	 */
+	private function applyHostToolPolicy( array $source_tools, string $source_slug, array $context ): array {
+		$policy = HostToolPolicy::fromContext( $context );
+		if ( null === $policy ) {
+			return $source_tools;
+		}
+
+		$rejections = array();
+		if ( isset( $source_tools[ AbilityToolSource::REJECTION_METADATA_KEY ] ) && is_array( $source_tools[ AbilityToolSource::REJECTION_METADATA_KEY ] ) ) {
+			$rejections = $source_tools[ AbilityToolSource::REJECTION_METADATA_KEY ];
+		}
+
+		foreach ( $source_tools as $tool_name => $tool_definition ) {
+			if ( AbilityToolSource::REJECTION_METADATA_KEY === $tool_name || ! is_string( $tool_name ) || ! is_array( $tool_definition ) ) {
+				continue;
+			}
+
+			if ( $policy->isLocallyRunnable( $tool_name ) ) {
+				continue;
+			}
+
+			$rejections[ $tool_name ] = array(
+				'tool_name'           => $tool_name,
+				'reason'              => 'host_tool_policy',
+				'execution_location'  => $policy->executionLocation( $tool_name ),
+				'source'              => $source_slug,
+			);
+			unset( $source_tools[ $tool_name ] );
+		}
+
+		if ( ! empty( $context['include_source_rejection_metadata'] ) && ! empty( $rejections ) ) {
+			$source_tools[ AbilityToolSource::REJECTION_METADATA_KEY ] = $rejections;
+		} else {
+			unset( $source_tools[ AbilityToolSource::REJECTION_METADATA_KEY ] );
+		}
+
+		return $source_tools;
+	}
+
+	/**
+	 * Agents API source-tools filter that enforces host policy after source filters.
+	 *
+	 * @param mixed                         $source_tools Source tool declarations.
+	 * @param string                        $source_slug  Source slug.
+	 * @param array<string,mixed>           $context      Resolver context.
+	 * @param WP_Agent_Tool_Source_Registry $registry     Source registry instance.
+	 * @return mixed Filtered source tools.
+	 */
+	public function filterSourceToolsForHostPolicy( $source_tools, string $source_slug, array $context, WP_Agent_Tool_Source_Registry $registry ) {
+		if ( $registry !== $this->registry || ! is_array( $source_tools ) ) {
+			return $source_tools;
+		}
+
+		return $this->applyHostToolPolicy( $source_tools, $source_slug, $context );
 	}
 
 	/**

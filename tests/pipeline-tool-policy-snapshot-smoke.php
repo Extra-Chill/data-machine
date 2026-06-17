@@ -16,6 +16,16 @@ namespace DataMachine\Abilities\Flow {
 	}
 }
 
+namespace DataMachine\Core {
+	if ( ! class_exists( PluginSettings::class, false ) ) {
+		class PluginSettings {
+			public static function get( string $key, $default = null ) {
+				return $default;
+			}
+		}
+	}
+}
+
 namespace {
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -57,6 +67,46 @@ if ( ! function_exists( 'wp_generate_uuid4' ) ) {
 	}
 }
 
+if ( ! class_exists( 'SnapshotPolicyAbility', false ) ) {
+	class SnapshotPolicyAbility {
+		public function get_meta(): array {
+			return array( 'annotations' => array() );
+		}
+
+		public function get_category(): string {
+			return 'test';
+		}
+
+		public function get_description(): string {
+			return 'Snapshot policy test ability';
+		}
+
+		public function get_label(): string {
+			return 'Snapshot policy test ability';
+		}
+
+		public function get_input_schema(): array {
+			return array( 'type' => 'object', 'properties' => array() );
+		}
+	}
+}
+
+if ( ! class_exists( 'WP_Abilities_Registry', false ) ) {
+	class WP_Abilities_Registry {
+		public static function get_instance(): self {
+			return new self();
+		}
+
+		public function is_registered( string $ability_slug ): bool {
+			return in_array( $ability_slug, array( 'test/control-plane', 'test/runner' ), true );
+		}
+
+		public function get_registered( string $ability_slug ): ?SnapshotPolicyAbility {
+			return $this->is_registered( $ability_slug ) ? new SnapshotPolicyAbility() : null;
+		}
+	}
+}
+
 require_once __DIR__ . '/../inc/Core/Steps/FlowStepConfig.php';
 require_once __DIR__ . '/../inc/Core/Steps/FlowStepConfigFactory.php';
 require_once __DIR__ . '/../inc/Core/Steps/WorkflowConfigFactory.php';
@@ -66,10 +116,13 @@ require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Tools/class-wp-agent
 require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Tools/class-wp-agent-tool-policy-filter.php';
 require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Tools/class-wp-agent-tool-policy.php';
 require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Tools/class-wp-agent-tool-source-registry.php';
+require_once __DIR__ . '/../inc/Engine/AI/ToolSchemaNormalizer.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/ToolManager.php';
+require_once __DIR__ . '/../inc/Engine/AI/Tools/AbilityToolAdapter.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/Policy/DataMachineAgentToolPolicyProvider.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/Policy/DataMachineMandatoryToolPolicy.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/Policy/DataMachineToolAccessPolicy.php';
+require_once __DIR__ . '/../inc/Engine/AI/Tools/HostToolPolicy.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/Sources/RuntimeToolSource.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/Sources/DataMachineToolRegistrySource.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/Sources/AdjacentHandlerToolSource.php';
@@ -356,6 +409,63 @@ echo "\n[10] required-tool evidence reuses captured source trace:\n";
 $resolver_source = file_get_contents( __DIR__ . '/../inc/Engine/AI/Tools/ToolPolicyResolver.php' ) ?: '';
 assert_policy_equals( 0, substr_count( $resolver_source, 'gatherWithMetadata(' ), 'evidence no longer manually replays metadata-only source gathering', $failures, $passes );
 assert_policy_equals( true, str_contains( $resolver_source, '$args[\'source_trace\'] = $this->last_source_trace' ), 'evidence builder receives captured trace metadata', $failures, $passes );
+
+echo "\n[11] host tool policy excludes non-runner local tools from every source:\n";
+$previous_policy_env = getenv( 'DATAMACHINE_HOST_TOOL_POLICY_JSON' );
+putenv(
+	'DATAMACHINE_HOST_TOOL_POLICY_JSON=' . json_encode(
+		array(
+			'schema'                     => 'datamachine/host-tool-policy/v1',
+			'default_execution_location' => 'disabled',
+			'tools'                      => array(
+				'alpha_tool'                   => array( 'execution_location' => 'control_plane' ),
+				'beta_tool'                    => array( 'execution_location' => 'runner' ),
+				'client/control_plane_runtime' => array( 'execution_location' => 'control_plane' ),
+				'client/runner_runtime'        => array( 'execution_location' => 'runner' ),
+				'control_plane_ability'        => array( 'execution_location' => 'control_plane' ),
+				'runner_ability'               => array( 'execution_location' => 'runner' ),
+			),
+		)
+	)
+);
+$resolver   = new ToolPolicyResolver( new SnapshotPolicyToolManager() );
+$resolution = $resolver->resolveWithEvidence(
+	array(
+		'mode'                      => ToolPolicyResolver::MODE_PIPELINE,
+		'agent_id'                  => 0,
+		'previous_step_config'      => null,
+		'next_step_config'          => null,
+		'pipeline_step_id'          => 'ephemeral_pipeline_0',
+		'engine_data'               => array(),
+		'categories'                => array(),
+		'allow_only_explicit'       => true,
+		'allow_only'                => array( 'alpha_tool', 'beta_tool', 'client/control_plane_runtime', 'client/runner_runtime', 'control_plane_ability', 'runner_ability' ),
+		'runtime_tool_declarations' => array(
+			'client/control_plane_runtime' => array( 'description' => 'Control-plane runtime tool', 'parameters' => array( 'type' => 'object', 'properties' => array() ), 'executor' => 'client', 'scope' => 'run' ),
+			'client/runner_runtime'        => array( 'description' => 'Runner runtime tool', 'parameters' => array( 'type' => 'object', 'properties' => array() ), 'executor' => 'client', 'scope' => 'run' ),
+		),
+		'ability_tools'             => array(
+			'control_plane_ability' => array( 'ability' => 'test/control-plane', 'modes' => array( ToolPolicyResolver::MODE_PIPELINE ) ),
+			'runner_ability'        => array( 'ability' => 'test/runner', 'modes' => array( ToolPolicyResolver::MODE_PIPELINE ) ),
+		),
+	),
+	array( 'alpha_tool', 'client/control_plane_runtime', 'control_plane_ability' ),
+	array( 'alpha_tool', 'beta_tool', 'client/control_plane_runtime', 'client/runner_runtime', 'control_plane_ability', 'runner_ability' )
+);
+if ( false === $previous_policy_env ) {
+	putenv( 'DATAMACHINE_HOST_TOOL_POLICY_JSON' );
+} else {
+	putenv( 'DATAMACHINE_HOST_TOOL_POLICY_JSON=' . $previous_policy_env );
+}
+assert_policy_equals( array( 'client/runner_runtime', 'beta_tool', 'runner_ability' ), array_keys( $resolution['tools'] ), 'host policy keeps only runner-owned tools across local sources', $failures, $passes );
+assert_policy_equals( array( 'alpha_tool', 'client/control_plane_runtime', 'control_plane_ability' ), $resolution['evidence']['unavailable_required_tool_names'] ?? null, 'host policy reports control-plane required tools unavailable', $failures, $passes );
+assert_policy_equals( 'host_tool_policy', $resolution['evidence']['required_tool_resolution'][0]['reason'] ?? null, 'host policy records source-level rejection reason', $failures, $passes );
+assert_policy_equals( 'control_plane', $resolution['evidence']['required_tool_resolution'][0]['execution_location'] ?? null, 'host policy records rejected execution location', $failures, $passes );
+assert_policy_equals( 'runtime_tools', $resolution['evidence']['required_tool_resolution'][1]['source'] ?? null, 'host policy records rejected runtime tool source', $failures, $passes );
+assert_policy_equals( 'ability_tools', $resolution['evidence']['required_tool_resolution'][2]['source'] ?? null, 'host policy records rejected ability tool source', $failures, $passes );
+assert_policy_equals( array( 'client/runner_runtime' ), $resolution['evidence']['available_tool_sources'][0]['accepted_tool_names'] ?? null, 'runtime source excludes control-plane tool from accepted names', $failures, $passes );
+assert_policy_equals( array( 'beta_tool' ), $resolution['evidence']['available_tool_sources'][2]['accepted_tool_names'] ?? null, 'static registry evidence excludes control-plane tool from accepted names', $failures, $passes );
+assert_policy_equals( array( 'runner_ability' ), $resolution['evidence']['available_tool_sources'][3]['accepted_tool_names'] ?? null, 'ability source excludes control-plane tool from accepted names', $failures, $passes );
 
 if ( $failures ) {
 	echo "\nFAILED: " . count( $failures ) . " pipeline policy assertions failed.\n";

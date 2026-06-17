@@ -66,8 +66,14 @@ final class AgentBundleRunner {
 			return $this->response( $selection, $input, $runtime_imports );
 		}
 
-		$workflow     = $this->workflow_from_bundle_flow( $selection['flow'], $selection['pipeline'], $input );
-		$initial_data = is_array( $input['initial_data'] ?? null ) ? $input['initial_data'] : array();
+		$workflow_override = $this->workflow_override_from_input( $input );
+		if ( empty( $workflow_override['success'] ) ) {
+			return $this->response( $workflow_override, $input, $runtime_imports, $selection );
+		}
+
+		$workflow     = is_array( $workflow_override['workflow'] ?? null ) ? $workflow_override['workflow'] : $this->workflow_from_bundle_flow( $selection['flow'], $selection['pipeline'], $input );
+		$initial_data = is_array( $workflow_override['initial_data'] ?? null ) ? $workflow_override['initial_data'] : array();
+		$initial_data = array_merge( $initial_data, is_array( $input['initial_data'] ?? null ) ? $input['initial_data'] : array() );
 		$manifest     = $directory->manifest()->to_array();
 
 		$initial_data['agent_bundle'] = array(
@@ -801,6 +807,60 @@ final class AgentBundleRunner {
 			'success'         => true,
 			'bundle'          => $bundle,
 			'source_revision' => $revision,
+		);
+	}
+
+	/** @return array<string,mixed> */
+	private function workflow_override_from_input( array $input ): array {
+		$workflow = null;
+		if ( isset( $input['execute_workflow'] ) ) {
+			$workflow = $input['execute_workflow'];
+		} elseif ( isset( $input['execute_workflow_path'] ) ) {
+			$path = trim( (string) $input['execute_workflow_path'] );
+			if ( '' === $path || ! is_file( $path ) ) {
+				return array(
+					'success' => false,
+					'error'   => sprintf( 'Workflow override path not found: %s', $path ),
+				);
+			}
+
+			$raw = file_get_contents( $path ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
+			if ( false === $raw ) {
+				return array(
+					'success' => false,
+					'error'   => sprintf( 'Workflow override path is not readable: %s', $path ),
+				);
+			}
+
+			$workflow = json_decode( $raw, true );
+			if ( ! is_array( $workflow ) ) {
+				return array(
+					'success' => false,
+					'error'   => sprintf( 'Workflow override path does not contain valid JSON: %s', $path ),
+				);
+			}
+		}
+
+		if ( null === $workflow ) {
+			return array( 'success' => true );
+		}
+
+		$initial_data = is_array( $workflow['initial_data'] ?? null ) ? $workflow['initial_data'] : array();
+		if ( is_array( $workflow['workflow'] ?? null ) ) {
+			$workflow = $workflow['workflow'];
+		}
+
+		if ( ! is_array( $workflow ) || ! is_array( $workflow['steps'] ?? null ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'Workflow override must contain a workflow steps array.',
+			);
+		}
+
+		return array(
+			'success'      => true,
+			'workflow'     => $workflow,
+			'initial_data' => $initial_data,
 		);
 	}
 

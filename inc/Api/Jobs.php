@@ -48,20 +48,20 @@ class Jobs {
 				'callback'            => array( self::class, 'handle_get_jobs' ),
 				'permission_callback' => array( self::class, 'check_permission' ),
 				'args'                => array(
-					'orderby'       => array(
+					'orderby'             => array(
 						'required'    => false,
 						'type'        => 'string',
 						'default'     => 'job_id',
 						'description' => __( 'Order jobs by field', 'data-machine' ),
 					),
-					'order'         => array(
+					'order'               => array(
 						'required'    => false,
 						'type'        => 'string',
 						'default'     => 'DESC',
 						'enum'        => array( 'ASC', 'DESC' ),
 						'description' => __( 'Sort order', 'data-machine' ),
 					),
-					'per_page'      => array(
+					'per_page'            => array(
 						'required'    => false,
 						'type'        => 'integer',
 						'default'     => 50,
@@ -69,44 +69,57 @@ class Jobs {
 						'maximum'     => 100,
 						'description' => __( 'Number of jobs per page', 'data-machine' ),
 					),
-					'offset'        => array(
+					'offset'              => array(
 						'required'    => false,
 						'type'        => 'integer',
 						'default'     => 0,
 						'minimum'     => 0,
 						'description' => __( 'Offset for pagination', 'data-machine' ),
 					),
-					'pipeline_id'   => array(
+					'pipeline_id'         => array(
 						'required'    => false,
 						'type'        => 'integer',
 						'description' => __( 'Filter by pipeline ID', 'data-machine' ),
 					),
-					'flow_id'       => array(
+					'flow_id'             => array(
 						'required'    => false,
 						'type'        => 'integer',
 						'description' => __( 'Filter by flow ID', 'data-machine' ),
 					),
-					'status'        => array(
+					'status'              => array(
 						'required'    => false,
 						'type'        => 'string',
 						'description' => __( 'Filter by job status', 'data-machine' ),
 					),
-					'user_id'       => array(
+					'user_id'             => array(
 						'required'          => false,
 						'type'              => 'integer',
 						'description'       => __( 'Filter by user ID (admin only, non-admins always see own data)', 'data-machine' ),
 						'sanitize_callback' => 'absint',
 					),
-					'parent_job_id' => array(
+					'parent_job_id'       => array(
 						'required'    => false,
 						'type'        => 'integer',
 						'description' => __( 'Filter by parent job ID (for batch child jobs)', 'data-machine' ),
 					),
-					'hide_children' => array(
+					'hide_children'       => array(
 						'required'    => false,
 						'type'        => 'boolean',
 						'default'     => false,
 						'description' => __( 'Hide child jobs from top-level list', 'data-machine' ),
+					),
+					'metadata'            => array(
+						'required'    => false,
+						'type'        => 'object',
+						'description' => __( 'Exact metadata filters keyed by engine_data dot-path.', 'data-machine' ),
+					),
+					'metadata_scan_limit' => array(
+						'required'    => false,
+						'type'        => 'integer',
+						'default'     => 1000,
+						'minimum'     => 1,
+						'maximum'     => 5000,
+						'description' => __( 'Maximum candidate jobs to scan when applying exact metadata filters.', 'data-machine' ),
 					),
 				),
 			)
@@ -208,10 +221,16 @@ class Jobs {
 		if ( $request->get_param( 'hide_children' ) ) {
 			$input['hide_children'] = true;
 		}
+		if ( is_array( $request->get_param( 'metadata' ) ) ) {
+			$input['metadata'] = $request->get_param( 'metadata' );
+		}
+		if ( $request->get_param( 'metadata_scan_limit' ) ) {
+			$input['metadata_scan_limit'] = (int) $request->get_param( 'metadata_scan_limit' );
+		}
 
 		$result = ( new GetJobsAbility() )->execute( $input );
 
-		return AbilityResult::rest_collection_response( $result, 'jobs', array( 'top_extra' => array( 'filters_applied' ) ), 'get_jobs_failed', __( 'Failed to get jobs.', 'data-machine' ) );
+		return AbilityResult::rest_collection_response( $result, 'jobs', array( 'top_extra' => array( 'filters_applied', 'metadata_query' ) ), 'get_jobs_failed', __( 'Failed to get jobs.', 'data-machine' ) );
 	}
 
 	/**
