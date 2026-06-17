@@ -300,7 +300,7 @@ function datamachine_run_conversation(
 
 	// Normalize the substrate result and augment with DM-specific fields.
 	try {
-		$result = WP_Agent_Conversation_Result::normalize( $result );
+		$result                    = WP_Agent_Conversation_Result::normalize( $result );
 		$completion_policy_stopped = false;
 		foreach ( is_array( $result['events'] ?? null ) ? $result['events'] : array() as $event ) {
 			if ( ! is_array( $event ) || ! in_array( (string) ( $event['type'] ?? '' ), array( 'completion_policy_stop', 'completion_policy_continue' ), true ) ) {
@@ -405,8 +405,8 @@ function datamachine_run_conversation(
 		$evaluation_context = $loop_payload;
 		$typed_artifacts    = datamachine_normalize_typed_artifact_outputs( $result );
 		if ( ! empty( $typed_artifacts ) ) {
-			$evaluation_engine_data            = is_array( $evaluation_context['engine_data'] ?? null ) ? $evaluation_context['engine_data'] : array();
-			$evaluation_engine_data['outputs'] = is_array( $evaluation_engine_data['outputs'] ?? null ) ? $evaluation_engine_data['outputs'] : array();
+			$evaluation_engine_data                               = is_array( $evaluation_context['engine_data'] ?? null ) ? $evaluation_context['engine_data'] : array();
+			$evaluation_engine_data['outputs']                    = is_array( $evaluation_engine_data['outputs'] ?? null ) ? $evaluation_engine_data['outputs'] : array();
 			$evaluation_engine_data['outputs']['typed_artifacts'] = array_replace_recursive(
 				is_array( $evaluation_engine_data['outputs']['typed_artifacts'] ?? null ) ? $evaluation_engine_data['outputs']['typed_artifacts'] : array(),
 				$typed_artifacts

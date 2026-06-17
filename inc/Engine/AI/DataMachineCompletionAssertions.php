@@ -680,11 +680,11 @@ class DataMachineCompletionAssertions {
 				continue;
 			}
 
-			if ( '' !== $required_output['schema'] && $required_output['schema'] !== (string) ( $output['schema'] ?? '' ) ) {
+			if ( '' !== $required_output['schema'] && (string) ( $output['schema'] ?? '' ) !== $required_output['schema'] ) {
 				continue;
 			}
 
-			if ( '' !== $required_output['artifact'] && $required_output['artifact'] !== (string) ( $output['artifact'] ?? '' ) ) {
+			if ( '' !== $required_output['artifact'] && (string) ( $output['artifact'] ?? '' ) !== $required_output['artifact'] ) {
 				continue;
 			}
 

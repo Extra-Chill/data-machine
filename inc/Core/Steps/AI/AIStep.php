@@ -544,8 +544,8 @@ class AIStep extends Step {
 			$loop_metadata = datamachine_conversation_metadata( $loop_result );
 
 			if ( $this->job_id > 0 ) {
-				$artifact_engine_data                           = datamachine_get_engine_data( $this->job_id );
-				$artifact_engine_data['tool_execution_summary'] = self::summarizeToolExecutions( $loop_result );
+				$artifact_engine_data                             = datamachine_get_engine_data( $this->job_id );
+				$artifact_engine_data['tool_execution_summary']   = self::summarizeToolExecutions( $loop_result );
 				$artifact_engine_data['tool_resolution_evidence'] = $tool_resolution_evidence;
 				if ( isset( $loop_result['runtime_provenance'] ) && is_array( $loop_result['runtime_provenance'] ) ) {
 					$artifact_engine_data['runtime_provenance'] = $loop_result['runtime_provenance'];
@@ -553,7 +553,7 @@ class AIStep extends Step {
 
 				$typed_artifacts = datamachine_normalize_typed_artifact_outputs( $loop_result );
 				if ( ! empty( $typed_artifacts ) ) {
-					$artifact_engine_data['outputs'] = is_array( $artifact_engine_data['outputs'] ?? null ) ? $artifact_engine_data['outputs'] : array();
+					$artifact_engine_data['outputs']                    = is_array( $artifact_engine_data['outputs'] ?? null ) ? $artifact_engine_data['outputs'] : array();
 					$artifact_engine_data['outputs']['typed_artifacts'] = array_replace_recursive(
 						is_array( $artifact_engine_data['outputs']['typed_artifacts'] ?? null ) ? $artifact_engine_data['outputs']['typed_artifacts'] : array(),
 						$typed_artifacts
