@@ -2,6 +2,12 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.150.8] - 2026-06-17
+
+### Fixed
+- centralize consumed queue entry primitives
+- decouple agents api boundary hooks
+
 ## [0.150.7] - 2026-06-17
 
 ### Fixed
