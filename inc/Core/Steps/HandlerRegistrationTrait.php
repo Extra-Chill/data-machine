@@ -11,6 +11,8 @@
 
 namespace DataMachine\Core\Steps;
 
+use DataMachine\Engine\AI\Tools\ToolManager;
+
 if ( ! defined('ABSPATH') ) {
 	exit;
 }
@@ -127,16 +129,12 @@ trait HandlerRegistrationTrait {
 			add_filter(
 				'datamachine_tools',
 				function ( array $tools ) use ( $slug, $aiToolCallback ): array {
-					// Wrapper entry keyed uniquely per handler slug.
-					// ToolPolicyResolver::gatherPipelineTools detects
-					// `_handler_callable` entries and invokes them with
-					// runtime handler context; this registry entry is
-					// intentionally NOT a directly usable tool definition.
-					$tools[ '__handler_tools_' . $slug ] = array(
-						'_handler_callable' => $aiToolCallback,
-						'handler'           => $slug,
-						'modes'             => array( 'pipeline' ),
-						'access_level'      => 'admin',
+					$tools[ '__handler_tools_' . $slug ] = ToolManager::handlerToolDeclaration(
+						$aiToolCallback,
+						array(
+							'handler'                 => $slug,
+							'client_context_bindings' => array( 'job_id' ),
+						)
 					);
 					return $tools;
 				}

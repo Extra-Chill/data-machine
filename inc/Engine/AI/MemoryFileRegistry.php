@@ -116,72 +116,15 @@ class MemoryFileRegistry {
 			return;
 		}
 
-		$layer = self::normalize_layer( $args['layer'] ?? self::LAYER_AGENT );
 
-		// Composable files are auto-generated — never hand-editable.
-		$composable = (bool) ( $args['composable'] ?? false );
-
-		// Normalize editable: true (default), false, or a WordPress capability string.
-		// Composable files force editable to false.
-		$editable = $composable ? false : ( $args['editable'] ?? true );
-		if ( ! is_bool( $editable ) && ! is_string( $editable ) ) {
-			$editable = true;
-		}
-
-		// Normalize modes: omitted means registered but not prompt-injected.
-		$modes = $args['modes'] ?? self::MODES_NONE;
-		if ( ! is_array( $modes ) ) {
-			$modes = self::MODES_NONE;
-		}
-		$modes                    = array_values( array_unique( array_map( 'sanitize_key', $modes ) ) );
-		$injection_contexts       = self::normalize_injection_contexts( $args['injection_contexts'] ?? array() );
-		$default_retrieval_policy = self::default_retrieval_policy( empty( $modes ) && empty( $injection_contexts ) );
-
-		// Convention path: relative path from ABSPATH for an additional copy.
-		$convention_path = isset( $args['convention_path'] ) ? ltrim( $args['convention_path'], '/' ) : '';
-
-		$metadata = array(
-			'filename'           => $filename,
-			'priority'           => $priority,
-			'layer'              => $layer,
-			'protected'          => (bool) ( $args['protected'] ?? false ),
-			'editable'           => $editable,
-			'composable'         => $composable,
-			'convention_path'    => $convention_path,
-			'modes'              => $modes,
-			'injection_contexts' => $injection_contexts,
-			'label'              => $args['label'] ?? self::filename_to_label( $filename ),
-			'description'        => $args['description'] ?? '',
-			'retrieval_policy'   => self::normalize_retrieval_policy( $args['retrieval_policy'] ?? $default_retrieval_policy ),
-			'authority_tier'     => $args['authority_tier'] ?? self::default_authority_tier( $layer, $filename ),
-			'provenance'         => is_array( $args['provenance'] ?? null ) ? $args['provenance'] : self::default_provenance( $filename ),
-		);
+		$metadata = self::normalize_file_metadata( $filename, $priority, $args );
 
 		self::$files[ $filename ] = $metadata;
 
 		// Mirror into the Agents API source registry.
 		WP_Agent_Memory_Registry::register(
 			self::source_id_for_filename( $filename ),
-			array(
-				'layer'              => $layer,
-				'priority'           => $priority,
-				'protected'          => $metadata['protected'],
-				'editable'           => $editable,
-				'modes'              => $modes,
-				'injection_contexts' => $injection_contexts,
-				'retrieval_policy'   => $metadata['retrieval_policy'],
-				'composable'         => $composable,
-				'context_slug'       => self::context_slug_for_filename( $filename ),
-				'convention_path'    => $convention_path,
-				'label'              => $metadata['label'],
-				'description'        => $metadata['description'],
-				'meta'               => array(
-					'filename'           => $filename,
-					'authority_tier'     => $metadata['authority_tier'],
-					'provenance'         => $metadata['provenance'],
-					'injection_contexts' => $injection_contexts,
-				),
-			)
+			self::to_agents_api_source( $metadata )
 		);
 	}
 
@@ -633,10 +576,12 @@ class MemoryFileRegistry {
 				continue;
 			}
 
-			$files[ $filename ] = array(
+			$files[ $filename ] = self::normalize_file_metadata(
+				$filename,
+				(int) ( $source['priority'] ?? 50 ),
+				array(
 				'filename'           => $filename,
-				'priority'           => (int) ( $source['priority'] ?? 50 ),
-				'layer'              => self::normalize_layer( $source['layer'] ?? self::LAYER_AGENT ),
+				'layer'              => $source['layer'] ?? self::LAYER_AGENT,
 				'protected'          => (bool) ( $source['protected'] ?? false ),
 				'editable'           => $source['editable'] ?? true,
 				'composable'         => (bool) ( $source['composable'] ?? false ),
@@ -648,10 +593,77 @@ class MemoryFileRegistry {
 				'retrieval_policy'   => is_string( $source['retrieval_policy'] ?? null ) ? $source['retrieval_policy'] : WP_Agent_Context_Injection_Policy::ALWAYS,
 				'authority_tier'     => is_string( $source['meta']['authority_tier'] ?? null ) ? $source['meta']['authority_tier'] : self::default_authority_tier( self::normalize_layer( $source['layer'] ?? self::LAYER_AGENT ), $filename ),
 				'provenance'         => is_array( $source['meta']['provenance'] ?? null ) ? $source['meta']['provenance'] : self::default_provenance( $filename ),
+				)
 			);
 		}
 
 		return $files;
+	}
+
+	/**
+	 * Normalize Data Machine's filename-keyed memory metadata shape.
+	 *
+	 * @param string $filename Filename.
+	 * @param int    $priority Sort priority.
+	 * @param array  $args     Raw registration args.
+	 * @return array<string,mixed> Normalized metadata.
+	 */
+	private static function normalize_file_metadata( string $filename, int $priority, array $args ): array {
+		$layer              = self::normalize_layer( $args['layer'] ?? self::LAYER_AGENT );
+		$composable         = (bool) ( $args['composable'] ?? false );
+		$editable           = $composable ? false : ( $args['editable'] ?? true );
+		$editable           = ( is_bool( $editable ) || is_string( $editable ) ) ? $editable : true;
+		$modes              = is_array( $args['modes'] ?? null ) ? array_values( array_unique( array_map( 'sanitize_key', $args['modes'] ) ) ) : self::MODES_NONE;
+		$injection_contexts = self::normalize_injection_contexts( $args['injection_contexts'] ?? array() );
+		$retrieval_policy   = $args['retrieval_policy'] ?? self::default_retrieval_policy( empty( $modes ) && empty( $injection_contexts ) );
+
+		return array(
+			'filename'           => $filename,
+			'priority'           => $priority,
+			'layer'              => $layer,
+			'protected'          => (bool) ( $args['protected'] ?? false ),
+			'editable'           => $editable,
+			'composable'         => $composable,
+			'convention_path'    => isset( $args['convention_path'] ) ? ltrim( (string) $args['convention_path'], '/' ) : '',
+			'modes'              => $modes,
+			'injection_contexts' => $injection_contexts,
+			'label'              => $args['label'] ?? self::filename_to_label( $filename ),
+			'description'        => $args['description'] ?? '',
+			'retrieval_policy'   => self::normalize_retrieval_policy( (string) $retrieval_policy ),
+			'authority_tier'     => $args['authority_tier'] ?? self::default_authority_tier( $layer, $filename ),
+			'provenance'         => is_array( $args['provenance'] ?? null ) ? $args['provenance'] : self::default_provenance( $filename ),
+		);
+	}
+
+	/**
+	 * Project normalized Data Machine memory metadata into Agents API source shape.
+	 *
+	 * @param array $metadata Normalized file metadata.
+	 * @return array<string,mixed> Agents API memory source metadata.
+	 */
+	private static function to_agents_api_source( array $metadata ): array {
+		$filename = (string) $metadata['filename'];
+
+		return array(
+			'layer'              => $metadata['layer'],
+			'priority'           => $metadata['priority'],
+			'protected'          => $metadata['protected'],
+			'editable'           => $metadata['editable'],
+			'modes'              => $metadata['modes'],
+			'injection_contexts' => $metadata['injection_contexts'],
+			'retrieval_policy'   => $metadata['retrieval_policy'],
+			'composable'         => $metadata['composable'],
+			'context_slug'       => self::context_slug_for_filename( $filename ),
+			'convention_path'    => $metadata['convention_path'],
+			'label'              => $metadata['label'],
+			'description'        => $metadata['description'],
+			'meta'               => array(
+				'filename'           => $filename,
+				'authority_tier'     => $metadata['authority_tier'],
+				'provenance'         => $metadata['provenance'],
+				'injection_contexts' => $metadata['injection_contexts'],
+			),
+		);
 	}
 
 	private static function source_id_for_filename( string $filename ): string {

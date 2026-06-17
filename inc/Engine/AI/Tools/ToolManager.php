@@ -208,6 +208,52 @@ class ToolManager {
 	}
 
 	/**
+	 * Build a normalized handler-tool declaration for the `datamachine_tools` registry.
+	 *
+	 * Handler declarations are not directly exposed to models. They describe which
+	 * adjacent handler(s) can lazily produce tools and which runtime context values
+	 * should be bound onto each produced tool definition.
+	 *
+	 * Existing `_handler_callable` arrays remain supported; this helper is the
+	 * first-class shape new handler registrations should use.
+	 *
+	 * @param callable $handler_callable Callback that returns tools for a handler.
+	 * @param array    $args             Declaration args: handler, handler_types, modes,
+	 *                                   access_level, ability, client_context_bindings.
+	 * @return array<string,mixed> Handler-tool declaration.
+	 */
+	public static function handlerToolDeclaration( callable $handler_callable, array $args = array() ): array {
+		$args['_handler_callable'] = $handler_callable;
+		return self::normalizeHandlerToolDeclaration( $args );
+	}
+
+	/**
+	 * Normalize legacy and first-class handler-tool declarations.
+	 *
+	 * @param array $definition Raw declaration.
+	 * @return array<string,mixed> Normalized declaration.
+	 */
+	public static function normalizeHandlerToolDeclaration( array $definition ): array {
+		if ( ! isset( $definition['modes'] ) ) {
+			$definition['modes'] = array( ToolPolicyResolver::MODE_PIPELINE );
+		}
+		if ( ! isset( $definition['access_level'] ) && ! isset( $definition['ability'] ) ) {
+			$definition['access_level'] = 'admin';
+		}
+
+		if ( isset( $definition['context_bindings'] ) && ! isset( $definition['client_context_bindings'] ) ) {
+			$definition['client_context_bindings'] = $definition['context_bindings'];
+		}
+		unset( $definition['context_bindings'] );
+
+		if ( isset( $definition['handler_types'] ) && is_string( $definition['handler_types'] ) ) {
+			$definition['handler_types'] = array( $definition['handler_types'] );
+		}
+
+		return $definition;
+	}
+
+	/**
 	 * Resolve handler tools for a specific adjacent-step handler.
 	 *
 	 * Iterates the unified `datamachine_tools` registry and resolves every
@@ -255,6 +301,7 @@ class ToolManager {
 			if ( ! is_array( $definition ) ) {
 				continue;
 			}
+			$definition = self::normalizeHandlerToolDeclaration( $definition );
 			if ( ! isset( $definition['_handler_callable'] ) || ! is_callable( $definition['_handler_callable'] ) ) {
 				continue;
 			}
@@ -318,36 +365,7 @@ class ToolManager {
 					continue;
 				}
 
-				// Ensure a handler link is set so downstream filters (handler
-				// context, permission resolution) know which handler owns
-				// the tool.
-				if ( ! isset( $tool_def['handler'] ) ) {
-					$tool_def['handler'] = $handler_slug;
-				}
-				if ( ! isset( $tool_def['handler_config'] ) ) {
-					$tool_def['handler_config'] = $handler_config;
-				}
-
-				// Auto-attach the job_id context binding for handler-class
-				// tools. Handler tools route through the *Handler base classes
-				// (Upsert/Publish/Fetch) via handle_tool_call(), all of which
-				// require the run's job_id to load engine_data — and after the
-				// explicit-context-bindings migration, job_id only reaches a
-				// tool when it is named in client_context_bindings. Defaulting
-				// the binding here means satellite plugins (events, socials,
-				// business, third parties) no longer have to declare it
-				// per-tool-def and cannot silently regress into rejecting
-				// every tool call. Tools that explicitly declare their own
-				// bindings keep them untouched.
-				if ( 'handle_tool_call' === ( $tool_def['method'] ?? '' ) ) {
-					$existing = is_array( $tool_def['client_context_bindings'] ?? null )
-						? $tool_def['client_context_bindings']
-						: array();
-					if ( ! in_array( 'job_id', $existing, true ) && ! array_key_exists( 'job_id', $existing ) ) {
-						$existing[]                          = 'job_id';
-						$tool_def['client_context_bindings'] = $existing;
-					}
-				}
+				$tool_def = $this->withHandlerToolContext( $tool_def, $definition, $handler_slug, $handler_config );
 
 				// Apply registry-level meta unless the resolved tool
 				// explicitly overrides.
@@ -370,6 +388,65 @@ class ToolManager {
 		}
 
 		return $resolved;
+	}
+
+	/**
+	 * Apply handler ownership and declaration-level context bindings to a tool.
+	 *
+	 * @param array  $tool_def       Tool definition returned by the handler callback.
+	 * @param array  $declaration    Normalized handler-tool declaration.
+	 * @param string $handler_slug   Adjacent step handler slug.
+	 * @param array  $handler_config Handler configuration from flow step.
+	 * @return array<string,mixed> Tool definition with handler context.
+	 */
+	private function withHandlerToolContext( array $tool_def, array $declaration, string $handler_slug, array $handler_config ): array {
+		if ( ! isset( $tool_def['handler'] ) ) {
+			$tool_def['handler'] = $handler_slug;
+		}
+		if ( ! isset( $tool_def['handler_config'] ) ) {
+			$tool_def['handler_config'] = $handler_config;
+		}
+
+		$declared_bindings = is_array( $declaration['client_context_bindings'] ?? null )
+			? $declaration['client_context_bindings']
+			: array();
+		if ( ! empty( $declared_bindings ) ) {
+			$tool_def['client_context_bindings'] = self::mergeContextBindings( $tool_def['client_context_bindings'] ?? array(), $declared_bindings );
+		}
+
+		// Compatibility fallback for existing third-party handler declarations.
+		// New registrations should declare context bindings on the handler-tool
+		// declaration so ownership is visible before the callback is invoked.
+		if ( 'handle_tool_call' === ( $tool_def['method'] ?? '' ) ) {
+			$tool_def['client_context_bindings'] = self::mergeContextBindings( $tool_def['client_context_bindings'] ?? array(), array( 'job_id' ) );
+		}
+
+		return $tool_def;
+	}
+
+	/**
+	 * Merge context-binding lists/maps without changing existing mappings.
+	 *
+	 * @param mixed $existing Existing tool-level binding declaration.
+	 * @param array $defaults Default bindings from the handler declaration.
+	 * @return array<int|string,string> Merged bindings.
+	 */
+	private static function mergeContextBindings( mixed $existing, array $defaults ): array {
+		$merged = is_array( $existing ) ? $existing : array();
+		foreach ( $defaults as $parameter => $context_key ) {
+			if ( is_int( $parameter ) ) {
+				if ( is_string( $context_key ) && '' !== $context_key && ! in_array( $context_key, $merged, true ) && ! array_key_exists( $context_key, $merged ) ) {
+					$merged[] = $context_key;
+				}
+				continue;
+			}
+
+			if ( is_string( $parameter ) && '' !== $parameter && is_string( $context_key ) && '' !== $context_key && ! array_key_exists( $parameter, $merged ) ) {
+				$merged[ $parameter ] = $context_key;
+			}
+		}
+
+		return $merged;
 	}
 
 	/**

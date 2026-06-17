@@ -23,6 +23,7 @@ use DataMachine\Core\ExecutionContext;
 use DataMachine\Core\FilesRepository\FileStorage;
 use DataMachine\Core\Steps\Fetch\Tools\FetchItemDispositionTool;
 use DataMachine\Core\Steps\Handlers\HttpRequestHelpers;
+use DataMachine\Engine\AI\Tools\ToolManager;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -422,11 +423,12 @@ abstract class FetchHandler {
 		add_filter(
 			'datamachine_tools',
 			static function ( array $tools ): array {
-				$tools['__handler_tools_fetch_dispositions'] = array(
-					'_handler_callable' => array( self::class, 'resolveFetchDispositionTools' ),
-					'handler_types'     => array( 'fetch', 'event_import' ),
-					'modes'             => array( 'pipeline' ),
-					'access_level'      => 'admin',
+				$tools['__handler_tools_fetch_dispositions'] = ToolManager::handlerToolDeclaration(
+					array( self::class, 'resolveFetchDispositionTools' ),
+					array(
+						'handler_types'           => array( 'fetch', 'event_import' ),
+						'client_context_bindings' => array( 'job_id' ),
+					)
 				);
 				return $tools;
 			}
@@ -469,14 +471,13 @@ abstract class FetchHandler {
 	 */
 	private static function getRejectSourceToolDefinition( string $handler_slug, array $handler_config ): array {
 		return array(
-			'class'                   => FetchItemDispositionTool::class,
-			'client_context_bindings' => array( 'job_id' ),
-			'method'                  => 'handle_tool_call',
-			'handler'                 => $handler_slug,
-			'disposition'             => 'reject_source',
-			'runtime'                 => array( 'completion_signal' => 'terminal' ),
-			'description'             => 'Reject this fetched source item after reasoned content/source evaluation. Use when the source itself is irrelevant, too thin, duplicate, noisy, spammy, or otherwise fails the pipeline quality or relevance criteria. The source item will be marked as processed and will not normally be refetched.',
-			'parameters'              => array(
+			'class'          => FetchItemDispositionTool::class,
+			'method'         => 'handle_tool_call',
+			'handler'        => $handler_slug,
+			'disposition'    => 'reject_source',
+			'runtime'        => array( 'completion_signal' => 'terminal' ),
+			'description'    => 'Reject this fetched source item after reasoned content/source evaluation. Use when the source itself is irrelevant, too thin, duplicate, noisy, spammy, or otherwise fails the pipeline quality or relevance criteria. The source item will be marked as processed and will not normally be refetched.',
+			'parameters'     => array(
 				'type'       => 'object',
 				'properties' => array(
 					'reason' => array(
@@ -486,7 +487,7 @@ abstract class FetchHandler {
 				),
 				'required'   => array( 'reason' ),
 			),
-			'handler_config'          => $handler_config,
+			'handler_config' => $handler_config,
 		);
 	}
 
@@ -500,14 +501,13 @@ abstract class FetchHandler {
 	 */
 	private static function getDeferItemToolDefinition( string $handler_slug, array $handler_config ): array {
 		return array(
-			'class'                   => FetchItemDispositionTool::class,
-			'client_context_bindings' => array( 'job_id' ),
-			'method'                  => 'handle_tool_call',
-			'handler'                 => $handler_slug,
-			'disposition'             => 'defer_item',
-			'runtime'                 => array( 'completion_signal' => 'terminal' ),
-			'description'             => 'Defer this fetched source item when the agent cannot safely complete processing now because of runtime failures, tool errors, missing context, uncertainty, or temporary limitations. The source claim will be released and the item will remain eligible to be fetched and retried later; it will not be marked processed.',
-			'parameters'              => array(
+			'class'          => FetchItemDispositionTool::class,
+			'method'         => 'handle_tool_call',
+			'handler'        => $handler_slug,
+			'disposition'    => 'defer_item',
+			'runtime'        => array( 'completion_signal' => 'terminal' ),
+			'description'    => 'Defer this fetched source item when the agent cannot safely complete processing now because of runtime failures, tool errors, missing context, uncertainty, or temporary limitations. The source claim will be released and the item will remain eligible to be fetched and retried later; it will not be marked processed.',
+			'parameters'     => array(
 				'type'       => 'object',
 				'properties' => array(
 					'reason' => array(
@@ -517,7 +517,7 @@ abstract class FetchHandler {
 				),
 				'required'   => array( 'reason' ),
 			),
-			'handler_config'          => $handler_config,
+			'handler_config' => $handler_config,
 		);
 	}
 }
