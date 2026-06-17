@@ -12,6 +12,7 @@ use DataMachine\Abilities\Engine\DrainJobAbility;
 use DataMachine\Core\Agents\AgentBundler;
 use DataMachine\Core\Agents\AgentIdentityResolver;
 use DataMachine\Core\Database\Jobs\Jobs;
+use DataMachine\Core\DataPath;
 use DataMachine\Core\JobStatus;
 
 defined( 'ABSPATH' ) || exit;
@@ -207,9 +208,9 @@ final class AgentBundleRunner {
 	private function apply_runtime_ability_tools( array &$initial_data, array $input, array $bundle = array() ): void {
 		$ability_tools = is_array( $input['ability_tools'] ?? null ) ? $input['ability_tools'] : array();
 		if ( empty( $ability_tools ) ) {
-			$metadata_tools = $this->path_value( $bundle, 'metadata.agent_runtime.ability_tools' );
+			$metadata_tools = DataPath::value( $bundle, 'metadata.agent_runtime.ability_tools' );
 			if ( ! is_array( $metadata_tools ) ) {
-				$metadata_tools = $this->path_value( $bundle, 'metadata.codebox.agent_runtime.bundle.ability_tools' );
+				$metadata_tools = DataPath::value( $bundle, 'metadata.codebox.agent_runtime.bundle.ability_tools' );
 			}
 			$ability_tools = is_array( $metadata_tools ) ? $metadata_tools : array();
 		}
@@ -272,10 +273,7 @@ final class AgentBundleRunner {
 
 	/** @return array<string,mixed> */
 	private static function compact_response_array( array $values ): array {
-		return array_filter(
-			$values,
-			static fn( $value ): bool => null !== $value && '' !== $value && array() !== $value
-		);
+		return DataPath::filterPresent( $values );
 	}
 
 	/** @return array<string,mixed> */
@@ -313,13 +311,13 @@ final class AgentBundleRunner {
 
 		foreach ( $mappings as $key => $path ) {
 			$value = $this->mapped_output_value( $response, $path );
-			if ( $this->has_output_value( $value ) ) {
+			if ( DataPath::hasValue( $value ) ) {
 				$outputs[ $key ] = $value;
 			}
 		}
 
 		foreach ( $declared as $key ) {
-			if ( ! isset( $outputs[ $key ] ) && $this->has_output_value( $engine_data[ $key ] ?? null ) ) {
+			if ( ! isset( $outputs[ $key ] ) && DataPath::hasValue( $engine_data[ $key ] ?? null ) ) {
 				$outputs[ $key ] = $engine_data[ $key ];
 			}
 		}
@@ -327,7 +325,7 @@ final class AgentBundleRunner {
 		if ( is_array( $engine_data['outputs'] ?? null ) ) {
 			foreach ( $engine_data['outputs'] as $key => $value ) {
 				$key = sanitize_key( (string) $key );
-				if ( '' !== $key && $this->has_output_value( $value ) ) {
+				if ( '' !== $key && DataPath::hasValue( $value ) ) {
 					$outputs[ $key ] = $value;
 				}
 			}
@@ -335,7 +333,7 @@ final class AgentBundleRunner {
 			$typed_artifacts = is_array( $engine_data['outputs']['typed_artifacts'] ?? null ) ? $engine_data['outputs']['typed_artifacts'] : array();
 			foreach ( $typed_artifacts as $key => $artifact_output ) {
 				$key = sanitize_key( (string) $key );
-				if ( '' !== $key && is_array( $artifact_output ) && $this->has_output_value( $artifact_output['payload'] ?? null ) ) {
+				if ( '' !== $key && is_array( $artifact_output ) && DataPath::hasValue( $artifact_output['payload'] ?? null ) ) {
 					$outputs[ $key ] = $artifact_output['payload'];
 				}
 			}
@@ -343,7 +341,7 @@ final class AgentBundleRunner {
 
 		foreach ( $engine_data as $key => $value ) {
 			$key = (string) $key;
-			if ( ! isset( $outputs[ $key ] ) && $this->is_common_output_key( $key ) && $this->has_output_value( $value ) ) {
+			if ( ! isset( $outputs[ $key ] ) && $this->is_common_output_key( $key ) && DataPath::hasValue( $value ) ) {
 				$outputs[ $key ] = $value;
 			}
 		}
@@ -385,7 +383,7 @@ final class AgentBundleRunner {
 			array_filter(
 				$required,
 				function ( string $key ) use ( $outputs ): bool {
-					return ! array_key_exists( $key, $outputs ) || ! $this->has_output_value( $outputs[ $key ] );
+					return ! array_key_exists( $key, $outputs ) || ! DataPath::hasValue( $outputs[ $key ] );
 				}
 			)
 		);
@@ -443,19 +441,7 @@ final class AgentBundleRunner {
 			'response'    => $response,
 		);
 
-		return $this->path_value( $source, $path );
-	}
-
-	private function path_value( array $source, string $path ): mixed {
-		$value = $source;
-		foreach ( array_filter( explode( '.', $path ), static fn( string $part ): bool => '' !== $part ) as $part ) {
-			if ( ! is_array( $value ) || ! array_key_exists( $part, $value ) ) {
-				return null;
-			}
-			$value = $value[ $part ];
-		}
-
-		return $value;
+		return DataPath::value( $source, $path );
 	}
 
 	/** @return array<int,string> */
@@ -519,10 +505,6 @@ final class AgentBundleRunner {
 		}
 
 		return array_values( array_unique( $keys ) );
-	}
-
-	private function has_output_value( mixed $value ): bool {
-		return null !== $value && '' !== $value && array() !== $value;
 	}
 
 	private function is_common_output_key( string $key ): bool {

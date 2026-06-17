@@ -7,6 +7,9 @@
 
 namespace DataMachine\Engine\AI;
 
+use DataMachine\Core\DataPath;
+use DataMachine\Core\OutputContract;
+
 defined( 'ABSPATH' ) || exit;
 
 /**
@@ -49,7 +52,7 @@ class DataMachineCompletionAssertions {
 		$this->required_tool_names            = $this->sanitizeList( $config['required_tool_names'] ?? array() );
 		$this->minimum_successful_tool_counts = $this->sanitizeToolCountMap( $config['minimum_successful_tool_counts'] ?? array() );
 		$this->required_output_packet_types   = $this->sanitizeList( $config['required_output_packet_types'] ?? array() );
-		$this->required_artifact_outputs      = $this->sanitizeRequiredArtifactOutputs( $config['required_artifact_outputs'] ?? array() );
+		$this->required_artifact_outputs      = OutputContract::normalizeRequiredArtifactOutputs( $config['required_artifact_outputs'] ?? array() );
 		$this->complete_when_any              = $this->sanitizeOutcomeAssertions( $config['complete_when_any'] ?? array() );
 	}
 
@@ -338,7 +341,7 @@ class DataMachineCompletionAssertions {
 
 	private function parametersMatch( array $parameters, array $required_parameters ): bool {
 		foreach ( $required_parameters as $path => $expected ) {
-			if ( ! $this->hasPathValue( $parameters, (string) $path, $expected ) ) {
+			if ( ! DataPath::hasPathValue( $parameters, (string) $path, $expected ) ) {
 				return false;
 			}
 		}
@@ -346,50 +349,22 @@ class DataMachineCompletionAssertions {
 		return true;
 	}
 
-	private function hasPathValue( array $data, string $path, mixed $expected ): bool {
-		$segments = explode( '.', $path );
-		$value    = $data;
-		foreach ( $segments as $segment ) {
-			if ( ! is_array( $value ) || ! array_key_exists( $segment, $value ) ) {
-				return false;
-			}
-
-			$value = $value[ $segment ];
-		}
-
-		return $value === $expected;
-	}
-
 	private function resultsHaveOutputField( array $results, string $field ): bool {
 		foreach ( $results as $result ) {
-			if ( $this->hasNonEmptyPath( $result, $field ) ) {
+			if ( DataPath::hasPresentPath( $result, $field ) ) {
 				return true;
 			}
 
-			if ( is_array( $result['data'] ?? null ) && $this->hasNonEmptyPath( $result['data'], $field ) ) {
+			if ( is_array( $result['data'] ?? null ) && DataPath::hasPresentPath( $result['data'], $field ) ) {
 				return true;
 			}
 
-			if ( is_array( $result['result'] ?? null ) && $this->hasNonEmptyPath( $result['result'], $field ) ) {
+			if ( is_array( $result['result'] ?? null ) && DataPath::hasPresentPath( $result['result'], $field ) ) {
 				return true;
 			}
 		}
 
 		return false;
-	}
-
-	private function hasNonEmptyPath( array $data, string $path ): bool {
-		$segments = explode( '.', $path );
-		$value    = $data;
-		foreach ( $segments as $segment ) {
-			if ( ! is_array( $value ) || ! array_key_exists( $segment, $value ) ) {
-				return false;
-			}
-
-			$value = $value[ $segment ];
-		}
-
-		return null !== $value && '' !== $value && array() !== $value;
 	}
 
 	private function hasAvailableOutcomePath( array $tools ): bool {
@@ -574,53 +549,9 @@ class DataMachineCompletionAssertions {
 		return $parameters;
 	}
 
-	/**
-	 * @param mixed $value Raw typed artifact output assertions.
-	 * @return array<int, array{output_key: string, schema: string, artifact: string}>
-	 */
-	private function sanitizeRequiredArtifactOutputs( mixed $value ): array {
-		if ( ! is_array( $value ) ) {
-			return array();
-		}
-
-		$outputs = array();
-		foreach ( $value as $key => $entry ) {
-			if ( is_string( $entry ) ) {
-				$output_key = trim( $entry );
-				$schema     = '';
-				$artifact   = '';
-			} elseif ( is_array( $entry ) ) {
-				$output_key = trim( (string) ( $entry['output_key'] ?? ( is_string( $key ) ? $key : '' ) ) );
-				$schema     = trim( (string) ( $entry['schema'] ?? '' ) );
-				$artifact   = trim( (string) ( $entry['artifact'] ?? '' ) );
-			} else {
-				continue;
-			}
-
-			if ( '' !== $output_key ) {
-				$outputs[] = array(
-					'output_key' => $output_key,
-					'schema'     => $schema,
-					'artifact'   => $artifact,
-				);
-			}
-		}
-
-		return array_values(
-			array_reduce(
-				$outputs,
-				static function ( array $carry, array $output ): array {
-					$carry[ $output['output_key'] ] = $output;
-					return $carry;
-				},
-				array()
-			)
-		);
-	}
-
 	/** @return array<int, string> */
 	private function requiredArtifactOutputKeys(): array {
-		return array_values( array_unique( array_map( static fn( array $output ): string => $output['output_key'], $this->required_artifact_outputs ) ) );
+		return OutputContract::requiredArtifactOutputKeys( $this->required_artifact_outputs );
 	}
 
 	/**
@@ -640,14 +571,14 @@ class DataMachineCompletionAssertions {
 
 		$satisfied = array();
 		foreach ( $this->required_engine_data_keys as $key ) {
-			if ( array_key_exists( $key, $data ) && null !== $data[ $key ] && '' !== $data[ $key ] && array() !== $data[ $key ] ) {
+			if ( array_key_exists( $key, $data ) && DataPath::hasValue( $data[ $key ] ) ) {
 				$satisfied[] = $key;
 				continue;
 			}
 
 			if ( is_object( $engine ) && method_exists( $engine, 'get' ) ) {
 				$value = $engine->get( $key );
-				if ( null !== $value && '' !== $value && array() !== $value ) {
+				if ( DataPath::hasValue( $value ) ) {
 					$satisfied[] = $key;
 				}
 			}
@@ -674,28 +605,14 @@ class DataMachineCompletionAssertions {
 		$typed_artifacts = is_array( $data['outputs']['typed_artifacts'] ?? null ) ? $data['outputs']['typed_artifacts'] : array();
 		$satisfied       = array();
 		foreach ( $this->required_artifact_outputs as $required_output ) {
-			$output_key = $required_output['output_key'];
-			$output     = is_array( $typed_artifacts[ $output_key ] ?? null ) ? $typed_artifacts[ $output_key ] : array();
-			if ( ! $this->hasOutputPayload( $output ) ) {
+			if ( ! OutputContract::artifactOutputSatisfied( $required_output, $typed_artifacts ) ) {
 				continue;
 			}
 
-			if ( '' !== $required_output['schema'] && (string) ( $output['schema'] ?? '' ) !== $required_output['schema'] ) {
-				continue;
-			}
-
-			if ( '' !== $required_output['artifact'] && (string) ( $output['artifact'] ?? '' ) !== $required_output['artifact'] ) {
-				continue;
-			}
-
-			$satisfied[] = $output_key;
+			$satisfied[] = $required_output['output_key'];
 		}
 
 		return array_values( array_unique( $satisfied ) );
-	}
-
-	private function hasOutputPayload( array $output ): bool {
-		return array_key_exists( 'payload', $output ) && null !== $output['payload'] && '' !== $output['payload'] && array() !== $output['payload'];
 	}
 
 	/**

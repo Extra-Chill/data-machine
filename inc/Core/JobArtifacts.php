@@ -629,10 +629,7 @@ class JobArtifacts {
 
 	/** @return array<string,mixed> */
 	private function filter_empty( array $value ): array {
-		return array_filter(
-			$value,
-			static fn( $child ) => null !== $child && '' !== $child && array() !== $child
-		);
+		return DataPath::filterPresent( $value );
 	}
 
 	/**
