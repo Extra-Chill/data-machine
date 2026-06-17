@@ -21,6 +21,7 @@
 
 namespace DataMachine\Abilities\Publish;
 
+use DataMachine\Abilities\AbilityRegistration;
 use DataMachine\Abilities\PermissionHelper;
 
 defined( 'ABSPATH' ) || exit;
@@ -120,7 +121,7 @@ class SendEmailQueuedAbility {
 	 * @return array<string, array<string, mixed>>
 	 */
 	private static function get_ability_definitions( self $instance ): array {
-		return array(
+		return AbilityRegistration::with_lazy_runtime( array(
 			'datamachine/send-email-queued' => array(
 				'label'               => __( 'Send Email (Queued)', 'data-machine' ),
 				'description'         => __( 'Queue an email for delivery via Action Scheduler. Accepts the same payload as datamachine/send-email plus optional send_at and priority. Returns the scheduled action id.', 'data-machine' ),
@@ -229,7 +230,7 @@ class SendEmailQueuedAbility {
 					),
 				),
 			),
-		);
+		) );
 	}
 
 	/**
