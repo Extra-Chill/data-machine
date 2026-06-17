@@ -11,6 +11,7 @@
 namespace DataMachine\Cli\Commands;
 
 use WP_CLI;
+use DataMachine\Cli\AbilityRunner;
 use DataMachine\Cli\BaseCommand;
 use DataMachine\Abilities\Taxonomy\CreateTaxonomyTermAbility;
 use DataMachine\Abilities\Taxonomy\DeleteTaxonomyTermAbility;
@@ -117,7 +118,7 @@ class TaxonomyCommand extends BaseCommand {
 			$input['parent'] = (int) $assoc_args['parent'];
 		}
 
-		$result = ( new GetTaxonomyTermsAbility() )->execute( $input );
+		$result = AbilityRunner::execute( 'datamachine/get-taxonomy-terms', $input );
 
 		if ( ! $result['success'] ) {
 			WP_CLI::error( $result['error'] ?? 'Failed to get taxonomy terms.' );

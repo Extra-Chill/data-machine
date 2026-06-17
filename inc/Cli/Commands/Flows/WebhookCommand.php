@@ -13,6 +13,7 @@
 namespace DataMachine\Cli\Commands\Flows;
 
 use WP_CLI;
+use DataMachine\Cli\AbilityRunner;
 use DataMachine\Cli\BaseCommand;
 
 defined( 'ABSPATH' ) || exit;
@@ -181,8 +182,7 @@ class WebhookCommand extends BaseCommand {
 			$input['secret_id'] = (string) $assoc_args['secret-id'];
 		}
 
-		$ability = new \DataMachine\Abilities\Flow\WebhookTriggerAbility();
-		$result  = $ability->executeEnable( $input );
+		$result = AbilityRunner::execute( 'datamachine/webhook-trigger-enable', $input );
 
 		if ( empty( $result['success'] ) ) {
 			WP_CLI::error( $result['error'] ?? 'Failed to enable webhook trigger' );
@@ -316,8 +316,7 @@ class WebhookCommand extends BaseCommand {
 			$input['secret_id'] = (string) $assoc_args['secret-id'];
 		}
 
-		$ability = new \DataMachine\Abilities\Flow\WebhookTriggerAbility();
-		$result  = $ability->executeSetSecret( $input );
+		$result = AbilityRunner::execute( 'datamachine/webhook-trigger-set-secret', $input );
 
 		if ( empty( $result['success'] ) ) {
 			WP_CLI::error( $result['error'] ?? 'Failed to set webhook secret' );
@@ -360,8 +359,7 @@ class WebhookCommand extends BaseCommand {
 			return;
 		}
 
-		$ability = new \DataMachine\Abilities\Flow\WebhookTriggerAbility();
-		$result  = $ability->executeDisable( array( 'flow_id' => $flow_id ) );
+		$result = AbilityRunner::execute( 'datamachine/webhook-trigger-disable', array( 'flow_id' => $flow_id ) );
 
 		if ( ! $result['success'] ) {
 			WP_CLI::error( $result['error'] ?? 'Failed to disable webhook trigger' );
@@ -401,8 +399,7 @@ class WebhookCommand extends BaseCommand {
 			return;
 		}
 
-		$ability = new \DataMachine\Abilities\Flow\WebhookTriggerAbility();
-		$result  = $ability->executeRegenerate( array( 'flow_id' => $flow_id ) );
+		$result = AbilityRunner::execute( 'datamachine/webhook-trigger-regenerate', array( 'flow_id' => $flow_id ) );
 
 		if ( ! $result['success'] ) {
 			WP_CLI::error( $result['error'] ?? 'Failed to regenerate webhook token' );
@@ -456,8 +453,7 @@ class WebhookCommand extends BaseCommand {
 
 		$format = $assoc_args['format'] ?? 'table';
 
-		$ability = new \DataMachine\Abilities\Flow\WebhookTriggerAbility();
-		$result  = $ability->executeStatus( array( 'flow_id' => $flow_id ) );
+		$result = AbilityRunner::execute( 'datamachine/webhook-trigger-status', array( 'flow_id' => $flow_id ) );
 
 		if ( ! $result['success'] ) {
 			WP_CLI::error( $result['error'] ?? 'Failed to get webhook status' );
@@ -598,8 +594,7 @@ class WebhookCommand extends BaseCommand {
 
 		// If no --max or --window provided, show current config.
 		if ( ! isset( $assoc_args['max'] ) && ! isset( $assoc_args['window'] ) ) {
-			$ability = new \DataMachine\Abilities\Flow\WebhookTriggerAbility();
-			$result  = $ability->executeStatus( array( 'flow_id' => $flow_id ) );
+			$result = AbilityRunner::execute( 'datamachine/webhook-trigger-status', array( 'flow_id' => $flow_id ) );
 
 			if ( ! $result['success'] ) {
 				WP_CLI::error( $result['error'] ?? 'Failed to get webhook status' );
@@ -632,8 +627,7 @@ class WebhookCommand extends BaseCommand {
 			$input['window'] = (int) $assoc_args['window'];
 		}
 
-		$ability = new \DataMachine\Abilities\Flow\WebhookTriggerAbility();
-		$result  = $ability->executeSetRateLimit( $input );
+		$result = AbilityRunner::execute( 'datamachine/webhook-trigger-rate-limit', $input );
 
 		if ( ! $result['success'] ) {
 			WP_CLI::error( $result['error'] ?? 'Failed to set rate limit' );
@@ -703,8 +697,7 @@ class WebhookCommand extends BaseCommand {
 			$input['previous_ttl_seconds'] = (int) $assoc_args['previous-ttl-seconds'];
 		}
 
-		$ability = new \DataMachine\Abilities\Flow\WebhookTriggerAbility();
-		$result  = $ability->executeRotateSecret( $input );
+		$result = AbilityRunner::execute( 'datamachine/webhook-trigger-rotate-secret', $input );
 
 		if ( empty( $result['success'] ) ) {
 			WP_CLI::error( $result['error'] ?? 'Failed to rotate secret' );
@@ -762,8 +755,8 @@ class WebhookCommand extends BaseCommand {
 			return;
 		}
 
-		$ability = new \DataMachine\Abilities\Flow\WebhookTriggerAbility();
-		$result  = $ability->executeForgetSecret(
+		$result = AbilityRunner::execute(
+			'datamachine/webhook-trigger-forget-secret',
 			array(
 				'flow_id'   => $flow_id,
 				'secret_id' => $secret_id,
