@@ -2129,7 +2129,7 @@ function datamachine_first_tool_result_data( array ...$candidates ): array {
  */
 function datamachine_tool_result_record_value( array $source, mixed $selector ): mixed {
 	if ( is_scalar( $selector ) ) {
-		return datamachine_tool_result_path_value( $source, (string) $selector );
+		return \DataMachine\Core\DataPath::value( $source, (string) $selector );
 	}
 
 	if ( ! is_array( $selector ) ) {
@@ -2142,8 +2142,8 @@ function datamachine_tool_result_record_value( array $source, mixed $selector ):
 			continue;
 		}
 
-		$value = datamachine_tool_result_path_value( $source, (string) $path );
-		if ( null === $value || '' === $value || array() === $value ) {
+		$value = \DataMachine\Core\DataPath::value( $source, (string) $path );
+		if ( ! \DataMachine\Core\DataPath::hasValue( $value ) ) {
 			continue;
 		}
 
@@ -2156,18 +2156,6 @@ function datamachine_tool_result_record_value( array $source, mixed $selector ):
 	}
 
 	return null;
-}
-
-function datamachine_tool_result_path_value( array $source, string $path ): mixed {
-	$value = $source;
-	foreach ( array_filter( explode( '.', $path ), static fn( string $part ): bool => '' !== $part ) as $part ) {
-		if ( ! is_array( $value ) || ! array_key_exists( $part, $value ) ) {
-			return null;
-		}
-		$value = $value[ $part ];
-	}
-
-	return $value;
 }
 
 /**

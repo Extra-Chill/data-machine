@@ -13,6 +13,8 @@ $passes   = 0;
 
 defined( 'ABSPATH' ) || define( 'ABSPATH', $root . '/' );
 
+require_once $root . '/inc/Core/DataPath.php';
+require_once $root . '/inc/Core/OutputContract.php';
 require_once $root . '/inc/Engine/AI/DataMachineCompletionAssertions.php';
 require_once $root . '/inc/Engine/AI/conversation-loop.php';
 

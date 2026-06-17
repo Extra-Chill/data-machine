@@ -105,6 +105,7 @@ datamachine_bundle_runner_contains( $ai_step, "\$payload['tool_recorders']", 'AI
 
 echo "\n[3] Runner exposes semantic outputs without hiding raw engine data\n";
 require_once $root . '/inc/Core/JobStatus.php';
+require_once $root . '/inc/Core/DataPath.php';
 require_once $root . '/inc/Engine/Bundle/AgentBundleRunner.php';
 require_once $root . '/inc/Abilities/Flow/FlowHelpers.php';
 require_once $root . '/inc/Abilities/Flow/QueueAbility.php';
