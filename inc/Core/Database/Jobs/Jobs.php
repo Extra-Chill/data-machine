@@ -17,6 +17,7 @@
 namespace DataMachine\Core\Database\Jobs;
 
 use DataMachine\Core\Database\BaseRepository;
+use DataMachine\Core\ExecutionQuery;
 use DataMachine\Core\JobStatus;
 use DataMachine\Core\RunMetrics;
 
@@ -725,6 +726,85 @@ class Jobs extends BaseRepository {
 		}
 
 		return $results ? $results : array();
+	}
+
+	/**
+	 * Query execution job records by exact engine metadata filters.
+	 *
+	 * This is the supported read-only primitive for downstream consumers that
+	 * need to find executions by generic metadata without querying internal
+	 * tables or decoding engine_data themselves.
+	 *
+	 * @param array $args Query arguments. Supports get_jobs_for_list_table args plus:
+	 *                    - metadata: array of engine_data dot-path => exact value.
+	 *                    - metadata_scan_limit: max candidate rows to scan after indexed filters.
+	 * @return array{jobs:array,total:int,scanned:int,scan_limit:int,filters:array}
+	 */
+	public function query_executions_by_metadata( array $args = array() ): array {
+		$metadata_filters = ExecutionQuery::normalize_metadata_filters( $args['metadata'] ?? array() );
+		$per_page         = max( 1, min( 500, (int) ( $args['per_page'] ?? 50 ) ) );
+		$offset           = max( 0, (int) ( $args['offset'] ?? 0 ) );
+		$scan_limit       = max( $per_page + $offset, min( 5000, (int) ( $args['metadata_scan_limit'] ?? 1000 ) ) );
+
+		$query_args              = $args;
+		$query_args['per_page']  = $scan_limit;
+		$query_args['offset']    = 0;
+		$query_args['fields']    = $this->metadata_query_fields( $args['fields'] ?? array() );
+		$key_markers             = array_map(
+			static function ( string $path ): string {
+				$segments = explode( '.', $path );
+				return '"' . end( $segments ) . '"';
+			},
+			array_keys( $metadata_filters )
+		);
+		$query_args['engine_data_contains'] = array_values( array_unique( array_merge( (array) ( $args['engine_data_contains'] ?? array() ), $key_markers ) ) );
+
+		unset( $query_args['metadata'], $query_args['metadata_scan_limit'] );
+
+		$candidates = $this->get_jobs_for_list_table( $query_args );
+		$matches    = array_values(
+			array_filter(
+				$candidates,
+				static function ( array $job ) use ( $metadata_filters ): bool {
+					return ExecutionQuery::matches_metadata_filters( is_array( $job['engine_data'] ?? null ) ? $job['engine_data'] : array(), $metadata_filters );
+				}
+			)
+		);
+
+		$jobs = array_slice( $matches, $offset, $per_page );
+		if ( is_array( $args['fields'] ?? null ) && ! in_array( 'engine_data', $args['fields'], true ) ) {
+			foreach ( $jobs as &$job ) {
+				unset( $job['engine_data'] );
+			}
+			unset( $job );
+		}
+
+		return array(
+			'jobs'       => $jobs,
+			'total'      => count( $matches ),
+			'scanned'    => count( $candidates ),
+			'scan_limit' => $scan_limit,
+			'filters'    => $metadata_filters,
+		);
+	}
+
+	/**
+	 * Ensure metadata queries include engine_data for exact matching.
+	 *
+	 * @param mixed $fields Requested fields.
+	 * @return array Fields needed for candidate matching.
+	 */
+	private function metadata_query_fields( mixed $fields ): array {
+		$fields = is_array( $fields ) ? $fields : array();
+		if ( empty( $fields ) ) {
+			return array();
+		}
+
+		if ( ! in_array( 'engine_data', $fields, true ) ) {
+			$fields[] = 'engine_data';
+		}
+
+		return $fields;
 	}
 
 	/**

@@ -100,6 +100,17 @@ class GetJobsAbility {
 								'items'       => array( 'type' => 'string' ),
 								'description' => __( 'Optional database field projection for low-memory list output.', 'data-machine' ),
 							),
+							'metadata'    => array(
+								'type'        => 'object',
+								'description' => __( 'Exact metadata filters keyed by engine_data dot-path, for generic execution lookups.', 'data-machine' ),
+							),
+							'metadata_scan_limit' => array(
+								'type'        => 'integer',
+								'default'     => 1000,
+								'minimum'     => 1,
+								'maximum'     => 5000,
+								'description' => __( 'Maximum candidate jobs to scan when applying exact metadata filters.', 'data-machine' ),
+							),
 						),
 					),
 					'output_schema'       => array(
@@ -145,6 +156,7 @@ class GetJobsAbility {
 		$orderby     = $input['orderby'] ?? 'j.job_id';
 		$order       = $input['order'] ?? 'DESC';
 		$fields      = $input['fields'] ?? null;
+		$metadata    = \DataMachine\Core\ExecutionQuery::normalize_metadata_filters( $input['metadata'] ?? array() );
 
 		// Direct job lookup by ID - bypasses pagination and filters.
 		if ( $job_id ) {
@@ -242,15 +254,25 @@ class GetJobsAbility {
 			$filters_applied['hide_children'] = true;
 		}
 
-		$jobs  = $this->db_jobs->get_jobs_for_list_table( $args );
-		$total = $this->db_jobs->get_jobs_count( $args );
+		$metadata_query = array();
+		if ( ! empty( $metadata ) ) {
+			$args['metadata']            = $metadata;
+			$args['metadata_scan_limit'] = (int) ( $input['metadata_scan_limit'] ?? 1000 );
+			$metadata_query              = $this->db_jobs->query_executions_by_metadata( $args );
+			$jobs                        = $metadata_query['jobs'];
+			$total                       = $metadata_query['total'];
+			$filters_applied['metadata'] = $metadata;
+		} else {
+			$jobs  = $this->db_jobs->get_jobs_for_list_table( $args );
+			$total = $this->db_jobs->get_jobs_count( $args );
+		}
 
 		if ( empty( $args['fields'] ) ) {
 			$jobs = $this->enrichJobNames( $jobs );
 		}
 		$jobs = array_map( array( $this, 'addDisplayFields' ), $jobs );
 
-		return array(
+		$result = array(
 			'success'         => true,
 			'jobs'            => $jobs,
 			'total'           => $total,
@@ -258,5 +280,14 @@ class GetJobsAbility {
 			'offset'          => $offset,
 			'filters_applied' => $filters_applied,
 		);
+
+		if ( ! empty( $metadata_query ) ) {
+			$result['metadata_query'] = array(
+				'scanned'    => $metadata_query['scanned'],
+				'scan_limit' => $metadata_query['scan_limit'],
+			);
+		}
+
+		return $result;
 	}
 }

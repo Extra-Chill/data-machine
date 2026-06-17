@@ -26,6 +26,7 @@ use DataMachine\Abilities\Job\RetryJobAbility;
 use DataMachine\Abilities\Engine\PipelineBatchScheduler;
 use DataMachine\Abilities\Job\RunMetricsAbility;
 use DataMachine\Core\AbilityResult;
+use DataMachine\Core\ExecutionQuery;
 use DataMachine\Core\JobArtifacts;
 use DataMachine\Core\RunMetrics;
 use DataMachine\Core\Database\Chat\ConversationStoreFactory;
@@ -1170,6 +1171,15 @@ class JobsCommand extends BaseCommand {
 	 * [--fields=<fields>]
 	 * : Limit output to specific fields (comma-separated).
 	 *
+	 * [--metadata=<filters>]
+	 * : Exact metadata filters as comma-separated key=value pairs. Keys are engine_data dot-paths.
+	 *
+	 * [--metadata-scan-limit=<limit>]
+	 * : Maximum candidate jobs to scan after indexed filters when applying metadata filters.
+	 * ---
+	 * default: 1000
+	 * ---
+	 *
 	 * ## EXAMPLES
 	 *
 	 *     # List recent jobs
@@ -1198,6 +1208,9 @@ class JobsCommand extends BaseCommand {
 	 *
 	 *     # Show all jobs since midnight
 	 *     wp datamachine jobs list --since=today
+	 *
+	 *     # Find executions by generic metadata
+	 *     wp datamachine jobs list --metadata="task_type=daily,source.slug=example"
 	 *
 	 * @subcommand list
 	 */
@@ -1246,6 +1259,17 @@ class JobsCommand extends BaseCommand {
 
 		if ( ! empty( $assoc_args['handler'] ) ) {
 			$input['handler'] = (string) $assoc_args['handler'];
+		}
+
+		if ( ! empty( $assoc_args['metadata'] ) ) {
+			$metadata = ExecutionQuery::parse_metadata_filter_string( (string) $assoc_args['metadata'] );
+			if ( empty( $metadata ) ) {
+				WP_CLI::error( 'Invalid --metadata value. Use comma-separated key=value pairs.' );
+				return;
+			}
+
+			$input['metadata']            = $metadata;
+			$input['metadata_scan_limit'] = (int) ( $assoc_args['metadata-scan-limit'] ?? 1000 );
 		}
 
 		$since = $assoc_args['since'] ?? null;

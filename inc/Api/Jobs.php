@@ -108,6 +108,19 @@ class Jobs {
 						'default'     => false,
 						'description' => __( 'Hide child jobs from top-level list', 'data-machine' ),
 					),
+					'metadata'      => array(
+						'required'    => false,
+						'type'        => 'object',
+						'description' => __( 'Exact metadata filters keyed by engine_data dot-path.', 'data-machine' ),
+					),
+					'metadata_scan_limit' => array(
+						'required'    => false,
+						'type'        => 'integer',
+						'default'     => 1000,
+						'minimum'     => 1,
+						'maximum'     => 5000,
+						'description' => __( 'Maximum candidate jobs to scan when applying exact metadata filters.', 'data-machine' ),
+					),
 				),
 			)
 		);
@@ -208,10 +221,16 @@ class Jobs {
 		if ( $request->get_param( 'hide_children' ) ) {
 			$input['hide_children'] = true;
 		}
+		if ( is_array( $request->get_param( 'metadata' ) ) ) {
+			$input['metadata'] = $request->get_param( 'metadata' );
+		}
+		if ( $request->get_param( 'metadata_scan_limit' ) ) {
+			$input['metadata_scan_limit'] = (int) $request->get_param( 'metadata_scan_limit' );
+		}
 
 		$result = ( new GetJobsAbility() )->execute( $input );
 
-		return AbilityResult::rest_collection_response( $result, 'jobs', array( 'top_extra' => array( 'filters_applied' ) ), 'get_jobs_failed', __( 'Failed to get jobs.', 'data-machine' ) );
+		return AbilityResult::rest_collection_response( $result, 'jobs', array( 'top_extra' => array( 'filters_applied', 'metadata_query' ) ), 'get_jobs_failed', __( 'Failed to get jobs.', 'data-machine' ) );
 	}
 
 	/**
