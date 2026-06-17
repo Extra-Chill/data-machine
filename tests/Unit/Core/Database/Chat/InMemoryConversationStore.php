@@ -364,11 +364,57 @@ class InMemoryConversationStore implements ConversationStoreInterface {
 		return $deleted;
 	}
 
+	public function count_old_sessions( int $retention_days, bool $exclude_pipeline_transcripts = false ): int {
+		$cutoff = gmdate( 'Y-m-d H:i:s', time() - ( $retention_days * DAY_IN_SECONDS ) );
+		$count  = 0;
+		foreach ( $this->sessions as $session ) {
+			if ( $exclude_pipeline_transcripts && 'pipeline' === ( $session['mode'] ?? '' ) && 'pipeline_transcript' === ( $session['metadata']['source'] ?? '' ) ) {
+				continue;
+			}
+
+			if ( $session['updated_at'] < $cutoff ) {
+				++$count;
+			}
+		}
+		return $count;
+	}
+
 	public function cleanup_old_sessions( int $retention_days ): int {
 		$cutoff  = gmdate( 'Y-m-d H:i:s', time() - ( $retention_days * DAY_IN_SECONDS ) );
 		$deleted = 0;
 		foreach ( $this->sessions as $id => $session ) {
 			if ( $session['updated_at'] < $cutoff ) {
+				unset( $this->sessions[ $id ] );
+				++$deleted;
+			}
+		}
+		return $deleted;
+	}
+
+	public function count_old_pipeline_transcripts( int $retention_days ): int {
+		if ( $retention_days <= 0 ) {
+			return 0;
+		}
+
+		$cutoff = gmdate( 'Y-m-d H:i:s', time() - ( $retention_days * DAY_IN_SECONDS ) );
+		$count  = 0;
+		foreach ( $this->sessions as $session ) {
+			if ( 'pipeline' === ( $session['mode'] ?? '' ) && 'pipeline_transcript' === ( $session['metadata']['source'] ?? '' ) && $session['updated_at'] < $cutoff ) {
+				++$count;
+			}
+		}
+		return $count;
+	}
+
+	public function cleanup_pipeline_transcripts( int $retention_days ): int {
+		if ( $retention_days <= 0 ) {
+			return 0;
+		}
+
+		$cutoff  = gmdate( 'Y-m-d H:i:s', time() - ( $retention_days * DAY_IN_SECONDS ) );
+		$deleted = 0;
+		foreach ( $this->sessions as $id => $session ) {
+			if ( 'pipeline' === ( $session['mode'] ?? '' ) && 'pipeline_transcript' === ( $session['metadata']['source'] ?? '' ) && $session['updated_at'] < $cutoff ) {
 				unset( $this->sessions[ $id ] );
 				++$deleted;
 			}

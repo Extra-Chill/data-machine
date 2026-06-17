@@ -949,75 +949,7 @@ class RetentionCleanup {
 	}
 
 	public static function countOldFiles(): int {
-		$upload_dir  = wp_upload_dir();
-		$base        = trailingslashit( $upload_dir['basedir'] ) . 'datamachine-files';
-		$cutoff_time = time() - ( self::fileRetentionDays() * DAY_IN_SECONDS );
-		$count       = 0;
-
-		if ( ! is_dir( $base ) ) {
-			return 0;
-		}
-
-		$pipeline_dirs = glob( "{$base}/pipeline-*", GLOB_ONLYDIR );
-		if ( false === $pipeline_dirs ) {
-			$pipeline_dirs = array();
-		}
-
-		foreach ( $pipeline_dirs as $pipeline_dir ) {
-			$flow_dirs = glob( "{$pipeline_dir}/flow-*", GLOB_ONLYDIR );
-			if ( false === $flow_dirs ) {
-				$flow_dirs = array();
-			}
-
-			foreach ( $flow_dirs as $flow_dir ) {
-				$flow_id   = basename( $flow_dir );
-				$files_dir = "{$flow_dir}/{$flow_id}-files";
-
-				if ( is_dir( $files_dir ) ) {
-					$files = glob( "{$files_dir}/*" );
-					if ( false === $files ) {
-						$files = array();
-					}
-
-					foreach ( $files as $file ) {
-						if ( is_file( $file ) && filemtime( $file ) < $cutoff_time ) {
-							++$count;
-						}
-					}
-				}
-
-				$jobs_dir = "{$flow_dir}/jobs";
-				$job_dirs = glob( "{$jobs_dir}/job-*", GLOB_ONLYDIR );
-				if ( false === $job_dirs ) {
-					$job_dirs = array();
-				}
-
-				foreach ( $job_dirs as $job_dir ) {
-					$files = glob( "{$job_dir}/*" );
-					if ( false === $files ) {
-						$files = array();
-					}
-
-					if ( empty( $files ) ) {
-						continue;
-					}
-
-					$all_old = true;
-					foreach ( $files as $file ) {
-						if ( is_file( $file ) && filemtime( $file ) >= $cutoff_time ) {
-							$all_old = false;
-							break;
-						}
-					}
-
-					if ( $all_old ) {
-						++$count;
-					}
-				}
-			}
-		}
-
-		return $count;
+		return ( new FileCleanup() )->count_old_files( self::fileRetentionDays() );
 	}
 
 	public static function cleanupOldFiles(): array {
@@ -1067,58 +999,17 @@ class RetentionCleanup {
 	}
 
 	public static function countChatSessions(): int {
-		global $wpdb;
+		$chat_db = ConversationStoreFactory::get();
 
-		if ( ! Chat::table_exists() ) {
+		if ( $chat_db instanceof Chat && ! Chat::table_exists() ) {
 			return 0;
 		}
 
-		$table                     = Chat::get_prefixed_table_name();
 		$retention_days            = self::chatRetentionDays();
 		$transcript_retention_days = self::transcriptRetentionDays();
-		$session_cutoff            = gmdate( 'Y-m-d H:i:s', time() - ( $retention_days * DAY_IN_SECONDS ) );
-		$transcript_count          = 0;
+		$transcript_count          = method_exists( $chat_db, 'count_old_pipeline_transcripts' ) ? $chat_db->count_old_pipeline_transcripts( $transcript_retention_days ) : 0;
 
-		if ( $transcript_retention_days > 0 ) {
-			$transcript_cutoff = gmdate( 'Y-m-d H:i:s', time() - ( $transcript_retention_days * DAY_IN_SECONDS ) );
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-			$transcript_count = (int) $wpdb->get_var(
-				$wpdb->prepare(
-					'SELECT COUNT(*) FROM %i
-					WHERE mode = %s
-					AND metadata LIKE %s
-					AND updated_at < %s',
-					$table,
-					'pipeline',
-					'%"source":"pipeline_transcript"%',
-					$transcript_cutoff
-				)
-			);
-		}
-
-		if ( $transcript_retention_days > 0 ) {
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-			$session_count = (int) $wpdb->get_var(
-				$wpdb->prepare(
-					'SELECT COUNT(*) FROM %i
-					WHERE updated_at < %s
-					AND NOT (mode = %s AND metadata LIKE %s)',
-					$table,
-					$session_cutoff,
-					'pipeline',
-					'%"source":"pipeline_transcript"%'
-				)
-			);
-		} else {
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-			$session_count = (int) $wpdb->get_var(
-				$wpdb->prepare(
-					'SELECT COUNT(*) FROM %i WHERE updated_at < %s',
-					$table,
-					$session_cutoff
-				)
-			);
-		}
+		$session_count = $chat_db->count_old_sessions( $retention_days, $transcript_retention_days > 0 );
 
 		return $transcript_count + $session_count;
 	}

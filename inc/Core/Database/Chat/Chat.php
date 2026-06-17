@@ -1486,6 +1486,44 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 	}
 
 	/**
+	 * Count old sessions based on retention period.
+	 *
+	 * @param int  $retention_days               Days to retain sessions.
+	 * @param bool $exclude_pipeline_transcripts Whether pipeline transcripts are counted separately.
+	 * @return int Number of matching sessions.
+	 */
+	public function count_old_sessions( int $retention_days, bool $exclude_pipeline_transcripts = false ): int {
+		global $wpdb;
+
+		$table_name  = self::get_prefixed_table_name();
+		$cutoff_date = gmdate( 'Y-m-d H:i:s', time() - ( $retention_days * DAY_IN_SECONDS ) );
+
+		if ( $exclude_pipeline_transcripts ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			return (int) $wpdb->get_var(
+				$wpdb->prepare(
+					'SELECT COUNT(*) FROM %i
+					WHERE updated_at < %s
+					AND NOT (mode = %s AND metadata LIKE %s)',
+					$table_name,
+					$cutoff_date,
+					'pipeline',
+					'%"source":"pipeline_transcript"%'
+				)
+			);
+		}
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		return (int) $wpdb->get_var(
+			$wpdb->prepare(
+				'SELECT COUNT(*) FROM %i WHERE updated_at < %s',
+				$table_name,
+				$cutoff_date
+			)
+		);
+	}
+
+	/**
 	 * Cleanup old sessions based on retention period
 	 *
 	 * @param int $retention_days Days to retain sessions
@@ -1521,6 +1559,38 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 		}
 
 		return (int) $deleted;
+	}
+
+	/**
+	 * Count pipeline transcript sessions older than the retention window.
+	 *
+	 * @since next
+	 * @param int $retention_days Days to retain pipeline transcripts.
+	 * @return int Number of matching transcript sessions.
+	 */
+	public function count_old_pipeline_transcripts( int $retention_days ): int {
+		global $wpdb;
+
+		if ( $retention_days <= 0 ) {
+			return 0;
+		}
+
+		$table_name  = self::get_prefixed_table_name();
+		$cutoff_date = gmdate( 'Y-m-d H:i:s', time() - ( $retention_days * DAY_IN_SECONDS ) );
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		return (int) $wpdb->get_var(
+			$wpdb->prepare(
+				'SELECT COUNT(*) FROM %i
+				WHERE mode = %s
+				AND metadata LIKE %s
+				AND updated_at < %s',
+				$table_name,
+				'pipeline',
+				'%"source":"pipeline_transcript"%',
+				$cutoff_date
+			)
+		);
 	}
 
 	/**
