@@ -88,11 +88,7 @@ class RecoverStuckJobsAbility {
 			);
 		};
 
-		if ( doing_action( 'wp_abilities_api_init' ) ) {
-			$register_callback();
-		} elseif ( ! did_action( 'wp_abilities_api_init' ) ) {
-			add_action( 'wp_abilities_api_init', $register_callback );
-		}
+		\DataMachine\Abilities\AbilityRegistration::on_abilities_api_init( $register_callback );
 	}
 
 	/**
