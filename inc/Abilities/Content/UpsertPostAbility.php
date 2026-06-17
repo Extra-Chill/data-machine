@@ -187,11 +187,7 @@ class UpsertPostAbility {
 			);
 		};
 
-		if ( doing_action( 'wp_abilities_api_init' ) ) {
-			$register();
-		} elseif ( ! did_action( 'wp_abilities_api_init' ) ) {
-			add_action( 'wp_abilities_api_init', $register );
-		}
+		\DataMachine\Abilities\AbilityRegistration::on_abilities_api_init( $register );
 	}
 
 	/**
