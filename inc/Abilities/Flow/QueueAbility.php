@@ -36,6 +36,7 @@ use DataMachine\Core\Database\Flows\Flows as DB_Flows;
 use DataMachine\Core\Database\Pipelines\Pipelines as DB_Pipelines;
 use DataMachine\Abilities\DuplicateCheck\DuplicateCheckAbility;
 use DataMachine\Core\Steps\FlowStepConfig;
+use DataMachine\Engine\ExecutionPlan;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -1655,6 +1656,203 @@ class QueueAbility {
 				'queue_mode' => $queue_mode,
 			)
 		);
+
+		return null;
+	}
+
+	/**
+	 * Build an engine_data backup for a queue entry consumed from flow config.
+	 *
+	 * Only drain-mode consumes need restoration. Loop mode has already rotated the
+	 * consumed entry back to the tail, and static mode never mutates storage.
+	 *
+	 * @param int    $flow_id      Flow ID.
+	 * @param string $flow_step_id Flow step ID.
+	 * @param string $slot         Queue slot name.
+	 * @param string $queue_mode   Queue consumption mode.
+	 * @param array  $entry        Consumed queue entry.
+	 * @return array|null Backup payload, or null when no restoration is needed.
+	 */
+	public static function createConsumedEntryBackup(
+		int $flow_id,
+		string $flow_step_id,
+		string $slot,
+		string $queue_mode,
+		array $entry
+	): ?array {
+		if ( 'drain' !== $queue_mode ) {
+			return null;
+		}
+
+		$backup = array(
+			'slot'         => $slot,
+			'mode'         => $queue_mode,
+			'flow_id'      => $flow_id,
+			'flow_step_id' => $flow_step_id,
+			'added_at'     => $entry['added_at'] ?? null,
+		);
+
+		if ( self::SLOT_CONFIG_PATCH_QUEUE === $slot && isset( $entry['patch'] ) && is_array( $entry['patch'] ) ) {
+			$backup['patch'] = $entry['patch'];
+		} elseif ( self::SLOT_PROMPT_QUEUE === $slot && isset( $entry['prompt'] ) ) {
+			$backup['prompt'] = $entry['prompt'];
+		} else {
+			return null;
+		}
+
+		return $backup;
+	}
+
+	/**
+	 * Restore a consumed queue-entry backup to a persisted flow config.
+	 *
+	 * @param int           $flow_id  Flow ID.
+	 * @param array         $backup   Backup payload from job engine_data.
+	 * @param DB_Flows|null $db_flows Optional database instance.
+	 * @return bool Whether an entry was restored.
+	 */
+	public static function restoreConsumedEntryBackup(
+		int $flow_id,
+		array $backup,
+		?DB_Flows $db_flows = null
+	): bool {
+		if ( null === $db_flows ) {
+			$db_flows = new DB_Flows();
+		}
+
+		$flow = $db_flows->get_flow( $flow_id );
+		if ( ! $flow || ! isset( $flow['flow_config'] ) || ! is_array( $flow['flow_config'] ) ) {
+			return false;
+		}
+
+		$flow_config = $flow['flow_config'];
+		if ( ! self::restoreConsumedEntryBackupToFlowConfig( $flow_config, $backup ) ) {
+			return false;
+		}
+
+		return (bool) $db_flows->update_flow( $flow_id, array( 'flow_config' => $flow_config ) );
+	}
+
+	/**
+	 * Apply consumed queue-entry backup restoration to an in-memory flow config.
+	 *
+	 * @param array $flow_config Flow config to mutate when restoration is needed.
+	 * @param array $backup      Backup payload from job engine_data.
+	 * @return bool Whether an entry was appended.
+	 */
+	public static function restoreConsumedEntryBackupToFlowConfig(
+		array &$flow_config,
+		array $backup
+	): bool {
+		if ( 'drain' !== ( $backup['mode'] ?? 'drain' ) || empty( $backup['flow_step_id'] ) ) {
+			return false;
+		}
+
+		$step_id = (string) $backup['flow_step_id'];
+		if ( ! isset( $flow_config[ $step_id ] ) || ! is_array( $flow_config[ $step_id ] ) ) {
+			return false;
+		}
+
+		$slot  = $backup['slot'] ?? self::SLOT_PROMPT_QUEUE;
+		$entry = null;
+
+		if ( self::SLOT_CONFIG_PATCH_QUEUE === $slot && isset( $backup['patch'] ) && is_array( $backup['patch'] ) ) {
+			$entry = array(
+				'patch'    => $backup['patch'],
+				'added_at' => $backup['added_at'] ?? gmdate( 'c' ),
+			);
+		} elseif ( isset( $backup['prompt'] ) ) {
+			$slot  = self::SLOT_PROMPT_QUEUE;
+			$entry = array(
+				'prompt'   => $backup['prompt'],
+				'added_at' => $backup['added_at'] ?? gmdate( 'c' ),
+			);
+		}
+
+		if ( null === $entry ) {
+			return false;
+		}
+
+		if ( ! isset( $flow_config[ $step_id ][ $slot ] ) || ! is_array( $flow_config[ $step_id ][ $slot ] ) ) {
+			$flow_config[ $step_id ][ $slot ] = array();
+		}
+
+		$flow_config[ $step_id ][ $slot ][] = $entry;
+
+		return true;
+	}
+
+	/**
+	 * Return first-step drain queue work availability for a flow config.
+	 *
+	 * @param mixed $flow_config_json Raw flow config JSON or decoded array.
+	 * @return array{flow_step_id:string,queue_mode:string,slot:string,has_work:bool,reason:string}|null
+	 */
+	public static function firstDrainQueueWorkAvailability( mixed $flow_config_json ): ?array {
+		$flow_config = is_array( $flow_config_json ) ? $flow_config_json : json_decode( (string) $flow_config_json, true );
+		if ( ! is_array( $flow_config ) ) {
+			return null;
+		}
+
+		try {
+			$first_flow_step_id = ExecutionPlan::from_flow_config( $flow_config )->first_step_id();
+		} catch ( \InvalidArgumentException $e ) {
+			return null;
+		}
+
+		if ( ! $first_flow_step_id || ! isset( $flow_config[ $first_flow_step_id ] ) || ! is_array( $flow_config[ $first_flow_step_id ] ) ) {
+			return null;
+		}
+
+		$first_step = $flow_config[ $first_flow_step_id ];
+		if ( 'drain' !== (string) ( $first_step['queue_mode'] ?? 'static' ) ) {
+			return null;
+		}
+
+		$slot = self::queueSlotForStepConfig( $first_step );
+		if ( null === $slot ) {
+			return null;
+		}
+
+		$queue = $first_step[ $slot ] ?? array();
+		return array(
+			'flow_step_id' => (string) $first_flow_step_id,
+			'queue_mode'   => 'drain',
+			'slot'         => $slot,
+			'has_work'     => is_array( $queue ) && ! empty( $queue ),
+			'reason'       => 'empty_drain_queue',
+		);
+	}
+
+	/**
+	 * Determine whether the first drain-mode queue has queued work now.
+	 *
+	 * @param mixed $flow_config_json Raw flow config JSON or decoded array.
+	 * @return bool True when queued work should bypass suppression.
+	 */
+	public static function firstDrainQueueHasWork( mixed $flow_config_json ): bool {
+		$availability = self::firstDrainQueueWorkAvailability( $flow_config_json );
+		return true === ( $availability['has_work'] ?? false );
+	}
+
+	/**
+	 * Resolve the queue slot a step config consumes from.
+	 *
+	 * @param array $step_config Flow step config.
+	 * @return string|null Queue slot name.
+	 */
+	private static function queueSlotForStepConfig( array $step_config ): ?string {
+		if ( 'fetch' === (string) ( $step_config['step_type'] ?? '' ) ) {
+			return self::SLOT_CONFIG_PATCH_QUEUE;
+		}
+
+		if ( array_key_exists( self::SLOT_PROMPT_QUEUE, $step_config ) ) {
+			return self::SLOT_PROMPT_QUEUE;
+		}
+
+		if ( array_key_exists( self::SLOT_CONFIG_PATCH_QUEUE, $step_config ) ) {
+			return self::SLOT_CONFIG_PATCH_QUEUE;
+		}
 
 		return null;
 	}

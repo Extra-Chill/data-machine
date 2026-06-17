@@ -230,25 +230,18 @@ trait QueueableTrait {
 			)
 		);
 
-		// Store backup of the popped prompt in engine data for retry on
-		// failure. Static mode never mutates so no rollback is needed —
-		// re-running the static tick re-peeks the same entry naturally.
-		if ( 'static' !== $queue_mode
-			&& property_exists( $this, 'job_id' )
-			&& ! empty( $this->job_id )
-		) {
+		// Store backup of drain-mode consumed entries for retry/failure restore.
+		$backup = QueueAbility::createConsumedEntryBackup(
+			(int) $flow_id,
+			$this->flow_step_id,
+			QueueAbility::SLOT_PROMPT_QUEUE,
+			$queue_mode,
+			$entry
+		);
+		if ( null !== $backup && property_exists( $this, 'job_id' ) && ! empty( $this->job_id ) ) {
 			\datamachine_merge_engine_data(
 				$this->job_id,
-				array(
-					'queued_prompt_backup' => array(
-						'slot'         => QueueAbility::SLOT_PROMPT_QUEUE,
-						'mode'         => $queue_mode,
-						'prompt'       => $entry['prompt'],
-						'flow_id'      => (int) $flow_id,
-						'flow_step_id' => $this->flow_step_id,
-						'added_at'     => $entry['added_at'] ?? null,
-					),
-				)
+				array( 'queued_prompt_backup' => $backup )
 			);
 		}
 
@@ -298,22 +291,17 @@ trait QueueableTrait {
 			)
 		);
 
-		if ( 'static' !== $queue_mode
-			&& property_exists( $this, 'job_id' )
-			&& ! empty( $this->job_id )
-		) {
+		$backup = QueueAbility::createConsumedEntryBackup(
+			(int) $flow_id,
+			$this->flow_step_id,
+			QueueAbility::SLOT_CONFIG_PATCH_QUEUE,
+			$queue_mode,
+			$entry
+		);
+		if ( null !== $backup && property_exists( $this, 'job_id' ) && ! empty( $this->job_id ) ) {
 			\datamachine_merge_engine_data(
 				$this->job_id,
-				array(
-					'queued_prompt_backup' => array(
-						'slot'         => QueueAbility::SLOT_CONFIG_PATCH_QUEUE,
-						'mode'         => $queue_mode,
-						'patch'        => $entry['patch'],
-						'flow_id'      => (int) $flow_id,
-						'flow_step_id' => $this->flow_step_id,
-						'added_at'     => $entry['added_at'] ?? null,
-					),
-				)
+				array( 'queued_prompt_backup' => $backup )
 			);
 		}
 

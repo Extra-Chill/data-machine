@@ -8,6 +8,7 @@
 
 namespace DataMachine\Engine\Actions\Handlers;
 
+use DataMachine\Abilities\Flow\QueueAbility;
 use DataMachine\Core\JobRetryPolicy;
 
 /**
@@ -73,45 +74,37 @@ class FailJobHandler {
 
 		$success = $db_jobs->complete_job( $job_id, $status->toString() );
 
-		// Re-queue logic: If a queued prompt was popped but the job failed, add it back.
+		// Restore a drain-mode queue entry if the job failed after consuming it.
 		$engine_data = \datamachine_get_engine_data( $job_id );
 		if ( isset( $engine_data['queued_prompt_backup'] ) && is_array( $engine_data['queued_prompt_backup'] ) ) {
 			$backup = $engine_data['queued_prompt_backup'];
-			if ( ! empty( $backup['prompt'] ) && ! empty( $backup['flow_id'] ) && ! empty( $backup['flow_step_id'] ) ) {
-				$queue_ability = new \DataMachine\Abilities\Flow\QueueAbility();
-				$result        = $queue_ability->executeQueueAdd(
-					array(
-						'flow_id'      => (int) $backup['flow_id'],
-						'flow_step_id' => (string) $backup['flow_step_id'],
-						'prompt'       => $backup['prompt'],
-					)
-				);
+			if ( ! empty( $backup['flow_id'] ) && ! empty( $backup['flow_step_id'] ) ) {
+				$restored = QueueAbility::restoreConsumedEntryBackup( (int) $backup['flow_id'], $backup );
 
-				if ( ! empty( $result['success'] ) ) {
+				if ( $restored ) {
 					unset( $engine_data['queued_prompt_backup'] );
 					\datamachine_set_engine_data( $job_id, $engine_data );
 					do_action(
 						'datamachine_log',
 						'info',
-						'Prompt re-queued to back due to job failure',
+						'Queue entry restored due to job failure',
 						array(
 							'job_id'       => $job_id,
 							'flow_id'      => (int) $backup['flow_id'],
 							'flow_step_id' => (string) $backup['flow_step_id'],
-							'prompt'       => $backup['prompt'],
+							'slot'         => (string) ( $backup['slot'] ?? QueueAbility::SLOT_PROMPT_QUEUE ),
 						)
 					);
 				} else {
 					do_action(
 						'datamachine_log',
 						'error',
-						'Failed to re-queue prompt after job failure - backup retained in engine_data',
+						'Failed to restore queue entry after job failure - backup retained in engine_data',
 						array(
 							'job_id'       => $job_id,
 							'flow_id'      => (int) $backup['flow_id'],
 							'flow_step_id' => (string) $backup['flow_step_id'],
-							'prompt'       => $backup['prompt'],
-							'queue_error'  => $result['error'] ?? 'unknown',
+							'slot'         => (string) ( $backup['slot'] ?? QueueAbility::SLOT_PROMPT_QUEUE ),
 						)
 					);
 				}

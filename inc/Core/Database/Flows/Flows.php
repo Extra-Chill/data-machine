@@ -4,7 +4,6 @@ namespace DataMachine\Core\Database\Flows;
 
 use DataMachine\Abilities\Flow\QueueAbility;
 use DataMachine\Core\Database\BaseRepository;
-use DataMachine\Engine\ExecutionPlan;
 
 /**
  * Flows Database Class
@@ -1174,32 +1173,7 @@ class Flows extends BaseRepository {
 	 * @return bool True when new queued work should bypass suppression.
 	 */
 	private static function first_drain_queue_has_work( mixed $flow_config_json ): bool {
-		$flow_config = is_array( $flow_config_json ) ? $flow_config_json : json_decode( (string) $flow_config_json, true );
-		if ( ! is_array( $flow_config ) ) {
-			return false;
-		}
-
-		try {
-			$first_flow_step_id = ExecutionPlan::from_flow_config( $flow_config )->first_step_id();
-		} catch ( \InvalidArgumentException $e ) {
-			return false;
-		}
-
-		if ( ! $first_flow_step_id || ! isset( $flow_config[ $first_flow_step_id ] ) || ! is_array( $flow_config[ $first_flow_step_id ] ) ) {
-			return false;
-		}
-
-		$first_step = $flow_config[ $first_flow_step_id ];
-		if ( 'fetch' !== (string) ( $first_step['step_type'] ?? '' ) ) {
-			return false;
-		}
-
-		if ( 'drain' !== (string) ( $first_step['queue_mode'] ?? 'static' ) ) {
-			return false;
-		}
-
-		$queue = $first_step[ QueueAbility::SLOT_CONFIG_PATCH_QUEUE ] ?? array();
-		return is_array( $queue ) && ! empty( $queue );
+		return QueueAbility::firstDrainQueueHasWork( $flow_config_json );
 	}
 
 	/**
