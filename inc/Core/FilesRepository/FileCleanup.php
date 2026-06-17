@@ -144,16 +144,30 @@ class FileCleanup {
 	 * @return int Number of files deleted
 	 */
 	public function cleanup_old_files( int $retention_days = 7 ): int {
+		return $this->walk_old_files( $retention_days, true, false );
+	}
+
+	/**
+	 * Count old files and job directories eligible for cleanup.
+	 *
+	 * @param int $retention_days Files older than this many days are eligible.
+	 * @return int Number of eligible files/directories.
+	 */
+	public function count_old_files( int $retention_days = 7 ): int {
+		return $this->walk_old_files( $retention_days, false, true );
+	}
+
+	private function walk_old_files( int $retention_days, bool $delete, bool $count_job_dirs ): int {
 		$upload_dir    = wp_upload_dir();
 		$base          = trailingslashit( $upload_dir['basedir'] ) . self::REPOSITORY_DIR;
 		$cutoff_time   = time() - ( $retention_days * DAY_IN_SECONDS );
-		$deleted_count = 0;
+		$matched_count = 0;
 
 		if ( ! is_dir( $base ) ) {
 			return 0;
 		}
 
-		// Traverse: pipeline → flow → files
+		// Traverse: pipeline -> flow -> files.
 		$pipeline_dirs = glob( "{$base}/pipeline-*", GLOB_ONLYDIR );
 		$pipeline_dirs = is_array( $pipeline_dirs ) ? $pipeline_dirs : array();
 
@@ -170,13 +184,17 @@ class FileCleanup {
 					$files = glob( "{$files_dir}/*" );
 					$files = is_array( $files ) ? $files : array();
 					foreach ( $files as $file ) {
-						if ( is_file( $file ) && filemtime( $file ) < $cutoff_time && wp_delete_file( $file ) ) {
-							++$deleted_count;
+						if ( ! is_file( $file ) || filemtime( $file ) >= $cutoff_time ) {
+							continue;
+						}
+
+						if ( ! $delete || wp_delete_file( $file ) ) {
+							++$matched_count;
 						}
 					}
 
 					// Remove empty files directory
-					if ( empty( glob( "{$files_dir}/*" ) ) ) {
+					if ( $delete && empty( glob( "{$files_dir}/*" ) ) ) {
 						$this->remove_directory( $files_dir );
 					}
 				}
@@ -200,19 +218,25 @@ class FileCleanup {
 						}
 
 						if ( $all_old && ! empty( $files ) ) {
-							$this->remove_directory( $job_dir );
+							if ( $delete ) {
+								$this->remove_directory( $job_dir );
+							}
+
+							if ( $count_job_dirs ) {
+								++$matched_count;
+							}
 						}
 					}
 
 					// Remove empty jobs directory
-					if ( empty( glob( "{$jobs_dir}/*" ) ) ) {
+					if ( $delete && empty( glob( "{$jobs_dir}/*" ) ) ) {
 						$this->remove_directory( $jobs_dir );
 					}
 				}
 			}
 		}
 
-		return $deleted_count;
+		return $matched_count;
 	}
 
 	/**

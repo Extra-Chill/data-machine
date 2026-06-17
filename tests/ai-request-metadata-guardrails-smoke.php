@@ -169,7 +169,10 @@ class RequestMetadataSmokeStore implements ConversationStoreInterface {
 	public function count_unread( array $messages, ?string $last_read_at ): int { return 0; }
 	public function mark_session_read( string $session_id, int $user_id ) { return gmdate( 'Y-m-d H:i:s' ); }
 	public function cleanup_expired_sessions(): int { return 0; }
+	public function count_old_sessions( int $retention_days, bool $exclude_pipeline_transcripts = false ): int { return 0; }
 	public function cleanup_old_sessions( int $retention_days ): int { return 0; }
+	public function count_old_pipeline_transcripts( int $retention_days ): int { return 0; }
+	public function cleanup_pipeline_transcripts( int $retention_days ): int { return 0; }
 	public function cleanup_orphaned_sessions( int $hours = 1 ): int { return 0; }
 	public function list_sessions_for_day( string $date ): array { return array(); }
 	public function get_storage_metrics(): ?array { return array( 'rows' => 0, 'size_mb' => '0.0' ); }
