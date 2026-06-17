@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.150.6] - 2026-06-17
+
+### Fixed
+- match live-origin bundle flows by rename-proof handler identity in adopt (#2683)
+
 ## [0.150.5] - 2026-06-17
 
 ### Changed
