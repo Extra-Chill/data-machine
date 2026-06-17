@@ -780,8 +780,9 @@ class Jobs extends BaseRepository {
 			return array();
 		}
 
-        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		// phpcs:disable WordPress.DB.PreparedSQL -- Table name and flow ID are prepared.
 		$results = $this->wpdb->get_results( $this->wpdb->prepare( 'SELECT * FROM %i WHERE flow_id = %s ORDER BY created_at DESC', $this->table_name, (string) $flow_id ), ARRAY_A );
+		// phpcs:enable WordPress.DB.PreparedSQL
 
 		return $results ? $results : array();
 	}
@@ -807,7 +808,7 @@ class Jobs extends BaseRepository {
 			return array();
 		}
 
-		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared -- Query is prepared on the next line.
+		// phpcs:disable WordPress.DB.PreparedSQL -- Query is prepared on the next line.
 		$rows = $this->wpdb->get_results(
 			$this->wpdb->prepare(
 				'SELECT * FROM %i WHERE parent_job_id = %d ORDER BY job_id ASC',
@@ -816,7 +817,7 @@ class Jobs extends BaseRepository {
 			),
 			ARRAY_A
 		);
-		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
+		// phpcs:enable WordPress.DB.PreparedSQL
 
 		if ( empty( $rows ) ) {
 			return array();
@@ -863,7 +864,7 @@ class Jobs extends BaseRepository {
 		$placeholders = implode( ',', array_fill( 0, count( $flow_ids ), '%s' ) );
 
 		// Subquery to get max job_id per flow, then join to get full row
-		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
+		// phpcs:disable WordPress.DB.PreparedSQL, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
 		$query = $this->wpdb->prepare(
 			"SELECT j.* FROM %i j
              INNER JOIN (
@@ -874,10 +875,11 @@ class Jobs extends BaseRepository {
              ) latest ON j.job_id = latest.max_job_id",
 			array_merge( array( $this->table_name, $this->table_name ), $flow_ids )
 		);
-		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
+		// phpcs:enable WordPress.DB.PreparedSQL, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
 
-		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Query is prepared above
+		// phpcs:disable WordPress.DB.PreparedSQL -- Query is prepared above.
 		$results = $this->wpdb->get_results( $query, ARRAY_A );
+		// phpcs:enable WordPress.DB.PreparedSQL
 
 		if ( ! $results ) {
 			return array();
@@ -1028,11 +1030,13 @@ class Jobs extends BaseRepository {
 
 		if ( ! empty( $criteria['failed'] ) ) {
 			$failed_pattern = $this->wpdb->esc_like( 'failed' ) . '%';
-            // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			// phpcs:disable WordPress.DB.PreparedSQL -- Table name is the repository table; value is prepared.
 			$result = $this->wpdb->query( $this->wpdb->prepare( 'DELETE FROM %i WHERE status LIKE %s', $this->table_name, $failed_pattern ) );
+			// phpcs:enable WordPress.DB.PreparedSQL
 		} else {
-            // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			// phpcs:disable WordPress.DB.PreparedSQL -- Table name is the repository table.
 			$result = $this->wpdb->query( $this->wpdb->prepare( 'DELETE FROM %i', $this->table_name ) );
+			// phpcs:enable WordPress.DB.PreparedSQL
 		}
 
 		do_action(
@@ -1279,14 +1283,14 @@ class Jobs extends BaseRepository {
 	 * @return array Array of [flow_id => counts_array] for problem flows.
 	 */
 	public function get_problem_flow_ids( int $threshold = 3 ): array {
-        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		// phpcs:disable WordPress.DB.PreparedSQL -- Query is prepared below with repository table name.
 		$query = $this->wpdb->prepare(
 			"SELECT DISTINCT flow_id FROM %i WHERE flow_id != 'direct' AND flow_id REGEXP '^[0-9]+$'",
 			$this->table_name
 		);
 
-        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 		$flow_ids = $this->wpdb->get_col( $query );
+		// phpcs:enable WordPress.DB.PreparedSQL
 
 		if ( empty( $flow_ids ) ) {
 			return array();

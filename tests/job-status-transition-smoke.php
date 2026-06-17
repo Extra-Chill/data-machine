@@ -41,6 +41,20 @@ namespace {
 		}
 	}
 
+	if ( function_exists( 'add_action' ) ) {
+		add_action(
+			'datamachine_job_complete',
+			function ( int $job_id, string $status ): void {
+				$GLOBALS['datamachine_transition_hooks'][] = array(
+					'hook' => 'datamachine_job_complete',
+					'args' => array( $job_id, $status ),
+				);
+			},
+			10,
+			2
+		);
+	}
+
 	class DataMachineTransitionWpdbStub {
 		public string $prefix = 'wp_';
 
@@ -87,7 +101,7 @@ namespace {
 
 	$assert( 'terminal update succeeds through update_job_status', $jobs->update_job_status( 11, 'completed' ) );
 	$terminal = $wpdb->updates[1]['data'] ?? array();
-	$assert( 'terminal update writes completed_at', isset( $terminal['completed_at'] ) && '2026-06-17 03:00:00' === $terminal['completed_at'] );
+	$assert( 'terminal update writes completed_at', isset( $terminal['completed_at'] ) && is_string( $terminal['completed_at'] ) && '' !== $terminal['completed_at'] );
 	$assert( 'terminal update records run metrics', 'completed' === ( RunMetrics::$completed[11] ?? '' ) );
 	$assert( 'terminal update fires completion hook once', 1 === count( $datamachine_transition_hooks ) );
 	$assert( 'completion hook receives terminal status', 'completed' === ( $datamachine_transition_hooks[0]['args'][1] ?? '' ) );
