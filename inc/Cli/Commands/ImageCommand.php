@@ -355,8 +355,9 @@ class ImageCommand extends BaseCommand {
 		$configured    = ImageGenerationAbilities::is_configured();
 		$refinement    = ImageGenerationAbilities::is_refinement_enabled();
 		$config        = ImageGenerationAbilities::get_config();
-		$provider      = $config['default_provider'] ?? ImageGenerationAbilities::DEFAULT_PROVIDER;
-		$default_model = $config['default_model'] ?? ImageGenerationAbilities::DEFAULT_MODEL;
+		$defaults      = ImageGenerationAbilities::resolve_capability_defaults( $config );
+		$provider      = $config['default_provider'] ?? $defaults['provider'];
+		$default_model = $config['default_model'] ?? $defaults['model'];
 		$default_ratio = $config['default_aspect_ratio'] ?? ImageGenerationAbilities::DEFAULT_ASPECT_RATIO;
 
 		$items = array(
