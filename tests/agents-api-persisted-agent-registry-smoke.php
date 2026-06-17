@@ -80,6 +80,9 @@ class DataMachinePersistedAgentProjectorFakeRepository extends Agents {
 
 function datamachine_persisted_agent_registry_reset(): void {
 	WP_Agents_Registry::reset_for_tests();
+	if ( function_exists( 'remove_all_actions' ) ) {
+		remove_all_actions( 'wp_agents_api_init' );
+	}
 	$GLOBALS['__agents_api_smoke_actions'] = array();
 	$GLOBALS['__agents_api_smoke_wrong']   = array();
 	$GLOBALS['__agents_api_smoke_current'] = array();
