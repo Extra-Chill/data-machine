@@ -467,6 +467,174 @@ agent_bundle_slug_matcher_assert(
 	$passes
 );
 
+// ---- 14. Handler-identity fallback: rename-proof in-pipeline match. ---------
+// Reproduces the events-bot live-origin bundle shape that the slug AND name
+// fallbacks both miss (#2683). The in-memory bundle adopt loads carries each
+// flow's steps in `flow_config` (keyed by step id), its `flow_name` RENAMED to
+// "<Source> — <City>" (event-bundles#5) and its `portable_slug` deduped
+// ("dice-fm-101") — so neither the unique-slug pass nor the name fallback can
+// meet the live row, whose `flow_name` is still the bare source label
+// ("Dice.fm"). The import HANDLER is the only rename-proof identity, present on
+// BOTH sides as `flow_config[<step>].handler_slugs[0]`.
+$handler_live_rows = array(
+	// Pipeline 9 (Austin): one Dice.fm source flow + one Ticketmaster source flow.
+	array(
+		'flow_id'       => 26,
+		'pipeline_id'   => 9,
+		'flow_name'     => 'Dice.fm',
+		'portable_slug' => null,
+		'flow_config'   => array(
+			'9_a_26' => array( 'step_type' => 'event_import', 'execution_order' => 0, 'handler_slugs' => array( 'dice_fm' ) ),
+			'9_b_26' => array( 'step_type' => 'ai', 'execution_order' => 1 ),
+			'9_c_26' => array( 'step_type' => 'upsert', 'execution_order' => 2, 'handler_slugs' => array( 'upsert_event' ) ),
+		),
+	),
+	array(
+		'flow_id'       => 27,
+		'pipeline_id'   => 9,
+		'flow_name'     => 'Ticketmaster',
+		'portable_slug' => null,
+		'flow_config'   => array(
+			'9_d_27' => array( 'step_type' => 'event_import', 'execution_order' => 0, 'handler_slugs' => array( 'ticketmaster' ) ),
+			'9_e_27' => array( 'step_type' => 'ai', 'execution_order' => 1 ),
+		),
+	),
+);
+
+// Bundle flow (array-bundle shape): renamed name, deduped slug, no `steps`, the
+// handler lives in `flow_config` exactly like the live row.
+$handler_bundle_flow = array(
+	'original_pipeline_id' => 9,
+	'flow_name'            => 'Dice.fm — Austin',
+	'portable_slug'        => 'dice-fm-101',
+	'flow_config'          => array(
+		'1_bundle_step_0_70' => array( 'step_type' => 'event_import', 'execution_order' => 0, 'handler_slugs' => array( 'dice_fm' ) ),
+		'1_bundle_step_1_70' => array( 'step_type' => 'ai', 'execution_order' => 1 ),
+		'1_bundle_step_2_70' => array( 'step_type' => 'upsert', 'execution_order' => 2, 'handler_slugs' => array( 'upsert_event' ) ),
+	),
+);
+
+$h_slug_key = AgentBundleSlugMatcher::bundle_slug( $handler_bundle_flow, 'flow_name', 'flow' );
+$h_name_key = AgentBundleSlugMatcher::bundle_name_key( $handler_bundle_flow, 'flow_name', 'flow' );
+$h_handler  = AgentBundleSlugMatcher::bundle_handler_key( $handler_bundle_flow, 'flow' );
+
+agent_bundle_slug_matcher_assert(
+	'dice-fm-101' === $h_slug_key && 'dice-fm-austin' === $h_name_key && 'dice-fm' === $h_handler,
+	'events-bot shape: slug=dice-fm-101, name=dice-fm-austin, handler=dice-fm (rename-proof)',
+	$failures,
+	$passes
+);
+
+// Slug pass misses (live row has NULL slug -> keyed on "dice-fm").
+$h_slug_index = AgentBundleSlugMatcher::index_existing( $handler_live_rows, 'flow_name', 'flow' );
+agent_bundle_slug_matcher_assert(
+	! isset( $h_slug_index['matched'][ $h_slug_key ] ),
+	'events-bot shape: deduped slug "dice-fm-101" misses the slug pass (live keyed on "dice-fm")',
+	$failures,
+	$passes
+);
+// Name pass misses (bundle name "dice-fm-austin" vs live "dice-fm").
+$h_name_index = AgentBundleSlugMatcher::index_existing_by_name( $handler_live_rows, 'flow_name', 'flow' );
+agent_bundle_slug_matcher_assert(
+	! isset( $h_name_index['matched'][ $h_name_key ] ),
+	'events-bot shape: renamed name "dice-fm-austin" misses the name pass (live "dice-fm")',
+	$failures,
+	$passes
+);
+// Handler pass matches the correct row, unambiguously.
+$h_index = AgentBundleSlugMatcher::index_existing_by_handler( $handler_live_rows, 'flow' );
+agent_bundle_slug_matcher_assert(
+	isset( $h_index['matched']['dice-fm'] )
+		&& 26 === ( $h_index['matched']['dice-fm']['flow_id'] ?? 0 )
+		&& empty( $h_index['ambiguous'] ),
+	'events-bot shape: handler fallback binds "dice-fm" to its live row (flow_id 26), 0 ambiguous',
+	$failures,
+	$passes
+);
+agent_bundle_slug_matcher_assert(
+	isset( $h_index['matched']['ticketmaster'] ) && 27 === ( $h_index['matched']['ticketmaster']['flow_id'] ?? 0 ),
+	'events-bot shape: the sibling Ticketmaster source flow binds to flow_id 27 by handler',
+	$failures,
+	$passes
+);
+
+// ---- 15. Handler key ignores AI/output steps (source step only). -----------
+// The first non-AI / non-upsert / non-publish step defines the source. An
+// upsert-only or ai-only flow yields no handler key and falls back to name.
+$ai_upsert_only = array(
+	'flow_config' => array(
+		's0' => array( 'step_type' => 'ai', 'execution_order' => 0 ),
+		's1' => array( 'step_type' => 'upsert', 'execution_order' => 1, 'handler_slugs' => array( 'upsert_event' ) ),
+	),
+);
+agent_bundle_slug_matcher_assert(
+	'' === AgentBundleSlugMatcher::bundle_handler_key( $ai_upsert_only, 'flow' ),
+	'handler key is empty when a flow has only ai/upsert steps (no source handler)',
+	$failures,
+	$passes
+);
+
+// ---- 16. Handler key reads BOTH bundle shapes symmetrically. ---------------
+// On-disk document shape (steps[] ordered list) and in-memory array-bundle
+// shape (flow_config map) must derive the SAME key from the same flow.
+$doc_shape = array(
+	'steps' => array(
+		array( 'step_type' => 'event_import', 'step_position' => 0, 'handler_slugs' => array( 'dice_fm' ) ),
+		array( 'step_type' => 'ai', 'step_position' => 1 ),
+	),
+);
+$array_shape = array(
+	'flow_config' => array(
+		'x1' => array( 'step_type' => 'ai', 'execution_order' => 1 ),
+		'x0' => array( 'step_type' => 'event_import', 'execution_order' => 0, 'handler_slugs' => array( 'dice_fm' ) ),
+	),
+);
+agent_bundle_slug_matcher_assert(
+	'dice-fm' === AgentBundleSlugMatcher::bundle_handler_key( $doc_shape, 'flow' )
+		&& 'dice-fm' === AgentBundleSlugMatcher::bundle_handler_key( $array_shape, 'flow' ),
+	'handler key is identical for steps[] (document) and flow_config (array-bundle) shapes',
+	$failures,
+	$passes
+);
+agent_bundle_slug_matcher_assert(
+	'dice-fm' === AgentBundleSlugMatcher::bundle_handler_key(
+		array( 'flow_config' => array( 'x' => array( 'step_type' => 'event_import', 'handler_configs' => array( 'dice_fm' => array() ) ) ) ),
+		'flow'
+	),
+	'handler key falls back to the handler_configs map key when handler_slugs is absent',
+	$failures,
+	$passes
+);
+
+// ---- 17. Handler fallback STILL refuses a genuine in-pipeline source tie. ---
+// Two flows with the SAME source handler in ONE pipeline (e.g. two Dice.fm
+// searches) and no slug/name signal to split them: the handler pass must
+// surface ambiguous and NEVER guess — preserving #2668 at the source-identity
+// scope.
+$handler_tie_rows = array(
+	array(
+		'flow_id'       => 51,
+		'pipeline_id'   => 200,
+		'flow_name'     => 'Dice.fm Rock',
+		'portable_slug' => null,
+		'flow_config'   => array( 's' => array( 'step_type' => 'event_import', 'execution_order' => 0, 'handler_slugs' => array( 'dice_fm' ) ) ),
+	),
+	array(
+		'flow_id'       => 52,
+		'pipeline_id'   => 200,
+		'flow_name'     => 'Dice.fm Jazz',
+		'portable_slug' => null,
+		'flow_config'   => array( 's' => array( 'step_type' => 'event_import', 'execution_order' => 0, 'handler_slugs' => array( 'dice_fm' ) ) ),
+	),
+);
+$tie_handler_index = AgentBundleSlugMatcher::index_existing_by_handler( $handler_tie_rows, 'flow' );
+agent_bundle_slug_matcher_assert(
+	isset( $tie_handler_index['ambiguous']['dice-fm'] ) && ! isset( $tie_handler_index['matched']['dice-fm'] ),
+	'handler fallback: two same-source flows in ONE pipeline stay ambiguous (no guess)',
+	$failures,
+	$passes
+);
+
 if ( $failures ) {
 	echo "\nFAILED: " . count( $failures ) . " agent bundle slug matcher assertions failed.\n";
 	exit( 1 );
