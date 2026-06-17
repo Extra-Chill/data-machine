@@ -52,6 +52,7 @@ use DataMachine\Engine\Actions\Handlers\MarkItemProcessedHandler;
 use DataMachine\Engine\Actions\Handlers\FailJobHandler;
 use DataMachine\Engine\Actions\Handlers\JobCompleteHandler;
 use DataMachine\Engine\Actions\Handlers\LogHandler;
+use DataMachine\Engine\Actions\Handlers\StepLifecycleHandler;
 use AgentsAPI\AI\Approvals\WP_Agent_Approval_Decision;
 use AgentsAPI\AI\Approvals\WP_Agent_Pending_Action;
 
@@ -66,6 +67,9 @@ function datamachine_register_core_actions() {
 	add_action( 'datamachine_fail_job', array( FailJobHandler::class, 'handle' ), 10, 3 );
 	add_action( 'datamachine_job_complete', array( JobCompleteHandler::class, 'handle' ), 10, 2 );
 	add_action( 'datamachine_log', array( LogHandler::class, 'handle' ), 10, 3 );
+	add_action( 'datamachine_step_lifecycle_inline_continuation', array( StepLifecycleHandler::class, 'handleInlineContinuation' ), 10, 3 );
+	add_action( 'datamachine_step_lifecycle_completed', array( StepLifecycleHandler::class, 'handleCompleted' ), 10, 2 );
+	add_action( 'datamachine_step_lifecycle_failed', array( StepLifecycleHandler::class, 'handleFailed' ), 10, 2 );
 	add_action(
 		'datamachine_pending_action_staged',
 		function ( string $action_id, array $payload ): void {

@@ -127,6 +127,7 @@ echo "Case 5: production files expose the claim contract\n";
 $processed_items = file_get_contents( __DIR__ . '/../inc/Core/Database/ProcessedItems/ProcessedItems.php' );
 $fetch_handler   = file_get_contents( __DIR__ . '/../inc/Core/Steps/Fetch/Handlers/FetchHandler.php' );
 $fail_handler    = file_get_contents( __DIR__ . '/../inc/Engine/Actions/Handlers/FailJobHandler.php' );
+$lifecycle       = file_get_contents( __DIR__ . '/../inc/Engine/Actions/Handlers/StepLifecycleHandler.php' );
 $execute_step    = file_get_contents( __DIR__ . '/../inc/Abilities/Engine/ExecuteStepAbility.php' );
 
 assert_claims_smoke( 'repository defines claimed status', (bool) preg_match( "/STATUS_CLAIMED\s*=\s*'claimed'/", $processed_items ) );
@@ -136,8 +137,9 @@ assert_claims_smoke( 'repository has release claim method', str_contains( $proce
 assert_claims_smoke( 'repository ensures claim columns', str_contains( $processed_items, 'function ensure_claim_columns' ) );
 assert_claims_smoke( 'fetch filters active claims', str_contains( $fetch_handler, 'isItemClaimed' ) );
 assert_claims_smoke( 'fetch claims after max_items', strpos( $fetch_handler, 'array_slice' ) < strpos( $fetch_handler, 'claimItems' ) );
-assert_claims_smoke( 'fail handler releases claims', str_contains( $fail_handler, 'releaseInFlightSourceClaims' ) );
-assert_claims_smoke( 'failed status override releases claim', str_contains( $execute_step, 'releaseInFlightItemClaim' ) );
+assert_claims_smoke( 'fail handler delegates failed lifecycle', str_contains( $fail_handler, 'datamachine_step_lifecycle_failed' ) );
+assert_claims_smoke( 'lifecycle handler releases claims for failed work', str_contains( $lifecycle, 'release_claims_for_job' ) && str_contains( $lifecycle, 'release_claim' ) );
+assert_claims_smoke( 'execute step delegates lifecycle hooks', str_contains( $execute_step, 'handleStepLifecycleCompleted' ) && str_contains( $execute_step, 'handleStepLifecycleFailed' ) );
 
 echo "\nProcessed item claims smoke complete: {$total} assertions, {$failed} failures.\n";
 if ( $failed > 0 ) {
