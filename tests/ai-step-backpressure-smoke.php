@@ -111,6 +111,7 @@ if ( ! function_exists( 'sanitize_key' ) ) {
 
 require_once __DIR__ . '/../inc/Core/NetworkSettings.php';
 require_once __DIR__ . '/../inc/Core/PluginSettings.php';
+require_once __DIR__ . '/../inc/Core/OptionLeaseStore.php';
 require_once __DIR__ . '/../inc/Engine/AI/PipelineAIConcurrencyLease.php';
 require_once __DIR__ . '/../inc/Engine/AI/PipelineAIConcurrencyLimiter.php';
 

@@ -7,6 +7,8 @@
 
 namespace DataMachine\Engine\AI;
 
+use DataMachine\Core\OptionLeaseStore;
+
 defined( 'ABSPATH' ) || exit;
 
 /**
@@ -38,10 +40,7 @@ class PipelineAIConcurrencyLease {
 	 */
 	public function release(): void {
 		foreach ( $this->option_names as $option_name ) {
-			$lease = get_option( $option_name, false );
-			if ( is_array( $lease ) && ( $lease['token'] ?? '' ) === $this->token ) {
-				delete_option( $option_name );
-			}
+			OptionLeaseStore::release( $option_name, $this->token );
 		}
 	}
 }
