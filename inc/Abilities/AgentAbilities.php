@@ -61,6 +61,8 @@ class AgentAbilities {
 	 * @return \WP_Ability|null Registered ability, or null when registration is not currently possible.
 	 */
 	private static function registerAbility( string $name, array $args ): ?\WP_Ability {
+		$args = AbilityRegistration::with_lazy_runtime( array( $name => $args ) )[ $name ];
+
 		if ( doing_action( 'wp_abilities_api_init' ) ) {
 			return \wp_register_ability( $name, $args );
 		}

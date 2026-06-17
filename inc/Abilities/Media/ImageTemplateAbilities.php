@@ -12,6 +12,7 @@
 
 namespace DataMachine\Abilities\Media;
 
+use DataMachine\Abilities\AbilityRegistration;
 use DataMachine\Abilities\PermissionHelper;
 
 defined( 'ABSPATH' ) || exit;
@@ -87,10 +88,10 @@ class ImageTemplateAbilities {
 	 * @return array<string, array<string, mixed>>
 	 */
 	private static function get_ability_definitions(): array {
-		return array(
+		return AbilityRegistration::with_lazy_runtime( array(
 			'datamachine/render-image-template' => self::render_image_template_definition(),
 			'datamachine/list-image-templates'  => self::list_image_templates_definition(),
-		);
+		) );
 	}
 
 	private static function render_image_template_definition(): array {

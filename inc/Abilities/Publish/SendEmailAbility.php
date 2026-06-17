@@ -22,6 +22,7 @@
 
 namespace DataMachine\Abilities\Publish;
 
+use DataMachine\Abilities\AbilityRegistration;
 use DataMachine\Abilities\PermissionHelper;
 
 defined( 'ABSPATH' ) || exit;
@@ -99,7 +100,7 @@ class SendEmailAbility {
 	 * @return array<string, array<string, mixed>>
 	 */
 	private static function get_ability_definitions( self $instance ): array {
-		return array(
+		return AbilityRegistration::with_lazy_runtime( array(
 			'datamachine/send-email' => array(
 				'label'               => __( 'Send Email', 'data-machine' ),
 				'description'         => __( 'Send an email with optional attachments via wp_mail(). Body may be supplied directly or rendered from a template registered via the datamachine_email_templates filter. Optionally routes the wp_mail() call through a specific site via switch_to_blog() on multisite.', 'data-machine' ),
@@ -192,7 +193,7 @@ class SendEmailAbility {
 				'permission_callback' => array( $instance, 'checkPermission' ),
 				'meta'                => array( 'show_in_rest' => true ),
 			),
-		);
+		) );
 	}
 
 	/**
