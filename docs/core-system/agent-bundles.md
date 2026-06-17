@@ -25,6 +25,8 @@ Agent bundles are portable, versioned packages for an agent's runtime behavior. 
 
 Data Machine owns the directory names listed in `BundleSchema::RESERVED_TREES` plus the manifest filename. Anything else at the bundle root is **opaque to the Bundle layer** and round-trips as an *extra*: a top-level directory whose contents are carried as a file map (`<key>/<relative-path>` => string contents) under `bundle["extras"]`.
 
+Knowledge corpus trees use the same extras contract. A bundle can include `wiki/`, `corpus/`, `datasets/`, or another extension-owned tree, but Data Machine treats those files as bytes to transport. The owning extension interprets the corpus format, frontmatter, schema profile, import policy, and validation rules.
+
 Reserved trees as of `schema_version 1`:
 
 - `manifest.json`, `agent/`, `memory/`
@@ -39,6 +41,23 @@ Extras rules:
 - Empty extras directories are dropped on read.
 - Hidden entries (names starting with `.`), symlinks that escape the bundle root, and binary files (NUL-byte heuristic) are skipped on read with a logged warning.
 - Data Machine does NOT auto-extract extras to disk on install. Consumers persist extras themselves via the post-install hook below.
+- Data Machine does NOT parse or validate Markdown frontmatter profiles or any other knowledge corpus format inside extras.
+
+If a bundle wants to advertise how a consumer should interpret an extra, keep that metadata extension-owned and generic. For example, an extension artifact can describe a profile hint without asking Data Machine core to understand the format:
+
+```json
+{
+  "artifact_type": "knowledge_corpus",
+  "artifact_id": "wiki",
+  "source_path": "extensions/example-plugin/knowledge-corpus-wiki.json",
+  "payload": {
+    "extras_key": "wiki",
+    "profile": "example-profile"
+  }
+}
+```
+
+In that example, Data Machine transports `wiki/` as opaque extras and normalizes the extension artifact envelope. The extension that owns `artifact_type: knowledge_corpus` decides what `profile: example-profile` means and how to import or validate those files.
 
 ### Consumer Pattern
 
@@ -75,7 +94,7 @@ add_action(
 
 The hook fires after the install/upgrade transaction commits — never on dry-run, never on failure. Listener exceptions are caught, logged, and suppressed; they do not roll back the install.
 
-See `Automattic/intelligence#467` for the reference consumer that claims the `wiki/` extras key.
+Consumer plugins coordinate corpus and Markdown/frontmatter profile semantics outside Data Machine core.
 
 ## Manifest Schema
 
