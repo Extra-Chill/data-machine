@@ -107,6 +107,51 @@ if ( ! class_exists( 'WP_Abilities_Registry', false ) ) {
 	}
 }
 
+function datamachine_pipeline_policy_register_test_ability( string $ability_slug ): void {
+	if ( ! class_exists( 'WP_Abilities_Registry', false ) || ! method_exists( 'WP_Abilities_Registry', 'get_instance' ) ) {
+		return;
+	}
+
+	if ( class_exists( 'WP_Ability_Categories_Registry', false ) && method_exists( 'WP_Ability_Categories_Registry', 'get_instance' ) ) {
+		$category_registry = WP_Ability_Categories_Registry::get_instance();
+		if ( is_object( $category_registry ) && method_exists( $category_registry, 'register' ) ) {
+			$category_registry->register(
+				'test',
+				array(
+					'label'       => 'Test',
+					'description' => 'Synthetic test abilities.',
+				)
+			);
+		}
+	}
+
+	$registry = WP_Abilities_Registry::get_instance();
+	if ( ! is_object( $registry ) || ! method_exists( $registry, 'register' ) ) {
+		return;
+	}
+
+	if ( method_exists( $registry, 'is_registered' ) && $registry->is_registered( $ability_slug ) ) {
+		return;
+	}
+
+	$registry->register(
+		$ability_slug,
+		array(
+			'label'               => 'Snapshot policy test ability',
+			'description'         => 'Snapshot policy test ability',
+			'category'            => 'test',
+			'input_schema'        => array( 'type' => 'object', 'properties' => array() ),
+			'output_schema'       => array( 'type' => 'object', 'properties' => array() ),
+			'execute_callback'    => static fn() => array(),
+			'permission_callback' => static fn() => true,
+			'meta'                => array( 'annotations' => array() ),
+		)
+	);
+}
+
+datamachine_pipeline_policy_register_test_ability( 'test/control-plane' );
+datamachine_pipeline_policy_register_test_ability( 'test/runner' );
+
 require_once __DIR__ . '/../inc/Core/Steps/FlowStepConfig.php';
 require_once __DIR__ . '/../inc/Core/Steps/FlowStepConfigFactory.php';
 require_once __DIR__ . '/../inc/Core/Steps/WorkflowConfigFactory.php';
