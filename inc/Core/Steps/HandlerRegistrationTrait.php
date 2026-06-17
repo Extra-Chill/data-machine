@@ -17,6 +17,17 @@ if ( ! defined('ABSPATH') ) {
 
 trait HandlerRegistrationTrait {
 	/**
+	 * Track registered handlers to prevent duplicate filter registration.
+	 *
+	 * Handler classes may be instantiated multiple times during plugin load and
+	 * execution. This guard ensures filters are only added once per handler
+	 * identity.
+	 *
+	 * @var array<string, bool>
+	 */
+	private static array $registered_handlers = array();
+
+	/**
 	 * Register a handler with all required filters.
 	 *
 	 * Provides a standardized way to register handlers, eliminating
@@ -55,6 +66,14 @@ trait HandlerRegistrationTrait {
 		array $meta = array(),
 		?callable $validationCallback = null
 	): void {
+		$handler_key = $type . ':' . $slug;
+
+		// Prevent duplicate registration when handler class is instantiated multiple times.
+		if ( isset( self::$registered_handlers[ $handler_key ] ) ) {
+			return;
+		}
+		self::$registered_handlers[ $handler_key ] = true;
+
 		// Compute auth provider key for both handler metadata and auth registration
 		$provider_key = $authProviderKey ?? $slug;
 
