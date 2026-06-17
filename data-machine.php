@@ -380,6 +380,37 @@ function datamachine_run_datamachine_plugin() {
 }
 
 /**
+ * Request full Data Machine runtime loading for the current request.
+ *
+ * Host runtimes that execute Data Machine abilities from non-standard request
+ * shapes can call this before `plugins_loaded` priority 20 instead of forcing
+ * the generic runtime gate open with a broad filter.
+ *
+ * @param string $reason Optional caller-readable activation reason.
+ * @return void
+ */
+function datamachine_request_full_runtime( string $reason = '' ): void {
+	\DataMachine\Core\Bootstrap\RuntimeEnvironment::request_full_runtime( $reason );
+}
+
+/**
+ * Request and, when possible, activate the full Data Machine runtime now.
+ *
+ * This covers late plugin activation flows where a host activates Data Machine
+ * after the normal `plugins_loaded` bootstrap window has already passed.
+ *
+ * @param string $reason Optional caller-readable activation reason.
+ * @return void
+ */
+function datamachine_activate_full_runtime( string $reason = '' ): void {
+	datamachine_request_full_runtime( $reason );
+
+	if ( did_action( 'plugins_loaded' ) ) {
+		datamachine_run_datamachine_plugin();
+	}
+}
+
+/**
  * Determine whether the full Data Machine runtime is needed for this request.
  *
  * Normal frontend page views do not need the agent, REST, tool, queue, or admin

@@ -103,6 +103,12 @@ namespace {
 		}
 	}
 
+	if ( ! function_exists( 'do_action' ) ) {
+		function do_action( string $hook_name, ...$args ): void {
+			unset( $hook_name, $args );
+		}
+	}
+
 	$_SERVER['REQUEST_URI'] = '/frontend-page/';
 	unset( $_GET['rest_route'] );
 	putenv( 'WP_AGENT_RUNTIME' );
@@ -120,6 +126,12 @@ namespace {
 	);
 
 	putenv( 'WP_AGENT_RUNTIME' );
+	RuntimeEnvironment::request_full_runtime( 'test-host' );
+
+	$assert(
+		'explicit runtime request loads full runtime',
+		RuntimeEnvironment::should_load_full_runtime()
+	);
 
 }
 
