@@ -483,6 +483,57 @@ $runtime_tools = resolve_source_tools(
 );
 assert_source_equals( false, isset( $runtime_tools['client/select_block'] ), 'runtime tool is denied by default because it requires allow_only opt-in', $failures, $passes );
 
+$ambient_context_tools = resolve_source_tools(
+	ToolPolicyResolver::MODE_CHAT,
+	new SourcePolicyToolManager(),
+	array(
+		'allow_only'     => array( 'client/ambient_tool' ),
+		'client_context' => array(
+			'tool_declarations' => array(
+				'client/ambient_tool' => array(
+					'description' => 'Ambient runtime declaration that core should not read.',
+					'parameters'  => array( 'type' => 'object' ),
+					'executor'    => 'client',
+				),
+			),
+		),
+	)
+);
+assert_source_equals( false, isset( $ambient_context_tools['client/ambient_tool'] ), 'runtime source ignores arbitrary client_context tool_declarations', $failures, $passes );
+
+add_filter(
+	'datamachine_runtime_tool_declaration_sets',
+	static function ( array $sets, array $args, array $client_context ): array {
+		unset( $args );
+		if ( is_array( $client_context['tool_declarations'] ?? null ) ) {
+			$sets[] = $client_context['tool_declarations'];
+		}
+		return $sets;
+	},
+	10,
+	3
+);
+$adapter_context_tools = resolve_source_tools(
+	ToolPolicyResolver::MODE_CHAT,
+	new SourcePolicyToolManager(),
+	array(
+		'allow_only'     => array( 'client/ambient_tool' ),
+		'client_context' => array(
+			'tool_declarations' => array(
+				'client/ambient_tool' => array(
+					'description' => 'Adapter-owned runtime declaration.',
+					'parameters'  => array( 'type' => 'object' ),
+					'executor'    => 'client',
+					'scope'       => 'run',
+				),
+			),
+		),
+	)
+);
+assert_source_equals( true, isset( $adapter_context_tools['client/ambient_tool'] ), 'runtime declaration filter lets adapters opt in context-specific shapes', $failures, $passes );
+remove_all_filters_for_source_smoke();
+$GLOBALS['__datamachine_log_entries'] = array();
+
 $runtime_policy_tools = resolve_source_tools(
 	ToolPolicyResolver::MODE_CHAT,
 	new SourcePolicyToolManager(),

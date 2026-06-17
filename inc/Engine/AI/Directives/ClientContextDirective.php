@@ -2,10 +2,9 @@
 /**
  * Client Context Directive.
  *
- * Renders client-side context data as a system message so the AI agent
- * knows what the user is currently doing in the application. Context is
- * provided by the frontend via the `client_context` parameter on the
- * chat REST endpoint.
+ * Renders caller-provided client context data as a system message so the AI
+ * agent can consider request-local context. Context is provided via the
+ * `client_context` request parameter.
  *
  * Examples of client context:
  *   - { "tab": "compose", "post_id": 123, "post_title": "My Draft" }
@@ -110,7 +109,11 @@ class ClientContextDirective {
 		$lines[] = '';
 		$lines[] = 'Important: frontend editor context can describe the user\'s current in-browser draft state. Prefer it when answering questions about what is currently open in the editor.';
 
-		return implode( "\n", $lines );
+		$guidance = implode( "\n", $lines );
+
+		return function_exists( 'apply_filters' )
+			? (string) apply_filters( 'datamachine_client_context_editor_guidance', $guidance, $client_context )
+			: $guidance;
 	}
 
 	/**
@@ -139,9 +142,14 @@ class ClientContextDirective {
 			return array();
 		}
 
+		$intro = 'Here is request-local client context supplied by the caller:';
+		if ( function_exists( 'apply_filters' ) ) {
+			$intro = (string) apply_filters( 'datamachine_client_context_directive_intro', $intro, $client_context, $payload );
+		}
+
 		$content = "# Current Client Context\n\n"
-			. 'The user is interacting with you from a frontend interface. '
-			. "Here is their current context:\n\n"
+			. $intro
+			. "\n\n"
 			. implode( "\n", $lines );
 
 		$editor_guidance = self::build_editor_guidance( $client_context );
@@ -149,12 +157,16 @@ class ClientContextDirective {
 			$content .= "\n\n" . $editor_guidance;
 		}
 
-		return array(
+		$outputs = array(
 			array(
 				'type'    => 'system_text',
 				'content' => $content,
 			),
 		);
+
+		return function_exists( 'apply_filters' )
+			? apply_filters( 'datamachine_client_context_directive_outputs', $outputs, $client_context, $payload, $provider_name, $tools, $step_id )
+			: $outputs;
 	}
 }
 
@@ -163,10 +175,15 @@ class ClientContextDirective {
 add_filter(
 	'datamachine_directives',
 	function ( $directives ) {
+		$modes = array( 'chat' );
+		if ( function_exists( 'apply_filters' ) ) {
+			$modes = apply_filters( 'datamachine_client_context_directive_modes', $modes );
+		}
+
 		$directives[] = array(
 			'class'    => ClientContextDirective::class,
 			'priority' => 35,
-			'modes'    => array( 'all' ),
+			'modes'    => is_array( $modes ) ? $modes : array( 'chat' ),
 		);
 		return $directives;
 	}

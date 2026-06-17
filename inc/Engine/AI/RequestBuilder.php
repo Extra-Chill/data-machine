@@ -104,7 +104,12 @@ class RequestBuilder {
 			)
 		);
 
-		// 4. Dispatch the request. wp-ai-client is the only runtime provider path.
+		$adapter_result = apply_filters( 'datamachine_ai_request_result', null, $provider_request, $provider, $model, $request, $request_metadata );
+		if ( null !== $adapter_result ) {
+			return self::normalizeAdapterResult( $adapter_result, $provider, $model );
+		}
+
+		// 4. Dispatch the request through Data Machine's default wp-ai-client adapter.
 		$unavailable_reason = self::wpAiClientUnavailableReason( $provider );
 		if ( null !== $unavailable_reason ) {
 			do_action(
@@ -129,20 +134,7 @@ class RequestBuilder {
 
 		$filtered_result = apply_filters( 'datamachine_wp_ai_client_text_result', null, $provider_request, $provider, $model, $request );
 		if ( null !== $filtered_result ) {
-			if ( $filtered_result instanceof \WP_Error || $filtered_result instanceof \WordPress\AiClient\Results\DTO\GenerativeAiResult ) {
-				return $filtered_result;
-			}
-
-			if ( is_array( $filtered_result ) ) {
-				$data = $filtered_result['data'] ?? $filtered_result;
-				if ( is_callable( array( '\WordPress\AiClient\Results\DTO\GenerativeAiResult', 'fromData' ) ) ) {
-					return \WordPress\AiClient\Results\DTO\GenerativeAiResult::fromData( $data );
-				}
-
-				if ( is_callable( array( '\WordPress\AiClient\Results\DTO\GenerativeAiResult', 'fromArray' ) ) ) {
-					return \WordPress\AiClient\Results\DTO\GenerativeAiResult::fromArray( self::wpAiClientResultArray( $data, $provider, $model ) );
-				}
-			}
+			return self::normalizeAdapterResult( $filtered_result, $provider, $model );
 		}
 
 		$result                        = null;
@@ -791,10 +783,14 @@ class RequestBuilder {
 			}
 		}
 
-		return array(
+		$aliases = array(
 			'logical_to_provider' => $logical_to_provider,
 			'provider_to_logical' => $provider_to_logical,
 		);
+
+		return function_exists( 'apply_filters' )
+			? apply_filters( 'datamachine_provider_tool_name_aliases', $aliases, $tools )
+			: $aliases;
 	}
 
 	/**
@@ -805,6 +801,13 @@ class RequestBuilder {
 	 * @return string Provider-safe tool name.
 	 */
 	private static function providerToolName( string $logical_name, array $tool_config ): string {
+		$filtered_name = function_exists( 'apply_filters' )
+			? apply_filters( 'datamachine_provider_tool_name', null, $logical_name, $tool_config )
+			: null;
+		if ( is_string( $filtered_name ) && self::isProviderSafeToolName( $filtered_name ) ) {
+			return $filtered_name;
+		}
+
 		$runtime_tool_id = is_string( $tool_config['runtime_tool_id'] ?? null ) ? trim( (string) $tool_config['runtime_tool_id'] ) : '';
 		if ( self::isProviderSafeToolName( $runtime_tool_id ) ) {
 			return $runtime_tool_id;
@@ -972,6 +975,36 @@ class RequestBuilder {
 		}
 
 		return $payload;
+	}
+
+	/**
+	 * Normalize an adapter/filter result into the wp-ai-client result contract.
+	 *
+	 * Custom dispatch adapters can return a WP_Error, a GenerativeAiResult, or compact
+	 * response data matching the existing test adapter shape.
+	 *
+	 * @param mixed  $result   Adapter result.
+	 * @param string $provider Provider identifier.
+	 * @param string $model    Model identifier.
+	 * @return \WordPress\AiClient\Results\DTO\GenerativeAiResult|\WP_Error|mixed Normalized result when possible.
+	 */
+	private static function normalizeAdapterResult( $result, string $provider, string $model ) {
+		if ( $result instanceof \WP_Error || $result instanceof \WordPress\AiClient\Results\DTO\GenerativeAiResult ) {
+			return $result;
+		}
+
+		if ( is_array( $result ) ) {
+			$data = $result['data'] ?? $result;
+			if ( is_callable( array( '\WordPress\AiClient\Results\DTO\GenerativeAiResult', 'fromData' ) ) ) {
+				return \WordPress\AiClient\Results\DTO\GenerativeAiResult::fromData( $data );
+			}
+
+			if ( is_callable( array( '\WordPress\AiClient\Results\DTO\GenerativeAiResult', 'fromArray' ) ) ) {
+				return \WordPress\AiClient\Results\DTO\GenerativeAiResult::fromArray( self::wpAiClientResultArray( $data, $provider, $model ) );
+			}
+		}
+
+		return $result;
 	}
 
 	/**
