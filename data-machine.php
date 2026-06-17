@@ -200,6 +200,7 @@ function datamachine_run_datamachine_plugin() {
 	require_once __DIR__ . '/inc/Abilities/Media/ImageTemplateAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/AgentCallAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/AgentRemoteCallAbilities.php';
+	require_once __DIR__ . '/inc/Abilities/Runtime/RuntimeTaskAbility.php';
 	require_once __DIR__ . '/inc/Abilities/AgentAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/AgentMemoryAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/InjectableMemoryFilesAbility.php';
@@ -303,6 +304,7 @@ function datamachine_run_datamachine_plugin() {
 	new \DataMachine\Abilities\Media\ImageTemplateAbilities();
 	new \DataMachine\Abilities\AgentCallAbilities();
 	new \DataMachine\Abilities\AgentRemoteCallAbilities();
+	new \DataMachine\Abilities\Runtime\RuntimeTaskAbility();
 	new \DataMachine\Abilities\Taxonomy\ResolveTermAbility();
 	new \DataMachine\Abilities\Taxonomy\MergeTermMetaAbility();
 	new \DataMachine\Abilities\Taxonomy\GetTaxonomyTermsAbility();
