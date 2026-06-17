@@ -14,6 +14,8 @@ namespace DataMachine\Tests\Unit\Abilities;
 
 use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Abilities\AbilityScopePermissionFilter;
+use DataMachine\Abilities\ExecutionScope;
+use DataMachine\Api\RestAccessGuard;
 use WP_UnitTestCase;
 
 class PermissionHelperTest extends WP_UnitTestCase {
@@ -23,6 +25,7 @@ class PermissionHelperTest extends WP_UnitTestCase {
 	 */
 	public function tear_down(): void {
 		PermissionHelper::clear_agent_context();
+		remove_filter( 'datamachine_cli_bypass_permissions', '__return_false' );
 		wp_set_current_user( 0 );
 
 		// Ensure authenticated context is always reset.
@@ -60,6 +63,38 @@ class PermissionHelperTest extends WP_UnitTestCase {
 		wp_set_current_user( $user_id );
 
 		$this->assertFalse( PermissionHelper::can_manage() );
+	}
+
+	public function test_execution_scope_snapshots_current_permission_context(): void {
+		$user_id = self::factory()->user->create( array( 'role' => 'administrator' ) );
+		wp_set_current_user( $user_id );
+
+		$scope = ExecutionScope::current( 'manage_flows' );
+
+		$this->assertSame( 'manage_flows', $scope->action() );
+		$this->assertTrue( $scope->can_action() );
+		$this->assertSame( $user_id, $scope->acting_user_id() );
+		$this->assertNull( $scope->acting_agent_id() );
+	}
+
+	public function test_rest_access_guard_denies_action_with_standard_rest_error(): void {
+		wp_set_current_user( 0 );
+		add_filter( 'datamachine_cli_bypass_permissions', '__return_false' );
+
+		$result = RestAccessGuard::for_action( 'manage_flows' )->check_permission( 'Denied.' );
+
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'rest_forbidden', $result->get_error_code() );
+		$this->assertSame( 403, $result->get_error_data()['status'] );
+	}
+
+	public function test_rest_access_guard_authorizes_agent_resource_through_permission_helper(): void {
+		$user_id = self::factory()->user->create( array( 'role' => 'administrator' ) );
+		wp_set_current_user( $user_id );
+
+		$allowed = RestAccessGuard::for_action( 'manage_flows' )->authorize_agent_resource( null, $user_id + 100, 'Denied.' );
+
+		$this->assertTrue( $allowed );
 	}
 
 	public function test_authenticated_context_not_set_by_default(): void {
