@@ -127,6 +127,21 @@ $assert( 'jobs summary accepts compact input', str_contains( $summary_ability, "
 $assert( 'jobs summary has compact helper', str_contains( $summary_ability, 'getCompactSummary' ) );
 $assert( 'compact summary skips database breakdown helpers', ! str_contains( $summary_ability, 'get_pipeline_summary_rows' ) && ! str_contains( $summary_ability, 'get_flow_summary_rows' ) );
 
+echo "\n[6] job status transitions use one terminal primitive\n";
+$jobs_repository = file_get_contents( __DIR__ . '/../inc/Core/Database/Jobs/Jobs.php' );
+$recover_ability = file_get_contents( __DIR__ . '/../inc/Abilities/Job/RecoverStuckJobsAbility.php' );
+$retry_ability   = file_get_contents( __DIR__ . '/../inc/Abilities/Job/RetryJobAbility.php' );
+$fail_ability    = file_get_contents( __DIR__ . '/../inc/Abilities/Job/FailJobAbility.php' );
+
+$assert( 'Jobs repository exposes transition primitive', str_contains( $jobs_repository, 'function transition_job_status' ) );
+$assert( 'complete_job delegates to transition primitive', str_contains( $jobs_repository, 'return $this->transition_job_status( $job_id, $status, true );' ) );
+$assert( 'update_job_status delegates to transition primitive', str_contains( $jobs_repository, 'return $this->transition_job_status( $job_id, $status );' ) );
+$assert( 'transition primitive owns terminal hooks', 1 === substr_count( $jobs_repository, "do_action( 'datamachine_job_complete'" ) );
+$assert( 'recover-stuck uses transition primitive for terminal repairs', str_contains( $recover_ability, 'transition_job_status' ) );
+$assert( 'recover-stuck no longer fires manual completion hooks', ! str_contains( $recover_ability, "do_action( 'datamachine_job_complete'" ) );
+$assert( 'retry ability no longer fires duplicate completion hook', ! str_contains( $retry_ability, "do_action( 'datamachine_job_complete'" ) );
+$assert( 'fail ability no longer fires duplicate completion hook', ! str_contains( $fail_ability, "do_action( 'datamachine_job_complete'" ) );
+
 if ( $failures > 0 ) {
 	echo "\n=== job-status-accounting-smoke: {$failures} FAILURE(S) / {$total} assertions ===\n";
 	exit( 1 );

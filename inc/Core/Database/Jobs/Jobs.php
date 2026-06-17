@@ -780,8 +780,9 @@ class Jobs extends BaseRepository {
 			return array();
 		}
 
-        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		// phpcs:disable WordPress.DB.PreparedSQL -- Table name and flow ID are prepared.
 		$results = $this->wpdb->get_results( $this->wpdb->prepare( 'SELECT * FROM %i WHERE flow_id = %s ORDER BY created_at DESC', $this->table_name, (string) $flow_id ), ARRAY_A );
+		// phpcs:enable WordPress.DB.PreparedSQL
 
 		return $results ? $results : array();
 	}
@@ -807,7 +808,7 @@ class Jobs extends BaseRepository {
 			return array();
 		}
 
-		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared -- Query is prepared on the next line.
+		// phpcs:disable WordPress.DB.PreparedSQL -- Query is prepared on the next line.
 		$rows = $this->wpdb->get_results(
 			$this->wpdb->prepare(
 				'SELECT * FROM %i WHERE parent_job_id = %d ORDER BY job_id ASC',
@@ -816,7 +817,7 @@ class Jobs extends BaseRepository {
 			),
 			ARRAY_A
 		);
-		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
+		// phpcs:enable WordPress.DB.PreparedSQL
 
 		if ( empty( $rows ) ) {
 			return array();
@@ -863,7 +864,7 @@ class Jobs extends BaseRepository {
 		$placeholders = implode( ',', array_fill( 0, count( $flow_ids ), '%s' ) );
 
 		// Subquery to get max job_id per flow, then join to get full row
-		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
+		// phpcs:disable WordPress.DB.PreparedSQL, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
 		$query = $this->wpdb->prepare(
 			"SELECT j.* FROM %i j
              INNER JOIN (
@@ -874,10 +875,11 @@ class Jobs extends BaseRepository {
              ) latest ON j.job_id = latest.max_job_id",
 			array_merge( array( $this->table_name, $this->table_name ), $flow_ids )
 		);
-		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
+		// phpcs:enable WordPress.DB.PreparedSQL, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
 
-		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Query is prepared above
+		// phpcs:disable WordPress.DB.PreparedSQL -- Query is prepared above.
 		$results = $this->wpdb->get_results( $query, ARRAY_A );
+		// phpcs:enable WordPress.DB.PreparedSQL
 
 		if ( ! $results ) {
 			return array();
@@ -1028,11 +1030,13 @@ class Jobs extends BaseRepository {
 
 		if ( ! empty( $criteria['failed'] ) ) {
 			$failed_pattern = $this->wpdb->esc_like( 'failed' ) . '%';
-            // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			// phpcs:disable WordPress.DB.PreparedSQL -- Table name is the repository table; value is prepared.
 			$result = $this->wpdb->query( $this->wpdb->prepare( 'DELETE FROM %i WHERE status LIKE %s', $this->table_name, $failed_pattern ) );
+			// phpcs:enable WordPress.DB.PreparedSQL
 		} else {
-            // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			// phpcs:disable WordPress.DB.PreparedSQL -- Table name is the repository table.
 			$result = $this->wpdb->query( $this->wpdb->prepare( 'DELETE FROM %i', $this->table_name ) );
+			// phpcs:enable WordPress.DB.PreparedSQL
 		}
 
 		do_action(
@@ -1200,36 +1204,7 @@ class Jobs extends BaseRepository {
 	 * @return bool True on success, false on failure.
 	 */
 	public function complete_job( int $job_id, string $status ): bool {
-		// Validate using JobStatus - supports compound statuses like "agent_skipped - reason"
-		if ( empty( $job_id ) || ! JobStatus::isStatusFinal( $status ) ) {
-			return false;
-		}
-
-		// Truncate to fit varchar(255) column. Full reason is preserved in engine_data.
-		if ( strlen( $status ) > 255 ) {
-			$status = substr( $status, 0, 252 ) . '...';
-		}
-
-		$update_data = array(
-			'status'       => $status,
-			'completed_at' => current_time( 'mysql', true ),
-		);
-
-        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-		$updated = $this->wpdb->update(
-			$this->table_name,
-			$update_data,
-			array( 'job_id' => $job_id ),
-			array( '%s', '%s' ),
-			array( '%d' )
-		);
-
-		if ( false !== $updated ) {
-			RunMetrics::complete( $job_id, $status );
-			do_action( 'datamachine_job_complete', $job_id, $status );
-		}
-
-		return false !== $updated;
+		return $this->transition_job_status( $job_id, $status, true );
 	}
 
 	/**
@@ -1240,8 +1215,28 @@ class Jobs extends BaseRepository {
 	 * @return bool True on success, false on failure.
 	 */
 	public function update_job_status( int $job_id, string $status ): bool {
+		return $this->transition_job_status( $job_id, $status );
+	}
+
+	/**
+	 * Transition a job to a new status.
+	 *
+	 * Final statuses receive terminal accounting in one place: completed_at,
+	 * run metrics completion, and datamachine_job_complete hooks.
+	 *
+	 * @param int    $job_id        The job ID.
+	 * @param string $status        The new status.
+	 * @param bool   $require_final Whether to reject non-final statuses.
+	 * @return bool True on success, false on failure.
+	 */
+	public function transition_job_status( int $job_id, string $status, bool $require_final = false ): bool {
 
 		if ( empty( $job_id ) ) {
+			return false;
+		}
+
+		$is_final = JobStatus::isStatusFinal( $status );
+		if ( $require_final && ! $is_final ) {
 			return false;
 		}
 
@@ -1252,6 +1247,10 @@ class Jobs extends BaseRepository {
 
 		$update_data = array( 'status' => $status );
 		$format      = array( '%s' );
+		if ( $is_final ) {
+			$update_data['completed_at'] = current_time( 'mysql', true );
+			$format[]                    = '%s';
+		}
 
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		$updated = $this->wpdb->update(
@@ -1261,6 +1260,11 @@ class Jobs extends BaseRepository {
 			$format,
 			array( '%d' )
 		);
+
+		if ( false !== $updated && $is_final ) {
+			RunMetrics::complete( $job_id, $status );
+			do_action( 'datamachine_job_complete', $job_id, $status );
+		}
 
 		return false !== $updated;
 	}
@@ -1279,14 +1283,14 @@ class Jobs extends BaseRepository {
 	 * @return array Array of [flow_id => counts_array] for problem flows.
 	 */
 	public function get_problem_flow_ids( int $threshold = 3 ): array {
-        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		// phpcs:disable WordPress.DB.PreparedSQL -- Query is prepared below with repository table name.
 		$query = $this->wpdb->prepare(
 			"SELECT DISTINCT flow_id FROM %i WHERE flow_id != 'direct' AND flow_id REGEXP '^[0-9]+$'",
 			$this->table_name
 		);
 
-        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 		$flow_ids = $this->wpdb->get_col( $query );
+		// phpcs:enable WordPress.DB.PreparedSQL
 
 		if ( empty( $flow_ids ) ) {
 			return array();
