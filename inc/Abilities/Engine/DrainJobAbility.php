@@ -12,6 +12,8 @@
 
 namespace DataMachine\Abilities\Engine;
 
+use DataMachine\Core\ActionScheduler\ScopedDrainService;
+use DataMachine\Core\Database\Jobs\Jobs;
 use DataMachine\Core\JobStatus;
 
 defined( 'ABSPATH' ) || exit;
@@ -19,10 +21,6 @@ defined( 'ABSPATH' ) || exit;
 class DrainJobAbility {
 
 	use EngineHelpers;
-
-	private const GROUP = 'data-machine';
-
-	private const HOOK_EXECUTE_STEP = 'datamachine_execute_step';
 
 	private const DEFAULT_STEP_BUDGET = 50;
 
@@ -111,9 +109,8 @@ class DrainJobAbility {
 		$job_id          = (int) ( $input['job_id'] ?? 0 );
 		$step_budget     = max( 1, (int) ( $input['step_budget'] ?? self::DEFAULT_STEP_BUDGET ) );
 		$time_budget_ms  = max( 1, (int) ( $input['time_budget_ms'] ?? self::DEFAULT_TIME_BUDGET_MS ) );
-		$started_at      = microtime( true );
-		$actions_drained = 0;
-		$last_error      = null;
+		$started_at = microtime( true );
+		$last_error = null;
 
 		if ( $job_id <= 0 ) {
 			return array(
@@ -141,42 +138,47 @@ class DrainJobAbility {
 			);
 		}
 
-		while ( true ) {
+		$terminal_status = static function () use ( $job_id ): string {
+			$job    = ( new Jobs() )->get_job( $job_id );
+			$status = (string) ( $job['status'] ?? '' );
+
+			return JobStatus::isStatusFinal( $status ) ? $status : '';
+		};
+
+		$drain_stats = ( new ScopedDrainService() )->drain(
+			array(
+				'limit'                    => $step_budget,
+				'batch_size'               => 1,
+				'time_limit_ms'            => $time_budget_ms,
+				'job_ids'                  => array( $job_id ),
+				'hooks'                    => array(
+					ScopedDrainService::HOOK_EXECUTE_STEP,
+					ScopedDrainService::HOOK_BATCH_CHUNK,
+				),
+				'execution_context'        => 'Data Machine drain-job ability',
+				'terminal_status_callback' => $terminal_status,
+				'warning_callback'         => static function ( string $message ) use ( &$last_error ): void {
+					$last_error = $message;
+				},
+			)
+		);
+
+		$terminal_state = (string) ( $drain_stats['terminal_state'] ?? '' );
+		if ( '' === $terminal_state ) {
 			$job    = $this->db_jobs->get_job( $job_id );
 			$status = (string) ( $job['status'] ?? '' );
-			if ( JobStatus::isStatusFinal( $status ) ) {
-				break;
-			}
-
-			if ( $actions_drained >= $step_budget || $this->elapsedMs( $started_at ) >= $time_budget_ms ) {
-				break;
-			}
-
-			$action_id = $this->getNextDuePendingActionId( $job_id );
-			if ( ! $action_id ) {
-				break;
-			}
-
-			try {
-				\ActionScheduler::runner()->process_action( $action_id, 'Data Machine drain-job ability' );
-			} catch ( \Throwable $e ) {
-				$last_error = $e->getMessage();
-			}
-
-			++$actions_drained;
+			$terminal_state = JobStatus::isStatusFinal( $status ) ? $status : '';
 		}
 
-		$job               = $this->db_jobs->get_job( $job_id );
-		$status            = (string) ( $job['status'] ?? '' );
-		$terminal_state    = JobStatus::isStatusFinal( $status ) ? $status : null;
-		$remaining_actions = $this->countDuePendingActions( $job_id );
+		$actions_drained   = (int) ( $drain_stats['actions_processed'] ?? 0 );
+		$remaining_actions = (int) ( $drain_stats['remaining_pending'] ?? 0 );
 		$wall_time_ms      = $this->elapsedMs( $started_at );
-		$budget_exhausted  = null === $terminal_state && ( $actions_drained >= $step_budget || $wall_time_ms >= $time_budget_ms );
+		$budget_exhausted  = '' === $terminal_state && in_array( (string) ( $drain_stats['stop_reason'] ?? '' ), array( 'limit', 'time_limit', 'timeout_margin' ), true );
 
 		return array(
-			'success'           => null !== $terminal_state,
+			'success'           => '' !== $terminal_state,
 			'job_id'            => $job_id,
-			'terminal_state'    => $terminal_state,
+			'terminal_state'    => '' === $terminal_state ? null : $terminal_state,
 			'steps_run'         => $actions_drained,
 			'actions_drained'   => $actions_drained,
 			'wall_time_ms'      => $wall_time_ms,
@@ -200,97 +202,6 @@ class DrainJobAbility {
 		}
 
 		return null;
-	}
-
-	/**
-	 * Get the next due pending Data Machine step action for a single job.
-	 */
-	private function getNextDuePendingActionId( int $job_id ): int {
-		$ids = $this->getDuePendingActionIds( $job_id );
-
-		return $ids[0] ?? 0;
-	}
-
-	/**
-	 * Count due pending Data Machine step actions for a single job.
-	 */
-	private function countDuePendingActions( int $job_id ): int {
-		return count( $this->getDuePendingActionIds( $job_id ) );
-	}
-
-	/**
-	 * Query due pending actions and filter by decoded job_id args.
-	 *
-	 * @return int[] Action IDs.
-	 */
-	private function getDuePendingActionIds( int $job_id ): array {
-		global $wpdb;
-
-		$actions_table = $wpdb->prefix . 'actionscheduler_actions';
-		$groups_table  = $wpdb->prefix . 'actionscheduler_groups';
-
-		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table names are generated from the WP prefix.
-		$rows = $wpdb->get_results(
-			$wpdb->prepare(
-				"SELECT a.action_id, a.args
-				 FROM {$actions_table} a
-				 INNER JOIN {$groups_table} g ON g.group_id = a.group_id
-				 WHERE a.hook IN (%s, %s)
-				 AND a.status = 'pending'
-				 AND g.slug = %s
-				 AND a.scheduled_date_gmt <= %s
-				 AND (a.args LIKE %s OR a.args LIKE %s)
-				 ORDER BY a.scheduled_date_gmt ASC, a.action_id ASC",
-				self::HOOK_EXECUTE_STEP,
-				PipelineBatchScheduler::BATCH_HOOK,
-				self::GROUP,
-				gmdate( 'Y-m-d H:i:s' ),
-				'%"job_id"%',
-				'%"parent_job_id"%'
-			)
-		);
-		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-
-		$ids = array();
-		foreach ( $rows as $row ) {
-			if ( $this->extractActionJobId( (string) $row->args ) !== $job_id ) {
-				continue;
-			}
-
-			$ids[] = (int) $row->action_id;
-		}
-
-		return $ids;
-	}
-
-	/**
-	 * Extract job_id from Action Scheduler's JSON-encoded args column.
-	 */
-	private function extractActionJobId( string $args_json ): int {
-		$args = json_decode( $args_json, true );
-		if ( ! is_array( $args ) ) {
-			return 0;
-		}
-
-		if ( isset( $args['job_id'] ) ) {
-			return (int) $args['job_id'];
-		}
-
-		if ( isset( $args['parent_job_id'] ) ) {
-			return (int) $args['parent_job_id'];
-		}
-
-		foreach ( $args as $value ) {
-			if ( is_array( $value ) && isset( $value['job_id'] ) ) {
-				return (int) $value['job_id'];
-			}
-
-			if ( is_array( $value ) && isset( $value['parent_job_id'] ) ) {
-				return (int) $value['parent_job_id'];
-			}
-		}
-
-		return 0;
 	}
 
 	/**
