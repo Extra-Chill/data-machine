@@ -72,6 +72,8 @@ foreach ( array(
 	'AgentBundleArrayAdapter::from_array_bundle' => 'runner consumes portable bundle documents',
 	'BundleSourceAuth::build_resolve_context'    => 'runner shares bundle token resolution with import/install surfaces',
 	'workflow_from_bundle_flow'                  => 'runner converts selected bundle flow to workflow steps',
+	'workflow_override_from_input'               => 'runner supports caller-supplied workflow overrides',
+	'execute_workflow_path'                      => 'runner accepts file-backed workflow overrides',
 	'ExecuteWorkflowAbility'                     => 'runner reuses existing headless workflow executor',
 	'DrainJobAbility'                            => 'runner can drain jobs for final result callers',
 	'wp_agent_import_runtime_bundles'            => 'runner uses generic runtime bundle import helper when available',
@@ -114,6 +116,50 @@ require_once $root . '/inc/Core/Steps/FlowStepConfigFactory.php';
 require_once $root . '/inc/Core/Steps/WorkflowConfigFactory.php';
 $runner_reflection = new ReflectionClass( DataMachine\Engine\Bundle\AgentBundleRunner::class );
 $runner_instance   = $runner_reflection->newInstanceWithoutConstructor();
+
+echo "\n[2a] Runner accepts direct workflow overrides\n";
+$workflow_override = $runner_reflection->getMethod( 'workflow_override_from_input' );
+$inline_override   = $workflow_override->invoke(
+	$runner_instance,
+	array(
+		'execute_workflow' => array(
+			'workflow'     => array(
+				'steps' => array(
+					array(
+						'step_type' => 'ai',
+						'label'     => 'Inline override',
+					),
+				),
+			),
+			'initial_data' => array( 'job_source' => 'inline_override' ),
+		),
+	)
+);
+datamachine_bundle_runner_assert( true === ( $inline_override['success'] ?? false ), 'inline workflow override resolves', $failures, $passes );
+datamachine_bundle_runner_assert( 'Inline override' === ( $inline_override['workflow']['steps'][0]['label'] ?? null ), 'inline workflow override unwraps workflow payload', $failures, $passes );
+datamachine_bundle_runner_assert( 'inline_override' === ( $inline_override['initial_data']['job_source'] ?? null ), 'inline workflow override preserves initial_data', $failures, $passes );
+
+$workflow_path = sys_get_temp_dir() . '/datamachine-agent-bundle-workflow-override-' . uniqid( '', true ) . '.json';
+file_put_contents(
+	$workflow_path,
+	json_encode(
+		array(
+			'workflow' => array(
+				'steps' => array(
+					array(
+						'step_type' => 'ai',
+						'label'     => 'Path override',
+					),
+				),
+			),
+		)
+	)
+);
+$path_override = $workflow_override->invoke( $runner_instance, array( 'execute_workflow_path' => $workflow_path ) );
+@unlink( $workflow_path );
+datamachine_bundle_runner_assert( true === ( $path_override['success'] ?? false ), 'file workflow override resolves', $failures, $passes );
+datamachine_bundle_runner_assert( 'Path override' === ( $path_override['workflow']['steps'][0]['label'] ?? null ), 'file workflow override unwraps workflow payload', $failures, $passes );
+
 $output_projection = $runner_reflection->getMethod( 'output_projection' );
 $projected_outputs = $output_projection->invoke(
 	$runner_instance,
