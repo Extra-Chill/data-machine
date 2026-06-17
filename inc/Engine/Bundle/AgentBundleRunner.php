@@ -824,7 +824,7 @@ final class AgentBundleRunner {
 				);
 			}
 
-			$raw = file_get_contents( $path );
+			$raw = file_get_contents( $path ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
 			if ( false === $raw ) {
 				return array(
 					'success' => false,
