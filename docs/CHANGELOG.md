@@ -2,6 +2,14 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.150.7] - 2026-06-17
+
+### Fixed
+- centralize ability boundary helpers
+- decouple step lifecycle source claims
+- share option-backed lease store
+- protect ability tool declaration boundaries
+
 ## [0.150.6] - 2026-06-17
 
 ### Fixed
