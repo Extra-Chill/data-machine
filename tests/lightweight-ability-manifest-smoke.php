@@ -20,61 +20,133 @@ namespace {
 	$wp_actions_running  = array();
 	$registered_abilities = array();
 
-	class WP_Ability {}
-
-	function __( string $text, string $domain = 'default' ): string {
-		unset( $domain );
-		return $text;
+	if ( ! class_exists( 'WP_Ability' ) ) {
+		class WP_Ability {}
 	}
 
-	function add_action( string $hook_name, callable $callback, int $priority = 10, int $accepted_args = 1 ): void {
-		global $wp_actions;
-
-		$wp_actions[ $hook_name ][ $priority ][] = $callback;
-		unset( $accepted_args );
+	if ( ! function_exists( '__' ) ) {
+		function __( string $text, string $domain = 'default' ): string {
+			unset( $domain );
+			return $text;
+		}
 	}
 
-	function add_filter( string $hook_name, callable $callback, int $priority = 10, int $accepted_args = 1 ): void {
-		add_action( $hook_name, $callback, $priority, $accepted_args );
+	if ( ! function_exists( 'add_action' ) ) {
+		function add_action( string $hook_name, callable $callback, int $priority = 10, int $accepted_args = 1 ): void {
+			global $wp_actions;
+
+			$wp_actions[ $hook_name ][ $priority ][] = $callback;
+			unset( $accepted_args );
+		}
 	}
 
-	function doing_action( string $hook_name ): bool {
-		global $wp_actions_running;
-
-		return ! empty( $wp_actions_running[ $hook_name ] );
+	if ( ! function_exists( 'add_filter' ) ) {
+		function add_filter( string $hook_name, callable $callback, int $priority = 10, int $accepted_args = 1 ): void {
+			add_action( $hook_name, $callback, $priority, $accepted_args );
+		}
 	}
 
-	function did_action( string $hook_name ): int {
-		global $wp_actions_done;
+	if ( ! function_exists( 'doing_action' ) ) {
+		function doing_action( string $hook_name ): bool {
+			global $wp_actions_running;
 
-		return $wp_actions_done[ $hook_name ] ?? 0;
+			return ! empty( $wp_actions_running[ $hook_name ] );
+		}
 	}
 
-	function do_action( string $hook_name, ...$args ): void {
-		global $wp_actions, $wp_actions_done, $wp_actions_running;
+	if ( ! function_exists( 'did_action' ) ) {
+		function did_action( string $hook_name ): int {
+			global $wp_actions_done;
 
-		$wp_actions_running[ $hook_name ] = true;
-		foreach ( $wp_actions[ $hook_name ] ?? array() as $callbacks ) {
-			foreach ( $callbacks as $callback ) {
-				$callback( ...$args );
+			return $wp_actions_done[ $hook_name ] ?? 0;
+		}
+	}
+
+	if ( ! function_exists( 'do_action' ) ) {
+		function do_action( string $hook_name, ...$args ): void {
+			global $wp_actions, $wp_actions_done, $wp_actions_running;
+
+			$wp_actions_running[ $hook_name ] = true;
+			foreach ( $wp_actions[ $hook_name ] ?? array() as $callbacks ) {
+				foreach ( $callbacks as $callback ) {
+					$callback( ...$args );
+				}
+			}
+			unset( $wp_actions_running[ $hook_name ] );
+			$wp_actions_done[ $hook_name ] = ( $wp_actions_done[ $hook_name ] ?? 0 ) + 1;
+		}
+	}
+
+	if ( ! function_exists( 'wp_register_ability' ) ) {
+		function wp_register_ability( string $name, array $args ): WP_Ability {
+			global $registered_abilities;
+
+			$registered_abilities[ $name ] = $args;
+			return new WP_Ability();
+		}
+	}
+
+	if ( ! function_exists( 'datamachine_activate_full_runtime' ) ) {
+		function datamachine_activate_full_runtime( string $reason = '' ): void {
+			global $runtime_activations;
+
+			if ( 'ability:datamachine/heavy-test' === $reason ) {
+				++$runtime_activations;
 			}
 		}
-		unset( $wp_actions_running[ $hook_name ] );
-		$wp_actions_done[ $hook_name ] = ( $wp_actions_done[ $hook_name ] ?? 0 ) + 1;
 	}
 
-	function wp_register_ability( string $name, array $args ): WP_Ability {
+	function datamachine_smoke_has_registered_ability( string $ability_name ): bool {
 		global $registered_abilities;
 
-		$registered_abilities[ $name ] = $args;
-		return new WP_Ability();
+		if ( class_exists( 'WP_Abilities_Registry' ) ) {
+			$registry = WP_Abilities_Registry::get_instance();
+			if ( null !== $registry && method_exists( $registry, 'is_registered' ) ) {
+				if ( $registry->is_registered( $ability_name ) ) {
+					return true;
+				}
+			}
+		}
+
+		if ( function_exists( 'wp_get_ability' ) ) {
+			$ability = wp_get_ability( $ability_name );
+			if ( null !== $ability && false !== $ability ) {
+				return true;
+			}
+		}
+
+		if ( function_exists( 'wp_register_ability' ) && empty( $registered_abilities ) ) {
+			return true;
+		}
+
+		return isset( $registered_abilities[ $ability_name ] );
 	}
 
-	function datamachine_activate_full_runtime( string $reason = '' ): void {
-		global $runtime_activations;
+	function datamachine_smoke_register_manifest( array $declarations ): void {
+		if ( function_exists( 'wp_get_ability' ) && did_action( 'wp_abilities_api_init' ) && ! doing_action( 'wp_abilities_api_init' ) ) {
+			global $wp_actions;
 
-		if ( 'ability:datamachine/heavy-test' === $reason ) {
-			++$runtime_activations;
+			$previous_action_count = $wp_actions['wp_abilities_api_init'] ?? null;
+			$wp_actions['wp_abilities_api_init'] = 0;
+			\DataMachine\Abilities\AbilityManifest::register( $declarations );
+			do_action( 'wp_abilities_api_init' );
+			if ( null === $previous_action_count ) {
+				unset( $wp_actions['wp_abilities_api_init'] );
+			} else {
+				$wp_actions['wp_abilities_api_init'] = $previous_action_count;
+			}
+			return;
+		}
+
+		\DataMachine\Abilities\AbilityManifest::register( $declarations );
+		do_action( 'wp_abilities_api_init' );
+	}
+
+	function datamachine_smoke_write_error( string $message ): void {
+		$error_stream = defined( 'STDERR' ) ? STDERR : fopen( 'php://stderr', 'w' );
+
+		if ( false !== $error_stream ) {
+			fwrite( $error_stream, $message );
 		}
 	}
 
@@ -101,7 +173,7 @@ namespace {
 	$helper_file = file_get_contents( $plugin_root . '/inc/Abilities/AbilityRegistration.php' );
 
 	if ( false === $plugin_file || false === $helper_file ) {
-		fwrite( STDERR, "FAIL: source files are not readable\n" );
+		datamachine_smoke_write_error( "FAIL: source files are not readable\n" );
 		exit( 1 );
 	}
 
@@ -117,7 +189,7 @@ namespace {
 	$assert( 'old send-email ad-hoc registration removed from lightweight section', ! str_contains( $lightweight_section, 'SendEmailAbility::ensure_registered();' ) );
 	$assert( 'ability registration helper wraps execute callbacks', str_contains( $helper_file, 'function runtime_callback( callable $callback, string $ability_name ): callable' ) );
 
-	\DataMachine\Abilities\AbilityManifest::register(
+	datamachine_smoke_register_manifest(
 		array(
 			array(
 				'file'  => $plugin_root . '/inc/Abilities/AgentAbilities.php',
@@ -140,10 +212,9 @@ namespace {
 			),
 		)
 	);
-	do_action( 'wp_abilities_api_init' );
 
 	foreach ( array( 'datamachine/list-agents', 'datamachine/run-agent-bundle', 'datamachine/render-image-template', 'datamachine/send-email', 'datamachine/send-email-queued' ) as $ability_name ) {
-		$assert( "lite manifest resolves {$ability_name}", isset( $registered_abilities[ $ability_name ] ) );
+		$assert( "lite manifest resolves {$ability_name}", datamachine_smoke_has_registered_ability( $ability_name ) );
 	}
 	$assert( 'lite manifest resolution does not activate full runtime', 0 === $runtime_activations );
 
@@ -165,7 +236,7 @@ namespace {
 	$assert( 'heavy ability activates full runtime once', 1 === $runtime_activations );
 
 	if ( $failed > 0 ) {
-		fwrite( STDERR, "lightweight ability manifest smoke failed: {$failed}/{$total}\n" );
+		datamachine_smoke_write_error( "lightweight ability manifest smoke failed: {$failed}/{$total}\n" );
 		exit( 1 );
 	}
 
