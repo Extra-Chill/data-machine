@@ -26,6 +26,9 @@ class DataMachineCompletionAssertions {
 	/** @var array<int, string> */
 	private array $required_output_packet_types;
 
+	/** @var array<int, array{output_key: string, schema: string, artifact: string}> */
+	private array $required_artifact_outputs;
+
 	/** @var array<int, array{name: string, tools: array<int, array{name: string, required_output: array<int, string>, required_parameters: array<string, mixed>, min_successful_calls: int}>}> */
 	private array $complete_when_any;
 
@@ -46,6 +49,7 @@ class DataMachineCompletionAssertions {
 		$this->required_tool_names            = $this->sanitizeList( $config['required_tool_names'] ?? array() );
 		$this->minimum_successful_tool_counts = $this->sanitizeToolCountMap( $config['minimum_successful_tool_counts'] ?? array() );
 		$this->required_output_packet_types   = $this->sanitizeList( $config['required_output_packet_types'] ?? array() );
+		$this->required_artifact_outputs      = $this->sanitizeRequiredArtifactOutputs( $config['required_artifact_outputs'] ?? array() );
 		$this->complete_when_any              = $this->sanitizeOutcomeAssertions( $config['complete_when_any'] ?? array() );
 	}
 
@@ -59,6 +63,7 @@ class DataMachineCompletionAssertions {
 			|| ! empty( $this->required_tool_names )
 			|| ! empty( $this->minimum_successful_tool_counts )
 			|| ! empty( $this->required_output_packet_types )
+			|| ! empty( $this->required_artifact_outputs )
 			|| ! empty( $this->complete_when_any );
 	}
 
@@ -121,6 +126,7 @@ class DataMachineCompletionAssertions {
 			'tool_names'          => array_values( array_intersect( $this->required_tool_names, array_unique( $this->executed_tool_names ) ) ),
 			'tool_counts'         => $this->satisfiedToolCounts(),
 			'output_packet_types' => array_values( array_intersect( $this->required_output_packet_types, $output_packet_types ) ),
+			'artifact_outputs'    => $this->satisfiedArtifactOutputKeys( $runtime_context ),
 			'complete_when_any'   => $outcome_evaluation['satisfied'],
 		);
 
@@ -130,6 +136,7 @@ class DataMachineCompletionAssertions {
 				'tool_names'          => array_values( array_diff( $this->required_tool_names, $satisfied['tool_names'] ) ),
 				'tool_counts'         => $this->missingToolCounts(),
 				'output_packet_types' => array_values( array_diff( $this->required_output_packet_types, $satisfied['output_packet_types'] ) ),
+				'artifact_outputs'    => array_values( array_diff( $this->requiredArtifactOutputKeys(), $satisfied['artifact_outputs'] ) ),
 				'complete_when_any'   => $outcome_evaluation['missing'],
 			)
 		);
@@ -172,6 +179,7 @@ class DataMachineCompletionAssertions {
 				'tool_names'          => $this->required_tool_names,
 				'tool_counts'         => $this->requiredToolCounts(),
 				'output_packet_types' => $this->required_output_packet_types,
+				'artifact_outputs'    => $this->required_artifact_outputs,
 				'complete_when_any'   => $this->complete_when_any,
 			)
 		);
@@ -567,6 +575,55 @@ class DataMachineCompletionAssertions {
 	}
 
 	/**
+	 * @param mixed $value Raw typed artifact output assertions.
+	 * @return array<int, array{output_key: string, schema: string, artifact: string}>
+	 */
+	private function sanitizeRequiredArtifactOutputs( mixed $value ): array {
+		if ( ! is_array( $value ) ) {
+			return array();
+		}
+
+		$outputs = array();
+		foreach ( $value as $key => $entry ) {
+			if ( is_string( $entry ) ) {
+				$output_key = trim( $entry );
+				$schema     = '';
+				$artifact   = '';
+			} elseif ( is_array( $entry ) ) {
+				$output_key = trim( (string) ( $entry['output_key'] ?? ( is_string( $key ) ? $key : '' ) ) );
+				$schema     = trim( (string) ( $entry['schema'] ?? '' ) );
+				$artifact   = trim( (string) ( $entry['artifact'] ?? '' ) );
+			} else {
+				continue;
+			}
+
+			if ( '' !== $output_key ) {
+				$outputs[] = array(
+					'output_key' => $output_key,
+					'schema'     => $schema,
+					'artifact'   => $artifact,
+				);
+			}
+		}
+
+		return array_values(
+			array_reduce(
+				$outputs,
+				static function ( array $carry, array $output ): array {
+					$carry[ $output['output_key'] ] = $output;
+					return $carry;
+				},
+				array()
+			)
+		);
+	}
+
+	/** @return array<int, string> */
+	private function requiredArtifactOutputKeys(): array {
+		return array_values( array_unique( array_map( static fn( array $output ): string => $output['output_key'], $this->required_artifact_outputs ) ) );
+	}
+
+	/**
 	 * @param array $runtime_context Caller-owned runtime context.
 	 * @return array<int, string>
 	 */
@@ -597,6 +654,48 @@ class DataMachineCompletionAssertions {
 		}
 
 		return array_values( array_unique( $satisfied ) );
+	}
+
+	/**
+	 * @param array $runtime_context Caller-owned runtime context.
+	 * @return array<int, string>
+	 */
+	private function satisfiedArtifactOutputKeys( array $runtime_context ): array {
+		$engine = $runtime_context['engine'] ?? null;
+		$data   = is_array( $runtime_context['engine_data'] ?? null ) ? $runtime_context['engine_data'] : array();
+
+		if ( is_object( $engine ) && method_exists( $engine, 'all' ) ) {
+			$engine_data = $engine->all();
+			if ( is_array( $engine_data ) ) {
+				$data = array_replace_recursive( $data, $engine_data );
+			}
+		}
+
+		$typed_artifacts = is_array( $data['outputs']['typed_artifacts'] ?? null ) ? $data['outputs']['typed_artifacts'] : array();
+		$satisfied       = array();
+		foreach ( $this->required_artifact_outputs as $required_output ) {
+			$output_key = $required_output['output_key'];
+			$output     = is_array( $typed_artifacts[ $output_key ] ?? null ) ? $typed_artifacts[ $output_key ] : array();
+			if ( ! $this->hasOutputPayload( $output ) ) {
+				continue;
+			}
+
+			if ( '' !== $required_output['schema'] && (string) ( $output['schema'] ?? '' ) !== $required_output['schema'] ) {
+				continue;
+			}
+
+			if ( '' !== $required_output['artifact'] && (string) ( $output['artifact'] ?? '' ) !== $required_output['artifact'] ) {
+				continue;
+			}
+
+			$satisfied[] = $output_key;
+		}
+
+		return array_values( array_unique( $satisfied ) );
+	}
+
+	private function hasOutputPayload( array $output ): bool {
+		return array_key_exists( 'payload', $output ) && null !== $output['payload'] && '' !== $output['payload'] && array() !== $output['payload'];
 	}
 
 	/**

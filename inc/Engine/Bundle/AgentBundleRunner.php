@@ -295,7 +295,7 @@ final class AgentBundleRunner {
 		$engine_data = is_array( $response['engine_data'] ?? null ) ? $response['engine_data'] : array();
 		$mappings    = $this->declared_output_mappings( $input );
 		$required    = $this->required_output_keys( $engine_data, $input );
-		$artifacts   = $this->required_artifact_keys( $input );
+		$artifacts   = $this->required_artifact_keys( $input, $engine_data );
 		$declared    = array_values( array_unique( array_merge( $required, $artifacts, array_keys( $mappings ) ) ) );
 		$outputs     = array();
 
@@ -317,6 +317,14 @@ final class AgentBundleRunner {
 				$key = sanitize_key( (string) $key );
 				if ( '' !== $key && $this->has_output_value( $value ) ) {
 					$outputs[ $key ] = $value;
+				}
+			}
+
+			$typed_artifacts = is_array( $engine_data['outputs']['typed_artifacts'] ?? null ) ? $engine_data['outputs']['typed_artifacts'] : array();
+			foreach ( $typed_artifacts as $key => $artifact_output ) {
+				$key = sanitize_key( (string) $key );
+				if ( '' !== $key && is_array( $artifact_output ) && $this->has_output_value( $artifact_output['payload'] ?? null ) ) {
+					$outputs[ $key ] = $artifact_output['payload'];
 				}
 			}
 		}
@@ -461,8 +469,26 @@ final class AgentBundleRunner {
 	}
 
 	/** @return array<int,string> */
-	private function required_artifact_keys( array $input ): array {
-		return $this->normalize_required_key_list( $input['required_artifacts'] ?? array() );
+	private function required_artifact_keys( array $input, array $engine_data = array() ): array {
+		$keys = $this->normalize_required_key_list( $input['required_artifacts'] ?? array() );
+		$keys = array_merge( $keys, $this->required_artifact_output_keys_from_engine_data( $engine_data ) );
+		return array_values( array_unique( $keys ) );
+	}
+
+	/** @return array<int,string> */
+	private function required_artifact_output_keys_from_engine_data( array $engine_data ): array {
+		$assertions = is_array( $engine_data['completion_assertions_required'] ?? null ) ? $engine_data['completion_assertions_required'] : array();
+		$outputs    = is_array( $assertions['artifact_outputs'] ?? null ) ? $assertions['artifact_outputs'] : array();
+		$keys       = array();
+		foreach ( $outputs as $output ) {
+			if ( is_array( $output ) ) {
+				$keys[] = $output['output_key'] ?? '';
+			} elseif ( is_scalar( $output ) ) {
+				$keys[] = (string) $output;
+			}
+		}
+
+		return $this->normalize_required_key_list( $keys );
 	}
 
 	/** @return array<int,string> */

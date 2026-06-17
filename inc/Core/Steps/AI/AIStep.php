@@ -25,6 +25,7 @@ use DataMachine\Engine\AI\Tools\ToolPolicyResolver;
 
 use function DataMachine\Engine\AI\datamachine_run_conversation;
 use function DataMachine\Engine\AI\datamachine_conversation_metadata;
+use function DataMachine\Engine\AI\datamachine_normalize_typed_artifact_outputs;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -543,11 +544,20 @@ class AIStep extends Step {
 			$loop_metadata = datamachine_conversation_metadata( $loop_result );
 
 			if ( $this->job_id > 0 ) {
-				$artifact_engine_data                           = datamachine_get_engine_data( $this->job_id );
-				$artifact_engine_data['tool_execution_summary'] = self::summarizeToolExecutions( $loop_result );
+				$artifact_engine_data                             = datamachine_get_engine_data( $this->job_id );
+				$artifact_engine_data['tool_execution_summary']   = self::summarizeToolExecutions( $loop_result );
 				$artifact_engine_data['tool_resolution_evidence'] = $tool_resolution_evidence;
 				if ( isset( $loop_result['runtime_provenance'] ) && is_array( $loop_result['runtime_provenance'] ) ) {
 					$artifact_engine_data['runtime_provenance'] = $loop_result['runtime_provenance'];
+				}
+
+				$typed_artifacts = datamachine_normalize_typed_artifact_outputs( $loop_result );
+				if ( ! empty( $typed_artifacts ) ) {
+					$artifact_engine_data['outputs']                    = is_array( $artifact_engine_data['outputs'] ?? null ) ? $artifact_engine_data['outputs'] : array();
+					$artifact_engine_data['outputs']['typed_artifacts'] = array_replace_recursive(
+						is_array( $artifact_engine_data['outputs']['typed_artifacts'] ?? null ) ? $artifact_engine_data['outputs']['typed_artifacts'] : array(),
+						$typed_artifacts
+					);
 				}
 
 				foreach ( array( 'completion_assertions_required', 'completion_assertions_missing', 'completion_assertions_satisfied' ) as $assertion_key ) {
@@ -707,13 +717,13 @@ class AIStep extends Step {
 	 */
 	private static function mergeCompletionAssertions( array $pipeline_assertions, array $flow_assertions ): array {
 		$merged = array();
-		foreach ( array( 'required_engine_data_keys', 'required_tool_names', 'required_output_packet_types' ) as $key ) {
+		foreach ( array( 'required_engine_data_keys', 'required_tool_names', 'required_output_packet_types', 'required_artifact_outputs' ) as $key ) {
 			$values = array_merge(
-				self::normalizeCompletionAssertionList( $pipeline_assertions[ $key ] ?? array() ),
-				self::normalizeCompletionAssertionList( $flow_assertions[ $key ] ?? array() )
+				self::normalizeCompletionAssertionValues( $pipeline_assertions[ $key ] ?? array() ),
+				self::normalizeCompletionAssertionValues( $flow_assertions[ $key ] ?? array() )
 			);
 			if ( ! empty( $values ) ) {
-				$merged[ $key ] = array_values( array_unique( $values ) );
+				$merged[ $key ] = 'required_artifact_outputs' === $key ? array_values( $values ) : array_values( array_unique( $values ) );
 			}
 		}
 
@@ -780,6 +790,36 @@ class AIStep extends Step {
 
 		$items = array();
 		foreach ( $value as $item ) {
+			$item = trim( (string) $item );
+			if ( '' !== $item ) {
+				$items[] = $item;
+			}
+		}
+
+		return $items;
+	}
+
+	/**
+	 * Normalize scalar assertion values while preserving structured assertion entries.
+	 *
+	 * @param mixed $value Raw assertion values.
+	 * @return array<int, mixed>
+	 */
+	private static function normalizeCompletionAssertionValues( $value ): array {
+		if ( is_string( $value ) && '' !== $value ) {
+			$value = array( $value );
+		}
+		if ( ! is_array( $value ) ) {
+			return array();
+		}
+
+		$items = array();
+		foreach ( $value as $item ) {
+			if ( is_array( $item ) ) {
+				$items[] = $item;
+				continue;
+			}
+
 			$item = trim( (string) $item );
 			if ( '' !== $item ) {
 				$items[] = $item;
