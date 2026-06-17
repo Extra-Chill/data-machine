@@ -92,66 +92,12 @@ class ProviderRequestAssembler {
 			$structured[ $tool_name ] = array(
 				'name'           => $tool_name,
 				'description'    => $tool_config['description'] ?? '',
-				'parameters'     => self::normalizeToolParameters( $tool_config['parameters'] ?? array() ),
+				'parameters'     => ToolSchemaNormalizer::normalize( $tool_config['parameters'] ?? array() ),
 				'handler'        => $tool_config['handler'] ?? null,
 				'handler_config' => $tool_config['handler_config'] ?? array(),
 			);
 		}
 
 		return $structured;
-	}
-
-	/**
-	 * Normalize raw tool parameters to canonical JSON Schema object form.
-	 *
-	 * Tool definitions historically used a flat property map with optional
-	 * property-level `required` flags. Providers expect the canonical root schema.
-	 *
-	 * @param mixed $parameters Raw tool parameters definition.
-	 * @return array<string, mixed>
-	 */
-	private static function normalizeToolParameters( mixed $parameters ): array {
-		if ( ! is_array( $parameters ) || empty( $parameters ) ) {
-			return array(
-				'type'       => 'object',
-				'properties' => (object) array(),
-			);
-		}
-
-		if ( isset( $parameters['type'] ) || isset( $parameters['properties'] ) || isset( $parameters['required'] ) ) {
-			$parameters['type'] = $parameters['type'] ?? 'object';
-			if ( isset( $parameters['properties'] ) && is_array( $parameters['properties'] ) && empty( $parameters['properties'] ) ) {
-				$parameters['properties'] = (object) array();
-			}
-			return $parameters;
-		}
-
-		$properties = array();
-		$required   = array();
-
-		foreach ( $parameters as $name => $schema ) {
-			if ( ! is_string( $name ) || '' === $name ) {
-				continue;
-			}
-
-			$property_schema = is_array( $schema ) ? $schema : array( 'type' => 'string' );
-			if ( ! empty( $property_schema['required'] ) ) {
-				$required[] = $name;
-			}
-			unset( $property_schema['required'] );
-
-			$properties[ $name ] = $property_schema;
-		}
-
-		$normalized = array(
-			'type'       => 'object',
-			'properties' => ! empty( $properties ) ? $properties : (object) array(),
-		);
-
-		if ( ! empty( $required ) ) {
-			$normalized['required'] = $required;
-		}
-
-		return $normalized;
 	}
 }

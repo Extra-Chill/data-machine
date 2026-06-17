@@ -250,7 +250,7 @@ class RequestBuilder {
 				$function_declarations[] = new \WordPress\AiClient\Tools\DTO\FunctionDeclaration(
 					$provider_name,
 					(string) ( $tool_config['description'] ?? '' ),
-					self::normalizeToolSchema( $tool_config['parameters'] ?? array() )
+					ToolSchemaNormalizer::normalize( $tool_config['parameters'] ?? array() )
 				);
 			}
 
@@ -1195,26 +1195,5 @@ class RequestBuilder {
 		} catch ( \Throwable $e ) {
 			return null;
 		}
-	}
-
-	/**
-	 * Return the canonical JSON Schema object for tool parameters.
-	 *
-	 * @param mixed $parameters Raw parameters definition.
-	 * @return array<string, mixed>
-	 */
-	private static function normalizeToolSchema( $parameters ): array {
-		if ( ! is_array( $parameters ) || empty( $parameters ) ) {
-			$parameters = array(
-				'type'       => 'object',
-				'properties' => array(),
-			);
-		}
-
-		if ( isset( $parameters['properties'] ) && is_array( $parameters['properties'] ) && empty( $parameters['properties'] ) ) {
-			$parameters['properties'] = (object) array();
-		}
-
-		return $parameters;
 	}
 }
