@@ -2,6 +2,15 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.150.4] - 2026-06-17
+
+### Changed
+- align assignment operators to satisfy phpcs WordPress standard
+
+### Fixed
+- honor --dry-run on flows update (handler-config/set-user-message no longer persist)
+- stage content-edit pending actions on the calling blog, not the target
+
 ## [0.150.3] - 2026-06-16
 
 ### Fixed
