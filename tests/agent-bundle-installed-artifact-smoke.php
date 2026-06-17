@@ -184,6 +184,9 @@ $round_trip = AgentBundleInstalledArtifact::from_array( $modified )->to_array();
 assert_installed_artifact_equals( 'round-trip recomputes modified status', AgentBundleArtifactStatus::MODIFIED, $round_trip['status'] );
 assert_installed_artifact_equals( 'round-trip preserves updated timestamp', '2026-04-28T01:00:00Z', $round_trip['updated_at'] );
 
+$dot_name = AgentBundleInstalledArtifact::from_array( array_merge( $installed_array, array( 'source_path' => 'prompts/version..notes.md' ) ) )->to_array();
+assert_installed_artifact_equals( 'bundle path normalizer allows dot sequences inside a filename', 'prompts/version..notes.md', $dot_name['source_path'] );
+
 $threw = false;
 try {
 	AgentBundleInstalledArtifact::from_array( array_merge( $installed_array, array( 'artifact_type' => 'secret' ) ) );

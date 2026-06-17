@@ -43,6 +43,7 @@ class ToolPolicyResolver {
 	private DataMachineToolAccessPolicy $tool_access_policy;
 	private \WP_Agent_Tool_Policy $tool_policy;
 	private \WP_Agent_Tool_Policy_Filter $policy_filter;
+	private ?array $last_source_trace = null;
 
 	public function __construct(
 		?ToolManager $tool_manager = null,
@@ -89,6 +90,7 @@ class ToolPolicyResolver {
 	 * @return array Resolved tools array keyed by tool name.
 	 */
 	public function resolve( array $args ): array {
+		$this->last_source_trace = null;
 		$modes    = self::normalizeModes( $args['modes'] ?? ( array_key_exists( 'mode', $args ) ? array( $args['mode'] ) : array( self::MODE_PIPELINE ) ) );
 		$agent_id = isset( $args['agent_id'] ) ? (int) $args['agent_id'] : 0;
 
@@ -103,7 +105,13 @@ class ToolPolicyResolver {
 
 		// 1. Gather tools from Data Machine-owned sources.
 		$args['modes'] = $modes;
-		$tools         = $this->gatherByModes( $modes, $args );
+		$source_trace  = null;
+		if ( ! empty( $args['capture_trace'] ) ) {
+			$source_trace = $this->tool_source_registry->gatherTrace( $modes, $args );
+			$tools        = $source_trace['tools'];
+		} else {
+			$tools = $this->gatherByModes( $modes, $args );
+		}
 		$tools        = $this->filterRuntimeToolsByPolicyOptIn( $tools, $args, $agent_policy );
 
 		// 2. Delegate generic mode/allow/deny/category policy resolution to Agents API.
@@ -128,6 +136,9 @@ class ToolPolicyResolver {
 		}
 
 		$tools = $this->tool_policy->resolve( $tools, $policy_context );
+		if ( is_array( $source_trace ) ) {
+			$this->last_source_trace = $source_trace;
+		}
 
 		// An explicitly-empty allow_only means "no optional tools." The generic
 		// substrate only applies a non-empty allow_only, so it would otherwise
@@ -157,7 +168,14 @@ class ToolPolicyResolver {
 	 * @return array{tools: array<string,array<string,mixed>>, evidence: array<string,mixed>}
 	 */
 	public function resolveWithEvidence( array $args, array $required_tool_names = array(), array $requested_tool_names = array() ): array {
+		$args['capture_trace']                    = true;
+		$args['include_unavailable']              = true;
+		$args['include_source_rejection_metadata'] = true;
+		$args['diagnostic_tool_names']             = array_values( array_unique( array_merge( $required_tool_names, $requested_tool_names ) ) );
 		$tools    = $this->resolve( $args );
+		if ( is_array( $this->last_source_trace ) ) {
+			$args['source_trace'] = $this->last_source_trace;
+		}
 		$evidence = $this->buildResolutionEvidence( $args, $tools, $required_tool_names, $requested_tool_names );
 
 		return array(
@@ -184,7 +202,7 @@ class ToolPolicyResolver {
 		$required_tool_names = $this->policy_filter->string_list( $required_tool_names );
 		$resolved_tool_names = array_keys( $resolved_tools );
 
-		$source_snapshot = $this->tool_source_registry->gatherWithMetadata(
+		$source_snapshot = is_array( $args['source_trace'] ?? null ) ? $args['source_trace'] : $this->tool_source_registry->gatherTrace(
 			$modes,
 			array_merge(
 				$args,

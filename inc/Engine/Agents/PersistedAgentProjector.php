@@ -8,6 +8,7 @@
 
 namespace DataMachine\Engine\Agents;
 
+use DataMachine\Core\Agents\AgentConfigFactory;
 use DataMachine\Core\Database\Agents\Agents;
 
 defined( 'ABSPATH' ) || exit;
@@ -57,7 +58,7 @@ class PersistedAgentProjector {
 	 * @return array<string,mixed>
 	 */
 	public static function definition_from_row( array $row ): array {
-		$config   = is_array( $row['agent_config'] ?? null ) ? $row['agent_config'] : array();
+		$config   = AgentConfigFactory::normalize( is_array( $row['agent_config'] ?? null ) ? $row['agent_config'] : array() );
 		$owner_id = (int) ( $row['owner_id'] ?? 0 );
 
 		return array(

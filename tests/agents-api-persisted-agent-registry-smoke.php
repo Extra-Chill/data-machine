@@ -11,9 +11,11 @@ require_once __DIR__ . '/agents-api-smoke-helpers.php';
 agents_api_smoke_require_module();
 
 require_once dirname( __DIR__ ) . '/inc/Core/Database/BaseRepository.php';
+require_once dirname( __DIR__ ) . '/inc/Core/Agents/AgentConfigFactory.php';
 require_once dirname( __DIR__ ) . '/inc/Core/Database/Agents/Agents.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/Agents/PersistedAgentProjector.php';
 
+use DataMachine\Core\Agents\AgentConfigFactory;
 use DataMachine\Core\Database\Agents\Agents;
 use DataMachine\Engine\Agents\PersistedAgentProjector;
 
@@ -146,6 +148,25 @@ agents_api_smoke_assert_equals( 7, $agent && is_callable( $agent->get_owner_reso
 agents_api_smoke_assert_equals( 'gpt-5.5', $agent ? $agent->get_default_config()['default_model'] ?? '' : '', 'agent_config becomes default_config', $failures, $passes );
 agents_api_smoke_assert_equals( 'wordpress-com-wiki', $agent ? $agent->get_meta()['source_package'] ?? '' : '', 'bundle slug is exposed as source package', $failures, $passes );
 agents_api_smoke_assert_equals( 'wordpress-com', $agent ? $agent->get_meta()['intelligence_wiki_brain_wiki_slug'] ?? '' : '', 'extension metadata projector is exposed', $failures, $passes );
+
+echo "\n[1b] persisted agent config normalizes legacy model aliases:\n";
+$legacy_config = AgentConfigFactory::normalize(
+	array(
+		'provider'    => 'openai',
+		'model'       => 'gpt-5.5',
+		'mode_models' => array(
+			'chat' => array(
+				'provider' => 'openai',
+				'model'    => 'gpt-5.5-chat',
+			),
+		),
+	)
+);
+agents_api_smoke_assert_equals( 'openai', $legacy_config['default_provider'] ?? '', 'legacy provider becomes default_provider', $failures, $passes );
+agents_api_smoke_assert_equals( 'gpt-5.5', $legacy_config['default_model'] ?? '', 'legacy model becomes default_model', $failures, $passes );
+agents_api_smoke_assert_equals( false, array_key_exists( 'provider', $legacy_config ), 'legacy provider alias is not persisted', $failures, $passes );
+agents_api_smoke_assert_equals( false, array_key_exists( 'model', $legacy_config ), 'legacy model alias is not persisted', $failures, $passes );
+agents_api_smoke_assert_equals( 'gpt-5.5-chat', $legacy_config['mode_models']['chat']['model'] ?? '', 'mode_models remain canonical mode overrides', $failures, $passes );
 
 echo "\n[2] persisted projection preserves earlier declarative registrations:\n";
 datamachine_persisted_agent_registry_reset();

@@ -42,6 +42,11 @@ class ToolSourceRegistry {
 	 * @return array Tools keyed by tool name.
 	 */
 	public function gather( array $modes, array $args ): array {
+		if ( ! empty( $args['capture_trace'] ) ) {
+			$trace = $this->gatherTrace( $modes, $args );
+			return $trace['tools'];
+		}
+
 		$callback = array( $this, 'orderSourcesForContext' );
 		if ( function_exists( 'add_filter' ) ) {
 			// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- Canonical Agents API tool-source compatibility hook.
@@ -74,6 +79,17 @@ class ToolSourceRegistry {
 	 * @return array{tools: array<string,array<string,mixed>>, sources: array<int,array<string,mixed>>}
 	 */
 	public function gatherWithMetadata( array $modes, array $args ): array {
+		return $this->gatherTrace( $modes, $args );
+	}
+
+	/**
+	 * Gather tools and source trace metadata through the same source path.
+	 *
+	 * @param array $modes Agent mode slugs.
+	 * @param array $args Full resolution arguments.
+	 * @return array{tools: array<string,array<string,mixed>>, sources: array<int,array<string,mixed>>}
+	 */
+	public function gatherTrace( array $modes, array $args ): array {
 		$context  = array_merge(
 			$args,
 			array(

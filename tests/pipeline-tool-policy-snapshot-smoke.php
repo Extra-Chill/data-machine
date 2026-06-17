@@ -352,6 +352,11 @@ assert_policy_equals( array(), $resolution['evidence']['unavailable_required_too
 assert_policy_equals( 'resolved', $resolution['evidence']['required_tool_resolution'][0]['status'] ?? null, 'resolved evidence marks required tool resolved', $failures, $passes );
 assert_policy_equals( 'alpha_tool', $resolution['evidence']['required_tool_resolution'][0]['resolved_name'] ?? null, 'resolved evidence preserves resolved logical name', $failures, $passes );
 
+echo "\n[10] required-tool evidence reuses captured source trace:\n";
+$resolver_source = file_get_contents( __DIR__ . '/../inc/Engine/AI/Tools/ToolPolicyResolver.php' ) ?: '';
+assert_policy_equals( 0, substr_count( $resolver_source, 'gatherWithMetadata(' ), 'evidence no longer manually replays metadata-only source gathering', $failures, $passes );
+assert_policy_equals( true, str_contains( $resolver_source, '$args[\'source_trace\'] = $this->last_source_trace' ), 'evidence builder receives captured trace metadata', $failures, $passes );
+
 if ( $failures ) {
 	echo "\nFAILED: " . count( $failures ) . " pipeline policy assertions failed.\n";
 	exit( 1 );
