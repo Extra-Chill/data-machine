@@ -67,6 +67,7 @@ final class PortableFlowStepFields {
 
 		if ( in_array( $field, array( 'flow_step_settings', 'completion_assertions' ), true ) ) {
 			if ( ! is_array( $value ) ) {
+				// phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- Exception text is not rendered directly.
 				throw new \InvalidArgumentException( self::message( sprintf( '%s must be an object.', $field ), $message_prefix ) );
 			}
 			return $value;
@@ -74,6 +75,7 @@ final class PortableFlowStepFields {
 
 		if ( 'tool_runtime_rules' === $field ) {
 			if ( ! is_array( $value ) || ! array_is_list( $value ) ) {
+				// phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- Exception text is not rendered directly.
 				throw new \InvalidArgumentException( self::message( 'tool_runtime_rules must be a list.', $message_prefix ) );
 			}
 			return $value;
@@ -93,6 +95,7 @@ final class PortableFlowStepFields {
 
 		if ( 'queue_mode' === $field ) {
 			if ( ! in_array( $value, self::QUEUE_MODES, true ) ) {
+				// phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- Exception text is not rendered directly.
 				throw new \InvalidArgumentException( self::message( 'queue_mode must be one of drain, loop, static.', $message_prefix ) );
 			}
 			return $value;
@@ -103,12 +106,14 @@ final class PortableFlowStepFields {
 
 	private static function normalize_string_list( string $field, $value, string $message_prefix ): array {
 		if ( ! is_array( $value ) || ! array_is_list( $value ) ) {
+			// phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- Exception text is not rendered directly.
 			throw new \InvalidArgumentException( self::message( sprintf( '%s must be a list of strings.', $field ), $message_prefix ) );
 		}
 
 		$normalized = array();
 		foreach ( $value as $item ) {
 			if ( ! is_string( $item ) ) {
+				// phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- Exception text is not rendered directly.
 				throw new \InvalidArgumentException( self::message( sprintf( '%s must be a list of strings.', $field ), $message_prefix ) );
 			}
 			$normalized[] = $item;
@@ -119,18 +124,22 @@ final class PortableFlowStepFields {
 
 	private static function normalize_prompt_queue( $value, string $message_prefix ): array {
 		if ( ! is_array( $value ) || ! array_is_list( $value ) ) {
+			// phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- Exception text is not rendered directly.
 			throw new \InvalidArgumentException( self::message( 'prompt_queue must be a list of objects.', $message_prefix ) );
 		}
 
 		$normalized = array();
 		foreach ( $value as $entry ) {
 			if ( ! is_array( $entry ) ) {
+				// phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- Exception text is not rendered directly.
 				throw new \InvalidArgumentException( self::message( 'prompt_queue must be a list of objects.', $message_prefix ) );
 			}
 			if ( ! array_key_exists( self::FIELD_PROMPT, $entry ) || ! is_string( $entry[ self::FIELD_PROMPT ] ) ) {
+				// phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- Exception text is not rendered directly.
 				throw new \InvalidArgumentException( self::message( 'prompt_queue entries must include a string prompt.', $message_prefix ) );
 			}
 			if ( array_key_exists( 'added_at', $entry ) && ! is_string( $entry['added_at'] ) ) {
+				// phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- Exception text is not rendered directly.
 				throw new \InvalidArgumentException( self::message( 'prompt_queue added_at must be a string when present.', $message_prefix ) );
 			}
 			$normalized[] = $entry;
@@ -141,18 +150,22 @@ final class PortableFlowStepFields {
 
 	private static function normalize_config_patch_queue( $value, string $message_prefix ): array {
 		if ( ! is_array( $value ) || ! array_is_list( $value ) ) {
+			// phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- Exception text is not rendered directly.
 			throw new \InvalidArgumentException( self::message( 'config_patch_queue must be a list of objects.', $message_prefix ) );
 		}
 
 		$normalized = array();
 		foreach ( $value as $entry ) {
 			if ( ! is_array( $entry ) ) {
+				// phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- Exception text is not rendered directly.
 				throw new \InvalidArgumentException( self::message( 'config_patch_queue must be a list of objects.', $message_prefix ) );
 			}
 			if ( ! array_key_exists( self::FIELD_PATCH, $entry ) || ! is_array( $entry[ self::FIELD_PATCH ] ) ) {
+				// phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- Exception text is not rendered directly.
 				throw new \InvalidArgumentException( self::message( 'config_patch_queue entries must include an object patch.', $message_prefix ) );
 			}
 			if ( array_key_exists( 'added_at', $entry ) && ! is_string( $entry['added_at'] ) ) {
+				// phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- Exception text is not rendered directly.
 				throw new \InvalidArgumentException( self::message( 'config_patch_queue added_at must be a string when present.', $message_prefix ) );
 			}
 			$normalized[] = $entry;

@@ -211,7 +211,7 @@ final class AgentBundleRunner {
 			if ( ! is_array( $metadata_tools ) ) {
 				$metadata_tools = $this->path_value( $bundle, 'metadata.codebox.agent_runtime.bundle.ability_tools' );
 			}
-			$ability_tools  = is_array( $metadata_tools ) ? $metadata_tools : array();
+			$ability_tools = is_array( $metadata_tools ) ? $metadata_tools : array();
 		}
 		if ( empty( $ability_tools ) ) {
 			return;

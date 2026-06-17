@@ -137,6 +137,7 @@ final class AgentBundleFlowFile {
 		try {
 			return PortableFlowStepFields::normalize_field( $field, $value, 'flow file' );
 		} catch ( \InvalidArgumentException $e ) {
+			// phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- Exception text is not rendered directly.
 			throw new BundleValidationException( $e->getMessage() );
 		}
 	}
