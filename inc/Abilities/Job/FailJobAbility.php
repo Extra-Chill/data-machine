@@ -127,8 +127,6 @@ class FailJobAbility {
 		$new_status = JobStatus::failed( $reason )->toString();
 		$this->db_jobs->complete_job( $job_id, $new_status );
 
-		do_action( 'datamachine_job_complete', $job_id, 'failed' );
-
 		do_action(
 			'datamachine_log',
 			'info',

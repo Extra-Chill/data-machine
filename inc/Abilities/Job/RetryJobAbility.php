@@ -118,8 +118,6 @@ class RetryJobAbility {
 		\DataMachine\Core\RunMetrics::increment( $job_id, 'retried' );
 		$this->db_jobs->complete_job( $job_id, 'failed - manual_retry' );
 
-		do_action( 'datamachine_job_complete', $job_id, 'failed' );
-
 		// Restore drain-mode queued_prompt_backup if the prior run removed an entry.
 		$prompt_requeued = false;
 		$job_flow_id     = (int) ( $job['flow_id'] ?? 0 );

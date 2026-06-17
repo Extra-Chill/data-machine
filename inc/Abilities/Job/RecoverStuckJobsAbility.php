@@ -173,19 +173,9 @@ class RecoverStuckJobsAbility {
 						'target_status' => $status,
 					) );
 				} else {
-					// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-					$result = $wpdb->update(
-						$table,
-						array(
-							'status'       => $status,
-							'completed_at' => current_time( 'mysql', true ),
-						),
-						array( 'job_id' => $job->job_id ),
-						array( '%s', '%s' ),
-						array( '%d' )
-					);
+					$result = $this->db_jobs->transition_job_status( (int) $job->job_id, $status, true );
 
-					if ( false !== $result ) {
+					if ( $result ) {
 						++$recovered;
 						$this->appendJobDetail( $jobs, $jobs_omitted, array(
 							'job_id'        => (int) $job->job_id,
@@ -193,8 +183,6 @@ class RecoverStuckJobsAbility {
 							'status'        => 'recovered',
 							'target_status' => $status,
 						) );
-
-						do_action( 'datamachine_job_complete', $job->job_id, $status );
 					} else {
 						++$skipped;
 						$this->appendJobDetail( $jobs, $jobs_omitted, array(
@@ -265,29 +253,15 @@ class RecoverStuckJobsAbility {
 						'status'  => 'would_timeout',
 					) );
 				} else {
-					// Mark as failed
-					// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-					$result = $wpdb->update(
-						$table,
-						array(
-							'status'       => 'failed',
-							'completed_at' => current_time( 'mysql', true ),
-						),
-						array( 'job_id' => $job_id ),
-						array( '%s', '%s' ),
-						array( '%d' )
-					);
+					$result = $this->db_jobs->transition_job_status( $job_id, JobStatus::FAILED, true );
 
-					if ( false !== $result ) {
+					if ( $result ) {
 						++$timed_out;
 						$this->appendJobDetail( $jobs, $jobs_omitted, array(
 							'job_id'  => $job_id,
 							'flow_id' => $job_flow_id,
 							'status'  => 'timed_out',
 						) );
-
-						do_action( 'datamachine_job_complete', $job_id, 'failed' );
-
 						// Restore drain-mode queued_prompt_backup if the prior run removed an entry.
 						$backup = $engine_data['queued_prompt_backup'] ?? array();
 						if ( ! empty( $backup ) && $this->restoreQueuedPromptBackup( $job_flow_id, $backup ) ) {

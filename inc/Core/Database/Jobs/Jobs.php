@@ -1200,36 +1200,7 @@ class Jobs extends BaseRepository {
 	 * @return bool True on success, false on failure.
 	 */
 	public function complete_job( int $job_id, string $status ): bool {
-		// Validate using JobStatus - supports compound statuses like "agent_skipped - reason"
-		if ( empty( $job_id ) || ! JobStatus::isStatusFinal( $status ) ) {
-			return false;
-		}
-
-		// Truncate to fit varchar(255) column. Full reason is preserved in engine_data.
-		if ( strlen( $status ) > 255 ) {
-			$status = substr( $status, 0, 252 ) . '...';
-		}
-
-		$update_data = array(
-			'status'       => $status,
-			'completed_at' => current_time( 'mysql', true ),
-		);
-
-        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-		$updated = $this->wpdb->update(
-			$this->table_name,
-			$update_data,
-			array( 'job_id' => $job_id ),
-			array( '%s', '%s' ),
-			array( '%d' )
-		);
-
-		if ( false !== $updated ) {
-			RunMetrics::complete( $job_id, $status );
-			do_action( 'datamachine_job_complete', $job_id, $status );
-		}
-
-		return false !== $updated;
+		return $this->transition_job_status( $job_id, $status, true );
 	}
 
 	/**
@@ -1240,8 +1211,28 @@ class Jobs extends BaseRepository {
 	 * @return bool True on success, false on failure.
 	 */
 	public function update_job_status( int $job_id, string $status ): bool {
+		return $this->transition_job_status( $job_id, $status );
+	}
+
+	/**
+	 * Transition a job to a new status.
+	 *
+	 * Final statuses receive terminal accounting in one place: completed_at,
+	 * run metrics completion, and datamachine_job_complete hooks.
+	 *
+	 * @param int    $job_id        The job ID.
+	 * @param string $status        The new status.
+	 * @param bool   $require_final Whether to reject non-final statuses.
+	 * @return bool True on success, false on failure.
+	 */
+	public function transition_job_status( int $job_id, string $status, bool $require_final = false ): bool {
 
 		if ( empty( $job_id ) ) {
+			return false;
+		}
+
+		$is_final = JobStatus::isStatusFinal( $status );
+		if ( $require_final && ! $is_final ) {
 			return false;
 		}
 
@@ -1252,6 +1243,10 @@ class Jobs extends BaseRepository {
 
 		$update_data = array( 'status' => $status );
 		$format      = array( '%s' );
+		if ( $is_final ) {
+			$update_data['completed_at'] = current_time( 'mysql', true );
+			$format[]                    = '%s';
+		}
 
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		$updated = $this->wpdb->update(
@@ -1261,6 +1256,11 @@ class Jobs extends BaseRepository {
 			$format,
 			array( '%d' )
 		);
+
+		if ( false !== $updated && $is_final ) {
+			RunMetrics::complete( $job_id, $status );
+			do_action( 'datamachine_job_complete', $job_id, $status );
+		}
 
 		return false !== $updated;
 	}
