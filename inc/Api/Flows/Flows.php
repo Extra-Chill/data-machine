@@ -10,7 +10,7 @@
 
 namespace DataMachine\Api\Flows;
 
-use DataMachine\Abilities\PermissionHelper;
+use DataMachine\Api\RestAccessGuard;
 use DataMachine\Core\AbilityResult;
 use WP_REST_Server;
 
@@ -346,15 +346,7 @@ class Flows {
 	 */
 	public static function check_permission( $request ) {
 		$request;
-		if ( ! PermissionHelper::can( 'manage_flows' ) ) {
-			return new \WP_Error(
-				'rest_forbidden',
-				__( 'You do not have permission to create flows.', 'data-machine' ),
-				array( 'status' => 403 )
-			);
-		}
-
-		return true;
+		return RestAccessGuard::for_action( 'manage_flows' )->check_permission( __( 'You do not have permission to create flows.', 'data-machine' ) );
 	}
 
 	/**
@@ -369,11 +361,11 @@ class Flows {
 		$input = array(
 			'pipeline_id' => (int) $request->get_param( 'pipeline_id' ),
 			'flow_name'   => $request->get_param( 'flow_name' ) ?? 'Flow',
-			'user_id'     => PermissionHelper::acting_user_id(),
+			'user_id'     => RestAccessGuard::for_action( 'manage_flows' )->acting_user_id(),
 		);
 
 		// Carry agent_id from body params or query string (agent interceptor).
-		$scoped_agent_id = PermissionHelper::resolve_scoped_agent_id( $request );
+		$scoped_agent_id = RestAccessGuard::for_action( 'manage_flows' )->resolve_scoped_agent_id( $request );
 		if ( null !== $scoped_agent_id ) {
 			$input['agent_id'] = $scoped_agent_id;
 		}
@@ -401,12 +393,9 @@ class Flows {
 		$flow     = $db_flows->get_flow( $flow_id );
 
 		$resource_agent_id = isset( $flow['agent_id'] ) ? (int) $flow['agent_id'] : null;
-		if ( $flow && ! PermissionHelper::owns_agent_resource( $resource_agent_id, (int) ( $flow['user_id'] ?? 0 ) ) ) {
-			return new \WP_Error(
-				'rest_forbidden',
-				__( 'You do not have permission to delete this flow.', 'data-machine' ),
-				array( 'status' => 403 )
-			);
+		$access            = RestAccessGuard::for_action( 'manage_flows' )->authorize_agent_resource( $resource_agent_id, (int) ( $flow['user_id'] ?? 0 ), __( 'You do not have permission to delete this flow.', 'data-machine' ) );
+		if ( $flow && is_wp_error( $access ) ) {
+			return $access;
 		}
 
 		$ability = wp_get_ability( 'datamachine/delete-flow' );
@@ -434,12 +423,9 @@ class Flows {
 		$flow     = $db_flows->get_flow( $flow_id );
 
 		$resource_agent_id = isset( $flow['agent_id'] ) ? (int) $flow['agent_id'] : null;
-		if ( $flow && ! PermissionHelper::owns_agent_resource( $resource_agent_id, (int) ( $flow['user_id'] ?? 0 ) ) ) {
-			return new \WP_Error(
-				'rest_forbidden',
-				__( 'You do not have permission to duplicate this flow.', 'data-machine' ),
-				array( 'status' => 403 )
-			);
+		$access            = RestAccessGuard::for_action( 'manage_flows' )->authorize_agent_resource( $resource_agent_id, (int) ( $flow['user_id'] ?? 0 ), __( 'You do not have permission to duplicate this flow.', 'data-machine' ) );
+		if ( $flow && is_wp_error( $access ) ) {
+			return $access;
 		}
 
 		$ability = wp_get_ability( 'datamachine/duplicate-flow' );
@@ -450,7 +436,7 @@ class Flows {
 		$result = $ability->execute(
 			array(
 				'source_flow_id' => $flow_id,
-				'user_id'        => PermissionHelper::acting_user_id(),
+				'user_id'        => RestAccessGuard::for_action( 'manage_flows' )->acting_user_id(),
 			)
 		);
 
@@ -465,8 +451,9 @@ class Flows {
 		$per_page        = $request->get_param( 'per_page' ) ?? 20;
 		$offset          = $request->get_param( 'offset' ) ?? 0;
 		$output_mode     = $request->get_param( 'output_mode' ) ?? 'full';
-		$scoped_user_id  = PermissionHelper::resolve_scoped_user_id( $request );
-		$scoped_agent_id = PermissionHelper::resolve_scoped_agent_id( $request );
+		$access_guard    = RestAccessGuard::for_action( 'manage_flows' );
+		$scoped_user_id  = $access_guard->resolve_scoped_user_id( $request );
+		$scoped_agent_id = $access_guard->resolve_scoped_agent_id( $request );
 
 		$ability = wp_get_ability( 'datamachine/get-flows' );
 		if ( ! $ability ) {
@@ -542,12 +529,9 @@ class Flows {
 		$flow     = $db_flows->get_flow( $flow_id );
 
 		$resource_agent_id = isset( $flow['agent_id'] ) ? (int) $flow['agent_id'] : null;
-		if ( $flow && ! PermissionHelper::owns_agent_resource( $resource_agent_id, (int) ( $flow['user_id'] ?? 0 ) ) ) {
-			return new \WP_Error(
-				'rest_forbidden',
-				__( 'You do not have permission to update this flow.', 'data-machine' ),
-				array( 'status' => 403 )
-			);
+		$access            = RestAccessGuard::for_action( 'manage_flows' )->authorize_agent_resource( $resource_agent_id, (int) ( $flow['user_id'] ?? 0 ), __( 'You do not have permission to update this flow.', 'data-machine' ) );
+		if ( $flow && is_wp_error( $access ) ) {
+			return $access;
 		}
 
 		$ability = wp_get_ability( 'datamachine/update-flow' );
@@ -775,12 +759,9 @@ class Flows {
 		}
 
 		$resource_agent_id = isset( $flow['agent_id'] ) ? (int) $flow['agent_id'] : null;
-		if ( ! PermissionHelper::owns_agent_resource( $resource_agent_id, (int) ( $flow['user_id'] ?? 0 ) ) ) {
-			return new \WP_Error(
-				'rest_forbidden',
-				__( 'You do not have permission to access this flow.', 'data-machine' ),
-				array( 'status' => 403 )
-			);
+		$access            = RestAccessGuard::for_action( 'manage_flows' )->authorize_agent_resource( $resource_agent_id, (int) ( $flow['user_id'] ?? 0 ), __( 'You do not have permission to access this flow.', 'data-machine' ) );
+		if ( is_wp_error( $access ) ) {
+			return $access;
 		}
 
 		$memory_files = $db_flows->get_flow_memory_files( $flow_id );
@@ -824,12 +805,9 @@ class Flows {
 		}
 
 		$resource_agent_id = isset( $flow['agent_id'] ) ? (int) $flow['agent_id'] : null;
-		if ( ! PermissionHelper::owns_agent_resource( $resource_agent_id, (int) ( $flow['user_id'] ?? 0 ) ) ) {
-			return new \WP_Error(
-				'rest_forbidden',
-				__( 'You do not have permission to update this flow.', 'data-machine' ),
-				array( 'status' => 403 )
-			);
+		$access            = RestAccessGuard::for_action( 'manage_flows' )->authorize_agent_resource( $resource_agent_id, (int) ( $flow['user_id'] ?? 0 ), __( 'You do not have permission to update this flow.', 'data-machine' ) );
+		if ( is_wp_error( $access ) ) {
+			return $access;
 		}
 
 		// Sanitize filenames.
