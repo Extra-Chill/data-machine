@@ -14,6 +14,7 @@
 namespace DataMachine\Core\Database\ProcessedItems;
 
 use DataMachine\Core\Database\BaseRepository;
+use DataMachine\Core\Database\LifecycleStateTransition;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit; // Exit if accessed directly.
@@ -347,6 +348,36 @@ class ProcessedItems extends BaseRepository {
 
 		$expires_at = gmdate( 'Y-m-d H:i:s', time() + $ttl_seconds );
 
+		// If the reprocess filter let a completed row through, atomically convert
+		// that processed row into a claim. Active claims remain untouched, so a
+		// parallel fetch still loses the race.
+		$claimed_existing_processed = LifecycleStateTransition::compare_and_set(
+			$this->wpdb,
+			$this->table_name,
+			array(
+				'flow_step_id'    => $flow_step_id,
+				'source_type'     => $source_type,
+				'item_identifier' => $item_identifier,
+			),
+			'status',
+			self::STATUS_PROCESSED,
+			self::STATUS_CLAIMED,
+			array(
+				'job_id'           => $job_id,
+				'claim_expires_at' => $expires_at,
+			),
+			array( '%s', '%s', '%s' ),
+			array( '%d', '%s' )
+		);
+
+		if ( false !== $claimed_existing_processed && $claimed_existing_processed > 0 ) {
+			return true;
+		}
+
+		if ( $this->has_active_claim( $flow_step_id, $source_type, $item_identifier ) ) {
+			return false;
+		}
+
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		$result = $this->wpdb->insert(
 			$this->table_name,
@@ -365,27 +396,7 @@ class ProcessedItems extends BaseRepository {
 			return true;
 		}
 
-		// If the reprocess filter let a completed row through, atomically convert
-		// that processed row into a claim. Active claims remain untouched, so a
-		// parallel fetch still loses the race.
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
-		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared -- Prepared with %i table placeholder.
-		$claimed_existing_processed = $this->wpdb->query(
-			$this->wpdb->prepare(
-				'UPDATE %i SET job_id = %d, status = %s, claim_expires_at = %s WHERE flow_step_id = %s AND source_type = %s AND item_identifier = %s AND status = %s',
-				$this->table_name,
-				$job_id,
-				self::STATUS_CLAIMED,
-				$expires_at,
-				$flow_step_id,
-				$source_type,
-				$item_identifier,
-				self::STATUS_PROCESSED
-			)
-		);
-		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
-
-		return false !== $claimed_existing_processed && $claimed_existing_processed > 0;
+		return false;
 	}
 
 	/**
