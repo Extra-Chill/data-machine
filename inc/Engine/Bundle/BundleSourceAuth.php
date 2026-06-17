@@ -130,7 +130,7 @@ final class BundleSourceAuth {
 	 * @return array
 	 */
 	public static function inject_github_auth( array $args, string $source, string $fetch_url ): array {
-		$context   = is_array( $args['datamachine_bundle_source']['context'] ?? null )
+		$context = is_array( $args['datamachine_bundle_source']['context'] ?? null )
 			? (array) $args['datamachine_bundle_source']['context']
 			: array();
 		return ( new GitHubBundleSourceAuthResolver() )->apply( $args, $source, $fetch_url, $context );
