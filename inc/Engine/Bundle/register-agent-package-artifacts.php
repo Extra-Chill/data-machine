@@ -68,20 +68,7 @@ function datamachine_agent_package_artifact_type_definitions(): array {
 		),
 	);
 
-	foreach ( BundleSchema::artifact_types() as $bundle_artifact_type ) {
-		$package_type = AgentBundleUpgradePlanner::package_artifact_type( $bundle_artifact_type );
-		if ( isset( $definitions[ $package_type ] ) ) {
-			continue;
-		}
-
-		$definitions[ $package_type ] = array(
-			'label'           => $package_type,
-			'description'     => 'Plugin-owned Data Machine bundle artifact.',
-			'import_callback' => $import_callback,
-		);
-	}
-
-	return $definitions;
+	return AgentBundleArtifactExtensions::package_artifact_type_definitions( $definitions );
 }
 
 /**

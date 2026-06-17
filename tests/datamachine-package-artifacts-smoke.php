@@ -49,16 +49,6 @@ function datamachine_package_smoke_artifacts_by_type( WP_Agent_Package $package 
 	return $indexed;
 }
 
-echo "\n[1] Data Machine registers package artifact types through the generic registry:\n";
-datamachine_package_smoke_reset_registry();
-$registered_types = wp_get_agent_package_artifact_types();
-$pipeline_type    = $registered_types['datamachine/pipeline'] ?? null;
-agents_api_smoke_assert_equals( true, wp_has_agent_package_artifact_type( 'datamachine/pipeline' ), 'pipeline artifact type is registered', $failures, $passes );
-agents_api_smoke_assert_equals( true, wp_has_agent_package_artifact_type( 'datamachine/flow' ), 'flow artifact type is registered', $failures, $passes );
-agents_api_smoke_assert_equals( true, wp_has_agent_package_artifact_type( 'datamachine/queue-seed' ), 'queue seed artifact type is registered', $failures, $passes );
-agents_api_smoke_assert_equals( 'Data Machine pipeline', $pipeline_type instanceof WP_Agent_Package_Artifact_Type ? $pipeline_type->get_label() : '', 'registered type carries Data Machine metadata outside agents-api', $failures, $passes );
-
-echo "\n[2] Bundle directories project to Core-shaped WP_Agent_Package identity:\n";
 add_filter(
 	'datamachine_agent_bundle_artifact_types',
 	static function ( array $types ): array {
@@ -69,6 +59,35 @@ add_filter(
 	10,
 	1
 );
+add_filter(
+	'datamachine_agent_package_artifact_type_definitions',
+	static function ( array $definitions ): array {
+		$definitions['intelligence/wiki-brain'] = array(
+			'label'           => 'Intelligence wiki brain',
+			'description'     => 'Plugin-owned Intelligence wiki brain artifact.',
+			'import_callback' => 'DataMachine\\Engine\\Bundle\\import_datamachine_agent_package_artifact',
+		);
+		$definitions['datamachine-extension/legacy_plugin_artifact'] = array(
+			'label'           => 'Legacy plugin artifact',
+			'description'     => 'Plugin-owned legacy artifact.',
+			'import_callback' => 'DataMachine\\Engine\\Bundle\\import_datamachine_agent_package_artifact',
+		);
+		return $definitions;
+	},
+	10,
+	1
+);
+
+echo "\n[1] Data Machine registers package artifact types through the generic registry:\n";
+datamachine_package_smoke_reset_registry();
+$registered_types = wp_get_agent_package_artifact_types();
+$pipeline_type    = $registered_types['datamachine/pipeline'] ?? null;
+agents_api_smoke_assert_equals( true, wp_has_agent_package_artifact_type( 'datamachine/pipeline' ), 'pipeline artifact type is registered', $failures, $passes );
+agents_api_smoke_assert_equals( true, wp_has_agent_package_artifact_type( 'datamachine/flow' ), 'flow artifact type is registered', $failures, $passes );
+agents_api_smoke_assert_equals( true, wp_has_agent_package_artifact_type( 'datamachine/queue-seed' ), 'queue seed artifact type is registered', $failures, $passes );
+agents_api_smoke_assert_equals( 'Data Machine pipeline', $pipeline_type instanceof WP_Agent_Package_Artifact_Type ? $pipeline_type->get_label() : '', 'registered type carries Data Machine metadata outside agents-api', $failures, $passes );
+
+echo "\n[2] Bundle directories project to Core-shaped WP_Agent_Package identity:\n";
 $directory = new AgentBundleDirectory(
 	new AgentBundleManifest(
 		'2026-04-30T12:00:00Z',

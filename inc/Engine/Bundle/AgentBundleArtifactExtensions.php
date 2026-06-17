@@ -83,6 +83,26 @@ final class AgentBundleArtifactExtensions {
 	}
 
 	/**
+	 * Let artifact owners register package artifact type definitions explicitly.
+	 *
+	 * @param array<string,array<string,mixed>> $definitions Core-owned definitions.
+	 * @return array<string,array<string,mixed>>
+	 */
+	public static function package_artifact_type_definitions( array $definitions ): array {
+		/**
+		 * Filter package artifact type definitions registered by Data Machine.
+		 *
+		 * Plugins that own bundle artifact types should add their package artifact
+		 * type here instead of having core register every known bundle artifact.
+		 *
+		 * @param array<string,array<string,mixed>> $definitions Existing definitions.
+		 */
+		$definitions = self::apply_filter( 'datamachine_agent_package_artifact_type_definitions', $definitions );
+
+		return is_array( $definitions ) ? $definitions : array();
+	}
+
+	/**
 	 * Normalize artifact envelopes and reject unknown plugin artifact types.
 	 *
 	 * @param array<int,array<string,mixed>> $artifacts Raw artifact envelopes.
