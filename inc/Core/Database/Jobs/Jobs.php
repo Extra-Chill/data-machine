@@ -746,11 +746,11 @@ class Jobs extends BaseRepository {
 		$offset           = max( 0, (int) ( $args['offset'] ?? 0 ) );
 		$scan_limit       = max( $per_page + $offset, min( 5000, (int) ( $args['metadata_scan_limit'] ?? 1000 ) ) );
 
-		$query_args              = $args;
-		$query_args['per_page']  = $scan_limit;
-		$query_args['offset']    = 0;
-		$query_args['fields']    = $this->metadata_query_fields( $args['fields'] ?? array() );
-		$key_markers             = array_map(
+		$query_args                         = $args;
+		$query_args['per_page']             = $scan_limit;
+		$query_args['offset']               = 0;
+		$query_args['fields']               = $this->metadata_query_fields( $args['fields'] ?? array() );
+		$key_markers                        = array_map(
 			static function ( string $path ): string {
 				$segments = explode( '.', $path );
 				return '"' . end( $segments ) . '"';
