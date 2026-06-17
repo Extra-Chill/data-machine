@@ -14,6 +14,7 @@ namespace DataMachine\Engine\AI\Tools\Execution;
 
 use AgentsAPI\AI\Tools\WP_Agent_Tool_Executor;
 use DataMachine\Core\AbilityResult;
+use DataMachine\Engine\AI\Tools\AbilityToolAdapter;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -33,8 +34,8 @@ class ToolExecutionCore implements WP_Agent_Tool_Executor {
 		$tool_name  = (string) ( $tool_call['tool_name'] ?? '' );
 		$parameters = is_array( $tool_call['parameters'] ?? null ) ? $tool_call['parameters'] : array();
 
-		if ( ! empty( $tool_definition['execution_ability'] ) ) {
-			return $this->executeAbilityTool( $tool_name, $parameters, $tool_definition );
+		if ( ! empty( $tool_definition['execution_ability'] ) || ! empty( $tool_definition['ability_map'] ) ) {
+			return AbilityToolAdapter::execute( $tool_name, $parameters, $tool_definition );
 		}
 
 		if ( empty( $tool_definition['class'] ) && ( ! empty( $tool_definition['ability'] ) || ! empty( $tool_definition['abilities'] ) ) ) {
@@ -49,71 +50,6 @@ class ToolExecutionCore implements WP_Agent_Tool_Executor {
 		}
 
 		return $this->executeClassMethodTool( $tool_name, $parameters, $tool_definition );
-	}
-
-	/**
-	 * Execute a tool through its linked WordPress Ability.
-	 *
-	 * @param string $tool_name       Tool name.
-	 * @param array  $parameters      Complete tool parameters.
-	 * @param array  $tool_definition Tool definition.
-	 * @return array Tool execution result.
-	 */
-	private function executeAbilityTool( string $tool_name, array $parameters, array $tool_definition ): array {
-		$ability_slug = (string) $tool_definition['execution_ability'];
-		if ( ! class_exists( '\\WP_Abilities_Registry' ) ) {
-			return array(
-				'success'   => false,
-				'error'     => sprintf( "Tool '%s' references ability '%s', but the WordPress Abilities API is not available.", $tool_name, $ability_slug ),
-				'tool_name' => $tool_name,
-				'metadata'  => array( 'ability' => $ability_slug ),
-			);
-		}
-
-		$registry = \WP_Abilities_Registry::get_instance();
-		if ( method_exists( $registry, 'is_registered' ) && ! $registry->is_registered( $ability_slug ) ) {
-			return array(
-				'success'   => false,
-				'error'     => sprintf( "Tool '%s' references missing ability '%s'.", $tool_name, $ability_slug ),
-				'tool_name' => $tool_name,
-				'metadata'  => array( 'ability' => $ability_slug ),
-			);
-		}
-
-		$ability = $registry->get_registered( $ability_slug );
-		if ( ! $ability ) {
-			return array(
-				'success'   => false,
-				'error'     => sprintf( "Tool '%s' references missing ability '%s'.", $tool_name, $ability_slug ),
-				'tool_name' => $tool_name,
-				'metadata'  => array( 'ability' => $ability_slug ),
-			);
-		}
-
-		$permission = $ability->check_permissions( $parameters );
-		if ( is_wp_error( $permission ) ) {
-			return array(
-				'success'   => false,
-				'error'     => $permission->get_error_message(),
-				'tool_name' => $tool_name,
-				'metadata'  => array( 'ability' => $ability_slug ),
-			);
-		}
-
-		if ( true !== $permission ) {
-			return array(
-				'success'   => false,
-				'error'     => sprintf( "Tool '%s' is not permitted by ability '%s'.", $tool_name, $ability_slug ),
-				'tool_name' => $tool_name,
-				'metadata'  => array( 'ability' => $ability_slug ),
-			);
-		}
-
-		return AbilityResult::normalize_tool_envelope(
-			AbilityResult::normalize_tool_result( $ability->execute( $parameters ), $tool_name, $ability_slug ),
-			$tool_name,
-			array( 'ability' => $ability_slug )
-		);
 	}
 
 	/**

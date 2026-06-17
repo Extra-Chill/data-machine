@@ -24,73 +24,32 @@ use DataMachine\Engine\AI\Tools\BaseTool;
 class InternalLinkAudit extends BaseTool {
 
 	public function __construct() {
-		$this->registerTool( 'internal_link_audit', array( $this, 'getToolDefinition' ), array( 'chat', 'pipeline' ), array( 'abilities' => array( 'datamachine/audit-internal-links', 'datamachine/get-orphaned-posts', 'datamachine/get-backlinks', 'datamachine/check-broken-links' ) ) );
-	}
-
-	public function handle_tool_call( array $parameters, array $tool_def = array() ): array {
-		$action = $parameters['action'] ?? 'audit';
-
-		$ability_map = array(
-			'audit'     => 'datamachine/audit-internal-links',
-			'orphans'   => 'datamachine/get-orphaned-posts',
-			'backlinks' => 'datamachine/get-backlinks',
-			'broken'    => 'datamachine/check-broken-links',
-		);
-
-		if ( ! isset( $ability_map[ $action ] ) ) {
-			return $this->buildErrorResponse(
-				sprintf( 'Invalid action "%s". Valid: audit, orphans, backlinks, broken.', $action ),
-				'internal_link_audit'
-			);
+		if ( ! function_exists( '\datamachine_register_ability_tool' ) ) {
+			return;
 		}
 
-		$ability_slug = $ability_map[ $action ];
-		$ability      = wp_get_ability( $ability_slug );
-
-		if ( ! $ability ) {
-			return $this->buildErrorResponse(
-				sprintf( 'Ability "%s" not registered. Ensure WordPress 6.9+ and InternalLinkingAbilities is loaded.', $ability_slug ),
-				'internal_link_audit'
-			);
-		}
-
-		// Build input from parameters (strip action).
-		$input = array_diff_key( $parameters, array( 'action' => true ) );
-
-		$result = $ability->execute( $input );
-
-		if ( is_wp_error( $result ) ) {
-			return $this->buildErrorResponse(
-				$result->get_error_message(),
-				'internal_link_audit'
-			);
-		}
-
-		if ( isset( $result['error'] ) ) {
-			return $this->buildErrorResponse(
-				$result['error'],
-				'internal_link_audit'
-			);
-		}
-
-		// Strip internal keys (prefixed with _) from AI response.
-		$clean = array_filter(
-			$result,
-			fn( $key ) => 0 !== strpos( $key, '_' ),
-			ARRAY_FILTER_USE_KEY
-		);
-
-		return array(
-			'success'   => true,
-			'data'      => $clean,
-			'tool_name' => 'internal_link_audit',
+		\datamachine_register_ability_tool(
+			'internal_link_audit',
+			array_merge(
+				$this->getToolDefinition(),
+				array(
+					'ability'                    => 'datamachine/audit-internal-links',
+					'ability_map'                => array(
+						'audit'     => 'datamachine/audit-internal-links',
+						'orphans'   => 'datamachine/get-orphaned-posts',
+						'backlinks' => 'datamachine/get-backlinks',
+						'broken'    => 'datamachine/check-broken-links',
+					),
+					'modes'                      => array( 'chat', 'pipeline' ),
+					'strip_action_parameter'     => true,
+					'strip_internal_result_keys' => true,
+				)
+			)
 		);
 	}
 
 	public function getToolDefinition(): array {
 		return array(
-			'class'           => __CLASS__,
-			'method'          => 'handle_tool_call',
 			'description'     => 'Audit links on this WordPress site. Four actions: "audit" scans post content to build a link graph (cached 24hr), "orphans" lists posts with zero inbound links, "backlinks" gets all posts linking to a given post_id, "broken" performs HTTP HEAD checks for broken URLs (expensive, supports internal/external/all scope). Always run "audit" first, then use other actions for specific checks.',
 			'requires_config' => false,
 			'parameters'      => array(

@@ -12,7 +12,7 @@
 
 namespace DataMachine\Engine\AI\Tools\Sources;
 
-use DataMachine\Engine\AI\ToolSchemaNormalizer;
+use DataMachine\Engine\AI\Tools\AbilityToolAdapter;
 use DataMachine\Engine\AI\Tools\ToolManager;
 use DataMachine\Engine\AI\Tools\ToolPolicyResolver;
 use DataMachine\Core\PluginSettings;
@@ -24,32 +24,6 @@ final class AbilityToolSource {
 	public const REJECTION_METADATA_KEY = '__datamachine_source_rejections';
 
 	private ToolManager $tool_manager;
-
-	/**
-	 * Metadata keys that tool authors may override on generated declarations.
-	 *
-	 * @var string[]
-	 */
-	private const OVERRIDE_KEYS = array(
-		'access_level',
-		'action_kind',
-		'action_policy',
-		'action_policy_chat',
-		'action_policy_pipeline',
-		'action_policy_system',
-		'action_preview_redact',
-		'build_action_preview',
-		'build_action_summary',
-		'client_context_bindings',
-		'description',
-		'label',
-		'mandatory',
-		'modes',
-		'parameters',
-		'requires_config',
-		'requires_opt_in',
-		'runtime',
-	);
 
 	public function __construct( ToolManager $tool_manager ) {
 		$this->tool_manager = $tool_manager;
@@ -134,7 +108,7 @@ final class AbilityToolSource {
 			}
 			$declared_tool_names[] = $tool_name;
 
-			$ability_slug = isset( $declaration['ability'] ) && is_string( $declaration['ability'] ) ? $declaration['ability'] : '';
+			$ability_slug = AbilityToolAdapter::primaryAbilitySlug( $declaration );
 			if ( '' === $ability_slug ) {
 				$rejections[ $tool_name ] = $this->rejection( $tool_name, 'invalid_projection' );
 				continue;
@@ -246,58 +220,23 @@ final class AbilityToolSource {
 	 * @return array<string,mixed>
 	 */
 	private function buildToolDefinition( string $tool_name, array $declaration, object $registry, array $args ): array {
-		$ability_slug = isset( $declaration['ability'] ) && is_string( $declaration['ability'] ) ? $declaration['ability'] : '';
-		if ( '' === $ability_slug ) {
+		$tool = AbilityToolAdapter::declaration( $tool_name, $declaration, $registry );
+		if ( empty( $tool ) ) {
 			return array();
 		}
-
-		if ( method_exists( $registry, 'is_registered' ) && ! $registry->is_registered( $ability_slug ) ) {
-			return array();
-		}
-
-		$ability = $registry->get_registered( $ability_slug );
-		if ( ! is_object( $ability ) ) {
-			return array();
-		}
-
-		$meta        = method_exists( $ability, 'get_meta' ) ? $ability->get_meta() : array();
-		$meta        = is_array( $meta ) ? $meta : array();
-		$annotations = is_array( $meta['annotations'] ?? null ) ? $meta['annotations'] : array();
-
-		$tool = array(
-			'ability'           => $ability_slug,
-			'execution_ability' => $ability_slug,
-			'ability_category'  => method_exists( $ability, 'get_category' ) ? (string) $ability->get_category() : '',
-			'annotations'       => $annotations,
-			'description'       => method_exists( $ability, 'get_description' ) ? (string) $ability->get_description() : '',
-			'label'             => method_exists( $ability, 'get_label' ) ? (string) $ability->get_label() : $tool_name,
-			'modes'             => array( ToolPolicyResolver::MODE_CHAT ),
-			'parameters'        => ToolSchemaNormalizer::normalize( method_exists( $ability, 'get_input_schema' ) ? $ability->get_input_schema() : array() ),
-		);
-
-		foreach ( self::OVERRIDE_KEYS as $key ) {
-			if ( array_key_exists( $key, $declaration ) ) {
-				$tool[ $key ] = $declaration[ $key ];
-			}
-		}
-
-		if ( ! is_array( $tool['parameters'] ?? null ) ) {
-			$tool['parameters'] = array();
-		}
-		$tool['parameters'] = ToolSchemaNormalizer::normalize( $tool['parameters'] );
-
-		$tool['modes'] = ToolPolicyResolver::normalizeModes( $tool['modes'] ?? array( ToolPolicyResolver::MODE_CHAT ) );
 
 		/**
 		 * Filter a generated ability-backed tool declaration before policy handling.
 		 *
 		 * @param array  $tool         Generated tool declaration.
 		 * @param string $tool_name    Model-facing tool name.
-		 * @param string $ability_slug Registered ability slug.
-		 * @param object $ability      Registered WP_Ability instance.
+		 * @param string $ability_slug Registered primary ability slug.
+		 * @param object $ability      Registered primary WP_Ability instance.
 		 * @param array  $declaration  Raw `datamachine_ability_tools` declaration.
 		 * @param array  $args         Tool resolution args.
 		 */
+		$ability_slug = (string) ( $tool['ability'] ?? '' );
+		$ability      = '' !== $ability_slug ? $registry->get_registered( $ability_slug ) : null;
 		$filtered = apply_filters( 'datamachine_ability_tool_definition', $tool, $tool_name, $ability_slug, $ability, $declaration, $args );
 		$tool     = is_array( $filtered ) ? $filtered : $tool;
 
