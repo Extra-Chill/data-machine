@@ -114,6 +114,8 @@ $datamachine_file = MemoryFileRegistry::get( 'SITE.md' );
 $agents_source    = WP_Agent_Memory_Registry::get( 'datamachine/site.md' );
 datamachine_contract_adoption_assert( null !== $agents_source, 'Data Machine registration creates an Agents API memory source' );
 datamachine_contract_adoption_assert( 'SITE.md' === ( $agents_source['meta']['filename'] ?? null ), 'Agents API source retains Data Machine filename adapter metadata' );
+datamachine_contract_adoption_assert( $datamachine_file['retrieval_policy'] === ( $agents_source['retrieval_policy'] ?? null ), 'Data Machine and Agents API memory registries share normalized retrieval policy' );
+datamachine_contract_adoption_assert( empty( $datamachine_file['injection_contexts'] ) && empty( $agents_source['injection_contexts'] ?? array() ), 'Data Machine and Agents API memory registries share normalized injection contexts' );
 datamachine_contract_adoption_assert( WP_Agent_Context_Authority_Tier::WORKSPACE_SHARED === $datamachine_file['authority_tier'], 'shared memory file receives workspace authority tier' );
 datamachine_contract_adoption_assert( false === $datamachine_file['editable'], 'composable files remain non-editable through the adapter' );
 

@@ -322,20 +322,22 @@ remove_all_filters_for_source_smoke();
 add_filter(
 	'datamachine_tools',
 	static function ( array $tools ): array {
-		$tools['__handler_tools_context_smoke'] = array(
-			'_handler_callable' => static function (): array {
+		$tools['__handler_tools_context_smoke'] = ToolManager::handlerToolDeclaration(
+			static function (): array {
 				return array(
-					'unbound_handler_tool' => array(
+					'declaration_bound_handler_tool' => array(
 						'description' => 'Handler tool without runtime context.',
 					),
-					'bound_handler_tool'   => array(
+					'tool_bound_handler_tool'        => array(
 						'description'             => 'Handler tool with explicit job context.',
-						'client_context_bindings' => array( 'job_id' ),
+						'client_context_bindings' => array( 'query' => 'search_query' ),
 					),
 				);
 			},
-			'handler'           => 'context_smoke',
-			'modes'             => array( 'pipeline' ),
+			array(
+				'handler'                 => 'context_smoke',
+				'client_context_bindings' => array( 'job_id' ),
+			)
 		);
 		return $tools;
 	}
@@ -346,8 +348,8 @@ $handler_context_tools = ( new ToolManager() )->resolveHandlerTools(
 	array( 'job_id' => 99 ),
 	'context_scope'
 );
-assert_source_equals( false, isset( $handler_context_tools['unbound_handler_tool']['client_context_bindings'] ), 'handler tools do not receive implicit job_id bindings', $failures, $passes );
-assert_source_equals( array( 'job_id' ), $handler_context_tools['bound_handler_tool']['client_context_bindings'] ?? null, 'handler tools keep explicit job_id bindings', $failures, $passes );
+assert_source_equals( array( 'job_id' ), $handler_context_tools['declaration_bound_handler_tool']['client_context_bindings'] ?? null, 'handler declaration binds job_id onto produced tools', $failures, $passes );
+assert_source_equals( array( 'query' => 'search_query', 'job_id' ), $handler_context_tools['tool_bound_handler_tool']['client_context_bindings'] ?? null, 'handler declaration bindings merge without replacing tool-level bindings', $failures, $passes );
 
 echo "\n[3] filters can add a source without disturbing default order:\n";
 remove_all_filters_for_source_smoke();
@@ -731,19 +733,35 @@ assert_source_equals(
 	$passes
 );
 
-echo "\n[9] handler-class tools auto-bind job_id context:\n";
+echo "\n[9] handler declarations expose first-class context bindings:\n";
 $tool_manager_source = (string) file_get_contents( __DIR__ . '/../inc/Engine/AI/Tools/ToolManager.php' );
+$handler_trait_source = (string) file_get_contents( __DIR__ . '/../inc/Core/Steps/HandlerRegistrationTrait.php' );
+$fetch_handler_source = (string) file_get_contents( __DIR__ . '/../inc/Core/Steps/Fetch/Handlers/FetchHandler.php' );
 assert_source_equals(
 	true,
-	false !== strpos( $tool_manager_source, "'handle_tool_call' === ( \$tool_def['method'] ?? '' )" ),
-	'ToolManager auto-binds job_id for handler-class tools (handle_tool_call method)',
+	false !== strpos( $tool_manager_source, 'handlerToolDeclaration' ),
+	'ToolManager exposes a first-class handler-tool declaration helper',
 	$failures,
 	$passes
 );
 assert_source_equals(
 	true,
-	false !== strpos( $tool_manager_source, "\$tool_def['client_context_bindings'] = \$existing" ),
-	'ToolManager writes the resolved client_context_bindings back onto handler tool defs',
+	false !== strpos( $tool_manager_source, 'normalizeHandlerToolDeclaration' ),
+	'ToolManager normalizes legacy and first-class handler declarations',
+	$failures,
+	$passes
+);
+assert_source_equals(
+	true,
+	false !== strpos( $handler_trait_source, 'ToolManager::handlerToolDeclaration' ) && false !== strpos( $handler_trait_source, "'client_context_bindings' => array( 'job_id' )" ),
+	'core handler registration declares job_id binding at wrapper level',
+	$failures,
+	$passes
+);
+assert_source_equals(
+	true,
+	false !== strpos( $fetch_handler_source, 'ToolManager::handlerToolDeclaration' ) && false !== strpos( $fetch_handler_source, "'client_context_bindings' => array( 'job_id' )" ),
+	'cross-cutting fetch handler tools declare job_id binding at wrapper level',
 	$failures,
 	$passes
 );
