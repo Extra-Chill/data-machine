@@ -247,8 +247,8 @@ class FlowSteps {
 					}
 
 					return array(
-					'flow_id'     => $flow_id,
-					'flow_config' => $flow_config,
+						'flow_id'     => $flow_id,
+						'flow_config' => $flow_config,
 					);
 				},
 				null,
@@ -279,8 +279,8 @@ class FlowSteps {
 			RestResultSpec::item(
 				static function ( array $result ) use ( $flow_step_id ): array {
 					return array(
-					'flow_step_id' => $flow_step_id,
-					'step_config'  => $result['steps'][0] ?? array(),
+						'flow_step_id' => $flow_step_id,
+						'step_config'  => $result['steps'][0] ?? array(),
 					);
 				},
 				null,

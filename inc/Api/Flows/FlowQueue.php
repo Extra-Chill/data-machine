@@ -246,11 +246,11 @@ class FlowQueue {
 			RestResultSpec::item(
 				static function ( array $result ): array {
 					return array(
-					'flow_id'      => $result['flow_id'],
-					'flow_step_id' => $result['flow_step_id'],
-					'queue'        => $result['queue'],
-					'count'        => $result['count'],
-					'queue_mode'   => $result['queue_mode'],
+						'flow_id'      => $result['flow_id'],
+						'flow_step_id' => $result['flow_step_id'],
+						'queue'        => $result['queue'],
+						'count'        => $result['count'],
+						'queue_mode'   => $result['queue_mode'],
 					);
 				},
 				null,
@@ -376,9 +376,9 @@ class FlowQueue {
 			RestResultSpec::item(
 				static function ( array $result ): array {
 					return array(
-					'flow_id'       => $result['flow_id'],
-					'flow_step_id'  => $result['flow_step_id'],
-					'cleared_count' => $result['cleared_count'],
+						'flow_id'       => $result['flow_id'],
+						'flow_step_id'  => $result['flow_step_id'],
+						'cleared_count' => $result['cleared_count'],
 					);
 				},
 				static function ( array $result ): array {
@@ -411,10 +411,10 @@ class FlowQueue {
 			RestResultSpec::item(
 				static function ( array $result ): array {
 					return array(
-					'flow_id'        => $result['flow_id'],
-					'flow_step_id'   => $result['flow_step_id'],
-					'removed_prompt' => $result['removed_prompt'],
-					'queue_length'   => $result['queue_length'],
+						'flow_id'        => $result['flow_id'],
+						'flow_step_id'   => $result['flow_step_id'],
+						'removed_prompt' => $result['removed_prompt'],
+						'queue_length'   => $result['queue_length'],
 					);
 				},
 				static function ( array $result ): array {
@@ -448,10 +448,10 @@ class FlowQueue {
 			RestResultSpec::item(
 				static function ( array $result ): array {
 					return array(
-					'flow_id'      => $result['flow_id'],
-					'flow_step_id' => $result['flow_step_id'],
-					'index'        => $result['index'],
-					'queue_length' => $result['queue_length'],
+						'flow_id'      => $result['flow_id'],
+						'flow_step_id' => $result['flow_step_id'],
+						'index'        => $result['index'],
+						'queue_length' => $result['queue_length'],
 					);
 				},
 				static function ( array $result ): array {
@@ -484,9 +484,9 @@ class FlowQueue {
 			RestResultSpec::item(
 				static function ( array $result ): array {
 					return array(
-					'flow_id'      => $result['flow_id'],
-					'flow_step_id' => $result['flow_step_id'],
-					'queue_mode'   => $result['queue_mode'],
+						'flow_id'      => $result['flow_id'],
+						'flow_step_id' => $result['flow_step_id'],
+						'queue_mode'   => $result['queue_mode'],
 					);
 				},
 				static function ( array $result ): array {

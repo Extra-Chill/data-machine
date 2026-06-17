@@ -553,8 +553,8 @@ class Pipelines {
 			RestResultSpec::item(
 				static function ( array $result ): array {
 					return array(
-					'pipeline_id'   => $result['pipeline_id'],
-					'pipeline_name' => $result['pipeline_name'],
+						'pipeline_id'   => $result['pipeline_id'],
+						'pipeline_name' => $result['pipeline_name'],
 					);
 				},
 				static function ( array $result ): array {
