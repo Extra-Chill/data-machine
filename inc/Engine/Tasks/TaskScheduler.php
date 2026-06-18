@@ -458,7 +458,7 @@ class TaskScheduler {
 	 * @param int|string $parentJobIdOrBatchId Parent job ID. Numeric strings
 	 *                                         from Action Scheduler are coerced.
 	 */
-	public static function processBatchChunk( int|string $parentJobIdOrBatchId ): void {
+	public static function processBatchChunk( int|string $parentJobIdOrBatchId, ?int $expected_offset = null ): void {
 		$parent_job_id = self::resolveParentJobId( $parentJobIdOrBatchId );
 
 		if ( $parent_job_id <= 0 ) {
@@ -492,7 +492,8 @@ class TaskScheduler {
 				$child_parent_id      = $caller_parent_job_id > 0 ? $caller_parent_job_id : $parent_id;
 
 				return self::schedule( $task_type, $params, $context, $child_parent_id );
-			}
+			},
+			$expected_offset
 		);
 
 		$jobs_db       = new Jobs();
@@ -514,6 +515,10 @@ class TaskScheduler {
 				$parent_job_id,
 				JobStatus::failed( 'batch_state_missing' )->toString()
 			);
+			return;
+		}
+
+		if ( ! empty( $result['duplicate'] ) ) {
 			return;
 		}
 

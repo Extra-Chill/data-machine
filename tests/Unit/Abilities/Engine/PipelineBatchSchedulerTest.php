@@ -230,10 +230,36 @@ class PipelineBatchSchedulerTest extends WP_UnitTestCase {
 
 		$this->assertEquals( 0, $count );
 
-		// Parent should be failed with cancellation reason.
+		// Parent should terminalize through the generic cancellation status.
 		$parent_job = $this->jobs_db->get_job( $parent_id );
-		$this->assertStringContainsString( 'failed', $parent_job['status'] );
-		$this->assertStringContainsString( 'batch cancelled', $parent_job['status'] );
+		$this->assertSame( JobStatus::CANCELLED, $parent_job['status'] );
+	}
+
+	public function test_duplicate_chunk_delivery_for_same_offset_does_not_create_duplicate_children(): void {
+		$parent_id = $this->create_parent_job();
+		$engine    = $this->make_engine_snapshot( $parent_id );
+		$packets   = array(
+			$this->make_data_packet( 'Event A' ),
+			$this->make_data_packet( 'Event B' ),
+		);
+
+		$scheduler = new PipelineBatchScheduler();
+		$scheduler->fanOut( $parent_id, 'step_abc_123', $packets, $engine );
+
+		$scheduler->processChunk( $parent_id, 0 );
+		$scheduler->processChunk( $parent_id, 0 );
+
+		global $wpdb;
+		$table = $wpdb->prefix . 'datamachine_jobs';
+		$count = (int) $wpdb->get_var(
+			$wpdb->prepare( "SELECT COUNT(*) FROM {$table} WHERE parent_job_id = %d", $parent_id )
+		);
+
+		$this->assertSame( 2, $count );
+
+		$parent_engine = datamachine_get_engine_data( $parent_id );
+		$this->assertSame( 2, (int) $parent_engine['batch_scheduled'] );
+		$this->assertArrayNotHasKey( 'batch_state', $parent_engine );
 	}
 
 	public function test_process_chunk_marks_parent_failed_when_batch_state_is_missing(): void {
