@@ -2010,8 +2010,8 @@ function datamachine_persist_inflight_tool_summary( array $loop_payload, array $
  * @param array<int,array<string,mixed>> $tool_execution_results Tool execution results accumulated by the loop.
  */
 function datamachine_record_tool_results_to_engine_data( array $loop_payload, array $tool_execution_results ): void {
-	$job_id    = (int) ( $loop_payload['job_id'] ?? 0 );
-	$recorders = is_array( $loop_payload['tool_recorders'] ?? null ) ? $loop_payload['tool_recorders'] : array();
+	$job_id     = (int) ( $loop_payload['job_id'] ?? 0 );
+	$recorders  = is_array( $loop_payload['tool_recorders'] ?? null ) ? $loop_payload['tool_recorders'] : array();
 	$can_record = function_exists( '\datamachine_append_engine_state_event' ) || function_exists( '\datamachine_merge_engine_data' );
 	if ( $job_id <= 0 || empty( $recorders ) || ! $can_record ) {
 		return;

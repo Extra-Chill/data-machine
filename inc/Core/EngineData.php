@@ -149,8 +149,8 @@ class EngineData {
 			$entry['metadata'] = $metadata;
 		}
 
-		$ledger[]                         = $entry;
-		$projected                        = array_replace_recursive( $current, $patch );
+		$ledger[]                          = $entry;
+		$projected                         = array_replace_recursive( $current, $patch );
 		$projected['_engine_state_ledger'] = $ledger;
 
 		return self::persist( $job_id, $projected ) ? $entry : null;
@@ -181,10 +181,10 @@ class EngineData {
 	 */
 	private static function stableHash( array $patch ): string {
 		$normalized = self::sortRecursively( $patch );
-		$json       = wp_json_encode( $normalized );
+		$json       = wp_json_encode( $normalized, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PARTIAL_OUTPUT_ON_ERROR );
 
 		if ( ! is_string( $json ) ) {
-			$json = serialize( $normalized );
+			$json = 'null';
 		}
 
 		return 'sha256:' . hash( 'sha256', $json );
