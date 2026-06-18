@@ -1344,6 +1344,7 @@ function datamachine_prepare_runtime_tool_request( array $request, array $payloa
 			'metadata'     => array(
 				'datamachine' => array(
 					'job_id'             => (int) $job_id,
+					'parent_job_id'      => max( 0, (int) ( $payload['job_id'] ?? $request['job_id'] ?? 0 ) ),
 					'persistence_status' => 'pending',
 					'session_id'         => (string) ( $request['session_id'] ?? '' ),
 					'user_id'            => (int) ( $payload['user_id'] ?? 0 ),
@@ -1422,8 +1423,9 @@ function datamachine_runtime_tool_request_store(): WP_Agent_Runtime_Tool_Request
 				$jobs_db->store_engine_data(
 					$job_id,
 					array(
-						'task_type'            => 'runtime_tool_request',
-						'runtime_tool_request' => $request,
+						'task_type'              => 'runtime_tool_request',
+						'runtime_tool_request'   => $request,
+						'runtime_tool_run_state' => ( new RuntimeToolRunStateStore( $jobs_db ) )->create_from_request( $request ),
 					)
 				);
 				datamachine_store_runtime_tool_request_on_session( $request );
@@ -1467,6 +1469,13 @@ function datamachine_runtime_tool_request_store(): WP_Agent_Runtime_Tool_Request
 				$datamachine_metadata['result']             = $result;
 				$request['metadata']['datamachine']         = $datamachine_metadata;
 				$engine_data['runtime_tool_request']        = $request;
+				$engine_data['runtime_tool_run_state']      = ( new RuntimeToolRunStateStore( $jobs_db ) )->finalize(
+					$job_id,
+					array( 'result' => $result ),
+					! empty( $result['metadata']['datamachine']['code'] ) && WP_Agent_Runtime_Tool_Request::STATUS_TIMEOUT === (string) $result['metadata']['datamachine']['code']
+						? RuntimeToolRunStateStore::STATUS_TIMED_OUT
+						: RuntimeToolRunStateStore::STATUS_FINALIZED
+				);
 
 				$jobs_db->store_engine_data( $job_id, $engine_data );
 				$jobs_db->complete_job( $job_id, ! empty( $result['success'] ) ? 'completed' : 'failed' );
@@ -1687,6 +1696,17 @@ function datamachine_resume_runtime_tool_request( string $request_id ): void {
 	$datamachine_metadata = datamachine_runtime_tool_datamachine_metadata( $request );
 	if ( 'pending' === (string) ( $datamachine_metadata['persistence_status'] ?? '' ) ) {
 		return;
+	}
+
+	$job_id = datamachine_runtime_tool_job_id_from_request_id( $request_id );
+	if ( $job_id > 0 ) {
+		( new RuntimeToolRunStateStore() )->resume(
+			$job_id,
+			array(
+				'session_id' => (string) ( $datamachine_metadata['session_id'] ?? '' ),
+				'user_id'    => (int) ( $datamachine_metadata['user_id'] ?? 0 ),
+			)
+		);
 	}
 
 	\DataMachine\Api\Chat\ChatOrchestrator::processContinue(
