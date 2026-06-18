@@ -43,20 +43,20 @@ class GetPostBlocksAbility {
 						'type'       => 'object',
 						'required'   => array( 'post_id' ),
 						'properties' => array(
-							'post_id'     => array(
+							'post_id'         => array(
 								'type'        => 'integer',
 								'description' => __( 'Post ID to parse', 'data-machine' ),
 							),
-							'blog_id'     => array(
+							'blog_id'         => array(
 								'type'        => 'integer',
 								'description' => __( 'Optional. Multisite blog ID the post lives on. Omit to use the current site. The read runs in that blog\'s context.', 'data-machine' ),
 							),
-							'block_types' => array(
+							'block_types'     => array(
 								'type'        => 'array',
 								'items'       => array( 'type' => 'string' ),
 								'description' => __( 'Filter to specific block types (e.g. ["core/paragraph", "core/heading"]). Empty = all blocks.', 'data-machine' ),
 							),
-							'search'      => array(
+							'search'          => array(
 								'type'        => 'string',
 								'description' => __( 'Filter to blocks containing this text (case-insensitive)', 'data-machine' ),
 							),
@@ -121,23 +121,23 @@ class GetPostBlocksAbility {
 			'method'      => 'handleChatToolCall',
 			'description' => 'Parse a WordPress post into its Gutenberg blocks. Optionally filter by block type or text content. Returns block index, type, and innerHTML for each matching block.',
 			'parameters'  => array(
-				'post_id'     => array(
+				'post_id'         => array(
 					'type'        => 'integer',
 					'required'    => true,
 					'description' => 'Post ID to parse',
 				),
-				'blog_id'     => array(
+				'blog_id'         => array(
 					'type'        => 'integer',
 					'required'    => false,
 					'description' => 'Optional multisite blog ID the post lives on. Omit for the current site.',
 				),
-				'block_types' => array(
+				'block_types'     => array(
 					'type'        => 'array',
 					'items'       => array( 'type' => 'string' ),
 					'required'    => false,
 					'description' => 'Filter to specific block types (e.g. ["core/paragraph"])',
 				),
-				'search'      => array(
+				'search'          => array(
 					'type'        => 'string',
 					'required'    => false,
 					'description' => 'Filter to blocks containing this text (case-insensitive)',
@@ -176,10 +176,10 @@ class GetPostBlocksAbility {
 	 * @return array
 	 */
 	public static function execute( array $input ): array {
+		// prefer_autosave defaults true: proofread the freshest authored content (in-flight autosave).
 		$post_id         = absint( $input['post_id'] ?? 0 );
 		$block_types     = $input['block_types'] ?? array();
 		$search          = $input['search'] ?? '';
-		// Default true: proofread the freshest authored content (in-flight autosave).
 		$prefer_autosave = ! array_key_exists( 'prefer_autosave', $input ) || ! empty( $input['prefer_autosave'] );
 
 		if ( $post_id <= 0 ) {
