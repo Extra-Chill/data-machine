@@ -284,8 +284,8 @@ class AgentAbilitiesTest extends WP_UnitTestCase {
 		);
 
 		$this->assertTrue( $result['success'] );
-		$this->assertSame( 'openai', $result['agent']['agent_config']['provider'] );
-		$this->assertSame( 'gpt-4o', $result['agent']['agent_config']['model'] );
+		$this->assertSame( 'openai', $result['agent']['agent_config']['default_provider'] );
+		$this->assertSame( 'gpt-4o', $result['agent']['agent_config']['default_model'] );
 	}
 
 	public function test_updateAgent_multiple_fields(): void {
@@ -307,7 +307,7 @@ class AgentAbilitiesTest extends WP_UnitTestCase {
 
 		$this->assertTrue( $result['success'] );
 		$this->assertSame( 'After', $result['agent']['agent_name'] );
-		$this->assertSame( 'anthropic', $result['agent']['agent_config']['provider'] );
+		$this->assertSame( 'anthropic', $result['agent']['agent_config']['default_provider'] );
 	}
 
 	public function test_updateAgent_requires_agent_identity(): void {
