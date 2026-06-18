@@ -37,7 +37,7 @@ namespace {
 		}
 	}
 
-	// Under a real WordPress runtime (e.g. the wp-codebox smoke harness) the
+	// Under a real WordPress runtime the
 	// do_action stub above never installs, so bridge the observed hook into the
 	// same capture buffer via real add_action.
 	if ( defined( 'WPINC' ) ) {

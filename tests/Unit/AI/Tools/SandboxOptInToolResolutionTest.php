@@ -1,7 +1,7 @@
 <?php
 /**
  * Tests that an opt-in ability-projected tool (the shape DMC uses for
- * workspace_write) resolves for a Codebox sandbox run when the runtime
+ * workspace_write) resolves for a sandbox run when the runtime
  * declares it via allow_only / an allow-mode tool policy.
  *
  * Data Machine has no sandbox-specific knowledge: 'sandbox' is just an unknown
@@ -45,7 +45,7 @@ class SandboxOptInToolResolutionTest extends WP_UnitTestCase {
 	}
 
 	/**
-	 * The argument shape a Codebox sandbox run passes through ChatOrchestrator.
+	 * The argument shape a sandbox run passes through ChatOrchestrator.
 	 */
 	private function sandboxArgs(): array {
 		return array(

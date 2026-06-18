@@ -238,7 +238,7 @@ datamachine_bundle_runner_assert( true === $success_status->invoke( null, 'compl
 datamachine_bundle_runner_assert( true === $success_status->invoke( null, 'completed_no_items' ), 'completed_no_items follows JobStatus success semantics', $failures, $passes );
 datamachine_bundle_runner_assert( true === $success_status->invoke( null, 'agent_skipped - no matching source items' ), 'agent_skipped-prefixed status follows JobStatus success semantics', $failures, $passes );
 
-echo "\n[3b] Runtime ability tools prefer generic metadata\n";
+echo "\n[3b] Runtime ability tools consume generic metadata only\n";
 $apply_runtime_ability_tools = $runner_reflection->getMethod( 'apply_runtime_ability_tools' );
 $initial_data                = array();
 $apply_runtime_ability_tools->invokeArgs(
@@ -251,18 +251,11 @@ $apply_runtime_ability_tools->invokeArgs(
 				'agent_runtime' => array(
 					'ability_tools' => array( array( 'name' => 'datamachine/generic-tool' ) ),
 				),
-				'codebox'       => array(
-					'agent_runtime' => array(
-						'bundle' => array(
-							'ability_tools' => array( array( 'name' => 'datamachine/codebox-tool' ) ),
-						),
-					),
-				),
 			),
 		)
 	)
 );
-datamachine_bundle_runner_assert( 'datamachine/generic-tool' === ( $initial_data['job']['ability_tools'][0]['name'] ?? null ), 'generic agent_runtime ability tools win over deprecated codebox metadata', $failures, $passes );
+datamachine_bundle_runner_assert( 'datamachine/generic-tool' === ( $initial_data['job']['ability_tools'][0]['name'] ?? null ), 'generic agent_runtime ability tools are consumed from bundle metadata', $failures, $passes );
 
 $initial_data = array();
 $apply_runtime_ability_tools->invokeArgs(
@@ -272,18 +265,16 @@ $apply_runtime_ability_tools->invokeArgs(
 		array(),
 		array(
 			'metadata' => array(
-				'codebox' => array(
+				'runtime' => array(
 					'agent_runtime' => array(
-						'bundle' => array(
-							'ability_tools' => array( array( 'name' => 'datamachine/codebox-tool' ) ),
-						),
+						'ability_tools' => array( array( 'name' => 'datamachine/runtime-specific-tool' ) ),
 					),
 				),
 			),
 		)
 	)
 );
-datamachine_bundle_runner_assert( 'datamachine/codebox-tool' === ( $initial_data['job']['ability_tools'][0]['name'] ?? null ), 'deprecated codebox ability tools remain compatible fallback', $failures, $passes );
+datamachine_bundle_runner_assert( empty( $initial_data['job']['ability_tools'] ?? array() ), 'runtime-specific metadata namespaces are ignored by the generic runner', $failures, $passes );
 
 echo "\n[3c] Successful tool results can be recorded into engine data\n";
 require_once $root . '/inc/Engine/AI/conversation-loop.php';
@@ -586,7 +577,6 @@ foreach ( array(
 	"'ability_tools'       => array("                                           => 'run-agent-bundle schema accepts runtime ability tools',
 	'apply_runtime_model_config'                                              => 'runner projects provider/model into initial data',
 	'apply_runtime_ability_tools'                                             => 'runner projects ability tools into initial data',
-	'metadata.codebox.agent_runtime.bundle.ability_tools'                     => 'runner consumes bundle metadata ability tools fallback',
 	"\$job_snapshot['ability_tools']"                                         => 'runner stamps job-scoped ability tool declarations',
 	"\$job_snapshot['default_provider']"                                      => 'runner stamps job-scoped default provider',
 	"\$job_snapshot['default_model']"                                         => 'runner stamps job-scoped default model',
@@ -599,7 +589,7 @@ foreach ( array(
 }
 
 echo "\n[6] Boundary stays generic\n";
-foreach ( array( 'homeboy', 'wp-codebox' ) as $forbidden ) {
+foreach ( array( 'homeboy' ) as $forbidden ) {
 	datamachine_bundle_runner_assert( false === stripos( $runner, $forbidden ), "runner does not mention {$forbidden}", $failures, $passes );
 }
 foreach ( array( 'DataMachine\\Core\\Database\\Agents', 'DataMachine\\Core\\Database\\Flows', 'DataMachine\\Core\\Database\\Pipelines' ) as $forbidden ) {

@@ -113,7 +113,7 @@ $assert(
 // add_action/wp_register_ability_category) to drive AbilityCategories through
 // its three timing states. Those stubs are only installed when the real
 // functions are absent (`if ( ! function_exists() )`), so under a real
-// WordPress runtime — e.g. the wp-codebox host-smoke harness — they are inert:
+// WordPress runtime they are inert:
 // `doing_action( 'wp_abilities_api_categories_init' )` reflects the live
 // dispatch state (false during the test) and the simulation can't control it,
 // which made state 1 fail spuriously. The source-string assertions above
@@ -181,7 +181,7 @@ if ( ! function_exists( 'wp_register_ability_category' ) ) {
 }
 
 // Minimal fake of the category registry so the late-registration path
-// (headless / WP Codebox sandbox load order — plugin included AFTER the
+// (headless sandbox load order — plugin included AFTER the
 // one-shot `wp_abilities_api_categories_init` fired) can be exercised. Mirrors
 // core: `WP_Ability_Categories_Registry::register()` has NO lifecycle guard —
 // only the `wp_register_ability_category()` wrapper does.
@@ -249,7 +249,7 @@ $assert(
 		&& empty( $state->registered )
 );
 
-// --- State 3: post-action (headless / WP Codebox sandbox load order).
+// --- State 3: post-action (headless sandbox load order).
 // The one-shot `wp_abilities_api_categories_init` already fired during
 // `wp-load.php` before `run-php` included the plugin file. Categories must
 // register late via the registry instance so category-bound abilities (e.g.

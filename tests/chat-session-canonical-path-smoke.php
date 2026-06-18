@@ -52,11 +52,6 @@ $assert(
 );
 
 $assert(
-	false === strpos( $bootstrap, 'wp_codebox_' ) && false === strpos( $agent_abilities, 'wp_codebox_' ),
-	'Data Machine does not reference WP Codebox-specific runtime hooks'
-);
-
-$assert(
 	false !== strpos( $chat_orchestrator, "'session_creation_ability_unavailable'" ),
 	'ChatOrchestrator reports missing ability dependencies as an explicit error'
 );

@@ -85,7 +85,7 @@ foreach ( array( 'send-email' => $send_source, 'send-email-queued' => $queue_sou
 
 // The behavioral simulation below stubs WordPress lifecycle functions, which
 // are only installed when the real ones are absent. Under a real WordPress
-// runtime — e.g. the wp-codebox host-smoke harness — those stubs are inert and
+// runtime those stubs are inert and
 // the simulation cannot control `doing_action()`, making state 1 fail
 // spuriously. The source-string assertions above lock the real contract in
 // every backend and the behavioral path is covered in the pure-PHP / PHPUnit

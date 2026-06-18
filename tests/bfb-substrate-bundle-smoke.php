@@ -218,7 +218,7 @@ $bfb_ability_names = array(
  *    that capture registrations into `$GLOBALS` arrays. We fire the bundle's
  *    registration callbacks by hand and assert against those recorders.
  *
- *  - Real WordPress (wp-codebox CI harness): WP core defines the abilities API and
+ *  - Real WordPress CI harness: WP core defines the abilities API and
  *    fires `wp_abilities_api_*_init` during normal init, so the BFB bundle has
  *    already registered into WP's real registry before this smoke runs. The
  *    pure-PHP recorders are never populated (registrations go through core), so we
