@@ -113,6 +113,7 @@ foreach ( array(
 	'FlowStep\\ConfigureFlowStepsAbility',
 	'FlowStep\\ValidateFlowStepsConfigAbility',
 	'Job\\GetJobsAbility',
+	'Job\\HydrateJobArtifactAbility',
 	'Job\\DeleteJobsAbility',
 	'Job\\ExecuteWorkflowAbility',
 	'Job\\FlowHealthAbility',

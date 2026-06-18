@@ -262,6 +262,7 @@ function datamachine_run_datamachine_plugin() {
 	new \DataMachine\Abilities\FlowStep\ConfigureFlowStepsAbility();
 	new \DataMachine\Abilities\FlowStep\ValidateFlowStepsConfigAbility();
 	new \DataMachine\Abilities\Job\GetJobsAbility();
+	new \DataMachine\Abilities\Job\HydrateJobArtifactAbility();
 	new \DataMachine\Abilities\Job\DeleteJobsAbility();
 	new \DataMachine\Abilities\Job\ExecuteWorkflowAbility();
 	new \DataMachine\Abilities\Job\ExecuteAgentWorkflowAbility();
