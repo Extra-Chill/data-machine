@@ -7,6 +7,7 @@
 
 namespace DataMachine\Engine\AI;
 
+use DataMachine\Core\EngineData;
 use DataMachine\Core\Database\Jobs\Jobs;
 
 defined( 'ABSPATH' ) || exit;
@@ -45,30 +46,38 @@ class RuntimeToolRunStateStore {
 	public function create( int $job_id, array $state ): array {
 		$this->assert_job_id( $job_id );
 
-		$engine_data = $this->engine_data( $job_id );
-		$existing    = $this->normalize_existing( $engine_data['runtime_tool_run_state'] ?? null );
-		if ( ! empty( $existing ) ) {
-			return $existing;
-		}
+		$run_state = array();
+		$this->mutate_engine_data(
+			$job_id,
+			function ( array $engine_data ) use ( $state, &$run_state ): array {
+				$existing = $this->normalize_existing( $engine_data['runtime_tool_run_state'] ?? null );
+				if ( ! empty( $existing ) ) {
+					$run_state = $existing;
+					return $engine_data;
+				}
 
-		$created_at = $this->timestamp();
-		$run_state  = array(
-			'parent_job_id'           => max( 0, (int) ( $state['parent_job_id'] ?? 0 ) ),
-			'runtime_tool_request_id' => $this->required_string( $state, 'runtime_tool_request_id' ),
-			'tool_name'               => $this->required_string( $state, 'tool_name' ),
-			'status'                  => self::STATUS_PENDING,
-			'timeout_seconds'         => max( 0, (int) ( $state['timeout_seconds'] ?? 0 ) ),
-			'deadline_at'             => (string) ( $state['deadline_at'] ?? '' ),
-			'resume_payload'          => null,
-			'finalize_payload'        => null,
-			'created_at'              => $created_at,
-			'updated_at'              => $created_at,
-			'finalized_at'            => null,
-			'resumed_at'              => null,
+				$created_at = $this->timestamp();
+				$run_state  = array(
+					'parent_job_id'           => max( 0, (int) ( $state['parent_job_id'] ?? 0 ) ),
+					'runtime_tool_request_id' => $this->required_string( $state, 'runtime_tool_request_id' ),
+					'tool_name'               => $this->required_string( $state, 'tool_name' ),
+					'status'                  => self::STATUS_PENDING,
+					'timeout_seconds'         => max( 0, (int) ( $state['timeout_seconds'] ?? 0 ) ),
+					'deadline_at'             => (string) ( $state['deadline_at'] ?? '' ),
+					'resume_payload'          => null,
+					'finalize_payload'        => null,
+					'created_at'              => $created_at,
+					'updated_at'              => $created_at,
+					'finalized_at'            => null,
+					'resumed_at'              => null,
+				);
+
+				$engine_data['runtime_tool_run_state'] = $run_state;
+
+				return $engine_data;
+			},
+			'runtime_tool_run_state_create'
 		);
-
-		$engine_data['runtime_tool_run_state'] = $run_state;
-		$this->jobs->store_engine_data( $job_id, $engine_data );
 
 		return $run_state;
 	}
@@ -148,26 +157,71 @@ class RuntimeToolRunStateStore {
 	private function transition_once( int $job_id, string $timestamp_key, string $payload_key, array $payload, string $status ): ?array {
 		$this->assert_job_id( $job_id );
 
-		$engine_data = $this->engine_data( $job_id );
-		$state       = $this->normalize_existing( $engine_data['runtime_tool_run_state'] ?? null );
-		if ( empty( $state ) ) {
-			return null;
-		}
+		$state = null;
+		$this->mutate_engine_data(
+			$job_id,
+			function ( array $engine_data ) use ( $timestamp_key, $payload_key, $payload, $status, &$state ): array {
+				$state = $this->normalize_existing( $engine_data['runtime_tool_run_state'] ?? null );
+				if ( empty( $state ) || ! empty( $state[ $timestamp_key ] ) ) {
+					return $engine_data;
+				}
 
-		if ( ! empty( $state[ $timestamp_key ] ) ) {
-			return $state;
-		}
+				$timestamp                             = $this->timestamp();
+				$state['status']                       = $status;
+				$state[ $payload_key ]                 = $payload;
+				$state[ $timestamp_key ]               = $timestamp;
+				$state['updated_at']                   = $timestamp;
+				$engine_data['runtime_tool_run_state'] = $state;
 
-		$timestamp                             = $this->timestamp();
-		$state['status']                       = $status;
-		$state[ $payload_key ]                 = $payload;
-		$state[ $timestamp_key ]               = $timestamp;
-		$state['updated_at']                   = $timestamp;
-		$engine_data['runtime_tool_run_state'] = $state;
-
-		$this->jobs->store_engine_data( $job_id, $engine_data );
+				return $engine_data;
+			},
+			'runtime_tool_run_state_transition'
+		);
 
 		return $state;
+	}
+
+	/**
+	 * @param int      $job_id Request job ID.
+	 * @param callable $callback Receives current engine data and returns next engine data.
+	 * @param string   $event_type Mutation event type.
+	 * @return bool
+	 */
+	private function mutate_engine_data( int $job_id, callable $callback, string $event_type ): bool {
+		if ( $this->jobs instanceof Jobs ) {
+			$result = EngineData::mutate( $job_id, $callback, $event_type );
+
+			return ! empty( $result['success'] );
+		}
+
+		for ( $attempt = 1; $attempt <= 3; $attempt++ ) {
+			$current = $this->engine_data( $job_id );
+			$next    = $callback( $current );
+			if ( ! is_array( $next ) ) {
+				return false;
+			}
+
+			if ( $next === $current ) {
+				return true;
+			}
+
+			if ( method_exists( $this->jobs, 'compare_and_swap_engine_data' ) ) {
+				$result = $this->jobs->compare_and_swap_engine_data( $job_id, $current, $next );
+				if ( ! empty( $result['updated'] ) ) {
+					return true;
+				}
+
+				if ( empty( $result['conflict'] ) ) {
+					return false;
+				}
+
+				continue;
+			}
+
+			return (bool) $this->jobs->store_engine_data( $job_id, $next );
+		}
+
+		return false;
 	}
 
 	/**

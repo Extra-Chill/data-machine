@@ -1147,27 +1147,10 @@ class Jobs extends BaseRepository {
 			return false;
 		}
 
-		// Encode data as JSON for database storage.
-		$encoded     = wp_json_encode( $data );
-		$update_data = array( 'engine_data' => $encoded );
-		$format      = array( '%s' );
-
-		// Promote task_type to its own indexed column for fast lookups.
-		if ( isset( $data['task_type'] ) && is_string( $data['task_type'] ) ) {
-			$update_data['task_type'] = sanitize_key( $data['task_type'] );
-			$format[]                 = '%s';
-		}
-
-		// Promote the first handler_slug to its own column so handler
-		// summaries / filtering survive engine_data being shed from terminal
-		// jobs by retention (see RetentionCleanup::cleanupEngineData()).
-		// Extracted from the encoded blob so the column matches exactly what
-		// the legacy REGEXP_SUBSTR( engine_data, ... ) aggregation produced.
-		$handler_slug = self::extract_handler_slug( is_string( $encoded ) ? $encoded : '' );
-		if ( '' !== $handler_slug ) {
-			$update_data['handler_slug'] = $handler_slug;
-			$format[]                    = '%s';
-		}
+		$encoded          = wp_json_encode( $data );
+		$storage_envelope = $this->engine_data_storage_envelope( $data, is_string( $encoded ) ? $encoded : '' );
+		$update_data      = $storage_envelope['data'];
+		$format           = $storage_envelope['format'];
 
 		$result = $this->wpdb->update(
 			$this->table_name,
@@ -1206,6 +1189,81 @@ class Jobs extends BaseRepository {
 	}
 
 	/**
+	 * Store engine data only when the persisted snapshot still matches the caller's baseline.
+	 *
+	 * @param int   $job_id        Job ID.
+	 * @param array $expected_data Engine data snapshot read before mutation.
+	 * @param array $new_data      Engine data snapshot to persist.
+	 * @return array{updated:bool,conflict:bool,error:string|null}
+	 */
+	public function compare_and_swap_engine_data( int $job_id, array $expected_data, array $new_data ): array {
+		if ( $job_id <= 0 ) {
+			do_action( 'datamachine_log', 'error', 'Invalid job ID for engine_data compare-and-swap', array( 'job_id' => $job_id ) );
+			return array(
+				'updated'  => false,
+				'conflict' => false,
+				'error'    => 'invalid_job_id',
+			);
+		}
+
+		$expected_encoded = wp_json_encode( $expected_data );
+		$new_encoded      = wp_json_encode( $new_data );
+		if ( ! is_string( $expected_encoded ) || ! is_string( $new_encoded ) ) {
+			return array(
+				'updated'  => false,
+				'conflict' => false,
+				'error'    => 'json_encode_failed',
+			);
+		}
+
+		$storage_envelope = $this->engine_data_storage_envelope( $new_data, $new_encoded );
+		$result           = $this->wpdb->update(
+			$this->table_name,
+			$storage_envelope['data'],
+			array(
+				'job_id'      => $job_id,
+				'engine_data' => $expected_encoded,
+			),
+			$storage_envelope['format'],
+			array( '%d', '%s' )
+		);
+
+		if ( false === $result ) {
+			do_action(
+				'datamachine_log',
+				'error',
+				'Failed to compare-and-swap engine_data',
+				array(
+					'job_id'   => $job_id,
+					'db_error' => $this->wpdb->last_error,
+				)
+			);
+
+			return array(
+				'updated'  => false,
+				'conflict' => false,
+				'error'    => 'db_error',
+			);
+		}
+
+		if ( 0 === (int) $result ) {
+			return array(
+				'updated'  => false,
+				'conflict' => true,
+				'error'    => null,
+			);
+		}
+
+		wp_cache_set( $job_id, $new_data, 'datamachine_engine_data' );
+
+		return array(
+			'updated'  => true,
+			'conflict' => false,
+			'error'    => null,
+		);
+	}
+
+	/**
 	 * Retrieve stored engine data for datamachine_engine_data filter access.
 	 */
 	public function retrieve_engine_data( int $job_id ): array {
@@ -1216,6 +1274,40 @@ class Jobs extends BaseRepository {
 		}
 
 		return array();
+	}
+
+	/**
+	 * Build column updates that mirror store_engine_data() promotion behavior.
+	 *
+	 * @param array  $data    Engine data snapshot.
+	 * @param string $encoded JSON-encoded engine_data.
+	 * @return array{data:array<string,mixed>,format:array<int,string>}
+	 */
+	private function engine_data_storage_envelope( array $data, string $encoded ): array {
+		$update_data = array( 'engine_data' => $encoded );
+		$format      = array( '%s' );
+
+		// Promote task_type to its own indexed column for fast lookups.
+		if ( isset( $data['task_type'] ) && is_string( $data['task_type'] ) ) {
+			$update_data['task_type'] = sanitize_key( $data['task_type'] );
+			$format[]                 = '%s';
+		}
+
+		// Promote the first handler_slug to its own column so handler
+		// summaries / filtering survive engine_data being shed from terminal
+		// jobs by retention (see RetentionCleanup::cleanupEngineData()).
+		// Extracted from the encoded blob so the column matches exactly what
+		// the legacy REGEXP_SUBSTR( engine_data, ... ) aggregation produced.
+		$handler_slug = self::extract_handler_slug( $encoded );
+		if ( '' !== $handler_slug ) {
+			$update_data['handler_slug'] = $handler_slug;
+			$format[]                    = '%s';
+		}
+
+		return array(
+			'data'   => $update_data,
+			'format' => $format,
+		);
 	}
 
 	/**
