@@ -48,7 +48,7 @@ class DataPacketStore {
 		}
 
 		if ( ! file_exists( $file_path ) ) {
-			$envelope = array(
+			$envelope    = array(
 				'schema_version' => self::SCHEMA_VERSION,
 				'hash_algorithm' => self::HASH_ALGORITHM,
 				'content_hash'   => $hash,
@@ -121,7 +121,7 @@ class DataPacketStore {
 
 		$packet = $envelope['packet'];
 		$hash   = self::content_hash( $packet );
-		if ( ! is_string( $hash ) || $hash !== (string) ( $packet_or_ref['content_hash'] ?? '' ) ) {
+		if ( ! is_string( $hash ) || (string) ( $packet_or_ref['content_hash'] ?? '' ) !== $hash ) {
 			return null;
 		}
 

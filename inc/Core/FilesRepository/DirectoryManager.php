@@ -395,8 +395,6 @@ class DirectoryManager {
 		if ( null !== $default_id ) {
 			return $default_id;
 		}
-
-
 		// Activation can run before the users table exists in WP-PHPUnit/Playground bootstraps.
 		try {
 			$admins = get_users( array(
