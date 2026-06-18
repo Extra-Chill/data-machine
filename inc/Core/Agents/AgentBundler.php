@@ -99,10 +99,8 @@ class AgentBundler {
 			);
 		}
 
-		$agent                         = is_array( $result['agent'] ?? null ) ? $result['agent'] : array();
-		$bundle                        = AgentBundleArrayAdapter::to_array_bundle( $directory );
-		$bundle['abilities_manifest']  = $this->collect_abilities_manifest();
-		$bundle['agent']['site_scope'] = (string) ( $agent['site_scope'] ?? 'site' );
+		$bundle                       = AgentBundleArrayAdapter::to_array_bundle( $directory );
+		$bundle['abilities_manifest'] = $this->collect_abilities_manifest();
 
 		return array(
 			'success' => true,
@@ -245,6 +243,10 @@ class AgentBundler {
 				'label'        => $agent['agent_name'],
 				'description'  => '',
 				'agent_config' => is_array( $agent['agent_config'] ?? null ) ? $agent['agent_config'] : array(),
+				// Preserve the agent's actual scope through the bundle round-trip:
+				// null = network-wide, positive int = a specific blog. The manifest
+				// drops legacy/unknown values so import never re-pins to a blog.
+				'site_scope'   => self::normalize_export_site_scope( $agent['site_scope'] ?? null ),
 			),
 			array(
 				'memory'       => array_keys( $memory_files ),
@@ -489,6 +491,25 @@ class AgentBundler {
 		return $manifest;
 	}
 
+	/**
+	 * Normalize a stored agent `site_scope` for export into a manifest.
+	 *
+	 * The DB column is `NULL` for network-wide or a blog ID otherwise. We map
+	 * `NULL` to a first-class `null` (network-wide) and a numeric value to its
+	 * integer blog ID. Anything else collapses to the unspecified sentinel,
+	 * which the manifest validator drops so it can't re-pin an agent on import.
+	 *
+	 * @param mixed $stored_scope Raw site_scope value from the agent row.
+	 * @return int|null|string
+	 */
+	private static function normalize_export_site_scope( mixed $stored_scope ): int|null|string {
+		if ( null === $stored_scope ) {
+			return null;
+		}
+
+		return \DataMachine\Engine\Bundle\BundleSchema::normalize_agent_site_scope( $stored_scope );
+	}
+
 	private static function strip_secret_like_values( array $value ): array {
 		$secret_keys = array( 'access_token', 'refresh_token', 'token', 'secret', 'client_secret', 'password', 'api_key', 'apikey', 'key' );
 		foreach ( $value as $key => $child ) {
@@ -708,11 +729,21 @@ class AgentBundler {
 					throw new \RuntimeException( 'Failed to update existing agent record.' );
 				}
 			} else {
+				// Honor the bundle's portable scope on CREATE only. `null` is
+				// first-class network-wide; a positive int scopes to that blog.
+				// An unspecified/legacy scope falls to the column default (NULL).
+				// Read with array_key_exists so an explicit null is not swallowed
+				// by `??` and collapsed into the unspecified sentinel.
+				$raw_site_scope    = array_key_exists( 'site_scope', $agent_data ) ? $agent_data['site_scope'] : BundleSchema::SITE_SCOPE_UNSPECIFIED;
+				$bundle_site_scope = BundleSchema::normalize_agent_site_scope( $raw_site_scope );
+				$create_site_scope = ( BundleSchema::SITE_SCOPE_UNSPECIFIED === $bundle_site_scope ) ? false : $bundle_site_scope;
+
 				$agent_id = $this->agents_repo->create_if_missing(
 					$slug,
 					$agent_data['agent_name'] ?? $slug,
 					$owner_id,
-					$config
+					$config,
+					$create_site_scope
 				);
 				if ( ! $agent_id ) {
 					throw new \RuntimeException( 'Failed to create agent record.' );

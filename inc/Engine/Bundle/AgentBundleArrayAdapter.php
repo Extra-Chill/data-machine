@@ -34,12 +34,7 @@ final class AgentBundleArrayAdapter {
 			(string) ( $bundle['bundle_version'] ?? '1' ),
 			(string) ( $bundle['source_ref'] ?? '' ),
 			(string) ( $bundle['source_revision'] ?? '' ),
-			array(
-				'slug'         => $bundle['agent']['agent_slug'] ?? 'agent',
-				'label'        => $bundle['agent']['agent_name'] ?? ( $bundle['agent']['agent_slug'] ?? 'Agent' ),
-				'description'  => (string) ( $bundle['agent']['description'] ?? '' ),
-				'agent_config' => is_array( $bundle['agent']['agent_config'] ?? null ) ? $bundle['agent']['agent_config'] : array(),
-			),
+			self::manifest_agent_block( $bundle['agent'] ?? array() ),
 			array(
 				'memory'       => self::memory_paths_from_array_bundle( $bundle, $pipeline_slugs, $flow_slugs ),
 				'pipelines'    => array_values( $pipeline_slugs ),
@@ -145,12 +140,7 @@ final class AgentBundleArrayAdapter {
 			'source_revision'       => $manifest['source_revision'] ?? '',
 			'bundle_schema_version' => BundleSchema::VERSION,
 			'exported_at'           => $manifest['exported_at'],
-			'agent'                 => array(
-				'agent_slug'   => $manifest['agent']['slug'],
-				'agent_name'   => $manifest['agent']['label'],
-				'agent_config' => $manifest['agent']['agent_config'],
-				'site_scope'   => 'site',
-			),
+			'agent'                 => self::bundle_agent_block( $manifest['agent'] ?? array() ),
 			'files'                 => self::strip_memory_prefix( $memory_files, 'agent/' ),
 			'user_template'         => $memory_files['USER.md'] ?? '',
 			'pipelines'             => $pipelines,
@@ -229,6 +219,63 @@ final class AgentBundleArrayAdapter {
 			$slugs[ $index ] = $slug;
 		}
 		return $slugs;
+	}
+
+	/**
+	 * Build the manifest agent block from a raw bundle agent array.
+	 *
+	 * Preserves the agent's actual `site_scope` through the round-trip: `null`
+	 * for network-wide, a positive integer for a specific blog. Legacy/unknown
+	 * values (`'site'`, empty string, absent) are omitted so the importer never
+	 * re-pins a network agent to the installing blog.
+	 *
+	 * @param array<string,mixed> $agent Raw bundle agent array.
+	 * @return array<string,mixed>
+	 */
+	private static function manifest_agent_block( array $agent ): array {
+		$block = array(
+			'slug'         => $agent['agent_slug'] ?? 'agent',
+			'label'        => $agent['agent_name'] ?? ( $agent['agent_slug'] ?? 'Agent' ),
+			'description'  => (string) ( $agent['description'] ?? '' ),
+			'agent_config' => is_array( $agent['agent_config'] ?? null ) ? $agent['agent_config'] : array(),
+		);
+
+		if ( array_key_exists( 'site_scope', $agent ) ) {
+			$scope = BundleSchema::normalize_agent_site_scope( $agent['site_scope'] );
+			if ( BundleSchema::SITE_SCOPE_UNSPECIFIED !== $scope ) {
+				$block['site_scope'] = $scope;
+			}
+		}
+
+		return $block;
+	}
+
+	/**
+	 * Build the bundle agent block from a validated manifest agent array.
+	 *
+	 * Emits the real `site_scope` carried by the manifest (`null` network-wide
+	 * or a positive integer). When the manifest carries no scope, the key is
+	 * omitted entirely — the importer treats an absent scope as "do not
+	 * re-pin", never as "scope to the current blog".
+	 *
+	 * @param array<string,mixed> $agent Validated manifest agent array.
+	 * @return array<string,mixed>
+	 */
+	private static function bundle_agent_block( array $agent ): array {
+		$block = array(
+			'agent_slug'   => $agent['slug'] ?? 'agent',
+			'agent_name'   => $agent['label'] ?? ( $agent['slug'] ?? 'Agent' ),
+			'agent_config' => is_array( $agent['agent_config'] ?? null ) ? $agent['agent_config'] : array(),
+		);
+
+		if ( array_key_exists( 'site_scope', $agent ) ) {
+			$scope = BundleSchema::normalize_agent_site_scope( $agent['site_scope'] );
+			if ( BundleSchema::SITE_SCOPE_UNSPECIFIED !== $scope ) {
+				$block['site_scope'] = $scope;
+			}
+		}
+
+		return $block;
 	}
 
 	private static function exported_by(): string {

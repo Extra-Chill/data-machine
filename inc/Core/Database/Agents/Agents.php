@@ -290,9 +290,15 @@ class Agents extends BaseRepository {
 	 * Update an agent's mutable fields.
 	 *
 	 * Only updates fields that are present in the $data array.
-	 * Allowed fields: agent_name, agent_config.
+	 * Allowed fields: agent_name, agent_config, site_scope.
+	 *
+	 * Changing `site_scope` is an explicit, intentional operation: callers must
+	 * pass the `site_scope` key to move an agent between network-wide (`null`)
+	 * and site-specific (positive int). It is never mutated as a side effect of
+	 * an agent_name/agent_config update.
 	 *
 	 * @since 0.43.0
+	 * @since 0.57.0 Added explicit site_scope support.
 	 * @param int   $agent_id Agent ID.
 	 * @param array $data     Associative array of fields to update.
 	 * @return bool True on success, false on DB failure or no valid fields.
@@ -314,6 +320,14 @@ class Agents extends BaseRepository {
 				$update[ $field ] = (string) $data[ $field ];
 				$formats[]        = '%s';
 			}
+		}
+
+		// site_scope is a nullable column, handled outside the string-cast loop
+		// so `null` (network-wide) round-trips correctly instead of becoming "".
+		if ( array_key_exists( 'site_scope', $data ) ) {
+			$scope              = $data['site_scope'];
+			$update['site_scope'] = ( null === $scope ) ? null : (int) $scope;
+			$formats[]            = ( null === $scope ) ? null : '%d';
 		}
 
 		if ( empty( $update ) ) {
@@ -406,29 +420,49 @@ class Agents extends BaseRepository {
 	/**
 	 * Create an agent if slug does not exist.
 	 *
-	 * @param string $agent_slug Agent slug.
-	 * @param string $agent_name Display name.
-	 * @param int    $owner_id Owner user ID.
-	 * @param array  $agent_config Agent configuration.
+	 * Network-wide scope is first-class and the default: when `$site_scope` is
+	 * omitted (the `false` sentinel) the `site_scope` column is left unset and
+	 * falls to its DB default of `NULL` (network-wide). Pass an explicit `null`
+	 * to force network-wide, or a positive integer to scope to a single blog.
+	 *
+	 * @since 0.57.0 Added explicit $site_scope parameter.
+	 *
+	 * @param string        $agent_slug   Agent slug.
+	 * @param string        $agent_name   Display name.
+	 * @param int           $owner_id     Owner user ID.
+	 * @param array         $agent_config Agent configuration.
+	 * @param int|null|false $site_scope  Scope to set on create. `null` = network-wide,
+	 *                                    positive int = a specific blog, `false` = use
+	 *                                    the column default (network-wide). Default false.
 	 * @return int Agent ID.
 	 */
-	public function create_if_missing( string $agent_slug, string $agent_name, int $owner_id, array $agent_config = array() ): int {
+	public function create_if_missing( string $agent_slug, string $agent_name, int $owner_id, array $agent_config = array(), int|null|false $site_scope = false ): int {
 		$existing = $this->get_by_slug( $agent_slug );
 
 		if ( $existing ) {
 			return (int) $existing['agent_id'];
 		}
 
+		$data    = array(
+			'agent_slug'   => $agent_slug,
+			'agent_name'   => $agent_name,
+			'owner_id'     => $owner_id,
+			'agent_config' => wp_json_encode( AgentConfigFactory::normalize( $agent_config ) ),
+		);
+		$formats = array( '%s', '%s', '%d', '%s' );
+
+		// Only write site_scope when the caller is intentional about it. The
+		// `false` sentinel leaves the column to its DB default (NULL = network-wide).
+		if ( false !== $site_scope ) {
+			$data['site_scope'] = ( null === $site_scope ) ? null : (int) $site_scope;
+			$formats[]          = ( null === $site_scope ) ? null : '%d';
+		}
+
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
 		$this->wpdb->insert(
 			$this->table_name,
-			array(
-				'agent_slug'   => $agent_slug,
-				'agent_name'   => $agent_name,
-				'owner_id'     => $owner_id,
-				'agent_config' => wp_json_encode( AgentConfigFactory::normalize( $agent_config ) ),
-			),
-			array( '%s', '%s', '%d', '%s' )
+			$data,
+			$formats
 		);
 
 		return (int) $this->wpdb->insert_id;

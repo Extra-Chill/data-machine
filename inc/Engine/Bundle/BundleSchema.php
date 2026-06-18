@@ -16,6 +16,15 @@ final class BundleSchema {
 
 	public const VERSION = 1;
 
+	/**
+	 * Sentinel returned by {@see self::normalize_agent_site_scope()} when a bundle
+	 * carries no usable scope value (absent key, empty string, or the legacy
+	 * `'site'` literal). Distinct from `null`, which is the first-class
+	 * "network-wide" scope. Callers must not write a `site_scope` column for the
+	 * unspecified sentinel so existing scope is preserved.
+	 */
+	public const SITE_SCOPE_UNSPECIFIED = '__unspecified__';
+
 	public const MANIFEST_FILE = 'manifest.json';
 
 	public const MEMORY_DIR = 'memory';
@@ -146,6 +155,46 @@ final class BundleSchema {
 		sort( $normalized, SORT_STRING );
 
 		return $normalized;
+	}
+
+	/**
+	 * Normalize a bundle agent's `site_scope` to a first-class scope value.
+	 *
+	 * Network-wide scope is a durable, intentional concept: it is `null`, never
+	 * the installing blog. A specific blog is a positive integer. The legacy
+	 * hardcoded `'site'` literal and the empty string carry no portable meaning
+	 * (they cannot identify a blog across installs), so both resolve to the
+	 * {@see self::SITE_SCOPE_UNSPECIFIED} sentinel and the importer leaves the
+	 * existing scope untouched rather than re-pinning to the current blog.
+	 *
+	 * @param mixed $value Raw site_scope value from a bundle/manifest.
+	 * @return int|null|string `null` for network-wide, positive int for a blog,
+	 *                          or the SITE_SCOPE_UNSPECIFIED sentinel.
+	 */
+	public static function normalize_agent_site_scope( mixed $value ): int|null|string {
+		if ( null === $value ) {
+			return null;
+		}
+
+		if ( is_int( $value ) ) {
+			return $value > 0 ? $value : self::SITE_SCOPE_UNSPECIFIED;
+		}
+
+		if ( is_string( $value ) ) {
+			$trimmed = trim( $value );
+			if ( '' === $trimmed || 'site' === strtolower( $trimmed ) ) {
+				return self::SITE_SCOPE_UNSPECIFIED;
+			}
+			if ( 'null' === strtolower( $trimmed ) ) {
+				return null;
+			}
+			if ( ctype_digit( $trimmed ) ) {
+				$int = (int) $trimmed;
+				return $int > 0 ? $int : self::SITE_SCOPE_UNSPECIFIED;
+			}
+		}
+
+		return self::SITE_SCOPE_UNSPECIFIED;
 	}
 
 	private static function apply_filter( string $hook, array $value ): mixed {

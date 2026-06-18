@@ -1075,17 +1075,11 @@ class AgentsCommand extends AgentBundleCommand {
 				$raw_value = substr( $pair, $eq_pos + 1 );
 
 				// Handle site_scope as a special case — it's a column, not agent_config.
+				// Changing scope is an explicit operation; route it through the
+				// repository so the nullable-column write stays in one place.
 				if ( 'site_scope' === $key ) {
 					$scope_value = ( 'null' === strtolower( $raw_value ) || '' === $raw_value ) ? null : (int) $raw_value;
-					global $wpdb;
-					// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-					$wpdb->update(
-						$wpdb->base_prefix . 'datamachine_agents',
-						array( 'site_scope' => $scope_value ),
-						array( 'agent_id' => $agent_id ),
-						array( null === $scope_value ? null : '%d' ),
-						array( '%d' )
-					);
+					$agents_repo->update_agent( $agent_id, array( 'site_scope' => $scope_value ) );
 					$site_scope_changed = true;
 					WP_CLI::log( sprintf( '  site_scope → %s', null === $scope_value ? 'NULL (network-wide)' : $scope_value ) );
 					continue;
