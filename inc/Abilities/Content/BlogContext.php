@@ -219,4 +219,56 @@ class BlogContext {
 			switch_to_blog( $target );
 		}
 	}
+
+	/**
+	 * Resolve the freshest authored content for a post, preferring the calling
+	 * user's in-flight autosave revision over the stored parent post.
+	 *
+	 * Editors that autosave (e.g. an iframe compose surface posting to
+	 * `/wp/v2/posts/<id>/autosaves` every few seconds) deliberately leave the
+	 * parent post untouched until an explicit Save/Submit. Reading
+	 * `$post->post_content` therefore surfaces stale — or, for a brand-new
+	 * draft, empty — content versus what the author is actively typing.
+	 *
+	 * WordPress core stores one autosave revision per user (`wp_get_post_autosave`
+	 * keyed on the user id), so the lookup is inherently scoped to the current
+	 * user — another user's in-flight draft is never returned. When that
+	 * autosave exists and is newer than the parent post, its `post_content` is
+	 * the freshest authored content and is returned in place of the parent's.
+	 *
+	 * This is a READ-only preference: it changes only which content is parsed
+	 * and shown to a caller proofreading/diffing a draft. It does not alter
+	 * where edits are written — write paths continue to target the parent post
+	 * through the normal pending-action/apply flow.
+	 *
+	 * Must be called inside the post's blog context (after BlogContext::enter()
+	 * on multisite) so the autosave lookup runs against the correct site.
+	 *
+	 * @param \WP_Post $post           The stored parent post.
+	 * @param bool     $prefer_autosave Whether to prefer a newer user autosave.
+	 *                                  Defaults to true (freshest-authored).
+	 * @return string The post_content to parse (autosave's when newer, else parent's).
+	 */
+	public static function freshest_authored_content( \WP_Post $post, bool $prefer_autosave = true ): string {
+		if ( ! $prefer_autosave ) {
+			return (string) $post->post_content;
+		}
+
+		$user_id = get_current_user_id();
+		if ( $user_id <= 0 ) {
+			return (string) $post->post_content;
+		}
+
+		$autosave = wp_get_post_autosave( $post->ID, $user_id );
+		if ( ! $autosave instanceof \WP_Post ) {
+			return (string) $post->post_content;
+		}
+
+		// Only prefer the autosave when it is strictly newer than the parent.
+		if ( strtotime( (string) $autosave->post_modified_gmt ) <= strtotime( (string) $post->post_modified_gmt ) ) {
+			return (string) $post->post_content;
+		}
+
+		return (string) $autosave->post_content;
+	}
 }
