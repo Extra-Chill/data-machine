@@ -42,6 +42,19 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 	const TABLE_NAME = 'datamachine_chat_sessions';
 
 	/**
+	 * Use network-level prefix so chat sessions are shared across the multisite network.
+	 *
+	 * A user's chat history follows them to every subsite — consistent with the
+	 * agent identity, tokens, and access tables, which already use base_prefix.
+	 *
+	 * @return string
+	 */
+	protected static function get_table_prefix(): string {
+		global $wpdb;
+		return $wpdb->base_prefix;
+	}
+
+	/**
 	 * Create chat sessions table
 	 *
 	 * Uses dbDelta for safe table creation/updates
@@ -91,6 +104,149 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 
 		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 		dbDelta( $sql );
+	}
+
+	/**
+	 * Migrate legacy per-site chat session tables into the network table.
+	 *
+	 * Chat sessions used to live in per-site tables (`<prefix>_<N>_datamachine_chat_sessions`)
+	 * because the repository defaulted to `$wpdb->prefix`. Now that the table is
+	 * network-scoped (`base_prefix`), a user's chat history must follow them across
+	 * every subsite. This one-time migration unions every legacy per-site table into
+	 * the single network table.
+	 *
+	 * Idempotent and re-runnable:
+	 * - Rows are de-duped on the `session_id` primary key via `INSERT IGNORE`.
+	 * - The source site whose prefix equals the network base prefix IS the network
+	 *   table, so it is skipped.
+	 * - Single-site installs have nothing to union and return early.
+	 *
+	 * @return int Number of rows copied into the network table.
+	 */
+	public static function migrate_per_site_tables_to_network(): int {
+		global $wpdb;
+
+		// Single-site installs already store sessions in the (base == site) table.
+		if ( ! function_exists( 'is_multisite' ) || ! is_multisite() || ! function_exists( 'get_sites' ) ) {
+			return 0;
+		}
+
+		// The network table must exist before we can union into it.
+		if ( ! self::table_exists() ) {
+			return 0;
+		}
+
+		$network_table = self::get_prefixed_table_name();
+		$base_prefix   = $wpdb->base_prefix;
+		$copied        = 0;
+
+		$blog_ids = get_sites(
+			array(
+				'fields'   => 'ids',
+				'archived' => 0,
+				'deleted'  => 0,
+				'number'   => 0,
+			)
+		);
+
+		foreach ( $blog_ids as $blog_id ) {
+			$site_prefix = $wpdb->get_blog_prefix( (int) $blog_id );
+			$site_table  = self::sanitize_table_name( $site_prefix . self::TABLE_NAME );
+
+			// Skip the network table itself (the site whose prefix == base prefix).
+			if ( $site_table === $network_table ) {
+				continue;
+			}
+
+			// Skip sites that never created a per-site sessions table.
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
+			$exists = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $site_table ) );
+			if ( $exists !== $site_table ) {
+				continue;
+			}
+
+			// Copy every legacy row into the network table. INSERT IGNORE makes this
+			// idempotent: rows whose session_id already lives in the network table are
+			// skipped, so re-running never duplicates or overwrites migrated history.
+			// Columns are listed explicitly so the copy is resilient to column-order
+			// drift between the two tables.
+			$columns     = 'session_id, workspace_type, workspace_id, user_id, owner_type, owner_key_hash, owner_label, agent_id, title, messages, metadata, provider, model, provider_response_id, mode, created_at, updated_at, last_read_at, expires_at, transcript_lock_token, transcript_lock_expires_at';
+			$column_list = self::intersect_migration_columns( $site_table, $network_table, $columns );
+			if ( '' === $column_list ) {
+				continue;
+			}
+
+			// $column_list is built solely from a fixed allowlist of column names
+			// intersected against the live table columns (see
+			// intersect_migration_columns), never from user input — so interpolating
+			// it into the column list is safe. Table names use %i placeholders.
+			// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			$result = $wpdb->query(
+				$wpdb->prepare(
+					"INSERT IGNORE INTO %i ({$column_list}) SELECT {$column_list} FROM %i",
+					$network_table,
+					$site_table
+				)
+			);
+			// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+
+			$rows    = false !== $result ? (int) $result : 0;
+			$copied += $rows;
+
+			if ( $rows > 0 ) {
+				do_action(
+					'datamachine_log',
+					'info',
+					'Migrated per-site chat sessions into network table',
+					array(
+						'blog_id'       => (int) $blog_id,
+						'source_table'  => $site_table,
+						'network_table' => $network_table,
+						'rows_copied'   => $rows,
+					)
+				);
+			}
+		}
+
+		return $copied;
+	}
+
+	/**
+	 * Build the column list shared by both the legacy and network tables.
+	 *
+	 * Different installs created the chat table at different schema versions, so a
+	 * legacy per-site table may be missing columns the network table has (or vice
+	 * versa). Copying only the intersection keeps the INSERT…SELECT valid on every
+	 * install without assuming a single column set.
+	 *
+	 * @param string $source_table Legacy per-site table name (prefixed).
+	 * @param string $target_table Network table name (prefixed).
+	 * @param string $columns      Comma-separated candidate column list.
+	 * @return string Comma-separated intersection, or '' when session_id is absent.
+	 */
+	private static function intersect_migration_columns( string $source_table, string $target_table, string $columns ): string {
+		global $wpdb;
+
+		$candidates = array_map( 'trim', explode( ',', $columns ) );
+		$shared     = array();
+
+		foreach ( $candidates as $column ) {
+			if ( '' === $column ) {
+				continue;
+			}
+
+			if ( self::column_exists( $source_table, $column, $wpdb ) && self::column_exists( $target_table, $column, $wpdb ) ) {
+				$shared[] = $column;
+			}
+		}
+
+		// session_id is the primary key and the de-dupe anchor — without it the
+		// migration is meaningless, so bail rather than copy an unkeyed subset.
+		if ( ! in_array( 'session_id', $shared, true ) ) {
+			return '';
+		}
+
+		return implode( ', ', $shared );
 	}
 
 	/**
@@ -299,7 +455,7 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 	public static function table_exists(): bool {
 		global $wpdb;
 
-		$table_name = $wpdb->prefix . self::TABLE_NAME;
+		$table_name = self::get_table_prefix() . self::TABLE_NAME;
 		$query      = $wpdb->prepare( 'SHOW TABLES LIKE %s', $table_name );
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
@@ -312,8 +468,7 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 	 * @return string Full table name
 	 */
 	public static function get_prefixed_table_name(): string {
-		global $wpdb;
-		return self::sanitize_table_name( $wpdb->prefix . self::TABLE_NAME );
+		return self::sanitize_table_name( self::get_table_prefix() . self::TABLE_NAME );
 	}
 
 	/**

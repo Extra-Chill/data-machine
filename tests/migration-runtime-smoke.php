@@ -17,6 +17,17 @@ if ( ! defined( 'ABSPATH' ) ) {
 	define( 'ABSPATH', __DIR__ . '/' );
 }
 
+// This is a pure-PHP smoke: it stubs get_option/update_option/add_action and
+// drives them via $GLOBALS state to assert the deferred-migration option gate
+// and hook registration. Under real WordPress those functions already exist,
+// so the stubs no-op and the option/hook assertions cannot be exercised. Skip
+// cleanly there — the standalone run (php tests/migration-runtime-smoke.php)
+// locks the contract.
+if ( defined( 'WPINC' ) ) {
+	echo "migration-runtime-smoke: skipped under real WordPress; standalone stubs drive this contract.\n";
+	exit( 0 );
+}
+
 if ( ! defined( 'DATAMACHINE_VERSION' ) ) {
 	define( 'DATAMACHINE_VERSION', '0.104.0-test' );
 }
@@ -67,6 +78,7 @@ $schema_chain = array(
 	'datamachine_migrate_bundle_artifacts_table',
 	'datamachine_migrate_processed_item_claims',
 	'datamachine_migrate_pending_actions_table',
+	'datamachine_migrate_chat_sessions_to_network',
 );
 
 foreach ( $schema_chain as $fn ) {

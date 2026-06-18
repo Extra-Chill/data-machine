@@ -9,6 +9,7 @@
 namespace DataMachine\Core;
 
 use DataMachine\Core\Database\Agents\Agents;
+use DataMachine\Core\Database\Chat\Chat;
 use DataMachine\Core\Database\Chat\ConversationStoreFactory;
 use DataMachine\Core\Database\Jobs\Jobs;
 use DataMachine\Core\FilesRepository\AgentMemory as AgentMemoryFile;
@@ -859,7 +860,7 @@ class JobArtifacts {
 	private function find_transcript_session_id_for_job( int $job_id ): string {
 		global $wpdb;
 
-		$table = $wpdb->prefix . 'datamachine_chat_sessions';
+		$table = Chat::get_prefixed_table_name();
 		$like  = '%"job_id":' . $job_id . '%';
 		$row   = $wpdb->get_var(
 			$wpdb->prepare(

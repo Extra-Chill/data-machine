@@ -686,6 +686,13 @@ function datamachine_activate_plugin( $network_wide = false ) {
 
 	if ( is_multisite() && $network_wide ) {
 		datamachine_for_each_site( 'datamachine_activate_for_site' );
+
+		// Per-site activation created the network chat table (base_prefix, idempotent);
+		// now union any legacy per-site chat session tables into it. Idempotent and
+		// guarded by a network option, so re-activation never re-scans every subsite.
+		if ( function_exists( 'datamachine_migrate_chat_sessions_to_network' ) ) {
+			datamachine_migrate_chat_sessions_to_network();
+		}
 	} else {
 		datamachine_activate_for_site();
 	}

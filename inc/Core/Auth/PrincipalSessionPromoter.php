@@ -8,6 +8,7 @@
 namespace DataMachine\Core\Auth;
 
 use DataMachine\Abilities\Chat\ChatTranscriptOwner;
+use DataMachine\Core\Database\Chat\Chat;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -40,7 +41,7 @@ final class PrincipalSessionPromoter {
 		$user = ChatTranscriptOwner::user_owner( $user_id );
 
 		global $wpdb;
-		$table = $wpdb->prefix . 'datamachine_chat_sessions';
+		$table = Chat::get_prefixed_table_name();
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- Intentional ownership migration for a completed login flow.
 		$result = $wpdb->update(

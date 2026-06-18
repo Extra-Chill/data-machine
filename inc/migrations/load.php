@@ -18,6 +18,7 @@ require_once __DIR__ . '/flows.php';
 require_once __DIR__ . '/bundle-artifacts.php';
 require_once __DIR__ . '/processed-item-claims.php';
 require_once __DIR__ . '/pending-actions.php';
+require_once __DIR__ . '/chat-sessions-network.php';
 
 // Current schema runtime — creates current deploy-time tables/columns without
 // carrying pre-1.0 data-shape migrations forward indefinitely.

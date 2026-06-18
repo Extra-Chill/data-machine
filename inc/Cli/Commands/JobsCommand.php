@@ -29,6 +29,7 @@ use DataMachine\Core\AbilityResult;
 use DataMachine\Core\ExecutionQuery;
 use DataMachine\Core\JobArtifacts;
 use DataMachine\Core\RunMetrics;
+use DataMachine\Core\Database\Chat\Chat;
 use DataMachine\Core\Database\Chat\ConversationStoreFactory;
 use DataMachine\Core\Database\Jobs\Jobs;
 use AgentsAPI\AI\WP_Agent_Message;
@@ -1724,7 +1725,7 @@ class JobsCommand extends BaseCommand {
 	private function findTranscriptSessionIdForJob( int $job_id ): string {
 		global $wpdb;
 
-		$table = $wpdb->prefix . 'datamachine_chat_sessions';
+		$table = Chat::get_prefixed_table_name();
 		$like  = '%"job_id":' . $job_id . '%';
 		$row   = $wpdb->get_var(
 			$wpdb->prepare(
