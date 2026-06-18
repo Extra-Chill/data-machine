@@ -308,9 +308,9 @@ class BatchScheduler {
 						return null;
 					}
 
-					$current_state['claims']      = $claims;
+					$current_state['claims']                              = $claims;
 					$current_state['claims'][ (string) $expected_offset ] = current_time( 'mysql' );
-					$current['batch_state']       = $current_state;
+					$current['batch_state']                               = $current_state;
 
 					return $current;
 				},
