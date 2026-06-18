@@ -21,7 +21,7 @@ class JobArtifacts {
 
 	private const TRANSCRIPT_ARTIFACT_SCHEMA_VERSION = 1;
 	private const TOOL_TRACE_ARTIFACT_SCHEMA_VERSION = 1;
-	private const ARTIFACT_REF_SCHEMA_VERSION       = 1;
+	private const ARTIFACT_REF_SCHEMA_VERSION        = 1;
 	private const MAX_TRANSCRIPT_MESSAGES            = 200;
 	private const MAX_TRANSCRIPT_CONTENT_CHARS       = 4000;
 	private const MAX_TOOL_TRACE_ENTRIES             = 200;
@@ -67,7 +67,7 @@ class JobArtifacts {
 		}
 
 		foreach ( $this->artifact_files_metadata( $engine_data ) as $artifact ) {
-			if ( $artifact_ref === (string) ( $artifact['artifact_ref'] ?? '' ) ) {
+			if ( (string) ( $artifact['artifact_ref'] ?? '' ) === $artifact_ref ) {
 				return array(
 					'success'  => true,
 					'artifact' => $artifact,
@@ -534,7 +534,7 @@ class JobArtifacts {
 	/** @return array<string,mixed> */
 	private function portable_artifact_file_ref( array $artifact_file ): array {
 		$stored_local_debug = is_array( $artifact_file['local_debug'] ?? null ) ? $artifact_file['local_debug'] : array();
-		$local_debug = $this->filter_empty(
+		$local_debug        = $this->filter_empty(
 			array(
 				'path' => isset( $artifact_file['path'] ) ? (string) $artifact_file['path'] : ( isset( $stored_local_debug['path'] ) ? (string) $stored_local_debug['path'] : null ),
 				'url'  => isset( $artifact_file['url'] ) ? esc_url_raw( (string) $artifact_file['url'] ) : ( isset( $stored_local_debug['url'] ) ? esc_url_raw( (string) $stored_local_debug['url'] ) : null ),
@@ -630,17 +630,17 @@ class JobArtifacts {
 			'success' => true,
 			'file'    => $this->filter_empty(
 				array(
-					'artifact_ref'    => $artifact_ref,
-					'type'            => $type,
-					'schema_version'  => self::ARTIFACT_REF_SCHEMA_VERSION,
-					'sha256'          => hash( 'sha256', $json ),
-					'bytes'           => strlen( $json ),
-					'relative_path'   => $relative_path,
-					'export_url'      => is_string( $export_url ) && '' !== $export_url ? $export_url : null,
-					'signed_url'      => is_string( $signed_url ) && '' !== $signed_url ? $signed_url : null,
-					'payload_sha256'  => (string) ( $artifact_payload['sha256'] ?? '' ),
-					'written_at'      => gmdate( 'c' ),
-					'local_debug'     => $this->filter_empty(
+					'artifact_ref'   => $artifact_ref,
+					'type'           => $type,
+					'schema_version' => self::ARTIFACT_REF_SCHEMA_VERSION,
+					'sha256'         => hash( 'sha256', $json ),
+					'bytes'          => strlen( $json ),
+					'relative_path'  => $relative_path,
+					'export_url'     => is_string( $export_url ) && '' !== $export_url ? $export_url : null,
+					'signed_url'     => is_string( $signed_url ) && '' !== $signed_url ? $signed_url : null,
+					'payload_sha256' => (string) ( $artifact_payload['sha256'] ?? '' ),
+					'written_at'     => gmdate( 'c' ),
+					'local_debug'    => $this->filter_empty(
 						array(
 							'path' => $file_path,
 							'url'  => '' !== $base_url ? trailingslashit( $base_url ) . $file_name : null,
