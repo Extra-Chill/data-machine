@@ -305,8 +305,11 @@ class InternalLinkingTask extends SystemTask {
 			fn( $word ) => strlen( $word ) >= 3
 		);
 
-		$related_tags = wp_get_post_tags( $related_post['id'], array( 'fields' => 'names' ) );
-		$related_tags = is_array( $related_tags ) ? array_map( 'strtolower', $related_tags ) : array();
+		// Off-site / filter-injected candidates carry id 0 and have no local
+		// tags to read; fall back to title-word matching only.
+		$related_post_id = absint( $related_post['id'] ?? 0 );
+		$related_tags    = $related_post_id > 0 ? wp_get_post_tags( $related_post_id, array( 'fields' => 'names' ) ) : array();
+		$related_tags    = is_array( $related_tags ) ? array_map( 'strtolower', $related_tags ) : array();
 
 		$best_block = null;
 		$best_score = 0;
@@ -449,7 +452,94 @@ class InternalLinkingTask extends SystemTask {
 			);
 		}
 
-		return $related;
+		/**
+		 * Filter the ranked list of internal-linking candidates for a post.
+		 *
+		 * Core discovers candidates from same-site posts that share categories
+		 * or tags with the source post. This filter lets a platform layer
+		 * inject additional candidates — for example, relevant targets on
+		 * sibling sites of a multisite network (events, community, news) — so
+		 * traffic can be routed toward forward surfaces rather than deepening a
+		 * single-site silo. Returned candidates are re-sorted by `score` and
+		 * capped at `$limit`.
+		 *
+		 * Each candidate is an associative array with:
+		 *   - url     (string, required) Absolute URL to link to.
+		 *   - title   (string, required) Human title of the target.
+		 *   - score   (float,  optional) Relevance score; higher ranks higher.
+		 *   - id      (int,    optional) Local post ID; 0 for off-site targets.
+		 *   - excerpt (string, optional) Short summary for prompt context.
+		 *
+		 * Core stays network-agnostic: it never names specific sites. Any
+		 * cross-site / forward-surface knowledge lives in the platform plugin
+		 * that hooks this filter.
+		 *
+		 * @since 0.74.0
+		 *
+		 * @param array  $related      Ranked candidates discovered by core.
+		 * @param int    $post_id      Source post being linked from.
+		 * @param string $source_title Title of the source post.
+		 * @param array  $categories   Source post category term IDs.
+		 * @param array  $tags         Source post tag term IDs.
+		 * @param int    $limit        Maximum candidates to return.
+		 */
+		$related = apply_filters(
+			'datamachine_internal_linking_candidates',
+			$related,
+			$post_id,
+			$source_title,
+			$categories,
+			$tags,
+			$limit
+		);
+
+		return $this->normalizeCandidates( $related, $limit );
+	}
+
+	/**
+	 * Normalize and re-rank the candidate list after filtering.
+	 *
+	 * Keeps only well-formed candidates (a non-empty url + title), backfills
+	 * optional keys so downstream consumers never hit undefined indices,
+	 * re-sorts by score descending, and caps to the requested limit.
+	 *
+	 * @param mixed $candidates Filtered candidate list (untrusted shape).
+	 * @param int   $limit      Maximum candidates to return.
+	 * @return array<int, array<string, mixed>>
+	 */
+	private function normalizeCandidates( $candidates, int $limit ): array {
+		if ( ! is_array( $candidates ) ) {
+			return array();
+		}
+
+		$normalized = array();
+		foreach ( $candidates as $candidate ) {
+			if ( ! is_array( $candidate ) ) {
+				continue;
+			}
+
+			$url   = isset( $candidate['url'] ) ? esc_url_raw( (string) $candidate['url'] ) : '';
+			$title = isset( $candidate['title'] ) ? trim( (string) $candidate['title'] ) : '';
+
+			if ( '' === $url || '' === $title ) {
+				continue;
+			}
+
+			$normalized[] = array(
+				'id'      => isset( $candidate['id'] ) ? absint( $candidate['id'] ) : 0,
+				'url'     => $url,
+				'title'   => $title,
+				'excerpt' => isset( $candidate['excerpt'] ) ? (string) $candidate['excerpt'] : '',
+				'score'   => isset( $candidate['score'] ) ? (float) $candidate['score'] : 0.0,
+			);
+		}
+
+		usort(
+			$normalized,
+			static fn( array $a, array $b ): int => $b['score'] <=> $a['score']
+		);
+
+		return array_slice( $normalized, 0, max( 0, $limit ) );
 	}
 
 	private function computeWordIDF( array $candidate_titles ): array {
