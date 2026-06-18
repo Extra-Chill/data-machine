@@ -167,6 +167,7 @@ namespace {
 	require __DIR__ . '/../vendor/wordpress/agents-api/src/Runtime/class-wp-agent-runtime-tool-request-store.php';
 	require __DIR__ . '/../vendor/wordpress/agents-api/src/Runtime/class-wp-agent-runtime-tool-continuation.php';
 	require __DIR__ . '/../vendor/wordpress/agents-api/src/Runtime/class-wp-agent-runtime-tool-lifecycle.php';
+	require __DIR__ . '/../inc/Engine/AI/RuntimeToolRunStateStore.php';
 	require __DIR__ . '/../inc/Engine/AI/conversation-loop.php';
 
 	$failures = array();
