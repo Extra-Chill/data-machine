@@ -2,6 +2,14 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.153.0] - 2026-06-18
+
+### Added
+- let internal linking source forward-surface candidates via filter
+
+### Changed
+- Add content-addressed DataPacket refs
+
 ## [0.152.1] - 2026-06-18
 
 ### Changed
