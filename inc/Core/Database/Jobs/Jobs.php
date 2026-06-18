@@ -17,6 +17,7 @@
 namespace DataMachine\Core\Database\Jobs;
 
 use DataMachine\Core\Database\BaseRepository;
+use DataMachine\Core\Database\LifecycleStateTransition;
 use DataMachine\Core\ExecutionQuery;
 use DataMachine\Core\JobStatus;
 use DataMachine\Core\RunMetrics;
@@ -1253,25 +1254,13 @@ class Jobs extends BaseRepository {
 	 * @return bool True on success, false on failure.
 	 */
 	public function start_job( int $job_id, string $status = 'processing' ): bool {
-		if ( empty( $job_id ) ) {
-			return false;
-		}
-        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-		$updated = $this->wpdb->update(
-			$this->table_name,
-			array(
-				'status' => $status,
-			),
-			array( 'job_id' => $job_id ),
-			array( '%s' ), // Format for data
-			array( '%d' )  // Format for WHERE
-		);
+		$result = $this->transition_job_status_result( $job_id, $status );
 
-		if ( false !== $updated ) {
+		if ( $result['changed'] ) {
 			RunMetrics::start( $job_id, array( 'status' => $status ) );
 		}
 
-		return false !== $updated;
+		return $result['success'];
 	}
 
 	/**
@@ -1310,14 +1299,42 @@ class Jobs extends BaseRepository {
 	 * @return bool True on success, false on failure.
 	 */
 	public function transition_job_status( int $job_id, string $status, bool $require_final = false ): bool {
+		$result = $this->transition_job_status_result( $job_id, $status, $require_final );
+
+		return $result['success'];
+	}
+
+	/**
+	 * Transition a job status with compare-and-set/idempotent lifecycle details.
+	 *
+	 * Non-terminal jobs may move to another non-terminal state or to a terminal
+	 * state. Terminal jobs are immutable; repeating the same terminal state is an
+	 * idempotent success and does not run terminal side effects again.
+	 *
+	 * @param int    $job_id        The job ID.
+	 * @param string $status        The new status.
+	 * @param bool   $require_final Whether to reject non-final statuses.
+	 * @return array{success: bool, changed: bool, current_status: ?string, status: string}
+	 */
+	public function transition_job_status_result( int $job_id, string $status, bool $require_final = false ): array {
 
 		if ( empty( $job_id ) ) {
-			return false;
+			return array(
+				'success'        => false,
+				'changed'        => false,
+				'current_status' => null,
+				'status'         => $status,
+			);
 		}
 
 		$is_final = JobStatus::isStatusFinal( $status );
 		if ( $require_final && ! $is_final ) {
-			return false;
+			return array(
+				'success'        => false,
+				'changed'        => false,
+				'current_status' => null,
+				'status'         => $status,
+			);
 		}
 
 		// Truncate to fit varchar(255) column.
@@ -1325,28 +1342,87 @@ class Jobs extends BaseRepository {
 			$status = substr( $status, 0, 252 ) . '...';
 		}
 
-		$update_data = array( 'status' => $status );
-		$format      = array( '%s' );
+		$job = $this->get_job( $job_id );
+		if ( ! is_array( $job ) ) {
+			return array(
+				'success'        => false,
+				'changed'        => false,
+				'current_status' => null,
+				'status'         => $status,
+			);
+		}
+
+		$current_status = is_string( $job['status'] ?? null ) ? $job['status'] : '';
+		if ( $current_status === $status ) {
+			return array(
+				'success'        => true,
+				'changed'        => false,
+				'current_status' => $current_status,
+				'status'         => $status,
+			);
+		}
+
+		if ( JobStatus::isStatusFinal( $current_status ) ) {
+			return array(
+				'success'        => false,
+				'changed'        => false,
+				'current_status' => $current_status,
+				'status'         => $status,
+			);
+		}
+
+		$update_data = array();
+		$format      = array();
 		if ( $is_final ) {
 			$update_data['completed_at'] = current_time( 'mysql', true );
 			$format[]                    = '%s';
 		}
 
-        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-		$updated = $this->wpdb->update(
+		$updated = LifecycleStateTransition::compare_and_set(
+			$this->wpdb,
 			$this->table_name,
-			$update_data,
 			array( 'job_id' => $job_id ),
-			$format,
-			array( '%d' )
+			'status',
+			$current_status,
+			$status,
+			$update_data,
+			array( '%d' ),
+			$format
 		);
 
-		if ( false !== $updated && $is_final ) {
+		if ( false === $updated ) {
+			return array(
+				'success'        => false,
+				'changed'        => false,
+				'current_status' => $current_status,
+				'status'         => $status,
+			);
+		}
+
+		if ( 0 === $updated ) {
+			$job_after      = $this->get_job( $job_id );
+			$status_after   = is_array( $job_after ) && is_string( $job_after['status'] ?? null ) ? $job_after['status'] : null;
+			$race_was_no_op = $status_after === $status;
+
+			return array(
+				'success'        => $race_was_no_op,
+				'changed'        => false,
+				'current_status' => $status_after,
+				'status'         => $status,
+			);
+		}
+
+		if ( $is_final ) {
 			RunMetrics::complete( $job_id, $status );
 			do_action( 'datamachine_job_complete', $job_id, $status );
 		}
 
-		return false !== $updated;
+		return array(
+			'success'        => true,
+			'changed'        => true,
+			'current_status' => $current_status,
+			'status'         => $status,
+		);
 	}
 
 	// ---------------------------------------------------------------------

@@ -120,7 +120,17 @@ class ExecuteStepAbility {
 		// RunFlowAbility). For batch child jobs this is the real transition from
 		// 'pending' → 'processing', ensuring recover-stuck only catches jobs
 		// that genuinely started but never finished.
-		$this->db_jobs->start_job( $job_id );
+		if ( ! $this->db_jobs->start_job( $job_id ) ) {
+			$job_after_start       = $this->db_jobs->get_job( $job_id );
+			$current_status        = is_array( $job_after_start ) ? (string) ( $job_after_start['status'] ?? '' ) : '';
+			$terminal_after_start = JobStatus::isStatusFinal( $current_status );
+
+			return array(
+				'success'        => false,
+				'error'          => $terminal_after_start ? sprintf( 'Job %d has terminal status "%s"; step execution skipped.', $job_id, $current_status ) : sprintf( 'Job %d could not be started from status "%s".', $job_id, $current_status ),
+				'terminal_state' => $terminal_after_start ? $current_status : null,
+			);
+		}
 
 		try {
 			$engine_snapshot = datamachine_get_engine_data( $job_id );
@@ -437,12 +447,18 @@ class ExecuteStepAbility {
 
 		// Status override: complete with override status and clean up.
 		if ( $status_override ) {
-			if ( str_starts_with( $status_override, JobStatus::FAILED ) === false ) {
-				$this->handleStepLifecycleCompleted( $job_id );
-			} else {
-				$this->handleStepLifecycleFailed( $job_id );
+			$transition = $this->db_jobs->transition_job_status_result( $job_id, $status_override, true );
+			if ( $transition['changed'] ) {
+				if ( str_starts_with( $status_override, JobStatus::FAILED ) === false ) {
+					$this->handleStepLifecycleCompleted( $job_id );
+				} else {
+					$this->handleStepLifecycleFailed( $job_id );
+				}
+
+				$cleanup = new FileCleanup();
+				$context = datamachine_get_file_context( $flow_id );
+				$cleanup->cleanup_job_data_packets( $job_id, $context );
 			}
-			$this->db_jobs->complete_job( $job_id, $status_override );
 
 			do_action(
 				'datamachine_log',
@@ -453,10 +469,6 @@ class ExecuteStepAbility {
 					'status' => $status_override,
 				)
 			);
-
-			$cleanup = new FileCleanup();
-			$context = datamachine_get_file_context( $flow_id );
-			$cleanup->cleanup_job_data_packets( $job_id, $context );
 
 			do_action(
 				'datamachine_log',
@@ -560,13 +572,15 @@ class ExecuteStepAbility {
 				);
 			}
 
-			// Notify lifecycle handlers after the full pipeline succeeds.
-			$this->handleStepLifecycleCompleted( $job_id );
+			$transition = $this->db_jobs->transition_job_status_result( $job_id, JobStatus::COMPLETED, true );
+			if ( $transition['changed'] ) {
+				// Notify lifecycle handlers after the full pipeline succeeds.
+				$this->handleStepLifecycleCompleted( $job_id );
 
-			$this->db_jobs->complete_job( $job_id, JobStatus::COMPLETED );
-			$cleanup = new FileCleanup();
-			$context = datamachine_get_file_context( $flow_id );
-			$cleanup->cleanup_job_data_packets( $job_id, $context );
+				$cleanup = new FileCleanup();
+				$context = datamachine_get_file_context( $flow_id );
+				$cleanup->cleanup_job_data_packets( $job_id, $context );
+			}
 
 			do_action(
 				'datamachine_log',
