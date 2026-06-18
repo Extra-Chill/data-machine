@@ -442,7 +442,7 @@ class MemoryCommand extends BaseCommand {
 	 * ## EXAMPLES
 	 *
 	 *     # Search MEMORY.md (default)
-	 *     wp datamachine memory search "homeboy"
+	 *     wp datamachine memory search "project"
 	 *
 	 *     # Search SOUL.md
 	 *     wp datamachine memory search "identity" --file=SOUL.md
@@ -539,7 +539,7 @@ class MemoryCommand extends BaseCommand {
 	 *     wp datamachine memory daily delete 2026-02-24
 	 *
 	 *     # Search daily memory
-	 *     wp datamachine memory daily search "homeboy"
+	 *     wp datamachine memory daily search "project"
 	 *
 	 *     # Search with date range
 	 *     wp datamachine memory daily search "deploy" --from=2026-02-01 --to=2026-02-28

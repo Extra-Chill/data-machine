@@ -40,15 +40,14 @@ class AgentAbilities {
 	 * requests, where this class hooks `registerAbilities()` onto the action
 	 * before it fires.
 	 *
-	 * WP Codebox sandbox runs (WordPress Playground) load Data Machine in a
-	 * fundamentally different order: `run-php` boots WordPress through
-	 * `wp-load.php` — which fires `init` and lazily initializes the abilities
-	 * registry, completing the one-shot `wp_abilities_api_init` action — and
-	 * only THEN `require_once`s the plugin file. By the time this class is
+	 * Some headless runtimes load Data Machine after WordPress has already
+	 * booted through `wp-load.php` — which fires `init` and lazily initializes
+	 * the abilities registry, completing the one-shot `wp_abilities_api_init`
+	 * action — and only THEN include the plugin file. By the time this class is
 	 * instantiated, the public registration window has already closed, so
 	 * `wp_register_ability()` would `_doing_it_wrong()` and return null,
-	 * leaving `datamachine/run-agent-bundle` unregistered for the very sandbox
-	 * runs that need it.
+	 * leaving `datamachine/run-agent-bundle` unregistered for the runs that
+	 * need it.
 	 *
 	 * WordPress core only enforces the lifecycle in the `wp_register_ability()`
 	 * wrapper; `WP_Abilities_Registry::register()` itself has no such guard and
@@ -96,7 +95,7 @@ class AgentAbilities {
 			add_action( 'wp_abilities_api_init', array( $this, 'registerAbilities' ) );
 			self::$registered = true;
 		} else {
-			// Post-lifecycle (headless / WP Codebox sandbox load order): the
+			// Post-lifecycle (headless runtime load order): the
 			// init action has already fired before this plugin file was
 			// included, so neither the in-lifecycle nor the hook path will run.
 			// Register immediately via the late path in registerAbility().

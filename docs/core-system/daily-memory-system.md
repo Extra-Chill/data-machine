@@ -233,9 +233,9 @@ wp_execute_ability('datamachine/daily-memory-write', [
     'mode'    => 'append',
 ]);
 
-// Search for mentions of "homeboy"
+// Search for mentions of "project"
 wp_execute_ability('datamachine/search-daily-memory', [
-    'query' => 'homeboy',
+    'query' => 'project',
     'from'  => '2026-03-01',
     'to'    => '2026-03-31',
 ]);

@@ -28,7 +28,7 @@ $assert( 'fixture avoids direct table writes', ! str_contains( $fixture, '$wpdb-
 $assert( 'fixture is not a registered WP-CLI command', ! str_contains( $fixture, 'WP_CLI::add_command' ) );
 $assert( 'fixture supports setup', str_contains( $fixture, "'setup'" ) );
 $assert( 'fixture supports cleanup', str_contains( $fixture, "'cleanup'" ) );
-$assert( 'fixture documents Homeboy Rigs usage', str_contains( $readme, 'Homeboy Rigs' ) );
+$assert( 'fixture documents generic setup and cleanup contract', str_contains( $readme, 'benchmark setup and cleanup contract' ) );
 
 if ( ! empty( $failures ) ) {
 	echo "\nFAILED: " . count( $failures ) . " admin scale benchmark fixture assertions failed.\n";
