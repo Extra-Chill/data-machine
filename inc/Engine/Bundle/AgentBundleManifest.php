@@ -150,12 +150,25 @@ final class AgentBundleManifest {
 			throw new BundleValidationException( 'manifest.json agent.agent_config must be an object.' );
 		}
 
-		return array(
+		$validated = array(
 			'slug'         => $agent['slug'],
 			'label'        => $agent['label'],
 			'description'  => $agent['description'],
 			'agent_config' => $agent['agent_config'],
 		);
+
+		// Carry the agent's site scope through the round-trip. `null` means
+		// network-wide; a positive integer means a specific blog. Anything else
+		// (legacy `'site'`, empty string, absent key) is "unspecified" and is
+		// omitted so the importer never re-pins the agent to the installing blog.
+		if ( array_key_exists( 'site_scope', $agent ) ) {
+			$scope = BundleSchema::normalize_agent_site_scope( $agent['site_scope'] );
+			if ( BundleSchema::SITE_SCOPE_UNSPECIFIED !== $scope ) {
+				$validated['site_scope'] = $scope;
+			}
+		}
+
+		return $validated;
 	}
 
 	private static function validate_included( array $included ): array {

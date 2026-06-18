@@ -355,6 +355,10 @@ class AgentAbilities {
 								'type'        => 'object',
 								'description' => 'Agent configuration object.',
 							),
+							'site_scope' => array(
+								'type'        => array( 'integer', 'null' ),
+								'description' => 'Site scope for the agent. Omit or null for network-wide (resolves on every site); a blog ID scopes the agent to that single site. Default network-wide.',
+							),
 						),
 					),
 					'output_schema'       => array(
@@ -366,6 +370,7 @@ class AgentAbilities {
 							'agent_name' => array( 'type' => 'string' ),
 							'owner_id'   => array( 'type' => 'integer' ),
 							'agent_dir'  => array( 'type' => 'string' ),
+							'site_scope' => array( 'type' => array( 'integer', 'null' ) ),
 							'message'    => array( 'type' => 'string' ),
 							'error'      => array( 'type' => 'string' ),
 						),
@@ -1913,6 +1918,21 @@ class AgentAbilities {
 		$owner_id = (int) ( $input['owner_id'] ?? 0 );
 		$config   = $input['config'] ?? array();
 
+		// Scope is first-class on create. Default (key absent) is network-wide
+		// via the DB column default. An explicit null also means network-wide;
+		// a positive integer scopes the agent to that single blog.
+		$site_scope = false;
+		if ( array_key_exists( 'site_scope', $input ) ) {
+			$scope_input = $input['site_scope'];
+			if ( null === $scope_input || '' === $scope_input ) {
+				$site_scope = null;
+			} elseif ( is_numeric( $scope_input ) && (int) $scope_input > 0 ) {
+				$site_scope = (int) $scope_input;
+			} else {
+				$site_scope = null;
+			}
+		}
+
 		if ( empty( $slug ) ) {
 			return array(
 				'success' => false,
@@ -2006,7 +2026,7 @@ class AgentAbilities {
 			);
 		}
 
-		$agent_id = $agents_repo->create_if_missing( $slug, $name, $owner_id, $config );
+		$agent_id = $agents_repo->create_if_missing( $slug, $name, $owner_id, $config, $site_scope );
 
 		if ( ! $agent_id ) {
 			return array(
@@ -2052,6 +2072,7 @@ class AgentAbilities {
 			'agent_name' => $name,
 			'owner_id'   => $owner_id,
 			'agent_dir'  => $agent_dir,
+			'site_scope' => ( false === $site_scope ) ? null : $site_scope,
 			'message'    => sprintf( 'Agent "%s" created (ID: %d).', $slug, $agent_id ),
 		);
 	}
