@@ -9,6 +9,10 @@ namespace DataMachine\Core;
 
 defined( 'ABSPATH' ) || exit;
 
+if ( ! class_exists( StepResult::class ) ) {
+	require_once __DIR__ . '/StepResult.php';
+}
+
 /**
  * Normalizes step execution status separately from DataPacket transport.
  */
@@ -40,7 +44,7 @@ class StepExecutionResult {
 	 *
 	 * @param mixed  $step_output Step return value.
 	 * @param string $step_type   Step type identifier.
-	 * @return array{status: string, packets: array, reason: string, error: ?string, diagnostics: array, terminal_status: ?string, success: bool, packet_count: int}
+	 * @return array{status: string, packets: array, reason: string, error: ?string, diagnostics: array, terminal_status: ?string, success: bool, packet_count: int, step_result: array}
 	 */
 	public static function fromStepOutput( $step_output, string $step_type = '' ): array {
 		if ( self::isExplicitResult( $step_output ) ) {
@@ -48,6 +52,7 @@ class StepExecutionResult {
 			$status  = self::normalizeStatus( $step_output['status'] ?? '' );
 			$reason  = is_scalar( $step_output['reason'] ?? null ) ? self::sanitizeReason( $step_output['reason'] ) : '';
 			$error   = self::normalizeError( $step_output['error'] ?? ( $step_output['error_message'] ?? null ) );
+			$context = self::envelopeContextFromOutput( $step_output );
 
 			if ( '' === $status ) {
 				$classified = self::classify( $packets, $step_type );
@@ -62,7 +67,7 @@ class StepExecutionResult {
 			$terminal_status = $step_output['terminal_status'] ?? null;
 			$terminal_status = is_scalar( $terminal_status ) && '' !== trim( (string) $terminal_status ) ? trim( (string) $terminal_status ) : null;
 
-			return self::buildResult( $status, $packets, $reason, $terminal_status, $error );
+			return self::buildResult( $status, $packets, $reason, $terminal_status, $error, array(), $context );
 		}
 
 		return self::classify( self::normalizePackets( $step_output ), $step_type );
@@ -73,7 +78,7 @@ class StepExecutionResult {
 	 *
 	 * @param array  $data_packets Returned data packets.
 	 * @param string $step_type    Step type identifier.
-	 * @return array{status: string, packets: array, reason: string, error: ?string, diagnostics: array, terminal_status: ?string, success: bool, packet_count: int}
+	 * @return array{status: string, packets: array, reason: string, error: ?string, diagnostics: array, terminal_status: ?string, success: bool, packet_count: int, step_result: array}
 	 */
 	public static function classify( array $data_packets, string $step_type = '' ): array {
 		$data_packets = self::normalizePackets( $data_packets );
@@ -141,13 +146,13 @@ class StepExecutionResult {
 		);
 	}
 
-	private static function buildResult( string $status, array $packets, string $reason, ?string $terminal_status, ?string $error = null, array $diagnostics = array() ): array {
+	private static function buildResult( string $status, array $packets, string $reason, ?string $terminal_status, ?string $error = null, array $diagnostics = array(), array $envelope_context = array() ): array {
 		$status = self::normalizeStatus( $status );
 		if ( '' === $status ) {
 			$status = self::STATUS_FAILED;
 		}
 
-		return array(
+		$result = array(
 			'status'          => $status,
 			'packets'         => $packets,
 			'reason'          => self::sanitizeReason( $reason ),
@@ -156,6 +161,22 @@ class StepExecutionResult {
 			'terminal_status' => $terminal_status,
 			'success'         => self::STATUS_SUCCEEDED === $status,
 			'packet_count'    => count( $packets ),
+		);
+
+		$result['step_result'] = StepResult::fromExecutionResult( $result, $envelope_context );
+
+		return $result;
+	}
+
+	private static function envelopeContextFromOutput( array $step_output ): array {
+		return array_filter(
+			array(
+				'outputs'       => is_array( $step_output['outputs'] ?? null ) ? $step_output['outputs'] : null,
+				'artifact_refs' => is_array( $step_output['artifact_refs'] ?? null ) ? $step_output['artifact_refs'] : ( is_array( $step_output['artifacts'] ?? null ) ? $step_output['artifacts'] : null ),
+				'packet_refs'   => is_array( $step_output['packet_refs'] ?? null ) ? $step_output['packet_refs'] : null,
+				'replay'        => is_array( $step_output['replay'] ?? null ) ? $step_output['replay'] : null,
+			),
+			fn( $value ) => null !== $value
 		);
 	}
 
