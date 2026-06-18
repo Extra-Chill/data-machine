@@ -126,10 +126,10 @@ public function register(): void {
 
 ## Testing
 
-Ability coverage lives in focused smoke tests under `tests/` rather than a separate `tests/Unit/Abilities/` tree. The ability-related smoke tests cover registration, schema contracts, permission contexts, chat/tool integration, source inventory, queue behavior, taxonomy cleanup, auth scoping, and wp-ai-client runtime boundaries. Run them through Homeboy or directly through the repository's PHP smoke harness:
+Ability coverage lives in focused smoke tests under `tests/` rather than a separate `tests/Unit/Abilities/` tree. The ability-related smoke tests cover registration, schema contracts, permission contexts, chat/tool integration, source inventory, queue behavior, taxonomy cleanup, auth scoping, and wp-ai-client runtime boundaries. Run them through the repository's configured test command or directly through the PHP smoke harness:
 
 ```bash
-homeboy test data-machine
+php tests/lightweight-ability-manifest-smoke.php
 ```
 
 ## WP-CLI Integration

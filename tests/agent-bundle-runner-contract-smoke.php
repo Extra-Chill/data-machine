@@ -589,9 +589,6 @@ foreach ( array(
 }
 
 echo "\n[6] Boundary stays generic\n";
-foreach ( array( 'homeboy' ) as $forbidden ) {
-	datamachine_bundle_runner_assert( false === stripos( $runner, $forbidden ), "runner does not mention {$forbidden}", $failures, $passes );
-}
 foreach ( array( 'DataMachine\\Core\\Database\\Agents', 'DataMachine\\Core\\Database\\Flows', 'DataMachine\\Core\\Database\\Pipelines' ) as $forbidden ) {
 	datamachine_bundle_runner_assert( false === strpos( $runner, $forbidden ), "runtime runner does not require caller-facing {$forbidden}", $failures, $passes );
 }

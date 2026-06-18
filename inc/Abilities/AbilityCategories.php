@@ -67,7 +67,7 @@ class AbilityCategories {
 		foreach ( self::get_category_definitions() as $slug => $args ) {
 			if ( $late ) {
 				// Late path: the categories-init action has already completed
-				// (headless / WP Codebox sandbox load order — see
+				// (headless runtime load order — see
 				// ensure_registered()). The public helper would
 				// `_doing_it_wrong()`, so register through the registry
 				// instance directly, which core permits any time after `init`.
@@ -94,12 +94,12 @@ class AbilityCategories {
 	 *      land in this same dispatch pass.
 	 *   2. `! did_action( wp_abilities_api_categories_init )` — the action
 	 *      has not fired yet. Attach a hook for the lazy fire.
-	 *   3. otherwise — the action has already fired and completed. This happens
-	 *      in headless runtimes (WP Codebox sandbox / WordPress Playground)
-	 *      where `run-php` boots WordPress through `wp-load.php` — firing the
-	 *      one-shot `wp_abilities_api_categories_init` — and only THEN includes
-	 *      the plugin file. Register through the registry instance directly via
-	 *      `register()`'s late path so category-bound abilities (e.g.
+	 *   3. otherwise — the action has already fired and completed. This can
+	 *      happen in headless runtimes where WordPress boots before including
+	 *      the plugin file, firing the one-shot
+	 *      `wp_abilities_api_categories_init` action first. Register through the
+	 *      registry instance directly via `register()`'s late path so
+	 *      category-bound abilities (e.g.
 	 *      `datamachine/run-agent-bundle`) are not silently dropped. Core only
 	 *      enforces the lifecycle in the `wp_register_ability_category()`
 	 *      wrapper, not in `WP_Ability_Categories_Registry::register()`.
