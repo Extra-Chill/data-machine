@@ -104,6 +104,21 @@ class DirectoryManager {
 	}
 
 	/**
+	 * Get the content-addressed DataPacket directory for a hash.
+	 *
+	 * @param int    $schema_version Packet store schema version.
+	 * @param string $content_hash Content hash.
+	 * @return string Full path to packet directory.
+	 */
+	public function get_data_packet_store_directory( int $schema_version, string $content_hash ): string {
+		$upload_dir = wp_upload_dir();
+		$base       = trailingslashit( $upload_dir['basedir'] ) . self::REPOSITORY_DIR;
+		$prefix     = substr( $content_hash, 0, 2 );
+
+		return "{$base}/data-packets/v{$schema_version}/{$prefix}";
+	}
+
+	/**
 	 * Get flow files directory path
 	 *
 	 * @param int|string $pipeline_id Pipeline ID or 'direct' for direct execution

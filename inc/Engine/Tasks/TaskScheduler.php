@@ -26,6 +26,7 @@ use DataMachine\Core\ActionScheduler\BatchScheduler;
 use DataMachine\Core\Agents\AgentIdentityResolver;
 use DataMachine\Core\AbilityResult;
 use DataMachine\Core\Database\Jobs\Jobs;
+use DataMachine\Core\DataPacketStore;
 use DataMachine\Core\JobStatus;
 use DataMachine\Engine\AI\System\Tasks\SystemTask;
 
@@ -90,6 +91,7 @@ class TaskScheduler {
 	 */
 	public static function schedule( string $taskType, array $params, array $context = array(), int $parentJobId = 0 ): int|false {
 		self::$last_schedule_error = null;
+		$params                    = DataPacketStore::hydrate_packet_collections_in_value( $params );
 
 		if ( ! TaskRegistry::isRegistered( $taskType ) ) {
 			$message = "TaskScheduler: Unknown task type '{$taskType}'";
