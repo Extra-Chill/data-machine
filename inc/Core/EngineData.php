@@ -114,10 +114,115 @@ class EngineData {
 			return false;
 		}
 
-		$current = self::retrieve( $job_id );
-		$merged  = array_replace_recursive( $current, $data );
+		$result = self::mutate(
+			$job_id,
+			static fn( array $current ): array => array_replace_recursive( $current, $data ),
+			'merge'
+		);
 
-		return self::persist( $job_id, $merged );
+		return ! empty( $result['success'] );
+	}
+
+	/**
+	 * Mutate engine data with compare-and-swap retries to preserve concurrent writes.
+	 *
+	 * @param int      $job_id       Job ID.
+	 * @param callable $callback     Receives the latest snapshot and returns the next snapshot, or null to abort.
+	 * @param string   $event_type   Mutation event type for diagnostics.
+	 * @param int      $max_attempts Maximum CAS attempts.
+	 * @return array{success:bool,conflict:bool,attempts:int,snapshot:array,error:string|null}
+	 */
+	public static function mutate( int $job_id, callable $callback, string $event_type = 'mutation', int $max_attempts = 3 ): array {
+		if ( $job_id <= 0 ) {
+			return array(
+				'success'  => false,
+				'conflict' => false,
+				'attempts' => 0,
+				'snapshot' => array(),
+				'error'    => 'invalid_job_id',
+			);
+		}
+
+		$db_jobs      = new Jobs();
+		$max_attempts = max( 1, $max_attempts );
+		$event_type   = sanitize_key( $event_type );
+
+		for ( $attempt = 1; $attempt <= $max_attempts; $attempt++ ) {
+			$current = $db_jobs->retrieve_engine_data( $job_id );
+			$current = is_array( $current ) ? $current : array();
+			$next    = $callback( $current );
+
+			if ( null === $next ) {
+				return array(
+					'success'  => false,
+					'conflict' => false,
+					'attempts' => $attempt,
+					'snapshot' => $current,
+					'error'    => 'mutation_aborted',
+				);
+			}
+
+			if ( ! is_array( $next ) ) {
+				return array(
+					'success'  => false,
+					'conflict' => false,
+					'attempts' => $attempt,
+					'snapshot' => $current,
+					'error'    => 'invalid_mutation_result',
+				);
+			}
+
+			if ( $next === $current ) {
+				return array(
+					'success'  => true,
+					'conflict' => false,
+					'attempts' => $attempt,
+					'snapshot' => $current,
+					'error'    => null,
+				);
+			}
+
+			$result = $db_jobs->compare_and_swap_engine_data( $job_id, $current, $next );
+			if ( ! empty( $result['updated'] ) ) {
+				wp_cache_set( $job_id, $next, 'datamachine_engine_data' );
+				return array(
+					'success'  => true,
+					'conflict' => false,
+					'attempts' => $attempt,
+					'snapshot' => $next,
+					'error'    => null,
+				);
+			}
+
+			if ( empty( $result['conflict'] ) ) {
+				return array(
+					'success'  => false,
+					'conflict' => false,
+					'attempts' => $attempt,
+					'snapshot' => $current,
+					'error'    => (string) ( $result['error'] ?? 'persist_failed' ),
+				);
+			}
+
+			do_action(
+				'datamachine_log',
+				'warning',
+				'EngineData mutation conflict, retrying latest snapshot',
+				array(
+					'job_id'     => $job_id,
+					'event_type' => $event_type,
+					'attempt'    => $attempt,
+				)
+			);
+		}
+
+		return array(
+			'success'  => false,
+			'conflict' => true,
+			'attempts' => $max_attempts,
+			'snapshot' => self::retrieve( $job_id ),
+			'error'    => 'conflict_exhausted',
+		);
 	}
 
 	/**
@@ -134,12 +239,23 @@ class EngineData {
 			return null;
 		}
 
-		$projection = EngineStateLedger::append( self::retrieve( $job_id ), $type, $patch, $metadata );
-		if ( null === $projection ) {
-			return null;
-		}
+		$event  = null;
+		$result = self::mutate(
+			$job_id,
+			static function ( array $current ) use ( $type, $patch, $metadata, &$event ): ?array {
+				$projection = EngineStateLedger::append( $current, $type, $patch, $metadata );
+				if ( null === $projection ) {
+					return null;
+				}
 
-		return self::persist( $job_id, $projection['snapshot'] ) ? $projection['event'] : null;
+				$event = $projection['event'];
+
+				return $projection['snapshot'];
+			},
+			$type
+		);
+
+		return ! empty( $result['success'] ) ? $event : null;
 	}
 
 	/**
