@@ -83,6 +83,99 @@ class JobArtifacts {
 	}
 
 	/**
+	 * Hydrate a portable job artifact ref into verified artifact content.
+	 *
+	 * Public consumers should use artifact_ref plus this resolver instead of
+	 * relying on local_debug paths, absolute filesystem paths, or URLs.
+	 *
+	 * @param string $artifact_ref Portable artifact ref.
+	 * @param array  $engine_data  Optional engine_data snapshot containing artifact_files.
+	 * @return array{success: bool, artifact?: array<string,mixed>, content?: string, bytes?: int, sha256?: string, verified?: bool, error?: string}
+	 */
+	public function hydrate_artifact_ref( string $artifact_ref, array $engine_data = array() ): array {
+		$resolved = $this->resolve_artifact_ref( $artifact_ref, $engine_data );
+		if ( empty( $resolved['success'] ) || ! is_array( $resolved['artifact'] ?? null ) ) {
+			return array(
+				'success' => false,
+				'error'   => (string) ( $resolved['error'] ?? 'Artifact metadata was not found.' ),
+			);
+		}
+
+		$artifact      = $resolved['artifact'];
+		$content       = null;
+		$resolver_args = array(
+			'artifact_ref' => $artifact_ref,
+			'artifact'     => $artifact,
+			'engine_data'  => $engine_data,
+		);
+
+		$filtered = apply_filters( 'datamachine_job_artifact_ref_content', null, $resolver_args );
+		if ( is_string( $filtered ) ) {
+			$content = $filtered;
+		} elseif ( is_array( $filtered ) && isset( $filtered['content'] ) && is_string( $filtered['content'] ) ) {
+			$content = $filtered['content'];
+		}
+
+		if ( null === $content ) {
+			$path = $this->artifact_storage_path( $artifact );
+			if ( '' !== $path ) {
+				$read = file_get_contents( $path ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
+				if ( false !== $read ) {
+					$content = $read;
+				}
+			}
+		}
+
+		if ( null === $content ) {
+			return array(
+				'success' => false,
+				'error'   => 'Artifact content is unavailable from configured artifact storage.',
+			);
+		}
+
+		$bytes  = strlen( $content );
+		$sha256 = hash( 'sha256', $content );
+		$verify = $this->verify_artifact_content( $artifact, $bytes, $sha256 );
+		if ( empty( $verify['success'] ) ) {
+			return array(
+				'success'  => false,
+				'artifact' => $this->public_artifact_metadata( $artifact ),
+				'bytes'    => $bytes,
+				'sha256'   => $sha256,
+				'error'    => (string) ( $verify['error'] ?? 'Artifact content failed integrity verification.' ),
+			);
+		}
+
+		return array(
+			'success'  => true,
+			'artifact' => $this->public_artifact_metadata( $artifact ),
+			'content'  => $content,
+			'bytes'    => $bytes,
+			'sha256'   => $sha256,
+			'verified' => true,
+		);
+	}
+
+	/**
+	 * Stream verified artifact content to a caller-provided writer.
+	 *
+	 * @param string   $artifact_ref Portable artifact ref.
+	 * @param callable $writer       Receives the content string once verified.
+	 * @param array    $engine_data  Optional engine_data snapshot containing artifact_files.
+	 * @return array{success: bool, artifact?: array<string,mixed>, bytes?: int, sha256?: string, verified?: bool, error?: string}
+	 */
+	public function stream_artifact_ref( string $artifact_ref, callable $writer, array $engine_data = array() ): array {
+		$hydrated = $this->hydrate_artifact_ref( $artifact_ref, $engine_data );
+		if ( empty( $hydrated['success'] ) || ! is_string( $hydrated['content'] ?? null ) ) {
+			return $hydrated;
+		}
+
+		$writer( $hydrated['content'] );
+		unset( $hydrated['content'] );
+		return $hydrated;
+	}
+
+	/**
 	 * Build a deterministic artifact payload for a job.
 	 *
 	 * @param int   $job_id                    Job ID.
@@ -530,6 +623,60 @@ class JobArtifacts {
 		}
 
 		return (int) $matches[1];
+	}
+
+	private function artifact_storage_path( array $artifact ): string {
+		$relative_path = trim( (string) ( $artifact['relative_path'] ?? '' ) );
+		if ( '' === $relative_path || str_contains( $relative_path, "\0" ) || str_starts_with( $relative_path, '/' ) || preg_match( '#^[A-Za-z]:[\\/]#', $relative_path ) ) {
+			return '';
+		}
+
+		$upload_dir = wp_upload_dir();
+		$base_root  = (string) ( $upload_dir['basedir'] ?? '' );
+		if ( '' === trim( $base_root ) ) {
+			return '';
+		}
+
+		$base_dir = realpath( $base_root );
+		if ( false === $base_dir ) {
+			return '';
+		}
+
+		$candidate = trailingslashit( $base_dir ) . ltrim( str_replace( '\\', '/', $relative_path ), '/' );
+		$real_path = realpath( $candidate );
+		if ( false === $real_path || ! is_file( $real_path ) ) {
+			return '';
+		}
+
+		$base_prefix = trailingslashit( $base_dir );
+		return str_starts_with( $real_path, $base_prefix ) ? $real_path : '';
+	}
+
+	/** @return array{success: bool, error?: string} */
+	private function verify_artifact_content( array $artifact, int $bytes, string $sha256 ): array {
+		$expected_bytes = isset( $artifact['bytes'] ) ? (int) $artifact['bytes'] : null;
+		if ( null !== $expected_bytes && $expected_bytes !== $bytes ) {
+			return array(
+				'success' => false,
+				'error'   => sprintf( 'Artifact byte count mismatch: expected %d, got %d.', $expected_bytes, $bytes ),
+			);
+		}
+
+		$expected_sha256 = strtolower( trim( (string) ( $artifact['sha256'] ?? '' ) ) );
+		if ( '' !== $expected_sha256 && ! hash_equals( $expected_sha256, $sha256 ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'Artifact sha256 mismatch.',
+			);
+		}
+
+		return array( 'success' => true );
+	}
+
+	/** @return array<string,mixed> */
+	private function public_artifact_metadata( array $artifact ): array {
+		unset( $artifact['local_debug'] );
+		return $artifact;
 	}
 
 	/** @return array<string,mixed> */

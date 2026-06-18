@@ -1716,6 +1716,65 @@ class JobsCommand extends BaseCommand {
 	}
 
 	/**
+	 * Hydrate verified artifact content by portable artifact ref.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <artifact_ref>
+	 * : The portable artifact ref to hydrate.
+	 *
+	 * [--format=<format>]
+	 * : Output format. `raw` streams the verified content bytes.
+	 * ---
+	 * default: json
+	 * options:
+	 *   - json
+	 *   - raw
+	 * ---
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp datamachine jobs artifact-content datamachine://jobs/844/artifacts/tool-trace --format=raw
+	 *
+	 * @subcommand artifact-content
+	 */
+	public function artifact_content( array $args, array $assoc_args ): void {
+		$artifact_ref = isset( $args[0] ) ? (string) $args[0] : '';
+		if ( '' === trim( $artifact_ref ) ) {
+			WP_CLI::error( 'artifact_ref is required.' );
+			return;
+		}
+
+		$format    = (string) ( $assoc_args['format'] ?? 'json' );
+		$artifacts = new JobArtifacts();
+		if ( 'raw' === $format ) {
+			$result = $artifacts->stream_artifact_ref(
+				$artifact_ref,
+				static function ( string $content ): void {
+					fwrite( STDOUT, $content ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fwrite
+				}
+			);
+			if ( empty( $result['success'] ) ) {
+				WP_CLI::error( $result['error'] ?? 'Failed to hydrate artifact content.' );
+			}
+			return;
+		}
+
+		$result = $artifacts->hydrate_artifact_ref( $artifact_ref );
+		if ( empty( $result['success'] ) ) {
+			WP_CLI::error( $result['error'] ?? 'Failed to hydrate artifact content.' );
+			return;
+		}
+
+		$content = (string) ( $result['content'] ?? '' );
+		unset( $result['content'] );
+		$result['content_base64'] = base64_encode( $content ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- Encodes verified artifact bytes for JSON-safe transport.
+		$result['encoding']       = 'base64';
+
+		WP_CLI::log( wp_json_encode( $result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE ) );
+	}
+
+	/**
 	 * Locate a pipeline transcript by metadata for jobs created before engine_data
 	 * stored transcript_session_id.
 	 *
