@@ -11,6 +11,8 @@
 
 namespace DataMachine\Core\FilesRepository;
 
+use DataMachine\Core\DataPacketStore;
+
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
@@ -204,9 +206,22 @@ class FileStorage {
 			}
 		}
 
-		// Merge new data (newest first)
+		$packet_refs = DataPacketStore::store_many( $data );
+		if ( false === $packet_refs ) {
+			do_action(
+				'datamachine_log',
+				'error',
+				'FileStorage: Failed to store content-addressed data packets.',
+				array(
+					'job_id' => $job_id,
+				)
+			);
+			return false;
+		}
+
+		// Merge new data (newest first). New writes store refs; retrieval hydrates them.
 		if ( ! empty( $data ) ) {
-			$accumulated_data = array_merge( $data, $accumulated_data );
+			$accumulated_data = array_merge( $packet_refs, $accumulated_data );
 		}
 
 		// Serialize and write
@@ -240,7 +255,7 @@ class FileStorage {
 			'is_data_reference' => true,
 			'job_id'            => $job_id,
 			'file_path'         => $file_path,
-			'stored_at'         => time(),
+			'packet_refs'       => $packet_refs,
 		);
 	}
 
@@ -296,6 +311,6 @@ class FileStorage {
 			return null;
 		}
 
-		return $data;
+		return is_array( $data ) ? DataPacketStore::hydrate_many( $data ) : $data;
 	}
 }

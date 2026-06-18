@@ -35,6 +35,7 @@
 namespace DataMachine\Core\ActionScheduler;
 
 use DataMachine\Core\Database\Jobs\Jobs;
+use DataMachine\Core\DataPacketStore;
 use DataMachine\Core\PluginSettings;
 
 defined( 'ABSPATH' ) || exit;
@@ -153,6 +154,7 @@ class BatchScheduler {
 		string $context = '',
 		string $completion_strategy = ''
 	): array {
+		$items      = array_map( array( DataPacketStore::class, 'reference_packet_collections_in_value' ), $items );
 		$total      = count( $items );
 		$chunk_size = self::chunkSize( $context );
 
@@ -269,6 +271,7 @@ class BatchScheduler {
 		$scheduled = 0;
 
 		foreach ( $chunk as $item ) {
+			$item   = DataPacketStore::hydrate_packet_collections_in_value( $item );
 			$result = $createItem( $item, $extra, $parent_job_id );
 			if ( $result ) {
 				++$scheduled;

@@ -11,6 +11,8 @@
 
 namespace DataMachine\Core\FilesRepository;
 
+use DataMachine\Core\DataPacketStore;
+
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
@@ -50,6 +52,6 @@ class FileRetrieval {
 		}
 
 		$data = json_decode( $json_data, true );
-		return is_array( $data ) ? $data : array();
+		return is_array( $data ) ? DataPacketStore::hydrate_many( $data ) : array();
 	}
 }
