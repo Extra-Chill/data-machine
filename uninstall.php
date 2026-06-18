@@ -13,7 +13,7 @@ if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
 	exit;
 }
 
-	if ( is_multisite() ) {
+if ( is_multisite() ) {
 	// Clean up every subsite on the network.
 	$datamachine_sites = get_sites( array( 'fields' => 'ids' ) );
 	foreach ( $datamachine_sites as $datamachine_blog_id ) {

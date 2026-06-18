@@ -176,15 +176,19 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 				continue;
 			}
 
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
+			// $column_list is built solely from a fixed allowlist of column names
+			// intersected against the live table columns (see
+			// intersect_migration_columns), never from user input — so interpolating
+			// it into the column list is safe. Table names use %i placeholders.
+			// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 			$result = $wpdb->query(
-				// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 				$wpdb->prepare(
 					"INSERT IGNORE INTO %i ({$column_list}) SELECT {$column_list} FROM %i",
 					$network_table,
 					$site_table
 				)
 			);
+			// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 
 			$rows    = false !== $result ? (int) $result : 0;
 			$copied += $rows;
