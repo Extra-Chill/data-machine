@@ -99,7 +99,9 @@ namespace {
 	datamachine_engine_state_ledger_assert( 'snapshot-value' === ( $snapshot['existing'] ?? null ), 'snapshot compatibility preserves existing keys', $failures, $passes );
 	datamachine_engine_state_ledger_assert( 'alpha' === ( $snapshot['tool_outputs']['first'] ?? null ), 'snapshot projection includes appended patch data', $failures, $passes );
 	datamachine_engine_state_ledger_assert( true === ( $snapshot['nested']['before'] ?? null ) && true === ( $snapshot['nested']['after'] ?? null ), 'snapshot projection recursively merges patches', $failures, $passes );
-	datamachine_engine_state_ledger_assert( 'trace.json' === ( $ledger[1]['patch']['artifact_files']['trace'] ?? null ), 'ledger retains append-only patch evidence', $failures, $passes );
+	datamachine_engine_state_ledger_assert( in_array( 'artifact_files', $ledger[1]['patch_keys'] ?? array(), true ), 'ledger records compact patch keys', $failures, $passes );
+	datamachine_engine_state_ledger_assert( is_string( $ledger[1]['patch_hash'] ?? null ) && 0 === strpos( $ledger[1]['patch_hash'], 'sha256:' ), 'ledger records deterministic patch hash', $failures, $passes );
+	datamachine_engine_state_ledger_assert( ! array_key_exists( 'patch', $ledger[1] ?? array() ), 'ledger omits full patch payload by default', $failures, $passes );
 
 	if ( ! empty( $failures ) ) {
 		echo "\nFailures:\n";

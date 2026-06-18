@@ -121,13 +121,13 @@ class EngineData {
 	}
 
 	/**
-	 * Append a versioned state event and persist its patch as the current snapshot projection.
+	 * Append a compact state event trace and persist its patch as the current snapshot projection.
 	 *
 	 * @param int    $job_id   Job ID.
 	 * @param string $type     Generic event type.
 	 * @param array  $patch    Engine data patch to project onto the snapshot.
 	 * @param array  $metadata Optional event metadata.
-	 * @return array|null Appended ledger entry on success, null on failure.
+	 * @return array|null Appended trace entry on success, null on failure.
 	 */
 	public static function appendStateEvent( int $job_id, string $type, array $patch, array $metadata = array() ): ?array {
 		if ( $job_id <= 0 || '' === trim( $type ) ) {
@@ -141,7 +141,8 @@ class EngineData {
 			'version'     => $version,
 			'type'        => sanitize_key( $type ),
 			'recorded_at' => gmdate( 'c' ),
-			'patch'       => $patch,
+			'patch_keys'  => array_keys( $patch ),
+			'patch_hash'  => self::stableHash( $patch ),
 		);
 
 		if ( ! empty( $metadata ) ) {
@@ -170,6 +171,46 @@ class EngineData {
 		}
 
 		return $version + 1;
+	}
+
+	/**
+	 * Build a stable hash for a projected state patch.
+	 *
+	 * @param array $patch Engine data patch.
+	 * @return string sha256 hash prefixed for readability.
+	 */
+	private static function stableHash( array $patch ): string {
+		$normalized = self::sortRecursively( $patch );
+		$json       = wp_json_encode( $normalized );
+
+		if ( ! is_string( $json ) ) {
+			$json = serialize( $normalized );
+		}
+
+		return 'sha256:' . hash( 'sha256', $json );
+	}
+
+	/**
+	 * Recursively sort associative array keys for deterministic hashing.
+	 *
+	 * @param mixed $value Value to sort.
+	 * @return mixed Sorted value.
+	 */
+	private static function sortRecursively( $value ) {
+		if ( ! is_array( $value ) ) {
+			return $value;
+		}
+
+		$sorted = array();
+		foreach ( $value as $key => $item ) {
+			$sorted[ $key ] = self::sortRecursively( $item );
+		}
+
+		if ( array_keys( $sorted ) !== range( 0, count( $sorted ) - 1 ) ) {
+			ksort( $sorted );
+		}
+
+		return $sorted;
 	}
 
 	/**
