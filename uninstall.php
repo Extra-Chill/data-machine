@@ -13,7 +13,7 @@ if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
 	exit;
 }
 
-if ( is_multisite() ) {
+	if ( is_multisite() ) {
 	// Clean up every subsite on the network.
 	$datamachine_sites = get_sites( array( 'fields' => 'ids' ) );
 	foreach ( $datamachine_sites as $datamachine_blog_id ) {
@@ -21,6 +21,9 @@ if ( is_multisite() ) {
 		datamachine_uninstall_site();
 		restore_current_blog();
 	}
+
+	// Drop network-scoped tables once (base_prefix), after every subsite is done.
+	datamachine_uninstall_network_tables();
 
 	// Clean up network-wide options (stored via get_site_option / update_site_option).
 	datamachine_uninstall_network_options();
@@ -56,14 +59,22 @@ function datamachine_uninstall_site() {
 	// --- Database tables ---
 
 	if ( current_user_can( 'delete_plugins' ) || defined( 'WP_UNINSTALL_PLUGIN' ) ) {
-		// Drop tables in reverse dependency order.
+		// Drop per-site tables in reverse dependency order. The chat sessions
+		// table is network-scoped (base_prefix) and is dropped once in
+		// datamachine_uninstall_network_tables(), not here — dropping it per-site
+		// would destroy the shared table on the first subsite uninstall.
 		$datamachine_tables_to_drop = array(
 			$wpdb->prefix . 'datamachine_processed_items',
 			$wpdb->prefix . 'datamachine_jobs',
 			$wpdb->prefix . 'datamachine_flows',
 			$wpdb->prefix . 'datamachine_pipelines',
-			$wpdb->prefix . 'datamachine_chat_sessions',
 		);
+
+		// On single-site, base_prefix === prefix, so the network table is dropped
+		// here alongside the per-site tables (there is no separate network pass).
+		if ( ! is_multisite() ) {
+			$datamachine_tables_to_drop[] = $wpdb->base_prefix . 'datamachine_chat_sessions';
+		}
 
 		foreach ( $datamachine_tables_to_drop as $datamachine_table_name ) {
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
@@ -103,6 +114,31 @@ function datamachine_uninstall_site() {
 }
 
 /**
+ * Drop network-scoped tables once on multisite uninstall.
+ *
+ * Chat sessions live on base_prefix (shared across the network, like the
+ * agent identity tables), so the table must be dropped exactly once after
+ * every subsite's per-site cleanup has run — never per-site, which would
+ * destroy the shared table on the first subsite uninstall.
+ */
+function datamachine_uninstall_network_tables() {
+	global $wpdb;
+
+	if ( ! current_user_can( 'delete_plugins' ) && ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
+		return;
+	}
+
+	$datamachine_network_tables = array(
+		$wpdb->base_prefix . 'datamachine_chat_sessions',
+	);
+
+	foreach ( $datamachine_network_tables as $datamachine_network_table ) {
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$wpdb->query( $wpdb->prepare( 'DROP TABLE IF EXISTS %i', $datamachine_network_table ) );
+	}
+}
+
+/**
  * Clean up network-wide options on multisite.
  *
  * These are stored via get_site_option() / update_site_option() and shared
@@ -115,6 +151,7 @@ function datamachine_uninstall_network_options() {
 		'datamachine_search_config',
 		'datamachine_auth_data',
 		'datamachine_network_settings',
+		'datamachine_chat_sessions_network_migrated',
 	);
 
 	foreach ( $datamachine_network_options as $datamachine_option ) {

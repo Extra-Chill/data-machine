@@ -309,6 +309,7 @@ if ( did_action( 'plugins_loaded' ) ) {
 add_action( 'init', array( \DataMachine\Engine\AI\ComposableFileInvalidation::class, 'register_hooks' ) );
 
 require_once __DIR__ . '/Engine/AI/Directives/ClientContextDirective.php';
+require_once __DIR__ . '/Engine/AI/Directives/CrossSiteHandoffDirective.php';
 require_once __DIR__ . '/Engine/AI/Directives/AgentDailyMemoryDirective.php';
 require_once __DIR__ . '/Core/Steps/AI/Directives/PipelineSystemPromptDirective.php';
 require_once __DIR__ . '/Core/Steps/AI/Directives/PipelineMemoryFilesDirective.php';

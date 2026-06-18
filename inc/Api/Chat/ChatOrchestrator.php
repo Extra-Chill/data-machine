@@ -158,6 +158,15 @@ class ChatOrchestrator {
 			return self::sessionLockContentionError();
 		}
 
+		// --- Cross-site handoff detection ---
+		// Compare the host this session was last active on against the current
+		// request host. On a cross-site move, the handoff payload feeds the
+		// CrossSiteHandoffDirective so the agent reconciles the move. The
+		// current host is re-stamped into metadata below so the comparison is
+		// always against the most recent turn.
+		$current_host       = self::currentRequestHost();
+		$cross_site_handoff = self::buildCrossSiteHandoff( $session_metadata, $current_host );
+
 		// --- Build user message (text or multi-modal with attachments) ---
 		$attachments = $options['attachments'] ?? array();
 
@@ -181,6 +190,7 @@ class ChatOrchestrator {
 					'status'            => 'processing',
 					'started_at'        => current_time( 'mysql', true ),
 					'message_count'     => count( $messages ),
+					'last_seen_host'    => '' !== $current_host ? $current_host : ( $session_metadata['last_seen_host'] ?? '' ),
 					'consent_decisions' => array(
 						'store_transcript' => $transcript_consent_decision->to_array(),
 					),
@@ -229,6 +239,7 @@ class ChatOrchestrator {
 				'agent_slug'            => $agent_slug,
 				'interrupt_source'      => $interrupt_source,
 				'client_context'        => $options['client_context'] ?? array(),
+				'cross_site_handoff'    => $cross_site_handoff,
 				'tool_policy'           => is_array( $options['tool_policy'] ?? null ) ? $options['tool_policy'] : null,
 				'allow_only'            => is_array( $options['allow_only'] ?? null ) ? $options['allow_only'] : null,
 				'completion_assertions' => is_array( $options['completion_assertions'] ?? null ) ? $options['completion_assertions'] : null,
@@ -251,6 +262,7 @@ class ChatOrchestrator {
 			'message_count'     => count( $result['messages'] ),
 			'current_turn'      => $result['turn_count'],
 			'has_pending_tools' => ! $is_completed,
+			'last_seen_host'    => '' !== $current_host ? $current_host : ( $session_metadata['last_seen_host'] ?? '' ),
 		);
 		if ( ! empty( $loop_metadata['runtime_tool_pending_requests'] ) ) {
 			$metadata['runtime_tool_requests'] = array();
@@ -421,6 +433,11 @@ class ChatOrchestrator {
 			return self::sessionLockContentionError();
 		}
 
+		// Detect a cross-site resume the same way processChat does: compare the
+		// host the session was last active on against the current request host.
+		$current_host       = self::currentRequestHost();
+		$cross_site_handoff = self::buildCrossSiteHandoff( $metadata, $current_host );
+
 		// Recover the original modes array from the stored session.mode column.
 		// Sessions created from a multi-mode request (e.g. ['cluckin-chuck',
 		// 'chat']) persist as the comma-joined string 'cluckin-chuck,chat'.
@@ -448,6 +465,7 @@ class ChatOrchestrator {
 				'user_id'              => (int) ( $session['user_id'] ?? 0 ),
 				'agent_id'             => (int) ( $session['agent_id'] ?? 0 ),
 				'agent_slug'           => (string) ( $session['agent_slug'] ?? '' ),
+				'cross_site_handoff'   => $cross_site_handoff,
 			)
 		);
 
@@ -470,6 +488,7 @@ class ChatOrchestrator {
 			'message_count'     => count( $result['messages'] ),
 			'current_turn'      => $current_turn,
 			'has_pending_tools' => ! $is_completed,
+			'last_seen_host'    => '' !== $current_host ? $current_host : ( $metadata['last_seen_host'] ?? '' ),
 		);
 		if ( ! empty( $metadata['runtime_tool_requests'] ) ) {
 			$updated_metadata['runtime_tool_requests'] = $metadata['runtime_tool_requests'];
@@ -531,6 +550,51 @@ class ChatOrchestrator {
 		do_action( 'datamachine_chat_response_complete', $session_id, $continue_response, (int) ( $session['agent_id'] ?? 0 ), $user_id );
 
 		return $continue_response;
+	}
+
+	/**
+	 * Resolve the current request's site host.
+	 *
+	 * Chat sessions are network-wide, so a session can be resumed on a
+	 * different subsite than it was last active on. The host is derived from
+	 * live request state (the current site's home URL) — never hardcoded — so
+	 * cross-site handoff detection stays generic across the network.
+	 *
+	 * @return string Lowercased host, or '' when not resolvable.
+	 */
+	private static function currentRequestHost(): string {
+		if ( ! function_exists( 'home_url' ) ) {
+			return '';
+		}
+
+		$host = wp_parse_url( home_url( '/' ), PHP_URL_HOST );
+
+		return is_string( $host ) ? strtolower( $host ) : '';
+	}
+
+	/**
+	 * Build the cross-site handoff payload for a resumed session.
+	 *
+	 * Compares the host the session was last active on (stored per turn in
+	 * session metadata) against the current request host. Returns an empty
+	 * array when there is no prior host or the user has not changed sites, so
+	 * the handoff directive only fires on an actual cross-site move.
+	 *
+	 * @param array  $session_metadata Loaded session metadata.
+	 * @param string $current_host     Current request host.
+	 * @return array{previous_host:string,current_host:string}|array{} Handoff payload or empty.
+	 */
+	private static function buildCrossSiteHandoff( array $session_metadata, string $current_host ): array {
+		$previous_host = isset( $session_metadata['last_seen_host'] ) ? strtolower( (string) $session_metadata['last_seen_host'] ) : '';
+
+		if ( '' === $previous_host || '' === $current_host || $previous_host === $current_host ) {
+			return array();
+		}
+
+		return array(
+			'previous_host' => $previous_host,
+			'current_host'  => $current_host,
+		);
 	}
 
 	/**
@@ -863,6 +927,9 @@ class ChatOrchestrator {
 			}
 			if ( ! empty( $client_context ) ) {
 				$loop_context['client_context'] = $client_context;
+			}
+			if ( is_array( $options['cross_site_handoff'] ?? null ) && ! empty( $options['cross_site_handoff'] ) ) {
+				$loop_context['cross_site_handoff'] = $options['cross_site_handoff'];
 			}
 			if ( is_array( $options['completion_assertions'] ?? null ) ) {
 				$loop_context['completion_assertions'] = $options['completion_assertions'];

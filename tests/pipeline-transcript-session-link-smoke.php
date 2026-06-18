@@ -37,8 +37,8 @@ $assert(
 );
 
 $assert(
-	false !== strpos( $jobs_cli, 'metadata LIKE' ) && false !== strpos( $jobs_cli, 'datamachine_chat_sessions' ),
-	'metadata fallback searches pipeline transcript rows by job_id'
+	false !== strpos( $jobs_cli, 'metadata LIKE' ) && false !== strpos( $jobs_cli, 'Chat::get_prefixed_table_name()' ),
+	'metadata fallback searches pipeline transcript rows by job_id in the network chat sessions table'
 );
 
 echo "\n";
