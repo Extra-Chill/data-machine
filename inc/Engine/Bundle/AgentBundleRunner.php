@@ -14,6 +14,7 @@ use DataMachine\Core\Agents\AgentIdentityResolver;
 use DataMachine\Core\Database\Jobs\Jobs;
 use DataMachine\Core\DataPath;
 use DataMachine\Core\JobStatus;
+use DataMachine\Engine\AI\Tools\HostToolPolicy;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -88,6 +89,7 @@ final class AgentBundleRunner {
 		$initial_data['job_source']   = (string) ( $input['job_source'] ?? 'agent_bundle' );
 		$initial_data['job_label']    = (string) ( $input['job_label'] ?? ( $selection['flow_name'] ?? 'Agent Bundle Workflow' ) );
 		$this->apply_runtime_ability_tools( $initial_data, $input, $bundle );
+		$this->apply_runtime_host_tool_policy( $initial_data, $input );
 		$this->apply_runtime_model_config( $initial_data, $input );
 
 		if ( ! empty( $input['dry_run'] ) ) {
@@ -224,6 +226,37 @@ final class AgentBundleRunner {
 		$job_snapshot                  = is_array( $initial_data['job'] ?? null ) ? $initial_data['job'] : array();
 		$job_snapshot['ability_tools'] = $ability_tools;
 		$initial_data['job']           = $job_snapshot;
+	}
+
+	/**
+	 * Project the active host tool policy into the durable job snapshot.
+	 *
+	 * Agent bundle runs can outlive the launching PHP process, so environment-only
+	 * host policy must be captured before queued AI steps resolve tools.
+	 *
+	 * @param array<string,mixed> $initial_data Initial workflow engine data.
+	 * @param array<string,mixed> $input Bundle run input.
+	 */
+	private function apply_runtime_host_tool_policy( array &$initial_data, array $input ): void {
+		$policy = null;
+		foreach ( array( 'host_tool_policy', 'external_tool_ownership_policy' ) as $key ) {
+			if ( is_array( $input[ $key ] ?? null ) ) {
+				$policy = $input[ $key ];
+				break;
+			}
+		}
+
+		if ( null === $policy ) {
+			$policy = HostToolPolicy::environmentSnapshot();
+		}
+
+		if ( empty( $policy ) || ! is_array( $policy ) ) {
+			return;
+		}
+
+		$job_snapshot                     = is_array( $initial_data['job'] ?? null ) ? $initial_data['job'] : array();
+		$job_snapshot['host_tool_policy'] = $policy;
+		$initial_data['job']              = $job_snapshot;
 	}
 
 	private function status_from_response( array $response ): string {

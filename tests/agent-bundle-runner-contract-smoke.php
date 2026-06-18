@@ -120,6 +120,7 @@ datamachine_bundle_runner_contains( $ai_step, "\$payload['tool_recorders']", 'AI
 echo "\n[3] Runner exposes semantic outputs without hiding raw engine data\n";
 require_once $root . '/inc/Core/JobStatus.php';
 require_once $root . '/inc/Core/DataPath.php';
+require_once $root . '/inc/Engine/AI/Tools/HostToolPolicy.php';
 require_once $root . '/inc/Engine/Bundle/AgentBundleRunner.php';
 require_once $root . '/inc/Abilities/Flow/FlowHelpers.php';
 require_once $root . '/inc/Abilities/Flow/QueueAbility.php';
@@ -276,7 +277,48 @@ $apply_runtime_ability_tools->invokeArgs(
 );
 datamachine_bundle_runner_assert( empty( $initial_data['job']['ability_tools'] ?? array() ), 'runtime-specific metadata namespaces are ignored by the generic runner', $failures, $passes );
 
-echo "\n[3c] Successful tool results can be recorded into engine data\n";
+echo "\n[3c] Host tool policy is captured into durable job snapshots\n";
+$apply_runtime_host_tool_policy = $runner_reflection->getMethod( 'apply_runtime_host_tool_policy' );
+$initial_data                   = array();
+$apply_runtime_host_tool_policy->invokeArgs(
+	$runner_instance,
+	array(
+		&$initial_data,
+		array(
+			'host_tool_policy' => array(
+				'schema'           => 'datamachine/host-tool-policy/v1',
+				'default_location' => 'runner',
+				'tools'            => array(
+					'workspace_read' => array( 'execution_location' => 'control_plane' ),
+				),
+			),
+		),
+	)
+);
+datamachine_bundle_runner_assert( 'control_plane' === ( $initial_data['job']['host_tool_policy']['tools']['workspace_read']['execution_location'] ?? null ), 'explicit host tool policy is projected into job snapshot', $failures, $passes );
+
+$previous_host_policy = getenv( 'DATAMACHINE_HOST_TOOL_POLICY_JSON' );
+putenv(
+	'DATAMACHINE_HOST_TOOL_POLICY_JSON=' . json_encode(
+		array(
+			'schema'           => 'homeboy/agent-tool-policy/v1',
+			'default_location' => 'runner',
+			'tools'            => array(
+				'workspace_grep' => array( 'execution_location' => 'control_plane' ),
+			),
+		)
+	)
+);
+$initial_data = array();
+$apply_runtime_host_tool_policy->invokeArgs( $runner_instance, array( &$initial_data, array() ) );
+if ( false === $previous_host_policy ) {
+	putenv( 'DATAMACHINE_HOST_TOOL_POLICY_JSON' );
+} else {
+	putenv( 'DATAMACHINE_HOST_TOOL_POLICY_JSON=' . $previous_host_policy );
+}
+datamachine_bundle_runner_assert( 'control_plane' === ( $initial_data['job']['host_tool_policy']['tools']['workspace_grep']['execution_location'] ?? null ), 'environment host tool policy is snapshotted for queued bundle jobs', $failures, $passes );
+
+echo "\n[3d] Successful tool results can be recorded into engine data\n";
 require_once $root . '/inc/Engine/AI/conversation-loop.php';
 $GLOBALS['datamachine_bundle_runner_engine_data_merges'] = array();
 \DataMachine\Engine\AI\datamachine_record_tool_results_to_engine_data(
@@ -577,11 +619,14 @@ foreach ( array(
 	"'ability_tools'       => array("                                           => 'run-agent-bundle schema accepts runtime ability tools',
 	'apply_runtime_model_config'                                              => 'runner projects provider/model into initial data',
 	'apply_runtime_ability_tools'                                             => 'runner projects ability tools into initial data',
+	'apply_runtime_host_tool_policy'                                         => 'runner projects host tool policy into initial data',
 	"\$job_snapshot['ability_tools']"                                         => 'runner stamps job-scoped ability tool declarations',
+	"\$job_snapshot['host_tool_policy']"                                     => 'runner stamps job-scoped host tool policy',
 	"\$job_snapshot['default_provider']"                                      => 'runner stamps job-scoped default provider',
 	"\$job_snapshot['default_model']"                                         => 'runner stamps job-scoped default model',
 	"\$mode_models['pipeline']"                                               => 'runner stamps pipeline mode model config',
 	"'ability_tools'        => is_array( \$job_snapshot['ability_tools'] ?? null )" => 'AI step passes job-scoped ability tools to resolver',
+	"'host_tool_policy'     => is_array( \$job_snapshot['host_tool_policy'] ?? null )" => 'AI step passes job-scoped host tool policy to resolver',
 	'resolveModelFromJobSnapshot'                                             => 'AI step reads run-scoped model config',
 	'resolveModelForExecutionModes( $agent_id, $execution_modes, $job_snapshot )' => 'AI validation uses job-scoped model config',
 ) as $needle => $label ) {

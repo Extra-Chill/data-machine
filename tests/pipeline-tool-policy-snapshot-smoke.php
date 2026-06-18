@@ -534,6 +534,87 @@ $completion_assertions = new \DataMachine\Engine\AI\DataMachineCompletionAsserti
 assert_policy_equals( array(), $completion_assertions->unavailableRequiredToolNames( $resolution['tools'] ), 'complete_when_any treats delegated control-plane path as available', $failures, $passes );
 assert_policy_equals( array( 'alpha_tool', 'control_plane_ability' ), $completion_assertions->unavailableRequiredToolNames( array() ), 'complete_when_any still reports missing tools without a delegated path', $failures, $passes );
 
+echo "\n[12] host tool policy accepts default_location policy payloads:\n";
+$resolution = ( new ToolPolicyResolver( new SnapshotPolicyToolManager() ) )->resolveWithEvidence(
+	array(
+		'mode'                => ToolPolicyResolver::MODE_PIPELINE,
+		'pipeline_step_id'    => 'ephemeral_pipeline_0',
+		'engine_data'         => array(),
+		'categories'          => array(),
+		'allow_only_explicit' => true,
+		'allow_only'          => array( 'alpha_tool', 'beta_tool' ),
+		'host_tool_policy'    => array(
+			'schema'           => 'homeboy/agent-tool-policy/v1',
+			'default_location' => 'runner',
+			'tools'            => array(
+				'alpha_tool' => array( 'execution_location' => 'control_plane' ),
+			),
+		),
+	),
+	array( 'alpha_tool' ),
+	array( 'alpha_tool', 'beta_tool' )
+);
+assert_policy_equals( 'client', $resolution['tools']['alpha_tool']['executor'] ?? null, 'default_location host policy delegates explicit control-plane tool', $failures, $passes );
+assert_policy_equals( null, $resolution['tools']['beta_tool']['executor'] ?? null, 'default_location host policy leaves runner-default tool local', $failures, $passes );
+
+echo "\n[13] host tool policy accepts wrapped runtime policy payloads:\n";
+$wrapped_policy = array(
+	'apply' => 'propose_only',
+	'read'  => 'workspace',
+	'tools' => array(
+		'schema'           => 'homeboy/agent-tool-policy/v1',
+		'default_location' => 'runner',
+		'tools'            => array(
+			'alpha_tool' => array( 'execution_location' => 'control_plane' ),
+		),
+	),
+	'write' => 'artifacts_only',
+);
+$resolution     = ( new ToolPolicyResolver( new SnapshotPolicyToolManager() ) )->resolve(
+	array(
+		'mode'                => ToolPolicyResolver::MODE_PIPELINE,
+		'pipeline_step_id'    => 'ephemeral_pipeline_0',
+		'engine_data'         => array(),
+		'categories'          => array(),
+		'allow_only_explicit' => true,
+		'allow_only'          => array( 'alpha_tool', 'beta_tool' ),
+		'host_tool_policy'    => $wrapped_policy,
+	)
+);
+assert_policy_equals( 'client', $resolution['alpha_tool']['executor'] ?? null, 'wrapped policy delegates explicit control-plane tool', $failures, $passes );
+assert_policy_equals( null, $resolution['beta_tool']['executor'] ?? null, 'wrapped policy leaves runner-default tool local', $failures, $passes );
+
+echo "\n[14] host tool policy accepts sandbox transport policy payloads:\n";
+$sandbox_policy = array(
+	'schema'   => 'wp-codebox/sandbox-tool-policy/v1',
+	'version'  => 1,
+	'tools'    => array(
+		array(
+			'id'                 => 'alpha_tool',
+			'runtime_tool_id'    => 'alpha_tool',
+			'execution_location' => 'parent',
+		),
+		array(
+			'id'                 => 'beta_tool',
+			'runtime_tool_id'    => 'beta_tool',
+			'execution_location' => 'sandbox',
+		),
+	),
+);
+$resolution     = ( new ToolPolicyResolver( new SnapshotPolicyToolManager() ) )->resolve(
+	array(
+		'mode'                => ToolPolicyResolver::MODE_PIPELINE,
+		'pipeline_step_id'    => 'ephemeral_pipeline_0',
+		'engine_data'         => array(),
+		'categories'          => array(),
+		'allow_only_explicit' => true,
+		'allow_only'          => array( 'alpha_tool', 'beta_tool' ),
+		'host_tool_policy'    => $sandbox_policy,
+	)
+);
+assert_policy_equals( 'client', $resolution['alpha_tool']['executor'] ?? null, 'sandbox policy delegates parent-visible tool', $failures, $passes );
+assert_policy_equals( null, $resolution['beta_tool']['executor'] ?? null, 'sandbox policy leaves sandbox-local tool local', $failures, $passes );
+
 if ( $failures ) {
 	echo "\nFAILED: " . count( $failures ) . " pipeline policy assertions failed.\n";
 	exit( 1 );
