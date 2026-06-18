@@ -158,11 +158,11 @@ class RuntimeToolRunStateStore {
 			return $state;
 		}
 
-		$timestamp                              = $this->timestamp();
-		$state['status']                        = $status;
-		$state[ $payload_key ]                  = $payload;
-		$state[ $timestamp_key ]                = $timestamp;
-		$state['updated_at']                    = $timestamp;
+		$timestamp                             = $this->timestamp();
+		$state['status']                       = $status;
+		$state[ $payload_key ]                 = $payload;
+		$state[ $timestamp_key ]               = $timestamp;
+		$state['updated_at']                   = $timestamp;
 		$engine_data['runtime_tool_run_state'] = $state;
 
 		$this->jobs->store_engine_data( $job_id, $engine_data );
@@ -204,7 +204,7 @@ class RuntimeToolRunStateStore {
 	private function required_string( array $state, string $key ): string {
 		$value = trim( (string) ( $state[ $key ] ?? '' ) );
 		if ( '' === $value ) {
-			throw new \InvalidArgumentException( "Runtime tool run state requires {$key}." );
+			throw new \InvalidArgumentException( sprintf( 'Runtime tool run state requires %s.', esc_html( $key ) ) );
 		}
 
 		return $value;
