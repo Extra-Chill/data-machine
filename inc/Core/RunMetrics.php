@@ -59,51 +59,58 @@ class RunMetrics {
 			return false;
 		}
 
-		$engine       = EngineData::retrieve( $job_id );
-		$step_results = is_array( $engine[ self::STEP_RESULTS_KEY ] ?? null ) ? $engine[ self::STEP_RESULTS_KEY ] : array();
-		$existing     = is_array( $step_results[ $flow_step_id ] ?? null ) ? $step_results[ $flow_step_id ] : array();
 		$clean_result = self::sanitizeResult( $result );
+		$result       = EngineData::mutate(
+			$job_id,
+			static function ( array $engine ) use ( $flow_step_id, $clean_result ): array {
+				$step_results = is_array( $engine[ self::STEP_RESULTS_KEY ] ?? null ) ? $engine[ self::STEP_RESULTS_KEY ] : array();
+				$existing     = is_array( $step_results[ $flow_step_id ] ?? null ) ? $step_results[ $flow_step_id ] : array();
 
-		$step_results[ $flow_step_id ] = array_replace_recursive(
-			$existing,
-			array_merge(
-				array(
-					'flow_step_id' => $flow_step_id,
-					'recorded_at'  => self::now(),
-				),
-				$clean_result
-			)
+				$step_results[ $flow_step_id ] = array_replace_recursive(
+					$existing,
+					array_merge(
+						array(
+							'flow_step_id' => $flow_step_id,
+							'recorded_at'  => self::now(),
+						),
+						$clean_result
+					)
+				);
+
+				$engine[ self::STEP_RESULTS_KEY ] = $step_results;
+				if ( is_array( $clean_result['step_result'] ?? null ) ) {
+					$step_result_envelopes                     = is_array( $engine[ self::STEP_RESULT_ENVELOPES_KEY ] ?? null ) ? $engine[ self::STEP_RESULT_ENVELOPES_KEY ] : array();
+					$step_result_envelope                      = $clean_result['step_result'];
+					$step_result_envelope['flow_step_id']    ??= $flow_step_id;
+					$step_result_envelopes[ $flow_step_id ]    = $step_result_envelope;
+					$engine[ self::STEP_RESULT_ENVELOPES_KEY ] = $step_result_envelopes;
+				}
+
+				$metrics = self::normalize( $engine[ self::KEY ] ?? array() );
+				if ( isset( $clean_result['packet_count'] ) && 'fetch' === ( $clean_result['step_type'] ?? '' ) ) {
+					$metrics['counts']['fetch_packets'] = max( (int) $metrics['counts']['fetch_packets'], (int) $clean_result['packet_count'] );
+				}
+				if ( in_array( $clean_result['result'] ?? '', array( 'no_content', 'completed_no_items' ), true ) ) {
+					$metrics['counts']['no_content'] = max( 1, (int) $metrics['counts']['no_content'] );
+				}
+				if ( 'source_rejected' === ( $clean_result['result'] ?? '' ) || ! empty( $clean_result['source_rejection_reason'] ) ) {
+					$metrics['counts']['source_rejected'] = max( 1, (int) $metrics['counts']['source_rejected'] );
+				}
+				foreach ( self::classesFromStepResult( $clean_result, (string) ( $clean_result['status'] ?? '' ) ) as $class ) {
+					if ( ! isset( $metrics['counts'][ $class ] ) ) {
+						$metrics['counts'][ $class ] = 0;
+					}
+					$metrics['counts'][ $class ] = max( 1, (int) $metrics['counts'][ $class ] );
+				}
+				$metrics['last_activity_at'] = self::now();
+				$engine[ self::KEY ]         = $metrics;
+
+				return $engine;
+			},
+			'record_step_result'
 		);
 
-		$engine[ self::STEP_RESULTS_KEY ] = $step_results;
-		if ( is_array( $clean_result['step_result'] ?? null ) ) {
-			$step_result_envelopes                     = is_array( $engine[ self::STEP_RESULT_ENVELOPES_KEY ] ?? null ) ? $engine[ self::STEP_RESULT_ENVELOPES_KEY ] : array();
-			$step_result_envelope                      = $clean_result['step_result'];
-			$step_result_envelope['flow_step_id']    ??= $flow_step_id;
-			$step_result_envelopes[ $flow_step_id ]    = $step_result_envelope;
-			$engine[ self::STEP_RESULT_ENVELOPES_KEY ] = $step_result_envelopes;
-		}
-
-		$metrics = self::normalize( $engine[ self::KEY ] ?? array() );
-		if ( isset( $clean_result['packet_count'] ) && 'fetch' === ( $clean_result['step_type'] ?? '' ) ) {
-			$metrics['counts']['fetch_packets'] = max( (int) $metrics['counts']['fetch_packets'], (int) $clean_result['packet_count'] );
-		}
-		if ( in_array( $clean_result['result'] ?? '', array( 'no_content', 'completed_no_items' ), true ) ) {
-			$metrics['counts']['no_content'] = max( 1, (int) $metrics['counts']['no_content'] );
-		}
-		if ( 'source_rejected' === ( $clean_result['result'] ?? '' ) || ! empty( $clean_result['source_rejection_reason'] ) ) {
-			$metrics['counts']['source_rejected'] = max( 1, (int) $metrics['counts']['source_rejected'] );
-		}
-		foreach ( self::classesFromStepResult( $clean_result, (string) ( $clean_result['status'] ?? '' ) ) as $class ) {
-			if ( ! isset( $metrics['counts'][ $class ] ) ) {
-				$metrics['counts'][ $class ] = 0;
-			}
-			$metrics['counts'][ $class ] = max( 1, (int) $metrics['counts'][ $class ] );
-		}
-		$metrics['last_activity_at'] = self::now();
-		$engine[ self::KEY ]         = $metrics;
-
-		return EngineData::persist( $job_id, $engine );
+		return ! empty( $result['success'] );
 	}
 
 	public static function start( int $job_id, array $context = array() ): bool {
@@ -217,6 +224,7 @@ class RunMetrics {
 			'duration_seconds' => self::durationSeconds( $started_at, $duration_end ),
 			'outcome'          => self::outcomeDetails( $job, $engine, $counts, $outcome_classes ),
 			'step_results'     => self::stepResults( $engine ),
+			'run_result'       => self::runResult( $engine, $status ),
 			'context'          => $metrics['context'],
 			'token_usage'      => self::tokenUsage( $engine ),
 			'cost'             => self::cost( $engine ),
@@ -466,6 +474,22 @@ class RunMetrics {
 	private static function stepResults( array $engine ): array {
 		$step_results = is_array( $engine[ self::STEP_RESULTS_KEY ] ?? null ) ? $engine[ self::STEP_RESULTS_KEY ] : array();
 		return array_values( array_filter( $step_results, 'is_array' ) );
+	}
+
+	private static function runResult( array $engine, string $status ): array {
+		$step_results = array();
+		foreach ( self::stepResults( $engine ) as $result ) {
+			if ( is_array( $result['step_result'] ?? null ) ) {
+				$step_results[] = $result['step_result'];
+			}
+		}
+
+		return RunResult::fromStepResults(
+			$step_results,
+			array(
+				'status' => $status,
+			)
+		);
 	}
 
 	private static function firstStepField( array $engine, string $field ) {

@@ -272,7 +272,7 @@ class ExecuteStepAbility {
 					'status'       => $recorded_status,
 					'reason'       => $result['reason'] ?? ( $execution_result['reason'] ?? ( $result['error'] ?? null ) ),
 					'error'        => $result['error'] ?? ( $execution_result['error'] ?? null ),
-					'step_result'  => $execution_result['step_result'] ?? array(),
+					'step_result'  => is_array( $execution_result['step_result'] ?? null ) ? $execution_result['step_result'] : array(),
 				)
 			);
 

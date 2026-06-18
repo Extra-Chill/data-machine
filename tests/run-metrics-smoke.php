@@ -11,7 +11,16 @@ if ( ! defined( 'ABSPATH' ) ) {
 	define( 'ABSPATH', __DIR__ . '/' );
 }
 
+if ( ! function_exists( 'wp_json_encode' ) ) {
+	function wp_json_encode( $data, $flags = 0, $depth = 512 ) {
+		return json_encode( $data, $flags, $depth );
+	}
+}
+
 require_once __DIR__ . '/../inc/Core/JobStatus.php';
+require_once __DIR__ . '/../inc/Core/JobArtifactSurfaces.php';
+require_once __DIR__ . '/../inc/Core/StepResult.php';
+require_once __DIR__ . '/../inc/Core/RunResult.php';
 require_once __DIR__ . '/../inc/Core/RunMetrics.php';
 
 use DataMachine\Core\RunMetrics;
