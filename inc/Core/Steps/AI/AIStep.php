@@ -382,7 +382,7 @@ class AIStep extends Step {
 					'pipeline_step_id'     => $pipeline_step_id,
 					'engine_data'          => $engine_data,
 					'ability_tools'        => is_array( $job_snapshot['ability_tools'] ?? null ) ? $job_snapshot['ability_tools'] : array(),
-					'host_tool_policy'    => is_array( $job_snapshot['host_tool_policy'] ?? null ) ? $job_snapshot['host_tool_policy'] : array(),
+					'host_tool_policy'     => is_array( $job_snapshot['host_tool_policy'] ?? null ) ? $job_snapshot['host_tool_policy'] : array(),
 					'categories'           => $tool_categories,
 				),
 				PipelineToolPolicyArgs::fromConfigs( $this->flow_step_config, $pipeline_step_config )

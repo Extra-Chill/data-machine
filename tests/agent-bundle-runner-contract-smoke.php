@@ -626,7 +626,7 @@ foreach ( array(
 	"\$job_snapshot['default_model']"                                         => 'runner stamps job-scoped default model',
 	"\$mode_models['pipeline']"                                               => 'runner stamps pipeline mode model config',
 	"'ability_tools'        => is_array( \$job_snapshot['ability_tools'] ?? null )" => 'AI step passes job-scoped ability tools to resolver',
-	"'host_tool_policy'    => is_array( \$job_snapshot['host_tool_policy'] ?? null )" => 'AI step passes job-scoped host tool policy to resolver',
+	"'host_tool_policy'     => is_array( \$job_snapshot['host_tool_policy'] ?? null )" => 'AI step passes job-scoped host tool policy to resolver',
 	'resolveModelFromJobSnapshot'                                             => 'AI step reads run-scoped model config',
 	'resolveModelForExecutionModes( $agent_id, $execution_modes, $job_snapshot )' => 'AI validation uses job-scoped model config',
 ) as $needle => $label ) {
