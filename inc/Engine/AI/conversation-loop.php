@@ -2012,7 +2012,8 @@ function datamachine_persist_inflight_tool_summary( array $loop_payload, array $
 function datamachine_record_tool_results_to_engine_data( array $loop_payload, array $tool_execution_results ): void {
 	$job_id    = (int) ( $loop_payload['job_id'] ?? 0 );
 	$recorders = is_array( $loop_payload['tool_recorders'] ?? null ) ? $loop_payload['tool_recorders'] : array();
-	if ( $job_id <= 0 || empty( $recorders ) || ! function_exists( '\datamachine_merge_engine_data' ) ) {
+	$can_record = function_exists( '\datamachine_append_engine_state_event' ) || function_exists( '\datamachine_merge_engine_data' );
+	if ( $job_id <= 0 || empty( $recorders ) || ! $can_record ) {
 		return;
 	}
 
@@ -2045,6 +2046,16 @@ function datamachine_record_tool_results_to_engine_data( array $loop_payload, ar
 				$engine_data[ $key ] = array_merge( is_array( $engine_data[ $key ] ?? null ) ? $engine_data[ $key ] : array(), $values );
 			}
 		}
+	}
+
+	if ( ! empty( $engine_data ) && function_exists( '\datamachine_append_engine_state_event' ) ) {
+		\datamachine_append_engine_state_event(
+			$job_id,
+			'tool_result_recorded',
+			$engine_data,
+			array( 'source' => 'conversation_loop' )
+		);
+		return;
 	}
 
 	if ( ! empty( $engine_data ) ) {

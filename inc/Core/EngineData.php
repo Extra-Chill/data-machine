@@ -121,6 +121,58 @@ class EngineData {
 	}
 
 	/**
+	 * Append a versioned state event and persist its patch as the current snapshot projection.
+	 *
+	 * @param int    $job_id   Job ID.
+	 * @param string $type     Generic event type.
+	 * @param array  $patch    Engine data patch to project onto the snapshot.
+	 * @param array  $metadata Optional event metadata.
+	 * @return array|null Appended ledger entry on success, null on failure.
+	 */
+	public static function appendStateEvent( int $job_id, string $type, array $patch, array $metadata = array() ): ?array {
+		if ( $job_id <= 0 || '' === trim( $type ) ) {
+			return null;
+		}
+
+		$current = self::retrieve( $job_id );
+		$ledger  = is_array( $current['_engine_state_ledger'] ?? null ) ? $current['_engine_state_ledger'] : array();
+		$version = self::nextLedgerVersion( $ledger );
+		$entry   = array(
+			'version'     => $version,
+			'type'        => sanitize_key( $type ),
+			'recorded_at' => gmdate( 'c' ),
+			'patch'       => $patch,
+		);
+
+		if ( ! empty( $metadata ) ) {
+			$entry['metadata'] = $metadata;
+		}
+
+		$ledger[]                         = $entry;
+		$projected                        = array_replace_recursive( $current, $patch );
+		$projected['_engine_state_ledger'] = $ledger;
+
+		return self::persist( $job_id, $projected ) ? $entry : null;
+	}
+
+	/**
+	 * Resolve the next monotonically increasing ledger version.
+	 *
+	 * @param array $ledger Existing ledger entries.
+	 * @return int Next version number.
+	 */
+	private static function nextLedgerVersion( array $ledger ): int {
+		$version = 0;
+		foreach ( $ledger as $entry ) {
+			if ( is_array( $entry ) && isset( $entry['version'] ) ) {
+				$version = max( $version, (int) $entry['version'] );
+			}
+		}
+
+		return $version + 1;
+	}
+
+	/**
 	 * Set a value in the engine data and persist it.
 	 *
 	 * @param string $key   Data key.

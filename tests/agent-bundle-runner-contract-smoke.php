@@ -29,6 +29,18 @@ if ( ! function_exists( 'datamachine_merge_engine_data' ) ) {
 	}
 }
 
+if ( ! function_exists( 'datamachine_append_engine_state_event' ) ) {
+	function datamachine_append_engine_state_event( int $job_id, string $type, array $patch, array $metadata = array() ): ?array {
+		$GLOBALS['datamachine_bundle_runner_engine_data_merges'][] = array(
+			'job_id'   => $job_id,
+			'type'     => $type,
+			'data'     => $patch,
+			'metadata' => $metadata,
+		);
+		return array( 'version' => count( $GLOBALS['datamachine_bundle_runner_engine_data_merges'] ) );
+	}
+}
+
 function datamachine_bundle_runner_assert( bool $condition, string $label, array &$failures, int &$passes ): void {
 	if ( $condition ) {
 		++$passes;
@@ -311,6 +323,7 @@ $GLOBALS['datamachine_bundle_runner_engine_data_merges'] = array();
 );
 $recorded_merge = $GLOBALS['datamachine_bundle_runner_engine_data_merges'][0] ?? array();
 datamachine_bundle_runner_assert( 77 === ( $recorded_merge['job_id'] ?? null ), 'tool recorder writes to the owning job', $failures, $passes );
+datamachine_bundle_runner_assert( 'tool_result_recorded' === ( $recorded_merge['type'] ?? null ), 'tool recorder uses versioned append path when available', $failures, $passes );
 datamachine_bundle_runner_assert( 'static/issue-460-design-direction' === ( $recorded_merge['data']['static_site_agent']['branch'] ?? null ), 'tool recorder maps branch from result data', $failures, $passes );
 datamachine_bundle_runner_assert( 'https://github.com/chubes4/wp-site-generator/pull/461' === ( $recorded_merge['data']['static_site_agent']['pr_url'] ?? null ), 'tool recorder maps PR URL from result data', $failures, $passes );
 datamachine_bundle_runner_assert( 'issue-460-design-direction' === ( $recorded_merge['data']['static_site_agent']['slug'] ?? null ), 'tool recorder applies strip_prefix transforms', $failures, $passes );
