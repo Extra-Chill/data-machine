@@ -60,6 +60,10 @@ class GetPostBlocksAbility {
 								'type'        => 'string',
 								'description' => __( 'Filter to blocks containing this text (case-insensitive)', 'data-machine' ),
 							),
+							'prefer_autosave' => array(
+								'type'        => 'boolean',
+								'description' => __( 'When true (default), read the calling user\'s latest autosave revision if it is newer than the saved post — so an in-flight draft is proofread, not the stale saved version. Set false to always read the saved post.', 'data-machine' ),
+							),
 						),
 					),
 					'output_schema'       => array(
@@ -138,6 +142,11 @@ class GetPostBlocksAbility {
 					'required'    => false,
 					'description' => 'Filter to blocks containing this text (case-insensitive)',
 				),
+				'prefer_autosave' => array(
+					'type'        => 'boolean',
+					'required'    => false,
+					'description' => 'When true (default), read the caller\'s latest autosave revision if newer than the saved post, so an in-flight draft is proofread instead of the stale saved version.',
+				),
 			),
 		);
 	}
@@ -167,9 +176,11 @@ class GetPostBlocksAbility {
 	 * @return array
 	 */
 	public static function execute( array $input ): array {
-		$post_id     = absint( $input['post_id'] ?? 0 );
-		$block_types = $input['block_types'] ?? array();
-		$search      = $input['search'] ?? '';
+		$post_id         = absint( $input['post_id'] ?? 0 );
+		$block_types     = $input['block_types'] ?? array();
+		$search          = $input['search'] ?? '';
+		// Default true: proofread the freshest authored content (in-flight autosave).
+		$prefer_autosave = ! array_key_exists( 'prefer_autosave', $input ) || ! empty( $input['prefer_autosave'] );
 
 		if ( $post_id <= 0 ) {
 			return array(
@@ -197,7 +208,12 @@ class GetPostBlocksAbility {
 				);
 			}
 
-			$block_content = ContentFormat::storedToBlocks( (string) $post->post_content, (string) $post->post_type );
+			// Prefer the calling user's in-flight autosave when it is newer than
+			// the saved post — so a draft being actively typed is proofread, not
+			// the stale saved version. Runs inside the post's blog context above.
+			$source_content = BlogContext::freshest_authored_content( $post, $prefer_autosave );
+
+			$block_content = ContentFormat::storedToBlocks( $source_content, (string) $post->post_type );
 			if ( is_wp_error( $block_content ) ) {
 				return array(
 					'success' => false,
