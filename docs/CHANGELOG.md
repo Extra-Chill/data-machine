@@ -2,6 +2,42 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.151.0] - 2026-06-18
+
+### Added
+- make get-post-blocks read prefer in-flight user autosave
+
+### Changed
+- align array arrows for new prefer_autosave key
+- Store compact engine state trace entries
+- Add runtime tool run state store
+- Add versioned engine state ledger
+- Add deterministic job lifecycle transitions
+- Delegate host-owned tools through runtime path
+- Normalize agent config and bundle path handling
+- Add lightweight ability manifest registration
+- Respect host-owned tool policy in runners
+- Remove implicit image provider default hook
+- Add generic execution metadata queries
+- Add explicit handler tool declaration primitive
+- Remove image generation provider defaults from core
+- Document opaque knowledge corpus bundle extras
+- Add generic runtime task ability contract
+- Add explicit runtime activation primitive
+- centralize plugin settings writes
+- centralize retention count primitives
+- centralize flow REST ability execution
+- Guard duplicate handler registration
+- centralize ability lifecycle guards
+- satisfy bundle auth resolver lint
+- fix bundle egress smoke under WordPress
+
+### Fixed
+- Fix engine state ledger lint warnings
+- Fix runtime tool state lint issues
+- Fix pipeline policy smoke ability registration
+- Fix bundle runner workflow path lint
+
 ## [0.150.10] - 2026-06-17
 
 ### Changed
