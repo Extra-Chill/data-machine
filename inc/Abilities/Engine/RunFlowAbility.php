@@ -16,6 +16,7 @@ namespace DataMachine\Abilities\Engine;
 
 use DataMachine\Abilities\Flow\QueueAbility;
 use DataMachine\Core\Agents\AgentIdentityResolver;
+use DataMachine\Core\JobStatus;
 use DataMachine\Engine\ExecutionPlan;
 
 defined( 'ABSPATH' ) || exit;
@@ -214,9 +215,6 @@ class RunFlowAbility {
 			);
 		}
 
-		// Transition job from pending to processing.
-		$this->db_jobs->start_job( $job_id );
-
 		$scheduling_config   = $flow['scheduling_config'] ?? array();
 		$run_artifact_policy = \DataMachine\Engine\Bundle\BundleSchema::normalize_run_artifact_egress_policy( $scheduling_config['run_artifacts'] ?? array() );
 
@@ -301,6 +299,8 @@ class RunFlowAbility {
 		try {
 			$first_flow_step_id = ExecutionPlan::from_flow_config( $flow_config )->first_step_id();
 		} catch ( \InvalidArgumentException $e ) {
+			$this->db_jobs->complete_job( $job_id, JobStatus::failed( 'invalid_execution_plan' )->toString() );
+
 			do_action(
 				'datamachine_log',
 				'error',
@@ -314,11 +314,15 @@ class RunFlowAbility {
 			);
 			return array(
 				'success' => false,
+				'job_id'  => $job_id,
+				'reason'  => 'invalid_execution_plan',
 				'error'   => $e->getMessage(),
 			);
 		}
 
 		if ( ! $first_flow_step_id ) {
+			$this->db_jobs->complete_job( $job_id, JobStatus::failed( 'no_first_step' )->toString() );
+
 			do_action(
 				'datamachine_log',
 				'error',
@@ -331,9 +335,14 @@ class RunFlowAbility {
 			);
 			return array(
 				'success' => false,
+				'job_id'  => $job_id,
+				'reason'  => 'no_first_step',
 				'error'   => 'Flow execution failed - no first step found.',
 			);
 		}
+
+		// Transition job from pending to processing only after a first step is known.
+		$this->db_jobs->start_job( $job_id );
 
 		do_action( 'datamachine_schedule_next_step', $job_id, $first_flow_step_id, array() );
 
