@@ -92,9 +92,6 @@ class JobRetryPolicy {
 			);
 		}
 
-		self::recordRetry( $job_id, $reason, $context_data, $engine_data, $attempt, $max_attempts, $delay_seconds, $timestamp, $policy );
-		$db_jobs->update_job_status( $job_id, 'pending' );
-
 		$action_id = as_schedule_single_action(
 			$timestamp,
 			'datamachine_execute_step',
@@ -106,7 +103,6 @@ class JobRetryPolicy {
 		);
 
 		if ( false === $action_id ) {
-			$db_jobs->update_job_status( $job_id, 'processing' );
 			return array(
 				'retried'      => false,
 				'exhausted'    => false,
@@ -115,6 +111,9 @@ class JobRetryPolicy {
 				'reason'       => 'retry_schedule_failed',
 			);
 		}
+
+		self::recordRetry( $job_id, $reason, $context_data, $engine_data, $attempt, $max_attempts, $delay_seconds, $timestamp, $policy );
+		$db_jobs->update_job_status( $job_id, 'pending' );
 
 		do_action(
 			'datamachine_log',
