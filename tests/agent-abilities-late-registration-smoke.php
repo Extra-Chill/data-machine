@@ -5,8 +5,8 @@
  * Run with: php tests/agent-abilities-late-registration-smoke.php
  *
  * Runs in two modes:
- *  - Real WordPress runtime (e.g. the wp-codebox host-smoke-wp backend, which
- *    boots WordPress and includes the plugin): assert the canonical
+ *  - Real WordPress runtime (which boots WordPress and includes the plugin):
+ *    assert the canonical
  *    `datamachine/run-agent-bundle` ability is registered. This is the headless
  *    sandbox load order (`run-php` boots WP, then includes the plugin file) that
  *    must resolve the ability — see Extra-Chill/data-machine#2629.
@@ -19,13 +19,13 @@ namespace {
 	// exist, so the pure-PHP stubs below must NOT be declared (they would fatal
 	// with "Cannot redeclare"). Assert the real registration outcome and return.
 	if ( function_exists( 'wp_get_ability' ) ) {
-		// Real WordPress runtime (e.g. the wp-codebox host-smoke-wp backend).
+		// Real WordPress runtime.
 		// The harness boots a bare WordPress with the plugin DIRECTORY mounted
 		// but NOT activated, so load the agent ability registration the same
 		// unconditional way data-machine.php does at file scope, then assert the
 		// ability resolves through `wp_get_ability()` (which lazily fires
 		// `wp_abilities_api_init`). This exercises the real registration code
-		// path the WP Codebox sandbox depends on for `datamachine/run-agent-bundle`.
+		// path headless sandbox runs depend on for `datamachine/run-agent-bundle`.
 		if ( ! class_exists( '\DataMachine\Abilities\AgentAbilities' ) ) {
 			require_once dirname( __DIR__ ) . '/vendor/autoload.php';
 			require_once dirname( __DIR__ ) . '/inc/Abilities/AbilityCategories.php';
@@ -91,7 +91,7 @@ namespace {
 	}
 
 	// Minimal fake of the abilities registry so the late-registration path
-	// (headless / WP Codebox sandbox load order, where the plugin file is
+	// (headless sandbox load order, where the plugin file is
 	// included AFTER `wp_abilities_api_init` has already fired) can be
 	// exercised. Mirrors core: `WP_Abilities_Registry::register()` has NO
 	// lifecycle guard — only the `wp_register_ability()` wrapper does.
@@ -178,7 +178,7 @@ namespace {
 	$registered = array_keys( $GLOBALS['datamachine_test_state']->registered );
 	$assert( 'normal bootstrap registers agent bundle/import abilities during wp_abilities_api_init', in_array( 'datamachine/import-agent', $registered, true ) && in_array( 'datamachine/run-agent-bundle', $registered, true ) );
 
-	// Headless / WP Codebox sandbox load order: `run-php` boots WordPress
+	// Headless sandbox load order: `run-php` boots WordPress
 	// through `wp-load.php` (firing the one-shot `wp_abilities_api_init`) and
 	// only THEN includes the plugin file. The constructor must register
 	// immediately through the registry instance — NOT silently no-op, which was

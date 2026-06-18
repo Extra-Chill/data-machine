@@ -318,7 +318,7 @@ class RequestBuilderMultimodalTest extends TestCase {
 
 		// The slashed logical tool name is not provider-safe (OpenAI/Responses
 		// require ^[a-zA-Z0-9_-]+$). The provider declares it with a safe name
-		// (e.g. wp-codebox normalises `client/filesystem-write` → `filesystem_write`),
+		// (e.g. some runtimes normalize `client/filesystem-write` to `filesystem_write`),
 		// and RequestBuilder carries that mapping via the alias table built from
 		// the structured tool declarations. The transcript converter must rewrite
 		// the logical name to the provider-safe alias so replayed function call /

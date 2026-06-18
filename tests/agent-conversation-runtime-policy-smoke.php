@@ -49,7 +49,7 @@ if ( ! function_exists( 'datamachine_merge_engine_data' ) ) {
 	}
 }
 
-// Under a real WordPress runtime (e.g. the wp-codebox smoke harness) the
+// Under a real WordPress runtime the
 // do_action stub above is never defined, so bridge the hooks this test
 // observes into the same capture buffer via real add_action.
 if ( defined( 'WPINC' ) ) {

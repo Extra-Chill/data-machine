@@ -13,12 +13,12 @@ namespace {
 	}
 
 	if ( function_exists( 'wp_get_ability' ) ) {
-		// Real WordPress runtime (e.g. the wp-codebox host-smoke-wp backend).
+		// Real WordPress runtime.
 		// The harness boots a bare WordPress with the plugin DIRECTORY mounted
 		// but NOT activated, so Data Machine's normal `plugins_loaded`
-		// registration never runs. This mirrors the WP Codebox sandbox case the
-		// fix targets: a runtime task that needs `datamachine/run-agent-bundle`
-		// must be able to register it on demand, regardless of request shape.
+		// registration never runs. This mirrors headless sandbox tasks that need
+		// `datamachine/run-agent-bundle` to register on demand, regardless of
+		// request shape.
 		//
 		// Load the agent ability registration the same unconditional way
 		// data-machine.php does at file scope, then assert the ability resolves.
@@ -53,7 +53,7 @@ namespace {
 	$GLOBALS['agent_abilities_registered_abilities'] = array();
 
 	// Minimal fake of the WordPress abilities registry so the late-registration
-	// path (used in headless / WP Codebox sandbox load order, where the plugin
+	// path (used in headless sandbox load order, where the plugin
 	// is included AFTER `wp_abilities_api_init` has already fired) can be
 	// exercised without a full WordPress runtime. Mirrors how
 	// `WP_Abilities_Registry::register()` has NO lifecycle guard — only the
@@ -173,7 +173,7 @@ namespace {
 	$GLOBALS['agent_abilities_doing_action'] = false;
 	agent_abilities_assert( isset( $GLOBALS['agent_abilities_registered_abilities']['datamachine/run-agent-bundle'] ), 'run-agent-bundle registers during wp_abilities_api_init' );
 
-	// Headless / WP Codebox sandbox load order: `run-php` boots WordPress
+	// Headless sandbox load order: `run-php` boots WordPress
 	// through `wp-load.php` (firing the one-shot `wp_abilities_api_init`) and
 	// only THEN includes the plugin file. The constructor sees the action has
 	// already completed and must register immediately through the registry

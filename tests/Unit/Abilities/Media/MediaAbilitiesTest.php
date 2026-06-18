@@ -164,13 +164,13 @@ class MediaAbilitiesTest extends WP_UnitTestCase {
 	 */
 	public function test_video_metadata_returns_structure(): void {
 		// Write the fixture with the PHP filesystem primitive rather than the
-		// $wp_filesystem global: the WP Codebox / Playground test runner does not
+		// $wp_filesystem global: the headless test runner does not
 		// initialize $wp_filesystem, so $wp_filesystem->put_contents() is a call
 		// on null there (see #2506). VideoMetadata::extract() reads the real bytes
 		// off disk regardless of how they were written, so this fixture is
 		// equivalent while being environment-agnostic.
 		$temp_file = tempnam( sys_get_temp_dir(), 'dm-video-test-' );
-		file_put_contents( $temp_file, str_repeat( 'x', 100 ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents -- Test fixture on the local temp dir; $wp_filesystem is unavailable in the Codebox/Playground runner (#2506).
+		file_put_contents( $temp_file, str_repeat( 'x', 100 ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents -- Test fixture on the local temp dir; $wp_filesystem is unavailable in the headless runner (#2506).
 
 		$result = $this->abilities->executeVideoMetadata( array(
 			'path' => $temp_file,

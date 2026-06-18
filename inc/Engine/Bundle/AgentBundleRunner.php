@@ -215,10 +215,7 @@ final class AgentBundleRunner {
 		$ability_tools = is_array( $input['ability_tools'] ?? null ) ? $input['ability_tools'] : array();
 		if ( empty( $ability_tools ) ) {
 			$metadata_tools = DataPath::value( $bundle, 'metadata.agent_runtime.ability_tools' );
-			if ( ! is_array( $metadata_tools ) ) {
-				$metadata_tools = DataPath::value( $bundle, 'metadata.codebox.agent_runtime.bundle.ability_tools' );
-			}
-			$ability_tools = is_array( $metadata_tools ) ? $metadata_tools : array();
+			$ability_tools  = is_array( $metadata_tools ) ? $metadata_tools : array();
 		}
 		if ( empty( $ability_tools ) ) {
 			return;
@@ -590,7 +587,18 @@ final class AgentBundleRunner {
 			$import_input
 		);
 
-		$imports = wp_agent_import_runtime_bundles( $bundle_specs, $import_input );
+		if ( ! function_exists( '\wp_agent_import_runtime_bundles' ) ) {
+			return array(
+				'required' => true,
+				'success'  => false,
+				'status'   => 'unavailable',
+				'imports'  => array(),
+				'failed'   => array(),
+				'error'    => 'The generic runtime bundle importer is unavailable.',
+			);
+		}
+
+		$imports = \wp_agent_import_runtime_bundles( $bundle_specs, $import_input );
 
 		$failed = array_values(
 			array_filter(
