@@ -95,7 +95,7 @@ class RunResult {
 	 * @return array<string,mixed>
 	 */
 	private static function buildReplayMetadata( array $steps, array $outputs, array $artifact_refs, array $packet_refs, array $replay ): array {
-		$content_hashes = is_array( $replay['content_hashes'] ?? null ) ? $replay['content_hashes'] : array();
+		$content_hashes  = is_array( $replay['content_hashes'] ?? null ) ? $replay['content_hashes'] : array();
 		$content_hashes += array(
 			'steps'         => self::contentHash( $steps ),
 			'outputs'       => self::contentHash( $outputs ),
@@ -115,7 +115,7 @@ class RunResult {
 	 * @return string Content hash.
 	 */
 	private static function contentHash( $value ): string {
-		$encoded = function_exists( 'wp_json_encode' ) ? wp_json_encode( self::sortKeysRecursive( $value ), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE ) : json_encode( self::sortKeysRecursive( $value ), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE );
+		$encoded = wp_json_encode( self::sortKeysRecursive( $value ), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE );
 
 		if ( ! is_string( $encoded ) ) {
 			$encoded = '';

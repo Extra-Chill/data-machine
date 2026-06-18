@@ -123,7 +123,7 @@ class StepResult {
 	 */
 	private static function contentHash( $value ): string {
 		$normalized = self::sortKeysRecursive( $value );
-		$encoded    = function_exists( 'wp_json_encode' ) ? wp_json_encode( $normalized, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE ) : json_encode( $normalized, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE );
+		$encoded    = wp_json_encode( $normalized, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE );
 
 		if ( ! is_string( $encoded ) ) {
 			$encoded = '';

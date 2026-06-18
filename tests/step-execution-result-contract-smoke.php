@@ -18,6 +18,13 @@ if ( ! function_exists( 'sanitize_key' ) ) {
 	}
 }
 
+if ( ! function_exists( 'wp_json_encode' ) ) {
+	function wp_json_encode( $data, int $options = 0 ) {
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode -- Pure-PHP smoke test fallback outside WordPress.
+		return json_encode( $data, $options );
+	}
+}
+
 require_once __DIR__ . '/../inc/Core/JobStatus.php';
 require_once __DIR__ . '/../inc/Core/StepResult.php';
 require_once __DIR__ . '/../inc/Core/RunResult.php';
