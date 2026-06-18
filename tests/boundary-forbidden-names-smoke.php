@@ -59,7 +59,6 @@ function datamachine_boundary_is_allowed_file( string $relative_path ): bool {
 		// Developer/release harness config. Runtime code must remain generic.
 		'.buildignore',
 		'composer.json',
-		'homeboy.json',
 	);
 
 	if ( in_array( $relative_path, $allowed_files, true ) ) {
