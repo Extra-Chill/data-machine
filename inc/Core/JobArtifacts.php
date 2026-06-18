@@ -21,10 +21,65 @@ class JobArtifacts {
 
 	private const TRANSCRIPT_ARTIFACT_SCHEMA_VERSION = 1;
 	private const TOOL_TRACE_ARTIFACT_SCHEMA_VERSION = 1;
+	private const ARTIFACT_REF_SCHEMA_VERSION       = 1;
 	private const MAX_TRANSCRIPT_MESSAGES            = 200;
 	private const MAX_TRANSCRIPT_CONTENT_CHARS       = 4000;
 	private const MAX_TOOL_TRACE_ENTRIES             = 200;
 	private const MAX_TOOL_TRACE_FIELD_CHARS         = 4000;
+
+	/**
+	 * Resolve a portable job artifact ref into the stored artifact metadata.
+	 *
+	 * External runners should treat artifact_ref as the stable identifier and use
+	 * this resolver rather than reading local path or URL metadata directly.
+	 *
+	 * @param string $artifact_ref Portable artifact ref.
+	 * @param array  $engine_data  Optional engine_data snapshot containing artifact_files.
+	 * @return array{success: bool, artifact?: array<string,mixed>, error?: string}
+	 */
+	public function resolve_artifact_ref( string $artifact_ref, array $engine_data = array() ): array {
+		$artifact_ref = sanitize_text_field( $artifact_ref );
+		if ( '' === $artifact_ref ) {
+			return array(
+				'success' => false,
+				'error'   => 'artifact_ref must be a non-empty string.',
+			);
+		}
+
+		if ( empty( $engine_data ) ) {
+			$job_id = $this->job_id_from_artifact_ref( $artifact_ref );
+			if ( $job_id <= 0 ) {
+				return array(
+					'success' => false,
+					'error'   => 'artifact_ref is not a Data Machine job artifact ref.',
+				);
+			}
+
+			$job = ( new Jobs() )->get_job( $job_id );
+			if ( ! $job || ! is_array( $job['engine_data'] ?? null ) ) {
+				return array(
+					'success' => false,
+					'error'   => sprintf( 'Artifact metadata for job %d was not found.', $job_id ),
+				);
+			}
+
+			$engine_data = $job['engine_data'];
+		}
+
+		foreach ( $this->artifact_files_metadata( $engine_data ) as $artifact ) {
+			if ( $artifact_ref === (string) ( $artifact['artifact_ref'] ?? '' ) ) {
+				return array(
+					'success'  => true,
+					'artifact' => $artifact,
+				);
+			}
+		}
+
+		return array(
+			'success' => false,
+			'error'   => sprintf( 'Artifact ref %s was not found.', $artifact_ref ),
+		);
+	}
 
 	/**
 	 * Build a deterministic artifact payload for a job.
@@ -250,20 +305,7 @@ class JobArtifacts {
 				continue;
 			}
 
-			$out[ $key ] = $this->filter_empty(
-				array(
-					'artifact_type'   => isset( $artifact_file['artifact_type'] ) ? sanitize_key( (string) $artifact_file['artifact_type'] ) : null,
-					'artifact_ref'    => isset( $artifact_file['artifact_ref'] ) ? sanitize_text_field( (string) $artifact_file['artifact_ref'] ) : null,
-					'retention_scope' => isset( $artifact_file['retention_scope'] ) ? sanitize_key( (string) $artifact_file['retention_scope'] ) : null,
-					'relative_path'   => isset( $artifact_file['relative_path'] ) ? sanitize_text_field( (string) $artifact_file['relative_path'] ) : null,
-					'path'            => isset( $artifact_file['path'] ) ? (string) $artifact_file['path'] : null,
-					'url'             => isset( $artifact_file['url'] ) ? esc_url_raw( (string) $artifact_file['url'] ) : null,
-					'sha256'          => isset( $artifact_file['sha256'] ) ? sanitize_text_field( (string) $artifact_file['sha256'] ) : null,
-					'payload_sha256'  => isset( $artifact_file['payload_sha256'] ) ? sanitize_text_field( (string) $artifact_file['payload_sha256'] ) : null,
-					'bytes'           => isset( $artifact_file['bytes'] ) ? (int) $artifact_file['bytes'] : null,
-					'written_at'      => isset( $artifact_file['written_at'] ) ? sanitize_text_field( (string) $artifact_file['written_at'] ) : null,
-				)
-			);
+			$out[ $key ] = $this->portable_artifact_file_ref( $artifact_file );
 		}
 
 		return $out;
@@ -481,6 +523,42 @@ class JobArtifacts {
 		return $ref;
 	}
 
+	private function job_id_from_artifact_ref( string $artifact_ref ): int {
+		if ( ! preg_match( '#^datamachine://jobs/(\d+)/artifacts/#', $artifact_ref, $matches ) ) {
+			return 0;
+		}
+
+		return (int) $matches[1];
+	}
+
+	/** @return array<string,mixed> */
+	private function portable_artifact_file_ref( array $artifact_file ): array {
+		$stored_local_debug = is_array( $artifact_file['local_debug'] ?? null ) ? $artifact_file['local_debug'] : array();
+		$local_debug = $this->filter_empty(
+			array(
+				'path' => isset( $artifact_file['path'] ) ? (string) $artifact_file['path'] : ( isset( $stored_local_debug['path'] ) ? (string) $stored_local_debug['path'] : null ),
+				'url'  => isset( $artifact_file['url'] ) ? esc_url_raw( (string) $artifact_file['url'] ) : ( isset( $stored_local_debug['url'] ) ? esc_url_raw( (string) $stored_local_debug['url'] ) : null ),
+			)
+		);
+
+		return $this->filter_empty(
+			array(
+				'artifact_ref'    => isset( $artifact_file['artifact_ref'] ) ? sanitize_text_field( (string) $artifact_file['artifact_ref'] ) : null,
+				'type'            => isset( $artifact_file['type'] ) ? sanitize_key( (string) $artifact_file['type'] ) : ( isset( $artifact_file['artifact_type'] ) ? sanitize_key( (string) $artifact_file['artifact_type'] ) : null ),
+				'schema_version'  => isset( $artifact_file['schema_version'] ) ? (int) $artifact_file['schema_version'] : self::ARTIFACT_REF_SCHEMA_VERSION,
+				'sha256'          => isset( $artifact_file['sha256'] ) ? sanitize_text_field( (string) $artifact_file['sha256'] ) : null,
+				'bytes'           => isset( $artifact_file['bytes'] ) ? (int) $artifact_file['bytes'] : null,
+				'relative_path'   => isset( $artifact_file['relative_path'] ) ? sanitize_text_field( (string) $artifact_file['relative_path'] ) : null,
+				'export_url'      => isset( $artifact_file['export_url'] ) ? esc_url_raw( (string) $artifact_file['export_url'] ) : null,
+				'signed_url'      => isset( $artifact_file['signed_url'] ) ? esc_url_raw( (string) $artifact_file['signed_url'] ) : null,
+				'retention_scope' => isset( $artifact_file['retention_scope'] ) ? sanitize_key( (string) $artifact_file['retention_scope'] ) : null,
+				'payload_sha256'  => isset( $artifact_file['payload_sha256'] ) ? sanitize_text_field( (string) $artifact_file['payload_sha256'] ) : null,
+				'written_at'      => isset( $artifact_file['written_at'] ) ? sanitize_text_field( (string) $artifact_file['written_at'] ) : null,
+				'local_debug'     => ! empty( $local_debug ) ? $local_debug : null,
+			)
+		);
+	}
+
 	/**
 	 * @return array{success: bool, file?: array<string,mixed>, error?: string}
 	 */
@@ -523,19 +601,51 @@ class JobArtifacts {
 		}
 
 		$relative_path = 'datamachine-artifacts/jobs/' . $job_id . '/' . $file_name;
+		$artifact_ref  = (string) ( $artifact_payload['artifact_ref'] ?? $this->artifact_ref( $job_id, $artifact_key ) );
+		$type          = (string) ( $artifact_payload['artifact_type'] ?? $artifact_key );
+		$export_url    = apply_filters(
+			'datamachine_job_artifact_ref_export_url',
+			null,
+			array(
+				'artifact_ref'  => $artifact_ref,
+				'type'          => $type,
+				'job_id'        => $job_id,
+				'relative_path' => $relative_path,
+				'path'          => $file_path,
+			)
+		);
+		$signed_url    = apply_filters(
+			'datamachine_job_artifact_ref_signed_url',
+			null,
+			array(
+				'artifact_ref'  => $artifact_ref,
+				'type'          => $type,
+				'job_id'        => $job_id,
+				'relative_path' => $relative_path,
+				'path'          => $file_path,
+			)
+		);
+
 		return array(
 			'success' => true,
 			'file'    => $this->filter_empty(
 				array(
-					'artifact_type'  => (string) ( $artifact_payload['artifact_type'] ?? $artifact_key ),
-					'artifact_ref'   => (string) ( $artifact_payload['artifact_ref'] ?? $this->artifact_ref( $job_id, $artifact_key ) ),
-					'relative_path'  => $relative_path,
-					'path'           => $file_path,
-					'url'            => '' !== $base_url ? trailingslashit( $base_url ) . $file_name : null,
-					'sha256'         => hash( 'sha256', $json ),
-					'payload_sha256' => (string) ( $artifact_payload['sha256'] ?? '' ),
-					'bytes'          => strlen( $json ),
-					'written_at'     => gmdate( 'c' ),
+					'artifact_ref'    => $artifact_ref,
+					'type'            => $type,
+					'schema_version'  => self::ARTIFACT_REF_SCHEMA_VERSION,
+					'sha256'          => hash( 'sha256', $json ),
+					'bytes'           => strlen( $json ),
+					'relative_path'   => $relative_path,
+					'export_url'      => is_string( $export_url ) && '' !== $export_url ? $export_url : null,
+					'signed_url'      => is_string( $signed_url ) && '' !== $signed_url ? $signed_url : null,
+					'payload_sha256'  => (string) ( $artifact_payload['sha256'] ?? '' ),
+					'written_at'      => gmdate( 'c' ),
+					'local_debug'     => $this->filter_empty(
+						array(
+							'path' => $file_path,
+							'url'  => '' !== $base_url ? trailingslashit( $base_url ) . $file_name : null,
+						)
+					),
 				)
 			),
 		);

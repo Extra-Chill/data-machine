@@ -54,6 +54,26 @@ $assert(
 );
 
 $assert(
+	false !== strpos( $job_artifacts, 'public function resolve_artifact_ref' )
+		&& false !== strpos( $job_artifacts, "'artifact_ref'" )
+		&& false !== strpos( $job_artifacts, "'type'" )
+		&& false !== strpos( $job_artifacts, "'schema_version'" )
+		&& false !== strpos( $job_artifacts, "'sha256'" )
+		&& false !== strpos( $job_artifacts, "'bytes'" )
+		&& false !== strpos( $job_artifacts, "'relative_path'" ),
+	'job artifact files expose a portable ArtifactRef resolver contract'
+);
+
+$assert(
+	false !== strpos( $job_artifacts, "'local_debug'" )
+		&& false !== strpos( $job_artifacts, 'datamachine_job_artifact_ref_export_url' )
+		&& false !== strpos( $job_artifacts, 'datamachine_job_artifact_ref_signed_url' )
+		&& false === strpos( $job_artifacts, "\t\t\t\t\t'path'            =>" )
+		&& false === strpos( $job_artifacts, "\t\t\t\t\t'url'             =>" ),
+	'absolute filesystem paths and local URLs stay in local_debug while export/signed URLs are explicit'
+);
+
+$assert(
 	false !== strpos( $job_artifacts, "'required_tool_names'")
 		&& false !== strpos( $job_artifacts, "'satisfied_tool_names'" )
 		&& false !== strpos( $job_artifacts, "'successful_tool_calls'" ),
