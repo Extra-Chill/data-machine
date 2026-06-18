@@ -50,7 +50,7 @@ function datamachine_merge_engine_data( int $job_id, array $data ): bool {
 }
 
 /**
- * Append a compact engine state event trace and persist its patch as the current snapshot projection.
+ * Append a replayable engine state event and persist its patch as the current snapshot projection.
  *
  * @param int    $job_id   Job ID.
  * @param string $type     Generic event type.

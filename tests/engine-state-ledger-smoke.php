@@ -65,6 +65,13 @@ namespace {
 		}
 	}
 
+	if ( ! function_exists( 'wp_generate_uuid4' ) ) {
+		function wp_generate_uuid4(): string {
+			return '00000000-0000-4000-8000-000000000000';
+		}
+	}
+
+	require_once $root . '/inc/Core/EngineStateLedger.php';
 	require_once $root . '/inc/Core/EngineData.php';
 	require_once $root . '/inc/Engine/Filters/EngineData.php';
 
@@ -82,16 +89,28 @@ namespace {
 		array(
 			'tool_outputs' => array( 'first' => 'alpha' ),
 			'nested'       => array( 'after' => true ),
+		),
+		array(
+			'op_id'  => 'op-001',
+			'actor'  => 'test-runner',
+			'source' => 'engine-state-ledger-smoke',
 		)
 	);
 	$second = \datamachine_append_engine_state_event(
 		101,
 		'artifact_recorded',
-		array( 'artifact_files' => array( 'trace' => 'trace.json' ) )
+		array( 'artifact_files' => array( 'trace' => 'trace.json' ) ),
+		array(
+			'op_id'  => 'op-002',
+			'actor'  => 'test-runner',
+			'source' => 'artifact-writer',
+		)
 	);
 
-	$snapshot = \datamachine_get_engine_data( 101 );
-	$ledger   = $snapshot['_engine_state_ledger'] ?? array();
+	$snapshot        = \datamachine_get_engine_data( 101 );
+	$ledger          = \DataMachine\Core\EngineStateLedger::fromSnapshot( $snapshot );
+	$replayed        = \DataMachine\Core\EngineStateLedger::replaySnapshotLedger( $snapshot, array( 'existing' => 'snapshot-value', 'nested' => array( 'before' => true ) ) );
+	$replay_expected = \DataMachine\Core\EngineStateLedger::snapshotForHashing( $snapshot );
 
 	datamachine_engine_state_ledger_assert( 1 === ( $first['version'] ?? null ), 'first append starts at version 1', $failures, $passes );
 	datamachine_engine_state_ledger_assert( 2 === ( $second['version'] ?? null ), 'second append increments version monotonically', $failures, $passes );
@@ -99,9 +118,17 @@ namespace {
 	datamachine_engine_state_ledger_assert( 'snapshot-value' === ( $snapshot['existing'] ?? null ), 'snapshot compatibility preserves existing keys', $failures, $passes );
 	datamachine_engine_state_ledger_assert( 'alpha' === ( $snapshot['tool_outputs']['first'] ?? null ), 'snapshot projection includes appended patch data', $failures, $passes );
 	datamachine_engine_state_ledger_assert( true === ( $snapshot['nested']['before'] ?? null ) && true === ( $snapshot['nested']['after'] ?? null ), 'snapshot projection recursively merges patches', $failures, $passes );
+	datamachine_engine_state_ledger_assert( 1 === ( $ledger[0]['schema_version'] ?? null ), 'ledger records schema version', $failures, $passes );
+	datamachine_engine_state_ledger_assert( 'tool_result_recorded' === ( $ledger[0]['event_type'] ?? null ), 'ledger records event type alias', $failures, $passes );
+	datamachine_engine_state_ledger_assert( 'op-001' === ( $ledger[0]['op_id'] ?? null ), 'ledger records operation id', $failures, $passes );
+	datamachine_engine_state_ledger_assert( 'test-runner' === ( $ledger[0]['actor'] ?? null ), 'ledger records actor', $failures, $passes );
+	datamachine_engine_state_ledger_assert( 'engine-state-ledger-smoke' === ( $ledger[0]['source'] ?? null ), 'ledger records source', $failures, $passes );
+	datamachine_engine_state_ledger_assert( array( 'tool_outputs' => array( 'first' => 'alpha' ), 'nested' => array( 'after' => true ) ) === ( $ledger[0]['patch'] ?? null ), 'ledger stores replayable patch body', $failures, $passes );
 	datamachine_engine_state_ledger_assert( in_array( 'artifact_files', $ledger[1]['patch_keys'] ?? array(), true ), 'ledger records compact patch keys', $failures, $passes );
 	datamachine_engine_state_ledger_assert( is_string( $ledger[1]['patch_hash'] ?? null ) && 0 === strpos( $ledger[1]['patch_hash'], 'sha256:' ), 'ledger records deterministic patch hash', $failures, $passes );
-	datamachine_engine_state_ledger_assert( ! array_key_exists( 'patch', $ledger[1] ?? array() ), 'ledger omits full patch payload by default', $failures, $passes );
+	datamachine_engine_state_ledger_assert( is_string( $ledger[1]['pre_snapshot_hash'] ?? null ) && 0 === strpos( $ledger[1]['pre_snapshot_hash'], 'sha256:' ), 'ledger records pre snapshot hash', $failures, $passes );
+	datamachine_engine_state_ledger_assert( is_string( $ledger[1]['post_snapshot_hash'] ?? null ) && 0 === strpos( $ledger[1]['post_snapshot_hash'], 'sha256:' ), 'ledger records post snapshot hash', $failures, $passes );
+	datamachine_engine_state_ledger_assert( $replay_expected === $replayed, 'ledger events replay to snapshot projection', $failures, $passes );
 
 	if ( ! empty( $failures ) ) {
 		echo "\nFailures:\n";
