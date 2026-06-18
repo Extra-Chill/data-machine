@@ -104,6 +104,8 @@ namespace {
 	}
 
 	require_once __DIR__ . '/../inc/Core/JobStatus.php';
+	require_once __DIR__ . '/../inc/Core/JobArtifactSurfaces.php';
+	require_once __DIR__ . '/../inc/Core/StepResult.php';
 	require_once __DIR__ . '/../inc/Core/RunResult.php';
 	require_once __DIR__ . '/../inc/Core/EngineData.php';
 	require_once __DIR__ . '/../inc/Core/RunMetrics.php';
@@ -198,7 +200,7 @@ namespace {
 	);
 
 	datamachine_step_result_persistence_assert( RunResult::SCHEMA_VERSION === ( $metrics['run_result']['schema_version'] ?? null ), 'RunMetrics exposes canonical RunResult summary' );
-	datamachine_step_result_persistence_assert( 'datamachine.step_result.v1' === ( $metrics['run_result']['steps'][0]['schema_version'] ?? null ), 'RunResult summary includes persisted StepResult envelope' );
+	datamachine_step_result_persistence_assert( 'datamachine.step_result.v1' === ( $metrics['run_result']['step_results'][0]['schema_version'] ?? null ), 'RunResult summary includes persisted StepResult envelope' );
 
 	echo "\n=== step-result-persistence-cas-smoke: ALL PASS ===\n";
 }
