@@ -2,6 +2,15 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.152.1] - 2026-06-18
+
+### Changed
+- Add replayable engine state ledger
+- Add CAS-backed engine data mutations
+
+### Fixed
+- stop chat migration phpcs:disable block from unmasking ignored queries
+
 ## [0.152.0] - 2026-06-18
 
 ### Added
