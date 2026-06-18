@@ -78,6 +78,50 @@ class RuntimeToolRunStateStoreTest extends TestCase {
 		$this->assertSame( RuntimeToolRunStateStore::STATUS_RESUMED, $second['status'] );
 	}
 
+	public function test_finalize_retries_conflicting_engine_data_write(): void {
+		$jobs  = new RuntimeToolRunStateJobsDouble();
+		$store = new RuntimeToolRunStateStore( $jobs );
+
+		$store->create(
+			42,
+			array(
+				'runtime_tool_request_id' => 'runtime_tool_42',
+				'tool_name'               => 'client.inspect',
+			)
+		);
+
+		$jobs->conflict_once_with = array( 'concurrent_metric' => array( 'count' => 1 ) );
+		$jobs->cas_attempts      = 0;
+
+		$state = $store->finalize( 42, array( 'result' => array( 'value' => 'final' ) ) );
+
+		$this->assertSame( RuntimeToolRunStateStore::STATUS_FINALIZED, $state['status'] );
+		$this->assertSame( 'final', $state['finalize_payload']['result']['value'] );
+		$this->assertSame( 1, $jobs->data[42]['concurrent_metric']['count'] );
+		$this->assertSame( 2, $jobs->cas_attempts );
+	}
+
+	public function test_create_retries_conflicting_engine_data_write(): void {
+		$jobs                         = new RuntimeToolRunStateJobsDouble();
+		$jobs->data[42]               = array( 'existing_key' => 'before' );
+		$jobs->conflict_once_with     = array( 'concurrent_metric' => array( 'count' => 1 ) );
+		$store                        = new RuntimeToolRunStateStore( $jobs );
+
+		$state = $store->create(
+			42,
+			array(
+				'runtime_tool_request_id' => 'runtime_tool_42',
+				'tool_name'               => 'client.inspect',
+			)
+		);
+
+		$this->assertSame( RuntimeToolRunStateStore::STATUS_PENDING, $state['status'] );
+		$this->assertSame( 'before', $jobs->data[42]['existing_key'] );
+		$this->assertSame( 1, $jobs->data[42]['concurrent_metric']['count'] );
+		$this->assertArrayHasKey( 'runtime_tool_run_state', $jobs->data[42] );
+		$this->assertSame( 2, $jobs->cas_attempts );
+	}
+
 	public function test_create_from_request_maps_timeout_and_deadline_fields(): void {
 		$jobs  = new RuntimeToolRunStateJobsDouble();
 		$store = new RuntimeToolRunStateStore( $jobs );
@@ -108,6 +152,11 @@ class RuntimeToolRunStateJobsDouble {
 	/** @var array<int,array<string,mixed>> */
 	public array $data = array();
 
+	/** @var array<string,mixed>|null */
+	public ?array $conflict_once_with = null;
+
+	public int $cas_attempts = 0;
+
 	/**
 	 * @param int $job_id Job ID.
 	 * @return array<string,mixed>
@@ -124,5 +173,43 @@ class RuntimeToolRunStateJobsDouble {
 		$this->data[ $job_id ] = $data;
 
 		return true;
+	}
+
+	/**
+	 * @param int                 $job_id        Job ID.
+	 * @param array<string,mixed> $expected_data Expected engine data.
+	 * @param array<string,mixed> $new_data      New engine data.
+	 * @return array{updated:bool,conflict:bool,error:string|null}
+	 */
+	public function compare_and_swap_engine_data( int $job_id, array $expected_data, array $new_data ): array {
+		$this->cas_attempts++;
+		$current = $this->data[ $job_id ] ?? array();
+
+		if ( null !== $this->conflict_once_with ) {
+			$this->data[ $job_id ]      = array_replace_recursive( $current, $this->conflict_once_with );
+			$this->conflict_once_with = null;
+
+			return array(
+				'updated'  => false,
+				'conflict' => true,
+				'error'    => null,
+			);
+		}
+
+		if ( $current !== $expected_data ) {
+			return array(
+				'updated'  => false,
+				'conflict' => true,
+				'error'    => null,
+			);
+		}
+
+		$this->data[ $job_id ] = $new_data;
+
+		return array(
+			'updated'  => true,
+			'conflict' => false,
+			'error'    => null,
+		);
 	}
 }
