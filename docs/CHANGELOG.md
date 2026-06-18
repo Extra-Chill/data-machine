@@ -2,6 +2,24 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.152.0] - 2026-06-18
+
+### Added
+- store chat sessions network-wide so chat follows users across subsites
+
+### Changed
+- Expect canonical agent config defaults
+- Add portable step result envelopes
+- Add portable job artifact refs
+- Route delegated runtime tools through result resolver
+
+### Fixed
+- green CI for network-wide chat sessions
+- Fix step result envelope lint
+- Fix job artifact PHPCS lint
+- Fix job failure handler formatting
+- Fix deterministic job lifecycle states
+
 ## [0.151.0] - 2026-06-18
 
 ### Added
