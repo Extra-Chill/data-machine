@@ -182,7 +182,7 @@ $projected_outputs = $output_projection->invoke(
 				'artifact_outputs' => array(
 					array(
 						'output_key' => 'concept_packet',
-						'schema'     => 'wp-site-generator/ConceptPacket/v1',
+						'schema'     => 'example-agent/ConceptPacket/v1',
 						'artifact'   => 'ConceptPacket',
 					),
 				),
@@ -193,13 +193,13 @@ $projected_outputs = $output_projection->invoke(
 			'agent_id'                       => 7,
 			'store_idea_agent'              => array(
 				'issue_number' => 456,
-				'issue_url'    => 'https://github.com/chubes4/wp-site-generator/issues/456',
+				'issue_url'    => 'https://github.com/Extra-Chill/example-agent/issues/456',
 			),
 			'outputs'                        => array(
 				'summary_title'    => 'semantic output projection',
 				'typed_artifacts'  => array(
 					'concept_packet' => array(
-						'schema'   => 'wp-site-generator/ConceptPacket/v1',
+						'schema'   => 'example-agent/ConceptPacket/v1',
 						'artifact' => 'ConceptPacket',
 						'payload'  => array( 'title' => 'Projected typed artifact' ),
 					),
@@ -223,7 +223,7 @@ datamachine_bundle_runner_assert( 'https://github.com/Extra-Chill/data-machine/i
 datamachine_bundle_runner_assert( 'artifacts/result.json' === ( $projected_outputs['outputs']['result_path'] ?? null ), 'common scalar task output is projected', $failures, $passes );
 datamachine_bundle_runner_assert( 'semantic output projection' === ( $projected_outputs['outputs']['summary_title'] ?? null ), 'explicit outputs map is projected', $failures, $passes );
 datamachine_bundle_runner_assert( 456 === ( $projected_outputs['outputs']['store_issue_number'] ?? null ), 'declared nested engine_data output number is projected', $failures, $passes );
-datamachine_bundle_runner_assert( 'https://github.com/chubes4/wp-site-generator/issues/456' === ( $projected_outputs['outputs']['store_issue_url'] ?? null ), 'declared nested engine_data output URL is projected', $failures, $passes );
+datamachine_bundle_runner_assert( 'https://github.com/Extra-Chill/example-agent/issues/456' === ( $projected_outputs['outputs']['store_issue_url'] ?? null ), 'declared nested engine_data output URL is projected', $failures, $passes );
 datamachine_bundle_runner_assert( array( 'title' => 'Projected typed artifact' ) === ( $projected_outputs['outputs']['concept_packet'] ?? null ), 'declared typed artifact payload path is projected', $failures, $passes );
 datamachine_bundle_runner_assert( ! isset( $projected_outputs['outputs']['agent_id'] ), 'runtime identity fields are not projected as outputs', $failures, $passes );
 datamachine_bundle_runner_assert( array( 'issue_number', 'issue_url', 'missing_result_url' ) === ( $projected_outputs['diagnostics']['required_outputs'] ?? null ), 'required semantic outputs are diagnosed', $failures, $passes );
@@ -306,7 +306,7 @@ $GLOBALS['datamachine_bundle_runner_engine_data_merges'] = array();
 				'success' => true,
 				'data'    => array(
 					'head'     => 'static/issue-460-design-direction',
-					'html_url' => 'https://github.com/chubes4/wp-site-generator/pull/461',
+					'html_url' => 'https://github.com/Extra-Chill/example-agent/pull/461',
 				),
 			),
 		),
@@ -316,7 +316,7 @@ $recorded_merge = $GLOBALS['datamachine_bundle_runner_engine_data_merges'][0] ??
 datamachine_bundle_runner_assert( 77 === ( $recorded_merge['job_id'] ?? null ), 'tool recorder writes to the owning job', $failures, $passes );
 datamachine_bundle_runner_assert( 'tool_result_recorded' === ( $recorded_merge['type'] ?? null ), 'tool recorder uses versioned append path when available', $failures, $passes );
 datamachine_bundle_runner_assert( 'static/issue-460-design-direction' === ( $recorded_merge['data']['static_site_agent']['branch'] ?? null ), 'tool recorder maps branch from result data', $failures, $passes );
-datamachine_bundle_runner_assert( 'https://github.com/chubes4/wp-site-generator/pull/461' === ( $recorded_merge['data']['static_site_agent']['pr_url'] ?? null ), 'tool recorder maps PR URL from result data', $failures, $passes );
+datamachine_bundle_runner_assert( 'https://github.com/Extra-Chill/example-agent/pull/461' === ( $recorded_merge['data']['static_site_agent']['pr_url'] ?? null ), 'tool recorder maps PR URL from result data', $failures, $passes );
 datamachine_bundle_runner_assert( 'issue-460-design-direction' === ( $recorded_merge['data']['static_site_agent']['slug'] ?? null ), 'tool recorder applies strip_prefix transforms', $failures, $passes );
 
 $GLOBALS['datamachine_bundle_runner_engine_data_merges'] = array();
@@ -343,7 +343,7 @@ $GLOBALS['datamachine_bundle_runner_engine_data_merges'] = array();
 			'tool_result_data' => array(
 				'data' => array(
 					'head'     => 'static/issue-468-design-direction',
-					'html_url' => 'https://github.com/chubes4/wp-site-generator/pull/470',
+					'html_url' => 'https://github.com/Extra-Chill/example-agent/pull/470',
 				),
 			),
 		),
@@ -351,7 +351,7 @@ $GLOBALS['datamachine_bundle_runner_engine_data_merges'] = array();
 );
 $recorded_envelope_merge = $GLOBALS['datamachine_bundle_runner_engine_data_merges'][0] ?? array();
 datamachine_bundle_runner_assert( 'static/issue-468-design-direction' === ( $recorded_envelope_merge['data']['static_site_agent']['branch'] ?? null ), 'tool recorder maps branch from wrapped tool_result_data', $failures, $passes );
-datamachine_bundle_runner_assert( 'https://github.com/chubes4/wp-site-generator/pull/470' === ( $recorded_envelope_merge['data']['static_site_agent']['pr_url'] ?? null ), 'tool recorder maps PR URL from wrapped tool_result_data', $failures, $passes );
+datamachine_bundle_runner_assert( 'https://github.com/Extra-Chill/example-agent/pull/470' === ( $recorded_envelope_merge['data']['static_site_agent']['pr_url'] ?? null ), 'tool recorder maps PR URL from wrapped tool_result_data', $failures, $passes );
 
 $GLOBALS['datamachine_bundle_runner_engine_data_merges'] = array();
 \DataMachine\Engine\AI\datamachine_record_tool_results_to_engine_data(
@@ -378,7 +378,7 @@ $GLOBALS['datamachine_bundle_runner_engine_data_merges'] = array();
 				'metadata' => array(
 					'tool_result_data' => array(
 						'issue_number' => 516,
-						'issue_url'    => 'https://github.com/chubes4/wp-site-generator/issues/516',
+						'issue_url'    => 'https://github.com/Extra-Chill/example-agent/issues/516',
 					),
 				),
 			),
@@ -387,7 +387,7 @@ $GLOBALS['datamachine_bundle_runner_engine_data_merges'] = array();
 );
 $recorded_direct_tool_merge = $GLOBALS['datamachine_bundle_runner_engine_data_merges'][0] ?? array();
 datamachine_bundle_runner_assert( 516 === ( $recorded_direct_tool_merge['data']['design_agent']['issue_number'] ?? null ), 'tool recorder maps issue number from direct tool metadata payload', $failures, $passes );
-datamachine_bundle_runner_assert( 'https://github.com/chubes4/wp-site-generator/issues/516' === ( $recorded_direct_tool_merge['data']['design_agent']['issue_url'] ?? null ), 'tool recorder maps issue URL from direct tool metadata payload', $failures, $passes );
+datamachine_bundle_runner_assert( 'https://github.com/Extra-Chill/example-agent/issues/516' === ( $recorded_direct_tool_merge['data']['design_agent']['issue_url'] ?? null ), 'tool recorder maps issue URL from direct tool metadata payload', $failures, $passes );
 
 $GLOBALS['datamachine_bundle_runner_engine_data_merges'] = array();
 \DataMachine\Engine\AI\datamachine_record_tool_results_to_engine_data(
@@ -414,7 +414,7 @@ $GLOBALS['datamachine_bundle_runner_engine_data_merges'] = array();
 				'result'  => array(
 					'kind'         => 'issue',
 					'issue_number' => 522,
-					'issue_url'    => 'https://github.com/chubes4/wp-site-generator/issues/522',
+					'issue_url'    => 'https://github.com/Extra-Chill/example-agent/issues/522',
 				),
 			),
 		),
@@ -422,7 +422,7 @@ $GLOBALS['datamachine_bundle_runner_engine_data_merges'] = array();
 );
 $recorded_direct_envelope_merge = $GLOBALS['datamachine_bundle_runner_engine_data_merges'][0] ?? array();
 datamachine_bundle_runner_assert( 522 === ( $recorded_direct_envelope_merge['data']['design_agent']['issue_number'] ?? null ), 'tool recorder maps issue number from direct result envelope payload', $failures, $passes );
-datamachine_bundle_runner_assert( 'https://github.com/chubes4/wp-site-generator/issues/522' === ( $recorded_direct_envelope_merge['data']['design_agent']['issue_url'] ?? null ), 'tool recorder maps issue URL from direct result envelope payload', $failures, $passes );
+datamachine_bundle_runner_assert( 'https://github.com/Extra-Chill/example-agent/issues/522' === ( $recorded_direct_envelope_merge['data']['design_agent']['issue_url'] ?? null ), 'tool recorder maps issue URL from direct result envelope payload', $failures, $passes );
 
 echo "\n[3d] Runner applies run-scoped flow step patches\n";
 $workflow_from_bundle_flow = $runner_reflection->getMethod( 'workflow_from_bundle_flow' );
@@ -437,7 +437,7 @@ $patched_workflow          = $workflow_from_bundle_flow->invoke(
 				'step_type'        => 'fetch',
 				'handler_configs'  => array(
 					'github' => array(
-						'repo'   => 'chubes4/wp-site-generator',
+						'repo'   => 'Extra-Chill/example-agent',
 						'labels' => 'status:idea-ready',
 					),
 				),
@@ -487,7 +487,7 @@ $patched_workflow          = $workflow_from_bundle_flow->invoke(
 	)
 );
 datamachine_bundle_runner_assert( 429 === ( $patched_workflow['steps'][0]['handler_configs']['github']['issue_number'] ?? null ), 'flow step patch merges nested handler config', $failures, $passes );
-datamachine_bundle_runner_assert( 'chubes4/wp-site-generator' === ( $patched_workflow['steps'][0]['handler_configs']['github']['repo'] ?? null ), 'flow step patch preserves existing handler config', $failures, $passes );
+datamachine_bundle_runner_assert( 'Extra-Chill/example-agent' === ( $patched_workflow['steps'][0]['handler_configs']['github']['repo'] ?? null ), 'flow step patch preserves existing handler config', $failures, $passes );
 datamachine_bundle_runner_assert( 'github_pull_request_publish' === ( $patched_workflow['steps'][1]['tool_recorders'][0]['tool'] ?? null ), 'run-scoped tool recorders are projected onto AI workflow steps', $failures, $passes );
 
 $ephemeral_configs = DataMachine\Core\Steps\WorkflowConfigFactory::buildEphemeralConfigs( $patched_workflow );

@@ -1209,7 +1209,7 @@ $typed_artifact_assertions = new \DataMachine\Engine\AI\DataMachineCompletionAss
 		'required_artifact_outputs' => array(
 			array(
 				'output_key' => 'concept_packet',
-				'schema'     => 'wp-site-generator/ConceptPacket/v1',
+				'schema'     => 'example-agent/ConceptPacket/v1',
 				'artifact'   => 'ConceptPacket',
 			),
 		),
@@ -1221,7 +1221,7 @@ $typed_artifact_evaluation = $typed_artifact_assertions->evaluate(
 			'outputs' => array(
 				'typed_artifacts' => array(
 					'concept_packet' => array(
-						'schema'   => 'wp-site-generator/ConceptPacket/v1',
+						'schema'   => 'example-agent/ConceptPacket/v1',
 						'artifact' => 'ConceptPacket',
 						'payload'  => array( 'title' => 'Test concept' ),
 					),
@@ -1240,7 +1240,7 @@ $missing_typed_artifact_evaluation = $typed_artifact_assertions->evaluate(
 			'outputs' => array(
 				'typed_artifacts' => array(
 					'concept_packet' => array(
-						'schema'   => 'wp-site-generator/ConceptPacket/v2',
+						'schema'   => 'example-agent/ConceptPacket/v2',
 						'artifact' => 'ConceptPacket',
 						'payload'  => array( 'title' => 'Wrong schema' ),
 					),
