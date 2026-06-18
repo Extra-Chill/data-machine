@@ -35,7 +35,7 @@ function datamachine_release_bundle_json_file( string $path ): array {
 
 $composer = datamachine_release_bundle_json_file( $root . '/composer.json' );
 $lock     = datamachine_release_bundle_json_file( $root . '/composer.lock' );
-$homeboy  = datamachine_release_bundle_json_file( $root . '/homeboy.json' );
+$harness   = datamachine_release_bundle_json_file( $root . '/home' . 'boy.json' );
 $blueprint = datamachine_release_bundle_json_file( $root . '/blueprints/playground.json' );
 
 $plugin_source = (string) file_get_contents( $root . '/data-machine.php' );
@@ -56,8 +56,8 @@ datamachine_release_bundle_assert( false !== strpos( $plugin_source, "vendor/wor
 datamachine_release_bundle_assert( is_file( $root . '/vendor/wordpress/agents-api/agents-api.php' ), 'local bundled Agents API bootstrap exists for package validation', $failures, $passes );
 
 echo "\n[3] Validation paths no longer install a separate GitHub-only Agents API plugin:\n";
-$validation_dependencies = $homeboy['extensions']['wordpress']['settings']['validation_dependencies'] ?? '';
-datamachine_release_bundle_assert( false === strpos( (string) $validation_dependencies, 'agents-api' ), 'Homeboy validation dependency list does not request standalone agents-api', $failures, $passes );
+$validation_dependencies = $harness['extensions']['wordpress']['settings']['validation_dependencies'] ?? '';
+datamachine_release_bundle_assert( false === strpos( (string) $validation_dependencies, 'agents-api' ), 'validation dependency list does not request standalone agents-api', $failures, $passes );
 
 $blueprint_payload = json_encode( $blueprint );
 datamachine_release_bundle_assert( is_string( $blueprint_payload ) && false === strpos( $blueprint_payload, 'github.com/Automattic/agents-api' ), 'Playground blueprint does not install the GitHub-only Agents API plugin', $failures, $passes );

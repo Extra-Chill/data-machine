@@ -36,7 +36,7 @@ $normalized = \DataMachine\Engine\AI\datamachine_normalize_typed_artifact_output
 		'typed_artifacts' => array(
 			array(
 				'output_key' => 'concept_packet',
-				'schema'     => 'wp-site-generator/ConceptPacket/v1',
+				'schema'     => 'example-agent/ConceptPacket/v1',
 				'artifact'   => 'ConceptPacket',
 				'payload'    => array( 'title' => 'Normalized concept' ),
 			),
@@ -56,7 +56,7 @@ $assertions = new \DataMachine\Engine\AI\DataMachineCompletionAssertions(
 		'required_artifact_outputs' => array(
 			array(
 				'output_key' => 'concept_packet',
-				'schema'     => 'wp-site-generator/ConceptPacket/v1',
+				'schema'     => 'example-agent/ConceptPacket/v1',
 				'artifact'   => 'ConceptPacket',
 			),
 		),
@@ -83,7 +83,7 @@ $missing = $assertions->evaluate(
 			'outputs' => array(
 				'typed_artifacts' => array(
 					'concept_packet' => array(
-						'schema'   => 'wp-site-generator/ConceptPacket/v1',
+						'schema'   => 'example-agent/ConceptPacket/v1',
 						'artifact' => 'ConceptPacket',
 						'payload'  => array(),
 					),

@@ -339,10 +339,9 @@ See [`docs/development/hooks/core-filters.md`](docs/development/hooks/core-filte
 ## Development
 
 ```bash
-homeboy test data-machine    # PHPUnit tests
-homeboy audit data-machine   # Architecture and convention audits
-homeboy build data-machine   # Test, lint, build, package
-homeboy lint data-machine    # PHPCS with WordPress standards
+composer test    # PHP smoke tests
+composer lint    # PHPCS with WordPress standards
+npm run build    # Build admin assets
 ```
 
 ## Documentation
