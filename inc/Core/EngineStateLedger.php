@@ -61,7 +61,7 @@ class EngineStateLedger {
 			$event['metadata'] = $metadata;
 		}
 
-		$ledger[]                         = $event;
+		$ledger[]                        = $event;
 		$projected[ self::SNAPSHOT_KEY ] = $ledger;
 
 		return array(
