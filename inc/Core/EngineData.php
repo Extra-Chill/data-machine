@@ -226,7 +226,7 @@ class EngineData {
 	}
 
 	/**
-	 * Append a compact state event trace and persist its patch as the current snapshot projection.
+	 * Append a replayable state event and persist its patch as the current snapshot projection.
 	 *
 	 * @param int    $job_id   Job ID.
 	 * @param string $type     Generic event type.
@@ -239,90 +239,44 @@ class EngineData {
 			return null;
 		}
 
-		$entry  = null;
+		$event  = null;
 		$result = self::mutate(
 			$job_id,
-			static function ( array $current ) use ( $type, $patch, $metadata, &$entry ): array {
-				$ledger = is_array( $current['_engine_state_ledger'] ?? null ) ? $current['_engine_state_ledger'] : array();
-				$entry  = array(
-					'version'     => self::nextLedgerVersion( $ledger ),
-					'type'        => sanitize_key( $type ),
-					'recorded_at' => gmdate( 'c' ),
-					'patch_keys'  => array_keys( $patch ),
-					'patch_hash'  => self::stableHash( $patch ),
-				);
-
-				if ( ! empty( $metadata ) ) {
-					$entry['metadata'] = $metadata;
+			static function ( array $current ) use ( $type, $patch, $metadata, &$event ): ?array {
+				$projection = EngineStateLedger::append( $current, $type, $patch, $metadata );
+				if ( null === $projection ) {
+					return null;
 				}
 
-				$ledger[]                          = $entry;
-				$projected                         = array_replace_recursive( $current, $patch );
-				$projected['_engine_state_ledger'] = $ledger;
+				$event = $projection['event'];
 
-				return $projected;
+				return $projection['snapshot'];
 			},
 			$type
 		);
 
-		return ! empty( $result['success'] ) ? $entry : null;
+		return ! empty( $result['success'] ) ? $event : null;
 	}
 
 	/**
-	 * Resolve the next monotonically increasing ledger version.
+	 * Return replayable state ledger events from a snapshot.
 	 *
-	 * @param array $ledger Existing ledger entries.
-	 * @return int Next version number.
+	 * @param array $snapshot Engine data snapshot.
+	 * @return array Ledger events.
 	 */
-	private static function nextLedgerVersion( array $ledger ): int {
-		$version = 0;
-		foreach ( $ledger as $entry ) {
-			if ( is_array( $entry ) && isset( $entry['version'] ) ) {
-				$version = max( $version, (int) $entry['version'] );
-			}
-		}
-
-		return $version + 1;
+	public static function stateLedger( array $snapshot ): array {
+		return EngineStateLedger::fromSnapshot( $snapshot );
 	}
 
 	/**
-	 * Build a stable hash for a projected state patch.
+	 * Replay state ledger events onto a base snapshot.
 	 *
-	 * @param array $patch Engine data patch.
-	 * @return string sha256 hash prefixed for readability.
+	 * @param array $events        Ledger events.
+	 * @param array $base_snapshot Optional base snapshot.
+	 * @return array Replayed engine data snapshot without ledger metadata.
 	 */
-	private static function stableHash( array $patch ): string {
-		$normalized = self::sortRecursively( $patch );
-		$json       = wp_json_encode( $normalized, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PARTIAL_OUTPUT_ON_ERROR );
-
-		if ( ! is_string( $json ) ) {
-			$json = 'null';
-		}
-
-		return 'sha256:' . hash( 'sha256', $json );
-	}
-
-	/**
-	 * Recursively sort associative array keys for deterministic hashing.
-	 *
-	 * @param mixed $value Value to sort.
-	 * @return mixed Sorted value.
-	 */
-	private static function sortRecursively( $value ) {
-		if ( ! is_array( $value ) ) {
-			return $value;
-		}
-
-		$sorted = array();
-		foreach ( $value as $key => $item ) {
-			$sorted[ $key ] = self::sortRecursively( $item );
-		}
-
-		if ( array_keys( $sorted ) !== range( 0, count( $sorted ) - 1 ) ) {
-			ksort( $sorted );
-		}
-
-		return $sorted;
+	public static function replayStateLedger( array $events, array $base_snapshot = array() ): array {
+		return EngineStateLedger::replay( $events, $base_snapshot );
 	}
 
 	/**
