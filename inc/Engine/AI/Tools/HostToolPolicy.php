@@ -56,6 +56,18 @@ final class HostToolPolicy {
 	}
 
 	/**
+	 * Return a normalized policy snapshot from the process environment.
+	 *
+	 * This lets durable job runners capture host ownership while the launching
+	 * process still has the host-provided environment available.
+	 *
+	 * @return array<string,mixed>|null
+	 */
+	public static function environmentSnapshot(): ?array {
+		return self::normalizePolicy( self::policyFromEnvironment() );
+	}
+
+	/**
 	 * Return the execution location assigned to a tool by host policy.
 	 */
 	public function executionLocation( string $tool_name ): string {

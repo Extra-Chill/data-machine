@@ -534,6 +534,29 @@ $completion_assertions = new \DataMachine\Engine\AI\DataMachineCompletionAsserti
 assert_policy_equals( array(), $completion_assertions->unavailableRequiredToolNames( $resolution['tools'] ), 'complete_when_any treats delegated control-plane path as available', $failures, $passes );
 assert_policy_equals( array( 'alpha_tool', 'control_plane_ability' ), $completion_assertions->unavailableRequiredToolNames( array() ), 'complete_when_any still reports missing tools without a delegated path', $failures, $passes );
 
+echo "\n[12] host tool policy accepts default_location policy payloads:\n";
+$resolution = ( new ToolPolicyResolver( new SnapshotPolicyToolManager() ) )->resolveWithEvidence(
+	array(
+		'mode'                => ToolPolicyResolver::MODE_PIPELINE,
+		'pipeline_step_id'    => 'ephemeral_pipeline_0',
+		'engine_data'         => array(),
+		'categories'          => array(),
+		'allow_only_explicit' => true,
+		'allow_only'          => array( 'alpha_tool', 'beta_tool' ),
+		'host_tool_policy'    => array(
+			'schema'           => 'homeboy/agent-tool-policy/v1',
+			'default_location' => 'runner',
+			'tools'            => array(
+				'alpha_tool' => array( 'execution_location' => 'control_plane' ),
+			),
+		),
+	),
+	array( 'alpha_tool' ),
+	array( 'alpha_tool', 'beta_tool' )
+);
+assert_policy_equals( 'client', $resolution['tools']['alpha_tool']['executor'] ?? null, 'default_location host policy delegates explicit control-plane tool', $failures, $passes );
+assert_policy_equals( null, $resolution['tools']['beta_tool']['executor'] ?? null, 'default_location host policy leaves runner-default tool local', $failures, $passes );
+
 if ( $failures ) {
 	echo "\nFAILED: " . count( $failures ) . " pipeline policy assertions failed.\n";
 	exit( 1 );
