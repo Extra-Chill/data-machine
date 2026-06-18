@@ -1768,7 +1768,7 @@ class JobsCommand extends BaseCommand {
 
 		$content = (string) ( $result['content'] ?? '' );
 		unset( $result['content'] );
-		$result['content_base64'] = base64_encode( $content );
+		$result['content_base64'] = base64_encode( $content ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- Encodes verified artifact bytes for JSON-safe transport.
 		$result['encoding']       = 'base64';
 
 		WP_CLI::log( wp_json_encode( $result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE ) );

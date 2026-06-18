@@ -83,7 +83,7 @@ class HydrateJobArtifactAbility {
 
 		$content = (string) ( $result['content'] ?? '' );
 		unset( $result['content'] );
-		$result['content_base64'] = base64_encode( $content );
+		$result['content_base64'] = base64_encode( $content ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- Encodes verified artifact bytes for JSON-safe transport.
 		$result['encoding']       = 'base64';
 
 		return $result;

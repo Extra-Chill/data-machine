@@ -145,11 +145,13 @@ $missing_result = $artifacts->hydrate_artifact_ref( $artifact_ref, $without_stor
 $assert_true( false === ( $missing_result['success'] ?? true ), 'rejects traversal-shaped storage paths' );
 
 $filtered_content = "filter-storage\n";
-$GLOBALS['datamachine_test_filters']['datamachine_job_artifact_ref_content'] = array(
-	static function ( $value, array $args ) use ( $artifact_ref, $filtered_content ) {
-		return $artifact_ref === ( $args['artifact_ref'] ?? '' ) ? $filtered_content : $value;
-	},
-);
+$filter_callback = static function ( $value, array $args ) use ( $artifact_ref, $filtered_content ) {
+	return $artifact_ref === ( $args['artifact_ref'] ?? '' ) ? $filtered_content : $value;
+};
+$GLOBALS['datamachine_test_filters']['datamachine_job_artifact_ref_content'] = array( $filter_callback );
+if ( function_exists( 'add_filter' ) ) {
+	add_filter( 'datamachine_job_artifact_ref_content', $filter_callback, 10, 2 );
+}
 $filter_engine_data = array(
 	'artifact_files' => array(
 		'filtered' => array(
