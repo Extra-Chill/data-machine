@@ -77,10 +77,10 @@ class RunMetrics {
 
 		$engine[ self::STEP_RESULTS_KEY ] = $step_results;
 		if ( is_array( $clean_result['step_result'] ?? null ) ) {
-			$step_result_envelopes                  = is_array( $engine[ self::STEP_RESULT_ENVELOPES_KEY ] ?? null ) ? $engine[ self::STEP_RESULT_ENVELOPES_KEY ] : array();
-			$step_result_envelope                   = $clean_result['step_result'];
-			$step_result_envelope['flow_step_id'] ??= $flow_step_id;
-			$step_result_envelopes[ $flow_step_id ] = $step_result_envelope;
+			$step_result_envelopes                     = is_array( $engine[ self::STEP_RESULT_ENVELOPES_KEY ] ?? null ) ? $engine[ self::STEP_RESULT_ENVELOPES_KEY ] : array();
+			$step_result_envelope                      = $clean_result['step_result'];
+			$step_result_envelope['flow_step_id']    ??= $flow_step_id;
+			$step_result_envelopes[ $flow_step_id ]    = $step_result_envelope;
 			$engine[ self::STEP_RESULT_ENVELOPES_KEY ] = $step_result_envelopes;
 		}
 
@@ -525,8 +525,8 @@ class RunMetrics {
 		}
 
 		unset( $engine[ self::RUN_RESULT_KEY ] );
-		$job['engine_data']              = $engine;
-		$summary                         = self::fromJob( $job );
+		$job['engine_data']             = $engine;
+		$summary                        = self::fromJob( $job );
 		$engine[ self::RUN_RESULT_KEY ] = RunResult::fromJobSummary( $job, $summary );
 
 		return $engine;

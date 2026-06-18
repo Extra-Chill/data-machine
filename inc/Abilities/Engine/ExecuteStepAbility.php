@@ -121,8 +121,8 @@ class ExecuteStepAbility {
 		// 'pending' → 'processing', ensuring recover-stuck only catches jobs
 		// that genuinely started but never finished.
 		if ( ! $this->db_jobs->start_job( $job_id ) ) {
-			$job_after_start       = $this->db_jobs->get_job( $job_id );
-			$current_status        = is_array( $job_after_start ) ? (string) ( $job_after_start['status'] ?? '' ) : '';
+			$job_after_start      = $this->db_jobs->get_job( $job_id );
+			$current_status       = is_array( $job_after_start ) ? (string) ( $job_after_start['status'] ?? '' ) : '';
 			$terminal_after_start = JobStatus::isStatusFinal( $current_status );
 
 			return array(
