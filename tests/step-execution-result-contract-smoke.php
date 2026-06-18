@@ -19,10 +19,14 @@ if ( ! function_exists( 'sanitize_key' ) ) {
 }
 
 require_once __DIR__ . '/../inc/Core/JobStatus.php';
+require_once __DIR__ . '/../inc/Core/StepResult.php';
+require_once __DIR__ . '/../inc/Core/RunResult.php';
 require_once __DIR__ . '/../inc/Core/StepExecutionResult.php';
 
 use DataMachine\Core\JobStatus;
+use DataMachine\Core\RunResult;
 use DataMachine\Core\StepExecutionResult;
+use DataMachine\Core\StepResult;
 
 $failures = 0;
 $total    = 0;
@@ -155,6 +159,46 @@ $result = StepExecutionResult::classify(
 $assert( 'recovered failed runtime tool does not fail final step', 'succeeded' === $result['status'] );
 $assert( 'recovered failed runtime tool packet remains in audit packets', false === ( $result['packets'][0]['metadata']['tool_success'] ?? null ) );
 $assert( 'recovered failed runtime tool diagnostics remain in packet history', 'file_too_large' === ( $result['packets'][0]['metadata']['tool_result_envelope']['code'] ?? '' ) );
+
+echo "\n[7] step result envelope carries portable deterministic refs\n";
+$result = StepExecutionResult::fromStepOutput(
+	array(
+		'status'        => 'succeeded',
+		'outputs'       => array( 'post_id' => 123 ),
+		'artifact_refs' => array(
+			array(
+				'type' => 'file',
+				'uri'  => 'artifact://job/123/output.json',
+			),
+		),
+		'packets'       => array(
+			array(
+				'type'     => 'source_item',
+				'data'     => array( 'body' => 'ok' ),
+				'metadata' => array(
+					'source_type' => 'test',
+					'source_id'   => 'abc',
+				),
+			),
+		),
+	),
+	'publish'
+);
+
+$step_result = $result['step_result'];
+$assert( 'step envelope schema version is canonical', StepResult::SCHEMA_VERSION === ( $step_result['schema_version'] ?? '' ) );
+$assert( 'step envelope preserves non-packet outputs', 123 === ( $step_result['outputs']['post_id'] ?? null ) );
+$assert( 'step envelope includes artifact refs', 'artifact://job/123/output.json' === ( $step_result['artifact_refs'][0]['uri'] ?? '' ) );
+$assert( 'step envelope references packets by content hash', str_starts_with( (string) ( $step_result['packet_refs'][0]['content_hash'] ?? '' ), 'sha256:' ) );
+$assert( 'step envelope records replay content hashes', str_starts_with( (string) ( $step_result['replay']['content_hashes']['packet_refs'] ?? '' ), 'sha256:' ) );
+
+echo "\n[8] run result envelope aggregates step envelopes\n";
+$run_result = RunResult::fromStepResults( array( $step_result ) );
+
+$assert( 'run envelope schema version is canonical', RunResult::SCHEMA_VERSION === ( $run_result['schema_version'] ?? '' ) );
+$assert( 'run envelope derives success from step envelopes', 'succeeded' === ( $run_result['status'] ?? '' ) );
+$assert( 'run envelope aggregates packet refs', str_starts_with( (string) ( $run_result['packet_refs'][0]['content_hash'] ?? '' ), 'sha256:' ) );
+$assert( 'run envelope records step replay hash', str_starts_with( (string) ( $run_result['replay']['content_hashes']['steps'] ?? '' ), 'sha256:' ) );
 
 if ( $failures > 0 ) {
 	echo "\n=== step-execution-result-contract-smoke: {$failures} FAILURE(S) / {$total} assertions ===\n";
