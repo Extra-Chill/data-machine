@@ -14,6 +14,10 @@ namespace DataMachine\Core;
 
 defined( 'ABSPATH' ) || exit;
 
+if ( ! class_exists( RunResult::class ) ) {
+	require_once __DIR__ . '/RunResult.php';
+}
+
 class RunMetrics {
 
 	private const KEY = 'run_metrics';
@@ -46,6 +50,10 @@ class RunMetrics {
 
 	private const STEP_RESULTS_KEY = 'step_results';
 
+	private const STEP_RESULT_ENVELOPES_KEY = 'step_result';
+
+	private const RUN_RESULT_KEY = 'run_result';
+
 	public static function recordStepResult( int $job_id, string $flow_step_id, array $result ): bool {
 		if ( $job_id <= 0 || '' === $flow_step_id ) {
 			return false;
@@ -68,6 +76,13 @@ class RunMetrics {
 		);
 
 		$engine[ self::STEP_RESULTS_KEY ] = $step_results;
+		if ( is_array( $clean_result['step_result'] ?? null ) ) {
+			$step_result_envelopes                  = is_array( $engine[ self::STEP_RESULT_ENVELOPES_KEY ] ?? null ) ? $engine[ self::STEP_RESULT_ENVELOPES_KEY ] : array();
+			$step_result_envelope                   = $clean_result['step_result'];
+			$step_result_envelope['flow_step_id'] ??= $flow_step_id;
+			$step_result_envelopes[ $flow_step_id ] = $step_result_envelope;
+			$engine[ self::STEP_RESULT_ENVELOPES_KEY ] = $step_result_envelopes;
+		}
 
 		$metrics = self::normalize( $engine[ self::KEY ] ?? array() );
 		if ( isset( $clean_result['packet_count'] ) && 'fetch' === ( $clean_result['step_type'] ?? '' ) ) {
@@ -113,7 +128,7 @@ class RunMetrics {
 		}
 
 		$engine[ self::KEY ] = $metrics;
-		return EngineData::persist( $job_id, $engine );
+		return EngineData::persist( $job_id, self::withRunResult( $job_id, $engine ) );
 	}
 
 	public static function increment( int $job_id, string $key, int $amount = 1 ): bool {
@@ -162,7 +177,7 @@ class RunMetrics {
 		}
 
 		$engine[ self::KEY ] = $metrics;
-		return EngineData::persist( $job_id, $engine );
+		return EngineData::persist( $job_id, self::withRunResult( $job_id, $engine, $status ) );
 	}
 
 	public static function fromJob( array $job ): array {
@@ -182,7 +197,7 @@ class RunMetrics {
 
 		$outcome_classes = self::outcomeClasses( $job, $engine, $counts );
 
-		return array(
+		$summary = array(
 			'job_id'           => (int) ( $job['job_id'] ?? 0 ),
 			'source'           => $job['source'] ?? null,
 			'label'            => $job['label'] ?? ( $job['display_label'] ?? null ),
@@ -206,6 +221,10 @@ class RunMetrics {
 			'token_usage'      => self::tokenUsage( $engine ),
 			'cost'             => self::cost( $engine ),
 		);
+
+		$summary['run_result'] = is_array( $engine[ self::RUN_RESULT_KEY ] ?? null ) ? $engine[ self::RUN_RESULT_KEY ] : RunResult::fromJobSummary( $job, $summary );
+
+		return $summary;
 	}
 
 	public static function normalize( $metrics ): array {
@@ -492,9 +511,55 @@ class RunMetrics {
 		foreach ( $values as $key => $value ) {
 			if ( is_scalar( $value ) || null === $value ) {
 				$clean[ is_int( $key ) ? $key : (string) $key ] = $value;
+			} elseif ( is_array( $value ) ) {
+				$clean[ is_int( $key ) ? $key : (string) $key ] = self::sanitizeList( $value );
 			}
 		}
 		return $clean;
+	}
+
+	private static function withRunResult( int $job_id, array $engine, ?string $status_override = null ): array {
+		$job = self::jobForEnvelope( $job_id, $engine, $status_override );
+		if ( null === $job ) {
+			return $engine;
+		}
+
+		unset( $engine[ self::RUN_RESULT_KEY ] );
+		$job['engine_data']              = $engine;
+		$summary                         = self::fromJob( $job );
+		$engine[ self::RUN_RESULT_KEY ] = RunResult::fromJobSummary( $job, $summary );
+
+		return $engine;
+	}
+
+	private static function jobForEnvelope( int $job_id, array $engine, ?string $status_override = null ): ?array {
+		global $wpdb;
+		if ( $job_id <= 0 || ! is_object( $wpdb ) ) {
+			return null;
+		}
+
+		$table = $wpdb->prefix . 'datamachine_jobs';
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQLPlaceholders, WordPress.DB.PreparedSQL -- Data Machine owns the jobs table and needs fresh job state for durable result envelopes.
+		$job = $wpdb->get_row(
+			$wpdb->prepare(
+				"SELECT * FROM {$table} WHERE job_id = %d LIMIT 1",
+				$job_id
+			),
+			ARRAY_A
+		);
+		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQLPlaceholders, WordPress.DB.PreparedSQL
+
+		if ( ! is_array( $job ) ) {
+			$job = is_array( $engine['job'] ?? null ) ? $engine['job'] : array( 'job_id' => $job_id );
+		}
+
+		if ( null !== $status_override ) {
+			$job['status'] = $status_override;
+		}
+
+		$job['engine_data'] = $engine;
+
+		return $job;
 	}
 
 	private static function childTotals( int $job_id ): array {

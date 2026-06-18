@@ -250,6 +250,20 @@ class PipelineExecutionContractTest extends WP_UnitTestCase
         $this->assertSame('inline_continuation', $fetch_result['outcome'] ?? '');
         $this->assertSame('flow_ai', $this->_latestScheduledStep()['flow_step_id'] ?? '');
 
+		$engine_after_fetch = datamachine_get_engine_data($job_id);
+		$this->assertSame(
+			'datamachine.step_result.v1',
+			$engine_after_fetch['step_result']['flow_fetch']['schema_version'] ?? ''
+		);
+		$this->assertSame(
+			'datamachine.step_result.v1',
+			$engine_after_fetch['step_results']['flow_fetch']['step_result']['schema_version'] ?? ''
+		);
+		$this->assertSame(
+			'datamachine.run_result.v1',
+			$engine_after_fetch['run_result']['schema_version'] ?? ''
+		);
+
         $ai_result = $executor->execute(
             array(
                 'job_id'       => $job_id,
@@ -297,6 +311,11 @@ class PipelineExecutionContractTest extends WP_UnitTestCase
             $engine_after_ai['token_usage'] ?? array()
         );
         $this->assertSame('preserved', $engine_after_ai['fake_handler_written_key'] ?? '');
+		$this->assertSame(
+			'datamachine.step_result.v1',
+			$engine_after_ai['step_result']['flow_ai']['schema_version'] ?? ''
+		);
+		$this->assertNotEmpty($engine_after_ai['step_result']['flow_ai']['packet_refs'] ?? array());
 
         $publish_result = $executor->execute(
             array(
@@ -314,6 +333,15 @@ class PipelineExecutionContractTest extends WP_UnitTestCase
 
         $job = (new Jobs())->get_job($job_id);
         $this->assertSame(JobStatus::COMPLETED, $job['status'] ?? '');
+
+		$completed_engine = datamachine_get_engine_data($job_id);
+		$this->assertSame(
+			'datamachine.run_result.v1',
+			$completed_engine['run_result']['schema_version'] ?? ''
+		);
+		$this->assertSame(JobStatus::COMPLETED, $completed_engine['run_result']['status'] ?? '');
+		$this->assertCount(3, $completed_engine['run_result']['step_results'] ?? array());
+		$this->assertNotEmpty($completed_engine['run_result']['packet_refs'] ?? array());
     }
 
     /**
