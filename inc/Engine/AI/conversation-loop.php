@@ -197,7 +197,7 @@ function datamachine_run_conversation(
 		$completion_nudges
 	);
 
-	$tool_executor     = datamachine_build_loop_tool_executor( $tools, $loop_payload, $mode );
+	$tool_executor     = datamachine_build_loop_tool_executor( $tools, $loop_payload, $mode, $modes, $event_sink, $base_log_context );
 	$pre_tool_mediator = datamachine_build_pre_tool_mediator(
 		$tools,
 		$loop_payload,
@@ -557,9 +557,12 @@ function datamachine_normalize_typed_artifact_outputs( array $result ): array {
  * @param array<string,array<string,mixed>> $tools        Tool declarations keyed by name.
  * @param array<string,mixed>              $loop_payload Cleaned loop payload.
  * @param string                           $mode         Comma-separated execution mode label.
+ * @param array<int,string>                $modes        Execution mode slugs.
+ * @param LoopEventSinkInterface           $event_sink   Event sink.
+ * @param array<string,mixed>              $base_log_context Base log context.
  */
-function datamachine_build_loop_tool_executor( array $tools, array $loop_payload, string $mode ): WP_Agent_Tool_Executor {
-	return new class( $tools, $loop_payload, $mode ) implements WP_Agent_Tool_Executor {
+function datamachine_build_loop_tool_executor( array $tools, array $loop_payload, string $mode, array $modes, LoopEventSinkInterface $event_sink, array $base_log_context ): WP_Agent_Tool_Executor {
+	return new class( $tools, $loop_payload, $mode, $modes, $event_sink, $base_log_context ) implements WP_Agent_Tool_Executor {
 		/** @var array<string,array<string,mixed>> */
 		private array $tools;
 
@@ -568,36 +571,67 @@ function datamachine_build_loop_tool_executor( array $tools, array $loop_payload
 
 		private string $mode;
 
+		/** @var array<int,string> */
+		private array $modes;
+
+		private LoopEventSinkInterface $event_sink;
+
+		/** @var array<string,mixed> */
+		private array $base_log_context;
+
 		/**
 		 * @param array<string,array<string,mixed>> $tools        Tool declarations keyed by name.
 		 * @param array<string,mixed>              $loop_payload Cleaned loop payload.
 		 * @param string                           $mode         Comma-separated execution mode label.
+		 * @param array<int,string>                $modes        Execution mode slugs.
+		 * @param LoopEventSinkInterface           $event_sink   Event sink.
+		 * @param array<string,mixed>              $base_log_context Base log context.
 		 */
-		public function __construct( array $tools, array $loop_payload, string $mode ) {
-			$this->tools        = $tools;
-			$this->loop_payload = $loop_payload;
-			$this->mode         = $mode;
+		public function __construct( array $tools, array $loop_payload, string $mode, array $modes, LoopEventSinkInterface $event_sink, array $base_log_context ) {
+			$this->tools            = $tools;
+			$this->loop_payload     = $loop_payload;
+			$this->mode             = $mode;
+			$this->modes            = $modes;
+			$this->event_sink       = $event_sink;
+			$this->base_log_context = $base_log_context;
 		}
 
 		/** @inheritDoc */
 		public function executeWP_Agent_Tool_Call( array $tool_call, array $tool_definition, array $context = array() ): array {
-			unset( $tool_definition );
-
 			$tool_name      = (string) ( $tool_call['tool_name'] ?? $tool_call['name'] ?? '' );
 			$parameters     = is_array( $tool_call['parameters'] ?? null ) ? $tool_call['parameters'] : array();
 			$prior_results  = is_array( $context['prior_tool_results'] ?? null ) ? $context['prior_tool_results'] : array();
 			$tool_payload   = datamachine_payload_with_inflight_run_artifacts( $this->loop_payload, $prior_results );
 			$client_context = is_array( $tool_payload['client_context'] ?? null ) ? $tool_payload['client_context'] : array();
 
-			$result = ToolExecutor::executeTool(
-				$tool_name,
-				$parameters,
-				$this->tools,
-				$tool_payload,
-				$this->mode,
-				(int) ( $tool_payload['agent_id'] ?? 0 ),
-				$client_context
-			);
+			if ( datamachine_is_external_runtime_tool( $tool_definition ) ) {
+				$result = datamachine_fulfill_runtime_tool_call(
+					array_merge(
+						$tool_call,
+						array(
+							'name'       => $tool_name,
+							'parameters' => $parameters,
+						)
+					),
+					$tool_definition,
+					$tool_payload,
+					$this->mode,
+					$this->modes,
+					(int) ( $context['turn'] ?? 0 ),
+					$this->event_sink,
+					$this->base_log_context
+				);
+			} else {
+				$result = ToolExecutor::executeTool(
+					$tool_name,
+					$parameters,
+					$this->tools,
+					$tool_payload,
+					$this->mode,
+					(int) ( $tool_payload['agent_id'] ?? 0 ),
+					$client_context
+				);
+			}
 
 			$metadata                              = is_array( $result['metadata'] ?? null ) ? $result['metadata'] : array();
 			$metadata['datamachine']               = is_array( $metadata['datamachine'] ?? null ) ? $metadata['datamachine'] : array();
