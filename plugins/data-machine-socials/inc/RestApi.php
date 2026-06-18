@@ -1193,24 +1193,72 @@ class RestApi {
 	}
 
 	/**
-	 * Check if user can publish posts
+	 * Check if user can publish posts.
+	 *
+	 * The base capability check is wrapped by the generic
+	 * `datamachine_socials_user_can` filter so host platforms can impose
+	 * additional gating (e.g. restrict the shared brand accounts to admins)
+	 * without this plugin knowing anything about that policy. Defaults to the
+	 * raw capability check, so unhooked installs see zero behavior change.
+	 *
+	 * @return bool
 	 */
 	public static function check_publish_permission() {
-		return current_user_can( 'publish_posts' );
+		$allowed = current_user_can( 'publish_posts' );
+
+		/**
+		 * Filter whether the current user may act on the social surface.
+		 *
+		 * @param bool   $allowed Whether the base capability check passed.
+		 * @param string $action  The action being gated: one of
+		 *                        `publish` | `edit` | `upload`.
+		 * @param int    $user_id The current user ID.
+		 */
+		return apply_filters( 'datamachine_socials_user_can', $allowed, 'publish', get_current_user_id() );
 	}
 
 	/**
-	 * Check if user can edit posts (used for read/update endpoints)
+	 * Check if user can edit posts (used for read/update endpoints).
+	 *
+	 * Wrapped by the generic `datamachine_socials_user_can` filter — see
+	 * {@see self::check_publish_permission()} for the contract.
+	 *
+	 * @return bool
 	 */
 	public static function check_edit_permission() {
-		return current_user_can( 'edit_posts' );
+		$allowed = current_user_can( 'edit_posts' );
+
+		/**
+		 * Filter whether the current user may act on the social surface.
+		 *
+		 * @param bool   $allowed Whether the base capability check passed.
+		 * @param string $action  The action being gated: one of
+		 *                        `publish` | `edit` | `upload`.
+		 * @param int    $user_id The current user ID.
+		 */
+		return apply_filters( 'datamachine_socials_user_can', $allowed, 'edit', get_current_user_id() );
 	}
 
 	/**
-	 * Check if user can upload files
+	 * Check if user can upload files.
+	 *
+	 * Wrapped by the generic `datamachine_socials_user_can` filter — see
+	 * {@see self::check_publish_permission()} for the contract.
+	 *
+	 * @return bool
 	 */
 	public static function check_upload_permission() {
-		return current_user_can( 'upload_files' );
+		$allowed = current_user_can( 'upload_files' );
+
+		/**
+		 * Filter whether the current user may act on the social surface.
+		 *
+		 * @param bool   $allowed Whether the base capability check passed.
+		 * @param string $action  The action being gated: one of
+		 *                        `publish` | `edit` | `upload`.
+		 * @param int    $user_id The current user ID.
+		 */
+		return apply_filters( 'datamachine_socials_user_can', $allowed, 'upload', get_current_user_id() );
 	}
 
 	/**
