@@ -178,5 +178,4 @@ class FailJobHandler {
 		$retry = is_array( $engine_data['retry'] ?? null ) ? $engine_data['retry'] : array();
 		return ! empty( $retry['next_retry_at'] );
 	}
-
 }
