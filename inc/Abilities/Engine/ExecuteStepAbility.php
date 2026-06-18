@@ -121,8 +121,8 @@ class ExecuteStepAbility {
 		// 'pending' → 'processing', ensuring recover-stuck only catches jobs
 		// that genuinely started but never finished.
 		if ( ! $this->db_jobs->start_job( $job_id ) ) {
-			$job_after_start       = $this->db_jobs->get_job( $job_id );
-			$current_status        = is_array( $job_after_start ) ? (string) ( $job_after_start['status'] ?? '' ) : '';
+			$job_after_start      = $this->db_jobs->get_job( $job_id );
+			$current_status       = is_array( $job_after_start ) ? (string) ( $job_after_start['status'] ?? '' ) : '';
 			$terminal_after_start = JobStatus::isStatusFinal( $current_status );
 
 			return array(
@@ -213,6 +213,20 @@ class ExecuteStepAbility {
 
 			$payload['data'] = $dataPackets;
 			$this->logStepExecutionResult( $execution_result, $job_id, $flow_step_id, $step_type );
+			RunMetrics::recordStepResult(
+				$job_id,
+				$flow_step_id,
+				array(
+					'step_type'    => $step_type,
+					'result'       => $execution_result['status'] ?? ( $step_success ? 'completed' : 'failed' ),
+					'step_success' => $step_success,
+					'packet_count' => $execution_result['packet_count'],
+					'status'       => $execution_result['status'] ?? null,
+					'reason'       => $execution_result['reason'] ?? null,
+					'error'        => $execution_result['error'] ?? null,
+					'step_result'  => $execution_result['step_result'] ?? array(),
+				)
+			);
 
 			// Refresh engine data to capture changes made during step execution.
 			$refreshed_engine_data = datamachine_get_engine_data( $job_id );
@@ -258,6 +272,7 @@ class ExecuteStepAbility {
 					'status'       => $recorded_status,
 					'reason'       => $result['reason'] ?? ( $execution_result['reason'] ?? ( $result['error'] ?? null ) ),
 					'error'        => $result['error'] ?? ( $execution_result['error'] ?? null ),
+					'step_result'  => $execution_result['step_result'] ?? array(),
 				)
 			);
 
@@ -272,6 +287,15 @@ class ExecuteStepAbility {
 					'packet_count' => 0,
 					'reason'       => 'throwable_exception_in_step_execution',
 					'error'        => $e->getMessage(),
+					'step_result'  => \DataMachine\Core\StepResult::fromExecutionResult(
+						array(
+							'status'      => 'failed',
+							'packets'     => array(),
+							'reason'      => 'throwable_exception_in_step_execution',
+							'error'       => $e->getMessage(),
+							'diagnostics' => array( 'flow_step_id' => $flow_step_id ),
+						)
+					),
 				)
 			);
 			do_action(
