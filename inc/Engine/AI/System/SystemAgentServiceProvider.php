@@ -291,7 +291,7 @@ class SystemAgentServiceProvider {
 	 * @since 0.72.0
 	 */
 	private function registerActionSchedulerHooks(): void {
-		add_action( 'datamachine_task_process_batch', array( $this, 'handleBatchChunk' ) );
+		add_action( 'datamachine_task_process_batch', array( $this, 'handleBatchChunk' ), 10, 2 );
 		add_action( 'datamachine_task_retry', array( $this, 'handleTaskRetry' ) );
 		add_action(
 			'datamachine_system_agent_set_featured_image',
@@ -465,10 +465,11 @@ class SystemAgentServiceProvider {
 	 *
 	 * @since 0.32.0
 	 *
-	 * @param string $batchId Batch identifier.
+	 * @param string   $batchId Batch identifier.
+	 * @param int|null $offset  Offset key carried by the scheduler action.
 	 */
-	public function handleBatchChunk( string $batchId ): void {
-		TaskScheduler::processBatchChunk( $batchId );
+	public function handleBatchChunk( string $batchId, ?int $offset = null ): void {
+		TaskScheduler::processBatchChunk( $batchId, $offset );
 	}
 
 	/**

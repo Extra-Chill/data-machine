@@ -36,6 +36,7 @@ namespace DataMachine\Core\ActionScheduler;
 
 use DataMachine\Core\Database\Jobs\Jobs;
 use DataMachine\Core\DataPacketStore;
+use DataMachine\Core\EngineData;
 use DataMachine\Core\PluginSettings;
 
 defined( 'ABSPATH' ) || exit;
@@ -190,7 +191,10 @@ class BatchScheduler {
 		as_schedule_single_action(
 			time(),
 			$hook,
-			array( 'parent_job_id' => $parent_job_id ),
+			array(
+				'parent_job_id' => $parent_job_id,
+				'offset'        => 0,
+			),
 			'data-machine'
 		);
 
@@ -215,22 +219,39 @@ class BatchScheduler {
 	 * that as a fatal protocol error and complete the parent as failed).
 	 *
 	 * @param int      $parent_job_id Parent job ID.
-	 * @param callable $createItem    fn(array $item, array $extra, int $parent_job_id): mixed
+	 * @param callable $createItem      fn(array $item, array $extra, int $parent_job_id): mixed
+	 * @param int|null $expected_offset Offset key carried by the scheduler action.
 	 * @return array{
 	 *     scheduled:int,
 	 *     offset:int,
 	 *     total:int,
 	 *     more:bool,
 	 *     cancelled:bool,
-	 *     missing:bool
+	 *     missing:bool,
+	 *     duplicate:bool
 	 * } Chunk result. `missing` is true only when the batch_state key
 	 *   has been lost; consumer must fail the parent in that case.
 	 */
-	public static function processChunk( int $parent_job_id, callable $createItem ): array {
+	public static function processChunk( int $parent_job_id, callable $createItem, ?int $expected_offset = null ): array {
 		$parent_engine = datamachine_get_engine_data( $parent_job_id );
 		$batch_state   = $parent_engine['batch_state'] ?? null;
 
 		if ( ! is_array( $batch_state ) ) {
+			if ( null !== $expected_offset && ! empty( $parent_engine['batch'] ) ) {
+				$total  = (int) ( $parent_engine['batch_total'] ?? 0 );
+				$offset = (int) ( $parent_engine['batch_offset'] ?? $total );
+
+				return array(
+					'scheduled' => 0,
+					'offset'    => $offset,
+					'total'     => $total,
+					'more'      => false,
+					'cancelled' => ! empty( $parent_engine['cancelled'] ),
+					'missing'   => false,
+					'duplicate' => true,
+				);
+			}
+
 			return array(
 				'scheduled' => 0,
 				'offset'    => 0,
@@ -238,6 +259,7 @@ class BatchScheduler {
 				'more'      => false,
 				'cancelled' => false,
 				'missing'   => true,
+				'duplicate' => false,
 			);
 		}
 
@@ -254,7 +276,64 @@ class BatchScheduler {
 				'more'      => false,
 				'cancelled' => true,
 				'missing'   => false,
+				'duplicate' => false,
 			);
+		}
+
+		if ( null !== $expected_offset ) {
+			$claim_error = null;
+			$claim       = EngineData::mutate(
+				$parent_job_id,
+				static function ( array $current ) use ( $expected_offset, &$claim_error ): ?array {
+					$current_state = $current['batch_state'] ?? null;
+					if ( ! is_array( $current_state ) ) {
+						$claim_error = 'missing';
+						return null;
+					}
+
+					if ( ! empty( $current['cancelled'] ) ) {
+						$claim_error = 'cancelled';
+						return null;
+					}
+
+					$current_offset = (int) ( $current_state['offset'] ?? 0 );
+					if ( $current_offset !== $expected_offset ) {
+						$claim_error = 'stale_offset';
+						return null;
+					}
+
+					$claims = is_array( $current_state['claims'] ?? null ) ? $current_state['claims'] : array();
+					if ( isset( $claims[ (string) $expected_offset ] ) ) {
+						$claim_error = 'already_claimed';
+						return null;
+					}
+
+					$current_state['claims']                              = $claims;
+					$current_state['claims'][ (string) $expected_offset ] = current_time( 'mysql' );
+					$current['batch_state']                               = $current_state;
+
+					return $current;
+				},
+				'batch_chunk_claim'
+			);
+
+			if ( empty( $claim['success'] ) ) {
+				$latest       = is_array( $claim['snapshot'] ?? null ) ? $claim['snapshot'] : datamachine_get_engine_data( $parent_job_id );
+				$latest_state = is_array( $latest['batch_state'] ?? null ) ? $latest['batch_state'] : array();
+
+				return array(
+					'scheduled' => 0,
+					'offset'    => (int) ( $latest_state['offset'] ?? ( $latest['batch_offset'] ?? 0 ) ),
+					'total'     => (int) ( $latest_state['total'] ?? ( $latest['batch_total'] ?? 0 ) ),
+					'more'      => ! empty( $latest['batch_state'] ),
+					'cancelled' => 'cancelled' === $claim_error || ! empty( $latest['cancelled'] ),
+					'missing'   => 'missing' === $claim_error && empty( $latest['batch'] ),
+					'duplicate' => in_array( $claim_error, array( 'already_claimed', 'stale_offset', 'missing' ), true ),
+				);
+			}
+
+			$parent_engine = $claim['snapshot'];
+			$batch_state   = is_array( $parent_engine['batch_state'] ?? null ) ? $parent_engine['batch_state'] : $batch_state;
 		}
 
 		$context    = $parent_engine['batch_context'] ?? '';
@@ -280,30 +359,41 @@ class BatchScheduler {
 
 		$new_offset = $offset + $chunk_size;
 
-		// Re-read engine_data — caller's createItem callback may have
-		// merged its own keys (child links, deferred state, etc.).
-		$parent_engine                    = datamachine_get_engine_data( $parent_job_id );
-		$parent_engine['batch_scheduled'] = ( $parent_engine['batch_scheduled'] ?? 0 ) + $scheduled;
-		$parent_engine['batch_offset']    = min( $new_offset, $total );
-
 		$more = $new_offset < $total;
 
+		EngineData::mutate(
+			$parent_job_id,
+			static function ( array $current ) use ( $scheduled, $new_offset, $total, $more, $expected_offset ): array {
+				$current['batch_scheduled'] = ( $current['batch_scheduled'] ?? 0 ) + $scheduled;
+				$current['batch_offset']    = min( $new_offset, $total );
+
+				if ( $more ) {
+					if ( is_array( $current['batch_state'] ?? null ) ) {
+						$current['batch_state']['offset'] = $new_offset;
+						if ( null !== $expected_offset && isset( $current['batch_state']['claims'][ (string) $expected_offset ] ) ) {
+							unset( $current['batch_state']['claims'][ (string) $expected_offset ] );
+						}
+					}
+				} else {
+					unset( $current['batch_state'] );
+				}
+
+				return $current;
+			},
+			'batch_chunk_advance'
+		);
+
 		if ( $more ) {
-			$parent_engine['batch_state']['offset'] = $new_offset;
-			datamachine_set_engine_data( $parent_job_id, $parent_engine );
 
 			as_schedule_single_action(
 				time() + $delay,
 				$hook,
-				array( 'parent_job_id' => $parent_job_id ),
+				array(
+					'parent_job_id' => $parent_job_id,
+					'offset'        => $new_offset,
+				),
 				'data-machine'
 			);
-		} else {
-			// Last chunk — drop batch_state to free row space. Top-level
-			// batch_total / batch_scheduled / batch_offset stay so the
-			// parent's status aggregation has what it needs.
-			unset( $parent_engine['batch_state'] );
-			datamachine_set_engine_data( $parent_job_id, $parent_engine );
 		}
 
 		return array(
@@ -313,6 +403,7 @@ class BatchScheduler {
 			'more'      => $more,
 			'cancelled' => false,
 			'missing'   => false,
+			'duplicate' => false,
 		);
 	}
 

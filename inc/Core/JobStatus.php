@@ -24,6 +24,7 @@ class JobStatus {
 	public const WAITING            = 'waiting';
 	public const COMPLETED          = 'completed';
 	public const FAILED             = 'failed';
+	public const CANCELLED          = 'cancelled';
 	public const COMPLETED_NO_ITEMS = 'completed_no_items';
 	public const AGENT_SKIPPED      = 'agent_skipped';
 
@@ -33,6 +34,7 @@ class JobStatus {
 	public const FINAL_STATUSES = array(
 		self::COMPLETED,
 		self::FAILED,
+		self::CANCELLED,
 		self::COMPLETED_NO_ITEMS,
 		self::AGENT_SKIPPED,
 	);

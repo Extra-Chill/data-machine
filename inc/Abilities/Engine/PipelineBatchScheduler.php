@@ -119,9 +119,10 @@ class PipelineBatchScheduler {
 	 * Action Scheduler callback — delegates to BatchScheduler::processChunk
 	 * with a pipeline-specific child-creation callback.
 	 *
-	 * @param int $parent_job_id The parent job ID.
+	 * @param int      $parent_job_id  The parent job ID.
+	 * @param int|null $expected_offset Offset key carried by the scheduler action.
 	 */
-	public function processChunk( int $parent_job_id ): void {
+	public function processChunk( int $parent_job_id, ?int $expected_offset = null ): void {
 		$parent_job = $this->db_jobs->get_job( $parent_job_id );
 		if ( ! $parent_job || JobStatus::PROCESSING !== ( $parent_job['status'] ?? '' ) ) {
 			do_action(
@@ -138,8 +139,13 @@ class PipelineBatchScheduler {
 
 		$result = BatchScheduler::processChunk(
 			$parent_job_id,
-			array( $this, 'createChildJobFromBatch' )
+			array( $this, 'createChildJobFromBatch' ),
+			$expected_offset
 		);
+
+		if ( ! empty( $result['duplicate'] ) ) {
+			return;
+		}
 
 		if ( $result['missing'] ) {
 			$this->failParentIfStillProcessing( $parent_job_id, 'batch_state_missing' );
@@ -155,7 +161,7 @@ class PipelineBatchScheduler {
 		if ( $result['cancelled'] ) {
 			$this->db_jobs->complete_job(
 				$parent_job_id,
-				JobStatus::failed( 'batch cancelled' )->toString()
+				JobStatus::CANCELLED
 			);
 			return;
 		}

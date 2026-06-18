@@ -106,12 +106,12 @@ function datamachine_register_core_actions() {
 	// Pipeline batch fan-out: process chunks and track child completion.
 	add_action(
 		PipelineBatchScheduler::BATCH_HOOK,
-		function ( $parent_job_id ) {
+		function ( $parent_job_id, $offset = null ) {
 			$scheduler = new PipelineBatchScheduler();
-			$scheduler->processChunk( (int) $parent_job_id );
+			$scheduler->processChunk( (int) $parent_job_id, null === $offset ? null : (int) $offset );
 		},
 		10,
-		1
+		2
 	);
 	add_action( 'datamachine_job_complete', array( PipelineBatchScheduler::class, 'onChildComplete' ), 20, 2 );
 

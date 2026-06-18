@@ -80,4 +80,22 @@ class JobLifecycleTransitionTest extends WP_UnitTestCase {
 		$job = $this->db_jobs->get_job( $job_id );
 		$this->assertSame( JobStatus::COMPLETED_NO_ITEMS, $job['status'] );
 	}
+
+	public function test_cancelled_is_generic_terminal_status(): void {
+		$job_id = $this->db_jobs->create_job( array( 'label' => 'Cancelled terminal lifecycle' ) );
+		$this->assertIsInt( $job_id );
+
+		$this->assertTrue( $this->db_jobs->start_job( $job_id, JobStatus::PROCESSING ) );
+
+		$cancelled = $this->db_jobs->transition_job_status_result( $job_id, JobStatus::CANCELLED, true );
+		$restart   = $this->db_jobs->start_job( $job_id, JobStatus::PROCESSING );
+
+		$this->assertTrue( $cancelled['success'] );
+		$this->assertTrue( $cancelled['changed'] );
+		$this->assertFalse( $restart );
+		$this->assertTrue( JobStatus::isStatusFinal( JobStatus::CANCELLED ) );
+
+		$job = $this->db_jobs->get_job( $job_id );
+		$this->assertSame( JobStatus::CANCELLED, $job['status'] );
+	}
 }
