@@ -34,6 +34,7 @@ function datamachine_boundary_is_excluded_dir( string $relative_path ): bool {
 		'.git',
 		'.datamachine',
 		'.claude',
+		'.homeboy-action',
 		'build',
 		'dist',
 		'node_modules',
