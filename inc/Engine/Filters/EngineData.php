@@ -50,6 +50,27 @@ function datamachine_merge_engine_data( int $job_id, array $data ): bool {
 }
 
 /**
+ * Append a compact engine state event trace and persist its patch as the current snapshot projection.
+ *
+ * @param int    $job_id   Job ID.
+ * @param string $type     Generic event type.
+ * @param array  $patch    Engine data patch to project onto the snapshot.
+ * @param array  $metadata Optional event metadata.
+ * @return array|null Appended ledger entry on success, null on failure.
+ */
+function datamachine_append_engine_state_event( int $job_id, string $type, array $patch, array $metadata = array() ): ?array {
+	$entry = \DataMachine\Core\EngineData::appendStateEvent( $job_id, $type, $patch, $metadata );
+	if ( is_array( $entry ) ) {
+		$snapshot = \DataMachine\Core\EngineData::retrieve( $job_id );
+		if ( datamachine_engine_data_should_write_artifact_files( $snapshot ) ) {
+			datamachine_write_engine_data_artifact_files( $job_id );
+		}
+	}
+
+	return $entry;
+}
+
+/**
  * Determine whether an engine data snapshot has enough runtime artifact data to
  * emit first-class transcript/tool-trace files.
  *
