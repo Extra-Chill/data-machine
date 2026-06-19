@@ -22,6 +22,7 @@ use DataMachine\Core\Database\RunMetadata\RunMetadata;
 use DataMachine\Core\ExecutionQuery;
 use DataMachine\Core\JobStatus;
 use DataMachine\Core\RunMetrics;
+use DataMachine\Core\RunLifecycleStore;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -89,7 +90,16 @@ class Jobs extends BaseRepository {
 			return false;
 		}
 
-		return $this->wpdb->insert_id;
+		$job_id = (int) $this->wpdb->insert_id;
+		( new RunLifecycleStore( $this ) )->mark_job_created(
+			$job_id,
+			array(
+				'run_type' => $prepared['data']['source'] ?? 'job',
+				'status'   => $prepared['data']['status'] ?? JobStatus::PENDING,
+			)
+		);
+
+		return $job_id;
 	}
 
 	/**
@@ -111,6 +121,14 @@ class Jobs extends BaseRepository {
 
 		$existing = $this->get_job_by_idempotency_key( $idempotency_key );
 		if ( null !== $existing ) {
+			( new RunLifecycleStore( $this ) )->mark_job_created(
+				(int) $existing['job_id'],
+				array(
+					'run_type' => $existing['source'] ?? 'job',
+					'status'   => $existing['status'] ?? JobStatus::PENDING,
+				)
+			);
+
 			return array(
 				'job_id'         => (int) $existing['job_id'],
 				'created'        => false,
@@ -129,6 +147,14 @@ class Jobs extends BaseRepository {
 		if ( false === $inserted ) {
 			$existing = $this->get_job_by_idempotency_key( $idempotency_key );
 			if ( null !== $existing ) {
+				( new RunLifecycleStore( $this ) )->mark_job_created(
+					(int) $existing['job_id'],
+					array(
+						'run_type' => $existing['source'] ?? 'job',
+						'status'   => $existing['status'] ?? JobStatus::PENDING,
+					)
+				);
+
 				return array(
 					'job_id'         => (int) $existing['job_id'],
 					'created'        => false,
@@ -152,6 +178,13 @@ class Jobs extends BaseRepository {
 		}
 
 		$job_id = (int) $this->wpdb->insert_id;
+		( new RunLifecycleStore( $this ) )->mark_job_created(
+			$job_id,
+			array(
+				'run_type' => $prepared['data']['source'] ?? 'job',
+				'status'   => $prepared['data']['status'] ?? JobStatus::PENDING,
+			)
+		);
 
 		return array(
 			'job_id'         => $job_id,
@@ -1430,6 +1463,31 @@ class Jobs extends BaseRepository {
 		}
 
 		if ( 0 === (int) $result ) {
+			if ( array() === $expected_data ) {
+				$job = $this->get_job( $job_id );
+				if ( is_array( $job ) && ( ! array_key_exists( 'engine_data', $job ) || null === $job['engine_data'] || '' === $job['engine_data'] ) ) {
+					$result = $this->wpdb->update(
+						$this->table_name,
+						$storage_envelope['data'],
+						array(
+							'job_id'      => $job_id,
+							'engine_data' => null,
+						),
+						$storage_envelope['format'],
+						array( '%d', null )
+					);
+
+					if ( false !== $result && (int) $result > 0 ) {
+						wp_cache_set( $job_id, $new_data, 'datamachine_engine_data' );
+						return array(
+							'updated'  => true,
+							'conflict' => false,
+							'error'    => null,
+						);
+					}
+				}
+			}
+
 			return array(
 				'updated'  => false,
 				'conflict' => true,
@@ -1692,6 +1750,8 @@ class Jobs extends BaseRepository {
 			RunMetrics::complete( $job_id, $status );
 			do_action( 'datamachine_job_complete', $job_id, $status );
 		}
+
+		( new RunLifecycleStore( $this ) )->mark_job_status( $job_id, $status );
 
 		return array(
 			'success'        => true,
