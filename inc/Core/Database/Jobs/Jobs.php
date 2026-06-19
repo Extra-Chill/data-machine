@@ -67,14 +67,138 @@ class Jobs extends BaseRepository {
 	 * @return int|false Job ID on success, false on failure
 	 */
 	public function create_job( array $job_data ): int|false {
+		$prepared = $this->prepare_job_insert( $job_data );
+		if ( false === $prepared ) {
+			return false;
+		}
 
+		$inserted = $this->insert_prepared_job( $prepared );
+
+		if ( false === $inserted ) {
+			do_action(
+				'datamachine_log',
+				'error',
+				'Failed to insert job',
+				array(
+					'pipeline_id' => $prepared['pipeline_id'],
+					'flow_id'     => $prepared['flow_id'],
+					'db_error'    => $this->wpdb->last_error,
+				)
+			);
+			return false;
+		}
+
+		return $this->wpdb->insert_id;
+	}
+
+	/**
+	 * Create a job once for a deterministic idempotency key, or return the existing job.
+	 *
+	 * @param array $job_data Job data. Requires a non-empty idempotency_key.
+	 * @return array{job_id:int,created:bool,already_exists:bool,job:?array}|false Result on success, false on invalid input or insert failure.
+	 */
+	public function create_or_get_job( array $job_data ): array|false {
+		$idempotency_key = $this->normalize_idempotency_key( $job_data['idempotency_key'] ?? '' );
+		if ( '' === $idempotency_key ) {
+			do_action(
+				'datamachine_log',
+				'error',
+				'Invalid job data: create_or_get_job requires idempotency_key'
+			);
+			return false;
+		}
+
+		$existing = $this->get_job_by_idempotency_key( $idempotency_key );
+		if ( null !== $existing ) {
+			return array(
+				'job_id'         => (int) $existing['job_id'],
+				'created'        => false,
+				'already_exists' => true,
+				'job'            => $existing,
+			);
+		}
+
+		$job_data['idempotency_key'] = $idempotency_key;
+		$prepared                    = $this->prepare_job_insert( $job_data );
+		if ( false === $prepared ) {
+			return false;
+		}
+
+		$inserted = $this->insert_prepared_job( $prepared );
+		if ( false === $inserted ) {
+			$existing = $this->get_job_by_idempotency_key( $idempotency_key );
+			if ( null !== $existing ) {
+				return array(
+					'job_id'         => (int) $existing['job_id'],
+					'created'        => false,
+					'already_exists' => true,
+					'job'            => $existing,
+				);
+			}
+
+			do_action(
+				'datamachine_log',
+				'error',
+				'Failed to insert idempotent job',
+				array(
+					'pipeline_id'     => $prepared['pipeline_id'],
+					'flow_id'         => $prepared['flow_id'],
+					'idempotency_key' => $idempotency_key,
+					'db_error'        => $this->wpdb->last_error,
+				)
+			);
+			return false;
+		}
+
+		$job_id = (int) $this->wpdb->insert_id;
+
+		return array(
+			'job_id'         => $job_id,
+			'created'        => true,
+			'already_exists' => false,
+			'job'            => $this->get_job( $job_id ),
+		);
+	}
+
+	/**
+	 * Fetch a job by idempotency key.
+	 *
+	 * @param string $idempotency_key Job idempotency key.
+	 * @return array|null Job row, or null when not found.
+	 */
+	public function get_job_by_idempotency_key( string $idempotency_key ): ?array {
+		$idempotency_key = $this->normalize_idempotency_key( $idempotency_key );
+		if ( '' === $idempotency_key ) {
+			return null;
+		}
+
+		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		$job = $this->wpdb->get_row( $this->wpdb->prepare( 'SELECT * FROM %i WHERE idempotency_key = %s LIMIT 1', $this->table_name, $idempotency_key ), ARRAY_A );
+
+		if ( $job && isset( $job['engine_data'] ) && is_string( $job['engine_data'] ) ) {
+			$decoded = json_decode( $job['engine_data'], true );
+			if ( json_last_error() === JSON_ERROR_NONE ) {
+				$job['engine_data'] = $decoded;
+			}
+		}
+
+		return $job ? $job : null;
+	}
+
+	/**
+	 * Prepare sanitized insert data shared by create_job() and create_or_get_job().
+	 *
+	 * @param array $job_data Raw job data.
+	 * @return array{data:array,format:array,pipeline_id:mixed,flow_id:mixed}|false Prepared insert data, or false when invalid.
+	 */
+	private function prepare_job_insert( array $job_data ): array|false {
 		$pipeline_id = $job_data['pipeline_id'] ?? null;
 		$flow_id     = $job_data['flow_id'] ?? null;
 
-		// Direct execution: both must be explicitly 'direct'
+		// Direct execution: both must be explicitly 'direct'.
 		$is_direct_execution = ( 'direct' === $pipeline_id && 'direct' === $flow_id );
 
-		// Database flow: both must be valid numeric IDs > 0
+		// Database flow: both must be valid numeric IDs > 0.
 		$is_database_flow = ( is_numeric( $pipeline_id ) && (int) $pipeline_id > 0 && is_numeric( $flow_id ) && (int) $flow_id > 0 );
 
 		// No pipeline/flow context: both are null.
@@ -137,24 +261,43 @@ class Jobs extends BaseRepository {
 			$format[]              = '%d';
 		}
 
-        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-		$inserted = $this->wpdb->insert( $this->table_name, $data, $format );
-
-		if ( false === $inserted ) {
-			do_action(
-				'datamachine_log',
-				'error',
-				'Failed to insert job',
-				array(
-					'pipeline_id' => $pipeline_id,
-					'flow_id'     => $flow_id,
-					'db_error'    => $this->wpdb->last_error,
-				)
-			);
-			return false;
+		$idempotency_key = $this->normalize_idempotency_key( $job_data['idempotency_key'] ?? '' );
+		if ( '' !== $idempotency_key ) {
+			$data['idempotency_key'] = $idempotency_key;
+			$format[]                = '%s';
 		}
 
-		return $this->wpdb->insert_id;
+		return array(
+			'data'        => $data,
+			'format'      => $format,
+			'pipeline_id' => $pipeline_id,
+			'flow_id'     => $flow_id,
+		);
+	}
+
+	/**
+	 * Insert prepared job data.
+	 *
+	 * @param array{data:array,format:array} $prepared Prepared insert data.
+	 * @return int|false Number of rows inserted, or false on failure.
+	 */
+	private function insert_prepared_job( array $prepared ): int|false {
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		return $this->wpdb->insert( $this->table_name, $prepared['data'], $prepared['format'] );
+	}
+
+	/**
+	 * Normalize a job idempotency key for storage and lookup.
+	 *
+	 * @param mixed $idempotency_key Raw idempotency key.
+	 * @return string Normalized idempotency key, or empty string.
+	 */
+	private function normalize_idempotency_key( mixed $idempotency_key ): string {
+		if ( ! is_scalar( $idempotency_key ) ) {
+			return '';
+		}
+
+		return substr( sanitize_text_field( (string) $idempotency_key ), 0, 191 );
 	}
 
 	public function get_job( int $job_id ): ?array {
@@ -1720,6 +1863,7 @@ class Jobs extends BaseRepository {
             status varchar(255) NOT NULL,
             engine_data longtext NULL,
             handler_slug varchar(100) NULL DEFAULT NULL,
+            idempotency_key varchar(191) NULL DEFAULT NULL,
             created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
             completed_at datetime NULL DEFAULT NULL,
             PRIMARY KEY  (job_id),
@@ -1732,7 +1876,8 @@ class Jobs extends BaseRepository {
             KEY idx_created_at (created_at),
             KEY idx_flow_created (flow_id, created_at),
             KEY idx_status_created (status(50), created_at),
-            KEY idx_source_created (source, created_at)
+            KEY idx_source_created (source, created_at),
+            UNIQUE KEY idx_idempotency_key (idempotency_key)
         ) $charset_collate;";
 
 		dbDelta( $sql );
@@ -1740,6 +1885,7 @@ class Jobs extends BaseRepository {
 		self::migrate_columns( $table_name );
 		self::migrate_task_type_column( $table_name );
 		self::migrate_handler_slug_column( $table_name );
+		self::migrate_idempotency_key_column( $table_name );
 		self::migrate_indexes( $table_name );
 
 		do_action(
@@ -2126,6 +2272,69 @@ class Jobs extends BaseRepository {
 			'Added handler_slug column to jobs table for indexed handler summaries',
 			array( 'table_name' => $table_name )
 		);
+	}
+
+	/**
+	 * Add idempotency_key column for deterministic job creation.
+	 *
+	 * @param string $table_name Fully qualified table name.
+	 */
+	private static function migrate_idempotency_key_column( string $table_name ): void {
+		global $wpdb;
+
+		if ( ! BaseRepository::column_exists( $table_name, 'idempotency_key', $wpdb ) ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.SchemaChange
+			// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
+			$result = $wpdb->query(
+				"ALTER TABLE {$table_name}
+				 ADD COLUMN idempotency_key varchar(191) NULL DEFAULT NULL"
+			);
+			// phpcs:enable WordPress.DB.PreparedSQL
+
+			if ( false === $result ) {
+				do_action(
+					'datamachine_log',
+					'error',
+					'Failed to add idempotency_key column to jobs table',
+					array(
+						'table_name' => $table_name,
+						'db_error'   => $wpdb->last_error,
+					)
+				);
+				return;
+			}
+		}
+
+		self::ensure_jobs_index( $table_name, 'idx_idempotency_key', 'UNIQUE INDEX', '(idempotency_key)' );
+	}
+
+	/**
+	 * Ensure a jobs table index exists.
+	 *
+	 * @param string $table_name Fully qualified table name.
+	 * @param string $index_name Index name.
+	 * @param string $index_type Index type for ALTER TABLE, such as INDEX or UNIQUE INDEX.
+	 * @param string $index_def  Index column definition, including parentheses.
+	 * @return bool True when the index exists or was added.
+	 */
+	private static function ensure_jobs_index( string $table_name, string $index_name, string $index_type, string $index_def ): bool {
+		global $wpdb;
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+		// phpcs:disable WordPress.DB.PreparedSQL -- Table/index names from plugin constants, not user input.
+		$existing = $wpdb->get_row( "SHOW INDEX FROM {$table_name} WHERE Key_name = '{$index_name}'" );
+		// phpcs:enable WordPress.DB.PreparedSQL
+
+		if ( $existing ) {
+			return true;
+		}
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.SchemaChange
+		// phpcs:disable WordPress.DB.PreparedSQL -- Table/index names from plugin constants, not user input.
+		$result = $wpdb->query( "ALTER TABLE {$table_name} ADD {$index_type} {$index_name} {$index_def}" );
+		// phpcs:enable WordPress.DB.PreparedSQL
+
+		return false !== $result;
 	}
 
 	/**
