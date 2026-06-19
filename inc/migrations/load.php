@@ -16,6 +16,7 @@ require_once __DIR__ . '/site-md.php';
 require_once __DIR__ . '/agents-md.php';
 require_once __DIR__ . '/flows.php';
 require_once __DIR__ . '/bundle-artifacts.php';
+require_once __DIR__ . '/run-metadata.php';
 require_once __DIR__ . '/processed-item-claims.php';
 require_once __DIR__ . '/pending-actions.php';
 require_once __DIR__ . '/chat-sessions-network.php';

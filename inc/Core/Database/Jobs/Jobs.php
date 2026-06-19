@@ -18,6 +18,7 @@ namespace DataMachine\Core\Database\Jobs;
 
 use DataMachine\Core\Database\BaseRepository;
 use DataMachine\Core\Database\LifecycleStateTransition;
+use DataMachine\Core\Database\RunMetadata\RunMetadata;
 use DataMachine\Core\ExecutionQuery;
 use DataMachine\Core\JobStatus;
 use DataMachine\Core\RunMetrics;
@@ -739,6 +740,12 @@ class Jobs extends BaseRepository {
 			$where_values[]  = sanitize_text_field( $args['source'] );
 		}
 
+		$job_id_filter = array_values( array_filter( array_map( 'absint', (array) ( $args['job_ids'] ?? array() ) ) ) );
+		if ( ! empty( $job_id_filter ) ) {
+			$where_clauses[] = 'j.job_id IN (' . implode( ',', array_fill( 0, count( $job_id_filter ), '%d' ) ) . ')';
+			$where_values    = array_merge( $where_values, $job_id_filter );
+		}
+
 		if ( ! empty( $args['handler'] ) ) {
 			$handler = sanitize_key( (string) $args['handler'] );
 			if ( '' !== $handler ) {
@@ -888,7 +895,38 @@ class Jobs extends BaseRepository {
 		$metadata_filters = ExecutionQuery::normalize_metadata_filters( $args['metadata'] ?? array() );
 		$per_page         = max( 1, min( 500, (int) ( $args['per_page'] ?? 50 ) ) );
 		$offset           = max( 0, (int) ( $args['offset'] ?? 0 ) );
-		$scan_limit       = max( $per_page + $offset, min( 5000, (int) ( $args['metadata_scan_limit'] ?? 1000 ) ) );
+		$run_metadata     = new RunMetadata();
+		$matching_job_ids = $run_metadata->query_job_ids( $metadata_filters, $per_page, $offset );
+		$total            = $run_metadata->count_jobs( $metadata_filters );
+		if ( ! empty( $matching_job_ids ) || $total > 0 ) {
+			if ( empty( $matching_job_ids ) ) {
+				return array(
+					'jobs'       => array(),
+					'total'      => $total,
+					'scanned'    => 0,
+					'scan_limit' => $per_page,
+					'filters'    => $metadata_filters,
+					'indexed'    => true,
+				);
+			}
+
+			$query_args             = $args;
+			$query_args['job_ids']  = $matching_job_ids;
+			$query_args['per_page'] = $per_page;
+			$query_args['offset']   = 0;
+			unset( $query_args['metadata'], $query_args['metadata_scan_limit'], $query_args['engine_data_contains'] );
+
+			return array(
+				'jobs'       => $this->get_jobs_for_list_table( $query_args ),
+				'total'      => $total,
+				'scanned'    => count( $matching_job_ids ),
+				'scan_limit' => $per_page,
+				'filters'    => $metadata_filters,
+				'indexed'    => true,
+			);
+		}
+
+		$scan_limit = max( $per_page + $offset, min( 5000, (int) ( $args['metadata_scan_limit'] ?? 1000 ) ) );
 
 		$query_args                         = $args;
 		$query_args['per_page']             = $scan_limit;
@@ -929,6 +967,7 @@ class Jobs extends BaseRepository {
 			'scanned'    => count( $candidates ),
 			'scan_limit' => $scan_limit,
 			'filters'    => $metadata_filters,
+			'indexed'    => false,
 		);
 	}
 
@@ -1317,6 +1356,7 @@ class Jobs extends BaseRepository {
 		}
 
 		wp_cache_set( $job_id, $data, 'datamachine_engine_data' );
+		( new RunMetadata() )->replace_for_engine_data( $job_id, $data );
 
 		do_action(
 			'datamachine_log',
@@ -1398,6 +1438,7 @@ class Jobs extends BaseRepository {
 		}
 
 		wp_cache_set( $job_id, $new_data, 'datamachine_engine_data' );
+		( new RunMetadata() )->replace_for_engine_data( $job_id, $new_data );
 
 		return array(
 			'updated'  => true,

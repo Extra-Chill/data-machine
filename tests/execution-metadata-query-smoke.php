@@ -50,12 +50,18 @@ $assert( 'matching metadata requires every filter', ExecutionQuery::matches_meta
 $assert( 'metadata matching is exact', ! ExecutionQuery::matches_metadata_filters( $engine_data, array( 'task_type' => 'weekly' ) ) );
 
 $jobs_db_source = file_get_contents( dirname( __DIR__ ) . '/inc/Core/Database/Jobs/Jobs.php' ) ?: '';
+$run_metadata_source = file_get_contents( dirname( __DIR__ ) . '/inc/Core/Database/RunMetadata/RunMetadata.php' ) ?: '';
+$bootstrap_source = file_get_contents( dirname( __DIR__ ) . '/data-machine.php' ) ?: '';
 $ability_source = file_get_contents( dirname( __DIR__ ) . '/inc/Abilities/Job/GetJobsAbility.php' ) ?: '';
 $cli_source     = file_get_contents( dirname( __DIR__ ) . '/inc/Cli/Commands/JobsCommand.php' ) ?: '';
 $rest_source    = file_get_contents( dirname( __DIR__ ) . '/inc/Api/Jobs.php' ) ?: '';
 
 $assert( 'Jobs repository exposes read-only metadata query primitive', str_contains( $jobs_db_source, 'function query_executions_by_metadata' ) );
-$assert( 'get-jobs ability accepts metadata filters', str_contains( $ability_source, "'metadata'    => array(" ) );
+$assert( 'run metadata table has indexed exact path/value lookup', str_contains( $run_metadata_source, 'KEY path_value (metadata_path, metadata_value)' ) );
+$assert( 'schema creation includes run metadata table', str_contains( $bootstrap_source, 'Database\\RunMetadata\\RunMetadata::create_table' ) );
+$assert( 'Jobs metadata query uses indexed run metadata first', str_contains( $jobs_db_source, 'new RunMetadata()' ) && str_contains( $jobs_db_source, "'indexed'    => true" ) );
+$assert( 'engine data persistence updates run metadata index', str_contains( $jobs_db_source, 'replace_for_engine_data' ) );
+$assert( 'get-jobs ability accepts metadata filters', str_contains( $ability_source, "'metadata'" ) && str_contains( $ability_source, 'query_executions_by_metadata' ) );
 $assert( 'jobs CLI exposes metadata filter option', str_contains( $cli_source, '[--metadata=<filters>]' ) );
 $assert( 'REST jobs endpoint exposes metadata query diagnostics', str_contains( $rest_source, "'metadata_query'" ) );
 
