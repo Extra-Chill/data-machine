@@ -114,7 +114,7 @@ class FilesystemHelper {
 		// files it fails with EPERM, so skip it rather than emit a Warning.
 		if ( function_exists( 'posix_getuid' ) ) {
 			$owner = fileowner( $filepath );
-			if ( false !== $owner && $owner !== posix_getuid() ) {
+			if ( false !== $owner && posix_getuid() !== $owner ) {
 				return false;
 			}
 		}
