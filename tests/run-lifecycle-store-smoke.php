@@ -27,6 +27,9 @@ namespace {
 	if ( ! defined( 'ARRAY_A' ) ) {
 		define( 'ARRAY_A', 'ARRAY_A' );
 	}
+	if ( ! defined( 'OBJECT' ) ) {
+		define( 'OBJECT', 'OBJECT' );
+	}
 
 	if ( ! function_exists( 'absint' ) ) {
 		function absint( $value ): int {
@@ -75,15 +78,25 @@ namespace {
 		}
 	}
 
-	class wpdb {
-		public string $prefix = 'wp_';
-		public int $insert_id = 0;
-		public string $last_error = '';
+	if ( ! class_exists( 'wpdb' ) ) {
+		class wpdb {
+			public $prefix;
+			public $insert_id;
+			public $last_error;
+		}
+	}
+
+	class Datamachine_Run_Lifecycle_Smoke_Wpdb extends wpdb {
+		public function __construct() {
+			$this->prefix     = 'wp_';
+			$this->insert_id  = 0;
+			$this->last_error = '';
+		}
 
 		/** @var array<int,array<string,mixed>> */
 		public array $rows = array();
 
-		public function insert( string $table, array $data, array $format ) {
+		public function insert( $table, $data, $format = null ) {
 			++$this->insert_id;
 			$this->rows[ $this->insert_id ] = array_merge(
 				array(
@@ -97,7 +110,7 @@ namespace {
 			return 1;
 		}
 
-		public function update( string $table, array $data, array $where, array $format, array $where_format ) {
+		public function update( $table, $data, $where, $format = null, $where_format = null ) {
 			$job_id = (int) ( $where['job_id'] ?? 0 );
 			if ( ! isset( $this->rows[ $job_id ] ) ) {
 				return 0;
@@ -125,11 +138,11 @@ namespace {
 			return 1;
 		}
 
-		public function prepare( string $query, ...$args ): array {
+		public function prepare( $query, ...$args ) {
 			return array( $query, $args );
 		}
 
-		public function get_row( $query, string $output = ARRAY_A ) {
+		public function get_row( $query = null, $output = OBJECT, $y = 0 ) {
 			$args   = is_array( $query ) ? ( $query[1] ?? array() ) : array();
 			$job_id = (int) end( $args );
 			$row    = $this->rows[ $job_id ] ?? null;
@@ -137,7 +150,7 @@ namespace {
 		}
 	}
 
-	$wpdb = new wpdb();
+	$wpdb = new Datamachine_Run_Lifecycle_Smoke_Wpdb();
 
 	require_once __DIR__ . '/../inc/Core/JobStatus.php';
 	require_once __DIR__ . '/../inc/Core/Database/BaseRepository.php';

@@ -26,6 +26,9 @@ namespace {
 	if ( ! defined( 'ARRAY_A' ) ) {
 		define( 'ARRAY_A', 'ARRAY_A' );
 	}
+	if ( ! defined( 'OBJECT' ) ) {
+		define( 'OBJECT', 'OBJECT' );
+	}
 
 	if ( ! function_exists( 'absint' ) ) {
 		function absint( $value ): int {
@@ -95,8 +98,16 @@ namespace {
 		);
 	}
 
-	class wpdb {
-		public string $prefix = 'wp_';
+	if ( ! class_exists( 'wpdb' ) ) {
+		class wpdb {
+			public $prefix;
+		}
+	}
+
+	class Datamachine_Transition_Smoke_Wpdb extends wpdb {
+		public function __construct() {
+			$this->prefix = 'wp_';
+		}
 
 		/** @var array<int,array<string,mixed>> */
 		public array $updates = array();
@@ -108,7 +119,7 @@ namespace {
 			12 => array( 'job_id' => 12, 'status' => 'pending', 'engine_data' => null ),
 		);
 
-		public function update( string $table, array $data, array $where, array $format, array $where_format ) {
+		public function update( $table, $data, $where, $format = null, $where_format = null ) {
 			$this->updates[] = compact( 'table', 'data', 'where', 'format', 'where_format' );
 			$job_id          = (int) ( $where['job_id'] ?? 0 );
 			if ( isset( $this->rows[ $job_id ] ) ) {
@@ -117,11 +128,11 @@ namespace {
 			return 1;
 		}
 
-		public function prepare( string $query, ...$args ): array {
+		public function prepare( $query, ...$args ) {
 			return array( $query, $args );
 		}
 
-		public function get_row( $query, string $output = ARRAY_A ) {
+		public function get_row( $query = null, $output = OBJECT, $y = 0 ) {
 			$args   = is_array( $query ) ? ( $query[1] ?? array() ) : array();
 			$job_id = (int) end( $args );
 			$row    = $this->rows[ $job_id ] ?? null;
@@ -135,7 +146,7 @@ namespace {
 		}
 	}
 
-	$wpdb = new wpdb();
+	$wpdb = new Datamachine_Transition_Smoke_Wpdb();
 
 	require_once __DIR__ . '/../inc/Core/JobStatus.php';
 	require_once __DIR__ . '/../inc/Core/Database/BaseRepository.php';

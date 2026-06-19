@@ -168,8 +168,8 @@ class RunLifecycleStore {
 		return $this->mutate_run(
 			$run_id,
 			function ( array $meta ) use ( $event_type, $payload ): array {
-				$events   = is_array( $meta['replay_events'] ?? null ) ? $meta['replay_events'] : array();
-				$events[] = array(
+				$events                = is_array( $meta['replay_events'] ?? null ) ? $meta['replay_events'] : array();
+				$events[]              = array(
 					'type'       => $event_type,
 					'payload'    => $payload,
 					'created_at' => $this->now(),
@@ -205,7 +205,14 @@ class RunLifecycleStore {
 					$metadata
 				);
 
-				return array_merge( $created, $meta, array( 'run_id' => $this->run_id_for_job( $job_id ), 'job_id' => $job_id ) );
+				return array_merge(
+					$created,
+					$meta,
+					array(
+						'run_id' => $this->run_id_for_job( $job_id ),
+						'job_id' => $job_id,
+					)
+				);
 			}
 		);
 
@@ -235,13 +242,13 @@ class RunLifecycleStore {
 		return false !== $result;
 	}
 
-	private function transition_run( int|string $run_id, string $status, string $timestamp_key, array $context = array(), bool $final = false ): array|false {
+	private function transition_run( int|string $run_id, string $status, string $timestamp_key, array $context = array(), bool $is_final = false ): array|false {
 		$job_id = $this->job_id_from_run_id( $run_id );
 		if ( $job_id <= 0 ) {
 			return false;
 		}
 
-		$transition = $this->jobs->transition_job_status_result( $job_id, $status, $final );
+		$transition = $this->jobs->transition_job_status_result( $job_id, $status, $is_final );
 		if ( empty( $transition['success'] ) ) {
 			return false;
 		}
@@ -271,15 +278,15 @@ class RunLifecycleStore {
 		$result = EngineData::mutate(
 			$job_id,
 			function ( array $snapshot ) use ( $job_id, $callback ): array {
-				$meta                  = is_array( $snapshot[ self::META_KEY ] ?? null ) ? $snapshot[ self::META_KEY ] : array();
-				$meta['run_id']        = (string) ( $meta['run_id'] ?? $this->run_id_for_job( $job_id ) );
-				$meta['job_id']        = $job_id;
-				$meta['attempt']       = max( 1, (int) ( $meta['attempt'] ?? 1 ) );
-				$meta['replay_events'] = is_array( $meta['replay_events'] ?? null ) ? array_values( $meta['replay_events'] ) : array();
-				$meta['artifact_refs'] = is_array( $meta['artifact_refs'] ?? null ) ? array_values( $meta['artifact_refs'] ) : array();
-				$next                  = $callback( $meta );
-				$next['run_id']        = $this->run_id_for_job( $job_id );
-				$next['job_id']        = $job_id;
+				$meta                       = is_array( $snapshot[ self::META_KEY ] ?? null ) ? $snapshot[ self::META_KEY ] : array();
+				$meta['run_id']             = (string) ( $meta['run_id'] ?? $this->run_id_for_job( $job_id ) );
+				$meta['job_id']             = $job_id;
+				$meta['attempt']            = max( 1, (int) ( $meta['attempt'] ?? 1 ) );
+				$meta['replay_events']      = is_array( $meta['replay_events'] ?? null ) ? array_values( $meta['replay_events'] ) : array();
+				$meta['artifact_refs']      = is_array( $meta['artifact_refs'] ?? null ) ? array_values( $meta['artifact_refs'] ) : array();
+				$next                       = $callback( $meta );
+				$next['run_id']             = $this->run_id_for_job( $job_id );
+				$next['job_id']             = $job_id;
 				$snapshot[ self::META_KEY ] = $next;
 				return $snapshot;
 			},
