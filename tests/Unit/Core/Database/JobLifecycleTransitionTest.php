@@ -98,4 +98,38 @@ class JobLifecycleTransitionTest extends WP_UnitTestCase {
 		$job = $this->db_jobs->get_job( $job_id );
 		$this->assertSame( JobStatus::CANCELLED, $job['status'] );
 	}
+
+	public function test_create_or_get_job_returns_existing_job_for_same_idempotency_key(): void {
+		$idempotency_key = 'unit-idempotent-job-' . wp_generate_uuid4();
+
+		$first = $this->db_jobs->create_or_get_job(
+			array(
+				'label'           => 'First idempotent job',
+				'idempotency_key' => $idempotency_key,
+			)
+		);
+
+		$this->assertIsArray( $first );
+		$this->assertTrue( $first['created'] );
+		$this->assertFalse( $first['already_exists'] );
+		$this->assertIsInt( $first['job_id'] );
+
+		$second = $this->db_jobs->create_or_get_job(
+			array(
+				'label'           => 'Second idempotent job',
+				'idempotency_key' => $idempotency_key,
+			)
+		);
+
+		$this->assertIsArray( $second );
+		$this->assertFalse( $second['created'] );
+		$this->assertTrue( $second['already_exists'] );
+		$this->assertSame( $first['job_id'], $second['job_id'] );
+		$this->assertSame( 'First idempotent job', $second['job']['label'] );
+		$this->assertSame( $idempotency_key, $second['job']['idempotency_key'] );
+	}
+
+	public function test_create_or_get_job_requires_idempotency_key(): void {
+		$this->assertFalse( $this->db_jobs->create_or_get_job( array( 'label' => 'Missing idempotency key' ) ) );
+	}
 }
