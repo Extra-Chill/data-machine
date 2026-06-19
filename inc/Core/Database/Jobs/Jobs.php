@@ -141,10 +141,10 @@ class Jobs extends BaseRepository {
 				'error',
 				'Failed to insert idempotent job',
 				array(
-					'pipeline_id'      => $prepared['pipeline_id'],
-					'flow_id'          => $prepared['flow_id'],
-					'idempotency_key'  => $idempotency_key,
-					'db_error'         => $this->wpdb->last_error,
+					'pipeline_id'     => $prepared['pipeline_id'],
+					'flow_id'         => $prepared['flow_id'],
+					'idempotency_key' => $idempotency_key,
+					'db_error'        => $this->wpdb->last_error,
 				)
 			);
 			return false;
@@ -182,7 +182,7 @@ class Jobs extends BaseRepository {
 			}
 		}
 
-		return $job ?: null;
+		return $job ? $job : null;
 	}
 
 	/**
