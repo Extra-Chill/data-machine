@@ -469,15 +469,25 @@ class FlowsCommand extends BaseCommand {
 			return;
 		}
 
+		// Apply the human empty-cell placeholder ("—") ONLY for the table
+		// display. Structured formats (json/csv/yaml/ids/count) must carry the
+		// real value (an empty string when there's no config summary) — a
+		// display dash in structured output is a silent data-integrity bug: it
+		// reads as "this flow has config '—'" when the flow simply has none
+		// (#2754).
+		$is_table = 'table' === $format;
+
 		// Transform flows to flat row format.
 		$items = array_map(
-			function ( $flow ) {
+			function ( $flow ) use ( $is_table ) {
+				$config_summary = $this->extractConfigSummary( $flow );
+
 				return array(
 					'id'          => $flow['flow_id'],
 					'name'        => $flow['flow_name'],
 					'pipeline_id' => $flow['pipeline_id'],
 					'handlers'    => $this->extractHandlers( $flow ),
-					'config'      => $this->extractConfigSummary( $flow ),
+					'config'      => ( $is_table && '' === $config_summary ) ? '—' : $config_summary,
 					'schedule'    => $this->extractSchedule( $flow ),
 					'max_items'   => $this->extractMaxItems( $flow ),
 					'prompt'      => $this->extractPrompt( $flow ),
@@ -1578,8 +1588,13 @@ class FlowsCommand extends BaseCommand {
 	 * specific taxonomy, handler, or post type. Surfaces distinguishing
 	 * values like coordinates, city names, URLs, and taxonomy selections.
 	 *
+	 * Returns the honest summary string — an EMPTY string when the flow has
+	 * no distinguishing config — so the value is safe for every output format
+	 * (json/csv/yaml). The human "—" empty-cell placeholder is a table-display
+	 * concern and is applied only when building table rows, never here (#2754).
+	 *
 	 * @param array $flow Flow data.
-	 * @return string Config summary (max ~60 chars).
+	 * @return string Config summary (max ~60 chars), or '' when empty.
 	 */
 	private function extractConfigSummary( array $flow ): string {
 		$flow_config = $flow['flow_config'] ?? array();
@@ -1637,7 +1652,7 @@ class FlowsCommand extends BaseCommand {
 			$summary = mb_substr( $summary, 0, 57 ) . '...';
 		}
 
-		return '' !== $summary ? $summary : '—';
+		return $summary;
 	}
 
 	/**
