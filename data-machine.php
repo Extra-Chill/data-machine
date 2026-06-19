@@ -788,6 +788,7 @@ function datamachine_ensure_all_tables() {
 	$db_identity_index->create_table();
 
 	\DataMachine\Core\Database\BundleArtifacts\InstalledBundleArtifacts::create_table();
+	\DataMachine\Core\Database\RunMetadata\RunMetadata::create_table();
 
 	\DataMachine\Core\Database\Chat\Chat::create_table();
 	\DataMachine\Core\Database\Chat\Chat::ensure_owner_columns();

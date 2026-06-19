@@ -654,29 +654,12 @@ class JobArtifacts {
 
 	/** @return array{success: bool, error?: string} */
 	private function verify_artifact_content( array $artifact, int $bytes, string $sha256 ): array {
-		$expected_bytes = isset( $artifact['bytes'] ) ? (int) $artifact['bytes'] : null;
-		if ( null !== $expected_bytes && $expected_bytes !== $bytes ) {
-			return array(
-				'success' => false,
-				'error'   => sprintf( 'Artifact byte count mismatch: expected %d, got %d.', $expected_bytes, $bytes ),
-			);
-		}
-
-		$expected_sha256 = strtolower( trim( (string) ( $artifact['sha256'] ?? '' ) ) );
-		if ( '' !== $expected_sha256 && ! hash_equals( $expected_sha256, $sha256 ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'Artifact sha256 mismatch.',
-			);
-		}
-
-		return array( 'success' => true );
+		return ArtifactManifest::verify( $artifact, $bytes, $sha256 );
 	}
 
 	/** @return array<string,mixed> */
 	private function public_artifact_metadata( array $artifact ): array {
-		unset( $artifact['local_debug'] );
-		return $artifact;
+		return ArtifactManifest::public_metadata( $artifact );
 	}
 
 	/** @return array<string,mixed> */
@@ -774,28 +757,26 @@ class JobArtifacts {
 			)
 		);
 
+		$manifest = ArtifactManifest::create(
+			array(
+				'artifact_ref'   => $artifact_ref,
+				'artifact_type'  => $type,
+				'content'        => $json,
+				'relative_path'  => $relative_path,
+				'export_url'     => is_string( $export_url ) ? $export_url : '',
+				'signed_url'     => is_string( $signed_url ) ? $signed_url : '',
+				'payload_sha256' => (string) ( $artifact_payload['sha256'] ?? '' ),
+				'written_at'     => gmdate( 'c' ),
+				'local_debug'    => array(
+					'path' => $file_path,
+					'url'  => '' !== $base_url ? trailingslashit( $base_url ) . $file_name : null,
+				),
+			)
+		);
+
 		return array(
 			'success' => true,
-			'file'    => $this->filter_empty(
-				array(
-					'artifact_ref'   => $artifact_ref,
-					'type'           => $type,
-					'schema_version' => self::ARTIFACT_REF_SCHEMA_VERSION,
-					'sha256'         => hash( 'sha256', $json ),
-					'bytes'          => strlen( $json ),
-					'relative_path'  => $relative_path,
-					'export_url'     => is_string( $export_url ) && '' !== $export_url ? $export_url : null,
-					'signed_url'     => is_string( $signed_url ) && '' !== $signed_url ? $signed_url : null,
-					'payload_sha256' => (string) ( $artifact_payload['sha256'] ?? '' ),
-					'written_at'     => gmdate( 'c' ),
-					'local_debug'    => $this->filter_empty(
-						array(
-							'path' => $file_path,
-							'url'  => '' !== $base_url ? trailingslashit( $base_url ) . $file_name : null,
-						)
-					),
-				)
-			),
+			'file'    => $manifest,
 		);
 	}
 

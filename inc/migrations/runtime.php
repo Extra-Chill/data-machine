@@ -30,6 +30,7 @@ function datamachine_run_schema_migrations(): void {
 	}
 
 	datamachine_migrate_bundle_artifacts_table();
+	datamachine_migrate_run_metadata_table();
 	datamachine_migrate_processed_item_claims();
 	datamachine_migrate_pending_actions_table();
 	datamachine_migrate_chat_sessions_to_network();
