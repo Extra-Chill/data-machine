@@ -71,6 +71,20 @@ class EngineStateLedger {
 	}
 
 	/**
+	 * Append a replayable event to a persisted job snapshot once per operation id.
+	 *
+	 * @param int    $job_id   Job ID.
+	 * @param string $op_id    Deterministic operation id.
+	 * @param string $type     Event type.
+	 * @param array  $patch    Engine data patch.
+	 * @param array  $metadata Optional event metadata.
+	 * @return array|null Appended event, existing event for duplicate op_id, or null on failure.
+	 */
+	public static function appendOnce( int $job_id, string $op_id, string $type, array $patch, array $metadata = array() ): ?array {
+		return EngineData::appendStateEventOnce( $job_id, $op_id, $type, $patch, $metadata );
+	}
+
+	/**
 	 * Return ledger events from a snapshot.
 	 *
 	 * @param array $snapshot Engine data snapshot.
@@ -78,6 +92,28 @@ class EngineStateLedger {
 	 */
 	public static function fromSnapshot( array $snapshot ): array {
 		return is_array( $snapshot[ self::SNAPSHOT_KEY ] ?? null ) ? $snapshot[ self::SNAPSHOT_KEY ] : array();
+	}
+
+	/**
+	 * Return the first ledger event matching an operation id.
+	 *
+	 * @param array  $snapshot Engine data snapshot.
+	 * @param string $op_id    Operation id.
+	 * @return array|null Matching ledger event, or null when absent.
+	 */
+	public static function findByOpId( array $snapshot, string $op_id ): ?array {
+		$op_id = trim( $op_id );
+		if ( '' === $op_id ) {
+			return null;
+		}
+
+		foreach ( self::fromSnapshot( $snapshot ) as $event ) {
+			if ( is_array( $event ) && $op_id === (string) ( $event['op_id'] ?? '' ) ) {
+				return $event;
+			}
+		}
+
+		return null;
 	}
 
 	/**

@@ -259,6 +259,50 @@ class EngineData {
 	}
 
 	/**
+	 * Append a replayable state event once per deterministic operation id.
+	 *
+	 * Duplicate operation ids return the existing ledger event without reapplying the patch.
+	 *
+	 * @param int    $job_id   Job ID.
+	 * @param string $op_id    Deterministic operation id.
+	 * @param string $type     Generic event type.
+	 * @param array  $patch    Engine data patch to project onto the snapshot.
+	 * @param array  $metadata Optional event metadata.
+	 * @return array|null Appended or existing trace entry on success, null on failure.
+	 */
+	public static function appendStateEventOnce( int $job_id, string $op_id, string $type, array $patch, array $metadata = array() ): ?array {
+		$op_id = trim( $op_id );
+		if ( $job_id <= 0 || '' === $op_id || '' === trim( $type ) ) {
+			return null;
+		}
+
+		$metadata['op_id'] = $op_id;
+		$event             = null;
+		$result            = self::mutate(
+			$job_id,
+			static function ( array $current ) use ( $op_id, $type, $patch, $metadata, &$event ): ?array {
+				$existing = EngineStateLedger::findByOpId( $current, $op_id );
+				if ( null !== $existing ) {
+					$event = $existing;
+					return $current;
+				}
+
+				$projection = EngineStateLedger::append( $current, $type, $patch, $metadata );
+				if ( null === $projection ) {
+					return null;
+				}
+
+				$event = $projection['event'];
+
+				return $projection['snapshot'];
+			},
+			$type
+		);
+
+		return ! empty( $result['success'] ) ? $event : null;
+	}
+
+	/**
 	 * Return replayable state ledger events from a snapshot.
 	 *
 	 * @param array $snapshot Engine data snapshot.
