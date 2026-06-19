@@ -108,7 +108,7 @@ class EngineStateLedger {
 		}
 
 		foreach ( self::fromSnapshot( $snapshot ) as $event ) {
-			if ( is_array( $event ) && $op_id === (string) ( $event['op_id'] ?? '' ) ) {
+			if ( is_array( $event ) && (string) ( $event['op_id'] ?? '' ) === $op_id ) {
 				return $event;
 			}
 		}
