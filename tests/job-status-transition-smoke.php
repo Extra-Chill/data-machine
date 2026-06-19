@@ -23,6 +23,46 @@ namespace {
 	if ( ! defined( 'ABSPATH' ) ) {
 		define( 'ABSPATH', __DIR__ . '/' );
 	}
+	if ( ! defined( 'ARRAY_A' ) ) {
+		define( 'ARRAY_A', 'ARRAY_A' );
+	}
+
+	if ( ! function_exists( 'absint' ) ) {
+		function absint( $value ): int {
+			return abs( (int) $value );
+		}
+	}
+
+	if ( ! function_exists( 'sanitize_key' ) ) {
+		function sanitize_key( $key ): string {
+			return preg_replace( '/[^a-z0-9_\-]/', '', strtolower( (string) $key ) );
+		}
+	}
+
+	if ( ! function_exists( 'sanitize_text_field' ) ) {
+		function sanitize_text_field( $value ): string {
+			return trim( strip_tags( (string) $value ) );
+		}
+	}
+
+	if ( ! function_exists( 'wp_json_encode' ) ) {
+		function wp_json_encode( $data, int $flags = 0, int $depth = 512 ) {
+			return json_encode( $data, $flags, $depth );
+		}
+	}
+
+	if ( ! function_exists( 'wp_cache_get' ) ) {
+		function wp_cache_get( $key, string $group = '' ) {
+			return $GLOBALS['datamachine_transition_cache'][ $group ][ $key ] ?? false;
+		}
+	}
+
+	if ( ! function_exists( 'wp_cache_set' ) ) {
+		function wp_cache_set( $key, $value, string $group = '' ): bool {
+			$GLOBALS['datamachine_transition_cache'][ $group ][ $key ] = $value;
+			return true;
+		}
+	}
 
 	$datamachine_transition_hooks = array();
 
@@ -55,22 +95,53 @@ namespace {
 		);
 	}
 
-	class DataMachineTransitionWpdbStub {
+	class wpdb {
 		public string $prefix = 'wp_';
 
 		/** @var array<int,array<string,mixed>> */
 		public array $updates = array();
 
+		/** @var array<int,array<string,mixed>> */
+		public array $rows = array(
+			10 => array( 'job_id' => 10, 'status' => 'pending', 'engine_data' => null ),
+			11 => array( 'job_id' => 11, 'status' => 'pending', 'engine_data' => null ),
+			12 => array( 'job_id' => 12, 'status' => 'pending', 'engine_data' => null ),
+		);
+
 		public function update( string $table, array $data, array $where, array $format, array $where_format ) {
 			$this->updates[] = compact( 'table', 'data', 'where', 'format', 'where_format' );
+			$job_id          = (int) ( $where['job_id'] ?? 0 );
+			if ( isset( $this->rows[ $job_id ] ) ) {
+				$this->rows[ $job_id ] = array_merge( $this->rows[ $job_id ], $data );
+			}
 			return 1;
+		}
+
+		public function prepare( string $query, ...$args ): array {
+			return array( $query, $args );
+		}
+
+		public function get_row( $query, string $output = ARRAY_A ) {
+			$args   = is_array( $query ) ? ( $query[1] ?? array() ) : array();
+			$job_id = (int) end( $args );
+			$row    = $this->rows[ $job_id ] ?? null;
+			if ( $row && isset( $row['engine_data'] ) && is_string( $row['engine_data'] ) ) {
+				$decoded = json_decode( $row['engine_data'], true );
+				if ( JSON_ERROR_NONE === json_last_error() ) {
+					$row['engine_data'] = $decoded;
+				}
+			}
+			return $row ?: null;
 		}
 	}
 
-	$wpdb = new DataMachineTransitionWpdbStub();
+	$wpdb = new wpdb();
 
 	require_once __DIR__ . '/../inc/Core/JobStatus.php';
 	require_once __DIR__ . '/../inc/Core/Database/BaseRepository.php';
+	require_once __DIR__ . '/../inc/Core/Database/LifecycleStateTransition.php';
+	require_once __DIR__ . '/../inc/Core/EngineData.php';
+	require_once __DIR__ . '/../inc/Core/RunLifecycleStore.php';
 	require_once __DIR__ . '/../inc/Core/Database/Jobs/Jobs.php';
 
 	use DataMachine\Core\Database\Jobs\Jobs;
@@ -93,21 +164,29 @@ namespace {
 	echo "=== job-status-transition-smoke ===\n";
 
 	$jobs = new Jobs();
+	$status_updates = static function () use ( $wpdb ): array {
+		return array_values(
+			array_filter(
+				$wpdb->updates,
+				static fn( array $update ): bool => array_key_exists( 'status', $update['data'] ?? array() )
+			)
+		);
+	};
 
 	$assert( 'non-final update succeeds', $jobs->update_job_status( 10, 'processing' ) );
-	$non_terminal = $wpdb->updates[0]['data'] ?? array();
+	$non_terminal = $status_updates()[0]['data'] ?? array();
 	$assert( 'non-final update writes status only', array( 'status' ) === array_keys( $non_terminal ) );
 	$assert( 'non-final update does not fire completion hook', 0 === count( $datamachine_transition_hooks ) );
 
 	$assert( 'terminal update succeeds through update_job_status', $jobs->update_job_status( 11, 'completed' ) );
-	$terminal = $wpdb->updates[1]['data'] ?? array();
+	$terminal = $status_updates()[1]['data'] ?? array();
 	$assert( 'terminal update writes completed_at', isset( $terminal['completed_at'] ) && is_string( $terminal['completed_at'] ) && '' !== $terminal['completed_at'] );
 	$assert( 'terminal update records run metrics', 'completed' === ( RunMetrics::$completed[11] ?? '' ) );
 	$assert( 'terminal update fires completion hook once', 1 === count( $datamachine_transition_hooks ) );
 	$assert( 'completion hook receives terminal status', 'completed' === ( $datamachine_transition_hooks[0]['args'][1] ?? '' ) );
 
 	$assert( 'complete_job rejects non-final statuses', false === $jobs->complete_job( 12, 'processing' ) );
-	$assert( 'rejected complete_job does not write', 2 === count( $wpdb->updates ) );
+	$assert( 'rejected complete_job does not write', 2 === count( $status_updates() ) );
 
 	if ( $failures > 0 ) {
 		echo "\n=== job-status-transition-smoke: {$failures} FAILURE(S) / {$total} assertions ===\n";
