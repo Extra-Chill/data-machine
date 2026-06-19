@@ -1,7 +1,7 @@
 {
     "apiVersion": 2,
     "name": "data-machine-events/event-details",
-    "version": "0.41.0",
+    "version": "0.42.0",
     "title": "Event Details",
     "category": "data-machine-events",
     "icon": "calendar-alt",

@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.42.0] - 2026-06-19
+
+### Added
+- add optional in-block time-scope preset chips to the filter bar
+
 ## [0.41.0] - 2026-06-16
 
 ### Added
