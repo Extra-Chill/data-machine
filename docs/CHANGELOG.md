@@ -2,6 +2,16 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.153.1] - 2026-06-19
+
+### Changed
+- Add idempotent job creation foundation
+- Add append-once engine state ledger writes
+
+### Fixed
+- emit real flow config in structured output instead of the table display placeholder
+- make FilesystemHelper group-writable chmod best-effort (stop EPERM warnings)
+
 ## [0.153.0] - 2026-06-18
 
 ### Added
