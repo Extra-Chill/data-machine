@@ -64,7 +64,7 @@ class ArtifactManifest {
 		}
 
 		foreach ( $manifests as $manifest ) {
-			if ( is_array( $manifest ) && $artifact_ref === (string) ( $manifest['artifact_ref'] ?? '' ) ) {
+			if ( is_array( $manifest ) && (string) ( $manifest['artifact_ref'] ?? '' ) === $artifact_ref ) {
 				return array(
 					'success'  => true,
 					'artifact' => self::public_metadata( $manifest ),

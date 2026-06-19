@@ -926,7 +926,7 @@ class Jobs extends BaseRepository {
 			);
 		}
 
-		$scan_limit       = max( $per_page + $offset, min( 5000, (int) ( $args['metadata_scan_limit'] ?? 1000 ) ) );
+		$scan_limit = max( $per_page + $offset, min( 5000, (int) ( $args['metadata_scan_limit'] ?? 1000 ) ) );
 
 		$query_args                         = $args;
 		$query_args['per_page']             = $scan_limit;

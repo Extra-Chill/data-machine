@@ -148,7 +148,7 @@ final class RunMetadata extends BaseRepository {
 		$where_sql = implode( ' OR ', $where_parts );
 		$needed    = count( $filters );
 
-		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQL.NotPrepared
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
 		$query = $this->wpdb->prepare(
 			"SELECT job_id
 			 FROM {$this->table_name}
@@ -160,7 +160,7 @@ final class RunMetadata extends BaseRepository {
 			array_merge( $where_values, array( $needed, $limit, $offset ) )
 		);
 		$rows  = $this->wpdb->get_col( $query );
-		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQL.NotPrepared
+		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
 
 		return array_map( 'intval', is_array( $rows ) ? $rows : array() );
 	}
