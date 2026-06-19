@@ -28,6 +28,70 @@ class ScopeResolver {
 	const VALID_SCOPES = array( 'today', 'tonight', 'this-weekend', 'this-week' );
 
 	/**
+	 * Resolve the human-readable, translated label for a scope slug.
+	 *
+	 * Single source of truth for chip / control labels so the PHP template,
+	 * any future server-rendered surface, and tests never drift on copy.
+	 * The empty / 'current' scope resolves to the generic "All" label.
+	 *
+	 * @param string $scope The scope identifier.
+	 * @return string Translated label, or the raw slug for unknown scopes.
+	 */
+	public static function label( string $scope ): string {
+		$scope = sanitize_key( $scope );
+
+		switch ( $scope ) {
+			case '':
+			case 'current':
+				return __( 'All', 'data-machine-events' );
+			case 'today':
+				return __( 'Today', 'data-machine-events' );
+			case 'tonight':
+				return __( 'Tonight', 'data-machine-events' );
+			case 'this-weekend':
+				return __( 'This Weekend', 'data-machine-events' );
+			case 'this-week':
+				return __( 'This Week', 'data-machine-events' );
+			default:
+				return $scope;
+		}
+	}
+
+	/**
+	 * Build the ordered list of scope slugs to surface as preset controls.
+	 *
+	 * Generic, consumer-agnostic: the optional `$preset_slugs` argument (a
+	 * block attribute) subsets and/or reorders {@see VALID_SCOPES}. Unknown
+	 * slugs are dropped and duplicates are collapsed. An empty/invalid list
+	 * falls back to all valid scopes in declaration order.
+	 *
+	 * The returned list never includes the empty "All" scope — callers
+	 * render that chip separately so its position (typically first) stays a
+	 * presentation concern.
+	 *
+	 * @param string[] $preset_slugs Optional subset/order of scope slugs.
+	 * @return string[] Ordered, validated, de-duplicated scope slugs.
+	 */
+	public static function preset_scopes( array $preset_slugs = array() ): array {
+		$preset_slugs = array_values(
+			array_filter(
+				array_map( 'sanitize_key', $preset_slugs ),
+				static function ( string $slug ): bool {
+					return in_array( $slug, self::VALID_SCOPES, true );
+				}
+			)
+		);
+
+		$preset_slugs = array_values( array_unique( $preset_slugs ) );
+
+		if ( empty( $preset_slugs ) ) {
+			return self::VALID_SCOPES;
+		}
+
+		return $preset_slugs;
+	}
+
+	/**
 	 * Resolve a scope name to concrete date boundaries.
 	 *
 	 * Returns null for 'current' (the default) or unrecognized scopes,

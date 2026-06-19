@@ -35,6 +35,7 @@ import {
 	getMonthGridController,
 } from './modules/month-grid-nav';
 import { initLoadMore, destroyLoadMore } from './modules/load-more';
+import { initScopePresets } from './modules/scope-presets';
 
 import type { FlatpickrInstance } from './types';
 
@@ -95,6 +96,13 @@ function initCalendarInstance( calendar: HTMLElement ): void {
 	} );
 
 	initSearchInput( calendar );
+
+	// #373: optional in-block time-scope preset chips. No-op unless the
+	// `showScopePresets` attribute rendered the chip group. Reuses the same
+	// filter-change flow as search/date so there is one re-fetch path.
+	initScopePresets( calendar, function () {
+		handleFilterChange( calendar );
+	} );
 
 	// Auto-detect map block on page and enable geo sync.
 	if ( hasMapBlockOnPage() ) {

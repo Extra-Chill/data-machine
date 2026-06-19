@@ -547,6 +547,52 @@
     font-size: 16px;
 }
 
+/* Time-scope preset chips (#373) — in-block filter chips that drive the
+   calendar's existing `scope` round-trip. Opt-in via `showScopePresets`. */
+.data-machine-events-scope-presets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 1rem;
+}
+
+.data-machine-events-scope-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.5rem 1rem;
+    font-size: 0.9rem;
+    line-height: 1.2;
+    border-radius: var(--data-machine-border-radius);
+    background: var(--data-machine-background-light);
+    border: 1px solid var(--data-machine-border-light);
+    color: var(--data-machine-text-primary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-decoration: none;
+}
+
+.data-machine-events-scope-chip:hover {
+    background: var(--data-machine-background-hover);
+    border-color: var(--data-machine-border-hover);
+    color: var(--data-machine-text-primary);
+}
+
+.data-machine-events-scope-chip:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--data-machine-border-focus);
+}
+
+.data-machine-events-scope-chip-active {
+    background: var(--data-machine-text-accent);
+    color: white;
+    border-color: var(--data-machine-border-focus);
+}
+
+.data-machine-events-scope-chip-active:hover {
+    background: var(--data-machine-border-focus);
+    color: white;
+}
+
 /* Custom Modal Structure */
 .data-machine-taxonomy-modal {
     position: fixed;

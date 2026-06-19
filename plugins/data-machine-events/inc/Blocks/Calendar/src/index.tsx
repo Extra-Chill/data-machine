@@ -13,6 +13,8 @@ interface CalendarBlockAttributes {
 	showFilters: boolean;
 	showDateFilter: boolean;
 	defaultDateRange: string;
+	showScopePresets: boolean;
+	scopePresets: string[];
 	displayMode: 'date-groups' | 'month-grid';
 }
 
@@ -23,7 +25,8 @@ interface EditProps {
 
 registerBlockType( 'data-machine-events/calendar', {
 	edit: function Edit( { attributes, setAttributes }: EditProps ) {
-		const { defaultView, showSearch, displayMode } = attributes;
+		const { defaultView, showSearch, showScopePresets, displayMode } =
+			attributes;
 
 		const blockProps = useBlockProps( {
 			className: 'data-machine-events-calendar-editor',
@@ -73,6 +76,21 @@ registerBlockType( 'data-machine-events/calendar', {
 							checked={ showSearch }
 							onChange={ ( value ) =>
 								setAttributes( { showSearch: value } )
+							}
+						/>
+
+						<ToggleControl
+							label={ __(
+								'Show Time Scope Presets',
+								'data-machine-events'
+							) }
+							help={ __(
+								'Show in-block filter chips (Today, Tonight, This Weekend, This Week, All) that re-filter this calendar via its scope mechanism. Default off (#373).',
+								'data-machine-events'
+							) }
+							checked={ showScopePresets }
+							onChange={ ( value ) =>
+								setAttributes( { showScopePresets: value } )
 							}
 						/>
 

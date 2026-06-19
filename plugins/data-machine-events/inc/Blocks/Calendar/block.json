@@ -37,6 +37,17 @@
 			"type": "string",
 			"default": "current"
 		},
+		"showScopePresets": {
+			"type": "boolean",
+			"default": false
+		},
+		"scopePresets": {
+			"type": "array",
+			"items": {
+				"type": "string"
+			},
+			"default": []
+		},
 		"displayMode": {
 			"type": "string",
 			"enum": [ "date-groups", "month-grid" ],

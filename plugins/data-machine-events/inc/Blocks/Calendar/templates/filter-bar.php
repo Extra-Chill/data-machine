@@ -34,6 +34,25 @@ $has_archive_context = ! empty( $archive_context['taxonomy'] ) && ! empty( $arch
 
 $hide_filter_button_when_inactive = $hide_filter_button_when_inactive ?? false;
 $hide_filter_button_attr          = $hide_filter_button_when_inactive ? ' hidden data-hide-when-inactive="1"' : '';
+
+// #373: optional in-block time-scope preset chips. These surface the
+// block's existing ScopeResolver/scope round-trip as generic filter-bar
+// controls. They are IN-BLOCK FILTER CHIPS (buttons that re-filter this
+// calendar) — NOT links to other pages. Any SEO-landing-page behavior is
+// a consumer concern that stays out of this generic layer. Default OFF so
+// existing consumers are byte-identical.
+$show_scope_presets = ! empty( $attributes['showScopePresets'] );
+$active_scope       = isset( $scope ) ? (string) $scope : '';
+if ( '' === $active_scope || 'current' === $active_scope ) {
+	$active_scope = '';
+}
+$scope_preset_slugs = $show_scope_presets
+	? \DataMachineEvents\Blocks\Calendar\Query\ScopeResolver::preset_scopes(
+		isset( $attributes['scopePresets'] ) && is_array( $attributes['scopePresets'] )
+			? $attributes['scopePresets']
+			: array()
+	)
+	: array();
 ?>
 
 <div class="data-machine-events-filter-bar">
@@ -72,7 +91,27 @@ $hide_filter_button_attr          = $hide_filter_button_when_inactive ? ' hidden
 			</button>
 		</div>
 	</div>
-	
+
+	<?php if ( $show_scope_presets ) : ?>
+		<div class="data-machine-events-scope-presets" role="group" aria-label="<?php esc_attr_e( 'Time scope', 'data-machine-events' ); ?>">
+			<button type="button"
+					class="data-machine-events-scope-chip<?php echo ( '' === $active_scope ? ' data-machine-events-scope-chip-active' : '' ); ?>"
+					data-scope=""
+					aria-pressed="<?php echo ( '' === $active_scope ? 'true' : 'false' ); ?>">
+				<?php echo esc_html( \DataMachineEvents\Blocks\Calendar\Query\ScopeResolver::label( '' ) ); ?>
+			</button>
+			<?php foreach ( $scope_preset_slugs as $scope_slug ) : ?>
+				<?php $is_active_chip = ( $scope_slug === $active_scope ); ?>
+				<button type="button"
+						class="data-machine-events-scope-chip<?php echo ( $is_active_chip ? ' data-machine-events-scope-chip-active' : '' ); ?>"
+						data-scope="<?php echo esc_attr( $scope_slug ); ?>"
+						aria-pressed="<?php echo ( $is_active_chip ? 'true' : 'false' ); ?>">
+					<?php echo esc_html( \DataMachineEvents\Blocks\Calendar\Query\ScopeResolver::label( $scope_slug ) ); ?>
+				</button>
+			<?php endforeach; ?>
+		</div>
+	<?php endif; ?>
+
 	<!-- Taxonomy Filter Modal -->
 	<div id="<?php echo esc_attr( $modal_id ); ?>" class="data-machine-taxonomy-modal" aria-labelledby="<?php echo esc_attr( $modal_id . '-title' ); ?>"
 	<?php

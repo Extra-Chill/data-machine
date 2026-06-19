@@ -189,6 +189,22 @@ class FilterStateManager {
 			params.set( 'event_search', searchInput.value );
 		}
 
+		// #373: optional in-block time-scope preset chips. Read the active
+		// `[data-scope]` chip for this calendar instance and set `scope`.
+		// The "All" chip carries an empty `data-scope`, which means "no
+		// scope" — match the server's ScopeResolver, which treats both ''
+		// and 'current' as unscoped, by omitting the param entirely.
+		const activeScopeChip =
+			this.calendar.querySelector< HTMLButtonElement >(
+				'.data-machine-events-scope-chip-active[data-scope]'
+			);
+		if ( activeScopeChip ) {
+			const scopeSlug = activeScopeChip.dataset.scope || '';
+			if ( scopeSlug && scopeSlug !== 'current' ) {
+				params.set( 'scope', scopeSlug );
+			}
+		}
+
 		if ( datePicker?.selectedDates?.length && datePicker.selectedDates.length > 0 ) {
 			const startDate = datePicker.selectedDates[ 0 ];
 			const endDate = datePicker.selectedDates[ 1 ] || startDate;

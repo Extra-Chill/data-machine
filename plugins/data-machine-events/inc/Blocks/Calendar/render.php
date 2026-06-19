@@ -289,6 +289,7 @@ if ( '' !== $scope_token_value ) {
 			'search_query'                     => $search_query,
 			'date_start'                       => $date_start,
 			'date_end'                         => $date_end,
+			'scope'                            => $scope,
 			'filter_count'                     => $filter_count,
 			'archive_context'                  => $archive_context,
 			'hide_filter_button_when_inactive' => $hide_filter_button_when_inactive,
