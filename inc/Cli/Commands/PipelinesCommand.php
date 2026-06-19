@@ -360,18 +360,26 @@ class PipelinesCommand extends BaseCommand {
 				return;
 			}
 
+			// Apply the human empty-cell placeholder ("—") ONLY for the table
+			// display. Structured formats (json/csv/yaml/ids/count) must carry
+			// the real value (empty string when there's no summary) — mirrors
+			// the flows-list fix; a display dash in structured output is a
+			// silent data-integrity bug (#2754).
+			$is_table = 'table' === $format;
+
 			// Transform pipelines to flat row format.
 			$items = array_map(
-				function ( $pipeline ) {
-					$config = $pipeline['pipeline_config'] ?? array();
-					$flows  = $pipeline['flows'] ?? array();
+				function ( $pipeline ) use ( $is_table ) {
+					$config   = $pipeline['pipeline_config'] ?? array();
+					$flows    = $pipeline['flows'] ?? array();
+					$location = $this->extractPipelineLocation( $flows );
 					return array(
 						'id'         => $pipeline['pipeline_id'],
 						'name'       => $pipeline['pipeline_name'],
 						'steps'      => count( $config ),
 						'step_types' => $this->extractStepTypes( $config ),
 						'flows'      => count( $flows ),
-						'location'   => $this->extractPipelineLocation( $flows ),
+						'location'   => ( $is_table && '' === $location ) ? '—' : $location,
 						'updated'    => $pipeline['updated_at_display'] ?? $pipeline['updated_at'] ?? 'N/A',
 					);
 				},
@@ -493,8 +501,13 @@ class PipelinesCommand extends BaseCommand {
 	 * city names, URLs, taxonomy term IDs. Domain-agnostic: reads raw
 	 * config keys without assuming any specific taxonomy or handler.
 	 *
+	 * Returns the honest summary string — an EMPTY string when no
+	 * distinguishing config is found — so the value is safe for every output
+	 * format. The "—" empty-cell placeholder is applied only when building
+	 * table rows, never here (#2754).
+	 *
 	 * @param array $flows Pipeline's flows array.
-	 * @return string Config summary or "—".
+	 * @return string Config summary, or '' when empty.
 	 */
 	private function extractPipelineLocation( array $flows ): string {
 		$parts = array();
@@ -537,7 +550,7 @@ class PipelinesCommand extends BaseCommand {
 		}
 
 		$summary = implode( ' | ', array_unique( $parts ) );
-		return '' !== $summary ? $summary : '—';
+		return $summary;
 	}
 
 	/**
