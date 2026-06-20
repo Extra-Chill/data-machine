@@ -2,6 +2,14 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.44.0] - 2026-06-20
+
+### Added
+- ancestor rollup mode for get-upcoming-counts
+
+### Changed
+- use pre-increment in rollup ancestor walk
+
 ## [0.43.0] - 2026-06-20
 
 ### Added
