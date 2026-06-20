@@ -2,6 +2,17 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.153.2] - 2026-06-20
+
+### Changed
+- Pin Blocks Engine transformer trunk commit
+- Use Blocks Engine transformer for content formats
+- Add generic run lifecycle store
+- Add indexed run metadata and artifact manifests
+
+### Fixed
+- make RunMetrics engine_data writes compare-and-swap safe
+
 ## [0.153.1] - 2026-06-19
 
 ### Changed
