@@ -50,6 +50,10 @@ class UpcomingCountAbilities {
 								'type'        => 'boolean',
 								'description' => __( 'Exclude root-level terms (parent = 0). Default true for hierarchical taxonomies like location.', 'data-machine-events' ),
 							),
+							'rollup'          => array(
+								'type'        => 'boolean',
+								'description' => __( 'Roll counts up the hierarchy: each non-leaf term reports the number of DISTINCT upcoming events tagged to ANY of its descendant terms (deduped). Default false (count only events tagged directly to each term). Only meaningful for hierarchical taxonomies; ignored otherwise. When true, exclude_roots controls whether root ancestors are returned.', 'data-machine-events' ),
+							),
 							'filter_taxonomy' => array(
 								'type'        => 'string',
 								'description' => __( 'Optional. When paired with filter_term_id, restrict counts to upcoming events also tagged with that term in this taxonomy (e.g. taxonomy=venue + filter_taxonomy=artist + filter_term_id=N counts distinct venues of upcoming events tagged with artist N).', 'data-machine-events' ),
@@ -155,6 +159,15 @@ class UpcomingCountAbilities {
 			return new \WP_Error( 'invalid_taxonomy', "Taxonomy '{$taxonomy}' does not exist.", array( 'status' => 400 ) );
 		}
 
+		// Rollup mode: ancestor terms report distinct upcoming events across
+		// their whole subtree. Only meaningful for hierarchical taxonomies;
+		// for flat taxonomies a term has no descendants so rollup === direct
+		// counts, and we fall through to the standard path.
+		$rollup = ! empty( $input['rollup'] ) && is_taxonomy_hierarchical( $taxonomy );
+		if ( $rollup ) {
+			return $this->executeRollupCounts( $taxonomy, $exclude_roots, $has_filter, $filter_taxonomy, $filter_term_id );
+		}
+
 		global $wpdb;
 
 		$today    = gmdate( 'Y-m-d 00:00:00' );
@@ -236,6 +249,170 @@ class UpcomingCountAbilities {
 				'url'     => $url,
 			);
 		}
+
+		return array(
+			'success'  => true,
+			'taxonomy' => $taxonomy,
+			'terms'    => $terms,
+			'total'    => count( $terms ),
+		);
+	}
+
+	/**
+	 * Execute get-upcoming-counts in rollup mode.
+	 *
+	 * Each non-leaf term reports the number of DISTINCT upcoming events tagged
+	 * to any term in its subtree (the term itself plus all descendants). An
+	 * event tagged to two sibling cities counts once for the shared ancestor.
+	 *
+	 * Strategy (taxonomy is shallow — region → state → city): pull every
+	 * (term_id, object_id) pair for upcoming published events in ONE query,
+	 * then aggregate distinct object_ids per ancestor in PHP using the term
+	 * hierarchy. Avoids N per-ancestor queries while keeping the dedup exact.
+	 *
+	 * @param string      $taxonomy        Hierarchical taxonomy slug.
+	 * @param bool        $exclude_roots   Exclude root (parent = 0) ancestors from the result.
+	 * @param bool        $has_filter      Whether a co-occurrence filter is active.
+	 * @param string|null $filter_taxonomy Co-occurrence filter taxonomy.
+	 * @param int         $filter_term_id  Co-occurrence filter term id.
+	 * @return array|\WP_Error Ancestor term counts sorted by event count descending.
+	 */
+	private function executeRollupCounts( string $taxonomy, bool $exclude_roots, bool $has_filter, ?string $filter_taxonomy, int $filter_term_id ): array|\WP_Error {
+		global $wpdb;
+
+		$today    = gmdate( 'Y-m-d 00:00:00' );
+		$ed_table = \DataMachineEvents\Core\EventDatesTable::table_name();
+
+		// Pull every (term_id, object_id) pair for upcoming published events
+		// in this taxonomy. One pass; deduped per-ancestor in PHP below.
+		if ( $has_filter ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			$pairs = $wpdb->get_results(
+				$wpdb->prepare(
+					"SELECT tt.term_id AS term_id, tr.object_id AS object_id
+					FROM {$wpdb->term_relationships} tr
+					INNER JOIN {$wpdb->term_taxonomy} tt ON tr.term_taxonomy_id = tt.term_taxonomy_id
+					INNER JOIN {$ed_table} ed ON tr.object_id = ed.post_id
+					INNER JOIN {$wpdb->term_relationships} f_tr ON f_tr.object_id = tr.object_id
+					INNER JOIN {$wpdb->term_taxonomy} f_tt ON f_tr.term_taxonomy_id = f_tt.term_taxonomy_id
+					WHERE tt.taxonomy = %s
+					AND ed.post_status = 'publish'
+					AND ed.start_datetime >= %s
+					AND f_tt.taxonomy = %s
+					AND f_tt.term_id = %d",
+					$taxonomy,
+					$today,
+					$filter_taxonomy,
+					$filter_term_id
+				)
+			);
+		} else {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			$pairs = $wpdb->get_results(
+				$wpdb->prepare(
+					"SELECT tt.term_id AS term_id, tr.object_id AS object_id
+					FROM {$wpdb->term_relationships} tr
+					INNER JOIN {$wpdb->term_taxonomy} tt ON tr.term_taxonomy_id = tt.term_taxonomy_id
+					INNER JOIN {$ed_table} ed ON tr.object_id = ed.post_id
+					WHERE tt.taxonomy = %s
+					AND ed.post_status = 'publish'
+					AND ed.start_datetime >= %s",
+					$taxonomy,
+					$today
+				)
+			);
+		}
+
+		// Parent map for every term in the taxonomy (term_id => parent_id).
+		// hide_empty=false so ancestors with zero direct tags are present.
+		$all_terms = get_terms(
+			array(
+				'taxonomy'   => $taxonomy,
+				'hide_empty' => false,
+			)
+		);
+		if ( is_wp_error( $all_terms ) ) {
+			return $all_terms;
+		}
+
+		$parent_of = array();
+		$term_meta = array();
+		foreach ( $all_terms as $term ) {
+			$parent_of[ (int) $term->term_id ] = (int) $term->parent;
+			$term_meta[ (int) $term->term_id ] = $term;
+		}
+
+		// For each tagged term, walk up to collect its ancestor chain, then
+		// attribute the event to the term itself AND every ancestor. Using a
+		// set per term keeps the dedup exact (an event in two child cities
+		// hits the shared ancestor's set once).
+		$ancestors_cache = array();
+		$event_sets      = array(); // term_id => array<object_id => true>.
+
+		foreach ( $pairs as $pair ) {
+			$leaf      = (int) $pair->term_id;
+			$object_id = (int) $pair->object_id;
+
+			if ( ! isset( $ancestors_cache[ $leaf ] ) ) {
+				$chain   = array( $leaf );
+				$current = $leaf;
+				$guard   = 0;
+				while ( isset( $parent_of[ $current ] ) && $parent_of[ $current ] > 0 && $guard < 50 ) {
+					$current = $parent_of[ $current ];
+					$chain[] = $current;
+					$guard++;
+				}
+				$ancestors_cache[ $leaf ] = $chain;
+			}
+
+			foreach ( $ancestors_cache[ $leaf ] as $term_id ) {
+				$event_sets[ $term_id ][ $object_id ] = true;
+			}
+		}
+
+		// Emit ONLY non-leaf terms (terms that are a parent of at least one
+		// other term). Rollup is about ancestor totals; leaf counts are what
+		// the default (non-rollup) path already returns.
+		$is_parent = array();
+		foreach ( $parent_of as $child => $parent ) {
+			if ( $parent > 0 ) {
+				$is_parent[ $parent ] = true;
+			}
+		}
+
+		$terms = array();
+		foreach ( $event_sets as $term_id => $object_ids ) {
+			if ( empty( $is_parent[ $term_id ] ) ) {
+				continue; // Leaf term — not a rollup ancestor.
+			}
+			if ( $exclude_roots && isset( $parent_of[ $term_id ] ) && 0 === $parent_of[ $term_id ] ) {
+				continue; // Root ancestor excluded by request.
+			}
+			if ( ! isset( $term_meta[ $term_id ] ) ) {
+				continue;
+			}
+
+			$url = get_term_link( $term_id, $taxonomy );
+			if ( is_wp_error( $url ) ) {
+				continue;
+			}
+
+			$terms[] = array(
+				'term_id' => $term_id,
+				'name'    => $term_meta[ $term_id ]->name,
+				'slug'    => $term_meta[ $term_id ]->slug,
+				'count'   => count( $object_ids ),
+				'url'     => $url,
+			);
+		}
+
+		// Sort by count descending to match the non-rollup contract.
+		usort(
+			$terms,
+			static function ( $a, $b ) {
+				return $b['count'] <=> $a['count'];
+			}
+		);
 
 		return array(
 			'success'  => true,
