@@ -36,27 +36,29 @@ namespace {
         ++$failed;
     }
 
-    class WP_Error {
+    if ( ! class_exists( 'WP_Error' ) ) {
+        class WP_Error {
 
-        private string $code;
-        private string $message;
+            private string $code;
+            private string $message;
 
-        public function __construct( string $code = '', string $message = '', $data = null ) {
-            unset( $data );
-            $this->code    = $code;
-            $this->message = $message;
-        }
+            public function __construct( string $code = '', string $message = '', $data = null ) {
+                unset( $data );
+                $this->code    = $code;
+                $this->message = $message;
+            }
 
-        public function get_error_code(): string {
-            return $this->code;
-        }
+            public function get_error_code(): string {
+                return $this->code;
+            }
 
-        public function get_error_message(): string {
-            return $this->message;
-        }
+            public function get_error_message(): string {
+                return $this->message;
+            }
 
-        public function get_error_data() {
-            return null;
+            public function get_error_data() {
+                return null;
+            }
         }
     }
 
@@ -66,14 +68,18 @@ namespace {
     $GLOBALS['__publish_format_next_id']     = 100;
     $GLOBALS['__publish_format_conversions'] = array();
 
-    function doing_action( string $hook ): bool {
-        unset( $hook );
-        return false;
+    if ( ! function_exists( 'doing_action' ) ) {
+        function doing_action( string $hook ): bool {
+            unset( $hook );
+            return false;
+        }
     }
 
-    function did_action( string $hook ): int {
-        unset( $hook );
-        return 1;
+    if ( ! function_exists( 'did_action' ) ) {
+        function did_action( string $hook ): int {
+            unset( $hook );
+            return 1;
+        }
     }
 
     if ( ! function_exists( 'add_filter' ) ) {
@@ -123,8 +129,10 @@ namespace {
         }
     }
 
-    function wp_filter_post_kses( $content ): string {
-        return (string) $content;
+    if ( ! function_exists( 'wp_filter_post_kses' ) ) {
+        function wp_filter_post_kses( $content ): string {
+            return (string) $content;
+        }
     }
 
     if ( ! function_exists( 'esc_url' ) ) {
@@ -134,8 +142,10 @@ namespace {
         }
     }
 
-    function esc_url_raw( $url ): string {
-        return esc_url( $url );
+    if ( ! function_exists( 'esc_url_raw' ) ) {
+        function esc_url_raw( $url ): string {
+            return esc_url( $url );
+        }
     }
 
     if ( ! function_exists( 'esc_html' ) ) {
@@ -163,9 +173,11 @@ namespace {
         }
     }
 
-    function get_users( array $args = array() ): array {
-        unset( $args );
-        return array( 1 );
+    if ( ! function_exists( 'get_users' ) ) {
+        function get_users( array $args = array() ): array {
+            unset( $args );
+            return array( 1 );
+        }
     }
 
     if ( ! function_exists( 'wp_insert_post' ) ) {
@@ -253,6 +265,10 @@ namespace {
     function published_post_content( array $result ): string {
         $post_id = isset( $result['post_id'] ) ? (int) $result['post_id'] : 0;
         $post    = $GLOBALS['__publish_format_posts'][ $post_id ] ?? null;
+
+        if ( ! $post && function_exists( 'get_post' ) ) {
+            $post = get_post( $post_id );
+        }
 
         return is_object( $post ) && isset( $post->post_content ) ? (string) $post->post_content : '';
     }

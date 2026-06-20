@@ -428,39 +428,43 @@ namespace {
 		);
 	}
 
-	function parse_blocks( string $content ): array {
-		$blocks = array();
-		if ( preg_match_all( '/<!-- wp:([^ ]+) -->\s*(.*?)\s*<!-- \/wp:\1 -->/s', $content, $matches, PREG_SET_ORDER ) ) {
-			foreach ( $matches as $match ) {
-				$block_name = str_contains( $match[1], '/' ) ? $match[1] : 'core/' . $match[1];
-				$blocks[]   = array(
-					'blockName'    => $block_name,
-					'innerHTML'    => $match[2],
-					'innerContent' => array( $match[2] ),
-					'innerBlocks'  => array(),
-				);
+	if ( ! function_exists( 'parse_blocks' ) ) {
+		function parse_blocks( string $content ): array {
+			$blocks = array();
+			if ( preg_match_all( '/<!-- wp:([^ ]+) -->\s*(.*?)\s*<!-- \/wp:\1 -->/s', $content, $matches, PREG_SET_ORDER ) ) {
+				foreach ( $matches as $match ) {
+					$block_name = str_contains( $match[1], '/' ) ? $match[1] : 'core/' . $match[1];
+					$blocks[]   = array(
+						'blockName'    => $block_name,
+						'innerHTML'    => $match[2],
+						'innerContent' => array( $match[2] ),
+						'innerBlocks'  => array(),
+					);
+				}
+				return $blocks;
 			}
-			return $blocks;
-		}
 
-		return array(
-			array(
-				'blockName'    => null,
-				'innerHTML'    => $content,
-				'innerContent' => array( $content ),
-				'innerBlocks'  => array(),
-			),
-		);
+			return array(
+				array(
+					'blockName'    => null,
+					'innerHTML'    => $content,
+					'innerContent' => array( $content ),
+					'innerBlocks'  => array(),
+				),
+			);
+		}
 	}
 
-	function serialize_blocks( array $blocks ): string {
-		$serialized = array();
-		foreach ( $blocks as $block ) {
-			$name         = $block['blockName'] ?? 'core/freeform';
-			$html         = $block['innerHTML'] ?? '';
-			$serialized[] = "<!-- wp:{$name} -->\n{$html}\n<!-- /wp:{$name} -->";
+	if ( ! function_exists( 'serialize_blocks' ) ) {
+		function serialize_blocks( array $blocks ): string {
+			$serialized = array();
+			foreach ( $blocks as $block ) {
+				$name         = $block['blockName'] ?? 'core/freeform';
+				$html         = $block['innerHTML'] ?? '';
+				$serialized[] = "<!-- wp:{$name} -->\n{$html}\n<!-- /wp:{$name} -->";
+			}
+			return implode( "\n", $serialized );
 		}
-		return implode( "\n", $serialized );
 	}
 
 	function content_ability_post_count(): int {
