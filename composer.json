@@ -53,7 +53,7 @@
 				"source": {
 					"type": "git",
 					"url": "https://github.com/Automattic/blocks-engine.git",
-					"reference": "trunk"
+					"reference": "f8259ed02cf9f815e945dced6c8e5458cda96212"
 				},
 				"autoload": {
 					"psr-4": {
