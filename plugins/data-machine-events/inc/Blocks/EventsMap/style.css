@@ -22,3 +22,63 @@
 	background: none;
 	border: none;
 }
+
+/* ---------- Collapsible (opt-in) ---------- */
+
+/* The collapsible wrapper exists only when the block opts in via the
+   `collapsible` attribute. Default-off blocks never emit this markup. */
+.data-machine-events-map-collapsible {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+}
+
+/* Toggle is a real <button> — keyboard operable, accessible. Styled as a
+   slim header bar so the collapsed state reads as a clear "Show map" peek. */
+.data-machine-events-map-toggle {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.5rem;
+	align-self: flex-start;
+	padding: 0.5rem 0.875rem;
+	font-size: 0.875rem;
+	font-weight: 600;
+	cursor: pointer;
+	border: 1px solid var(--data-machine-border-default, #d1d5db);
+	border-radius: var(--data-machine-border-radius, 8px);
+	background: var(--data-machine-background-light, #f3f4f6);
+	color: var(--data-machine-text-primary, #111827);
+	transition: background 0.15s ease, color 0.15s ease;
+}
+
+.data-machine-events-map-toggle:hover {
+	background: var(--data-machine-background-hover, #e5e7eb);
+	color: var(--data-machine-text-accent, #2563eb);
+}
+
+.data-machine-events-map-toggle:focus-visible {
+	outline: 2px solid var(--data-machine-border-focus, #2563eb);
+	outline-offset: 2px;
+}
+
+/* A small disclosure caret that rotates with state. */
+.data-machine-events-map-toggle::before {
+	content: "";
+	width: 0;
+	height: 0;
+	border-left: 5px solid transparent;
+	border-right: 5px solid transparent;
+	border-top: 6px solid currentColor;
+	transition: transform 0.2s ease;
+}
+
+.data-machine-events-map-collapsible.is-collapsed .data-machine-events-map-toggle::before {
+	transform: rotate(-90deg);
+}
+
+/* The collapsible region. When collapsed it is hidden via the [hidden]
+   attribute (set by render.php and toggled by the frontend), which keeps the
+   map out of the layout so Leaflet doesn't init in a zero-height box. */
+.data-machine-events-map-region[hidden] {
+	display: none;
+}

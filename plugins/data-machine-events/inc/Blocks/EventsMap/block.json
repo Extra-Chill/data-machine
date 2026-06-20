@@ -29,6 +29,14 @@
         "chronologicalRouteMode": {
             "type": "boolean",
             "default": false
+        },
+        "collapsible": {
+            "type": "boolean",
+            "default": false
+        },
+        "defaultCollapsed": {
+            "type": "boolean",
+            "default": false
         }
     },
     "supports": {

@@ -134,11 +134,52 @@ $scope_token = '';
  */
 $scope_token = (string) apply_filters( 'data_machine_events_map_scope_token', $scope_token, $context );
 
+// Collapsible: opt-in capability letting a consumer make the map non-dominant
+// by rendering an expand/collapse control. Default false everywhere, so when
+// not enabled this block renders byte-identically to before. When enabled, the
+// map (the React root) is wrapped in a collapsible region driven by an
+// accessible toggle button; the frontend owns Leaflet's invalidateSize() on
+// expand so tiles re-render correctly. The generic block knows nothing about
+// which consumer/page enables it.
+$collapsible       = (bool) ( $attributes['collapsible'] ?? false );
+$default_collapsed = $collapsible && (bool) ( $attributes['defaultCollapsed'] ?? false );
+
+// IDs + accessible labels for the toggle <-> region relationship.
+$region_id = $map_id . '-region';
+$toggle_id = $map_id . '-toggle';
+$show_label = __( 'Show map', 'data-machine-events' );
+$hide_label = __( 'Hide map', 'data-machine-events' );
+
 ?>
 <div <?php echo $wrapper; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>>
+	<?php if ( $collapsible ) : ?>
+	<div class="data-machine-events-map-collapsible<?php echo $default_collapsed ? ' is-collapsed' : ''; ?>">
+		<button
+			type="button"
+			id="<?php echo esc_attr( $toggle_id ); ?>"
+			class="data-machine-events-map-toggle"
+			aria-expanded="<?php echo $default_collapsed ? 'false' : 'true'; ?>"
+			aria-controls="<?php echo esc_attr( $region_id ); ?>"
+			data-label-show="<?php echo esc_attr( $show_label ); ?>"
+			data-label-hide="<?php echo esc_attr( $hide_label ); ?>"
+		><?php echo esc_html( $default_collapsed ? $show_label : $hide_label ); ?></button>
+		<div
+			id="<?php echo esc_attr( $region_id ); ?>"
+			class="data-machine-events-map-region"
+			<?php echo $default_collapsed ? 'hidden' : ''; ?>
+		>
+	<?php endif; ?>
 	<div
 		id="<?php echo esc_attr( $map_id ); ?>"
 		class="data-machine-events-map-root"
+		<?php if ( $collapsible ) : ?>
+		data-collapsible="1"
+		data-toggle-id="<?php echo esc_attr( $toggle_id ); ?>"
+		data-region-id="<?php echo esc_attr( $region_id ); ?>"
+		<?php if ( $default_collapsed ) : ?>
+		data-default-collapsed="1"
+		<?php endif; ?>
+		<?php endif; ?>
 		data-height="<?php echo esc_attr( $height ); ?>"
 		data-zoom="<?php echo esc_attr( $zoom ); ?>"
 		data-map-type="<?php echo esc_attr( $map_type ); ?>"
@@ -173,4 +214,8 @@ $scope_token = (string) apply_filters( 'data_machine_events_map_scope_token', $s
 	 */
 	do_action( 'data_machine_events_map_after_summary', array(), $context );
 	?>
+	<?php if ( $collapsible ) : ?>
+		</div><!-- .data-machine-events-map-region -->
+	</div><!-- .data-machine-events-map-collapsible -->
+	<?php endif; ?>
 </div>

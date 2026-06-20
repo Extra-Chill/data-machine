@@ -64,6 +64,10 @@ export interface MapAttributes {
 	zoom: number;
 	mapType: MapType;
 	chronologicalRouteMode?: boolean;
+	/** Opt-in: render an expand/collapse control on the map. */
+	collapsible?: boolean;
+	/** Initial collapsed state when collapsible. */
+	defaultCollapsed?: boolean;
 }
 
 /**

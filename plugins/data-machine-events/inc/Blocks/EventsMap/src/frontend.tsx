@@ -578,6 +578,25 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 		// Force a resize check after mount.
 		setTimeout( () => map.invalidateSize(), 100 );
 
+		// Collapsible support: when the block is rendered inside a
+		// collapsible region, the container can be hidden (display:none /
+		// [hidden]) at the moment Leaflet first lays out, which leaves the
+		// map sized to a zero-height box and renders gray tiles. The mount
+		// layer (initEventsMap) defers React mount until the FIRST expand so
+		// init always happens with real dimensions; for every SUBSEQUENT
+		// expand it dispatches `data-machine-map-invalidate-size` at this
+		// container so Leaflet recomputes tiles. We listen for that here,
+		// mirroring the existing recenter/set-user-location event pattern.
+		const handleInvalidateSize = () => {
+			// rAF so we read the post-layout size after the collapsed class
+			// / [hidden] attribute has been removed by the toggle handler.
+			window.requestAnimationFrame( () => map.invalidateSize() );
+		};
+		el.addEventListener(
+			'data-machine-map-invalidate-size',
+			handleInvalidateSize,
+		);
+
 		// Fetch venues on mount and notify other blocks (e.g. calendar geo-sync).
 		if ( initialVenues.length === 0 ) {
 			// Small delay so map is fully sized first.
@@ -593,6 +612,10 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 		}
 
 		return () => {
+			el.removeEventListener(
+				'data-machine-map-invalidate-size',
+				handleInvalidateSize,
+			);
 			map.remove();
 			mapRef.current = null;
 			clusterGroupRef.current = null;
@@ -953,6 +976,103 @@ function parseMapProps( container: HTMLElement ): MapProps {
 	};
 }
 
+/**
+ * Mount the React map into its root container exactly once.
+ *
+ * Idempotent via the `initialized` dataset flag so the deferred-expand path
+ * and the normal path can both call it safely.
+ */
+function mountMap( container: HTMLElement ): void {
+	if ( container.dataset.initialized === '1' ) return;
+	container.dataset.initialized = '1';
+
+	const props = parseMapProps( container );
+	const root = createRoot( container );
+	root.render( <EventsMap { ...props } /> );
+}
+
+/**
+ * Wire the collapsible toggle for a map root, when the block opted in
+ * (`data-collapsible="1"` from render.php). Generic collapse/expand behavior:
+ *
+ * - The toggle is a real server-rendered <button> (accessible, keyboard
+ *   operable, aria-expanded reflecting state) found via `data-toggle-id`.
+ * - Leaflet must not initialize inside a zero-height (hidden) container or it
+ *   renders gray tiles. So when the region starts collapsed we DEFER the React
+ *   mount until the first expand; otherwise we mount immediately and only
+ *   invalidate size on subsequent expands.
+ *
+ * Returns true when the map's mount is being managed here (collapsed defer),
+ * so the caller skips its own immediate mount.
+ *
+ * @return Whether the immediate mount should be skipped (deferred to expand).
+ */
+function setupCollapsible( container: HTMLElement ): boolean {
+	if ( container.dataset.collapsible !== '1' ) return false;
+	if ( container.dataset.collapsibleBound === '1' ) {
+		// Already wired; report current defer state.
+		return container.dataset.initialized !== '1';
+	}
+	container.dataset.collapsibleBound = '1';
+
+	const toggleId = container.dataset.toggleId || '';
+	const regionId = container.dataset.regionId || '';
+	const toggle = toggleId
+		? document.getElementById( toggleId )
+		: null;
+	const region = regionId
+		? document.getElementById( regionId )
+		: null;
+	const wrapper = container.closest(
+		'.data-machine-events-map-collapsible',
+	) as HTMLElement | null;
+
+	// If the expected markup is missing, fall back to non-collapsible
+	// behavior so the map still renders.
+	if ( ! toggle || ! region ) return false;
+
+	const startCollapsed = container.dataset.defaultCollapsed === '1';
+
+	const setExpanded = ( expanded: boolean ) => {
+		toggle.setAttribute( 'aria-expanded', expanded ? 'true' : 'false' );
+		if ( wrapper ) {
+			wrapper.classList.toggle( 'is-collapsed', ! expanded );
+		}
+		if ( expanded ) {
+			region.removeAttribute( 'hidden' );
+		} else {
+			region.setAttribute( 'hidden', '' );
+		}
+
+		const showLabel = toggle.dataset.labelShow;
+		const hideLabel = toggle.dataset.labelHide;
+		const label = expanded ? hideLabel : showLabel;
+		if ( label ) {
+			toggle.textContent = label;
+		}
+
+		if ( expanded ) {
+			// Mount on first expand (deferred init), else just re-measure.
+			if ( container.dataset.initialized !== '1' ) {
+				mountMap( container );
+			} else {
+				container.dispatchEvent(
+					new CustomEvent( 'data-machine-map-invalidate-size' ),
+				);
+			}
+		}
+	};
+
+	toggle.addEventListener( 'click', () => {
+		const expanded = toggle.getAttribute( 'aria-expanded' ) === 'true';
+		setExpanded( ! expanded );
+	} );
+
+	// When it starts collapsed, defer the React mount until first expand so
+	// Leaflet never initializes in a zero-height container.
+	return startCollapsed;
+}
+
 function initEventsMap(): void {
 	const containers = document.querySelectorAll<HTMLElement>(
 		'.data-machine-events-map-root',
@@ -960,11 +1080,11 @@ function initEventsMap(): void {
 
 	containers.forEach( ( container ) => {
 		if ( container.dataset.initialized === '1' ) return;
-		container.dataset.initialized = '1';
 
-		const props = parseMapProps( container );
-		const root = createRoot( container );
-		root.render( <EventsMap { ...props } /> );
+		const deferMount = setupCollapsible( container );
+		if ( deferMount ) return;
+
+		mountMap( container );
 	} );
 }
 

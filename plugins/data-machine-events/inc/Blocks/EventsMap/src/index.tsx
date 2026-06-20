@@ -18,6 +18,7 @@ import {
 	PanelBody,
 	RangeControl,
 	SelectControl,
+	ToggleControl,
 } from '@wordpress/components';
 
 import type { MapAttributes, MapType } from './types';
@@ -37,7 +38,8 @@ const MAP_STYLE_OPTIONS: { label: string; value: MapType }[] = [
 
 registerBlockType<MapAttributes>( 'data-machine-events/events-map', {
 	edit: function Edit( { attributes, setAttributes }: EditProps ) {
-		const { height, zoom, mapType } = attributes;
+		const { height, zoom, mapType, collapsible, defaultCollapsed } =
+			attributes;
 		const blockProps = useBlockProps( {
 			className: 'data-machine-events-map-block',
 		} );
@@ -76,6 +78,38 @@ registerBlockType<MapAttributes>( 'data-machine-events/events-map', {
 							setAttributes( { mapType: value as MapType } )
 						}
 					/>
+						<ToggleControl
+							label={ __(
+								'Collapsible',
+								'data-machine-events',
+							) }
+							help={ __(
+								'Add an expand/collapse control so the map can be hidden behind a toggle.',
+								'data-machine-events',
+							) }
+							checked={ !! collapsible }
+							onChange={ ( value ) =>
+								setAttributes( { collapsible: value } )
+							}
+						/>
+						{ collapsible && (
+							<ToggleControl
+								label={ __(
+									'Collapsed by default',
+									'data-machine-events',
+								) }
+								help={ __(
+									'Start with the map collapsed; visitors expand it via the toggle.',
+									'data-machine-events',
+								) }
+								checked={ !! defaultCollapsed }
+								onChange={ ( value ) =>
+									setAttributes( {
+										defaultCollapsed: value,
+									} )
+								}
+							/>
+						) }
 					</PanelBody>
 				</InspectorControls>
 
