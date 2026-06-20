@@ -89,7 +89,10 @@ class EventDateQueryAbilities {
 									'lat'    => array( 'type' => 'number' ),
 									'lng'    => array( 'type' => 'number' ),
 									'radius' => array( 'type' => 'number' ),
-									'unit'   => array( 'type' => 'string', 'enum' => array( 'mi', 'km' ) ),
+									'unit'   => array(
+										'type' => 'string',
+										'enum' => array( 'mi', 'km' ),
+									),
 								),
 							),
 							'exclude'     => array(
@@ -240,19 +243,30 @@ class EventDateQueryAbilities {
 				&& \DataMachineEvents\Blocks\Calendar\Geo_Query::validate_params( $geo_lat, $geo_lng, $geo_radius ) ) {
 
 				$nearby_venue_ids = \DataMachineEvents\Blocks\Calendar\Geo_Query::get_venue_ids_within_radius(
-					$geo_lat, $geo_lng, $geo_radius, $geo_unit
+					$geo_lat,
+					$geo_lng,
+					$geo_radius,
+					$geo_unit
 				);
 
-				$tax_query             = isset( $query_args['tax_query'] ) ? $query_args['tax_query'] : array();
-				$tax_query['relation'] = 'AND';
-				$tax_query[]           = array(
-					'taxonomy' => 'venue',
-					'field'    => 'term_id',
-					'terms'    => ! empty( $nearby_venue_ids ) ? $nearby_venue_ids : array( 0 ),
-					'operator' => 'IN',
-				);
+				// Only constrain by venue proximity when the haversine actually
+				// found venues in radius. An empty match means "no additional
+				// geo signal" — drop the geo constraint and fall back to the
+				// other constraints (e.g. the location term + date filters)
+				// instead of forcing terms => [0], which would guarantee an
+				// empty result even when the location term has events. See #378.
+				if ( ! empty( $nearby_venue_ids ) ) {
+					$tax_query             = isset( $query_args['tax_query'] ) ? $query_args['tax_query'] : array();
+					$tax_query['relation'] = 'AND';
+					$tax_query[]           = array(
+						'taxonomy' => 'venue',
+						'field'    => 'term_id',
+						'terms'    => $nearby_venue_ids,
+						'operator' => 'IN',
+					);
 
-				$query_args['tax_query'] = $tax_query;
+					$query_args['tax_query'] = $tax_query;
+				}
 			}
 		}
 
