@@ -118,24 +118,34 @@ class RunMetrics {
 			return false;
 		}
 
-		$engine  = EngineData::retrieve( $job_id );
-		$metrics = self::normalize( $engine[ self::KEY ] ?? array() );
-		$now     = self::now();
+		// Compare-and-swap mutate so a concurrent writer's keys (e.g. a
+		// fan-out batch_state merge happening in the same tight window)
+		// are never clobbered by a blind full-snapshot overwrite. See #2762.
+		$result = EngineData::mutate(
+			$job_id,
+			static function ( array $engine ) use ( $context, $job_id ): array {
+				$metrics = self::normalize( $engine[ self::KEY ] ?? array() );
+				$now     = self::now();
 
-		if ( empty( $metrics['started_at'] ) ) {
-			$metrics['started_at'] = $now;
-		}
-		$metrics['last_activity_at'] = $now;
+				if ( empty( $metrics['started_at'] ) ) {
+					$metrics['started_at'] = $now;
+				}
+				$metrics['last_activity_at'] = $now;
 
-		if ( ! empty( $context ) ) {
-			$metrics['context'] = array_replace_recursive(
-				is_array( $metrics['context'] ?? null ) ? $metrics['context'] : array(),
-				self::sanitizeContext( $context )
-			);
-		}
+				if ( ! empty( $context ) ) {
+					$metrics['context'] = array_replace_recursive(
+						is_array( $metrics['context'] ?? null ) ? $metrics['context'] : array(),
+						self::sanitizeContext( $context )
+					);
+				}
 
-		$engine[ self::KEY ] = $metrics;
-		return EngineData::persist( $job_id, self::withRunResult( $job_id, $engine ) );
+				$engine[ self::KEY ] = $metrics;
+				return self::withRunResult( $job_id, $engine );
+			},
+			'run_metrics_start'
+		);
+
+		return ! empty( $result['success'] );
 	}
 
 	public static function increment( int $job_id, string $key, int $amount = 1 ): bool {
@@ -143,18 +153,27 @@ class RunMetrics {
 			return false;
 		}
 
-		$engine  = EngineData::retrieve( $job_id );
-		$metrics = self::normalize( $engine[ self::KEY ] ?? array() );
+		// Compare-and-swap mutate so concurrent writers cannot lose the
+		// incremented counter or clobber unrelated keys. See #2762.
+		$result = EngineData::mutate(
+			$job_id,
+			static function ( array $engine ) use ( $key, $amount ): array {
+				$metrics = self::normalize( $engine[ self::KEY ] ?? array() );
 
-		if ( ! isset( $metrics['counts'][ $key ] ) ) {
-			$metrics['counts'][ $key ] = 0;
-		}
+				if ( ! isset( $metrics['counts'][ $key ] ) ) {
+					$metrics['counts'][ $key ] = 0;
+				}
 
-		$metrics['counts'][ $key ]   = max( 0, (int) $metrics['counts'][ $key ] + $amount );
-		$metrics['last_activity_at'] = self::now();
+				$metrics['counts'][ $key ]   = max( 0, (int) $metrics['counts'][ $key ] + $amount );
+				$metrics['last_activity_at'] = self::now();
 
-		$engine[ self::KEY ] = $metrics;
-		return EngineData::persist( $job_id, $engine );
+				$engine[ self::KEY ] = $metrics;
+				return $engine;
+			},
+			'run_metrics_increment'
+		);
+
+		return ! empty( $result['success'] );
 	}
 
 	public static function complete( int $job_id, string $status ): bool {
@@ -162,29 +181,39 @@ class RunMetrics {
 			return false;
 		}
 
-		$engine  = EngineData::retrieve( $job_id );
-		$metrics = self::normalize( $engine[ self::KEY ] ?? array() );
-		$now     = self::now();
+		// Compare-and-swap mutate so completing a parent job cannot blindly
+		// overwrite a concurrent fan-out batch_state write with a stale
+		// snapshot — the lost-update race behind batch_state_missing. See #2762.
+		$result = EngineData::mutate(
+			$job_id,
+			static function ( array $engine ) use ( $status, $job_id ): array {
+				$metrics = self::normalize( $engine[ self::KEY ] ?? array() );
+				$now     = self::now();
 
-		if ( empty( $metrics['started_at'] ) ) {
-			$metrics['started_at'] = $engine['started_at'] ?? ( $engine['job']['created_at'] ?? $now );
-		}
+				if ( empty( $metrics['started_at'] ) ) {
+					$metrics['started_at'] = $engine['started_at'] ?? ( $engine['job']['created_at'] ?? $now );
+				}
 
-		$metrics['completed_at']     = $now;
-		$metrics['last_activity_at'] = $now;
-		$metrics['duration_seconds'] = self::durationSeconds( $metrics['started_at'], $now );
-		$metrics['terminal_status']  = $status;
+				$metrics['completed_at']     = $now;
+				$metrics['last_activity_at'] = $now;
+				$metrics['duration_seconds'] = self::durationSeconds( $metrics['started_at'], $now );
+				$metrics['terminal_status']  = $status;
 
-		if ( JobStatus::isStatusFailure( $status ) ) {
-			$metrics['counts']['failed'] = max( 1, (int) ( $metrics['counts']['failed'] ?? 0 ) );
-		} elseif ( str_starts_with( $status, JobStatus::AGENT_SKIPPED ) || str_starts_with( $status, JobStatus::COMPLETED_NO_ITEMS ) ) {
-			$metrics['counts']['skipped'] = max( 1, (int) ( $metrics['counts']['skipped'] ?? 0 ) );
-		} elseif ( JobStatus::COMPLETED === $status ) {
-			$metrics['counts']['processed'] = max( 1, (int) ( $metrics['counts']['processed'] ?? 0 ) );
-		}
+				if ( JobStatus::isStatusFailure( $status ) ) {
+					$metrics['counts']['failed'] = max( 1, (int) ( $metrics['counts']['failed'] ?? 0 ) );
+				} elseif ( str_starts_with( $status, JobStatus::AGENT_SKIPPED ) || str_starts_with( $status, JobStatus::COMPLETED_NO_ITEMS ) ) {
+					$metrics['counts']['skipped'] = max( 1, (int) ( $metrics['counts']['skipped'] ?? 0 ) );
+				} elseif ( JobStatus::COMPLETED === $status ) {
+					$metrics['counts']['processed'] = max( 1, (int) ( $metrics['counts']['processed'] ?? 0 ) );
+				}
 
-		$engine[ self::KEY ] = $metrics;
-		return EngineData::persist( $job_id, self::withRunResult( $job_id, $engine, $status ) );
+				$engine[ self::KEY ] = $metrics;
+				return self::withRunResult( $job_id, $engine, $status );
+			},
+			'run_metrics_complete'
+		);
+
+		return ! empty( $result['success'] );
 	}
 
 	public static function fromJob( array $job ): array {

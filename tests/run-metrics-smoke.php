@@ -119,4 +119,23 @@ $failed = RunMetrics::fromJob(
 dm_assert( 1 === $skipped['counts']['skipped'], 'completed_no_items increments skipped' );
 dm_assert( 1 === $failed['counts']['failed'], 'failed status increments failed' );
 
+echo "\n[4] engine_data writers use compare-and-swap, not blind overwrite (regression: #2762)\n";
+// The lost-update race behind batch_state_missing came from start(), increment(),
+// and complete() doing a non-atomic retrieve()+persist() read-modify-write that
+// could overwrite a concurrent fan-out batch_state merge with a stale snapshot.
+// All three must route through the compare-and-swap EngineData::mutate() path so
+// they can never clobber another writer's keys.
+$run_metrics_source = file_get_contents( __DIR__ . '/../inc/Core/RunMetrics.php' );
+dm_assert( false !== $run_metrics_source, 'RunMetrics source readable' );
+
+foreach ( array( 'start', 'increment', 'complete' ) as $method ) {
+	if ( ! preg_match( '/public static function ' . $method . '\([^)]*\)[^{]*\{(.*?)\n\t\}/s', $run_metrics_source, $m ) ) {
+		echo "  [FAIL] could not locate {$method}() body\n";
+		exit( 1 );
+	}
+	$body = $m[1];
+	dm_assert( str_contains( $body, 'EngineData::mutate' ), "{$method}() persists via EngineData::mutate (CAS)" );
+	dm_assert( ! str_contains( $body, 'EngineData::persist' ), "{$method}() does not blind-overwrite via EngineData::persist" );
+}
+
 echo "\n=== run-metrics-smoke: ALL PASS ===\n";
