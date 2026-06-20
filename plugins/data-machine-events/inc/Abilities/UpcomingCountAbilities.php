@@ -360,7 +360,7 @@ class UpcomingCountAbilities {
 				while ( isset( $parent_of[ $current ] ) && $parent_of[ $current ] > 0 && $guard < 50 ) {
 					$current = $parent_of[ $current ];
 					$chain[] = $current;
-					$guard++;
+					++$guard;
 				}
 				$ancestors_cache[ $leaf ] = $chain;
 			}
