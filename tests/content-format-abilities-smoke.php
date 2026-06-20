@@ -75,8 +75,9 @@ namespace {
 	}
 
 	$GLOBALS['__content_ability_filters'] = array();
+	$fixture_post_id                      = 7;
 	$fixture_post                         = function_exists( 'get_post' ) ? (object) array() : new WP_Post();
-	$fixture_post->ID                     = 7;
+	$fixture_post->ID                     = $fixture_post_id;
 	$fixture_post->post_type              = 'wiki';
 	$fixture_post->post_title             = 'Markdown Page';
 	$fixture_post->post_name              = 'markdown-page';
@@ -84,11 +85,28 @@ namespace {
 	$fixture_post->post_modified_gmt      = '2026-01-01 00:00:00';
 
 	$GLOBALS['__content_ability_posts']       = array(
-		7 => $fixture_post,
+		$fixture_post_id => $fixture_post,
 	);
 	$GLOBALS['__content_ability_next_id']     = 20;
 	$GLOBALS['__content_ability_conversions'] = array();
 	$GLOBALS['__content_ability_meta']        = array();
+
+	if ( function_exists( 'wp_insert_post' ) ) {
+		$inserted_fixture_id = wp_insert_post(
+			array(
+				'post_type'    => 'wiki',
+				'post_title'   => 'Markdown Page',
+				'post_name'    => 'markdown-page',
+				'post_content' => "# Original\n\nHello world.",
+				'post_status'  => 'publish',
+			),
+			true
+		);
+
+		if ( ! is_wp_error( $inserted_fixture_id ) ) {
+			$fixture_post_id = (int) $inserted_fixture_id;
+		}
+	}
 
 	if ( ! function_exists( 'is_multisite' ) ) {
 		function is_multisite(): bool {
@@ -516,15 +534,15 @@ namespace {
 	include_once dirname( __DIR__ ) . '/inc/Abilities/Content/EditPostBlocksAbility.php';
 	include_once dirname( __DIR__ ) . '/inc/Abilities/Content/UpsertPostAbility.php';
 
-	$get = DataMachine\Abilities\Content\GetPostBlocksAbility::execute( array( 'post_id' => 7 ) );
+	$get = DataMachine\Abilities\Content\GetPostBlocksAbility::execute( array( 'post_id' => $fixture_post_id ) );
 	assert_content_ability( 'markdown-post-read-succeeds', true === $get['success'] );
 	assert_content_ability( 'markdown-post-read-converts-to-blocks', 'core/heading' === ( $get['blocks'][0]['block_name'] ?? '' ) );
-	$stored_after_read = get_post( 7 )->post_content ?? '';
+	$stored_after_read = get_post( $fixture_post_id )->post_content ?? '';
 	assert_content_ability( 'markdown-post-read-does-not-mutate-storage', "# Original\n\nHello world." === $stored_after_read );
 
 	$edit = DataMachine\Abilities\Content\EditPostBlocksAbility::execute(
 		array(
-			'post_id' => 7,
+			'post_id' => $fixture_post_id,
 			'edits'   => array(
 				array(
 					'block_index' => 1,
@@ -535,7 +553,7 @@ namespace {
 		)
 	);
 	assert_content_ability( 'markdown-post-edit-succeeds', true === $edit['success'] );
-	$stored_after_edit = get_post( 7 )->post_content ?? '';
+	$stored_after_edit = get_post( $fixture_post_id )->post_content ?? '';
 	assert_content_ability( 'markdown-post-edit-saves-markdown', false === strpos( $stored_after_edit, '<!-- wp:' ) );
 	assert_content_ability( 'markdown-post-edit-has-replacement', false !== strpos( $stored_after_edit, 'Hello markdown.' ) );
 
@@ -619,7 +637,7 @@ namespace {
 	assert_content_ability( 'upsert-future-source-date-succeeds', true === $future_source_upsert['success'] );
 	assert_content_ability( 'upsert-future-source-url-still-stored', 'https://example.com/future-source-post/' === get_post_meta( $future_source_id, '_datamachine_source_url', true ) );
 	assert_content_ability( 'upsert-future-original-date-ignored', '' === get_post_meta( $future_source_id, '_datamachine_original_date_gmt', true ) );
-	assert_content_ability( 'upsert-future-original-date-does-not-set-post-date-gmt', empty( $future_source_post->post_date_gmt ) );
+	assert_content_ability( 'upsert-future-original-date-does-not-set-post-date-gmt', '2999-01-01 00:00:00' !== ( $future_source_post->post_date_gmt ?? '' ) );
 
 	$chat_upsert   = DataMachine\Abilities\Content\UpsertPostAbility::handleChatToolCall(
 		array(
