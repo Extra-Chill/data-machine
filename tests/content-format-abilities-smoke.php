@@ -539,13 +539,20 @@ namespace {
 	assert_content_ability( 'markdown-post-read-converts-to-blocks', 'core/heading' === ( $get['blocks'][0]['block_name'] ?? '' ) );
 	$stored_after_read = get_post( $fixture_post_id )->post_content ?? '';
 	assert_content_ability( 'markdown-post-read-does-not-mutate-storage', "# Original\n\nHello world." === $stored_after_read );
+	$paragraph_block_index = 1;
+	foreach ( $get['blocks'] ?? array() as $block ) {
+		if ( 'core/paragraph' === ( $block['block_name'] ?? '' ) && false !== strpos( $block['inner_html'] ?? '', 'Hello world.' ) ) {
+			$paragraph_block_index = (int) ( $block['index'] ?? $paragraph_block_index );
+			break;
+		}
+	}
 
 	$edit = DataMachine\Abilities\Content\EditPostBlocksAbility::execute(
 		array(
 			'post_id' => $fixture_post_id,
 			'edits'   => array(
 				array(
-					'block_index' => 1,
+					'block_index' => $paragraph_block_index,
 					'find'        => 'Hello world.',
 					'replace'     => 'Hello markdown.',
 				),
