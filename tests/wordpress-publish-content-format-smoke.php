@@ -192,32 +192,62 @@ namespace {
         }
     }
 
-    function bfb_convert( string $content, string $from, string $to ) {
+    function blocks_engine_php_transformer_convert_format( string $content, string $from, string $to, array $options = array() ): array {
+        unset( $options );
         $GLOBALS['__publish_format_conversions'][] = array( $from, $to, $content );
 
-        if ( $from === $to ) {
-            return $content;
+        if ( 'blocks' === $from && str_contains( $content, '<!-- wp:' ) && ! str_contains( $content, '<!-- /wp:' ) ) {
+            return array(
+                'schema'      => 'blocks-engine/php-transformer/result/v1',
+                'status'      => 'failed',
+                'diagnostics' => array(
+                    array(
+                        'code'    => 'blocks_unclosed_comment',
+                        'message' => 'Serialized block markup contains an unclosed block comment.',
+                    ),
+                ),
+            );
+        }
+
+        if ( $from === $to && 'blocks' === $to ) {
+            return array(
+                'schema'            => 'blocks-engine/php-transformer/result/v1',
+                'status'            => 'success',
+                'serialized_blocks' => str_replace( array( "\r\n", "\r" ), "\n", $content ),
+                'documents'         => array(),
+            );
         }
 
         if ( 'html' === $from && 'blocks' === $to ) {
-            return "<!-- wp:paragraph -->\n{$content}\n<!-- /wp:paragraph -->";
+            return array(
+                'schema'            => 'blocks-engine/php-transformer/result/v1',
+                'status'            => 'success',
+                'serialized_blocks' => "<!-- wp:paragraph -->\n{$content}\n<!-- /wp:paragraph -->",
+                'documents'         => array(),
+            );
         }
 
         if ( 'markdown' === $from && 'blocks' === $to ) {
             $html = preg_replace( '/^# (.+)$/m', '<h1>$1</h1>', $content );
             $html = preg_replace( '/\*\*([^*]+)\*\* \[([^\]]+)\]\(([^)]+)\)/', '<strong>$1</strong> <a href="$3">$2</a>', $html );
-            return "<!-- wp:paragraph -->\n{$html}\n<!-- /wp:paragraph -->";
+            return array(
+                'schema'            => 'blocks-engine/php-transformer/result/v1',
+                'status'            => 'success',
+                'serialized_blocks' => "<!-- wp:paragraph -->\n{$html}\n<!-- /wp:paragraph -->",
+                'documents'         => array(),
+            );
         }
 
-        return new WP_Error( 'unsupported', "Unsupported {$from} to {$to}." );
-    }
-
-    function bfb_normalize( string $content, string $format ) {
-        if ( 'blocks' === $format && str_contains( $content, '<!-- wp:' ) && ! str_contains( $content, '<!-- /wp:' ) ) {
-            return new WP_Error( 'bfb_blocks_unclosed_comment', 'Serialized block markup contains an unclosed block comment.' );
-        }
-
-        return str_replace( array( "\r\n", "\r" ), "\n", $content );
+        return array(
+            'schema'      => 'blocks-engine/php-transformer/result/v1',
+            'status'      => 'failed',
+            'diagnostics' => array(
+                array(
+                    'code'    => 'unsupported',
+                    'message' => "Unsupported {$from} to {$to}.",
+                ),
+            ),
+        );
     }
 
     function published_post_content( array $result ): string {

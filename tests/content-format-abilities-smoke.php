@@ -237,15 +237,72 @@ namespace {
 		}
 	}
 
-	function bfb_convert( string $content, string $from, string $to ) {
+	function blocks_engine_php_transformer_convert_format( string $content, string $from, string $to, array $options = array() ): array {
+		unset( $options );
 		$GLOBALS['__content_ability_conversions'][] = array( $from, $to, $content );
 
 		if ( str_contains( $content, 'CONVERT_FAIL' ) ) {
-			return new WP_Error( 'bfb_conversion_failed', 'BFB conversion failed.', array( 'format' => $from ) );
+			return array(
+				'schema'      => 'blocks-engine/php-transformer/result/v1',
+				'status'      => 'failed',
+				'diagnostics' => array(
+					array(
+						'code'    => 'blocks_engine_conversion_failed',
+						'message' => 'Blocks Engine conversion failed.',
+					),
+				),
+			);
+		}
+
+		if ( 'blocks' === $from ) {
+			if ( str_contains( $content, '<!-- wp:' ) && ! str_contains( $content, '<!-- /wp:' ) ) {
+				return array(
+					'schema'      => 'blocks-engine/php-transformer/result/v1',
+					'status'      => 'failed',
+					'diagnostics' => array(
+						array(
+							'code'    => 'blocks_unclosed_comment',
+							'message' => 'Serialized block markup contains an unclosed block comment.',
+						),
+					),
+				);
+			}
+
+			if ( ! str_contains( $content, '<!-- wp:' ) ) {
+				return array(
+					'schema'      => 'blocks-engine/php-transformer/result/v1',
+					'status'      => 'failed',
+					'diagnostics' => array(
+						array(
+							'code'    => 'blocks_missing_comments',
+							'message' => 'Declared blocks content does not contain serialized block comments.',
+						),
+					),
+				);
+			}
+		}
+
+		if ( $from === $to && 'blocks' === $to ) {
+			return array(
+				'schema'            => 'blocks-engine/php-transformer/result/v1',
+				'status'            => 'success',
+				'serialized_blocks' => str_replace( array( "\r\n", "\r" ), "\n", $content ),
+				'documents'         => array(),
+			);
 		}
 
 		if ( $from === $to ) {
-			return $content;
+			return array(
+				'schema'            => 'blocks-engine/php-transformer/result/v1',
+				'status'            => 'success',
+				'serialized_blocks' => '',
+				'documents'         => array(
+					array(
+						'format'  => $to,
+						'content' => str_replace( array( "\r\n", "\r" ), "\n", $content ),
+					),
+				),
+			);
 		}
 
 		if ( 'markdown' === $from && 'blocks' === $to ) {
@@ -263,7 +320,12 @@ namespace {
 					$blocks[] = "<!-- wp:paragraph -->\n<p>{$line}</p>\n<!-- /wp:paragraph -->";
 				}
 			}
-			return implode( "\n", $blocks );
+			return array(
+				'schema'            => 'blocks-engine/php-transformer/result/v1',
+				'status'            => 'success',
+				'serialized_blocks' => implode( "\n", $blocks ),
+				'documents'         => array(),
+			);
 		}
 
 		if ( 'html' === $from && 'blocks' === $to ) {
@@ -276,36 +338,48 @@ namespace {
 					$blocks[] = "<!-- wp:paragraph -->\n<p>" . ( $match[2] ?? '' ) . "</p>\n<!-- /wp:paragraph -->";
 				}
 				}
-				return implode( "\n", $blocks );
+				return array(
+					'schema'            => 'blocks-engine/php-transformer/result/v1',
+					'status'            => 'success',
+					'serialized_blocks' => implode( "\n", $blocks ),
+					'documents'         => array(),
+				);
 			}
-			return "<!-- wp:html -->\n{$content}\n<!-- /wp:html -->";
+			return array(
+				'schema'            => 'blocks-engine/php-transformer/result/v1',
+				'status'            => 'success',
+				'serialized_blocks' => "<!-- wp:html -->\n{$content}\n<!-- /wp:html -->",
+				'documents'         => array(),
+			);
 		}
 
 		if ( 'blocks' === $from && 'markdown' === $to ) {
 			$content = preg_replace( '/<!--\s*\/?wp:[^>]+-->\s*/', '', $content );
 			$content = preg_replace( '/<h[1-6][^>]*>(.*?)<\/h[1-6]>/', '# $1', $content );
 			$content = preg_replace( '/<p[^>]*>(.*?)<\/p>/', '$1', $content );
-			return trim( html_entity_decode( strip_tags( $content ) ) );
+			return array(
+				'schema'            => 'blocks-engine/php-transformer/result/v1',
+				'status'            => 'success',
+				'serialized_blocks' => '',
+				'documents'         => array(
+					array(
+						'format'  => 'markdown',
+						'content' => trim( html_entity_decode( strip_tags( $content ) ) ),
+					),
+				),
+			);
 		}
 
-		return new WP_Error( 'unsupported', "Unsupported {$from} to {$to}." );
-	}
-
-	function bfb_normalize( string $content, string $format ) {
-		if ( 'blocks' === $format ) {
-			if ( str_contains( $content, '<!-- wp:' ) && ! str_contains( $content, '<!-- /wp:' ) ) {
-				return new WP_Error(
-					'bfb_blocks_unclosed_comment',
-					'Serialized block markup contains an unclosed block comment.',
-					array( 'open_blocks' => array( 'paragraph' ) )
-				);
-			}
-			if ( ! str_contains( $content, '<!-- wp:' ) ) {
-				return new WP_Error( 'bfb_blocks_missing_comments', 'Declared blocks content does not contain serialized block comments.' );
-			}
-		}
-
-		return str_replace( array( "\r\n", "\r" ), "\n", $content );
+		return array(
+			'schema'      => 'blocks-engine/php-transformer/result/v1',
+			'status'      => 'failed',
+			'diagnostics' => array(
+				array(
+					'code'    => 'unsupported',
+					'message' => "Unsupported {$from} to {$to}.",
+				),
+			),
+		);
 	}
 
 	function parse_blocks( string $content ): array {
@@ -537,7 +611,7 @@ namespace {
 		)
 	);
 	assert_content_ability( 'raw-upsert-omitted-format-treats-markdown-as-blocks', false === $raw_markdown_without_format['success'] );
-	assert_content_ability( 'raw-upsert-omitted-markdown-fails-loudly', 'bfb_blocks_missing_comments' === ( $raw_markdown_without_format['error_code'] ?? '' ) );
+	assert_content_ability( 'raw-upsert-omitted-markdown-fails-loudly', 'datamachine_content_format_blocks_missing_comments' === ( $raw_markdown_without_format['error_code'] ?? '' ) );
 	assert_content_ability( 'raw-upsert-omitted-markdown-does-not-write-post', $posts_before_raw_markdown_default === content_ability_post_count() );
 	assert_content_ability( 'internal-upsert-execute-callers-are-explicitly-audited', array() === content_ability_raw_upsert_execute_callers() );
 
@@ -575,8 +649,7 @@ namespace {
 		)
 	);
 	assert_content_ability( 'malformed-blocks-source-fails', false === $malformed_blocks['success'] );
-	assert_content_ability( 'malformed-blocks-source-preserves-bfb-error-code', 'bfb_blocks_unclosed_comment' === ( $malformed_blocks['error_code'] ?? '' ) );
-	assert_content_ability( 'malformed-blocks-source-preserves-bfb-error-data', array( 'paragraph' ) === ( $malformed_blocks['error_data']['open_blocks'] ?? array() ) );
+	assert_content_ability( 'malformed-blocks-source-preserves-transformer-error-code', 'datamachine_content_format_blocks_unclosed_comment' === ( $malformed_blocks['error_code'] ?? '' ) );
 	assert_content_ability( 'malformed-blocks-source-does-not-write-post', $posts_before_malformed === content_ability_post_count() );
 
 	$conversion_error = DataMachine\Abilities\Content\UpsertPostAbility::execute(
@@ -587,8 +660,8 @@ namespace {
 			'content_format' => 'markdown',
 		)
 	);
-	assert_content_ability( 'bfb-conversion-error-fails', false === $conversion_error['success'] );
-	assert_content_ability( 'bfb-conversion-error-code-is-distinct-from-missing-bfb', 'bfb_conversion_failed' === ( $conversion_error['error_code'] ?? '' ) );
+	assert_content_ability( 'blocks-engine-conversion-error-fails', false === $conversion_error['success'] );
+	assert_content_ability( 'blocks-engine-conversion-error-code-is-distinct-from-missing-transformer', 'datamachine_content_format_blocks_engine_conversion_failed' === ( $conversion_error['error_code'] ?? '' ) );
 
 	$tool = DataMachine\Abilities\Content\UpsertPostAbility::getChatTool();
 	assert_content_ability( 'chat-tool-content-format-is-optional', ! in_array( 'content_format', $tool['required'] ?? array(), true ) );

@@ -28,7 +28,6 @@ function assert_content_format_blocks_engine( string $name, bool $condition ): v
 
 $GLOBALS['__content_format_blocks_engine_filters']     = array();
 $GLOBALS['__content_format_blocks_engine_helper_calls'] = array();
-$GLOBALS['__content_format_bfb_calls']                  = array();
 
 if ( ! function_exists( 'add_filter' ) ) {
 	function add_filter( string $hook, callable $callback, int $priority = 10, int $accepted_args = 1 ): void {
@@ -114,12 +113,6 @@ function blocks_engine_php_transformer_convert_format( string $content, string $
 	);
 }
 
-function bfb_convert( string $content, string $from, string $to ): string {
-	$GLOBALS['__content_format_bfb_calls'][] = array( $from, $to, $content );
-
-	return 'legacy-bfb';
-}
-
 require_once dirname( __DIR__ ) . '/inc/Core/Content/ContentFormat.php';
 
 use DataMachine\Core\Content\ContentFormat;
@@ -128,7 +121,7 @@ $blocks = ContentFormat::convert( 'Hello', 'html', 'blocks', array( 'post_type' 
 
 assert_content_format_blocks_engine( 'blocks-engine-helper-converts-to-blocks', is_string( $blocks ) && false !== strpos( $blocks, '<!-- wp:paragraph -->' ) );
 assert_content_format_blocks_engine( 'blocks-engine-helper-receives-context', 'page' === ( $GLOBALS['__content_format_blocks_engine_helper_calls'][0][3]['post_type'] ?? '' ) );
-assert_content_format_blocks_engine( 'blocks-engine-helper-preferred-over-bfb', array() === $GLOBALS['__content_format_bfb_calls'] );
+assert_content_format_blocks_engine( 'blocks-engine-helper-is-runtime-transformer', 1 === count( $GLOBALS['__content_format_blocks_engine_helper_calls'] ) );
 
 $markdown = ContentFormat::convert( '<!-- wp:paragraph --><p>Hello</p><!-- /wp:paragraph -->', 'blocks', 'markdown' );
 assert_content_format_blocks_engine( 'blocks-engine-document-content-used-for-non-blocks', '[blocks:markdown]<!-- wp:paragraph --><p>Hello</p><!-- /wp:paragraph -->' === $markdown );

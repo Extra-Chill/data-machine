@@ -6,7 +6,8 @@
 	"require": {
 		"php": ">=8.2",
 		"wordpress/agents-api": "dev-main",
-		"woocommerce/action-scheduler": "^3.9"
+		"woocommerce/action-scheduler": "^3.9",
+		"automattic/blocks-engine-php-transformer": "dev-trunk"
 	},
 	"require-dev": {
 		"php-stubs/wordpress-stubs": "^6.9",
@@ -43,6 +44,32 @@
 		}
 	},
 	"repositories": [
+		{
+			"type": "package",
+			"package": {
+				"name": "automattic/blocks-engine-php-transformer",
+				"version": "dev-trunk",
+				"type": "library",
+				"source": {
+					"type": "git",
+					"url": "https://github.com/Automattic/blocks-engine.git",
+					"reference": "trunk"
+				},
+				"autoload": {
+					"psr-4": {
+						"Automattic\\BlocksEngine\\PhpTransformer\\": "php-transformer/src/"
+					},
+					"files": [
+						"php-transformer/php-transformer.php"
+					]
+				},
+				"require": {
+					"php": ">=8.1",
+					"league/commonmark": "^2.5",
+					"league/html-to-markdown": "^5.1"
+				}
+			}
+		},
 		{
 			"name": "agents-api",
 			"type": "vcs",

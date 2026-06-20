@@ -110,7 +110,14 @@ class ContentFormat {
 			}
 		}
 
-		return self::convertWithBfb( $content, $from, $to );
+		if ( $from === $to ) {
+			return $content;
+		}
+
+		return new \WP_Error(
+			'datamachine_content_format_transformer_missing',
+			sprintf( 'Blocks Engine PHP Transformer is required to convert post content from %s to %s.', $from, $to )
+		);
 	}
 
 	/**
@@ -151,58 +158,6 @@ class ContentFormat {
 			'datamachine_content_format_blocks_engine_missing_content',
 			sprintf( 'Blocks Engine PHP Transformer did not return %s content converting post content from %s to %s.', $to, $from, $to )
 		);
-	}
-
-	/**
-	 * Convert content through legacy Block Format Bridge when no canonical runtime transformer is active.
-	 *
-	 * @param  string $content Source content.
-	 * @param  string $from    Source format slug.
-	 * @param  string $to      Target format slug.
-	 * @return string|\WP_Error Converted content or error.
-	 */
-	private static function convertWithBfb( string $content, string $from, string $to ) {
-		if ( function_exists( 'bfb_normalize' ) ) {
-			$normalized = bfb_normalize( $content, $from );
-			if ( is_wp_error( $normalized ) ) {
-				return $normalized;
-			}
-
-			if ( ! is_string( $normalized ) ) {
-				return new \WP_Error(
-					'datamachine_content_format_invalid_normalization_result',
-					sprintf( 'Block Format Bridge returned a non-string result normalizing post content as %s.', $from )
-				);
-			}
-
-			$content = $normalized;
-		}
-
-		if ( $from === $to ) {
-			return $content;
-		}
-
-		if ( ! function_exists( 'bfb_convert' ) ) {
-			return new \WP_Error(
-				'datamachine_content_format_transformer_missing',
-				sprintf( 'Blocks Engine PHP Transformer or Block Format Bridge is required to convert post content from %s to %s.', $from, $to )
-			);
-		}
-
-		$converted = bfb_convert( $content, $from, $to );
-
-		if ( is_wp_error( $converted ) ) {
-			return $converted;
-		}
-
-		if ( ! is_string( $converted ) ) {
-			return new \WP_Error(
-				'datamachine_content_format_invalid_result',
-				sprintf( 'Block Format Bridge returned a non-string result converting post content from %s to %s.', $from, $to )
-			);
-		}
-
-		return $converted;
 	}
 
 	/**
