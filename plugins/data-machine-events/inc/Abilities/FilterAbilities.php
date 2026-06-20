@@ -213,26 +213,34 @@ class FilterAbilities {
 			if ( Geo_Query::validate_params( $geo_lat, $geo_lng, $geo_radius ) ) {
 				$nearby_venue_ids = Geo_Query::get_venue_ids_within_radius( $geo_lat, $geo_lng, $geo_radius, $geo_unit );
 
-				$venue_constraint = array(
-					'taxonomy' => 'venue',
-					'field'    => 'term_id',
-					'terms'    => ! empty( $nearby_venue_ids ) ? $nearby_venue_ids : array( 0 ),
-				);
+				// Only constrain by venue proximity when the haversine actually
+				// found venues in radius. An empty match means "no additional
+				// geo signal" — drop the geo constraint and fall back to the
+				// other constraints instead of forcing terms => [0], which would
+				// guarantee an empty result even when the active filters (e.g. a
+				// location term) have events. See #378.
+				if ( ! empty( $nearby_venue_ids ) ) {
+					$venue_constraint = array(
+						'taxonomy' => 'venue',
+						'field'    => 'term_id',
+						'terms'    => $nearby_venue_ids,
+					);
 
-				if ( is_array( $tax_query_override ) ) {
-					$tax_query_override[] = $venue_constraint;
-				} else {
-					$tax_query_override = array( $venue_constraint );
+					if ( is_array( $tax_query_override ) ) {
+						$tax_query_override[] = $venue_constraint;
+					} else {
+						$tax_query_override = array( $venue_constraint );
+					}
+
+					$geo_context = array(
+						'active'      => true,
+						'venue_count' => count( $nearby_venue_ids ),
+						'lat'         => $geo_lat,
+						'lng'         => $geo_lng,
+						'radius'      => $geo_radius,
+						'radius_unit' => $geo_unit,
+					);
 				}
-
-				$geo_context = array(
-					'active'      => true,
-					'venue_count' => count( $nearby_venue_ids ),
-					'lat'         => $geo_lat,
-					'lng'         => $geo_lng,
-					'radius'      => $geo_radius,
-					'radius_unit' => $geo_unit,
-				);
 			}
 		}
 
