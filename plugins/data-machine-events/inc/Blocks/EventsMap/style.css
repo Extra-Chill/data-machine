@@ -23,6 +23,31 @@
 	border: none;
 }
 
+/* Emoji pin sizing must be self-contained, not dependent on ambient CSS.
+   The marker is an L.divIcon whose glyph size comes from an inline
+   `font-size` on its inner <span>. WordPress core's emoji feature rewrites
+   the literal 📍 into an <img class="emoji">, and themes that don't ship
+   the core `img.emoji { width: 1em; height: 1em }` clamp (or that load it
+   in a context the dynamically-injected Leaflet marker never inherits) let
+   that <img> render at its intrinsic size — a giant pin. Pin the glyph box
+   to the divIcon's iconSize (28px) here so the marker is correct regardless
+   of theme, emoji replacement, or wrapper layout. */
+.data-machine-events-map .emoji-marker span {
+	display: block;
+	width: 28px;
+	height: 28px;
+	font-size: 28px;
+	line-height: 1;
+}
+
+.data-machine-events-map .emoji-marker img {
+	width: 28px;
+	height: 28px;
+	max-width: none;
+	margin: 0;
+	vertical-align: top;
+}
+
 /* ---------- Collapsible (opt-in) ---------- */
 
 /* The collapsible wrapper exists only when the block opts in via the
