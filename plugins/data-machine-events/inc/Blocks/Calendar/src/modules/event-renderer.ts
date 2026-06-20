@@ -23,11 +23,11 @@
  *     (server-rendered via `Taxonomy\Badges::render_taxonomy_badges()`)
  *     and `renderBadges()` injects it directly, falling back to client
  *     reconstruction from raw terms only when it's absent. See #381.
- *   - `data_machine_events_more_info_button_classes` server filter is
- *     still NOT honored on client-rendered cards. Themes/plugins relying
- *     on More Info button class-list customization will see defaults on
- *     appended events. Follow-up: ship the pre-filtered button class list
- *     in the data envelope the same way `badges_html` now is.
+ *   - `data_machine_events_more_info_button_classes` server filter IS now
+ *     honored on client-rendered cards: the data envelope ships
+ *     `event.button_classes` (the filtered class list) and `renderEventCard()`
+ *     applies it to the More Info button, falling back to the default class
+ *     only when absent. See #381.
  */
 
 import type {
@@ -139,9 +139,12 @@ export function renderEventCard(
 
 	const moreInfo = document.createElement( 'a' );
 	moreInfo.href = event.permalink;
-	// Default class list. Server-side `data_machine_events_more_info_button_classes`
-	// filter is not honored on client-rendered cards (Phase-1.5 deferred).
-	moreInfo.className = 'data-machine-more-info-button';
+	// Prefer the server-filtered class list shipped in the data envelope
+	// (runs `data_machine_events_more_info_button_classes`), falling back to
+	// the default class only when absent. Keeps client-appended cards in
+	// parity with server-rendered ones. See #381.
+	moreInfo.className =
+		( event.button_classes || '' ).trim() || 'data-machine-more-info-button';
 	moreInfo.textContent = 'More Info';
 	meta.appendChild( moreInfo );
 

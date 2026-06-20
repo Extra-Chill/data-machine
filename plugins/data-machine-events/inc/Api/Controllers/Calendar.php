@@ -268,6 +268,9 @@ class Calendar {
 	 *   honor the badge-class filters themes hook for styling. The raw
 	 *   `taxonomies` map is still provided for any consumer that wants to
 	 *   render badges itself. See #381.
+	 * - `button_classes` ships the server-filtered "More Info" button class
+	 *   list (via the `data_machine_events_more_info_button_classes` filter)
+	 *   for the same client-render parity reason. See #381.
 	 *
 	 * @param int   $post_id     Event post ID.
 	 * @param array $event_entry The serialized entry from `paged_date_groups`.
@@ -278,33 +281,45 @@ class Calendar {
 		$title      = (string) ( $event_entry['title'] ?? get_the_title( $post_id ) );
 
 		return array(
-			'id'          => $post_id,
-			'title'       => $title,
-			'permalink'   => (string) get_permalink( $post_id ),
-			'date'        => array(
+			'id'             => $post_id,
+			'title'          => $title,
+			'permalink'      => (string) get_permalink( $post_id ),
+			'date'           => array(
 				'start_date'     => (string) ( $event_data['startDate'] ?? '' ),
 				'start_time'     => (string) ( $event_data['startTime'] ?? '' ),
 				'end_date'       => (string) ( $event_data['endDate'] ?? '' ),
 				'end_time'       => (string) ( $event_data['endTime'] ?? '' ),
 				'venue_timezone' => (string) ( $event_data['venueTimezone'] ?? '' ),
 			),
-			'venue'       => $this->serialize_venue( $post_id, $event_data ),
-			'organizer'   => $this->serialize_organizer( $event_data ),
-			'ticket'      => array(
+			'venue'          => $this->serialize_venue( $post_id, $event_data ),
+			'organizer'      => $this->serialize_organizer( $event_data ),
+			'ticket'         => array(
 				'url' => (string) ( $event_data['ticketUrl'] ?? '' ),
 			),
-			'performer'   => array(
+			'performer'      => array(
 				'name' => (string) ( $event_data['performerName'] ?? '' ),
 			),
-			'address'     => (string) ( $event_data['address'] ?? '' ),
-			'taxonomies'  => $this->serialize_taxonomies( $post_id ),
+			'address'        => (string) ( $event_data['address'] ?? '' ),
+			'taxonomies'     => $this->serialize_taxonomies( $post_id ),
 			// Server-filtered badge HTML so client-rendered (Load More)
 			// cards honor the `data_machine_events_badge_wrapper_classes`
 			// and `data_machine_events_badge_classes` filters that themes
 			// hook for styling. Without this, the TS renderer rebuilds
 			// badges from raw terms and drops the theme classes, leaving
 			// appended events with unstyled fallback badges. See #381.
-			'badges_html' => Badges::render_taxonomy_badges( $post_id ),
+			'badges_html'    => Badges::render_taxonomy_badges( $post_id ),
+			// Server-filtered "More Info" button class list so client-rendered
+			// (Load More) cards honor the
+			// `data_machine_events_more_info_button_classes` filter, mirroring
+			// the badge-class parity fix above and the lazy-render path in
+			// EventRenderer.php. See #381.
+			'button_classes' => implode(
+				' ',
+				apply_filters(
+					'data_machine_events_more_info_button_classes',
+					array( 'data-machine-more-info-button' )
+				)
+			),
 		);
 	}
 

@@ -193,6 +193,14 @@ export interface CalendarEventItem {
 	 * theme classes). See #381.
 	 */
 	badges_html?: string;
+	/**
+	 * Server-filtered "More Info" button class list from the
+	 * `data_machine_events_more_info_button_classes` filter. When present,
+	 * the event renderer applies it to client-appended (Load More) cards so
+	 * the button honors theme/plugin class customization instead of falling
+	 * back to the default class only. See #381.
+	 */
+	button_classes?: string;
 }
 
 /**
