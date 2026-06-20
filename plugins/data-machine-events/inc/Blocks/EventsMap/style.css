@@ -59,7 +59,8 @@
 }
 
 /* Toggle is a real <button> — keyboard operable, accessible. Styled as a
-   slim header bar so the collapsed state reads as a clear "Show map" peek. */
+   slim bar; collapsed state gets an accent tint + pin glyph so "Show map"
+   reads as an intentional affordance (the map itself stays fully hidden). */
 .data-machine-events-map-toggle {
 	display: inline-flex;
 	align-items: center;
@@ -99,6 +100,24 @@
 
 .data-machine-events-map-collapsible.is-collapsed .data-machine-events-map-toggle::before {
 	transform: rotate(-90deg);
+}
+
+/* A map-pin glyph after the label so the toggle reads as a clear "there's a
+   map here" affordance — no asset, stays vendor-neutral. */
+.data-machine-events-map-toggle::after {
+	content: "\1F4CD"; /* 📍 */
+	font-size: 0.9375em;
+	line-height: 1;
+}
+
+/* Collapsed state: tint the bar with the accent color so the "Show map"
+   control reads as an intentional, tappable affordance rather than a bare
+   button. Kept fully hidden (no live map sliver) so collapsed = zero Leaflet
+   work. */
+.data-machine-events-map-collapsible.is-collapsed .data-machine-events-map-toggle {
+	border-color: var(--data-machine-border-focus, #2563eb);
+	background: var(--data-machine-background-accent-soft, rgba(37, 99, 235, 0.08));
+	color: var(--data-machine-text-accent, #2563eb);
 }
 
 /* The collapsible region. When collapsed it is hidden via the [hidden]
