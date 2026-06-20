@@ -2,6 +2,21 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.43.0] - 2026-06-20
+
+### Added
+- feat(events-map): add opt-in collapsible/expandable capability (#376)
+
+### Changed
+- style(events-map): polish collapsed toggle with pin glyph and accent tint
+
+### Fixed
+- never geocode a context-free bare street as a fallback
+- fix(events-map): clamp emoji pin size so markers can't balloon
+- honor more-info button-class filter on load-more events
+- honor badge-class filters on load-more events
+- fall back instead of zeroing results when geo radius matches no venues
+
 ## [0.42.0] - 2026-06-19
 
 ### Added
