@@ -184,6 +184,23 @@ export interface CalendarEventItem {
 	performer: { name: string };
 	address: string;
 	taxonomies: Record<string, CalendarEventTaxonomyTerm[]>;
+	/**
+	 * Server-rendered, filter-applied badge markup from
+	 * `Badges::render_taxonomy_badges()`. When present, the event renderer
+	 * injects this directly so client-appended (Load More) cards honor the
+	 * `data_machine_events_badge_*_classes` filters themes hook for styling,
+	 * instead of rebuilding badges from `taxonomies` (which drops those
+	 * theme classes). See #381.
+	 */
+	badges_html?: string;
+	/**
+	 * Server-filtered "More Info" button class list from the
+	 * `data_machine_events_more_info_button_classes` filter. When present,
+	 * the event renderer applies it to client-appended (Load More) cards so
+	 * the button honors theme/plugin class customization instead of falling
+	 * back to the default class only. See #381.
+	 */
+	button_classes?: string;
 }
 
 /**

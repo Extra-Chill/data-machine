@@ -18,13 +18,16 @@
  *     computed client-side here because the #301 data envelope does
  *     not (yet) expose these pre-formatted strings. See `formatTimeDisplay`
  *     and friends below — port of `DisplayVars::build()` in PHP.
- *   - `data_machine_events_badge_classes` and
- *     `data_machine_events_more_info_button_classes` server filters are
- *     NOT honored on client-rendered cards. Themes/plugins relying on
- *     class-list customization will see defaults on appended events.
- *     Follow-up: extend the data envelope to ship the pre-filtered
- *     class lists (and `badges_html`) the same way the lazy-render
- *     placeholder JSON already does.
+ *   - `data_machine_events_badge_classes` server filter IS now honored on
+ *     client-rendered cards: the data envelope ships `event.badges_html`
+ *     (server-rendered via `Taxonomy\Badges::render_taxonomy_badges()`)
+ *     and `renderBadges()` injects it directly, falling back to client
+ *     reconstruction from raw terms only when it's absent. See #381.
+ *   - `data_machine_events_more_info_button_classes` server filter IS now
+ *     honored on client-rendered cards: the data envelope ships
+ *     `event.button_classes` (the filtered class list) and `renderEventCard()`
+ *     applies it to the More Info button, falling back to the default class
+ *     only when absent. See #381.
  */
 
 import type {
@@ -136,9 +139,12 @@ export function renderEventCard(
 
 	const moreInfo = document.createElement( 'a' );
 	moreInfo.href = event.permalink;
-	// Default class list. Server-side `data_machine_events_more_info_button_classes`
-	// filter is not honored on client-rendered cards (Phase-1.5 deferred).
-	moreInfo.className = 'data-machine-more-info-button';
+	// Prefer the server-filtered class list shipped in the data envelope
+	// (runs `data_machine_events_more_info_button_classes`), falling back to
+	// the default class only when absent. Keeps client-appended cards in
+	// parity with server-rendered ones. See #381.
+	moreInfo.className =
+		( event.button_classes || '' ).trim() || 'data-machine-more-info-button';
 	moreInfo.textContent = 'More Info';
 	meta.appendChild( moreInfo );
 
@@ -153,6 +159,20 @@ export function renderEventCard(
 /* ------------------------------------------------------------------ */
 
 function renderBadges( event: CalendarEventItem ): HTMLElement | null {
+	// Prefer the server-rendered, filter-applied badge markup when the
+	// data envelope ships it. `Badges::render_taxonomy_badges()` runs the
+	// `data_machine_events_badge_wrapper_classes` /
+	// `data_machine_events_badge_classes` filters that themes hook for
+	// styling, so injecting this keeps client-appended (Load More) cards
+	// byte-identical to server-rendered cards. The markup is built
+	// entirely server-side from escaped values (esc_html / esc_url /
+	// esc_attr), so parsing it here introduces no new injection surface.
+	// See #381.
+	const serverBadges = renderServerBadges( event.badges_html );
+	if ( serverBadges ) {
+		return serverBadges;
+	}
+
 	const taxonomies = event.taxonomies || {};
 	const taxonomySlugs = Object.keys( taxonomies );
 	if ( taxonomySlugs.length === 0 ) {
@@ -201,6 +221,28 @@ function renderBadges( event: CalendarEventItem ): HTMLElement | null {
 	} );
 
 	return badgeCount > 0 ? wrapper : null;
+}
+
+/**
+ * Parse the server-rendered badge HTML (`event.badges_html`) into a
+ * detached element ready to append.
+ *
+ * Returns null when no markup is supplied so the caller can fall back to
+ * the client-side reconstruction from raw taxonomy terms. The markup is
+ * produced by `Taxonomy\Badges::render_taxonomy_badges()` — a single
+ * `.data-machine-taxonomy-badges` wrapper element — so we lift that first
+ * element child out of the parse container.
+ */
+function renderServerBadges( badgesHtml?: string ): HTMLElement | null {
+	const html = ( badgesHtml || '' ).trim();
+	if ( html === '' ) {
+		return null;
+	}
+
+	const template = document.createElement( 'template' );
+	template.innerHTML = html;
+	const node = template.content.firstElementChild;
+	return node instanceof HTMLElement ? node : null;
 }
 
 /* ------------------------------------------------------------------ */
