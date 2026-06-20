@@ -122,6 +122,13 @@ class CalendarCache {
 			// buckets — otherwise the first response shape served
 			// for a given envelope sticks for the cache TTL.
 			'format'           => (string) ( $envelope['format'] ?? '' ),
+			// #381: data-envelope schema version. Folding it into the key
+			// means a deploy that changes the envelope SHAPE never serves a
+			// stale older-shape response to the newer client for the cache
+			// TTL window. Only set for the data format (see Calendar
+			// controller); empty for HTML responses, which keeps their
+			// existing buckets unchanged.
+			'data_schema'      => (int) ( $envelope['data_schema_version'] ?? 0 ),
 			// #318: month-grid mode scopes events to a specific YYYY-MM
 			// window (regardless of past/upcoming). Fold the month into
 			// the key so grid and list responses for the same archive

@@ -37,6 +37,7 @@ use WP_REST_Request;
 use DataMachineEvents\Abilities\CalendarAbilities;
 use DataMachineEvents\Api\BrowserNavigationGuard;
 use DataMachineEvents\Blocks\Calendar\Cache\CalendarCache;
+use DataMachineEvents\Blocks\Calendar\Display\DisplayVars;
 use DataMachineEvents\Blocks\Calendar\Query\CalendarRequest;
 use DataMachineEvents\Blocks\Calendar\Taxonomy\Badges;
 
@@ -44,6 +45,18 @@ use DataMachineEvents\Blocks\Calendar\Taxonomy\Badges;
  * Calendar API controller
  */
 class Calendar {
+
+	/**
+	 * Schema version of the `format=data` response envelope.
+	 *
+	 * Bump this whenever the data-envelope SHAPE changes in a way the client
+	 * renderer depends on. It is folded into the full-response cache key so a
+	 * deploy that changes the shape can never serve a stale older-shape
+	 * envelope to the newer client (and vice-versa) for the cache TTL window.
+	 *
+	 * v2 (#381): per-occurrence `display` block added to `grouping.by_date`.
+	 */
+	const DATA_SCHEMA_VERSION = 2;
 
 	/**
 	 * Calendar endpoint implementation
@@ -74,6 +87,13 @@ class Calendar {
 		// (the ability-side envelope only sees the derived `include_html`).
 		$envelope['format'] = $calendar_request->format();
 		$is_data_format     = ( 'data' === $envelope['format'] );
+
+		// Fold the data-envelope schema version into the cache key (data
+		// format only) so a shape change across a deploy never serves a
+		// stale older-shape envelope to the newer client. See #381.
+		if ( $is_data_format ) {
+			$envelope['data_schema_version'] = self::DATA_SCHEMA_VERSION;
+		}
 
 		// Editors with `manage_options` always bypass the cache so they
 		// see fresh data immediately after publishing / editing events.
@@ -173,6 +193,16 @@ class Calendar {
 		// lives on the grouping entry, not on the event itself, because
 		// the same post can be a "start day" on one date and a
 		// "continuation" on the next.
+		//
+		// The per-occurrence `display` block (server-computed via
+		// DisplayVars::build()) ALSO lives on the grouping entry, not the
+		// event, for the same reason: the formatted time string differs by
+		// occurrence (a multi-day event reads "7:30 PM" on its start day
+		// and "Ongoing · ends Mar 22" on continuation days). Shipping it
+		// here keeps DisplayVars the single source of truth for all render
+		// paths (PHP template, lazy-render hydration, and the client-side
+		// event-renderer) — the client never re-derives time/date strings.
+		// See #381.
 		$events_by_id  = array();
 		$grouping      = array();
 		$ordered_dates = array();
@@ -196,9 +226,15 @@ class Calendar {
 					$events_by_id[ $post_id ] = $this->serialize_event( $post_id, $event_entry );
 				}
 
+				$display_context = $event_entry['display_context'] ?? array();
+
 				$grouping[ $date_key ][] = array(
 					'post_id'         => $post_id,
-					'display_context' => $event_entry['display_context'] ?? array(),
+					'display_context' => $display_context,
+					'display'         => $this->serialize_display(
+						$event_entry['event_data'] ?? array(),
+						$display_context
+					),
 				);
 			}
 		}
@@ -211,7 +247,12 @@ class Calendar {
 			'success'    => true,
 			'schema'     => array(
 				'name'    => 'calendar-data',
-				'version' => 1,
+				// v2 (#381): each `grouping.by_date` occurrence now carries a
+				// server-computed `display` block (DisplayVars::build()) so the
+				// client renderer never re-derives time/date strings. The cache
+				// key folds in this version so stale v1 buckets (which lack the
+				// `display` block) are never served to the v2 client.
+				'version' => self::DATA_SCHEMA_VERSION,
 				'phase'   => 1,
 				'issue'   => 298,
 			),
@@ -320,6 +361,42 @@ class Calendar {
 					array( 'data-machine-more-info-button' )
 				)
 			),
+		);
+	}
+
+	/**
+	 * Serialize the per-occurrence display block for the data envelope.
+	 *
+	 * Thin pass-through over `DisplayVars::build()` — the single source of
+	 * truth for every render path's display strings (formatted time range,
+	 * multi-day "through"/"Ongoing · ends" labels, ISO start date, decoded
+	 * venue/performer names, and the show_* flags). The client-side
+	 * `event-renderer.ts` consumes these verbatim instead of re-deriving
+	 * time/date/unicode logic in JavaScript, which is what let badge and
+	 * time formatting drift between server- and client-rendered cards. See #381.
+	 *
+	 * Lives per-occurrence (on the `grouping.by_date` entry) rather than on
+	 * the event because the formatted time string varies by occurrence for
+	 * multi-day events — the same post reads as a timed range on its start
+	 * day and "Ongoing · ends X" on continuation days.
+	 *
+	 * @param array $event_data      Hydrated event_data array for the event.
+	 * @param array $display_context Per-occurrence context (is_multi_day / is_continuation / ...).
+	 * @return array<string,mixed>
+	 */
+	private function serialize_display( array $event_data, array $display_context ): array {
+		$vars = DisplayVars::build( $event_data, $display_context );
+
+		return array(
+			'formatted_time_display' => (string) ( $vars['formatted_time_display'] ?? '' ),
+			'multi_day_label'        => (string) ( $vars['multi_day_label'] ?? '' ),
+			'iso_start_date'         => (string) ( $vars['iso_start_date'] ?? '' ),
+			'venue_name'             => (string) ( $vars['venue_name'] ?? '' ),
+			'performer_name'         => (string) ( $vars['performer_name'] ?? '' ),
+			'show_performer'         => (bool) ( $vars['show_performer'] ?? false ),
+			'show_ticket_link'       => (bool) ( $vars['show_ticket_link'] ?? true ),
+			'is_continuation'        => (bool) ( $vars['is_continuation'] ?? false ),
+			'is_multi_day'           => (bool) ( $vars['is_multi_day'] ?? false ),
 		);
 	}
 

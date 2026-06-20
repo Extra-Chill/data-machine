@@ -221,10 +221,37 @@ export interface CalendarEventOccurrenceContext {
 	total_days?: number;
 }
 
+/**
+ * Server-computed display strings for a single occurrence, produced by
+ * `DisplayVars::build()` (the one source of truth for all render paths).
+ *
+ * The client renderer consumes these verbatim rather than re-deriving
+ * time / date / unicode logic in JS. Lives per-occurrence because the
+ * formatted time string varies by occurrence for multi-day events. See #381.
+ */
+export interface CalendarEventDisplay {
+	/** Ready-to-print time string, e.g. "7:30 - 10:00 PM" or "Ongoing · ends Mar 22". */
+	formatted_time_display: string;
+	/** Multi-day "through Mar 22" label shown on a start day, or "". */
+	multi_day_label: string;
+	/** Timezone-aware ISO 8601 start timestamp for the `data-date` attribute. */
+	iso_start_date: string;
+	/** Unicode-decoded venue name for the `data-venue` attribute. */
+	venue_name: string;
+	/** Unicode-decoded performer name for the `data-performer` attribute. */
+	performer_name: string;
+	show_performer: boolean;
+	show_ticket_link: boolean;
+	is_continuation: boolean;
+	is_multi_day: boolean;
+}
+
 /** A single occurrence of an event on a specific date. */
 export interface CalendarEventOccurrence {
 	post_id: number;
 	display_context: CalendarEventOccurrenceContext;
+	/** Server-computed display strings for this occurrence. See #381. */
+	display: CalendarEventDisplay;
 }
 
 /** Date grouping index. Date keys are `Y-m-d` strings. */

@@ -99,7 +99,7 @@ export function renderDateGroup(
 		if ( ! event ) {
 			return;
 		}
-		const card = renderEventCard( event, occurrence.display_context );
+		const card = renderEventCard( event, occurrence );
 		wrapper.appendChild( card );
 	} );
 

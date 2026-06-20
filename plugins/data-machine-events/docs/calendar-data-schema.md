@@ -42,7 +42,7 @@ full-response cache key (`CalendarCache::generate_full_response_key()`).
   "success": true,
   "schema": {
     "name": "calendar-data",
-    "version": 1,
+    "version": 2,
     "phase": 1,
     "issue": 298
   },
@@ -51,7 +51,7 @@ full-response cache key (`CalendarCache::generate_full_response_key()`).
     "ordered_dates": [ "2026-06-12", "2026-06-13", "..." ],
     "by_date": {
       "2026-06-12": [
-        { "post_id": 12345, "display_context": { /* ... */ } }
+        { "post_id": 12345, "display_context": { /* ... */ }, "display": { /* ... */ } }
       ]
     },
     "gaps": { "2026-06-15": 3 }
@@ -81,9 +81,23 @@ full-response cache key (`CalendarCache::generate_full_response_key()`).
 ### `schema`
 
 Identifies the schema for forward compatibility. Clients should check
-`schema.name === 'calendar-data'` and `schema.version === 1` before
+`schema.name === 'calendar-data'` and `schema.version === 2` before
 reading the rest. Future phases bump `phase`; backward-incompatible
 shape changes bump `version`.
+
+`schema.version` is also folded into the full-response cache key (as
+`data_schema` — see [Caching](#caching)), so a deploy that bumps the
+version can never serve a stale older-shape envelope to the newer client
+for the cache TTL window.
+
+**v2 ([#381](https://github.com/Extra-Chill/data-machine-events/issues/381)):** each `grouping.by_date`
+occurrence now carries a server-computed `display` block. The client-side
+event renderer consumes those values verbatim instead of re-deriving
+time / date / unicode formatting in JavaScript, making
+`DisplayVars::build()` the single source of truth for every render path
+(PHP template, lazy-render hydration, and the client event renderer).
+This closed the badge- and time-format drift bugs where client-rendered
+(Load More) cards diverged from server-rendered ones.
 
 ### `events`
 
@@ -170,6 +184,34 @@ the same `post_id` appears under every spanned date, each with its own
 }
 ```
 
+#### `display` (v2, [#381](https://github.com/Extra-Chill/data-machine-events/issues/381))
+
+Each occurrence also carries a server-computed `display` block, produced
+by `DisplayVars::build( $event_data, $display_context )` — the single
+source of truth for every render path's display strings. It lives
+**per-occurrence** (not on the event) because the formatted time string
+varies by occurrence for multi-day events: the same `post_id` reads as a
+timed range on its start day and `"Ongoing · ends Mar 22"` on
+continuation days.
+
+```jsonc
+{
+  "formatted_time_display": "7:30 - 10:00 PM",   // ready-to-print, e.g. "Ongoing · ends Mar 22"
+  "multi_day_label":        "",                  // "through Mar 22" on a multi-day start day, else ""
+  "iso_start_date":         "2026-06-12T20:30:00-04:00", // timezone-aware, for the data-date attribute
+  "venue_name":             "The Royal American", // unicode-decoded, for data-venue
+  "performer_name":         "Headliner Name",      // unicode-decoded, for data-performer
+  "show_performer":         false,
+  "show_ticket_link":       true,
+  "is_continuation":        false,
+  "is_multi_day":           false
+}
+```
+
+Clients should render these verbatim and must **not** re-derive time,
+date, or unicode formatting locally — doing so reintroduces the
+server/client drift this block exists to eliminate.
+
 ### `pagination`, `counter`, `navigation`
 
 Pure metadata — no HTML strings. Field meanings mirror the legacy
@@ -200,6 +242,13 @@ As of [#318](https://github.com/Extra-Chill/data-machine-events/issues/318) the 
 `month` envelope field, so month-grid responses scoped to a specific
 `YYYY-MM` window don't collide with list-mode responses for the same
 archive.
+
+As of [#381](https://github.com/Extra-Chill/data-machine-events/issues/381) the cache key also includes
+`data_schema` (the data-envelope `schema.version`, set only for
+`format=data` requests). Bumping `Calendar::DATA_SCHEMA_VERSION` therefore
+isolates the new envelope shape into fresh cache buckets, so a deploy that
+changes the shape never serves a stale older-shape response to the newer
+client for the cache TTL window.
 
 ## Month-grid scoping (#318)
 

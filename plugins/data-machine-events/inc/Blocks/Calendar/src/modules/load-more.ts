@@ -423,10 +423,7 @@ function appendPage(
 					if ( ! event ) {
 						return;
 					}
-					const card = renderEventCard(
-						event,
-						occurrence.display_context
-					);
+					const card = renderEventCard( event, occurrence );
 					wrapper.appendChild( card );
 				} );
 				// Update the count badge.
