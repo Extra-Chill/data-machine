@@ -21,6 +21,17 @@ namespace {
 		define( 'ABSPATH', __DIR__ . '/' );
 	}
 
+	if ( ! class_exists( 'WP_Post' ) ) {
+		class WP_Post {
+			public int $ID = 0;
+			public string $post_type = '';
+			public string $post_title = '';
+			public string $post_name = '';
+			public string $post_content = '';
+			public string $post_modified_gmt = '';
+		}
+	}
+
 	$failed = 0;
 	$total  = 0;
 
@@ -35,45 +46,74 @@ namespace {
 		++$failed;
 	}
 
-	class WP_Error {
+	if ( ! class_exists( 'WP_Error' ) ) {
+		class WP_Error {
 
-		private string $code;
-		private string $message;
-		/** @var mixed */
-		private $data;
+			private string $code;
+			private string $message;
+			/** @var mixed */
+			private $data;
 
-		public function __construct( string $code = '', string $message = '', $data = null ) {
-			$this->code    = $code;
-			$this->message = $message;
-			$this->data    = $data;
-		}
+			public function __construct( string $code = '', string $message = '', $data = null ) {
+				$this->code    = $code;
+				$this->message = $message;
+				$this->data    = $data;
+			}
 
-		public function get_error_code(): string {
-			return $this->code;
-		}
+			public function get_error_code(): string {
+				return $this->code;
+			}
 
-		public function get_error_message(): string {
-			return $this->message;
-		}
+			public function get_error_message(): string {
+				return $this->message;
+			}
 
-		public function get_error_data() {
-			return $this->data;
+			public function get_error_data() {
+				return $this->data;
+			}
 		}
 	}
 
-	$GLOBALS['__content_ability_filters']     = array();
+	$GLOBALS['__content_ability_filters'] = array();
+	$fixture_post                         = function_exists( 'get_post' ) ? (object) array() : new WP_Post();
+	$fixture_post->ID                     = 7;
+	$fixture_post->post_type              = 'wiki';
+	$fixture_post->post_title             = 'Markdown Page';
+	$fixture_post->post_name              = 'markdown-page';
+	$fixture_post->post_content           = "# Original\n\nHello world.";
+	$fixture_post->post_modified_gmt      = '2026-01-01 00:00:00';
+
 	$GLOBALS['__content_ability_posts']       = array(
-		7 => (object) array(
-			'ID'           => 7,
-			'post_type'    => 'wiki',
-			'post_title'   => 'Markdown Page',
-			'post_name'    => 'markdown-page',
-			'post_content' => "# Original\n\nHello world.",
-		),
+		7 => $fixture_post,
 	);
 	$GLOBALS['__content_ability_next_id']     = 20;
 	$GLOBALS['__content_ability_conversions'] = array();
 	$GLOBALS['__content_ability_meta']        = array();
+
+	if ( ! function_exists( 'is_multisite' ) ) {
+		function is_multisite(): bool {
+			return false;
+		}
+	}
+
+	if ( ! function_exists( 'get_current_blog_id' ) ) {
+		function get_current_blog_id(): int {
+			return 1;
+		}
+	}
+
+	if ( ! function_exists( 'get_current_user_id' ) ) {
+		function get_current_user_id(): int {
+			return 0;
+		}
+	}
+
+	if ( ! function_exists( 'wp_get_post_autosave' ) ) {
+		function wp_get_post_autosave( int $post_id, int $user_id ) {
+			unset( $post_id, $user_id );
+			return false;
+		}
+	}
 
 	if ( ! function_exists( 'add_filter' ) ) {
 		function add_filter( string $hook, callable $callback, int $priority = 10, int $accepted_args = 1 ): void {
@@ -116,8 +156,10 @@ namespace {
 		}
 	}
 
-	function esc_url_raw( $url ): string {
-		return trim( (string) $url );
+	if ( ! function_exists( 'esc_url_raw' ) ) {
+		function esc_url_raw( $url ): string {
+			return trim( (string) $url );
+		}
 	}
 
 	if ( ! function_exists( 'esc_url' ) ) {
@@ -188,13 +230,17 @@ namespace {
 		}
 	}
 
-	function get_date_from_gmt( string $date ): string {
-		return $date;
+	if ( ! function_exists( 'get_date_from_gmt' ) ) {
+		function get_date_from_gmt( string $date ): string {
+			return $date;
+		}
 	}
 
-	function taxonomy_exists( string $taxonomy ): bool {
-		unset( $taxonomy );
-		return false;
+	if ( ! function_exists( 'taxonomy_exists' ) ) {
+		function taxonomy_exists( string $taxonomy ): bool {
+			unset( $taxonomy );
+			return false;
+		}
 	}
 
 	if ( ! function_exists( 'wp_update_post' ) ) {
@@ -461,6 +507,7 @@ namespace {
 	include_once dirname( __DIR__ ) . '/inc/Core/WordPress/PostTracking.php';
 	include_once dirname( __DIR__ ) . '/inc/Core/WordPress/WordPressPublishHelper.php';
 	include_once dirname( __DIR__ ) . '/inc/Abilities/Content/BlockSanitizer.php';
+	include_once dirname( __DIR__ ) . '/inc/Abilities/Content/BlogContext.php';
 	include_once dirname( __DIR__ ) . '/inc/Abilities/Content/GetPostBlocksAbility.php';
 	include_once dirname( __DIR__ ) . '/inc/Abilities/Content/EditPostBlocksAbility.php';
 	include_once dirname( __DIR__ ) . '/inc/Abilities/Content/UpsertPostAbility.php';

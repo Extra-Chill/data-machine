@@ -271,6 +271,7 @@ namespace {
     require_once dirname( __DIR__ ) . '/inc/Core/WordPress/PostTracking.php';
     require_once dirname( __DIR__ ) . '/inc/Core/WordPress/WordPressSettingsResolver.php';
     require_once dirname( __DIR__ ) . '/inc/Core/WordPress/WordPressPublishHelper.php';
+    require_once dirname( __DIR__ ) . '/inc/Abilities/AbilityRegistration.php';
     require_once dirname( __DIR__ ) . '/inc/Abilities/Publish/PublishWordPressAbility.php';
 
     $ability = new \DataMachine\Abilities\Publish\PublishWordPressAbility();

@@ -149,7 +149,7 @@ class ContentFormat {
 		}
 
 		foreach ( $result['documents'] ?? array() as $document ) {
-			if ( is_array( $document ) && $to === ( $document['format'] ?? null ) && is_string( $document['content'] ?? null ) ) {
+			if ( is_array( $document ) && ( $document['format'] ?? null ) === $to && is_string( $document['content'] ?? null ) ) {
 				return $document['content'];
 			}
 		}
@@ -191,6 +191,13 @@ class ContentFormat {
 	 * @return string|\WP_Error Stored-format content or error.
 	 */
 	public static function sourceToStored( string $content, string $source_format, string $post_type ) {
-		return self::convert( $content, $source_format, self::storedFormat( $post_type ) );
+		$source_format = sanitize_key( $source_format );
+		$stored_format = self::storedFormat( $post_type );
+
+		if ( $source_format === $stored_format && 'blocks' !== $stored_format ) {
+			return $content;
+		}
+
+		return self::convert( $content, $source_format, $stored_format );
 	}
 }

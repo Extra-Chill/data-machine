@@ -102,7 +102,9 @@ namespace {
 		}
 	}
 
-	class WP_Error {
+	if ( ! class_exists( 'WP_Error' ) ) {
+		class WP_Error {
+		}
 	}
 
 	require_once dirname( __DIR__ ) . '/inc/Core/Content/ContentFormat.php';

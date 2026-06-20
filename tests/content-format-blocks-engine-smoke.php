@@ -65,22 +65,24 @@ if ( ! function_exists( 'is_wp_error' ) ) {
 	}
 }
 
-class WP_Error {
+if ( ! class_exists( 'WP_Error' ) ) {
+	class WP_Error {
 
-	private string $code;
-	private string $message;
+		private string $code;
+		private string $message;
 
-	public function __construct( string $code = '', string $message = '' ) {
-		$this->code    = $code;
-		$this->message = $message;
-	}
+		public function __construct( string $code = '', string $message = '' ) {
+			$this->code    = $code;
+			$this->message = $message;
+		}
 
-	public function get_error_code(): string {
-		return $this->code;
-	}
+		public function get_error_code(): string {
+			return $this->code;
+		}
 
-	public function get_error_message(): string {
-		return $this->message;
+		public function get_error_message(): string {
+			return $this->message;
+		}
 	}
 }
 
