@@ -511,13 +511,15 @@ surface failure.
 Data Machine separates **authoring/source format** from **stored format**.
 AI-facing tools should treat normal authored prose as markdown unless a workflow
 explicitly pins another source format. Storage-aware abilities then convert that
-source through Block Format Bridge into the post type's canonical stored shape.
+source through the active Blocks Engine PHP Transformer runtime into the post
+type's canonical stored shape.
 
-Block Format Bridge is bundled by Data Machine and is an internal substrate for
-these boundaries. Consumers should not require a standalone BFB plugin on a
-DM-powered site just to use Data Machine content abilities. Keep format repair,
-mixed-content detection, and malformed-input normalization in BFB (`bfb_normalize()`)
-rather than duplicating those checks in Data Machine call sites.
+Data Machine owns workflow and storage policy at these boundaries. Format repair,
+mixed-content detection, and malformed-input normalization belong in the runtime
+transformer, which Data Machine detects through `blocks_engine_php_transformer_*`
+helpers or `Automattic\BlocksEngine\PhpTransformer` classes. Legacy Block Format
+Bridge functions remain a runtime-only fallback for sites that still provide
+them, but Data Machine no longer bundles that old converter stack.
 
 ### `datamachine_post_content_format`
 

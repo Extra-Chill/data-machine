@@ -4,54 +4,30 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "d2d6f0b91d3e4bd6482dede51af142d5",
+    "content-hash": "684b1cea1db6afde16fa2e019140b230",
     "packages": [
         {
-            "name": "chubes4/block-format-bridge",
-            "version": "v0.8.1",
+            "name": "automattic/blocks-engine-php-transformer",
+            "version": "dev-trunk",
             "source": {
                 "type": "git",
-                "url": "git@github.com:chubes4/block-format-bridge.git",
-                "reference": "a77266bd18461cd6157acd8b96d1343c232f7bcf"
-            },
-            "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/chubes4/block-format-bridge/zipball/a77266bd18461cd6157acd8b96d1343c232f7bcf",
-                "reference": "a77266bd18461cd6157acd8b96d1343c232f7bcf",
-                "shasum": ""
+                "url": "https://github.com/Automattic/blocks-engine.git",
+                "reference": "trunk"
             },
             "require": {
                 "league/commonmark": "^2.5",
                 "league/html-to-markdown": "^5.1",
-                "php": "^8.1"
+                "php": ">=8.1"
             },
-            "require-dev": {
-                "chubes4/html-to-blocks-converter": "dev-main",
-                "humbug/php-scoper": "^0.18.19"
-            },
-            "type": "wordpress-plugin",
+            "type": "library",
             "autoload": {
+                "psr-4": {
+                    "Automattic\\BlocksEngine\\PhpTransformer\\": "php-transformer/src/"
+                },
                 "files": [
-                    "library.php"
+                    "php-transformer/php-transformer.php"
                 ]
-            },
-            "scripts": {
-                "build": [
-                    "./build.sh"
-                ]
-            },
-            "license": [
-                "GPL-2.0-or-later"
-            ],
-            "authors": [
-                {
-                    "name": "Chris Huber",
-                    "homepage": "https://chubes.net"
-                }
-            ],
-            "description": "WordPress plugin orchestrating bidirectional content format conversion (HTML, Blocks, Markdown) via a unified adapter API.",
-            "homepage": "https://github.com/chubes4/block-format-bridge",
-            "time": "2026-06-07T20:03:54+00:00"
+            }
         },
         {
             "name": "dflydev/dot-access-data",
@@ -475,16 +451,16 @@
         },
         {
             "name": "nette/utils",
-            "version": "v4.1.3",
+            "version": "v4.1.4",
             "source": {
                 "type": "git",
                 "url": "https://github.com/nette/utils.git",
-                "reference": "bb3ea637e3d131d72acc033cfc2746ee893349fe"
+                "reference": "7da6c396d7ebe142bc857c20479d5e70a5e1aac7"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/nette/utils/zipball/bb3ea637e3d131d72acc033cfc2746ee893349fe",
-                "reference": "bb3ea637e3d131d72acc033cfc2746ee893349fe",
+                "url": "https://api.github.com/repos/nette/utils/zipball/7da6c396d7ebe142bc857c20479d5e70a5e1aac7",
+                "reference": "7da6c396d7ebe142bc857c20479d5e70a5e1aac7",
                 "shasum": ""
             },
             "require": {
@@ -560,9 +536,9 @@
             ],
             "support": {
                 "issues": "https://github.com/nette/utils/issues",
-                "source": "https://github.com/nette/utils/tree/v4.1.3"
+                "source": "https://github.com/nette/utils/tree/v4.1.4"
             },
-            "time": "2026-02-13T03:05:33+00:00"
+            "time": "2026-05-11T20:49:54+00:00"
         },
         {
             "name": "psr/event-dispatcher",
@@ -616,16 +592,16 @@
         },
         {
             "name": "symfony/deprecation-contracts",
-            "version": "v3.6.0",
+            "version": "v3.7.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/symfony/deprecation-contracts.git",
-                "reference": "63afe740e99a13ba87ec199bb07bbdee937a5b62"
+                "reference": "50f59d1f3ca46d41ac911f97a78626b6756af35b"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/symfony/deprecation-contracts/zipball/63afe740e99a13ba87ec199bb07bbdee937a5b62",
-                "reference": "63afe740e99a13ba87ec199bb07bbdee937a5b62",
+                "url": "https://api.github.com/repos/symfony/deprecation-contracts/zipball/50f59d1f3ca46d41ac911f97a78626b6756af35b",
+                "reference": "50f59d1f3ca46d41ac911f97a78626b6756af35b",
                 "shasum": ""
             },
             "require": {
@@ -638,7 +614,7 @@
                     "name": "symfony/contracts"
                 },
                 "branch-alias": {
-                    "dev-main": "3.6-dev"
+                    "dev-main": "3.7-dev"
                 }
             },
             "autoload": {
@@ -663,7 +639,7 @@
             "description": "A generic function and convention to trigger deprecation notices",
             "homepage": "https://symfony.com",
             "support": {
-                "source": "https://github.com/symfony/deprecation-contracts/tree/v3.6.0"
+                "source": "https://github.com/symfony/deprecation-contracts/tree/v3.7.0"
             },
             "funding": [
                 {
@@ -675,11 +651,15 @@
                     "type": "github"
                 },
                 {
+                    "url": "https://github.com/nicolas-grekas",
+                    "type": "github"
+                },
+                {
                     "url": "https://tidelift.com/funding/github/packagist/symfony/symfony",
                     "type": "tidelift"
                 }
             ],
-            "time": "2024-09-25T14:21:43+00:00"
+            "time": "2026-04-13T15:52:40+00:00"
         },
         {
             "name": "symfony/polyfill-php80",
@@ -1627,6 +1607,7 @@
     "aliases": [],
     "minimum-stability": "stable",
     "stability-flags": {
+        "automattic/blocks-engine-php-transformer": 20,
         "wordpress/agents-api": 20
     },
     "prefer-stable": false,

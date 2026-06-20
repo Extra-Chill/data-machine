@@ -118,7 +118,7 @@ Agent bundles are portable packages for an agent recipe: manifest metadata, memo
 
 ### Content Formats
 
-Content and publish abilities accept `content_format` (`markdown`, `html`, or `blocks`) as the caller's source format. Data Machine stores content in the post type's canonical format from `datamachine_post_content_format`, converting through its bundled Block Format Bridge substrate.
+Content and publish abilities accept `content_format` (`markdown`, `html`, or `blocks`) as the caller's source format. Data Machine stores content in the post type's canonical format from `datamachine_post_content_format`, converting through the active Blocks Engine PHP Transformer runtime when available.
 
 ### Multi-Agent
 

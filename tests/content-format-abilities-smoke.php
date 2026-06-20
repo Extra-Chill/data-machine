@@ -21,6 +21,17 @@ namespace {
 		define( 'ABSPATH', __DIR__ . '/' );
 	}
 
+	if ( ! class_exists( 'WP_Post' ) ) {
+		class WP_Post {
+			public int $ID = 0;
+			public string $post_type = '';
+			public string $post_title = '';
+			public string $post_name = '';
+			public string $post_content = '';
+			public string $post_modified_gmt = '';
+		}
+	}
+
 	$failed = 0;
 	$total  = 0;
 
@@ -35,45 +46,92 @@ namespace {
 		++$failed;
 	}
 
-	class WP_Error {
+	if ( ! class_exists( 'WP_Error' ) ) {
+		class WP_Error {
 
-		private string $code;
-		private string $message;
-		/** @var mixed */
-		private $data;
+			private string $code;
+			private string $message;
+			/** @var mixed */
+			private $data;
 
-		public function __construct( string $code = '', string $message = '', $data = null ) {
-			$this->code    = $code;
-			$this->message = $message;
-			$this->data    = $data;
-		}
+			public function __construct( string $code = '', string $message = '', $data = null ) {
+				$this->code    = $code;
+				$this->message = $message;
+				$this->data    = $data;
+			}
 
-		public function get_error_code(): string {
-			return $this->code;
-		}
+			public function get_error_code(): string {
+				return $this->code;
+			}
 
-		public function get_error_message(): string {
-			return $this->message;
-		}
+			public function get_error_message(): string {
+				return $this->message;
+			}
 
-		public function get_error_data() {
-			return $this->data;
+			public function get_error_data() {
+				return $this->data;
+			}
 		}
 	}
 
-	$GLOBALS['__content_ability_filters']     = array();
+	$GLOBALS['__content_ability_filters'] = array();
+	$fixture_post_id                      = 7;
+	$fixture_post                         = function_exists( 'get_post' ) ? (object) array() : new WP_Post();
+	$fixture_post->ID                     = $fixture_post_id;
+	$fixture_post->post_type              = 'wiki';
+	$fixture_post->post_title             = 'Markdown Page';
+	$fixture_post->post_name              = 'markdown-page';
+	$fixture_post->post_content           = "# Original\n\nHello world.";
+	$fixture_post->post_modified_gmt      = '2026-01-01 00:00:00';
+
 	$GLOBALS['__content_ability_posts']       = array(
-		7 => (object) array(
-			'ID'           => 7,
-			'post_type'    => 'wiki',
-			'post_title'   => 'Markdown Page',
-			'post_name'    => 'markdown-page',
-			'post_content' => "# Original\n\nHello world.",
-		),
+		$fixture_post_id => $fixture_post,
 	);
 	$GLOBALS['__content_ability_next_id']     = 20;
 	$GLOBALS['__content_ability_conversions'] = array();
 	$GLOBALS['__content_ability_meta']        = array();
+
+	if ( function_exists( 'wp_insert_post' ) ) {
+		$inserted_fixture_id = wp_insert_post(
+			array(
+				'post_type'    => 'wiki',
+				'post_title'   => 'Markdown Page',
+				'post_name'    => 'markdown-page',
+				'post_content' => "# Original\n\nHello world.",
+				'post_status'  => 'publish',
+			),
+			true
+		);
+
+		if ( ! is_wp_error( $inserted_fixture_id ) ) {
+			$fixture_post_id = (int) $inserted_fixture_id;
+		}
+	}
+
+	if ( ! function_exists( 'is_multisite' ) ) {
+		function is_multisite(): bool {
+			return false;
+		}
+	}
+
+	if ( ! function_exists( 'get_current_blog_id' ) ) {
+		function get_current_blog_id(): int {
+			return 1;
+		}
+	}
+
+	if ( ! function_exists( 'get_current_user_id' ) ) {
+		function get_current_user_id(): int {
+			return 0;
+		}
+	}
+
+	if ( ! function_exists( 'wp_get_post_autosave' ) ) {
+		function wp_get_post_autosave( int $post_id, int $user_id ) {
+			unset( $post_id, $user_id );
+			return false;
+		}
+	}
 
 	if ( ! function_exists( 'add_filter' ) ) {
 		function add_filter( string $hook, callable $callback, int $priority = 10, int $accepted_args = 1 ): void {
@@ -116,8 +174,10 @@ namespace {
 		}
 	}
 
-	function esc_url_raw( $url ): string {
-		return trim( (string) $url );
+	if ( ! function_exists( 'esc_url_raw' ) ) {
+		function esc_url_raw( $url ): string {
+			return trim( (string) $url );
+		}
 	}
 
 	if ( ! function_exists( 'esc_url' ) ) {
@@ -188,13 +248,17 @@ namespace {
 		}
 	}
 
-	function get_date_from_gmt( string $date ): string {
-		return $date;
+	if ( ! function_exists( 'get_date_from_gmt' ) ) {
+		function get_date_from_gmt( string $date ): string {
+			return $date;
+		}
 	}
 
-	function taxonomy_exists( string $taxonomy ): bool {
-		unset( $taxonomy );
-		return false;
+	if ( ! function_exists( 'taxonomy_exists' ) ) {
+		function taxonomy_exists( string $taxonomy ): bool {
+			unset( $taxonomy );
+			return false;
+		}
 	}
 
 	if ( ! function_exists( 'wp_update_post' ) ) {
@@ -237,15 +301,72 @@ namespace {
 		}
 	}
 
-	function bfb_convert( string $content, string $from, string $to ) {
+	function blocks_engine_php_transformer_convert_format( string $content, string $from, string $to, array $options = array() ): array {
+		unset( $options );
 		$GLOBALS['__content_ability_conversions'][] = array( $from, $to, $content );
 
 		if ( str_contains( $content, 'CONVERT_FAIL' ) ) {
-			return new WP_Error( 'bfb_conversion_failed', 'BFB conversion failed.', array( 'format' => $from ) );
+			return array(
+				'schema'      => 'blocks-engine/php-transformer/result/v1',
+				'status'      => 'failed',
+				'diagnostics' => array(
+					array(
+						'code'    => 'blocks_engine_conversion_failed',
+						'message' => 'Blocks Engine conversion failed.',
+					),
+				),
+			);
+		}
+
+		if ( 'blocks' === $from ) {
+			if ( str_contains( $content, '<!-- wp:' ) && ! str_contains( $content, '<!-- /wp:' ) ) {
+				return array(
+					'schema'      => 'blocks-engine/php-transformer/result/v1',
+					'status'      => 'failed',
+					'diagnostics' => array(
+						array(
+							'code'    => 'blocks_unclosed_comment',
+							'message' => 'Serialized block markup contains an unclosed block comment.',
+						),
+					),
+				);
+			}
+
+			if ( ! str_contains( $content, '<!-- wp:' ) ) {
+				return array(
+					'schema'      => 'blocks-engine/php-transformer/result/v1',
+					'status'      => 'failed',
+					'diagnostics' => array(
+						array(
+							'code'    => 'blocks_missing_comments',
+							'message' => 'Declared blocks content does not contain serialized block comments.',
+						),
+					),
+				);
+			}
+		}
+
+		if ( $from === $to && 'blocks' === $to ) {
+			return array(
+				'schema'            => 'blocks-engine/php-transformer/result/v1',
+				'status'            => 'success',
+				'serialized_blocks' => str_replace( array( "\r\n", "\r" ), "\n", $content ),
+				'documents'         => array(),
+			);
 		}
 
 		if ( $from === $to ) {
-			return $content;
+			return array(
+				'schema'            => 'blocks-engine/php-transformer/result/v1',
+				'status'            => 'success',
+				'serialized_blocks' => '',
+				'documents'         => array(
+					array(
+						'format'  => $to,
+						'content' => str_replace( array( "\r\n", "\r" ), "\n", $content ),
+					),
+				),
+			);
 		}
 
 		if ( 'markdown' === $from && 'blocks' === $to ) {
@@ -263,7 +384,12 @@ namespace {
 					$blocks[] = "<!-- wp:paragraph -->\n<p>{$line}</p>\n<!-- /wp:paragraph -->";
 				}
 			}
-			return implode( "\n", $blocks );
+			return array(
+				'schema'            => 'blocks-engine/php-transformer/result/v1',
+				'status'            => 'success',
+				'serialized_blocks' => implode( "\n", $blocks ),
+				'documents'         => array(),
+			);
 		}
 
 		if ( 'html' === $from && 'blocks' === $to ) {
@@ -276,71 +402,87 @@ namespace {
 					$blocks[] = "<!-- wp:paragraph -->\n<p>" . ( $match[2] ?? '' ) . "</p>\n<!-- /wp:paragraph -->";
 				}
 				}
-				return implode( "\n", $blocks );
+				return array(
+					'schema'            => 'blocks-engine/php-transformer/result/v1',
+					'status'            => 'success',
+					'serialized_blocks' => implode( "\n", $blocks ),
+					'documents'         => array(),
+				);
 			}
-			return "<!-- wp:html -->\n{$content}\n<!-- /wp:html -->";
+			return array(
+				'schema'            => 'blocks-engine/php-transformer/result/v1',
+				'status'            => 'success',
+				'serialized_blocks' => "<!-- wp:html -->\n{$content}\n<!-- /wp:html -->",
+				'documents'         => array(),
+			);
 		}
 
 		if ( 'blocks' === $from && 'markdown' === $to ) {
 			$content = preg_replace( '/<!--\s*\/?wp:[^>]+-->\s*/', '', $content );
 			$content = preg_replace( '/<h[1-6][^>]*>(.*?)<\/h[1-6]>/', '# $1', $content );
 			$content = preg_replace( '/<p[^>]*>(.*?)<\/p>/', '$1', $content );
-			return trim( html_entity_decode( strip_tags( $content ) ) );
-		}
-
-		return new WP_Error( 'unsupported', "Unsupported {$from} to {$to}." );
-	}
-
-	function bfb_normalize( string $content, string $format ) {
-		if ( 'blocks' === $format ) {
-			if ( str_contains( $content, '<!-- wp:' ) && ! str_contains( $content, '<!-- /wp:' ) ) {
-				return new WP_Error(
-					'bfb_blocks_unclosed_comment',
-					'Serialized block markup contains an unclosed block comment.',
-					array( 'open_blocks' => array( 'paragraph' ) )
-				);
-			}
-			if ( ! str_contains( $content, '<!-- wp:' ) ) {
-				return new WP_Error( 'bfb_blocks_missing_comments', 'Declared blocks content does not contain serialized block comments.' );
-			}
-		}
-
-		return str_replace( array( "\r\n", "\r" ), "\n", $content );
-	}
-
-	function parse_blocks( string $content ): array {
-		$blocks = array();
-		if ( preg_match_all( '/<!-- wp:([^ ]+) -->\s*(.*?)\s*<!-- \/wp:\1 -->/s', $content, $matches, PREG_SET_ORDER ) ) {
-			foreach ( $matches as $match ) {
-				$block_name = str_contains( $match[1], '/' ) ? $match[1] : 'core/' . $match[1];
-				$blocks[]   = array(
-					'blockName'    => $block_name,
-					'innerHTML'    => $match[2],
-					'innerContent' => array( $match[2] ),
-					'innerBlocks'  => array(),
-				);
-			}
-			return $blocks;
+			return array(
+				'schema'            => 'blocks-engine/php-transformer/result/v1',
+				'status'            => 'success',
+				'serialized_blocks' => '',
+				'documents'         => array(
+					array(
+						'format'  => 'markdown',
+						'content' => trim( html_entity_decode( strip_tags( $content ) ) ),
+					),
+				),
+			);
 		}
 
 		return array(
-			array(
-				'blockName'    => null,
-				'innerHTML'    => $content,
-				'innerContent' => array( $content ),
-				'innerBlocks'  => array(),
+			'schema'      => 'blocks-engine/php-transformer/result/v1',
+			'status'      => 'failed',
+			'diagnostics' => array(
+				array(
+					'code'    => 'unsupported',
+					'message' => "Unsupported {$from} to {$to}.",
+				),
 			),
 		);
 	}
 
-	function serialize_blocks( array $blocks ): string {
-		$serialized = array();
-		foreach ( $blocks as $block ) {
-			$name         = $block['blockName'] ?? 'core/freeform';
-			$html         = $block['innerHTML'] ?? '';
-			$serialized[] = "<!-- wp:{$name} -->\n{$html}\n<!-- /wp:{$name} -->";
+	if ( ! function_exists( 'parse_blocks' ) ) {
+		function parse_blocks( string $content ): array {
+			$blocks = array();
+			if ( preg_match_all( '/<!-- wp:([^ ]+) -->\s*(.*?)\s*<!-- \/wp:\1 -->/s', $content, $matches, PREG_SET_ORDER ) ) {
+				foreach ( $matches as $match ) {
+					$block_name = str_contains( $match[1], '/' ) ? $match[1] : 'core/' . $match[1];
+					$blocks[]   = array(
+						'blockName'    => $block_name,
+						'innerHTML'    => $match[2],
+						'innerContent' => array( $match[2] ),
+						'innerBlocks'  => array(),
+					);
+				}
+				return $blocks;
+			}
+
+			return array(
+				array(
+					'blockName'    => null,
+					'innerHTML'    => $content,
+					'innerContent' => array( $content ),
+					'innerBlocks'  => array(),
+				),
+			);
 		}
-		return implode( "\n", $serialized );
+	}
+
+	if ( ! function_exists( 'serialize_blocks' ) ) {
+		function serialize_blocks( array $blocks ): string {
+			$serialized = array();
+			foreach ( $blocks as $block ) {
+				$name         = $block['blockName'] ?? 'core/freeform';
+				$html         = $block['innerHTML'] ?? '';
+				$serialized[] = "<!-- wp:{$name} -->\n{$html}\n<!-- /wp:{$name} -->";
+			}
+			return implode( "\n", $serialized );
+		}
 	}
 
 	function content_ability_post_count(): int {
@@ -387,22 +529,30 @@ namespace {
 	include_once dirname( __DIR__ ) . '/inc/Core/WordPress/PostTracking.php';
 	include_once dirname( __DIR__ ) . '/inc/Core/WordPress/WordPressPublishHelper.php';
 	include_once dirname( __DIR__ ) . '/inc/Abilities/Content/BlockSanitizer.php';
+	include_once dirname( __DIR__ ) . '/inc/Abilities/Content/BlogContext.php';
 	include_once dirname( __DIR__ ) . '/inc/Abilities/Content/GetPostBlocksAbility.php';
 	include_once dirname( __DIR__ ) . '/inc/Abilities/Content/EditPostBlocksAbility.php';
 	include_once dirname( __DIR__ ) . '/inc/Abilities/Content/UpsertPostAbility.php';
 
-	$get = DataMachine\Abilities\Content\GetPostBlocksAbility::execute( array( 'post_id' => 7 ) );
+	$get = DataMachine\Abilities\Content\GetPostBlocksAbility::execute( array( 'post_id' => $fixture_post_id ) );
 	assert_content_ability( 'markdown-post-read-succeeds', true === $get['success'] );
 	assert_content_ability( 'markdown-post-read-converts-to-blocks', 'core/heading' === ( $get['blocks'][0]['block_name'] ?? '' ) );
-	$stored_after_read = get_post( 7 )->post_content ?? '';
+	$stored_after_read = get_post( $fixture_post_id )->post_content ?? '';
 	assert_content_ability( 'markdown-post-read-does-not-mutate-storage', "# Original\n\nHello world." === $stored_after_read );
+	$paragraph_block_index = 1;
+	foreach ( $get['blocks'] ?? array() as $block ) {
+		if ( 'core/paragraph' === ( $block['block_name'] ?? '' ) && false !== strpos( $block['inner_html'] ?? '', 'Hello world.' ) ) {
+			$paragraph_block_index = (int) ( $block['index'] ?? $paragraph_block_index );
+			break;
+		}
+	}
 
 	$edit = DataMachine\Abilities\Content\EditPostBlocksAbility::execute(
 		array(
-			'post_id' => 7,
+			'post_id' => $fixture_post_id,
 			'edits'   => array(
 				array(
-					'block_index' => 1,
+					'block_index' => $paragraph_block_index,
 					'find'        => 'Hello world.',
 					'replace'     => 'Hello markdown.',
 				),
@@ -410,7 +560,7 @@ namespace {
 		)
 	);
 	assert_content_ability( 'markdown-post-edit-succeeds', true === $edit['success'] );
-	$stored_after_edit = get_post( 7 )->post_content ?? '';
+	$stored_after_edit = get_post( $fixture_post_id )->post_content ?? '';
 	assert_content_ability( 'markdown-post-edit-saves-markdown', false === strpos( $stored_after_edit, '<!-- wp:' ) );
 	assert_content_ability( 'markdown-post-edit-has-replacement', false !== strpos( $stored_after_edit, 'Hello markdown.' ) );
 
@@ -494,7 +644,7 @@ namespace {
 	assert_content_ability( 'upsert-future-source-date-succeeds', true === $future_source_upsert['success'] );
 	assert_content_ability( 'upsert-future-source-url-still-stored', 'https://example.com/future-source-post/' === get_post_meta( $future_source_id, '_datamachine_source_url', true ) );
 	assert_content_ability( 'upsert-future-original-date-ignored', '' === get_post_meta( $future_source_id, '_datamachine_original_date_gmt', true ) );
-	assert_content_ability( 'upsert-future-original-date-does-not-set-post-date-gmt', empty( $future_source_post->post_date_gmt ) );
+	assert_content_ability( 'upsert-future-original-date-does-not-set-post-date-gmt', '2999-01-01 00:00:00' !== ( $future_source_post->post_date_gmt ?? '' ) );
 
 	$chat_upsert   = DataMachine\Abilities\Content\UpsertPostAbility::handleChatToolCall(
 		array(
@@ -537,7 +687,7 @@ namespace {
 		)
 	);
 	assert_content_ability( 'raw-upsert-omitted-format-treats-markdown-as-blocks', false === $raw_markdown_without_format['success'] );
-	assert_content_ability( 'raw-upsert-omitted-markdown-fails-loudly', 'bfb_blocks_missing_comments' === ( $raw_markdown_without_format['error_code'] ?? '' ) );
+	assert_content_ability( 'raw-upsert-omitted-markdown-fails-loudly', 'datamachine_content_format_blocks_missing_comments' === ( $raw_markdown_without_format['error_code'] ?? '' ) );
 	assert_content_ability( 'raw-upsert-omitted-markdown-does-not-write-post', $posts_before_raw_markdown_default === content_ability_post_count() );
 	assert_content_ability( 'internal-upsert-execute-callers-are-explicitly-audited', array() === content_ability_raw_upsert_execute_callers() );
 
@@ -575,8 +725,7 @@ namespace {
 		)
 	);
 	assert_content_ability( 'malformed-blocks-source-fails', false === $malformed_blocks['success'] );
-	assert_content_ability( 'malformed-blocks-source-preserves-bfb-error-code', 'bfb_blocks_unclosed_comment' === ( $malformed_blocks['error_code'] ?? '' ) );
-	assert_content_ability( 'malformed-blocks-source-preserves-bfb-error-data', array( 'paragraph' ) === ( $malformed_blocks['error_data']['open_blocks'] ?? array() ) );
+	assert_content_ability( 'malformed-blocks-source-preserves-transformer-error-code', 'datamachine_content_format_blocks_unclosed_comment' === ( $malformed_blocks['error_code'] ?? '' ) );
 	assert_content_ability( 'malformed-blocks-source-does-not-write-post', $posts_before_malformed === content_ability_post_count() );
 
 	$conversion_error = DataMachine\Abilities\Content\UpsertPostAbility::execute(
@@ -587,8 +736,8 @@ namespace {
 			'content_format' => 'markdown',
 		)
 	);
-	assert_content_ability( 'bfb-conversion-error-fails', false === $conversion_error['success'] );
-	assert_content_ability( 'bfb-conversion-error-code-is-distinct-from-missing-bfb', 'bfb_conversion_failed' === ( $conversion_error['error_code'] ?? '' ) );
+	assert_content_ability( 'blocks-engine-conversion-error-fails', false === $conversion_error['success'] );
+	assert_content_ability( 'blocks-engine-conversion-error-code-is-distinct-from-missing-transformer', 'datamachine_content_format_blocks_engine_conversion_failed' === ( $conversion_error['error_code'] ?? '' ) );
 
 	$tool = DataMachine\Abilities\Content\UpsertPostAbility::getChatTool();
 	assert_content_ability( 'chat-tool-content-format-is-optional', ! in_array( 'content_format', $tool['required'] ?? array(), true ) );

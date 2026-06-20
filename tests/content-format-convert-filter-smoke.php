@@ -29,46 +29,44 @@ function assert_content_format_filter( string $name, bool $condition ): void {
 $GLOBALS['__content_format_filter_hooks'] = array();
 
 if ( ! function_exists( 'add_filter' ) ) {
-    function add_filter( string $hook, callable $callback, int $priority = 10, int $accepted_args = 1 ): void {
-    	$GLOBALS['__content_format_filter_hooks'][ $hook ][ $priority ][] = array( $callback, $accepted_args );
-    }
+	function add_filter( string $hook, callable $callback, int $priority = 10, int $accepted_args = 1 ): void {
+		$GLOBALS['__content_format_filter_hooks'][ $hook ][ $priority ][] = array( $callback, $accepted_args );
+	}
 }
 
 if ( ! function_exists( 'apply_filters' ) ) {
-    function apply_filters( string $hook, $value, ...$args ) {
-    	if ( empty( $GLOBALS['__content_format_filter_hooks'][ $hook ] ) ) {
-    		return $value;
-    	}
+	function apply_filters( string $hook, $value, ...$args ) {
+		if ( empty( $GLOBALS['__content_format_filter_hooks'][ $hook ] ) ) {
+			return $value;
+		}
 
-    	ksort( $GLOBALS['__content_format_filter_hooks'][ $hook ] );
-    	foreach ( $GLOBALS['__content_format_filter_hooks'][ $hook ] as $callbacks ) {
-    		foreach ( $callbacks as $registered_callback ) {
-    			list( $callback, $accepted_args ) = $registered_callback;
-    			$value                            = $callback( ...array_slice( array_merge( array( $value ), $args ), 0, $accepted_args ) );
-    		}
-    	}
+		ksort( $GLOBALS['__content_format_filter_hooks'][ $hook ] );
+		foreach ( $GLOBALS['__content_format_filter_hooks'][ $hook ] as $callbacks ) {
+			foreach ( $callbacks as $registered_callback ) {
+				list( $callback, $accepted_args ) = $registered_callback;
+				$value                            = $callback( ...array_slice( array_merge( array( $value ), $args ), 0, $accepted_args ) );
+			}
+		}
 
-    	return $value;
-    }
+		return $value;
+	}
 }
 
 if ( ! function_exists( 'sanitize_key' ) ) {
-    function sanitize_key( $key ): string {
-    	return strtolower( preg_replace( '/[^a-zA-Z0-9_\-]/', '', (string) $key ) );
-    }
+	function sanitize_key( $key ): string {
+		return strtolower( preg_replace( '/[^a-zA-Z0-9_\-]/', '', (string) $key ) );
+	}
 }
 
 if ( ! function_exists( 'is_wp_error' ) ) {
-    function is_wp_error( $thing ): bool {
-    	return $thing instanceof WP_Error;
-    }
+	function is_wp_error( $thing ): bool {
+		return $thing instanceof WP_Error;
+	}
 }
 
-function bfb_convert( string $content, string $from, string $to ) {
-	return "[{$from}:{$to}]{$content}";
-}
-
-class WP_Error {
+if ( ! class_exists( 'WP_Error' ) ) {
+	class WP_Error {
+	}
 }
 
 require_once dirname( __DIR__ ) . '/inc/Core/Content/ContentFormat.php';
@@ -86,7 +84,7 @@ $filtered = apply_filters(
 	array( 'post_type' => 'page' )
 );
 
-assert_content_format_filter( 'generic-filter-converts-with-bfb', '[markdown:blocks]# Hello' === $filtered );
+assert_content_format_filter( 'generic-filter-requires-blocks-engine-transformer', is_wp_error( $filtered ) );
 
 add_filter(
 	'datamachine_content_format_convert',

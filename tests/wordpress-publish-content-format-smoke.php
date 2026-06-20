@@ -36,27 +36,29 @@ namespace {
         ++$failed;
     }
 
-    class WP_Error {
+    if ( ! class_exists( 'WP_Error' ) ) {
+        class WP_Error {
 
-        private string $code;
-        private string $message;
+            private string $code;
+            private string $message;
 
-        public function __construct( string $code = '', string $message = '', $data = null ) {
-            unset( $data );
-            $this->code    = $code;
-            $this->message = $message;
-        }
+            public function __construct( string $code = '', string $message = '', $data = null ) {
+                unset( $data );
+                $this->code    = $code;
+                $this->message = $message;
+            }
 
-        public function get_error_code(): string {
-            return $this->code;
-        }
+            public function get_error_code(): string {
+                return $this->code;
+            }
 
-        public function get_error_message(): string {
-            return $this->message;
-        }
+            public function get_error_message(): string {
+                return $this->message;
+            }
 
-        public function get_error_data() {
-            return null;
+            public function get_error_data() {
+                return null;
+            }
         }
     }
 
@@ -66,14 +68,18 @@ namespace {
     $GLOBALS['__publish_format_next_id']     = 100;
     $GLOBALS['__publish_format_conversions'] = array();
 
-    function doing_action( string $hook ): bool {
-        unset( $hook );
-        return false;
+    if ( ! function_exists( 'doing_action' ) ) {
+        function doing_action( string $hook ): bool {
+            unset( $hook );
+            return false;
+        }
     }
 
-    function did_action( string $hook ): int {
-        unset( $hook );
-        return 1;
+    if ( ! function_exists( 'did_action' ) ) {
+        function did_action( string $hook ): int {
+            unset( $hook );
+            return 1;
+        }
     }
 
     if ( ! function_exists( 'add_filter' ) ) {
@@ -123,8 +129,10 @@ namespace {
         }
     }
 
-    function wp_filter_post_kses( $content ): string {
-        return (string) $content;
+    if ( ! function_exists( 'wp_filter_post_kses' ) ) {
+        function wp_filter_post_kses( $content ): string {
+            return (string) $content;
+        }
     }
 
     if ( ! function_exists( 'esc_url' ) ) {
@@ -134,8 +142,10 @@ namespace {
         }
     }
 
-    function esc_url_raw( $url ): string {
-        return esc_url( $url );
+    if ( ! function_exists( 'esc_url_raw' ) ) {
+        function esc_url_raw( $url ): string {
+            return esc_url( $url );
+        }
     }
 
     if ( ! function_exists( 'esc_html' ) ) {
@@ -163,9 +173,11 @@ namespace {
         }
     }
 
-    function get_users( array $args = array() ): array {
-        unset( $args );
-        return array( 1 );
+    if ( ! function_exists( 'get_users' ) ) {
+        function get_users( array $args = array() ): array {
+            unset( $args );
+            return array( 1 );
+        }
     }
 
     if ( ! function_exists( 'wp_insert_post' ) ) {
@@ -192,37 +204,71 @@ namespace {
         }
     }
 
-    function bfb_convert( string $content, string $from, string $to ) {
+    function blocks_engine_php_transformer_convert_format( string $content, string $from, string $to, array $options = array() ): array {
+        unset( $options );
         $GLOBALS['__publish_format_conversions'][] = array( $from, $to, $content );
 
-        if ( $from === $to ) {
-            return $content;
+        if ( 'blocks' === $from && str_contains( $content, '<!-- wp:' ) && ! str_contains( $content, '<!-- /wp:' ) ) {
+            return array(
+                'schema'      => 'blocks-engine/php-transformer/result/v1',
+                'status'      => 'failed',
+                'diagnostics' => array(
+                    array(
+                        'code'    => 'blocks_unclosed_comment',
+                        'message' => 'Serialized block markup contains an unclosed block comment.',
+                    ),
+                ),
+            );
+        }
+
+        if ( $from === $to && 'blocks' === $to ) {
+            return array(
+                'schema'            => 'blocks-engine/php-transformer/result/v1',
+                'status'            => 'success',
+                'serialized_blocks' => str_replace( array( "\r\n", "\r" ), "\n", $content ),
+                'documents'         => array(),
+            );
         }
 
         if ( 'html' === $from && 'blocks' === $to ) {
-            return "<!-- wp:paragraph -->\n{$content}\n<!-- /wp:paragraph -->";
+            return array(
+                'schema'            => 'blocks-engine/php-transformer/result/v1',
+                'status'            => 'success',
+                'serialized_blocks' => "<!-- wp:paragraph -->\n{$content}\n<!-- /wp:paragraph -->",
+                'documents'         => array(),
+            );
         }
 
         if ( 'markdown' === $from && 'blocks' === $to ) {
             $html = preg_replace( '/^# (.+)$/m', '<h1>$1</h1>', $content );
             $html = preg_replace( '/\*\*([^*]+)\*\* \[([^\]]+)\]\(([^)]+)\)/', '<strong>$1</strong> <a href="$3">$2</a>', $html );
-            return "<!-- wp:paragraph -->\n{$html}\n<!-- /wp:paragraph -->";
+            return array(
+                'schema'            => 'blocks-engine/php-transformer/result/v1',
+                'status'            => 'success',
+                'serialized_blocks' => "<!-- wp:paragraph -->\n{$html}\n<!-- /wp:paragraph -->",
+                'documents'         => array(),
+            );
         }
 
-        return new WP_Error( 'unsupported', "Unsupported {$from} to {$to}." );
-    }
-
-    function bfb_normalize( string $content, string $format ) {
-        if ( 'blocks' === $format && str_contains( $content, '<!-- wp:' ) && ! str_contains( $content, '<!-- /wp:' ) ) {
-            return new WP_Error( 'bfb_blocks_unclosed_comment', 'Serialized block markup contains an unclosed block comment.' );
-        }
-
-        return str_replace( array( "\r\n", "\r" ), "\n", $content );
+        return array(
+            'schema'      => 'blocks-engine/php-transformer/result/v1',
+            'status'      => 'failed',
+            'diagnostics' => array(
+                array(
+                    'code'    => 'unsupported',
+                    'message' => "Unsupported {$from} to {$to}.",
+                ),
+            ),
+        );
     }
 
     function published_post_content( array $result ): string {
         $post_id = isset( $result['post_id'] ) ? (int) $result['post_id'] : 0;
         $post    = $GLOBALS['__publish_format_posts'][ $post_id ] ?? null;
+
+        if ( ! $post && function_exists( 'get_post' ) ) {
+            $post = get_post( $post_id );
+        }
 
         return is_object( $post ) && isset( $post->post_content ) ? (string) $post->post_content : '';
     }
@@ -241,6 +287,7 @@ namespace {
     require_once dirname( __DIR__ ) . '/inc/Core/WordPress/PostTracking.php';
     require_once dirname( __DIR__ ) . '/inc/Core/WordPress/WordPressSettingsResolver.php';
     require_once dirname( __DIR__ ) . '/inc/Core/WordPress/WordPressPublishHelper.php';
+    require_once dirname( __DIR__ ) . '/inc/Abilities/AbilityRegistration.php';
     require_once dirname( __DIR__ ) . '/inc/Abilities/Publish/PublishWordPressAbility.php';
 
     $ability = new \DataMachine\Abilities\Publish\PublishWordPressAbility();
