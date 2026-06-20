@@ -168,6 +168,61 @@ class PipelineBatchSchedulerTest extends WP_UnitTestCase {
 		$this->assertFalse( get_transient( 'dm_pipeline_batch_' . $parent_id ) );
 	}
 
+	/**
+	 * Regression for #2762: a concurrent RunMetrics write must not clobber
+	 * batch_state written by fan-out.
+	 *
+	 * Reproduces the lost-update race where the Ticketmaster fan-out flow
+	 * fails children with batch_state_missing: fan-out writes batch_state, but
+	 * a RunMetrics persist that started from a pre-fan-out baseline overwrites
+	 * the whole engine_data column with a snapshot that has no batch key. The
+	 * stale object-cache entry below stands in for that baseline. With the
+	 * compare-and-swap path, RunMetrics re-reads the live snapshot and the
+	 * batch key survives.
+	 */
+	public function test_runmetrics_write_does_not_clobber_batch_state(): void {
+		$parent_id = $this->create_parent_job();
+		$engine    = $this->make_engine_snapshot( $parent_id );
+
+		// Snapshot the parent BEFORE fan-out — this is the stale baseline a
+		// concurrent RunMetrics writer would have read.
+		$stale_baseline = datamachine_get_engine_data( $parent_id );
+		$this->assertArrayNotHasKey( 'batch', $stale_baseline );
+
+		$packets = array(
+			$this->make_data_packet( 'Event A' ),
+			$this->make_data_packet( 'Event B' ),
+		);
+
+		$scheduler = new PipelineBatchScheduler();
+		$scheduler->fanOut( $parent_id, 'step_abc_123', $packets, $engine );
+
+		// Parent now carries the batch state on disk.
+		$after_fanout = datamachine_get_engine_data( $parent_id );
+		$this->assertTrue( $after_fanout['batch'] );
+		$this->assertArrayHasKey( 'batch_state', $after_fanout );
+
+		// Re-prime the object cache with the stale pre-fan-out baseline to
+		// simulate a concurrent runner that read engine_data before fan-out
+		// committed. A blind read-modify-write persist would push this stale
+		// snapshot back and drop batch / batch_state.
+		wp_cache_set( $parent_id, $stale_baseline, 'datamachine_engine_data' );
+
+		\DataMachine\Core\RunMetrics::increment( $parent_id, 'processed' );
+
+		$preserved = datamachine_get_engine_data( $parent_id );
+		$this->assertTrue( $preserved['batch'] ?? false, 'batch flag survives concurrent RunMetrics write' );
+		$this->assertArrayHasKey( 'batch_state', $preserved, 'batch_state survives concurrent RunMetrics write' );
+		$this->assertSame( 2, (int) $preserved['batch_state']['total'] );
+		$this->assertSame( 1, (int) $preserved['run_metrics']['counts']['processed'] );
+
+		// And the chunk that runs next still finds its state — no
+		// batch_state_missing failure.
+		$scheduler->processChunk( $parent_id );
+		$parent_job = $this->jobs_db->get_job( $parent_id );
+		$this->assertStringNotContainsString( 'batch_state_missing', (string) $parent_job['status'] );
+	}
+
 	public function test_process_chunk_creates_child_jobs(): void {
 		$parent_id = $this->create_parent_job();
 		$engine    = $this->make_engine_snapshot( $parent_id );
