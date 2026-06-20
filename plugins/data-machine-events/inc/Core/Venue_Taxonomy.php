@@ -608,8 +608,24 @@ class Venue_Taxonomy {
 			$queries['name_lookup'] = implode( ', ', $parts );
 		}
 
-		// Strategy 4: Raw address field as-is (in case it's already a complete, well-formatted address)
-		if ( ! empty( $address ) && $address !== ( $queries['cleaned_address'] ?? '' ) ) {
+		// Strategy 4: Raw address field as-is (in case it's already a complete, well-formatted address).
+		//
+		// Guard against coordinate roulette: a bare street with no embedded
+		// city/state (e.g. "500 College Drive") must NOT be geocoded alone when
+		// we have separate city meta to build a contextual query — Nominatim
+		// will happily match the street number to an unrelated city (the real
+		// "500 College Drive" resolves to Reno, NV, mis-placing a Lake Jackson,
+		// TX venue 1,500+ miles away). See data-machine-events#379.
+		//
+		// Only fall back to the raw address when it carries its own context
+		// (contains a comma, i.e. multi-part) OR when there is no city meta to
+		// produce a better-scoped query in strategies 1-3.
+		$raw_has_context = false !== strpos( $address, ',' );
+		if (
+			! empty( $address )
+			&& $address !== ( $queries['cleaned_address'] ?? '' )
+			&& ( $raw_has_context || empty( $city ) )
+		) {
 			$queries['raw_address'] = html_entity_decode( $address );
 		}
 
