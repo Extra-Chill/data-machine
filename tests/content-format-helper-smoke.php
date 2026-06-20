@@ -92,12 +92,12 @@ add_filter(
 );
 
 assert_content_format( 'filtered-format-is-markdown', 'markdown' === ContentFormat::storedFormat( 'wiki' ) );
-assert_content_format( 'same-format-is-no-op-without-bfb', 'Hello' === ContentFormat::convert( 'Hello', 'markdown', 'markdown' ) );
+assert_content_format( 'same-format-is-no-op-without-transformer', 'Hello' === ContentFormat::convert( 'Hello', 'markdown', 'markdown' ) );
 
 $missing = ContentFormat::convert( '# Hello', 'markdown', 'blocks' );
-assert_content_format( 'missing-bfb-returns-wp-error', is_wp_error( $missing ) );
+assert_content_format( 'missing-transformer-returns-wp-error', is_wp_error( $missing ) );
 $missing_message = is_wp_error( $missing ) ? $missing->get_error_message() : '';
-assert_content_format( 'missing-bfb-error-is-clear', false !== strpos( $missing_message, 'Block Format Bridge is required' ) );
+assert_content_format( 'missing-transformer-error-is-clear', false !== strpos( $missing_message, 'Blocks Engine PHP Transformer or Block Format Bridge is required' ) );
 
 echo "\nContentFormat helper smoke: {$total} assertions, {$failed} failures.\n";
 

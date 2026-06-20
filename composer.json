@@ -6,8 +6,7 @@
 	"require": {
 		"php": ">=8.2",
 		"wordpress/agents-api": "dev-main",
-		"woocommerce/action-scheduler": "^3.9",
-		"chubes4/block-format-bridge": "^0.8"
+		"woocommerce/action-scheduler": "^3.9"
 	},
 	"require-dev": {
 		"php-stubs/wordpress-stubs": "^6.9",
@@ -48,11 +47,6 @@
 			"name": "agents-api",
 			"type": "vcs",
 			"url": "https://github.com/Automattic/agents-api"
-		},
-		{
-			"name": "block-format-bridge",
-			"type": "vcs",
-			"url": "https://github.com/chubes4/block-format-bridge"
 		}
 	]
 }
