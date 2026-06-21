@@ -126,13 +126,6 @@ final class HostToolPolicy {
 			return self::normalizePolicy( $unwrapped );
 		}
 
-		if ( self::isSandboxPolicyDocument( $policy ) ) {
-			$policy = self::normalizeSandboxPolicyDocument( $policy );
-			if ( null === $policy ) {
-				return null;
-			}
-		}
-
 		$tools = is_array( $policy['tools'] ?? null ) ? $policy['tools'] : array();
 		foreach ( $tools as $tool_name => $rule ) {
 			if ( ! is_string( $tool_name ) || '' === $tool_name || ! is_array( $rule ) ) {
@@ -176,10 +169,6 @@ final class HostToolPolicy {
 			return $policy['external_tool_ownership_policy'];
 		}
 
-		if ( is_array( $policy['sandbox_tool_policy'] ?? null ) ) {
-			return $policy['sandbox_tool_policy'];
-		}
-
 		$tools = is_array( $policy['tools'] ?? null ) ? $policy['tools'] : null;
 		if ( is_array( $tools ) && is_array( $tools['tools'] ?? null ) ) {
 			foreach ( array( 'schema', 'default_location', 'default_execution_location', 'execution_location' ) as $key ) {
@@ -190,70 +179,5 @@ final class HostToolPolicy {
 		}
 
 		return $policy;
-	}
-
-	/**
-	 * @param array<string,mixed> $policy Policy candidate.
-	 */
-	private static function isSandboxPolicyDocument( array $policy ): bool {
-		if ( 'wp-codebox/sandbox-tool-policy/v1' === (string) ( $policy['schema'] ?? '' ) ) {
-			return true;
-		}
-
-		$tools = is_array( $policy['tools'] ?? null ) ? $policy['tools'] : array();
-		if ( empty( $tools ) ) {
-			return false;
-		}
-
-		return array_is_list( $tools ) && is_array( $tools[0] ?? null ) && ( isset( $tools[0]['id'] ) || isset( $tools[0]['runtime_tool_id'] ) );
-	}
-
-	/**
-	 * Convert a sandbox transport policy list into the generic host policy shape.
-	 *
-	 * @param array<string,mixed> $policy Sandbox policy document.
-	 * @return array<string,mixed>|null
-	 */
-	private static function normalizeSandboxPolicyDocument( array $policy ): ?array {
-		$entries = is_array( $policy['tools'] ?? null ) ? $policy['tools'] : array();
-		if ( empty( $entries ) ) {
-			return null;
-		}
-
-		$tools = array();
-
-		foreach ( $entries as $entry ) {
-			if ( ! is_array( $entry ) ) {
-				continue;
-			}
-
-			$tool_name = is_string( $entry['id'] ?? null ) && '' !== trim( (string) $entry['id'] )
-				? trim( (string) $entry['id'] )
-				: ( is_string( $entry['runtime_tool_id'] ?? null ) ? trim( (string) $entry['runtime_tool_id'] ) : '' );
-			if ( '' === $tool_name ) {
-				continue;
-			}
-
-			$location = self::sandboxExecutionLocationToHostLocation( (string) ( $entry['execution_location'] ?? '' ) );
-
-			$tools[ $tool_name ] = array( 'execution_location' => $location );
-		}
-
-		return array(
-			'default_location' => 'disabled',
-			'tools'            => $tools,
-		);
-	}
-
-	private static function sandboxExecutionLocationToHostLocation( string $location ): string {
-		$location = strtolower( trim( $location ) );
-		if ( in_array( $location, array( 'sandbox', 'runner', 'runtime_local' ), true ) ) {
-			return 'runner';
-		}
-		if ( in_array( $location, array( 'parent', 'control_plane' ), true ) ) {
-			return 'control_plane';
-		}
-
-		return 'disabled';
 	}
 }

@@ -584,24 +584,17 @@ $resolution     = ( new ToolPolicyResolver( new SnapshotPolicyToolManager() ) )-
 assert_policy_equals( 'client', $resolution['alpha_tool']['executor'] ?? null, 'wrapped policy delegates explicit control-plane tool', $failures, $passes );
 assert_policy_equals( null, $resolution['beta_tool']['executor'] ?? null, 'wrapped policy leaves runner-default tool local', $failures, $passes );
 
-echo "\n[14] host tool policy accepts sandbox transport policy payloads:\n";
-$sandbox_policy = array(
-	'schema'   => 'wp-codebox/sandbox-tool-policy/v1',
-	'version'  => 1,
-	'tools'    => array(
+echo "\n[14] host tool policy ignores list-shaped transport payloads:\n";
+$transport_policy = array(
+	'schema' => 'vendor/tool-policy/v1',
+	'tools'  => array(
 		array(
 			'id'                 => 'alpha_tool',
-			'runtime_tool_id'    => 'alpha_tool',
-			'execution_location' => 'parent',
-		),
-		array(
-			'id'                 => 'beta_tool',
-			'runtime_tool_id'    => 'beta_tool',
-			'execution_location' => 'sandbox',
+			'execution_location' => 'control_plane',
 		),
 	),
 );
-$resolution     = ( new ToolPolicyResolver( new SnapshotPolicyToolManager() ) )->resolve(
+$resolution       = ( new ToolPolicyResolver( new SnapshotPolicyToolManager() ) )->resolve(
 	array(
 		'mode'                => ToolPolicyResolver::MODE_PIPELINE,
 		'pipeline_step_id'    => 'ephemeral_pipeline_0',
@@ -609,11 +602,11 @@ $resolution     = ( new ToolPolicyResolver( new SnapshotPolicyToolManager() ) )-
 		'categories'          => array(),
 		'allow_only_explicit' => true,
 		'allow_only'          => array( 'alpha_tool', 'beta_tool' ),
-		'host_tool_policy'    => $sandbox_policy,
+		'host_tool_policy'    => $transport_policy,
 	)
 );
-assert_policy_equals( 'client', $resolution['alpha_tool']['executor'] ?? null, 'sandbox policy delegates parent-visible tool', $failures, $passes );
-assert_policy_equals( null, $resolution['beta_tool']['executor'] ?? null, 'sandbox policy leaves sandbox-local tool local', $failures, $passes );
+assert_policy_equals( null, $resolution['alpha_tool']['executor'] ?? null, 'list-shaped transport policy is not converted into host policy', $failures, $passes );
+assert_policy_equals( null, $resolution['beta_tool']['executor'] ?? null, 'list-shaped transport policy does not affect unrelated tools', $failures, $passes );
 
 if ( $failures ) {
 	echo "\nFAILED: " . count( $failures ) . " pipeline policy assertions failed.\n";
