@@ -69,6 +69,7 @@ function datamachine_business_load_handlers() {
 	// Load Abilities (they self-register)
 	new \DataMachineBusiness\Abilities\Analytics\GoogleAnalyticsAbilities();
 	new \DataMachineBusiness\Abilities\Analytics\ContentPerformanceAbility();
+	new \DataMachineBusiness\Abilities\Analytics\ContentFlagsAbility();
 
 	// Global AI tools.
 	new \DataMachineBusiness\Engine\AI\Tools\Global\GoogleAnalytics();
