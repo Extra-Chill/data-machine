@@ -130,6 +130,9 @@ function datamachine_business_load_handlers() {
 
 	// Media Hygiene — orphan files + unused attachments.
 	new \DataMachineBusiness\Abilities\MediaHygiene\MediaHygieneAbility();
+
+	// Sendy — generic email-marketing integration (subscribe, campaigns, metrics).
+	new \DataMachineBusiness\Abilities\Sendy\SendyAbilities();
 }
 
 // Hook into plugins_loaded to ensure Data Machine core is loaded first
