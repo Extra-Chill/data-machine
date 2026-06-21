@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 Homeboy maintains this file from conventional commits at release time —
 do not edit by hand.
 
+## [0.10.0] - 2026-06-21
+
+### Added
+- content-flags confidence guards (low-sample + query-intent caveat)
+
 ## [0.9.0] - 2026-06-21
 
 ### Added
