@@ -59,6 +59,21 @@
  * GA's sampling/threshold caveats and is not bot-filtered the way the
  * first-party reads are.
  *
+ * Two confidence guards (added after dogfooding the live screen):
+ *   1. Low-sample confidence — avg_duration is noisy at the ~10-16 engaged
+ *      sessions where flagged posts cluster, so the FACT of being flagged is
+ *      reliable but the worst-holding-first ORDERING among flagged posts is not.
+ *      Each flagged post carries a `confidence` field derived from
+ *      engaged_sessions (low < 15, moderate 15-40, good > 40); low-confidence
+ *      rows must not be finely ranked against each other.
+ *   2. Query-intent caveat — the screen measures dwell-vs-median and CANNOT see
+ *      query intent or the cultural/topical weight of a post's subject. A low
+ *      dwell can mean a fully-satisfying answer to a shallow quick-answer query
+ *      (healthy: the reader got the gist and left) just as easily as weak
+ *      content. The tool ADMITS this limit rather than trying to measure culture
+ *      from data — confirm weakness with human judgment before treating a flag
+ *      as a fixable defect.
+ *
  * @package DataMachineBusiness\Abilities\Analytics
  * @since 0.41.0
  */
@@ -111,6 +126,26 @@ class ContentFlagsAbility {
 	 */
 	const DEMAND_DURATION_FACTOR = 0.4;
 
+	/**
+	 * Engaged-sessions ceiling (exclusive) for `low` confidence.
+	 *
+	 * Below this sample size, avg_duration is noisy enough that the
+	 * worst-holding-first ordering among flagged posts is not reliable. The
+	 * flag itself still holds (the >=10 gate is unchanged) — only the ranking
+	 * confidence is `low`.
+	 *
+	 * @var int
+	 */
+	const CONFIDENCE_LOW_MAX = 15;
+
+	/**
+	 * Engaged-sessions ceiling (inclusive) for `moderate` confidence. Above it,
+	 * confidence is `good`.
+	 *
+	 * @var int
+	 */
+	const CONFIDENCE_MODERATE_MAX = 40;
+
 	private static bool $registered = false;
 
 	public function __construct() {
@@ -128,7 +163,7 @@ class ContentFlagsAbility {
 				'datamachine/content-flags',
 				array(
 					'label'               => 'Content Red-Flag Detector',
-					'description'         => 'Deterministic TRIAGE SCREEN (not a quality score) over a category\'s published posts. Reuses the datamachine/content-performance category->GA4-engagement join, then flags posts by OUTCOME and annotates them with structure as a POSSIBLE explanation. The ONE confident flag is demand_failing_content (engaged_sessions >= 10 AND avg dwell < 0.4x the category median) — it measures the outcome, not a structural proxy. Structural signals (thin: word_count < 500; padded_stub: >15 headings/1k words AND <1000 words) are ADVISORY NOTES attached only to an already-flagged post — never standalone verdicts — because a 277-post validation showed structural rules predict quality at 40-59% precision (barely above the 34% base rate) and do not generalize. Also reports a category-level coverage ratio (with_traffic/published): a low ratio signals a DISCOVERY gap, not a content gap. CAVEAT: flags and dwell are valid only WITHIN this category — dwell is contaminated by traffic-source and demand differences between categories, so never compare a post against a post in another category. Per-page dwell is GA4-only (the first-party pageview table has no duration event), so results carry GA sampling caveats and are NOT bot-filtered.',
+					'description'         => 'Deterministic TRIAGE SCREEN (not a quality score) over a category\'s published posts. Reuses the datamachine/content-performance category->GA4-engagement join, then flags posts by OUTCOME and annotates them with structure as a POSSIBLE explanation. The ONE confident flag is demand_failing_content (engaged_sessions >= 10 AND avg dwell < 0.4x the category median) — it measures the outcome, not a structural proxy. Structural signals (thin: word_count < 500; padded_stub: >15 headings/1k words AND <1000 words) are ADVISORY NOTES attached only to an already-flagged post — never standalone verdicts — because a 277-post validation showed structural rules predict quality at 40-59% precision (barely above the 34% base rate) and do not generalize. Also reports a category-level coverage ratio (with_traffic/published): a low ratio signals a DISCOVERY gap, not a content gap. Each flagged post carries a `confidence` field (low/moderate/good) derived from engaged_sessions — at low sample size avg dwell is noisy, so the FACT of a flag is reliable but the worst-holding-first ORDERING among low-confidence posts is not; do not finely rank low-confidence rows against each other. QUERY-INTENT CAVEAT (the most important limit): a flagged post may be a quick-answer query where low dwell is APPROPRIATE — the reader got the gist and left satisfied. Dwell vs. category median CANNOT distinguish weak content from a shallow-but-satisfied query; the cultural/topical weight of the underlying topic is invisible to this tool. Confirm content weakness with human judgment before treating a flag as a fixable defect — some flagged posts are healthy quick-answers, not defects. CAVEAT: flags and dwell are valid only WITHIN this category — dwell is contaminated by traffic-source and demand differences between categories, so never compare a post against a post in another category. Per-page dwell is GA4-only (the first-party pageview table has no duration event), so results carry GA sampling caveats and are NOT bot-filtered.',
 					'category'            => 'datamachine-analytics',
 					'input_schema'        => array(
 						'type'       => 'object',
@@ -151,18 +186,19 @@ class ContentFlagsAbility {
 					'output_schema'       => array(
 						'type'       => 'object',
 						'properties' => array(
-							'success'         => array( 'type' => 'boolean' ),
-							'category'        => array( 'type' => 'string' ),
-							'window'          => array( 'type' => 'object' ),
-							'published_total' => array( 'type' => 'integer' ),
-							'with_traffic'    => array( 'type' => 'integer' ),
-							'coverage'        => array( 'type' => 'number' ),
-							'comparable'      => array( 'type' => 'integer' ),
-							'flagged'         => array( 'type' => 'integer' ),
-							'median_duration' => array( 'type' => 'number' ),
-							'posts'           => array( 'type' => 'array' ),
-							'caveat'          => array( 'type' => 'string' ),
-							'error'           => array( 'type' => 'string' ),
+							'success'             => array( 'type' => 'boolean' ),
+							'category'            => array( 'type' => 'string' ),
+							'window'              => array( 'type' => 'object' ),
+							'published_total'     => array( 'type' => 'integer' ),
+							'with_traffic'        => array( 'type' => 'integer' ),
+							'coverage'            => array( 'type' => 'number' ),
+							'comparable'          => array( 'type' => 'integer' ),
+							'flagged'             => array( 'type' => 'integer' ),
+							'median_duration'     => array( 'type' => 'number' ),
+							'posts'               => array( 'type' => 'array' ),
+							'caveat'              => array( 'type' => 'string' ),
+							'query_intent_caveat' => array( 'type' => 'string' ),
+							'error'               => array( 'type' => 'string' ),
 						),
 					),
 					'execute_callback'    => array( self::class, 'screen' ),
@@ -274,6 +310,7 @@ class ContentFlagsAbility {
 				'title'            => $post->post_title,
 				'flag'             => 'demand_failing_content',
 				'engaged_sessions' => $engaged_sessions,
+				'confidence'       => self::confidence_for_sessions( $engaged_sessions ),
 				'avg_duration'     => $avg_duration,
 				'category_median'  => $median_duration,
 				'word_count'       => $word_count,
@@ -293,18 +330,46 @@ class ContentFlagsAbility {
 		);
 
 		return array(
-			'success'         => true,
-			'category'        => $category,
-			'window'          => $performance['window'] ?? array(),
-			'published_total' => $published_total,
-			'with_traffic'    => $with_traffic,
-			'coverage'        => $coverage,
-			'comparable'      => count( $comparable ),
-			'flagged'         => count( $flagged ),
-			'median_duration' => $median_duration,
-			'posts'           => $flagged,
-			'caveat'          => 'Triage screen, not a quality score. The ONLY flag is demand_failing_content (an OUTCOME measure); structural notes are possible explanations, never verdicts — structure predicts quality at barely-above-chance precision. Flags/dwell are valid only WITHIN this category; never compare across categories. Per-page dwell is GA4-only and not bot-filtered.',
+			'success'             => true,
+			'category'            => $category,
+			'window'              => $performance['window'] ?? array(),
+			'published_total'     => $published_total,
+			'with_traffic'        => $with_traffic,
+			'coverage'            => $coverage,
+			'comparable'          => count( $comparable ),
+			'flagged'             => count( $flagged ),
+			'median_duration'     => $median_duration,
+			'posts'               => $flagged,
+			'caveat'              => 'Triage screen, not a quality score. The ONLY flag is demand_failing_content (an OUTCOME measure); structural notes are possible explanations, never verdicts — structure predicts quality at barely-above-chance precision. Flags/dwell are valid only WITHIN this category; never compare across categories. Per-page dwell is GA4-only and not bot-filtered. Each post carries a confidence (low/moderate/good) from its engaged_sessions — low-sample dwell is noisy, so the worst-holding-first ORDERING among low-confidence posts is soft; do not finely rank them against each other.',
+			'query_intent_caveat' => 'A flagged post may be a quick-answer query where low dwell is APPROPRIATE — the reader got what they came for and left satisfied. Dwell vs. category median cannot distinguish weak content from a shallow-but-satisfied query (the cultural/topical weight of the underlying topic is invisible to this tool). Confirm content weakness with human judgment before treating a flag as a fix; some flagged posts are healthy quick-answers, not defects.',
 		);
+	}
+
+	/**
+	 * Map engaged sessions to a ranking-confidence label.
+	 *
+	 * Dwell (avg_duration) is averaged over engaged_sessions, so at low N a
+	 * couple of quick bounces swing it hard and the worst-holding-first ordering
+	 * among flagged posts becomes unreliable. This label tells the reader how
+	 * much to
+	 * trust the per-post dwell value (and therefore the ranking) — it does NOT
+	 * affect whether a post is flagged (the >=10 gate is unchanged).
+	 *
+	 * Thresholds: low (< 15), moderate (15-40), good (> 40).
+	 *
+	 * @param int $engaged_sessions Engaged sessions for the post.
+	 * @return string One of `low`, `moderate`, `good`.
+	 */
+	private static function confidence_for_sessions( int $engaged_sessions ): string {
+		if ( $engaged_sessions < self::CONFIDENCE_LOW_MAX ) {
+			return 'low';
+		}
+
+		if ( $engaged_sessions <= self::CONFIDENCE_MODERATE_MAX ) {
+			return 'moderate';
+		}
+
+		return 'good';
 	}
 
 	/**
