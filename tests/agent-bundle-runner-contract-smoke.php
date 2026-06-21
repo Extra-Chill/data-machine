@@ -117,7 +117,7 @@ datamachine_bundle_runner_contains( $abilities, "'required_artifacts'", 'ability
 datamachine_bundle_runner_contains( $abilities, "'engine_data_outputs'", 'ability input schema accepts semantic output mappings', $failures, $passes );
 datamachine_bundle_runner_contains( $ai_step, "\$payload['tool_recorders']", 'AI step forwards configured tool recorders to the loop', $failures, $passes );
 
-echo "\n[3] Runner exposes semantic outputs without hiding raw engine data\n";
+echo "\n[3] Runner exposes semantic outputs while preserving raw engine data\n";
 require_once $root . '/inc/Core/JobStatus.php';
 require_once $root . '/inc/Core/DataPath.php';
 require_once $root . '/inc/Engine/AI/Tools/HostToolPolicy.php';
@@ -301,7 +301,7 @@ $previous_host_policy = getenv( 'DATAMACHINE_HOST_TOOL_POLICY_JSON' );
 putenv(
 	'DATAMACHINE_HOST_TOOL_POLICY_JSON=' . json_encode(
 		array(
-			'schema'           => 'homeboy/agent-tool-policy/v1',
+			'schema'           => 'generic/host-tool-policy/v1',
 			'default_location' => 'runner',
 			'tools'            => array(
 				'workspace_grep' => array( 'execution_location' => 'control_plane' ),
@@ -601,7 +601,7 @@ $scheduled_required_response = $response_method->invoke(
 datamachine_bundle_runner_assert( true === ( $scheduled_required_response['success'] ?? null ), 'required outputs do not fail an async scheduled run before completion', $failures, $passes );
 datamachine_bundle_runner_assert( array( 'future_result_url' ) === ( $scheduled_required_response['output_diagnostics']['missing_outputs'] ?? null ), 'async scheduled run still exposes missing output diagnostics', $failures, $passes );
 
-echo "\n[4] WP-CLI wraps the same ability instead of duplicating runner internals\n";
+echo "\n[4] WP-CLI wraps the same ability through the shared runner path\n";
 foreach ( array(
 	'@subcommand run-bundle'       => 'run-bundle subcommand declared',
 	'AgentAbilities::runAgentBundle' => 'CLI calls ability callback',
@@ -633,9 +633,9 @@ foreach ( array(
 	datamachine_bundle_runner_contains( $abilities . $runner . $ai_step, $needle, $label, $failures, $passes );
 }
 
-echo "\n[6] Boundary stays generic\n";
-foreach ( array( 'DataMachine\\Core\\Database\\Agents', 'DataMachine\\Core\\Database\\Flows', 'DataMachine\\Core\\Database\\Pipelines' ) as $forbidden ) {
-	datamachine_bundle_runner_assert( false === strpos( $runner, $forbidden ), "runtime runner does not require caller-facing {$forbidden}", $failures, $passes );
+echo "\n[6] Runner stays host-neutral\n";
+foreach ( array( 'DataMachine\\Core\\Database\\Agents', 'DataMachine\\Core\\Database\\Flows', 'DataMachine\\Core\\Database\\Pipelines' ) as $runner_dependency ) {
+	datamachine_bundle_runner_assert( false === strpos( $runner, $runner_dependency ), "runtime runner uses shared ability access instead of {$runner_dependency}", $failures, $passes );
 }
 
 if ( $failures ) {
