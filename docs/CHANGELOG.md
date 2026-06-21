@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.153.4] - 2026-06-21
+
+### Fixed
+- remove Codebox-specific tool policy parsing
+
 ## [0.153.3] - 2026-06-21
 
 ### Changed
