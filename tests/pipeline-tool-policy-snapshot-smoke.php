@@ -544,7 +544,7 @@ $resolution = ( new ToolPolicyResolver( new SnapshotPolicyToolManager() ) )->res
 		'allow_only_explicit' => true,
 		'allow_only'          => array( 'alpha_tool', 'beta_tool' ),
 		'host_tool_policy'    => array(
-			'schema'           => 'homeboy/agent-tool-policy/v1',
+			'schema'           => 'generic/host-tool-policy/v1',
 			'default_location' => 'runner',
 			'tools'            => array(
 				'alpha_tool' => array( 'execution_location' => 'control_plane' ),
@@ -562,7 +562,7 @@ $wrapped_policy = array(
 	'apply' => 'propose_only',
 	'read'  => 'workspace',
 	'tools' => array(
-		'schema'           => 'homeboy/agent-tool-policy/v1',
+		'schema'           => 'generic/host-tool-policy/v1',
 		'default_location' => 'runner',
 		'tools'            => array(
 			'alpha_tool' => array( 'execution_location' => 'control_plane' ),

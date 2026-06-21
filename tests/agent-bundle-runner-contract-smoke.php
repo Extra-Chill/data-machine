@@ -301,7 +301,7 @@ $previous_host_policy = getenv( 'DATAMACHINE_HOST_TOOL_POLICY_JSON' );
 putenv(
 	'DATAMACHINE_HOST_TOOL_POLICY_JSON=' . json_encode(
 		array(
-			'schema'           => 'homeboy/agent-tool-policy/v1',
+			'schema'           => 'generic/host-tool-policy/v1',
 			'default_location' => 'runner',
 			'tools'            => array(
 				'workspace_grep' => array( 'execution_location' => 'control_plane' ),
