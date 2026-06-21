@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 Homeboy maintains this file from conventional commits at release time —
 do not edit by hand.
 
+## [0.11.0] - 2026-06-21
+
+### Added
+- generic Sendy integration (API + read-only metrics)
+- GSC opportunity auditor
+- mediavine-reports ability (direct GraphQL+CSV fetch)
+
 ## [0.10.0] - 2026-06-21
 
 ### Added
