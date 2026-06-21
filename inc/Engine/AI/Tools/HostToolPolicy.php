@@ -15,9 +15,7 @@ defined( 'ABSPATH' ) || exit;
 final class HostToolPolicy {
 
 	private const ENV_POLICY_JSON = 'DATAMACHINE_HOST_TOOL_POLICY_JSON';
-	private const SCHEMA_RUNTIME_TOOL_POLICY = 'datamachine/runtime-tool-policy/v1';
-	// Deprecated transport alias retained for older sandbox hosts.
-	private const SCHEMA_LEGACY_SANDBOX_TOOL_POLICY = 'wp-codebox/sandbox-tool-policy/v1';
+	private const SCHEMA_RUNTIME_TOOL_POLICY = 'agents-api/runtime-tool-policy/v1';
 
 	/** @var array<string,mixed> */
 	private array $policy;
@@ -166,11 +164,7 @@ final class HostToolPolicy {
 	 */
 	private static function normalizeTransportPolicy( array $policy ): array {
 		$schema = is_string( $policy['schema'] ?? null ) ? (string) $policy['schema'] : '';
-		$supported_schemas = array(
-			self::SCHEMA_RUNTIME_TOOL_POLICY,
-			self::SCHEMA_LEGACY_SANDBOX_TOOL_POLICY,
-		);
-		if ( ! in_array( $schema, $supported_schemas, true ) ) {
+		if ( self::SCHEMA_RUNTIME_TOOL_POLICY !== $schema ) {
 			return $policy;
 		}
 

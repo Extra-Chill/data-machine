@@ -586,7 +586,7 @@ assert_policy_equals( null, $resolution['beta_tool']['executor'] ?? null, 'wrapp
 
 echo "\n[14] host tool policy accepts generic list-shaped runtime policy payloads:\n";
 $transport_policy = array(
-	'schema'           => 'datamachine/runtime-tool-policy/v1',
+	'schema'           => 'agents-api/runtime-tool-policy/v1',
 	'default_location' => 'runner',
 	'tools'            => array(
 		array(
@@ -609,18 +609,15 @@ $resolution       = ( new ToolPolicyResolver( new SnapshotPolicyToolManager() ) 
 assert_policy_equals( 'client', $resolution['alpha_tool']['executor'] ?? null, 'generic runtime policy delegates explicit control-plane tool', $failures, $passes );
 assert_policy_equals( null, $resolution['beta_tool']['executor'] ?? null, 'generic runtime policy leaves runner-default tool local', $failures, $passes );
 
-echo "\n[15] host tool policy accepts legacy sandbox runtime policy payloads:\n";
-$legacy_transport_policy = array(
-	'schema'           => 'wp-codebox/sandbox-tool-policy/v1',
+echo "\n[15] host tool policy accepts neutral host policy payloads:\n";
+$host_policy = array(
+	'schema'           => 'datamachine/host-tool-policy/v1',
 	'default_location' => 'runner',
 	'tools'            => array(
-		array(
-			'id'                 => 'alpha_tool',
-			'execution_location' => 'control_plane',
-		),
+		'alpha_tool' => array( 'execution_location' => 'control_plane' ),
 	),
 );
-$resolution              = ( new ToolPolicyResolver( new SnapshotPolicyToolManager() ) )->resolve(
+$resolution  = ( new ToolPolicyResolver( new SnapshotPolicyToolManager() ) )->resolve(
 	array(
 		'mode'                => ToolPolicyResolver::MODE_PIPELINE,
 		'pipeline_step_id'    => 'ephemeral_pipeline_0',
@@ -628,11 +625,11 @@ $resolution              = ( new ToolPolicyResolver( new SnapshotPolicyToolManag
 		'categories'          => array(),
 		'allow_only_explicit' => true,
 		'allow_only'          => array( 'alpha_tool', 'beta_tool' ),
-		'host_tool_policy'    => $legacy_transport_policy,
+		'host_tool_policy'    => $host_policy,
 	)
 );
-assert_policy_equals( 'client', $resolution['alpha_tool']['executor'] ?? null, 'legacy sandbox policy delegates explicit control-plane tool', $failures, $passes );
-assert_policy_equals( null, $resolution['beta_tool']['executor'] ?? null, 'legacy sandbox policy leaves runner-default tool local', $failures, $passes );
+assert_policy_equals( 'client', $resolution['alpha_tool']['executor'] ?? null, 'neutral host policy delegates explicit control-plane tool', $failures, $passes );
+assert_policy_equals( null, $resolution['beta_tool']['executor'] ?? null, 'neutral host policy leaves runner-default tool local', $failures, $passes );
 
 echo "\n[16] host tool policy ignores unrecognized list-shaped transport payloads:\n";
 $transport_policy = array(

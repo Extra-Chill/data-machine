@@ -80,8 +80,9 @@ $forbidden_patterns = array(
 	'homeboy'           => '/homeboy/i',
 );
 
-$violations = array();
-$iterator   = new RecursiveIteratorIterator(
+$violations                = array();
+$production_inc_violations = array();
+$iterator                  = new RecursiveIteratorIterator(
 	new RecursiveCallbackFilterIterator(
 		new RecursiveDirectoryIterator( $root, FilesystemIterator::SKIP_DOTS ),
 		function ( SplFileInfo $file ) use ( $root ): bool {
@@ -111,11 +112,22 @@ foreach ( $iterator as $file ) {
 	foreach ( $forbidden_patterns as $label => $pattern ) {
 		if ( preg_match( $pattern, $contents ) ) {
 			$violations[] = "{$relative_path} contains {$label}";
+			if ( 'codebox' === $label && str_starts_with( $relative_path, 'inc/' ) ) {
+				$production_inc_violations[] = "{$relative_path} contains {$label}";
+			}
 		}
 	}
 }
 
+datamachine_boundary_assert( array() === $production_inc_violations, 'production inc files have no Codebox vocabulary', $failures, $passes );
 datamachine_boundary_assert( array() === $violations, 'first-party source has no downstream runtime names outside explicit harness/generated allowlists', $failures, $passes );
+
+if ( ! empty( $production_inc_violations ) ) {
+	echo "\nProduction inc boundary mentions:\n";
+	foreach ( $production_inc_violations as $violation ) {
+		echo "  - {$violation}\n";
+	}
+}
 
 if ( ! empty( $violations ) ) {
 	echo "\nForbidden boundary mentions:\n";
