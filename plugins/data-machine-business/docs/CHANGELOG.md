@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 Homeboy maintains this file from conventional commits at release time —
 do not edit by hand.
 
+## [0.8.0] - 2026-06-21
+
+### Added
+- add content-performance ability for within-category engagement audit
+
+### Changed
+- align assignment operators in content-performance ability (phpcbf)
+
 ## [0.7.0] - 2026-06-16
 
 ### Added
