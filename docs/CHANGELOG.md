@@ -2,6 +2,15 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.153.3] - 2026-06-21
+
+### Changed
+- Use tagged Blocks Engine transformer release
+- Refresh Blocks Engine transformer pin
+
+### Fixed
+- remove Codebox-specific tool policy parsing
+
 ## [0.153.2] - 2026-06-20
 
 ### Changed
