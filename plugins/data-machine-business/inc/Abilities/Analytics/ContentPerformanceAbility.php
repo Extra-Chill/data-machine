@@ -244,7 +244,7 @@ class ContentPerformanceAbility {
 			// Weight per-path averages by that path's engaged sessions so multiple
 			// URL variants of one post aggregate into a session-weighted mean
 			// rather than an unweighted average of averages.
-			$weight                                = max( $engaged, 1.0 );
+			$weight                                   = max( $engaged, 1.0 );
 			$by_post[ $post_id ]['engaged_sessions'] += $engaged;
 			$by_post[ $post_id ]['dur_weighted']     += $dur * $weight;
 			$by_post[ $post_id ]['rate_weighted']    += $rate * $weight;
@@ -294,7 +294,7 @@ class ContentPerformanceAbility {
 
 		// Category benchmark: the median duration across comparable posts. Posts
 		// far below it carry the strongest content-weakness signal.
-		$durations       = wp_list_pluck( $comparable, 'avg_duration' );
+		$durations = wp_list_pluck( $comparable, 'avg_duration' );
 		sort( $durations );
 		$count           = count( $durations );
 		$median_duration = 0.0;
