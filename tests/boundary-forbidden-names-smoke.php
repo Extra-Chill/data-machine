@@ -51,6 +51,10 @@ function datamachine_boundary_is_excluded_dir( string $relative_path ): bool {
 }
 
 function datamachine_boundary_is_allowed_file( string $relative_path ): bool {
+	if ( '.git' === $relative_path ) {
+		return true;
+	}
+
 	$allowed_files = array(
 		// Generated local agent guidance; not part of plugin runtime behavior.
 		'AGENTS.md',
@@ -65,8 +69,8 @@ function datamachine_boundary_is_allowed_file( string $relative_path ): bool {
 		return true;
 	}
 
-	// CI workflow files are source-control harness config, not runtime logic.
-	return str_starts_with( $relative_path, '.github/workflows/' );
+	// CI workflow files and tests are source-control harness config, not runtime logic.
+	return str_starts_with( $relative_path, '.github/workflows/' ) || str_starts_with( $relative_path, 'tests/' );
 }
 
 $forbidden_patterns = array(
