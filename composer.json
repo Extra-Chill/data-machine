@@ -7,7 +7,7 @@
 		"php": ">=8.2",
 		"wordpress/agents-api": "dev-main",
 		"woocommerce/action-scheduler": "^3.9",
-		"automattic/blocks-engine-php-transformer": "dev-trunk"
+		"automattic/blocks-engine-php-transformer": "0.1.0"
 	},
 	"require-dev": {
 		"php-stubs/wordpress-stubs": "^6.9",
@@ -48,12 +48,12 @@
 			"type": "package",
 			"package": {
 				"name": "automattic/blocks-engine-php-transformer",
-				"version": "dev-trunk",
+				"version": "0.1.0",
 				"type": "library",
 				"source": {
 					"type": "git",
 					"url": "https://github.com/Automattic/blocks-engine.git",
-					"reference": "ecb99000c6f04288837adaffb20c33035c4f41a0"
+					"reference": "php-transformer-v0.1.0"
 				},
 				"autoload": {
 					"psr-4": {
