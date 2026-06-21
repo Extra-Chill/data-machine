@@ -79,6 +79,7 @@ function datamachine_business_load_handlers() {
 	new \DataMachineBusiness\Abilities\GoogleSheets\FetchGoogleSheetsAbility();
 	new \DataMachineBusiness\Abilities\GoogleSheets\PublishGoogleSheetsAbility();
 	new \DataMachineBusiness\Abilities\Analytics\GoogleSearchConsoleAbilities();
+	new \DataMachineBusiness\Abilities\Analytics\GscOpportunityAbility();
 
 	// Google Sheets Handlers
 	new \DataMachineBusiness\Handlers\GoogleSheets\GoogleSheetsFetch();
