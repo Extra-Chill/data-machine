@@ -15,6 +15,9 @@ defined( 'ABSPATH' ) || exit;
 final class HostToolPolicy {
 
 	private const ENV_POLICY_JSON = 'DATAMACHINE_HOST_TOOL_POLICY_JSON';
+	private const SCHEMA_RUNTIME_TOOL_POLICY = 'datamachine/runtime-tool-policy/v1';
+	// Deprecated transport alias retained for older sandbox hosts.
+	private const SCHEMA_LEGACY_SANDBOX_TOOL_POLICY = 'wp-codebox/sandbox-tool-policy/v1';
 
 	/** @var array<string,mixed> */
 	private array $policy;
@@ -126,6 +129,11 @@ final class HostToolPolicy {
 			return self::normalizePolicy( $unwrapped );
 		}
 
+		$transport_policy = self::normalizeTransportPolicy( $policy );
+		if ( $transport_policy !== $policy ) {
+			return self::normalizePolicy( $transport_policy );
+		}
+
 		$tools = is_array( $policy['tools'] ?? null ) ? $policy['tools'] : array();
 		foreach ( $tools as $tool_name => $rule ) {
 			if ( ! is_string( $tool_name ) || '' === $tool_name || ! is_array( $rule ) ) {
@@ -148,6 +156,53 @@ final class HostToolPolicy {
 		}
 
 		return $has_default || ! empty( $tools ) ? $policy : null;
+	}
+
+	/**
+	 * Normalize runtime transport schemas into the host policy document shape.
+	 *
+	 * @param array<string,mixed> $policy Policy candidate.
+	 * @return array<string,mixed>
+	 */
+	private static function normalizeTransportPolicy( array $policy ): array {
+		$schema = is_string( $policy['schema'] ?? null ) ? (string) $policy['schema'] : '';
+		$supported_schemas = array(
+			self::SCHEMA_RUNTIME_TOOL_POLICY,
+			self::SCHEMA_LEGACY_SANDBOX_TOOL_POLICY,
+		);
+		if ( ! in_array( $schema, $supported_schemas, true ) ) {
+			return $policy;
+		}
+
+		$tools = is_array( $policy['tools'] ?? null ) ? $policy['tools'] : array();
+		if ( empty( $tools ) || ! array_is_list( $tools ) ) {
+			return $policy;
+		}
+
+		$normalized_tools = array();
+		foreach ( $tools as $tool ) {
+			if ( ! is_array( $tool ) ) {
+				continue;
+			}
+
+			$tool_name = is_string( $tool['name'] ?? null )
+				? (string) $tool['name']
+				: ( is_string( $tool['id'] ?? null ) ? (string) $tool['id'] : '' );
+			$tool_name = trim( $tool_name );
+			if ( '' === $tool_name ) {
+				continue;
+			}
+
+			$rule = array();
+			if ( is_string( $tool['execution_location'] ?? null ) ) {
+				$rule['execution_location'] = (string) $tool['execution_location'];
+			}
+
+			$normalized_tools[ $tool_name ] = $rule;
+		}
+
+		$policy['tools'] = $normalized_tools;
+		return $policy;
 	}
 
 	/**
