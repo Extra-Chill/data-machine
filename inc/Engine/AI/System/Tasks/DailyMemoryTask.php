@@ -621,19 +621,68 @@ class DailyMemoryTask extends SystemTask {
 
 			$persistent_size = strlen( (string) $parsed['persistent'] );
 			$original_size   = strlen( $original_content );
-			if ( $original_size > AgentMemory::MAX_FILE_SIZE && $persistent_size > AgentMemory::MAX_FILE_SIZE ) {
+
+			// Overflow-aware acceptance target for the persistent section.
+			//
+			// When MEMORY.md is already far over MAX_FILE_SIZE, demanding the
+			// persistent section drop to MAX_FILE_SIZE in a single bounded
+			// conversation (default 3 turns) is frequently unsatisfiable: the
+			// model can rarely thread a clean, non-duplicating, conservation-
+			// passing partition that also lands under budget in one pass, so
+			// the loop exhausts its turns and the job fails every day, freezing
+			// the agent's memory (issue #2775).
+			//
+			// Instead of failing closed forever, accept a split that makes
+			// meaningful FORWARD PROGRESS toward budget. The acceptance ceiling
+			// scales with how far over budget the file is, mirroring the
+			// deterministic-overflow `oversize_factor` precedent below: a file
+			// that is N* over budget need only shrink to a fraction of its
+			// original size this pass, and subsequent daily runs compound the
+			// progress until it converges on MAX_FILE_SIZE. Near-budget files
+			// keep the strict MAX_FILE_SIZE target, so their fail-closed
+			// protection is unchanged.
+			$max_size            = AgentMemory::MAX_FILE_SIZE;
+			$oversize_factor     = $original_size / max( $max_size, 1 );
+			$acceptable_max_size = $max_size;
+			if ( $oversize_factor > 1 ) {
+				// Require the persistent section to drop to at most this
+				// fraction of the original size this pass. The fraction
+				// tightens as the file approaches budget (it can never exceed
+				// the strict target once within ~1x), guaranteeing strict
+				// per-run progress while remaining reachable for a far-over
+				// file. Floored at MAX_FILE_SIZE so the target never relaxes
+				// below budget.
+				$progress_ratio = (float) apply_filters(
+					'datamachine_daily_memory_overflow_progress_ratio',
+					0.75,
+					array(
+						'date'            => $date,
+						'job_id'          => $jobId,
+						'original_size'   => $original_size,
+						'persistent_size' => $persistent_size,
+						'oversize_factor' => $oversize_factor,
+						'max_size'        => $max_size,
+					)
+				);
+				$progress_ratio      = min( 1.0, max( 0.0, $progress_ratio ) );
+				$acceptable_max_size = max( $max_size, (int) floor( $original_size * $progress_ratio ) );
+			}
+
+			if ( $persistent_size > $acceptable_max_size ) {
 				return WP_Agent_Conversation_Completion_Decision::incomplete(
 					'Daily memory completion policy: persistent memory remains oversized.',
 					array(
 						'turn_count'           => $turn_count,
 						'original_size'        => $original_size,
 						'persistent_size'      => $persistent_size,
-						'max_size'             => AgentMemory::MAX_FILE_SIZE,
+						'max_size'             => $max_size,
+						'acceptable_max_size'  => $acceptable_max_size,
 						'continuation_message' => sprintf(
-							'The `===PERSISTENT===` section is still %s, above the target %s. Return a corrected full split. Keep durable facts, archive session-specific detail, condense overlapping entries, and ensure `===PERSISTENT===` is at or below %s without discarding information.',
+							'The `===PERSISTENT===` section is still %s. For this pass it must be at or below %s (the file is far over the %s budget, so it should shrink toward budget now and converge over subsequent runs). Return a corrected full split. Keep durable facts, archive session-specific detail, condense overlapping entries, and shrink `===PERSISTENT===` to at or below %s without discarding information.',
 							size_format( $persistent_size ),
-							size_format( AgentMemory::MAX_FILE_SIZE ),
-							size_format( AgentMemory::MAX_FILE_SIZE )
+							size_format( $acceptable_max_size ),
+							size_format( $max_size ),
+							size_format( $acceptable_max_size )
 						),
 					)
 				);
