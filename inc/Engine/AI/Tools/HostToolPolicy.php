@@ -200,7 +200,7 @@ final class HostToolPolicy {
 	}
 
 	/**
-	 * Unwrap host policy documents embedded in broader runtime/sandbox payloads.
+	 * Unwrap host policy documents embedded in broader runtime payloads.
 	 *
 	 * @param array<string,mixed> $policy Policy candidate.
 	 * @return array<string,mixed>
