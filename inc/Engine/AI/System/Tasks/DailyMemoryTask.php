@@ -652,7 +652,7 @@ class DailyMemoryTask extends SystemTask {
 				// per-run progress while remaining reachable for a far-over
 				// file. Floored at MAX_FILE_SIZE so the target never relaxes
 				// below budget.
-				$progress_ratio = (float) apply_filters(
+				$progress_ratio      = (float) apply_filters(
 					'datamachine_daily_memory_overflow_progress_ratio',
 					0.75,
 					array(
