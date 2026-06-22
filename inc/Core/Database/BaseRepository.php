@@ -176,6 +176,39 @@ abstract class BaseRepository {
 	}
 
 	/**
+	 * Check whether a table exists.
+	 *
+	 * Uses SQLite's native schema table on Studio/SQLite and SHOW TABLES on MySQL.
+	 *
+	 * @since 0.149.1
+	 *
+	 * @param string     $table_name Fully-qualified table name.
+	 * @param \wpdb|null $wpdb       Optional wpdb instance (defaults to global).
+	 * @return bool
+	 */
+	public static function table_exists( string $table_name, ?\wpdb $wpdb = null ): bool {
+		if ( null === $wpdb ) {
+			global $wpdb;
+		}
+
+		if ( self::is_sqlite() ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			$result = $wpdb->get_var(
+				$wpdb->prepare( "SELECT name FROM sqlite_master WHERE type = 'table' AND name = %s", $table_name )
+			);
+
+			return $table_name === $result;
+		}
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$result = $wpdb->get_var(
+			$wpdb->prepare( 'SHOW TABLES LIKE %s', $table_name )
+		);
+
+		return $table_name === $result;
+	}
+
+	/**
 	 * Get column metadata from information_schema (MySQL only).
 	 *
 	 * Returns an object-keyed result set with DATA_TYPE,
