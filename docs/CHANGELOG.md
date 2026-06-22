@@ -2,6 +2,20 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.153.5] - 2026-06-22
+
+### Changed
+- style(daily-memory): align assignment in overflow progress-ratio filter
+- Neutralize Agents API runtime fixture vocabulary
+- Add neutral sandbox tool policy contract
+- Use neutral host tool policy fixtures
+- Remove Codebox host tool policy alias
+- Add generic runtime tool policy schema
+
+### Fixed
+- fix(daily-memory): let an over-budget MEMORY.md make compaction progress instead of failing the completion policy every day
+- Fix policy smoke filter registration
+
 ## [0.153.4] - 2026-06-21
 
 ### Fixed
