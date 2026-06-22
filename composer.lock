@@ -794,12 +794,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/Automattic/agents-api.git",
-                "reference": "995e94571dc26ffd3d0fe3eda95ddf25ff1fe215"
+                "reference": "7be8fc3e2c6736c553d61c0578f295b4fe565cf1"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/Automattic/agents-api/zipball/995e94571dc26ffd3d0fe3eda95ddf25ff1fe215",
-                "reference": "995e94571dc26ffd3d0fe3eda95ddf25ff1fe215",
+                "url": "https://api.github.com/repos/Automattic/agents-api/zipball/7be8fc3e2c6736c553d61c0578f295b4fe565cf1",
+                "reference": "7be8fc3e2c6736c553d61c0578f295b4fe565cf1",
                 "shasum": ""
             },
             "require": {
@@ -918,7 +918,7 @@
                 "issues": "https://github.com/Automattic/agents-api/issues",
                 "source": "https://github.com/Automattic/agents-api"
             },
-            "time": "2026-06-08T03:16:09+00:00"
+            "time": "2026-06-21T22:54:32+00:00"
         }
     ],
     "packages-dev": [

@@ -30,6 +30,10 @@ function datamachine_runtime_vocab_relative_path( string $root, string $path ): 
 }
 
 function datamachine_runtime_vocab_is_excluded_dir( string $relative_path ): bool {
+	if ( 'vendor/wordpress/agents-api/tests' === $relative_path || str_starts_with( $relative_path, 'vendor/wordpress/agents-api/tests/' ) ) {
+		return false;
+	}
+
 	$excluded_roots = array(
 		'.git',
 		'.datamachine',
@@ -69,8 +73,8 @@ function datamachine_runtime_vocab_is_allowed_file( string $relative_path ): boo
 		return true;
 	}
 
-	// CI workflow files and tests are source-control harness config, not runtime logic.
-	return str_starts_with( $relative_path, '.github/workflows/' ) || str_starts_with( $relative_path, 'tests/' );
+	// CI workflow files are source-control harness config, not runtime logic.
+	return str_starts_with( $relative_path, '.github/workflows/' );
 }
 
 $host_specific_patterns = array(
