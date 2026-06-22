@@ -34,6 +34,14 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 if ( ! function_exists( 'apply_filters' ) ) {
 	function apply_filters( string $hook, $value, ...$args ) {
+		global $datamachine_pipeline_policy_filters;
+		if ( is_array( $datamachine_pipeline_policy_filters[ $hook ] ?? null ) ) {
+			foreach ( $datamachine_pipeline_policy_filters[ $hook ] as $callback ) {
+				$value = $callback( $value, ...$args );
+			}
+			return $value;
+		}
+
 		if ( 'datamachine_step_types' === $hook ) {
 			return array(
 				'ai'      => array( 'uses_handler' => false, 'multi_handler' => false ),
@@ -584,7 +592,32 @@ $resolution     = ( new ToolPolicyResolver( new SnapshotPolicyToolManager() ) )-
 assert_policy_equals( 'client', $resolution['alpha_tool']['executor'] ?? null, 'wrapped policy delegates explicit control-plane tool', $failures, $passes );
 assert_policy_equals( null, $resolution['beta_tool']['executor'] ?? null, 'wrapped policy leaves runner-default tool local', $failures, $passes );
 
-echo "\n[14] host tool policy accepts generic list-shaped runtime policy payloads:\n";
+echo "\n[14] host tool policy accepts neutral list-shaped sandbox policy payloads:\n";
+$transport_policy = array(
+	'schema'           => 'datamachine/sandbox-tool-policy/v1',
+	'default_location' => 'runner',
+	'tools'            => array(
+		array(
+			'name'               => 'alpha_tool',
+			'execution_location' => 'control_plane',
+		),
+	),
+);
+$resolution       = ( new ToolPolicyResolver( new SnapshotPolicyToolManager() ) )->resolve(
+	array(
+		'mode'                => ToolPolicyResolver::MODE_PIPELINE,
+		'pipeline_step_id'    => 'ephemeral_pipeline_0',
+		'engine_data'         => array(),
+		'categories'          => array(),
+		'allow_only_explicit' => true,
+		'allow_only'          => array( 'alpha_tool', 'beta_tool' ),
+		'host_tool_policy'    => $transport_policy,
+	)
+);
+assert_policy_equals( 'client', $resolution['alpha_tool']['executor'] ?? null, 'neutral sandbox policy delegates explicit control-plane tool', $failures, $passes );
+assert_policy_equals( null, $resolution['beta_tool']['executor'] ?? null, 'neutral sandbox policy leaves runner-default tool local', $failures, $passes );
+
+echo "\n[14b] host tool policy accepts generic list-shaped runtime policy payloads:\n";
 $transport_policy = array(
 	'schema'           => 'agents-api/runtime-tool-policy/v1',
 	'default_location' => 'runner',
@@ -631,7 +664,38 @@ $resolution  = ( new ToolPolicyResolver( new SnapshotPolicyToolManager() ) )->re
 assert_policy_equals( 'client', $resolution['alpha_tool']['executor'] ?? null, 'neutral host policy delegates explicit control-plane tool', $failures, $passes );
 assert_policy_equals( null, $resolution['beta_tool']['executor'] ?? null, 'neutral host policy leaves runner-default tool local', $failures, $passes );
 
-echo "\n[16] host tool policy ignores unrecognized list-shaped transport payloads:\n";
+echo "\n[16] host tool policy accepts filter-registered list-shaped transport payloads:\n";
+$datamachine_pipeline_policy_filters['datamachine_host_tool_policy_transport_schemas'] = array(
+	static function ( array $schemas ): array {
+		$schemas[] = 'vendor/tool-policy/v1';
+		return $schemas;
+	},
+);
+$transport_policy = array(
+	'schema' => 'vendor/tool-policy/v1',
+	'tools'  => array(
+		array(
+			'id'                 => 'alpha_tool',
+			'execution_location' => 'control_plane',
+		),
+	),
+);
+$resolution       = ( new ToolPolicyResolver( new SnapshotPolicyToolManager() ) )->resolve(
+	array(
+		'mode'                => ToolPolicyResolver::MODE_PIPELINE,
+		'pipeline_step_id'    => 'ephemeral_pipeline_0',
+		'engine_data'         => array(),
+		'categories'          => array(),
+		'allow_only_explicit' => true,
+		'allow_only'          => array( 'alpha_tool', 'beta_tool' ),
+		'host_tool_policy'    => $transport_policy,
+	)
+);
+unset( $datamachine_pipeline_policy_filters['datamachine_host_tool_policy_transport_schemas'] );
+assert_policy_equals( 'client', $resolution['alpha_tool']['executor'] ?? null, 'filter-registered transport policy delegates explicit control-plane tool', $failures, $passes );
+assert_policy_equals( null, $resolution['beta_tool']['executor'] ?? null, 'filter-registered transport policy does not affect unrelated tools', $failures, $passes );
+
+echo "\n[17] host tool policy ignores unrecognized list-shaped transport payloads:\n";
 $transport_policy = array(
 	'schema' => 'vendor/tool-policy/v1',
 	'tools'  => array(
@@ -654,6 +718,10 @@ $resolution       = ( new ToolPolicyResolver( new SnapshotPolicyToolManager() ) 
 );
 assert_policy_equals( null, $resolution['alpha_tool']['executor'] ?? null, 'list-shaped transport policy is not converted into host policy', $failures, $passes );
 assert_policy_equals( null, $resolution['beta_tool']['executor'] ?? null, 'list-shaped transport policy does not affect unrelated tools', $failures, $passes );
+
+echo "\n[18] production host policy code has no Codebox sandbox schema special-case:\n";
+$host_policy_source = file_get_contents( __DIR__ . '/../inc/Engine/AI/Tools/HostToolPolicy.php' ) ?: '';
+assert_policy_equals( false, str_contains( $host_policy_source, 'wp-codebox/sandbox-tool-policy/v1' ), 'HostToolPolicy does not name the Codebox sandbox schema', $failures, $passes );
 
 if ( $failures ) {
 	echo "\nFAILED: " . count( $failures ) . " pipeline policy assertions failed.\n";
