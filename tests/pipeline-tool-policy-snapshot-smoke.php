@@ -55,6 +55,32 @@ if ( ! function_exists( 'apply_filters' ) ) {
 	}
 }
 
+if ( ! function_exists( 'add_filter' ) ) {
+	function add_filter( string $hook, callable $callback ): bool {
+		global $datamachine_pipeline_policy_filters;
+		$datamachine_pipeline_policy_filters[ $hook ][] = $callback;
+		return true;
+	}
+}
+
+if ( ! function_exists( 'remove_filter' ) ) {
+	function remove_filter( string $hook, callable $callback ): bool {
+		global $datamachine_pipeline_policy_filters;
+		if ( ! is_array( $datamachine_pipeline_policy_filters[ $hook ] ?? null ) ) {
+			return false;
+		}
+
+		foreach ( $datamachine_pipeline_policy_filters[ $hook ] as $index => $registered_callback ) {
+			if ( $registered_callback === $callback ) {
+				unset( $datamachine_pipeline_policy_filters[ $hook ][ $index ] );
+				return true;
+			}
+		}
+
+		return false;
+	}
+}
+
 if ( ! function_exists( 'do_action' ) ) {
 	function do_action( string $hook, ...$args ): void {
 		// no-op for tests.
@@ -665,12 +691,11 @@ assert_policy_equals( 'client', $resolution['alpha_tool']['executor'] ?? null, '
 assert_policy_equals( null, $resolution['beta_tool']['executor'] ?? null, 'neutral host policy leaves runner-default tool local', $failures, $passes );
 
 echo "\n[16] host tool policy accepts filter-registered list-shaped transport payloads:\n";
-$datamachine_pipeline_policy_filters['datamachine_host_tool_policy_transport_schemas'] = array(
-	static function ( array $schemas ): array {
-		$schemas[] = 'vendor/tool-policy/v1';
-		return $schemas;
-	},
-);
+$transport_schema_filter = static function ( array $schemas ): array {
+	$schemas[] = 'vendor/tool-policy/v1';
+	return $schemas;
+};
+add_filter( 'datamachine_host_tool_policy_transport_schemas', $transport_schema_filter );
 $transport_policy = array(
 	'schema' => 'vendor/tool-policy/v1',
 	'tools'  => array(
@@ -691,7 +716,7 @@ $resolution       = ( new ToolPolicyResolver( new SnapshotPolicyToolManager() ) 
 		'host_tool_policy'    => $transport_policy,
 	)
 );
-unset( $datamachine_pipeline_policy_filters['datamachine_host_tool_policy_transport_schemas'] );
+remove_filter( 'datamachine_host_tool_policy_transport_schemas', $transport_schema_filter );
 assert_policy_equals( 'client', $resolution['alpha_tool']['executor'] ?? null, 'filter-registered transport policy delegates explicit control-plane tool', $failures, $passes );
 assert_policy_equals( null, $resolution['beta_tool']['executor'] ?? null, 'filter-registered transport policy does not affect unrelated tools', $failures, $passes );
 
