@@ -457,7 +457,7 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 			$table_name = self::get_prefixed_table_name();
 		}
 
-		return parent::table_exists( $table_name, $wpdb );
+		return parent::database_table_exists( $table_name, $wpdb );
 	}
 
 	/**

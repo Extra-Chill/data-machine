@@ -186,7 +186,7 @@ abstract class BaseRepository {
 	 * @param \wpdb|null $wpdb       Optional wpdb instance (defaults to global).
 	 * @return bool
 	 */
-	public static function table_exists( string $table_name, ?\wpdb $wpdb = null ): bool {
+	public static function database_table_exists( string $table_name, ?\wpdb $wpdb = null ): bool {
 		if ( null === $wpdb ) {
 			global $wpdb;
 		}

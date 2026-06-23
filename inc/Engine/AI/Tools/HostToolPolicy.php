@@ -15,6 +15,7 @@ defined( 'ABSPATH' ) || exit;
 final class HostToolPolicy {
 
 	private const ENV_POLICY_JSON = 'DATAMACHINE_HOST_TOOL_POLICY_JSON';
+	private const SCHEMA_SANDBOX_TOOL_POLICY = 'datamachine/sandbox-tool-policy/v1';
 	private const SCHEMA_RUNTIME_TOOL_POLICY = 'agents-api/runtime-tool-policy/v1';
 
 	/** @var array<string,mixed> */
@@ -163,8 +164,8 @@ final class HostToolPolicy {
 	 * @return array<string,mixed>
 	 */
 	private static function normalizeTransportPolicy( array $policy ): array {
-		$schema = is_string( $policy['schema'] ?? null ) ? (string) $policy['schema'] : '';
-		if ( self::SCHEMA_RUNTIME_TOOL_POLICY !== $schema ) {
+		$schema = is_string( $policy['schema'] ?? null ) ? trim( (string) $policy['schema'] ) : '';
+		if ( '' === $schema || ! in_array( $schema, self::transportPolicySchemas(), true ) ) {
 			return $policy;
 		}
 
@@ -197,6 +198,35 @@ final class HostToolPolicy {
 
 		$policy['tools'] = $normalized_tools;
 		return $policy;
+	}
+
+	/**
+	 * Return list-shaped transport schemas that can be normalized into host policy.
+	 *
+	 * @return array<int,string>
+	 */
+	private static function transportPolicySchemas(): array {
+		$schemas = array(
+			self::SCHEMA_SANDBOX_TOOL_POLICY,
+			self::SCHEMA_RUNTIME_TOOL_POLICY,
+		);
+
+		if ( function_exists( 'apply_filters' ) ) {
+			$schemas = apply_filters( 'datamachine_host_tool_policy_transport_schemas', $schemas );
+		}
+
+		if ( ! is_array( $schemas ) ) {
+			return array();
+		}
+
+		$normalized = array();
+		foreach ( $schemas as $schema ) {
+			if ( is_string( $schema ) && '' !== trim( $schema ) ) {
+				$normalized[] = trim( $schema );
+			}
+		}
+
+		return array_values( array_unique( $normalized ) );
 	}
 
 	/**

@@ -163,7 +163,7 @@ class TrackedItems extends BaseRepository {
 	 * Create or update the tracked items table.
 	 */
 	public function create_table(): void {
-		if ( self::is_sqlite() && self::table_exists( $this->table_name, $this->wpdb ) ) {
+		if ( self::is_sqlite() && self::database_table_exists( $this->table_name, $this->wpdb ) ) {
 			return;
 		}
 
