@@ -88,6 +88,7 @@ ContentFormat::register();
 
 add_filter( 'wp_agent_runtime_import_bundle', array( AgentAbilities::class, 'importRuntimeAgentBundle' ), 5, 4 );
 add_filter( 'wp_agent_runtime_run_bundle', array( AgentAbilities::class, 'runRuntimeAgentBundle' ), 10, 4 );
+add_filter( 'wp_agent_runtime_package_run_handler', array( AgentAbilities::class, 'runtimePackageRunHandler' ), 10, 3 );
 
 add_filter(
 	'datamachine_auth_providers',

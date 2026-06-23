@@ -71,6 +71,8 @@ foreach ( array(
 	'runAgentBundleOutputSchema'   => 'dedicated output schema declared',
 	'AgentBundleRunner'            => 'ability delegates to runner service',
 	'runRuntimeAgentBundle'        => 'generic runtime run adapter declared',
+	'runtimePackageRunHandler'     => 'Agents API runtime-package handler declared',
+	'resolveRuntimePackageSource'  => 'runtime-package sources resolve against workspace mounts',
 	"'show_in_rest' => true"      => 'ability is REST-visible for headless callers',
 	"'readonly'    => false"      => 'ability marks execution as mutating',
 ) as $needle => $label ) {
@@ -78,6 +80,7 @@ foreach ( array(
 }
 datamachine_bundle_runner_contains( $bootstrap, "add_filter( 'wp_agent_runtime_import_bundle', array( AgentAbilities::class, 'importRuntimeAgentBundle' ), 5, 4 )", 'Data Machine importer runs before generic runtime bundle fallback', $failures, $passes );
 datamachine_bundle_runner_contains( $bootstrap, "add_filter( 'wp_agent_runtime_run_bundle'", 'Data Machine registers generic runtime run seam', $failures, $passes );
+datamachine_bundle_runner_contains( $bootstrap, "add_filter( 'wp_agent_runtime_package_run_handler', array( AgentAbilities::class, 'runtimePackageRunHandler' ), 10, 3 )", 'Data Machine registers Agents API runtime-package handler', $failures, $passes );
 
 echo "\n[2] Runner projects bundles to ephemeral workflows\n";
 foreach ( array(
