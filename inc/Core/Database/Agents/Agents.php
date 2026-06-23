@@ -46,6 +46,10 @@ class Agents extends BaseRepository {
 		$table_name      = $wpdb->base_prefix . self::TABLE_NAME;
 		$charset_collate = $wpdb->get_charset_collate();
 
+		if ( self::is_sqlite() && self::database_table_exists( $table_name, $wpdb ) ) {
+			return;
+		}
+
 		$sql = "CREATE TABLE {$table_name} (
 			agent_id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
 			agent_slug VARCHAR(200) NOT NULL,

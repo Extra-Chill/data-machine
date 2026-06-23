@@ -74,7 +74,9 @@ class AgentAccess extends BaseRepository {
 		) {$charset_collate};";
 
 		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
-		dbDelta( $sql );
+		if ( ! self::is_sqlite() || ! self::database_table_exists( $table_name, $wpdb ) ) {
+			dbDelta( $sql );
+		}
 
 		$principal_table_name = $wpdb->base_prefix . self::PRINCIPAL_TABLE_NAME;
 		$principal_sql        = "CREATE TABLE {$principal_table_name} (
@@ -91,7 +93,9 @@ class AgentAccess extends BaseRepository {
 			KEY role (role)
 		) {$charset_collate};";
 
-		dbDelta( $principal_sql );
+		if ( ! self::is_sqlite() || ! self::database_table_exists( $principal_table_name, $wpdb ) ) {
+			dbDelta( $principal_sql );
+		}
 	}
 
 	/**
