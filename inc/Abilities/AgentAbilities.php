@@ -1583,6 +1583,76 @@ class AgentAbilities {
 		return self::runAgentBundle( $input );
 	}
 
+	/**
+	 * Provide the Agents API canonical runtime-package handler for Data Machine bundles.
+	 *
+	 * @param callable|null $handler Existing runtime package handler.
+	 * @param object        $request Agents API runtime package request value object.
+	 * @param array         $raw_input Raw ability input.
+	 * @return callable|null Runtime package handler.
+	 */
+	public static function runtimePackageRunHandler( $handler, object $request, array $raw_input = array() ) {
+		if ( null !== $handler ) {
+			return $handler;
+		}
+
+		return static function () use ( $request, $raw_input ): array {
+			$package  = method_exists( $request, 'get_package' ) ? $request->get_package() : array();
+			$workflow = method_exists( $request, 'get_workflow' ) ? $request->get_workflow() : array();
+			$input    = method_exists( $request, 'get_input' ) ? $request->get_input() : array();
+			$options  = method_exists( $request, 'get_options' ) ? $request->get_options() : array();
+			$metadata = method_exists( $request, 'get_metadata' ) ? $request->get_metadata() : array();
+			$replay   = method_exists( $request, 'get_replay' ) ? $request->get_replay() : array();
+
+			$bundle_input = array(
+				'initial_data' => $input,
+				'metadata'     => $metadata,
+				'replay'       => $replay,
+				'job_source'   => 'runtime_package',
+			);
+
+			if ( isset( $package['source'] ) && is_string( $package['source'] ) && '' !== trim( $package['source'] ) ) {
+				$bundle_input['source'] = trim( $package['source'] );
+			}
+
+			if ( isset( $workflow['id'] ) && is_string( $workflow['id'] ) && '' !== trim( $workflow['id'] ) ) {
+				$bundle_input['flow'] = trim( $workflow['id'] );
+			}
+
+			if ( isset( $workflow['spec'] ) && is_array( $workflow['spec'] ) ) {
+				$bundle_input['workflow'] = $workflow['spec'];
+			}
+
+			foreach ( array( 'provider', 'model', 'wait_for_completion', 'wait', 'step_budget', 'time_budget_ms', 'required_outputs', 'required_artifacts', 'engine_data_outputs', 'runtime_tools', 'ability_tools', 'tools', 'disable_directives' ) as $key ) {
+				if ( array_key_exists( $key, $options ) ) {
+					$bundle_input[ $key ] = $options[ $key ];
+				}
+			}
+
+			if ( isset( $package['slug'] ) && is_string( $package['slug'] ) && '' !== trim( $package['slug'] ) ) {
+				$bundle_input['runtime_bundle'] = array_merge( $package, array( 'slug' => trim( $package['slug'] ) ) );
+			}
+
+			if ( isset( $raw_input['runtime_import'] ) && is_array( $raw_input['runtime_import'] ) ) {
+				$bundle_input['runtime_import'] = $raw_input['runtime_import'];
+			}
+
+			$result = self::runAgentBundle( $bundle_input );
+			$status = (bool) ( $result['success'] ?? false ) ? 'succeeded' : 'failed';
+
+			return array(
+				'status'        => $status,
+				'result'        => $result,
+				'artifact_refs' => array_values( array_filter( array_merge( $result['export_refs'] ?? array(), $result['transcript_refs'] ?? array() ), 'is_array' ) ),
+				'metadata'      => array(
+					'handler' => 'datamachine/run-agent-bundle',
+					'package' => $package,
+				),
+				'replay'        => $replay,
+			);
+		};
+	}
+
 	private static function bundleLifecycleService(): AgentBundleAbilityService {
 		return new AgentBundleAbilityService();
 	}
