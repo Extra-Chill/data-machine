@@ -452,14 +452,12 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 	 *
 	 * @return bool True if table exists
 	 */
-	public static function table_exists(): bool {
-		global $wpdb;
+	public static function table_exists( string $table_name = '', ?\wpdb $wpdb = null ): bool {
+		if ( '' === $table_name ) {
+			$table_name = self::get_prefixed_table_name();
+		}
 
-		$table_name = self::get_table_prefix() . self::TABLE_NAME;
-		$query      = $wpdb->prepare( 'SHOW TABLES LIKE %s', $table_name );
-
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
-		return $wpdb->get_var( $query ) === $table_name;
+		return parent::table_exists( $table_name, $wpdb );
 	}
 
 	/**
