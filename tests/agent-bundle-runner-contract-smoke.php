@@ -72,7 +72,6 @@ foreach ( array(
 	'AgentBundleRunner'            => 'ability delegates to runner service',
 	'runRuntimeAgentBundle'        => 'generic runtime run adapter declared',
 	'runtimePackageRunHandler'     => 'Agents API runtime-package handler declared',
-	'resolveRuntimePackageSource'  => 'runtime-package sources resolve against workspace mounts',
 	"'show_in_rest' => true"      => 'ability is REST-visible for headless callers',
 	"'readonly'    => false"      => 'ability marks execution as mutating',
 ) as $needle => $label ) {

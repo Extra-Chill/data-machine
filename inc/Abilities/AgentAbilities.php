@@ -1612,7 +1612,7 @@ class AgentAbilities {
 			);
 
 			if ( isset( $package['source'] ) && is_string( $package['source'] ) && '' !== trim( $package['source'] ) ) {
-				$bundle_input['source'] = self::resolveRuntimePackageSource( trim( $package['source'] ), $raw_input );
+				$bundle_input['source'] = trim( $package['source'] );
 			}
 
 			if ( isset( $workflow['id'] ) && is_string( $workflow['id'] ) && '' !== trim( $workflow['id'] ) ) {
@@ -1651,61 +1651,6 @@ class AgentAbilities {
 				'replay'        => $replay,
 			);
 		};
-	}
-
-	/**
-	 * Resolve a relative runtime package source against sandbox workspace mounts.
-	 *
-	 * @param string $source Runtime package source from the generic descriptor.
-	 * @param array  $raw_input Raw runtime package ability input.
-	 * @return string Resolved source path or the original source.
-	 */
-	private static function resolveRuntimePackageSource( string $source, array $raw_input ): string {
-		if ( '' === $source || self::isPortableSourceAbsolute( $source ) || file_exists( $source ) ) {
-			return $source;
-		}
-
-		foreach ( self::runtimeWorkspaceRoots( $raw_input ) as $root ) {
-			$candidate = rtrim( $root, '/' ) . '/' . ltrim( $source, '/' );
-			if ( file_exists( $candidate ) ) {
-				return $candidate;
-			}
-		}
-
-		return $source;
-	}
-
-	/**
-	 * @param array $raw_input Raw runtime package ability input.
-	 * @return array<int,string>
-	 */
-	private static function runtimeWorkspaceRoots( array $raw_input ): array {
-		$roots    = array();
-		$contexts = array();
-
-		foreach ( array( $raw_input, $raw_input['input'] ?? null, $raw_input['task_input'] ?? null ) as $value ) {
-			if ( is_array( $value ) && is_array( $value['client_context'] ?? null ) ) {
-				$contexts[] = $value['client_context'];
-			}
-		}
-
-		foreach ( $contexts as $context ) {
-			if ( isset( $context['default_workspace']['target'] ) && is_string( $context['default_workspace']['target'] ) ) {
-				$roots[] = $context['default_workspace']['target'];
-			}
-
-			foreach ( is_array( $context['sandbox_workspace']['mounts'] ?? null ) ? $context['sandbox_workspace']['mounts'] : array() as $mount ) {
-				if ( is_array( $mount ) && isset( $mount['target'] ) && is_string( $mount['target'] ) ) {
-					$roots[] = $mount['target'];
-				}
-			}
-		}
-
-		return array_values( array_unique( array_filter( $roots, static fn( string $root ): bool => '' !== trim( $root ) ) ) );
-	}
-
-	private static function isPortableSourceAbsolute( string $source ): bool {
-		return str_starts_with( $source, '/' ) || 1 === preg_match( '#^[a-z][a-z0-9+.-]*://#i', $source ) || 1 === preg_match( '#^[A-Za-z]:[\\/]#', $source );
 	}
 
 	private static function bundleLifecycleService(): AgentBundleAbilityService {
