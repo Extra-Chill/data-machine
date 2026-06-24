@@ -162,7 +162,7 @@ function datamachine_run_datamachine_plugin() {
 	// Register ability categories first — must happen before any ability registration.
 	// Categories are also registered unconditionally at file include time (see bottom
 	// of this file); this call is the defensive in-runtime path for late `plugins_loaded`
-	// inclusion (`plugin_sandbox_scrape()` during activation, etc.). The static guard in
+	// inclusion during activation or runtime inspection. The static guard in
 	// `AbilityCategories::register()` makes it idempotent.
 	require_once __DIR__ . '/inc/Abilities/AbilityCategories.php';
 	\DataMachine\Abilities\AbilityCategories::ensure_registered();
@@ -485,7 +485,7 @@ if ( did_action( 'plugins_loaded' ) ) {
  * `ensure_registered()` here attaches the `wp_abilities_api_categories_init`
  * hook before `init` fires (the action cannot fire before `init`, so any
  * later `plugins_loaded` priority works too — but earlier is safer for any
- * site that includes our plugin file via `plugin_sandbox_scrape()` or
+ * site that includes our plugin file through late runtime inspection or
  * similar late-load paths).
  */
 require_once __DIR__ . '/inc/Abilities/AbilityCategories.php';
@@ -497,7 +497,7 @@ require_once __DIR__ . '/inc/Abilities/AbilityManifest.php';
 /**
  * Declare Data Machine abilities whose schemas are cheap enough for lite requests.
  *
- * These abilities have frontend, sandbox, or helper consumers that can resolve
+ * These abilities have frontend, headless runtime, or helper consumers that can resolve
  * them before the full runtime gate opens. The declarations load only schema and
  * callback owners; execution callbacks lazily activate the full runtime.
  *
@@ -730,7 +730,7 @@ function datamachine_activate_for_site() {
 
 	// Ensure default agent memory files exist.
 	// During activation the Abilities API is unavailable (init already fired before
-	// the plugin was included via plugin_sandbox_scrape, so our init callback that
+	// the plugin was included for activation inspection, so our init callback that
 	// registers abilities never ran). Set a transient so the scaffold runs on the
 	// first normal request where the full hook sequence fires in order.
 	if ( ! datamachine_ensure_default_memory_files() ) {

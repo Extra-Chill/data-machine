@@ -15,7 +15,6 @@ defined( 'ABSPATH' ) || exit;
 final class HostToolPolicy {
 
 	private const ENV_POLICY_JSON = 'DATAMACHINE_HOST_TOOL_POLICY_JSON';
-	private const SCHEMA_SANDBOX_TOOL_POLICY = 'datamachine/sandbox-tool-policy/v1';
 	private const SCHEMA_RUNTIME_TOOL_POLICY = 'agents-api/runtime-tool-policy/v1';
 
 	/** @var array<string,mixed> */
@@ -207,7 +206,6 @@ final class HostToolPolicy {
 	 */
 	private static function transportPolicySchemas(): array {
 		$schemas = array(
-			self::SCHEMA_SANDBOX_TOOL_POLICY,
 			self::SCHEMA_RUNTIME_TOOL_POLICY,
 		);
 

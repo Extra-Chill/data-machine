@@ -66,7 +66,7 @@ class AgentAbilities {
 			return \wp_register_ability( $name, $args );
 		}
 
-		// Late path: the init action has already fired (headless / sandbox
+		// Late path: the init action has already fired (headless runtime
 		// load order). Register through the registry instance directly, which
 		// WordPress core permits any time after `init`.
 		if ( ! did_action( 'wp_abilities_api_init' ) || ! class_exists( '\WP_Abilities_Registry' ) ) {
@@ -1558,7 +1558,7 @@ class AgentAbilities {
 	 *
 	 * @param mixed $result         Previous runner result, or null when unhandled.
 	 * @param array $task_config    Generic task/bundle execution config.
-	 * @param array $runtime_config Generic runtime config supplied by the sandbox owner.
+	 * @param array $runtime_config Generic runtime config supplied by the runtime host.
 	 * @param int   $index          Bundle/task index in the runtime request.
 	 * @return mixed Runtime bundle run result.
 	 */
@@ -1742,7 +1742,7 @@ class AgentAbilities {
 				),
 				'agent_bundles'       => array(
 					'type'        => 'array',
-					'description' => 'Alias for runtime_bundles used by sandbox task payloads.',
+					'description' => 'Alias for runtime_bundles used by runtime host task payloads.',
 					'items'       => array( 'type' => 'object' ),
 				),
 				'runtime_import'      => array(

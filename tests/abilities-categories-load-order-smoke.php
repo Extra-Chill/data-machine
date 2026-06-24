@@ -96,8 +96,8 @@ $assert(
 );
 
 $assert(
-	'ensure_registered() documents the headless / sandbox late-registration path',
-	str_contains( $categories, 'sandbox' )
+	'ensure_registered() documents the headless runtime late-registration path',
+	str_contains( $categories, 'headless runtime' )
 );
 
 $assert(
@@ -181,7 +181,7 @@ if ( ! function_exists( 'wp_register_ability_category' ) ) {
 }
 
 // Minimal fake of the category registry so the late-registration path
-// (headless sandbox load order — plugin included AFTER the
+// (headless runtime load order: plugin included AFTER the
 // one-shot `wp_abilities_api_categories_init` fired) can be exercised. Mirrors
 // core: `WP_Ability_Categories_Registry::register()` has NO lifecycle guard —
 // only the `wp_register_ability_category()` wrapper does.
@@ -249,7 +249,7 @@ $assert(
 		&& empty( $state->registered )
 );
 
-// --- State 3: post-action (headless sandbox load order).
+// --- State 3: post-action (headless runtime load order).
 // The one-shot `wp_abilities_api_categories_init` already fired during
 // `wp-load.php` before `run-php` included the plugin file. Categories must
 // register late via the registry instance so category-bound abilities (e.g.

@@ -16,7 +16,7 @@ namespace {
 		// Real WordPress runtime.
 		// The harness boots a bare WordPress with the plugin DIRECTORY mounted
 		// but NOT activated, so Data Machine's normal `plugins_loaded`
-		// registration never runs. This mirrors headless sandbox tasks that need
+		// registration never runs. This mirrors headless runtime tasks that need
 		// `datamachine/run-agent-bundle` to register on demand, regardless of
 		// request shape.
 		//
@@ -53,7 +53,7 @@ namespace {
 	$GLOBALS['agent_abilities_registered_abilities'] = array();
 
 	// Minimal fake of the WordPress abilities registry so the late-registration
-	// path (used in headless sandbox load order, where the plugin
+	// path (used in headless runtime load order, where the plugin
 	// is included AFTER `wp_abilities_api_init` has already fired) can be
 	// exercised without a full WordPress runtime. Mirrors how
 	// `WP_Abilities_Registry::register()` has NO lifecycle guard — only the
@@ -173,12 +173,12 @@ namespace {
 	$GLOBALS['agent_abilities_doing_action'] = false;
 	agent_abilities_assert( isset( $GLOBALS['agent_abilities_registered_abilities']['datamachine/run-agent-bundle'] ), 'run-agent-bundle registers during wp_abilities_api_init' );
 
-	// Headless sandbox load order: `run-php` boots WordPress
+	// Headless runtime load order: the host boots WordPress
 	// through `wp-load.php` (firing the one-shot `wp_abilities_api_init`) and
 	// only THEN includes the plugin file. The constructor sees the action has
 	// already completed and must register immediately through the registry
 	// instance, NOT silently no-op (the original bug that left
-	// `datamachine/run-agent-bundle` unregistered for sandbox runs).
+	// `datamachine/run-agent-bundle` unregistered for headless runtime runs).
 	$GLOBALS['agent_abilities_actions']              = array();
 	$GLOBALS['agent_abilities_registered_abilities'] = array();
 	$GLOBALS['agent_abilities_doing_action']         = false;
@@ -188,7 +188,7 @@ namespace {
 	new \DataMachine\Abilities\AgentAbilities();
 	agent_abilities_assert(
 		isset( $GLOBALS['agent_abilities_registered_abilities']['datamachine/run-agent-bundle'] ),
-		'late construction (post-init, headless sandbox load order) registers run-agent-bundle via the registry'
+		'late construction (post-init, headless runtime load order) registers run-agent-bundle via the registry'
 	);
 
 	// Re-constructing after a successful late registration must remain

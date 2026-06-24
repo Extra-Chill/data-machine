@@ -67,7 +67,7 @@ class AbilityCategories {
 		foreach ( self::get_category_definitions() as $slug => $args ) {
 			if ( $late ) {
 				// Late path: the categories-init action has already completed
-				// (headless runtime load order — see
+				// (headless runtime load order; see
 				// ensure_registered()). The public helper would
 				// `_doing_it_wrong()`, so register through the registry
 				// instance directly, which core permits any time after `init`.

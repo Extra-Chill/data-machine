@@ -619,32 +619,7 @@ $resolution     = ( new ToolPolicyResolver( new SnapshotPolicyToolManager() ) )-
 assert_policy_equals( 'client', $resolution['alpha_tool']['executor'] ?? null, 'wrapped policy delegates explicit control-plane tool', $failures, $passes );
 assert_policy_equals( null, $resolution['beta_tool']['executor'] ?? null, 'wrapped policy leaves runner-default tool local', $failures, $passes );
 
-echo "\n[14] host tool policy accepts neutral list-shaped sandbox policy payloads:\n";
-$transport_policy = array(
-	'schema'           => 'datamachine/sandbox-tool-policy/v1',
-	'default_location' => 'runner',
-	'tools'            => array(
-		array(
-			'name'               => 'alpha_tool',
-			'execution_location' => 'control_plane',
-		),
-	),
-);
-$resolution       = ( new ToolPolicyResolver( new SnapshotPolicyToolManager() ) )->resolve(
-	array(
-		'mode'                => ToolPolicyResolver::MODE_PIPELINE,
-		'pipeline_step_id'    => 'ephemeral_pipeline_0',
-		'engine_data'         => array(),
-		'categories'          => array(),
-		'allow_only_explicit' => true,
-		'allow_only'          => array( 'alpha_tool', 'beta_tool' ),
-		'host_tool_policy'    => $transport_policy,
-	)
-);
-assert_policy_equals( 'client', $resolution['alpha_tool']['executor'] ?? null, 'neutral sandbox policy delegates explicit control-plane tool', $failures, $passes );
-assert_policy_equals( null, $resolution['beta_tool']['executor'] ?? null, 'neutral sandbox policy leaves runner-default tool local', $failures, $passes );
-
-echo "\n[14b] host tool policy accepts generic list-shaped runtime policy payloads:\n";
+echo "\n[14] host tool policy accepts generic list-shaped runtime policy payloads:\n";
 $transport_policy = array(
 	'schema'           => 'agents-api/runtime-tool-policy/v1',
 	'default_location' => 'runner',
@@ -668,6 +643,52 @@ $resolution       = ( new ToolPolicyResolver( new SnapshotPolicyToolManager() ) 
 );
 assert_policy_equals( 'client', $resolution['alpha_tool']['executor'] ?? null, 'generic runtime policy delegates explicit control-plane tool', $failures, $passes );
 assert_policy_equals( null, $resolution['beta_tool']['executor'] ?? null, 'generic runtime policy leaves runner-default tool local', $failures, $passes );
+
+echo "\n[14b] host tool policy ignores deprecated sandbox-shaped policy payloads unless a runtime host registers them:\n";
+$transport_policy = array(
+	'schema'           => 'datamachine/sandbox-tool-policy/v1',
+	'default_location' => 'runner',
+	'tools'            => array(
+		array(
+			'name'               => 'alpha_tool',
+			'execution_location' => 'control_plane',
+		),
+	),
+);
+$resolution       = ( new ToolPolicyResolver( new SnapshotPolicyToolManager() ) )->resolve(
+	array(
+		'mode'                => ToolPolicyResolver::MODE_PIPELINE,
+		'pipeline_step_id'    => 'ephemeral_pipeline_0',
+		'engine_data'         => array(),
+		'categories'          => array(),
+		'allow_only_explicit' => true,
+		'allow_only'          => array( 'alpha_tool', 'beta_tool' ),
+		'host_tool_policy'    => $transport_policy,
+	)
+);
+assert_policy_equals( null, $resolution['alpha_tool']['executor'] ?? null, 'deprecated sandbox-shaped policy is not built into Data Machine core', $failures, $passes );
+assert_policy_equals( null, $resolution['beta_tool']['executor'] ?? null, 'deprecated sandbox-shaped policy does not affect unrelated tools', $failures, $passes );
+
+echo "\n[14c] host tool policy accepts externally registered deprecated transport payloads:\n";
+$deprecated_transport_schema_filter = static function ( array $schemas ): array {
+	$schemas[] = 'datamachine/sandbox-tool-policy/v1';
+	return $schemas;
+};
+add_filter( 'datamachine_host_tool_policy_transport_schemas', $deprecated_transport_schema_filter );
+$resolution = ( new ToolPolicyResolver( new SnapshotPolicyToolManager() ) )->resolve(
+	array(
+		'mode'                => ToolPolicyResolver::MODE_PIPELINE,
+		'pipeline_step_id'    => 'ephemeral_pipeline_0',
+		'engine_data'         => array(),
+		'categories'          => array(),
+		'allow_only_explicit' => true,
+		'allow_only'          => array( 'alpha_tool', 'beta_tool' ),
+		'host_tool_policy'    => $transport_policy,
+	)
+);
+remove_filter( 'datamachine_host_tool_policy_transport_schemas', $deprecated_transport_schema_filter );
+assert_policy_equals( 'client', $resolution['alpha_tool']['executor'] ?? null, 'runtime hosts can externally register deprecated transport schemas', $failures, $passes );
+assert_policy_equals( null, $resolution['beta_tool']['executor'] ?? null, 'externally registered deprecated transport schema leaves runner-default tool local', $failures, $passes );
 
 echo "\n[15] host tool policy accepts neutral host policy payloads:\n";
 $host_policy = array(
@@ -745,9 +766,9 @@ $resolution       = ( new ToolPolicyResolver( new SnapshotPolicyToolManager() ) 
 assert_policy_equals( null, $resolution['alpha_tool']['executor'] ?? null, 'list-shaped transport policy is not converted into host policy', $failures, $passes );
 assert_policy_equals( null, $resolution['beta_tool']['executor'] ?? null, 'list-shaped transport policy does not affect unrelated tools', $failures, $passes );
 
-echo "\n[18] production host policy code has no unregistered vendor sandbox schema special-case:\n";
+echo "\n[18] production host policy code has no sandbox transport schema special-case:\n";
 $host_policy_source = file_get_contents( __DIR__ . '/../inc/Engine/AI/Tools/HostToolPolicy.php' ) ?: '';
-assert_policy_equals( false, str_contains( $host_policy_source, 'acme-runner/sandbox-tool-policy/v1' ), 'HostToolPolicy does not name an unregistered vendor sandbox schema', $failures, $passes );
+assert_policy_equals( false, str_contains( $host_policy_source, 'sandbox-tool-policy/v1' ), 'HostToolPolicy does not name sandbox transport schemas', $failures, $passes );
 
 if ( $failures ) {
 	echo "\nFAILED: " . count( $failures ) . " pipeline policy assertions failed.\n";
