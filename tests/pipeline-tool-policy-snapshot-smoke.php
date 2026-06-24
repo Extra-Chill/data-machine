@@ -193,6 +193,7 @@ require_once __DIR__ . '/../inc/Core/Steps/AI/ToolPolicy/PipelineToolPolicyArgs.
 require_once __DIR__ . '/../inc/Core/DataPath.php';
 require_once __DIR__ . '/../inc/Core/OutputContract.php';
 require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Tools/class-wp-agent-tool-access-policy.php';
+require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Tools/class-wp-agent-tool-parameters.php';
 require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Tools/class-wp-agent-tool-declaration.php';
 require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Tools/class-wp-agent-tool-policy-filter.php';
 require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Tools/class-wp-agent-tool-policy.php';
@@ -744,9 +745,9 @@ $resolution       = ( new ToolPolicyResolver( new SnapshotPolicyToolManager() ) 
 assert_policy_equals( null, $resolution['alpha_tool']['executor'] ?? null, 'list-shaped transport policy is not converted into host policy', $failures, $passes );
 assert_policy_equals( null, $resolution['beta_tool']['executor'] ?? null, 'list-shaped transport policy does not affect unrelated tools', $failures, $passes );
 
-echo "\n[18] production host policy code has no Codebox sandbox schema special-case:\n";
+echo "\n[18] production host policy code has no unregistered vendor sandbox schema special-case:\n";
 $host_policy_source = file_get_contents( __DIR__ . '/../inc/Engine/AI/Tools/HostToolPolicy.php' ) ?: '';
-assert_policy_equals( false, str_contains( $host_policy_source, 'wp-codebox/sandbox-tool-policy/v1' ), 'HostToolPolicy does not name the Codebox sandbox schema', $failures, $passes );
+assert_policy_equals( false, str_contains( $host_policy_source, 'acme-runner/sandbox-tool-policy/v1' ), 'HostToolPolicy does not name an unregistered vendor sandbox schema', $failures, $passes );
 
 if ( $failures ) {
 	echo "\nFAILED: " . count( $failures ) . " pipeline policy assertions failed.\n";
