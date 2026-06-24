@@ -552,6 +552,24 @@ datamachine_bundle_runner_assert( 'completed_no_items' === ( $no_item_response['
 datamachine_bundle_runner_assert( true === ( $no_item_response['success'] ?? null ), 'no-item terminal status is a successful bundle run', $failures, $passes );
 datamachine_bundle_runner_assert( true === ( $no_item_response['completion_outcome']['success'] ?? null ), 'no-item completion outcome is successful', $failures, $passes );
 
+$incomplete_wait_response = $response_method->invoke(
+	$runner_instance,
+	array(
+		'success'             => true,
+		'wait_for_completion' => true,
+		'wait_result'         => array(
+			'success'           => false,
+			'terminal_state'    => null,
+			'remaining_actions' => 1,
+		),
+		'job_status'          => 'processing',
+	),
+	array( 'wait_for_completion' => true )
+);
+datamachine_bundle_runner_assert( false === ( $incomplete_wait_response['success'] ?? null ), 'non-terminal wait result fails the bundle run', $failures, $passes );
+datamachine_bundle_runner_assert( 'failed' === ( $incomplete_wait_response['status'] ?? null ), 'non-terminal wait result exposes failed status', $failures, $passes );
+datamachine_bundle_runner_assert( 'wait_incomplete' === ( $incomplete_wait_response['error_type'] ?? null ), 'non-terminal wait result exposes typed error', $failures, $passes );
+
 echo "\n[3f] Completed bundle runs enforce required semantic outputs\n";
 $missing_artifact_response = $response_method->invoke(
 	$runner_instance,

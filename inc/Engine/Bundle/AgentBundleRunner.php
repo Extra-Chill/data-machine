@@ -148,6 +148,7 @@ final class AgentBundleRunner {
 	/** @return array<string,mixed> */
 	private function response( array $response, array $input, array $runtime_imports = array(), array $selection = array() ): array {
 		$response['schema'] ??= 'datamachine/agent-bundle-run/v1';
+		$response           = $this->apply_wait_result_status( $response );
 
 		if ( ! empty( $runtime_imports ) ) {
 			$response['runtime_imports'] = $runtime_imports;
@@ -174,6 +175,26 @@ final class AgentBundleRunner {
 		$response['status']             = $this->status_from_response( $response );
 		$response['success']            = ! empty( $response['success'] ) && self::is_success_status( $response['status'] );
 		$response['completion_outcome'] = $this->completion_outcome( $response );
+
+		return $response;
+	}
+
+	/** @return array<string,mixed> */
+	private function apply_wait_result_status( array $response ): array {
+		if ( empty( $response['wait_for_completion'] ) || ! is_array( $response['wait_result'] ?? null ) ) {
+			return $response;
+		}
+
+		$wait_result = $response['wait_result'];
+		if ( ! empty( $wait_result['success'] ) ) {
+			return $response;
+		}
+
+		$response['success'] = false;
+		$response['error'] ??= (string) ( $wait_result['error'] ?? 'Agent bundle run did not reach a terminal job state before the wait budget was exhausted.' );
+		if ( empty( $response['error_type'] ) ) {
+			$response['error_type'] = (string) ( $wait_result['error_type'] ?? 'wait_incomplete' );
+		}
 
 		return $response;
 	}
