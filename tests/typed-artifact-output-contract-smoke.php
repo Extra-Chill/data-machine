@@ -56,7 +56,7 @@ $tool_result_normalized = \DataMachine\Engine\AI\datamachine_normalize_typed_art
 		'tool_execution_results' => array(
 			array(
 				'success' => true,
-				'data'    => array(
+				'outputs' => array(
 					'typed_artifacts' => array(
 						'concept_packet' => array(
 							'schema'   => 'example-agent/ConceptPacket/v1',
@@ -72,7 +72,7 @@ $tool_result_normalized = \DataMachine\Engine\AI\datamachine_normalize_typed_art
 
 datamachine_typed_artifact_contract_assert(
 	array( 'title' => 'Tool Result Concept' ) === ( $tool_result_normalized['concept_packet']['payload'] ?? null ),
-	'typed artifact output normalizes from tool result data',
+	'typed artifact output normalizes from tool result outputs',
 	$failures,
 	$passes
 );
