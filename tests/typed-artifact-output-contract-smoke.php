@@ -103,6 +103,16 @@ $satisfied = $assertions->evaluate(
 datamachine_typed_artifact_contract_assert( true === $satisfied['complete'], 'required_artifact_outputs is recognized as a completion assertion target', $failures, $passes );
 datamachine_typed_artifact_contract_assert( array( 'concept_packet' ) === ( $satisfied['satisfied']['artifact_outputs'] ?? null ), 'typed artifact completion reports the satisfied output key', $failures, $passes );
 
+$top_level_satisfied = $assertions->evaluate(
+	array(
+		'outputs' => array(
+			'typed_artifacts' => $normalized,
+		),
+	),
+	''
+);
+datamachine_typed_artifact_contract_assert( true === $top_level_satisfied['complete'], 'required_artifact_outputs is recognized from top-level outputs.typed_artifacts', $failures, $passes );
+
 $tool_result_assertions = new \DataMachine\Engine\AI\DataMachineCompletionAssertions(
 	array(
 		'required_artifact_outputs' => array(

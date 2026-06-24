@@ -602,7 +602,12 @@ class DataMachineCompletionAssertions {
 			}
 		}
 
-		$typed_artifacts = is_array( $data['outputs']['typed_artifacts'] ?? null ) ? $data['outputs']['typed_artifacts'] : array();
+		$typed_artifacts = array();
+		foreach ( array( $data['outputs']['typed_artifacts'] ?? null, $runtime_context['outputs']['typed_artifacts'] ?? null ) as $artifact_outputs ) {
+			if ( is_array( $artifact_outputs ) ) {
+				$typed_artifacts = array_replace_recursive( $typed_artifacts, $artifact_outputs );
+			}
+		}
 		foreach ( $this->successful_tool_results as $tool_results ) {
 			foreach ( is_array( $tool_results ) ? $tool_results : array() as $tool_result ) {
 				if ( ! is_array( $tool_result ) ) {
