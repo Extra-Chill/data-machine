@@ -603,7 +603,20 @@ class DataMachineCompletionAssertions {
 		}
 
 		$typed_artifacts = is_array( $data['outputs']['typed_artifacts'] ?? null ) ? $data['outputs']['typed_artifacts'] : array();
-		$satisfied       = array();
+		foreach ( $this->successful_tool_results as $tool_results ) {
+			foreach ( is_array( $tool_results ) ? $tool_results : array() as $tool_result ) {
+				if ( ! is_array( $tool_result ) ) {
+					continue;
+				}
+
+				foreach ( array( $tool_result['typed_artifacts'] ?? null, $tool_result['data']['typed_artifacts'] ?? null, $tool_result['result']['typed_artifacts'] ?? null ) as $artifact_outputs ) {
+					if ( is_array( $artifact_outputs ) ) {
+						$typed_artifacts = array_replace_recursive( $typed_artifacts, $artifact_outputs );
+					}
+				}
+			}
+		}
+		$satisfied = array();
 		foreach ( $this->required_artifact_outputs as $required_output ) {
 			if ( ! OutputContract::artifactOutputSatisfied( $required_output, $typed_artifacts ) ) {
 				continue;

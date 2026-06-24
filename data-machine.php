@@ -549,6 +549,7 @@ function datamachine_load_handlers() {
 	// Publish Handlers (core only - social handlers moved to data-machine-socials plugin)
 	new \DataMachine\Core\Steps\Publish\Handlers\WordPress\WordPress();
 	new \DataMachine\Core\Steps\Publish\Handlers\Email\Email();
+	new \DataMachine\Core\Steps\Publish\Handlers\TypedArtifact\TypedArtifact();
 
 	// Fetch Handlers
 	new \DataMachine\Core\Steps\Fetch\Handlers\WordPress\WordPress();
