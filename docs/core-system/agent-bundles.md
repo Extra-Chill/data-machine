@@ -283,7 +283,7 @@ Agent package operations live under `wp datamachine agent`:
 
 Every read/preview command supports `--format=json` for automation.
 
-`run-bundle` returns `datamachine/agent-bundle-run/v1`. By default it is a job-start envelope with `job_id`, `execution_type`, and bundle metadata. Pass `--wait` to drain the created job in the current request and include terminal `job_status`, `wait_result`, and final `engine_data`. `--step-budget` and `--time-budget-ms` bound synchronous drains for one-shot CI or sandbox runtimes.
+`run-bundle` returns `datamachine/agent-bundle-run/v1`. By default it is a job-start envelope with `job_id`, `execution_type`, and bundle metadata. Pass `--wait` to drain the created job in the current request and include terminal `job_status`, `wait_result`, and final `engine_data`. `--step-budget` and `--time-budget-ms` bound synchronous drains for one-shot CI or headless runtimes.
 
 `install`, `import`, `upgrade`, and `diff` accept `--token=<token>` and `--token-env=<varname>` for one-off authenticated downloads — see [Authenticated Bundle Sources](#authenticated-bundle-sources).
 
