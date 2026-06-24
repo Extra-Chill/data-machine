@@ -129,7 +129,7 @@ $tool_result_assertions->recordToolResult(
 	array( 'handler' => 'typed_artifact' ),
 	array(
 		'success' => true,
-		'data'    => array(
+		'outputs' => array(
 			'typed_artifacts' => array(
 				'concept_packet' => array(
 					'schema'   => 'example-agent/ConceptPacket/v1',
