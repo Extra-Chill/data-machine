@@ -535,6 +535,9 @@ function datamachine_normalize_typed_artifact_outputs( array $result ): array {
 		if ( is_array( $tool_result['result']['typed_artifacts'] ?? null ) ) {
 			$sources[] = $tool_result['result']['typed_artifacts'];
 		}
+		if ( is_array( $tool_result['result']['data']['typed_artifacts'] ?? null ) ) {
+			$sources[] = $tool_result['result']['data']['typed_artifacts'];
+		}
 	}
 
 	$typed_artifacts = array();

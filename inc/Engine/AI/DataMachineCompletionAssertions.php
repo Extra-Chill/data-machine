@@ -79,7 +79,7 @@ class DataMachineCompletionAssertions {
 	 * @param array      $tool_parameters Tool parameters.
 	 */
 	public function recordToolResult( string $tool_name, ?array $tool_def, array $tool_result, array $tool_parameters = array() ): void {
-		$tool_succeeded = true === ( $tool_result['success'] ?? false );
+		$tool_succeeded = true === ( $tool_result['success'] ?? false ) || in_array( (string) ( $tool_result['status'] ?? '' ), array( 'success', 'succeeded', 'completed' ), true );
 
 		if ( '' !== $tool_name && $tool_succeeded ) {
 			$tool_result['_parameters']                    = $tool_parameters;
@@ -614,7 +614,7 @@ class DataMachineCompletionAssertions {
 					continue;
 				}
 
-				foreach ( array( $tool_result['typed_artifacts'] ?? null, $tool_result['outputs']['typed_artifacts'] ?? null, $tool_result['data']['typed_artifacts'] ?? null, $tool_result['result']['typed_artifacts'] ?? null ) as $artifact_outputs ) {
+				foreach ( array( $tool_result['typed_artifacts'] ?? null, $tool_result['outputs']['typed_artifacts'] ?? null, $tool_result['data']['typed_artifacts'] ?? null, $tool_result['result']['typed_artifacts'] ?? null, $tool_result['result']['data']['typed_artifacts'] ?? null ) as $artifact_outputs ) {
 					if ( is_array( $artifact_outputs ) ) {
 						$typed_artifacts = array_replace_recursive( $typed_artifacts, $artifact_outputs );
 					}

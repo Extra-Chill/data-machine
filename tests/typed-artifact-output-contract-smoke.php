@@ -143,6 +143,38 @@ $tool_result_assertions->recordToolResult(
 $tool_result_satisfied = $tool_result_assertions->evaluate( array(), '' );
 datamachine_typed_artifact_contract_assert( true === $tool_result_satisfied['complete'], 'required_artifact_outputs can be satisfied by a handler tool result', $failures, $passes );
 
+$wrapped_tool_result_assertions = new \DataMachine\Engine\AI\DataMachineCompletionAssertions(
+	array(
+		'required_artifact_outputs' => array(
+			array(
+				'output_key' => 'concept_packet',
+				'schema'     => 'example-agent/ConceptPacket/v1',
+				'artifact'   => 'ConceptPacket',
+			),
+		),
+	)
+);
+$wrapped_tool_result_assertions->recordToolResult(
+	'emit_typed_artifact',
+	array( 'handler' => 'typed_artifact' ),
+	array(
+		'status' => 'success',
+		'result' => array(
+			'data' => array(
+				'typed_artifacts' => array(
+					'concept_packet' => array(
+						'schema'   => 'example-agent/ConceptPacket/v1',
+						'artifact' => 'ConceptPacket',
+						'payload'  => array( 'title' => 'Wrapped Tool Result Concept' ),
+					),
+				),
+			),
+		),
+	)
+);
+$wrapped_tool_result_satisfied = $wrapped_tool_result_assertions->evaluate( array(), '' );
+datamachine_typed_artifact_contract_assert( true === $wrapped_tool_result_satisfied['complete'], 'required_artifact_outputs can be satisfied by wrapped handler tool result data', $failures, $passes );
+
 $missing = $assertions->evaluate(
 	array(
 		'engine_data' => array(
