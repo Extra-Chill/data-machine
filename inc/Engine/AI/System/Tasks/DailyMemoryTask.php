@@ -182,6 +182,60 @@ class DailyMemoryTask extends SystemTask {
 
 		$datamachine_metadata = is_array( $response['metadata']['datamachine'] ?? null ) ? $response['metadata']['datamachine'] : array();
 		if ( empty( $datamachine_metadata['completed'] ) ) {
+			$response_error = is_string( $response['error'] ?? null ) ? trim( $response['error'] ) : '';
+
+			// Distinguish a genuine execution failure from a legitimate
+			// "nothing worth changing today" no-op.
+			//
+			// The conversation loop sets completed=false both when the
+			// request actually failed (provider error, runtime exception,
+			// malformed loop result, interruption) AND when the model simply
+			// ran out of turns without producing a split the completion
+			// policy would accept. The latter is the common path for small,
+			// already-healthy MEMORY.md files: the agent reviewed the day's
+			// activity and never emitted an acceptable PERSISTENT/ARCHIVED
+			// partition because there was nothing memory-worthy to fold in.
+			//
+			// At this point nothing has been written to MEMORY.md yet (the
+			// replace_all() call happens later in this method), so the file
+			// is genuinely untouched. A no-op should therefore complete the
+			// job successfully and log at info, not fail loudly and pollute
+			// error-rate metrics / the wake briefing (issue #2783).
+			//
+			// A genuine fault is identified by an explicit error signal:
+			// a non-empty error string, an error_code, or a hard failure /
+			// interrupted status from the loop. Those still fail the job.
+			$genuine_failure = '' !== $response_error
+				|| ! empty( $response['error_code'] )
+				|| in_array( (string) ( $response['status'] ?? '' ), array( 'error', 'failed', 'interrupted' ), true );
+
+			if ( ! $genuine_failure ) {
+				do_action(
+					'datamachine_log',
+					'info',
+					'Daily memory no-op: completion policy not satisfied, MEMORY.md left unchanged.',
+					array(
+						'date'        => $date,
+						'job_id'      => $jobId,
+						'status'      => $response['status'] ?? '',
+						'turn_count'  => $response['turn_count'] ?? 0,
+						'datamachine' => $datamachine_metadata,
+					)
+				);
+
+				$this->completeJob(
+					$jobId,
+					array(
+						'skipped'       => true,
+						'no_change'     => true,
+						'reason'        => 'Completion policy not satisfied within turn budget; MEMORY.md left unchanged (no memory-worthy change this run).',
+						'original_size' => $original_size,
+						'turn_count'    => $response['turn_count'] ?? 0,
+					)
+				);
+				return;
+			}
+
 			do_action(
 				'datamachine_log',
 				'warning',
@@ -195,7 +249,7 @@ class DailyMemoryTask extends SystemTask {
 					'error'       => $response['error'] ?? null,
 				)
 			);
-			$this->failJob( $jobId, $response['error'] ?? 'Daily memory completion policy was not satisfied. MEMORY.md unchanged.' );
+			$this->failJob( $jobId, $response_error !== '' ? $response_error : 'Daily memory completion policy was not satisfied. MEMORY.md unchanged.' );
 			return;
 		}
 
