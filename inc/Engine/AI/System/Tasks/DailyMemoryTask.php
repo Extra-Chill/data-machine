@@ -249,7 +249,7 @@ class DailyMemoryTask extends SystemTask {
 					'error'       => $response['error'] ?? null,
 				)
 			);
-			$this->failJob( $jobId, $response_error !== '' ? $response_error : 'Daily memory completion policy was not satisfied. MEMORY.md unchanged.' );
+			$this->failJob( $jobId, '' !== $response_error ? $response_error : 'Daily memory completion policy was not satisfied. MEMORY.md unchanged.' );
 			return;
 		}
 
