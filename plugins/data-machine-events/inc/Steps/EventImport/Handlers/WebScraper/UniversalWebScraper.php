@@ -730,12 +730,38 @@ class UniversalWebScraper extends EventImportHandler {
 		}
 
 		if ( ! $result['success'] ) {
+			$error_message = $result['error'] ?? 'Unknown error';
+
+			// Distinguish permanently-unreachable sources (DNS gone) from
+			// transient transport failures. A dead-DNS venue site retries its
+			// WP REST + Tribe Events fallbacks every cron cycle and would
+			// otherwise log at `error` severity indefinitely, flooding the log.
+			//
+			// Downgrade unrecoverable-source failures to a single clear
+			// `warning` signal. This mirrors the existing HttpClient policy of
+			// treating expected external attrition (bot-blocks, moved pages,
+			// origin-down) as `warning` rather than a Data-Machine-side fault.
+			// Operators surface these via the venues tooling for re-qualify or
+			// removal; the flow itself is left untouched here.
+			if ( $this->isUnrecoverableSourceError( $error_message ) ) {
+				$context->log(
+					'warning',
+					'Universal Web Scraper: Source permanently unreachable (DNS failure) — skipping',
+					array(
+						'url'    => $url,
+						'error'  => $error_message,
+						'reason' => 'dns_unresolvable',
+					)
+				);
+				return '';
+			}
+
 			$context->log(
 				'error',
 				'Universal Web Scraper: HTTP request failed',
 				array(
 					'url'   => $url,
-					'error' => $result['error'] ?? 'Unknown error',
+					'error' => $error_message,
 				)
 			);
 			return '';
@@ -753,6 +779,53 @@ class UniversalWebScraper extends EventImportHandler {
 		}
 
 		return $result['data'];
+	}
+
+	/**
+	 * Classify an HTTP failure message as an unrecoverable source error.
+	 *
+	 * Unrecoverable means the source host cannot be reached at all because its
+	 * DNS no longer resolves (the domain is dead / gone, not rate-limited or
+	 * temporarily down). These never succeed on retry, so they should not be
+	 * logged at `error` severity on every cron cycle.
+	 *
+	 * Detection is signature-based against the cURL / resolver error strings
+	 * that surface through WordPress' HTTP transport. It is intentionally
+	 * generic — no hardcoded hostnames.
+	 *
+	 * Matched signatures:
+	 * - `cURL error 6` — CURLE_COULDNT_RESOLVE_HOST
+	 * - `Could not resolve host` — cURL human-readable message
+	 * - `Could not resolve: ...` — alternate cURL resolver phrasing
+	 * - `Name or service not known` / `nodename nor servname` — getaddrinfo
+	 * - `NXDOMAIN` — non-existent domain from the resolver
+	 *
+	 * @param string $error_message The failure message from the HTTP result.
+	 * @return bool True when the source is permanently unreachable.
+	 */
+	private function isUnrecoverableSourceError( string $error_message ): bool {
+		if ( '' === $error_message ) {
+			return false;
+		}
+
+		$signatures = array(
+			'curl error 6',
+			'could not resolve host',
+			'could not resolve:',
+			'name or service not known',
+			'nodename nor servname',
+			'nxdomain',
+		);
+
+		$haystack = strtolower( $error_message );
+
+		foreach ( $signatures as $signature ) {
+			if ( false !== strpos( $haystack, $signature ) ) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	/**
