@@ -2,6 +2,21 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.153.6] - 2026-06-25
+
+### Changed
+- Keep runtime tool policy host neutral
+- Neutralize runtime vocabulary fixture
+- Keep runtime package handler host neutral
+- Add runtime package bundle handler
+- Skip existing agent table dbDelta on SQLite
+- Avoid table helper name collision
+
+### Fixed
+- treat daily-memory no-op as success instead of hard failure
+- Fix SQLite table existence checks
+- Fix tracked items table bootstrap on SQLite
+
 ## [0.153.5] - 2026-06-22
 
 ### Changed
