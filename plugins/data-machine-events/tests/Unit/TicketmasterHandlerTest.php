@@ -178,6 +178,125 @@ class TicketmasterHandlerTest extends WP_UnitTestCase {
 		$this->assertEquals( '', $result['price'] );
 	}
 
+	public function test_is_rate_limited_detects_429_from_error_message() {
+		$method = $this->getProtectedMethod( 'is_rate_limited' );
+
+		$result = array(
+			'success' => false,
+			'error'   => 'Ticketmaster GET returned HTTP 429: {"fault":{"faultstring":"Spike arrest violation"}}',
+		);
+
+		$this->assertTrue( $method->invoke( $this->handler, $result ) );
+	}
+
+	public function test_is_rate_limited_detects_429_from_status_code() {
+		$method = $this->getProtectedMethod( 'is_rate_limited' );
+
+		$result = array(
+			'success'     => false,
+			'status_code' => 429,
+			'error'       => 'throttled',
+		);
+
+		$this->assertTrue( $method->invoke( $this->handler, $result ) );
+	}
+
+	public function test_is_rate_limited_false_for_success() {
+		$method = $this->getProtectedMethod( 'is_rate_limited' );
+
+		$result = array(
+			'success'     => true,
+			'status_code' => 200,
+			'data'        => '{}',
+		);
+
+		$this->assertFalse( $method->invoke( $this->handler, $result ) );
+	}
+
+	public function test_is_rate_limited_false_for_other_errors() {
+		$method = $this->getProtectedMethod( 'is_rate_limited' );
+
+		$result = array(
+			'success' => false,
+			'error'   => 'Ticketmaster GET returned HTTP 500: server error',
+		);
+
+		$this->assertFalse( $method->invoke( $this->handler, $result ) );
+	}
+
+	public function test_retry_after_seconds_parses_delta_seconds_header() {
+		$method = $this->getProtectedMethod( 'retry_after_seconds' );
+
+		$result = array(
+			'success' => false,
+			'headers' => array( 'Retry-After' => '5' ),
+		);
+
+		$this->assertSame( 5, $method->invoke( $this->handler, $result ) );
+	}
+
+	public function test_retry_after_seconds_is_case_insensitive() {
+		$method = $this->getProtectedMethod( 'retry_after_seconds' );
+
+		$result = array(
+			'success' => false,
+			'headers' => array( 'retry-after' => '3' ),
+		);
+
+		$this->assertSame( 3, $method->invoke( $this->handler, $result ) );
+	}
+
+	public function test_retry_after_seconds_null_when_absent() {
+		$method = $this->getProtectedMethod( 'retry_after_seconds' );
+
+		$result = array(
+			'success' => false,
+			'error'   => 'Ticketmaster GET returned HTTP 429: throttled',
+		);
+
+		$this->assertNull( $method->invoke( $this->handler, $result ) );
+	}
+
+	public function test_backoff_grows_exponentially_and_is_clamped() {
+		$method = $this->getProtectedMethod( 'rate_limit_backoff_seconds' );
+
+		$result = array(
+			'success' => false,
+			'error'   => 'Ticketmaster GET returned HTTP 429: throttled',
+		);
+
+		// Without a Retry-After header, delay grows with the attempt index and
+		// is clamped to RATE_LIMIT_BACKOFF_MAX_SECONDS. Jitter adds 0 or 1s.
+		$delay0 = $method->invoke( $this->handler, $result, 0 );
+		$delay3 = $method->invoke( $this->handler, $result, 3 );
+
+		$this->assertGreaterThanOrEqual( 1, $delay0 );
+		$this->assertLessThanOrEqual( 8, $delay0 );
+		$this->assertLessThanOrEqual( 8, $delay3 );
+	}
+
+	public function test_backoff_respects_retry_after_header() {
+		$method = $this->getProtectedMethod( 'rate_limit_backoff_seconds' );
+
+		$result = array(
+			'success' => false,
+			'headers' => array( 'Retry-After' => '4' ),
+		);
+
+		$this->assertSame( 4, $method->invoke( $this->handler, $result, 0 ) );
+	}
+
+	public function test_backoff_clamps_oversized_retry_after_header() {
+		$method = $this->getProtectedMethod( 'rate_limit_backoff_seconds' );
+
+		$result = array(
+			'success' => false,
+			'headers' => array( 'Retry-After' => '600' ),
+		);
+
+		$this->assertSame( 8, $method->invoke( $this->handler, $result, 0 ) );
+	}
+
 	private function getProtectedMethod( string $name ) {
 		$reflection = new ReflectionClass( $this->handler );
 		$method     = $reflection->getMethod( $name );

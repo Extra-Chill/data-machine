@@ -35,6 +35,28 @@ class Ticketmaster extends EventImportHandler {
 
 	const MAX_PAGE = 19;
 
+	/**
+	 * Maximum number of retry attempts when the Discovery API answers HTTP 429
+	 * (spike-arrest). Ticketmaster's spike-arrest window is short (rate is
+	 * expressed per-second/per-minute), so a few bounded retries reliably clear
+	 * it without hard-failing the job or losing import volume.
+	 */
+	const RATE_LIMIT_MAX_RETRIES = 3;
+
+	/**
+	 * Base back-off in seconds for the first 429 retry. Subsequent retries grow
+	 * exponentially (base, base*2, base*4, ...) with added jitter so that the
+	 * many per-city geo-radius pipelines that tripped the limit together do not
+	 * all wake up and re-fire on the same instant.
+	 */
+	const RATE_LIMIT_BACKOFF_BASE_SECONDS = 1;
+
+	/**
+	 * Upper bound on a single back-off sleep, in seconds. Keeps a job from
+	 * parking on a sleep() longer than is useful inside one fetch run.
+	 */
+	const RATE_LIMIT_BACKOFF_MAX_SECONDS = 8;
+
 	public function __construct() {
 		parent::__construct( 'ticketmaster' );
 
@@ -364,18 +386,18 @@ class Ticketmaster extends EventImportHandler {
 	private function fetch_events( array $params, ExecutionContext $context ): array {
 		$url = self::API_BASE . 'events.json?' . http_build_query( $params );
 
-		$result = $this->httpGet(
-			$url,
-			array(
-				'timeout' => 30,
-				'headers' => array(
-					'Accept' => 'application/json',
-				),
-			)
-		);
+		$result = $this->request_events_page( $url, $context );
 
 		if ( ! $result['success'] ) {
-			$context->log( 'error', 'Ticketmaster: API request failed', array( 'error' => $result['error'] ?? 'Unknown error' ) );
+			// A 429 that survived every retry is a transient throttle, not a
+			// Data-Machine-side fault — log it at warning so it stops flooding
+			// the error log. Any other failure stays an error.
+			$severity = $this->is_rate_limited( $result ) ? 'warning' : 'error';
+			$context->log(
+				$severity,
+				'Ticketmaster: API request failed',
+				array( 'error' => $result['error'] ?? 'Unknown error' )
+			);
 			return array(
 				'events' => array(),
 				'page'   => array(
@@ -395,6 +417,164 @@ class Ticketmaster extends EventImportHandler {
 				'totalPages' => 1,
 			),
 		);
+	}
+
+	/**
+	 * GET an events page, retrying through Ticketmaster spike-arrest (HTTP 429).
+	 *
+	 * Multiple per-city geo-radius pipelines drain on the same heartbeat cron
+	 * tick and collectively blow Ticketmaster's spike-arrest limit (5 messages
+	 * per period). The window is short, so instead of hard-failing the job we
+	 * back off and retry in-process. Events still import — just a beat later —
+	 * so import volume is preserved and the error log stays quiet.
+	 *
+	 * The back-off respects the API's `Retry-After` header when present (and
+	 * when the underlying client surfaces it), otherwise it grows exponentially
+	 * with jitter to de-synchronise the pipelines that tripped the limit
+	 * together.
+	 *
+	 * @param string           $url     Fully built Discovery API events URL.
+	 * @param ExecutionContext $context Execution context for logging.
+	 * @return array HttpClient-shaped result (success/data/error/...).
+	 */
+	private function request_events_page( string $url, ExecutionContext $context ): array {
+		$attempt = 0;
+
+		do {
+			$result = $this->httpGet(
+				$url,
+				array(
+					'timeout' => 30,
+					'headers' => array(
+						'Accept' => 'application/json',
+					),
+				)
+			);
+
+			if ( $result['success'] || ! $this->is_rate_limited( $result ) ) {
+				return $result;
+			}
+
+			if ( $attempt >= self::RATE_LIMIT_MAX_RETRIES ) {
+				return $result;
+			}
+
+			$delay = $this->rate_limit_backoff_seconds( $result, $attempt );
+
+			$context->log(
+				'warning',
+				'Ticketmaster: spike-arrest (HTTP 429), backing off before retry',
+				array(
+					'attempt'       => $attempt + 1,
+					'max_retries'   => self::RATE_LIMIT_MAX_RETRIES,
+					'delay_seconds' => $delay,
+				)
+			);
+
+			if ( $delay > 0 ) {
+				sleep( $delay );
+			}
+
+			++$attempt;
+		} while ( $attempt <= self::RATE_LIMIT_MAX_RETRIES );
+
+		return $result;
+	}
+
+	/**
+	 * Whether an HttpClient result represents a Ticketmaster spike-arrest (429).
+	 *
+	 * HttpClient collapses non-2xx responses to `{ success: false, error }` and
+	 * does not surface the numeric status code on the failure path, so the 429
+	 * is detected from the error message it builds
+	 * (`"<context> GET returned HTTP 429: ..."`).
+	 *
+	 * @param array $result HttpClient-shaped result.
+	 * @return bool
+	 */
+	private function is_rate_limited( array $result ): bool {
+		if ( ! empty( $result['success'] ) ) {
+			return false;
+		}
+
+		if ( isset( $result['status_code'] ) && 429 === (int) $result['status_code'] ) {
+			return true;
+		}
+
+		$error = (string) ( $result['error'] ?? '' );
+
+		return false !== stripos( $error, 'HTTP 429' );
+	}
+
+	/**
+	 * Compute the back-off delay (seconds) before the next 429 retry.
+	 *
+	 * Prefers the server's `Retry-After` hint when the client surfaces response
+	 * headers; otherwise falls back to exponential growth with jitter, clamped
+	 * to a sane upper bound.
+	 *
+	 * @param array $result  HttpClient-shaped result for the throttled request.
+	 * @param int   $attempt Zero-based retry attempt index.
+	 * @return int Delay in whole seconds (>= 0).
+	 */
+	private function rate_limit_backoff_seconds( array $result, int $attempt ): int {
+		$retry_after = $this->retry_after_seconds( $result );
+		if ( null !== $retry_after ) {
+			return min( max( $retry_after, 0 ), self::RATE_LIMIT_BACKOFF_MAX_SECONDS );
+		}
+
+		$base   = self::RATE_LIMIT_BACKOFF_BASE_SECONDS * ( 2 ** $attempt );
+		$base   = min( $base, self::RATE_LIMIT_BACKOFF_MAX_SECONDS );
+		$jitter = wp_rand( 0, 1 );
+
+		return min( $base + $jitter, self::RATE_LIMIT_BACKOFF_MAX_SECONDS );
+	}
+
+	/**
+	 * Extract a `Retry-After` delay in seconds from a result's response headers.
+	 *
+	 * Supports both delta-seconds (`Retry-After: 5`) and HTTP-date forms. When
+	 * the client does not surface headers on the failure path (the common case
+	 * today) this returns null and the caller falls back to exponential backoff.
+	 *
+	 * @param array $result HttpClient-shaped result.
+	 * @return int|null Seconds to wait, or null when unavailable.
+	 */
+	private function retry_after_seconds( array $result ): ?int {
+		$headers = $result['headers'] ?? null;
+
+		$value = null;
+		if ( is_array( $headers ) ) {
+			foreach ( $headers as $name => $header_value ) {
+				if ( 0 === strcasecmp( (string) $name, 'Retry-After' ) ) {
+					$value = is_array( $header_value ) ? reset( $header_value ) : $header_value;
+					break;
+				}
+			}
+		} elseif ( is_object( $headers ) && method_exists( $headers, 'offsetGet' ) && method_exists( $headers, 'offsetExists' ) ) {
+			// wp_remote_retrieve_headers() returns a Requests case-insensitive
+			// dictionary implementing ArrayAccess.
+			if ( $headers->offsetExists( 'retry-after' ) ) {
+				$value = $headers->offsetGet( 'retry-after' );
+			}
+		}
+
+		if ( null === $value || '' === $value ) {
+			return null;
+		}
+
+		$value = trim( (string) $value );
+
+		if ( ctype_digit( $value ) ) {
+			return (int) $value;
+		}
+
+		$timestamp = strtotime( $value );
+		if ( false === $timestamp ) {
+			return null;
+		}
+
+		return max( $timestamp - time(), 0 );
 	}
 
 	private function map_ticketmaster_event( array $tm_event ): array {
