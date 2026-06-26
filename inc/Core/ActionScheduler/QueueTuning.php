@@ -82,15 +82,40 @@ add_action(
  *
  * A deadlock is transient and retryable by design — the database itself tells us
  * to restart the transaction. So instead of letting it become a fatal, we replace
- * the default queue-runner callback with one that retries run() a few times with a
- * short jittered backoff when the failure is a transient deadlock, and re-throws
- * anything else unchanged. We cannot patch the vendored Action Scheduler library,
- * so this guard lives in DM where it owns the runner wiring (mirroring how
+ * the default queue-runner callback with one that retries run() with an
+ * exponential, jittered backoff when the failure is a transient deadlock, and
+ * re-throws anything else unchanged. We cannot patch the vendored Action Scheduler
+ * library, so this guard lives in DM where it owns the runner wiring (mirroring how
  * datamachine_enable_cron_async_dispatch() already swaps an AS shutdown callback).
+ *
+ * Two correctness details this function has to get right:
+ *
+ *  1. Idempotency. `action_scheduler_init` can fire more than once in a request
+ *     (notably on multisite, where AS may initialize across switch_to_blog()
+ *     contexts). Without a guard, each fire would stack another wrapper closure on
+ *     `action_scheduler_run_queue` — the queue would then run two-plus times per
+ *     dispatch, multiplying the concurrent claim_actions() pressure that causes the
+ *     deadlock in the first place. A static guard makes the swap happen once per
+ *     request.
+ *
+ *  2. Sufficient retry budget. Under concurrent batches (default 3) the same hot
+ *     rows can deadlock several times in quick succession, so a 3-attempt /
+ *     ~150ms-ceiling budget can still exhaust and surface the fatal. We widen the
+ *     budget to 5 attempts with exponential backoff (up to ~800ms + jitter), which
+ *     stays well inside the batch time limit while giving competing transactions
+ *     room to commit and release their locks.
  *
  * @since 0.153.6
  */
 function datamachine_install_deadlock_resilient_runner(): void {
+	static $installed = false;
+
+	// `action_scheduler_init` can fire multiple times per request; only swap once.
+	if ( $installed ) {
+		return;
+	}
+	$installed = true;
+
 	$runner = \ActionScheduler::runner();
 
 	// Swap AS's default `run` callback for a deadlock-resilient wrapper.
@@ -99,7 +124,7 @@ function datamachine_install_deadlock_resilient_runner(): void {
 	add_action(
 		'action_scheduler_run_queue',
 		function ( $context = '' ) use ( $runner ) {
-			$max_attempts = 3;
+			$max_attempts = 5;
 			$attempt      = 0;
 
 			while ( true ) {
@@ -113,11 +138,12 @@ function datamachine_install_deadlock_resilient_runner(): void {
 						throw $e;
 					}
 
-					// Transient deadlock: back off briefly with jitter, then retry.
-					// 50ms, 100ms (+ up to 50ms jitter) keeps us well inside the
-					// batch time limit while giving the competing transaction time
-					// to commit and release its locks.
-					$backoff_us = ( 50000 * $attempt ) + random_int( 0, 50000 );
+					// Transient deadlock: back off with exponential, jittered delay,
+					// then retry. 50/100/200/400ms (+ up to 50ms jitter) caps total
+					// backoff under ~1s — comfortably inside the batch time limit —
+					// while giving the competing transaction time to commit and
+					// release its locks.
+					$backoff_us = ( 50000 * ( 2 ** ( $attempt - 1 ) ) ) + random_int( 0, 50000 );
 					usleep( $backoff_us );
 				}
 			}
