@@ -132,8 +132,9 @@ class SettingsAbilities {
 						'ai_provider_keys'               => array( 'type' => 'object' ),
 						'queue_tuning'                   => array(
 							'type'        => 'object',
-							'description' => 'Queue tuning — producer side (chunk_size/chunk_delay control how DM creates child jobs) and consumer side (concurrent_batches/batch_size/time_limit control how Action Scheduler drains them).',
+							'description' => 'Queue tuning — admission side (max_active_jobs caps how many in-flight jobs DM admits before deferring new scheduler runs), producer side (chunk_size/chunk_delay control how DM creates child jobs) and consumer side (concurrent_batches/batch_size/time_limit control how Action Scheduler drains them).',
 							'properties'  => array(
+								'max_active_jobs'    => array( 'type' => 'integer' ),
 								'concurrent_batches' => array( 'type' => 'integer' ),
 								'batch_size'         => array( 'type' => 'integer' ),
 								'time_limit'         => array( 'type' => 'integer' ),
@@ -559,6 +560,12 @@ class SettingsAbilities {
 		// Queue tuning settings for Action Scheduler
 		if ( isset( $input['queue_tuning'] ) && is_array( $input['queue_tuning'] ) ) {
 			$tuning = wp_parse_args( $all_settings['queue_tuning'] ?? array(), PluginSettings::getDefaultQueueTuning() );
+
+			if ( isset( $input['queue_tuning']['max_active_jobs'] ) ) {
+				// 0 disables admission throttling; otherwise clamp to a sane ceiling.
+				$max_active                = absint( $input['queue_tuning']['max_active_jobs'] );
+				$tuning['max_active_jobs'] = min( PluginSettings::MAX_QUEUE_MAX_ACTIVE_JOBS, $max_active );
+			}
 
 			if ( isset( $input['queue_tuning']['concurrent_batches'] ) ) {
 				$batches                      = absint( $input['queue_tuning']['concurrent_batches'] );

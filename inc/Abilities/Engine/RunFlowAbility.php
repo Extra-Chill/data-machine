@@ -25,6 +25,19 @@ class RunFlowAbility {
 
 	use EngineHelpers;
 
+	/**
+	 * Default ceiling on in-flight (pending + processing) jobs before new
+	 * scheduler-triggered runs are deferred. Tunable via the queue_tuning
+	 * setting `max_active_jobs` or the `datamachine_max_active_jobs` filter.
+	 */
+	public const DEFAULT_MAX_ACTIVE_JOBS = 500;
+
+	/**
+	 * Default backoff (seconds) before a backpressured flow is retried.
+	 * Tunable via the `datamachine_backpressure_defer_seconds` filter.
+	 */
+	public const DEFAULT_BACKPRESSURE_DEFER_SECONDS = 60;
+
 	public function __construct() {
 		$this->initDatabases();
 
@@ -174,6 +187,20 @@ class RunFlowAbility {
 
 		// Use provided job_id or create new one (for scheduled/recurring flows).
 		if ( ! $job_id ) {
+			// Admission throttle for scheduler-triggered runs. When the queue
+			// already holds at least $max_active in-flight (pending/processing)
+			// jobs, defer this run instead of admitting another job. Each job
+			// fans out into a chain of execute_step actions, so unbounded
+			// admission is what bloats the Action Scheduler tables and starves
+			// the claim query into deadlocks. Manual/API runs (respect_paused
+			// === false, or a pre-created job_id) are never throttled.
+			if ( $respect_paused ) {
+				$defer = $this->maybeDeferForBackpressure( $flow_id );
+				if ( null !== $defer ) {
+					return $defer;
+				}
+			}
+
 			$job_data = array(
 				'pipeline_id' => $pipeline_id,
 				'flow_id'     => $flow_id,
@@ -363,6 +390,121 @@ class RunFlowAbility {
 			'job_id'     => $job_id,
 			'first_step' => $first_flow_step_id,
 		);
+	}
+
+	/**
+	 * Defer a scheduler-triggered run when the queue is already saturated.
+	 *
+	 * Reads the in-flight (pending + processing) job count and compares it to
+	 * the configured ceiling. When at or over the ceiling, reschedules
+	 * `datamachine_run_flow_now` for this flow a short, jittered delay later
+	 * and returns a skip result so no new job is admitted. Below the ceiling
+	 * (or when throttling is disabled with a ceiling <= 0) returns null and the
+	 * caller proceeds to admit the job normally.
+	 *
+	 * The jittered backoff prevents a thundering-herd re-stampede where every
+	 * deferred flow wakes at the same instant and saturates the queue again.
+	 *
+	 * @param int $flow_id Flow being scheduled.
+	 * @return array{success:bool,flow_id:int,job_id:null,skipped:bool,reason:string}|null
+	 *               Skip result when deferred, or null to proceed.
+	 */
+	private function maybeDeferForBackpressure( int $flow_id ): ?array {
+		$max_active = self::maxActiveJobs();
+		if ( $max_active <= 0 ) {
+			return null;
+		}
+
+		$active = $this->db_jobs->count_active_jobs();
+		if ( $active < $max_active ) {
+			return null;
+		}
+
+		$delay = self::backpressureDeferSeconds( $flow_id );
+
+		if ( function_exists( 'as_schedule_single_action' ) ) {
+			// Only enqueue a deferral tick if one is not already pending for
+			// this flow, so repeated saturated cycles don't pile up duplicate
+			// wake-ups for the same flow.
+			$already_pending = function_exists( 'as_next_scheduled_action' )
+				&& false !== as_next_scheduled_action( 'datamachine_run_flow_now', array( $flow_id ), 'data-machine' );
+
+			if ( ! $already_pending ) {
+				as_schedule_single_action(
+					time() + $delay,
+					'datamachine_run_flow_now',
+					array( $flow_id ),
+					'data-machine'
+				);
+			}
+		}
+
+		do_action(
+			'datamachine_log',
+			'info',
+			'Flow execution deferred - queue backpressure',
+			array(
+				'flow_id'       => $flow_id,
+				'active_jobs'   => $active,
+				'max_active'    => $max_active,
+				'defer_seconds' => $delay,
+				'reason'        => 'queue_backpressure',
+			)
+		);
+
+		return array(
+			'success' => true,
+			'flow_id' => $flow_id,
+			'job_id'  => null,
+			'skipped' => true,
+			'reason'  => 'queue_backpressure',
+		);
+	}
+
+	/**
+	 * Resolve the maximum number of in-flight jobs before new scheduler-
+	 * triggered runs are deferred.
+	 *
+	 * Reads queue_tuning.max_active_jobs and runs it through the
+	 * `datamachine_max_active_jobs` filter. A value of 0 (or less) disables
+	 * admission throttling entirely (the prior unbounded behavior).
+	 *
+	 * @return int Ceiling on in-flight jobs (0 disables throttling).
+	 */
+	private static function maxActiveJobs(): int {
+		$tuning  = \DataMachine\Core\PluginSettings::get( 'queue_tuning', array() );
+		$default = ( is_array( $tuning ) && isset( $tuning['max_active_jobs'] ) )
+			? (int) $tuning['max_active_jobs']
+			: self::DEFAULT_MAX_ACTIVE_JOBS;
+
+		/**
+		 * Filter the in-flight job ceiling used for scheduler admission control.
+		 *
+		 * @param int $default The resolved ceiling. 0 (or less) disables throttling.
+		 */
+		$max = (int) apply_filters( 'datamachine_max_active_jobs', $default );
+
+		return $max > 0 ? $max : 0;
+	}
+
+	/**
+	 * Resolve the deferral backoff (seconds) for a backpressured flow, with
+	 * deterministic per-flow jitter to avoid a synchronized re-stampede.
+	 *
+	 * @param int $flow_id Flow being deferred (used as the jitter seed).
+	 * @return int Delay in seconds (always >= 1).
+	 */
+	private static function backpressureDeferSeconds( int $flow_id ): int {
+		$base = (int) apply_filters( 'datamachine_backpressure_defer_seconds', self::DEFAULT_BACKPRESSURE_DEFER_SECONDS );
+		if ( $base < 1 ) {
+			$base = self::DEFAULT_BACKPRESSURE_DEFER_SECONDS;
+		}
+
+		// Deterministic jitter in [0, base) spreads deferred flows across the
+		// window instead of waking them all at base seconds.
+		$jitter = absint( crc32( 'dm_backpressure_' . $flow_id ) ) % $base;
+
+		return $base + $jitter;
 	}
 
 	/**
