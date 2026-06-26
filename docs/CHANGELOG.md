@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.153.7] - 2026-06-26
+
+### Fixed
+- retry lifecycle state transitions on transient DB deadlocks
+
 ## [0.153.6] - 2026-06-25
 
 ### Changed
