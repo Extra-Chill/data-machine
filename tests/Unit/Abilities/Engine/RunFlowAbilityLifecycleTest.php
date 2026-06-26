@@ -124,7 +124,12 @@ class RunFlowAbilityLifecycleTest extends WP_UnitTestCase {
 		$this->assertTrue( $result['success'] ?? false );
 		$this->assertTrue( $result['skipped'] ?? false );
 		$this->assertSame( 'queue_backpressure', $result['reason'] ?? '' );
-		$this->assertNull( $result['job_id'] ?? 'unset' );
+		// On a backpressure defer the result carries an explicit null job_id
+		// (no job admitted). Assert the key exists and is null directly — the
+		// `?? 'unset'` idiom would coerce a legitimate null into the default
+		// and make assertNull() impossible to satisfy.
+		$this->assertArrayHasKey( 'job_id', $result );
+		$this->assertNull( $result['job_id'] );
 
 		// No new job was admitted.
 		$this->assertSame( $jobs_before, $jobs->count_active_jobs() );
