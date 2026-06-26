@@ -439,6 +439,33 @@ class Jobs extends BaseRepository {
 	}
 
 	/**
+	 * Count in-flight (non-terminal) jobs.
+	 *
+	 * "In-flight" means a job that Action Scheduler is still fanning out work
+	 * for: pending (admitted, first step not yet scheduled) or processing
+	 * (executing steps). This is the load the scheduler must throttle against
+	 * — every in-flight job spawns a chain of `datamachine_execute_step`
+	 * actions, so admitting an unbounded number of them is what bloats the
+	 * Action Scheduler tables and deadlocks the claim query.
+	 *
+	 * Deliberately a single cheap COUNT over an indexed status column — it
+	 * never hydrates or decodes the heavy engine_data blob.
+	 *
+	 * @return int Number of pending + processing jobs.
+	 */
+	public function count_active_jobs(): int {
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		return (int) $this->wpdb->get_var(
+			$this->wpdb->prepare(
+				'SELECT COUNT(job_id) FROM %i WHERE status IN (%s, %s)',
+				$this->table_name,
+				'pending',
+				'processing'
+			)
+		);
+	}
+
+	/**
 	 * Get memory-safe aggregate job summary counts.
 	 *
 	 * Uses grouped SQL queries so operator dashboards can inspect large job

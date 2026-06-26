@@ -30,6 +30,7 @@ class PluginSettings {
 	public const MAX_QUEUE_TIME_LIMIT                  = 300;
 	public const MAX_QUEUE_CHUNK_SIZE                  = 500;
 	public const MAX_QUEUE_CHUNK_DELAY                 = 300;
+	public const MAX_QUEUE_MAX_ACTIVE_JOBS             = 100000;
 	public const DEFAULT_WP_AI_CLIENT_CONNECT_TIMEOUT  = 15.0;
 	public const DEFAULT_WP_AI_CLIENT_REQUEST_TIMEOUT  = 300.0;
 	public const MAX_WP_AI_CLIENT_CONNECT_TIMEOUT      = 300.0;
@@ -41,7 +42,12 @@ class PluginSettings {
 	/**
 	 * Get default queue tuning values.
 	 *
-	 * Five knobs across two layers:
+	 * Six knobs across three layers:
+	 *
+	 *   Admission side (RunFlowAbility — whether DM admits a new flow job):
+	 *     - max_active_jobs: ceiling on in-flight (pending + processing) jobs
+	 *                        before scheduler-triggered runs are deferred.
+	 *                        0 disables admission throttling.
 	 *
 	 *   Producer side (BatchScheduler — how DM creates child jobs):
 	 *     - chunk_size:  child jobs created per scheduling cycle
@@ -52,10 +58,11 @@ class PluginSettings {
 	 *     - batch_size:         actions claimed per AS batch
 	 *     - time_limit:         seconds per AS batch
 	 *
-	 * @return array{concurrent_batches:int,batch_size:int,time_limit:int,chunk_size:int,chunk_delay:int}
+	 * @return array{max_active_jobs:int,concurrent_batches:int,batch_size:int,time_limit:int,chunk_size:int,chunk_delay:int}
 	 */
 	public static function getDefaultQueueTuning(): array {
 		return array(
+			'max_active_jobs'    => \DataMachine\Abilities\Engine\RunFlowAbility::DEFAULT_MAX_ACTIVE_JOBS,
 			'concurrent_batches' => 3,
 			'batch_size'         => 25,
 			'time_limit'         => 60,
