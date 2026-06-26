@@ -311,6 +311,9 @@ class SystemAbilities {
 				'oldest_due_gmt'   => $due['oldest_gmt'],
 				'next_pending_gmt' => $pending['oldest_gmt'],
 				'last_attempt_gmt' => $complete['last_attempt_gmt'],
+				'table_sizes'      => function_exists( 'as_get_scheduled_actions' ) && class_exists( '\\ActionScheduler' )
+					? \DataMachine\Engine\AI\System\Tasks\Retention\RetentionCleanup::actionSchedulerTableSizes()
+					: null,
 			),
 			'wp_cron'                 => array(
 				'action_scheduler_run_queue_next_gmt' => is_int( $wp_cron_next ) ? gmdate( 'Y-m-d H:i:s', $wp_cron_next ) : null,

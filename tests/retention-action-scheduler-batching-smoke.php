@@ -499,6 +499,60 @@ namespace {
 		'ceiling_deleted=' . ( $ceiling_result['ceiling_actions_deleted'] ?? 0 )
 	);
 
+	// -----------------------------------------------------------------------
+	// 4. Bloat guardrail + catch-up reschedule (#2792).
+	// -----------------------------------------------------------------------
+
+	$task = file_get_contents( $root . '/inc/Engine/AI/System/Tasks/Retention/RetentionActionSchedulerTask.php' ) ?: '';
+
+	assert_batching(
+		'guardrail threshold is filterable',
+		str_contains( $cleanup, "apply_filters( 'datamachine_as_table_size_threshold'" )
+	);
+	assert_batching(
+		'guardrail logs a warning when a table is over threshold',
+		str_contains( $cleanup, "'warning'," )
+			&& str_contains( $cleanup, 'Action Scheduler bloat guardrail' )
+	);
+	assert_batching(
+		'cleanup attaches live table sizes to its result',
+		(bool) preg_match( "/'table_sizes'\\s+=>\\s+\\\$table_sizes/", $cleanup )
+			&& str_contains( $cleanup, 'checkActionSchedulerTableSizes()' )
+	);
+	assert_batching(
+		'read-only table-size method exists for health surfaces',
+		str_contains( $cleanup, 'public static function actionSchedulerTableSizes()' )
+	);
+	assert_batching(
+		'AS retention task enqueues a catch-up pass when a run hits its limit',
+		str_contains( $task, 'maybeScheduleCatchUp' )
+			&& str_contains( $task, 'TaskScheduler::schedule( RetentionCleanup::TASK_AS_ACTIONS' )
+	);
+	assert_batching(
+		'catch-up only fires when the pass made progress (guards hot loop)',
+		str_contains( $task, '$hit_limit && $deleted > 0' )
+	);
+
+	// Functional: threshold filter clamps to 0 (disabled) and back.
+	retention_set_filter( 'datamachine_as_table_size_threshold', 0 );
+	assert_batching(
+		'threshold of 0 disables the guardrail',
+		0 === RetentionCleanup::actionSchedulerTableSizeThreshold()
+	);
+	retention_set_filter( 'datamachine_as_table_size_threshold', 5000 );
+	assert_batching(
+		'threshold is read from the filter',
+		5000 === RetentionCleanup::actionSchedulerTableSizeThreshold()
+	);
+
+	// Functional: a disabled guardrail short-circuits without counting.
+	retention_set_filter( 'datamachine_as_table_size_threshold', 0 );
+	$disabled = RetentionCleanup::checkActionSchedulerTableSizes();
+	assert_batching(
+		'disabled guardrail returns enabled=false and breached=false',
+		false === $disabled['enabled'] && false === $disabled['breached']
+	);
+
 	if ( $failed > 0 ) {
 		echo "\nretention-action-scheduler-batching-smoke failed: {$failed}/{$total} assertions failed.\n";
 		exit( 1 );

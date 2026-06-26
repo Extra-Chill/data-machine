@@ -250,6 +250,132 @@ class RetentionCleanup {
 		return $threshold > 0 ? $threshold : 100000;
 	}
 
+	/**
+	 * Row-count threshold above which an Action Scheduler table is flagged.
+	 *
+	 * A bloat guardrail: when either `actionscheduler_actions` or
+	 * `actionscheduler_logs` exceeds this many rows after a cleanup pass, a
+	 * `warning` is logged so an operator (or the system health surface) notices
+	 * before the tables silently grow to tens of GB again — which is exactly
+	 * how blog 7 reached a 30GB / 25M-row actions table while daily retention
+	 * was running but could not keep up with a runaway producer.
+	 *
+	 * Default is 1,000,000 rows. A value of `0` (or less) disables the check.
+	 *
+	 * @return int Row-count threshold (>= 0; 0 disables the guardrail).
+	 */
+	public static function actionSchedulerTableSizeThreshold(): int {
+		$threshold = (int) apply_filters( 'datamachine_as_table_size_threshold', 1000000 );
+		return $threshold > 0 ? $threshold : 0;
+	}
+
+	/**
+	 * Read-only row counts for the Action Scheduler tables.
+	 *
+	 * Pure read with no side effects — safe for health/diagnostic surfaces.
+	 * Returns the per-table counts plus a `breached` flag against the configured
+	 * threshold. When the threshold is disabled (`<= 0`) `breached` is always
+	 * false but the live counts are still returned for reporting.
+	 *
+	 * NOTE: `SELECT COUNT(*)` on InnoDB is a full index scan. On the very
+	 * installs this guardrail targets (multi-million-row tables) that is not
+	 * free, so callers should treat it as a periodic check, not a hot path.
+	 *
+	 * @return array{enabled: bool, threshold: int, actions: int, logs: int, breached: bool}
+	 */
+	public static function actionSchedulerTableSizes(): array {
+		global $wpdb;
+
+		$threshold     = self::actionSchedulerTableSizeThreshold();
+		$actions_table = $wpdb->prefix . 'actionscheduler_actions';
+		$logs_table    = $wpdb->prefix . 'actionscheduler_logs';
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$actions_rows = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i', $actions_table ) );
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$logs_rows = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i', $logs_table ) );
+
+		$breached = $threshold > 0 && ( $actions_rows > $threshold || $logs_rows > $threshold );
+
+		return array(
+			'enabled'   => $threshold > 0,
+			'threshold' => $threshold,
+			'actions'   => $actions_rows,
+			'logs'      => $logs_rows,
+			'breached'  => $breached,
+		);
+	}
+
+	/**
+	 * Emit a guardrail warning when an Action Scheduler table is oversized.
+	 *
+	 * Counts rows in the actions and logs tables and logs a `warning` for each
+	 * one over `actionSchedulerTableSizeThreshold()`. Returns the per-table
+	 * counts and a `breached` flag so callers (the AS retention task) can react
+	 * — e.g. enqueue an immediate catch-up pass. Skipped entirely when the
+	 * threshold is disabled.
+	 *
+	 * @return array{enabled: bool, threshold: int, actions: int, logs: int, breached: bool}
+	 */
+	public static function checkActionSchedulerTableSizes(): array {
+		$threshold = self::actionSchedulerTableSizeThreshold();
+		if ( $threshold <= 0 ) {
+			return array(
+				'enabled'   => false,
+				'threshold' => 0,
+				'actions'   => 0,
+				'logs'      => 0,
+				'breached'  => false,
+			);
+		}
+
+		$sizes        = self::actionSchedulerTableSizes();
+		$actions_rows = $sizes['actions'];
+		$logs_rows    = $sizes['logs'];
+
+		global $wpdb;
+		$actions_table = $wpdb->prefix . 'actionscheduler_actions';
+		$logs_table    = $wpdb->prefix . 'actionscheduler_logs';
+
+		$breached = false;
+
+		if ( $actions_rows > $threshold ) {
+			$breached = true;
+			do_action(
+				'datamachine_log',
+				'warning',
+				'Action Scheduler bloat guardrail: actions table over threshold',
+				array(
+					'table'     => $actions_table,
+					'rows'      => $actions_rows,
+					'threshold' => $threshold,
+				)
+			);
+		}
+
+		if ( $logs_rows > $threshold ) {
+			$breached = true;
+			do_action(
+				'datamachine_log',
+				'warning',
+				'Action Scheduler bloat guardrail: logs table over threshold',
+				array(
+					'table'     => $logs_table,
+					'rows'      => $logs_rows,
+					'threshold' => $threshold,
+				)
+			);
+		}
+
+		return array(
+			'enabled'   => true,
+			'threshold' => $threshold,
+			'actions'   => $actions_rows,
+			'logs'      => $logs_rows,
+			'breached'  => $breached,
+		);
+	}
+
 	public static function staleClaimMaxAgeSeconds(): int {
 		$seconds = absint( apply_filters( 'datamachine_stale_claim_max_age', DAY_IN_SECONDS ) );
 		return $seconds > 0 ? $seconds : DAY_IN_SECONDS;
@@ -727,6 +853,12 @@ class RetentionCleanup {
 			);
 		}
 
+		// Bloat guardrail: after every pass, check the live table sizes and
+		// warn if either is still oversized. This is the safety net that was
+		// missing when blog 7 silently grew to 30GB — daily retention ran but
+		// nothing ever flagged that it was falling behind.
+		$table_sizes = self::checkActionSchedulerTableSizes();
+
 		return array(
 			'deleted'                 => $total_deleted,
 			'actions_deleted'         => $actions_deleted,
@@ -738,6 +870,7 @@ class RetentionCleanup {
 			'iterations'              => $iterations_used,
 			'hit_limit'               => $hit_limit,
 			'optimized'               => $optimized,
+			'table_sizes'             => $table_sizes,
 		);
 	}
 
