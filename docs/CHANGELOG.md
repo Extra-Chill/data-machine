@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.153.8] - 2026-06-26
+
+### Fixed
+- retry Action Scheduler claim on transient deadlock instead of fataling
+
 ## [0.153.7] - 2026-06-26
 
 ### Fixed
