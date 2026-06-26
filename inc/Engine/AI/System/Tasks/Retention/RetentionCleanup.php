@@ -686,7 +686,7 @@ class RetentionCleanup {
 		// a hook beyond its cap regardless of age, so the table is physically
 		// bounded by generation spikes. Shares the same batch + iteration +
 		// wall-clock budget as the age passes.
-		$ceiling = self::enforceActionSchedulerRowCeilings(
+		$ceiling          = self::enforceActionSchedulerRowCeilings(
 			$actions_table,
 			$logs_table,
 			$batch_size,
