@@ -2,6 +2,16 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.154.0] - 2026-06-26
+
+### Added
+- bound Action Scheduler tables with row-count ceiling + frequent retention
+- throttle flow-job admission to cap Action Scheduler queue growth
+
+### Fixed
+- satisfy strict phpcs NotPrepared sniff in count_active_jobs
+- bound AI concurrency defers to stop runaway action generation
+
 ## [0.153.9] - 2026-06-26
 
 ### Fixed
