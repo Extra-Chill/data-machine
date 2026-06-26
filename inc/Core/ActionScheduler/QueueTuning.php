@@ -61,8 +61,88 @@ add_action(
 		} );
 
 		datamachine_enable_cron_async_dispatch();
+		datamachine_install_deadlock_resilient_runner();
 	}
 );
+
+/**
+ * Make the Action Scheduler queue runner resilient to transient claim deadlocks.
+ *
+ * DM runs the queue runner with concurrent batches enabled (default 3) and also
+ * drops Action Scheduler's is_admin() gate on the async dispatch chain (see
+ * datamachine_enable_cron_async_dispatch()), so multiple runner processes can
+ * call ActionScheduler_DBStore::claim_actions() at the same time. That method
+ * issues an `UPDATE ... JOIN` against the actions table; when several of those
+ * run concurrently against the same hot rows, MariaDB/MySQL can return a
+ * deadlock ("Deadlock found when trying to get lock; try restarting transaction").
+ *
+ * Action Scheduler treats that as fatal: claim_actions() throws an uncaught
+ * RuntimeException from ActionScheduler_DBStore.php, which bubbles out of
+ * ActionScheduler_QueueRunner::run() and crashes the request with a PHP fatal.
+ *
+ * A deadlock is transient and retryable by design — the database itself tells us
+ * to restart the transaction. So instead of letting it become a fatal, we replace
+ * the default queue-runner callback with one that retries run() a few times with a
+ * short jittered backoff when the failure is a transient deadlock, and re-throws
+ * anything else unchanged. We cannot patch the vendored Action Scheduler library,
+ * so this guard lives in DM where it owns the runner wiring (mirroring how
+ * datamachine_enable_cron_async_dispatch() already swaps an AS shutdown callback).
+ *
+ * @since 0.153.6
+ */
+function datamachine_install_deadlock_resilient_runner(): void {
+	$runner = \ActionScheduler::runner();
+
+	// Swap AS's default `run` callback for a deadlock-resilient wrapper.
+	remove_action( 'action_scheduler_run_queue', array( $runner, 'run' ) );
+
+	add_action(
+		'action_scheduler_run_queue',
+		function ( $context = '' ) use ( $runner ) {
+			$max_attempts = 3;
+			$attempt      = 0;
+
+			while ( true ) {
+				$attempt++;
+
+				try {
+					return $runner->run( $context );
+				} catch ( \RuntimeException $e ) {
+					if ( ! datamachine_is_transient_deadlock( $e ) || $attempt >= $max_attempts ) {
+						// Not retryable, or we're out of attempts — let it surface.
+						throw $e;
+					}
+
+					// Transient deadlock: back off briefly with jitter, then retry.
+					// 50ms, 100ms (+ up to 50ms jitter) keeps us well inside the
+					// batch time limit while giving the competing transaction time
+					// to commit and release its locks.
+					$backoff_us = ( 50000 * $attempt ) + random_int( 0, 50000 );
+					usleep( $backoff_us );
+				}
+			}
+		},
+		10,
+		1
+	);
+}
+
+/**
+ * Determine whether an exception represents a transient, retryable DB deadlock.
+ *
+ * Action Scheduler surfaces the raw database error inside the RuntimeException
+ * message (see ActionScheduler_DBStore::claim_actions()), so we match on the
+ * deadlock / lock-wait signatures the database emits.
+ *
+ * @param \Throwable $e Exception thrown while claiming actions.
+ * @return bool True when the failure is a transient deadlock or lock-wait timeout.
+ */
+function datamachine_is_transient_deadlock( \Throwable $e ): bool {
+	$message = $e->getMessage();
+
+	return false !== stripos( $message, 'Deadlock found when trying to get lock' )
+		|| false !== stripos( $message, 'Lock wait timeout exceeded' );
+}
 
 /**
  * Enable async request dispatch from WP-Cron and CLI contexts.
