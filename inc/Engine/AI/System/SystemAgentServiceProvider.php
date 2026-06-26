@@ -218,15 +218,20 @@ class SystemAgentServiceProvider {
 					'label'           => 'Daily processed-items cleanup',
 				)
 			),
-			RetentionCleanup::TASK_AS_ACTIONS      => array_merge(
-				$daily_first_run,
-				array(
-					'task_type'       => RetentionCleanup::TASK_AS_ACTIONS,
-					'interval'        => 'daily',
-					'enabled_setting' => 'retention_as_actions_enabled',
-					'default_enabled' => true,
-					'label'           => 'Daily Action Scheduler action cleanup',
-				)
+			// Action Scheduler actions are the highest-churn table on busy
+			// installs: a single step-execution fan-out can add millions of
+			// completed rows per day (~tens per second). A once-daily,
+			// time-boxed pass deletes far fewer rows than accrue between runs,
+			// so the table grows without bound. Run this one on a short cadence
+			// so cleanup chips continuously and keeps pace with generation.
+			RetentionCleanup::TASK_AS_ACTIONS      => array(
+				'task_type'          => RetentionCleanup::TASK_AS_ACTIONS,
+				'interval'           => 'every_5_minutes',
+				'enabled_setting'    => 'retention_as_actions_enabled',
+				'default_enabled'    => true,
+				'label'              => 'Action Scheduler action cleanup (high-frequency)',
+				'first_run_callback' => 'strtotime',
+				'first_run_arg'      => '+5 minutes',
 			),
 			RetentionCleanup::TASK_STALE_CLAIMS    => array_merge(
 				$daily_first_run,

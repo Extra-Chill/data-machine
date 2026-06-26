@@ -97,7 +97,23 @@ namespace {
 	);
 	assert_batching(
 		'default per-hook override targets execute_step',
-		str_contains( $cleanup, "'datamachine_execute_step' => 0.25" )
+		str_contains( $cleanup, "'datamachine_execute_step' => 1 / 24" )
+	);
+	assert_batching(
+		'per-hook row-count ceiling is filterable',
+		str_contains( $cleanup, "apply_filters( 'datamachine_as_actions_hook_max_rows'" )
+	);
+	assert_batching(
+		'default row-count ceiling targets execute_step',
+		str_contains( $cleanup, "'datamachine_execute_step' => 100000" )
+	);
+	assert_batching(
+		'ceiling probe selects cutoff via OFFSET on max_rows',
+		str_contains( $cleanup, 'ORDER BY last_attempt_gmt DESC LIMIT 1 OFFSET %d' )
+	);
+	assert_batching(
+		'ceiling enforcement is wired into the cleanup pass',
+		str_contains( $cleanup, 'enforceActionSchedulerRowCeilings' )
 	);
 	assert_batching(
 		'iteration + runtime safety caps exist',
@@ -151,9 +167,30 @@ namespace {
 			);
 		}
 
-		public function get_var( $prepared ): int {
-			$sql    = $prepared['sql'];
-			$args   = $prepared['args'];
+		public function get_var( $prepared ) {
+			$sql  = $prepared['sql'];
+			$args = $prepared['args'];
+
+			// Row-count ceiling probe: return the last_attempt_gmt at OFFSET
+			// $max_rows among the most-recent completed/terminal rows for the
+			// hook (or null when fewer than $max_rows exist).
+			if ( str_contains( $sql, 'ORDER BY last_attempt_gmt DESC LIMIT 1 OFFSET' ) ) {
+				$hook   = $this->extract_hook( $sql, $args );
+				$offset = (int) end( $args );
+				$rows   = array();
+				foreach ( $this->actions as $row ) {
+					if ( ! in_array( $row['status'], array( 'complete', 'failed', 'canceled' ), true ) ) {
+						continue;
+					}
+					if ( null !== $hook && $row['hook'] !== $hook ) {
+						continue;
+					}
+					$rows[] = $row['last_attempt_gmt'];
+				}
+				rsort( $rows );
+				return $rows[ $offset ] ?? null;
+			}
+
 			$cutoff = $this->extract_cutoff( $args );
 			$hook   = $this->extract_hook( $sql, $args );
 
@@ -406,6 +443,60 @@ namespace {
 		$fake_wpdb->optimize_calls >= 1
 			&& in_array( 'wp_actionscheduler_actions', $opt_result['optimized'], true ),
 		"optimize_calls={$fake_wpdb->optimize_calls}"
+	);
+
+	// -----------------------------------------------------------------------
+	// 3. Functional row-count ceiling: rows within the age window but beyond
+	//    the per-hook ceiling must still be deleted (oldest-first).
+	// -----------------------------------------------------------------------
+
+	$fake_wpdb->actions        = array();
+	$fake_wpdb->logs           = array();
+	$fake_wpdb->delete_queries = 0;
+	$fake_wpdb->optimize_calls = 0;
+	$fake_wpdb->batch_sizes    = array();
+
+	// Reset filters from the OPTIMIZE block, then cap execute_step at 10 rows
+	// and disable the age window for it (large negative-ish window) so ONLY the
+	// ceiling can delete. Seed 25 fresh execute_step rows with distinct, recent
+	// timestamps (within any age window) — 15 should be deleted by the ceiling,
+	// the 10 most-recent must survive.
+	$GLOBALS['__retention_filters'] = array();
+	retention_set_filter( 'datamachine_as_actions_hook_max_age_days', array( 'datamachine_execute_step' => 3650.0 ) );
+	retention_set_filter( 'datamachine_as_actions_hook_max_rows', array( 'datamachine_execute_step' => 10 ) );
+
+	$caid = 1;
+	for ( $i = 0; $i < 25; $i++ ) {
+		// Distinct timestamps, all very recent (i seconds ago).
+		$fake_wpdb->actions[ $caid ] = array(
+			'action_id'        => $caid,
+			'hook'             => 'datamachine_execute_step',
+			'status'           => 'complete',
+			'last_attempt_gmt' => gmdate( 'Y-m-d H:i:s', $now - ( 25 - $i ) ),
+		);
+		++$caid;
+	}
+
+	$ceiling_result = RetentionCleanup::cleanupActionSchedulerActions();
+
+	$surviving = array_filter(
+		$fake_wpdb->actions,
+		static fn( $r ) => 'datamachine_execute_step' === $r['hook']
+	);
+
+	// Boundary semantics: the deleters use strictly `< cutoff`, and the cutoff
+	// is the timestamp AT offset $max_rows. So the boundary row survives too —
+	// we keep $max_rows + 1 (never over-delete) and delete the rest. With 25
+	// rows and a cap of 10, that is 11 kept / 14 deleted.
+	assert_batching(
+		'row-count ceiling deletes rows beyond the cap despite age window',
+		11 === count( $surviving ),
+		'surviving=' . count( $surviving )
+	);
+	assert_batching(
+		'ceiling kept the most-recent rows (oldest deleted first, boundary kept)',
+		14 === ( $ceiling_result['ceiling_actions_deleted'] ?? 0 ),
+		'ceiling_deleted=' . ( $ceiling_result['ceiling_actions_deleted'] ?? 0 )
 	);
 
 	if ( $failed > 0 ) {

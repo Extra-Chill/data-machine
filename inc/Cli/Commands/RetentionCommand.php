@@ -210,12 +210,23 @@ class RetentionCommand extends BaseCommand {
 			$hook_windows[] = sprintf( '%s=%s', $hook, $this->format_days( $days ) );
 		}
 
+		$hook_ceilings = array();
+		foreach ( RetentionCleanup::actionSchedulerHookMaxRows() as $hook => $max_rows ) {
+			$hook_ceilings[] = sprintf( '%s=%s rows', $hook, number_format_i18n( $max_rows ) );
+		}
+
 		WP_CLI::log( '' );
 		WP_CLI::log( sprintf( 'Global window:   %d days', RetentionCleanup::actionSchedulerMaxAgeDays() ) );
 		WP_CLI::log(
 			sprintf(
 				'Per-hook window: %s',
 				empty( $hook_windows ) ? '(none)' : implode( ', ', $hook_windows )
+			)
+		);
+		WP_CLI::log(
+			sprintf(
+				'Per-hook ceiling: %s',
+				empty( $hook_ceilings ) ? '(none)' : implode( ', ', $hook_ceilings )
 			)
 		);
 		WP_CLI::log( sprintf( 'Batch size:      %d rows/iteration', RetentionCleanup::actionSchedulerBatchSize() ) );
