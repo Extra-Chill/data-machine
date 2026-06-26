@@ -180,6 +180,15 @@ assert_ai_backpressure_smoke( 'existing transport retry classifier remains intac
 assert_ai_backpressure_smoke( 'throttle log includes requested metadata', str_contains( $ai_src, 'rescheduled_for_seconds' ) && str_contains( $ai_src, "'active'" ) && str_contains( $ai_src, "'limit'" ) );
 assert_ai_backpressure_smoke( 'limiter checks for advanced owner leases generically', str_contains( file_get_contents( __DIR__ . '/../inc/Engine/AI/PipelineAIConcurrencyLimiter.php' ) ?: '', 'isAdvancedOwnerLease' ) );
 
+echo "Case 6: concurrency defers are bounded (#2793 runaway guard)\n";
+assert_ai_backpressure_smoke( 'defer attempt budget constant exists', str_contains( $ai_src, 'AI_CONCURRENCY_MAX_DEFERS' ) );
+assert_ai_backpressure_smoke( 'defer budget is filterable', str_contains( $ai_src, 'datamachine_ai_concurrency_max_defers' ) );
+assert_ai_backpressure_smoke( 'defer increments a per-step attempt counter', str_contains( $ai_src, "'attempts'" ) && str_contains( $ai_src, '$prior_attempts + 1' ) );
+assert_ai_backpressure_smoke( 'attempt counter resets when the AI step advances', str_contains( $ai_src, "( \$existing_throttle['flow_step_id'] ?? '' ) === \$this->flow_step_id" ) );
+assert_ai_backpressure_smoke( 'exhausted budget fails the job terminally', str_contains( $ai_src, 'ai_concurrency_defer_exhausted' ) && str_contains( $ai_src, "'retryable'     => false" ) );
+assert_ai_backpressure_smoke( 'exhausted budget clears the throttle marker so the failure is not swallowed', str_contains( $ai_src, "'ai_concurrency_throttle' => array()" ) );
+assert_ai_backpressure_smoke( 'defers back off exponentially under a capped ceiling', str_contains( $ai_src, 'AI_CONCURRENCY_MAX_DEFER_DELAY' ) && str_contains( $ai_src, '2 ** ' ) );
+
 echo "\nAI step backpressure smoke complete: {$total} assertions, {$failed} failures.\n";
 if ( $failed > 0 ) {
 	exit( 1 );

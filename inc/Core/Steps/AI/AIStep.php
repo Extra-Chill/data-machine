@@ -42,6 +42,28 @@ class AIStep extends Step {
 	use QueueableTrait;
 
 	/**
+	 * Maximum number of times an AI step may defer itself because the pipeline
+	 * AI concurrency slot is saturated before it gives up and fails.
+	 *
+	 * Without this ceiling a saturated single-slot limiter (the default
+	 * `pipeline_ai_concurrency_limit` is 1) lets every contending job
+	 * reschedule its own `datamachine_execute_step` action every throttle
+	 * delay, indefinitely. Under a sustained backlog that turns into millions
+	 * of self-rescheduling actions a day (see #2793). Capping the defers makes
+	 * a saturated queue fail loudly and boundedly instead of churning forever.
+	 *
+	 * Filterable via `datamachine_ai_concurrency_max_defers`.
+	 */
+	private const AI_CONCURRENCY_MAX_DEFERS = 30;
+
+	/**
+	 * Ceiling (seconds) for the exponential backoff applied between AI
+	 * concurrency defers. Keeps a long-saturated queue from hammering the
+	 * limiter on the base throttle delay for the full attempt budget.
+	 */
+	private const AI_CONCURRENCY_MAX_DEFER_DELAY = 600;
+
+	/**
 	 * Initialize AI step.
 	 */
 	public function __construct() {
@@ -631,7 +653,86 @@ class AIStep extends Step {
 	 * @param array  $lease_result  Limiter result.
 	 */
 	private function deferForAIConcurrency( string $provider_name, array $lease_result ): void {
-		$delay_seconds = max( 1, (int) ( $lease_result['delay'] ?? 10 ) );
+		// Count defers per job/step so a permanently saturated slot cannot
+		// reschedule this step forever. The throttle state is keyed by
+		// flow_step_id: a job that legitimately advances to a different AI
+		// step starts its own budget rather than inheriting the prior step's.
+		$existing_throttle = $this->engine instanceof \DataMachine\Core\EngineData
+			? $this->engine->get( 'ai_concurrency_throttle' )
+			: null;
+		$existing_throttle = is_array( $existing_throttle ) ? $existing_throttle : array();
+
+		$prior_attempts = 0;
+		if ( (string) ( $existing_throttle['flow_step_id'] ?? '' ) === $this->flow_step_id ) {
+			$prior_attempts = (int) ( $existing_throttle['attempts'] ?? 0 );
+		}
+		$attempt = $prior_attempts + 1;
+
+		$max_defers = max(
+			1,
+			(int) apply_filters(
+				'datamachine_ai_concurrency_max_defers',
+				self::AI_CONCURRENCY_MAX_DEFERS,
+				$provider_name,
+				$this->job_id
+			)
+		);
+
+		// Budget exhausted: stop self-rescheduling and route through the normal
+		// failure path. This bounds the runaway — a saturated queue fails loudly
+		// instead of generating self-rescheduling actions indefinitely (#2793).
+		if ( $attempt > $max_defers ) {
+			do_action(
+				'datamachine_log',
+				'error',
+				'Pipeline AI step exhausted concurrency defer budget; failing job',
+				array(
+					'job_id'       => $this->job_id,
+					'flow_step_id' => $this->flow_step_id,
+					'provider'     => $provider_name,
+					'attempts'     => $prior_attempts,
+					'max_defers'   => $max_defers,
+					'limit'        => (int) ( $lease_result['limit'] ?? 0 ),
+					'active'       => (int) ( $lease_result['active'] ?? 0 ),
+				)
+			);
+
+			// Clear the throttle marker so ExecuteStepAbility does not treat the
+			// empty packet list as an already-routed retry and swallow the failure.
+			datamachine_merge_engine_data(
+				$this->job_id,
+				array( 'ai_concurrency_throttle' => array() )
+			);
+
+			do_action(
+				'datamachine_fail_job',
+				$this->job_id,
+				'ai_concurrency_defer_exhausted',
+				array(
+					'flow_step_id'  => $this->flow_step_id,
+					'ai_provider'   => $provider_name,
+					'attempts'      => $prior_attempts,
+					'max_defers'    => $max_defers,
+					// Terminal, not retryable: the defer budget IS the retry
+					// budget for this contention. Retrying would re-enter the
+					// same starvation and reopen the runaway (#2793).
+					'retryable'     => false,
+					'error_message' => sprintf(
+						'AI concurrency slot saturated; gave up after %d defers.',
+						$prior_attempts
+					),
+				)
+			);
+			return;
+		}
+
+		// Exponential backoff between defers, capped, so a long-saturated queue
+		// backs off instead of polling the limiter on the base delay forever.
+		$base_delay    = max( 1, (int) ( $lease_result['delay'] ?? 10 ) );
+		$delay_seconds = min(
+			self::AI_CONCURRENCY_MAX_DEFER_DELAY,
+			$base_delay * ( 2 ** min( $prior_attempts, 16 ) )
+		);
 		$timestamp     = time() + $delay_seconds;
 		$action_id     = false;
 
@@ -672,6 +773,8 @@ class AIStep extends Step {
 					'reason'                  => 'ai_concurrency_limit',
 					'provider'                => $provider_name,
 					'flow_step_id'            => $this->flow_step_id,
+					'attempts'                => $attempt,
+					'max_defers'              => $max_defers,
 					'limit'                   => (int) ( $lease_result['limit'] ?? 0 ),
 					'active'                  => (int) ( $lease_result['active'] ?? 0 ),
 					'action_id'               => $action_id,
@@ -688,6 +791,8 @@ class AIStep extends Step {
 				'flow_step_id'            => $this->flow_step_id,
 				'provider'                => $provider_name,
 				'reason'                  => 'ai_concurrency_limit',
+				'attempts'                => $attempt,
+				'max_defers'              => $max_defers,
 				'limit'                   => (int) ( $lease_result['limit'] ?? 0 ),
 				'active'                  => (int) ( $lease_result['active'] ?? 0 ),
 				'rescheduled_for_seconds' => $delay_seconds,
