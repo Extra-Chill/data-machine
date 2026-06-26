@@ -454,15 +454,17 @@ class Jobs extends BaseRepository {
 	 * @return int Number of pending + processing jobs.
 	 */
 	public function count_active_jobs(): int {
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-		return (int) $this->wpdb->get_var(
-			$this->wpdb->prepare(
-				'SELECT COUNT(job_id) FROM %i WHERE status IN (%s, %s)',
-				$this->table_name,
-				'pending',
-				'processing'
-			)
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
+		$query = $this->wpdb->prepare(
+			'SELECT COUNT(job_id) FROM %i WHERE status IN (%s, %s)',
+			$this->table_name,
+			'pending',
+			'processing'
 		);
+		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
+
+		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- Query is prepared above.
+		return (int) $this->wpdb->get_var( $query );
 	}
 
 	/**
