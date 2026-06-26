@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.153.9] - 2026-06-26
+
+### Fixed
+- make AS deadlock-resilient runner idempotent and widen retry budget
+
 ## [0.153.8] - 2026-06-26
 
 ### Fixed
