@@ -104,6 +104,7 @@ echo "-------------------------------------\n\n";
 
 $method = new ReflectionMethod( AIStep::class, 'processLoopResults' );
 $missing_method = new ReflectionMethod( AIStep::class, 'missingCompletionAssertionsFailure' );
+$runtime_input_method = new ReflectionMethod( AIStep::class, 'runtimeInputPacketsForPrompt' );
 
 $result = $method->invoke(
 	null,
@@ -161,6 +162,26 @@ $complete_failure = $missing_method->invoke(
 );
 
 assert_completion_packet( null === $complete_failure, 'satisfied assertions do not build failure payload', $failures, $passes );
+
+$ai_step_reflection = new ReflectionClass( AIStep::class );
+$ai_step            = $ai_step_reflection->newInstanceWithoutConstructor();
+$engine_data_prop   = $ai_step_reflection->getParentClass()->getProperty( 'engine_data' );
+$engine_data_prop->setValue(
+	$ai_step,
+	array(
+		'artifacts'      => array(
+			'concept_packet' => array(
+				'payload' => array( 'title' => 'Runtime concept' ),
+			),
+		),
+		'concept_packet' => array( 'title' => 'Runtime concept' ),
+	)
+);
+$runtime_packets = $runtime_input_method->invoke( $ai_step, array() );
+assert_completion_packet( 1 === count( $runtime_packets ), 'runtime input prompt packet is added when runtime artifacts exist', $failures, $passes );
+assert_completion_packet( 'runtime_input' === ( $runtime_packets[0]['type'] ?? null ), 'runtime input packet uses runtime_input type', $failures, $passes );
+assert_completion_packet( 'Runtime concept' === ( $runtime_packets[0]['data']['runtime_input']['concept_packet']['title'] ?? null ), 'runtime concept packet is prompt-visible', $failures, $passes );
+assert_completion_packet( 'Runtime concept' === ( $runtime_packets[0]['data']['runtime_input']['artifacts']['concept_packet']['payload']['title'] ?? null ), 'runtime artifact map is prompt-visible', $failures, $passes );
 
 echo "\n-------------------------------------\n";
 echo sprintf( "%d / %d passed\n", $passes, $passes + count( $failures ) );

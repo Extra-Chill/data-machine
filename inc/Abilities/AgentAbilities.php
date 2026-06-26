@@ -1601,6 +1601,9 @@ class AgentAbilities {
 			$workflow = method_exists( $request, 'get_workflow' ) ? $request->get_workflow() : array();
 			$input    = method_exists( $request, 'get_input' ) ? $request->get_input() : array();
 			$options  = method_exists( $request, 'get_options' ) ? $request->get_options() : array();
+			if ( is_array( $raw_input['options'] ?? null ) ) {
+				$options = array_replace( $raw_input['options'], is_array( $options ) ? $options : array() );
+			}
 			$metadata = method_exists( $request, 'get_metadata' ) ? $request->get_metadata() : array();
 			$replay   = method_exists( $request, 'get_replay' ) ? $request->get_replay() : array();
 
@@ -1626,6 +1629,8 @@ class AgentAbilities {
 			foreach ( array( 'provider', 'model', 'wait_for_completion', 'wait', 'step_budget', 'time_budget_ms', 'required_outputs', 'required_artifacts', 'engine_data_outputs', 'runtime_tools', 'ability_tools', 'tools', 'disable_directives' ) as $key ) {
 				if ( array_key_exists( $key, $options ) ) {
 					$bundle_input[ $key ] = $options[ $key ];
+				} elseif ( array_key_exists( $key, $input ) ) {
+					$bundle_input[ $key ] = $input[ $key ];
 				}
 			}
 

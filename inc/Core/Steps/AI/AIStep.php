@@ -273,10 +273,11 @@ class AIStep extends Step {
 				'pipeline_step_id' => $pipeline_step_id,
 			);
 
-			$messages = array();
+			$messages            = array();
+			$prompt_data_packets = $this->runtimeInputPacketsForPrompt( $this->dataPackets );
 
-			if ( ! empty( $this->dataPackets ) ) {
-				$data_packet_content = wp_json_encode( array( 'data_packets' => DataPacketPromptProjector::project( $this->dataPackets, $packet_projection_context ) ), JSON_UNESCAPED_UNICODE );
+			if ( ! empty( $prompt_data_packets ) ) {
+				$data_packet_content = wp_json_encode( array( 'data_packets' => DataPacketPromptProjector::project( $prompt_data_packets, $packet_projection_context ) ), JSON_UNESCAPED_UNICODE );
 				$messages[]          = ConversationManager::buildConversationMessage(
 					'user',
 					false === $data_packet_content ? '' : $data_packet_content
@@ -707,6 +708,44 @@ class AIStep extends Step {
 	 */
 	public static function sanitizeDataPacketsForAi( array $data_packets ): array {
 		return DataPacketPromptProjector::project( $data_packets );
+	}
+
+	/**
+	 * Add runtime-package caller input to the AI-visible packet list.
+	 *
+	 * Runtime-package workflows can start with caller-provided artifacts without a
+	 * preceding fetch step. Those values live in engine_data for deterministic
+	 * handlers, but AI prompt construction reads data packets. Expose the runtime
+	 * input as a prompt-only packet so agents can consume upstream artifacts while
+	 * leaving canonical pipeline packets unchanged.
+	 *
+	 * @param array $data_packets Canonical data packets.
+	 * @return array Prompt-facing data packets.
+	 */
+	private function runtimeInputPacketsForPrompt( array $data_packets ): array {
+		$runtime_input = array();
+		foreach ( array( 'artifacts', 'concept_packet', 'design_packet', 'static_site_candidate', 'import_validation_result', 'visual_parity_artifact', 'finding_packet_set' ) as $key ) {
+			if ( array_key_exists( $key, $this->engine_data ) ) {
+				$runtime_input[ $key ] = $this->engine_data[ $key ];
+			}
+		}
+
+		if ( empty( $runtime_input ) ) {
+			return $data_packets;
+		}
+
+		$packet = new DataPacket(
+			array(
+				'runtime_input' => $runtime_input,
+			),
+			array(
+				'source_type'  => 'runtime_package_input',
+				'source_label' => 'Runtime package input',
+			),
+			'runtime_input'
+		);
+
+		return $packet->addTo( $data_packets );
 	}
 
 	/**

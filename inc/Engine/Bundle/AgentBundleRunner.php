@@ -74,6 +74,7 @@ final class AgentBundleRunner {
 
 		$workflow     = is_array( $workflow_override['workflow'] ?? null ) ? $workflow_override['workflow'] : $this->workflow_from_bundle_flow( $selection['flow'], $selection['pipeline'], $input );
 		$initial_data = is_array( $workflow_override['initial_data'] ?? null ) ? $workflow_override['initial_data'] : array();
+		$initial_data = array_merge( $initial_data, $this->initial_data_from_workflow_input( $input ) );
 		$initial_data = array_merge( $initial_data, is_array( $input['initial_data'] ?? null ) ? $input['initial_data'] : array() );
 		$manifest     = $directory->manifest()->to_array();
 
@@ -143,6 +144,21 @@ final class AgentBundleRunner {
 		);
 
 		return $this->response( $response, $input, $runtime_imports, $selection );
+	}
+
+	/**
+	 * Promote caller workflow input into workflow state for runtime-package runs.
+	 *
+	 * @param array<string,mixed> $input Bundle run input.
+	 * @return array<string,mixed>
+	 */
+	private function initial_data_from_workflow_input( array $input ): array {
+		$workflow_input = is_array( $input['input'] ?? null ) ? $input['input'] : array();
+		foreach ( array( 'wait_for_completion', 'wait', 'step_budget', 'time_budget_ms', 'required_outputs', 'required_artifacts', 'engine_data_outputs', 'runtime_tools', 'ability_tools', 'tools', 'disable_directives' ) as $control_field ) {
+			unset( $workflow_input[ $control_field ] );
+		}
+
+		return $workflow_input;
 	}
 
 	/** @return array<string,mixed> */

@@ -80,6 +80,8 @@ foreach ( array(
 datamachine_bundle_runner_contains( $bootstrap, "add_filter( 'wp_agent_runtime_import_bundle', array( AgentAbilities::class, 'importRuntimeAgentBundle' ), 5, 4 )", 'Data Machine importer runs before generic runtime bundle fallback', $failures, $passes );
 datamachine_bundle_runner_contains( $bootstrap, "add_filter( 'wp_agent_runtime_run_bundle'", 'Data Machine registers generic runtime run seam', $failures, $passes );
 datamachine_bundle_runner_contains( $bootstrap, "add_filter( 'wp_agent_runtime_package_run_handler', array( AgentAbilities::class, 'runtimePackageRunHandler' ), 10, 3 )", 'Data Machine registers Agents API runtime-package handler', $failures, $passes );
+datamachine_bundle_runner_contains( $abilities, 'array_key_exists( $key, $input )', 'runtime-package handler lifts control fields from package input', $failures, $passes );
+datamachine_bundle_runner_contains( $abilities, 'array_replace( $raw_input[\'options\']', 'runtime-package handler falls back to raw package options', $failures, $passes );
 
 echo "\n[2] Runner projects bundles to ephemeral workflows\n";
 foreach ( array(
@@ -174,6 +176,27 @@ $path_override = $workflow_override->invoke( $runner_instance, array( 'execute_w
 @unlink( $workflow_path );
 datamachine_bundle_runner_assert( true === ( $path_override['success'] ?? false ), 'file workflow override resolves', $failures, $passes );
 datamachine_bundle_runner_assert( 'Path override' === ( $path_override['workflow']['steps'][0]['label'] ?? null ), 'file workflow override unwraps workflow payload', $failures, $passes );
+
+$initial_data_from_workflow_input = $runner_reflection->getMethod( 'initial_data_from_workflow_input' );
+$runtime_initial_data             = $initial_data_from_workflow_input->invoke(
+	$runner_instance,
+	array(
+		'input' => array(
+			'wait_for_completion' => true,
+			'site_kind'           => 'store',
+			'artifacts'           => array(
+				'concept_packet' => array(
+					'payload' => array( 'title' => 'Kiln Shelf Supply' ),
+				),
+			),
+			'concept_packet'     => array( 'title' => 'Kiln Shelf Supply' ),
+		),
+	)
+);
+datamachine_bundle_runner_assert( 'store' === ( $runtime_initial_data['site_kind'] ?? null ), 'runtime workflow input scalar is promoted to initial_data', $failures, $passes );
+datamachine_bundle_runner_assert( 'Kiln Shelf Supply' === ( $runtime_initial_data['concept_packet']['title'] ?? null ), 'runtime workflow artifact alias is promoted to initial_data', $failures, $passes );
+datamachine_bundle_runner_assert( 'Kiln Shelf Supply' === ( $runtime_initial_data['artifacts']['concept_packet']['payload']['title'] ?? null ), 'runtime workflow artifacts map is promoted to initial_data', $failures, $passes );
+datamachine_bundle_runner_assert( ! isset( $runtime_initial_data['wait_for_completion'] ), 'runtime workflow control field is not promoted to initial_data', $failures, $passes );
 
 $output_projection = $runner_reflection->getMethod( 'output_projection' );
 $projected_outputs = $output_projection->invoke(
