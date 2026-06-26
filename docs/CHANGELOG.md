@@ -2,6 +2,12 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.155.0] - 2026-06-26
+
+### Added
+- surface PHP fatals, disk pressure, and Action Scheduler bloat in wake briefing
+- add Action Scheduler bloat guardrail and retention catch-up
+
 ## [0.154.0] - 2026-06-26
 
 ### Added
