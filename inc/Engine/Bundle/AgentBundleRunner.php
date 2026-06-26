@@ -74,6 +74,7 @@ final class AgentBundleRunner {
 
 		$workflow     = is_array( $workflow_override['workflow'] ?? null ) ? $workflow_override['workflow'] : $this->workflow_from_bundle_flow( $selection['flow'], $selection['pipeline'], $input );
 		$initial_data = is_array( $workflow_override['initial_data'] ?? null ) ? $workflow_override['initial_data'] : array();
+		$initial_data = array_merge( $initial_data, $this->initial_data_from_workflow_input( $input ) );
 		$initial_data = array_merge( $initial_data, is_array( $input['initial_data'] ?? null ) ? $input['initial_data'] : array() );
 		$manifest     = $directory->manifest()->to_array();
 
@@ -145,9 +146,25 @@ final class AgentBundleRunner {
 		return $this->response( $response, $input, $runtime_imports, $selection );
 	}
 
+	/**
+	 * Promote caller workflow input into workflow state for runtime-package runs.
+	 *
+	 * @param array<string,mixed> $input Bundle run input.
+	 * @return array<string,mixed>
+	 */
+	private function initial_data_from_workflow_input( array $input ): array {
+		$workflow_input = is_array( $input['input'] ?? null ) ? $input['input'] : array();
+		foreach ( array( 'wait_for_completion', 'wait', 'step_budget', 'time_budget_ms', 'required_outputs', 'required_artifacts', 'engine_data_outputs', 'runtime_tools', 'ability_tools', 'tools', 'disable_directives' ) as $control_field ) {
+			unset( $workflow_input[ $control_field ] );
+		}
+
+		return $workflow_input;
+	}
+
 	/** @return array<string,mixed> */
 	private function response( array $response, array $input, array $runtime_imports = array(), array $selection = array() ): array {
 		$response['schema'] ??= 'datamachine/agent-bundle-run/v1';
+		$response           = $this->apply_wait_result_status( $response );
 
 		if ( ! empty( $runtime_imports ) ) {
 			$response['runtime_imports'] = $runtime_imports;
@@ -174,6 +191,26 @@ final class AgentBundleRunner {
 		$response['status']             = $this->status_from_response( $response );
 		$response['success']            = ! empty( $response['success'] ) && self::is_success_status( $response['status'] );
 		$response['completion_outcome'] = $this->completion_outcome( $response );
+
+		return $response;
+	}
+
+	/** @return array<string,mixed> */
+	private function apply_wait_result_status( array $response ): array {
+		if ( empty( $response['wait_for_completion'] ) || ! is_array( $response['wait_result'] ?? null ) ) {
+			return $response;
+		}
+
+		$wait_result = $response['wait_result'];
+		if ( ! empty( $wait_result['success'] ) ) {
+			return $response;
+		}
+
+		$response['success'] = false;
+		$response['error'] ??= (string) ( $wait_result['error'] ?? 'Agent bundle run did not reach a terminal job state before the wait budget was exhausted.' );
+		if ( empty( $response['error_type'] ) ) {
+			$response['error_type'] = (string) ( $wait_result['error_type'] ?? 'wait_incomplete' );
+		}
 
 		return $response;
 	}
