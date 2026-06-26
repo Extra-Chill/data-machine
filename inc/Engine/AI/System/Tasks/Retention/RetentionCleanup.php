@@ -96,9 +96,12 @@ class RetentionCleanup {
 	 */
 	public static function actionSchedulerHookMaxAgeDays(): array {
 		$defaults = array(
-			// Completed step-execution actions are pure fan-out noise after a
-			// few hours; prune them aggressively (6h) to cap steady-state rows.
-			'datamachine_execute_step' => 0.25,
+			// Completed step-execution actions are pure fan-out noise almost
+			// immediately; at tens of completions per second even a few hours
+			// is millions of rows. Prune them within ~1h to cap steady-state
+			// rows. The row-count ceiling (see actionSchedulerHookMaxRows)
+			// bounds the table regardless of generation rate as a backstop.
+			'datamachine_execute_step' => 1 / 24,
 		);
 
 		$overrides = apply_filters( 'datamachine_as_actions_hook_max_age_days', $defaults );
@@ -116,6 +119,54 @@ class RetentionCleanup {
 			$days = (float) $days;
 			if ( $days > 0 ) {
 				$normalized[ $hook ] = $days;
+			}
+		}
+
+		return $normalized;
+	}
+
+	/**
+	 * Per-hook hard row-count ceilings for completed Action Scheduler actions.
+	 *
+	 * Age-based windows alone cannot bound a table when generation outruns the
+	 * cleanup cadence: a burst of step-execution fan-out can add rows faster
+	 * than any time-boxed pass deletes them, so the table grows without bound
+	 * between runs no matter how short the age window is. A row-count ceiling
+	 * is the backstop — it deletes the OLDEST completed/terminal rows for a
+	 * hook beyond the cap regardless of their age, so the table is physically
+	 * bounded by generation-rate spikes.
+	 *
+	 * Returns a map of `hook => max_rows`. A value of `0` (or less) disables
+	 * the ceiling for that hook (age windows still apply). Defaults cap the
+	 * known high-churn step-execution hook; operators can tune or extend via
+	 * the filter.
+	 *
+	 * @return array<string, int> Map of hook name to max retained completed rows.
+	 */
+	public static function actionSchedulerHookMaxRows(): array {
+		$defaults = array(
+			// Keep at most ~100k completed step-execution rows. At tens of
+			// completions/second this is well under an hour of history — more
+			// than enough for diagnostics — while guaranteeing the table can
+			// never balloon into the millions during a generation spike.
+			'datamachine_execute_step' => 100000,
+		);
+
+		$overrides = apply_filters( 'datamachine_as_actions_hook_max_rows', $defaults );
+
+		if ( ! is_array( $overrides ) ) {
+			return array();
+		}
+
+		$normalized = array();
+		foreach ( $overrides as $hook => $max_rows ) {
+			if ( ! is_string( $hook ) || '' === $hook ) {
+				continue;
+			}
+
+			$max_rows = (int) $max_rows;
+			if ( $max_rows > 0 ) {
+				$normalized[ $hook ] = $max_rows;
 			}
 		}
 
@@ -629,6 +680,24 @@ class RetentionCleanup {
 			);
 		}
 
+		// Hard row-count ceiling per high-churn hook. Age windows above can
+		// leave the table unbounded when generation outruns the cleanup
+		// cadence; this backstop deletes the OLDEST completed/terminal rows for
+		// a hook beyond its cap regardless of age, so the table is physically
+		// bounded by generation spikes. Shares the same batch + iteration +
+		// wall-clock budget as the age passes.
+		$ceiling = self::enforceActionSchedulerRowCeilings(
+			$actions_table,
+			$logs_table,
+			$batch_size,
+			$max_iterations,
+			$deadline,
+			$iterations_used,
+			$hit_limit
+		);
+		$actions_deleted += $ceiling['actions_deleted'];
+		$logs_deleted    += $ceiling['logs_deleted'];
+
 		$total_deleted = $logs_deleted + $actions_deleted;
 
 		// InnoDB never returns DELETE-freed space to the OS; only a table
@@ -645,26 +714,123 @@ class RetentionCleanup {
 			self::log(
 				'Scheduled cleanup: deleted old Action Scheduler actions and logs',
 				array(
-					'actions_deleted' => $actions_deleted,
-					'logs_deleted'    => $logs_deleted,
-					'max_age_days'    => $max_age_days,
-					'batch_size'      => $batch_size,
-					'iterations'      => $iterations_used,
-					'hit_limit'       => $hit_limit,
-					'optimized'       => $optimized,
+					'actions_deleted'         => $actions_deleted,
+					'logs_deleted'            => $logs_deleted,
+					'ceiling_actions_deleted' => $ceiling['actions_deleted'],
+					'ceiling_logs_deleted'    => $ceiling['logs_deleted'],
+					'max_age_days'            => $max_age_days,
+					'batch_size'              => $batch_size,
+					'iterations'              => $iterations_used,
+					'hit_limit'               => $hit_limit,
+					'optimized'               => $optimized,
 				)
 			);
 		}
 
 		return array(
-			'deleted'         => $total_deleted,
+			'deleted'                 => $total_deleted,
+			'actions_deleted'         => $actions_deleted,
+			'logs_deleted'            => $logs_deleted,
+			'ceiling_actions_deleted' => $ceiling['actions_deleted'],
+			'ceiling_logs_deleted'    => $ceiling['logs_deleted'],
+			'max_age_days'            => $max_age_days,
+			'batch_size'              => $batch_size,
+			'iterations'              => $iterations_used,
+			'hit_limit'               => $hit_limit,
+			'optimized'               => $optimized,
+		);
+	}
+
+	/**
+	 * Enforce per-hook hard row-count ceilings for completed actions.
+	 *
+	 * For each hook with a configured ceiling, deletes the oldest completed/
+	 * failed/canceled rows (and their FK-child logs) that sit beyond the cap —
+	 * regardless of age. "Oldest beyond cap" is computed by keeping the most
+	 * recent $max_rows rows (by last_attempt_gmt) and deleting everything older
+	 * for that hook. Shares the caller's batch/iteration/wall-clock budget.
+	 *
+	 * @param string $actions_table   Actions table name.
+	 * @param string $logs_table      Logs table name.
+	 * @param int    $batch_size      Rows per batch.
+	 * @param int    $max_iterations  Hard iteration ceiling (shared budget).
+	 * @param float  $deadline        Wall-clock deadline (microtime float).
+	 * @param int    $iterations_used Shared iteration counter (by reference).
+	 * @param bool   $hit_limit       Set true when a budget cap trips (by reference).
+	 * @return array{actions_deleted:int,logs_deleted:int}
+	 */
+	private static function enforceActionSchedulerRowCeilings(
+		string $actions_table,
+		string $logs_table,
+		int $batch_size,
+		int $max_iterations,
+		float $deadline,
+		int &$iterations_used,
+		bool &$hit_limit
+	): array {
+		global $wpdb;
+
+		$actions_deleted = 0;
+		$logs_deleted    = 0;
+
+		foreach ( self::actionSchedulerHookMaxRows() as $hook => $max_rows ) {
+			if ( $iterations_used >= $max_iterations || microtime( true ) >= $deadline ) {
+				$hit_limit = true;
+				break;
+			}
+
+			// Resolve the cutoff timestamp that keeps the most recent $max_rows
+			// completed/terminal rows for this hook. Everything at or older than
+			// the cutoff is deleted. One bounded OFFSET probe per hook (indexed
+			// on hook + last_attempt_gmt) — cheap relative to the delete loop.
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			$cutoff = $wpdb->get_var(
+				$wpdb->prepare(
+					'SELECT last_attempt_gmt FROM %i WHERE status IN (%s, %s, %s) AND hook = %s ORDER BY last_attempt_gmt DESC LIMIT 1 OFFSET %d',
+					$actions_table,
+					'complete',
+					'failed',
+					'canceled',
+					$hook,
+					$max_rows
+				)
+			);
+
+			// Fewer than $max_rows rows exist for this hook — nothing to cap.
+			if ( null === $cutoff || '' === $cutoff ) {
+				continue;
+			}
+
+			// Logs first (FK children), then the actions themselves. Reuse the
+			// shared batched id-subquery deleters with this hook's ceiling
+			// cutoff so all the budget/lock-safety guarantees carry over.
+			$logs_deleted += self::deleteActionSchedulerLogsBatched(
+				$logs_table,
+				$actions_table,
+				$cutoff,
+				$hook,
+				$batch_size,
+				$max_iterations,
+				$deadline,
+				$iterations_used,
+				$hit_limit
+			);
+
+			$actions_deleted += self::deleteActionSchedulerActionsBatched(
+				$actions_table,
+				$cutoff,
+				$hook,
+				$batch_size,
+				$max_iterations,
+				$deadline,
+				$iterations_used,
+				$hit_limit
+			);
+		}
+
+		return array(
 			'actions_deleted' => $actions_deleted,
 			'logs_deleted'    => $logs_deleted,
-			'max_age_days'    => $max_age_days,
-			'batch_size'      => $batch_size,
-			'iterations'      => $iterations_used,
-			'hit_limit'       => $hit_limit,
-			'optimized'       => $optimized,
 		);
 	}
 
