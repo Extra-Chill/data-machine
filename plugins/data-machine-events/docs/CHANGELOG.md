@@ -2,6 +2,13 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.44.1] - 2026-06-27
+
+### Fixed
+- guard MultiDayResolver against malformed placeholder dates
+- downgrade dead-DNS scraper sources to a single warning signal
+- make Ticketmaster HTTP 429 spike-arrest non-fatal with backoff
+
 ## [0.44.0] - 2026-06-20
 
 ### Added
