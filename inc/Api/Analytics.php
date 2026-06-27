@@ -90,7 +90,7 @@ class Analytics {
 	 */
 	public static function check_permission( $request ) {
 		$request;
-		if ( ! PermissionHelper::can( 'manage_flows' ) ) {
+		if ( ! PermissionHelper::can( 'view_analytics' ) ) {
 			return new \WP_Error(
 				'rest_forbidden',
 				__( 'You do not have permission to access analytics data.', 'data-machine' ),
