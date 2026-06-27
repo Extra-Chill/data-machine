@@ -400,18 +400,27 @@ class GoogleAnalyticsAbilities {
 		// network_density groups by hostName x pageReferrer. pageReferrer is a
 		// near-unbounded, high-cardinality dimension, so the single-page GA4 row
 		// cap fills with the largest external/"(other)" referrer buckets and the
-		// small in-network EC->EC referrer rows fall off the end — silently
-		// under-counting in-network referrals. Constrain pageReferrer to EC hosts
-		// server-side so GA4 only returns in-network rows BEFORE the cap applies,
-		// keeping it one cheap API call (there are far fewer than the row cap of
-		// distinct in-network referrer buckets) and making the result
-		// volume-independent.
+		// small in-network referrer rows fall off the end — silently
+		// under-counting in-network referrals. Constrain pageReferrer to the
+		// configured in-network hosts server-side so GA4 only returns in-network
+		// rows BEFORE the cap applies, keeping it one cheap API call (there are
+		// far fewer than the row cap of distinct in-network referrer buckets) and
+		// making the result volume-independent.
 		if ( 'network_density' === $action ) {
-			// Source the EC host set from a filter so it lives in one place
-			// rather than as a brittle inline literal at the call site.
+			/**
+			 * Filter the set of in-network hosts used to constrain the
+			 * network_density referrer query.
+			 *
+			 * Generic Data Machine layers ship with no site baked in. A consumer
+			 * plugin registers its own network's hostnames here. With no consumer
+			 * configured this defaults to an empty list and no referrer
+			 * constraint is applied.
+			 *
+			 * @param array $network_hosts List of in-network hostnames. Empty by default.
+			 */
 			$network_hosts = apply_filters(
 				'datamachine_network_density_hosts',
-				array( 'extrachill.com', 'extrachill.link' )
+				array()
 			);
 
 			$host_expressions = array();
@@ -421,8 +430,8 @@ class GoogleAnalyticsAbilities {
 					continue;
 				}
 				// CONTAINS covers the apex host and every subdomain
-				// (e.g. "extrachill.com" matches both "extrachill.com" and
-				// "community.extrachill.com"), so wildcard subdomains are
+				// (e.g. "example.com" matches both "example.com" and
+				// "sub.example.com"), so wildcard subdomains are
 				// implicit and do not need separate patterns.
 				$host_expressions[] = array(
 					'filter' => array(

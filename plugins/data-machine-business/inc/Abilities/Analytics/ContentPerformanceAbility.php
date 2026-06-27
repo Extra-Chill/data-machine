@@ -49,19 +49,41 @@ class ContentPerformanceAbility {
 	 */
 	const DEFAULT_MIN_SESSIONS = 5;
 
+	private static bool $registered = false;
+
 	/**
-	 * Default hostname for resolving page paths to posts.
+	 * Resolve the hostname used to map GA page paths to posts.
 	 *
 	 * The GA `engagement` action groups by pagePath only (host-independent), so
 	 * on a multisite GA4 property we constrain to one host to avoid cross-site
 	 * "/" collisions. The category posts are resolved on the current blog via
 	 * url_to_postid(), so this should match the blog the command runs on.
 	 *
-	 * @var string
+	 * Resolution order: explicit input -> the
+	 * `datamachine_analytics_default_hostname` filter (a consumer plugin
+	 * supplies its own site's host) -> empty. This generic layer ships with no
+	 * site baked in; when nothing resolves, the caller must require the input.
+	 *
+	 * @param array $input Ability input.
+	 * @return string Hostname, or '' when neither input nor filter supplies one.
 	 */
-	const DEFAULT_HOSTNAME = 'extrachill.com';
+	public static function resolve_hostname( array $input ): string {
+		if ( ! empty( $input['hostname'] ) ) {
+			return sanitize_text_field( $input['hostname'] );
+		}
 
-	private static bool $registered = false;
+		/**
+		 * Filter the default hostname for analytics page-to-post mapping.
+		 *
+		 * Generic Data Machine layers ship with no site baked in. A consumer
+		 * plugin registers its own site's hostname here so the analytics
+		 * abilities can map GA page paths to local posts without an explicit
+		 * `hostname` input on every call.
+		 *
+		 * @param string $hostname Default hostname. Empty string by default.
+		 */
+		return sanitize_text_field( (string) apply_filters( 'datamachine_analytics_default_hostname', '' ) );
+	}
 
 	public function __construct() {
 		if ( self::$registered ) {
@@ -98,7 +120,7 @@ class ContentPerformanceAbility {
 							),
 							'hostname'     => array(
 								'type'        => 'string',
-								'description' => 'Hostname whose pages map to this blog\'s posts (default: extrachill.com). The GA engagement report is filtered to this host.',
+								'description' => 'Hostname whose pages map to this blog\'s posts. The GA engagement report is filtered to this host. Required unless a consumer registers a default via the datamachine_analytics_default_hostname filter.',
 							),
 							'sort_by'      => array(
 								'type'        => 'string',
@@ -145,13 +167,20 @@ class ContentPerformanceAbility {
 		$category     = sanitize_title( $input['category'] ?? '' );
 		$days         = ! empty( $input['days'] ) ? max( 1, (int) $input['days'] ) : self::DEFAULT_DAYS;
 		$min_sessions = isset( $input['min_sessions'] ) ? max( 1, (int) $input['min_sessions'] ) : self::DEFAULT_MIN_SESSIONS;
-		$hostname     = ! empty( $input['hostname'] ) ? sanitize_text_field( $input['hostname'] ) : self::DEFAULT_HOSTNAME;
+		$hostname     = self::resolve_hostname( $input );
 		$sort_by      = ( 'rate' === ( $input['sort_by'] ?? '' ) ) ? 'rate' : 'duration';
 
 		if ( '' === $category ) {
 			return array(
 				'success' => false,
 				'error'   => 'A category slug is required.',
+			);
+		}
+
+		if ( '' === $hostname ) {
+			return array(
+				'success' => false,
+				'error'   => 'A hostname is required. Pass the "hostname" input or register a default via the datamachine_analytics_default_hostname filter.',
 			);
 		}
 

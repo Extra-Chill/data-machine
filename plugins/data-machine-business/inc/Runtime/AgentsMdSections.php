@@ -10,9 +10,9 @@
  * The command surface is read from {@see \DataMachineBusiness\Cli\CommandRegistry},
  * the single source of truth shared with the WP-CLI bootstrap. Each command is
  * reflected via the shared `\DataMachine\Engine\AI\CliCommandIntrospector`
- * (the intelligence / extrachill-cli pattern) when present, with a minimal,
- * self-contained fallback so this plugin never hard-depends on an unreleased
- * core class. Every command this plugin owns is a flat `__invoke` command — the
+ * (the shared CLI-introspection pattern a consumer CLI plugin also uses) when
+ * present, with a minimal, self-contained fallback so this plugin never
+ * hard-depends on an unreleased core class. Every command this plugin owns is a flat `__invoke` command — the
  * action is a positional argument, not a WP-CLI subcommand — so each reflects
  * to a single `__default` entry and renders as a headline carrying the
  * command's own short description.

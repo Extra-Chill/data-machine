@@ -14,8 +14,8 @@
  *   1. GraphQL login mutation (unidashSignIn) -> a Bearer access token, cached
  *      in a transient until it expires.
  *   2. The per-page revenue CSV report (slug,views,revenue,rpm,cpm,viewability,
- *      fillRate,impressionsPerPageview) for a date range — the rows that feed
- *      `extrachill analytics revenue import`.
+ *      fillRate,impressionsPerPageview) for a date range — the rows a consumer
+ *      CLI plugin imports into its revenue store.
  *
  * A bonus `summary` action calls the metricsSummary GraphQL query for
  * site-level totals (note: that query uses ISO timestamps, NOT MM/DD/YYYY).
@@ -63,13 +63,6 @@ class MediavineReportsAbilities {
 	 * @var string
 	 */
 	const API_BASE = 'https://api-publishers.mediavine.com';
-
-	/**
-	 * Default Extra Chill site id (base64 "InternalSite:11476").
-	 *
-	 * @var string
-	 */
-	const DEFAULT_SITE_ID = 'SW50ZXJuYWxTaXRlOjExNDc2';
 
 	/**
 	 * Per-page CSV row cap requested from Mediavine.
@@ -131,7 +124,7 @@ class MediavineReportsAbilities {
 							),
 							'site_id'    => array(
 								'type'        => 'string',
-								'description' => 'Mediavine site id. Defaults to the configured site_id, else the Extra Chill default.',
+								'description' => 'Mediavine site id. Defaults to the configured site_id, else the datamachine_mediavine_default_site_id filter. Required when neither is set.',
 							),
 						),
 					),
@@ -195,9 +188,14 @@ class MediavineReportsAbilities {
 			);
 		}
 
-		$site_id = ! empty( $input['site_id'] )
-			? sanitize_text_field( $input['site_id'] )
-			: ( ! empty( $config['site_id'] ) ? (string) $config['site_id'] : self::DEFAULT_SITE_ID );
+		$site_id = self::resolve_site_id( $input, $config );
+
+		if ( '' === $site_id ) {
+			return array(
+				'success' => false,
+				'error'   => 'A Mediavine site id is required. Pass the "site_id" input, set site_id in the datamachine_mediavine_config option, or register a default via the datamachine_mediavine_default_site_id filter.',
+			);
+		}
 
 		if ( 'summary' === $action ) {
 			return self::fetchSummary( $input, $access_token, $site_id );
@@ -715,6 +713,40 @@ class MediavineReportsAbilities {
 	public static function is_configured(): bool {
 		$config = self::get_config();
 		return ! empty( $config['email'] ) && ! empty( $config['password'] );
+	}
+
+	/**
+	 * Resolve the Mediavine site id to query.
+	 *
+	 * Resolution order: explicit input -> the configured `site_id` in the
+	 * datamachine_mediavine_config option -> the
+	 * `datamachine_mediavine_default_site_id` filter -> empty. This generic
+	 * layer ships with no site id baked in; when nothing resolves, the caller
+	 * must require the input.
+	 *
+	 * @param array $input  Ability input.
+	 * @param array $config Stored Mediavine config.
+	 * @return string Mediavine site id, or '' when nothing supplies one.
+	 */
+	private static function resolve_site_id( array $input, array $config ): string {
+		if ( ! empty( $input['site_id'] ) ) {
+			return sanitize_text_field( $input['site_id'] );
+		}
+
+		if ( ! empty( $config['site_id'] ) ) {
+			return (string) $config['site_id'];
+		}
+
+		/**
+		 * Filter the default Mediavine site id.
+		 *
+		 * Generic Data Machine layers ship with no site id baked in. A consumer
+		 * plugin registers its own Mediavine site id here so the revenue
+		 * abilities can run without an explicit `site_id` input on every call.
+		 *
+		 * @param string $site_id Default Mediavine site id. Empty string by default.
+		 */
+		return sanitize_text_field( (string) apply_filters( 'datamachine_mediavine_default_site_id', '' ) );
 	}
 
 	/**

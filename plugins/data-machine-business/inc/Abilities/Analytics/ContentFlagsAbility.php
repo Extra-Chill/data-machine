@@ -179,7 +179,7 @@ class ContentFlagsAbility {
 							),
 							'hostname' => array(
 								'type'        => 'string',
-								'description' => 'Hostname whose pages map to this blog\'s posts (default: extrachill.com).',
+								'description' => 'Hostname whose pages map to this blog\'s posts. Required unless a consumer registers a default via the datamachine_analytics_default_hostname filter.',
 							),
 						),
 					),
@@ -247,12 +247,15 @@ class ContentFlagsAbility {
 		// post that had ANY traffic — the demand flag carries its own session
 		// gate (>=10), so the ranking-honesty gate content-performance uses (>=5)
 		// is not what we want here.
+		// hostname is passed straight through (possibly absent); audit() resolves
+		// it via input -> datamachine_analytics_default_hostname filter and
+		// returns a clear error when neither supplies a host.
 		$performance = ContentPerformanceAbility::audit(
 			array(
 				'category'     => $category,
 				'days'         => isset( $input['days'] ) ? max( 1, (int) $input['days'] ) : ContentPerformanceAbility::DEFAULT_DAYS,
 				'min_sessions' => 1,
-				'hostname'     => ! empty( $input['hostname'] ) ? sanitize_text_field( $input['hostname'] ) : ContentPerformanceAbility::DEFAULT_HOSTNAME,
+				'hostname'     => ! empty( $input['hostname'] ) ? sanitize_text_field( $input['hostname'] ) : '',
 				'sort_by'      => 'duration',
 			)
 		);

@@ -92,7 +92,7 @@ class GoogleAnalyticsCommand extends BaseCommand {
 	 *     wp datamachine analytics ga path_sequence
 	 *
 	 *     # Filter by hostname for multisite
-	 *     wp datamachine analytics ga page_stats --hostname=events.extrachill.com
+	 *     wp datamachine analytics ga page_stats --hostname=events.example.com
 	 *
 	 *     # Compare last 28 days vs previous 28 days
 	 *     wp datamachine analytics ga page_stats --compare
