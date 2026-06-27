@@ -174,6 +174,7 @@ class SettingsAbilitiesTest extends WP_UnitTestCase {
 		$updated_settings = get_option( 'datamachine_settings', array() );
 		$this->assertSame(
 			array(
+				'max_active_jobs'    => 500,
 				'concurrent_batches' => 50,
 				'batch_size'         => 500,
 				'time_limit'         => 300,
@@ -202,6 +203,7 @@ class SettingsAbilitiesTest extends WP_UnitTestCase {
 		$updated_settings = get_option( 'datamachine_settings', array() );
 		$this->assertSame(
 			array(
+				'max_active_jobs'    => 500,
 				'concurrent_batches' => 50,
 				'batch_size'         => 500,
 				'time_limit'         => 300,
