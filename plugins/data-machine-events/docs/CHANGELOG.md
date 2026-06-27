@@ -2,6 +2,14 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.45.0] - 2026-06-27
+
+### Added
+- add filter for Add-to-Calendar toggle classes + ticket-button token fallbacks
+
+### Changed
+- delete dead Taxonomy/Helper class and dead PageBoundary methods
+
 ## [0.44.1] - 2026-06-27
 
 ### Fixed
