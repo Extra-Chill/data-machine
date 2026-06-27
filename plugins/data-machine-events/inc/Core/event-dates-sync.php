@@ -206,6 +206,42 @@ function data_machine_events_sync_datetime_meta( $post_id, $post, $update ) {
 				$end_time .= ':00';
 			}
 
+			// Universal write chokepoint: never let a malformed/placeholder date
+			// (e.g. "2026-07-??") be concatenated into a DATETIME and written to
+			// the event_dates table. On non-strict sql_mode MySQL silently
+			// coerces these to "0000-00-00 00:00:00", which then detonates on the
+			// render path. Every write path (AI, manual, CLI, backfill) funnels
+			// through save_post, so guarding here protects all of them. Skip the
+			// datetime sync cleanly rather than throwing or writing a junk row.
+			// See issue #394.
+			$has_valid_start = $start_date && DateTimeParser::isValidYmd( $start_date );
+			$has_invalid_end = $end_date && ! DateTimeParser::isValidYmd( $end_date );
+
+			if ( $start_date && ( ! $has_valid_start || $has_invalid_end ) ) {
+				do_action(
+					'datamachine_log',
+					'warning',
+					'Event date sync skipped: malformed startDate/endDate would write an invalid DATETIME',
+					array(
+						'post_id'   => $post_id,
+						'startDate' => $start_date,
+						'endDate'   => $end_date,
+					)
+				);
+
+				// Still keep the ticket URL meta in sync, then stop before the
+				// datetime write. Do not fall through to the EventDatesTable::delete()
+				// branch — that is reserved for the genuinely date-less case.
+				$ticket_url = $block['attrs']['ticketUrl'] ?? '';
+				if ( $ticket_url ) {
+					update_post_meta( $post_id, EVENT_TICKET_URL_META_KEY, datamachine_normalize_ticket_url( $ticket_url ) );
+				} else {
+					delete_post_meta( $post_id, EVENT_TICKET_URL_META_KEY );
+				}
+
+				break;
+			}
+
 			if ( $start_date ) {
 				$effective_start_time = $start_time ? $start_time : '00:00:00';
 				$datetime             = $start_date . ' ' . $effective_start_time;

@@ -260,6 +260,67 @@ class DateTimeParser {
 	}
 
 	/**
+	 * Strictly validate a Y-m-d date string.
+	 *
+	 * The single source of truth for "is this a real calendar date in
+	 * canonical YYYY-MM-DD form?". Rejects placeholder / TBD values
+	 * (e.g. "2026-07-??", "2026-??-??"), out-of-range values
+	 * (e.g. "2026-13-01"), and impossible calendar dates
+	 * (e.g. "2026-02-30"). Used at the AI gate, the storage chokepoint,
+	 * and the render path so an unparseable string can never reach a
+	 * `new DateTime()` and throw a DateMalformedStringException.
+	 *
+	 * @param string $date Date string to validate.
+	 * @return bool True when $date is a valid Y-m-d calendar date.
+	 */
+	public static function isValidYmd( string $date ): bool {
+		if ( ! preg_match( '/^(\d{4})-(\d{2})-(\d{2})$/', $date, $matches ) ) {
+			return false;
+		}
+
+		return checkdate( (int) $matches[2], (int) $matches[3], (int) $matches[1] );
+	}
+
+	/**
+	 * Non-throwing DateTime factory.
+	 *
+	 * Returns null instead of throwing when the date is not a valid
+	 * Y-m-d calendar date. Render-path callers use this to degrade
+	 * gracefully (skip a row / fall back) when a malformed date slipped
+	 * into storage before the prevention layers existed.
+	 *
+	 * The date is validated with isValidYmd() first; a DateTime is only
+	 * constructed when the date is known-good, so this never throws.
+	 * An optional time-of-day suffix (e.g. " 00:00:00" or " 19:30") may
+	 * be appended after the Y-m-d date.
+	 *
+	 * @param string            $date Date string. May be a bare Y-m-d or
+	 *                                "Y-m-d H:i[:s]" — only the leading
+	 *                                Y-m-d portion is validated.
+	 * @param DateTimeZone|null  $tz   Optional timezone.
+	 * @return DateTime|null DateTime on success, null on invalid input.
+	 */
+	public static function safeCreate( string $date, ?DateTimeZone $tz = null ): ?DateTime {
+		$date = trim( $date );
+
+		if ( '' === $date ) {
+			return null;
+		}
+
+		// Only the leading Y-m-d is validated; an optional time suffix may follow.
+		$ymd = substr( $date, 0, 10 );
+		if ( ! self::isValidYmd( $ymd ) ) {
+			return null;
+		}
+
+		try {
+			return null !== $tz ? new DateTime( $date, $tz ) : new DateTime( $date );
+		} catch ( Exception $e ) {
+			return null;
+		}
+	}
+
+	/**
 	 * Validate IANA timezone identifier.
 	 *
 	 * @param string $timezone Timezone to validate

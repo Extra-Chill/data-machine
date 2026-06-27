@@ -11,6 +11,8 @@
 namespace DataMachineEvents\Tests\Unit;
 
 use WP_UnitTestCase;
+use DateTime;
+use DateTimeZone;
 use DataMachineEvents\Core\DateTimeParser;
 
 class DateTimeParserTest extends WP_UnitTestCase {
@@ -154,5 +156,94 @@ class DateTimeParserTest extends WP_UnitTestCase {
 		$this->assertFalse( DateTimeParser::isValidTimezone( 'Invalid/Timezone' ) );
 		$this->assertFalse( DateTimeParser::isValidTimezone( '' ) );
 		$this->assertFalse( DateTimeParser::isValidTimezone( 'CST' ) );
+	}
+
+	/**
+	 * isValidYmd is the single source of truth for "is this a real
+	 * canonical Y-m-d date?". It must reject the placeholder / TBD strings
+	 * (e.g. "2026-07-??") that caused the original fatal (#394), out-of-range
+	 * months/days, impossible calendar dates, and empty input — while
+	 * accepting genuine dates.
+	 */
+	public function test_is_valid_ymd_rejects_placeholder_day() {
+		$this->assertFalse( DateTimeParser::isValidYmd( '2026-07-??' ) );
+	}
+
+	public function test_is_valid_ymd_rejects_placeholder_month_and_day() {
+		$this->assertFalse( DateTimeParser::isValidYmd( '2026-??-??' ) );
+	}
+
+	public function test_is_valid_ymd_rejects_out_of_range_month() {
+		$this->assertFalse( DateTimeParser::isValidYmd( '2026-13-01' ) );
+	}
+
+	public function test_is_valid_ymd_rejects_impossible_calendar_date() {
+		$this->assertFalse( DateTimeParser::isValidYmd( '2026-02-30' ) );
+	}
+
+	public function test_is_valid_ymd_rejects_empty_string() {
+		$this->assertFalse( DateTimeParser::isValidYmd( '' ) );
+	}
+
+	public function test_is_valid_ymd_rejects_non_ymd_shapes() {
+		$this->assertFalse( DateTimeParser::isValidYmd( '07/15/2026' ) );
+		$this->assertFalse( DateTimeParser::isValidYmd( '2026-7-5' ) );
+		$this->assertFalse( DateTimeParser::isValidYmd( '2026-07-15 19:30' ) );
+	}
+
+	public function test_is_valid_ymd_accepts_real_date() {
+		$this->assertTrue( DateTimeParser::isValidYmd( '2026-07-15' ) );
+		$this->assertTrue( DateTimeParser::isValidYmd( '2024-02-29' ) );
+	}
+
+	/**
+	 * safeCreate is the non-throwing factory used on the render path. It must
+	 * return null (never throw) for any input isValidYmd rejects, and a real
+	 * DateTime for valid input — including an optional time-of-day suffix.
+	 */
+	public function test_safe_create_returns_null_for_placeholder_day() {
+		$this->assertNull( DateTimeParser::safeCreate( '2026-07-??' ) );
+	}
+
+	public function test_safe_create_returns_null_for_placeholder_month_and_day() {
+		$this->assertNull( DateTimeParser::safeCreate( '2026-??-??' ) );
+	}
+
+	public function test_safe_create_returns_null_for_out_of_range_month() {
+		$this->assertNull( DateTimeParser::safeCreate( '2026-13-01' ) );
+	}
+
+	public function test_safe_create_returns_null_for_impossible_calendar_date() {
+		$this->assertNull( DateTimeParser::safeCreate( '2026-02-30' ) );
+	}
+
+	public function test_safe_create_returns_null_for_empty_string() {
+		$this->assertNull( DateTimeParser::safeCreate( '' ) );
+	}
+
+	public function test_safe_create_returns_datetime_for_valid_date() {
+		$dt = DateTimeParser::safeCreate( '2026-07-15' );
+
+		$this->assertInstanceOf( DateTime::class, $dt );
+		$this->assertEquals( '2026-07-15', $dt->format( 'Y-m-d' ) );
+	}
+
+	public function test_safe_create_accepts_time_suffix() {
+		$dt = DateTimeParser::safeCreate( '2026-07-15 19:30:00' );
+
+		$this->assertInstanceOf( DateTime::class, $dt );
+		$this->assertEquals( '2026-07-15 19:30:00', $dt->format( 'Y-m-d H:i:s' ) );
+	}
+
+	public function test_safe_create_honors_timezone() {
+		$tz = new DateTimeZone( 'America/New_York' );
+		$dt = DateTimeParser::safeCreate( '2026-07-15 00:00:00', $tz );
+
+		$this->assertInstanceOf( DateTime::class, $dt );
+		$this->assertEquals( 'America/New_York', $dt->getTimezone()->getName() );
+	}
+
+	public function test_safe_create_rejects_malformed_date_even_with_time_suffix() {
+		$this->assertNull( DateTimeParser::safeCreate( '2026-07-?? 00:00:00' ) );
 	}
 }
