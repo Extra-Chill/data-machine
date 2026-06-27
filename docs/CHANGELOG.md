@@ -2,6 +2,21 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.156.0] - 2026-06-27
+
+### Added
+- add read-only view_analytics capability tier
+
+### Changed
+- Improve bundle source import diagnostics
+- Expose runtime package inputs to bundle runs
+- Fail incomplete agent bundle waits
+- Recognize wrapped typed artifact results
+- Normalize typed artifact tool outputs
+- Accept typed artifact tool output envelopes
+- Accept top-level typed artifact outputs
+- Add typed artifact publish handler
+
 ## [0.155.0] - 2026-06-26
 
 ### Added
