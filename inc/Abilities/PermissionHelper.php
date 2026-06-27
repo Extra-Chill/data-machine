@@ -34,6 +34,7 @@ class PermissionHelper {
 		'manage_agents'    => 'datamachine_manage_agents',
 		'manage_flows'     => 'datamachine_manage_flows',
 		'manage_settings'  => 'datamachine_manage_settings',
+		'view_analytics'   => 'datamachine_view_analytics',
 		'chat'             => 'datamachine_chat',
 		'use_tools'        => 'datamachine_use_tools',
 		'view_logs'        => 'datamachine_view_logs',
@@ -157,6 +158,14 @@ class PermissionHelper {
 	 * @return bool
 	 */
 	public static function can( string $action ): bool {
+		// Read-only analytics access is implied by any management capability.
+		// This keeps existing manage_flows / manage_settings / manage_agents
+		// holders (and administrators via manage_options) working without a
+		// dedicated datamachine_view_analytics grant — no regression.
+		if ( 'view_analytics' === $action && self::can_manage() ) {
+			return true;
+		}
+
 		// WP-CLI always allowed (filterable for testing).
 		if ( defined( 'WP_CLI' ) && WP_CLI ) {
 			if ( apply_filters( 'datamachine_cli_bypass_permissions', true ) ) {

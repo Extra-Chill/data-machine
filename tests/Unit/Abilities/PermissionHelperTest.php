@@ -346,6 +346,49 @@ class PermissionHelperTest extends WP_UnitTestCase {
 		$this->assertSame( 'datamachine_ability_scope_denied', $result->get_error_code() );
 	}
 
+	public function test_view_analytics_granted_to_manage_flows_holder(): void {
+		$user_id = self::factory()->user->create();
+		$user    = get_user_by( 'id', $user_id );
+		$user->add_cap( 'datamachine_manage_flows' );
+		wp_set_current_user( $user_id );
+
+		// A manage_flows holder retains analytics read access — no regression.
+		$this->assertTrue( PermissionHelper::can( 'view_analytics' ) );
+
+		$user->remove_cap( 'datamachine_manage_flows' );
+	}
+
+	public function test_view_analytics_granted_to_admin(): void {
+		$user_id = self::factory()->user->create( array( 'role' => 'administrator' ) );
+		wp_set_current_user( $user_id );
+
+		// Administrators pass via manage_options — no regression.
+		$this->assertTrue( PermissionHelper::can( 'view_analytics' ) );
+	}
+
+	public function test_dedicated_view_analytics_cap_does_not_grant_write_access(): void {
+		$user_id = self::factory()->user->create( array( 'role' => 'subscriber' ) );
+		$user    = get_user_by( 'id', $user_id );
+		$user->add_cap( 'datamachine_view_analytics' );
+		wp_set_current_user( $user_id );
+
+		// Read-only analytics access granted...
+		$this->assertTrue( PermissionHelper::can( 'view_analytics' ) );
+
+		// ...but NOT the write/admin surface gated on manage_flows.
+		$this->assertFalse( PermissionHelper::can( 'manage_flows' ) );
+		$this->assertFalse( PermissionHelper::can_manage() );
+
+		$user->remove_cap( 'datamachine_view_analytics' );
+	}
+
+	public function test_view_analytics_denied_to_unprivileged_user(): void {
+		$user_id = self::factory()->user->create( array( 'role' => 'subscriber' ) );
+		wp_set_current_user( $user_id );
+
+		$this->assertFalse( PermissionHelper::can( 'view_analytics' ) );
+	}
+
 	public function test_user_session_agent_context_uses_owner_ceiling_without_token_id(): void {
 		$user_id = self::factory()->user->create( array( 'role' => 'administrator' ) );
 
