@@ -15,6 +15,7 @@ namespace DataMachineEvents\Blocks\Calendar\Grouping;
 use DateTime;
 use DateTimeZone;
 use DataMachineEvents\Admin\Settings_Page;
+use DataMachineEvents\Core\DateTimeParser;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -47,7 +48,7 @@ class MultiDayResolver {
 		// Placeholder / TBD dates (e.g. "2026-07-??") are not parseable and
 		// cannot be expanded into a date range. Treat them as single-day so
 		// the calendar still renders rather than throwing a fatal.
-		if ( ! self::is_valid_date( $start_date ) || ! self::is_valid_date( $end_date ) ) {
+		if ( ! DateTimeParser::isValidYmd( $start_date ) || ! DateTimeParser::isValidYmd( $end_date ) ) {
 			return false;
 		}
 
@@ -85,8 +86,8 @@ class MultiDayResolver {
 		// Guard against placeholder / malformed dates that would throw a
 		// DateMalformedStringException. is_multi_day() already filters these,
 		// but get_date_range() is a public entry point in its own right.
-		if ( ! self::is_valid_date( $start_date ) || ! self::is_valid_date( $end_date ) ) {
-			if ( self::is_valid_date( $start_date ) ) {
+		if ( ! DateTimeParser::isValidYmd( $start_date ) || ! DateTimeParser::isValidYmd( $end_date ) ) {
+			if ( DateTimeParser::isValidYmd( $start_date ) ) {
 				$dates[] = $start_date;
 			}
 
@@ -106,24 +107,5 @@ class MultiDayResolver {
 		}
 
 		return $dates;
-	}
-
-	/**
-	 * Strictly validate a Y-m-d date string.
-	 *
-	 * Rejects placeholder / TBD values (e.g. "2026-07-??") and any string
-	 * that does not represent a real calendar date, so callers can avoid
-	 * passing unparseable input into DateTime and triggering a
-	 * DateMalformedStringException.
-	 *
-	 * @param string $date Date string to validate.
-	 * @return bool True when $date is a valid Y-m-d calendar date.
-	 */
-	private static function is_valid_date( string $date ): bool {
-		if ( ! preg_match( '/^(\d{4})-(\d{2})-(\d{2})$/', $date, $matches ) ) {
-			return false;
-		}
-
-		return checkdate( (int) $matches[2], (int) $matches[3], (int) $matches[1] );
 	}
 }

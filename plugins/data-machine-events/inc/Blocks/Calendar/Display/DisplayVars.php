@@ -15,6 +15,7 @@ namespace DataMachineEvents\Blocks\Calendar\Display;
 use DateTime;
 use DateTimeZone;
 use DataMachineEvents\Blocks\Calendar\Grouping\DateGrouper;
+use DataMachineEvents\Core\DateTimeParser;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -39,17 +40,25 @@ class DisplayVars {
 		$iso_start_date         = '';
 		$multi_day_label        = '';
 
-		if ( $start_date ) {
-			$event_tz           = DateGrouper::get_event_timezone( $event_data );
-			$start_datetime_obj = new DateTime( $start_date . ' ' . $start_time, $event_tz );
-			$iso_start_date     = $start_datetime_obj->format( 'c' );
+		$event_tz           = DateGrouper::get_event_timezone( $event_data );
+		$start_datetime_obj = $start_date
+			? DateTimeParser::safeCreate( $start_date . ' ' . $start_time, $event_tz )
+			: null;
+
+		// A malformed/placeholder startDate that predates the prevention layers
+		// cannot be formatted. Degrade gracefully — return empty display vars for
+		// the date fields rather than throwing on the render path. See #394.
+		if ( $start_datetime_obj instanceof DateTime ) {
+			$iso_start_date = $start_datetime_obj->format( 'c' );
 
 			$is_multi_day    = ! empty( $display_context['is_multi_day'] );
 			$is_continuation = ! empty( $display_context['is_continuation'] );
 
-			if ( $is_multi_day && ! empty( $end_date ) ) {
-				$end_datetime_obj = new DateTime( $end_date, $event_tz );
+			$end_datetime_obj = ( $is_multi_day && ! empty( $end_date ) )
+				? DateTimeParser::safeCreate( $end_date, $event_tz )
+				: null;
 
+			if ( $is_multi_day && ! empty( $end_date ) && $end_datetime_obj instanceof DateTime ) {
 				if ( $is_continuation ) {
 					$formatted_time_display = sprintf(
 						/* translators: %s: end date. Example: "Ongoing · ends Mar 22" */
@@ -101,7 +110,12 @@ class DisplayVars {
 			return $start_formatted_full;
 		}
 
-		$end_datetime_obj = new DateTime( $end_date . ' ' . $end_time, $event_tz );
+		$end_datetime_obj = DateTimeParser::safeCreate( $end_date . ' ' . $end_time, $event_tz );
+
+		// A malformed end date can't form a range; just show the start time.
+		if ( ! $end_datetime_obj instanceof DateTime ) {
+			return $start_formatted_full;
+		}
 
 		// Don't show a range when start and end are identical (no real end time).
 		if ( $start_datetime_obj->format( 'Y-m-d H:i' ) === $end_datetime_obj->format( 'Y-m-d H:i' ) ) {

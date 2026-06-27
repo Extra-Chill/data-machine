@@ -15,6 +15,7 @@ use DateTime;
 use DateTimeZone;
 use WP_Query;
 use DataMachineEvents\Blocks\Calendar\Data\EventHydrator;
+use DataMachineEvents\Core\DateTimeParser;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -43,10 +44,17 @@ class DateGrouper {
 			if ( $event_data ) {
 				$start_time     = $event_data['startTime'] ?? '00:00:00';
 				$event_tz       = self::get_event_timezone( $event_data );
-				$event_datetime = new DateTime(
-					$event_data['startDate'] . ' ' . $start_time,
+				$event_datetime = DateTimeParser::safeCreate(
+					( $event_data['startDate'] ?? '' ) . ' ' . $start_time,
 					$event_tz
 				);
+
+				// A malformed/placeholder startDate that slipped into storage
+				// before the prevention layers existed cannot be rendered.
+				// Skip it rather than fataling the whole calendar. See #394.
+				if ( null === $event_datetime ) {
+					continue;
+				}
 
 				$paged_events[] = array(
 					'post'       => $event_post,
@@ -139,7 +147,12 @@ class DateGrouper {
 			}
 
 			foreach ( $event_dates as $index => $date_key ) {
-				$display_datetime_obj = new DateTime( $date_key . ' 00:00:00', $event_tz );
+				$display_datetime_obj = DateTimeParser::safeCreate( $date_key . ' 00:00:00', $event_tz );
+
+				// Defensive: a malformed date key cannot anchor a day group.
+				if ( null === $display_datetime_obj ) {
+					continue;
+				}
 
 				if ( ! isset( $date_groups[ $date_key ] ) ) {
 					$date_groups[ $date_key ] = array(
@@ -235,15 +248,22 @@ class DateGrouper {
 		$previous_date = null;
 
 		foreach ( $date_groups as $date_key => $date_group ) {
+			$current_date = DateTimeParser::safeCreate( $date_key, wp_timezone() );
+
+			// A malformed group key can't participate in gap math; skip it
+			// without throwing or resetting the previous-date cursor.
+			if ( null === $current_date ) {
+				continue;
+			}
+
 			if ( null !== $previous_date ) {
-				$current_date = new DateTime( $date_key, wp_timezone() );
-				$days_diff    = $current_date->diff( $previous_date )->days;
+				$days_diff = $current_date->diff( $previous_date )->days;
 
 				if ( $days_diff > 1 ) {
 					$gaps[ $date_key ] = $days_diff;
 				}
 			}
-			$previous_date = new DateTime( $date_key, wp_timezone() );
+			$previous_date = $current_date;
 		}
 
 		return $gaps;

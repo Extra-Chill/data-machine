@@ -1239,8 +1239,23 @@ class EventUpsert extends UpsertHandler {
 	private function getDateTimeConfidence( array $parameters, EngineData $engine ): string {
 		$start_date = trim( (string) ( $engine->get( 'startDate' ) ?? $parameters['startDate'] ?? '' ) );
 		$start_time = trim( (string) ( $engine->get( 'startTime' ) ?? $parameters['startTime'] ?? '' ) );
+		$end_date   = trim( (string) ( $engine->get( 'endDate' ) ?? $parameters['endDate'] ?? '' ) );
 
 		if ( '' === $start_date ) {
+			return 'none';
+		}
+
+		// A non-empty-but-unparseable startDate (e.g. "2026-07-??", "2026-??-??")
+		// must not auto-publish a junk date. Treat it like a missing date so the
+		// existing rejection path fires and the AI calls reject_source instead.
+		// Mirrors the junk-title guard. See issue #394.
+		if ( ! \DataMachineEvents\Core\DateTimeParser::isValidYmd( $start_date ) ) {
+			return 'none';
+		}
+
+		// A present-but-invalid endDate is equally unstorable; reject rather than
+		// concatenate a malformed DATETIME downstream.
+		if ( '' !== $end_date && ! \DataMachineEvents\Core\DateTimeParser::isValidYmd( $end_date ) ) {
 			return 'none';
 		}
 
