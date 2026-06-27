@@ -46,20 +46,28 @@
     font-size: 0.85rem;
 }
 
-/* Ticket Button */
+/* Ticket Button
+ *
+ * Token-first with fallbacks so the button never renders with an
+ * unresolved background on themes that don't define `--data-machine-*`
+ * (the toggle and ticket button both rely on this). Consumers that map
+ * these buttons onto their own button system (via
+ * `data_machine_events_ticket_button_classes` /
+ * `data_machine_events_add_to_calendar_button_classes`) override this
+ * entirely. */
 .ticket-button {
     display: inline-block;
     padding: 0.75rem 1.5rem;
-    background: var(--data-machine-text-accent);
+    background: var(--data-machine-text-accent, #2271b1);
     color: #fff;
     text-decoration: none;
-    border-radius: var(--data-machine-border-radius);
+    border-radius: var(--data-machine-border-radius, 4px);
     font-weight: 500;
     transition: background-color 0.2s;
 }
 
 .ticket-button:hover {
-    background: var(--data-machine-border-focus);
+    background: var(--data-machine-border-focus, #135e96);
     color: #fff;
 }
 

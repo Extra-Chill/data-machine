@@ -70,11 +70,37 @@ if ( ! function_exists( 'data_machine_events_render_add_to_calendar_button' ) ) 
 		}
 
 		$menu_id = 'dm-atc-menu-' . $post_id;
+
+		/**
+		 * Filters the CSS classes applied to the Add-to-Calendar toggle button.
+		 *
+		 * Mirrors `data_machine_events_ticket_button_classes` so a consuming
+		 * theme/plugin can route the toggle through its own button system (e.g.
+		 * map it onto theme `button-*` classes) instead of relying on the
+		 * default `ticket-button` styling. The base classes
+		 * (`dm-events-action-btn dm-events-add-to-calendar-toggle`) are always
+		 * present; only the trailing style classes are filterable.
+		 *
+		 * @since 0.44.2
+		 *
+		 * @param string[] $classes Style classes for the toggle. Default `['ticket-button']`.
+		 * @param int      $post_id Event post ID.
+		 */
+		$toggle_style_classes = apply_filters(
+			'data_machine_events_add_to_calendar_button_classes',
+			array( 'ticket-button' ),
+			$post_id
+		);
+
+		$toggle_classes = array_merge(
+			array( 'dm-events-action-btn', 'dm-events-add-to-calendar-toggle' ),
+			(array) $toggle_style_classes
+		);
 		?>
 		<div class="dm-events-add-to-calendar" data-dm-add-to-calendar>
 			<button
 				type="button"
-				class="dm-events-action-btn dm-events-add-to-calendar-toggle ticket-button"
+				class="<?php echo esc_attr( implode( ' ', $toggle_classes ) ); ?>"
 				aria-haspopup="true"
 				aria-expanded="false"
 				aria-controls="<?php echo esc_attr( $menu_id ); ?>"

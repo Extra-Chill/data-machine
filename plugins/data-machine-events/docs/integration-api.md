@@ -93,6 +93,7 @@ signatures are stable.
 | Filter | Signature | Purpose |
 |---|---|---|
 | `data_machine_events_ticket_button_classes` | `(array $classes)` | Modify CSS classes on the ticket button. |
+| `data_machine_events_add_to_calendar_button_classes` | `(array $classes, int $post_id)` | Modify the style classes on the Add-to-Calendar toggle. Mirrors the ticket-button filter so consumers can route the toggle through their own button system (e.g. theme `button-*` classes). Base classes `dm-events-action-btn dm-events-add-to-calendar-toggle` are always present; default style class is `ticket-button`. |
 | `data_machine_events_max_occurrence_display` | `(int $max)` | Cap on multi-occurrence display rows. |
 | `data_machine_events_non_ticket_price_patterns` | `(array $patterns)` | Strings that suppress the ticket button. |
 
