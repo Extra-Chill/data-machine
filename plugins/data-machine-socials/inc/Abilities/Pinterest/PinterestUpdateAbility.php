@@ -13,6 +13,7 @@
 namespace DataMachineSocials\Abilities\Pinterest;
 
 use DataMachine\Abilities\PermissionHelper;
+use DataMachine\Core\HttpClient;
 use DataMachineSocials\Handlers\Pinterest\PinterestAuth;
 use DataMachineSocials\Abilities\AbstractSocialAbility;
 
@@ -118,10 +119,10 @@ class PinterestUpdateAbility extends AbstractSocialAbility {
 	private function deletePin( string $access_token, string $pin_id ): array|\WP_Error {
 		$url = self::API_URL . '/pins/' . rawurlencode( $pin_id );
 
-		$response = wp_remote_request(
+		$result = HttpClient::delete(
 			$url,
 			array(
-				'method'  => 'DELETE',
+				'context' => 'Pinterest Delete',
 				'timeout' => 30,
 				'headers' => array(
 					'Authorization' => 'Bearer ' . $access_token,
@@ -129,13 +130,7 @@ class PinterestUpdateAbility extends AbstractSocialAbility {
 			)
 		);
 
-		if ( is_wp_error( $response ) ) {
-			return new \WP_Error( 'api_error', $response->get_error_message(), array( 'status' => 500 ) );
-		}
-
-		$status_code = wp_remote_retrieve_response_code( $response );
-
-		if ( 204 === $status_code || 200 === $status_code ) {
+		if ( ! empty( $result['success'] ) ) {
 			return array(
 				'success' => true,
 				'data'    => array(
@@ -145,7 +140,6 @@ class PinterestUpdateAbility extends AbstractSocialAbility {
 			);
 		}
 
-		$body = json_decode( wp_remote_retrieve_body( $response ), true );
-		return new \WP_Error( 'api_error', $body['message'] ?? 'Failed to delete pin', array( 'status' => 500 ) );
+		return new \WP_Error( 'api_error', $result['error'] ?? 'Failed to delete pin', array( 'status' => 500 ) );
 	}
 }

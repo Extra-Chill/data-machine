@@ -12,6 +12,7 @@
 namespace DataMachineSocials\Abilities\Threads;
 
 use DataMachine\Abilities\PermissionHelper;
+use DataMachine\Core\HttpClient;
 use DataMachineSocials\Abilities\AbstractSocialAbility;
 use DataMachineSocials\Handlers\Threads\ThreadsAuth;
 
@@ -82,9 +83,10 @@ class ThreadsDeleteAbility extends AbstractSocialAbility {
 
 		$url = self::GRAPH_API_URL . '/' . rawurlencode( $input['thread_id'] );
 
-		$response = wp_remote_post(
+		$result = HttpClient::post(
 			$url,
 			array(
+				'context' => 'Threads Delete',
 				'timeout' => 30,
 				'body'    => array(
 					'access_token' => $access_token,
@@ -92,15 +94,7 @@ class ThreadsDeleteAbility extends AbstractSocialAbility {
 			)
 		);
 
-		$normalized = $this->normalizeJsonResponse( $response );
-		if ( is_wp_error( $normalized ) ) {
-			return $normalized;
-		}
-
-		$status_code = $normalized['status_code'];
-		$body        = $normalized['data'];
-
-		if ( 200 === $status_code || 204 === $status_code ) {
+		if ( ! empty( $result['success'] ) ) {
 			return array(
 				'success' => true,
 				'data'    => array(
@@ -110,7 +104,7 @@ class ThreadsDeleteAbility extends AbstractSocialAbility {
 			);
 		}
 
-		return $this->apiError( $body['error']['message'] ?? 'Failed to delete thread' );
+		return $this->apiError( $result['error'] ?? 'Failed to delete thread' );
 	}
 
 	private function getAuthProvider(): ?ThreadsAuth {

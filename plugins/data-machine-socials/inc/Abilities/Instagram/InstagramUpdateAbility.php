@@ -13,6 +13,7 @@
 namespace DataMachineSocials\Abilities\Instagram;
 
 use DataMachine\Abilities\PermissionHelper;
+use DataMachine\Core\HttpClient;
 use DataMachineSocials\Handlers\Facebook\FacebookAuth;
 use DataMachineSocials\Handlers\Instagram\InstagramAuth;
 use DataMachineSocials\Abilities\AbstractSocialAbility;
@@ -173,9 +174,10 @@ class InstagramUpdateAbility extends AbstractSocialAbility {
 
 		$url = self::GRAPH_API_URL . '/' . rawurlencode( $media_id );
 
-		$response = wp_remote_post(
+		$result = HttpClient::post(
 			$url,
 			array(
+				'context' => 'Instagram Edit Caption',
 				'timeout' => 30,
 				'body'    => array(
 					'access_token' => $access_token,
@@ -184,16 +186,11 @@ class InstagramUpdateAbility extends AbstractSocialAbility {
 			)
 		);
 
-		if ( is_wp_error( $response ) ) {
-			return new \WP_Error( 'api_error', $response->get_error_message(), array( 'status' => 500 ) );
+		if ( empty( $result['success'] ) ) {
+			return new \WP_Error( 'api_error', $result['error'] ?? 'Failed to edit caption', array( 'status' => 500 ) );
 		}
 
-		$status_code = wp_remote_retrieve_response_code( $response );
-		$body        = json_decode( wp_remote_retrieve_body( $response ), true );
-
-		if ( 200 !== $status_code ) {
-			return new \WP_Error( 'api_error', $body['error']['message'] ?? 'Failed to edit caption', array( 'status' => 500 ) );
-		}
+		$body = json_decode( $result['data'], true );
 
 		return array(
 			'success' => true,
@@ -214,9 +211,10 @@ class InstagramUpdateAbility extends AbstractSocialAbility {
 	private function deleteMedia( string $access_token, string $media_id ): array|\WP_Error {
 		$url = self::GRAPH_API_URL . '/' . rawurlencode( $media_id );
 
-		$response = wp_remote_post(
+		$result = HttpClient::post(
 			$url,
 			array(
+				'context' => 'Instagram Delete',
 				'timeout' => 30,
 				'body'    => array(
 					'access_token' => $access_token,
@@ -229,14 +227,7 @@ class InstagramUpdateAbility extends AbstractSocialAbility {
 		// We need to use the user media edge to delete. This is a limitation.
 		// For now, return an error with guidance.
 
-		if ( is_wp_error( $response ) ) {
-			return new \WP_Error( 'api_error', $response->get_error_message(), array( 'status' => 500 ) );
-		}
-
-		$status_code = wp_remote_retrieve_response_code( $response );
-		$body        = json_decode( wp_remote_retrieve_body( $response ), true );
-
-		if ( 200 === $status_code || 204 === $status_code ) {
+		if ( ! empty( $result['success'] ) ) {
 			return array(
 				'success' => true,
 				'data'    => array(
@@ -248,7 +239,7 @@ class InstagramUpdateAbility extends AbstractSocialAbility {
 
 		// Instagram doesn't support direct delete via API for all media types.
 		// Return informative error.
-		return new \WP_Error( 'api_error', $body['error']['message'] ?? 'Delete not supported for this media type via API. Consider archiving instead.', array( 'status' => 500 ) );
+		return new \WP_Error( 'api_error', $result['error'] ?? 'Delete not supported for this media type via API. Consider archiving instead.', array( 'status' => 500 ) );
 	}
 
 	/**
@@ -261,9 +252,10 @@ class InstagramUpdateAbility extends AbstractSocialAbility {
 	private function archiveMedia( string $access_token, string $media_id ): array|\WP_Error {
 		$url = self::GRAPH_API_URL . '/' . rawurlencode( $media_id );
 
-		$response = wp_remote_post(
+		$result = HttpClient::post(
 			$url,
 			array(
+				'context' => 'Instagram Archive',
 				'timeout' => 30,
 				'body'    => array(
 					'access_token' => $access_token,
@@ -272,16 +264,11 @@ class InstagramUpdateAbility extends AbstractSocialAbility {
 			)
 		);
 
-		if ( is_wp_error( $response ) ) {
-			return new \WP_Error( 'api_error', $response->get_error_message(), array( 'status' => 500 ) );
+		if ( empty( $result['success'] ) ) {
+			return new \WP_Error( 'api_error', $result['error'] ?? 'Failed to archive media', array( 'status' => 500 ) );
 		}
 
-		$status_code = wp_remote_retrieve_response_code( $response );
-		$body        = json_decode( wp_remote_retrieve_body( $response ), true );
-
-		if ( 200 !== $status_code ) {
-			return new \WP_Error( 'api_error', $body['error']['message'] ?? 'Failed to archive media', array( 'status' => 500 ) );
-		}
+		$body = json_decode( $result['data'], true );
 
 		return array(
 			'success' => true,

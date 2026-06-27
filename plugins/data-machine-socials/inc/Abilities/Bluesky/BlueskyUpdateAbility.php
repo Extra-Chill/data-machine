@@ -13,6 +13,7 @@
 namespace DataMachineSocials\Abilities\Bluesky;
 
 use DataMachine\Abilities\PermissionHelper;
+use DataMachine\Core\HttpClient;
 use DataMachineSocials\Handlers\Bluesky\BlueskyAuth;
 use DataMachineSocials\Abilities\AbstractSocialAbility;
 
@@ -134,10 +135,10 @@ class BlueskyUpdateAbility extends AbstractSocialAbility {
 			'rkey'       => $rkey,
 		);
 
-		$response = wp_remote_request(
+		$result = HttpClient::delete(
 			$url,
 			array(
-				'method'  => 'DELETE',
+				'context' => 'Bluesky Delete',
 				'timeout' => 30,
 				'headers' => array(
 					'Authorization' => 'Bearer ' . $session['accessJwt'],
@@ -147,13 +148,7 @@ class BlueskyUpdateAbility extends AbstractSocialAbility {
 			)
 		);
 
-		if ( is_wp_error( $response ) ) {
-			return new \WP_Error( 'api_error', $response->get_error_message(), array( 'status' => 500 ) );
-		}
-
-		$status_code = wp_remote_retrieve_response_code( $response );
-
-		if ( 200 === $status_code || 204 === $status_code ) {
+		if ( ! empty( $result['success'] ) ) {
 			return array(
 				'success' => true,
 				'data'    => array(
@@ -163,8 +158,7 @@ class BlueskyUpdateAbility extends AbstractSocialAbility {
 			);
 		}
 
-		$body = json_decode( wp_remote_retrieve_body( $response ), true );
-		return new \WP_Error( 'api_error', $body['error'] ?? 'Failed to delete post', array( 'status' => 500 ) );
+		return new \WP_Error( 'api_error', $result['error'] ?? 'Failed to delete post', array( 'status' => 500 ) );
 	}
 
 	private function likePost( array $session, string $post_uri ): array|\WP_Error {
@@ -173,9 +167,10 @@ class BlueskyUpdateAbility extends AbstractSocialAbility {
 
 		$url = $pds_url . '/xrpc/app.bsky.feed.like';
 
-		$response = wp_remote_post(
+		$result = HttpClient::post(
 			$url,
 			array(
+				'context' => 'Bluesky Like',
 				'timeout' => 30,
 				'headers' => array(
 					'Authorization' => 'Bearer ' . $session['accessJwt'],
@@ -195,14 +190,8 @@ class BlueskyUpdateAbility extends AbstractSocialAbility {
 			)
 		);
 
-		if ( is_wp_error( $response ) ) {
-			return new \WP_Error( 'api_error', $response->get_error_message(), array( 'status' => 500 ) );
-		}
-
-		$status_code = wp_remote_retrieve_response_code( $response );
-		$body        = json_decode( wp_remote_retrieve_body( $response ), true );
-
-		if ( 200 === $status_code ) {
+		if ( ! empty( $result['success'] ) ) {
+			$body = json_decode( $result['data'], true );
 			return array(
 				'success' => true,
 				'data'    => array(
@@ -213,7 +202,7 @@ class BlueskyUpdateAbility extends AbstractSocialAbility {
 			);
 		}
 
-		return new \WP_Error( 'api_error', $body['error'] ?? 'Failed to like post', array( 'status' => 500 ) );
+		return new \WP_Error( 'api_error', $result['error'] ?? 'Failed to like post', array( 'status' => 500 ) );
 	}
 
 	private function unlikePost( array $session): array|\WP_Error {

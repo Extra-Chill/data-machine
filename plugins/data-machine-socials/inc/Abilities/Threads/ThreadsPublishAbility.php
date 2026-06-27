@@ -12,6 +12,7 @@ namespace DataMachineSocials\Abilities\Threads;
 
 use DataMachine\Abilities\AuthAbilities;
 use DataMachine\Abilities\PermissionHelper;
+use DataMachine\Core\HttpClient;
 use DataMachineSocials\Abilities\AbstractSocialAbility;
 
 defined( 'ABSPATH' ) || exit;
@@ -183,23 +184,18 @@ class ThreadsPublishAbility extends AbstractSocialAbility {
 
 		$url = "https://graph.threads.net/v1.0/{$user_id}/threads";
 
-		$response = wp_remote_post(
+		$result = HttpClient::post(
 			$url,
 			array(
+				'context' => 'Threads Publish',
 				'body'    => $post_data,
 				'timeout' => 30,
 			)
 		);
 
-		if ( is_wp_error( $response ) ) {
-			return new \WP_Error( 'api_error', $response->get_error_message(), array( 'status' => 500 ) );
-		}
+		$data = ! empty( $result['success'] ) ? json_decode( $result['data'], true ) : null;
 
-		$status_code = wp_remote_retrieve_response_code( $response );
-		$body        = wp_remote_retrieve_body( $response );
-		$data        = json_decode( $body, true );
-
-		if ( $status_code >= 200 && $status_code < 300 && isset( $data['id'] ) ) {
+		if ( ! empty( $result['success'] ) && isset( $data['id'] ) ) {
 			$creation_id = $data['id'];
 
 			// Step 3: Publish the thread
@@ -221,6 +217,8 @@ class ThreadsPublishAbility extends AbstractSocialAbility {
 		$error_msg = 'Threads API error';
 		if ( isset( $data['error']['message'] ) ) {
 			$error_msg = $data['error']['message'];
+		} elseif ( ! empty( $result['error'] ) ) {
+			$error_msg = $result['error'];
 		}
 
 		return new \WP_Error( 'api_error', $error_msg, array( 'status' => 500 ) );
@@ -259,9 +257,10 @@ class ThreadsPublishAbility extends AbstractSocialAbility {
 	private static function create_media_container( string $access_token, string $user_id, string $image_url ) {
 		$url = "https://graph.threads.net/v1.0/{$user_id}/media";
 
-		$response = wp_remote_post(
+		$result = HttpClient::post(
 			$url,
 			array(
+				'context' => 'Threads Media Container',
 				'body'    => array(
 					'media_type'   => 'IMAGE',
 					'image_url'    => $image_url,
@@ -271,21 +270,15 @@ class ThreadsPublishAbility extends AbstractSocialAbility {
 			)
 		);
 
-		if ( is_wp_error( $response ) ) {
-			return $response;
-		}
+		$data = ! empty( $result['success'] ) ? json_decode( $result['data'], true ) : null;
 
-		$status_code = wp_remote_retrieve_response_code( $response );
-		$body        = wp_remote_retrieve_body( $response );
-		$data        = json_decode( $body, true );
-
-		if ( $status_code >= 200 && $status_code < 300 && isset( $data['id'] ) ) {
+		if ( ! empty( $result['success'] ) && isset( $data['id'] ) ) {
 			return $data['id'];
 		}
 
 		return new \WP_Error(
 			'threads_media_failed',
-			$data['error']['message'] ?? 'Failed to create media container'
+			$data['error']['message'] ?? ( $result['error'] ?? 'Failed to create media container' )
 		);
 	}
 
@@ -300,14 +293,19 @@ class ThreadsPublishAbility extends AbstractSocialAbility {
 		$url = "https://graph.threads.net/v1.0/{$media_id}?access_token={$access_token}";
 
 		for ( $i = 0; $i < 10; $i++ ) {
-			$response = wp_remote_get( $url, array( 'timeout' => 10 ) );
+			$result = HttpClient::get(
+				$url,
+				array(
+					'context' => 'Threads Media Status',
+					'timeout' => 10,
+				)
+			);
 
-			if ( is_wp_error( $response ) ) {
+			if ( empty( $result['success'] ) ) {
 				return false;
 			}
 
-			$body = wp_remote_retrieve_body( $response );
-			$data = json_decode( $body, true );
+			$data = json_decode( $result['data'], true );
 
 			if ( isset( $data['status'] ) && 'FINISHED' === $data['status'] ) {
 				return true;
@@ -333,9 +331,10 @@ class ThreadsPublishAbility extends AbstractSocialAbility {
 	private static function publish_thread( string $access_token, string $creation_id ) {
 		$url = 'https://graph.threads.net/v1.0/me/threads_publish';
 
-		$response = wp_remote_post(
+		$result = HttpClient::post(
 			$url,
 			array(
+				'context' => 'Threads Publish Thread',
 				'body'    => array(
 					'creation_id'  => $creation_id,
 					'access_token' => $access_token,
@@ -344,21 +343,15 @@ class ThreadsPublishAbility extends AbstractSocialAbility {
 			)
 		);
 
-		if ( is_wp_error( $response ) ) {
-			return $response;
-		}
+		$data = ! empty( $result['success'] ) ? json_decode( $result['data'], true ) : null;
 
-		$status_code = wp_remote_retrieve_response_code( $response );
-		$body        = wp_remote_retrieve_body( $response );
-		$data        = json_decode( $body, true );
-
-		if ( $status_code >= 200 && $status_code < 300 && isset( $data['id'] ) ) {
+		if ( ! empty( $result['success'] ) && isset( $data['id'] ) ) {
 			return $data['id'];
 		}
 
 		return new \WP_Error(
 			'threads_publish_failed',
-			$data['error']['message'] ?? 'Failed to publish thread'
+			$data['error']['message'] ?? ( $result['error'] ?? 'Failed to publish thread' )
 		);
 	}
 }

@@ -13,6 +13,7 @@
 namespace DataMachineSocials\Abilities\Reddit;
 
 use DataMachine\Abilities\PermissionHelper;
+use DataMachine\Core\HttpClient;
 use DataMachineSocials\Abilities\AbstractSocialAbility;
 
 defined( 'ABSPATH' ) || exit;
@@ -220,9 +221,10 @@ class SubmitRedditAbility extends AbstractSocialAbility {
 			$body['spoiler'] = true;
 		}
 
-		$response = wp_remote_post(
+		$http = HttpClient::post(
 			$api_url,
 			array(
+				'context' => 'Reddit Submit',
 				'timeout' => 30,
 				'headers' => array(
 					'Authorization' => 'Bearer ' . $access_token,
@@ -232,14 +234,13 @@ class SubmitRedditAbility extends AbstractSocialAbility {
 			)
 		);
 
-		if ( is_wp_error( $response ) ) {
-			return new \WP_Error( 'api_error', $response->get_error_message(), array( 'status' => 500 ) );
+		if ( empty( $http['success'] ) ) {
+			return new \WP_Error( 'api_error', $http['error'] ?? 'Reddit API request failed', array( 'status' => 500 ) );
 		}
 
-		$status_code = wp_remote_retrieve_response_code( $response );
-		$result      = json_decode( wp_remote_retrieve_body( $response ), true );
+		$result = json_decode( $http['data'], true );
 
-		// Reddit returns errors in json.errors array.
+		// Reddit returns errors in json.errors array (HTTP 200 with logical errors).
 		$errors = $result['json']['errors'] ?? array();
 		if ( ! empty( $errors ) ) {
 			$error_messages = array_map(
@@ -249,10 +250,6 @@ class SubmitRedditAbility extends AbstractSocialAbility {
 				$errors
 			);
 			return new \WP_Error( 'api_error', implode( '; ', $error_messages ), array( 'status' => 500 ) );
-		}
-
-		if ( $status_code < 200 || $status_code >= 300 ) {
-			return new \WP_Error( 'api_error', "Reddit API returned HTTP {$status_code}", array( 'status' => 500 ) );
 		}
 
 		$post_data = $result['json']['data'] ?? array();

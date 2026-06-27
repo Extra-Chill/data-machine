@@ -12,6 +12,7 @@
 namespace DataMachineSocials\Abilities\Facebook;
 
 use DataMachine\Abilities\PermissionHelper;
+use DataMachine\Core\HttpClient;
 use DataMachineSocials\Handlers\Facebook\FacebookAuth;
 use DataMachineSocials\Abilities\AbstractSocialAbility;
 
@@ -82,9 +83,10 @@ class FacebookDeleteAbility extends AbstractSocialAbility {
 
 		$url = self::GRAPH_API_URL . '/' . rawurlencode( $input['post_id'] );
 
-		$response = wp_remote_post(
+		$result = HttpClient::post(
 			$url,
 			array(
+				'context' => 'Facebook Delete',
 				'timeout' => 30,
 				'body'    => array(
 					'access_token' => $access_token,
@@ -93,15 +95,9 @@ class FacebookDeleteAbility extends AbstractSocialAbility {
 			)
 		);
 
-		$normalized = $this->normalizeJsonResponse( $response );
-		if ( is_wp_error( $normalized ) ) {
-			return $normalized;
-		}
+		$body = ! empty( $result['success'] ) ? json_decode( $result['data'], true ) : null;
 
-		$status_code = $normalized['status_code'];
-		$body        = $normalized['data'];
-
-		if ( 200 === $status_code || ( isset( $body['success'] ) && $body['success'] ) ) {
+		if ( ! empty( $result['success'] ) || ( isset( $body['success'] ) && $body['success'] ) ) {
 			return array(
 				'success' => true,
 				'data'    => array(
@@ -111,7 +107,7 @@ class FacebookDeleteAbility extends AbstractSocialAbility {
 			);
 		}
 
-		return $this->apiError( $body['error']['message'] ?? 'Failed to delete post' );
+		return $this->apiError( $result['error'] ?? 'Failed to delete post' );
 	}
 
 	private function getAuthProvider(): ?FacebookAuth {

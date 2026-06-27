@@ -12,6 +12,7 @@
 namespace DataMachineSocials\Abilities\Instagram;
 
 use DataMachine\Abilities\PermissionHelper;
+use DataMachine\Core\HttpClient;
 use DataMachineSocials\Handlers\Facebook\FacebookAuth;
 use DataMachineSocials\Handlers\Instagram\InstagramAuth;
 use DataMachineSocials\Abilities\AbstractSocialAbility;
@@ -118,10 +119,10 @@ class InstagramDeleteAbility extends AbstractSocialAbility {
 	private function deleteMedia( string $access_token, string $media_id ): array|\WP_Error {
 		$url = self::GRAPH_API_URL . '/' . rawurlencode( $media_id );
 
-		$response = wp_remote_request(
+		$result = HttpClient::delete(
 			$url,
 			array(
-				'method'  => 'DELETE',
+				'context' => 'Instagram Delete',
 				'timeout' => 30,
 				'body'    => array(
 					'access_token' => $access_token,
@@ -129,15 +130,7 @@ class InstagramDeleteAbility extends AbstractSocialAbility {
 			)
 		);
 
-		$normalized = $this->normalizeJsonResponse( $response );
-		if ( is_wp_error( $normalized ) ) {
-			return $normalized;
-		}
-
-		$status_code = $normalized['status_code'];
-		$body        = $normalized['data'];
-
-		if ( 200 === $status_code || 204 === $status_code ) {
+		if ( ! empty( $result['success'] ) ) {
 			return array(
 				'success' => true,
 				'data'    => array(
@@ -147,6 +140,6 @@ class InstagramDeleteAbility extends AbstractSocialAbility {
 			);
 		}
 
-		return $this->apiError( $body['error']['message'] ?? 'Delete failed. The Instagram API may not support deletion for this media type. Consider archiving instead.' );
+		return $this->apiError( $result['error'] ?? 'Delete failed. The Instagram API may not support deletion for this media type. Consider archiving instead.' );
 	}
 }

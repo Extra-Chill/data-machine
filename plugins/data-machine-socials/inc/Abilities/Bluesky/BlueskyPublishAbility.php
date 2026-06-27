@@ -12,6 +12,7 @@ namespace DataMachineSocials\Abilities\Bluesky;
 
 use DataMachine\Abilities\AuthAbilities;
 use DataMachine\Abilities\PermissionHelper;
+use DataMachine\Core\HttpClient;
 use DataMachineSocials\Abilities\AbstractSocialAbility;
 
 defined( 'ABSPATH' ) || exit;
@@ -203,9 +204,10 @@ class BlueskyPublishAbility extends AbstractSocialAbility {
 		}
 
 		// Create post
-		$response = wp_remote_post(
+		$result = HttpClient::post(
 			'https://bsky.social/xrpc/com.atproto.repo.createRecord',
 			array(
+				'context' => 'Bluesky Publish',
 				'headers' => array(
 					'Authorization' => 'Bearer ' . $access_token,
 					'Content-Type'  => 'application/json',
@@ -219,30 +221,23 @@ class BlueskyPublishAbility extends AbstractSocialAbility {
 			)
 		);
 
-		if ( is_wp_error( $response ) ) {
-			return new \WP_Error( 'api_error', $response->get_error_message(), array( 'status' => 500 ) );
+		if ( ! empty( $result['success'] ) ) {
+			$data = json_decode( $result['data'], true );
+
+			if ( isset( $data['uri'] ) ) {
+				$parts    = explode( '/', $data['uri'] );
+				$post_id  = end( $parts );
+				$post_url = "https://bsky.app/profile/{$handle}/post/{$post_id}";
+
+				return array(
+					'success'  => true,
+					'post_id'  => $post_id,
+					'post_url' => $post_url,
+				);
+			}
 		}
 
-		$status_code = wp_remote_retrieve_response_code( $response );
-		$body        = wp_remote_retrieve_body( $response );
-		$data        = json_decode( $body, true );
-
-		if ( $status_code >= 200 && $status_code < 300 && isset( $data['uri'] ) ) {
-			$parts    = explode( '/', $data['uri'] );
-			$post_id  = end( $parts );
-			$post_url = "https://bsky.app/profile/{$handle}/post/{$post_id}";
-
-			return array(
-				'success'  => true,
-				'post_id'  => $post_id,
-				'post_url' => $post_url,
-			);
-		}
-
-		$error_msg = 'Bluesky API error';
-		if ( isset( $data['message'] ) ) {
-			$error_msg = $data['message'];
-		}
+		$error_msg = $result['error'] ?? 'Bluesky API error';
 
 		return new \WP_Error( 'api_error', $error_msg, array( 'status' => 500 ) );
 	}
@@ -280,18 +275,31 @@ class BlueskyPublishAbility extends AbstractSocialAbility {
 	 */
 	private static function upload_image( string $access_token, string $image_url ): ?array {
 		// Download image
-		$response = wp_remote_get( $image_url, array( 'timeout' => 30 ) );
-		if ( is_wp_error( $response ) ) {
+		$download = HttpClient::get(
+			$image_url,
+			array(
+				'context' => 'Bluesky Image Download',
+				'timeout' => 30,
+			)
+		);
+		if ( empty( $download['success'] ) ) {
 			return null;
 		}
 
-		$image_data   = wp_remote_retrieve_body( $response );
-		$content_type = wp_remote_retrieve_header( $response, 'content-type' );
+		$image_data   = $download['data'];
+		$content_type = '';
+		if ( ! empty( $download['headers'] ) ) {
+			$headers      = $download['headers'];
+			$content_type = is_object( $headers ) && method_exists( $headers, 'offsetGet' )
+				? (string) ( $headers['content-type'] ?? '' )
+				: (string) ( is_array( $headers ) ? ( $headers['content-type'] ?? '' ) : '' );
+		}
 
 		// Upload blob
-		$response = wp_remote_post(
+		$result = HttpClient::post(
 			'https://bsky.social/xrpc/com.atproto.repo.uploadBlob',
 			array(
+				'context' => 'Bluesky Blob Upload',
 				'headers' => array(
 					'Authorization' => 'Bearer ' . $access_token,
 					'Content-Type'  => $content_type ? $content_type : 'image/jpeg',
@@ -301,15 +309,13 @@ class BlueskyPublishAbility extends AbstractSocialAbility {
 			)
 		);
 
-		if ( is_wp_error( $response ) ) {
+		if ( empty( $result['success'] ) ) {
 			return null;
 		}
 
-		$status_code = wp_remote_retrieve_response_code( $response );
-		$body        = wp_remote_retrieve_body( $response );
-		$data        = json_decode( $body, true );
+		$data = json_decode( $result['data'], true );
 
-		if ( $status_code >= 200 && $status_code < 300 && isset( $data['blob'] ) ) {
+		if ( isset( $data['blob'] ) ) {
 			return $data['blob'];
 		}
 
@@ -375,16 +381,22 @@ class BlueskyPublishAbility extends AbstractSocialAbility {
 			'image'       => '',
 		);
 
-		$response = wp_remote_get( $url, array(
-			'timeout'    => 10,
-			'user-agent' => 'DataMachineSocials/1.0 (link card preview)',
-		) );
+		$response = HttpClient::get(
+			$url,
+			array(
+				'context' => 'Bluesky OG Tags',
+				'timeout' => 10,
+				'headers' => array(
+					'User-Agent' => 'DataMachineSocials/1.0 (link card preview)',
+				),
+			)
+		);
 
-		if ( is_wp_error( $response ) ) {
+		if ( empty( $response['success'] ) ) {
 			return $defaults;
 		}
 
-		$html = wp_remote_retrieve_body( $response );
+		$html = $response['data'];
 		if ( empty( $html ) ) {
 			return $defaults;
 		}

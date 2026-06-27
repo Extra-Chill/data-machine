@@ -16,6 +16,7 @@ namespace DataMachineSocials\Abilities\Instagram;
 
 use DataMachine\Abilities\AuthAbilities;
 use DataMachine\Abilities\PermissionHelper;
+use DataMachine\Core\HttpClient;
 use DataMachineSocials\Handlers\Facebook\FacebookAuth;
 use DataMachineSocials\Abilities\AbstractSocialAbility;
 
@@ -290,19 +291,20 @@ class InstagramPublishAbility extends AbstractSocialAbility {
 				$container_body['caption'] = $caption;
 			}
 
-			$response = wp_remote_post(
+			$result = HttpClient::post(
 				self::GRAPH_API_URL . "/{$user_id}/media",
 				array(
+					'context' => 'Instagram Media Container',
 					'body'    => $container_body,
 					'timeout' => 40,
 				)
 			);
 
-			if ( is_wp_error( $response ) ) {
-				return new \WP_Error( 'api_error', 'Error creating media container: ' . $response->get_error_message(), array( 'status' => 500 ) );
+			if ( empty( $result['success'] ) ) {
+				return new \WP_Error( 'api_error', 'Error creating media container: ' . ( $result['error'] ?? 'unknown error' ), array( 'status' => 500 ) );
 			}
 
-			$body = json_decode( wp_remote_retrieve_body( $response ), true );
+			$body = json_decode( $result['data'], true );
 
 			if ( empty( $body['id'] ) ) {
 				$error_msg = 'No container ID returned for image';
@@ -315,14 +317,17 @@ class InstagramPublishAbility extends AbstractSocialAbility {
 			$container_id = $body['id'];
 
 			// Check initial status.
-			$status_resp = wp_remote_get(
+			$status_result = HttpClient::get(
 				self::GRAPH_API_URL . "/{$container_id}?fields=status_code&access_token={$access_token}",
-				array( 'timeout' => 40 )
+				array(
+					'context' => 'Instagram Container Status',
+					'timeout' => 40,
+				)
 			);
 
 			$status = 'IN_PROGRESS';
-			if ( ! is_wp_error( $status_resp ) ) {
-				$status_body = json_decode( wp_remote_retrieve_body( $status_resp ), true );
+			if ( ! empty( $status_result['success'] ) ) {
+				$status_body = json_decode( $status_result['data'], true );
 				if ( ! empty( $status_body['status_code'] ) ) {
 					$status = $status_body['status_code'];
 				}
@@ -347,10 +352,11 @@ class InstagramPublishAbility extends AbstractSocialAbility {
 		$main_container_id = null;
 		$media_kind        = 'image';
 		if ( $is_carousel && count( $container_ids ) > 1 ) {
-			$children      = implode( ',', $container_ids );
-			$carousel_resp = wp_remote_post(
+			$children       = implode( ',', $container_ids );
+			$carousel_result = HttpClient::post(
 				self::GRAPH_API_URL . "/{$user_id}/media",
 				array(
+					'context' => 'Instagram Carousel Container',
 					'body'    => array(
 						'media_type'   => 'CAROUSEL',
 						'children'     => $children,
@@ -361,11 +367,11 @@ class InstagramPublishAbility extends AbstractSocialAbility {
 				)
 			);
 
-			if ( is_wp_error( $carousel_resp ) ) {
-				return new \WP_Error( 'api_error', 'Error creating carousel container: ' . $carousel_resp->get_error_message(), array( 'status' => 500 ) );
+			if ( empty( $carousel_result['success'] ) ) {
+				return new \WP_Error( 'api_error', 'Error creating carousel container: ' . ( $carousel_result['error'] ?? 'unknown error' ), array( 'status' => 500 ) );
 			}
 
-			$carousel_body = json_decode( wp_remote_retrieve_body( $carousel_resp ), true );
+			$carousel_body = json_decode( $carousel_result['data'], true );
 			if ( empty( $carousel_body['id'] ) ) {
 				$error_msg = 'No carousel container ID returned';
 				if ( isset( $carousel_body['error']['message'] ) ) {
@@ -441,19 +447,20 @@ class InstagramPublishAbility extends AbstractSocialAbility {
 		}
 
 		// Step 1: Create the Reel container.
-		$response = wp_remote_post(
+		$result = HttpClient::post(
 			self::GRAPH_API_URL . "/{$user_id}/media",
 			array(
+				'context' => 'Instagram Reel Container',
 				'body'    => $container_body,
 				'timeout' => 60,
 			)
 		);
 
-		if ( is_wp_error( $response ) ) {
-			return new \WP_Error( 'api_error', 'Error creating Reel container: ' . $response->get_error_message(), array( 'status' => 500 ) );
+		if ( empty( $result['success'] ) ) {
+			return new \WP_Error( 'api_error', 'Error creating Reel container: ' . ( $result['error'] ?? 'unknown error' ), array( 'status' => 500 ) );
 		}
 
-		$body = json_decode( wp_remote_retrieve_body( $response ), true );
+		$body = json_decode( $result['data'], true );
 
 		if ( empty( $body['id'] ) ) {
 			$error_msg = 'No container ID returned for Reel';
@@ -523,19 +530,20 @@ class InstagramPublishAbility extends AbstractSocialAbility {
 		}
 
 		// Step 1: Create the Story container.
-		$response = wp_remote_post(
+		$result = HttpClient::post(
 			self::GRAPH_API_URL . "/{$user_id}/media",
 			array(
+				'context' => 'Instagram Story Container',
 				'body'    => $container_body,
 				'timeout' => 60,
 			)
 		);
 
-		if ( is_wp_error( $response ) ) {
-			return new \WP_Error( 'api_error', 'Error creating Story container: ' . $response->get_error_message(), array( 'status' => 500 ) );
+		if ( empty( $result['success'] ) ) {
+			return new \WP_Error( 'api_error', 'Error creating Story container: ' . ( $result['error'] ?? 'unknown error' ), array( 'status' => 500 ) );
 		}
 
-		$body = json_decode( wp_remote_retrieve_body( $response ), true );
+		$body = json_decode( $result['data'], true );
 
 		if ( empty( $body['id'] ) ) {
 			$error_msg = 'No container ID returned for Story';
@@ -573,9 +581,10 @@ class InstagramPublishAbility extends AbstractSocialAbility {
 	 * @return array Result with success, media_id, media_kind, permalink.
 	 */
 	private static function publish_container( string $user_id, string $access_token, string $container_id, string $media_kind ): array|\WP_Error {
-		$publish_resp = wp_remote_post(
+		$publish_result = HttpClient::post(
 			self::GRAPH_API_URL . "/{$user_id}/media_publish",
 			array(
+				'context' => 'Instagram Media Publish',
 				'body'    => array(
 					'creation_id'  => $container_id,
 					'access_token' => $access_token,
@@ -584,11 +593,11 @@ class InstagramPublishAbility extends AbstractSocialAbility {
 			)
 		);
 
-		if ( is_wp_error( $publish_resp ) ) {
-			return new \WP_Error( 'api_error', 'Error publishing to Instagram: ' . $publish_resp->get_error_message(), array( 'status' => 500 ) );
+		if ( empty( $publish_result['success'] ) ) {
+			return new \WP_Error( 'api_error', 'Error publishing to Instagram: ' . ( $publish_result['error'] ?? 'unknown error' ), array( 'status' => 500 ) );
 		}
 
-		$publish_body = json_decode( wp_remote_retrieve_body( $publish_resp ), true );
+		$publish_body = json_decode( $publish_result['data'], true );
 		if ( empty( $publish_body['id'] ) ) {
 			$error_msg = 'No media ID returned after publishing';
 			if ( isset( $publish_body['error']['message'] ) ) {
@@ -600,14 +609,17 @@ class InstagramPublishAbility extends AbstractSocialAbility {
 		$media_id = $publish_body['id'];
 
 		// Fetch permalink.
-		$permalink      = null;
-		$permalink_resp = wp_remote_get(
+		$permalink        = null;
+		$permalink_result = HttpClient::get(
 			self::GRAPH_API_URL . "/{$media_id}?fields=id,permalink&access_token={$access_token}",
-			array( 'timeout' => 40 )
+			array(
+				'context' => 'Instagram Permalink',
+				'timeout' => 40,
+			)
 		);
 
-		if ( ! is_wp_error( $permalink_resp ) ) {
-			$permalink_body = json_decode( wp_remote_retrieve_body( $permalink_resp ), true );
+		if ( ! empty( $permalink_result['success'] ) ) {
+			$permalink_body = json_decode( $permalink_result['data'], true );
 			if ( isset( $permalink_body['permalink'] ) ) {
 				$permalink = $permalink_body['permalink'];
 			}
@@ -634,13 +646,19 @@ class InstagramPublishAbility extends AbstractSocialAbility {
 		$url = self::GRAPH_API_URL . "/{$container_id}?fields=status_code&access_token={$access_token}";
 
 		for ( $i = 0; $i < $max_retries; $i++ ) {
-			$response = wp_remote_get( $url, array( 'timeout' => 10 ) );
+			$result = HttpClient::get(
+				$url,
+				array(
+					'context' => 'Instagram Container Status',
+					'timeout' => 10,
+				)
+			);
 
-			if ( is_wp_error( $response ) ) {
+			if ( empty( $result['success'] ) ) {
 				return false;
 			}
 
-			$body = json_decode( wp_remote_retrieve_body( $response ), true );
+			$body = json_decode( $result['data'], true );
 
 			if ( isset( $body['status_code'] ) && 'FINISHED' === $body['status_code'] ) {
 				return true;

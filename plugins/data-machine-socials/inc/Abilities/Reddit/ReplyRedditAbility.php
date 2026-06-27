@@ -13,6 +13,7 @@
 namespace DataMachineSocials\Abilities\Reddit;
 
 use DataMachine\Abilities\PermissionHelper;
+use DataMachine\Core\HttpClient;
 use DataMachineSocials\Abilities\AbstractSocialAbility;
 
 defined( 'ABSPATH' ) || exit;
@@ -128,9 +129,10 @@ class ReplyRedditAbility extends AbstractSocialAbility {
 	private function postComment( string $access_token, string $thing_id, string $text ): array|\WP_Error {
 		$url = self::API_BASE . '/api/comment';
 
-		$response = wp_remote_post(
+		$result = HttpClient::post(
 			$url,
 			array(
+				'context' => 'Reddit Reply',
 				'timeout' => 30,
 				'headers' => array(
 					'Authorization' => 'Bearer ' . $access_token,
@@ -144,14 +146,13 @@ class ReplyRedditAbility extends AbstractSocialAbility {
 			)
 		);
 
-		if ( is_wp_error( $response ) ) {
-			return new \WP_Error( 'api_error', $response->get_error_message(), array( 'status' => 500 ) );
+		if ( empty( $result['success'] ) ) {
+			return new \WP_Error( 'api_error', $result['error'] ?? 'Reddit API request failed', array( 'status' => 500 ) );
 		}
 
-		$status_code = wp_remote_retrieve_response_code( $response );
-		$body        = json_decode( wp_remote_retrieve_body( $response ), true );
+		$body = json_decode( $result['data'], true );
 
-		// Reddit returns errors in json.errors array.
+		// Reddit returns errors in json.errors array (HTTP 200 with logical errors).
 		$errors = $body['json']['errors'] ?? array();
 		if ( ! empty( $errors ) ) {
 			$error_messages = array_map(
@@ -161,10 +162,6 @@ class ReplyRedditAbility extends AbstractSocialAbility {
 				$errors
 			);
 			return new \WP_Error( 'api_error', implode( '; ', $error_messages ), array( 'status' => 500 ) );
-		}
-
-		if ( $status_code < 200 || $status_code >= 300 ) {
-			return new \WP_Error( 'api_error', "Reddit API returned HTTP {$status_code}", array( 'status' => 500 ) );
 		}
 
 		// Extract the new comment data.

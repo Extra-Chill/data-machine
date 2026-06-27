@@ -12,6 +12,7 @@
 namespace DataMachineSocials\Abilities\Reddit;
 
 use DataMachine\Abilities\PermissionHelper;
+use DataMachine\Core\HttpClient;
 use DataMachineSocials\Abilities\AbstractSocialAbility;
 
 defined( 'ABSPATH' ) || exit;
@@ -105,9 +106,10 @@ class VoteRedditAbility extends AbstractSocialAbility {
 
 		$url = self::API_BASE . '/api/vote';
 
-		$response = wp_remote_post(
+		$result = HttpClient::post(
 			$url,
 			array(
+				'context' => 'Reddit Vote',
 				'timeout' => 30,
 				'headers' => array(
 					'Authorization' => 'Bearer ' . $access_token,
@@ -120,15 +122,8 @@ class VoteRedditAbility extends AbstractSocialAbility {
 			)
 		);
 
-		if ( is_wp_error( $response ) ) {
-			return new \WP_Error( 'api_error', $response->get_error_message(), array( 'status' => 500 ) );
-		}
-
-		$status_code = wp_remote_retrieve_response_code( $response );
-
-		if ( $status_code < 200 || $status_code >= 300 ) {
-			$body = json_decode( wp_remote_retrieve_body( $response ), true );
-			return new \WP_Error( 'api_error', $body['message'] ?? "Reddit API returned HTTP {$status_code}", array( 'status' => 500 ) );
+		if ( empty( $result['success'] ) ) {
+			return new \WP_Error( 'api_error', $result['error'] ?? 'Reddit API request failed', array( 'status' => 500 ) );
 		}
 
 		$direction_labels = array(

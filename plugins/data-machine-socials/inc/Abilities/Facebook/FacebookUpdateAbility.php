@@ -13,6 +13,7 @@
 namespace DataMachineSocials\Abilities\Facebook;
 
 use DataMachine\Abilities\PermissionHelper;
+use DataMachine\Core\HttpClient;
 use DataMachineSocials\Handlers\Facebook\FacebookAuth;
 use DataMachineSocials\Abilities\AbstractSocialAbility;
 
@@ -158,9 +159,10 @@ class FacebookUpdateAbility extends AbstractSocialAbility {
 	private function editPost( string $access_token, string $post_id, string $message ): array|\WP_Error {
 		$url = self::GRAPH_API_URL . '/' . rawurlencode( $post_id );
 
-		$response = wp_remote_post(
+		$result = HttpClient::post(
 			$url,
 			array(
+				'context' => 'Facebook Edit',
 				'timeout' => 30,
 				'body'    => array(
 					'access_token' => $access_token,
@@ -169,16 +171,11 @@ class FacebookUpdateAbility extends AbstractSocialAbility {
 			)
 		);
 
-		if ( is_wp_error( $response ) ) {
-			return new \WP_Error( 'api_error', $response->get_error_message(), array( 'status' => 500 ) );
+		if ( empty( $result['success'] ) ) {
+			return new \WP_Error( 'api_error', $result['error'] ?? 'Failed to edit post', array( 'status' => 500 ) );
 		}
 
-		$status_code = wp_remote_retrieve_response_code( $response );
-		$body        = json_decode( wp_remote_retrieve_body( $response ), true );
-
-		if ( 200 !== $status_code ) {
-			return new \WP_Error( 'api_error', $body['error']['message'] ?? 'Failed to edit post', array( 'status' => 500 ) );
-		}
+		$body = json_decode( $result['data'], true );
 
 		return array(
 			'success' => true,
@@ -200,9 +197,10 @@ class FacebookUpdateAbility extends AbstractSocialAbility {
 	private function hidePost( string $access_token, string $post_id, bool $hide ): array|\WP_Error {
 		$url = self::GRAPH_API_URL . '/' . rawurlencode( $post_id );
 
-		$response = wp_remote_post(
+		$result = HttpClient::post(
 			$url,
 			array(
+				'context' => 'Facebook Visibility',
 				'timeout' => 30,
 				'body'    => array(
 					'access_token' => $access_token,
@@ -211,15 +209,8 @@ class FacebookUpdateAbility extends AbstractSocialAbility {
 			)
 		);
 
-		if ( is_wp_error( $response ) ) {
-			return new \WP_Error( 'api_error', $response->get_error_message(), array( 'status' => 500 ) );
-		}
-
-		$status_code = wp_remote_retrieve_response_code( $response );
-		$body        = json_decode( wp_remote_retrieve_body( $response ), true );
-
-		if ( 200 !== $status_code ) {
-			return new \WP_Error( 'api_error', $body['error']['message'] ?? 'Failed to update post visibility', array( 'status' => 500 ) );
+		if ( empty( $result['success'] ) ) {
+			return new \WP_Error( 'api_error', $result['error'] ?? 'Failed to update post visibility', array( 'status' => 500 ) );
 		}
 
 		return array(
@@ -241,9 +232,10 @@ class FacebookUpdateAbility extends AbstractSocialAbility {
 	private function deletePost( string $access_token, string $post_id ): array|\WP_Error {
 		$url = self::GRAPH_API_URL . '/' . rawurlencode( $post_id );
 
-		$response = wp_remote_post(
+		$result = HttpClient::post(
 			$url,
 			array(
+				'context' => 'Facebook Delete',
 				'timeout' => 30,
 				'body'    => array(
 					'access_token' => $access_token,
@@ -252,14 +244,9 @@ class FacebookUpdateAbility extends AbstractSocialAbility {
 			)
 		);
 
-		if ( is_wp_error( $response ) ) {
-			return new \WP_Error( 'api_error', $response->get_error_message(), array( 'status' => 500 ) );
-		}
+		$body = ! empty( $result['success'] ) ? json_decode( $result['data'], true ) : null;
 
-		$status_code = wp_remote_retrieve_response_code( $response );
-		$body        = json_decode( wp_remote_retrieve_body( $response ), true );
-
-		if ( 200 === $status_code || ( isset( $body['success'] ) && $body['success'] ) ) {
+		if ( ! empty( $result['success'] ) || ( isset( $body['success'] ) && $body['success'] ) ) {
 			return array(
 				'success' => true,
 				'data'    => array(
@@ -269,6 +256,6 @@ class FacebookUpdateAbility extends AbstractSocialAbility {
 			);
 		}
 
-		return new \WP_Error( 'api_error', $body['error']['message'] ?? 'Failed to delete post', array( 'status' => 500 ) );
+		return new \WP_Error( 'api_error', $result['error'] ?? 'Failed to delete post', array( 'status' => 500 ) );
 	}
 }

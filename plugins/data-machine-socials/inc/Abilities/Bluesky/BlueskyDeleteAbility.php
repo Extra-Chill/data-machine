@@ -12,6 +12,7 @@
 namespace DataMachineSocials\Abilities\Bluesky;
 
 use DataMachine\Abilities\PermissionHelper;
+use DataMachine\Core\HttpClient;
 use DataMachineSocials\Handlers\Bluesky\BlueskyAuth;
 use DataMachineSocials\Abilities\AbstractSocialAbility;
 
@@ -89,9 +90,10 @@ class BlueskyDeleteAbility extends AbstractSocialAbility {
 			return new \WP_Error( 'api_error', 'Could not extract rkey from post URI: ' . $post_uri, array( 'status' => 500 ) );
 		}
 
-		$response = wp_remote_post(
+		$result = HttpClient::post(
 			'https://bsky.social/xrpc/com.atproto.repo.deleteRecord',
 			array(
+				'context' => 'Bluesky Delete',
 				'timeout' => 30,
 				'headers' => array(
 					'Authorization' => 'Bearer ' . $session['accessJwt'],
@@ -105,13 +107,7 @@ class BlueskyDeleteAbility extends AbstractSocialAbility {
 			)
 		);
 
-		if ( is_wp_error( $response ) ) {
-			return new \WP_Error( 'api_error', $response->get_error_message(), array( 'status' => 500 ) );
-		}
-
-		$status_code = wp_remote_retrieve_response_code( $response );
-
-		if ( 200 === $status_code || 204 === $status_code ) {
+		if ( ! empty( $result['success'] ) ) {
 			return array(
 				'success' => true,
 				'data'    => array(
@@ -121,8 +117,7 @@ class BlueskyDeleteAbility extends AbstractSocialAbility {
 			);
 		}
 
-		$body = json_decode( wp_remote_retrieve_body( $response ), true );
-		return new \WP_Error( 'api_error', $body['error'] ?? 'Failed to delete post', array( 'status' => 500 ) );
+		return new \WP_Error( 'api_error', $result['error'] ?? 'Failed to delete post', array( 'status' => 500 ) );
 	}
 
 	private function getAuthProvider(): ?BlueskyAuth {

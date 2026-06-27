@@ -4,8 +4,12 @@
  *
  * Base class for the social primitive abilities in inc/Abilities. Centralizes
  * the register scaffold (the `$registered` guard plus the
- * did_action/doing_action dispatch), the auth-resolve preamble, and the
- * wp_remote response normalization that every platform ability repeated.
+ * did_action/doing_action dispatch) and the auth-resolve preamble that every
+ * platform ability repeated.
+ *
+ * HTTP transport (request dispatch + response normalization) is handled by the
+ * shared DataMachine\Core\HttpClient, which every read, auth, and write ability
+ * now calls directly — so the base no longer carries a wp_remote normalizer.
  *
  * The base intentionally exposes reusable helpers rather than a rigid template
  * method: the per-platform execute bodies differ substantially (endpoints,
@@ -14,7 +18,6 @@
  *
  * - registerAbility()        Register one or more abilities once, guarded.
  * - resolveProvider()        Resolve + authenticate the platform provider.
- * - normalizeJsonResponse()  Decode a wp_remote response into data + status.
  * - apiError()               Build the standard api_error WP_Error.
  *
  * @package    DataMachineSocials
@@ -93,42 +96,6 @@ abstract class AbstractSocialAbility {
 		}
 
 		return $provider;
-	}
-
-	/**
-	 * Normalize a wp_remote_* response into decoded data and status code.
-	 *
-	 * Returns a WP_Error('api_error') when the request itself errored. On a
-	 * transport-level success it returns an array with the decoded body and the
-	 * HTTP status code, leaving status interpretation to the caller (platforms
-	 * differ on success codes and error field paths).
-	 *
-	 * @param array|\WP_Error $response Result of wp_remote_post()/wp_remote_get().
-	 * @return array{data: mixed, status_code: int, body: string}|\WP_Error
-	 */
-	protected function normalizeJsonResponse( $response ) {
-		if ( is_wp_error( $response ) ) {
-			return $this->apiError( $response->get_error_message() );
-		}
-
-		$status_code = wp_remote_retrieve_response_code( $response );
-		$body        = wp_remote_retrieve_body( $response );
-
-		return array(
-			'data'        => json_decode( $body, true ),
-			'status_code' => (int) $status_code,
-			'body'        => $body,
-		);
-	}
-
-	/**
-	 * Whether an HTTP status code is in the 2xx success range.
-	 *
-	 * @param int $status_code HTTP status code.
-	 * @return bool
-	 */
-	protected function isSuccessStatus( int $status_code ): bool {
-		return $status_code >= 200 && $status_code < 300;
 	}
 
 	/**

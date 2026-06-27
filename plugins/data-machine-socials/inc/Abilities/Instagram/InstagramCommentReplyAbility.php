@@ -12,6 +12,7 @@
 namespace DataMachineSocials\Abilities\Instagram;
 
 use DataMachine\Abilities\PermissionHelper;
+use DataMachine\Core\HttpClient;
 use DataMachineSocials\Handlers\Facebook\FacebookAuth;
 use DataMachineSocials\Handlers\Instagram\InstagramAuth;
 use DataMachineSocials\Abilities\AbstractSocialAbility;
@@ -120,9 +121,10 @@ class InstagramCommentReplyAbility extends AbstractSocialAbility {
 	private function replyToComment( string $access_token, string $comment_id, string $message ): array|\WP_Error {
 		$url = self::GRAPH_API_URL . '/' . rawurlencode( $comment_id ) . '/replies';
 
-		$response = wp_remote_post(
+		$result = HttpClient::post(
 			$url,
 			array(
+				'context' => 'Instagram Comment Reply',
 				'timeout' => 30,
 				'body'    => array(
 					'access_token' => $access_token,
@@ -131,15 +133,10 @@ class InstagramCommentReplyAbility extends AbstractSocialAbility {
 			)
 		);
 
-		if ( is_wp_error( $response ) ) {
-			return new \WP_Error( 'api_error', $response->get_error_message(), array( 'status' => 500 ) );
-		}
+		$body = ! empty( $result['success'] ) ? json_decode( $result['data'], true ) : null;
 
-		$status_code = wp_remote_retrieve_response_code( $response );
-		$body        = json_decode( wp_remote_retrieve_body( $response ), true );
-
-		if ( 200 !== $status_code || isset( $body['error'] ) ) {
-			return new \WP_Error( 'api_error', $body['error']['message'] ?? 'Failed to reply to Instagram comment', array( 'status' => 500 ) );
+		if ( empty( $result['success'] ) || isset( $body['error'] ) ) {
+			return new \WP_Error( 'api_error', $body['error']['message'] ?? ( $result['error'] ?? 'Failed to reply to Instagram comment' ), array( 'status' => 500 ) );
 		}
 
 		return array(

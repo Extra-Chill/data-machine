@@ -12,6 +12,7 @@ namespace DataMachineSocials\Abilities\Facebook;
 
 use DataMachine\Abilities\AuthAbilities;
 use DataMachine\Abilities\PermissionHelper;
+use DataMachine\Core\HttpClient;
 use DataMachineSocials\Handlers\Facebook\FacebookAuth;
 use DataMachineSocials\Abilities\AbstractSocialAbility;
 
@@ -183,23 +184,18 @@ class FacebookPublishAbility extends AbstractSocialAbility {
 		// Make API request
 		$api_url = self::build_graph_url( "{$page_id}/feed" );
 
-		$response = wp_remote_post(
+		$http = HttpClient::post(
 			$api_url,
 			array(
+				'context' => 'Facebook Publish',
 				'body'    => $post_data,
 				'timeout' => 30,
 			)
 		);
 
-		if ( is_wp_error( $response ) ) {
-			return new \WP_Error( 'api_error', $response->get_error_message(), array( 'status' => 500 ) );
-		}
+		$data = ! empty( $http['success'] ) ? json_decode( $http['data'], true ) : null;
 
-		$status_code = wp_remote_retrieve_response_code( $response );
-		$body        = wp_remote_retrieve_body( $response );
-		$data        = json_decode( $body, true );
-
-		if ( $status_code >= 200 && $status_code < 300 && isset( $data['id'] ) ) {
+		if ( ! empty( $http['success'] ) && isset( $data['id'] ) ) {
 			$post_id  = $data['id'];
 			$post_url = "https://www.facebook.com/{$page_id}/posts/{$post_id}";
 
@@ -224,6 +220,8 @@ class FacebookPublishAbility extends AbstractSocialAbility {
 		$error_msg = 'Facebook API error';
 		if ( isset( $data['error']['message'] ) ) {
 			$error_msg = $data['error']['message'];
+		} elseif ( ! empty( $http['error'] ) ) {
+			$error_msg = $http['error'];
 		}
 
 		return new \WP_Error( 'api_error', $error_msg, array( 'status' => 500 ) );
@@ -264,9 +262,10 @@ class FacebookPublishAbility extends AbstractSocialAbility {
 	private static function upload_photo( string $page_id, string $access_token, string $image_url ): ?string {
 		$url = self::build_graph_url( "{$page_id}/photos" );
 
-		$response = wp_remote_post(
+		$result = HttpClient::post(
 			$url,
 			array(
+				'context' => 'Facebook Photo Upload',
 				'body'    => array(
 					'url'          => $image_url,
 					'published'    => 'false',
@@ -276,15 +275,13 @@ class FacebookPublishAbility extends AbstractSocialAbility {
 			)
 		);
 
-		if ( is_wp_error( $response ) ) {
+		if ( empty( $result['success'] ) ) {
 			return null;
 		}
 
-		$status_code = wp_remote_retrieve_response_code( $response );
-		$body        = wp_remote_retrieve_body( $response );
-		$data        = json_decode( $body, true );
+		$data = json_decode( $result['data'], true );
 
-		if ( $status_code >= 200 && $status_code < 300 && isset( $data['id'] ) ) {
+		if ( isset( $data['id'] ) ) {
 			return $data['id'];
 		}
 
@@ -302,9 +299,10 @@ class FacebookPublishAbility extends AbstractSocialAbility {
 	private static function post_comment( string $post_id, string $message, string $access_token ): array|\WP_Error {
 		$url = self::build_graph_url( "{$post_id}/comments" );
 
-		$response = wp_remote_post(
+		$result = HttpClient::post(
 			$url,
 			array(
+				'context' => 'Facebook Comment',
 				'body'    => array(
 					'message'      => $message,
 					'access_token' => $access_token,
@@ -313,15 +311,9 @@ class FacebookPublishAbility extends AbstractSocialAbility {
 			)
 		);
 
-		if ( is_wp_error( $response ) ) {
-			return new \WP_Error( 'api_error', $response->get_error_message(), array( 'status' => 500 ) );
-		}
+		$data = ! empty( $result['success'] ) ? json_decode( $result['data'], true ) : null;
 
-		$status_code = wp_remote_retrieve_response_code( $response );
-		$body        = wp_remote_retrieve_body( $response );
-		$data        = json_decode( $body, true );
-
-		if ( $status_code >= 200 && $status_code < 300 && isset( $data['id'] ) ) {
+		if ( ! empty( $result['success'] ) && isset( $data['id'] ) ) {
 			$comment_id  = $data['id'];
 			$comment_url = "https://www.facebook.com/{$post_id}/?comment_id={$comment_id}";
 
@@ -332,7 +324,7 @@ class FacebookPublishAbility extends AbstractSocialAbility {
 			);
 		}
 
-		return new \WP_Error( 'api_error', $data['error']['message'] ?? 'Failed to post comment', array( 'status' => 500 ) );
+		return new \WP_Error( 'api_error', $data['error']['message'] ?? ( $result['error'] ?? 'Failed to post comment' ), array( 'status' => 500 ) );
 	}
 
 	/**
