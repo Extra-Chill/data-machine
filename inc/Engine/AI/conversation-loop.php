@@ -90,9 +90,7 @@ function datamachine_run_conversation(
 	$all_tool_calls         = array();
 	$tool_execution_results = array();
 	$completion_nudges      = array();
-	$last_request_metadata  = array();
-	$latest_messages        = $messages;
-	$latest_turn_count      = 0;
+	$turn_state             = new DataMachineProviderTurnState( $messages );
 	$runtime_tool_pending   = false;
 	$runtime_tool_requests  = array();
 
@@ -190,9 +188,7 @@ function datamachine_run_conversation(
 		$base_log_context,
 		$last_tool_calls,
 		$all_tool_calls,
-		$last_request_metadata,
-		$latest_messages,
-		$latest_turn_count,
+		$turn_state,
 		$completion_policy,
 		$completion_nudges
 	);
@@ -273,13 +269,13 @@ function datamachine_run_conversation(
 		// known state from completed turns so failed job artifacts still explain
 		// where the conversation stopped.
 		$error_result          = array(
-			'messages'               => $latest_messages,
+			'messages'               => $turn_state->latest_messages,
 			'final_content'          => '',
-			'turn_count'             => $latest_turn_count,
+			'turn_count'             => $turn_state->latest_turn_count,
 			'tool_execution_results' => $tool_execution_results,
 			'error'                  => $e->getMessage(),
 			'usage'                  => array(),
-			'request_metadata'       => $last_request_metadata,
+			'request_metadata'       => $turn_state->last_request_metadata,
 			'status'                 => 'error',
 		);
 		$error_result          = datamachine_with_conversation_metadata(
@@ -290,7 +286,7 @@ function datamachine_run_conversation(
 				'tool_calls'      => $all_tool_calls,
 			)
 		);
-		$transcript_session_id = $transcript_persister->persist( $latest_messages, $conversation_request, $error_result );
+		$transcript_session_id = $transcript_persister->persist( $turn_state->latest_messages, $conversation_request, $error_result );
 		if ( '' !== $transcript_session_id ) {
 			$error_result['transcript_session_id'] = $transcript_session_id;
 		}
@@ -437,7 +433,7 @@ function datamachine_run_conversation(
 	$result                       = datamachine_with_conversation_metadata( $result, $datamachine_metadata );
 	$result['runtime_provenance'] = RuntimeProvenance::fromConversationResult( $result, $loop_payload, $provider, $model, $modes );
 	if ( 'failed' === (string) ( $result['status'] ?? '' ) || isset( $result['error'] ) ) {
-		$transcript_session_id = $transcript_persister->persist( is_array( $result['messages'] ?? null ) ? $result['messages'] : $latest_messages, $conversation_request, $result );
+		$transcript_session_id = $transcript_persister->persist( is_array( $result['messages'] ?? null ) ? $result['messages'] : $turn_state->latest_messages, $conversation_request, $result );
 		if ( '' !== $transcript_session_id ) {
 			$result['transcript_session_id'] = $transcript_session_id;
 		}
@@ -862,6 +858,124 @@ function datamachine_enrich_mediated_tool_results( array $tool_results, array $t
 }
 
 /**
+ * Dispatch one DM provider turn and normalize the wp-ai-client result.
+ *
+ * Owns the genuinely DM-specific half of a provider turn:
+ *  - DM prompt assembly + authenticated dispatch via RequestBuilder::build()
+ *    (per-provider API-key auth, transport timeouts, response caching,
+ *    model-config, multimodal/vision parts, oversized-request guarding).
+ *  - provider-safe tool-name aliasing of the extracted tool calls.
+ *  - per-turn token-usage and finish-reason capture.
+ *
+ * #2803 / agents-api#370: the upstream WP_Agent_Default_Provider_Turn_Adapter
+ * now owns the GENERIC half of this work (message→builder mapping, dispatch via
+ * wp_ai_client_prompt(), tool-call extraction, usage/result normalization), and
+ * exposes a prompt-input seam (set_prompt_input_provider) for consumer prompt
+ * assembly. DM cannot adopt that adapter's run_turn() yet: it dispatches through
+ * a BARE wp_ai_client_prompt() builder with no seam for DM's authenticated,
+ * transport-tuned, cached, model-config-aware, vision-capable dispatch, so
+ * routing DM through it would drop provider auth and break parity. That gap is
+ * tracked in agents-api#371. When that seam lands, this helper is the single
+ * swap point: construct the default adapter, inject DM prompt assembly through
+ * set_prompt_input_provider, and inject DM dispatch through the new dispatch
+ * seam — leaving aliasing/events/nudges in the caller untouched.
+ *
+ * @param array  $messages         Messages for this turn.
+ * @param array  $tools            Available tools keyed by name.
+ * @param string $provider         AI provider identifier.
+ * @param string $model            AI model identifier.
+ * @param array  $modes            Execution mode slugs.
+ * @param array  $loop_payload     Cleaned loop payload.
+ * @param DataMachineProviderTurnState $turn_state Per-turn state; updated with the
+ *                                     dispatched turn's request metadata even when
+ *                                     dispatch fails, preserving the failure-path
+ *                                     diagnostics the caller's error result reports.
+ * @return array{content:string,tool_calls:array,usage:array,request_metadata:array,request_metadata_pre_finish:array,finish_reason:?string}
+ *               `request_metadata_pre_finish` is the metadata snapshot taken
+ *               before the finish reason is appended, used for the
+ *               `request_built` event to preserve the legacy event payload shape.
+ * @throws \RuntimeException When the wp-ai-client request fails (caught by the upstream loop).
+ */
+function datamachine_dispatch_provider_turn(
+	array $messages,
+	array $tools,
+	string $provider,
+	string $model,
+	array $modes,
+	array $loop_payload,
+	DataMachineProviderTurnState $turn_state
+): array {
+	// Build and dispatch the AI request through DM's centralized RequestBuilder.
+	// RequestBuilder owns directive-ordered prompt assembly (PromptBuilder) AND
+	// authenticated wp-ai-client dispatch; the two are fused today, which is why
+	// the agents-api#370 prompt-input seam alone cannot replace this path.
+	// RequestBuilder populates $request_metadata even on failure, so capture it
+	// into turn state before any throw to preserve failure-path diagnostics.
+	$request_metadata = array();
+	$ai_response      = RequestBuilder::build(
+		$messages,
+		$provider,
+		$model,
+		$tools,
+		$modes,
+		$loop_payload,
+		$request_metadata
+	);
+
+	$turn_state->last_request_metadata = $request_metadata;
+
+	// Handle AI request failure — throw so the upstream loop catches and the
+	// caller reconstructs a best-effort error result from the last turn state.
+	if ( $ai_response instanceof \WP_Error ) {
+		// phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- Exception message is caught by upstream loop and returned as structured array, never rendered as HTML.
+		throw new \RuntimeException( $ai_response->get_error_message() );
+	}
+
+	/** @var \WordPress\AiClient\Results\DTO\GenerativeAiResult $ai_result */
+	$ai_result = $ai_response;
+
+	// Provider-safe tool-name aliasing: map provider-emitted names back to DM's
+	// logical tool names. Generic extraction is delegated to Agents API; the
+	// alias map is DM-specific request metadata and stays here.
+	$tool_calls = datamachine_apply_provider_tool_name_aliases(
+		datamachine_extract_tool_calls( $ai_result ),
+		$request_metadata
+	);
+	$ai_content = RequestBuilder::resultText( $ai_result );
+
+	// Snapshot the metadata as returned by RequestBuilder (before the finish
+	// reason is appended) so the `request_built` event payload matches the
+	// legacy behavior, which emitted the event prior to enrichment.
+	$request_metadata_pre_finish = $request_metadata;
+
+	// Per-turn token usage. The substrate accumulates this across turns and
+	// exposes the running total on the final loop result.
+	$token_usage   = $ai_result->getTokenUsage();
+	$turn_usage    = array(
+		'prompt_tokens'     => $token_usage->getPromptTokens(),
+		'completion_tokens' => $token_usage->getCompletionTokens(),
+		'total_tokens'      => $token_usage->getTotalTokens(),
+	);
+	$finish_reason = datamachine_ai_result_finish_reason( $ai_result );
+	if ( null !== $finish_reason ) {
+		$request_metadata['response']['finish_reason'] = $finish_reason;
+		// Mirror the legacy behavior of re-capturing metadata once the finish
+		// reason is appended, so the failure-path/error-result diagnostics carry
+		// the same enriched metadata as the returned turn.
+		$turn_state->last_request_metadata = $request_metadata;
+	}
+
+	return array(
+		'content'                     => $ai_content,
+		'tool_calls'                  => $tool_calls,
+		'usage'                       => $turn_usage,
+		'request_metadata'            => $request_metadata,
+		'request_metadata_pre_finish' => $request_metadata_pre_finish,
+		'finish_reason'               => $finish_reason,
+	);
+}
+
+/**
  * Build the DM-specific provider-turn adapter callable.
  *
  * The adapter handles one provider turn: build request → dispatch via
@@ -884,9 +998,7 @@ function datamachine_enrich_mediated_tool_results( array $tool_results, array $t
  * @param array                                     $base_log_context   Base log context.
  * @param array                                     &$last_tool_calls    Mutable last turn's tool calls (DM-flavored shape).
  * @param array                                     &$all_tool_calls     Mutable all tool calls made during the run.
- * @param array                                     &$last_request_metadata Mutable last request metadata.
- * @param array                                     &$latest_messages    Mutable latest messages.
- * @param int                                       &$latest_turn_count  Mutable latest turn count.
+ * @param DataMachineProviderTurnState              $turn_state         Mutable per-turn state for the pre-substrate error path.
  * @param WP_Agent_Conversation_Completion_Policy   $completion_policy  Completion policy for natural completions.
  * @param array                                     &$completion_nudges  Mutable nudge diagnostics (DM-only).
  * @return callable Provider-turn adapter callable.
@@ -902,9 +1014,7 @@ function datamachine_build_provider_turn_adapter(
 	array $base_log_context,
 	array &$last_tool_calls,
 	array &$all_tool_calls,
-	array &$last_request_metadata,
-	array &$latest_messages,
-	int &$latest_turn_count,
+	DataMachineProviderTurnState $turn_state,
 	WP_Agent_Conversation_Completion_Policy $completion_policy,
 	array &$completion_nudges
 ): callable {
@@ -918,11 +1028,9 @@ function datamachine_build_provider_turn_adapter(
 		$event_sink,
 		$base_log_context,
 		$completion_policy,
+		$turn_state,
 		&$last_tool_calls,
 		&$all_tool_calls,
-		&$last_request_metadata,
-		&$latest_messages,
-		&$latest_turn_count,
 		&$completion_nudges
 	): array {
 		$messages = is_array( $provider_turn_request ) ? $provider_turn_request : array();
@@ -939,25 +1047,66 @@ function datamachine_build_provider_turn_adapter(
 		}
 
 		// The upstream loop provides the turn number via turn_context.
-		$turn_count        = (int) ( $turn_context['turn'] ?? 1 );
-		$latest_turn_count = $turn_count;
-		$latest_messages   = $messages;
+		$turn_count                    = (int) ( $turn_context['turn'] ?? 1 );
+		$turn_state->latest_turn_count = $turn_count;
+		$turn_state->latest_messages   = $messages;
 
-		// Build and dispatch AI request using centralized RequestBuilder.
-		// Per-turn request metadata is captured locally and returned in the
-		// turn result so the substrate can surface the latest one on the
-		// final loop result.
-		$request_metadata      = array();
-		$ai_response           = RequestBuilder::build(
-			$messages,
-			$provider,
-			$model,
-			$tools,
-			$modes,
-			$loop_payload,
-			$request_metadata
-		);
-		$last_request_metadata = $request_metadata;
+		// Dispatch one DM provider turn: prompt assembly + authenticated
+		// wp-ai-client dispatch + provider-safe tool-name aliasing + per-turn
+		// usage. Throws RuntimeException on failure (caught by the upstream loop);
+		// the dispatched-turn state captured above lets the caller rebuild a
+		// best-effort error result. See datamachine_dispatch_provider_turn() for
+		// the agents-api#370/#371 default-adapter adoption boundary.
+		try {
+			$turn = datamachine_dispatch_provider_turn(
+				$messages,
+				$tools,
+				$provider,
+				$model,
+				$modes,
+				$loop_payload,
+				$turn_state
+			);
+		} catch ( \RuntimeException $e ) {
+			datamachine_emit_loop_event(
+				$event_sink,
+				'request_built',
+				array_merge(
+					$base_log_context,
+					array(
+						'turn_count'       => $turn_count,
+						'provider'         => $provider,
+						'model'            => $model,
+						'success'          => false,
+						'request_metadata' => $turn_state->last_request_metadata,
+					)
+				)
+			);
+
+			do_action(
+				'datamachine_log',
+				'error',
+				'datamachine_run_conversation: AI request failed',
+				array_merge(
+					$base_log_context,
+					array(
+						'turn_count' => $turn_count,
+						'error'      => $e->getMessage(),
+						'provider'   => $provider,
+					)
+				)
+			);
+
+			throw $e;
+		}
+
+		// On success the helper has already recorded request metadata (including
+		// the resolved finish_reason) into turn state.
+		$request_metadata = $turn['request_metadata'];
+		$tool_calls       = $turn['tool_calls'];
+		$ai_content       = $turn['content'];
+		$turn_usage       = $turn['usage'];
+		$finish_reason    = $turn['finish_reason'];
 
 		datamachine_emit_loop_event(
 			$event_sink,
@@ -968,53 +1117,15 @@ function datamachine_build_provider_turn_adapter(
 					'turn_count'       => $turn_count,
 					'provider'         => $provider,
 					'model'            => $model,
-					'success'          => ! is_wp_error( $ai_response ),
-					'request_metadata' => $request_metadata,
+					'success'          => true,
+					'request_metadata' => $turn['request_metadata_pre_finish'],
 				)
 			)
 		);
 
-		// Handle AI request failure — throw so the upstream loop catches.
-		if ( $ai_response instanceof \WP_Error ) {
-			do_action(
-				'datamachine_log',
-				'error',
-				'datamachine_run_conversation: AI request failed',
-				array_merge(
-					$base_log_context,
-					array(
-						'turn_count' => $turn_count,
-						'error'      => $ai_response->get_error_message(),
-						'provider'   => $provider,
-					)
-				)
-			);
-
-			// phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- Exception message is caught by upstream loop and returned as structured array, never rendered as HTML.
-			throw new \RuntimeException( $ai_response->get_error_message() );
-		}
-
-		/** @var \WordPress\AiClient\Results\DTO\GenerativeAiResult $ai_result */
-		$ai_result       = $ai_response;
-		$tool_calls      = datamachine_apply_provider_tool_name_aliases( datamachine_extract_tool_calls( $ai_result ), $request_metadata );
-		$ai_content      = RequestBuilder::resultText( $ai_result );
 		$last_tool_calls = $tool_calls;
 		foreach ( $tool_calls as $tool_call ) {
 			$all_tool_calls[] = $tool_call;
-		}
-
-		// Per-turn token usage. Substrate accumulates this across turns and
-		// exposes the running total on the final loop result.
-		$token_usage   = $ai_result->getTokenUsage();
-		$turn_usage    = array(
-			'prompt_tokens'     => $token_usage->getPromptTokens(),
-			'completion_tokens' => $token_usage->getCompletionTokens(),
-			'total_tokens'      => $token_usage->getTotalTokens(),
-		);
-		$finish_reason = datamachine_ai_result_finish_reason( $ai_result );
-		if ( null !== $finish_reason ) {
-			$request_metadata['response']['finish_reason'] = $finish_reason;
-			$last_request_metadata                         = $request_metadata;
 		}
 
 		$messages_with_response = $messages;
