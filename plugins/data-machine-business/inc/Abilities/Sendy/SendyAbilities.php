@@ -129,7 +129,7 @@ class SendyAbilities {
 				),
 				'output_schema'       => array( 'type' => 'object' ),
 				'execute_callback'    => array( $this, 'execute_subscribe' ),
-				'permission_callback' => array( $this, 'check_permission' ),
+				'permission_callback' => array( $this, 'check_subscribe_permission' ),
 				'meta'                => array( 'show_in_rest' => false ),
 			)
 		);
@@ -213,12 +213,31 @@ class SendyAbilities {
 	}
 
 	/**
-	 * Shared permission gate.
+	 * Management permission gate for privileged Sendy abilities
+	 * (push-campaign, metrics).
 	 *
 	 * @return bool
 	 */
 	public function check_permission(): bool {
 		return PermissionHelper::can_manage();
+	}
+
+	/**
+	 * Public permission gate for the subscribe ability.
+	 *
+	 * Subscribing an email to a list is an inherently public/anonymous action:
+	 * it backs the front-end newsletter signup form, which is submitted by
+	 * logged-out visitors. Gating it behind a management capability breaks every
+	 * real signup (it only "works" via WP-CLI, which bypasses permissions).
+	 *
+	 * Abuse is already mitigated upstream — the EC signup form is protected by
+	 * Cloudflare Turnstile, and Sendy itself dedupes repeat addresses — so this
+	 * primitive is intentionally open.
+	 *
+	 * @return bool
+	 */
+	public function check_subscribe_permission(): bool {
+		return true;
 	}
 
 	/**
