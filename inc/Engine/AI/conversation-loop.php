@@ -858,39 +858,6 @@ function datamachine_enrich_mediated_tool_results( array $tool_results, array $t
 }
 
 /**
- * Mutable per-turn state surfaced to the caller for the pre-substrate error path.
- *
- * The upstream conversation loop surfaces turn_count, final_content, usage, and
- * request_metadata on the FINAL result (agents-api#136). DM only needs to carry
- * these by reference for the case where the provider-turn adapter throws a
- * RuntimeException BEFORE the substrate can return its accumulated result — see
- * the catch block in datamachine_run_conversation(), which reconstructs a
- * best-effort error result from the last completed turn. Consolidating the
- * three previously-separate by-ref params (latest_messages, latest_turn_count,
- * last_request_metadata) into one accumulator shrinks the provider-turn
- * adapter's parameter surface toward the #2803 decomposition target without
- * changing behavior.
- */
-final class DataMachineProviderTurnState {
-
-	/** @var array Messages handed to the latest dispatched turn. */
-	public array $latest_messages;
-
-	/** @var int Turn number of the latest dispatched turn. */
-	public int $latest_turn_count = 0;
-
-	/** @var array Request metadata captured on the latest dispatched turn. */
-	public array $last_request_metadata = array();
-
-	/**
-	 * @param array $initial_messages Initial conversation messages.
-	 */
-	public function __construct( array $initial_messages ) {
-		$this->latest_messages = $initial_messages;
-	}
-}
-
-/**
  * Dispatch one DM provider turn and normalize the wp-ai-client result.
  *
  * Owns the genuinely DM-specific half of a provider turn:
@@ -954,6 +921,7 @@ function datamachine_dispatch_provider_turn(
 		$loop_payload,
 		$request_metadata
 	);
+
 	$turn_state->last_request_metadata = $request_metadata;
 
 	// Handle AI request failure — throw so the upstream loop catches and the
@@ -1079,9 +1047,9 @@ function datamachine_build_provider_turn_adapter(
 		}
 
 		// The upstream loop provides the turn number via turn_context.
-		$turn_count                     = (int) ( $turn_context['turn'] ?? 1 );
-		$turn_state->latest_turn_count  = $turn_count;
-		$turn_state->latest_messages    = $messages;
+		$turn_count                    = (int) ( $turn_context['turn'] ?? 1 );
+		$turn_state->latest_turn_count = $turn_count;
+		$turn_state->latest_messages   = $messages;
 
 		// Dispatch one DM provider turn: prompt assembly + authenticated
 		// wp-ai-client dispatch + provider-safe tool-name aliasing + per-turn
