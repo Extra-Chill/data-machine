@@ -1317,8 +1317,9 @@ class AgentAbilities {
 		$source            = trim( (string) ( $input['source'] ?? '' ) );
 		if ( ! $has_inline_bundle && '' === $source ) {
 			return array(
-				'success' => false,
-				'error'   => 'Bundle source or inline bundle is required.',
+				'success'     => false,
+				'error'       => 'Bundle source or inline bundle is required.',
+				'diagnostics' => self::bundle_source_import_diagnostics( $source ),
 			);
 		}
 
@@ -1330,8 +1331,9 @@ class AgentAbilities {
 			$resolved = BundleSource::resolve( $source, $context );
 			if ( is_wp_error( $resolved ) ) {
 				return array(
-					'success' => false,
-					'error'   => $resolved->get_error_message(),
+					'success'     => false,
+					'error'       => $resolved->get_error_message(),
+					'diagnostics' => self::bundle_source_import_diagnostics( $source ),
 				);
 			}
 
@@ -1374,8 +1376,9 @@ class AgentAbilities {
 
 		if ( ! is_array( $bundle ) ) {
 			return array(
-				'success' => false,
-				'error'   => 'Failed to parse bundle. Use a bundle directory, .json file, or .zip archive.',
+				'success'     => false,
+				'error'       => 'Failed to parse bundle. Use a bundle directory, .json file, or .zip archive.',
+				'diagnostics' => $has_inline_bundle ? array() : self::bundle_source_import_diagnostics( $source ),
 			);
 		}
 
@@ -1876,6 +1879,27 @@ class AgentAbilities {
 		return BundleSourceAuth::build_resolve_context(
 			isset( $input['token'] ) ? (string) $input['token'] : null,
 			isset( $input['token_env'] ) ? (string) $input['token_env'] : null
+		);
+	}
+
+	/**
+	 * Build source import diagnostics for runtime/package callers.
+	 *
+	 * @param string $source Attempted source path or URL.
+	 * @return array<string,mixed>
+	 */
+	private static function bundle_source_import_diagnostics( string $source ): array {
+		$context = 'empty';
+		if ( '' !== $source ) {
+			$context = BundleSource::is_remote( $source ) ? 'remote_url' : 'local_path';
+		}
+		$cwd = getcwd();
+
+		return array(
+			'source'         => $source,
+			'cwd'            => false === $cwd ? '' : $cwd,
+			'context'        => $context,
+			'expected_shape' => 'Readable local directory, .zip, or JSON file, or remote .zip/.json URL containing a Data Machine agent bundle.',
 		);
 	}
 

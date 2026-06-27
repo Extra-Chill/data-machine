@@ -287,6 +287,7 @@ namespace {
 	$agent_abilities_source = file_get_contents( dirname( __DIR__ ) . '/inc/Abilities/AgentAbilities.php' );
 	$assert( 'import-agent execution validates source-or-bundle requirement', false !== strpos( $agent_abilities_source, 'Bundle source or inline bundle is required.' ) && false === strpos( $agent_abilities_source, "array( 'required' => array( 'bundle' ) )" ) );
 	$assert( 'import-agent schema exposes inline bundle input', false !== strpos( $agent_abilities_source, "'bundle'      => array(" ) && false !== strpos( $agent_abilities_source, 'Already-parsed portable Data Machine agent bundle array' ) );
+	$assert( 'import-agent schema keeps source as canonical path field', false !== strpos( $agent_abilities_source, "'source'            => array(" ) && false === strpos( $agent_abilities_source, "'source_path'" ) );
 	$assert( 'runtime importer does not stage bundles through temp files', false === strpos( $agent_abilities_source, 'tempnam' ) && false === strpos( $agent_abilities_source, 'wp_tempnam' ) );
 
 	echo "=== Import Agent Ability Behavior Smoke (#1306) ===\n";
@@ -359,6 +360,26 @@ namespace {
 	$assert( 'owner_id passes through to bundler import', 99 === AgentBundler::$last_import['owner_id'] );
 	// @phpstan-ignore-next-line smoke-test stub property shadows production class.
 	$assert( 'ability lets bundler use rewritten bundle slug, not new_slug', null === AgentBundler::$last_import['new_slug'] );
+
+	$reset();
+	$missing_source = sys_get_temp_dir() . '/datamachine-missing-runtime-bundle-' . uniqid() . '.json';
+	$result         = AgentAbilities::importAgent( array( 'source' => $missing_source ) );
+	$assert( 'missing source import fails', false === $result['success'] );
+	$assert( 'missing source diagnostic reports attempted source', $missing_source === ( $result['diagnostics']['source'] ?? '' ) );
+	$assert( 'missing source diagnostic reports cwd', isset( $result['diagnostics']['cwd'] ) && is_string( $result['diagnostics']['cwd'] ) );
+	$assert( 'missing source diagnostic reports context', 'local_path' === ( $result['diagnostics']['context'] ?? '' ) );
+	$assert( 'missing source diagnostic reports expected shape', 'Readable local directory, .zip, or JSON file, or remote .zip/.json URL containing a Data Machine agent bundle.' === ( $result['diagnostics']['expected_shape'] ?? '' ) );
+
+	$reset();
+	$invalid_json_temp = tempnam( sys_get_temp_dir(), 'datamachine-invalid-runtime-bundle-' );
+	$invalid_json_path = $invalid_json_temp . '.json';
+	rename( $invalid_json_temp, $invalid_json_path );
+	file_put_contents( $invalid_json_path, '{not valid json' );
+	$result = AgentAbilities::importAgent( array( 'source' => $invalid_json_path ) );
+	$assert( 'invalid source import fails', false === $result['success'] );
+	$assert( 'invalid source diagnostic reports attempted source', $invalid_json_path === ( $result['diagnostics']['source'] ?? '' ) );
+	$assert( 'invalid source diagnostic reports expected shape', 'Readable local directory, .zip, or JSON file, or remote .zip/.json URL containing a Data Machine agent bundle.' === ( $result['diagnostics']['expected_shape'] ?? '' ) );
+	@unlink( $invalid_json_path );
 
 	echo "\n[3] Inline bundle import path\n";
 	$reset();
