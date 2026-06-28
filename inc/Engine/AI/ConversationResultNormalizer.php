@@ -87,8 +87,9 @@ final class ConversationResultNormalizer {
 			$datamachine_metadata['completed']                     = false;
 			$datamachine_metadata['runtime_tool_pending']          = true;
 			$datamachine_metadata['runtime_tool_pending_requests'] = $runtime_tool_requests;
-			$status                                                = DataMachineConversationStatus::RUNTIME_TOOL_PENDING;
-			$status_overridden                                     = true;
+
+			$status            = DataMachineConversationStatus::RUNTIME_TOOL_PENDING;
+			$status_overridden = true;
 		}
 		if ( ! empty( $completion_nudges ) ) {
 			$latest_nudge                                   = $completion_nudges[ count( $completion_nudges ) - 1 ];
