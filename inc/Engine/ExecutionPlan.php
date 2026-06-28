@@ -76,6 +76,15 @@ class ExecutionPlan {
 	}
 
 	/**
+	 * Get all flow step IDs in execution order.
+	 *
+	 * @return string[] Flow step IDs sorted by execution_order.
+	 */
+	public function ordered_step_ids(): array {
+		return $this->step_ids;
+	}
+
+	/**
 	 * Get the next flow step ID after the current step.
 	 *
 	 * @param string $flow_step_id Current flow step ID.

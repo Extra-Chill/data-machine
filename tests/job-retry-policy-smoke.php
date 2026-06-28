@@ -8,6 +8,7 @@
  */
 
 define( 'ABSPATH', __DIR__ );
+define( 'WPINC', 'wp-includes' );
 
 $failed = 0;
 $total  = 0;
@@ -52,6 +53,7 @@ function datamachine_merge_engine_data( int $job_id, array $data ): void {
 	$merged_engine_data = $data;
 }
 
+require_once __DIR__ . '/../inc/Engine/ExecutionPlan.php';
 require_once __DIR__ . '/../inc/Core/JobRetryPolicy.php';
 
 $reflection          = new ReflectionClass( DataMachine\Core\JobRetryPolicy::class );
@@ -63,6 +65,8 @@ $classify_failure    = $reflection->getMethod( 'classifyFailure' );
 $resolve_policy      = $reflection->getMethod( 'resolvePolicy' );
 $record_poison_item  = $reflection->getMethod( 'recordPoisonItem' );
 $resolve_ephemeral   = $reflection->getMethod( 'resolveEphemeralFlowStepId' );
+$resolve_resume      = $reflection->getMethod( 'resolveResumeStepId' );
+$step_completed      = $reflection->getMethod( 'stepCompletedSuccessfully' );
 
 echo "Case 1: Retry-After values are normalized\n";
 assert_retry_policy_smoke( 'numeric Retry-After is seconds', 90 === $extract_retry_after->invoke( null, array( 'retry_after' => '90' ) ) );
@@ -176,15 +180,16 @@ assert_retry_policy_smoke(
 	'ephemeral_step_0' === $resolve_ephemeral->invoke( null, $keyed_engine_data )
 );
 
-// Multi-step ephemeral workflows are not blindly resumed.
+// Non-resumable multi-step ephemeral workflows are not blindly resumed (the
+// current #2810 fail-fast guard — unchanged).
 $multi_engine_data = array(
 	'flow_config' => array(
-		'ephemeral_step_0' => array( 'flow_step_id' => 'ephemeral_step_0' ),
-		'ephemeral_step_1' => array( 'flow_step_id' => 'ephemeral_step_1' ),
+		'ephemeral_step_0' => array( 'flow_step_id' => 'ephemeral_step_0', 'execution_order' => 0 ),
+		'ephemeral_step_1' => array( 'flow_step_id' => 'ephemeral_step_1', 'execution_order' => 1 ),
 	),
 );
 assert_retry_policy_smoke(
-	'multi-step ephemeral workflow does not resolve a single step',
+	'non-resumable multi-step ephemeral workflow does not resolve a single step',
 	'' === $resolve_ephemeral->invoke( null, $multi_engine_data )
 );
 
@@ -193,6 +198,131 @@ assert_retry_policy_smoke(
 assert_retry_policy_smoke(
 	'absent flow_config yields empty (defers to context flow_step_id)',
 	'' === $resolve_ephemeral->invoke( null, array() )
+);
+
+echo "Case 8: Resumable multi-step ephemeral workflows resume from the first incomplete step (#2811)\n";
+
+// A resumable multi-step workflow where step 0 completed but step 1 has not:
+// the resume point is step 1, so step 0's already-applied effects are skipped.
+$resumable_partial = array(
+	'resumable'    => true,
+	'flow_config'  => array(
+		'ephemeral_step_0' => array( 'flow_step_id' => 'ephemeral_step_0', 'execution_order' => 0 ),
+		'ephemeral_step_1' => array( 'flow_step_id' => 'ephemeral_step_1', 'execution_order' => 1 ),
+		'ephemeral_step_2' => array( 'flow_step_id' => 'ephemeral_step_2', 'execution_order' => 2 ),
+	),
+	'step_results' => array(
+		'ephemeral_step_0' => array( 'flow_step_id' => 'ephemeral_step_0', 'step_success' => true, 'result' => 'inline_continuation' ),
+	),
+);
+assert_retry_policy_smoke(
+	'resumable workflow resumes at the first step without a completed result',
+	'ephemeral_step_1' === $resolve_ephemeral->invoke( null, $resumable_partial )
+);
+assert_retry_policy_smoke(
+	'resolveResumeStepId returns the first incomplete step directly',
+	'ephemeral_step_1' === $resolve_resume->invoke( null, $resumable_partial['flow_config'], $resumable_partial )
+);
+
+// execution_order — not array insertion order — drives the resume point.
+$resumable_reordered = array(
+	'resumable'    => true,
+	'flow_config'  => array(
+		'ephemeral_step_1' => array( 'flow_step_id' => 'ephemeral_step_1', 'execution_order' => 1 ),
+		'ephemeral_step_0' => array( 'flow_step_id' => 'ephemeral_step_0', 'execution_order' => 0 ),
+	),
+	'step_results' => array(
+		'ephemeral_step_0' => array( 'flow_step_id' => 'ephemeral_step_0', 'step_success' => true ),
+	),
+);
+assert_retry_policy_smoke(
+	'resume point follows execution_order, not array order',
+	'ephemeral_step_1' === $resolve_ephemeral->invoke( null, $resumable_reordered )
+);
+
+// A failed mid-flow step is the resume point even when a later step somehow
+// recorded success — the first incomplete step in order wins.
+$resumable_failed_mid = array(
+	'resumable'    => true,
+	'flow_config'  => array(
+		'ephemeral_step_0' => array( 'flow_step_id' => 'ephemeral_step_0', 'execution_order' => 0 ),
+		'ephemeral_step_1' => array( 'flow_step_id' => 'ephemeral_step_1', 'execution_order' => 1 ),
+	),
+	'step_results' => array(
+		'ephemeral_step_0' => array( 'flow_step_id' => 'ephemeral_step_0', 'step_success' => false, 'result' => 'failed' ),
+		'ephemeral_step_1' => array( 'flow_step_id' => 'ephemeral_step_1', 'step_success' => true ),
+	),
+);
+assert_retry_policy_smoke(
+	'a failed step is the resume point even with later success recorded',
+	'ephemeral_step_0' === $resolve_ephemeral->invoke( null, $resumable_failed_mid )
+);
+
+// Every step already completed: nothing to resume (not a partial-execution
+// case) so resolution is empty and the workflow fails normally.
+$resumable_all_done = array(
+	'resumable'    => true,
+	'flow_config'  => array(
+		'ephemeral_step_0' => array( 'flow_step_id' => 'ephemeral_step_0', 'execution_order' => 0 ),
+		'ephemeral_step_1' => array( 'flow_step_id' => 'ephemeral_step_1', 'execution_order' => 1 ),
+	),
+	'step_results' => array(
+		'ephemeral_step_0' => array( 'flow_step_id' => 'ephemeral_step_0', 'step_success' => true ),
+		'ephemeral_step_1' => array( 'flow_step_id' => 'ephemeral_step_1', 'step_success' => true ),
+	),
+);
+assert_retry_policy_smoke(
+	'fully-completed resumable workflow resolves no resume step',
+	'' === $resolve_ephemeral->invoke( null, $resumable_all_done )
+);
+
+// Opt-in gate: the SAME partial multi-step snapshot WITHOUT the resumable flag
+// still fails fast (no resume) — proving the default is non-resumable.
+$non_resumable_partial            = $resumable_partial;
+$non_resumable_partial['resumable'] = false;
+assert_retry_policy_smoke(
+	'partial multi-step workflow without resumable flag still fails fast',
+	'' === $resolve_ephemeral->invoke( null, $non_resumable_partial )
+);
+unset( $non_resumable_partial['resumable'] );
+assert_retry_policy_smoke(
+	'partial multi-step workflow with absent resumable flag still fails fast',
+	'' === $resolve_ephemeral->invoke( null, $non_resumable_partial )
+);
+
+// The single-step path from #2810 is unchanged regardless of the resumable
+// flag — a single step is always its own resume point.
+$single_with_flag = array(
+	'resumable'   => true,
+	'flow_config' => array(
+		'ephemeral_step_0' => array( 'flow_step_id' => 'ephemeral_step_0', 'execution_order' => 0 ),
+	),
+);
+assert_retry_policy_smoke(
+	'single-step path is unchanged even when resumable flag is set',
+	'ephemeral_step_0' === $resolve_ephemeral->invoke( null, $single_with_flag )
+);
+
+// step completion classification: step_success boolean is authoritative;
+// terminal-success result strings count as completed; failed/absent do not.
+assert_retry_policy_smoke( 'step_success=true counts as completed', true === $step_completed->invoke( null, array( 'step_success' => true ) ) );
+assert_retry_policy_smoke( 'step_success=false counts as incomplete', false === $step_completed->invoke( null, array( 'step_success' => false, 'result' => 'failed' ) ) );
+assert_retry_policy_smoke( 'completed result string counts as completed', true === $step_completed->invoke( null, array( 'result' => 'completed' ) ) );
+assert_retry_policy_smoke( 'inline_continuation result counts as completed', true === $step_completed->invoke( null, array( 'result' => 'inline_continuation' ) ) );
+assert_retry_policy_smoke( 'absent step result counts as incomplete', false === $step_completed->invoke( null, null ) );
+
+// An invalid execution order (missing execution_order) cannot be safely
+// resumed — fall back to fail-fast rather than guess.
+$resumable_bad_order = array(
+	'resumable'   => true,
+	'flow_config' => array(
+		'ephemeral_step_0' => array( 'flow_step_id' => 'ephemeral_step_0' ),
+		'ephemeral_step_1' => array( 'flow_step_id' => 'ephemeral_step_1' ),
+	),
+);
+assert_retry_policy_smoke(
+	'resumable workflow with invalid execution order fails fast',
+	'' === $resolve_ephemeral->invoke( null, $resumable_bad_order )
 );
 
 echo "\nJob retry policy smoke complete: {$total} assertions, {$failed} failures.\n";

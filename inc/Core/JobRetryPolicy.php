@@ -419,33 +419,138 @@ class JobRetryPolicy {
 	}
 
 	/**
-	 * Resolve the flow_step_id of a direct/system task's ephemeral step.
+	 * Resolve the flow_step_id a direct/system task should re-run on retry.
 	 *
-	 * Direct tasks (scheduled via TaskScheduler → execute-workflow) store a
-	 * single ephemeral step under engine_data['flow_config']. Its key (and its
-	 * own `flow_step_id`) is what datamachine_execute_step needs to re-run the
-	 * task against the same job. Returns '' when the snapshot has no single
-	 * resumable system_task step (multi-step ephemeral workflows are not
-	 * blindly resumed here).
+	 * Direct tasks (scheduled via TaskScheduler → execute-workflow) store their
+	 * ephemeral steps under engine_data['flow_config'], keyed by flow_step_id.
+	 * datamachine_execute_step re-runs a step purely by its flow_step_id against
+	 * the engine snapshot, so resolving the right id is all that's needed to make
+	 * a direct task retryable.
+	 *
+	 * Resolution is scoped by step count:
+	 *
+	 *   - Single-step ephemeral workflow (the default getWorkflow() for all 13
+	 *     current system tasks): the step IS the whole task and is idempotent, so
+	 *     re-running it is the retry. Returns that step's id.
+	 *
+	 *   - Multi-step ephemeral workflow: only resumed when the task opted in via
+	 *     SystemTask::isResumable() (surfaced as engine_data['resumable'] = true).
+	 *     For a resumable workflow the resume point is the FIRST INCOMPLETE step
+	 *     in execution order — steps that already completed (recorded in
+	 *     engine_data['step_results']) are skipped, so their already-applied
+	 *     effects (engine_data['effects']) are never re-applied. A non-resumable
+	 *     multi-step workflow returns '' and continues to fail fast, never
+	 *     blindly re-running a step of a partially-executed flow.
+	 *
+	 *   - No flow_config (a genuine pipeline/flow job): returns '' so the normal
+	 *     $context_data['flow_step_id'] path is used instead.
 	 *
 	 * @param array $engine_data Job engine data.
-	 * @return string Ephemeral flow_step_id, or '' when not resolvable.
+	 * @return string Resume flow_step_id, or '' when not resolvable.
 	 */
 	private static function resolveEphemeralFlowStepId( array $engine_data ): string {
 		$flow_config = is_array( $engine_data['flow_config'] ?? null ) ? $engine_data['flow_config'] : array();
-		if ( 1 !== count( $flow_config ) ) {
+		$step_count  = count( $flow_config );
+
+		if ( 0 === $step_count ) {
 			return '';
 		}
 
-		$step = reset( $flow_config );
-		if ( ! is_array( $step ) ) {
+		if ( 1 === $step_count ) {
+			return self::flowStepIdFor( $flow_config, (string) ( array_key_first( $flow_config ) ?? '' ) );
+		}
+
+		// Multi-step ephemeral workflow: only resumable workflows resolve a
+		// resume point. Everything else fails fast (unchanged behavior).
+		if ( empty( $engine_data['resumable'] ) ) {
 			return '';
 		}
 
-		$flow_step_id = (string) ( $step['flow_step_id'] ?? '' );
-		if ( '' === $flow_step_id ) {
-			$key          = array_key_first( $flow_config );
-			$flow_step_id = is_string( $key ) ? $key : '';
+		return self::resolveResumeStepId( $flow_config, $engine_data );
+	}
+
+	/**
+	 * Resolve the first incomplete step id of a resumable multi-step workflow.
+	 *
+	 * Walks the flow_config in execution order and returns the first step that
+	 * does not have a successful completion recorded in
+	 * engine_data['step_results']. Completed steps are skipped so the retry never
+	 * re-runs already-applied work. Returns '' when the order cannot be resolved
+	 * (invalid execution_order) or when every step already completed (nothing to
+	 * resume — the failure is not a resumable partial-execution case).
+	 *
+	 * @param array $flow_config Ephemeral flow config keyed by flow_step_id.
+	 * @param array $engine_data Job engine data.
+	 * @return string First incomplete flow_step_id, or '' when not resolvable.
+	 */
+	private static function resolveResumeStepId( array $flow_config, array $engine_data ): string {
+		try {
+			$plan = \DataMachine\Engine\ExecutionPlan::from_flow_config( $flow_config );
+		} catch ( \InvalidArgumentException $e ) {
+			// A workflow without a valid execution order cannot be safely
+			// resumed; fall back to fail-fast rather than guess an order.
+			return '';
+		}
+
+		$ordered      = $plan->ordered_step_ids();
+		$step_results = is_array( $engine_data['step_results'] ?? null ) ? $engine_data['step_results'] : array();
+
+		foreach ( $ordered as $flow_step_id ) {
+			if ( ! self::stepCompletedSuccessfully( $step_results[ $flow_step_id ] ?? null ) ) {
+				return self::flowStepIdFor( $flow_config, (string) $flow_step_id );
+			}
+		}
+
+		return '';
+	}
+
+	/**
+	 * Whether a recorded step result represents a successful completion.
+	 *
+	 * RunMetrics::recordStepResult stamps engine_data['step_results'][id] with a
+	 * step_success boolean and a result/status string as each step runs. A step
+	 * counts as completed (and must NOT be re-run on resume) when it reported
+	 * step_success or a terminal-success result. Any other shape — failed,
+	 * never-run (null), or empty — is an incomplete step to resume from.
+	 *
+	 * @param mixed $step_result Recorded step result entry, or null when absent.
+	 * @return bool True when the step completed successfully.
+	 */
+	private static function stepCompletedSuccessfully( $step_result ): bool {
+		if ( ! is_array( $step_result ) ) {
+			return false;
+		}
+
+		if ( array_key_exists( 'step_success', $step_result ) ) {
+			return (bool) $step_result['step_success'];
+		}
+
+		$outcome = (string) ( $step_result['result'] ?? ( $step_result['status'] ?? '' ) );
+
+		return in_array(
+			$outcome,
+			array( 'completed', 'completed_override', 'inline_continuation', 'batch_scheduled', 'completed_no_items', 'waiting' ),
+			true
+		);
+	}
+
+	/**
+	 * Resolve the canonical flow_step_id for an ephemeral flow_config entry.
+	 *
+	 * Prefers the entry's own `flow_step_id` field, falling back to its config
+	 * key (the engine keys flow_config by flow_step_id).
+	 *
+	 * @param array  $flow_config  Ephemeral flow config keyed by flow_step_id.
+	 * @param string $flow_step_id Candidate/key flow step id.
+	 * @return string Resolved flow_step_id, or '' when not resolvable.
+	 */
+	private static function flowStepIdFor( array $flow_config, string $flow_step_id ): string {
+		$step = is_array( $flow_config[ $flow_step_id ] ?? null ) ? $flow_config[ $flow_step_id ] : null;
+		if ( is_array( $step ) ) {
+			$explicit = (string) ( $step['flow_step_id'] ?? '' );
+			if ( '' !== $explicit ) {
+				return $explicit;
+			}
 		}
 
 		return $flow_step_id;
