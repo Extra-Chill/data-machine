@@ -1,0 +1,1060 @@
+<?php
+/**
+ * Pipeline Step Abilities
+ *
+ * Abilities API primitives for pipeline step operations.
+ * Centralizes pipeline step CRUD logic for REST API, CLI, and Chat tools.
+ *
+ * @package DataMachine\Abilities
+ */
+
+namespace DataMachine\Abilities;
+
+use DataMachine\Abilities\PermissionHelper;
+
+use DataMachine\Core\Database\Flows\Flows;
+use DataMachine\Core\Database\Pipelines\Pipelines;
+use DataMachine\Core\Database\ProcessedItems\ProcessedItems;
+use DataMachine\Core\PluginSettings;
+use DataMachine\Core\Steps\FlowStepConfigFactory;
+
+defined( 'ABSPATH' ) || exit;
+
+class PipelineStepAbilities {
+
+	private static bool $registered = false;
+
+	private Pipelines $db_pipelines;
+	private Flows $db_flows;
+	private ProcessedItems $db_processed_items;
+
+	public function __construct() {
+		$this->db_pipelines       = new Pipelines();
+		$this->db_flows           = new Flows();
+		$this->db_processed_items = new ProcessedItems();
+
+		if ( self::$registered ) {
+			return;
+		}
+
+		$this->registerAbilities();
+		self::$registered = true;
+	}
+
+	private function registerAbilities(): void {
+		$register_callback = function () {
+			$this->registerGetPipelineStepsAbility();
+			$this->registerAddPipelineStepAbility();
+			$this->registerUpdatePipelineStepAbility();
+			$this->registerDeletePipelineStepAbility();
+			$this->registerReorderPipelineStepsAbility();
+		};
+
+		\DataMachine\Abilities\AbilityRegistration::on_abilities_api_init( $register_callback );
+	}
+
+	private function registerGetPipelineStepsAbility(): void {
+		wp_register_ability(
+			'datamachine/get-pipeline-steps',
+			array(
+				'label'               => __( 'Get Pipeline Steps', 'data-machine' ),
+				'description'         => __( 'Get all steps for a pipeline, or a single step by ID.', 'data-machine' ),
+				'category'            => 'datamachine-pipeline',
+				'input_schema'        => array(
+					'type'       => 'object',
+					'properties' => array(
+						'pipeline_id'      => array(
+							'type'        => 'integer',
+							'description' => __( 'Pipeline ID to get steps for (required unless pipeline_step_id provided)', 'data-machine' ),
+						),
+						'pipeline_step_id' => array(
+							'type'        => array( 'string', 'null' ),
+							'description' => __( 'Get a specific step by ID (ignores pipeline_id when provided)', 'data-machine' ),
+						),
+					),
+				),
+				'output_schema'       => array(
+					'type'       => 'object',
+					'properties' => array(
+						'success'     => array( 'type' => 'boolean' ),
+						'steps'       => array( 'type' => 'array' ),
+						'pipeline_id' => array( 'type' => 'integer' ),
+						'step_count'  => array( 'type' => 'integer' ),
+						'error'       => array( 'type' => 'string' ),
+					),
+				),
+				'execute_callback'    => array( $this, 'executeGetPipelineSteps' ),
+				'permission_callback' => array( $this, 'checkPermission' ),
+				'meta'                => array( 'show_in_rest' => true ),
+			)
+		);
+	}
+
+	private function registerAddPipelineStepAbility(): void {
+		$step_type_abilities = new StepTypeAbilities();
+		$valid_types         = array_keys( $step_type_abilities->getAllStepTypes() );
+		$types_list          = ! empty( $valid_types ) ? implode( ', ', $valid_types ) : 'fetch, ai, publish, upsert';
+
+		wp_register_ability(
+			'datamachine/add-pipeline-step',
+			array(
+				'label'               => __( 'Add Pipeline Step', 'data-machine' ),
+				'description'         => __( 'Add a step to a pipeline. Automatically syncs to all flows on that pipeline.', 'data-machine' ),
+				'category'            => 'datamachine-pipeline',
+				'input_schema'        => array(
+					'type'       => 'object',
+					'required'   => array( 'pipeline_id', 'step_type' ),
+					'properties' => array(
+						'pipeline_id' => array(
+							'type'        => 'integer',
+							'description' => __( 'Pipeline ID to add the step to', 'data-machine' ),
+						),
+						'step_type'   => array(
+							'type'        => 'string',
+							'enum'        => $valid_types,
+							'description' => sprintf(
+								/* translators: %s: comma-separated list of valid step types */
+								__( 'Type of step: %s', 'data-machine' ),
+								$types_list
+							),
+						),
+						'step_config' => array(
+							'type'        => 'object',
+							'description' => __( 'Optional step configuration to seed the new step (e.g. system_prompt, provider, model, label). Fresh pipeline_step_id, execution_order, and step_type are always generated/validated and will override values in step_config.', 'data-machine' ),
+						),
+					),
+				),
+				'output_schema'       => array(
+					'type'       => 'object',
+					'properties' => array(
+						'success'          => array( 'type' => 'boolean' ),
+						'pipeline_id'      => array( 'type' => 'integer' ),
+						'pipeline_step_id' => array( 'type' => 'string' ),
+						'step_type'        => array( 'type' => 'string' ),
+						'flows_updated'    => array( 'type' => 'integer' ),
+						'flow_step_ids'    => array( 'type' => 'array' ),
+						'message'          => array( 'type' => 'string' ),
+						'error'            => array( 'type' => 'string' ),
+					),
+				),
+				'execute_callback'    => array( $this, 'executeAddPipelineStep' ),
+				'permission_callback' => array( $this, 'checkPermission' ),
+				'meta'                => array( 'show_in_rest' => true ),
+			)
+		);
+	}
+
+	private function registerUpdatePipelineStepAbility(): void {
+		wp_register_ability(
+			'datamachine/update-pipeline-step',
+			array(
+				'label'               => __( 'Update Pipeline Step', 'data-machine' ),
+				'description'         => __( 'Update pipeline step configuration (system prompt, AI execution modes, and AI tool policy). Model/provider are configured via mode_models setting.', 'data-machine' ),
+				'category'            => 'datamachine-pipeline',
+				'input_schema'        => array(
+					'type'       => 'object',
+					'required'   => array( 'pipeline_step_id' ),
+					'properties' => array(
+						'pipeline_step_id' => array(
+							'type'        => 'string',
+							'description' => __( 'Pipeline step ID to update', 'data-machine' ),
+						),
+						'system_prompt'    => array(
+							'type'        => 'string',
+							'description' => __( 'System prompt for AI step', 'data-machine' ),
+						),
+						'agent_modes'      => array(
+							'type'        => 'array',
+							'description' => __( 'Agent execution modes for this AI step. Defaults to pipeline.', 'data-machine' ),
+							'items'       => array( 'type' => 'string' ),
+						),
+						'disabled_tools'   => array(
+							'type'        => 'array',
+							'description' => __( 'Array of disabled tool IDs for this step', 'data-machine' ),
+							'items'       => array( 'type' => 'string' ),
+						),
+						'tool_categories'  => array(
+							'type'        => 'array',
+							'description' => __( 'Array of ability categories allowed for this step', 'data-machine' ),
+							'items'       => array( 'type' => 'string' ),
+						),
+					),
+				),
+				'output_schema'       => array(
+					'type'       => 'object',
+					'properties' => array(
+						'success'          => array( 'type' => 'boolean' ),
+						'pipeline_step_id' => array( 'type' => 'string' ),
+						'pipeline_id'      => array( 'type' => 'integer' ),
+						'updated_fields'   => array(
+							'type'  => 'array',
+							'items' => array( 'type' => 'string' ),
+						),
+						'message'          => array( 'type' => 'string' ),
+						'error'            => array( 'type' => 'string' ),
+					),
+				),
+				'execute_callback'    => array( $this, 'executeUpdatePipelineStep' ),
+				'permission_callback' => array( $this, 'checkPermission' ),
+				'meta'                => array( 'show_in_rest' => true ),
+			)
+		);
+	}
+
+	private function registerDeletePipelineStepAbility(): void {
+		wp_register_ability(
+			'datamachine/delete-pipeline-step',
+			array(
+				'label'               => __( 'Delete Pipeline Step', 'data-machine' ),
+				'description'         => __( 'Remove a step from a pipeline. Removes step from all flows on the pipeline.', 'data-machine' ),
+				'category'            => 'datamachine-pipeline',
+				'input_schema'        => array(
+					'type'       => 'object',
+					'required'   => array( 'pipeline_id', 'pipeline_step_id' ),
+					'properties' => array(
+						'pipeline_id'      => array(
+							'type'        => 'integer',
+							'description' => __( 'Pipeline ID containing the step', 'data-machine' ),
+						),
+						'pipeline_step_id' => array(
+							'type'        => 'string',
+							'description' => __( 'Pipeline step ID to delete', 'data-machine' ),
+						),
+					),
+				),
+				'output_schema'       => array(
+					'type'       => 'object',
+					'properties' => array(
+						'success'          => array( 'type' => 'boolean' ),
+						'pipeline_id'      => array( 'type' => 'integer' ),
+						'pipeline_step_id' => array( 'type' => 'string' ),
+						'affected_flows'   => array( 'type' => 'integer' ),
+						'message'          => array( 'type' => 'string' ),
+						'error'            => array( 'type' => 'string' ),
+					),
+				),
+				'execute_callback'    => array( $this, 'executeDeletePipelineStep' ),
+				'permission_callback' => array( $this, 'checkPermission' ),
+				'meta'                => array( 'show_in_rest' => true ),
+			)
+		);
+	}
+
+	private function registerReorderPipelineStepsAbility(): void {
+		wp_register_ability(
+			'datamachine/reorder-pipeline-steps',
+			array(
+				'label'               => __( 'Reorder Pipeline Steps', 'data-machine' ),
+				'description'         => __( 'Reorder steps within a pipeline.', 'data-machine' ),
+				'category'            => 'datamachine-pipeline',
+				'input_schema'        => array(
+					'type'       => 'object',
+					'required'   => array( 'pipeline_id', 'step_order' ),
+					'properties' => array(
+						'pipeline_id' => array(
+							'type'        => 'integer',
+							'description' => __( 'Pipeline ID to reorder steps for', 'data-machine' ),
+						),
+						'step_order'  => array(
+							'type'        => 'array',
+							'description' => __( 'Array of step order objects. Input array order determines final contiguous execution_order values.', 'data-machine' ),
+						),
+					),
+				),
+				'output_schema'       => array(
+					'type'       => 'object',
+					'properties' => array(
+						'success'     => array( 'type' => 'boolean' ),
+						'pipeline_id' => array( 'type' => 'integer' ),
+						'step_count'  => array( 'type' => 'integer' ),
+						'message'     => array( 'type' => 'string' ),
+						'error'       => array( 'type' => 'string' ),
+					),
+				),
+				'execute_callback'    => array( $this, 'executeReorderPipelineSteps' ),
+				'permission_callback' => array( $this, 'checkPermission' ),
+				'meta'                => array( 'show_in_rest' => true ),
+			)
+		);
+	}
+
+	/**
+	 * Permission callback for abilities.
+	 *
+	 * @return bool True if user has permission.
+	 */
+	public function checkPermission(): bool {
+		return PermissionHelper::can_manage();
+	}
+
+	/**
+	 * Execute get pipeline steps ability.
+	 *
+	 * @param array $input Input parameters.
+	 * @return array Result with steps data.
+	 */
+	public function executeGetPipelineSteps( array $input ): array {
+		$pipeline_id      = $input['pipeline_id'] ?? null;
+		$pipeline_step_id = $input['pipeline_step_id'] ?? null;
+
+		// Direct step lookup by ID - bypasses pipeline_id requirement.
+		if ( null !== $pipeline_step_id ) {
+			if ( ! is_string( $pipeline_step_id ) || empty( $pipeline_step_id ) ) {
+				return array(
+					'success' => false,
+					'error'   => 'pipeline_step_id must be a non-empty string',
+				);
+			}
+
+			$step_config = $this->db_pipelines->get_pipeline_step_config( $pipeline_step_id );
+
+			if ( empty( $step_config ) ) {
+				return array(
+					'success'     => true,
+					'steps'       => array(),
+					'pipeline_id' => null,
+					'step_count'  => 0,
+				);
+			}
+
+			return array(
+				'success'     => true,
+				'steps'       => array( $step_config ),
+				'pipeline_id' => $step_config['pipeline_id'] ?? null,
+				'step_count'  => 1,
+			);
+		}
+
+		if ( ! is_numeric( $pipeline_id ) || (int) $pipeline_id <= 0 ) {
+			return array(
+				'success' => false,
+				'error'   => 'pipeline_id is required and must be a positive integer',
+			);
+		}
+
+		$pipeline_id = (int) $pipeline_id;
+		$pipeline    = $this->db_pipelines->get_pipeline( $pipeline_id );
+
+		if ( ! $pipeline ) {
+			return array(
+				'success' => false,
+				'error'   => 'Pipeline not found',
+			);
+		}
+
+		$steps = array_values( $this->db_pipelines->get_pipeline_config( $pipeline_id ) );
+
+		return array(
+			'success'     => true,
+			'steps'       => $steps,
+			'pipeline_id' => $pipeline_id,
+			'step_count'  => count( $steps ),
+		);
+	}
+
+	/**
+	 * Execute add pipeline step ability.
+	 *
+	 * @param array $input Input parameters.
+	 * @return array Result with created step data.
+	 */
+	public function executeAddPipelineStep( array $input ): array {
+		$pipeline_id = $input['pipeline_id'] ?? null;
+		$step_type   = $input['step_type'] ?? null;
+
+		if ( ! is_numeric( $pipeline_id ) || (int) $pipeline_id <= 0 ) {
+			return array(
+				'success' => false,
+				'error'   => 'pipeline_id is required and must be a positive integer',
+			);
+		}
+
+		if ( empty( $step_type ) || ! is_string( $step_type ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'step_type is required and must be a string',
+			);
+		}
+
+		$step_type_abilities = new StepTypeAbilities();
+		$valid_types         = array_keys( $step_type_abilities->getAllStepTypes() );
+
+		if ( ! in_array( $step_type, $valid_types, true ) ) {
+			return array(
+				'success' => false,
+				'error'   => "Invalid step_type '{$step_type}'. Must be one of: " . implode( ', ', $valid_types ),
+			);
+		}
+
+		$pipeline_id = (int) $pipeline_id;
+		$step_type   = sanitize_text_field( wp_unslash( $step_type ) );
+
+		$step_type_config = $step_type_abilities->getStepType( $step_type );
+		if ( ! $step_type_config ) {
+			do_action( 'datamachine_log', 'error', 'Invalid step type for step creation', array( 'step_type' => $step_type ) );
+			return array(
+				'success' => false,
+				'error'   => 'Invalid step type configuration',
+			);
+		}
+
+		$current_steps        = $this->db_pipelines->get_pipeline_config( $pipeline_id );
+		$next_execution_order = count( $current_steps );
+
+		// Seed from optional step_config (used by import to restore system_prompt, provider,
+		// model, label, etc.). Fresh pipeline_step_id / execution_order / step_type always
+		// override — the incoming pipeline_step_id is scoped to the exporting install and
+		// would collide here.
+		$seed_config = ( isset( $input['step_config'] ) && is_array( $input['step_config'] ) )
+			? $input['step_config']
+			: array();
+
+		$new_step = array_merge(
+			$seed_config,
+			array(
+				'step_type'        => $step_type,
+				'execution_order'  => $next_execution_order,
+				'pipeline_step_id' => $pipeline_id . '_' . wp_generate_uuid4(),
+			)
+		);
+
+		if ( ! isset( $new_step['label'] ) || '' === $new_step['label'] ) {
+			$new_step['label'] = $step_type_config['label'] ?? ucfirst( str_replace( '_', ' ', $step_type ) );
+		}
+
+		if ( 'ai' === $step_type ) {
+			if ( empty( $new_step['provider'] ) || empty( $new_step['model'] ) ) {
+				$pipeline_defaults = PluginSettings::getModelForMode( 'pipeline' );
+				if ( empty( $new_step['provider'] ) ) {
+					$new_step['provider'] = $pipeline_defaults['provider'];
+				}
+				if ( empty( $new_step['model'] ) ) {
+					$new_step['model'] = $pipeline_defaults['model'];
+				}
+			}
+		}
+
+		$pipeline_config = array();
+		foreach ( $current_steps as $step ) {
+			$pipeline_config[ $step['pipeline_step_id'] ] = $step;
+		}
+		$pipeline_config[ $new_step['pipeline_step_id'] ] = $new_step;
+
+		$success = $this->db_pipelines->update_pipeline(
+			$pipeline_id,
+			array(
+				'pipeline_config' => $pipeline_config,
+			)
+		);
+
+		if ( ! $success ) {
+			do_action(
+				'datamachine_log',
+				'error',
+				'Failed to add step to pipeline',
+				array(
+					'pipeline_id' => $pipeline_id,
+					'step_type'   => $step_type,
+				)
+			);
+			return array(
+				'success' => false,
+				'error'   => 'Failed to add step. Verify the pipeline_id exists and you have sufficient permissions.',
+			);
+		}
+
+		$pipeline_step_id = $new_step['pipeline_step_id'];
+		$flows            = $this->db_flows->get_flows_for_pipeline( $pipeline_id );
+
+		foreach ( $flows as $flow ) {
+			$this->syncStepsToFlow( $flow['flow_id'], $pipeline_id, array( $new_step ), $pipeline_config );
+		}
+
+		$flow_step_ids = array();
+		$updated_flows = $this->db_flows->get_flows_for_pipeline( $pipeline_id );
+		foreach ( $updated_flows as $flow ) {
+			$flow_config = $flow['flow_config'] ?? array();
+			foreach ( $flow_config as $flow_step_id => $step_data ) {
+				if ( isset( $step_data['pipeline_step_id'] ) && $step_data['pipeline_step_id'] === $pipeline_step_id ) {
+					$flow_step_ids[] = array(
+						'flow_id'      => $flow['flow_id'],
+						'flow_step_id' => $flow_step_id,
+					);
+				}
+			}
+		}
+
+		do_action(
+			'datamachine_log',
+			'info',
+			'Pipeline step added via ability',
+			array(
+				'pipeline_id'      => $pipeline_id,
+				'pipeline_step_id' => $pipeline_step_id,
+				'step_type'        => $step_type,
+				'flows_updated'    => count( $flows ),
+			)
+		);
+
+		return array(
+			'success'          => true,
+			'pipeline_id'      => $pipeline_id,
+			'pipeline_step_id' => $pipeline_step_id,
+			'step_type'        => $step_type,
+			'flows_updated'    => count( $flows ),
+			'flow_step_ids'    => $flow_step_ids,
+			'message'          => "Step '{$step_type}' added to pipeline. Use configure_flow_steps with the flow_step_ids to set handler configuration.",
+		);
+	}
+
+	/**
+	 * Execute update pipeline step ability.
+	 *
+	 * @param array $input Input parameters.
+	 * @return array Result with update status.
+	 */
+	public function executeUpdatePipelineStep( array $input ): array {
+		$pipeline_step_id = $input['pipeline_step_id'] ?? null;
+
+		if ( empty( $pipeline_step_id ) || ! is_string( $pipeline_step_id ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'pipeline_step_id is required and must be a string',
+			);
+		}
+
+		// Reject handler fields — handlers are flow-scoped, not pipeline-scoped.
+		if ( isset( $input['handler_slug'] ) || isset( $input['handler_slugs'] ) || isset( $input['handler_config'] ) || isset( $input['handler_configs'] ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'handler_slug(s) and handler_config(s) are flow-scoped. Use datamachine/update-flow-step ability instead.',
+			);
+		}
+
+		$system_prompt = $input['system_prompt'] ?? null;
+		$agent_modes   = $input['agent_modes'] ?? null;
+		$policy_fields = array( 'disabled_tools', 'tool_categories' );
+
+		// provider/model are no longer configurable at the pipeline step level.
+		// Model resolution is handled exclusively by the mode system (mode_models setting).
+
+		$has_policy_field = false;
+		foreach ( $policy_fields as $field ) {
+			if ( array_key_exists( $field, $input ) ) {
+				$has_policy_field = true;
+				break;
+			}
+		}
+
+		if ( null === $system_prompt && null === $agent_modes && ! $has_policy_field ) {
+			return array(
+				'success' => false,
+				'error'   => 'At least one of system_prompt, agent_modes, disabled_tools, or tool_categories is required',
+			);
+		}
+
+		$step_config = $this->db_pipelines->get_pipeline_step_config( $pipeline_step_id );
+
+		if ( empty( $step_config ) || empty( $step_config['pipeline_id'] ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'Pipeline step not found',
+			);
+		}
+
+		$pipeline_id = $step_config['pipeline_id'];
+		$pipeline    = $this->db_pipelines->get_pipeline( $pipeline_id );
+
+		if ( ! $pipeline ) {
+			return array(
+				'success' => false,
+				'error'   => 'Pipeline not found',
+			);
+		}
+
+		$pipeline_config = $pipeline['pipeline_config'] ?? array();
+		$existing_config = $pipeline_config[ $pipeline_step_id ] ?? array();
+
+		$step_config_data = array();
+		$updated_fields   = array();
+
+		if ( null !== $system_prompt ) {
+			$step_config_data['system_prompt'] = wp_unslash( $system_prompt );
+			$updated_fields[]                  = 'system_prompt';
+		}
+
+		if ( null !== $agent_modes ) {
+			$sanitized_modes = self::sanitizeStringListField( $agent_modes, 'agent_modes' );
+			if ( is_wp_error( $sanitized_modes ) ) {
+				return array(
+					'success' => false,
+					'error'   => $sanitized_modes->get_error_message(),
+				);
+			}
+			$step_config_data['agent_modes'] = $sanitized_modes;
+			$updated_fields[]                = 'agent_modes';
+		}
+
+		foreach ( $policy_fields as $field ) {
+			if ( ! array_key_exists( $field, $input ) ) {
+				continue;
+			}
+
+			$sanitized_values = self::sanitizeStringListField( $input[ $field ], $field );
+			if ( is_wp_error( $sanitized_values ) ) {
+				return array(
+					'success' => false,
+					'error'   => $sanitized_values->get_error_message(),
+				);
+			}
+
+			if ( 'disabled_tools' === $field ) {
+				$tools_manager    = new \DataMachine\Engine\AI\Tools\ToolManager();
+				$sanitized_values = $tools_manager->save_step_tool_selections( $pipeline_step_id, $sanitized_values );
+			}
+
+			$step_config_data[ $field ] = $sanitized_values;
+			$updated_fields[]           = $field;
+		}
+
+		$pipeline_config[ $pipeline_step_id ] = array_merge( $existing_config, $step_config_data );
+
+		$success = $this->db_pipelines->update_pipeline(
+			$pipeline_id,
+			array( 'pipeline_config' => $pipeline_config )
+		);
+
+		if ( ! $success ) {
+			return array(
+				'success' => false,
+				'error'   => 'Failed to update pipeline step configuration',
+			);
+		}
+
+		do_action(
+			'datamachine_log',
+			'info',
+			'Pipeline step updated via ability',
+			array(
+				'pipeline_step_id' => $pipeline_step_id,
+				'pipeline_id'      => $pipeline_id,
+				'updated_fields'   => $updated_fields,
+			)
+		);
+
+		return array(
+			'success'          => true,
+			'pipeline_step_id' => $pipeline_step_id,
+			'pipeline_id'      => $pipeline_id,
+			'updated_fields'   => $updated_fields,
+			'message'          => 'Pipeline step configuration updated successfully. Fields updated: ' . implode( ', ', $updated_fields ),
+		);
+	}
+
+	/**
+	 * Sanitize an array-of-strings configuration field.
+	 *
+	 * @param mixed  $value Input value.
+	 * @param string $field Field name for error messages.
+	 * @return array|\WP_Error Sanitized string list or validation error.
+	 */
+	public static function sanitizeStringListField( mixed $value, string $field ): array|\WP_Error {
+		if ( ! is_array( $value ) ) {
+			return new \WP_Error(
+				'invalid_' . $field,
+				sprintf( '%s must be an array of strings', $field )
+			);
+		}
+
+		$sanitized = array();
+		foreach ( $value as $item ) {
+			if ( ! is_string( $item ) ) {
+				return new \WP_Error(
+					'invalid_' . $field,
+					sprintf( '%s must contain only strings', $field )
+				);
+			}
+
+			$sanitized[] = sanitize_text_field( wp_unslash( $item ) );
+		}
+
+		return array_values( $sanitized );
+	}
+
+	/**
+	 * Execute delete pipeline step ability.
+	 *
+	 * @param array $input Input parameters.
+	 * @return array Result with deletion status.
+	 */
+	public function executeDeletePipelineStep( array $input ): array {
+		$pipeline_id      = $input['pipeline_id'] ?? null;
+		$pipeline_step_id = $input['pipeline_step_id'] ?? null;
+
+		if ( ! is_numeric( $pipeline_id ) || (int) $pipeline_id <= 0 ) {
+			return array(
+				'success' => false,
+				'error'   => 'pipeline_id is required and must be a positive integer',
+			);
+		}
+
+		if ( empty( $pipeline_step_id ) || ! is_string( $pipeline_step_id ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'pipeline_step_id is required and must be a string',
+			);
+		}
+
+		$pipeline_id      = absint( $pipeline_id );
+		$pipeline_step_id = trim( sanitize_text_field( $pipeline_step_id ) );
+
+		$pipeline = $this->db_pipelines->get_pipeline( $pipeline_id );
+		if ( ! $pipeline ) {
+			return array(
+				'success' => false,
+				'error'   => __( 'Pipeline not found.', 'data-machine' ),
+			);
+		}
+
+		if ( ! isset( $pipeline['pipeline_name'] ) || empty( trim( $pipeline['pipeline_name'] ) ) ) {
+			do_action(
+				'datamachine_log',
+				'error',
+				'Cannot delete pipeline step - pipeline missing or empty name',
+				array(
+					'pipeline_id'      => $pipeline_id,
+					'pipeline_step_id' => $pipeline_step_id,
+				)
+			);
+			return array(
+				'success' => false,
+				'error'   => __( 'Pipeline data is corrupted - missing name.', 'data-machine' ),
+			);
+		}
+
+		$pipeline_name  = $pipeline['pipeline_name'];
+		$affected_flows = $this->db_flows->get_flows_for_pipeline( $pipeline_id );
+		$flow_count     = count( $affected_flows );
+
+		$current_steps   = $this->db_pipelines->get_pipeline_config( $pipeline_id );
+		$remaining_steps = array();
+		$step_found      = false;
+
+		foreach ( $current_steps as $step ) {
+			if ( ( $step['pipeline_step_id'] ?? '' ) !== $pipeline_step_id ) {
+				$remaining_steps[] = $step;
+			} else {
+				$step_found = true;
+			}
+		}
+
+		if ( ! $step_found ) {
+			return array(
+				'success' => false,
+				'error'   => __( 'Step not found in pipeline.', 'data-machine' ),
+			);
+		}
+
+		$updated_steps = array();
+		foreach ( $remaining_steps as $index => $step ) {
+			$step['execution_order']                    = $index;
+			$updated_steps[ $step['pipeline_step_id'] ] = $step;
+		}
+		$updated_orders = $this->buildExecutionOrderMap( $updated_steps );
+
+		$success = $this->db_pipelines->update_pipeline(
+			$pipeline_id,
+			array(
+				'pipeline_config' => $updated_steps,
+			)
+		);
+
+		if ( ! $success ) {
+			return array(
+				'success' => false,
+				'error'   => __( 'Failed to delete step from pipeline.', 'data-machine' ),
+			);
+		}
+
+		// Sync deletions to flows
+		$affected_flows = $this->db_flows->get_flows_for_pipeline( $pipeline_id );
+		foreach ( $affected_flows as $flow ) {
+			$flow_config         = $flow['flow_config'] ?? array();
+			$updated_flow_config = array();
+			foreach ( $flow_config as $flow_step_id => $flow_step ) {
+				if ( isset( $flow_step['pipeline_step_id'] ) && $flow_step['pipeline_step_id'] !== $pipeline_step_id ) {
+					$flow_pipeline_step_id = $flow_step['pipeline_step_id'];
+					if ( isset( $updated_orders[ $flow_pipeline_step_id ] ) ) {
+						$flow_step['execution_order'] = $updated_orders[ $flow_pipeline_step_id ];
+					}
+					$updated_flow_config[ $flow_step_id ] = $flow_step;
+				}
+			}
+			$this->db_flows->update_flow(
+				$flow['flow_id'],
+				array( 'flow_config' => $updated_flow_config )
+			);
+		}
+
+		// Clean processed items
+		$this->db_processed_items->delete_processed_items( array( 'pipeline_step_id' => $pipeline_step_id ) );
+
+		do_action(
+			'datamachine_log',
+			'info',
+			'Pipeline step deleted via ability',
+			array(
+				'pipeline_id'      => $pipeline_id,
+				'pipeline_step_id' => $pipeline_step_id,
+				'affected_flows'   => $flow_count,
+			)
+		);
+
+		return array(
+			'success'          => true,
+			'pipeline_id'      => $pipeline_id,
+			'pipeline_step_id' => $pipeline_step_id,
+			'affected_flows'   => $flow_count,
+			'message'          => sprintf(
+				/* translators: 1: pipeline name, 2: number of flows affected */
+				esc_html__( 'Step deleted successfully from pipeline "%1$s". %2$d flows were updated and processed items cleaned.', 'data-machine' ),
+				$pipeline_name,
+				$flow_count
+			),
+		);
+	}
+
+	/**
+	 * Execute reorder pipeline steps ability.
+	 *
+	 * @param array $input Input parameters.
+	 * @return array Result with reorder status.
+	 */
+	public function executeReorderPipelineSteps( array $input ): array {
+		$pipeline_id = $input['pipeline_id'] ?? null;
+		$step_order  = $input['step_order'] ?? null;
+
+		if ( ! is_numeric( $pipeline_id ) || (int) $pipeline_id <= 0 ) {
+			return array(
+				'success' => false,
+				'error'   => 'pipeline_id is required and must be a positive integer',
+			);
+		}
+
+		if ( empty( $step_order ) || ! is_array( $step_order ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'step_order is required and must be an array',
+			);
+		}
+
+		foreach ( $step_order as $index => $item ) {
+			if ( ! is_array( $item ) ) {
+				return array(
+					'success' => false,
+					'error'   => "Step order item at index {$index} must be an object",
+				);
+			}
+
+			if ( ! isset( $item['pipeline_step_id'] ) || ! isset( $item['execution_order'] ) ) {
+				return array(
+					'success' => false,
+					'error'   => 'Each step order item must have pipeline_step_id and execution_order',
+				);
+			}
+
+			if ( ! is_string( $item['pipeline_step_id'] ) || ! is_numeric( $item['execution_order'] ) ) {
+				return array(
+					'success' => false,
+					'error'   => 'pipeline_step_id must be string and execution_order must be numeric',
+				);
+			}
+		}
+
+		$pipeline_id    = (int) $pipeline_id;
+		$pipeline_steps = $this->db_pipelines->get_pipeline_config( $pipeline_id );
+
+		if ( empty( $pipeline_steps ) ) {
+			return array(
+				'success' => false,
+				'error'   => __( 'Pipeline not found', 'data-machine' ),
+			);
+		}
+
+		$steps_by_id = array();
+		foreach ( $pipeline_steps as $step ) {
+			if ( ! empty( $step['pipeline_step_id'] ) ) {
+				$steps_by_id[ $step['pipeline_step_id'] ] = $step;
+			}
+		}
+
+		$updated_steps = array();
+		$seen_steps    = array();
+		foreach ( $step_order as $index => $item ) {
+			$pipeline_step_id = sanitize_text_field( $item['pipeline_step_id'] );
+
+			if ( isset( $seen_steps[ $pipeline_step_id ] ) ) {
+				return array(
+					'success' => false,
+					'error'   => sprintf(
+						/* translators: %s: pipeline step ID */
+						__( 'Step %s appears more than once in reorder input', 'data-machine' ),
+						$pipeline_step_id
+					),
+				);
+			}
+			$seen_steps[ $pipeline_step_id ] = true;
+
+			if ( ! isset( $steps_by_id[ $pipeline_step_id ] ) ) {
+				return array(
+					'success' => false,
+					'error'   => sprintf(
+						/* translators: %s: pipeline step ID */
+						__( 'Step %s not found in pipeline', 'data-machine' ),
+						$pipeline_step_id
+					),
+				);
+			}
+
+			$step                               = $steps_by_id[ $pipeline_step_id ];
+			$step['execution_order']            = $index;
+			$updated_steps[ $pipeline_step_id ] = $step;
+		}
+
+		if ( count( $updated_steps ) !== count( $pipeline_steps ) ) {
+			return array(
+				'success' => false,
+				'error'   => __( 'Step count mismatch during reorder', 'data-machine' ),
+			);
+		}
+
+		$success = $this->db_pipelines->update_pipeline(
+			$pipeline_id,
+			array(
+				'pipeline_config' => $updated_steps,
+			)
+		);
+
+		if ( ! $success ) {
+			return array(
+				'success' => false,
+				'error'   => __( 'Failed to save step order', 'data-machine' ),
+			);
+		}
+
+		$updated_orders = $this->buildExecutionOrderMap( $updated_steps );
+		$flows          = $this->db_flows->get_flows_for_pipeline( $pipeline_id );
+		foreach ( $flows as $flow ) {
+			$flow_id     = $flow['flow_id'];
+			$flow_config = $flow['flow_config'] ?? array();
+
+			foreach ( $flow_config as $flow_step_id => &$flow_step ) {
+				if ( ! isset( $flow_step['pipeline_step_id'] ) || empty( $flow_step['pipeline_step_id'] ) ) {
+					continue;
+				}
+				$pipeline_step_id = $flow_step['pipeline_step_id'];
+
+				if ( isset( $updated_orders[ $pipeline_step_id ] ) ) {
+					$flow_step['execution_order'] = $updated_orders[ $pipeline_step_id ];
+				}
+			}
+			unset( $flow_step );
+
+			$this->db_flows->update_flow(
+				$flow_id,
+				array(
+					'flow_config' => $flow_config,
+				)
+			);
+		}
+
+		do_action(
+			'datamachine_log',
+			'info',
+			'Pipeline steps reordered via ability',
+			array(
+				'pipeline_id' => $pipeline_id,
+				'step_count'  => count( $updated_steps ),
+			)
+		);
+
+		return array(
+			'success'     => true,
+			'pipeline_id' => $pipeline_id,
+			'step_count'  => count( $updated_steps ),
+			'message'     => 'Pipeline steps reordered successfully.',
+		);
+	}
+
+	/**
+	 * Build pipeline step ID to execution order map.
+	 *
+	 * @param array $steps Pipeline steps keyed by pipeline_step_id.
+	 * @return array<string,int>
+	 */
+	private function buildExecutionOrderMap( array $steps ): array {
+		$orders = array();
+		foreach ( $steps as $step ) {
+			if ( ! empty( $step['pipeline_step_id'] ) && isset( $step['execution_order'] ) ) {
+				$orders[ $step['pipeline_step_id'] ] = (int) $step['execution_order'];
+			}
+		}
+		return $orders;
+	}
+
+	/**
+	 * Sync pipeline steps to a flow's configuration.
+	 *
+	 * @param int   $flow_id Flow ID.
+	 * @param int   $pipeline_id Pipeline ID.
+	 * @param array $steps Array of pipeline step data.
+	 * @param array $pipeline_config Full pipeline config.
+	 * @return bool Success status.
+	 */
+	private function syncStepsToFlow( int $flow_id, int $pipeline_id, array $steps, array $pipeline_config = array() ): bool {
+		$flow = $this->db_flows->get_flow( $flow_id );
+		if ( ! $flow ) {
+			do_action( 'datamachine_log', 'error', 'Flow not found for step sync', array( 'flow_id' => $flow_id ) );
+			return false;
+		}
+
+		$flow_config = $flow['flow_config'] ?? array();
+
+		foreach ( $steps as $step ) {
+			$pipeline_step_id = $step['pipeline_step_id'] ?? null;
+			if ( ! $pipeline_step_id ) {
+				continue;
+			}
+
+			$flow_step_id = apply_filters( 'datamachine_generate_flow_step_id', '', $pipeline_step_id, $flow_id );
+
+			$flow_config[ $flow_step_id ] = FlowStepConfigFactory::buildFromPipelineStep(
+				$step,
+				$pipeline_id,
+				$flow_id,
+				$flow_step_id,
+				$pipeline_config[ $pipeline_step_id ] ?? array()
+			);
+		}
+
+		$success = $this->db_flows->update_flow(
+			$flow_id,
+			array( 'flow_config' => $flow_config )
+		);
+
+		if ( ! $success ) {
+			do_action(
+				'datamachine_log',
+				'error',
+				'Flow step sync failed - database update failed',
+				array(
+					'flow_id'     => $flow_id,
+					'steps_count' => count( $steps ),
+				)
+			);
+			return false;
+		}
+
+		return true;
+	}
+}

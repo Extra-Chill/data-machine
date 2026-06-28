@@ -1,0 +1,79 @@
+{
+	"name": "chubes/datamachine",
+	"description": "WordPress plugin for automated data collection, AI processing, and multi-platform publishing",
+	"version": "0.10.2",
+	"license": "GPL-2.0-or-later",
+	"require": {
+		"php": ">=8.2",
+		"wordpress/agents-api": "dev-main",
+		"woocommerce/action-scheduler": "^3.9",
+		"automattic/blocks-engine-php-transformer": "0.1.0"
+	},
+	"require-dev": {
+		"php-stubs/wordpress-stubs": "^6.9",
+		"wp-coding-standards/wpcs": "^3.1",
+		"phpcsstandards/phpcsutils": "^1.0",
+		"phpcompatibility/phpcompatibility-wp": "^2.1"
+	},
+	"autoload": {
+		"psr-4": {
+			"DataMachine\\Abilities\\": "inc/Abilities/",
+			"DataMachine\\Api\\": "inc/Api/",
+			"DataMachine\\Cli\\": "inc/Cli/",
+			"DataMachine\\Core\\": "inc/Core/",
+			"DataMachine\\Engine\\": "inc/Engine/"
+		},
+		"files": [
+			"inc/Engine/AI/conversation-loop.php"
+		]
+	},
+	"autoload-dev": {
+		"psr-4": {
+			"DataMachine\\Tests\\": "tests/"
+		}
+	},
+	"scripts": {
+		"test": "homeboy test data-machine",
+		"lint": "phpcs",
+		"lint-fix": "phpcbf"
+	},
+	"config": {
+		"process-timeout": 0,
+		"allow-plugins": {
+			"dealerdirect/phpcodesniffer-composer-installer": true
+		}
+	},
+	"repositories": [
+		{
+			"type": "package",
+			"package": {
+				"name": "automattic/blocks-engine-php-transformer",
+				"version": "0.1.0",
+				"type": "library",
+				"source": {
+					"type": "git",
+					"url": "https://github.com/Automattic/blocks-engine.git",
+					"reference": "php-transformer-v0.1.0"
+				},
+				"autoload": {
+					"psr-4": {
+						"Automattic\\BlocksEngine\\PhpTransformer\\": "php-transformer/src/"
+					},
+					"files": [
+						"php-transformer/php-transformer.php"
+					]
+				},
+				"require": {
+					"php": ">=8.1",
+					"league/commonmark": "^2.5",
+					"league/html-to-markdown": "^5.1"
+				}
+			}
+		},
+		{
+			"name": "agents-api",
+			"type": "vcs",
+			"url": "https://github.com/Automattic/agents-api"
+		}
+	]
+}

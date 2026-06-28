@@ -1,0 +1,20 @@
+{
+  "auto_cleanup": false,
+  "changelog_target": "CHANGELOG.md",
+  "id": "php-transformer",
+  "remote_path": "",
+  "version_targets": [
+    {
+      "file": "VERSION",
+      "pattern": "^([0-9]+\\.[0-9]+\\.[0-9]+)$"
+    },
+    {
+      "file": "php-transformer.php",
+      "pattern": "Version: ([0-9]+\\.[0-9]+\\.[0-9]+)"
+    },
+    {
+      "file": "php-transformer.php",
+      "pattern": "BLOCKS_ENGINE_PHP_TRANSFORMER_VERSION', '([0-9]+\\.[0-9]+\\.[0-9]+)'"
+    }
+  ]
+}

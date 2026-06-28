@@ -1,0 +1,14 @@
+includes:
+	- vendor/szepeviktor/phpstan-wordpress/extension.neon
+
+parameters:
+	level: max
+	paths:
+		- src
+		- agents-api.php
+	scanFiles:
+		- stubs/class-wp-ability.php
+		- stubs/class-wp-abilities-registry.php
+		- stubs/class-wp-filter-sentinel.php
+		- stubs/abilities-api-functions.php
+		- stubs/action-scheduler-functions.php

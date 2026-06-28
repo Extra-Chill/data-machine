@@ -1,0 +1,833 @@
+<?php
+/**
+ * Permission helper for Data Machine abilities.
+ *
+ * @package DataMachine\Abilities
+ * @since 0.20.4
+ */
+
+namespace DataMachine\Abilities;
+
+use AgentsAPI\AI\WP_Agent_Execution_Principal;
+use DataMachine\Core\Database\Agents\AgentTokens;
+
+/**
+ * Helper class for ability permission checks.
+ *
+ * Centralizes permission logic to handle:
+ * - WP-CLI commands
+ * - Action Scheduler background processing
+ * - Pre-authenticated contexts (webhook tokens, API keys)
+ * - Standard user capability checks
+ *
+ * @see https://github.com/Extra-Chill/data-machine/issues/346
+ */
+class PermissionHelper {
+
+	/**
+	 * Data Machine capability map.
+	 *
+	 * @since 0.37.0
+	 * @var array<string, string>
+	 */
+	private const CAPABILITY_MAP = array(
+		'manage_agents'    => 'datamachine_manage_agents',
+		'manage_flows'     => 'datamachine_manage_flows',
+		'manage_settings'  => 'datamachine_manage_settings',
+		'view_analytics'   => 'datamachine_view_analytics',
+		'chat'             => 'datamachine_chat',
+		'use_tools'        => 'datamachine_use_tools',
+		'view_logs'        => 'datamachine_view_logs',
+		'create_own_agent' => 'datamachine_create_own_agent',
+	);
+
+	/**
+	 * Whether the current execution context has been pre-authenticated.
+	 *
+	 * When true, can_manage() returns true without checking WordPress
+	 * capabilities. This allows callers that have already authenticated
+	 * via alternative mechanisms (Bearer tokens, API keys, etc.) to
+	 * execute abilities through the standard wp_get_ability() path
+	 * instead of bypassing the Abilities API entirely.
+	 *
+	 * @since 0.31.0
+	 *
+	 * @var bool
+	 */
+	private static bool $authenticated_context = false;
+
+	/**
+	 * Acting user ID for pre-authenticated contexts.
+	 *
+	 * @since 0.37.0
+	 * @var int
+	 */
+	private static int $authenticated_user_id = 0;
+
+	/**
+	 * Acting agent ID when authenticated via agent bearer token.
+	 *
+	 * @since 0.47.0
+	 * @var int|null
+	 */
+	private static ?int $acting_agent_id = null;
+
+	/**
+	 * Acting token ID when authenticated via agent bearer token.
+	 *
+	 * Distinguishes multiple external logins/clients authenticated to the same
+	 * agent. This is optional runtime context for integrations like chat bridges
+	 * that need login-level routing on top of agent-level authorization.
+	 *
+	 * @since 0.47.1
+	 * @var int|null
+	 */
+	private static ?int $acting_token_id = null;
+
+	/**
+	 * Owner user ID for the acting agent.
+	 *
+	 * @since 0.47.0
+	 * @var int
+	 */
+	private static int $agent_owner_id = 0;
+
+	/**
+	 * Capability restrictions from the agent's bearer token.
+	 * Null means unrestricted (all agent capabilities apply).
+	 * Array means only these DM capabilities are allowed for this token.
+	 *
+	 * @since 0.47.0
+	 * @var array|null
+	 */
+	private static ?\WP_Agent_Capability_Ceiling $capability_ceiling = null;
+
+	/**
+	 * Structured token scope for Data Machine ability-category enforcement.
+	 *
+	 * @since 1.0.0
+	 * @var array|null
+	 */
+	private static ?array $agent_token_scope = null;
+
+	/**
+	 * Agents API execution principal for the current request.
+	 *
+	 * @since 0.103.15
+	 * @var WP_Agent_Execution_Principal|null
+	 */
+	private static ?WP_Agent_Execution_Principal $execution_principal = null;
+
+	/**
+	 * Cross-site caller context for the current request.
+	 *
+	 * Populated by AgentAuthMiddleware from canonical Agents API caller headers
+	 * after bearer-token resolution.
+	 * Describes who is calling and where this request sits in an
+	 * agent-to-agent chain. Null means no A2A caller context is set —
+	 * typically a top-of-chain request (admin UI, CLI, direct /chat call).
+	 *
+	 * @since 0.71.0
+	 * @var \WP_Agent_Caller_Context|null
+	 */
+	private static ?\WP_Agent_Caller_Context $caller_context = null;
+
+	/**
+	 * Check if current context has admin-level permissions.
+	 *
+	 * Allows execution in:
+	 * - WP-CLI context (command line)
+	 * - Action Scheduler background processing (scheduled jobs)
+	 * - Pre-authenticated context (set via run_as_authenticated())
+	 * - Standard requests with logged-in admin user
+	 *
+	 * @since 0.20.4
+	 *
+	 * @return bool True if permission granted.
+	 */
+	public static function can_manage(): bool {
+		return self::can( 'manage_flows' ) || self::can( 'manage_settings' ) || self::can( 'manage_agents' );
+	}
+
+	/**
+	 * Check whether current context can perform an action.
+	 *
+	 * @since 0.37.0
+	 *
+	 * @param string $action Action key (manage_agents, manage_flows, manage_settings, chat, use_tools, view_logs).
+	 * @return bool
+	 */
+	public static function can( string $action ): bool {
+		// Read-only analytics access is implied by any management capability.
+		// This keeps existing manage_flows / manage_settings / manage_agents
+		// holders (and administrators via manage_options) working without a
+		// dedicated datamachine_view_analytics grant — no regression.
+		if ( 'view_analytics' === $action && self::can_manage() ) {
+			return true;
+		}
+
+		// WP-CLI always allowed (filterable for testing).
+		if ( defined( 'WP_CLI' ) && WP_CLI ) {
+			if ( apply_filters( 'datamachine_cli_bypass_permissions', true ) ) {
+				return true;
+			}
+		}
+
+		// Action Scheduler background processing context.
+		if ( doing_action( 'action_scheduler_run_queue' ) ) {
+			return true;
+		}
+
+		// Agent context: token-based authentication with capability ceiling.
+		if ( null !== self::$acting_agent_id ) {
+			return self::agent_can( $action );
+		}
+
+		// Pre-authenticated context: evaluate acting user if provided.
+		if ( self::$authenticated_context ) {
+			if ( self::$authenticated_user_id > 0 ) {
+				return self::user_can( self::$authenticated_user_id, $action );
+			}
+
+			return true;
+		}
+
+		if ( ! is_user_logged_in() ) {
+			return false;
+		}
+
+		return self::user_can( get_current_user_id(), $action );
+	}
+
+	/**
+	 * Get current acting user ID for permission-bounded execution.
+	 *
+	 * @since 0.37.0
+	 *
+	 * @return int
+	 */
+	public static function acting_user_id(): int {
+		// Agent context: return the owner's user ID.
+		if ( null !== self::$acting_agent_id && self::$agent_owner_id > 0 ) {
+			return self::$agent_owner_id;
+		}
+
+		if ( self::$authenticated_context && self::$authenticated_user_id > 0 ) {
+			return self::$authenticated_user_id;
+		}
+
+		return get_current_user_id();
+	}
+
+	/**
+	 * Execute a callback within a pre-authenticated context.
+	 *
+	 * Sets the authenticated context flag before executing the callback,
+	 * ensuring it is always reset afterward — even if an exception is thrown.
+	 * This guarantees the elevated context never leaks beyond the callback scope.
+	 *
+	 * Usage:
+	 *
+	 *     $result = PermissionHelper::run_as_authenticated( function () use ( $input ) {
+	 *         $ability = wp_get_ability( 'datamachine/execute-workflow' );
+	 *         return $ability->execute( $input );
+	 *     } );
+	 *
+	 * @since 0.31.0
+	 *
+	 * @param callable $callback The callback to execute in authenticated context.
+	 * @return mixed The return value of the callback.
+	 *
+	 * @throws \Throwable Re-throws any exception from the callback after resetting context.
+	 */
+	public static function run_as_authenticated( callable $callback, int $acting_user_id = 0 ) {
+		self::$authenticated_context = true;
+		self::$authenticated_user_id = absint( $acting_user_id );
+
+		try {
+			$result = $callback();
+		} finally {
+			self::$authenticated_context = false;
+			self::$authenticated_user_id = 0;
+		}
+
+		return $result;
+	}
+
+	/**
+	 * Check whether the current context is pre-authenticated.
+	 *
+	 * Useful for logging and debugging to determine why a permission
+	 * check passed.
+	 *
+	 * @since 0.31.0
+	 *
+	 * @return bool True if running in a pre-authenticated context.
+	 */
+	public static function is_authenticated_context(): bool {
+		return self::$authenticated_context;
+	}
+
+	/**
+	 * Set agent execution context.
+	 *
+	 * Called by AgentAuthMiddleware after resolving a bearer token.
+	 * Sets the acting agent identity and optional capability restrictions.
+	 *
+	 * @since 0.47.0
+	 *
+	 * @param int        $agent_id     Agent ID.
+	 * @param int        $owner_id     Agent owner's WordPress user ID.
+	 * @param array|null $capabilities Token capability restrictions (null = unrestricted).
+	 * @param int|null   $token_id     Token ID for login-level runtime scoping.
+	 */
+	public static function set_agent_context( int $agent_id, int $owner_id, ?array $capabilities = null, ?int $token_id = null ): void {
+		$scope = AgentTokens::normalize_capability_payload( $capabilities );
+
+		self::$acting_agent_id     = $agent_id;
+		self::$acting_token_id     = $token_id;
+		self::$agent_owner_id      = $owner_id;
+		self::$agent_token_scope   = $scope['stored_payload'];
+		self::$capability_ceiling  = new \WP_Agent_Capability_Ceiling(
+			$owner_id,
+			$scope['allowed_capabilities'],
+			array(
+				'agent_id' => $agent_id,
+				'token_id' => $token_id,
+				'scope'    => $scope['stored_payload'],
+			)
+		);
+		self::$execution_principal = null !== $token_id
+			? WP_Agent_Execution_Principal::agent_token(
+				$owner_id,
+				(string) $agent_id,
+				$token_id,
+				WP_Agent_Execution_Principal::REQUEST_CONTEXT_REST,
+				array(),
+				null,
+				null,
+				self::$capability_ceiling
+			)
+			: WP_Agent_Execution_Principal::user_session(
+				$owner_id,
+				(string) $agent_id,
+				WP_Agent_Execution_Principal::REQUEST_CONTEXT_REST,
+				array(),
+				null,
+				null,
+				self::$capability_ceiling
+			);
+	}
+
+	/**
+	 * Clear agent execution context.
+	 *
+	 * @since 0.47.0
+	 */
+	public static function clear_agent_context(): void {
+		self::$acting_agent_id     = null;
+		self::$acting_token_id     = null;
+		self::$agent_owner_id      = 0;
+		self::$capability_ceiling  = null;
+		self::$agent_token_scope   = null;
+		self::$execution_principal = null;
+		self::$caller_context      = null;
+	}
+
+	/**
+	 * Set the Agents API execution principal for the current request.
+	 *
+	 * @since 0.103.15
+	 *
+	 * @param WP_Agent_Execution_Principal $principal Execution principal.
+	 */
+	public static function set_execution_principal( WP_Agent_Execution_Principal $principal ): void {
+		self::$execution_principal = $principal;
+		if ( property_exists( $principal, 'capability_ceiling' ) && $principal->capability_ceiling instanceof \WP_Agent_Capability_Ceiling ) {
+			self::$capability_ceiling = $principal->capability_ceiling;
+		}
+	}
+
+	/**
+	 * Get the current Agents API execution principal, if one is active.
+	 *
+	 * @since 0.103.15
+	 *
+	 * @return WP_Agent_Execution_Principal|null
+	 */
+	public static function get_execution_principal(): ?WP_Agent_Execution_Principal {
+		return self::$execution_principal;
+	}
+
+	/**
+	 * Set the cross-site caller context for the current request.
+	 *
+	 * Called by {@see \DataMachine\Core\Auth\AgentAuthMiddleware} after
+	 * parsing canonical Agents API caller headers.
+	 *
+	 * @since 0.71.0
+	 *
+	 * @param \WP_Agent_Caller_Context $context
+	 */
+	public static function set_caller_context( \WP_Agent_Caller_Context $context ): void {
+		self::$caller_context = $context;
+	}
+
+	/**
+	 * Get the cross-site caller context for the current request.
+	 *
+	 * @since 0.71.0
+	 *
+	 * @return \WP_Agent_Caller_Context|null
+	 */
+	public static function get_caller_context(): ?\WP_Agent_Caller_Context {
+		return self::$caller_context;
+	}
+
+	/**
+	 * Whether the current request originated from another DM site.
+	 *
+	 * Convenience wrapper over {@see \WP_Agent_Caller_Context::is_cross_site()} that
+	 * treats the absence of a caller context as "not cross-site".
+	 *
+	 * @since 0.71.0
+	 *
+	 * @return bool
+	 */
+	public static function in_cross_site_context(): bool {
+		return null !== self::$caller_context && self::$caller_context->is_cross_site();
+	}
+
+	/**
+	 * Get the acting agent ID, if in agent context.
+	 *
+	 * @since 0.47.0
+	 *
+	 * @return int|null Agent ID or null if not in agent context.
+	 */
+	public static function get_acting_agent_id(): ?int {
+		return self::$acting_agent_id;
+	}
+
+	/**
+	 * Get the acting token ID, if in agent bearer-token context.
+	 *
+	 * This enables login/client-level routing for integrations that need to
+	 * distinguish multiple active tokens for the same agent.
+	 *
+	 * @since 0.47.1
+	 *
+	 * @return int|null Token ID or null if not in agent token context.
+	 */
+	public static function get_acting_token_id(): ?int {
+		return self::$acting_token_id;
+	}
+
+	/**
+	 * Check if currently executing in an agent context.
+	 *
+	 * @since 0.47.0
+	 *
+	 * @return bool True if a bearer token resolved to an agent.
+	 */
+	public static function in_agent_context(): bool {
+		return null !== self::$acting_agent_id;
+	}
+
+	/**
+	 * Check whether the current token scope allows a Data Machine ability.
+	 *
+	 * Raw WordPress capabilities remain enforced separately through the Agents API
+	 * capability ceiling. This method applies Data Machine's structured scope
+	 * metadata: category allow-list, explicit ability allow-list, and deny-list.
+	 *
+	 * @since 1.0.0
+	 *
+	 * @param string $ability_slug Ability slug, e.g. datamachine/get-posts.
+	 * @param string $category     Optional already-resolved ability category.
+	 * @return bool
+	 */
+	public static function can_use_ability( string $ability_slug, string $category = '' ): bool {
+		if ( '' === trim( $ability_slug ) ) {
+			return false;
+		}
+
+		if ( null === self::$acting_agent_id || null === self::$agent_token_scope ) {
+			return true;
+		}
+
+		$scope = AgentTokens::normalize_capability_payload( self::$agent_token_scope )['stored_payload'];
+		if ( null === $scope ) {
+			return true;
+		}
+
+		$deny = (array) ( $scope['ability_deny'] ?? array() );
+		if ( in_array( $ability_slug, $deny, true ) ) {
+			return false;
+		}
+
+		$allow = (array) ( $scope['ability_allow'] ?? array() );
+		if ( in_array( $ability_slug, $allow, true ) ) {
+			return true;
+		}
+
+		$categories = (array) ( $scope['ability_categories'] ?? array() );
+		if ( array() === $categories ) {
+			return true;
+		}
+
+		if ( '' === $category && class_exists( '\\WP_Abilities_Registry' ) ) {
+			$registry = \WP_Abilities_Registry::get_instance();
+			if ( method_exists( $registry, 'is_registered' ) && $registry->is_registered( $ability_slug ) ) {
+				$ability = $registry->get_registered( $ability_slug );
+				if ( is_object( $ability ) && method_exists( $ability, 'get_category' ) ) {
+					$category = (string) $ability->get_category();
+				}
+			}
+		}
+
+		return '' !== $category && in_array( $category, $categories, true );
+	}
+
+	/**
+	 * Check if an agent can perform an action.
+	 *
+	 * Enforces the capability ceiling:
+	 * 1. If token has capability restrictions, check the action is in the allowed list
+	 * 2. Check the owner's WordPress capabilities (the ceiling — agent can never exceed)
+	 *
+	 * @since 0.47.0
+	 *
+	 * @param string $action Action key.
+	 * @return bool
+	 */
+	private static function agent_can( string $action ): bool {
+		$capability = self::CAPABILITY_MAP[ $action ] ?? null;
+		if ( empty( $capability ) || self::$agent_owner_id <= 0 ) {
+			return false;
+		}
+
+		$principal = self::$execution_principal ?? WP_Agent_Execution_Principal::user_session(
+			self::$agent_owner_id,
+			(string) self::$acting_agent_id,
+			WP_Agent_Execution_Principal::REQUEST_CONTEXT_REST,
+			array(),
+			null,
+			null,
+			self::$capability_ceiling
+		);
+
+		$policy = new \WP_Agent_WordPress_Authorization_Policy(
+			null,
+			static fn( int $user_id, string $required_capability ): bool => self::user_has_capability( $user_id, $required_capability )
+		);
+
+		return $policy->can( $principal, $capability, array( 'capability_ceiling' => self::$capability_ceiling ) );
+	}
+
+	/**
+	 * Resolve user_id for scoped REST API queries.
+	 *
+	 * Determines whose data should be returned based on the request:
+	 * - If `user_id` param is present and caller is admin → use that user_id
+	 * - If caller is admin and no `user_id` param → return null (all users)
+	 * - If caller is non-admin → always return their own user_id
+	 *
+	 * @since 0.40.0
+	 *
+	 * @param \WP_REST_Request $request REST request.
+	 * @param string           $action  Action key for admin check (default: 'manage_flows').
+	 * @return int|null User ID to filter by, or null for all users (admin default).
+	 */
+	public static function resolve_scoped_user_id( \WP_REST_Request $request, string $action = 'manage_flows' ): ?int {
+		$requested_user_id = $request->get_param( 'user_id' );
+		$is_admin          = self::can( $action );
+
+		// Admin with explicit user filter → scope to that user.
+		if ( $is_admin && null !== $requested_user_id && '' !== $requested_user_id ) {
+			return (int) $requested_user_id;
+		}
+
+		// Admin with no filter → all users.
+		if ( $is_admin ) {
+			return null;
+		}
+
+		// Non-admin → always their own data.
+		return self::acting_user_id();
+	}
+
+	/**
+	 * Check if the acting user owns a resource.
+	 *
+	 * Returns true if:
+	 * - Resource has user_id 0 (single-agent mode, anyone can access)
+	 * - Resource belongs to the acting user
+	 * - Acting user is an admin (can manage any resource)
+	 *
+	 * @since 0.40.0
+	 *
+	 * @param int    $resource_user_id User ID on the resource record.
+	 * @param string $action           Action key for admin check (default: 'manage_flows').
+	 * @return bool True if the acting user can access this resource.
+	 */
+	public static function owns_resource( int $resource_user_id, string $action = 'manage_flows' ): bool {
+		// Single-agent mode resources (user_id 0) are accessible to anyone with the capability.
+		if ( 0 === $resource_user_id ) {
+			return true;
+		}
+
+		// Admins can access any resource.
+		if ( self::can( $action ) && ( self::is_authenticated_context() || current_user_can( 'manage_options' ) ) ) {
+			return true;
+		}
+
+		// Owner check.
+		return self::acting_user_id() === $resource_user_id;
+	}
+
+	/**
+	 * Resolve agent_id for scoped REST API queries.
+	 *
+	 * Determines which agent's data should be returned based on the request:
+	 * - If `agent_id` param is present and caller has access → use that agent_id
+	 * - If caller is admin and no `agent_id` param → return null (all agents)
+	 * - If caller is non-admin → resolve via ownership, then access grants
+	 *
+	 * @since 0.41.0
+	 * @since 0.57.0 Non-admin fallback checks access grants when user owns no agent.
+	 *
+	 * @param \WP_REST_Request $request REST request.
+	 * @param string           $action  Action key for admin check (default: 'manage_flows').
+	 * @return int|null Agent ID to filter by, or null for all agents (admin default).
+	 */
+	public static function resolve_scoped_agent_id( \WP_REST_Request $request, string $action = 'manage_flows' ): ?int {
+		$requested_agent    = $request->get_param( 'agent' );
+		$requested_agent_id = $request->get_param( 'agent_id' );
+		$requested_slug     = $request->get_param( 'agent_slug' );
+		$is_admin           = self::can( $action );
+
+		// Explicit agent parameter — use it if caller has access. `agent` and
+		// `agent_slug` are slug-first aliases; `agent_id` remains compatible.
+		if (
+			( null !== $requested_agent && '' !== $requested_agent )
+			|| ( null !== $requested_slug && '' !== $requested_slug )
+			|| ( null !== $requested_agent_id && '' !== $requested_agent_id )
+		) {
+			$context = array();
+			if ( null !== $requested_agent && '' !== $requested_agent ) {
+				$context['agent'] = (string) $requested_agent;
+			}
+			if ( null !== $requested_slug && '' !== $requested_slug ) {
+				$context['agent_slug'] = (string) $requested_slug;
+			}
+			if ( null !== $requested_agent_id && '' !== $requested_agent_id ) {
+				$context['agent_id'] = (int) $requested_agent_id;
+			}
+
+			try {
+				if ( isset( $context['agent'] ) ) {
+					$identity = ( new \DataMachine\Core\Agents\AgentIdentityResolver() )->resolve_agent_identity( $context['agent'] );
+					unset( $context['agent'] );
+					$context['agent_id']   = $context['agent_id'] ?? $identity->agent_id;
+					$context['agent_slug'] = $context['agent_slug'] ?? $identity->agent_slug;
+				}
+
+				$agent_id = ( new \DataMachine\Core\Agents\AgentIdentityResolver() )->resolve_agent_identity( $context )->agent_id;
+			} catch ( \InvalidArgumentException $e ) {
+				return null;
+			}
+
+			// Admins can access any agent.
+			if ( $is_admin ) {
+				return $agent_id;
+			}
+
+			// Non-admin: verify they have access to this agent.
+			if ( self::can_access_agent( $agent_id ) ) {
+				return $agent_id;
+			}
+
+			// Fallback: try user_id-based scoping via resolve_scoped_user_id.
+			return null;
+		}
+
+		// Admin with no filter → all agents.
+		if ( $is_admin ) {
+			return null;
+		}
+
+		// Non-admin with no explicit agent_id: resolve via owner_id first.
+		$user_id     = self::acting_user_id();
+		$agents_repo = new \DataMachine\Core\Database\Agents\Agents();
+		$agent       = $agents_repo->get_by_owner_id( $user_id );
+
+		if ( $agent ) {
+			return (int) $agent['agent_id'];
+		}
+
+		// Fallback: check access grants (user may have access to an agent they don't own).
+		$access_repo    = new \DataMachine\Core\Database\Agents\AgentAccess();
+		$accessible_ids = $access_repo->get_agent_ids_for_user( $user_id );
+
+		if ( ! empty( $accessible_ids ) ) {
+			return $accessible_ids[0];
+		}
+
+		// No agent found — return 0 which will match nothing (safe fallback).
+		return 0;
+	}
+
+	/**
+	 * Resolve all agent IDs the acting user can access.
+	 *
+	 * Multi-agent companion to {@see self::resolve_scoped_agent_id()}. Returns
+	 * the union of agents the user OWNS plus agents granted to them via the
+	 * access table. Admins (callers with the given $action capability) get an
+	 * empty array, which by convention means "no scoping — see everything."
+	 *
+	 * @since 0.69.2
+	 *
+	 * @param string $action Action key for admin check (default: 'manage_flows').
+	 * @return int[] Agent IDs the user can access. Empty array for admins
+	 *               (no scoping) OR for unauthenticated callers (no access).
+	 *               Use {@see self::can()} to disambiguate if needed.
+	 */
+	public static function resolve_all_accessible_agent_ids( string $action = 'manage_flows' ): array {
+		// Admins get no scoping — empty array signals "see everything."
+		if ( self::can( $action ) ) {
+			return array();
+		}
+
+		$user_id = self::acting_user_id();
+
+		if ( $user_id <= 0 ) {
+			return array();
+		}
+
+		$agents_repo = new \DataMachine\Core\Database\Agents\Agents();
+		$owned       = $agents_repo->get_all_by_owner_id( $user_id );
+		$owned_ids   = array_map( static fn( $a ) => (int) $a['agent_id'], $owned );
+
+		$access_repo    = new \DataMachine\Core\Database\Agents\AgentAccess();
+		$accessible_ids = $access_repo->get_agent_ids_for_user( $user_id );
+
+		return array_values( array_unique( array_merge( $owned_ids, array_map( 'intval', $accessible_ids ) ) ) );
+	}
+
+	/**
+	 * Check if the acting user can access an agent.
+	 *
+	 * Returns true if:
+	 * - User is an admin (manage_options or authenticated context)
+	 * - User is the agent's owner
+	 * - User has an explicit access grant via agent_access table
+	 *
+	 * @since 0.41.0
+	 *
+	 * @param int    $agent_id     Agent ID to check.
+	 * @param string $minimum_role Minimum role required (default: 'viewer').
+	 * @return bool True if the acting user can access this agent.
+	 */
+	public static function can_access_agent( int $agent_id, string $minimum_role = 'viewer' ): bool {
+		// Admins can access any agent.
+		if ( self::can( 'manage_agents' ) && ( self::is_authenticated_context() || current_user_can( 'manage_options' ) ) ) {
+			return true;
+		}
+
+		$user_id = self::acting_user_id();
+
+		if ( $user_id <= 0 ) {
+			return false;
+		}
+
+		// Check if user is the agent owner.
+		$agents_repo = new \DataMachine\Core\Database\Agents\Agents();
+		$agent       = $agents_repo->get_agent( $agent_id );
+
+		if ( $agent && (int) $agent['owner_id'] === $user_id ) {
+			return true;
+		}
+
+		// Check explicit access grants.
+		$access_repo = new \DataMachine\Core\Database\Agents\AgentAccess();
+		$grant       = $access_repo->get_access( (string) $agent_id, $user_id );
+		$can_access  = $grant instanceof \WP_Agent_Access_Grant && $grant->role_meets( $minimum_role );
+
+		/**
+		 * Filter whether a user can access an agent.
+		 *
+		 * Allows plugins to grant or deny agent access based on custom logic
+		 * (e.g. team membership, organization roles, subscription status).
+		 * Returning true from this filter overrides the default access check.
+		 *
+		 * @since 0.62.0
+		 *
+		 * @param bool   $can_access   Whether the user can access the agent.
+		 * @param int    $agent_id     Agent ID.
+		 * @param int    $user_id      User ID.
+		 * @param string $minimum_role Minimum role required.
+		 */
+		return apply_filters( 'datamachine_can_access_agent', $can_access, $agent_id, $user_id, $minimum_role );
+	}
+
+	/**
+	 * Check if the acting user owns a resource scoped by agent_id.
+	 *
+	 * Returns true if:
+	 * - Resource has agent_id NULL (single-agent mode, anyone can access)
+	 * - User can access the resource's agent
+	 * - Fallback to user_id-based ownership check
+	 *
+	 * @since 0.41.0
+	 *
+	 * @param int|null $resource_agent_id Agent ID on the resource record (null = unscoped).
+	 * @param int      $resource_user_id  User ID on the resource record.
+	 * @param string   $action            Action key for admin check (default: 'manage_flows').
+	 * @return bool True if the acting user can access this resource.
+	 */
+	public static function owns_agent_resource( ?int $resource_agent_id, int $resource_user_id, string $action = 'manage_flows' ): bool {
+		// Unscoped resources (agent_id NULL) — fall back to user_id check.
+		if ( null === $resource_agent_id ) {
+			return self::owns_resource( $resource_user_id, $action );
+		}
+
+		// Agent-scoped — check agent access.
+		return self::can_access_agent( $resource_agent_id );
+	}
+
+	/**
+	 * Check capability for a specific user against Data Machine action.
+	 *
+	 * @since 0.37.0
+	 *
+	 * @param int    $user_id User ID.
+	 * @param string $action  Action key.
+	 * @return bool
+	 */
+	private static function user_can( int $user_id, string $action ): bool {
+		$mapped_capability = self::CAPABILITY_MAP[ $action ] ?? null;
+
+		if ( empty( $mapped_capability ) ) {
+			return false;
+		}
+
+		return self::user_has_capability( $user_id, $mapped_capability );
+	}
+
+	/**
+	 * Check a concrete WordPress capability for a user under Data Machine policy.
+	 *
+	 * Administrators retain Data Machine admin behavior through manage_options;
+	 * named Data Machine caps remain the narrower operator/viewer surface.
+	 *
+	 * @since 0.103.15
+	 *
+	 * @param int    $user_id    User ID.
+	 * @param string $capability WordPress capability.
+	 * @return bool
+	 */
+	private static function user_has_capability( int $user_id, string $capability ): bool {
+		return user_can( $user_id, $capability ) || user_can( $user_id, 'manage_options' );
+	}
+}
