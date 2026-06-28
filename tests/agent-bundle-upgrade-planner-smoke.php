@@ -462,7 +462,7 @@ $staged = AgentBundleUpgradePendingAction::stage(
 	)
 );
 assert_upgrade_plan( 'pending action staged', true === ( $staged['staged'] ?? false ) );
-$staged_pending = $staged['payload']['pending_action'] ?? $staged;
+$staged_pending = $staged['payload'] ?? $staged;
 assert_upgrade_plan_equals( 'pending action kind is bundle_upgrade', 'bundle_upgrade', $staged_pending['kind'] ?? null );
 assert_upgrade_plan_equals( 'preview carries approval count', 1, $staged_pending['preview']['counts']['needs_approval'] ?? null );
 

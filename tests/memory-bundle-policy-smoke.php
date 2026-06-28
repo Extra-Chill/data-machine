@@ -403,7 +403,7 @@ $staged = SelfMemoryWritePolicy::execute(
 );
 memory_policy_assert( true === $staged['staged'], 'bundle-owned overwrite is staged instead of applied' );
 memory_policy_assert( ! str_contains( $store->files[ $scope_key ], 'super-secret-value' ), 'staged overwrite does not mutate memory immediately' );
-$staged_preview = $staged['payload']['pending_action']['preview'] ?? array();
+$staged_preview = $staged['payload']['preview'] ?? array();
 memory_policy_assert( str_contains( $staged_preview['diff'] ?? '', '[redacted]' ), 'preview diff redacts secret-like values' );
 memory_policy_assert( ! str_contains( $staged_preview['diff'] ?? '', 'super-secret-value' ), 'preview diff does not expose secret-like value' );
 
