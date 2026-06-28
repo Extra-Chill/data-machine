@@ -17,9 +17,11 @@ namespace DataMachine\Engine\AI;
 use AgentsAPI\AI\WP_Agent_Conversation_Completion_Policy;
 use AgentsAPI\AI\WP_Agent_Conversation_Loop;
 use AgentsAPI\AI\WP_Agent_Conversation_Result;
+use AgentsAPI\AI\WP_Agent_Default_Provider_Turn_Adapter;
 use AgentsAPI\AI\WP_Agent_Transcript_Persister;
 use AgentsAPI\AI\WP_Agent_Message;
 use AgentsAPI\AI\WP_Agent_Null_Transcript_Persister;
+use AgentsAPI\AI\WP_Agent_Provider_Turn_Request;
 use AgentsAPI\AI\WP_Agent_Provider_Turn_Result;
 use AgentsAPI\AI\WP_Agent_Runtime_Tool_Request;
 use AgentsAPI\AI\WP_Agent_Runtime_Tool_Request_Store;
@@ -858,27 +860,26 @@ function datamachine_enrich_mediated_tool_results( array $tool_results, array $t
 }
 
 /**
- * Dispatch one DM provider turn and normalize the wp-ai-client result.
+ * Dispatch one DM provider turn through the Agents API default adapter.
  *
- * Owns the genuinely DM-specific half of a provider turn:
- *  - DM prompt assembly + authenticated dispatch via RequestBuilder::build()
- *    (per-provider API-key auth, transport timeouts, response caching,
- *    model-config, multimodal/vision parts, oversized-request guarding).
- *  - provider-safe tool-name aliasing of the extracted tool calls.
- *  - per-turn token-usage and finish-reason capture.
+ * agents-api#370 shipped WP_Agent_Default_Provider_Turn_Adapter and agents-api#371
+ * (PR #373) added its dispatch-provider seam, so DM now delegates the GENERIC
+ * half of a provider turn to the substrate and keeps only the DM-specific half:
  *
- * #2803 / agents-api#370: the upstream WP_Agent_Default_Provider_Turn_Adapter
- * now owns the GENERIC half of this work (message→builder mapping, dispatch via
- * wp_ai_client_prompt(), tool-call extraction, usage/result normalization), and
- * exposes a prompt-input seam (set_prompt_input_provider) for consumer prompt
- * assembly. DM cannot adopt that adapter's run_turn() yet: it dispatches through
- * a BARE wp_ai_client_prompt() builder with no seam for DM's authenticated,
- * transport-tuned, cached, model-config-aware, vision-capable dispatch, so
- * routing DM through it would drop provider auth and break parity. That gap is
- * tracked in agents-api#371. When that seam lands, this helper is the single
- * swap point: construct the default adapter, inject DM prompt assembly through
- * set_prompt_input_provider, and inject DM dispatch through the new dispatch
- * seam — leaving aliasing/events/nudges in the caller untouched.
+ *  - GENERIC (owned by the default adapter): map the request into builder inputs,
+ *    run the turn, then extract tool calls, assistant text, and token usage via
+ *    the now-public WP_Agent_Provider_Turn_Result::{extract_tool_calls, result_text,
+ *    result_usage} and assemble the normalized { content, tool_calls, usage,
+ *    request_metadata } result. DM no longer re-implements any of this.
+ *  - DM-SPECIFIC dispatch (injected via set_dispatch_provider): RequestBuilder::build()
+ *    performs directive-ordered prompt assembly AND authenticated wp-ai-client
+ *    dispatch (per-provider API-key auth, transport timeouts, response caching,
+ *    model-config, multimodal/vision parts, oversized-request guarding). It returns
+ *    the wp-ai-client GenerativeAiResult; the adapter owns the tail from there.
+ *  - DM-SPECIFIC enrichments re-applied on the adapter's normalized output:
+ *    provider-safe tool-name aliasing of the extracted tool calls, DM's full
+ *    request metadata (the adapter only surfaces provider_id/model_id), and the
+ *    response finish reason.
  *
  * @param array  $messages         Messages for this turn.
  * @param array  $tools            Available tools keyed by name.
@@ -905,58 +906,80 @@ function datamachine_dispatch_provider_turn(
 	array $loop_payload,
 	DataMachineProviderTurnState $turn_state
 ): array {
-	// Build and dispatch the AI request through DM's centralized RequestBuilder.
-	// RequestBuilder owns directive-ordered prompt assembly (PromptBuilder) AND
-	// authenticated wp-ai-client dispatch; the two are fused today, which is why
-	// the agents-api#370 prompt-input seam alone cannot replace this path.
-	// RequestBuilder populates $request_metadata even on failure, so capture it
-	// into turn state before any throw to preserve failure-path diagnostics.
+	// DM's full request metadata + the raw wp-ai-client result, captured out of
+	// RequestBuilder::build() (by ref) inside the dispatch provider so they
+	// survive back here for enrichment. The adapter's own request_metadata only
+	// carries provider_id/model_id, and the finish reason is read off the raw
+	// result DM produced.
 	$request_metadata = array();
-	$ai_response      = RequestBuilder::build(
+	$ai_result        = null;
+
+	// Inject DM's authenticated dispatch into the substrate's default adapter.
+	// The adapter owns the generic mapping and the generic tail (extract/text/
+	// usage/normalize); the dispatch provider owns only request construction and
+	// dispatch, returning a wp-ai-client GenerativeAiResult. RequestBuilder
+	// populates $request_metadata even on failure, so capture it before any throw
+	// to preserve failure-path diagnostics.
+	$dispatch_provider = static function ( array $payload ) use (
 		$messages,
+		$tools,
 		$provider,
 		$model,
-		$tools,
 		$modes,
 		$loop_payload,
-		$request_metadata
-	);
+		$turn_state,
+		&$request_metadata,
+		&$ai_result
+	) {
+		unset( $payload ); // DM builds its own authenticated request from the loop inputs.
 
-	$turn_state->last_request_metadata = $request_metadata;
+		$response                          = RequestBuilder::build(
+			$messages,
+			$provider,
+			$model,
+			$tools,
+			$modes,
+			$loop_payload,
+			$request_metadata
+		);
+		$turn_state->last_request_metadata = $request_metadata;
 
-	// Handle AI request failure — throw so the upstream loop catches and the
-	// caller reconstructs a best-effort error result from the last turn state.
-	if ( $ai_response instanceof \WP_Error ) {
-		// phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- Exception message is caught by upstream loop and returned as structured array, never rendered as HTML.
-		throw new \RuntimeException( $ai_response->get_error_message() );
-	}
+		// Keep the raw result for DM's finish-reason read after the adapter tail.
+		if ( ! ( $response instanceof \WP_Error ) ) {
+			$ai_result = $response;
+		}
 
-	/** @var \WordPress\AiClient\Results\DTO\GenerativeAiResult $ai_result */
-	$ai_result = $ai_response;
+		// Returning the WP_Error lets the adapter throw the RuntimeException the
+		// upstream loop catches (identical to the bare-builder failure path).
+		return $response;
+	};
 
-	// Provider-safe tool-name aliasing: map provider-emitted names back to DM's
-	// logical tool names. Generic extraction is delegated to Agents API; the
-	// alias map is DM-specific request metadata and stays here.
+	$adapter = new WP_Agent_Default_Provider_Turn_Adapter( $provider, $model );
+	$adapter->set_dispatch_provider( $dispatch_provider );
+
+	// run_turn() resolves provider/model from the request first, so pass an empty
+	// model map and let it fall back to the constructor provider/model above.
+	$request = new WP_Agent_Provider_Turn_Request( $messages, $tools );
+
+	// The adapter owns extract/text/usage/normalize; it returns
+	// { content, tool_calls, usage, request_metadata{provider_id,model_id} }.
+	$result = $adapter->run_turn( $request );
+
+	// Re-apply the two DM-specific enrichments the generic tail does not cover:
+	// provider-safe tool-name aliasing and DM's full request metadata.
 	$tool_calls = datamachine_apply_provider_tool_name_aliases(
-		datamachine_extract_tool_calls( $ai_result ),
+		is_array( $result['tool_calls'] ?? null ) ? $result['tool_calls'] : array(),
 		$request_metadata
 	);
-	$ai_content = RequestBuilder::resultText( $ai_result );
+	$ai_content = is_string( $result['content'] ?? null ) ? $result['content'] : '';
+	$turn_usage = is_array( $result['usage'] ?? null ) ? $result['usage'] : array();
 
-	// Snapshot the metadata as returned by RequestBuilder (before the finish
+	// Snapshot DM's metadata as returned by RequestBuilder (before the finish
 	// reason is appended) so the `request_built` event payload matches the
 	// legacy behavior, which emitted the event prior to enrichment.
 	$request_metadata_pre_finish = $request_metadata;
 
-	// Per-turn token usage. The substrate accumulates this across turns and
-	// exposes the running total on the final loop result.
-	$token_usage   = $ai_result->getTokenUsage();
-	$turn_usage    = array(
-		'prompt_tokens'     => $token_usage->getPromptTokens(),
-		'completion_tokens' => $token_usage->getCompletionTokens(),
-		'total_tokens'      => $token_usage->getTotalTokens(),
-	);
-	$finish_reason = datamachine_ai_result_finish_reason( $ai_result );
+	$finish_reason = null !== $ai_result ? datamachine_ai_result_finish_reason( $ai_result ) : null;
 	if ( null !== $finish_reason ) {
 		$request_metadata['response']['finish_reason'] = $finish_reason;
 		// Mirror the legacy behavior of re-capturing metadata once the finish
@@ -2377,16 +2400,6 @@ function datamachine_completion_nudge_diagnostic( array $decision_context, int $
 		'completion_assertions_satisfied' => is_array( $decision_context['satisfied'] ?? null ) ? $decision_context['satisfied'] : array(),
 		'completion_nudge_turn'           => $turn_count,
 	);
-}
-
-/**
- * Extract tool calls from a wp-ai-client GenerativeAiResult.
- *
- * @param \WordPress\AiClient\Results\DTO\GenerativeAiResult $result wp-ai-client result.
- * @return array<int, array{name:string,parameters:array,id:mixed}>
- */
-function datamachine_extract_tool_calls( $result ): array {
-	return \AgentsAPI\AI\WP_Agent_Provider_Turn_Result::extract_tool_calls( $result );
 }
 
 /**
