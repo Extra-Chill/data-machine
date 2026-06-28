@@ -19,6 +19,13 @@ if ( ! defined( 'DATAMACHINE_PENDING_ACTION_TRANSIENT_FALLBACK' ) ) {
 	define( 'DATAMACHINE_PENDING_ACTION_TRANSIENT_FALLBACK', true );
 }
 
+// The host-smoke backend runs under WordPress Playground (PHP WASM), which does
+// not define the STDERR stream constant. Define it so the assert helper can
+// report failures instead of crashing on an undefined constant.
+if ( ! defined( 'STDERR' ) ) {
+	define( 'STDERR', fopen( 'php://stderr', 'w' ) );
+}
+
 $GLOBALS['datamachine_memory_policy_filters']    = array();
 $GLOBALS['datamachine_memory_policy_actions']    = array();
 $GLOBALS['datamachine_memory_policy_transients'] = array();

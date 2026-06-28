@@ -111,6 +111,10 @@ $result = PendingActionHelper::stage(
 			'diff' => '- old' . "\n" . '+ new',
 		),
 		'agent_id'     => 456,
+		// Pass user_id explicitly so creator is deterministic regardless of the
+		// runtime. The pure-PHP stub returns 123, but real WP (host-smoke
+		// backend) overrides get_current_user_id() with the unauthenticated 0.
+		'user_id'      => 123,
 		'context'      => array(
 			'tool_name'  => 'wiki_upsert',
 			'session_id' => 'session_123',

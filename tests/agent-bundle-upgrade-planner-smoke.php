@@ -462,6 +462,12 @@ if ( is_object( $wpdb ) && method_exists( $wpdb, 'get_charset_collate' ) && file
 	\DataMachine\Engine\AI\Actions\PendingActionStore::create_table();
 }
 
+// Register the canonical store + resolver adapters so resolution dispatches
+// through the generic agents/resolve-pending-action surface. In a fully booted
+// plugin these are wired at bootstrap; the standalone smoke wires them itself.
+add_filter( 'wp_agent_pending_action_store', static fn() => \DataMachine\Engine\AI\Actions\PendingActionStore::adapter() );
+add_filter( 'wp_agent_pending_action_resolver', static fn() => ResolvePendingActionAbility::adapter() );
+
 $staged = AgentBundleUpgradePendingAction::stage(
 	$plan,
 	array(
@@ -469,6 +475,10 @@ $staged = AgentBundleUpgradePendingAction::stage(
 		'bundle'             => array( 'bundle_slug' => 'woocommerce-brain', 'target_version' => '1.1.0' ),
 		'target_artifacts'   => $target_artifacts,
 		'approved_artifacts' => array( 'pipeline:collector' ),
+		// Stage as the resolving user so the action's creator matches the
+		// resolution scope (pure-PHP stub returns 1; real WP returns the current
+		// user). Without this the resolver denies on owner mismatch.
+		'user_id'            => get_current_user_id(),
 	)
 );
 assert_upgrade_plan( 'pending action staged', true === ( $staged['staged'] ?? false ) );
