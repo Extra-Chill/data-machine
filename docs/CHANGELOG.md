@@ -2,6 +2,14 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.156.2] - 2026-06-28
+
+### Changed
+- route DM provider turn through default adapter dispatch seam
+
+### Fixed
+- make direct/system tasks retryable through JobRetryPolicy
+
 ## [0.156.1] - 2026-06-28
 
 ### Changed
