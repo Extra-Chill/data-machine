@@ -2,6 +2,14 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.157.1] - 2026-06-28
+
+### Changed
+- extract conversation-result normalizer with named status constants (#2803 slice 2)
+
+### Fixed
+- scrub Extra Chill domain literal from external command error string
+
 ## [0.157.0] - 2026-06-28
 
 ### Added
