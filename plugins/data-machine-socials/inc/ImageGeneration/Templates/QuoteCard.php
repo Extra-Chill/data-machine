@@ -41,16 +41,88 @@ class QuoteCard implements TemplateInterface {
 	);
 
 	/**
-	 * Color palette — Extra Chill brand.
+	 * Neutral default color palette.
+	 *
+	 * Generic, brand-agnostic dark theme. Deploying sites override the palette
+	 * (including their own brand accent) via the `dm_socials_quote_card_palette`
+	 * filter — see get_palette().
 	 */
-	private const COLORS = array(
+	private const DEFAULT_COLORS = array(
 		'background'  => array( 26, 26, 26 ),      // #1a1a1a — dark.
 		'quote_text'  => array( 245, 245, 245 ),    // #f5f5f5 — near-white.
 		'attribution' => array( 176, 176, 176 ),    // #b0b0b0 — muted.
-		'accent'      => array( 83, 148, 11 ),      // #53940b — EC green.
-		'quote_mark'  => array( 83, 148, 11 ),      // #53940b — EC green.
+		'accent'      => array( 160, 160, 160 ),    // #a0a0a0 — neutral grey.
+		'quote_mark'  => array( 160, 160, 160 ),    // #a0a0a0 — neutral grey.
 		'branding'    => array( 120, 120, 120 ),    // #787878 — subtle.
 	);
+
+	/**
+	 * Neutral default header font filename.
+	 *
+	 * Resolved by GDRenderer against the active theme's assets/fonts/ directory
+	 * (with a system fallback). Sites that want a distinct brand display font
+	 * override this via the `dm_socials_quote_card_header_font` filter.
+	 */
+	private const DEFAULT_HEADER_FONT = 'helvetica.ttf';
+
+	/**
+	 * Resolve the color palette.
+	 *
+	 * Generic substrate ships a neutral dark palette. Deploying sites register
+	 * their own brand palette (accent color, etc.) by filtering the default.
+	 * Returned array is merged over the default so partial overrides are safe.
+	 *
+	 * @return array Palette keyed by region => array( r, g, b ).
+	 */
+	private function get_palette(): array {
+		/**
+		 * Filters the quote-card color palette.
+		 *
+		 * @param array $palette Palette keyed by region => array( r, g, b ).
+		 */
+		$palette = apply_filters( 'dm_socials_quote_card_palette', self::DEFAULT_COLORS );
+
+		return array_merge( self::DEFAULT_COLORS, is_array( $palette ) ? $palette : array() );
+	}
+
+	/**
+	 * Resolve the header (display) font filename.
+	 *
+	 * @return string Font filename resolved by GDRenderer against the theme.
+	 */
+	private function get_header_font(): string {
+		/**
+		 * Filters the quote-card header font filename.
+		 *
+		 * @param string $font Font filename (resolved against the theme fonts dir).
+		 */
+		$font = apply_filters( 'dm_socials_quote_card_header_font', self::DEFAULT_HEADER_FONT );
+
+		return is_string( $font ) && '' !== $font ? $font : self::DEFAULT_HEADER_FONT;
+	}
+
+	/**
+	 * Resolve the default branding text.
+	 *
+	 * Generic substrate derives branding from the running site, never a
+	 * hardcoded host. Deploying sites can override via the
+	 * `dm_socials_quote_card_branding` filter.
+	 *
+	 * @return string Branding text stamped onto the card.
+	 */
+	private function get_default_branding(): string {
+		$host    = wp_parse_url( home_url(), PHP_URL_HOST );
+		$default = is_string( $host ) && '' !== $host ? $host : (string) get_bloginfo( 'name' );
+
+		/**
+		 * Filters the default quote-card branding text.
+		 *
+		 * @param string $default Site-derived branding text.
+		 */
+		$branding = apply_filters( 'dm_socials_quote_card_branding', $default );
+
+		return is_string( $branding ) ? $branding : $default;
+	}
 
 	public function get_id(): string {
 		return 'quote_card';
@@ -61,7 +133,7 @@ class QuoteCard implements TemplateInterface {
 	}
 
 	public function get_description(): string {
-		return 'Instagram-friendly quote graphic from interview content. Renders quote text with attribution and Extra Chill branding.';
+		return 'Instagram-friendly quote graphic from interview content. Renders quote text with attribution and site branding.';
 	}
 
 	public function get_fields(): array {
@@ -118,7 +190,7 @@ class QuoteCard implements TemplateInterface {
 			);
 		}
 
-		$branding = $data['branding'] ?? 'extrachill.com';
+		$branding = $data['branding'] ?? $this->get_default_branding();
 		$preset   = $options['preset'] ?? $this->get_default_preset();
 		$format   = $options['format'] ?? 'png';
 		$context  = $options['context'] ?? array();
@@ -161,7 +233,7 @@ class QuoteCard implements TemplateInterface {
 	 * @param string     $quote_text   The quote.
 	 * @param string     $attribution  Who said it.
 	 * @param string     $source_title Interview/article title.
-	 * @param string     $branding     Branding text (e.g. extrachill.com).
+	 * @param string     $branding     Branding text (e.g. the site host).
 	 * @param string     $preset       Platform preset name.
 	 * @param string     $format       Output format (png/jpeg).
 	 * @param array      $context      Storage context for repository.
@@ -187,16 +259,19 @@ class QuoteCard implements TemplateInterface {
 		}
 
 		// Register fonts.
-		$renderer->register_font( 'header', 'WilcoLoftSans-Treble.ttf' );
+		$renderer->register_font( 'header', $this->get_header_font() );
 		$renderer->register_font( 'body', 'helvetica.ttf' );
 
+		// Resolve palette (neutral default, brand override via filter).
+		$colors = $this->get_palette();
+
 		// Allocate colors.
-		$bg_color          = $renderer->color_rgb( 'background', self::COLORS['background'] );
-		$quote_text_color  = $renderer->color_rgb( 'quote_text', self::COLORS['quote_text'] );
-		$attribution_color = $renderer->color_rgb( 'attribution', self::COLORS['attribution'] );
-		$accent_color      = $renderer->color_rgb( 'accent', self::COLORS['accent'] );
-		$quote_mark_color  = $renderer->color_rgb( 'quote_mark', self::COLORS['quote_mark'] );
-		$branding_color    = $renderer->color_rgb( 'branding', self::COLORS['branding'] );
+		$bg_color          = $renderer->color_rgb( 'background', $colors['background'] );
+		$quote_text_color  = $renderer->color_rgb( 'quote_text', $colors['quote_text'] );
+		$attribution_color = $renderer->color_rgb( 'attribution', $colors['attribution'] );
+		$accent_color      = $renderer->color_rgb( 'accent', $colors['accent'] );
+		$quote_mark_color  = $renderer->color_rgb( 'quote_mark', $colors['quote_mark'] );
+		$branding_color    = $renderer->color_rgb( 'branding', $colors['branding'] );
 
 		// Fill background.
 		$renderer->fill( $bg_color );
