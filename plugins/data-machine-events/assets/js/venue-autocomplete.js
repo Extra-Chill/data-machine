@@ -13,7 +13,10 @@
 
     // Nominatim API configuration
     const NOMINATIM_API = 'https://nominatim.openstreetmap.org/search';
-    const USER_AGENT = 'ExtraChill-Events/1.0 (https://extrachill.com)';
+    // User-Agent is localized from PHP off the deploying site host so a
+    // generic distributable plugin never announces one specific site to OSM.
+    const CONFIG = window.dmEventsVenueAutocomplete || {};
+    const USER_AGENT = CONFIG.userAgent || 'DataMachineEvents/1.0';
     const DEBOUNCE_DELAY = 1000; // 1 second (Nominatim usage policy)
     const CACHE_KEY = 'data_machine_events_venue_autocomplete_cache';
     const CACHE_EXPIRY = 3600000; // 1 hour in milliseconds

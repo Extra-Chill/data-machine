@@ -43,6 +43,16 @@ add_action(
 			true
 		);
 
+		// Localize the outbound Nominatim User-Agent off the deploying site host
+		// so the client never announces one hard-coded site to OSM.
+		wp_localize_script(
+			'data-machine-events-venue-autocomplete',
+			'dmEventsVenueAutocomplete',
+			array(
+				'userAgent' => \DataMachineEvents\Core\NominatimClient::userAgent(),
+			)
+		);
+
 		// Enqueue venue selector JavaScript
 		wp_enqueue_script(
 			'data-machine-events-venue-selector',

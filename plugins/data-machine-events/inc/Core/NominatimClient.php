@@ -44,12 +44,31 @@ if ( ! defined( 'ABSPATH' ) ) {
 class NominatimClient {
 
 	/**
-	 * Single canonical user-agent for every Nominatim request from this plugin.
+	 * Build the canonical user-agent for every Nominatim request from this
+	 * plugin.
 	 *
-	 * Matches the value previously hard-coded across three call sites; do not
-	 * change without coordinating with OSM usage policy.
+	 * OSM's usage policy requires a real contact URL for the *deploying* site,
+	 * so the default is derived from the install's own host (`home_url()`),
+	 * never a hard-coded one. Operators can override the whole string via the
+	 * `dm_events_geocoding_user_agent` filter.
+	 *
+	 * @return string Outbound User-Agent header value.
 	 */
-	public const USER_AGENT = 'DataMachineEvents/1.0 (https://extrachill.com)';
+	public static function userAgent(): string {
+		$host = (string) wp_parse_url( home_url(), PHP_URL_HOST );
+		if ( '' === $host ) {
+			$host = 'localhost';
+		}
+
+		$default = sprintf( 'DataMachineEvents/1.0 (https://%s)', $host );
+
+		/**
+		 * Filter the User-Agent sent on every Nominatim/OSM geocoding request.
+		 *
+		 * @param string $default User-Agent derived from the deploying site host.
+		 */
+		return (string) apply_filters( 'dm_events_geocoding_user_agent', $default );
+	}
 
 	/**
 	 * Transient prefix for cached geocoding results.
@@ -249,7 +268,7 @@ class NominatimClient {
 			array(
 				'timeout' => self::HTTP_TIMEOUT,
 				'headers' => array(
-					'User-Agent' => self::USER_AGENT,
+					'User-Agent' => self::userAgent(),
 				),
 				'context' => $context,
 			)

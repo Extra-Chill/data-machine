@@ -147,9 +147,14 @@ class CheckDurationCommand {
 		} elseif ( $trash ) {
 			\WP_CLI::log( 'Use --trash-all to trash all flagged events, or trash individually:' );
 			\WP_CLI::log( '' );
+			$site_host = (string) wp_parse_url( home_url(), PHP_URL_HOST );
+			if ( '' === $site_host ) {
+				$site_host = 'example.com';
+			}
 			foreach ( $events as $event ) {
 				\WP_CLI::log( sprintf(
-					'  wp --allow-root --url=events.extrachill.com post update %d --post_status=trash',
+					'  wp --allow-root --url=%s post update %d --post_status=trash',
+					$site_host,
 					$event['id']
 				) );
 			}

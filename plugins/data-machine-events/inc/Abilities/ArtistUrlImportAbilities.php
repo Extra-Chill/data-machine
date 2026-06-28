@@ -741,12 +741,30 @@ class ArtistUrlImportAbilities {
 	 * @return string Raw HTML body, or '' on error.
 	 */
 	private function fetchPageHtml( string $url ): string {
+		$host = (string) wp_parse_url( home_url(), PHP_URL_HOST );
+		if ( '' === $host ) {
+			$host = 'localhost';
+		}
+
+		$default_user_agent = sprintf(
+			'Mozilla/5.0 (compatible; DataMachineEventsBot/1.0; +https://%s)',
+			$host
+		);
+
+		/**
+		 * Filter the User-Agent sent when fetching an artist's tour/events page.
+		 *
+		 * @param string $default_user_agent UA derived from the deploying site host.
+		 * @param string $url                The page URL being fetched.
+		 */
+		$user_agent = (string) apply_filters( 'dm_events_fetch_user_agent', $default_user_agent, $url );
+
 		$response = wp_safe_remote_get(
 			$url,
 			array(
 				'timeout'     => 5,
 				'redirection' => 3,
-				'user-agent'  => 'Mozilla/5.0 (compatible; ExtraChillBot/1.0; +https://extrachill.com)',
+				'user-agent'  => $user_agent,
 			)
 		);
 
@@ -1041,9 +1059,20 @@ class ArtistUrlImportAbilities {
 				// site settings at runtime; baking a literal here silently
 				// overrides the operator's configured model on every
 				// approved artist pipeline.
+				/**
+				 * Filter the events feed name written into the AI step prompt.
+				 *
+				 * Defaults to the deploying site's name; a generic distributable
+				 * plugin must not bake one site's brand into runtime AI behavior.
+				 *
+				 * @param string $feed_name Default feed name (site name).
+				 */
+				$feed_name = (string) apply_filters( 'dm_events_feed_name', get_bloginfo( 'name' ) );
+
 				$step['system_prompt'] = sprintf(
-					'You process events from %1$s\'s tour/events page for the Extra Chill events feed. The artist is %1$s and is already pre-selected — do not change the artist binding. Identify the venue, city/location, and festival (if any) for each event based on the available information. Skip WordPress categories and post tags entirely.',
-					$artist_name
+					'You process events from %1$s\'s tour/events page for the %2$s events feed. The artist is %1$s and is already pre-selected — do not change the artist binding. Identify the venue, city/location, and festival (if any) for each event based on the available information. Skip WordPress categories and post tags entirely.',
+					$artist_name,
+					$feed_name
 				);
 				$step['enabled_tools'] = array();
 			}

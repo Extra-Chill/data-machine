@@ -19,13 +19,6 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 class Venue_Taxonomy {
 
-	/**
-	 * @deprecated 0.40.0 Use NominatimClient::USER_AGENT. Retained as a
-	 *             private alias because removing the constant entirely
-	 *             would break any reflective consumer.
-	 */
-	private const NOMINATIM_USER_AGENT = NominatimClient::USER_AGENT;
-
 	public static $meta_fields = array(
 		'address'     => '_venue_address',
 		'city'        => '_venue_city',
@@ -1039,6 +1032,16 @@ class Venue_Taxonomy {
 			array(),
 			filemtime( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'assets/js/venue-autocomplete.js' ),
 			true
+		);
+
+		// Localize the outbound Nominatim User-Agent off the deploying site host
+		// so the client never announces one hard-coded site to OSM.
+		wp_localize_script(
+			'data-machine-events-venue-autocomplete',
+			'dmEventsVenueAutocomplete',
+			array(
+				'userAgent' => NominatimClient::userAgent(),
+			)
 		);
 
 		wp_enqueue_style(
