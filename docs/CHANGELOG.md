@@ -2,6 +2,14 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.157.0] - 2026-06-28
+
+### Added
+- resume multi-step ephemeral workflows from first incomplete step
+
+### Changed
+- Conform Data Machine to the canonical flat approval envelope
+
 ## [0.156.2] - 2026-06-28
 
 ### Changed
