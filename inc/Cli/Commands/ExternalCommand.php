@@ -205,7 +205,7 @@ class ExternalCommand extends BaseCommand {
 		$key = $args[0] ?? '';
 
 		if ( empty( $key ) ) {
-			WP_CLI::error( 'Connection key is required (e.g., "extrachill.com/sarai").' );
+			WP_CLI::error( 'Connection key is required (e.g., "example.com/agent-slug").' );
 			return;
 		}
 
