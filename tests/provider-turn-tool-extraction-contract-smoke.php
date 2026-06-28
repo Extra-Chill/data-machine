@@ -27,8 +27,20 @@ $assert = static function ( bool $condition, string $message ) use ( &$failures,
 
 $assert( false !== $loop_source, 'conversation loop source is readable' );
 $assert(
-	false !== strpos( (string) $loop_source, 'WP_Agent_Provider_Turn_Result::extract_tool_calls( $result )' ),
-	'Data Machine delegates provider-turn tool extraction to Agents API'
+	false !== strpos( (string) $loop_source, 'new WP_Agent_Default_Provider_Turn_Adapter(' ),
+	'Data Machine routes the provider turn through the Agents API default adapter'
+);
+$assert(
+	false !== strpos( (string) $loop_source, '$adapter->set_dispatch_provider(' ),
+	'Data Machine injects its authenticated dispatch through the adapter dispatch seam'
+);
+$assert(
+	false !== strpos( (string) $loop_source, '$adapter->run_turn(' ),
+	'Data Machine delegates provider-turn extraction/text/usage normalization to the adapter run_turn() tail'
+);
+$assert(
+	false === strpos( (string) $loop_source, 'function datamachine_extract_tool_calls(' ),
+	'Data Machine no longer wraps Agents API tool extraction with its own helper'
 );
 $assert(
 	false === strpos( (string) $loop_source, 'class_exists( \'\\AgentsAPI\\AI\\WP_Agent_Provider_Turn_Result\'' ),

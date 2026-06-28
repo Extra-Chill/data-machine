@@ -793,13 +793,13 @@
             "version": "dev-main",
             "source": {
                 "type": "git",
-                "url": "https://github.com/Automattic/agents-api.git",
-                "reference": "7be8fc3e2c6736c553d61c0578f295b4fe565cf1"
+                "url": "https://github.com/Automattic/agents-api",
+                "reference": "ab9686c1e854bda3aea46657454c06aaaf820bd3"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/Automattic/agents-api/zipball/7be8fc3e2c6736c553d61c0578f295b4fe565cf1",
-                "reference": "7be8fc3e2c6736c553d61c0578f295b4fe565cf1",
+                "url": "https://api.github.com/repos/Automattic/agents-api/zipball/ab9686c1e854bda3aea46657454c06aaaf820bd3",
+                "reference": "ab9686c1e854bda3aea46657454c06aaaf820bd3",
                 "shasum": ""
             },
             "require": {
@@ -846,6 +846,7 @@
                     "php tests/tool-policy-contracts-smoke.php",
                     "php tests/tool-source-registry-smoke.php",
                     "php tests/runtime-tool-policy-smoke.php",
+                    "php tests/runtime-tool-lifecycle-abilities-smoke.php",
                     "php tests/tool-tier-resolver-smoke.php",
                     "php tests/action-policy-resolver-smoke.php",
                     "php tests/ability-meta-abilities-smoke.php",
@@ -877,19 +878,29 @@
                     "php tests/context-registry-smoke.php",
                     "php tests/conversation-loop-smoke.php",
                     "php tests/provider-turn-adapter-smoke.php",
+                    "php tests/default-provider-turn-adapter-smoke.php",
+                    "php tests/ability-tool-executor-smoke.php",
+                    "php tests/tool-mediation-runner-smoke.php",
                     "php tests/conversation-loop-tool-execution-smoke.php",
                     "php tests/conversation-loop-completion-policy-smoke.php",
                     "php tests/conversation-loop-transcript-persister-smoke.php",
                     "php tests/conversation-loop-events-smoke.php",
                     "php tests/tool-declaration-rejection-smoke.php",
                     "php tests/conversation-loop-interrupt-source-smoke.php",
+                    "php tests/run-outcome-status-smoke.php",
+                    "php tests/run-result-envelope-smoke.php",
                     "php tests/iteration-budget-smoke.php",
                     "php tests/conversation-loop-budgets-smoke.php",
+                    "php tests/runtime-package-run-contract-smoke.php",
+                    "php tests/run-control-normalization-smoke.php",
+                    "php tests/canonical-run-lifecycle-smoke.php",
                     "php tests/channels-smoke.php",
                     "php tests/chat-run-control-smoke.php",
+                    "php tests/external-chat-run-bridge-fixture-smoke.php",
                     "php tests/task-execution-smoke.php",
                     "php tests/frontend-chat-rest-smoke.php",
                     "php tests/agents-chat-jsonrpc-route-smoke.php",
+                    "php tests/response-and-input-primitives-smoke.php",
                     "php tests/agents-dispatch-message-ability-smoke.php",
                     "php tests/webhook-safety-smoke.php",
                     "php tests/remote-bridge-smoke.php",
@@ -918,7 +929,7 @@
                 "issues": "https://github.com/Automattic/agents-api/issues",
                 "source": "https://github.com/Automattic/agents-api"
             },
-            "time": "2026-06-21T22:54:32+00:00"
+            "time": "2026-06-27T22:02:33+00:00"
         }
     ],
     "packages-dev": [
@@ -1614,6 +1625,6 @@
     "platform": {
         "php": ">=8.2"
     },
-    "platform-dev": {},
-    "plugin-api-version": "2.9.0"
+    "platform-dev": [],
+    "plugin-api-version": "2.6.0"
 }
