@@ -399,6 +399,17 @@ if ( is_object( $wpdb ) && method_exists( $wpdb, 'get_charset_collate' ) && file
 	PendingActionStore::create_table();
 }
 
+// On the real-WP host-smoke backend the runner is unauthenticated, so resolution
+// authorization fails. Act as an administrator (the pure-PHP stubs simulate this
+// with current_user_can => true) so staging and resolution share an authorized
+// operator identity.
+if ( function_exists( 'wp_set_current_user' ) && function_exists( 'get_users' ) ) {
+	$smoke_admins = get_users( array( 'role' => 'administrator', 'number' => 1, 'fields' => 'ID' ) );
+	if ( ! empty( $smoke_admins ) ) {
+		wp_set_current_user( (int) $smoke_admins[0] );
+	}
+}
+
 add_filter(
 	'datamachine_memory_section_artifact',
 	static function ( $_artifact, array $context ) use ( $artifact ) {
