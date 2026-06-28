@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 Homeboy maintains this file from conventional commits at release time —
 do not edit by hand.
 
+## [0.12.0] - 2026-06-28
+
+### Added
+- repoint GSC and PageSpeed analytics routes to view_analytics cap
+
+### Changed
+- remove hardcoded Extra Chill knowledge from Analytics abilities
+
 ## [0.11.1] - 2026-06-27
 
 ### Fixed
