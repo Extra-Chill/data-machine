@@ -2,6 +2,12 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.156.1] - 2026-06-28
+
+### Changed
+- fix phpcs findings in provider-turn-adapter slice
+- stage default provider-turn adapter adoption seam in conversation loop
+
 ## [0.156.0] - 2026-06-27
 
 ### Added
