@@ -348,10 +348,40 @@ abstract class SystemTask {
 	/**
 	 * Mark a job as failed with an error message.
 	 *
+	 * Routes through the canonical `datamachine_fail_job` action so system
+	 * tasks share the same failure path as pipeline steps: JobRetryPolicy gets
+	 * a chance to reschedule transient provider/transport failures (e.g. an AI
+	 * request timeout on daily_memory_generation), structured error context is
+	 * persisted to engine_data, and the failure is logged consistently. When a
+	 * retry is scheduled the job is left pending and is NOT finalized here.
+	 *
+	 * The real error message is forwarded in $context_data so the retry
+	 * classifier can recognize timeout / rate-limit / overload signatures. Falls
+	 * back to direct finalization only if the action is somehow unavailable, so
+	 * a task never hangs un-finalized.
+	 *
 	 * @param int    $jobId   Job ID.
 	 * @param string $message Error message.
 	 */
 	protected function failJob( int $jobId, string $message ): void {
+		if ( has_action( 'datamachine_fail_job' ) ) {
+			do_action(
+				'datamachine_fail_job',
+				$jobId,
+				$message,
+				array(
+					'reason'        => $message,
+					'error_message' => $message,
+					'ai_error'      => $message,
+					'task_type'     => $this->getTaskType(),
+					'context'       => 'system',
+				)
+			);
+			return;
+		}
+
+		// Defensive fallback: finalize directly if the central handler is not
+		// registered (should not happen on a booted install).
 		$jobs_db              = new Jobs();
 		$engine_data          = $jobs_db->retrieve_engine_data( $jobId );
 		$engine_data['error'] = $message;

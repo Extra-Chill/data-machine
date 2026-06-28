@@ -62,6 +62,7 @@ $resolve_delay       = $reflection->getMethod( 'resolveDelay' );
 $classify_failure    = $reflection->getMethod( 'classifyFailure' );
 $resolve_policy      = $reflection->getMethod( 'resolvePolicy' );
 $record_poison_item  = $reflection->getMethod( 'recordPoisonItem' );
+$resolve_ephemeral   = $reflection->getMethod( 'resolveEphemeralFlowStepId' );
 
 echo "Case 1: Retry-After values are normalized\n";
 assert_retry_policy_smoke( 'numeric Retry-After is seconds', 90 === $extract_retry_after->invoke( null, array( 'retry_after' => '90' ) ) );
@@ -146,6 +147,53 @@ assert_retry_policy_smoke( 'policy records poison item isolation metadata', str_
 assert_retry_policy_smoke( 'fail handler tries retry before final failure', strpos( $fail_src, 'maybeRetry' ) < strpos( $fail_src, 'complete_job' ) );
 assert_retry_policy_smoke( 'fail handler persists structured diagnostics', str_contains( $fail_src, "'error_diagnostics'" ) && str_contains( $fail_src, "\$context_data['diagnostics']" ) );
 assert_retry_policy_smoke( 'AI failures pass retry and transport context', str_contains( $ai_src, "'retry_after'" ) && str_contains( $ai_src, "'headers'" ) && str_contains( $ai_src, "'transport_profile'" ) );
+
+echo "Case 7: Direct/system tasks resolve an ephemeral flow_step_id so they are retryable\n";
+// A direct task (e.g. daily_memory_generation) runs through a single ephemeral
+// step under engine_data['flow_config']; its flow_step_id is what
+// datamachine_execute_step needs to re-run the same job on retry.
+$direct_engine_data = array(
+	'flow_config' => array(
+		'ephemeral_step_0' => array(
+			'flow_step_id' => 'ephemeral_step_0',
+			'step_type'    => 'system_task',
+		),
+	),
+);
+assert_retry_policy_smoke(
+	'ephemeral single-step workflow resolves its flow_step_id',
+	'ephemeral_step_0' === $resolve_ephemeral->invoke( null, $direct_engine_data )
+);
+
+// Falls back to the array key when the step omits an explicit flow_step_id.
+$keyed_engine_data = array(
+	'flow_config' => array(
+		'ephemeral_step_0' => array( 'step_type' => 'system_task' ),
+	),
+);
+assert_retry_policy_smoke(
+	'ephemeral step without explicit id falls back to its config key',
+	'ephemeral_step_0' === $resolve_ephemeral->invoke( null, $keyed_engine_data )
+);
+
+// Multi-step ephemeral workflows are not blindly resumed.
+$multi_engine_data = array(
+	'flow_config' => array(
+		'ephemeral_step_0' => array( 'flow_step_id' => 'ephemeral_step_0' ),
+		'ephemeral_step_1' => array( 'flow_step_id' => 'ephemeral_step_1' ),
+	),
+);
+assert_retry_policy_smoke(
+	'multi-step ephemeral workflow does not resolve a single step',
+	'' === $resolve_ephemeral->invoke( null, $multi_engine_data )
+);
+
+// No flow_config (e.g. a genuine pipeline job) yields empty so the normal
+// $context_data['flow_step_id'] path is used instead.
+assert_retry_policy_smoke(
+	'absent flow_config yields empty (defers to context flow_step_id)',
+	'' === $resolve_ephemeral->invoke( null, array() )
+);
 
 echo "\nJob retry policy smoke complete: {$total} assertions, {$failed} failures.\n";
 if ( $failed > 0 ) {
