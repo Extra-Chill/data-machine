@@ -86,12 +86,11 @@ function datamachine_run_conversation(
 
 	// DM-flavored mutable state accumulated by the turn runner. The substrate
 	// surfaces turn_count, final_content, usage, and request_metadata on the
-	// final result directly (see agents-api#136), so we only carry by-reference
-	// the things substrate doesn't track for us.
-	$last_tool_calls        = array();
-	$all_tool_calls         = array();
+	// final result directly (see agents-api#136), so we only carry the things
+	// substrate doesn't track for us. The per-turn mutable accumulators
+	// (last_tool_calls, all_tool_calls, completion_nudges) now live on
+	// $turn_state so they flow through one object instead of by-reference params.
 	$tool_execution_results = array();
-	$completion_nudges      = array();
 	$turn_state             = new DataMachineProviderTurnState( $messages );
 
 	// Base log context for consistent logging.
@@ -186,11 +185,8 @@ function datamachine_run_conversation(
 		$loop_payload,
 		$event_sink,
 		$base_log_context,
-		$last_tool_calls,
-		$all_tool_calls,
 		$turn_state,
-		$completion_policy,
-		$completion_nudges
+		$completion_policy
 	);
 
 	$tool_executor     = datamachine_build_loop_tool_executor( $tools, $loop_payload, $mode, $modes, $event_sink, $base_log_context );
@@ -282,8 +278,8 @@ function datamachine_run_conversation(
 			$error_result,
 			array(
 				'completed'       => false,
-				'last_tool_calls' => $last_tool_calls,
-				'tool_calls'      => $all_tool_calls,
+				'last_tool_calls' => $turn_state->last_tool_calls,
+				'tool_calls'      => $turn_state->all_tool_calls,
 			)
 		);
 		$transcript_session_id = $transcript_persister->persist( $turn_state->latest_messages, $conversation_request, $error_result );
@@ -357,10 +353,10 @@ function datamachine_run_conversation(
 	// the diagnostics namespaced so the top level remains the Agents API result.
 	$normalization = ConversationResultNormalizer::normalize(
 		$result,
-		$last_tool_calls,
-		$all_tool_calls,
+		$turn_state->last_tool_calls,
+		$turn_state->all_tool_calls,
 		$tool_execution_results,
-		$completion_nudges,
+		$turn_state->completion_nudges,
 		$completion_policy_stopped,
 		$turn_budget->ceiling(),
 		$assertions,
@@ -957,11 +953,10 @@ function datamachine_dispatch_provider_turn(
  * @param array                                     $loop_payload       Cleaned payload.
  * @param LoopEventSinkInterface                    $event_sink         DM event sink.
  * @param array                                     $base_log_context   Base log context.
- * @param array                                     &$last_tool_calls    Mutable last turn's tool calls (DM-flavored shape).
- * @param array                                     &$all_tool_calls     Mutable all tool calls made during the run.
- * @param DataMachineProviderTurnState              $turn_state         Mutable per-turn state for the pre-substrate error path.
+ * @param DataMachineProviderTurnState              $turn_state         Mutable per-turn state: carries the pre-substrate
+ *                                                                      error-path snapshot plus the tool-call and nudge
+ *                                                                      accumulators read after the loop.
  * @param WP_Agent_Conversation_Completion_Policy   $completion_policy  Completion policy for natural completions.
- * @param array                                     &$completion_nudges  Mutable nudge diagnostics (DM-only).
  * @return callable Provider-turn adapter callable.
  */
 function datamachine_build_provider_turn_adapter(
@@ -973,11 +968,8 @@ function datamachine_build_provider_turn_adapter(
 	array $loop_payload,
 	LoopEventSinkInterface $event_sink,
 	array $base_log_context,
-	array &$last_tool_calls,
-	array &$all_tool_calls,
 	DataMachineProviderTurnState $turn_state,
-	WP_Agent_Conversation_Completion_Policy $completion_policy,
-	array &$completion_nudges
+	WP_Agent_Conversation_Completion_Policy $completion_policy
 ): callable {
 	return static function ( $provider_turn_request, array $turn_context = array() ) use (
 		$tools,
@@ -989,10 +981,7 @@ function datamachine_build_provider_turn_adapter(
 		$event_sink,
 		$base_log_context,
 		$completion_policy,
-		$turn_state,
-		&$last_tool_calls,
-		&$all_tool_calls,
-		&$completion_nudges
+		$turn_state
 	): array {
 		$messages = is_array( $provider_turn_request ) ? $provider_turn_request : array();
 		if ( is_object( $provider_turn_request ) ) {
@@ -1084,9 +1073,9 @@ function datamachine_build_provider_turn_adapter(
 			)
 		);
 
-		$last_tool_calls = $tool_calls;
+		$turn_state->last_tool_calls = $tool_calls;
 		foreach ( $tool_calls as $tool_call ) {
-			$all_tool_calls[] = $tool_call;
+			$turn_state->all_tool_calls[] = $tool_call;
 		}
 
 		$messages_with_response = $messages;
@@ -1174,7 +1163,7 @@ function datamachine_build_provider_turn_adapter(
 				if ( '' !== $completion_nudge ) {
 					$continuation_messages[] = ConversationManager::buildConversationMessage( 'user', $completion_nudge );
 					datamachine_record_completion_nudge(
-						$completion_nudges,
+						$turn_state->completion_nudges,
 						$event_sink,
 						$base_log_context,
 						$mode,
