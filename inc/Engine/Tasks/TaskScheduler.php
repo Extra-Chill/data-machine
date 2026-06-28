@@ -245,21 +245,31 @@ class TaskScheduler {
 			? $task_meta['label']
 			: ucfirst( str_replace( '_', ' ', $taskType ) );
 
+		$initial_data = array(
+			'task_type'     => $taskType,
+			'task_params'   => $params,
+			'task_context'  => $context,
+			'job_source'    => 'system',
+			'job_label'     => $job_label,
+			'parent_job_id' => $parentJobId,
+			'user_id'       => $context_user_id,
+			'agent_id'      => $context_agent_id,
+			'agent_slug'    => $context_agent_slug,
+			'job'           => $job_snapshot,
+		);
+
+		// Multi-step resumable tasks opt into resume-from-checkpoint retry so a
+		// transient failure restarts from the first incomplete step rather than
+		// failing fast. Only stamp the flag when opted in — the 13 single-step
+		// tasks keep an unchanged engine snapshot and the existing retry path.
+		if ( $handler->isResumable() ) {
+			$initial_data['resumable'] = true;
+		}
+
 		$result = AbilityResult::normalize( $ability->execute( array(
 			'workflow'     => $workflow,
 			'timestamp'    => $params['scheduled_at'] ?? null,
-			'initial_data' => array(
-				'task_type'     => $taskType,
-				'task_params'   => $params,
-				'task_context'  => $context,
-				'job_source'    => 'system',
-				'job_label'     => $job_label,
-				'parent_job_id' => $parentJobId,
-				'user_id'       => $context_user_id,
-				'agent_id'      => $context_agent_id,
-				'agent_slug'    => $context_agent_slug,
-				'job'           => $job_snapshot,
-			),
+			'initial_data' => $initial_data,
 		) ) );
 
 		if ( empty( $result['success'] ) ) {

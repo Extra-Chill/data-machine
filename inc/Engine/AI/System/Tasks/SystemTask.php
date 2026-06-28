@@ -93,6 +93,35 @@ abstract class SystemTask {
 	}
 
 	/**
+	 * Whether a transient failure in this task's workflow may be retried from
+	 * the first incomplete step (resume-from-checkpoint) instead of failing fast.
+	 *
+	 * Single-step tasks (the default getWorkflow()) are always retryable through
+	 * JobRetryPolicy — the one step *is* the whole task, and re-running it is the
+	 * idempotent retry. This flag only matters for tasks that override
+	 * getWorkflow() to emit a MULTI-step ephemeral workflow: on retry the engine
+	 * must not blindly re-run a step of a partially-executed flow, because steps
+	 * 0..K-1 may have already applied side effects (writes, sent messages,
+	 * created posts).
+	 *
+	 * When this returns true, JobRetryPolicy resolves the resume point as the
+	 * first step whose engine_data['step_results'] entry did not complete
+	 * successfully, so completed steps (and their already-recorded effects) are
+	 * never re-applied. When false (the safe default), a multi-step workflow
+	 * fails fast on a transient error rather than risk partial re-execution.
+	 *
+	 * Only override this to true when every step in the workflow is either
+	 * idempotent or records its effects under engine_data['effects'] so the
+	 * resume contract can skip already-applied work.
+	 *
+	 * @return bool True when the workflow may resume from its first incomplete step.
+	 * @since 0.156.2
+	 */
+	public function isResumable(): bool {
+		return false;
+	}
+
+	/**
 	 * Execute the task's imperative business logic.
 	 *
 	 * Called by SystemTaskStep when running as a pipeline/workflow step.
