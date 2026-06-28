@@ -452,6 +452,16 @@ assert_upgrade_plan_equals( 'scheduled seed is visible in after diff', 'hourly',
 assert_upgrade_plan_equals( 'burn-in max_items seed drift remains visible', 50, $runtime_update['diff']['after']['runtime_overlays']['steps']['1_fetch_1']['handler_configs']['mcp']['max_items'] ?? null );
 
 echo "\n[3] PendingAction stages bundle-upgrade previews\n";
+
+// The host-smoke backend provides a real $wpdb but does not run the plugin's
+// deferred migrations, so the durable pending-actions table is absent while
+// has_database() still reports true. Create the table when a real database is
+// present; pure-PHP runs (no real $wpdb) keep using the transient fallback.
+global $wpdb;
+if ( is_object( $wpdb ) && method_exists( $wpdb, 'get_charset_collate' ) && file_exists( ABSPATH . 'wp-admin/includes/upgrade.php' ) ) {
+	\DataMachine\Engine\AI\Actions\PendingActionStore::create_table();
+}
+
 $staged = AgentBundleUpgradePendingAction::stage(
 	$plan,
 	array(

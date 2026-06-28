@@ -90,6 +90,15 @@ function datamachine_pending_action_helper_assert( bool $condition, string $mess
 
 $GLOBALS['datamachine_pending_action_helper_transients'] = array();
 
+// The host-smoke backend provides a real $wpdb but does not run the plugin's
+// deferred migrations, so the durable pending-actions table is absent while
+// has_database() still reports true. Create the table when a real database is
+// present; pure-PHP runs (no real $wpdb) keep using the transient fallback.
+global $wpdb;
+if ( is_object( $wpdb ) && method_exists( $wpdb, 'get_charset_collate' ) && file_exists( ABSPATH . 'wp-admin/includes/upgrade.php' ) ) {
+	PendingActionStore::create_table();
+}
+
 $result = PendingActionHelper::stage(
 	array(
 		'kind'         => 'wiki_upsert',
