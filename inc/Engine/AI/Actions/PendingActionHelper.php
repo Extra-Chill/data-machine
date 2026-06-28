@@ -5,8 +5,8 @@
  *
  * Tools that opt into WP_Agent_Action_Policy should never hand-roll the store/envelope
  * shape. Call PendingActionHelper::stage() from the 'preview' branch of the
- * tool handler and return its result directly. The AI sees the Agents API
- * approval-required envelope: read pending_action.action_id and call
+ * tool handler and return its result directly. The AI sees the canonical Agents
+ * API approval_required envelope: read payload.action_id and call
  * `resolve_pending_action` with `accepted` or `rejected` once the user
  * decides.
  *
@@ -26,10 +26,11 @@ class PendingActionHelper {
 	/**
 	 * Stage a tool invocation for user approval.
 	 *
-	 * The returned value is an Agents API approval_required envelope. The
-	 * envelope payload carries a `pending_action` value object plus the
-	 * `resolve_with` / `resolve_params` directives the AI uses to confirm
-	 * or reject the invocation.
+	 * The returned value is the canonical Agents API approval_required envelope.
+	 * The envelope payload carries the full canonical pending-action shape
+	 * (action_id, kind, summary, preview, status, expires_at, …) plus the
+	 * standardized `instruction` and `grants` slots the AI uses to confirm or
+	 * reject the invocation.
 	 *
 	 * @param array $args {
 	 *     Staging arguments.
@@ -165,18 +166,9 @@ class PendingActionHelper {
 			'expires_at'      => null !== $expires_at ? gmdate( 'c', $expires_at ) : null,
 		);
 
-		if ( class_exists( WP_Agent_Pending_Action::class ) ) {
-			$pending_action = WP_Agent_Pending_Action::from_array( $pending_action )->to_array();
-		}
-
-		$envelope_payload = array(
-			'pending_action' => $pending_action,
-			'resolve_with'   => 'resolve_pending_action',
-			'resolve_params' => array(
-				'action_id' => $action_id,
-				'decision'  => '<accepted|rejected>',
-			),
-			'instruction'    => 'Show this preview to the user and wait for their confirmation. Do not call resolve_pending_action until they explicitly approve or reject. If the user asks to modify, call the original tool again with updated parameters instead of resolving this action.',
+		$instruction = sprintf(
+			'Show this preview to the user and wait for their confirmation. Do not resolve until they explicitly approve or reject. To resolve, call resolve_pending_action with action_id "%s" and decision "accepted" or "rejected". If the user asks to modify, call the original tool again with updated parameters instead of resolving this action.',
+			$action_id
 		);
 
 		$envelope_metadata = array(
@@ -187,24 +179,34 @@ class PendingActionHelper {
 			),
 		);
 
-		$envelope = method_exists( WP_Agent_Message::class, 'approvalRequired' )
-			? WP_Agent_Message::approvalRequired( $payload['summary'], $envelope_payload, $envelope_metadata )
-			: array(
-				'schema'   => WP_Agent_Message::SCHEMA,
-				'version'  => WP_Agent_Message::VERSION,
-				'type'     => WP_Agent_Message::TYPE_APPROVAL_REQUIRED,
-				'role'     => 'tool',
-				'content'  => $payload['summary'],
-				'payload'  => $envelope_payload,
-				'metadata' => $envelope_metadata,
-			);
+		// Emit the canonical flat approval_required envelope. The payload carries
+		// the full canonical pending-action shape (action_id, kind, summary,
+		// preview, status, expires_at, …) plus the standardized `instruction`
+		// and `grants` slots, so every producer emits and every consumer reads
+		// one shape. See Agents API WP_Agent_Pending_Action::to_approval_envelope().
+		$pending = WP_Agent_Pending_Action::from_array( $pending_action );
+
+		if ( method_exists( $pending, 'to_approval_envelope' ) ) {
+			$envelope = $pending->to_approval_envelope( $instruction, $grants, $envelope_metadata );
+		} else {
+			// Transitional path for an Agents API build that predates
+			// to_approval_envelope(): build the identical canonical flat payload
+			// inline so the emitted shape is the same either way.
+			$flat_payload                = $pending->to_array();
+			$flat_payload['instruction'] = $instruction;
+			$grant_list                  = array_values( array_filter( $grants, 'is_array' ) );
+			if ( array() !== $grant_list ) {
+				$flat_payload['grants'] = $grant_list;
+			}
+			$envelope = WP_Agent_Message::approvalRequired( $payload['summary'], $flat_payload, $envelope_metadata );
+		}
 
 		// Surface staged + action_id at the top level so internal callers
 		// (content abilities, ToolExecutor, bundle/memory pending actions)
 		// can detect success and reference the new pending action without
-		// digging into the envelope payload. Everything else — kind,
-		// summary, preview, resolve_with, instruction, timestamps — lives
-		// inside the Agents API envelope payload (envelope.payload.pending_action).
+		// digging into the envelope payload. Everything else — kind, summary,
+		// preview, status, instruction, grants, timestamps — lives inside the
+		// canonical Agents API envelope payload (envelope.payload).
 		return array_merge(
 			$envelope,
 			array(

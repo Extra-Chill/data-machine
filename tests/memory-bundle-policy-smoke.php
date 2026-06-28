@@ -19,6 +19,13 @@ if ( ! defined( 'DATAMACHINE_PENDING_ACTION_TRANSIENT_FALLBACK' ) ) {
 	define( 'DATAMACHINE_PENDING_ACTION_TRANSIENT_FALLBACK', true );
 }
 
+// The host-smoke backend runs under WordPress Playground (PHP WASM), which does
+// not define the STDERR stream constant. Define it so the assert helper can
+// report failures instead of crashing on an undefined constant.
+if ( ! defined( 'STDERR' ) ) {
+	define( 'STDERR', fopen( 'php://stderr', 'w' ) );
+}
+
 $GLOBALS['datamachine_memory_policy_filters']    = array();
 $GLOBALS['datamachine_memory_policy_actions']    = array();
 $GLOBALS['datamachine_memory_policy_transients'] = array();
@@ -382,6 +389,27 @@ $durable_fact = SelfMemoryWritePolicy::execute(
 memory_policy_assert( false === $durable_fact['success'] && 'durable_fact_denied' === $durable_fact['error_code'], 'durable fact writes are rejected' );
 
 echo "\n[3] Bundle-owned section overwrites are staged with redacted PendingAction preview\n";
+
+// The host-smoke backend provides a real $wpdb but does not run the plugin's
+// deferred migrations, so the durable pending-actions table is absent while
+// has_database() still reports true. Create the table when a real database is
+// present; pure-PHP runs (no real $wpdb) keep using the transient fallback.
+global $wpdb;
+if ( is_object( $wpdb ) && method_exists( $wpdb, 'get_charset_collate' ) && file_exists( ABSPATH . 'wp-admin/includes/upgrade.php' ) ) {
+	PendingActionStore::create_table();
+}
+
+// On the real-WP host-smoke backend the runner is unauthenticated, so resolution
+// authorization fails. Act as an administrator (the pure-PHP stubs simulate this
+// with current_user_can => true) so staging and resolution share an authorized
+// operator identity.
+if ( function_exists( 'wp_set_current_user' ) && function_exists( 'get_users' ) ) {
+	$smoke_admins = get_users( array( 'role' => 'administrator', 'number' => 1, 'fields' => 'ID' ) );
+	if ( ! empty( $smoke_admins ) ) {
+		wp_set_current_user( (int) $smoke_admins[0] );
+	}
+}
+
 add_filter(
 	'datamachine_memory_section_artifact',
 	static function ( $_artifact, array $context ) use ( $artifact ) {
@@ -403,7 +431,7 @@ $staged = SelfMemoryWritePolicy::execute(
 );
 memory_policy_assert( true === $staged['staged'], 'bundle-owned overwrite is staged instead of applied' );
 memory_policy_assert( ! str_contains( $store->files[ $scope_key ], 'super-secret-value' ), 'staged overwrite does not mutate memory immediately' );
-$staged_preview = $staged['payload']['pending_action']['preview'] ?? array();
+$staged_preview = $staged['payload']['preview'] ?? array();
 memory_policy_assert( str_contains( $staged_preview['diff'] ?? '', '[redacted]' ), 'preview diff redacts secret-like values' );
 memory_policy_assert( ! str_contains( $staged_preview['diff'] ?? '', 'super-secret-value' ), 'preview diff does not expose secret-like value' );
 

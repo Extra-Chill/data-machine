@@ -5,14 +5,22 @@
  * Run with: php tests/pending-action-helper-approval-envelope-smoke.php
  *
  * Contract:
- *   - Successful stage() returns the Agents API approval_required envelope
- *     plus two top-level convenience fields: staged=true and action_id.
- *   - Every other detail (kind, summary, preview, resolve_with, etc.) lives
- *     inside envelope.payload / envelope.payload.pending_action.
+ *   - Successful stage() returns the canonical Agents API approval_required
+ *     envelope plus two top-level convenience fields: staged=true and action_id.
+ *   - The envelope payload is the canonical flat pending-action shape (action_id,
+ *     kind, summary, preview, status, expires_at, …) plus the standardized
+ *     `instruction` and `grants` slots — no nested pending_action/resolve_with
+ *     wrapper.
  *   - Failure stage() returns array( 'staged' => false, 'error' => ... ).
  *
  * @package DataMachine\Tests
  */
+
+// Pure-PHP smoke runs without a $wpdb, so let PendingActionStore fall back to
+// the transient store (matches the sibling pending-action smokes).
+if ( ! defined( 'DATAMACHINE_PENDING_ACTION_TRANSIENT_FALLBACK' ) ) {
+	define( 'DATAMACHINE_PENDING_ACTION_TRANSIENT_FALLBACK', true );
+}
 
 require_once __DIR__ . '/bootstrap-unit.php';
 
@@ -82,6 +90,15 @@ function datamachine_pending_action_helper_assert( bool $condition, string $mess
 
 $GLOBALS['datamachine_pending_action_helper_transients'] = array();
 
+// The host-smoke backend provides a real $wpdb but does not run the plugin's
+// deferred migrations, so the durable pending-actions table is absent while
+// has_database() still reports true. Create the table when a real database is
+// present; pure-PHP runs (no real $wpdb) keep using the transient fallback.
+global $wpdb;
+if ( is_object( $wpdb ) && method_exists( $wpdb, 'get_charset_collate' ) && file_exists( ABSPATH . 'wp-admin/includes/upgrade.php' ) ) {
+	PendingActionStore::create_table();
+}
+
 $result = PendingActionHelper::stage(
 	array(
 		'kind'         => 'wiki_upsert',
@@ -94,6 +111,10 @@ $result = PendingActionHelper::stage(
 			'diff' => '- old' . "\n" . '+ new',
 		),
 		'agent_id'     => 456,
+		// Pass user_id explicitly so creator is deterministic regardless of the
+		// runtime. The pure-PHP stub returns 123, but real WP (host-smoke
+		// backend) overrides get_current_user_id() with the unauthenticated 0.
+		'user_id'      => 123,
 		'context'      => array(
 			'tool_name'  => 'wiki_upsert',
 			'session_id' => 'session_123',
@@ -117,23 +138,32 @@ datamachine_pending_action_helper_assert( ! isset( $result['resolve_params'] ), 
 datamachine_pending_action_helper_assert( ! isset( $result['instruction'] ), 'Top level no longer mirrors instruction.' );
 datamachine_pending_action_helper_assert( ! isset( $result['expires_at'] ), 'Top level no longer mirrors expires_at.' );
 
+// Canonical flat payload: the pending-action fields live directly on the
+// payload, not under a nested `pending_action` key. There is no longer a
+// `pending_action`, `resolve_with`, or `resolve_params` wrapper.
 $payload = $result['payload'];
-datamachine_pending_action_helper_assert( 'resolve_pending_action' === $payload['resolve_with'], 'Envelope payload carries resolve_with.' );
-datamachine_pending_action_helper_assert( $result['action_id'] === $payload['resolve_params']['action_id'], 'Envelope payload resolve_params carries the action_id.' );
-datamachine_pending_action_helper_assert( '<accepted|rejected>' === $payload['resolve_params']['decision'], 'Envelope payload resolve_params describes the decision shape.' );
-datamachine_pending_action_helper_assert( is_string( $payload['instruction'] ?? null ) && '' !== $payload['instruction'], 'Envelope payload carries the operator instruction.' );
+datamachine_pending_action_helper_assert( ! array_key_exists( 'pending_action', $payload ), 'Payload no longer nests a pending_action wrapper.' );
+datamachine_pending_action_helper_assert( ! array_key_exists( 'resolve_with', $payload ), 'Payload no longer carries a resolve_with directive.' );
+datamachine_pending_action_helper_assert( ! array_key_exists( 'resolve_params', $payload ), 'Payload no longer carries a resolve_params directive.' );
 
-$pending_action = $payload['pending_action'];
-datamachine_pending_action_helper_assert( $result['action_id'] === $pending_action['action_id'], 'pending_action carries the staged action_id.' );
-datamachine_pending_action_helper_assert( 'wiki_upsert' === $pending_action['kind'], 'pending_action carries the product handler kind.' );
-datamachine_pending_action_helper_assert( 'Update Wiki Page' === $pending_action['summary'], 'pending_action carries the sanitized summary.' );
-datamachine_pending_action_helper_assert( array( 'diff' => "- old\n+ new" ) === $pending_action['preview'], 'pending_action carries preview data.' );
-datamachine_pending_action_helper_assert( 'user:123' === $pending_action['creator'], 'pending_action records creator identity.' );
-datamachine_pending_action_helper_assert( 'agent:456' === $pending_action['agent'], 'pending_action records agent identity.' );
-datamachine_pending_action_helper_assert( 123 === $pending_action['metadata']['datamachine']['created_by'], 'Data Machine created_by audit field is retained in pending_action metadata.' );
-datamachine_pending_action_helper_assert( 456 === $pending_action['metadata']['datamachine']['agent_id'], 'Data Machine agent_id audit field is retained in pending_action metadata.' );
-datamachine_pending_action_helper_assert( isset( $pending_action['created_at'] ) && is_string( $pending_action['created_at'] ), 'pending_action carries an ISO creation timestamp.' );
-datamachine_pending_action_helper_assert( isset( $pending_action['expires_at'] ) && is_string( $pending_action['expires_at'] ), 'pending_action carries an ISO expiration timestamp.' );
+datamachine_pending_action_helper_assert( $result['action_id'] === $payload['action_id'], 'Payload carries the staged action_id at the top level.' );
+datamachine_pending_action_helper_assert( 'wiki_upsert' === $payload['kind'], 'Payload carries the product handler kind.' );
+datamachine_pending_action_helper_assert( 'Update Wiki Page' === $payload['summary'], 'Payload carries the sanitized summary.' );
+datamachine_pending_action_helper_assert( array( 'diff' => "- old\n+ new" ) === $payload['preview'], 'Payload carries preview data.' );
+datamachine_pending_action_helper_assert( array( 'title' => 'Demo', 'content' => 'Updated content.' ) === $payload['apply_input'], 'Payload carries apply_input.' );
+datamachine_pending_action_helper_assert( 'pending' === $payload['status'], 'Payload carries the canonical pending status.' );
+datamachine_pending_action_helper_assert( 'user:123' === $payload['creator'], 'Payload records creator identity.' );
+datamachine_pending_action_helper_assert( 'agent:456' === $payload['agent'], 'Payload records agent identity.' );
+datamachine_pending_action_helper_assert( 123 === $payload['metadata']['datamachine']['created_by'], 'Data Machine created_by audit field is retained in payload metadata.' );
+datamachine_pending_action_helper_assert( 456 === $payload['metadata']['datamachine']['agent_id'], 'Data Machine agent_id audit field is retained in payload metadata.' );
+datamachine_pending_action_helper_assert( isset( $payload['created_at'] ) && is_string( $payload['created_at'] ), 'Payload carries an ISO creation timestamp.' );
+datamachine_pending_action_helper_assert( array_key_exists( 'expires_at', $payload ), 'Payload carries an expires_at field.' );
+
+// Standardized orchestration slots: instruction is always present; grants is
+// omitted when the caller staged no resolver grants.
+datamachine_pending_action_helper_assert( is_string( $payload['instruction'] ?? null ) && '' !== $payload['instruction'], 'Payload carries the operator instruction slot.' );
+datamachine_pending_action_helper_assert( str_contains( $payload['instruction'], $result['action_id'] ), 'Instruction references the action_id to resolve.' );
+datamachine_pending_action_helper_assert( ! array_key_exists( 'grants', $payload ), 'Grants slot is omitted when no resolver grants were staged.' );
 
 datamachine_pending_action_helper_assert( 'data-machine' === $result['metadata']['adapter'], 'Data Machine is identified as adapter metadata.' );
 datamachine_pending_action_helper_assert( 'wiki_upsert' === $result['metadata']['datamachine']['kind'], 'Data Machine handler kind lives in adapter metadata.' );
@@ -148,6 +178,23 @@ datamachine_pending_action_helper_assert( ! array_key_exists( 'preview', $stored
 $normalized = WP_Agent_Message::normalize( $result );
 datamachine_pending_action_helper_assert( WP_Agent_Message::TYPE_APPROVAL_REQUIRED === $normalized['type'], 'Result normalizes as an approval_required envelope.' );
 datamachine_pending_action_helper_assert( $result['payload'] === $normalized['payload'], 'Envelope payload survives normalization.' );
+
+// Resolver grants flow into the canonical `grants` slot.
+$granted = PendingActionHelper::stage(
+	array(
+		'kind'            => 'wiki_upsert',
+		'summary'         => 'Grant-carrying stage.',
+		'apply_input'     => array( 'title' => 'Demo' ),
+		'resolver_grants' => array(
+			array( 'resolver' => 'service:publisher', 'scope' => 'publish' ),
+		),
+	)
+);
+datamachine_pending_action_helper_assert( true === $granted['staged'], 'Grant-carrying stage succeeds.' );
+datamachine_pending_action_helper_assert(
+	array( array( 'resolver' => 'service:publisher', 'scope' => 'publish' ) ) === $granted['payload']['grants'],
+	'Resolver grants flow into the canonical payload grants slot.'
+);
 
 // Failure shape: missing kind/apply_input still returns staged=false.
 $failure = PendingActionHelper::stage( array() );

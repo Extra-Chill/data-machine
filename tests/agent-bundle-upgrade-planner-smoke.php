@@ -452,6 +452,33 @@ assert_upgrade_plan_equals( 'scheduled seed is visible in after diff', 'hourly',
 assert_upgrade_plan_equals( 'burn-in max_items seed drift remains visible', 50, $runtime_update['diff']['after']['runtime_overlays']['steps']['1_fetch_1']['handler_configs']['mcp']['max_items'] ?? null );
 
 echo "\n[3] PendingAction stages bundle-upgrade previews\n";
+
+// The host-smoke backend provides a real $wpdb but does not run the plugin's
+// deferred migrations, so the durable pending-actions table is absent while
+// has_database() still reports true. Create the table when a real database is
+// present; pure-PHP runs (no real $wpdb) keep using the transient fallback.
+global $wpdb;
+if ( is_object( $wpdb ) && method_exists( $wpdb, 'get_charset_collate' ) && file_exists( ABSPATH . 'wp-admin/includes/upgrade.php' ) ) {
+	\DataMachine\Engine\AI\Actions\PendingActionStore::create_table();
+}
+
+// Register the canonical store + resolver adapters so resolution dispatches
+// through the generic agents/resolve-pending-action surface. In a fully booted
+// plugin these are wired at bootstrap; the standalone smoke wires them itself.
+add_filter( 'wp_agent_pending_action_store', static fn() => \DataMachine\Engine\AI\Actions\PendingActionStore::adapter() );
+add_filter( 'wp_agent_pending_action_resolver', static fn() => ResolvePendingActionAbility::adapter() );
+
+// On the real-WP host-smoke backend the runner is unauthenticated, so resolution
+// authorization fails. Act as an administrator (the pure-PHP stubs simulate this
+// with current_user_can => true) so staging and resolution share an authorized
+// operator identity.
+if ( function_exists( 'wp_set_current_user' ) && function_exists( 'get_users' ) ) {
+	$smoke_admins = get_users( array( 'role' => 'administrator', 'number' => 1, 'fields' => 'ID' ) );
+	if ( ! empty( $smoke_admins ) ) {
+		wp_set_current_user( (int) $smoke_admins[0] );
+	}
+}
+
 $staged = AgentBundleUpgradePendingAction::stage(
 	$plan,
 	array(
@@ -459,10 +486,14 @@ $staged = AgentBundleUpgradePendingAction::stage(
 		'bundle'             => array( 'bundle_slug' => 'woocommerce-brain', 'target_version' => '1.1.0' ),
 		'target_artifacts'   => $target_artifacts,
 		'approved_artifacts' => array( 'pipeline:collector' ),
+		// Stage as the resolving user so the action's creator matches the
+		// resolution scope (pure-PHP stub returns 1; real WP returns the current
+		// user). Without this the resolver denies on owner mismatch.
+		'user_id'            => get_current_user_id(),
 	)
 );
 assert_upgrade_plan( 'pending action staged', true === ( $staged['staged'] ?? false ) );
-$staged_pending = $staged['payload']['pending_action'] ?? $staged;
+$staged_pending = $staged['payload'] ?? $staged;
 assert_upgrade_plan_equals( 'pending action kind is bundle_upgrade', 'bundle_upgrade', $staged_pending['kind'] ?? null );
 assert_upgrade_plan_equals( 'preview carries approval count', 1, $staged_pending['preview']['counts']['needs_approval'] ?? null );
 
