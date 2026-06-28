@@ -82,6 +82,18 @@ class JobRetryPolicy {
 		$timestamp     = time() + $delay_seconds;
 		$flow_step_id  = (string) ( $context_data['flow_step_id'] ?? '' );
 
+		// Direct/system tasks (e.g. daily_memory_generation) run through an
+		// ephemeral single-step workflow with flow_id=pipeline_id='direct'.
+		// They fail without a flow_step_id in $context_data, but their engine
+		// snapshot still carries the ephemeral step definition under
+		// flow_config — and datamachine_execute_step re-runs a step purely by
+		// its flow_step_id against that snapshot. Resolve it so a transient
+		// provider failure on a direct task is retryable through the same path
+		// as a pipeline step, rather than dead-ending on missing_flow_step_id.
+		if ( '' === $flow_step_id ) {
+			$flow_step_id = self::resolveEphemeralFlowStepId( $engine_data );
+		}
+
 		if ( '' === $flow_step_id ) {
 			return array(
 				'retried'      => false,
@@ -404,6 +416,39 @@ class JobRetryPolicy {
 		}
 
 		return null;
+	}
+
+	/**
+	 * Resolve the flow_step_id of a direct/system task's ephemeral step.
+	 *
+	 * Direct tasks (scheduled via TaskScheduler → execute-workflow) store a
+	 * single ephemeral step under engine_data['flow_config']. Its key (and its
+	 * own `flow_step_id`) is what datamachine_execute_step needs to re-run the
+	 * task against the same job. Returns '' when the snapshot has no single
+	 * resumable system_task step (multi-step ephemeral workflows are not
+	 * blindly resumed here).
+	 *
+	 * @param array $engine_data Job engine data.
+	 * @return string Ephemeral flow_step_id, or '' when not resolvable.
+	 */
+	private static function resolveEphemeralFlowStepId( array $engine_data ): string {
+		$flow_config = is_array( $engine_data['flow_config'] ?? null ) ? $engine_data['flow_config'] : array();
+		if ( 1 !== count( $flow_config ) ) {
+			return '';
+		}
+
+		$step = reset( $flow_config );
+		if ( ! is_array( $step ) ) {
+			return '';
+		}
+
+		$flow_step_id = (string) ( $step['flow_step_id'] ?? '' );
+		if ( '' === $flow_step_id ) {
+			$key          = array_key_first( $flow_config );
+			$flow_step_id = is_string( $key ) ? $key : '';
+		}
+
+		return $flow_step_id;
 	}
 
 	/**
