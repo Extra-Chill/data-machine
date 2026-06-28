@@ -26,6 +26,7 @@ use DataMachine\Engine\Bundle\AgentBundleArtifactExtensions;
 use DataMachine\Engine\Bundle\AgentBundleArtifactState;
 use DataMachine\Engine\Bundle\AgentBundleAgentConfig;
 use DataMachine\Engine\Bundle\AgentBundleArtifactStatus;
+use DataMachine\Engine\Bundle\AgentBundleMemoryArtifact;
 use DataMachine\Engine\Bundle\BundleStepIdRemapper;
 use DataMachine\Engine\Bundle\AgentBundleDirectory;
 use DataMachine\Engine\Bundle\AgentBundleFlowFile;
@@ -751,8 +752,15 @@ class AgentBundler {
 				$created_agent_id = $agent_id;
 			}
 
-			// 2. Write agent identity files.
-			$this->write_agent_files( $slug, $agent_id, $owner_id, $bundle['files'] ?? array() );
+			// 2. Write agent identity files. A fresh install seeds every
+			// bundle-carried file. On upgrade over an existing agent, identity
+			// files are skipped here and materialized through the ledger-aware
+			// memory block below, so authored identity (SOUL.md) is updated with
+			// local-modification protection while learned runtime memory
+			// (MEMORY.md, WAKE.md, daily/*) is never clobbered by a deploy.
+			if ( ! $existing ) {
+				$this->write_agent_files( $slug, $agent_id, $owner_id, $bundle['files'] ?? array(), false );
+			}
 
 			// 3. Write USER.md template if provided.
 			if ( ! empty( $bundle['user_template'] ) ) {
@@ -1038,6 +1046,54 @@ class AgentBundler {
 						'reason'        => 'missing_apply_handler',
 					);
 					continue;
+				}
+
+				$artifact_records[ $artifact_key ] = $this->bundle_artifact_record(
+					$bundle_metadata,
+					(string) $artifact['artifact_type'],
+					(string) $artifact['artifact_id'],
+					(string) $artifact['source_path'],
+					$artifact['payload'] ?? null
+				);
+			}
+
+			// 6b. Materialize authored agent identity (SOUL.md) into the live
+			// store and track it in the ledger. Learned runtime memory is never
+			// in scope here — AgentBundleMemoryArtifact gates on authority tier.
+			// On fresh install the file is already on disk (write_agent_files);
+			// on upgrade we apply it here with local-modification protection so a
+			// deploy can ship updated identity without blowing away local edits.
+			foreach ( AgentBundleMemoryArtifact::target_artifacts( $bundle ) as $artifact ) {
+				$artifact_key = self::artifact_key( (string) $artifact['artifact_type'], (string) $artifact['artifact_id'] );
+				$record       = is_array( $artifact_records[ $artifact_key ] ?? null ) ? $artifact_records[ $artifact_key ] : null;
+
+				if ( $existing ) {
+					$local_payload = AgentBundleMemoryArtifact::current_payload( $agent_id, (string) $artifact['artifact_id'] );
+					if (
+						$record
+						&& $this->artifact_has_local_modifications( $record, $local_payload )
+						&& ! hash_equals(
+							AgentBundleArtifactHasher::hash( $artifact['payload'] ?? null ),
+							AgentBundleArtifactHasher::hash( $local_payload )
+						)
+					) {
+						$conflicts[] = array(
+							'artifact_type' => $artifact['artifact_type'],
+							'artifact_id'   => $artifact['artifact_id'],
+							'reason'        => 'local_modified',
+						);
+						continue;
+					}
+
+					$applied = AgentBundleMemoryArtifact::apply( $artifact, $agent_id );
+					if ( is_wp_error( $applied ) ) {
+						$conflicts[] = array(
+							'artifact_type' => $artifact['artifact_type'],
+							'artifact_id'   => $artifact['artifact_id'],
+							'reason'        => $applied->get_error_message(),
+						);
+						continue;
+					}
 				}
 
 				$artifact_records[ $artifact_key ] = $this->bundle_artifact_record(
@@ -1719,19 +1775,35 @@ class AgentBundler {
 	/**
 	 * Write agent identity files to disk.
 	 *
-	 * @param string $slug     Agent slug.
-	 * @param int    $agent_id Imported agent ID.
-	 * @param int    $owner_id Imported agent owner ID.
-	 * @param array  $files    filename => content map.
+	 * On a fresh install every bundle-carried file is written so the new agent
+	 * is fully seeded. On an upgrade ($is_upgrade = true) only authored identity
+	 * (SOUL.md, authority tier `agent_identity`) is overwritten; learned runtime
+	 * memory (MEMORY.md, WAKE.md, daily/*) is preserved so a deploy never
+	 * clobbers what the live agent has accumulated.
+	 *
+	 * @param string $slug       Agent slug.
+	 * @param int    $agent_id   Imported agent ID.
+	 * @param int    $owner_id   Imported agent owner ID.
+	 * @param array  $files      filename => content map.
+	 * @param bool   $is_upgrade Whether this write targets an existing agent.
 	 */
-	private function write_agent_files( string $slug, int $agent_id, int $owner_id, array $files ): void {
+	private function write_agent_files( string $slug, int $agent_id, int $owner_id, array $files, bool $is_upgrade = false ): void {
 		$agent_dir = $this->directory_manager->get_agent_identity_directory( $slug );
 		$this->directory_manager->ensure_directory_exists( $agent_dir );
 
 		foreach ( $files as $relative_path => $content ) {
 			$relative_path = str_replace( '\\', '/', (string) $relative_path );
 			if ( preg_match( '#^daily/(\d{4})/(\d{2})/(\d{2})\.md$#', $relative_path, $matches ) ) {
+				// daily/* is learned runtime memory — never overwrite on upgrade.
+				if ( $is_upgrade ) {
+					continue;
+				}
 				( new DailyMemory( $owner_id, $agent_id ) )->write( $matches[1], $matches[2], $matches[3], (string) $content );
+				continue;
+			}
+
+			// On upgrade, only authored identity is materialized from the bundle.
+			if ( $is_upgrade && ! AgentBundleMemoryArtifact::is_upgradeable_agent_file( $relative_path ) ) {
 				continue;
 			}
 
