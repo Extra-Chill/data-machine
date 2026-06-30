@@ -11,7 +11,6 @@ use DataMachineEvents\Api\Controllers\EventIcs;
 use DataMachineEvents\Api\Controllers\Filters;
 use DataMachineEvents\Api\Controllers\Geocoding;
 use DataMachineEvents\Api\Controllers\VenueMap;
-use DataMachineEvents\Api\Controllers\ArtistUrlImport;
 
 /**
  * Register REST API routes for Data Machine Events
@@ -312,100 +311,6 @@ function register_routes() {
 		)
 	);
 
-	// Artist URL Import — extrachill-events#320.
-	$artist_url_import = new ArtistUrlImport();
-
-	register_rest_route(
-		API_NAMESPACE,
-		'/artist-url/preview',
-		array(
-			'methods'             => 'POST',
-			'callback'            => array( $artist_url_import, 'preview' ),
-			'permission_callback' => array( ArtistUrlImport::class, 'permission_logged_in' ),
-			'args'                => array(
-				'url' => array(
-					'required'          => true,
-					'type'              => 'string',
-					'sanitize_callback' => 'esc_url_raw',
-				),
-			),
-		)
-	);
-
-	register_rest_route(
-		API_NAMESPACE,
-		'/artist-url/submit',
-		array(
-			'methods'             => 'POST',
-			'callback'            => array( $artist_url_import, 'submit' ),
-			'permission_callback' => array( ArtistUrlImport::class, 'permission_logged_in' ),
-			'args'                => array(
-				'url'           => array(
-					'required'          => true,
-					'type'              => 'string',
-					'sanitize_callback' => 'esc_url_raw',
-				),
-				'contact_email' => array(
-					'type'              => 'string',
-					'sanitize_callback' => 'sanitize_email',
-				),
-				'contact_name'  => array(
-					'type'              => 'string',
-					'sanitize_callback' => 'sanitize_text_field',
-				),
-			),
-		)
-	);
-
-	register_rest_route(
-		API_NAMESPACE,
-		'/artist-url/(?P<id>\d+)/approve',
-		array(
-			'methods'             => 'POST',
-			'callback'            => array( $artist_url_import, 'approve' ),
-			'permission_callback' => array( ArtistUrlImport::class, 'permission_admin' ),
-			'args'                => array(
-				'id'                => array(
-					'required'          => true,
-					'type'              => 'integer',
-					'sanitize_callback' => 'absint',
-				),
-				'artist_term_id'    => array(
-					'type'              => 'integer',
-					'sanitize_callback' => 'absint',
-				),
-				'artist_name'       => array(
-					'type'              => 'string',
-					'sanitize_callback' => 'sanitize_text_field',
-				),
-				'schedule_interval' => array(
-					'type'              => 'string',
-					'sanitize_callback' => 'sanitize_key',
-				),
-			),
-		)
-	);
-
-	register_rest_route(
-		API_NAMESPACE,
-		'/artist-url/(?P<id>\d+)/reject',
-		array(
-			'methods'             => 'POST',
-			'callback'            => array( $artist_url_import, 'reject' ),
-			'permission_callback' => array( ArtistUrlImport::class, 'permission_admin' ),
-			'args'                => array(
-				'id'     => array(
-					'required'          => true,
-					'type'              => 'integer',
-					'sanitize_callback' => 'absint',
-				),
-				'reason' => array(
-					'type'              => 'string',
-					'sanitize_callback' => 'sanitize_textarea_field',
-				),
-			),
-		)
-	);
 }
 
 add_action( 'rest_api_init', __NAMESPACE__ . '\\register_routes' );
