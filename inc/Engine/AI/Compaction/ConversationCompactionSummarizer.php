@@ -135,7 +135,7 @@ class ConversationCompactionSummarizer {
 				$error = is_string( $response['error'] ?? null ) ? trim( (string) $response['error'] ) : '';
 				throw new \RuntimeException(
 					'' !== $error
-						? 'Conversation compaction summarizer produced no summary: ' . $error
+						? 'Conversation compaction summarizer produced no summary: ' . esc_html( $error )
 						: 'Conversation compaction summarizer produced an empty summary.'
 				);
 			}
@@ -173,11 +173,11 @@ class ConversationCompactionSummarizer {
 		$retained = (int) ( $context['retained_count'] ?? 0 );
 
 		$instructions = sprintf(
-			"You are compacting the earlier part of an ongoing assistant conversation to keep it within its context budget. "
+			'You are compacting the earlier part of an ongoing assistant conversation to keep it within its context budget. '
 				. "Summarize the following %d earlier message(s) (of %d total; the most recent %d remain verbatim and are NOT shown here).\n\n"
-				. "Preserve every durable fact, decision, constraint, identifier, file path, open question, and any state the assistant must remember to continue correctly. "
-				. "Do not invent information. Do not include pleasantries. Write a dense, faithful summary in plain prose or compact bullet points. "
-				. "Return ONLY the summary text with no preamble.",
+				. 'Preserve every durable fact, decision, constraint, identifier, file path, open question, and any state the assistant must remember to continue correctly. '
+				. 'Do not invent information. Do not include pleasantries. Write a dense, faithful summary in plain prose or compact bullet points. '
+				. 'Return ONLY the summary text with no preamble.',
 			$compact,
 			$total,
 			$retained
