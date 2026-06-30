@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.159.0] - 2026-06-30
+
+### Added
+- express packet fan-out as the generic parallel-map step contract
+
 ## [0.158.0] - 2026-06-30
 
 ### Added
