@@ -2,19 +2,22 @@
 /**
  * Parallel-map fan-out adapter.
  *
- * Expresses Data Machine's packet fan-out *in terms of* the generic
- * `parallel` workflow step contract introduced by Agents API
- * ({@link https://github.com/Automattic/agents-api/pull/389}, the
- * parallel-MAP shape). It lets a workflow spec authored against the
- * Agents API `parallel` step be satisfied by Data Machine's
+ * The SINGLE decision/dispatch surface for Data Machine packet fan-out.
+ * DM expresses fan-out *as* the generic `parallel`-map workflow step
+ * contract owned by Agents API
+ * ({@link https://github.com/Automattic/agents-api/pull/389}); there is
+ * no bespoke fan-out decision path left in the engine. A workflow spec
+ * authored against the Agents API `parallel` step is satisfied by DM's
  * Action-Scheduler-backed {@see PipelineBatchScheduler} executor.
  *
- * Architectural boundary (complementary, not duplicative):
+ * Architectural boundary:
  *
- *   - Agents API owns the `parallel` step CONTRACT and its synchronous
- *     reference dispatch (run the same nested steps over N items in one
- *     request, returning `{ shape:'map', count, branches:[...] }`).
- *   - Data Machine provides a CONCURRENT executor backend for the map
+ *   - Agents API owns the `parallel` step CONTRACT: the schema, the
+ *     `wp_agent_workflow_should_fanout` adaptive gate, and the
+ *     `{ shape:'map', count, branches:[...] }` output envelope. Its
+ *     {@see \AgentsAPI\AI\Workflows\WP_Agent_Workflow_Runner} ships the
+ *     reference (synchronous) `parallel` handler.
+ *   - Data Machine provides the CONCURRENT executor backend for the map
  *     shape: each item becomes an independent child pipeline job drained
  *     through Action Scheduler with real concurrency budgets, chunk
  *     sizing, and parent/child status rollup. DM does not replace the
@@ -45,13 +48,14 @@
  *
  * Adaptive gate: honors the `wp_agent_workflow_should_fanout` filter
  * (default true) so the decision to fan out is consistent across every
- * consumer of the generic contract. When the gate returns false the
- * adapter reports `shape:'inline'` and performs no fan-out.
+ * consumer of the generic contract. This is the ONLY fan-out gate in
+ * Data Machine. When the gate returns false the adapter reports
+ * `shape:'inline'` and performs no fan-out; callers continue inline.
  *
- * This adapter has no hard dependency on Agents API code being present.
- * It models the contract shape directly so Data Machine's existing
- * behavior keeps working before PR #389 merges; once that substrate is
- * installed, DM composes the same primitive instead of re-deriving it.
+ * Hard dependency: this adapter depends on the Agents API `parallel`
+ * step substrate (PR #389) being installed and registered. There is no
+ * "Agents API absent, do it the old way" fallback — DM hard-depends on
+ * the contract via the `wordpress/agents-api` package. {@see assertSubstrateAvailable()}.
  *
  * @package DataMachine\Abilities\Engine
  * @since 0.159.0
@@ -67,6 +71,18 @@ class ParallelMapFanoutAdapter {
 	 * Contract step type owned by the Agents API `parallel` step.
 	 */
 	public const STEP_TYPE = 'parallel';
+
+	/**
+	 * Fully-qualified Agents API substrate runner class that ships the
+	 * generic `parallel` step handler (PR #389). DM hard-depends on this
+	 * being present; its absence is a misconfiguration, not a fallback.
+	 */
+	public const SUBSTRATE_RUNNER_CLASS = '\\AgentsAPI\\AI\\Workflows\\WP_Agent_Workflow_Runner';
+
+	/**
+	 * Adaptive fan-out gate filter, owned by the Agents API substrate.
+	 */
+	public const FANOUT_GATE_FILTER = 'wp_agent_workflow_should_fanout';
 
 	/**
 	 * Map shape identifier from the generic `parallel` contract output.
@@ -129,15 +145,36 @@ class ParallelMapFanoutAdapter {
 		/**
 		 * Filter whether a generic `parallel`-map step should fan out.
 		 *
-		 * Compatible with the Agents API `wp_agent_workflow_should_fanout`
-		 * contract (PR #389). Returning false collapses the map shape to an
-		 * inline (single-branch) pass so no child jobs are scheduled.
+		 * This IS the Agents API `wp_agent_workflow_should_fanout` gate
+		 * (PR #389) — the single fan-out gate in Data Machine. Returning
+		 * false collapses the map shape to an inline (single-branch) pass
+		 * so no child jobs are scheduled.
 		 *
 		 * @param bool  $should  Whether to fan out. Default true.
 		 * @param array $step    The `parallel`-map step spec.
 		 * @param array $context Caller context.
 		 */
-		return (bool) apply_filters( 'wp_agent_workflow_should_fanout', true, $step, $context );
+		return (bool) apply_filters( self::FANOUT_GATE_FILTER, true, $step, $context );
+	}
+
+	/**
+	 * Assert the Agents API `parallel` step substrate is installed.
+	 *
+	 * DM hard-depends on the generic `parallel` contract (PR #389): the
+	 * substrate runner class must be loadable. There is no silent
+	 * "do it the old way" fallback — a missing substrate is a fatal
+	 * misconfiguration of the `wordpress/agents-api` dependency.
+	 *
+	 * @throws \RuntimeException When the substrate is not present.
+	 */
+	public static function assertSubstrateAvailable(): void {
+		if ( ! class_exists( self::SUBSTRATE_RUNNER_CLASS ) ) {
+			throw new \RuntimeException(
+				'Data Machine packet fan-out requires the Agents API generic `parallel` step substrate '
+				. '(Automattic/agents-api#389). Install/activate the wordpress/agents-api package that ships '
+				. 'AgentsAPI\\AI\\Workflows\\WP_Agent_Workflow_Runner.'
+			);
+		}
 	}
 
 	/**
@@ -168,6 +205,8 @@ class ParallelMapFanoutAdapter {
 		string $next_flow_step_id,
 		array $engine_snapshot
 	): array {
+		self::assertSubstrateAvailable();
+
 		$items = is_array( $step['items'] ?? null ) ? array_values( $step['items'] ) : array();
 		$count = count( $items );
 

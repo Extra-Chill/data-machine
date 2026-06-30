@@ -577,12 +577,15 @@ class ExecuteStepAbility {
 					);
 				}
 
-				// Adaptive fan-out gate. This packet fan-out is Data Machine's
-				// concurrent backend for the generic Agents API `parallel`-map
-				// step contract, so route the decision through the same
-				// `wp_agent_workflow_should_fanout` filter the substrate uses.
-				// A false return collapses to inline continuation: the routed
-				// packets continue on this job instead of spawning children.
+				// Express the packet fan-out as the generic Agents API
+				// `parallel`-map step contract (Automattic/agents-api#389) and
+				// dispatch through the single ParallelMapFanoutAdapter surface.
+				// The adapter owns the entire decision: it applies the one
+				// `wp_agent_workflow_should_fanout` gate and either fans the
+				// routed packets into child jobs (shape:'map', backed by the
+				// Action-Scheduler PipelineBatchScheduler) or, when the gate
+				// declines, reports shape:'inline' so the packets continue on
+				// this job. There is no second fan-out decision path here.
 				$parallel_step = array(
 					'id'    => $next_flow_step_id,
 					'type'  => ParallelMapFanoutAdapter::STEP_TYPE,
@@ -590,14 +593,19 @@ class ExecuteStepAbility {
 					'steps' => array( array( 'flow_step_id' => $next_flow_step_id ) ),
 				);
 
-				if ( ! ParallelMapFanoutAdapter::shouldFanOut(
+				$engine_snapshot = datamachine_get_engine_data( $job_id );
+				$adapter         = new ParallelMapFanoutAdapter();
+				$parallel_result = $adapter->dispatch(
 					$parallel_step,
-					array(
-						'job_id'            => $job_id,
-						'next_flow_step_id' => $next_flow_step_id,
-						'item_count'        => $packet_count,
-					)
-				) ) {
+					$job_id,
+					$next_flow_step_id,
+					$engine_snapshot
+				);
+
+				// Gate declined (shape:'inline'): collapse to inline
+				// continuation — the routed packets continue on this job
+				// instead of spawning children.
+				if ( ParallelMapFanoutAdapter::SHAPE_INLINE === ( $parallel_result['shape'] ?? '' ) ) {
 					$this->handleStepLifecycleInlineContinuation( $job_id, $flow_step_config, $routed_packets );
 
 					do_action(
@@ -611,21 +619,9 @@ class ExecuteStepAbility {
 						'success'      => true,
 						'step_success' => true,
 						'outcome'      => 'fanout_gated_inline',
+						'parallel'     => $parallel_result,
 					);
 				}
-
-				// Fan out: each routed DataPacket becomes its own child job
-				// continuing through the remaining pipeline steps. The adapter
-				// expresses this as the generic `parallel`-map step contract,
-				// backed by the Action-Scheduler PipelineBatchScheduler.
-				$engine_snapshot = datamachine_get_engine_data( $job_id );
-				$adapter         = new ParallelMapFanoutAdapter();
-				$parallel_result = $adapter->dispatch(
-					$parallel_step,
-					$job_id,
-					$next_flow_step_id,
-					$engine_snapshot
-				);
 
 				return array(
 					'success'      => true,

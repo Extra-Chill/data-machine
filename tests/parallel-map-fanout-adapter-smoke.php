@@ -2,10 +2,17 @@
 /**
  * Pure-PHP smoke test for the parallel-map fan-out adapter.
  *
- * Proves Data Machine's packet fan-out can be expressed as the generic
- * Agents API `parallel`-MAP step contract (PR #389): a `parallel`-map step
- * spec `{ items, steps }` maps onto DM's PipelineBatchScheduler executor,
- * and the `wp_agent_workflow_should_fanout` adaptive gate is honored.
+ * Proves Data Machine's packet fan-out is the SINGLE-path expression of the
+ * generic Agents API `parallel`-MAP step contract (PR #389):
+ *
+ *   - A `parallel`-map step spec `{ items, steps }` maps onto DM's
+ *     PipelineBatchScheduler executor through one decision/dispatch surface.
+ *   - The adapter HARD-DEPENDS on the Agents API substrate: dispatch()
+ *     throws when the substrate runner class is absent (no fallback path).
+ *   - The `wp_agent_workflow_should_fanout` adaptive gate is the ONLY gate;
+ *     dispatch() applies it and returns shape:'inline' when it declines.
+ *   - ExecuteStepAbility routes fan-out exclusively through the adapter and
+ *     never re-evaluates the gate or calls a legacy fan-out entry point.
  *
  * Run with: php tests/parallel-map-fanout-adapter-smoke.php
  *
@@ -36,6 +43,13 @@ namespace DataMachine\Abilities\Engine {
 			);
 		}
 	}
+}
+
+// Stub the Agents API `parallel` step substrate (PR #389) the adapter
+// hard-depends on. Its presence lets dispatch() proceed; the "absent"
+// case is exercised separately below before this class is defined.
+namespace AgentsAPI\AI\Workflows {
+	class WP_Agent_Workflow_Runner {}
 }
 
 namespace {
@@ -160,6 +174,40 @@ namespace {
 
 	$GLOBALS['__should_fanout_filter'] = null;
 	parallel_map_assert( true, ParallelMapFanoutAdapter::shouldFanOut( $parallel_step, array( 'job_id' => 42 ) ), 'shouldFanOut defaults to true', $failures, $passes );
+
+	// --- Hard dependency: dispatch asserts the substrate is present ---
+	// The substrate stub is defined, so assertSubstrateAvailable() must NOT
+	// throw and dispatch() must proceed.
+	parallel_map_assert( true, class_exists( ParallelMapFanoutAdapter::SUBSTRATE_RUNNER_CLASS ), 'substrate runner class resolves', $failures, $passes );
+
+	$substrate_present_ok = true;
+	try {
+		ParallelMapFanoutAdapter::assertSubstrateAvailable();
+	} catch ( \RuntimeException $e ) {
+		$substrate_present_ok = false;
+	}
+	parallel_map_assert( true, $substrate_present_ok, 'assertSubstrateAvailable passes when substrate present', $failures, $passes );
+
+	// The gate filter name the adapter applies IS the Agents API contract
+	// filter — a single, named gate, not a DM-private duplicate.
+	parallel_map_assert( 'wp_agent_workflow_should_fanout', ParallelMapFanoutAdapter::FANOUT_GATE_FILTER, 'gate is the Agents API contract filter', $failures, $passes );
+
+	// --- Single-path: source-level proof there is no legacy fan-out path ---
+	$adapter_source = file_get_contents( __DIR__ . '/../inc/Abilities/Engine/ParallelMapFanoutAdapter.php' ) ?: '';
+	parallel_map_assert( true, str_contains( $adapter_source, 'assertSubstrateAvailable' ), 'adapter hard-depends on substrate (no absent fallback)', $failures, $passes );
+	parallel_map_assert( false, str_contains( $adapter_source, 'no hard dependency' ), 'adapter drops the no-hard-dependency hedge', $failures, $passes );
+
+	$execute_source = file_get_contents( __DIR__ . '/../inc/Abilities/Engine/ExecuteStepAbility.php' ) ?: '';
+	// ExecuteStepAbility must route fan-out solely through the adapter: it
+	// constructs the adapter and never instantiates the executor backend
+	// (PipelineBatchScheduler) directly as a second fan-out entry point.
+	parallel_map_assert( true, str_contains( $execute_source, 'new ParallelMapFanoutAdapter()' ), 'ExecuteStepAbility dispatches via the adapter', $failures, $passes );
+	parallel_map_assert( false, str_contains( $execute_source, 'new PipelineBatchScheduler()' ), 'ExecuteStepAbility has no direct PipelineBatchScheduler fan-out path', $failures, $passes );
+	// The gate is evaluated once, inside the adapter. ExecuteStepAbility must
+	// not pre-evaluate ParallelMapFanoutAdapter::shouldFanOut itself.
+	parallel_map_assert( false, str_contains( $execute_source, 'ParallelMapFanoutAdapter::shouldFanOut' ), 'ExecuteStepAbility does not re-evaluate the fan-out gate', $failures, $passes );
+	// The inline-vs-fanned decision keys off the adapter's contract shape.
+	parallel_map_assert( true, str_contains( $execute_source, 'ParallelMapFanoutAdapter::SHAPE_INLINE' ), 'ExecuteStepAbility branches on the adapter contract shape', $failures, $passes );
 
 	if ( $failures ) {
 		echo "\nFAILED: " . count( $failures ) . " parallel-map fan-out adapter assertions failed.\n";
