@@ -577,14 +577,53 @@ class ExecuteStepAbility {
 					);
 				}
 
+				// Adaptive fan-out gate. This packet fan-out is Data Machine's
+				// concurrent backend for the generic Agents API `parallel`-map
+				// step contract, so route the decision through the same
+				// `wp_agent_workflow_should_fanout` filter the substrate uses.
+				// A false return collapses to inline continuation: the routed
+				// packets continue on this job instead of spawning children.
+				$parallel_step = array(
+					'id'    => $next_flow_step_id,
+					'type'  => ParallelMapFanoutAdapter::STEP_TYPE,
+					'items' => $routed_packets,
+					'steps' => array( array( 'flow_step_id' => $next_flow_step_id ) ),
+				);
+
+				if ( ! ParallelMapFanoutAdapter::shouldFanOut(
+					$parallel_step,
+					array(
+						'job_id'            => $job_id,
+						'next_flow_step_id' => $next_flow_step_id,
+						'item_count'        => $packet_count,
+					)
+				) ) {
+					$this->handleStepLifecycleInlineContinuation( $job_id, $flow_step_config, $routed_packets );
+
+					do_action(
+						'datamachine_schedule_next_step',
+						$job_id,
+						$next_flow_step_id,
+						$routed_packets
+					);
+
+					return array(
+						'success'      => true,
+						'step_success' => true,
+						'outcome'      => 'fanout_gated_inline',
+					);
+				}
+
 				// Fan out: each routed DataPacket becomes its own child job
-				// continuing through the remaining pipeline steps.
+				// continuing through the remaining pipeline steps. The adapter
+				// expresses this as the generic `parallel`-map step contract,
+				// backed by the Action-Scheduler PipelineBatchScheduler.
 				$engine_snapshot = datamachine_get_engine_data( $job_id );
-				$batch_scheduler = new PipelineBatchScheduler();
-				$batch_result    = $batch_scheduler->fanOut(
+				$adapter         = new ParallelMapFanoutAdapter();
+				$parallel_result = $adapter->dispatch(
+					$parallel_step,
 					$job_id,
 					$next_flow_step_id,
-					$routed_packets,
 					$engine_snapshot
 				);
 
@@ -592,7 +631,8 @@ class ExecuteStepAbility {
 					'success'      => true,
 					'step_success' => true,
 					'outcome'      => 'batch_scheduled',
-					'batch'        => $batch_result,
+					'batch'        => $parallel_result['batch'] ?? array(),
+					'parallel'     => $parallel_result,
 				);
 			}
 
