@@ -79,7 +79,7 @@ namespace {
 		global $assertions;
 		++$assertions;
 		if ( $expected !== $actual ) {
-			fwrite( STDERR, "FAIL: {$message}\nExpected: " . var_export( $expected, true ) . "\nActual: " . var_export( $actual, true ) . "\n" );
+			fwrite( fopen( 'php://stderr', 'w' ), "FAIL: {$message}\nExpected: " . var_export( $expected, true ) . "\nActual: " . var_export( $actual, true ) . "\n" );
 			exit( 1 );
 		}
 	}
@@ -149,5 +149,5 @@ namespace {
 	$summarizer = ConversationCompactionSummarizer::build( array( 'agent_id' => 7 ), array( 'enabled' => true ) );
 	compaction_assert_same( true, is_callable( $summarizer ), 'summarizer factory returns a callable' );
 
-	fwrite( STDOUT, "ConversationCompactionPolicyResolver smoke passed ({$assertions} assertions).\n" );
+	fwrite( fopen( 'php://stdout', 'w' ), "ConversationCompactionPolicyResolver smoke passed ({$assertions} assertions).\n" );
 }
