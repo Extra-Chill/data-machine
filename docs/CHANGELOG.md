@@ -2,6 +2,17 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.158.0] - 2026-06-30
+
+### Added
+- wire conversation compaction into the live chat loop
+
+### Changed
+- fold tool-call and nudge accumulators into turn state (#2803 slice 3)
+
+### Fixed
+- materialize bundle agent identity (SOUL.md) on upgrade (#2818)
+
 ## [0.157.1] - 2026-06-28
 
 ### Changed
