@@ -79,6 +79,12 @@ function datamachine_run_conversation(
 		datamachine_payload_without_runtime_objects( $payload )
 	);
 
+	// Resolve optional per-agent conversation compaction. Default DISABLED:
+	// agents that have not opted into compaction get a no-op policy and no
+	// summarizer, so the substrate's maybe_compact() never fires. The summarizer
+	// closes over the cleaned loop payload so it can drive a tool-free model turn.
+	$conversation_compaction = datamachine_resolve_conversation_compaction( $modes, $loop_payload );
+
 	// Build the turns budget through DM's registry (site-config-aware ceiling
 	// resolution). The upstream loop owns increment + exceeded checks.
 	$turn_budget = IterationBudgetRegistry::create( 'conversation_turns', 0, $max_turns );
@@ -236,32 +242,43 @@ function datamachine_run_conversation(
 	);
 
 	// Run through the upstream substrate loop.
+	$loop_options = array(
+		'max_turns'             => $max_turns,
+		'budgets'               => array( $turn_budget ),
+		'context'               => array_merge( $loop_payload, array(
+			'mode'  => $mode,
+			'modes' => $modes,
+		) ),
+		'request'               => $conversation_request,
+		'should_continue'       => $should_continue,
+		'transcript_persister'  => $transcript_persister,
+		'transcript_lock'       => $transcript_lock,
+		'transcript_session_id' => (string) ( $loop_payload['transcript_session_id'] ?? $loop_payload['session_id'] ?? '' ),
+		'transcript_lock_ttl'   => (int) ( $payload['transcript_lock_ttl'] ?? 300 ),
+		'interrupt_source'      => $interrupt_source,
+		'on_event'              => $on_event,
+		'tool_executor'         => $tool_executor,
+		'tool_declarations'     => $tools,
+		'runtime_tool_store'    => datamachine_runtime_tool_request_store(),
+		'provider_turn_adapter' => $provider_turn_adapter,
+		'pre_tool_mediator'     => $pre_tool_mediator,
+		'completion_policy'     => $completion_policy,
+	);
+
+	// Attach conversation compaction only when the agent opted in. The substrate
+	// no-ops unless BOTH compaction_policy (array) and summarizer (callable) are
+	// present, so omitting them entirely keeps the non-compacting path identical
+	// to before for every agent that has not enabled compaction.
+	if ( $conversation_compaction['enabled'] ) {
+		$loop_options['compaction_policy'] = $conversation_compaction['policy'];
+		$loop_options['summarizer']        = $conversation_compaction['summarizer'];
+	}
+
 	try {
 		$result = WP_Agent_Conversation_Loop::run(
 			$messages,
 			$provider_turn_adapter,
-			array(
-				'max_turns'             => $max_turns,
-				'budgets'               => array( $turn_budget ),
-				'context'               => array_merge( $loop_payload, array(
-					'mode'  => $mode,
-					'modes' => $modes,
-				) ),
-				'request'               => $conversation_request,
-				'should_continue'       => $should_continue,
-				'transcript_persister'  => $transcript_persister,
-				'transcript_lock'       => $transcript_lock,
-				'transcript_session_id' => (string) ( $loop_payload['transcript_session_id'] ?? $loop_payload['session_id'] ?? '' ),
-				'transcript_lock_ttl'   => (int) ( $payload['transcript_lock_ttl'] ?? 300 ),
-				'interrupt_source'      => $interrupt_source,
-				'on_event'              => $on_event,
-				'tool_executor'         => $tool_executor,
-				'tool_declarations'     => $tools,
-				'runtime_tool_store'    => datamachine_runtime_tool_request_store(),
-				'provider_turn_adapter' => $provider_turn_adapter,
-				'pre_tool_mediator'     => $pre_tool_mediator,
-				'completion_policy'     => $completion_policy,
-			)
+			$loop_options
 		);
 	} catch ( \RuntimeException $e ) {
 		// The provider-turn adapter throws RuntimeException for wp-ai-client failures before
@@ -298,12 +315,34 @@ function datamachine_run_conversation(
 	try {
 		$result                    = WP_Agent_Conversation_Result::normalize( $result );
 		$completion_policy_stopped = false;
+		$compaction_event_types    = array(
+			\AgentsAPI\AI\WP_Agent_Conversation_Compaction::EVENT_STARTED,
+			\AgentsAPI\AI\WP_Agent_Conversation_Compaction::EVENT_COMPLETED,
+			\AgentsAPI\AI\WP_Agent_Conversation_Compaction::EVENT_FAILED,
+			\AgentsAPI\AI\WP_Agent_Conversation_Compaction::EVENT_ARCHIVED,
+		);
 		foreach ( is_array( $result['events'] ?? null ) ? $result['events'] : array() as $event ) {
-			if ( ! is_array( $event ) || ! in_array( (string) ( $event['type'] ?? '' ), array( DataMachineConversationStatus::COMPLETION_POLICY_STOP, DataMachineConversationStatus::COMPLETION_POLICY_CONTINUE ), true ) ) {
+			$event_type = is_array( $event ) ? (string) ( $event['type'] ?? '' ) : '';
+
+			// Surface substrate compaction lifecycle events through the DM event
+			// sink for observability, mirroring how request/tool events flow.
+			if ( in_array( $event_type, $compaction_event_types, true ) ) {
+				datamachine_emit_loop_event(
+					$event_sink,
+					$event_type,
+					array_merge(
+						$base_log_context,
+						is_array( $event['metadata'] ?? null ) ? $event['metadata'] : array()
+					)
+				);
 				continue;
 			}
 
-			if ( DataMachineConversationStatus::COMPLETION_POLICY_STOP === (string) ( $event['type'] ?? '' ) ) {
+			if ( ! is_array( $event ) || ! in_array( $event_type, array( DataMachineConversationStatus::COMPLETION_POLICY_STOP, DataMachineConversationStatus::COMPLETION_POLICY_CONTINUE ), true ) ) {
+				continue;
+			}
+
+			if ( DataMachineConversationStatus::COMPLETION_POLICY_STOP === $event_type ) {
 				$completion_policy_stopped = true;
 			}
 
@@ -2399,6 +2438,43 @@ function datamachine_resolve_completion_policy( array $modes, array $payload, ?D
 	}
 
 	return new DefaultAgentConversationCompletionPolicy( $assertions );
+}
+
+/**
+ * Resolve optional per-agent conversation compaction for the chat/system loop.
+ *
+ * Reads the acting agent's compaction policy from agent_config (via the
+ * ConversationCompactionPolicyResolver) and, when enabled, builds the DM-owned
+ * summarizer callable the Agents API compaction contract consumes. Compaction is
+ * DISABLED by default: agents that have not opted in resolve to enabled=false,
+ * which keeps the substrate's maybe_compact() a strict no-op.
+ *
+ * @param array $modes        Execution modes.
+ * @param array $loop_payload Cleaned loop payload (carries agent_id).
+ * @return array{enabled:bool,policy:array<string,mixed>,summarizer:?callable}
+ */
+function datamachine_resolve_conversation_compaction( array $modes, array $loop_payload ): array {
+	$resolver = new \DataMachine\Engine\AI\Compaction\ConversationCompactionPolicyResolver();
+	$policy   = $resolver->resolve(
+		array(
+			'agent_id' => (int) ( $loop_payload['agent_id'] ?? 0 ),
+			'modes'    => $modes,
+		)
+	);
+
+	if ( empty( $policy['enabled'] ) ) {
+		return array(
+			'enabled'    => false,
+			'policy'     => $policy,
+			'summarizer' => null,
+		);
+	}
+
+	return array(
+		'enabled'    => true,
+		'policy'     => $policy,
+		'summarizer' => \DataMachine\Engine\AI\Compaction\ConversationCompactionSummarizer::build( $loop_payload, $policy ),
+	);
 }
 
 /**
