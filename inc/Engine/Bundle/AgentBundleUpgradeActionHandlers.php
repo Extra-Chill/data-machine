@@ -64,7 +64,7 @@ final class AgentBundleCoreArtifactApply {
 		$agent_id = (int) ( $agent['agent_id'] ?? 0 );
 		$payload  = $artifact['payload'] ?? null;
 
-		if ( $agent_id <= 0 || null === $payload || ! in_array( $type, array( 'agent_config', 'pipeline', 'flow', 'prompt', 'rubric' ), true ) ) {
+		if ( $agent_id <= 0 || null === $payload || ! in_array( $type, array( 'agent_config', 'pipeline', 'flow', 'prompt', 'rubric', 'memory' ), true ) ) {
 			return null;
 		}
 
@@ -73,6 +73,11 @@ final class AgentBundleCoreArtifactApply {
 				'artifact_type' => $type,
 				'artifact_id'   => (string) ( $artifact['artifact_id'] ?? '' ),
 			);
+		} elseif ( 'memory' === $type ) {
+			$applied = AgentBundleMemoryArtifact::apply( $artifact, $agent_id );
+			if ( null === $applied ) {
+				return null;
+			}
 		} elseif ( 'agent_config' === $type ) {
 			if ( ! is_array( $payload ) ) {
 				return null;

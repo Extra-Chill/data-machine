@@ -121,6 +121,10 @@ final class AgentBundleLifecycleProjection {
 			$artifacts[] = $artifact;
 		}
 
+		foreach ( AgentBundleMemoryArtifact::target_artifacts( $bundle ) as $artifact ) {
+			$artifacts[] = $artifact;
+		}
+
 		foreach ( AgentBundleArtifactExtensions::normalize_artifacts( is_array( $bundle['extension_artifacts'] ?? null ) ? $bundle['extension_artifacts'] : array() ) as $artifact ) {
 			$artifacts[] = $artifact;
 		}
@@ -193,6 +197,7 @@ final class AgentBundleLifecycleProjection {
 
 		return array_merge(
 			$artifacts,
+			AgentBundleMemoryArtifact::current_artifacts( $agent_id, $installed ),
 			SystemTaskPromptRegistry::current_artifacts(),
 			AgentBundleArtifactExtensions::current_artifacts( $agent, $installed, array( 'agent_id' => $agent_id ) )
 		);

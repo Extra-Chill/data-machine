@@ -485,6 +485,63 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 		$this->assertSame( 1, $search['data']['match_count'] ?? 0 );
 	}
 
+	public function test_upgrade_materializes_authored_soul_without_clobbering_learned_memory(): void {
+		$store                     = new DailyMemoryImportFakeStore();
+		$this->memory_store_filter = static fn( $default, array $context ) => $store;
+		add_filter( 'wp_agent_memory_store', $this->memory_store_filter, 10, 2 );
+
+		// Fresh install: a flow-less, memory-bearing bundle carrying authored SOUL.
+		$bundle                          = $this->fixture_bundle( 'soul-upgrade-agent' );
+		$bundle['pipelines']             = array();
+		$bundle['flows']                 = array();
+		$bundle['files']['SOUL.md']      = "# Identity\n\noriginal soul\n";
+		$bundle_dir                      = sys_get_temp_dir() . '/datamachine-soul-bundle-' . getmypid();
+		$this->remove_tree( $bundle_dir );
+		$this->assertTrue( $this->bundler->to_directory( $bundle, $bundle_dir ), 'Bundle directory write succeeds.' );
+		$install_bundle = $this->bundler->from_directory( $bundle_dir );
+		$this->assertIsArray( $install_bundle, 'Install bundle reads back from directory.' );
+
+		$installed = $this->bundler->import( $install_bundle, null, $this->owner_id );
+		$this->assertTrue( (bool) $installed['success'], 'Fresh install of a memory-bearing bundle succeeds.' );
+
+		$agent    = $this->agents_repo->get_by_slug( 'soul-upgrade-agent' );
+		$agent_id = (int) $agent['agent_id'];
+
+		$soul = new \DataMachine\Core\FilesRepository\AgentMemory( 0, $agent_id, 'SOUL.md' );
+		$this->assertTrue( $soul->read()->exists, 'Fresh install writes SOUL.md to the live store.' );
+		$this->assertStringContainsString( 'original soul', $soul->read()->content, 'Fresh install seeds the bundle SOUL content.' );
+
+		// The agent accumulates LEARNED memory after install — this must survive an upgrade.
+		$learned = new \DataMachine\Core\FilesRepository\AgentMemory( 0, $agent_id, 'MEMORY.md' );
+		$learned->replace_all( "# Memory\n\nlearned-sentinel\n" );
+
+		// SOUL is tracked as an installed memory artifact so future upgrades diff cleanly.
+		$installed_types = array_map(
+			static fn( AgentBundleInstalledArtifact $artifact ): string => $artifact->to_array()['artifact_type'],
+			( new InstalledBundleArtifacts() )->list_for_bundle( 'soul-upgrade-agent', $agent_id )
+		);
+		$this->assertContains( 'memory', $installed_types, 'Authored SOUL is recorded in the bundle artifact ledger.' );
+
+		// Upgrade: ship a NEW SOUL. The bundle carries no MEMORY.md.
+		$upgrade_bundle                     = $this->fixture_bundle( 'soul-upgrade-agent' );
+		$upgrade_bundle['pipelines']        = array();
+		$upgrade_bundle['flows']            = array();
+		$upgrade_bundle['files']['SOUL.md'] = "# Identity\n\nupgraded soul\n";
+		$this->remove_tree( $bundle_dir );
+		$this->assertTrue( $this->bundler->to_directory( $upgrade_bundle, $bundle_dir ), 'Upgrade bundle directory write succeeds.' );
+		$upgrade_bundle = $this->bundler->from_directory( $bundle_dir );
+		$this->remove_tree( $bundle_dir );
+
+		$result = $this->bundler->import( $upgrade_bundle, null, $this->owner_id, false, array( 'is_upgrade' => true ) );
+		$this->assertTrue( (bool) $result['success'], 'Upgrade of a memory-bearing bundle succeeds.' );
+
+		$soul_after = new \DataMachine\Core\FilesRepository\AgentMemory( 0, $agent_id, 'SOUL.md' );
+		$this->assertStringContainsString( 'upgraded soul', $soul_after->read()->content, 'Upgrade materializes the new authored SOUL into the live store.' );
+
+		$learned_after = new \DataMachine\Core\FilesRepository\AgentMemory( 0, $agent_id, 'MEMORY.md' );
+		$this->assertStringContainsString( 'learned-sentinel', $learned_after->read()->content, 'Upgrade preserves learned runtime memory it did not ship.' );
+	}
+
 	private function remove_tree( string $path ): void {
 		if ( ! is_dir( $path ) ) {
 			return;
