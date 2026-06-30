@@ -5,7 +5,7 @@
 	"license": "GPL-2.0-or-later",
 	"require": {
 		"php": ">=8.2",
-		"wordpress/agents-api": "dev-feat/parallel-step-handler",
+		"wordpress/agents-api": "dev-main",
 		"woocommerce/action-scheduler": "^3.9",
 		"automattic/blocks-engine-php-transformer": "0.1.0"
 	},
