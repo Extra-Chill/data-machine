@@ -202,3 +202,58 @@ function host_matches_blocklist( string $host, array $blocklist ): bool {
 
 	return false;
 }
+
+/**
+ * Whether a URL points at a host that structurally blocks automated imports.
+ *
+ * Public, reusable predicate over the SAME blocklist the web_fetch guard
+ * enforces (the single source of truth, filterable via
+ * `data_machine_events_web_fetch_blocked_hosts`). Any caller that fetches or
+ * scrapes a user-supplied URL can use this to reject a known bot-blocked
+ * ticketing/aggregator domain up front — before spending a network round-trip
+ * that will only ever return HTTP 403 — and surface a clear message instead of
+ * a generic "couldn't read that page" failure.
+ *
+ * This helper is deliberately domain-agnostic: it knows nothing about what the
+ * caller intends to extract, only that the host is on the bot-blocked list.
+ *
+ * @param string $url Absolute http/https URL (or bare host).
+ * @return bool True when the URL's host is a known bot-blocked domain.
+ */
+function is_bot_blocked_host( string $url ): bool {
+	if ( '' === $url ) {
+		return false;
+	}
+
+	$host = strtolower( (string) wp_parse_url( $url, PHP_URL_HOST ) );
+	if ( '' === $host ) {
+		// Allow callers to pass a bare host instead of a full URL.
+		$host = strtolower( trim( $url ) );
+	}
+
+	if ( '' === $host ) {
+		return false;
+	}
+
+	return host_matches_blocklist( $host, blocked_web_fetch_hosts() );
+}
+
+/**
+ * Generic, domain-agnostic message explaining why a bot-blocked host can't be
+ * imported automatically, and what to do instead.
+ *
+ * Intentionally carries no assumption about what kind of content the caller is
+ * importing — it only states that the source blocks automated requests and that
+ * the user should provide the original source page instead. Callers can wrap or
+ * localize this for their own surface.
+ *
+ * @param string $host The bot-blocked host (e.g. "www.bandsintown.com").
+ * @return string Human-readable, generic guidance message.
+ */
+function bot_blocked_host_message( string $host ): string {
+	return sprintf(
+		/* translators: %s: the host name that was submitted, e.g. www.bandsintown.com */
+		__( '%s blocks automated imports, so its listings can\'t be read automatically. Paste the original source page instead and we\'ll try again.', 'data-machine-events' ),
+		$host
+	);
+}

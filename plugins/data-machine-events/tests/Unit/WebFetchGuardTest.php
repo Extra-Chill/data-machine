@@ -24,6 +24,8 @@ use function DataMachineEvents\Core\block_ticketing_web_fetch;
 use function DataMachineEvents\Core\host_matches_blocklist;
 use function DataMachineEvents\Core\is_web_fetch_request;
 use function DataMachineEvents\Core\blocked_web_fetch_hosts;
+use function DataMachineEvents\Core\is_bot_blocked_host;
+use function DataMachineEvents\Core\bot_blocked_host_message;
 
 class WebFetchGuardTest extends WP_UnitTestCase {
 
@@ -179,5 +181,60 @@ class WebFetchGuardTest extends WP_UnitTestCase {
 		$this->assertContains( 'ticketmaster.com', $hosts );
 		$this->assertContains( 'ticketweb.com', $hosts );
 		$this->assertContains( 'ticketmaster.evyy.net', $hosts );
+	}
+
+	// ────────────────────────────────────────────────────────────────────
+	// is_bot_blocked_host / bot_blocked_host_message (reusable helpers)
+	// ────────────────────────────────────────────────────────────────────
+
+	public function test_is_bot_blocked_host_matches_full_url(): void {
+		$this->assertTrue( is_bot_blocked_host( 'https://www.bandsintown.com/a/12345-some-band' ) );
+		$this->assertTrue( is_bot_blocked_host( 'https://www.ticketmaster.com/event/1' ) );
+	}
+
+	public function test_is_bot_blocked_host_accepts_bare_host(): void {
+		$this->assertTrue( is_bot_blocked_host( 'bandsintown.com' ) );
+		$this->assertTrue( is_bot_blocked_host( 'www.ticketweb.com' ) );
+	}
+
+	public function test_is_bot_blocked_host_allows_unlisted_domains(): void {
+		$this->assertFalse( is_bot_blocked_host( 'https://www.someindievenue.com/shows' ) );
+		$this->assertFalse( is_bot_blocked_host( 'https://easyhoneymusic.com/tour/' ) );
+		$this->assertFalse( is_bot_blocked_host( '' ) );
+	}
+
+	public function test_is_bot_blocked_host_respects_blocklist_filter(): void {
+		$added = static function ( $hosts ) {
+			$hosts[] = 'customblocked.example';
+			return $hosts;
+		};
+		add_filter( 'data_machine_events_web_fetch_blocked_hosts', $added );
+
+		$result = is_bot_blocked_host( 'https://customblocked.example/page' );
+
+		remove_filter( 'data_machine_events_web_fetch_blocked_hosts', $added );
+
+		$this->assertTrue( $result );
+	}
+
+	public function test_bot_blocked_host_message_is_generic_and_names_host(): void {
+		// Use a neutral host so the assertion targets the message TEMPLATE
+		// wording, not the interpolated host (e.g. "bandsintown" itself
+		// contains the substring "band").
+		$host    = 'example-blocked.test';
+		$message = bot_blocked_host_message( $host );
+
+		// Must name the host so the caller's surface can show what was rejected.
+		$this->assertStringContainsString( $host, $message );
+
+		// The template must carry zero domain-specific (artist/music/band/tour)
+		// wording — this helper lives in the generic scraping layer. Strip the
+		// host before checking so a host that happens to contain such a
+		// substring can't trip the assertion.
+		$template = strtolower( str_replace( $host, '', $message ) );
+		$this->assertStringNotContainsString( 'artist', $template );
+		$this->assertStringNotContainsString( 'music', $template );
+		$this->assertStringNotContainsString( 'band', $template );
+		$this->assertStringNotContainsString( 'tour', $template );
 	}
 }

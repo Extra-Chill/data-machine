@@ -28,6 +28,7 @@
  * 18. GoDaddy website builder
  * 19. Timely Event Discovery (FullCalendar.js)
  * 20. Elfsight Events Calendar (shy.elfsight.com API)
+ * 20b. Seated tour widget (cdn.seated.com/api/tour API — artist tour pages)
  * 21. Eventbrite (organizer pages, individual event pages)
  * 22. Schema.org JSON-LD
  * 23. WordPress (Tribe Events, WP REST)
@@ -88,6 +89,7 @@ use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\SofarSoun
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\VisionExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\SquareOnlineExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\WeeblyExtractor;
+use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\SeatedExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\VisionExtractionProcessor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Paginators\PaginatorInterface;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Paginators\JsonApiPaginator;
@@ -174,6 +176,7 @@ class UniversalWebScraper extends EventImportHandler {
 			new GoDaddyExtractor(),
 			new TimelyExtractor(),
 			new ElfsightEventsExtractor(),
+			new SeatedExtractor(),
 			new EventbriteExtractor(),
 			new JsonLdExtractor(),
 			new GenericHtmlEventsExtractor(),
