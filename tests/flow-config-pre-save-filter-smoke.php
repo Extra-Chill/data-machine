@@ -106,7 +106,7 @@ use DataMachine\Core\Database\Flows\Flows;
 
 function datamachine_flow_config_pre_save_assert( bool $condition, string $message ): void {
 	if ( ! $condition ) {
-		fwrite( STDERR, "FAIL {$message}\n" );
+		fwrite( fopen( 'php://stderr', 'w' ), "FAIL {$message}\n" );
 		exit( 1 );
 	}
 

@@ -7,7 +7,7 @@
 
 $source = file_get_contents( dirname( __DIR__ ) . '/data-machine.php' );
 if ( false === $source ) {
-	fwrite( STDERR, "FAIL: unable to read data-machine.php\n" );
+	fwrite( fopen( 'php://stderr', 'w' ), "FAIL: unable to read data-machine.php\n" );
 	exit( 1 );
 }
 
@@ -15,7 +15,7 @@ $assertions = 0;
 $assert     = function ( string $label, bool $condition ) use ( &$assertions ): void {
 	++$assertions;
 	if ( ! $condition ) {
-		fwrite( STDERR, "FAIL: {$label}\n" );
+		fwrite( fopen( 'php://stderr', 'w' ), "FAIL: {$label}\n" );
 		exit( 1 );
 	}
 

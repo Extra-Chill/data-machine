@@ -19,7 +19,7 @@ function datamachine_pending_inspection_assert( bool $condition, string $message
 	global $assertions;
 	++$assertions;
 	if ( ! $condition ) {
-		fwrite( STDERR, "FAIL: {$message}\n" );
+		fwrite( fopen( 'php://stderr', 'w' ), "FAIL: {$message}\n" );
 		exit( 1 );
 	}
 }

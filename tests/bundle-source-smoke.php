@@ -139,7 +139,7 @@ namespace {
 	$assert     = function ( string $label, bool $condition ) use ( &$assertions ): void {
 		++$assertions;
 		if ( ! $condition ) {
-			fwrite( STDERR, "FAIL: {$label}\n" );
+			fwrite( fopen( 'php://stderr', 'w' ), "FAIL: {$label}\n" );
 			exit( 1 );
 		}
 		echo "ok - {$label}\n";
@@ -392,7 +392,7 @@ namespace {
 	// Remote URL without .zip/.json extension is rejected before download.
 	$reset_stubs();
 	$GLOBALS['datamachine_test_safe_remote_get'] = function () {
-		fwrite( STDERR, "FAIL: wp_safe_remote_get should not have been called for unsupported extension\n" );
+		fwrite( fopen( 'php://stderr', 'w' ), "FAIL: wp_safe_remote_get should not have been called for unsupported extension\n" );
 		exit( 1 );
 	};
 	$bad_ext = BundleSource::resolve( 'https://example.com/something' );

@@ -48,7 +48,7 @@ $bootstrap   = file_get_contents( $plugin_root . '/data-machine.php' );
 $categories  = file_get_contents( $plugin_root . '/inc/Abilities/AbilityCategories.php' );
 
 if ( false === $bootstrap || false === $categories ) {
-	fwrite( STDERR, "FAIL: unable to read plugin source\n" );
+	fwrite( fopen( 'php://stderr', 'w' ), "FAIL: unable to read plugin source\n" );
 	exit( 1 );
 }
 
@@ -123,7 +123,7 @@ $assert(
 // real WordPress runtime.
 if ( defined( 'WPINC' ) ) {
 	if ( $failed > 0 ) {
-		fwrite( STDERR, "\nabilities-categories-load-order-smoke: {$failed}/{$total} assertions failed\n" );
+		fwrite( fopen( 'php://stderr', 'w' ), "\nabilities-categories-load-order-smoke: {$failed}/{$total} assertions failed\n" );
 		exit( 1 );
 	}
 
@@ -284,7 +284,7 @@ $assert(
 );
 
 if ( $failed > 0 ) {
-	fwrite( STDERR, "\nabilities-categories-load-order-smoke: {$failed}/{$total} assertions failed\n" );
+	fwrite( fopen( 'php://stderr', 'w' ), "\nabilities-categories-load-order-smoke: {$failed}/{$total} assertions failed\n" );
 	exit( 1 );
 }
 

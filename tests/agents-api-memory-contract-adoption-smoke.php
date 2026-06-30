@@ -90,7 +90,7 @@ function datamachine_contract_adoption_assert( bool $condition, string $message 
 	static $assertions = 0;
 	++$assertions;
 	if ( ! $condition ) {
-		fwrite( STDERR, "Assertion failed: {$message}\n" );
+		fwrite( fopen( 'php://stderr', 'w' ), "Assertion failed: {$message}\n" );
 		exit( 1 );
 	}
 	echo "ok {$assertions} - {$message}\n";

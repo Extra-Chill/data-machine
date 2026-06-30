@@ -91,7 +91,7 @@ function assert_action_scheduler_group_true( bool $condition, string $message ):
 	global $assertions;
 	++$assertions;
 	if ( ! $condition ) {
-		fwrite( STDERR, "FAIL: {$message}\n" );
+		fwrite( fopen( 'php://stderr', 'w' ), "FAIL: {$message}\n" );
 		exit( 1 );
 	}
 }

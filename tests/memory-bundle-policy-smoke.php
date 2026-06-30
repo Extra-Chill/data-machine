@@ -297,7 +297,7 @@ function memory_policy_assert( bool $condition, string $message ): void {
 	static $assertions = 0;
 	++$assertions;
 	if ( ! $condition ) {
-		fwrite( STDERR, "Assertion failed: {$message}\n" );
+		fwrite( fopen( 'php://stderr', 'w' ), "Assertion failed: {$message}\n" );
 		exit( 1 );
 	}
 	echo "ok {$assertions} - {$message}\n";

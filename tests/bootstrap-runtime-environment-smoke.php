@@ -38,7 +38,7 @@ namespace {
 	$bootstrap = file_get_contents( $plugin_root . '/inc/bootstrap.php' );
 
 	if ( false === $bootstrap ) {
-		fwrite( STDERR, "FAIL: bootstrap source is not readable\n" );
+		fwrite( fopen( 'php://stderr', 'w' ), "FAIL: bootstrap source is not readable\n" );
 		exit( 1 );
 	}
 
@@ -144,7 +144,7 @@ namespace {
 	);
 
 	if ( $failed > 0 ) {
-		fwrite( STDERR, "bootstrap runtime environment smoke failed: {$failed}/{$total}\n" );
+		fwrite( fopen( 'php://stderr', 'w' ), "bootstrap runtime environment smoke failed: {$failed}/{$total}\n" );
 		exit( 1 );
 	}
 

@@ -30,7 +30,7 @@ $send_source = file_get_contents( $plugin_root . '/inc/Abilities/Publish/SendEma
 $queue_source = file_get_contents( $plugin_root . '/inc/Abilities/Publish/SendEmailQueuedAbility.php' );
 
 if ( false === $bootstrap || false === $send_source || false === $queue_source ) {
-	fwrite( STDERR, "FAIL: unable to read plugin source\n" );
+	fwrite( fopen( 'php://stderr', 'w' ), "FAIL: unable to read plugin source\n" );
 	exit( 1 );
 }
 
@@ -92,7 +92,7 @@ foreach ( array( 'send-email' => $send_source, 'send-email-queued' => $queue_sou
 // context, so skip the stub-driven simulation under a real WordPress runtime.
 if ( defined( 'WPINC' ) ) {
 	if ( $failed > 0 ) {
-		fwrite( STDERR, "\nabilities-send-email-load-order-smoke: {$failed}/{$total} assertions failed\n" );
+		fwrite( fopen( 'php://stderr', 'w' ), "\nabilities-send-email-load-order-smoke: {$failed}/{$total} assertions failed\n" );
 		exit( 1 );
 	}
 
@@ -245,7 +245,7 @@ $assert(
 );
 
 if ( $failed > 0 ) {
-	fwrite( STDERR, "\nabilities-send-email-load-order-smoke: {$failed}/{$total} assertions failed\n" );
+	fwrite( fopen( 'php://stderr', 'w' ), "\nabilities-send-email-load-order-smoke: {$failed}/{$total} assertions failed\n" );
 	exit( 1 );
 }
 

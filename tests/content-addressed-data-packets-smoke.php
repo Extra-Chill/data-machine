@@ -145,7 +145,7 @@ use DataMachine\Core\FilesRepository\FileStorage;
 
 function datamachine_packet_smoke_assert( bool $condition, string $message ): void {
 	if ( ! $condition ) {
-		fwrite( STDERR, "FAIL: {$message}\n" );
+		fwrite( fopen( 'php://stderr', 'w' ), "FAIL: {$message}\n" );
 		exit( 1 );
 	}
 }
@@ -229,4 +229,4 @@ $child_params = DataPacketStore::hydrate_packet_collections_in_value( $batch_ite
 datamachine_packet_smoke_assert( $child_params['data_packets'][0]['data']['title'] === 'Packet title', 'child packet ref hydrates deterministically' );
 
 datamachine_packet_smoke_rm_tree( $upload_dir['basedir'] );
-fwrite( STDOUT, "content-addressed-data-packets-smoke: ok\n" );
+fwrite( fopen( 'php://stdout', 'w' ), "content-addressed-data-packets-smoke: ok\n" );

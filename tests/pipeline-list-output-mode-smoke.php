@@ -92,7 +92,7 @@ $assert(
 );
 
 if ( $failures ) {
-	fwrite( STDERR, "Pipeline list output mode smoke failed:\n- " . implode( "\n- ", $failures ) . "\n" );
+	fwrite( fopen( 'php://stderr', 'w' ), "Pipeline list output mode smoke failed:\n- " . implode( "\n- ", $failures ) . "\n" );
 	exit( 1 );
 }
 

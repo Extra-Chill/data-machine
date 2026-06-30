@@ -52,7 +52,7 @@ require_once __DIR__ . '/../inc/Abilities/Publish/SendEmailQueuedAbility.php';
 \DataMachine\Abilities\Publish\SendEmailQueuedAbility::ensure_registered();
 
 if ( 0 !== $datamachine_test_translations ) {
-	fwrite( STDERR, "FAIL: send-email abilities translated definitions before wp_abilities_api_init.\n" );
+	fwrite( fopen( 'php://stderr', 'w' ), "FAIL: send-email abilities translated definitions before wp_abilities_api_init.\n" );
 	exit( 1 );
 }
 
@@ -64,12 +64,12 @@ foreach ( $datamachine_test_actions['wp_abilities_api_init'] ?? array() as $call
 }
 
 if ( ! isset( $datamachine_test_registered['datamachine/send-email'], $datamachine_test_registered['datamachine/send-email-queued'] ) ) {
-	fwrite( STDERR, "FAIL: send-email abilities were not registered when wp_abilities_api_init fired.\n" );
+	fwrite( fopen( 'php://stderr', 'w' ), "FAIL: send-email abilities were not registered when wp_abilities_api_init fired.\n" );
 	exit( 1 );
 }
 
 if ( 0 === $datamachine_test_translations ) {
-	fwrite( STDERR, "FAIL: send-email definitions were not built during wp_abilities_api_init.\n" );
+	fwrite( fopen( 'php://stderr', 'w' ), "FAIL: send-email definitions were not built during wp_abilities_api_init.\n" );
 	exit( 1 );
 }
 

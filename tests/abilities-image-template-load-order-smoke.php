@@ -45,7 +45,7 @@ $bootstrap    = file_get_contents( $plugin_root . '/data-machine.php' );
 $class_source = file_get_contents( $plugin_root . '/inc/Abilities/Media/ImageTemplateAbilities.php' );
 
 if ( false === $bootstrap || false === $class_source ) {
-	fwrite( STDERR, "FAIL: unable to read plugin source\n" );
+	fwrite( fopen( 'php://stderr', 'w' ), "FAIL: unable to read plugin source\n" );
 	exit( 1 );
 }
 
@@ -119,7 +119,7 @@ $assert(
 // the stub-driven simulation under a real WordPress runtime.
 if ( defined( 'WPINC' ) ) {
 	if ( $failed > 0 ) {
-		fwrite( STDERR, "\nabilities-image-template-load-order-smoke: {$failed}/{$total} assertions failed\n" );
+		fwrite( fopen( 'php://stderr', 'w' ), "\nabilities-image-template-load-order-smoke: {$failed}/{$total} assertions failed\n" );
 		exit( 1 );
 	}
 
@@ -265,7 +265,7 @@ $assert(
 );
 
 if ( $failed > 0 ) {
-	fwrite( STDERR, "\nabilities-image-template-load-order-smoke: {$failed}/{$total} assertions failed\n" );
+	fwrite( fopen( 'php://stderr', 'w' ), "\nabilities-image-template-load-order-smoke: {$failed}/{$total} assertions failed\n" );
 	exit( 1 );
 }
 

@@ -69,7 +69,7 @@ function read_react_file( string $relative ): string {
 	$base = dirname( __DIR__ ) . '/inc/Core/Admin/Pages/Pipelines/assets/react';
 	$path = $base . '/' . ltrim( $relative, '/' );
 	if ( ! is_readable( $path ) ) {
-		fwrite( STDERR, "Missing React source: {$path}\n" );
+		fwrite( fopen( 'php://stderr', 'w' ), "Missing React source: {$path}\n" );
 		exit( 2 );
 	}
 	return (string) file_get_contents( $path );

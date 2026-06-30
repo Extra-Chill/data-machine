@@ -36,9 +36,9 @@ if ( file_exists( $root . '/inc/Engine/AI/Tools/Global/BingWebmaster.php' ) ) {
 }
 
 if ( $failures ) {
-	fwrite( STDERR, "FAILED: " . count( $failures ) . " Bing extraction assertion(s) failed.\n" );
+	fwrite( fopen( 'php://stderr', 'w' ), "FAILED: " . count( $failures ) . " Bing extraction assertion(s) failed.\n" );
 	foreach ( $failures as $failure ) {
-		fwrite( STDERR, "- {$failure}\n" );
+		fwrite( fopen( 'php://stderr', 'w' ), "- {$failure}\n" );
 	}
 	exit( 1 );
 }

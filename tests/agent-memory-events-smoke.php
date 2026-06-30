@@ -294,7 +294,7 @@ function datamachine_agent_memory_events_assert( bool $condition, string $messag
 	++$assertions;
 
 	if ( ! $condition ) {
-		fwrite( STDERR, "Assertion failed: {$message}\n" );
+		fwrite( fopen( 'php://stderr', 'w' ), "Assertion failed: {$message}\n" );
 		exit( 1 );
 	}
 

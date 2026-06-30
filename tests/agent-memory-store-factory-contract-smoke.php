@@ -139,7 +139,7 @@ function datamachine_agent_memory_store_contract_assert( bool $condition, string
 	++$assertions;
 
 	if ( ! $condition ) {
-		fwrite( STDERR, "Assertion failed: {$message}\n" );
+		fwrite( fopen( 'php://stderr', 'w' ), "Assertion failed: {$message}\n" );
 		exit( 1 );
 	}
 

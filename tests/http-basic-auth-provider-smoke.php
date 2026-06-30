@@ -81,23 +81,23 @@ $provider->save_config(
 
 $stored = $GLOBALS['datamachine_http_basic_options']['datamachine_auth_data']['http_basic']['config']['password'] ?? '';
 if ( ! is_string( $stored ) || ! str_starts_with( $stored, BaseAuthProvider::ENCRYPTION_PREFIX ) ) {
-	fwrite( STDERR, "password was not encrypted at rest\n" );
+	fwrite( fopen( 'php://stderr', 'w' ), "password was not encrypted at rest\n" );
 	exit( 1 );
 }
 
 $resolved = $provider->resolve_auth_ref( 'logstash' );
 if ( is_wp_error( $resolved ) ) {
-	fwrite( STDERR, "auth ref unexpectedly failed\n" );
+	fwrite( fopen( 'php://stderr', 'w' ), "auth ref unexpectedly failed\n" );
 	exit( 1 );
 }
 
 if ( 'basic' !== ( $resolved['auth']['type'] ?? '' ) || 'chubes4' !== ( $resolved['auth']['username'] ?? '' ) || 'secret-password' !== ( $resolved['auth']['password'] ?? '' ) ) {
-	fwrite( STDERR, "auth ref did not resolve Basic credentials\n" );
+	fwrite( fopen( 'php://stderr', 'w' ), "auth ref did not resolve Basic credentials\n" );
 	exit( 1 );
 }
 
 if ( 'socks5://127.0.0.1:8080' !== ( $resolved['proxy_url'] ?? '' ) ) {
-	fwrite( STDERR, "auth ref did not resolve proxy URL\n" );
+	fwrite( fopen( 'php://stderr', 'w' ), "auth ref did not resolve proxy URL\n" );
 	exit( 1 );
 }
 

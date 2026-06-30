@@ -224,7 +224,7 @@ namespace {
 	$assert = function ( string $label, bool $condition ) use ( &$assertions ): void {
 		++$assertions;
 		if ( ! $condition ) {
-			fwrite( STDERR, "FAIL: {$label}\n" );
+			fwrite( fopen( 'php://stderr', 'w' ), "FAIL: {$label}\n" );
 			exit( 1 );
 		}
 		echo "ok - {$label}\n";
@@ -233,7 +233,7 @@ namespace {
 	$write_bundle = function ( array $bundle ): string {
 		$path = tempnam( sys_get_temp_dir(), 'datamachine-import-agent-' );
 		if ( false === $path ) {
-			fwrite( STDERR, "FAIL: unable to create temp bundle\n" );
+			fwrite( fopen( 'php://stderr', 'w' ), "FAIL: unable to create temp bundle\n" );
 			exit( 1 );
 		}
 		$json_path = $path . '.json';
