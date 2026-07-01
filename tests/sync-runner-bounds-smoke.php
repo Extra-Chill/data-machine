@@ -18,7 +18,7 @@ $assertions = 0;
 $assert = static function ( bool $condition, string $message ) use ( &$assertions ): void {
 	++$assertions;
 	if ( ! $condition ) {
-		fwrite( STDERR, "sync-runner smoke failed: {$message}\n" );
+		fwrite( fopen( 'php://stderr', 'w' ), "sync-runner smoke failed: {$message}\n" );
 		exit( 1 );
 	}
 };

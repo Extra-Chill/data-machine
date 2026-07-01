@@ -45,7 +45,7 @@ function assert_tool_policy_surface( string $name, bool $condition ): void {
 function read_tool_policy_surface_file( string $relative ): string {
 	$path = dirname( __DIR__ ) . '/' . ltrim( $relative, '/' );
 	if ( ! is_readable( $path ) ) {
-		fwrite( STDERR, "Missing source file: {$path}\n" );
+		fwrite( fopen( 'php://stderr', 'w' ), "Missing source file: {$path}\n" );
 		exit( 2 );
 	}
 	return (string) file_get_contents( $path );

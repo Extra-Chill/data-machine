@@ -39,7 +39,7 @@ namespace {
 		global $assertions;
 		++$assertions;
 		if ( $expected !== $actual ) {
-			fwrite( STDERR, "FAIL: {$message}\nExpected: " . var_export( $expected, true ) . "\nActual: " . var_export( $actual, true ) . "\n" );
+			fwrite( fopen( 'php://stderr', 'w' ), "FAIL: {$message}\nExpected: " . var_export( $expected, true ) . "\nActual: " . var_export( $actual, true ) . "\n" );
 			exit( 1 );
 		}
 	}
@@ -173,5 +173,5 @@ namespace {
 	);
 	directive_policy_assert_same( array( 'CoreMemoryFilesDirective', 'AgentModeDirective' ), directive_policy_names( $result['directives'] ), 'mode-scoped policy affects matching mode' );
 
-	fwrite( STDOUT, "DirectivePolicyResolver smoke passed ({$assertions} assertions).\n" );
+	fwrite( fopen( 'php://stdout', 'w' ), "DirectivePolicyResolver smoke passed ({$assertions} assertions).\n" );
 }

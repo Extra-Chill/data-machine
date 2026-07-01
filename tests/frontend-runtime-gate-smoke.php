@@ -12,7 +12,7 @@ $source      = file_get_contents( $plugin_file );
 $runtime     = file_get_contents( dirname( __DIR__ ) . '/inc/Core/Bootstrap/RuntimeEnvironment.php' );
 
 if ( false === $source || false === $runtime ) {
-	fwrite( STDERR, "FAIL: bootstrap source is not readable\n" );
+	fwrite( fopen( 'php://stderr', 'w' ), "FAIL: bootstrap source is not readable\n" );
 	exit( 1 );
 }
 
@@ -44,7 +44,7 @@ $assert( 'extensions-can-opt-in', str_contains( $runtime, "apply_filters( 'datam
 $assert( 'frontend-default-is-lazy', str_contains( $runtime, "apply_filters( 'datamachine_should_load_full_runtime', false" ) );
 
 if ( $failed > 0 ) {
-	fwrite( STDERR, "frontend runtime gate smoke failed: {$failed}/{$total}\n" );
+	fwrite( fopen( 'php://stderr', 'w' ), "frontend runtime gate smoke failed: {$failed}/{$total}\n" );
 	exit( 1 );
 }
 

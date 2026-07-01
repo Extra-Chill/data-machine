@@ -48,11 +48,11 @@ $failures = array();
 
 function dm_assert( bool $cond, string $message, array &$failures ): void {
 	if ( $cond ) {
-		fwrite( STDOUT, "PASS: {$message}\n" );
+		fwrite( fopen( 'php://stdout', 'w' ), "PASS: {$message}\n" );
 		return;
 	}
 	$failures[] = $message;
-	fwrite( STDOUT, "FAIL: {$message}\n" );
+	fwrite( fopen( 'php://stdout', 'w' ), "FAIL: {$message}\n" );
 }
 
 // Load the CommandRegistry (pure map, no WP_CLI dependency) and the gated
@@ -146,9 +146,9 @@ dm_assert(
 // --- Report. ----------------------------------------------------------------
 
 if ( empty( $failures ) ) {
-	fwrite( STDOUT, "\nAll assertions passed.\n" );
+	fwrite( fopen( 'php://stdout', 'w' ), "\nAll assertions passed.\n" );
 	exit( 0 );
 }
 
-fwrite( STDERR, "\n" . count( $failures ) . " assertion(s) failed.\n" );
+fwrite( fopen( 'php://stderr', 'w' ), "\n" . count( $failures ) . " assertion(s) failed.\n" );
 exit( 1 );

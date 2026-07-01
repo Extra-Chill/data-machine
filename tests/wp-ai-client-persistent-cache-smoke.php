@@ -140,7 +140,7 @@ namespace {
 
 	if ( $failures ) {
 		foreach ( $failures as $failure ) {
-			fwrite( STDERR, "FAIL: {$failure}\n" );
+			fwrite( fopen( 'php://stderr', 'w' ), "FAIL: {$failure}\n" );
 		}
 		exit( 1 );
 	}

@@ -39,7 +39,7 @@ $assert = static function ( string $label, bool $condition ) use ( &$failures, &
 	}
 
 	++$failures;
-	fwrite( STDERR, "FAIL: {$label}\n" );
+	fwrite( fopen( 'php://stderr', 'w' ), "FAIL: {$label}\n" );
 };
 
 $content  = "{\"ok\":true}\n";
@@ -83,7 +83,7 @@ $assert( 'existing job artifact writer uses generic manifest primitive', str_con
 $assert( 'job artifact verification delegates to generic primitive', str_contains( $job_artifacts_source, 'ArtifactManifest::verify' ) );
 
 if ( $failures > 0 ) {
-	fwrite( STDERR, "artifact-manifest-smoke: {$failures} failure(s), {$passes} pass(es).\n" );
+	fwrite( fopen( 'php://stderr', 'w' ), "artifact-manifest-smoke: {$failures} failure(s), {$passes} pass(es).\n" );
 	exit( 1 );
 }
 

@@ -36,11 +36,11 @@ namespace {
 
 	$ability = ScaffoldAbilities::get_ability();
 	if ( null !== $ability ) {
-		fwrite( STDERR, "FAIL: pre-init scaffold ability lookup should defer\n" );
+		fwrite( fopen( 'php://stderr', 'w' ), "FAIL: pre-init scaffold ability lookup should defer\n" );
 		exit( 1 );
 	}
 	if ( 0 !== $GLOBALS['datamachine_test_state']->wp_get_ability_calls ) {
-		fwrite( STDERR, "FAIL: pre-init scaffold ability lookup should not call wp_get_ability\n" );
+		fwrite( fopen( 'php://stderr', 'w' ), "FAIL: pre-init scaffold ability lookup should not call wp_get_ability\n" );
 		exit( 1 );
 	}
 
@@ -49,7 +49,7 @@ namespace {
 	$GLOBALS['datamachine_test_state']->did_init = 1;
 	$ability = ScaffoldAbilities::get_ability();
 	if ( ! $ability instanceof WP_Ability ) {
-		fwrite( STDERR, "FAIL: post-init scaffold ability lookup should use wp_get_ability\n" );
+		fwrite( fopen( 'php://stderr', 'w' ), "FAIL: post-init scaffold ability lookup should use wp_get_ability\n" );
 		exit( 1 );
 	}
 

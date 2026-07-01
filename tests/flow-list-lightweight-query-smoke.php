@@ -60,7 +60,7 @@ $assert(
 );
 
 if ( $failures ) {
-	fwrite( STDERR, "Lightweight flow list query smoke failed:\n- " . implode( "\n- ", $failures ) . "\n" );
+	fwrite( fopen( 'php://stderr', 'w' ), "Lightweight flow list query smoke failed:\n- " . implode( "\n- ", $failures ) . "\n" );
 	exit( 1 );
 }
 

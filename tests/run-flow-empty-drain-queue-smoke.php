@@ -17,7 +17,7 @@ function assert_run_flow_empty_drain_true( bool $condition, string $message ): v
 	++$assertions;
 
 	if ( ! $condition ) {
-		fwrite( STDERR, "FAIL: {$message}\n" );
+		fwrite( fopen( 'php://stderr', 'w' ), "FAIL: {$message}\n" );
 		exit( 1 );
 	}
 }

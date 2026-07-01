@@ -136,7 +136,7 @@ namespace {
 	$assert     = function ( string $label, bool $condition ) use ( &$assertions ): void {
 		++$assertions;
 		if ( ! $condition ) {
-			fwrite( STDERR, "FAIL: {$label}\n" );
+			fwrite( fopen( 'php://stderr', 'w' ), "FAIL: {$label}\n" );
 			exit( 1 );
 		}
 

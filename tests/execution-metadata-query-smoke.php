@@ -27,7 +27,7 @@ $assert = static function ( string $label, bool $condition ) use ( &$failures, &
 	}
 
 	++$failures;
-	fwrite( STDERR, "FAIL: {$label}\n" );
+	fwrite( fopen( 'php://stderr', 'w' ), "FAIL: {$label}\n" );
 };
 
 $engine_data = array(
@@ -66,7 +66,7 @@ $assert( 'jobs CLI exposes metadata filter option', str_contains( $cli_source, '
 $assert( 'REST jobs endpoint exposes metadata query diagnostics', str_contains( $rest_source, "'metadata_query'" ) );
 
 if ( $failures > 0 ) {
-	fwrite( STDERR, "execution-metadata-query-smoke: {$failures} failure(s), {$passes} pass(es).\n" );
+	fwrite( fopen( 'php://stderr', 'w' ), "execution-metadata-query-smoke: {$failures} failure(s), {$passes} pass(es).\n" );
 	exit( 1 );
 }
 

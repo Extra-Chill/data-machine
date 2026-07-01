@@ -22,7 +22,7 @@ function assert_true( bool $condition, string $message ): void {
 	global $assertions;
 	++$assertions;
 	if ( ! $condition ) {
-		fwrite( STDERR, "FAIL: {$message}\n" );
+		fwrite( fopen( 'php://stderr', 'w' ), "FAIL: {$message}\n" );
 		exit( 1 );
 	}
 }
