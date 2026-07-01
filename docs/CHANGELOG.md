@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.159.1] - 2026-06-30
+
+### Changed
+- Full-migrate packet fan-out to the generic parallel-map contract (single path, hard dependency)
+
 ## [0.159.0] - 2026-06-30
 
 ### Added
