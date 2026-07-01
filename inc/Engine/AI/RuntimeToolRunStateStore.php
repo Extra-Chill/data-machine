@@ -211,8 +211,15 @@ class RuntimeToolRunStateStore {
 					return true;
 				}
 
-				if ( empty( $result['conflict'] ) ) {
+				// Retry on both logical conflicts and transient DB lock
+				// contention (deadlock / lock-wait timeout); bail only on a
+				// genuinely fatal persist failure.
+				if ( empty( $result['conflict'] ) && empty( $result['retryable'] ) ) {
 					return false;
+				}
+
+				if ( ! empty( $result['retryable'] ) && $attempt < 3 ) {
+					usleep( wp_rand( 5000, 25000 ) );
 				}
 
 				continue;

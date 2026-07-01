@@ -1439,7 +1439,7 @@ class Jobs extends BaseRepository {
 	 * @param int   $job_id        Job ID.
 	 * @param array $expected_data Engine data snapshot read before mutation.
 	 * @param array $new_data      Engine data snapshot to persist.
-	 * @return array{updated:bool,conflict:bool,error:string|null}
+	 * @return array{updated:bool,conflict:bool,retryable?:bool,error:string|null}
 	 */
 	public function compare_and_swap_engine_data( int $job_id, array $expected_data, array $new_data ): array {
 		if ( $job_id <= 0 ) {
@@ -1474,20 +1474,27 @@ class Jobs extends BaseRepository {
 		);
 
 		if ( false === $result ) {
+			$db_error  = (string) $this->wpdb->last_error;
+			$retryable = $this->is_retryable_db_error( $db_error );
+
 			do_action(
 				'datamachine_log',
-				'error',
-				'Failed to compare-and-swap engine_data',
+				$retryable ? 'warning' : 'error',
+				$retryable
+					? 'Transient DB lock contention during engine_data compare-and-swap, retrying'
+					: 'Failed to compare-and-swap engine_data',
 				array(
-					'job_id'   => $job_id,
-					'db_error' => $this->wpdb->last_error,
+					'job_id'    => $job_id,
+					'db_error'  => $db_error,
+					'retryable' => $retryable,
 				)
 			);
 
 			return array(
-				'updated'  => false,
-				'conflict' => false,
-				'error'    => 'db_error',
+				'updated'   => false,
+				'conflict'  => false,
+				'retryable' => $retryable,
+				'error'     => $retryable ? 'deadlock' : 'db_error',
 			);
 		}
 
@@ -1532,6 +1539,38 @@ class Jobs extends BaseRepository {
 			'conflict' => false,
 			'error'    => null,
 		);
+	}
+
+	/**
+	 * Determine whether a DB error string represents a transient lock condition
+	 * that should be retried by re-reading the latest snapshot.
+	 *
+	 * Covers InnoDB deadlocks (MySQL 1213) and lock-wait timeouts (MySQL 1205),
+	 * both of which MySQL explicitly recommends resolving by restarting the
+	 * transaction rather than treating as a fatal failure.
+	 *
+	 * @param string $db_error Raw $wpdb->last_error message.
+	 * @return bool True when the error is transient and retryable.
+	 */
+	private function is_retryable_db_error( string $db_error ): bool {
+		if ( '' === $db_error ) {
+			return false;
+		}
+
+		$needles = array(
+			'deadlock found',
+			'try restarting transaction',
+			'lock wait timeout exceeded',
+		);
+
+		$haystack = strtolower( $db_error );
+		foreach ( $needles as $needle ) {
+			if ( false !== strpos( $haystack, $needle ) ) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	/**

@@ -194,7 +194,9 @@ class EngineData {
 				);
 			}
 
-			if ( empty( $result['conflict'] ) ) {
+			$is_retryable = ! empty( $result['conflict'] ) || ! empty( $result['retryable'] );
+
+			if ( ! $is_retryable ) {
 				return array(
 					'success'  => false,
 					'conflict' => false,
@@ -207,13 +209,21 @@ class EngineData {
 			do_action(
 				'datamachine_log',
 				'warning',
-				'EngineData mutation conflict, retrying latest snapshot',
+				'EngineData mutation contention, retrying latest snapshot',
 				array(
 					'job_id'     => $job_id,
 					'event_type' => $event_type,
 					'attempt'    => $attempt,
+					'reason'     => ! empty( $result['retryable'] ) ? 'deadlock' : 'conflict',
 				)
 			);
+
+			// On a transient DB lock (deadlock / lock-wait), the row may still be
+			// locked momentarily; a small randomized backoff lets the winning
+			// transaction commit before we re-read and retry.
+			if ( ! empty( $result['retryable'] ) && $attempt < $max_attempts ) {
+				usleep( wp_rand( 5000, 25000 ) );
+			}
 		}
 
 		return array(
