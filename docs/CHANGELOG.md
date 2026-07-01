@@ -2,6 +2,12 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.159.2] - 2026-07-01
+
+### Fixed
+- retry engine_data CAS on InnoDB deadlocks instead of dropping writes
+- require canonical typed artifact outputs
+
 ## [0.159.1] - 2026-06-30
 
 ### Changed
