@@ -33,12 +33,13 @@ echo "typed-artifact-output-contract-smoke\n";
 
 $normalized = \DataMachine\Engine\AI\datamachine_normalize_typed_artifact_outputs(
 	array(
-		'typed_artifacts' => array(
-			array(
-				'output_key' => 'concept_packet',
-				'schema'     => 'example-agent/ConceptPacket/v1',
-				'artifact'   => 'ConceptPacket',
-				'payload'    => array( 'title' => 'Normalized concept' ),
+		'outputs' => array(
+			'typed_artifacts' => array(
+				'concept_packet' => array(
+					'schema'   => 'example-agent/ConceptPacket/v1',
+					'artifact' => 'ConceptPacket',
+					'payload'  => array( 'title' => 'Normalized concept' ),
+				),
 			),
 		),
 	)
@@ -47,6 +48,25 @@ $normalized = \DataMachine\Engine\AI\datamachine_normalize_typed_artifact_output
 datamachine_typed_artifact_contract_assert(
 	array( 'title' => 'Normalized concept' ) === ( $normalized['concept_packet']['payload'] ?? null ),
 	'loop result typed_artifacts normalize to outputs.typed_artifacts.<key>.payload shape',
+	$failures,
+	$passes
+);
+
+$legacy_normalized = \DataMachine\Engine\AI\datamachine_normalize_typed_artifact_outputs(
+	array(
+		'typed_artifacts' => array(
+			'concept_packet' => array(
+				'schema'   => 'example-agent/ConceptPacket/v1',
+				'artifact' => 'ConceptPacket',
+				'payload'  => array( 'title' => 'Legacy concept' ),
+			),
+		),
+	)
+);
+
+datamachine_typed_artifact_contract_assert(
+	array() === $legacy_normalized,
+	'legacy top-level typed_artifacts alias is ignored',
 	$failures,
 	$passes
 );
@@ -143,7 +163,7 @@ $tool_result_assertions->recordToolResult(
 $tool_result_satisfied = $tool_result_assertions->evaluate( array(), '' );
 datamachine_typed_artifact_contract_assert( true === $tool_result_satisfied['complete'], 'required_artifact_outputs can be satisfied by a handler tool result', $failures, $passes );
 
-$wrapped_tool_result_assertions = new \DataMachine\Engine\AI\DataMachineCompletionAssertions(
+$legacy_tool_result_assertions = new \DataMachine\Engine\AI\DataMachineCompletionAssertions(
 	array(
 		'required_artifact_outputs' => array(
 			array(
@@ -154,7 +174,7 @@ $wrapped_tool_result_assertions = new \DataMachine\Engine\AI\DataMachineCompleti
 		),
 	)
 );
-$wrapped_tool_result_assertions->recordToolResult(
+$legacy_tool_result_assertions->recordToolResult(
 	'emit_typed_artifact',
 	array( 'handler' => 'typed_artifact' ),
 	array(
@@ -172,8 +192,8 @@ $wrapped_tool_result_assertions->recordToolResult(
 		),
 	)
 );
-$wrapped_tool_result_satisfied = $wrapped_tool_result_assertions->evaluate( array(), '' );
-datamachine_typed_artifact_contract_assert( true === $wrapped_tool_result_satisfied['complete'], 'required_artifact_outputs can be satisfied by wrapped handler tool result data', $failures, $passes );
+$legacy_tool_result_satisfied = $legacy_tool_result_assertions->evaluate( array(), '' );
+datamachine_typed_artifact_contract_assert( false === $legacy_tool_result_satisfied['complete'], 'legacy wrapped handler tool result data does not satisfy required_artifact_outputs', $failures, $passes );
 
 $missing = $assertions->evaluate(
 	array(
