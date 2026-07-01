@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.159.3] - 2026-07-01
+
+### Fixed
+- use php://stdout|stderr streams in smoke tests so they run under the Playground SAPI
+
 ## [0.159.2] - 2026-07-01
 
 ### Fixed
