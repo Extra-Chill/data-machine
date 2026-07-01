@@ -10,8 +10,10 @@ namespace {
 	$GLOBALS['datamachine_provider_admin_site_options'] = array();
 	$GLOBALS['datamachine_provider_admin_updates']      = array();
 
-	function wp_supports_ai(): bool {
-		return true;
+	if ( ! function_exists( 'wp_supports_ai' ) ) {
+		function wp_supports_ai(): bool {
+			return true;
+		}
 	}
 
 	if ( ! function_exists( 'sanitize_key' ) ) {
