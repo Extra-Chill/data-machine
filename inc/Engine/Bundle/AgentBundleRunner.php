@@ -164,7 +164,7 @@ final class AgentBundleRunner {
 	/** @return array<string,mixed> */
 	private function response( array $response, array $input, array $runtime_imports = array(), array $selection = array() ): array {
 		$response['schema'] ??= 'datamachine/agent-bundle-run/v1';
-		$response           = $this->apply_wait_result_status( $response );
+		$response             = $this->apply_wait_result_status( $response );
 
 		if ( ! empty( $runtime_imports ) ) {
 			$response['runtime_imports'] = $runtime_imports;
@@ -402,7 +402,6 @@ final class AgentBundleRunner {
 					$outputs[ $key ] = $value;
 				}
 			}
-
 		}
 
 		foreach ( $engine_data as $key => $value ) {
@@ -412,8 +411,8 @@ final class AgentBundleRunner {
 			}
 		}
 
-		$present = array_keys( $outputs );
-		$missing = array_values( array_diff( array_values( array_unique( array_merge( $required, array_keys( $mappings ) ) ) ), $present ) );
+		$present           = array_keys( $outputs );
+		$missing           = array_values( array_diff( array_values( array_unique( array_merge( $required, array_keys( $mappings ) ) ) ), $present ) );
 		$missing_artifacts = array_values(
 			array_filter(
 				$artifacts,
@@ -441,16 +440,16 @@ final class AgentBundleRunner {
 
 	/** @return array<string,mixed> */
 	private function enforce_required_outputs( array $response, array $input ): array {
-		$diagnostics = is_array( $response['output_diagnostics'] ?? null ) ? $response['output_diagnostics'] : array();
+		$diagnostics        = is_array( $response['output_diagnostics'] ?? null ) ? $response['output_diagnostics'] : array();
 		$required_outputs   = is_array( $diagnostics['required_outputs'] ?? null ) ? $diagnostics['required_outputs'] : array();
 		$required_artifacts = is_array( $diagnostics['required_artifacts'] ?? null ) ? $diagnostics['required_artifacts'] : array();
 		if ( ( empty( $required_outputs ) && empty( $required_artifacts ) ) || empty( $response['success'] ) || ! $this->can_enforce_required_outputs( $response, $input ) ) {
 			return $response;
 		}
 
-		$outputs         = is_array( $response['outputs'] ?? null ) ? $response['outputs'] : array();
-		$typed_artifacts = is_array( $outputs['typed_artifacts'] ?? null ) ? $outputs['typed_artifacts'] : array();
-		$missing_outputs = array_values(
+		$outputs           = is_array( $response['outputs'] ?? null ) ? $response['outputs'] : array();
+		$typed_artifacts   = is_array( $outputs['typed_artifacts'] ?? null ) ? $outputs['typed_artifacts'] : array();
+		$missing_outputs   = array_values(
 			array_filter(
 				$required_outputs,
 				function ( string $key ) use ( $outputs ): bool {
@@ -466,7 +465,7 @@ final class AgentBundleRunner {
 				}
 			)
 		);
-		$missing = array_values( array_unique( array_merge( $missing_outputs, $missing_artifacts ) ) );
+		$missing           = array_values( array_unique( array_merge( $missing_outputs, $missing_artifacts ) ) );
 		if ( empty( $missing ) ) {
 			return $response;
 		}
