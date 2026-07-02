@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.159.4] - 2026-07-02
+
+### Fixed
+- harden daily-memory no-op classification and make quiet days observable
+
 ## [0.159.3] - 2026-07-01
 
 ### Fixed
