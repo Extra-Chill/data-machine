@@ -27,6 +27,7 @@ use DataMachine\Core\Database\Chat\ConversationStoreFactory;
 use DataMachine\Core\PluginSettings;
 use DataMachine\Core\FilesRepository\AgentMemory;
 use DataMachine\Core\FilesRepository\DailyMemory;
+use DataMachine\Engine\AI\DataMachineConversationStatus;
 use DataMachine\Engine\AI\NaturalCompletionPolicyInterface;
 use AgentsAPI\AI\WP_Agent_Compaction_Conservation;
 use AgentsAPI\AI\WP_Agent_Conversation_Completion_Decision;
@@ -205,15 +206,36 @@ class DailyMemoryTask extends SystemTask {
 			// A genuine fault is identified by an explicit error signal:
 			// a non-empty error string, an error_code, or a hard failure /
 			// interrupted status from the loop. Those still fail the job.
-			$genuine_failure = '' !== $response_error
-				|| ! empty( $response['error_code'] )
-				|| in_array( (string) ( $response['status'] ?? '' ), array( 'error', 'failed', 'interrupted' ), true );
+			//
+			// The complement — the legitimate no-op — is the far more common
+			// path for small, already-healthy MEMORY.md files: the model
+			// reviewed the day and never emitted an acceptable split, so the
+			// completion policy kept declining until the turn budget was
+			// exhausted. The substrate reports that budget exhaustion as
+			// `budget_exceeded` (see DataMachineConversationStatus), which is
+			// deliberately NOT a hard-failure status here. Classification is
+			// centralized in self::isGenuineFailureResponse() so the no-op vs
+			// failure decision has a single, testable source of truth rather
+			// than an implicit "absent from a denylist" read.
+			$genuine_failure = self::isGenuineFailureResponse( $response, $response_error );
 
 			if ( ! $genuine_failure ) {
+				// A quiet no-op is an expected, healthy outcome of a recurring
+				// maintenance task — not an error and not a warning. But at the
+				// default production log level (`error`) an info log is silently
+				// discarded, so a quiet day leaves no trace in the log store and
+				// looks indistinguishable from "the task never ran" (issue
+				// #2827). The durable, level-independent signal is the job's own
+				// completed status plus the structured `no_change` marker written
+				// to engine_data by completeJob() below: `wp datamachine jobs
+				// show <id>` and the run-outcome metrics both surface it
+				// regardless of log filtering. The info log stays for verbose
+				// installs; the structured completion is the observability
+				// contract.
 				do_action(
 					'datamachine_log',
 					'info',
-					'Daily memory no-op: completion policy not satisfied, MEMORY.md left unchanged.',
+					'Daily memory no-op: completion policy not satisfied within turn budget, MEMORY.md left unchanged (expected on a quiet day).',
 					array(
 						'date'        => $date,
 						'job_id'      => $jobId,
@@ -228,9 +250,11 @@ class DailyMemoryTask extends SystemTask {
 					array(
 						'skipped'       => true,
 						'no_change'     => true,
+						'outcome'       => 'no_op',
 						'reason'        => 'Completion policy not satisfied within turn budget; MEMORY.md left unchanged (no memory-worthy change this run).',
 						'original_size' => $original_size,
 						'turn_count'    => $response['turn_count'] ?? 0,
+						'status'        => (string) ( $response['status'] ?? '' ),
 					)
 				);
 				return;
@@ -388,6 +412,59 @@ class DailyMemoryTask extends SystemTask {
 				'compaction'        => $plan['metadata'],
 				'compaction_events' => $plan['events'],
 			)
+		);
+	}
+
+	/**
+	 * Decide whether an incomplete conversation result is a genuine failure.
+	 *
+	 * When the daily-memory conversation ends without the completion policy
+	 * being satisfied (`metadata.datamachine.completed` is falsey), the run is
+	 * either a real fault or a legitimate no-op. This is the single source of
+	 * truth for that classification, extracted so it can be regression-tested
+	 * in isolation (see tests/daily-memory-noop-classification-smoke.php) and
+	 * so both the guard and its intent live in one place instead of an
+	 * implicit "not present in a denylist" read.
+	 *
+	 * A GENUINE FAILURE is signalled by any of:
+	 *   - a non-empty error string on the result,
+	 *   - a non-empty `error_code`, or
+	 *   - a hard-failure conversation status: `error`, `failed`, or
+	 *     `interrupted` (an external interruption, distinct from turn-budget
+	 *     exhaustion).
+	 *
+	 * Everything else is a NO-OP, including the common turn-budget-exhaustion
+	 * status `budget_exceeded` and an empty/absent status. Turn-budget
+	 * exhaustion is expected on a quiet day: the model reviewed the day's
+	 * activity and never produced an acceptable PERSISTENT/ARCHIVED split
+	 * because there was nothing memory-worthy to fold in. MEMORY.md is left
+	 * untouched (nothing is written until later in executeTask()), so the job
+	 * should complete cleanly rather than fail and pollute error-rate metrics
+	 * and the wake briefing (issues #2783, #2827).
+	 *
+	 * @param array  $response       Normalized conversation result.
+	 * @param string $response_error Pre-trimmed error string from the result.
+	 * @return bool True when the result is a genuine failure, false for a no-op.
+	 */
+	public static function isGenuineFailureResponse( array $response, string $response_error ): bool {
+		if ( '' !== $response_error ) {
+			return true;
+		}
+
+		if ( ! empty( $response['error_code'] ) ) {
+			return true;
+		}
+
+		$status = (string) ( $response['status'] ?? '' );
+
+		return in_array(
+			$status,
+			array(
+				DataMachineConversationStatus::FAILED,
+				DataMachineConversationStatus::INTERRUPTED,
+				'error',
+			),
+			true
 		);
 	}
 
