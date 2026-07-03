@@ -40,17 +40,6 @@ function datamachine_read_agents_api_plugin_version( string $plugin_file ): ?str
 		return '' !== $version ? $version : null;
 	}
 
-	$handle = fopen( $plugin_file, 'rb' );
-	if ( false === $handle ) {
-		return null;
-	}
-
-	$contents = (string) fread( $handle, 8192 );
-	fclose( $handle );
-	if ( preg_match( '/^[ \t\/*#@]*Version:\s*(.+)$/mi', $contents, $matches ) ) {
-		return trim( (string) $matches[1] );
-	}
-
 	return null;
 }
 

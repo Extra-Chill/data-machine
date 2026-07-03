@@ -103,7 +103,9 @@ defined( 'ABSPATH' ) || define( 'ABSPATH', __DIR__ . '/' );
 	}
 
 	$GLOBALS['__abilities'] = array();
-	function wp_get_ability( string $name ) { return $GLOBALS['__abilities'][ $name ] ?? null; }
+	if ( ! function_exists( 'wp_get_ability' ) ) {
+		function wp_get_ability( string $name ) { return $GLOBALS['__abilities'][ $name ] ?? null; }
+	}
 
 	if ( ! class_exists( 'WP_Ability' ) ) {
 		class WP_Ability {
@@ -113,9 +115,46 @@ defined( 'ABSPATH' ) || define( 'ABSPATH', __DIR__ . '/' );
 		}
 	}
 
-	class Stub_Agent_Workflow_Ability extends WP_Ability {
-		public function __construct( private \Closure $handler ) {}
-		public function execute( array $input ) { return ( $this->handler )( $input ); }
+	if ( ! function_exists( 'wp_register_ability' ) ) {
+		class Stub_Agent_Workflow_Ability extends WP_Ability {
+			public function __construct( private \Closure $handler ) {}
+			public function execute( array $input ) { return ( $this->handler )( $input ); }
+		}
+	}
+
+	function register_agent_workflow_bridge_smoke_ability( string $name, \Closure $handler ): void {
+		if ( function_exists( 'wp_register_ability' ) ) {
+			global $wp_current_filter;
+
+			if ( function_exists( 'wp_has_ability_category' ) && ! wp_has_ability_category( 'demo' ) ) {
+				$wp_current_filter[] = 'wp_abilities_api_categories_init';
+				wp_register_ability_category(
+					'demo',
+					array(
+						'label'       => 'Demo',
+						'description' => 'Demo abilities for workflow smoke tests.',
+					)
+				);
+				array_pop( $wp_current_filter );
+			}
+
+			$wp_current_filter[] = 'wp_abilities_api_init';
+			wp_register_ability(
+				$name,
+				array(
+					'label'               => $name,
+					'description'         => 'Workflow bridge smoke test ability.',
+					'category'            => 'demo',
+					'execute_callback'    => static fn( array $input ): array => $handler( $input ),
+					'permission_callback' => '__return_true',
+				)
+			);
+			array_pop( $wp_current_filter );
+
+			return;
+		}
+
+		$GLOBALS['__abilities'][ $name ] = new Stub_Agent_Workflow_Ability( $handler );
 	}
 
 	require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Tools/class-wp-agent-tool-parameters.php';
@@ -163,10 +202,12 @@ defined( 'ABSPATH' ) || define( 'ABSPATH', __DIR__ . '/' );
 
 	echo "agents-api-workflow-bridge-smoke\n";
 
-	$GLOBALS['__abilities']['demo/uppercase'] = new Stub_Agent_Workflow_Ability(
+	register_agent_workflow_bridge_smoke_ability(
+		'demo/uppercase',
 		static fn( array $input ): array => array( 'value' => strtoupper( (string) ( $input['text'] ?? '' ) ) )
 	);
-	$GLOBALS['__abilities']['agents/chat'] = new Stub_Agent_Workflow_Ability(
+	register_agent_workflow_bridge_smoke_ability(
+		'agents/chat',
 		static fn( array $input ): array => array( 'reply' => sprintf( '%s: %s', $input['agent'] ?? '', $input['message'] ?? '' ) )
 	);
 
