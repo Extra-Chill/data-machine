@@ -80,6 +80,9 @@ defined( 'ABSPATH' ) || define( 'ABSPATH', __DIR__ . '/' );
 	if ( ! function_exists( 'add_action' ) ) {
 		function add_action( string $hook, callable $callback, int $priority = 10, int $accepted_args = 1 ): void { unset( $hook, $callback, $priority, $accepted_args ); }
 	}
+	if ( ! function_exists( 'do_action' ) ) {
+		function do_action( string $hook, ...$args ): void { unset( $hook, $args ); }
+	}
 	if ( ! function_exists( 'apply_filters' ) ) {
 		function apply_filters( string $hook, $value ) { unset( $hook ); return $value; }
 	}
@@ -96,16 +99,34 @@ defined( 'ABSPATH' ) || define( 'ABSPATH', __DIR__ . '/' );
 	$GLOBALS['__abilities'] = array();
 	function wp_get_ability( string $name ) { return $GLOBALS['__abilities'][ $name ] ?? null; }
 
-	class Stub_Agent_Workflow_Ability {
+	if ( ! class_exists( 'WP_Ability' ) ) {
+		class WP_Ability {
+			public function execute( array $input ) { unset( $input ); return null; }
+			public function get_input_schema(): array { return array(); }
+			public function get_meta_item( string $key, $default = null ) { unset( $key ); return $default; }
+		}
+	}
+
+	class Stub_Agent_Workflow_Ability extends WP_Ability {
 		public function __construct( private \Closure $handler ) {}
 		public function execute( array $input ) { return ( $this->handler )( $input ); }
 	}
 
+	require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Tools/class-wp-agent-tool-parameters.php';
+	require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Abilities/class-wp-agent-ability-dispatcher.php';
 	require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Workflows/class-wp-agent-workflow-bindings.php';
 	require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Workflows/class-wp-agent-workflow-spec-validator.php';
 	require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Workflows/class-wp-agent-workflow-spec.php';
 	require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Workflows/class-wp-agent-workflow-run-result.php';
 	require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Workflows/class-wp-agent-workflow-run-recorder.php';
+	require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Runtime/interface-wp-agent-run-control-store.php';
+	require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Runtime/class-wp-agent-option-run-control-store.php';
+	require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Runtime/class-wp-agent-run-control.php';
+	require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Workflows/class-wp-agent-workflow-store.php';
+	require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Workflows/class-wp-agent-workflow-lifecycle.php';
+	require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Workflows/class-wp-agent-workflow-run-context.php';
+	require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Workflows/interface-wp-agent-workflow-branch-executor.php';
+	require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Workflows/class-wp-agent-workflow-step-executor.php';
 	require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Workflows/class-wp-agent-workflow-runner.php';
 	require_once __DIR__ . '/../inc/Core/JobStatus.php';
 	require_once __DIR__ . '/../inc/Abilities/PermissionHelper.php';

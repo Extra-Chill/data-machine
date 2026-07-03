@@ -224,14 +224,14 @@ agents_api_smoke_assert_equals( 'wordpress-com-wiki', $result->get_agent_slug(),
 
 echo "\n[5] Public package contract has no product vocabulary:\n";
 $contract_files = array(
-	'inc/class-wp-agent-package.php',
-	'inc/class-wp-agent-package-artifact.php',
-	'inc/class-wp-agent-package-artifact-type.php',
-	'inc/class-wp-agent-package-artifacts-registry.php',
-	'inc/class-wp-agent-package-adopter.php',
-	'inc/class-wp-agent-package-adoption-diff.php',
-	'inc/class-wp-agent-package-adoption-result.php',
-	'inc/register-agent-package-artifacts.php',
+	'src/Packages/class-wp-agent-package.php',
+	'src/Packages/class-wp-agent-package-artifact.php',
+	'src/Packages/class-wp-agent-package-artifact-type.php',
+	'src/Packages/class-wp-agent-package-artifacts-registry.php',
+	'src/Packages/class-wp-agent-package-adopter.php',
+	'src/Packages/class-wp-agent-package-adoption-diff.php',
+	'src/Packages/class-wp-agent-package-adoption-result.php',
+	'src/Packages/register-agent-package-artifacts.php',
 );
 $forbidden = array( 'DataMachine\\', 'pipeline', 'flow', 'job', 'handler', 'Intelligence', 'wpcom', 'Dolly', 'Odie' );
 $matches   = array();
