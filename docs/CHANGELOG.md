@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.159.9] - 2026-07-03
+
+### Changed
+- Internal improvements
+
 ## [0.159.8] - 2026-07-03
 
 ### Fixed
