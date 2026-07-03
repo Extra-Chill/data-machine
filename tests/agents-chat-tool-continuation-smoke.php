@@ -103,7 +103,103 @@ datamachine_agents_chat_tool_continuation_assert(
 			'content' => 'Here is the answer.',
 		),
 	) === $messages,
-	'Canonical Agents API chat output should omit internal tool call/result messages.'
+	'Canonical Agents API chat output should omit tool envelopes that carry no renderable tool_name.'
+);
+++ $assertions;
+
+/*
+ * Interactive tool parts that carry a tool_name (e.g. present_question choice
+ * cards, confirmation/DiffCard buttons) must be projected through to the
+ * canonical messages[] on the live turn — preserving type, payload, and
+ * metadata — so the frontend renders the clickable card on the sending turn
+ * instead of only after a session reload. This is the fix for the dead-loop
+ * where the model references a card the client never received.
+ */
+$interactive_messages = $method->invoke(
+	$handler,
+	array(
+		array(
+			'role'    => 'user',
+			'type'    => 'text',
+			'content' => 'Should I proceed?',
+		),
+		array(
+			'role'     => 'assistant',
+			'type'     => 'tool_call',
+			'content'  => 'AI ACTION (Turn 1): Executing Present Question.',
+			'payload'  => array(
+				'tool_name'  => 'present_question',
+				'parameters' => array(
+					'question' => 'Which surface?',
+				),
+				'turn'       => 1,
+			),
+			'metadata' => array(
+				'timestamp' => '2026-07-03T00:00:00+00:00',
+			),
+		),
+		array(
+			'role'    => 'user',
+			'type'    => 'tool_result',
+			'content' => 'TOOL RESPONSE (Turn 1): SUCCESS.',
+			'payload' => array(
+				'tool_name' => 'present_question',
+				'success'   => true,
+				'tool_data' => array(
+					'question' => 'Which surface?',
+					'choices'  => array(
+						array(
+							'label'   => 'Platform',
+							'message' => 'Platform',
+						),
+						array(
+							'label'   => 'UX',
+							'message' => 'UX',
+						),
+					),
+				),
+			),
+		),
+		array(
+			'role'    => 'assistant',
+			'type'    => 'text',
+			'content' => 'Click a choice on the card above.',
+		),
+	)
+);
+
+datamachine_agents_chat_tool_continuation_assert(
+	4 === count( $interactive_messages ),
+	'Interactive tool parts with a tool_name must be carried through into canonical messages[] on the live turn.'
+);
+++ $assertions;
+
+datamachine_agents_chat_tool_continuation_assert(
+	'tool_call' === ( $interactive_messages[1]['type'] ?? null )
+		&& 'present_question' === ( $interactive_messages[1]['payload']['tool_name'] ?? null )
+		&& 'assistant' === ( $interactive_messages[1]['role'] ?? null ),
+	'Live-turn tool_call projection preserves type, role, and tool_name for the frontend renderer.'
+);
+++ $assertions;
+
+datamachine_agents_chat_tool_continuation_assert(
+	'tool_result' === ( $interactive_messages[2]['type'] ?? null )
+		&& true === ( $interactive_messages[2]['payload']['success'] ?? null )
+		&& 2 === count( $interactive_messages[2]['payload']['tool_data']['choices'] ?? array() ),
+	'Live-turn tool_result projection preserves the interactive tool_data payload (question/choices).'
+);
+++ $assertions;
+
+datamachine_agents_chat_tool_continuation_assert(
+	array( 'timestamp' => '2026-07-03T00:00:00+00:00' ) === ( $interactive_messages[1]['metadata'] ?? null ),
+	'Live-turn tool projection preserves envelope metadata when present.'
+);
+++ $assertions;
+
+datamachine_agents_chat_tool_continuation_assert(
+	'Click a choice on the card above.' === ( $interactive_messages[3]['content'] ?? null )
+		&& ! isset( $interactive_messages[3]['type'] ),
+	'Plain text messages retain the {role, content} contract unchanged alongside tool parts.'
 );
 ++ $assertions;
 

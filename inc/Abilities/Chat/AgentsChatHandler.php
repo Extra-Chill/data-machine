@@ -353,10 +353,18 @@ class AgentsChatHandler {
 	}
 
 	/**
-	 * Project Data Machine envelopes to the simple canonical message list.
+	 * Project Data Machine envelopes to the canonical message list.
+	 *
+	 * Text messages project to the plain `{role, content}` contract. Interactive
+	 * tool parts (`tool_call`/`tool_result` — e.g. a `present_question` choice
+	 * card or a confirmation/DiffCard button) are carried through with their
+	 * `type`, `payload`, and `metadata` preserved, matching the shape the
+	 * persisted transcript and the frontend renderer already consume on session
+	 * reload. This makes the live-turn projection equivalent to a reload so the
+	 * card renders on the turn it is produced instead of only after a reload.
 	 *
 	 * @param array $conversation Conversation messages.
-	 * @return array<int,array{role:string,content:string}>
+	 * @return array<int,array<string,mixed>>
 	 */
 	private function toCanonicalMessages( array $conversation ): array {
 		$messages = array();
@@ -366,7 +374,13 @@ class AgentsChatHandler {
 				continue;
 			}
 
-			if ( in_array( (string) ( $message['type'] ?? '' ), array( 'tool_call', 'tool_result' ), true ) ) {
+			$type = (string) ( $message['type'] ?? '' );
+
+			if ( in_array( $type, array( 'tool_call', 'tool_result' ), true ) ) {
+				$tool_message = $this->toCanonicalToolMessage( $message, $type );
+				if ( null !== $tool_message ) {
+					$messages[] = $tool_message;
+				}
 				continue;
 			}
 
@@ -381,5 +395,45 @@ class AgentsChatHandler {
 		}
 
 		return $messages;
+	}
+
+	/**
+	 * Project a tool_call/tool_result envelope into the canonical message shape.
+	 *
+	 * Preserves the interactive payload (tool_name, parameters, model-facing
+	 * tool_data, success) so the frontend can render the clickable card on the
+	 * live turn. Mirrors the persisted-transcript / session-reload projection so
+	 * both paths feed the renderer an identical envelope.
+	 *
+	 * @param array  $message Tool envelope from the conversation transcript.
+	 * @param string $type    Envelope type: `tool_call` or `tool_result`.
+	 * @return array<string,mixed>|null Canonical tool message, or null when unrenderable.
+	 */
+	private function toCanonicalToolMessage( array $message, string $type ): ?array {
+		$payload  = is_array( $message['payload'] ?? null ) ? $message['payload'] : array();
+		$metadata = is_array( $message['metadata'] ?? null ) ? $message['metadata'] : array();
+
+		$tool_name = (string) ( $payload['tool_name'] ?? $metadata['tool_name'] ?? '' );
+		if ( '' === $tool_name ) {
+			return null;
+		}
+
+		$content = $message['content'];
+		if ( ! is_string( $content ) && ! is_array( $content ) ) {
+			return null;
+		}
+
+		$canonical = array(
+			'role'    => (string) $message['role'],
+			'content' => $content,
+			'type'    => $type,
+			'payload' => $payload,
+		);
+
+		if ( ! empty( $metadata ) ) {
+			$canonical['metadata'] = $metadata;
+		}
+
+		return $canonical;
 	}
 }
