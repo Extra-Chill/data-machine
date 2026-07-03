@@ -22,8 +22,102 @@ define( 'DATAMACHINE_VERSION', '0.159.6' );
 define( 'DATAMACHINE_PATH', plugin_dir_path( __FILE__ ) );
 define( 'DATAMACHINE_URL', plugin_dir_url( __FILE__ ) );
 
+/**
+ * Read the Agents API plugin header version without loading the plugin file.
+ *
+ * @param string $plugin_file Plugin file path.
+ * @return string|null Version string, or null when unavailable.
+ */
+function datamachine_read_agents_api_plugin_version( string $plugin_file ): ?string {
+	if ( ! is_readable( $plugin_file ) ) {
+		return null;
+	}
+
+	if ( function_exists( 'get_file_data' ) ) {
+		$headers = get_file_data( $plugin_file, array( 'version' => 'Version' ), 'plugin' );
+		$version = trim( (string) ( $headers['version'] ?? '' ) );
+
+		return '' !== $version ? $version : null;
+	}
+
+	return null;
+}
+
+/**
+ * Load bundled Agents API unless another copy is already active.
+ *
+ * @return array{loaded:string,bundled_version:?string,active_version:?string,active_file:?string,warning:?string}
+ */
+function datamachine_load_bundled_agents_api(): array {
+	$bundled_file    = __DIR__ . '/vendor/wordpress/agents-api/agents-api.php';
+	$bundled_version = datamachine_read_agents_api_plugin_version( $bundled_file );
+
+	if ( defined( 'AGENTS_API_LOADED' ) ) {
+		$active_file    = defined( 'AGENTS_API_PLUGIN_FILE' ) ? (string) constant( 'AGENTS_API_PLUGIN_FILE' ) : null;
+		$active_version = defined( 'AGENTS_API_VERSION' ) ? (string) constant( 'AGENTS_API_VERSION' ) : null;
+		if ( null === $active_version && null !== $active_file ) {
+			$active_version = datamachine_read_agents_api_plugin_version( $active_file );
+		}
+
+		$warning = null;
+		if ( null !== $bundled_version && null !== $active_version && $bundled_version !== $active_version ) {
+			$warning = sprintf(
+				'Data Machine is using an already-loaded Agents API version %1$s instead of its bundled version %2$s. Deactivate the standalone Agents API plugin or align versions to avoid runtime substrate skew.',
+				$active_version,
+				$bundled_version
+			);
+		}
+
+		return array(
+			'loaded'          => 'external',
+			'bundled_version' => $bundled_version,
+			'active_version'  => $active_version,
+			'active_file'     => $active_file,
+			'warning'         => $warning,
+		);
+	}
+
+	require_once $bundled_file;
+
+	return array(
+		'loaded'          => 'bundled',
+		'bundled_version' => $bundled_version,
+		'active_version'  => $bundled_version,
+		'active_file'     => defined( 'AGENTS_API_PLUGIN_FILE' )
+			? (string) constant( 'AGENTS_API_PLUGIN_FILE' )
+			: $bundled_file,
+		'warning'         => null,
+	);
+}
+
+/**
+ * Emit any deferred Agents API load warning through the Data Machine logger.
+ *
+ * @return void
+ */
+function datamachine_log_agents_api_load_warning(): void {
+	global $datamachine_agents_api_load_state;
+
+	if ( ! is_array( $datamachine_agents_api_load_state ) || empty( $datamachine_agents_api_load_state['warning'] ) ) {
+		return;
+	}
+
+	do_action(
+		'datamachine_log',
+		'warning',
+		(string) $datamachine_agents_api_load_state['warning'],
+		array(
+			'component'       => 'agents-api',
+			'loaded'          => $datamachine_agents_api_load_state['loaded'] ?? null,
+			'active_version'  => $datamachine_agents_api_load_state['active_version'] ?? null,
+			'bundled_version' => $datamachine_agents_api_load_state['bundled_version'] ?? null,
+			'active_file'     => $datamachine_agents_api_load_state['active_file'] ?? null,
+		)
+	);
+}
+
 require_once __DIR__ . '/vendor/autoload.php';
-require_once __DIR__ . '/vendor/wordpress/agents-api/agents-api.php';
+$datamachine_agents_api_load_state = datamachine_load_bundled_agents_api();
 
 // WP-CLI integration
 // @phpstan-ignore-next-line Runtime constant may be defined false outside PHPStan's configured CLI context.
@@ -103,6 +197,7 @@ function datamachine_run_datamachine_plugin() {
 	datamachine_register_admin_filters();
 	datamachine_register_oauth_system();
 	datamachine_register_core_actions();
+	datamachine_log_agents_api_load_warning();
 
 	// Load step types - they self-register via constructors
 	datamachine_load_step_types();
