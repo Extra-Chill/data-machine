@@ -199,6 +199,16 @@ class GoogleSearchConsoleAbilities {
 			);
 		}
 
+		// Auto-scope analytics queries to the current subsite when running on a
+		// genuine subdomain of the configured sc-domain: property and the caller
+		// supplied neither an explicit site_url nor an explicit url_filter.
+		if ( empty( $input['site_url'] ) && empty( $input['url_filter'] ) ) {
+			$auto_prefix = self::computeSubsiteUrlPrefix( $site_url, home_url() );
+			if ( '' !== $auto_prefix ) {
+				$input['url_filter'] = $auto_prefix;
+			}
+		}
+
 		// Route to specialized handlers for non-analytics actions.
 		if ( 'inspect_url' === $action ) {
 			return self::inspectUrl( $input, $access_token, $site_url );
@@ -769,6 +779,59 @@ class GoogleSearchConsoleAbilities {
 	public static function is_configured(): bool {
 		$config = self::get_config();
 		return ! empty( $config['service_account_json'] );
+	}
+
+	/**
+	 * Compute an auto url_filter prefix that scopes GSC analytics to the current
+	 * subsite when it is a genuine subdomain of the configured domain property.
+	 *
+	 * Returns the current blog's URL prefix (e.g. https://studio.extrachill.com/)
+	 * only when ALL of the following hold:
+	 *  - the configured property is a domain property (sc-domain:...);
+	 *  - the current blog's home host is a genuine subdomain of the
+	 *    domain-property host (host !== domain host, but ends with .domain host).
+	 *
+	 * The main site (blog whose host equals the domain-property host, with or
+	 * without a leading www) and any non-subdomain context return '' so the
+	 * whole-domain rollup is preserved. A URL-prefix property (https://...) also
+	 * returns '' — it already scopes itself and needs no page filter.
+	 *
+	 * Pure function (no WP state) so it is unit-testable; callers pass home_url().
+	 *
+	 * @param string $site_url The resolved GSC property URL (sc-domain: or https://).
+	 * @param string $home_url The current blog's home URL (from home_url()).
+	 * @return string URL prefix to filter on, or '' to leave the query unscoped.
+	 */
+	public static function computeSubsiteUrlPrefix( string $site_url, string $home_url ): string {
+		// Only domain properties (sc-domain:) support page-level subsite scoping.
+		if ( 0 !== strpos( $site_url, 'sc-domain:' ) ) {
+			return '';
+		}
+
+		$domain_host = strtolower( trim( substr( $site_url, strlen( 'sc-domain:' ) ) ) );
+		if ( '' === $domain_host ) {
+			return '';
+		}
+
+		$home_host = strtolower( (string) wp_parse_url( $home_url, PHP_URL_HOST ) );
+		if ( '' === $home_host ) {
+			return '';
+		}
+
+		// Main site / property root: host matches the domain property exactly
+		// (with or without a leading www). Preserve the rollup — no filter.
+		if ( $home_host === $domain_host || 'www.' . $domain_host === $home_host ) {
+			return '';
+		}
+
+		// Genuine subdomain: host ends with ".{$domain_host}".
+		if ( substr( $home_host, -strlen( '.' . $domain_host ) ) !== '.' . $domain_host ) {
+			return '';
+		}
+
+		// Scope to this subsite's URL prefix. trailingslashit keeps the filter
+		// tight to this host's pages under a GSC "page contains" match.
+		return trailingslashit( $home_url );
 	}
 
 	/**

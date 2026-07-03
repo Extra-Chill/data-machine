@@ -98,6 +98,7 @@ URL & Sitemap actions:
 
 **url_filter** (string)
 - Filter results to URLs containing this string
+- Subsite auto-scoping: on a multisite subsite whose host is a genuine subdomain of the configured `sc-domain:` domain property, when neither `site_url` nor `url_filter` is supplied the ability auto-applies a `url_filter` of that subsite's URL prefix — so a subsite context returns subsite-scoped rows. The main site returns the whole-domain rollup, and passing an explicit `site_url` or `url_filter` overrides this.
 
 **query_filter** (string)
 - Filter results to queries containing this string
