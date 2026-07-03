@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.159.8] - 2026-07-03
+
+### Fixed
+- purge dm_ prefix remnants
+
 ## [0.159.7] - 2026-07-03
 
 ### Changed
