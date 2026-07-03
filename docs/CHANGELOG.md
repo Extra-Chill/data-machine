@@ -2,6 +2,14 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.159.7] - 2026-07-03
+
+### Changed
+- restore test to pull_request command set (#2840)
+
+### Fixed
+- harden agent authorize redirect URI matching
+
 ## [0.159.6] - 2026-07-03
 
 ### Changed
