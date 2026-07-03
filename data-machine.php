@@ -848,6 +848,49 @@ function datamachine_resolve_or_create_agent_id( int $user_id ): int {
 }
 
 /**
+ * Resolve the acting agent identity for a system/ability-triggered operation.
+ *
+ * Media, SEO, and linking abilities enqueue agent-owned queued tasks (alt text,
+ * meta descriptions, image optimization, internal linking). Those tasks require
+ * a real agent owner in TaskScheduler — a queued task with agent_id/user_id 0 is
+ * rejected by the agent-context gate before it ever runs.
+ *
+ * The historical pattern resolved identity solely from get_current_user_id(),
+ * which returns 0 whenever the ability runs outside an authenticated web request
+ * — WP-Cron, WP-CLI without --user, or a system pipeline step. That produced a
+ * zeroed context and a flood of "queued task requires agent context" rejections,
+ * one per batched item. This helper closes that gap by falling back to the
+ * install's default agent user (DirectoryManager::get_default_agent_user_id())
+ * when no user is present in the request, mirroring how the rest of the
+ * single-agent surface resolves an owner.
+ *
+ * @since 0.72.0
+ *
+ * @return array{user_id:int,agent_id:int} Acting user id and its agent id. Both
+ *                                          may be 0 only when the install has no
+ *                                          resolvable owner at all.
+ */
+function datamachine_resolve_system_agent_context(): array {
+	$user_id = function_exists( 'get_current_user_id' ) ? (int) get_current_user_id() : 0;
+
+	// No authenticated user (cron / CLI / system pipeline): fall back to the
+	// install's default agent owner so agent-owned queued tasks carry a real
+	// identity into TaskScheduler instead of a zeroed, gate-rejected context.
+	if ( $user_id <= 0 && class_exists( \DataMachine\Core\FilesRepository\DirectoryManager::class ) ) {
+		$user_id = (int) \DataMachine\Core\FilesRepository\DirectoryManager::get_default_agent_user_id();
+	}
+
+	$agent_id = ( $user_id > 0 && function_exists( 'datamachine_resolve_or_create_agent_id' ) )
+		? datamachine_resolve_or_create_agent_id( $user_id )
+		: 0;
+
+	return array(
+		'user_id'  => $user_id,
+		'agent_id' => $agent_id,
+	);
+}
+
+/**
  * Run a callback for every site on the network.
  *
  * Switches to each site, runs the callback, then restores. Used by
