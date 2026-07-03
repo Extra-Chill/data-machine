@@ -86,11 +86,9 @@ export default class HandlerModel {
 					config,
 					currentSettings
 				);
-			} else {
+			} else if ( config.type === 'checkbox' ) {
 				// coerce booleans to booleans for checkboxes
-				if ( config.type === 'checkbox' ) {
-					normalized[ key ] = !! normalized[ key ];
-				}
+				normalized[ key ] = !! normalized[ key ];
 			}
 		} );
 
@@ -123,12 +121,12 @@ export default class HandlerModel {
 
 					if ( typeof value === 'string' ) {
 						try {
-							sanitized[ key ] = JSON.parse( value );
-						} catch ( error ) {
-							throw new Error(
-								`Invalid JSON for ${ fieldConfig.label || key }.`
-							);
-						}
+						sanitized[ key ] = JSON.parse( value );
+					} catch {
+						throw new Error(
+							`Invalid JSON for ${ fieldConfig.label || key }.`
+						);
+					}
 						break;
 					}
 
@@ -155,12 +153,12 @@ export default class HandlerModel {
 	}
 
 	// Validation hook (basic) - subclasses may override with more complex validation
-	validate( formData = {} ) {
+	validate() {
 		return { valid: true, errors: {} };
 	}
 
 	// Optionally render a custom React editor for a handler (e.g., Files)
-	renderSettingsEditor( props = {} ) {
+	renderSettingsEditor() {
 		return null; // default: no custom UI
 	}
 }

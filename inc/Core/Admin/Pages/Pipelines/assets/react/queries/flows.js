@@ -289,7 +289,7 @@ export const useUpdateFlowHandler = () => {
 						);
 					}
 				}
-			} catch ( err ) {
+			} catch {
 				// If model creation fails, fall back to original settings
 			}
 

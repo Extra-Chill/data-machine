@@ -61,8 +61,6 @@ export const formatRelativeTime = ( dateString ) => {
 	}
 
 	const diffMins = Math.floor( diffMs / 60000 );
-	const diffHours = Math.floor( diffMs / 3600000 );
-	const diffDays = Math.floor( diffMs / 86400000 );
 
 	if ( diffMins < 1 ) {
 		return __( 'just now', 'data-machine' );
@@ -74,6 +72,7 @@ export const formatRelativeTime = ( dateString ) => {
 				: __( 'mins ago', 'data-machine' )
 		}`;
 	}
+	const diffHours = Math.floor( diffMs / 3600000 );
 	if ( diffHours < 24 ) {
 		return `${ diffHours } ${
 			diffHours === 1
@@ -81,6 +80,7 @@ export const formatRelativeTime = ( dateString ) => {
 				: __( 'hours ago', 'data-machine' )
 		}`;
 	}
+	const diffDays = Math.floor( diffMs / 86400000 );
 	if ( diffDays < 7 ) {
 		return `${ diffDays } ${
 			diffDays === 1

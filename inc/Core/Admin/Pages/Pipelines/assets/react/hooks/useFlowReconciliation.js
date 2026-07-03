@@ -34,9 +34,7 @@ const sleep = ( ms ) => new Promise( ( resolve ) => setTimeout( resolve, ms ) );
  * then updates the query cache. Uses a cancellation token to prevent stale
  * updates when a new run is triggered before the previous reconciliation completes.
  *
- * @return {Object} Reconciliation state and trigger function.
- * @return {string|null} return.optimisticLastRunDisplay - Temporary display text (e.g. "Queued") or null.
- * @return {Function}    return.reconcile                - Trigger reconciliation for a flow run.
+ * @return {Object} Reconciliation state: `optimisticLastRunDisplay` (string|null temp display text, e.g. "Queued") and `reconcile` (Function to trigger reconciliation for a flow run).
  */
 export default function useFlowReconciliation() {
 	const queryClient = useQueryClient();
@@ -55,8 +53,8 @@ export default function useFlowReconciliation() {
 	 * Poll for updated flow data after a run.
 	 *
 	 * @param {Object}      options
-	 * @param {number}      options.flowId         - Flow ID to poll.
-	 * @param {number}      options.pipelineId     - Pipeline ID for cache scoping.
+	 * @param {number}      options.flowId          - Flow ID to poll.
+	 * @param {number}      options.pipelineId      - Pipeline ID for cache scoping.
 	 * @param {string|null} options.baselineLastRun - last_run value before the run was triggered.
 	 */
 	const reconcile = useCallback(
@@ -127,7 +125,7 @@ export default function useFlowReconciliation() {
 						setOptimisticLastRunDisplay( null );
 						return;
 					}
-				} catch ( err ) {
+				} catch {
 					// Network error — continue polling.
 					continue;
 				}

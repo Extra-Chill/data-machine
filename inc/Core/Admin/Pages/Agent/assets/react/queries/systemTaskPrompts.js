@@ -6,6 +6,9 @@
  * @since 0.43.0
  */
 
+/**
+ * External dependencies
+ */
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { client } from '@shared/utils/api';
 

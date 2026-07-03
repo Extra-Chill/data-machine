@@ -111,6 +111,9 @@ export const client = {
 	/**
 	 * GET request with automatic param interceptor injection.
 	 * Interceptor params are applied first, then caller params override.
+	 *
+	 * @param {string} path   Request path.
+	 * @param {Object} params Optional query params.
 	 */
 	get: ( path, params = {} ) =>
 		request( path, 'GET', undefined, {

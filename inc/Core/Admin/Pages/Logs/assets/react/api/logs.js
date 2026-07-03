@@ -4,8 +4,6 @@
  * REST API calls for database-backed log operations.
  */
 
-/* eslint-disable jsdoc/check-line-alignment */
-
 /**
  * External dependencies
  */

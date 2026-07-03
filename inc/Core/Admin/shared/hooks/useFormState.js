@@ -12,8 +12,8 @@ import { useReducer, useCallback, useRef, useState } from '@wordpress/element';
 
 /**
  * Form state reducer
- * @param state
- * @param action
+ * @param {Object} state
+ * @param {Object} action
  */
 const formReducer = ( state, action ) => {
 	switch ( action.type ) {

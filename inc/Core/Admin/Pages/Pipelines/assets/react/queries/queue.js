@@ -62,7 +62,7 @@ const invalidateFlows = ( queryClient, pipelineId ) => {
  * Fetch queue for a flow
  *
  * @param {number} flowId     - Flow ID
- * @param          flowStepId
+ * @param {number} flowStepId - Flow step ID
  * @return {Object} Query result with queue data
  */
 export const useFlowQueue = ( flowId, flowStepId ) => {
