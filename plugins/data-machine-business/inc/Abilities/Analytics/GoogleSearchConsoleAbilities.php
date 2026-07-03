@@ -190,7 +190,14 @@ class GoogleSearchConsoleAbilities {
 			);
 		}
 
-		$site_url = ! empty( $input['site_url'] ) ? sanitize_text_field( $input['site_url'] ) : ( $config['site_url'] ?? '' );
+		$site_url = self::resolve_site_url( $input, $config );
+
+		if ( is_wp_error( $site_url ) ) {
+			return array(
+				'success' => false,
+				'error'   => $site_url->get_error_message(),
+			);
+		}
 
 		// Route to specialized handlers for non-analytics actions.
 		if ( 'inspect_url' === $action ) {
@@ -273,7 +280,7 @@ class GoogleSearchConsoleAbilities {
 		if ( ! $result['success'] ) {
 			return array(
 				'success' => false,
-				'error'   => 'Failed to connect to Google Search Console API: ' . ( $result['error'] ?? 'Unknown error' ),
+				'error'   => self::describe_request_error( $result['error'] ?? 'Unknown error', $site_url ),
 			);
 		}
 
@@ -302,6 +309,103 @@ class GoogleSearchConsoleAbilities {
 			'results_count' => count( $rows ),
 			'results'       => $rows,
 		);
+	}
+
+	/**
+	 * Resolve the GSC property to query, constraining any model-supplied site_url
+	 * to the configured property.
+	 *
+	 * The service account is verified on exactly one GSC property (the configured
+	 * `site_url`). Forwarding an arbitrary model-supplied property to Google produces
+	 * an opaque HTTP 403 that reads like an auth outage. To prevent that, a supplied
+	 * site_url is only honoured when it matches the configured property; anything else
+	 * is rejected up front with an actionable error, before any Google request.
+	 *
+	 * Behaviour preserved: with no site_url in the input, the configured property is
+	 * used (the CLI default path that works today).
+	 *
+	 * @param array $input  Ability input.
+	 * @param array $config GSC configuration.
+	 * @return string|\WP_Error Resolved property URL, or WP_Error when the supplied
+	 *                          property is not the configured/verified one.
+	 */
+	private static function resolve_site_url( array $input, array $config ) {
+		$configured = isset( $config['site_url'] ) ? (string) $config['site_url'] : '';
+		$supplied   = ! empty( $input['site_url'] ) ? sanitize_text_field( $input['site_url'] ) : '';
+
+		if ( '' === $supplied ) {
+			return $configured;
+		}
+
+		if ( '' === $configured ) {
+			// Nothing to validate against — honour the supplied value as before.
+			return $supplied;
+		}
+
+		if ( self::normalize_property( $supplied ) === self::normalize_property( $configured ) ) {
+			return $configured;
+		}
+
+		return new \WP_Error(
+			'gsc_property_not_verified',
+			sprintf(
+				'Requested GSC property "%1$s" is not verified for the configured service account. This install is scoped to "%2$s". Omit site_url to query the configured property, or verify "%1$s" for the service account in Google Search Console.',
+				$supplied,
+				$configured
+			)
+		);
+	}
+
+	/**
+	 * Normalize a GSC property URL for comparison.
+	 *
+	 * Treats `https://example.com/`, `https://example.com`, and `sc-domain:example.com`
+	 * as equivalent host-level references so a model-supplied URL-prefix property can
+	 * match a configured domain property (and vice versa).
+	 *
+	 * @param string $property Property string.
+	 * @return string Normalized host key.
+	 */
+	private static function normalize_property( string $property ): string {
+		$property = strtolower( trim( $property ) );
+
+		if ( 0 === strpos( $property, 'sc-domain:' ) ) {
+			$host = substr( $property, strlen( 'sc-domain:' ) );
+		} else {
+			$parsed = wp_parse_url( $property );
+			$host   = $parsed['host'] ?? $property;
+			$path   = isset( $parsed['path'] ) ? trim( $parsed['path'], '/' ) : '';
+			if ( '' !== $path ) {
+				// URL-prefix property with a path is distinct from a domain property.
+				return $host . '/' . $path;
+			}
+		}
+
+		return ltrim( rtrim( $host, '/' ), '/' );
+	}
+
+	/**
+	 * Turn a raw HttpClient error string into an actionable message.
+	 *
+	 * A Google 403 on the searchAnalytics endpoint means the service account is not
+	 * verified for the requested property — not that Data Machine's credential or the
+	 * WP capability gate failed. Surfacing that distinction stops operators from
+	 * misreading a property-scope problem as an auth outage.
+	 *
+	 * @param string $error    Raw error from HttpClient.
+	 * @param string $site_url Property the request targeted.
+	 * @return string Actionable error message.
+	 */
+	private static function describe_request_error( string $error, string $site_url ): string {
+		if ( false !== strpos( $error, 'HTTP 403' ) ) {
+			return sprintf(
+				'Google Search Console returned HTTP 403 for property "%s": the configured service account is not verified for this property. This is a property-authorization issue, not a Data Machine credential or WordPress permission failure. Verify the property for the service account in Google Search Console, or target a verified property. (Raw: %s)',
+				$site_url,
+				$error
+			);
+		}
+
+		return 'Failed to connect to Google Search Console API: ' . $error;
 	}
 
 	/**
@@ -590,7 +694,7 @@ class GoogleSearchConsoleAbilities {
 	 * @return string|\WP_Error Access token or error.
 	 */
 	private static function get_access_token( array $service_account ) {
-		$cached = get_transient( self::TOKEN_TRANSIENT );
+		$cached = get_site_transient( self::TOKEN_TRANSIENT );
 
 		if ( ! empty( $cached ) ) {
 			return $cached;
@@ -641,7 +745,7 @@ class GoogleSearchConsoleAbilities {
 			return new \WP_Error( 'gsc_token_failed', 'Failed to get access token: ' . $error_desc );
 		}
 
-		set_transient( self::TOKEN_TRANSIENT, $body['access_token'], 3500 );
+		set_site_transient( self::TOKEN_TRANSIENT, $body['access_token'], 3500 );
 
 		return $body['access_token'];
 	}
