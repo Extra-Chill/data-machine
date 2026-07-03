@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.159.5] - 2026-07-03
+
+### Fixed
+- carry tool_call/tool_result parts through live agents/chat reply
+
 ## [0.159.4] - 2026-07-02
 
 ### Fixed
