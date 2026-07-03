@@ -424,10 +424,10 @@ class AgentsChatHandler {
 		}
 
 		$canonical = array(
-			'role'     => (string) $message['role'],
-			'content'  => $content,
-			'type'     => $type,
-			'payload'  => $payload,
+			'role'    => (string) $message['role'],
+			'content' => $content,
+			'type'    => $type,
+			'payload' => $payload,
 		);
 
 		if ( ! empty( $metadata ) ) {
