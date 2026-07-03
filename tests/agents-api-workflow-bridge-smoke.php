@@ -145,6 +145,10 @@ defined( 'ABSPATH' ) || define( 'ABSPATH', __DIR__ . '/' );
 					'label'               => $name,
 					'description'         => 'Workflow bridge smoke test ability.',
 					'category'            => 'demo',
+					'input_schema'        => array(
+						'type'                 => 'object',
+						'additionalProperties' => true,
+					),
 					'execute_callback'    => static fn( array $input ): array => $handler( $input ),
 					'permission_callback' => '__return_true',
 				)
