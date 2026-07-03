@@ -204,7 +204,7 @@ class AgentAuthorize {
 
 			$login_url = wp_login_url( $authorize_url );
 
-			header( 'Location: ' . $login_url );
+			wp_safe_redirect( $login_url );
 			exit;
 		}
 
@@ -260,19 +260,19 @@ class AgentAuthorize {
 
 		// Must be logged in.
 		if ( ! is_user_logged_in() ) {
-			header( 'Location: ' . add_query_arg( 'error', 'not_authenticated', $redirect_uri ) );
+			$this->redirect_to_allowed_external_uri( add_query_arg( 'error', 'not_authenticated', $redirect_uri ) );
 			exit;
 		}
 
 		// Verify nonce.
 		if ( ! wp_verify_nonce( $nonce, self::NONCE_ACTION ) ) {
-			header( 'Location: ' . add_query_arg( 'error', 'invalid_nonce', $redirect_uri ) );
+			$this->redirect_to_allowed_external_uri( add_query_arg( 'error', 'invalid_nonce', $redirect_uri ) );
 			exit;
 		}
 
 		// Handle deny.
 		if ( 'deny' === $action ) {
-			header( 'Location: ' . add_query_arg( 'error', 'access_denied', $redirect_uri ) );
+			$this->redirect_to_allowed_external_uri( add_query_arg( 'error', 'access_denied', $redirect_uri ) );
 			exit;
 		}
 
@@ -281,14 +281,14 @@ class AgentAuthorize {
 		$agent       = $agents_repo->get_by_slug( $agent_slug );
 
 		if ( ! $agent ) {
-			header( 'Location: ' . add_query_arg( 'error', 'agent_not_found', $redirect_uri ) );
+			$this->redirect_to_allowed_external_uri( add_query_arg( 'error', 'agent_not_found', $redirect_uri ) );
 			exit;
 		}
 
 		// Verify access.
 		$user_id = get_current_user_id();
 		if ( ! $this->user_can_authorize( $user_id, $agent ) ) {
-			header( 'Location: ' . add_query_arg( 'error', 'access_denied', $redirect_uri ) );
+			$this->redirect_to_allowed_external_uri( add_query_arg( 'error', 'access_denied', $redirect_uri ) );
 			exit;
 		}
 
@@ -298,7 +298,7 @@ class AgentAuthorize {
 		}
 
 		if ( ! isset( $scope_presets[ $scope_key ] ) ) {
-			header( 'Location: ' . add_query_arg( 'error', 'invalid_scope', $redirect_uri ) );
+			$this->redirect_to_allowed_external_uri( add_query_arg( 'error', 'invalid_scope', $redirect_uri ) );
 			exit;
 		}
 
@@ -331,10 +331,10 @@ class AgentAuthorize {
 
 		if ( null !== $redirect_override ) {
 			if ( is_wp_error( $redirect_override ) ) {
-				header( 'Location: ' . add_query_arg( 'error', $redirect_override->get_error_code(), $redirect_uri ) );
+				$this->redirect_to_allowed_external_uri( add_query_arg( 'error', $redirect_override->get_error_code(), $redirect_uri ) );
 				exit;
 			}
-			header( 'Location: ' . $redirect_override );
+			$this->redirect_to_allowed_external_uri( $redirect_override );
 			exit;
 		}
 
@@ -351,7 +351,7 @@ class AgentAuthorize {
 		);
 
 		if ( ! $result ) {
-			header( 'Location: ' . add_query_arg( 'error', 'token_creation_failed', $redirect_uri ) );
+			$this->redirect_to_allowed_external_uri( add_query_arg( 'error', 'token_creation_failed', $redirect_uri ) );
 			exit;
 		}
 
@@ -379,8 +379,17 @@ class AgentAuthorize {
 			$redirect_uri
 		);
 
-		header( 'Location: ' . $callback_url );
+		$this->redirect_to_allowed_external_uri( $callback_url );
 		exit;
+	}
+
+	/**
+	 * Redirect to a validated external callback URI.
+	 *
+	 * @param string $url Final redirect URL.
+	 */
+	private function redirect_to_allowed_external_uri( string $url ): void {
+		header( 'Location: ' . wp_sanitize_redirect( $url ) );
 	}
 
 	/**
@@ -486,12 +495,62 @@ class AgentAuthorize {
 
 		// Wildcard path pattern.
 		if ( str_ends_with( $pattern, '/*' ) ) {
-			$base = rtrim( substr( $pattern, 0, -2 ), '/' );
-			return str_starts_with( rtrim( $uri, '/' ), $base );
+			$pattern_base = substr( $pattern, 0, -2 );
+			$pattern_url  = wp_parse_url( $pattern_base );
+			$uri_url      = wp_parse_url( $uri );
+
+			if ( ! is_array( $pattern_url ) || ! is_array( $uri_url ) ) {
+				return false;
+			}
+
+			$pattern_scheme = strtolower( (string) ( $pattern_url['scheme'] ?? '' ) );
+			$uri_scheme     = strtolower( (string) ( $uri_url['scheme'] ?? '' ) );
+			$pattern_host   = strtolower( (string) ( $pattern_url['host'] ?? '' ) );
+			$uri_host       = strtolower( (string) ( $uri_url['host'] ?? '' ) );
+
+			if ( '' === $pattern_scheme || '' === $uri_scheme || $pattern_scheme !== $uri_scheme ) {
+				return false;
+			}
+
+			if ( '' === $pattern_host || '' === $uri_host || $pattern_host !== $uri_host ) {
+				return false;
+			}
+
+			if ( $this->normalize_uri_port( $pattern_scheme, $pattern_url['port'] ?? null ) !== $this->normalize_uri_port( $uri_scheme, $uri_url['port'] ?? null ) ) {
+				return false;
+			}
+
+			$pattern_path = rtrim( (string) ( $pattern_url['path'] ?? '' ), '/' );
+			$uri_path     = rtrim( (string) ( $uri_url['path'] ?? '' ), '/' );
+
+			if ( '' === $pattern_path ) {
+				return true;
+			}
+
+			return $uri_path === $pattern_path || str_starts_with( $uri_path, $pattern_path . '/' );
 		}
 
 		// Exact match.
 		return rtrim( $uri, '/' ) === rtrim( $pattern, '/' );
+	}
+
+	/**
+	 * Normalize absent default ports so explicit and implicit defaults compare equal.
+	 *
+	 * @param string   $scheme URI scheme.
+	 * @param int|null $port   Parsed URI port.
+	 * @return int|null
+	 */
+	private function normalize_uri_port( string $scheme, ?int $port ): ?int {
+		if ( null !== $port ) {
+			return $port;
+		}
+
+		return match ( strtolower( $scheme ) ) {
+			'http'  => 80,
+			'https' => 443,
+			default => null,
+		};
 	}
 
 	/**
