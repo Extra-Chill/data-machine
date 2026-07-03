@@ -224,7 +224,6 @@ final class PendingActionInspectionAbility {
 		$context     = isset( $datamachine['context'] ) && is_array( $datamachine['context'] ) ? $datamachine['context'] : array();
 		$workspace   = isset( $action['workspace'] ) && is_array( $action['workspace'] ) ? $action['workspace'] : array();
 
-		$action['preview_data']      = $action['preview'] ?? $action['preview_data'] ?? array();
 		$action['agent_id']          = isset( $datamachine['agent_id'] ) ? (int) $datamachine['agent_id'] : self::id_from_canonical_ref( $action['agent'] ?? null, 'agent' );
 		$action['created_by']        = isset( $datamachine['created_by'] ) ? (int) $datamachine['created_by'] : self::id_from_canonical_ref( $action['creator'] ?? null, 'user' );
 		$action['context']           = $context;

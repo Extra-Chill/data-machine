@@ -13,7 +13,7 @@ Data Machine has two separate runtime layers:
 - **wp-ai-client** owns provider/model prompt execution.
 - **RequestBuilder** is the Data Machine adapter from product payloads to `wp-ai-client` provider requests.
 
-Pipeline AI steps and Data Machine chat turns use `RequestBuilder::build()` so directives, metadata, request inspection, tool declarations, and timeout behavior stay consistent. Plugins that only need one-shot provider calls may call `wp-ai-client` directly; they do not need to route through Data Machine or Agents API.
+Pipeline AI steps and Data Machine chat turns use `RequestBuilder::build()` so directives, metadata, request inspection, tool declarations, and timeout behavior stay consistent. Plugins that only need one-shot AI operations may call `wp-ai-client` directly; they do not need to route through Data Machine or Agents API.
 
 ## Flow
 

@@ -122,36 +122,36 @@ Move contracts/value objects before services. The first extraction PR should be 
 
 | Move first | Current in-repo location | Why first |
 |---|---|---|
-| `WP_Agent`, `WP_Agents_Registry`, and registration helpers | `agents-api/inc/class-wp-agent.php`, `class-wp-agents-registry.php`, `register-agents.php` | Public registration facade; no Data Machine product import. |
-| Agent package artifact contracts/helpers | `agents-api/inc/class-wp-agent-package*.php`, `register-agent-package-artifacts.php` | Bundle/package contract is already backend-only. |
-| `WP_Agent_Message` and `WP_Agent_Conversation_Result` | `agents-api/inc/AI/` | Generic run/message value contracts. |
-| `WP_Agent_Tool_Declaration` | `agents-api/inc/AI/Tools/` | Generic run-scoped tool declaration validation. |
-| `WP_Agent_Conversation_Store` | `agents-api/inc/Core/Database/Chat/` | Narrow transcript CRUD contract; does not require Data Machine chat UI. |
-| Memory store value objects/interfaces | `agents-api/inc/Core/FilesRepository/` | Generic memory seam; Data Machine default store remains an adapter. |
+| `WP_Agent`, `WP_Agents_Registry`, and registration helpers | `agents-api/src/Registry/class-wp-agent.php`, `class-wp-agents-registry.php`, `register-agents.php` | Public registration facade; no Data Machine product import. |
+| Agent package artifact contracts/helpers | `agents-api/src/Packages/class-wp-agent-package*.php`, `register-agent-package-artifacts.php` | Bundle/package contract is already backend-only. |
+| `WP_Agent_Message` and `WP_Agent_Conversation_Result` | `agents-api/src/Runtime/` | Generic run/message value contracts. |
+| `WP_Agent_Tool_Declaration` | `agents-api/src/Tools/` | Generic run-scoped tool declaration validation. |
+| `WP_Agent_Conversation_Store` | `agents-api/src/Transcripts/` | Narrow transcript CRUD contract; does not require Data Machine chat UI. |
+| Memory store value objects/interfaces | `agents-api/src/Memory/` | Generic memory seam; Data Machine default store remains an adapter. |
 
 Current in-repo source checklist for the first move:
 
 - `agents-api.php`
-- `inc/class-wp-agent.php`
-- `inc/class-wp-agents-registry.php`
-- `inc/register-agents.php`
-- `inc/class-wp-agent-package.php`
-- `inc/class-wp-agent-package-artifact.php`
-- `inc/class-wp-agent-package-artifact-type.php`
-- `inc/class-wp-agent-package-artifacts-registry.php`
-- `inc/class-wp-agent-package-adoption-diff.php`
-- `inc/class-wp-agent-package-adoption-result.php`
-- `inc/class-wp-agent-package-adopter.php`
-- `inc/register-agent-package-artifacts.php`
-- `inc/AI/WP_Agent_Message.php`
-- `inc/AI/WP_Agent_Conversation_Result.php`
-- `inc/AI/Tools/WP_Agent_Tool_Declaration.php`
-- `inc/Core/Database/Chat/WP_Agent_Conversation_Store.php`
-- `inc/Core/FilesRepository/WP_Agent_Memory_Scope.php`
-- `inc/Core/FilesRepository/WP_Agent_Memory_List_Entry.php`
-- `inc/Core/FilesRepository/WP_Agent_Memory_Read_Result.php`
-- `inc/Core/FilesRepository/WP_Agent_Memory_Write_Result.php`
-- `inc/Core/FilesRepository/WP_Agent_Memory_Store.php`
+- `src/Registry/class-wp-agent.php`
+- `src/Registry/class-wp-agents-registry.php`
+- `src/Registry/register-agents.php`
+- `src/Packages/class-wp-agent-package.php`
+- `src/Packages/class-wp-agent-package-artifact.php`
+- `src/Packages/class-wp-agent-package-artifact-type.php`
+- `src/Packages/class-wp-agent-package-artifacts-registry.php`
+- `src/Packages/class-wp-agent-package-adoption-diff.php`
+- `src/Packages/class-wp-agent-package-adoption-result.php`
+- `src/Packages/class-wp-agent-package-adopter.php`
+- `src/Packages/register-agent-package-artifacts.php`
+- `src/Runtime/class-wp-agent-message.php`
+- `src/Runtime/class-wp-agent-conversation-result.php`
+- `src/Tools/class-wp-agent-tool-declaration.php`
+- `src/Transcripts/class-wp-agent-conversation-store.php`
+- `src/Memory/class-wp-agent-memory-scope.php`
+- `src/Memory/class-wp-agent-memory-list-entry.php`
+- `src/Memory/class-wp-agent-memory-read-result.php`
+- `src/Memory/class-wp-agent-memory-write-result.php`
+- `src/Memory/class-wp-agent-memory-store.php`
 
 ## Keep In Data Machine For Now
 

@@ -172,7 +172,6 @@ Target shape:
 These generic seams still need Agents API naming decisions or have already moved
 in place:
 
-- `agents_api_conversation_runner`
 - `datamachine_conversation_store`
 - `wp_agent_memory_store`
 - `agents_api_tool_sources`

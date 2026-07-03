@@ -1485,53 +1485,43 @@ $tools = $resolver->resolve( array(
 4. Policy resolution - Agents API tool policy applies deny, allow-only, category, mode, mandatory-tool, and chat access rules.
 5. Final filter - `datamachine_resolved_tools` can adjust the resolved set.
 
-### AIConversationLoop (`/inc/Engine/AI/AIConversationLoop.php`)
+### Conversation Loop (`/inc/Engine/AI/conversation-loop.php`)
 
-**Purpose**: Multi-turn conversation execution with automatic tool calling.
+**Purpose**: Multi-turn conversation execution through the Agents API loop substrate.
 
 **Canonical entry point**:
 
 ```php
-$final_response = \DataMachine\Engine\AI\AIConversationLoop::run(
+$final_response = \DataMachine\Engine\AI\datamachine_run_conversation(
     array $messages,
     array $tools,
     string $provider,
     string $model,
-    string $context,         // 'pipeline', 'chat', etc.
+    array $modes,           // 'pipeline', 'chat', etc.
     array $payload = [],
     int $max_turns = 25,
     bool $single_turn = false
 ): array
 ```
 
-`run()` internally applies the `agents_api_conversation_runner` filter, giving
-a registered runtime adapter the chance to short-circuit the built-in loop. If
-no adapter returns an array, Data Machine's built-in `execute()` runs.
+Data Machine owns request preparation and product adapters: provider/model
+selection, tool declarations, provider-turn assembly, completion policy,
+transcript persistence, event emission, and runtime tool mediation. It then
+delegates loop sequencing directly to `WP_Agent_Conversation_Loop::run()`.
 
-**Filter: `agents_api_conversation_runner`**
-
-```php
-apply_filters(
-    'agents_api_conversation_runner',
-    null,           // Return non-null array to short-circuit
-    $messages, $tools, $provider, $model,
-    $context, $payload, $max_turns, $single_turn
-);
-```
-
-Return an array matching `execute()`'s documented return shape to replace the
-built-in loop. Return `null` (the default) to let Data Machine run the
-conversation. See [ai-conversation-loop.md](../../core-system/ai-conversation-loop.md#runtime-adapters)
-for the full adapter contract.
+There is no Data Machine or Agents API conversation-runner replacement filter
+in this code path. The Agents API loop is the runner; consumers extend runtime
+behavior through Agents API seams such as the provider-turn adapter, tool
+executor/mediator, completion policy, transcript persister, interrupt source,
+and event callback.
 
 **Features**:
 
 - Automatic tool execution during conversation turns
-- Conversation completion detection
-- Turn-based state management with chronological ordering
-- Duplicate message prevention
-- Maximum turn limiting (default: 25)
-- Runtime-swappable via `agents_api_conversation_runner`
+- Completion policy and continuation handling
+- Turn-budget limiting (default: 25)
+- Transcript persistence and loop event emission
+- Runtime tool mediation through Agents API loop options
 
 ### ConversationStoreInterface (`/inc/Core/Database/Chat/ConversationStoreInterface.php`)
 

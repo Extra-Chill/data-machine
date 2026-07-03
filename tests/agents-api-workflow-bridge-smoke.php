@@ -62,11 +62,13 @@ namespace {
 
 defined( 'ABSPATH' ) || define( 'ABSPATH', __DIR__ . '/' );
 
-	class WP_Error {
-		public function __construct( private string $code = '', private string $message = '', private $data = null ) {}
-		public function get_error_code(): string { return $this->code; }
-		public function get_error_message(): string { return $this->message; }
-		public function get_error_data() { return $this->data; }
+	if ( ! class_exists( 'WP_Error' ) ) {
+		class WP_Error {
+			public function __construct( private string $code = '', private string $message = '', private $data = null ) {}
+			public function get_error_code(): string { return $this->code; }
+			public function get_error_message(): string { return $this->message; }
+			public function get_error_data() { return $this->data; }
+		}
 	}
 
 	if ( ! function_exists( 'is_wp_error' ) ) {
@@ -75,10 +77,17 @@ defined( 'ABSPATH' ) || define( 'ABSPATH', __DIR__ . '/' );
 	if ( ! function_exists( '__' ) ) {
 		function __( string $text, string $domain = 'default' ): string { unset( $domain ); return $text; }
 	}
-	function doing_action( string $hook ): bool { unset( $hook ); return false; }
-	function did_action( string $hook ): int { unset( $hook ); return 1; }
+	if ( ! function_exists( 'doing_action' ) ) {
+		function doing_action( string $hook ): bool { unset( $hook ); return false; }
+	}
+	if ( ! function_exists( 'did_action' ) ) {
+		function did_action( string $hook ): int { unset( $hook ); return 1; }
+	}
 	if ( ! function_exists( 'add_action' ) ) {
 		function add_action( string $hook, callable $callback, int $priority = 10, int $accepted_args = 1 ): void { unset( $hook, $callback, $priority, $accepted_args ); }
+	}
+	if ( ! function_exists( 'do_action' ) ) {
+		function do_action( string $hook, ...$args ): void { unset( $hook, $args ); }
 	}
 	if ( ! function_exists( 'apply_filters' ) ) {
 		function apply_filters( string $hook, $value ) { unset( $hook ); return $value; }
@@ -94,18 +103,79 @@ defined( 'ABSPATH' ) || define( 'ABSPATH', __DIR__ . '/' );
 	}
 
 	$GLOBALS['__abilities'] = array();
-	function wp_get_ability( string $name ) { return $GLOBALS['__abilities'][ $name ] ?? null; }
-
-	class Stub_Agent_Workflow_Ability {
-		public function __construct( private \Closure $handler ) {}
-		public function execute( array $input ) { return ( $this->handler )( $input ); }
+	if ( ! function_exists( 'wp_get_ability' ) ) {
+		function wp_get_ability( string $name ) { return $GLOBALS['__abilities'][ $name ] ?? null; }
 	}
 
+	if ( ! class_exists( 'WP_Ability' ) ) {
+		class WP_Ability {
+			public function execute( array $input ) { unset( $input ); return null; }
+			public function get_input_schema(): array { return array(); }
+			public function get_meta_item( string $key, $default = null ) { unset( $key ); return $default; }
+		}
+	}
+
+	if ( ! function_exists( 'wp_register_ability' ) ) {
+		class Stub_Agent_Workflow_Ability extends WP_Ability {
+			public function __construct( private \Closure $handler ) {}
+			public function execute( array $input ) { return ( $this->handler )( $input ); }
+		}
+	}
+
+	function register_agent_workflow_bridge_smoke_ability( string $name, \Closure $handler ): void {
+		if ( function_exists( 'wp_register_ability' ) ) {
+			global $wp_current_filter;
+
+			if ( function_exists( 'wp_has_ability_category' ) && ! wp_has_ability_category( 'demo' ) ) {
+				$wp_current_filter[] = 'wp_abilities_api_categories_init';
+				wp_register_ability_category(
+					'demo',
+					array(
+						'label'       => 'Demo',
+						'description' => 'Demo abilities for workflow smoke tests.',
+					)
+				);
+				array_pop( $wp_current_filter );
+			}
+
+			$wp_current_filter[] = 'wp_abilities_api_init';
+			wp_register_ability(
+				$name,
+				array(
+					'label'               => $name,
+					'description'         => 'Workflow bridge smoke test ability.',
+					'category'            => 'demo',
+					'input_schema'        => array(
+						'type'                 => 'object',
+						'additionalProperties' => true,
+					),
+					'execute_callback'    => static fn( array $input ): array => $handler( $input ),
+					'permission_callback' => '__return_true',
+				)
+			);
+			array_pop( $wp_current_filter );
+
+			return;
+		}
+
+		$GLOBALS['__abilities'][ $name ] = new Stub_Agent_Workflow_Ability( $handler );
+	}
+
+	require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Tools/class-wp-agent-tool-parameters.php';
+	require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Abilities/class-wp-agent-ability-dispatcher.php';
 	require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Workflows/class-wp-agent-workflow-bindings.php';
 	require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Workflows/class-wp-agent-workflow-spec-validator.php';
 	require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Workflows/class-wp-agent-workflow-spec.php';
 	require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Workflows/class-wp-agent-workflow-run-result.php';
 	require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Workflows/class-wp-agent-workflow-run-recorder.php';
+	require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Runtime/interface-wp-agent-run-control-store.php';
+	require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Runtime/class-wp-agent-option-run-control-store.php';
+	require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Runtime/class-wp-agent-run-control.php';
+	require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Workflows/class-wp-agent-workflow-store.php';
+	require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Workflows/class-wp-agent-workflow-lifecycle.php';
+	require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Workflows/class-wp-agent-workflow-run-context.php';
+	require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Workflows/interface-wp-agent-workflow-branch-executor.php';
+	require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Workflows/class-wp-agent-workflow-step-executor.php';
 	require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Workflows/class-wp-agent-workflow-runner.php';
 	require_once __DIR__ . '/../inc/Core/JobStatus.php';
 	require_once __DIR__ . '/../inc/Abilities/PermissionHelper.php';
@@ -136,10 +206,12 @@ defined( 'ABSPATH' ) || define( 'ABSPATH', __DIR__ . '/' );
 
 	echo "agents-api-workflow-bridge-smoke\n";
 
-	$GLOBALS['__abilities']['demo/uppercase'] = new Stub_Agent_Workflow_Ability(
+	register_agent_workflow_bridge_smoke_ability(
+		'demo/uppercase',
 		static fn( array $input ): array => array( 'value' => strtoupper( (string) ( $input['text'] ?? '' ) ) )
 	);
-	$GLOBALS['__abilities']['agents/chat'] = new Stub_Agent_Workflow_Ability(
+	register_agent_workflow_bridge_smoke_ability(
+		'agents/chat',
 		static fn( array $input ): array => array( 'reply' => sprintf( '%s: %s', $input['agent'] ?? '', $input['message'] ?? '' ) )
 	);
 
