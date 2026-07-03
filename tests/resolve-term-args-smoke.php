@@ -35,20 +35,20 @@ if ( ! defined( 'ABSPATH' ) ) {
  * @param array $args Raw caller args.
  * @return array Sanitised args ready for wp_insert_term().
  */
-function dm_test_normalize_term_args( array $args ): array {
+function datamachine_test_normalize_term_args( array $args ): array {
 	$clean = array();
 
 	if ( isset( $args['description'] ) ) {
-		$clean['description'] = dm_test_sanitize_textarea_field( (string) $args['description'] );
+		$clean['description'] = datamachine_test_sanitize_textarea_field( (string) $args['description'] );
 	}
 	if ( isset( $args['parent'] ) ) {
-		$clean['parent'] = dm_test_absint( $args['parent'] );
+		$clean['parent'] = datamachine_test_absint( $args['parent'] );
 	}
 	if ( isset( $args['slug'] ) ) {
-		$clean['slug'] = dm_test_sanitize_title( (string) $args['slug'] );
+		$clean['slug'] = datamachine_test_sanitize_title( (string) $args['slug'] );
 	}
 	if ( isset( $args['alias_of'] ) ) {
-		$clean['alias_of'] = dm_test_sanitize_title( (string) $args['alias_of'] );
+		$clean['alias_of'] = datamachine_test_sanitize_title( (string) $args['alias_of'] );
 	}
 
 	return $clean;
@@ -57,16 +57,16 @@ function dm_test_normalize_term_args( array $args ): array {
 // Lightweight stand-ins for the WordPress sanitisers used by the production
 // code. Behaviour is approximated, not byte-identical — the production code
 // runs the real WordPress functions.
-function dm_test_sanitize_textarea_field( string $value ): string {
+function datamachine_test_sanitize_textarea_field( string $value ): string {
 	$value = preg_replace( '/[\x00-\x08\x0B\x0C\x0E-\x1F]/', '', $value );
 	return trim( $value );
 }
 
-function dm_test_absint( $value ): int {
+function datamachine_test_absint( $value ): int {
 	return abs( (int) $value );
 }
 
-function dm_test_sanitize_title( string $value ): string {
+function datamachine_test_sanitize_title( string $value ): string {
 	$value = strtolower( trim( $value ) );
 	$value = preg_replace( '/[^a-z0-9\-_]+/', '-', $value );
 	$value = trim( $value, '-' );
@@ -76,13 +76,13 @@ function dm_test_sanitize_title( string $value ): string {
 $failures = array();
 
 // Case 1: empty input => empty array.
-$out = dm_test_normalize_term_args( array() );
+$out = datamachine_test_normalize_term_args( array() );
 if ( $out !== array() ) {
 	$failures[] = 'empty input should yield empty array, got: ' . var_export( $out, true );
 }
 
 // Case 2: all four whitelisted keys flow through.
-$out = dm_test_normalize_term_args(
+$out = datamachine_test_normalize_term_args(
 	array(
 		'description' => 'A description',
 		'parent'      => '12',
@@ -104,7 +104,7 @@ if ( ! isset( $out['alias_of'] ) || 'existing-term' !== $out['alias_of'] ) {
 }
 
 // Case 3: unknown keys are silently dropped (no leakage to wp_insert_term).
-$out = dm_test_normalize_term_args(
+$out = datamachine_test_normalize_term_args(
 	array(
 		'description' => 'desc',
 		'evil'        => 'should not survive',
@@ -116,13 +116,13 @@ if ( count( $out ) !== 1 || ! isset( $out['description'] ) ) {
 }
 
 // Case 4: parent=0 is preserved (top-level), not dropped.
-$out = dm_test_normalize_term_args( array( 'parent' => 0 ) );
+$out = datamachine_test_normalize_term_args( array( 'parent' => 0 ) );
 if ( ! array_key_exists( 'parent', $out ) || 0 !== $out['parent'] ) {
 	$failures[] = 'parent=0 should pass through as 0: ' . var_export( $out, true );
 }
 
 // Case 5: negative parent is absint'd.
-$out = dm_test_normalize_term_args( array( 'parent' => -5 ) );
+$out = datamachine_test_normalize_term_args( array( 'parent' => -5 ) );
 if ( 5 !== $out['parent'] ) {
 	$failures[] = 'negative parent not absint\'d: ' . var_export( $out, true );
 }

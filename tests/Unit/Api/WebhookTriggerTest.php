@@ -44,7 +44,7 @@ class WebhookTriggerTest extends WP_UnitTestCase {
 
 	public function tear_down(): void {
 		remove_all_filters( 'datamachine_webhook_auth_presets' );
-		delete_transient( 'dm_webhook_rate_' . $this->flow_id );
+		delete_transient( WebhookTrigger::rate_limit_transient_key( $this->flow_id ) );
 		parent::tear_down();
 	}
 

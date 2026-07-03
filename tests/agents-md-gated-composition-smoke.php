@@ -46,7 +46,7 @@ if ( ! function_exists( 'is_multisite' ) ) {
 
 $failures = array();
 
-function dm_assert( bool $cond, string $message, array &$failures ): void {
+function datamachine_assert( bool $cond, string $message, array &$failures ): void {
 	if ( $cond ) {
 		fwrite( fopen( 'php://stdout', 'w' ), "PASS: {$message}\n" );
 		return;
@@ -62,7 +62,7 @@ require_once dirname( __DIR__ ) . '/inc/migrations/agents-md.php';
 
 // --- 1. Gate is constant-only and default-OFF. -----------------------------
 
-dm_assert(
+datamachine_assert(
 	false === datamachine_agents_md_enabled(),
 	'Gate is OFF when DATAMACHINE_COMPOSE_AGENTS_MD is undefined',
 	$failures
@@ -75,13 +75,13 @@ $file_registered = false;
 // it while OFF, this would fatal. Reaching the next line proves the no-op.
 datamachine_register_agents_md_file();
 datamachine_register_agents_md_sections();
-dm_assert( true, 'File + section registration helpers are no-ops while gate OFF', $failures );
+datamachine_assert( true, 'File + section registration helpers are no-ops while gate OFF', $failures );
 
 // --- 3. CommandRegistry map: analytics is gone, real commands present. ------
 
 $map = \DataMachine\Cli\CommandRegistry::map();
 
-dm_assert(
+datamachine_assert(
 	! array_key_exists( 'datamachine analytics', $map ),
 	'CommandRegistry map does NOT contain a `datamachine analytics` entry (relocated to DMB)',
 	$failures
@@ -93,9 +93,9 @@ foreach ( $map as $cmd => $class ) {
 		$has_analytics_class = true;
 	}
 }
-dm_assert( ! $has_analytics_class, 'No analytics command/class anywhere in the map', $failures );
+datamachine_assert( ! $has_analytics_class, 'No analytics command/class anywhere in the map', $failures );
 
-dm_assert(
+datamachine_assert(
 	isset( $map['datamachine memory'] ) && isset( $map['datamachine drain'] ) && isset( $map['datamachine retention'] ),
 	'Map contains real core commands (memory, drain, retention)',
 	$failures
@@ -122,7 +122,7 @@ final class DM_Smoke_AnnotatedCommand {
 
 $names = datamachine_agents_md_reflect_subcommand_names( DM_Smoke_AnnotatedCommand::class );
 sort( $names );
-dm_assert(
+datamachine_assert(
 	array( 'read', 'write' ) === $names,
 	'Reflection fallback resolves @subcommand-annotated methods (read, write)',
 	$failures
@@ -137,7 +137,7 @@ final class DM_Smoke_InvokeCommand {
 }
 
 $invoke_names = datamachine_agents_md_reflect_subcommand_names( DM_Smoke_InvokeCommand::class );
-dm_assert(
+datamachine_assert(
 	array() === $invoke_names,
 	'Reflection fallback omits a flat __invoke command from the subcommand list',
 	$failures

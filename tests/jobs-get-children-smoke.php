@@ -51,7 +51,7 @@ function shape_children_rows( array $rows ): array {
 	return $rows;
 }
 
-function dm_assert( bool $cond, string $msg ): void {
+function datamachine_assert( bool $cond, string $msg ): void {
 	if ( $cond ) {
 		echo "  [PASS] {$msg}\n";
 		return;
@@ -65,7 +65,7 @@ echo "=== jobs-get-children-smoke ===\n";
 // -----------------------------------------------------------------
 echo "\n[1] empty result set → empty array\n";
 $out = shape_children_rows( array() );
-dm_assert( array() === $out, 'empty rows return empty array' );
+datamachine_assert( array() === $out, 'empty rows return empty array' );
 
 // -----------------------------------------------------------------
 echo "\n[2] two children, engine_data decoded, order preserved\n";
@@ -86,14 +86,14 @@ $rows = array(
 
 $out = shape_children_rows( $rows );
 
-dm_assert( 2 === count( $out ), 'two rows returned' );
-dm_assert( 65 === $out[0]['job_id'], 'first row is job_id=65 (ASC order preserved)' );
-dm_assert( 66 === $out[1]['job_id'], 'second row is job_id=66 (ASC order preserved)' );
-dm_assert( is_array( $out[0]['engine_data'] ), 'first row engine_data decoded to array' );
-dm_assert( is_array( $out[1]['engine_data'] ), 'second row engine_data decoded to array' );
-dm_assert( 'alt_text' === $out[0]['engine_data']['task_type'], 'task_type accessible after decode' );
-dm_assert( 1 === $out[0]['engine_data']['effects'][0]['target']['post_id'], 'nested effect target accessible' );
-dm_assert( 2 === $out[1]['engine_data']['effects'][0]['target']['post_id'], 'second child distinct from first' );
+datamachine_assert( 2 === count( $out ), 'two rows returned' );
+datamachine_assert( 65 === $out[0]['job_id'], 'first row is job_id=65 (ASC order preserved)' );
+datamachine_assert( 66 === $out[1]['job_id'], 'second row is job_id=66 (ASC order preserved)' );
+datamachine_assert( is_array( $out[0]['engine_data'] ), 'first row engine_data decoded to array' );
+datamachine_assert( is_array( $out[1]['engine_data'] ), 'second row engine_data decoded to array' );
+datamachine_assert( 'alt_text' === $out[0]['engine_data']['task_type'], 'task_type accessible after decode' );
+datamachine_assert( 1 === $out[0]['engine_data']['effects'][0]['target']['post_id'], 'nested effect target accessible' );
+datamachine_assert( 2 === $out[1]['engine_data']['effects'][0]['target']['post_id'], 'second child distinct from first' );
 
 // -----------------------------------------------------------------
 echo "\n[3] malformed JSON → engine_data degrades to empty array\n";
@@ -107,8 +107,8 @@ $rows = array(
 
 $out = shape_children_rows( $rows );
 
-dm_assert( 1 === count( $out ), 'one row returned' );
-dm_assert( array() === $out[0]['engine_data'], 'malformed JSON degrades to empty array (not null, not the raw string)' );
+datamachine_assert( 1 === count( $out ), 'one row returned' );
+datamachine_assert( array() === $out[0]['engine_data'], 'malformed JSON degrades to empty array (not null, not the raw string)' );
 
 // -----------------------------------------------------------------
 echo "\n[4] empty string engine_data → empty array\n";
@@ -121,7 +121,7 @@ $rows = array(
 );
 
 $out = shape_children_rows( $rows );
-dm_assert( array() === $out[0]['engine_data'], 'empty string engine_data → empty array' );
+datamachine_assert( array() === $out[0]['engine_data'], 'empty string engine_data → empty array' );
 
 // -----------------------------------------------------------------
 echo "\n[5] missing engine_data key → empty array (defensive)\n";
@@ -133,7 +133,7 @@ $rows = array(
 );
 
 $out = shape_children_rows( $rows );
-dm_assert( array() === $out[0]['engine_data'], 'missing engine_data key → empty array' );
+datamachine_assert( array() === $out[0]['engine_data'], 'missing engine_data key → empty array' );
 
 // -----------------------------------------------------------------
 echo "\n[6] mixed children — some with effects, some without (fan-out reality)\n";
@@ -166,10 +166,10 @@ foreach ( $out as $child ) {
 	$effects       = array_merge( $effects, $child_effects );
 }
 
-dm_assert( 3 === count( $out ), 'three children shaped' );
-dm_assert( 3 === count( $effects ), 'merged effects from children = 3 (1 from #80, 0 from #81, 2 from #82)' );
-dm_assert( 'post_meta_set' === $effects[0]['type'], 'first effect from job #80' );
-dm_assert( 'post_field_set' === $effects[1]['type'], 'second effect from job #82 (in order)' );
-dm_assert( 'attachment_created' === $effects[2]['type'], 'third effect from job #82 (in order)' );
+datamachine_assert( 3 === count( $out ), 'three children shaped' );
+datamachine_assert( 3 === count( $effects ), 'merged effects from children = 3 (1 from #80, 0 from #81, 2 from #82)' );
+datamachine_assert( 'post_meta_set' === $effects[0]['type'], 'first effect from job #80' );
+datamachine_assert( 'post_field_set' === $effects[1]['type'], 'second effect from job #82 (in order)' );
+datamachine_assert( 'attachment_created' === $effects[2]['type'], 'third effect from job #82 (in order)' );
 
 echo "\n=== jobs-get-children-smoke: ALL PASS ===\n";

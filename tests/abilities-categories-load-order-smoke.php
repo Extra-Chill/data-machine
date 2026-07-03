@@ -150,32 +150,32 @@ if ( ! function_exists( '__' ) ) {
 }
 if ( ! function_exists( 'doing_action' ) ) {
 	function doing_action( $hook ) {
-		global $dm_2287_state;
-		return $dm_2287_state->doing && $hook === 'wp_abilities_api_categories_init';
+		global $datamachine_2287_state;
+		return $datamachine_2287_state->doing && $hook === 'wp_abilities_api_categories_init';
 	}
 }
 if ( ! function_exists( 'did_action' ) ) {
 	function did_action( $hook ) {
-		global $dm_2287_state;
-		return $hook === 'wp_abilities_api_categories_init' ? $dm_2287_state->did : 0;
+		global $datamachine_2287_state;
+		return $hook === 'wp_abilities_api_categories_init' ? $datamachine_2287_state->did : 0;
 	}
 }
 if ( ! function_exists( 'add_action' ) ) {
 	function add_action( $hook, $callback, $priority = 10, $accepted_args = 1 ) {
-		global $dm_2287_state;
-		$dm_2287_state->hooked[ $hook ][] = $callback;
+		global $datamachine_2287_state;
+		$datamachine_2287_state->hooked[ $hook ][] = $callback;
 		return true;
 	}
 }
 if ( ! function_exists( 'wp_register_ability_category' ) ) {
 	function wp_register_ability_category( $slug, $args ) {
-		global $dm_2287_state;
+		global $datamachine_2287_state;
 		// Only succeed when the action is firing (mirror core's guard).
 		if ( ! doing_action( 'wp_abilities_api_categories_init' ) ) {
-			$dm_2287_state->doing_it_wrong = ( $dm_2287_state->doing_it_wrong ?? 0 ) + 1;
+			$datamachine_2287_state->doing_it_wrong = ( $datamachine_2287_state->doing_it_wrong ?? 0 ) + 1;
 			return null;
 		}
-		$dm_2287_state->registered[ $slug ] = $args;
+		$datamachine_2287_state->registered[ $slug ] = $args;
 		return true;
 	}
 }
@@ -195,28 +195,28 @@ if ( ! class_exists( 'WP_Ability_Categories_Registry' ) ) {
 			return self::$instance;
 		}
 		public function is_registered( $slug ): bool {
-			global $dm_2287_state;
-			return isset( $dm_2287_state->registered[ $slug ] );
+			global $datamachine_2287_state;
+			return isset( $datamachine_2287_state->registered[ $slug ] );
 		}
 		public function register( $slug, $args ): bool {
-			global $dm_2287_state;
-			$dm_2287_state->registered[ $slug ] = $args;
+			global $datamachine_2287_state;
+			$datamachine_2287_state->registered[ $slug ] = $args;
 			return true;
 		}
 	}
 }
 
-$GLOBALS['dm_2287_state'] = $state;
+$GLOBALS['datamachine_2287_state'] = $state;
 
 require_once $plugin_root . '/inc/Abilities/AbilityCategories.php';
 
 $reset = static function (): void {
-	global $dm_2287_state;
-	$dm_2287_state->doing  = false;
-	$dm_2287_state->did    = 0;
-	$dm_2287_state->hooked = array();
-	$dm_2287_state->registered = array();
-	$dm_2287_state->doing_it_wrong = 0;
+	global $datamachine_2287_state;
+	$datamachine_2287_state->doing  = false;
+	$datamachine_2287_state->did    = 0;
+	$datamachine_2287_state->hooked = array();
+	$datamachine_2287_state->registered = array();
+	$datamachine_2287_state->doing_it_wrong = 0;
 
 	$reflection = new ReflectionClass( \DataMachine\Abilities\AbilityCategories::class );
 	$prop       = $reflection->getProperty( 'registered' );

@@ -787,7 +787,7 @@ class GDRenderer {
 			return null;
 		}
 
-		$temp_file = tempnam( sys_get_temp_dir(), 'dm_img_' );
+		$temp_file = tempnam( sys_get_temp_dir(), 'datamachine_img_' );
 		$ext       = 'jpeg' === $format ? '.jpg' : '.png';
 		$path      = $temp_file . $ext;
 

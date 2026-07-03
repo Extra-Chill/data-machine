@@ -84,7 +84,7 @@ function validate_workflow_for_test( array $workflow ): array {
 	return array( 'valid' => true );
 }
 
-function dm_assert( bool $cond, string $msg ): void {
+function datamachine_assert( bool $cond, string $msg ): void {
 	if ( $cond ) { echo "  [PASS] {$msg}\n"; return; }
 	echo "  [FAIL] {$msg}\n";
 	exit( 1 );
@@ -107,19 +107,19 @@ $wf = array(
 	),
 );
 $r = validate_workflow_for_test( $wf );
-dm_assert( true === $r['valid'], 'system_task step accepted without handler_slug' );
+datamachine_assert( true === $r['valid'], 'system_task step accepted without handler_slug' );
 
 // -----------------------------------------------------------------
 echo "\n[2] webhook_gate step with no handler_slug — VALID\n";
 $wf = array( 'steps' => array( array( 'step_type' => 'webhook_gate' ) ) );
 $r  = validate_workflow_for_test( $wf );
-dm_assert( true === $r['valid'], 'webhook_gate step accepted without handler_slug' );
+datamachine_assert( true === $r['valid'], 'webhook_gate step accepted without handler_slug' );
 
 // -----------------------------------------------------------------
 echo "\n[3] ai step with no handler_slug — VALID (existing behavior)\n";
 $wf = array( 'steps' => array( array( 'step_type' => 'ai' ) ) );
 $r  = validate_workflow_for_test( $wf );
-dm_assert( true === $r['valid'], 'ai step accepted without handler_slug' );
+datamachine_assert( true === $r['valid'], 'ai step accepted without handler_slug' );
 
 // -----------------------------------------------------------------
 echo "\n[4] fetch step without handler_slug — VALID at workflow level\n";
@@ -129,26 +129,26 @@ echo "\n[4] fetch step without handler_slug — VALID at workflow level\n";
 // validate their own config.
 $wf = array( 'steps' => array( array( 'step_type' => 'fetch' ) ) );
 $r  = validate_workflow_for_test( $wf );
-dm_assert( true === $r['valid'], 'fetch without handler_slug accepted at workflow level' );
+datamachine_assert( true === $r['valid'], 'fetch without handler_slug accepted at workflow level' );
 
 // -----------------------------------------------------------------
 echo "\n[5] fetch step WITH legacy handler_slug — INVALID\n";
 $wf = array( 'steps' => array( array( 'step_type' => 'fetch', 'handler_slug' => 'rss' ) ) );
 $r  = validate_workflow_for_test( $wf );
-dm_assert( false === $r['valid'], 'fetch with legacy handler_slug rejected' );
-dm_assert( str_contains( $r['error'] ?? '', 'unsupported legacy field handler_slug' ), 'legacy handler_slug error is explicit' );
+datamachine_assert( false === $r['valid'], 'fetch with legacy handler_slug rejected' );
+datamachine_assert( str_contains( $r['error'] ?? '', 'unsupported legacy field handler_slug' ), 'legacy handler_slug error is explicit' );
 
 // -----------------------------------------------------------------
 echo "\n[6] publish step without handler_slug — VALID at workflow level\n";
 $wf = array( 'steps' => array( array( 'step_type' => 'publish' ) ) );
 $r  = validate_workflow_for_test( $wf );
-dm_assert( true === $r['valid'], 'publish without handler_slug accepted at workflow level' );
+datamachine_assert( true === $r['valid'], 'publish without handler_slug accepted at workflow level' );
 
 // -----------------------------------------------------------------
 echo "\n[7] upsert step without handler_slug — VALID at workflow level\n";
 $wf = array( 'steps' => array( array( 'step_type' => 'upsert' ) ) );
 $r  = validate_workflow_for_test( $wf );
-dm_assert( true === $r['valid'], 'upsert without handler_slug accepted at workflow level' );
+datamachine_assert( true === $r['valid'], 'upsert without handler_slug accepted at workflow level' );
 
 // -----------------------------------------------------------------
 echo "\n[8] mixed workflow: fetch + ai + system_task — VALID\n";
@@ -164,33 +164,33 @@ $wf = array(
 	),
 );
 $r = validate_workflow_for_test( $wf );
-dm_assert( true === $r['valid'], 'realistic mixed workflow valid' );
+datamachine_assert( true === $r['valid'], 'realistic mixed workflow valid' );
 
 // -----------------------------------------------------------------
 echo "\n[9] step with unregistered type — INVALID\n";
 $wf = array( 'steps' => array( array( 'step_type' => 'time_travel' ) ) );
 $r  = validate_workflow_for_test( $wf );
-dm_assert( false === $r['valid'], 'unregistered type rejected' );
-dm_assert( str_contains( $r['error'], 'invalid step_type' ), 'error names the issue' );
-dm_assert( str_contains( $r['error'], 'time_travel' ), 'error names the bad type' );
-dm_assert( str_contains( $r['error'], 'Valid types' ), 'error lists valid alternatives' );
+datamachine_assert( false === $r['valid'], 'unregistered type rejected' );
+datamachine_assert( str_contains( $r['error'], 'invalid step_type' ), 'error names the issue' );
+datamachine_assert( str_contains( $r['error'], 'time_travel' ), 'error names the bad type' );
+datamachine_assert( str_contains( $r['error'], 'Valid types' ), 'error lists valid alternatives' );
 
 // -----------------------------------------------------------------
 echo "\n[10] empty workflow — INVALID\n";
 $r = validate_workflow_for_test( array( 'steps' => array() ) );
-dm_assert( false === $r['valid'], 'empty workflow rejected' );
+datamachine_assert( false === $r['valid'], 'empty workflow rejected' );
 
 // -----------------------------------------------------------------
 echo "\n[11] workflow without steps array — INVALID\n";
 $r = validate_workflow_for_test( array() );
-dm_assert( false === $r['valid'], 'workflow lacking steps array rejected' );
+datamachine_assert( false === $r['valid'], 'workflow lacking steps array rejected' );
 
 // -----------------------------------------------------------------
 echo "\n[12] step missing step_type — INVALID\n";
 $r = validate_workflow_for_test( array( 'steps' => array( array() ) ) );
-dm_assert( false === $r['valid'], 'step without step_type rejected' );
-dm_assert( str_contains( $r['error'], 'missing step_type' ), 'error names the issue' );
-dm_assert( str_contains( $r['error'], 'Step 0' ), 'error identifies the step index' );
+datamachine_assert( false === $r['valid'], 'step without step_type rejected' );
+datamachine_assert( str_contains( $r['error'], 'missing step_type' ), 'error names the issue' );
+datamachine_assert( str_contains( $r['error'], 'Step 0' ), 'error identifies the step index' );
 
 // -----------------------------------------------------------------
 echo "\n[13] real-world DailyMemoryTask workflow — VALID (the bug case)\n";
@@ -207,6 +207,6 @@ $wf = array(
 	),
 );
 $r = validate_workflow_for_test( $wf );
-dm_assert( true === $r['valid'], 'DailyMemoryTask workflow validates cleanly' );
+datamachine_assert( true === $r['valid'], 'DailyMemoryTask workflow validates cleanly' );
 
 echo "\n=== system-task-workflow-validation-smoke: ALL PASS ===\n";

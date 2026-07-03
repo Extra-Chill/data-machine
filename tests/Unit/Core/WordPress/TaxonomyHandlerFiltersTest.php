@@ -28,7 +28,7 @@ class TaxonomyHandlerFiltersTest extends WP_UnitTestCase {
 	 * Intentionally NOT named after any real Extra Chill taxonomy so the
 	 * tests document the generic contract, not a vendor-specific shape.
 	 */
-	private const TEST_TAXONOMY = 'dm_test_region';
+	private const TEST_TAXONOMY = 'datamachine_test_region';
 
 	public function set_up(): void {
 		parent::set_up();

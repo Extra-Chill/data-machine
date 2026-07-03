@@ -202,7 +202,7 @@ function run_undo_loop_body(
 	$jobs_db->store_engine_data( $jid, $engine_data );
 }
 
-function dm_assert( bool $cond, string $msg ): void {
+function datamachine_assert( bool $cond, string $msg ): void {
 	if ( $cond ) {
 		echo "  [PASS] {$msg}\n";
 		return;
@@ -237,13 +237,13 @@ $reverted = $skipped = $failed = 0;
 
 run_undo_loop_body( $parent, $task, $jobs_db, false, false, $reverted, $skipped, $failed );
 
-dm_assert( $task->undo_called, 'task->undo() called even though parent has no own effects (the bug fix)' );
-dm_assert( 64 === $task->undo_jid, 'undo received parent jid' );
-dm_assert( 2 === $reverted, 'children effects counted as reverted' );
-dm_assert( 0 === $skipped, 'no skipped' );
-dm_assert( 0 === $failed, 'no failed' );
-dm_assert( isset( $jobs_db->stored_engine_data[64]['undo'] ), 'undo metadata stamped on parent' );
-dm_assert( 2 === $jobs_db->stored_engine_data[64]['undo']['effects_reverted'], 'undo metadata records 2 reverted' );
+datamachine_assert( $task->undo_called, 'task->undo() called even though parent has no own effects (the bug fix)' );
+datamachine_assert( 64 === $task->undo_jid, 'undo received parent jid' );
+datamachine_assert( 2 === $reverted, 'children effects counted as reverted' );
+datamachine_assert( 0 === $skipped, 'no skipped' );
+datamachine_assert( 0 === $failed, 'no failed' );
+datamachine_assert( isset( $jobs_db->stored_engine_data[64]['undo'] ), 'undo metadata stamped on parent' );
+datamachine_assert( 2 === $jobs_db->stored_engine_data[64]['undo']['effects_reverted'], 'undo metadata records 2 reverted' );
 
 // -----------------------------------------------------------------
 echo "\n[2] true no-op (no own effects, no child effects) — logged + skipped, no engine_data write\n";
@@ -266,10 +266,10 @@ $reverted = $skipped = $failed = 0;
 
 run_undo_loop_body( $parent, $task, $jobs_db, false, false, $reverted, $skipped, $failed );
 
-dm_assert( $task->undo_called, 'task->undo() still called (no premature short-circuit)' );
-dm_assert( 0 === $reverted && 0 === $failed, 'no reverted, no failed' );
-dm_assert( 1 === $skipped, 'true no-op increments skipped counter' );
-dm_assert( ! isset( $jobs_db->stored_engine_data[70] ), 'no engine_data stamp on a true no-op (no undo metadata write)' );
+datamachine_assert( $task->undo_called, 'task->undo() still called (no premature short-circuit)' );
+datamachine_assert( 0 === $reverted && 0 === $failed, 'no reverted, no failed' );
+datamachine_assert( 1 === $skipped, 'true no-op increments skipped counter' );
+datamachine_assert( ! isset( $jobs_db->stored_engine_data[70] ), 'no engine_data stamp on a true no-op (no undo metadata write)' );
 
 $found_noop_log = false;
 foreach ( Cli_Capture::$log as $line ) {
@@ -278,7 +278,7 @@ foreach ( Cli_Capture::$log as $line ) {
 		break;
 	}
 }
-dm_assert( $found_noop_log, 'no-op surfaced as "no effects to undo" log line' );
+datamachine_assert( $found_noop_log, 'no-op surfaced as "no effects to undo" log line' );
 
 // -----------------------------------------------------------------
 echo "\n[3] leaf job with own effects — undo called, normal counter flow\n";
@@ -303,9 +303,9 @@ $reverted = $skipped = $failed = 0;
 
 run_undo_loop_body( $leaf, $task, $jobs_db, false, false, $reverted, $skipped, $failed );
 
-dm_assert( $task->undo_called, 'leaf undo called' );
-dm_assert( 1 === $reverted, 'leaf effect counted' );
-dm_assert( 0 === $skipped && 0 === $failed, 'no skipped/failed' );
+datamachine_assert( $task->undo_called, 'leaf undo called' );
+datamachine_assert( 1 === $reverted, 'leaf effect counted' );
+datamachine_assert( 0 === $skipped && 0 === $failed, 'no skipped/failed' );
 
 // -----------------------------------------------------------------
 echo "\n[4] dry-run on fan-out parent — preview enumerates children's effects\n";
@@ -342,7 +342,7 @@ $reverted = $skipped = $failed = 0;
 
 run_undo_loop_body( $parent, $task, $jobs_db, true, false, $reverted, $skipped, $failed );
 
-dm_assert( ! $task->undo_called, 'dry-run does NOT call undo' );
+datamachine_assert( ! $task->undo_called, 'dry-run does NOT call undo' );
 
 $found_count_line = false;
 foreach ( Cli_Capture::$log as $line ) {
@@ -351,7 +351,7 @@ foreach ( Cli_Capture::$log as $line ) {
 		break;
 	}
 }
-dm_assert( $found_count_line, 'dry-run preview reports 3 effects (aggregated from 2 children)' );
+datamachine_assert( $found_count_line, 'dry-run preview reports 3 effects (aggregated from 2 children)' );
 
 $found_attachment_line = false;
 foreach ( Cli_Capture::$log as $line ) {
@@ -360,7 +360,7 @@ foreach ( Cli_Capture::$log as $line ) {
 		break;
 	}
 }
-dm_assert( $found_attachment_line, 'dry-run lists per-effect type from child #82' );
+datamachine_assert( $found_attachment_line, 'dry-run lists per-effect type from child #82' );
 
 // -----------------------------------------------------------------
 echo "\n[5] dry-run on fan-out parent with no children — logged as no-op, skipped++\n";
@@ -375,8 +375,8 @@ $reverted = $skipped = $failed = 0;
 
 run_undo_loop_body( $parent, $task, $jobs_db, true, false, $reverted, $skipped, $failed );
 
-dm_assert( ! $task->undo_called, 'dry-run does not call undo' );
-dm_assert( 1 === $skipped, 'dry-run no-op increments skipped' );
+datamachine_assert( ! $task->undo_called, 'dry-run does not call undo' );
+datamachine_assert( 1 === $skipped, 'dry-run no-op increments skipped' );
 
 // -----------------------------------------------------------------
 echo "\n[6] dry-run on leaf with own effects — preview reads engine_data['effects'] directly\n";
@@ -396,7 +396,7 @@ $reverted = $skipped = $failed = 0;
 
 run_undo_loop_body( $leaf, $task, $jobs_db, true, false, $reverted, $skipped, $failed );
 
-dm_assert( ! $task->undo_called, 'dry-run does not call undo' );
+datamachine_assert( ! $task->undo_called, 'dry-run does not call undo' );
 $found_count_line = false;
 foreach ( Cli_Capture::$log as $line ) {
 	if ( str_contains( $line, 'would undo 1 effect(s)' ) ) {
@@ -404,7 +404,7 @@ foreach ( Cli_Capture::$log as $line ) {
 		break;
 	}
 }
-dm_assert( $found_count_line, 'dry-run leaf reports 1 effect from own engine_data (children path skipped)' );
+datamachine_assert( $found_count_line, 'dry-run leaf reports 1 effect from own engine_data (children path skipped)' );
 
 // -----------------------------------------------------------------
 echo "\n[7] task with already-undone marker — skipped without calling undo\n";
@@ -422,8 +422,8 @@ $reverted = $skipped = $failed = 0;
 
 run_undo_loop_body( $parent, $task, $jobs_db, false, false, $reverted, $skipped, $failed );
 
-dm_assert( ! $task->undo_called, 'undo NOT called on already-undone parent (no force)' );
-dm_assert( 1 === $skipped, 'already-undone increments skipped' );
+datamachine_assert( ! $task->undo_called, 'undo NOT called on already-undone parent (no force)' );
+datamachine_assert( 1 === $skipped, 'already-undone increments skipped' );
 
 // -----------------------------------------------------------------
 echo "\n[8] --force overrides already-undone marker — undo IS called\n";
@@ -439,8 +439,8 @@ $reverted = $skipped = $failed = 0;
 
 run_undo_loop_body( $parent, $task, $jobs_db, false, true, $reverted, $skipped, $failed );
 
-dm_assert( $task->undo_called, '--force calls undo on already-undone parent' );
-dm_assert( 1 === $reverted, '--force re-undo counts reverted' );
+datamachine_assert( $task->undo_called, '--force calls undo on already-undone parent' );
+datamachine_assert( 1 === $reverted, '--force re-undo counts reverted' );
 
 // -----------------------------------------------------------------
 echo "\n[9] envelope with mixed buckets (reverted + skipped + failed)\n";
@@ -460,10 +460,10 @@ $reverted = $skipped = $failed = 0;
 
 run_undo_loop_body( $parent, $task, $jobs_db, false, false, $reverted, $skipped, $failed );
 
-dm_assert( $task->undo_called, 'undo called' );
-dm_assert( 1 === $reverted, '1 reverted' );
-dm_assert( 1 === $skipped, '1 skipped' );
-dm_assert( 1 === $failed, '1 failed' );
-dm_assert( 1 === count( Cli_Capture::$warning ), 'failed effect surfaces as a CLI warning' );
+datamachine_assert( $task->undo_called, 'undo called' );
+datamachine_assert( 1 === $reverted, '1 reverted' );
+datamachine_assert( 1 === $skipped, '1 skipped' );
+datamachine_assert( 1 === $failed, '1 failed' );
+datamachine_assert( 1 === count( Cli_Capture::$warning ), 'failed effect surfaces as a CLI warning' );
 
 echo "\n=== jobs-command-undo-fanout-smoke: ALL PASS ===\n";

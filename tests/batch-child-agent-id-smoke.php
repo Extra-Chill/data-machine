@@ -87,7 +87,7 @@ function strip_flow_runtime_queue_payloads( array $engine_snapshot ): array {
 	return $engine_snapshot;
 }
 
-function dm_assert( bool $cond, string $msg ): void {
+function datamachine_assert( bool $cond, string $msg ): void {
 	if ( $cond ) {
 		echo "  [PASS] {$msg}\n";
 		return;
@@ -115,14 +115,14 @@ $parent_snapshot = array(
 
 $child = build_child_engine_data( $parent_snapshot, 65, 64, '2', '2' );
 
-dm_assert( 65 === $child['job']['job_id'], 'child job_id replaces parent' );
-dm_assert( 64 === $child['job']['parent_job_id'], 'parent_job_id set' );
-dm_assert( 2 === $child['job']['agent_id'], 'agent_id carried from parent' );
-dm_assert( 1 === $child['job']['user_id'], 'user_id carried from parent' );
-dm_assert( '2' === $child['job']['pipeline_id'], 'pipeline_id preserved' );
-dm_assert( '2' === $child['job']['flow_id'], 'flow_id preserved' );
-dm_assert( isset( $child['flow_config'] ), 'engine_snapshot keys preserved (flow_config)' );
-dm_assert( isset( $child['pipeline_config'] ), 'engine_snapshot keys preserved (pipeline_config)' );
+datamachine_assert( 65 === $child['job']['job_id'], 'child job_id replaces parent' );
+datamachine_assert( 64 === $child['job']['parent_job_id'], 'parent_job_id set' );
+datamachine_assert( 2 === $child['job']['agent_id'], 'agent_id carried from parent' );
+datamachine_assert( 1 === $child['job']['user_id'], 'user_id carried from parent' );
+datamachine_assert( '2' === $child['job']['pipeline_id'], 'pipeline_id preserved' );
+datamachine_assert( '2' === $child['job']['flow_id'], 'flow_id preserved' );
+datamachine_assert( isset( $child['flow_config'] ), 'engine_snapshot keys preserved (flow_config)' );
+datamachine_assert( isset( $child['pipeline_config'] ), 'engine_snapshot keys preserved (pipeline_config)' );
 
 // -----------------------------------------------------------------
 echo "\n[1b] runtime queue payloads are not cloned into child engine_data\n";
@@ -156,13 +156,13 @@ $parent_snapshot = array(
 
 $child = build_child_engine_data( $parent_snapshot, 65, 64, '2', '2' );
 
-dm_assert( isset( $child['flow_config']['fetch_step']['queue_mode'] ), 'queue_mode preserved for queue consumers' );
-dm_assert( 'drain' === $child['flow_config']['fetch_step']['queue_mode'], 'fetch queue_mode value preserved' );
-dm_assert( ! isset( $child['flow_config']['fetch_step']['config_patch_queue'] ), 'config_patch_queue stripped from child engine_data' );
-dm_assert( ! isset( $child['flow_config']['fetch_step']['prompt_queue'] ), 'prompt_queue stripped from child engine_data' );
-dm_assert( ! isset( $child['flow_config']['fetch_step']['_queue_consume_revision'] ), 'queue revision stripped from child engine_data' );
-dm_assert( ! isset( $child['flow_config']['ai_step']['prompt_queue'] ), 'prompt_queue stripped from later steps too' );
-dm_assert( 'ai' === $child['flow_config']['ai_step']['step_type'], 'non-runtime step definition fields preserved' );
+datamachine_assert( isset( $child['flow_config']['fetch_step']['queue_mode'] ), 'queue_mode preserved for queue consumers' );
+datamachine_assert( 'drain' === $child['flow_config']['fetch_step']['queue_mode'], 'fetch queue_mode value preserved' );
+datamachine_assert( ! isset( $child['flow_config']['fetch_step']['config_patch_queue'] ), 'config_patch_queue stripped from child engine_data' );
+datamachine_assert( ! isset( $child['flow_config']['fetch_step']['prompt_queue'] ), 'prompt_queue stripped from child engine_data' );
+datamachine_assert( ! isset( $child['flow_config']['fetch_step']['_queue_consume_revision'] ), 'queue revision stripped from child engine_data' );
+datamachine_assert( ! isset( $child['flow_config']['ai_step']['prompt_queue'] ), 'prompt_queue stripped from later steps too' );
+datamachine_assert( 'ai' === $child['flow_config']['ai_step']['step_type'], 'non-runtime step definition fields preserved' );
 
 // -----------------------------------------------------------------
 echo "\n[2] parent without agent_id — child gets null (not 0, not garbage)\n";
@@ -178,8 +178,8 @@ $parent_snapshot = array(
 
 $child = build_child_engine_data( $parent_snapshot, 101, 100, '3', '5' );
 
-dm_assert( null === $child['job']['agent_id'], 'agent_id is null when absent on parent' );
-dm_assert( 1 === $child['job']['user_id'], 'user_id still carried' );
+datamachine_assert( null === $child['job']['agent_id'], 'agent_id is null when absent on parent' );
+datamachine_assert( 1 === $child['job']['user_id'], 'user_id still carried' );
 
 // -----------------------------------------------------------------
 echo "\n[3] parent with agent_id=0 — treated as absent (null on child)\n";
@@ -193,7 +193,7 @@ $parent_snapshot = array(
 
 $child = build_child_engine_data( $parent_snapshot, 201, 200, '1', '1' );
 
-dm_assert( null === $child['job']['agent_id'], 'agent_id=0 on parent → null on child' );
+datamachine_assert( null === $child['job']['agent_id'], 'agent_id=0 on parent → null on child' );
 
 // -----------------------------------------------------------------
 echo "\n[4] parent with no user_id — null carried forward\n";
@@ -206,8 +206,8 @@ $parent_snapshot = array(
 
 $child = build_child_engine_data( $parent_snapshot, 301, 300, '1', '1' );
 
-dm_assert( 2 === $child['job']['agent_id'], 'agent_id carried' );
-dm_assert( null === $child['job']['user_id'], 'user_id null when absent' );
+datamachine_assert( 2 === $child['job']['agent_id'], 'agent_id carried' );
+datamachine_assert( null === $child['job']['user_id'], 'user_id null when absent' );
 
 // -----------------------------------------------------------------
 echo "\n[5] empty parent job — child has minimal context\n";
@@ -217,10 +217,10 @@ $parent_snapshot = array(
 
 $child = build_child_engine_data( $parent_snapshot, 401, 400, '1', '1' );
 
-dm_assert( null === $child['job']['agent_id'], 'agent_id null' );
-dm_assert( null === $child['job']['user_id'], 'user_id null' );
-dm_assert( 401 === $child['job']['job_id'], 'job_id still set' );
-dm_assert( 400 === $child['job']['parent_job_id'], 'parent_job_id still set' );
+datamachine_assert( null === $child['job']['agent_id'], 'agent_id null' );
+datamachine_assert( null === $child['job']['user_id'], 'user_id null' );
+datamachine_assert( 401 === $child['job']['job_id'], 'job_id still set' );
+datamachine_assert( 400 === $child['job']['parent_job_id'], 'parent_job_id still set' );
 
 // -----------------------------------------------------------------
 echo "\n[6] real-world WooCommerce flow shape (job 64 → child 65 from session)\n";
@@ -246,9 +246,9 @@ $child = build_child_engine_data( $parent_snapshot, 65, 64, '2', '2' );
 // causing CoreMemoryFilesDirective to fall back to the user_id default-agent
 // lookup which returns the WRONG agent (the install's primary agent, not
 // the wiki-generator the pipeline is bound to).
-dm_assert( 2 === $child['job']['agent_id'], 'wiki-generator agent_id (2) carried to child' );
-dm_assert( 64 === $child['job']['parent_job_id'], 'parent linkage preserved' );
-dm_assert( 'wiki-generator: WooCommerce releases' === $child['pipeline']['name'], 'pipeline metadata preserved on child' );
-dm_assert( 'WC backfill — mgs (queueable test)' === $child['flow']['name'], 'flow metadata preserved on child' );
+datamachine_assert( 2 === $child['job']['agent_id'], 'wiki-generator agent_id (2) carried to child' );
+datamachine_assert( 64 === $child['job']['parent_job_id'], 'parent linkage preserved' );
+datamachine_assert( 'wiki-generator: WooCommerce releases' === $child['pipeline']['name'], 'pipeline metadata preserved on child' );
+datamachine_assert( 'WC backfill — mgs (queueable test)' === $child['flow']['name'], 'flow metadata preserved on child' );
 
 echo "\n=== batch-child-agent-id-smoke: ALL PASS ===\n";

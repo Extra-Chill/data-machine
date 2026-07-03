@@ -527,7 +527,7 @@ class RecurringScheduler {
 		if ( $max_offset <= 0 ) {
 			return 0;
 		}
-		return absint( crc32( 'dm_stagger_' . $seed ) ) % $max_offset;
+		return absint( crc32( 'datamachine_stagger_' . $seed ) ) % $max_offset;
 	}
 
 	/**
