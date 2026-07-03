@@ -329,7 +329,7 @@ class Agents extends BaseRepository {
 		// site_scope is a nullable column, handled outside the string-cast loop
 		// so `null` (network-wide) round-trips correctly instead of becoming "".
 		if ( array_key_exists( 'site_scope', $data ) ) {
-			$scope              = $data['site_scope'];
+			$scope                = $data['site_scope'];
 			$update['site_scope'] = ( null === $scope ) ? null : (int) $scope;
 			$formats[]            = ( null === $scope ) ? null : '%d';
 		}

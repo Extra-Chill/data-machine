@@ -508,8 +508,9 @@ class Pipelines extends BaseRepository {
 			return array();
 		}
 
-		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared -- uses %i identifier placeholder; WPCS does not recognize %i (false positive).
 		$pipeline_config_json = $this->wpdb->get_var( $this->wpdb->prepare( 'SELECT pipeline_config FROM %i WHERE pipeline_id = %d', $this->table_name, $pipeline_id ) );
+		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
 
 		if ( empty( $pipeline_config_json ) ) {
 			return array();
@@ -970,7 +971,8 @@ class Pipelines extends BaseRepository {
 		$limit  = max( 1, min( 100, $limit ) );
 		$offset = max( 0, $offset );
 
-		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared -- Table name uses %i and limit/offset are prepared integers.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		// phpcs:disable WordPress.DB.PreparedSQL -- Table name uses %i and limit/offset are prepared integers.
 		$results = $this->wpdb->get_results(
 			$this->wpdb->prepare(
 				'SELECT pipeline_id, pipeline_name, user_id, portable_slug, created_at, updated_at FROM %i WHERE agent_id IS NULL ORDER BY updated_at DESC LIMIT %d OFFSET %d',
@@ -980,7 +982,7 @@ class Pipelines extends BaseRepository {
 			),
 			ARRAY_A
 		);
-		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
+		// phpcs:enable WordPress.DB.PreparedSQL
 
 		return is_array( $results ) ? $results : array();
 	}

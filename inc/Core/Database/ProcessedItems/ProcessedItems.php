@@ -85,8 +85,9 @@ class ProcessedItems extends BaseRepository {
 	 * @return bool True if any processed items exist for this flow step.
 	 */
 	public function has_processed_items( string $flow_step_id ): bool {
-        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared -- uses %i identifier placeholder; WPCS does not recognize %i (false positive).
 		$count = $this->wpdb->get_var( $this->wpdb->prepare( 'SELECT COUNT(*) FROM %i WHERE flow_step_id = %s AND status = %s LIMIT 1', $this->table_name, $flow_step_id, self::STATUS_PROCESSED ) );
+		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
 
 		return $count > 0;
 	}
@@ -505,13 +506,15 @@ class ProcessedItems extends BaseRepository {
 		// Handle flow_id (needs LIKE query since flow_step_id contains it)
 		if ( ! empty( $criteria['flow_id'] ) && empty( $criteria['flow_step_id'] ) ) {
 			$pattern = '%_' . $criteria['flow_id'];
-            // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared -- uses %i identifier placeholder; WPCS does not recognize %i (false positive).
 			$result = $this->wpdb->query( $this->wpdb->prepare( 'DELETE FROM %i WHERE flow_step_id LIKE %s', $this->table_name, $pattern ) );
+			// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
 		} elseif ( ! empty( $criteria['pipeline_step_id'] ) && empty( $criteria['flow_step_id'] ) ) {
 			// Handle pipeline_step_id (delete processed items for this pipeline step across all flows)
 			$pattern = $criteria['pipeline_step_id'] . '_%';
-            // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared -- uses %i identifier placeholder; WPCS does not recognize %i (false positive).
 			$result = $this->wpdb->query( $this->wpdb->prepare( 'DELETE FROM %i WHERE flow_step_id LIKE %s', $this->table_name, $pattern ) );
+			// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
 		} elseif ( ! empty( $criteria['pipeline_id'] ) && empty( $criteria['flow_step_id'] ) ) {
 			// Handle pipeline_id (get all flows for pipeline and delete their processed items)
 			// Get all flows for this pipeline using the existing filter
@@ -542,8 +545,9 @@ class ProcessedItems extends BaseRepository {
 			// Execute individual DELETE queries for each pattern
 			$total_deleted = 0;
 			foreach ( $flow_patterns as $pattern ) {
-                // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+				// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared -- uses %i identifier placeholder; WPCS does not recognize %i (false positive).
 				$deleted = $this->wpdb->query( $this->wpdb->prepare( 'DELETE FROM %i WHERE flow_step_id LIKE %s', $this->table_name, $pattern ) );
+				// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
 				if ( false !== $deleted ) {
 					$total_deleted += $deleted;
 				}
@@ -712,8 +716,9 @@ class ProcessedItems extends BaseRepository {
 		global $wpdb;
 
 		// Check if the index already exists.
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		// phpcs:disable WordPress.DB.PreparedSQL -- table name is code-defined ($wpdb->prefix), not user input.
 		$index = $wpdb->get_row( "SHOW INDEX FROM {$table_name} WHERE Key_name = 'flow_source_item'" );
+		// phpcs:enable WordPress.DB.PreparedSQL
 
 		if ( $index ) {
 			return;
@@ -776,8 +781,9 @@ class ProcessedItems extends BaseRepository {
 	private static function ensure_flow_source_ts_index( string $table_name ): void {
 		global $wpdb;
 
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		// phpcs:disable WordPress.DB.PreparedSQL -- table name is code-defined ($wpdb->prefix), not user input.
 		$index = $wpdb->get_row( "SHOW INDEX FROM {$table_name} WHERE Key_name = 'flow_source_ts'" );
+		// phpcs:enable WordPress.DB.PreparedSQL
 
 		if ( $index ) {
 			return;
@@ -807,25 +813,31 @@ class ProcessedItems extends BaseRepository {
 	public static function ensure_claim_columns( string $table_name ): void {
 		global $wpdb;
 
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		// phpcs:disable WordPress.DB.PreparedSQL -- table name is code-defined ($wpdb->prefix), not user input.
 		$status_column = $wpdb->get_var( "SHOW COLUMNS FROM {$table_name} LIKE 'status'" );
+		// phpcs:enable WordPress.DB.PreparedSQL
 		if ( ! $status_column ) {
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			// phpcs:disable WordPress.DB.PreparedSQL -- table name is code-defined ($wpdb->prefix), not user input.
 			$wpdb->query( "ALTER TABLE {$table_name} ADD COLUMN status VARCHAR(20) NOT NULL DEFAULT 'processed'" );
+			// phpcs:enable WordPress.DB.PreparedSQL
 		}
 
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		// phpcs:disable WordPress.DB.PreparedSQL -- table name is code-defined ($wpdb->prefix), not user input.
 		$claim_column = $wpdb->get_var( "SHOW COLUMNS FROM {$table_name} LIKE 'claim_expires_at'" );
+		// phpcs:enable WordPress.DB.PreparedSQL
 		if ( ! $claim_column ) {
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			// phpcs:disable WordPress.DB.PreparedSQL -- table name is code-defined ($wpdb->prefix), not user input.
 			$wpdb->query( "ALTER TABLE {$table_name} ADD COLUMN claim_expires_at DATETIME NULL" );
+			// phpcs:enable WordPress.DB.PreparedSQL
 		}
 
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		// phpcs:disable WordPress.DB.PreparedSQL -- table name is code-defined ($wpdb->prefix), not user input.
 		$index = $wpdb->get_row( "SHOW INDEX FROM {$table_name} WHERE Key_name = 'status_claim_expires'" );
+		// phpcs:enable WordPress.DB.PreparedSQL
 		if ( ! $index ) {
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			// phpcs:disable WordPress.DB.PreparedSQL -- table name is code-defined ($wpdb->prefix), not user input.
 			$wpdb->query( "ALTER TABLE {$table_name} ADD KEY `status_claim_expires` (status, claim_expires_at)" );
+			// phpcs:enable WordPress.DB.PreparedSQL
 		}
 	}
 }
