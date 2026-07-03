@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 Homeboy maintains this file from conventional commits at release time —
 do not edit by hand.
 
+## [0.13.0] - 2026-07-03
+
+### Added
+- auto-scope GSC ability to subsite when on a genuine subdomain
+
+### Fixed
+- constrain GSC site_url to the verified property and clarify 403s
+
 ## [0.12.0] - 2026-06-28
 
 ### Added
