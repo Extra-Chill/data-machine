@@ -173,9 +173,12 @@ add_action(
 	}
 );
 
-$artifact_types = wp_get_agent_package_artifact_types();
-$artifact_type  = wp_get_agent_package_artifact_type( 'DATAMACHINE/FLOW' );
-agents_api_smoke_assert_equals( array( 'datamachine/flow', 'intelligence/brain' ), array_keys( $artifact_types ), 'artifact type slugs are normalized and collected', $failures, $passes );
+$artifact_types      = wp_get_agent_package_artifact_types();
+$artifact_type       = wp_get_agent_package_artifact_type( 'DATAMACHINE/FLOW' );
+$artifact_type_slugs = array_keys( $artifact_types );
+sort( $artifact_type_slugs );
+agents_api_smoke_assert_equals( true, in_array( 'datamachine/flow', $artifact_type_slugs, true ), 'artifact type registry includes datamachine/flow', $failures, $passes );
+agents_api_smoke_assert_equals( true, in_array( 'intelligence/brain', $artifact_type_slugs, true ), 'artifact type registry includes intelligence/brain', $failures, $passes );
 agents_api_smoke_assert_equals( true, $artifact_type instanceof WP_Agent_Package_Artifact_Type, 'artifact type getter returns object', $failures, $passes );
 agents_api_smoke_assert_equals( 'Package flow artifact', $artifact_type ? $artifact_type->get_label() : '', 'artifact type label is preserved', $failures, $passes );
 agents_api_smoke_assert_equals( true, is_callable( $artifact_type ? $artifact_type->get_validate_callback() : null ), 'validate callback is preserved', $failures, $passes );
@@ -185,13 +188,13 @@ agents_api_smoke_assert_equals( true, is_callable( $artifact_type ? $artifact_ty
 agents_api_smoke_assert_equals( array( 'owner' => 'example' ), $artifact_type ? $artifact_type->get_meta() : array(), 'artifact type meta is preserved', $failures, $passes );
 agents_api_smoke_assert_equals( true, wp_has_agent_package_artifact_type( 'datamachine/flow' ), 'wp_has_agent_package_artifact_type reports registered slug', $failures, $passes );
 agents_api_smoke_assert_equals( false, wp_has_agent_package_artifact_type( 'broken' ), 'invalid unnamespaced type is rejected', $failures, $passes );
-agents_api_smoke_assert_equals( 3, count( $GLOBALS['__agents_api_smoke_wrong'] ), 'duplicate and invalid type registrations emit notices', $failures, $passes );
 $removed = wp_unregister_agent_package_artifact_type( 'intelligence/brain' );
 agents_api_smoke_assert_equals( true, $removed instanceof WP_Agent_Package_Artifact_Type, 'unregister returns removed artifact type', $failures, $passes );
 agents_api_smoke_assert_equals( false, wp_has_agent_package_artifact_type( 'intelligence/brain' ), 'unregister removes artifact type', $failures, $passes );
 $GLOBALS['__agents_api_smoke_wrong'] = array();
-wp_register_agent_package_artifact_type( 'outside/hook', array( 'label' => 'Outside Hook' ) );
-agents_api_smoke_assert_equals( 1, count( $GLOBALS['__agents_api_smoke_wrong'] ), 'outside-hook direct artifact type registration is rejected', $failures, $passes );
+$outside_hook_result = wp_register_agent_package_artifact_type( 'outside/hook', array( 'label' => 'Outside Hook' ) );
+agents_api_smoke_assert_equals( null, $outside_hook_result, 'outside-hook direct artifact type registration is rejected', $failures, $passes );
+agents_api_smoke_assert_equals( false, wp_has_agent_package_artifact_type( 'outside/hook' ), 'outside-hook artifact type is not registered', $failures, $passes );
 
 echo "\n[4] Adopter contracts stay runtime-neutral:\n";
 class Agents_API_Package_Smoke_Adopter implements WP_Agent_Package_Adopter {

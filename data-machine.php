@@ -40,7 +40,13 @@ function datamachine_read_agents_api_plugin_version( string $plugin_file ): ?str
 		return '' !== $version ? $version : null;
 	}
 
-	$contents = (string) file_get_contents( $plugin_file, false, null, 0, 8192 );
+	$handle = fopen( $plugin_file, 'rb' );
+	if ( false === $handle ) {
+		return null;
+	}
+
+	$contents = (string) fread( $handle, 8192 );
+	fclose( $handle );
 	if ( preg_match( '/^[ \t\/*#@]*Version:\s*(.+)$/mi', $contents, $matches ) ) {
 		return trim( (string) $matches[1] );
 	}
@@ -112,11 +118,11 @@ function datamachine_log_agents_api_load_warning(): void {
 		'warning',
 		(string) $datamachine_agents_api_load_state['warning'],
 		array(
-			'component'        => 'agents-api',
-			'loaded'           => $datamachine_agents_api_load_state['loaded'] ?? null,
-			'active_version'   => $datamachine_agents_api_load_state['active_version'] ?? null,
-			'bundled_version'  => $datamachine_agents_api_load_state['bundled_version'] ?? null,
-			'active_file'      => $datamachine_agents_api_load_state['active_file'] ?? null,
+			'component'       => 'agents-api',
+			'loaded'          => $datamachine_agents_api_load_state['loaded'] ?? null,
+			'active_version'  => $datamachine_agents_api_load_state['active_version'] ?? null,
+			'bundled_version' => $datamachine_agents_api_load_state['bundled_version'] ?? null,
+			'active_file'     => $datamachine_agents_api_load_state['active_file'] ?? null,
 		)
 	);
 }

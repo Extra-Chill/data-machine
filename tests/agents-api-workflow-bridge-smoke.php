@@ -62,11 +62,13 @@ namespace {
 
 defined( 'ABSPATH' ) || define( 'ABSPATH', __DIR__ . '/' );
 
-	class WP_Error {
-		public function __construct( private string $code = '', private string $message = '', private $data = null ) {}
-		public function get_error_code(): string { return $this->code; }
-		public function get_error_message(): string { return $this->message; }
-		public function get_error_data() { return $this->data; }
+	if ( ! class_exists( 'WP_Error' ) ) {
+		class WP_Error {
+			public function __construct( private string $code = '', private string $message = '', private $data = null ) {}
+			public function get_error_code(): string { return $this->code; }
+			public function get_error_message(): string { return $this->message; }
+			public function get_error_data() { return $this->data; }
+		}
 	}
 
 	if ( ! function_exists( 'is_wp_error' ) ) {
@@ -75,8 +77,12 @@ defined( 'ABSPATH' ) || define( 'ABSPATH', __DIR__ . '/' );
 	if ( ! function_exists( '__' ) ) {
 		function __( string $text, string $domain = 'default' ): string { unset( $domain ); return $text; }
 	}
-	function doing_action( string $hook ): bool { unset( $hook ); return false; }
-	function did_action( string $hook ): int { unset( $hook ); return 1; }
+	if ( ! function_exists( 'doing_action' ) ) {
+		function doing_action( string $hook ): bool { unset( $hook ); return false; }
+	}
+	if ( ! function_exists( 'did_action' ) ) {
+		function did_action( string $hook ): int { unset( $hook ); return 1; }
+	}
 	if ( ! function_exists( 'add_action' ) ) {
 		function add_action( string $hook, callable $callback, int $priority = 10, int $accepted_args = 1 ): void { unset( $hook, $callback, $priority, $accepted_args ); }
 	}
