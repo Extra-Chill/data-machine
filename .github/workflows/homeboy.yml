@@ -20,9 +20,37 @@ jobs:
   homeboy:
     if: ${{ github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'release:') }}
     uses: Extra-Chill/homeboy-action/.github/workflows/ci.yml@v2
+    # TEMPORARY (2026-07-03): `test` is dropped from the pull_request command set
+    # because CI's WP Codebox runtime is broken upstream. CI builds the WP Codebox
+    # CLI from `Automattic/wp-codebox@main` on every run (the release artifact is not
+    # published, so setup falls back to a source install — see homeboy-extensions
+    # wordpress/scripts/build/setup.sh: `ref="${HOMEBOY_WP_CODEBOX_REF:-main}"`).
+    # An upstream regression (wp-codebox PR #1698 "canonical-input-mount-paths",
+    # commit 242e36f8, merged ~2026-07-03 00:34 UTC) breaks composer autoloading of
+    # mounted plugin classes inside the Playground runtime, so phpunit crashes at
+    # collection with `Class "DataMachine\Core\OAuth\BaseAuthProvider" not found`.
+    # This is NOT a data-machine bug — an untouched-main canary reproduces it
+    # (see #2840). The known-good WP Codebox ref is tag `v0.12.0` (commit 536fc6fd,
+    # 2026-07-02 19:37 UTC), which predates the breaking merge and matches the last
+    # green data-machine run (1370 tests passing, 2026-07-02).
+    #
+    # We cannot pin the ref from this repo: `HOMEBOY_WP_CODEBOX_REF` is a process env
+    # var consumed inside the homeboy-action reusable workflow's job, and a reusable
+    # workflow invoked via `uses:` does not inherit the caller's `env:`. Neither the
+    # reusable workflow (ci.yml@v2) nor the composite action expose a codebox-ref
+    # input, and no homeboy.json `--setting` feeds it. The only repo-controllable
+    # lever is which command legs run — so `test` is removed from `pull_request` to
+    # stop the phantom red Test check from blocking PRs, while `audit` + `lint`
+    # continue to gate. `push`/`workflow_dispatch` still run `test` so the upstream
+    # breakage stays visible on main/manual runs without blocking contributors.
+    #
+    # REVERT once the upstream wp-codebox fix lands (or a pinned release artifact is
+    # published): restore `test` to the pull_request command set below (i.e. change
+    # the pull_request branch back to 'audit,lint,test' for both `commands` and
+    # `expected-commands`).
     with:
-      commands: ${{ github.event_name == 'pull_request' && 'audit,lint,test' || github.event_name == 'workflow_dispatch' && 'audit,lint,test' || 'test' }}
-      expected-commands: ${{ github.event_name == 'pull_request' && 'audit,lint,test' || github.event_name == 'workflow_dispatch' && 'audit,lint,test' || 'test' }}
+      commands: ${{ github.event_name == 'pull_request' && 'audit,lint' || github.event_name == 'workflow_dispatch' && 'audit,lint,test' || 'test' }}
+      expected-commands: ${{ github.event_name == 'pull_request' && 'audit,lint' || github.event_name == 'workflow_dispatch' && 'audit,lint,test' || 'test' }}
       autofix: ${{ github.event_name == 'pull_request' && 'true' || 'false' }}
       autofix-commands: 'lint --fix'
     secrets: inherit
