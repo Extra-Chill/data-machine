@@ -82,11 +82,11 @@ class WorkerLock {
 	 * @return array<string,int|string|bool> Lock state.
 	 */
 	public static function snapshot( ?int $now = null, int $ttl = self::DEFAULT_TTL, string $lane = '' ): array {
-		$now     = $now ?? time();
-		$ttl     = max( 60, $ttl );
+		$now      = $now ?? time();
+		$ttl      = max( 60, $ttl );
 		$snapshot = OptionLeaseStore::snapshot( self::optionName( $lane ), $ttl, $now );
 		$payload  = $snapshot['payload'];
-		$lane    = self::normalizeLane( $lane );
+		$lane     = self::normalizeLane( $lane );
 
 		if ( ! is_array( $payload ) || empty( $payload['started_at'] ) ) {
 			return array(

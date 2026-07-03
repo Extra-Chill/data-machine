@@ -9,7 +9,7 @@
  */
 
 /**
- * Internal dependencies
+ * External dependencies
  */
 import { client } from '@shared/utils/api';
 import { useAgentStore } from '@shared/stores/agentStore';

@@ -117,8 +117,8 @@ class PipelineAIConcurrencyLimiter {
 	 * @return array{acquired:bool,limit:int,active:int,option_name?:string}
 	 */
 	private static function acquireScope( string $scope, int $limit, string $token, string $provider, array $context ): array {
-		$now = time();
-		$ttl = self::ttl( $provider, $context );
+		$now   = time();
+		$ttl   = self::ttl( $provider, $context );
 		$lease = array(
 			'token'        => $token,
 			'provider'     => $provider,

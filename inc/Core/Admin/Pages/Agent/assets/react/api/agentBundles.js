@@ -3,7 +3,7 @@
  */
 
 /**
- * Internal dependencies
+ * External dependencies
  */
 import { client } from '@shared/utils/api';
 

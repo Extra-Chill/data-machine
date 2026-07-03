@@ -2,8 +2,8 @@
  * Chat API Queries
  *
  * TanStack Query hooks for chat session management.
- * Message sending and continuation loops are handled by
- * @extrachill/chat's useChat hook — see ChatSidebar.jsx.
+ * Message sending and continuation loops are handled by the
+ * `@extrachill/chat` useChat hook — see ChatSidebar.jsx.
  */
 
 /**
@@ -25,10 +25,10 @@ import { client } from '@shared/utils/api';
  * Uses the shared API client so the agent interceptor automatically
  * injects agent_id when an agent is selected in the AgentSwitcher.
  *
- * @param {number} limit     - Maximum sessions to return
-	 * @param {string|null} context - Optional session context filter
-	 * @return {Object} TanStack Query object with sessions data
-	 */
+ * @param {number}      limit   - Maximum sessions to return
+ * @param {string|null} context - Optional session context filter
+ * @return {Object} TanStack Query object with sessions data
+ */
 export function useChatSessions( limit = 20, context = null ) {
 	return useQuery( {
 		queryKey: [ 'chat-sessions', limit, context ],

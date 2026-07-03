@@ -38,11 +38,11 @@ add_action(
 		);
 
 		$routes = array(
-			'/agent-bundles/inspect' => array( AgentAbilities::class, 'inspectAgentBundle' ),
+			'/agent-bundles/inspect'  => array( AgentAbilities::class, 'inspectAgentBundle' ),
 			'/agent-bundles/validate' => array( AgentAbilities::class, 'validateAgentBundle' ),
-			'/agent-bundles/plan'    => array( AgentAbilities::class, 'planAgentBundleUpgrade' ),
-			'/agent-bundles/rebase'  => array( AgentAbilities::class, 'rebaseAgentBundleArtifacts' ),
-			'/agent-bundles/upgrade' => array( AgentAbilities::class, 'applyAgentBundleUpgrade' ),
+			'/agent-bundles/plan'     => array( AgentAbilities::class, 'planAgentBundleUpgrade' ),
+			'/agent-bundles/rebase'   => array( AgentAbilities::class, 'rebaseAgentBundleArtifacts' ),
+			'/agent-bundles/upgrade'  => array( AgentAbilities::class, 'applyAgentBundleUpgrade' ),
 		);
 
 		foreach ( $routes as $route => $callback ) {
@@ -51,7 +51,7 @@ add_action(
 				$route,
 				array(
 					'methods'             => 'POST',
-					'callback'            => static fn( \WP_REST_Request $request ): array => call_user_func( $callback, $request->get_json_params() ?: array() ),
+					'callback'            => static fn( \WP_REST_Request $request ): array => call_user_func( $callback, $request->get_json_params() ? $request->get_json_params() : array() ),
 					'permission_callback' => static fn(): bool => PermissionHelper::can_manage(),
 				)
 			);

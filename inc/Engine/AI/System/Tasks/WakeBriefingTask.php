@@ -480,8 +480,9 @@ class WakeBriefingTask extends SystemTask {
 			$since_ts = 0;
 		}
 
-		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fopen
+		// phpcs:disable WordPress.WP.AlternativeFunctions.file_system_operations_fopen -- Tail-reading debug.log requires direct fopen/fseek; WP_Filesystem offers no seek API.
 		$handle = @fopen( $path, 'rb' ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+		// phpcs:enable WordPress.WP.AlternativeFunctions.file_system_operations_fopen
 		if ( false === $handle ) {
 			return '';
 		}
@@ -524,7 +525,7 @@ class WakeBriefingTask extends SystemTask {
 
 		for ( $line = fgets( $handle ); false !== $line; $line = fgets( $handle ) ) {
 			$ts = $this->parseLogTimestamp( $line );
-			if ( null !== $ts || '' !== $line && '[' === $line[0] ) {
+			if ( null !== $ts || ( '' !== $line && '[' === $line[0] ) ) {
 				$flush();
 				$current = array(
 					'ts'  => $ts,
@@ -730,17 +731,16 @@ class WakeBriefingTask extends SystemTask {
 		$offenders = array();
 
 		foreach ( $tables as $table ) {
-			// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
+			// phpcs:disable WordPress.DB.PreparedSQL -- Query is built via $wpdb->prepare() above; sizing probe of information_schema.
 			$query = $wpdb->prepare(
 				'SELECT table_rows AS n, (data_length + index_length) AS bytes
 				 FROM information_schema.TABLES
 				 WHERE table_schema = DATABASE() AND table_name = %s',
 				$table
 			);
-			// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
 
-			// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- Query is prepared above.
 			$row = $wpdb->get_row( $query, ARRAY_A );
+			// phpcs:enable WordPress.DB.PreparedSQL
 
 			if ( empty( $row ) ) {
 				continue;
@@ -775,9 +775,10 @@ class WakeBriefingTask extends SystemTask {
 	 * @return string
 	 */
 	private function formatBytes( float $bytes ): string {
-		$units = array( 'B', 'KB', 'MB', 'GB', 'TB', 'PB' );
-		$i     = 0;
-		while ( $bytes >= 1000 && $i < count( $units ) - 1 ) {
+		$units      = array( 'B', 'KB', 'MB', 'GB', 'TB', 'PB' );
+		$unit_count = count( $units );
+		$i          = 0;
+		while ( $bytes >= 1000 && $i < $unit_count - 1 ) {
 			$bytes /= 1000;
 			++$i;
 		}

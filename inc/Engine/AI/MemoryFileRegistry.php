@@ -116,7 +116,6 @@ class MemoryFileRegistry {
 			return;
 		}
 
-
 		$metadata = self::normalize_file_metadata( $filename, $priority, $args );
 
 		self::$files[ $filename ] = $metadata;
@@ -580,19 +579,19 @@ class MemoryFileRegistry {
 				$filename,
 				(int) ( $source['priority'] ?? 50 ),
 				array(
-				'filename'           => $filename,
-				'layer'              => $source['layer'] ?? self::LAYER_AGENT,
-				'protected'          => (bool) ( $source['protected'] ?? false ),
-				'editable'           => $source['editable'] ?? true,
-				'composable'         => (bool) ( $source['composable'] ?? false ),
-				'convention_path'    => is_string( $source['convention_path'] ?? null ) ? $source['convention_path'] : '',
-				'modes'              => is_array( $source['modes'] ?? null ) ? $source['modes'] : self::MODES_NONE,
-				'injection_contexts' => self::normalize_injection_contexts( $source['injection_contexts'] ?? ( $source['meta']['injection_contexts'] ?? array() ) ),
-				'label'              => is_string( $source['label'] ?? null ) ? $source['label'] : self::filename_to_label( $filename ),
-				'description'        => is_string( $source['description'] ?? null ) ? $source['description'] : '',
-				'retrieval_policy'   => is_string( $source['retrieval_policy'] ?? null ) ? $source['retrieval_policy'] : WP_Agent_Context_Injection_Policy::ALWAYS,
-				'authority_tier'     => is_string( $source['meta']['authority_tier'] ?? null ) ? $source['meta']['authority_tier'] : self::default_authority_tier( self::normalize_layer( $source['layer'] ?? self::LAYER_AGENT ), $filename ),
-				'provenance'         => is_array( $source['meta']['provenance'] ?? null ) ? $source['meta']['provenance'] : self::default_provenance( $filename ),
+					'filename'           => $filename,
+					'layer'              => $source['layer'] ?? self::LAYER_AGENT,
+					'protected'          => (bool) ( $source['protected'] ?? false ),
+					'editable'           => $source['editable'] ?? true,
+					'composable'         => (bool) ( $source['composable'] ?? false ),
+					'convention_path'    => is_string( $source['convention_path'] ?? null ) ? $source['convention_path'] : '',
+					'modes'              => is_array( $source['modes'] ?? null ) ? $source['modes'] : self::MODES_NONE,
+					'injection_contexts' => self::normalize_injection_contexts( $source['injection_contexts'] ?? ( $source['meta']['injection_contexts'] ?? array() ) ),
+					'label'              => is_string( $source['label'] ?? null ) ? $source['label'] : self::filename_to_label( $filename ),
+					'description'        => is_string( $source['description'] ?? null ) ? $source['description'] : '',
+					'retrieval_policy'   => is_string( $source['retrieval_policy'] ?? null ) ? $source['retrieval_policy'] : WP_Agent_Context_Injection_Policy::ALWAYS,
+					'authority_tier'     => is_string( $source['meta']['authority_tier'] ?? null ) ? $source['meta']['authority_tier'] : self::default_authority_tier( self::normalize_layer( $source['layer'] ?? self::LAYER_AGENT ), $filename ),
+					'provenance'         => is_array( $source['meta']['provenance'] ?? null ) ? $source['meta']['provenance'] : self::default_provenance( $filename ),
 				)
 			);
 		}

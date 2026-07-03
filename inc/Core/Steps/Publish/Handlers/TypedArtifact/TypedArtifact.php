@@ -115,9 +115,9 @@ class TypedArtifact extends PublishHandler {
 		$job_id = (int) ( $parameters['job_id'] ?? 0 );
 		$engine = $parameters['engine'] ?? null;
 		if ( $job_id > 0 ) {
-			$outputs                                     = $engine instanceof EngineData ? $engine->get( 'outputs', array() ) : array();
-			$outputs                                     = is_array( $outputs ) ? $outputs : array();
-			$outputs['typed_artifacts']                  = is_array( $outputs['typed_artifacts'] ?? null ) ? $outputs['typed_artifacts'] : array();
+			$outputs                                   = $engine instanceof EngineData ? $engine->get( 'outputs', array() ) : array();
+			$outputs                                   = is_array( $outputs ) ? $outputs : array();
+			$outputs['typed_artifacts']                = is_array( $outputs['typed_artifacts'] ?? null ) ? $outputs['typed_artifacts'] : array();
 			$outputs['typed_artifacts'][ $output_key ] = $typed_artifact;
 
 			if ( $engine instanceof EngineData ) {
@@ -144,12 +144,12 @@ class TypedArtifact extends PublishHandler {
 						'payload'    => $payload,
 					),
 					'metadata' => array(
-						'source_type'       => 'typed_artifact_handler',
-						'handler_tool'      => 'typed_artifact',
-						'tool_success'      => true,
-						'output_key'        => $output_key,
-						'artifact_schema'   => $schema,
-						'artifact'          => $artifact,
+						'source_type'     => 'typed_artifact_handler',
+						'handler_tool'    => 'typed_artifact',
+						'tool_success'    => true,
+						'output_key'      => $output_key,
+						'artifact_schema' => $schema,
+						'artifact'        => $artifact,
 					),
 				),
 			)

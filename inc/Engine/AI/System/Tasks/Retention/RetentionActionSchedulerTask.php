@@ -80,10 +80,10 @@ class RetentionActionSchedulerTask extends RetentionTask {
 			'info',
 			'Action Scheduler retention: enqueued catch-up pass (backlog not drained in one run)',
 			array(
-				'deleted'    => $deleted,
-				'hit_limit'  => $hit_limit,
-				'breached'   => $breached,
-				'scheduled'  => false !== $scheduled,
+				'deleted'   => $deleted,
+				'hit_limit' => $hit_limit,
+				'breached'  => $breached,
+				'scheduled' => false !== $scheduled,
 			)
 		);
 	}
