@@ -107,12 +107,14 @@ datamachine_agents_chat_tool_continuation_assert(
 );
 ++ $assertions;
 
-// Interactive tool parts that carry a tool_name (e.g. present_question choice
-// cards, confirmation/DiffCard buttons) must be projected through to the
-// canonical messages[] on the live turn — preserving type, payload, and
-// metadata — so the frontend renders the clickable card on the sending turn
-// instead of only after a session reload. This is the fix for the dead-loop
-// where the model references a card the client never received.
+/*
+ * Interactive tool parts that carry a tool_name (e.g. present_question choice
+ * cards, confirmation/DiffCard buttons) must be projected through to the
+ * canonical messages[] on the live turn — preserving type, payload, and
+ * metadata — so the frontend renders the clickable card on the sending turn
+ * instead of only after a session reload. This is the fix for the dead-loop
+ * where the model references a card the client never received.
+ */
 $interactive_messages = $method->invoke(
 	$handler,
 	array(
