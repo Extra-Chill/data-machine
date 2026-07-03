@@ -25,7 +25,7 @@ require_once __DIR__ . '/../inc/Core/RunMetrics.php';
 
 use DataMachine\Core\RunMetrics;
 
-function dm_assert( bool $cond, string $msg ): void {
+function datamachine_assert( bool $cond, string $msg ): void {
 	if ( $cond ) {
 		echo "  [PASS] {$msg}\n";
 		return;
@@ -47,10 +47,10 @@ $normalized = RunMetrics::normalize(
 	)
 );
 
-dm_assert( 4 === $normalized['counts']['processed'], 'processed count preserved' );
-dm_assert( 2 === $normalized['counts']['staged_actions'], 'staged action count preserved' );
-dm_assert( 0 === $normalized['counts']['failed'], 'missing failed count defaults to zero' );
-dm_assert( 0 === $normalized['counts']['retried'], 'missing retried count defaults to zero' );
+datamachine_assert( 4 === $normalized['counts']['processed'], 'processed count preserved' );
+datamachine_assert( 2 === $normalized['counts']['staged_actions'], 'staged action count preserved' );
+datamachine_assert( 0 === $normalized['counts']['failed'], 'missing failed count defaults to zero' );
+datamachine_assert( 0 === $normalized['counts']['retried'], 'missing retried count defaults to zero' );
 
 echo "\n[2] fromJob combines persisted metrics, batch results, tokens, and duration\n";
 $metrics = RunMetrics::fromJob(
@@ -85,16 +85,16 @@ $metrics = RunMetrics::fromJob(
 	)
 );
 
-dm_assert( 123 === $metrics['job_id'], 'job_id surfaced' );
-dm_assert( 11 === $metrics['counts']['selected'], 'batch selected count surfaced' );
-dm_assert( 8 === $metrics['counts']['processed'], 'batch completed count maps to processed' );
-dm_assert( 2 === $metrics['counts']['skipped'], 'batch skipped count surfaced' );
-dm_assert( 1 === $metrics['counts']['failed'], 'batch failed count surfaced' );
-dm_assert( 1 === $metrics['counts']['retried'], 'batch retried count surfaced' );
-dm_assert( 3 === $metrics['counts']['staged_actions'], 'staged action count surfaced' );
-dm_assert( 2 === $metrics['counts']['accepted_actions'], 'accepted action count surfaced' );
-dm_assert( 300 === $metrics['duration_seconds'], 'duration uses started/completed timestamps' );
-dm_assert( 99 === $metrics['token_usage']['total_tokens'], 'token usage is exposed when present' );
+datamachine_assert( 123 === $metrics['job_id'], 'job_id surfaced' );
+datamachine_assert( 11 === $metrics['counts']['selected'], 'batch selected count surfaced' );
+datamachine_assert( 8 === $metrics['counts']['processed'], 'batch completed count maps to processed' );
+datamachine_assert( 2 === $metrics['counts']['skipped'], 'batch skipped count surfaced' );
+datamachine_assert( 1 === $metrics['counts']['failed'], 'batch failed count surfaced' );
+datamachine_assert( 1 === $metrics['counts']['retried'], 'batch retried count surfaced' );
+datamachine_assert( 3 === $metrics['counts']['staged_actions'], 'staged action count surfaced' );
+datamachine_assert( 2 === $metrics['counts']['accepted_actions'], 'accepted action count surfaced' );
+datamachine_assert( 300 === $metrics['duration_seconds'], 'duration uses started/completed timestamps' );
+datamachine_assert( 99 === $metrics['token_usage']['total_tokens'], 'token usage is exposed when present' );
 
 echo "\n[3] status-derived counts cover terminal no-item and failed jobs\n";
 $skipped = RunMetrics::fromJob(
@@ -116,8 +116,8 @@ $failed = RunMetrics::fromJob(
 	)
 );
 
-dm_assert( 1 === $skipped['counts']['skipped'], 'completed_no_items increments skipped' );
-dm_assert( 1 === $failed['counts']['failed'], 'failed status increments failed' );
+datamachine_assert( 1 === $skipped['counts']['skipped'], 'completed_no_items increments skipped' );
+datamachine_assert( 1 === $failed['counts']['failed'], 'failed status increments failed' );
 
 echo "\n[4] engine_data writers use compare-and-swap, not blind overwrite (regression: #2762)\n";
 // The lost-update race behind batch_state_missing came from start(), increment(),
@@ -126,7 +126,7 @@ echo "\n[4] engine_data writers use compare-and-swap, not blind overwrite (regre
 // All three must route through the compare-and-swap EngineData::mutate() path so
 // they can never clobber another writer's keys.
 $run_metrics_source = file_get_contents( __DIR__ . '/../inc/Core/RunMetrics.php' );
-dm_assert( false !== $run_metrics_source, 'RunMetrics source readable' );
+datamachine_assert( false !== $run_metrics_source, 'RunMetrics source readable' );
 
 foreach ( array( 'start', 'increment', 'complete' ) as $method ) {
 	if ( ! preg_match( '/public static function ' . $method . '\([^)]*\)[^{]*\{(.*?)\n\t\}/s', $run_metrics_source, $m ) ) {
@@ -134,8 +134,8 @@ foreach ( array( 'start', 'increment', 'complete' ) as $method ) {
 		exit( 1 );
 	}
 	$body = $m[1];
-	dm_assert( str_contains( $body, 'EngineData::mutate' ), "{$method}() persists via EngineData::mutate (CAS)" );
-	dm_assert( ! str_contains( $body, 'EngineData::persist' ), "{$method}() does not blind-overwrite via EngineData::persist" );
+	datamachine_assert( str_contains( $body, 'EngineData::mutate' ), "{$method}() persists via EngineData::mutate (CAS)" );
+	datamachine_assert( ! str_contains( $body, 'EngineData::persist' ), "{$method}() does not blind-overwrite via EngineData::persist" );
 }
 
 echo "\n=== run-metrics-smoke: ALL PASS ===\n";

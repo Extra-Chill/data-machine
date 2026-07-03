@@ -20,7 +20,7 @@ require_once __DIR__ . '/../inc/Core/RunState.php';
 
 use DataMachine\Core\RunState;
 
-function dm_assert( bool $cond, string $msg ): void {
+function datamachine_assert( bool $cond, string $msg ): void {
 	if ( $cond ) {
 		echo "  [PASS] {$msg}\n";
 		return;
@@ -44,15 +44,15 @@ $expected_states = array(
 	'cancelled',
 );
 
-dm_assert( $expected_states === RunState::ALL_STATES, 'all states are ordered and complete' );
-dm_assert( count( $expected_states ) === count( array_unique( RunState::ALL_STATES ) ), 'states are unique' );
+datamachine_assert( $expected_states === RunState::ALL_STATES, 'all states are ordered and complete' );
+datamachine_assert( count( $expected_states ) === count( array_unique( RunState::ALL_STATES ) ), 'states are unique' );
 
 echo "\n[2] validity is exact, not prefix-based\n";
 foreach ( $expected_states as $state ) {
-	dm_assert( RunState::is_valid( $state ), "{$state} is valid" );
+	datamachine_assert( RunState::is_valid( $state ), "{$state} is valid" );
 }
-dm_assert( ! RunState::is_valid( 'waiting' ), 'generic waiting is intentionally not a run state' );
-dm_assert( ! RunState::is_valid( 'waiting_for_human' ), 'unregistered future wait reason is invalid until named' );
+datamachine_assert( ! RunState::is_valid( 'waiting' ), 'generic waiting is intentionally not a run state' );
+datamachine_assert( ! RunState::is_valid( 'waiting_for_human' ), 'unregistered future wait reason is invalid until named' );
 
 echo "\n[3] waiting states are explicit pause reasons\n";
 $expected_waiting = array(
@@ -61,21 +61,21 @@ $expected_waiting = array(
 	'waiting_for_approval',
 	'waiting_for_callback',
 );
-dm_assert( $expected_waiting === RunState::WAITING_STATES, 'waiting states are explicit reason states' );
+datamachine_assert( $expected_waiting === RunState::WAITING_STATES, 'waiting states are explicit reason states' );
 foreach ( $expected_waiting as $state ) {
-	dm_assert( RunState::is_waiting( $state ), "{$state} is waiting" );
+	datamachine_assert( RunState::is_waiting( $state ), "{$state} is waiting" );
 }
-dm_assert( ! RunState::is_waiting( RunState::PENDING ), 'pending is not waiting' );
-dm_assert( ! RunState::is_waiting( RunState::RUNNING ), 'running is not waiting' );
-dm_assert( ! RunState::is_waiting( RunState::COMPLETED ), 'completed is not waiting' );
+datamachine_assert( ! RunState::is_waiting( RunState::PENDING ), 'pending is not waiting' );
+datamachine_assert( ! RunState::is_waiting( RunState::RUNNING ), 'running is not waiting' );
+datamachine_assert( ! RunState::is_waiting( RunState::COMPLETED ), 'completed is not waiting' );
 
 echo "\n[4] terminal states are distinct from resumable states\n";
 $expected_terminal = array( 'completed', 'failed', 'cancelled' );
-dm_assert( $expected_terminal === RunState::TERMINAL_STATES, 'terminal states are complete' );
+datamachine_assert( $expected_terminal === RunState::TERMINAL_STATES, 'terminal states are complete' );
 foreach ( $expected_terminal as $state ) {
-	dm_assert( RunState::is_terminal( $state ), "{$state} is terminal" );
+	datamachine_assert( RunState::is_terminal( $state ), "{$state} is terminal" );
 }
-dm_assert( ! RunState::is_terminal( RunState::WAITING_FOR_CALLBACK ), 'waiting_for_callback remains resumable' );
-dm_assert( ! RunState::is_terminal( RunState::RUNNING ), 'running is not terminal' );
+datamachine_assert( ! RunState::is_terminal( RunState::WAITING_FOR_CALLBACK ), 'waiting_for_callback remains resumable' );
+datamachine_assert( ! RunState::is_terminal( RunState::RUNNING ), 'running is not terminal' );
 
 echo "\n=== run-state-smoke: ALL PASS ===\n";

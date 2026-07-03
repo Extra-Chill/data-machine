@@ -16,7 +16,7 @@ use WP_UnitTestCase;
 
 class TaxonomyAbilityWpErrorTest extends WP_UnitTestCase {
 
-	private const TEST_TAXONOMY = 'dm_wp_error_terms';
+	private const TEST_TAXONOMY = 'datamachine_wp_error_terms';
 
 	public function set_up(): void {
 		parent::set_up();
@@ -80,7 +80,7 @@ class TaxonomyAbilityWpErrorTest extends WP_UnitTestCase {
 				'term_id'   => 0,
 				'taxonomy'  => self::TEST_TAXONOMY,
 				'data'      => array( 'name' => 'Charleston' ),
-				'field_map' => array( 'name' => 'dm_name' ),
+				'field_map' => array( 'name' => 'datamachine_name' ),
 			)
 		);
 
@@ -94,7 +94,7 @@ class TaxonomyAbilityWpErrorTest extends WP_UnitTestCase {
 			0,
 			self::TEST_TAXONOMY,
 			array( 'name' => 'Charleston' ),
-			array( 'name' => 'dm_name' )
+			array( 'name' => 'datamachine_name' )
 		);
 
 		$this->assertIsArray( $result );

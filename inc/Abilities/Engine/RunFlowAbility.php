@@ -502,7 +502,7 @@ class RunFlowAbility {
 
 		// Deterministic jitter in [0, base) spreads deferred flows across the
 		// window instead of waking them all at base seconds.
-		$jitter = absint( crc32( 'dm_backpressure_' . $flow_id ) ) % $base;
+		$jitter = absint( crc32( 'datamachine_backpressure_' . $flow_id ) ) % $base;
 
 		return $base + $jitter;
 	}

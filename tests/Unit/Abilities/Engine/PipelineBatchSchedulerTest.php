@@ -165,7 +165,7 @@ class PipelineBatchSchedulerTest extends WP_UnitTestCase {
 		$this->assertEquals( 'step_abc_123', $parent_engine['next_flow_step_id'] );
 
 		// No transient should exist.
-		$this->assertFalse( get_transient( 'dm_pipeline_batch_' . $parent_id ) );
+		$this->assertFalse( get_transient( 'datamachine_pipeline_batch_' . $parent_id ) );
 	}
 
 	/**

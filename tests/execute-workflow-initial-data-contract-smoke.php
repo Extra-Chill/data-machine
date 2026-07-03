@@ -61,7 +61,7 @@ function build_execute_workflow_engine_data_for_contract_test( int $job_id, arra
 	return $engine_data;
 }
 
-function dm_assert_same( $expected, $actual, string $msg ): void {
+function datamachine_assert_same( $expected, $actual, string $msg ): void {
 	if ( $expected === $actual ) {
 		echo "  [PASS] {$msg}\n";
 		return;
@@ -110,24 +110,24 @@ $initial_data = array(
 );
 
 $engine_data = build_execute_workflow_engine_data_for_contract_test( 100, $configs, $initial_data );
-dm_assert_same( $generated_flow_config, $engine_data['flow_config'], 'generated flow_config is preserved' );
-dm_assert_same( false, isset( $engine_data['flow_config']['poisoned_flow'] ), 'caller flow_config is not retained' );
-dm_assert_same( $generated_pipeline_config, $engine_data['pipeline_config'], 'generated pipeline_config is preserved' );
-dm_assert_same( false, isset( $engine_data['pipeline_config']['poisoned_pipeline'] ), 'caller pipeline_config is not retained' );
-dm_assert_same( 'wiki_maintain_article', $engine_data['task_type'], 'non-reserved initial_data remains available' );
+datamachine_assert_same( $generated_flow_config, $engine_data['flow_config'], 'generated flow_config is preserved' );
+datamachine_assert_same( false, isset( $engine_data['flow_config']['poisoned_flow'] ), 'caller flow_config is not retained' );
+datamachine_assert_same( $generated_pipeline_config, $engine_data['pipeline_config'], 'generated pipeline_config is preserved' );
+datamachine_assert_same( false, isset( $engine_data['pipeline_config']['poisoned_pipeline'] ), 'caller pipeline_config is not retained' );
+datamachine_assert_same( 'wiki_maintain_article', $engine_data['task_type'], 'non-reserved initial_data remains available' );
 
 echo "\n[2] parent_job_id still routes to create_job args\n";
 $create_args = build_execute_workflow_create_args_for_contract_test( $initial_data );
-dm_assert_same( 64, $create_args['parent_job_id'] ?? null, 'parent_job_id preserved for indexed job linkage' );
+datamachine_assert_same( 64, $create_args['parent_job_id'] ?? null, 'parent_job_id preserved for indexed job linkage' );
 
 echo "\n[3] flat identity fields still route into the job snapshot\n";
-dm_assert_same( 2, $engine_data['agent_id'], 'flat agent_id remains in engine_data' );
-dm_assert_same( 'Wayward Son', $engine_data['agent_slug'], 'flat agent_slug remains in engine_data' );
-dm_assert_same( 1, $engine_data['user_id'], 'flat user_id remains in engine_data' );
-dm_assert_same( 100, $engine_data['job']['job_id'], 'authoritative job_id wins in job snapshot' );
-dm_assert_same( 2, $engine_data['job']['agent_id'], 'flat agent_id fills missing job.agent_id' );
-dm_assert_same( 'wayward-son', $engine_data['job']['agent_slug'], 'flat agent_slug fills missing job.agent_slug' );
-dm_assert_same( 1, $engine_data['job']['user_id'], 'job.user_id preserved from caller snapshot' );
+datamachine_assert_same( 2, $engine_data['agent_id'], 'flat agent_id remains in engine_data' );
+datamachine_assert_same( 'Wayward Son', $engine_data['agent_slug'], 'flat agent_slug remains in engine_data' );
+datamachine_assert_same( 1, $engine_data['user_id'], 'flat user_id remains in engine_data' );
+datamachine_assert_same( 100, $engine_data['job']['job_id'], 'authoritative job_id wins in job snapshot' );
+datamachine_assert_same( 2, $engine_data['job']['agent_id'], 'flat agent_id fills missing job.agent_id' );
+datamachine_assert_same( 'wayward-son', $engine_data['job']['agent_slug'], 'flat agent_slug fills missing job.agent_slug' );
+datamachine_assert_same( 1, $engine_data['job']['user_id'], 'job.user_id preserved from caller snapshot' );
 
 echo "\n[4] caller job snapshot identity is preserved when provided\n";
 $initial_data_with_snapshot = array(
@@ -140,16 +140,16 @@ $initial_data_with_snapshot = array(
 	),
 );
 $engine_data_with_snapshot = build_execute_workflow_engine_data_for_contract_test( 101, $configs, $initial_data_with_snapshot );
-dm_assert_same( 9, $engine_data_with_snapshot['job']['agent_id'], 'caller job.agent_id remains authoritative over flat agent_id' );
-dm_assert_same( 8, $engine_data_with_snapshot['job']['user_id'], 'caller job.user_id remains authoritative over flat user_id' );
-dm_assert_same( 101, $engine_data_with_snapshot['job']['job_id'], 'engine job_id remains authoritative over caller job.job_id' );
+datamachine_assert_same( 9, $engine_data_with_snapshot['job']['agent_id'], 'caller job.agent_id remains authoritative over flat agent_id' );
+datamachine_assert_same( 8, $engine_data_with_snapshot['job']['user_id'], 'caller job.user_id remains authoritative over flat user_id' );
+datamachine_assert_same( 101, $engine_data_with_snapshot['job']['job_id'], 'engine job_id remains authoritative over caller job.job_id' );
 
 echo "\n[5] direct workflow packet handoff is engine-backed\n";
 $schedule_next_step_source = file_get_contents( dirname( __DIR__ ) . '/inc/Abilities/Engine/ScheduleNextStepAbility.php' ) ?: '';
 $execute_step_source       = file_get_contents( dirname( __DIR__ ) . '/inc/Abilities/Engine/ExecuteStepAbility.php' ) ?: '';
-dm_assert_same( true, str_contains( $schedule_next_step_source, "'direct' === \$raw_flow_id" ), 'direct schedule path is detected before file storage' );
-dm_assert_same( true, str_contains( $schedule_next_step_source, 'direct_step_data_packets' ), 'direct schedule path stores data packets on engine data' );
-dm_assert_same( true, str_contains( $execute_step_source, "empty( \$dataPackets ) && 'direct' === \$flow_id" ), 'direct execute path falls back when file storage has no packets' );
-dm_assert_same( true, str_contains( $execute_step_source, 'direct_step_data_packets' ), 'direct execute path reloads engine-backed packets' );
+datamachine_assert_same( true, str_contains( $schedule_next_step_source, "'direct' === \$raw_flow_id" ), 'direct schedule path is detected before file storage' );
+datamachine_assert_same( true, str_contains( $schedule_next_step_source, 'direct_step_data_packets' ), 'direct schedule path stores data packets on engine data' );
+datamachine_assert_same( true, str_contains( $execute_step_source, "empty( \$dataPackets ) && 'direct' === \$flow_id" ), 'direct execute path falls back when file storage has no packets' );
+datamachine_assert_same( true, str_contains( $execute_step_source, 'direct_step_data_packets' ), 'direct execute path reloads engine-backed packets' );
 
 echo "\n=== execute-workflow-initial-data-contract-smoke: ALL PASS ===\n";

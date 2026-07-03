@@ -1334,7 +1334,7 @@ class EmailAbilities {
 		 *
 		 * @param string $from The derived From address.
 		 */
-		$from   = apply_filters( 'dm_email_sent_folder_from', $from );
+		$from   = apply_filters( 'datamachine_email_sent_folder_from', $from );
 		$to_str = implode( ', ', $to );
 		$date   = gmdate( 'r' );
 

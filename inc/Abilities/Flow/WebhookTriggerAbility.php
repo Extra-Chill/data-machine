@@ -878,7 +878,7 @@ class WebhookTriggerAbility {
 		}
 
 		// Clear any existing rate limit counter so new config takes effect immediately.
-		delete_transient( 'dm_webhook_rate_' . $flow_id );
+		delete_transient( \DataMachine\Api\WebhookTrigger::rate_limit_transient_key( $flow_id ) );
 
 		$effective_max    = $rate_config['max'] ?? \DataMachine\Api\WebhookTrigger::DEFAULT_RATE_LIMIT_MAX;
 		$effective_window = $rate_config['window'] ?? \DataMachine\Api\WebhookTrigger::DEFAULT_RATE_LIMIT_WINDOW;

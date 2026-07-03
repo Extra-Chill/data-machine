@@ -518,7 +518,7 @@ class WebhookTrigger {
 			return null;
 		}
 
-		$transient_key = 'dm_webhook_rate_' . $flow_id;
+		$transient_key = self::rate_limit_transient_key( $flow_id );
 		$current_count = (int) get_transient( $transient_key );
 
 		if ( $current_count >= $max ) {
@@ -566,6 +566,16 @@ class WebhookTrigger {
 		}
 
 		return null;
+	}
+
+	/**
+	 * Build the per-flow rate-limit transient key.
+	 *
+	 * @param int $flow_id Flow ID.
+	 * @return string Transient key.
+	 */
+	public static function rate_limit_transient_key( int $flow_id ): string {
+		return 'datamachine_webhook_rate_' . $flow_id;
 	}
 
 	/**

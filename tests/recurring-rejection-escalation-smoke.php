@@ -32,23 +32,23 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 // ─── In-memory WordPress option + hook stubs ────────────────────────
 
-$GLOBALS['dm_test_options'] = array();
-$GLOBALS['dm_test_logs']    = array();
+$GLOBALS['datamachine_test_options'] = array();
+$GLOBALS['datamachine_test_logs']    = array();
 
 if ( ! function_exists( 'get_option' ) ) {
 	function get_option( string $name, $default = false ) {
-		return $GLOBALS['dm_test_options'][ $name ] ?? $default;
+		return $GLOBALS['datamachine_test_options'][ $name ] ?? $default;
 	}
 }
 if ( ! function_exists( 'update_option' ) ) {
 	function update_option( string $name, $value, $autoload = null ): bool {
-		$GLOBALS['dm_test_options'][ $name ] = $value;
+		$GLOBALS['datamachine_test_options'][ $name ] = $value;
 		return true;
 	}
 }
 if ( ! function_exists( 'delete_option' ) ) {
 	function delete_option( string $name ): bool {
-		unset( $GLOBALS['dm_test_options'][ $name ] );
+		unset( $GLOBALS['datamachine_test_options'][ $name ] );
 		return true;
 	}
 }
@@ -60,7 +60,7 @@ if ( ! function_exists( 'apply_filters' ) ) {
 if ( ! function_exists( 'do_action' ) ) {
 	function do_action( string $hook, ...$args ): void {
 		if ( 'datamachine_log' === $hook ) {
-			$GLOBALS['dm_test_logs'][] = array(
+			$GLOBALS['datamachine_test_logs'][] = array(
 				'level'   => $args[0] ?? '',
 				'message' => $args[1] ?? '',
 				'context' => $args[2] ?? array(),
@@ -89,14 +89,14 @@ $assert = function ( string $label, bool $cond ) use ( &$failures, &$total ): vo
 };
 
 $reset_state = function (): void {
-	$GLOBALS['dm_test_options'] = array();
-	$GLOBALS['dm_test_logs']    = array();
+	$GLOBALS['datamachine_test_options'] = array();
+	$GLOBALS['datamachine_test_logs']    = array();
 };
 
 $escalation_logs = static function (): array {
 	return array_values(
 		array_filter(
-			$GLOBALS['dm_test_logs'],
+			$GLOBALS['datamachine_test_logs'],
 			static fn( array $log ): bool =>
 				( $log['context']['error_code'] ?? '' ) === RecurringRejectionTracker::ESCALATION_ERROR_CODE
 		)
@@ -148,7 +148,7 @@ $assert( 'schedule no longer degraded after success', ! isset( RecurringRejectio
 $assert( 'tracker state for schedule is fully cleared', ! isset( RecurringRejectionTracker::all()['workspace_disk_emergency_cleanup'] ) );
 
 echo "\n[c2] After reset, a fresh rejection streak escalates again\n";
-$GLOBALS['dm_test_logs'] = array();
+$GLOBALS['datamachine_test_logs'] = array();
 for ( $i = 1; $i <= $threshold; $i++ ) {
 	RecurringRejectionTracker::record_rejection( 'workspace_disk_emergency_cleanup', 'workspace_disk_emergency_cleanup', 'task_scheduler_agent_context_required' );
 }

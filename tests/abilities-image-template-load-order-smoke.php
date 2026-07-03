@@ -131,7 +131,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	define( 'ABSPATH', '/tmp/' );
 }
 
-$GLOBALS['dm_2290_state'] = (object) array(
+$GLOBALS['datamachine_2290_state'] = (object) array(
 	'doing'           => false,
 	'did'             => 0,
 	'hooked'          => array(),
@@ -147,35 +147,35 @@ if ( ! function_exists( '__' ) ) {
 
 if ( ! function_exists( 'doing_action' ) ) {
 	function doing_action( $hook ) {
-		global $dm_2290_state;
-		return $dm_2290_state->doing && $hook === 'wp_abilities_api_init';
+		global $datamachine_2290_state;
+		return $datamachine_2290_state->doing && $hook === 'wp_abilities_api_init';
 	}
 }
 
 if ( ! function_exists( 'did_action' ) ) {
 	function did_action( $hook ) {
-		global $dm_2290_state;
-		return $hook === 'wp_abilities_api_init' ? $dm_2290_state->did : 0;
+		global $datamachine_2290_state;
+		return $hook === 'wp_abilities_api_init' ? $datamachine_2290_state->did : 0;
 	}
 }
 
 if ( ! function_exists( 'add_action' ) ) {
 	function add_action( $hook, $callback, $priority = 10, $accepted_args = 1 ) {
-		global $dm_2290_state;
-		$dm_2290_state->hooked[ $hook ][] = $callback;
+		global $datamachine_2290_state;
+		$datamachine_2290_state->hooked[ $hook ][] = $callback;
 		return true;
 	}
 }
 
 if ( ! function_exists( 'wp_register_ability' ) ) {
 	function wp_register_ability( $name, $args ) {
-		global $dm_2290_state;
+		global $datamachine_2290_state;
 		// Mirror core's guard: only succeed when doing_action(wp_abilities_api_init) is true.
 		if ( ! doing_action( 'wp_abilities_api_init' ) ) {
-			++$dm_2290_state->doing_it_wrong;
+			++$datamachine_2290_state->doing_it_wrong;
 			return null;
 		}
-		$dm_2290_state->registered[ $name ] = $args;
+		$datamachine_2290_state->registered[ $name ] = $args;
 		return true;
 	}
 }
@@ -193,12 +193,12 @@ if ( ! class_exists( 'DataMachine\\Abilities\\PermissionHelper' ) ) {
 require_once $plugin_root . '/inc/Abilities/Media/ImageTemplateAbilities.php';
 
 $reset = static function (): void {
-	global $dm_2290_state;
-	$dm_2290_state->doing          = false;
-	$dm_2290_state->did            = 0;
-	$dm_2290_state->hooked         = array();
-	$dm_2290_state->registered     = array();
-	$dm_2290_state->doing_it_wrong = 0;
+	global $datamachine_2290_state;
+	$datamachine_2290_state->doing          = false;
+	$datamachine_2290_state->did            = 0;
+	$datamachine_2290_state->hooked         = array();
+	$datamachine_2290_state->registered     = array();
+	$datamachine_2290_state->doing_it_wrong = 0;
 
 	$reflection = new ReflectionClass( \DataMachine\Abilities\Media\ImageTemplateAbilities::class );
 	$prop       = $reflection->getProperty( 'registered' );
@@ -208,13 +208,13 @@ $reset = static function (): void {
 
 // --- State 1: doing_action — register immediately.
 $reset();
-$GLOBALS['dm_2290_state']->doing = true;
+$GLOBALS['datamachine_2290_state']->doing = true;
 \DataMachine\Abilities\Media\ImageTemplateAbilities::ensure_registered();
 $assert(
 	'state 1: when doing_action fires, abilities register immediately via wp_register_ability()',
-	isset( $GLOBALS['dm_2290_state']->registered['datamachine/render-image-template'] )
-		&& isset( $GLOBALS['dm_2290_state']->registered['datamachine/list-image-templates'] )
-		&& empty( $GLOBALS['dm_2290_state']->hooked )
+	isset( $GLOBALS['datamachine_2290_state']->registered['datamachine/render-image-template'] )
+		&& isset( $GLOBALS['datamachine_2290_state']->registered['datamachine/list-image-templates'] )
+		&& empty( $GLOBALS['datamachine_2290_state']->hooked )
 );
 
 // --- State 2: pre-action — hook for later.
@@ -222,46 +222,46 @@ $reset();
 \DataMachine\Abilities\Media\ImageTemplateAbilities::ensure_registered();
 $assert(
 	'state 2: when action has not fired, callback is hooked on wp_abilities_api_init',
-	isset( $GLOBALS['dm_2290_state']->hooked['wp_abilities_api_init'] )
-		&& count( $GLOBALS['dm_2290_state']->hooked['wp_abilities_api_init'] ) === 1
-		&& empty( $GLOBALS['dm_2290_state']->registered )
+	isset( $GLOBALS['datamachine_2290_state']->hooked['wp_abilities_api_init'] )
+		&& count( $GLOBALS['datamachine_2290_state']->hooked['wp_abilities_api_init'] ) === 1
+		&& empty( $GLOBALS['datamachine_2290_state']->registered )
 );
 
 // --- State 3: post-action — no-op instead of mutating registry internals.
 $reset();
-$GLOBALS['dm_2290_state']->did = 1;
+$GLOBALS['datamachine_2290_state']->did = 1;
 \DataMachine\Abilities\Media\ImageTemplateAbilities::ensure_registered();
 $assert(
 	'state 3: when action already fired, abilities do not register late',
-	empty( $GLOBALS['dm_2290_state']->registered )
+	empty( $GLOBALS['datamachine_2290_state']->registered )
 );
 
 $assert(
 	'state 3: no-op path does not call wp_register_ability() (which would fire _doing_it_wrong)',
-	0 === $GLOBALS['dm_2290_state']->doing_it_wrong
+	0 === $GLOBALS['datamachine_2290_state']->doing_it_wrong
 );
 
 $assert(
 	'state 3: no-op path does not double-hook the action',
-	empty( $GLOBALS['dm_2290_state']->hooked )
+	empty( $GLOBALS['datamachine_2290_state']->hooked )
 );
 
 // --- Idempotency: a second post-action ensure_registered() remains a no-op.
-$prior_registered = $GLOBALS['dm_2290_state']->registered;
+$prior_registered = $GLOBALS['datamachine_2290_state']->registered;
 \DataMachine\Abilities\Media\ImageTemplateAbilities::ensure_registered();
 $assert(
 	'idempotent: second post-action ensure_registered() call is a no-op',
-	$GLOBALS['dm_2290_state']->registered === $prior_registered
-		&& 0 === $GLOBALS['dm_2290_state']->doing_it_wrong
+	$GLOBALS['datamachine_2290_state']->registered === $prior_registered
+		&& 0 === $GLOBALS['datamachine_2290_state']->doing_it_wrong
 );
 
 // --- Constructor path still works (for the in-runtime defensive call site).
 $reset();
-$GLOBALS['dm_2290_state']->doing = true;
+$GLOBALS['datamachine_2290_state']->doing = true;
 new \DataMachine\Abilities\Media\ImageTemplateAbilities();
 $assert(
 	'constructor path: instantiating the class triggers ensure_registered()',
-	isset( $GLOBALS['dm_2290_state']->registered['datamachine/render-image-template'] )
+	isset( $GLOBALS['datamachine_2290_state']->registered['datamachine/render-image-template'] )
 );
 
 if ( $failed > 0 ) {

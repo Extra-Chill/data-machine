@@ -35,7 +35,7 @@ $failures = 0;
  * @param string $label  Test label.
  * @param string $detail Optional detail.
  */
-function dm_assert( bool $cond, string $label, string $detail = '' ): void {
+function datamachine_assert( bool $cond, string $label, string $detail = '' ): void {
 	global $failures;
 	if ( $cond ) {
 		echo "  [PASS] {$label}\n";
@@ -56,35 +56,35 @@ function dm_assert( bool $cond, string $label, string $detail = '' ): void {
  * @param string $format   Output format.
  * @return string Cell value.
  */
-function dm_list_cell( string $summary, string $format ): string {
+function datamachine_list_cell( string $summary, string $format ): string {
 	$is_table = 'table' === $format;
 	return ( $is_table && '' === $summary ) ? '—' : $summary;
 }
 
 echo "\n[1] table + empty summary → em-dash placeholder (human display)\n";
-dm_assert( '—' === dm_list_cell( '', 'table' ), 'empty config in table shows "—"' );
+datamachine_assert( '—' === datamachine_list_cell( '', 'table' ), 'empty config in table shows "—"' );
 
 echo "\n[2] structured formats + empty summary → honest empty string (no dash)\n";
 foreach ( array( 'json', 'csv', 'yaml', 'ids', 'count' ) as $fmt ) {
-	dm_assert(
-		'' === dm_list_cell( '', $fmt ),
+	datamachine_assert(
+		'' === datamachine_list_cell( '', $fmt ),
 		"empty config in {$fmt} is '' not '—'",
-		"got: '" . dm_list_cell( '', $fmt ) . "'"
+		"got: '" . datamachine_list_cell( '', $fmt ) . "'"
 	);
 }
 
 echo "\n[3] real summary passes through verbatim in every format\n";
 $real = 'city=Charleston | r=50';
 foreach ( array( 'table', 'json', 'csv', 'yaml' ) as $fmt ) {
-	dm_assert(
-		$real === dm_list_cell( $real, $fmt ),
+	datamachine_assert(
+		$real === datamachine_list_cell( $real, $fmt ),
 		"real config preserved in {$fmt}"
 	);
 }
 
 echo "\n[4] the literal em-dash never appears in structured output for an empty cell\n";
-$json_cell = dm_list_cell( '', 'json' );
-dm_assert(
+$json_cell = datamachine_list_cell( '', 'json' );
+datamachine_assert(
 	false === strpos( $json_cell, '—' ),
 	'json cell contains no em-dash',
 	"got: '{$json_cell}'"
@@ -93,19 +93,19 @@ dm_assert(
 echo "\n[5] source guard: extractors no longer hardcode the '—' fallback\n";
 $flows_src     = (string) file_get_contents( __DIR__ . '/../inc/Cli/Commands/Flows/FlowsCommand.php' );
 $pipelines_src = (string) file_get_contents( __DIR__ . '/../inc/Cli/Commands/PipelinesCommand.php' );
-dm_assert(
+datamachine_assert(
 	false === strpos( $flows_src, "? \$summary : '—'" ),
 	'FlowsCommand::extractConfigSummary dropped the inline "—" fallback'
 );
-dm_assert(
+datamachine_assert(
 	false === strpos( $pipelines_src, "? \$summary : '—'" ),
 	'PipelinesCommand::extractPipelineLocation dropped the inline "—" fallback'
 );
-dm_assert(
+datamachine_assert(
 	false !== strpos( $flows_src, "( \$is_table && '' === \$config_summary ) ? '—'" ),
 	'FlowsCommand applies the "—" placeholder only for table format'
 );
-dm_assert(
+datamachine_assert(
 	false !== strpos( $pipelines_src, "( \$is_table && '' === \$location ) ? '—'" ),
 	'PipelinesCommand applies the "—" placeholder only for table format'
 );

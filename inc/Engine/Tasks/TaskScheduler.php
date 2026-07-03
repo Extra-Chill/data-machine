@@ -375,7 +375,7 @@ class TaskScheduler {
 		// so the chain caller → batch_parent is preserved even though
 		// per-item children chain off the caller directly (below).
 		$jobs_db           = new Jobs();
-		$batch_id          = 'dm_batch_' . wp_generate_uuid4();
+		$batch_id          = 'datamachine_batch_' . wp_generate_uuid4();
 		$batch_create_args = array(
 			'pipeline_id' => 'direct',
 			'flow_id'     => 'direct',

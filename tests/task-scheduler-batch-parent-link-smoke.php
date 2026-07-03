@@ -86,7 +86,7 @@ function build_execute_workflow_create_args( ?array $initial_data ): array {
 	return $args;
 }
 
-function dm_assert( bool $cond, string $msg ): void {
+function datamachine_assert( bool $cond, string $msg ): void {
 	if ( $cond ) {
 		echo "  [PASS] {$msg}\n";
 		return;
@@ -105,39 +105,39 @@ $context = array(
 	'user_id'       => 1,
 );
 $resolved = resolve_small_batch_parent_id( $context );
-dm_assert( 64 === $resolved, 'small-batch path resolves caller parent_job_id from context' );
+datamachine_assert( 64 === $resolved, 'small-batch path resolves caller parent_job_id from context' );
 
 // -----------------------------------------------------------------
 echo "\n[2] small batch without parent_job_id → resolves to 0\n";
 $context  = array( 'agent_id' => 2 );
 $resolved = resolve_small_batch_parent_id( $context );
-dm_assert( 0 === $resolved, 'no parent_job_id in context → 0 (no link)' );
+datamachine_assert( 0 === $resolved, 'no parent_job_id in context → 0 (no link)' );
 
 // -----------------------------------------------------------------
 echo "\n[3] small batch with parent_job_id=0 explicit → 0 (no link)\n";
 $context  = array( 'parent_job_id' => 0 );
 $resolved = resolve_small_batch_parent_id( $context );
-dm_assert( 0 === $resolved, 'explicit parent_job_id=0 stays 0' );
+datamachine_assert( 0 === $resolved, 'explicit parent_job_id=0 stays 0' );
 
 // -----------------------------------------------------------------
 echo "\n[4] small batch with string parent_job_id → coerced to int\n";
 $context  = array( 'parent_job_id' => '99' );
 $resolved = resolve_small_batch_parent_id( $context );
-dm_assert( 99 === $resolved, 'string parent_job_id coerced to int' );
+datamachine_assert( 99 === $resolved, 'string parent_job_id coerced to int' );
 
 // -----------------------------------------------------------------
 echo "\n[5] large batch parent — caller passed parent_job_id → batch parent links to caller\n";
 $args = build_batch_parent_create_args( 'wiki_maintain', 64 );
-dm_assert( isset( $args['parent_job_id'] ), 'parent_job_id stamped onto batch parent create_args' );
-dm_assert( 64 === $args['parent_job_id'], 'batch parent linked to caller (job 64)' );
-dm_assert( 'batch' === $args['source'], 'source still batch' );
-dm_assert( 'Batch: Wiki maintain' === $args['label'], 'label humanized from task_type' );
+datamachine_assert( isset( $args['parent_job_id'] ), 'parent_job_id stamped onto batch parent create_args' );
+datamachine_assert( 64 === $args['parent_job_id'], 'batch parent linked to caller (job 64)' );
+datamachine_assert( 'batch' === $args['source'], 'source still batch' );
+datamachine_assert( 'Batch: Wiki maintain' === $args['label'], 'label humanized from task_type' );
 
 // -----------------------------------------------------------------
 echo "\n[6] large batch parent — no caller parent → no parent_job_id key\n";
 $args = build_batch_parent_create_args( 'alt_text', 0 );
-dm_assert( ! isset( $args['parent_job_id'] ), 'no parent_job_id key when caller did not pass one' );
-dm_assert( 'batch' === $args['source'], 'source still batch' );
+datamachine_assert( ! isset( $args['parent_job_id'] ), 'no parent_job_id key when caller did not pass one' );
+datamachine_assert( 'batch' === $args['source'], 'source still batch' );
 
 // -----------------------------------------------------------------
 echo "\n[7] large batch chunk — caller_parent_job_id wins over batch_parent_id\n";
@@ -150,7 +150,7 @@ $extra = array(
 	'caller_parent_job_id' => 64,
 );
 $resolved = resolve_chunk_child_parent_id( $extra, 100 ); // 100 = batch_parent_id
-dm_assert( 64 === $resolved, 'children chain to caller (64), not batch parent (100)' );
+datamachine_assert( 64 === $resolved, 'children chain to caller (64), not batch parent (100)' );
 
 // -----------------------------------------------------------------
 echo "\n[8] large batch chunk — no caller parent → children chain to batch_parent\n";
@@ -159,7 +159,7 @@ $extra = array(
 	'caller_parent_job_id' => 0,
 );
 $resolved = resolve_chunk_child_parent_id( $extra, 100 );
-dm_assert( 100 === $resolved, 'children chain to batch parent when caller did not pass parent_job_id' );
+datamachine_assert( 100 === $resolved, 'children chain to batch parent when caller did not pass parent_job_id' );
 
 // -----------------------------------------------------------------
 echo "\n[9] large batch chunk — missing caller_parent_job_id key → falls back to batch_parent\n";
@@ -168,7 +168,7 @@ $extra = array(
 	// no caller_parent_job_id key at all.
 );
 $resolved = resolve_chunk_child_parent_id( $extra, 100 );
-dm_assert( 100 === $resolved, 'missing caller_parent_job_id key → batch parent' );
+datamachine_assert( 100 === $resolved, 'missing caller_parent_job_id key → batch parent' );
 
 // -----------------------------------------------------------------
 echo "\n[10] ExecuteWorkflowAbility — parent_job_id from initial_data → create_args\n";
@@ -182,18 +182,18 @@ $initial_data = array(
 	'user_id'       => 1,
 );
 $args = build_execute_workflow_create_args( $initial_data );
-dm_assert( isset( $args['parent_job_id'] ), 'parent_job_id stamped onto create_args from initial_data' );
-dm_assert( 64 === $args['parent_job_id'], 'create_args parent_job_id = 64' );
+datamachine_assert( isset( $args['parent_job_id'] ), 'parent_job_id stamped onto create_args from initial_data' );
+datamachine_assert( 64 === $args['parent_job_id'], 'create_args parent_job_id = 64' );
 
 // -----------------------------------------------------------------
 echo "\n[11] ExecuteWorkflowAbility — no parent_job_id in initial_data → no key\n";
 $args = build_execute_workflow_create_args( array( 'task_type' => 'wiki_maintain' ) );
-dm_assert( ! isset( $args['parent_job_id'] ), 'no parent_job_id key when initial_data lacks it' );
+datamachine_assert( ! isset( $args['parent_job_id'] ), 'no parent_job_id key when initial_data lacks it' );
 
 // -----------------------------------------------------------------
 echo "\n[12] ExecuteWorkflowAbility — null initial_data → no key\n";
 $args = build_execute_workflow_create_args( null );
-dm_assert( ! isset( $args['parent_job_id'] ), 'null initial_data → no parent_job_id key' );
+datamachine_assert( ! isset( $args['parent_job_id'] ), 'null initial_data → no parent_job_id key' );
 
 // -----------------------------------------------------------------
 echo "\n[13] end-to-end fan-out shape — caller(64) → 3 children, all linked\n";
@@ -221,6 +221,6 @@ foreach ( $slugs as $slug ) {
 	$child_link_ids[] = $args['parent_job_id'] ?? 0;
 }
 
-dm_assert( array( 64, 64, 64 ) === $child_link_ids, 'all three children linked to caller (64)' );
+datamachine_assert( array( 64, 64, 64 ) === $child_link_ids, 'all three children linked to caller (64)' );
 
 echo "\n=== task-scheduler-batch-parent-link-smoke: ALL PASS ===\n";

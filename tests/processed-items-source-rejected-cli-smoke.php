@@ -40,7 +40,7 @@ require_once __DIR__ . '/../inc/Cli/Commands/ProcessedItemsCommand.php';
 
 use DataMachine\Cli\Commands\ProcessedItemsCommand;
 
-function dm_source_rejected_assert( bool $cond, string $msg ): void {
+function datamachine_source_rejected_assert( bool $cond, string $msg ): void {
 	if ( $cond ) {
 		echo "  [PASS] {$msg}\n";
 		return;
@@ -59,9 +59,9 @@ if ( PHP_VERSION_ID < 80100 ) {
 
 echo "Test 1: default query targets processed rows from source-rejected jobs\n";
 $result = $query_parts->invoke( $cmd, array(), 'wp_datamachine_processed_items', 'wp_datamachine_jobs' );
-dm_source_rejected_assert( str_contains( $result['where_sql'], 'pi.status = %s' ), 'filters processed item status' );
-dm_source_rejected_assert( str_contains( $result['where_sql'], 'j.status = %s' ), 'filters owning job status' );
-dm_source_rejected_assert(
+datamachine_source_rejected_assert( str_contains( $result['where_sql'], 'pi.status = %s' ), 'filters processed item status' );
+datamachine_source_rejected_assert( str_contains( $result['where_sql'], 'j.status = %s' ), 'filters owning job status' );
+datamachine_source_rejected_assert(
 	array( 'wp_datamachine_processed_items', 'wp_datamachine_jobs', 'processed', 'agent_skipped - source-rejected' ) === $result['values'],
 	'default values include both table names and exact source-rejected status'
 );
@@ -79,12 +79,12 @@ $result = $query_parts->invoke(
 	'wp_datamachine_processed_items',
 	'wp_datamachine_jobs'
 );
-dm_source_rejected_assert( str_contains( $result['where_sql'], 'j.pipeline_id = %s' ), 'adds pipeline filter' );
-dm_source_rejected_assert( str_contains( $result['where_sql'], 'j.flow_id = %s' ), 'adds flow filter' );
-dm_source_rejected_assert( str_contains( $result['where_sql'], 'pi.source_type = %s' ), 'adds source type filter' );
-dm_source_rejected_assert( str_contains( $result['where_sql'], 'pi.processed_timestamp >= %s' ), 'adds lower date bound' );
-dm_source_rejected_assert( str_contains( $result['where_sql'], 'pi.processed_timestamp <= %s' ), 'adds upper date bound' );
-dm_source_rejected_assert( in_array( 'mcp', $result['values'], true ), 'keeps source type generic' );
+datamachine_source_rejected_assert( str_contains( $result['where_sql'], 'j.pipeline_id = %s' ), 'adds pipeline filter' );
+datamachine_source_rejected_assert( str_contains( $result['where_sql'], 'j.flow_id = %s' ), 'adds flow filter' );
+datamachine_source_rejected_assert( str_contains( $result['where_sql'], 'pi.source_type = %s' ), 'adds source type filter' );
+datamachine_source_rejected_assert( str_contains( $result['where_sql'], 'pi.processed_timestamp >= %s' ), 'adds lower date bound' );
+datamachine_source_rejected_assert( str_contains( $result['where_sql'], 'pi.processed_timestamp <= %s' ), 'adds upper date bound' );
+datamachine_source_rejected_assert( in_array( 'mcp', $result['values'], true ), 'keeps source type generic' );
 
 echo "Test 3: clear output describes blast-radius filters\n";
 $description = $describe->invoke(
@@ -95,8 +95,8 @@ $description = $describe->invoke(
 		'after'       => '2026-05-01',
 	)
 );
-dm_source_rejected_assert( str_contains( $description, 'job-status=agent_skipped - source-rejected' ), 'describes default job status' );
-dm_source_rejected_assert( str_contains( $description, 'pipeline=12' ), 'describes pipeline scope' );
-dm_source_rejected_assert( str_contains( $description, 'source-type=mcp' ), 'describes source-type scope' );
+datamachine_source_rejected_assert( str_contains( $description, 'job-status=agent_skipped - source-rejected' ), 'describes default job status' );
+datamachine_source_rejected_assert( str_contains( $description, 'pipeline=12' ), 'describes pipeline scope' );
+datamachine_source_rejected_assert( str_contains( $description, 'source-type=mcp' ), 'describes source-type scope' );
 
 echo "\nAll source-rejected CLI smoke checks passed.\n";

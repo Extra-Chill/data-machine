@@ -47,7 +47,7 @@ require_once __DIR__ . '/../inc/Cli/Commands/ProcessedItemsCommand.php';
 
 use DataMachine\Cli\Commands\ProcessedItemsCommand;
 
-function dm_assert( bool $cond, string $msg ): void {
+function datamachine_assert( bool $cond, string $msg ): void {
 	if ( $cond ) {
 		echo "  [PASS] {$msg}\n";
 		return;
@@ -68,27 +68,27 @@ $parse = static function ( string $input ) use ( $method, $cmd ) {
 
 echo "Test 1: canonical {pipeline_id}_{uuid}_{flow_id} shape\n";
 $result = $parse( '2_0978b49e-a5a1-46e6-ae3a-0bf62ccea60d_2' );
-dm_assert( is_array( $result ), 'returns an array for canonical input' );
-dm_assert( 2 === $result['pipeline_id'], 'pipeline_id parsed from prefix' );
-dm_assert( 2 === $result['flow_id'], 'flow_id parsed from suffix' );
+datamachine_assert( is_array( $result ), 'returns an array for canonical input' );
+datamachine_assert( 2 === $result['pipeline_id'], 'pipeline_id parsed from prefix' );
+datamachine_assert( 2 === $result['flow_id'], 'flow_id parsed from suffix' );
 
 echo "Test 2: multi-digit pipeline + flow ids\n";
 $result = $parse( '42_aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee_137' );
-dm_assert( 42 === $result['pipeline_id'], 'multi-digit pipeline_id' );
-dm_assert( 137 === $result['flow_id'], 'multi-digit flow_id' );
+datamachine_assert( 42 === $result['pipeline_id'], 'multi-digit pipeline_id' );
+datamachine_assert( 137 === $result['flow_id'], 'multi-digit flow_id' );
 
 echo "Test 3: pipeline_id and flow_id can match without aliasing the uuid\n";
 $result = $parse( '7_xxxx-yyyy-zzzz_7' );
-dm_assert( 7 === $result['pipeline_id'], 'leading 7' );
-dm_assert( 7 === $result['flow_id'], 'trailing 7 — different segment' );
+datamachine_assert( 7 === $result['pipeline_id'], 'leading 7' );
+datamachine_assert( 7 === $result['flow_id'], 'trailing 7 — different segment' );
 
 echo "Test 4: malformed inputs return null\n";
-dm_assert( null === $parse( '' ), 'empty string' );
-dm_assert( null === $parse( '2' ), 'no underscore' );
-dm_assert( null === $parse( '2_uuid' ), 'single underscore (no flow_id segment)' );
-dm_assert( null === $parse( 'abc_uuid_2' ), 'non-numeric pipeline_id' );
-dm_assert( null === $parse( '2_uuid_abc' ), 'non-numeric flow_id' );
-dm_assert( null === $parse( '_uuid_2' ), 'empty pipeline_id segment' );
-dm_assert( null === $parse( '2_uuid_' ), 'empty flow_id segment' );
+datamachine_assert( null === $parse( '' ), 'empty string' );
+datamachine_assert( null === $parse( '2' ), 'no underscore' );
+datamachine_assert( null === $parse( '2_uuid' ), 'single underscore (no flow_id segment)' );
+datamachine_assert( null === $parse( 'abc_uuid_2' ), 'non-numeric pipeline_id' );
+datamachine_assert( null === $parse( '2_uuid_abc' ), 'non-numeric flow_id' );
+datamachine_assert( null === $parse( '_uuid_2' ), 'empty pipeline_id segment' );
+datamachine_assert( null === $parse( '2_uuid_' ), 'empty flow_id segment' );
 
 echo "\nAll smoke checks passed.\n";

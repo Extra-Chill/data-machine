@@ -92,10 +92,10 @@ function datamachine_get_scaffold_defaults( string $agent_name = '' ): array {
 	$admin_name  = $admin_user ? $admin_user->display_name : '';
 
 	// --- Versions ---
-	$wp_version  = get_bloginfo( 'version' );
-	$php_version = PHP_MAJOR_VERSION . '.' . PHP_MINOR_VERSION . '.' . PHP_RELEASE_VERSION;
-	$dm_version  = defined( 'DATAMACHINE_VERSION' ) ? DATAMACHINE_VERSION : 'unknown';
-	$created     = wp_date( 'Y-m-d' );
+	$wp_version          = get_bloginfo( 'version' );
+	$php_version         = PHP_MAJOR_VERSION . '.' . PHP_MINOR_VERSION . '.' . PHP_RELEASE_VERSION;
+	$datamachine_version = defined( 'DATAMACHINE_VERSION' ) ? DATAMACHINE_VERSION : 'unknown';
+	$created             = wp_date( 'Y-m-d' );
 
 	// --- Build SOUL.md context lines ---
 	$context_items   = array();
@@ -187,7 +187,7 @@ function datamachine_get_scaffold_defaults( string $agent_name = '' ): array {
 			'This file tracks persistent knowledge. Keep it lean — persistent facts only, not session logs.',
 			'',
 			'## State',
-			"- Data Machine v{$dm_version} activated on {$created}",
+			"- Data Machine v{$datamachine_version} activated on {$created}",
 			"- WordPress {$wp_version}, PHP {$php_version}",
 			'',
 			'## Lessons Learned',

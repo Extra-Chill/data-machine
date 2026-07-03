@@ -36,7 +36,7 @@ require_once __DIR__ . '/../inc/Abilities/Fetch/FetchRssAbility.php';
 
 use DataMachine\Abilities\Fetch\FetchRssAbility;
 
-function dm_assert( bool $cond, string $msg ): void {
+function datamachine_assert( bool $cond, string $msg ): void {
 	if ( $cond ) {
 		echo "  [PASS] {$msg}\n";
 		return;
@@ -67,33 +67,33 @@ function call_search( FetchRssAbility $ability, string $text, string $search ): 
 $ability = new FetchRssAbility();
 
 echo "applyKeywordExclusion — empty exclusion list never matches\n";
-dm_assert( false === call_exclude( $ability, 'Anything', '' ), 'empty string returns false' );
-dm_assert( false === call_exclude( $ability, 'Anything', '   ' ), 'whitespace-only returns false' );
-dm_assert( false === call_exclude( $ability, 'Anything', ',,,' ), 'commas-only returns false' );
+datamachine_assert( false === call_exclude( $ability, 'Anything', '' ), 'empty string returns false' );
+datamachine_assert( false === call_exclude( $ability, 'Anything', '   ' ), 'whitespace-only returns false' );
+datamachine_assert( false === call_exclude( $ability, 'Anything', ',,,' ), 'commas-only returns false' );
 
 echo "applyKeywordExclusion — single keyword match\n";
-dm_assert( true === call_exclude( $ability, 'Foo dot release bar', 'dot release' ), 'substring matches' );
-dm_assert( true === call_exclude( $ability, 'FOO DOT RELEASE BAR', 'dot release' ), 'case-insensitive uppercase text' );
-dm_assert( true === call_exclude( $ability, 'Foo Dot Release Bar', 'DOT RELEASE' ), 'case-insensitive uppercase keyword' );
+datamachine_assert( true === call_exclude( $ability, 'Foo dot release bar', 'dot release' ), 'substring matches' );
+datamachine_assert( true === call_exclude( $ability, 'FOO DOT RELEASE BAR', 'dot release' ), 'case-insensitive uppercase text' );
+datamachine_assert( true === call_exclude( $ability, 'Foo Dot Release Bar', 'DOT RELEASE' ), 'case-insensitive uppercase keyword' );
 
 echo "applyKeywordExclusion — non-matching\n";
-dm_assert( false === call_exclude( $ability, 'Foo bar baz', 'qux' ), 'unrelated keyword returns false' );
-dm_assert( false === call_exclude( $ability, '', 'qux' ), 'empty text returns false' );
+datamachine_assert( false === call_exclude( $ability, 'Foo bar baz', 'qux' ), 'unrelated keyword returns false' );
+datamachine_assert( false === call_exclude( $ability, '', 'qux' ), 'empty text returns false' );
 
 echo "applyKeywordExclusion — multiple comma-separated keywords (any-match)\n";
-dm_assert( true === call_exclude( $ability, 'A B C D', 'X, B, Y' ), 'second keyword matches' );
-dm_assert( true === call_exclude( $ability, 'A B C D', 'A,X,Y' ), 'first keyword matches' );
-dm_assert( false === call_exclude( $ability, 'A B C D', 'X, Y, Z' ), 'no keyword matches' );
-dm_assert( true === call_exclude( $ability, 'A B C D', '   ,B,   ' ), 'empty terms ignored, real term matches' );
+datamachine_assert( true === call_exclude( $ability, 'A B C D', 'X, B, Y' ), 'second keyword matches' );
+datamachine_assert( true === call_exclude( $ability, 'A B C D', 'A,X,Y' ), 'first keyword matches' );
+datamachine_assert( false === call_exclude( $ability, 'A B C D', 'X, Y, Z' ), 'no keyword matches' );
+datamachine_assert( true === call_exclude( $ability, 'A B C D', '   ,B,   ' ), 'empty terms ignored, real term matches' );
 
 echo "applyKeywordExclusion vs applyKeywordSearch — inverse semantics\n";
 // "search" is include-first: empty search means "keep everything"; non-empty must match to keep.
 // "exclude" is the inverse: empty means "skip nothing"; non-empty must match to skip.
-dm_assert( true === call_search( $ability, 'A B', '' ), 'empty search keeps item' );
-dm_assert( false === call_exclude( $ability, 'A B', '' ), 'empty exclude does NOT skip item' );
-dm_assert( true === call_search( $ability, 'A B', 'B' ), 'matching search keeps item' );
-dm_assert( true === call_exclude( $ability, 'A B', 'B' ), 'matching exclude SKIPS item' );
-dm_assert( false === call_search( $ability, 'A B', 'C' ), 'non-matching search drops item' );
-dm_assert( false === call_exclude( $ability, 'A B', 'C' ), 'non-matching exclude does NOT skip item' );
+datamachine_assert( true === call_search( $ability, 'A B', '' ), 'empty search keeps item' );
+datamachine_assert( false === call_exclude( $ability, 'A B', '' ), 'empty exclude does NOT skip item' );
+datamachine_assert( true === call_search( $ability, 'A B', 'B' ), 'matching search keeps item' );
+datamachine_assert( true === call_exclude( $ability, 'A B', 'B' ), 'matching exclude SKIPS item' );
+datamachine_assert( false === call_search( $ability, 'A B', 'C' ), 'non-matching search drops item' );
+datamachine_assert( false === call_exclude( $ability, 'A B', 'C' ), 'non-matching exclude does NOT skip item' );
 
 echo "\n[OK] All exclude_keywords smoke tests passed.\n";
