@@ -134,8 +134,9 @@ class MetaDescriptionAbilities {
 		$limit     = absint( $input['limit'] ?? 50 );
 		$force     = ! empty( $input['force'] );
 
-		$user_id         = get_current_user_id();
-		$agent_id        = function_exists( 'datamachine_resolve_or_create_agent_id' ) && $user_id > 0 ? datamachine_resolve_or_create_agent_id( $user_id ) : 0;
+		$acting          = datamachine_resolve_system_agent_context();
+		$user_id         = $acting['user_id'];
+		$agent_id        = $acting['agent_id'];
 		$system_defaults = PluginSettings::resolveModelForAgentMode( $agent_id, 'system' );
 		$provider        = $system_defaults['provider'];
 		$model           = $system_defaults['model'];
