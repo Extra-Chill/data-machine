@@ -794,12 +794,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/Automattic/agents-api.git",
-                "reference": "07300175de7004b3f5af75d16865a078a37203d4"
+                "reference": "59d1e6b473f22498e40e279130bbb4f9bcde3b73"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/Automattic/agents-api/zipball/07300175de7004b3f5af75d16865a078a37203d4",
-                "reference": "07300175de7004b3f5af75d16865a078a37203d4",
+                "url": "https://api.github.com/repos/Automattic/agents-api/zipball/59d1e6b473f22498e40e279130bbb4f9bcde3b73",
+                "reference": "59d1e6b473f22498e40e279130bbb4f9bcde3b73",
                 "shasum": ""
             },
             "require": {
@@ -914,6 +914,12 @@
                     "php tests/workflow-spec-validator-smoke.php",
                     "php tests/workflow-runner-smoke.php",
                     "php tests/workflow-parallel-smoke.php",
+                    "php tests/workflow-parallel-async-smoke.php",
+                    "php tests/workflow-as-branch-smoke.php",
+                    "php tests/workflow-branch-concurrency-gate-smoke.php",
+                    "php tests/workflow-async-branch-payload-smoke.php",
+                    "php tests/workflow-async-loopback-target-smoke.php",
+                    "php tests/workflow-reconcile-race-smoke.php",
                     "php tests/workflow-lifecycle-smoke.php",
                     "php tests/agents-workflow-ability-smoke.php",
                     "php tests/routine-smoke.php",
@@ -934,7 +940,7 @@
                 "issues": "https://github.com/Automattic/agents-api/issues",
                 "source": "https://github.com/Automattic/agents-api"
             },
-            "time": "2026-06-30T21:38:29+00:00"
+            "time": "2026-07-03T14:34:26+00:00"
         }
     ],
     "packages-dev": [
