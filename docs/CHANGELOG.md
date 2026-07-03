@@ -2,6 +2,14 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.159.6] - 2026-07-03
+
+### Changed
+- stop broken upstream wp-codebox from blocking PRs (#2840)
+
+### Fixed
+- resolve default agent owner for system-triggered media/SEO task enqueues
+
 ## [0.159.5] - 2026-07-03
 
 ### Fixed
