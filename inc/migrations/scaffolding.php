@@ -92,8 +92,8 @@ function datamachine_get_scaffold_defaults( string $agent_name = '' ): array {
 	$admin_name  = $admin_user ? $admin_user->display_name : '';
 
 	// --- Versions ---
-	$wp_version  = get_bloginfo( 'version' );
-	$php_version = PHP_MAJOR_VERSION . '.' . PHP_MINOR_VERSION . '.' . PHP_RELEASE_VERSION;
+	$wp_version          = get_bloginfo( 'version' );
+	$php_version         = PHP_MAJOR_VERSION . '.' . PHP_MINOR_VERSION . '.' . PHP_RELEASE_VERSION;
 	$datamachine_version = defined( 'DATAMACHINE_VERSION' ) ? DATAMACHINE_VERSION : 'unknown';
 	$created             = wp_date( 'Y-m-d' );
 
