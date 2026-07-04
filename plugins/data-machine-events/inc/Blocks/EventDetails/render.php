@@ -33,6 +33,21 @@ $occurrence_dates = $attributes['occurrenceDates'] ?? array();
 
 $post_id = get_the_ID();
 
+/*
+ * Event timing state: 'upcoming' | 'ongoing' | 'past'.
+ *
+ * Derived from the authoritative event-dates table via the canonical
+ * public helper (same source-of-truth logic as the calendar's
+ * upcoming/past SQL filters), so consumers and this block share one
+ * definition of tense instead of each re-deriving it. Falls back to
+ * 'upcoming' if the helper is somehow unavailable, so a missing helper
+ * never suppresses live CTAs on a genuinely upcoming event.
+ */
+$event_timing = function_exists( 'data_machine_events_get_timing' )
+	? data_machine_events_get_timing( (int) $post_id )
+	: 'upcoming';
+$is_past      = ( 'past' === $event_timing );
+
 $venue_data  = null;
 $venue_terms = get_the_terms( $post_id, 'venue' );
 if ( $venue_terms && ! is_wp_error( $venue_terms ) ) {
@@ -179,15 +194,53 @@ $event_schema     = EventSchemaProvider::generateSchemaOrg( $event_data, $venue_
 			 *
 			 * @param int    $post_id Current event post ID.
 			 * @param string $price   Event price string (may be empty).
+			 * @param string $timing  Event timing state: 'upcoming' | 'ongoing' | 'past'.
+			 *                        Added in 0.46.0; consumers hooking with fewer
+			 *                        params keep working (extra args are ignored).
 			 */
-			do_action( 'data_machine_events_after_price_display', $post_id, $price );
+			do_action( 'data_machine_events_after_price_display', $post_id, $price, $event_timing );
 			?>
 		</div>
 	</div>
 
 	<div class="event-action-buttons">
-		<?php if ( $ticket_url ) : ?>
-			<a href="<?php echo esc_url( $ticket_url ); ?>" class="<?php echo esc_attr( implode( ' ', apply_filters( 'data_machine_events_ticket_button_classes', array( 'ticket-button' ) ) ) ); ?>" target="_blank" rel="noopener">
+		<?php
+		/**
+		 * Whether to render the block's own ticket / event-link button.
+		 *
+		 * Defaults to true for upcoming and ongoing events and false for past
+		 * events — buying tickets to a show that already happened is a dead CTA,
+		 * so the generically-correct default is to suppress it once the event is
+		 * over. Sites that still want the link on past events (e.g. to point at
+		 * an archived listing) can force it back on via this filter.
+		 *
+		 * @since 0.46.0
+		 *
+		 * @param bool   $show    Whether to show the ticket button. Default: false on past, true otherwise.
+		 * @param int    $post_id Current event post ID.
+		 * @param string $timing  Event timing state: 'upcoming' | 'ongoing' | 'past'.
+		 */
+		$show_ticket_button = apply_filters(
+			'data_machine_events_show_ticket_button',
+			! $is_past,
+			$post_id,
+			$event_timing
+		);
+		?>
+		<?php if ( $ticket_url && $show_ticket_button ) : ?>
+			<?php
+			/*
+			 * De-emphasis class hook for past-but-still-shown ticket buttons.
+			 * The default filter above suppresses the button on past events, but
+			 * when a site overrides that to keep it visible, tag it with a
+			 * modifier class so themes can visually de-emphasize it.
+			 */
+			$ticket_classes = apply_filters( 'data_machine_events_ticket_button_classes', array( 'ticket-button' ), $post_id, $event_timing );
+			if ( $is_past ) {
+				$ticket_classes[] = 'ticket-button--past';
+			}
+			?>
+			<a href="<?php echo esc_url( $ticket_url ); ?>" class="<?php echo esc_attr( implode( ' ', $ticket_classes ) ); ?>" target="_blank" rel="noopener">
 				<?php echo esc_html( $ticket_button_text ); ?>
 			</a>
 		<?php endif; ?>
@@ -198,10 +251,13 @@ $event_schema     = EventSchemaProvider::generateSchemaOrg( $event_data, $venue_
 		 *
 		 * Allows themes and plugins to add buttons (share, RSVP, etc.) alongside the ticket button.
 		 *
-		 * @param int $post_id Current event post ID
+		 * @param int    $post_id    Current event post ID
 		 * @param string $ticket_url Ticket URL if available (empty string if not)
+		 * @param string $timing     Event timing state: 'upcoming' | 'ongoing' | 'past'.
+		 *                           Added in 0.46.0; consumers hooking with fewer
+		 *                           params keep working (extra args are ignored).
 		 */
-		do_action( 'data_machine_events_action_buttons', $post_id, $ticket_url );
+		do_action( 'data_machine_events_action_buttons', $post_id, $ticket_url, $event_timing );
 		?>
 	</div>
 

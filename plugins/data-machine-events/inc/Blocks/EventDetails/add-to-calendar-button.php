@@ -26,7 +26,7 @@ add_action(
 	'data_machine_events_action_buttons',
 	'data_machine_events_render_add_to_calendar_button',
 	7,
-	2
+	3
 );
 
 if ( ! function_exists( 'data_machine_events_render_add_to_calendar_button' ) ) {
@@ -35,12 +35,39 @@ if ( ! function_exists( 'data_machine_events_render_add_to_calendar_button' ) ) 
 	 *
 	 * @param int    $post_id    Event post ID.
 	 * @param string $ticket_url Ticket URL (unused here, present for hook signature parity).
+	 * @param string $timing     Event timing state: 'upcoming' | 'ongoing' | 'past'.
+	 *                           Defaults to 'upcoming' when omitted (older callers
+	 *                           of the action that pass only two args).
 	 */
-	function data_machine_events_render_add_to_calendar_button( $post_id, $ticket_url ) {
+	function data_machine_events_render_add_to_calendar_button( $post_id, $ticket_url, $timing = 'upcoming' ) {
 		unset( $ticket_url );
 
 		$post_id = (int) $post_id;
 		if ( $post_id <= 0 ) {
+			return;
+		}
+
+		/**
+		 * Whether to render the Add-to-Calendar button for this event.
+		 *
+		 * Defaults to false for past events — adding a finished show to a
+		 * personal calendar is not a useful action — and true otherwise.
+		 * Filterable so a consuming site can override the default in either
+		 * direction.
+		 *
+		 * @since 0.46.0
+		 *
+		 * @param bool   $show    Whether to show the Add-to-Calendar button. Default: false on past, true otherwise.
+		 * @param int    $post_id Event post ID.
+		 * @param string $timing  Event timing state: 'upcoming' | 'ongoing' | 'past'.
+		 */
+		$show_add_to_calendar = apply_filters(
+			'data_machine_events_show_add_to_calendar',
+			'past' !== $timing,
+			$post_id,
+			$timing
+		);
+		if ( ! $show_add_to_calendar ) {
 			return;
 		}
 
