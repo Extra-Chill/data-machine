@@ -92,8 +92,10 @@ signatures are stable.
 
 | Filter | Signature | Purpose |
 |---|---|---|
-| `data_machine_events_ticket_button_classes` | `(array $classes)` | Modify CSS classes on the ticket button. |
+| `data_machine_events_ticket_button_classes` | `(array $classes, int $post_id, string $timing)` | Modify CSS classes on the ticket button. `$post_id` and `$timing` (`'upcoming'`\|`'ongoing'`\|`'past'`) added in 0.46.0; existing callbacks accepting one arg keep working. On past events the block also appends a `ticket-button--past` modifier class after this filter runs. |
 | `data_machine_events_add_to_calendar_button_classes` | `(array $classes, int $post_id)` | Modify the style classes on the Add-to-Calendar toggle. Mirrors the ticket-button filter so consumers can route the toggle through their own button system (e.g. theme `button-*` classes). Base classes `dm-events-action-btn dm-events-add-to-calendar-toggle` are always present; default style class is `ticket-button`. |
+| `data_machine_events_show_ticket_button` | `(bool $show, int $post_id, string $timing)` | Whether to render the block's own ticket / event-link button. Defaults to `false` on `past` timing (a finished show's buy-tickets CTA is dead) and `true` otherwise. Override to force it on/off regardless of tense. |
+| `data_machine_events_show_add_to_calendar` | `(bool $show, int $post_id, string $timing)` | Whether to render the Add-to-Calendar button. Defaults to `false` on `past` timing and `true` otherwise. |
 | `data_machine_events_max_occurrence_display` | `(int $max)` | Cap on multi-occurrence display rows. |
 | `data_machine_events_non_ticket_price_patterns` | `(array $patterns)` | Strings that suppress the ticket button. |
 
@@ -112,8 +114,8 @@ signatures are stable.
 
 | Action | Signature | Purpose |
 |---|---|---|
-| `data_machine_events_after_price_display` | `(int $post_id, string $price)` | Render extra UI after the price line. |
-| `data_machine_events_action_buttons` | `(int $post_id, string $ticket_url)` | Add buttons to the event action row (alongside the ticket button). |
+| `data_machine_events_after_price_display` | `(int $post_id, string $price, string $timing)` | Render extra UI after the price line. `$timing` (`'upcoming'`\|`'ongoing'`\|`'past'`) added in 0.46.0; callbacks accepting fewer args keep working. |
+| `data_machine_events_action_buttons` | `(int $post_id, string $ticket_url, string $timing)` | Add buttons to the event action row (alongside the ticket button). `$timing` (`'upcoming'`\|`'ongoing'`\|`'past'`) added in 0.46.0 so consumers can compose tense-aware UI without re-deriving it; callbacks accepting two args keep working. |
 | `data_machine_events_map_after_summary` | `(array $venues, array $context)` | Render extra UI after the map summary block. |
 
 ## Public functions
@@ -197,6 +199,28 @@ exists for the post in the `datamachine_event_dates` table. Equivalent to
 calling the existing `datamachine_get_event_dates()` and reading
 `start_datetime`.
 
+### `data_machine_events_get_timing( int $post_id ): string`
+
+Return the timing state of an event relative to now — `'upcoming'`,
+`'ongoing'`, or `'past'` — derived from the event's start/end datetimes in the
+authoritative `datamachine_event_dates` table:
+
+- `upcoming` — start >= now
+- `ongoing` — start < now AND end >= now
+- `past` — start < now AND (end < now OR end is null)
+
+Events with no parseable start datetime are treated as `'past'`. This is the
+canonical way for a consumer to know an event's tense; call it instead of
+re-querying the event-dates table yourself. Prefer this prefixed helper over
+`datamachine_get_event_timing()` — both are stable and identical, but this name
+matches the rest of the `data_machine_events_*` surface.
+
+```php
+if ( 'past' === data_machine_events_get_timing( $post_id ) ) {
+    // Render a post-show layout instead of buy-tickets CTAs.
+}
+```
+
 ### Pre-existing helpers (kept stable)
 
 These functions predate this document and remain part of the public API:
@@ -204,7 +228,8 @@ These functions predate this document and remain part of the public API:
 - `datamachine_get_event_dates( int $post_id ): ?object` — full event-dates
   row from the `datamachine_event_dates` table.
 - `datamachine_get_event_timing( int $post_id ): string` — `'upcoming'` |
-  `'ongoing'` | `'past'`.
+  `'ongoing'` | `'past'`. Equivalent to `data_machine_events_get_timing()`;
+  the prefixed name is preferred for new code.
 
 ## Public constants
 

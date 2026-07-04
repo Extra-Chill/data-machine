@@ -280,3 +280,37 @@ if ( ! function_exists( 'data_machine_events_get_event_datetime' ) ) {
 		return $dates && ! empty( $dates->start_datetime ) ? (string) $dates->start_datetime : '';
 	}
 }
+
+if ( ! function_exists( 'data_machine_events_get_timing' ) ) {
+	/**
+	 * Get the timing state of an event relative to now.
+	 *
+	 * Returns one of `'upcoming'`, `'ongoing'`, or `'past'`, derived from the
+	 * event's start/end datetimes in the authoritative `datamachine_event_dates`
+	 * table using the same source-of-truth logic as the calendar's
+	 * upcoming/past SQL filters:
+	 *
+	 *   - `upcoming` — start >= now
+	 *   - `ongoing`  — start < now AND end >= now
+	 *   - `past`     — start < now AND (end < now OR end is null)
+	 *
+	 * Events with no parseable start datetime are treated as `'past'`.
+	 *
+	 * Prefer this prefixed helper over calling `datamachine_get_event_timing()`
+	 * directly; both are stable, but this name matches the rest of the public
+	 * `data_machine_events_*` surface. Consuming plugins should call this instead
+	 * of re-querying the event-dates table to derive tense themselves.
+	 *
+	 * @since 0.46.0
+	 *
+	 * @param int $post_id Event post ID.
+	 * @return string `'upcoming'` | `'ongoing'` | `'past'`.
+	 */
+	function data_machine_events_get_timing( int $post_id ): string {
+		if ( ! function_exists( 'datamachine_get_event_timing' ) ) {
+			return 'past';
+		}
+
+		return datamachine_get_event_timing( $post_id );
+	}
+}

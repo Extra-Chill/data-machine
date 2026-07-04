@@ -24,6 +24,15 @@ The block exposes 15+ attributes (dates, venue, price, performer/organizer metad
 - Event dates are synced to the `datamachine_event_dates` table in `inc/Core/event-dates-sync.php`, keeping calendar queries performant, powering schema fallbacks, and enabling day-based pagination and REST filtering. Use global `datamachine_get_event_dates( $post_id )` to read.
 - Leaflet assets (`leaflet.css`, `leaflet.js`, `assets/js/venue-map.js`) load on event detail views via `enqueue_root_styles()` whenever the block or a `data_machine_events` post renders, so venue maps always display with consistent markers.
 
+## Tense-Aware Rendering
+
+The block derives an event's timing state once per render — `'upcoming'`, `'ongoing'`, or `'past'` — via the public `data_machine_events_get_timing( $post_id )` helper (same source-of-truth logic as the calendar's upcoming/past SQL filters). That single fact drives two things:
+
+- **Its own CTAs adapt to tense.** On a `past` event the block's ticket / event-link button and the Add-to-Calendar dropdown are suppressed by default — buying tickets to or calendaring a finished show are dead actions. Both defaults are filterable: `data_machine_events_show_ticket_button` and `data_machine_events_show_add_to_calendar` each receive `(bool $show, int $post_id, string $timing)` and default to `false` on `past`. A site that overrides the ticket button back on gets a `ticket-button--past` modifier class for de-emphasis styling.
+- **Consumers receive the timing without re-deriving it.** The `data_machine_events_action_buttons` and `data_machine_events_after_price_display` actions both pass `$timing` as their final argument, so downstream buttons (share, RSVP, and any consumer-supplied action) can compose tense-aware UI without re-querying the event-dates table. The argument is additive — callbacks registered with the old two-/one-arg signatures keep working unchanged.
+
+See `docs/integration-api.md` for the full filter/action signatures and the helper contract.
+
 ## Venue & Taxonomy Integration
 
 - Venue metadata lives in the `venue` taxonomy (address, city, state, zip, country, phone, website, capacity, coordinates) and surfaces across the REST API and Event Details block; `Venue_Taxonomy` and `VenueService` ensure find-or-create workflows keep term meta complete.
