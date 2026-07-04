@@ -2,6 +2,18 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.46.0] - 2026-07-04
+
+### Added
+- add cross-site events-by-artist LIST ability
+- make Event Details block tense-aware (expose timing + adapt past-event CTAs)
+- add generic Seated tour-widget extractor + reusable bot-blocked-host guard helpers
+
+### Changed
+- remove artist-URL-import subsystem (moved to extrachill-events #200)
+- scrub Extra Chill identity from executable code (layer purity)
+- route event dates through a single validating chokepoint
+
 ## [0.45.0] - 2026-06-27
 
 ### Added
