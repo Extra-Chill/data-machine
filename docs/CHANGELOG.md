@@ -2,6 +2,14 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.159.10] - 2026-07-05
+
+### Changed
+- use review quality commands
+
+### Fixed
+- make generic content-publishing tools opt-in for pipeline AI steps
+
 ## [0.159.9] - 2026-07-03
 
 ### Changed
