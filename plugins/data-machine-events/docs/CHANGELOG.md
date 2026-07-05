@@ -2,6 +2,12 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.46.3] - 2026-07-05
+
+### Fixed
+- drop Ticketmaster test/placeholder payloads (CCPER-*, Standalone Upsell) during import
+- log and harden the empty-startDate rejection gate at event upsert (#415)
+
 ## [0.46.2] - 2026-07-05
 
 ### Changed
