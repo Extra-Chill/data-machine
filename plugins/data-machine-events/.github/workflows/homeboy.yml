@@ -50,6 +50,6 @@ jobs:
 
       - uses: Extra-Chill/homeboy-action@v2
         with:
-          commands: audit
+          commands: review audit
           app-token: ${{ steps.app-token.outputs.token || '' }}
           autofix: 'false'
