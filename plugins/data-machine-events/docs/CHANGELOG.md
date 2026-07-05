@@ -2,6 +2,14 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.46.2] - 2026-07-05
+
+### Changed
+- use review audit command
+
+### Fixed
+- strip generic content-writing tools from events AI steps
+
 ## [0.46.1] - 2026-07-05
 
 ### Fixed
