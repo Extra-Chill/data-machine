@@ -150,7 +150,7 @@ class ToolManager {
 		if ( ! empty( $modes ) ) {
 			$resolved['modes'] = $modes;
 		}
-		foreach ( array( 'ability', 'abilities', 'access_level', 'requires_opt_in' ) as $key ) {
+		foreach ( array( 'ability', 'abilities', 'access_level', 'requires_opt_in', 'requires_pipeline_opt_in' ) as $key ) {
 			if ( isset( $meta[ $key ] ) ) {
 				$resolved[ $key ] = $meta[ $key ];
 			}

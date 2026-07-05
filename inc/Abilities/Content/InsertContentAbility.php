@@ -97,9 +97,14 @@ class InsertContentAbility {
 			'datamachine_tools',
 			function ( $tools ) {
 				$tools['insert_content'] = array(
-					'_callable' => array( self::class, 'getChatTool' ),
-					'modes'     => array( 'chat', 'pipeline', 'system', 'editor' ),
-					'ability'   => 'datamachine/insert-content',
+					'_callable'                => array( self::class, 'getChatTool' ),
+					'modes'                    => array( 'chat', 'pipeline', 'system', 'editor' ),
+					'ability'                  => 'datamachine/insert-content',
+					// Generic content-writing tools are opt-in for pipeline AI
+					// steps so a model cannot improvise arbitrary publishes that
+					// bypass the flow's declared handler. Chat/system/editor
+					// unaffected. See data-machine#2852.
+					'requires_pipeline_opt_in' => true,
 				);
 				return $tools;
 			}
