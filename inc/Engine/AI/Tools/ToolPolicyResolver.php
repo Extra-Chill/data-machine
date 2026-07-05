@@ -11,9 +11,10 @@
  * 2. Per-agent tool policy (deny/allow mode from agent_config, supports categories)
  * 3. Ability category filter (narrows tools by their linked ability's category)
  * 4. Context-level allow_only (narrows to explicit subset)
- * 5. Context preset (pipeline/chat/system)
- * 6. Global enablement settings
- * 7. Tool configuration requirements
+ * 5. Pipeline content-writing opt-in (generic write tools excluded by default)
+ * 6. Context preset (pipeline/chat/system)
+ * 7. Global enablement settings
+ * 8. Tool configuration requirements
  *
  * @package DataMachine\Engine\AI\Tools
  * @since 0.39.0
@@ -35,6 +36,26 @@ class ToolPolicyResolver {
 	public const MODE_PIPELINE = 'pipeline';
 	public const MODE_CHAT     = 'chat';
 	public const MODE_SYSTEM   = 'system';
+
+	/**
+	 * Tool declaration flag that gates a generic content-writing tool behind
+	 * explicit opt-in for pipeline AI steps. Tools marked with this flag are
+	 * excluded from the default pipeline preset; a step must list them in
+	 * enabled_tools (or an allow-mode tool policy) to use them.
+	 *
+	 * See https://github.com/Extra-Chill/data-machine/issues/2852.
+	 */
+	public const PIPELINE_OPT_IN_FLAG = 'requires_pipeline_opt_in';
+
+	/**
+	 * Ability categories whose projected tools are content-writing surface and
+	 * therefore gated behind explicit opt-in for pipeline AI steps. The
+	 * canonical category slugs are owned by AbilityCategories; they are
+	 * inlined here as strings so the generic policy layer has no upward
+	 * dependency on the Abilities namespace (matches the established pattern
+	 * in AgentAuthorize).
+	 */
+	private const PIPELINE_OPT_IN_CATEGORIES = array( 'datamachine-publishing' );
 
 	private ToolManager $tool_manager;
 	private ToolSourceRegistry $tool_source_registry;
@@ -133,6 +154,18 @@ class ToolPolicyResolver {
 		$tools = $this->tool_policy->resolve( $tools, $policy_context );
 		$tools = $this->restoreExplicitDelegatedRuntimeTools( $tools, $gathered_tools, $args, $agent_policy );
 		$this->last_source_trace = $source_trace;
+
+		// Generic content-writing abilities are opt-in for pipeline AI steps.
+		// By default a pipeline step receives only its adjacent-handler tools,
+		// research/read tools, and disposition tools. Generic publish/write-any
+		// tools (publish-wordpress, upsert-post, insert-content, ...) leak
+		// otherwise: a model can improvise arbitrary publishes that bypass the
+		// flow's declared handler and its guards. Adjacent-handler plumbing is
+		// mandatory and therefore exempt. Chat/system modes are unaffected.
+		// See https://github.com/Extra-Chill/data-machine/issues/2852.
+		if ( in_array( self::MODE_PIPELINE, $modes, true ) ) {
+			$tools = $this->filterPipelineWriteOptInTools( $tools, $args );
+		}
 
 		// An explicitly-empty allow_only means "no optional tools." The generic
 		// substrate only applies a non-empty allow_only, so it would otherwise
@@ -566,5 +599,69 @@ class ToolPolicyResolver {
 		}
 
 		return in_array( $tool_name, $allowed, true );
+	}
+
+	/**
+	 * Whether a tool is a generic content-writing surface gated behind
+	 * explicit opt-in for pipeline AI steps.
+	 *
+	 * A tool is gated when it declares the {@see PIPELINE_OPT_IN_FLAG} flag at
+	 * its registration site, or when it is projected from one of the canonical
+	 * content-writing ability categories ({@see PIPELINE_OPT_IN_CATEGORIES}).
+	 * Adjacent-handler tools do not carry the flag and are not projected from
+	 * those categories, so flow plumbing is never gated.
+	 *
+	 * @param array $tool Tool definition.
+	 * @return bool True when the tool requires explicit opt-in in pipeline mode.
+	 */
+	private function isPipelineWriteOptInTool( array $tool ): bool {
+		if ( ! empty( $tool[ self::PIPELINE_OPT_IN_FLAG ] ) ) {
+			return true;
+		}
+
+		$category = isset( $tool['ability_category'] ) && is_string( $tool['ability_category'] ) ? $tool['ability_category'] : '';
+		if ( '' !== $category && in_array( $category, self::PIPELINE_OPT_IN_CATEGORIES, true ) ) {
+			return true;
+		}
+
+		return false;
+	}
+
+	/**
+	 * Drop pipeline-gated content-writing tools that were not explicitly opted
+	 * into by the step. Adjacent-handler plumbing (mandatory tools) and tools
+	 * named in an allow path (enabled_tools / allow-mode tool policy) survive.
+	 *
+	 * @param array<string,array<string,mixed>> $tools Resolved tools keyed by name.
+	 * @param array                             $args  Resolver args.
+	 * @return array<string,array<string,mixed>> Filtered tools.
+	 */
+	private function filterPipelineWriteOptInTools( array $tools, array $args ): array {
+		$allowed = $this->policy_filter->string_list( $args['allow_only'] ?? array() );
+		$policy  = is_array( $args['tool_policy'] ?? null ) ? $args['tool_policy'] : null;
+		if ( is_array( $policy ) && \WP_Agent_Tool_Policy::MODE_ALLOW === ( $policy['mode'] ?? '' ) ) {
+			$allowed = array_merge( $allowed, $this->policy_filter->string_list( $policy['tools'] ?? array() ) );
+		}
+		$allowed = array_flip( $allowed );
+
+		foreach ( $tools as $name => $tool ) {
+			if ( ! is_array( $tool ) || ! $this->isPipelineWriteOptInTool( $tool ) ) {
+				continue;
+			}
+
+			// Flow plumbing (adjacent-handler tools) is mandatory and survives.
+			if ( $this->mandatory_tool_policy->isMandatory( $tool ) ) {
+				continue;
+			}
+
+			// A step that explicitly opts in (enabled_tools / allow policy) keeps it.
+			if ( isset( $allowed[ $name ] ) ) {
+				continue;
+			}
+
+			unset( $tools[ $name ] );
+		}
+
+		return $tools;
 	}
 }

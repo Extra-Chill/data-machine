@@ -198,9 +198,14 @@ class UpsertPostAbility {
 			'datamachine_tools',
 			function ( array $tools ): array {
 				$tools['upsert_post'] = array(
-					'_callable' => array( self::class, 'getChatTool' ),
-					'modes'     => array( 'chat', 'pipeline', 'system' ),
-					'ability'   => self::ABILITY_NAME,
+					'_callable'                => array( self::class, 'getChatTool' ),
+					'modes'                    => array( 'chat', 'pipeline', 'system' ),
+					'ability'                  => self::ABILITY_NAME,
+					// Generic content-writing tools are opt-in for pipeline AI
+					// steps so a model cannot improvise arbitrary publishes that
+					// bypass the flow's declared handler. Chat/system unaffected.
+					// See https://github.com/Extra-Chill/data-machine/issues/2852.
+					'requires_pipeline_opt_in' => true,
 				);
 				return $tools;
 			}
