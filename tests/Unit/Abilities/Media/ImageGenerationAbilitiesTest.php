@@ -31,7 +31,7 @@ class ImageGenerationAbilitiesTest extends WP_UnitTestCase {
 	}
 
 	public function tear_down(): void {
-		delete_site_option( 'datamachine_image_generation_config' );
+		delete_site_option( ImageGenerationAbilities::CONFIG_OPTION );
 		WpAiClientTestDouble::reset();
 		parent::tear_down();
 	}
@@ -67,7 +67,7 @@ class ImageGenerationAbilitiesTest extends WP_UnitTestCase {
 	}
 
 	public function test_generate_image_missing_provider(): void {
-		update_site_option( 'datamachine_image_generation_config', array( 'default_provider' => '', 'default_model' => 'gpt-image-1' ) );
+		update_site_option( ImageGenerationAbilities::CONFIG_OPTION, array( 'default_provider' => '', 'default_model' => 'gpt-image-1' ) );
 
 		$result = ImageGenerationAbilities::generateImage( array( 'prompt' => 'Test prompt' ) );
 
@@ -83,7 +83,7 @@ class ImageGenerationAbilitiesTest extends WP_UnitTestCase {
 	}
 
 	public function test_generate_image_uses_explicit_config(): void {
-		update_site_option( 'datamachine_image_generation_config', array( 'default_provider' => 'openai', 'default_model' => 'configured-model' ) );
+		update_site_option( ImageGenerationAbilities::CONFIG_OPTION, array( 'default_provider' => 'openai', 'default_model' => 'configured-model' ) );
 
 		$captured_request = null;
 		WpAiClientTestDouble::set_response_callback( function ( array $request ) use ( &$captured_request ): array {
@@ -101,7 +101,7 @@ class ImageGenerationAbilitiesTest extends WP_UnitTestCase {
 	}
 
 	public function test_generate_image_input_provider_and_model_override_config(): void {
-		update_site_option( 'datamachine_image_generation_config', array( 'default_provider' => 'openai', 'default_model' => 'configured-model' ) );
+		update_site_option( ImageGenerationAbilities::CONFIG_OPTION, array( 'default_provider' => 'openai', 'default_model' => 'configured-model' ) );
 
 		$captured_request = null;
 		WpAiClientTestDouble::set_response_callback( function ( array $request ) use ( &$captured_request ): array {
@@ -123,7 +123,7 @@ class ImageGenerationAbilitiesTest extends WP_UnitTestCase {
 	}
 
 	public function test_generate_image_unregistered_provider(): void {
-		update_site_option( 'datamachine_image_generation_config', array( 'default_provider' => 'missing-provider', 'default_model' => 'image-model' ) );
+		update_site_option( ImageGenerationAbilities::CONFIG_OPTION, array( 'default_provider' => 'missing-provider', 'default_model' => 'image-model' ) );
 
 		$result = ImageGenerationAbilities::generateImage( array( 'prompt' => 'Test prompt' ) );
 
@@ -132,7 +132,7 @@ class ImageGenerationAbilitiesTest extends WP_UnitTestCase {
 	}
 
 	public function test_generate_image_support_check_failure(): void {
-		update_site_option( 'datamachine_image_generation_config', array( 'default_provider' => 'openai', 'default_model' => 'text-only-model' ) );
+		update_site_option( ImageGenerationAbilities::CONFIG_OPTION, array( 'default_provider' => 'openai', 'default_model' => 'text-only-model' ) );
 		WpAiClientTestDouble::set_response_callback( function (): array {
 			return array( 'success' => true, 'supported' => false );
 		} );
@@ -144,7 +144,7 @@ class ImageGenerationAbilitiesTest extends WP_UnitTestCase {
 	}
 
 	public function test_generate_image_provider_error(): void {
-		update_site_option( 'datamachine_image_generation_config', array( 'default_provider' => 'openai', 'default_model' => 'gpt-image-1' ) );
+		update_site_option( ImageGenerationAbilities::CONFIG_OPTION, array( 'default_provider' => 'openai', 'default_model' => 'gpt-image-1' ) );
 		WpAiClientTestDouble::set_response_callback( function (): array {
 			return array( 'success' => false, 'error' => 'Provider unavailable' );
 		} );
@@ -157,7 +157,7 @@ class ImageGenerationAbilitiesTest extends WP_UnitTestCase {
 	}
 
 	public function test_generate_image_success_schedules_job(): void {
-		update_site_option( 'datamachine_image_generation_config', array(
+		update_site_option( ImageGenerationAbilities::CONFIG_OPTION, array(
 			'default_provider'     => 'openai',
 			'default_model'        => 'gpt-image-1',
 			'default_aspect_ratio' => '3:4',
@@ -184,7 +184,7 @@ class ImageGenerationAbilitiesTest extends WP_UnitTestCase {
 	}
 
 	public function test_is_configured_false_when_provider_unavailable(): void {
-		update_site_option( 'datamachine_image_generation_config', array( 'default_provider' => 'missing-provider', 'default_model' => 'gpt-image-1' ) );
+		update_site_option( ImageGenerationAbilities::CONFIG_OPTION, array( 'default_provider' => 'missing-provider', 'default_model' => 'gpt-image-1' ) );
 		$this->assertFalse( ImageGenerationAbilities::is_configured() );
 	}
 
@@ -193,18 +193,18 @@ class ImageGenerationAbilitiesTest extends WP_UnitTestCase {
 	}
 
 	public function test_is_configured_true_when_provider_and_model_available(): void {
-		update_site_option( 'datamachine_image_generation_config', array( 'default_provider' => 'openai', 'default_model' => 'gpt-image-1' ) );
+		update_site_option( ImageGenerationAbilities::CONFIG_OPTION, array( 'default_provider' => 'openai', 'default_model' => 'gpt-image-1' ) );
 		$this->assertTrue( ImageGenerationAbilities::is_configured() );
 	}
 
 	public function test_get_config_empty(): void {
-		delete_site_option( 'datamachine_image_generation_config' );
+		delete_site_option( ImageGenerationAbilities::CONFIG_OPTION );
 		$this->assertSame( array(), ImageGenerationAbilities::get_config() );
 	}
 
 	public function test_get_config_returns_stored(): void {
 		$config = array( 'default_provider' => 'openai', 'default_model' => 'custom-model' );
-		update_site_option( 'datamachine_image_generation_config', $config );
+		update_site_option( ImageGenerationAbilities::CONFIG_OPTION, $config );
 		$this->assertSame( $config, ImageGenerationAbilities::get_config() );
 	}
 }

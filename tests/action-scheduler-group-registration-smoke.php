@@ -104,7 +104,7 @@ assert_action_scheduler_group_contains( 'action_scheduler_init', $plugin_src, 'p
 assert_action_scheduler_group_contains( 'GroupRegistrar::class', $plugin_src, 'plugin hooks the Data Machine group registrar' );
 assert_action_scheduler_group_contains( 'ensureDataMachineGroup', $plugin_src, 'plugin ensures Data Machine group during AS init' );
 
-assert_action_scheduler_group_contains( "public const GROUP = 'data-machine'", $group_src, 'group registrar owns the Data Machine group slug' );
+assert_action_scheduler_group_contains( "public const GROUP = '" . \DataMachine\Core\ActionScheduler\GroupRegistrar::GROUP . "'", $group_src, 'group registrar owns the Data Machine group slug' );
 assert_action_scheduler_group_contains( 'ensureCustomTableGroup( self::GROUP )', $group_src, 'group registrar ensures custom-table group storage' );
 assert_action_scheduler_group_contains( 'ensurePostStoreGroup( self::GROUP )', $group_src, 'group registrar ensures legacy post-store taxonomy storage' );
 assert_action_scheduler_group_contains( 'actionscheduler_groups', $group_src, 'custom-table group storage targets Action Scheduler groups table' );
@@ -120,11 +120,11 @@ assert_action_scheduler_group_true( $ensure_pos < $claim_pos, 'drain ensures gro
 \DataMachine\Core\ActionScheduler\GroupRegistrar::ensureDataMachineGroup();
 
 assert_action_scheduler_group_true(
-	array( 'table' => 'wp_actionscheduler_groups', 'data' => array( 'slug' => 'data-machine' ) ) === $GLOBALS['wpdb']->inserted[0],
+	array( 'table' => 'wp_actionscheduler_groups', 'data' => array( 'slug' => \DataMachine\Core\ActionScheduler\GroupRegistrar::GROUP ) ) === $GLOBALS['wpdb']->inserted[0],
 	'group registrar creates the custom-table group row when missing'
 );
 assert_action_scheduler_group_true(
-	in_array( 'data-machine', $GLOBALS['action_scheduler_group_terms'], true ),
+	in_array( \DataMachine\Core\ActionScheduler\GroupRegistrar::GROUP, $GLOBALS['action_scheduler_group_terms'], true ),
 	'group registrar creates the legacy action-group taxonomy term when missing'
 );
 

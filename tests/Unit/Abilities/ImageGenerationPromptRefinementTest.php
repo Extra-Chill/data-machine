@@ -27,7 +27,7 @@ class ImageGenerationPromptRefinementTest extends WP_UnitTestCase {
 	}
 
 	public function tear_down(): void {
-		delete_site_option( 'datamachine_image_generation_config' );
+		delete_site_option( ImageGenerationAbilities::CONFIG_OPTION );
 		delete_option( 'datamachine_settings' );
 		PluginSettings::clearCache();
 		WpAiClientTestDouble::reset();
@@ -254,7 +254,7 @@ class ImageGenerationPromptRefinementTest extends WP_UnitTestCase {
 	}
 
 	public function test_generate_image_applies_refinement_when_enabled(): void {
-		update_site_option( 'datamachine_image_generation_config', array(
+		update_site_option( ImageGenerationAbilities::CONFIG_OPTION, array(
 			'default_provider'          => 'openai',
 			'default_model'             => 'gpt-image-1',
 			'prompt_refinement_enabled' => true,
@@ -282,7 +282,7 @@ class ImageGenerationPromptRefinementTest extends WP_UnitTestCase {
 	}
 
 	public function test_generate_image_skips_refinement_when_disabled(): void {
-		update_site_option( 'datamachine_image_generation_config', array(
+		update_site_option( ImageGenerationAbilities::CONFIG_OPTION, array(
 			'default_provider'          => 'openai',
 			'default_model'             => 'gpt-image-1',
 			'prompt_refinement_enabled' => false,

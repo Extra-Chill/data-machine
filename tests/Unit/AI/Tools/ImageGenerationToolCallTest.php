@@ -10,6 +10,7 @@
 
 namespace DataMachine\Tests\Unit\AI\Tools;
 
+use DataMachine\Abilities\Media\ImageGenerationAbilities;
 use DataMachine\Engine\AI\Tools\Global\ImageGeneration;
 use DataMachine\Tests\Unit\Support\WpAiClientTestDouble;
 use WP_UnitTestCase;
@@ -32,7 +33,7 @@ class ImageGenerationToolCallTest extends WP_UnitTestCase {
 	}
 
 	public function tear_down(): void {
-		delete_site_option( 'datamachine_image_generation_config' );
+		delete_site_option( ImageGenerationAbilities::CONFIG_OPTION );
 		WpAiClientTestDouble::reset();
 		parent::tear_down();
 	}
@@ -52,7 +53,7 @@ class ImageGenerationToolCallTest extends WP_UnitTestCase {
 			return array( 'success' => false, 'error' => 'Provider connection failed' );
 		} );
 
-		update_site_option( 'datamachine_image_generation_config', array( 'default_provider' => 'openai', 'default_model' => 'gpt-image-1' ) );
+		update_site_option( ImageGenerationAbilities::CONFIG_OPTION, array( 'default_provider' => 'openai', 'default_model' => 'gpt-image-1' ) );
 
 		$result = $this->tool->handle_tool_call( array( 'prompt' => 'A beautiful sunset' ) );
 
@@ -65,7 +66,7 @@ class ImageGenerationToolCallTest extends WP_UnitTestCase {
 	 * Test handle_tool_call handles error from ability result.
 	 */
 	public function test_handle_tool_call_ability_error(): void {
-		update_site_option( 'datamachine_image_generation_config', array( 'default_provider' => 'missing-provider', 'default_model' => 'gpt-image-1' ) );
+		update_site_option( ImageGenerationAbilities::CONFIG_OPTION, array( 'default_provider' => 'missing-provider', 'default_model' => 'gpt-image-1' ) );
 
 		$result = $this->tool->handle_tool_call( array( 'prompt' => 'A beautiful sunset' ) );
 
@@ -78,7 +79,7 @@ class ImageGenerationToolCallTest extends WP_UnitTestCase {
 	 * Test handle_tool_call delegates to ability successfully.
 	 */
 	public function test_handle_tool_call_success_basic(): void {
-		update_site_option( 'datamachine_image_generation_config', array( 'default_provider' => 'openai', 'default_model' => 'gpt-image-1' ) );
+		update_site_option( ImageGenerationAbilities::CONFIG_OPTION, array( 'default_provider' => 'openai', 'default_model' => 'gpt-image-1' ) );
 
 		$result = $this->tool->handle_tool_call( array( 'prompt' => 'A beautiful sunset' ) );
 
@@ -93,7 +94,7 @@ class ImageGenerationToolCallTest extends WP_UnitTestCase {
 	 * Test handle_tool_call passes parameters through.
 	 */
 	public function test_handle_tool_call_with_parameters(): void {
-		update_site_option( 'datamachine_image_generation_config', array( 'default_provider' => 'openai', 'default_model' => 'gpt-image-1' ) );
+		update_site_option( ImageGenerationAbilities::CONFIG_OPTION, array( 'default_provider' => 'openai', 'default_model' => 'gpt-image-1' ) );
 
 		$result = $this->tool->handle_tool_call( array(
 			'prompt'       => 'A serene mountain landscape',
@@ -114,7 +115,7 @@ class ImageGenerationToolCallTest extends WP_UnitTestCase {
 	 * Test handle_tool_call always returns tool_name.
 	 */
 	public function test_handle_tool_call_returns_tool_name(): void {
-		update_site_option( 'datamachine_image_generation_config', array( 'default_provider' => 'openai', 'default_model' => 'gpt-image-1' ) );
+		update_site_option( ImageGenerationAbilities::CONFIG_OPTION, array( 'default_provider' => 'openai', 'default_model' => 'gpt-image-1' ) );
 
 		$result = $this->tool->handle_tool_call( array( 'prompt' => 'Test image' ) );
 
