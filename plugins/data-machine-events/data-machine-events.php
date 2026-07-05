@@ -99,6 +99,13 @@ require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Core/retention.php';
 require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Core/web-fetch-guard.php';
 \DataMachineEvents\Core\register_web_fetch_guard();
 
+// Strip generic content-writing tools from events AI steps so the model can only
+// publish through the adjacent `upsert_event` handler (see issue #412). Hooked
+// unconditionally so it is registered before any pipeline AI step resolves; the
+// `datamachine_resolved_tools` filter never fires when Data Machine is inactive.
+require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Core/event-tool-guard.php';
+\DataMachineEvents\Core\register_event_tool_guard();
+
 	// Load REST API routes (modular)
 if ( file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Api/Routes.php' ) ) {
 	require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Api/Routes.php';
