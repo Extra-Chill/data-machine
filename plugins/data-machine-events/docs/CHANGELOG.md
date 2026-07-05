@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.46.1] - 2026-07-05
+
+### Fixed
+- cap scraped ICS recurrence horizon and per-scrape event count
+
 ## [0.46.0] - 2026-07-04
 
 ### Added
