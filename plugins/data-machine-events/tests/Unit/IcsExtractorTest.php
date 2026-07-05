@@ -120,4 +120,99 @@ ICS;
 	public function test_extraction_method_is_ics_feed() {
 		$this->assertEquals( 'ics_feed', $this->extractor->getMethod() );
 	}
+
+	/**
+	 * Build a minimal single-event ICS feed at the given DTSTART.
+	 */
+	private function build_ics( string $dtstart, string $summary = 'Test Event' ): string {
+		return <<<ICS
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Test//Test//EN
+BEGIN:VTIMEZONE
+TZID:America/New_York
+END:VTIMEZONE
+BEGIN:VEVENT
+DTSTART;TZID=America/New_York:{$dtstart}
+DTEND;TZID=America/New_York:{$dtstart}
+SUMMARY:{$summary}
+LOCATION:Test Venue
+END:VEVENT
+END:VCALENDAR
+ICS;
+	}
+
+	public function test_recurrence_horizon_drops_far_future_occurrences() {
+		// ~1 year out — well beyond the default 90-day horizon.
+		$far_date = gmdate( 'Ymd\THis', strtotime( '+1 year' ) );
+		$ics      = $this->build_ics( $far_date, 'Year Out' );
+
+		$events = $this->extractor->extract( $ics, 'https://example.com/events.ics' );
+
+		$this->assertEmpty( $events, 'Far-future occurrence beyond the horizon must be dropped' );
+	}
+
+	public function test_recurrence_horizon_filter_extends_window() {
+		$far_date = gmdate( 'Ymd\THis', strtotime( '+1 year' ) );
+		$ics      = $this->build_ics( $far_date, 'Year Out' );
+
+		add_filter(
+			'data_machine_events_scraper_recurrence_horizon_days',
+			static function () {
+				return 400;
+			}
+		);
+
+		$events = $this->extractor->extract( $ics, 'https://example.com/events.ics' );
+
+		$this->assertCount( 1, $events, 'Far-future occurrence must be kept when horizon is raised via filter' );
+		$this->assertEquals( 'Year Out', $events[0]['title'] );
+	}
+
+	public function test_recurrence_cap_keeps_nearest_events() {
+		// Three near-term events (all within the default 90-day horizon).
+		$d1 = gmdate( 'Ymd\THis', strtotime( '+5 days' ) );
+		$d2 = gmdate( 'Ymd\THis', strtotime( '+20 days' ) );
+		$d3 = gmdate( 'Ymd\THis', strtotime( '+30 days' ) );
+
+		$ics = <<<ICS
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Test//Test//EN
+BEGIN:VTIMEZONE
+TZID:America/New_York
+END:VTIMEZONE
+BEGIN:VEVENT
+DTSTART;TZID=America/New_York:{$d3}
+SUMMARY:Mid30
+LOCATION:Test Venue
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;TZID=America/New_York:{$d1}
+SUMMARY:Near5
+LOCATION:Test Venue
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;TZID=America/New_York:{$d2}
+SUMMARY:Mid20
+LOCATION:Test Venue
+END:VEVENT
+END:VCALENDAR
+ICS;
+
+		// Lower the cap to 2 so the farthest (+30d) is dropped.
+		add_filter(
+			'data_machine_events_scraper_max_events',
+			static function () {
+				return 2;
+			}
+		);
+
+		$events = $this->extractor->extract( $ics, 'https://example.com/events.ics' );
+
+		$this->assertCount( 2, $events, 'Cap must keep only the nearest N events' );
+		$titles = array_column( $events, 'title' );
+		$this->assertEquals( array( 'Near5', 'Mid20' ), $titles, 'Cap must keep the nearest events, ascending' );
+		$this->assertNotContains( 'Mid30', $titles, 'Farthest event within horizon must be dropped when cap bites' );
+	}
 }

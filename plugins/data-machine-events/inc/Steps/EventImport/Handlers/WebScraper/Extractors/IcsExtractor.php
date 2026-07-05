@@ -59,6 +59,14 @@ class IcsExtractor extends BaseExtractor {
 				return array();
 			}
 
+			$events = $this->constrainRecurrenceHorizon(
+				$events,
+				array(
+					'source_url' => $source_url,
+					'method'     => $this->getMethod(),
+				)
+			);
+
 			$calendar_timezone = $ical->calendarTimeZone() ?? '';
 
 			// Fallback: extract timezone from X-WR-TIMEZONE when the library returned UTC.

@@ -40,7 +40,7 @@ class EmbeddedCalendarExtractor extends BaseExtractor {
 		}
 
 		$calendar_timezone                 = $calendar_data['timezone'] ? $calendar_data['timezone'] : '';
-		[$ical_events, $calendar_timezone] = $this->parseIcsContent( $ics_content, $calendar_timezone );
+		[$ical_events, $calendar_timezone] = $this->parseIcsContent( $ics_content, $calendar_timezone, $source_url );
 
 		if ( empty( $ical_events ) ) {
 			return array();
@@ -158,8 +158,13 @@ class EmbeddedCalendarExtractor extends BaseExtractor {
 
 	/**
 	 * Parse ICS content using ICal library.
+	 *
+	 * @param string $ics_content       Raw ICS feed content.
+	 * @param string $calendar_timezone Calendar timezone hint.
+	 * @param string $source_url        Source URL, passed as filter context.
+	 * @return array{0: array, 1: string} [events, resolved timezone].
 	 */
-	private function parseIcsContent( string $ics_content, string $calendar_timezone = 'UTC' ): array {
+	private function parseIcsContent( string $ics_content, string $calendar_timezone = 'UTC', string $source_url = '' ): array {
 		try {
 			$ical = new ICal(
 				false,
@@ -180,7 +185,16 @@ class EmbeddedCalendarExtractor extends BaseExtractor {
 				$calendar_timezone = $extracted_timezone;
 			}
 
-			return array( $ical->events() ?? array(), $calendar_timezone );
+			$events = $ical->events() ?? array();
+			$events = $this->constrainRecurrenceHorizon(
+				$events,
+				array(
+					'source_url' => $source_url,
+					'method'     => $this->getMethod(),
+				)
+			);
+
+			return array( $events, $calendar_timezone );
 		} catch ( \Exception $e ) {
 			return array( array(), '' );
 		}

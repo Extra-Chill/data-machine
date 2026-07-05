@@ -270,6 +270,151 @@ abstract class BaseExtractor implements ExtractorInterface {
 	}
 
 	/**
+	 * Forward-occurrence horizon (days) for scraped ICS calendars.
+	 *
+	 * Open-ended RRULE recurrences (no UNTIL/COUNT) project years into the
+	 * future. This bounds the user-visible forward window so an open-ended
+	 * weekly residency yields ~13 occurrences (90 days) instead of ~104 (2 years).
+	 *
+	 * Filterable so a legitimately long-horizon source (e.g. a festival
+	 * announcing a year out) can opt into a wider window.
+	 *
+	 * @since 0.46.1
+	 *
+	 * @param array $context Optional context (source_url, method) for filter callbacks.
+	 * @return int Horizon in days. Default 90.
+	 */
+	protected function getRecurrenceHorizonDays( array $context = array() ): int {
+		/**
+		 * Filter the forward-occurrence horizon (days) for scraped ICS calendars.
+		 *
+		 * Open-ended RRULE recurrences are dropped once their start exceeds
+		 * now + horizon days. Raise this for a source that legitimately
+		 * publishes far-future events.
+		 *
+		 * @param int   $days    Default horizon in days.
+		 * @param array $context Optional context (source_url, method).
+		 */
+		$days = (int) apply_filters( 'data_machine_events_scraper_recurrence_horizon_days', 90, $context );
+
+		return $days > 0 ? $days : 90;
+	}
+
+	/**
+	 * Maximum events a single ICS scrape may emit.
+	 *
+	 * Backstop so no single run can dump thousands of items even if the
+	 * recurrence-horizon logic regresses. The nearest events are kept.
+	 *
+	 * Filterable so a legitimately high-volume source can raise the ceiling.
+	 *
+	 * @since 0.46.1
+	 *
+	 * @param array $context Optional context.
+	 * @return int Max events. Default 200.
+	 */
+	protected function getMaxScrapeEvents( array $context = array() ): int {
+		/**
+		 * Filter the per-scrape event cap for ICS extractors.
+		 *
+		 * @param int   $max     Default max events per scrape.
+		 * @param array $context Optional context (source_url, method).
+		 */
+		$max = (int) apply_filters( 'data_machine_events_scraper_max_events', 200, $context );
+
+		return $max > 0 ? $max : 200;
+	}
+
+	/**
+	 * Constrain expanded ICal recurrence events to a forward horizon and total cap.
+	 *
+	 * Drops any occurrence whose start is more than the horizon (days) in the
+	 * future, then caps the remaining set to the max-events backstop, keeping
+	 * the nearest events. Operates on raw ICal\Event objects before
+	 * normalization so far-future occurrences never pay normalization cost.
+	 *
+	 * This is the single source of truth for the forward window; the vendored
+	 * parser's defaultSpan is intentionally left unchanged so this filter is
+	 * not silently re-capped by the parser.
+	 *
+	 * @since 0.46.1
+	 *
+	 * @param array $events  Expanded ICal events (any shape with a ->dtstart).
+	 * @param array $context Optional context for filters.
+	 * @return array Filtered + capped events, nearest first.
+	 */
+	protected function constrainRecurrenceHorizon( array $events, array $context = array() ): array {
+		if ( empty( $events ) ) {
+			return $events;
+		}
+
+		$horizon_days = $this->getRecurrenceHorizonDays( $context );
+		$max_events   = $this->getMaxScrapeEvents( $context );
+
+		try {
+			$cutoff_ts = ( new \DateTime( '+' . $horizon_days . ' days' ) )->getTimestamp();
+		} catch ( \Exception $e ) {
+			$cutoff_ts = ( new \DateTime( '+90 days' ) )->getTimestamp();
+		}
+
+		$kept = array();
+		foreach ( $events as $event ) {
+			$ts = $this->getEventStartTimestamp( $event );
+			// Drop occurrences beyond the forward horizon. Events with an
+			// unreadable start are kept defensively rather than silently dropped.
+			if ( null !== $ts && $ts > $cutoff_ts ) {
+				continue;
+			}
+
+			$kept[] = $event;
+		}
+
+		if ( empty( $kept ) ) {
+			return $kept;
+		}
+
+		// ICal::events() returns feed order, not date order. Sort ascending by
+		// start before slicing so the cap keeps the nearest events.
+		usort(
+			$kept,
+			function ( $a, $b ) {
+				$ta = $this->getEventStartTimestamp( $a ) ?? PHP_INT_MAX;
+				$tb = $this->getEventStartTimestamp( $b ) ?? PHP_INT_MAX;
+				return $ta <=> $tb;
+			}
+		);
+
+		if ( count( $kept ) > $max_events ) {
+			$kept = array_slice( $kept, 0, $max_events );
+		}
+
+		return $kept;
+	}
+
+	/**
+	 * Best-effort Unix timestamp for an ICal\Event start.
+	 *
+	 * @since 0.46.1
+	 *
+	 * @param object $event ICal event object with a ->dtstart property.
+	 * @return int|null Timestamp, or null if the start is unreadable.
+	 */
+	protected function getEventStartTimestamp( object $event ): ?int {
+		$start = $event->dtstart ?? null;
+
+		if ( $start instanceof \DateTime ) {
+			return $start->getTimestamp();
+		}
+
+		if ( is_string( $start ) && '' !== $start ) {
+			$ts = strtotime( $start );
+			return false !== $ts ? $ts : null;
+		}
+
+		return null;
+	}
+
+	/**
 	 * Load an HTML string into a DOMDocument + DOMXPath pair.
 	 *
 	 * Eliminates the repeated 5-line DOM bootstrap boilerplate
