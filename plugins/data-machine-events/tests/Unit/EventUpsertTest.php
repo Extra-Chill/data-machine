@@ -178,6 +178,116 @@ class EventUpsertTest extends WP_UnitTestCase {
 		$this->assertSame( 'date_only', $result );
 	}
 
+	public function test_datetime_confidence_full_with_date_and_time(): void {
+		$method = new \ReflectionMethod( $this->handler, 'getDateTimeConfidence' );
+		$method->setAccessible( true );
+
+		$engine = new \DataMachine\Core\EngineData( array(), 0 );
+
+		$result = $method->invoke(
+			$this->handler,
+			array(
+				'title'     => 'Full Event',
+				'startDate' => '2026-07-05',
+				'startTime' => '20:00',
+			),
+			$engine
+		);
+
+		$this->assertSame( 'full', $result, 'A valid Y-m-d date plus a time must yield full datetime confidence.' );
+	}
+
+	/**
+	 * Regression: an event with no startDate must be rejected at the upsert
+	 * boundary — an undated event can never be published.
+	 *
+	 * @see https://github.com/Extra-Chill/data-machine-events/issues/415
+	 */
+	public function test_execute_upsert_rejects_empty_start_date(): void {
+		$method = new \ReflectionMethod( $this->handler, 'executeUpsert' );
+		$method->setAccessible( true );
+
+		$engine = new \DataMachine\Core\EngineData( array(), 0 );
+
+		$result = $method->invoke(
+			$this->handler,
+			array(
+				'title'  => 'Undated Event ' . uniqid(),
+				'engine' => $engine,
+				'job_id' => 0,
+			),
+			array()
+		);
+
+		$this->assertFalse( $result['success'] ?? null, 'Upsert with an empty startDate must not succeed.' );
+		$this->assertStringContainsString( 'startDate', $result['error'] ?? '', 'Error must reference the missing startDate.' );
+	}
+
+	/**
+	 * Regression: a startTime present with an empty startDate is the exact
+	 * failure signature of upstream date-extraction failure (the scraper got
+	 * the time but not the date). It must be rejected, never published.
+	 *
+	 * @see https://github.com/Extra-Chill/data-machine-events/issues/415
+	 */
+	public function test_execute_upsert_rejects_start_time_without_start_date(): void {
+		$method = new \ReflectionMethod( $this->handler, 'executeUpsert' );
+		$method->setAccessible( true );
+
+		$engine = new \DataMachine\Core\EngineData(
+			array(
+				'startTime' => '19:00',
+			),
+			0
+		);
+
+		$result = $method->invoke(
+			$this->handler,
+			array(
+				'title'    => 'Time Only Event ' . uniqid(),
+				'startTime' => '19:00',
+				'engine'   => $engine,
+				'job_id'   => 0,
+			),
+			array()
+		);
+
+		$this->assertFalse( $result['success'] ?? null, 'Upsert with a startTime but no startDate must not succeed.' );
+		$this->assertStringContainsString( 'startDate', $result['error'] ?? '' );
+	}
+
+	/**
+	 * Regression: an unparseable startDate (wrong format / impossible calendar
+	 * date) must be rejected just like a missing one.
+	 *
+	 * @see https://github.com/Extra-Chill/data-machine-events/issues/415
+	 */
+	public function test_execute_upsert_rejects_unparseable_start_date(): void {
+		$method = new \ReflectionMethod( $this->handler, 'executeUpsert' );
+		$method->setAccessible( true );
+
+		$engine = new \DataMachine\Core\EngineData(
+			array(
+				'startDate' => '2026-13-99',
+			),
+			0
+		);
+
+		$result = $method->invoke(
+			$this->handler,
+			array(
+				'title'     => 'Bad Date Event ' . uniqid(),
+				'startDate' => '2026-13-99',
+				'engine'    => $engine,
+				'job_id'    => 0,
+			),
+			array()
+		);
+
+		$this->assertFalse( $result['success'] ?? null, 'Upsert with an unparseable startDate must not succeed.' );
+		$this->assertStringContainsString( 'startDate', $result['error'] ?? '' );
+	}
+
 	/**
 	 * Verify that recurring series events with the same title but different
 	 * dates are treated as distinct events, not duplicates.

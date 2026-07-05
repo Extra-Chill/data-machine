@@ -118,12 +118,35 @@ class EventUpsert extends UpsertHandler {
 		$datetime_confidence = $this->getDateTimeConfidence( $parameters, $engine );
 
 		if ( 'none' === $datetime_confidence ) {
+			// A startTime present with an empty/unparseable startDate is the
+			// exact signature of a date-extraction failure upstream (the fetch
+			// step got the time but not the date). Surface it as a distinct
+			// warning so the source parser can be improved, and reject the
+			// item instead of publishing an undated event. See issue #415.
+			$start_time = trim( (string) ( $engine->get( 'startTime' ) ?? $parameters['startTime'] ?? '' ) );
+
+			if ( '' !== $start_time ) {
+				do_action(
+					'datamachine_log',
+					'warning',
+					'Event Upsert: rejected undated event — startTime present but startDate is missing or unparseable (upstream date extraction failed)',
+					array(
+						'title'               => $title,
+						'venue'               => $venue,
+						'startDate'           => $startDate,
+						'startTime'           => $start_time,
+						'datetime_confidence' => $datetime_confidence,
+					)
+				);
+			}
+
 			return $this->errorResponse(
 				'valid startDate is required for event upsert',
 				array(
 					'title'               => $title,
 					'venue'               => $venue,
 					'startDate'           => $startDate,
+					'startTime'           => $start_time,
 					'datetime_confidence' => $datetime_confidence,
 				)
 			);
