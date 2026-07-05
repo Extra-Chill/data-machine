@@ -303,4 +303,75 @@ class TicketmasterHandlerTest extends WP_UnitTestCase {
 		$method->setAccessible( true );
 		return $method;
 	}
+
+	public function test_register_junk_patterns_seeds_ticketmaster_defaults() {
+		$result = $this->handler->register_junk_patterns( array(), 'ticketmaster' );
+
+		$this->assertContains( 'CCPER-', $result['id'] );
+		$this->assertContains( 'CCPER-', $result['title'] );
+		$this->assertContains( 'Standalone Upsell', $result['title'] );
+		$this->assertContains( 'Test Event', $result['title'] );
+		$this->assertContains( 'Upcoming Event', $result['title_prefix_no_artist'] );
+		$this->assertTrue( $result['honor_test_flag'] );
+	}
+
+	public function test_register_junk_patterns_ignores_other_sources() {
+		$empty = array( 'id' => array(), 'title' => array() );
+		$result = $this->handler->register_junk_patterns( $empty, 'dice' );
+
+		$this->assertSame( $empty, $result );
+	}
+
+	public function test_junk_patterns_exposed_via_filter() {
+		$patterns = apply_filters( 'data_machine_events_junk_payload_patterns', array(), 'ticketmaster' );
+
+		$this->assertNotEmpty( $patterns['id'] );
+		$this->assertNotEmpty( $patterns['title'] );
+		$this->assertNotEmpty( $patterns['title_prefix_no_artist'] );
+	}
+
+	public function test_is_junk_payload_drops_ccper_event() {
+		$filter = new \DataMachineEvents\Steps\EventImport\JunkPayloadFilter();
+		$this->assertTrue(
+			$filter->is_junk(
+				array(
+					'source_id'        => 'CCPER-2756',
+					'title'            => 'Upcoming Event CCPER-2756',
+					'artist'           => '',
+					'is_explicit_test' => false,
+				),
+				'ticketmaster'
+			)
+		);
+	}
+
+	public function test_is_junk_payload_drops_explicit_test_flag() {
+		$filter = new \DataMachineEvents\Steps\EventImport\JunkPayloadFilter();
+		$this->assertTrue(
+			$filter->is_junk(
+				array(
+					'source_id'        => 'Z5xNormal',
+					'title'            => 'Some Real Event',
+					'artist'           => 'Real Artist',
+					'is_explicit_test' => true,
+				),
+				'ticketmaster'
+			)
+		);
+	}
+
+	public function test_is_junk_payload_keeps_normal_event() {
+		$filter = new \DataMachineEvents\Steps\EventImport\JunkPayloadFilter();
+		$this->assertFalse(
+			$filter->is_junk(
+				array(
+					'source_id'        => 'vvG1hZwAd_k-p',
+					'title'            => 'Phish - Summer Tour 2026',
+					'artist'           => 'Phish',
+					'is_explicit_test' => false,
+				),
+				'ticketmaster'
+			)
+		);
+	}
 }

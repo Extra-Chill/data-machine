@@ -9,6 +9,7 @@ namespace DataMachineEvents\Steps\EventImport\Handlers\Ticketmaster;
 
 use DataMachine\Core\ExecutionContext;
 use DataMachineEvents\Steps\EventImport\Handlers\EventImportHandler;
+use DataMachineEvents\Steps\EventImport\JunkPayloadFilter;
 use DataMachine\Core\Steps\HandlerRegistrationTrait;
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -57,6 +58,15 @@ class Ticketmaster extends EventImportHandler {
 	 */
 	const RATE_LIMIT_BACKOFF_MAX_SECONDS = 8;
 
+	/**
+	 * Junk / test-payload matcher. Vendor-agnostic; Ticketmaster's own junk
+	 * patterns are seeded via register_junk_patterns() so no vendor string
+	 * leaks into the generic filter.
+	 *
+	 * @var JunkPayloadFilter
+	 */
+	private JunkPayloadFilter $junk_filter;
+
 	public function __construct() {
 		parent::__construct( 'ticketmaster' );
 
@@ -71,6 +81,58 @@ class Ticketmaster extends EventImportHandler {
 			TicketmasterSettings::class,
 			null
 		);
+
+		$this->junk_filter = new JunkPayloadFilter();
+		add_filter( 'data_machine_events_junk_payload_patterns', array( $this, 'register_junk_patterns' ), 10, 2 );
+	}
+
+	/**
+	 * Seed the junk/test-payload pattern table with Ticketmaster defaults.
+	 *
+	 * Layer purity: this is the only place Ticketmaster-specific junk strings
+	 * live. The matcher (JunkPayloadFilter) stays vendor-agnostic and pattern
+	 * buckets are filterable by site code via the same filter.
+	 *
+	 * @param array  $patterns    Existing pattern buckets.
+	 * @param string $source_type Source handler slug.
+	 * @return array
+	 */
+	public function register_junk_patterns( array $patterns, string $source_type ): array {
+		if ( 'ticketmaster' !== $source_type ) {
+			return $patterns;
+		}
+
+		$patterns['honor_test_flag'] = $patterns['honor_test_flag'] ?? true;
+
+		$patterns['id'] = array_merge(
+			(array) ( $patterns['id'] ?? array() ),
+			array(
+				// Ticketmaster internal QA / placeholder event IDs (e.g. CCPER-2756).
+				'CCPER-',
+			)
+		);
+
+		$patterns['title'] = array_merge(
+			(array) ( $patterns['title'] ?? array() ),
+			array(
+				// Test ID frequently embedded in placeholder titles.
+				'CCPER-',
+				// Ticketmaster placeholder event title fragment.
+				'Standalone Upsell',
+				// Generic placeholder title.
+				'Test Event',
+			)
+		);
+
+		$patterns['title_prefix_no_artist'] = array_merge(
+			(array) ( $patterns['title_prefix_no_artist'] ?? array() ),
+			array(
+				// Ticketmaster placeholder title prefix when no real attraction is attached.
+				'Upcoming Event',
+			)
+		);
+
+		return $patterns;
 	}
 
 	protected function getSourceInventoryCapabilities(): array {
@@ -144,13 +206,17 @@ class Ticketmaster extends EventImportHandler {
 
 				$standardized_event = $this->map_ticketmaster_event( $raw_event );
 
-				if ( empty( $standardized_event['title'] ) ) {
-					continue;
-				}
+			if ( empty( $standardized_event['title'] ) ) {
+				continue;
+			}
 
-				if ( $this->shouldSkipEventTitle( $standardized_event['title'] ) ) {
-					continue;
-				}
+			if ( $this->is_junk_payload( $raw_event, $standardized_event, $context ) ) {
+				continue;
+			}
+
+			if ( $this->shouldSkipEventTitle( $standardized_event['title'] ) ) {
+				continue;
+			}
 
 				$search_text = $standardized_event['title'] . ' ' . ( $standardized_event['description'] ?? '' );
 
@@ -575,6 +641,40 @@ class Ticketmaster extends EventImportHandler {
 		}
 
 		return max( $timestamp - time(), 0 );
+	}
+
+	/**
+	 * Drop known Ticketmaster test/placeholder payloads before they enter the
+	 * pipeline, logging each dropped item so the pattern table can be tuned.
+	 *
+	 * @param array            $raw_event        Raw Ticketmaster Discovery API event.
+	 * @param array            $standardized     Mapped standardized event data.
+	 * @param ExecutionContext $context          Execution context for logging.
+	 * @return bool True when the payload was dropped as junk.
+	 */
+	private function is_junk_payload( array $raw_event, array $standardized, ExecutionContext $context ): bool {
+		$evidence = array(
+			'source_id'        => (string) ( $raw_event['id'] ?? '' ),
+			'title'            => (string) ( $standardized['title'] ?? '' ),
+			'artist'           => (string) ( $standardized['artist'] ?? '' ),
+			'is_explicit_test' => array_key_exists( 'test', $raw_event ) ? (bool) $raw_event['test'] : null,
+		);
+
+		if ( ! $this->junk_filter->is_junk( $evidence, 'ticketmaster' ) ) {
+			return false;
+		}
+
+		$context->log(
+			'info',
+			'Ticketmaster: Dropped test/placeholder payload',
+			array(
+				'title'     => $evidence['title'],
+				'source_id' => $evidence['source_id'],
+				'artist'    => $evidence['artist'],
+			)
+		);
+
+		return true;
 	}
 
 	private function map_ticketmaster_event( array $tm_event ): array {
