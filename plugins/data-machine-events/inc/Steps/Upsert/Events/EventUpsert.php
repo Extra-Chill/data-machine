@@ -15,6 +15,7 @@
 namespace DataMachineEvents\Steps\Upsert\Events;
 
 use DataMachine\Core\EngineData;
+use DataMachine\Core\PluginSettings;
 use DataMachineEvents\Steps\Upsert\Events\Venue;
 use DataMachineEvents\Steps\Upsert\Events\Promoter;
 use DataMachineEvents\Core\Event_Post_Type;
@@ -1085,20 +1086,29 @@ class EventUpsert extends UpsertHandler {
 	/**
 	 * Resolve post author for event creation.
 	 *
-	 * When an event is submitted by a logged-in user (via the event submission form),
-	 * their user_id is stored in initial_data['submission']['user_id']. This takes
-	 * priority over handler config defaults so submitted events are attributed to
-	 * the submitter.
+	 * When an event is submitted by a user (logged-in or anonymous-with-a-
+	 * resolved-account — see extrachill-events Phase 1), their user_id is stored
+	 * in initial_data['submission']['user_id'] and takes priority over handler
+	 * config defaults so submitted events are attributed to the submitter.
 	 *
-	 * Resolution order:
-	 * 1. Submission user_id from engine data (user-submitted events)
-	 * 2. WordPressSettingsResolver (system defaults / handler config / fallbacks)
+	 * For genuine automation (no submission context), the author resolves to:
+	 *   1. An explicitly-configured author (system-wide default_author_id, then
+	 *      per-handler post_author) — respected when set.
+	 *   2. The network bot account via `ec_get_network_bot_user_id()` — the
+	 *      honest default for headless automation, config-driven so the bot id
+	 *      is not a magic literal (issue #207 Phase 2). This intentionally
+	 *      supersedes WordPressSettingsResolver's first-administrator fallback,
+	 *      which historically misattributed automation to uid 1 (the ~3k uid-1
+	 *      event rows that the backfill in extrachill-events corrects).
+	 *   3. WordPressSettingsResolver (logged-in user / first admin) — last
+	 *      resort, only when the bot-account helper is unavailable.
 	 *
 	 * @param array      $handler_config Handler configuration.
 	 * @param EngineData $engine         Engine snapshot helper.
 	 * @return int Post author ID.
 	 */
 	private function resolvePostAuthor( array $handler_config, EngineData $engine ): int {
+		// 1. Submission user_id (human submitter) — highest priority.
 		$submission = $engine->get( 'submission' );
 
 		if ( is_array( $submission ) && ! empty( $submission['user_id'] ) ) {
@@ -1108,7 +1118,46 @@ class EventUpsert extends UpsertHandler {
 			}
 		}
 
+		// 2. Explicit author configuration (system default, then handler
+		//    override). Per-flow post_author wins over the bot default so an
+		//    operator can still pin a specific author on a flow.
+		$explicit = $this->resolve_explicit_author_id( $handler_config );
+		if ( $explicit > 0 ) {
+			return $explicit;
+		}
+
+		// 3. Network bot account — the honest author for headless automation.
+		if ( function_exists( 'ec_get_network_bot_user_id' ) ) {
+			$bot_id = (int) ec_get_network_bot_user_id();
+			if ( $bot_id > 0 ) {
+				return $bot_id;
+			}
+		}
+
+		// 4. Last resort: generic resolver (logged-in user / first admin).
 		return WordPressSettingsResolver::getPostAuthor( $handler_config );
+	}
+
+	/**
+	 * Resolve an explicitly-configured author id, if any.
+	 *
+	 * Mirrors the config-first portion of WordPressSettingsResolver::getPostAuthor():
+	 * system-wide default_author_id, then handler-specific post_author. Returns 0
+	 * when neither is set (the headless-automation case the bot-account default
+	 * handles). Extracted so resolvePostAuthor() can branch on "no explicit
+	 * config → bot" without re-running the resolver's first-admin fallback.
+	 *
+	 * @param array $handler_config Handler configuration.
+	 * @return int Explicitly-configured author id, or 0 if none.
+	 */
+	private function resolve_explicit_author_id( array $handler_config ): int {
+		$wp_settings = PluginSettings::get( 'wordpress_settings', array() );
+		$default     = (int) ( $wp_settings['default_author_id'] ?? 0 );
+		if ( $default > 0 ) {
+			return $default;
+		}
+
+		return (int) ( $handler_config['post_author'] ?? 0 );
 	}
 
 	/**
