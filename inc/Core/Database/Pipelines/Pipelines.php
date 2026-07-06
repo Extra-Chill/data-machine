@@ -981,13 +981,12 @@ class Pipelines extends BaseRepository {
 			$offset
 		);
 
-		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared -- query is prepared above with %i/%d placeholders.
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		$results = $this->wpdb->get_results(
+			// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- query is prepared above with %i/%d placeholders.
 			$orphaned_pipelines_sql,
 			ARRAY_A
 		);
-		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
 
 		return is_array( $results ) ? $results : array();
 	}
