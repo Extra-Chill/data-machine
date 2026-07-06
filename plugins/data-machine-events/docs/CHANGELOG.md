@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.47.0] - 2026-07-06
+
+### Added
+- consolidate pre-publish event validation gate at upsert_event (#417)
+
 ## [0.46.4] - 2026-07-06
 
 ### Fixed
