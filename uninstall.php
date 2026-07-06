@@ -13,6 +13,11 @@ if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
 	exit;
 }
 
+require_once __DIR__ . '/inc/Abilities/Media/ImageGenerationAbilities.php';
+require_once __DIR__ . '/inc/Abilities/SettingsAbilities.php';
+require_once __DIR__ . '/inc/Core/ActionScheduler/GroupRegistrar.php';
+require_once __DIR__ . '/inc/Core/NetworkSettings.php';
+
 if ( is_multisite() ) {
 	// Clean up every subsite on the network.
 	$datamachine_sites = get_sites( array( 'fields' => 'ids' ) );
@@ -39,11 +44,11 @@ if ( is_multisite() ) {
 function datamachine_uninstall_site() {
 	global $wpdb;
 
-	// --- Options ---
+	// --- Site options ---
 
 	// Core plugin settings.
 	delete_option( 'datamachine_settings' );
-	delete_option( 'datamachine_handler_defaults' );
+	delete_option( \DataMachine\Abilities\SettingsAbilities::HANDLER_DEFAULTS_OPTION );
 	delete_option( 'datamachine_agent_ping_callback_token' );
 	delete_option( 'datamachine_page_hook_suffixes' );
 
@@ -101,7 +106,7 @@ function datamachine_uninstall_site() {
 	// --- Scheduled actions ---
 
 	if ( function_exists( 'as_unschedule_all_actions' ) ) {
-		as_unschedule_all_actions( '', array(), 'data-machine' );
+		as_unschedule_all_actions( '', array(), \DataMachine\Core\ActionScheduler\GroupRegistrar::GROUP );
 	}
 
 	// --- Transients ---
@@ -146,11 +151,11 @@ function datamachine_uninstall_network_tables() {
  */
 function datamachine_uninstall_network_options() {
 	$datamachine_network_options = array(
-		'datamachine_image_generation_config',
+		\DataMachine\Abilities\Media\ImageGenerationAbilities::CONFIG_OPTION,
 		'datamachine_gsc_config',
 		'datamachine_search_config',
 		'datamachine_auth_data',
-		'datamachine_network_settings',
+		\DataMachine\Core\NetworkSettings::OPTION_NAME,
 		'datamachine_chat_sessions_network_migrated',
 	);
 

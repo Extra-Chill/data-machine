@@ -31,29 +31,29 @@ class ImageGenerationTest extends WP_UnitTestCase {
 	}
 
 	public function tear_down(): void {
-		delete_site_option( 'datamachine_image_generation_config' );
+		delete_site_option( ImageGenerationAbilities::CONFIG_OPTION );
 		WpAiClientTestDouble::reset();
 		parent::tear_down();
 	}
 
 	public function test_is_configured_returns_false_when_no_config(): void {
-		delete_site_option( 'datamachine_image_generation_config' );
+		delete_site_option( ImageGenerationAbilities::CONFIG_OPTION );
 		$this->assertFalse( ImageGeneration::is_configured() );
 	}
 
 	public function test_is_configured_returns_true_when_provider_and_model_set(): void {
-		update_site_option( 'datamachine_image_generation_config', [ 'default_provider' => 'openai', 'default_model' => 'gpt-image-1' ] );
+		update_site_option( ImageGenerationAbilities::CONFIG_OPTION, [ 'default_provider' => 'openai', 'default_model' => 'gpt-image-1' ] );
 		$this->assertTrue( ImageGeneration::is_configured() );
 	}
 
 	public function test_get_config_returns_empty_array_by_default(): void {
-		delete_site_option( 'datamachine_image_generation_config' );
+		delete_site_option( ImageGenerationAbilities::CONFIG_OPTION );
 		$this->assertSame( [], ImageGeneration::get_config() );
 	}
 
 	public function test_get_config_returns_stored_config(): void {
 		$config = [ 'default_provider' => 'openai', 'default_model' => 'gpt-image-1' ];
-		update_site_option( 'datamachine_image_generation_config', $config );
+		update_site_option( ImageGenerationAbilities::CONFIG_OPTION, $config );
 		$this->assertSame( $config, ImageGeneration::get_config() );
 	}
 
@@ -63,10 +63,10 @@ class ImageGenerationTest extends WP_UnitTestCase {
 	}
 
 	public function test_check_configuration_returns_status_for_image_generation(): void {
-		delete_site_option( 'datamachine_image_generation_config' );
+		delete_site_option( ImageGenerationAbilities::CONFIG_OPTION );
 		$this->assertFalse( $this->tool->check_configuration( true, 'image_generation' ) );
 
-		update_site_option( 'datamachine_image_generation_config', [ 'default_provider' => 'openai', 'default_model' => 'gpt-image-1' ] );
+		update_site_option( ImageGenerationAbilities::CONFIG_OPTION, [ 'default_provider' => 'openai', 'default_model' => 'gpt-image-1' ] );
 		$this->assertTrue( $this->tool->check_configuration( false, 'image_generation' ) );
 	}
 
@@ -77,7 +77,7 @@ class ImageGenerationTest extends WP_UnitTestCase {
 
 	public function test_get_configuration_returns_config_for_image_generation(): void {
 		$config = [ 'default_provider' => 'openai', 'default_model' => 'gpt-image-1' ];
-		update_site_option( 'datamachine_image_generation_config', $config );
+		update_site_option( ImageGenerationAbilities::CONFIG_OPTION, $config );
 		$this->assertSame( $config, $this->tool->get_configuration( [], 'image_generation' ) );
 	}
 
@@ -114,7 +114,7 @@ class ImageGenerationTest extends WP_UnitTestCase {
 	}
 
 	public function test_handle_tool_call_error_when_not_configured(): void {
-		delete_site_option( 'datamachine_image_generation_config' );
+		delete_site_option( ImageGenerationAbilities::CONFIG_OPTION );
 		$result = $this->tool->handle_tool_call( [ 'prompt' => 'A sunset' ] );
 		$this->assertFalse( $result['success'] );
 		$this->assertStringContainsString( 'not configured', $result['error'] );
@@ -128,6 +128,8 @@ class ImageGenerationTest extends WP_UnitTestCase {
 	}
 
 	public function test_config_option_key(): void {
-		$this->assertSame( 'datamachine_image_generation_config', ImageGenerationAbilities::CONFIG_OPTION );
+		$method = new \ReflectionMethod( ImageGeneration::class, 'get_config_option_name' );
+
+		$this->assertSame( ImageGenerationAbilities::CONFIG_OPTION, $method->invoke( $this->tool ) );
 	}
 }

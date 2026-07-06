@@ -8,6 +8,7 @@
 
 namespace DataMachine\Tests\Unit\Engine\AI\System\Tasks;
 
+use DataMachine\Abilities\Media\ImageGenerationAbilities;
 use DataMachine\Engine\AI\System\Tasks\ImageGenerationTask;
 use WP_UnitTestCase;
 
@@ -45,7 +46,7 @@ class ImageGenerationTaskTest extends WP_UnitTestCase {
 	}
 
 	public function tear_down(): void {
-		delete_site_option( 'datamachine_image_generation_config' );
+		delete_site_option( ImageGenerationAbilities::CONFIG_OPTION );
 		parent::tear_down();
 	}
 

@@ -51,7 +51,14 @@ add_action(
 				$route,
 				array(
 					'methods'             => 'POST',
-					'callback'            => static fn( \WP_REST_Request $request ): array => call_user_func( $callback, $request->get_json_params() ? $request->get_json_params() : array() ),
+					'callback'            => static function ( \WP_REST_Request $request ) use ( $callback ): array {
+						$params = $request->get_json_params();
+						if ( ! is_array( $params ) ) {
+							$params = array();
+						}
+
+						return call_user_func( $callback, $params );
+					},
 					'permission_callback' => static fn(): bool => PermissionHelper::can_manage(),
 				)
 			);

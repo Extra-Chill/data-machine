@@ -112,9 +112,11 @@ if ( ! function_exists( 'sanitize_key' ) ) {
 require_once __DIR__ . '/../inc/Core/NetworkSettings.php';
 require_once __DIR__ . '/../inc/Core/PluginSettings.php';
 require_once __DIR__ . '/../inc/Core/OptionLeaseStore.php';
+require_once __DIR__ . '/../inc/Core/ActionScheduler/GroupRegistrar.php';
 require_once __DIR__ . '/../inc/Engine/AI/PipelineAIConcurrencyLease.php';
 require_once __DIR__ . '/../inc/Engine/AI/PipelineAIConcurrencyLimiter.php';
 
+use DataMachine\Core\ActionScheduler\GroupRegistrar;
 use DataMachine\Engine\AI\PipelineAIConcurrencyLease;
 use DataMachine\Engine\AI\PipelineAIConcurrencyLimiter;
 
@@ -149,7 +151,7 @@ assert_ai_backpressure_smoke( 'stale owner initially acquires slot', true === $s
 $GLOBALS['datamachine_ai_backpressure_actions'][] = new DataMachineAIBackpressureSmokeAction(
 	array(
 		'hook'   => 'datamachine_execute_step',
-		'group'  => 'data-machine',
+		'group'  => GroupRegistrar::GROUP,
 		'status' => 'pending',
 		'job_id' => 201,
 		'args'   => array(

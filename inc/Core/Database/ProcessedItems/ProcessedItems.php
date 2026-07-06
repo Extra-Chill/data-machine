@@ -789,13 +789,14 @@ class ProcessedItems extends BaseRepository {
 			return;
 		}
 
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange
 		$wpdb->query(
-			"ALTER TABLE {$table_name}
-			 ADD KEY `flow_source_ts` (flow_step_id, source_type, processed_timestamp)"
+			// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- uses %i identifier placeholder; WPCS does not recognize %i (false positive).
+			$wpdb->prepare(
+				'ALTER TABLE %i ADD KEY `flow_source_ts` (flow_step_id, source_type, processed_timestamp)',
+				$table_name
+			)
 		);
-		// phpcs:enable WordPress.DB.PreparedSQL
 
 		do_action(
 			'datamachine_log',
@@ -813,31 +814,37 @@ class ProcessedItems extends BaseRepository {
 	public static function ensure_claim_columns( string $table_name ): void {
 		global $wpdb;
 
-		// phpcs:disable WordPress.DB.PreparedSQL -- table name is code-defined ($wpdb->prefix), not user input.
-		$status_column = $wpdb->get_var( "SHOW COLUMNS FROM {$table_name} LIKE 'status'" );
-		// phpcs:enable WordPress.DB.PreparedSQL
+		$status_column = $wpdb->get_var(
+			// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- uses %i identifier placeholder; WPCS does not recognize %i (false positive).
+			$wpdb->prepare( 'SHOW COLUMNS FROM %i LIKE %s', $table_name, 'status' )
+		);
 		if ( ! $status_column ) {
-			// phpcs:disable WordPress.DB.PreparedSQL -- table name is code-defined ($wpdb->prefix), not user input.
-			$wpdb->query( "ALTER TABLE {$table_name} ADD COLUMN status VARCHAR(20) NOT NULL DEFAULT 'processed'" );
-			// phpcs:enable WordPress.DB.PreparedSQL
+			$wpdb->query(
+				// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- uses %i identifier placeholder; WPCS does not recognize %i (false positive).
+				$wpdb->prepare( "ALTER TABLE %i ADD COLUMN status VARCHAR(20) NOT NULL DEFAULT 'processed'", $table_name )
+			);
 		}
 
-		// phpcs:disable WordPress.DB.PreparedSQL -- table name is code-defined ($wpdb->prefix), not user input.
-		$claim_column = $wpdb->get_var( "SHOW COLUMNS FROM {$table_name} LIKE 'claim_expires_at'" );
-		// phpcs:enable WordPress.DB.PreparedSQL
+		$claim_column = $wpdb->get_var(
+			// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- uses %i identifier placeholder; WPCS does not recognize %i (false positive).
+			$wpdb->prepare( 'SHOW COLUMNS FROM %i LIKE %s', $table_name, 'claim_expires_at' )
+		);
 		if ( ! $claim_column ) {
-			// phpcs:disable WordPress.DB.PreparedSQL -- table name is code-defined ($wpdb->prefix), not user input.
-			$wpdb->query( "ALTER TABLE {$table_name} ADD COLUMN claim_expires_at DATETIME NULL" );
-			// phpcs:enable WordPress.DB.PreparedSQL
+			$wpdb->query(
+				// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- uses %i identifier placeholder; WPCS does not recognize %i (false positive).
+				$wpdb->prepare( 'ALTER TABLE %i ADD COLUMN claim_expires_at DATETIME NULL', $table_name )
+			);
 		}
 
-		// phpcs:disable WordPress.DB.PreparedSQL -- table name is code-defined ($wpdb->prefix), not user input.
-		$index = $wpdb->get_row( "SHOW INDEX FROM {$table_name} WHERE Key_name = 'status_claim_expires'" );
-		// phpcs:enable WordPress.DB.PreparedSQL
+		$index = $wpdb->get_row(
+			// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- uses %i identifier placeholder; WPCS does not recognize %i (false positive).
+			$wpdb->prepare( 'SHOW INDEX FROM %i WHERE Key_name = %s', $table_name, 'status_claim_expires' )
+		);
 		if ( ! $index ) {
-			// phpcs:disable WordPress.DB.PreparedSQL -- table name is code-defined ($wpdb->prefix), not user input.
-			$wpdb->query( "ALTER TABLE {$table_name} ADD KEY `status_claim_expires` (status, claim_expires_at)" );
-			// phpcs:enable WordPress.DB.PreparedSQL
+			$wpdb->query(
+				// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- uses %i identifier placeholder; WPCS does not recognize %i (false positive).
+				$wpdb->prepare( 'ALTER TABLE %i ADD KEY `status_claim_expires` (status, claim_expires_at)', $table_name )
+			);
 		}
 	}
 }

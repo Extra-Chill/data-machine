@@ -29,6 +29,7 @@ use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_Store_Capabilities;
 use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_Write_Result;
 use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Core\Agents\AgentBundler;
+use DataMachine\Core\ActionScheduler\GroupRegistrar;
 use DataMachine\Core\Database\Agents\Agents as AgentsRepository;
 use DataMachine\Core\Database\BundleArtifacts\InstalledBundleArtifacts;
 use DataMachine\Core\Database\Flows\Flows as FlowsRepository;
@@ -579,8 +580,8 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 		$flow     = $this->flows_repo->get_by_portable_slug( (int) $pipeline['pipeline_id'], 'static-site-flow' );
 		$flow_id  = (int) $flow['flow_id'];
 
-		as_unschedule_all_actions( 'datamachine_run_flow_now', array( $flow_id ), 'data-machine' );
-		$this->assertFalse( as_next_scheduled_action( 'datamachine_run_flow_now', array( $flow_id ), 'data-machine' ), 'Test setup removes the scheduled action while preserving flow row scheduling.' );
+		as_unschedule_all_actions( 'datamachine_run_flow_now', array( $flow_id ), GroupRegistrar::GROUP );
+		$this->assertFalse( as_next_scheduled_action( 'datamachine_run_flow_now', array( $flow_id ), GroupRegistrar::GROUP ), 'Test setup removes the scheduled action while preserving flow row scheduling.' );
 
 		$second = $this->bundler->import(
 			$bundle,
@@ -591,7 +592,7 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 		);
 
 		$this->assertTrue( (bool) $second['success'], 'Upgrade import succeeds when only the scheduled action is missing.' );
-		$this->assertNotFalse( as_next_scheduled_action( 'datamachine_run_flow_now', array( $flow_id ), 'data-machine' ), 'Importer re-creates the missing scheduled action for an enabled non-manual flow.' );
+		$this->assertNotFalse( as_next_scheduled_action( 'datamachine_run_flow_now', array( $flow_id ), GroupRegistrar::GROUP ), 'Importer re-creates the missing scheduled action for an enabled non-manual flow.' );
 	}
 
 	public function test_reconcile_runtime_replaces_local_modified_flow_queue_and_schedule(): void {
