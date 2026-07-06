@@ -2,6 +2,12 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.159.11] - 2026-07-06
+
+### Fixed
+- update Composer test script for Homeboy review
+- Fix review audit and lint findings
+
 ## [0.159.10] - 2026-07-05
 
 ### Changed
