@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.46.4] - 2026-07-06
+
+### Fixed
+- default automation post author to the network bot account (#207)
+
 ## [0.46.3] - 2026-07-05
 
 ### Fixed
