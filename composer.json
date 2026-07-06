@@ -33,7 +33,7 @@
 		}
 	},
 	"scripts": {
-		"test": "homeboy test data-machine",
+		"test": "homeboy review test data-machine",
 		"lint": "phpcs",
 		"lint-fix": "phpcbf"
 	},
