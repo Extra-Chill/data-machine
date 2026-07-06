@@ -521,4 +521,227 @@ class EventUpsertTest extends WP_UnitTestCase {
 			'A normal title with em dash and parenthetical must NOT be refused.'
 		);
 	}
+
+	/**
+	 * Helper: invoke the private validateForPublish() gate directly.
+	 */
+	private function invoke_gate( array $evidence, array $parameters = array(), array $engine_data = array() ): ?array {
+		$method = new \ReflectionMethod( $this->handler, 'validateForPublish' );
+		$method->setAccessible( true );
+
+		$engine = new \DataMachine\Core\EngineData( $engine_data, 0 );
+
+		return $method->invoke( $this->handler, $evidence, $parameters, $engine );
+	}
+
+	/**
+	 * A valid event must pass the gate cleanly (null return).
+	 *
+	 * @see https://github.com/Extra-Chill/data-machine-events/issues/417
+	 */
+	public function test_gate_passes_valid_event(): void {
+		$result = $this->invoke_gate(
+			array(
+				'title'       => 'Eggy at Charleston Pour House',
+				'venue'       => 'Charleston Pour House',
+				'startDate'   => '2026-08-01',
+				'startTime'   => '20:00',
+				'source_type' => '',
+				'artist'      => 'Eggy',
+			),
+			array(
+				'title'     => 'Eggy at Charleston Pour House',
+				'startDate' => '2026-08-01',
+				'startTime' => '20:00',
+			)
+		);
+
+		$this->assertNull( $result, 'A valid event must pass the validation gate.' );
+	}
+
+	/**
+	 * Empty startDate is rejected at the gate (folds in #415).
+	 *
+	 * @see https://github.com/Extra-Chill/data-machine-events/issues/415
+	 * @see https://github.com/Extra-Chill/data-machine-events/issues/417
+	 */
+	public function test_gate_rejects_empty_start_date(): void {
+		$result = $this->invoke_gate(
+			array(
+				'title'       => 'Undated Event ' . uniqid(),
+				'venue'       => 'Some Venue',
+				'startDate'   => '',
+				'startTime'   => '',
+				'source_type' => '',
+				'artist'      => '',
+			)
+		);
+
+		$this->assertIsArray( $result );
+		$this->assertFalse( $result['success'] ?? null );
+		$this->assertSame( 'invalid_start_date', $result['rule'] ?? '' );
+		$this->assertStringContainsString( 'startDate', $result['error'] ?? '' );
+	}
+
+	/**
+	 * A placeholder "Test Event" title is rejected at the gate regardless of
+	 * source — the generic placeholder check is source-agnostic.
+	 *
+	 * @see https://github.com/Extra-Chill/data-machine-events/issues/417
+	 */
+	public function test_gate_rejects_placeholder_test_event_title(): void {
+		$result = $this->invoke_gate(
+			array(
+				'title'       => 'Test Event',
+				'venue'       => 'Some Venue',
+				'startDate'   => '2026-08-01',
+				'startTime'   => '20:00',
+				'source_type' => 'universal_web_scraper',
+				'artist'      => '',
+			),
+			array(
+				'title'     => 'Test Event',
+				'startDate' => '2026-08-01',
+				'startTime' => '20:00',
+			)
+		);
+
+		$this->assertIsArray( $result );
+		$this->assertFalse( $result['success'] ?? null );
+		$this->assertSame( 'placeholder_title', $result['rule'] ?? '' );
+	}
+
+	/**
+	 * A bare-punctuation title (e.g. "?") is rejected as noise.
+	 *
+	 * @see https://github.com/Extra-Chill/data-machine-events/issues/417
+	 */
+	public function test_gate_rejects_bare_question_mark_title(): void {
+		$result = $this->invoke_gate(
+			array(
+				'title'       => '?',
+				'venue'       => 'Some Venue',
+				'startDate'   => '2026-08-01',
+				'startTime'   => '',
+				'source_type' => '',
+				'artist'      => '',
+			),
+			array(
+				'title'     => '?',
+				'startDate' => '2026-08-01',
+			)
+		);
+
+		$this->assertIsArray( $result );
+		$this->assertFalse( $result['success'] ?? null );
+		$this->assertSame( 'placeholder_title', $result['rule'] ?? '' );
+	}
+
+	/**
+	 * A junk/test payload is caught at the gate from a NON-Ticketmaster path.
+	 *
+	 * This is the key consolidation win: the JunkPayloadFilter (#416) now
+	 * runs at the upsert boundary for every source, not only inside the
+	 * Ticketmaster handler. Here a custom 'dice' source registers a junk
+	 * pattern via the filter; the gate must reject a matching title even
+	 * though Dice has no handler-level filter of its own.
+	 *
+	 * @see https://github.com/Extra-Chill/data-machine-events/issues/416
+	 * @see https://github.com/Extra-Chill/data-machine-events/issues/417
+	 */
+	public function test_gate_rejects_junk_payload_from_non_ticketmaster_source(): void {
+		$callback = function ( array $patterns, string $source_type ): array {
+			if ( 'dice' !== $source_type ) {
+				return $patterns;
+			}
+			$patterns['title'][] = 'QA Sandbox';
+
+			return $patterns;
+		};
+		add_filter( 'data_machine_events_junk_payload_patterns', $callback, 10, 2 );
+
+		$result = $this->invoke_gate(
+			array(
+				'title'       => 'QA Sandbox Preview Night',
+				'venue'       => 'Dice Venue',
+				'startDate'   => '2026-09-01',
+				'startTime'   => '21:00',
+				'source_type' => 'dice',
+				'artist'      => '',
+			),
+			array(
+				'title'     => 'QA Sandbox Preview Night',
+				'startDate' => '2026-09-01',
+				'startTime' => '21:00',
+			),
+			array( 'source_type' => 'dice' )
+		);
+
+		remove_filter( 'data_machine_events_junk_payload_patterns', $callback, 10 );
+
+		$this->assertIsArray( $result, 'A junk payload from a non-Ticketmaster source must be rejected at the gate.' );
+		$this->assertFalse( $result['success'] ?? null );
+		$this->assertSame( 'junk_payload', $result['rule'] ?? '' );
+	}
+
+	/**
+	 * The placeholder title deny-list is filterable.
+	 *
+	 * @see https://github.com/Extra-Chill/data-machine-events/issues/417
+	 */
+	public function test_placeholder_titles_are_filterable(): void {
+		$callback = static function ( array $placeholders ): array {
+			$placeholders[] = 'Placeholder Concert';
+
+			return $placeholders;
+		};
+		add_filter( 'data_machine_events_placeholder_titles', $callback );
+
+		$result = $this->invoke_gate(
+			array(
+				'title'       => 'Placeholder Concert',
+				'venue'       => 'Some Venue',
+				'startDate'   => '2026-08-01',
+				'startTime'   => '',
+				'source_type' => '',
+				'artist'      => '',
+			),
+			array(
+				'title'     => 'Placeholder Concert',
+				'startDate' => '2026-08-01',
+			)
+		);
+
+		remove_filter( 'data_machine_events_placeholder_titles', $callback );
+
+		$this->assertIsArray( $result );
+		$this->assertFalse( $result['success'] ?? null );
+		$this->assertSame( 'placeholder_title', $result['rule'] ?? '' );
+	}
+
+	/**
+	 * A title that merely CONTAINS a placeholder word but is not an exact
+	 * match must pass (e.g. "Test Event Cancellation Policy" is not junk by
+	 * this rule — substring junk detection is the JunkPayloadFilter's job).
+	 *
+	 * @see https://github.com/Extra-Chill/data-machine-events/issues/417
+	 */
+	public function test_placeholder_check_is_exact_match_not_substring(): void {
+		$result = $this->invoke_gate(
+			array(
+				'title'       => 'Upcoming Event Featuring Phish',
+				'venue'       => 'Some Venue',
+				'startDate'   => '2026-08-01',
+				'startTime'   => '',
+				'source_type' => '',
+				'artist'      => 'Phish',
+			),
+			array(
+				'title'     => 'Upcoming Event Featuring Phish',
+				'startDate' => '2026-08-01',
+			)
+		);
+
+		$this->assertNull( $result, 'A non-exact title containing a placeholder word must NOT be rejected by the placeholder rule.' );
+	}
 }

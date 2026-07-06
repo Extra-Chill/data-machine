@@ -16,6 +16,7 @@ namespace DataMachineEvents\Steps\Upsert\Events;
 
 use DataMachine\Core\EngineData;
 use DataMachine\Core\PluginSettings;
+use DataMachineEvents\Steps\EventImport\JunkPayloadFilter;
 use DataMachineEvents\Steps\Upsert\Events\Venue;
 use DataMachineEvents\Steps\Upsert\Events\Promoter;
 use DataMachineEvents\Core\Event_Post_Type;
@@ -41,12 +42,24 @@ class EventUpsert extends UpsertHandler {
 
 	protected $taxonomy_handler;
 
+	/**
+	 * Reusable junk/test-payload matcher (see #416).
+	 *
+	 * Evaluated at the upsert gate so test/placeholder records are caught for
+	 * every source, not only inside the Ticketmaster fetch handler.
+	 *
+	 * @var JunkPayloadFilter
+	 */
+	private JunkPayloadFilter $junk_filter;
+
 	public function __construct() {
 		$this->taxonomy_handler = new TaxonomyHandler();
 		// Register custom handler for venue taxonomy
 		TaxonomyHandler::addCustomHandler( 'venue', array( $this, 'assignVenueTaxonomy' ) );
 		// Register custom handler for promoter taxonomy
 		TaxonomyHandler::addCustomHandler( 'promoter', array( $this, 'assignPromoterTaxonomy' ) );
+
+		$this->junk_filter = new JunkPayloadFilter();
 	}
 
 	/**
@@ -71,37 +84,35 @@ class EventUpsert extends UpsertHandler {
 		$startDate = $engine->get( 'startDate' ) ?? $parameters['startDate'] ?? '';
 		$ticketUrl = $engine->get( 'ticketUrl' ) ?? $parameters['ticketUrl'] ?? '';
 
-		// Validate title after extraction from engine data or parameters
-		if ( empty( $title ) ) {
-			return $this->errorResponse(
-				'title parameter is required for event upsert',
-				array(
-					'provided_parameters' => array_keys( $parameters ),
-					'engine_data_keys'    => array_keys( $engine->all() ),
-				)
-			);
-		}
-
-		// Belt-and-suspenders guard against junk-title leakage (see issues #349, #367).
+		// Run the consolidated pre-publish validation gate before any write.
 		//
-		// When the AI recognizes a source item is not a real, attendable event
-		// (e.g. season-ticket packages, parking passes) or is a duplicate of an
-		// existing event, it is supposed to call the reject_source disposition
-		// tool. If the per-pipeline prompt lacks rejection/dedup guidance, the
-		// model sometimes improvises by publishing the item with a marker in
-		// the title instead — "Rejected:" prefixes (#349) or dedup markers like
-		// "(duplicate)", "Duplicate:", "Consolidate:", "(merged)", "see
-		// canonical listing" (#367) — leaking junk onto the public calendar.
-		// This guard refuses to create/update any post whose title carries such
-		// a marker (or any control characters / null bytes) so a prompt
-		// regression can never silently publish a junk item again.
-		if ( $this->isJunkTitle( $title ) ) {
-			return $this->errorResponse(
-				'Refusing to upsert event with a junk marker title (Rejected/Duplicate/Consolidate/merged/see canonical, or control characters); the AI should call reject_source instead of publishing a marked item (see issues #349, #367)',
-				array(
-					'title' => $title,
-				)
-			);
+		// Every fetch handler (web scraper, Ticketmaster, Dice, …) funnels
+		// through this single boundary, so a minimum quality bar is enforced
+		// uniformly regardless of source. Rejected items are SKIP + LOG:
+		// nothing is published, nothing is drafted, and each rejection is
+		// logged so upstream parsers and the junk pattern table can be tuned.
+		// The gate consolidates the prior scattered guards (empty startDate
+		// #415, junk-marker title #349/#367, junk/test payload #416) instead
+		// of duplicating them. See issue #417.
+		$start_time  = trim( (string) ( $engine->get( 'startTime' ) ?? $parameters['startTime'] ?? '' ) );
+		$source_type = (string) ( $engine->get( 'source_type' ) ?? $parameters['source_type'] ?? '' );
+		$artist      = (string) ( $engine->get( 'performer' ) ?? $parameters['performer'] ?? $parameters['artist'] ?? '' );
+
+		$rejection = $this->validateForPublish(
+			array(
+				'title'       => $title,
+				'venue'       => $venue,
+				'startDate'   => $startDate,
+				'startTime'   => $start_time,
+				'source_type' => $source_type,
+				'artist'      => $artist,
+			),
+			$parameters,
+			$engine
+		);
+
+		if ( null !== $rejection ) {
+			return $rejection;
 		}
 
 		do_action(
@@ -115,43 +126,6 @@ class EventUpsert extends UpsertHandler {
 				'ticketUrl' => $ticketUrl,
 			)
 		);
-
-		$datetime_confidence = $this->getDateTimeConfidence( $parameters, $engine );
-
-		if ( 'none' === $datetime_confidence ) {
-			// A startTime present with an empty/unparseable startDate is the
-			// exact signature of a date-extraction failure upstream (the fetch
-			// step got the time but not the date). Surface it as a distinct
-			// warning so the source parser can be improved, and reject the
-			// item instead of publishing an undated event. See issue #415.
-			$start_time = trim( (string) ( $engine->get( 'startTime' ) ?? $parameters['startTime'] ?? '' ) );
-
-			if ( '' !== $start_time ) {
-				do_action(
-					'datamachine_log',
-					'warning',
-					'Event Upsert: rejected undated event — startTime present but startDate is missing or unparseable (upstream date extraction failed)',
-					array(
-						'title'               => $title,
-						'venue'               => $venue,
-						'startDate'           => $startDate,
-						'startTime'           => $start_time,
-						'datetime_confidence' => $datetime_confidence,
-					)
-				);
-			}
-
-			return $this->errorResponse(
-				'valid startDate is required for event upsert',
-				array(
-					'title'               => $title,
-					'venue'               => $venue,
-					'startDate'           => $startDate,
-					'startTime'           => $start_time,
-					'datetime_confidence' => $datetime_confidence,
-				)
-			);
-		}
 
 		// Acquire advisory lock to prevent race conditions between concurrent
 		// flows importing the same event. Lock key is derived from the date and
@@ -208,6 +182,242 @@ class EventUpsert extends UpsertHandler {
 		// "see canonical" substring (e.g. "— see canonical listing").
 		if ( false !== stripos( $trimmed, 'see canonical' ) ) {
 			return true;
+		}
+
+		return false;
+	}
+
+	/**
+	 * Consolidated pre-publish validation gate.
+	 *
+	 * Single boundary at upsert_event that enforces a minimum quality bar
+	 * before any event is written. Every fetch handler passes through here,
+	 * so junk never reaches publish regardless of source. Rejected items are
+	 * SKIP + LOG (never published, never drafted); each rejection is logged
+	 * via datamachine_log so upstream parsers and the junk pattern table can
+	 * be tuned.
+	 *
+	 * Consolidates (rather than duplicates) the prior scattered guards:
+	 *  - Empty / unparseable startDate gate (#415) — folded in from the
+	 *    former inline check; getDateTimeConfidence() reused as-is.
+	 *  - Junk-marker title guard (#349, #367) — isJunkTitle() reused.
+	 *  - Junk / test-payload filter (#416) — JunkPayloadFilter reused, now
+	 *    evaluated at the upsert boundary for every source instead of only
+	 *    inside the Ticketmaster fetch handler.
+	 *
+	 * @since 0.46.4
+	 *
+	 * @param array      $evidence Pre-extracted event fields {
+	 *     @type string $title
+	 *     @type string $venue
+	 *     @type string $startDate
+	 *     @type string $startTime
+	 *     @type string $source_type
+	 *     @type string $artist
+	 * }
+	 * @param array      $parameters Full tool parameters.
+	 * @param EngineData $engine     Engine data.
+	 * @return array|null Null when the item passes the gate; otherwise an
+	 *                    error response array (success:false) carrying the
+	 *                    rejection reason and a machine-readable `rule` slug.
+	 */
+	private function validateForPublish( array $evidence, array $parameters, EngineData $engine ): ?array {
+		$title     = (string) ( $evidence['title'] ?? '' );
+		$venue     = (string) ( $evidence['venue'] ?? '' );
+		$startDate = (string) ( $evidence['startDate'] ?? '' );
+		$startTime = (string) ( $evidence['startTime'] ?? '' );
+
+		// 1. Title is mandatory.
+		if ( '' === $title ) {
+			return $this->gateRejection(
+				'title parameter is required for event upsert',
+				array(
+					'provided_parameters' => array_keys( $parameters ),
+					'engine_data_keys'    => array_keys( $engine->all() ),
+				),
+				'missing_title'
+			);
+		}
+
+		// 2. Junk-marker title leakage (Rejected:/Duplicate:/Consolidate:/…).
+		//    The AI is meant to call reject_source; this catches prompt
+		//    regressions where it improvises a marker in the title instead.
+		//    See issues #349, #367.
+		if ( $this->isJunkTitle( $title ) ) {
+			return $this->gateRejection(
+				'Refusing to upsert event with a junk marker title (Rejected/Duplicate/Consolidate/merged/see canonical, or control characters); the AI should call reject_source instead of publishing a marked item (see issues #349, #367)',
+				array( 'title' => $title ),
+				'junk_marker_title'
+			);
+		}
+
+		// 3. Placeholder / noise title. Generic, source-agnostic catch for
+		//    titles that carry no real event identity ("Test Event", bare
+		//    "?", etc.). The deny-list is filterable; matching is generic.
+		if ( $this->isPlaceholderTitle( $title ) ) {
+			return $this->gateRejection(
+				'Refusing to upsert event with a placeholder or noise title; the AI should call reject_source for non-events (see issue #417)',
+				array( 'title' => $title ),
+				'placeholder_title'
+			);
+		}
+
+		// 4. Valid start date — non-empty and parseable Y-m-d. The #415 fix
+		//    lives here now: getDateTimeConfidence() returns 'none' for empty
+		//    or unparseable dates (and impossible calendar dates).
+		$datetime_confidence = $this->getDateTimeConfidence( $parameters, $engine );
+		if ( 'none' === $datetime_confidence ) {
+			// A startTime present with an empty/unparseable startDate is the
+			// exact signature of a date-extraction failure upstream (the fetch
+			// step got the time but not the date). Surface it as a distinct
+			// warning so the source parser can be improved. See issue #415.
+			if ( '' !== $startTime ) {
+				do_action(
+					'datamachine_log',
+					'warning',
+					'Event Upsert: rejected undated event — startTime present but startDate is missing or unparseable (upstream date extraction failed)',
+					array(
+						'title'               => $title,
+						'venue'               => $venue,
+						'startDate'           => $startDate,
+						'startTime'           => $startTime,
+						'datetime_confidence' => $datetime_confidence,
+					)
+				);
+			}
+
+			return $this->gateRejection(
+				'valid startDate is required for event upsert',
+				array(
+					'title'               => $title,
+					'venue'               => $venue,
+					'startDate'           => $startDate,
+					'startTime'           => $startTime,
+					'datetime_confidence' => $datetime_confidence,
+				),
+				'invalid_start_date'
+			);
+		}
+
+		// 5. Junk / test payload — reuse the filterable JunkPayloadFilter
+		//    (#416) so test/placeholder records are caught at the upsert
+		//    boundary regardless of which feed produced them. Source handlers
+		//    seed their own deny-list via
+		//    data_machine_events_junk_payload_patterns; the resolved
+		//    source_type selects the right buckets. This is the key
+		//    consolidation win: the check now runs for every source, not only
+		//    inside the Ticketmaster handler.
+		$junk_evidence = array(
+			'source_id'        => (string) ( $engine->get( 'item_identifier' ) ?? $parameters['item_identifier'] ?? '' ),
+			'title'            => $title,
+			'artist'           => (string) ( $evidence['artist'] ?? '' ),
+			// The raw upstream test flag is evaluated at fetch time; at the
+			// upsert boundary it is unknown, so leave it null and let the
+			// title/id pattern buckets do the work.
+			'is_explicit_test' => null,
+		);
+		$source_type   = (string) ( $evidence['source_type'] ?? '' );
+
+		if ( $this->junk_filter->is_junk( $junk_evidence, $source_type ) ) {
+			return $this->gateRejection(
+				'Refusing to upsert known junk/test event payload; the item matches the junk deny-list for its source (see issues #416, #417)',
+				array(
+					'title'       => $title,
+					'source_id'   => $junk_evidence['source_id'],
+					'source_type' => $source_type,
+				),
+				'junk_payload'
+			);
+		}
+
+		return null;
+	}
+
+	/**
+	 * Build a uniform validation-gate rejection response.
+	 *
+	 * Every gate rule routes through here so rejections are logged with a
+	 * consistent prefix and carry a machine-readable `rule` slug for metrics
+	 * and tuning. The returned array matches the errorResponse() shape
+	 * (success:false) so the tool executor treats it like any other failed
+	 * tool call — the item is neither published nor drafted.
+	 *
+	 * @since 0.46.4
+	 *
+	 * @param string $message Human-readable rejection reason.
+	 * @param array  $context Diagnostic context for the log entry.
+	 * @param string $rule    Machine-readable rule slug.
+	 * @return array Error response with success:false.
+	 */
+	private function gateRejection( string $message, array $context, string $rule ): array {
+		do_action(
+			'datamachine_log',
+			'warning',
+			'Event Upsert: validation gate rejected item — ' . $rule,
+			array_merge( $context, array( 'rule' => $rule ) )
+		);
+
+		return array(
+			'success'   => false,
+			'error'     => $message,
+			'tool_name' => static::class,
+			'rule'      => $rule,
+		);
+	}
+
+	/**
+	 * Determine whether an event title is a generic placeholder carrying no
+	 * real event identity.
+	 *
+	 * Source-agnostic complement to the per-source JunkPayloadFilter: catches
+	 * titles that are pure noise regardless of which feed produced them.
+	 * Matching is generic (no vendor named); the exact-match deny-list is
+	 * filterable via `data_machine_events_placeholder_titles`.
+	 *
+	 * @since 0.46.4
+	 *
+	 * @param string $title Event title.
+	 * @return bool True when the title is a generic placeholder or pure noise.
+	 */
+	private function isPlaceholderTitle( string $title ): bool {
+		$trimmed = trim( $title );
+
+		if ( '' === $trimmed ) {
+			return true;
+		}
+
+		// Bare punctuation / symbols / whitespace only: "?", "??", "-", "…".
+		if ( preg_match( '/^[\p{P}\p{S}\s]+$/u', $trimmed ) ) {
+			return true;
+		}
+
+		/**
+		 * Filter the generic placeholder title deny-list.
+		 *
+		 * Exact, case-insensitive matches (after trim) against any entry are
+		 * rejected at the upsert gate. Add source-specific patterns via
+		 * `data_machine_events_junk_payload_patterns` instead — this filter
+		 * is for titles that are placeholders regardless of source.
+		 *
+		 * @param string[] $placeholders Placeholder titles.
+		 */
+		$placeholders = (array) apply_filters(
+			'data_machine_events_placeholder_titles',
+			array(
+				'Test Event',
+				'Upcoming Event',
+			)
+		);
+
+		foreach ( $placeholders as $placeholder ) {
+			$placeholder = trim( (string) $placeholder );
+			if ( '' === $placeholder ) {
+				continue;
+			}
+
+			if ( 0 === strcasecmp( $trimmed, $placeholder ) ) {
+				return true;
+			}
 		}
 
 		return false;
