@@ -510,8 +510,9 @@ class Pipelines extends BaseRepository {
 
 		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- uses %i identifier placeholder; WPCS does not recognize %i (false positive).
 		$pipeline_config_sql = $this->wpdb->prepare( 'SELECT pipeline_config FROM %i WHERE pipeline_id = %d', $this->table_name, $pipeline_id );
-		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- query is prepared above with %i/%d placeholders.
+		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared -- query is prepared above with %i/%d placeholders.
 		$pipeline_config_json = $this->wpdb->get_var( $pipeline_config_sql );
+		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
 
 		if ( empty( $pipeline_config_json ) ) {
 			return array();
@@ -980,11 +981,13 @@ class Pipelines extends BaseRepository {
 			$offset
 		);
 
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared -- query is prepared above with %i/%d placeholders.
+		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared -- query is prepared above with %i/%d placeholders.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		$results = $this->wpdb->get_results(
 			$orphaned_pipelines_sql,
 			ARRAY_A
 		);
+		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
 
 		return is_array( $results ) ? $results : array();
 	}

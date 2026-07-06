@@ -789,11 +789,13 @@ class ProcessedItems extends BaseRepository {
 			return;
 		}
 
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange,WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is code-defined ($wpdb->prefix), not user input.
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is code-defined ($wpdb->prefix), not user input.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange
 		$wpdb->query(
 			"ALTER TABLE {$table_name}
 			 ADD KEY `flow_source_ts` (flow_step_id, source_type, processed_timestamp)"
 		);
+		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 
 		do_action(
 			'datamachine_log',
@@ -811,25 +813,31 @@ class ProcessedItems extends BaseRepository {
 	public static function ensure_claim_columns( string $table_name ): void {
 		global $wpdb;
 
-		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is code-defined ($wpdb->prefix), not user input.
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is code-defined ($wpdb->prefix), not user input.
 		$status_column = $wpdb->get_var( "SHOW COLUMNS FROM {$table_name} LIKE 'status'" );
+		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 		if ( ! $status_column ) {
-			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is code-defined ($wpdb->prefix), not user input.
+			// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is code-defined ($wpdb->prefix), not user input.
 			$wpdb->query( "ALTER TABLE {$table_name} ADD COLUMN status VARCHAR(20) NOT NULL DEFAULT 'processed'" );
+			// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 		}
 
-		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is code-defined ($wpdb->prefix), not user input.
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is code-defined ($wpdb->prefix), not user input.
 		$claim_column = $wpdb->get_var( "SHOW COLUMNS FROM {$table_name} LIKE 'claim_expires_at'" );
+		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 		if ( ! $claim_column ) {
-			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is code-defined ($wpdb->prefix), not user input.
+			// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is code-defined ($wpdb->prefix), not user input.
 			$wpdb->query( "ALTER TABLE {$table_name} ADD COLUMN claim_expires_at DATETIME NULL" );
+			// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 		}
 
-		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is code-defined ($wpdb->prefix), not user input.
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is code-defined ($wpdb->prefix), not user input.
 		$index = $wpdb->get_row( "SHOW INDEX FROM {$table_name} WHERE Key_name = 'status_claim_expires'" );
+		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 		if ( ! $index ) {
-			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is code-defined ($wpdb->prefix), not user input.
+			// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is code-defined ($wpdb->prefix), not user input.
 			$wpdb->query( "ALTER TABLE {$table_name} ADD KEY `status_claim_expires` (status, claim_expires_at)" );
+			// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 		}
 	}
 }
