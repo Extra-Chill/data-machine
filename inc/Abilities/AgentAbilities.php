@@ -801,7 +801,7 @@ class AgentAbilities {
 					),
 					'execute_callback'    => array( self::class, 'pruneAgents' ),
 					'permission_callback' => fn() => PermissionHelper::can_manage(),
-				'meta'                => array( 'show_in_rest' => true ),
+					'meta'                => array( 'show_in_rest' => true ),
 				)
 			);
 
