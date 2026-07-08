@@ -18,6 +18,7 @@ namespace DataMachineEvents\Abilities;
 use WP_Query;
 use DataMachineEvents\Core\Event_Post_Type;
 use DataMachineEvents\Core\EventDatesTable;
+use DataMachineEvents\Blocks\Calendar\Query\ScopeResolver;
 use DataMachineEvents\Blocks\Calendar\Query\UpcomingFilter;
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -74,6 +75,11 @@ class EventDateQueryAbilities {
 							'time_end'    => array(
 								'type'        => 'string',
 								'description' => 'Time bound end (HH:MM:SS). Used with date_end.',
+							),
+							'time_scope'  => array(
+								'type'        => 'string',
+								'enum'        => array( 'today', 'tonight', 'this-weekend', 'this-week' ),
+								'description' => 'Named time scope that resolves to a concrete date/time window via ScopeResolver (today, tonight, this-weekend, this-week). The resolved window is applied through the same UpcomingFilter date-range path the calendar list uses, so count and list never drift. Explicit date_start/date_end take precedence and skip resolution. #428.',
 							),
 							'tax_filters' => array(
 								'type'        => 'object',
@@ -175,6 +181,7 @@ class EventDateQueryAbilities {
 		$days_ahead  = (int) ( $input['days_ahead'] ?? 0 );
 		$time_start  = $input['time_start'] ?? '';
 		$time_end    = $input['time_end'] ?? '';
+		$time_scope  = isset( $input['time_scope'] ) ? sanitize_key( $input['time_scope'] ) : '';
 		$tax_filters = is_array( $input['tax_filters'] ?? null ) ? $input['tax_filters'] : array();
 		$search      = $input['search'] ?? '';
 		$geo         = is_array( $input['geo'] ?? null ) ? $input['geo'] : array();
@@ -184,6 +191,28 @@ class EventDateQueryAbilities {
 		$order       = strtoupper( $input['order'] ?? 'ASC' ) === 'DESC' ? 'DESC' : 'ASC';
 		$status      = $input['status'] ?? 'publish';
 		$meta_query  = is_array( $input['meta_query'] ?? null ) ? $input['meta_query'] : array();
+
+		// #428: resolve a named time scope (today/tonight/this-weekend/
+		// this-week) to concrete date/time boundaries via ScopeResolver —
+		// the same source of truth the calendar LIST uses in
+		// CalendarAbilities::executeGetCalendarPage(). The resolved window
+		// flows into the existing date-range WHERE branch (buildDateClauses),
+		// which applies UpcomingFilter::range_start_where + start_datetime
+		// upper bound, so the count is constrained by the SAME primitive the
+		// list uses and the two can never drift. Explicit date_start/date_end
+		// from the caller take precedence (mirrors the list path, which only
+		// resolves scope "when user hasn't set explicit dates"), so a caller
+		// can still pin a precise window. Bare/unscoped requests (no
+		// time_scope) are untouched and keep reporting total upcoming.
+		if ( '' !== $time_scope && empty( $date_start ) && empty( $date_end ) ) {
+			$resolved = ScopeResolver::resolve( $time_scope );
+			if ( is_array( $resolved ) ) {
+				$date_start = $resolved['date_start'] ?? '';
+				$date_end   = $resolved['date_end'] ?? '';
+				$time_start = $resolved['time_start'] ?? '';
+				$time_end   = $resolved['time_end'] ?? '';
+			}
+		}
 
 		// Build WP_Query args.
 		$query_args = array(

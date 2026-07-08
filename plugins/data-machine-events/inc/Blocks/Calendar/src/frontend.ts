@@ -43,6 +43,21 @@ function isMonthGridMode( calendar: HTMLElement ): boolean {
 	return calendar.getAttribute( 'data-display-mode' ) === 'month-grid';
 }
 
+/**
+ * Whether the calendar is scoped to a single-day time window.
+ *
+ * Single-day scopes (tonight/today) render a flat vertical list — the
+ * horizontal carousel is poor UX when the whole result set fits one day.
+ * Mirrors the month-grid carousel skip: the `data-scope` attribute is
+ * emitted server-side in render.php and read here the same way
+ * `isMonthGridMode` reads `data-display-mode`. Multi-day scopes
+ * (this-week/this-weekend) keep the carousel. #428.
+ */
+function isSingleDayScope( calendar: HTMLElement ): boolean {
+	const scope = calendar.getAttribute( 'data-scope' );
+	return scope === 'tonight' || scope === 'today';
+}
+
 const calendarInstances = new WeakMap< HTMLElement, true >();
 
 document.addEventListener( 'DOMContentLoaded', function () {
@@ -63,6 +78,12 @@ function initCalendarInstance( calendar: HTMLElement ): void {
 
 	const gridMode = isMonthGridMode( calendar );
 
+	// #428: skip the horizontal carousel for single-day scopes (tonight/
+	// today) and render a flat vertical list instead. Mirrors the month-grid
+	// skip — `useCarousel` is the single gate for carousel init/destroy so
+	// both the initial mount and the content-updated re-init stay in sync.
+	const useCarousel = ! gridMode && ! isSingleDayScope( calendar );
+
 	if ( gridMode ) {
 		// In grid mode the list view is the mobile fallback and the
 		// progressive-render modules (lazy-render, day-loader) target
@@ -74,7 +95,9 @@ function initCalendarInstance( calendar: HTMLElement ): void {
 	} else {
 		initLazyRender( calendar );
 		initDayLoader( calendar );
-		initCarousel( calendar );
+		if ( useCarousel ) {
+			initCarousel( calendar );
+		}
 	}
 
 	initDatePicker( calendar, function () {
@@ -138,12 +161,12 @@ function initCalendarInstance( calendar: HTMLElement ): void {
 		function () {
 			destroyLazyRender( calendar );
 			destroyDayLoader( calendar );
-			if ( ! gridMode ) {
+			if ( useCarousel ) {
 				destroyCarousel( calendar );
 			}
 			initLazyRender( calendar );
 			initDayLoader( calendar );
-			if ( ! gridMode ) {
+			if ( useCarousel ) {
 				initCarousel( calendar );
 			}
 

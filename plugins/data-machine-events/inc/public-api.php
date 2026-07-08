@@ -171,6 +171,13 @@ if ( ! function_exists( 'data_machine_events_query_events' ) ) {
 	 * - `order`        (string)  `'ASC'` | `'DESC'`.
 	 * - `date_start`   (string)  ISO date.
 	 * - `date_end`     (string)  ISO date.
+	 * - `time_scope`   (string)  Named window: `'today'`, `'tonight'`,
+	 *                            `'this-weekend'`, `'this-week'`. Resolves via
+	 *                            ScopeResolver and constrains the query to
+	 *                            that window through the same UpcomingFilter
+	 *                            path the calendar list uses, so a scoped
+	 *                            count matches the scoped list. Explicit
+	 *                            date_start/date_end take precedence. #428.
 	 *
 	 * @since 0.32.0
 	 *
