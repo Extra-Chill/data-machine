@@ -64,8 +64,15 @@ class AgentAccessFilterBridgeFakeAgentsRepository extends Agents {
 
 /**
  * Clear any hooked datamachine_can_access_agent callbacks between scenarios.
+ *
+ * Uses the real WordPress hook API when available (CI host-smoke-wp backend)
+ * and falls back to the pure-PHP stub harness's filter global otherwise.
  */
 function agent_access_filter_bridge_clear_hooks(): void {
+	if ( function_exists( 'remove_all_filters' ) ) {
+		remove_all_filters( 'datamachine_can_access_agent' );
+	}
+
 	unset( $GLOBALS['__agents_api_smoke_filters']['datamachine_can_access_agent'] );
 }
 
@@ -181,10 +188,17 @@ add_filter(
 agents_api_smoke_assert_equals( true, $bridge->bridge_access_decision( false, $user_principal, '77', \WP_Agent_Access_Grant::ROLE_VIEWER, array() ), 'numeric agent identifier is forwarded to hook without slug resolution', $failures, $passes );
 
 // ---- 7. Register wires the bridge into the substrate filter ----
-$GLOBALS['__agents_api_smoke_filters'] = array();
+if ( function_exists( 'remove_all_filters' ) ) {
+	remove_all_filters( 'wp_agent_can_access_agent' );
+}
+unset( $GLOBALS['__agents_api_smoke_filters']['wp_agent_can_access_agent'] );
 AgentAccessFilterBridge::register();
-$registered = $GLOBALS['__agents_api_smoke_filters']['wp_agent_can_access_agent'][10] ?? array();
-agents_api_smoke_assert_equals( true, ! empty( $registered ), 'register() hooks wp_agent_can_access_agent', $failures, $passes );
+if ( function_exists( 'has_filter' ) ) {
+	$registered = false !== has_filter( 'wp_agent_can_access_agent' );
+} else {
+	$registered = ! empty( $GLOBALS['__agents_api_smoke_filters']['wp_agent_can_access_agent'][10] ?? array() );
+}
+agents_api_smoke_assert_equals( true, $registered, 'register() hooks wp_agent_can_access_agent', $failures, $passes );
 
 // ---- 8. Non-principal value passes through unchanged ----
 agent_access_filter_bridge_clear_hooks();
