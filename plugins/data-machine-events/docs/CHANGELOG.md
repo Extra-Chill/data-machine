@@ -2,6 +2,13 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.47.1] - 2026-07-08
+
+### Changed
+- split EventUpsert god-class into focused collaborators (#425)
+- collapse triple datetime store to block + table (#424)
+- delete legacy meta_query dedup cascade — indexed strategy owns all duplicate detection (#423)
+
 ## [0.47.0] - 2026-07-06
 
 ### Added
