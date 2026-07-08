@@ -134,12 +134,13 @@ class MetaDescriptionAbilities {
 		$limit     = absint( $input['limit'] ?? 50 );
 		$force     = ! empty( $input['force'] );
 
-		$acting          = datamachine_resolve_system_agent_context();
-		$user_id         = $acting['user_id'];
-		$agent_id        = $acting['agent_id'];
-		$system_defaults = PluginSettings::resolveModelForAgentMode( $agent_id, 'system' );
-		$provider        = $system_defaults['provider'];
-		$model           = $system_defaults['model'];
+		$acting             = datamachine_resolve_system_agent_context();
+		$user_id            = $acting['user_id'];
+		$agent_id           = $acting['agent_id'];
+		$triggering_user_id = $acting['triggering_user_id'];
+		$system_defaults    = PluginSettings::resolveModelForAgentMode( $agent_id, 'system' );
+		$provider           = $system_defaults['provider'];
+		$model              = $system_defaults['model'];
 
 		if ( empty( $provider ) || empty( $model ) ) {
 			return array(
@@ -206,8 +207,9 @@ class MetaDescriptionAbilities {
 			'meta_description_generation',
 			$item_params,
 			array(
-				'user_id'  => $user_id,
-				'agent_id' => $agent_id,
+				'user_id'            => $user_id,
+				'agent_id'           => $agent_id,
+				'triggering_user_id' => $triggering_user_id,
 			)
 		);
 
