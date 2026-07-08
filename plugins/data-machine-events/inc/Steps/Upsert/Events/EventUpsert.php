@@ -6,7 +6,13 @@
  * Searches for existing events by (title, venue, startDate) and updates if found,
  * creates if new, or skips if data unchanged.
  *
- * Replaces Publisher with smarter create/update logic and change detection.
+ * Thin orchestrator: fetch normalized data → validate → dedup (via
+ * EventDuplicateStrategy) → build content → assign taxonomy → write.
+ * Validation, block-content assembly, and venue/promoter taxonomy assignment
+ * are delegated to focused collaborators (see #425):
+ *  - EventUpsertValidator       — pre-publish validation gate.
+ *  - EventBlockContentBuilder   — event-details block / description assembly.
+ *  - EventTaxonomyAssigner      — venue/promoter taxonomy assignment.
  *
  * @package DataMachineEvents\Steps\Upsert\Events
  * @since   0.2.0
@@ -17,11 +23,8 @@ namespace DataMachineEvents\Steps\Upsert\Events;
 use DataMachine\Core\EngineData;
 use DataMachine\Core\PluginSettings;
 use DataMachineEvents\Steps\EventImport\JunkPayloadFilter;
-use DataMachineEvents\Steps\Upsert\Events\Venue;
-use DataMachineEvents\Steps\Upsert\Events\Promoter;
 use DataMachineEvents\Core\Event_Post_Type;
 use DataMachineEvents\Core\VenueParameterProvider;
-use DataMachineEvents\Core\Promoter_Taxonomy;
 use DataMachineEvents\Core\EventSchemaProvider;
 use DataMachineEvents\Utilities\EventIdentifierGenerator;
 use const DataMachineEvents\Core\EVENT_TICKET_URL_META_KEY;
@@ -41,23 +44,37 @@ class EventUpsert extends UpsertHandler {
 	protected $taxonomy_handler;
 
 	/**
-	 * Reusable junk/test-payload matcher (see #416).
+	 * Pre-publish validation gate (title, junk markers, dates, junk payload).
 	 *
-	 * Evaluated at the upsert gate so test/placeholder records are caught for
-	 * every source, not only inside the Ticketmaster fetch handler.
-	 *
-	 * @var JunkPayloadFilter
+	 * @var EventUpsertValidator
 	 */
-	private JunkPayloadFilter $junk_filter;
+	private EventUpsertValidator $validator;
+
+	/**
+	 * Event-details block / description content assembly.
+	 *
+	 * @var EventBlockContentBuilder
+	 */
+	private EventBlockContentBuilder $content_builder;
+
+	/**
+	 * Venue/promoter taxonomy assignment.
+	 *
+	 * @var EventTaxonomyAssigner
+	 */
+	private EventTaxonomyAssigner $taxonomy_assigner;
 
 	public function __construct() {
 		$this->taxonomy_handler = new TaxonomyHandler();
-		// Register custom handler for venue taxonomy
-		TaxonomyHandler::addCustomHandler( 'venue', array( $this, 'assignVenueTaxonomy' ) );
-		// Register custom handler for promoter taxonomy
-		TaxonomyHandler::addCustomHandler( 'promoter', array( $this, 'assignPromoterTaxonomy' ) );
 
-		$this->junk_filter = new JunkPayloadFilter();
+		$this->validator         = new EventUpsertValidator( new JunkPayloadFilter(), static::class );
+		$this->content_builder   = new EventBlockContentBuilder();
+		$this->taxonomy_assigner = new EventTaxonomyAssigner();
+
+		// Register custom handler for venue taxonomy
+		TaxonomyHandler::addCustomHandler( 'venue', array( $this->taxonomy_assigner, 'assignVenueTaxonomy' ) );
+		// Register custom handler for promoter taxonomy
+		TaxonomyHandler::addCustomHandler( 'promoter', array( $this->taxonomy_assigner, 'assignPromoterTaxonomy' ) );
 	}
 
 	/**
@@ -139,286 +156,40 @@ class EventUpsert extends UpsertHandler {
 	}
 
 	/**
-	 * Determine whether an event title is a junk-marker leak.
+	 * Pre-publish validation gate. Delegates to EventUpsertValidator.
 	 *
-	 * The AI is meant to call the reject_source disposition tool for non-events
-	 * and discovered duplicates; when a stale prompt omits that guidance it can
-	 * instead improvise a marker in the title and publish the junk item. This
-	 * catches (case-insensitive, after trimming surrounding whitespace):
+	 * Kept as a thin delegator so the upsert path and existing reflection-based
+	 * tests resolve against EventUpsert; the gate logic lives in
+	 * EventUpsertValidator (extracted in #425).
 	 *
-	 * - "Rejected:" / "Rejected -" / "Rejected —" prefixes (issue #349)
-	 * - "Duplicate:" / "Consolidate:" prefixes and their dash variants (issue #367)
-	 * - "(duplicate)" / "(merged)" / "(consolidated)" markers anywhere in the title
-	 * - "see canonical" substring (e.g. "— see canonical listing")
-	 * - Any control characters or null bytes (unconditionally rejected)
-	 *
-	 * See issues #349 and #367.
+	 * @param array      $evidence Pre-extracted event fields.
+	 * @param array      $parameters Full tool parameters.
+	 * @param EngineData $engine Engine data.
+	 * @return array|null Null on pass; rejection array on fail.
+	 */
+	private function validateForPublish( array $evidence, array $parameters, EngineData $engine ): ?array {
+		return $this->validator->validateForPublish( $evidence, $parameters, $engine );
+	}
+
+	/**
+	 * Junk-marker title check. Delegates to EventUpsertValidator.
 	 *
 	 * @param string $title Event title.
 	 * @return bool True if the title is a junk-marker leak.
 	 */
 	private function isJunkTitle( string $title ): bool {
-		// Control characters / null bytes are never legitimate in a title.
-		if ( preg_match( '/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', $title ) ) {
-			return true;
-		}
-
-		$trimmed = trim( $title );
-
-		// "Rejected:" / "Duplicate:" / "Consolidate:" prefixes with colon,
-		// hyphen, en dash, or em dash separators (issue #349, #367).
-		if ( preg_match( '/^(rejected|duplicate|consolidate)\s*[:\-\x{2013}\x{2014}]/iu', $trimmed ) ) {
-			return true;
-		}
-
-		// "(duplicate)" / "(merged)" / "(consolidated)" markers anywhere,
-		// including compound forms like "(Duplicate — Consolidated)".
-		if ( preg_match( '/\(\s*(duplicate|merged|consolidated)\b[^)]*\)/i', $trimmed ) ) {
-			return true;
-		}
-
-		// "see canonical" substring (e.g. "— see canonical listing").
-		if ( false !== stripos( $trimmed, 'see canonical' ) ) {
-			return true;
-		}
-
-		return false;
+		return $this->validator->isJunkTitle( $title );
 	}
 
 	/**
-	 * Consolidated pre-publish validation gate.
+	 * Datetime confidence. Delegates to EventUpsertValidator.
 	 *
-	 * Single boundary at upsert_event that enforces a minimum quality bar
-	 * before any event is written. Every fetch handler passes through here,
-	 * so junk never reaches publish regardless of source. Rejected items are
-	 * SKIP + LOG (never published, never drafted); each rejection is logged
-	 * via datamachine_log so upstream parsers and the junk pattern table can
-	 * be tuned.
-	 *
-	 * Consolidates (rather than duplicates) the prior scattered guards:
-	 *  - Empty / unparseable startDate gate (#415) — folded in from the
-	 *    former inline check; getDateTimeConfidence() reused as-is.
-	 *  - Junk-marker title guard (#349, #367) — isJunkTitle() reused.
-	 *  - Junk / test-payload filter (#416) — JunkPayloadFilter reused, now
-	 *    evaluated at the upsert boundary for every source instead of only
-	 *    inside the Ticketmaster fetch handler.
-	 *
-	 * @since 0.46.4
-	 *
-	 * @param array      $evidence Pre-extracted event fields {
-	 *     @type string $title
-	 *     @type string $venue
-	 *     @type string $startDate
-	 *     @type string $startTime
-	 *     @type string $source_type
-	 *     @type string $artist
-	 * }
-	 * @param array      $parameters Full tool parameters.
-	 * @param EngineData $engine     Engine data.
-	 * @return array|null Null when the item passes the gate; otherwise an
-	 *                    error response array (success:false) carrying the
-	 *                    rejection reason and a machine-readable `rule` slug.
+	 * @param array $parameters Event parameters.
+	 * @param EngineData $engine Engine data helper.
+	 * @return string One of full|date_only|none.
 	 */
-	private function validateForPublish( array $evidence, array $parameters, EngineData $engine ): ?array {
-		$title     = (string) ( $evidence['title'] ?? '' );
-		$venue     = (string) ( $evidence['venue'] ?? '' );
-		$startDate = (string) ( $evidence['startDate'] ?? '' );
-		$startTime = (string) ( $evidence['startTime'] ?? '' );
-
-		// 1. Title is mandatory.
-		if ( '' === $title ) {
-			return $this->gateRejection(
-				'title parameter is required for event upsert',
-				array(
-					'provided_parameters' => array_keys( $parameters ),
-					'engine_data_keys'    => array_keys( $engine->all() ),
-				),
-				'missing_title'
-			);
-		}
-
-		// 2. Junk-marker title leakage (Rejected:/Duplicate:/Consolidate:/…).
-		//    The AI is meant to call reject_source; this catches prompt
-		//    regressions where it improvises a marker in the title instead.
-		//    See issues #349, #367.
-		if ( $this->isJunkTitle( $title ) ) {
-			return $this->gateRejection(
-				'Refusing to upsert event with a junk marker title (Rejected/Duplicate/Consolidate/merged/see canonical, or control characters); the AI should call reject_source instead of publishing a marked item (see issues #349, #367)',
-				array( 'title' => $title ),
-				'junk_marker_title'
-			);
-		}
-
-		// 3. Placeholder / noise title. Generic, source-agnostic catch for
-		//    titles that carry no real event identity ("Test Event", bare
-		//    "?", etc.). The deny-list is filterable; matching is generic.
-		if ( $this->isPlaceholderTitle( $title ) ) {
-			return $this->gateRejection(
-				'Refusing to upsert event with a placeholder or noise title; the AI should call reject_source for non-events (see issue #417)',
-				array( 'title' => $title ),
-				'placeholder_title'
-			);
-		}
-
-		// 4. Valid start date — non-empty and parseable Y-m-d. The #415 fix
-		//    lives here now: getDateTimeConfidence() returns 'none' for empty
-		//    or unparseable dates (and impossible calendar dates).
-		$datetime_confidence = $this->getDateTimeConfidence( $parameters, $engine );
-		if ( 'none' === $datetime_confidence ) {
-			// A startTime present with an empty/unparseable startDate is the
-			// exact signature of a date-extraction failure upstream (the fetch
-			// step got the time but not the date). Surface it as a distinct
-			// warning so the source parser can be improved. See issue #415.
-			if ( '' !== $startTime ) {
-				do_action(
-					'datamachine_log',
-					'warning',
-					'Event Upsert: rejected undated event — startTime present but startDate is missing or unparseable (upstream date extraction failed)',
-					array(
-						'title'               => $title,
-						'venue'               => $venue,
-						'startDate'           => $startDate,
-						'startTime'           => $startTime,
-						'datetime_confidence' => $datetime_confidence,
-					)
-				);
-			}
-
-			return $this->gateRejection(
-				'valid startDate is required for event upsert',
-				array(
-					'title'               => $title,
-					'venue'               => $venue,
-					'startDate'           => $startDate,
-					'startTime'           => $startTime,
-					'datetime_confidence' => $datetime_confidence,
-				),
-				'invalid_start_date'
-			);
-		}
-
-		// 5. Junk / test payload — reuse the filterable JunkPayloadFilter
-		//    (#416) so test/placeholder records are caught at the upsert
-		//    boundary regardless of which feed produced them. Source handlers
-		//    seed their own deny-list via
-		//    data_machine_events_junk_payload_patterns; the resolved
-		//    source_type selects the right buckets. This is the key
-		//    consolidation win: the check now runs for every source, not only
-		//    inside the Ticketmaster handler.
-		$junk_evidence = array(
-			'source_id'        => (string) ( $engine->get( 'item_identifier' ) ?? $parameters['item_identifier'] ?? '' ),
-			'title'            => $title,
-			'artist'           => (string) ( $evidence['artist'] ?? '' ),
-			// The raw upstream test flag is evaluated at fetch time; at the
-			// upsert boundary it is unknown, so leave it null and let the
-			// title/id pattern buckets do the work.
-			'is_explicit_test' => null,
-		);
-		$source_type   = (string) ( $evidence['source_type'] ?? '' );
-
-		if ( $this->junk_filter->is_junk( $junk_evidence, $source_type ) ) {
-			return $this->gateRejection(
-				'Refusing to upsert known junk/test event payload; the item matches the junk deny-list for its source (see issues #416, #417)',
-				array(
-					'title'       => $title,
-					'source_id'   => $junk_evidence['source_id'],
-					'source_type' => $source_type,
-				),
-				'junk_payload'
-			);
-		}
-
-		return null;
-	}
-
-	/**
-	 * Build a uniform validation-gate rejection response.
-	 *
-	 * Every gate rule routes through here so rejections are logged with a
-	 * consistent prefix and carry a machine-readable `rule` slug for metrics
-	 * and tuning. The returned array matches the errorResponse() shape
-	 * (success:false) so the tool executor treats it like any other failed
-	 * tool call — the item is neither published nor drafted.
-	 *
-	 * @since 0.46.4
-	 *
-	 * @param string $message Human-readable rejection reason.
-	 * @param array  $context Diagnostic context for the log entry.
-	 * @param string $rule    Machine-readable rule slug.
-	 * @return array Error response with success:false.
-	 */
-	private function gateRejection( string $message, array $context, string $rule ): array {
-		do_action(
-			'datamachine_log',
-			'warning',
-			'Event Upsert: validation gate rejected item — ' . $rule,
-			array_merge( $context, array( 'rule' => $rule ) )
-		);
-
-		return array(
-			'success'   => false,
-			'error'     => $message,
-			'tool_name' => static::class,
-			'rule'      => $rule,
-		);
-	}
-
-	/**
-	 * Determine whether an event title is a generic placeholder carrying no
-	 * real event identity.
-	 *
-	 * Source-agnostic complement to the per-source JunkPayloadFilter: catches
-	 * titles that are pure noise regardless of which feed produced them.
-	 * Matching is generic (no vendor named); the exact-match deny-list is
-	 * filterable via `data_machine_events_placeholder_titles`.
-	 *
-	 * @since 0.46.4
-	 *
-	 * @param string $title Event title.
-	 * @return bool True when the title is a generic placeholder or pure noise.
-	 */
-	private function isPlaceholderTitle( string $title ): bool {
-		$trimmed = trim( $title );
-
-		if ( '' === $trimmed ) {
-			return true;
-		}
-
-		// Bare punctuation / symbols / whitespace only: "?", "??", "-", "…".
-		if ( preg_match( '/^[\p{P}\p{S}\s]+$/u', $trimmed ) ) {
-			return true;
-		}
-
-		/**
-		 * Filter the generic placeholder title deny-list.
-		 *
-		 * Exact, case-insensitive matches (after trim) against any entry are
-		 * rejected at the upsert gate. Add source-specific patterns via
-		 * `data_machine_events_junk_payload_patterns` instead — this filter
-		 * is for titles that are placeholders regardless of source.
-		 *
-		 * @param string[] $placeholders Placeholder titles.
-		 */
-		$placeholders = (array) apply_filters(
-			'data_machine_events_placeholder_titles',
-			array(
-				'Test Event',
-				'Upcoming Event',
-			)
-		);
-
-		foreach ( $placeholders as $placeholder ) {
-			$placeholder = trim( (string) $placeholder );
-			if ( '' === $placeholder ) {
-				continue;
-			}
-
-			if ( 0 === strcasecmp( $trimmed, $placeholder ) ) {
-				return true;
-			}
-		}
-
-		return false;
+	private function getDateTimeConfidence( array $parameters, EngineData $engine ): string {
+		return $this->validator->getDateTimeConfidence( $parameters, $engine );
 	}
 
 	/**
@@ -467,7 +238,7 @@ class EventUpsert extends UpsertHandler {
 		$event_data = $this->buildEventData( $parameters, $handler_config, $engine, $existing_post_id );
 
 		// 3. Generate block content and compute hash for idempotency.
-		$block_content = $this->generate_event_block_content( $event_data, $parameters );
+		$block_content = $this->content_builder->generate_event_block_content( $event_data, $parameters );
 		$content_hash  = md5( $block_content );
 
 		// 4. Resolve post author and status.
@@ -523,8 +294,8 @@ class EventUpsert extends UpsertHandler {
 
 		// 8. Post-upsert event-specific processing (create and update paths).
 		$this->processEventFeaturedImage( $post_id, $handler_config, $engine );
-		$this->processVenue( $post_id, $parameters, $engine );
-		$this->processPromoter( $post_id, $parameters, $engine, $handler_config );
+		$this->taxonomy_assigner->processVenue( $post_id, $parameters, $engine );
+		$this->taxonomy_assigner->processPromoter( $post_id, $parameters, $engine, $handler_config );
 
 		// Map performer to artist taxonomy if not explicitly provided.
 		if ( empty( $parameters['artist'] ) && ! empty( $event_data['performer'] ) ) {
@@ -1008,129 +779,6 @@ class EventUpsert extends UpsertHandler {
 	}
 
 	/**
-	 * Determine datetime confidence from engine/AI parameters.
-	 *
-	 * @param array $parameters Event parameters.
-	 * @param EngineData $engine Engine data helper.
-	 * @return string One of full|date_only|none.
-	 */
-	private function getDateTimeConfidence( array $parameters, EngineData $engine ): string {
-		$start_date = trim( (string) ( $engine->get( 'startDate' ) ?? $parameters['startDate'] ?? '' ) );
-		$start_time = trim( (string) ( $engine->get( 'startTime' ) ?? $parameters['startTime'] ?? '' ) );
-		$end_date   = trim( (string) ( $engine->get( 'endDate' ) ?? $parameters['endDate'] ?? '' ) );
-
-		if ( '' === $start_date ) {
-			return 'none';
-		}
-
-		// A non-empty-but-unparseable startDate (e.g. "2026-07-??", "2026-??-??")
-		// must not auto-publish a junk date. Treat it like a missing date so the
-		// existing rejection path fires and the AI calls reject_source instead.
-		// Mirrors the junk-title guard. See issue #394.
-		if ( ! \DataMachineEvents\Core\DateTimeParser::isValidYmd( $start_date ) ) {
-			return 'none';
-		}
-
-		// A present-but-invalid endDate is equally unstorable; reject rather than
-		// concatenate a malformed DATETIME downstream.
-		if ( '' !== $end_date && ! \DataMachineEvents\Core\DateTimeParser::isValidYmd( $end_date ) ) {
-			return 'none';
-		}
-
-		if ( '' === $start_time ) {
-			return 'date_only';
-		}
-
-		return 'full';
-	}
-
-	/**
-	 * Process venue taxonomy assignment.
-	 * Engine data takes precedence over AI-provided values.
-	 *
-	 * @param int $post_id Post ID
-	 * @param array $parameters Event parameters
-	 * @param EngineData $engine Engine data helper
-	 */
-	private function processVenue( int $post_id, array $parameters, EngineData $engine ): void {
-		$venue_name = $engine->get( 'venue' ) ?? $parameters['venue'] ?? '';
-
-		if ( empty( $venue_name ) ) {
-			$venue_context = $engine->get( 'venue_context' );
-			if ( is_array( $venue_context ) && ! empty( $venue_context['name'] ) ) {
-				$venue_name = $venue_context['name'];
-			}
-		}
-
-		if ( ! empty( $venue_name ) ) {
-			// Merge engine data with AI parameters (engine takes precedence)
-			$merged_params  = array_merge( $parameters, $engine->all() );
-			$venue_metadata = VenueParameterProvider::extractFromParameters( $merged_params );
-
-			$venue_result = \DataMachineEvents\Core\Venue_Taxonomy::find_or_create_venue( $venue_name, $venue_metadata );
-
-			if ( $venue_result['term_id'] ) {
-				Venue::assign_venue_to_event(
-					$post_id,
-					array(
-						'venue' => $venue_result['term_id'],
-					)
-				);
-			}
-		}
-	}
-
-	/**
-	 * Process promoter taxonomy assignment.
-	 * Engine data takes precedence over AI-provided values.
-	 * Maps to Schema.org "organizer" property.
-	 *
-	 * @param int $post_id Post ID
-	 * @param array $parameters Event parameters
-	 * @param EngineData $engine Engine data helper
-	 * @param array $handler_config Handler configuration
-	 */
-	private function processPromoter( int $post_id, array $parameters, EngineData $engine, array $handler_config = array() ): void {
-		$selection = $this->getPromoterSelection( $handler_config );
-
-		if ( 'skip' === $selection ) {
-			return;
-		}
-
-		if ( $this->isPromoterTermSelection( $selection ) ) {
-			$this->assignConfiguredPromoter( $post_id, (int) $selection );
-			return;
-		}
-
-		if ( ! $this->isPromoterAiSelection( $selection ) ) {
-			return;
-		}
-
-		// Organizer field name maps to promoter taxonomy
-		$promoter_name = $engine->get( 'organizer' ) ?? $parameters['organizer'] ?? '';
-
-		if ( empty( $promoter_name ) ) {
-			return;
-		}
-
-		$promoter_metadata = array(
-			'url'  => $engine->get( 'organizerUrl' ) ?? $parameters['organizerUrl'] ?? '',
-			'type' => $engine->get( 'organizerType' ) ?? $parameters['organizerType'] ?? 'Organization',
-		);
-
-		$promoter_result = Promoter_Taxonomy::find_or_create_promoter( $promoter_name, $promoter_metadata );
-
-		if ( $promoter_result['term_id'] ) {
-			Promoter::assign_promoter_to_event(
-				$post_id,
-				array(
-					'promoter' => $promoter_result['term_id'],
-				)
-			);
-		}
-	}
-
-	/**
 	 * Process featured image with EngineData context and handler fallbacks.
 	 */
 	private function processEventFeaturedImage( int $post_id, array $handler_config, EngineData $engine ): void {
@@ -1148,275 +796,6 @@ class EventUpsert extends UpsertHandler {
 	}
 
 	/**
-	 * Generate Event Details block content
-	 *
-	 * @param array $event_data Event data
-	 * @param array $parameters Full parameters (includes engine data)
-	 * @return string Block content
-	 */
-	private function generate_event_block_content( array $event_data, array $parameters = array() ): string {
-		$block_attributes = array(
-			'startDate'         => $event_data['startDate'] ?? '',
-			'startTime'         => $event_data['startTime'] ?? '',
-			'endDate'           => $event_data['endDate'] ?? '',
-			'endTime'           => $event_data['endTime'] ?? '',
-			'occurrenceDates'   => $event_data['occurrenceDates'] ?? array(),
-			'venue'             => $event_data['venue'] ?? $parameters['venue'] ?? '',
-			'address'           => $event_data['venueAddress'] ?? $parameters['venueAddress'] ?? '',
-			'price'             => $event_data['price'] ?? '',
-			'ticketUrl'         => $event_data['ticketUrl'] ?? '',
-
-			'performer'         => $event_data['performer'] ?? '',
-			'performerType'     => $event_data['performerType'] ?? 'PerformingGroup',
-			'organizer'         => $event_data['organizer'] ?? '',
-			'organizerType'     => $event_data['organizerType'] ?? 'Organization',
-			'organizerUrl'      => $event_data['organizerUrl'] ?? '',
-			'eventStatus'       => $event_data['eventStatus'] ?? 'EventScheduled',
-			'previousStartDate' => $event_data['previousStartDate'] ?? '',
-			'priceCurrency'     => $event_data['priceCurrency'] ?? 'USD',
-			'offerAvailability' => $event_data['offerAvailability'] ?? 'InStock',
-
-			'showVenue'         => true,
-			'showPrice'         => true,
-			'showTicketLink'    => true,
-		);
-
-		$block_attributes = array_filter(
-			$block_attributes,
-			function ( $value ) {
-				return '' !== $value && null !== $value;
-			}
-		);
-
-		$block_attributes['showVenue']      = true;
-		$block_attributes['showPrice']      = true;
-		$block_attributes['showTicketLink'] = true;
-
-		$block_json  = wp_json_encode( $block_attributes, JSON_UNESCAPED_UNICODE );
-		$description = ! empty( $event_data['description'] ) ? wp_kses_post( $event_data['description'] ) : '';
-
-		$inner_blocks = $this->generate_description_blocks( $description );
-
-		return '<!-- wp:data-machine-events/event-details ' . $block_json . ' -->' . "\n" .
-				'<div class="wp-block-data-machine-events-event-details">' .
-				( $inner_blocks ? "\n" . $inner_blocks . "\n" : '' ) .
-				'</div>' . "\n" .
-				'<!-- /wp:data-machine-events/event-details -->';
-	}
-
-	/**
-	 * Generate paragraph blocks from HTML description
-	 *
-	 * @param string $description HTML description content
-	 * @return string InnerBlocks content with proper paragraph blocks
-	 */
-	private function generate_description_blocks( string $description ): string {
-		if ( empty( $description ) ) {
-			return '';
-		}
-
-		// Split on closing/opening p tags or double line breaks
-		$paragraphs = preg_split( '/<\/p>\s*<p[^>]*>|<\/p>\s*<p>|\n\n+/', $description );
-
-		$blocks = array();
-		foreach ( $paragraphs as $para ) {
-			// Strip outer p tags but keep inline formatting
-			$para = preg_replace( '/^<p[^>]*>|<\/p>$/', '', trim( $para ) );
-			$para = trim( $para );
-
-			if ( ! empty( $para ) ) {
-				$blocks[] = '<!-- wp:paragraph -->' . "\n" . '<p>' . $para . '</p>' . "\n" . '<!-- /wp:paragraph -->';
-			}
-		}
-
-		return implode( "\n", $blocks );
-	}
-
-	/**
-	 * Custom taxonomy handler for venue
-	 *
-	 * @param int $post_id Post ID
-	 * @param array $parameters Event parameters
-	 * @param array $handler_config Handler configuration
-	 * @param mixed $engine_context Engine context (EngineData|array|null)
-	 * @return array|null Assignment result
-	 */
-	public function assignVenueTaxonomy( int $post_id, array $parameters, array $handler_config, $engine_context = null ): ?array {
-		$engine     = $this->resolveEngineContext( $engine_context, $parameters );
-		$venue_name = $parameters['venue'] ?? $engine->get( 'venue' ) ?? '';
-
-		if ( empty( $venue_name ) ) {
-			return null;
-		}
-
-		$venue_metadata = array(
-			'address'     => $this->getParameterValue( $parameters, 'venueAddress' ) ?: ( $engine->get( 'venueAddress' ) ?? '' ),
-			'city'        => $this->getParameterValue( $parameters, 'venueCity' ) ?: ( $engine->get( 'venueCity' ) ?? '' ),
-			'state'       => $this->getParameterValue( $parameters, 'venueState' ) ?: ( $engine->get( 'venueState' ) ?? '' ),
-			'zip'         => $this->getParameterValue( $parameters, 'venueZip' ) ?: ( $engine->get( 'venueZip' ) ?? '' ),
-			'country'     => $this->getParameterValue( $parameters, 'venueCountry' ) ?: ( $engine->get( 'venueCountry' ) ?? '' ),
-			'phone'       => $this->getParameterValue( $parameters, 'venuePhone' ) ?: ( $engine->get( 'venuePhone' ) ?? '' ),
-			'website'     => $this->getParameterValue( $parameters, 'venueWebsite' ) ?: ( $engine->get( 'venueWebsite' ) ?? '' ),
-			'coordinates' => $this->getParameterValue( $parameters, 'venueCoordinates' ) ?: ( $engine->get( 'venueCoordinates' ) ?? '' ),
-			'capacity'    => $this->getParameterValue( $parameters, 'venueCapacity' ) ?: ( $engine->get( 'venueCapacity' ) ?? '' ),
-		);
-
-		$venue_result = \DataMachineEvents\Core\Venue_Taxonomy::find_or_create_venue( $venue_name, $venue_metadata );
-
-		if ( ! empty( $venue_result['term_id'] ) ) {
-			$assignment_result = Venue::assign_venue_to_event( $post_id, array( 'venue' => $venue_result['term_id'] ) );
-
-			if ( ! empty( $assignment_result ) ) {
-				return array(
-					'success'   => true,
-					'taxonomy'  => 'venue',
-					'term_id'   => $venue_result['term_id'],
-					'term_name' => $venue_name,
-					'source'    => 'event_venue_handler',
-				);
-			}
-
-			return array(
-				'success' => false,
-				'error'   => 'Failed to assign venue term',
-			);
-		}
-
-		return array(
-			'success' => false,
-			'error'   => 'Failed to create or find venue',
-		);
-	}
-
-	/**
-	 * Custom taxonomy handler for promoter
-	 * Maps Schema.org "organizer" field to promoter taxonomy
-	 *
-	 * @param int $post_id Post ID
-	 * @param array $parameters Event parameters
-	 * @param array $handler_config Handler configuration
-	 * @param mixed $engine_context Engine context (EngineData|array|null)
-	 * @return array|null Assignment result
-	 */
-	public function assignPromoterTaxonomy( int $post_id, array $parameters, array $handler_config, $engine_context = null ): ?array {
-		$selection = $this->getPromoterSelection( $handler_config );
-
-		if ( 'skip' === $selection ) {
-			return null;
-		}
-
-		if ( $this->isPromoterTermSelection( $selection ) ) {
-			$result = $this->assignConfiguredPromoter( $post_id, (int) $selection );
-			if ( $result ) {
-				return $result;
-			}
-			return array(
-				'success' => false,
-				'error'   => 'Failed to assign configured promoter',
-			);
-		}
-
-		if ( ! $this->isPromoterAiSelection( $selection ) ) {
-			return null;
-		}
-
-		$engine        = $this->resolveEngineContext( $engine_context, $parameters );
-		$promoter_name = $parameters['organizer'] ?? $engine->get( 'organizer' ) ?? '';
-
-		if ( empty( $promoter_name ) ) {
-			return null;
-		}
-
-		$promoter_metadata = array(
-			'url'  => $this->getParameterValue( $parameters, 'organizerUrl' ) ?: ( $engine->get( 'organizerUrl' ) ?? '' ),
-			'type' => $this->getParameterValue( $parameters, 'organizerType' ) ?: ( $engine->get( 'organizerType' ) ?? 'Organization' ),
-		);
-
-		$promoter_result = Promoter_Taxonomy::find_or_create_promoter( $promoter_name, $promoter_metadata );
-
-		if ( ! empty( $promoter_result['term_id'] ) ) {
-			$assignment_result = Promoter::assign_promoter_to_event( $post_id, array( 'promoter' => $promoter_result['term_id'] ) );
-
-			if ( ! empty( $assignment_result ) ) {
-				return array(
-					'success'   => true,
-					'taxonomy'  => 'promoter',
-					'term_id'   => $promoter_result['term_id'],
-					'term_name' => $promoter_name,
-					'source'    => 'event_promoter_handler',
-				);
-			}
-
-			return array(
-				'success' => false,
-				'error'   => 'Failed to assign promoter term',
-			);
-		}
-
-		return array(
-			'success' => false,
-			'error'   => 'Failed to create or find promoter',
-		);
-	}
-
-	private function getPromoterSelection( array $handler_config ): string {
-		$selection = $handler_config['taxonomy_promoter_selection'] ?? 'skip';
-		if ( is_numeric( $selection ) ) {
-			return (string) absint( $selection );
-		}
-		return $selection;
-	}
-
-	private function isPromoterTermSelection( string $selection ): bool {
-		return is_numeric( $selection ) && (int) $selection > 0;
-	}
-
-	private function isPromoterAiSelection( string $selection ): bool {
-		return 'ai_decides' === $selection;
-	}
-
-	private function assignConfiguredPromoter( int $post_id, int $term_id ): ?array {
-		if ( $term_id <= 0 ) {
-			return null;
-		}
-
-		if ( ! term_exists( $term_id, 'promoter' ) ) {
-			return null;
-		}
-
-		$assignment_result = Promoter::assign_promoter_to_event( $post_id, array( 'promoter' => $term_id ) );
-
-		if ( ! empty( $assignment_result ) ) {
-			$term      = get_term( $term_id, 'promoter' );
-			$term_name = ( ! is_wp_error( $term ) && $term ) ? $term->name : '';
-
-			return array(
-				'success'   => true,
-				'taxonomy'  => 'promoter',
-				'term_id'   => $term_id,
-				'term_name' => $term_name,
-				'source'    => 'event_promoter_handler',
-			);
-		}
-
-		return null;
-	}
-
-	/**
-	 * Get parameter value (camelCase only)
-	 *
-	 * @param array $parameters Parameters array
-	 * @param string $camelKey CamelCase parameter key
-	 * @return string Parameter value or empty string
-	 */
-	private function getParameterValue( array $parameters, string $camelKey ): string {
-		if ( ! empty( $parameters[ $camelKey ] ) ) {
-			return (string) $parameters[ $camelKey ];
-		}
-		return '';
-	}
-
-	/**
 	 * Success response wrapper
 	 */
 	protected function successResponse( array $data ): array {
@@ -1425,34 +804,5 @@ class EventUpsert extends UpsertHandler {
 			'data'      => $data,
 			'tool_name' => 'data_machine_events',
 		);
-	}
-
-	/**
-	 * Normalize arbitrary engine context input into an EngineData instance.
-	 *
-	 * @param mixed $engine_context Engine context (EngineData|array|null)
-	 * @param array $parameters Parameters array
-	 * @return EngineData EngineData instance
-	 */
-	private function resolveEngineContext( $engine_context = null, array $parameters = array() ): EngineData {
-		if ( $engine_context instanceof EngineData ) {
-			return $engine_context;
-		}
-
-		$job_id = (int) ( $parameters['job_id'] ?? null );
-
-		if ( null === $engine_context ) {
-			$engine_context = $parameters['engine'] ?? ( $parameters['engine_data'] ?? array() );
-		}
-
-		if ( $engine_context instanceof EngineData ) {
-			return $engine_context;
-		}
-
-		if ( ! is_array( $engine_context ) ) {
-			$engine_context = is_string( $engine_context ) ? array( 'image_url' => $engine_context ) : array();
-		}
-
-		return new EngineData( $engine_context, $job_id );
 	}
 }
