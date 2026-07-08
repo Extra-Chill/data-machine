@@ -1527,6 +1527,16 @@ class AgentAbilities {
 	}
 
 	/**
+	 * Reconcile every installed bundle-backed agent against its on-disk manifest.
+	 *
+	 * @param array $input Ability input.
+	 * @return array<string,mixed>
+	 */
+	public static function reconcileAllAgentBundles( array $input ): array {
+		return self::bundleLifecycleService()->reconcile_all( $input );
+	}
+
+	/**
 	 * Bind an already-live agent to a bundle (one-time, idempotent adopt).
 	 *
 	 * @param array $input Ability input.
