@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.159.12] - 2026-07-08
+
+### Fixed
+- match compound failed statuses in jobs cleanup and retention
+
 ## [0.159.11] - 2026-07-06
 
 ### Fixed
