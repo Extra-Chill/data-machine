@@ -40,6 +40,15 @@ class Jobs extends BaseRepository {
 	 * instead of LIKE, which enables efficient use of the idx_status_created
 	 * composite index.
 	 *
+	 * Only prefixes whose variants are genuinely enumerable belong here.
+	 * `failed` is deliberately absent: real failure statuses embed arbitrary
+	 * error text (e.g. `failed - packet_failure`, `failed: policy not
+	 * satisfied`), so they can never be enumerated and a prefix LIKE
+	 * `failed%` is the honest match. That LIKE is a prefix pattern, so it
+	 * still uses idx_status_created, and it matches both bare `failed` and
+	 * every compound form — matching the LIKE semantics already used by
+	 * get_jobs_count(), get_jobs_for_list_table(), and delete_jobs().
+	 *
 	 * @var array<string, string[]>
 	 */
 	private const STATUS_VARIANTS = array(
@@ -47,9 +56,6 @@ class Jobs extends BaseRepository {
 			'completed',
 			'completed_no_items',
 			'agent_skipped',
-		),
-		'failed'    => array(
-			'failed',
 		),
 	);
 
@@ -1223,7 +1229,11 @@ class Jobs extends BaseRepository {
 	 * Resolve a status prefix to known variants for indexed lookups.
 	 *
 	 * Falls back to a LIKE pattern when the prefix is not in STATUS_VARIANTS
-	 * (e.g. custom statuses from third-party handlers).
+	 * (e.g. custom statuses from third-party handlers, or `failed` whose
+	 * compound forms embed arbitrary error text and cannot be enumerated).
+	 * The LIKE fallback is a prefix pattern (`prefix%`) so it still benefits
+	 * from idx_status_created and matches both the bare prefix and every
+	 * compound form.
 	 *
 	 * @param string $status_prefix The status prefix (e.g. 'completed', 'failed').
 	 * @return array{type: 'in', values: string[]} | array{type: 'like', pattern: string}
