@@ -24,4 +24,4 @@ Dice FM delivers curated gig data with keyword filtering, city-specific scopes, 
 
 ## Event Handoff
 
-After extraction, `EventEngineData` stores the structured payload. `EventUpsert` merges engine data with AI parameters, runs change detection across every field, assigns venue/promoter terms via `TaxonomyHandler` using `VenueService`/`Venue_Taxonomy`, syncs `_datamachine_event_datetime`, and optionally downloads featured images through `WordPressPublishHelper`. This keeps Event Details, REST responses, and Calendar pagination consistent across imports.
+After extraction, `EventEngineData` stores the structured payload. `EventUpsert` merges engine data with AI parameters, runs change detection across every field, assigns venue/promoter terms via `TaxonomyHandler` using `VenueService`/`Venue_Taxonomy`, syncs the `datamachine_event_dates` table, and optionally downloads featured images through `WordPressPublishHelper`. This keeps Event Details, REST responses, and Calendar pagination consistent across imports.

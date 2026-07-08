@@ -2,9 +2,10 @@
 /**
  * Event Dates Table
  *
- * Manages the dedicated datamachine_event_dates table that replaces
- * postmeta-based event datetime storage. Provides schema creation via
- * dbDelta(), backfill from postmeta, and helper read/write functions.
+ * Manages the dedicated datamachine_event_dates table — the single query
+ * source of truth for event datetimes. Provides schema creation via
+ * dbDelta(), one-time backfill from legacy postmeta, and helper read/write
+ * functions.
  *
  * The table includes a denormalized post_status column so that queries
  * can filter to published events without joining the posts table (which
@@ -149,7 +150,12 @@ class EventDatesTable {
 	}
 
 	/**
-	 * Backfill the event dates table from postmeta.
+	 * Backfill the event dates table from legacy postmeta.
+	 *
+	 * One-time migration: populates the table for events that still have
+	 * `_datamachine_event_datetime` postmeta but no row in the table yet.
+	 * New events are written directly to the table by save_post; this method
+	 * only catches events created before the table existed.
 	 *
 	 * @param int           $batch_size Events per batch.
 	 * @param callable|null $progress   Progress callback (receives total processed count).

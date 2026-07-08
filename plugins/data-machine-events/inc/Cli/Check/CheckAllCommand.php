@@ -23,7 +23,7 @@ class CheckAllCommand {
 	/**
 	 * Run all data quality checks.
 	 *
-	 * Runs times, venues, encoding, meta-sync, duration, and duplicates
+	 * Runs times, venues, encoding, duration, and duplicates
 	 * checks sequentially and displays results.
 	 *
 	 * ## OPTIONS
@@ -68,7 +68,6 @@ class CheckAllCommand {
 			'times'      => 'Time Issues',
 			'venues'     => 'Venue Issues',
 			'encoding'   => 'Encoding Issues',
-			'meta-sync'  => 'Meta Sync Issues',
 			'duration'   => 'Duration Issues',
 			'duplicates' => 'Duplicate Events',
 		);
@@ -88,11 +87,6 @@ class CheckAllCommand {
 				'days-ahead' => $days_ahead,
 				'limit'      => $limit,
 			);
-
-			// meta-sync only uses --limit
-			if ( 'meta-sync' === $subcommand ) {
-				$run_args = array( 'limit' => $limit );
-			}
 
 			// duration uses --max-days and --scope, not --days-ahead or --limit
 			if ( 'duration' === $subcommand ) {

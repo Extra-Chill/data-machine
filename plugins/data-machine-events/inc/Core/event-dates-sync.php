@@ -3,17 +3,17 @@
  * Event Dates Sync
  *
  * Syncs event dates from Event Details block attributes to the
- * datamachine_event_dates table on save_post. Also handles ticket URL
- * normalization for duplicate detection and post_status denormalization.
+ * datamachine_event_dates table on save_post. The block attribute is the
+ * authoring source of truth; the datamachine_event_dates table is the query
+ * source of truth. Also handles ticket URL normalization for duplicate
+ * detection and post_status denormalization.
  *
  * @package DataMachine_Events
  */
 
 namespace DataMachineEvents\Core;
 
-const EVENT_DATETIME_META_KEY     = '_datamachine_event_datetime';
-const EVENT_END_DATETIME_META_KEY = '_datamachine_event_end_datetime';
-const EVENT_TICKET_URL_META_KEY   = '_datamachine_ticket_url';
+const EVENT_TICKET_URL_META_KEY = '_datamachine_ticket_url';
 
 /**
  * Normalize ticket URL for consistent duplicate detection
@@ -169,7 +169,11 @@ function datamachine_unwrap_affiliate_url( string $url ): string {
 }
 
 /**
- * Sync event datetime to post meta on save
+ * Sync event datetime to the datamachine_event_dates table on save.
+ *
+ * Parses the Event Details block attributes (the authoring source of truth)
+ * and writes the computed datetime to the datamachine_event_dates table (the
+ * query source of truth). Ticket URL meta is also synced for dedup queries.
  *
  * @param int     $post_id Post ID.
  * @param WP_Post $post    Post object.

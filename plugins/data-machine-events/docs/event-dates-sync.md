@@ -2,9 +2,14 @@
 
 Syncs event dates from Event Details block attributes to the `datamachine_event_dates` table on save. Also handles ticket URL normalization for duplicate detection.
 
-## Overview
+## Architecture
 
-The event dates sync system provides performant event querying by maintaining a dedicated dates table with denormalized `post_status`. When Event Details blocks are saved, the system automatically extracts datetime information and writes it to the `datamachine_event_dates` table for fast SQL queries without parsing block content.
+Event datetimes are stored in **two** places:
+
+1. **Event Details block attributes** (`startDate`, `startTime`, `endDate`, `endTime`) — the authoring source of truth. Edited by humans and AI in the block editor.
+2. **`datamachine_event_dates` table** — the query source of truth. Calendar queries, upcoming-event filters, admin columns, and Schema.org fallbacks all read from this table.
+
+The `save_post` hook parses the block attributes and writes the computed MySQL DATETIME to the table. There is no postmeta middle layer — the redundant `_datamachine_event_datetime` / `_datamachine_event_end_datetime` meta keys were removed in issue #424.
 
 ## Location
 
@@ -14,78 +19,45 @@ The event dates sync system provides performant event querying by maintaining a 
 
 ### Automatic Synchronization
 
-Monitors post saves and automatically syncs Event Details block data to post meta.
-
-### Dual Meta Keys
-
-Maintains both start and end datetime metadata for comprehensive event querying.
+Monitors post saves and automatically syncs Event Details block data to the `datamachine_event_dates` table.
 
 ### Block Parsing
 
 Parses Gutenberg blocks to extract datetime information from Event Details blocks.
 
-## Constants
+### Denormalized post_status
 
-- `EVENT_DATETIME_META_KEY`: `'_datamachine_event_datetime'` - Stores start datetime
-- `EVENT_END_DATETIME_META_KEY`: `'_datamachine_event_end_datetime'` - Stores end datetime
+The table includes a `post_status` column kept in sync via `transition_post_status` so date queries can filter to published events without joining the posts table.
 
 ## Key Function
 
 ### `data_machine_events_sync_datetime_meta(int $post_id, WP_Post $post, bool $update): void`
 
-Syncs event datetime to post meta on save.
+Syncs event datetime to the `datamachine_event_dates` table on save.
 
 **Process:**
 1. Validates post type is `data_machine_events`
 2. Skips autosave operations
 3. Parses blocks to find Event Details blocks
 4. Extracts start/end dates and times from block attributes
-5. Combines into MySQL DATETIME format
-6. Updates or deletes meta keys based on data presence
+5. Guards against malformed dates (issue #394) — skips the datetime write cleanly instead of writing a junk `0000-00-00 00:00:00` row
+6. Combines into MySQL DATETIME format
+7. Upserts or deletes the table row based on data presence
+8. Syncs ticket URL meta for duplicate detection queries
 
 **Datetime Logic:**
 - Start datetime: `startDate + ' ' + startTime` (defaults to 00:00:00 if no time)
-- End datetime: Uses `endDate + endTime` if provided, otherwise calculates start + 3 hours
-- If no start date, deletes both meta keys
+- End datetime: Uses `endDate + endTime` if provided, otherwise null
+- If no start date, deletes the table row
 
 ## Integration Points
 
 - **Event Details Block**: Automatically triggered on block saves
-- **Calendar Block**: Uses meta for efficient date-based queries
-- **EventUpsert**: Keeps meta synchronized during programmatic updates
-- **Admin Interface**: Enables date-based sorting and filtering
-
-## Usage Examples
-
-### Querying Events by Date
-
-```php
-// Find events starting today
-$today = date('Y-m-d');
-$args = [
-    'post_type' => 'data_machine_events',
-    'meta_query' => [
-        [
-            'key' => '_datamachine_event_datetime',
-            'value' => $today,
-            'compare' => 'LIKE'
-        ]
-    ]
-];
-$events = get_posts($args);
-```
-
-### Sorting Events by Date
-
-```php
-$args = [
-    'post_type' => 'data_machine_events',
-    'meta_key' => '_datamachine_event_datetime',
-    'orderby' => 'meta_value',
-    'order' => 'ASC'
-];
-$events = get_posts($args);
-```
+- **Calendar Block**: Queries the table for efficient date-based filtering (via `DateFilter` / `UpcomingFilter`)
+- **EventUpsert**: Block content is generated from AI parameters; save_post handles table sync
+- **Admin Interface**: Enables date-based sorting and filtering via table JOIN
+- **EventSchemaProvider**: Falls back to the table (not meta) when block attributes are empty
+- **EventHydrator**: Reads datetime from the table to hydrate calendar event data
 
 ## Data Format
 
@@ -106,18 +78,11 @@ The system reads these attributes from Event Details blocks:
 
 ## Performance Benefits
 
-- **Index Support**: Post meta queries can use database indexes
-- **Fast Filtering**: Enables efficient date range queries
-- **Sorting**: Allows ORDER BY on datetime fields
+- **Index Support**: Dedicated table with indexes on `start_datetime`, `end_datetime`, and `(post_status, start_datetime)`
+- **Fast Filtering**: Enables efficient date range queries without postmeta JOINs
+- **Sorting**: Allows ORDER BY on indexed datetime columns
 - **Calendar Queries**: Powers responsive calendar block filtering
 
-## Error Handling
+## Migration
 
-- Invalid dates fall back gracefully
-- Missing time defaults to appropriate values
-- Parse errors don't break the save process
-- Logs datetime calculation issues
-
-## Migration Notes
-
-When upgrading from older versions, existing Event Details blocks will automatically sync their datetime metadata on the next save operation.
+The `EventDatesTable::backfill()` method performs a one-time migration of events that still have legacy `_datamachine_event_datetime` postmeta but no row in the table. New events are written directly to the table by `save_post`.

@@ -26,6 +26,6 @@ The handler paginates Ticketmaster API results up to `MAX_PAGE = 19`, advancing 
 1. `EventImportStep` instantiates `Ticketmaster` and reads `TicketmasterSettings` values.
 2. Handler fetches the first eligible event, normalizes identity with `EventIdentifierGenerator`, stores venue context via `EventEngineData::storeVenueContext()`, and returns a single `DataPacket`.
 3. `EventEngineData` carries the structured payload into the pipeline.
-4. `EventUpsert` receives the data, merges engine parameters, runs field-by-field change detection, assigns venue/promoter via `TaxonomyHandler`, syncs `_datamachine_event_datetime`, and optionally downloads featured images.
+4. `EventUpsert` receives the data, merges engine parameters, runs field-by-field change detection, assigns venue/promoter via `TaxonomyHandler`, syncs the `datamachine_event_dates` table, and optionally downloads featured images.
 
 Every EventUpsert run uses the same identifier hash so duplicates do not slip through.

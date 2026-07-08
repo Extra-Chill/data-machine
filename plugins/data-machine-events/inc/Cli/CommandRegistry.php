@@ -83,10 +83,6 @@ class CommandRegistry {
 				'file'  => $cli . 'Check/CheckEncodingCommand.php',
 				'class' => Check\CheckEncodingCommand::class,
 			),
-			'data-machine-events check meta-sync'        => array(
-				'file'  => $cli . 'Check/CheckMetaSyncCommand.php',
-				'class' => Check\CheckMetaSyncCommand::class,
-			),
 			'data-machine-events check duration'         => array(
 				'file'  => $cli . 'Check/CheckDurationCommand.php',
 				'class' => Check\CheckDurationCommand::class,
@@ -144,10 +140,6 @@ class CommandRegistry {
 			'data-machine-events resync-ticket-urls'     => array(
 				'file'  => $cli . 'TicketUrlResyncCommand.php',
 				'class' => TicketUrlResyncCommand::class,
-			),
-			'data-machine-events resync-meta'            => array(
-				'file'  => $cli . 'ResyncMetaCommand.php',
-				'class' => ResyncMetaCommand::class,
 			),
 			'data-machine-events geocode-venues'         => array(
 				'file'  => $cli . 'GeocodeVenuesCommand.php',

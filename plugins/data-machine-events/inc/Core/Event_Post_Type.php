@@ -20,8 +20,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 class Event_Post_Type {
 
-	const POST_TYPE           = 'data_machine_events';
-	const EVENT_DATE_META_KEY = '_datamachine_event_datetime';
+	const POST_TYPE = 'data_machine_events';
 
 	public static function register() {
 		$labels = array(

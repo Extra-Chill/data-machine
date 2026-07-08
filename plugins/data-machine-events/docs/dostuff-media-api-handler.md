@@ -33,4 +33,4 @@ See `docs/universal-web-scraper-handler.md` for extraction behavior and `inc/Ste
 
 ## Event Handoff
 
-`EventUpsert` receives the standardized payload, merges engine data with AI parameters, runs change detection across every field, delegates venue/promoter assignment to `TaxonomyHandler`, syncs `_datamachine_event_datetime`, and optionally downloads images for the event post. Venue metadata maintained by `VenueService` ensures REST routes (`/events/venues/{id}`) reflect the latest contact information.
+`EventUpsert` receives the standardized payload, merges engine data with AI parameters, runs change detection across every field, delegates venue/promoter assignment to `TaxonomyHandler`, syncs the `datamachine_event_dates` table, and optionally downloads images for the event post. Venue metadata maintained by `VenueService` ensures REST routes (`/events/venues/{id}`) reflect the latest contact information.

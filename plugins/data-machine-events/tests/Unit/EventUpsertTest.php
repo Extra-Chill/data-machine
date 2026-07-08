@@ -13,6 +13,7 @@ namespace DataMachineEvents\Tests\Unit;
 use WP_UnitTestCase;
 use DataMachineEvents\Steps\Upsert\Events\EventUpsert;
 use DataMachineEvents\Core\Event_Post_Type;
+use DataMachineEvents\Core\EventDatesTable;
 use DataMachineEvents\Core\Venue_Taxonomy;
 
 class EventUpsertTest extends WP_UnitTestCase {
@@ -66,7 +67,7 @@ class EventUpsertTest extends WP_UnitTestCase {
 		wp_delete_post( $post_id, true );
 	}
 
-	public function test_event_datetime_meta_storage() {
+	public function test_event_datetime_table_storage() {
 		$post_id = wp_insert_post(
 			array(
 				'post_title'  => 'DateTime Test Event ' . uniqid(),
@@ -76,10 +77,59 @@ class EventUpsertTest extends WP_UnitTestCase {
 		);
 
 		$datetime = '2026-06-15 19:30:00';
-		update_post_meta( $post_id, '_datamachine_event_datetime', $datetime );
+		EventDatesTable::upsert( $post_id, $datetime );
 
-		$stored = get_post_meta( $post_id, '_datamachine_event_datetime', true );
-		$this->assertEquals( $datetime, $stored );
+		$stored = EventDatesTable::get( $post_id );
+		$this->assertNotNull( $stored );
+		$this->assertEquals( $datetime, $stored->start_datetime );
+
+		// Cleanup
+		wp_delete_post( $post_id, true );
+	}
+
+	/**
+	 * save_post must populate the datamachine_event_dates table from the
+	 * Event Details block attributes (block = authoring source of truth,
+	 * table = query source of truth).
+	 *
+	 * @see https://github.com/Extra-Chill/data-machine-events/issues/424
+	 */
+	public function test_save_post_populates_table_from_block(): void {
+		$start_date = '2026-08-15';
+		$start_time = '20:00';
+		$end_date   = '2026-08-15';
+		$end_time   = '23:00';
+
+		$post_id = wp_insert_post(
+			array(
+				'post_title'   => 'Block Sync Test ' . uniqid(),
+				'post_type'    => 'data_machine_events',
+				'post_status'  => 'publish',
+				'post_content' => sprintf(
+					'<!-- wp:data-machine-events/event-details {"startDate":"%s","startTime":"%s","endDate":"%s","endTime":"%s"} --><div class="wp-block-data-machine-events-event-details"></div><!-- /wp:data-machine-events/event-details -->',
+					$start_date,
+					$start_time,
+					$end_date,
+					$end_time
+				),
+			)
+		);
+
+		$this->assertGreaterThan( 0, $post_id );
+
+		$dates = EventDatesTable::get( $post_id );
+		$this->assertNotNull( $dates, 'save_post should have written a row to the event_dates table.' );
+		$this->assertEquals( '2026-08-15 20:00:00', $dates->start_datetime );
+		$this->assertEquals( '2026-08-15 23:00:00', $dates->end_datetime );
+
+		// Calendar hydration (EventHydrator) must read the same values from the table.
+		$post = get_post( $post_id );
+		$data = \DataMachineEvents\Blocks\Calendar\Data\EventHydrator::parse_event_data( $post );
+		$this->assertNotNull( $data );
+		$this->assertEquals( '2026-08-15', $data['startDate'] );
+		$this->assertEquals( '20:00:00', $data['startTime'] );
+		$this->assertEquals( '2026-08-15', $data['endDate'] );
+		$this->assertEquals( '23:00:00', $data['endTime'] );
 
 		// Cleanup
 		wp_delete_post( $post_id, true );

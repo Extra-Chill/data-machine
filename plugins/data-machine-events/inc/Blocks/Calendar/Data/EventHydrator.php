@@ -3,7 +3,8 @@
  * Event Hydrator
  *
  * Parses event data from block attributes and hydrates from authoritative
- * sources (post meta for datetime, taxonomy for venue/promoter).
+ * sources (datamachine_event_dates table for datetime, taxonomy for
+ * venue/promoter).
  *
  * @package DataMachineEvents\Blocks\Calendar\Data
  * @since   0.14.0
@@ -23,8 +24,9 @@ class EventHydrator {
 	/**
 	 * Parse event data from post, hydrating from authoritative sources.
 	 *
-	 * Combines block attributes with post meta (datetime) and taxonomy terms
-	 * (venue, promoter) to return complete, authoritative event data.
+	 * Combines block attributes with the datamachine_event_dates table
+	 * (datetime) and taxonomy terms (venue, promoter) to return complete,
+	 * authoritative event data.
 	 *
 	 * @param \WP_Post $post Post object.
 	 * @return array|null Event data array or null if no startDate found.
@@ -40,7 +42,7 @@ class EventHydrator {
 			}
 		}
 
-		self::hydrate_datetime_from_meta( $post->ID, $event_data );
+		self::hydrate_datetime_from_table( $post->ID, $event_data );
 		self::hydrate_venue_from_taxonomy( $post->ID, $event_data );
 		self::hydrate_promoter_from_taxonomy( $post->ID, $event_data );
 
@@ -48,15 +50,16 @@ class EventHydrator {
 	}
 
 	/**
-	 * Hydrate datetime fields from post meta.
+	 * Hydrate datetime fields from the datamachine_event_dates table.
 	 *
-	 * Post meta is the source of truth for datetime.
-	 * When meta values exist, they override any block attribute values.
+	 * The datamachine_event_dates table is the query source of truth for
+	 * datetime. When table values exist, they override any block attribute
+	 * values.
 	 *
 	 * @param int   $post_id    Post ID.
 	 * @param array $event_data Event data array (modified by reference).
 	 */
-	private static function hydrate_datetime_from_meta( int $post_id, array &$event_data ): void {
+	private static function hydrate_datetime_from_table( int $post_id, array &$event_data ): void {
 		$dates          = \DataMachineEvents\Core\EventDatesTable::get( $post_id );
 		$start_datetime = $dates ? $dates->start_datetime : '';
 		if ( $start_datetime ) {

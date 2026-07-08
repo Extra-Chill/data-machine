@@ -109,7 +109,8 @@ class UpcomingCountAbilities {
 	 * Execute get-upcoming-counts ability.
 	 *
 	 * Single SQL query: counts upcoming events per term using GROUP BY.
-	 * Filters to published data_machine_events with _datamachine_event_datetime >= today.
+	 * Filters to published data_machine_events with start_datetime >= today
+	 * (via the datamachine_event_dates table).
 	 *
 	 * @param array $input Input parameters.
 	 * @return array|\WP_Error Term counts sorted by event count descending.

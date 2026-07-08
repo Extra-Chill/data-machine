@@ -377,11 +377,6 @@ class DATAMACHINE_Events {
 			new \DataMachineEvents\Abilities\TicketUrlResyncAbilities();
 		}
 
-		if ( file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/MetaSyncAbilities.php' ) ) {
-			require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/MetaSyncAbilities.php';
-			new \DataMachineEvents\Abilities\MetaSyncAbilities();
-		}
-
 		if ( file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/TicketmasterTest.php' ) ) {
 			require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/TicketmasterTest.php';
 			new \DataMachineEvents\Abilities\TicketmasterTest();

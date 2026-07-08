@@ -16,7 +16,7 @@ The Pagination system provides day-based pagination for the Calendar block. Inst
 
 ### SQL-Based Optimization
 - **Date Boundary Queries**: Efficient queries using date ranges for each page
-- **Indexed Meta Fields**: Uses `_datamachine_event_datetime` meta field for fast filtering
+- **Indexed Table**: Uses the `datamachine_event_dates` table for fast filtering
 - **Minimal Memory Usage**: Only loads events for the current page's date range
 
 ### Progressive Enhancement

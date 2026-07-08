@@ -20,7 +20,6 @@ use DataMachine\Core\Similarity\SimilarityEngine;
 use DataMachineEvents\Abilities\EventDateQueryAbilities;
 use DataMachineEvents\Utilities\EventIdentifierGenerator;
 use DataMachineEvents\Core\Event_Post_Type;
-use const DataMachineEvents\Core\EVENT_DATETIME_META_KEY;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;

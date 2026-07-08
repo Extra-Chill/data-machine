@@ -29,7 +29,6 @@ The `Event_Post_Type` class handles the complete registration and management of 
 ### Constants
 
 - `POST_TYPE`: `'data_machine_events'` - The post type slug
-- `EVENT_DATE_META_KEY`: `'_datamachine_event_datetime'` - Meta key for event datetime
 
 ## Key Methods
 

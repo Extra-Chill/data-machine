@@ -14,6 +14,7 @@ use WP_UnitTestCase;
 use WP_REST_Request;
 use WP_REST_Server;
 use DataMachineEvents\Core\Event_Post_Type;
+use DataMachineEvents\Core\EventDatesTable;
 use DataMachineEvents\Core\Venue_Taxonomy;
 
 class EventRestControllerTest extends WP_UnitTestCase {
@@ -86,9 +87,9 @@ class EventRestControllerTest extends WP_UnitTestCase {
 			)
 		);
 
-		// Set event datetime in the future
+		// Set event datetime in the future (table is the query source of truth).
 		$future_datetime = date( 'Y-m-d H:i:s', strtotime( '+1 week' ) );
-		update_post_meta( $post_id, '_datamachine_event_datetime', $future_datetime );
+		EventDatesTable::upsert( $post_id, $future_datetime );
 
 		$request  = new WP_REST_Request( 'GET', '/datamachine/v1/events/calendar' );
 		$response = $this->server->dispatch( $request );
@@ -114,7 +115,7 @@ class EventRestControllerTest extends WP_UnitTestCase {
 		);
 
 		$future_datetime = date( 'Y-m-d H:i:s', strtotime( '+1 week' ) );
-		update_post_meta( $post_id, '_datamachine_event_datetime', $future_datetime );
+		EventDatesTable::upsert( $post_id, $future_datetime );
 
 		$request = new WP_REST_Request( 'GET', '/datamachine/v1/events/calendar' );
 		$request->set_param( 'event_search', $unique_term );

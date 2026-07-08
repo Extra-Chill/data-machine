@@ -27,7 +27,7 @@ Data Machine Events exposes a focused REST surface under the `datamachine/v1` na
   - `archive_term_id` (int): Term ID for archive context.
   - `paged` (int): Page number.
   - `past` (string): Past-event toggle.
-- **Behavior**: Sanitizes every argument, builds SQL-based WP_Query filters (dates, `_datamachine_event_datetime`, taxonomies), caches taxonomy counts via helper classes, and returns success + fragments for frontend replacement.
+- **Behavior**: Sanitizes every argument, builds SQL-based WP_Query filters (dates via the `datamachine_event_dates` table, taxonomies), caches taxonomy counts via helper classes, and returns success + fragments for frontend replacement.
 
 ### GET `/wp-json/datamachine/v1/events/filters`
 - **Purpose**: Provides taxonomy term data (counts, parents, dependencies) for the Calendar filter modal.
@@ -65,5 +65,5 @@ Data Machine Events exposes a focused REST surface under the `datamachine/v1` na
 
 ## Notes
 
-- **Query performance**: Calendar queries rely on `_datamachine_event_datetime` meta and taxonomy joins.
+- **Query performance**: Calendar queries JOIN the `datamachine_event_dates` table and taxonomy terms for index-optimized filtering.
 - **Response shape**: Endpoints return JSON suitable for progressive enhancement, but templates still render server-side when JS is absent.
