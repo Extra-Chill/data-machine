@@ -15,6 +15,12 @@
  * All query logic uses PostIdentityIndex (indexed columns) instead of
  * wp_postmeta LIKE scans.
  *
+ * Date-awareness: every strategy scopes its index query by date_only
+ * (extracted from startDate in context). This means recurring series —
+ * same title and venue but a different calendar date — are never matched
+ * as duplicates. The same title + venue + date within a 2-hour time
+ * window IS a duplicate. See #423.
+ *
  * @package DataMachineEvents\Core\DuplicateDetection
  * @since   0.18.0
  */

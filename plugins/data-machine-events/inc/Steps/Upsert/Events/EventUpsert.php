@@ -427,7 +427,7 @@ class EventUpsert extends UpsertHandler {
 	 * Execute the find-or-create logic within an advisory lock.
 	 *
 	 * Separated from executeUpsert() so the lock boundary is clear:
-	 * the lock is held from before findExistingEvent() through the
+	 * the lock is held from before findExistingEventViaAbility() through the
 	 * completion of the DM core upsert and post-processing.
 	 *
 	 * Domain-specific identity resolution (fuzzy title/venue/date matching,
@@ -585,8 +585,9 @@ class EventUpsert extends UpsertHandler {
 	 * the registered EventDuplicateStrategy, querying the PostIdentityIndex
 	 * with indexed lookups instead of postmeta LIKE scans.
 	 *
-	 * Falls back to the legacy findExistingEvent() if the ability or
-	 * identity index table is not available.
+	 * The indexed strategy is date-aware: every query scopes by date_only,
+	 * so recurring series (same title/venue, different date) are never
+	 * falsely matched. See #423.
 	 *
 	 * The `address` and `city` context fields let EventDuplicateStrategy
 	 * resolve the incoming venue via the same address-first cascade the
@@ -601,15 +602,21 @@ class EventUpsert extends UpsertHandler {
 	 * @return int|null Post ID if found, null otherwise.
 	 */
 	private function findExistingEventViaAbility( string $title, string $venue, string $startDate, string $ticketUrl, string $address = '', string $city = '' ): ?int {
-		// Check if the identity index table class exists (requires DM core >= 0.50.0).
-		if ( ! class_exists( 'DataMachine\\Core\\Database\\PostIdentityIndex\\PostIdentityIndex' ) ) {
-			return $this->findExistingEvent( $title, $venue, $startDate, $ticketUrl );
+		// The indexed EventDuplicateStrategy owns all event duplicate
+		// detection. If the index class or ability is unavailable (DM core
+		// too old), there is no safe fallback — return null so a new event
+		// is created rather than silently skipping dedup. In practice core
+		// is network-pinned so this branch is unreachable.
+		if ( ! class_exists( 'DataMachine\Core\Database\PostIdentityIndex\PostIdentityIndex' ) ) {
+			do_action( 'datamachine_log', 'warning', 'Event Upsert: PostIdentityIndex unavailable — skipping dedup, creating new event', array( 'title' => $title ) );
+			return null;
 		}
 
 		$duplicate_check = wp_get_ability( 'datamachine/check-duplicate' );
 
 		if ( ! $duplicate_check ) {
-			return $this->findExistingEvent( $title, $venue, $startDate, $ticketUrl );
+			do_action( 'datamachine_log', 'warning', 'Event Upsert: datamachine/check-duplicate ability unavailable — skipping dedup, creating new event', array( 'title' => $title ) );
+			return null;
 		}
 
 		$result = $duplicate_check->execute(
@@ -627,45 +634,50 @@ class EventUpsert extends UpsertHandler {
 			)
 		);
 
-		if ( is_array( $result ) && 'duplicate' === ( $result['verdict'] ?? '' ) ) {
-			$post_id = (int) ( $result['match']['post_id'] ?? 0 );
-			if ( $post_id > 0 ) {
-				// Verify the matched post has the same startDate. The core
-				// duplicate check matches on title similarity alone and does
-				// not consider event dates. Recurring series events (e.g.
-				// weekly "Barn Jam" at Awendaw Green) share the same title
-				// and venue but have different dates — these are distinct
-				// events, not duplicates.
-				// See: https://github.com/Extra-Chill/data-machine/issues/1108
-				if ( ! empty( $startDate ) ) {
-					$existing_data      = $this->extractEventData( $post_id );
-					$existing_startDate = $existing_data['startDate'] ?? '';
+		if ( ! ( is_array( $result ) && 'duplicate' === ( $result['verdict'] ?? '' ) ) ) {
+			return null;
+		}
 
-					if ( ! empty( $existing_startDate ) && $existing_startDate !== $startDate ) {
-						do_action(
-							'datamachine_log',
-							'info',
-							'Event Upsert: Ability matched title but startDate differs — treating as new event (recurring series)',
-							array(
-								'title'              => $title,
-								'venue'              => $venue,
-								'incoming_startDate' => $startDate,
-								'existing_startDate' => $existing_startDate,
-								'existing_post_id'   => $post_id,
-							)
-						);
+		$post_id = (int) ( $result['match']['post_id'] ?? 0 );
+		if ( $post_id <= 0 ) {
+			return null;
+		}
 
-						// Fall through to legacy date-aware lookup which
-						// searches by venue + date + fuzzy title.
-						return $this->findExistingEvent( $title, $venue, $startDate, $ticketUrl );
-					}
+		// Defensive date guard: EventDuplicateStrategy is date-aware (queries
+		// by date_only), so its own matches are always date-correct. However
+		// DM core may run additional strategies that match on title alone.
+		// If such a strategy returned this match and the existing event is
+		// on a genuinely different calendar date, treat it as a distinct
+		// recurring-series event rather than a duplicate.
+		// See: https://github.com/Extra-Chill/data-machine/issues/1108
+		if ( ! empty( $startDate ) ) {
+			$existing_data      = $this->extractEventData( $post_id );
+			$existing_startDate = $existing_data['startDate'] ?? '';
+
+			if ( ! empty( $existing_startDate ) ) {
+				$existing_date_only = self::extractDateForQuery( $existing_startDate );
+				$incoming_date_only = self::extractDateForQuery( $startDate );
+
+				if ( $existing_date_only !== $incoming_date_only ) {
+					do_action(
+						'datamachine_log',
+						'info',
+						'Event Upsert: Ability matched title but date differs — treating as new event (recurring series)',
+						array(
+							'title'            => $title,
+							'venue'            => $venue,
+							'incoming_date'    => $incoming_date_only,
+							'existing_date'    => $existing_date_only,
+							'existing_post_id' => $post_id,
+						)
+					);
+
+					return null;
 				}
-
-				return $post_id;
 			}
 		}
 
-		return null;
+		return $post_id;
 	}
 
 	/**
@@ -741,243 +753,9 @@ class EventUpsert extends UpsertHandler {
 	}
 
 	/**
-	 * Find existing event by title, venue, start date, and ticket URL
-	 *
-	 * Checks in order of reliability:
-	 * 1. Ticket URL matching (most reliable - stable identifier from ticketing platform)
-	 * 2. Fuzzy title matching at same venue/date
-	 * 3. Exact title matching
-	 *
-	 * @param string $title Event title
-	 * @param string $venue Venue name
-	 * @param string $startDate Start date (YYYY-MM-DD)
-	 * @param string $ticketUrl Ticket purchase URL
-	 * @return int|null Post ID if found, null otherwise
-	 */
-	private function findExistingEvent( string $title, string $venue, string $startDate, string $ticketUrl = '' ): ?int {
-		$identity_confidence = EventIdentifierGenerator::getIdentityConfidence( $title, $startDate, $venue );
-
-		// Try ticket URL matching first (most reliable)
-		if ( ! empty( $ticketUrl ) && ! empty( $startDate ) ) {
-			$ticket_match = $this->findEventByTicketUrl( $ticketUrl, $startDate );
-			if ( $ticket_match ) {
-				return $ticket_match;
-			}
-		}
-
-		// Try fuzzy title matching when we have venue and date
-		if ( ! empty( $venue ) && ! empty( $startDate ) ) {
-			$fuzzy_match = $this->findEventByVenueDateAndFuzzyTitle( $title, $venue, $startDate );
-			if ( $fuzzy_match ) {
-				return $fuzzy_match;
-			}
-		}
-
-		// Try exact title matching (with venue confirmation)
-		$exact_match = $this->findEventByExactTitle( $title, $venue, $startDate );
-		if ( $exact_match ) {
-			return $exact_match;
-		}
-
-		// Final safety net: fuzzy title + date search without venue constraint.
-		// Catches cross-source duplicates where venue names differ between scrapers
-		// (e.g. "Come and Take It Live" vs "Come and Take It Productions").
-		// Venue is passed for confirmation when both sides have it.
-		if ( ! empty( $startDate ) && 'low' !== $identity_confidence ) {
-			return $this->findEventByDateAndFuzzyTitle( $title, $startDate, $venue );
-		}
-
-		if ( ! empty( $startDate ) ) {
-			do_action(
-				'datamachine_log',
-				'debug',
-				'Event Upsert: Skipping venue-agnostic fuzzy fallback for low-confidence event identity',
-				array(
-					'title'               => $title,
-					'venue'               => $venue,
-					'startDate'           => $startDate,
-					'identity_confidence' => $identity_confidence,
-				)
-			);
-		}
-
-		return null;
-	}
-
-	/**
-	 * Find event by venue + date, then fuzzy title comparison
-	 *
-	 * Queries all events at a venue on a given date, then compares titles
-	 * using core title extraction to catch variations like tour names or openers.
-	 *
-	 * @param string $title Event title to match
-	 * @param string $venue Venue name
-	 * @param string $startDate Start date (YYYY-MM-DD)
-	 * @return int|null Post ID if fuzzy match found, null otherwise
-	 */
-	private function findEventByVenueDateAndFuzzyTitle( string $title, string $venue, string $startDate ): ?int {
-		if ( EventIdentifierGenerator::isLowConfidenceTitle( $title ) ) {
-			do_action(
-				'datamachine_log',
-				'debug',
-				'Event Upsert: Skipping venue-scoped fuzzy match for low-confidence title',
-				array(
-					'title'     => $title,
-					'venue'     => $venue,
-					'startDate' => $startDate,
-				)
-			);
-			return null;
-		}
-
-		// Find venue term — cascading lookup: exact name → slug → normalized name.
-		$venue_term = get_term_by( 'name', $venue, 'venue' );
-		if ( ! $venue_term ) {
-			$venue_slug = sanitize_title( $venue );
-			$venue_term = get_term_by( 'slug', $venue_slug, 'venue' );
-		}
-		if ( ! $venue_term ) {
-			$venue_term = \DataMachineEvents\Core\Venue_Taxonomy::find_venue_by_normalized_name_public( $venue );
-		}
-		if ( ! $venue_term ) {
-			do_action(
-				'datamachine_log',
-				'debug',
-				'Event Upsert: Venue term not found for fuzzy title matching, will try venue-agnostic fallback',
-				array(
-					'venue_name' => $venue,
-					'title'      => $title,
-					'startDate'  => $startDate,
-				)
-			);
-			return null;
-		}
-
-		// Query events at this venue on this date.
-		// Use date-only matching; time comparison is done separately.
-		$date_only  = self::extractDateForQuery( $startDate );
-		$ability    = new \DataMachineEvents\Abilities\EventDateQueryAbilities();
-		$result     = $ability->executeQueryEvents( array(
-			'date_match'  => $date_only,
-			'tax_filters' => array( 'venue' => array( $venue_term->term_id ) ),
-			'per_page'    => 10,
-			'status'      => 'any',
-		) );
-		$candidates = $result['posts'];
-
-		if ( empty( $candidates ) ) {
-			return null;
-		}
-
-		// Compare titles using core extraction and time window
-		foreach ( $candidates as $candidate ) {
-			if ( ! EventIdentifierGenerator::titlesMatch( $title, $candidate->post_title ) ) {
-				continue;
-			}
-
-			// Check time window if both events have time data
-			$candidate_dates   = \DataMachineEvents\Core\EventDatesTable::get( $candidate->ID );
-			$existing_datetime = $candidate_dates ? $candidate_dates->start_datetime : '';
-			if ( ! $this->isWithinTimeWindow( $startDate, $existing_datetime ) ) {
-				do_action(
-					'datamachine_log',
-					'debug',
-					'Event Upsert: Title matched but outside time window (possible early/late show)',
-					array(
-						'incoming_title'    => $title,
-						'matched_title'     => $candidate->post_title,
-						'incoming_datetime' => $startDate,
-						'existing_datetime' => $existing_datetime,
-						'post_id'           => $candidate->ID,
-					)
-				);
-				continue;
-			}
-
-			do_action(
-				'datamachine_log',
-				'info',
-				'Event Upsert: Fuzzy matched incoming title to existing event',
-				array(
-					'incoming_title' => $title,
-					'matched_title'  => $candidate->post_title,
-					'post_id'        => $candidate->ID,
-					'venue'          => $venue,
-					'date'           => $startDate,
-				)
-			);
-			return $candidate->ID;
-		}
-
-		return null;
-	}
-
-	/**
-	 * Check if two datetimes are within a tolerance window
-	 *
-	 * Used to distinguish early/late shows (3+ hours apart) from the same event
-	 * listed with different times across sources (typically within 1-2 hours).
-	 *
-	 * If either datetime lacks a time component, returns true (allows match).
-	 *
-	 * @param string $datetime1 First datetime (YYYY-MM-DD or YYYY-MM-DDTHH:MM)
-	 * @param string $datetime2 Second datetime (YYYY-MM-DD or YYYY-MM-DDTHH:MM)
-	 * @param int $windowHours Maximum hours apart to consider a match (default 2)
-	 * @return bool True if within window or time data unavailable
-	 */
-	private function isWithinTimeWindow( string $datetime1, string $datetime2, int $windowHours = 2 ): bool {
-		// If either is empty, allow match
-		if ( empty( $datetime1 ) || empty( $datetime2 ) ) {
-			return true;
-		}
-
-		// Normalize T separator to space for consistent parsing.
-		$datetime1 = self::normalizeDatetime( $datetime1 );
-		$datetime2 = self::normalizeDatetime( $datetime2 );
-
-		// Check if both have time components (space followed by time)
-		$has_time1 = preg_match( '/\s\d{2}:\d{2}/', $datetime1 );
-		$has_time2 = preg_match( '/\s\d{2}:\d{2}/', $datetime2 );
-
-		// If either lacks time, allow match (can't compare)
-		if ( ! $has_time1 || ! $has_time2 ) {
-			return true;
-		}
-
-		// Parse both datetimes
-		$time1 = strtotime( $datetime1 );
-		$time2 = strtotime( $datetime2 );
-
-		if ( false === $time1 || false === $time2 ) {
-			return true;
-		}
-
-		// Calculate absolute difference in hours
-		$diff_hours = abs( $time1 - $time2 ) / 3600;
-
-		return $diff_hours <= $windowHours;
-	}
-
-	/**
-	 * Normalize a datetime string for consistent comparison.
-	 *
-	 * Replaces ISO 8601 'T' separator with space so that LIKE queries
-	 * and string comparisons work against DB-stored values which use
-	 * space separators (e.g. '2026-03-20 21:00:00').
-	 *
-	 * @param string $datetime Datetime string in any common format.
-	 * @return string Normalized datetime with space separator.
-	 */
-	private static function normalizeDatetime( string $datetime ): string {
-		// Replace T separator with space: 2026-03-20T21:00:00 → 2026-03-20 21:00:00
-		return preg_replace( '/(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})/', '$1 $2', $datetime );
-	}
-
-	/**
 	 * Extract just the date portion (YYYY-MM-DD) from a datetime string.
 	 *
-	 * Used for LIKE queries against the event datetime meta field.
-	 * The time comparison is done separately in isWithinTimeWindow().
+	 * Used for date-scoped queries and advisory-lock key derivation.
 	 *
 	 * @param string $datetime Datetime or date string.
 	 * @return string Date portion only (YYYY-MM-DD).
@@ -988,286 +766,6 @@ class EventUpsert extends UpsertHandler {
 			return $matches[1];
 		}
 		return $datetime;
-	}
-
-	/**
-	 * Find event by exact title match with venue confirmation
-	 *
-	 * Matches are returned when:
-	 * - No incoming venue (can't verify, trust the title+date match)
-	 * - Existing post has no venue assigned (can't verify, trust the match)
-	 * - Venues match exactly OR fuzzy-match (normalized comparison)
-	 *
-	 * @param string $title Event title
-	 * @param string $venue Venue name
-	 * @param string $startDate Start date (YYYY-MM-DD)
-	 * @return int|null Post ID if found, null otherwise
-	 */
-	private function findEventByExactTitle( string $title, string $venue, string $startDate ): ?int {
-		$low_confidence_title = EventIdentifierGenerator::isLowConfidenceTitle( $title );
-
-		if ( ! empty( $startDate ) ) {
-			$exact_date_only = self::extractDateForQuery( $startDate );
-			$ability         = new \DataMachineEvents\Abilities\EventDateQueryAbilities();
-			$result          = $ability->executeQueryEvents( array(
-				'date_match' => $exact_date_only,
-				'per_page'   => -1,
-				'fields'     => 'ids',
-				'status'     => 'any',
-			) );
-			// Filter to exact title match in PHP.
-			$posts = array();
-			foreach ( $result['posts'] as $candidate_id ) {
-				if ( get_the_title( $candidate_id ) === $title ) {
-					$posts[] = $candidate_id;
-					break;
-				}
-			}
-		} else {
-			$args  = array(
-				'post_type'      => Event_Post_Type::POST_TYPE,
-				'title'          => $title,
-				'posts_per_page' => 1,
-				'post_status'    => array( 'publish', 'draft', 'pending' ),
-				'fields'         => 'ids',
-			);
-			$posts = get_posts( $args );
-		}
-
-		if ( ! empty( $posts ) ) {
-			$post_id = $posts[0];
-
-			// No incoming venue — trust the title+date match only for stronger titles.
-			if ( empty( $venue ) ) {
-				if ( $low_confidence_title ) {
-					return null;
-				}
-				return $post_id;
-			}
-
-			$venue_terms = wp_get_post_terms( $post_id, 'venue', array( 'fields' => 'names' ) );
-
-			// Existing post has no venue — trust the title+date match only for stronger titles.
-			if ( empty( $venue_terms ) ) {
-				if ( $low_confidence_title ) {
-					return null;
-				}
-				return $post_id;
-			}
-
-			// Check venue: exact match first, then normalized comparison
-			foreach ( $venue_terms as $existing_venue ) {
-				if ( $venue === $existing_venue ) {
-					return $post_id;
-				}
-
-				if ( EventIdentifierGenerator::venuesMatch( $venue, $existing_venue ) ) {
-					do_action(
-						'datamachine_log',
-						'info',
-						'Event Upsert: Fuzzy venue match in exact title search',
-						array(
-							'incoming_venue' => $venue,
-							'existing_venue' => $existing_venue,
-							'post_id'        => $post_id,
-							'title'          => $title,
-						)
-					);
-					return $post_id;
-				}
-			}
-		}
-
-		return null;
-	}
-
-	/**
-	 * Find event by matching ticket URL on the same date
-	 *
-	 * Ticket URLs are stable identifiers from ticketing platforms.
-	 * Same ticket URL + same date = definitively the same event.
-	 *
-	 * @param string $ticketUrl Ticket purchase URL
-	 * @param string $startDate Start date (YYYY-MM-DD)
-	 * @return int|null Post ID if found, null otherwise
-	 */
-	private function findEventByTicketUrl( string $ticketUrl, string $startDate ): ?int {
-		if ( empty( $ticketUrl ) || empty( $startDate ) ) {
-			return null;
-		}
-
-		$normalized_url = datamachine_normalize_ticket_url( $ticketUrl );
-		if ( empty( $normalized_url ) ) {
-			return null;
-		}
-
-		// Strategy A: exact match on stored normalized URL
-		$ticket_date_only = self::extractDateForQuery( $startDate );
-		$ability          = new \DataMachineEvents\Abilities\EventDateQueryAbilities();
-		$result_a         = $ability->executeQueryEvents( array(
-			'date_match' => $ticket_date_only,
-			'per_page'   => 1,
-			'fields'     => 'ids',
-			'status'     => 'any',
-			'meta_query' => array(
-				array(
-					'key'     => EVENT_TICKET_URL_META_KEY,
-					'value'   => $normalized_url,
-					'compare' => '=',
-				),
-			),
-		) );
-		$posts            = $result_a['posts'];
-
-		if ( ! empty( $posts ) ) {
-			do_action(
-				'datamachine_log',
-				'info',
-				'Event Upsert: Found duplicate by ticket URL (exact)',
-				array(
-					'ticket_url'      => $ticketUrl,
-					'normalized_url'  => $normalized_url,
-					'matched_post_id' => $posts[0],
-					'date'            => $startDate,
-				)
-			);
-			return $posts[0];
-		}
-
-		// Strategy B: match on canonical ticket identity (unwraps affiliate URLs).
-		// This catches cases where one source provides an affiliate link and another
-		// provides the direct URL for the same event.
-		$canonical_identity = datamachine_extract_ticket_identity( $ticketUrl );
-		if ( empty( $canonical_identity ) || $canonical_identity === $normalized_url ) {
-			return null; // No different identity to check
-		}
-
-		// Search all events on the same date and compare their canonical identities
-		$result_b   = $ability->executeQueryEvents( array(
-			'date_match' => $ticket_date_only,
-			'per_page'   => 50,
-			'fields'     => 'ids',
-			'status'     => 'any',
-			'meta_query' => array(
-				array(
-					'key'     => EVENT_TICKET_URL_META_KEY,
-					'compare' => 'EXISTS',
-				),
-			),
-		) );
-		$candidates = $result_b['posts'];
-
-		foreach ( $candidates as $candidate_id ) {
-			$stored_url       = get_post_meta( $candidate_id, EVENT_TICKET_URL_META_KEY, true );
-			$stored_canonical = datamachine_extract_ticket_identity( $stored_url );
-
-			if ( $stored_canonical === $canonical_identity ) {
-				do_action(
-					'datamachine_log',
-					'info',
-					'Event Upsert: Found duplicate by ticket canonical identity',
-					array(
-						'ticket_url'         => $ticketUrl,
-						'canonical_identity' => $canonical_identity,
-						'stored_url'         => $stored_url,
-						'matched_post_id'    => $candidate_id,
-						'date'               => $startDate,
-					)
-				);
-				return $candidate_id;
-			}
-		}
-
-		return null;
-	}
-
-	/**
-	 * Find event by date and fuzzy title without venue constraint
-	 *
-	 * Last-resort deduplication for cross-source imports where the same event
-	 * appears with different venue names (e.g. "Come and Take It Live" vs
-	 * "Come and Take It Productions") or where one source omits the venue entirely.
-	 *
-	 * Queries all events on a given date and compares titles using core extraction.
-	 * More permissive than venue-scoped fuzzy matching — only fires as a final
-	 * fallback after ticket URL, venue+fuzzy, and exact title strategies all fail.
-	 *
-	 * When both the incoming event and a candidate have venue data, venue matching
-	 * is required to prevent false positives (e.g. "Open Mic Night" at two
-	 * different bars on the same date).
-	 *
-	 * @param string $title Event title to match
-	 * @param string $startDate Start date (YYYY-MM-DD)
-	 * @param string $venue Incoming venue name for confirmation (may be empty)
-	 * @return int|null Post ID if fuzzy match found, null otherwise
-	 */
-	private function findEventByDateAndFuzzyTitle( string $title, string $startDate, string $venue = '' ): ?int {
-		if ( EventIdentifierGenerator::isLowConfidenceTitle( $title ) ) {
-			return null;
-		}
-
-		$date_only  = self::extractDateForQuery( $startDate );
-		$ability    = new \DataMachineEvents\Abilities\EventDateQueryAbilities();
-		$result     = $ability->executeQueryEvents( array(
-			'date_match' => $date_only,
-			'per_page'   => 20,
-			'status'     => 'any',
-		) );
-		$candidates = $result['posts'];
-
-		if ( empty( $candidates ) ) {
-			return null;
-		}
-
-		foreach ( $candidates as $candidate ) {
-			if ( ! EventIdentifierGenerator::titlesMatch( $title, $candidate->post_title ) ) {
-				continue;
-			}
-
-			$candidate_dates   = \DataMachineEvents\Core\EventDatesTable::get( $candidate->ID );
-			$existing_datetime = $candidate_dates ? $candidate_dates->start_datetime : '';
-			if ( ! $this->isWithinTimeWindow( $startDate, $existing_datetime ) ) {
-				continue;
-			}
-
-			// When both sides have venue data, require venue match to avoid
-			// false positives on generic titles at different venues.
-			if ( ! empty( $venue ) ) {
-				$candidate_venues = wp_get_post_terms( $candidate->ID, 'venue', array( 'fields' => 'names' ) );
-				$candidate_venue  = ( ! is_wp_error( $candidate_venues ) && ! empty( $candidate_venues ) ) ? $candidate_venues[0] : '';
-
-				if ( ! empty( $candidate_venue ) && ! EventIdentifierGenerator::venuesMatch( $venue, $candidate_venue ) ) {
-					do_action(
-						'datamachine_log',
-						'debug',
-						'Event Upsert: Title matched but venues differ in venue-agnostic fallback',
-						array(
-							'incoming_title' => $title,
-							'matched_title'  => $candidate->post_title,
-							'incoming_venue' => $venue,
-							'existing_venue' => $candidate_venue,
-							'post_id'        => $candidate->ID,
-						)
-					);
-					continue;
-				}
-			}
-
-			do_action(
-				'datamachine_log',
-				'info',
-				'Event Upsert: Cross-source fuzzy match (venue-agnostic) found duplicate',
-				array(
-					'incoming_title' => $title,
-					'matched_title'  => $candidate->post_title,
-					'post_id'        => $candidate->ID,
-					'date'           => $startDate,
-				)
-			);
-			return $candidate->ID;
-		}
-
-		return null;
 	}
 
 	/**
