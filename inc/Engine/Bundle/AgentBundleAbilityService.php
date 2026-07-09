@@ -79,8 +79,8 @@ final class AgentBundleAbilityService {
 		// deployed manifest change has not yet reached the live agent.
 		$drift = $this->manifest_drift( $agent );
 		if ( null !== $drift ) {
-			$status['manifest']            = $drift;
-			$status['has_manifest_drift']  = ! empty( $drift['has_drift'] );
+			$status['manifest']           = $drift;
+			$status['has_manifest_drift'] = ! empty( $drift['has_drift'] );
 		}
 
 		return $status;
@@ -997,7 +997,7 @@ final class AgentBundleAbilityService {
 		$installed_config_payload = AgentBundleAgentConfig::tracked_payload(
 			is_array( $agent['agent_config'] ?? null ) ? $agent['agent_config'] : array()
 		);
-		$manifest_config_payload = AgentBundleAgentConfig::tracked_payload(
+		$manifest_config_payload  = AgentBundleAgentConfig::tracked_payload(
 			is_array( $manifest_data['agent']['agent_config'] ?? null ) ? $manifest_data['agent']['agent_config'] : array()
 		);
 
@@ -1070,8 +1070,8 @@ final class AgentBundleAbilityService {
 				continue;
 			}
 
-			$slug   = (string) $agent['agent_slug'];
-			$dir    = AgentBundleDirectoryRegistry::resolve_for_agent( $agent );
+			$slug = (string) $agent['agent_slug'];
+			$dir  = AgentBundleDirectoryRegistry::resolve_for_agent( $agent );
 
 			if ( null === $dir ) {
 				$results[] = array(

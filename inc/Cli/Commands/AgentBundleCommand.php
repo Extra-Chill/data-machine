@@ -248,8 +248,8 @@ class AgentBundleCommand extends BaseCommand {
 			WP_CLI::log( 'Run `wp datamachine agent diff <slug>` for the full upgrade plan.' );
 		}
 
-		$row            = $status;
-		$row['drift']   = $has_drift ? 'Yes' : 'No';
+		$row          = $status;
+		$row['drift'] = $has_drift ? 'Yes' : 'No';
 		$this->format_items( array( $row ), array( 'agent_id', 'agent_slug', 'template_slug', 'template_version', 'bundle_slug', 'bundle_version', 'artifact_count', 'drift' ), array( 'format' => 'table' ) );
 	}
 
