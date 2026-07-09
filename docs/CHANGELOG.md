@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.160.0] - 2026-07-09
+
+### Added
+- bridge wp_agent_can_access_agent into datamachine_can_access_agent
+
 ## [0.159.12] - 2026-07-08
 
 ### Fixed
