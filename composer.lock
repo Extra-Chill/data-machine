@@ -794,12 +794,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/Automattic/agents-api.git",
-                "reference": "59d1e6b473f22498e40e279130bbb4f9bcde3b73"
+                "reference": "c1183c44f7d6ef21e162b5ac42532c27f8ff7d22"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/Automattic/agents-api/zipball/59d1e6b473f22498e40e279130bbb4f9bcde3b73",
-                "reference": "59d1e6b473f22498e40e279130bbb4f9bcde3b73",
+                "url": "https://api.github.com/repos/Automattic/agents-api/zipball/c1183c44f7d6ef21e162b5ac42532c27f8ff7d22",
+                "reference": "c1183c44f7d6ef21e162b5ac42532c27f8ff7d22",
                 "shasum": ""
             },
             "require": {
@@ -836,8 +836,10 @@
                     "php tests/package-adoption-orchestration-smoke.php",
                     "php tests/execution-principal-smoke.php",
                     "php tests/effective-agent-resolver-smoke.php",
+                    "php tests/runtime-profile-smoke.php",
                     "php tests/caller-context-smoke.php",
                     "php tests/authorization-smoke.php",
+                    "php tests/autonomous-capability-ceiling-smoke.php",
                     "php tests/agents-access-ability-smoke.php",
                     "php tests/agents-conversation-session-abilities-smoke.php",
                     "php tests/conversation-session-store-contract-smoke.php",
@@ -848,6 +850,7 @@
                     "php tests/tool-executor-registry-smoke.php",
                     "php tests/tool-result-error-type-smoke.php",
                     "php tests/runtime-tool-policy-smoke.php",
+                    "php tests/write-capable-default-smoke.php",
                     "php tests/runtime-tool-lifecycle-abilities-smoke.php",
                     "php tests/tool-tier-resolver-smoke.php",
                     "php tests/action-policy-resolver-smoke.php",
@@ -883,6 +886,7 @@
                     "php tests/default-provider-turn-adapter-smoke.php",
                     "php tests/default-agents-chat-handler-smoke.php",
                     "php tests/ability-tool-executor-smoke.php",
+                    "php tests/ability-tool-ceiling-smoke.php",
                     "php tests/tool-mediation-runner-smoke.php",
                     "php tests/conversation-loop-tool-execution-smoke.php",
                     "php tests/tool-call-gate-smoke.php",
@@ -917,6 +921,7 @@
                     "php tests/workflow-parallel-async-smoke.php",
                     "php tests/workflow-as-branch-smoke.php",
                     "php tests/workflow-branch-concurrency-gate-smoke.php",
+                    "php tests/workflow-scoped-drain-smoke.php",
                     "php tests/workflow-async-branch-payload-smoke.php",
                     "php tests/workflow-async-loopback-target-smoke.php",
                     "php tests/workflow-reconcile-race-smoke.php",
@@ -925,6 +930,7 @@
                     "php tests/routine-smoke.php",
                     "php tests/event-trigger-smoke.php",
                     "php tests/subagents-smoke.php",
+                    "php tests/access-decision-filter-smoke.php",
                     "php tests/no-product-imports-smoke.php"
                 ],
                 "test": [
@@ -940,7 +946,7 @@
                 "issues": "https://github.com/Automattic/agents-api/issues",
                 "source": "https://github.com/Automattic/agents-api"
             },
-            "time": "2026-07-03T14:34:26+00:00"
+            "time": "2026-07-08T14:21:40+00:00"
         }
     ],
     "packages-dev": [
@@ -1636,6 +1642,6 @@
     "platform": {
         "php": ">=8.2"
     },
-    "platform-dev": {},
-    "plugin-api-version": "2.9.0"
+    "platform-dev": [],
+    "plugin-api-version": "2.6.0"
 }

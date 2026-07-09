@@ -77,6 +77,7 @@ use DataMachine\Abilities\AbilityScopePermissionFilter;
 use DataMachine\Abilities\AgentAbilities;
 use DataMachine\Core\Content\ContentFormat;
 use DataMachine\Core\Database\Chat\ConversationStoreFactory;
+use DataMachine\Core\Auth\AgentAccessFilterBridge;
 use DataMachine\Core\Auth\AgentAccessStoreAdapter;
 use DataMachine\Core\Identity\AgentIdentityStoreAdapter;
 use DataMachine\Core\OAuth\HttpBasicAuthProvider;
@@ -112,6 +113,7 @@ add_filter(
 );
 
 AgentAccessStoreAdapter::register();
+AgentAccessFilterBridge::register();
 AgentIdentityStoreAdapter::register();
 
 add_filter(
