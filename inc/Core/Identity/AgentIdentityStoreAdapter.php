@@ -74,12 +74,27 @@ class AgentIdentityStoreAdapter implements WP_Agent_Identity_Store {
 			return $this->identity_from_row( $existing, $scope );
 		}
 
+		// Only materialize identities that correspond to a registered agent
+		// definition. A stale scope (e.g., from pruned user-meta or a cached
+		// pointer) must not resurrect a phantom agent row.
+		if ( function_exists( 'wp_has_agent' ) && ! wp_has_agent( $scope->agent_slug ) ) {
+			throw new \InvalidArgumentException(
+				sprintf( 'Cannot materialize unregistered agent "%s".', esc_html( $scope->agent_slug ) )
+			);
+		}
+
 		$agent_id = $this->agents_repository->create_if_missing(
 			$scope->agent_slug,
 			$this->label_from_meta( $meta, $scope->agent_slug ),
 			$scope->owner_user_id,
 			$default_config
 		);
+
+		if ( $agent_id <= 0 ) {
+			throw new \RuntimeException(
+				sprintf( 'Failed to create agent row for "%s".', esc_html( $scope->agent_slug ) )
+			);
+		}
 
 		$row = $this->agents_repository->get_agent( $agent_id );
 		if ( ! is_array( $row ) ) {
