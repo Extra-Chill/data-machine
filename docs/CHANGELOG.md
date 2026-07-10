@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.161.1] - 2026-07-10
+
+### Fixed
+- prevent pruned agent resurrection by clearing stale meta and guarding materialization/grants
+
 ## [0.161.0] - 2026-07-10
 
 ### Added
