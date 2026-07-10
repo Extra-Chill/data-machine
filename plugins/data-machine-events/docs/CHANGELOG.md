@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.47.2] - 2026-07-10
+
+### Fixed
+- scoped-count capability + single-day flat-list for location scope pages (#428)
+
 ## [0.47.1] - 2026-07-08
 
 ### Changed
