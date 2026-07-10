@@ -427,9 +427,9 @@ class DATAMACHINE_Events {
 			new \DataMachineEvents\Abilities\EventDateQueryAbilities();
 		}
 
-		if ( file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/EventsByArtistAbilities.php' ) ) {
-			require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/EventsByArtistAbilities.php';
-			new \DataMachineEvents\Abilities\EventsByArtistAbilities();
+		if ( file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/EventsByTermAbilities.php' ) ) {
+			require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/EventsByTermAbilities.php';
+			new \DataMachineEvents\Abilities\EventsByTermAbilities();
 		}
 
 		if ( file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/MergedBillDetectAbilities.php' ) ) {

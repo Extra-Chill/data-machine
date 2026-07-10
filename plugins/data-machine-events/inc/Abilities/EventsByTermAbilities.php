@@ -1,12 +1,12 @@
 <?php
 /**
- * Events By Artist Abilities
+ * Events By Term Abilities
  *
- * Cross-site-callable primitive that returns the LIST of events tagged to an
- * artist term on the events site. The whole point is the CONSUMER (e.g. the
- * artist profile hub on a different blog) can call this ability even though
- * this plugin's PHP is NOT loaded there — switch_to_blog() changes the DB
- * context, not the loaded code, so a consumer on another blog cannot call
+ * Cross-site-callable primitive that returns the LIST of events tagged to a
+ * term in any taxonomy on the events site. The whole point is the CONSUMER
+ * (e.g. the artist profile hub on a different blog) can call this ability even
+ * though this plugin's PHP is NOT loaded there — switch_to_blog() changes the
+ * DB context, not the loaded code, so a consumer on another blog cannot call
  * data_machine_events_query_events() directly. The ability is the bridge.
  *
  * It internally switches to the events blog (resolved via ec_get_blog_id when
@@ -16,9 +16,11 @@
  * time) pre-resolved while still in events-blog context — because the caller
  * renders on a DIFFERENT blog and cannot resolve those afterward.
  *
- * Layer purity: this ability is generic "events for artist term X on this
- * events site". It carries no consumer-specific identity and returns data,
- * not markup — presentation is the consumer's job.
+ * Layer purity: this ability is generic "events for term X in taxonomy Y on
+ * this events site". It carries no consumer-specific identity and returns data,
+ * not markup — presentation is the consumer's job. The taxonomy is supplied by
+ * the caller, so the generic plugin never hardcodes a consumer taxonomy such as
+ * "artist".
  *
  * @package DataMachineEvents\Abilities
  */
@@ -31,7 +33,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-class EventsByArtistAbilities {
+class EventsByTermAbilities {
 
 	private static bool $registered = false;
 
@@ -50,25 +52,29 @@ class EventsByArtistAbilities {
 	private function registerAbilities(): void {
 		$register_callback = function () {
 			wp_register_ability(
-				'data-machine-events/events-by-artist',
+				'data-machine-events/events-by-term',
 				array(
-					'label'               => __( 'Events By Artist', 'data-machine-events' ),
-					'description'         => __( 'Return the list of events for an artist term on the events site, split into upcoming and past. Cross-site callable: resolves everything (permalinks, venue names, formatted dates) on the events blog so consumers on any other site can render the result directly.', 'data-machine-events' ),
+					'label'               => __( 'Events By Term', 'data-machine-events' ),
+					'description'         => __( 'Return the list of events for a term in a taxonomy on the events site, split into upcoming and past. Cross-site callable: resolves everything (permalinks, venue names, formatted dates) on the events blog so consumers on any other site can render the result directly.', 'data-machine-events' ),
 					'category'            => 'datamachine-events-events',
 					'input_schema'        => array(
 						'type'       => 'object',
-						'required'   => array( 'artist_slug' ),
+						'required'   => array( 'taxonomy', 'term_slug' ),
 						'properties' => array(
-							'artist_slug' => array(
+							'taxonomy'  => array(
 								'type'        => 'string',
-								'description' => __( 'Artist term slug (the canonical cross-blog join key) to look up on the events site.', 'data-machine-events' ),
+								'description' => __( 'Taxonomy name on the events site (e.g. "artist"). Must be registered there.', 'data-machine-events' ),
 							),
-							'scope'       => array(
+							'term_slug' => array(
+								'type'        => 'string',
+								'description' => __( 'Term slug (the canonical cross-blog join key) to look up on the events site.', 'data-machine-events' ),
+							),
+							'scope'     => array(
 								'type'        => 'string',
 								'enum'        => array( 'upcoming', 'past', 'all' ),
 								'description' => __( 'Which events to return. Default all.', 'data-machine-events' ),
 							),
-							'limit'       => array(
+							'limit'     => array(
 								'type'        => 'integer',
 								'description' => __( 'Maximum events to return per scope (upcoming and past are limited independently). Default 12.', 'data-machine-events' ),
 							),
@@ -77,19 +83,20 @@ class EventsByArtistAbilities {
 					'output_schema'       => array(
 						'type'       => 'object',
 						'properties' => array(
-							'artist_slug' => array( 'type' => 'string' ),
-							'found'       => array( 'type' => 'boolean' ),
-							'upcoming'    => array(
+							'taxonomy'  => array( 'type' => 'string' ),
+							'term_slug' => array( 'type' => 'string' ),
+							'found'     => array( 'type' => 'boolean' ),
+							'upcoming'  => array(
 								'type'  => 'array',
 								'items' => array( 'type' => 'object' ),
 							),
-							'past'        => array(
+							'past'      => array(
 								'type'  => 'array',
 								'items' => array( 'type' => 'object' ),
 							),
 						),
 					),
-					'execute_callback'    => array( $this, 'executeEventsByArtist' ),
+					'execute_callback'    => array( $this, 'executeEventsByTerm' ),
 					'permission_callback' => '__return_true',
 					'meta'                => array(
 						'show_in_rest' => true,
@@ -110,18 +117,19 @@ class EventsByArtistAbilities {
 	}
 
 	/**
-	 * Execute the events-by-artist ability.
+	 * Execute the events-by-term ability.
 	 *
-	 * Switches to the events blog, resolves the artist term by slug, queries
-	 * the event_dates table for that term split by now, and returns a plain
-	 * structured array with presentational strings pre-resolved.
+	 * Switches to the events blog, resolves the term by slug in the requested
+	 * taxonomy, queries the event_dates table for that term split by now, and
+	 * returns a plain structured array with presentational strings pre-resolved.
 	 *
 	 * @param array $input Input parameters.
-	 * @return array|\WP_Error { artist_slug, found, upcoming: [...], past: [...] }
+	 * @return array|\WP_Error { taxonomy, term_slug, found, upcoming: [...], past: [...] }
 	 */
-	public function executeEventsByArtist( array $input ): array|\WP_Error {
-		$artist_slug = isset( $input['artist_slug'] ) ? sanitize_title( (string) $input['artist_slug'] ) : '';
-		$scope       = $input['scope'] ?? 'all';
+	public function executeEventsByTerm( array $input ): array|\WP_Error {
+		$taxonomy  = isset( $input['taxonomy'] ) ? sanitize_key( (string) $input['taxonomy'] ) : '';
+		$term_slug = isset( $input['term_slug'] ) ? sanitize_title( (string) $input['term_slug'] ) : '';
+		$scope     = $input['scope'] ?? 'all';
 		if ( ! in_array( $scope, array( 'upcoming', 'past', 'all' ), true ) ) {
 			$scope = 'all';
 		}
@@ -130,10 +138,18 @@ class EventsByArtistAbilities {
 			$limit = self::DEFAULT_LIMIT;
 		}
 
-		if ( '' === $artist_slug ) {
+		if ( '' === $taxonomy ) {
 			return new \WP_Error(
-				'invalid_artist_slug',
-				__( 'A non-empty artist_slug is required.', 'data-machine-events' ),
+				'invalid_taxonomy',
+				__( 'A non-empty taxonomy is required.', 'data-machine-events' ),
+				array( 'status' => 400 )
+			);
+		}
+
+		if ( '' === $term_slug ) {
+			return new \WP_Error(
+				'invalid_term_slug',
+				__( 'A non-empty term_slug is required.', 'data-machine-events' ),
 				array( 'status' => 400 )
 			);
 		}
@@ -149,7 +165,7 @@ class EventsByArtistAbilities {
 
 		switch_to_blog( $events_blog_id );
 		try {
-			return $this->collectEventsForArtist( $artist_slug, $scope, $limit );
+			return $this->collectEventsForTerm( $taxonomy, $term_slug, $scope, $limit );
 		} finally {
 			restore_current_blog();
 		}
@@ -173,7 +189,7 @@ class EventsByArtistAbilities {
 		}
 
 		/**
-		 * Filter the resolved events-site blog ID for the events-by-artist ability.
+		 * Filter the resolved events-site blog ID for the events-by-term ability.
 		 *
 		 * Lets non-Extra-Chill installs (or tests) point the ability at the
 		 * blog that actually holds event posts without hard-coding an ID in
@@ -187,54 +203,57 @@ class EventsByArtistAbilities {
 	}
 
 	/**
-	 * Collect upcoming and past events for an artist term.
+	 * Collect upcoming and past events for a term in a taxonomy.
 	 *
 	 * Must be called in events-blog context (after switch_to_blog). Reads the
 	 * event_dates table joined to term_relationships so past/upcoming split
 	 * comes straight from start_datetime vs now, then pre-resolves every
 	 * presentational string per event.
 	 *
-	 * @param string $artist_slug Artist term slug.
-	 * @param string $scope       upcoming|past|all.
-	 * @param int    $limit       Per-scope result limit.
+	 * @param string $taxonomy  Taxonomy name on the events site.
+	 * @param string $term_slug Term slug to look up.
+	 * @param string $scope     upcoming|past|all.
+	 * @param int    $limit     Per-scope result limit.
 	 * @return array Structured result.
 	 */
-	private function collectEventsForArtist( string $artist_slug, string $scope, int $limit ): array {
+	private function collectEventsForTerm( string $taxonomy, string $term_slug, string $scope, int $limit ): array {
 		$empty = array(
-			'artist_slug' => $artist_slug,
-			'found'       => false,
-			'upcoming'    => array(),
-			'past'        => array(),
+			'taxonomy'  => $taxonomy,
+			'term_slug' => $term_slug,
+			'found'     => false,
+			'upcoming'  => array(),
+			'past'      => array(),
 		);
 
-		if ( ! taxonomy_exists( 'artist' ) ) {
+		if ( ! taxonomy_exists( $taxonomy ) ) {
 			return $empty;
 		}
 
-		$term = get_term_by( 'slug', $artist_slug, 'artist' );
+		$term = get_term_by( 'slug', $term_slug, $taxonomy );
 		if ( ! $term || is_wp_error( $term ) ) {
 			return $empty;
 		}
 
 		$result = array(
-			'artist_slug' => $artist_slug,
-			'found'       => true,
-			'upcoming'    => array(),
-			'past'        => array(),
+			'taxonomy'  => $taxonomy,
+			'term_slug' => $term_slug,
+			'found'     => true,
+			'upcoming'  => array(),
+			'past'      => array(),
 		);
 
 		if ( 'past' !== $scope ) {
-			$result['upcoming'] = $this->queryScope( (int) $term->term_id, 'upcoming', $limit );
+			$result['upcoming'] = $this->queryScope( (int) $term->term_id, $taxonomy, 'upcoming', $limit );
 		}
 		if ( 'upcoming' !== $scope ) {
-			$result['past'] = $this->queryScope( (int) $term->term_id, 'past', $limit );
+			$result['past'] = $this->queryScope( (int) $term->term_id, $taxonomy, 'past', $limit );
 		}
 
 		return $result;
 	}
 
 	/**
-	 * Query one scope (upcoming or past) of events for an artist term.
+	 * Query one scope (upcoming or past) of events for a term.
 	 *
 	 * Reads post IDs directly from the event_dates table joined to
 	 * term_relationships / term_taxonomy, filtered by start_datetime vs now
@@ -242,12 +261,13 @@ class EventsByArtistAbilities {
 	 * ordered most-recent-first. Each event is then hydrated into a plain
 	 * presentational array.
 	 *
-	 * @param int    $term_id Artist term ID.
-	 * @param string $scope   upcoming|past.
-	 * @param int    $limit   Max events to return.
+	 * @param int    $term_id  Term ID.
+	 * @param string $taxonomy Taxonomy name.
+	 * @param string $scope    upcoming|past.
+	 * @param int    $limit    Max events to return.
 	 * @return array List of event arrays.
 	 */
-	private function queryScope( int $term_id, string $scope, int $limit ): array {
+	private function queryScope( int $term_id, string $taxonomy, string $scope, int $limit ): array {
 		global $wpdb;
 
 		$ed_table = EventDatesTable::table_name();
@@ -256,8 +276,8 @@ class EventsByArtistAbilities {
 		// Two fully-literal query strings keep the date comparator and sort
 		// direction out of variable interpolation so $wpdb->prepare() sees a
 		// stable placeholder count. The only interpolated token is the table
-		// name (a trusted internal constant), matching the sibling
-		// UpcomingCountAbilities pattern.
+		// name (a trusted internal constant); the taxonomy is passed as a %s
+		// placeholder, matching the sibling UpcomingCountAbilities pattern.
 		$timing = ( 'upcoming' === $scope ) ? 'upcoming' : 'past';
 
 		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- $ed_table is a trusted internal constant; the two literal query strings keep placeholder counts stable.
@@ -268,12 +288,13 @@ class EventsByArtistAbilities {
 					FROM {$ed_table} ed
 					INNER JOIN {$wpdb->term_relationships} tr ON tr.object_id = ed.post_id
 					INNER JOIN {$wpdb->term_taxonomy} tt ON tr.term_taxonomy_id = tt.term_taxonomy_id
-					WHERE tt.taxonomy = 'artist'
+					WHERE tt.taxonomy = %s
 					AND tt.term_id = %d
 					AND ed.post_status = 'publish'
 					AND ed.start_datetime >= %s
 					ORDER BY ed.start_datetime ASC
 					LIMIT %d",
+					$taxonomy,
 					$term_id,
 					$now,
 					$limit
@@ -286,12 +307,13 @@ class EventsByArtistAbilities {
 					FROM {$ed_table} ed
 					INNER JOIN {$wpdb->term_relationships} tr ON tr.object_id = ed.post_id
 					INNER JOIN {$wpdb->term_taxonomy} tt ON tr.term_taxonomy_id = tt.term_taxonomy_id
-					WHERE tt.taxonomy = 'artist'
+					WHERE tt.taxonomy = %s
 					AND tt.term_id = %d
 					AND ed.post_status = 'publish'
 					AND ed.start_datetime < %s
 					ORDER BY ed.start_datetime DESC
 					LIMIT %d",
+					$taxonomy,
 					$term_id,
 					$now,
 					$limit
