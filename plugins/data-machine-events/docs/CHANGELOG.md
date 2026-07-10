@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.47.3] - 2026-07-10
+
+### Changed
+- generalize events-by-artist ability to events-by-term
+
 ## [0.47.2] - 2026-07-10
 
 ### Fixed
