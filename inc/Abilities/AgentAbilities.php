@@ -772,6 +772,40 @@ class AgentAbilities {
 			);
 
 			self::registerAbility(
+				'datamachine/prune-agents',
+				array(
+					'label'               => 'Prune Agents',
+					'description'         => 'List or remove agent rows with zero references (no sessions, jobs, grants, files, or bundle config).',
+					'category'            => 'datamachine-agent',
+					'input_schema'        => array(
+						'type'       => 'object',
+						'properties' => array(
+							'dry_run' => array(
+								'type'        => 'boolean',
+								'description' => 'When true (default), list candidates without deleting.',
+							),
+						),
+					),
+					'output_schema'       => array(
+						'type'       => 'object',
+						'properties' => array(
+							'success'       => array( 'type' => 'boolean' ),
+							'dry_run'       => array( 'type' => 'boolean' ),
+							'total'         => array( 'type' => 'integer' ),
+							'count'         => array( 'type' => 'integer' ),
+							'deleted_count' => array( 'type' => 'integer' ),
+							'candidates'    => array( 'type' => 'array' ),
+							'deleted'       => array( 'type' => 'array' ),
+							'error'         => array( 'type' => 'string' ),
+						),
+					),
+					'execute_callback'    => array( self::class, 'pruneAgents' ),
+					'permission_callback' => fn() => PermissionHelper::can_manage(),
+					'meta'                => array( 'show_in_rest' => true ),
+				)
+			);
+
+			self::registerAbility(
 				'datamachine/grant-agent-audience-access',
 				array(
 					'label'               => 'Grant Agent Audience Access',
@@ -2620,6 +2654,175 @@ class AgentAbilities {
 			}
 		}
 		rmdir( $dir ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_rmdir
+	}
+
+	/**
+	 * Find agent rows with no external references.
+	 *
+	 * Candidates are agents that own nothing: no chat sessions, no jobs, no
+	 * access grants, no on-disk agent directory, no bundle install metadata, and
+	 * they are not the install's default agent. The default agent and any agent
+	 * with files, grants, sessions, jobs, or bundle config is always spared.
+	 *
+	 * @param array $input {
+	 *     Optional. Input arguments.
+	 *
+	 *     @type bool $dry_run Default true. When true, return candidates without deleting.
+	 * }
+	 * @return array Result with candidates and counts.
+	 */
+	public static function pruneAgents( array $input ): array {
+		$dry_run = $input['dry_run'] ?? true;
+
+		$agents_repo = new Agents();
+		$agents      = $agents_repo->get_all();
+
+		$default_user_id = class_exists( DirectoryManager::class )
+			? (int) DirectoryManager::get_default_agent_user_id()
+			: 0;
+
+		$referenced_ids = self::collect_referenced_agent_ids( $agents, $default_user_id );
+
+		$candidates = array();
+		foreach ( $agents as $agent ) {
+			$agent_id = (int) $agent['agent_id'];
+			if ( isset( $referenced_ids[ $agent_id ] ) ) {
+				continue;
+			}
+
+			$candidates[] = array(
+				'agent_id'   => $agent_id,
+				'agent_slug' => (string) $agent['agent_slug'],
+				'agent_name' => (string) $agent['agent_name'],
+				'owner_id'   => (int) $agent['owner_id'],
+			);
+		}
+
+		$deleted = array();
+		if ( ! $dry_run ) {
+			foreach ( $candidates as $candidate ) {
+				$result = self::deleteAgent( array( 'agent_id' => $candidate['agent_id'] ) );
+				if ( ! empty( $result['success'] ) ) {
+					$deleted[] = $candidate;
+				}
+			}
+		}
+
+		return array(
+			'success'       => true,
+			'dry_run'       => $dry_run,
+			'total'         => count( $agents ),
+			'candidates'    => $candidates,
+			'count'         => count( $candidates ),
+			'deleted'       => $deleted,
+			'deleted_count' => count( $deleted ),
+		);
+	}
+
+	/**
+	 * Collect agent IDs that have any reference preventing prune.
+	 *
+	 * References checked: chat sessions, jobs, access grants, on-disk directory,
+	 * bundle install config, and the install default agent.
+	 *
+	 * @param array $agents          List of agent rows.
+	 * @param int   $default_user_id Install default agent owner user ID.
+	 * @return array<int,true> Referenced agent IDs.
+	 */
+	private static function collect_referenced_agent_ids( array $agents, int $default_user_id ): array {
+		$referenced = array();
+
+		// Default agent owner is always referenced.
+		if ( $default_user_id > 0 ) {
+			foreach ( $agents as $agent ) {
+				if ( (int) $agent['owner_id'] === $default_user_id ) {
+					$referenced[ (int) $agent['agent_id'] ] = true;
+				}
+			}
+		}
+
+		// Bundle-installed agents are real.
+		foreach ( $agents as $agent ) {
+			$config = $agent['agent_config'] ?? array();
+			if ( is_array( $config ) && ! empty( $config['datamachine_bundle'] ) ) {
+				$referenced[ (int) $agent['agent_id'] ] = true;
+			}
+		}
+
+		// On-disk agent directories.
+		$directory_manager = new DirectoryManager();
+		foreach ( $agents as $agent ) {
+			$agent_dir = $directory_manager->get_agent_identity_directory( (string) $agent['agent_slug'] );
+			if ( is_dir( $agent_dir ) ) {
+				$referenced[ (int) $agent['agent_id'] ] = true;
+			}
+		}
+
+		global $wpdb;
+
+		// Chat sessions: network-wide table (current) plus legacy per-site tables.
+		if ( class_exists( \DataMachine\Core\Database\Chat\Chat::class ) ) {
+			$chat_table = $wpdb->base_prefix . \DataMachine\Core\Database\Chat\Chat::TABLE_NAME;
+			// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
+			$chat_agent_ids = $wpdb->get_col( $wpdb->prepare( 'SELECT DISTINCT agent_id FROM %i WHERE agent_id IS NOT NULL AND agent_id > 0', $chat_table ) );
+			// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
+			foreach ( $chat_agent_ids as $id ) {
+				$referenced[ (int) $id ] = true;
+			}
+
+			// Legacy per-site tables (pre-network migration).
+			if ( function_exists( 'is_multisite' ) && is_multisite() && function_exists( 'get_sites' ) ) {
+				$blog_ids = get_sites(
+					array(
+						'fields' => 'ids',
+						'number' => 0,
+					)
+				);
+				foreach ( $blog_ids as $blog_id ) {
+					$site_prefix = $wpdb->get_blog_prefix( (int) $blog_id );
+					$site_table  = $site_prefix . \DataMachine\Core\Database\Chat\Chat::TABLE_NAME;
+					if ( $site_table === $chat_table ) {
+						continue;
+					}
+					// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
+					$exists = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $site_table ) );
+					// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
+					if ( $exists !== $site_table ) {
+						continue;
+					}
+					// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
+					$site_agent_ids = $wpdb->get_col( $wpdb->prepare( 'SELECT DISTINCT agent_id FROM %i WHERE agent_id IS NOT NULL AND agent_id > 0', $site_table ) );
+					// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
+					foreach ( $site_agent_ids as $id ) {
+						$referenced[ (int) $id ] = true;
+					}
+				}
+			}
+		}
+
+		// Jobs (agent_id column).
+		$jobs_repo  = new \DataMachine\Core\Database\Jobs\Jobs();
+		$jobs_table = $jobs_repo->get_table_name();
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
+		$job_agent_ids = $wpdb->get_col( $wpdb->prepare( 'SELECT DISTINCT agent_id FROM %i WHERE agent_id IS NOT NULL AND agent_id > 0', $jobs_table ) );
+		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
+		foreach ( $job_agent_ids as $id ) {
+			$referenced[ (int) $id ] = true;
+		}
+
+		// Access grants (user + principal).
+		$access_repo     = new AgentAccess();
+		$access_table    = $wpdb->base_prefix . AgentAccess::TABLE_NAME;
+		$principal_table = $wpdb->base_prefix . AgentAccess::PRINCIPAL_TABLE_NAME;
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
+		$grant_agent_ids = $wpdb->get_col( $wpdb->prepare( 'SELECT DISTINCT agent_id FROM %i', $access_table ) );
+		$principal_ids   = $wpdb->get_col( $wpdb->prepare( 'SELECT DISTINCT agent_id FROM %i', $principal_table ) );
+		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
+		foreach ( array_merge( $grant_agent_ids, $principal_ids ) as $id ) {
+			$referenced[ (int) $id ] = true;
+		}
+
+		return $referenced;
 	}
 
 	/**

@@ -137,12 +137,13 @@ class AltTextAbilities {
 		$post_id       = absint( $input['post_id'] ?? 0 );
 		$force         = ! empty( $input['force'] );
 
-		$acting          = datamachine_resolve_system_agent_context();
-		$user_id         = $acting['user_id'];
-		$agent_id        = $acting['agent_id'];
-		$system_defaults = PluginSettings::resolveModelForAgentMode( $agent_id, 'system' );
-		$provider        = $system_defaults['provider'];
-		$model           = $system_defaults['model'];
+		$acting             = datamachine_resolve_system_agent_context();
+		$user_id            = $acting['user_id'];
+		$agent_id           = $acting['agent_id'];
+		$triggering_user_id = $acting['triggering_user_id'];
+		$system_defaults    = PluginSettings::resolveModelForAgentMode( $agent_id, 'system' );
+		$provider           = $system_defaults['provider'];
+		$model              = $system_defaults['model'];
 
 		if ( empty( $provider ) || empty( $model ) ) {
 			return array(
@@ -241,8 +242,9 @@ class AltTextAbilities {
 			'alt_text_generation',
 			$item_params,
 			array(
-				'user_id'  => $user_id,
-				'agent_id' => $agent_id,
+				'user_id'            => $user_id,
+				'agent_id'           => $agent_id,
+				'triggering_user_id' => $triggering_user_id,
 			)
 		);
 
@@ -354,12 +356,13 @@ class AltTextAbilities {
 			return;
 		}
 
-		$acting          = datamachine_resolve_system_agent_context();
-		$user_id         = $acting['user_id'];
-		$agent_id        = $acting['agent_id'];
-		$system_defaults = PluginSettings::resolveModelForAgentMode( $agent_id, 'system' );
-		$provider        = $system_defaults['provider'];
-		$model           = $system_defaults['model'];
+		$acting             = datamachine_resolve_system_agent_context();
+		$user_id            = $acting['user_id'];
+		$agent_id           = $acting['agent_id'];
+		$triggering_user_id = $acting['triggering_user_id'];
+		$system_defaults    = PluginSettings::resolveModelForAgentMode( $agent_id, 'system' );
+		$provider           = $system_defaults['provider'];
+		$model              = $system_defaults['model'];
 
 		if ( empty( $provider ) || empty( $model ) ) {
 			return;
@@ -381,8 +384,9 @@ class AltTextAbilities {
 				'source'        => 'add_attachment',
 			),
 			array(
-				'user_id'  => $user_id,
-				'agent_id' => $agent_id,
+				'user_id'            => $user_id,
+				'agent_id'           => $agent_id,
+				'triggering_user_id' => $triggering_user_id,
 			)
 		);
 	}

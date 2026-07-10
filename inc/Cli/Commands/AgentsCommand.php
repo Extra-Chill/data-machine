@@ -518,6 +518,86 @@ class AgentsCommand extends AgentBundleCommand {
 	}
 
 	/**
+	 * Prune agent rows with zero references.
+	 *
+	 * Lists candidates by default. Use --yes to actually delete. A candidate
+	 * is an agent row with no chat sessions, no jobs, no access grants, no
+	 * on-disk directory, no bundle install config, and is not the install's
+	 * default agent.
+	 *
+	 * ## OPTIONS
+	 *
+	 * [--yes]
+	 * : Skip the dry-run preview and delete candidates.
+	 *
+	 * [--format=<format>]
+	 * : Output format for the candidate list.
+	 * ---
+	 * default: table
+	 * options:
+	 *   - table
+	 *   - json
+	 *   - csv
+	 *   - yaml
+	 *   - ids
+	 * ---
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     # Preview candidates (default)
+	 *     wp datamachine agent prune
+	 *
+	 *     # Delete candidates
+	 *     wp datamachine agent prune --yes
+	 *
+	 * @subcommand prune
+	 */
+	public function prune( array $args, array $assoc_args ): void {
+		$apply = isset( $assoc_args['yes'] );
+
+		$result = AgentAbilities::pruneAgents(
+			array(
+				'dry_run' => ! $apply,
+			)
+		);
+
+		if ( empty( $result['success'] ) ) {
+			WP_CLI::error( $result['error'] ?? 'Failed to prune agents.' );
+			return;
+		}
+
+		$candidates = $result['candidates'] ?? array();
+
+		if ( empty( $candidates ) ) {
+			WP_CLI::success( 'No pruneable agents found — all rows have references.' );
+			return;
+		}
+
+		$items = array();
+		foreach ( $candidates as $agent ) {
+			$owner_id = (int) $agent['owner_id'];
+			$user     = $owner_id > 0 ? get_user_by( 'id', $owner_id ) : false;
+			$items[]  = array(
+				'agent_id'    => (int) $agent['agent_id'],
+				'agent_slug'  => (string) $agent['agent_slug'],
+				'agent_name'  => (string) $agent['agent_name'],
+				'owner_id'    => $owner_id,
+				'owner_login' => $user ? $user->user_login : '(deleted)',
+			);
+		}
+
+		$fields = array( 'agent_id', 'agent_slug', 'agent_name', 'owner_id', 'owner_login' );
+		$this->format_items( $items, $fields, $assoc_args, 'agent_id' );
+
+		if ( ! $apply ) {
+			WP_CLI::log( sprintf( 'Found %d pruneable agent(s). Re-run with --yes to delete.', count( $items ) ) );
+			return;
+		}
+
+		WP_CLI::success( sprintf( 'Deleted %d pruneable agent(s).', (int) $result['deleted_count'] ) );
+	}
+
+	/**
 	 * Manage agent access grants.
 	 *
 	 * ## OPTIONS

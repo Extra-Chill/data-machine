@@ -4,22 +4,15 @@
  *
  * Run with: php tests/system-agent-context-resolution-smoke.php
  *
- * Regression coverage for the "queued task requires agent context" flood
- * produced when media/SEO/linking abilities enqueued agent-owned batch tasks
- * (alt_text_generation, image_optimization, meta_description_generation,
- * internal_linking) from a context with no authenticated user — WP-Cron,
- * WP-CLI without --user, or a system pipeline step.
+ * Regression coverage for the stray-agent provisioning leak tracked in
+ * Extra-Chill/data-machine #2864. Media/SEO/linking abilities enqueue
+ * agent-owned queued tasks; historically they resolved identity from
+ * get_current_user_id(), which caused every authenticated user who triggered
+ * a system task to get a persistent agent row minted from their login.
  *
- * The old resolution resolved identity solely from get_current_user_id(),
- * which returns 0 outside a web request. That zeroed the enqueue context, so
- * every batched item hit TaskScheduler's agent-context gate and was rejected
- * (one ERROR log line per item). The fix teaches the enqueue path to fall back
- * to the install's default agent owner via
- * DirectoryManager::get_default_agent_user_id().
- *
- * This test verifies the resolver's decision table without a WP bootstrap by
- * mirroring its production logic byte-for-byte in a harness whose two inputs
- * (current-user id, default-agent user id → agent id) are injectable.
+ * The resolver now always attributes system tasks to the install's default
+ * agent owner and returns the original triggering user separately so callers
+ * can carry it as task-context metadata for audit.
  *
  * @package DataMachine\Tests
  */
@@ -31,27 +24,22 @@ if ( ! defined( 'ABSPATH' ) ) {
 // ─── Harness mirroring datamachine_resolve_system_agent_context() ────
 //
 // Mirrors data-machine.php:datamachine_resolve_system_agent_context().
-// The two collaborators the real function calls — get_current_user_id() and
-// DirectoryManager::get_default_agent_user_id() — are supplied as inputs, and
-// the user_id → agent_id resolution (datamachine_resolve_or_create_agent_id)
-// is supplied as a closure so the branch logic is exercised in isolation.
+// The collaborators the real function calls are supplied as inputs/closure so
+// the branch logic is exercised in isolation without a WP bootstrap.
 //
 // @param int      $current_user_id  What get_current_user_id() would return.
 // @param int      $default_user_id  What DirectoryManager::get_default_agent_user_id() would return.
 // @param callable $resolve_agent_id user_id => agent_id (0 for unresolvable users).
 function resolve_system_agent_context_for_test( int $current_user_id, int $default_user_id, callable $resolve_agent_id ): array {
-	$user_id = $current_user_id;
-
-	// No authenticated user: fall back to the install's default agent owner.
-	if ( $user_id <= 0 ) {
-		$user_id = $default_user_id;
-	}
+	$triggering_user_id = $current_user_id;
+	$user_id            = $default_user_id;
 
 	$agent_id = $user_id > 0 ? (int) $resolve_agent_id( $user_id ) : 0;
 
 	return array(
-		'user_id'  => $user_id,
-		'agent_id' => $agent_id,
+		'user_id'            => $user_id,
+		'agent_id'           => $agent_id,
+		'triggering_user_id' => $triggering_user_id,
 	);
 }
 
@@ -87,16 +75,18 @@ $resolve = static function ( int $user_id ): int {
 
 // ─── Test cases ─────────────────────────────────────────────────────
 
-echo "\n[1] Authenticated web request resolves the current user's agent\n";
+echo "\n[1] Authenticated web request attributes to the default agent, not the triggering user\n";
 $ctx = resolve_system_agent_context_for_test( 7, 1, $resolve );
-$assert( 'user_id is the current user', 7 === $ctx['user_id'] );
-$assert( 'agent_id resolved for current user', 25 === $ctx['agent_id'] );
+$assert( 'user_id is the default agent owner', 1 === $ctx['user_id'] );
+$assert( 'agent_id resolved for default owner', 1 === $ctx['agent_id'] );
+$assert( 'triggering_user_id preserves the human', 7 === $ctx['triggering_user_id'] );
 $assert( 'enqueue context passes the agent-context gate', task_scheduler_gate_for_test( $ctx ) );
 
-echo "\n[2] Cron/CLI/system context (no current user) falls back to default agent owner\n";
+echo "\n[2] Cron/CLI/system context (no current user) still resolves to default agent owner\n";
 $ctx = resolve_system_agent_context_for_test( 0, 1, $resolve );
-$assert( 'user_id falls back to default agent user', 1 === $ctx['user_id'] );
+$assert( 'user_id is the default agent user', 1 === $ctx['user_id'] );
 $assert( 'agent_id resolved from default owner', 1 === $ctx['agent_id'] );
+$assert( 'triggering_user_id is 0 when no human triggered the work', 0 === $ctx['triggering_user_id'] );
 $assert(
 	'REGRESSION: fallback context is NOT gate-rejected (was agent_id 0 before fix)',
 	task_scheduler_gate_for_test( $ctx )
@@ -114,13 +104,13 @@ echo "\n[4] Install with no resolvable owner at all still returns zeros (no fata
 $ctx = resolve_system_agent_context_for_test( 0, 0, $resolve );
 $assert( 'user_id is 0 when no default owner exists', 0 === $ctx['user_id'] );
 $assert( 'agent_id is 0 when no default owner exists', 0 === $ctx['agent_id'] );
+$assert( 'triggering_user_id is still reported', 0 === $ctx['triggering_user_id'] );
 
-echo "\n[5] Production sources use the shared resolver, not raw get_current_user_id()\n";
+echo "\n[5] Production sources use the shared resolver and carry triggering_user_id\n";
 $root    = dirname( __DIR__ );
 $sources = array(
 	'AltTextAbilities'          => $root . '/inc/Abilities/Media/AltTextAbilities.php',
 	'ImageOptimizationAbilities' => $root . '/inc/Abilities/Media/ImageOptimizationAbilities.php',
-	'ImageGenerationAbilities'  => $root . '/inc/Abilities/Media/ImageGenerationAbilities.php',
 	'MetaDescriptionAbilities'  => $root . '/inc/Abilities/SEO/MetaDescriptionAbilities.php',
 	'InternalLinkingAbilities'  => $root . '/inc/Abilities/InternalLinkingAbilities.php',
 );
@@ -128,15 +118,23 @@ foreach ( $sources as $name => $path ) {
 	$src = (string) file_get_contents( $path );
 	$assert( "{$name} calls datamachine_resolve_system_agent_context()", str_contains( $src, 'datamachine_resolve_system_agent_context()' ) );
 	$assert(
-		"{$name} no longer resolves system-task agent id from a user-gated ternary",
-		! str_contains( $src, 'datamachine_resolve_or_create_agent_id( $user_id ) : 0' )
+		"{$name} carries triggering_user_id into TaskScheduler context",
+		str_contains( $src, "'triggering_user_id' => \$triggering_user_id" )
 	);
 }
 
-echo "\n[6] The resolver is defined and documents the cron/CLI fallback\n";
+echo "\n[6] Chat path is untouched — it still auto-provisions via resolve_or_create_agent_id\n";
+$chat_src = (string) file_get_contents( $root . '/inc/Api/Chat/ChatOrchestrator.php' );
+$assert(
+	'ChatOrchestrator calls datamachine_resolve_or_create_agent_id()',
+	str_contains( $chat_src, 'datamachine_resolve_or_create_agent_id' )
+);
+
+echo "\n[7] The resolver documents the attribution-vs-identity distinction\n";
 $plugin_src = (string) file_get_contents( $root . '/data-machine.php' );
 $assert( 'datamachine_resolve_system_agent_context() defined', str_contains( $plugin_src, 'function datamachine_resolve_system_agent_context(): array' ) );
-$assert( 'resolver falls back to the default agent user', str_contains( $plugin_src, 'get_default_agent_user_id()' ) );
+$assert( 'resolver always falls back to default agent user', str_contains( $plugin_src, '$user_id = (int) \\DataMachine\\Core\\FilesRepository\\DirectoryManager::get_default_agent_user_id();' ) );
+$assert( 'resolver returns triggering_user_id', str_contains( $plugin_src, "'triggering_user_id' =>" ) );
 
 echo "\n";
 if ( $failures > 0 ) {

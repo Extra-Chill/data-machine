@@ -340,16 +340,18 @@ class ImageOptimizationAbilities {
 			);
 		}
 
-		$acting   = datamachine_resolve_system_agent_context();
-		$user_id  = $acting['user_id'];
-		$agent_id = $acting['agent_id'];
+		$acting             = datamachine_resolve_system_agent_context();
+		$user_id            = $acting['user_id'];
+		$agent_id           = $acting['agent_id'];
+		$triggering_user_id = $acting['triggering_user_id'];
 
 		$batch = TaskScheduler::scheduleBatch(
 			'image_optimization',
 			$item_params,
 			array(
-				'user_id'  => $user_id,
-				'agent_id' => $agent_id,
+				'user_id'            => $user_id,
+				'agent_id'           => $agent_id,
+				'triggering_user_id' => $triggering_user_id,
 			)
 		);
 
