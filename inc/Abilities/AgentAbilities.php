@@ -1226,6 +1226,11 @@ class AgentAbilities {
 	/**
 	 * Resolve active agent row from persisted preference or safe fallback.
 	 *
+	 * A persisted slug that no longer resolves to an accessible agent is treated
+	 * as "no active agent": the stale pointer is cleared so that later read paths
+	 * (and any external resolver that reads this meta) cannot re-materialize a
+	 * pruned agent identity.
+	 *
 	 * @param int        $user_id               User ID.
 	 * @param array|null $candidates            Optional accessible agent rows.
 	 * @param bool       $allow_single_fallback Whether a single candidate should become active by default.
@@ -1236,14 +1241,20 @@ class AgentAbilities {
 		$stored     = self::get_active_agent_slug_for_user( $user_id );
 
 		if ( '' !== $stored ) {
+			$matched = false;
 			foreach ( $candidates as $row ) {
 				if ( (string) ( $row['agent_slug'] ?? '' ) === $stored && self::user_can_access_agent_row( $user_id, $row ) ) {
+					$matched = true;
 					return array(
 						'agent'        => $row,
 						'source'       => 'preference',
 						'needs_choice' => false,
 					);
 				}
+			}
+
+			if ( ! $matched ) {
+				self::clear_active_agent_slug_for_user( $user_id );
 			}
 		}
 
@@ -1263,14 +1274,40 @@ class AgentAbilities {
 	}
 
 	/**
-	 * Read persisted active agent slug for a user.
+	 * Read persisted active agent slug for a user, validating it still exists.
+	 *
+	 * If the stored slug no longer resolves to a real agent row, the stale meta
+	 * entry is deleted and an empty string is returned.
 	 *
 	 * @param int $user_id User ID.
 	 * @return string
 	 */
 	private static function get_active_agent_slug_for_user( int $user_id ): string {
 		$stored = get_user_meta( $user_id, self::ACTIVE_AGENT_META_KEY, true );
-		return is_string( $stored ) ? sanitize_title( $stored ) : '';
+		$slug   = is_string( $stored ) ? sanitize_title( $stored ) : '';
+		if ( '' === $slug ) {
+			return '';
+		}
+
+		$agents_repo = new Agents();
+		if ( ! $agents_repo->get_by_slug( $slug ) ) {
+			self::clear_active_agent_slug_for_user( $user_id );
+			return '';
+		}
+
+		return $slug;
+	}
+
+	/**
+	 * Clear a user's persisted active agent preference.
+	 *
+	 * @param int $user_id User ID.
+	 * @return void
+	 */
+	private static function clear_active_agent_slug_for_user( int $user_id ): void {
+		if ( $user_id > 0 ) {
+			delete_user_meta( $user_id, self::ACTIVE_AGENT_META_KEY );
+		}
 	}
 
 	/**
@@ -2713,6 +2750,7 @@ class AgentAbilities {
 			foreach ( $candidates as $candidate ) {
 				$result = self::deleteAgent( array( 'agent_id' => $candidate['agent_id'] ) );
 				if ( ! empty( $result['success'] ) ) {
+					self::clear_active_agent_meta_for_owner( (int) $candidate['owner_id'] );
 					$deleted[] = $candidate;
 				}
 			}
@@ -2727,6 +2765,44 @@ class AgentAbilities {
 			'deleted'       => $deleted,
 			'deleted_count' => count( $deleted ),
 		);
+	}
+
+	/**
+	 * Clear the active-agent user-meta pointer for a pruned agent's owner.
+	 *
+	 * User meta is per-site on multisite, so this deletes the key from every
+	 * site where it might have been set.
+	 *
+	 * @param int $owner_id Owner user ID.
+	 * @return void
+	 */
+	private static function clear_active_agent_meta_for_owner( int $owner_id ): void {
+		if ( $owner_id <= 0 ) {
+			return;
+		}
+
+		if ( ! function_exists( 'delete_user_meta' ) ) {
+			return;
+		}
+
+		if ( ! is_multisite() || ! function_exists( 'get_sites' ) || ! function_exists( 'switch_to_blog' ) ) {
+			delete_user_meta( $owner_id, self::ACTIVE_AGENT_META_KEY );
+			return;
+		}
+
+		$blog_ids = get_sites(
+			array(
+				'fields' => 'ids',
+				'number' => 0,
+			)
+		);
+
+		$original_blog_id = get_current_blog_id();
+		foreach ( $blog_ids as $blog_id ) {
+			switch_to_blog( (int) $blog_id );
+			delete_user_meta( $owner_id, self::ACTIVE_AGENT_META_KEY );
+		}
+		switch_to_blog( $original_blog_id );
 	}
 
 	/**

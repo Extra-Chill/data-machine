@@ -277,6 +277,11 @@ class AgentAccess extends BaseRepository {
 		$agent_id = (int) $grant->agent_id;
 		$user_id  = $grant->user_id;
 		$role     = $grant->role;
+
+		if ( $agent_id <= 0 ) {
+			throw new \InvalidArgumentException( 'invalid_datamachine_agent_access_grant_agent_id' );
+		}
+
 		$existing = $this->get_access( $grant->agent_id, $user_id, $grant->workspace_id );
 
 		if ( $existing ) {
@@ -453,6 +458,10 @@ class AgentAccess extends BaseRepository {
 	 * @return bool True on success.
 	 */
 	public function bootstrap_owner_access( int $agent_id, int $owner_id ): bool {
+		if ( $agent_id <= 0 || $owner_id <= 0 ) {
+			return false;
+		}
+
 		try {
 			$this->grant_access( new \WP_Agent_Access_Grant( (string) $agent_id, $owner_id, \WP_Agent_Access_Grant::ROLE_ADMIN ) );
 			return true;
