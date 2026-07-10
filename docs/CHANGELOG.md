@@ -2,6 +2,14 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.161.0] - 2026-07-10
+
+### Added
+- agent bundle manifest reconciliation — slug-based diff, status drift, upgrade (#2860)
+
+### Fixed
+- stop system tasks from minting per-user agent rows; add agent prune
+
 ## [0.160.0] - 2026-07-09
 
 ### Added
