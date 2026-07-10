@@ -72,7 +72,18 @@ final class AgentBundleAbilityService {
 			);
 		}
 
-		return array_merge( array( 'success' => true ), $this->installed_status( $agent ) );
+		$status = array_merge( array( 'success' => true ), $this->installed_status( $agent ) );
+
+		// Manifest drift detection (#2860): compare the on-disk bundle
+		// manifest against the installed row so operators can see when a
+		// deployed manifest change has not yet reached the live agent.
+		$drift = $this->manifest_drift( $agent );
+		if ( null !== $drift ) {
+			$status['manifest']           = $drift;
+			$status['has_manifest_drift'] = ! empty( $drift['has_drift'] );
+		}
+
+		return $status;
 	}
 
 	/** @return array<string,mixed> */
@@ -579,6 +590,18 @@ final class AgentBundleAbilityService {
 			);
 		}
 
+		// Slug resolution (#2860): when the source is neither a remote URL
+		// nor an existing local path, treat it as a bundle/agent slug and
+		// try to resolve the on-disk bundle directory registered by the
+		// integration plugin. This lets operators run `agent diff <slug>`
+		// / `agent upgrade <slug>` without knowing the filesystem path.
+		if ( ! BundleSource::is_remote( $source ) && ! file_exists( $source ) ) {
+			$resolved_dir = $this->resolve_bundle_directory_for_slug( $source );
+			if ( null !== $resolved_dir ) {
+				$source = $resolved_dir;
+			}
+		}
+
 		$context  = BundleSourceAuth::build_resolve_context(
 			isset( $input['token'] ) ? (string) $input['token'] : null,
 			isset( $input['token_env'] ) ? (string) $input['token_env'] : null
@@ -893,6 +916,30 @@ final class AgentBundleAbilityService {
 		return null;
 	}
 
+	/**
+	 * Resolve a slug to a registered on-disk bundle directory.
+	 *
+	 * Tries a direct bundle-slug match against registered directories
+	 * first, then falls back to resolving through an installed agent's
+	 * stored bundle_slug.
+	 *
+	 * @param string $slug Agent slug or bundle slug.
+	 * @return string|null Absolute directory path, or null when unresolved.
+	 */
+	private function resolve_bundle_directory_for_slug( string $slug ): ?string {
+		$dir = AgentBundleDirectoryRegistry::resolve_for_bundle_slug( $slug );
+		if ( null !== $dir ) {
+			return $dir;
+		}
+
+		$agent = $this->resolve_installed_agent( $slug );
+		if ( $agent ) {
+			return AgentBundleDirectoryRegistry::resolve_for_agent( $agent );
+		}
+
+		return null;
+	}
+
 	private function installed_status( array $agent ): array {
 		$bundle    = $agent['agent_config']['datamachine_bundle'] ?? array();
 		$artifacts = AgentBundleArtifactState::installed_for_agent( $agent );
@@ -908,6 +955,156 @@ final class AgentBundleAbilityService {
 			'source_revision'  => (string) ( $bundle['source_revision'] ?? '' ),
 			'artifact_count'   => count( $artifacts ),
 			'artifacts'        => $artifacts,
+		);
+	}
+
+	/**
+	 * Compare the on-disk bundle manifest against the installed agent row.
+	 *
+	 * Returns null when no registered bundle directory is available.
+	 * Otherwise returns a drift report comparing bundle_version and the
+	 * bundle-owned agent_config payload (via the same projection the
+	 * upgrade planner uses).
+	 *
+	 * @param array<string,mixed> $agent Installed agent row.
+	 * @return array<string,mixed>|null Drift report or null.
+	 */
+	private function manifest_drift( array $agent ): ?array {
+		$dir = AgentBundleDirectoryRegistry::resolve_for_agent( $agent );
+		if ( null === $dir ) {
+			return null;
+		}
+
+		try {
+			$directory = AgentBundleDirectory::read( $dir );
+		} catch ( BundleValidationException $e ) {
+			return array(
+				'path'      => $dir,
+				'available' => false,
+				'error'     => $e->getMessage(),
+				'has_drift' => false,
+			);
+		}
+
+		$manifest         = $directory->manifest();
+		$manifest_data    = $manifest->to_array();
+		$installed_bundle = $agent['agent_config']['datamachine_bundle'] ?? array();
+
+		$installed_version = (string) ( $installed_bundle['bundle_version'] ?? '' );
+		$manifest_version  = $manifest->bundle_version();
+		$version_drift     = $installed_version !== $manifest_version;
+
+		$installed_config_payload = AgentBundleAgentConfig::tracked_payload(
+			is_array( $agent['agent_config'] ?? null ) ? $agent['agent_config'] : array()
+		);
+		$manifest_config_payload  = AgentBundleAgentConfig::tracked_payload(
+			is_array( $manifest_data['agent']['agent_config'] ?? null ) ? $manifest_data['agent']['agent_config'] : array()
+		);
+
+		$config_drift = self::config_drift_fields( $installed_config_payload, $manifest_config_payload );
+
+		return array(
+			'path'           => $dir,
+			'available'      => true,
+			'bundle_version' => array(
+				'installed' => $installed_version,
+				'manifest'  => $manifest_version,
+				'drift'     => $version_drift,
+			),
+			'config_drift'   => $config_drift,
+			'has_drift'      => $version_drift || ! empty( $config_drift ),
+		);
+	}
+
+	/**
+	 * Report top-level config fields that differ between two tracked payloads.
+	 *
+	 * @param array<string,mixed> $installed Tracked installed config.
+	 * @param array<string,mixed> $manifest  Tracked manifest config.
+	 * @return array<int,array<string,mixed>> List of {key, installed, manifest} entries.
+	 */
+	public static function config_drift_fields( array $installed, array $manifest ): array {
+		$drift = array();
+		$keys  = array_unique( array_merge( array_keys( $installed ), array_keys( $manifest ) ) );
+		sort( $keys );
+
+		foreach ( $keys as $key ) {
+			$installed_value = array_key_exists( $key, $installed ) ? $installed[ $key ] : null;
+			$manifest_value  = array_key_exists( $key, $manifest ) ? $manifest[ $key ] : null;
+
+			if ( AgentBundleArtifactHasher::hash( $installed_value ) === AgentBundleArtifactHasher::hash( $manifest_value ) ) {
+				continue;
+			}
+
+			$drift[] = array(
+				'key'       => (string) $key,
+				'installed' => $installed_value,
+				'manifest'  => $manifest_value,
+			);
+		}
+
+		return $drift;
+	}
+
+	/**
+	 * Reconcile every installed bundle-backed agent against its on-disk manifest.
+	 *
+	 * Iterates all agents with a stored bundle_slug, resolves each one's
+	 * registered bundle directory, and runs the standard upgrade path.
+	 * Agents without a registered directory are reported as skipped.
+	 *
+	 * @param array<string,mixed> $input { dry_run?: bool }.
+	 * @return array<string,mixed>
+	 */
+	public function reconcile_all( array $input ): array {
+		$dry_run = ! empty( $input['dry_run'] );
+		$results = array();
+
+		foreach ( $this->agents->get_all() as $agent ) {
+			if ( ! is_array( $agent ) ) {
+				continue;
+			}
+
+			$bundle = $agent['agent_config']['datamachine_bundle'] ?? array();
+			if ( empty( $bundle['bundle_slug'] ) ) {
+				continue;
+			}
+
+			$slug = (string) $agent['agent_slug'];
+			$dir  = AgentBundleDirectoryRegistry::resolve_for_agent( $agent );
+
+			if ( null === $dir ) {
+				$results[] = array(
+					'agent_slug'  => $slug,
+					'bundle_slug' => (string) $bundle['bundle_slug'],
+					'success'     => false,
+					'skipped'     => true,
+					'error'       => 'No registered bundle directory for this agent.',
+				);
+				continue;
+			}
+
+			$result = $this->upgrade(
+				array(
+					'source'  => $dir,
+					'slug'    => $slug,
+					'dry_run' => $dry_run,
+				)
+			);
+
+			$results[] = array_merge(
+				$result,
+				array(
+					'agent_slug'  => $slug,
+					'bundle_slug' => (string) $bundle['bundle_slug'],
+				)
+			);
+		}
+
+		return array(
+			'success'    => true,
+			'reconciled' => $results,
+			'count'      => count( $results ),
 		);
 	}
 

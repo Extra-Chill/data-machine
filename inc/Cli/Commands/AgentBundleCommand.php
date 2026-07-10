@@ -187,6 +187,10 @@ class AgentBundleCommand extends BaseCommand {
 	/**
 	 * Show installed package status for an agent or package slug.
 	 *
+	 * Includes manifest drift detection when the on-disk bundle directory
+	 * is discoverable: reports whether a deployed manifest change has not
+	 * yet reached the live agent row (#2860).
+	 *
 	 * ## OPTIONS
 	 *
 	 * <slug>
@@ -208,16 +212,54 @@ class AgentBundleCommand extends BaseCommand {
 			return;
 		}
 
-		$this->output( $status, $assoc_args, array( 'agent_id', 'agent_slug', 'template_slug', 'template_version', 'bundle_slug', 'bundle_version', 'artifact_count' ) );
+		$has_drift = ! empty( $status['has_manifest_drift'] );
+
+		if ( 'json' === ( $assoc_args['format'] ?? 'table' ) ) {
+			WP_CLI::line( (string) wp_json_encode( $status, JSON_PRETTY_PRINT ) );
+			return;
+		}
+
+		if ( $has_drift ) {
+			$manifest      = $status['manifest'] ?? array();
+			$config_drift  = is_array( $manifest['config_drift'] ?? null ) ? $manifest['config_drift'] : array();
+			$version_drift = is_array( $manifest['bundle_version'] ?? null ) ? (bool) ( $manifest['bundle_version']['drift'] ?? false ) : false;
+
+			if ( $version_drift ) {
+				WP_CLI::warning( sprintf(
+					'Bundle version drift: installed %s, manifest %s.',
+					(string) ( $manifest['bundle_version']['installed'] ?? '' ),
+					(string) ( $manifest['bundle_version']['manifest'] ?? '' )
+				) );
+			}
+
+			foreach ( $config_drift as $field ) {
+				$key = (string) ( $field['key'] ?? '' );
+				if ( '' === $key ) {
+					continue;
+				}
+				WP_CLI::warning( sprintf(
+					'Config drift: %s (installed: %s, manifest: %s)',
+					$key,
+					wp_json_encode( $field['installed'] ?? null ),
+					wp_json_encode( $field['manifest'] ?? null )
+				) );
+			}
+
+			WP_CLI::log( 'Run `wp datamachine agent diff <slug>` for the full upgrade plan.' );
+		}
+
+		$row          = $status;
+		$row['drift'] = $has_drift ? 'Yes' : 'No';
+		$this->format_items( array( $row ), array( 'agent_id', 'agent_slug', 'template_slug', 'template_version', 'bundle_slug', 'bundle_version', 'artifact_count', 'drift' ), array( 'format' => 'table' ) );
 	}
 
 	/**
-	 * Inspect an agent package from a local file, directory, or URL without writing.
+	 * Inspect an agent package from a slug, local file, directory, or URL.
 	 *
 	 * ## OPTIONS
 	 *
-	 * <path>
-	 * : Package path (.zip, .json, or directory) or remote URL.
+	 * <slug-or-path>
+	 * : Installed agent/bundle slug, or package path (.zip, .json, or directory) or remote URL.
 	 *
 	 * [--slug=<slug>]
 	 * : Override target agent slug for summary output.
@@ -286,12 +328,17 @@ class AgentBundleCommand extends BaseCommand {
 	}
 
 	/**
-	 * Show an upgrade diff for a package path.
+	 * Show an upgrade diff for a package path or installed agent slug.
+	 *
+	 * When given a slug (not a file path or URL), resolves the on-disk
+	 * bundle directory registered by the integration plugin via the
+	 * `datamachine_agent_bundle_directories` filter and diffs that
+	 * manifest against the installed agent row.
 	 *
 	 * ## OPTIONS
 	 *
-	 * <path>
-	 * : Package path (.zip, .json, or directory).
+	 * <slug-or-path>
+	 * : Installed agent/bundle slug, or package path (.zip, .json, or directory).
 	 *
 	 * [--slug=<slug>]
 	 * : Override target agent slug.
@@ -324,13 +371,21 @@ class AgentBundleCommand extends BaseCommand {
 	/**
 	 * Upgrade an installed agent package.
 	 *
+	 * Accepts either a filesystem path or an installed agent/bundle slug.
+	 * When given a slug, resolves the on-disk bundle directory registered
+	 * by the integration plugin via `datamachine_agent_bundle_directories`.
+	 *
 	 * Clean artifacts are applied through the importer. Approval-required changes
 	 * are staged as PendingActions.
 	 *
 	 * ## OPTIONS
 	 *
-	 * <path>
-	 * : Package path (.zip, .json, or directory).
+	 * [<slug-or-path>]
+	 * : Installed agent/bundle slug, or package path (.zip, .json, or directory).
+	 *   Required unless --all is used.
+	 *
+	 * [--all]
+	 * : Reconcile every installed bundle-backed agent against its on-disk manifest.
 	 *
 	 * [--slug=<slug>]
 	 * : Override target agent slug.
@@ -375,6 +430,48 @@ class AgentBundleCommand extends BaseCommand {
 	 * ---
 	 */
 	public function upgrade( array $args, array $assoc_args ): void {
+		$all = \WP_CLI\Utils\get_flag_value( $assoc_args, 'all', false );
+
+		if ( $all ) {
+			$dry_run  = \WP_CLI\Utils\get_flag_value( $assoc_args, 'dry-run', false );
+			$response = AgentAbilities::reconcileAllAgentBundles( array( 'dry_run' => $dry_run ) );
+			if ( empty( $response['success'] ) ) {
+				WP_CLI::error( (string) ( $response['error'] ?? 'Bundle reconcile-all failed.' ) );
+				return;
+			}
+
+			if ( 'json' === ( $assoc_args['format'] ?? 'table' ) ) {
+				WP_CLI::line( (string) wp_json_encode( $response, JSON_PRETTY_PRINT ) );
+				return;
+			}
+
+			WP_CLI::log( sprintf( 'Reconciled %d agent(s).', (int) ( $response['count'] ?? 0 ) ) );
+
+			$rows = array();
+			foreach ( is_array( $response['reconciled'] ?? null ) ? $response['reconciled'] : array() as $entry ) {
+				$rows[] = array(
+					'agent_slug'  => (string) ( $entry['agent_slug'] ?? '' ),
+					'bundle_slug' => (string) ( $entry['bundle_slug'] ?? '' ),
+					'success'     => ! empty( $entry['success'] ) ? 'Yes' : 'No',
+					'skipped'     => ! empty( $entry['skipped'] ) ? 'Yes' : 'No',
+					'error'       => (string) ( $entry['error'] ?? '' ),
+				);
+			}
+
+			if ( $rows ) {
+				$this->format_items( $rows, array( 'agent_slug', 'bundle_slug', 'success', 'skipped', 'error' ), array( 'format' => 'table' ) );
+			}
+
+			return;
+		}
+
+		$source = (string) ( $args[0] ?? '' );
+		if ( '' === $source ) {
+			WP_CLI::error( 'Slug or path is required. Use --all to reconcile every installed bundle-backed agent.' );
+			return;
+		}
+
+		$args             = array( $source );
 		$dry_run          = \WP_CLI\Utils\get_flag_value( $assoc_args, 'dry-run', false );
 		$input            = $this->bundle_ability_input( $args, $assoc_args );
 		$input['dry_run'] = $dry_run;
