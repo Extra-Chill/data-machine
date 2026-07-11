@@ -2,6 +2,12 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.161.2] - 2026-07-11
+
+### Fixed
+- guard null source_url in WordPress publish dedup path
+- fix(wake-briefing): add freshness stamp, staleness guard, and honest hourly wording
+
 ## [0.161.1] - 2026-07-10
 
 ### Fixed
