@@ -133,6 +133,51 @@ class GscOpportunityAbility {
 	 */
 	const FETCH_LIMIT = 25000;
 
+	/**
+	 * Definition-box (zero-click) query detection — bare-definitional patterns.
+	 *
+	 * Some queries are bare-word definitional searches — "<term> meaning",
+	 * "define <term>" — where Google answers inline via a definition panel, an
+	 * AI Overview, or a featured snippet, and the organic result is structurally
+	 * never seen. For those, a near-0% CTR at a strong rank is STRUCTURAL
+	 * (SERP-captured), not a fixable title/meta problem. Scoring them as
+	 * snippet-gap "recoverable clicks" produces phantom top-of-list
+	 * opportunities that dominate the ranking and bury genuinely recoverable
+	 * song/context-intent queries underneath them on the same page.
+	 *
+	 * Each entry is a fully-delimited PCRE pattern. A match means the query has
+	 * a DEFINITIONAL shape. Match ALONE is never sufficient to flag a row — it
+	 * is only leg (a) of a three-leg signature; see is_definition_box() and
+	 * DEFINITION_BOX_CTR_FRACTION. The patterns are deliberately conservative
+	 * on term length so song-intent queries ("no diggity lyrics meaning") and
+	 * natural-language questions ("what does X mean in <song>") do not match;
+	 * even if one slipped through, the CTR leg (c) would still protect it.
+	 *
+	 * @var string[]
+	 */
+	const DEFINITION_BOX_PATTERNS = array(
+		// "<term> meaning" / "<term> definition(s)" — term is 1-2 words.
+		'/^(?:[\w\'-]+(?:\s+[\w\'-]+)?)\s+(?:meaning|definitions?)$/i',
+		// "define <term>" / "definition(s) of <term>" / "meaning of <term>".
+		'/^(?:define|definitions?\s+of|meaning\s+of)\s+\S+/i',
+	);
+
+	/**
+	 * CTR-ratio threshold for the definition-box signature (leg c).
+	 *
+	 * Flag a definitional-pattern query only when its current CTR is below this
+	 * fraction of the position-expected CTR. 0.1 means "an order of magnitude
+	 * below baseline" — the leg that separates a genuinely SERP-captured query
+	 * ("diggity meaning", CTR 0.005% at a rank expecting 10% → ratio 0.0005,
+	 * far below 0.1) from a modestly-recoverable song-intent query on the SAME
+	 * page at nearly the SAME rank ("no diggity meaning", CTR 1.0% expecting 7%
+	 * → ratio 0.14, above 0.1). The 200x CTR gap between the two IS the
+	 * definition-box signature; this threshold encodes it.
+	 *
+	 * @var float
+	 */
+	const DEFINITION_BOX_CTR_FRACTION = 0.1;
+
 	private static bool $registered = false;
 
 	public function __construct() {
@@ -204,15 +249,16 @@ class GscOpportunityAbility {
 					'output_schema'       => array(
 						'type'       => 'object',
 						'properties' => array(
-							'success'            => array( 'type' => 'boolean' ),
-							'window'             => array( 'type' => 'object' ),
-							'dimension'          => array( 'type' => 'string' ),
-							'thresholds'         => array( 'type' => 'object' ),
-							'snippet_gap'        => array( 'type' => 'array' ),
-							'page2_demand'       => array( 'type' => 'array' ),
-							'snippet_gap_count'  => array( 'type' => 'integer' ),
-							'page2_demand_count' => array( 'type' => 'integer' ),
-							'error'              => array( 'type' => 'string' ),
+							'success'              => array( 'type' => 'boolean' ),
+							'window'               => array( 'type' => 'object' ),
+							'dimension'            => array( 'type' => 'string' ),
+							'thresholds'           => array( 'type' => 'object' ),
+							'snippet_gap'          => array( 'type' => 'array' ),
+							'page2_demand'         => array( 'type' => 'array' ),
+							'snippet_gap_count'    => array( 'type' => 'integer' ),
+							'page2_demand_count'   => array( 'type' => 'integer' ),
+							'definition_box_count' => array( 'type' => 'integer' ),
+							'error'                => array( 'type' => 'string' ),
 						),
 					),
 					'execute_callback'    => array( self::class, 'audit' ),
@@ -267,8 +313,9 @@ class GscOpportunityAbility {
 			$actions['page'] = 'page_stats';
 		}
 
-		$snippet_gap  = array();
-		$page2_demand = array();
+		$snippet_gap          = array();
+		$page2_demand         = array();
+		$definition_box_count = 0;
 
 		foreach ( $actions as $kind => $action ) {
 			$gsc_input = array(
@@ -321,9 +368,23 @@ class GscOpportunityAbility {
 					&& $expected_ctr > 0.0
 					&& $ctr < ( $expected_ctr * $ctr_gap_factor )
 				) {
-					$recoverable = (int) round( $impressions * max( 0.0, $expected_ctr - $ctr ) );
-					if ( $recoverable > 0 ) {
-						$snippet_gap[] = array(
+					$recoverable    = (int) round( $impressions * max( 0.0, $expected_ctr - $ctr ) );
+					$definition_box = self::is_definition_box( $label, $position, $ctr, $expected_ctr, $good_position );
+
+					if ( $definition_box ) {
+						// SERP-captured (definition-box) query: the near-0% CTR
+						// is structural (Google answers inline), not a
+						// title/meta problem. Keep the row visible so the
+						// operator still sees "this high-impression query
+						// exists but is unrecoverable", but zero its
+						// recoverable estimate so it cannot dominate the
+						// ranking and bury actionable rows. See the
+						// DEFINITION_BOX_PATTERNS docblock for the rationale.
+						$recoverable = 0;
+					}
+
+					if ( $recoverable > 0 || $definition_box ) {
+						$row_out = array(
 							'type'               => $kind,
 							'target'             => $label,
 							'position'           => round( $position, 1 ),
@@ -333,6 +394,11 @@ class GscOpportunityAbility {
 							'expected_ctr'       => round( $expected_ctr, 4 ),
 							'recoverable_clicks' => $recoverable,
 						);
+						if ( $definition_box ) {
+							$row_out['definition_box'] = true;
+							++$definition_box_count;
+						}
+						$snippet_gap[] = $row_out;
 					}
 					continue;
 				}
@@ -373,14 +439,14 @@ class GscOpportunityAbility {
 		}
 
 		return array(
-			'success'            => true,
-			'dimension'          => $dimension,
-			'window'             => array(
+			'success'              => true,
+			'dimension'            => $dimension,
+			'window'               => array(
 				'start_date' => $start_date,
 				'end_date'   => $end_date,
 				'days'       => $days,
 			),
-			'thresholds'         => array(
+			'thresholds'           => array(
 				'min_impressions'       => $min_impressions,
 				'good_position'         => $good_position,
 				'ctr_gap_factor'        => $ctr_gap_factor,
@@ -388,10 +454,11 @@ class GscOpportunityAbility {
 				'page2_max_position'    => self::DEFAULT_PAGE2_MAX_POSITION,
 				'page2_target_position' => self::PAGE2_TARGET_POSITION,
 			),
-			'snippet_gap'        => $snippet_gap,
-			'page2_demand'       => $page2_demand,
-			'snippet_gap_count'  => count( $snippet_gap ),
-			'page2_demand_count' => count( $page2_demand ),
+			'snippet_gap'          => $snippet_gap,
+			'page2_demand'         => $page2_demand,
+			'snippet_gap_count'    => count( $snippet_gap ),
+			'page2_demand_count'   => count( $page2_demand ),
+			'definition_box_count' => $definition_box_count,
 		);
 	}
 
@@ -420,6 +487,59 @@ class GscOpportunityAbility {
 		$last_key = array_key_last( $baseline );
 
 		return $baseline[ $last_key ];
+	}
+
+	/**
+	 * Detect whether a query row is a SERP-captured definition-box query.
+	 *
+	 * A definition-box query is a bare-word definitional search ("<term>
+	 * meaning") where Google answers inline and the organic result is never
+	 * seen. Returns true ONLY when ALL THREE legs of the signature hold:
+	 *
+	 *   (a) PATTERN — the query matches a bare-definitional shape (see
+	 *       DEFINITION_BOX_PATTERNS). "Contains the word meaning" alone is NOT
+	 *       enough: legit song-intent queries like "no diggity lyrics meaning"
+	 *       or "what does X mean in <song>" must stay fully scored.
+	 *   (b) RANK — position <= good_position. A definition box only suppresses
+	 *       the organic result when the page is actually ranking well; a page-2
+	 *       row is not SERP-captured, it is just not ranking (and cannot reach
+	 *       this method anyway, since page-2 rows fall into CLASS 2).
+	 *   (c) CTR — current CTR is an order of magnitude below the position
+	 *       baseline (ctr < expected_ctr * DEFINITION_BOX_CTR_FRACTION). This
+	 *       is the leg that separates "diggity meaning" (0.005% CTR) from "no
+	 *       diggity meaning" (1.0% CTR) at the same rank on the same page.
+	 *
+	 * Any single leg is noise; all three together are the signature. The checks
+	 * are ordered cheapest-first (rank, then CTR, then the regex) so the common
+	 * non-matching rows short-circuit before pattern matching.
+	 *
+	 * @param string $query        Query string (row label).
+	 * @param float  $position     SERP position.
+	 * @param float  $ctr          Current CTR (fraction).
+	 * @param float  $expected_ctr Position-expected CTR (fraction).
+	 * @param float  $good_position Good-rank cutoff (position <= this is strong).
+	 * @return bool True when the row is a SERP-captured definition-box query.
+	 */
+	private static function is_definition_box( string $query, float $position, float $ctr, float $expected_ctr, float $good_position ): bool {
+
+		// Leg (b) — strong rank.
+		if ( $position > $good_position || $expected_ctr <= 0.0 ) {
+			return false;
+		}
+
+		// Leg (c) — catastrophic CTR: an order of magnitude below baseline.
+		if ( $ctr >= ( $expected_ctr * self::DEFINITION_BOX_CTR_FRACTION ) ) {
+			return false;
+		}
+
+		// Leg (a) — definitional pattern.
+		foreach ( self::DEFINITION_BOX_PATTERNS as $pattern ) {
+			if ( preg_match( $pattern, $query ) ) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	/**
