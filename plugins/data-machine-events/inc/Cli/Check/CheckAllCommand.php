@@ -64,12 +64,13 @@ class CheckAllCommand {
 		$limit      = $assoc_args['limit'] ?? '10';
 
 		$checks = array(
-			'quality'    => 'Unified Quality Audit',
-			'times'      => 'Time Issues',
-			'venues'     => 'Venue Issues',
-			'encoding'   => 'Encoding Issues',
-			'duration'   => 'Duration Issues',
-			'duplicates' => 'Duplicate Events',
+			'quality'         => 'Unified Quality Audit',
+			'times'           => 'Time Issues',
+			'malformed-dates' => 'Malformed Dates',
+			'venues'          => 'Venue Issues',
+			'encoding'        => 'Encoding Issues',
+			'duration'        => 'Duration Issues',
+			'duplicates'      => 'Duplicate Events',
 		);
 
 		\WP_CLI::log( '=====================================' );
@@ -91,6 +92,11 @@ class CheckAllCommand {
 			// duration uses --max-days and --scope, not --days-ahead or --limit
 			if ( 'duration' === $subcommand ) {
 				$run_args = array( 'scope' => $scope );
+			}
+
+			// malformed-dates takes no scope/limit flags.
+			if ( 'malformed-dates' === $subcommand ) {
+				$run_args = array();
 			}
 
 			try {
