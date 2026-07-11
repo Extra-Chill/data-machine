@@ -2,6 +2,19 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.47.4] - 2026-07-11
+
+### Changed
+- Revert "fix: network-register events-by-term so cross-site lookups resolve (#422) (#439)"
+
+### Fixed
+- stop 50mi metro sweep from tagging all events with one city term (#379)
+- drop dangling phpunit.xml bootstrap attribute pointing at deleted tests/bootstrap.php
+- reject malformed event dates before they coerce to 0000-00-00 + audit command (#395)
+- network-register events-by-term so cross-site lookups resolve (#422)
+- strip trailing address from venue name so find-or-create dedup works (#433)
+- reject pre-selected artist name as a venue value (#434)
+
 ## [0.47.3] - 2026-07-10
 
 ### Changed
