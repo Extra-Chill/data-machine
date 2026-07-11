@@ -177,6 +177,48 @@ class DuplicateCheckAbilityTest extends WP_UnitTestCase {
 		$this->assertSame( $post_id, $result['match']['post_id'] );
 	}
 
+	/**
+	 * Dedup must still work when source_url is absent/null — it falls back
+	 * to title matching. Regression guard for #2870.
+	 */
+	public function test_check_duplicate_falls_back_to_title_when_source_url_absent(): void {
+		$post_id = self::factory()->post->create(
+			array(
+				'post_title'  => 'Bonnaroo 2026 Lineup Announced',
+				'post_status' => 'publish',
+				'post_type'   => 'post',
+			)
+		);
+
+		update_post_meta( $post_id, PostTracking::SOURCE_URL_META_KEY, 'https://www.reddit.com/r/bonnaroo/comments/zzz/original/' );
+
+		$ability = wp_get_ability( 'datamachine/check-duplicate' );
+
+		$result_without = $ability->execute(
+			array(
+				'title'     => 'Bonnaroo 2026 Lineup Announced',
+				'post_type' => 'post',
+				'scope'     => 'published',
+			)
+		);
+
+		$this->assertSame( 'duplicate', $result_without['verdict'] );
+		$this->assertSame( 'published_post', $result_without['source'] );
+		$this->assertSame( $post_id, $result_without['match']['post_id'] );
+
+		$result_null = $ability->execute(
+			array(
+				'title'      => 'Bonnaroo 2026 Lineup Announced',
+				'post_type'  => 'post',
+				'scope'      => 'published',
+				'source_url' => null,
+			)
+		);
+
+		$this->assertSame( 'duplicate', $result_null['verdict'] );
+		$this->assertSame( 'published_post', $result_null['source'] );
+	}
+
 	// -----------------------------------------------------------------------
 	// Strategy registry
 	// -----------------------------------------------------------------------
