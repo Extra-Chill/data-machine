@@ -14,10 +14,12 @@
 namespace DataMachineEvents\Steps\Upsert\Events;
 
 use DataMachine\Core\EngineData;
+use DataMachine\Core\Selection\SelectionMode;
 use DataMachineEvents\Steps\Upsert\Events\Venue;
 use DataMachineEvents\Steps\Upsert\Events\Promoter;
 use DataMachineEvents\Core\VenueParameterProvider;
 use DataMachineEvents\Core\Promoter_Taxonomy;
+use DataMachineEvents\Core\Venue_Taxonomy;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -37,8 +39,9 @@ class EventTaxonomyAssigner {
 	 * @param int $post_id Post ID
 	 * @param array $parameters Event parameters
 	 * @param EngineData $engine Engine data helper
+	 * @param array $handler_config Handler configuration with taxonomy selections
 	 */
-	public function processVenue( int $post_id, array $parameters, EngineData $engine ): void {
+	public function processVenue( int $post_id, array $parameters, EngineData $engine, array $handler_config = array() ): void {
 		$venue_name = $engine->get( 'venue' ) ?? $parameters['venue'] ?? '';
 
 		if ( empty( $venue_name ) ) {
@@ -48,21 +51,37 @@ class EventTaxonomyAssigner {
 			}
 		}
 
-		if ( ! empty( $venue_name ) ) {
-			// Merge engine data with AI parameters (engine takes precedence)
-			$merged_params  = array_merge( $parameters, $engine->all() );
-			$venue_metadata = VenueParameterProvider::extractFromParameters( $merged_params );
+		if ( empty( $venue_name ) ) {
+			return;
+		}
 
-			$venue_result = \DataMachineEvents\Core\Venue_Taxonomy::find_or_create_venue( $venue_name, $venue_metadata );
+		if ( $this->isVenueNameMatchingArtist( $venue_name, $handler_config ) ) {
+			do_action(
+				'datamachine_log',
+				'warning',
+				'Venue candidate matches pre-selected artist name; leaving venue unassigned',
+				array(
+					'post_id'     => $post_id,
+					'venue_name'  => $venue_name,
+					'artist_name' => $this->getPreSelectedArtistName( $handler_config ),
+				)
+			);
+			return;
+		}
 
-			if ( $venue_result['term_id'] ) {
-				Venue::assign_venue_to_event(
-					$post_id,
-					array(
-						'venue' => $venue_result['term_id'],
-					)
-				);
-			}
+		// Merge engine data with AI parameters (engine takes precedence)
+		$merged_params  = array_merge( $parameters, $engine->all() );
+		$venue_metadata = VenueParameterProvider::extractFromParameters( $merged_params );
+
+		$venue_result = Venue_Taxonomy::find_or_create_venue( $venue_name, $venue_metadata );
+
+		if ( $venue_result['term_id'] ) {
+			Venue::assign_venue_to_event(
+				$post_id,
+				array(
+					'venue' => $venue_result['term_id'],
+				)
+			);
 		}
 	}
 
@@ -133,6 +152,20 @@ class EventTaxonomyAssigner {
 			return null;
 		}
 
+		if ( $this->isVenueNameMatchingArtist( $venue_name, $handler_config ) ) {
+			do_action(
+				'datamachine_log',
+				'warning',
+				'Venue candidate matches pre-selected artist name; leaving venue unassigned',
+				array(
+					'post_id'     => $post_id,
+					'venue_name'  => $venue_name,
+					'artist_name' => $this->getPreSelectedArtistName( $handler_config ),
+				)
+			);
+			return null;
+		}
+
 		$venue_metadata = array(
 			'address'     => $this->getParameterValue( $parameters, 'venueAddress' ) ?: ( $engine->get( 'venueAddress' ) ?? '' ),
 			'city'        => $this->getParameterValue( $parameters, 'venueCity' ) ?: ( $engine->get( 'venueCity' ) ?? '' ),
@@ -145,7 +178,7 @@ class EventTaxonomyAssigner {
 			'capacity'    => $this->getParameterValue( $parameters, 'venueCapacity' ) ?: ( $engine->get( 'venueCapacity' ) ?? '' ),
 		);
 
-		$venue_result = \DataMachineEvents\Core\Venue_Taxonomy::find_or_create_venue( $venue_name, $venue_metadata );
+		$venue_result = Venue_Taxonomy::find_or_create_venue( $venue_name, $venue_metadata );
 
 		if ( ! empty( $venue_result['term_id'] ) ) {
 			$assignment_result = Venue::assign_venue_to_event( $post_id, array( 'venue' => $venue_result['term_id'] ) );
@@ -241,6 +274,68 @@ class EventTaxonomyAssigner {
 			'success' => false,
 			'error'   => 'Failed to create or find promoter',
 		);
+	}
+
+	/**
+	 * Resolve the pre-selected artist term name from handler config, if any.
+	 *
+	 * Only returns a name when `taxonomy_artist_selection` is a pre-selected
+	 * value (numeric term ID, term name, or slug). AI_DECIDES or SKIP modes
+	 * return null so the guardrail does not apply.
+	 *
+	 * @param array $handler_config Handler configuration with taxonomy selections.
+	 * @return string|null Artist term name, or null if not pre-selected / not found.
+	 */
+	private function getPreSelectedArtistName( array $handler_config ): ?string {
+		$selection = $handler_config['taxonomy_artist_selection'] ?? 'skip';
+
+		if ( ! SelectionMode::isPreSelected( $selection ) ) {
+			return null;
+		}
+
+		$term = null;
+		if ( is_numeric( $selection ) ) {
+			$term = get_term( (int) $selection, 'artist' );
+		} else {
+			$term = get_term_by( 'name', $selection, 'artist' );
+			if ( ! $term ) {
+				$term = get_term_by( 'slug', $selection, 'artist' );
+			}
+		}
+
+		if ( ! $term || is_wp_error( $term ) ) {
+			return null;
+		}
+
+		return $term->name;
+	}
+
+	/**
+	 * Check whether a venue candidate matches the pre-selected artist name.
+	 *
+	 * Uses the same normalization as the venue matcher so variants like
+	 * "The X" / "X" or punctuation differences are caught. When the artist
+	 * is not pre-selected, this always returns false.
+	 *
+	 * @param string $venue_name Venue candidate name.
+	 * @param array  $handler_config Handler configuration with taxonomy selections.
+	 * @return bool True when the venue candidate matches the pre-selected artist.
+	 */
+	private function isVenueNameMatchingArtist( string $venue_name, array $handler_config ): bool {
+		$artist_name = $this->getPreSelectedArtistName( $handler_config );
+
+		if ( empty( $artist_name ) || empty( $venue_name ) ) {
+			return false;
+		}
+
+		$normalized_venue  = Venue_Taxonomy::normalize_venue_name_for_matching( $venue_name );
+		$normalized_artist = Venue_Taxonomy::normalize_venue_name_for_matching( $artist_name );
+
+		if ( empty( $normalized_venue ) || empty( $normalized_artist ) ) {
+			return false;
+		}
+
+		return $normalized_venue === $normalized_artist;
 	}
 
 	private function getPromoterSelection( array $handler_config ): string {

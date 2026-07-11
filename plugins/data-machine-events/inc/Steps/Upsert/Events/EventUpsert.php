@@ -294,7 +294,7 @@ class EventUpsert extends UpsertHandler {
 
 		// 8. Post-upsert event-specific processing (create and update paths).
 		$this->processEventFeaturedImage( $post_id, $handler_config, $engine );
-		$this->taxonomy_assigner->processVenue( $post_id, $parameters, $engine );
+		$this->taxonomy_assigner->processVenue( $post_id, $parameters, $engine, $handler_config );
 		$this->taxonomy_assigner->processPromoter( $post_id, $parameters, $engine, $handler_config );
 
 		// Map performer to artist taxonomy if not explicitly provided.
