@@ -195,4 +195,108 @@ class VenueNormalizationTest extends WP_UnitTestCase {
 			'Suite-suffix address variant should resolve to the same venue term.'
 		);
 	}
+
+	// ---------------------------------------------------------------------
+	// Part C: address-in-name extraction (#433)
+	// ---------------------------------------------------------------------
+
+	public function test_extract_address_from_name_strips_full_address(): void {
+		$result = Venue_Taxonomy::extract_address_from_name(
+			'The Dinghy , 8 J C Long Blvd, Isle of Palms, SC 29451'
+		);
+
+		$this->assertSame( 'The Dinghy', $result['name'] );
+		$this->assertSame( '8 J C Long Blvd', $result['address'] );
+		$this->assertSame( 'Isle of Palms', $result['city'] );
+		$this->assertSame( 'SC', $result['state'] );
+		$this->assertSame( '29451', $result['zip'] );
+	}
+
+	public function test_extract_address_from_name_strips_address_no_zip(): void {
+		$result = Venue_Taxonomy::extract_address_from_name(
+			'Blind Tiger Pub, 36-38 Broad St, Charleston, SC'
+		);
+
+		$this->assertSame( 'Blind Tiger Pub', $result['name'] );
+		$this->assertSame( '36-38 Broad St', $result['address'] );
+		$this->assertSame( 'Charleston', $result['city'] );
+		$this->assertSame( 'SC', $result['state'] );
+	}
+
+	public function test_extract_address_from_name_strips_city_state_only(): void {
+		$result = Venue_Taxonomy::extract_address_from_name( 'Lake Oconee , Greensboro, GA' );
+
+		$this->assertSame( 'Lake Oconee', $result['name'] );
+		$this->assertSame( '', $result['address'] );
+		$this->assertSame( 'Greensboro', $result['city'] );
+		$this->assertSame( 'GA', $result['state'] );
+	}
+
+	public function test_extract_address_from_name_ignores_plain_name(): void {
+		$this->assertSame( array(), Venue_Taxonomy::extract_address_from_name( 'The Dinghy' ) );
+	}
+
+	public function test_extract_address_from_name_does_not_truncate_legit_comma_name(): void {
+		// "Restaurant & Grill" does not end in a state abbreviation, so the
+		// conservative guard must refuse to touch it.
+		$this->assertSame(
+			array(),
+			Venue_Taxonomy::extract_address_from_name( 'Bar, Restaurant & Grill' )
+		);
+	}
+
+	public function test_extract_address_from_name_does_not_truncate_slash_name(): void {
+		// No comma at all — nothing to strip regardless of trailing tokens.
+		$this->assertSame( array(), Venue_Taxonomy::extract_address_from_name( 'RADIO/EAST' ) );
+	}
+
+	public function test_find_or_create_venue_dedupes_clean_name_and_address_baked_name(): void {
+		// First call: clean name only (no metadata) — this is the scenario
+		// from #433 where a canonical clean-name term already exists.
+		$clean = Venue_Taxonomy::find_or_create_venue( 'The Dinghy Test ' . uniqid() );
+		$this->assertIsArray( $clean );
+		$this->assertNotNull( $clean['term_id'] );
+
+		$clean_term = get_term( $clean['term_id'], 'venue' );
+
+		// Second call: AI-style blob with the address baked into the name,
+		// but matching address metadata so it resolves via address match
+		// once extraction populates $venue_data.
+		$blob_name = $clean_term->name . ' , 8 J C Long Blvd, Isle of Palms, SC 29451';
+		$blob      = Venue_Taxonomy::find_or_create_venue(
+			$blob_name,
+			array(
+				'address' => '8 J C Long Blvd',
+				'city'    => 'Isle of Palms',
+				'state'   => 'SC',
+				'zip'     => '29451',
+			)
+		);
+
+		$this->assertIsArray( $blob );
+		$this->assertNotNull( $blob['term_id'] );
+
+		// Third call: same blob, but WITHOUT any pre-supplied address
+		// metadata — extraction must recover it from the name itself and
+		// still land on the same term via the normalized-name match
+		// (since no address meta was pre-populated on the second call's
+		// term until smart-merge runs).
+		$blob_only_name = $clean_term->name . ' , 8 J C Long Blvd, Isle of Palms, SC 29451';
+		$blob_only      = Venue_Taxonomy::find_or_create_venue( $blob_only_name );
+
+		$this->assertIsArray( $blob_only );
+		$this->assertSame(
+			$blob['term_id'],
+			$blob_only['term_id'],
+			'Extraction must recover address from the name itself even with no pre-supplied venue_data.'
+		);
+
+		// The created term's name must be the clean name — never the blob.
+		$created_term = get_term( $blob['term_id'], 'venue' );
+		$this->assertSame( $clean_term->name, $created_term->name );
+
+		// Address metadata must have landed on the term, not been discarded.
+		$saved_address = get_term_meta( $blob['term_id'], '_venue_address', true );
+		$this->assertSame( '8 J C Long Blvd', $saved_address );
+	}
 }

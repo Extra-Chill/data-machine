@@ -45,6 +45,26 @@ class Venue_Taxonomy {
 		'timezone'    => 'Timezone',
 	);
 
+	/**
+	 * US state / DC / territory postal abbreviations.
+	 *
+	 * Used by extract_address_from_name() as the conservative guard that
+	 * decides whether a trailing comma-separated segment is really a state
+	 * (and therefore the tail is an address blob) rather than two
+	 * incidental capital letters that happen to appear at the end of a
+	 * legitimate venue name.
+	 *
+	 * @var string[]
+	 */
+	private static $us_state_abbreviations = array(
+		'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA',
+		'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD',
+		'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ',
+		'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC',
+		'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY',
+		'DC', 'PR', 'VI', 'GU', 'AS', 'MP',
+	);
+
 	public static function register() {
 		self::register_venue_taxonomy();
 
@@ -87,6 +107,10 @@ class Venue_Taxonomy {
 	 * Find or create a venue with given name and metadata
 	 *
 	 * Matching cascade:
+	 * 0. Address-in-name extraction (strips a trailing "street, city, ST zip"
+	 *    blob baked into the name — common with AI-extracted venue strings —
+	 *    and routes it into $venue_data BEFORE matching runs, so step 1 below
+	 *    can resolve it against the canonical venue by address)
 	 * 1. Address-based matching (normalized street + city comparison)
 	 * 2. Exact name match
 	 * 3. "The" prefix toggle ("The Royal American" ↔ "Royal American")
@@ -100,6 +124,21 @@ class Venue_Taxonomy {
 	 * @return array Array with keys: term_id, was_created
 	 */
 	public static function find_or_create_venue( $venue_name, $venue_data = array() ) {
+		// Strip a trailing address blob baked into the venue name (AI
+		// extraction sometimes returns "Venue Name, street, city, ST zip"
+		// as a single string). Must run first: it both cleans the name used
+		// for matching/creation below AND fills $venue_data so the
+		// address-based match immediately below can use it. See #433.
+		$extracted_address = self::extract_address_from_name( $venue_name );
+		if ( ! empty( $extracted_address ) ) {
+			$venue_name = $extracted_address['name'];
+			foreach ( array( 'address', 'city', 'state', 'zip' ) as $field ) {
+				if ( ! empty( $extracted_address[ $field ] ) && empty( $venue_data[ $field ] ) ) {
+					$venue_data[ $field ] = $extracted_address[ $field ];
+				}
+			}
+		}
+
 		// Address-based matching (source of truth)
 		$address = $venue_data['address'] ?? '';
 		$city    = $venue_data['city'] ?? '';
@@ -186,6 +225,136 @@ class Venue_Taxonomy {
 		return array(
 			'term_id'     => $term_id,
 			'was_created' => true,
+		);
+	}
+
+	/**
+	 * Detect and strip a trailing address blob baked into a venue name.
+	 *
+	 * AI-driven venue extraction (AI_DECIDES resolution) sometimes returns
+	 * the venue name and its address concatenated into ONE string, comma
+	 * separated, e.g.:
+	 *
+	 *   "The Dinghy , 8 J C Long Blvd, Isle of Palms, SC 29451"
+	 *   "Blind Tiger Pub, 36-38 Broad St, Charleston, SC 29403"
+	 *   "Lake Oconee , Greensboro, GA"
+	 *
+	 * Left alone, this becomes the taxonomy term NAME, which (a) produces
+	 * ugly terms and (b) defeats find_or_create_venue()'s dedup: the SAME
+	 * venue splits into a clean term and an address-suffixed term depending
+	 * on whether the AI happened to include the address that run. See #433.
+	 *
+	 * Heuristic (deliberately conservative — false negatives are cheap,
+	 * false positives truncate a real venue name):
+	 *
+	 * 1. Split the string on commas.
+	 * 2. A single-segment name (no commas) never matches — nothing to strip.
+	 * 3. The LAST segment must look like "<City>, <ST> <zip?>" or a bare
+	 *    "<ST> <zip>" / "<ST>" — i.e. it must end in a two-letter token that
+	 *    is a real US state/territory abbreviation (see
+	 *    self::$us_state_abbreviations), optionally followed by a 5 or
+	 *    5+4 digit ZIP. This is the load-bearing guard: legitimate venue
+	 *    names with commas ("Bar, Restaurant & Grill") never end in a state
+	 *    abbreviation, so they never match and are never truncated.
+	 * 4. Once the state-bearing tail segment is confirmed, everything from
+	 *    the SECOND segment onward is treated as the address blob (segment
+	 *    1 is the clean venue name). Within that blob, the last segment is
+	 *    parsed for a "<city>? <ST> <zip?>" pattern — if it carries its own
+	 *    leading city text (e.g. one comma-separated segment holds
+	 *    "Isle of Palms SC 29451"), that leading text becomes the city;
+	 *    otherwise the city is pulled from the next-to-last segment (e.g.
+	 *    when city and state are each their own comma segment). Anything
+	 *    remaining before the city is the street.
+	 *
+	 * Examples walked through the heuristic:
+	 * - "The Dinghy , 8 J C Long Blvd, Isle of Palms, SC 29451"
+	 *   → segments: ["The Dinghy", "8 J C Long Blvd", "Isle of Palms", "SC 29451"]
+	 *   → last segment "SC 29451" ends in state+zip, no leading city text → match.
+	 *   → name = "The Dinghy", street = "8 J C Long Blvd", city = "Isle of Palms",
+	 *     state = "SC", zip = "29451".
+	 * - "Lake Oconee , Greensboro, GA"
+	 *   → segments: ["Lake Oconee", "Greensboro", "GA"]
+	 *   → last segment "GA" is a bare state → match.
+	 *   → name = "Lake Oconee", street = "" (only 2 tail segments: city + state),
+	 *     city = "Greensboro", state = "GA".
+	 * - "Bar, Restaurant & Grill"
+	 *   → segments: ["Bar", "Restaurant & Grill"]
+	 *   → last segment "Restaurant & Grill" does not end in a state
+	 *     abbreviation → no match, name returned unchanged (empty array).
+	 * - "The Dinghy"
+	 *   → no commas → no match, name returned unchanged (empty array).
+	 *
+	 * @param string $venue_name Raw venue name, possibly with an address baked in.
+	 * @return array{name: string, address: string, city: string, state: string, zip: string}|array{}
+	 *         Empty array when no address tail was detected (name should be used as-is).
+	 */
+	public static function extract_address_from_name( string $venue_name ): array {
+		if ( false === strpos( $venue_name, ',' ) ) {
+			return array();
+		}
+
+		$segments = array_map( 'trim', explode( ',', $venue_name ) );
+		$segments = array_values( array_filter( $segments, static fn( $segment ) => '' !== $segment ) );
+
+		// Need at least "name" + one address segment to have anything to strip.
+		if ( count( $segments ) < 2 ) {
+			return array();
+		}
+
+		$last = end( $segments );
+
+		// The tail segment must end in a real state/territory abbreviation,
+		// optionally preceded by leading city text and optionally followed
+		// by a ZIP (5 or ZIP+4). This is what distinguishes an address blob
+		// from an ordinary comma-containing venue name (e.g.
+		// "Restaurant & Grill" never matches this pattern).
+		if ( ! preg_match(
+			'/^(?<city>.*?)\s*\b(?<state>[A-Z]{2})\s*(?<zip>\d{5}(?:-\d{4})?)?$/',
+			strtoupper( $last ),
+			$tail_matches
+		) ) {
+			return array();
+		}
+
+		$state = $tail_matches['state'];
+		$zip   = $tail_matches['zip'] ?? '';
+
+		if ( ! in_array( $state, self::$us_state_abbreviations, true ) ) {
+			return array();
+		}
+
+		// Confirmed: everything from the second segment onward is the
+		// address blob. First segment is the clean venue name.
+		$name         = array_shift( $segments );
+		$address_tail = $segments; // Remaining segments, ending in the state(+zip) segment just parsed.
+
+		// Drop the state(+zip) segment — already parsed above.
+		array_pop( $address_tail );
+
+		// Recover the original (non-uppercased) leading city text from
+		// inside the last segment, if any (e.g. "Isle of Palms SC 29451").
+		$city_in_last_segment = trim( mb_substr( $last, 0, mb_strlen( trim( $tail_matches['city'] ) ) ) );
+
+		if ( '' !== $city_in_last_segment ) {
+			// City was embedded in the same segment as the state/zip.
+			$city   = $city_in_last_segment;
+			$street = implode( ', ', $address_tail );
+		} else {
+			// City is its own comma-separated segment (or absent).
+			$city   = ! empty( $address_tail ) ? array_pop( $address_tail ) : '';
+			$street = implode( ', ', $address_tail );
+		}
+
+		if ( '' === $name ) {
+			return array();
+		}
+
+		return array(
+			'name'    => $name,
+			'address' => $street,
+			'city'    => $city,
+			'state'   => $state,
+			'zip'     => $zip,
 		);
 	}
 
