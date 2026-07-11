@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 Homeboy maintains this file from conventional commits at release time —
 do not edit by hand.
 
+## [0.13.1] - 2026-07-11
+
+### Fixed
+- discount SERP-captured definition-box queries in GSC opportunity scorer
+- enumerate flat __invoke command actions in AGENTS.md section
+
 ## [0.13.0] - 2026-07-03
 
 ### Added
