@@ -142,15 +142,18 @@ class WordPress extends PublishHandler {
 				$existing_id     = null;
 
 				if ( $duplicate_check ) {
-					$duplicate_result = $duplicate_check->execute(
-						array(
-							'title'         => $title,
-							'post_type'     => $post_type,
-							'lookback_days' => $lookback_days,
-							'scope'         => 'published',
-							'source_url'    => $source_url,
-						)
+					$args = array(
+						'title'         => $title,
+						'post_type'     => $post_type,
+						'lookback_days' => $lookback_days,
+						'scope'         => 'published',
 					);
+
+					if ( is_string( $source_url ) && '' !== $source_url ) {
+						$args['source_url'] = $source_url;
+					}
+
+					$duplicate_result = $duplicate_check->execute( $args );
 
 					if ( is_wp_error( $duplicate_result ) ) {
 						$this->log( 'warning', 'Duplicate check failed: ' . $duplicate_result->get_error_message() );
