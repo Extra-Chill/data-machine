@@ -277,6 +277,282 @@ class EventTaxonomyAssigner {
 	}
 
 	/**
+	 * Process location taxonomy assignment for an event.
+	 *
+	 * City `location` pipelines fetch events within a discovery radius (e.g. a
+	 * 50-mile Ticketmaster/Dice sweep) but, when location is PRE_SELECTED, the
+	 * generic taxonomy pass stamps EVERY fetched event with the pipeline's
+	 * single city term — so a city archive absorbs the whole surrounding metro.
+	 * A Galveston-centered sweep tagged Houston, Sugar Land, Dallas, and even
+	 * Reno events as "Galveston". See data-machine-events#379.
+	 *
+	 * This intercepts the PRE_SELECTED location path and derives the term from
+	 * the event's actual venue city instead of the ingest center. When the
+	 * venue city resolves to a location term, that term wins. When it cannot be
+	 * resolved, the pipeline's configured term is kept as a conservative
+	 * fallback so the event stays discoverable by location. AI_DECIDES and SKIP
+	 * modes are left to the generic taxonomy pass (this returns false to signal
+	 * "not handled here").
+	 *
+	 * @param int $post_id Post ID.
+	 * @param array $parameters Event parameters.
+	 * @param EngineData $engine Engine data helper.
+	 * @param array $handler_config Handler configuration.
+	 * @return bool True when location was assigned here (caller should skip the
+	 *              generic pass for location); false when left to the generic pass.
+	 */
+	public function processLocation( int $post_id, array $parameters, EngineData $engine, array $handler_config = array() ): bool {
+		$selection = (string) ( $handler_config['taxonomy_location_selection'] ?? 'skip' );
+
+		// Only intercept PRE_SELECTED. AI_DECIDES is handled by the generic
+		// taxonomy pass (the AI picks from event data); SKIP needs no work.
+		if ( ! SelectionMode::isPreSelected( $selection ) ) {
+			return false;
+		}
+
+		if ( ! taxonomy_exists( 'location' ) ) {
+			return false;
+		}
+
+		// Resolve the pipeline-configured ingest-center term as the fallback.
+		$fallback_term_id = $this->resolveLocationSelectionTermId( $selection );
+
+		// Determine the event's actual venue city/state.
+		$venue_location = $this->getVenueLocationContext( $post_id, $parameters, $engine );
+
+		/**
+		 * Resolve the event location term from the venue's city.
+		 *
+		 * Lets a consumer layer that owns market knowledge (e.g. suburb→market
+		 * rollups like Cambridge→Boston, or state-abbreviation disambiguation)
+		 * supply a richer resolver than the substrate's generic city-name match.
+		 * Returning a WP_Term overrides the default resolution; returning null
+		 * lets the substrate fall back to its own name match, then to the
+		 * pipeline's configured term.
+		 *
+		 * @param \WP_Term|null $term    Resolved term so far (null by default).
+		 * @param string        $city    Venue city.
+		 * @param string        $state   Venue state (abbreviation or full name).
+		 * @param string        $zip     Venue zip code.
+		 * @param int           $post_id Event post ID.
+		 */
+		$resolved = apply_filters( 'data_machine_events_resolve_event_location_term', null, $venue_location['city'], $venue_location['state'], $venue_location['zip'], $post_id );
+
+		if ( ! $resolved instanceof \WP_Term ) {
+			$resolved = $this->resolveLocationTermForVenueCity( $venue_location['city'], $venue_location['state'] );
+		}
+
+		$term_id = $resolved instanceof \WP_Term ? (int) $resolved->term_id : $fallback_term_id;
+
+		if ( $term_id <= 0 ) {
+			// Neither the venue city nor the pipeline selection resolved to a
+			// usable term — nothing to assign. Still report handled so the
+			// generic pass does not re-stamp a dead selection value.
+			return true;
+		}
+
+		$result = wp_set_object_terms( $post_id, array( $term_id ), 'location' );
+
+		if ( is_wp_error( $result ) ) {
+			do_action(
+				'datamachine_log',
+				'warning',
+				'Event location assignment failed',
+				array(
+					'post_id' => $post_id,
+					'term_id' => $term_id,
+					'error'   => $result->get_error_message(),
+				)
+			);
+		} elseif ( $resolved instanceof \WP_Term && $fallback_term_id > 0 && (int) $resolved->term_id !== $fallback_term_id ) {
+			// Log when the venue city overrode the pipeline-center term — the
+			// exact metro-sweep mis-tag this method exists to correct.
+			do_action(
+				'datamachine_log',
+				'info',
+				'Event location derived from venue city (overrode pipeline center)',
+				array(
+					'post_id'          => $post_id,
+					'venue_city'       => $venue_location['city'],
+					'assigned_term'    => $resolved->name,
+					'pipeline_term_id' => $fallback_term_id,
+				)
+			);
+		}
+
+		return true;
+	}
+
+	/**
+	 * Resolve a PRE_SELECTED location selection to a term ID.
+	 *
+	 * @param string $selection Term ID, name, or slug.
+	 * @return int Term ID, or 0 when unresolvable.
+	 */
+	private function resolveLocationSelectionTermId( string $selection ): int {
+		if ( is_numeric( $selection ) ) {
+			$term = get_term( (int) $selection, 'location' );
+			return ( $term && ! is_wp_error( $term ) ) ? (int) $term->term_id : 0;
+		}
+
+		$term = get_term_by( 'name', $selection, 'location' );
+		if ( ! $term ) {
+			$term = get_term_by( 'slug', $selection, 'location' );
+		}
+
+		return ( $term && ! is_wp_error( $term ) ) ? (int) $term->term_id : 0;
+	}
+
+	/**
+	 * Gather the venue city/state/zip for an event.
+	 *
+	 * Reads from the venue term attached to the post (canonical, set earlier
+	 * in the upsert pass by processVenue), falling back to the engine/parameter
+	 * values when the venue term carries no city meta.
+	 *
+	 * @param int $post_id Post ID.
+	 * @param array $parameters Event parameters.
+	 * @param EngineData $engine Engine data helper.
+	 * @return array{city:string, state:string, zip:string}
+	 */
+	private function getVenueLocationContext( int $post_id, array $parameters, EngineData $engine ): array {
+		$venue_terms = wp_get_object_terms( $post_id, 'venue' );
+
+		if ( ! is_wp_error( $venue_terms ) && ! empty( $venue_terms ) ) {
+			$venue = $venue_terms[0];
+			$city  = trim( (string) get_term_meta( $venue->term_id, '_venue_city', true ) );
+
+			if ( '' !== $city ) {
+				return array(
+					'city'  => $city,
+					'state' => trim( (string) get_term_meta( $venue->term_id, '_venue_state', true ) ),
+					'zip'   => trim( (string) get_term_meta( $venue->term_id, '_venue_zip', true ) ),
+				);
+			}
+		}
+
+		return array(
+			'city'  => trim( (string) ( $engine->get( 'venueCity' ) ?? $parameters['venueCity'] ?? '' ) ),
+			'state' => trim( (string) ( $engine->get( 'venueState' ) ?? $parameters['venueState'] ?? '' ) ),
+			'zip'   => trim( (string) ( $engine->get( 'venueZip' ) ?? $parameters['venueZip'] ?? '' ) ),
+		);
+	}
+
+	/**
+	 * Resolve a city name to a `location` taxonomy term.
+	 *
+	 * Generic, consumer-agnostic resolution: exact (case-insensitive) city-name
+	 * match, with best-effort state disambiguation when multiple location terms
+	 * share a city name (e.g. Portland, OR vs Portland, ME — location is
+	 * hierarchical Country > State > City). No market mapping (suburb→city
+	 * rollups like Cambridge→Boston live in the consumer layer via the
+	 * data_machine_events_resolve_event_location_term filter).
+	 *
+	 * @param string $city  Venue city.
+	 * @param string $state Venue state (abbreviation or full name).
+	 * @return \WP_Term|null Resolved term, or null when unresolved.
+	 */
+	private function resolveLocationTermForVenueCity( string $city, string $state ): ?\WP_Term {
+		$city = trim( $city );
+		if ( '' === $city ) {
+			return null;
+		}
+
+		$matches = $this->getLocationTermsByName()[ strtolower( $city ) ] ?? array();
+
+		if ( 1 === count( $matches ) ) {
+			return reset( $matches );
+		}
+
+		if ( count( $matches ) > 1 ) {
+			return $this->disambiguateLocationByState( $matches, $state );
+		}
+
+		return null;
+	}
+
+	/**
+	 * Get all location terms grouped by lowercased name (request-cached).
+	 *
+	 * @return array<string, array<int, \WP_Term>>
+	 */
+	private function getLocationTermsByName(): array {
+		static $by_name = null;
+
+		if ( null !== $by_name ) {
+			return $by_name;
+		}
+
+		$by_name = array();
+
+		if ( ! taxonomy_exists( 'location' ) ) {
+			return $by_name;
+		}
+
+		$terms = get_terms(
+			array(
+				'taxonomy'   => 'location',
+				'hide_empty' => false,
+				'number'     => 0,
+			)
+		);
+
+		if ( is_wp_error( $terms ) ) {
+			return $by_name;
+		}
+
+		foreach ( $terms as $term ) {
+			$key = strtolower( $term->name );
+			if ( ! isset( $by_name[ $key ] ) ) {
+				$by_name[ $key ] = array();
+			}
+			$by_name[ $key ][] = $term;
+		}
+
+		return $by_name;
+	}
+
+	/**
+	 * Disambiguate same-named location terms using the venue's state.
+	 *
+	 * Location terms are hierarchical (Country > State > City). Compares the
+	 * venue's state against each candidate's parent (state-level) term name,
+	 * case-insensitively. Best-effort: state-abbreviation → full-name mapping
+	 * (e.g. "SC" → "South Carolina") is intentionally NOT owned by this
+	 * substrate layer — consumers with locale knowledge should hook
+	 * data_machine_events_resolve_event_location_term for robust disambiguation.
+	 *
+	 * @param array<int, \WP_Term> $matches Location terms sharing a city name.
+	 * @param string               $state   Venue state.
+	 * @return \WP_Term|null Matched term, or null when state doesn't resolve it.
+	 */
+	private function disambiguateLocationByState( array $matches, string $state ): ?\WP_Term {
+		$state = trim( $state );
+		if ( '' === $state ) {
+			return null;
+		}
+
+		$state_lower = strtolower( $state );
+
+		foreach ( $matches as $match ) {
+			if ( $match->parent <= 0 ) {
+				continue;
+			}
+
+			$parent = get_term( $match->parent, 'location' );
+			if ( ! $parent instanceof \WP_Term ) {
+				continue;
+			}
+
+			if ( strtolower( $parent->name ) === $state_lower ) {
+				return $match;
+			}
+		}
+
+		return null;
+	}
+
+	/**
 	 * Resolve the pre-selected artist term name from handler config, if any.
 	 *
 	 * Only returns a name when `taxonomy_artist_selection` is a pre-selected

@@ -28,6 +28,19 @@ class EventTaxonomyAssignerTest extends WP_UnitTestCase {
 		if ( ! taxonomy_exists( 'venue' ) ) {
 			Venue_Taxonomy::register();
 		}
+		if ( ! taxonomy_exists( 'location' ) ) {
+			// The `location` taxonomy is owned by the consumer layer, not this
+			// substrate. Register a minimal hierarchical instance for tests.
+			register_taxonomy(
+				'location',
+				'data_machine_events',
+				array(
+					'hierarchical' => true,
+					'public'       => true,
+					'show_in_rest' => true,
+				)
+			);
+		}
 
 		$this->assigner = new EventTaxonomyAssigner();
 	}
@@ -112,5 +125,206 @@ class EventTaxonomyAssignerTest extends WP_UnitTestCase {
 		$this->assertCount( 0, (array) $terms, 'processPromoter must not assign when selection is skip.' );
 
 		wp_delete_post( $post_id, true );
+	}
+
+	public function test_process_location_returns_false_for_skip_mode() {
+		$post_id = $this->make_event_post();
+
+		$engine = new \DataMachine\Core\EngineData( array(), 0 );
+
+		$handled = $this->assigner->processLocation(
+			$post_id,
+			array(),
+			$engine,
+			array( 'taxonomy_location_selection' => 'skip' )
+		);
+
+		$this->assertFalse( $handled, 'processLocation must not take ownership for SKIP mode.' );
+		wp_delete_post( $post_id, true );
+	}
+
+	public function test_process_location_returns_false_for_ai_decides_mode() {
+		$post_id = $this->make_event_post();
+
+		$engine = new \DataMachine\Core\EngineData( array(), 0 );
+
+		$handled = $this->assigner->processLocation(
+			$post_id,
+			array(),
+			$engine,
+			array( 'taxonomy_location_selection' => 'ai_decides' )
+		);
+
+		$this->assertFalse( $handled, 'processLocation must defer AI_DECIDES to the generic taxonomy pass.' );
+		wp_delete_post( $post_id, true );
+	}
+
+	/**
+	 * The core #379 bug: a Houston venue fetched inside a Galveston-centered
+	 * 50mi sweep must NOT inherit the pipeline's Galveston location term — it
+	 * must carry Houston, derived from the venue's own city.
+	 */
+	public function test_process_location_derives_term_from_venue_city_not_pipeline_center() {
+		$galveston = wp_insert_term( 'Galveston', 'location' );
+		$houston   = wp_insert_term( 'Houston', 'location' );
+		$this->assertNotWPError( $galveston );
+		$this->assertNotWPError( $houston );
+
+		$post_id = $this->make_event_post();
+
+		// Attach a venue term whose city is Houston (the event's actual city).
+		$venue = wp_insert_term( 'Toyota Center', 'venue' );
+		$this->assertNotWPError( $venue );
+		update_term_meta( $venue['term_id'], '_venue_city', 'Houston' );
+		wp_set_object_terms( $post_id, array( $venue['term_id'] ), 'venue' );
+
+		$engine = new \DataMachine\Core\EngineData( array(), 0 );
+
+		$handled = $this->assigner->processLocation(
+			$post_id,
+			array(),
+			$engine,
+			array( 'taxonomy_location_selection' => (string) $galveston['term_id'] ) // pipeline center = Galveston
+		);
+
+		$this->assertTrue( $handled, 'processLocation must take ownership for PRE_SELECTED mode.' );
+
+		$assigned = wp_get_object_terms( $post_id, 'location' );
+		$this->assertNotWPError( $assigned );
+		$this->assertCount( 1, $assigned, 'Exactly one location term must be assigned.' );
+		$this->assertSame( 'Houston', $assigned[0]->name, 'Venue-city term must override the pipeline-center term.' );
+
+		wp_delete_post( $post_id, true );
+		wp_delete_term( $venue['term_id'], 'venue' );
+		wp_delete_term( $houston['term_id'], 'location' );
+		wp_delete_term( $galveston['term_id'], 'location' );
+	}
+
+	/**
+	 * When the venue city is the pipeline's own city, the assignment is
+	 * unchanged — the fix must not regress the normal in-city case.
+	 */
+	public function test_process_location_keeps_pipeline_term_when_venue_is_in_that_city() {
+		$galveston = wp_insert_term( 'Galveston', 'location' );
+		$this->assertNotWPError( $galveston );
+
+		$post_id = $this->make_event_post();
+
+		$venue = wp_insert_term( 'The Grand 1894 Opera House', 'venue' );
+		$this->assertNotWPError( $venue );
+		update_term_meta( $venue['term_id'], '_venue_city', 'Galveston' );
+		wp_set_object_terms( $post_id, array( $venue['term_id'] ), 'venue' );
+
+		$engine = new \DataMachine\Core\EngineData( array(), 0 );
+
+		$this->assigner->processLocation(
+			$post_id,
+			array(),
+			$engine,
+			array( 'taxonomy_location_selection' => (string) $galveston['term_id'] )
+		);
+
+		$assigned = wp_get_object_terms( $post_id, 'location' );
+		$this->assertNotWPError( $assigned );
+		$this->assertCount( 1, $assigned );
+		$this->assertSame( 'Galveston', $assigned[0]->name );
+
+		wp_delete_post( $post_id, true );
+		wp_delete_term( $venue['term_id'], 'venue' );
+		wp_delete_term( $galveston['term_id'], 'location' );
+	}
+
+	/**
+	 * When the venue city has no matching location term (e.g. an unmapped
+	 * suburb), the pipeline's configured term is kept as a conservative
+	 * fallback rather than dropping the event from the location archive.
+	 */
+	public function test_process_location_falls_back_to_pipeline_term_when_venue_city_unresolved() {
+		$galveston = wp_insert_term( 'Galveston', 'location' );
+		$this->assertNotWPError( $galveston );
+
+		$post_id = $this->make_event_post();
+
+		// Venue in "Tinyburg" — no matching location term exists.
+		$venue = wp_insert_term( 'Tinyburg Hall', 'venue' );
+		$this->assertNotWPError( $venue );
+		update_term_meta( $venue['term_id'], '_venue_city', 'Tinyburg' );
+		wp_set_object_terms( $post_id, array( $venue['term_id'] ), 'venue' );
+
+		$engine = new \DataMachine\Core\EngineData( array(), 0 );
+
+		$this->assigner->processLocation(
+			$post_id,
+			array(),
+			$engine,
+			array( 'taxonomy_location_selection' => (string) $galveston['term_id'] )
+		);
+
+		$assigned = wp_get_object_terms( $post_id, 'location' );
+		$this->assertNotWPError( $assigned );
+		$this->assertCount( 1, $assigned );
+		$this->assertSame( 'Galveston', $assigned[0]->name, 'Unresolved venue city must fall back to the pipeline term.' );
+
+		wp_delete_post( $post_id, true );
+		wp_delete_term( $venue['term_id'], 'venue' );
+		wp_delete_term( $galveston['term_id'], 'location' );
+	}
+
+	/**
+	 * The data_machine_events_resolve_event_location_term filter lets a
+	 * consumer layer supply a richer resolver (e.g. suburb→market rollup).
+	 */
+	public function test_process_location_honors_consumer_filter_override() {
+		$galveston = wp_insert_term( 'Galveston', 'location' );
+		$houston   = wp_insert_term( 'Houston', 'location' );
+		$this->assertNotWPError( $galveston );
+		$this->assertNotWPError( $houston );
+
+		$post_id = $this->make_event_post();
+
+		// Venue in "Sugar Land" (a Houston suburb with no direct location term).
+		$venue = wp_insert_term( 'Smart Financial Centre', 'venue' );
+		$this->assertNotWPError( $venue );
+		update_term_meta( $venue['term_id'], '_venue_city', 'Sugar Land' );
+		wp_set_object_terms( $post_id, array( $venue['term_id'] ), 'venue' );
+
+		$engine = new \DataMachine\Core\EngineData( array(), 0 );
+
+		// Consumer filter rolls "Sugar Land" up to the Houston market.
+		$callback = function () use ( $houston ) {
+			return get_term( $houston['term_id'], 'location' );
+		};
+		add_filter( 'data_machine_events_resolve_event_location_term', $callback );
+
+		$this->assigner->processLocation(
+			$post_id,
+			array(),
+			$engine,
+			array( 'taxonomy_location_selection' => (string) $galveston['term_id'] )
+		);
+
+		remove_filter( 'data_machine_events_resolve_event_location_term', $callback );
+
+		$assigned = wp_get_object_terms( $post_id, 'location' );
+		$this->assertNotWPError( $assigned );
+		$this->assertCount( 1, $assigned );
+		$this->assertSame( 'Houston', $assigned[0]->name, 'Consumer filter override must win.' );
+
+		wp_delete_post( $post_id, true );
+		wp_delete_term( $venue['term_id'], 'venue' );
+		wp_delete_term( $houston['term_id'], 'location' );
+		wp_delete_term( $galveston['term_id'], 'location' );
+	}
+
+	private function make_event_post(): int {
+		$post_id = wp_insert_post(
+			array(
+				'post_title'  => 'Location Test ' . uniqid(),
+				'post_type'   => 'data_machine_events',
+				'post_status' => 'publish',
+			)
+		);
+		$this->assertGreaterThan( 0, $post_id );
+		return $post_id;
 	}
 }

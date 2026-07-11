@@ -12,7 +12,7 @@
  * are delegated to focused collaborators (see #425):
  *  - EventUpsertValidator       — pre-publish validation gate.
  *  - EventBlockContentBuilder   — event-details block / description assembly.
- *  - EventTaxonomyAssigner      — venue/promoter taxonomy assignment.
+ *  - EventTaxonomyAssigner      — venue/promoter/location taxonomy assignment.
  *
  * @package DataMachineEvents\Steps\Upsert\Events
  * @since   0.2.0
@@ -58,7 +58,7 @@ class EventUpsert extends UpsertHandler {
 	private EventBlockContentBuilder $content_builder;
 
 	/**
-	 * Venue/promoter taxonomy assignment.
+	 * Venue/promoter/location taxonomy assignment.
 	 *
 	 * @var EventTaxonomyAssigner
 	 */
@@ -297,6 +297,13 @@ class EventUpsert extends UpsertHandler {
 		$this->taxonomy_assigner->processVenue( $post_id, $parameters, $engine, $handler_config );
 		$this->taxonomy_assigner->processPromoter( $post_id, $parameters, $engine, $handler_config );
 
+		// Derive location from the event's actual venue city rather than the
+		// pipeline's ingest center. processLocation returns true when it took
+		// ownership of the location term (PRE_SELECTED mode), in which case the
+		// generic taxonomy pass below must skip location so it doesn't
+		// re-stamp the pipeline-center term. See data-machine-events#379.
+		$location_handled = $this->taxonomy_assigner->processLocation( $post_id, $parameters, $engine, $handler_config );
+
 		// Map performer to artist taxonomy if not explicitly provided.
 		if ( empty( $parameters['artist'] ) && ! empty( $event_data['performer'] ) ) {
 			$parameters['artist'] = $event_data['performer'];
@@ -305,7 +312,10 @@ class EventUpsert extends UpsertHandler {
 		$handler_config_for_tax                                = $handler_config;
 		$handler_config_for_tax['taxonomy_venue_selection']    = 'skip';
 		$handler_config_for_tax['taxonomy_promoter_selection'] = 'skip';
-		$engine_data_array                                     = $engine instanceof EngineData ? $engine->all() : array();
+		if ( $location_handled ) {
+			$handler_config_for_tax['taxonomy_location_selection'] = 'skip';
+		}
+		$engine_data_array = $engine instanceof EngineData ? $engine->all() : array();
 		$this->taxonomy_handler->processTaxonomies( $post_id, $parameters, $handler_config_for_tax, $engine_data_array );
 
 		do_action( 'datamachine_event_taxonomy_processed', $post_id );
