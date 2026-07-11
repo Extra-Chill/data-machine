@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.47.5] - 2026-07-11
+
+### Fixed
+- register abilities on wp_abilities_api_init instead of firing outside the action
+
 ## [0.47.4] - 2026-07-11
 
 ### Changed
