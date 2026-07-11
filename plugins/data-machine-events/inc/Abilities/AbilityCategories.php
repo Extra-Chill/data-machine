@@ -72,10 +72,6 @@ class AbilityCategories {
 			return;
 		}
 
-		if ( did_action( 'wp_abilities_api_categories_init' ) ) {
-			self::register();
-		} else {
-			add_action( 'wp_abilities_api_categories_init', array( self::class, 'register' ) );
-		}
+		add_action( 'wp_abilities_api_categories_init', array( self::class, 'register' ) );
 	}
 }

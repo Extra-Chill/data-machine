@@ -160,11 +160,7 @@ class EventDateQueryAbilities {
 			);
 		};
 
-		if ( did_action( 'wp_abilities_api_init' ) ) {
-			$register_callback();
-		} else {
-			add_action( 'wp_abilities_api_init', $register_callback );
-		}
+		add_action( 'wp_abilities_api_init', $register_callback );
 	}
 
 	/**
