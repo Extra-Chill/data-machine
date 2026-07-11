@@ -60,6 +60,7 @@ class SystemAgentServiceProvider {
 		$this->initializeRegistry();
 		$this->registerActionSchedulerHooks();
 		add_action( 'action_scheduler_init', array( $this, 'manageRecurringTaskSchedules' ) );
+		WakeBriefingTask::registerStalenessGuard();
 	}
 
 	/**
