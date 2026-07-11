@@ -15,6 +15,26 @@ defined( 'ABSPATH' ) || exit;
 class BingWebmasterCommand extends BaseCommand {
 
 	/**
+	 * Available actions for this flat `__invoke` command.
+	 *
+	 * The action is a positional argument dispatched inside `__invoke`, so it
+	 * is invisible to method reflection. This static accessor is the
+	 * machine-readable source consumed by the AGENTS.md section renderer
+	 * without instantiating the command. Keep in sync with the `## OPTIONS`
+	 * `<action>` list.
+	 *
+	 * @return array<string,string> Action name => short description.
+	 */
+	public static function actions(): array {
+		return array(
+			'query_stats'   => 'Top search queries by clicks',
+			'traffic_stats' => 'Rank and traffic stats over time',
+			'page_stats'    => 'Top pages by traffic',
+			'crawl_stats'   => 'Crawl activity statistics',
+		);
+	}
+
+	/**
 	 * Query Bing Webmaster Tools analytics.
 	 *
 	 * ## OPTIONS

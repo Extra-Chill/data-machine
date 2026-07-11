@@ -19,6 +19,27 @@ defined( 'ABSPATH' ) || exit;
 class MediaHygieneCommand extends BaseCommand {
 
 	/**
+	 * Available actions for this flat `__invoke` command.
+	 *
+	 * The action is a positional argument dispatched inside `__invoke`, so it
+	 * is invisible to method reflection. This static accessor is the
+	 * machine-readable source consumed by the AGENTS.md section renderer
+	 * without instantiating the command. Keep in sync with the `## OPTIONS`
+	 * `<action>` list.
+	 *
+	 * @return array<string,string> Action name => short description.
+	 */
+	public static function actions(): array {
+		return array(
+			'diagnose'       => 'Summary of dead-weight media across detectors',
+			'orphan-files'   => 'Files on disk with no attachment record',
+			'unused'         => 'Attachments not referenced in any content',
+			'delete-orphans' => 'Delete orphan files (requires --apply)',
+			'delete-unused'  => 'Delete unused attachments (requires --apply)',
+		);
+	}
+
+	/**
 	 * Inspect and clean dead-weight media (orphan files + unreferenced attachments).
 	 *
 	 * ## OPTIONS

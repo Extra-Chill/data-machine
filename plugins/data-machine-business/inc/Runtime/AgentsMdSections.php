@@ -20,7 +20,9 @@
  * Context safety: callbacks run on `plugins_loaded` in web/cron compose
  * contexts, NOT only under WP-CLI. Reflection over autoloadable command classes
  * never touches the live WP_CLI runner and never instantiates the command
- * classes.
+ * classes. The flat-`__invoke` action list is read from a static `actions()`
+ * method (when a command declares one) via a static call — also instantiation-
+ * free — so action enumeration stays context-safe.
  *
  * @package DataMachineBusiness\Runtime
  */
@@ -98,6 +100,17 @@ final class AgentsMdSections {
 				$lines[] = '' !== $summary
 					? sprintf( '- `%s %s <action>` — %s', $wp, $command, $summary )
 					: sprintf( '- `%s %s <action>`', $wp, $command );
+
+				// Flat commands carry their verbs as a positional <action>
+				// argument dispatched inside __invoke, which reflection cannot
+				// see. When the command exposes a static actions() accessor,
+				// enumerate each action as a bullet so AGENTS.md shows the real
+				// surface (mirrors the extrachill-cli subcommand-bullet depth).
+				foreach ( self::flat_invoke_actions( $class ) as $name => $description ) {
+					$lines[] = '' !== $description
+						? sprintf( '  - `%s` — %s', $name, $description )
+						: sprintf( '  - `%s`', $name );
+				}
 				continue;
 			}
 
@@ -172,6 +185,61 @@ MD;
 		$only = $subcommands[0];
 
 		return ( isset( $only['name'] ) && '__default' === $only['name'] ) ? $only : null;
+	}
+
+	/**
+	 * Read the action list for a flat `__invoke` command, when available.
+	 *
+	 * Flat `__invoke` commands dispatch their verbs from a positional
+	 * `<action>` argument inside `__invoke` (a switch/match), so the valid
+	 * action names are invisible to method reflection. A command may declare
+	 * them as a public static `actions()` accessor returning either:
+	 *
+	 *   - An associative `array<string,string>` of `action => short description`.
+	 *   - An indexed `array<int,string>` of bare action names.
+	 *
+	 * Both shapes are normalized to `array<string,string>` (missing
+	 * descriptions become ''). This is context-safe: a static method call
+	 * never instantiates the command class, so it is safe to run from
+	 * `plugins_loaded` in web/cron compose contexts. Returns an empty array
+	 * when the class is absent or declares no `actions()` accessor, leaving
+	 * the bare headline (no action bullets) as the graceful fallback.
+	 *
+	 * @param class-string $command_class Fully-qualified command class name.
+	 * @return array<string,string> Action name => short description.
+	 */
+	private static function flat_invoke_actions( string $command_class ): array {
+		if ( ! class_exists( $command_class ) || ! method_exists( $command_class, 'actions' ) ) {
+			return array();
+		}
+
+		try {
+			$actions = call_user_func( array( $command_class, 'actions' ) );
+		} catch ( \Throwable $e ) {
+			return array();
+		}
+
+		if ( ! is_array( $actions ) ) {
+			return array();
+		}
+
+		$normalized = array();
+		foreach ( $actions as $key => $value ) {
+			if ( is_int( $key ) ) {
+				// Indexed array: the value is the action name.
+				if ( is_string( $value ) && '' !== $value ) {
+					$normalized[ $value ] = '';
+				}
+				continue;
+			}
+
+			// Associative array: key is the action, value is the description.
+			if ( is_string( $key ) && '' !== $key ) {
+				$normalized[ $key ] = is_string( $value ) ? $value : '';
+			}
+		}
+
+		return $normalized;
 	}
 
 	/**

@@ -17,6 +17,32 @@ if ( ! defined( 'ABSPATH' ) ) {
 class GoogleSearchConsoleCommand extends BaseCommand {
 
 	/**
+	 * Available actions for this flat `__invoke` command.
+	 *
+	 * The action is a positional argument dispatched inside `__invoke`, so it
+	 * is invisible to method reflection. This static accessor is the
+	 * machine-readable source consumed by the AGENTS.md section renderer (and
+	 * available to any introspector) without instantiating the command.
+	 *
+	 * Keep in sync with the `## OPTIONS` `<action>` list and the ability's
+	 * valid-actions check.
+	 *
+	 * @return array<string,string> Action name => short description.
+	 */
+	public static function actions(): array {
+		return array(
+			'query_stats'        => 'Top search queries by clicks and impressions',
+			'page_stats'         => 'Top pages by clicks and impressions',
+			'query_page_stats'   => 'Combined query/page breakdown per URL',
+			'date_stats'         => 'Performance trends by date',
+			'inspect_url'        => 'URL Inspection — index status, coverage, mobile usability',
+			'list_sitemaps'      => 'List submitted sitemaps',
+			'get_sitemap'        => 'Get details for a single sitemap',
+			'submit_sitemap'     => 'Submit a sitemap for crawling',
+		);
+	}
+
+	/**
 	 * Query Google Search Console analytics.
 	 *
 	 * ## OPTIONS

@@ -21,6 +21,33 @@ if ( ! defined( 'ABSPATH' ) ) {
 class GoogleAnalyticsCommand extends BaseCommand {
 
 	/**
+	 * Available actions for this flat `__invoke` command.
+	 *
+	 * The action is a positional argument dispatched inside `__invoke`, so it
+	 * is invisible to method reflection. This static accessor is the
+	 * machine-readable source consumed by the AGENTS.md section renderer
+	 * without instantiating the command. Keep in sync with the `## OPTIONS`
+	 * `<action>` list.
+	 *
+	 * @return array<string,string> Action name => short description.
+	 */
+	public static function actions(): array {
+		return array(
+			'page_stats'        => 'Top pages by sessions, views, and engagement',
+			'traffic_sources'   => 'Sessions grouped by source and medium',
+			'date_stats'        => 'Daily session and engagement trends',
+			'realtime'          => 'Real-time active users',
+			'top_events'        => 'Top events by count',
+			'user_demographics' => 'Sessions by country and device',
+			'landing_pages'     => 'Top landing pages by entrances and engagement',
+			'engagement'        => 'Aggregate engagement metrics per page',
+			'new_vs_returning'  => 'New vs returning user split',
+			'network_density'   => 'Cross-site journey density via referrer host',
+			'path_sequence'     => 'Ordered cross-host path sequences (funnel report)',
+		);
+	}
+
+	/**
 	 * Query Google Analytics (GA4) data.
 	 *
 	 * ## OPTIONS

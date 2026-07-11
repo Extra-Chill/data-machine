@@ -15,6 +15,25 @@ defined( 'ABSPATH' ) || exit;
 class PageSpeedCommand extends BaseCommand {
 
 	/**
+	 * Available actions for this flat `__invoke` command.
+	 *
+	 * The action is a positional argument dispatched inside `__invoke`, so it
+	 * is invisible to method reflection. This static accessor is the
+	 * machine-readable source consumed by the AGENTS.md section renderer
+	 * without instantiating the command. Keep in sync with the `## OPTIONS`
+	 * `<action>` list.
+	 *
+	 * @return array<string,string> Action name => short description.
+	 */
+	public static function actions(): array {
+		return array(
+			'analyze'       => 'Full PageSpeed/Lighthouse audit',
+			'performance'   => 'Core Web Vitals focus',
+			'opportunities' => 'Optimization suggestions',
+		);
+	}
+
+	/**
 	 * Run PageSpeed Insights (Lighthouse) audits.
 	 *
 	 * ## OPTIONS
