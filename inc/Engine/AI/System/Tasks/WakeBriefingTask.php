@@ -15,8 +15,10 @@
  * sessions. A single mutable "last_wake" timestamp would be a race: whichever
  * session composed first would reset the clock and blind every concurrent
  * session. So this task keeps NO state. The digest is always "what changed in
- * the last N hours", recomputed from the current time on every run. There is
- * nothing to race because there is nothing to reset.
+ * the last N hours", recomputed hourly via Action Scheduler (see
+ * SystemAgentServiceProvider, schedule interval=hourly) — not per session.
+ * There is nothing to race because there is nothing to reset; the "hourly"
+ * cadence means a freshly composed file is at most ~1 cycle old.
  *
  * ## Signal discipline is the feature
  *
@@ -316,14 +318,22 @@ class WakeBriefingTask extends SystemTask {
 	 * Render the digest. Ruthless terseness: one grouped line per signal,
 	 * a single quiet line when nothing crosses the bar.
 	 *
+	 * The rendered header includes a machine+human-readable `generated_at`
+	 * (UTC) stamp so any reader can see the digest age. The injection-time
+	 * staleness guard (see {@see self::applyStalenessGuard()}) layers a
+	 * visible warning on top when the on-disk file is older than the
+	 * rolling window.
+	 *
 	 * @param string[] $signals      Threshold-crossing signal lines.
 	 * @param int      $window_hours Window size in hours.
 	 * @return string Markdown content.
 	 */
 	private function render( array $signals, int $window_hours, string $scope = 'site' ): string {
-		$reach   = 'network' === $scope ? 'across the network' : 'on this site';
-		$header  = "# Wake Briefing\n\n";
-		$header .= sprintf( "_What changed in the last %dh %s (recomputed each session; not personal to one session)._\n\n", $window_hours, $reach );
+		$reach        = 'network' === $scope ? 'across the network' : 'on this site';
+		$generated_at = gmdate( 'Y-m-d H:i T' );
+		$header       = "# Wake Briefing\n\n";
+		$header      .= sprintf( "_What changed in the last %dh %s (recomposed hourly; a rolling %dh window; not personal to one session)._\n\n", $window_hours, $reach, $window_hours );
+		$header      .= sprintf( "_Generated at %s._\n\n", $generated_at );
 
 		if ( empty( $signals ) ) {
 			$where = 'network' === $scope ? 'across the network' : 'here';
@@ -824,6 +834,58 @@ class WakeBriefingTask extends SystemTask {
 	 */
 	public function getTaskType(): string {
 		return 'wake_briefing';
+	}
+
+	/**
+	 * Register the injection-time staleness guard for WAKE.md.
+	 *
+	 * Hooks into datamachine_memory_file_content to prepend a visible
+	 * warning when the on-disk WAKE.md is older than the rolling window
+	 * — i.e. when hourly recomposition has stalled (feature disabled,
+	 * cron wedged, etc.). Without this guard every consumer silently
+	 * trusts fossil data.
+	 *
+	 * Called once from SystemAgentServiceProvider at construction time.
+	 */
+	public static function registerStalenessGuard(): void {
+		add_filter( 'datamachine_memory_file_content', array( self::class, 'applyStalenessGuard' ), 10, 4 );
+	}
+
+	/**
+	 * Staleness guard callback for datamachine_memory_file_content.
+	 *
+	 * If WAKE.md hasn't been refreshed within the rolling window, prepend
+	 * a visible warning so consumers don't silently trust stale data. The
+	 * generated_at stamp baked into the file by render() already shows the
+	 * composition time; this guard adds a machine-computed age warning at
+	 * injection time based on the file's actual mtime.
+	 *
+	 * @param string     $content    File content.
+	 * @param string     $filename   Filename.
+	 * @param array|null $meta       Registry metadata (unused).
+	 * @param int|null   $updated_at File mtime (Unix timestamp), or null.
+	 * @return string
+	 */
+	public static function applyStalenessGuard( string $content, string $filename, ?array $meta, ?int $updated_at ): string {
+		if ( self::BRIEFING_FILENAME !== $filename || null === $updated_at ) {
+			return $content;
+		}
+
+		$window_hours = (int) apply_filters( 'datamachine_wake_briefing_window_hours', self::DEFAULT_WINDOW_HOURS, array() );
+		$age          = time() - $updated_at;
+		$max_age      = $window_hours * HOUR_IN_SECONDS;
+
+		if ( $age <= $max_age ) {
+			return $content;
+		}
+
+		$hours_old = (int) round( $age / HOUR_IN_SECONDS );
+
+		return sprintf(
+			"⚠ **This briefing is %d hours old — recomposition may be stalled.** The data below may be out of date.\n\n%s",
+			$hours_old,
+			$content
+		);
 	}
 
 	/**

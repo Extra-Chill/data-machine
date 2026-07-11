@@ -92,7 +92,7 @@ class CoreMemoryFilesDirective implements DirectiveInterface {
 				continue;
 			}
 
-			$content = self::normalize_for_injection( $read->content, $read->bytes, $filename );
+			$content = self::normalize_for_injection( $read->content, $read->bytes, $filename, $read->updated_at );
 			if ( null === $content ) {
 				continue;
 			}
@@ -207,9 +207,10 @@ class CoreMemoryFilesDirective implements DirectiveInterface {
 	 * @param string $content  Raw file content (already loaded by caller).
 	 * @param int    $bytes    Content length in bytes (already known by caller).
 	 * @param string $filename Filename for logs and the content filter.
+	 * @param int|null $updated_at File mtime (Unix timestamp) or null when unknown.
 	 * @return string|null
 	 */
-	private static function normalize_for_injection( string $content, int $bytes, string $filename ): ?string {
+	private static function normalize_for_injection( string $content, int $bytes, string $filename, ?int $updated_at = null ): ?string {
 		if ( $bytes > AgentMemory::MAX_FILE_SIZE ) {
 			do_action(
 				'datamachine_log',
@@ -242,16 +243,19 @@ class CoreMemoryFilesDirective implements DirectiveInterface {
 		 * file read, not just composable ones.
 		 *
 		 * @since 0.66.0
+		 * @since next  Added $updated_at (file mtime) as 4th param.
 		 *
-		 * @param string     $content  File content.
-		 * @param string     $filename Filename (e.g. 'SOUL.md', 'MEMORY.md').
-		 * @param array|null $meta     Registry metadata, or null if unregistered.
+		 * @param string     $content    File content.
+		 * @param string     $filename   Filename (e.g. 'SOUL.md', 'MEMORY.md').
+		 * @param array|null $meta       Registry metadata, or null if unregistered.
+		 * @param int|null   $updated_at File mtime (Unix timestamp) or null.
 		 */
 		$content = apply_filters(
 			'datamachine_memory_file_content',
 			$content,
 			$filename,
-			MemoryFileRegistry::get( $filename )
+			MemoryFileRegistry::get( $filename ),
+			$updated_at
 		);
 
 		if ( empty( trim( $content ) ) ) {
