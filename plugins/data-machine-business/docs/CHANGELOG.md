@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 Homeboy maintains this file from conventional commits at release time —
 do not edit by hand.
 
+## [0.13.3] - 2026-07-12
+
+### Fixed
+- restore GSC row click initialization
+
 ## [0.13.2] - 2026-07-12
 
 ### Fixed
