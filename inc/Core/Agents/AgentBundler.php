@@ -1747,13 +1747,13 @@ class AgentBundler {
 	 * @return array Missing ability slugs.
 	 */
 	private function check_abilities_manifest( array $manifest ): array {
-		if ( empty( $manifest ) || ! function_exists( 'wp_get_ability' ) ) {
+		if ( empty( $manifest ) || ! function_exists( 'wp_has_ability' ) ) {
 			return array();
 		}
 
 		$missing = array();
 		foreach ( $manifest as $slug ) {
-			if ( ! wp_get_ability( $slug ) ) {
+			if ( ! wp_has_ability( $slug ) ) {
 				$missing[] = $slug;
 			}
 		}
