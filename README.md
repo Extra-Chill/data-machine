@@ -339,7 +339,7 @@ See [`docs/development/hooks/core-filters.md`](docs/development/hooks/core-filte
 ## Development
 
 ```bash
-composer test    # PHP smoke tests
+homeboy review data-machine test    # PHP smoke tests
 composer lint    # PHPCS with WordPress standards
 npm run build    # Build admin assets
 ```

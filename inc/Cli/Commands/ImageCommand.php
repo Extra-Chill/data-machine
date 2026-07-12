@@ -16,6 +16,7 @@ use WP_CLI;
 use DataMachine\Cli\BaseCommand;
 use DataMachine\Abilities\Media\ImageGenerationAbilities;
 use DataMachine\Abilities\Media\ImageOptimizationAbilities;
+use DataMachine\Abilities\Media\BrokenImageReferenceAbilities;
 use DataMachine\Abilities\Media\ImageTemplateAbilities;
 
 defined( 'ABSPATH' ) || exit;
@@ -605,6 +606,119 @@ class ImageCommand extends BaseCommand {
 		if ( ! empty( $result['batch_id'] ) ) {
 			WP_CLI::log( sprintf( 'Batch ID: %d — track progress with: wp datamachine jobs list --parent_id=%d', $result['batch_id'], $result['batch_id'] ) );
 		}
+	}
+
+	/**
+	 * Diagnose broken image references in published post content.
+	 *
+	 * Scans post HTML for <img> references (src, srcset candidates, and common
+	 * lazy-load attributes) and reports those whose local files are missing.
+	 * Multisite-aware: each reference URL is resolved to its owning site's upload
+	 * directory, including cross-site references where a post on one blog embeds
+	 * an upload hosted by another network blog. Read-only; never mutates posts
+	 * or files.
+	 *
+	 * ## OPTIONS
+	 *
+	 * [--post_type=<type>]
+	 * : Post type to scan.
+	 * ---
+	 * default: post
+	 * ---
+	 *
+	 * [--post_id=<id>]
+	 * : Limit the scan to a single post ID on the current site.
+	 *
+	 * [--limit=<number>]
+	 * : Maximum posts to scan. 0 for no limit.
+	 * ---
+	 * default: 0
+	 * ---
+	 *
+	 * [--network]
+	 * : Scan every site on the network (multisite only). Default: current site only.
+	 *
+	 * [--format=<format>]
+	 * : Output format.
+	 * ---
+	 * default: table
+	 * options:
+	 *   - table
+	 *   - json
+	 *   - csv
+	 * ---
+	 *
+	 * [--fields=<fields>]
+	 * : Limit output to specific fields (comma-separated).
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     # Scan the current site for missing image files
+	 *     $ wp datamachine image broken
+	 *
+	 *     # Scan a single post
+	 *     $ wp datamachine image broken --post_id=123
+	 *
+	 *     # Scan every site on the network
+	 *     $ wp datamachine image broken --network
+	 *
+	 *     # JSON output
+	 *     $ wp datamachine image broken --format=json
+	 *
+	 * @subcommand broken
+	 */
+	public function broken( array $args, array $assoc_args ): void {
+		$format    = $assoc_args['format'] ?? 'table';
+		$post_type = sanitize_text_field( $assoc_args['post_type'] ?? 'post' );
+		$post_id   = isset( $assoc_args['post_id'] ) ? absint( $assoc_args['post_id'] ) : 0;
+		$limit     = absint( $assoc_args['limit'] ?? 0 );
+		$network   = isset( $assoc_args['network'] );
+
+		$scope_label = $network ? 'network (all sites)' : 'current site';
+		WP_CLI::log( sprintf( 'Scanning %s for broken image references...', $scope_label ) );
+
+		$result = BrokenImageReferenceAbilities::diagnoseBrokenImageReferences(
+			array(
+				'post_type' => $post_type,
+				'post_id'   => $post_id,
+				'limit'     => $limit,
+				'network'   => $network,
+			)
+		);
+
+		if ( empty( $result['success'] ) ) {
+			WP_CLI::error( $result['error'] ?? 'Failed to scan broken image references.' );
+			return;
+		}
+
+		$posts_scanned = (int) ( $result['posts_scanned'] ?? 0 );
+		$refs_found    = (int) ( $result['references_found'] ?? 0 );
+		$broken_count  = (int) ( $result['broken_count'] ?? 0 );
+
+		if ( 'json' === $format ) {
+			WP_CLI::line( self::encode_json( $result ) );
+			return;
+		}
+
+		WP_CLI::log( '' );
+		WP_CLI::log( sprintf( 'Posts scanned:        %d', $posts_scanned ) );
+		WP_CLI::log( sprintf( 'Image references:     %d', $refs_found ) );
+		WP_CLI::log( sprintf( 'Missing local files:  %d', $broken_count ) );
+		WP_CLI::log( '' );
+
+		$broken = $result['broken_references'] ?? array();
+		if ( empty( $broken ) ) {
+			WP_CLI::success( sprintf( 'No missing local image files found (%d posts, %d references).', $posts_scanned, $refs_found ) );
+			return;
+		}
+
+		$this->format_items(
+			$broken,
+			array( 'blog_id', 'post_id', 'post_title', 'url', 'attribute', 'host_blog', 'reason' ),
+			$assoc_args
+		);
+
+		WP_CLI::warning( sprintf( '%d missing local image reference(s) found.', $broken_count ) );
 	}
 
 	/**

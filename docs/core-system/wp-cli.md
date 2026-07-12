@@ -475,9 +475,14 @@ wp datamachine image diagnose --size_threshold=500000
 
 # Optimize oversized images
 wp datamachine image optimize --size_threshold=500000 --quality=82 --limit=50 --dry-run
+
+# Diagnose broken image references (multisite-aware, read-only)
+wp datamachine image broken
+wp datamachine image broken --post_id=123
+wp datamachine image broken --network --format=json
 ```
 
-**Options**: `--model`, `--aspect_ratio`, `--mode=featured|insert`, `--format`
+**Options**: `--model`, `--aspect_ratio`, `--mode=featured|insert`, `--post_type`, `--post_id`, `--limit`, `--network`, `--format`
 
 ### datamachine analytics
 
