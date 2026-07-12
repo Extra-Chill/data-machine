@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.162.2] - 2026-07-12
+
+### Fixed
+- downgrade empty-fetch log from ERROR to INFO (#2873)
+
 ## [0.162.1] - 2026-07-12
 
 ### Fixed
