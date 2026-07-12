@@ -13,7 +13,7 @@
  *
  *   1. GraphQL login mutation (unidashSignIn) -> a Bearer access token, cached
  *      in a transient until it expires.
- *   2. The per-page revenue CSV report (slug,views,revenue,rpm,cpm,viewability,
+ *   2. The pagesSummary GraphQL report (slug,views,revenue,rpm,cpm,viewability,
  *      fillRate,impressionsPerPageview) for a date range — the rows a consumer
  *      CLI plugin imports into its revenue store.
  *
@@ -65,7 +65,7 @@ class MediavineReportsAbilities {
 	const API_BASE = 'https://api-publishers.mediavine.com';
 
 	/**
-	 * Per-page CSV row cap requested from Mediavine.
+	 * Per-page row cap requested from Mediavine.
 	 *
 	 * @var int
 	 */
@@ -88,7 +88,7 @@ class MediavineReportsAbilities {
 				'datamachine/mediavine-reports',
 				array(
 					'label'               => 'Mediavine Reports',
-					'description'         => 'Fetch per-period, per-URL Mediavine ad revenue directly from the Mediavine publisher API (GraphQL login + CSV report). Actions: pages (per-period per-URL revenue rows: slug,views,revenue,rpm,cpm,viewability,fillRate,impressionsPerPageview,period), summary (site-level aggregate totals: earnings, pageviews, sessions, rpm), backfill (iterate a list of periods, returning pages rows per period for a full revenue-arc backfill). Credentials live server-side in the datamachine_mediavine_config option.',
+					'description'         => 'Fetch per-period, per-URL Mediavine ad revenue directly from the Mediavine publisher GraphQL API. Actions: pages (per-period per-URL revenue rows: slug,views,revenue,rpm,cpm,viewability,fillRate,impressionsPerPageview,period), summary (site-level aggregate totals: earnings, pageviews, sessions, rpm), backfill (iterate a list of periods, returning pages rows per period for a full revenue-arc backfill). Credentials live server-side in the datamachine_mediavine_config option.',
 					'category'            => 'datamachine-analytics',
 					'input_schema'        => array(
 						'type'       => 'object',
@@ -96,7 +96,7 @@ class MediavineReportsAbilities {
 						'properties' => array(
 							'action'     => array(
 								'type'        => 'string',
-								'description' => 'Action: pages (per-period per-URL CSV rows), summary (aggregate totals), backfill (iterate periods).',
+								'description' => 'Action: pages (per-period per-URL rows), summary (aggregate totals), backfill (iterate periods).',
 							),
 							'start_date' => array(
 								'type'        => 'string',
@@ -124,7 +124,7 @@ class MediavineReportsAbilities {
 							),
 							'site_id'    => array(
 								'type'        => 'string',
-								'description' => 'Mediavine site id. Defaults to the configured site_id, else the datamachine_mediavine_default_site_id filter. Required when neither is set.',
+								'description' => 'Mediavine GraphQL global InternalSite ID. A numeric internal site id is also accepted and encoded. Legacy site slugs are not accepted by the reporting API.',
 							),
 						),
 					),
@@ -194,6 +194,14 @@ class MediavineReportsAbilities {
 			return array(
 				'success' => false,
 				'error'   => 'A Mediavine site id is required. Pass the "site_id" input, set site_id in the datamachine_mediavine_config option, or register a default via the datamachine_mediavine_default_site_id filter.',
+			);
+		}
+
+		$site_id = self::normalizeReportSiteId( $site_id );
+		if ( is_wp_error( $site_id ) ) {
+			return array(
+				'success' => false,
+				'error'   => $site_id->get_error_message(),
 			);
 		}
 
@@ -312,12 +320,11 @@ class MediavineReportsAbilities {
 	}
 
 	/**
-	 * GET the per-page revenue CSV and parse it into structured rows.
+	 * Fetch the current pagesSummary GraphQL report and normalize its rows.
 	 *
-	 * The CSV header is slug,views,revenue,rpm,cpm,viewability,fillRate,
-	 * impressionsPerPageview — exactly the tokens the revenue importer matches
-	 * loosely. Each parsed row carries those fields plus the supplied period so
-	 * the consumer can stamp the revenue arc.
+	 * GraphQL fields are normalized to slug,views,revenue,rpm,cpm,viewability,
+	 * fillRate,impressionsPerPageview — exactly the established public row shape.
+	 * Each parsed row also carries the supplied period for revenue-arc grouping.
 	 *
 	 * @param string $access_token Bearer token.
 	 * @param string $site_id      Mediavine site id.
@@ -327,32 +334,94 @@ class MediavineReportsAbilities {
 	 * @return array|\WP_Error Parsed rows or error.
 	 */
 	private static function fetchPagesRows( string $access_token, string $site_id, string $start_date, string $end_date, string $period ) {
-		$url = self::API_BASE . '/reports/' . rawurlencode( $site_id ) . '/pages.csv?' . http_build_query(
-			array(
-				'startDate'      => self::toMdy( $start_date ),
-				'endDate'        => self::toMdy( $end_date ),
-				'perPage'        => self::PAGES_PER_PAGE,
-				'useMonetizable' => 'false',
-			)
-		);
-
-		$result = HttpClient::get(
-			$url,
+		$result = HttpClient::post(
+			self::API_BASE . '/graphql',
 			array(
 				'timeout' => 60,
 				'headers' => array(
 					'Authorization' => 'Bearer ' . $access_token,
-					'Accept'        => 'text/csv',
+					'Content-Type'  => 'application/json',
 				),
-				'context' => 'Mediavine Pages CSV',
+				'body'    => wp_json_encode( self::buildPagesRequestBody( $site_id, $start_date, $end_date ) ),
+				'context' => 'Mediavine pagesSummary',
 			)
 		);
 
 		if ( empty( $result['success'] ) ) {
-			return new \WP_Error( 'mediavine_pages_failed', 'Failed to fetch Mediavine pages CSV: ' . ( $result['error'] ?? 'Unknown error' ) );
+			return new \WP_Error( 'mediavine_pages_transport', 'Mediavine pages report transport or authorization failure: ' . ( $result['error'] ?? 'Unknown error' ) );
 		}
 
-		return self::parsePagesCsv( (string) ( $result['data'] ?? '' ), $period );
+		$data = json_decode( (string) ( $result['data'] ?? '' ), true );
+		if ( json_last_error() !== JSON_ERROR_NONE ) {
+			return new \WP_Error( 'mediavine_pages_parse', 'Mediavine pages report returned invalid JSON.' );
+		}
+
+		$error = self::graphqlError( $data );
+		if ( null !== $error ) {
+			return new \WP_Error( 'mediavine_pages_schema', 'Mediavine pages report schema or authorization error: ' . $error );
+		}
+
+		return self::parsePagesResponse( $data, $period );
+	}
+
+	/**
+	 * Build the current pagesSummary request contract.
+	 */
+	public static function buildPagesRequestBody( string $site_id, string $start_date, string $end_date ): array {
+		return array(
+			'query'         => 'query PagesSummaryQuery($data: GetPagesSummaryInput!){ pagesSummary(data:$data){ meta{ totalCount reportStart reportEnd } pages{ path pageviews pageRevenue rpm cpm viewability fillrate impressionsPerPageView } } }',
+			'operationName' => 'PagesSummaryQuery',
+			'variables'     => array(
+				'data' => array(
+					'siteId'    => $site_id,
+					'startDate' => self::toIso( $start_date, false ),
+					'endDate'   => self::toIso( $end_date, true ),
+					'page'      => 1,
+					'perPage'   => self::PAGES_PER_PAGE,
+					'sort'      => 'pageRevenue',
+					'direction' => 'desc',
+				),
+			),
+		);
+	}
+
+	/**
+	 * Normalize a pagesSummary response into the established ability row shape.
+	 *
+	 * @return array|\WP_Error
+	 */
+	public static function parsePagesResponse( array $data, string $period ) {
+		$payload = $data['data']['pagesSummary'] ?? null;
+		if ( ! is_array( $payload ) || ! isset( $payload['pages'] ) || ! is_array( $payload['pages'] ) ) {
+			return new \WP_Error( 'mediavine_pages_contract', 'Mediavine pages report response is missing pagesSummary.pages.' );
+		}
+
+		if ( empty( $payload['pages'] ) ) {
+			return new \WP_Error( 'mediavine_pages_empty', 'Mediavine pages report returned no page-level rows for the requested date range.' );
+		}
+
+		$rows = array();
+		foreach ( $payload['pages'] as $page ) {
+			if ( ! is_array( $page ) || empty( $page['path'] ) ) {
+				continue;
+			}
+
+			$rows[] = array(
+				'slug'                   => (string) $page['path'],
+				'views'                  => (int) ( $page['pageviews'] ?? 0 ),
+				'revenue'                => (float) ( $page['pageRevenue'] ?? 0 ),
+				'rpm'                    => (float) ( $page['rpm'] ?? 0 ),
+				'cpm'                    => (float) ( $page['cpm'] ?? 0 ),
+				'viewability'            => (float) ( $page['viewability'] ?? 0 ),
+				'fillRate'               => (float) ( $page['fillrate'] ?? 0 ),
+				'impressionsPerPageview' => (float) ( $page['impressionsPerPageView'] ?? 0 ),
+				'period'                 => $period,
+			);
+		}
+
+		return empty( $rows )
+			? new \WP_Error( 'mediavine_pages_empty', 'Mediavine pages report contained no usable page-level rows.' )
+			: $rows;
 	}
 
 	/**
@@ -463,7 +532,7 @@ class MediavineReportsAbilities {
 		$start_date = self::resolveDate( $input['start_date'] ?? '', '-28 days' );
 		$end_date   = self::resolveDate( $input['end_date'] ?? '', '-1 day' );
 
-		$query = 'query MetricsSummaryQuery($data: MetricsSummaryInput!){ metricsSummary(data:$data){ summary{ earnings pageviews sessions cpm sessionRpm pageRpm paidImpressions } } }';
+		$query = 'query MetricsSummaryQuery($data: GetMetricsSummaryInput!){ metricsSummary(data:$data){ summary{ earnings pageviews sessions cpm sessionRpm pageRpm paidImpressions } } }';
 
 		$body = array(
 			'query'         => $query,
@@ -515,6 +584,12 @@ class MediavineReportsAbilities {
 		}
 
 		$summary = $data['data']['metricsSummary']['summary'] ?? array();
+		if ( empty( $summary ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'Mediavine summary report returned no summary data for the requested date range.',
+			);
+		}
 
 		$row = array(
 			'period'          => sanitize_text_field( $input['period'] ?? '' ),
@@ -649,30 +724,40 @@ class MediavineReportsAbilities {
 	 * Resolve a date input to Y-m-d, falling back to a relative default.
 	 *
 	 * @param string $value   Raw date input.
-	 * @param string $default Relative fallback (e.g. "-28 days").
+	 * @param string $fallback Relative fallback (e.g. "-28 days").
 	 * @return string Y-m-d date.
 	 */
-	private static function resolveDate( string $value, string $default ): string {
+	private static function resolveDate( string $value, string $fallback ): string {
 		$value = sanitize_text_field( $value );
 		$ts    = '' !== $value ? strtotime( $value ) : false;
 		if ( false === $ts ) {
-			$ts = strtotime( $default );
+			$ts = strtotime( $fallback );
 		}
 		return gmdate( 'Y-m-d', $ts );
 	}
 
 	/**
-	 * Convert a Y-m-d date to Mediavine's MM/DD/YYYY CSV-report format.
+	 * Normalize the configured identifier for current report operations.
 	 *
-	 * @param string $date Y-m-d date.
-	 * @return string MM/DD/YYYY.
+	 * Current reports require a Relay global InternalSite ID. Numeric internal
+	 * ids are accepted as a convenience; legacy dashboard slugs cannot be
+	 * resolved with publisher credentials and therefore fail explicitly.
+	 *
+	 * @return string|\WP_Error
 	 */
-	private static function toMdy( string $date ): string {
-		$ts = strtotime( $date );
-		if ( false === $ts ) {
-			$ts = time();
+	private static function normalizeReportSiteId( string $site_id ) {
+		if ( ctype_digit( $site_id ) ) {
+			// phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- Relay global ID encoding, not obfuscation.
+			return base64_encode( 'InternalSite:' . $site_id );
 		}
-		return gmdate( 'm/d/Y', $ts );
+
+		// phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_decode -- Validate the Relay global ID type.
+		$decoded = base64_decode( $site_id, true );
+		if ( false !== $decoded && str_starts_with( $decoded, 'InternalSite:' ) ) {
+			return $site_id;
+		}
+
+		return new \WP_Error( 'mediavine_site_id_contract', 'Mediavine reporting requires a GraphQL global InternalSite ID (or numeric internal site id); legacy site slugs are no longer accepted.' );
 	}
 
 	/**
