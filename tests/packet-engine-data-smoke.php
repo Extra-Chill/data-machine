@@ -7,7 +7,9 @@
 
 define( 'ABSPATH', __DIR__ . '/' );
 
-function do_action() {}
+if ( ! function_exists( 'do_action' ) ) {
+	function do_action() {}
+}
 
 require_once dirname( __DIR__ ) . '/inc/Core/PacketEngineData.php';
 
