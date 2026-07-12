@@ -275,6 +275,63 @@ $assert( null === $rext['path'], 'external has no path' );
 $r_prefix = BrokenImageReferenceAbilities::resolve_url_to_local( 'https://extrachill.com/wp-content/uploads-other/x.jpg', $blog_uploads, 1, 'https://extrachill.com' );
 $assert( 'external' === $r_prefix['kind'] || 'unresolvable' === $r_prefix['kind'], 'shared-prefix sibling directory does not falsely match upload base' );
 
+// --- Encoded upload path resolution (issue #2887) ----------------------------
+
+echo "\nresolve_url_to_local (encoded upload paths):\n";
+$sep = DIRECTORY_SEPARATOR;
+
+// %20 decodes once to a literal space.
+$r_space = BrokenImageReferenceAbilities::resolve_url_to_local( 'https://extrachill.com/wp-content/uploads/2024/01/my%20file.jpg', $blog_uploads, 1, 'https://extrachill.com' );
+$assert( 'local' === $r_space['kind'], '%20 url resolves as local' );
+$assert( str_replace( '/', $sep, '/var/www/uploads/2024/01/my file.jpg' ) === $r_space['path'], '%20 decodes once to a literal space in the path' );
+
+// %2B decodes once to a literal '+'. rawurldecode keeps a literal '+' intact.
+$r_plus = BrokenImageReferenceAbilities::resolve_url_to_local( 'https://extrachill.com/wp-content/uploads/2024/01/a%2Bb.jpg', $blog_uploads, 1, 'https://extrachill.com' );
+$assert( 'local' === $r_plus['kind'], '%2B url resolves as local' );
+$assert( str_replace( '/', $sep, '/var/www/uploads/2024/01/a+b.jpg' ) === $r_plus['path'], '%2B decodes once to a literal plus sign' );
+
+// A literal '+' in the URL path must NOT become a space (path semantics, not query).
+$r_lit_plus = BrokenImageReferenceAbilities::resolve_url_to_local( 'https://extrachill.com/wp-content/uploads/2024/01/a+b.jpg', $blog_uploads, 1, 'https://extrachill.com' );
+$assert( str_replace( '/', $sep, '/var/www/uploads/2024/01/a+b.jpg' ) === $r_lit_plus['path'], 'literal plus in path stays a plus (rawurldecode, not urldecode)' );
+
+// The Blogger migration case: %2528 -> %28 (decoded exactly once, not re-decoded).
+$r_blogger = BrokenImageReferenceAbilities::resolve_url_to_local( 'https://extrachill.com/wp-content/uploads/blogger/s1600/Abstract-ECF%25281%2529.jpg', $blog_uploads, 1, 'https://extrachill.com' );
+$assert( 'local' === $r_blogger['kind'], 'Blogger-encoded %2528 url resolves as local' );
+$assert( str_replace( '/', $sep, '/var/www/uploads/blogger/s1600/Abstract-ECF%281%29.jpg' ) === $r_blogger['path'], '%2528 decodes once to the literal %28 filename on disk' );
+
+// Unicode filename (UTF-8 bytes percent-encoded) decodes once to the multibyte name.
+$r_uni = BrokenImageReferenceAbilities::resolve_url_to_local( 'https://extrachill.com/wp-content/uploads/2024/01/caf%C3%A9.jpg', $blog_uploads, 1, 'https://extrachill.com' );
+$assert( 'local' === $r_uni['kind'], 'unicode-encoded url resolves as local' );
+$assert( str_replace( '/', $sep, '/var/www/uploads/2024/01/caf' . "\xc3\xa9" . '.jpg' ) === $r_uni['path'], 'unicode %C3%A9 decodes once to the UTF-8 filename' );
+
+// Decoded traversal must be rejected (never produce a local path above basedir).
+$r_trav = BrokenImageReferenceAbilities::resolve_url_to_local( 'https://extrachill.com/wp-content/uploads/2024/01/../../etc/passwd', $blog_uploads, 1, 'https://extrachill.com' );
+$assert( 'unresolvable' === $r_trav['kind'], 'decoded ../ traversal is rejected as unresolvable' );
+$assert( null === $r_trav['path'], 'decoded traversal yields no filesystem path' );
+
+// Encoded separator escape (%2f..%2f) decodes to /../ and must be rejected.
+$r_enc_trav = BrokenImageReferenceAbilities::resolve_url_to_local( 'https://extrachill.com/wp-content/uploads/2024/01/foo%2f..%2f..%2fsecret', $blog_uploads, 1, 'https://extrachill.com' );
+$assert( 'unresolvable' === $r_enc_trav['kind'], 'encoded separator traversal (%2f..%2f) is rejected' );
+
+// Single-encoded %2e%2e traversal must also be rejected.
+$r_dot_enc = BrokenImageReferenceAbilities::resolve_url_to_local( 'https://extrachill.com/wp-content/uploads/%2e%2e/%2e%2e/etc', $blog_uploads, 1, 'https://extrachill.com' );
+$assert( 'unresolvable' === $r_dot_enc['kind'], 'encoded %2e%2e traversal is rejected' );
+
+// Double-encoded traversal decodes once to a literal (inert) name and stays contained.
+$r_double = BrokenImageReferenceAbilities::resolve_url_to_local( 'https://extrachill.com/wp-content/uploads/%252e%252e%252flogo.jpg', $blog_uploads, 1, 'https://extrachill.com' );
+$assert( 'local' === $r_double['kind'], 'double-encoded traversal stays local (single decode only)' );
+$assert( str_replace( '/', $sep, '/var/www/uploads/%2e%2e%2flogo.jpg' ) === $r_double['path'], 'double-encoded sequence is not re-decoded, stays a literal filename' );
+
+// Query strings and fragments must be stripped before filesystem lookup.
+$r_query = BrokenImageReferenceAbilities::resolve_url_to_local( 'https://extrachill.com/wp-content/uploads/2024/01/cache.jpg?v=123', $blog_uploads, 1, 'https://extrachill.com' );
+$assert( str_replace( '/', $sep, '/var/www/uploads/2024/01/cache.jpg' ) === $r_query['path'], 'query string is stripped from the filesystem path' );
+
+// Cross-site encoded path still resolves against the owning site's base.
+$r_cross_enc = BrokenImageReferenceAbilities::resolve_url_to_local( 'https://community.extrachill.com/wp-content/uploads/sites/2/2024/02/cross%20shot.jpg', $blog_uploads, 1, 'https://extrachill.com' );
+$assert( 'local' === $r_cross_enc['kind'], 'cross-site encoded url resolves as local' );
+$assert( 2 === $r_cross_enc['blog_id'], 'cross-site encoded url attributes to owning blog 2' );
+$assert( str_replace( '/', $sep, '/var/www/uploads/sites/2/2024/02/cross shot.jpg' ) === $r_cross_enc['path'], 'cross-site encoded path uses blog 2 basedir with decoded name' );
+
 // --- Full orchestration: diagnoseBrokenImageReferences -----------------------
 
 echo "\ndiagnoseBrokenImageReferences (full scan):\n";
@@ -296,6 +353,11 @@ $GLOBALS['__dm_broken_image_rows'] = array(
 			'post_title'   => 'Post with present cross-site',
 			'post_content' => '<img src="https://community.extrachill.com/wp-content/uploads/sites/2/2024/02/cross_present.jpg">',
 		),
+		(object) array(
+			'ID'           => 12,
+			'post_title'   => 'Post with present Blogger-encoded image',
+			'post_content' => '<img src="https://extrachill.com/wp-content/uploads/blogger/s1600/Abstract-ECF%25281%2529.jpg">',
+		),
 	),
 	2 => array(),
 );
@@ -304,6 +366,7 @@ $GLOBALS['__dm_broken_image_rows'] = array(
 $present = array(
 	'/var/www/uploads/2024/01/present.jpg',
 	'/var/www/uploads/sites/2/2024/02/cross_present.jpg',
+	'/var/www/uploads/blogger/s1600/Abstract-ECF%281%29.jpg',
 );
 $sep        = DIRECTORY_SEPARATOR;
 $present_n  = array_map( static fn( $p ) => str_replace( '/', $sep, $p ), $present );
@@ -320,7 +383,7 @@ $result = BrokenImageReferenceAbilities::diagnoseBrokenImageReferences(
 );
 
 $assert( true === $result['success'], 'network scan returns success' );
-$assert( 2 === $result['posts_scanned'], 'two posts scanned (blog 2 has no posts)' );
+$assert( 3 === $result['posts_scanned'], 'three posts scanned (blog 2 has no posts)' );
 
 $broken = $result['broken_references'];
 $urls   = array();
@@ -336,6 +399,11 @@ $assert( in_array( $missing_main, $urls, true ), 'missing main-site file reporte
 $assert( in_array( $cross_missing, $urls, true ), 'missing cross-site (blog 2) file reported from a blog 1 post' );
 $assert( in_array( $root_missing, $urls, true ), 'root-relative missing file reported' );
 $assert( ! in_array( 'https://cdn.example.com/external.jpg', $urls, true ), 'external url is not reported as missing local' );
+
+// The Blogger-encoded image whose decoded filename exists on disk must NOT be
+// reported as broken — the concrete production false-positive from issue #2887.
+$blogger_present_url = 'https://extrachill.com/wp-content/uploads/blogger/s1600/Abstract-ECF%25281%2529.jpg';
+$assert( ! in_array( $blogger_present_url, $urls, true ), 'present Blogger-encoded (%2528 -> %28) image is not a false positive' );
 
 // Dedup: missing.jpg appears in src AND srcset but must be reported once.
 $duplicate_count = 0;
@@ -377,7 +445,7 @@ $single = BrokenImageReferenceAbilities::diagnoseBrokenImageReferences(
 );
 
 $assert( true === $single['success'], 'single-site scan returns success' );
-$assert( 2 === $single['posts_scanned'], 'single-site scan reads the current blog posts' );
+$assert( 3 === $single['posts_scanned'], 'single-site scan reads the current blog posts' );
 
 // --- single post_id scope ----------------------------------------------------
 
