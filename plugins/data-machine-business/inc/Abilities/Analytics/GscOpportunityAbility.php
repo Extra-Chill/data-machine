@@ -353,6 +353,7 @@ class GscOpportunityAbility {
 				}
 
 				$impressions = (int) ( $row['impressions'] ?? 0 );
+				$clicks      = (int) ( $row['clicks'] ?? 0 );
 				$ctr         = (float) ( $row['ctr'] ?? 0.0 );
 				$position    = (float) ( $row['position'] ?? 0.0 );
 
