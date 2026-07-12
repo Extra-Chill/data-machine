@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.161.5] - 2026-07-12
+
+### Fixed
+- preserve engine data during inline continuation
+
 ## [0.161.4] - 2026-07-12
 
 ### Fixed
