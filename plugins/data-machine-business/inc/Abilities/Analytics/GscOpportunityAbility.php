@@ -255,8 +255,10 @@ class GscOpportunityAbility {
 							'thresholds'           => array( 'type' => 'object' ),
 							'snippet_gap'          => array( 'type' => 'array' ),
 							'page2_demand'         => array( 'type' => 'array' ),
+							'serp_captured'        => array( 'type' => 'array' ),
 							'snippet_gap_count'    => array( 'type' => 'integer' ),
 							'page2_demand_count'   => array( 'type' => 'integer' ),
+							'serp_captured_count'  => array( 'type' => 'integer' ),
 							'definition_box_count' => array( 'type' => 'integer' ),
 							'error'                => array( 'type' => 'string' ),
 						),
@@ -313,22 +315,20 @@ class GscOpportunityAbility {
 			$actions['page'] = 'page_stats';
 		}
 
-		$snippet_gap          = array();
-		$page2_demand         = array();
-		$definition_box_count = 0;
+		$snippet_gap      = array();
+		$page2_demand     = array();
+		$serp_captured    = array();
+		$captured_by_page = array();
+		if ( 'page' === $dimension || 'both' === $dimension ) {
+			$support_input    = self::gsc_input( 'query_page_stats', $start_date, $end_date, $input );
+			$support_result   = $gsc->execute( $support_input );
+			$captured_by_page = ! is_wp_error( $support_result ) && ! empty( $support_result['success'] )
+				? self::captured_impressions_by_page( (array) ( $support_result['results'] ?? array() ), $good_position )
+				: array();
+		}
 
 		foreach ( $actions as $kind => $action ) {
-			$gsc_input = array(
-				'action'     => $action,
-				'start_date' => $start_date,
-				'end_date'   => $end_date,
-				'limit'      => self::FETCH_LIMIT,
-			);
-			foreach ( array( 'site_url', 'url_filter', 'query_filter' ) as $passthrough ) {
-				if ( ! empty( $input[ $passthrough ] ) ) {
-					$gsc_input[ $passthrough ] = sanitize_text_field( $input[ $passthrough ] );
-				}
-			}
+			$gsc_input = self::gsc_input( $action, $start_date, $end_date, $input );
 
 			$result = $gsc->execute( $gsc_input );
 
@@ -353,7 +353,6 @@ class GscOpportunityAbility {
 				}
 
 				$impressions = (int) ( $row['impressions'] ?? 0 );
-				$clicks      = (int) ( $row['clicks'] ?? 0 );
 				$ctr         = (float) ( $row['ctr'] ?? 0.0 );
 				$position    = (float) ( $row['position'] ?? 0.0 );
 
@@ -368,35 +367,28 @@ class GscOpportunityAbility {
 					&& $expected_ctr > 0.0
 					&& $ctr < ( $expected_ctr * $ctr_gap_factor )
 				) {
-					$recoverable    = (int) round( $impressions * max( 0.0, $expected_ctr - $ctr ) );
 					$definition_box = self::is_definition_box( $label, $position, $ctr, $expected_ctr, $good_position );
 
-					if ( $definition_box ) {
-						// SERP-captured (definition-box) query: the near-0% CTR
-						// is structural (Google answers inline), not a
-						// title/meta problem. Keep the row visible so the
-						// operator still sees "this high-impression query
-						// exists but is unrecoverable", but zero its
-						// recoverable estimate so it cannot dominate the
-						// ranking and bury actionable rows. See the
-						// DEFINITION_BOX_PATTERNS docblock for the rationale.
-						$recoverable = 0;
+					if ( $definition_box && 'query' === $kind ) {
+						$serp_captured[] = self::opportunity_row( $kind, $label, $row, $expected_ctr, 0 ) + array(
+							'definition_box' => true,
+							'serp_captured'  => true,
+						);
+						continue;
 					}
 
-					if ( $recoverable > 0 || $definition_box ) {
-						$row_out = array(
-							'type'               => $kind,
-							'target'             => $label,
-							'position'           => round( $position, 1 ),
-							'impressions'        => $impressions,
-							'clicks'             => $clicks,
-							'current_ctr'        => round( $ctr, 4 ),
-							'expected_ctr'       => round( $expected_ctr, 4 ),
-							'recoverable_clicks' => $recoverable,
-						);
-						if ( $definition_box ) {
-							$row_out['definition_box'] = true;
-							++$definition_box_count;
+					$captured    = 'page' === $kind ? (int) ( $captured_by_page[ $label ] ?? 0 ) : 0;
+					$actionable  = max( 0, $impressions - $captured );
+					$recoverable = (int) round( $actionable * max( 0.0, $expected_ctr - $ctr ) );
+					if ( $recoverable > 0 ) {
+						$row_out = self::opportunity_row( $kind, $label, $row, $expected_ctr, $recoverable );
+						if ( $captured > 0 ) {
+							$row_out += array(
+								'serp_captured_impressions' => $captured,
+								'actionable_impressions' => $actionable,
+								'serp_captured_share'    => round( $captured / $impressions, 4 ),
+								'serp_captured_observed_only' => true,
+							);
 						}
 						$snippet_gap[] = $row_out;
 					}
@@ -426,17 +418,9 @@ class GscOpportunityAbility {
 			}
 		}
 
-		// Rank both classes by estimated recoverable clicks (descending).
-		$by_recoverable = static function ( array $a, array $b ): int {
-			return $b['recoverable_clicks'] <=> $a['recoverable_clicks'];
-		};
-		usort( $snippet_gap, $by_recoverable );
-		usort( $page2_demand, $by_recoverable );
-
-		if ( $limit > 0 ) {
-			$snippet_gap  = array_slice( $snippet_gap, 0, $limit );
-			$page2_demand = array_slice( $page2_demand, 0, $limit );
-		}
+		$snippet_gap   = self::sort_and_limit( $snippet_gap, 'recoverable_clicks', $limit );
+		$page2_demand  = self::sort_and_limit( $page2_demand, 'recoverable_clicks', $limit );
+		$serp_captured = self::sort_and_limit( $serp_captured, 'impressions', $limit );
 
 		return array(
 			'success'              => true,
@@ -456,9 +440,54 @@ class GscOpportunityAbility {
 			),
 			'snippet_gap'          => $snippet_gap,
 			'page2_demand'         => $page2_demand,
+			'serp_captured'        => $serp_captured,
 			'snippet_gap_count'    => count( $snippet_gap ),
 			'page2_demand_count'   => count( $page2_demand ),
-			'definition_box_count' => $definition_box_count,
+			'serp_captured_count'  => count( $serp_captured ),
+			'definition_box_count' => count( $serp_captured ),
+		);
+	}
+
+	public static function captured_impressions_by_page( array $rows, float $good_position = self::DEFAULT_GOOD_POSITION ): array {
+		$captured = array();
+		foreach ( $rows as $row ) {
+			$keys = (array) ( $row['keys'] ?? array() );
+			if ( count( $keys ) < 2 ) {
+				continue;
+			}
+			$position = (float) ( $row['position'] ?? 0 );
+			if ( self::is_definition_box( (string) $keys[0], $position, (float) ( $row['ctr'] ?? 0 ), self::expected_ctr( $position ), $good_position ) ) {
+				$captured[ (string) $keys[1] ] = ( $captured[ (string) $keys[1] ] ?? 0 ) + (int) ( $row['impressions'] ?? 0 );
+			}
+		}
+		return $captured;
+	}
+
+	public static function sort_and_limit( array $rows, string $field, int $limit = 0 ): array {
+		usort( $rows, static fn( array $a, array $b ): int => ( $b[ $field ] ?? 0 ) <=> ( $a[ $field ] ?? 0 ) );
+		return $limit > 0 ? array_slice( $rows, 0, $limit ) : $rows;
+	}
+
+	private static function gsc_input( string $action, string $start_date, string $end_date, array $input ): array {
+		$output = compact( 'action', 'start_date', 'end_date' ) + array( 'limit' => self::FETCH_LIMIT );
+		foreach ( array( 'site_url', 'url_filter', 'query_filter' ) as $key ) {
+			if ( ! empty( $input[ $key ] ) ) {
+				$output[ $key ] = sanitize_text_field( $input[ $key ] );
+			}
+		}
+		return $output;
+	}
+
+	private static function opportunity_row( string $kind, string $label, array $row, float $expected_ctr, int $recoverable ): array {
+		return array(
+			'type'               => $kind,
+			'target'             => $label,
+			'position'           => round( (float) $row['position'], 1 ),
+			'impressions'        => (int) $row['impressions'],
+			'clicks'             => (int) ( $row['clicks'] ?? 0 ),
+			'current_ctr'        => round( (float) ( $row['ctr'] ?? 0 ), 4 ),
+			'expected_ctr'       => round( $expected_ctr, 4 ),
+			'recoverable_clicks' => $recoverable,
 		);
 	}
 
@@ -513,14 +542,14 @@ class GscOpportunityAbility {
 	 * are ordered cheapest-first (rank, then CTR, then the regex) so the common
 	 * non-matching rows short-circuit before pattern matching.
 	 *
-	 * @param string $query        Query string (row label).
-	 * @param float  $position     SERP position.
-	 * @param float  $ctr          Current CTR (fraction).
-	 * @param float  $expected_ctr Position-expected CTR (fraction).
+	 * @param string $query         Query string (row label).
+	 * @param float  $position      SERP position.
+	 * @param float  $ctr           Current CTR (fraction).
+	 * @param float  $expected_ctr  Position-expected CTR (fraction).
 	 * @param float  $good_position Good-rank cutoff (position <= this is strong).
 	 * @return bool True when the row is a SERP-captured definition-box query.
 	 */
-	private static function is_definition_box( string $query, float $position, float $ctr, float $expected_ctr, float $good_position ): bool {
+	public static function is_definition_box( string $query, float $position, float $ctr, float $expected_ctr, float $good_position ): bool {
 
 		// Leg (b) — strong rank.
 		if ( $position > $good_position || $expected_ctr <= 0.0 ) {
