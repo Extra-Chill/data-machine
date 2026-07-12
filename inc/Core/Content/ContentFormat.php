@@ -93,23 +93,6 @@ class ContentFormat {
 			return self::contentFromBlocksEngineResult( $result, $from, $to );
 		}
 
-		$format_bridge_class = '\\Automattic\\BlocksEngine\\PhpTransformer\\FormatBridge\\FormatBridge';
-		if ( class_exists( $format_bridge_class ) ) {
-			try {
-				$result = ( new $format_bridge_class() )->convertResult( $content, $from, $to, $context );
-				if ( is_object( $result ) && method_exists( $result, 'toArray' ) ) {
-					$result = $result->toArray();
-				}
-
-				return self::contentFromBlocksEngineResult( $result, $from, $to );
-			} catch ( \Throwable $throwable ) {
-				return new \WP_Error(
-					'datamachine_content_format_blocks_engine_exception',
-					sprintf( 'Blocks Engine PHP Transformer failed converting post content from %s to %s: %s', $from, $to, $throwable->getMessage() )
-				);
-			}
-		}
-
 		if ( $from === $to ) {
 			return $content;
 		}
