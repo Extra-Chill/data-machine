@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 Homeboy maintains this file from conventional commits at release time —
 do not edit by hand.
 
+## [0.13.2] - 2026-07-12
+
+### Fixed
+- update Mediavine reporting API contract (#66)
+- preserve SERP-captured GSC visibility
+
 ## [0.13.1] - 2026-07-11
 
 ### Fixed
