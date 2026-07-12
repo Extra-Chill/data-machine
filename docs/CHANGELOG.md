@@ -2,6 +2,14 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.161.3] - 2026-07-12
+
+### Changed
+- remove retired FormatBridge fallback
+
+### Fixed
+- use ability existence predicate in bundles
+
 ## [0.161.2] - 2026-07-11
 
 ### Fixed
