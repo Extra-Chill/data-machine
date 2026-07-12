@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.161.4] - 2026-07-12
+
+### Fixed
+- track normalized handler post results
+
 ## [0.161.3] - 2026-07-12
 
 ### Changed
