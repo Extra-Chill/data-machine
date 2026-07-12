@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.162.1] - 2026-07-12
+
+### Fixed
+- decode encoded upload paths once in broken image audit
+
 ## [0.162.0] - 2026-07-12
 
 ### Added
