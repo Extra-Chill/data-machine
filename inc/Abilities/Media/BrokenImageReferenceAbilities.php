@@ -630,7 +630,13 @@ class BrokenImageReferenceAbilities {
 	 * for cross-site references. URLs whose host never matches a network site are
 	 * classified `external`. Pure given the maps.
 	 *
+	 * The URL remainder below the matched upload base is URL-decoded exactly once
+	 * (the URL-to-filename boundary) before joining to the uploads base directory.
+	 * See {@see build_contained_upload_path()} for the decode boundary and
+	 * containment rules.
+	 *
 	 * @since 0.161.6
+	 * @since 0.162.1 Decode encoded upload paths once and contain them under basedir.
 	 *
 	 * @param string                                                        $url              Absolute URL.
 	 * @param array<int, array{baseurl: string, basedir: string}>           $blog_uploads     Blog upload maps.
@@ -694,16 +700,88 @@ class BrokenImageReferenceAbilities {
 
 		$basedir  = $blog_uploads[ $best_blog_id ]['basedir'] ?? '';
 		$relative = substr( $url, strlen( $best_baseurl ) );
-		$fs_path  = $basedir . $relative;
+		$fs_path  = self::build_contained_upload_path( $basedir, $relative );
 
-		// Normalize directory separators for the platform.
-		$fs_path = str_replace( '/', DIRECTORY_SEPARATOR, $fs_path );
+		if ( null === $fs_path ) {
+			// Empty remainder or a decoded traversal/separator escape attempt.
+			return array(
+				'kind'    => 'unresolvable',
+				'path'    => null,
+				'blog_id' => null,
+			);
+		}
 
 		return array(
 			'kind'    => 'local',
 			'path'    => $fs_path,
 			'blog_id' => $best_blog_id,
 		);
+	}
+
+	/**
+	 * Build a contained filesystem path for the URL remainder below an upload base.
+	 *
+	 * The remainder (the raw URL substring after the matched upload base URL) is
+	 * URL-decoded exactly once before being joined to the uploads base directory.
+	 * `rawurldecode()` is the correct path-component decoder: it maps `%20` to a
+	 * space, `%2B` to a literal `+`, and — for Blogger migration URLs — `%2528`
+	 * to the literal filename fragment `%28`. The result is never decoded again,
+	 * so a double-encoded sequence like `%252e%252e%252f` stays an inert literal
+	 * filename (`%2e%2e%2f`) rather than a traversal.
+	 *
+	 * Containment is enforced lexically: `realpath()` is unusable here because
+	 * this diagnostic verifies files that are expected to be *missing*. Any path
+	 * segment equal to `..` is rejected outright, which also catches decoded
+	 * separator escapes (e.g. `%2f..%2f` decodes to `/../`). Query strings and
+	 * fragments are dropped before lookup since they are not part of the filename.
+	 *
+	 * @since 0.162.1
+	 *
+	 * @param string $basedir   Absolute uploads base directory (no trailing slash expected).
+	 * @param string $remainder Raw URL remainder after the upload base URL (starts with `/`, `?`, or empty).
+	 * @return string|null Contained filesystem path under basedir, or null when the
+	 *                     remainder is empty or attempts to escape the base.
+	 */
+	private static function build_contained_upload_path( string $basedir, string $remainder ): ?string {
+		if ( '' === $basedir ) {
+			return null;
+		}
+
+		// Query strings and fragments are not part of the filesystem name.
+		$split     = preg_split( '/[?#]/', $remainder, 2 );
+		$path_part = is_array( $split ) ? (string) $split[0] : $remainder;
+
+		// Decode exactly once: URL representation -> literal filesystem name.
+		// A single pass maps `%2528` to `%28`; further decoding is intentionally
+		// avoided so double-encoded traversal stays an inert literal.
+		$decoded = rawurldecode( $path_part );
+
+		$segments = explode( '/', $decoded );
+		$clean    = array();
+		foreach ( $segments as $segment ) {
+			if ( '' === $segment || '.' === $segment ) {
+				// Collapse empty (leading/duplicate separators) and current-dir segments.
+				continue;
+			}
+
+			if ( '..' === $segment || false !== strpos( $segment, "\0" ) ) {
+				// Reject decoded traversal (`..`, including `%2e%2e` variants) and
+				// null-byte injection outright; a contained upload never needs them.
+				return null;
+			}
+
+			$clean[] = $segment;
+		}
+
+		if ( empty( $clean ) ) {
+			// The URL pointed at the upload root itself (or carried only a query).
+			return null;
+		}
+
+		$fs_path = $basedir . '/' . implode( '/', $clean );
+
+		// Normalize directory separators for the platform.
+		return str_replace( '/', DIRECTORY_SEPARATOR, $fs_path );
 	}
 
 	/**
