@@ -122,6 +122,32 @@ if ( $is_month_grid_mode && empty( $query_args['month'] ) ) {
 	$query_args['month'] = current_time( 'Y-m' );
 }
 
+/**
+ * Filter the assembled calendar request arguments before they are parsed.
+ *
+ * Request values and built-in block defaults are already present. Consumers
+ * providing contextual defaults should therefore add only missing keys so
+ * explicit request values retain precedence. Every returned value is parsed
+ * and sanitized by CalendarRequest::fromQueryArgs(). Parsed taxonomy and geo
+ * state then follows the existing initial-query, rendered-attribute, filter,
+ * and frontend REST round-trip paths.
+ *
+ * @since 0.48.0
+ *
+ * @param array $query_args Raw calendar request arguments.
+ * @param array $context    Render context containing block `attributes`, resolved
+ *                          `display_mode`, and optional `archive_term` (WP_Term|null).
+ */
+$query_args = (array) apply_filters(
+	'data_machine_events_calendar_request_args',
+	$query_args,
+	array(
+		'attributes'   => $attributes,
+		'display_mode' => $display_mode,
+		'archive_term' => $archive_term,
+	)
+);
+
 $request = CalendarRequest::fromQueryArgs( $query_args, $archive_term );
 
 // Local aliases used by template includes / data attrs further down.

@@ -16,6 +16,12 @@ use DataMachineEvents\Blocks\Calendar\Pagination\Renderer as Pagination;
 
 class CalendarBlockTest extends WP_UnitTestCase {
 
+	private function render_calendar( array $attributes = array() ): string {
+		$block = \WP_Block_Type_Registry::get_instance()->get_registered( 'data-machine-events/calendar' );
+
+		return (string) call_user_func( $block->render_callback, $attributes, '', $block );
+	}
+
 	public function test_calendar_block_registered() {
 		$block_registry = \WP_Block_Type_Registry::get_instance();
 		$block          = $block_registry->get_registered( 'data-machine-events/calendar' );
@@ -74,6 +80,97 @@ class CalendarBlockTest extends WP_UnitTestCase {
 
 		$this->assertTrue( $modified );
 		$this->assertEquals( 'data_machine_events', $args['post_type'] );
+	}
+
+	public function test_calendar_request_args_filter_injects_sanitized_defaults_and_context() {
+		$original_get = $_GET;
+		$_GET        = array();
+		$context      = null;
+		$parsed_input = null;
+
+		add_filter(
+			'data_machine_events_calendar_request_args',
+			function ( $args, $render_context ) use ( &$context ) {
+				$context                  = $render_context;
+				$args['lat']              = '32.7765<script>';
+				$args['lng']              = '-79.9311';
+				$args['radius']           = '25px';
+				$args['radius_unit']      = 'MI<script>';
+				$args['tax_filter']       = array(
+					'Festival<script>' => array( '42', '-3', 'invalid' ),
+				);
+
+				return $args;
+			},
+			10,
+			2
+		);
+		add_filter(
+			'data_machine_events_calendar_query_args',
+			function ( $args, $input ) use ( &$parsed_input ) {
+				$parsed_input = $input;
+				return $args;
+			},
+			10,
+			2
+		);
+
+		$html = $this->render_calendar( array( 'displayMode' => 'date-groups', 'showSearch' => false ) );
+
+		$this->assertSame( array(), $_GET, 'Consumers do not need to mutate request globals.' );
+		$this->assertSame( 'date-groups', $context['display_mode'] );
+		$this->assertSame( false, $context['attributes']['showSearch'] );
+		$this->assertArrayHasKey( 'archive_term', $context );
+		$this->assertNull( $context['archive_term'] );
+		$this->assertSame( array( 'festivalscript' => array( 42, 3 ) ), $parsed_input['tax_filter'] );
+		$this->assertSame( '32.7765', $parsed_input['geo_lat'] );
+		$this->assertSame( 25, $parsed_input['geo_radius'] );
+		$this->assertSame( 'miscript', $parsed_input['geo_radius_unit'] );
+		$this->assertStringContainsString( 'data-geo-lat="32.7765"', $html );
+
+		$_GET = $original_get;
+	}
+
+	public function test_calendar_request_defaults_preserve_explicit_values_and_reject_invalid_state() {
+		$original_get = $_GET;
+		$_GET        = array(
+			'lat'        => '40.7128',
+			'lng'        => '-74.0060',
+			'tax_filter' => array( 'venue' => array( '9' ) ),
+		);
+		$parsed_input = null;
+
+		add_filter(
+			'data_machine_events_calendar_request_args',
+			function ( $args ) {
+				$args += array(
+					'lat'        => 'invalid-default',
+					'lng'        => 'invalid-default',
+					'tax_filter' => array( 'festival' => array( 42 ) ),
+					'month'     => 'not-a-month',
+				);
+				return $args;
+			}
+		);
+		add_filter(
+			'data_machine_events_calendar_query_args',
+			function ( $args, $input ) use ( &$parsed_input ) {
+				$parsed_input = $input;
+				return $args;
+			},
+			10,
+			2
+		);
+
+		$this->render_calendar();
+
+		$this->assertSame( '40.7128', $parsed_input['geo_lat'] );
+		$this->assertSame( '-74.0060', $parsed_input['geo_lng'] );
+		$this->assertSame( array( 'venue' => array( 9 ) ), $parsed_input['tax_filter'] );
+		$this->assertSame( '', $parsed_input['month'] );
+		$this->assertSame( '40.7128', $_GET['lat'] );
+
+		$_GET = $original_get;
 	}
 
 	public function test_calendar_renders_no_events_state() {

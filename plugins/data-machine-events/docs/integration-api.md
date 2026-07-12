@@ -86,6 +86,7 @@ signatures are stable.
 | `data_machine_events_excluded_taxonomies` | `(array $excluded, string $context)` | Exclude taxonomies from badge / modal display. `$context` is `'badge'` or `'modal'`. |
 | `data_machine_events_more_info_button_classes` | `(array $classes)` | Modify CSS classes on the calendar card "More Info" link. |
 | `data_machine_events_modal_button_classes` | `(array $classes, string $variant)` | Modify CSS classes on filter modal buttons. `$variant` is `'primary'` or `'secondary'`. |
+| `data_machine_events_calendar_request_args` | `(array $query_args, array $context)` | Add contextual calendar defaults immediately before `CalendarRequest` parsing. Request and block values are already assembled, so consumers should add only missing keys; all returned values are sanitized by `CalendarRequest`. Context contains `attributes`, resolved `display_mode`, and `archive_term` (`WP_Term|null`). Parsed taxonomy and geo values automatically reach the initial query, rendered state, controls, and existing frontend REST round-trips. |
 | `data_machine_events_calendar_query_args` | `(array $args, array $params)` | Modify the WP_Query args used by the calendar block. |
 
 ### Event Details block filters
