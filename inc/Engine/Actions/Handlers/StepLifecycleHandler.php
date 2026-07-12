@@ -8,6 +8,7 @@
 
 namespace DataMachine\Engine\Actions\Handlers;
 
+use DataMachine\Core\PacketEngineData;
 use DataMachine\Core\Database\ProcessedItems\ProcessedItems;
 
 /**
@@ -29,7 +30,9 @@ class StepLifecycleHandler {
 		}
 
 		$packet_meta = $routed_packets[0]['metadata'] ?? array();
-		$seed_data   = array();
+		$seed_data   = is_array( $packet_meta['_engine_data'] ?? null )
+			? PacketEngineData::sanitize( $packet_meta['_engine_data'], $job_id )
+			: array();
 		if ( ! empty( $packet_meta['item_identifier'] ) ) {
 			$seed_data['item_identifier'] = $packet_meta['item_identifier'];
 		}
