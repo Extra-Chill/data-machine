@@ -401,22 +401,35 @@ class ExecuteStepAbility {
 	private function logStepExecutionResult( array $execution_result, int $job_id, string $flow_step_id, string $step_type = '' ): void {
 		$success = (bool) ( $execution_result['success'] ?? false );
 
-		if ( ! $success ) {
-			do_action(
-				'datamachine_log',
-				'warning',
-				'Step execution did not produce a successful result',
-				array(
-					'job_id'       => $job_id,
-					'flow_step_id' => $flow_step_id,
-					'step_type'    => $step_type,
-					'status'       => $execution_result['status'] ?? 'failed',
-					'reason'       => $execution_result['reason'] ?? 'step_execution_failed',
-					'packet_count' => $execution_result['packet_count'] ?? 0,
-					'diagnostics'  => is_array( $execution_result['diagnostics'] ?? null ) ? $execution_result['diagnostics'] : array(),
-				)
-			);
+		if ( $success ) {
+			return;
 		}
+
+		$status = $execution_result['status'] ?? 'failed';
+
+		// completed_no_items is a success-family terminal status (an empty fetch
+		// window, not a failure) — it already gets its own INFO log downstream
+		// ("Step completed with no new items to process"). Warning here on top
+		// of that INFO and the step's own info-level "no content" log would be
+		// triple noise for one routine event. See #2873.
+		if ( 'completed_no_items' === $status ) {
+			return;
+		}
+
+		do_action(
+			'datamachine_log',
+			'warning',
+			'Step execution did not produce a successful result',
+			array(
+				'job_id'       => $job_id,
+				'flow_step_id' => $flow_step_id,
+				'step_type'    => $step_type,
+				'status'       => $status,
+				'reason'       => $execution_result['reason'] ?? 'step_execution_failed',
+				'packet_count' => $execution_result['packet_count'] ?? 0,
+				'diagnostics'  => is_array( $execution_result['diagnostics'] ?? null ) ? $execution_result['diagnostics'] : array(),
+			)
+		);
 	}
 
 	/**

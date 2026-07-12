@@ -253,7 +253,13 @@ class FetchStep extends Step {
 		}
 
 		if ( empty( $packets ) ) {
-			$this->log( 'error', 'Fetch handler returned no content' );
+			// Empty fetch is routine, expected behavior (filtered sources, quiet
+			// windows, small subreddits with no qualifying items) — not a handler
+			// failure. The job proceeds to the success-family `completed_no_items`
+			// terminal status, and RunMetrics already records `result: no_content`
+			// below. Reserve `error` for the is_wp_error() branch above, which is
+			// an actual handler failure. See #2873.
+			$this->log( 'info', 'Fetch handler returned no content' );
 			RunMetrics::recordStepResult(
 				$this->job_id,
 				$this->flow_step_id,
