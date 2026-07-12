@@ -357,11 +357,12 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 		$this->assertNotEmpty( $flow, 'Flow imports from a schema-versioned array that omits source install IDs.' );
 	}
 
-	public function test_schema_versioned_array_import_preserves_abilities_manifest_for_dry_run_checks(): void {
+	public function test_schema_versioned_array_import_reports_only_missing_manifest_abilities(): void {
 		$bundle                       = AgentBundleArrayAdapter::to_array_bundle( AgentBundleArrayAdapter::from_array_bundle( $this->fixture_bundle( 'schema-abilities-agent' ) ) );
-		$bundle['abilities_manifest'] = array( 'datamachine/test-missing-ability' );
+		$bundle['abilities_manifest'] = array( 'datamachine/run-flow', 'datamachine/test-missing-ability' );
 
-		$this->setExpectedIncorrectUsage( 'WP_Abilities_Registry::get_registered' );
+		$this->assertTrue( wp_has_ability( 'datamachine/run-flow' ), 'Present manifest fixture ability is registered.' );
+		$this->assertFalse( wp_has_ability( 'datamachine/test-missing-ability' ), 'Missing manifest fixture ability is not registered.' );
 		$result = $this->bundler->import( $bundle, null, $this->owner_id, true );
 
 		$this->assertTrue( (bool) $result['success'], 'Schema-versioned dry run succeeds.' );
