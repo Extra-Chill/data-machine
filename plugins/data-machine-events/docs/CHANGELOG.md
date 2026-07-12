@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.48.0] - 2026-07-12
+
+### Added
+- filter calendar request defaults before parsing
+
 ## [0.47.5] - 2026-07-11
 
 ### Fixed
