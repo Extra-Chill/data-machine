@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.162.0] - 2026-07-12
+
+### Added
+- multisite-aware broken image reference diagnostic
+
 ## [0.161.5] - 2026-07-12
 
 ### Fixed
