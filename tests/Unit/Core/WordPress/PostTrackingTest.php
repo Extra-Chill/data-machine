@@ -103,8 +103,11 @@ class PostTrackingTest extends WP_UnitTestCase {
 	public function test_extract_post_id_from_various_result_shapes(): void {
 		$this->assertSame( 42, PostTracking::extractPostId( array( 'data' => array( 'post_id' => 42 ) ) ) );
 		$this->assertSame( 99, PostTracking::extractPostId( array( 'post_id' => 99 ) ) );
+		$this->assertSame( 123, PostTracking::extractPostId( array( 'result' => array( 'post_id' => 123 ) ) ) );
+		$this->assertSame( 456, PostTracking::extractPostId( array( 'result' => array( 'data' => array( 'post_id' => 456 ) ) ) ) );
 		$this->assertSame( 0, PostTracking::extractPostId( array() ) );
 		$this->assertSame( 0, PostTracking::extractPostId( array( 'data' => array( 'post_id' => 0 ) ) ) );
+		$this->assertSame( 0, PostTracking::extractPostId( array( 'result' => array( 'data' => array( 'post_id' => 0 ) ) ) ) );
 	}
 
 	public function test_get_agent_id_for_post_resolves_via_flow_row(): void {

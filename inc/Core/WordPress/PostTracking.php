@@ -218,6 +218,11 @@ class PostTracking {
 			return (int) $result['result']['post_id'];
 		}
 
+		// Data Machine handlers normalized through Agents API: result.data.post_id.
+		if ( ! empty( $result['result']['data']['post_id'] ) ) {
+			return (int) $result['result']['data']['post_id'];
+		}
+
 		return 0;
 	}
 }
