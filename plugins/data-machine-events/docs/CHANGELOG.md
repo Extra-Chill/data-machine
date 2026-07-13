@@ -2,6 +2,14 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.49.0] - 2026-07-13
+
+### Added
+- add events-by-term result filter
+
+### Fixed
+- resolve remaining phpcs findings (SQL prep, escaping, nonces)
+
 ## [0.48.0] - 2026-07-12
 
 ### Added
