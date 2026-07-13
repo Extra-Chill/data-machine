@@ -148,7 +148,7 @@ namespace {
 		/** @var array<int, array{action_id:int, hook:string, status:string, last_attempt_gmt:string}> */
 		public array $actions = array();
 
-		/** @var array<int, array{log_id:int, action_id:int, log_date_gmt:string}> */
+		/** @var array<int, array{log_id:int, action_id:int}> */
 		public array $logs = array();
 
 		public int $delete_queries = 0;
@@ -194,10 +194,6 @@ namespace {
 			$cutoff = $this->extract_cutoff( $args );
 			$hook   = $this->extract_hook( $sql, $args );
 
-			if ( str_contains( $sql, 'LEFT JOIN' ) ) {
-				return count( $this->matching_orphan_logs( $cutoff ) );
-			}
-
 			if ( str_contains( $sql, 'FROM %i l' ) || str_contains( $sql, 'log_id' ) ) {
 				return count( $this->matching_logs( $cutoff, $hook ) );
 			}
@@ -221,9 +217,7 @@ namespace {
 			$this->batch_sizes[] = $limit;
 
 			if ( str_contains( $sql, 'log_id IN' ) ) {
-				$matching = str_contains( $sql, 'LEFT JOIN' )
-					? array_slice( $this->matching_orphan_logs( $cutoff ), 0, $limit, true )
-					: array_slice( $this->matching_logs( $cutoff, $hook ), 0, $limit, true );
+				$matching = array_slice( $this->matching_logs( $cutoff, $hook ), 0, $limit, true );
 				foreach ( array_keys( $matching ) as $log_id ) {
 					unset( $this->logs[ $log_id ] );
 				}
@@ -292,17 +286,6 @@ namespace {
 			}
 			return $out;
 		}
-
-		private function matching_orphan_logs( string $cutoff ): array {
-			$out = array();
-			foreach ( $this->logs as $id => $row ) {
-				if ( 0 === $row['action_id'] || isset( $this->actions[ $row['action_id'] ] ) || $row['log_date_gmt'] >= $cutoff ) {
-					continue;
-				}
-				$out[ $id ] = $row;
-			}
-			return $out;
-		}
 	};
 
 	// Seed enough rows to force the batching loop to iterate past the 1000-row
@@ -325,9 +308,8 @@ namespace {
 			'last_attempt_gmt' => $seven_h,
 		);
 		$fake_wpdb->logs[ $lid ] = array(
-			'log_id'       => $lid,
-			'action_id'    => $aid,
-			'log_date_gmt' => $seven_h,
+			'log_id'    => $lid,
+			'action_id' => $aid,
 		);
 		++$aid;
 		++$lid;
@@ -350,17 +332,6 @@ namespace {
 		);
 		++$aid;
 	}
-	$fake_wpdb->logs[ $lid ] = array(
-		'log_id'       => $lid,
-		'action_id'    => 999999,
-		'log_date_gmt' => $eight_day,
-	);
-	++$lid;
-	$fake_wpdb->logs[ $lid ] = array(
-		'log_id'       => $lid,
-		'action_id'    => 999998,
-		'log_date_gmt' => $fresh,
-	);
 
 	$GLOBALS['wpdb'] = $fake_wpdb;
 
@@ -376,8 +347,8 @@ namespace {
 			&& 0 === $fake_wpdb->delete_queries
 	);
 	assert_batching(
-		'count includes expired orphan logs (2501 logs + 2530 actions)',
-		5031 === $count_total,
+		'count covers per-hook + global eligible rows (2500 logs + 2530 actions)',
+		5030 === $count_total,
 		"got {$count_total}"
 	);
 
@@ -430,18 +401,13 @@ namespace {
 		)
 	);
 	assert_batching(
-		'result reports per-table deletion counts, including the orphan log, and batch metadata',
+		'result reports per-table deletion counts + batch metadata',
 		2530 === $result['actions_deleted']
-			&& 2501 === $result['logs_deleted']
-			&& 1 === $result['orphan_logs_deleted']
+			&& 2500 === $result['logs_deleted']
 			&& 1000 === $result['batch_size']
 			&& isset( $result['iterations'] )
 			&& false === $result['hit_limit'],
 		"actions={$result['actions_deleted']} logs={$result['logs_deleted']}"
-	);
-	assert_batching(
-		'expired orphan logs are removed while fresh orphan logs survive',
-		! isset( $fake_wpdb->logs[ 2501 ] ) && isset( $fake_wpdb->logs[ 2502 ] )
 	);
 
 	// OPTIMIZE is opt-in: default off => no OPTIMIZE call.
