@@ -407,4 +407,12 @@ echo "\n[16] Action Scheduler native recurring-ensure hook repairs interrupted s
 $provider_source = file_get_contents( __DIR__ . '/../inc/Engine/AI/System/SystemAgentServiceProvider.php' ) ?: '';
 datamachine_assert( str_contains( $provider_source, "add_action( 'action_scheduler_ensure_recurring_actions', array( \$this, 'manageRecurringTaskSchedules' ) );" ), 'provider registers reconciliation on Action Scheduler native recurring-ensure hook' );
 
+echo "\n[17] distinct argument tuples sharing a hook remain independently schedulable\n";
+datamachine_rs_reset();
+datamachine_assert_schedule_result( RecurringScheduler::ensureSchedule( 'datamachine_per_flow', array( 'flow_id' => 1 ), 'hourly' ) );
+datamachine_assert_schedule_result( RecurringScheduler::ensureSchedule( 'datamachine_per_flow', array( 'flow_id' => 2 ), 'hourly' ) );
+datamachine_assert( array( false, false ) === $GLOBALS['datamachine_rs_recurring_unique'], 'argument-bearing schedules do not use hook/group-only Action Scheduler uniqueness' );
+datamachine_assert( 1 === datamachine_rs_pending_count( 'datamachine_per_flow', array( 'flow_id' => 1 ), RecurringScheduler::GROUP ), 'first argument tuple has its own pending chain' );
+datamachine_assert( 1 === datamachine_rs_pending_count( 'datamachine_per_flow', array( 'flow_id' => 2 ), RecurringScheduler::GROUP ), 'second argument tuple has its own pending chain' );
+
 echo "\nAll recurring scheduler idempotency assertions passed.\n";
