@@ -2,10 +2,13 @@
 
 All notable changes to Data Machine will be documented in this file.
 
-## [Unreleased]
+## [0.163.0] - 2026-07-13
 
 ### Added
 - Core `flow_diagram` image template — a brand-agnostic, spec-driven flow diagram (nodes + edges) rendered server-side via GDRenderer. Composable through the existing `datamachine/render-image-template` ability surface (CLI, REST, MCP, PHP): `wp datamachine image render --template_id=flow_diagram --data='{"nodes":[...],"edges":[...]}'`. Core ships only generic structural templates; domain templates remain downstream.
+
+### Changed
+- fix image template smoke bootstrap
 
 ### Fixed
 - `GDRenderer::draw_rounded_rect()` no longer fatals on PHP 8.0–8.3. It called `imagefilledroundedrectangle()` unconditionally, but that builtin is PHP 8.4+; added a manual rounded-rect fallback so rounded nodes render on all supported PHP versions.
