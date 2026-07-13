@@ -332,6 +332,47 @@ namespace {
 		);
 		++$aid;
 	}
+	$expired_recurring_action_id = $aid;
+	$expired_recurring_log_id    = $lid;
+	$fake_wpdb->actions[ $aid ]  = array(
+		'action_id'        => $aid,
+		'hook'             => 'datamachine_recurring_retention_as_actions',
+		'status'           => 'canceled',
+		'last_attempt_gmt' => $eight_day,
+	);
+	$fake_wpdb->logs[ $lid ] = array(
+		'log_id'    => $lid,
+		'action_id' => $aid,
+	);
+	++$aid;
+	++$lid;
+
+	$recent_recurring_action_id = $aid;
+	$recent_recurring_log_id    = $lid;
+	$fake_wpdb->actions[ $aid ] = array(
+		'action_id'        => $aid,
+		'hook'             => 'datamachine_recurring_retention_as_actions',
+		'status'           => 'canceled',
+		'last_attempt_gmt' => $fresh,
+	);
+	$fake_wpdb->logs[ $lid ] = array(
+		'log_id'    => $lid,
+		'action_id' => $aid,
+	);
+	++$aid;
+	++$lid;
+
+	$non_datamachine_log_id    = $lid;
+	$fake_wpdb->actions[ $aid ] = array(
+		'action_id'        => $aid,
+		'hook'             => 'woocommerce_background_task',
+		'status'           => 'pending',
+		'last_attempt_gmt' => $eight_day,
+	);
+	$fake_wpdb->logs[ $lid ] = array(
+		'log_id'    => $lid,
+		'action_id' => $aid,
+	);
 
 	$GLOBALS['wpdb'] = $fake_wpdb;
 
@@ -347,8 +388,8 @@ namespace {
 			&& 0 === $fake_wpdb->delete_queries
 	);
 	assert_batching(
-		'count covers per-hook + global eligible rows (2500 logs + 2530 actions)',
-		5030 === $count_total,
+		'count includes expired logs attached to canceled Data Machine recurrences (2501 logs + 2531 actions)',
+		5032 === $count_total,
 		"got {$count_total}"
 	);
 
@@ -402,12 +443,23 @@ namespace {
 	);
 	assert_batching(
 		'result reports per-table deletion counts + batch metadata',
-		2530 === $result['actions_deleted']
-			&& 2500 === $result['logs_deleted']
+		2531 === $result['actions_deleted']
+			&& 2501 === $result['logs_deleted']
 			&& 1000 === $result['batch_size']
 			&& isset( $result['iterations'] )
 			&& false === $result['hit_limit'],
 		"actions={$result['actions_deleted']} logs={$result['logs_deleted']}"
+	);
+	assert_batching(
+		'expired canceled Data Machine recurrence and its log are deleted',
+		! isset( $fake_wpdb->actions[ $expired_recurring_action_id ] )
+			&& ! isset( $fake_wpdb->logs[ $expired_recurring_log_id ] )
+	);
+	assert_batching(
+		'recent canceled and non-Data-Machine logs are preserved',
+		isset( $fake_wpdb->actions[ $recent_recurring_action_id ] )
+			&& isset( $fake_wpdb->logs[ $recent_recurring_log_id ] )
+			&& isset( $fake_wpdb->logs[ $non_datamachine_log_id ] )
 	);
 
 	// OPTIMIZE is opt-in: default off => no OPTIMIZE call.
