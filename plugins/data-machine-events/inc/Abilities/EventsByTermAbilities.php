@@ -161,7 +161,20 @@ class EventsByTermAbilities {
 
 		switch_to_blog( $events_blog_id );
 		try {
-			return $this->collectEventsForTerm( $taxonomy, $term_slug, $scope, $limit );
+			$result = $this->collectEventsForTerm( $taxonomy, $term_slug, $scope, $limit );
+
+			/**
+			 * Filter events-by-term results in the canonical events-site context.
+			 *
+			 * Consumers can compose domain-owned relationship data while term and
+			 * permalink APIs still resolve against the events site. This primitive
+			 * remains taxonomy-agnostic: it neither assumes nor declares consumers'
+			 * response fields.
+			 *
+			 * @param array $result Hydrated events-by-term response.
+			 * @param array $input  Normalized ability input.
+			 */
+			return apply_filters( 'data_machine_events_events_by_term_result', $result, $input );
 		} finally {
 			restore_current_blog();
 		}
