@@ -693,6 +693,7 @@ class RetentionCleanup {
 
 		$actions_count = 0;
 		$logs_count    = 0;
+		$global_cutoff = gmdate( 'Y-m-d H:i:s', time() - (int) round( self::actionSchedulerMaxAgeDays() * DAY_IN_SECONDS ) );
 
 		foreach ( self::actionSchedulerCleanupWindows() as $window ) {
 			$cutoff = $window['cutoff'];
@@ -753,6 +754,18 @@ class RetentionCleanup {
 			}
 		}
 
+		// The custom tables do not enforce a foreign key, so native Action
+		// Scheduler cleanup can leave expired logs after deleting actions.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$logs_count += (int) $wpdb->get_var(
+			$wpdb->prepare(
+				'SELECT COUNT(*) FROM %i l LEFT JOIN %i a ON l.action_id = a.action_id WHERE l.action_id != 0 AND a.action_id IS NULL AND l.log_date_gmt < %s',
+				$logs_table,
+				$actions_table,
+				$global_cutoff
+			)
+		);
+
 		return array(
 			'actions' => $actions_count,
 			'logs'    => $logs_count,
@@ -775,6 +788,7 @@ class RetentionCleanup {
 		$hit_limit       = false;
 		$logs_deleted    = 0;
 		$actions_deleted = 0;
+		$orphan_logs_deleted = 0;
 
 		foreach ( self::actionSchedulerCleanupWindows() as $window ) {
 			$cutoff = $window['cutoff'];
@@ -805,6 +819,18 @@ class RetentionCleanup {
 				$hit_limit
 			);
 		}
+
+		$orphan_logs_deleted = self::deleteOrphanActionSchedulerLogsBatched(
+			$logs_table,
+			$actions_table,
+			gmdate( 'Y-m-d H:i:s', time() - (int) round( self::actionSchedulerMaxAgeDays() * DAY_IN_SECONDS ) ),
+			$batch_size,
+			$max_iterations,
+			$deadline,
+			$iterations_used,
+			$hit_limit
+		);
+		$logs_deleted += $orphan_logs_deleted;
 
 		// Hard row-count ceiling per high-churn hook. Age windows above can
 		// leave the table unbounded when generation outruns the cleanup
@@ -842,6 +868,7 @@ class RetentionCleanup {
 				array(
 					'actions_deleted'         => $actions_deleted,
 					'logs_deleted'            => $logs_deleted,
+					'orphan_logs_deleted'     => $orphan_logs_deleted,
 					'ceiling_actions_deleted' => $ceiling['actions_deleted'],
 					'ceiling_logs_deleted'    => $ceiling['logs_deleted'],
 					'max_age_days'            => $max_age_days,
@@ -863,6 +890,7 @@ class RetentionCleanup {
 			'deleted'                 => $total_deleted,
 			'actions_deleted'         => $actions_deleted,
 			'logs_deleted'            => $logs_deleted,
+			'orphan_logs_deleted'     => $orphan_logs_deleted,
 			'ceiling_actions_deleted' => $ceiling['actions_deleted'],
 			'ceiling_logs_deleted'    => $ceiling['logs_deleted'],
 			'max_age_days'            => $max_age_days,
@@ -1069,6 +1097,59 @@ class RetentionCleanup {
 					)
 				);
 			}
+
+			$affected = false !== $affected ? (int) $affected : 0;
+			$deleted += $affected;
+		} while ( $affected > 0 );
+
+		return $deleted;
+	}
+
+	/**
+	 * Delete expired logs whose actions were already removed by another cleanup.
+	 *
+	 * @param string $logs_table      Logs table name.
+	 * @param string $actions_table   Actions table name.
+	 * @param string $cutoff          GMT cutoff datetime.
+	 * @param int    $batch_size      Rows per batch.
+	 * @param int    $max_iterations  Hard iteration ceiling (shared budget).
+	 * @param float  $deadline        Wall-clock deadline (microtime float).
+	 * @param int    $iterations_used Shared iteration counter (by reference).
+	 * @param bool   $hit_limit       Set true when a budget cap trips (by reference).
+	 * @return int Total rows deleted.
+	 */
+	private static function deleteOrphanActionSchedulerLogsBatched(
+		string $logs_table,
+		string $actions_table,
+		string $cutoff,
+		int $batch_size,
+		int $max_iterations,
+		float $deadline,
+		int &$iterations_used,
+		bool &$hit_limit
+	): int {
+		global $wpdb;
+
+		$deleted = 0;
+
+		do {
+			if ( $iterations_used >= $max_iterations || microtime( true ) >= $deadline ) {
+				$hit_limit = true;
+				break;
+			}
+			++$iterations_used;
+
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			$affected = $wpdb->query(
+				$wpdb->prepare(
+					'DELETE FROM %i WHERE log_id IN ( SELECT log_id FROM ( SELECT l.log_id FROM %i l LEFT JOIN %i a ON l.action_id = a.action_id WHERE l.action_id != 0 AND a.action_id IS NULL AND l.log_date_gmt < %s LIMIT %d ) AS tmp )',
+					$logs_table,
+					$logs_table,
+					$actions_table,
+					$cutoff,
+					$batch_size
+				)
+			);
 
 			$affected = false !== $affected ? (int) $affected : 0;
 			$deleted += $affected;
