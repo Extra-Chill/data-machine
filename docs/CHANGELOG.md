@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.163.1] - 2026-07-13
+
+### Fixed
+- reconcile recurring Action Scheduler actions safely
+
 ## [0.163.0] - 2026-07-13
 
 ### Added
