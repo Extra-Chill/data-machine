@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [Unreleased]
+
+### Changed
+- `flow_diagram` template now renders onto a fixed target canvas and centers the diagram within it, defaulting to a 16:9 card (twitter_card, 1200x675) that works as a blog featured image or social share. The diagram grid scales down uniformly to fit the canvas, and callers can override via `preset` or explicit `width`/`height`. Very wide flows still grow the canvas rather than clip.
+
 ## [0.163.1] - 2026-07-13
 
 ### Fixed

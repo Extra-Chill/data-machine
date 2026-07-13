@@ -37,6 +37,7 @@
 namespace DataMachine\Abilities\Media\Templates;
 
 use DataMachine\Abilities\Media\GDRenderer;
+use DataMachine\Abilities\Media\PlatformPresets;
 use DataMachine\Abilities\Media\TemplateInterface;
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -96,8 +97,14 @@ class FlowDiagramTemplate implements TemplateInterface {
 		);
 	}
 
+	/**
+	 * Default canvas: twitter_card is 1200x675, a true 16:9 card that works well
+	 * as a blog featured image / social share. The diagram is centered within it.
+	 */
+	private const DEFAULT_PRESET = 'twitter_card';
+
 	public function get_default_preset(): string {
-		return 'open_graph';
+		return self::DEFAULT_PRESET;
 	}
 
 	/**
@@ -131,16 +138,45 @@ class FlowDiagramTemplate implements TemplateInterface {
 				break;
 			}
 		}
-		$gap = $has_edge_labels ? self::GAP + 90 : self::GAP;
 
-		// Compute canvas from the node grid (ignore preset; diagrams size to content).
-		if ( 'vertical' === $direction ) {
-			$width  = self::MARGIN * 2 + self::NODE_WIDTH;
-			$height = self::MARGIN * 2 + $title_band + $count * self::NODE_HEIGHT + ( $count - 1 ) * $gap;
-		} else {
-			$width  = self::MARGIN * 2 + $count * self::NODE_WIDTH + ( $count - 1 ) * $gap;
-			$height = self::MARGIN * 2 + $title_band + self::NODE_HEIGHT;
+		// Resolve the target canvas first (default is a 16:9 card). The diagram
+		// grid is then scaled to fit inside it and centered, so a bare render
+		// always produces a clean, correctly-proportioned image.
+		$canvas = $this->resolve_canvas( $options );
+		$width  = $canvas['width'];
+		$height = $canvas['height'];
+
+		// Base (unscaled) grid metrics.
+		$node_w = self::NODE_WIDTH;
+		$node_h = self::NODE_HEIGHT;
+		$gap    = $has_edge_labels ? self::GAP + 90 : self::GAP;
+		$margin = self::MARGIN;
+
+		$content_w = $this->grid_width( $direction, $count, $node_w, $gap, $margin );
+		$content_h = $this->grid_height( $direction, $count, $node_h, $gap, $margin, $title_band );
+
+		// Scale the whole grid down uniformly if it overflows the canvas in
+		// either axis. Never scale up past the base size (keeps small diagrams
+		// from ballooning on a large canvas).
+		$scale = min( 1.0, $width / max( 1, $content_w ), $height / max( 1, $content_h ) );
+		if ( $scale < 1.0 ) {
+			// floor() (not round()) guarantees the scaled grid never exceeds the
+			// target canvas by a rounding pixel, so preset dimensions stay exact.
+			$node_w     = (int) floor( $node_w * $scale );
+			$node_h     = (int) floor( $node_h * $scale );
+			$gap        = (int) floor( $gap * $scale );
+			$margin     = (int) floor( $margin * $scale );
+			$title_band = (int) floor( $title_band * $scale );
+			$content_w  = $this->grid_width( $direction, $count, $node_w, $gap, $margin );
+			$content_h  = $this->grid_height( $direction, $count, $node_h, $gap, $margin, $title_band );
 		}
+
+		// If content is still larger than the canvas (single very wide node),
+		// grow the canvas so nothing clips.
+		$width  = max( $width, $content_w );
+		$height = max( $height, $content_h );
+		$off_x  = intdiv( $width - $content_w, 2 );
+		$off_y  = intdiv( $height - $content_h, 2 );
 
 		$renderer->create_canvas( $width, $height );
 
@@ -159,20 +195,22 @@ class FlowDiagramTemplate implements TemplateInterface {
 		$renderer->fill( $bg );
 
 		if ( '' !== $title ) {
-			$renderer->filled_rect( 0, 0, $width, $title_band, $surface );
-			$renderer->draw_text_centered( $title, 30, self::MARGIN + 6, $title_c, 'title' );
+			$title_fs = max( 16, (int) round( 30 * ( $title_band / self::TITLE_BAND ) ) );
+			$renderer->filled_rect( 0, $off_y, $width, $off_y + $title_band, $surface );
+			$renderer->draw_text_centered( $title, $title_fs, $off_y + $margin + 6, $title_c, 'title' );
 		}
 
 		// Position nodes on a single row/column and index by id for edge routing.
+		// Offsets center the content grid within the (possibly larger) canvas.
 		$positions = array();
-		$top0      = self::MARGIN + $title_band;
+		$top0      = $off_y + $margin + $title_band;
 
 		foreach ( $nodes as $i => $node ) {
 			if ( 'vertical' === $direction ) {
-				$x = self::MARGIN;
-				$y = $top0 + $i * ( self::NODE_HEIGHT + $gap );
+				$x = $off_x + $margin;
+				$y = $top0 + $i * ( $node_h + $gap );
 			} else {
-				$x = self::MARGIN + $i * ( self::NODE_WIDTH + $gap );
+				$x = $off_x + $margin + $i * ( $node_w + $gap );
 				$y = $top0;
 			}
 
@@ -181,10 +219,10 @@ class FlowDiagramTemplate implements TemplateInterface {
 			$positions[ $id ] = array(
 				'x'      => $x,
 				'y'      => $y,
-				'cx'     => $x + intdiv( self::NODE_WIDTH, 2 ),
-				'cy'     => $y + intdiv( self::NODE_HEIGHT, 2 ),
-				'right'  => $x + self::NODE_WIDTH,
-				'bottom' => $y + self::NODE_HEIGHT,
+				'cx'     => $x + intdiv( $node_w, 2 ),
+				'cy'     => $y + intdiv( $node_h, 2 ),
+				'right'  => $x + $node_w,
+				'bottom' => $y + $node_h,
 			);
 		}
 
@@ -240,24 +278,77 @@ class FlowDiagramTemplate implements TemplateInterface {
 			$label = isset( $node['label'] ) ? (string) $node['label'] : '';
 			$label = str_replace( '\n', "\n", $label );
 
+			$radius = max( 6, (int) round( 16 * ( $node_h / self::NODE_HEIGHT ) ) );
+
 			switch ( $shape ) {
 				case 'diamond':
-					$renderer->draw_diamond( $pos['cx'], $pos['cy'], self::NODE_WIDTH, self::NODE_HEIGHT, $fill, true );
+					$renderer->draw_diamond( $pos['cx'], $pos['cy'], $node_w, $node_h, $fill, true );
 					break;
 				case 'oval':
-					$renderer->draw_oval( $pos['cx'], $pos['cy'], self::NODE_WIDTH, self::NODE_HEIGHT, $fill, true );
+					$renderer->draw_oval( $pos['cx'], $pos['cy'], $node_w, $node_h, $fill, true );
 					break;
 				default:
-					$renderer->draw_rounded_rect( $pos['x'], $pos['y'], self::NODE_WIDTH, self::NODE_HEIGHT, $fill, 16 );
+					$renderer->draw_rounded_rect( $pos['x'], $pos['y'], $node_w, $node_h, $fill, $radius );
 					break;
 			}
 
-			$this->draw_node_label( $renderer, $label, $pos, $text_c );
+			$this->draw_node_label( $renderer, $label, $pos, $text_c, $node_w );
 		}
 
 		$path = $renderer->save_temp( $format );
 
 		return $path ? array( $path ) : array();
+	}
+
+	/**
+	 * Resolve the target output canvas size.
+	 *
+	 * Precedence:
+	 *   1. Explicit options[width] + options[height]
+	 *   2. options[preset] resolved via PlatformPresets
+	 *   3. The template default preset (16:9 twitter_card, 1200x675)
+	 *
+	 * @param array $options Render options (preset, width, height).
+	 * @return array{width: int, height: int}
+	 */
+	private function resolve_canvas( array $options ): array {
+		if ( ! empty( $options['width'] ) && ! empty( $options['height'] ) ) {
+			return array(
+				'width'  => (int) $options['width'],
+				'height' => (int) $options['height'],
+			);
+		}
+
+		$preset = ! empty( $options['preset'] ) ? (string) $options['preset'] : self::DEFAULT_PRESET;
+		$dims   = PlatformPresets::dimensions( $preset );
+		if ( ! $dims ) {
+			$dims = PlatformPresets::dimensions( self::DEFAULT_PRESET );
+		}
+
+		return array(
+			'width'  => (int) ( $dims['width'] ?? 1200 ),
+			'height' => (int) ( $dims['height'] ?? 675 ),
+		);
+	}
+
+	/**
+	 * Total grid width for the given metrics.
+	 */
+	private function grid_width( string $direction, int $count, int $node_w, int $gap, int $margin ): int {
+		if ( 'vertical' === $direction ) {
+			return $margin * 2 + $node_w;
+		}
+		return $margin * 2 + $count * $node_w + ( $count - 1 ) * $gap;
+	}
+
+	/**
+	 * Total grid height for the given metrics.
+	 */
+	private function grid_height( string $direction, int $count, int $node_h, int $gap, int $margin, int $title_band ): int {
+		if ( 'vertical' === $direction ) {
+			return $margin * 2 + $title_band + $count * $node_h + ( $count - 1 ) * $gap;
+		}
+		return $margin * 2 + $title_band + $node_h;
 	}
 
 	/**
@@ -267,18 +358,19 @@ class FlowDiagramTemplate implements TemplateInterface {
 	 * @param string              $label    Label text (may contain "\n").
 	 * @param array<string, int>  $pos      Node position record.
 	 * @param int                 $color    Text color id.
+	 * @param int                 $node_w   Node width (scaled).
 	 */
-	private function draw_node_label( GDRenderer $renderer, string $label, array $pos, int $color ): void {
+	private function draw_node_label( GDRenderer $renderer, string $label, array $pos, int $color, int $node_w ): void {
 		if ( '' === $label ) {
 			return;
 		}
 
-		$inner = self::NODE_WIDTH - 40;
+		$inner = $node_w - 40;
 
-		// Auto-shrink the font until the longest single token fits the node
-		// width. Handles long unbroken strings (e.g. "ai-provider-for-claude-code")
-		// that word-wrapping alone can't break.
-		$font_size = 20;
+		// Base font scales with the node, then auto-shrinks until the longest
+		// single token fits the inner width. Handles long unbroken strings
+		// (e.g. "ai-provider-for-claude-code") that word-wrapping can't break.
+		$font_size = max( 11, (int) round( 20 * ( $node_w / self::NODE_WIDTH ) ) );
 		$longest   = '';
 		foreach ( preg_split( '/\s+/', str_replace( "\n", ' ', $label ) ) as $token ) {
 			if ( strlen( $token ) > strlen( $longest ) ) {
