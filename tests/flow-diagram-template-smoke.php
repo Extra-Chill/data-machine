@@ -36,9 +36,9 @@ $plugin_root = dirname( __DIR__ );
 // Source-string assertions (hold in every backend, incl. real WordPress).
 // -------------------------------------------------------------------------
 
-$bootstrap     = (string) file_get_contents( $plugin_root . '/inc/bootstrap.php' );
-$gd_source     = (string) file_get_contents( $plugin_root . '/inc/Abilities/Media/GDRenderer.php' );
-$tmpl_source   = (string) file_get_contents( $plugin_root . '/inc/Abilities/Media/Templates/FlowDiagramTemplate.php' );
+$bootstrap   = (string) file_get_contents( $plugin_root . '/inc/bootstrap.php' );
+$gd_source   = (string) file_get_contents( $plugin_root . '/inc/Abilities/Media/GDRenderer.php' );
+$tmpl_source = (string) file_get_contents( $plugin_root . '/inc/Abilities/Media/Templates/FlowDiagramTemplate.php' );
 
 $assert(
 	'bootstrap registers flow_diagram on the core template filter',
@@ -135,7 +135,17 @@ if ( $path && file_exists( $path ) ) {
 	$info = getimagesize( $path );
 	$assert( 'output is a valid PNG', is_array( $info ) && $info['mime'] === 'image/png' );
 	$assert( 'output has sane dimensions', is_array( $info ) && $info[0] > 100 && $info[1] > 100 );
+	// Default canvas is a 16:9 twitter_card (1200x675).
+	$assert( 'default render is 16:9 (1200x675)', is_array( $info ) && $info[0] === 1200 && $info[1] === 675 );
 	wp_delete_file( $path );
+}
+
+// Explicit preset override is honored.
+$og = $template->render( $spec, new GDRenderer(), array( 'preset' => 'open_graph' ) );
+if ( ! empty( $og[0] ) && file_exists( $og[0] ) ) {
+	$oginfo = getimagesize( $og[0] );
+	$assert( 'preset override honored (open_graph 1200x630)', is_array( $oginfo ) && $oginfo[0] === 1200 && $oginfo[1] === 630 );
+	wp_delete_file( $og[0] );
 }
 
 // Empty nodes must fail gracefully (no fatal, empty result).
