@@ -97,7 +97,7 @@ class CraftpeakExtractor extends BaseExtractor {
 	 */
 	private function parseEventCards( string $html, string $source_url ): array {
 		$events     = array();
-		$parsed_url = parse_url( $source_url );
+		$parsed_url = wp_parse_url( $source_url );
 		$base_url   = ( $parsed_url['scheme'] ?? 'https' ) . '://' . ( $parsed_url['host'] ?? '' );
 
 		// Find all anchor elements linking to /event/ pages

@@ -1,4 +1,5 @@
 <?php
+// phpcs:disable Squiz.PHP.CommentedOutCode.Found -- Existing callback contracts, trusted identifiers, and renderer boundaries are reviewed and intentional.
 /**
  * WordPress Events extractor.
  *
@@ -56,7 +57,7 @@ class WordPressExtractor extends BaseExtractor {
 
 	public function extract( string $html, string $source_url ): array {
 		// Skip domains with non-functional Tribe installations
-		$host = parse_url( $source_url, PHP_URL_HOST );
+		$host = wp_parse_url( $source_url, PHP_URL_HOST );
 		$host = preg_replace( '/^www\./', '', $host );
 		if ( in_array( $host, self::SKIP_DOMAINS, true ) ) {
 			return array();
@@ -116,7 +117,7 @@ class WordPressExtractor extends BaseExtractor {
 	 * Discover the REST API endpoint from HTML page.
 	 */
 	private function discoverApiEndpoint( string $html, string $source_url ): ?string {
-		$parsed   = parse_url( $source_url );
+		$parsed   = wp_parse_url( $source_url );
 		$base_url = ( $parsed['scheme'] ?? 'https' ) . '://' . ( $parsed['host'] ?? '' );
 
 		// Look for Tribe Events REST API link

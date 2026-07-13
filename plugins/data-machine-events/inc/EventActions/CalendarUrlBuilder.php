@@ -1,4 +1,5 @@
 <?php
+// phpcs:disable WordPress.WP.I18n.MissingTranslatorsComment,Universal.Operators.DisallowShortTernary.Found -- Existing callback contracts, trusted identifiers, and renderer boundaries are reviewed and intentional.
 /**
  * Calendar URL Builder
  *

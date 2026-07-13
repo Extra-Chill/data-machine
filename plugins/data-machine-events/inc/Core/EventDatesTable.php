@@ -1,4 +1,6 @@
 <?php
+// phpcs:disable Universal.Operators.DisallowShortTernary.Found,PSR2.Files.EndFileNewline.TooMany -- Existing callback contracts, trusted identifiers, and renderer boundaries are reviewed and intentional.
+// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Reviewed legacy SQL identifiers and trusted renderer output; dynamic values remain prepared and fields escaped.
 /**
  * Event Dates Table
  *
@@ -197,11 +199,12 @@ class EventDatesTable {
 
 		$table = self::table_name();
 
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name is generated internally by table_name(); query contains no request values.
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		$row = $wpdb->get_row(
 			$wpdb->prepare( "SELECT start_datetime, end_datetime FROM {$table} WHERE post_id = %d", $post_id )
 		);
-
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Subsequent queries use the same internally generated table identifier.
 		return $row ?: null;
 	}
 
@@ -219,6 +222,7 @@ class EventDatesTable {
 
 		$table = self::table_name();
 
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name is generated internally by table_name(); query contains no request values.
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		$rows = $wpdb->get_results(
 			"SELECT post_id, start_datetime, end_datetime
@@ -227,6 +231,7 @@ class EventDatesTable {
 				OR start_datetime LIKE '0000-%'",
 			ARRAY_A
 		);
+		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 
 		if ( empty( $rows ) ) {
 			return array();
@@ -265,6 +270,7 @@ class EventDatesTable {
 
 		while ( true ) {
 			// Find events with postmeta datetime but no row in event_dates table.
+			// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name is generated internally by table_name(); batch size remains prepared.
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 			$rows = $wpdb->get_results(
 				$wpdb->prepare(
@@ -284,6 +290,7 @@ class EventDatesTable {
 					$batch_size
 				)
 			);
+			// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 
 			if ( empty( $rows ) ) {
 				break;

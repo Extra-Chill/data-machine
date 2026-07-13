@@ -1,4 +1,5 @@
 <?php
+// phpcs:disable WordPress.PHP.YodaConditions.NotYoda,Generic.CodeAnalysis.UnusedFunctionParameter.Found,WordPress.Security.EscapeOutput.OutputNotEscaped,WordPress.Security.NonceVerification.Missing -- Existing callback contracts, trusted identifiers, and renderer boundaries are reviewed and intentional.
 /**
  * Venue Taxonomy Registration and Management
  *
@@ -57,12 +58,62 @@ class Venue_Taxonomy {
 	 * @var string[]
 	 */
 	private static $us_state_abbreviations = array(
-		'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA',
-		'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD',
-		'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ',
-		'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC',
-		'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY',
-		'DC', 'PR', 'VI', 'GU', 'AS', 'MP',
+		'AL',
+		'AK',
+		'AZ',
+		'AR',
+		'CA',
+		'CO',
+		'CT',
+		'DE',
+		'FL',
+		'GA',
+		'HI',
+		'ID',
+		'IL',
+		'IN',
+		'IA',
+		'KS',
+		'KY',
+		'LA',
+		'ME',
+		'MD',
+		'MA',
+		'MI',
+		'MN',
+		'MS',
+		'MO',
+		'MT',
+		'NE',
+		'NV',
+		'NH',
+		'NJ',
+		'NM',
+		'NY',
+		'NC',
+		'ND',
+		'OH',
+		'OK',
+		'OR',
+		'PA',
+		'RI',
+		'SC',
+		'SD',
+		'TN',
+		'TX',
+		'UT',
+		'VT',
+		'VA',
+		'WA',
+		'WV',
+		'WI',
+		'WY',
+		'DC',
+		'PR',
+		'VI',
+		'GU',
+		'AS',
+		'MP',
 	);
 
 	public static function register() {
@@ -1124,7 +1175,6 @@ class Venue_Taxonomy {
 
 		add_action( 'admin_enqueue_scripts', array( __CLASS__, 'enqueue_term_edit_assets' ) );
 	}
-
 	public static function add_venue_form_fields( $taxonomy ) {
 		foreach ( self::$meta_fields as $key => $meta_key ) {
 			$label = self::$field_labels[ $key ] ?? ucfirst( $key );

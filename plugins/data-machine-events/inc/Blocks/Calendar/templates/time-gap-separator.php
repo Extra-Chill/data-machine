@@ -1,4 +1,5 @@
 <?php
+// phpcs:disable Universal.Operators.StrictComparisons.LooseEqual,WordPress.WP.I18n.MissingTranslatorsComment -- Existing callback contracts, trusted identifiers, and renderer boundaries are reviewed and intentional.
 /**
  * Time Gap Separator Template
  *

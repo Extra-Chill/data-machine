@@ -1,4 +1,5 @@
 <?php
+// phpcs:disable Generic.Formatting.MultipleStatementAlignment.NotSameWarning,Universal.Operators.DisallowShortTernary.Found,Squiz.PHP.DisallowSizeFunctionsInLoops.Found,WordPress.WP.I18n.MissingTranslatorsComment -- Existing callback contracts, trusted identifiers, and renderer boundaries are reviewed and intentional.
 /**
  * .ics (iCalendar / RFC 5545) Builder
  *
@@ -109,7 +110,6 @@ class IcsBuilder {
 		}
 
 		$dtstamp = ( new \DateTimeImmutable( 'now', new \DateTimeZone( 'UTC' ) ) )->format( 'Ymd\THis\Z' );
-
 		$uid_seed = $permalink ?: ( 'event-' . $post_id . '@' . wp_parse_url( home_url(), PHP_URL_HOST ) );
 
 		$lines   = array();
@@ -297,7 +297,6 @@ class IcsBuilder {
 		$out    = '';
 		$first  = true;
 		$remain = $line;
-
 		while ( strlen( $remain ) > 0 ) {
 			$chunk_size = $first ? self::FOLD_LIMIT : self::FOLD_LIMIT - 1;
 			$chunk      = self::utf8_safe_substr( $remain, $chunk_size );

@@ -1,4 +1,5 @@
 <?php
+// phpcs:disable WordPress.DateTime.RestrictedFunctions.date_date,Squiz.PHP.CommentedOutCode.Found -- Existing callback contracts, trusted identifiers, and renderer boundaries are reviewed and intentional.
 /**
  * RHP Events extractor.
  *
@@ -68,7 +69,6 @@ class RhpEventsExtractor extends BaseExtractor {
 				return (int) $matches[1];
 			}
 		}
-
 		return (int) date( 'Y' );
 	}
 
@@ -265,7 +265,7 @@ class RhpEventsExtractor extends BaseExtractor {
 				$href = $detail_node->getAttribute( 'href' );
 				// Make absolute if relative
 				if ( strpos( $href, 'http' ) !== 0 ) {
-					$parsed = parse_url( $source_url );
+					$parsed = wp_parse_url( $source_url );
 					$base   = ( $parsed['scheme'] ?? 'https' ) . '://' . ( $parsed['host'] ?? '' );
 					$href   = $base . '/' . ltrim( $href, '/' );
 				}

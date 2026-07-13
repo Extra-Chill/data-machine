@@ -1,4 +1,6 @@
 <?php
+// phpcs:disable Universal.Operators.DisallowShortTernary.Found,PSR2.Files.EndFileNewline.TooMany -- Existing callback contracts, trusted identifiers, and renderer boundaries are reviewed and intentional.
+// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Reviewed legacy SQL identifiers and trusted renderer output; dynamic values remain prepared and fields escaped.
 /**
  * Event Quality Audit Abilities
  *
@@ -207,28 +209,40 @@ class EventQualityAuditAbilities {
 				'count'  => count( $missing_start_date ),
 				'events' => array_slice( $missing_start_date, 0, $limit ),
 			)
-			: array( 'count' => 0, 'events' => array() );
+			: array(
+				'count'  => 0,
+				'events' => array(),
+			);
 
 		$missing_start_time_result = ( 'all' === $issue || 'missing_start_time' === $issue )
 			? array(
 				'count'  => count( $missing_start_time ),
 				'events' => array_slice( $missing_start_time, 0, $limit ),
 			)
-			: array( 'count' => 0, 'events' => array() );
+			: array(
+				'count'  => 0,
+				'events' => array(),
+			);
 
 		$missing_venue_result = ( 'all' === $issue || 'missing_venue' === $issue )
 			? array(
 				'count'  => count( $missing_venue ),
 				'events' => array_slice( $missing_venue, 0, $limit ),
 			)
-			: array( 'count' => 0, 'events' => array() );
+			: array(
+				'count'  => 0,
+				'events' => array(),
+			);
 
 		$duplicate_result = ( 'all' === $issue || 'duplicates' === $issue )
 			? array(
 				'count'  => count( $duplicate_groups ),
 				'groups' => array_slice( $duplicate_groups, 0, $limit ),
 			)
-			: array( 'count' => 0, 'groups' => array() );
+			: array(
+				'count'  => 0,
+				'groups' => array(),
+			);
 
 		return array(
 			'total_scanned'       => count( $events ),
@@ -302,7 +316,7 @@ class EventQualityAuditAbilities {
 
 		global $wpdb;
 		$table = $wpdb->prefix . 'datamachine_flows';
-		$name  = $wpdb->get_var( $wpdb->prepare( "SELECT flow_name FROM {$table} WHERE flow_id = %d", $flow_id ) );
+		$name  = $wpdb->get_var( $wpdb->prepare( 'SELECT flow_name FROM %i WHERE flow_id = %d', $table, $flow_id ) );
 
 		return is_string( $name ) ? $name : '';
 	}

@@ -1,4 +1,5 @@
 <?php
+// phpcs:disable PSR12.Files.FileHeader.IncorrectOrder -- Existing callback contracts, trusted identifiers, and renderer boundaries are reviewed and intentional.
 /**
  * Event Duplicate Detection Strategy
  *

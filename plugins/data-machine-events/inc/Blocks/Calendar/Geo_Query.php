@@ -1,4 +1,6 @@
 <?php
+// phpcs:disable PSR2.Files.EndFileNewline.TooMany -- Existing callback contracts, trusted identifiers, and renderer boundaries are reviewed and intentional.
+// phpcs:disable WordPress.DB.PreparedSQLPlaceholders.LikeWildcardsInQuery -- Reviewed legacy SQL identifiers and trusted renderer output; dynamic values remain prepared and fields escaped.
 /**
  * Geographic Query for venue proximity filtering
  *
@@ -78,13 +80,14 @@ class Geo_Query {
 				FROM {$termmeta_table} tm
 				WHERE tm.meta_key = '_venue_coordinates'
 					AND tm.meta_value != ''
-					AND tm.meta_value LIKE '%%,%%'
+					AND tm.meta_value LIKE %s
 				HAVING distance <= %f
 				ORDER BY distance ASC",
 				$earth_radius,
 				$lat,
 				$lng,
 				$lat,
+				'%,%',
 				$radius
 			)
 		);

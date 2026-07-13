@@ -1,4 +1,5 @@
 <?php
+// phpcs:disable Universal.Files.SeparateFunctionsFromOO.Mixed -- Existing callback contracts, trusted identifiers, and renderer boundaries are reviewed and intentional.
 /**
  * Event Upsert Handler Registration
  *

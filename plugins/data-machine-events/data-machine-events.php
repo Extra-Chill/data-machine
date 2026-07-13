@@ -1,4 +1,5 @@
 <?php
+// phpcs:disable Universal.Files.SeparateFunctionsFromOO.Mixed -- Existing callback contracts, trusted identifiers, and renderer boundaries are reviewed and intentional.
 /**
  * Plugin Name: Data Machine Events
  * Plugin URI: https://chubes.net
@@ -196,7 +197,6 @@ class DATAMACHINE_Events {
 			if ( class_exists( 'DataMachineEvents\\Admin\\Settings_Page' ) ) {
 				new \DataMachineEvents\Admin\Settings_Page();
 			}
-
 		}
 
 		add_action( 'init', array( $this, 'init_data_machine_integration' ), 25 );

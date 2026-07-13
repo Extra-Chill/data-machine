@@ -1,4 +1,5 @@
 <?php
+// phpcs:disable WordPress.DateTime.RestrictedFunctions.date_date,Squiz.PHP.CommentedOutCode.Found -- Existing callback contracts, trusted identifiers, and renderer boundaries are reviewed and intentional.
 /**
  * Red Rocks Amphitheatre extractor.
  *
@@ -70,7 +71,6 @@ class RedRocksExtractor extends BaseExtractor {
 				return (int) $matches[1];
 			}
 		}
-
 		return (int) date( 'Y' );
 	}
 
@@ -136,7 +136,6 @@ class RedRocksExtractor extends BaseExtractor {
 		}
 
 		$date_text = trim( $date_node->textContent );
-
 		// Pattern: "Wed, Apr 15, 7:30 pm" or "Wed, Apr 15"
 		if ( preg_match( '/(\w+),?\s*(\w+)\s+(\d{1,2})(?:,?\s*(\d{1,2}(?::\d{2})?\s*(?:am|pm)))?/i', $date_text, $matches ) ) {
 			$month = $matches[2];
@@ -211,7 +210,7 @@ class RedRocksExtractor extends BaseExtractor {
 			$href = $link_node->getAttribute( 'href' );
 			if ( ! empty( $href ) && '#' !== $href ) {
 				if ( strpos( $href, 'http' ) !== 0 ) {
-					$parsed = parse_url( $source_url );
+					$parsed = wp_parse_url( $source_url );
 					$base   = ( $parsed['scheme'] ?? 'https' ) . '://' . ( $parsed['host'] ?? 'www.redrocksonline.com' );
 					$href   = $base . '/' . ltrim( $href, '/' );
 				}

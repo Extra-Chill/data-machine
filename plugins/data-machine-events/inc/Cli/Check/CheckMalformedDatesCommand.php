@@ -75,7 +75,7 @@ class CheckMalformedDatesCommand {
 		$delete_zero_rows = isset( $assoc_args['delete-zero-rows'] );
 		$skip_confirm     = isset( $assoc_args['yes'] );
 
-		$zero_rows      = EventDatesTable::find_zero_date_rows();
+		$zero_rows          = EventDatesTable::find_zero_date_rows();
 		$block_placeholders = $this->find_placeholder_block_dates();
 
 		$total = count( $zero_rows ) + count( $block_placeholders );
@@ -83,9 +83,9 @@ class CheckMalformedDatesCommand {
 		if ( 'json' === $format ) {
 			\WP_CLI::log( wp_json_encode(
 				array(
-					'zero_date_rows'      => $zero_rows,
-					'block_placeholders'  => $block_placeholders,
-					'total_issues'        => $total,
+					'zero_date_rows'     => $zero_rows,
+					'block_placeholders' => $block_placeholders,
+					'total_issues'       => $total,
 				),
 				JSON_PRETTY_PRINT
 			) );
@@ -103,7 +103,7 @@ class CheckMalformedDatesCommand {
 		} else {
 			$table_data = array();
 			foreach ( $zero_rows as $row ) {
-				$post = get_post( $row['post_id'] );
+				$post         = get_post( $row['post_id'] );
 				$table_data[] = array(
 					'ID'            => $row['post_id'],
 					'Title'         => $post ? mb_substr( $post->post_title, 0, 45 ) : '(deleted)',
@@ -145,11 +145,11 @@ class CheckMalformedDatesCommand {
 			$table_data = array();
 			foreach ( $block_placeholders as $item ) {
 				$table_data[] = array(
-					'ID'       => $item['id'],
-					'Title'    => mb_substr( $item['title'], 0, 45 ),
-					'Status'   => $item['status'],
+					'ID'        => $item['id'],
+					'Title'     => mb_substr( $item['title'], 0, 45 ),
+					'Status'    => $item['status'],
 					'StartDate' => $item['start_date'],
-					'EndDate'  => $item['end_date'],
+					'EndDate'   => $item['end_date'],
 				);
 			}
 

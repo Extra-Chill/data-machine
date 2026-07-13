@@ -137,7 +137,7 @@ class WebflowExtractor extends BaseExtractor {
 	private function findTitle( string $html ): string {
 		// Try headings first.
 		if ( preg_match( '/<h[1-4][^>]*>(.*?)<\/h[1-4]>/si', $html, $m ) ) {
-			$text = strip_tags( $m[1] );
+			$text = wp_strip_all_tags( $m[1] );
 			if ( strlen( trim( $text ) ) >= 2 ) {
 				return trim( $text );
 			}
@@ -227,12 +227,29 @@ class WebflowExtractor extends BaseExtractor {
 		}
 
 		$month_map = array(
-			'jan' => 1, 'january' => 1, 'feb' => 2, 'february' => 2,
-			'mar' => 3, 'march' => 3, 'apr' => 4, 'april' => 4,
-			'may' => 5, 'jun' => 6, 'june' => 6, 'jul' => 7, 'july' => 7,
-			'aug' => 8, 'august' => 8, 'sep' => 9, 'september' => 9,
-			'oct' => 10, 'october' => 10, 'nov' => 11, 'november' => 11,
-			'dec' => 12, 'december' => 12,
+			'jan'       => 1,
+			'january'   => 1,
+			'feb'       => 2,
+			'february'  => 2,
+			'mar'       => 3,
+			'march'     => 3,
+			'apr'       => 4,
+			'april'     => 4,
+			'may'       => 5,
+			'jun'       => 6,
+			'june'      => 6,
+			'jul'       => 7,
+			'july'      => 7,
+			'aug'       => 8,
+			'august'    => 8,
+			'sep'       => 9,
+			'september' => 9,
+			'oct'       => 10,
+			'october'   => 10,
+			'nov'       => 11,
+			'november'  => 11,
+			'dec'       => 12,
+			'december'  => 12,
 		);
 
 		$month = $month_map[ strtolower( $month_str ) ] ?? 0;

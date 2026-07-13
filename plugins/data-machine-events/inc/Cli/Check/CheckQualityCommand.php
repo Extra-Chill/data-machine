@@ -102,10 +102,22 @@ class CheckQualityCommand {
 		\WP_CLI::log( '' );
 
 		$rows = array(
-			array( 'Category' => 'Missing Start Date', 'Count' => $result['missing_start_date']['count'] ?? 0 ),
-			array( 'Category' => 'Missing Start Time', 'Count' => $result['missing_start_time']['count'] ?? 0 ),
-			array( 'Category' => 'Missing Venue', 'Count' => $result['missing_venue']['count'] ?? 0 ),
-			array( 'Category' => 'Probable Duplicates', 'Count' => $result['probable_duplicates']['count'] ?? 0 ),
+			array(
+				'Category' => 'Missing Start Date',
+				'Count'    => $result['missing_start_date']['count'] ?? 0,
+			),
+			array(
+				'Category' => 'Missing Start Time',
+				'Count'    => $result['missing_start_time']['count'] ?? 0,
+			),
+			array(
+				'Category' => 'Missing Venue',
+				'Count'    => $result['missing_venue']['count'] ?? 0,
+			),
+			array(
+				'Category' => 'Probable Duplicates',
+				'Count'    => $result['probable_duplicates']['count'] ?? 0,
+			),
 		);
 
 		\WP_CLI\Utils\format_items( 'table', $rows, array( 'Category', 'Count' ) );

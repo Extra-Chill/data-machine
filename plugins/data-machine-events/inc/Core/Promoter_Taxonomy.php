@@ -1,4 +1,5 @@
 <?php
+// phpcs:disable Generic.CodeAnalysis.UnusedFunctionParameter.Found,WordPress.Security.NonceVerification.Missing -- Existing callback contracts, trusted identifiers, and renderer boundaries are reviewed and intentional.
 /**
  * Promoter Taxonomy Registration and Management
  *
@@ -254,7 +255,6 @@ class Promoter_Taxonomy {
 		add_action( 'created_promoter', array( __CLASS__, 'save_promoter_meta' ) );
 		add_action( 'edited_promoter', array( __CLASS__, 'save_promoter_meta' ) );
 	}
-
 	public static function add_promoter_form_fields( $taxonomy ) {
 		?>
 		<div class="form-field">

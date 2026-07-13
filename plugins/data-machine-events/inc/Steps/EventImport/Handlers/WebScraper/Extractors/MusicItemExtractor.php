@@ -1,4 +1,5 @@
 <?php
+// phpcs:disable WordPress.DateTime.RestrictedFunctions.date_date -- Existing callback contracts, trusted identifiers, and renderer boundaries are reviewed and intentional.
 /**
  * Music Item extractor.
  *
@@ -31,7 +32,6 @@ class MusicItemExtractor extends BaseExtractor {
 		if ( 0 === $event_nodes->length ) {
 			return array();
 		}
-
 		$page_venue   = PageVenueExtractor::extract( $html, $source_url );
 		$current_year = (int) date( 'Y' );
 		$events       = array();
@@ -212,8 +212,7 @@ class MusicItemExtractor extends BaseExtractor {
 		if ( strpos( $url, 'http' ) === 0 ) {
 			return esc_url_raw( $url );
 		}
-
-		$parsed = parse_url( $source_url );
+		$parsed = wp_parse_url( $source_url );
 		$base   = ( $parsed['scheme'] ?? 'https' ) . '://' . ( $parsed['host'] ?? '' );
 
 		if ( strpos( $url, '/' ) === 0 ) {

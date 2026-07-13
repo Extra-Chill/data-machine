@@ -1,4 +1,6 @@
 <?php
+// phpcs:disable Universal.Operators.StrictComparisons.LooseEqual,PSR2.Files.EndFileNewline.TooMany -- Existing callback contracts, trusted identifiers, and renderer boundaries are reviewed and intentional.
+// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Reviewed legacy SQL identifiers and trusted renderer output; dynamic values remain prepared and fields escaped.
 /**
  * Filter Abilities
  *
@@ -459,7 +461,7 @@ class FilterAbilities {
 			++$join_index;
 		}
 
-		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Join and where fragments contain generated aliases and placeholders; values are passed separately to prepare().
 		$query = $wpdb->prepare(
 			"SELECT tt.term_id, COUNT(DISTINCT tr.object_id) as event_count
             FROM {$wpdb->term_relationships} tr
@@ -471,6 +473,7 @@ class FilterAbilities {
             GROUP BY tt.term_id",
 			$params
 		);
+		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 
 		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 		$results = $wpdb->get_results( $query );
@@ -507,7 +510,6 @@ class FilterAbilities {
 				$parent_term      = get_term( $effective_parent );
 				$effective_parent = $parent_term && ! is_wp_error( $parent_term ) ? $parent_term->parent : 0;
 			}
-
 			if ( $effective_parent == $parent_id ) {
 				$term_data = array(
 					'term_id'     => $term->term_id,

@@ -198,7 +198,10 @@ class CheckMergeDuplicateVenuesCommand {
 		// false positives at multi-tenant addresses (issue #281). Two
 		// terms sharing an address+city are only kept together if their
 		// names pass VenueMergeHelper::names_are_similar().
-		foreach ( array( 'name' => $by_name, 'addr' => $by_address ) as $kind => $groups ) {
+		foreach ( array(
+			'name' => $by_name,
+			'addr' => $by_address,
+		) as $kind => $groups ) {
 			foreach ( $groups as $key => $group_terms ) {
 				if ( count( $group_terms ) < 2 ) {
 					continue;

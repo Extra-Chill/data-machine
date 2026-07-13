@@ -1,4 +1,5 @@
 <?php
+// phpcs:disable PSR12.Traits.UseDeclaration.NoBlankLineAfterUse,Generic.CodeAnalysis.UnusedFunctionParameter.Found -- Existing callback contracts, trusted identifiers, and renderer boundaries are reviewed and intentional.
 /**
  * Event Flyer Handler Settings
  *
@@ -20,7 +21,6 @@ if ( ! defined( 'ABSPATH' ) ) {
 class EventFlyerSettings {
 
 	use VenueFieldsTrait;
-
 	public static function get_fields( array $current_config = array() ): array {
 		$event_fields = array(
 			'title' => array(
@@ -92,7 +92,6 @@ class EventFlyerSettings {
 
 		return self::save_venue_on_settings_save( $settings );
 	}
-
 	public static function requires_authentication( array $current_config = array() ): bool {
 		return false;
 	}

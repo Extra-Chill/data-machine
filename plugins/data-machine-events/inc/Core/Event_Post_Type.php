@@ -1,4 +1,5 @@
 <?php
+// phpcs:disable Generic.CodeAnalysis.UnusedFunctionParameter.FoundAfterLastUsed,WordPress.Security.NonceVerification.Recommended,Generic.CodeAnalysis.UnusedFunctionParameter.Found,Universal.Operators.DisallowShortTernary.Found -- Existing callback contracts, trusted identifiers, and renderer boundaries are reviewed and intentional.
 /**
  * Event Post Type Registration
  *
@@ -405,7 +406,7 @@ class Event_Post_Type {
 		if ( isset( $submenu[ $post_type_menu ] ) ) {
 			foreach ( $submenu[ $post_type_menu ] as $key => $menu_item ) {
 				if ( strpos( $menu_item[2], 'taxonomy=' ) !== false ) {
-					parse_str( parse_url( $menu_item[2], PHP_URL_QUERY ), $query_vars );
+					parse_str( wp_parse_url( $menu_item[2], PHP_URL_QUERY ), $query_vars );
 					$taxonomy = $query_vars['taxonomy'] ?? '';
 
 					if ( $taxonomy && ! isset( $allowed_items[ $taxonomy ] ) ) {

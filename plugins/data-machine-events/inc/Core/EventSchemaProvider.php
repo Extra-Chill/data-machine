@@ -10,8 +10,6 @@
 
 namespace DataMachineEvents\Core;
 
-
-
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }

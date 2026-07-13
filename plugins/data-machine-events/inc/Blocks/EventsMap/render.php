@@ -145,8 +145,8 @@ $collapsible       = (bool) ( $attributes['collapsible'] ?? false );
 $default_collapsed = $collapsible && (bool) ( $attributes['defaultCollapsed'] ?? false );
 
 // IDs + accessible labels for the toggle <-> region relationship.
-$region_id = $map_id . '-region';
-$toggle_id = $map_id . '-toggle';
+$region_id  = $map_id . '-region';
+$toggle_id  = $map_id . '-toggle';
 $show_label = __( 'Show map', 'data-machine-events' );
 $hide_label = __( 'Hide map', 'data-machine-events' );
 
@@ -176,7 +176,7 @@ $hide_label = __( 'Hide map', 'data-machine-events' );
 		data-collapsible="1"
 		data-toggle-id="<?php echo esc_attr( $toggle_id ); ?>"
 		data-region-id="<?php echo esc_attr( $region_id ); ?>"
-		<?php if ( $default_collapsed ) : ?>
+			<?php if ( $default_collapsed ) : ?>
 		data-default-collapsed="1"
 		<?php endif; ?>
 		<?php endif; ?>

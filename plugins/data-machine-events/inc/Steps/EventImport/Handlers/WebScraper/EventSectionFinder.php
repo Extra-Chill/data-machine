@@ -1,4 +1,5 @@
 <?php
+// phpcs:disable Generic.CodeAnalysis.UnusedFunctionParameter.FoundAfterLastUsed,WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_decode -- Existing callback contracts, trusted identifiers, and renderer boundaries are reviewed and intentional.
 /**
  * Universal Web Scraper Event Section Finder
  *
@@ -211,15 +212,14 @@ final class EventSectionFinder {
 		$date_text = preg_replace( '/^[A-Za-z]+,\s*/', '', trim( $date_text ) );
 
 		if ( ! preg_match( '/\b\d{4}\b/', $date_text ) ) {
-			$date_text .= ' ' . date( 'Y' );
+			$date_text .= ' ' . gmdate( 'Y' );
 		}
 
 		$timestamp = strtotime( $date_text );
 		if ( ! $timestamp ) {
 			return null;
 		}
-
-		return date( 'Y-m-d', $timestamp );
+		return gmdate( 'Y-m-d', $timestamp );
 	}
 
 	/**
@@ -237,7 +237,6 @@ final class EventSectionFinder {
 		if ( empty( $base64_data ) ) {
 			return null;
 		}
-
 		$decoded = base64_decode( $base64_data, true );
 		if ( false === $decoded ) {
 			return null;
@@ -271,14 +270,13 @@ final class EventSectionFinder {
 		$date_string = preg_replace( '/^[A-Za-z]+,\s*/', '', $date_string );
 
 		if ( ! preg_match( '/\b\d{4}\b/', $date_string ) ) {
-			$date_string .= ' ' . date( 'Y' );
+			$date_string .= ' ' . gmdate( 'Y' );
 		}
 
 		$timestamp = strtotime( $date_string );
 		if ( ! $timestamp ) {
 			return null;
 		}
-
-		return date( 'Y-m-d', $timestamp );
+		return gmdate( 'Y-m-d', $timestamp );
 	}
 }

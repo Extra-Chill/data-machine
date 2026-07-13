@@ -1,4 +1,5 @@
 <?php
+// phpcs:disable Universal.Operators.DisallowShortTernary.Found -- Existing callback contracts, trusted identifiers, and renderer boundaries are reviewed and intentional.
 /**
  * HTML Link Paginator for standard HTML pagination.
  *

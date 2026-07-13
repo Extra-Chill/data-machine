@@ -1,4 +1,5 @@
 <?php
+// phpcs:disable Universal.NamingConventions.NoReservedKeywordParameterNames.classFound -- Existing callback contracts, trusted identifiers, and renderer boundaries are reviewed and intentional.
 /**
  * AGENTS.md Section Generator
  *

@@ -206,17 +206,17 @@ class Ticketmaster extends EventImportHandler {
 
 				$standardized_event = $this->map_ticketmaster_event( $raw_event );
 
-			if ( empty( $standardized_event['title'] ) ) {
-				continue;
-			}
+				if ( empty( $standardized_event['title'] ) ) {
+					continue;
+				}
 
-			if ( $this->is_junk_payload( $raw_event, $standardized_event, $context ) ) {
-				continue;
-			}
+				if ( $this->is_junk_payload( $raw_event, $standardized_event, $context ) ) {
+					continue;
+				}
 
-			if ( $this->shouldSkipEventTitle( $standardized_event['title'] ) ) {
-				continue;
-			}
+				if ( $this->shouldSkipEventTitle( $standardized_event['title'] ) ) {
+					continue;
+				}
 
 				$search_text = $standardized_event['title'] . ' ' . ( $standardized_event['description'] ?? '' );
 

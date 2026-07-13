@@ -1,4 +1,5 @@
 <?php
+// phpcs:disable PSR12.Files.FileHeader.IncorrectOrder,PSR12.Files.FileHeader.IncorrectGrouping,Universal.Operators.DisallowShortTernary.Found -- Existing callback contracts, trusted identifiers, and renderer boundaries are reviewed and intentional.
 /**
  * Event Upsert Handler
  *

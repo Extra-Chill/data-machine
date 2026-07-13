@@ -79,7 +79,7 @@ class FirebaseExtractor extends BaseExtractor {
 		// 2. Look for local script tags and sniff them
 		if ( preg_match_all( '/<script[^>]+src=["\']([^"\']+\.js[^"\']*)["\']/', $html, $matches ) ) {
 			$base_url      = rtrim( dirname( $source_url ), '/' ) . '/';
-			$parsed_source = parse_url( $source_url );
+			$parsed_source = wp_parse_url( $source_url );
 			$host_url      = ( $parsed_source['scheme'] ?? 'https' ) . '://' . ( $parsed_source['host'] ?? '' );
 
 			foreach ( $matches[1] as $script_src ) {

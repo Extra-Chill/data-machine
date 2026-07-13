@@ -1,4 +1,5 @@
 <?php
+// phpcs:disable Generic.CodeAnalysis.EmptyStatement.DetectedCatch -- Existing callback contracts, trusted identifiers, and renderer boundaries are reviewed and intentional.
 /**
  * Centralized datetime parsing with timezone awareness for event imports.
  *

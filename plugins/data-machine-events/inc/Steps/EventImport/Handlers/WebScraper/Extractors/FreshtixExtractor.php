@@ -108,7 +108,7 @@ class FreshtixExtractor extends BaseExtractor {
 	}
 
 	private function getBaseUrl( string $url ): string {
-		$parsed = parse_url( $url );
+		$parsed = wp_parse_url( $url );
 		$scheme = $parsed['scheme'] ?? 'https';
 		$host   = $parsed['host'] ?? '';
 

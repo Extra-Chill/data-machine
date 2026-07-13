@@ -340,11 +340,17 @@ GRAPHQL;
 
 		$start_parsed = ! empty( $utc_starts )
 			? $this->parseUtcDatetime( $utc_starts, $timezone )
-			: array( 'date' => '', 'time' => '' );
+			: array(
+				'date' => '',
+				'time' => '',
+			);
 
 		$end_parsed = ! empty( $utc_ends )
 			? $this->parseUtcDatetime( $utc_ends, $timezone )
-			: array( 'date' => '', 'time' => '' );
+			: array(
+				'date' => '',
+				'time' => '',
+			);
 
 		// Venue — often secret/unlisted for Sofar shows.
 		$venue_name    = $this->sanitizeText( $event['venue']['venueName'] ?? '' );

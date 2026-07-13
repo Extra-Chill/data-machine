@@ -34,7 +34,7 @@ class DateFilter {
 	 * Apply "upcoming" date filter via posts_clauses.
 	 *
 	 * Adds a JOIN on the event_dates table and a WHERE clause that selects
- 	 * events whose start_datetime >= $datetime OR end_datetime >= $datetime.
+	 * events whose start_datetime >= $datetime OR end_datetime >= $datetime.
 	 * Delegates to UpcomingFilter for the WHERE clause.
 	 *
 	 * @param string $datetime MySQL datetime to compare against.

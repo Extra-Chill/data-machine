@@ -287,7 +287,6 @@ class EventUpdateAbilities {
 			);
 		}
 
-
 		$existing_attrs = $blocks[ $block_index ]['attrs'] ?? array();
 		$new_attrs      = $this->buildUpdatedAttributes( $existing_attrs, $event_update, $updated_fields );
 

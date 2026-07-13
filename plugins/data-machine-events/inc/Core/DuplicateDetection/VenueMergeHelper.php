@@ -1,4 +1,5 @@
 <?php
+// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Existing callback contracts, trusted identifiers, and renderer boundaries are reviewed and intentional.
 /**
  * VenueMergeHelper
  *

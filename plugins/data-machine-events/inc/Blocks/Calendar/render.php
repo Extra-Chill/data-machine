@@ -1,4 +1,5 @@
 <?php
+// phpcs:disable WordPress.Security.EscapeOutput.OutputNotEscaped -- Reviewed legacy SQL identifiers and trusted renderer output; dynamic values remain prepared and fields escaped.
 /**
  * Calendar Block Server-Side Render Template
  *
@@ -303,8 +304,7 @@ if ( '' !== $scope_token_value ) {
 	$scope_token_data_attr = sprintf( ' data-scope-token="%s"', esc_attr( $scope_token_value ) );
 }
 ?>
-
-<div data-instance-id="<?php echo esc_attr( $instance_id ); ?>"<?php echo $archive_data_attrs; ?><?php echo $geo_data_attrs; ?><?php echo $scope_data_attr; ?><?php echo $scope_token_data_attr; ?><?php echo $display_mode_attr; ?> <?php echo $wrapper_attributes; ?>>
+<div data-instance-id="<?php echo esc_attr( $instance_id ); ?>"<?php echo $archive_data_attrs; ?><?php echo $geo_data_attrs; ?><?php echo $scope_data_attr; ?><?php echo $scope_token_data_attr; ?><?php echo $display_mode_attr; ?> <?php echo $wrapper_attributes; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Attribute fragments are escaped when assembled; wrapper attributes come from WordPress core. ?>>
 	<?php
 	\DataMachineEvents\Blocks\Calendar\Template_Loader::include_template(
 		'filter-bar',

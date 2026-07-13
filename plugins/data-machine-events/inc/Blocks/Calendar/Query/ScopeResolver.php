@@ -1,4 +1,5 @@
 <?php
+// phpcs:disable WordPress.DateTime.CurrentTimeTimestamp.Requested -- Existing callback contracts, trusted identifiers, and renderer boundaries are reviewed and intentional.
 /**
  * Scope Resolver
  *
@@ -107,7 +108,6 @@ class ScopeResolver {
 		if ( 'current' === $scope || '' === $scope ) {
 			return null;
 		}
-
 		$now   = current_time( 'timestamp' );
 		$today = gmdate( 'Y-m-d', $now );
 

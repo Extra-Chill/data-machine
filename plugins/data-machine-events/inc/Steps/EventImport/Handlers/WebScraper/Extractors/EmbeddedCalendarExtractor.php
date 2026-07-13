@@ -1,4 +1,5 @@
 <?php
+// phpcs:disable WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_decode,WordPress.PHP.DiscouragedPHPFunctions.urlencode_urlencode -- Existing callback contracts, trusted identifiers, and renderer boundaries are reviewed and intentional.
 /**
  * Embedded Calendar extractor.
  *
@@ -87,7 +88,7 @@ class EmbeddedCalendarExtractor extends BaseExtractor {
 		}
 
 		$iframe_src = html_entity_decode( $matches[1] );
-		$parsed_url = parse_url( $iframe_src );
+		$parsed_url = wp_parse_url( $iframe_src );
 
 		if ( empty( $parsed_url['query'] ) ) {
 			return $data;

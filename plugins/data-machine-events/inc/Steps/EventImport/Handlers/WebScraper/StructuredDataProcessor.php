@@ -207,6 +207,4 @@ class StructuredDataProcessor {
 			}
 		}
 	}
-
-
 }

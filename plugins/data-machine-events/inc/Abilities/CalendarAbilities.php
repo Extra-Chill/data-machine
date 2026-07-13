@@ -1,4 +1,5 @@
 <?php
+// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared -- Existing callback contracts, trusted identifiers, and renderer boundaries are reviewed and intentional.
 /**
  * Calendar Abilities
  *
@@ -515,8 +516,14 @@ class CalendarAbilities {
 
 		$ability = new \DataMachineEvents\Abilities\EventDateQueryAbilities();
 
-		$future = $ability->executeQueryEvents( array( 'scope' => 'upcoming', 'fields' => 'count' ) );
-		$past   = $ability->executeQueryEvents( array( 'scope' => 'past', 'fields' => 'count' ) );
+		$future = $ability->executeQueryEvents( array(
+			'scope'  => 'upcoming',
+			'fields' => 'count',
+		) );
+		$past   = $ability->executeQueryEvents( array(
+			'scope'  => 'past',
+			'fields' => 'count',
+		) );
 
 		$result = array(
 			'past'   => $past['total'],

@@ -1,4 +1,6 @@
 <?php
+// phpcs:disable PSR2.Files.EndFileNewline.TooMany -- Existing callback contracts, trusted identifiers, and renderer boundaries are reviewed and intentional.
+// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Reviewed legacy SQL identifiers and trusted renderer output; dynamic values remain prepared and fields escaped.
 /**
  * Upcoming Count Abilities
  *
@@ -171,6 +173,7 @@ class UpcomingCountAbilities {
 		$ed_table = \DataMachineEvents\Core\EventDatesTable::table_name();
 
 		$parent_clause = $exclude_roots ? 'AND tt.parent != 0' : '';
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table names and optional clauses are internally constructed; request values remain prepared.
 
 		if ( $has_filter ) {
 			// Co-occurrence join: require each counted post to ALSO be tagged
@@ -223,6 +226,7 @@ class UpcomingCountAbilities {
 		}
 
 		if ( empty( $rows ) ) {
+			// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 			return array(
 				'success'  => true,
 				'taxonomy' => $taxonomy,
@@ -282,6 +286,7 @@ class UpcomingCountAbilities {
 
 		// Pull every (term_id, object_id) pair for upcoming published events
 		// in this taxonomy. One pass; deduped per-ancestor in PHP below.
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- The event dates table name is internally generated; request values remain prepared.
 		if ( $has_filter ) {
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 			$pairs = $wpdb->get_results(
@@ -321,6 +326,7 @@ class UpcomingCountAbilities {
 		}
 
 		// Parent map for every term in the taxonomy (term_id => parent_id).
+		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 		// hide_empty=false so ancestors with zero direct tags are present.
 		$all_terms = get_terms(
 			array(

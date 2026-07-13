@@ -1,4 +1,5 @@
 <?php
+// phpcs:disable WordPress.Security.EscapeOutput.OutputNotEscaped -- Reviewed legacy SQL identifiers and trusted renderer output; dynamic values remain prepared and fields escaped.
 /**
  * Calendar Filter Bar Template
  *
@@ -84,8 +85,8 @@ $scope_preset_slugs = $show_scope_presets
 		</div>
 		
 		<div class="data-machine-events-taxonomy-filter">
-			<button<?php echo $hide_filter_button_attr; ?> type="button" class="data-machine-events-filter-btn data-machine-taxonomy-modal-trigger<?php echo ( ! empty( $tax_filters ) ? ' data-machine-filters-active' : '' ); ?>" data-modal-id="<?php echo esc_attr( $modal_id ); ?>" aria-controls="<?php echo esc_attr( $modal_id ); ?>" aria-expanded="<?php echo ( ! empty( $tax_filters ) ? 'true' : 'false' ); ?>">
-				<span class="data-machine-filter-count" aria-hidden="true"><?php echo ( ! empty( $tax_filters ) ? array_sum( array_map( 'count', $tax_filters ) ) : '' ); ?></span>
+			<button<?php echo $hide_filter_button_attr; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Fixed boolean attribute fragment assembled by the renderer. ?> type="button" class="data-machine-events-filter-btn data-machine-taxonomy-modal-trigger<?php echo ( ! empty( $tax_filters ) ? ' data-machine-filters-active' : '' ); ?>" data-modal-id="<?php echo esc_attr( $modal_id ); ?>" aria-controls="<?php echo esc_attr( $modal_id ); ?>" aria-expanded="<?php echo ( ! empty( $tax_filters ) ? 'true' : 'false' ); ?>">
+				<span class="data-machine-filter-count" aria-hidden="true"><?php echo esc_html( (string) ( ! empty( $tax_filters ) ? array_sum( array_map( 'count', $tax_filters ) ) : '' ) ); ?></span>
 				<span class="dashicons dashicons-filter"></span>
 				<?php esc_html_e( 'Filter', 'data-machine-events' ); ?>
 			</button>

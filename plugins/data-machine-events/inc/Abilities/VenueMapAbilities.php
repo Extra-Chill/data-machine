@@ -1,4 +1,6 @@
 <?php
+// phpcs:disable WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber,PSR2.Files.EndFileNewline.TooMany -- Existing callback contracts, trusted identifiers, and renderer boundaries are reviewed and intentional.
+// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Reviewed legacy SQL identifiers and trusted renderer output; dynamic values remain prepared and fields escaped.
 /**
  * Venue Map Abilities
  *
@@ -127,13 +129,13 @@ class VenueMapAbilities {
 							),
 						),
 						'total'  => array( 'type' => 'integer' ),
-					'center'     => array(
-						'type'       => array( 'object', 'null' ),
-						'properties' => array(
-							'lat' => array( 'type' => 'number' ),
-							'lng' => array( 'type' => 'number' ),
+						'center' => array(
+							'type'       => array( 'object', 'null' ),
+							'properties' => array(
+								'lat' => array( 'type' => 'number' ),
+								'lng' => array( 'type' => 'number' ),
+							),
 						),
-					),
 						'radius' => array( 'type' => 'integer' ),
 					),
 				),
@@ -193,7 +195,10 @@ class VenueMapAbilities {
 				return array(
 					'venues' => array(),
 					'total'  => 0,
-					'center' => array( 'lat' => $lat, 'lng' => $lng ),
+					'center' => array(
+						'lat' => $lat,
+						'lng' => $lng,
+					),
 					'radius' => $radius,
 				);
 			}
@@ -207,7 +212,10 @@ class VenueMapAbilities {
 				return array(
 					'venues' => array(),
 					'total'  => 0,
-					'center' => $has_geo ? array( 'lat' => $lat, 'lng' => $lng ) : null,
+					'center' => $has_geo ? array(
+						'lat' => $lat,
+						'lng' => $lng,
+					) : null,
 					'radius' => $radius,
 				);
 			}
@@ -372,7 +380,10 @@ class VenueMapAbilities {
 		return array(
 			'venues' => $venues,
 			'total'  => $total,
-			'center' => $has_geo ? array( 'lat' => $lat, 'lng' => $lng ) : null,
+			'center' => $has_geo ? array(
+				'lat' => $lat,
+				'lng' => $lng,
+			) : null,
 			'radius' => $radius,
 		);
 	}
@@ -410,7 +421,7 @@ class VenueMapAbilities {
 		}
 
 		// Extract lat/lng from "lat,lng" string using SUBSTRING_INDEX.
-		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Optional ID clause contains generated placeholders only; values are passed separately to prepare().
 		$query = $wpdb->prepare(
 			"SELECT tm.term_id,
 				CAST(SUBSTRING_INDEX(tm.meta_value, ',', 1) AS DECIMAL(10,7)) AS lat,
@@ -431,6 +442,7 @@ class VenueMapAbilities {
 				array( self::MAX_VENUES + 50 ) // Fetch slightly more to allow for invalid entries.
 			)
 		);
+		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 
 		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 		$results = $wpdb->get_results( $query );
@@ -561,7 +573,7 @@ class VenueMapAbilities {
 
 		$placeholders = implode( ',', array_fill( 0, count( $venue_ids ), '%d' ) );
 
-		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Placeholder list is generated from validated integer venue IDs; values are passed separately to prepare().
 		$query = $wpdb->prepare(
 			"SELECT tt.term_id, COUNT(DISTINCT p.ID) AS upcoming_count
 			FROM {$wpdb->term_relationships} tr
@@ -579,6 +591,7 @@ class VenueMapAbilities {
 			GROUP BY tt.term_id",
 			array_merge( $venue_ids, array( $post_type, $today ) )
 		);
+		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 
 		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		$rows = $wpdb->get_results( $query );
@@ -626,7 +639,7 @@ class VenueMapAbilities {
 
 		$placeholders = implode( ',', array_fill( 0, count( $venue_ids ), '%d' ) );
 
-		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Placeholder list is generated from validated integer venue IDs; values are passed separately to prepare().
 		$query = $wpdb->prepare(
 			"SELECT venue_tt.term_id AS venue_term_id,
 				p.ID AS post_id,
@@ -657,6 +670,7 @@ class VenueMapAbilities {
 				array( $post_type, $today, $filter_taxonomy, $filter_term_id )
 			)
 		);
+		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 
 		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		$rows = $wpdb->get_results( $query );

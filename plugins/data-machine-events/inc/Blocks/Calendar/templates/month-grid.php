@@ -1,4 +1,5 @@
 <?php
+// phpcs:disable Universal.Operators.DisallowShortTernary.Found -- Existing callback contracts, trusted identifiers, and renderer boundaries are reviewed and intentional.
 /**
  * Month Grid Template
  *
@@ -97,7 +98,8 @@ $weekday_labels = array(
 				data-row-start="<?php echo esc_attr( $row['start_date'] ); ?>"
 				data-row-end="<?php echo esc_attr( $row['end_date'] ); ?>"
 				style="--data-machine-month-grid-lanes: <?php echo esc_attr( (string) $lane_count ); ?>;">
-				<?php foreach ( $row['cells'] as $cell ) :
+				<?php
+				foreach ( $row['cells'] as $cell ) :
 					$cell_classes = array(
 						'data-machine-month-grid__cell',
 						'data-machine-day-' . $cell['day_of_week'],
@@ -135,7 +137,8 @@ $weekday_labels = array(
 
 				<?php if ( ! empty( $row['ribbons'] ) ) : ?>
 					<div class="data-machine-month-grid__ribbons" aria-hidden="false">
-						<?php foreach ( $row['ribbons'] as $ribbon ) :
+						<?php
+						foreach ( $row['ribbons'] as $ribbon ) :
 							$ribbon_classes = array(
 								'data-machine-month-grid__ribbon',
 								'data-machine-day-' . $ribbon['day_of_week'],

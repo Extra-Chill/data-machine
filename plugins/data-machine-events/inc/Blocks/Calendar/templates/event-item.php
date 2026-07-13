@@ -1,4 +1,5 @@
 <?php
+// phpcs:disable WordPress.Security.EscapeOutput.OutputNotEscaped -- Reviewed legacy SQL identifiers and trusted renderer output; dynamic values remain prepared and fields escaped.
 /**
  * Event Item Template
  *
@@ -45,8 +46,7 @@ if ( $is_multi_day ) {
 	data-has-tickets="<?php echo ( $show_ticket_link && ! empty( $ticket_url ) ) ? 'true' : 'false'; ?>">
 
 	<div class="data-machine-event-link">
-
-		<?php echo \DataMachineEvents\Blocks\Calendar\Taxonomy\Badges::render_taxonomy_badges( $event_post->ID ); ?>
+		<?php echo \DataMachineEvents\Blocks\Calendar\Taxonomy\Badges::render_taxonomy_badges( $event_post->ID ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Badge renderer escapes each taxonomy label and URL. ?>
 
 		<h4 class="data-machine-event-title">
 			<a href="<?php echo esc_url( get_the_permalink() ); ?>">

@@ -90,8 +90,8 @@ class DoStuffExtractor extends BaseExtractor {
 			$start_datetime = strtotime( $raw_event['begin_time'] );
 
 			if ( $start_datetime ) {
-				$event['startDate'] = date( 'Y-m-d', $start_datetime );
-				$event['startTime'] = date( 'H:i', $start_datetime );
+				$event['startDate'] = gmdate( 'Y-m-d', $start_datetime );
+				$event['startTime'] = gmdate( 'H:i', $start_datetime );
 			}
 		}
 
@@ -99,8 +99,8 @@ class DoStuffExtractor extends BaseExtractor {
 			$end_datetime = strtotime( $raw_event['end_time'] );
 
 			if ( $end_datetime ) {
-				$event['endDate'] = date( 'Y-m-d', $end_datetime );
-				$event['endTime'] = date( 'H:i', $end_datetime );
+				$event['endDate'] = gmdate( 'Y-m-d', $end_datetime );
+				$event['endTime'] = gmdate( 'H:i', $end_datetime );
 			}
 		}
 	}

@@ -408,7 +408,8 @@ class WeeblyExtractor extends BaseExtractor {
 		$artists    = array();
 		$first_time = '';
 
-		for ( $i = 1; $i < count( $lines ); $i++ ) {
+		$lines_count = count( $lines );
+		for ( $i = 1; $i < $lines_count; $i++ ) {
 			$line = $lines[ $i ];
 
 			// Skip lines that are only a URL (artist links on separate lines).
@@ -446,7 +447,7 @@ class WeeblyExtractor extends BaseExtractor {
 		if ( ! empty( $artists ) ) {
 			// Use a generic title derived from the series name, or first artist.
 			$series_name    = $this->extractSeriesName( $lines[0] );
-			$event['title'] = $series_name ?: $artists[0]['name'];
+			$event['title'] = $series_name ? $series_name : $artists[0]['name'];
 
 			// Build description with time+artist lineup.
 			$lineup = array();

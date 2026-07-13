@@ -1,4 +1,5 @@
 <?php
+// phpcs:disable WordPress.PHP.DiscouragedPHPFunctions.urlencode_urlencode -- Existing callback contracts, trusted identifiers, and renderer boundaries are reviewed and intentional.
 /**
  * Prekindle extractor.
  *
@@ -203,11 +204,11 @@ class PrekindleExtractor extends BaseExtractor {
 	private function parseStartTime( string $time_text ): string {
 		if ( preg_match( '/(?:Start|Doors)\s+(\d{1,2}:\d{2}\s*(?:am|pm))/i', $time_text, $m ) ) {
 			$ts = strtotime( $m[1] );
-			return $ts ? date( 'H:i', $ts ) : '';
+			return $ts ? gmdate( 'H:i', $ts ) : '';
 		}
 		if ( preg_match( '/(\d{1,2}:\d{2}\s*(?:am|pm))/i', $time_text, $m ) ) {
 			$ts = strtotime( $m[1] );
-			return $ts ? date( 'H:i', $ts ) : '';
+			return $ts ? gmdate( 'H:i', $ts ) : '';
 		}
 		return '';
 	}

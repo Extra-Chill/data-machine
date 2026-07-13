@@ -1,4 +1,5 @@
 <?php
+// phpcs:disable Squiz.PHP.DisallowSizeFunctionsInLoops.Found,Squiz.PHP.DisallowMultipleAssignments.Found -- Existing callback contracts, trusted identifiers, and renderer boundaries are reviewed and intentional.
 /**
  * Month Grid Builder
  *

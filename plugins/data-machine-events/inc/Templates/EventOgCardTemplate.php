@@ -144,8 +144,8 @@ class EventOgCardTemplate implements TemplateInterface {
 		$brand_path   = $fonts['brand'] ?? '';
 
 		$renderer->register_font( 'header', is_string( $heading_path ) && $heading_path ? $heading_path : 'Heading.ttf' );
-		$renderer->register_font( 'body',   is_string( $body_path )    && $body_path    ? $body_path    : 'Body.ttf' );
-		$renderer->register_font( 'brand',  is_string( $brand_path )   && $brand_path   ? $brand_path   : ( is_string( $heading_path ) && $heading_path ? $heading_path : 'Brand.ttf' ) );
+		$renderer->register_font( 'body', is_string( $body_path ) && $body_path ? $body_path : 'Body.ttf' );
+		$renderer->register_font( 'brand', is_string( $brand_path ) && $brand_path ? $brand_path : ( is_string( $heading_path ) && $heading_path ? $heading_path : 'Brand.ttf' ) );
 
 		$padding     = 64;
 		$content_max = $width - ( $padding * 2 );

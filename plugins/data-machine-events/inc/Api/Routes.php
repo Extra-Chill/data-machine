@@ -310,7 +310,6 @@ function register_routes() {
 			),
 		)
 	);
-
 }
 
 add_action( 'rest_api_init', __NAMESPACE__ . '\\register_routes' );

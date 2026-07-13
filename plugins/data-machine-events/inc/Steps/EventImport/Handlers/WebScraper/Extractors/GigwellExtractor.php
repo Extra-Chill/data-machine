@@ -88,7 +88,7 @@ class GigwellExtractor extends BaseExtractor {
 	 * @return array API response data or empty array
 	 */
 	private function fetchEvents( string $agency_id ): array {
-		$url = self::API_BASE . '?agencies=' . urlencode( $agency_id ) . '&limit=100&direction=ASC';
+		$url = self::API_BASE . '?agencies=' . rawurlencode( $agency_id ) . '&limit=100&direction=ASC';
 
 		$result = HttpClient::get(
 			$url,

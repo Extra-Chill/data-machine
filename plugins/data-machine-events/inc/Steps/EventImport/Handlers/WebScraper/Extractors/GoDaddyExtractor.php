@@ -104,9 +104,8 @@ class GoDaddyExtractor extends BaseExtractor {
 				'time' => '',
 			);
 		}
-
-		$date = date( 'Y-m-d', $timestamp );
-		$time = date( 'H:i', $timestamp );
+		$date = gmdate( 'Y-m-d', $timestamp );
+		$time = gmdate( 'H:i', $timestamp );
 
 		// If it doesn't contain 'T', it's likely an all-day event or date-only
 		if ( ! str_contains( $datetime, 'T' ) ) {

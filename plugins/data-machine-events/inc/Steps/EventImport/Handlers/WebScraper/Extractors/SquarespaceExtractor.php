@@ -661,7 +661,7 @@ class SquarespaceExtractor extends BaseExtractor {
 
 		// Get the collection URL by fetching the site's navigation/collections
 		// For now, try common event collection paths
-		$parsed   = parse_url( $source_url );
+		$parsed   = wp_parse_url( $source_url );
 		$base_url = ( $parsed['scheme'] ?? 'https' ) . '://' . ( $parsed['host'] ?? '' );
 
 		// Try common Squarespace event collection paths

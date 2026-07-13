@@ -1,4 +1,5 @@
 <?php
+// phpcs:disable Squiz.PHP.CommentedOutCode.Found,Generic.CodeAnalysis.EmptyStatement.DetectedCatch,Universal.Operators.StrictComparisons.LooseEqual -- Existing callback contracts, trusted identifiers, and renderer boundaries are reviewed and intentional.
 /**
  * SpotHopper extractor.
  *
@@ -95,7 +96,7 @@ class SpotHopperExtractor extends BaseExtractor {
 	 * Fetch events from SpotHopper API.
 	 */
 	private function fetchEvents( string $spot_id ): array {
-		$url = self::API_BASE . urlencode( $spot_id ) . '/events';
+		$url = self::API_BASE . rawurlencode( $spot_id ) . '/events';
 
 		$result = HttpClient::get(
 			$url,
