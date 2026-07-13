@@ -7,9 +7,9 @@
  *
  * Two kinds of assertions:
  *
- * 1. Source-string assertions — `data-machine.php` must call
- *    `ImageTemplateAbilities::ensure_registered()` UNCONDITIONALLY at
- *    file include time, NOT only inside the gated runtime function.
+ * 1. Source-string assertions — `data-machine.php` must declare
+ *    `ImageTemplateAbilities::ensure_registered()` in the lightweight
+ *    ability manifest registered at file include time.
  *
  * 2. Behavioral assertions — `ImageTemplateAbilities::ensure_registered()`
  *    must handle all three timing states defensively, matching the
@@ -50,22 +50,20 @@ if ( false === $bootstrap || false === $class_source ) {
 }
 
 $assert(
-	'data-machine.php calls ImageTemplateAbilities::ensure_registered() unconditionally at file load',
-	str_contains( $bootstrap, 'Register `datamachine/render-image-template` and' )
-		&& str_contains( $bootstrap, "require_once __DIR__ . '/inc/Abilities/Media/ImageTemplateAbilities.php';\n\\DataMachine\\Abilities\\Media\\ImageTemplateAbilities::ensure_registered();" )
+	'data-machine.php declares ImageTemplateAbilities::ensure_registered() in the lightweight manifest',
+	str_contains( $bootstrap, "'file'   => __DIR__ . '/inc/Abilities/Media/ImageTemplateAbilities.php'," )
+		&& str_contains( $bootstrap, "'class'  => \\DataMachine\\Abilities\\Media\\ImageTemplateAbilities::class," )
+		&& str_contains( $bootstrap, "'method' => 'ensure_registered'," )
 );
 
 $assert(
-	'unconditional call site is OUTSIDE datamachine_run_datamachine_plugin()',
-	// The image-template registration must sit at file scope, after the
-	// unconditional `AbilityCategories::ensure_registered()` call (which other
-	// unconditional ability registrations — e.g. AgentAbilities — may follow).
+	'lightweight manifest registration is unconditional at file load',
 	(bool) preg_match(
 		'/^\\\\DataMachine\\\\Abilities\\\\AbilityCategories::ensure_registered\(\);\s*\n/m',
 		$bootstrap
 	)
 		&& (bool) preg_match(
-			'/^\/\*\*\s*\n\s*\*\s*Register `datamachine\/render-image-template`/m',
+			'/^\\\\DataMachine\\\\Abilities\\\\AbilityManifest::register\( datamachine_lightweight_ability_manifest\(\) \);\s*$/m',
 			$bootstrap
 		)
 );
@@ -180,7 +178,9 @@ if ( ! function_exists( 'wp_register_ability' ) ) {
 	}
 }
 
-// Stub PermissionHelper which the ability definitions reference.
+// Load or stub every collaborator used while building ability definitions.
+require_once $plugin_root . '/inc/Abilities/AbilityRegistration.php';
+
 if ( ! class_exists( 'DataMachine\\Abilities\\PermissionHelper' ) ) {
 	eval(
 		'namespace DataMachine\\Abilities;
@@ -189,6 +189,16 @@ if ( ! class_exists( 'DataMachine\\Abilities\\PermissionHelper' ) ) {
 		}'
 	);
 }
+
+$assert(
+	'bootstrap loads AbilityRegistration used to build registration definitions',
+	class_exists( 'DataMachine\\Abilities\\AbilityRegistration', false )
+);
+
+$assert(
+	'bootstrap loads PermissionHelper referenced by registration definitions',
+	class_exists( 'DataMachine\\Abilities\\PermissionHelper', false )
+);
 
 require_once $plugin_root . '/inc/Abilities/Media/ImageTemplateAbilities.php';
 
@@ -214,6 +224,8 @@ $assert(
 	'state 1: when doing_action fires, abilities register immediately via wp_register_ability()',
 	isset( $GLOBALS['datamachine_2290_state']->registered['datamachine/render-image-template'] )
 		&& isset( $GLOBALS['datamachine_2290_state']->registered['datamachine/list-image-templates'] )
+		&& $GLOBALS['datamachine_2290_state']->registered['datamachine/render-image-template']['execute_callback'] instanceof Closure
+		&& $GLOBALS['datamachine_2290_state']->registered['datamachine/list-image-templates']['execute_callback'] instanceof Closure
 		&& empty( $GLOBALS['datamachine_2290_state']->hooked )
 );
 
