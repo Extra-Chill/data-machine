@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Data Machine Socials
  * Plugin URI: https://github.com/Extra-Chill/data-machine-socials
- * Description: Social media extension for Data Machine. Adds support for Instagram, TikTok, Twitter, Facebook, Bluesky, Mastodon, Threads, Pinterest, LinkedIn, Tumblr, and Reddit.
+ * Description: Social media extension for Data Machine. Adds support for Instagram, TikTok, YouTube, Twitter, Facebook, Bluesky, Mastodon, Threads, Pinterest, LinkedIn, Tumblr, and Reddit.
  * Version: 0.16.0
  * Requires at least: 6.9
  * Requires PHP: 8.2
@@ -136,6 +136,11 @@ function datamachine_socials_bootstrap() {
 	new \DataMachineSocials\Abilities\Reddit\SubmitRedditAbility();
 	new \DataMachineSocials\Abilities\Reddit\VoteRedditAbility();
 
+	// YouTube
+	new \DataMachineSocials\Abilities\YouTube\YouTubeUploadAbility();
+	new \DataMachineSocials\Abilities\YouTube\YouTubeSearchAbility();
+	new \DataMachineSocials\Abilities\YouTube\YouTubeAccountAbility();
+
 	// Tumblr
 	new \DataMachineSocials\Abilities\Tumblr\TumblrPublishAbility();
 	new \DataMachineSocials\Abilities\Tumblr\TumblrReadAbility();
@@ -157,6 +162,9 @@ function datamachine_socials_bootstrap() {
 
 	// Reddit (Fetch)
 	new \DataMachineSocials\Handlers\Reddit\Reddit();
+
+	// YouTube
+	new \DataMachineSocials\Handlers\YouTube\YouTube();
 
 	// Register task handlers for DM Task System.
 	add_filter( 'datamachine_tasks', function ( array $tasks ): array {
@@ -311,6 +319,8 @@ function datamachine_socials_load_chat_tools() {
 	new \DataMachineSocials\Chat\Tools\ReadPinterest();
 	new \DataMachineSocials\Chat\Tools\UpdatePinterest();
 	new \DataMachineSocials\Chat\Tools\UpdateThreads();
+	new \DataMachineSocials\Chat\Tools\PublishYouTube();
+	new \DataMachineSocials\Chat\Tools\SearchYouTube();
 
 	// LinkedIn chat tools
 	new \DataMachineSocials\Chat\Tools\PublishLinkedIn();
