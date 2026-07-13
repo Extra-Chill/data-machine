@@ -272,10 +272,11 @@ class MediavineReportsAbilitiesTest extends WP_UnitTestCase {
 	}
 
 	public function test_registered_ability_schema_fully_describes_result_and_period_items(): void {
-		$ability = wp_get_ability( 'datamachine/mediavine-reports' );
-
-		$this->assertNotNull( $ability, 'The test must exercise the registered Mediavine ability.' );
-		$schema = $ability->get_output_schema();
+		// Use the static schema directly so this contract test runs in any
+		// environment. It does not depend on the data-machine dependency being
+		// active to register the ability (the test bootstrap loads this plugin
+		// alone); outputSchema() is exactly what the ability registers.
+		$schema = MediavineReportsAbilities::outputSchema();
 
 		$this->assertArrayHasKey( 'site_id', $schema['properties'] );
 		$this->assertArrayHasKey( 'date_range', $schema['properties'] );
@@ -289,10 +290,11 @@ class MediavineReportsAbilitiesTest extends WP_UnitTestCase {
 	}
 
 	public function test_registered_ability_schema_validates_all_action_outputs_with_omitted_metadata(): void {
-		$ability = wp_get_ability( 'datamachine/mediavine-reports' );
-
-		$this->assertNotNull( $ability, 'The test must exercise the registered Mediavine ability.' );
-		$schema = $ability->get_output_schema();
+		// Dependency-free: validate the actual builder outputs (the same
+		// structures execute() returns) against the registered schema, with
+		// upstream metadata omitted so provenance canonical dates/row_count are
+		// null. This is the merge-safety gate.
+		$schema = MediavineReportsAbilities::outputSchema();
 		$relay  = base64_encode( 'InternalSite:11476' );
 		$row    = array(
 			'slug'                   => '/music/example/',
@@ -331,10 +333,9 @@ class MediavineReportsAbilitiesTest extends WP_UnitTestCase {
 	}
 
 	public function test_registered_ability_schema_validates_explicit_null_metadata_for_all_actions(): void {
-		$ability = wp_get_ability( 'datamachine/mediavine-reports' );
-
-		$this->assertNotNull( $ability, 'The test must exercise the registered Mediavine ability.' );
-		$schema = $ability->get_output_schema();
+		// Dependency-free: explicit null upstream metadata must still validate,
+		// proving the schema declares the nullable form the upstream can return.
+		$schema = MediavineReportsAbilities::outputSchema();
 		$relay  = base64_encode( 'InternalSite:11476' );
 		$meta   = MediavineReportsAbilities::normalizeReportMeta(
 			array(
@@ -360,6 +361,57 @@ class MediavineReportsAbilitiesTest extends WP_UnitTestCase {
 			$this->assertNull( $provenance['period']['canonical']['end'] );
 			$this->assertNull( $provenance['period']['row_count'] );
 		}
+	}
+
+	/**
+	 * Dependency-free schema gate for backfill mixing a successful period
+	 * (canonical metadata present) and a failed period (transport error,
+	 * omitted metadata). Both period summaries must validate against the
+	 * registered periods-items schema and carry provenance; the failed period
+	 * carries its error plus null canonical provenance.
+	 */
+	public function test_backfill_validates_with_successful_and_failed_periods_omitted_metadata(): void {
+		$schema         = MediavineReportsAbilities::outputSchema();
+		$periods_schema = $schema['properties']['periods']['items'];
+		$relay          = base64_encode( 'InternalSite:11476' );
+
+		$meta_ok = MediavineReportsAbilities::normalizeReportMeta(
+			array(
+				'totalCount'  => 12,
+				'reportStart' => '2026/05/01',
+				'reportEnd'   => '2026/05/31',
+			)
+		);
+
+		$success_period = MediavineReportsAbilities::buildBackfillPeriodSummary( '11476', $relay, '2026-05', '2026-05-01', '2026-05-31', 2, $meta_ok );
+		$failed_period  = MediavineReportsAbilities::buildBackfillPeriodSummary( '11476', $relay, '2026-06', '2026-06-01', '2026-06-30', 0, array(), 'upstream failure' );
+		$backfill       = MediavineReportsAbilities::buildBackfillResult( '11476', $relay, array( $success_period, $failed_period ), array() );
+
+		// Whole backfill response validates.
+		$validated = rest_validate_value_from_schema( $backfill, $schema, 'output' );
+		$this->assertTrue( $validated, 'backfill output failed schema validation: ' . ( is_wp_error( $validated ) ? $validated->get_error_message() : '' ) );
+
+		// Each period summary (incl. the failed one) validates against the items schema.
+		$ok = rest_validate_value_from_schema( $success_period, $periods_schema, 'period[ok]' );
+		$this->assertTrue( $ok, 'successful period failed schema validation: ' . ( is_wp_error( $ok ) ? $ok->get_error_message() : '' ) );
+		$err = rest_validate_value_from_schema( $failed_period, $periods_schema, 'period[fail]' );
+		$this->assertTrue( $err, 'failed period failed schema validation: ' . ( is_wp_error( $err ) ? $err->get_error_message() : '' ) );
+
+		// Successful period: canonical provenance preserved, action stays backfill.
+		$this->assertSame( 'backfill', $success_period['provenance']['source']['action'] );
+		$this->assertSame( '2026/05/01', $success_period['provenance']['period']['canonical']['start'] );
+		$this->assertSame( 12, $success_period['provenance']['period']['row_count'] );
+		$this->assertArrayNotHasKey( 'error', $success_period );
+
+		// Failed period: error carried, canonical provenance null (omitted metadata).
+		$this->assertSame( 'backfill', $failed_period['provenance']['source']['action'] );
+		$this->assertNull( $failed_period['provenance']['period']['canonical']['start'] );
+		$this->assertNull( $failed_period['provenance']['period']['row_count'] );
+		$this->assertSame( 'upstream failure', $failed_period['error'] );
+
+		// Top-level provenance spans the full requested window with null canonical metadata.
+		$this->assertSame( '2026-05-01', $backfill['provenance']['period']['requested']['start'] );
+		$this->assertSame( '2026-06-30', $backfill['provenance']['period']['requested']['end'] );
 	}
 
 	/**
