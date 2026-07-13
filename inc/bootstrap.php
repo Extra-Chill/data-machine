@@ -146,6 +146,22 @@ add_filter(
 
 /*
 |--------------------------------------------------------------------------
+| Core image templates
+|--------------------------------------------------------------------------
+| Core ships only brand-agnostic, structural templates (generic primitives).
+| Domain-specific templates (event cards, quote cards) belong downstream.
+*/
+add_filter(
+	// phpcs:ignore WordPress.NamingConventions.ValidHookName -- Intentional slash-separated hook namespace.
+	'datamachine/image_generation/templates',
+	static function ( array $templates ): array {
+		$templates['flow_diagram'] ??= \DataMachine\Abilities\Media\Templates\FlowDiagramTemplate::class;
+		return $templates;
+	}
+);
+
+/*
+|--------------------------------------------------------------------------
 | Iteration budget registrations
 |--------------------------------------------------------------------------
 | Named bounded-iteration budgets shared across the engine. Each budget
