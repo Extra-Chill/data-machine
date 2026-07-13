@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 Homeboy maintains this file from conventional commits at release time —
 do not edit by hand.
 
+## [0.14.0] - 2026-07-13
+
+### Added
+- preserve Mediavine report provenance for downstream attribution
+
 ## [0.13.4] - 2026-07-13
 
 ### Changed
