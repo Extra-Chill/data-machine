@@ -9,6 +9,7 @@ All notable changes to Data Machine will be documented in this file.
 
 ### Fixed
 - `GDRenderer::draw_rounded_rect()` no longer fatals on PHP 8.0–8.3. It called `imagefilledroundedrectangle()` unconditionally, but that builtin is PHP 8.4+; added a manual rounded-rect fallback so rounded nodes render on all supported PHP versions.
+- Remove a stray empty tracked `.eslintrc.js` under the Pipelines React assets. It was dev-only cruft with no runtime purpose, excluded from the production build, which caused the release packager's tracked-file parity check to fail.
 
 ## [0.162.3] - 2026-07-13
 
