@@ -139,14 +139,8 @@ class FlowDiagramTemplate implements TemplateInterface {
 			}
 		}
 
-		// Resolve the target canvas first (default is a 16:9 card). The diagram
-		// grid is then scaled to fit inside it and centered, so a bare render
-		// always produces a clean, correctly-proportioned image.
-		$canvas = $this->resolve_canvas( $options );
-		$width  = $canvas['width'];
-		$height = $canvas['height'];
-
-		// Base (unscaled) grid metrics.
+		// Grid metrics are always full size. The diagram is NEVER downscaled;
+		// instead the canvas is grown around the native-size content.
 		$node_w = self::NODE_WIDTH;
 		$node_h = self::NODE_HEIGHT;
 		$gap    = $has_edge_labels ? self::GAP + 90 : self::GAP;
@@ -155,28 +149,17 @@ class FlowDiagramTemplate implements TemplateInterface {
 		$content_w = $this->grid_width( $direction, $count, $node_w, $gap, $margin );
 		$content_h = $this->grid_height( $direction, $count, $node_h, $gap, $margin, $title_band );
 
-		// Scale the whole grid down uniformly if it overflows the canvas in
-		// either axis. Never scale up past the base size (keeps small diagrams
-		// from ballooning on a large canvas).
-		$scale = min( 1.0, $width / max( 1, $content_w ), $height / max( 1, $content_h ) );
-		if ( $scale < 1.0 ) {
-			// floor() (not round()) guarantees the scaled grid never exceeds the
-			// target canvas by a rounding pixel, so preset dimensions stay exact.
-			$node_w     = (int) floor( $node_w * $scale );
-			$node_h     = (int) floor( $node_h * $scale );
-			$gap        = (int) floor( $gap * $scale );
-			$margin     = (int) floor( $margin * $scale );
-			$title_band = (int) floor( $title_band * $scale );
-			$content_w  = $this->grid_width( $direction, $count, $node_w, $gap, $margin );
-			$content_h  = $this->grid_height( $direction, $count, $node_h, $gap, $margin, $title_band );
-		}
+		// Resolve the canvas:
+		//   - Explicit width/height or preset: use it, but grow (never shrink)
+		//     so content is never clipped and never downscaled.
+		//   - Default: render the content at native size, then pad the canvas
+		//     out to a 16:9 aspect ratio around it.
+		$canvas = $this->resolve_canvas( $options, $content_w, $content_h );
+		$width  = $canvas['width'];
+		$height = $canvas['height'];
 
-		// If content is still larger than the canvas (single very wide node),
-		// grow the canvas so nothing clips.
-		$width  = max( $width, $content_w );
-		$height = max( $height, $content_h );
-		$off_x  = intdiv( $width - $content_w, 2 );
-		$off_y  = intdiv( $height - $content_h, 2 );
+		$off_x = intdiv( $width - $content_w, 2 );
+		$off_y = intdiv( $height - $content_h, 2 );
 
 		$renderer->create_canvas( $width, $height );
 
@@ -301,33 +284,72 @@ class FlowDiagramTemplate implements TemplateInterface {
 	}
 
 	/**
-	 * Resolve the target output canvas size.
+	 * Resolve the output canvas size around native-size content.
 	 *
-	 * Precedence:
-	 *   1. Explicit options[width] + options[height]
-	 *   2. options[preset] resolved via PlatformPresets
-	 *   3. The template default preset (16:9 twitter_card, 1200x675)
+	 * The diagram is never downscaled. The canvas is sized to at least the
+	 * content, then:
+	 *   - Explicit width/height or a named preset: grow that target to the
+	 *     content if the content is larger (never clip, never shrink).
+	 *   - Default: pad the content out to a 16:9 aspect ratio, so a bare
+	 *     render produces a clean 16:9 card at the content's native resolution
+	 *     (e.g. a 4-node flow becomes ~1600x900, not a shrunk 1200x675).
 	 *
-	 * @param array $options Render options (preset, width, height).
+	 * @param array $options   Render options (preset, width, height, aspect).
+	 * @param int   $content_w Native content width.
+	 * @param int   $content_h Native content height.
 	 * @return array{width: int, height: int}
 	 */
-	private function resolve_canvas( array $options ): array {
+	private function resolve_canvas( array $options, int $content_w, int $content_h ): array {
+		// Explicit target dimensions (grow to content, never shrink).
 		if ( ! empty( $options['width'] ) && ! empty( $options['height'] ) ) {
 			return array(
-				'width'  => (int) $options['width'],
-				'height' => (int) $options['height'],
+				'width'  => max( (int) $options['width'], $content_w ),
+				'height' => max( (int) $options['height'], $content_h ),
 			);
 		}
 
-		$preset = ! empty( $options['preset'] ) ? (string) $options['preset'] : self::DEFAULT_PRESET;
-		$dims   = PlatformPresets::dimensions( $preset );
-		if ( ! $dims ) {
-			$dims = PlatformPresets::dimensions( self::DEFAULT_PRESET );
+		// Named preset: use its aspect ratio, applied at native content scale.
+		if ( ! empty( $options['preset'] ) ) {
+			$dims = PlatformPresets::dimensions( (string) $options['preset'] );
+			if ( $dims && ! empty( $dims['width'] ) && ! empty( $dims['height'] ) ) {
+				return $this->pad_to_aspect( $content_w, $content_h, (int) $dims['width'], (int) $dims['height'] );
+			}
+		}
+
+		// Default: pad out to 16:9 around the native content.
+		return $this->pad_to_aspect( $content_w, $content_h, 16, 9 );
+	}
+
+	/**
+	 * Grow a content box to a target aspect ratio without shrinking it.
+	 *
+	 * Whichever axis is short is padded up so width:height matches
+	 * aspect_w:aspect_h. The content is never scaled, only surrounded.
+	 *
+	 * @param int $content_w Native content width.
+	 * @param int $content_h Native content height.
+	 * @param int $aspect_w  Target aspect numerator.
+	 * @param int $aspect_h  Target aspect denominator.
+	 * @return array{width: int, height: int}
+	 */
+	private function pad_to_aspect( int $content_w, int $content_h, int $aspect_w, int $aspect_h ): array {
+		$content_w = max( 1, $content_w );
+		$content_h = max( 1, $content_h );
+
+		// Width needed to make this height match the aspect, and vice versa.
+		$needed_w = (int) ceil( $content_h * $aspect_w / $aspect_h );
+		$needed_h = (int) ceil( $content_w * $aspect_h / $aspect_w );
+
+		if ( $needed_w >= $content_w ) {
+			return array(
+				'width'  => $needed_w,
+				'height' => $content_h,
+			);
 		}
 
 		return array(
-			'width'  => (int) ( $dims['width'] ?? 1200 ),
-			'height' => (int) ( $dims['height'] ?? 675 ),
+			'width'  => $content_w,
+			'height' => $needed_h,
 		);
 	}
 
