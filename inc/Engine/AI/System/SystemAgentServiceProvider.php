@@ -59,7 +59,10 @@ class SystemAgentServiceProvider {
 		$this->registerBuiltInSchedules();
 		$this->initializeRegistry();
 		$this->registerActionSchedulerHooks();
+		// Bootstrap immediately after AS initializes, then let AS's native daily
+		// recurring-ensure action repair schedules that are later interrupted.
 		add_action( 'action_scheduler_init', array( $this, 'manageRecurringTaskSchedules' ) );
+		add_action( 'action_scheduler_ensure_recurring_actions', array( $this, 'manageRecurringTaskSchedules' ) );
 		WakeBriefingTask::registerStalenessGuard();
 	}
 
