@@ -48,12 +48,7 @@ class SendyAbilities {
 			return;
 		}
 
-		$callback = array( $this, 'register_abilities' );
-		if ( did_action( 'wp_abilities_api_init' ) ) {
-			$callback();
-		} else {
-			add_action( 'wp_abilities_api_init', $callback );
-		}
+		\DataMachine\Abilities\AbilityRegistration::on_abilities_api_init( array( $this, 'register_abilities' ) );
 
 		self::$registered = true;
 	}

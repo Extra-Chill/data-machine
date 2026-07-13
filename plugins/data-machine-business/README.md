@@ -20,7 +20,7 @@ This plugin extends Data Machine with business-focused integrations including:
 
 - WordPress 6.9+
 - PHP 8.2+
-- Data Machine core plugin (required)
+- Data Machine core plugin 0.151.0+ (required)
 
 ## Installation
 

@@ -71,11 +71,7 @@ class FetchGoogleSheetsAbility {
 			);
 		};
 
-		if ( did_action( 'wp_abilities_api_init' ) ) {
-			$register_callback();
-		} else {
-			add_action( 'wp_abilities_api_init', $register_callback );
-		}
+		\DataMachine\Abilities\AbilityRegistration::on_abilities_api_init( $register_callback );
 	}
 
 	public function checkPermission(): bool {

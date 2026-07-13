@@ -55,7 +55,7 @@ if ( file_exists( $datamachine_business_autoloader ) ) {
  * we test for the dependency.
  */
 function datamachine_business_load_handlers() {
-	if ( ! class_exists( 'DataMachine\\Core\\Steps\\Publish\\Handlers\\PublishHandler' ) ) {
+	if ( ! class_exists( 'DataMachine\\Core\\Steps\\Publish\\Handlers\\PublishHandler' ) || ! class_exists( 'DataMachine\\Abilities\\AbilityRegistration' ) ) {
 		add_action( 'admin_notices', function () {
 			?>
 			<div class="notice notice-error">
