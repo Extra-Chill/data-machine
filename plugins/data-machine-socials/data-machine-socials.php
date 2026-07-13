@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Data Machine Socials
  * Plugin URI: https://github.com/Extra-Chill/data-machine-socials
- * Description: Social media extension for Data Machine. Adds support for Instagram, Twitter, Facebook, Bluesky, Threads, Pinterest, LinkedIn, and Reddit.
+ * Description: Social media extension for Data Machine. Adds support for Instagram, Twitter, Facebook, Bluesky, Threads, Pinterest, LinkedIn, Tumblr, and Reddit.
  * Version: 0.16.0
  * Requires at least: 6.9
  * Requires PHP: 8.2
@@ -126,6 +126,13 @@ function datamachine_socials_bootstrap() {
 	new \DataMachineSocials\Abilities\Reddit\SubmitRedditAbility();
 	new \DataMachineSocials\Abilities\Reddit\VoteRedditAbility();
 
+	// Tumblr
+	new \DataMachineSocials\Abilities\Tumblr\TumblrPublishAbility();
+	new \DataMachineSocials\Abilities\Tumblr\TumblrReadAbility();
+	new \DataMachineSocials\Abilities\Tumblr\TumblrUpdateAbility();
+	new \DataMachineSocials\Abilities\Tumblr\TumblrDeleteAbility();
+	new \DataMachineSocials\Abilities\Tumblr\TumblrEngageAbility();
+
 	// Social Handlers
 	new \DataMachineSocials\Handlers\Twitter\Twitter();
 	new \DataMachineSocials\Handlers\Facebook\Facebook();
@@ -134,6 +141,7 @@ function datamachine_socials_bootstrap() {
 	new \DataMachineSocials\Handlers\Pinterest\Pinterest();
 	new \DataMachineSocials\Handlers\Instagram\Instagram();
 	new \DataMachineSocials\Handlers\LinkedIn\LinkedIn();
+	new \DataMachineSocials\Handlers\Tumblr\Tumblr();
 
 	// Reddit (Fetch)
 	new \DataMachineSocials\Handlers\Reddit\Reddit();
@@ -296,6 +304,10 @@ function datamachine_socials_load_chat_tools() {
 	new \DataMachineSocials\Chat\Tools\ReadLinkedIn();
 	new \DataMachineSocials\Chat\Tools\UpdateLinkedIn();
 	new \DataMachineSocials\Chat\Tools\DeleteLinkedIn();
+
+	// Tumblr chat tools
+	new \DataMachineSocials\Chat\Tools\PublishTumblr();
+	new \DataMachineSocials\Chat\Tools\ReadTumblr();
 
 	// Delete chat tools
 	new \DataMachineSocials\Chat\Tools\DeleteInstagram();

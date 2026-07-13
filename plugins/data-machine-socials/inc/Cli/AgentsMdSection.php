@@ -45,7 +45,7 @@ class AgentsMdSection {
 		$lines   = array();
 		$lines[] = '### Data Machine Socials CLI';
 		$lines[] = '';
-		$lines[] = 'Cross-platform social media commands — read, publish, and engage across Instagram, Twitter/X, Facebook, Bluesky, Threads, Pinterest, LinkedIn, and Reddit, plus unified comments and per-item share tracking.';
+		$lines[] = 'Cross-platform social media commands — read, publish, and engage across Instagram, Twitter/X, Facebook, Bluesky, Threads, Pinterest, LinkedIn, Tumblr, and Reddit, plus unified comments and per-item share tracking.';
 		$lines[] = "Discover everything: `{$wp} datamachine-socials --help`";
 		$lines[] = '';
 

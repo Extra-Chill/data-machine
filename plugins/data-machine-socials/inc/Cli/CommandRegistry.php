@@ -32,6 +32,7 @@ class CommandRegistry {
 			'datamachine-socials comments'  => Commands\CommentsCommand::class,
 			'datamachine-socials linkedin'  => Commands\LinkedInCommand::class,
 			'datamachine-socials pinterest' => Commands\PinterestCommand::class,
+			'datamachine-socials tumblr'    => Commands\TumblrCommand::class,
 			'datamachine-socials reddit'    => Commands\RedditCommand::class,
 			'datamachine-socials instagram' => Commands\InstagramCommand::class,
 			'datamachine-socials threads'   => Commands\ThreadsCommand::class,
