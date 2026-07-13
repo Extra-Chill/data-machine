@@ -147,6 +147,9 @@ $GLOBALS['datamachine_rs_scheduled_single']   = 0;
 $GLOBALS['datamachine_rs_scheduled_recurring'] = 0;
 $GLOBALS['datamachine_rs_scheduled_cron']      = 0;
 $GLOBALS['datamachine_rs_unscheduled']         = 0;
+$GLOBALS['datamachine_rs_recurring_unique']    = array();
+$GLOBALS['datamachine_rs_cron_unique']         = array();
+$GLOBALS['datamachine_rs_schedule_race']       = false;
 
 function datamachine_rs_key( string $hook, array $args, string $group ): string {
 	return $group . '|' . $hook . '|' . serialize( $args );
@@ -177,6 +180,9 @@ function datamachine_rs_reset(): void {
 	$GLOBALS['datamachine_rs_scheduled_recurring'] = 0;
 	$GLOBALS['datamachine_rs_scheduled_cron']      = 0;
 	$GLOBALS['datamachine_rs_unscheduled']         = 0;
+	$GLOBALS['datamachine_rs_recurring_unique']    = array();
+	$GLOBALS['datamachine_rs_cron_unique']         = array();
+	$GLOBALS['datamachine_rs_schedule_race']       = false;
 	ActionScheduler::$initialized         = true;
 }
 
@@ -220,14 +226,24 @@ function as_schedule_single_action( int $timestamp, string $hook, array $args = 
 	return 101;
 }
 
-function as_schedule_recurring_action( int $timestamp, int $interval, string $hook, array $args = array(), string $group = '' ): int {
+function as_schedule_recurring_action( int $timestamp, int $interval, string $hook, array $args = array(), string $group = '', bool $unique = false ): int {
 	++$GLOBALS['datamachine_rs_scheduled_recurring'];
+	$GLOBALS['datamachine_rs_recurring_unique'][] = $unique;
+	if ( $GLOBALS['datamachine_rs_schedule_race'] ) {
+		$GLOBALS['datamachine_rs_schedule_race'] = false;
+		datamachine_rs_seed_action( $hook, $args, $group, new DmRecurringSchedulerFakeSchedule( true, $interval, $timestamp ) );
+		return 0;
+	}
+	if ( $unique && datamachine_rs_pending_count( $hook, $args, $group ) > 0 ) {
+		return 0;
+	}
 	datamachine_rs_seed_action( $hook, $args, $group, new DmRecurringSchedulerFakeSchedule( true, $interval, $timestamp ) );
 	return 202;
 }
 
-function as_schedule_cron_action( int $timestamp, string $expression, string $hook, array $args = array(), string $group = '' ): int {
+function as_schedule_cron_action( int $timestamp, string $expression, string $hook, array $args = array(), string $group = '', bool $unique = false ): int {
 	++$GLOBALS['datamachine_rs_scheduled_cron'];
+	$GLOBALS['datamachine_rs_cron_unique'][] = $unique;
 	datamachine_rs_seed_action( $hook, $args, $group, new DmRecurringSchedulerFakeSchedule( true, $expression, $timestamp ) );
 	return 303;
 }
@@ -370,5 +386,33 @@ datamachine_assert( true === ( $result['deduplicated'] ?? false ), 'cron result 
 datamachine_assert( 1 === datamachine_rs_counter( 'datamachine_rs_unscheduled' ), 'cron duplicates were unscheduled' );
 datamachine_assert( 1 === datamachine_rs_counter( 'datamachine_rs_scheduled_cron' ), 'exactly one cron chain recreated' );
 datamachine_assert( 1 === datamachine_rs_pending_count( 'datamachine_cron', array(), RecurringScheduler::GROUP ), 'cron collapsed to exactly one pending action' );
+
+echo "\n[14] concurrent recurring reconciliation creates exactly one unique chain (#2892)\n";
+datamachine_rs_reset();
+$GLOBALS['datamachine_rs_schedule_race'] = true;
+$result                                  = datamachine_assert_schedule_result( RecurringScheduler::ensureSchedule( 'datamachine_recurring_retention_as_actions', array(), 'hourly' ) );
+datamachine_assert( 1 === datamachine_rs_pending_count( 'datamachine_recurring_retention_as_actions', array(), RecurringScheduler::GROUP ), 'concurrent reconciliation preserves exactly one pending chain' );
+datamachine_assert( array( true ) === $GLOBALS['datamachine_rs_recurring_unique'], 'recurring reconciliation requests Action Scheduler uniqueness' );
+datamachine_assert( 0 === datamachine_rs_counter( 'datamachine_rs_unscheduled' ), 'initial reconciliation does not cancel a concurrent healthy chain' );
+
+echo "\n[15] all recurring and cron replacement paths request Action Scheduler uniqueness (#2892)\n";
+datamachine_rs_reset();
+datamachine_assert_schedule_result( RecurringScheduler::ensureSchedule( 'datamachine_recurring_retention_as_actions', array(), 'hourly' ) );
+datamachine_assert( array( true ) === $GLOBALS['datamachine_rs_recurring_unique'], 'missing enabled recurrence is restored as a unique action' );
+datamachine_rs_reset();
+datamachine_assert_schedule_result( RecurringScheduler::ensureSchedule( 'datamachine_cron', array(), 'cron', array( 'cron_expression' => '0 0 * * *' ) ) );
+datamachine_assert( array( true ) === $GLOBALS['datamachine_rs_cron_unique'], 'cron replacement is also unique' );
+
+echo "\n[16] Action Scheduler native recurring-ensure hook repairs interrupted schedules (#2892)\n";
+$provider_source = file_get_contents( __DIR__ . '/../inc/Engine/AI/System/SystemAgentServiceProvider.php' ) ?: '';
+datamachine_assert( str_contains( $provider_source, "add_action( 'action_scheduler_ensure_recurring_actions', array( \$this, 'manageRecurringTaskSchedules' ) );" ), 'provider registers reconciliation on Action Scheduler native recurring-ensure hook' );
+
+echo "\n[17] distinct argument tuples sharing a hook remain independently schedulable\n";
+datamachine_rs_reset();
+datamachine_assert_schedule_result( RecurringScheduler::ensureSchedule( 'datamachine_per_flow', array( 'flow_id' => 1 ), 'hourly' ) );
+datamachine_assert_schedule_result( RecurringScheduler::ensureSchedule( 'datamachine_per_flow', array( 'flow_id' => 2 ), 'hourly' ) );
+datamachine_assert( array( false, false ) === $GLOBALS['datamachine_rs_recurring_unique'], 'argument-bearing schedules do not use hook/group-only Action Scheduler uniqueness' );
+datamachine_assert( 1 === datamachine_rs_pending_count( 'datamachine_per_flow', array( 'flow_id' => 1 ), RecurringScheduler::GROUP ), 'first argument tuple has its own pending chain' );
+datamachine_assert( 1 === datamachine_rs_pending_count( 'datamachine_per_flow', array( 'flow_id' => 2 ), RecurringScheduler::GROUP ), 'second argument tuple has its own pending chain' );
 
 echo "\nAll recurring scheduler idempotency assertions passed.\n";

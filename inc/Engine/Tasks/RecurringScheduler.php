@@ -228,6 +228,9 @@ class RecurringScheduler {
 				: 0;
 			$first_run_time = time() + $stagger_offset;
 		}
+		// Action Scheduler unique actions are keyed by hook and group, not args.
+		// Preserve independent schedules that share a hook but have distinct args.
+		$unique = empty( $args );
 
 		if ( empty( $options['force_reschedule'] ) && self::hasMatchingRecurringAction( $hook, $args, $group, (int) $interval_seconds ) ) {
 			// Self-healing dedup: if a previous call already created MORE THAN
@@ -235,7 +238,7 @@ class RecurringScheduler {
 			// single chain now instead of preserving the duplicates.
 			if ( self::countMatchingPendingActions( $hook, $args, $group ) > 1 ) {
 				self::unschedule( $hook, $args, $group );
-				as_schedule_recurring_action( $first_run_time, $interval_seconds, $hook, $args, $group );
+				as_schedule_recurring_action( $first_run_time, $interval_seconds, $hook, $args, $group, $unique );
 
 				if ( ! self::isScheduled( $hook, $args, $group ) ) {
 					return self::error(
@@ -263,9 +266,13 @@ class RecurringScheduler {
 			);
 		}
 
-		self::unschedule( $hook, $args, $group );
+		if ( self::getPendingAction( $hook, $args, $group ) ) {
+			self::unschedule( $hook, $args, $group );
+		}
 
-		as_schedule_recurring_action( $first_run_time, $interval_seconds, $hook, $args, $group );
+		// A reconciliation can race another request during activation, upgrades,
+		// or cron. Let Action Scheduler atomically preserve the first chain.
+		as_schedule_recurring_action( $first_run_time, $interval_seconds, $hook, $args, $group, $unique );
 
 		// Verify persistence. AS can silently drop actions when its tables
 		// aren't ready (e.g. CLI context during plugin activation).
@@ -671,12 +678,16 @@ class RecurringScheduler {
 			);
 		}
 
+		// Action Scheduler unique actions are keyed by hook and group, not args.
+		// Preserve independent schedules that share a hook but have distinct args.
+		$unique = empty( $args );
+
 		if ( ! $force_reschedule && self::hasMatchingCronAction( $hook, $args, $group, $cron_expression ) ) {
 			// Self-healing dedup: collapse an already-duplicated signature to a
 			// single chain instead of preserving the duplicates.
 			if ( self::countMatchingPendingActions( $hook, $args, $group ) > 1 ) {
 				self::unschedule( $hook, $args, $group );
-				$action_id = as_schedule_cron_action( time(), $cron_expression, $hook, $args, $group );
+				$action_id = as_schedule_cron_action( time(), $cron_expression, $hook, $args, $group, $unique );
 
 				if ( ! self::isScheduled( $hook, $args, $group ) ) {
 					return self::error(
@@ -703,9 +714,11 @@ class RecurringScheduler {
 			);
 		}
 
-		self::unschedule( $hook, $args, $group );
+		if ( self::getPendingAction( $hook, $args, $group ) ) {
+			self::unschedule( $hook, $args, $group );
+		}
 
-		$action_id = as_schedule_cron_action( time(), $cron_expression, $hook, $args, $group );
+		$action_id = as_schedule_cron_action( time(), $cron_expression, $hook, $args, $group, $unique );
 
 		if ( ! self::isScheduled( $hook, $args, $group ) ) {
 			return self::error(
