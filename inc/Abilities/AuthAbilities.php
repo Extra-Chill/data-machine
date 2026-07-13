@@ -778,7 +778,7 @@ class AuthAbilities {
 		}
 
 		foreach ( $config_fields as $field_name => $field_config ) {
-			$value = sanitize_text_field( $config_input[ $field_name ] ?? '' );
+			$value = self::sanitizeConfigValue( $config_input[ $field_name ] ?? '', $field_config );
 
 			if ( ( $field_config['required'] ?? false ) && empty( $value ) && empty( $existing_config[ $field_name ] ?? '' ) ) {
 				return array(
@@ -953,11 +953,11 @@ class AuthAbilities {
 			);
 		}
 
-		// Sanitize string values in account data.
+		// Account data can contain opaque credentials, including percent-encoded cookies.
 		$sanitized = array();
 		foreach ( $account_data as $key => $value ) {
 			if ( is_string( $value ) ) {
-				$sanitized[ $key ] = sanitize_text_field( $value );
+				$sanitized[ $key ] = self::sanitizeOpaqueCredentialValue( $value );
 			} elseif ( is_int( $value ) || is_float( $value ) || is_bool( $value ) || is_null( $value ) ) {
 				$sanitized[ $key ] = $value;
 			} elseif ( is_array( $value ) ) {
@@ -1107,5 +1107,40 @@ class AuthAbilities {
 		}
 
 		return array_filter( $context );
+	}
+
+	/**
+	 * Sanitize an auth config value according to its provider-declared field type.
+	 *
+	 * Password and textarea fields can carry opaque credentials, so they must not
+	 * pass through sanitize_text_field(), which removes percent-encoded octets.
+	 *
+	 * @param mixed $value        Submitted field value.
+	 * @param array $field_config Provider field declaration.
+	 * @return string Sanitized value.
+	 */
+	private static function sanitizeConfigValue( $value, array $field_config ): string {
+		if ( ! is_scalar( $value ) ) {
+			return '';
+		}
+
+		$value = (string) $value;
+		$type  = $field_config['type'] ?? 'text';
+
+		if ( in_array( $type, array( 'password', 'textarea' ), true ) ) {
+			return self::sanitizeOpaqueCredentialValue( $value );
+		}
+
+		return sanitize_text_field( $value );
+	}
+
+	/**
+	 * Preserve opaque credential payloads while rejecting control characters.
+	 *
+	 * @param string $value Submitted credential value.
+	 * @return string Credential-safe value.
+	 */
+	private static function sanitizeOpaqueCredentialValue( string $value ): string {
+		return trim( preg_replace( '/[\x00-\x1F\x7F]/', '', $value ) );
 	}
 }

@@ -25,6 +25,31 @@ class AuthAbilitiesAccountScopeProvider extends BaseAuthProvider {
 	}
 }
 
+class AuthAbilitiesConfigProvider extends BaseAuthProvider {
+
+	public function get_config_fields(): array {
+		return array(
+			'session_cookie' => array(
+				'label'    => 'Session Cookie',
+				'type'     => 'password',
+				'required' => true,
+			),
+			'cookie_jar'     => array(
+				'label' => 'Cookie Jar',
+				'type'  => 'textarea',
+			),
+			'label'          => array(
+				'label' => 'Label',
+				'type'  => 'text',
+			),
+		);
+	}
+
+	public function is_authenticated(): bool {
+		return false;
+	}
+}
+
 class AuthAbilitiesTest extends WP_UnitTestCase {
 
 	private AuthAbilities $auth_abilities;
@@ -135,6 +160,61 @@ class AuthAbilitiesTest extends WP_UnitTestCase {
 		$this->assertArrayHasKey( 'error', $result );
 	}
 
+	public function test_save_auth_config_preserves_opaque_credential_fields(): void {
+		$provider = new AuthAbilitiesConfigProvider( 'config_provider' );
+		$this->registerConfigProvider( $provider );
+		$cookie = 'tk_or=%22https%3A%2F%2Fwww.google.com%2F%22;wporg_sec=abc%7Cdef$o3$g0';
+
+		$result = $this->auth_abilities->executeSaveAuthConfig(
+			array(
+				'handler_slug' => 'config_handler',
+				'config'       => array(
+					'session_cookie' => $cookie,
+					'cookie_jar'     => $cookie,
+				),
+			)
+		);
+
+		$this->assertTrue( $result['success'] );
+		$this->assertSame( $cookie, $provider->get_config()['session_cookie'] );
+		$this->assertSame( $cookie, $provider->get_config()['cookie_jar'] );
+	}
+
+	public function test_save_auth_config_sanitizes_text_fields(): void {
+		$provider = new AuthAbilitiesConfigProvider( 'config_provider' );
+		$this->registerConfigProvider( $provider );
+		$value = " <strong>Example</strong>\n";
+
+		$result = $this->auth_abilities->executeSaveAuthConfig(
+			array(
+				'handler_slug' => 'config_handler',
+				'config'       => array(
+					'session_cookie' => 'required-cookie',
+					'label'          => $value,
+				),
+			)
+		);
+
+		$this->assertTrue( $result['success'] );
+		$this->assertSame( sanitize_text_field( $value ), $provider->get_config()['label'] );
+	}
+
+	public function test_set_auth_token_preserves_opaque_token_value(): void {
+		$provider = new AuthAbilitiesAccountScopeProvider( 'scope_provider' );
+		$this->registerAccountScopeProvider( $provider );
+		$token = 'tk_or=%22https%3A%2F%2Fwww.google.com%2F%22%7C$o3$g0';
+
+		$result = $this->auth_abilities->executeSetAuthToken(
+			array(
+				'handler_slug' => 'scope_handler',
+				'account_data' => array( 'access_token' => $token ),
+			)
+		);
+
+		$this->assertTrue( $result['success'] );
+		$this->assertSame( $token, $provider->get_site_account()['access_token'] );
+	}
+
 	public function test_set_auth_token_saves_user_account_without_site_fallback(): void {
 		$provider = new AuthAbilitiesAccountScopeProvider( 'scope_provider' );
 		$this->registerAccountScopeProvider( $provider );
@@ -187,6 +267,30 @@ class AuthAbilitiesTest extends WP_UnitTestCase {
 					'slug'              => 'scope_handler',
 					'requires_auth'     => true,
 					'auth_provider_key' => 'scope_provider',
+				);
+				return $handlers;
+			}
+		);
+
+		AuthAbilities::clearCache();
+		HandlerAbilities::clearCache();
+	}
+
+	private function registerConfigProvider( AuthAbilitiesConfigProvider $provider ): void {
+		add_filter(
+			'datamachine_auth_providers',
+			function ( array $providers ) use ( $provider ): array {
+				$providers['config_provider'] = $provider;
+				return $providers;
+			}
+		);
+		add_filter(
+			'datamachine_handlers',
+			function ( array $handlers ): array {
+				$handlers['config_handler'] = array(
+					'slug'              => 'config_handler',
+					'requires_auth'     => true,
+					'auth_provider_key' => 'config_provider',
 				);
 				return $handlers;
 			}

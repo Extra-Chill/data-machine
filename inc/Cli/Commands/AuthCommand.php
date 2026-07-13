@@ -829,7 +829,7 @@ class AuthCommand extends BaseCommand {
 				$missing[] = sprintf( '--%s', $cli_key );
 			}
 
-			$config_data[ $field_name ] = sanitize_text_field( $value );
+			$config_data[ $field_name ] = $value;
 		}
 
 		if ( ! empty( $missing ) ) {
