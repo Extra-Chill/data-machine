@@ -35,6 +35,7 @@ class CommandRegistry {
 			'datamachine-socials tumblr'    => Commands\TumblrCommand::class,
 			'datamachine-socials reddit'    => Commands\RedditCommand::class,
 			'datamachine-socials instagram' => Commands\InstagramCommand::class,
+			'datamachine-socials tiktok'    => Commands\TikTokCommand::class,
 			'datamachine-socials threads'   => Commands\ThreadsCommand::class,
 			'datamachine-socials facebook'  => Commands\FacebookCommand::class,
 			'datamachine-socials twitter'   => Commands\TwitterCommand::class,

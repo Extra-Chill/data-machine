@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Data Machine Socials
  * Plugin URI: https://github.com/Extra-Chill/data-machine-socials
- * Description: Social media extension for Data Machine. Adds support for Instagram, Twitter, Facebook, Bluesky, Threads, Pinterest, LinkedIn, Tumblr, and Reddit.
+ * Description: Social media extension for Data Machine. Adds support for Instagram, TikTok, Twitter, Facebook, Bluesky, Threads, Pinterest, LinkedIn, Tumblr, and Reddit.
  * Version: 0.16.0
  * Requires at least: 6.9
  * Requires PHP: 8.2
@@ -108,6 +108,10 @@ function datamachine_socials_bootstrap() {
 	new \DataMachineSocials\Abilities\Instagram\InstagramDeleteAbility();
 	new \DataMachineSocials\Abilities\Instagram\InstagramCommentReplyAbility();
 
+	// TikTok
+	new \DataMachineSocials\Abilities\TikTok\TikTokPublishAbility();
+	new \DataMachineSocials\Abilities\TikTok\TikTokReadAbility();
+
 	// Pinterest
 	new \DataMachineSocials\Abilities\Pinterest\PinterestReadAbility();
 	new \DataMachineSocials\Abilities\Pinterest\PinterestUpdateAbility();
@@ -140,6 +144,7 @@ function datamachine_socials_bootstrap() {
 	new \DataMachineSocials\Handlers\Bluesky\Bluesky();
 	new \DataMachineSocials\Handlers\Pinterest\Pinterest();
 	new \DataMachineSocials\Handlers\Instagram\Instagram();
+	new \DataMachineSocials\Handlers\TikTok\TikTok();
 	new \DataMachineSocials\Handlers\LinkedIn\LinkedIn();
 	new \DataMachineSocials\Handlers\Tumblr\Tumblr();
 
@@ -283,6 +288,7 @@ function datamachine_socials_load_chat_tools() {
 	new \DataMachineSocials\Chat\Tools\PublishInstagram();
 	new \DataMachineSocials\Chat\Tools\PublishReelInstagram();
 	new \DataMachineSocials\Chat\Tools\PublishStoryInstagram();
+	new \DataMachineSocials\Chat\Tools\PublishTikTok();
 	new \DataMachineSocials\Chat\Tools\PublishTwitter();
 	new \DataMachineSocials\Chat\Tools\PublishFacebook();
 	new \DataMachineSocials\Chat\Tools\PublishBluesky();

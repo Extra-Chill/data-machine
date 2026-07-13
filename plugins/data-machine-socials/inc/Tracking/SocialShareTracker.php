@@ -231,6 +231,7 @@ class SocialShareTracker {
 	public static function extract_platform_post_id( string $platform, array $result ): string {
 		$id_keys = array(
 			'instagram' => 'media_id',
+			'tiktok'    => 'publish_id',
 			'twitter'   => 'tweet_id',
 			'facebook'  => 'post_id',
 			'bluesky'   => 'post_id',
@@ -256,6 +257,7 @@ class SocialShareTracker {
 	public static function extract_platform_url( string $platform, array $result ): string {
 		$url_keys = array(
 			'instagram' => 'permalink',
+			'tiktok'    => 'post_url',
 			'twitter'   => 'tweet_url',
 			'facebook'  => 'post_url',
 			'bluesky'   => 'post_url',
