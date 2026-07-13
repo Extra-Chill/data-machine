@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.164.1] - 2026-07-13
+
+### Fixed
+- flow_diagram pads to 16:9 at native size, never downscales
+
 ## [0.164.0] - 2026-07-13
 
 ### Added
