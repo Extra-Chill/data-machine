@@ -717,8 +717,33 @@ class GDRenderer {
 			return $this;
 		}
 
-		// Draw filled rectangle with rounded corners using arc.
-		imagefilledroundedrectangle( $this->image, $x, $y, $x + $width, $y + $height, $radius, $color );
+		$x2 = $x + $width;
+		$y2 = $y + $height;
+
+		// imagefilledroundedrectangle() is PHP 8.4+. Fall back to a manual
+		// composition (rects + corner arcs) so rounded nodes render on 8.0–8.3.
+		if ( function_exists( 'imagefilledroundedrectangle' ) ) {
+			imagefilledroundedrectangle( $this->image, $x, $y, $x2, $y2, $radius, $color );
+			return $this;
+		}
+
+		$radius = max( 0, min( $radius, intdiv( $width, 2 ), intdiv( $height, 2 ) ) );
+
+		if ( 0 === $radius ) {
+			imagefilledrectangle( $this->image, $x, $y, $x2, $y2, $color );
+			return $this;
+		}
+
+		// Center cross of the rounded rect.
+		imagefilledrectangle( $this->image, $x + $radius, $y, $x2 - $radius, $y2, $color );
+		imagefilledrectangle( $this->image, $x, $y + $radius, $x2, $y2 - $radius, $color );
+
+		$d = $radius * 2;
+		// Four corner quarter-circles.
+		imagefilledellipse( $this->image, $x + $radius, $y + $radius, $d, $d, $color );
+		imagefilledellipse( $this->image, $x2 - $radius, $y + $radius, $d, $d, $color );
+		imagefilledellipse( $this->image, $x + $radius, $y2 - $radius, $d, $d, $color );
+		imagefilledellipse( $this->image, $x2 - $radius, $y2 - $radius, $d, $d, $color );
 
 		return $this;
 	}
