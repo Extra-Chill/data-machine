@@ -45,19 +45,19 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class FlowDiagramTemplate implements TemplateInterface {
 
-	private const DEFAULT_BG        = '#0f1117';
-	private const DEFAULT_SURFACE   = '#1b1f2a';
-	private const DEFAULT_NODE      = '#2d6cdf';
-	private const DEFAULT_EDGE      = '#8a93a6';
-	private const DEFAULT_TEXT      = '#ffffff';
-	private const DEFAULT_TITLE     = '#ffffff';
-	private const DEFAULT_MUTED     = '#8a93a6';
+	private const DEFAULT_BG      = '#0f1117';
+	private const DEFAULT_SURFACE = '#1b1f2a';
+	private const DEFAULT_NODE    = '#2d6cdf';
+	private const DEFAULT_EDGE    = '#8a93a6';
+	private const DEFAULT_TEXT    = '#ffffff';
+	private const DEFAULT_TITLE   = '#ffffff';
+	private const DEFAULT_MUTED   = '#8a93a6';
 
-	private const NODE_WIDTH        = 260;
-	private const NODE_HEIGHT       = 120;
-	private const GAP               = 90;
-	private const MARGIN            = 60;
-	private const TITLE_BAND        = 96;
+	private const NODE_WIDTH  = 260;
+	private const NODE_HEIGHT = 120;
+	private const GAP         = 90;
+	private const MARGIN      = 60;
+	private const TITLE_BAND  = 96;
 
 	public function get_id(): string {
 		return 'flow_diagram';
@@ -216,12 +216,12 @@ class FlowDiagramTemplate implements TemplateInterface {
 
 			$label = isset( $edge['label'] ) ? (string) $edge['label'] : '';
 			if ( '' !== $label ) {
-				$mid_x   = intdiv( $x1 + $x2, 2 );
-				$mid_y   = intdiv( $y1 + $y2, 2 );
-				$fs      = 14;
-				$lw      = $renderer->measure_text_width( $label, $fs, 'label' );
-				$pad     = 8;
-				$chip_h  = $fs + $pad;
+				$mid_x  = intdiv( $x1 + $x2, 2 );
+				$mid_y  = intdiv( $y1 + $y2, 2 );
+				$fs     = 14;
+				$lw     = $renderer->measure_text_width( $label, $fs, 'label' );
+				$pad    = 8;
+				$chip_h = $fs + $pad;
 				// Chip sits above the connector so it never overlaps node fills.
 				$chip_x1 = $mid_x - intdiv( $lw, 2 ) - $pad;
 				$chip_y1 = $mid_y - $chip_h - 6;
@@ -235,10 +235,10 @@ class FlowDiagramTemplate implements TemplateInterface {
 			$id  = isset( $node['id'] ) ? (string) $node['id'] : (string) $i;
 			$pos = $positions[ $id ];
 
-			$shape     = $node['shape'] ?? 'box';
-			$fill      = isset( $node['color'] ) ? $renderer->color_hex( 'node_' . $id, (string) $node['color'] ) : $node_c;
-			$label     = isset( $node['label'] ) ? (string) $node['label'] : '';
-			$label     = str_replace( '\n', "\n", $label );
+			$shape = $node['shape'] ?? 'box';
+			$fill  = isset( $node['color'] ) ? $renderer->color_hex( 'node_' . $id, (string) $node['color'] ) : $node_c;
+			$label = isset( $node['label'] ) ? (string) $node['label'] : '';
+			$label = str_replace( '\n', "\n", $label );
 
 			switch ( $shape ) {
 				case 'diamond':
@@ -297,9 +297,9 @@ class FlowDiagramTemplate implements TemplateInterface {
 			}
 		}
 
-		$line_h      = (int) ( $font_size * 1.35 );
-		$block_h     = count( $lines ) * $line_h;
-		$start_y     = $pos['cy'] - intdiv( $block_h, 2 );
+		$line_h  = (int) ( $font_size * 1.35 );
+		$block_h = count( $lines ) * $line_h;
+		$start_y = $pos['cy'] - intdiv( $block_h, 2 );
 
 		foreach ( $lines as $n => $line ) {
 			$lw = $renderer->measure_text_width( $line, $font_size, 'label' );
