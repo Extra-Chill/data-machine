@@ -135,17 +135,31 @@ if ( $path && file_exists( $path ) ) {
 	$info = getimagesize( $path );
 	$assert( 'output is a valid PNG', is_array( $info ) && $info['mime'] === 'image/png' );
 	$assert( 'output has sane dimensions', is_array( $info ) && $info[0] > 100 && $info[1] > 100 );
-	// Default canvas is a 16:9 twitter_card (1200x675).
-	$assert( 'default render is 16:9 (1200x675)', is_array( $info ) && $info[0] === 1200 && $info[1] === 675 );
+	// Default: content rendered at native size, canvas padded to 16:9.
+	// The 4-node flow is wider than 1200, so the diagram is NOT downscaled
+	// into a fixed card; the canvas grows around it at a 16:9 ratio.
+	$ratio = is_array( $info ) ? $info[0] / $info[1] : 0;
+	$assert( 'default render is ~16:9 aspect', abs( $ratio - ( 16 / 9 ) ) < 0.02 );
+	$assert( 'content rendered at native size (not downscaled to 1200 wide)', is_array( $info ) && $info[0] > 1200 );
 	wp_delete_file( $path );
 }
 
-// Explicit preset override is honored.
+// Explicit preset uses that aspect ratio (still at native content scale).
 $og = $template->render( $spec, new GDRenderer(), array( 'preset' => 'open_graph' ) );
 if ( ! empty( $og[0] ) && file_exists( $og[0] ) ) {
-	$oginfo = getimagesize( $og[0] );
-	$assert( 'preset override honored (open_graph 1200x630)', is_array( $oginfo ) && $oginfo[0] === 1200 && $oginfo[1] === 630 );
+	$oginfo   = getimagesize( $og[0] );
+	$ogratio  = is_array( $oginfo ) ? $oginfo[0] / $oginfo[1] : 0;
+	$expected = 1200 / 630;
+	$assert( 'preset override applies its aspect ratio', abs( $ogratio - $expected ) < 0.03 );
 	wp_delete_file( $og[0] );
+}
+
+// Explicit width/height grows to content, never clips.
+$fixed = $template->render( $spec, new GDRenderer(), array( 'width' => 400, 'height' => 300 ) );
+if ( ! empty( $fixed[0] ) && file_exists( $fixed[0] ) ) {
+	$finfo = getimagesize( $fixed[0] );
+	$assert( 'explicit small canvas grows to content (no clip)', is_array( $finfo ) && $finfo[0] >= 400 && $finfo[1] >= 300 );
+	wp_delete_file( $fixed[0] );
 }
 
 // Empty nodes must fail gracefully (no fatal, empty result).
