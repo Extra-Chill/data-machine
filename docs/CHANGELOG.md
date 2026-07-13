@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.162.3] - 2026-07-13
+
+### Fixed
+- store credential auth config fields byte-exact
+
 ## [0.162.2] - 2026-07-12
 
 ### Fixed
