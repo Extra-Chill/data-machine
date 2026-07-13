@@ -40,6 +40,7 @@ class CommandRegistry {
 			'datamachine-socials facebook'  => Commands\FacebookCommand::class,
 			'datamachine-socials twitter'   => Commands\TwitterCommand::class,
 			'datamachine-socials bluesky'   => Commands\BlueskyCommand::class,
+			'datamachine-socials mastodon'  => Commands\MastodonCommand::class,
 			'datamachine-socials shares'    => Commands\SharesCommand::class,
 		);
 	}

@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Data Machine Socials
  * Plugin URI: https://github.com/Extra-Chill/data-machine-socials
- * Description: Social media extension for Data Machine. Adds support for Instagram, TikTok, Twitter, Facebook, Bluesky, Threads, Pinterest, LinkedIn, Tumblr, and Reddit.
+ * Description: Social media extension for Data Machine. Adds support for Instagram, TikTok, Twitter, Facebook, Bluesky, Mastodon, Threads, Pinterest, LinkedIn, Tumblr, and Reddit.
  * Version: 0.16.0
  * Requires at least: 6.9
  * Requires PHP: 8.2
@@ -95,6 +95,12 @@ function datamachine_socials_bootstrap() {
 	new \DataMachineSocials\Abilities\Bluesky\BlueskyUpdateAbility();
 	new \DataMachineSocials\Abilities\Bluesky\BlueskyDeleteAbility();
 
+	// Mastodon
+	new \DataMachineSocials\Abilities\Mastodon\MastodonPublishAbility();
+	new \DataMachineSocials\Abilities\Mastodon\MastodonReadAbility();
+	new \DataMachineSocials\Abilities\Mastodon\MastodonUpdateAbility();
+	new \DataMachineSocials\Abilities\Mastodon\MastodonDeleteAbility();
+
 	// Threads
 	new \DataMachineSocials\Abilities\Threads\ThreadsPublishAbility();
 	new \DataMachineSocials\Abilities\Threads\ThreadsReadAbility();
@@ -142,6 +148,7 @@ function datamachine_socials_bootstrap() {
 	new \DataMachineSocials\Handlers\Facebook\Facebook();
 	new \DataMachineSocials\Handlers\Threads\Threads();
 	new \DataMachineSocials\Handlers\Bluesky\Bluesky();
+	new \DataMachineSocials\Handlers\Mastodon\Mastodon();
 	new \DataMachineSocials\Handlers\Pinterest\Pinterest();
 	new \DataMachineSocials\Handlers\Instagram\Instagram();
 	new \DataMachineSocials\Handlers\TikTok\TikTok();

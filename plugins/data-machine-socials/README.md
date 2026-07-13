@@ -1,6 +1,6 @@
 # Data Machine Socials
 
-Social media publishing extension for [Data Machine](https://github.com/Extra-Chill/data-machine). Enables automated publishing to Twitter/X, Facebook Pages, Bluesky, Threads, Pinterest, and Tumblr.
+Social media publishing extension for [Data Machine](https://github.com/Extra-Chill/data-machine). Enables automated publishing to Twitter/X, Facebook Pages, Bluesky, Mastodon, Threads, Pinterest, Tumblr, and TikTok.
 
 ## Requirements
 
@@ -22,6 +22,7 @@ Social media publishing extension for [Data Machine](https://github.com/Extra-Ch
 | **Twitter/X** | OAuth 1.0a | 280 chars | Images |
 | **Facebook Pages** | OAuth 2.0 | No limit | Images |
 | **Bluesky** | App Password | 300 chars | Images |
+| **Mastodon / Fediverse** | OAuth 2.0 token | Instance-configurable | One image |
 | **Threads** | OAuth 2.0 | 500 chars | Images |
 | **Pinterest** | Bearer Token | N/A (pins) | Images required |
 | **Tumblr** | OAuth 2.0 | No documented text limit | Text posts; native media upload is not included |
