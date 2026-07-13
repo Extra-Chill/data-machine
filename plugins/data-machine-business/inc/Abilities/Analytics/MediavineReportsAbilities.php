@@ -18,7 +18,7 @@
  *      CLI plugin imports into its revenue store.
  *
  * A bonus `summary` action calls the metricsSummary GraphQL query for
- * site-level totals (note: that query uses ISO timestamps, NOT MM/DD/YYYY).
+ * site-level totals (request variables use ISO timestamps).
  *
  * Structurally this mirrors GoogleAnalyticsAbilities: a CONFIG_OPTION read via
  * get_config(), a token cached in a transient, authenticate -> fetch -> return
@@ -71,6 +71,39 @@ class MediavineReportsAbilities {
 	 */
 	const PAGES_PER_PAGE = 100000;
 
+	/**
+	 * Whether the upstream page-report schema exposes row-level host attribution.
+	 *
+	 * Proven by introspection of the Mediavine publisher GraphQL API
+	 * (api-publishers.mediavine.com): the `pagesSummary` query returns rows of
+	 * type `PageReport`, which exposes `path` (a URL path) plus a per-row
+	 * `siteId`/`date` that come back null for aggregate (date-range) queries,
+	 * but NO hostname, canonical URL, or domain field. Downstream attribution
+	 * that relies on a host must therefore treat every page row as
+	 * host-unattributed and resolve ownership through its own out-of-band
+	 * mapping rather than guessing from the path.
+	 *
+	 * @var bool
+	 */
+	const HOST_ATTRIBUTION_AVAILABLE = false;
+
+	/**
+	 * Human-readable page-report reason for HOST_ATTRIBUTION_AVAILABLE.
+	 *
+	 * References the actual upstream type (`PageReport`) so the limitation is
+	 * traceable to the source schema rather than an Extra Chill assumption.
+	 *
+	 * @var string
+	 */
+	const PAGES_HOST_ATTRIBUTION_REASON = 'Mediavine PageReport exposes path only; hostname, canonical URL, and domain are not part of the upstream pagesSummary GraphQL schema.';
+
+	/**
+	 * Human-readable host attribution reason for aggregate summary reports.
+	 *
+	 * @var string
+	 */
+	const SUMMARY_HOST_ATTRIBUTION_REASON = 'Mediavine metricsSummary returns site-level aggregate metrics without row-level URL or host dimensions.';
+
 	private static bool $registered = false;
 
 	public function __construct() {
@@ -88,7 +121,7 @@ class MediavineReportsAbilities {
 				'datamachine/mediavine-reports',
 				array(
 					'label'               => 'Mediavine Reports',
-					'description'         => 'Fetch per-period, per-URL Mediavine ad revenue directly from the Mediavine publisher GraphQL API. Actions: pages (per-period per-URL revenue rows: slug,views,revenue,rpm,cpm,viewability,fillRate,impressionsPerPageview,period), summary (site-level aggregate totals: earnings, pageviews, sessions, rpm), backfill (iterate a list of periods, returning pages rows per period for a full revenue-arc backfill). Credentials live server-side in the datamachine_mediavine_config option.',
+					'description'         => 'Fetch per-period, per-URL Mediavine ad revenue directly from the Mediavine publisher GraphQL API. Actions: pages (per-period per-URL revenue rows: slug,views,revenue,rpm,cpm,viewability,fillRate,impressionsPerPageview,period), summary (site-level aggregate totals: earnings, pageviews, sessions, rpm), backfill (iterate a list of periods, returning pages rows per period for a full revenue-arc backfill). Every result batch and each backfill period summary carries a `provenance` block: the requested Mediavine site id, the requested and canonical report period, the source action/query identity, and an explicit host_attribution.available=false flag (the upstream PageReport type exposes path only, never hostname/domain). Credentials live server-side in the datamachine_mediavine_config option.',
 					'category'            => 'datamachine-analytics',
 					'input_schema'        => array(
 						'type'       => 'object',
@@ -128,17 +161,7 @@ class MediavineReportsAbilities {
 							),
 						),
 					),
-					'output_schema'       => array(
-						'type'       => 'object',
-						'properties' => array(
-							'success'       => array( 'type' => 'boolean' ),
-							'action'        => array( 'type' => 'string' ),
-							'results_count' => array( 'type' => 'integer' ),
-							'results'       => array( 'type' => 'array' ),
-							'periods'       => array( 'type' => 'array' ),
-							'error'         => array( 'type' => 'string' ),
-						),
-					),
+					'output_schema'       => self::outputSchema(),
 					'execute_callback'    => array( self::class, 'fetch' ),
 					'permission_callback' => fn() => PermissionHelper::can_manage(),
 					'meta'                => array( 'show_in_rest' => false ),
@@ -147,6 +170,140 @@ class MediavineReportsAbilities {
 		};
 
 		\DataMachine\Abilities\AbilityRegistration::on_abilities_api_init( $register_callback );
+	}
+
+	/**
+	 * Return the complete public output contract for every action.
+	 */
+	public static function outputSchema(): array {
+		$result_properties = array(
+			'slug'                   => array( 'type' => 'string' ),
+			'views'                  => array( 'type' => 'integer' ),
+			'revenue'                => array( 'type' => 'number' ),
+			'rpm'                    => array( 'type' => 'number' ),
+			'cpm'                    => array( 'type' => 'number' ),
+			'viewability'            => array( 'type' => 'number' ),
+			'fillRate'               => array( 'type' => 'number' ),
+			'impressionsPerPageview' => array( 'type' => 'number' ),
+			'period'                 => array( 'type' => 'string' ),
+			'earnings'               => array( 'type' => 'number' ),
+			'pageviews'              => array( 'type' => 'integer' ),
+			'sessions'               => array( 'type' => 'integer' ),
+			'sessionRpm'             => array( 'type' => 'number' ),
+			'pageRpm'                => array( 'type' => 'number' ),
+			'paidImpressions'        => array( 'type' => 'integer' ),
+		);
+
+		return array(
+			'type'       => 'object',
+			'required'   => array( 'success' ),
+			'properties' => array(
+				'success'       => array( 'type' => 'boolean' ),
+				'action'        => array(
+					'type' => 'string',
+					'enum' => array( 'pages', 'summary', 'backfill' ),
+				),
+				'site_id'       => array(
+					'type'        => 'string',
+					'description' => 'Normalized Relay global InternalSite ID sent to Mediavine.',
+				),
+				'period'        => array( 'type' => 'string' ),
+				'date_range'    => array(
+					'type'       => 'object',
+					'required'   => array( 'start_date', 'end_date' ),
+					'properties' => array(
+						'start_date' => array( 'type' => 'string' ),
+						'end_date'   => array( 'type' => 'string' ),
+					),
+				),
+				'results_count' => array( 'type' => 'integer' ),
+				'results'       => array(
+					'type'  => 'array',
+					'items' => array(
+						'type'       => 'object',
+						'properties' => $result_properties,
+					),
+				),
+				'periods'       => array(
+					'type'  => 'array',
+					'items' => array(
+						'type'       => 'object',
+						'required'   => array( 'period', 'start_date', 'end_date', 'rows', 'provenance' ),
+						'properties' => array(
+							'period'     => array( 'type' => 'string' ),
+							'start_date' => array( 'type' => 'string' ),
+							'end_date'   => array( 'type' => 'string' ),
+							'rows'       => array( 'type' => 'integer' ),
+							'provenance' => self::provenanceSchema(),
+							'error'      => array( 'type' => 'string' ),
+						),
+					),
+				),
+				'provenance'    => self::provenanceSchema(),
+				'error'         => array( 'type' => 'string' ),
+			),
+		);
+	}
+
+	/**
+	 * Return the source provenance output contract.
+	 */
+	private static function provenanceSchema(): array {
+		$date_pair = array(
+			'type'       => 'object',
+			'required'   => array( 'start', 'end' ),
+			'properties' => array(
+				'start' => array( 'type' => array( 'string', 'null' ) ),
+				'end'   => array( 'type' => array( 'string', 'null' ) ),
+			),
+		);
+
+		return array(
+			'type'        => 'object',
+			'description' => 'Source provenance for the requested site, normalized report identity, period boundaries, and host attribution support.',
+			'required'    => array( 'source', 'site', 'period', 'host_attribution' ),
+			'properties'  => array(
+				'source'           => array(
+					'type'       => 'object',
+					'required'   => array( 'ability', 'action', 'operation', 'api' ),
+					'properties' => array(
+						'ability'   => array( 'type' => 'string' ),
+						'action'    => array(
+							'type' => 'string',
+							'enum' => array( 'pages', 'summary', 'backfill' ),
+						),
+						'operation' => array( 'type' => 'string' ),
+						'api'       => array( 'type' => 'string' ),
+					),
+				),
+				'site'             => array(
+					'type'       => 'object',
+					'required'   => array( 'requested_id', 'relay_id', 'internal_id' ),
+					'properties' => array(
+						'requested_id' => array( 'type' => 'string' ),
+						'relay_id'     => array( 'type' => 'string' ),
+						'internal_id'  => array( 'type' => array( 'string', 'null' ) ),
+					),
+				),
+				'period'           => array(
+					'type'       => 'object',
+					'required'   => array( 'requested', 'canonical', 'row_count' ),
+					'properties' => array(
+						'requested' => $date_pair,
+						'canonical' => $date_pair,
+						'row_count' => array( 'type' => array( 'integer', 'null' ) ),
+					),
+				),
+				'host_attribution' => array(
+					'type'       => 'object',
+					'required'   => array( 'available', 'reason' ),
+					'properties' => array(
+						'available' => array( 'type' => 'boolean' ),
+						'reason'    => array( 'type' => 'string' ),
+					),
+				),
+			),
+		);
 	}
 
 	/**
@@ -184,16 +341,16 @@ class MediavineReportsAbilities {
 			);
 		}
 
-		$site_id = self::resolve_site_id( $input, $config );
+		$requested_site_id = self::resolve_site_id( $input, $config );
 
-		if ( '' === $site_id ) {
+		if ( '' === $requested_site_id ) {
 			return array(
 				'success' => false,
 				'error'   => 'A Mediavine site id is required. Pass the "site_id" input, set site_id in the datamachine_mediavine_config option, or register a default via the datamachine_mediavine_default_site_id filter.',
 			);
 		}
 
-		$site_id = self::normalizeReportSiteId( $site_id );
+		$site_id = self::normalizeReportSiteId( $requested_site_id );
 		if ( is_wp_error( $site_id ) ) {
 			return array(
 				'success' => false,
@@ -202,14 +359,14 @@ class MediavineReportsAbilities {
 		}
 
 		if ( 'summary' === $action ) {
-			return self::fetchSummary( $input, $access_token, $site_id );
+			return self::fetchSummary( $input, $access_token, $requested_site_id, $site_id );
 		}
 
 		if ( 'backfill' === $action ) {
-			return self::fetchBackfill( $input, $access_token, $site_id );
+			return self::fetchBackfill( $input, $access_token, $requested_site_id, $site_id );
 		}
 
-		return self::fetchPages( $input, $access_token, $site_id );
+		return self::fetchPages( $input, $access_token, $requested_site_id, $site_id );
 	}
 
 	/**
@@ -217,22 +374,44 @@ class MediavineReportsAbilities {
 	 *
 	 * @param array  $input        Ability input.
 	 * @param string $access_token Bearer token.
-	 * @param string $site_id      Mediavine site id.
+	 * @param string $requested_site_id Original site id supplied by the caller or configuration.
+	 * @param string $site_id      Normalized Relay global Mediavine site id.
 	 * @return array
 	 */
-	private static function fetchPages( array $input, string $access_token, string $site_id ): array {
+	private static function fetchPages( array $input, string $access_token, string $requested_site_id, string $site_id ): array {
 		$start_date = self::resolveDate( $input['start_date'] ?? '', '-28 days' );
 		$end_date   = self::resolveDate( $input['end_date'] ?? '', '-1 day' );
 		$period     = sanitize_text_field( $input['period'] ?? '' );
 
-		$rows = self::fetchPagesRows( $access_token, $site_id, $start_date, $end_date, $period );
+		$parsed = self::fetchPagesRows( $access_token, $site_id, $start_date, $end_date, $period );
 
-		if ( is_wp_error( $rows ) ) {
+		if ( is_wp_error( $parsed ) ) {
 			return array(
 				'success' => false,
-				'error'   => $rows->get_error_message(),
+				'error'   => $parsed->get_error_message(),
 			);
 		}
+
+		return self::buildPagesResult( $requested_site_id, $site_id, $start_date, $end_date, $period, $parsed );
+	}
+
+	/**
+	 * Assemble the `pages` action response, including source provenance.
+	 *
+	 * Pure (no HTTP) so the batch-level shape — rows plus provenance — is
+	 * unit-testable without a network round-trip.
+	 *
+	 * @param string $requested_site_id Original site id supplied by the caller or configuration.
+	 * @param string $site_id     Normalized Relay global Mediavine site id.
+	 * @param string $start_date  Requested window start (Y-m-d).
+	 * @param string $end_date    Requested window end (Y-m-d).
+	 * @param string $period      Period label stamped on rows.
+	 * @param array  $parsed      Parsed payload from parsePagesPayload() {rows, meta}.
+	 * @return array
+	 */
+	public static function buildPagesResult( string $requested_site_id, string $site_id, string $start_date, string $end_date, string $period, array $parsed ): array {
+		$rows = $parsed['rows'] ?? array();
+		$meta = $parsed['meta'] ?? array();
 
 		return array(
 			'success'       => true,
@@ -245,6 +424,7 @@ class MediavineReportsAbilities {
 			),
 			'results_count' => count( $rows ),
 			'results'       => $rows,
+			'provenance'    => self::buildProvenance( 'pages', 'PagesSummaryQuery', $requested_site_id, $site_id, $start_date, $end_date, $meta ),
 		);
 	}
 
@@ -258,10 +438,11 @@ class MediavineReportsAbilities {
 	 *
 	 * @param array  $input        Ability input.
 	 * @param string $access_token Bearer token.
-	 * @param string $site_id      Mediavine site id.
+	 * @param string $requested_site_id Original site id supplied by the caller or configuration.
+	 * @param string $site_id      Normalized Relay global Mediavine site id.
 	 * @return array
 	 */
-	private static function fetchBackfill( array $input, string $access_token, string $site_id ): array {
+	private static function fetchBackfill( array $input, string $access_token, string $requested_site_id, string $site_id ): array {
 		$periods = $input['periods'] ?? array();
 
 		if ( ! is_array( $periods ) || empty( $periods ) ) {
@@ -283,26 +464,79 @@ class MediavineReportsAbilities {
 			$start_date = self::resolveDate( $entry['start_date'] ?? '', '-28 days' );
 			$end_date   = self::resolveDate( $entry['end_date'] ?? '', '-1 day' );
 
-			$rows = self::fetchPagesRows( $access_token, $site_id, $start_date, $end_date, $period );
+			$parsed = self::fetchPagesRows( $access_token, $site_id, $start_date, $end_date, $period );
 
-			if ( is_wp_error( $rows ) ) {
-				$period_summaries[] = array(
-					'period'     => $period,
-					'start_date' => $start_date,
-					'end_date'   => $end_date,
-					'rows'       => 0,
-					'error'      => $rows->get_error_message(),
-				);
+			if ( is_wp_error( $parsed ) ) {
+				$period_summaries[] = self::buildBackfillPeriodSummary( $requested_site_id, $site_id, $period, $start_date, $end_date, 0, array(), $parsed->get_error_message() );
 				continue;
 			}
 
+			$rows               = $parsed['rows'] ?? array();
 			$all_rows           = array_merge( $all_rows, $rows );
-			$period_summaries[] = array(
-				'period'     => $period,
-				'start_date' => $start_date,
-				'end_date'   => $end_date,
-				'rows'       => count( $rows ),
-			);
+			$period_summaries[] = self::buildBackfillPeriodSummary( $requested_site_id, $site_id, $period, $start_date, $end_date, count( $rows ), $parsed['meta'] ?? array() );
+		}
+
+		return self::buildBackfillResult( $requested_site_id, $site_id, $period_summaries, $all_rows );
+	}
+
+	/**
+	 * Assemble a single backfill period summary, including source provenance.
+	 *
+	 * Provenance is carried per-period (not only at the top level) so a
+	 * downstream consumer can attribute each batch independently, including a
+	 * period that failed to fetch (provenance still records what was requested).
+	 *
+	 * @param string $requested_site_id Original site id supplied by the caller or configuration.
+	 * @param string $site_id     Normalized Relay global Mediavine site id.
+	 * @param string $period      Period label.
+	 * @param string $start_date  Requested window start (Y-m-d).
+	 * @param string $end_date    Requested window end (Y-m-d).
+	 * @param int    $row_count   Rows fetched for this period.
+	 * @param array  $meta        Canonical meta from upstream (reportStart/reportEnd/totalCount).
+	 * @param string|null $error  Optional per-period error message.
+	 * @return array
+	 */
+	public static function buildBackfillPeriodSummary( string $requested_site_id, string $site_id, string $period, string $start_date, string $end_date, int $row_count, array $meta = array(), ?string $error = null ): array {
+		$summary = array(
+			'period'     => $period,
+			'start_date' => $start_date,
+			'end_date'   => $end_date,
+			'rows'       => $row_count,
+			'provenance' => self::buildProvenance( 'backfill', 'PagesSummaryQuery', $requested_site_id, $site_id, $start_date, $end_date, $meta ),
+		);
+
+		if ( null !== $error ) {
+			$summary['error'] = $error;
+		}
+
+		return $summary;
+	}
+
+	/**
+	 * Assemble the top-level backfill response, including source provenance.
+	 *
+	 * The top-level provenance spans the full requested range (min start to
+	 * max end across periods) so consumers know the overall window without
+	 * re-deriving it from the period list.
+	 *
+	 * @param string $requested_site_id Original site id supplied by the caller or configuration.
+	 * @param string $site_id          Normalized Relay global Mediavine site id.
+	 * @param array  $period_summaries Per-period summaries (each carries its own provenance).
+	 * @param array  $all_rows         Flattened rows across all periods.
+	 * @return array
+	 */
+	public static function buildBackfillResult( string $requested_site_id, string $site_id, array $period_summaries, array $all_rows ): array {
+		$span_start = '';
+		$span_end   = '';
+		foreach ( $period_summaries as $ps ) {
+			$s = isset( $ps['start_date'] ) ? (string) $ps['start_date'] : '';
+			$e = isset( $ps['end_date'] ) ? (string) $ps['end_date'] : '';
+			if ( '' !== $s && ( '' === $span_start || $s < $span_start ) ) {
+				$span_start = $s;
+			}
+			if ( '' !== $e && ( '' === $span_end || $e > $span_end ) ) {
+				$span_end = $e;
+			}
 		}
 
 		return array(
@@ -312,22 +546,25 @@ class MediavineReportsAbilities {
 			'periods'       => $period_summaries,
 			'results_count' => count( $all_rows ),
 			'results'       => $all_rows,
+			'provenance'    => self::buildProvenance( 'backfill', 'PagesSummaryQuery', $requested_site_id, $site_id, $span_start, $span_end, array() ),
 		);
 	}
 
 	/**
-	 * Fetch the current pagesSummary GraphQL report and normalize its rows.
+	 * Fetch the current pagesSummary GraphQL report and normalize its payload.
 	 *
 	 * GraphQL fields are normalized to slug,views,revenue,rpm,cpm,viewability,
 	 * fillRate,impressionsPerPageview — exactly the established public row shape.
 	 * Each parsed row also carries the supplied period for revenue-arc grouping.
+	 * The upstream `meta` block (totalCount/reportStart/reportEnd) is preserved
+	 * so the canonical report period survives into the provenance block.
 	 *
 	 * @param string $access_token Bearer token.
 	 * @param string $site_id      Mediavine site id.
 	 * @param string $start_date   Window start (Y-m-d).
 	 * @param string $end_date     Window end (Y-m-d).
 	 * @param string $period       Period label to stamp on each row.
-	 * @return array|\WP_Error Parsed rows or error.
+	 * @return array|\WP_Error Parsed payload {rows, meta} or error.
 	 */
 	private static function fetchPagesRows( string $access_token, string $site_id, string $start_date, string $end_date, string $period ) {
 		$result = HttpClient::post(
@@ -357,7 +594,7 @@ class MediavineReportsAbilities {
 			return new \WP_Error( 'mediavine_pages_schema', 'Mediavine pages report schema or authorization error: ' . $error );
 		}
 
-		return self::parsePagesResponse( $data, $period );
+		return self::parsePagesPayload( $data, $period );
 	}
 
 	/**
@@ -384,13 +621,43 @@ class MediavineReportsAbilities {
 	/**
 	 * Normalize a pagesSummary response into the established ability row shape.
 	 *
+	 * Backward-compatible wrapper: returns only the parsed rows (or WP_Error).
+	 * New callers should use parsePagesPayload() to also receive the canonical
+	 * upstream meta block (reportStart/reportEnd/totalCount).
+	 *
 	 * @return array|\WP_Error
 	 */
 	public static function parsePagesResponse( array $data, string $period ) {
+		$parsed = self::parsePagesPayload( $data, $period );
+
+		if ( is_wp_error( $parsed ) ) {
+			return $parsed;
+		}
+
+		return $parsed['rows'];
+	}
+
+	/**
+	 * Normalize a pagesSummary response into rows plus the canonical meta block.
+	 *
+	 * The established row shape is preserved exactly
+	 * (slug,views,revenue,rpm,cpm,viewability,fillRate,impressionsPerPageview,period)
+	 * so existing consumers are unaffected. The upstream `meta`
+	 * (totalCount/reportStart/reportEnd) is captured separately so the canonical
+	 * report period can be propagated into source provenance. Note: the upstream
+	 * `PageReport` type exposes `path` (a URL path) but no hostname/domain, so
+	 * no host field is read here — host attribution is reported as unavailable
+	 * in the provenance block rather than synthesized.
+	 *
+	 * @return array|\WP_Error {rows: array, meta: array} or error.
+	 */
+	public static function parsePagesPayload( array $data, string $period ) {
 		$payload = $data['data']['pagesSummary'] ?? null;
 		if ( ! is_array( $payload ) || ! isset( $payload['pages'] ) || ! is_array( $payload['pages'] ) ) {
 			return new \WP_Error( 'mediavine_pages_contract', 'Mediavine pages report response is missing pagesSummary.pages.' );
 		}
+
+		$raw_meta = is_array( $payload['meta'] ?? null ) ? $payload['meta'] : array();
 
 		if ( empty( $payload['pages'] ) ) {
 			return new \WP_Error( 'mediavine_pages_empty', 'Mediavine pages report returned no page-level rows for the requested date range.' );
@@ -415,9 +682,118 @@ class MediavineReportsAbilities {
 			);
 		}
 
-		return empty( $rows )
-			? new \WP_Error( 'mediavine_pages_empty', 'Mediavine pages report contained no usable page-level rows.' )
-			: $rows;
+		if ( empty( $rows ) ) {
+			return new \WP_Error( 'mediavine_pages_empty', 'Mediavine pages report contained no usable page-level rows.' );
+		}
+
+		return array(
+			'rows' => $rows,
+			'meta' => self::normalizeReportMeta( $raw_meta ),
+		);
+	}
+
+	/**
+	 * Normalize the upstream `meta` (ReportMeta) block into a typed array.
+	 *
+	 * reportStart/reportEnd arrive as YYYY/MM/DD strings (e.g. "2026/06/01");
+	 * they are preserved verbatim as the canonical period rather than
+	 * re-formatted, so consumers can see exactly what the upstream reported.
+	 *
+	 * @param array $meta Raw meta block.
+	 * @return array
+	 */
+	public static function normalizeReportMeta( array $meta ): array {
+		return array(
+			'totalCount'  => isset( $meta['totalCount'] ) ? (int) $meta['totalCount'] : null,
+			'reportStart' => isset( $meta['reportStart'] ) ? (string) $meta['reportStart'] : null,
+			'reportEnd'   => isset( $meta['reportEnd'] ) ? (string) $meta['reportEnd'] : null,
+		);
+	}
+
+	/**
+	 * Build the source provenance block for a result batch.
+	 *
+	 * Provenance preserves exactly what the upstream source can truthfully
+	 * provide:
+	 *   - the requested Mediavine site id (relay-encoded) plus its decoded
+	 *     numeric internal id when derivable;
+	 *   - the requested report window (Y-m-d, what the caller asked for) and
+	 *     the canonical report period (the upstream meta reportStart/reportEnd);
+	 *   - the source action and GraphQL operation identity;
+	 *   - an explicit host_attribution.available flag. This is always false for
+	 *     pagesSummary because the upstream `PageReport` type exposes `path`
+	 *     only — proven by schema introspection, not assumed. Consumers must
+	 *     not infer a host from the row path.
+	 *
+	 * @param string $action            Ability action (pages|summary|backfill).
+	 * @param string $operation         GraphQL operation name.
+	 * @param string $requested_site_id Original site id supplied by input, config, or filter.
+	 * @param string $relay_site_id     Normalized Relay global site id used in the request.
+	 * @param string $start_date        Requested window start (Y-m-d).
+	 * @param string $end_date          Requested window end (Y-m-d).
+	 * @param array  $meta              Normalized canonical meta block.
+	 * @return array
+	 */
+	public static function buildProvenance( string $action, string $operation, string $requested_site_id, string $relay_site_id, string $start_date, string $end_date, array $meta = array() ): array {
+		$host_reason = 'summary' === $action ? self::SUMMARY_HOST_ATTRIBUTION_REASON : self::PAGES_HOST_ATTRIBUTION_REASON;
+
+		return array(
+			'source'           => array(
+				'ability'   => 'datamachine/mediavine-reports',
+				'action'    => $action,
+				'operation' => $operation,
+				'api'       => self::API_BASE . '/graphql',
+			),
+			'site'             => array(
+				'requested_id' => $requested_site_id,
+				'relay_id'     => $relay_site_id,
+				'internal_id'  => self::decodeInternalSiteId( $relay_site_id ),
+			),
+			'period'           => array(
+				'requested' => array(
+					'start' => $start_date,
+					'end'   => $end_date,
+				),
+				'canonical' => array(
+					'start' => $meta['reportStart'] ?? null,
+					'end'   => $meta['reportEnd'] ?? null,
+				),
+				'row_count' => array_key_exists( 'totalCount', $meta ) ? $meta['totalCount'] : null,
+			),
+			'host_attribution' => array(
+				'available' => self::HOST_ATTRIBUTION_AVAILABLE,
+				'reason'    => $host_reason,
+			),
+		);
+	}
+
+	/**
+	 * Decode a numeric internal site id from a relay-encoded or raw site id.
+	 *
+	 * Reporting requests use a Relay global id ("Base64(InternalSite:<n>)").
+	 * A plain numeric id is passed through. Returns null when the id cannot be
+	 * resolved to a numeric internal id (e.g. a legacy slug).
+	 *
+	 * @param string $requested_site_id Site id used in the request.
+	 * @return string|null Numeric internal id, or null.
+	 */
+	public static function decodeInternalSiteId( string $requested_site_id ): ?string {
+		if ( '' === $requested_site_id ) {
+			return null;
+		}
+
+		if ( ctype_digit( $requested_site_id ) ) {
+			return $requested_site_id;
+		}
+
+		// phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_decode -- Read a Relay global ID type prefix.
+		$decoded = base64_decode( $requested_site_id, true );
+		if ( false !== $decoded && str_starts_with( $decoded, 'InternalSite:' ) ) {
+			$numeric = substr( $decoded, strlen( 'InternalSite:' ) );
+			return ctype_digit( $numeric ) ? $numeric : null;
+		}
+
+		return null;
 	}
 
 	/**
@@ -515,20 +891,21 @@ class MediavineReportsAbilities {
 	/**
 	 * Fetch the site-level metricsSummary aggregate.
 	 *
-	 * NOTE: metricsSummary uses ISO 8601 timestamps (e.g. 2023-01-01T05:00:00.000Z),
-	 * NOT the MM/DD/YYYY format the CSV report uses. The Y-m-d window is converted
-	 * to the start/end-of-day ISO instants here.
+	 * NOTE: metricsSummary request variables use ISO 8601 timestamps (e.g.
+	 * 2023-01-01T05:00:00.000Z). ReportMeta response boundaries use YYYY/MM/DD.
+	 * The Y-m-d input window is converted to start/end-of-day ISO instants here.
 	 *
 	 * @param array  $input        Ability input.
 	 * @param string $access_token Bearer token.
-	 * @param string $site_id      Mediavine site id.
+	 * @param string $requested_site_id Original site id supplied by the caller or configuration.
+	 * @param string $site_id      Normalized Relay global Mediavine site id.
 	 * @return array
 	 */
-	private static function fetchSummary( array $input, string $access_token, string $site_id ): array {
+	private static function fetchSummary( array $input, string $access_token, string $requested_site_id, string $site_id ): array {
 		$start_date = self::resolveDate( $input['start_date'] ?? '', '-28 days' );
 		$end_date   = self::resolveDate( $input['end_date'] ?? '', '-1 day' );
 
-		$query = 'query MetricsSummaryQuery($data: GetMetricsSummaryInput!){ metricsSummary(data:$data){ summary{ earnings pageviews sessions cpm sessionRpm pageRpm paidImpressions } } }';
+		$query = 'query MetricsSummaryQuery($data: GetMetricsSummaryInput!){ metricsSummary(data:$data){ meta{ totalCount reportStart reportEnd } summary{ earnings pageviews sessions cpm sessionRpm pageRpm paidImpressions } } }';
 
 		$body = array(
 			'query'         => $query,
@@ -579,7 +956,8 @@ class MediavineReportsAbilities {
 			);
 		}
 
-		$summary = $data['data']['metricsSummary']['summary'] ?? array();
+		$payload = $data['data']['metricsSummary'] ?? array();
+		$summary = $payload['summary'] ?? array();
 		if ( empty( $summary ) ) {
 			return array(
 				'success' => false,
@@ -598,6 +976,26 @@ class MediavineReportsAbilities {
 			'paidImpressions' => (int) ( $summary['paidImpressions'] ?? 0 ),
 		);
 
+		$meta = self::normalizeReportMeta( is_array( $payload['meta'] ?? null ) ? $payload['meta'] : array() );
+
+		return self::buildSummaryResult( $requested_site_id, $site_id, $start_date, $end_date, $row, $meta );
+	}
+
+	/**
+	 * Assemble the `summary` action response, including source provenance.
+	 *
+	 * Pure (no HTTP) so the summary batch shape — including provenance and the
+	 * canonical period — is unit-testable without a network round-trip.
+	 *
+	 * @param string $requested_site_id Original site id supplied by the caller or configuration.
+	 * @param string $site_id     Normalized Relay global Mediavine site id.
+	 * @param string $start_date  Requested window start (Y-m-d).
+	 * @param string $end_date    Requested window end (Y-m-d).
+	 * @param array  $row         Normalized summary row.
+	 * @param array  $meta        Normalized canonical meta block.
+	 * @return array
+	 */
+	public static function buildSummaryResult( string $requested_site_id, string $site_id, string $start_date, string $end_date, array $row, array $meta = array() ): array {
 		return array(
 			'success'       => true,
 			'action'        => 'summary',
@@ -608,6 +1006,7 @@ class MediavineReportsAbilities {
 			),
 			'results_count' => 1,
 			'results'       => array( $row ),
+			'provenance'    => self::buildProvenance( 'summary', 'MetricsSummaryQuery', $requested_site_id, $site_id, $start_date, $end_date, $meta ),
 		);
 	}
 
@@ -759,8 +1158,8 @@ class MediavineReportsAbilities {
 	/**
 	 * Convert a Y-m-d date to an ISO 8601 instant for metricsSummary.
 	 *
-	 * The summary GraphQL query uses ISO timestamps, not MM/DD/YYYY. Start dates
-	 * map to the start of the day, end dates to the end of the day, both in UTC.
+	 * The summary GraphQL query uses ISO timestamps. Start dates map to the start
+	 * of the day, end dates to the end of the day, both in UTC.
 	 *
 	 * @param string $date     Y-m-d date.
 	 * @param bool   $end_of_day Whether this is an end date (end of day).
