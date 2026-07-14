@@ -185,7 +185,7 @@ class ScopeResolver {
 	 * @return array Resolved date boundaries with time precision.
 	 */
 	private static function resolve_tonight( int $now, string $display_day ): array {
-		$current_hour = (int) gmdate( 'G', $now );
+		$current_hour       = (int) gmdate( 'G', $now );
 		$display_day_bounds = self::resolve_display_day( $display_day );
 
 		// Before 5 PM: show from 5 PM today onward.
