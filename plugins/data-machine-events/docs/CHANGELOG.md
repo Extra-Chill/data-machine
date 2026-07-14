@@ -2,6 +2,13 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.49.1] - 2026-07-14
+
+### Fixed
+- retain nightlife scopes after midnight
+- correct past calendar date boundaries
+- normalize overnight event end dates
+
 ## [0.49.0] - 2026-07-13
 
 ### Added
