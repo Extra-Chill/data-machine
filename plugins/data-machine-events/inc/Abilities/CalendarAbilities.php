@@ -16,6 +16,7 @@ use DataMachineEvents\Blocks\Calendar\Query\ScopeResolver;
 use DataMachineEvents\Blocks\Calendar\Data\EventHydrator;
 use DataMachineEvents\Blocks\Calendar\Grouping\DateGrouper;
 use DataMachineEvents\Blocks\Calendar\Grouping\LateNightCutoff;
+use DataMachineEvents\Blocks\Calendar\Query\UpcomingFilter;
 use DataMachineEvents\Blocks\Calendar\Display\EventRenderer;
 use DataMachineEvents\Blocks\Calendar\Pagination\Renderer as PaginationRenderer;
 use DataMachineEvents\Blocks\Calendar\Pagination\PageBoundary;
@@ -675,6 +676,7 @@ class CalendarAbilities {
 
 		$show_past_param = $params['show_past'] ?? false;
 		$current_date    = current_time( 'Y-m-d' );
+		$current_time    = current_time( 'mysql' );
 		$ed_table        = EventDatesTable::table_name();
 
 		$archive_taxonomy = $params['archive_taxonomy'] ?? '';
@@ -696,7 +698,11 @@ class CalendarAbilities {
 			$where_clauses = array( "ed.post_status = 'publish'" );
 			$query_values  = array();
 
-			if ( ! $show_past_param ) {
+			if ( $show_past_param ) {
+				// Keep page buckets aligned with the canonical completed-event
+				// scope used by EventDateQueryAbilities.
+				$where_clauses[] = UpcomingFilter::past_where( $current_time );
+			} else {
 				$where_clauses[] = 'ed.start_datetime >= %s';
 				$query_values[]  = $current_date . ' 00:00:00';
 			}
@@ -726,7 +732,9 @@ class CalendarAbilities {
 		$join_clauses  = array();
 		$query_values  = array();
 
-		if ( ! $show_past_param ) {
+		if ( $show_past_param ) {
+			$where_clauses[] = UpcomingFilter::past_where( $current_time );
+		} else {
 			$where_clauses[] = 'ed.start_datetime >= %s';
 			$query_values[]  = $current_date . ' 00:00:00';
 		}
