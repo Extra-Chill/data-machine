@@ -349,7 +349,10 @@ class GoogleAnalyticsAbilities {
 			'dateRanges' => $date_ranges,
 			'dimensions' => $dimensions,
 			'metrics'    => $metrics,
-			'limit'      => $limit,
+			// Comparison rows are reconciled after the API response. Fetch the full
+			// supported key set so a prior row outside the final display limit is
+			// not incorrectly classified as new.
+			'limit'      => $compare ? self::MAX_LIMIT : $limit,
 		);
 
 		// Build dimension filters.
@@ -552,8 +555,9 @@ class GoogleAnalyticsAbilities {
 			);
 		}
 
-		$rows = $compare
-			? self::formatComparisonRows( $data)
+		$limit = ! empty( $input['limit'] ) ? min( (int) $input['limit'], self::MAX_LIMIT ) : self::DEFAULT_LIMIT;
+		$rows  = $compare
+			? self::formatComparisonRows( $data, $limit )
 			: self::formatReportRows( $data);
 
 		$response = array(
@@ -1110,61 +1114,86 @@ class GoogleAnalyticsAbilities {
 	/**
 	 * Format GA4 comparison rows with delta columns.
 	 *
-	 * When two date ranges are used, the API returns rows with metricValues
-	 * containing values for each date range. This interleaves current and
-	 * previous values, then computes percentage deltas.
+	 * GA returns a separate row for each date range and adds a synthetic
+	 * dateRange dimension. Reconcile those rows by the complete report dimension
+	 * tuple, preserving current-period order and omitting prior-only rows.
 	 *
-	 * @param array $data          Raw GA4 API response.
-	 * @param array $report_config Report configuration.
+	 * @param array $data  Raw GA4 API response.
+	 * @param int   $limit Final reconciled row limit.
 	 * @return array Formatted rows with delta columns.
 	 */
-	private static function formatComparisonRows( array $data): array {
+	private static function formatComparisonRows( array $data, int $limit ): array {
 		$dimension_headers = wp_list_pluck( $data['dimensionHeaders'] ?? array(), 'name' );
 		$metric_headers    = wp_list_pluck( $data['metricHeaders'] ?? array(), 'name' );
-		$metric_count      = count( $metric_headers );
-
-		$rows = array();
+		$date_range_index  = array_search( 'dateRange', $dimension_headers, true );
+		$current_rows      = array();
+		$previous_rows     = array();
 
 		foreach ( ( $data['rows'] ?? array() ) as $row ) {
 			$dim_values    = wp_list_pluck( $row['dimensionValues'] ?? array(), 'value' );
 			$metric_values = wp_list_pluck( $row['metricValues'] ?? array(), 'value' );
-
-			$formatted = array();
+			$dimensions    = array();
 			foreach ( $dimension_headers as $i => $name ) {
-				// Skip the dateRange dimension GA4 adds for multi-range requests.
 				if ( 'dateRange' === $name ) {
 					continue;
 				}
-				$formatted[ $name ] = $dim_values[ $i ] ?? '';
+				$dimensions[ $name ] = $dim_values[ $i ] ?? '';
 			}
 
-			// GA4 returns metric values as [current_m1, current_m2, ..., previous_m1, previous_m2, ...].
-			for ( $i = 0; $i < $metric_count; $i++ ) {
-				$name     = $metric_headers[ $i ];
-				$current  = $metric_values[ $i ] ?? '0';
-				$previous = $metric_values[ $i + $metric_count ] ?? '0';
+			$key         = wp_json_encode( array_values( $dimensions ) );
+			$range       = false !== $date_range_index ? ( $dim_values[ $date_range_index ] ?? 'date_range_0' ) : 'date_range_0';
+			$formatted   = $dimensions;
+			$raw_metrics = array();
+			foreach ( $metric_headers as $i => $name ) {
+				$value                = $metric_values[ $i ] ?? '0';
+				$raw_metrics[ $name ] = $value;
+				$formatted[ $name ]   = is_numeric( $value )
+					? ( strpos( $value, '.' ) !== false ? (float) $value : (int) $value )
+					: $value;
+			}
 
+			$entry = array(
+				'formatted' => $formatted,
+				'metrics'   => $raw_metrics,
+			);
+
+			if ( 'date_range_1' === $range ) {
+				$previous_rows[ $key ] = $entry;
+			} else {
+				$current_rows[ $key ] = $entry;
+			}
+		}
+
+		$rows = array();
+		foreach ( $current_rows as $key => $current_row ) {
+			$formatted    = $current_row['formatted'];
+			$has_previous = isset( $previous_rows[ $key ] );
+
+			foreach ( $metric_headers as $name ) {
+				$current      = $current_row['metrics'][ $name ] ?? '0';
 				$current_num  = is_numeric( $current ) ? (float) $current : 0;
-				$previous_num = is_numeric( $previous ) ? (float) $previous : 0;
+				$delta_column = "\xCE\x94 " . $name;
 
-				// Format current value.
-				if ( is_numeric( $current ) ) {
-					$formatted[ $name ] = strpos( $current, '.' ) !== false ? (float) $current : (int) $current;
-				} else {
-					$formatted[ $name ] = $current;
+				if ( ! $has_previous ) {
+					$formatted[ $delta_column ] = 'new';
+					continue;
 				}
 
-				// Compute delta percentage.
+				$previous     = $previous_rows[ $key ]['metrics'][ $name ] ?? '0';
+				$previous_num = is_numeric( $previous ) ? (float) $previous : 0;
 				if ( 0.0 !== $previous_num ) {
-					$delta                            = ( ( $current_num - $previous_num ) / $previous_num ) * 100;
-					$sign                             = $delta >= 0 ? '+' : '';
-					$formatted[ "\xCE\x94 " . $name ] = $sign . round( $delta, 1 ) . '%';
+					$delta                      = ( ( $current_num - $previous_num ) / $previous_num ) * 100;
+					$sign                       = $delta >= 0 ? '+' : '';
+					$formatted[ $delta_column ] = $sign . round( $delta, 1 ) . '%';
 				} else {
-					$formatted[ "\xCE\x94 " . $name ] = $current_num > 0 ? 'new' : '-';
+					$formatted[ $delta_column ] = '-';
 				}
 			}
 
 			$rows[] = $formatted;
+			if ( count( $rows ) >= $limit ) {
+				break;
+			}
 		}
 
 		return $rows;

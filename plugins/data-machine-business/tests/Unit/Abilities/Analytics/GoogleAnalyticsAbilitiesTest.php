@@ -388,6 +388,131 @@ class GoogleAnalyticsAbilitiesTest extends WP_UnitTestCase {
 		$this->assertArrayNotHasKey( 'dimensionFilter', $body );
 	}
 
+	/**
+	 * Comparison rows are joined by landing page before the final limit is
+	 * applied. Prior-only rows are not emitted and absent prior keys are new.
+	 */
+	public function test_landing_page_comparison_reconciles_rows_and_applies_final_limit(): void {
+		$data = $this->comparison_response(
+			array( 'landingPage' ),
+			array( 'sessions' ),
+			array(
+				array( array( '/shared' ), 'date_range_0', array( '120' ) ),
+				array( array( '/new' ), 'date_range_0', array( '30' ) ),
+				array( array( '/shared' ), 'date_range_1', array( '100' ) ),
+				array( array( '/removed' ), 'date_range_1', array( '40' ) ),
+			)
+		);
+
+		$rows = $this->format_comparison_rows( $data, 2 );
+
+		$this->assertCount( 2, $rows );
+		$this->assertSame( '/shared', $rows[0]['landingPage'] );
+		$this->assertSame( 120, $rows[0]['sessions'] );
+		$this->assertSame( '+20%', $rows[0]["\xCE\x94 sessions"] );
+		$this->assertSame( 'new', $rows[1]["\xCE\x94 sessions"] );
+		$this->assertNotContains( '/removed', wp_list_pluck( $rows, 'landingPage' ) );
+
+		$limited = $this->format_comparison_rows( $data, 1 );
+		$this->assertCount( 1, $limited );
+		$this->assertSame( '/shared', $limited[0]['landingPage'] );
+	}
+
+	/**
+	 * A present zero-valued prior row is not a new key, even though a percentage
+	 * delta cannot be calculated from zero.
+	 */
+	public function test_comparison_marks_only_absent_prior_keys_as_new(): void {
+		$data = $this->comparison_response(
+			array( 'landingPage' ),
+			array( 'sessions' ),
+			array(
+				array( array( '(not set)' ), 'date_range_0', array( '10' ) ),
+				array( array( '(not set)' ), 'date_range_1', array( '0' ) ),
+			)
+		);
+
+		$rows = $this->format_comparison_rows( $data, 10 );
+
+		$this->assertSame( '-', $rows[0]["\xCE\x94 sessions"] );
+	}
+
+	/**
+	 * Multi-dimension actions use the complete tuple as their stable key, so two
+	 * rows sharing a source but using different media remain independent.
+	 */
+	public function test_comparison_uses_complete_multi_dimension_key(): void {
+		$data = $this->comparison_response(
+			array( 'sessionSource', 'sessionMedium' ),
+			array( 'sessions' ),
+			array(
+				array( array( 'search', 'organic' ), 'date_range_0', array( '90' ) ),
+				array( array( 'search', 'referral' ), 'date_range_0', array( '25' ) ),
+				array( array( 'search', 'organic' ), 'date_range_1', array( '60' ) ),
+				array( array( 'search', 'referral' ), 'date_range_1', array( '20' ) ),
+			)
+		);
+
+		$rows = $this->format_comparison_rows( $data, 10 );
+
+		$this->assertCount( 2, $rows );
+		$this->assertSame( '+50%', $rows[0]["\xCE\x94 sessions"] );
+		$this->assertSame( '+25%', $rows[1]["\xCE\x94 sessions"] );
+	}
+
+	/**
+	 * Compare requests fetch the supported key set; the requested limit is
+	 * enforced after current/prior reconciliation instead of by GA per range.
+	 */
+	public function test_compare_request_defers_limit_until_after_reconciliation(): void {
+		$body = GoogleAnalyticsAbilities::buildReportRequestBody(
+			array(
+				'compare'    => true,
+				'limit'      => 30,
+				'start_date' => '2026-04-01',
+				'end_date'   => '2026-07-13',
+			),
+			'landing_pages'
+		);
+
+		$this->assertSame( GoogleAnalyticsAbilities::MAX_LIMIT, $body['limit'] );
+	}
+
+	private function format_comparison_rows( array $data, int $limit ): array {
+		$method = new \ReflectionMethod( GoogleAnalyticsAbilities::class, 'formatComparisonRows' );
+		$method->setAccessible( true );
+
+		return $method->invoke( null, $data, $limit );
+	}
+
+	private function comparison_response( array $dimensions, array $metrics, array $rows ): array {
+		return array(
+			'dimensionHeaders' => array_map(
+				static fn( string $name ): array => array( 'name' => $name ),
+				array_merge( $dimensions, array( 'dateRange' ) )
+			),
+			'metricHeaders'    => array_map(
+				static fn( string $name ): array => array( 'name' => $name ),
+				$metrics
+			),
+			'rows'             => array_map(
+				static function ( array $row ): array {
+					return array(
+						'dimensionValues' => array_map(
+							static fn( string $value ): array => array( 'value' => $value ),
+							array_merge( $row[0], array( $row[1] ) )
+						),
+						'metricValues'    => array_map(
+							static fn( string $value ): array => array( 'value' => $value ),
+							$row[2]
+						),
+					);
+				},
+				$rows
+			),
+		);
+	}
+
 	public static function all_filterable_actions(): array {
 		return array(
 			'page_stats'        => array( 'page_stats' ),
