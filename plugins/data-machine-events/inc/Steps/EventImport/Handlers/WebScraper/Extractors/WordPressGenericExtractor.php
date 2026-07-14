@@ -336,7 +336,7 @@ class WordPressGenericExtractor extends BaseExtractor {
 			'title'         => $this->sanitizeText( html_entity_decode( wp_strip_all_tags( $title ), ENT_QUOTES, 'UTF-8' ) ),
 			'description'   => $this->cleanHtml( $description ),
 			'startDate'     => $start_date,
-			'endDate'       => $start_date,
+			'endDate'       => '',
 			'startTime'     => $start_time,
 			'endTime'       => '',
 			'venue'         => $this->sanitizeText( $venue ),
@@ -567,7 +567,7 @@ class WordPressGenericExtractor extends BaseExtractor {
 		}
 
 		$event['startDate'] = $start_date;
-		$event['endDate']   = $start_date;
+		$event['endDate']   = '';
 		$event['startTime'] = $start_time;
 
 		// Image — first <img src> in the article.

@@ -15,6 +15,7 @@ use DataMachineEvents\Steps\Upsert\Events\EventUpsert;
 use DataMachineEvents\Core\Event_Post_Type;
 use DataMachineEvents\Core\EventDatesTable;
 use DataMachineEvents\Core\Venue_Taxonomy;
+use DataMachineEvents\Blocks\Calendar\Query\UpcomingFilter;
 
 class EventUpsertTest extends WP_UnitTestCase {
 
@@ -29,6 +30,9 @@ class EventUpsertTest extends WP_UnitTestCase {
 		}
 		if ( ! taxonomy_exists( 'venue' ) ) {
 			Venue_Taxonomy::register();
+		}
+		if ( ! EventDatesTable::table_exists() ) {
+			EventDatesTable::create_table();
 		}
 
 		$this->handler = new EventUpsert();
@@ -133,6 +137,45 @@ class EventUpsertTest extends WP_UnitTestCase {
 
 		// Cleanup
 		wp_delete_post( $post_id, true );
+	}
+
+	public function test_save_post_normalizes_implicit_overnight_end_time(): void {
+		$post_id = wp_insert_post(
+			array(
+				'post_title'   => 'Implicit Overnight Sync Test ' . uniqid(),
+				'post_type'    => 'data_machine_events',
+				'post_status'  => 'publish',
+				'post_content' => '<!-- wp:data-machine-events/event-details {"startDate":"2026-08-15","startTime":"23:00","endTime":"02:00"} --><div class="wp-block-data-machine-events-event-details"></div><!-- /wp:data-machine-events/event-details -->',
+			)
+		);
+
+		$dates = EventDatesTable::get( $post_id );
+		$this->assertNotNull( $dates );
+		$this->assertSame( '2026-08-15 23:00:00', $dates->start_datetime );
+		$this->assertSame( '2026-08-16 02:00:00', $dates->end_datetime );
+
+		global $wpdb;
+		$table      = EventDatesTable::table_name();
+		$comparison = '2026-08-16 01:00:00';
+		$visible    = (int) $wpdb->get_var(
+			$wpdb->prepare( "SELECT COUNT(*) FROM {$table} ed WHERE ed.post_id = %d AND " . UpcomingFilter::upcoming_where( $comparison ), $post_id )
+		);
+		$this->assertSame( 1, $visible, 'The overnight event must remain in the canonical upcoming filter after midnight.' );
+	}
+
+	public function test_save_post_preserves_explicit_contradictory_end_datetime(): void {
+		$post_id = wp_insert_post(
+			array(
+				'post_title'   => 'Explicit Contradiction Sync Test ' . uniqid(),
+				'post_type'    => 'data_machine_events',
+				'post_status'  => 'publish',
+				'post_content' => '<!-- wp:data-machine-events/event-details {"startDate":"2026-08-15","startTime":"23:00","endDate":"2026-08-15","endTime":"02:00"} --><div class="wp-block-data-machine-events-event-details"></div><!-- /wp:data-machine-events/event-details -->',
+			)
+		);
+
+		$dates = EventDatesTable::get( $post_id );
+		$this->assertNotNull( $dates );
+		$this->assertSame( '2026-08-15 02:00:00', $dates->end_datetime );
 	}
 
 	public function test_event_with_venue_assignment() {

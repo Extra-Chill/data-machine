@@ -254,8 +254,26 @@ function data_machine_events_sync_datetime_meta( $post_id, $post, $update ) {
 				if ( $end_date ) {
 					$effective_end_time = $end_time ? $end_time : '23:59:59';
 					$end_datetime_val   = $end_date . ' ' . $effective_end_time;
+
+					if ( $end_datetime_val < $datetime ) {
+						do_action(
+							'datamachine_log',
+							'warning',
+							'Event date sync preserved an explicit end datetime before its start datetime',
+							array(
+								'post_id'        => $post_id,
+								'start_datetime' => $datetime,
+								'end_datetime'   => $end_datetime_val,
+							)
+						);
+					}
 				} elseif ( $end_time ) {
 					$end_datetime_val = $start_date . ' ' . $end_time;
+
+					// A time-only end before the start is an implicit overnight event.
+					if ( $end_datetime_val < $datetime ) {
+						$end_datetime_val = gmdate( 'Y-m-d H:i:s', strtotime( $end_datetime_val . ' +1 day' ) );
+					}
 				} else {
 					$end_datetime_val = null;
 				}

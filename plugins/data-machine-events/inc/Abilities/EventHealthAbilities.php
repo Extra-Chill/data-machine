@@ -15,6 +15,8 @@
 namespace DataMachineEvents\Abilities;
 
 use DataMachineEvents\Abilities\EventDateQueryAbilities;
+use DataMachineEvents\Core\EventDatesTable;
+use DataMachineEvents\Core\Event_Post_Type;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -100,6 +102,10 @@ class EventHealthAbilities {
 									'events' => array( 'type' => 'array' ),
 								),
 							),
+							'missing_event_dates' => array(
+								'count'  => array( 'type' => 'integer' ),
+								'events' => array( 'type' => 'array' ),
+							),
 							'missing_description' => array(
 								'type'       => 'object',
 								'properties' => array(
@@ -160,11 +166,19 @@ class EventHealthAbilities {
 			return new \WP_Error( 'query_failed', 'Failed to query events: ' . $events->get_error_message(), array( 'status' => 500 ) );
 		}
 
+		$missing_event_dates = EventDatesTable::find_missing_rows( Event_Post_Type::POST_TYPE );
+
 		if ( empty( $events ) ) {
 			return array(
-				'total_scanned' => 0,
-				'scope'         => $scope,
-				'message'       => 'No events found matching the specified scope.',
+				'total_scanned'       => 0,
+				'scope'               => $scope,
+				'missing_event_dates' => array(
+					'count'  => count( $missing_event_dates ),
+					'events' => array_slice( $missing_event_dates, 0, $limit ),
+				),
+				'message'             => ! empty( $missing_event_dates )
+					? count( $missing_event_dates ) . ' published events are missing event-date index rows.'
+					: 'No events found matching the specified scope.',
 			);
 		}
 
@@ -278,6 +292,9 @@ class EventHealthAbilities {
 		if ( ! empty( $invalid_encoding ) ) {
 			$message_parts[] = count( $invalid_encoding ) . ' invalid encoding';
 		}
+		if ( ! empty( $missing_event_dates ) ) {
+			$message_parts[] = count( $missing_event_dates ) . ' missing event-date index rows';
+		}
 		if ( $no_venue_count > 0 ) {
 			$message_parts[] = $no_venue_count . ' no venue';
 		}
@@ -310,6 +327,10 @@ class EventHealthAbilities {
 			'missing_venue'       => array(
 				'count'  => count( $missing_venue ),
 				'events' => array_slice( $missing_venue, 0, $limit ),
+			),
+			'missing_event_dates' => array(
+				'count'  => count( $missing_event_dates ),
+				'events' => array_slice( $missing_event_dates, 0, $limit ),
 			),
 			'missing_description' => array(
 				'count'  => count( $missing_description ),

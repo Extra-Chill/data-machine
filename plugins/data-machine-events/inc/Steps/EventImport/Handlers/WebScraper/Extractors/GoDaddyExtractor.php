@@ -74,7 +74,7 @@ class GoDaddyExtractor extends BaseExtractor {
 			'title'       => sanitize_text_field( $raw['title'] ?? '' ),
 			'description' => wp_kses_post( $raw['desc'] ?? '' ),
 			'startDate'   => $start['date'],
-			'endDate'     => $end['date'] ? $end['date'] : $start['date'],
+			'endDate'     => $end['date'],
 			'startTime'   => $start['time'],
 			'endTime'     => $end['time'],
 			'venue'       => sanitize_text_field( $raw['location'] ?? '' ),

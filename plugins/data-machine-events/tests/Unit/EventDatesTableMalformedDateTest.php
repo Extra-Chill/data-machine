@@ -166,4 +166,19 @@ class EventDatesTableMalformedDateTest extends WP_UnitTestCase {
 			$this->assertNotEquals( $post_id, $row['post_id'] );
 		}
 	}
+
+	public function test_find_missing_rows_surfaces_published_events_without_an_index(): void {
+		$post_id = wp_insert_post(
+			array(
+				'post_title'  => 'Unindexed Event ' . uniqid(),
+				'post_type'   => Event_Post_Type::POST_TYPE,
+				'post_status' => 'publish',
+			)
+		);
+
+		$rows = EventDatesTable::find_missing_rows( Event_Post_Type::POST_TYPE );
+		$ids  = array_column( $rows, 'id' );
+
+		$this->assertContains( $post_id, $ids );
+	}
 }

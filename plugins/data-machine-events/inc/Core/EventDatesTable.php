@@ -250,6 +250,39 @@ class EventDatesTable {
 	}
 
 	/**
+	 * Find published event posts without an event-dates index row.
+	 *
+	 * @param string $post_type Event post type.
+	 * @return array<array{id: int, title: string}> Unindexed published events.
+	 */
+	public static function find_missing_rows( string $post_type ): array {
+		global $wpdb;
+
+		$table = self::table_name();
+
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name is generated internally by table_name(); values remain prepared.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$rows = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT p.ID, p.post_title FROM {$wpdb->posts} p LEFT JOIN {$table} ed ON p.ID = ed.post_id WHERE p.post_type = %s AND p.post_status = 'publish' AND ed.post_id IS NULL ORDER BY p.ID ASC",
+				$post_type
+			),
+			ARRAY_A
+		);
+		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+
+		return array_map(
+			static function ( array $row ): array {
+				return array(
+					'id'    => (int) $row['ID'],
+					'title' => (string) $row['post_title'],
+				);
+			},
+			$rows
+		);
+	}
+
+	/**
 	 * Backfill the event dates table from legacy postmeta.
 	 *
 	 * One-time migration: populates the table for events that still have
