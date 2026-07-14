@@ -9,6 +9,15 @@
     }
   },
   "id": "data-machine-events",
+  "scopes": {
+    "release": {
+      "exclude": [
+        "inc/Blocks/Calendar/webpack.config.js",
+        "inc/Blocks/EventDetails/webpack.config.js",
+        "inc/Blocks/EventsMap/webpack.config.js"
+      ]
+    }
+  },
   "version_targets": [
     {
       "file": "data-machine-events.php",
