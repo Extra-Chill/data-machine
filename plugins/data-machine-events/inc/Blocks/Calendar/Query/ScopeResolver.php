@@ -15,6 +15,8 @@
 
 namespace DataMachineEvents\Blocks\Calendar\Query;
 
+use DataMachineEvents\Blocks\Calendar\Grouping\LateNightCutoff;
+
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
@@ -98,34 +100,34 @@ class ScopeResolver {
 	 * Returns null for 'current' (the default) or unrecognized scopes,
 	 * which signals the caller to use existing unscoped behavior.
 	 *
-	 * @param string $scope The scope identifier.
+	 * @param string   $scope The scope identifier.
+	 * @param int|null $now   Current site-local timestamp. Null uses the current time.
 	 * @return array|null Array with 'date_start', 'date_end', and optionally
 	 *                    'time_start', 'time_end' for sub-day precision. Null if no scope.
 	 */
-	public static function resolve( string $scope ): ?array {
+	public static function resolve( string $scope, ?int $now = null ): ?array {
 		$scope = sanitize_key( $scope );
 
 		if ( 'current' === $scope || '' === $scope ) {
 			return null;
 		}
-		$now   = current_time( 'timestamp' );
-		$today = gmdate( 'Y-m-d', $now );
+		$now         = $now ?? current_time( 'timestamp' );
+		$literal_day = gmdate( 'Y-m-d', $now );
+		$time        = gmdate( 'H:i:s', $now );
+		$display_day = LateNightCutoff::display_date_from_strings( $literal_day, $time );
 
 		switch ( $scope ) {
 			case 'today':
-				return array(
-					'date_start' => $today,
-					'date_end'   => $today,
-				);
+				return self::resolve_display_day( $display_day );
 
 			case 'tonight':
-				return self::resolve_tonight( $now, $today );
+				return self::resolve_tonight( $now, $display_day );
 
 			case 'this-weekend':
-				return self::resolve_this_weekend( $now, $today );
+				return self::resolve_this_weekend( $now, $literal_day );
 
 			case 'this-week':
-				return self::resolve_this_week( $now, $today );
+				return self::resolve_this_week( $now, $literal_day );
 
 			default:
 				return null;
@@ -143,28 +145,58 @@ class ScopeResolver {
 	}
 
 	/**
-	 * Resolve "tonight" — events starting from 5 PM today through 3:59 AM tomorrow.
+	 * Resolve the raw datetime bounds for one nightlife display day.
 	 *
-	 * Before 5 PM, tonight means today 5 PM – tomorrow 3:59 AM.
-	 * After 5 PM, tonight means now – tomorrow 3:59 AM.
+	 * When late-night bucketing is enabled, the display day starts at the
+	 * configured cutoff and ends just before that cutoff on the following
+	 * literal day. This ensures date filters select exactly the events grouped
+	 * under the same display-day heading. With bucketing disabled, the display
+	 * day remains the literal calendar day.
+	 *
+	 * @param string $display_day Display date in Y-m-d format.
+	 * @return array Resolved date boundaries with time precision when enabled.
+	 */
+	private static function resolve_display_day( string $display_day ): array {
+		$cutoff = LateNightCutoff::cutoff_hour();
+
+		if ( $cutoff <= 0 ) {
+			return array(
+				'date_start' => $display_day,
+				'date_end'   => $display_day,
+			);
+		}
+
+		return array(
+			'date_start' => $display_day,
+			'date_end'   => gmdate( 'Y-m-d', strtotime( $display_day . ' +1 day' ) ),
+			'time_start' => sprintf( '%02d:00:00', $cutoff ),
+			'time_end'   => sprintf( '%02d:59:59', $cutoff - 1 ),
+		);
+	}
+
+	/**
+	 * Resolve "tonight" — events starting from 5 PM on the active display day
+	 * through the configured late-night cutoff on its following literal day.
+	 *
+	 * Before 5 PM, tonight starts at 5 PM. After 5 PM, it starts now.
 	 *
 	 * @param int    $now   Current timestamp (site timezone).
-	 * @param string $today Today's date in Y-m-d format.
+	 * @param string $display_day Active nightlife display date in Y-m-d format.
 	 * @return array Resolved date boundaries with time precision.
 	 */
-	private static function resolve_tonight( int $now, string $today ): array {
+	private static function resolve_tonight( int $now, string $display_day ): array {
 		$current_hour = (int) gmdate( 'G', $now );
-		$tomorrow     = gmdate( 'Y-m-d', $now + DAY_IN_SECONDS );
+		$display_day_bounds = self::resolve_display_day( $display_day );
 
 		// Before 5 PM: show from 5 PM today onward.
 		// After 5 PM: show from now onward (events already in progress or starting soon).
 		$time_start = $current_hour < 17 ? '17:00:00' : gmdate( 'H:i:s', $now );
 
 		return array(
-			'date_start' => $today,
-			'date_end'   => $tomorrow,
+			'date_start' => $display_day,
+			'date_end'   => $display_day_bounds['date_end'],
 			'time_start' => $time_start,
-			'time_end'   => '03:59:59',
+			'time_end'   => $display_day_bounds['time_end'] ?? '23:59:59',
 		);
 	}
 

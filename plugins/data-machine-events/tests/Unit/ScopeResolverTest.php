@@ -18,6 +18,19 @@ use DataMachineEvents\Blocks\Calendar\Query\ScopeResolver;
 
 class ScopeResolverTest extends WP_UnitTestCase {
 
+	private $cutoff_filter;
+
+	public function set_up(): void {
+		parent::set_up();
+		$this->cutoff_filter = static fn() => 5;
+		add_filter( 'data_machine_events_late_night_cutoff_hour', $this->cutoff_filter );
+	}
+
+	public function tear_down(): void {
+		remove_filter( 'data_machine_events_late_night_cutoff_hour', $this->cutoff_filter );
+		parent::tear_down();
+	}
+
 	// ---------------------------------------------------------------------
 	// preset_scopes(): default / subset / order / sanitization
 	// ---------------------------------------------------------------------
@@ -97,5 +110,86 @@ class ScopeResolverTest extends WP_UnitTestCase {
 				"Scope '{$slug}' must resolve to a human label."
 			);
 		}
+	}
+
+	// ---------------------------------------------------------------------
+	// resolve(): raw query bounds follow the active display day
+	// ---------------------------------------------------------------------
+
+	public function test_resolve_today_retains_the_active_display_day_after_midnight(): void {
+		$before_midnight = ScopeResolver::resolve( 'today', strtotime( '2026-07-10 23:59:59 UTC' ) );
+		$after_midnight  = ScopeResolver::resolve( 'today', strtotime( '2026-07-11 00:00:01 UTC' ) );
+
+		$this->assertSame(
+			array(
+				'date_start' => '2026-07-10',
+				'date_end'   => '2026-07-11',
+				'time_start' => '05:00:00',
+				'time_end'   => '04:59:59',
+			),
+			$before_midnight
+		);
+		$this->assertSame( $before_midnight, $after_midnight );
+	}
+
+	public function test_resolve_tonight_retains_the_active_display_day_after_midnight(): void {
+		$this->assertSame(
+			array(
+				'date_start' => '2026-07-10',
+				'date_end'   => '2026-07-11',
+				'time_start' => '17:00:00',
+				'time_end'   => '04:59:59',
+			),
+			ScopeResolver::resolve( 'tonight', strtotime( '2026-07-11 00:00:01 UTC' ) )
+		);
+	}
+
+	public function test_resolve_uses_the_new_display_day_at_the_cutoff(): void {
+		$this->assertSame(
+			array(
+				'date_start' => '2026-07-11',
+				'date_end'   => '2026-07-12',
+				'time_start' => '05:00:00',
+				'time_end'   => '04:59:59',
+			),
+			ScopeResolver::resolve( 'today', strtotime( '2026-07-11 05:00:00 UTC' ) )
+		);
+	}
+
+	public function test_resolve_tonight_keeps_daytime_and_evening_behavior(): void {
+		$this->assertSame(
+			array(
+				'date_start' => '2026-07-11',
+				'date_end'   => '2026-07-12',
+				'time_start' => '17:00:00',
+				'time_end'   => '04:59:59',
+			),
+			ScopeResolver::resolve( 'tonight', strtotime( '2026-07-11 14:30:00 UTC' ) )
+		);
+		$this->assertSame(
+			array(
+				'date_start' => '2026-07-11',
+				'date_end'   => '2026-07-12',
+				'time_start' => '18:30:00',
+				'time_end'   => '04:59:59',
+			),
+			ScopeResolver::resolve( 'tonight', strtotime( '2026-07-11 18:30:00 UTC' ) )
+		);
+	}
+
+	public function test_resolve_uses_the_configured_cutoff_for_display_day_bounds(): void {
+		remove_filter( 'data_machine_events_late_night_cutoff_hour', $this->cutoff_filter );
+		$this->cutoff_filter = static fn() => 3;
+		add_filter( 'data_machine_events_late_night_cutoff_hour', $this->cutoff_filter );
+
+		$this->assertSame(
+			array(
+				'date_start' => '2026-07-10',
+				'date_end'   => '2026-07-11',
+				'time_start' => '03:00:00',
+				'time_end'   => '02:59:59',
+			),
+			ScopeResolver::resolve( 'today', strtotime( '2026-07-11 02:59:59 UTC' ) )
+		);
 	}
 }
