@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.49.2] - 2026-07-15
+
+### Changed
+- remove consumer coupling from events
+
 ## [0.49.1] - 2026-07-14
 
 ### Fixed
