@@ -7,15 +7,9 @@
  * three counts: venue terms total, venue terms with empty
  * `_venue_address`, and venue terms with `wp_term_taxonomy.count = 0`.
  *
- * Part C of issue #277. The weekly qualify-digest (extrachill-events#79)
- * is the intended consumer — it will read this ability each Monday and
- * surface the trend lines so we can spot regressions in the venue
- * dedup pipeline.
- *
- * Kept deliberately small. This is a read-only stats surface; the
- * actual repair work lives in the two `check` CLI commands. Wiring the
- * digest itself is a follow-up in the extrachill-events repo so this
- * PR can stay scoped to data-machine-events (no cross-plugin edits).
+ * Kept deliberately small. This is a read-only stats surface; the actual
+ * repair work lives in the two `check` CLI commands. Consumers can use it to
+ * surface venue-data trends without adding reporting policy to this plugin.
  *
  * @package DataMachineEvents\Abilities
  * @since   0.38.0

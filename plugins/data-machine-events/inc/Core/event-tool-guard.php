@@ -14,8 +14,7 @@
  * the set when a step carries an explicit `enabled_tools` allow-list. Events
  * flows were seeded with `enabled_tools: []` (no allow-list), so the events AI
  * agent could reach past `upsert_event` and publish plain `post`-type junk
- * ("rejection reports", "admin logs"). On events.extrachill.com this leaked
- * 224 junk `post` items across ~75 flows (see issue #412).
+ * ("rejection reports", "admin logs") outside the event post type.
  *
  * Events pipelines are hand-built in the DM UI and stored as flow_config data;
  * this plugin does not seed them programmatically, so a code default for new

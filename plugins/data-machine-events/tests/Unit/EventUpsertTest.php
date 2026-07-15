@@ -42,6 +42,21 @@ class EventUpsertTest extends WP_UnitTestCase {
 		$this->assertInstanceOf( EventUpsert::class, $this->handler );
 	}
 
+	public function test_consumer_can_provide_automated_import_author(): void {
+		$user_id = self::factory()->user->create();
+		$callback = static function ( int $author_id ) use ( $user_id ): int {
+			return $user_id;
+		};
+		add_filter( 'data_machine_events_fallback_author_id', $callback );
+
+		$method = new \ReflectionMethod( $this->handler, 'resolvePostAuthor' );
+		$method->setAccessible( true );
+		$engine = new \DataMachine\Core\EngineData( array(), 0 );
+
+		$this->assertSame( $user_id, $method->invoke( $this->handler, array(), $engine ) );
+		remove_filter( 'data_machine_events_fallback_author_id', $callback );
+	}
+
 	public function test_venue_taxonomy_handler_registered() {
 		$handlers = \DataMachine\Core\WordPress\TaxonomyHandler::getCustomHandlers();
 		$this->assertArrayHasKey( 'venue', $handlers );

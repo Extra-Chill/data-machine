@@ -9,8 +9,8 @@
  * DB context, not the loaded code, so a consumer on another blog cannot call
  * data_machine_events_query_events() directly. The ability is the bridge.
  *
- * It internally switches to the events blog (resolved via ec_get_blog_id when
- * available, with a filterable fallback), reads the datamachine_event_dates
+ * It internally switches to the configured events blog (the current site by
+ * default), reads the datamachine_event_dates
  * table + venue/date data directly, and returns a PLAIN STRUCTURED ARRAY with
  * every presentational string (title, permalink, venue name, formatted date /
  * time) pre-resolved while still in events-blog context — because the caller
@@ -183,28 +183,22 @@ class EventsByTermAbilities {
 	/**
 	 * Resolve the events site blog ID.
 	 *
-	 * Prefers the network helper ec_get_blog_id('events') when available.
-	 * A filter provides a graceful override / fallback for installs where
-	 * that helper is not present, keeping this plugin generic (it does not
-	 * hard-code any site's blog ID).
+	 * Defaults to the current site so standalone installs work without any
+	 * configuration. Consumers that keep events on another site can override
+	 * the target through the filter below.
 	 *
 	 * @return int Blog ID, or 0 when unresolved.
 	 */
 	private function resolveEventsBlogId(): int {
-		$blog_id = 0;
-
-		if ( function_exists( 'ec_get_blog_id' ) ) {
-			$blog_id = (int) ec_get_blog_id( 'events' );
-		}
+		$blog_id = get_current_blog_id();
 
 		/**
 		 * Filter the resolved events-site blog ID for the events-by-term ability.
 		 *
-		 * Lets non-Extra-Chill installs (or tests) point the ability at the
-		 * blog that actually holds event posts without hard-coding an ID in
-		 * this generic plugin. Return a positive integer blog ID.
+		 * Lets consumers point the ability at the blog that holds event posts.
+		 * Return a positive integer blog ID.
 		 *
-		 * @param int $blog_id Blog ID resolved from ec_get_blog_id('events'), or 0.
+		 * @param int $blog_id Current-site blog ID by default.
 		 */
 		$blog_id = (int) apply_filters( 'data_machine_events_events_blog_id', $blog_id );
 

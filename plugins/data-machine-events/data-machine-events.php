@@ -92,9 +92,6 @@ if ( ! function_exists( 'datamachine_get_event_timing' ) ) {
 require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Core/performance.php';
 \DataMachineEvents\Core\cache_last_post_time();
 
-// Load retention policy overrides (tightens Data Machine core defaults for this site's volume).
-require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Core/retention.php';
-
 // Short-circuit AI web_fetch requests to bot-blocked ticketing domains before they
 // burn a billed model turn returning HTTP 403 (Ticketmaster, TicketWeb, AXS, etc.).
 require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Core/web-fetch-guard.php';

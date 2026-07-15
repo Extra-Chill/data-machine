@@ -5,13 +5,8 @@
  * Audit + repair pass for pipelines whose `pipeline_config` is empty or
  * invalid JSON while one or more flows are still scheduled against them.
  *
- * Per Extra-Chill/data-machine-events#363, pipeline 20 ("Nashville
- * Events") on events.extrachill.com had its `pipeline_config` wiped to a
- * zero-length string while 13 flows kept running daily/twice-daily
- * against it. Every scheduled run walked the flow's steps, failed to
- * resolve them against the (empty) pipeline config, and the Data Machine
- * engine logged a `Pipeline step not found in pipeline config` ERROR per
- * step, per run — 734 errors in ~2.6 days, plus hundreds of doomed jobs.
+ * Scheduled flows can survive a damaged pipeline configuration. In that
+ * state each run cannot resolve its steps and produces avoidable failed jobs.
  *
  * The flows themselves remained intact: each carries a full, well-formed
  * `flow_config` describing its steps (e.g. event_import -> ai -> upsert),

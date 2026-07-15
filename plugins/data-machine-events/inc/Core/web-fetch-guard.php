@@ -10,8 +10,8 @@
  * turn, so the failure is pure wasted OpenAI spend, and the job frequently
  * ends in `failed - tool_result_failed`.
  *
- * On events.extrachill.com this accounted for ~195 HTTP 403 Web Fetch Tool
- * failures over ~2.5 days, ~77% of them on the Ticketmaster domain family.
+ * Ticketing domains account for a large share of failed fetches in event
+ * automation, particularly within the Ticketmaster domain family.
  *
  * Ticketmaster data is *already* imported through the structured Ticketmaster
  * Discovery API handler (inc/Steps/EventImport/Handlers/Ticketmaster/), so the

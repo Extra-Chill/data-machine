@@ -7,10 +7,8 @@
  * with three calendar destinations: Google Calendar, Outlook.com, and
  * a downloadable .ics file (for Apple Calendar / Thunderbird / etc.).
  *
- * Hook priority 7: this puts the button between the existing attendance
- * button (priority 5, from extrachill-events) and the share button
- * (priority 10, from extrachill-events). Order on a page that has all
- * three: Ticket → Attendance → Add to Calendar → Share.
+ * Hook priority 7 positions the button between lower-priority attendance
+ * controls and higher-priority share controls when they are present.
  *
  * @package DataMachineEvents\Blocks\EventDetails
  * @since   0.40.0

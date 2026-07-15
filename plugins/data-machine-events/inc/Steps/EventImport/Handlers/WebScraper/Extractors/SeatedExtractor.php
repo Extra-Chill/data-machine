@@ -11,8 +11,8 @@
  * Because the events are loaded client-side, none of the structured-data or
  * HTML-section extractors can see them — the server-fetched HTML contains no
  * event markup. This caused a real artist tour page (easyhoneymusic.com/tour/)
- * to fail the artist-URL tour-import flow with "couldn't extract events"
- * (extrachill-events#403), even though the page works fine in a browser.
+ * to fail an artist-tour import flow with "couldn't extract events", even
+ * though the page works fine in a browser.
  *
  * This extractor reproduces the widget's own API call:
  *

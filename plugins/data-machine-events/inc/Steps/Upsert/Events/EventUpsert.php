@@ -574,22 +574,17 @@ class EventUpsert extends UpsertHandler {
 	/**
 	 * Resolve post author for event creation.
 	 *
-	 * When an event is submitted by a user (logged-in or anonymous-with-a-
-	 * resolved-account — see extrachill-events Phase 1), their user_id is stored
-	 * in initial_data['submission']['user_id'] and takes priority over handler
+	 * When an event is submitted by a user, their user_id is stored in
+	 * initial_data['submission']['user_id'] and takes priority over handler
 	 * config defaults so submitted events are attributed to the submitter.
 	 *
 	 * For genuine automation (no submission context), the author resolves to:
 	 *   1. An explicitly-configured author (system-wide default_author_id, then
 	 *      per-handler post_author) — respected when set.
-	 *   2. The network bot account via `ec_get_network_bot_user_id()` — the
-	 *      honest default for headless automation, config-driven so the bot id
-	 *      is not a magic literal (issue #207 Phase 2). This intentionally
-	 *      supersedes WordPressSettingsResolver's first-administrator fallback,
-	 *      which historically misattributed automation to uid 1 (the ~3k uid-1
-	 *      event rows that the backfill in extrachill-events corrects).
+	 *   2. A consumer-provided fallback author via
+	 *      `data_machine_events_fallback_author_id`.
 	 *   3. WordPressSettingsResolver (logged-in user / first admin) — last
-	 *      resort, only when the bot-account helper is unavailable.
+	 *      resort when no fallback policy provides an author.
 	 *
 	 * @param array      $handler_config Handler configuration.
 	 * @param EngineData $engine         Engine snapshot helper.
@@ -614,12 +609,20 @@ class EventUpsert extends UpsertHandler {
 			return $explicit;
 		}
 
-		// 3. Network bot account — the honest author for headless automation.
-		if ( function_exists( 'ec_get_network_bot_user_id' ) ) {
-			$bot_id = (int) ec_get_network_bot_user_id();
-			if ( $bot_id > 0 ) {
-				return $bot_id;
-			}
+		/**
+		 * Filter the fallback post author for automated event imports.
+		 *
+		 * Return a positive user ID to apply a consumer-specific authorship
+		 * policy. The default of 0 leaves WordPress to resolve its usual
+		 * logged-in-user or first-administrator fallback.
+		 *
+		 * @param int        $author_id     Fallback author ID. Default 0.
+		 * @param array      $handler_config Handler configuration.
+		 * @param EngineData $engine        Engine snapshot helper.
+		 */
+		$fallback_author_id = (int) apply_filters( 'data_machine_events_fallback_author_id', 0, $handler_config, $engine );
+		if ( $fallback_author_id > 0 ) {
+			return $fallback_author_id;
 		}
 
 		// 4. Last resort: generic resolver (logged-in user / first admin).
@@ -631,9 +634,8 @@ class EventUpsert extends UpsertHandler {
 	 *
 	 * Mirrors the config-first portion of WordPressSettingsResolver::getPostAuthor():
 	 * system-wide default_author_id, then handler-specific post_author. Returns 0
-	 * when neither is set (the headless-automation case the bot-account default
-	 * handles). Extracted so resolvePostAuthor() can branch on "no explicit
-	 * config → bot" without re-running the resolver's first-admin fallback.
+	 * when neither is set. Extracted so resolvePostAuthor() can apply a fallback
+	 * policy without re-running the resolver's first-admin fallback.
 	 *
 	 * @param array $handler_config Handler configuration.
 	 * @return int Explicitly-configured author id, or 0 if none.

@@ -4,11 +4,8 @@
  * `wp data-machine-events check orphan-venues`
  *
  * Audit + repair pass for venue terms whose `wp_term_taxonomy.count = 0`.
- * Per issue #277, the network-wide audit found 278 of 3,765 venue terms
- * (7%) in this state on events.extrachill.com — either every post that
- * was tagged with them got deleted, or they were created as side effects
- * of failed event upserts. They are noise in the verdict-log + qualify
- * pipeline.
+ * Such terms can be left behind after their posts are deleted or after failed
+ * event upserts. They create noise in venue-management workflows.
  *
  * Behavior per orphan candidate, in order:
  *

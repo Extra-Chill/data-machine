@@ -3,10 +3,8 @@
  * `wp data-machine-events check missing-venue-addresses`
  *
  * Audit + repair pass for venue terms whose `_venue_address` meta is
- * empty or missing. Per issue #277, network-wide audit found 262 of
- * 3,765 venue terms (7%) in this state on events.extrachill.com —
- * invisible to address-based dedup because `find_venue_by_address`
- * keys on the address+city pair.
+ * empty or missing. These terms are invisible to address-based dedup because
+ * `find_venue_by_address` keys on the address+city pair.
  *
  * Repair strategy per term, in order:
  *

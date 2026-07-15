@@ -13,9 +13,9 @@
  * 19 events, `$handler->get_fetch_data()` returns an array of 19 DataPackets.
  *
  * Prior to the #265 fix, this ability read only `$results[0]` — the first packet —
- * and returned its single event as `event_data`. The qualify path
- * (extrachill-events/QualifyFingerprinter::count_events()) then saw a single-event
- * payload and recorded `extractor_attempts[i].events: 1` regardless of how many
+ * and returned its single event as `event_data`. A qualifying consumer then
+ * saw a single-event payload and recorded `extractor_attempts[i].events: 1`
+ * regardless of how many
  * events the extractor actually found. That undercount caused every Bandzoogle /
  * multi-event JSON-LD venue to be flagged `extraction_gap` on its first qualify run.
  *
@@ -272,12 +272,12 @@ class EventScraperTest {
 		$event_data['venueZip']     = $venue_zip;
 
 		// Surface the full event list and total count so qualify-path consumers
-		// (extrachill-events QualifyFingerprinter::count_events) see the true
+		// downstream consumers see the true
 		// extraction count instead of just the first event (#265).
 		//
 		// `items` is the field QualifyFingerprinter::count_events() already
 		// inspects (`isset($event_data['items'])`) — populating it lets the fix
-		// land without requiring a matching change in extrachill-events.
+		// land without requiring a matching consumer change.
 		$event_data['items']       = $all_events;
 		$event_data['event_count'] = count( $all_events );
 

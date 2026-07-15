@@ -517,9 +517,8 @@ class SquarespaceExtractor extends BaseExtractor {
 	 * treat the page as a single-event detail page and surface that one
 	 * item to the caller.
 	 *
-	 * This dovetails with extrachill-events#78's `event_page_shape=detail`
-	 * detection — when a single-event-detail URL extracts exactly 1 event,
-	 * qualify v2 returns `qualified_structured`.
+	 * This supports consumers that classify an event page as `detail` when a
+	 * single-event-detail URL extracts exactly one event.
 	 *
 	 * @since 0.15.x
 	 * @param array $data Decoded Squarespace JSON payload.
