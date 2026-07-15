@@ -1,281 +1,313 @@
 # Data Machine Business
 
-Business and enterprise integrations for Data Machine.
+Business and enterprise integrations for [Data Machine](https://github.com/Extra-Chill/data-machine).
 
-## Description
-
-This plugin extends Data Machine with business-focused integrations including:
-
-- **Google Search**: Search the web through Google Custom Search API as an AI tool
-- **Google Sheets**: Fetch data from spreadsheets and append data for reporting
-- **PageSpeed Insights**: Run Lighthouse audits for performance, SEO, accessibility, and optimization opportunities
-- **Google Analytics (GA4)**: Fetch visitor analytics, realtime, engagement, and comparison metrics
-- **Google Search Console**: Read search analytics, inspect URLs, and manage sitemaps
-- **Slack**: Post messages and fetch conversations from channels
-- **Discord**: Post messages and fetch messages from server channels
-- **Amazon Affiliate Link**: Search Amazon products and return affiliate links using the Amazon Creators API
-- **Bing Webmaster Tools**: Fetch Bing search, traffic, page, and crawl analytics
+Data Machine Business connects WordPress automation, agents, and pipelines to analytics, search intelligence, productivity, messaging, email marketing, affiliate commerce, and media-maintenance services. Features are exposed through the WordPress Abilities API, Data Machine AI tools, pipeline handlers, REST endpoints, and WP-CLI as appropriate for each integration.
 
 ## Requirements
 
 - WordPress 6.9+
 - PHP 8.2+
-- Data Machine core plugin 0.151.0+ (required)
+- Data Machine core plugin, installed and active
 
 ## Installation
 
-1. Install and activate Data Machine core plugin
-2. Upload and activate this plugin
-3. Configure Google Sheets authentication in Data Machine settings
-4. Create flows using the Google Sheets handlers
+1. Install and activate Data Machine.
+2. Install and activate Data Machine Business.
+3. Configure only the integrations you intend to use in Data Machine settings.
+4. Connect OAuth providers or add service credentials as described below.
 
-## Google Search Tool
+## Feature Overview
 
-Data Machine Business registers the `google_search` AI tool for chat and pipeline contexts. It uses the Google Custom Search API endpoint and the same `datamachine_search_config` site option previously used by Data Machine core, so existing saved API keys and Custom Search Engine IDs continue to work after this plugin is activated.
+| Integration | What it provides | Primary surfaces |
+|---|---|---|
+| Google Analytics 4 | Page, acquisition, audience, engagement, realtime, comparison, and cross-site journey reports | Ability, AI tool, WP-CLI |
+| Google Search Console | Search analytics, URL inspection, sitemap management, and ranked SEO opportunities | Abilities, AI tool, REST, WP-CLI |
+| Bing Webmaster Tools | Query, traffic, page, and crawl analytics | Ability, AI tool, WP-CLI |
+| PageSpeed Insights | Lighthouse audits, Core Web Vitals, and optimization opportunities | Ability, AI tool, REST, WP-CLI |
+| Google Search | Google Programmable Search results for agents and pipelines | AI tool |
+| Google Sheets | Read worksheets and append structured rows | Abilities, fetch/publish handlers |
+| Google Drive | List folders, export native Google files, download binaries, and feed files into pipelines | Abilities, fetch handler |
+| Slack | Fetch channel messages and publish messages or thread replies | Abilities, fetch/publish handlers |
+| Discord | Fetch channel messages and publish text or embeds | Abilities, fetch/publish handlers |
+| Amazon Associates | Search products and generate Creators API affiliate links | AI tool |
+| Sendy | Subscribe users, create or update campaigns, and read email-funnel metrics | Abilities |
+| Mediavine | Fetch page-level and aggregate publisher revenue reports | Ability |
+| Content analytics | Category-level engagement audits, editorial triage flags, and GSC opportunity ranking | Abilities |
+| Media hygiene | Detect and safely remove orphan files and unreferenced attachments | Ability, WP-CLI |
+| Agent context | Generate an `AGENTS.md` section from the registered business CLI command map | Data Machine memory composition |
 
-### Google Search Setup
+## Abilities
 
-1. Go to [Google Cloud Console](https://console.cloud.google.com/)
-2. Enable the Custom Search API for your project
-3. Create or select an API key with access to the Custom Search API
-4. Create a Programmable Search Engine and copy its Search Engine ID
-5. Save the API key and Search Engine ID in Data Machine tool settings for `google_search`
+The plugin registers the following WordPress abilities. Management-oriented abilities use Data Machine's management permission gate unless noted otherwise.
 
-### Google Search Usage
+### Analytics And Search
 
-The tool accepts a required `query` parameter and an optional `site_restrict` domain. It returns up to 10 structured results with title, link, snippet, and display link fields.
+| Ability | Purpose |
+|---|---|
+| `datamachine/google-analytics` | Run GA4 reports, realtime analytics, period comparisons, network-density reports, and ordered cross-host funnel reports |
+| `datamachine/google-search-console` | Query search performance, inspect URLs, and list, inspect, or submit sitemaps |
+| `datamachine/gsc-opportunity` | Rank snippet/CTR gaps, page-two demand, and SERP-captured queries using GSC data |
+| `datamachine/bing-webmaster` | Query Bing search, traffic, page, and crawl statistics |
+| `datamachine/pagespeed` | Run full, performance-focused, or opportunity-focused PageSpeed audits |
+| `datamachine/mediavine-reports` | Fetch page reports, aggregate summaries, or multi-period revenue backfills with source provenance |
+| `datamachine/content-performance` | Rank posts within a category by GA4 engagement while accounting for traffic and sample size |
+| `datamachine/content-flags` | Produce an outcome-based editorial triage screen with confidence and query-intent caveats |
 
-## Google Analytics (GA4) Setup
+### Google Workspace
 
-Data Machine Business registers the `datamachine/google-analytics` ability and `google_analytics` chat/pipeline tool. Data Machine core keeps the compatible REST and WP-CLI dispatchers (`/analytics/ga` and `wp datamachine analytics ga`), which work when this plugin is active.
+| Ability | Purpose |
+|---|---|
+| `datamachine/fetch-googlesheets` | Fetch raw values from a spreadsheet worksheet |
+| `datamachine/publish-googlesheets` | Append rows to a spreadsheet worksheet |
+| `datamachine/fetch-googledrive` | Fetch a folder for pipeline use, export native files, and optionally materialize binaries in a flow-scoped directory |
+| `datamachine/list-googledrive-files` | Recursively or non-recursively list Drive file metadata with optional MIME and modification filters |
+| `datamachine/read-googledrive-doc` | Export Docs, Sheets, or Slides as Markdown, text, or CSV |
+| `datamachine/download-googledrive` | Download a non-Google binary file into the WordPress uploads tree or another allowed destination |
 
-Existing Data Machine GA4 settings are adopted automatically because this plugin uses the same option key, `datamachine_ga_config`, and token transient, `datamachine_ga_access_token`.
+### Messaging And Email
 
-1. Go to [Google Cloud Console](https://console.cloud.google.com/)
-2. Enable the Google Analytics Data API
-3. Create a service account and download its JSON key
-4. Grant the service account access to the GA4 property
-5. Configure the Service Account JSON and GA4 Property ID in Data Machine tool settings
+| Ability | Purpose |
+|---|---|
+| `datamachine/post-message-slack` | Post Slack text or Block Kit content, including thread replies and link-unfurl controls |
+| `datamachine/fetch-messages-slack` | Fetch and filter Slack channel history |
+| `datamachine/post-message-discord` | Post a Discord message or embed |
+| `datamachine/fetch-messages-discord` | Fetch Discord channel history with before/after pagination |
+| `datamachine/sendy-subscribe` | Subscribe an email address to a Sendy list; intentionally supports public callers |
+| `datamachine/sendy-push-campaign` | Create or update a Sendy campaign |
+| `datamachine/sendy-metrics` | Read subscriber, campaign, or combined funnel metrics from Sendy |
 
-### GA4 Ability And Tool
+### WordPress Operations
 
-- `datamachine/google-analytics` — Fetches GA4 reports and realtime analytics
-- `google_analytics` — Chat and pipeline tool wrapper for AI agents
+| Ability | Purpose |
+|---|---|
+| `datamachine/media-hygiene` | Diagnose, list, preview deletion, or delete orphan files and unused attachments |
 
-Supported actions include `page_stats`, `traffic_sources`, `date_stats`, `realtime`, `top_events`, `user_demographics`, `landing_pages`, `engagement`, and `new_vs_returning`.
+## AI Tools
 
-## Google Sheets Setup
+Data Machine Business contributes these tools to Data Machine chat and pipeline AI contexts:
 
-1. Go to [Google Cloud Console](https://console.cloud.google.com/)
-2. Create a new project or select existing
-3. Enable the Google Sheets API
-4. Create OAuth 2.0 credentials (Web application type)
-5. Add your site's URL as authorized redirect URI
-6. Copy Client ID and Client Secret to Data Machine settings
-7. Authenticate the handler
+| Tool | Purpose |
+|---|---|
+| `google_search` | Search Google Programmable Search, optionally restricted to a domain |
+| `google_analytics` | Run GA4 analytics actions |
+| `google_search_console` | Run Search Console analytics and inspection actions |
+| `bing_webmaster` | Query Bing Webmaster Tools |
+| `pagespeed` | Run PageSpeed Insights audits |
+| `amazon_affiliate_link` | Search Amazon products and return an affiliate URL, title, thumbnail, and ASIN |
 
-## PageSpeed Insights
+## Pipeline Handlers
 
-PageSpeed Insights runs Google Lighthouse audits against any URL. It works without an API key, but Google may rate-limit anonymous requests. Add an optional Google API key in the Data Machine tool settings under **PageSpeed** for higher limits.
+The plugin adds these handlers to Data Machine's flow builder:
 
-Data Machine Business registers the same PageSpeed surfaces that previously lived in Data Machine core:
+| Handler | Step type | Behavior |
+|---|---|---|
+| `googlesheets_fetch` | Fetch | Read a worksheet by row, by column, or as a complete spreadsheet |
+| `googlesheets_publish` | Publish | Append mapped pipeline data to spreadsheet columns |
+| `google_drive_fetch` | Fetch | Emit one unprocessed Drive file at a time, exporting native files and streaming binaries |
+| `slack_fetch` | Fetch | Read channel history with count and timestamp filters and per-message deduplication |
+| `slack_publish` | Publish | Send messages, append source URLs, reply in threads, and control link unfurling |
+| `discord_fetch` | Fetch | Read channel history with message-ID pagination and per-message deduplication |
+| `discord_publish` | Publish | Send plain messages or embeds and optionally append source URLs |
 
-- AI tool: `pagespeed`
-- Ability: `datamachine/pagespeed`
-- REST endpoint: `POST /wp-json/datamachine/v1/analytics/pagespeed`
-- WP-CLI command: `wp datamachine analytics pagespeed <action>`
+## WP-CLI
 
-Existing PageSpeed API-key config is adopted automatically because the integration continues to use the `datamachine_pagespeed_config` site option.
+Every business-owned command uses a positional action. Run `wp help <command>` for the complete option reference.
 
-### PageSpeed Actions
-
-| Action | Description |
-|--------|-------------|
-| `analyze` | Full Lighthouse audit with category scores and key metrics |
-| `performance` | Focused performance score and Core Web Vitals metrics |
-| `opportunities` | Optimization opportunities sorted by estimated savings |
-
-### PageSpeed CLI Examples
+### Google Analytics
 
 ```bash
-wp datamachine analytics pagespeed analyze --page-url="https://example.com" --strategy=mobile
-wp datamachine analytics pagespeed performance --page-url="https://example.com" --strategy=desktop
-wp datamachine analytics pagespeed opportunities --page-url="https://example.com" --format=json
+wp datamachine analytics ga <action>
 ```
 
-### PageSpeed REST Example
+Actions:
+
+- `page_stats`
+- `traffic_sources`
+- `date_stats`
+- `realtime`
+- `top_events`
+- `user_demographics`
+- `landing_pages`
+- `engagement`
+- `new_vs_returning`
+- `network_density`
+- `path_sequence`
+
+Common options include `--start-date`, `--end-date`, `--limit`, `--page-filter`, `--hostname`, `--sort-by`, `--order`, `--compare`, and `--format`.
 
 ```bash
-curl -X POST https://example.com/wp-json/datamachine/v1/analytics/pagespeed \
-  -H "Content-Type: application/json" \
-  -H "X-WP-Nonce: {nonce}" \
-  --cookie "{auth_cookie}" \
-  -d '{"action":"analyze","url":"https://example.com/","strategy":"desktop"}'
+wp datamachine analytics ga page_stats --hostname=example.com --compare
+wp datamachine analytics ga path_sequence --format=json
 ```
 
-## Google Search Console Setup
+### Google Search Console
 
-Google Search Console uses a Google service account, not the shared Google OAuth user credential.
+```bash
+wp datamachine analytics gsc <action>
+```
 
-1. Go to [Google Cloud Console](https://console.cloud.google.com/)
-2. Create or select a project with the Search Console APIs enabled
-3. Create a service account and JSON key
-4. Add the service account email as a user on the Search Console property
-5. Configure the `google_search_console` tool in Data Machine settings with the JSON key and property URL
+Actions:
 
-Existing Data Machine core installations keep using the same `datamachine_gsc_config` option, so activating Data Machine Business adopts previously saved Search Console configuration automatically.
+- `query_stats`
+- `page_stats`
+- `query_page_stats`
+- `date_stats`
+- `inspect_url`
+- `list_sitemaps`
+- `get_sitemap`
+- `submit_sitemap`
 
-### Google Search Console Usage
+```bash
+wp datamachine analytics gsc query_stats --limit=50
+wp datamachine analytics gsc inspect_url --inspect-url=https://example.com/page/
+wp datamachine analytics gsc submit_sitemap --sitemap-url=https://example.com/sitemap.xml
+```
 
-- AI tool: `google_search_console`
-- Ability: `datamachine/google-search-console`
-- REST: `POST /wp-json/datamachine/v1/analytics/gsc`
-- WP-CLI: `wp datamachine analytics gsc query_stats`
+### Bing Webmaster Tools
 
-## Usage
+```bash
+wp datamachine analytics bing <action>
+```
 
-### Fetch Handler
-Fetches data from Google Sheets with three processing modes:
-- **By Row**: Process one row at a time (deduplication supported)
-- **By Column**: Process one column at a time
-- **Full Spreadsheet**: Process entire sheet at once
+Actions: `query_stats`, `traffic_stats`, `page_stats`, and `crawl_stats`.
 
-### Publish Handler
-Appends structured data to Google Sheets with customizable column mapping.
+```bash
+wp datamachine analytics bing traffic_stats --days=30
+```
 
-## Slack Setup
+### PageSpeed Insights
 
-Slack integration uses a **Bot Token** (`xoxb-...`) rather than OAuth2. The token is long-lived and managed in your Slack App settings.
+```bash
+wp datamachine analytics pagespeed <action>
+```
 
-### Creating a Slack App
+Actions: `analyze`, `performance`, and `opportunities`.
 
-1. Go to [Slack API: Applications](https://api.slack.com/apps)
-2. Click **Create New App** → **From scratch**
-3. Give it a name (e.g., "Data Machine") and select your workspace
+```bash
+wp datamachine analytics pagespeed analyze --page-url=https://example.com --strategy=mobile
+wp datamachine analytics pagespeed opportunities --page-url=https://example.com --format=json
+```
 
-### Adding Bot Token Scopes
+### Media Hygiene
 
-1. Go to **OAuth & Permissions** in the sidebar
-2. Under **Bot Token Scopes**, add:
-   - `chat:write` — Send messages
-   - `channels:history` — Read messages from public channels
-   - `groups:history` — Read messages from private channels
-   - `channels:read` — List public channels (optional)
-   - `groups:read` — List private channels (optional)
-3. Click **Install to Workspace** (or reinstall if already installed)
-4. Copy the **Bot OAuth Token** (`xoxb-...`)
+```bash
+wp datamachine media <action>
+```
 
-### Configuring Data Machine
+Actions:
 
-1. Go to Data Machine → Settings in WordPress admin
-2. Find the Slack provider configuration
-3. Paste your Bot OAuth Token
-4. Click **Validate** to verify the connection
+- `diagnose` - summarize all detected dead weight
+- `orphan-files` - list files with no attachment record
+- `unused` - list attachments with no detected content reference
+- `delete-orphans` - preview or delete orphan files
+- `delete-unused` - preview or delete unused attachments
 
-### Adding the Bot to Channels
+Delete actions are dry runs unless `--apply` is provided. Use `--all-sites` to scan an entire multisite network.
 
-The bot must be explicitly added to any channel it should post to or read from:
-- Open the channel in Slack
-- Type `/invite @Data Machine` (or whatever you named your app)
+```bash
+wp datamachine media diagnose --all-sites
+wp datamachine media delete-unused --limit=50
+wp datamachine media delete-unused --limit=50 --apply
+```
 
-## Slack Usage
+## REST
 
-### Publish Handler
-Posts messages to a configured Slack channel. Supports:
-- Plain text and Slack mrkdwn formatting
-- Source URL appending
-- Thread replies (reply to a specific message)
-- Link unfurling (rich previews)
+The plugin owns two compatibility REST controllers in addition to ability routes exposed by the WordPress Abilities API:
 
-### Fetch Handler
-Fetches messages from a configured Slack channel with:
-- Configurable message limit (1-1000)
-- Time-based filtering (oldest/latest timestamps)
-- Per-message deduplication (skips already-processed messages)
-- Automatic filtering of join/leave noise
+| Endpoint | Purpose |
+|---|---|
+| `POST /wp-json/datamachine/v1/analytics/pagespeed` | Dispatch PageSpeed actions |
+| `POST /wp-json/datamachine/v1/analytics/gsc` | Dispatch Search Console actions |
 
-### Abilities (REST API / Chat Tools)
-- `datamachine/post-message-slack` — Post a message to any channel
-- `datamachine/fetch-messages-slack` — Fetch messages from any channel
+Both endpoints require Data Machine's `view_analytics` permission.
 
-## Discord Setup
+## Agent Context
 
-Discord integration uses a **Bot Token** from the Discord Developer Portal. The token is long-lived and managed in your application settings.
+Data Machine Business registers its own section with Data Machine's composable `AGENTS.md` memory system. The section is generated from the same `CommandRegistry` used to register WP-CLI commands, including each command's positional actions, so agent instructions stay aligned with the executable CLI surface.
 
-### Creating a Discord Bot
+## Configuration
 
-1. Go to [Discord Developer Portal](https://discord.com/developers/applications)
-2. Click **New Application**, give it a name (e.g., "Data Machine")
-3. Go to **Bot** in the sidebar
-4. Click **Reset Token** and copy the token (you only see it once)
-5. Under **Privileged Gateway Intents**, enable any intents your use case requires
+### Unified Google OAuth: Sheets And Drive
 
-### Adding Bot Token Scopes
+Google Sheets and Google Drive share one `google` OAuth provider. Enable the Google Sheets API and Google Drive API in the same Google Cloud project, create OAuth 2.0 web credentials, and configure the client ID and secret in Data Machine settings.
 
-1. Go to **OAuth2** → **URL Generator** in the sidebar
-2. Under **Scopes**, select `bot`
-3. Under **Bot Permissions**, select:
-   - `Send Messages` — Post messages to channels
-   - `Read Message History` — Fetch messages from channels
-4. Copy the generated URL and open it to invite the bot to your server
+The provider requests the Sheets scope plus the read-only Drive scopes required by the Drive handlers. Tokens created before Drive support was enabled must be disconnected and reconnected so Google can grant the additional scopes.
 
-### Configuring Data Machine
+### Google Analytics 4
 
-1. Go to Data Machine → Settings in WordPress admin
-2. Find the Discord provider configuration
-3. Paste your Bot Token
-4. Click **Validate** to verify the connection
+1. Enable the Google Analytics Data API in Google Cloud.
+2. Create a service account and JSON key.
+3. Grant the service account access to the GA4 property.
+4. Configure the service account JSON and numeric property ID in Data Machine settings.
 
-### Adding the Bot to Channels
+The integration supports both the stable Data API and the alpha funnel-report API used by `path_sequence`. See [Google Analytics](docs/google-analytics.md) for details.
 
-The bot can see channels based on its server permissions:
-- Ensure the bot's role has **Read Messages** and **Send Messages** permissions in the target channel
-- For private channels, explicitly grant access to the bot's role
+### Google Search Console
 
-## Discord Usage
+1. Enable the Search Console API and URL Inspection API.
+2. Create a service account and JSON key.
+3. Add the service account email to the Search Console property.
+4. Configure the JSON key and property URL in Data Machine settings.
 
-### Publish Handler
-Posts messages to a configured Discord channel. Supports:
-- Plain text messages
-- Source URL appending
-- Discord embed objects for rich formatting
+Search analytics accepts both URL-prefix and `sc-domain:` properties. See [Google Search Console](docs/ai-tools/google-search-console.md).
 
-### Fetch Handler
-Fetches messages from a configured Discord channel with:
-- Configurable message limit (1-100)
-- Pagination via before/after message IDs
-- Per-message deduplication (skips already-processed messages)
-- Automatic filtering of join/leave and system messages
+### Google Search
 
-### Abilities (REST API / Chat Tools)
-- `datamachine/post-message-discord` — Post a message to any channel
-- `datamachine/fetch-messages-discord` — Fetch messages from any channel
+Enable the Custom Search JSON API, create an API key, and create a Programmable Search Engine. Save the API key and Search Engine ID in the `google_search` tool settings.
 
-## Amazon Affiliate Link Tool
+### PageSpeed Insights
 
-The `amazon_affiliate_link` AI tool searches Amazon products and returns an affiliate URL, product title, thumbnail, and ASIN. It is available in Data Machine chat and pipeline contexts when Data Machine Business is active.
+PageSpeed works without credentials but may be rate-limited. An optional Google API key can be added to the `pagespeed` tool settings for higher quotas.
 
-Existing credentials saved by older Data Machine core versions are adopted automatically because the extension uses the same `datamachine_amazon_config` site option.
+### Slack
 
-### Amazon Setup
+Create a Slack app with a bot token and grant the scopes needed by your flows:
 
-1. Join or open Amazon Associates.
-2. Create Amazon Creators API credentials.
-3. In Data Machine tool settings, configure Credential ID, Credential Secret, Partner Tag, and Marketplace.
-4. Use `amazon_affiliate_link` only for genuinely relevant product references.
+- `chat:write` for publishing
+- `channels:history` for public-channel history
+- `groups:history` for private-channel history
+- `channels:read` and `groups:read` when channel listing is needed
 
-## Bing Webmaster Tools
+Add the bot to each channel it should access, then configure its `xoxb-...` token in Data Machine settings.
 
-Bing Webmaster Tools is owned by Data Machine Business. When this plugin is active, it registers the same user-facing capability that previously lived in Data Machine core:
+### Discord
 
-- Ability: `datamachine/bing-webmaster`
-- AI tool: `bing_webmaster`
-- REST route: `POST /wp-json/datamachine/v1/analytics/bing`
-- WP-CLI: `wp datamachine analytics bing <action>`
+Create a Discord application and bot, grant it Send Messages and Read Message History in the target channels, and configure the bot token in Data Machine settings.
 
-Existing sites keep their saved configuration because the business plugin adopts the original `datamachine_bing_webmaster_config` site option.
+### Bing Webmaster Tools
 
-See [Bing Webmaster Tools](docs/bing-webmaster.md) for setup and usage details.
+Configure the Bing Webmaster API key and site URL in Data Machine settings. Existing values stored under the original Data Machine option are adopted automatically. See [Bing Webmaster Tools](docs/bing-webmaster.md).
+
+### Amazon Associates
+
+Join Amazon Associates, create Amazon Creators API credentials, and configure the credential ID, credential secret, partner tag, and marketplace in the `amazon_affiliate_link` tool settings. See [Amazon Affiliate Link](docs/amazon-affiliate-link.md).
+
+### Sendy
+
+Sendy is config-driven: callers pass the Sendy installation URL and API key to each ability. `datamachine/sendy-metrics` can also receive an optional read-only database connection for metrics unavailable through Sendy's API. The plugin does not store Sendy credentials or consumer-specific list and brand IDs.
+
+### Mediavine
+
+Store the publisher account email and password in the `datamachine_mediavine_config` option. Reports use the publisher GraphQL API and cache a short-lived access token. Keep fetches low-frequency, such as monthly imports and one-time backfills.
+
+Mediavine page reports expose paths but not hostnames. Results therefore include explicit provenance and report `host_attribution.available=false`; multisite consumers must resolve path ownership without guessing a host.
+
+## Content Analytics Notes
+
+`datamachine/content-performance` and `datamachine/content-flags` compare posts only within a category and require GA4 engagement data. A hostname must be supplied directly or through the `datamachine_analytics_default_hostname` filter on multisite properties.
+
+The flags ability is a triage screen, not a quality score. It flags strong-demand pages with dwell far below their category median, reports sample confidence, and treats structural observations only as advisory notes. Query intent and editorial judgment remain outside the metric.
+
+`datamachine/gsc-opportunity` builds on the Search Console ability to identify recoverable CTR gaps, ranking opportunities, and likely SERP-captured queries. It reuses the configured Search Console authentication and does not own a separate transport.
+
+## Media Safety
+
+Media-hygiene scan actions are read-only. Delete actions enforce a bounded batch limit and return a preview unless explicitly called with `apply=true` or `--apply`. Review previews before deleting media, especially on multisite installations.
+
+## Compatibility
+
+Several integrations were moved from Data Machine core into this plugin. Existing Google Analytics, Search Console, PageSpeed, Bing, Google Search, and Amazon settings continue to use their established option keys so activation does not require credential migration.
 
 ## License
 
