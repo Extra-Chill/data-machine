@@ -342,7 +342,9 @@ class GscOpportunityAbility {
 				);
 			}
 
-			foreach ( (array) ( $result['results'] ?? array() ) as $row ) {
+			$rows = self::prepare_rows( $kind, (array) ( $result['results'] ?? array() ) );
+
+			foreach ( $rows as $row ) {
 				$label = self::row_label( $row );
 				if ( '' === $label ) {
 					continue;
@@ -453,8 +455,9 @@ class GscOpportunityAbility {
 				continue;
 			}
 			$position = (float) ( $row['position'] ?? 0 );
-			if ( self::is_definition_box( (string) $keys[0], $position, (float) ( $row['ctr'] ?? 0 ), self::expected_ctr( $position ), $good_position ) ) {
-				$captured[ (string) $keys[1] ] = ( $captured[ (string) $keys[1] ] ?? 0 ) + (int) ( $row['impressions'] ?? 0 );
+			$page     = self::canonical_page_url( (string) $keys[1] );
+			if ( '' !== $page && self::is_definition_box( (string) $keys[0], $position, (float) ( $row['ctr'] ?? 0 ), self::expected_ctr( $position ), $good_position ) ) {
+				$captured[ $page ] = ( $captured[ $page ] ?? 0 ) + (int) ( $row['impressions'] ?? 0 );
 			}
 		}
 		return $captured;
@@ -463,6 +466,86 @@ class GscOpportunityAbility {
 	public static function sort_and_limit( array $rows, string $field, int $limit = 0 ): array {
 		usort( $rows, static fn( array $a, array $b ): int => ( $b[ $field ] ?? 0 ) <=> ( $a[ $field ] ?? 0 ) );
 		return $limit > 0 ? array_slice( $rows, 0, $limit ) : $rows;
+	}
+
+	/**
+	 * Prepare raw GSC rows for opportunity classification.
+	 *
+	 * Query rows retain their original grain. Page rows are grouped by a stable
+	 * URL identity before thresholds and opportunity classes are evaluated.
+	 *
+	 * @param string $kind GSC dimension kind (query or page).
+	 * @param array  $rows Raw GSC result rows.
+	 * @return array Rows at the dimension's classification grain.
+	 */
+	public static function prepare_rows( string $kind, array $rows ): array {
+		if ( 'page' !== $kind ) {
+			return $rows;
+		}
+
+		$aggregated = array();
+		foreach ( $rows as $row ) {
+			$keys = (array) ( $row['keys'] ?? array() );
+			if ( empty( $keys ) ) {
+				continue;
+			}
+
+			$url = self::canonical_page_url( (string) $keys[0] );
+			if ( '' === $url ) {
+				continue;
+			}
+
+			$impressions = (int) ( $row['impressions'] ?? 0 );
+			if ( ! isset( $aggregated[ $url ] ) ) {
+				$aggregated[ $url ] = $row + array(
+					'clicks'      => 0,
+					'impressions' => 0,
+					'ctr'         => 0.0,
+					'position'    => 0.0,
+				);
+
+				$aggregated[ $url ]['keys']               = array( $url );
+				$aggregated[ $url ]['clicks']             = 0;
+				$aggregated[ $url ]['impressions']        = 0;
+				$aggregated[ $url ]['_position_weighted'] = 0.0;
+			}
+
+			$aggregated[ $url ]['clicks']             += (int) ( $row['clicks'] ?? 0 );
+			$aggregated[ $url ]['impressions']        += $impressions;
+			$aggregated[ $url ]['_position_weighted'] += (float) ( $row['position'] ?? 0.0 ) * $impressions;
+		}
+
+		foreach ( $aggregated as &$row ) {
+			$impressions     = (int) $row['impressions'];
+			$row['ctr']      = $impressions > 0 ? (int) $row['clicks'] / $impressions : 0.0;
+			$row['position'] = $impressions > 0 ? $row['_position_weighted'] / $impressions : 0.0;
+			unset( $row['_position_weighted'] );
+		}
+		unset( $row );
+
+		return array_values( $aggregated );
+	}
+
+	/**
+	 * Normalize a page URL for report identity.
+	 *
+	 * @param string $url Raw GSC page URL.
+	 * @return string Canonical report URL, or an empty string when invalid.
+	 */
+	private static function canonical_page_url( string $url ): string {
+		$parts = wp_parse_url( $url );
+		if ( ! is_array( $parts ) || empty( $parts['host'] ) ) {
+			return '';
+		}
+
+		$scheme = strtolower( (string) ( $parts['scheme'] ?? 'https' ) );
+		$host   = strtolower( (string) $parts['host'] );
+		$port   = isset( $parts['port'] ) ? ':' . (int) $parts['port'] : '';
+		$path   = (string) ( $parts['path'] ?? '/' );
+		$path   = '' === $path ? '/' : $path;
+		$path   = '/' === $path ? '/' : rtrim( $path, '/' );
+
+		return $scheme . '://' . $host . $port . $path;
 	}
 
 	private static function gsc_input( string $action, string $start_date, string $end_date, array $input ): array {

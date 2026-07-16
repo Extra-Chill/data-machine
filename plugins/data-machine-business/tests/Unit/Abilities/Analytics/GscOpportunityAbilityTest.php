@@ -59,6 +59,7 @@ class GscOpportunityAbilityTest extends WP_UnitTestCase {
 
 	public function test_captured_query_impressions_qualify_page_aggregate(): void {
 		$page = 'https://extrachill.com/the-meaning-of-blackstreets-no-diggity/';
+		$canonical_page = 'https://extrachill.com/the-meaning-of-blackstreets-no-diggity';
 		$map  = GscOpportunityAbility::captured_impressions_by_page(
 			array(
 				array(
@@ -76,13 +77,14 @@ class GscOpportunityAbilityTest extends WP_UnitTestCase {
 			)
 		);
 
-		$this->assertSame( 340000, $map[ $page ] );
-		$this->assertSame( 14588, 354588 - $map[ $page ] );
-		$this->assertLessThan( 5000, (int) round( ( 354588 - $map[ $page ] ) * ( 0.10 - 0.0004 ) ) );
+		$this->assertSame( 340000, $map[ $canonical_page ] );
+		$this->assertSame( 14588, 354588 - $map[ $canonical_page ] );
+		$this->assertLessThan( 5000, (int) round( ( 354588 - $map[ $canonical_page ] ) * ( 0.10 - 0.0004 ) ) );
 	}
 
 	public function test_normal_page_has_no_captured_adjustment(): void {
 		$page = 'https://extrachill.com/normal-article/';
+		$canonical_page = 'https://extrachill.com/normal-article';
 		$map  = GscOpportunityAbility::captured_impressions_by_page(
 			array(
 				array(
@@ -94,7 +96,51 @@ class GscOpportunityAbilityTest extends WP_UnitTestCase {
 			)
 		);
 
-		$this->assertArrayNotHasKey( $page, $map );
+		$this->assertArrayNotHasKey( $canonical_page, $map );
 		$this->assertSame( 900, (int) round( 10000 * ( 0.10 - 0.01 ) ) );
+	}
+
+	public function test_page_rows_are_aggregated_by_canonical_url_before_classification(): void {
+		$rows = GscOpportunityAbility::prepare_rows(
+			'page',
+			array(
+				array(
+					'keys'        => array( 'https://EXTRACHILL.com/led-zeppelin-icarus-meaning/?utm_source=test' ),
+					'clicks'      => 10,
+					'impressions' => 100,
+					'ctr'         => 0.10,
+					'position'    => 2.0,
+				),
+				array(
+					'keys'        => array( 'https://extrachill.com/led-zeppelin-icarus-meaning' ),
+					'clicks'      => 5,
+					'impressions' => 300,
+					'ctr'         => 0.0167,
+					'position'    => 6.0,
+				),
+			)
+		);
+
+		$this->assertCount( 1, $rows );
+		$this->assertSame( array( 'https://extrachill.com/led-zeppelin-icarus-meaning' ), $rows[0]['keys'] );
+		$this->assertSame( 15, $rows[0]['clicks'] );
+		$this->assertSame( 400, $rows[0]['impressions'] );
+		$this->assertEqualsWithDelta( 0.0375, $rows[0]['ctr'], 0.000001 );
+		$this->assertEqualsWithDelta( 5.0, $rows[0]['position'], 0.000001 );
+	}
+
+	public function test_query_rows_remain_distinct(): void {
+		$rows = array(
+			array(
+				'keys'        => array( 'led zeppelin icarus meaning' ),
+				'impressions' => 100,
+			),
+			array(
+				'keys'        => array( 'icarus meaning led zeppelin' ),
+				'impressions' => 200,
+			),
+		);
+
+		$this->assertSame( $rows, GscOpportunityAbility::prepare_rows( 'query', $rows ) );
 	}
 }
