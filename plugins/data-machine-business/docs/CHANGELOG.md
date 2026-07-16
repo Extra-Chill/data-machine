@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 Homeboy maintains this file from conventional commits at release time —
 do not edit by hand.
 
+## [0.14.1] - 2026-07-16
+
+### Changed
+- make Mediavine provenance schema gates dependency-free
+
+### Fixed
+- aggregate canonical GSC page opportunities
+- reconcile GA comparison rows by dimensions
+
 ## [0.14.0] - 2026-07-13
 
 ### Added
