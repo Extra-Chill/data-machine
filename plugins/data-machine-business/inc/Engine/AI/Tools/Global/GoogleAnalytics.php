@@ -66,18 +66,21 @@ class GoogleAnalytics extends BaseTool {
 	 * @return array Tool definition array.
 	 */
 	public function getToolDefinition(): array {
+		$valid_actions = array_merge( array_keys( GoogleAnalyticsAbilities::ACTION_REPORTS ), array( 'realtime', 'path_sequence' ) );
+
 		return array(
 			'class'           => __CLASS__,
 			'method'          => 'handle_tool_call',
-			'description'     => 'Fetch visitor analytics from Google Analytics (GA4). Get page performance metrics (with hostName for multisite), traffic sources, daily trends, real-time active users, top events, user demographics, landing pages, engagement metrics, new-vs-returning user breakdown, a cross-site network-density proxy, and true ordered cross-host session journeys (path_sequence). Supports sorting, hostname filtering for multisite, and period-over-period comparison.',
+			'description'     => 'Fetch visitor analytics from Google Analytics (GA4), including fixed landing-page acquisition, touched-page acquisition, and page audience breakdowns. Supports sorting, hostname and page filtering, and period-over-period comparison without arbitrary dimension selection.',
 			'requires_config' => true,
 			'parameters'      => array(
 				'type'       => 'object',
 				'properties' => array(
 					'action'      => array(
-					'type'        => 'string',
-					'description' => 'Action to perform: page_stats (per-page views, sessions, bounce rate; includes hostName so multisite pages are distinguishable), traffic_sources (where visitors come from), date_stats (daily trends over time), realtime (active users right now), top_events (most triggered events), user_demographics (visitor country and device breakdown), landing_pages (entry pages with session metrics), engagement (engagement rate, session quality, pages/session), new_vs_returning (new vs returning user comparison), network_density (cross-site journey proxy: hostName x pageReferrer, to compute % of sessions per site whose referrer was another site on the network; approximation only — pageReferrer is the immediately-preceding URL not an ordered session path, and is subject to referrer-policy stripping, sampling, and high-cardinality bucketing), path_sequence (TRUE ordered cross-host journeys via the v1alpha funnel report: discovers the hosts then runs a 2-step closed funnel per ordered host pair, returning each host\'s entry_users, ordered next-host transitions (next_host + activeUsers), and onward_users, so you can compute "% of each host\'s users reaching >=1 other site" and rank the top ordered cross-site paths — unlike network_density this is a real ordered hop, not a referrer guess. Caveats: v1alpha API, USER-scoped (activeUsers, not sessions), subject to sampling, 2-hop transitions per host pair (compose deeper chains yourself), capped to top hosts; fully-accurate source would be a BigQuery export, not yet configured).',
-				),
+						'type'        => 'string',
+						'enum'        => $valid_actions,
+						'description' => 'Choose a bounded report. landing_page_acquisition uses session-entry landingPage x session source/medium. page_acquisition uses touched pagePath x session source/medium. page_audience uses touched pagePath x country/device.',
+					),
 					'property_id' => array(
 					'type'        => 'string',
 					'description' => 'GA4 property ID (numeric). Defaults to the configured property ID.',
@@ -92,6 +95,8 @@ class GoogleAnalytics extends BaseTool {
 				),
 					'limit'       => array(
 					'type'        => 'integer',
+					'minimum'     => 1,
+					'maximum'     => GoogleAnalyticsAbilities::MAX_LIMIT,
 					'description' => 'Row limit (default: 25, max: 10000).',
 				),
 					'page_filter' => array(
@@ -108,6 +113,7 @@ class GoogleAnalytics extends BaseTool {
 				),
 					'order'       => array(
 					'type'        => 'string',
+					'enum'        => array( 'asc', 'desc' ),
 					'description' => 'Sort direction: asc or desc (default: desc).',
 				),
 					'compare'     => array(

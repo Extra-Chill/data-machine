@@ -99,45 +99,61 @@ class GoogleAnalyticsAbilities {
 	 * @var array
 	 */
 	const ACTION_REPORTS = array(
-		'page_stats'        => array(
+		'page_stats'              => array(
 			// hostName is prepended (not replacing pagePath) so existing pagePath-keyed
 			// consumers keep working while cross-site rows become distinguishable — on a
 			// multisite GA4 property two sites otherwise both collapse to pagePath "/".
 			'dimensions' => array( 'hostName', 'pagePath', 'pageTitle' ),
 			'metrics'    => array( 'screenPageViews', 'sessions', 'bounceRate', 'averageSessionDuration', 'activeUsers' ),
 		),
-		'network_density'   => array(
+		'network_density'         => array(
 			// Cross-site journey proxy: current host x previous URL. Bucket pageReferrer's
 			// host into in-network vs external to compute "% of sessions per site whose
 			// referrer was another EC site". Approximation only — see action description.
 			'dimensions' => array( 'hostName', 'pageReferrer' ),
 			'metrics'    => array( 'sessions', 'activeUsers', 'screenPageViews' ),
 		),
-		'traffic_sources'   => array(
+		'traffic_sources'         => array(
 			'dimensions' => array( 'sessionSource', 'sessionMedium' ),
 			'metrics'    => array( 'sessions', 'activeUsers', 'screenPageViews', 'bounceRate' ),
 		),
-		'date_stats'        => array(
+		'date_stats'              => array(
 			'dimensions' => array( 'date' ),
 			'metrics'    => array( 'sessions', 'screenPageViews', 'activeUsers', 'bounceRate', 'averageSessionDuration' ),
 		),
-		'top_events'        => array(
+		'top_events'              => array(
 			'dimensions' => array( 'eventName' ),
 			'metrics'    => array( 'eventCount', 'eventCountPerUser' ),
 		),
-		'user_demographics' => array(
+		'user_demographics'       => array(
 			'dimensions' => array( 'country', 'deviceCategory' ),
 			'metrics'    => array( 'sessions', 'activeUsers', 'screenPageViews' ),
 		),
-		'landing_pages'     => array(
+		'landing_pages'           => array(
 			'dimensions' => array( 'landingPage' ),
 			'metrics'    => array( 'sessions', 'activeUsers', 'bounceRate', 'averageSessionDuration', 'engagementRate' ),
 		),
-		'engagement'        => array(
+		'landing_page_acquisition' => array(
+			// Session-entry semantics: acquisition is attributed to the page where
+			// the session began, not every page subsequently touched.
+			'dimensions' => array( 'landingPage', 'sessionSource', 'sessionMedium' ),
+			'metrics'    => array( 'sessions', 'activeUsers', 'engagedSessions', 'engagementRate' ),
+		),
+		'page_acquisition'        => array(
+			// Touched-page semantics: pagePath includes any matching page viewed
+			// during sessions attributed to the returned source and medium.
+			'dimensions' => array( 'pagePath', 'sessionSource', 'sessionMedium' ),
+			'metrics'    => array( 'screenPageViews', 'sessions', 'activeUsers', 'engagedSessions' ),
+		),
+		'page_audience'           => array(
+			'dimensions' => array( 'pagePath', 'country', 'deviceCategory' ),
+			'metrics'    => array( 'screenPageViews', 'sessions', 'activeUsers' ),
+		),
+		'engagement'              => array(
 			'dimensions' => array( 'pagePath', 'pageTitle' ),
 			'metrics'    => array( 'engagementRate', 'averageSessionDuration', 'engagedSessions', 'sessionsPerUser', 'screenPageViewsPerSession', 'userEngagementDuration' ),
 		),
-		'new_vs_returning'  => array(
+		'new_vs_returning'        => array(
 			'dimensions' => array( 'newVsReturning' ),
 			'metrics'    => array( 'sessions', 'activeUsers', 'engagementRate', 'screenPageViewsPerSession', 'averageSessionDuration' ),
 		),
@@ -156,6 +172,8 @@ class GoogleAnalyticsAbilities {
 
 	private function registerAbilities(): void {
 		$register_callback = function () {
+			$valid_actions = array_merge( array_keys( self::ACTION_REPORTS ), array( 'realtime', 'path_sequence' ) );
+
 			wp_register_ability(
 				'datamachine/google-analytics',
 				array(
@@ -168,7 +186,8 @@ class GoogleAnalyticsAbilities {
 						'properties' => array(
 							'action'      => array(
 								'type'        => 'string',
-								'description' => 'Action to perform: page_stats (per-page metrics, includes hostName for multisite), traffic_sources, date_stats, realtime, top_events, user_demographics, landing_pages, engagement, new_vs_returning, network_density (cross-site journey proxy: hostName x pageReferrer; approximation only — pageReferrer is the immediately-preceding URL, not an ordered session path, and is subject to referrer-policy stripping, sampling, and high-cardinality "(other)" bucketing), path_sequence (true ordered cross-host journeys via the v1alpha funnel report — discovers hosts then runs a 2-step closed funnel per ordered host pair, returning each host\'s entry_users, ordered next-host transitions (next_host with activeUsers), and onward_users, so a consumer can compute "% of each host\'s users reaching >=1 other site" and rank top ordered cross-site paths; in-network bucketing is the consumer\'s job. DATA SOURCE: GA4 Data API v1alpha funnel report. Caveats: v1alpha (may change), USER-scoped metric (activeUsers, not sessions), subject to sampling, returns ordered 2-hop transitions per host pair (compose deeper chains from the matrix), capped to the top hosts. The fully-accurate long-term source is a BigQuery export tap, not yet configured).',
+								'enum'        => $valid_actions,
+								'description' => 'Action to perform. Acquisition reports are bounded presets: landing_page_acquisition groups session-entry landingPage by session source/medium; page_acquisition groups touched pagePath by session source/medium; page_audience groups touched pagePath by country/device. Other actions: page_stats, traffic_sources, date_stats, realtime, top_events, user_demographics, landing_pages, engagement, new_vs_returning, network_density (referrer proxy), path_sequence (ordered v1alpha funnel report).',
 							),
 							'property_id' => array(
 								'type'        => 'string',
@@ -184,6 +203,8 @@ class GoogleAnalyticsAbilities {
 							),
 							'limit'       => array(
 								'type'        => 'integer',
+								'minimum'     => 1,
+								'maximum'     => self::MAX_LIMIT,
 								'description' => 'Row limit (default: 25, max: 10000). For path_sequence this instead selects how many top hosts (by sessions) to pair, default 6, clamped to 12 — fan-out grows ~N*(N-1) funnel calls.',
 							),
 							'page_filter' => array(
@@ -200,6 +221,7 @@ class GoogleAnalyticsAbilities {
 							),
 							'order'       => array(
 								'type'        => 'string',
+								'enum'        => array( 'asc', 'desc' ),
 								'description' => 'Sort direction: asc or desc (default: desc).',
 							),
 							'compare'     => array(
@@ -215,6 +237,7 @@ class GoogleAnalyticsAbilities {
 							'action'        => array( 'type' => 'string' ),
 							'results_count' => array( 'type' => 'integer' ),
 							'results'       => array( 'type' => 'array' ),
+							'pagination'    => array( 'type' => 'object' ),
 							'error'         => array( 'type' => 'string' ),
 						),
 					),
@@ -310,7 +333,7 @@ class GoogleAnalyticsAbilities {
 
 		$start_date = ! empty( $input['start_date'] ) ? sanitize_text_field( $input['start_date'] ) : gmdate( 'Y-m-d', strtotime( '-28 days' ) );
 		$end_date   = ! empty( $input['end_date'] ) ? sanitize_text_field( $input['end_date'] ) : gmdate( 'Y-m-d', strtotime( '-1 day' ) );
-		$limit      = ! empty( $input['limit'] ) ? min( (int) $input['limit'], self::MAX_LIMIT ) : self::DEFAULT_LIMIT;
+		$limit      = ! empty( $input['limit'] ) ? max( 1, min( (int) $input['limit'], self::MAX_LIMIT ) ) : self::DEFAULT_LIMIT;
 		$compare    = ! empty( $input['compare'] );
 
 		$dimensions = array_map(
@@ -555,7 +578,7 @@ class GoogleAnalyticsAbilities {
 			);
 		}
 
-		$limit = ! empty( $input['limit'] ) ? min( (int) $input['limit'], self::MAX_LIMIT ) : self::DEFAULT_LIMIT;
+		$limit = ! empty( $input['limit'] ) ? max( 1, min( (int) $input['limit'], self::MAX_LIMIT ) ) : self::DEFAULT_LIMIT;
 		$rows  = $compare
 			? self::formatComparisonRows( $data, $limit )
 			: self::formatReportRows( $data);
@@ -569,6 +592,7 @@ class GoogleAnalyticsAbilities {
 			),
 			'results_count' => count( $rows ),
 			'results'       => $rows,
+			'pagination'    => self::buildPaginationMetadata( $data, $limit, count( $rows ), $compare ),
 		);
 
 		if ( $compare ) {
@@ -579,6 +603,44 @@ class GoogleAnalyticsAbilities {
 		}
 
 		return $response;
+	}
+
+	/**
+	 * Describe GA4 and display-level row limiting for a standard report.
+	 *
+	 * @param array $data           Raw GA4 API response.
+	 * @param int   $limit          Requested display limit.
+	 * @param int   $returned_rows  Number of formatted rows returned.
+	 * @param bool  $compare        Whether two date ranges were requested.
+	 * @return array Pagination metadata.
+	 */
+	private static function buildPaginationMetadata( array $data, int $limit, int $returned_rows, bool $compare ): array {
+		$fetched_rows   = count( $data['rows'] ?? array() );
+		$api_row_count  = isset( $data['rowCount'] ) ? (int) $data['rowCount'] : $fetched_rows;
+		$available_rows = $fetched_rows;
+
+		if ( $compare ) {
+			$dimension_headers = wp_list_pluck( $data['dimensionHeaders'] ?? array(), 'name' );
+			$date_range_index  = array_search( 'dateRange', $dimension_headers, true );
+			$available_rows    = 0;
+
+			foreach ( ( $data['rows'] ?? array() ) as $row ) {
+				$range = false !== $date_range_index
+					? ( $row['dimensionValues'][ $date_range_index ]['value'] ?? 'date_range_0' )
+					: 'date_range_0';
+				if ( 'date_range_0' === $range ) {
+					++$available_rows;
+				}
+			}
+		}
+
+		return array(
+			'limit'         => $limit,
+			'returned_rows' => $returned_rows,
+			'api_row_count' => $api_row_count,
+			'fetched_rows'  => $fetched_rows,
+			'truncated'     => $api_row_count > $fetched_rows || $available_rows > $returned_rows,
+		);
 	}
 
 	/**

@@ -15,6 +15,7 @@
 namespace DataMachine\Tests\Unit\Abilities\Analytics;
 
 use DataMachineBusiness\Abilities\Analytics\GoogleAnalyticsAbilities;
+use DataMachineBusiness\Engine\AI\Tools\Global\GoogleAnalytics;
 use WP_UnitTestCase;
 
 class GoogleAnalyticsAbilitiesTest extends WP_UnitTestCase {
@@ -166,6 +167,135 @@ class GoogleAnalyticsAbilitiesTest extends WP_UnitTestCase {
 		);
 
 		$this->assertArrayNotHasKey( 'dimensionFilter', $body );
+	}
+
+	/**
+	 * The recovery-analysis additions are fixed report presets. Callers cannot
+	 * select arbitrary dimensions or metrics.
+	 *
+	 * @dataProvider bounded_page_report_configs
+	 */
+	public function test_bounded_page_report_config( string $action, array $dimensions, array $metrics ): void {
+		$body = GoogleAnalyticsAbilities::buildReportRequestBody(
+			array(
+				'start_date' => '2026-01-01',
+				'end_date'   => '2026-01-31',
+			),
+			$action
+		);
+
+		$this->assertSame( $dimensions, wp_list_pluck( $body['dimensions'], 'name' ) );
+		$this->assertSame( $metrics, wp_list_pluck( $body['metrics'], 'name' ) );
+	}
+
+	/**
+	 * landing_page_acquisition retains session-entry filtering while the two
+	 * pagePath reports retain touched-page filtering.
+	 *
+	 * @dataProvider bounded_page_filter_dimensions
+	 */
+	public function test_bounded_page_report_filter_semantics( string $action, string $field_name ): void {
+		$body = GoogleAnalyticsAbilities::buildReportRequestBody(
+			array(
+				'page_filter' => '/recovery/',
+				'hostname'    => 'example.com',
+				'start_date'  => '2026-01-01',
+				'end_date'    => '2026-01-31',
+			),
+			$action
+		);
+
+		$filters = $body['dimensionFilter']['andGroup']['expressions'];
+		$this->assertSame( $field_name, $filters[0]['filter']['fieldName'] );
+		$this->assertSame( 'hostName', $filters[1]['filter']['fieldName'] );
+	}
+
+	public function test_report_limit_is_clamped_to_valid_range(): void {
+		$too_small = GoogleAnalyticsAbilities::buildReportRequestBody( array( 'limit' => -5 ), 'page_acquisition' );
+		$too_large = GoogleAnalyticsAbilities::buildReportRequestBody( array( 'limit' => 20000 ), 'page_acquisition' );
+
+		$this->assertSame( 1, $too_small['limit'] );
+		$this->assertSame( GoogleAnalyticsAbilities::MAX_LIMIT, $too_large['limit'] );
+	}
+
+	public function test_ai_tool_schema_enumerates_bounded_actions(): void {
+		$reflection = new \ReflectionClass( GoogleAnalytics::class );
+		$tool       = $reflection->newInstanceWithoutConstructor();
+		$definition = $tool->getToolDefinition();
+		$parameters = $definition['parameters']['properties'];
+
+		$this->assertContains( 'landing_page_acquisition', $parameters['action']['enum'] );
+		$this->assertContains( 'page_acquisition', $parameters['action']['enum'] );
+		$this->assertContains( 'page_audience', $parameters['action']['enum'] );
+		$this->assertSame( array( 'asc', 'desc' ), $parameters['order']['enum'] );
+		$this->assertSame( 1, $parameters['limit']['minimum'] );
+		$this->assertSame( GoogleAnalyticsAbilities::MAX_LIMIT, $parameters['limit']['maximum'] );
+	}
+
+	public function test_report_rows_keep_dimensions_and_cast_numeric_metrics(): void {
+		$data = array(
+			'dimensionHeaders' => array(
+				array( 'name' => 'pagePath' ),
+				array( 'name' => 'country' ),
+				array( 'name' => 'deviceCategory' ),
+			),
+			'metricHeaders'    => array(
+				array( 'name' => 'screenPageViews' ),
+				array( 'name' => 'engagementRate' ),
+			),
+			'rows'             => array(
+				array(
+					'dimensionValues' => array(
+						array( 'value' => '/recovery/' ),
+						array( 'value' => 'United States' ),
+						array( 'value' => 'mobile' ),
+					),
+					'metricValues'    => array(
+						array( 'value' => '42' ),
+						array( 'value' => '0.625' ),
+					),
+				),
+			),
+		);
+
+		$method = new \ReflectionMethod( GoogleAnalyticsAbilities::class, 'formatReportRows' );
+		$method->setAccessible( true );
+		$rows = $method->invoke( null, $data );
+
+		$this->assertSame( '/recovery/', $rows[0]['pagePath'] );
+		$this->assertSame( 42, $rows[0]['screenPageViews'] );
+		$this->assertSame( 0.625, $rows[0]['engagementRate'] );
+	}
+
+	public function test_pagination_metadata_discloses_api_truncation(): void {
+		$data = array(
+			'rowCount' => 10,
+			'rows'     => array( array(), array(), array() ),
+		);
+
+		$pagination = $this->pagination_metadata( $data, 3, 3, false );
+
+		$this->assertSame( 10, $pagination['api_row_count'] );
+		$this->assertSame( 3, $pagination['fetched_rows'] );
+		$this->assertTrue( $pagination['truncated'] );
+	}
+
+	public function test_comparison_pagination_uses_current_period_rows_for_display_truncation(): void {
+		$data = $this->comparison_response(
+			array( 'pagePath', 'sessionSource', 'sessionMedium' ),
+			array( 'sessions' ),
+			array(
+				array( array( '/one/', 'google', 'organic' ), 'date_range_0', array( '20' ) ),
+				array( array( '/two/', 'direct', '(none)' ), 'date_range_0', array( '10' ) ),
+				array( array( '/one/', 'google', 'organic' ), 'date_range_1', array( '18' ) ),
+				array( array( '/two/', 'direct', '(none)' ), 'date_range_1', array( '8' ) ),
+			)
+		);
+		$data['rowCount'] = 4;
+
+		$pagination = $this->pagination_metadata( $data, 2, 2, true );
+
+		$this->assertFalse( $pagination['truncated'] );
 	}
 
 	/**
@@ -485,6 +615,13 @@ class GoogleAnalyticsAbilitiesTest extends WP_UnitTestCase {
 		return $method->invoke( null, $data, $limit );
 	}
 
+	private function pagination_metadata( array $data, int $limit, int $returned_rows, bool $compare ): array {
+		$method = new \ReflectionMethod( GoogleAnalyticsAbilities::class, 'buildPaginationMetadata' );
+		$method->setAccessible( true );
+
+		return $method->invoke( null, $data, $limit, $returned_rows, $compare );
+	}
+
 	private function comparison_response( array $dimensions, array $metrics, array $rows ): array {
 		return array(
 			'dimensionHeaders' => array_map(
@@ -515,21 +652,26 @@ class GoogleAnalyticsAbilitiesTest extends WP_UnitTestCase {
 
 	public static function all_filterable_actions(): array {
 		return array(
-			'page_stats'        => array( 'page_stats' ),
-			'traffic_sources'   => array( 'traffic_sources' ),
-			'date_stats'        => array( 'date_stats' ),
-			'top_events'        => array( 'top_events' ),
-			'user_demographics' => array( 'user_demographics' ),
-			'landing_pages'     => array( 'landing_pages' ),
-			'engagement'        => array( 'engagement' ),
-			'new_vs_returning'  => array( 'new_vs_returning' ),
+			'page_stats'              => array( 'page_stats' ),
+			'traffic_sources'         => array( 'traffic_sources' ),
+			'date_stats'              => array( 'date_stats' ),
+			'top_events'              => array( 'top_events' ),
+			'user_demographics'       => array( 'user_demographics' ),
+			'landing_pages'           => array( 'landing_pages' ),
+			'landing_page_acquisition' => array( 'landing_page_acquisition' ),
+			'page_acquisition'        => array( 'page_acquisition' ),
+			'page_audience'           => array( 'page_audience' ),
+			'engagement'              => array( 'engagement' ),
+			'new_vs_returning'        => array( 'new_vs_returning' ),
 		);
 	}
 
 	public static function page_path_grouped_actions(): array {
 		return array(
-			'page_stats' => array( 'page_stats' ),
-			'engagement' => array( 'engagement' ),
+			'page_stats'       => array( 'page_stats' ),
+			'engagement'       => array( 'engagement' ),
+			'page_acquisition' => array( 'page_acquisition' ),
+			'page_audience'    => array( 'page_audience' ),
 		);
 	}
 
@@ -540,6 +682,34 @@ class GoogleAnalyticsAbilitiesTest extends WP_UnitTestCase {
 			'top_events'        => array( 'top_events' ),
 			'user_demographics' => array( 'user_demographics' ),
 			'new_vs_returning'  => array( 'new_vs_returning' ),
+		);
+	}
+
+	public static function bounded_page_report_configs(): array {
+		return array(
+			'landing page acquisition' => array(
+				'landing_page_acquisition',
+				array( 'landingPage', 'sessionSource', 'sessionMedium' ),
+				array( 'sessions', 'activeUsers', 'engagedSessions', 'engagementRate' ),
+			),
+			'page acquisition'         => array(
+				'page_acquisition',
+				array( 'pagePath', 'sessionSource', 'sessionMedium' ),
+				array( 'screenPageViews', 'sessions', 'activeUsers', 'engagedSessions' ),
+			),
+			'page audience'            => array(
+				'page_audience',
+				array( 'pagePath', 'country', 'deviceCategory' ),
+				array( 'screenPageViews', 'sessions', 'activeUsers' ),
+			),
+		);
+	}
+
+	public static function bounded_page_filter_dimensions(): array {
+		return array(
+			'landing page acquisition' => array( 'landing_page_acquisition', 'landingPage' ),
+			'page acquisition'         => array( 'page_acquisition', 'pagePath' ),
+			'page audience'            => array( 'page_audience', 'pagePath' ),
 		);
 	}
 }

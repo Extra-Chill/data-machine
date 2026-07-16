@@ -129,6 +129,9 @@ Actions:
 - `top_events`
 - `user_demographics`
 - `landing_pages`
+- `landing_page_acquisition`
+- `page_acquisition`
+- `page_audience`
 - `engagement`
 - `new_vs_returning`
 - `network_density`
@@ -138,6 +141,8 @@ Common options include `--start-date`, `--end-date`, `--limit`, `--page-filter`,
 
 ```bash
 wp datamachine analytics ga page_stats --hostname=example.com --compare
+wp datamachine analytics ga landing_page_acquisition --hostname=example.com
+wp datamachine analytics ga page_acquisition --page-filter=/blog/
 wp datamachine analytics ga path_sequence --format=json
 ```
 

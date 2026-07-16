@@ -33,17 +33,20 @@ class GoogleAnalyticsCommand extends BaseCommand {
 	 */
 	public static function actions(): array {
 		return array(
-			'page_stats'        => 'Top pages by sessions, views, and engagement',
-			'traffic_sources'   => 'Sessions grouped by source and medium',
-			'date_stats'        => 'Daily session and engagement trends',
-			'realtime'          => 'Real-time active users',
-			'top_events'        => 'Top events by count',
-			'user_demographics' => 'Sessions by country and device',
-			'landing_pages'     => 'Top landing pages by entrances and engagement',
-			'engagement'        => 'Aggregate engagement metrics per page',
-			'new_vs_returning'  => 'New vs returning user split',
-			'network_density'   => 'Cross-site journey density via referrer host',
-			'path_sequence'     => 'Ordered cross-host path sequences (funnel report)',
+			'page_stats'              => 'Top pages by sessions, views, and engagement',
+			'traffic_sources'         => 'Sessions grouped by source and medium',
+			'date_stats'              => 'Daily session and engagement trends',
+			'realtime'                => 'Real-time active users',
+			'top_events'              => 'Top events by count',
+			'user_demographics'       => 'Sessions by country and device',
+			'landing_pages'           => 'Top landing pages by entrances and engagement',
+			'landing_page_acquisition' => 'Landing pages by session source and medium',
+			'page_acquisition'        => 'Touched pages by session source and medium',
+			'page_audience'           => 'Touched pages by country and device',
+			'engagement'              => 'Aggregate engagement metrics per page',
+			'new_vs_returning'        => 'New vs returning user split',
+			'network_density'         => 'Cross-site journey density via referrer host',
+			'path_sequence'           => 'Ordered cross-host path sequences (funnel report)',
 		);
 	}
 
@@ -53,7 +56,7 @@ class GoogleAnalyticsCommand extends BaseCommand {
 	 * ## OPTIONS
 	 *
 	 * <action>
-	 * : Action to perform: page_stats, traffic_sources, date_stats, realtime, top_events, user_demographics, landing_pages, engagement, new_vs_returning, network_density, path_sequence.
+	 * : Action to perform: page_stats, traffic_sources, date_stats, realtime, top_events, user_demographics, landing_pages, landing_page_acquisition, page_acquisition, page_audience, engagement, new_vs_returning, network_density, path_sequence.
 	 *
 	 * [--start-date=<date>]
 	 * : Start date in YYYY-MM-DD format (default: 28 days ago). Not used for realtime.
@@ -108,6 +111,15 @@ class GoogleAnalyticsCommand extends BaseCommand {
 	 *
 	 *     # Landing pages with highest engagement
 	 *     wp datamachine analytics ga landing_pages --sort-by=engagementRate --order=desc
+	 *
+	 *     # Session-entry pages broken down by acquisition source
+	 *     wp datamachine analytics ga landing_page_acquisition --hostname=example.com
+	 *
+	 *     # Any touched page broken down by acquisition source
+	 *     wp datamachine analytics ga page_acquisition --page-filter=/blog/
+	 *
+	 *     # Any touched page broken down by country and device
+	 *     wp datamachine analytics ga page_audience --page-filter=/blog/
 	 *
 	 *     # Engagement metrics for specific section
 	 *     wp datamachine analytics ga engagement --page-filter=/blog/

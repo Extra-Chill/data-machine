@@ -29,10 +29,21 @@ Existing GA4 installations do not need a migration step. Data Machine Business u
 - `top_events`
 - `user_demographics`
 - `landing_pages`
+- `landing_page_acquisition`
+- `page_acquisition`
+- `page_audience`
 - `engagement`
 - `new_vs_returning`
 - `network_density`
 - `path_sequence`
+
+### Bounded page breakdowns
+
+- **`landing_page_acquisition`** groups `landingPage` by `sessionSource` and `sessionMedium`. It answers how sessions were acquired for the page where each session began.
+- **`page_acquisition`** groups `pagePath` by `sessionSource` and `sessionMedium`. It answers which acquisition channels drove sessions that touched a page, whether or not that page was the session entry.
+- **`page_audience`** groups `pagePath` by `country` and `deviceCategory` for geographic and device analysis of touched pages.
+
+These are fixed report presets rather than an arbitrary GA4 report builder. All support `page_filter`, `hostname`, sorting, row limits, and comparison. Standard report responses include pagination metadata with the requested limit, returned and fetched row counts, GA4's reported row count, and a truncation flag.
 
 ### `network_density` vs `path_sequence`
 
