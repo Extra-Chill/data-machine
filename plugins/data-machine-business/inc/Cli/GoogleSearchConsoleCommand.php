@@ -65,6 +65,18 @@ class GoogleSearchConsoleCommand extends BaseCommand {
 	 * [--query-filter=<string>]
 	 * : Filter results to queries containing this string.
 	 *
+	 * [--search-type=<type>]
+	 * : Search result type: web, image, video, news, discover, or googleNews (default: web).
+	 *
+	 * [--country=<code>]
+	 * : Filter by ISO 3166-1 alpha-3 country code, such as USA or GBR.
+	 *
+	 * [--device=<device>]
+	 * : Filter by device: DESKTOP, MOBILE, or TABLET.
+	 *
+	 * [--search-appearance=<appearance>]
+	 * : Filter by a Search Console appearance value, such as AMP_BLUE_LINK.
+	 *
 	 * [--inspect-url=<url>]
 	 * : URL for inspect_url action (named --inspect-url to avoid WP-CLI's global --url).
 	 *
@@ -98,6 +110,10 @@ class GoogleSearchConsoleCommand extends BaseCommand {
 			'limit'        => 'limit',
 			'url-filter'   => 'url_filter',
 			'query-filter' => 'query_filter',
+			'search-type'  => 'search_type',
+			'country'      => 'country',
+			'device'       => 'device',
+			'search-appearance' => 'search_appearance',
 			'inspect-url'  => 'url',
 			'sitemap-url'  => 'sitemap_url',
 		) );

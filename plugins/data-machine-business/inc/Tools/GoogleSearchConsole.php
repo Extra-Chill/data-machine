@@ -109,6 +109,24 @@ class GoogleSearchConsole extends BaseTool {
 					'type'        => 'string',
 					'description' => 'Filter results to queries containing this string.',
 				),
+					'search_type'  => array(
+					'type'        => 'string',
+					'enum'        => GoogleSearchConsoleAbilities::SEARCH_TYPES,
+					'description' => 'Search result type. Defaults to web.',
+				),
+					'country'      => array(
+					'type'        => 'string',
+					'description' => 'ISO 3166-1 alpha-3 country filter, such as USA or GBR.',
+				),
+					'device'       => array(
+					'type'        => 'string',
+					'enum'        => GoogleSearchConsoleAbilities::DEVICES,
+					'description' => 'Device filter: DESKTOP, MOBILE, or TABLET.',
+				),
+					'search_appearance' => array(
+					'type'        => 'string',
+					'description' => 'Search appearance filter, such as AMP_BLUE_LINK.',
+				),
 				),
 				'required'   => array( 'action' ),
 			),

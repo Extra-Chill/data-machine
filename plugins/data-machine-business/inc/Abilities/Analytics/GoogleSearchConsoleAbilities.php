@@ -45,6 +45,20 @@ class GoogleSearchConsoleAbilities {
 	);
 
 	/**
+	 * Search types accepted by the Search Analytics API.
+	 *
+	 * @var string[]
+	 */
+	const SEARCH_TYPES = array( 'web', 'image', 'video', 'news', 'discover', 'googleNews' );
+
+	/**
+	 * Device filter values accepted by the Search Analytics API.
+	 *
+	 * @var string[]
+	 */
+	const DEVICES = array( 'DESKTOP', 'MOBILE', 'TABLET' );
+
+	/**
 	 * Default result limit.
 	 *
 	 * @var int
@@ -117,6 +131,26 @@ class GoogleSearchConsoleAbilities {
 								'type'        => 'string',
 								'description' => 'Filter results to queries containing this string.',
 							),
+							'search_type'  => array(
+								'type'        => 'string',
+								'enum'        => self::SEARCH_TYPES,
+								'description' => 'Search result type: web, image, video, news, discover, or googleNews. Defaults to web.',
+							),
+							'country'      => array(
+								'type'        => 'string',
+								'pattern'     => '^[A-Za-z]{3}$',
+								'description' => 'Filter by ISO 3166-1 alpha-3 country code, such as USA or GBR.',
+							),
+							'device'       => array(
+								'type'        => 'string',
+								'enum'        => self::DEVICES,
+								'description' => 'Filter by device: DESKTOP, MOBILE, or TABLET.',
+							),
+							'search_appearance' => array(
+								'type'        => 'string',
+								'pattern'     => '^[A-Za-z][A-Za-z0-9_]*$',
+								'description' => 'Filter by a Search Console search appearance value, such as AMP_BLUE_LINK.',
+							),
 						),
 					),
 					'output_schema'       => array(
@@ -126,6 +160,7 @@ class GoogleSearchConsoleAbilities {
 							'action'        => array( 'type' => 'string' ),
 							'results_count' => array( 'type' => 'integer' ),
 							'results'       => array( 'type' => 'array' ),
+							'metadata'      => array( 'type' => 'object' ),
 							'error'         => array( 'type' => 'string' ),
 						),
 					),
@@ -231,39 +266,12 @@ class GoogleSearchConsoleAbilities {
 			);
 		}
 
-		$request_body = array(
-			'startDate'  => $start_date,
-			'endDate'    => $end_date,
-			'dimensions' => $dimensions,
-			'rowLimit'   => $limit,
-			'dataState'  => 'final',
-		);
+		$request_body = self::buildSearchAnalyticsRequest( $input, $start_date, $end_date, $dimensions, $limit );
 
-		// Build dimension filter groups if filters provided.
-		$filters = array();
-
-		if ( ! empty( $input['url_filter'] ) ) {
-			$filters[] = array(
-				'dimension'  => 'page',
-				'operator'   => 'contains',
-				'expression' => sanitize_text_field( $input['url_filter'] ),
-			);
-		}
-
-		if ( ! empty( $input['query_filter'] ) ) {
-			$filters[] = array(
-				'dimension'  => 'query',
-				'operator'   => 'contains',
-				'expression' => sanitize_text_field( $input['query_filter'] ),
-			);
-		}
-
-		if ( ! empty( $filters ) ) {
-			$request_body['dimensionFilterGroups'] = array(
-				array(
-					'groupType' => 'and',
-					'filters'   => $filters,
-				),
+		if ( is_wp_error( $request_body ) ) {
+			return array(
+				'success' => false,
+				'error'   => $request_body->get_error_message(),
 			);
 		}
 
@@ -314,7 +322,105 @@ class GoogleSearchConsoleAbilities {
 			'action'        => $action,
 			'results_count' => count( $rows ),
 			'results'       => $rows,
+			'metadata'      => array(
+				'dimensions'  => $dimensions,
+				'search_type' => $request_body['type'],
+				'filters'     => $request_body['dimensionFilterGroups'][0]['filters'] ?? array(),
+			),
 		);
+	}
+
+	/**
+	 * Build and validate a bounded Search Analytics request body.
+	 *
+	 * Audience inputs are filters only; they never alter the dimensions returned
+	 * by the named report action.
+	 *
+	 * @param array    $input      Ability input.
+	 * @param string   $start_date Start date.
+	 * @param string   $end_date   End date.
+	 * @param string[] $dimensions Report dimensions.
+	 * @param int      $limit      Row limit.
+	 * @return array|\WP_Error
+	 */
+	private static function buildSearchAnalyticsRequest( array $input, string $start_date, string $end_date, array $dimensions, int $limit ) {
+		$search_type = ! empty( $input['search_type'] ) ? sanitize_text_field( $input['search_type'] ) : 'web';
+		if ( ! in_array( $search_type, self::SEARCH_TYPES, true ) ) {
+			return new \WP_Error( 'invalid_gsc_search_type', 'Invalid search_type. Must be one of: ' . implode( ', ', self::SEARCH_TYPES ) );
+		}
+
+		$request_body = array(
+			'startDate'  => $start_date,
+			'endDate'    => $end_date,
+			'dimensions' => $dimensions,
+			'rowLimit'   => $limit,
+			'dataState'  => 'final',
+			'type'       => $search_type,
+		);
+		$filters = array();
+
+		if ( ! empty( $input['url_filter'] ) ) {
+			$filters[] = array(
+				'dimension'  => 'page',
+				'operator'   => 'contains',
+				'expression' => sanitize_text_field( $input['url_filter'] ),
+			);
+		}
+
+		if ( ! empty( $input['query_filter'] ) ) {
+			$filters[] = array(
+				'dimension'  => 'query',
+				'operator'   => 'contains',
+				'expression' => sanitize_text_field( $input['query_filter'] ),
+			);
+		}
+
+		if ( ! empty( $input['country'] ) ) {
+			$country = strtolower( sanitize_text_field( $input['country'] ) );
+			if ( 1 !== preg_match( '/^[a-z]{3}$/', $country ) ) {
+				return new \WP_Error( 'invalid_gsc_country', 'Invalid country. Use an ISO 3166-1 alpha-3 country code such as USA or GBR.' );
+			}
+			$filters[] = array(
+				'dimension'  => 'country',
+				'operator'   => 'equals',
+				'expression' => $country,
+			);
+		}
+
+		if ( ! empty( $input['device'] ) ) {
+			$device = strtoupper( sanitize_text_field( $input['device'] ) );
+			if ( ! in_array( $device, self::DEVICES, true ) ) {
+				return new \WP_Error( 'invalid_gsc_device', 'Invalid device. Must be one of: ' . implode( ', ', self::DEVICES ) );
+			}
+			$filters[] = array(
+				'dimension'  => 'device',
+				'operator'   => 'equals',
+				'expression' => $device,
+			);
+		}
+
+		if ( ! empty( $input['search_appearance'] ) ) {
+			$search_appearance = strtoupper( sanitize_text_field( $input['search_appearance'] ) );
+			if ( 1 !== preg_match( '/^[A-Z][A-Z0-9_]*$/', $search_appearance ) ) {
+				return new \WP_Error( 'invalid_gsc_search_appearance', 'Invalid search_appearance. Use a Search Console appearance value such as AMP_BLUE_LINK.' );
+			}
+			$filters[] = array(
+				'dimension'  => 'searchAppearance',
+				'operator'   => 'equals',
+				'expression' => $search_appearance,
+			);
+		}
+
+		if ( ! empty( $filters ) ) {
+			$request_body['dimensionFilterGroups'] = array(
+				array(
+					'groupType' => 'and',
+					'filters'   => $filters,
+				),
+			);
+		}
+
+		return $request_body;
 	}
 
 	/**

@@ -103,6 +103,19 @@ URL & Sitemap actions:
 **query_filter** (string)
 - Filter results to queries containing this string
 
+**search_type** (string)
+- Select the Search Analytics search type: `web` (default), `image`, `video`, `news`, `discover`, or `googleNews`
+
+**country** (string)
+- Filter by an ISO 3166-1 alpha-3 country code, such as `USA` or `GBR`
+
+**device** (string)
+- Filter by `DESKTOP`, `MOBILE`, or `TABLET`
+
+**search_appearance** (string)
+- Filter by a Search Console appearance value, such as `AMP_BLUE_LINK`
+- Appearance values are supplied by Search Console and can vary by property
+
 **url** (string)
 - Required for `inspect_url` action — the full URL to inspect
 
@@ -126,6 +139,8 @@ URL & Sitemap actions:
 
 All search analytics responses include: `clicks`, `impressions`, `ctr`, `position` per row, plus dimension keys.
 
+`country`, `device`, and `search_appearance` are filters, not returned dimensions. The selected named report continues to control the returned dimensions. Response `metadata` records those dimensions, the selected search type, and the exact filters sent to Google.
+
 ### URL Inspection API
 
 **Endpoint**: `POST https://searchconsole.googleapis.com/v1/urlInspection/index:inspect`
@@ -146,6 +161,11 @@ Returns indexing status, mobile usability, and rich results information for a sp
     'success'       => true,
     'action'        => 'query_stats',
     'results_count' => 25,
+    'metadata'      => [
+        'dimensions'  => ['query'],
+        'search_type' => 'web',
+        'filters'     => [],
+    ],
     'results'       => [
         [
             'keys'        => ['wordpress analytics'],
@@ -204,7 +224,7 @@ wp datamachine analytics gsc list_sitemaps --allow-root
 wp datamachine analytics gsc submit_sitemap --sitemap-url=https://chubes.net/sitemap.xml --allow-root
 ```
 
-**Flags**: `--start-date`, `--end-date`, `--limit`, `--url-filter`, `--query-filter`, `--url`, `--sitemap-url`, `--format` (table|json|csv)
+**Flags**: `--start-date`, `--end-date`, `--limit`, `--url-filter`, `--query-filter`, `--search-type`, `--country`, `--device`, `--search-appearance`, `--url`, `--sitemap-url`, `--format` (table|json|csv)
 
 ## REST API
 
