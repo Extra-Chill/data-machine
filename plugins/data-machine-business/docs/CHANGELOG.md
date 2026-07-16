@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 Homeboy maintains this file from conventional commits at release time —
 do not edit by hand.
 
+## [0.15.0] - 2026-07-16
+
+### Added
+- expose GA page acquisition reports
+- expose GSC audience segmentation
+
 ## [0.14.1] - 2026-07-16
 
 ### Changed
