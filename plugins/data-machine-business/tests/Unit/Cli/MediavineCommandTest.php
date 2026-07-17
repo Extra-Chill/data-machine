@@ -20,11 +20,42 @@ class MediavineCommandTest extends WP_UnitTestCase {
 			'date_range' => array( 'start_date' => '2026-07-10', 'end_date' => '2026-07-16' ),
 			'results_count' => 1,
 			'results' => array( array( 'label' => 'Mobile', 'pageviews' => 1200, 'revenue' => 15.0, 'period' => '2026-07' ) ),
+			'diagnostics' => array(
+				'status' => 'warning',
+				'warning_count' => 1,
+				'warnings' => array( array( 'code' => 'monetizable_pageviews_exceed_pageviews' ) ),
+			),
 			'provenance' => array( 'source' => array( 'operation' => 'DevicesMetricsSummaryQuery' ) ),
 		);
 
 		$this->assertSame( $result, json_decode( MediavineCommand::jsonOutput( $result ), true ) );
 		$this->assertIsInt( json_decode( MediavineCommand::jsonOutput( $result ), true )['results'][0]['pageviews'] );
+	}
+
+	public function test_integrity_warning_messages_surface_row_and_observed_values(): void {
+		$result = array(
+			'diagnostics' => array(
+				'warnings' => array(
+					array(
+						'row' => array( 'index' => 3, 'dimension' => 'label', 'value' => 'other' ),
+						'observed' => array(
+							'subset_field' => 'monetizablePageviews',
+							'subset_value' => 18211,
+							'total_field' => 'pageviews',
+							'total_value' => 6,
+						),
+					),
+				),
+			),
+		);
+
+		$messages = MediavineCommand::integrityWarningMessages( $result );
+
+		$this->assertCount( 1, $messages );
+		$this->assertStringContainsString( 'row 3 (label=other)', $messages[0] );
+		$this->assertStringContainsString( 'monetizablePageviews=18211 exceeds pageviews=6', $messages[0] );
+		$this->assertStringContainsString( 'Upstream bucket semantics are unknown', $messages[0] );
+		$this->assertSame( array(), MediavineCommand::integrityWarningMessages( array() ) );
 	}
 
 	public function test_table_and_csv_rows_use_stable_action_specific_columns(): void {

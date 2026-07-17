@@ -95,6 +95,10 @@ class MediavineCommand extends BaseCommand {
 			return;
 		}
 
+		foreach ( self::integrityWarningMessages( $result ) as $warning ) {
+			WP_CLI::warning( $warning );
+		}
+
 		$rows = self::tabularRows( $result );
 		if ( empty( $rows ) ) {
 			WP_CLI::success( 'Mediavine report returned no rows. Use --format=json for the complete response envelope.' );
@@ -114,6 +118,38 @@ class MediavineCommand extends BaseCommand {
 	public static function jsonOutput( array $result ): string {
 		$encoded = wp_json_encode( $result, JSON_PRETTY_PRINT | JSON_PRESERVE_ZERO_FRACTION );
 		return false === $encoded ? '{}' : $encoded;
+	}
+
+	/**
+	 * Render concise human warnings from machine-readable diagnostics.
+	 *
+	 * @param array $result Ability result.
+	 * @return array<int,string>
+	 */
+	public static function integrityWarningMessages( array $result ): array {
+		$messages = array();
+		foreach ( $result['diagnostics']['warnings'] ?? array() as $warning ) {
+			if ( ! is_array( $warning ) || ! is_array( $warning['row'] ?? null ) || ! is_array( $warning['observed'] ?? null ) ) {
+				continue;
+			}
+
+			$row      = $warning['row'];
+			$observed = $warning['observed'];
+			$value    = null === ( $row['value'] ?? null ) ? 'null' : (string) $row['value'];
+
+			$messages[] = sprintf(
+				'Mediavine integrity warning at row %d (%s=%s): %s=%d exceeds %s=%d. Upstream bucket semantics are unknown; raw values were preserved.',
+				(int) ( $row['index'] ?? 0 ),
+				(string) ( $row['dimension'] ?? 'dimension' ),
+				$value,
+				(string) ( $observed['subset_field'] ?? 'subset' ),
+				(int) ( $observed['subset_value'] ?? 0 ),
+				(string) ( $observed['total_field'] ?? 'total' ),
+				(int) ( $observed['total_value'] ?? 0 )
+			);
+		}
+
+		return $messages;
 	}
 
 	/**

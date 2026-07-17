@@ -276,6 +276,48 @@ class MediavineReportsAbilities {
 						),
 					),
 				),
+				'diagnostics'   => array(
+					'type'        => 'object',
+					'description' => 'Integrity diagnostics for source-native dimensional rows. Raw result rows are never changed by these checks.',
+					'required'    => array( 'status', 'warning_count', 'warnings' ),
+					'properties'  => array(
+						'status'        => array( 'type' => 'string', 'enum' => array( 'ok', 'warning' ) ),
+						'warning_count' => array( 'type' => 'integer' ),
+						'warnings'      => array(
+							'type'  => 'array',
+							'items' => array(
+								'type'       => 'object',
+								'required'   => array( 'code', 'severity', 'row', 'invariant', 'observed', 'source_semantics', 'message' ),
+								'properties' => array(
+									'code'             => array( 'type' => 'string' ),
+									'severity'         => array( 'type' => 'string', 'enum' => array( 'warning' ) ),
+									'row'              => array(
+										'type'       => 'object',
+										'required'   => array( 'index', 'dimension', 'value' ),
+										'properties' => array(
+											'index'     => array( 'type' => 'integer' ),
+											'dimension' => array( 'type' => 'string' ),
+											'value'     => array( 'type' => array( 'string', 'null' ) ),
+										),
+									),
+									'invariant'         => array( 'type' => 'string' ),
+									'observed'          => array(
+										'type'       => 'object',
+										'required'   => array( 'subset_field', 'subset_value', 'total_field', 'total_value' ),
+										'properties' => array(
+											'subset_field' => array( 'type' => 'string' ),
+											'subset_value' => array( 'type' => 'integer' ),
+											'total_field'  => array( 'type' => 'string' ),
+											'total_value'  => array( 'type' => 'integer' ),
+										),
+									),
+									'source_semantics' => array( 'type' => 'string', 'enum' => array( 'unknown_upstream' ) ),
+									'message'           => array( 'type' => 'string' ),
+								),
+							),
+						),
+					),
+				),
 				'provenance'    => self::provenanceSchema(),
 				'error'         => array( 'type' => 'string' ),
 			),
@@ -1104,7 +1146,83 @@ class MediavineReportsAbilities {
 			),
 			'results_count' => count( $rows ),
 			'results'       => $rows,
+			'diagnostics'   => self::diagnoseDimensionalIntegrity( $action, $rows ),
 			'provenance'    => self::buildProvenance( $action, $contract['operation'], $requested_site_id, $site_id, $start_date, $end_date, $parsed['meta'] ?? array() ),
+		);
+	}
+
+	/**
+	 * Detect proven subset-count violations without changing source rows.
+	 *
+	 * Device, country, and source reports expose ordinary totals alongside their
+	 * monetizable subsets. An upstream bucket that violates either relationship
+	 * is retained verbatim and marked as unknown upstream semantics.
+	 *
+	 * @param string $action Dimensional action.
+	 * @param array  $rows   Normalized source rows.
+	 * @return array
+	 */
+	public static function diagnoseDimensionalIntegrity( string $action, array $rows ): array {
+		$warnings = array();
+		if ( ! in_array( $action, array( 'devices', 'countries', 'sources' ), true ) ) {
+			return array(
+				'status'        => 'ok',
+				'warning_count' => 0,
+				'warnings'      => array(),
+			);
+		}
+
+		$dimension = array(
+			'devices'   => 'label',
+			'countries' => 'country',
+			'sources'   => 'source',
+		)[ $action ];
+		$invariants = array(
+			array( 'monetizablePageviews', 'pageviews', 'monetizable_pageviews_exceed_pageviews' ),
+			array( 'monetizableSessions', 'sessions', 'monetizable_sessions_exceed_sessions' ),
+		);
+
+		foreach ( $rows as $index => $row ) {
+			if ( ! is_array( $row ) ) {
+				continue;
+			}
+			foreach ( $invariants as $invariant ) {
+				list( $subset_field, $total_field, $code ) = $invariant;
+				if ( ! array_key_exists( $subset_field, $row ) || ! array_key_exists( $total_field, $row ) ) {
+					continue;
+				}
+
+				$subset_value = (int) $row[ $subset_field ];
+				$total_value  = (int) $row[ $total_field ];
+				if ( $subset_value <= $total_value ) {
+					continue;
+				}
+
+				$warnings[] = array(
+					'code'             => $code,
+					'severity'         => 'warning',
+					'row'              => array(
+						'index'     => (int) $index,
+						'dimension' => $dimension,
+						'value'     => null === ( $row[ $dimension ] ?? null ) ? null : (string) $row[ $dimension ],
+					),
+					'invariant'         => $subset_field . ' <= ' . $total_field,
+					'observed'          => array(
+						'subset_field' => $subset_field,
+						'subset_value' => $subset_value,
+						'total_field'  => $total_field,
+						'total_value'  => $total_value,
+					),
+					'source_semantics' => 'unknown_upstream',
+					'message'           => 'The source row violates documented subset-count semantics. Upstream bucket semantics are unknown; raw values are preserved unchanged and should not support causal conclusions.',
+				);
+			}
+		}
+
+		return array(
+			'status'        => empty( $warnings ) ? 'ok' : 'warning',
+			'warning_count' => count( $warnings ),
+			'warnings'      => $warnings,
 		);
 	}
 

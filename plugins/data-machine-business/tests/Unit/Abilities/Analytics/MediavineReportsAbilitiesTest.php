@@ -484,6 +484,40 @@ class MediavineReportsAbilitiesTest extends WP_UnitTestCase {
 		}
 	}
 
+	public function test_coherent_and_unknown_dimensional_rows_have_no_integrity_warnings(): void {
+		$fixtures = $this->dimensionalFixtures();
+
+		foreach ( array( 'devices', 'countries', 'sources' ) as $action ) {
+			$parsed      = MediavineReportsAbilities::parseDimensionalPayload( $action, $fixtures[ $action ], '2026-07' );
+			$diagnostics = MediavineReportsAbilities::diagnoseDimensionalIntegrity( $action, $parsed['rows'] );
+
+			$this->assertSame( 'ok', $diagnostics['status'], $action );
+			$this->assertSame( 0, $diagnostics['warning_count'], $action );
+			$this->assertSame( array(), $diagnostics['warnings'], $action );
+		}
+	}
+
+	public function test_impossible_device_counts_are_diagnosed_without_changing_rows(): void {
+		$fixtures = $this->dimensionalFixtures();
+		$parsed   = MediavineReportsAbilities::parseDimensionalPayload( 'devices', $fixtures['devices_impossible'], '2026-07' );
+		$rows     = $parsed['rows'];
+		$output   = MediavineReportsAbilities::buildDimensionalResult( 'devices', 'site', 'relay-id', '2026-04-17', '2026-07-16', '2026-07', $parsed );
+
+		$this->assertSame( $rows, $output['results'] );
+		$this->assertSame( 6, $output['results'][1]['pageviews'] );
+		$this->assertSame( 18211, $output['results'][1]['monetizablePageviews'] );
+		$this->assertSame( 'warning', $output['diagnostics']['status'] );
+		$this->assertSame( 2, $output['diagnostics']['warning_count'] );
+		$this->assertSame( 'monetizable_pageviews_exceed_pageviews', $output['diagnostics']['warnings'][0]['code'] );
+		$this->assertSame( array( 'index' => 1, 'dimension' => 'label', 'value' => 'other' ), $output['diagnostics']['warnings'][0]['row'] );
+		$this->assertSame( 'monetizablePageviews <= pageviews', $output['diagnostics']['warnings'][0]['invariant'] );
+		$this->assertSame( 18211, $output['diagnostics']['warnings'][0]['observed']['subset_value'] );
+		$this->assertSame( 6, $output['diagnostics']['warnings'][0]['observed']['total_value'] );
+		$this->assertSame( 'unknown_upstream', $output['diagnostics']['warnings'][0]['source_semantics'] );
+		$this->assertStringContainsString( 'raw values are preserved unchanged', $output['diagnostics']['warnings'][0]['message'] );
+		$this->assertSame( 'DevicesMetricsSummaryQuery', $output['provenance']['source']['operation'] );
+	}
+
 	public function test_ad_unit_parser_keeps_parent_and_child_device_grains_unambiguous(): void {
 		$fixtures = $this->dimensionalFixtures();
 		$parsed   = MediavineReportsAbilities::parseDimensionalPayload( 'ad_units', $fixtures['ad_units'], '2026-07' );
@@ -511,9 +545,21 @@ class MediavineReportsAbilitiesTest extends WP_UnitTestCase {
 			$this->assertSame( 2, $output['provenance']['period']['row_count'] );
 			$this->assertSame( '2026/07/10', $output['provenance']['period']['canonical']['start'] );
 			$this->assertSame( $action, $output['provenance']['source']['action'] );
+			$this->assertSame( 'ok', $output['diagnostics']['status'] );
+			$this->assertSame( 0, $output['diagnostics']['warning_count'] );
 			$this->assertFalse( $output['provenance']['host_attribution']['available'] );
 			$this->assertStringContainsString( 'source-native aggregate buckets', $output['provenance']['host_attribution']['reason'] );
 		}
+	}
+
+	public function test_impossible_device_diagnostics_validate_against_output_schema(): void {
+		$fixtures = $this->dimensionalFixtures();
+		$parsed   = MediavineReportsAbilities::parseDimensionalPayload( 'devices', $fixtures['devices_impossible'], '2026-07' );
+		$output   = MediavineReportsAbilities::buildDimensionalResult( 'devices', 'site', 'relay-id', '2026-04-17', '2026-07-16', '2026-07', $parsed );
+		$valid    = rest_validate_value_from_schema( $output, MediavineReportsAbilities::outputSchema(), 'output' );
+
+		$this->assertTrue( $valid, is_wp_error( $valid ) ? $valid->get_error_message() : '' );
+		$this->assertArrayHasKey( 'diagnostics', MediavineReportsAbilities::outputSchema()['properties'] );
 	}
 
 	public function test_dimensional_fixtures_and_outputs_contain_no_secret_material(): void {
@@ -524,6 +570,8 @@ class MediavineReportsAbilitiesTest extends WP_UnitTestCase {
 			$parsed = MediavineReportsAbilities::parseDimensionalPayload( $action, $fixtures[ $action ], '2026-07' );
 			$blob  .= wp_json_encode( MediavineReportsAbilities::buildDimensionalResult( $action, '11476', $relay, '2026-07-10', '2026-07-16', '2026-07', $parsed ) );
 		}
+		$impossible = MediavineReportsAbilities::parseDimensionalPayload( 'devices', $fixtures['devices_impossible'], '2026-07' );
+		$blob      .= wp_json_encode( MediavineReportsAbilities::buildDimensionalResult( 'devices', '11476', $relay, '2026-04-17', '2026-07-16', '2026-07', $impossible ) );
 		$forbidden = array( 'password', 'Bearer ', 'accessToken', 'refreshToken', 'userId' );
 
 		foreach ( $forbidden as $needle ) {

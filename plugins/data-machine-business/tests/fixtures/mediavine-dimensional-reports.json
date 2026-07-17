@@ -10,6 +10,17 @@
       }
     }
   },
+  "devices_impossible": {
+    "data": {
+      "devicesMetricsSummary": {
+        "meta": { "totalCount": 2, "reportStart": "2026/04/17", "reportEnd": "2026/07/16" },
+        "devices": [
+          { "label": "desktop", "pageviewRpm": 4.72, "pageviews": 105677, "revenue": 498.72, "sessionRpm": 5.22, "sessions": 95476, "monetizablePageviews": 23314, "monetizableSessions": 20912, "monetizablePageviewRpm": 21.41, "monetizableSessionRpm": 23.85 },
+          { "label": "other", "pageviewRpm": 435.38, "pageviews": 6, "revenue": 2.61, "sessionRpm": 435.38, "sessions": 6, "monetizablePageviews": 18211, "monetizableSessions": 15976, "monetizablePageviewRpm": 0.14, "monetizableSessionRpm": 0.16 }
+        ]
+      }
+    }
+  },
   "countries": {
     "data": {
       "countriesReport": {

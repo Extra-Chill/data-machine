@@ -33,6 +33,19 @@ Mediavine returns country `netRevenue` in 1/10,000 dollar units; the ability nor
 
 Unknown string literals from Mediavine are preserved. An absent dimension remains JSON `null`, which is distinct from a literal `Unknown` bucket.
 
+## Integrity Diagnostics
+
+Dimensional results include an additive `diagnostics` block with `status`, `warning_count`, and machine-readable `warnings`. For device, country, and source rows, the ability checks only the source fields with established subset semantics:
+
+- `monetizablePageviews <= pageviews`
+- `monetizableSessions <= sessions`
+
+Each warning identifies the zero-based row index and source dimension, the violated invariant, both observed field/value pairs, and `source_semantics=unknown_upstream`. The normalized source row remains unchanged. Zero counts, null dimensions, and literal unknown buckets are not warnings unless the counts themselves violate one of these relationships.
+
+Mediavine's GraphQL schema exposes these ordinary and monetizable counts as separate scalar fields but does not document alternate semantics for unclassified buckets. A live `devicesMetricsSummary` report has returned an `other` bucket that violates both relationships while named device rows remain coherent. The dashboard/API evidence does not establish whether this is special unclassified-bucket behavior or an upstream defect, so anomalous rows must not support causal or economic conclusions until Mediavine explains them.
+
+Table and CSV commands print visible warnings before their rows. JSON remains machine-readable and preserves the complete diagnostics envelope.
+
 ## Provenance
 
 Every result includes:
