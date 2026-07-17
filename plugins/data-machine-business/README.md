@@ -32,7 +32,7 @@ Data Machine Business connects WordPress automation, agents, and pipelines to an
 | Discord | Fetch channel messages and publish text or embeds | Abilities, fetch/publish handlers |
 | Amazon Associates | Search products and generate Creators API affiliate links | AI tool |
 | Sendy | Subscribe users, create or update campaigns, and read email-funnel metrics | Abilities |
-| Mediavine | Fetch page-level and aggregate publisher revenue reports | Ability |
+| Mediavine | Fetch page, aggregate, device, country, normalized-source, and ad-unit publisher revenue reports | Ability, WP-CLI |
 | Content analytics | Category-level engagement audits, editorial triage flags, and GSC opportunity ranking | Abilities |
 | Media hygiene | Detect and safely remove orphan files and unreferenced attachments | Ability, WP-CLI |
 | Agent context | Generate an `AGENTS.md` section from the registered business CLI command map | Data Machine memory composition |
@@ -50,7 +50,7 @@ The plugin registers the following WordPress abilities. Management-oriented abil
 | `datamachine/gsc-opportunity` | Rank snippet/CTR gaps, page-two demand, and SERP-captured queries using GSC data |
 | `datamachine/bing-webmaster` | Query Bing search, traffic, page, and crawl statistics |
 | `datamachine/pagespeed` | Run full, performance-focused, or opportunity-focused PageSpeed audits |
-| `datamachine/mediavine-reports` | Fetch page reports, aggregate summaries, or multi-period revenue backfills with source provenance |
+| `datamachine/mediavine-reports` | Fetch page reports, aggregate summaries, multi-period backfills, and bounded device/country/source/ad-unit reports with source provenance |
 | `datamachine/content-performance` | Rank posts within a category by GA4 engagement while accounting for traffic and sample size |
 | `datamachine/content-flags` | Produce an outcome-based editorial triage screen with confidence and query-intent caveats |
 
@@ -181,6 +181,25 @@ Actions: `query_stats`, `traffic_stats`, `page_stats`, and `crawl_stats`.
 wp datamachine analytics bing traffic_stats --days=30
 ```
 
+### Mediavine
+
+```bash
+wp datamachine analytics mediavine <action>
+```
+
+Actions: `devices`, `countries`, `sources`, and `ad_units`.
+
+Common options are `--site-id`, `--start-date`, `--end-date`, `--period`, and `--format=table|json|csv`. JSON preserves the complete typed ability response, including provenance. Table and CSV output use stable action-specific columns.
+
+```bash
+wp datamachine analytics mediavine devices
+wp datamachine analytics mediavine countries --start-date=2026-07-01 --end-date=2026-07-07
+wp datamachine analytics mediavine sources --format=json
+wp datamachine analytics mediavine ad_units --format=csv
+```
+
+See [Mediavine Reports](docs/mediavine.md) for exact report grains, fields, and attribution caveats.
+
 ### PageSpeed Insights
 
 ```bash
@@ -297,6 +316,8 @@ Sendy is config-driven: callers pass the Sendy installation URL and API key to e
 Store the publisher account email and password in the `datamachine_mediavine_config` option. Reports use the publisher GraphQL API and cache a short-lived access token. Keep fetches low-frequency, such as monthly imports and one-time backfills.
 
 Mediavine page reports expose paths but not hostnames. Results therefore include explicit provenance and report `host_attribution.available=false`; multisite consumers must resolve path ownership without guessing a host.
+
+Dimensional reports are source-native Mediavine aggregates. In particular, `sources.source` is Mediavine's normalized acquisition bucket rather than a raw referrer or GA4 source/medium, countries stop at country grain, and ad-unit output explicitly distinguishes parent rows from child rows broken down by `deviceType`. See [Mediavine Reports](docs/mediavine.md).
 
 ## Content Analytics Notes
 

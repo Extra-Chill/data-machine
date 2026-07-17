@@ -38,6 +38,7 @@ class AgentsMdActionsTest extends \PHPUnit\Framework\TestCase {
 		return array(
 			'GSC'        => array( 'inc/Cli/GoogleSearchConsoleCommand.php' ),
 			'GA'         => array( 'inc/Cli/GoogleAnalyticsCommand.php' ),
+			'Mediavine'  => array( 'inc/Cli/MediavineCommand.php' ),
 			'PageSpeed'  => array( 'inc/Cli/PageSpeedCommand.php' ),
 			'Media'      => array( 'inc/Cli/MediaHygieneCommand.php' ),
 			'Bing'       => array( 'inc/Cli/Commands/BingWebmasterCommand.php' ),

@@ -104,6 +104,13 @@ class MediavineReportsAbilities {
 	 */
 	const SUMMARY_HOST_ATTRIBUTION_REASON = 'Mediavine metricsSummary returns site-level aggregate metrics without row-level URL or host dimensions.';
 
+	/**
+	 * Human-readable host attribution reason for dimensional reports.
+	 *
+	 * @var string
+	 */
+	const DIMENSIONAL_HOST_ATTRIBUTION_REASON = 'Mediavine dimensional reports return source-native aggregate buckets without row-level URL or host attribution.';
+
 	private static bool $registered = false;
 
 	public function __construct() {
@@ -121,7 +128,7 @@ class MediavineReportsAbilities {
 				'datamachine/mediavine-reports',
 				array(
 					'label'               => 'Mediavine Reports',
-					'description'         => 'Fetch per-period, per-URL Mediavine ad revenue directly from the Mediavine publisher GraphQL API. Actions: pages (per-period per-URL revenue rows: slug,views,revenue,rpm,cpm,viewability,fillRate,impressionsPerPageview,period), summary (site-level aggregate totals: earnings, pageviews, sessions, rpm), backfill (iterate a list of periods, returning pages rows per period for a full revenue-arc backfill). Every result batch and each backfill period summary carries a `provenance` block: the requested Mediavine site id, the requested and canonical report period, the source action/query identity, and an explicit host_attribution.available=false flag (the upstream PageReport type exposes path only, never hostname/domain). Credentials live server-side in the datamachine_mediavine_config option.',
+					'description'         => 'Fetch bounded Mediavine publisher reports directly from the source GraphQL API. Actions: pages, summary, backfill, devices, countries, sources, and ad_units. Dimensional reports preserve Mediavine source-native buckets and typed metrics; ad-unit rows identify parent versus child grain explicitly. Every result batch carries source, site, period, row-count, and host-attribution provenance. Credentials live server-side in the datamachine_mediavine_config option.',
 					'category'            => 'datamachine-analytics',
 					'input_schema'        => array(
 						'type'       => 'object',
@@ -129,7 +136,7 @@ class MediavineReportsAbilities {
 						'properties' => array(
 							'action'     => array(
 								'type'        => 'string',
-								'description' => 'Action: pages (per-period per-URL rows), summary (aggregate totals), backfill (iterate periods).',
+								'description' => 'Action: pages, summary, backfill, devices, countries, sources, or ad_units.',
 							),
 							'start_date' => array(
 								'type'        => 'string',
@@ -192,6 +199,36 @@ class MediavineReportsAbilities {
 			'sessionRpm'             => array( 'type' => 'number' ),
 			'pageRpm'                => array( 'type' => 'number' ),
 			'paidImpressions'        => array( 'type' => 'integer' ),
+			'label'                  => array( 'type' => array( 'string', 'null' ) ),
+			'country'                => array( 'type' => array( 'string', 'null' ) ),
+			'source'                 => array(
+				'type'        => array( 'string', 'null' ),
+				'description' => 'Mediavine normalized acquisition bucket; not a raw referrer or GA source/medium.',
+			),
+			'adunit'                 => array( 'type' => array( 'string', 'null' ) ),
+			'grain'                  => array( 'type' => 'string', 'enum' => array( 'parent', 'child' ) ),
+			'deviceType'             => array( 'type' => array( 'string', 'null' ) ),
+			'pageviewRpm'            => array( 'type' => 'number' ),
+			'monetizablePageviews'   => array( 'type' => 'integer' ),
+			'monetizableSessions'    => array( 'type' => 'integer' ),
+			'monetizablePageviewRpm' => array( 'type' => 'number' ),
+			'monetizableSessionRpm'  => array( 'type' => 'number' ),
+			'pageviewsPercentage'    => array( 'type' => 'number' ),
+			'sessionsPercentage'     => array( 'type' => 'number' ),
+			'netRevenue'             => array( 'type' => 'number' ),
+			'pageRevenue'            => array( 'type' => 'number' ),
+			'impressions'            => array( 'type' => 'integer' ),
+			'fillrate'               => array( 'type' => 'number' ),
+			'pageviewsRpm'           => array( 'type' => 'number' ),
+			'sessionsRpm'            => array( 'type' => 'number' ),
+			'monetizablePageviewsPercentage' => array( 'type' => 'number' ),
+			'monetizableSessionsPercentage'  => array( 'type' => 'number' ),
+			'monetizablePageviewsRpm'        => array( 'type' => 'number' ),
+			'monetizableSessionsRpm'         => array( 'type' => 'number' ),
+			'impressionsPerPageview'         => array( 'type' => 'number' ),
+			'impressionsPerSession'          => array( 'type' => 'number' ),
+			'impressionsPerMonetizablePageview' => array( 'type' => 'number' ),
+			'impressionsPerMonetizableSession'  => array( 'type' => 'number' ),
 		);
 
 		return array(
@@ -201,7 +238,7 @@ class MediavineReportsAbilities {
 				'success'       => array( 'type' => 'boolean' ),
 				'action'        => array(
 					'type' => 'string',
-					'enum' => array( 'pages', 'summary', 'backfill' ),
+					'enum' => array( 'pages', 'summary', 'backfill', 'devices', 'countries', 'sources', 'ad_units' ),
 				),
 				'site_id'       => array(
 					'type'        => 'string',
@@ -270,7 +307,7 @@ class MediavineReportsAbilities {
 						'ability'   => array( 'type' => 'string' ),
 						'action'    => array(
 							'type' => 'string',
-							'enum' => array( 'pages', 'summary', 'backfill' ),
+							'enum' => array( 'pages', 'summary', 'backfill', 'devices', 'countries', 'sources', 'ad_units' ),
 						),
 						'operation' => array( 'type' => 'string' ),
 						'api'       => array( 'type' => 'string' ),
@@ -315,7 +352,7 @@ class MediavineReportsAbilities {
 	public static function fetch( array $input ): array {
 		$action = sanitize_text_field( $input['action'] ?? '' );
 
-		$valid_actions = array( 'pages', 'summary', 'backfill' );
+		$valid_actions = array( 'pages', 'summary', 'backfill', 'devices', 'countries', 'sources', 'ad_units' );
 		if ( empty( $action ) || ! in_array( $action, $valid_actions, true ) ) {
 			return array(
 				'success' => false,
@@ -364,6 +401,10 @@ class MediavineReportsAbilities {
 
 		if ( 'backfill' === $action ) {
 			return self::fetchBackfill( $input, $access_token, $requested_site_id, $site_id );
+		}
+
+		if ( in_array( $action, array( 'devices', 'countries', 'sources', 'ad_units' ), true ) ) {
+			return self::fetchDimensionalReport( $action, $input, $access_token, $requested_site_id, $site_id );
 		}
 
 		return self::fetchPages( $input, $access_token, $requested_site_id, $site_id );
@@ -735,7 +776,13 @@ class MediavineReportsAbilities {
 	 * @return array
 	 */
 	public static function buildProvenance( string $action, string $operation, string $requested_site_id, string $relay_site_id, string $start_date, string $end_date, array $meta = array() ): array {
-		$host_reason = 'summary' === $action ? self::SUMMARY_HOST_ATTRIBUTION_REASON : self::PAGES_HOST_ATTRIBUTION_REASON;
+		if ( 'summary' === $action ) {
+			$host_reason = self::SUMMARY_HOST_ATTRIBUTION_REASON;
+		} elseif ( in_array( $action, array( 'devices', 'countries', 'sources', 'ad_units' ), true ) ) {
+			$host_reason = self::DIMENSIONAL_HOST_ATTRIBUTION_REASON;
+		} else {
+			$host_reason = self::PAGES_HOST_ATTRIBUTION_REASON;
+		}
 
 		return array(
 			'source'           => array(
@@ -886,6 +933,302 @@ class MediavineReportsAbilities {
 		}
 
 		return $rows;
+	}
+
+	/**
+	 * Fetch one bounded source-native dimensional report.
+	 *
+	 * @param string $action            Dimensional action.
+	 * @param array  $input             Ability input.
+	 * @param string $access_token      Bearer token.
+	 * @param string $requested_site_id Original site id supplied by the caller or configuration.
+	 * @param string $site_id           Normalized Relay global Mediavine site id.
+	 * @return array
+	 */
+	private static function fetchDimensionalReport( string $action, array $input, string $access_token, string $requested_site_id, string $site_id ): array {
+		$start_date = self::resolveDate( $input['start_date'] ?? '', '-28 days' );
+		$end_date   = self::resolveDate( $input['end_date'] ?? '', '-1 day' );
+		$period     = sanitize_text_field( $input['period'] ?? '' );
+		$contract   = self::dimensionalContract( $action );
+
+		$result = HttpClient::post(
+			self::API_BASE . '/graphql',
+			array(
+				'timeout' => 30,
+				'headers' => array(
+					'Authorization' => 'Bearer ' . $access_token,
+					'Content-Type'  => 'application/json',
+				),
+				'body'    => wp_json_encode( self::buildDimensionalRequestBody( $action, $site_id, $start_date, $end_date ) ),
+				'context' => 'Mediavine ' . $contract['root'],
+			)
+		);
+
+		if ( empty( $result['success'] ) ) {
+			return array(
+				'success' => false,
+				'error'   => sprintf( 'Mediavine %s report transport or authorization failure: %s', $action, $result['error'] ?? 'Unknown error' ),
+			);
+		}
+
+		$data = json_decode( (string) ( $result['data'] ?? '' ), true );
+		if ( json_last_error() !== JSON_ERROR_NONE ) {
+			return array(
+				'success' => false,
+				'error'   => sprintf( 'Mediavine %s report returned invalid JSON.', $action ),
+			);
+		}
+
+		$error = self::graphqlError( $data );
+		if ( null !== $error ) {
+			return array(
+				'success' => false,
+				'error'   => sprintf( 'Mediavine %s report schema or authorization error: %s', $action, $error ),
+			);
+		}
+
+		$parsed = self::parseDimensionalPayload( $action, $data, $period );
+		if ( is_wp_error( $parsed ) ) {
+			return array(
+				'success' => false,
+				'error'   => $parsed->get_error_message(),
+			);
+		}
+
+		return self::buildDimensionalResult( $action, $requested_site_id, $site_id, $start_date, $end_date, $period, $parsed );
+	}
+
+	/**
+	 * Build one of the four confirmed dimensional GraphQL operations.
+	 *
+	 * @param string $action     Dimensional action.
+	 * @param string $site_id    Normalized Relay global Mediavine site id.
+	 * @param string $start_date Window start (Y-m-d).
+	 * @param string $end_date   Window end (Y-m-d).
+	 * @return array
+	 */
+	public static function buildDimensionalRequestBody( string $action, string $site_id, string $start_date, string $end_date ): array {
+		$contract = self::dimensionalContract( $action );
+
+		return array(
+			'query'         => $contract['query'],
+			'operationName' => $contract['operation'],
+			'variables'     => array(
+				'data' => array(
+					'siteId'    => $site_id,
+					'startDate' => self::toIso( $start_date, false ),
+					'endDate'   => self::toIso( $end_date, true ),
+				),
+			),
+		);
+	}
+
+	/**
+	 * Normalize a dimensional response into typed public rows and report meta.
+	 *
+	 * Unknown literals are preserved, while absent dimensions remain null so a
+	 * caller can distinguish an upstream null from a literal "Unknown" bucket.
+	 *
+	 * @param string $action Dimensional action.
+	 * @param array  $data   Decoded GraphQL response.
+	 * @param string $period Optional caller-provided period label.
+	 * @return array|\WP_Error Parsed payload {rows, meta} or error.
+	 */
+	public static function parseDimensionalPayload( string $action, array $data, string $period = '' ) {
+		$contract = self::dimensionalContract( $action );
+		$payload  = $data['data'][ $contract['root'] ] ?? null;
+
+		if ( ! is_array( $payload ) ) {
+			return new \WP_Error( 'mediavine_' . $action . '_contract', sprintf( 'Mediavine %s report response is missing %s.', $action, $contract['root'] ) );
+		}
+
+		$rows = array();
+		if ( 'ad_units' === $action ) {
+			foreach ( array( 'parentAdunits' => 'parent', 'childAdunits' => 'child' ) as $collection => $grain ) {
+				if ( ! isset( $payload[ $collection ] ) || ! is_array( $payload[ $collection ] ) ) {
+					return new \WP_Error( 'mediavine_ad_units_contract', 'Mediavine ad_units report response is missing parentAdunits or childAdunits.' );
+				}
+
+				foreach ( $payload[ $collection ] as $raw_row ) {
+					if ( is_array( $raw_row ) ) {
+						$rows[] = self::normalizeDimensionalRow( $action, $raw_row, $period, $grain );
+					}
+				}
+			}
+		} else {
+			$collection = $contract['collection'];
+			if ( ! isset( $payload[ $collection ] ) || ! is_array( $payload[ $collection ] ) ) {
+				return new \WP_Error( 'mediavine_' . $action . '_contract', sprintf( 'Mediavine %s report response is missing %s.%s.', $action, $contract['root'], $collection ) );
+			}
+
+			foreach ( $payload[ $collection ] as $raw_row ) {
+				if ( is_array( $raw_row ) ) {
+					$rows[] = self::normalizeDimensionalRow( $action, $raw_row, $period );
+				}
+			}
+		}
+
+		$meta               = self::normalizeReportMeta( is_array( $payload['meta'] ?? null ) ? $payload['meta'] : array() );
+		$meta['totalCount'] = count( $rows );
+
+		return array(
+			'rows' => $rows,
+			'meta' => $meta,
+		);
+	}
+
+	/**
+	 * Assemble a dimensional action response with shared provenance.
+	 *
+	 * @param string $action            Dimensional action.
+	 * @param string $requested_site_id Original site id supplied by the caller or configuration.
+	 * @param string $site_id           Normalized Relay global Mediavine site id.
+	 * @param string $start_date        Requested window start (Y-m-d).
+	 * @param string $end_date          Requested window end (Y-m-d).
+	 * @param string $period            Optional caller-provided period label.
+	 * @param array  $parsed            Parsed payload {rows, meta}.
+	 * @return array
+	 */
+	public static function buildDimensionalResult( string $action, string $requested_site_id, string $site_id, string $start_date, string $end_date, string $period, array $parsed ): array {
+		$contract = self::dimensionalContract( $action );
+		$rows     = $parsed['rows'] ?? array();
+
+		return array(
+			'success'       => true,
+			'action'        => $action,
+			'site_id'       => $site_id,
+			'period'        => $period,
+			'date_range'    => array(
+				'start_date' => $start_date,
+				'end_date'   => $end_date,
+			),
+			'results_count' => count( $rows ),
+			'results'       => $rows,
+			'provenance'    => self::buildProvenance( $action, $contract['operation'], $requested_site_id, $site_id, $start_date, $end_date, $parsed['meta'] ?? array() ),
+		);
+	}
+
+	/**
+	 * Normalize one dimensional row according to its confirmed source schema.
+	 *
+	 * @param string      $action Dimensional action.
+	 * @param array       $row    Raw source row.
+	 * @param string      $period Optional caller-provided period label.
+	 * @param string|null $grain  Ad-unit grain (parent or child).
+	 * @return array
+	 */
+	private static function normalizeDimensionalRow( string $action, array $row, string $period, ?string $grain = null ): array {
+		$field_types = self::dimensionalFieldTypes( $action );
+		$normalized  = array();
+
+		foreach ( $field_types as $field => $type ) {
+			$value = $row[ $field ] ?? null;
+			// Country netRevenue is returned in 1/10,000 dollar units, unlike the
+			// dollar-denominated source report field with the same name.
+			if ( 'countries' === $action && 'netRevenue' === $field && null !== $value ) {
+				$value = (float) $value / 10000;
+			}
+			if ( 'string' === $type ) {
+				$normalized[ $field ] = null === $value ? null : (string) $value;
+			} elseif ( 'integer' === $type ) {
+				$normalized[ $field ] = (int) ( $value ?? 0 );
+			} else {
+				$normalized[ $field ] = (float) ( $value ?? 0 );
+			}
+		}
+
+		if ( 'ad_units' === $action ) {
+			$normalized['grain'] = $grain;
+			if ( 'parent' === $grain ) {
+				$normalized['deviceType'] = null;
+			}
+		}
+
+		$normalized['period'] = $period;
+		return $normalized;
+	}
+
+	/**
+	 * Return the exact selected fields and public scalar types for an action.
+	 *
+	 * @param string $action Dimensional action.
+	 * @return array<string,string>
+	 */
+	private static function dimensionalFieldTypes( string $action ): array {
+		$fields = array(
+			'devices' => array(
+				'label' => 'string', 'pageviewRpm' => 'number', 'pageviews' => 'integer', 'revenue' => 'number',
+				'sessionRpm' => 'number', 'sessions' => 'integer', 'monetizablePageviews' => 'integer',
+				'monetizableSessions' => 'integer', 'monetizablePageviewRpm' => 'number', 'monetizableSessionRpm' => 'number',
+			),
+			'countries' => array(
+				'country' => 'string', 'pageviews' => 'integer', 'pageviewsPercentage' => 'number', 'sessions' => 'integer',
+				'sessionsPercentage' => 'number', 'netRevenue' => 'number', 'pageRevenue' => 'number', 'impressions' => 'integer',
+				'paidImpressions' => 'integer', 'cpm' => 'number', 'fillrate' => 'number', 'viewability' => 'number',
+				'pageviewsRpm' => 'number', 'sessionsRpm' => 'number', 'monetizablePageviews' => 'integer',
+				'monetizablePageviewsPercentage' => 'number', 'monetizablePageviewsRpm' => 'number', 'monetizableSessions' => 'integer',
+				'monetizableSessionsPercentage' => 'number', 'monetizableSessionsRpm' => 'number',
+			),
+			'sources' => array(
+				'source' => 'string', 'revenue' => 'number', 'netRevenue' => 'number', 'pageviews' => 'integer', 'sessions' => 'integer',
+				'impressions' => 'integer', 'pageviewsRpm' => 'number', 'sessionsRpm' => 'number', 'monetizablePageviews' => 'integer',
+				'monetizablePageviewsRpm' => 'number', 'monetizableSessions' => 'integer', 'monetizableSessionsRpm' => 'number',
+				'impressionsPerPageview' => 'number', 'impressionsPerSession' => 'number',
+				'impressionsPerMonetizablePageview' => 'number', 'impressionsPerMonetizableSession' => 'number',
+			),
+			'ad_units' => array(
+				'adunit' => 'string', 'deviceType' => 'string', 'revenue' => 'number', 'paidImpressions' => 'integer',
+				'viewability' => 'number', 'fillrate' => 'number', 'sessionRpm' => 'number', 'pageviewRpm' => 'number',
+				'monetizableSessionRpm' => 'number', 'monetizablePageviewRpm' => 'number', 'cpm' => 'number',
+			),
+		);
+
+		if ( ! isset( $fields[ $action ] ) ) {
+			throw new \InvalidArgumentException( 'Unsupported Mediavine dimensional action.' );
+		}
+
+		return $fields[ $action ];
+	}
+
+	/**
+	 * Return the confirmed GraphQL contract for one bounded action.
+	 *
+	 * @param string $action Dimensional action.
+	 * @return array{operation:string,root:string,collection:string,query:string}
+	 */
+	private static function dimensionalContract( string $action ): array {
+		$contracts = array(
+			'devices' => array(
+				'operation'  => 'DevicesMetricsSummaryQuery',
+				'root'       => 'devicesMetricsSummary',
+				'collection' => 'devices',
+				'query'      => 'query DevicesMetricsSummaryQuery($data: GetDevicesMetricsSummaryInput!){ devicesMetricsSummary(data:$data){ meta{ totalCount reportStart reportEnd } devices{ label pageviewRpm pageviews revenue sessionRpm sessions monetizablePageviews monetizableSessions monetizablePageviewRpm monetizableSessionRpm } } }',
+			),
+			'countries' => array(
+				'operation'  => 'CountriesReportQuery',
+				'root'       => 'countriesReport',
+				'collection' => 'countries',
+				'query'      => 'query CountriesReportQuery($data: GetCountriesReportInput!){ countriesReport(data:$data){ meta{ totalCount reportStart reportEnd } countries{ country pageviews pageviewsPercentage sessions sessionsPercentage netRevenue pageRevenue impressions paidImpressions cpm fillrate viewability pageviewsRpm sessionsRpm monetizablePageviews monetizablePageviewsPercentage monetizablePageviewsRpm monetizableSessions monetizableSessionsPercentage monetizableSessionsRpm } } }',
+			),
+			'sources' => array(
+				'operation'  => 'SourceReportsQuery',
+				'root'       => 'sourceReports',
+				'collection' => 'reports',
+				'query'      => 'query SourceReportsQuery($data: GetSourceReportsInput!){ sourceReports(data:$data){ meta{ totalCount reportStart reportEnd } reports{ source revenue netRevenue pageviews sessions impressions pageviewsRpm sessionsRpm monetizablePageviews monetizablePageviewsRpm monetizableSessions monetizableSessionsRpm impressionsPerPageview impressionsPerSession impressionsPerMonetizablePageview impressionsPerMonetizableSession } } }',
+			),
+			'ad_units' => array(
+				'operation'  => 'AdunitsMetricsQuery',
+				'root'       => 'adunitsMetrics',
+				'collection' => '',
+				'query'      => 'query AdunitsMetricsQuery($data: GetAdunitsMetricsInput!){ adunitsMetrics(data:$data){ meta{ totalCount reportStart reportEnd } parentAdunits{ adunit revenue paidImpressions viewability fillrate sessionRpm pageviewRpm monetizableSessionRpm monetizablePageviewRpm cpm } childAdunits{ adunit deviceType revenue paidImpressions viewability fillrate sessionRpm pageviewRpm monetizableSessionRpm monetizablePageviewRpm cpm } } }',
+			),
+		);
+
+		if ( ! isset( $contracts[ $action ] ) ) {
+			throw new \InvalidArgumentException( 'Unsupported Mediavine dimensional action.' );
+		}
+
+		return $contracts[ $action ];
 	}
 
 	/**

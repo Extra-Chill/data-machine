@@ -1,0 +1,48 @@
+{
+  "devices": {
+    "data": {
+      "devicesMetricsSummary": {
+        "meta": { "totalCount": 2, "reportStart": "2026/07/10", "reportEnd": "2026/07/16" },
+        "devices": [
+          { "label": "Mobile", "pageviewRpm": 12.5, "pageviews": 1200, "revenue": 15, "sessionRpm": 16.67, "sessions": 900, "monetizablePageviews": 1100, "monetizableSessions": 850, "monetizablePageviewRpm": 13.64, "monetizableSessionRpm": 17.65 },
+          { "label": null, "pageviewRpm": 1, "pageviews": 5, "revenue": 0.01, "sessionRpm": 2, "sessions": 4, "monetizablePageviews": 3, "monetizableSessions": 2, "monetizablePageviewRpm": 3.33, "monetizableSessionRpm": 5 }
+        ]
+      }
+    }
+  },
+  "countries": {
+    "data": {
+      "countriesReport": {
+        "meta": { "totalCount": 2, "reportStart": "2026/07/10", "reportEnd": "2026/07/16" },
+        "countries": [
+          { "country": "United States", "pageviews": 900, "pageviewsPercentage": 75, "sessions": 700, "sessionsPercentage": 77.78, "netRevenue": 190000, "pageRevenue": 18, "impressions": 5000, "paidImpressions": 4500, "cpm": 4.22, "fillrate": 0.95, "viewability": 0.7, "pageviewsRpm": 20, "sessionsRpm": 25.71, "monetizablePageviews": 850, "monetizablePageviewsPercentage": 77.27, "monetizablePageviewsRpm": 21.18, "monetizableSessions": 650, "monetizableSessionsPercentage": 76.47, "monetizableSessionsRpm": 27.69 },
+          { "country": "Unknown", "pageviews": 1, "pageviewsPercentage": 0.08, "sessions": 1, "sessionsPercentage": 0.11, "netRevenue": 0, "pageRevenue": 0, "impressions": 0, "paidImpressions": 0, "cpm": 0, "fillrate": 0, "viewability": 0, "pageviewsRpm": 0, "sessionsRpm": 0, "monetizablePageviews": 0, "monetizablePageviewsPercentage": 0, "monetizablePageviewsRpm": 0, "monetizableSessions": 0, "monetizableSessionsPercentage": 0, "monetizableSessionsRpm": 0 }
+        ]
+      }
+    }
+  },
+  "sources": {
+    "data": {
+      "sourceReports": {
+        "meta": { "totalCount": 2, "reportStart": "2026/07/10", "reportEnd": "2026/07/16" },
+        "reports": [
+          { "source": "Search", "revenue": 21, "netRevenue": 20, "pageviews": 1000, "sessions": 800, "impressions": 6000, "pageviewsRpm": 21, "sessionsRpm": 26.25, "monetizablePageviews": 950, "monetizablePageviewsRpm": 22.11, "monetizableSessions": 760, "monetizableSessionsRpm": 27.63, "impressionsPerPageview": 6, "impressionsPerSession": 7.5, "impressionsPerMonetizablePageview": 6.32, "impressionsPerMonetizableSession": 7.89 },
+          { "source": null, "revenue": 0, "netRevenue": 0, "pageviews": 2, "sessions": 2, "impressions": 1, "pageviewsRpm": 0, "sessionsRpm": 0, "monetizablePageviews": 1, "monetizablePageviewsRpm": 0, "monetizableSessions": 1, "monetizableSessionsRpm": 0, "impressionsPerPageview": 0.5, "impressionsPerSession": 0.5, "impressionsPerMonetizablePageview": 1, "impressionsPerMonetizableSession": 1 }
+        ]
+      }
+    }
+  },
+  "ad_units": {
+    "data": {
+      "adunitsMetrics": {
+        "meta": { "totalCount": 2, "reportStart": "2026/07/10", "reportEnd": "2026/07/16" },
+        "parentAdunits": [
+          { "adunit": "Content", "revenue": 25, "paidImpressions": 10000, "viewability": 0.71, "fillrate": 0.96, "sessionRpm": 27.78, "pageviewRpm": 20.83, "monetizableSessionRpm": 29.41, "monetizablePageviewRpm": 22.73, "cpm": 2.5 }
+        ],
+        "childAdunits": [
+          { "adunit": "Content", "deviceType": "Mobile", "revenue": 18, "paidImpressions": 7000, "viewability": 0.74, "fillrate": 0.97, "sessionRpm": 30, "pageviewRpm": 24, "monetizableSessionRpm": 31.58, "monetizablePageviewRpm": 25.71, "cpm": 2.57 }
+        ]
+      }
+    }
+  }
+}

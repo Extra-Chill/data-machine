@@ -12,6 +12,14 @@ use WP_UnitTestCase;
 
 class MediavineReportsAbilitiesTest extends WP_UnitTestCase {
 
+	private function dimensionalFixtures(): array {
+		$json = file_get_contents( dirname( __DIR__, 3 ) . '/fixtures/mediavine-dimensional-reports.json' );
+		$this->assertIsString( $json );
+		$fixtures = json_decode( $json, true );
+		$this->assertIsArray( $fixtures );
+		return $fixtures;
+	}
+
 	public function test_pages_request_uses_current_graphql_contract(): void {
 		$body = MediavineReportsAbilities::buildPagesRequestBody( 'global-id', '2026-06-01', '2026-06-30' );
 
@@ -422,5 +430,104 @@ class MediavineReportsAbilitiesTest extends WP_UnitTestCase {
 		$source = file_get_contents( dirname( __DIR__, 4 ) . '/inc/Abilities/Analytics/MediavineReportsAbilities.php' );
 
 		$this->assertDoesNotMatchRegularExpression( '/extrachill\.com|community\.extra|events\.extra|wire\.extra|artist\.extra/i', $source );
+	}
+
+	public function test_dimensional_requests_use_confirmed_operations_input_types_and_fields(): void {
+		$contracts = array(
+			'devices' => array( 'DevicesMetricsSummaryQuery', 'GetDevicesMetricsSummaryInput!', 'devicesMetricsSummary(data:$data)', array( 'label', 'monetizablePageviewRpm' ) ),
+			'countries' => array( 'CountriesReportQuery', 'GetCountriesReportInput!', 'countriesReport(data:$data)', array( 'country', 'pageviewsPercentage', 'monetizableSessionsRpm' ) ),
+			'sources' => array( 'SourceReportsQuery', 'GetSourceReportsInput!', 'sourceReports(data:$data)', array( 'source', 'netRevenue', 'impressionsPerMonetizableSession' ) ),
+			'ad_units' => array( 'AdunitsMetricsQuery', 'GetAdunitsMetricsInput!', 'adunitsMetrics(data:$data)', array( 'parentAdunits', 'childAdunits', 'deviceType' ) ),
+		);
+
+		foreach ( $contracts as $action => $expected ) {
+			$body = MediavineReportsAbilities::buildDimensionalRequestBody( $action, 'global-id', '2026-07-10', '2026-07-16' );
+			$this->assertSame( $expected[0], $body['operationName'], $action );
+			$this->assertStringContainsString( $expected[1], $body['query'], $action );
+			$this->assertStringContainsString( $expected[2], $body['query'], $action );
+			foreach ( $expected[3] as $field ) {
+				$this->assertStringContainsString( $field, $body['query'], $action . ':' . $field );
+			}
+			$this->assertSame( 'global-id', $body['variables']['data']['siteId'] );
+			$this->assertSame( '2026-07-10T00:00:00.000Z', $body['variables']['data']['startDate'] );
+			$this->assertSame( '2026-07-16T23:59:59.999Z', $body['variables']['data']['endDate'] );
+			$this->assertArrayNotHasKey( 'demandSources', $body['variables']['data'] );
+		}
+
+		$this->assertStringNotContainsString( 'demandSources', MediavineReportsAbilities::buildDimensionalRequestBody( 'sources', 'global-id', '2026-07-10', '2026-07-16' )['query'] );
+	}
+
+	public function test_dimensional_fixture_parsers_preserve_labels_and_numeric_types(): void {
+		$fixtures = $this->dimensionalFixtures();
+
+		$devices = MediavineReportsAbilities::parseDimensionalPayload( 'devices', $fixtures['devices'], '2026-07' );
+		$this->assertSame( 'Mobile', $devices['rows'][0]['label'] );
+		$this->assertSame( 1200, $devices['rows'][0]['pageviews'] );
+		$this->assertSame( 12.5, $devices['rows'][0]['pageviewRpm'] );
+		$this->assertNull( $devices['rows'][1]['label'] );
+
+		$countries = MediavineReportsAbilities::parseDimensionalPayload( 'countries', $fixtures['countries'], '2026-07' );
+		$this->assertSame( 'United States', $countries['rows'][0]['country'] );
+		$this->assertSame( 'Unknown', $countries['rows'][1]['country'] );
+		$this->assertSame( 5000, $countries['rows'][0]['impressions'] );
+		$this->assertSame( 19.0, $countries['rows'][0]['netRevenue'] );
+
+		$sources = MediavineReportsAbilities::parseDimensionalPayload( 'sources', $fixtures['sources'], '2026-07' );
+		$this->assertSame( 'Search', $sources['rows'][0]['source'] );
+		$this->assertNull( $sources['rows'][1]['source'] );
+		$this->assertSame( 6.32, $sources['rows'][0]['impressionsPerMonetizablePageview'] );
+
+		foreach ( array( $devices, $countries, $sources ) as $parsed ) {
+			$this->assertSame( 2, $parsed['meta']['totalCount'] );
+			$this->assertSame( '2026/07/10', $parsed['meta']['reportStart'] );
+			$this->assertSame( '2026-07', $parsed['rows'][0]['period'] );
+		}
+	}
+
+	public function test_ad_unit_parser_keeps_parent_and_child_device_grains_unambiguous(): void {
+		$fixtures = $this->dimensionalFixtures();
+		$parsed   = MediavineReportsAbilities::parseDimensionalPayload( 'ad_units', $fixtures['ad_units'], '2026-07' );
+
+		$this->assertSame( 2, count( $parsed['rows'] ) );
+		$this->assertSame( 'parent', $parsed['rows'][0]['grain'] );
+		$this->assertNull( $parsed['rows'][0]['deviceType'] );
+		$this->assertSame( 'child', $parsed['rows'][1]['grain'] );
+		$this->assertSame( 'Mobile', $parsed['rows'][1]['deviceType'] );
+		$this->assertSame( 7000, $parsed['rows'][1]['paidImpressions'] );
+	}
+
+	public function test_dimensional_outputs_validate_and_include_complete_provenance(): void {
+		$fixtures = $this->dimensionalFixtures();
+		$schema   = MediavineReportsAbilities::outputSchema();
+		$relay    = base64_encode( 'InternalSite:11476' );
+
+		foreach ( array( 'devices', 'countries', 'sources', 'ad_units' ) as $action ) {
+			$parsed = MediavineReportsAbilities::parseDimensionalPayload( $action, $fixtures[ $action ], '2026-07' );
+			$output = MediavineReportsAbilities::buildDimensionalResult( $action, '11476', $relay, '2026-07-10', '2026-07-16', '2026-07', $parsed );
+			$valid  = rest_validate_value_from_schema( $output, $schema, 'output' );
+
+			$this->assertTrue( $valid, $action . ': ' . ( is_wp_error( $valid ) ? $valid->get_error_message() : '' ) );
+			$this->assertSame( 2, $output['results_count'] );
+			$this->assertSame( 2, $output['provenance']['period']['row_count'] );
+			$this->assertSame( '2026/07/10', $output['provenance']['period']['canonical']['start'] );
+			$this->assertSame( $action, $output['provenance']['source']['action'] );
+			$this->assertFalse( $output['provenance']['host_attribution']['available'] );
+			$this->assertStringContainsString( 'source-native aggregate buckets', $output['provenance']['host_attribution']['reason'] );
+		}
+	}
+
+	public function test_dimensional_fixtures_and_outputs_contain_no_secret_material(): void {
+		$fixtures = $this->dimensionalFixtures();
+		$blob     = wp_json_encode( $fixtures );
+		$relay    = base64_encode( 'InternalSite:11476' );
+		foreach ( array( 'devices', 'countries', 'sources', 'ad_units' ) as $action ) {
+			$parsed = MediavineReportsAbilities::parseDimensionalPayload( $action, $fixtures[ $action ], '2026-07' );
+			$blob  .= wp_json_encode( MediavineReportsAbilities::buildDimensionalResult( $action, '11476', $relay, '2026-07-10', '2026-07-16', '2026-07', $parsed ) );
+		}
+		$forbidden = array( 'password', 'Bearer ', 'accessToken', 'refreshToken', 'userId' );
+
+		foreach ( $forbidden as $needle ) {
+			$this->assertStringNotContainsString( $needle, $blob );
+		}
 	}
 }

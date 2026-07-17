@@ -31,6 +31,7 @@ namespace {
 
 	require_once $root . '/inc/Cli/GoogleSearchConsoleCommand.php';
 	require_once $root . '/inc/Cli/GoogleAnalyticsCommand.php';
+	require_once $root . '/inc/Cli/MediavineCommand.php';
 	require_once $root . '/inc/Cli/PageSpeedCommand.php';
 	require_once $root . '/inc/Cli/MediaHygieneCommand.php';
 	require_once $root . '/inc/Cli/Commands/BingWebmasterCommand.php';
@@ -60,6 +61,9 @@ namespace {
 	}
 	if ( false === strpos( $output, '`diagnose`' ) ) {
 		$failures[] = "Media action 'diagnose' missing from rendered output";
+	}
+	if ( false === strpos( $output, '`ad_units`' ) ) {
+		$failures[] = "Mediavine action 'ad_units' missing from rendered output";
 	}
 
 	if ( empty( $failures ) ) {

@@ -68,7 +68,7 @@ final class AgentsMdSections {
 			array( self::class, 'render' ),
 			array(
 				'label'       => 'Data Machine Business',
-				'description' => 'Business-owned WP-CLI surface (Google Analytics, Search Console, Bing, PageSpeed, media hygiene).',
+				'description' => 'Business-owned WP-CLI surface (Google Analytics, Search Console, Mediavine, Bing, PageSpeed, media hygiene).',
 				'owner'       => 'data-machine-business',
 				'freshness'   => 'snapshot',
 				'conditions'  => 'Registered when Data Machine Business and composable memory section registration are available.',
