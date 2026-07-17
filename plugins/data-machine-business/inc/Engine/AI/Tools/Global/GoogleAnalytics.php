@@ -71,7 +71,7 @@ class GoogleAnalytics extends BaseTool {
 		return array(
 			'class'           => __CLASS__,
 			'method'          => 'handle_tool_call',
-			'description'     => 'Fetch visitor analytics from Google Analytics (GA4), including fixed landing-page acquisition, touched-page acquisition, and page audience breakdowns. Supports sorting, hostname and page filtering, and period-over-period comparison without arbitrary dimension selection.',
+			'description'     => 'Fetch visitor analytics from Google Analytics (GA4), including fixed landing-page acquisition, touched-page acquisition, and page audience breakdowns. Landing-page acquisition preserves `(not set)` rows and reports unknown-dimension coverage metadata. Supports sorting, hostname and page filtering, and period-over-period comparison without arbitrary dimension selection.',
 			'requires_config' => true,
 			'parameters'      => array(
 				'type'       => 'object',
@@ -79,7 +79,7 @@ class GoogleAnalytics extends BaseTool {
 					'action'      => array(
 						'type'        => 'string',
 						'enum'        => $valid_actions,
-						'description' => 'Choose a bounded report. landing_page_acquisition uses session-entry landingPage x session source/medium. page_acquisition uses touched pagePath x session source/medium. page_audience uses touched pagePath x country/device.',
+						'description' => 'Choose a bounded report. landing_page_acquisition uses session-entry landingPage x session source/medium and discloses material `(not set)` coverage without filtering it. page_acquisition uses touched pagePath x session source/medium. page_audience uses touched pagePath x country/device.',
 					),
 					'property_id' => array(
 					'type'        => 'string',

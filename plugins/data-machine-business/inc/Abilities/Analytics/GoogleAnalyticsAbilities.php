@@ -92,6 +92,13 @@ class GoogleAnalyticsAbilities {
 	const MAX_LIMIT = 10000;
 
 	/**
+	 * Share at which unknown landing-page coverage is material to analysis.
+	 *
+	 * @var float
+	 */
+	const UNKNOWN_LANDING_PAGE_MATERIAL_SHARE = 0.05;
+
+	/**
 	 * Action-to-report configuration mapping.
 	 *
 	 * Each action defines the dimensions and metrics for its GA4 report request.
@@ -99,37 +106,37 @@ class GoogleAnalyticsAbilities {
 	 * @var array
 	 */
 	const ACTION_REPORTS = array(
-		'page_stats'              => array(
+		'page_stats'               => array(
 			// hostName is prepended (not replacing pagePath) so existing pagePath-keyed
 			// consumers keep working while cross-site rows become distinguishable — on a
 			// multisite GA4 property two sites otherwise both collapse to pagePath "/".
 			'dimensions' => array( 'hostName', 'pagePath', 'pageTitle' ),
 			'metrics'    => array( 'screenPageViews', 'sessions', 'bounceRate', 'averageSessionDuration', 'activeUsers' ),
 		),
-		'network_density'         => array(
+		'network_density'          => array(
 			// Cross-site journey proxy: current host x previous URL. Bucket pageReferrer's
 			// host into in-network vs external to compute "% of sessions per site whose
 			// referrer was another EC site". Approximation only — see action description.
 			'dimensions' => array( 'hostName', 'pageReferrer' ),
 			'metrics'    => array( 'sessions', 'activeUsers', 'screenPageViews' ),
 		),
-		'traffic_sources'         => array(
+		'traffic_sources'          => array(
 			'dimensions' => array( 'sessionSource', 'sessionMedium' ),
 			'metrics'    => array( 'sessions', 'activeUsers', 'screenPageViews', 'bounceRate' ),
 		),
-		'date_stats'              => array(
+		'date_stats'               => array(
 			'dimensions' => array( 'date' ),
 			'metrics'    => array( 'sessions', 'screenPageViews', 'activeUsers', 'bounceRate', 'averageSessionDuration' ),
 		),
-		'top_events'              => array(
+		'top_events'               => array(
 			'dimensions' => array( 'eventName' ),
 			'metrics'    => array( 'eventCount', 'eventCountPerUser' ),
 		),
-		'user_demographics'       => array(
+		'user_demographics'        => array(
 			'dimensions' => array( 'country', 'deviceCategory' ),
 			'metrics'    => array( 'sessions', 'activeUsers', 'screenPageViews' ),
 		),
-		'landing_pages'           => array(
+		'landing_pages'            => array(
 			'dimensions' => array( 'landingPage' ),
 			'metrics'    => array( 'sessions', 'activeUsers', 'bounceRate', 'averageSessionDuration', 'engagementRate' ),
 		),
@@ -139,21 +146,21 @@ class GoogleAnalyticsAbilities {
 			'dimensions' => array( 'landingPage', 'sessionSource', 'sessionMedium' ),
 			'metrics'    => array( 'sessions', 'activeUsers', 'engagedSessions', 'engagementRate' ),
 		),
-		'page_acquisition'        => array(
+		'page_acquisition'         => array(
 			// Touched-page semantics: pagePath includes any matching page viewed
 			// during sessions attributed to the returned source and medium.
 			'dimensions' => array( 'pagePath', 'sessionSource', 'sessionMedium' ),
 			'metrics'    => array( 'screenPageViews', 'sessions', 'activeUsers', 'engagedSessions' ),
 		),
-		'page_audience'           => array(
+		'page_audience'            => array(
 			'dimensions' => array( 'pagePath', 'country', 'deviceCategory' ),
 			'metrics'    => array( 'screenPageViews', 'sessions', 'activeUsers' ),
 		),
-		'engagement'              => array(
+		'engagement'               => array(
 			'dimensions' => array( 'pagePath', 'pageTitle' ),
 			'metrics'    => array( 'engagementRate', 'averageSessionDuration', 'engagedSessions', 'sessionsPerUser', 'screenPageViewsPerSession', 'userEngagementDuration' ),
 		),
-		'new_vs_returning'        => array(
+		'new_vs_returning'         => array(
 			'dimensions' => array( 'newVsReturning' ),
 			'metrics'    => array( 'sessions', 'activeUsers', 'engagementRate', 'screenPageViewsPerSession', 'averageSessionDuration' ),
 		),
@@ -230,17 +237,7 @@ class GoogleAnalyticsAbilities {
 							),
 						),
 					),
-					'output_schema'       => array(
-						'type'       => 'object',
-						'properties' => array(
-							'success'       => array( 'type' => 'boolean' ),
-							'action'        => array( 'type' => 'string' ),
-							'results_count' => array( 'type' => 'integer' ),
-							'results'       => array( 'type' => 'array' ),
-							'pagination'    => array( 'type' => 'object' ),
-							'error'         => array( 'type' => 'string' ),
-						),
-					),
+					'output_schema'       => self::outputSchema(),
 					'execute_callback'    => array( self::class, 'fetchStats' ),
 					'permission_callback' => fn() => PermissionHelper::can_manage(),
 					'meta'                => array( 'show_in_rest' => false ),
@@ -249,6 +246,61 @@ class GoogleAnalyticsAbilities {
 		};
 
 		\DataMachine\Abilities\AbilityRegistration::on_abilities_api_init( $register_callback );
+	}
+
+	/**
+	 * Ability output schema.
+	 *
+	 * @return array
+	 */
+	public static function outputSchema(): array {
+		$coverage_period = array(
+			'type'       => 'object',
+			'properties' => array(
+				'status'                     => array(
+					'type' => 'string',
+					'enum' => array( 'complete', 'partial' ),
+				),
+				'unknown_sessions'           => array( 'type' => array( 'integer', 'null' ) ),
+				'observed_unknown_sessions'  => array( 'type' => 'integer' ),
+				'observed_fetched_sessions'  => array( 'type' => 'integer' ),
+				'total_sessions'             => array( 'type' => array( 'integer', 'null' ) ),
+				'share'                      => array( 'type' => array( 'number', 'null' ) ),
+				'observed_share_lower_bound' => array( 'type' => array( 'number', 'null' ) ),
+				'engaged_sessions'           => array( 'type' => array( 'integer', 'null' ) ),
+				'engagement_rate'            => array( 'type' => array( 'number', 'null' ) ),
+				'materiality'                => array(
+					'type' => 'string',
+					'enum' => array( 'absent', 'small', 'material', 'unknown' ),
+				),
+			),
+		);
+
+		return array(
+			'type'       => 'object',
+			'properties' => array(
+				'success'                    => array( 'type' => 'boolean' ),
+				'action'                     => array( 'type' => 'string' ),
+				'results_count'              => array( 'type' => 'integer' ),
+				'results'                    => array( 'type' => 'array' ),
+				'pagination'                 => array( 'type' => 'object' ),
+				'unknown_dimension_coverage' => array(
+					'type'       => 'object',
+					'properties' => array(
+						'dimension'                => array( 'type' => 'string' ),
+						'unknown_value'            => array( 'type' => 'string' ),
+						'interpretation'           => array( 'type' => 'string' ),
+						'material_share_threshold' => array( 'type' => 'number' ),
+						'current_period'           => $coverage_period,
+						'comparison_period'        => array(
+							'type'       => array( 'object', 'null' ),
+							'properties' => $coverage_period['properties'],
+						),
+					),
+				),
+				'error'                      => array( 'type' => 'string' ),
+			),
+		);
 	}
 
 	/**
@@ -377,6 +429,10 @@ class GoogleAnalyticsAbilities {
 			// not incorrectly classified as new.
 			'limit'      => $compare ? self::MAX_LIMIT : $limit,
 		);
+
+		if ( 'landing_page_acquisition' === $action ) {
+			$request_body['metricAggregations'] = array( 'TOTAL' );
+		}
 
 		// Build dimension filters.
 		$filters = array();
@@ -581,7 +637,7 @@ class GoogleAnalyticsAbilities {
 		$limit = ! empty( $input['limit'] ) ? max( 1, min( (int) $input['limit'], self::MAX_LIMIT ) ) : self::DEFAULT_LIMIT;
 		$rows  = $compare
 			? self::formatComparisonRows( $data, $limit )
-			: self::formatReportRows( $data);
+			: self::formatReportRows( $data );
 
 		$response = array(
 			'success'       => true,
@@ -595,6 +651,10 @@ class GoogleAnalyticsAbilities {
 			'pagination'    => self::buildPaginationMetadata( $data, $limit, count( $rows ), $compare ),
 		);
 
+		if ( 'landing_page_acquisition' === $action ) {
+			$response['unknown_dimension_coverage'] = self::buildUnknownDimensionCoverage( $data, $compare );
+		}
+
 		if ( $compare ) {
 			$response['compare_date_range'] = array(
 				'start_date' => $date_ranges[1]['startDate'],
@@ -603,6 +663,130 @@ class GoogleAnalyticsAbilities {
 		}
 
 		return $response;
+	}
+
+	/**
+	 * Quantify GA4's unknown landing-page cohort without altering report rows.
+	 *
+	 * GA documents landingPage as the first page_view in a session and `(not set)`
+	 * as a session with no page_view. The report cannot identify the collection
+	 * path that caused an individual gap, so the interpretation stays bounded.
+	 *
+	 * @param array $data    Raw GA4 API response.
+	 * @param bool  $compare Whether two date ranges were requested.
+	 * @return array
+	 */
+	public static function buildUnknownDimensionCoverage( array $data, bool $compare ): array {
+		$fetched_rows = count( $data['rows'] ?? array() );
+		$complete     = isset( $data['rowCount'] ) && (int) $data['rowCount'] <= $fetched_rows;
+
+		return array(
+			'dimension'                => 'landingPage',
+			'unknown_value'            => '(not set)',
+			'interpretation'           => 'GA4 did not associate a first page_view with these sessions. This report cannot identify the collection cause.',
+			'material_share_threshold' => self::UNKNOWN_LANDING_PAGE_MATERIAL_SHARE,
+			'current_period'           => self::buildUnknownCoveragePeriod( $data, 'date_range_0', $complete ),
+			'comparison_period'        => $compare ? self::buildUnknownCoveragePeriod( $data, 'date_range_1', $complete ) : null,
+		);
+	}
+
+	/**
+	 * Build one date range's unknown landing-page coverage.
+	 *
+	 * @param array  $data       Raw GA4 API response.
+	 * @param string $date_range GA4 synthetic date range value.
+	 * @param bool   $complete   Whether all dimensional rows were fetched.
+	 * @return array
+	 */
+	private static function buildUnknownCoveragePeriod( array $data, string $date_range, bool $complete ): array {
+		$dimension_headers = wp_list_pluck( $data['dimensionHeaders'] ?? array(), 'name' );
+		$metric_headers    = wp_list_pluck( $data['metricHeaders'] ?? array(), 'name' );
+		$landing_index     = array_search( 'landingPage', $dimension_headers, true );
+		$date_range_index  = array_search( 'dateRange', $dimension_headers, true );
+		$sessions_index    = array_search( 'sessions', $metric_headers, true );
+		$engaged_index     = array_search( 'engagedSessions', $metric_headers, true );
+		$unknown_sessions  = 0;
+		$engaged_sessions  = 0;
+		$fetched_sessions  = 0;
+
+		foreach ( ( $data['rows'] ?? array() ) as $row ) {
+			$dimensions = wp_list_pluck( $row['dimensionValues'] ?? array(), 'value' );
+			$row_range  = false !== $date_range_index ? ( $dimensions[ $date_range_index ] ?? 'date_range_0' ) : 'date_range_0';
+			if ( $date_range !== $row_range ) {
+				continue;
+			}
+
+			$metrics           = wp_list_pluck( $row['metricValues'] ?? array(), 'value' );
+			$fetched_sessions += false !== $sessions_index ? (int) ( $metrics[ $sessions_index ] ?? 0 ) : 0;
+			if ( false === $landing_index || '(not set)' !== ( $dimensions[ $landing_index ] ?? '' ) ) {
+				continue;
+			}
+
+			$unknown_sessions += false !== $sessions_index ? (int) ( $metrics[ $sessions_index ] ?? 0 ) : 0;
+			$engaged_sessions += false !== $engaged_index ? (int) ( $metrics[ $engaged_index ] ?? 0 ) : 0;
+		}
+
+		$total_sessions = self::extractTotalSessions( $data, $date_range );
+		if ( null === $total_sessions && $complete && false !== $sessions_index ) {
+			$total_sessions = $fetched_sessions;
+		}
+
+		$observed_share = null !== $total_sessions && $total_sessions > 0 ? $unknown_sessions / $total_sessions : null;
+		$share          = $complete ? $observed_share : null;
+		$materiality    = 'unknown';
+		if ( $complete ) {
+			if ( 0 === $unknown_sessions ) {
+				$materiality = 'absent';
+			} elseif ( null !== $share ) {
+				$materiality = $share >= self::UNKNOWN_LANDING_PAGE_MATERIAL_SHARE ? 'material' : 'small';
+			}
+		} elseif ( null !== $observed_share && $observed_share >= self::UNKNOWN_LANDING_PAGE_MATERIAL_SHARE ) {
+			$materiality = 'material';
+		}
+
+		return array(
+			'status'                     => $complete ? 'complete' : 'partial',
+			'unknown_sessions'           => $complete ? $unknown_sessions : null,
+			'observed_unknown_sessions'  => $unknown_sessions,
+			'observed_fetched_sessions'  => $fetched_sessions,
+			'total_sessions'             => $total_sessions,
+			'share'                      => $share,
+			'observed_share_lower_bound' => $complete ? null : $observed_share,
+			'engaged_sessions'           => $complete ? $engaged_sessions : null,
+			'engagement_rate'            => $complete && $unknown_sessions > 0 ? $engaged_sessions / $unknown_sessions : null,
+			'materiality'                => $materiality,
+		);
+	}
+
+	/**
+	 * Read GA4's requested TOTAL sessions aggregation for one date range.
+	 *
+	 * @param array  $data       Raw GA4 API response.
+	 * @param string $date_range GA4 synthetic date range value.
+	 * @return int|null
+	 */
+	private static function extractTotalSessions( array $data, string $date_range ): ?int {
+		$dimension_headers = wp_list_pluck( $data['dimensionHeaders'] ?? array(), 'name' );
+		$metric_headers    = wp_list_pluck( $data['metricHeaders'] ?? array(), 'name' );
+		$date_range_index  = array_search( 'dateRange', $dimension_headers, true );
+		$sessions_index    = array_search( 'sessions', $metric_headers, true );
+
+		if ( false === $sessions_index ) {
+			return null;
+		}
+
+		foreach ( ( $data['totals'] ?? array() ) as $index => $row ) {
+			$dimensions = wp_list_pluck( $row['dimensionValues'] ?? array(), 'value' );
+			$row_range  = false !== $date_range_index ? ( $dimensions[ $date_range_index ] ?? '' ) : ( 0 === $index ? 'date_range_0' : 'date_range_1' );
+			if ( $date_range !== $row_range ) {
+				continue;
+			}
+
+			$metrics = wp_list_pluck( $row['metricValues'] ?? array(), 'value' );
+			return (int) ( $metrics[ $sessions_index ] ?? 0 );
+		}
+
+		return null;
 	}
 
 	/**
@@ -1143,7 +1327,7 @@ class GoogleAnalyticsAbilities {
 	 * @param array $report_config Report configuration with dimension/metric names.
 	 * @return array Formatted rows.
 	 */
-	private static function formatReportRows( array $data): array {
+	private static function formatReportRows( array $data ): array {
 		$dimension_headers = wp_list_pluck( $data['dimensionHeaders'] ?? array(), 'name' );
 		$metric_headers    = wp_list_pluck( $data['metricHeaders'] ?? array(), 'name' );
 
@@ -1274,18 +1458,26 @@ class GoogleAnalyticsAbilities {
 			return $cached;
 		}
 
-		$header = self::base64url_encode( wp_json_encode( array(
-			'alg' => 'RS256',
-			'typ' => 'JWT',
-		) ) );
+		$header = self::base64url_encode(
+			wp_json_encode(
+				array(
+					'alg' => 'RS256',
+					'typ' => 'JWT',
+				)
+			)
+		);
 		$now    = time();
-		$claims = self::base64url_encode( wp_json_encode( array(
-			'iss'   => $service_account['client_email'],
-			'scope' => 'https://www.googleapis.com/auth/analytics.readonly',
-			'aud'   => 'https://oauth2.googleapis.com/token',
-			'iat'   => $now,
-			'exp'   => $now + 3600,
-		) ) );
+		$claims = self::base64url_encode(
+			wp_json_encode(
+				array(
+					'iss'   => $service_account['client_email'],
+					'scope' => 'https://www.googleapis.com/auth/analytics.readonly',
+					'aud'   => 'https://oauth2.googleapis.com/token',
+					'iat'   => $now,
+					'exp'   => $now + 3600,
+				)
+			)
+		);
 
 		$unsigned = $header . '.' . $claims;
 

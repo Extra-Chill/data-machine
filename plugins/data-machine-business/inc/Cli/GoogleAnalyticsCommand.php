@@ -33,20 +33,20 @@ class GoogleAnalyticsCommand extends BaseCommand {
 	 */
 	public static function actions(): array {
 		return array(
-			'page_stats'              => 'Top pages by sessions, views, and engagement',
-			'traffic_sources'         => 'Sessions grouped by source and medium',
-			'date_stats'              => 'Daily session and engagement trends',
-			'realtime'                => 'Real-time active users',
-			'top_events'              => 'Top events by count',
-			'user_demographics'       => 'Sessions by country and device',
-			'landing_pages'           => 'Top landing pages by entrances and engagement',
+			'page_stats'               => 'Top pages by sessions, views, and engagement',
+			'traffic_sources'          => 'Sessions grouped by source and medium',
+			'date_stats'               => 'Daily session and engagement trends',
+			'realtime'                 => 'Real-time active users',
+			'top_events'               => 'Top events by count',
+			'user_demographics'        => 'Sessions by country and device',
+			'landing_pages'            => 'Top landing pages by entrances and engagement',
 			'landing_page_acquisition' => 'Landing pages by session source and medium',
-			'page_acquisition'        => 'Touched pages by session source and medium',
-			'page_audience'           => 'Touched pages by country and device',
-			'engagement'              => 'Aggregate engagement metrics per page',
-			'new_vs_returning'        => 'New vs returning user split',
-			'network_density'         => 'Cross-site journey density via referrer host',
-			'path_sequence'           => 'Ordered cross-host path sequences (funnel report)',
+			'page_acquisition'         => 'Touched pages by session source and medium',
+			'page_audience'            => 'Touched pages by country and device',
+			'engagement'               => 'Aggregate engagement metrics per page',
+			'new_vs_returning'         => 'New vs returning user split',
+			'network_density'          => 'Cross-site journey density via referrer host',
+			'path_sequence'            => 'Ordered cross-host path sequences (funnel report)',
 		);
 	}
 
@@ -144,15 +144,19 @@ class GoogleAnalyticsCommand extends BaseCommand {
 			'action' => $args[0] ?? '',
 		);
 
-		$this->map_optional( $input, $assoc_args, array(
-			'start-date'  => 'start_date',
-			'end-date'    => 'end_date',
-			'limit'       => 'limit',
-			'page-filter' => 'page_filter',
-			'hostname'    => 'hostname',
-			'sort-by'     => 'sort_by',
-			'order'       => 'order',
-		) );
+		$this->map_optional(
+			$input,
+			$assoc_args,
+			array(
+				'start-date'  => 'start_date',
+				'end-date'    => 'end_date',
+				'limit'       => 'limit',
+				'page-filter' => 'page_filter',
+				'hostname'    => 'hostname',
+				'sort-by'     => 'sort_by',
+				'order'       => 'order',
+			)
+		);
 
 		// --compare is a boolean flag (no value).
 		if ( isset( $assoc_args['compare'] ) ) {
@@ -202,6 +206,11 @@ class GoogleAnalyticsCommand extends BaseCommand {
 		if ( empty( $result['success'] ) ) {
 			WP_CLI::error( $result['error'] ?? 'Unknown error.' );
 			return;
+		}
+
+		$coverage_warning = self::coverageWarning( $result );
+		if ( null !== $coverage_warning ) {
+			WP_CLI::warning( $coverage_warning );
 		}
 
 		$format = $assoc_args['format'] ?? 'table';
@@ -262,15 +271,43 @@ class GoogleAnalyticsCommand extends BaseCommand {
 			WP_CLI::log( sprintf( '%d results (%s to %s)', $count, $start, $end ) );
 
 			if ( null !== $days_ago && $days_ago > 30 ) {
-				WP_CLI::warning( sprintf(
-					'Data is %d days stale (latest: %s). Check API key and site verification.',
-					$days_ago,
-					$end
-				) );
+				WP_CLI::warning(
+					sprintf(
+						'Data is %d days stale (latest: %s). Check API key and site verification.',
+						$days_ago,
+						$end
+					)
+				);
 			}
 		} else {
 			WP_CLI::log( sprintf( '%d results', $count ) );
 		}
+	}
+
+	/**
+	 * Build the human warning for material unknown landing-page coverage.
+	 *
+	 * @param array $result Ability result.
+	 * @return string|null
+	 */
+	public static function coverageWarning( array $result ): ?string {
+		$coverage = $result['unknown_dimension_coverage']['current_period'] ?? null;
+		if ( ! is_array( $coverage ) || 'material' !== ( $coverage['materiality'] ?? '' ) ) {
+			return null;
+		}
+
+		$partial = 'partial' === ( $coverage['status'] ?? '' );
+		$share   = $partial ? ( $coverage['observed_share_lower_bound'] ?? null ) : ( $coverage['share'] ?? null );
+		$count   = $partial ? ( $coverage['observed_unknown_sessions'] ?? 0 ) : ( $coverage['unknown_sessions'] ?? 0 );
+		$label   = $partial ? 'at least ' : '';
+
+		return sprintf(
+			'GA4 landing-page attribution gap: %s%d sessions (%s%.1f%%) have landingPage `(not set)`. Preserve these rows, but exclude or segment them for page-level acquisition conclusions.',
+			$label,
+			(int) $count,
+			$label,
+			(float) $share * 100
+		);
 	}
 
 	/**

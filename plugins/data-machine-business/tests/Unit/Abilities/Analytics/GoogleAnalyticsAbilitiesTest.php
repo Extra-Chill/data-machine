@@ -15,6 +15,7 @@
 namespace DataMachine\Tests\Unit\Abilities\Analytics;
 
 use DataMachineBusiness\Abilities\Analytics\GoogleAnalyticsAbilities;
+use DataMachineBusiness\Cli\GoogleAnalyticsCommand;
 use DataMachineBusiness\Engine\AI\Tools\Global\GoogleAnalytics;
 use WP_UnitTestCase;
 
@@ -218,6 +219,13 @@ class GoogleAnalyticsAbilitiesTest extends WP_UnitTestCase {
 		$this->assertSame( GoogleAnalyticsAbilities::MAX_LIMIT, $too_large['limit'] );
 	}
 
+	public function test_landing_acquisition_requests_total_session_aggregation(): void {
+		$body = GoogleAnalyticsAbilities::buildReportRequestBody( array( 'limit' => 25 ), 'landing_page_acquisition' );
+
+		$this->assertSame( array( 'TOTAL' ), $body['metricAggregations'] );
+		$this->assertArrayNotHasKey( 'metricAggregations', GoogleAnalyticsAbilities::buildReportRequestBody( array(), 'page_acquisition' ) );
+	}
+
 	public function test_ai_tool_schema_enumerates_bounded_actions(): void {
 		$reflection = new \ReflectionClass( GoogleAnalytics::class );
 		$tool       = $reflection->newInstanceWithoutConstructor();
@@ -296,6 +304,166 @@ class GoogleAnalyticsAbilitiesTest extends WP_UnitTestCase {
 		$pagination = $this->pagination_metadata( $data, 2, 2, true );
 
 		$this->assertFalse( $pagination['truncated'] );
+	}
+
+	public function test_unknown_landing_coverage_reports_absent_cohort(): void {
+		$data     = $this->landing_acquisition_response(
+			array( array( '/known/', 'google', 'organic', 100, 60 ) ),
+			100
+		);
+		$coverage = GoogleAnalyticsAbilities::buildUnknownDimensionCoverage( $data, false );
+		$current  = $coverage['current_period'];
+
+		$this->assertSame( 'complete', $current['status'] );
+		$this->assertSame( 0, $current['unknown_sessions'] );
+		$this->assertSame( 100, $current['observed_fetched_sessions'] );
+		$this->assertSame( 0, $current['share'] );
+		$this->assertSame( 'absent', $current['materiality'] );
+		$this->assertNull( GoogleAnalyticsCommand::coverageWarning( array( 'unknown_dimension_coverage' => $coverage ) ) );
+	}
+
+	public function test_unknown_landing_coverage_reports_small_cohort(): void {
+		$data     = $this->landing_acquisition_response(
+			array(
+				array( '(not set)', 'google', 'organic', 4, 1 ),
+				array( '/known/', 'google', 'organic', 96, 58 ),
+			),
+			100
+		);
+		$current = GoogleAnalyticsAbilities::buildUnknownDimensionCoverage( $data, false )['current_period'];
+
+		$this->assertSame( 4, $current['unknown_sessions'] );
+		$this->assertSame( 0.04, $current['share'] );
+		$this->assertSame( 0.25, $current['engagement_rate'] );
+		$this->assertSame( 'small', $current['materiality'] );
+	}
+
+	public function test_unknown_landing_coverage_reports_material_cohort_and_cli_warning(): void {
+		$data     = $this->landing_acquisition_response(
+			array(
+				array( '(not set)', 'google', 'organic', 12, 2 ),
+				array( '(not set)', 'bing', 'organic', 8, 0 ),
+				array( '/known/', 'google', 'organic', 80, 48 ),
+			),
+			100
+		);
+		$coverage = GoogleAnalyticsAbilities::buildUnknownDimensionCoverage( $data, false );
+		$current  = $coverage['current_period'];
+
+		$this->assertSame( 20, $current['unknown_sessions'] );
+		$this->assertSame( 100, $current['total_sessions'] );
+		$this->assertSame( 0.2, $current['share'] );
+		$this->assertSame( 2, $current['engaged_sessions'] );
+		$this->assertSame( 0.1, $current['engagement_rate'] );
+		$this->assertSame( 'material', $current['materiality'] );
+		$this->assertStringContainsString( '20 sessions (20.0%)', GoogleAnalyticsCommand::coverageWarning( array( 'unknown_dimension_coverage' => $coverage ) ) );
+	}
+
+	public function test_truncated_unknown_landing_coverage_is_an_explicit_lower_bound(): void {
+		$data             = $this->landing_acquisition_response(
+			array(
+				array( '(not set)', 'google', 'organic', 20, 2 ),
+				array( '/known/', 'google', 'organic', 30, 18 ),
+			),
+			100
+		);
+		$data['rowCount'] = 12;
+		$coverage         = GoogleAnalyticsAbilities::buildUnknownDimensionCoverage( $data, false );
+		$current          = $coverage['current_period'];
+
+		$this->assertSame( 'partial', $current['status'] );
+		$this->assertNull( $current['unknown_sessions'] );
+		$this->assertSame( 20, $current['observed_unknown_sessions'] );
+		$this->assertSame( 50, $current['observed_fetched_sessions'] );
+		$this->assertNull( $current['share'] );
+		$this->assertSame( 0.2, $current['observed_share_lower_bound'] );
+		$this->assertNull( $current['engaged_sessions'] );
+		$this->assertNull( $current['engagement_rate'] );
+		$this->assertSame( 'material', $current['materiality'] );
+		$this->assertStringContainsString( 'at least 20 sessions (at least 20.0%)', GoogleAnalyticsCommand::coverageWarning( array( 'unknown_dimension_coverage' => $coverage ) ) );
+	}
+
+	public function test_truncated_small_observation_has_unknown_materiality(): void {
+		$data             = $this->landing_acquisition_response(
+			array( array( '(not set)', 'google', 'organic', 2, 0 ) ),
+			100
+		);
+		$data['rowCount'] = 50;
+		$current          = GoogleAnalyticsAbilities::buildUnknownDimensionCoverage( $data, false )['current_period'];
+
+		$this->assertSame( 'partial', $current['status'] );
+		$this->assertSame( 'unknown', $current['materiality'] );
+	}
+
+	public function test_missing_api_row_count_never_claims_complete_coverage(): void {
+		$data = $this->landing_acquisition_response(
+			array( array( '(not set)', 'google', 'organic', 20, 2 ) ),
+			100
+		);
+		unset( $data['rowCount'] );
+
+		$current = GoogleAnalyticsAbilities::buildUnknownDimensionCoverage( $data, false )['current_period'];
+
+		$this->assertSame( 'partial', $current['status'] );
+		$this->assertNull( $current['unknown_sessions'] );
+		$this->assertSame( 0.2, $current['observed_share_lower_bound'] );
+	}
+
+	public function test_comparison_reports_each_period_unknown_coverage(): void {
+		$data     = $this->landing_acquisition_response(
+			array(
+				array( '(not set)', 'google', 'organic', 20, 2 ),
+				array( '/known/', 'google', 'organic', 80, 48 ),
+			),
+			100,
+			array(
+				array( '(not set)', 'google', 'organic', 4, 1 ),
+				array( '/known/', 'google', 'organic', 76, 45 ),
+			),
+			80
+		);
+		$coverage = GoogleAnalyticsAbilities::buildUnknownDimensionCoverage( $data, true );
+
+		$this->assertSame( 0.2, $coverage['current_period']['share'] );
+		$this->assertSame( 'material', $coverage['current_period']['materiality'] );
+		$this->assertSame( 0.05, $coverage['comparison_period']['share'] );
+		$this->assertSame( 'material', $coverage['comparison_period']['materiality'] );
+	}
+
+	public function test_unknown_coverage_does_not_filter_or_mutate_report_rows(): void {
+		$data = $this->landing_acquisition_response(
+			array(
+				array( '(not set)', 'google', 'organic', 20, 2 ),
+				array( '/known/', 'google', 'organic', 80, 48 ),
+			),
+			100
+		);
+		$before = $data;
+
+		GoogleAnalyticsAbilities::buildUnknownDimensionCoverage( $data, false );
+		$rows = $this->format_report_rows( $data );
+
+		$this->assertSame( $before, $data );
+		$this->assertCount( 2, $rows );
+		$this->assertSame( '(not set)', $rows[0]['landingPage'] );
+	}
+
+	public function test_unknown_coverage_validates_against_ability_output_schema(): void {
+		$data     = $this->landing_acquisition_response(
+			array( array( '(not set)', 'google', 'organic', 20, 2 ) ),
+			20
+		);
+		$response = array(
+			'success'                    => true,
+			'action'                     => 'landing_page_acquisition',
+			'results_count'              => 1,
+			'results'                    => $this->format_report_rows( $data ),
+			'pagination'                 => array( 'truncated' => false ),
+			'unknown_dimension_coverage' => GoogleAnalyticsAbilities::buildUnknownDimensionCoverage( $data, false ),
+		);
+
+		$validated = rest_validate_value_from_schema( $response, GoogleAnalyticsAbilities::outputSchema(), 'output' );
+		$this->assertTrue( $validated, is_wp_error( $validated ) ? $validated->get_error_message() : '' );
 	}
 
 	/**
@@ -615,6 +783,13 @@ class GoogleAnalyticsAbilitiesTest extends WP_UnitTestCase {
 		return $method->invoke( null, $data, $limit );
 	}
 
+	private function format_report_rows( array $data ): array {
+		$method = new \ReflectionMethod( GoogleAnalyticsAbilities::class, 'formatReportRows' );
+		$method->setAccessible( true );
+
+		return $method->invoke( null, $data );
+	}
+
 	private function pagination_metadata( array $data, int $limit, int $returned_rows, bool $compare ): array {
 		$method = new \ReflectionMethod( GoogleAnalyticsAbilities::class, 'buildPaginationMetadata' );
 		$method->setAccessible( true );
@@ -647,6 +822,69 @@ class GoogleAnalyticsAbilitiesTest extends WP_UnitTestCase {
 				},
 				$rows
 			),
+		);
+	}
+
+	private function landing_acquisition_response( array $current_rows, int $current_total, array $comparison_rows = array(), ?int $comparison_total = null ): array {
+		$compare    = null !== $comparison_total;
+		$dimensions = array( 'landingPage', 'sessionSource', 'sessionMedium' );
+		if ( $compare ) {
+			$dimensions[] = 'dateRange';
+		}
+
+		$build_row = static function ( array $row, string $date_range, bool $include_range ): array {
+			$dimension_values = array_slice( $row, 0, 3 );
+			if ( $include_range ) {
+				$dimension_values[] = $date_range;
+			}
+
+			return array(
+				'dimensionValues' => array_map( static fn( string $value ): array => array( 'value' => $value ), $dimension_values ),
+				'metricValues'    => array(
+					array( 'value' => (string) $row[3] ),
+					array( 'value' => (string) $row[3] ),
+					array( 'value' => (string) $row[4] ),
+					array( 'value' => (string) ( $row[3] > 0 ? $row[4] / $row[3] : 0 ) ),
+				),
+			);
+		};
+
+		$rows = array_map( static fn( array $row ): array => $build_row( $row, 'date_range_0', $compare ), $current_rows );
+		if ( $compare ) {
+			$rows = array_merge( $rows, array_map( static fn( array $row ): array => $build_row( $row, 'date_range_1', true ), $comparison_rows ) );
+		}
+
+		$build_total = static function ( int $sessions, string $date_range, bool $include_range ): array {
+			$dimension_values = array( 'RESERVED_TOTAL', 'RESERVED_TOTAL', 'RESERVED_TOTAL' );
+			if ( $include_range ) {
+				$dimension_values[] = $date_range;
+			}
+
+			return array(
+				'dimensionValues' => array_map( static fn( string $value ): array => array( 'value' => $value ), $dimension_values ),
+				'metricValues'    => array(
+					array( 'value' => (string) $sessions ),
+					array( 'value' => '0' ),
+					array( 'value' => '0' ),
+					array( 'value' => '0' ),
+				),
+			);
+		};
+
+		$totals = array( $build_total( $current_total, 'date_range_0', $compare ) );
+		if ( $compare ) {
+			$totals[] = $build_total( (int) $comparison_total, 'date_range_1', true );
+		}
+
+		return array(
+			'dimensionHeaders' => array_map( static fn( string $name ): array => array( 'name' => $name ), $dimensions ),
+			'metricHeaders'    => array_map(
+				static fn( string $name ): array => array( 'name' => $name ),
+				array( 'sessions', 'activeUsers', 'engagedSessions', 'engagementRate' )
+			),
+			'rows'             => $rows,
+			'totals'           => $totals,
+			'rowCount'         => count( $rows ),
 		);
 	}
 

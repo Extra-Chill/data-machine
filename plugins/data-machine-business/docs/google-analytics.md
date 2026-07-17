@@ -45,6 +45,16 @@ Existing GA4 installations do not need a migration step. Data Machine Business u
 
 These are fixed report presets rather than an arbitrary GA4 report builder. All support `page_filter`, `hostname`, sorting, row limits, and comparison. Standard report responses include pagination metadata with the requested limit, returned and fetched row counts, GA4's reported row count, and a truncation flag.
 
+#### Unknown landing-page coverage
+
+`landing_page_acquisition` preserves GA4's `(not set)` rows and adds `unknown_dimension_coverage` metadata. Google defines `landingPage` as the page path associated with the first `page_view` in a session and documents `(not set)` for this dimension when a session has no `page_view`. This identifies an attribution/collection gap, but the Data API response cannot prove whether an individual gap came from Measurement Protocol, consent or tag sequencing, automated traffic, or another collection path. Separately, `(not set)` session source/medium can indicate a missing `session_start` event.
+
+The metadata reports observed unknown sessions, sessions represented by fetched rows, total sessions from GA4's `TOTAL` metric aggregation, unknown-cohort engagement, and a 5% materiality status. `share` and exact unknown/engagement counts are populated only when all dimensional rows were fetched. If GA4's row count exceeds the fetched rows, `status` is `partial`, exact fields are `null`, and `observed_share_lower_bound` makes the top-N limitation explicit. A partial cohort is still `material` when that lower bound is at least 5%; otherwise materiality is `unknown`.
+
+Table and CSV CLI output warn when the exact share or observed lower bound is material. JSON retains the complete metadata. For page-level acquisition conclusions, operators should preserve the cohort in source data but exclude or segment it from ranked landing-page analysis, disclose the omitted share, and investigate tagging/collection separately. Do not relabel it as bot or Measurement Protocol traffic without independent evidence.
+
+References: [Google's `(not set)` guidance](https://support.google.com/analytics/answer/13504892) and the [GA4 Data API schema](https://developers.google.com/analytics/devguides/reporting/data/v1/api-schema).
+
 ### `network_density` vs `path_sequence`
 
 Both measure cross-site behavior on a multisite GA4 property, but they are not the same thing:
