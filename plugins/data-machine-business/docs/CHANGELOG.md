@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 Homeboy maintains this file from conventional commits at release time —
 do not edit by hand.
 
+## [0.16.1] - 2026-07-17
+
+### Fixed
+- disclose GA landing attribution gaps
+- surface Mediavine integrity warnings
+
 ## [0.16.0] - 2026-07-17
 
 ### Added
