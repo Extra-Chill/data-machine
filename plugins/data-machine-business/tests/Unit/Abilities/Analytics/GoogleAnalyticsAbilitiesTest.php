@@ -528,6 +528,34 @@ class GoogleAnalyticsAbilitiesTest extends WP_UnitTestCase {
 	}
 
 	/**
+	 * Every ordered direction is queried and aggregated independently, including
+	 * the asymmetric case where the first direction is zero.
+	 */
+	public function test_path_sequence_queries_ordered_directions_independently(): void {
+		$fixture = json_decode(
+			file_get_contents( dirname( __DIR__, 3 ) . '/fixtures/ga-path-sequence-directions.json' ),
+			true
+		);
+		$method  = new \ReflectionMethod( GoogleAnalyticsAbilities::class, 'collectPathSequenceResults' );
+		$method->setAccessible( true );
+
+		foreach ( $fixture['cases'] as $case ) {
+			$requests = array();
+			$fetch    = static function ( string $entry_host, string $next_host ) use ( $case, &$requests ): array {
+				$key        = $entry_host . ' -> ' . $next_host;
+				$requests[] = $key;
+
+				return $case['transitions'][ $key ];
+			};
+
+			$results = $method->invoke( null, $case['hosts'], $fetch );
+
+			$this->assertSame( $case['expected_requests'], $requests, $case['name'] );
+			$this->assertSame( $case['expected_results'], $results, $case['name'] );
+		}
+	}
+
+	/**
 	 * The generic layer ships with NO in-network host set baked in. With no
 	 * consumer registering the datamachine_network_density_hosts filter, the
 	 * default host list is empty and network_density emits no pageReferrer

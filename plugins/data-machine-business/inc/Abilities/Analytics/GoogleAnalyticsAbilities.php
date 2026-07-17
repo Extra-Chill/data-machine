@@ -1019,10 +1019,42 @@ class GoogleAnalyticsAbilities {
 
 		$host_names = wp_list_pluck( $hosts, 'hostName' );
 
-		// Accumulate transitions keyed by entry host. We iterate unordered host
-		// PAIRS (i < j) and probe A -> B first; if A -> B has zero users then no
-		// user reached both hosts, so the reverse B -> A is also zero and we skip
-		// that funnel call. Only when A -> B is non-zero do we probe B -> A.
+		$results = self::collectPathSequenceResults(
+			$host_names,
+			static fn( string $entry_host, string $next_host ) => self::fetchOrderedPairTransition(
+				$access_token,
+				$property_id,
+				$start_date,
+				$end_date,
+				$entry_host,
+				$next_host
+			)
+		);
+
+		if ( is_wp_error( $results ) ) {
+			return array(
+				'success' => false,
+				'error'   => $results->get_error_message(),
+			);
+		}
+
+		return array_merge(
+			$base_response,
+			array(
+				'results_count' => count( $results ),
+				'results'       => $results,
+			)
+		);
+	}
+
+	/**
+	 * Query and aggregate every ordered direction among a bounded host list.
+	 *
+	 * @param array    $host_names       Hostnames to pair.
+	 * @param callable $fetch_transition Callback receiving entry and next host.
+	 * @return array|\WP_Error Aggregated host results or the first request error.
+	 */
+	private static function collectPathSequenceResults( array $host_names, callable $fetch_transition ) {
 		$transitions_by_host = array();
 		$entry_users_by_host = array();
 		foreach ( $host_names as $host_name ) {
@@ -1036,42 +1068,25 @@ class GoogleAnalyticsAbilities {
 				$a = $host_names[ $i ];
 				$b = $host_names[ $j ];
 
-				$ab = self::fetchOrderedPairTransition( $access_token, $property_id, $start_date, $end_date, $a, $b );
-				if ( is_wp_error( $ab ) ) {
-					return array(
-						'success' => false,
-						'error'   => 'Failed to fetch path sequence for ' . $a . ' -> ' . $b . ': ' . $ab->get_error_message(),
-					);
-				}
+				foreach ( array( array( $a, $b ), array( $b, $a ) ) as $direction ) {
+					list( $entry_host, $next_host ) = $direction;
+					$transition                     = $fetch_transition( $entry_host, $next_host );
 
-				if ( null === $entry_users_by_host[ $a ] ) {
-					$entry_users_by_host[ $a ] = $ab['entry_users'];
-				}
-
-				if ( $ab['next_users'] > 0 ) {
-					$transitions_by_host[ $a ][] = array(
-						'next_host' => $b,
-						'users'     => $ab['next_users'],
-					);
-
-					// Only probe the reverse direction when at least one user
-					// shared both hosts — otherwise B -> A is necessarily zero.
-					$ba = self::fetchOrderedPairTransition( $access_token, $property_id, $start_date, $end_date, $b, $a );
-					if ( is_wp_error( $ba ) ) {
-						return array(
-							'success' => false,
-							'error'   => 'Failed to fetch path sequence for ' . $b . ' -> ' . $a . ': ' . $ba->get_error_message(),
+					if ( is_wp_error( $transition ) ) {
+						return new \WP_Error(
+							'ga_path_sequence_pair_failed',
+							'Failed to fetch path sequence for ' . $entry_host . ' -> ' . $next_host . ': ' . $transition->get_error_message()
 						);
 					}
 
-					if ( null === $entry_users_by_host[ $b ] ) {
-						$entry_users_by_host[ $b ] = $ba['entry_users'];
+					if ( null === $entry_users_by_host[ $entry_host ] ) {
+						$entry_users_by_host[ $entry_host ] = $transition['entry_users'];
 					}
 
-					if ( $ba['next_users'] > 0 ) {
-						$transitions_by_host[ $b ][] = array(
-							'next_host' => $a,
-							'users'     => $ba['next_users'],
+					if ( $transition['next_users'] > 0 ) {
+						$transitions_by_host[ $entry_host ][] = array(
+							'next_host' => $next_host,
+							'users'     => $transition['next_users'],
 						);
 					}
 				}
@@ -1105,13 +1120,7 @@ class GoogleAnalyticsAbilities {
 			);
 		}
 
-		return array_merge(
-			$base_response,
-			array(
-				'results_count' => count( $results ),
-				'results'       => $results,
-			)
-		);
+		return $results;
 	}
 
 	/**
