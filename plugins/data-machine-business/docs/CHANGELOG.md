@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 Homeboy maintains this file from conventional commits at release time —
 do not edit by hand.
 
+## [0.16.0] - 2026-07-17
+
+### Added
+- expose Mediavine dimensional reports
+
 ## [0.15.0] - 2026-07-16
 
 ### Added
