@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 Homeboy maintains this file from conventional commits at release time —
 do not edit by hand.
 
+## [0.16.2] - 2026-07-18
+
+### Fixed
+- query GA path directions independently
+
 ## [0.16.1] - 2026-07-17
 
 ### Fixed
