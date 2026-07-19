@@ -437,6 +437,33 @@ class Flows extends BaseRepository {
 	}
 
 	/**
+	 * Get the minimal persisted fields needed to audit schedule coverage.
+	 *
+	 * @return array Flow schedule definitions ordered by flow ID.
+	 */
+	public function get_flow_schedules(): array {
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared -- Fresh operational coverage must be read from Data Machine's owned table.
+		$flows = $this->wpdb->get_results(
+			$this->wpdb->prepare(
+				'SELECT flow_id, flow_name, scheduling_config FROM %i ORDER BY flow_id ASC',
+				$this->table_name
+			),
+			ARRAY_A
+		);
+		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared
+
+		if ( ! is_array( $flows ) ) {
+			return array();
+		}
+
+		foreach ( $flows as &$flow ) {
+			$flow['scheduling_config'] = json_decode( $flow['scheduling_config'], true ) ?? array();
+		}
+
+		return $flows;
+	}
+
+	/**
 	 * Get paginated flows for a pipeline
 	 *
 	 * @param int $pipeline_id Pipeline ID

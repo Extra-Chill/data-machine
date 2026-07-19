@@ -351,6 +351,7 @@ function datamachine_run_datamachine_plugin() {
 	new \DataMachine\Abilities\Flow\DuplicateFlowAbility();
 	new \DataMachine\Abilities\Flow\PauseFlowAbility();
 	new \DataMachine\Abilities\Flow\ResumeFlowAbility();
+	new \DataMachine\Abilities\Flow\ReconcileFlowSchedulesAbility();
 	new \DataMachine\Abilities\Flow\QueueAbility();
 	new \DataMachine\Abilities\Flow\WebhookTriggerAbility();
 	new \DataMachine\Abilities\FlowStep\GetFlowStepsAbility();
@@ -843,8 +844,9 @@ function datamachine_activate_for_site() {
 	// every deploy.
 	\DataMachine\Engine\AI\ComposableFileGenerator::regenerate_all();
 
-	// Re-schedule any flows with non-manual scheduling
-	datamachine_activate_scheduled_flows();
+	// Action Scheduler may not be initialized during activation. Mark this site
+	// for reconciliation on the next initialized scheduler request.
+	datamachine_mark_flow_schedule_reconciliation();
 
 	// Track DB schema version so deploy-time migrations auto-run.
 	update_option( 'datamachine_db_version', DATAMACHINE_VERSION, true );

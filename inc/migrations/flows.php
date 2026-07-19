@@ -1,77 +1,79 @@
 <?php
-// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange -- Data Machine owns custom operational tables and these paths require fresh runtime state or one-time schema mutation.
 /**
- * Data Machine — Flow activation helpers.
+ * Data Machine flow schedule repair lifecycle.
  *
- * Re-schedules flows with non-manual scheduling on plugin activation.
+ * Activation and deploy-time migrations only mark the current site. The repair
+ * runs after Action Scheduler initializes so datastore reads and writes are safe.
  *
  * @package DataMachine
- * @since 0.60.0
  */
 
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Re-schedule all flows with non-manual scheduling on plugin activation.
+ * Persist a per-site marker requesting flow schedule reconciliation.
  *
- * Ensures scheduled flows resume after plugin reactivation.
+ * @return void
  */
-function datamachine_activate_scheduled_flows() {
-	if ( ! function_exists( 'as_schedule_recurring_action' ) ) {
+function datamachine_mark_flow_schedule_reconciliation(): void {
+	update_option(
+		'datamachine_flow_schedule_reconciliation_pending',
+		array(
+			'marked_at' => time(),
+			'reason'    => 'activation_or_deploy',
+		),
+		false
+	);
+}
+
+/**
+ * Repair marked flow schedules once Action Scheduler is ready.
+ *
+ * The marker is retained after transient failures so a later request can retry.
+ * Paused, manual, one-time, and malformed schedule definitions are not repaired;
+ * malformed definitions are reported without making the marker permanent.
+ *
+ * @return void
+ */
+function datamachine_reconcile_marked_flow_schedules(): void {
+	if ( ! get_option( 'datamachine_flow_schedule_reconciliation_pending', false ) ) {
 		return;
 	}
 
-	global $wpdb;
-	$table_name = $wpdb->prefix . 'datamachine_flows';
-
-	// Check if table exists (fresh install won't have flows yet)
-	if ( $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table_name ) ) !== $table_name ) {
+	if ( ! \DataMachine\Engine\Tasks\RecurringScheduler::isReady() ) {
 		return;
 	}
 
-	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-	$flows = $wpdb->get_results( $wpdb->prepare( 'SELECT flow_id, scheduling_config FROM %i', $table_name ), ARRAY_A );
-
-	if ( empty( $flows ) ) {
-		return;
-	}
-
-	$scheduled_count = 0;
-
-	foreach ( $flows as $flow ) {
-		$flow_id           = (int) $flow['flow_id'];
-		$scheduling_config = json_decode( $flow['scheduling_config'], true );
-
-		if ( empty( $scheduling_config ) || empty( $scheduling_config['interval'] ) ) {
-			continue;
-		}
-
-		$interval = $scheduling_config['interval'];
-
-		if ( 'manual' === $interval ) {
-			continue;
-		}
-
-		// Delegate to FlowScheduling — single source of truth for scheduling
-		// logic including stagger offsets, interval validation, and AS registration.
-		$result = \DataMachine\Api\Flows\FlowScheduling::handle_scheduling_update(
-			$flow_id,
-			$scheduling_config
-		);
-
-		if ( ! is_wp_error( $result ) ) {
-			++$scheduled_count;
-		}
-	}
-
-	if ( $scheduled_count > 0 ) {
+	$result = ( new \DataMachine\Api\Flows\FlowScheduleReconciler() )->reconcile( true );
+	if ( empty( $result['success'] ) && ! empty( $result['transient'] ) ) {
 		do_action(
 			'datamachine_log',
-			'info',
-			'Flows re-scheduled on plugin activation',
-			array(
-				'scheduled_count' => $scheduled_count,
-			)
+			'error',
+			'Deferred flow schedule reconciliation failed; marker retained',
+			array( 'result' => $result )
 		);
+		return;
 	}
+
+	delete_option( 'datamachine_flow_schedule_reconciliation_pending' );
+	if ( empty( $result['success'] ) ) {
+		do_action(
+			'datamachine_log',
+			'error',
+			'Deferred flow schedule reconciliation failed permanently; marker cleared',
+			array( 'result' => $result )
+		);
+		return;
+	}
+	do_action(
+		'datamachine_log',
+		'info',
+		'Deferred flow schedule reconciliation completed',
+		array(
+			'eligible' => (int) ( $result['eligible'] ?? 0 ),
+			'repaired' => (int) ( $result['repaired'] ?? 0 ),
+		)
+	);
 }
+
+add_action( 'action_scheduler_init', 'datamachine_reconcile_marked_flow_schedules', 20 );

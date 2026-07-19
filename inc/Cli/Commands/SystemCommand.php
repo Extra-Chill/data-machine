@@ -132,6 +132,18 @@ class SystemCommand extends BaseCommand {
 					WP_CLI::log( sprintf( '  Daily memory:   last attempted %s GMT', $daily_memory['last_attempt_gmt'] ) );
 				}
 			}
+			if ( isset( $check_result['flow_schedule_coverage'] ) && is_array( $check_result['flow_schedule_coverage'] ) ) {
+				$coverage = $check_result['flow_schedule_coverage'];
+				WP_CLI::log(
+					sprintf(
+						'  Flow schedules: %d covered, %d missing, %d blocked, %d invalid',
+						(int) ( $coverage['covered'] ?? 0 ),
+						(int) ( $coverage['remaining_missing'] ?? 0 ),
+						(int) ( $coverage['blocked'] ?? 0 ),
+						(int) ( $coverage['invalid'] ?? 0 )
+					)
+				);
+			}
 			if ( ! empty( $check_result['rejected_schedules'] ) && is_array( $check_result['rejected_schedules'] ) ) {
 				WP_CLI::log( sprintf( '  Rejected schedules: %d (rejected every tick, never running)', count( $check_result['rejected_schedules'] ) ) );
 				foreach ( $check_result['rejected_schedules'] as $rejected ) {

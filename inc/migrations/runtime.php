@@ -76,6 +76,9 @@ function datamachine_maybe_run_deferred_migrations(): void {
 
 	// Mismatch: a deploy bumped the constant past the persisted option.
 	datamachine_run_schema_migrations();
+	if ( function_exists( 'datamachine_mark_flow_schedule_reconciliation' ) ) {
+		datamachine_mark_flow_schedule_reconciliation();
+	}
 	update_option( 'datamachine_db_version', DATAMACHINE_VERSION, true );
 }
 

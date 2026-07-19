@@ -46,6 +46,11 @@ class RecurringScheduler {
 	public const MAX_STAGGER_SECONDS = 3600;
 
 	/**
+	 * Maximum explicit fleet distribution window in seconds.
+	 */
+	public const MAX_DISTRIBUTION_WINDOW_SECONDS = 86400;
+
+	/**
 	 * Ensure an Action Scheduler schedule matches the requested configuration.
 	 *
 	 * This is the single entry point for all recurring/cron/one-time scheduling
@@ -83,6 +88,10 @@ class RecurringScheduler {
 	 *                                            takes precedence over stagger.
 	 *                                            Default: time() + stagger offset.
 	 *     @type string      $group               AS group. Default self::GROUP.
+	 *     @type int|null    $distribution_window_seconds Explicit first-run distribution
+	 *                                            window for fleet recovery. Capped at
+	 *                                            24 hours. Ordinary scheduling ignores
+	 *                                            this and retains the one-hour stagger.
 	 *     @type bool        $force_reschedule    When true, replace existing matching
 	 *                                            pending actions. Default false.
 	 * }
@@ -175,12 +184,12 @@ class RecurringScheduler {
 					array( 'status' => 400 )
 				);
 			}
-			return self::scheduleCron( $hook, $args, $cron_expression, $group, ! empty( $options['force_reschedule'] ) );
+			return self::scheduleCron( $hook, $args, $cron_expression, $group, $options );
 		}
 
 		// Auto-detect cron expression passed as the interval value.
 		if ( self::looksLikeCronExpression( $interval ) ) {
-			return self::scheduleCron( $hook, $args, $interval, $group );
+			return self::scheduleCron( $hook, $args, $interval, $group, $options );
 		}
 
 		// Recurring by interval key (with alias resolution).
@@ -222,10 +231,18 @@ class RecurringScheduler {
 		if ( isset( $options['first_run_timestamp'] ) ) {
 			$first_run_time = (int) $options['first_run_timestamp'];
 		} else {
-			$stagger_seed   = (int) ( $options['stagger_seed'] ?? 0 );
-			$stagger_offset = $stagger_seed > 0
-				? self::calculateStaggerOffset( $stagger_seed, (int) $interval_seconds )
-				: 0;
+			$stagger_seed        = (int) ( $options['stagger_seed'] ?? 0 );
+			$distribution_window = min(
+				self::MAX_DISTRIBUTION_WINDOW_SECONDS,
+				max( 0, (int) ( $options['distribution_window_seconds'] ?? 0 ) )
+			);
+			if ( $stagger_seed > 0 && $distribution_window > 0 ) {
+				$stagger_offset = self::calculateDistributionOffset( $stagger_seed, $distribution_window );
+			} else {
+				$stagger_offset = $stagger_seed > 0
+					? self::calculateStaggerOffset( $stagger_seed, (int) $interval_seconds )
+					: 0;
+			}
 			$first_run_time = time() + $stagger_offset;
 		}
 		// Action Scheduler unique actions are keyed by hook and group, not args.
@@ -324,6 +341,48 @@ class RecurringScheduler {
 		}
 
 		return false !== as_next_scheduled_action( $hook, $args, $group );
+	}
+
+	/**
+	 * Check whether a pending or in-progress action covers a schedule slot.
+	 *
+	 * @param string $hook  Hook name.
+	 * @param array  $args  Action args (signature).
+	 * @param string $group AS group.
+	 * @return bool True when matching work is pending or currently running.
+	 */
+	public static function hasCoverage( string $hook, array $args, string $group = self::GROUP ): bool {
+		if ( ! function_exists( 'as_get_scheduled_actions' ) || ! self::isReady() ) {
+			return false;
+		}
+
+		foreach ( array( 'pending', 'in-progress' ) as $status ) {
+			$actions = as_get_scheduled_actions(
+				array(
+					'hook'     => $hook,
+					'args'     => $args,
+					'group'    => $group,
+					'status'   => $status,
+					'per_page' => 1,
+				),
+				'ids'
+			);
+
+			if ( ! empty( $actions ) ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * Check whether Action Scheduler can safely answer datastore queries.
+	 *
+	 * @return bool True when Action Scheduler is initialized.
+	 */
+	public static function isReady(): bool {
+		return self::isActionSchedulerDataStoreReady();
 	}
 
 	/**
@@ -538,6 +597,25 @@ class RecurringScheduler {
 	}
 
 	/**
+	 * Calculate an offset inside an explicit fleet distribution window.
+	 *
+	 * Unlike ordinary staggering, this is not bounded by recurrence interval;
+	 * callers opt into it only when recovering a fleet of missing schedules.
+	 *
+	 * @param int $seed           Stable schedule seed.
+	 * @param int $window_seconds Requested distribution window in seconds.
+	 * @return int Offset from zero up to the capped window.
+	 */
+	public static function calculateDistributionOffset( int $seed, int $window_seconds ): int {
+		$window_seconds = min( self::MAX_DISTRIBUTION_WINDOW_SECONDS, max( 0, $window_seconds ) );
+		if ( $window_seconds <= 0 ) {
+			return 0;
+		}
+
+		return absint( crc32( 'datamachine_distribution_' . $seed ) ) % $window_seconds;
+	}
+
+	/**
 	 * Validate a cron expression string.
 	 *
 	 * Uses Action Scheduler's bundled CronExpression library — no external
@@ -648,9 +726,11 @@ class RecurringScheduler {
 	 * @param array  $args            Action args.
 	 * @param string $cron_expression Cron expression.
 	 * @param string $group           AS group.
+	 * @param array  $options         Scheduling options.
 	 * @return array{interval:'cron',scheduled:true,cron_expression:string,first_run?:string|null,action_id?:int,preserved?:bool}|\WP_Error
 	 */
-	private static function scheduleCron( string $hook, array $args, string $cron_expression, string $group, bool $force_reschedule = false ) {
+	private static function scheduleCron( string $hook, array $args, string $cron_expression, string $group, array $options = array() ) {
+		$force_reschedule = ! empty( $options['force_reschedule'] );
 		if ( ! self::isValidCronExpression( $cron_expression ) ) {
 			return self::error(
 				'invalid_cron_expression',
@@ -687,7 +767,7 @@ class RecurringScheduler {
 			// single chain instead of preserving the duplicates.
 			if ( self::countMatchingPendingActions( $hook, $args, $group ) > 1 ) {
 				self::unschedule( $hook, $args, $group );
-				$action_id = as_schedule_cron_action( time(), $cron_expression, $hook, $args, $group, $unique );
+				$action_id = as_schedule_cron_action( self::cronStartTimestamp( $options ), $cron_expression, $hook, $args, $group, $unique );
 
 				if ( ! self::isScheduled( $hook, $args, $group ) ) {
 					return self::error(
@@ -718,7 +798,7 @@ class RecurringScheduler {
 			self::unschedule( $hook, $args, $group );
 		}
 
-		$action_id = as_schedule_cron_action( time(), $cron_expression, $hook, $args, $group, $unique );
+		$action_id = as_schedule_cron_action( self::cronStartTimestamp( $options ), $cron_expression, $hook, $args, $group, $unique );
 
 		if ( ! self::isScheduled( $hook, $args, $group ) ) {
 			return self::error(
@@ -744,5 +824,25 @@ class RecurringScheduler {
 			'first_run'       => $next_run,
 			'action_id'       => $action_id,
 		);
+	}
+
+	/**
+	 * Resolve a cron chain's initial timing without changing ordinary behavior.
+	 *
+	 * @param array $options Scheduling options.
+	 * @return int Cron schedule start timestamp.
+	 */
+	private static function cronStartTimestamp( array $options ): int {
+		if ( isset( $options['first_run_timestamp'] ) ) {
+			return (int) $options['first_run_timestamp'];
+		}
+
+		$seed   = (int) ( $options['stagger_seed'] ?? 0 );
+		$window = (int) ( $options['distribution_window_seconds'] ?? 0 );
+		if ( $seed > 0 && $window > 0 ) {
+			return time() + self::calculateDistributionOffset( $seed, $window );
+		}
+
+		return time();
 	}
 }
