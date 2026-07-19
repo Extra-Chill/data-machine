@@ -108,6 +108,12 @@ export interface CalendarRequest {
 	scope_token: string;
 }
 
+export interface FilterRequestContext {
+	event_search: string;
+	scope: string;
+	scope_token: string;
+}
+
 /* ------------------------------------------------------------------ */
 /*  REST API responses                                                 */
 /* ------------------------------------------------------------------ */

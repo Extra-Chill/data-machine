@@ -8,6 +8,7 @@ import type {
 	CalendarResponse,
 	DateContext,
 	FilterResponse,
+	FilterRequestContext,
 	GeoContext,
 	TaxFilters,
 } from '../types';
@@ -222,7 +223,9 @@ export async function fetchFilters(
 	activeFilters: TaxFilters = {},
 	dateContext: Partial< DateContext > = {},
 	archiveContext: Partial< ArchiveContext > = {},
-	geoContext: Partial< GeoContext > = {}
+	geoContext: Partial< GeoContext > = {},
+	requestContext: Partial< FilterRequestContext > = {},
+	signal?: AbortSignal
 ): Promise< FilterResponse > {
 	const params = new URLSearchParams();
 
@@ -260,10 +263,21 @@ export async function fetchFilters(
 		}
 	}
 
+	if ( requestContext.event_search ) {
+		params.set( 'event_search', requestContext.event_search );
+	}
+	if ( requestContext.scope ) {
+		params.set( 'scope', requestContext.scope );
+	}
+	if ( requestContext.scope_token ) {
+		params.set( 'scope_token', requestContext.scope_token );
+	}
+
 	const apiUrl = `/wp-json/datamachine/v1/events/filters?${ params.toString() }`;
 
 	const response = await fetch( apiUrl, {
 		method: 'GET',
+		signal,
 		headers: {
 			'Content-Type': 'application/json',
 			Accept: 'application/json',

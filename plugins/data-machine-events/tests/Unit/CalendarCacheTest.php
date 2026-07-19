@@ -292,4 +292,15 @@ class CalendarCacheTest extends WP_UnitTestCase {
 
 		wp_set_current_user( 0 );
 	}
+
+	public function test_scope_tokens_isolate_cache_keys_without_leaking_token_contents() {
+		$token = 'signed.private.scope.payload';
+		$key   = CalendarCache::generate_full_response_key( array( 'scope_token' => $token ) );
+
+		$this->assertNotSame(
+			CalendarCache::generate_full_response_key( array() ),
+			$key
+		);
+		$this->assertStringNotContainsString( $token, $key );
+	}
 }

@@ -240,6 +240,20 @@ function register_routes() {
 					'type'              => 'string',
 					'sanitize_callback' => 'sanitize_text_field',
 				),
+				'event_search'     => array(
+					'type'              => 'string',
+					'sanitize_callback' => 'sanitize_text_field',
+				),
+				'scope'            => array(
+					'type'              => 'string',
+					'sanitize_callback' => 'sanitize_key',
+				),
+				'scope_token'      => array(
+					'type'              => 'string',
+					'default'           => '',
+					'sanitize_callback' => 'sanitize_text_field',
+					'description'       => 'Opaque consumer-minted scope token passed through to the authoritative event query.',
+				),
 				'archive_taxonomy' => array(
 					'type'              => 'string',
 					'sanitize_callback' => 'sanitize_key',

@@ -17,8 +17,8 @@
 namespace DataMachineEvents\Abilities;
 
 use DataMachineEvents\Blocks\Calendar\Geo_Query;
+use DataMachineEvents\Blocks\Calendar\Query\ScopeResolver;
 use DataMachineEvents\Core\Event_Post_Type;
-use DataMachineEvents\Core\EventDatesTable;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -85,6 +85,18 @@ class FilterAbilities {
 							'context'          => array(
 								'type'        => 'string',
 								'description' => 'Filter context: modal, inline, badge (default: modal)',
+							),
+							'event_search'     => array(
+								'type'        => 'string',
+								'description' => 'Search query string',
+							),
+							'scope'            => array(
+								'type'        => 'string',
+								'description' => 'Time scope: today, tonight, this-weekend, this-week',
+							),
+							'scope_token'      => array(
+								'type'        => 'string',
+								'description' => 'Opaque consumer-minted scope token passed to the authoritative event query',
 							),
 						),
 					),
@@ -156,6 +168,19 @@ class FilterAbilities {
 			'date_end'   => $input['date_context']['date_end'] ?? '',
 			'past'       => $input['date_context']['past'] ?? '',
 		);
+
+		$scope          = sanitize_key( $input['scope'] ?? '' );
+		$scope_resolved = ScopeResolver::is_valid( $scope ) ? ScopeResolver::resolve( $scope ) : null;
+		$date_bounds    = ScopeResolver::intersect_date_bounds( array( $date_context, $scope_resolved ) );
+
+		$date_context['date_start'] = $date_bounds['date_start'];
+		$date_context['date_end']   = $date_bounds['date_end'];
+		$date_context['time_start'] = $scope_resolved && ( $scope_resolved['date_start'] ?? '' ) === $date_bounds['date_start']
+			? ( $scope_resolved['time_start'] ?? '' )
+			: '';
+		$date_context['time_end']   = $scope_resolved && ( $scope_resolved['date_end'] ?? '' ) === $date_bounds['date_end']
+			? ( $scope_resolved['time_end'] ?? '' )
+			: '';
 
 		// Build archive constraint.
 		$archive_taxonomy = sanitize_key( $input['archive_taxonomy'] ?? '' );
@@ -242,7 +267,18 @@ class FilterAbilities {
 			}
 		}
 
-		$taxonomies_data = $this->get_all_taxonomies_with_counts( $active_filters, $date_context, $tax_query_override );
+		$query_context = array(
+			'event_search' => sanitize_text_field( $input['event_search'] ?? '' ),
+			'scope_token'  => sanitize_text_field( $input['scope_token'] ?? '' ),
+			'geo'          => $geo_context['active'] ? array(
+				'lat'    => $geo_context['lat'],
+				'lng'    => $geo_context['lng'],
+				'radius' => $geo_context['radius'],
+				'unit'   => $geo_context['radius_unit'],
+			) : array(),
+		);
+
+		$taxonomies_data = $this->get_all_taxonomies_with_counts( $active_filters, $date_context, $tax_query_override, $query_context );
 
 		return array(
 			'success'         => true,
@@ -253,6 +289,8 @@ class FilterAbilities {
 				'context'        => $context,
 				'active_filters' => $active_filters,
 				'date_context'   => $date_context,
+				'event_search'   => $query_context['event_search'],
+				'scope'          => $scope,
 			),
 		);
 	}
@@ -263,9 +301,10 @@ class FilterAbilities {
 	 * @param array      $active_filters    Active filter selections keyed by taxonomy slug.
 	 * @param array      $date_context      Optional date filtering context (date_start, date_end, past).
 	 * @param array|null $tax_query_override Optional taxonomy query override.
+	 * @param array      $query_context     Search, geo, and opaque scope-token context.
 	 * @return array Structured taxonomy data with hierarchy and event counts.
 	 */
-	private function get_all_taxonomies_with_counts( $active_filters = array(), $date_context = array(), $tax_query_override = null ) {
+	private function get_all_taxonomies_with_counts( $active_filters = array(), $date_context = array(), $tax_query_override = null, $query_context = array() ) {
 		$taxonomies_data = array();
 
 		$taxonomies = get_object_taxonomies( Event_Post_Type::POST_TYPE, 'objects' );
@@ -281,7 +320,7 @@ class FilterAbilities {
 				continue;
 			}
 
-			$terms_hierarchy = $this->get_taxonomy_hierarchy( $taxonomy->name, null, $date_context, $active_filters, $tax_query_override );
+			$terms_hierarchy = $this->get_taxonomy_hierarchy( $taxonomy->name, null, $date_context, $active_filters, $tax_query_override, $query_context );
 
 			if ( ! empty( $terms_hierarchy ) ) {
 				$taxonomies_data[ $taxonomy->name ] = array(
@@ -304,9 +343,10 @@ class FilterAbilities {
 	 * @param array      $date_context    Optional date filtering context.
 	 * @param array      $active_filters  Optional active taxonomy filters for cross-filtering.
 	 * @param array|null $tax_query_override Optional taxonomy query override.
+	 * @param array      $query_context   Search, geo, and opaque scope-token context.
 	 * @return array Hierarchical term structure with event counts.
 	 */
-	private function get_taxonomy_hierarchy( $taxonomy_slug, $allowed_term_ids = null, $date_context = array(), $active_filters = array(), $tax_query_override = null ) {
+	private function get_taxonomy_hierarchy( $taxonomy_slug, $allowed_term_ids = null, $date_context = array(), $active_filters = array(), $tax_query_override = null, $query_context = array() ) {
 		$terms = get_terms(
 			array(
 				'taxonomy'   => $taxonomy_slug,
@@ -324,7 +364,7 @@ class FilterAbilities {
 			return array();
 		}
 
-		$term_counts = $this->get_batch_term_counts( $taxonomy_slug, $date_context, $active_filters, $tax_query_override );
+		$term_counts = $this->get_batch_term_counts( $taxonomy_slug, $date_context, $active_filters, $tax_query_override, $query_context );
 
 		$terms_with_events = array();
 		foreach ( $terms as $term ) {
@@ -364,123 +404,56 @@ class FilterAbilities {
 	}
 
 	/**
-	 * Get event counts for all terms in a taxonomy with a single query.
+	 * Get event counts for all terms in a taxonomy.
 	 *
-	 * Joins term_relationships → event_dates directly. The posts table is
-	 * NOT joined because event_dates already carries post_status (synced
-	 * on upsert) and only event-typed posts ever get rows in that table.
-	 * Filtering on ed.post_status = 'publish' eliminates stale/trashed
-	 * rows and guarantees the post_type constraint transitively.
+	 * Queries matching event IDs through EventDateQueryAbilities, the same
+	 * primitive used by calendar results, then tallies their terms.
 	 *
 	 * @param string     $taxonomy_slug     Taxonomy to count events for.
 	 * @param array      $date_context      Optional date filtering context.
 	 * @param array      $active_filters    Optional active taxonomy filters for cross-filtering.
 	 * @param array|null $tax_query_override Optional taxonomy query override.
+	 * @param array      $query_context     Search, geo, and opaque scope-token context.
 	 * @return array Term ID => event count mapping.
 	 */
-	private function get_batch_term_counts( $taxonomy_slug, $date_context = array(), $active_filters = array(), $tax_query_override = null ) {
-		global $wpdb;
-
-		$ed_table = EventDatesTable::table_name();
-
-		// Join event_dates directly onto tr.object_id — no posts table hop.
-		// event_dates.post_status is authoritative and already indexed.
-		$joins         = "INNER JOIN {$ed_table} ed ON tr.object_id = ed.post_id";
-		$where_clauses = " AND ed.post_status = 'publish'";
-		$params        = array( $taxonomy_slug );
-
-		if ( ! empty( $date_context ) ) {
-			$date_start       = $date_context['date_start'] ?? '';
-			$date_end         = $date_context['date_end'] ?? '';
-			$show_past        = ! empty( $date_context['past'] ) && '1' === $date_context['past'];
-			$current_datetime = current_time( 'mysql' );
-
-			if ( ! empty( $date_start ) && ! empty( $date_end ) ) {
-				$where_clauses .= ' AND (ed.start_datetime >= %s AND ed.start_datetime <= %s)';
-				$params[]       = $date_start . ' 00:00:00';
-				$params[]       = $date_end . ' 23:59:59';
-			} elseif ( $show_past ) {
-				$where_clauses .= ' AND (ed.start_datetime < %s AND (ed.end_datetime < %s OR ed.end_datetime IS NULL))';
-				$params[]       = $current_datetime;
-				$params[]       = $current_datetime;
-			} else {
-				$where_clauses .= ' AND (ed.start_datetime >= %s OR ed.end_datetime >= %s)';
-				$params[]       = $current_datetime;
-				$params[]       = $current_datetime;
+	private function get_batch_term_counts( $taxonomy_slug, $date_context = array(), $active_filters = array(), $tax_query_override = null, $query_context = array() ) {
+		$tax_filters = array_diff_key( $active_filters, array( $taxonomy_slug => true ) );
+		foreach ( (array) $tax_query_override as $clause ) {
+			$taxonomy = sanitize_key( $clause['taxonomy'] ?? '' );
+			$terms    = array_map( 'absint', (array) ( $clause['terms'] ?? array() ) );
+			if ( $taxonomy && $terms ) {
+				$tax_filters[ $taxonomy ] = $terms;
 			}
 		}
 
-		if ( ! empty( $tax_query_override ) && is_array( $tax_query_override ) ) {
-			$base_join_index = 0;
-			foreach ( $tax_query_override as $clause ) {
-				$base_taxonomy = sanitize_key( $clause['taxonomy'] ?? '' );
-				$base_terms    = array_map( 'absint', (array) ( $clause['terms'] ?? array() ) );
-
-				if ( ! $base_taxonomy || empty( $base_terms ) ) {
-					continue;
-				}
-
-				$placeholders = implode( ',', array_fill( 0, count( $base_terms ), '%d' ) );
-				$alias_tr     = "base_tr_{$base_join_index}";
-				$alias_tt     = "base_tt_{$base_join_index}";
-
-				$joins .= " INNER JOIN {$wpdb->term_relationships} {$alias_tr} ON tr.object_id = {$alias_tr}.object_id";
-				$joins .= " INNER JOIN {$wpdb->term_taxonomy} {$alias_tt} ON {$alias_tr}.term_taxonomy_id = {$alias_tt}.term_taxonomy_id";
-
-				// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-				$where_clauses .= " AND {$alias_tt}.taxonomy = %s AND {$alias_tt}.term_id IN ($placeholders)";
-				$params[]       = $base_taxonomy;
-				$params         = array_merge( $params, $base_terms );
-
-				++$base_join_index;
-			}
-		}
-
-		// Cross-taxonomy filtering (exclude current taxonomy from cross-filter).
-		$cross_filters = array_diff_key( $active_filters, array( $taxonomy_slug => true ) );
-		$join_index    = 0;
-		foreach ( $cross_filters as $filter_taxonomy => $term_ids ) {
-			if ( empty( $term_ids ) ) {
-				continue;
-			}
-
-			$term_ids     = array_map( 'intval', (array) $term_ids );
-			$placeholders = implode( ',', array_fill( 0, count( $term_ids ), '%d' ) );
-
-			$alias_tr = "cross_tr_{$join_index}";
-			$alias_tt = "cross_tt_{$join_index}";
-
-			$joins .= " INNER JOIN {$wpdb->term_relationships} {$alias_tr} ON tr.object_id = {$alias_tr}.object_id";
-			$joins .= " INNER JOIN {$wpdb->term_taxonomy} {$alias_tt} ON {$alias_tr}.term_taxonomy_id = {$alias_tt}.term_taxonomy_id";
-
-			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-			$where_clauses .= " AND {$alias_tt}.taxonomy = %s AND {$alias_tt}.term_id IN ($placeholders)";
-			$params[]       = $filter_taxonomy;
-			$params         = array_merge( $params, $term_ids );
-
-			++$join_index;
-		}
-
-		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Join and where fragments contain generated aliases and placeholders; values are passed separately to prepare().
-		$query = $wpdb->prepare(
-			"SELECT tt.term_id, COUNT(DISTINCT tr.object_id) as event_count
-            FROM {$wpdb->term_relationships} tr
-            INNER JOIN {$wpdb->term_taxonomy} tt
-                ON tr.term_taxonomy_id = tt.term_taxonomy_id
-            {$joins}
-            WHERE tt.taxonomy = %s
-            {$where_clauses}
-            GROUP BY tt.term_id",
-			$params
+		$query_input = array(
+			'scope'       => ! empty( $date_context['past'] ) && '1' === $date_context['past'] ? 'past' : 'upcoming',
+			'date_start'  => $date_context['date_start'] ?? '',
+			'date_end'    => $date_context['date_end'] ?? '',
+			'time_start'  => $date_context['time_start'] ?? '',
+			'time_end'    => $date_context['time_end'] ?? '',
+			'tax_filters' => $tax_filters,
+			'search'      => $query_context['event_search'] ?? '',
+			'geo'         => $query_context['geo'] ?? array(),
+			'scope_token' => $query_context['scope_token'] ?? '',
+			'fields'      => 'ids',
+			'per_page'    => -1,
 		);
-		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 
-		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-		$results = $wpdb->get_results( $query );
+		$result   = ( new EventDateQueryAbilities() )->executeQueryEvents( $query_input );
+		$post_ids = array_map( 'absint', $result['posts'] );
+		$counts   = array();
+		if ( empty( $post_ids ) ) {
+			return $counts;
+		}
 
-		$counts = array();
-		foreach ( $results as $row ) {
-			$counts[ (int) $row->term_id ] = (int) $row->event_count;
+		$terms = wp_get_object_terms( $post_ids, $taxonomy_slug, array( 'fields' => 'all_with_object_id' ) );
+		if ( is_wp_error( $terms ) ) {
+			return $counts;
+		}
+		foreach ( $terms as $term ) {
+			$term_id            = (int) $term->term_id;
+			$counts[ $term_id ] = ( $counts[ $term_id ] ?? 0 ) + 1;
 		}
 
 		return $counts;

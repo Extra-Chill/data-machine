@@ -145,6 +145,39 @@ class ScopeResolver {
 	}
 
 	/**
+	 * Intersect inclusive date windows, preserving one-sided constraints.
+	 *
+	 * An empty intersection intentionally returns a lower bound after the upper
+	 * bound so the canonical event-date query returns zero rows.
+	 *
+	 * @param array $windows Date windows with optional date_start/date_end keys.
+	 * @return array{date_start:string,date_end:string}
+	 */
+	public static function intersect_date_bounds( array $windows ): array {
+		$starts = array();
+		$ends   = array();
+
+		foreach ( $windows as $window ) {
+			if ( ! is_array( $window ) ) {
+				continue;
+			}
+			$start = (string) ( $window['date_start'] ?? '' );
+			$end   = (string) ( $window['date_end'] ?? '' );
+			if ( '' !== $start ) {
+				$starts[] = $start;
+			}
+			if ( '' !== $end ) {
+				$ends[] = $end;
+			}
+		}
+
+		return array(
+			'date_start' => $starts ? max( $starts ) : '',
+			'date_end'   => $ends ? min( $ends ) : '',
+		);
+	}
+
+	/**
 	 * Resolve the raw datetime bounds for one nightlife display day.
 	 *
 	 * When late-night bucketing is enabled, the display day starts at the

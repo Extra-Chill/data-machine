@@ -11,6 +11,8 @@ import type {
 	ArchiveContext,
 	DateContext,
 	FlatTaxonomyTerm,
+	FilterRequestContext,
+	GeoContext,
 	TaxFilters,
 	TaxonomyData,
 	TaxonomyTerm,
@@ -29,6 +31,8 @@ interface ModalElement extends HTMLElement {
 	_applyBtn?: HTMLElement;
 	_resetHandler?: () => void;
 	_resetBtn?: HTMLElement;
+	_filterAbortController?: AbortController;
+	_filterRequestGeneration?: number;
 }
 
 export function initFilterModal(
@@ -72,6 +76,7 @@ export function initFilterModal(
 	);
 
 	const closeModal = function (): void {
+		cancelFilterRequest( modal );
 		modal.classList.remove( 'data-machine-modal-active' );
 		document.body.classList.remove( 'data-machine-modal-active' );
 		if ( filterBtn ) {
@@ -87,11 +92,21 @@ export function initFilterModal(
 		document.body.classList.add( 'data-machine-modal-active' );
 		filterBtn?.setAttribute( 'aria-expanded', 'true' );
 
+		const params = filterState.buildParams();
+		const urlParams = new URLSearchParams( window.location.search );
 		await loadFilters(
 			modal,
 			filterState.getTaxFilters(),
 			filterState.getDateContext(),
-			archiveContext
+			archiveContext,
+			filterState.getGeoContext(),
+			{
+				event_search:
+					params.get( 'event_search' ) ||
+					filterState.getSearchQuery(),
+				scope: params.get( 'scope' ) || urlParams.get( 'scope' ) || '',
+				scope_token: calendar.dataset.scopeToken || '',
+			}
 		);
 	};
 
@@ -193,6 +208,8 @@ export function destroyFilterModal( calendar: HTMLElement ): void {
 		return;
 	}
 
+	cancelFilterRequest( modal );
+
 	const filterBtn = calendar.querySelector< HTMLElement >(
 		'.data-machine-taxonomy-filter-btn, .data-machine-taxonomy-modal-trigger, .data-machine-events-filter-btn'
 	);
@@ -244,6 +261,8 @@ export function destroyFilterModal( calendar: HTMLElement ): void {
 	delete modal._applyBtn;
 	delete modal._resetHandler;
 	delete modal._resetBtn;
+	delete modal._filterAbortController;
+	delete modal._filterRequestGeneration;
 
 	modal.dataset.dmListenersAttached = 'false';
 }
@@ -266,10 +285,12 @@ function getArchiveContextFromModal(
 }
 
 async function loadFilters(
-	modal: HTMLElement,
+	modal: ModalElement,
 	activeFilters: TaxFilters = {},
 	dateContext: Partial< DateContext > = {},
-	archiveContext: Partial< ArchiveContext > = {}
+	archiveContext: Partial< ArchiveContext > = {},
+	geoContext: Partial< GeoContext > = {},
+	requestContext: Partial< FilterRequestContext > = {}
 ): Promise< void > {
 	const container = modal.querySelector< HTMLElement >(
 		'.data-machine-filter-taxonomies'
@@ -282,37 +303,98 @@ async function loadFilters(
 		return;
 	}
 
+	modal._filterAbortController?.abort();
+	const controller = new AbortController();
+	const generation = ( modal._filterRequestGeneration ?? 0 ) + 1;
+	modal._filterAbortController = controller;
+	modal._filterRequestGeneration = generation;
+
 	if ( loading ) {
 		loading.style.display = 'flex';
 	}
-	container.innerHTML = '';
 
 	try {
 		const data = await fetchFilters(
 			activeFilters,
 			dateContext,
-			archiveContext
+			archiveContext,
+			geoContext,
+			requestContext,
+			controller.signal
 		);
+		if ( generation !== modal._filterRequestGeneration ) {
+			return;
+		}
 
 		if ( ! data.success ) {
 			throw new Error( 'API returned unsuccessful response' );
 		}
 
+		container.innerHTML = '';
 		renderTaxonomies(
 			container,
 			data.taxonomies,
 			activeFilters,
 			data.archive_context || {}
 		);
-		attachFilterChangeListeners( modal, dateContext, archiveContext );
-	} catch {
-		container.innerHTML =
-			'<div class="data-machine-filter-error"><p>Error loading filters. Please try again.</p></div>';
+		attachFilterChangeListeners(
+			modal,
+			dateContext,
+			archiveContext,
+			geoContext,
+			requestContext
+		);
+	} catch ( error ) {
+		if (
+			generation !== modal._filterRequestGeneration ||
+			( error as Error ).name === 'AbortError'
+		) {
+			return;
+		}
+		renderFilterError( container, () => {
+			void loadFilters(
+				modal,
+				activeFilters,
+				dateContext,
+				archiveContext,
+				geoContext,
+				requestContext
+			);
+		} );
 	} finally {
-		if ( loading ) {
+		if ( generation === modal._filterRequestGeneration && loading ) {
 			loading.style.display = 'none';
 		}
 	}
+}
+
+function cancelFilterRequest( modal: ModalElement ): void {
+	modal._filterAbortController?.abort();
+	modal._filterAbortController = undefined;
+	modal._filterRequestGeneration = ( modal._filterRequestGeneration ?? 0 ) + 1;
+	const loading = modal.querySelector< HTMLElement >(
+		'.data-machine-filter-loading'
+	);
+	if ( loading ) {
+		loading.style.display = 'none';
+	}
+}
+
+function renderFilterError(
+	container: HTMLElement,
+	onRetry: () => void
+): void {
+	container.querySelector( '.data-machine-filter-error' )?.remove();
+	const error = document.createElement( 'div' );
+	error.className = 'data-machine-filter-error';
+	error.innerHTML = '<p>Could not refresh filters. Previous options are still available.</p>';
+	const retry = document.createElement( 'button' );
+	retry.type = 'button';
+	retry.className = 'data-machine-filter-retry';
+	retry.textContent = 'Try again';
+	retry.addEventListener( 'click', onRetry, { once: true } );
+	error.appendChild( retry );
+	container.appendChild( error );
 }
 
 function renderTaxonomies(
@@ -429,9 +511,11 @@ function flattenHierarchy(
 }
 
 function attachFilterChangeListeners(
-	modal: HTMLElement,
+	modal: ModalElement,
 	dateContext: Partial< DateContext > = {},
-	archiveContext: Partial< ArchiveContext > = {}
+	archiveContext: Partial< ArchiveContext > = {},
+	geoContext: Partial< GeoContext > = {},
+	requestContext: Partial< FilterRequestContext > = {}
 ): void {
 	const checkboxes = modal.querySelectorAll< HTMLInputElement >(
 		'input[type="checkbox"]:not([data-locked="true"])'
@@ -444,7 +528,9 @@ function attachFilterChangeListeners(
 				modal,
 				activeFilters,
 				dateContext,
-				archiveContext
+				archiveContext,
+				geoContext,
+				requestContext
 			);
 		} );
 	} );

@@ -53,6 +53,9 @@ class Filters {
 				'geo_lng'          => $request->get_param( 'lng' ) ?? '',
 				'geo_radius'       => $request->get_param( 'radius' ) ?? 25,
 				'geo_radius_unit'  => $request->get_param( 'radius_unit' ) ?? 'mi',
+				'event_search'     => $request->get_param( 'event_search' ) ?? '',
+				'scope'            => $request->get_param( 'scope' ) ?? '',
+				'scope_token'      => $request->get_param( 'scope_token' ) ?? '',
 			)
 		);
 

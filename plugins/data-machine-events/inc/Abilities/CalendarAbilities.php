@@ -183,7 +183,7 @@ class CalendarAbilities {
 
 		$scope          = $input['scope'] ?? '';
 		$scope_resolved = $scope ? ScopeResolver::resolve( $scope ) : null;
-		$date_bounds    = self::intersect_date_bounds(
+		$date_bounds    = ScopeResolver::intersect_date_bounds(
 			array(
 				array(
 					'date_start' => $user_date_start,
@@ -193,12 +193,13 @@ class CalendarAbilities {
 				$scope_resolved,
 			)
 		);
-		$user_date_start   = $date_bounds['date_start'];
-		$user_date_end     = $date_bounds['date_end'];
-		$scope_time_start  = $scope_resolved && $user_date_start === ( $scope_resolved['date_start'] ?? '' )
+
+		$user_date_start  = $date_bounds['date_start'];
+		$user_date_end    = $date_bounds['date_end'];
+		$scope_time_start = $scope_resolved && ( $scope_resolved['date_start'] ?? '' ) === $user_date_start
 			? ( $scope_resolved['time_start'] ?? '' )
 			: '';
-		$scope_time_end   = $scope_resolved && $user_date_end === ( $scope_resolved['date_end'] ?? '' )
+		$scope_time_end   = $scope_resolved && ( $scope_resolved['date_end'] ?? '' ) === $user_date_end
 			? ( $scope_resolved['time_end'] ?? '' )
 			: '';
 
@@ -233,6 +234,7 @@ class CalendarAbilities {
 			'geo_lng'            => $input['geo_lng'] ?? '',
 			'geo_radius'         => $input['geo_radius'] ?? 25,
 			'geo_radius_unit'    => $input['geo_radius_unit'] ?? 'mi',
+			'scope_token'        => sanitize_text_field( $input['scope_token'] ?? '' ),
 		);
 
 		$date_data         = self::get_unique_event_dates( $base_params );
@@ -345,6 +347,7 @@ class CalendarAbilities {
 			'search'      => $query_params['search_query'],
 			'order'       => $query_params['show_past'] ? 'DESC' : 'ASC',
 			'per_page'    => 500, // Safety cap — prevents loading 17K+ posts when date boundaries are empty.
+			'scope_token' => $query_params['scope_token'] ?? '',
 		);
 
 		// Date range overrides scope.
@@ -469,39 +472,6 @@ class CalendarAbilities {
 		wp_reset_postdata();
 
 		return $result;
-	}
-
-	/**
-	 * Intersect inclusive date windows, preserving one-sided constraints.
-	 *
-	 * An empty intersection intentionally returns a lower bound after the upper
-	 * bound; the canonical event-date query then returns zero rows.
-	 *
-	 * @param array $windows Date windows with optional date_start/date_end keys.
-	 * @return array{date_start:string,date_end:string}
-	 */
-	private static function intersect_date_bounds( array $windows ): array {
-		$starts = array();
-		$ends   = array();
-
-		foreach ( $windows as $window ) {
-			if ( ! is_array( $window ) ) {
-				continue;
-			}
-			$start = (string) ( $window['date_start'] ?? '' );
-			$end   = (string) ( $window['date_end'] ?? '' );
-			if ( '' !== $start ) {
-				$starts[] = $start;
-			}
-			if ( '' !== $end ) {
-				$ends[] = $end;
-			}
-		}
-
-		return array(
-			'date_start' => $starts ? max( $starts ) : '',
-			'date_end'   => $ends ? min( $ends ) : '',
-		);
 	}
 
 	/**
