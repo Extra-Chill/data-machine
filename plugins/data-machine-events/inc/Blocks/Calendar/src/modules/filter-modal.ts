@@ -130,7 +130,6 @@ export function initFilterModal(
 
 	const resetHandler = function (): void {
 		filterState.clearStorage();
-		window.history.pushState( {}, '', window.location.pathname );
 
 		const checkboxes = modal.querySelectorAll< HTMLInputElement >(
 			'input[type="checkbox"]:checked'

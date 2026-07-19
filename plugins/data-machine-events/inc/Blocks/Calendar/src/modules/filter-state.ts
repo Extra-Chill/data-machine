@@ -203,6 +203,11 @@ class FilterStateManager {
 			if ( scopeSlug && scopeSlug !== 'current' ) {
 				params.set( 'scope', scopeSlug );
 			}
+		} else {
+			const defaultScope = this.calendar.dataset.scope || '';
+			if ( defaultScope && defaultScope !== 'current' ) {
+				params.set( 'scope', defaultScope );
+			}
 		}
 
 		if ( datePicker?.selectedDates?.length && datePicker.selectedDates.length > 0 ) {
@@ -274,6 +279,86 @@ class FilterStateManager {
 		}
 
 		return params;
+	}
+
+	/**
+	 * Apply shareable URL state back to controls after history navigation.
+	 */
+	applyParams(
+		params: URLSearchParams,
+		datePicker: FlatpickrInstance | null = null
+	): void {
+		const searchInput = this.calendar.querySelector< HTMLInputElement >(
+			'.data-machine-events-search-input'
+		);
+		if ( searchInput ) {
+			searchInput.value = params.get( 'event_search' ) || '';
+		}
+
+		const scope = params.get( 'scope' ) || '';
+		this.calendar
+			.querySelectorAll< HTMLButtonElement >(
+				'.data-machine-events-scope-chip[data-scope]'
+			)
+			.forEach( ( chip ) => {
+				const active = ( chip.dataset.scope || '' ) === scope;
+				chip.classList.toggle(
+					'data-machine-events-scope-chip-active',
+					active
+				);
+				chip.setAttribute( 'aria-pressed', active ? 'true' : 'false' );
+			} );
+
+		const selectedTerms = new Set< string >();
+		for ( const [ key, value ] of params.entries() ) {
+			const match = key.match( /^tax_filter\[([^\]]+)\]\[(?:\d+)?\]$/ );
+			if ( match ) {
+				selectedTerms.add( `${ match[ 1 ] }:${ value }` );
+			}
+		}
+		this.calendar
+			.querySelectorAll< HTMLInputElement >(
+				'input[type="checkbox"][data-taxonomy]'
+			)
+			.forEach( ( checkbox ) => {
+				if ( checkbox.dataset.locked !== 'true' ) {
+					checkbox.checked = selectedTerms.has(
+						`${ checkbox.dataset.taxonomy }:${ checkbox.value }`
+					);
+				}
+			} );
+
+		if ( datePicker ) {
+			const start = params.get( 'date_start' );
+			const end = params.get( 'date_end' );
+			datePicker.setDate(
+				start ? ( end ? [ start, end ] : start ) : [],
+				false
+			);
+			this.calendar
+				.querySelector( '.data-machine-events-date-clear-btn' )
+				?.classList.toggle( 'visible', Boolean( start ) );
+		}
+
+		const locationInput = this.calendar.querySelector< HTMLInputElement >(
+			'.data-machine-events-location-search'
+		);
+		if ( locationInput ) {
+			const lat = params.get( 'lat' ) || '';
+			const lng = params.get( 'lng' ) || '';
+			locationInput.dataset.geoLat = lat;
+			locationInput.dataset.geoLng = lng;
+			locationInput.value = lat && lng ? `${ lat }, ${ lng }` : '';
+		}
+
+		const radiusSelect = this.calendar.querySelector< HTMLSelectElement >(
+			'.data-machine-events-radius-select'
+		);
+		if ( radiusSelect && params.get( 'radius' ) ) {
+			radiusSelect.value = params.get( 'radius' )!;
+			radiusSelect.dataset.radiusUnit =
+				params.get( 'radius_unit' ) || 'mi';
+		}
 	}
 
 	/**

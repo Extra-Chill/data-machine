@@ -147,6 +147,21 @@ class EventRestControllerTest extends WP_UnitTestCase {
 		$this->assertIsArray( $data );
 	}
 
+	public function test_calendar_data_response_uses_canonical_empty_state(): void {
+		$request = new WP_REST_Request( 'GET', '/datamachine/v1/events/calendar' );
+		$request->set_header( 'X-Requested-With', 'XMLHttpRequest' );
+		$request->set_param( 'format', 'data' );
+		$request->set_param( 'month', '2999-12' );
+		$response = $this->server->dispatch( $request );
+		$data     = $response->get_data();
+
+		$this->assertSame( 200, $response->get_status() );
+		$this->assertSame( 3, $data['schema']['version'] );
+		$this->assertSame( array(), $data['grouping']['ordered_dates'] );
+		$this->assertStringContainsString( 'data-machine-events-no-events', $data['empty_html'] );
+		$this->assertStringContainsString( 'data-machine-events-no-events-today-link', $data['empty_html'] );
+	}
+
 	public function test_filters_endpoint_returns_taxonomies() {
 		$request  = new WP_REST_Request( 'GET', '/datamachine/v1/events/filters' );
 		$response = $this->server->dispatch( $request );

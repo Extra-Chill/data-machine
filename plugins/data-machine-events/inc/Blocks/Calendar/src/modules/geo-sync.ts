@@ -38,6 +38,7 @@ interface BoundsChangedDetail {
 interface GeoSyncState {
 	handler: ( e: Event ) => void;
 	currentGeo: GeoContext | null;
+	onGridUpdate?: ( geo: GeoContext ) => Promise< boolean >;
 }
 
 const instances = new WeakMap< HTMLElement, GeoSyncState >();
@@ -48,7 +49,10 @@ const instances = new WeakMap< HTMLElement, GeoSyncState >();
  * Listens for map bounds-changed events and re-fetches the calendar
  * via REST, updating the DOM in-place.
  */
-export function initGeoSync( calendar: HTMLElement ): void {
+export function initGeoSync(
+	calendar: HTMLElement,
+	onGridUpdate?: ( geo: GeoContext ) => Promise< boolean >
+): void {
 	if ( instances.has( calendar ) ) {
 		return;
 	}
@@ -56,6 +60,7 @@ export function initGeoSync( calendar: HTMLElement ): void {
 	const state: GeoSyncState = {
 		handler: createBoundsHandler( calendar ),
 		currentGeo: null,
+		onGridUpdate,
 	};
 
 	instances.set( calendar, state );
@@ -103,7 +108,7 @@ export function updateCalendarGeo(
 		state.currentGeo = geo;
 	}
 
-	fetchAndUpdate( calendar, geo );
+	void fetchAndUpdate( calendar, geo );
 }
 
 /* ------------------------------------------------------------------ */
@@ -139,7 +144,7 @@ function createBoundsHandler(
 				state.currentGeo = geo;
 			}
 
-			fetchAndUpdate( calendar, geo );
+			void fetchAndUpdate( calendar, geo );
 		}, 300 );
 	};
 }
@@ -152,6 +157,20 @@ async function fetchAndUpdate(
 	geo: GeoContext
 ): Promise< void > {
 	const filterState = getFilterState( calendar );
+	const state = instances.get( calendar );
+	if ( state?.onGridUpdate ) {
+		const updated = await state.onGridUpdate( geo );
+		if ( updated ) {
+			filterState.saveGeoToStorage( {
+				lat: geo.lat,
+				lng: geo.lng,
+				radius: geo.radius,
+				radius_unit: geo.radius_unit,
+				label: '',
+			} );
+		}
+		return;
+	}
 	const archiveContext = filterState.getArchiveContext();
 
 	// Build via the shared helper so passthrough stays consistent with
@@ -227,5 +246,4 @@ function boundsToRadius(
 	// Clamp to reasonable range.
 	return Math.max( 1, Math.min( 500, Math.round( distance ) ) );
 }
-
 

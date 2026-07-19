@@ -135,7 +135,7 @@ export interface CalendarResponse {
 /** Identifies the schema version + phase the server returned. */
 export interface CalendarDataSchemaMeta {
 	name: 'calendar-data';
-	version: 1;
+	version: 3;
 	phase: 1;
 	issue: 298;
 }
@@ -298,6 +298,7 @@ export interface CalendarDataResponse {
 	pagination: CalendarDataPagination;
 	counter: CalendarDataCounter;
 	navigation: CalendarDataNavigation;
+	empty_html: string;
 }
 
 export interface FilterResponse {
@@ -342,6 +343,10 @@ export interface EventPlaceholderData {
 export interface FlatpickrInstance {
 	selectedDates: Date[];
 	clear: () => void;
+	setDate: (
+		date: string | string[] | Date | Date[],
+		triggerChange?: boolean
+	) => void;
 	destroy: () => void;
 }
 

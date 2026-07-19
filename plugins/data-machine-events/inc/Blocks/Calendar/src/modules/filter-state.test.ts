@@ -114,4 +114,76 @@ describe( 'stored calendar filters', () => {
 		).toBe( false );
 		expect( navigate ).not.toHaveBeenCalled();
 	} );
+
+	it( 'applies popstate parameters back to every filter control', () => {
+		document.body.innerHTML = `
+			<div class="data-machine-events-calendar" data-filter-persistence="1">
+				<input class="data-machine-events-search-input" value="old">
+				<button class="data-machine-events-scope-chip data-machine-events-scope-chip-active" data-scope="" aria-pressed="true"></button>
+				<button class="data-machine-events-scope-chip" data-scope="tonight" aria-pressed="false"></button>
+				<input type="checkbox" data-taxonomy="venue" value="42">
+				<input class="data-machine-events-location-search" data-geo-lat="1" data-geo-lng="2" value="Old place">
+				<select class="data-machine-events-radius-select" data-radius-unit="mi"><option value="25">25</option><option value="50">50</option></select>
+			</div>`;
+		calendar = document.querySelector< HTMLElement >(
+			'.data-machine-events-calendar'
+		)!;
+		const picker = {
+			selectedDates: [],
+			clear: jest.fn(),
+			setDate: jest.fn(),
+			destroy: jest.fn(),
+		};
+		const params = new URLSearchParams(
+			'event_search=new&scope=tonight&date_start=2026-08-10&date_end=2026-08-12&tax_filter%5Bvenue%5D%5B%5D=42&lat=32.78&lng=-79.93&radius=50&radius_unit=mi'
+		);
+
+		getFilterState( calendar ).applyParams( params, picker );
+		const tonightChip = calendar.querySelector< HTMLButtonElement >(
+			'[data-scope="tonight"]'
+		)!;
+		const venueCheckbox = calendar.querySelector< HTMLInputElement >(
+			'[data-taxonomy="venue"]'
+		)!;
+
+		expect(
+			calendar.querySelector< HTMLInputElement >(
+				'.data-machine-events-search-input'
+			)!.value
+		).toBe( 'new' );
+		expect( tonightChip.getAttribute( 'aria-pressed' ) ).toBe( 'true' );
+		expect( venueCheckbox.checked ).toBe( true );
+		expect( picker.setDate ).toHaveBeenCalledWith(
+			[ '2026-08-10', '2026-08-12' ],
+			false
+		);
+		expect(
+			calendar.querySelector< HTMLInputElement >(
+				'.data-machine-events-location-search'
+			)!.dataset.geoLat
+		).toBe( '32.78' );
+		expect(
+			calendar.querySelector< HTMLSelectElement >(
+				'.data-machine-events-radius-select'
+			)!.value
+		).toBe( '50' );
+	} );
+
+	it( 'preserves the server default scope when no scope chips exist', () => {
+		calendar.dataset.scope = 'tonight';
+
+		expect( getFilterState( calendar ).buildParams().get( 'scope' ) ).toBe(
+			'tonight'
+		);
+	} );
+
+	it( 'allows an active All chip to clear the server default scope', () => {
+		calendar.dataset.scope = 'tonight';
+		calendar.innerHTML =
+			'<button class="data-machine-events-scope-chip data-machine-events-scope-chip-active" data-scope=""></button>';
+
+		expect( getFilterState( calendar ).buildParams().has( 'scope' ) ).toBe(
+			false
+		);
+	} );
 } );

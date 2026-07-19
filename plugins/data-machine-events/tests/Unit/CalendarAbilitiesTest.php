@@ -99,4 +99,60 @@ class CalendarAbilitiesTest extends WP_UnitTestCase {
 		$this->assertSame( 1, $result['event_count'] );
 		$this->assertSame( $past_id, $result['paged_date_groups'][0]['events'][0]['post_id'] );
 	}
+
+	public function test_month_intersects_explicit_date_range(): void {
+		$month_start = new DateTimeImmutable( 'first day of +2 months 00:00:00' );
+		$outside     = $month_start->modify( '+4 days' );
+		$inside      = $month_start->modify( '+9 days' );
+		$this->seed_event( 'Outside explicit range', $outside->format( 'Y-m-d 20:00:00' ), $outside->format( 'Y-m-d 22:00:00' ) );
+		$inside_id = $this->seed_event( 'Inside explicit range', $inside->format( 'Y-m-d 20:00:00' ), $inside->format( 'Y-m-d 22:00:00' ) );
+
+		$result = $this->abilities->executeGetCalendarPage(
+			array(
+				'month'        => $month_start->format( 'Y-m' ),
+				'date_start'   => $inside->format( 'Y-m-d' ),
+				'date_end'     => $inside->format( 'Y-m-d' ),
+				'include_html' => false,
+			)
+		);
+
+		$this->assertSame( 1, $result['event_count'] );
+		$this->assertSame( $inside->format( 'Y-m-d' ), $result['date_boundaries']['start_date'] );
+		$this->assertSame( $inside->format( 'Y-m-d' ), $result['date_boundaries']['end_date'] );
+		$this->assertSame( $inside_id, $result['paged_date_groups'][0]['events'][0]['post_id'] );
+	}
+
+	public function test_month_intersects_resolved_scope_and_can_be_empty(): void {
+		$today         = new DateTimeImmutable( current_time( 'Y-m-d' ) . ' 12:00:00' );
+		$tomorrow      = $today->modify( '+1 day' );
+		$today_id      = $this->seed_event( 'Today scoped event', $today->format( 'Y-m-d 12:00:00' ), $today->format( 'Y-m-d 14:00:00' ) );
+		$future_id     = $this->seed_event( 'Tomorrow unscoped event', $tomorrow->format( 'Y-m-d 12:00:00' ), $tomorrow->format( 'Y-m-d 14:00:00' ) );
+		$current_month = $today->format( 'Y-m' );
+
+		$scoped = $this->abilities->executeGetCalendarPage(
+			array(
+				'month'        => $current_month,
+				'scope'        => 'today',
+				'date_start'   => $today->format( 'Y-m-d' ),
+				'date_end'     => $today->format( 'Y-m-d' ),
+				'include_html' => false,
+			)
+		);
+		$scoped_ids = array_column( $scoped['paged_date_groups'][0]['events'], 'post_id' );
+		$this->assertSame( $today->format( 'Y-m-d' ), $scoped['date_boundaries']['start_date'] );
+		$this->assertSame( $today->format( 'Y-m-d' ), $scoped['date_boundaries']['end_date'] );
+		$this->assertContains( $today_id, $scoped_ids );
+		$this->assertNotContains( $future_id, $scoped_ids );
+
+		$empty = $this->abilities->executeGetCalendarPage(
+			array(
+				'month'        => $today->modify( '+2 months' )->format( 'Y-m' ),
+				'scope'        => 'today',
+				'include_html' => false,
+			)
+		);
+		$this->assertSame( 0, $empty['event_count'] );
+		$this->assertSame( array(), $empty['paged_date_groups'] );
+		$this->assertGreaterThan( $empty['date_boundaries']['end_date'], $empty['date_boundaries']['start_date'] );
+	}
 }

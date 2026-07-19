@@ -13,7 +13,7 @@
  */
 
 import { buildCalendarRequest } from './api-client';
-import { renderMonthGrid } from './month-grid-renderer';
+import { renderMonthGridResponse } from './month-grid-response-renderer';
 
 import type {
 	ArchiveContext,
@@ -24,14 +24,25 @@ import type {
 const controllers = new WeakMap< HTMLElement, MonthGridController >();
 
 class MonthGridController {
-	constructor( private readonly calendar: HTMLElement ) {}
+	private requestSequence = 0;
+	private readonly initialMonth: string;
+
+	constructor(
+		private readonly calendar: HTMLElement,
+		private readonly onPopState?: ( params: URLSearchParams ) => void
+	) {
+		this.initialMonth = this.getCurrentMonth();
+	}
 
 	init(): void {
 		this.bindNavLinks();
+		window.addEventListener( 'popstate', this.handlePopState );
 	}
 
 	destroy(): void {
 		this.unbindNavLinks();
+		window.removeEventListener( 'popstate', this.handlePopState );
+		this.requestSequence++;
 	}
 
 	private getCurrentMonth(): string {
@@ -82,25 +93,54 @@ class MonthGridController {
 		void this.navigateToMonth( month );
 	};
 
+	private readonly handlePopState = (): void => {
+		const params = new URLSearchParams( window.location.search );
+		this.onPopState?.( params );
+		const month = params.get( 'month' );
+		void this.navigateToMonth(
+			month && /^\d{4}-\d{2}$/.test( month )
+				? month
+				: this.initialMonth,
+			params,
+			false
+		);
+	};
+
 	/**
 	 * Public entry point called by frontend.ts when a filter changes
 	 * in grid mode.
 	 */
-	async handleFilterChange(): Promise< void > {
-		await this.navigateToMonth( this.getCurrentMonth() );
+	async handleFilterChange( params: URLSearchParams ): Promise< boolean > {
+		return this.navigateToMonth(
+			this.getCurrentMonth(),
+			params,
+			true,
+			true
+		);
 	}
 
 	/**
 	 * Public entry point for callers that want to jump to a specific
 	 * month (kept narrow so future external callers can re-use it).
 	 */
-	async navigateToMonth( month: string ): Promise< void > {
+	async navigateToMonth(
+		month: string,
+		source: URLSearchParams = new URLSearchParams( window.location.search ),
+		pushHistory = true,
+		syncGeoState = false
+	): Promise< boolean > {
+		const requestId = ++this.requestSequence;
+		const publicParams = this.buildPublicParams( source, month );
 		const archiveContext = this.readArchiveContext();
-		const geoContext = this.readGeoContext();
+		const geoContext = this.readGeoContext(
+			publicParams,
+			pushHistory && ! syncGeoState
+		);
 
 		const params = buildCalendarRequest( {
 			archiveContext,
 			geoContext,
+			source: publicParams,
 			overrides: {
 				// `format=data` activates the data-only REST envelope
 				// (phase 1 of #298). Grid mode is the first consumer.
@@ -157,34 +197,27 @@ class MonthGridController {
 			if ( ! data?.success ) {
 				throw new Error( 'Calendar response not successful' );
 			}
-
-			const baseUrl = this.buildBaseUrl();
-			const newGrid = renderMonthGrid( month, data, baseUrl );
-
-			if ( grid ) {
-				grid.replaceWith( newGrid );
-			} else {
-				// First-time mount — append after the filter bar.
-				const filterBar = this.calendar.querySelector(
-					'.data-machine-events-filter-bar'
-				);
-				if ( filterBar?.parentElement ) {
-					filterBar.parentElement.insertBefore(
-						newGrid,
-						filterBar.nextSibling
-					);
-				} else {
-					this.calendar.prepend( newGrid );
-				}
+			if ( requestId !== this.requestSequence ) {
+				return false;
 			}
+
+			const baseUrl = this.buildBaseUrl( publicParams );
+			renderMonthGridResponse(
+				this.calendar,
+				month,
+				data,
+				baseUrl,
+				publicParams
+			);
 
 			// Sync URL via pushState so prev/next history works and the
 			// month is shareable. Preserve all other query params.
-			const url = new URL( window.location.href );
-			url.searchParams.set( 'month', month );
-			url.searchParams.delete( 'paged' );
-			url.searchParams.delete( 'past' );
-			window.history.pushState( null, '', url.toString() );
+			if ( pushHistory ) {
+				this.pushUrl( publicParams );
+			}
+			if ( syncGeoState ) {
+				this.syncGeoState( publicParams );
+			}
 
 			this.calendar.dispatchEvent(
 				new CustomEvent( 'data-machine-month-grid-updated', {
@@ -192,25 +225,84 @@ class MonthGridController {
 					detail: { month },
 				} )
 			);
+			return true;
 		} catch ( error ) {
-			console.error( 'Month-grid fetch failed:', error );
+			if ( requestId === this.requestSequence ) {
+				console.error( 'Month-grid fetch failed:', error );
+			}
+			return false;
 		} finally {
-			const refreshedGrid = this.calendar.querySelector(
-				'.data-machine-month-grid'
-			);
-			refreshedGrid?.classList.remove( 'is-loading' );
+			if ( requestId === this.requestSequence ) {
+				const refreshedGrid = this.calendar.querySelector(
+					'.data-machine-month-grid'
+				);
+				refreshedGrid?.classList.remove( 'is-loading' );
+			}
 		}
+	}
+
+	private buildPublicParams(
+		source: URLSearchParams,
+		month: string
+	): URLSearchParams {
+		const params = new URLSearchParams( source );
+		const hasScopeControls = Boolean(
+			this.calendar.querySelector(
+				'.data-machine-events-scope-chip[data-scope]'
+			)
+		);
+		if ( ! params.has( 'scope' ) && ! hasScopeControls ) {
+			const defaultScope = this.calendar.dataset.scope || '';
+			if ( defaultScope && defaultScope !== 'current' ) {
+				params.set( 'scope', defaultScope );
+			}
+		}
+		[
+			'format',
+			'archive_taxonomy',
+			'archive_term_id',
+			'scope_token',
+			'paged',
+			'past',
+		].forEach( ( key ) => params.delete( key ) );
+		params.set( 'month', month );
+		return params;
+	}
+
+	private pushUrl( params: URLSearchParams ): void {
+		const url = new URL( window.location.href );
+		url.search = params.toString();
+		const current = `${ window.location.pathname }${ window.location.search }${ window.location.hash }`;
+		const next = `${ url.pathname }${ url.search }${ url.hash }`;
+		if ( next !== current ) {
+			window.history.pushState( null, '', next );
+		}
+	}
+
+	private syncGeoState( params: URLSearchParams ): void {
+		const geoAttributes = {
+			geoLat: params.get( 'lat' ) || '',
+			geoLng: params.get( 'lng' ) || '',
+			geoRadius: params.get( 'radius' ) || '',
+			geoRadiusUnit: params.get( 'radius_unit' ) || '',
+		};
+		Object.entries( geoAttributes ).forEach( ( [ key, value ] ) => {
+			if ( value ) {
+				this.calendar.dataset[ key ] = value;
+			} else {
+				delete this.calendar.dataset[ key ];
+			}
+		} );
 	}
 
 	/**
 	 * Base URL used by the renderer for prev/next/today hrefs.
 	 * Preserves every URL param except `month`/`paged`/`past`.
 	 */
-	private buildBaseUrl(): string {
+	private buildBaseUrl( params: URLSearchParams ): string {
 		const url = new URL( window.location.href );
+		url.search = params.toString();
 		url.searchParams.delete( 'month' );
-		url.searchParams.delete( 'paged' );
-		url.searchParams.delete( 'past' );
 		return `${ url.pathname }${
 			url.searchParams.toString() ? '?' + url.searchParams.toString() : ''
 		}`;
@@ -236,7 +328,28 @@ class MonthGridController {
 		return this.calendar.getAttribute( 'data-scope-token' ) ?? '';
 	}
 
-	private readGeoContext(): Partial< GeoContext > {
+	private readGeoContext(
+		params: URLSearchParams,
+		allowDomFallback: boolean
+	): Partial< GeoContext > {
+		const urlLat = params.get( 'lat' );
+		const urlLng = params.get( 'lng' );
+		if ( urlLat && urlLng ) {
+			const radius = params.get( 'radius' );
+			const radiusUnit = params.get( 'radius_unit' );
+			return {
+				lat: urlLat,
+				lng: urlLng,
+				radius: radius ? Number( radius ) : undefined,
+				radius_unit:
+					radiusUnit === 'mi' || radiusUnit === 'km'
+						? radiusUnit
+						: undefined,
+			};
+		}
+		if ( ! allowDomFallback ) {
+			return {};
+		}
 		const lat = this.calendar.getAttribute( 'data-geo-lat' );
 		const lng = this.calendar.getAttribute( 'data-geo-lng' );
 		if ( ! lat || ! lng ) {
@@ -256,11 +369,14 @@ class MonthGridController {
 	}
 }
 
-export function initMonthGridNav( calendar: HTMLElement ): void {
+export function initMonthGridNav(
+	calendar: HTMLElement,
+	onPopState?: ( params: URLSearchParams ) => void
+): void {
 	if ( controllers.has( calendar ) ) {
 		return;
 	}
-	const controller = new MonthGridController( calendar );
+	const controller = new MonthGridController( calendar, onPopState );
 	controllers.set( calendar, controller );
 	controller.init();
 }

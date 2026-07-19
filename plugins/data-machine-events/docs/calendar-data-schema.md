@@ -5,7 +5,8 @@ Status: **phase 1 of the refactor in [Extra-Chill/data-machine-events#298](https
 The canonical calendar REST response remains the legacy HTML-string envelope
 returned by `/wp-json/datamachine/v1/events/calendar`. This document describes
 the **opt-in** data-only envelope introduced in phase 1: a server-rendered
-JSON shape with **zero HTML strings**, intended to become the canonical
+JSON shape with structured event data and one canonical server-rendered
+empty-state recovery fragment, intended to become the canonical
 contract once the consumers in `inc/Blocks/Calendar/src/` are ported in
 subsequent phases.
 
@@ -42,7 +43,7 @@ full-response cache key (`CalendarCache::generate_full_response_key()`).
   "success": true,
   "schema": {
     "name": "calendar-data",
-    "version": 2,
+    "version": 3,
     "phase": 1,
     "issue": 298
   },
@@ -74,14 +75,15 @@ full-response cache key (`CalendarCache::generate_full_response_key()`).
     "future_count": 834,
     "has_past":     true,
     "has_future":   true
-  }
+  },
+  "empty_html": ""
 }
 ```
 
 ### `schema`
 
 Identifies the schema for forward compatibility. Clients should check
-`schema.name === 'calendar-data'` and `schema.version === 2` before
+`schema.name === 'calendar-data'` and `schema.version === 3` before
 reading the rest. Future phases bump `phase`; backward-incompatible
 shape changes bump `version`.
 
@@ -98,6 +100,10 @@ time / date / unicode formatting in JavaScript, making
 (PHP template, lazy-render hydration, and the client event renderer).
 This closed the badge- and time-format drift bugs where client-rendered
 (Load More) cards diverged from server-rendered ones.
+
+**v3 ([#465](https://github.com/Extra-Chill/data-machine-events/issues/465)):** empty
+responses carry `empty_html`, rendered from the existing `no-events.php`
+template. Non-empty responses carry an empty string.
 
 ### `events`
 
@@ -212,12 +218,15 @@ Clients should render these verbatim and must **not** re-derive time,
 date, or unicode formatting locally — doing so reintroduces the
 server/client drift this block exists to eliminate.
 
-### `pagination`, `counter`, `navigation`
+### `pagination`, `counter`, `navigation`, `empty_html`
 
-Pure metadata — no HTML strings. Field meanings mirror the legacy
+Pagination, counter, and navigation are pure metadata. Field meanings mirror the legacy
 envelope's metadata fields (`pagination.current_page`,
 `navigation.past_count`, etc.), with the HTML-rendering fields
 (`pagination.html`, `counter` as string, `navigation.html`) removed.
+`empty_html` is empty for non-empty results. For an empty result it contains
+the translated output of the canonical `no-events.php` template, including
+the existing Today recovery control, so clients do not duplicate that copy.
 
 ## What this phase does NOT change
 

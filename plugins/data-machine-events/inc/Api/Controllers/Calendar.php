@@ -22,7 +22,8 @@
  * - `?format=data`: the structured data-only envelope introduced in
  *   phase 1 of refactor #298. Returns event objects, pagination /
  *   counter / navigation metadata, gap map, and a `by_date` grouping
- *   index — zero HTML strings. See `docs/calendar-data-schema.md`.
+ *   index. Empty results include the canonical server-rendered recovery
+ *   fragment. See `docs/calendar-data-schema.md`.
  *
  * Both envelopes are cached independently via
  * `CalendarCache::generate_full_response_key()`, which includes
@@ -38,8 +39,10 @@ use DataMachineEvents\Abilities\CalendarAbilities;
 use DataMachineEvents\Api\BrowserNavigationGuard;
 use DataMachineEvents\Blocks\Calendar\Cache\CalendarCache;
 use DataMachineEvents\Blocks\Calendar\Display\DisplayVars;
+use DataMachineEvents\Blocks\Calendar\Display\EventRenderer;
 use DataMachineEvents\Blocks\Calendar\Query\CalendarRequest;
 use DataMachineEvents\Blocks\Calendar\Taxonomy\Badges;
+use DataMachineEvents\Blocks\Calendar\Template_Loader;
 
 /**
  * Calendar API controller
@@ -55,8 +58,9 @@ class Calendar {
 	 * envelope to the newer client (and vice-versa) for the cache TTL window.
 	 *
 	 * v2 (#381): per-occurrence `display` block added to `grouping.by_date`.
+	 * v3 (#465): canonical server-rendered empty-state fragment added.
 	 */
-	const DATA_SCHEMA_VERSION = 2;
+	const DATA_SCHEMA_VERSION = 3;
 
 	/**
 	 * Calendar endpoint implementation
@@ -161,13 +165,13 @@ class Calendar {
 	 * Build the data-only response envelope (phase 1 of refactor #298).
 	 *
 	 * Returns structured event objects, pagination / counter / navigation
-	 * metadata, gap map, and a `by_date` grouping index. NO HTML strings.
+	 * metadata, gap map, and a `by_date` grouping index. The only HTML is the
+	 * canonical no-events recovery fragment when the result is empty.
 	 *
-	 * Performance note: this path NEVER calls `ob_start()` or any template
-	 * loader. `CalendarAbilities::executeGetCalendarPage()` was already
-	 * invoked with `include_html: false`, so the ability skipped its
-	 * `renderHtml()` branch entirely. The work here is pure array
-	 * restructuring on top of `paged_date_groups`.
+	 * Performance note: non-empty responses never call a template loader.
+	 * `CalendarAbilities::executeGetCalendarPage()` was invoked with
+	 * `include_html: false`, so the ability skipped its full `renderHtml()`
+	 * branch. Empty responses render only the canonical recovery fragment.
 	 *
 	 * Schema: see `docs/calendar-data-schema.md`.
 	 *
@@ -240,6 +244,11 @@ class Calendar {
 		}
 
 		$events = array_values( $events_by_id );
+		$empty_html = '';
+		if ( empty( $ordered_dates ) ) {
+			Template_Loader::init();
+			$empty_html = EventRenderer::render_date_groups( array() );
+		}
 
 		$show_past = $req->past();
 
@@ -281,6 +290,7 @@ class Calendar {
 				'has_past'     => (int) ( $result['event_counts']['past'] ?? 0 ) > 0,
 				'has_future'   => (int) ( $result['event_counts']['future'] ?? 0 ) > 0,
 			),
+			'empty_html' => $empty_html,
 		);
 	}
 

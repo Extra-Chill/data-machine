@@ -54,8 +54,8 @@ const CALENDAR_PASSTHROUGH_KEYS: ( keyof CalendarRequest )[] = [
  * fetches but got dropped by geo-sync re-fetches).
  *
  * Order of operations:
- *   1. Passthrough every canonical calendar param from
- *      `window.location.search` (one source of truth).
+ *   1. Passthrough every canonical calendar param from the explicit
+ *      `source`, or `window.location.search` by default.
  *   2. Passthrough every `tax_filter[*]` entry from the URL.
  *   3. Apply `archiveContext` (sets `archive_taxonomy` /
  *      `archive_term_id` if both present).
@@ -71,13 +71,18 @@ const CALENDAR_PASSTHROUGH_KEYS: ( keyof CalendarRequest )[] = [
  * the returned object — the helper intentionally does not encode
  * deletion semantics so the override semantics stay simple.
  */
-export function buildCalendarRequest( opts: {
-	archiveContext?: Partial< ArchiveContext >;
-	geoContext?: Partial< GeoContext >;
-	overrides?: Partial< CalendarRequest >;
-} = {} ): URLSearchParams {
+export function buildCalendarRequest(
+	opts: {
+		archiveContext?: Partial< ArchiveContext >;
+		geoContext?: Partial< GeoContext >;
+		overrides?: Partial< CalendarRequest >;
+		source?: URLSearchParams;
+	} = {}
+): URLSearchParams {
 	const params = new URLSearchParams();
-	const urlParams = new URLSearchParams( window.location.search );
+	const urlParams = opts.source
+		? new URLSearchParams( opts.source )
+		: new URLSearchParams( window.location.search );
 
 	// 1. Canonical passthrough.
 	CALENDAR_PASSTHROUGH_KEYS.forEach( ( key ) => {

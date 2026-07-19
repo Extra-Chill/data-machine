@@ -92,7 +92,7 @@ class CalendarAbilities {
 							),
 							'scope'            => array(
 								'type'        => 'string',
-								'description' => 'Time scope: today, tonight, this-weekend, this-week (overrides date_start/date_end when set)',
+								'description' => 'Time scope: today, tonight, this-weekend, this-week (intersects date_start/date_end and month when set)',
 							),
 							'month'            => array(
 								'type'        => 'string',
@@ -167,38 +167,40 @@ class CalendarAbilities {
 		$user_date_end   = $input['date_end'] ?? '';
 		$tax_filters     = is_array( $input['tax_filter'] ?? null ) ? $input['tax_filter'] : array();
 
-		// #318: month-grid mode short-circuits scope/paged semantics. When
-		// a `YYYY-MM` month is supplied, expand it to first-of-month →
-		// last-of-month and flip `show_past` on so past dates within the
-		// month are included (grid mode displays both past and future
-		// inside one window — the locked-design decision is "no past/
-		// upcoming toggle in grid; users navigate months freely"). The
-		// existing user_date_range branch downstream collapses pagination
-		// to a single page automatically.
+		// Month-grid displays past and future dates inside one visible month.
+		// Month, explicit date, and resolved scope windows are independent
+		// constraints, so compose them by intersection instead of allowing one
+		// input to overwrite another.
 		$month_input = '';
 		if ( isset( $input['month'] ) && is_string( $input['month'] ) ) {
 			$month_input = self::normalize_month_input( $input['month'] );
 		}
-		if ( '' !== $month_input ) {
-			$month_bounds = self::month_to_date_bounds( $month_input );
-			if ( $month_bounds ) {
-				$user_date_start = $month_bounds['date_start'];
-				$user_date_end   = $month_bounds['date_end'];
-				$show_past       = true; // Include past dates that fall inside the visible month.
-				$current_page    = 1;
-			}
+		$month_bounds = '' !== $month_input ? self::month_to_date_bounds( $month_input ) : null;
+		if ( $month_bounds ) {
+			$show_past    = true;
+			$current_page = 1;
 		}
 
-		// Resolve scope to date boundaries when user hasn't set explicit dates.
 		$scope          = $input['scope'] ?? '';
-		$scope_resolved = null;
-		if ( $scope && empty( $user_date_start ) && empty( $user_date_end ) ) {
-			$scope_resolved = ScopeResolver::resolve( $scope );
-			if ( $scope_resolved ) {
-				$user_date_start = $scope_resolved['date_start'];
-				$user_date_end   = $scope_resolved['date_end'];
-			}
-		}
+		$scope_resolved = $scope ? ScopeResolver::resolve( $scope ) : null;
+		$date_bounds    = self::intersect_date_bounds(
+			array(
+				array(
+					'date_start' => $user_date_start,
+					'date_end'   => $user_date_end,
+				),
+				$month_bounds,
+				$scope_resolved,
+			)
+		);
+		$user_date_start   = $date_bounds['date_start'];
+		$user_date_end     = $date_bounds['date_end'];
+		$scope_time_start  = $scope_resolved && $user_date_start === ( $scope_resolved['date_start'] ?? '' )
+			? ( $scope_resolved['time_start'] ?? '' )
+			: '';
+		$scope_time_end   = $scope_resolved && $user_date_end === ( $scope_resolved['date_end'] ?? '' )
+			? ( $scope_resolved['time_end'] ?? '' )
+			: '';
 
 		$archive_taxonomy = sanitize_key( $input['archive_taxonomy'] ?? '' );
 		$archive_term_id  = absint( $input['archive_term_id'] ?? 0 );
@@ -219,8 +221,8 @@ class CalendarAbilities {
 			'search_query'       => $search_query,
 			'date_start'         => $user_date_start,
 			'date_end'           => $user_date_end,
-			'time_start'         => $scope_resolved['time_start'] ?? '',
-			'time_end'           => $scope_resolved['time_end'] ?? '',
+			'time_start'         => $scope_time_start,
+			'time_end'           => $scope_time_end,
 			'tax_filters'        => $tax_filters,
 			'tax_query_override' => $tax_query_override,
 			'archive_taxonomy'   => $archive_taxonomy,
@@ -467,6 +469,39 @@ class CalendarAbilities {
 		wp_reset_postdata();
 
 		return $result;
+	}
+
+	/**
+	 * Intersect inclusive date windows, preserving one-sided constraints.
+	 *
+	 * An empty intersection intentionally returns a lower bound after the upper
+	 * bound; the canonical event-date query then returns zero rows.
+	 *
+	 * @param array $windows Date windows with optional date_start/date_end keys.
+	 * @return array{date_start:string,date_end:string}
+	 */
+	private static function intersect_date_bounds( array $windows ): array {
+		$starts = array();
+		$ends   = array();
+
+		foreach ( $windows as $window ) {
+			if ( ! is_array( $window ) ) {
+				continue;
+			}
+			$start = (string) ( $window['date_start'] ?? '' );
+			$end   = (string) ( $window['date_end'] ?? '' );
+			if ( '' !== $start ) {
+				$starts[] = $start;
+			}
+			if ( '' !== $end ) {
+				$ends[] = $end;
+			}
+		}
+
+		return array(
+			'date_start' => $starts ? max( $starts ) : '',
+			'date_end'   => $ends ? min( $ends ) : '',
+		);
 	}
 
 	/**
