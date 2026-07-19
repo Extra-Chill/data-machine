@@ -303,8 +303,16 @@ $scope_token_value     = $request->scopeToken();
 if ( '' !== $scope_token_value ) {
 	$scope_token_data_attr = sprintf( ' data-scope-token="%s"', esc_attr( $scope_token_value ) );
 }
+
+// Stored taxonomy preferences are only safe for an interactive, unscoped
+// calendar. Consumer-scoped embeds own their query and must not inherit a
+// network-wide browser preference.
+$filter_persistence_enabled = ( $attributes['showFilters'] ?? true )
+	&& ( $attributes['showSearch'] ?? true )
+	&& '' === $scope_token_value;
+$filter_persistence_attr    = sprintf( ' data-filter-persistence="%d"', $filter_persistence_enabled ? 1 : 0 );
 ?>
-<div data-instance-id="<?php echo esc_attr( $instance_id ); ?>"<?php echo $archive_data_attrs; ?><?php echo $geo_data_attrs; ?><?php echo $scope_data_attr; ?><?php echo $scope_token_data_attr; ?><?php echo $display_mode_attr; ?> <?php echo $wrapper_attributes; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Attribute fragments are escaped when assembled; wrapper attributes come from WordPress core. ?>>
+<div data-instance-id="<?php echo esc_attr( $instance_id ); ?>"<?php echo $archive_data_attrs; ?><?php echo $geo_data_attrs; ?><?php echo $scope_data_attr; ?><?php echo $scope_token_data_attr; ?><?php echo $filter_persistence_attr; ?><?php echo $display_mode_attr; ?> <?php echo $wrapper_attributes; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Attribute fragments are escaped when assembled; wrapper attributes come from WordPress core. ?>>
 	<?php
 	\DataMachineEvents\Blocks\Calendar\Template_Loader::include_template(
 		'filter-bar',

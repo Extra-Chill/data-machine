@@ -2,6 +2,14 @@
  * Carousel overflow detection, indicators, and chevron navigation.
  */
 
+/**
+ * WordPress dependencies
+ */
+import { __ } from '@wordpress/i18n';
+
+/**
+ * Internal dependencies
+ */
 import type { CarouselObserverEntry } from '../types';
 
 const observers = new Map< HTMLElement, CarouselObserverEntry[] >();
@@ -34,9 +42,65 @@ export function initCarousel( calendar: HTMLElement ): void {
 		);
 
 		let indicators: HTMLElement | null = null;
-		let chevronLeft: HTMLElement | null = null;
-		let chevronRight: HTMLElement | null = null;
+		let chevronLeft: HTMLButtonElement | null = null;
+		let chevronRight: HTMLButtonElement | null = null;
 		let scrollHandler: ( () => void ) | null = null;
+		let holdInterval: ReturnType< typeof setInterval > | null = null;
+
+		const scrollByCard = function ( direction: number ): void {
+			const cardWidth =
+				events[ 0 ]?.getBoundingClientRect().width || 300;
+			wrapper.scrollBy( {
+				left: cardWidth * direction,
+				behavior: 'smooth',
+			} );
+		};
+
+		const startHold = function ( direction: number ): void {
+			scrollByCard( direction );
+			holdInterval = setInterval( function () {
+				scrollByCard( direction );
+			}, 300 );
+		};
+
+		const stopHold = function (): void {
+			if ( holdInterval ) {
+				clearInterval( holdInterval );
+				holdInterval = null;
+			}
+		};
+
+		const bindChevron = function (
+			chevron: HTMLButtonElement,
+			direction: number
+		): void {
+			chevron.addEventListener( 'click', function ( event ) {
+				event.preventDefault();
+				// Pointer/touch already moved one card on press. Native keyboard
+				// and assistive clicks have detail 0 and need activation here.
+				if ( event.detail === 0 ) {
+					scrollByCard( direction );
+				}
+			} );
+
+			chevron.addEventListener( 'mousedown', function () {
+				startHold( direction );
+			} );
+			chevron.addEventListener(
+				'touchstart',
+				function ( event ) {
+					event.preventDefault();
+					startHold( direction );
+				},
+				{ passive: false }
+			);
+
+			( [ 'mouseup', 'mouseleave', 'touchend', 'touchcancel' ] as const ).forEach(
+				function ( event ) {
+					chevron.addEventListener( event, stopHold );
+				}
+			);
+		};
 
 		const updateIndicators = function (): void {
 			if ( ! indicators ) {
@@ -190,6 +254,12 @@ export function initCarousel( calendar: HTMLElement ): void {
 				wrapper.scrollWidth - 5;
 			chevronLeft?.classList.toggle( 'hidden', atStart );
 			chevronRight?.classList.toggle( 'hidden', atEnd );
+			if ( chevronLeft ) {
+				chevronLeft.disabled = atStart;
+			}
+			if ( chevronRight ) {
+				chevronRight.disabled = atEnd;
+			}
 		};
 
 		const setupIndicators = function (): void {
@@ -199,10 +269,10 @@ export function initCarousel( calendar: HTMLElement ): void {
 			indicators = group.querySelector< HTMLElement >(
 				'.data-machine-carousel-indicators'
 			);
-			chevronLeft = group.querySelector< HTMLElement >(
+			chevronLeft = group.querySelector< HTMLButtonElement >(
 				'.data-machine-carousel-chevron-left'
 			);
-			chevronRight = group.querySelector< HTMLElement >(
+			chevronRight = group.querySelector< HTMLButtonElement >(
 				'.data-machine-carousel-chevron-right'
 			);
 
@@ -264,101 +334,32 @@ export function initCarousel( calendar: HTMLElement ): void {
 			}
 
 			if ( ! chevronLeft ) {
-				chevronLeft = document.createElement( 'span' );
+				chevronLeft = document.createElement( 'button' );
+				chevronLeft.type = 'button';
 				chevronLeft.className =
 					'data-machine-carousel-chevron data-machine-carousel-chevron-left';
+				chevronLeft.setAttribute(
+					'aria-label',
+					__( 'Show previous events', 'data-machine-events' )
+				);
 				chevronLeft.textContent = '\u2039';
 				group.appendChild( chevronLeft );
+				bindChevron( chevronLeft, -1 );
 			}
 
 			if ( ! chevronRight ) {
-				chevronRight = document.createElement( 'span' );
+				chevronRight = document.createElement( 'button' );
+				chevronRight.type = 'button';
 				chevronRight.className =
 					'data-machine-carousel-chevron data-machine-carousel-chevron-right';
+				chevronRight.setAttribute(
+					'aria-label',
+					__( 'Show next events', 'data-machine-events' )
+				);
 				chevronRight.textContent = '\u203A';
 				group.appendChild( chevronRight );
+				bindChevron( chevronRight, 1 );
 			}
-
-			// Chevron click/hold navigation
-			let holdInterval: ReturnType< typeof setInterval > | null =
-				null;
-
-			const scrollByCard = function ( direction: number ): void {
-				const cardWidth =
-					events[ 0 ]?.getBoundingClientRect().width || 300;
-				wrapper.scrollBy( {
-					left: cardWidth * direction,
-					behavior: 'smooth',
-				} );
-			};
-
-			const startHold = function ( direction: number ): void {
-				scrollByCard( direction );
-				holdInterval = setInterval( function () {
-					scrollByCard( direction );
-				}, 300 );
-			};
-
-			const stopHold = function (): void {
-				if ( holdInterval ) {
-					clearInterval( holdInterval );
-					holdInterval = null;
-				}
-			};
-
-			// Click handlers
-			chevronLeft.addEventListener( 'click', function ( e ) {
-				e.preventDefault();
-				if ( ! holdInterval ) {
-					scrollByCard( -1 );
-				}
-			} );
-			chevronRight!.addEventListener( 'click', function ( e ) {
-				e.preventDefault();
-				if ( ! holdInterval ) {
-					scrollByCard( 1 );
-				}
-			} );
-
-			// Hold handlers (mouse)
-			chevronLeft.addEventListener( 'mousedown', function () {
-				startHold( -1 );
-			} );
-			chevronRight!.addEventListener( 'mousedown', function () {
-				startHold( 1 );
-			} );
-
-			// Hold handlers (touch)
-			chevronLeft.addEventListener(
-				'touchstart',
-				function ( e ) {
-					e.preventDefault();
-					startHold( -1 );
-				},
-				{ passive: false }
-			);
-			chevronRight!.addEventListener(
-				'touchstart',
-				function ( e ) {
-					e.preventDefault();
-					startHold( 1 );
-				},
-				{ passive: false }
-			);
-
-			// Stop handlers
-			( [ 'mouseup', 'mouseleave' ] as const ).forEach(
-				function ( event ) {
-					chevronLeft!.addEventListener( event, stopHold );
-					chevronRight!.addEventListener( event, stopHold );
-				}
-			);
-			( [ 'touchend', 'touchcancel' ] as const ).forEach(
-				function ( event ) {
-					chevronLeft!.addEventListener( event, stopHold );
-					chevronRight!.addEventListener( event, stopHold );
-				}
-			);
 
 			if ( ! scrollHandler ) {
 				scrollHandler = updateIndicators;

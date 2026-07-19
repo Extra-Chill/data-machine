@@ -173,6 +173,22 @@ class CalendarBlockTest extends WP_UnitTestCase {
 		$_GET = $original_get;
 	}
 
+	public function test_filter_persistence_is_limited_to_interactive_unscoped_calendars() {
+		$interactive_html = $this->render_calendar();
+		$disabled_html    = $this->render_calendar( array( 'showFilters' => false ) );
+
+		$scope_filter = static function () {
+			return 'signed-consumer-scope';
+		};
+		add_filter( 'data_machine_events_calendar_scope_token', $scope_filter );
+		$scoped_html = $this->render_calendar();
+		remove_filter( 'data_machine_events_calendar_scope_token', $scope_filter );
+
+		$this->assertStringContainsString( 'data-filter-persistence="1"', $interactive_html );
+		$this->assertStringContainsString( 'data-filter-persistence="0"', $disabled_html );
+		$this->assertStringContainsString( 'data-filter-persistence="0"', $scoped_html );
+	}
+
 	public function test_calendar_renders_no_events_state() {
 		// Create a mock render with no events
 		$block_registry = \WP_Block_Type_Registry::get_instance();

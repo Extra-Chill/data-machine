@@ -74,7 +74,9 @@ function initCalendarInstance( calendar: HTMLElement ): void {
 
 	const filterState = getFilterState( calendar );
 
-	filterState.restoreFromStorage();
+	if ( filterState.restoreFromStorage() ) {
+		return;
+	}
 
 	const gridMode = isMonthGridMode( calendar );
 
