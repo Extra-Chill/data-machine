@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.164.2] - 2026-07-19
+
+### Fixed
+- reconcile missing recurring flow actions
+
 ## [0.164.1] - 2026-07-13
 
 ### Fixed
