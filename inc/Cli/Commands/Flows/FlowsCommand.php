@@ -42,7 +42,7 @@ class FlowsCommand extends BaseCommand {
 	 * ## OPTIONS
 	 *
 	 * [<args>...]
-	 * : Subcommand and arguments. Accepts: list [pipeline_id], get <flow_id>, run <flow_id>, create, delete <flow_id>, update <flow_id>.
+	 * : Subcommand and arguments. Accepts: list [pipeline_id], get <flow_id>, run <flow_id>, create, delete <flow_id>, update <flow_id>, reconcile-schedules.
 	 *
 	 * [--handler=<slug>]
 	 * : Filter flows using this handler slug (any step that uses this handler).
@@ -161,6 +161,12 @@ class FlowsCommand extends BaseCommand {
 	 *   set-user-message, handler-config) and prints a "[dry-run] would update
 	 *   ..." preview while making ZERO database writes.
 	 *
+	 * [--apply]
+	 * : Repair missing schedules for reconcile-schedules. Without this flag the command is a dry-run.
+	 *
+	 * [--spread-hours=<hours>]
+	 * : Explicit first-run distribution window for reconcile-schedules (1-24).
+	 *
 	 * [--pipeline=<id>]
 	 * : Pipeline ID for pause/resume scoping.
 	 *
@@ -269,12 +275,21 @@ class FlowsCommand extends BaseCommand {
  *     wp datamachine flows reassign --from-agent=1 --to-agent=events-bot
  *
  *     # Dry-run reassign
- *     wp datamachine flows reassign --where-null --to-agent=events-bot --dry-run
+	 *     wp datamachine flows reassign --where-null --to-agent=events-bot --dry-run
+	 *
+	 *     # Audit or repair recurring schedule coverage
+	 *     wp datamachine flows reconcile-schedules --format=json
+	 *     wp datamachine flows reconcile-schedules --apply --spread-hours=24
  *
 	 */
 	public function __invoke( array $args, array $assoc_args ): void {
 		$flow_id     = null;
 		$pipeline_id = null;
+
+		if ( ! empty( $args ) && 'reconcile-schedules' === $args[0] ) {
+			$this->reconcileSchedules( $assoc_args );
+			return;
+		}
 
 		// Handle 'create' subcommand: `flows create --pipeline_id=3 --name="Test"`.
 		if ( ! empty( $args ) && 'create' === $args[0] ) {
@@ -501,6 +516,74 @@ class FlowsCommand extends BaseCommand {
 		$this->format_items( $items, $this->default_fields, $assoc_args, 'id' );
 		$this->output_pagination( $offset, count( $flows ), $total, $format, 'flows' );
 		$this->outputFilters( $result['filters_applied'] ?? array(), $format );
+	}
+
+	/**
+	 * Audit and optionally repair recurring flow schedule coverage.
+	 *
+	 * @param array $assoc_args WP-CLI arguments.
+	 * @return void
+	 */
+	private function reconcileSchedules( array $assoc_args ): void {
+		$format = (string) ( $assoc_args['format'] ?? 'table' );
+		if ( ! in_array( $format, array( 'table', 'json' ), true ) ) {
+			WP_CLI::error( 'reconcile-schedules supports --format=table or --format=json.' );
+			return;
+		}
+
+		$spread_hours = isset( $assoc_args['spread-hours'] ) ? (int) $assoc_args['spread-hours'] : null;
+		if ( null !== $spread_hours && ( $spread_hours < 1 || $spread_hours > 24 ) ) {
+			WP_CLI::error( '--spread-hours must be between 1 and 24.' );
+			return;
+		}
+
+		$ability = wp_get_ability( 'datamachine/reconcile-flow-schedules' );
+		$result  = $ability->execute(
+			array(
+				'apply'        => isset( $assoc_args['apply'] ),
+				'spread_hours' => $spread_hours,
+			)
+		);
+
+		if ( 'json' === $format ) {
+			WP_CLI::line( (string) wp_json_encode( $result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+			if ( empty( $result['success'] ) || (int) ( $result['invalid'] ?? 0 ) > 0 ) {
+				WP_CLI::halt( 1 );
+			}
+			return;
+		}
+
+		if ( empty( $result['success'] ) && isset( $result['error'] ) ) {
+			WP_CLI::error( (string) $result['error'], false );
+			WP_CLI::halt( 1 );
+			return;
+		}
+
+		WP_CLI::log( ! empty( $result['applied'] ) ? 'Mode: apply' : 'Mode: dry-run' );
+		WP_CLI::log(
+			sprintf(
+				'Eligible: %d | Covered: %d | Missing: %d | Blocked: %d | Invalid: %d | Repaired: %d | Failed: %d | Spread: %dh',
+				(int) ( $result['eligible'] ?? 0 ),
+				(int) ( $result['covered'] ?? 0 ),
+				(int) ( $result['missing'] ?? 0 ),
+				(int) ( $result['blocked'] ?? 0 ),
+				(int) ( $result['invalid'] ?? 0 ),
+				(int) ( $result['repaired'] ?? 0 ),
+				(int) ( $result['failed'] ?? 0 ),
+				(int) ( $result['distribution_window_hours'] ?? 1 )
+			)
+		);
+
+		$details = $result['details'] ?? array();
+		if ( ! empty( $details ) ) {
+			WP_CLI\Utils\format_items( 'table', $details, array( 'flow_id', 'flow_name', 'interval', 'status', 'error' ) );
+		}
+		if ( ! empty( $result['details_truncated'] ) ) {
+			WP_CLI::warning( 'Detail output was truncated; use summary counts to assess the full fleet.' );
+		}
+		if ( empty( $result['success'] ) || (int) ( $result['failed'] ?? 0 ) > 0 || (int) ( $result['invalid'] ?? 0 ) > 0 ) {
+			WP_CLI::halt( 1 );
+		}
 	}
 
 	/**

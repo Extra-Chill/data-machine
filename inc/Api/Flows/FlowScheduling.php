@@ -75,7 +75,7 @@ class FlowScheduling {
 		}
 
 		// Verify AS action is actually pending.
-		if ( $flow_id > 0 && ! RecurringScheduler::isScheduled( self::FLOW_HOOK, array( $flow_id ) ) ) {
+		if ( $flow_id > 0 && ! RecurringScheduler::hasCoverage( self::FLOW_HOOK, array( $flow_id ) ) ) {
 			return false;
 		}
 

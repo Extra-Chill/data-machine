@@ -77,4 +77,28 @@ class RecurringSchedulerStaggerTest extends WP_UnitTestCase {
 		$this->assertGreaterThanOrEqual( 0, $offset );
 		$this->assertLessThan( 60, $offset );
 	}
+
+	/**
+	 * Explicit fleet distribution can exceed the ordinary one-hour cap.
+	 */
+	public function test_distribution_window_is_distinct_from_ordinary_stagger(): void {
+		$offsets = array();
+		for ( $seed = 1; $seed <= 100; $seed++ ) {
+			$offsets[] = RecurringScheduler::calculateDistributionOffset( $seed, 24 * HOUR_IN_SECONDS );
+		}
+
+		$this->assertGreaterThan( RecurringScheduler::MAX_STAGGER_SECONDS, max( $offsets ) );
+		$this->assertLessThan( RecurringScheduler::MAX_DISTRIBUTION_WINDOW_SECONDS, max( $offsets ) );
+	}
+
+	/**
+	 * Explicit windows are capped at 24 hours.
+	 */
+	public function test_distribution_window_is_capped_at_24_hours(): void {
+		for ( $seed = 1; $seed <= 100; $seed++ ) {
+			$offset = RecurringScheduler::calculateDistributionOffset( $seed, 7 * DAY_IN_SECONDS );
+			$this->assertGreaterThanOrEqual( 0, $offset );
+			$this->assertLessThan( RecurringScheduler::MAX_DISTRIBUTION_WINDOW_SECONDS, $offset );
+		}
+	}
 }

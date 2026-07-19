@@ -151,6 +151,7 @@ $expected_classes = array(
 	'DuplicateFlowAbility',
 	'PauseFlowAbility',
 	'ResumeFlowAbility',
+	'ReconcileFlowSchedulesAbility',
 	'QueueAbility',
 	'WebhookTriggerAbility',
 );

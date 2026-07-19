@@ -19,6 +19,7 @@ use DataMachine\Core\Database\Chat\ConversationStoreFactory;
 use DataMachine\Core\Database\Flows\Flows;
 use DataMachine\Core\Database\Pipelines\Pipelines;
 use DataMachine\Core\PluginSettings;
+use DataMachine\Api\Flows\FlowScheduleReconciler;
 use DataMachine\Engine\Tasks\RecurringRejectionTracker;
 use DataMachine\Engine\Tasks\RecurringScheduler;
 use DataMachine\Engine\Tasks\TaskScheduler;
@@ -249,6 +250,21 @@ class SystemAbilities {
 		$complete        = $this->getActionSchedulerGroupStats( 'complete' );
 		$due             = $this->getActionSchedulerGroupStats( 'pending', true );
 		$daily_memory    = $this->getActionSchedulerHookStats( 'datamachine_recurring_daily_memory_generation' );
+		$flow_coverage   = array(
+			'success'           => false,
+			'eligible'          => 0,
+			'covered'           => 0,
+			'remaining_missing' => 0,
+			'blocked'           => 0,
+			'invalid'           => 0,
+		);
+		if ( function_exists( 'as_get_scheduled_actions' ) && RecurringScheduler::isReady() ) {
+			$flow_coverage = ( new FlowScheduleReconciler() )->reconcile();
+		}
+		$missing_flow_schedules = (int) ( $flow_coverage['remaining_missing'] ?? 0 );
+		$invalid_flow_schedules = (int) ( $flow_coverage['invalid'] ?? 0 );
+		$blocked_flow_schedules = (int) ( $flow_coverage['blocked'] ?? 0 );
+		$coverage_failed        = empty( $flow_coverage['success'] ) && 0 === $blocked_flow_schedules;
 
 		// Recurring bindings rejected by TaskScheduler::schedule() on every
 		// tick are a silent, permanent failure: the task never runs and the
@@ -262,13 +278,46 @@ class SystemAbilities {
 			$status = 'unavailable';
 		} elseif ( ! empty( $rejected_schedules ) ) {
 			$status = 'failing';
+		} elseif ( $blocked_flow_schedules > 0 || $coverage_failed ) {
+			$status = 'failing';
+		} elseif ( $missing_flow_schedules > 0 || $invalid_flow_schedules > 0 ) {
+			$status = 'failing';
 		} elseif ( $due['count'] > 0 || ( null !== $wp_cron_overdue && $wp_cron_overdue > $stale_threshold ) ) {
 			$status = 'stale';
 		}
 
 		$message = match ( $status ) {
 			'ok'          => __( 'scheduler current', 'data-machine' ),
-			'failing'     => sprintf(
+			'failing'     => $blocked_flow_schedules > 0 ? sprintf(
+				/* translators: %d: number of flows blocked by in-progress Action Scheduler ownership. */
+				_n(
+					'%d recurring flow is blocked by in-progress Action Scheduler ownership',
+					'%d recurring flows are blocked by in-progress Action Scheduler ownership',
+					$blocked_flow_schedules,
+					'data-machine'
+				),
+				$blocked_flow_schedules
+			) : ( $missing_flow_schedules > 0 ? sprintf(
+				/* translators: %d: number of enabled recurring flows missing scheduler coverage. */
+				_n(
+					'%d enabled recurring flow is missing Action Scheduler coverage',
+					'%d enabled recurring flows are missing Action Scheduler coverage',
+					$missing_flow_schedules,
+					'data-machine'
+				),
+				$missing_flow_schedules
+			) : ( $invalid_flow_schedules > 0 ? sprintf(
+				/* translators: %d: number of malformed recurring flow definitions. */
+				_n(
+					'%d recurring flow has an invalid schedule definition',
+					'%d recurring flows have invalid schedule definitions',
+					$invalid_flow_schedules,
+					'data-machine'
+				),
+				$invalid_flow_schedules
+			) : ( $coverage_failed
+				? __( 'flow schedule coverage audit failed', 'data-machine' )
+				: sprintf(
 				/* translators: %d: number of recurring schedules rejected on every tick. */
 				_n(
 					'%d recurring schedule rejected on every tick and never running',
@@ -277,7 +326,7 @@ class SystemAbilities {
 					'data-machine'
 				),
 				count( $rejected_schedules )
-			),
+			) ) ) ),
 			'stale'       => __( 'scheduler has overdue work; invoke WordPress cron, run wp datamachine drain, or run a specific task with wp datamachine system run <task_type> --wait', 'data-machine' ),
 			'unavailable' => __( 'Action Scheduler is unavailable', 'data-machine' ),
 			default       => __( 'scheduler status unknown', 'data-machine' ),
@@ -323,8 +372,17 @@ class SystemAbilities {
 				'next_pending_gmt' => $daily_memory['pending']['oldest_gmt'],
 				'last_attempt_gmt' => $daily_memory['complete']['last_attempt_gmt'],
 			),
+			'flow_schedule_coverage'  => $flow_coverage,
 			'recommendation'          => match ( $status ) {
-				'failing' => __( 'One or more recurring schedules are rejected on every tick and never run. Inspect them with wp datamachine logs (filter error_code recurring_schedule_persistently_rejected) and fix the binding or its prerequisites (agent ownership, task registration, ability availability).', 'data-machine' ),
+				'failing' => $blocked_flow_schedules > 0
+					? __( 'Recover stale or uncertain in-progress jobs/actions first, then rerun wp datamachine flows reconcile-schedules. Reconciliation will not schedule around active ownership.', 'data-machine' )
+					: ( $missing_flow_schedules > 0
+					? __( 'Run wp datamachine flows reconcile-schedules to inspect missing coverage, then rerun with --apply. Large repairs automatically spread first runs across 24 hours.', 'data-machine' )
+					: ( $invalid_flow_schedules > 0
+						? __( 'Inspect invalid definitions with wp datamachine flows reconcile-schedules and correct each flow schedule before applying repairs.', 'data-machine' )
+						: ( $coverage_failed
+							? __( 'Run wp datamachine flows reconcile-schedules --format=json to inspect the coverage query failure before applying repairs.', 'data-machine' )
+							: __( 'One or more recurring schedules are rejected on every tick and never run. Inspect them with wp datamachine logs (filter error_code recurring_schedule_persistently_rejected) and fix the binding or its prerequisites (agent ownership, task registration, ability availability).', 'data-machine' ) ) ) ),
 				'stale'   => __( 'For local or low-traffic installs, schedule an external wake-up such as wp cron event run --due-now. To remediate only daily memory for an affected agent, run wp datamachine system run daily_memory_generation --param=agent_slug=<slug> --wait; for all overdue work, run wp datamachine drain.', 'data-machine' ),
 				default   => null,
 			},
