@@ -76,7 +76,21 @@ class HydrateJobArtifactAbility {
 			);
 		}
 
-		$result = ( new JobArtifacts() )->hydrate_artifact_ref( $artifact_ref );
+		$artifacts = new JobArtifacts();
+		$job_id    = $artifacts->job_id_from_artifact_ref( $artifact_ref );
+		$job       = $job_id > 0 ? $this->db_jobs->get_job( $job_id ) : null;
+		if ( ! is_array( $job ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'artifact_ref is not associated with an existing job.',
+			);
+		}
+
+		if ( ! $this->canAccessJob( $job ) ) {
+			return $this->jobAccessDenied();
+		}
+
+		$result = $artifacts->hydrate_artifact_ref( $artifact_ref, is_array( $job['engine_data'] ?? null ) ? $job['engine_data'] : array() );
 		if ( empty( $result['success'] ) ) {
 			return $result;
 		}

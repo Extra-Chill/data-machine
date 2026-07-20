@@ -578,12 +578,22 @@ class PermissionHelper {
 		}
 
 		// Admins can access any resource.
-		if ( self::can( $action ) && ( self::is_authenticated_context() || current_user_can( 'manage_options' ) ) ) {
+		if ( self::has_privileged_resource_access( $action ) ) {
 			return true;
 		}
 
 		// Owner check.
 		return self::acting_user_id() === $resource_user_id;
+	}
+
+	/**
+	 * Whether the current scope may operate across resource owners.
+	 *
+	 * @param string $action Data Machine action key.
+	 * @return bool
+	 */
+	public static function has_privileged_resource_access( string $action = 'manage_flows' ): bool {
+		return self::can( $action ) && ( self::is_authenticated_context() || current_user_can( 'manage_options' ) );
 	}
 
 	/**

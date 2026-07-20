@@ -71,6 +71,12 @@ class Execute {
 						'default'     => false,
 						'description' => 'Preview execution without creating posts (ephemeral workflows only)',
 					),
+					'operation_key' => array(
+						'type'        => 'string',
+						'required'    => false,
+						'maxLength'   => 191,
+						'description' => 'Caller-stable key for idempotent ephemeral workflow submission',
+					),
 				),
 			)
 		);
@@ -230,6 +236,7 @@ class Execute {
 		$timestamp    = $request->get_param( 'timestamp' );
 		$initial_data = $request->get_param( 'initial_data' );
 		$dry_run      = $request->get_param( 'dry_run' );
+		$operation_key = $request->get_param( 'operation_key' );
 
 		$ability = wp_get_ability( 'datamachine/execute-workflow' );
 		if ( ! $ability ) {
@@ -250,6 +257,10 @@ class Execute {
 			$input['dry_run'] = true;
 		}
 
+		if ( is_string( $operation_key ) && '' !== trim( $operation_key ) ) {
+			$input['operation_key'] = trim( $operation_key );
+		}
+
 		$result = $ability->execute( $input );
 
 		if ( is_wp_error( $result ) ) {
@@ -259,14 +270,20 @@ class Execute {
 		if ( ! ( $result['success'] ?? false ) ) {
 			$status = 400;
 			$error  = $result['error'] ?? __( 'Execution failed', 'data-machine' );
+			$error_data = array( 'status' => $status );
 
 			if ( false !== strpos( $error, 'not found' ) ) {
 				$status = 404;
 			} elseif ( false !== strpos( $error, 'Failed to create' ) || false !== strpos( $error, 'not available' ) ) {
 				$status = 500;
+			} elseif ( ! empty( $result['retryable'] ) ) {
+				$status = 409;
+				$error_data['retryable']     = true;
+				$error_data['enqueue_state'] = (string) ( $result['enqueue_state'] ?? 'enqueuing' );
 			}
+			$error_data['status'] = $status;
 
-			return new \WP_Error( 'execute_failed', $error, array( 'status' => $status ) );
+			return new \WP_Error( 'execute_failed', $error, $error_data );
 		}
 
 		$response_data = array(
@@ -289,6 +306,10 @@ class Execute {
 		if ( isset( $result['timestamp'] ) ) {
 			$response_data['timestamp']      = $result['timestamp'];
 			$response_data['scheduled_time'] = $result['scheduled_time'] ?? wp_date( 'c', $result['timestamp'] );
+		}
+
+		if ( isset( $result['replayed'] ) ) {
+			$response_data['replayed'] = (bool) $result['replayed'];
 		}
 
 		return rest_ensure_response(

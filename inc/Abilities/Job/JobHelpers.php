@@ -11,8 +11,9 @@
 
 namespace DataMachine\Abilities\Job;
 
-use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Abilities\Flow\QueueAbility;
+use DataMachine\Abilities\ExecutionScope;
+use DataMachine\Abilities\PermissionHelper;
 
 use DataMachine\Core\Admin\DateFormatter;
 use DataMachine\Core\JobArtifactSurfaces;
@@ -44,6 +45,83 @@ trait JobHelpers {
 	 */
 	public function checkPermission(): bool {
 		return PermissionHelper::can_manage();
+	}
+
+	/**
+	 * Check row ownership while preserving capability-gated access to legacy jobs.
+	 *
+	 * Jobs created before ownership was persisted have user_id=0 and agent_id=NULL.
+	 * Those rows retain the shipped manage-jobs behavior; owned rows require the
+	 * matching user/agent or privileged operational access.
+	 *
+	 * @param array $job Job row.
+	 * @return bool
+	 */
+	protected function canAccessJob( array $job ): bool {
+		$scope    = ExecutionScope::current( 'manage_flows' );
+		$user_id  = max( 0, (int) ( $job['user_id'] ?? 0 ) );
+		$agent_id = isset( $job['agent_id'] ) && (int) $job['agent_id'] > 0 ? (int) $job['agent_id'] : null;
+
+		if ( 0 === $user_id && null === $agent_id ) {
+			$legacy_unowned = empty( $job['request_fingerprint'] ) && empty( $job['operation_state'] );
+			return $legacy_unowned
+				? $scope->can_action()
+				: PermissionHelper::has_privileged_resource_access( 'manage_flows' );
+		}
+
+		return $scope->owns_agent_resource( $agent_id, $user_id );
+	}
+
+	/**
+	 * Standard failed result for an inaccessible job row.
+	 *
+	 * @return array
+	 */
+	protected function jobAccessDenied(): array {
+		return array(
+			'success'    => false,
+			'error_code' => 'job_access_denied',
+			'error'      => 'You do not have permission to access this job.',
+			'status'     => 403,
+		);
+	}
+
+	/**
+	 * Apply authoritative ownership constraints to a job collection query.
+	 *
+	 * @param int|null $requested_user_id  Caller-selected user filter.
+	 * @param int|null $requested_agent_id Caller-selected agent filter.
+	 * @return array{user_id?:int,agent_id?:int}|array{error:string}
+	 */
+	protected function jobCollectionScope( ?int $requested_user_id, ?int $requested_agent_id ): array {
+		if ( PermissionHelper::has_privileged_resource_access( 'manage_flows' ) ) {
+			if ( null !== $requested_agent_id ) {
+				return array( 'agent_id' => $requested_agent_id );
+			}
+			return null !== $requested_user_id ? array( 'user_id' => $requested_user_id ) : array();
+		}
+
+		$acting_user_id = PermissionHelper::acting_user_id();
+		if ( null !== $requested_agent_id ) {
+			return PermissionHelper::can_access_agent( $requested_agent_id )
+				? array( 'agent_id' => $requested_agent_id )
+				: array( 'error' => 'You do not have permission to access jobs for this agent.' );
+		}
+
+		$acting_agent_id = PermissionHelper::get_acting_agent_id();
+		if ( null !== $acting_agent_id ) {
+			return array( 'agent_id' => $acting_agent_id );
+		}
+
+		if ( null !== $requested_user_id && $requested_user_id !== $acting_user_id ) {
+			return array( 'error' => 'You do not have permission to access jobs for this user.' );
+		}
+
+		if ( $acting_user_id <= 0 ) {
+			return array( 'error' => 'An authenticated acting caller is required to list owned jobs.' );
+		}
+
+		return array( 'user_id' => $acting_user_id );
 	}
 
 	/**

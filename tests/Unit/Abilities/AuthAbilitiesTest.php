@@ -212,7 +212,7 @@ class AuthAbilitiesTest extends WP_UnitTestCase {
 		);
 
 		$this->assertTrue( $result['success'] );
-		$this->assertSame( $token, $provider->get_site_account()['access_token'] );
+		$this->assertSame( $token, $provider->get_account_for_user( get_current_user_id() )['access_token'] );
 	}
 
 	public function test_set_auth_token_saves_user_account_without_site_fallback(): void {

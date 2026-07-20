@@ -99,6 +99,10 @@ class FailJobAbility {
 			);
 		}
 
+		if ( ! $this->canAccessJob( $job ) ) {
+			return $this->jobAccessDenied();
+		}
+
 		$previous_status = $job['status'] ?? '';
 
 		// Already failed — nothing to do.

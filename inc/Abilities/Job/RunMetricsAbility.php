@@ -74,6 +74,10 @@ class RunMetricsAbility {
 			);
 		}
 
+		if ( ! $this->canAccessJob( $job ) ) {
+			return $this->jobAccessDenied();
+		}
+
 		$jobs = $this->enrichJobNames( array( $job ) );
 		$job  = $this->addDisplayFields( $jobs[0] );
 

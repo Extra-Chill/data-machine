@@ -112,6 +112,7 @@ class FlowScheduleReconcilerTest extends WP_UnitTestCase {
 			array( '%s', '%s' ),
 			array( '%d' )
 		);
+		wp_cache_flush();
 
 		$result = ( new FlowScheduleReconciler( $this->flows ) )->reconcile();
 		$this->assertTrue( $result['success'] );
@@ -142,6 +143,7 @@ class FlowScheduleReconcilerTest extends WP_UnitTestCase {
 			array( '%s', '%s' ),
 			array( '%d' )
 		);
+		wp_cache_flush();
 
 		$result = ( new FlowScheduleReconciler( $this->flows ) )->reconcile();
 		$this->assertFalse( $result['success'] );
@@ -174,6 +176,7 @@ class FlowScheduleReconcilerTest extends WP_UnitTestCase {
 			array( '%s', '%s' ),
 			array( '%d' )
 		);
+		wp_cache_flush();
 
 		$result = ( new FlowScheduleReconciler( $this->flows ) )->reconcile( true );
 		$this->assertFalse( $result['success'] );
