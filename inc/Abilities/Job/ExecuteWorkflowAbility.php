@@ -11,6 +11,8 @@
 
 namespace DataMachine\Abilities\Job;
 
+use DataMachine\Abilities\ExecutionScope;
+use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Core\Agents\AgentIdentityResolver;
 use DataMachine\Core\Steps\WorkflowConfigFactory;
 use DataMachine\Core\Steps\WorkflowSpecValidator;
@@ -63,6 +65,11 @@ class ExecuteWorkflowAbility {
 								'default'     => false,
 								'description' => __( 'Preview execution without creating posts. Returns preview data instead of publishing.', 'data-machine' ),
 							),
+							'operation_key' => array(
+								'type'        => 'string',
+								'maxLength'   => 191,
+								'description' => __( 'Optional caller-stable key for idempotent workflow submission.', 'data-machine' ),
+							),
 						),
 					),
 					'output_schema'       => array(
@@ -74,6 +81,7 @@ class ExecuteWorkflowAbility {
 							'job_id'         => array( 'type' => 'integer' ),
 							'step_count'     => array( 'type' => 'integer' ),
 							'dry_run'        => array( 'type' => 'boolean' ),
+							'replayed'       => array( 'type' => 'boolean' ),
 							'message'        => array( 'type' => 'string' ),
 							'error'          => array( 'type' => 'string' ),
 						),
@@ -95,9 +103,11 @@ class ExecuteWorkflowAbility {
 	 * @return array Result with job_id and execution info.
 	 */
 	public function execute( array $input ): array {
-		$workflow     = $input['workflow'] ?? null;
-		$timestamp    = $input['timestamp'] ?? null;
-		$initial_data = is_array( $input['initial_data'] ?? null ) ? $input['initial_data'] : array();
+		$workflow       = $input['workflow'] ?? null;
+		$timestamp      = $input['timestamp'] ?? null;
+		$initial_data   = is_array( $input['initial_data'] ?? null ) ? $input['initial_data'] : array();
+		$operation_key  = is_string( $input['operation_key'] ?? null ) ? trim( $input['operation_key'] ) : '';
+		$system_context = ! empty( $input['system_context'] );
 
 		// Validate workflow structure
 		$validation = WorkflowSpecValidator::validate( $workflow );
@@ -110,6 +120,14 @@ class ExecuteWorkflowAbility {
 
 		// Build configs from workflow
 		$configs = WorkflowConfigFactory::buildEphemeralConfigs( $workflow );
+
+		$ownership = $this->resolveOwnership( $initial_data, $system_context );
+		if ( isset( $ownership['error'] ) ) {
+			return array(
+				'success' => false,
+				'error'   => $ownership['error'],
+			);
+		}
 
 		// Create job record for direct execution. Honor parent_job_id
 		// from initial_data so callers (e.g. TaskScheduler scheduling
@@ -130,60 +148,35 @@ class ExecuteWorkflowAbility {
 			'flow_id'     => 'direct',
 			'source'      => $job_source,
 			'label'       => $job_label,
+			'user_id'     => $ownership['user_id'],
 		);
+		if ( $ownership['agent_id'] > 0 ) {
+			$create_args['agent_id'] = $ownership['agent_id'];
+		}
 
 		$initial_parent_job_id = (int) ( $initial_data['parent_job_id'] ?? 0 );
 		if ( $initial_parent_job_id > 0 ) {
 			$create_args['parent_job_id'] = $initial_parent_job_id;
 		}
 
-		$job_id = $this->db_jobs->create_job( $create_args );
-
-		if ( ! $job_id ) {
-			return array(
-				'success' => false,
-				'error'   => 'Failed to create job record',
-			);
-		}
-
 		// Build engine data with caller data underneath engine-owned configs.
 		$engine_data                    = $initial_data;
 		$engine_data['flow_config']     = $configs['flow_config'];
 		$engine_data['pipeline_config'] = $configs['pipeline_config'];
+		$engine_data['user_id']         = $ownership['user_id'];
+		$engine_data['calling_user_id'] = $ownership['calling_user_id'];
 
 		// Mirror RunFlowAbility's engine_data['job'] shape so downstream
-		// step types (AIStep, SystemTaskStep) can read job + agent
-		// identity from the engine snapshot the same way they do for
-		// flow jobs. Callers (e.g. TaskScheduler) may provide a partial
-		// 'job' snapshot in initial_data with agent_id/user_id; this
-		// layers our authoritative job_id on top of any caller-provided
-		// snapshot.
-		$caller_snapshot  = is_array( $engine_data['job'] ?? null ) ? $engine_data['job'] : array();
-		$job_snapshot     = array_merge(
-			array( 'user_id' => (int) ( $initial_data['user_id'] ?? 0 ) ),
-			$caller_snapshot,
-			array( 'job_id' => $job_id )
-		);
-		$identity_context = array_filter(
-			array(
-				'agent_slug' => $job_snapshot['agent_slug'] ?? ( $initial_data['agent_slug'] ?? null ),
-				'agent_id'   => $job_snapshot['agent_id'] ?? ( $initial_data['agent_id'] ?? null ),
-			),
-			fn( $value ) => null !== $value && '' !== $value && 0 !== $value
-		);
-		if ( ! empty( $identity_context ) ) {
-			try {
-				$identity                   = ( new AgentIdentityResolver() )->resolve_agent_identity( $identity_context );
-				$job_snapshot['agent_id']   = $identity->agent_id;
-				$job_snapshot['agent_slug'] = $identity->agent_slug;
-			} catch ( \InvalidArgumentException $e ) {
-				if ( ! empty( $initial_data['agent_id'] ) && empty( $job_snapshot['agent_id'] ) ) {
-					$job_snapshot['agent_id'] = (int) $initial_data['agent_id'];
-				}
-				if ( ! empty( $initial_data['agent_slug'] ) && empty( $job_snapshot['agent_slug'] ) ) {
-					$job_snapshot['agent_slug'] = sanitize_title( (string) $initial_data['agent_slug'] );
-				}
-			}
+		// step types can restore authoritative job and agent identity from
+		// the engine snapshot during worker execution and deferred resume.
+		$caller_snapshot         = is_array( $engine_data['job'] ?? null ) ? $engine_data['job'] : array();
+		$job_snapshot            = $caller_snapshot;
+		$job_snapshot['user_id'] = $ownership['user_id'];
+		if ( $ownership['agent_id'] > 0 ) {
+			$job_snapshot['agent_id']   = $ownership['agent_id'];
+			$job_snapshot['agent_slug'] = $ownership['agent_slug'];
+		} else {
+			unset( $job_snapshot['agent_id'], $job_snapshot['agent_slug'] );
 		}
 		$engine_data['job'] = $job_snapshot;
 
@@ -192,7 +185,52 @@ class ExecuteWorkflowAbility {
 			$engine_data['dry_run_mode'] = true;
 		}
 
-		$this->db_jobs->store_engine_data( $job_id, $engine_data );
+		$request_fingerprint = $this->requestFingerprint( $engine_data, $timestamp );
+		if ( '' !== $operation_key ) {
+			$create_args['idempotency_key'] = 'direct:' . hash( 'sha256', $ownership['user_id'] . ':' . $ownership['agent_id'] . ':' . $operation_key );
+			$engine_data['direct_request']   = array(
+				'operation_key' => $operation_key,
+				'fingerprint'   => $request_fingerprint,
+				'execution_type' => $timestamp && is_numeric( $timestamp ) && (int) $timestamp > time() ? 'delayed' : 'immediate',
+				'timestamp'      => is_numeric( $timestamp ) ? (int) $timestamp : null,
+				'dry_run'        => ! empty( $input['dry_run'] ),
+			);
+		}
+
+		$create_args['engine_data'] = $engine_data;
+		$creation                   = '' !== $operation_key
+			? $this->db_jobs->create_or_get_job( $create_args )
+			: $this->db_jobs->create_job( $create_args );
+		$job_id                     = is_array( $creation ) ? (int) ( $creation['job_id'] ?? 0 ) : (int) $creation;
+
+		if ( $job_id <= 0 ) {
+			return array(
+				'success' => false,
+				'error'   => 'Failed to create job record',
+			);
+		}
+
+		if ( is_array( $creation ) && ! empty( $creation['already_exists'] ) ) {
+			$existing_engine_data = is_array( $creation['job']['engine_data'] ?? null ) ? $creation['job']['engine_data'] : array();
+			$existing_fingerprint = (string) ( $existing_engine_data['direct_request']['fingerprint'] ?? '' );
+			if ( '' === $existing_fingerprint || ! hash_equals( $existing_fingerprint, $request_fingerprint ) ) {
+				return array(
+					'success' => false,
+					'error'   => 'operation_key has already been used with different workflow input.',
+				);
+			}
+
+			return $this->executionResponse( $job_id, $workflow, $existing_engine_data['direct_request'], true );
+		}
+
+		$engine_data['job']['job_id'] = $job_id;
+
+		if ( ! $this->db_jobs->store_engine_data( $job_id, $engine_data ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'Failed to persist job execution data',
+			);
+		}
 
 		try {
 			$first_step_id = ExecutionPlan::from_flow_config( $configs['flow_config'] )->first_step_id();
@@ -300,5 +338,135 @@ class ExecuteWorkflowAbility {
 			'scheduled_time' => wp_date( 'c', $timestamp ),
 			'message'        => 'Ephemeral workflow scheduled for one-time execution at ' . wp_date( 'M j, Y g:i A', $timestamp ),
 		);
+	}
+
+	/**
+	 * Resolve authoritative ownership for a direct asynchronous job.
+	 *
+	 * @param array $initial_data   Caller-provided engine data.
+	 * @param bool  $system_context Whether an internal scheduler initiated the job.
+	 * @return array{user_id:int,calling_user_id:int,agent_id:int,agent_slug:string}|array{error:string}
+	 */
+	private function resolveOwnership( array $initial_data, bool $system_context ): array {
+		$scope           = ExecutionScope::current( 'manage_flows' );
+		$principal       = $scope->principal();
+		$user_id         = $principal ? max( 0, (int) $principal->acting_user_id ) : max( 0, $scope->acting_user_id() );
+		$calling_user_id = $user_id;
+		$agent_id        = max( 0, (int) ( $scope->acting_agent_id() ?? 0 ) );
+		$agent_slug      = '';
+
+		$caller_snapshot = is_array( $initial_data['job'] ?? null ) ? $initial_data['job'] : array();
+		$identity_context = array_filter(
+			$agent_id > 0
+				? array( 'agent_id' => $agent_id )
+				: array(
+					'agent_id'   => $caller_snapshot['agent_id'] ?? ( $initial_data['agent_id'] ?? null ),
+					'agent_slug' => $caller_snapshot['agent_slug'] ?? ( $initial_data['agent_slug'] ?? null ),
+				),
+			static fn( $value ) => null !== $value && '' !== $value && 0 !== $value
+		);
+
+		if ( ! empty( $identity_context ) ) {
+			try {
+				$identity = ( new AgentIdentityResolver() )->resolve_agent_identity( $identity_context );
+			} catch ( \InvalidArgumentException $e ) {
+				return array( 'error' => $e->getMessage() );
+			}
+
+			if ( $agent_id <= 0 && ! $system_context && ! PermissionHelper::can_access_agent( $identity->agent_id ) ) {
+				return array( 'error' => 'You do not have permission to execute work for this agent.' );
+			}
+
+			$agent_id   = $identity->agent_id;
+			$agent_slug = $identity->agent_slug;
+			if ( $system_context && $user_id <= 0 ) {
+				$user_id = $identity->owner_id;
+			}
+		}
+
+		if ( ! $system_context && $user_id <= 0 && $agent_id <= 0 ) {
+			return array( 'error' => 'An authenticated acting caller is required for user-scoped workflow execution.' );
+		}
+
+		return array(
+			'user_id'         => $user_id,
+			'calling_user_id' => $calling_user_id,
+			'agent_id'        => $agent_id,
+			'agent_slug'      => $agent_slug,
+		);
+	}
+
+	/**
+	 * Hash the effective request input stored on an idempotent job.
+	 *
+	 * @param array $engine_data Effective engine data before request metadata.
+	 * @param mixed $timestamp   Requested execution timestamp.
+	 * @return string
+	 */
+	private function requestFingerprint( array $engine_data, $timestamp ): string {
+		$payload = $this->canonicalize(
+			array(
+				'engine_data' => $engine_data,
+				'timestamp'   => is_numeric( $timestamp ) ? (int) $timestamp : null,
+			)
+		);
+
+		return hash( 'sha256', (string) wp_json_encode( $payload ) );
+	}
+
+	/**
+	 * Sort object keys recursively while retaining list order.
+	 *
+	 * @param mixed $value Value to normalize.
+	 * @return mixed
+	 */
+	private function canonicalize( $value ) {
+		if ( ! is_array( $value ) ) {
+			return $value;
+		}
+
+		if ( ! array_is_list( $value ) ) {
+			ksort( $value, SORT_STRING );
+		}
+
+		foreach ( $value as $key => $item ) {
+			$value[ $key ] = $this->canonicalize( $item );
+		}
+
+		return $value;
+	}
+
+	/**
+	 * Recreate the original submission response without scheduling duplicate work.
+	 *
+	 * @param int   $job_id        Existing job ID.
+	 * @param array $workflow      Validated workflow input.
+	 * @param array $request_meta  Persisted direct request metadata.
+	 * @param bool  $replayed      Whether this is an idempotent replay.
+	 * @return array
+	 */
+	private function executionResponse( int $job_id, array $workflow, array $request_meta, bool $replayed ): array {
+		$execution_type = 'delayed' === ( $request_meta['execution_type'] ?? '' ) ? 'delayed' : 'immediate';
+		$is_dry_run     = ! empty( $request_meta['dry_run'] );
+		$response       = array(
+			'success'        => true,
+			'execution_mode' => 'direct',
+			'execution_type' => $execution_type,
+			'job_id'         => $job_id,
+			'step_count'     => count( $workflow['steps'] ?? array() ),
+			'replayed'       => $replayed,
+			'message'        => 'Existing workflow execution returned for operation_key.',
+		);
+
+		if ( $is_dry_run ) {
+			$response['dry_run'] = true;
+		}
+
+		if ( 'delayed' === $execution_type && ! empty( $request_meta['timestamp'] ) ) {
+			$response['timestamp']      = (int) $request_meta['timestamp'];
+			$response['scheduled_time'] = wp_date( 'c', (int) $request_meta['timestamp'] );
+		}
+
+		return $response;
 	}
 }

@@ -97,6 +97,10 @@ class RetryJobAbility {
 			);
 		}
 
+		if ( ! $this->canAccessJob( $job ) ) {
+			return $this->jobAccessDenied();
+		}
+
 		$previous_status = $job['status'] ?? '';
 
 		// Unless forced, only allow retrying failed or processing jobs.

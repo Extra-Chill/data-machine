@@ -71,6 +71,12 @@ class Execute {
 						'default'     => false,
 						'description' => 'Preview execution without creating posts (ephemeral workflows only)',
 					),
+					'operation_key' => array(
+						'type'        => 'string',
+						'required'    => false,
+						'maxLength'   => 191,
+						'description' => 'Caller-stable key for idempotent ephemeral workflow submission',
+					),
 				),
 			)
 		);
@@ -230,6 +236,7 @@ class Execute {
 		$timestamp    = $request->get_param( 'timestamp' );
 		$initial_data = $request->get_param( 'initial_data' );
 		$dry_run      = $request->get_param( 'dry_run' );
+		$operation_key = $request->get_param( 'operation_key' );
 
 		$ability = wp_get_ability( 'datamachine/execute-workflow' );
 		if ( ! $ability ) {
@@ -248,6 +255,10 @@ class Execute {
 
 		if ( $dry_run ) {
 			$input['dry_run'] = true;
+		}
+
+		if ( is_string( $operation_key ) && '' !== trim( $operation_key ) ) {
+			$input['operation_key'] = trim( $operation_key );
 		}
 
 		$result = $ability->execute( $input );
@@ -289,6 +300,10 @@ class Execute {
 		if ( isset( $result['timestamp'] ) ) {
 			$response_data['timestamp']      = $result['timestamp'];
 			$response_data['scheduled_time'] = $result['scheduled_time'] ?? wp_date( 'c', $result['timestamp'] );
+		}
+
+		if ( isset( $result['replayed'] ) ) {
+			$response_data['replayed'] = (bool) $result['replayed'];
 		}
 
 		return rest_ensure_response(

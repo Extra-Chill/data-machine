@@ -307,6 +307,16 @@ class Jobs extends BaseRepository {
 			$format[]                = '%s';
 		}
 
+		if ( isset( $job_data['engine_data'] ) && is_array( $job_data['engine_data'] ) ) {
+			$encoded_engine_data = wp_json_encode( $job_data['engine_data'] );
+			if ( false === $encoded_engine_data ) {
+				return false;
+			}
+
+			$data['engine_data'] = $encoded_engine_data;
+			$format[]            = '%s';
+		}
+
 		return array(
 			'data'        => $data,
 			'format'      => $format,

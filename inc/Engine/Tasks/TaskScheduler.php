@@ -267,9 +267,10 @@ class TaskScheduler {
 		}
 
 		$result = AbilityResult::normalize( $ability->execute( array(
-			'workflow'     => $workflow,
-			'timestamp'    => $params['scheduled_at'] ?? null,
-			'initial_data' => $initial_data,
+			'workflow'       => $workflow,
+			'timestamp'      => $params['scheduled_at'] ?? null,
+			'initial_data'   => $initial_data,
+			'system_context' => true,
 		) ) );
 
 		if ( empty( $result['success'] ) ) {

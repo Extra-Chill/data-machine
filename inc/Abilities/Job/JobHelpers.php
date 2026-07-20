@@ -11,8 +11,9 @@
 
 namespace DataMachine\Abilities\Job;
 
-use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Abilities\Flow\QueueAbility;
+use DataMachine\Abilities\ExecutionScope;
+use DataMachine\Abilities\PermissionHelper;
 
 use DataMachine\Core\Admin\DateFormatter;
 use DataMachine\Core\JobArtifactSurfaces;
@@ -44,6 +45,42 @@ trait JobHelpers {
 	 */
 	public function checkPermission(): bool {
 		return PermissionHelper::can_manage();
+	}
+
+	/**
+	 * Check row ownership while preserving capability-gated access to legacy jobs.
+	 *
+	 * Jobs created before ownership was persisted have user_id=0 and agent_id=NULL.
+	 * Those rows retain the shipped manage-jobs behavior; owned rows require the
+	 * matching user/agent or privileged operational access.
+	 *
+	 * @param array $job Job row.
+	 * @return bool
+	 */
+	protected function canAccessJob( array $job ): bool {
+		$scope    = ExecutionScope::current( 'manage_flows' );
+		$user_id  = max( 0, (int) ( $job['user_id'] ?? 0 ) );
+		$agent_id = isset( $job['agent_id'] ) && (int) $job['agent_id'] > 0 ? (int) $job['agent_id'] : null;
+
+		if ( 0 === $user_id && null === $agent_id ) {
+			return $scope->can_action();
+		}
+
+		return $scope->owns_agent_resource( $agent_id, $user_id );
+	}
+
+	/**
+	 * Standard failed result for an inaccessible job row.
+	 *
+	 * @return array
+	 */
+	protected function jobAccessDenied(): array {
+		return array(
+			'success'    => false,
+			'error_code' => 'job_access_denied',
+			'error'      => 'You do not have permission to access this job.',
+			'status'     => 403,
+		);
 	}
 
 	/**

@@ -180,6 +180,10 @@ class GetJobsAbility {
 				);
 			}
 
+			if ( ! $this->canAccessJob( $job ) ) {
+				return $this->jobAccessDenied();
+			}
+
 			$jobs_enriched = $this->enrichJobNames( array( $job ) );
 			$job           = $this->addDisplayFields( $jobs_enriched[0] );
 
