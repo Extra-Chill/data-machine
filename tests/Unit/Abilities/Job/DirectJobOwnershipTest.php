@@ -352,6 +352,30 @@ class DirectJobOwnershipTest extends WP_UnitTestCase {
 		$this->assertSame( 0, $result['action_id'] );
 	}
 
+	public function test_replay_commits_scheduled_action_after_submitter_crash(): void {
+		$jobs   = new Jobs();
+		$job_id = $jobs->create_job(
+			array(
+				'pipeline_id'       => 'direct',
+				'flow_id'           => 'direct',
+				'operation_state'   => 'preparing',
+				'operation_step_id' => 'ephemeral_step_0',
+			)
+		);
+		$claim = $jobs->claim_operation_enqueue( $job_id );
+		$this->assertIsArray( $claim );
+
+		$result = ( new DirectJobEnqueuer( $jobs, static fn() => 999, static fn() => 404 ) )->enqueue( $job_id, 'ephemeral_step_0' );
+		$job    = $jobs->get_job( $job_id );
+
+		$this->assertTrue( $result['success'] );
+		$this->assertSame( 404, $result['action_id'] );
+		$this->assertSame( 'enqueued', $job['operation_state'] );
+		$this->assertSame( 404, (int) $job['operation_action_id'] );
+		$this->assertSame( $claim['generation'], (int) $job['operation_generation'] );
+		$this->assertSame( $claim['token'], $job['operation_claim_token'] );
+	}
+
 	public function test_expired_lease_takeover_fences_slow_generation(): void {
 		global $wpdb;
 
@@ -488,6 +512,30 @@ class DirectJobOwnershipTest extends WP_UnitTestCase {
 		$this->assertSame( 'enqueued', $job['operation_state'] );
 		$this->assertSame( $original_action_id, (int) $job['operation_action_id'] );
 		$this->assertSame( $original_generation, (int) $job['operation_generation'] );
+	}
+
+	public function test_processing_multistep_retry_detects_live_action_for_different_step(): void {
+		wp_set_current_user( $this->owner_id );
+		$created = $this->execute( 'processing-multistep-retry' );
+		$jobs    = new Jobs();
+		$job_id  = (int) $created['job_id'];
+		$engine_data = $jobs->retrieve_engine_data( $job_id );
+		$first_step  = $engine_data['flow_config']['ephemeral_step_0'];
+		$second_step = $first_step;
+		$second_step['flow_step_id']   = 'ephemeral_step_1';
+		$second_step['execution_order'] = 1;
+		$engine_data['flow_config']['ephemeral_step_1'] = $second_step;
+		$engine_data['resumable'] = true;
+		$engine_data['step_results']['ephemeral_step_0'] = array( 'step_success' => true );
+		$this->assertTrue( $jobs->store_engine_data( $job_id, $engine_data ) );
+		$this->assertSame( 'ephemeral_step_1', JobRetryPolicy::resolveDirectResumeStepId( $engine_data ) );
+		$this->assertTrue( $jobs->start_job( $job_id ) );
+
+		$retry = ( new RetryJobAbility() )->execute( array( 'job_id' => $job_id ) );
+
+		$this->assertFalse( $retry['success'] );
+		$this->assertSame( 'job_execution_in_progress', $retry['error_code'] );
+		$this->assertSame( 'processing', $jobs->get_job( $job_id )['status'] );
 	}
 
 	public function test_failed_direct_retry_uses_next_generation_while_old_action_remains(): void {

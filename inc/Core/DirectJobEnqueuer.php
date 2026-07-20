@@ -51,7 +51,7 @@ class DirectJobEnqueuer {
 			? $this->scheduledActionId( $args )
 			: 0;
 		if ( $scheduled_action_id > 0 ) {
-			return $this->success( $scheduled_action_id, $generation );
+			return $this->reconcileScheduledAction( $job_id, $job, $scheduled_action_id, $generation, $token );
 		}
 
 		if ( 'enqueued' === ( $job['operation_state'] ?? '' ) && 'pending' === ( $job['status'] ?? '' ) ) {
@@ -66,7 +66,7 @@ class DirectJobEnqueuer {
 			$current_action_args = $this->actionArgs( $job_id, $flow_step_id, $current_generation, $current_token );
 			$current_action_id   = $this->scheduledActionId( $current_action_args );
 			if ( $current_action_id > 0 ) {
-				return $this->success( $current_action_id, $current_generation );
+				return $this->reconcileScheduledAction( $job_id, $job, $current_action_id, $current_generation, $current_token );
 			}
 
 			return $this->inProgress( $current_generation );
@@ -80,10 +80,7 @@ class DirectJobEnqueuer {
 		// recorded success. Reconcile that action before creating another one.
 		$scheduled_action_id = $this->scheduledActionId( $args );
 		if ( $scheduled_action_id > 0 ) {
-			if ( ! $this->jobs->finish_operation_enqueue( $job_id, 'enqueued', $scheduled_action_id, $token, $generation ) ) {
-				return $this->failure( 'enqueue_claim_fenced', $generation, true, 'enqueuing' );
-			}
-			return $this->success( $scheduled_action_id, $generation );
+			return $this->reconcileScheduledAction( $job_id, $this->jobs->get_job( $job_id ), $scheduled_action_id, $generation, $token );
 		}
 
 		if ( ! $this->jobs->owns_operation_enqueue_claim( $job_id, $token, $generation ) ) {
@@ -106,6 +103,33 @@ class DirectJobEnqueuer {
 
 	public function hasLiveAction( int $job_id, string $flow_step_id, int $generation, string $token ): bool {
 		return $this->scheduledActionId( $this->actionArgs( $job_id, $flow_step_id, $generation, $token ) ) > 0;
+	}
+
+	/**
+	 * Check for any pending/in-progress step in an operation generation.
+	 */
+	public function hasLiveGenerationAction( int $job_id, int $generation, string $token ): bool {
+		if ( ! function_exists( 'as_get_scheduled_actions' ) || $job_id <= 0 || $generation <= 0 || '' === $token ) {
+			return false;
+		}
+
+		$action_ids = as_get_scheduled_actions(
+			array(
+				'hook'                  => self::HOOK,
+				'group'                 => self::GROUP,
+				'args'                  => array(
+					'job_id'               => $job_id,
+					'operation_generation' => $generation,
+					'operation_claim_token' => $token,
+				),
+				'partial_args_matching' => 'like',
+				'status'                => array( 'pending', 'in-progress' ),
+				'per_page'              => 1,
+			),
+			'ids'
+		);
+
+		return ! empty( $action_ids );
 	}
 
 	private function actionArgs( int $job_id, string $flow_step_id, int $generation, string $token ): array {
@@ -155,6 +179,33 @@ class DirectJobEnqueuer {
 		}
 
 		return 0;
+	}
+
+	private function reconcileScheduledAction( int $job_id, ?array $job, int $action_id, int $generation, string $token ): array {
+		if ( ! is_array( $job ) || $generation <= 0 || '' === $token ) {
+			return $this->inProgress( $generation );
+		}
+
+		if ( 'enqueued' === ( $job['operation_state'] ?? '' )
+			&& $generation === (int) ( $job['operation_generation'] ?? 0 )
+			&& hash_equals( $token, (string) ( $job['operation_claim_token'] ?? '' ) ) ) {
+			return $this->success( $action_id, $generation );
+		}
+
+		if ( 'enqueuing' === ( $job['operation_state'] ?? '' )
+			&& $this->jobs->finish_operation_enqueue( $job_id, 'enqueued', $action_id, $token, $generation ) ) {
+			return $this->success( $action_id, $generation );
+		}
+
+		$reloaded = $this->jobs->get_job( $job_id );
+		if ( is_array( $reloaded )
+			&& 'enqueued' === ( $reloaded['operation_state'] ?? '' )
+			&& $generation === (int) ( $reloaded['operation_generation'] ?? 0 )
+			&& hash_equals( $token, (string) ( $reloaded['operation_claim_token'] ?? '' ) ) ) {
+			return $this->success( $action_id, $generation );
+		}
+
+		return $this->inProgress( max( $generation, (int) ( $reloaded['operation_generation'] ?? 0 ) ) );
 	}
 
 	private function success( int $action_id, int $generation ): array {

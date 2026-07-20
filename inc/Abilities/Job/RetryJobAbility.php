@@ -139,7 +139,7 @@ class RetryJobAbility {
 			if ( 'processing' === $previous_status ) {
 				$generation = (int) ( $job['operation_generation'] ?? 0 );
 				$token      = (string) ( $job['operation_claim_token'] ?? '' );
-				if ( $generation > 0 && '' !== $token && ( new DirectJobEnqueuer( $this->db_jobs ) )->hasLiveAction( $job_id, $flow_step_id, $generation, $token ) ) {
+				if ( $generation > 0 && '' !== $token && ( new DirectJobEnqueuer( $this->db_jobs ) )->hasLiveGenerationAction( $job_id, $generation, $token ) ) {
 					return array(
 						'success'         => false,
 						'job_id'          => $job_id,

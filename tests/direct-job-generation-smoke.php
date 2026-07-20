@@ -92,6 +92,14 @@ $blocked_result         = ( new DirectJobEnqueuer( $blocked, static fn() => 100,
 direct_generation_assert( false === $blocked_result['success'], 'non-owner does not acknowledge success without durable action' );
 direct_generation_assert( true === $blocked_result['retryable'] && 'enqueue_in_progress' === $blocked_result['error'], 'non-owner receives explicit retryable in-progress result' );
 
+$crash_recovery = new DirectJobGenerationFakeJobs();
+$crash_recovery->job['operation_state']       = 'enqueuing';
+$crash_recovery->job['operation_generation']  = 1;
+$crash_recovery->job['operation_claim_token'] = 'token-1';
+$recovered = ( new DirectJobEnqueuer( $crash_recovery, static fn() => 999, static fn() => 404 ) )->enqueue( 42, 'ephemeral_step_0' );
+direct_generation_assert( true === $recovered['success'], 'replay CAS-commits an action left by a crashed submitter' );
+direct_generation_assert( 'enqueued' === $crash_recovery->job['operation_state'] && 404 === $crash_recovery->job['operation_action_id'], 'crash reconciliation durably records the recovered action' );
+
 $interleaved = new DirectJobGenerationFakeJobs();
 $takeover    = null;
 $slow_result = ( new DirectJobEnqueuer(
