@@ -2,6 +2,14 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.49.3] - 2026-07-20
+
+### Fixed
+- preserve scoped boundary parity
+- keep filter options in query parity
+- synchronize month-grid filter state
+- synchronize filters and accessible controls
+
 ## [0.49.2] - 2026-07-15
 
 ### Changed
