@@ -510,37 +510,8 @@ trait FlowHelpers {
 			$flow_step_id = $target['flow_step_id'];
 			$step_type    = $target['step_type'] ?? (string) $step_key;
 
-			$normalized_handler_config = FlowStepConfigFactory::withHandlerFields(
-				array( 'step_type' => $step_type ),
-				$config
-			);
-
-			$handler_slugs   = $config['handler_slugs'] ?? array();
-			$handler_configs = FlowStepConfig::getHandlerConfigs( $normalized_handler_config );
-			$single_slug     = $config['handler_slug'] ?? '';
-			$single_config   = $config['handler_config'] ?? array();
-
-			// When handler_slugs is provided, add each handler with its config from handler_configs.
-			if ( ! empty( $handler_slugs ) ) {
-				foreach ( $handler_slugs as $slug ) {
-					$slug_config = $handler_configs[ $slug ] ?? array();
-					$add_result  = $update_flow_step_ability->execute(
-						array(
-							'flow_step_id'       => $flow_step_id,
-							'add_handler'        => $slug,
-							'add_handler_config' => $slug_config,
-						)
-					);
-					if ( ! $add_result['success'] ) {
-						$errors[] = array(
-							'step_type'    => $step_type,
-							'flow_step_id' => $flow_step_id,
-							'handler'      => $slug,
-							'error'        => $add_result['error'] ?? 'Failed to add handler',
-						);
-					}
-				}
-			}
+			$single_slug   = $config['handler_slug'] ?? '';
+			$single_config = $config['handler_config'] ?? array();
 
 			// Build the base update input for singular handler_slug / handler_config / user_message.
 			$update_input = array( 'flow_step_id' => $flow_step_id );
@@ -553,13 +524,6 @@ trait FlowHelpers {
 			}
 			if ( ! empty( $config['user_message'] ) ) {
 				$update_input['user_message'] = $config['user_message'];
-			}
-
-			// Only call update if there's something beyond the flow_step_id to apply.
-			if ( count( $update_input ) <= 1 && ! empty( $handler_slugs ) ) {
-				// Already handled via add_handler above — mark as applied.
-				$applied[] = $flow_step_id;
-				continue;
 			}
 
 			$result = $update_flow_step_ability->execute( $update_input );
@@ -579,6 +543,54 @@ trait FlowHelpers {
 			'applied' => $applied,
 			'errors'  => $errors,
 		);
+	}
+
+	/**
+	 * Validate the public flow-create step configuration shape.
+	 *
+	 * @param array $step_configs Configs keyed by step target.
+	 * @return true|string True when valid, otherwise an error message.
+	 */
+	protected function validateCreateStepConfigs( array $step_configs ): true|string {
+		$allowed_fields = array( 'handler_slug', 'handler_config', 'user_message', 'flow_step_id', 'pipeline_step_id', 'execution_order' );
+		$handlers       = new HandlerAbilities();
+
+		foreach ( $step_configs as $step_key => $config ) {
+			if ( ! is_array( $config ) ) {
+				return sprintf( 'step_configs.%s must be an object', $step_key );
+			}
+
+			$unknown_fields = array_diff( array_keys( $config ), $allowed_fields );
+			if ( ! empty( $unknown_fields ) ) {
+				return sprintf(
+					'Unknown fields in step_configs.%s: %s. Valid configuration fields: handler_slug, handler_config, user_message',
+					$step_key,
+					implode( ', ', $unknown_fields )
+				);
+			}
+
+			if ( isset( $config['handler_slug'] ) && ( ! is_string( $config['handler_slug'] ) || '' === trim( $config['handler_slug'] ) ) ) {
+				return sprintf( 'step_configs.%s.handler_slug must be a non-empty string', $step_key );
+			}
+
+			if ( isset( $config['handler_slug'] ) && ! $handlers->handlerExists( $config['handler_slug'] ) ) {
+				return sprintf( "Handler '%s' not found", $config['handler_slug'] );
+			}
+
+			if ( isset( $config['handler_config'] ) && ! is_array( $config['handler_config'] ) ) {
+				return sprintf( 'step_configs.%s.handler_config must be an object', $step_key );
+			}
+
+			if ( isset( $config['user_message'] ) && ! is_string( $config['user_message'] ) ) {
+				return sprintf( 'step_configs.%s.user_message must be a string', $step_key );
+			}
+
+			if ( ! array_key_exists( 'handler_slug', $config ) && ! array_key_exists( 'handler_config', $config ) && ! array_key_exists( 'user_message', $config ) ) {
+				return sprintf( 'step_configs.%s must include handler_slug, handler_config, or user_message', $step_key );
+			}
+		}
+
+		return true;
 	}
 
 	/**

@@ -171,7 +171,7 @@ class FlowsCommand extends BaseCommand {
 	 * : Pipeline ID for pause/resume scoping.
 	 *
  * [--agent=<slug_or_id>]
- * : Agent slug or ID. For update: set the flow's agent_id.
+ * : Agent slug or ID. For create/update: set the flow's agent_id.
  *   For pause/resume/list: scope by agent.
  *   For reassign: see --from-agent / --to-agent instead.
  *
@@ -928,6 +928,7 @@ class FlowsCommand extends BaseCommand {
 		$scheduled_at = $assoc_args['scheduled-at'] ?? null;
 		$dry_run      = isset( $assoc_args['dry-run'] );
 		$format       = $assoc_args['format'] ?? 'table';
+		$agent_id     = null;
 
 		if ( ! $pipeline_id ) {
 			WP_CLI::error( 'Required: --pipeline_id=<id>' );
@@ -937,6 +938,14 @@ class FlowsCommand extends BaseCommand {
 		if ( ! $flow_name ) {
 			WP_CLI::error( 'Required: --name=<name>' );
 			return;
+		}
+
+		if ( isset( $assoc_args['agent'] ) ) {
+			$agent_id = AgentResolver::resolve( $assoc_args );
+			if ( null === $agent_id ) {
+				WP_CLI::error( 'Could not resolve --agent to a valid agent.' );
+				return;
+			}
 		}
 
 		$step_configs = array();
@@ -993,17 +1002,12 @@ class FlowsCommand extends BaseCommand {
 			'scheduling_config' => $scheduling_config,
 			'step_configs'      => $step_configs,
 		);
+		if ( null !== $agent_id ) {
+			$input['agent_id'] = $agent_id;
+		}
 
 		if ( $dry_run ) {
 			$input['validate_only'] = true;
-			$input['flows']         = array(
-				array(
-					'pipeline_id'       => $pipeline_id,
-					'flow_name'         => $flow_name,
-					'scheduling_config' => $scheduling_config,
-					'step_configs'      => $step_configs,
-				),
-			);
 		}
 
 		$ability = wp_get_ability( 'datamachine/create-flow' );
@@ -1040,13 +1044,6 @@ class FlowsCommand extends BaseCommand {
 
 		if ( ! empty( $result['configured_steps'] ) ) {
 			WP_CLI::log( sprintf( 'Configured steps: %s', implode( ', ', $result['configured_steps'] ) ) );
-		}
-
-		if ( ! empty( $result['configuration_errors'] ) ) {
-			WP_CLI::warning( 'Some step configurations failed:' );
-			foreach ( $result['configuration_errors'] as $error ) {
-				WP_CLI::log( sprintf( '  - %s: %s', $error['step_type'] ?? 'unknown', $error['error'] ?? 'unknown error' ) );
-			}
 		}
 
 		if ( 'json' === $format && isset( $result['flow_data'] ) ) {

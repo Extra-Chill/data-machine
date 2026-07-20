@@ -164,6 +164,37 @@ class CreateFlowAbility {
 		$agent_id          = isset( $input['agent_id'] ) ? (int) $input['agent_id'] : null;
 		$scheduling_config = $input['scheduling_config'] ?? array( 'interval' => 'manual' );
 		$flow_config       = $input['flow_config'] ?? array();
+		$step_configs      = $input['step_configs'] ?? array();
+		$validate_only     = ! empty( $input['validate_only'] );
+
+		if ( ! is_array( $scheduling_config ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'scheduling_config must be an object',
+			);
+		}
+
+		if ( ! is_array( $flow_config ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'flow_config must be an object',
+			);
+		}
+
+		if ( ! is_array( $step_configs ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'step_configs must be an object',
+			);
+		}
+
+		$step_config_validation = $this->validateCreateStepConfigs( $step_configs );
+		if ( true !== $step_config_validation ) {
+			return array(
+				'success' => false,
+				'error'   => $step_config_validation,
+			);
+		}
 
 		// Resolve the owning agent when the caller did not supply one. Agent-first
 		// scoping (#735) makes agent-scoped reads filter `WHERE agent_id = %d`, so a
@@ -210,8 +241,21 @@ class CreateFlowAbility {
 			$flow_data['agent_id'] = $agent_id;
 		}
 
+		global $wpdb;
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
+		$transaction_started = false !== $wpdb->query( 'START TRANSACTION' );
+		if ( ! $transaction_started ) {
+			return array(
+				'success' => false,
+				'error'   => 'Unable to start flow creation transaction',
+			);
+		}
+
 		$flow_id = $this->db_flows->create_flow( $flow_data );
 		if ( ! $flow_id ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
+			$wpdb->query( 'ROLLBACK' );
 			do_action(
 				'datamachine_log',
 				'error',
@@ -232,7 +276,9 @@ class CreateFlowAbility {
 
 		if ( ! empty( $pipeline_config ) ) {
 			$pipeline_steps = is_array( $pipeline_config ) ? array_values( $pipeline_config ) : array();
-			$this->syncStepsToFlow( $flow_id, $pipeline_id, $pipeline_steps, $pipeline_config );
+			if ( ! $this->syncStepsToFlow( $flow_id, $pipeline_id, $pipeline_steps, $pipeline_config ) ) {
+				return $this->rollbackCreation( $flow_id, 'Failed to sync pipeline steps to flow' );
+			}
 			$synced_steps = count( $pipeline_config );
 		}
 
@@ -242,26 +288,28 @@ class CreateFlowAbility {
 				do_action(
 					'datamachine_log',
 					'error',
-					'Failed to schedule flow — reverting to manual',
+					'Failed to schedule flow during creation',
 					array(
 						'flow_id' => $flow_id,
 						'error'   => $scheduling_result->get_error_message(),
 					)
 				);
 
-				// Revert to manual so the DB doesn't claim a schedule that
-				// has no backing AS action.
-				$this->db_flows->update_flow_scheduling( $flow_id, array( 'interval' => 'manual' ) );
+				return $this->rollbackCreation( $flow_id, $scheduling_result->get_error_message() );
 			}
 		}
 
-		$step_configs   = $input['step_configs'] ?? array();
 		$config_results = array(
 			'applied' => array(),
 			'errors'  => array(),
 		);
 		if ( ! empty( $step_configs ) ) {
 			$config_results = $this->applyStepConfigsToFlow( $flow_id, $step_configs );
+			if ( ! empty( $config_results['errors'] ) ) {
+				$first_error = $config_results['errors'][0];
+				$message     = is_array( $first_error ) ? ( $first_error['error'] ?? 'Failed to configure flow step' ) : (string) $first_error;
+				return $this->rollbackCreation( $flow_id, $message, $config_results['errors'] );
+			}
 		}
 
 		$configured_step_types = array_keys( $step_configs );
@@ -272,6 +320,35 @@ class CreateFlowAbility {
 		}
 
 		$flow = $this->db_flows->get_flow( $flow_id );
+		if ( ! $flow ) {
+			return $this->rollbackCreation( $flow_id, 'Failed to load created flow' );
+		}
+
+		if ( $validate_only ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
+			$wpdb->query( 'ROLLBACK' );
+
+			return array(
+				'success'      => true,
+				'valid'        => true,
+				'mode'         => 'validate_only',
+				'would_create' => array(
+					array(
+						'pipeline_id'        => $pipeline_id,
+						'pipeline_name'      => $pipeline['pipeline_name'] ?? '',
+						'flow_name'          => $flow_name,
+						'scheduling'         => $scheduling_config['interval'] ?? 'manual',
+						'step_configs_count' => count( $step_configs ),
+					),
+				),
+				'message'      => 'Validation passed. Would create 1 flow.',
+			);
+		}
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
+		if ( false === $wpdb->query( 'COMMIT' ) ) {
+			return $this->rollbackCreation( $flow_id, 'Failed to commit flow creation transaction' );
+		}
 
 		do_action(
 			'datamachine_log',
@@ -298,8 +375,34 @@ class CreateFlowAbility {
 			$result['configured_steps'] = $config_results['applied'];
 		}
 
-		if ( ! empty( $config_results['errors'] ) ) {
-			$result['configuration_errors'] = $config_results['errors'];
+		return $result;
+	}
+
+	/**
+	 * Roll back all writes made while creating a flow.
+	 *
+	 * @param int    $flow_id Flow ID allocated in the transaction.
+	 * @param string $error Error message.
+	 * @param array  $configuration_errors Optional structured configuration errors.
+	 * @return array Failure result.
+	 */
+	private function rollbackCreation( int $flow_id, string $error, array $configuration_errors = array() ): array {
+		global $wpdb;
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
+		$wpdb->query( 'ROLLBACK' );
+
+		if ( function_exists( 'as_unschedule_all_actions' ) ) {
+			as_unschedule_all_actions( 'datamachine_run_flow_now', array( $flow_id ), 'data-machine' );
+		}
+
+		$result = array(
+			'success' => false,
+			'error'   => $error,
+		);
+
+		if ( ! empty( $configuration_errors ) ) {
+			$result['configuration_errors'] = $configuration_errors;
 		}
 
 		return $result;
@@ -316,10 +419,25 @@ class CreateFlowAbility {
 		$shared_step_config = $input['shared_step_config'] ?? array();
 		$validate_only      = ! empty( $input['validate_only'] );
 
+		if ( ! is_array( $shared_step_config ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'shared_step_config must be an object',
+			);
+		}
+
 		$validation_errors = array();
 		$pipeline_cache    = array();
 
 		foreach ( $flows as $index => $flow_config ) {
+			if ( ! is_array( $flow_config ) ) {
+				$validation_errors[] = array(
+					'index' => $index,
+					'error' => 'Each flows entry must be an object',
+				);
+				continue;
+			}
+
 			$pipeline_id = $flow_config['pipeline_id'] ?? null;
 			$flow_name   = $flow_config['flow_name'] ?? null;
 
@@ -365,25 +483,45 @@ class CreateFlowAbility {
 			);
 		}
 
-		if ( $validate_only ) {
-			$preview = array();
-			foreach ( $flows as $index => $flow_config ) {
-				$pipeline_id       = (int) $flow_config['pipeline_id'];
-				$flow_name         = $flow_config['flow_name'];
-				$scheduling_config = $flow_config['scheduling_config'] ?? array( 'interval' => 'manual' );
-				$step_configs      = $flow_config['step_configs'] ?? array();
-
-				$merged_step_configs = array_merge( $shared_step_config, $step_configs );
-
-				$preview[] = array(
-					'pipeline_id'        => $pipeline_id,
-					'pipeline_name'      => $pipeline_cache[ $pipeline_id ]['pipeline_name'] ?? '',
-					'flow_name'          => $flow_name,
-					'scheduling'         => $scheduling_config['interval'] ?? 'manual',
-					'step_configs_count' => count( $merged_step_configs ),
+		$preview = array();
+		foreach ( $flows as $index => $flow_config ) {
+			$pipeline_id       = (int) $flow_config['pipeline_id'];
+			$flow_name         = $flow_config['flow_name'];
+			$scheduling_config = $flow_config['scheduling_config'] ?? array( 'interval' => 'manual' );
+			$step_configs      = $flow_config['step_configs'] ?? array();
+			if ( ! is_array( $step_configs ) ) {
+				return array(
+					'success' => false,
+					'error'   => sprintf( 'Validation failed for flow %d: step_configs must be an object', $index ),
 				);
 			}
 
+			$single_input = array(
+				'pipeline_id'       => $pipeline_id,
+				'flow_name'         => $flow_name,
+				'scheduling_config' => $scheduling_config,
+				'step_configs'      => array_merge( $shared_step_config, $step_configs ),
+				'validate_only'     => true,
+			);
+			if ( isset( $flow_config['agent_id'] ) ) {
+				$single_input['agent_id'] = $flow_config['agent_id'];
+			} elseif ( isset( $input['agent_id'] ) ) {
+				$single_input['agent_id'] = $input['agent_id'];
+			}
+
+			$single_result = $this->executeSingle( $single_input );
+			if ( ! $single_result['success'] ) {
+				return array(
+					'success' => false,
+					'error'   => sprintf( 'Validation failed for flow %d: %s', $index, $single_result['error'] ?? 'unknown error' ),
+					'errors'  => $single_result['configuration_errors'] ?? array(),
+				);
+			}
+
+			$preview[] = $single_result['would_create'][0];
+		}
+
+		if ( $validate_only ) {
 			return array(
 				'success'      => true,
 				'valid'        => true,
@@ -407,11 +545,15 @@ class CreateFlowAbility {
 			$merged_step_configs = array_merge( $shared_step_config, $step_configs );
 
 			$single_result = $this->executeSingle(
-				array(
-					'pipeline_id'       => $pipeline_id,
-					'flow_name'         => $flow_name,
-					'scheduling_config' => $scheduling_config,
-					'step_configs'      => $merged_step_configs,
+				array_filter(
+					array(
+						'pipeline_id'       => $pipeline_id,
+						'flow_name'         => $flow_name,
+						'scheduling_config' => $scheduling_config,
+						'step_configs'      => $merged_step_configs,
+						'agent_id'          => $flow_config['agent_id'] ?? ( $input['agent_id'] ?? null ),
+					),
+					static fn( $value ) => null !== $value
 				)
 			);
 
@@ -441,10 +583,6 @@ class CreateFlowAbility {
 
 			if ( ! empty( $single_result['configured_steps'] ) ) {
 				$created_entry['configured_steps'] = $single_result['configured_steps'];
-			}
-
-			if ( ! empty( $single_result['configuration_errors'] ) ) {
-				$created_entry['configuration_errors'] = $single_result['configuration_errors'];
 			}
 
 			$created[] = $created_entry;
