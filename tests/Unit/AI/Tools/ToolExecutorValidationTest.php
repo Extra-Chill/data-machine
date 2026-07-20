@@ -8,6 +8,7 @@
 namespace DataMachine\Tests\Unit\AI\Tools;
 
 use AgentsAPI\AI\Tools\WP_Agent_Tool_Parameters;
+use AgentsAPI\AI\WP_Agent_Provider_Turn_Request;
 use AgentsAPI\Core\Workspace\WP_Agent_Workspace_Scope;
 use DataMachine\Engine\AI\Actions\PendingActionStore;
 use DataMachine\Engine\AI\Tools\ToolExecutor;
@@ -236,6 +237,85 @@ class ToolExecutorValidationTest extends WP_UnitTestCase {
 
 		$this->assertTrue( $result['success'] );
 		$this->assertSame( 42, $result['result']['data']['query'] ?? null );
+	}
+
+	public function test_execute_tool_applies_authoritative_caller_context_bindings(): void {
+		$tools = $this->authoritativeCallerContextTools();
+
+		$injected = ToolExecutor::executeTool(
+			'caller_context_tool',
+			array( 'query' => 'model query' ),
+			$tools,
+			array(
+				'calling_user_id' => 42,
+				'bound_query'     => 'context query',
+			)
+		);
+		$override_attempt = ToolExecutor::executeTool(
+			'caller_context_tool',
+			array(
+				'calling_user_id' => 999,
+				'query'           => 'model query',
+			),
+			$tools,
+			array(
+				'calling_user_id' => 42,
+				'bound_query'     => 'context query',
+			)
+		);
+
+		$this->assertTrue( $injected['success'] );
+		$this->assertSame( 42, $injected['result']['data']['calling_user_id'] ?? null );
+		$this->assertSame( 'model query', $injected['result']['data']['query'] ?? null );
+		$this->assertTrue( $override_attempt['success'] );
+		$this->assertSame( 42, $override_attempt['result']['data']['calling_user_id'] ?? null );
+		$this->assertSame( 'model query', $override_attempt['result']['data']['query'] ?? null );
+	}
+
+	public function test_execute_tool_preserves_authoritative_caller_context_zero(): void {
+		$result = ToolExecutor::executeTool(
+			'caller_context_tool',
+			array(
+				'calling_user_id' => 999,
+				'query'           => 'model query',
+			),
+			$this->authoritativeCallerContextTools(),
+			array(
+				'calling_user_id' => 0,
+				'bound_query'     => 'context query',
+			)
+		);
+
+		$this->assertTrue( $result['success'] );
+		$this->assertSame( 0, $result['result']['data']['calling_user_id'] ?? null );
+	}
+
+	public function test_execute_tool_fails_closed_without_authoritative_caller_context(): void {
+		$result = ToolExecutor::executeTool(
+			'caller_context_tool',
+			array(
+				'calling_user_id' => 999,
+				'query'           => 'model query',
+			),
+			$this->authoritativeCallerContextTools(),
+			array( 'bound_query' => 'context query' )
+		);
+
+		$this->assertFalse( $result['success'] );
+		$this->assertSame( 'missing_required_parameters', $result['metadata']['error_type'] ?? null );
+		$this->assertSame( array( 'calling_user_id' ), $result['metadata']['missing_parameters'] ?? array() );
+	}
+
+	public function test_provider_schema_excludes_authoritative_caller_context_parameters(): void {
+		$request = new WP_Agent_Provider_Turn_Request(
+			array( array( 'role' => 'user', 'content' => 'Inspect context.' ) ),
+			$this->authoritativeCallerContextTools()
+		);
+		$schema = $request->toolDeclarations()['caller_context_tool']['parameters'] ?? array();
+
+		$this->assertArrayNotHasKey( 'calling_user_id', $schema['properties'] ?? array() );
+		$this->assertArrayHasKey( 'query', $schema['properties'] ?? array() );
+		$this->assertSame( array( 'query' ), $schema['required'] ?? array() );
 	}
 
 	public function test_execute_tool_does_not_satisfy_required_params_from_ambient_context_keys(): void {
@@ -639,6 +719,36 @@ class ToolExecutorValidationTest extends WP_UnitTestCase {
 		);
 	}
 
+	private function authoritativeCallerContextTools(): array {
+		return array(
+			'caller_context_tool' => array(
+				'name'               => 'caller_context_tool',
+				'class'              => TestToolHandler::class,
+				'method'             => 'handle_tool_call',
+				'description'        => 'Inspect caller context.',
+				'parameters'         => array(
+					'type'       => 'object',
+					'required'   => array( 'calling_user_id', 'query' ),
+					'properties' => array(
+						'calling_user_id' => array( 'type' => 'integer' ),
+						'query'           => array( 'type' => 'string' ),
+					),
+				),
+				'parameter_bindings' => array(
+					'calling_user_id' => array(
+						'source'        => 'caller_context',
+						'path'          => 'calling_user_id',
+						'authoritative' => true,
+					),
+					'query'           => array(
+						'source' => 'caller_context',
+						'path'   => 'bound_query',
+					),
+				),
+			),
+		);
+	}
+
 	private function invokeValidateMethod( array $tool_parameters, array $tool_def ): array {
 		return WP_Agent_Tool_Parameters::validateRequiredParameters( $tool_parameters, $tool_def );
 	}
@@ -649,7 +759,7 @@ class TestToolHandler {
 	public function handle_tool_call( array $parameters, array $tool_def = array() ): array {
 		return array(
 			'success'   => true,
-			'data'      => array( 'query' => $parameters['query'] ?? '' ),
+			'data'      => $parameters,
 			'tool_name' => 'test_tool',
 		);
 	}

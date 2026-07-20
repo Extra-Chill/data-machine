@@ -63,7 +63,9 @@ class ToolExecutor {
 	): array {
 		$core           = new WP_Agent_Tool_Execution_Core();
 		$execution      = new ToolExecutionCore();
-		$tool_context   = array_merge( $client_context, $payload );
+		$tool_context                   = array_merge( $client_context, $payload );
+		$tool_context['client_context'] = $client_context;
+		$tool_context['caller_context'] = $payload;
 		$prepared       = $core->prepareWP_Agent_Tool_Call( $tool_name, $tool_parameters, $available_tools, $tool_context );
 		if ( empty( $prepared['ready'] ) ) {
 			unset( $prepared['ready'] );
