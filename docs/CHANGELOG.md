@@ -2,6 +2,14 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.164.3] - 2026-07-20
+
+### Changed
+- extract duplicate keyword filters into shared traits
+
+### Fixed
+- propagate acting caller to tool policy
+
 ## [0.164.2] - 2026-07-19
 
 ### Fixed
