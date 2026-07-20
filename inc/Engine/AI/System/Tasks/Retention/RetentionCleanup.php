@@ -522,8 +522,9 @@ class RetentionCleanup {
 	 *
 	 * Sets `engine_data = NULL` on jobs that have been terminal for longer than
 	 * engineDataTerminalMaxAgeDays(), KEEPING the row. The heavy working-state
-	 * blob is the only thing dropped; status, timing, counts and the promoted
-	 * handler_slug column survive for stats/history/dedup. Whole-row deletion
+	 * blob is the only thing dropped; status, timing, counts, handler_slug, and
+	 * retention-safe request_fingerprint/operation columns survive for
+	 * stats/history/idempotent replay. Whole-row deletion
 	 * (cleanupCompletedJobs/cleanupFailedJobs) handles the longer window.
 	 *
 	 * The UPDATE is batched by id (bounded LIMIT per pass, shared iteration +

@@ -14,6 +14,13 @@ use DataMachine\Core\JobStatus;
 use WP_UnitTestCase;
 
 class FailJobAbilityTest extends WP_UnitTestCase {
+	private int $admin_id;
+
+	public function set_up(): void {
+		parent::set_up();
+		$this->admin_id = self::factory()->user->create( array( 'role' => 'administrator' ) );
+		wp_set_current_user( $this->admin_id );
+	}
 
 	public function test_fail_job_allows_pending_jobs(): void {
 		$jobs_db = new Jobs();
@@ -58,6 +65,7 @@ class FailJobAbilityTest extends WP_UnitTestCase {
 				'flow_id'     => 'direct',
 				'source'      => 'system',
 				'label'       => 'Pending cancellation test',
+				'user_id'     => $this->admin_id,
 			)
 		);
 

@@ -22,6 +22,7 @@ namespace DataMachine\Engine\Tasks;
 
 defined( 'ABSPATH' ) || exit;
 
+use DataMachine\Abilities\Job\ExecuteWorkflowAbility;
 use DataMachine\Core\ActionScheduler\BatchScheduler;
 use DataMachine\Core\Agents\AgentIdentityResolver;
 use DataMachine\Core\AbilityResult;
@@ -161,21 +162,6 @@ class TaskScheduler {
 			return false;
 		}
 
-		// Delegate to the execute-workflow ability.
-		$ability = wp_get_ability( 'datamachine/execute-workflow' );
-
-		if ( ! $ability ) {
-			$message = 'TaskScheduler: datamachine/execute-workflow ability not available';
-			do_action(
-				'datamachine_log',
-				'error',
-				$message,
-				array( 'task_type' => $taskType )
-			);
-			self::recordScheduleError( $message, 'task_scheduler_execute_workflow_unavailable' );
-			return false;
-		}
-
 		// Resolve agent identity from the context when present. Tasks that can
 		// safely run as explicit system maintenance may opt out via
 		// SystemTask::requiresAgentContext(); all other queued task work must have
@@ -266,11 +252,15 @@ class TaskScheduler {
 			$initial_data['resumable'] = true;
 		}
 
-		$result = AbilityResult::normalize( $ability->execute( array(
-			'workflow'     => $workflow,
-			'timestamp'    => $params['scheduled_at'] ?? null,
-			'initial_data' => $initial_data,
-		) ) );
+		$result = AbilityResult::normalize(
+			( new ExecuteWorkflowAbility( false ) )->executeInternal(
+				array(
+					'workflow'     => $workflow,
+					'timestamp'    => $params['scheduled_at'] ?? null,
+					'initial_data' => $initial_data,
+				)
+			)
+		);
 
 		if ( empty( $result['success'] ) ) {
 			$message    = 'TaskScheduler: Workflow execution failed for ' . $taskType . ': ' . ( $result['error'] ?? 'Unknown error' );

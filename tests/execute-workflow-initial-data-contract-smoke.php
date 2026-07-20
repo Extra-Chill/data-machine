@@ -39,22 +39,20 @@ function build_execute_workflow_create_args_for_contract_test( array $initial_da
 /**
  * Mirror of ExecuteWorkflowAbility::execute()'s engine data assembly.
  */
-function build_execute_workflow_engine_data_for_contract_test( int $job_id, array $configs, array $initial_data ): array {
+function build_execute_workflow_engine_data_for_contract_test( int $job_id, array $configs, array $initial_data, array $ownership ): array {
 	$engine_data                    = $initial_data;
 	$engine_data['flow_config']     = $configs['flow_config'];
 	$engine_data['pipeline_config'] = $configs['pipeline_config'];
 
 	$caller_snapshot = is_array( $engine_data['job'] ?? null ) ? $engine_data['job'] : array();
-	$job_snapshot    = array_merge(
-		array( 'user_id' => (int) ( $initial_data['user_id'] ?? 0 ) ),
-		$caller_snapshot,
-		array( 'job_id' => $job_id )
-	);
-	if ( ! empty( $initial_data['agent_id'] ) && empty( $job_snapshot['agent_id'] ) ) {
-		$job_snapshot['agent_id'] = (int) $initial_data['agent_id'];
-	}
-	if ( ! empty( $initial_data['agent_slug'] ) && empty( $job_snapshot['agent_slug'] ) ) {
-		$job_snapshot['agent_slug'] = sanitize_title( (string) $initial_data['agent_slug'] );
+	$job_snapshot            = $caller_snapshot;
+	$job_snapshot['user_id'] = (int) $ownership['user_id'];
+	$job_snapshot['job_id']  = $job_id;
+	if ( ! empty( $ownership['agent_id'] ) ) {
+		$job_snapshot['agent_id']   = (int) $ownership['agent_id'];
+		$job_snapshot['agent_slug'] = sanitize_title( (string) $ownership['agent_slug'] );
+	} else {
+		unset( $job_snapshot['agent_id'], $job_snapshot['agent_slug'] );
 	}
 	$engine_data['job'] = $job_snapshot;
 
@@ -109,7 +107,16 @@ $initial_data = array(
 	'task_type'       => 'wiki_maintain_article',
 );
 
-$engine_data = build_execute_workflow_engine_data_for_contract_test( 100, $configs, $initial_data );
+$engine_data = build_execute_workflow_engine_data_for_contract_test(
+	100,
+	$configs,
+	$initial_data,
+	array(
+		'user_id'    => 1,
+		'agent_id'   => 2,
+		'agent_slug' => 'Wayward Son',
+	)
+);
 datamachine_assert_same( $generated_flow_config, $engine_data['flow_config'], 'generated flow_config is preserved' );
 datamachine_assert_same( false, isset( $engine_data['flow_config']['poisoned_flow'] ), 'caller flow_config is not retained' );
 datamachine_assert_same( $generated_pipeline_config, $engine_data['pipeline_config'], 'generated pipeline_config is preserved' );
@@ -129,7 +136,7 @@ datamachine_assert_same( 2, $engine_data['job']['agent_id'], 'flat agent_id fill
 datamachine_assert_same( 'wayward-son', $engine_data['job']['agent_slug'], 'flat agent_slug fills missing job.agent_slug' );
 datamachine_assert_same( 1, $engine_data['job']['user_id'], 'job.user_id preserved from caller snapshot' );
 
-echo "\n[4] caller job snapshot identity is preserved when provided\n";
+echo "\n[4] authoritative ownership overrides caller job snapshot identity\n";
 $initial_data_with_snapshot = array(
 	'agent_id' => 2,
 	'user_id'  => 1,
@@ -139,9 +146,18 @@ $initial_data_with_snapshot = array(
 		'job_id'   => 777,
 	),
 );
-$engine_data_with_snapshot = build_execute_workflow_engine_data_for_contract_test( 101, $configs, $initial_data_with_snapshot );
-datamachine_assert_same( 9, $engine_data_with_snapshot['job']['agent_id'], 'caller job.agent_id remains authoritative over flat agent_id' );
-datamachine_assert_same( 8, $engine_data_with_snapshot['job']['user_id'], 'caller job.user_id remains authoritative over flat user_id' );
+$engine_data_with_snapshot = build_execute_workflow_engine_data_for_contract_test(
+	101,
+	$configs,
+	$initial_data_with_snapshot,
+	array(
+		'user_id'    => 42,
+		'agent_id'   => 3,
+		'agent_slug' => 'Effective Agent',
+	)
+);
+datamachine_assert_same( 3, $engine_data_with_snapshot['job']['agent_id'], 'effective agent overrides caller job.agent_id' );
+datamachine_assert_same( 42, $engine_data_with_snapshot['job']['user_id'], 'acting user overrides caller job.user_id' );
 datamachine_assert_same( 101, $engine_data_with_snapshot['job']['job_id'], 'engine job_id remains authoritative over caller job.job_id' );
 
 echo "\n[5] direct workflow packet handoff is engine-backed\n";

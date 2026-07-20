@@ -10,6 +10,9 @@
 
 namespace DataMachine\Abilities\Job;
 
+use DataMachine\Core\DirectJobEnqueuer;
+use DataMachine\Core\JobRetryPolicy;
+
 defined( 'ABSPATH' ) || exit;
 
 class RetryJobAbility {
@@ -55,6 +58,9 @@ class RetryJobAbility {
 							'job_id'          => array( 'type' => 'integer' ),
 							'previous_status' => array( 'type' => 'string' ),
 							'prompt_requeued' => array( 'type' => 'boolean' ),
+							'direct_requeued' => array( 'type' => 'boolean' ),
+							'retryable'       => array( 'type' => 'boolean' ),
+							'error_code'      => array( 'type' => 'string' ),
 							'message'         => array( 'type' => 'string' ),
 							'error'           => array( 'type' => 'string' ),
 						),
@@ -97,6 +103,10 @@ class RetryJobAbility {
 			);
 		}
 
+		if ( ! $this->canAccessJob( $job ) ) {
+			return $this->jobAccessDenied();
+		}
+
 		$previous_status = $job['status'] ?? '';
 
 		// Unless forced, only allow retrying failed or processing jobs.
@@ -109,6 +119,64 @@ class RetryJobAbility {
 
 		// Retrieve engine data for prompt backup before marking failed.
 		$engine_data = $this->db_jobs->retrieve_engine_data( $job_id );
+
+		if ( 'direct' === (string) ( $job['flow_id'] ?? '' ) ) {
+			if ( empty( $engine_data['flow_config'] ) ) {
+				return array(
+					'success' => false,
+					'error'   => 'Direct workflow execution data is no longer available for retry.',
+				);
+			}
+
+			$flow_step_id = JobRetryPolicy::resolveDirectResumeStepId( $engine_data );
+			if ( '' === $flow_step_id ) {
+				return array(
+					'success' => false,
+					'error'   => 'Direct workflow has no safe resume step.',
+				);
+			}
+
+			if ( 'processing' === $previous_status ) {
+				$generation = (int) ( $job['operation_generation'] ?? 0 );
+				$token      = (string) ( $job['operation_claim_token'] ?? '' );
+				if ( $generation > 0 && '' !== $token && ( new DirectJobEnqueuer( $this->db_jobs ) )->hasLiveGenerationAction( $job_id, $generation, $token ) ) {
+					return array(
+						'success'         => false,
+						'job_id'          => $job_id,
+						'previous_status' => $previous_status,
+						'retryable'       => true,
+						'error_code'      => 'job_execution_in_progress',
+						'error'           => sprintf( 'Job %d still has live execution for generation %d; retry after it exits or is recovered.', $job_id, $generation ),
+					);
+				}
+				$this->db_jobs->complete_job( $job_id, 'failed - manual_retry' );
+			}
+			if ( ! $this->db_jobs->reopen_failed_job( $job_id ) ) {
+				return array(
+					'success' => false,
+					'error'   => sprintf( 'Job %d could not be reopened for retry.', $job_id ),
+				);
+			}
+
+			$enqueue = ( new DirectJobEnqueuer( $this->db_jobs ) )->enqueue( $job_id, $flow_step_id );
+			if ( empty( $enqueue['success'] ) ) {
+				$this->db_jobs->complete_job( $job_id, 'failed - retry_enqueue_failed' );
+				return array(
+					'success' => false,
+					'error'   => sprintf( 'Job %d retry could not be enqueued.', $job_id ),
+				);
+			}
+
+			\DataMachine\Core\RunMetrics::increment( $job_id, 'retried' );
+			return array(
+				'success'         => true,
+				'job_id'          => $job_id,
+				'previous_status' => $previous_status,
+				'prompt_requeued' => false,
+				'direct_requeued' => true,
+				'message'         => sprintf( 'Job %d direct workflow retry enqueued.', $job_id ),
+			);
+		}
 
 		// Mark as failed for retry.
 		\DataMachine\Core\RunMetrics::increment( $job_id, 'retried' );

@@ -60,6 +60,15 @@ class ExecuteStepAbility {
 								'type'        => 'string',
 								'description' => __( 'Flow step ID to execute.', 'data-machine' ),
 							),
+							'operation_generation' => array(
+								'type'        => 'integer',
+								'minimum'     => 0,
+								'description' => __( 'Direct workflow execution generation.', 'data-machine' ),
+							),
+							'operation_claim_token' => array(
+								'type'        => 'string',
+								'description' => __( 'Direct workflow enqueue ownership token.', 'data-machine' ),
+							),
 						),
 					),
 					'output_schema'       => array(
@@ -68,6 +77,9 @@ class ExecuteStepAbility {
 							'success'      => array( 'type' => 'boolean' ),
 							'step_success' => array( 'type' => 'boolean' ),
 							'outcome'      => array( 'type' => 'string' ),
+							'stale_generation' => array( 'type' => 'boolean' ),
+							'deferred'         => array( 'type' => 'boolean' ),
+							'retryable'        => array( 'type' => 'boolean' ),
 							'error'        => array( 'type' => 'string' ),
 						),
 					),
@@ -97,6 +109,8 @@ class ExecuteStepAbility {
 	public function execute( array $input ): array {
 		$job_id       = (int) ( $input['job_id'] ?? 0 );
 		$flow_step_id = (string) ( $input['flow_step_id'] ?? '' );
+		$operation_generation = max( 0, (int) ( $input['operation_generation'] ?? 0 ) );
+		$operation_claim_token = (string) ( $input['operation_claim_token'] ?? '' );
 		$job          = $this->db_jobs->get_job( $job_id );
 
 		if ( ! $job ) {
@@ -104,6 +118,16 @@ class ExecuteStepAbility {
 				'success' => false,
 				'error'   => sprintf( 'Job %d not found.', $job_id ),
 			);
+		}
+
+		if ( $operation_generation > 0 ) {
+			$admission = $this->operationGenerationAdmission( $job, $operation_generation, $operation_claim_token );
+			if ( 'pending_commit' === $admission ) {
+				return $this->deferOperationGeneration( $job_id, $flow_step_id, $operation_generation, $operation_claim_token );
+			}
+			if ( 'committed' !== $admission ) {
+				return $this->staleOperationGeneration( $job_id, $operation_generation, 'is stale or was not durably committed' );
+			}
 		}
 
 		$current_status = (string) ( $job['status'] ?? '' );
@@ -130,6 +154,13 @@ class ExecuteStepAbility {
 				'error'          => $terminal_after_start ? sprintf( 'Job %d has terminal status "%s"; step execution skipped.', $job_id, $current_status ) : sprintf( 'Job %d could not be started from status "%s".', $job_id, $current_status ),
 				'terminal_state' => $terminal_after_start ? $current_status : null,
 			);
+		}
+
+		if ( $operation_generation > 0 ) {
+			$job_before_side_effect = $this->db_jobs->get_job( $job_id );
+			if ( ! is_array( $job_before_side_effect ) || 'committed' !== $this->operationGenerationAdmission( $job_before_side_effect, $operation_generation, $operation_claim_token ) ) {
+				return $this->staleOperationGeneration( $job_id, $operation_generation, 'lost durable ownership before execution' );
+			}
 		}
 
 		try {
@@ -207,6 +238,12 @@ class ExecuteStepAbility {
 			);
 
 			$step_output      = $flow_step->execute( $payload );
+			if ( $operation_generation > 0 ) {
+				$job_after_execution = $this->db_jobs->get_job( $job_id );
+				if ( ! is_array( $job_after_execution ) || 'committed' !== $this->operationGenerationAdmission( $job_after_execution, $operation_generation, $operation_claim_token ) ) {
+					return $this->staleOperationGeneration( $job_id, $operation_generation, 'was superseded during execution' );
+				}
+			}
 			$execution_result = StepExecutionResult::fromStepOutput( $step_output, $step_type );
 			$dataPackets      = $execution_result['packets'];
 			$step_success     = (bool) $execution_result['success'];
@@ -245,6 +282,13 @@ class ExecuteStepAbility {
 				)
 			);
 
+			if ( $operation_generation > 0 ) {
+				$job_before_routing = $this->db_jobs->get_job( $job_id );
+				if ( ! is_array( $job_before_routing ) || 'committed' !== $this->operationGenerationAdmission( $job_before_routing, $operation_generation, $operation_claim_token ) ) {
+					return $this->staleOperationGeneration( $job_id, $operation_generation, 'was superseded before routing' );
+				}
+			}
+
 			$result = $this->routeAfterExecution(
 				$job_id,
 				$flow_step_id,
@@ -278,6 +322,12 @@ class ExecuteStepAbility {
 
 			return $result;
 		} catch ( \Throwable $e ) {
+			if ( $operation_generation > 0 ) {
+				$job_after_exception = $this->db_jobs->get_job( $job_id );
+				if ( ! is_array( $job_after_exception ) || 'committed' !== $this->operationGenerationAdmission( $job_after_exception, $operation_generation, $operation_claim_token ) ) {
+					return $this->staleOperationGeneration( $job_id, $operation_generation, 'threw after being superseded' );
+				}
+			}
 			RunMetrics::recordStepResult(
 				$job_id,
 				$flow_step_id,
@@ -314,6 +364,51 @@ class ExecuteStepAbility {
 				'error'   => $e->getMessage(),
 			);
 		}
+	}
+
+	private function operationGenerationAdmission( array $job, int $generation, string $token ): string {
+		if ( $generation <= 0 ) {
+			return 'committed';
+		}
+		if ( '' === $token || $generation !== (int) ( $job['operation_generation'] ?? 0 ) || ! hash_equals( $token, (string) ( $job['operation_claim_token'] ?? '' ) ) ) {
+			return 'stale';
+		}
+		if ( 'enqueued' === ( $job['operation_state'] ?? '' ) && (int) ( $job['operation_action_id'] ?? 0 ) > 0 ) {
+			return 'committed';
+		}
+
+		return 'enqueuing' === ( $job['operation_state'] ?? '' ) ? 'pending_commit' : 'stale';
+	}
+
+	private function deferOperationGeneration( int $job_id, string $flow_step_id, int $generation, string $token ): array {
+		$action_id = function_exists( 'as_schedule_single_action' )
+			? as_schedule_single_action(
+				time() + 1,
+				'datamachine_execute_step',
+				array(
+					'job_id'               => $job_id,
+					'flow_step_id'         => $flow_step_id,
+					'operation_generation' => $generation,
+					'operation_claim_token' => $token,
+				),
+				'data-machine'
+			)
+			: 0;
+
+		return array(
+			'success'   => false,
+			'deferred'  => true,
+			'retryable' => true,
+			'error'     => $action_id > 0 ? 'Execution deferred until enqueue generation is durably committed.' : 'Execution generation is not durably committed and could not be deferred.',
+		);
+	}
+
+	private function staleOperationGeneration( int $job_id, int $generation, string $reason ): array {
+		return array(
+			'success'          => false,
+			'error'            => sprintf( 'Job %d execution generation %d %s.', $job_id, $generation, $reason ),
+			'stale_generation' => true,
+		);
 	}
 
 	/**

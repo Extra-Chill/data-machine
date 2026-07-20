@@ -157,6 +157,18 @@ class GetJobsAbility {
 		$order       = $input['order'] ?? 'DESC';
 		$fields      = $input['fields'] ?? null;
 		$metadata    = \DataMachine\Core\ExecutionQuery::normalize_metadata_filters( $input['metadata'] ?? array() );
+		$ownership_scope = $this->jobCollectionScope(
+			null !== $user_id ? (int) $user_id : null,
+			null !== $agent_id ? (int) $agent_id : null
+		);
+		if ( isset( $ownership_scope['error'] ) ) {
+			return array(
+				'success'    => false,
+				'error_code' => 'job_access_denied',
+				'error'      => $ownership_scope['error'],
+				'status'     => 403,
+			);
+		}
 
 		// Direct job lookup by ID - bypasses pagination and filters.
 		if ( $job_id ) {
@@ -178,6 +190,10 @@ class GetJobsAbility {
 					'offset'          => $offset,
 					'filters_applied' => array( 'job_id' => (int) $job_id ),
 				);
+			}
+
+			if ( ! $this->canAccessJob( $job ) ) {
+				return $this->jobAccessDenied();
 			}
 
 			$jobs_enriched = $this->enrichJobNames( array( $job ) );
@@ -231,11 +247,11 @@ class GetJobsAbility {
 			$filters_applied['handler'] = $args['handler'];
 		}
 
-		if ( null !== $agent_id ) {
-			$args['agent_id']            = (int) $agent_id;
+		if ( isset( $ownership_scope['agent_id'] ) ) {
+			$args['agent_id']            = $ownership_scope['agent_id'];
 			$filters_applied['agent_id'] = $args['agent_id'];
-		} elseif ( null !== $user_id ) {
-			$args['user_id']            = (int) $user_id;
+		} elseif ( isset( $ownership_scope['user_id'] ) ) {
+			$args['user_id']            = $ownership_scope['user_id'];
 			$filters_applied['user_id'] = $args['user_id'];
 		}
 

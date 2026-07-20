@@ -617,7 +617,7 @@ class JobArtifacts {
 		return $ref;
 	}
 
-	private function job_id_from_artifact_ref( string $artifact_ref ): int {
+	public function job_id_from_artifact_ref( string $artifact_ref ): int {
 		if ( ! preg_match( '#^datamachine://jobs/(\d+)/artifacts/#', $artifact_ref, $matches ) ) {
 			return 0;
 		}

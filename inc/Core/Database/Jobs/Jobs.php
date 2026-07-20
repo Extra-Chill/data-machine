@@ -307,12 +307,165 @@ class Jobs extends BaseRepository {
 			$format[]                = '%s';
 		}
 
+		if ( isset( $job_data['engine_data'] ) && is_array( $job_data['engine_data'] ) ) {
+			$encoded_engine_data = wp_json_encode( $job_data['engine_data'] );
+			if ( false === $encoded_engine_data ) {
+				return false;
+			}
+
+			$data['engine_data'] = $encoded_engine_data;
+			$format[]            = '%s';
+		}
+
+		foreach ( array( 'request_fingerprint', 'operation_state', 'operation_step_id' ) as $operation_field ) {
+			if ( isset( $job_data[ $operation_field ] ) && is_scalar( $job_data[ $operation_field ] ) ) {
+				$data[ $operation_field ] = sanitize_text_field( (string) $job_data[ $operation_field ] );
+				$format[]                 = '%s';
+			}
+		}
+
 		return array(
 			'data'        => $data,
 			'format'      => $format,
 			'pipeline_id' => $pipeline_id,
 			'flow_id'     => $flow_id,
 		);
+	}
+
+	/**
+	 * Claim responsibility for durably enqueueing a job operation.
+	 *
+	 * Failed/preparing operations are immediately reclaimable. An enqueuing
+	 * claim becomes reclaimable after the lease to recover a crashed submitter.
+	 *
+	 * @param int $job_id        Job ID.
+	 * @param int $lease_seconds Claim lease in seconds.
+	 * @return array{token:string,generation:int}|false Claim details, or false when another generation owns it.
+	 */
+	public function claim_operation_enqueue( int $job_id, int $lease_seconds = 30 ): array|false {
+		if ( $job_id <= 0 ) {
+			return false;
+		}
+
+		$lease_cutoff = gmdate( 'Y-m-d H:i:s', time() - max( 1, $lease_seconds ) );
+		$claimed_at   = gmdate( 'Y-m-d H:i:s' );
+		$claim_token  = bin2hex( random_bytes( 16 ) );
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$updated = $this->wpdb->query(
+			$this->wpdb->prepare(
+				"UPDATE %i SET operation_state = 'enqueuing', operation_claimed_at = %s, operation_claim_token = %s, operation_generation = COALESCE(operation_generation, 0) + 1 WHERE job_id = %d AND (operation_state IN ('preparing', 'enqueue_failed') OR (operation_state = 'enqueuing' AND (operation_claimed_at IS NULL OR operation_claimed_at < %s)))",
+				$this->table_name,
+				$claimed_at,
+				$claim_token,
+				$job_id,
+				$lease_cutoff
+			)
+		);
+
+		if ( 1 !== (int) $updated ) {
+			return false;
+		}
+
+		$job = $this->get_job( $job_id );
+		if ( ! is_array( $job ) || ! hash_equals( $claim_token, (string) ( $job['operation_claim_token'] ?? '' ) ) ) {
+			return false;
+		}
+
+		return array(
+			'token'      => $claim_token,
+			'generation' => (int) ( $job['operation_generation'] ?? 0 ),
+		);
+	}
+
+	/**
+	 * Check whether an enqueue claim still owns the active generation.
+	 */
+	public function owns_operation_enqueue_claim( int $job_id, string $token, int $generation ): bool {
+		$job = $this->get_job( $job_id );
+
+		return is_array( $job )
+			&& 'enqueuing' === ( $job['operation_state'] ?? '' )
+			&& $generation === (int) ( $job['operation_generation'] ?? 0 )
+			&& '' !== $token
+			&& hash_equals( $token, (string) ( $job['operation_claim_token'] ?? '' ) );
+	}
+
+	/**
+	 * Make an enqueued-but-unowned pending operation reclaimable.
+	 *
+	 * @param int $job_id Job ID.
+	 * @return bool Whether the operation was reset.
+	 */
+	public function reclaim_missing_operation_action( int $job_id ): bool {
+		if ( $job_id <= 0 ) {
+			return false;
+		}
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$updated = $this->wpdb->query(
+			$this->wpdb->prepare(
+				"UPDATE %i SET operation_state = 'enqueue_failed', operation_action_id = NULL WHERE job_id = %d AND status = 'pending' AND operation_state = 'enqueued'",
+				$this->table_name,
+				$job_id
+			)
+		);
+
+		return 1 === (int) $updated;
+	}
+
+	/**
+	 * Record the durable enqueue outcome for an operation.
+	 *
+	 * @param int    $job_id   Job ID.
+	 * @param string $state    enqueued or enqueue_failed.
+	 * @param int    $action_id  Action Scheduler action ID when available.
+	 * @param string $token      Active claim token.
+	 * @param int    $generation Active claim generation.
+	 * @return bool
+	 */
+	public function finish_operation_enqueue( int $job_id, string $state, int $action_id, string $token, int $generation ): bool {
+		if ( $job_id <= 0 || '' === $token || $generation <= 0 || ! in_array( $state, array( 'enqueued', 'enqueue_failed' ), true ) ) {
+			return false;
+		}
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$updated = $this->wpdb->query(
+			$this->wpdb->prepare(
+				'UPDATE %i SET operation_state = %s, operation_claimed_at = NULL, operation_action_id = %d WHERE job_id = %d AND operation_state = %s AND operation_generation = %d AND operation_claim_token = %s',
+				$this->table_name,
+				$state,
+				max( 0, $action_id ),
+				$job_id,
+				'enqueuing',
+				$generation,
+				$token
+			)
+		);
+
+		return 1 === (int) $updated;
+	}
+
+	/**
+	 * Reopen a failed job for an explicit retry.
+	 *
+	 * @param int $job_id Job ID.
+	 * @return bool Whether the failed row was reopened.
+	 */
+	public function reopen_failed_job( int $job_id ): bool {
+		if ( $job_id <= 0 ) {
+			return false;
+		}
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$updated = $this->wpdb->query(
+			$this->wpdb->prepare(
+				"UPDATE %i SET status = 'pending', completed_at = NULL, operation_state = 'preparing', operation_claimed_at = NULL, operation_claim_token = NULL, operation_action_id = NULL WHERE job_id = %d AND status LIKE 'failed%'",
+				$this->table_name,
+				$job_id
+			)
+		);
+
+		return 1 === (int) $updated;
 	}
 
 	/**
@@ -966,7 +1119,8 @@ class Jobs extends BaseRepository {
 		$run_metadata     = new RunMetadata();
 		$matching_job_ids = $run_metadata->query_job_ids( $metadata_filters, $per_page, $offset );
 		$total            = $run_metadata->count_jobs( $metadata_filters );
-		if ( ! empty( $matching_job_ids ) || $total > 0 ) {
+		$has_ownership_scope = isset( $args['user_id'] ) || isset( $args['agent_id'] );
+		if ( ! $has_ownership_scope && ( ! empty( $matching_job_ids ) || $total > 0 ) ) {
 			if ( empty( $matching_job_ids ) ) {
 				return array(
 					'jobs'       => array(),
@@ -2043,6 +2197,13 @@ class Jobs extends BaseRepository {
             engine_data longtext NULL,
             handler_slug varchar(100) NULL DEFAULT NULL,
             idempotency_key varchar(191) NULL DEFAULT NULL,
+			request_fingerprint char(64) NULL DEFAULT NULL,
+			operation_state varchar(32) NULL DEFAULT NULL,
+			operation_step_id varchar(191) NULL DEFAULT NULL,
+			operation_claimed_at datetime NULL DEFAULT NULL,
+			operation_claim_token varchar(64) NULL DEFAULT NULL,
+			operation_generation bigint(20) unsigned NOT NULL DEFAULT 0,
+			operation_action_id bigint(20) unsigned NULL DEFAULT NULL,
             created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
             completed_at datetime NULL DEFAULT NULL,
             PRIMARY KEY  (job_id),
@@ -2065,6 +2226,7 @@ class Jobs extends BaseRepository {
 		self::migrate_task_type_column( $table_name );
 		self::migrate_handler_slug_column( $table_name );
 		self::migrate_idempotency_key_column( $table_name );
+		self::migrate_operation_columns( $table_name );
 		self::migrate_indexes( $table_name );
 
 		do_action(
@@ -2485,6 +2647,34 @@ class Jobs extends BaseRepository {
 		}
 
 		self::ensure_jobs_index( $table_name, 'idx_idempotency_key', 'UNIQUE INDEX', '(idempotency_key)' );
+	}
+
+	/**
+	 * Add retention-safe operation metadata used by idempotent job submission.
+	 *
+	 * @param string $table_name Fully qualified jobs table name.
+	 */
+	private static function migrate_operation_columns( string $table_name ): void {
+		global $wpdb;
+
+		$columns = array(
+			'request_fingerprint'  => 'char(64) NULL DEFAULT NULL',
+			'operation_state'      => 'varchar(32) NULL DEFAULT NULL',
+			'operation_step_id'    => 'varchar(191) NULL DEFAULT NULL',
+			'operation_claimed_at' => 'datetime NULL DEFAULT NULL',
+			'operation_claim_token' => 'varchar(64) NULL DEFAULT NULL',
+			'operation_generation' => 'bigint(20) unsigned NOT NULL DEFAULT 0',
+			'operation_action_id'  => 'bigint(20) unsigned NULL DEFAULT NULL',
+		);
+
+		foreach ( $columns as $column => $definition ) {
+			if ( BaseRepository::column_exists( $table_name, $column, $wpdb ) ) {
+				continue;
+			}
+
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.SchemaChange,WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Fixed schema identifiers and definitions.
+			$wpdb->query( "ALTER TABLE {$table_name} ADD COLUMN {$column} {$definition}" );
+		}
 	}
 
 	/**
