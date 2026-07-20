@@ -111,14 +111,14 @@ function datamachine_register_execution_engine() {
 	 */
 	add_action(
 		'datamachine_execute_step',
-		function ( $job_id, string $flow_step_id, ?array $dataPackets = null ) {
-			$dataPackets;
+		function ( $job_id, string $flow_step_id, $operation_generation = 0 ) {
 			$ability = wp_get_ability( 'datamachine/execute-step' );
 			if ( $ability ) {
 				$ability->execute(
 					array(
-						'job_id'       => (int) $job_id,
-						'flow_step_id' => $flow_step_id,
+						'job_id'               => (int) $job_id,
+						'flow_step_id'          => $flow_step_id,
+						'operation_generation' => is_numeric( $operation_generation ) ? (int) $operation_generation : 0,
 					)
 				);
 			}

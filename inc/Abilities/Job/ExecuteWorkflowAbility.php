@@ -86,6 +86,8 @@ class ExecuteWorkflowAbility {
 							'step_count'     => array( 'type' => 'integer' ),
 							'dry_run'        => array( 'type' => 'boolean' ),
 							'replayed'       => array( 'type' => 'boolean' ),
+							'retryable'      => array( 'type' => 'boolean' ),
+							'enqueue_state'  => array( 'type' => 'string' ),
 							'message'        => array( 'type' => 'string' ),
 							'error'          => array( 'type' => 'string' ),
 						),
@@ -279,7 +281,6 @@ class ExecuteWorkflowAbility {
 		$existing_engine_data['job']           = is_array( $existing_engine_data['job'] ?? null ) ? $existing_engine_data['job'] : array();
 		$existing_engine_data['job']['job_id'] = $job_id;
 		if ( ! $this->db_jobs->store_engine_data( $job_id, $existing_engine_data ) ) {
-			$this->db_jobs->finish_operation_enqueue( $job_id, 'enqueue_failed' );
 			return array(
 				'success' => false,
 				'error'   => 'Failed to persist job execution data; replay may retry the operation.',
@@ -293,8 +294,10 @@ class ExecuteWorkflowAbility {
 		);
 		if ( empty( $enqueue['success'] ) ) {
 			return array(
-				'success' => false,
-				'error'   => 'Failed to durably enqueue workflow execution; replay may retry the operation.',
+				'success'    => false,
+				'error'      => (string) ( $enqueue['error'] ?? 'enqueue_failed' ),
+				'retryable'  => ! empty( $enqueue['retryable'] ),
+				'enqueue_state' => (string) ( $enqueue['state'] ?? 'enqueue_failed' ),
 			);
 		}
 

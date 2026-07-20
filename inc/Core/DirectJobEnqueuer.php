@@ -36,61 +36,78 @@ class DirectJobEnqueuer {
 	 * @param int      $job_id       Job ID.
 	 * @param string   $flow_step_id Flow step ID.
 	 * @param int|null $timestamp    Optional future Unix timestamp.
-	 * @return array{success:bool,action_id:int,state:string,error?:string}
+	 * @return array{success:bool,action_id:int,state:string,generation:int,retryable?:bool,error?:string}
 	 */
 	public function enqueue( int $job_id, string $flow_step_id, ?int $timestamp = null ): array {
 		if ( $job_id <= 0 || '' === $flow_step_id ) {
 			return $this->failure( 'invalid_enqueue_target' );
 		}
 
-		$args = array(
-			'job_id'       => $job_id,
-			'flow_step_id' => $flow_step_id,
-		);
-		$scheduled_action_id = $this->scheduledActionId( $args );
+		$job        = $this->jobs->get_job( $job_id );
+		$generation = max( 0, (int) ( $job['operation_generation'] ?? 0 ) );
+		$args       = $this->actionArgs( $job_id, $flow_step_id, $generation );
+		$scheduled_action_id = in_array( (string) ( $job['operation_state'] ?? '' ), array( 'enqueued', 'enqueuing' ), true )
+			? $this->scheduledActionId( $args )
+			: 0;
 		if ( $scheduled_action_id > 0 ) {
-			$this->jobs->finish_operation_enqueue( $job_id, 'enqueued', $scheduled_action_id );
-			return $this->success( $scheduled_action_id );
+			return $this->success( $scheduled_action_id, $generation );
 		}
 
-		$job = $this->jobs->get_job( $job_id );
 		if ( 'enqueued' === ( $job['operation_state'] ?? '' ) && 'pending' === ( $job['status'] ?? '' ) ) {
 			$this->jobs->reclaim_missing_operation_action( $job_id );
 		}
 
-		if ( ! $this->jobs->claim_operation_enqueue( $job_id ) ) {
-			$job = $this->jobs->get_job( $job_id );
-			if ( 'enqueued' === ( $job['operation_state'] ?? '' ) ) {
-				return $this->success( (int) ( $job['operation_action_id'] ?? 0 ) );
+		$claim = $this->jobs->claim_operation_enqueue( $job_id );
+		if ( false === $claim ) {
+			$job                 = $this->jobs->get_job( $job_id );
+			$current_generation  = max( 0, (int) ( $job['operation_generation'] ?? 0 ) );
+			$current_action_args = $this->actionArgs( $job_id, $flow_step_id, $current_generation );
+			$current_action_id   = $this->scheduledActionId( $current_action_args );
+			if ( $current_action_id > 0 ) {
+				return $this->success( $current_action_id, $current_generation );
 			}
 
-			return array(
-				'success'   => true,
-				'action_id' => 0,
-				'state'     => 'enqueuing',
-			);
+			return $this->inProgress( $current_generation );
 		}
+
+		$token      = $claim['token'];
+		$generation = $claim['generation'];
+		$args       = $this->actionArgs( $job_id, $flow_step_id, $generation );
 
 		// A previous submitter may have crashed after scheduling but before it
 		// recorded success. Reconcile that action before creating another one.
 		$scheduled_action_id = $this->scheduledActionId( $args );
 		if ( $scheduled_action_id > 0 ) {
-			$this->jobs->finish_operation_enqueue( $job_id, 'enqueued', $scheduled_action_id );
-			return $this->success( $scheduled_action_id );
+			if ( ! $this->jobs->finish_operation_enqueue( $job_id, 'enqueued', $scheduled_action_id, $token, $generation ) ) {
+				return $this->failure( 'enqueue_claim_fenced', $generation, true, 'enqueuing' );
+			}
+			return $this->success( $scheduled_action_id, $generation );
+		}
+
+		if ( ! $this->jobs->owns_operation_enqueue_claim( $job_id, $token, $generation ) ) {
+			return $this->failure( 'enqueue_claim_fenced', $generation, true, 'enqueuing' );
 		}
 
 		$run_at    = null !== $timestamp && $timestamp > time() ? $timestamp : time();
 		$action_id = ( $this->scheduler )( $run_at, self::HOOK, $args, self::GROUP );
 		if ( ! is_int( $action_id ) || $action_id <= 0 ) {
-			$this->jobs->finish_operation_enqueue( $job_id, 'enqueue_failed' );
-			return $this->failure( 'action_schedule_failed' );
+			$this->jobs->finish_operation_enqueue( $job_id, 'enqueue_failed', 0, $token, $generation );
+			return $this->failure( 'action_schedule_failed', $generation, true );
 		}
 
-		if ( ! $this->jobs->finish_operation_enqueue( $job_id, 'enqueued', $action_id ) ) {
-			return $this->failure( 'enqueue_state_persist_failed' );
+		if ( ! $this->jobs->finish_operation_enqueue( $job_id, 'enqueued', $action_id, $token, $generation ) ) {
+			return $this->failure( 'enqueue_claim_fenced', $generation, true, 'enqueuing' );
 		}
 
-		return $this->success( $action_id );
+		return $this->success( $action_id, $generation );
+	}
+
+	private function actionArgs( int $job_id, string $flow_step_id, int $generation ): array {
+		return array(
+			'job_id'               => $job_id,
+			'flow_step_id'         => $flow_step_id,
+			'operation_generation' => $generation,
+		);
 	}
 
 	/**
@@ -133,20 +150,38 @@ class DirectJobEnqueuer {
 		return 0;
 	}
 
-	private function success( int $action_id ): array {
+	private function success( int $action_id, int $generation ): array {
 		return array(
-			'success'   => true,
-			'action_id' => $action_id,
-			'state'     => 'enqueued',
+			'success'    => true,
+			'action_id'  => $action_id,
+			'state'      => 'enqueued',
+			'generation' => $generation,
 		);
 	}
 
-	private function failure( string $error ): array {
+	private function inProgress( int $generation ): array {
 		return array(
-			'success'   => false,
-			'action_id' => 0,
-			'state'     => 'enqueue_failed',
-			'error'     => $error,
+			'success'    => false,
+			'action_id'  => 0,
+			'state'      => 'enqueuing',
+			'generation' => $generation,
+			'retryable'  => true,
+			'error'      => 'enqueue_in_progress',
 		);
+	}
+
+	private function failure( string $error, int $generation = 0, bool $retryable = false, string $state = 'enqueue_failed' ): array {
+		$result = array(
+			'success'    => false,
+			'action_id'  => 0,
+			'state'      => $state,
+			'generation' => $generation,
+			'error'      => $error,
+		);
+		if ( $retryable ) {
+			$result['retryable'] = true;
+		}
+
+		return $result;
 	}
 }

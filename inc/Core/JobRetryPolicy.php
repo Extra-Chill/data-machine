@@ -104,13 +104,18 @@ class JobRetryPolicy {
 			);
 		}
 
+		$action_args = array(
+			'job_id'       => $job_id,
+			'flow_step_id' => $flow_step_id,
+		);
+		if ( 'direct' === (string) ( $job['flow_id'] ?? '' ) && (int) ( $job['operation_generation'] ?? 0 ) > 0 ) {
+			$action_args['operation_generation'] = (int) $job['operation_generation'];
+		}
+
 		$action_id = as_schedule_single_action(
 			$timestamp,
 			'datamachine_execute_step',
-			array(
-				'job_id'       => $job_id,
-				'flow_step_id' => $flow_step_id,
-			),
+			$action_args,
 			'data-machine'
 		);
 

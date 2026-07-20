@@ -60,6 +60,11 @@ class ExecuteStepAbility {
 								'type'        => 'string',
 								'description' => __( 'Flow step ID to execute.', 'data-machine' ),
 							),
+							'operation_generation' => array(
+								'type'        => 'integer',
+								'minimum'     => 0,
+								'description' => __( 'Direct workflow execution generation.', 'data-machine' ),
+							),
 						),
 					),
 					'output_schema'       => array(
@@ -68,6 +73,7 @@ class ExecuteStepAbility {
 							'success'      => array( 'type' => 'boolean' ),
 							'step_success' => array( 'type' => 'boolean' ),
 							'outcome'      => array( 'type' => 'string' ),
+							'stale_generation' => array( 'type' => 'boolean' ),
 							'error'        => array( 'type' => 'string' ),
 						),
 					),
@@ -97,12 +103,21 @@ class ExecuteStepAbility {
 	public function execute( array $input ): array {
 		$job_id       = (int) ( $input['job_id'] ?? 0 );
 		$flow_step_id = (string) ( $input['flow_step_id'] ?? '' );
+		$operation_generation = max( 0, (int) ( $input['operation_generation'] ?? 0 ) );
 		$job          = $this->db_jobs->get_job( $job_id );
 
 		if ( ! $job ) {
 			return array(
 				'success' => false,
 				'error'   => sprintf( 'Job %d not found.', $job_id ),
+			);
+		}
+
+		if ( $operation_generation > 0 && $operation_generation !== (int) ( $job['operation_generation'] ?? 0 ) ) {
+			return array(
+				'success'          => false,
+				'error'            => sprintf( 'Job %d execution generation %d is stale.', $job_id, $operation_generation ),
+				'stale_generation' => true,
 			);
 		}
 
@@ -207,6 +222,16 @@ class ExecuteStepAbility {
 			);
 
 			$step_output      = $flow_step->execute( $payload );
+			if ( $operation_generation > 0 ) {
+				$job_after_execution = $this->db_jobs->get_job( $job_id );
+				if ( ! is_array( $job_after_execution ) || $operation_generation !== (int) ( $job_after_execution['operation_generation'] ?? 0 ) ) {
+					return array(
+						'success'          => false,
+						'error'            => sprintf( 'Job %d execution generation %d was superseded.', $job_id, $operation_generation ),
+						'stale_generation' => true,
+					);
+				}
+			}
 			$execution_result = StepExecutionResult::fromStepOutput( $step_output, $step_type );
 			$dataPackets      = $execution_result['packets'];
 			$step_success     = (bool) $execution_result['success'];
@@ -245,6 +270,17 @@ class ExecuteStepAbility {
 				)
 			);
 
+			if ( $operation_generation > 0 ) {
+				$job_before_routing = $this->db_jobs->get_job( $job_id );
+				if ( ! is_array( $job_before_routing ) || $operation_generation !== (int) ( $job_before_routing['operation_generation'] ?? 0 ) ) {
+					return array(
+						'success'          => false,
+						'error'            => sprintf( 'Job %d execution generation %d was superseded before routing.', $job_id, $operation_generation ),
+						'stale_generation' => true,
+					);
+				}
+			}
+
 			$result = $this->routeAfterExecution(
 				$job_id,
 				$flow_step_id,
@@ -278,6 +314,16 @@ class ExecuteStepAbility {
 
 			return $result;
 		} catch ( \Throwable $e ) {
+			if ( $operation_generation > 0 ) {
+				$job_after_exception = $this->db_jobs->get_job( $job_id );
+				if ( ! is_array( $job_after_exception ) || $operation_generation !== (int) ( $job_after_exception['operation_generation'] ?? 0 ) ) {
+					return array(
+						'success'          => false,
+						'error'            => sprintf( 'Job %d execution generation %d threw after being superseded.', $job_id, $operation_generation ),
+						'stale_generation' => true,
+					);
+				}
+			}
 			RunMetrics::recordStepResult(
 				$job_id,
 				$flow_step_id,

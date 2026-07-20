@@ -16,6 +16,7 @@ use DataMachine\Abilities\Job\JobsSummaryAbility;
 use DataMachine\Abilities\Job\RetryJobAbility;
 use DataMachine\Abilities\Job\RunMetricsAbility;
 use DataMachine\Abilities\PermissionHelper;
+use DataMachine\Abilities\Engine\ExecuteStepAbility;
 use DataMachine\Core\Database\Agents\Agents;
 use DataMachine\Core\Database\Jobs\Jobs;
 use DataMachine\Core\DirectJobEnqueuer;
@@ -320,7 +321,7 @@ class DirectJobOwnershipTest extends WP_UnitTestCase {
 				'operation_step_id' => 'ephemeral_step_0',
 			)
 		);
-		$this->assertTrue( $jobs->claim_operation_enqueue( $crashed_job_id ) );
+		$this->assertIsArray( $jobs->claim_operation_enqueue( $crashed_job_id ) );
 		$wpdb->update(
 			$wpdb->prefix . 'datamachine_jobs',
 			array( 'operation_claimed_at' => '2000-01-01 00:00:00' ),
@@ -331,22 +332,86 @@ class DirectJobOwnershipTest extends WP_UnitTestCase {
 		$this->assertSame( 'enqueued', $jobs->get_job( $crashed_job_id )['operation_state'] );
 	}
 
+	public function test_non_owner_gets_retryable_in_progress_until_action_is_durable(): void {
+		$jobs   = new Jobs();
+		$job_id = $jobs->create_job(
+			array(
+				'pipeline_id'      => 'direct',
+				'flow_id'          => 'direct',
+				'operation_state'  => 'preparing',
+				'operation_step_id' => 'ephemeral_step_0',
+			)
+		);
+		$this->assertIsArray( $jobs->claim_operation_enqueue( $job_id ) );
+
+		$result = ( new DirectJobEnqueuer( $jobs, static fn() => 99, static fn() => 0 ) )->enqueue( $job_id, 'ephemeral_step_0' );
+
+		$this->assertFalse( $result['success'] );
+		$this->assertTrue( $result['retryable'] );
+		$this->assertSame( 'enqueue_in_progress', $result['error'] );
+		$this->assertSame( 0, $result['action_id'] );
+	}
+
+	public function test_expired_lease_takeover_fences_slow_generation(): void {
+		global $wpdb;
+
+		$jobs   = new Jobs();
+		$job_id = $jobs->create_job(
+			array(
+				'pipeline_id'      => 'direct',
+				'flow_id'          => 'direct',
+				'operation_state'  => 'preparing',
+				'operation_step_id' => 'ephemeral_step_0',
+			)
+		);
+		$takeover_claim = null;
+		$slow = new DirectJobEnqueuer(
+			$jobs,
+			static function () use ( &$takeover_claim, $jobs, $wpdb, $job_id ) {
+				$wpdb->update(
+					$wpdb->prefix . 'datamachine_jobs',
+					array( 'operation_claimed_at' => '2000-01-01 00:00:00' ),
+					array( 'job_id' => $job_id )
+				);
+				$takeover_claim = $jobs->claim_operation_enqueue( $job_id );
+				return 101;
+			},
+			static fn() => 0
+		);
+
+		$slow_result = $slow->enqueue( $job_id, 'ephemeral_step_0' );
+		$this->assertFalse( $slow_result['success'] );
+		$this->assertSame( 'enqueue_claim_fenced', $slow_result['error'] );
+		$this->assertIsArray( $takeover_claim );
+		$this->assertSame( 2, $takeover_claim['generation'] );
+		$this->assertTrue( $jobs->finish_operation_enqueue( $job_id, 'enqueued', 202, $takeover_claim['token'], $takeover_claim['generation'] ) );
+
+		$job = $jobs->get_job( $job_id );
+		$this->assertSame( 2, (int) $job['operation_generation'] );
+		$this->assertSame( 202, (int) $job['operation_action_id'] );
+		$stale = ( new ExecuteStepAbility() )->execute(
+			array(
+				'job_id'               => $job_id,
+				'flow_step_id'          => 'ephemeral_step_0',
+				'operation_generation' => 1,
+			)
+		);
+		$this->assertTrue( $stale['stale_generation'] );
+	}
+
 	public function test_failed_direct_workflow_retry_reopens_and_enqueues_job(): void {
 		wp_set_current_user( $this->owner_id );
 		$created = $this->execute( 'explicit-direct-retry' );
 		$jobs    = new Jobs();
-		$original_action_id = (int) $jobs->get_job( (int) $created['job_id'] )['operation_action_id'];
-		as_unschedule_action(
-			'datamachine_execute_step',
-			array(
-				'job_id'       => (int) $created['job_id'],
-				'flow_step_id' => 'ephemeral_step_0',
-			),
-			'data-machine'
-		);
+		$original_job        = $jobs->get_job( (int) $created['job_id'] );
+		$original_action_id  = (int) $original_job['operation_action_id'];
+		$original_generation = (int) $original_job['operation_generation'];
+		$this->assertTrue( $jobs->start_job( (int) $created['job_id'] ) );
 		$this->assertTrue( $jobs->complete_job( (int) $created['job_id'], 'failed - test' ) );
+		$this->assertTrue( $jobs->reopen_failed_job( (int) $created['job_id'] ) );
+		$this->assertTrue( $jobs->start_job( (int) $created['job_id'] ) );
 
-		$retry = ( new RetryJobAbility() )->execute( array( 'job_id' => $created['job_id'] ) );
+		$retry = ( new RetryJobAbility() )->execute( array( 'job_id' => $created['job_id'], 'force' => true ) );
 		$job   = $jobs->get_job( (int) $created['job_id'] );
 
 		$this->assertTrue( $retry['success'] );
@@ -354,6 +419,16 @@ class DirectJobOwnershipTest extends WP_UnitTestCase {
 		$this->assertSame( 'pending', $job['status'] );
 		$this->assertSame( 'enqueued', $job['operation_state'] );
 		$this->assertNotSame( $original_action_id, (int) $job['operation_action_id'] );
+		$this->assertGreaterThan( $original_generation, (int) $job['operation_generation'] );
+
+		$stale = ( new ExecuteStepAbility() )->execute(
+			array(
+				'job_id'               => (int) $created['job_id'],
+				'flow_step_id'          => 'ephemeral_step_0',
+				'operation_generation' => $original_generation,
+			)
+		);
+		$this->assertTrue( $stale['stale_generation'] );
 	}
 
 	public function test_legacy_unowned_job_retains_capability_gated_access(): void {

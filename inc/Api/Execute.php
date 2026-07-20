@@ -270,14 +270,20 @@ class Execute {
 		if ( ! ( $result['success'] ?? false ) ) {
 			$status = 400;
 			$error  = $result['error'] ?? __( 'Execution failed', 'data-machine' );
+			$error_data = array( 'status' => $status );
 
 			if ( false !== strpos( $error, 'not found' ) ) {
 				$status = 404;
 			} elseif ( false !== strpos( $error, 'Failed to create' ) || false !== strpos( $error, 'not available' ) ) {
 				$status = 500;
+			} elseif ( ! empty( $result['retryable'] ) ) {
+				$status = 409;
+				$error_data['retryable']     = true;
+				$error_data['enqueue_state'] = (string) ( $result['enqueue_state'] ?? 'enqueuing' );
 			}
+			$error_data['status'] = $status;
 
-			return new \WP_Error( 'execute_failed', $error, array( 'status' => $status ) );
+			return new \WP_Error( 'execute_failed', $error, $error_data );
 		}
 
 		$response_data = array(
