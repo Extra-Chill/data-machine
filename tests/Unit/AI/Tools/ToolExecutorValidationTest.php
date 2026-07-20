@@ -9,6 +9,7 @@ namespace DataMachine\Tests\Unit\AI\Tools;
 
 use AgentsAPI\AI\Tools\WP_Agent_Tool_Parameters;
 use AgentsAPI\Core\Workspace\WP_Agent_Workspace_Scope;
+use DataMachine\Engine\AI\Actions\PendingActionStore;
 use DataMachine\Engine\AI\Tools\ToolExecutor;
 use DataMachine\Engine\AI\Tools\ToolManager;
 use WP_UnitTestCase;
@@ -453,6 +454,134 @@ class ToolExecutorValidationTest extends WP_UnitTestCase {
 		$this->assertTrue( $allowed['success'] );
 		$this->assertFalse( $forbidden['success'] );
 		$this->assertSame( 'forbidden', $forbidden['action_policy'] );
+	}
+
+	public function test_execute_tool_policy_provider_receives_complete_input_across_all_policy_outcomes(): void {
+		$seen_contexts = array();
+		add_filter(
+			'agents_api_action_policy_providers',
+			static function ( $providers ) use ( &$seen_contexts ) {
+				$providers[] = new class( $seen_contexts ) implements \WP_Agent_Action_Policy_Provider {
+					/** @var array<int,array<string,mixed>> */
+					private array $seen_contexts;
+
+					public function __construct( array &$seen_contexts ) {
+						$this->seen_contexts =& $seen_contexts;
+					}
+
+					public function get_action_policy( array $context ): ?string {
+						$this->seen_contexts[] = $context;
+
+						return match ( $context['input']['operation'] ?? '' ) {
+							'read'  => 'direct',
+							'write' => 'preview',
+							'delete' => 'forbidden',
+							default => null,
+						};
+					}
+				};
+
+				return $providers;
+			},
+			10,
+			1
+		);
+
+		$tools = array(
+			'input_sensitive_tool' => array(
+				'class'                   => TestToolHandler::class,
+				'method'                  => 'handle_tool_call',
+				'action_kind'             => 'input_sensitive_action',
+				'parameters'              => array(
+					'operation' => array(
+						'type'     => 'string',
+						'required' => true,
+					),
+					'query'     => array(
+						'type'     => 'string',
+						'required' => true,
+					),
+					'scope'     => array(
+						'type'     => 'string',
+						'required' => false,
+					),
+				),
+				'client_context_bindings' => array( 'query' => 'bound_query' ),
+				'parameter_defaults'      => array( 'scope' => 'all' ),
+			),
+		);
+
+		$read = ToolExecutor::executeTool(
+			'input_sensitive_tool',
+			array( 'operation' => 'read' ),
+			$tools,
+			array(),
+			'chat',
+			0,
+			array( 'bound_query' => 'record-1' )
+		);
+		$write = ToolExecutor::executeTool(
+			'input_sensitive_tool',
+			array( 'operation' => 'write' ),
+			$tools,
+			array(),
+			'chat',
+			0,
+			array( 'bound_query' => 'record-2' )
+		);
+		$forbidden = ToolExecutor::executeTool(
+			'input_sensitive_tool',
+			array( 'operation' => 'delete' ),
+			$tools,
+			array(),
+			'chat',
+			0,
+			array( 'bound_query' => 'record-3' )
+		);
+
+		$this->assertTrue( $read['success'] );
+		$this->assertSame( 'record-1', $read['result']['data']['query'] ?? null );
+		$this->assertTrue( $write['staged'] );
+		$this->assertSame( 'preview', $write['action_policy'] );
+		$this->assertFalse( $forbidden['success'] );
+		$this->assertSame( 'forbidden', $forbidden['action_policy'] );
+
+		$this->assertCount( 3, $seen_contexts );
+		$this->assertSame(
+			array(
+				'scope'     => 'all',
+				'query'     => 'record-1',
+				'operation' => 'read',
+			),
+			$seen_contexts[0]['input'] ?? null
+		);
+		$this->assertSame(
+			array(
+				'scope'     => 'all',
+				'query'     => 'record-2',
+				'operation' => 'write',
+			),
+			$seen_contexts[1]['input'] ?? null
+		);
+		$this->assertSame(
+			array(
+				'scope'     => 'all',
+				'query'     => 'record-3',
+				'operation' => 'delete',
+			),
+			$seen_contexts[2]['input'] ?? null
+		);
+
+		$pending_action = PendingActionStore::get( $write['action_id'] );
+		$this->assertSame(
+			array(
+				'scope'     => 'all',
+				'query'     => 'record-2',
+				'operation' => 'write',
+			),
+			$pending_action['apply_input'] ?? null
+		);
+		PendingActionStore::delete( $write['action_id'] );
 	}
 
 	public function test_resolve_tools_invokes_callables(): void {

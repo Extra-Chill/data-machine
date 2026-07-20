@@ -193,6 +193,64 @@ class ActionPolicyResolverTest extends WP_UnitTestCase {
 		$this->assertSame( ActionPolicyResolver::POLICY_FORBIDDEN, $policy );
 	}
 
+	public function test_filter_can_resolve_policy_from_normalized_input(): void {
+		add_filter(
+			'datamachine_tool_action_policy',
+			static function ( $policy, $tool_name, $mode, $context ) {
+				return 'read' === ( $context['input']['operation'] ?? '' ) ? 'direct' : 'preview';
+			},
+			10,
+			4
+		);
+
+		$read_policy = $this->resolver->resolveForTool(
+			array(
+				'tool_name' => 'records',
+				'mode'      => ActionPolicyResolver::MODE_CHAT,
+				'input'     => array( 'operation' => 'read' ),
+			)
+		);
+		$write_policy = $this->resolver->resolveForTool(
+			array(
+				'tool_name' => 'records',
+				'mode'      => ActionPolicyResolver::MODE_CHAT,
+				'input'     => array( 'operation' => 'write' ),
+			)
+		);
+
+		$this->assertSame( ActionPolicyResolver::POLICY_DIRECT, $read_policy );
+		$this->assertSame( ActionPolicyResolver::POLICY_PREVIEW, $write_policy );
+	}
+
+	public function test_absent_and_invalid_input_are_normalized_to_empty_array(): void {
+		$seen_inputs = array();
+		add_filter(
+			'datamachine_tool_action_policy',
+			static function ( $policy, $tool_name, $mode, $context ) use ( &$seen_inputs ) {
+				$seen_inputs[] = $context['input'] ?? null;
+				return $policy;
+			},
+			10,
+			4
+		);
+
+		$this->resolver->resolveForTool(
+			array(
+				'tool_name' => 'records',
+				'mode'      => ActionPolicyResolver::MODE_CHAT,
+			)
+		);
+		$this->resolver->resolveForTool(
+			array(
+				'tool_name' => 'records',
+				'mode'      => ActionPolicyResolver::MODE_CHAT,
+				'input'     => 'invalid',
+			)
+		);
+
+		$this->assertSame( array( array(), array() ), $seen_inputs );
+	}
+
 	public function test_filter_garbage_return_is_ignored(): void {
 		add_filter(
 			'datamachine_tool_action_policy',
