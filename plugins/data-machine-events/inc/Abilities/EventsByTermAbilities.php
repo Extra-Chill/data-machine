@@ -2,12 +2,8 @@
 /**
  * Events By Term Abilities
  *
- * Cross-site-callable primitive that returns the LIST of events tagged to a
- * term in any taxonomy on the events site. The whole point is the CONSUMER
- * (e.g. the artist profile hub on a different blog) can call this ability even
- * though this plugin's PHP is NOT loaded there — switch_to_blog() changes the
- * DB context, not the loaded code, so a consumer on another blog cannot call
- * data_machine_events_query_events() directly. The ability is the bridge.
+ * Returns the list of events assigned to a term in any registered taxonomy on
+ * the configured events site.
  *
  * It internally switches to the configured events blog (the current site by
  * default), reads the datamachine_event_dates
@@ -16,11 +12,7 @@
  * time) pre-resolved while still in events-blog context — because the caller
  * renders on a DIFFERENT blog and cannot resolve those afterward.
  *
- * Layer purity: this ability is generic "events for term X in taxonomy Y on
- * this events site". It carries no consumer-specific identity and returns data,
- * not markup — presentation is the consumer's job. The taxonomy is supplied by
- * the caller, so the generic plugin never hardcodes a consumer taxonomy such as
- * "artist".
+ * The ability is taxonomy-agnostic and returns data rather than markup.
  *
  * @package DataMachineEvents\Abilities
  */
@@ -55,19 +47,24 @@ class EventsByTermAbilities {
 				'data-machine-events/events-by-term',
 				array(
 					'label'               => __( 'Events By Term', 'data-machine-events' ),
-					'description'         => __( 'Return the list of events for a term in a taxonomy on the events site, split into upcoming and past. Cross-site callable: resolves everything (permalinks, venue names, formatted dates) on the events blog so consumers on any other site can render the result directly.', 'data-machine-events' ),
+					'description'         => __( 'Return the list of events for a local term in any registered taxonomy, split into upcoming and past.', 'data-machine-events' ),
 					'category'            => 'datamachine-events-events',
 					'input_schema'        => array(
 						'type'       => 'object',
-						'required'   => array( 'taxonomy', 'term_slug' ),
+						'required'   => array( 'taxonomy' ),
 						'properties' => array(
 							'taxonomy'  => array(
 								'type'        => 'string',
-								'description' => __( 'Taxonomy name on the events site (e.g. "artist"). Must be registered there.', 'data-machine-events' ),
+								'description' => __( 'Registered taxonomy name on the events site.', 'data-machine-events' ),
+							),
+							'term_id'   => array(
+								'type'        => 'integer',
+								'minimum'     => 1,
+								'description' => __( 'Positive local term ID. When supplied, this takes precedence over term_slug.', 'data-machine-events' ),
 							),
 							'term_slug' => array(
 								'type'        => 'string',
-								'description' => __( 'Term slug (the canonical cross-blog join key) to look up on the events site.', 'data-machine-events' ),
+								'description' => __( 'Local term slug. Required when term_id is omitted.', 'data-machine-events' ),
 							),
 							'scope'     => array(
 								'type'        => 'string',
@@ -84,6 +81,7 @@ class EventsByTermAbilities {
 						'type'       => 'object',
 						'properties' => array(
 							'taxonomy'  => array( 'type' => 'string' ),
+							'term_id'   => array( 'type' => 'integer' ),
 							'term_slug' => array( 'type' => 'string' ),
 							'found'     => array( 'type' => 'boolean' ),
 							'upcoming'  => array(
@@ -115,17 +113,19 @@ class EventsByTermAbilities {
 	/**
 	 * Execute the events-by-term ability.
 	 *
-	 * Switches to the events blog, resolves the term by slug in the requested
+	 * Switches to the events blog, resolves the local term in the requested
 	 * taxonomy, queries the event_dates table for that term split by now, and
 	 * returns a plain structured array with presentational strings pre-resolved.
 	 *
 	 * @param array $input Input parameters.
-	 * @return array|\WP_Error { taxonomy, term_slug, found, upcoming: [...], past: [...] }
+	 * @return array|\WP_Error { taxonomy, term_id, term_slug, found, upcoming: [...], past: [...] }
 	 */
 	public function executeEventsByTerm( array $input ): array|\WP_Error {
-		$taxonomy  = isset( $input['taxonomy'] ) ? sanitize_key( (string) $input['taxonomy'] ) : '';
-		$term_slug = isset( $input['term_slug'] ) ? sanitize_title( (string) $input['term_slug'] ) : '';
-		$scope     = $input['scope'] ?? 'all';
+		$taxonomy         = isset( $input['taxonomy'] ) ? sanitize_key( (string) $input['taxonomy'] ) : '';
+		$term_id_supplied = array_key_exists( 'term_id', $input );
+		$term_id          = $term_id_supplied ? (int) $input['term_id'] : 0;
+		$term_slug        = isset( $input['term_slug'] ) ? sanitize_title( (string) $input['term_slug'] ) : '';
+		$scope            = $input['scope'] ?? 'all';
 		if ( ! in_array( $scope, array( 'upcoming', 'past', 'all' ), true ) ) {
 			$scope = 'all';
 		}
@@ -142,10 +142,18 @@ class EventsByTermAbilities {
 			);
 		}
 
-		if ( '' === $term_slug ) {
+		if ( $term_id_supplied && $term_id < 1 ) {
+			return new \WP_Error(
+				'invalid_term_id',
+				__( 'term_id must be a positive local term ID.', 'data-machine-events' ),
+				array( 'status' => 400 )
+			);
+		}
+
+		if ( ! $term_id_supplied && '' === $term_slug ) {
 			return new \WP_Error(
 				'invalid_term_slug',
-				__( 'A non-empty term_slug is required.', 'data-machine-events' ),
+				__( 'A non-empty term_slug is required when term_id is omitted.', 'data-machine-events' ),
 				array( 'status' => 400 )
 			);
 		}
@@ -161,7 +169,10 @@ class EventsByTermAbilities {
 
 		switch_to_blog( $events_blog_id );
 		try {
-			$result = $this->collectEventsForTerm( $taxonomy, $term_slug, $scope, $limit );
+			$result = $this->collectEventsForTerm( $taxonomy, $term_id, $term_slug, $scope, $limit );
+			if ( is_wp_error( $result ) ) {
+				return $result;
+			}
 
 			/**
 			 * Filter events-by-term results in the canonical events-site context.
@@ -214,14 +225,16 @@ class EventsByTermAbilities {
 	 * presentational string per event.
 	 *
 	 * @param string $taxonomy  Taxonomy name on the events site.
-	 * @param string $term_slug Term slug to look up.
+	 * @param int    $term_id   Local term ID, or zero when resolving by slug.
+	 * @param string $term_slug Local term slug to look up when no ID is supplied.
 	 * @param string $scope     upcoming|past|all.
 	 * @param int    $limit     Per-scope result limit.
-	 * @return array Structured result.
+	 * @return array|\WP_Error Structured result or invalid-term error.
 	 */
-	private function collectEventsForTerm( string $taxonomy, string $term_slug, string $scope, int $limit ): array {
+	private function collectEventsForTerm( string $taxonomy, int $term_id, string $term_slug, string $scope, int $limit ): array|\WP_Error {
 		$empty = array(
 			'taxonomy'  => $taxonomy,
+			'term_id'   => 0,
 			'term_slug' => $term_slug,
 			'found'     => false,
 			'upcoming'  => array(),
@@ -232,14 +245,26 @@ class EventsByTermAbilities {
 			return $empty;
 		}
 
-		$term = get_term_by( 'slug', $term_slug, $taxonomy );
+		$term = $term_id > 0
+			? get_term( $term_id, $taxonomy )
+			: get_term_by( 'slug', $term_slug, $taxonomy );
+
+		if ( $term_id > 0 && ( ! $term || is_wp_error( $term ) ) ) {
+			return new \WP_Error(
+				'invalid_term_id',
+				__( 'term_id does not exist in the requested taxonomy.', 'data-machine-events' ),
+				array( 'status' => 400 )
+			);
+		}
+
 		if ( ! $term || is_wp_error( $term ) ) {
 			return $empty;
 		}
 
 		$result = array(
 			'taxonomy'  => $taxonomy,
-			'term_slug' => $term_slug,
+			'term_id'   => (int) $term->term_id,
+			'term_slug' => (string) $term->slug,
 			'found'     => true,
 			'upcoming'  => array(),
 			'past'      => array(),
