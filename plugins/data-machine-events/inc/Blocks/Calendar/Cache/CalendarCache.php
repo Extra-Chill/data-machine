@@ -6,9 +6,9 @@
  * Handles cache key generation, TTLs, and get/set operations.
  *
  * Two cache layers:
- * 1. Bucket caches (dates, counts) — keyed without geo params, used by
- *    EventQueryBuilder/Pagination internals. Stored as transients (which
- *    Redis object cache backs anyway on persistent-cache hosts).
+ * 1. Bucket caches (dates, counts) — keyed by every boundary constraint.
+ *    Stored as transients (which Redis object cache backs anyway on
+ *    persistent-cache hosts).
  * 2. Full-response cache (this is the calendar REST envelope itself,
  *    pre-rendered HTML included). Keyed on the COMPLETE CalendarRequest
  *    envelope INCLUDING geo params. Stored in wp_cache (dedicated group
@@ -65,8 +65,7 @@ class CalendarCache {
 	/**
 	 * Generate a cache key from query parameters (bucket caches).
 	 *
-	 * Does NOT include geo params — bucket caches operate on the broader
-	 * date/count slice and geo filtering happens downstream.
+	 * Includes every constraint that can alter the date/count slice.
 	 *
 	 * @param array  $params Query parameters.
 	 * @param string $prefix Key prefix (e.g. 'dates', 'counts').
@@ -74,16 +73,25 @@ class CalendarCache {
 	 */
 	public static function generate_key( array $params, string $prefix ): string {
 		$key_data = array(
-			'show_past'    => $params['show_past'] ?? false,
-			'search_query' => $params['search_query'] ?? '',
-			'date_start'   => $params['date_start'] ?? '',
-			'date_end'     => $params['date_end'] ?? '',
-			'tax_filters'  => $params['tax_filters'] ?? array(),
-			'archive_tax'  => $params['archive_taxonomy'] ?? '',
-			'archive_term' => $params['archive_term_id'] ?? 0,
+			'show_past'       => $params['show_past'] ?? false,
+			'search_query'    => $params['search_query'] ?? '',
+			'date_start'      => $params['date_start'] ?? '',
+			'date_end'        => $params['date_end'] ?? '',
+			'time_start'      => $params['time_start'] ?? '',
+			'time_end'        => $params['time_end'] ?? '',
+			'tax_filters'     => $params['tax_filters'] ?? array(),
+			'archive_tax'     => $params['archive_taxonomy'] ?? '',
+			'archive_term'    => $params['archive_term_id'] ?? 0,
+			'geo_lat'         => $params['geo_lat'] ?? '',
+			'geo_lng'         => $params['geo_lng'] ?? '',
+			'geo_radius'      => $params['geo_radius'] ?? 25,
+			'geo_radius_unit' => $params['geo_radius_unit'] ?? 'mi',
+			'scope_identity'  => ! empty( $params['scope_token'] )
+				? hash( 'sha256', (string) $params['scope_token'] )
+				: '',
 			// Bucketing depends on the cutoff hour; fold it into the key so
 			// switching the filter at runtime invalidates stale buckets.
-			'cutoff_hour'  => \DataMachineEvents\Blocks\Calendar\Grouping\LateNightCutoff::cutoff_hour(),
+			'cutoff_hour'     => \DataMachineEvents\Blocks\Calendar\Grouping\LateNightCutoff::cutoff_hour(),
 		);
 
 		return self::PREFIX . $prefix . '_' . md5( wp_json_encode( $key_data ) );

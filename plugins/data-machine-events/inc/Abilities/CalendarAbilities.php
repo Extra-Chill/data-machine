@@ -340,70 +340,8 @@ class CalendarAbilities {
 			}
 		}
 
-		// Build ability input from query_params.
-		$ability_input = array(
-			'scope'       => $query_params['show_past'] ? 'past' : 'upcoming',
-			'tax_filters' => $query_params['tax_filters'],
-			'search'      => $query_params['search_query'],
-			'order'       => $query_params['show_past'] ? 'DESC' : 'ASC',
-			'per_page'    => 500, // Safety cap — prevents loading 17K+ posts when date boundaries are empty.
-			'scope_token' => $query_params['scope_token'] ?? '',
-		);
-
-		// Date range overrides scope.
-		if ( ! empty( $query_params['date_start'] ) || ! empty( $query_params['date_end'] ) ) {
-			$ability_input['date_start'] = $query_params['date_start'];
-			$ability_input['date_end']   = $query_params['date_end'];
-			$ability_input['time_start'] = $query_params['time_start'] ?? '';
-			$ability_input['time_end']   = $query_params['time_end'] ?? '';
-			// When user provides explicit dates, don't add scope filter.
-			if ( $query_params['user_date_range'] ) {
-				$ability_input['scope'] = 'all';
-			}
-		}
-
-		// Taxonomy archive constraint.
-		if ( ! empty( $query_params['archive_taxonomy'] ) && ! empty( $query_params['archive_term_id'] ) ) {
-			$ability_input['tax_filters'][ $query_params['archive_taxonomy'] ] = array( (int) $query_params['archive_term_id'] );
-		}
-
-		// Apply calendar_base_query filter.
-		$tax_query_override = apply_filters(
-			'data_machine_events_calendar_base_query',
-			null,
-			array(
-				'archive_taxonomy' => $query_params['archive_taxonomy'],
-				'archive_term_id'  => $query_params['archive_term_id'],
-				'source'           => 'ability',
-			)
-		);
-		if ( $tax_query_override ) {
-			foreach ( $tax_query_override as $clause ) {
-				if ( isset( $clause['taxonomy'] ) && isset( $clause['terms'] ) ) {
-					$ability_input['tax_filters'][ $clause['taxonomy'] ] = (array) $clause['terms'];
-				}
-			}
-		}
-
-		// Geo. Skip when the request is already scoped to a single venue archive
-		// — the proximity radius cannot further filter what's already a one-venue
-		// result, and the haversine sweep over every venue's coordinates is
-		// expensive (especially under bot crawl pressure). This short-circuit
-		// intentionally only applies to `venue` archives because a venue is the
-		// only single-point archive; artist/festival/location archives can span
-		// multiple coordinates so geo+radius remain meaningful for them.
-		$skip_geo = ! empty( $query_params['archive_taxonomy'] )
-			&& 'venue' === $query_params['archive_taxonomy']
-			&& ! empty( $query_params['archive_term_id'] );
-
-		if ( ! $skip_geo && ! empty( $query_params['geo_lat'] ) && ! empty( $query_params['geo_lng'] ) ) {
-			$ability_input['geo'] = array(
-				'lat'    => (float) $query_params['geo_lat'],
-				'lng'    => (float) $query_params['geo_lng'],
-				'radius' => (float) ( $query_params['geo_radius'] ?? 25 ),
-				'unit'   => $query_params['geo_radius_unit'] ?? 'mi',
-			);
-		}
+		$ability_input             = self::build_event_query_input( $query_params );
+		$ability_input['per_page'] = 500; // Safety cap — prevents loading 17K+ posts when date boundaries are empty.
 
 		$event_date_query = new \DataMachineEvents\Abilities\EventDateQueryAbilities();
 		$query_result     = $event_date_query->executeQueryEvents( $ability_input );
@@ -696,6 +634,31 @@ class CalendarAbilities {
 		// LateNightCutoff::display_date_from_strings() at the PHP layer.
 		$start_bucket_sql = LateNightCutoff::sql_display_date_expression( 'ed.start_datetime' );
 
+		// Search, geo, and consumer scopes are implemented canonically by the
+		// event query ability. Capture its matching-ID SQL and aggregate it as a
+		// derived table so arbitrary WP_Query constraints remain authoritative
+		// without materializing every ID or generating placeholder-heavy IN lists.
+		if ( self::requires_canonical_boundary_query( $params ) ) {
+			$event_query  = new EventDateQueryAbilities();
+			$matching_sql = $event_query->buildMatchingPostIdsSql( self::build_event_query_input( $params ) );
+
+			if ( '' === $matching_sql ) {
+				return self::expand_date_buckets( array(), $show_past_param, $current_date );
+			}
+
+			$boundary_start_bucket_sql = LateNightCutoff::sql_display_date_expression( 'boundary_ed.start_datetime' );
+			$sql                       = "SELECT STRAIGHT_JOIN {$boundary_start_bucket_sql} AS start_date, DATE(boundary_ed.end_datetime) AS end_date, COUNT(DISTINCT matching.ID) AS bucket_count
+					FROM ({$matching_sql}) matching
+					INNER JOIN {$ed_table} boundary_ed ON matching.ID = boundary_ed.post_id
+					GROUP BY {$boundary_start_bucket_sql}, DATE(boundary_ed.end_datetime)
+					ORDER BY start_date ASC";
+
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQL.NotPrepared
+			$rows = $wpdb->get_results( $sql );
+
+			return self::expand_date_buckets( $rows, $show_past_param, $current_date );
+		}
+
 		// Fast path: no taxonomy constraint → skip posts/term joins entirely.
 		// event_dates already carries post_status, so we can aggregate against
 		// the single table + its status_start composite index.
@@ -793,6 +756,91 @@ class CalendarAbilities {
 		$rows = $wpdb->get_results( $wpdb->prepare( $sql, ...$query_values ) );
 
 		return self::expand_date_buckets( $rows, $show_past_param, $current_date );
+	}
+
+	/**
+	 * Build the canonical event-query constraints shared by buckets and rows.
+	 *
+	 * @param array $params Calendar query parameters.
+	 * @return array EventDateQueryAbilities input.
+	 */
+	private static function build_event_query_input( array $params ): array {
+		$ability_input = array(
+			'scope'       => ! empty( $params['show_past'] ) ? 'past' : 'upcoming',
+			'tax_filters' => is_array( $params['tax_filters'] ?? null ) ? $params['tax_filters'] : array(),
+			'search'      => $params['search_query'] ?? '',
+			'order'       => ! empty( $params['show_past'] ) ? 'DESC' : 'ASC',
+			'scope_token' => $params['scope_token'] ?? '',
+		);
+
+		if ( ! empty( $params['date_start'] ) || ! empty( $params['date_end'] ) ) {
+			$ability_input['date_start'] = $params['date_start'] ?? '';
+			$ability_input['date_end']   = $params['date_end'] ?? '';
+			$ability_input['time_start'] = $params['time_start'] ?? '';
+			$ability_input['time_end']   = $params['time_end'] ?? '';
+
+			if ( ! empty( $params['user_date_range'] ) ) {
+				$ability_input['scope'] = 'all';
+			}
+		}
+
+		if ( ! empty( $params['archive_taxonomy'] ) && ! empty( $params['archive_term_id'] ) ) {
+			$ability_input['tax_filters'][ $params['archive_taxonomy'] ] = array( (int) $params['archive_term_id'] );
+		}
+
+		$tax_query_override = apply_filters(
+			'data_machine_events_calendar_base_query',
+			null,
+			array(
+				'archive_taxonomy' => $params['archive_taxonomy'] ?? '',
+				'archive_term_id'  => $params['archive_term_id'] ?? 0,
+				'source'           => 'ability',
+			)
+		);
+		if ( $tax_query_override ) {
+			foreach ( $tax_query_override as $clause ) {
+				if ( isset( $clause['taxonomy'] ) && isset( $clause['terms'] ) ) {
+					$ability_input['tax_filters'][ $clause['taxonomy'] ] = (array) $clause['terms'];
+				}
+			}
+		}
+
+		// A venue archive already identifies one point, so proximity cannot
+		// narrow it and should not trigger the haversine venue lookup.
+		$skip_geo = ! empty( $params['archive_taxonomy'] )
+			&& 'venue' === $params['archive_taxonomy']
+			&& ! empty( $params['archive_term_id'] );
+
+		if ( ! $skip_geo && ! empty( $params['geo_lat'] ) && ! empty( $params['geo_lng'] ) ) {
+			$ability_input['geo'] = array(
+				'lat'    => (float) $params['geo_lat'],
+				'lng'    => (float) $params['geo_lng'],
+				'radius' => (float) ( $params['geo_radius'] ?? 25 ),
+				'unit'   => $params['geo_radius_unit'] ?? 'mi',
+			);
+		}
+
+		return $ability_input;
+	}
+
+	/**
+	 * Determine whether boundary buckets need canonical query selection.
+	 *
+	 * @param array $params Calendar query parameters.
+	 * @return bool
+	 */
+	private static function requires_canonical_boundary_query( array $params ): bool {
+		if ( ! empty( $params['search_query'] ) || ! empty( $params['scope_token'] ) ) {
+			return true;
+		}
+
+		$skip_geo = ! empty( $params['archive_taxonomy'] )
+			&& 'venue' === $params['archive_taxonomy']
+			&& ! empty( $params['archive_term_id'] );
+
+		$has_geo = ! $skip_geo && ! empty( $params['geo_lat'] ) && ! empty( $params['geo_lng'] );
+
+		return $has_geo || false !== has_filter( 'data_machine_events_calendar_query_args' );
 	}
 
 	/**

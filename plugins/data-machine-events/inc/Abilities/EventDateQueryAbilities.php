@@ -26,6 +26,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 class EventDateQueryAbilities {
+	private const CAPTURE_IDS_QUERY_VAR = '_data_machine_events_capture_ids_sql';
 
 	private static bool $registered = false;
 
@@ -184,7 +185,9 @@ class EventDateQueryAbilities {
 		$exclude     = is_array( $input['exclude'] ?? null ) ? array_map( 'absint', $input['exclude'] ) : array();
 		$per_page    = (int) ( $input['per_page'] ?? -1 );
 		$fields      = $input['fields'] ?? 'all';
-		$order       = strtoupper( $input['order'] ?? 'ASC' ) === 'DESC' ? 'DESC' : 'ASC';
+		$order       = ! empty( $input[ self::CAPTURE_IDS_QUERY_VAR ] )
+			? ''
+			: ( strtoupper( $input['order'] ?? 'ASC' ) === 'DESC' ? 'DESC' : 'ASC' );
 		$status      = $input['status'] ?? 'publish';
 		$meta_query  = is_array( $input['meta_query'] ?? null ) ? $input['meta_query'] : array();
 
@@ -221,6 +224,10 @@ class EventDateQueryAbilities {
 
 		if ( 'ids' === $fields ) {
 			$query_args['fields'] = 'ids';
+		}
+
+		if ( ! empty( $input[ self::CAPTURE_IDS_QUERY_VAR ] ) ) {
+			$query_args[ self::CAPTURE_IDS_QUERY_VAR ] = true;
 		}
 
 		if ( 'count' === $fields ) {
@@ -363,6 +370,55 @@ class EventDateQueryAbilities {
 	}
 
 	/**
+	 * Build the canonical matching-post IDs SQL without executing it.
+	 *
+	 * The generated query includes the same WordPress search, taxonomy, geo,
+	 * date, and consumer-supplied query-argument constraints as the row query.
+	 * It is suitable for use as a derived table in aggregate queries, avoiding
+	 * unbounded ID arrays and large placeholder lists in PHP.
+	 *
+	 * @param array $input Query-events ability input.
+	 * @return string SQL selecting one distinct ID column, or an empty string.
+	 */
+	public function buildMatchingPostIdsSql( array $input ): string {
+		global $wpdb;
+
+		$request                              = '';
+		$input['fields']                      = 'ids';
+		$input['per_page']                    = -1;
+		$input[ self::CAPTURE_IDS_QUERY_VAR ] = true;
+
+		$capture  = static function ( $posts, $query ) use ( &$request ) {
+			if ( ! $query->get( self::CAPTURE_IDS_QUERY_VAR ) ) {
+				return $posts;
+			}
+
+			$request = $query->request;
+			return array();
+		};
+		$fields   = static function ( $sql_fields, $query ) use ( $wpdb ) {
+			return $query->get( self::CAPTURE_IDS_QUERY_VAR ) ? "{$wpdb->posts}.ID" : $sql_fields;
+		};
+		$distinct = static function ( $sql_distinct, $query ) {
+			return $query->get( self::CAPTURE_IDS_QUERY_VAR ) ? 'DISTINCT' : $sql_distinct;
+		};
+
+		add_filter( 'posts_pre_query', $capture, PHP_INT_MAX, 2 );
+		add_filter( 'posts_fields', $fields, PHP_INT_MAX, 2 );
+		add_filter( 'posts_distinct', $distinct, PHP_INT_MAX, 2 );
+
+		try {
+			$this->executeQueryEvents( $input );
+		} finally {
+			remove_filter( 'posts_pre_query', $capture, PHP_INT_MAX );
+			remove_filter( 'posts_fields', $fields, PHP_INT_MAX );
+			remove_filter( 'posts_distinct', $distinct, PHP_INT_MAX );
+		}
+
+		return $request;
+	}
+
+	/**
 	 * Build a single posts_clauses callback that handles JOIN, WHERE, and ORDER BY.
 	 *
 	 * This consolidates all date logic into one filter — no stacking, no leaks.
@@ -433,7 +489,7 @@ class EventDateQueryAbilities {
 			// 'all' scope — no date WHERE clause.
 
 			// ORDER BY — always by start_datetime unless date_match (dedup doesn't need ordering).
-			if ( empty( $date_match ) ) {
+			if ( empty( $date_match ) && '' !== $order ) {
 				$clauses['orderby'] = "ed.start_datetime {$order}";
 			}
 

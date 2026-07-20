@@ -243,18 +243,6 @@ class FilterAbilities {
 				// guarantee an empty result even when the active filters (e.g. a
 				// location term) have events. See #378.
 				if ( ! empty( $nearby_venue_ids ) ) {
-					$venue_constraint = array(
-						'taxonomy' => 'venue',
-						'field'    => 'term_id',
-						'terms'    => $nearby_venue_ids,
-					);
-
-					if ( is_array( $tax_query_override ) ) {
-						$tax_query_override[] = $venue_constraint;
-					} else {
-						$tax_query_override = array( $venue_constraint );
-					}
-
 					$geo_context = array(
 						'active'      => true,
 						'venue_count' => count( $nearby_venue_ids ),

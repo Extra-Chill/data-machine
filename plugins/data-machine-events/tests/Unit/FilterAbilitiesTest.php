@@ -13,6 +13,7 @@ use DataMachineEvents\Abilities\FilterAbilities;
 use DataMachineEvents\Blocks\Calendar\Query\ScopeResolver;
 use DataMachineEvents\Core\Event_Post_Type;
 use DataMachineEvents\Core\EventDatesTable;
+use DataMachineEvents\Core\Venue_Taxonomy;
 
 class FilterAbilitiesTest extends WP_UnitTestCase {
 
@@ -23,6 +24,9 @@ class FilterAbilitiesTest extends WP_UnitTestCase {
 
 		if ( ! post_type_exists( Event_Post_Type::POST_TYPE ) ) {
 			Event_Post_Type::register();
+		}
+		if ( ! taxonomy_exists( 'venue' ) ) {
+			Venue_Taxonomy::register();
 		}
 		foreach ( array( 'filter_group', 'filter_kind' ) as $taxonomy ) {
 			if ( ! taxonomy_exists( $taxonomy ) ) {
@@ -143,5 +147,36 @@ class FilterAbilitiesTest extends WP_UnitTestCase {
 		remove_filter( 'data_machine_events_calendar_query_args', $filter, 10 );
 
 		$this->assertSame( 1, $this->term_count( $result, 'filter_kind', $term_id ) );
+	}
+
+	public function test_geo_intersects_active_venue_when_counting_other_taxonomies(): void {
+		$selected_venue = $this->create_term( 'venue' );
+		$nearby_venue   = $this->create_term( 'venue' );
+		$kind_id        = $this->create_term( 'filter_kind' );
+		add_term_meta( $selected_venue, '_venue_coordinates', '32.7765,-79.9311', true );
+		add_term_meta( $nearby_venue, '_venue_coordinates', '32.7800,-79.9300', true );
+
+		$tomorrow = ( new DateTimeImmutable( current_time( 'mysql' ) ) )->modify( '+1 day' );
+		$this->seed_event(
+			'Selected nearby venue',
+			$tomorrow->format( 'Y-m-d 20:00:00' ),
+			array( 'venue' => $selected_venue, 'filter_kind' => $kind_id )
+		);
+		$this->seed_event(
+			'Unselected nearby venue',
+			$tomorrow->format( 'Y-m-d 21:00:00' ),
+			array( 'venue' => $nearby_venue, 'filter_kind' => $kind_id )
+		);
+
+		$result = $this->abilities->executeGetFilterOptions(
+			array(
+				'active_filters' => array( 'venue' => array( $selected_venue ) ),
+				'geo_lat'        => '32.7765',
+				'geo_lng'        => '-79.9311',
+				'geo_radius'     => 10,
+			)
+		);
+
+		$this->assertSame( 1, $this->term_count( $result, 'filter_kind', $kind_id ) );
 	}
 }

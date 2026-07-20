@@ -51,9 +51,7 @@ class CalendarCacheTest extends WP_UnitTestCase {
 
 	/**
 	 * Two requests differing only by `lat`/`lng` MUST produce distinct
-	 * cache keys. The pre-fix bug was that the bucket cache key omitted
-	 * geo params entirely, so distinct radius searches collapsed onto
-	 * one bucket. The full-response key fixes that.
+	 * full-response cache keys.
 	 */
 	public function test_full_response_key_includes_geo_params() {
 		$base_envelope = array(
@@ -97,6 +95,33 @@ class CalendarCacheTest extends WP_UnitTestCase {
 			CalendarCache::generate_full_response_key( $base_envelope ),
 			'identical envelope MUST produce identical cache key'
 		);
+	}
+
+	public function test_bucket_key_includes_geo_and_time_constraints() {
+		$params = array(
+			'show_past'       => false,
+			'search_query'    => 'calendar',
+			'date_start'      => '2026-07-19',
+			'date_end'        => '2026-07-19',
+			'time_start'      => '18:00:00',
+			'time_end'        => '23:59:59',
+			'geo_lat'         => '32.7765',
+			'geo_lng'         => '-79.9311',
+			'geo_radius'      => 25,
+			'geo_radius_unit' => 'mi',
+		);
+
+		$other_lat            = $params;
+		$other_lat['geo_lat'] = '33.7765';
+		$other_radius               = $params;
+		$other_radius['geo_radius'] = 50;
+		$other_time               = $params;
+		$other_time['time_start'] = '20:00:00';
+
+		$key = CalendarCache::generate_key( $params, 'dates' );
+		$this->assertNotSame( $key, CalendarCache::generate_key( $other_lat, 'dates' ) );
+		$this->assertNotSame( $key, CalendarCache::generate_key( $other_radius, 'dates' ) );
+		$this->assertNotSame( $key, CalendarCache::generate_key( $other_time, 'dates' ) );
 	}
 
 	/**
@@ -302,5 +327,17 @@ class CalendarCacheTest extends WP_UnitTestCase {
 			$key
 		);
 		$this->assertStringNotContainsString( $token, $key );
+	}
+
+	public function test_scope_tokens_isolate_boundary_cache_keys_without_leaking_contents() {
+		$first_token = 'signed.private.boundary.scope.a';
+		$second_token = 'signed.private.boundary.scope.b';
+		$first_key = CalendarCache::generate_key( array( 'scope_token' => $first_token ), 'dates' );
+		$second_key = CalendarCache::generate_key( array( 'scope_token' => $second_token ), 'dates' );
+
+		$this->assertNotSame( $first_key, $second_key );
+		$this->assertNotSame( CalendarCache::generate_key( array(), 'dates' ), $first_key );
+		$this->assertStringNotContainsString( $first_token, $first_key );
+		$this->assertStringNotContainsString( $second_token, $second_key );
 	}
 }
