@@ -141,10 +141,37 @@ class CalendarAbilitiesTest extends WP_UnitTestCase {
 		);
 
 		$this->assertSame( 1, $result['total_event_count'] );
+		$this->assertSame( 1, $result['event_count'] );
 		$this->assertSame( $today->format( 'Y-m-d' ), $result['date_boundaries']['start_date'] );
 		$this->assertSame( $end->format( 'Y-m-d' ), $result['date_boundaries']['end_date'] );
 		$this->assertSame( $today->format( 'Y-m-d' ), $result['paged_date_groups'][0]['date'] );
-		$this->assertContains( $event_id, $this->result_post_ids( $result ) );
+		$this->assertSame( array( $event_id ), $this->result_post_ids( $result ) );
+	}
+
+	public function test_taxonomy_filtered_upcoming_boundaries_include_ongoing_multi_day_events(): void {
+		$term = wp_insert_term( 'Ongoing calendar venue ' . uniqid(), 'venue' );
+		$this->assertNotWPError( $term );
+		$venue_id = (int) $term['term_id'];
+		$today    = new DateTimeImmutable( current_time( 'Y-m-d' ) . ' 12:00:00' );
+		$start    = $today->modify( '-3 days' );
+		$end      = $today->modify( '+2 days' );
+
+		$event_id = $this->seed_event( 'Taxonomy-filtered ongoing event', $start->format( 'Y-m-d 20:00:00' ), $end->format( 'Y-m-d 22:00:00' ), $venue_id );
+
+		$result = $this->abilities->executeGetCalendarPage(
+			array(
+				'archive_taxonomy' => 'venue',
+				'archive_term_id'  => $venue_id,
+				'include_html'     => false,
+			)
+		);
+
+		$this->assertSame( 1, $result['total_event_count'] );
+		$this->assertSame( 1, $result['event_count'] );
+		$this->assertSame( $today->format( 'Y-m-d' ), $result['date_boundaries']['start_date'] );
+		$this->assertSame( $end->format( 'Y-m-d' ), $result['date_boundaries']['end_date'] );
+		$this->assertSame( $today->format( 'Y-m-d' ), $result['paged_date_groups'][0]['date'] );
+		$this->assertSame( array( $event_id ), $this->result_post_ids( $result ) );
 	}
 
 	public function test_month_intersects_explicit_date_range(): void {

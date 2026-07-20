@@ -671,8 +671,7 @@ class CalendarAbilities {
 				// scope used by EventDateQueryAbilities.
 				$where_clauses[] = UpcomingFilter::past_where( $current_time );
 			} else {
-				$where_clauses[] = 'ed.start_datetime >= %s';
-				$query_values[]  = $current_date . ' 00:00:00';
+				$where_clauses[] = UpcomingFilter::upcoming_where( $current_time );
 			}
 
 			$where = implode( ' AND ', $where_clauses );
@@ -703,8 +702,7 @@ class CalendarAbilities {
 		if ( $show_past_param ) {
 			$where_clauses[] = UpcomingFilter::past_where( $current_time );
 		} else {
-			$where_clauses[] = 'ed.start_datetime >= %s';
-			$query_values[]  = $current_date . ' 00:00:00';
+			$where_clauses[] = UpcomingFilter::upcoming_where( $current_time );
 		}
 
 		if ( $archive_taxonomy && $archive_term_id ) {
