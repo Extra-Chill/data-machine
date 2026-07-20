@@ -14,6 +14,8 @@ namespace DataMachine\Abilities\Job;
 use DataMachine\Abilities\ExecutionScope;
 use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Core\Agents\AgentIdentityResolver;
+use DataMachine\Core\DirectJobEnqueuer;
+use DataMachine\Core\JobStatus;
 use DataMachine\Core\Steps\WorkflowConfigFactory;
 use DataMachine\Core\Steps\WorkflowSpecValidator;
 use DataMachine\Engine\ExecutionPlan;
@@ -24,10 +26,12 @@ class ExecuteWorkflowAbility {
 
 	use JobHelpers;
 
-	public function __construct() {
+	public function __construct( bool $register = true ) {
 		$this->initDatabases();
 
-		$this->registerAbility();
+		if ( $register ) {
+			$this->registerAbility();
+		}
 	}
 
 	private function registerAbility(): void {
@@ -103,11 +107,31 @@ class ExecuteWorkflowAbility {
 	 * @return array Result with job_id and execution info.
 	 */
 	public function execute( array $input ): array {
+		return $this->executeWithAuthority( $input, false );
+	}
+
+	/**
+	 * Execute trusted internal system work without accepting public authority flags.
+	 *
+	 * @param array $input Workflow input.
+	 * @return array
+	 */
+	public function executeInternal( array $input ): array {
+		return $this->executeWithAuthority( $input, true );
+	}
+
+	/**
+	 * Execute an ephemeral workflow under an explicit trusted authority boundary.
+	 *
+	 * @param array $input          Workflow input.
+	 * @param bool  $system_context Trusted internal system execution.
+	 * @return array
+	 */
+	private function executeWithAuthority( array $input, bool $system_context ): array {
 		$workflow       = $input['workflow'] ?? null;
 		$timestamp      = $input['timestamp'] ?? null;
 		$initial_data   = is_array( $input['initial_data'] ?? null ) ? $input['initial_data'] : array();
 		$operation_key  = is_string( $input['operation_key'] ?? null ) ? trim( $input['operation_key'] ) : '';
-		$system_context = ! empty( $input['system_context'] );
 
 		// Validate workflow structure
 		$validation = WorkflowSpecValidator::validate( $workflow );
@@ -118,8 +142,23 @@ class ExecuteWorkflowAbility {
 			);
 		}
 
-		// Build configs from workflow
+		// Validate the complete execution plan before claiming an operation key.
 		$configs = WorkflowConfigFactory::buildEphemeralConfigs( $workflow );
+		try {
+			$first_step_id = ExecutionPlan::from_flow_config( $configs['flow_config'] )->first_step_id();
+		} catch ( \InvalidArgumentException $e ) {
+			return array(
+				'success' => false,
+				'error'   => $e->getMessage(),
+			);
+		}
+
+		if ( ! $first_step_id ) {
+			return array(
+				'success' => false,
+				'error'   => 'Could not determine first step in workflow',
+			);
+		}
 
 		$ownership = $this->resolveOwnership( $initial_data, $system_context );
 		if ( isset( $ownership['error'] ) ) {
@@ -144,11 +183,13 @@ class ExecuteWorkflowAbility {
 			: 'Chat Workflow';
 
 		$create_args = array(
-			'pipeline_id' => 'direct',
-			'flow_id'     => 'direct',
-			'source'      => $job_source,
-			'label'       => $job_label,
-			'user_id'     => $ownership['user_id'],
+			'pipeline_id'      => 'direct',
+			'flow_id'          => 'direct',
+			'source'           => $job_source,
+			'label'            => $job_label,
+			'user_id'          => $ownership['user_id'],
+			'operation_state'  => 'preparing',
+			'operation_step_id' => $first_step_id,
 		);
 		if ( $ownership['agent_id'] > 0 ) {
 			$create_args['agent_id'] = $ownership['agent_id'];
@@ -186,15 +227,16 @@ class ExecuteWorkflowAbility {
 		}
 
 		$request_fingerprint = $this->requestFingerprint( $engine_data, $timestamp );
+		$create_args['request_fingerprint'] = $request_fingerprint;
+		$engine_data['direct_request']       = array(
+			'operation_key'  => $operation_key,
+			'fingerprint'    => $request_fingerprint,
+			'execution_type' => $timestamp && is_numeric( $timestamp ) && (int) $timestamp > time() ? 'delayed' : 'immediate',
+			'timestamp'      => is_numeric( $timestamp ) ? (int) $timestamp : null,
+			'dry_run'        => ! empty( $input['dry_run'] ),
+		);
 		if ( '' !== $operation_key ) {
 			$create_args['idempotency_key'] = 'direct:' . hash( 'sha256', $ownership['user_id'] . ':' . $ownership['agent_id'] . ':' . $operation_key );
-			$engine_data['direct_request']   = array(
-				'operation_key' => $operation_key,
-				'fingerprint'   => $request_fingerprint,
-				'execution_type' => $timestamp && is_numeric( $timestamp ) && (int) $timestamp > time() ? 'delayed' : 'immediate',
-				'timestamp'      => is_numeric( $timestamp ) ? (int) $timestamp : null,
-				'dry_run'        => ! empty( $input['dry_run'] ),
-			);
 		}
 
 		$create_args['engine_data'] = $engine_data;
@@ -211,133 +253,52 @@ class ExecuteWorkflowAbility {
 		}
 
 		if ( is_array( $creation ) && ! empty( $creation['already_exists'] ) ) {
-			$existing_engine_data = is_array( $creation['job']['engine_data'] ?? null ) ? $creation['job']['engine_data'] : array();
-			$existing_fingerprint = (string) ( $existing_engine_data['direct_request']['fingerprint'] ?? '' );
+			$existing_fingerprint = (string) ( $creation['job']['request_fingerprint'] ?? '' );
 			if ( '' === $existing_fingerprint || ! hash_equals( $existing_fingerprint, $request_fingerprint ) ) {
 				return array(
 					'success' => false,
 					'error'   => 'operation_key has already been used with different workflow input.',
 				);
 			}
-
-			return $this->executionResponse( $job_id, $workflow, $existing_engine_data['direct_request'], true );
 		}
 
-		$engine_data['job']['job_id'] = $job_id;
-
-		if ( ! $this->db_jobs->store_engine_data( $job_id, $engine_data ) ) {
+		$job = $this->db_jobs->get_job( $job_id );
+		if ( ! is_array( $job ) ) {
 			return array(
 				'success' => false,
-				'error'   => 'Failed to persist job execution data',
+				'error'   => 'Failed to load job record after creation',
 			);
 		}
 
-		try {
-			$first_step_id = ExecutionPlan::from_flow_config( $configs['flow_config'] )->first_step_id();
-		} catch ( \InvalidArgumentException $e ) {
-			do_action(
-				'datamachine_log',
-				'error',
-				'Workflow execution failed - invalid execution plan',
-				array(
-					'job_id' => $job_id,
-					'error'  => $e->getMessage(),
-				)
-			);
+		$existing_engine_data = is_array( $job['engine_data'] ?? null ) ? $job['engine_data'] : array();
+		$request_meta         = is_array( $existing_engine_data['direct_request'] ?? null ) ? $existing_engine_data['direct_request'] : array();
+		if ( JobStatus::isStatusFinal( (string) ( $job['status'] ?? '' ) ) ) {
+			return $this->executionResponse( $job_id, $workflow, $request_meta, true );
+		}
 
+		$existing_engine_data['job']           = is_array( $existing_engine_data['job'] ?? null ) ? $existing_engine_data['job'] : array();
+		$existing_engine_data['job']['job_id'] = $job_id;
+		if ( ! $this->db_jobs->store_engine_data( $job_id, $existing_engine_data ) ) {
+			$this->db_jobs->finish_operation_enqueue( $job_id, 'enqueue_failed' );
 			return array(
 				'success' => false,
-				'error'   => $e->getMessage(),
+				'error'   => 'Failed to persist job execution data; replay may retry the operation.',
 			);
 		}
 
-		if ( ! $first_step_id ) {
-			return array(
-				'success' => false,
-				'error'   => 'Could not determine first step in workflow',
-			);
-		}
-
-		$step_count = count( $workflow['steps'] ?? array() );
-		$is_dry_run = ! empty( $input['dry_run'] );
-
-		// Immediate execution
-		if ( ! $timestamp || ! is_numeric( $timestamp ) || (int) $timestamp <= time() ) {
-			do_action( 'datamachine_schedule_next_step', $job_id, $first_step_id, array() );
-
-			do_action(
-				'datamachine_log',
-				'info',
-				'Workflow executed via ability (direct mode)',
-				array(
-					'execution_mode' => 'direct',
-					'execution_type' => 'immediate',
-					'job_id'         => $job_id,
-					'step_count'     => $step_count,
-					'dry_run'        => $is_dry_run,
-				)
-			);
-
-			$message = $is_dry_run
-				? 'Ephemeral workflow dry-run started. No posts will be created - preview data will be returned.'
-				: 'Ephemeral workflow execution started';
-
-			$response = array(
-				'success'        => true,
-				'execution_mode' => 'direct',
-				'execution_type' => 'immediate',
-				'job_id'         => $job_id,
-				'step_count'     => $step_count,
-				'message'        => $message,
-			);
-
-			if ( $is_dry_run ) {
-				$response['dry_run'] = true;
-			}
-
-			return $response;
-		}
-
-		// Delayed execution
-		$timestamp = (int) $timestamp;
-
-		$action_id = as_schedule_single_action(
-			$timestamp,
-			'datamachine_schedule_next_step',
-			array( $job_id, $first_step_id, array() ),
-			'data-machine'
+		$enqueue = ( new DirectJobEnqueuer( $this->db_jobs ) )->enqueue(
+			$job_id,
+			$first_step_id,
+			is_numeric( $timestamp ) ? (int) $timestamp : null
 		);
-
-		if ( false === $action_id ) {
+		if ( empty( $enqueue['success'] ) ) {
 			return array(
 				'success' => false,
-				'error'   => 'Failed to schedule workflow execution',
+				'error'   => 'Failed to durably enqueue workflow execution; replay may retry the operation.',
 			);
 		}
 
-		do_action(
-			'datamachine_log',
-			'info',
-			'Workflow scheduled via ability (direct mode)',
-			array(
-				'execution_mode' => 'direct',
-				'execution_type' => 'delayed',
-				'job_id'         => $job_id,
-				'step_count'     => $step_count,
-				'timestamp'      => $timestamp,
-			)
-		);
-
-		return array(
-			'success'        => true,
-			'execution_mode' => 'direct',
-			'execution_type' => 'delayed',
-			'job_id'         => $job_id,
-			'step_count'     => $step_count,
-			'timestamp'      => $timestamp,
-			'scheduled_time' => wp_date( 'c', $timestamp ),
-			'message'        => 'Ephemeral workflow scheduled for one-time execution at ' . wp_date( 'M j, Y g:i A', $timestamp ),
-		);
+		return $this->executionResponse( $job_id, $workflow, $request_meta, is_array( $creation ) && ! empty( $creation['already_exists'] ) );
 	}
 
 	/**

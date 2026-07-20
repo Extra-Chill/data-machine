@@ -470,6 +470,16 @@ class JobRetryPolicy {
 	}
 
 	/**
+	 * Resolve the safe resume step for an explicit direct-workflow retry.
+	 *
+	 * @param array $engine_data Job engine data.
+	 * @return string Resume step ID, or empty string when retry is unsafe.
+	 */
+	public static function resolveDirectResumeStepId( array $engine_data ): string {
+		return self::resolveEphemeralFlowStepId( $engine_data );
+	}
+
+	/**
 	 * Resolve the first incomplete step id of a resumable multi-step workflow.
 	 *
 	 * Walks the flow_config in execution order and returns the first step that

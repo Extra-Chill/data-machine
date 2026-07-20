@@ -377,7 +377,7 @@ $assert( 'TaskRegistry exposes mutates metadata', str_contains( $registry, "'mut
 $assert( 'TaskRegistry exposes requires_scope metadata', str_contains( $registry, "'requires_scope'" ) );
 $assert( 'TaskScheduler passes system job source to execute-workflow', str_contains( $scheduler, "'job_source'    => 'system'" ) );
 $assert( 'TaskScheduler records rejection details for callers', str_contains( $scheduler, 'recordScheduleError' ) && str_contains( $scheduler, 'getLastScheduleError' ) );
-$assert( 'execute-workflow honors caller job source', str_contains( $workflow_ability, "'source'      => $" . 'job_source' ) );
+$assert( 'execute-workflow honors caller job source', (bool) preg_match( "/'source'\\s*=>\\s*\\\$job_source/", $workflow_ability ) );
 
 echo "\nAssertions: {$total}, Failures: {$failures}\n";
 if ( $failures > 0 ) {

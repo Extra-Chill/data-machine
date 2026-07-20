@@ -63,7 +63,10 @@ trait JobHelpers {
 		$agent_id = isset( $job['agent_id'] ) && (int) $job['agent_id'] > 0 ? (int) $job['agent_id'] : null;
 
 		if ( 0 === $user_id && null === $agent_id ) {
-			return $scope->can_action();
+			$legacy_unowned = empty( $job['request_fingerprint'] ) && empty( $job['operation_state'] );
+			return $legacy_unowned
+				? $scope->can_action()
+				: PermissionHelper::has_privileged_resource_access( 'manage_flows' );
 		}
 
 		return $scope->owns_agent_resource( $agent_id, $user_id );
@@ -81,6 +84,44 @@ trait JobHelpers {
 			'error'      => 'You do not have permission to access this job.',
 			'status'     => 403,
 		);
+	}
+
+	/**
+	 * Apply authoritative ownership constraints to a job collection query.
+	 *
+	 * @param int|null $requested_user_id  Caller-selected user filter.
+	 * @param int|null $requested_agent_id Caller-selected agent filter.
+	 * @return array{user_id?:int,agent_id?:int}|array{error:string}
+	 */
+	protected function jobCollectionScope( ?int $requested_user_id, ?int $requested_agent_id ): array {
+		if ( PermissionHelper::has_privileged_resource_access( 'manage_flows' ) ) {
+			if ( null !== $requested_agent_id ) {
+				return array( 'agent_id' => $requested_agent_id );
+			}
+			return null !== $requested_user_id ? array( 'user_id' => $requested_user_id ) : array();
+		}
+
+		$acting_user_id = PermissionHelper::acting_user_id();
+		if ( null !== $requested_agent_id ) {
+			return PermissionHelper::can_access_agent( $requested_agent_id )
+				? array( 'agent_id' => $requested_agent_id )
+				: array( 'error' => 'You do not have permission to access jobs for this agent.' );
+		}
+
+		$acting_agent_id = PermissionHelper::get_acting_agent_id();
+		if ( null !== $acting_agent_id ) {
+			return array( 'agent_id' => $acting_agent_id );
+		}
+
+		if ( null !== $requested_user_id && $requested_user_id !== $acting_user_id ) {
+			return array( 'error' => 'You do not have permission to access jobs for this user.' );
+		}
+
+		if ( $acting_user_id <= 0 ) {
+			return array( 'error' => 'An authenticated acting caller is required to list owned jobs.' );
+		}
+
+		return array( 'user_id' => $acting_user_id );
 	}
 
 	/**

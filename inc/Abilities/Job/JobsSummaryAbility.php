@@ -93,12 +93,26 @@ class JobsSummaryAbility {
 	 * @return array Result with summary counts.
 	 */
 	public function execute( array $input ): array {
+		$ownership_scope = $this->jobCollectionScope(
+			isset( $input['user_id'] ) ? (int) $input['user_id'] : null,
+			isset( $input['agent_id'] ) ? (int) $input['agent_id'] : null
+		);
+		if ( isset( $ownership_scope['error'] ) ) {
+			return array(
+				'success'    => false,
+				'error_code' => 'job_access_denied',
+				'error'      => $ownership_scope['error'],
+				'status'     => 403,
+			);
+		}
+
 		$filters = array();
-		foreach ( array( 'flow_id', 'pipeline_id', 'handler', 'status', 'source', 'since', 'user_id', 'agent_id' ) as $key ) {
+		foreach ( array( 'flow_id', 'pipeline_id', 'handler', 'status', 'source', 'since' ) as $key ) {
 			if ( isset( $input[ $key ] ) && '' !== $input[ $key ] ) {
 				$filters[ $key ] = $input[ $key ];
 			}
 		}
+		$filters = array_merge( $filters, $ownership_scope );
 
 		$summary = empty( $input['compact'] ) ? $this->db_jobs->get_jobs_summary( $filters ) : $this->getCompactSummary( $filters );
 
