@@ -55,6 +55,7 @@ class ChatOrchestrator {
 	 *     @type int    $selected_pipeline_id Currently selected pipeline ID.
 	 *     @type int    $max_turns            Maximum turns allowed.
 	 *     @type string $request_id           Idempotency request ID.
+	 *     @type int    $calling_user_id      Authenticated acting user. 0 means no human caller.
 	 *     @type callable|null $interrupt_source Optional cooperative interrupt source.
 	 * }
 	 * @return array|WP_Error Response data array or WP_Error on failure.
@@ -73,6 +74,7 @@ class ChatOrchestrator {
 		$interrupt_source     = is_callable( $options['interrupt_source'] ?? null ) ? $options['interrupt_source'] : null;
 		$agent_id             = (int) ( $options['agent_id'] ?? 0 );
 		$agent_slug           = (string) ( $options['agent_slug'] ?? '' );
+		$calling_user_id      = array_key_exists( 'calling_user_id', $options ) ? max( 0, (int) $options['calling_user_id'] ) : $user_id;
 		$modes                = ToolPolicyResolver::normalizeModes( ! empty( $options['modes'] ) ? $options['modes'] : array( $options['mode'] ?? ToolPolicyResolver::MODE_CHAT ) );
 		$mode                 = implode( ',', $modes );
 		$transcript_owner     = ChatTranscriptOwner::resolve_for_request( $options, $user_id );
@@ -190,6 +192,7 @@ class ChatOrchestrator {
 					'status'            => 'processing',
 					'started_at'        => current_time( 'mysql', true ),
 					'message_count'     => count( $messages ),
+					'calling_user_id'   => $calling_user_id,
 					'last_seen_host'    => '' !== $current_host ? $current_host : ( $session_metadata['last_seen_host'] ?? '' ),
 					'consent_decisions' => array(
 						'store_transcript' => $transcript_consent_decision->to_array(),
@@ -235,6 +238,7 @@ class ChatOrchestrator {
 				'modes'                 => $modes,
 				'mode'                  => $mode,
 				'user_id'               => $user_id,
+				'calling_user_id'       => $calling_user_id,
 				'agent_id'              => $agent_id,
 				'agent_slug'            => $agent_slug,
 				'interrupt_source'      => $interrupt_source,
@@ -262,6 +266,7 @@ class ChatOrchestrator {
 			'message_count'     => count( $result['messages'] ),
 			'current_turn'      => $result['turn_count'],
 			'has_pending_tools' => ! $is_completed,
+			'calling_user_id'   => $calling_user_id,
 			'last_seen_host'    => '' !== $current_host ? $current_host : ( $session_metadata['last_seen_host'] ?? '' ),
 		);
 		if ( ! empty( $loop_metadata['runtime_tool_pending_requests'] ) ) {
@@ -320,7 +325,7 @@ class ChatOrchestrator {
 		}
 
 		// --- Build response data ---
-		$response_metadata = is_array( $loop_result['metadata'] ?? null ) ? $loop_result['metadata'] : array();
+		$response_metadata = is_array( $result['metadata'] ?? null ) ? $result['metadata'] : array();
 		if ( empty( $response_metadata ) ) {
 			$response_metadata = $metadata;
 		} else {
@@ -382,9 +387,10 @@ class ChatOrchestrator {
 	 *
 	 * @param string $session_id Session ID to continue.
 	 * @param int    $user_id    Current user ID for ownership check.
+	 * @param int|null $calling_user_id Original authenticated acting user. Null restores session context.
 	 * @return array|WP_Error Response data array or WP_Error on failure.
 	 */
-	public static function processContinue( string $session_id, int $user_id ): array|WP_Error {
+	public static function processContinue( string $session_id, int $user_id, ?int $calling_user_id = null ): array|WP_Error {
 		$max_turns = PluginSettings::get( 'max_turns', PluginSettings::DEFAULT_MAX_TURNS );
 
 		$chat_db = ConversationStoreFactory::get();
@@ -407,6 +413,9 @@ class ChatOrchestrator {
 		}
 
 		$metadata = $session['metadata'] ?? array();
+		$calling_user_id = null !== $calling_user_id
+			? max( 0, $calling_user_id )
+			: ( array_key_exists( 'calling_user_id', $metadata ) ? max( 0, (int) $metadata['calling_user_id'] ) : $user_id );
 
 		// Short-circuit if session is already completed.
 		if ( isset( $metadata['status'] ) && 'completed' === $metadata['status'] && empty( $metadata['has_pending_tools'] ) ) {
@@ -463,6 +472,7 @@ class ChatOrchestrator {
 				'modes'                => $modes,
 				'mode'                 => $stored_mode,
 				'user_id'              => (int) ( $session['user_id'] ?? 0 ),
+				'calling_user_id'      => $calling_user_id,
 				'agent_id'             => (int) ( $session['agent_id'] ?? 0 ),
 				'agent_slug'           => (string) ( $session['agent_slug'] ?? '' ),
 				'cross_site_handoff'   => $cross_site_handoff,
@@ -488,6 +498,7 @@ class ChatOrchestrator {
 			'message_count'     => count( $result['messages'] ),
 			'current_turn'      => $current_turn,
 			'has_pending_tools' => ! $is_completed,
+			'calling_user_id'   => $calling_user_id,
 			'last_seen_host'    => '' !== $current_host ? $current_host : ( $metadata['last_seen_host'] ?? '' ),
 		);
 		if ( ! empty( $metadata['runtime_tool_requests'] ) ) {
@@ -849,6 +860,7 @@ class ChatOrchestrator {
 	 *     @type int    $max_turns             Maximum turns allowed (default 25).
 	 *     @type int    $selected_pipeline_id  Currently selected pipeline ID.
 	 *     @type string $mode                  Agent mode (default 'chat').
+	 *     @type int    $calling_user_id       Authenticated acting user. 0 means no human caller.
 	 *     @type callable|null $interrupt_source Optional cooperative interrupt source.
 	 * }
 	 * @return array|WP_Error Result array with messages, final_content, completed, turn_count,
@@ -884,6 +896,13 @@ class ChatOrchestrator {
 				$agent_slug = ConversationStoreFactory::resolve_agent_slug_for_transcript( $agent_id );
 			}
 
+			// Keep the authenticated acting user separate from runtime/session
+			// ownership. An explicit 0 denotes a system or delegated runtime with
+			// no human caller and must not fall back to the transcript owner.
+			$calling_user_id = isset( $options['calling_user_id'] )
+				? max( 0, (int) $options['calling_user_id'] )
+				: $user_id;
+
 			$resolver       = new ToolPolicyResolver();
 			$client_context = $options['client_context'] ?? array();
 			$all_tools      = $resolver->resolve(
@@ -892,25 +911,13 @@ class ChatOrchestrator {
 					'agent_id'       => $agent_id,
 					'agent_slug'     => $agent_slug,
 					'user_id'        => $user_id,
+					'calling_user_id' => $calling_user_id,
 					'interactive'    => true,
 					'client_context' => is_array( $client_context ) ? $client_context : array(),
 					'tool_policy'    => is_array( $options['tool_policy'] ?? null ) ? $options['tool_policy'] : null,
 					'allow_only'     => is_array( $options['allow_only'] ?? null ) ? $options['allow_only'] : array(),
 				)
 			);
-
-			// `calling_user_id` is the human user on whose behalf this AI invocation
-			// is running. In a chat session that's the chat caller. Tools that resolve
-			// per-user OAuth credentials read this field — distinct from `agent_id`
-			// (the acting agent identity) and from pipeline `user_id` (job owner).
-			//
-			// Callers can override via `$options['calling_user_id']` to express
-			// "this is a system-level invocation borrowing an admin session_id for
-			// storage but has no real human caller" (e.g. processPing). When the
-			// override is absent, the chat user is the calling user.
-			$calling_user_id = isset( $options['calling_user_id'] )
-				? max( 0, (int) $options['calling_user_id'] )
-				: $user_id;
 
 			$loop_context = array(
 				'session_id'      => $session_id,

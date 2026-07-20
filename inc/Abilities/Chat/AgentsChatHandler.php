@@ -105,6 +105,7 @@ class AgentsChatHandler {
 		}
 		$agent_id = $identity ? $identity->agent_id : 0;
 
+		$calling_user_id = $this->resolveCallingUserId( $input );
 		$user_id = $this->resolveRuntimeUserId( $identity, (string) ( $input['agent'] ?? '' ), $input );
 		if ( $user_id <= 0 ) {
 			return new WP_Error( 'no_user', __( 'No user context available.', 'data-machine' ), array( 'status' => 400 ) );
@@ -145,6 +146,7 @@ class AgentsChatHandler {
 				'modes'                 => $modes,
 				'agent_id'              => $agent_id,
 				'agent_slug'            => $identity ? $identity->agent_slug : '',
+				'calling_user_id'        => $calling_user_id,
 				'attachments'           => $input['attachments'] ?? array(),
 				'client_context'        => $client_context,
 				'tool_policy'           => is_array( $input['tool_policy'] ?? null ) ? $input['tool_policy'] : null,
@@ -162,6 +164,26 @@ class AgentsChatHandler {
 
 		$output = $this->toCanonicalOutput( $result );
 		return $this->withInputControlDiagnostics( $output, $input );
+	}
+
+	/**
+	 * Resolve the authenticated user on whose behalf the chat executes.
+	 *
+	 * The runtime and transcript may be owned by an agent owner even when no
+	 * human is acting. An execution principal therefore takes precedence over
+	 * WordPress request state, including when it explicitly identifies a
+	 * system/runtime context with acting_user_id 0.
+	 *
+	 * @param array $input Canonical chat input.
+	 * @return int Acting WordPress user ID, or 0 when no human is acting.
+	 */
+	private function resolveCallingUserId( array $input ): int {
+		$principal = $this->resolveCallerPrincipal( $input ) ?? PermissionHelper::get_execution_principal();
+		if ( $principal instanceof \AgentsAPI\AI\WP_Agent_Execution_Principal ) {
+			return max( 0, $principal->acting_user_id );
+		}
+
+		return max( 0, get_current_user_id() );
 	}
 
 	/**

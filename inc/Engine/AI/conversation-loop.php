@@ -1488,6 +1488,7 @@ function datamachine_prepare_runtime_tool_request( array $request, array $payloa
 					'persistence_status' => 'pending',
 					'session_id'         => (string) ( $request['session_id'] ?? '' ),
 					'user_id'            => (int) ( $payload['user_id'] ?? 0 ),
+					'calling_user_id'    => array_key_exists( 'calling_user_id', $payload ) ? max( 0, (int) $payload['calling_user_id'] ) : (int) ( $payload['user_id'] ?? 0 ),
 					'agent_id'           => (int) ( $payload['agent_id'] ?? 0 ),
 					'mode'               => (string) ( $request['mode'] ?? '' ),
 					'modes'              => is_array( $request['modes'] ?? null ) ? $request['modes'] : array(),
@@ -1843,15 +1844,17 @@ function datamachine_resume_runtime_tool_request( string $request_id ): void {
 		( new RuntimeToolRunStateStore() )->resume(
 			$job_id,
 			array(
-				'session_id' => (string) ( $datamachine_metadata['session_id'] ?? '' ),
-				'user_id'    => (int) ( $datamachine_metadata['user_id'] ?? 0 ),
+				'session_id'      => (string) ( $datamachine_metadata['session_id'] ?? '' ),
+				'user_id'         => (int) ( $datamachine_metadata['user_id'] ?? 0 ),
+				'calling_user_id' => array_key_exists( 'calling_user_id', $datamachine_metadata ) ? max( 0, (int) $datamachine_metadata['calling_user_id'] ) : (int) ( $datamachine_metadata['user_id'] ?? 0 ),
 			)
 		);
 	}
 
 	\DataMachine\Api\Chat\ChatOrchestrator::processContinue(
 		(string) ( $datamachine_metadata['session_id'] ?? '' ),
-		(int) ( $datamachine_metadata['user_id'] ?? 0 )
+		(int) ( $datamachine_metadata['user_id'] ?? 0 ),
+		array_key_exists( 'calling_user_id', $datamachine_metadata ) ? max( 0, (int) $datamachine_metadata['calling_user_id'] ) : null
 	);
 }
 
