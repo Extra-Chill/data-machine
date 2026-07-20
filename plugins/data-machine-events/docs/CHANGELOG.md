@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.49.4] - 2026-07-20
+
+### Fixed
+- clamp ongoing event boundaries
+
 ## [0.49.3] - 2026-07-20
 
 ### Fixed
