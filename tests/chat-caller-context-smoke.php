@@ -69,6 +69,14 @@ namespace DataMachine\Core {
 			unset( $key );
 			return $default;
 		}
+
+		public static function resolveModelForAgentMode( int $agent_id, string $mode ): array {
+			unset( $agent_id, $mode );
+			return array(
+				'provider' => 'test-provider',
+				'model'    => 'test-model',
+			);
+		}
 	}
 }
 
@@ -78,8 +86,12 @@ namespace DataMachine\Core\Database\Chat {
 			'session_id' => 'caller-context-session',
 			'user_id'    => 700,
 			'agent_id'   => 9,
+			'agent_slug' => 'agent-9',
 			'messages'   => array(),
 			'metadata'   => array(),
+			'mode'       => 'chat',
+			'provider'   => 'test-provider',
+			'model'      => 'test-model',
 			'title'      => 'Existing title',
 		);
 
@@ -229,6 +241,10 @@ namespace {
 		return $value instanceof WP_Error;
 	}
 
+	function sanitize_key( string $key ): string {
+		return strtolower( preg_replace( '/[^a-z0-9_-]/', '', $key ) ?? '' );
+	}
+
 	function current_time( string $type, bool $gmt = false ): string {
 		unset( $type, $gmt );
 		return '2026-07-20 00:00:00';
@@ -331,6 +347,23 @@ namespace {
 		)
 	);
 	$assert_same( 'preserved', $response['metadata']['datamachine']['response_marker'] ?? null, 'loop response metadata survives final response assembly' );
+
+	$store = \DataMachine\Core\Database\Chat\ConversationStoreFactory::get();
+	$store->session['metadata']['status']          = 'processing';
+	$store->session['metadata']['has_pending_tools'] = true;
+	$store->session['metadata']['calling_user_id'] = 52;
+	\DataMachine\Api\Chat\ChatOrchestrator::processContinue( 'caller-context-session', 700 );
+	$assert_same( 52, $GLOBALS['datamachine_chat_caller_resolver_args'][4]['calling_user_id'], 'processContinue restores the delegated caller from session metadata' );
+	$assert_same( 52, $GLOBALS['datamachine_chat_caller_loop_tools'][4]['caller_tool']['caller'], 'delegated caller-sensitive tool remains visible after continuation' );
+
+	$store->session['metadata']['status']          = 'processing';
+	$store->session['metadata']['has_pending_tools'] = true;
+	$store->session['metadata']['calling_user_id'] = 52;
+	\DataMachine\Api\Chat\ChatOrchestrator::processContinue( 'caller-context-session', 700, 0 );
+	$assert_same( 0, $GLOBALS['datamachine_chat_caller_resolver_args'][5]['calling_user_id'], 'processContinue preserves an explicit no-human override' );
+	$assert_same( array(), $GLOBALS['datamachine_chat_caller_loop_tools'][5], 'owner-scoped tools do not appear after no-human continuation' );
+	$assert_same( 700, $GLOBALS['datamachine_chat_caller_loop_context'][5]['user_id'], 'continued no-human context retains separate runtime ownership' );
+	$assert_same( 0, $GLOBALS['datamachine_chat_caller_loop_context'][5]['calling_user_id'], 'continued no-human context does not inherit the runtime owner' );
 
 	if ( $failures ) {
 		echo "\nFAILED: " . count( $failures ) . " assertion(s)\n";

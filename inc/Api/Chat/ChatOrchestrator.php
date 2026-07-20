@@ -74,6 +74,7 @@ class ChatOrchestrator {
 		$interrupt_source     = is_callable( $options['interrupt_source'] ?? null ) ? $options['interrupt_source'] : null;
 		$agent_id             = (int) ( $options['agent_id'] ?? 0 );
 		$agent_slug           = (string) ( $options['agent_slug'] ?? '' );
+		$calling_user_id      = array_key_exists( 'calling_user_id', $options ) ? max( 0, (int) $options['calling_user_id'] ) : $user_id;
 		$modes                = ToolPolicyResolver::normalizeModes( ! empty( $options['modes'] ) ? $options['modes'] : array( $options['mode'] ?? ToolPolicyResolver::MODE_CHAT ) );
 		$mode                 = implode( ',', $modes );
 		$transcript_owner     = ChatTranscriptOwner::resolve_for_request( $options, $user_id );
@@ -191,6 +192,7 @@ class ChatOrchestrator {
 					'status'            => 'processing',
 					'started_at'        => current_time( 'mysql', true ),
 					'message_count'     => count( $messages ),
+					'calling_user_id'   => $calling_user_id,
 					'last_seen_host'    => '' !== $current_host ? $current_host : ( $session_metadata['last_seen_host'] ?? '' ),
 					'consent_decisions' => array(
 						'store_transcript' => $transcript_consent_decision->to_array(),
@@ -236,7 +238,7 @@ class ChatOrchestrator {
 				'modes'                 => $modes,
 				'mode'                  => $mode,
 				'user_id'               => $user_id,
-				'calling_user_id'       => isset( $options['calling_user_id'] ) ? max( 0, (int) $options['calling_user_id'] ) : $user_id,
+				'calling_user_id'       => $calling_user_id,
 				'agent_id'              => $agent_id,
 				'agent_slug'            => $agent_slug,
 				'interrupt_source'      => $interrupt_source,
@@ -264,6 +266,7 @@ class ChatOrchestrator {
 			'message_count'     => count( $result['messages'] ),
 			'current_turn'      => $result['turn_count'],
 			'has_pending_tools' => ! $is_completed,
+			'calling_user_id'   => $calling_user_id,
 			'last_seen_host'    => '' !== $current_host ? $current_host : ( $session_metadata['last_seen_host'] ?? '' ),
 		);
 		if ( ! empty( $loop_metadata['runtime_tool_pending_requests'] ) ) {
@@ -384,9 +387,10 @@ class ChatOrchestrator {
 	 *
 	 * @param string $session_id Session ID to continue.
 	 * @param int    $user_id    Current user ID for ownership check.
+	 * @param int|null $calling_user_id Original authenticated acting user. Null restores session context.
 	 * @return array|WP_Error Response data array or WP_Error on failure.
 	 */
-	public static function processContinue( string $session_id, int $user_id ): array|WP_Error {
+	public static function processContinue( string $session_id, int $user_id, ?int $calling_user_id = null ): array|WP_Error {
 		$max_turns = PluginSettings::get( 'max_turns', PluginSettings::DEFAULT_MAX_TURNS );
 
 		$chat_db = ConversationStoreFactory::get();
@@ -409,6 +413,9 @@ class ChatOrchestrator {
 		}
 
 		$metadata = $session['metadata'] ?? array();
+		$calling_user_id = null !== $calling_user_id
+			? max( 0, $calling_user_id )
+			: ( array_key_exists( 'calling_user_id', $metadata ) ? max( 0, (int) $metadata['calling_user_id'] ) : $user_id );
 
 		// Short-circuit if session is already completed.
 		if ( isset( $metadata['status'] ) && 'completed' === $metadata['status'] && empty( $metadata['has_pending_tools'] ) ) {
@@ -465,6 +472,7 @@ class ChatOrchestrator {
 				'modes'                => $modes,
 				'mode'                 => $stored_mode,
 				'user_id'              => (int) ( $session['user_id'] ?? 0 ),
+				'calling_user_id'      => $calling_user_id,
 				'agent_id'             => (int) ( $session['agent_id'] ?? 0 ),
 				'agent_slug'           => (string) ( $session['agent_slug'] ?? '' ),
 				'cross_site_handoff'   => $cross_site_handoff,
@@ -490,6 +498,7 @@ class ChatOrchestrator {
 			'message_count'     => count( $result['messages'] ),
 			'current_turn'      => $current_turn,
 			'has_pending_tools' => ! $is_completed,
+			'calling_user_id'   => $calling_user_id,
 			'last_seen_host'    => '' !== $current_host ? $current_host : ( $metadata['last_seen_host'] ?? '' ),
 		);
 		if ( ! empty( $metadata['runtime_tool_requests'] ) ) {
