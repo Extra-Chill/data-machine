@@ -132,7 +132,7 @@ class CheckOrphanVenuesCommandTest extends WP_UnitTestCase {
 		return array( $term_id, $post_id );
 	}
 
-	private function run( CheckOrphanVenuesCommand $cmd, array $assoc_args ): void {
+	private function run_command( CheckOrphanVenuesCommand $cmd, array $assoc_args ): void {
 		ob_start();
 		$cmd( array(), $assoc_args );
 		ob_end_clean();
@@ -150,7 +150,7 @@ class CheckOrphanVenuesCommandTest extends WP_UnitTestCase {
 		$this->make_event_with_venue( 'Real event', $active );
 
 		$cmd = new CheckOrphanVenuesCommand();
-		$this->run( $cmd, array( 'dry-run' => true ) );
+		$this->run_command( $cmd, array( 'dry-run' => true ) );
 
 		// No flag meta written on any candidate.
 		foreach ( array( $a, $b, $c ) as $term_id ) {
@@ -170,7 +170,7 @@ class CheckOrphanVenuesCommandTest extends WP_UnitTestCase {
 		[ $term_id ] = $this->make_stale_cached_orphan( 'Stale Cache Venue' );
 
 		$cmd = new CheckOrphanVenuesCommand();
-		$this->run( $cmd, array( 'apply' => true ) );
+		$this->run_command( $cmd, array( 'apply' => true ) );
 
 		// Term must NOT be flagged as orphan.
 		$this->assertSame(
@@ -227,7 +227,7 @@ class CheckOrphanVenuesCommandTest extends WP_UnitTestCase {
 		$this->assertSame( 0, $cached_before, 'precondition: stale cache should read 0' );
 
 		$cmd = new CheckOrphanVenuesCommand();
-		$this->run( $cmd, array( 'apply' => true ) );
+		$this->run_command( $cmd, array( 'apply' => true ) );
 
 		// Fresh DB read — must reflect the real count (2), not the stale 0.
 		$cached_after = (int) $wpdb->get_var(
@@ -274,7 +274,7 @@ class CheckOrphanVenuesCommandTest extends WP_UnitTestCase {
 		$this->assertSame( 0, (int) $primed->count, 'precondition: primed cache reads 0' );
 
 		$cmd = new CheckOrphanVenuesCommand();
-		$this->run( $cmd, array( 'apply' => true ) );
+		$this->run_command( $cmd, array( 'apply' => true ) );
 
 		// get_term() must now return the fresh value (2) — proves both
 		// the DB write AND the cache invalidation worked together.
@@ -302,7 +302,7 @@ class CheckOrphanVenuesCommandTest extends WP_UnitTestCase {
 		);
 
 		$cmd = new CheckOrphanVenuesCommand();
-		$this->run( $cmd, array( 'apply' => true ) );
+		$this->run_command( $cmd, array( 'apply' => true ) );
 
 		// protected-by-flow meta written, flag-at meta NOT written.
 		$this->assertSame(
@@ -322,7 +322,7 @@ class CheckOrphanVenuesCommandTest extends WP_UnitTestCase {
 		$term_id = $this->make_venue( 'Plain Orphan' );
 
 		$cmd = new CheckOrphanVenuesCommand();
-		$this->run( $cmd, array( 'apply' => true ) );
+		$this->run_command( $cmd, array( 'apply' => true ) );
 
 		// Flag meta written with a current-ish timestamp.
 		$flagged_at = (int) get_term_meta(
@@ -340,7 +340,7 @@ class CheckOrphanVenuesCommandTest extends WP_UnitTestCase {
 		$term_id = $this->make_venue( 'Deletable Orphan' );
 
 		$cmd = new CheckOrphanVenuesCommand();
-		$this->run(
+		$this->run_command(
 			$cmd,
 			array(
 				'apply'          => true,
@@ -365,7 +365,7 @@ class CheckOrphanVenuesCommandTest extends WP_UnitTestCase {
 		);
 
 		$cmd = new CheckOrphanVenuesCommand();
-		$this->run(
+		$this->run_command(
 			$cmd,
 			array(
 				'apply'          => true,

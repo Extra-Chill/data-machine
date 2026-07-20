@@ -140,7 +140,7 @@ class CheckOrphanPipelinesCommandTest extends WP_UnitTestCase {
 		);
 	}
 
-	private function run( array $assoc_args ): void {
+	private function run_command( array $assoc_args ): void {
 		$cmd = new CheckOrphanPipelinesCommand();
 		ob_start();
 		$cmd( array(), $assoc_args );
@@ -153,7 +153,7 @@ class CheckOrphanPipelinesCommandTest extends WP_UnitTestCase {
 		$this->insert_pipeline( 20, 'Nashville Events', '' );
 		$this->insert_flow( 20, $this->sample_flow_config( 20, 128 ) );
 
-		$this->run( array( 'dry-run' => true ) );
+		$this->run_command( array( 'dry-run' => true ) );
 
 		// Config must remain empty after a dry run.
 		$this->assertSame( '', (string) $this->get_pipeline_config_raw( 20 ) );
@@ -164,7 +164,7 @@ class CheckOrphanPipelinesCommandTest extends WP_UnitTestCase {
 		$this->insert_flow( 20, $this->sample_flow_config( 20, 128 ) );
 
 		// --apply alone must not perform the opt-in rebuild.
-		$this->run( array( 'apply' => true ) );
+		$this->run_command( array( 'apply' => true ) );
 
 		$this->assertSame( '', (string) $this->get_pipeline_config_raw( 20 ) );
 	}
@@ -174,7 +174,7 @@ class CheckOrphanPipelinesCommandTest extends WP_UnitTestCase {
 		$this->insert_flow( 20, $this->sample_flow_config( 20, 128 ) );
 		$this->insert_flow( 20, $this->sample_flow_config( 20, 129 ) );
 
-		$this->run(
+		$this->run_command(
 			array(
 				'apply'          => true,
 				'rebuild-config' => true,
@@ -225,7 +225,7 @@ class CheckOrphanPipelinesCommandTest extends WP_UnitTestCase {
 		$this->insert_pipeline( 18, 'Asheville Events', $valid );
 		$this->insert_flow( 18, $this->sample_flow_config( 18, 50 ) );
 
-		$this->run(
+		$this->run_command(
 			array(
 				'apply'          => true,
 				'rebuild-config' => true,
@@ -240,7 +240,7 @@ class CheckOrphanPipelinesCommandTest extends WP_UnitTestCase {
 		// Empty config but NO flows => not a candidate (nothing erroring).
 		$this->insert_pipeline( 99, 'Abandoned', '' );
 
-		$this->run(
+		$this->run_command(
 			array(
 				'apply'          => true,
 				'rebuild-config' => true,

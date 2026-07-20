@@ -73,7 +73,7 @@ class CheckMissingVenueAddressesCommandTest extends WP_UnitTestCase {
 		return $term_id;
 	}
 
-	private function run( StubbedMissingVenueAddressesCommand $cmd, array $assoc_args ): void {
+	private function run_command( StubbedMissingVenueAddressesCommand $cmd, array $assoc_args ): void {
 		ob_start();
 		$cmd( array(), $assoc_args );
 		ob_end_clean();
@@ -110,7 +110,7 @@ class CheckMissingVenueAddressesCommandTest extends WP_UnitTestCase {
 		// Note: we intentionally route through --dry-run; the stub will
 		// be called but no meta writes must result.
 
-		$this->run( $cmd, array( 'dry-run' => true ) );
+		$this->run_command( $cmd, array( 'dry-run' => true ) );
 
 		$this->assertSame( '', get_term_meta( $with_coords_a, '_venue_address', true ) );
 		$this->assertSame( '', get_term_meta( $with_coords_b, '_venue_address', true ) );
@@ -133,7 +133,7 @@ class CheckMissingVenueAddressesCommandTest extends WP_UnitTestCase {
 			'country' => 'United States',
 		);
 
-		$this->run( $cmd, array( 'apply' => true ) );
+		$this->run_command( $cmd, array( 'apply' => true ) );
 
 		$this->assertSame( '801 Red River St', get_term_meta( $term_id, '_venue_address', true ) );
 		$this->assertSame( 'Austin', get_term_meta( $term_id, '_venue_city', true ) );
@@ -164,7 +164,7 @@ class CheckMissingVenueAddressesCommandTest extends WP_UnitTestCase {
 			'display_name_short' => 'Stubbs Bar-B-Q',
 		);
 
-		$this->run( $cmd, array( 'apply' => true ) );
+		$this->run_command( $cmd, array( 'apply' => true ) );
 
 		$this->assertSame( '801 Red River St', get_term_meta( $term_id, '_venue_address', true ) );
 		$this->assertSame( 'Austin', get_term_meta( $term_id, '_venue_city', true ) );
@@ -198,7 +198,7 @@ class CheckMissingVenueAddressesCommandTest extends WP_UnitTestCase {
 			'country' => 'United States',
 		);
 
-		$this->run( $cmd, array( 'apply' => true ) );
+		$this->run_command( $cmd, array( 'apply' => true ) );
 
 		// Address WAS filled (was empty).
 		$this->assertSame( '801 Red River St', get_term_meta( $term_id, '_venue_address', true ) );
@@ -213,7 +213,7 @@ class CheckMissingVenueAddressesCommandTest extends WP_UnitTestCase {
 		$term_id = $this->make_venue( 'Phantom Venue' );
 
 		$cmd = new StubbedMissingVenueAddressesCommand();
-		$this->run( $cmd, array( 'apply' => true ) );
+		$this->run_command( $cmd, array( 'apply' => true ) );
 
 		// No writes.
 		$this->assertSame( '', get_term_meta( $term_id, '_venue_address', true ) );
@@ -244,7 +244,7 @@ class CheckMissingVenueAddressesCommandTest extends WP_UnitTestCase {
 			'display_name_short' => 'Texas Music Theater',
 		);
 
-		$this->run( $cmd, array( 'apply' => true ) );
+		$this->run_command( $cmd, array( 'apply' => true ) );
 
 		// Lookup was attempted but rejected — no writes.
 		$this->assertSame( '', get_term_meta( $term_id, '_venue_address', true ) );
