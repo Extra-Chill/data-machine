@@ -9,6 +9,7 @@ namespace DataMachine\Tests\Unit\AI\Tools;
 
 use AgentsAPI\AI\Tools\WP_Agent_Tool_Parameters;
 use AgentsAPI\Core\Workspace\WP_Agent_Workspace_Scope;
+use DataMachine\Engine\AI\Actions\PendingActionStore;
 use DataMachine\Engine\AI\Tools\ToolExecutor;
 use DataMachine\Engine\AI\Tools\ToolManager;
 use WP_UnitTestCase;
@@ -453,6 +454,76 @@ class ToolExecutorValidationTest extends WP_UnitTestCase {
 		$this->assertTrue( $allowed['success'] );
 		$this->assertFalse( $forbidden['success'] );
 		$this->assertSame( 'forbidden', $forbidden['action_policy'] );
+	}
+
+	public function test_execute_tool_policy_provider_receives_complete_input_across_direct_and_staged_paths(): void {
+		add_filter(
+			'agents_api_action_policy_providers',
+			static function ( $providers ) {
+				$providers[] = new class() implements \WP_Agent_Action_Policy_Provider {
+					public function get_action_policy( array $context ): ?string {
+						return 'read' === ( $context['input']['operation'] ?? '' ) ? 'direct' : 'preview';
+					}
+				};
+
+				return $providers;
+			},
+			10,
+			1
+		);
+
+		$tools = array(
+			'input_sensitive_tool' => array(
+				'class'                   => TestToolHandler::class,
+				'method'                  => 'handle_tool_call',
+				'action_kind'             => 'input_sensitive_action',
+				'parameters'              => array(
+					'operation' => array(
+						'type'     => 'string',
+						'required' => true,
+					),
+					'target'    => array(
+						'type'     => 'string',
+						'required' => true,
+					),
+				),
+				'client_context_bindings' => array( 'target' => 'bound_target' ),
+			),
+		);
+
+		$read = ToolExecutor::executeTool(
+			'input_sensitive_tool',
+			array( 'operation' => 'read' ),
+			$tools,
+			array(),
+			'chat',
+			0,
+			array( 'bound_target' => 'record-1' )
+		);
+		$write = ToolExecutor::executeTool(
+			'input_sensitive_tool',
+			array( 'operation' => 'write' ),
+			$tools,
+			array(),
+			'chat',
+			0,
+			array( 'bound_target' => 'record-2' )
+		);
+
+		$this->assertTrue( $read['success'] );
+		$this->assertSame( 'record-1', $read['result']['data']['target'] ?? null );
+		$this->assertTrue( $write['staged'] );
+		$this->assertSame( 'preview', $write['action_policy'] );
+
+		$pending_action = PendingActionStore::get( $write['action_id'] );
+		$this->assertSame(
+			array(
+				'operation' => 'write',
+				'target'    => 'record-2',
+			),
+			$pending_action['apply_input'] ?? null
+		);
+		PendingActionStore::delete( $write['action_id'] );
 	}
 
 	public function test_resolve_tools_invokes_callables(): void {

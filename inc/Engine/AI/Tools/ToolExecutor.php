@@ -95,6 +95,7 @@ class ToolExecutor {
 					'tool_name' => $tool_name,
 					'tool_def'  => $tool_def,
 					'mode'      => $mode,
+					'input'     => $complete_parameters,
 				)
 			)
 		);

@@ -78,6 +78,7 @@ class ActionPolicyResolver {
 	 *     @type string     $tool_name      Required. The tool being invoked.
 	 *     @type string     $mode           Required. Agent mode (chat/pipeline/system).
 	 *     @type array      $tool_def       Optional. Tool definition (to read `action_policy` default).
+	 *     @type array      $input          Optional. Normalized invocation input.
 	 *     @type int|null   $agent_id       Optional. Acting agent ID for per-agent overrides.
 	 *     @type array      $client_context Optional. Client-supplied runtime context.
 	 *     @type string[]   $deny           Optional. Tools to forcibly forbid in this call.
@@ -85,6 +86,7 @@ class ActionPolicyResolver {
 	 * @return string One of the POLICY_* constants.
 	 */
 	public function resolveForTool( array $context ): string {
+		$context['input'] = is_array( $context['input'] ?? null ) ? $context['input'] : array();
 		$context = $this->withAgentConfig( $context );
 		$policy  = $this->resolver->resolve_for_tool( $context );
 
