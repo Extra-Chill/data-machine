@@ -394,30 +394,117 @@ class DirectJobOwnershipTest extends WP_UnitTestCase {
 				'job_id'               => $job_id,
 				'flow_step_id'          => 'ephemeral_step_0',
 				'operation_generation' => 1,
+				'operation_claim_token' => 'superseded-token',
 			)
 		);
 		$this->assertTrue( $stale['stale_generation'] );
 	}
 
-	public function test_failed_direct_workflow_retry_reopens_and_enqueues_job(): void {
+	public function test_worker_defers_until_generation_commit_without_starting_job(): void {
+		$jobs   = new Jobs();
+		$job_id = $jobs->create_job(
+			array(
+				'pipeline_id'       => 'direct',
+				'flow_id'           => 'direct',
+				'operation_state'   => 'preparing',
+				'operation_step_id' => 'ephemeral_step_0',
+			)
+		);
+		$worker_result = null;
+		$enqueued      = ( new DirectJobEnqueuer(
+			$jobs,
+			static function ( int $run_at, string $hook, array $args ) use ( &$worker_result ) {
+				$run_at;
+				$hook;
+				$worker_result = ( new ExecuteStepAbility() )->execute( $args );
+				return 303;
+			},
+			static fn() => 0
+		) )->enqueue( $job_id, 'ephemeral_step_0' );
+
+		$this->assertTrue( $worker_result['deferred'] );
+		$this->assertTrue( $worker_result['retryable'] );
+		$this->assertSame( 'pending', $jobs->get_job( $job_id )['status'] );
+		$this->assertTrue( $enqueued['success'] );
+		$this->assertSame( 'enqueued', $jobs->get_job( $job_id )['operation_state'] );
+	}
+
+	public function test_deferred_worker_becomes_stale_after_crashed_claim_takeover(): void {
+		global $wpdb;
+
+		$jobs   = new Jobs();
+		$job_id = $jobs->create_job(
+			array(
+				'pipeline_id'       => 'direct',
+				'flow_id'           => 'direct',
+				'operation_state'   => 'preparing',
+				'operation_step_id' => 'ephemeral_step_0',
+			)
+		);
+		$first_claim = $jobs->claim_operation_enqueue( $job_id );
+		$this->assertIsArray( $first_claim );
+		$action_args = array(
+			'job_id'               => $job_id,
+			'flow_step_id'         => 'ephemeral_step_0',
+			'operation_generation' => $first_claim['generation'],
+			'operation_claim_token' => $first_claim['token'],
+		);
+
+		$before_takeover = ( new ExecuteStepAbility() )->execute( $action_args );
+		$this->assertTrue( $before_takeover['deferred'] );
+		$this->assertSame( 'pending', $jobs->get_job( $job_id )['status'] );
+
+		$wpdb->update(
+			$wpdb->prefix . 'datamachine_jobs',
+			array( 'operation_claimed_at' => '2000-01-01 00:00:00' ),
+			array( 'job_id' => $job_id )
+		);
+		$takeover = $jobs->claim_operation_enqueue( $job_id );
+		$this->assertIsArray( $takeover );
+		$this->assertGreaterThan( $first_claim['generation'], $takeover['generation'] );
+
+		$after_takeover = ( new ExecuteStepAbility() )->execute( $action_args );
+		$this->assertTrue( $after_takeover['stale_generation'] );
+		$this->assertArrayNotHasKey( 'deferred', $after_takeover );
+		$this->assertSame( 'pending', $jobs->get_job( $job_id )['status'] );
+	}
+
+	public function test_processing_direct_workflow_retry_waits_for_live_generation(): void {
 		wp_set_current_user( $this->owner_id );
-		$created = $this->execute( 'explicit-direct-retry' );
+		$created = $this->execute( 'processing-direct-retry' );
 		$jobs    = new Jobs();
 		$original_job        = $jobs->get_job( (int) $created['job_id'] );
 		$original_action_id  = (int) $original_job['operation_action_id'];
 		$original_generation = (int) $original_job['operation_generation'];
 		$this->assertTrue( $jobs->start_job( (int) $created['job_id'] ) );
-		$this->assertTrue( $jobs->complete_job( (int) $created['job_id'], 'failed - test' ) );
-		$this->assertTrue( $jobs->reopen_failed_job( (int) $created['job_id'] ) );
-		$this->assertTrue( $jobs->start_job( (int) $created['job_id'] ) );
 
-		$retry = ( new RetryJobAbility() )->execute( array( 'job_id' => $created['job_id'], 'force' => true ) );
+		$retry = ( new RetryJobAbility() )->execute( array( 'job_id' => $created['job_id'] ) );
+		$job   = $jobs->get_job( (int) $created['job_id'] );
+
+		$this->assertFalse( $retry['success'] );
+		$this->assertTrue( $retry['retryable'] );
+		$this->assertSame( 'job_execution_in_progress', $retry['error_code'] );
+		$this->assertSame( 'processing', $job['status'] );
+		$this->assertSame( 'enqueued', $job['operation_state'] );
+		$this->assertSame( $original_action_id, (int) $job['operation_action_id'] );
+		$this->assertSame( $original_generation, (int) $job['operation_generation'] );
+	}
+
+	public function test_failed_direct_retry_uses_next_generation_while_old_action_remains(): void {
+		wp_set_current_user( $this->owner_id );
+		$created = $this->execute( 'failed-direct-retry-generation' );
+		$jobs    = new Jobs();
+		$original_job        = $jobs->get_job( (int) $created['job_id'] );
+		$original_action_id  = (int) $original_job['operation_action_id'];
+		$original_generation = (int) $original_job['operation_generation'];
+		$this->assertTrue( $jobs->complete_job( (int) $created['job_id'], 'failed - test' ) );
+
+		$retry = ( new RetryJobAbility() )->execute( array( 'job_id' => $created['job_id'] ) );
 		$job   = $jobs->get_job( (int) $created['job_id'] );
 
 		$this->assertTrue( $retry['success'] );
 		$this->assertTrue( $retry['direct_requeued'] );
 		$this->assertSame( 'pending', $job['status'] );
-		$this->assertSame( 'enqueued', $job['operation_state'] );
 		$this->assertNotSame( $original_action_id, (int) $job['operation_action_id'] );
 		$this->assertGreaterThan( $original_generation, (int) $job['operation_generation'] );
 
@@ -426,6 +513,7 @@ class DirectJobOwnershipTest extends WP_UnitTestCase {
 				'job_id'               => (int) $created['job_id'],
 				'flow_step_id'          => 'ephemeral_step_0',
 				'operation_generation' => $original_generation,
+				'operation_claim_token' => (string) $original_job['operation_claim_token'],
 			)
 		);
 		$this->assertTrue( $stale['stale_generation'] );

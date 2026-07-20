@@ -431,7 +431,7 @@ class Jobs extends BaseRepository {
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		$updated = $this->wpdb->query(
 			$this->wpdb->prepare(
-				'UPDATE %i SET operation_state = %s, operation_claimed_at = NULL, operation_claim_token = NULL, operation_action_id = %d WHERE job_id = %d AND operation_state = %s AND operation_generation = %d AND operation_claim_token = %s',
+				'UPDATE %i SET operation_state = %s, operation_claimed_at = NULL, operation_action_id = %d WHERE job_id = %d AND operation_state = %s AND operation_generation = %d AND operation_claim_token = %s',
 				$this->table_name,
 				$state,
 				max( 0, $action_id ),

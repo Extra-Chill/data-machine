@@ -110,6 +110,7 @@ class JobRetryPolicy {
 		);
 		if ( 'direct' === (string) ( $job['flow_id'] ?? '' ) && (int) ( $job['operation_generation'] ?? 0 ) > 0 ) {
 			$action_args['operation_generation'] = (int) $job['operation_generation'];
+			$action_args['operation_claim_token'] = (string) ( $job['operation_claim_token'] ?? '' );
 		}
 
 		$action_id = as_schedule_single_action(

@@ -54,9 +54,8 @@ final class DirectJobGenerationFakeJobs extends Jobs {
 			return false;
 		}
 
-		$this->job['operation_state']      = $state;
-		$this->job['operation_action_id']  = $action_id;
-		$this->job['operation_claim_token'] = null;
+		$this->job['operation_state']     = $state;
+		$this->job['operation_action_id'] = $action_id;
 		return true;
 	}
 
@@ -107,6 +106,7 @@ direct_generation_assert( false === $slow_result['success'] && 'enqueue_claim_fe
 direct_generation_assert( 2 === $takeover['generation'], 'takeover advances enqueue generation' );
 direct_generation_assert( $interleaved->finish_operation_enqueue( 42, 'enqueued', 202, $takeover['token'], $takeover['generation'] ), 'active generation can finish' );
 direct_generation_assert( 202 === $interleaved->job['operation_action_id'], 'only active generation action is accepted' );
+direct_generation_assert( $takeover['token'] === $interleaved->job['operation_claim_token'], 'committed generation retains its worker admission token' );
 
 $retry = new DirectJobGenerationFakeJobs();
 $retry->job['operation_generation'] = 1;
@@ -130,6 +130,6 @@ direct_generation_assert( 2 === $seen_args['operation_generation'], 'retry actio
 $jobs_source = file_get_contents( dirname( __DIR__ ) . '/inc/Core/Database/Jobs/Jobs.php' ) ?: '';
 $step_source = file_get_contents( dirname( __DIR__ ) . '/inc/Abilities/Engine/ExecuteStepAbility.php' ) ?: '';
 direct_generation_assert( str_contains( $jobs_source, 'operation_claim_token = %s' ) && str_contains( $jobs_source, 'operation_generation = %d' ), 'enqueue finish is fenced by token and generation' );
-direct_generation_assert( str_contains( $step_source, 'stale_generation' ) && str_contains( $step_source, 'operation_generation' ), 'worker rejects stale execution generations' );
+direct_generation_assert( str_contains( $step_source, 'pending_commit' ) && str_contains( $step_source, 'operation_claim_token' ), 'worker waits for durable token and generation commit' );
 
 echo "=== direct-job-generation-smoke: ALL PASS ===\n";

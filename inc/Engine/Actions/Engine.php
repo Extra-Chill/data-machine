@@ -111,7 +111,7 @@ function datamachine_register_execution_engine() {
 	 */
 	add_action(
 		'datamachine_execute_step',
-		function ( $job_id, string $flow_step_id, $operation_generation = 0 ) {
+		function ( $job_id, string $flow_step_id, $operation_generation = 0, $operation_claim_token = '' ) {
 			$ability = wp_get_ability( 'datamachine/execute-step' );
 			if ( $ability ) {
 				$ability->execute(
@@ -119,12 +119,13 @@ function datamachine_register_execution_engine() {
 						'job_id'               => (int) $job_id,
 						'flow_step_id'          => $flow_step_id,
 						'operation_generation' => is_numeric( $operation_generation ) ? (int) $operation_generation : 0,
+						'operation_claim_token' => is_string( $operation_claim_token ) ? $operation_claim_token : '',
 					)
 				);
 			}
 		},
 		10,
-		3
+		4
 	);
 
 	/**

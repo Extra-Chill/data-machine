@@ -56,6 +56,8 @@ class AgentPruneResurrectionTest extends WP_UnitTestCase {
 	}
 
 	public function test_getActiveAgent_clears_stale_meta_and_does_not_resurrect(): void {
+		global $wpdb;
+
 		$created = AgentAbilities::createAgent(
 			array(
 				'agent_slug' => 'stale-meta-bot',
@@ -73,9 +75,10 @@ class AgentPruneResurrectionTest extends WP_UnitTestCase {
 		);
 		$this->assertSame( 'stale-meta-bot', get_user_meta( $this->owner_id, self::ACTIVE_AGENT_META_KEY, true ) );
 
-		// Simulate prune by deleting the agent row directly.
-		$deleted = AgentAbilities::deleteAgent( array( 'agent_id' => $created['agent_id'] ) );
-		$this->assertTrue( $deleted['success'] );
+		// Bypass deleteAgent(), whose deletion hook correctly clears this meta,
+		// to reproduce a genuinely stale historical row.
+		$deleted = $wpdb->delete( $wpdb->base_prefix . 'datamachine_agents', array( 'agent_id' => $created['agent_id'] ) );
+		$this->assertSame( 1, $deleted );
 
 		// Reading the active agent should now clear the stale meta and report none.
 		$result = AgentAbilities::getActiveAgent( array( 'user_id' => $this->owner_id ) );
@@ -90,9 +93,10 @@ class AgentPruneResurrectionTest extends WP_UnitTestCase {
 	}
 
 	public function test_pruneAgents_clears_owner_active_agent_meta(): void {
+		$agent_slug = 'prune-me-' . wp_generate_uuid4();
 		$created = AgentAbilities::createAgent(
 			array(
-				'agent_slug' => 'prune-me-bot',
+				'agent_slug' => $agent_slug,
 				'owner_id'   => $this->owner_id,
 			)
 		);

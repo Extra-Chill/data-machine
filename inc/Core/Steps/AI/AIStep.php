@@ -743,6 +743,7 @@ class AIStep extends Step {
 		$job = ( new \DataMachine\Core\Database\Jobs\Jobs() )->get_job( $this->job_id );
 		if ( 'direct' === (string) ( $job['flow_id'] ?? '' ) && (int) ( $job['operation_generation'] ?? 0 ) > 0 ) {
 			$action_args['operation_generation'] = (int) $job['operation_generation'];
+			$action_args['operation_claim_token'] = (string) ( $job['operation_claim_token'] ?? '' );
 		}
 
 		if ( function_exists( 'as_schedule_single_action' ) ) {

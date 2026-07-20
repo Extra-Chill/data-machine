@@ -45,7 +45,8 @@ class DirectJobEnqueuer {
 
 		$job        = $this->jobs->get_job( $job_id );
 		$generation = max( 0, (int) ( $job['operation_generation'] ?? 0 ) );
-		$args       = $this->actionArgs( $job_id, $flow_step_id, $generation );
+		$token      = (string) ( $job['operation_claim_token'] ?? '' );
+		$args       = $this->actionArgs( $job_id, $flow_step_id, $generation, $token );
 		$scheduled_action_id = in_array( (string) ( $job['operation_state'] ?? '' ), array( 'enqueued', 'enqueuing' ), true )
 			? $this->scheduledActionId( $args )
 			: 0;
@@ -61,7 +62,8 @@ class DirectJobEnqueuer {
 		if ( false === $claim ) {
 			$job                 = $this->jobs->get_job( $job_id );
 			$current_generation  = max( 0, (int) ( $job['operation_generation'] ?? 0 ) );
-			$current_action_args = $this->actionArgs( $job_id, $flow_step_id, $current_generation );
+			$current_token       = (string) ( $job['operation_claim_token'] ?? '' );
+			$current_action_args = $this->actionArgs( $job_id, $flow_step_id, $current_generation, $current_token );
 			$current_action_id   = $this->scheduledActionId( $current_action_args );
 			if ( $current_action_id > 0 ) {
 				return $this->success( $current_action_id, $current_generation );
@@ -72,7 +74,7 @@ class DirectJobEnqueuer {
 
 		$token      = $claim['token'];
 		$generation = $claim['generation'];
-		$args       = $this->actionArgs( $job_id, $flow_step_id, $generation );
+		$args       = $this->actionArgs( $job_id, $flow_step_id, $generation, $token );
 
 		// A previous submitter may have crashed after scheduling but before it
 		// recorded success. Reconcile that action before creating another one.
@@ -102,11 +104,16 @@ class DirectJobEnqueuer {
 		return $this->success( $action_id, $generation );
 	}
 
-	private function actionArgs( int $job_id, string $flow_step_id, int $generation ): array {
+	public function hasLiveAction( int $job_id, string $flow_step_id, int $generation, string $token ): bool {
+		return $this->scheduledActionId( $this->actionArgs( $job_id, $flow_step_id, $generation, $token ) ) > 0;
+	}
+
+	private function actionArgs( int $job_id, string $flow_step_id, int $generation, string $token ): array {
 		return array(
 			'job_id'               => $job_id,
 			'flow_step_id'         => $flow_step_id,
 			'operation_generation' => $generation,
+			'operation_claim_token' => $token,
 		);
 	}
 

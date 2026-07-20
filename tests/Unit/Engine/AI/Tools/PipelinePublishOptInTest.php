@@ -30,6 +30,21 @@ class PipelinePublishOptInTest extends WP_UnitTestCase {
 		parent::set_up();
 
 		datamachine_register_capabilities();
+		$registry = \WP_Abilities_Registry::get_instance();
+		if ( ! $registry->is_registered( 'datamachine/test-publish' ) ) {
+			wp_register_ability(
+				'datamachine/test-publish',
+				array(
+					'label'               => 'Test Publish',
+					'description'         => 'Test publishing ability fixture.',
+					'category'            => 'datamachine-publishing',
+					'input_schema'        => array( 'type' => 'object' ),
+					'output_schema'       => array( 'type' => 'object' ),
+					'execute_callback'    => static fn() => array(),
+					'permission_callback' => '__return_true',
+				)
+			);
+		}
 
 		$user_id = self::factory()->user->create( array( 'role' => 'administrator' ) );
 		wp_set_current_user( $user_id );
@@ -45,6 +60,10 @@ class PipelinePublishOptInTest extends WP_UnitTestCase {
 		$this->filter_callbacks = array();
 
 		ToolManager::clearCache();
+		$registry = \WP_Abilities_Registry::get_instance();
+		if ( $registry->is_registered( 'datamachine/test-publish' ) ) {
+			$registry->unregister( 'datamachine/test-publish' );
+		}
 		wp_set_current_user( 0 );
 		parent::tear_down();
 	}

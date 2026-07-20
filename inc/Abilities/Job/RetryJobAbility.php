@@ -59,6 +59,8 @@ class RetryJobAbility {
 							'previous_status' => array( 'type' => 'string' ),
 							'prompt_requeued' => array( 'type' => 'boolean' ),
 							'direct_requeued' => array( 'type' => 'boolean' ),
+							'retryable'       => array( 'type' => 'boolean' ),
+							'error_code'      => array( 'type' => 'string' ),
 							'message'         => array( 'type' => 'string' ),
 							'error'           => array( 'type' => 'string' ),
 						),
@@ -135,6 +137,18 @@ class RetryJobAbility {
 			}
 
 			if ( 'processing' === $previous_status ) {
+				$generation = (int) ( $job['operation_generation'] ?? 0 );
+				$token      = (string) ( $job['operation_claim_token'] ?? '' );
+				if ( $generation > 0 && '' !== $token && ( new DirectJobEnqueuer( $this->db_jobs ) )->hasLiveAction( $job_id, $flow_step_id, $generation, $token ) ) {
+					return array(
+						'success'         => false,
+						'job_id'          => $job_id,
+						'previous_status' => $previous_status,
+						'retryable'       => true,
+						'error_code'      => 'job_execution_in_progress',
+						'error'           => sprintf( 'Job %d still has live execution for generation %d; retry after it exits or is recovered.', $job_id, $generation ),
+					);
+				}
 				$this->db_jobs->complete_job( $job_id, 'failed - manual_retry' );
 			}
 			if ( ! $this->db_jobs->reopen_failed_job( $job_id ) ) {
