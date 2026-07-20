@@ -243,7 +243,7 @@ class Calendar {
 			}
 		}
 
-		$events = array_values( $events_by_id );
+		$events     = array_values( $events_by_id );
 		$empty_html = '';
 		if ( empty( $ordered_dates ) ) {
 			Template_Loader::init();
