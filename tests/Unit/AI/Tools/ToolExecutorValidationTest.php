@@ -456,13 +456,28 @@ class ToolExecutorValidationTest extends WP_UnitTestCase {
 		$this->assertSame( 'forbidden', $forbidden['action_policy'] );
 	}
 
-	public function test_execute_tool_policy_provider_receives_complete_input_across_direct_and_staged_paths(): void {
+	public function test_execute_tool_policy_provider_receives_complete_input_across_all_policy_outcomes(): void {
+		$seen_contexts = array();
 		add_filter(
 			'agents_api_action_policy_providers',
-			static function ( $providers ) {
-				$providers[] = new class() implements \WP_Agent_Action_Policy_Provider {
+			static function ( $providers ) use ( &$seen_contexts ) {
+				$providers[] = new class( $seen_contexts ) implements \WP_Agent_Action_Policy_Provider {
+					/** @var array<int,array<string,mixed>> */
+					private array $seen_contexts;
+
+					public function __construct( array &$seen_contexts ) {
+						$this->seen_contexts =& $seen_contexts;
+					}
+
 					public function get_action_policy( array $context ): ?string {
-						return 'read' === ( $context['input']['operation'] ?? '' ) ? 'direct' : 'preview';
+						$this->seen_contexts[] = $context;
+
+						return match ( $context['input']['operation'] ?? '' ) {
+							'read'  => 'direct',
+							'write' => 'preview',
+							'delete' => 'forbidden',
+							default => null,
+						};
 					}
 				};
 
@@ -482,12 +497,17 @@ class ToolExecutorValidationTest extends WP_UnitTestCase {
 						'type'     => 'string',
 						'required' => true,
 					),
-					'target'    => array(
+					'query'     => array(
 						'type'     => 'string',
 						'required' => true,
 					),
+					'scope'     => array(
+						'type'     => 'string',
+						'required' => false,
+					),
 				),
-				'client_context_bindings' => array( 'target' => 'bound_target' ),
+				'client_context_bindings' => array( 'query' => 'bound_query' ),
+				'parameter_defaults'      => array( 'scope' => 'all' ),
 			),
 		);
 
@@ -498,7 +518,7 @@ class ToolExecutorValidationTest extends WP_UnitTestCase {
 			array(),
 			'chat',
 			0,
-			array( 'bound_target' => 'record-1' )
+			array( 'bound_query' => 'record-1' )
 		);
 		$write = ToolExecutor::executeTool(
 			'input_sensitive_tool',
@@ -507,19 +527,57 @@ class ToolExecutorValidationTest extends WP_UnitTestCase {
 			array(),
 			'chat',
 			0,
-			array( 'bound_target' => 'record-2' )
+			array( 'bound_query' => 'record-2' )
+		);
+		$forbidden = ToolExecutor::executeTool(
+			'input_sensitive_tool',
+			array( 'operation' => 'delete' ),
+			$tools,
+			array(),
+			'chat',
+			0,
+			array( 'bound_query' => 'record-3' )
 		);
 
 		$this->assertTrue( $read['success'] );
-		$this->assertSame( 'record-1', $read['result']['data']['target'] ?? null );
+		$this->assertSame( 'record-1', $read['result']['data']['query'] ?? null );
 		$this->assertTrue( $write['staged'] );
 		$this->assertSame( 'preview', $write['action_policy'] );
+		$this->assertFalse( $forbidden['success'] );
+		$this->assertSame( 'forbidden', $forbidden['action_policy'] );
+
+		$this->assertCount( 3, $seen_contexts );
+		$this->assertSame(
+			array(
+				'scope'     => 'all',
+				'query'     => 'record-1',
+				'operation' => 'read',
+			),
+			$seen_contexts[0]['input'] ?? null
+		);
+		$this->assertSame(
+			array(
+				'scope'     => 'all',
+				'query'     => 'record-2',
+				'operation' => 'write',
+			),
+			$seen_contexts[1]['input'] ?? null
+		);
+		$this->assertSame(
+			array(
+				'scope'     => 'all',
+				'query'     => 'record-3',
+				'operation' => 'delete',
+			),
+			$seen_contexts[2]['input'] ?? null
+		);
 
 		$pending_action = PendingActionStore::get( $write['action_id'] );
 		$this->assertSame(
 			array(
+				'scope'     => 'all',
+				'query'     => 'record-2',
 				'operation' => 'write',
-				'target'    => 'record-2',
 			),
 			$pending_action['apply_input'] ?? null
 		);
