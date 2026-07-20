@@ -243,7 +243,7 @@ class AgentBundler {
 				'slug'         => $agent['agent_slug'],
 				'label'        => $agent['agent_name'],
 				'description'  => '',
-				'agent_config' => is_array( $agent['agent_config'] ?? null ) ? $agent['agent_config'] : array(),
+				'agent_config' => AgentBundleAgentConfig::tracked_payload( is_array( $agent['agent_config'] ?? null ) ? $agent['agent_config'] : array() ),
 				// Preserve the agent's actual scope through the bundle round-trip:
 				// null = network-wide, positive int = a specific blog. The manifest
 				// drops legacy/unknown values so import never re-pins to a blog.
