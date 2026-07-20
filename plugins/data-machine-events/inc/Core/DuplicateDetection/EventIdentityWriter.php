@@ -26,9 +26,13 @@ class EventIdentityWriter {
 	 */
 	public static function register(): void {
 		add_action( 'datamachine_event_dates_updated', array( static::class, 'onEventDatesUpdated' ), 10, 3 );
+		add_action( 'datamachine_event_dates_deleted', array( static::class, 'onEventDatesDeleted' ) );
 		// Keep ticket URL meta hook for identity sync.
 		add_action( 'updated_post_meta', array( static::class, 'onTicketUrlMetaChange' ), 10, 4 );
 		add_action( 'added_post_meta', array( static::class, 'onTicketUrlMetaChange' ), 10, 4 );
+		add_action( 'deleted_post_meta', array( static::class, 'onTicketUrlMetaChange' ), 10, 4 );
+		add_action( 'set_object_terms', array( static::class, 'onVenueTermsChanged' ), 10, 6 );
+		add_action( 'deleted_term_relationships', array( static::class, 'onVenueTermsRemoved' ), 10, 3 );
 	}
 
 	/**
@@ -45,6 +49,52 @@ class EventIdentityWriter {
 		}
 
 		self::syncIdentityRow( $post_id );
+	}
+
+	/**
+	 * Remove identity state when an event no longer has indexed dates.
+	 *
+	 * @param int $post_id Post ID.
+	 */
+	public static function onEventDatesDeleted( int $post_id ): void {
+		if ( Event_Post_Type::POST_TYPE !== get_post_type( $post_id ) ) {
+			return;
+		}
+
+		self::deleteIdentityRow( $post_id );
+	}
+
+	/**
+	 * React to venue assignments and replacements from upsert, editor, or REST.
+	 *
+	 * @param int    $object_id Post ID.
+	 * @param array  $terms     Assigned terms.
+	 * @param array  $tt_ids    Assigned term taxonomy IDs.
+	 * @param string $taxonomy  Taxonomy name.
+	 * @param bool   $append    Whether terms were appended.
+	 * @param array  $old_tt_ids Previous term taxonomy IDs.
+	 */
+	public static function onVenueTermsChanged( $object_id, $terms, $tt_ids, $taxonomy, $append, $old_tt_ids ): void {
+		if ( 'venue' !== $taxonomy || Event_Post_Type::POST_TYPE !== get_post_type( $object_id ) ) {
+			return;
+		}
+
+		self::syncIdentityRow( (int) $object_id );
+	}
+
+	/**
+	 * React to venue removal through wp_remove_object_terms().
+	 *
+	 * @param int    $object_id Post ID.
+	 * @param array  $tt_ids    Removed term taxonomy IDs.
+	 * @param string $taxonomy  Taxonomy name.
+	 */
+	public static function onVenueTermsRemoved( $object_id, $tt_ids, $taxonomy ): void {
+		if ( 'venue' !== $taxonomy || Event_Post_Type::POST_TYPE !== get_post_type( $object_id ) ) {
+			return;
+		}
+
+		self::syncIdentityRow( (int) $object_id );
 	}
 
 	/**
@@ -87,6 +137,7 @@ class EventIdentityWriter {
 		$dates    = \DataMachineEvents\Core\EventDatesTable::get( $post_id );
 		$datetime = $dates ? $dates->start_datetime : '';
 		if ( empty( $datetime ) ) {
+			self::deleteIdentityRow( $post_id );
 			return;
 		}
 
@@ -131,6 +182,17 @@ class EventIdentityWriter {
 				'title_hash'    => $title_hash,
 			)
 		);
+	}
+
+	/**
+	 * Delete an event's identity row when its required date identity is absent.
+	 *
+	 * @param int $post_id Event post ID.
+	 */
+	private static function deleteIdentityRow( int $post_id ): void {
+		if ( class_exists( PostIdentityIndex::class ) ) {
+			( new PostIdentityIndex() )->delete( $post_id );
+		}
 	}
 
 	/**

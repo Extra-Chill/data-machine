@@ -282,19 +282,11 @@ class EventUpsert extends UpsertHandler {
 		$post_id = (int) $result['post_id'];
 		$action  = $result['action'];
 
-		// 7. no_change: nothing else to do.
-		if ( 'no_change' === $action ) {
-			return $this->successResponse(
-				array(
-					'post_id'  => $post_id,
-					'post_url' => get_permalink( $post_id ),
-					'action'   => 'no_change',
-				)
-			);
+		// 7. Content idempotency does not imply taxonomy or identity integrity.
+		// Skip image work for unchanged content, but always reconcile indexed state.
+		if ( 'no_change' !== $action ) {
+			$this->processEventFeaturedImage( $post_id, $handler_config, $engine );
 		}
-
-		// 8. Post-upsert event-specific processing (create and update paths).
-		$this->processEventFeaturedImage( $post_id, $handler_config, $engine );
 		$this->taxonomy_assigner->processVenue( $post_id, $parameters, $engine, $handler_config );
 		$this->taxonomy_assigner->processPromoter( $post_id, $parameters, $engine, $handler_config );
 
@@ -321,10 +313,20 @@ class EventUpsert extends UpsertHandler {
 
 		do_action( 'datamachine_event_taxonomy_processed', $post_id );
 
-		// 9. Sync identity index (title or ticket URL may have changed).
+		// 8. Sync identity index after taxonomy reconciliation.
 		EventIdentityWriter::syncIdentityRow( $post_id, $title, datamachine_normalize_ticket_url( $ticketUrl ) ?: null );
 
-		// 10. Sync engine data for pipeline continuation (create path only).
+		if ( 'no_change' === $action ) {
+			return $this->successResponse(
+				array(
+					'post_id'  => $post_id,
+					'post_url' => get_permalink( $post_id ),
+					'action'   => 'no_change',
+				)
+			);
+		}
+
+		// 9. Sync engine data for pipeline continuation (create path only).
 		$job_id = (int) ( $parameters['job_id'] ?? 0 );
 		if ( 'created' === $action && $job_id ) {
 			datamachine_merge_engine_data(
@@ -336,7 +338,7 @@ class EventUpsert extends UpsertHandler {
 			);
 		}
 
-		// 11. Log and return.
+		// 10. Log and return.
 		$log_level = 'created' === $action ? 'info' : 'info';
 		$log_msg   = 'created' === $action ? 'Created new event' : 'Updated existing event';
 		do_action(

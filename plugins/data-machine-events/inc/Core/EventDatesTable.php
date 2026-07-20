@@ -186,6 +186,8 @@ class EventDatesTable {
 			array( 'post_id' => $post_id ),
 			array( '%d' )
 		);
+
+		do_action( 'datamachine_event_dates_deleted', $post_id );
 	}
 
 	/**

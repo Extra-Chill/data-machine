@@ -15,6 +15,7 @@ use WP_UnitTestCase;
 use WP_REST_Request;
 use WP_REST_Server;
 use DataMachineEvents\Blocks\Calendar\Cache\CalendarCache;
+use DataMachineEvents\Blocks\Calendar\Cache\CacheInvalidator;
 use DataMachineEvents\Core\Event_Post_Type;
 use DataMachineEvents\Core\Venue_Taxonomy;
 
@@ -35,6 +36,7 @@ class CalendarCacheTest extends WP_UnitTestCase {
 		if ( ! taxonomy_exists( 'venue' ) ) {
 			Venue_Taxonomy::register();
 		}
+		CacheInvalidator::init();
 	}
 
 	public function tearDown(): void {
@@ -327,6 +329,261 @@ class CalendarCacheTest extends WP_UnitTestCase {
 			$key
 		);
 		$this->assertStringNotContainsString( $token, $key );
+	}
+
+	public function test_identical_venue_assignment_does_not_invalidate_calendar_cache(): void {
+		$post_id = self::factory()->post->create(
+			array(
+				'post_type'   => Event_Post_Type::POST_TYPE,
+				'post_status' => 'publish',
+			)
+		);
+		$venue   = wp_insert_term( 'Cache Identical Venue ' . uniqid(), 'venue' );
+		$this->assertNotWPError( $venue );
+		wp_set_object_terms( $post_id, array( $venue['term_id'] ), 'venue' );
+
+		$invalidations = $this->count_calendar_invalidations(
+			static function () use ( $post_id, $venue ): void {
+				wp_set_object_terms( $post_id, array( $venue['term_id'] ), 'venue' );
+			}
+		);
+
+		$this->assertSame( 0, $invalidations );
+	}
+
+	public function test_venue_assignment_invalidates_calendar_cache_once(): void {
+		$post_id = self::factory()->post->create( array( 'post_type' => Event_Post_Type::POST_TYPE ) );
+		$venue   = wp_insert_term( 'Cache Assignment Venue ' . uniqid(), 'venue' );
+		$this->assertNotWPError( $venue );
+
+		$invalidations = $this->count_calendar_invalidations(
+			static function () use ( $post_id, $venue ): void {
+				wp_set_object_terms( $post_id, array( $venue['term_id'] ), 'venue' );
+			}
+		);
+
+		$this->assertSame( 1, $invalidations );
+	}
+
+	public function test_identical_venue_append_does_not_invalidate_calendar_cache(): void {
+		$post_id = self::factory()->post->create( array( 'post_type' => Event_Post_Type::POST_TYPE ) );
+		$venue   = wp_insert_term( 'Cache Identical Append Venue ' . uniqid(), 'venue' );
+		$this->assertNotWPError( $venue );
+		wp_set_object_terms( $post_id, array( $venue['term_id'] ), 'venue' );
+
+		$invalidations = $this->count_calendar_invalidations(
+			static function () use ( $post_id, $venue ): void {
+				wp_add_object_terms( $post_id, array( $venue['term_id'] ), 'venue' );
+			}
+		);
+
+		$this->assertSame( 0, $invalidations );
+	}
+
+	public function test_real_venue_append_invalidates_calendar_cache_once(): void {
+		$post_id = self::factory()->post->create( array( 'post_type' => Event_Post_Type::POST_TYPE ) );
+		$first   = wp_insert_term( 'Cache Existing Append Venue ' . uniqid(), 'venue' );
+		$second  = wp_insert_term( 'Cache Added Append Venue ' . uniqid(), 'venue' );
+		$this->assertNotWPError( $first );
+		$this->assertNotWPError( $second );
+		wp_set_object_terms( $post_id, array( $first['term_id'] ), 'venue' );
+
+		$invalidations = $this->count_calendar_invalidations(
+			static function () use ( $post_id, $second ): void {
+				wp_add_object_terms( $post_id, array( $second['term_id'] ), 'venue' );
+			}
+		);
+
+		$this->assertSame( 1, $invalidations );
+	}
+
+	public function test_venue_replacement_invalidates_calendar_cache_once(): void {
+		$post_id = self::factory()->post->create( array( 'post_type' => Event_Post_Type::POST_TYPE ) );
+		$first   = wp_insert_term( 'Cache First Venue ' . uniqid(), 'venue' );
+		$second  = wp_insert_term( 'Cache Second Venue ' . uniqid(), 'venue' );
+		$this->assertNotWPError( $first );
+		$this->assertNotWPError( $second );
+		wp_set_object_terms( $post_id, array( $first['term_id'] ), 'venue' );
+
+		$invalidations = $this->count_calendar_invalidations(
+			static function () use ( $post_id, $second ): void {
+				wp_set_object_terms( $post_id, array( $second['term_id'] ), 'venue' );
+			}
+		);
+
+		$this->assertSame( 1, $invalidations );
+		$this->assertSame( array(), $this->pending_removed_terms() );
+	}
+
+	public function test_reentrant_removal_for_another_event_invalidates_independently(): void {
+		$first_post  = self::factory()->post->create( array( 'post_type' => Event_Post_Type::POST_TYPE ) );
+		$second_post = self::factory()->post->create( array( 'post_type' => Event_Post_Type::POST_TYPE ) );
+		$first_old   = wp_insert_term( 'Cache Reentrant First Old ' . uniqid(), 'venue' );
+		$first_new   = wp_insert_term( 'Cache Reentrant First New ' . uniqid(), 'venue' );
+		$second_term = wp_insert_term( 'Cache Reentrant Second ' . uniqid(), 'venue' );
+		$this->assertNotWPError( $first_old );
+		$this->assertNotWPError( $first_new );
+		$this->assertNotWPError( $second_term );
+		wp_set_object_terms( $first_post, array( $first_old['term_id'] ), 'venue' );
+		wp_set_object_terms( $second_post, array( $second_term['term_id'] ), 'venue' );
+
+		$reentrant_removal = static function ( $post_id, $terms, $tt_ids, $taxonomy ) use ( $first_post, $second_post, $second_term ): void {
+			if ( $first_post === (int) $post_id && 'venue' === $taxonomy ) {
+				wp_remove_object_terms( $second_post, array( $second_term['term_id'] ), 'venue' );
+			}
+		};
+		add_action( 'set_object_terms', $reentrant_removal, 20, 4 );
+		try {
+			$invalidations = $this->count_calendar_invalidations(
+				static function () use ( $first_post, $first_new ): void {
+					wp_set_object_terms( $first_post, array( $first_new['term_id'] ), 'venue' );
+				}
+			);
+		} finally {
+			remove_action( 'set_object_terms', $reentrant_removal, 20 );
+		}
+
+		$this->assertSame( 2, $invalidations );
+		$this->assertSame( array(), $this->pending_removed_terms() );
+		$this->assertSame( array(), $this->operation_state( 'added_terms' ) );
+	}
+
+	public function test_same_relationship_key_nested_removals_use_lifo_state(): void {
+		$post_id = self::factory()->post->create( array( 'post_type' => Event_Post_Type::POST_TYPE ) );
+		$first   = wp_insert_term( 'Cache Nested Removal First ' . uniqid(), 'venue' );
+		$second  = wp_insert_term( 'Cache Nested Removal Second ' . uniqid(), 'venue' );
+		$this->assertNotWPError( $first );
+		$this->assertNotWPError( $second );
+		wp_set_object_terms( $post_id, array( $first['term_id'], $second['term_id'] ), 'venue' );
+
+		$nested       = false;
+		$invalidations = 0;
+		$snapshots     = array();
+		$query_filter  = static function ( string $query ) use ( &$invalidations ): string {
+			if ( str_starts_with( ltrim( $query ), 'DELETE FROM' ) && str_contains( $query, '_transient_' . CalendarCache::PREFIX ) ) {
+				++$invalidations;
+			}
+			return $query;
+		};
+		$nested_removal = static function ( $object_id, $tt_ids, $taxonomy ) use ( $post_id, $first, &$nested ): void {
+			if ( ! $nested && $post_id === (int) $object_id && 'venue' === $taxonomy ) {
+				$nested = true;
+				wp_remove_object_terms( $post_id, array( $first['term_id'] ), 'venue' );
+			}
+		};
+		$observe_removal = static function ( $object_id, $tt_ids, $taxonomy ) use ( $post_id, &$invalidations, &$snapshots ): void {
+			if ( $post_id === (int) $object_id && 'venue' === $taxonomy ) {
+				$remaining   = wp_get_object_terms( $post_id, 'venue', array( 'fields' => 'tt_ids' ) );
+				$snapshots[] = array(
+					'invalidations' => $invalidations,
+					'remaining'     => is_wp_error( $remaining ) ? -1 : count( $remaining ),
+				);
+			}
+		};
+
+		add_filter( 'query', $query_filter );
+		add_action( 'delete_term_relationships', $nested_removal, 20, 3 );
+		add_action( 'deleted_term_relationships', $observe_removal, 20, 3 );
+		try {
+			wp_remove_object_terms( $post_id, array( $first['term_id'], $second['term_id'] ), 'venue' );
+		} finally {
+			remove_filter( 'query', $query_filter );
+			remove_action( 'delete_term_relationships', $nested_removal, 20 );
+			remove_action( 'deleted_term_relationships', $observe_removal, 20 );
+		}
+
+		$this->assertSame( 2, $invalidations );
+		$this->assertSame(
+			array(
+				array(
+					'invalidations' => 1,
+					'remaining'     => 1,
+				),
+				array(
+					'invalidations' => 2,
+					'remaining'     => 0,
+				),
+			),
+			$snapshots
+		);
+		$this->assertSame( array(), $this->pending_removed_terms() );
+	}
+
+	public function test_bulk_venue_removal_invalidates_once_and_clears_pending_state(): void {
+		$post_id = self::factory()->post->create( array( 'post_type' => Event_Post_Type::POST_TYPE ) );
+		$first   = wp_insert_term( 'Cache Bulk Removal One ' . uniqid(), 'venue' );
+		$second  = wp_insert_term( 'Cache Bulk Removal Two ' . uniqid(), 'venue' );
+		$this->assertNotWPError( $first );
+		$this->assertNotWPError( $second );
+		wp_set_object_terms( $post_id, array( $first['term_id'], $second['term_id'] ), 'venue' );
+
+		$invalidations = $this->count_calendar_invalidations(
+			static function () use ( $post_id, $first, $second ): void {
+				wp_remove_object_terms( $post_id, array( $first['term_id'], $second['term_id'] ), 'venue' );
+			}
+		);
+
+		$this->assertSame( 1, $invalidations );
+		$this->assertSame( array(), $this->pending_removed_terms() );
+	}
+
+	public function test_venue_removal_invalidates_calendar_cache_once(): void {
+		$post_id = self::factory()->post->create(
+			array(
+				'post_type'   => Event_Post_Type::POST_TYPE,
+				'post_status' => 'publish',
+			)
+		);
+		$venue   = wp_insert_term( 'Cache Removal Venue ' . uniqid(), 'venue' );
+		$this->assertNotWPError( $venue );
+		wp_set_object_terms( $post_id, array( $venue['term_id'] ), 'venue' );
+
+		$invalidations = $this->count_calendar_invalidations(
+			static function () use ( $post_id, $venue ): void {
+				wp_remove_object_terms( $post_id, array( $venue['term_id'] ), 'venue' );
+			}
+		);
+
+		$this->assertSame( 1, $invalidations );
+		$this->assertSame( array(), $this->pending_removed_terms() );
+
+		$next_venue = wp_insert_term( 'Cache Next Operation Venue ' . uniqid(), 'venue' );
+		$this->assertNotWPError( $next_venue );
+		$this->assertSame(
+			1,
+			$this->count_calendar_invalidations(
+				static function () use ( $post_id, $next_venue ): void {
+					wp_set_object_terms( $post_id, array( $next_venue['term_id'] ), 'venue' );
+				}
+			),
+			'A standalone removal must not suppress a later independent operation.'
+		);
+	}
+
+	private function count_calendar_invalidations( callable $operation ): int {
+		$count  = 0;
+		$filter = static function ( string $query ) use ( &$count ): string {
+			if ( str_starts_with( ltrim( $query ), 'DELETE FROM' ) && str_contains( $query, '_transient_' . CalendarCache::PREFIX ) ) {
+				++$count;
+			}
+			return $query;
+		};
+
+		add_filter( 'query', $filter );
+		$operation();
+		remove_filter( 'query', $filter );
+
+		return $count;
+	}
+
+	private function pending_removed_terms(): array {
+		return $this->operation_state( 'pending_removed_terms' );
+	}
+
+	private function operation_state( string $name ): array {
+		$property = new \ReflectionProperty( CacheInvalidator::class, $name );
+		$property->setAccessible( true );
+		return $property->getValue();
 	}
 
 	public function test_scope_tokens_isolate_boundary_cache_keys_without_leaking_contents() {

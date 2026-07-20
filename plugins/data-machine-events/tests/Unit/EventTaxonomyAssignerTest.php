@@ -95,6 +95,55 @@ class EventTaxonomyAssignerTest extends WP_UnitTestCase {
 		wp_delete_post( $post_id, true );
 	}
 
+	public function test_process_venue_repairs_missing_taxonomy_without_changing_content(): void {
+		$post_id = $this->make_event_post();
+		$content = get_post_field( 'post_content', $post_id );
+		$venue   = 'Taxonomy Repair Venue ' . uniqid();
+		$engine  = new \DataMachine\Core\EngineData( array( 'venue' => $venue ), 0 );
+
+		$this->assigner->processVenue( $post_id, array(), $engine );
+
+		$terms = wp_get_object_terms( $post_id, 'venue' );
+		$this->assertNotWPError( $terms );
+		$this->assertCount( 1, $terms, 'An unchanged event must repair its missing venue relationship.' );
+		$this->assertSame( $venue, $terms[0]->name );
+		$this->assertSame( $content, get_post_field( 'post_content', $post_id ) );
+
+		wp_delete_post( $post_id, true );
+		wp_delete_term( $terms[0]->term_id, 'venue' );
+	}
+
+	public function test_process_venue_is_idempotent_when_assignment_is_already_correct(): void {
+		$post_id = $this->make_event_post();
+		$venue   = 'Idempotent Venue ' . uniqid();
+		$engine  = new \DataMachine\Core\EngineData( array( 'venue' => $venue ), 0 );
+
+		$this->assigner->processVenue( $post_id, array(), $engine );
+		$this->assigner->processVenue( $post_id, array(), $engine );
+
+		$terms = wp_get_object_terms( $post_id, 'venue' );
+		$this->assertNotWPError( $terms );
+		$this->assertCount( 1, $terms, 'Repeated reconciliation must not duplicate venue relationships.' );
+		$this->assertSame( $venue, $terms[0]->name );
+
+		wp_delete_post( $post_id, true );
+		wp_delete_term( $terms[0]->term_id, 'venue' );
+	}
+
+	public function test_process_venue_removes_stale_assignment_when_source_venue_is_empty(): void {
+		$post_id = $this->make_event_post();
+		$venue   = wp_insert_term( 'Removed Upsert Venue ' . uniqid(), 'venue' );
+		$this->assertNotWPError( $venue );
+		wp_set_object_terms( $post_id, array( $venue['term_id'] ), 'venue' );
+
+		$this->assigner->processVenue( $post_id, array(), new \DataMachine\Core\EngineData( array(), 0 ) );
+
+		$this->assertSame( array(), wp_get_object_terms( $post_id, 'venue', array( 'fields' => 'ids' ) ) );
+
+		wp_delete_post( $post_id, true );
+		wp_delete_term( $venue['term_id'], 'venue' );
+	}
+
 	public function test_process_promoter_skips_when_selection_is_skip() {
 		$post_id = wp_insert_post(
 			array(

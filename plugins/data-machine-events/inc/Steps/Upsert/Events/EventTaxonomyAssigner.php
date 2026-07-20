@@ -53,6 +53,7 @@ class EventTaxonomyAssigner {
 		}
 
 		if ( empty( $venue_name ) ) {
+			wp_set_post_terms( $post_id, array(), 'venue' );
 			return;
 		}
 

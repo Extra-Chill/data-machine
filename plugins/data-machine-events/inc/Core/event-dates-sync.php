@@ -192,14 +192,16 @@ function data_machine_events_sync_datetime_meta( $post_id, $post, $update ) {
 	}
 
 	// Parse blocks to extract event details from Event Details block.
-	$blocks = parse_blocks( $post->post_content );
+	$blocks              = parse_blocks( $post->post_content );
+	$event_details_found = false;
 
 	foreach ( $blocks as $block ) {
 		if ( 'data-machine-events/event-details' === $block['blockName'] ) {
-			$start_date = $block['attrs']['startDate'] ?? '';
-			$start_time = $block['attrs']['startTime'] ?? '';
-			$end_date   = $block['attrs']['endDate'] ?? '';
-			$end_time   = $block['attrs']['endTime'] ?? '';
+			$event_details_found = true;
+			$start_date         = $block['attrs']['startDate'] ?? '';
+			$start_time         = $block['attrs']['startTime'] ?? '';
+			$end_date           = $block['attrs']['endDate'] ?? '';
+			$end_time           = $block['attrs']['endTime'] ?? '';
 
 			$start_time_parts = $start_time ? explode( ':', $start_time ) : array();
 			if ( $start_time && count( $start_time_parts ) === 2 ) {
@@ -305,6 +307,11 @@ function data_machine_events_sync_datetime_meta( $post_id, $post, $update ) {
 
 			break;
 		}
+	}
+
+	if ( ! $event_details_found ) {
+		EventDatesTable::delete( $post_id );
+		delete_post_meta( $post_id, EVENT_TICKET_URL_META_KEY );
 	}
 }
 add_action( 'save_post', __NAMESPACE__ . '\\data_machine_events_sync_datetime_meta', 10, 3 );

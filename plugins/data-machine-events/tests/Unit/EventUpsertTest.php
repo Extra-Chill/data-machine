@@ -10,11 +10,15 @@
 
 namespace DataMachineEvents\Tests\Unit;
 
+use DataMachine\Core\Database\PostIdentityIndex\PostIdentityIndex;
+use DataMachine\Core\EngineData;
 use WP_UnitTestCase;
 use DataMachineEvents\Steps\Upsert\Events\EventUpsert;
 use DataMachineEvents\Core\Event_Post_Type;
 use DataMachineEvents\Core\EventDatesTable;
 use DataMachineEvents\Core\Venue_Taxonomy;
+use DataMachineEvents\Blocks\Calendar\Cache\CalendarCache;
+use DataMachineEvents\Blocks\Calendar\Cache\CacheInvalidator;
 use DataMachineEvents\Blocks\Calendar\Query\UpcomingFilter;
 
 class EventUpsertTest extends WP_UnitTestCase {
@@ -34,6 +38,10 @@ class EventUpsertTest extends WP_UnitTestCase {
 		if ( ! EventDatesTable::table_exists() ) {
 			EventDatesTable::create_table();
 		}
+		if ( class_exists( PostIdentityIndex::class ) ) {
+			( new PostIdentityIndex() )->create_table();
+		}
+		CacheInvalidator::init();
 
 		$this->handler = new EventUpsert();
 	}
@@ -152,6 +160,101 @@ class EventUpsertTest extends WP_UnitTestCase {
 
 		// Cleanup
 		wp_delete_post( $post_id, true );
+	}
+
+	public function test_save_post_deletes_indexed_dates_when_event_details_block_is_removed(): void {
+		$post_id = wp_insert_post(
+			array(
+				'post_title'   => 'Block Removal Sync Test ' . uniqid(),
+				'post_type'    => 'data_machine_events',
+				'post_status'  => 'publish',
+				'post_content' => '<!-- wp:data-machine-events/event-details {"startDate":"2026-08-15","startTime":"20:00"} --><div class="wp-block-data-machine-events-event-details"></div><!-- /wp:data-machine-events/event-details -->',
+			)
+		);
+
+		$this->assertNotNull( EventDatesTable::get( $post_id ) );
+
+		wp_update_post(
+			array(
+				'ID'           => $post_id,
+				'post_content' => '<!-- wp:paragraph --><p>Event details removed.</p><!-- /wp:paragraph -->',
+			)
+		);
+
+		$this->assertNull( EventDatesTable::get( $post_id ), 'Removing the source block must delete the stale date index row.' );
+	}
+
+	public function test_no_change_upsert_repairs_indexes_and_invalidates_cache_without_content_or_image_work(): void {
+		$title      = 'No Change Integrity Repair ' . uniqid();
+		$venue_name = 'No Change Repair Venue ' . uniqid();
+		$engine     = new EngineData(
+			array(
+				'image_file_path' => '/missing/no-change-image.jpg',
+			),
+			0
+		);
+		$parameters = array(
+			'title'       => $title,
+			'venue'       => $venue_name,
+			'startDate'   => '2026-10-15',
+			'startTime'   => '20:00',
+			'description' => 'Integration coverage for unchanged event reconciliation.',
+			'engine'      => $engine,
+			'job_id'      => 0,
+		);
+		$config     = array(
+			'post_status'    => 'publish',
+			'post_author'    => self::factory()->user->create( array( 'role' => 'administrator' ) ),
+			'include_images' => true,
+		);
+		$execute    = new \ReflectionMethod( $this->handler, 'executeUpsert' );
+		$execute->setAccessible( true );
+
+		$created = $execute->invoke( $this->handler, $parameters, $config );
+		$this->assertTrue( $created['success'] ?? false );
+		$this->assertSame( 'created', $created['data']['action'] ?? '' );
+
+		$post_id = (int) $created['data']['post_id'];
+		$venue   = get_term_by( 'name', $venue_name, 'venue' );
+		$this->assertInstanceOf( \WP_Term::class, $venue );
+
+		wp_set_object_terms( $post_id, array(), 'venue' );
+		$identity = ( new PostIdentityIndex() )->get( $post_id );
+		$this->assertNull( $identity['venue_term_id'] );
+
+		$cache_key = CalendarCache::PREFIX . 'no_change_repair_' . uniqid();
+		set_transient( $cache_key, 'stale', HOUR_IN_SECONDS );
+		$content_before     = get_post_field( 'post_content', $post_id );
+		$attachments_before = (int) wp_count_posts( 'attachment' )->inherit;
+		$image_attempts     = 0;
+		$log_listener       = static function ( $level, $message ) use ( &$image_attempts ): void {
+			if ( str_contains( (string) $message, 'Image file not found for attachment' ) ) {
+				++$image_attempts;
+			}
+		};
+		add_action( 'datamachine_log', $log_listener, 10, 2 );
+		$cache_invalidations = 0;
+		$query_listener      = static function ( string $query ) use ( &$cache_invalidations ): string {
+			if ( str_starts_with( ltrim( $query ), 'DELETE FROM' ) && str_contains( $query, '_transient_' . CalendarCache::PREFIX ) ) {
+				++$cache_invalidations;
+			}
+			return $query;
+		};
+		add_filter( 'query', $query_listener );
+
+		$repaired = $execute->invoke( $this->handler, $parameters, $config );
+
+		remove_action( 'datamachine_log', $log_listener, 10 );
+		remove_filter( 'query', $query_listener );
+		$this->assertTrue( $repaired['success'] ?? false );
+		$this->assertSame( 'no_change', $repaired['data']['action'] ?? '' );
+		$this->assertSame( $content_before, get_post_field( 'post_content', $post_id ) );
+		$this->assertSame( 0, $image_attempts, 'The no_change path must not invoke image attachment work.' );
+		$this->assertSame( $attachments_before, (int) wp_count_posts( 'attachment' )->inherit );
+		$this->assertSame( array( $venue->term_id ), wp_get_object_terms( $post_id, 'venue', array( 'fields' => 'ids' ) ) );
+		$this->assertSame( (string) $venue->term_id, (string) ( new PostIdentityIndex() )->get( $post_id )['venue_term_id'] );
+		$this->assertSame( 1, $cache_invalidations, 'A no_change taxonomy repair must invalidate canonical caches exactly once.' );
+		$this->assertFalse( get_transient( $cache_key ), 'Taxonomy-only repair must invalidate calendar caches.' );
 	}
 
 	public function test_save_post_normalizes_implicit_overnight_end_time(): void {
