@@ -28,7 +28,14 @@ use DataMachine\Engine\Bundle\BundleSchema;
 function datamachine_bundle_validate_smoke_reset_registry(): void {
 	do_action( 'init' );
 	WP_Agent_Package_Artifacts_Registry::reset_for_tests();
-	do_action( 'wp_agent_package_artifacts_init' );
+	$GLOBALS['__agents_api_smoke_wrong'] = array();
+}
+
+function datamachine_bundle_validate_smoke_artifact_definitions(): array {
+	return array_map(
+		static fn( WP_Agent_Package_Artifact_Type $type ): array => $type->to_array(),
+		wp_get_agent_package_artifact_types()
+	);
 }
 
 echo "\n[1] Valid Data Machine bundle projects and passes host capability checks:\n";
@@ -98,11 +105,17 @@ $directory = new AgentBundleDirectory(
 	)
 );
 
-$package = AgentPackageProjection::from_directory( $directory );
-$report  = AgentBundleAbilityService::capability_report( $package )->to_array();
+$package           = AgentPackageProjection::from_directory( $directory );
+$report            = AgentBundleAbilityService::capability_report( $package )->to_array();
+$artifact_types    = datamachine_bundle_validate_smoke_artifact_definitions();
+$repeated_report   = AgentBundleAbilityService::capability_report( $package )->to_array();
+$repeated_artifacts = datamachine_bundle_validate_smoke_artifact_definitions();
 agents_api_smoke_assert_equals( true, $report['compatible'] ?? false, 'valid bundle is compatible with Data Machine host capabilities', $failures, $passes );
 agents_api_smoke_assert_equals( array(), $report['unsupported_capabilities'] ?? null, 'valid bundle has no unsupported package capabilities', $failures, $passes );
 agents_api_smoke_assert_equals( array(), $report['unsupported_artifacts'] ?? null, 'valid bundle has no unsupported artifacts', $failures, $passes );
+agents_api_smoke_assert_equals( $report, $repeated_report, 'repeated inspection returns the same compatibility report', $failures, $passes );
+agents_api_smoke_assert_equals( $artifact_types, $repeated_artifacts, 'repeated inspection preserves registered artifact definitions', $failures, $passes );
+agents_api_smoke_assert_equals( array(), $GLOBALS['__agents_api_smoke_wrong'], 'repeated inspection emits no incorrect-usage notices', $failures, $passes );
 
 echo "\n[2] Projected extension artifact requirements are reported as unsupported:\n";
 add_filter(
