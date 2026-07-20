@@ -165,6 +165,7 @@ namespace DataMachine\Tests\ToolExecutorAbilityNativeSmoke {
 	require_once dirname( __DIR__ ) . '/vendor/wordpress/agents-api/src/Runtime/class-wp-agent-citation-metadata.php';
 	require_once dirname( __DIR__ ) . '/vendor/wordpress/agents-api/src/Tools/class-wp-agent-tool-result.php';
 	require_once dirname( __DIR__ ) . '/vendor/wordpress/agents-api/src/Tools/class-wp-agent-tool-executor.php';
+	require_once dirname( __DIR__ ) . '/vendor/wordpress/agents-api/src/Tools/class-wp-agent-tool-executor-registry.php';
 	require_once dirname( __DIR__ ) . '/vendor/wordpress/agents-api/src/Tools/class-wp-agent-tool-execution-core.php';
 	require_once dirname( __DIR__ ) . '/vendor/wordpress/agents-api/src/Tools/class-wp-agent-action-policy.php';
 	require_once dirname( __DIR__ ) . '/vendor/wordpress/agents-api/src/Workspace/class-wp-agent-workspace-scope.php';
