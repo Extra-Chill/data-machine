@@ -19,6 +19,11 @@ class CalendarAbilitiesTest extends WP_UnitTestCase {
 	private CalendarAbilities $abilities;
 
 	public function setUp(): void {
+		// Create the table before WP_UnitTestCase rewrites CREATE TABLE as temporary.
+		if ( ! EventDatesTable::table_exists() ) {
+			EventDatesTable::create_table();
+		}
+
 		parent::setUp();
 
 		if ( ! post_type_exists( Event_Post_Type::POST_TYPE ) ) {
@@ -33,10 +38,6 @@ class CalendarAbilitiesTest extends WP_UnitTestCase {
 		if ( ! taxonomy_exists( 'calendar_test_style' ) ) {
 			register_taxonomy( 'calendar_test_style', Event_Post_Type::POST_TYPE );
 		}
-		if ( ! EventDatesTable::table_exists() ) {
-			EventDatesTable::create_table();
-		}
-
 		$this->abilities = new CalendarAbilities();
 		delete_transient( 'data-machine_cal_counts' );
 	}
