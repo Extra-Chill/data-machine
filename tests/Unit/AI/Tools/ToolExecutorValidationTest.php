@@ -306,6 +306,49 @@ class ToolExecutorValidationTest extends WP_UnitTestCase {
 		$this->assertSame( array( 'calling_user_id' ), $result['metadata']['missing_parameters'] ?? array() );
 	}
 
+	public function test_caller_context_excludes_frontend_controlled_client_context(): void {
+		$tools = array(
+			'context_boundary_tool' => array(
+				'class'              => TestToolHandler::class,
+				'method'             => 'handle_tool_call',
+				'parameters'         => array(
+					'type'       => 'object',
+					'required'   => array( 'frontend_user_id' ),
+					'properties' => array(
+						'trusted_user_id'  => array( 'type' => 'integer' ),
+						'frontend_user_id' => array( 'type' => 'integer' ),
+					),
+				),
+				'parameter_bindings' => array(
+					'trusted_user_id'  => array(
+						'source'        => 'caller_context',
+						'path'          => 'client_context.calling_user_id',
+						'authoritative' => true,
+					),
+					'frontend_user_id' => array(
+						'source' => 'client_context',
+						'path'   => 'calling_user_id',
+					),
+				),
+			),
+		);
+		$client_context = array( 'calling_user_id' => 999 );
+
+		$result = ToolExecutor::executeTool(
+			'context_boundary_tool',
+			array( 'trusted_user_id' => 777 ),
+			$tools,
+			array( 'client_context' => $client_context ),
+			'chat',
+			0,
+			$client_context
+		);
+
+		$this->assertTrue( $result['success'] );
+		$this->assertArrayNotHasKey( 'trusted_user_id', $result['result']['data'] ?? array() );
+		$this->assertSame( 999, $result['result']['data']['frontend_user_id'] ?? null );
+	}
+
 	public function test_provider_schema_excludes_authoritative_caller_context_parameters(): void {
 		$request = new WP_Agent_Provider_Turn_Request(
 			array( array( 'role' => 'user', 'content' => 'Inspect context.' ) ),
