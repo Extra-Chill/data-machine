@@ -20,8 +20,10 @@ namespace DataMachine\Cli\Commands\Flows;
 use WP_CLI;
 use DataMachine\Cli\BaseCommand;
 use DataMachine\Cli\AgentResolver;
+use DataMachine\Cli\JsonInput;
 use DataMachine\Cli\UserResolver;
 use DataMachine\Cli\Commands\DrainCommand;
+use DataMachine\Core\Database\Flows\FlowConfigEscaping;
 use DataMachine\Core\Steps\FlowStepConfig;
 use DataMachine\Engine\Debug\SyncRunner;
 
@@ -42,7 +44,7 @@ class FlowsCommand extends BaseCommand {
 	 * ## OPTIONS
 	 *
 	 * [<args>...]
-	 * : Subcommand and arguments. Accepts: list [pipeline_id], get <flow_id>, run <flow_id>, create, delete <flow_id>, update <flow_id>, reconcile-schedules.
+	 * : Subcommand and arguments. Accepts: list [pipeline_id], get <flow_id>, run <flow_id>, create, delete <flow_id>, update <flow_id>, reconcile-schedules, repair-escaped-config <flow_id>.
 	 *
 	 * [--handler=<slug>]
 	 * : Filter flows using this handler slug (any step that uses this handler).
@@ -162,7 +164,7 @@ class FlowsCommand extends BaseCommand {
 	 *   ..." preview while making ZERO database writes.
 	 *
 	 * [--apply]
-	 * : Repair missing schedules for reconcile-schedules. Without this flag the command is a dry-run.
+	 * : Apply a repair command. Without this flag repair commands are dry-runs.
 	 *
 	 * [--spread-hours=<hours>]
 	 * : Explicit first-run distribution window for reconcile-schedules (1-24).
@@ -280,6 +282,10 @@ class FlowsCommand extends BaseCommand {
 	 *     # Audit or repair recurring schedule coverage
 	 *     wp datamachine flows reconcile-schedules --format=json
 	 *     wp datamachine flows reconcile-schedules --apply --spread-hours=24
+	 *
+	 *     # Audit literal JSON solidus escapes, then explicitly repair reviewed candidates
+	 *     wp datamachine flows repair-escaped-config 52 --format=json
+	 *     wp datamachine flows repair-escaped-config 52 --apply
  *
 	 */
 	public function __invoke( array $args, array $assoc_args ): void {
@@ -288,6 +294,15 @@ class FlowsCommand extends BaseCommand {
 
 		if ( ! empty( $args ) && 'reconcile-schedules' === $args[0] ) {
 			$this->reconcileSchedules( $assoc_args );
+			return;
+		}
+
+		if ( ! empty( $args ) && 'repair-escaped-config' === $args[0] ) {
+			if ( ! isset( $args[1] ) ) {
+				WP_CLI::error( 'Usage: wp datamachine flows repair-escaped-config <flow_id> [--apply] [--format=table|json]' );
+				return;
+			}
+			$this->repairEscapedConfig( (int) $args[1], $assoc_args );
 			return;
 		}
 
@@ -583,6 +598,66 @@ class FlowsCommand extends BaseCommand {
 		}
 		if ( empty( $result['success'] ) || (int) ( $result['failed'] ?? 0 ) > 0 || (int) ( $result['invalid'] ?? 0 ) > 0 ) {
 			WP_CLI::halt( 1 );
+		}
+	}
+
+	/**
+	 * Diagnose or explicitly repair literal JSON solidus escapes in one flow.
+	 *
+	 * @param int   $flow_id Flow ID.
+	 * @param array $assoc_args WP-CLI arguments.
+	 */
+	private function repairEscapedConfig( int $flow_id, array $assoc_args ): void {
+		if ( $flow_id <= 0 ) {
+			WP_CLI::error( 'flow_id must be a positive integer.' );
+			return;
+		}
+
+		$repo = new \DataMachine\Core\Database\Flows\Flows();
+		$flow = $repo->get_flow( $flow_id );
+		if ( ! $flow ) {
+			WP_CLI::error( sprintf( 'Flow %d not found.', $flow_id ) );
+			return;
+		}
+
+		$repair  = FlowConfigEscaping::repair( is_array( $flow['flow_config'] ?? null ) ? $flow['flow_config'] : array() );
+		$changes = $repair['changes'];
+		$apply   = isset( $assoc_args['apply'] );
+		$format  = (string) ( $assoc_args['format'] ?? 'table' );
+
+		if ( empty( $changes ) ) {
+			WP_CLI::success( sprintf( 'Flow %d has no literal JSON solidus escapes.', $flow_id ) );
+			return;
+		}
+
+		if ( $apply && ! $repo->update_flow( $flow_id, array( 'flow_config' => $repair['config'] ) ) ) {
+			WP_CLI::error( sprintf( 'Failed to repair flow %d.', $flow_id ) );
+			return;
+		}
+
+		$rows = array_map(
+			static function ( array $change ) use ( $flow_id, $apply ): array {
+				return array(
+					'flow_id' => $flow_id,
+					'status'  => $apply ? 'repaired' : 'would_repair',
+					'path'    => $change['path'],
+					'before'  => $change['before'],
+					'after'   => $change['after'],
+				);
+			},
+			$changes
+		);
+
+		if ( 'json' === $format ) {
+			WP_CLI::line( (string) wp_json_encode( $rows, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+		} else {
+			WP_CLI\Utils\format_items( 'table', $rows, array( 'flow_id', 'status', 'path', 'before', 'after' ) );
+		}
+
+		if ( $apply ) {
+			WP_CLI::success( sprintf( 'Repaired %d value(s) in flow %d.', count( $changes ), $flow_id ) );
+		} else {
+			WP_CLI::warning( 'Dry run only. Review each candidate, then rerun with --apply to write exactly these replacements.' );
 		}
 	}
 
@@ -941,7 +1016,7 @@ class FlowsCommand extends BaseCommand {
 
 		$step_configs = array();
 		if ( isset( $assoc_args['step_configs'] ) ) {
-			$decoded = json_decode( wp_unslash( $assoc_args['step_configs'] ), true );
+			$decoded = JsonInput::decode_array( (string) $assoc_args['step_configs'] );
 			if ( null === $decoded && '' !== $assoc_args['step_configs'] ) {
 				WP_CLI::error( 'Invalid JSON in --step_configs' );
 				return;
@@ -957,7 +1032,7 @@ class FlowsCommand extends BaseCommand {
 		// --handler-config accepts handler-keyed JSON, e.g. {"reddit":{"subreddit":"test"}}.
 		// Each handler slug is resolved to its step type and merged into step_configs.
 		if ( isset( $assoc_args['handler-config'] ) ) {
-			$handler_config_input = json_decode( wp_unslash( $assoc_args['handler-config'] ), true );
+			$handler_config_input = JsonInput::decode_array( (string) $assoc_args['handler-config'] );
 			if ( ! is_array( $handler_config_input ) ) {
 				WP_CLI::error( 'Invalid JSON in --handler-config. Must be a JSON object.' );
 				return;
@@ -1221,7 +1296,7 @@ class FlowsCommand extends BaseCommand {
 		$scheduled_at = $assoc_args['scheduled-at'] ?? null;
 		$has_agent    = isset( $assoc_args['agent'] );
 		$user_message = isset( $assoc_args['set-user-message'] )
-			? wp_kses_post( wp_unslash( $assoc_args['set-user-message'] ) )
+			? wp_kses_post( (string) $assoc_args['set-user-message'] )
 			: null;
 		$step         = $assoc_args['step'] ?? null;
 
@@ -1233,7 +1308,7 @@ class FlowsCommand extends BaseCommand {
 		$has_handler_config = isset( $assoc_args['handler-config'] );
 		$handler_config     = null;
 		if ( $has_handler_config ) {
-			$handler_config = json_decode( wp_unslash( $assoc_args['handler-config'] ), true );
+			$handler_config = JsonInput::decode_array( (string) $assoc_args['handler-config'] );
 			if ( ! is_array( $handler_config ) ) {
 				WP_CLI::error(
 					'Invalid JSON in --handler-config. Must be a JSON object, e.g. '
@@ -1852,9 +1927,9 @@ class FlowsCommand extends BaseCommand {
 
 		// Parse --config if provided.
 		if ( isset( $assoc_args['config'] ) ) {
-			$handler_config = json_decode( wp_unslash( $assoc_args['config'] ), true );
-			if ( json_last_error() !== JSON_ERROR_NONE ) {
-				WP_CLI::error( 'Invalid JSON in --config: ' . json_last_error_msg() );
+			$handler_config = JsonInput::decode_array( (string) $assoc_args['config'] );
+			if ( null === $handler_config ) {
+				WP_CLI::error( 'Invalid JSON in --config. Must be a JSON object.' );
 				return;
 			}
 			$input['add_handler_config'] = $handler_config;

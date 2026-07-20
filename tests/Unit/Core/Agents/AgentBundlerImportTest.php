@@ -230,6 +230,51 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 		$this->assertSame( array( 'mcp' => 5 ), $flow['scheduling_config']['max_items'] ?? null, 'Importer preserves bundle max item caps.' );
 	}
 
+	public function test_flow_config_strings_are_idempotent_across_import_and_export_round_trips(): void {
+		$bundle = $this->fixture_bundle( 'flow-string-round-trip-agent' );
+		$step   = &$bundle['flows'][0]['flow_config']['1_step-uuid_1'];
+		$step['step_type']       = 'fetch';
+		$step['handler_slugs']   = array( 'fixture' );
+		$step['handler_configs'] = array(
+			'fixture' => array(
+				'source_url' => 'https://example.com/events/',
+				'path'       => 'C:\\Temp\\events.json',
+				'regexp'     => '\\d+\\s+events',
+			),
+		);
+		$step['prompt_queue']    = array(
+			array(
+				'prompt'   => 'Process start/end with a literal \\ marker.',
+				'added_at' => '2026-07-20T00:00:00+00:00',
+			),
+		);
+		unset( $step );
+
+		$result = $this->bundler->import( $bundle, null, $this->owner_id );
+		$this->assertTrue( (bool) $result['success'] );
+
+		$agent    = $this->agents_repo->get_by_slug( 'flow-string-round-trip-agent' );
+		$pipeline = $this->pipelines_repo->get_by_portable_slug( (int) $agent['agent_id'], 'static-site-pipeline' );
+		$flow     = $this->flows_repo->get_by_portable_slug( (int) $pipeline['pipeline_id'], 'static-site-flow' );
+		$stored   = reset( $flow['flow_config'] );
+		$expected = reset( $bundle['flows'][0]['flow_config'] );
+
+		foreach ( array( 'handler_configs', 'prompt_queue' ) as $field ) {
+			$this->assertSame( $expected[ $field ], $stored[ $field ], "Import preserves {$field}." );
+		}
+
+		$first_export  = $this->bundler->export( 'flow-string-round-trip-agent' );
+		$first_step    = reset( $first_export['bundle']['flows'][0]['flow_config'] );
+		$directory     = AgentBundleArrayAdapter::from_array_bundle( $first_export['bundle'] );
+		$second_bundle = AgentBundleArrayAdapter::to_array_bundle( $directory );
+		$second_step   = reset( $second_bundle['flows'][0]['flow_config'] );
+
+		foreach ( array( 'handler_configs', 'prompt_queue' ) as $field ) {
+			$this->assertSame( $expected[ $field ], $first_step[ $field ], "Export preserves {$field}." );
+			$this->assertSame( $first_step[ $field ], $second_step[ $field ], "Repeated bundle round trip is idempotent for {$field}." );
+		}
+	}
+
 	public function test_import_persists_installed_artifacts_to_canonical_table(): void {
 		$result = $this->bundler->import( $this->fixture_bundle( 'artifact-state-agent' ), null, $this->owner_id );
 
