@@ -55,6 +55,7 @@ class ChatOrchestrator {
 	 *     @type int    $selected_pipeline_id Currently selected pipeline ID.
 	 *     @type int    $max_turns            Maximum turns allowed.
 	 *     @type string $request_id           Idempotency request ID.
+	 *     @type int    $calling_user_id      Authenticated acting user. 0 means no human caller.
 	 *     @type callable|null $interrupt_source Optional cooperative interrupt source.
 	 * }
 	 * @return array|WP_Error Response data array or WP_Error on failure.
@@ -235,6 +236,7 @@ class ChatOrchestrator {
 				'modes'                 => $modes,
 				'mode'                  => $mode,
 				'user_id'               => $user_id,
+				'calling_user_id'       => isset( $options['calling_user_id'] ) ? max( 0, (int) $options['calling_user_id'] ) : $user_id,
 				'agent_id'              => $agent_id,
 				'agent_slug'            => $agent_slug,
 				'interrupt_source'      => $interrupt_source,
@@ -320,7 +322,7 @@ class ChatOrchestrator {
 		}
 
 		// --- Build response data ---
-		$response_metadata = is_array( $loop_result['metadata'] ?? null ) ? $loop_result['metadata'] : array();
+		$response_metadata = is_array( $result['metadata'] ?? null ) ? $result['metadata'] : array();
 		if ( empty( $response_metadata ) ) {
 			$response_metadata = $metadata;
 		} else {
@@ -849,6 +851,7 @@ class ChatOrchestrator {
 	 *     @type int    $max_turns             Maximum turns allowed (default 25).
 	 *     @type int    $selected_pipeline_id  Currently selected pipeline ID.
 	 *     @type string $mode                  Agent mode (default 'chat').
+	 *     @type int    $calling_user_id       Authenticated acting user. 0 means no human caller.
 	 *     @type callable|null $interrupt_source Optional cooperative interrupt source.
 	 * }
 	 * @return array|WP_Error Result array with messages, final_content, completed, turn_count,
@@ -884,6 +887,13 @@ class ChatOrchestrator {
 				$agent_slug = ConversationStoreFactory::resolve_agent_slug_for_transcript( $agent_id );
 			}
 
+			// Keep the authenticated acting user separate from runtime/session
+			// ownership. An explicit 0 denotes a system or delegated runtime with
+			// no human caller and must not fall back to the transcript owner.
+			$calling_user_id = isset( $options['calling_user_id'] )
+				? max( 0, (int) $options['calling_user_id'] )
+				: $user_id;
+
 			$resolver       = new ToolPolicyResolver();
 			$client_context = $options['client_context'] ?? array();
 			$all_tools      = $resolver->resolve(
@@ -892,25 +902,13 @@ class ChatOrchestrator {
 					'agent_id'       => $agent_id,
 					'agent_slug'     => $agent_slug,
 					'user_id'        => $user_id,
+					'calling_user_id' => $calling_user_id,
 					'interactive'    => true,
 					'client_context' => is_array( $client_context ) ? $client_context : array(),
 					'tool_policy'    => is_array( $options['tool_policy'] ?? null ) ? $options['tool_policy'] : null,
 					'allow_only'     => is_array( $options['allow_only'] ?? null ) ? $options['allow_only'] : array(),
 				)
 			);
-
-			// `calling_user_id` is the human user on whose behalf this AI invocation
-			// is running. In a chat session that's the chat caller. Tools that resolve
-			// per-user OAuth credentials read this field — distinct from `agent_id`
-			// (the acting agent identity) and from pipeline `user_id` (job owner).
-			//
-			// Callers can override via `$options['calling_user_id']` to express
-			// "this is a system-level invocation borrowing an admin session_id for
-			// storage but has no real human caller" (e.g. processPing). When the
-			// override is absent, the chat user is the calling user.
-			$calling_user_id = isset( $options['calling_user_id'] )
-				? max( 0, (int) $options['calling_user_id'] )
-				: $user_id;
 
 			$loop_context = array(
 				'session_id'      => $session_id,
