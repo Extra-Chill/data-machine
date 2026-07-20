@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.165.0] - 2026-07-20
+
+### Added
+- expose invocation input to action policies
+
 ## [0.164.3] - 2026-07-20
 
 ### Changed
