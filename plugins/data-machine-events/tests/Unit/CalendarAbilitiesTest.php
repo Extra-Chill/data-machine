@@ -127,6 +127,26 @@ class CalendarAbilitiesTest extends WP_UnitTestCase {
 		$this->assertSame( $past_id, $result['paged_date_groups'][0]['events'][0]['post_id'] );
 	}
 
+	public function test_upcoming_boundaries_exclude_past_dates_from_ongoing_multi_day_events(): void {
+		$today = new DateTimeImmutable( current_time( 'Y-m-d' ) . ' 12:00:00' );
+		$start = $today->modify( '-3 days' );
+		$end   = $today->modify( '+2 days' );
+
+		$event_id = $this->seed_event( 'Ongoing multi-day event', $start->format( 'Y-m-d 20:00:00' ), $end->format( 'Y-m-d 22:00:00' ) );
+
+		$result = $this->abilities->executeGetCalendarPage(
+			array(
+				'include_html' => false,
+			)
+		);
+
+		$this->assertSame( 1, $result['total_event_count'] );
+		$this->assertSame( $today->format( 'Y-m-d' ), $result['date_boundaries']['start_date'] );
+		$this->assertSame( $end->format( 'Y-m-d' ), $result['date_boundaries']['end_date'] );
+		$this->assertSame( $today->format( 'Y-m-d' ), $result['paged_date_groups'][0]['date'] );
+		$this->assertContains( $event_id, $this->result_post_ids( $result ) );
+	}
+
 	public function test_month_intersects_explicit_date_range(): void {
 		$month_start = new DateTimeImmutable( 'first day of +2 months 00:00:00' );
 		$outside     = $month_start->modify( '+4 days' );

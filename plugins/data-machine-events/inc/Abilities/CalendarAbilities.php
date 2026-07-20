@@ -882,7 +882,9 @@ class CalendarAbilities {
 			}
 			$total_events += $count;
 
-			$events_per_date[ $row->start_date ] = ( $events_per_date[ $row->start_date ] ?? 0 ) + $count;
+			if ( $show_past_param || $row->start_date >= $current_date ) {
+				$events_per_date[ $row->start_date ] = ( $events_per_date[ $row->start_date ] ?? 0 ) + $count;
+			}
 
 			// Multi-day: each spanned date after the start also gets +$count.
 			if ( $row->end_date && $row->end_date > $row->start_date ) {
