@@ -522,7 +522,7 @@ trait FlowHelpers {
 			if ( ! empty( $single_config ) ) {
 				$update_input['handler_config'] = $single_config;
 			}
-			if ( ! empty( $config['user_message'] ) ) {
+			if ( array_key_exists( 'user_message', $config ) ) {
 				$update_input['user_message'] = $config['user_message'];
 			}
 
@@ -601,11 +601,12 @@ trait FlowHelpers {
 	 *
 	 * @param int   $flow_id Flow ID.
 	 * @param array $configured_step_types Step types that were explicitly configured.
-	 * @return array{applied: array, skipped: array}
+	 * @return array{applied: array, skipped: array, errors: array}
 	 */
 	protected function applySiteDefaultsToUnconfiguredSteps( int $flow_id, array $configured_step_types ): array {
 		$applied = array();
 		$skipped = array();
+		$errors  = array();
 
 		$flow        = $this->db_flows->get_flow( $flow_id );
 		$flow_config = $flow['flow_config'] ?? array();
@@ -617,6 +618,7 @@ trait FlowHelpers {
 			return array(
 				'applied' => $applied,
 				'skipped' => array_keys( $flow_config ),
+				'errors'  => $errors,
 			);
 		}
 
@@ -668,13 +670,19 @@ trait FlowHelpers {
 			if ( $result['success'] ) {
 				$applied[] = $flow_step_id;
 			} else {
-				$skipped[] = $flow_step_id;
+				$errors[] = array(
+					'flow_step_id' => $flow_step_id,
+					'step_type'    => $step_type,
+					'handler'      => $default_handler_slug,
+					'error'        => $result['error'] ?? 'Failed to apply site default configuration',
+				);
 			}
 		}
 
 		return array(
 			'applied' => $applied,
 			'skipped' => $skipped,
+			'errors'  => $errors,
 		);
 	}
 }

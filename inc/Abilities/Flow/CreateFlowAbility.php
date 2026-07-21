@@ -12,6 +12,8 @@ namespace DataMachine\Abilities\Flow;
 
 use DataMachine\Abilities\AbilityRegistration;
 use DataMachine\Api\Flows\FlowScheduling;
+use DataMachine\Core\Database\BaseRepository;
+use DataMachine\Engine\Tasks\RecurringScheduler;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -241,11 +243,8 @@ class CreateFlowAbility {
 			$flow_data['agent_id'] = $agent_id;
 		}
 
-		global $wpdb;
-
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
-		$transaction_started = false !== $wpdb->query( 'START TRANSACTION' );
-		if ( ! $transaction_started ) {
+		$transaction_scope = $this->beginCreationTransactionScope();
+		if ( null === $transaction_scope ) {
 			return array(
 				'success' => false,
 				'error'   => 'Unable to start flow creation transaction',
@@ -254,8 +253,7 @@ class CreateFlowAbility {
 
 		$flow_id = $this->db_flows->create_flow( $flow_data );
 		if ( ! $flow_id ) {
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
-			$wpdb->query( 'ROLLBACK' );
+			$this->rollbackCreationTransactionScope( $transaction_scope );
 			do_action(
 				'datamachine_log',
 				'error',
@@ -277,7 +275,7 @@ class CreateFlowAbility {
 		if ( ! empty( $pipeline_config ) ) {
 			$pipeline_steps = is_array( $pipeline_config ) ? array_values( $pipeline_config ) : array();
 			if ( ! $this->syncStepsToFlow( $flow_id, $pipeline_id, $pipeline_steps, $pipeline_config ) ) {
-				return $this->rollbackCreation( $flow_id, 'Failed to sync pipeline steps to flow' );
+				return $this->rollbackCreation( $transaction_scope, $flow_id, 'Failed to sync pipeline steps to flow' );
 			}
 			$synced_steps = count( $pipeline_config );
 		}
@@ -295,7 +293,7 @@ class CreateFlowAbility {
 					)
 				);
 
-				return $this->rollbackCreation( $flow_id, $scheduling_result->get_error_message() );
+				return $this->rollbackCreation( $transaction_scope, $flow_id, $scheduling_result->get_error_message() );
 			}
 		}
 
@@ -308,7 +306,7 @@ class CreateFlowAbility {
 			if ( ! empty( $config_results['errors'] ) ) {
 				$first_error = $config_results['errors'][0];
 				$message     = is_array( $first_error ) ? ( $first_error['error'] ?? 'Failed to configure flow step' ) : (string) $first_error;
-				return $this->rollbackCreation( $flow_id, $message, $config_results['errors'] );
+				return $this->rollbackCreation( $transaction_scope, $flow_id, $message, $config_results['errors'] );
 			}
 		}
 
@@ -318,15 +316,24 @@ class CreateFlowAbility {
 		if ( ! empty( $defaults_results['applied'] ) ) {
 			$config_results['applied'] = array_merge( $config_results['applied'], $defaults_results['applied'] );
 		}
+		if ( ! empty( $defaults_results['errors'] ) ) {
+			$first_error = $defaults_results['errors'][0];
+			return $this->rollbackCreation(
+				$transaction_scope,
+				$flow_id,
+				$first_error['error'] ?? 'Failed to apply site default configuration',
+				$defaults_results['errors']
+			);
+		}
 
 		$flow = $this->db_flows->get_flow( $flow_id );
 		if ( ! $flow ) {
-			return $this->rollbackCreation( $flow_id, 'Failed to load created flow' );
+			return $this->rollbackCreation( $transaction_scope, $flow_id, 'Failed to load created flow' );
 		}
 
 		if ( $validate_only ) {
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
-			$wpdb->query( 'ROLLBACK' );
+			$this->compensateFlowSchedule( $flow_id );
+			$this->rollbackCreationTransactionScope( $transaction_scope );
 
 			return array(
 				'success'      => true,
@@ -345,9 +352,8 @@ class CreateFlowAbility {
 			);
 		}
 
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
-		if ( false === $wpdb->query( 'COMMIT' ) ) {
-			return $this->rollbackCreation( $flow_id, 'Failed to commit flow creation transaction' );
+		if ( ! $this->commitCreationTransactionScope( $transaction_scope ) ) {
+			return $this->rollbackCreation( $transaction_scope, $flow_id, 'Failed to commit flow creation transaction' );
 		}
 
 		do_action(
@@ -381,20 +387,15 @@ class CreateFlowAbility {
 	/**
 	 * Roll back all writes made while creating a flow.
 	 *
+	 * @param array  $transaction_scope Transaction or savepoint owned by this call.
 	 * @param int    $flow_id Flow ID allocated in the transaction.
 	 * @param string $error Error message.
 	 * @param array  $configuration_errors Optional structured configuration errors.
 	 * @return array Failure result.
 	 */
-	private function rollbackCreation( int $flow_id, string $error, array $configuration_errors = array() ): array {
-		global $wpdb;
-
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
-		$wpdb->query( 'ROLLBACK' );
-
-		if ( function_exists( 'as_unschedule_all_actions' ) ) {
-			as_unschedule_all_actions( 'datamachine_run_flow_now', array( $flow_id ), 'data-machine' );
-		}
+	private function rollbackCreation( array $transaction_scope, int $flow_id, string $error, array $configuration_errors = array() ): array {
+		$this->compensateFlowSchedule( $flow_id );
+		$this->rollbackCreationTransactionScope( $transaction_scope );
 
 		$result = array(
 			'success' => false,
@@ -406,6 +407,92 @@ class CreateFlowAbility {
 		}
 
 		return $result;
+	}
+
+	/**
+	 * Begin an owned transaction scope without committing a caller transaction.
+	 *
+	 * @return array{type:string,name?:string}|null Scope metadata, or null on failure.
+	 */
+	private function beginCreationTransactionScope(): ?array {
+		global $wpdb;
+
+		static $savepoint_sequence = 0;
+
+		$in_transaction = false;
+		if ( ! BaseRepository::is_sqlite() ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
+			$in_transaction = 1 === (int) $wpdb->get_var( 'SELECT @@in_transaction' );
+		}
+
+		if ( $in_transaction || BaseRepository::is_sqlite() ) {
+			++$savepoint_sequence;
+			$name = 'datamachine_create_flow_' . $savepoint_sequence;
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			if ( false === $wpdb->query( "SAVEPOINT {$name}" ) ) {
+				return null;
+			}
+
+			return array(
+				'type' => 'savepoint',
+				'name' => $name,
+			);
+		}
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
+		if ( false === $wpdb->query( 'START TRANSACTION' ) ) {
+			return null;
+		}
+
+		return array( 'type' => 'transaction' );
+	}
+
+	/**
+	 * Commit only the transaction scope opened by this ability call.
+	 *
+	 * @param array{type:string,name?:string} $scope Transaction scope metadata.
+	 */
+	private function commitCreationTransactionScope( array $scope ): bool {
+		global $wpdb;
+
+		if ( 'savepoint' === $scope['type'] ) {
+			$name = $scope['name'];
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			return false !== $wpdb->query( "RELEASE SAVEPOINT {$name}" );
+		}
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
+		return false !== $wpdb->query( 'COMMIT' );
+	}
+
+	/**
+	 * Roll back only the transaction scope opened by this ability call.
+	 *
+	 * @param array{type:string,name?:string} $scope Transaction scope metadata.
+	 */
+	private function rollbackCreationTransactionScope( array $scope ): void {
+		global $wpdb;
+
+		if ( 'savepoint' === $scope['type'] ) {
+			$name = $scope['name'];
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			$wpdb->query( "ROLLBACK TO SAVEPOINT {$name}" );
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			$wpdb->query( "RELEASE SAVEPOINT {$name}" );
+			return;
+		}
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
+		$wpdb->query( 'ROLLBACK' );
+	}
+
+	/**
+	 * Remove any Action Scheduler side effect created for a rolled-back flow.
+	 *
+	 * @param int $flow_id Flow ID allocated in this scope.
+	 */
+	private function compensateFlowSchedule( int $flow_id ): void {
+		RecurringScheduler::unschedule( FlowScheduling::FLOW_HOOK, array( $flow_id ), RecurringScheduler::GROUP );
 	}
 
 	/**
