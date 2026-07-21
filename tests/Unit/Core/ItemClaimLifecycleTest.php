@@ -11,11 +11,13 @@ namespace DataMachine\Tests\Unit\Core;
 use DataMachine\Abilities\Job\FailJobAbility;
 use DataMachine\Abilities\Job\RecoverStuckJobsAbility;
 use DataMachine\Core\ActionScheduler\BatchScheduler;
+use DataMachine\Core\ActionScheduler\GroupRegistrar;
 use DataMachine\Core\Database\Jobs\Jobs;
 use DataMachine\Core\Database\ProcessedItems\ProcessedItems;
 use DataMachine\Core\Database\TrackedItems\TrackedItems;
 use DataMachine\Core\ExecutionContext;
 use DataMachine\Core\JobStatus;
+use DataMachine\Core\RunMetrics;
 use DataMachine\Engine\Actions\Handlers\FailJobHandler;
 use DataMachine\Engine\Actions\Handlers\StepLifecycleHandler;
 use Closure;
@@ -33,6 +35,7 @@ class ItemClaimLifecycleTest extends WP_UnitTestCase {
 	private int $admin_id;
 	private ?Closure $schedule_failure_filter   = null;
 	private ?Closure $chunk_size_filter         = null;
+	private ?Closure $tracked_handler_filter    = null;
 	private ?Closure $completion_handler_filter = null;
 
 	public function set_up(): void {
@@ -42,7 +45,8 @@ class ItemClaimLifecycleTest extends WP_UnitTestCase {
 		$this->jobs      = new Jobs();
 		$this->processed->create_table();
 		$this->tracked->create_table();
-		add_filter( 'datamachine_item_claim_completion_handlers', array( TrackedItems::class, 'registerClaimCompletionHandler' ) );
+		$this->tracked_handler_filter = static fn( array $handlers ): array => TrackedItems::registerClaimCompletionHandler( $handlers );
+		add_filter( 'datamachine_item_claim_completion_handlers', $this->tracked_handler_filter );
 		$this->admin_id = self::factory()->user->create( array( 'role' => 'administrator' ) );
 		wp_set_current_user( $this->admin_id );
 		$this->deleteTestRows();
@@ -58,7 +62,9 @@ class ItemClaimLifecycleTest extends WP_UnitTestCase {
 		if ( null !== $this->completion_handler_filter ) {
 			remove_filter( 'datamachine_item_claim_completion_handlers', $this->completion_handler_filter );
 		}
-		remove_filter( 'datamachine_item_claim_completion_handlers', array( TrackedItems::class, 'registerClaimCompletionHandler' ) );
+		if ( null !== $this->tracked_handler_filter ) {
+			remove_filter( 'datamachine_item_claim_completion_handlers', $this->tracked_handler_filter );
+		}
 		$this->deleteTestRows();
 		parent::tear_down();
 	}
@@ -496,7 +502,7 @@ class ItemClaimLifecycleTest extends WP_UnitTestCase {
 		$this->assertTrue( $this->jobs->complete_job( $job_id, JobStatus::COMPLETED ) );
 		$this->assertSame( 'success-revision', $this->tracked->get( self::NAMESPACE, 'success-id' )['source_revision'] );
 		$this->assertFalse( $this->processed->has_active_claim( self::SCOPE, self::SOURCE, 'success-id' ) );
-		$this->assertSame( 1, datamachine_get_engine_data( $job_id )['run_metrics']['counts']['processed'] );
+		$this->assertSame( 1, datamachine_get_engine_data( $job_id )[ RunMetrics::KEY ]['counts']['processed'] );
 	}
 
 	public function test_ordinary_terminal_failure_releases_claim(): void {
@@ -743,7 +749,7 @@ class ItemClaimLifecycleTest extends WP_UnitTestCase {
 		$this->assertSame( 'mixed-success-revision', $this->tracked->get( self::NAMESPACE, 'mixed-success-owned' )['source_revision'] );
 		$this->assertTrue( $this->processed->has_item_been_processed( self::SCOPE, self::SOURCE, 'mixed-success-legacy' ) );
 		$this->assertFalse( $this->processed->has_active_claim( self::SCOPE, self::SOURCE, 'mixed-success-owned' ) );
-		$this->assertSame( 2, datamachine_get_engine_data( $job_id )['run_metrics']['counts']['processed'] );
+		$this->assertSame( 2, datamachine_get_engine_data( $job_id )[ RunMetrics::KEY ]['counts']['processed'] );
 	}
 
 	public function test_malformed_content_addressed_ref_releases_sidecar_claim(): void {
@@ -822,7 +828,7 @@ class ItemClaimLifecycleTest extends WP_UnitTestCase {
 					'parent_job_id' => $parent_id,
 					'offset'        => 0,
 				),
-				'data-machine'
+				GroupRegistrar::GROUP
 			);
 		}
 	}
