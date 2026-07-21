@@ -17,6 +17,17 @@ permissions:
   issues: write
 
 jobs:
+  # This audit is repository policy, so run it directly instead of relying on Homeboy test discovery.
+  prefix-policy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+      - name: Audit WordPress identifier prefixes
+        run: php tests/prefix-policy-audit.php
+
   homeboy:
     if: ${{ github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'release:') }}
     uses: Extra-Chill/homeboy-action/.github/workflows/ci.yml@v2
