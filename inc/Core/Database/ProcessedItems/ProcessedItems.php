@@ -21,6 +21,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class ProcessedItems extends BaseRepository {
 
+	/** Monotonic suffix for connection-local nested claim savepoints. */
+	private static int $savepoint_sequence = 0;
+
 	const TABLE_NAME                = 'datamachine_processed_items';
 	const STATUS_CLAIMED            = 'claimed';
 	const STATUS_PROCESSED          = 'processed';
@@ -510,13 +513,71 @@ class ProcessedItems extends BaseRepository {
 			return false;
 		}
 
-		$now = current_time( 'mysql', true );
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-		$transaction_started = $this->wpdb->query( 'START TRANSACTION' );
+		$nested = 1 === (int) $this->wpdb->get_var( 'SELECT @@in_transaction' );
+		$savepoint = 'datamachine_claim_completion_' . ++self::$savepoint_sequence;
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Savepoint is a code-owned identifier.
+		$transaction_started = $this->wpdb->query( $nested ? "SAVEPOINT {$savepoint}" : 'START TRANSACTION' );
 		if ( false === $transaction_started ) {
 			return false;
 		}
+		$completed = $this->complete_owned_claim_in_transaction(
+			$identity_scope,
+			$source_type,
+			$item_identifier,
+			$claim_token,
+			$job_id,
+			$completion,
+			$retain_processed
+		);
+		if ( ! $completed ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Savepoint is a code-owned identifier.
+			$this->wpdb->query( $nested ? "ROLLBACK TO SAVEPOINT {$savepoint}" : 'ROLLBACK' );
+			if ( $nested ) {
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Savepoint is a code-owned identifier.
+				$this->wpdb->query( "RELEASE SAVEPOINT {$savepoint}" );
+			}
+			return false;
+		}
 
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Savepoint is a code-owned identifier.
+		$committed = false !== $this->wpdb->query( $nested ? "RELEASE SAVEPOINT {$savepoint}" : 'COMMIT' );
+		if ( ! $committed ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Savepoint is a code-owned identifier.
+			$this->wpdb->query( $nested ? "ROLLBACK TO SAVEPOINT {$savepoint}" : 'ROLLBACK' );
+			if ( $nested ) {
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Savepoint is a code-owned identifier.
+				$this->wpdb->query( "RELEASE SAVEPOINT {$savepoint}" );
+			}
+		}
+		return $committed;
+	}
+
+	/**
+	 * Complete an owned claim inside a caller-managed transaction.
+	 *
+	 * This method never starts, commits, or rolls back a transaction, allowing
+	 * every claim callback and transition to share the job terminal boundary.
+	 *
+	 * @param string $identity_scope  Claim identity scope.
+	 * @param string $source_type     Source type.
+	 * @param string $item_identifier Unique item identifier.
+	 * @param string $claim_token     Opaque ownership token.
+	 * @param int    $job_id          Completing job ID.
+	 * @param callable|null $completion Optional callback returning true on success.
+	 * @param bool   $retain_processed Whether to retain a processed row after completion.
+	 * @return bool Whether the token completed its owned claim.
+	 */
+	public function complete_owned_claim_in_transaction( string $identity_scope, string $source_type, string $item_identifier, string $claim_token, int $job_id, ?callable $completion = null, bool $retain_processed = true ): bool {
+		if ( '' === $claim_token ) {
+			return false;
+		}
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		if ( 1 !== (int) $this->wpdb->get_var( 'SELECT @@in_transaction' ) ) {
+			return false;
+		}
+
+		$now = current_time( 'mysql', true );
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		$owned = $this->wpdb->get_var(
 			// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Table identifier uses %i; all values use typed placeholders.
@@ -532,20 +593,14 @@ class ProcessedItems extends BaseRepository {
 		);
 
 		if ( ! is_string( $owned ) || ! hash_equals( $claim_token, $owned ) ) {
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-			$this->wpdb->query( 'ROLLBACK' );
 			return false;
 		}
 
 		try {
 			if ( null !== $completion && true !== $completion() ) {
-				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-				$this->wpdb->query( 'ROLLBACK' );
 				return false;
 			}
 		} catch ( \Throwable $exception ) {
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-			$this->wpdb->query( 'ROLLBACK' );
 			do_action( 'datamachine_log', 'error', 'Item claim completion callback failed.', array( 'exception' => $exception->getMessage() ) );
 			return false;
 		}
@@ -583,13 +638,10 @@ class ProcessedItems extends BaseRepository {
 		}
 
 		if ( false === $transitioned || 1 > $transitioned ) {
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-			$this->wpdb->query( 'ROLLBACK' );
 			return false;
 		}
 
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-		return false !== $this->wpdb->query( 'COMMIT' );
+		return true;
 	}
 
 	/**

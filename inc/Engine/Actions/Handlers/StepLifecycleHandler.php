@@ -19,6 +19,9 @@ use DataMachine\Core\RunMetrics;
  */
 class StepLifecycleHandler {
 
+	/** @var array<int,int> Processed metrics deferred until terminal commit. */
+	private static array $pending_processed_metrics = array();
+
 	/**
 	 * Seed lifecycle context before an inline continuation.
 	 *
@@ -61,28 +64,32 @@ class StepLifecycleHandler {
 	 *
 	 * @param int        $job_id      Completed job ID.
 	 * @param array|null $engine_data Optional engine data snapshot.
+	 * @param bool       $within_transaction Whether the caller owns the terminal transaction.
 	 * @return bool Whether all owned descriptor and legacy claims completed.
 	 */
-	public static function handleCompleted( int $job_id, ?array $engine_data = null ): bool {
+	public static function handleCompleted( int $job_id, ?array $engine_data = null, bool $within_transaction = false ): bool {
 		$engine_data = is_array( $engine_data ) ? $engine_data : \datamachine_get_engine_data( $job_id );
 		$claims      = self::claimsFromEngine( $engine_data );
+		$completed   = 0;
 		if ( ! empty( $claims ) ) {
 			foreach ( $claims as $claim ) {
-				if ( ! self::completeClaim( $claim, $job_id ) ) {
+				if ( ! self::completeClaim( $claim, $job_id, $within_transaction ) ) {
+					unset( self::$pending_processed_metrics[ $job_id ] );
 					return false;
 				}
+				++$completed;
 			}
 		}
 
 		$item_identifier = $engine_data['item_identifier'] ?? null;
 		$source_type     = $engine_data['source_type'] ?? null;
 		if ( empty( $item_identifier ) || empty( $source_type ) ) {
-			return true;
+			return self::recordCompletedMetrics( $job_id, $completed, $within_transaction );
 		}
 
 		$source_flow_step_id = self::resolveSourceIngestionFlowStepId( $engine_data );
 		if ( empty( $source_flow_step_id ) ) {
-			return true;
+			return self::recordCompletedMetrics( $job_id, $completed, $within_transaction );
 		}
 
 		$legacy_completed = ( new ProcessedItems() )->complete_claim_for_job(
@@ -92,13 +99,12 @@ class StepLifecycleHandler {
 			$job_id
 		);
 		if ( false === $legacy_completed ) {
+			unset( self::$pending_processed_metrics[ $job_id ] );
 			return false;
 		}
-		if ( 0 < $legacy_completed ) {
-			RunMetrics::increment( $job_id, 'processed' );
-		}
+		$completed += $legacy_completed;
 
-		return true;
+		return self::recordCompletedMetrics( $job_id, $completed, $within_transaction );
 	}
 
 	/**
@@ -132,7 +138,22 @@ class StepLifecycleHandler {
 			return;
 		}
 
+		unset( self::$pending_processed_metrics[ $job_id ] );
 		\do_action( 'datamachine_step_lifecycle_failed', $job_id, \datamachine_get_engine_data( $job_id ) );
+	}
+
+	/** Clear request-local completion state after a database rollback. */
+	public static function handleTerminalRollback( int $job_id ): void {
+		unset( self::$pending_processed_metrics[ $job_id ] );
+	}
+
+	/** Flush deferred metrics after commit and before final metric aggregation. */
+	public static function handleTerminalCommit( int $job_id, string $status ): void {
+		$completed = self::$pending_processed_metrics[ $job_id ] ?? 0;
+		unset( self::$pending_processed_metrics[ $job_id ] );
+		if ( JobStatus::isStatusSuccess( $status ) && 0 < $completed ) {
+			RunMetrics::increment( $job_id, 'processed', $completed );
+		}
 	}
 
 	/**
@@ -141,19 +162,23 @@ class StepLifecycleHandler {
 	 * @param string $status Requested terminal status.
 	 * @param int    $job_id Job ID.
 	 * @param array  $job    Current job row.
-	 * @return string Original success status or an observable failure status.
+	 * @return string|\WP_Error Original status or a rollback signal.
 	 */
-	public static function filterTerminalStatus( string $status, int $job_id, array $job ): string {
-		unset( $job );
+	public static function filterTerminalStatus( string $status, int $job_id, array $job ): string|\WP_Error {
 		if ( ! JobStatus::isStatusSuccess( $status ) ) {
 			return $status;
 		}
 
-		if ( self::handleCompleted( $job_id ) ) {
+		$engine_data = is_array( $job['engine_data'] ?? null ) ? $job['engine_data'] : array();
+		if ( self::handleCompleted( $job_id, $engine_data, true ) ) {
 			return $status;
 		}
 
-		return JobStatus::failed( 'item_claim_completion_failed' )->toString();
+		return new \WP_Error(
+			'item_claim_completion_failed',
+			'Item claim completion failed inside terminal ownership boundary.',
+			array( 'status' => JobStatus::failed( 'item_claim_completion_failed' )->toString() )
+		);
 	}
 
 	/**
@@ -195,9 +220,10 @@ class StepLifecycleHandler {
 	 *
 	 * @param array $claim  Validated claim descriptor.
 	 * @param int   $job_id Completing job ID.
+	 * @param bool  $within_transaction Whether the caller owns the terminal transaction.
 	 * @return bool Whether the descriptor claim and its callback completed.
 	 */
-	private static function completeClaim( array $claim, int $job_id ): bool {
+	private static function completeClaim( array $claim, int $job_id, bool $within_transaction = false ): bool {
 		$processed  = new ProcessedItems();
 		$completion = is_array( $claim['completion'] ?? null ) ? $claim['completion'] : array();
 		$handler_id = is_string( $completion['handler'] ?? null ) ? $completion['handler'] : '';
@@ -214,7 +240,8 @@ class StepLifecycleHandler {
 			$callback = static fn(): bool => true === call_user_func( $handler, $payload, $job_id, $claim );
 		}
 
-		$owned = $processed->complete_owned_claim(
+		$method = $within_transaction ? 'complete_owned_claim_in_transaction' : 'complete_owned_claim';
+		$owned  = $processed->{$method}(
 			$claim['identity_scope'],
 			$claim['source_type'],
 			$claim['item_identifier'],
@@ -226,7 +253,19 @@ class StepLifecycleHandler {
 		if ( ! $owned ) {
 			return false;
 		}
-		RunMetrics::increment( $job_id, 'processed' );
+		return true;
+	}
+
+	/**
+	 * Persist metrics now or defer them until the outer transaction commits.
+	 */
+	private static function recordCompletedMetrics( int $job_id, int $completed, bool $within_transaction ): bool {
+		if ( $within_transaction ) {
+			self::$pending_processed_metrics[ $job_id ] = $completed;
+		} elseif ( 0 < $completed ) {
+			RunMetrics::increment( $job_id, 'processed', $completed );
+		}
+
 		return true;
 	}
 

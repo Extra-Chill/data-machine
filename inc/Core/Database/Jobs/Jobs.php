@@ -32,6 +32,9 @@ class Jobs extends BaseRepository {
 
 	const TABLE_NAME = 'datamachine_jobs';
 
+	/** Job currently owning the connection-wide terminal transaction. */
+	private static ?int $terminalizing_job = null;
+
 	/**
 	 * Known compound status suffixes for exact-match queries.
 	 *
@@ -1902,6 +1905,9 @@ class Jobs extends BaseRepository {
 				'status'         => $status,
 			);
 		}
+		if ( $is_final ) {
+			return $this->transition_terminal_job_status_result( $job_id, $status );
+		}
 
 		$job = $this->get_job( $job_id );
 		if ( ! is_array( $job ) ) {
@@ -1932,36 +1938,9 @@ class Jobs extends BaseRepository {
 			);
 		}
 
-		if ( $is_final ) {
-			/**
-			 * Filter a terminal status before its irreversible database transition.
-			 *
-			 * @param string $status Current terminal status.
-			 * @param int    $job_id Job ID.
-			 * @param array  $job Current job row.
-			 */
-			$status   = (string) apply_filters( 'datamachine_job_terminal_status', $status, $job_id, $job );
-			$is_final = JobStatus::isStatusFinal( $status );
-			if ( ! $is_final ) {
-				return array(
-					'success'        => false,
-					'changed'        => false,
-					'current_status' => $current_status,
-					'status'         => $status,
-				);
-			}
-		}
-
 		// Truncate to fit varchar(255) column.
 		if ( strlen( $status ) > 255 ) {
 			$status = substr( $status, 0, 252 ) . '...';
-		}
-
-		$update_data = array();
-		$format      = array();
-		if ( $is_final ) {
-			$update_data['completed_at'] = current_time( 'mysql', true );
-			$format[]                    = '%s';
 		}
 
 		$updated = LifecycleStateTransition::compare_and_set(
@@ -1971,9 +1950,9 @@ class Jobs extends BaseRepository {
 			'status',
 			$current_status,
 			$status,
-			$update_data,
+			array(),
 			array( '%d' ),
-			$format
+			array()
 		);
 
 		if ( false === $updated ) {
@@ -1998,16 +1977,178 @@ class Jobs extends BaseRepository {
 			);
 		}
 
-		if ( $is_final ) {
-			RunMetrics::complete( $job_id, $status );
-			do_action( 'datamachine_job_complete', $job_id, $status );
-		}
-
 		( new RunLifecycleStore( $this ) )->mark_job_status( $job_id, $status );
 
 		return array(
 			'success'        => true,
 			'changed'        => true,
+			'current_status' => $current_status,
+			'status'         => $status,
+		);
+	}
+
+	/**
+	 * Atomically prepare claim side effects and persist one terminal winner.
+	 *
+	 * @param int    $job_id Job ID.
+	 * @param string $requested_status Requested final status.
+	 * @return array{success: bool, changed: bool, current_status: ?string, status: string}
+	 */
+	private function transition_terminal_job_status_result( int $job_id, string $requested_status ): array {
+		if ( null !== self::$terminalizing_job ) {
+			return $this->status_transition_result( false, false, null, $requested_status );
+		}
+
+		self::$terminalizing_job = $job_id;
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		if ( false === $this->wpdb->query( 'START TRANSACTION' ) ) {
+			self::$terminalizing_job = null;
+			return $this->status_transition_result( false, false, null, $requested_status );
+		}
+
+		$job = $this->get_job_for_update( $job_id );
+		if ( ! is_array( $job ) ) {
+			$this->rollback_terminal_transition( $job_id );
+			return $this->status_transition_result( false, false, null, $requested_status );
+		}
+
+		$current_status = is_string( $job['status'] ?? null ) ? $job['status'] : '';
+		if ( $current_status === $requested_status ) {
+			$this->rollback_terminal_transition( $job_id );
+			return $this->status_transition_result( true, false, $current_status, $current_status );
+		}
+		if ( JobStatus::isStatusFinal( $current_status ) ) {
+			$this->rollback_terminal_transition( $job_id );
+			return $this->status_transition_result( false, false, $current_status, $current_status );
+		}
+
+		$status = $requested_status;
+		if ( JobStatus::isStatusSuccess( $status ) ) {
+			try {
+				/**
+				 * Prepare a successful terminal transition inside the locked job transaction.
+				 *
+				 * Return WP_Error to roll back all preparation and persist its failure status.
+				 *
+				 * @param string $status Current terminal status.
+				 * @param int    $job_id Job ID.
+				 * @param array  $job Locked job row.
+				 */
+				$prepared_status = apply_filters( 'datamachine_job_terminal_status', $status, $job_id, $job );
+			} catch ( \Throwable $exception ) {
+				$prepared_status = new \WP_Error(
+					'terminal_preparation_exception',
+					$exception->getMessage(),
+					array( 'status' => JobStatus::failed( 'terminal_preparation_exception' )->toString() )
+				);
+			}
+
+			if ( is_wp_error( $prepared_status ) ) {
+				$this->rollback_terminal_transition( $job_id );
+				$failure_data   = $prepared_status->get_error_data();
+				$failure_status = is_array( $failure_data ) && is_string( $failure_data['status'] ?? null )
+					? $failure_data['status']
+					: JobStatus::failed( 'terminal_preparation_failed' )->toString();
+				return $this->transition_job_status_result( $job_id, $failure_status, true );
+			}
+			$status = is_string( $prepared_status ) ? $prepared_status : '';
+			if ( ! JobStatus::isStatusSuccess( $status ) ) {
+				$this->rollback_terminal_transition( $job_id );
+				$failure_status = JobStatus::isStatusFinal( $status )
+					? $status
+					: JobStatus::failed( 'terminal_preparation_failed' )->toString();
+				return $this->transition_job_status_result( $job_id, $failure_status, true );
+			}
+		}
+
+		if ( ! JobStatus::isStatusFinal( $status ) ) {
+			$this->rollback_terminal_transition( $job_id );
+			return $this->status_transition_result( false, false, $current_status, $current_status );
+		}
+		if ( strlen( $status ) > 255 ) {
+			$status = substr( $status, 0, 252 ) . '...';
+		}
+
+		// The locked row makes this a non-retrying ownership CAS. Any failure rolls
+		// back the whole callback/claim/job unit instead of retrying one statement.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$updated = $this->wpdb->update(
+			$this->table_name,
+			array(
+				'status'       => $status,
+				'completed_at' => current_time( 'mysql', true ),
+			),
+			array(
+				'job_id' => $job_id,
+				'status' => $current_status,
+			),
+			array( '%s', '%s' ),
+			array( '%d', '%s' )
+		);
+		if ( 1 !== $updated ) {
+			$this->rollback_terminal_transition( $job_id );
+			$winner = $this->get_job( $job_id );
+			$winner_status = is_array( $winner ) && is_string( $winner['status'] ?? null ) ? $winner['status'] : $current_status;
+			return $this->status_transition_result( false, false, $winner_status, $winner_status );
+		}
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$committed = false !== $this->wpdb->query( 'COMMIT' );
+		self::$terminalizing_job = null;
+		if ( ! $committed ) {
+			$this->rollback_terminal_transition( $job_id );
+			$winner = $this->get_job( $job_id );
+			$winner_status = is_array( $winner ) && is_string( $winner['status'] ?? null ) ? $winner['status'] : $current_status;
+			return $this->status_transition_result( $status === $winner_status, false, $winner_status, $winner_status );
+		}
+
+		do_action( 'datamachine_job_terminal_committed', $job_id, $status );
+		RunMetrics::complete( $job_id, $status );
+		do_action( 'datamachine_job_complete', $job_id, $status );
+		( new RunLifecycleStore( $this ) )->mark_job_status( $job_id, $status );
+
+		return $this->status_transition_result( true, true, $current_status, $status );
+	}
+
+	/**
+	 * Read and decode one job while holding its row lock.
+	 *
+	 * @param int $job_id Job ID.
+	 * @return array|null Locked job row.
+	 */
+	private function get_job_for_update( int $job_id ): ?array {
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$job = $this->wpdb->get_row(
+			// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Table identifier uses %i; value uses a typed placeholder.
+			$this->wpdb->prepare( 'SELECT * FROM %i WHERE job_id = %d FOR UPDATE', $this->table_name, $job_id ),
+			ARRAY_A
+		);
+		if ( is_array( $job ) && isset( $job['engine_data'] ) && is_string( $job['engine_data'] ) ) {
+			$decoded = json_decode( $job['engine_data'], true );
+			if ( JSON_ERROR_NONE === json_last_error() ) {
+				$job['engine_data'] = $decoded;
+			}
+		}
+
+		return is_array( $job ) ? $job : null;
+	}
+
+	/** Roll back a terminal ownership boundary and clear request-shared state. */
+	private function rollback_terminal_transition( int $job_id ): void {
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$this->wpdb->query( 'ROLLBACK' );
+		wp_cache_delete( $job_id, 'datamachine_engine_data' );
+		self::$terminalizing_job = null;
+		do_action( 'datamachine_job_terminal_rolled_back', $job_id );
+	}
+
+	/**
+	 * Build the canonical status transition result envelope.
+	 */
+	private function status_transition_result( bool $success, bool $changed, ?string $current_status, string $status ): array {
+		return array(
+			'success'        => $success,
+			'changed'        => $changed,
 			'current_status' => $current_status,
 			'status'         => $status,
 		);

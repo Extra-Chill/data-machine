@@ -585,7 +585,7 @@ class ExecuteStepAbility {
 				$context = datamachine_get_file_context( $flow_id );
 				$cleanup->cleanup_job_data_packets( $job_id, $context );
 			}
-			if ( JobStatus::isStatusSuccess( $status_override ) && ! JobStatus::isStatusSuccess( $transition['status'] ) ) {
+			if ( JobStatus::isStatusSuccess( $status_override ) && ( ! $transition['success'] || ! JobStatus::isStatusSuccess( $transition['status'] ) ) ) {
 				return array(
 					'success'      => false,
 					'step_success' => false,
@@ -749,7 +749,7 @@ class ExecuteStepAbility {
 				$context = datamachine_get_file_context( $flow_id );
 				$cleanup->cleanup_job_data_packets( $job_id, $context );
 			}
-			if ( ! JobStatus::isStatusSuccess( $transition['status'] ) ) {
+			if ( ! $transition['success'] || ! JobStatus::isStatusSuccess( $transition['status'] ) ) {
 				return array(
 					'success'      => false,
 					'step_success' => false,
@@ -809,7 +809,16 @@ class ExecuteStepAbility {
 		// Fetch/event_import legacy empty outputs classify this way, and explicit
 		// result-shaped step returns can also choose it without emitting packets.
 		if ( 'completed_no_items' === ( $execution_result['status'] ?? '' ) ) {
-			$this->db_jobs->complete_job( $job_id, JobStatus::COMPLETED_NO_ITEMS );
+			$transition = $this->db_jobs->transition_job_status_result( $job_id, JobStatus::COMPLETED_NO_ITEMS, true );
+			if ( ! $transition['success'] || ! JobStatus::isStatusSuccess( $transition['status'] ) ) {
+				return array(
+					'success'      => false,
+					'step_success' => false,
+					'outcome'      => 'claim_completion_failed',
+					'reason'       => 'item_claim_completion_failed',
+					'status'       => $transition['status'],
+				);
+			}
 			do_action(
 				'datamachine_log',
 				'info',

@@ -161,6 +161,223 @@ class ItemClaimLifecycleTest extends WP_UnitTestCase {
 		$this->assertIsArray( $this->context( 'retry-flow-step', $job_id + 1000 )->claimItemOwnership( self::SCOPE, 'terminal-rollback-id' ) );
 	}
 
+	public function test_later_claim_failure_rolls_back_every_claim_and_callback(): void {
+		$job_id = $this->createJobWithClaim( array(), true );
+		$first  = $this->claim( 'multi-rollback-first', $job_id, 'must-rollback' );
+		$second = $this->claimWithCompletion(
+			'multi-rollback-second',
+			$job_id,
+			array(
+				'handler'          => 'failing_test',
+				'retain_processed' => false,
+			)
+		);
+		datamachine_set_engine_data( $job_id, array( ProcessedItems::CLAIMS_METADATA_KEY => array( $first, $second ) ) );
+		$this->completion_handler_filter = static function ( array $handlers ): array {
+			$handlers['failing_test'] = static fn(): bool => false;
+			return $handlers;
+		};
+		add_filter( 'datamachine_item_claim_completion_handlers', $this->completion_handler_filter );
+
+		$this->assertTrue( $this->jobs->complete_job( $job_id, JobStatus::COMPLETED ) );
+
+		$job = $this->jobs->get_job( $job_id );
+		$this->assertIsArray( $job );
+		$this->assertStringContainsString( 'item_claim_completion_failed', (string) $job['status'] );
+		$this->assertNull( $this->tracked->get( self::NAMESPACE, 'multi-rollback-first' ) );
+		$this->assertFalse( $this->processed->has_active_claim( self::SCOPE, self::SOURCE, 'multi-rollback-first' ) );
+		$this->assertFalse( $this->processed->has_active_claim( self::SCOPE, self::SOURCE, 'multi-rollback-second' ) );
+	}
+
+	public function test_terminal_exception_rolls_back_callbacks_before_failure_recovery(): void {
+		$job_id = $this->createJobWithClaim( array(), true );
+		$claim  = $this->claim( 'crash-boundary-id', $job_id, 'must-rollback' );
+		datamachine_set_engine_data( $job_id, array( ProcessedItems::CLAIM_METADATA_KEY => $claim ) );
+		$crash = static function (): never {
+			throw new \RuntimeException( 'simulated crash before terminal CAS' );
+		};
+		add_filter( 'datamachine_job_terminal_status', $crash, 20 );
+
+		try {
+			$this->assertTrue( $this->jobs->complete_job( $job_id, JobStatus::COMPLETED ) );
+		} finally {
+			remove_filter( 'datamachine_job_terminal_status', $crash, 20 );
+		}
+
+		$job = $this->jobs->get_job( $job_id );
+		$this->assertIsArray( $job );
+		$this->assertStringContainsString( 'terminal_preparation_exception', (string) $job['status'] );
+		$this->assertNull( $this->tracked->get( self::NAMESPACE, 'crash-boundary-id' ) );
+		$this->assertFalse( $this->processed->has_active_claim( self::SCOPE, self::SOURCE, 'crash-boundary-id' ) );
+		$this->assertIsArray( $this->context( 'crash-retry-step', $job_id + 2000 )->claimItemOwnership( self::SCOPE, 'crash-boundary-id' ) );
+	}
+
+	public function test_forced_terminal_cas_failure_rolls_back_claim_side_effects(): void {
+		global $wpdb;
+		$job_id = $this->createJobWithClaim( array(), true );
+		$claim  = $this->claim( 'cas-loser-id', $job_id, 'must-rollback' );
+		datamachine_set_engine_data( $job_id, array( ProcessedItems::CLAIM_METADATA_KEY => $claim ) );
+		$force_cas_loss = static function ( string $status, int $filtered_job_id ) use ( $wpdb ): string {
+			$wpdb->update(
+				( new Jobs() )->get_table_name(),
+				array( 'status' => 'processing-race-winner' ),
+				array( 'job_id' => $filtered_job_id ),
+				array( '%s' ),
+				array( '%d' )
+			);
+			return $status;
+		};
+		add_filter( 'datamachine_job_terminal_status', $force_cas_loss, 20, 2 );
+
+		try {
+			$result = $this->jobs->transition_job_status_result( $job_id, JobStatus::COMPLETED, true );
+		} finally {
+			remove_filter( 'datamachine_job_terminal_status', $force_cas_loss, 20 );
+		}
+
+		$this->assertFalse( $result['success'] );
+		$this->assertSame( 'processing', $result['status'] );
+		$this->assertSame( 'processing', $this->jobs->get_job( $job_id )['status'] );
+		$this->assertNull( $this->tracked->get( self::NAMESPACE, 'cas-loser-id' ) );
+		$this->assertTrue( $this->processed->has_active_claim( self::SCOPE, self::SOURCE, 'cas-loser-id' ) );
+		StepLifecycleHandler::handleFailed( $job_id );
+	}
+
+	public function test_terminal_cas_loser_reports_persisted_winner(): void {
+		$job_id = $this->createJobWithClaim( array(), true );
+		$this->assertTrue( $this->jobs->complete_job( $job_id, JobStatus::CANCELLED ) );
+
+		$result = $this->jobs->transition_job_status_result( $job_id, JobStatus::COMPLETED, true );
+
+		$this->assertFalse( $result['success'] );
+		$this->assertSame( JobStatus::CANCELLED, $result['status'] );
+		$this->assertSame( JobStatus::CANCELLED, $result['current_status'] );
+	}
+
+	public function test_concurrent_terminal_callers_share_one_persisted_success(): void {
+		if ( ! function_exists( 'pcntl_fork' ) || ! function_exists( 'stream_socket_pair' ) ) {
+			$this->markTestSkipped( 'pcntl and socket pairs are required for DB concurrency coverage.' );
+		}
+
+		global $wpdb;
+		$sockets = stream_socket_pair( STREAM_PF_UNIX, STREAM_SOCK_STREAM, STREAM_IPPROTO_IP );
+		$this->assertIsArray( $sockets );
+		stream_set_timeout( $sockets[0], 5 );
+		stream_set_timeout( $sockets[1], 5 );
+		$job_id = $this->createJobWithClaim( array(), true );
+		$claim  = $this->claimWithCompletion(
+			'concurrent-terminal-id',
+			$job_id,
+			array(
+				'handler'          => 'counting_test',
+				'retain_processed' => false,
+			)
+		);
+		datamachine_set_engine_data( $job_id, array( ProcessedItems::CLAIM_METADATA_KEY => $claim ) );
+		$this->completion_handler_filter = static function ( array $handlers ): array {
+			$handlers['counting_test'] = static function ( array $payload, int $callback_job_id ): bool {
+				unset( $payload );
+				global $wpdb;
+				return false !== $wpdb->query(
+					// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Table identifier uses %i; all values use typed placeholders.
+					$wpdb->prepare(
+						'UPDATE %i SET label = CONCAT(label, %s) WHERE job_id = %d',
+						( new Jobs() )->get_table_name(),
+						'|callback',
+						$callback_job_id
+					)
+				);
+			};
+			return $handlers;
+		};
+		add_filter( 'datamachine_item_claim_completion_handlers', $this->completion_handler_filter );
+		$pause_owner = static function ( string $status ) use ( $sockets ): string {
+			fwrite( $sockets[0], "locked\n" );
+			fgets( $sockets[0] );
+			usleep( 200000 );
+			return $status;
+		};
+		add_filter( 'datamachine_job_terminal_status', $pause_owner, 20 );
+		$pid = pcntl_fork();
+		$this->assertNotSame( -1, $pid );
+
+		if ( 0 === $pid ) {
+			fclose( $sockets[0] );
+			$child_db = new \wpdb( DB_USER, DB_PASSWORD, DB_NAME, DB_HOST );
+			$child_db->set_prefix( $wpdb->prefix );
+			$GLOBALS['wpdb'] = $child_db;
+			fwrite( $sockets[1], "ready\n" );
+			fgets( $sockets[1] );
+			fwrite( $sockets[1], "attempting\n" );
+			$result = ( new Jobs() )->transition_job_status_result( $job_id, JobStatus::COMPLETED, true );
+			fwrite( $sockets[1], wp_json_encode( $result ) . "\n" );
+			fclose( $sockets[1] );
+			exit( 0 );
+		}
+
+		fclose( $sockets[1] );
+		$this->assertSame( "ready\n", fgets( $sockets[0] ) );
+		$owner_result = $this->jobs->transition_job_status_result( $job_id, JobStatus::COMPLETED, true );
+		$child_result = json_decode( (string) fgets( $sockets[0] ), true );
+		fclose( $sockets[0] );
+		pcntl_waitpid( $pid, $child_status );
+		remove_filter( 'datamachine_job_terminal_status', $pause_owner, 20 );
+
+		$this->assertSame( 0, pcntl_wexitstatus( $child_status ) );
+		$this->assertTrue( $owner_result['success'] );
+		$this->assertTrue( $child_result['success'] );
+		$this->assertSame( JobStatus::COMPLETED, $owner_result['status'] );
+		$this->assertSame( JobStatus::COMPLETED, $child_result['status'] );
+		$this->assertSame( 1, substr_count( (string) $this->jobs->get_job( $job_id )['label'], '|callback' ) );
+		$this->assertFalse( $this->processed->has_active_claim( self::SCOPE, self::SOURCE, 'concurrent-terminal-id' ) );
+	}
+
+	public function test_process_death_before_terminal_cas_rolls_back_and_recovers(): void {
+		if ( ! function_exists( 'pcntl_fork' ) || ! function_exists( 'stream_socket_pair' ) ) {
+			$this->markTestSkipped( 'pcntl and socket pairs are required for crash-boundary coverage.' );
+		}
+
+		global $wpdb;
+		$sockets = stream_socket_pair( STREAM_PF_UNIX, STREAM_SOCK_STREAM, STREAM_IPPROTO_IP );
+		$this->assertIsArray( $sockets );
+		stream_set_timeout( $sockets[0], 5 );
+		stream_set_timeout( $sockets[1], 5 );
+		$job_id = $this->createJobWithClaim( array(), true );
+		$claim  = $this->claim( 'process-death-id', $job_id, 'recovered-revision' );
+		datamachine_set_engine_data( $job_id, array( ProcessedItems::CLAIM_METADATA_KEY => $claim ) );
+		$kill_before_cas = static function ( string $status ) use ( $sockets ): string {
+			fwrite( $sockets[1], "prepared\n" );
+			if ( function_exists( 'posix_kill' ) ) {
+				posix_kill( getmypid(), SIGKILL );
+			}
+			exit( 99 );
+		};
+		add_filter( 'datamachine_job_terminal_status', $kill_before_cas, 20 );
+		$pid = pcntl_fork();
+		$this->assertNotSame( -1, $pid );
+
+		if ( 0 === $pid ) {
+			fclose( $sockets[0] );
+			$child_db = new \wpdb( DB_USER, DB_PASSWORD, DB_NAME, DB_HOST );
+			$child_db->set_prefix( $wpdb->prefix );
+			$GLOBALS['wpdb'] = $child_db;
+			( new Jobs() )->transition_job_status_result( $job_id, JobStatus::COMPLETED, true );
+			exit( 98 );
+		}
+
+		fclose( $sockets[1] );
+		$this->assertSame( "prepared\n", fgets( $sockets[0] ) );
+		fclose( $sockets[0] );
+		pcntl_waitpid( $pid, $child_status );
+		remove_filter( 'datamachine_job_terminal_status', $kill_before_cas, 20 );
+
+		$this->assertSame( 'processing', $this->jobs->get_job( $job_id )['status'] );
+		$this->assertNull( $this->tracked->get( self::NAMESPACE, 'process-death-id' ) );
+		$this->assertTrue( $this->processed->has_active_claim( self::SCOPE, self::SOURCE, 'process-death-id' ) );
+		$this->assertTrue( $this->jobs->complete_job( $job_id, JobStatus::COMPLETED ) );
+		$this->assertSame( 'recovered-revision', $this->tracked->get( self::NAMESPACE, 'process-death-id' )['source_revision'] );
+	}
+
 	public function test_gated_inline_continuation_completes_every_claim(): void {
 		$first  = $this->claim( 'inline-success-a', 211, 'revision-a' );
 		$second = $this->claim( 'inline-success-b', 211, 'revision-b' );
@@ -202,6 +419,7 @@ class ItemClaimLifecycleTest extends WP_UnitTestCase {
 		$this->assertTrue( $this->jobs->complete_job( $job_id, JobStatus::COMPLETED ) );
 		$this->assertSame( 'success-revision', $this->tracked->get( self::NAMESPACE, 'success-id' )['source_revision'] );
 		$this->assertFalse( $this->processed->has_active_claim( self::SCOPE, self::SOURCE, 'success-id' ) );
+		$this->assertSame( 1, datamachine_get_engine_data( $job_id )['run_metrics']['counts']['processed'] );
 	}
 
 	public function test_ordinary_terminal_failure_releases_claim(): void {
@@ -448,6 +666,7 @@ class ItemClaimLifecycleTest extends WP_UnitTestCase {
 		$this->assertSame( 'mixed-success-revision', $this->tracked->get( self::NAMESPACE, 'mixed-success-owned' )['source_revision'] );
 		$this->assertTrue( $this->processed->has_item_been_processed( self::SCOPE, self::SOURCE, 'mixed-success-legacy' ) );
 		$this->assertFalse( $this->processed->has_active_claim( self::SCOPE, self::SOURCE, 'mixed-success-owned' ) );
+		$this->assertSame( 2, datamachine_get_engine_data( $job_id )['run_metrics']['counts']['processed'] );
 	}
 
 	public function test_malformed_content_addressed_ref_releases_sidecar_claim(): void {
