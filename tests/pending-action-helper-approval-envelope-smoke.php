@@ -47,6 +47,12 @@ if ( ! function_exists( 'get_current_user_id' ) ) {
 	}
 }
 
+if ( ! function_exists( 'get_current_blog_id' ) ) {
+	function get_current_blog_id(): int {
+		return 7;
+	}
+}
+
 if ( ! function_exists( 'apply_filters' ) ) {
 	function apply_filters( string $_hook, $value, ...$_args ) {
 		return $value;
@@ -154,8 +160,10 @@ datamachine_pending_action_helper_assert( array( 'title' => 'Demo', 'content' =>
 datamachine_pending_action_helper_assert( 'pending' === $payload['status'], 'Payload carries the canonical pending status.' );
 datamachine_pending_action_helper_assert( 'user:123' === $payload['creator'], 'Payload records creator identity.' );
 datamachine_pending_action_helper_assert( 'agent:456' === $payload['agent'], 'Payload records agent identity.' );
+datamachine_pending_action_helper_assert( is_array( $payload['workspace'] ?? null ), 'Payload carries the canonical originating workspace.' );
 datamachine_pending_action_helper_assert( 123 === $payload['metadata']['datamachine']['created_by'], 'Data Machine created_by audit field is retained in payload metadata.' );
 datamachine_pending_action_helper_assert( 456 === $payload['metadata']['datamachine']['agent_id'], 'Data Machine agent_id audit field is retained in payload metadata.' );
+datamachine_pending_action_helper_assert( 7 === $payload['metadata']['datamachine']['context']['wordpress']['blog_id'], 'Payload exposes the stamped WordPress origin for canonical resolution routing.' );
 datamachine_pending_action_helper_assert( isset( $payload['created_at'] ) && is_string( $payload['created_at'] ), 'Payload carries an ISO creation timestamp.' );
 datamachine_pending_action_helper_assert( array_key_exists( 'expires_at', $payload ), 'Payload carries an expires_at field.' );
 

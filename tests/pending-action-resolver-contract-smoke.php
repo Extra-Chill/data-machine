@@ -15,8 +15,11 @@ if ( ! defined( 'DATAMACHINE_PENDING_ACTION_TRANSIENT_FALLBACK' ) ) {
 	define( 'DATAMACHINE_PENDING_ACTION_TRANSIENT_FALLBACK', true );
 }
 
-$GLOBALS['__resolver_filters']    = array();
-$GLOBALS['__resolver_transients'] = array();
+$GLOBALS['__resolver_filters']     = array();
+$GLOBALS['__resolver_transients']  = array();
+$GLOBALS['__resolver_current_blog'] = 1;
+$GLOBALS['__resolver_blog_stack']   = array();
+$GLOBALS['__resolver_switches']     = array();
 
 if ( ! function_exists( 'sanitize_text_field' ) ) {
 	function sanitize_text_field( $value ) {
@@ -41,6 +44,38 @@ if ( ! function_exists( 'wp_json_encode' ) ) {
 if ( ! function_exists( 'get_current_user_id' ) ) {
 	function get_current_user_id() {
 		return 123;
+	}
+}
+if ( ! function_exists( 'absint' ) ) {
+	function absint( $value ) {
+		return abs( (int) $value );
+	}
+}
+if ( ! function_exists( 'get_current_blog_id' ) ) {
+	function get_current_blog_id() {
+		return $GLOBALS['__resolver_current_blog'];
+	}
+}
+if ( ! function_exists( 'get_site' ) ) {
+	function get_site( int $blog_id ) {
+		return in_array( $blog_id, array( 1, 2, 7 ), true ) ? (object) array( 'blog_id' => $blog_id ) : null;
+	}
+}
+if ( ! function_exists( 'switch_to_blog' ) ) {
+	function switch_to_blog( int $blog_id ): bool {
+		$GLOBALS['__resolver_blog_stack'][] = $GLOBALS['__resolver_current_blog'];
+		$GLOBALS['__resolver_current_blog'] = $blog_id;
+		$GLOBALS['__resolver_switches'][]   = $blog_id;
+		return true;
+	}
+}
+if ( ! function_exists( 'restore_current_blog' ) ) {
+	function restore_current_blog(): bool {
+		if ( empty( $GLOBALS['__resolver_blog_stack'] ) ) {
+			return false;
+		}
+		$GLOBALS['__resolver_current_blog'] = array_pop( $GLOBALS['__resolver_blog_stack'] );
+		return true;
 	}
 }
 if ( ! function_exists( 'did_action' ) ) {
@@ -90,18 +125,18 @@ if ( ! function_exists( 'do_action' ) ) {
 if ( ! function_exists( 'set_transient' ) ) {
 	function set_transient( $key, $value, $expiration = 0 ) {
 		unset( $expiration );
-		$GLOBALS['__resolver_transients'][ $key ] = $value;
+		$GLOBALS['__resolver_transients'][ get_current_blog_id() ][ $key ] = $value;
 		return true;
 	}
 }
 if ( ! function_exists( 'get_transient' ) ) {
 	function get_transient( $key ) {
-		return $GLOBALS['__resolver_transients'][ $key ] ?? false;
+		return $GLOBALS['__resolver_transients'][ get_current_blog_id() ][ $key ] ?? false;
 	}
 }
 if ( ! function_exists( 'delete_transient' ) ) {
 	function delete_transient( $key ) {
-		unset( $GLOBALS['__resolver_transients'][ $key ] );
+		unset( $GLOBALS['__resolver_transients'][ get_current_blog_id() ][ $key ] );
 		return true;
 	}
 }
@@ -131,6 +166,7 @@ require_once dirname( __DIR__ ) . '/inc/Core/Workspace/WordPressWorkspaceScope.p
 require_once dirname( __DIR__ ) . '/inc/Engine/AI/Actions/PendingActionObservers.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/AI/Actions/WordPressActionDispatchObserver.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/AI/Actions/PendingActionStore.php';
+require_once dirname( __DIR__ ) . '/inc/Engine/AI/Actions/PendingActionHelper.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/AI/Actions/PendingActionScope.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/AI/Actions/PendingActionResolverAdapter.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/AI/Actions/ResolvePendingActionAbility.php';
@@ -138,7 +174,10 @@ require_once dirname( __DIR__ ) . '/inc/Engine/AI/Actions/ResolvePendingActionAb
 use AgentsAPI\AI\Approvals\WP_Agent_Approval_Decision;
 use AgentsAPI\AI\Approvals\WP_Agent_Pending_Action;
 use AgentsAPI\AI\Approvals\WP_Agent_Pending_Action_Handler;
+use AgentsAPI\AI\Approvals\WP_Agent_Pending_Action_Observer;
 use AgentsAPI\AI\Approvals\WP_Agent_Pending_Action_Resolver;
+use DataMachine\Engine\AI\Actions\PendingActionObservers;
+use DataMachine\Engine\AI\Actions\PendingActionHelper;
 use DataMachine\Engine\AI\Actions\PendingActionStore;
 use DataMachine\Engine\AI\Actions\ResolvePendingActionAbility;
 
@@ -535,6 +574,83 @@ $scoped_out = ResolvePendingActionAbility::execute(
 );
 resolver_smoke_assert( false === ( $scoped_out['success'] ?? true ), 'resolver rejects actions outside caller owner scope', $failures, $passes );
 resolver_smoke_assert( 0 === $scoped_out_apply_calls, 'scope denial happens before handler execution', $failures, $passes );
+
+$origin_handler_blogs = array();
+$origin_audit_blogs   = array();
+$origin_observer      = new class( $origin_audit_blogs ) implements WP_Agent_Pending_Action_Observer {
+	public function __construct( private array &$origin_audit_blogs ) {}
+	public function on_stored( WP_Agent_Pending_Action $action ): void {
+		unset( $action );
+	}
+	public function on_resolved( WP_Agent_Pending_Action $action, WP_Agent_Approval_Decision $decision, string $resolver ): void {
+		unset( $action, $decision, $resolver );
+		$this->origin_audit_blogs[] = get_current_blog_id();
+	}
+	public function on_expired( WP_Agent_Pending_Action $action ): void {
+		unset( $action );
+	}
+};
+PendingActionObservers::register( $origin_observer );
+add_filter(
+	'datamachine_pending_action_handlers',
+	static function ( array $handlers ) use ( &$origin_handler_blogs ) {
+		$handlers['origin_kind'] = array(
+			'apply' => static function () use ( &$origin_handler_blogs ) {
+				$origin_handler_blogs[] = get_current_blog_id();
+				return array( 'success' => true );
+			},
+		);
+		return $handlers;
+	},
+	50,
+	1
+);
+
+switch_to_blog( 7 );
+$origin_envelope = PendingActionHelper::stage(
+	array(
+		'action_id'   => 'act_00000000-0000-4000-8000-000000000007',
+		'kind'        => 'origin_kind',
+		'summary'     => 'Resolve at origin.',
+		'apply_input' => array( 'target' => 'origin' ),
+		'user_id'     => 123,
+		'context'     => array(
+			'wordpress' => array( 'blog_id' => 1 ),
+			'trace_id'  => 'caller-context-preserved',
+		),
+	)
+);
+$origin_action_id = $origin_envelope['action_id'] ?? '';
+$origin_stored    = PendingActionStore::get( $origin_action_id );
+restore_current_blog();
+$GLOBALS['__resolver_current_blog'] = 2;
+
+resolver_smoke_assert( 7 === ( $origin_stored['context']['wordpress']['blog_id'] ?? null ), 'store overwrites forged WordPress origin with the actual staging blog', $failures, $passes );
+resolver_smoke_assert( 'caller-context-preserved' === ( $origin_stored['context']['trace_id'] ?? null ), 'store preserves non-reserved caller context', $failures, $passes );
+resolver_smoke_assert( 7 === ( $origin_envelope['payload']['metadata']['datamachine']['context']['wordpress']['blog_id'] ?? null ), 'approval envelope exposes the actual server-owned origin', $failures, $passes );
+
+$origin_result = $adapter->resolve_pending_action(
+	$origin_action_id,
+	WP_Agent_Approval_Decision::accepted(),
+	'user:123',
+	array(),
+	array( 'wordpress' => array( 'blog_id' => 7 ) )
+);
+resolver_smoke_assert( true === ( $origin_result['success'] ?? false ), 'cross-site resolution succeeds against the originating store', $failures, $passes );
+resolver_smoke_assert( array( 7 ) === $origin_handler_blogs, 'approval handler executes in the originating blog context', $failures, $passes );
+resolver_smoke_assert( 2 === get_current_blog_id(), 'origin routing restores the caller blog after resolution', $failures, $passes );
+resolver_smoke_assert( array( 7 ) === $origin_audit_blogs, 'resolution audit lifecycle runs in the originating blog context', $failures, $passes );
+
+$forged_result = $adapter->resolve_pending_action(
+	'act_origin_accept',
+	WP_Agent_Approval_Decision::accepted(),
+	'user:123',
+	array(),
+	array( 'wordpress' => array( 'blog_id' => 1 ) )
+);
+resolver_smoke_assert( false === ( $forged_result['success'] ?? true ), 'forged origin metadata is denied', $failures, $passes );
+resolver_smoke_assert( array( 7 ) === $origin_handler_blogs, 'forged origin does not execute the handler', $failures, $passes );
+resolver_smoke_assert( 2 === get_current_blog_id(), 'forged origin denial also restores the caller blog', $failures, $passes );
 
 if ( ! empty( $failures ) ) {
 	echo "\nFailures:\n";

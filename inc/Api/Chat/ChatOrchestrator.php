@@ -17,6 +17,7 @@
 namespace DataMachine\Api\Chat;
 
 use AgentsAPI\AI\WP_Agent_Execution_Principal;
+use AgentsAPI\Core\Workspace\WP_Agent_Workspace_Scope;
 use DataMachine\Abilities\Chat\ChatTranscriptOwner;
 use DataMachine\Core\Database\Chat\ConversationStoreFactory;
 use DataMachine\Core\PluginSettings;
@@ -77,6 +78,10 @@ class ChatOrchestrator {
 		$calling_user_id      = array_key_exists( 'calling_user_id', $options ) ? max( 0, (int) $options['calling_user_id'] ) : $user_id;
 		$modes                = ToolPolicyResolver::normalizeModes( ! empty( $options['modes'] ) ? $options['modes'] : array( $options['mode'] ?? ToolPolicyResolver::MODE_CHAT ) );
 		$mode                 = implode( ',', $modes );
+		$workspace            = $options['workspace'] ?? WordPressWorkspaceScope::current();
+		if ( ! $workspace instanceof WP_Agent_Workspace_Scope ) {
+			return new WP_Error( 'invalid_transcript_workspace', __( 'A canonical transcript workspace is required.', 'data-machine' ), array( 'status' => 400 ) );
+		}
 		$transcript_owner     = ChatTranscriptOwner::resolve_for_request( $options, $user_id );
 		if ( is_wp_error( $transcript_owner ) ) {
 			return $transcript_owner;
@@ -118,6 +123,14 @@ class ChatOrchestrator {
 				);
 			}
 
+			if ( (string) ( $session['workspace_type'] ?? '' ) !== $workspace->workspace_type || (string) ( $session['workspace_id'] ?? '' ) !== $workspace->workspace_id ) {
+				return new WP_Error(
+					'session_not_found',
+					__( 'Session not found', 'data-machine' ),
+					array( 'status' => 404 )
+				);
+			}
+
 			$messages         = $session['messages'];
 			$session_metadata = $session['metadata'] ?? array();
 			if ( empty( $options['mode'] ) && ! empty( $session['mode'] ) ) {
@@ -125,7 +138,7 @@ class ChatOrchestrator {
 			}
 		} else {
 			// Check for recent pending session to prevent duplicates from timeout retries.
-			$pending_session = $chat_db->get_recent_pending_session( WordPressWorkspaceScope::current(), $user_id, 600, $mode, $acting_token_id, $transcript_owner );
+			$pending_session = $chat_db->get_recent_pending_session( $workspace, $user_id, 600, $mode, $acting_token_id, $transcript_owner );
 
 			if ( $pending_session ) {
 				$session_id       = $pending_session['session_id'];
@@ -144,7 +157,7 @@ class ChatOrchestrator {
 					)
 				);
 			} else {
-				$create_result = self::createSession( $user_id, '', $agent_id, $mode, $transcript_owner );
+				$create_result = self::createSession( $user_id, '', $agent_id, $mode, $transcript_owner, $workspace );
 
 				if ( is_wp_error( $create_result ) ) {
 					return $create_result;
@@ -750,7 +763,7 @@ class ChatOrchestrator {
 	 * @param string $source  Optional source identifier.
 	 * @return string|WP_Error Session ID on success, WP_Error on failure.
 	 */
-	private static function createSession( int $user_id, string $source = '', int $agent_id = 0, string $mode = ToolPolicyResolver::MODE_CHAT, ?array $transcript_owner = null ): string|WP_Error {
+	private static function createSession( int $user_id, string $source = '', int $agent_id = 0, string $mode = ToolPolicyResolver::MODE_CHAT, ?array $transcript_owner = null, ?WP_Agent_Workspace_Scope $workspace = null ): string|WP_Error {
 		// Comma-joined multi-mode strings ('cluckin-chuck,chat') survive intact
 		// here so processContinue can later parse them back into a modes array.
 		// Single-mode strings still get sanitize_key'd for the usual safety.
@@ -794,8 +807,9 @@ class ChatOrchestrator {
 		}
 
 		$agent_slug = ConversationStoreFactory::resolve_agent_slug_for_transcript( $agent_id );
+		$workspace  = $workspace ?? WordPressWorkspaceScope::current();
 		$input      = array(
-			'workspace' => WordPressWorkspaceScope::current()->to_array(),
+			'workspace' => $workspace->to_array(),
 			'agent'     => $agent_slug,
 			'context'   => $mode,
 			'principal' => WP_Agent_Execution_Principal::user_session(
@@ -803,7 +817,7 @@ class ChatOrchestrator {
 				$agent_slug,
 				WP_Agent_Execution_Principal::REQUEST_CONTEXT_CHAT,
 				array(),
-				WordPressWorkspaceScope::current()->key()
+				$workspace->key()
 			),
 			'metadata'  => array(
 				'started_at'    => current_time( 'mysql', true ),

@@ -94,6 +94,9 @@ $assert( str_contains( $handler_source, "'interrupted'" ) && str_contains( $hand
 $assert( str_contains( $handler_source, "'tool_execution_summary'" ), 'AgentsChatHandler returns bounded tool execution diagnostics in canonical metadata' );
 $assert( str_contains( $orchestrator, "'tool_execution_summary'" ) && str_contains( $orchestrator, 'datamachine_summarize_tool_execution_results' ), 'ChatOrchestrator forwards bounded tool execution diagnostics to chat adapters' );
 $assert( str_contains( $handler_source, "'calling_user_id'        => $" . "calling_user_id" ), 'AgentsChatHandler forwards the authenticated acting user separately from runtime ownership' );
+$assert( str_contains( $handler_source, "'workspace'             => $" . "workspace" ), 'AgentsChatHandler forwards the explicit canonical transcript workspace' );
+$assert( str_contains( $orchestrator, 'get_recent_pending_session( $workspace' ), 'ChatOrchestrator scopes pending-session deduplication to the explicit workspace' );
+$assert( str_contains( $orchestrator, "'workspace' => $" . "workspace->to_array()" ), 'ChatOrchestrator creates canonical sessions in the explicit workspace' );
 $assert( str_contains( $orchestrator, "'calling_user_id' => $" . "calling_user_id" ), 'ChatOrchestrator passes caller identity to tool resolution and the conversation loop' );
 $assert( str_contains( $orchestrator, '$response_metadata = is_array( $result[\'metadata\'] ?? null )' ), 'ChatOrchestrator exposes loop metadata from the actual turn result' );
 $assert( ! file_exists( $root . '/inc/Abilities/Chat/SendMessageAbility.php' ), 'datamachine/send-message facade class is removed' );
