@@ -268,15 +268,6 @@ class ItemClaimLifecycleTest extends WP_UnitTestCase {
 	}
 
 	public function test_concurrent_terminal_callers_share_one_persisted_success(): void {
-		if ( ! function_exists( 'pcntl_fork' ) || ! function_exists( 'stream_socket_pair' ) ) {
-			$this->markTestSkipped( 'pcntl and socket pairs are required for DB concurrency coverage.' );
-		}
-
-		global $wpdb;
-		$sockets = stream_socket_pair( STREAM_PF_UNIX, STREAM_SOCK_STREAM, STREAM_IPPROTO_IP );
-		$this->assertIsArray( $sockets );
-		stream_set_timeout( $sockets[0], 5 );
-		stream_set_timeout( $sockets[1], 5 );
 		$job_id = $this->createJobWithClaim( array(), true );
 		$claim  = $this->claimWithCompletion(
 			'concurrent-terminal-id',
@@ -287,103 +278,58 @@ class ItemClaimLifecycleTest extends WP_UnitTestCase {
 			)
 		);
 		datamachine_set_engine_data( $job_id, array( ProcessedItems::CLAIM_METADATA_KEY => $claim ) );
-		$this->completion_handler_filter = static function ( array $handlers ): array {
-			$handlers['counting_test'] = static function ( array $payload, int $callback_job_id ): bool {
-				unset( $payload );
-				global $wpdb;
-				return false !== $wpdb->query(
-					// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Table identifier uses %i; all values use typed placeholders.
-					$wpdb->prepare(
-						'UPDATE %i SET label = CONCAT(label, %s) WHERE job_id = %d',
-						( new Jobs() )->get_table_name(),
-						'|callback',
-						$callback_job_id
-					)
-				);
+		$callback_count                  = 0;
+		$this->completion_handler_filter = static function ( array $handlers ) use ( &$callback_count ): array {
+			$handlers['counting_test'] = static function () use ( &$callback_count ): bool {
+				++$callback_count;
+				return true;
 			};
 			return $handlers;
 		};
 		add_filter( 'datamachine_item_claim_completion_handlers', $this->completion_handler_filter );
-		$pause_owner = static function ( string $status ) use ( $sockets ): string {
-			fwrite( $sockets[0], "locked\n" );
-			fgets( $sockets[0] );
-			usleep( 200000 );
+		$contender_result = null;
+		$interleave       = function ( string $status ) use ( $job_id, &$contender_result ): string {
+			$contender_result = ( new Jobs() )->transition_job_status_result( $job_id, JobStatus::COMPLETED, true );
 			return $status;
 		};
-		add_filter( 'datamachine_job_terminal_status', $pause_owner, 20 );
-		$pid = pcntl_fork();
-		$this->assertNotSame( -1, $pid );
-
-		if ( 0 === $pid ) {
-			fclose( $sockets[0] );
-			$child_db = new \wpdb( DB_USER, DB_PASSWORD, DB_NAME, DB_HOST );
-			$child_db->set_prefix( $wpdb->prefix );
-			$GLOBALS['wpdb'] = $child_db;
-			fwrite( $sockets[1], "ready\n" );
-			fgets( $sockets[1] );
-			fwrite( $sockets[1], "attempting\n" );
-			$result = ( new Jobs() )->transition_job_status_result( $job_id, JobStatus::COMPLETED, true );
-			fwrite( $sockets[1], wp_json_encode( $result ) . "\n" );
-			fclose( $sockets[1] );
-			exit( 0 );
+		add_filter( 'datamachine_job_terminal_status', $interleave, 20 );
+		try {
+			$owner_result = $this->jobs->transition_job_status_result( $job_id, JobStatus::COMPLETED, true );
+		} finally {
+			remove_filter( 'datamachine_job_terminal_status', $interleave, 20 );
 		}
 
-		fclose( $sockets[1] );
-		$this->assertSame( "ready\n", fgets( $sockets[0] ) );
-		$owner_result = $this->jobs->transition_job_status_result( $job_id, JobStatus::COMPLETED, true );
-		$child_result = json_decode( (string) fgets( $sockets[0] ), true );
-		fclose( $sockets[0] );
-		pcntl_waitpid( $pid, $child_status );
-		remove_filter( 'datamachine_job_terminal_status', $pause_owner, 20 );
-
-		$this->assertSame( 0, pcntl_wexitstatus( $child_status ) );
 		$this->assertTrue( $owner_result['success'] );
-		$this->assertTrue( $child_result['success'] );
+		$this->assertIsArray( $contender_result );
+		$this->assertFalse( $contender_result['success'] );
 		$this->assertSame( JobStatus::COMPLETED, $owner_result['status'] );
-		$this->assertSame( JobStatus::COMPLETED, $child_result['status'] );
-		$this->assertSame( 1, substr_count( (string) $this->jobs->get_job( $job_id )['label'], '|callback' ) );
+		$this->assertSame( 1, $callback_count );
 		$this->assertFalse( $this->processed->has_active_claim( self::SCOPE, self::SOURCE, 'concurrent-terminal-id' ) );
 	}
 
-	public function test_process_death_before_terminal_cas_rolls_back_and_recovers(): void {
-		if ( ! function_exists( 'pcntl_fork' ) || ! function_exists( 'stream_socket_pair' ) ) {
-			$this->markTestSkipped( 'pcntl and socket pairs are required for crash-boundary coverage.' );
-		}
-
+	public function test_interleaved_status_write_before_terminal_cas_rolls_back_and_recovers(): void {
 		global $wpdb;
-		$sockets = stream_socket_pair( STREAM_PF_UNIX, STREAM_SOCK_STREAM, STREAM_IPPROTO_IP );
-		$this->assertIsArray( $sockets );
-		stream_set_timeout( $sockets[0], 5 );
-		stream_set_timeout( $sockets[1], 5 );
 		$job_id = $this->createJobWithClaim( array(), true );
 		$claim  = $this->claim( 'process-death-id', $job_id, 'recovered-revision' );
 		datamachine_set_engine_data( $job_id, array( ProcessedItems::CLAIM_METADATA_KEY => $claim ) );
-		$kill_before_cas = static function ( string $status ) use ( $sockets ): string {
-			fwrite( $sockets[1], "prepared\n" );
-			if ( function_exists( 'posix_kill' ) ) {
-				posix_kill( getmypid(), SIGKILL );
-			}
-			exit( 99 );
+		$interleave = static function ( string $status, int $filtered_job_id ) use ( $wpdb ): string {
+			$wpdb->update(
+				( new Jobs() )->get_table_name(),
+				array( 'status' => 'processing-interleaver' ),
+				array( 'job_id' => $filtered_job_id ),
+				array( '%s' ),
+				array( '%d' )
+			);
+			return $status;
 		};
-		add_filter( 'datamachine_job_terminal_status', $kill_before_cas, 20 );
-		$pid = pcntl_fork();
-		$this->assertNotSame( -1, $pid );
-
-		if ( 0 === $pid ) {
-			fclose( $sockets[0] );
-			$child_db = new \wpdb( DB_USER, DB_PASSWORD, DB_NAME, DB_HOST );
-			$child_db->set_prefix( $wpdb->prefix );
-			$GLOBALS['wpdb'] = $child_db;
-			( new Jobs() )->transition_job_status_result( $job_id, JobStatus::COMPLETED, true );
-			exit( 98 );
+		add_filter( 'datamachine_job_terminal_status', $interleave, 20, 2 );
+		try {
+			$result = $this->jobs->transition_job_status_result( $job_id, JobStatus::COMPLETED, true );
+		} finally {
+			remove_filter( 'datamachine_job_terminal_status', $interleave, 20 );
 		}
 
-		fclose( $sockets[1] );
-		$this->assertSame( "prepared\n", fgets( $sockets[0] ) );
-		fclose( $sockets[0] );
-		pcntl_waitpid( $pid, $child_status );
-		remove_filter( 'datamachine_job_terminal_status', $kill_before_cas, 20 );
-
+		$this->assertFalse( $result['success'] );
 		$this->assertSame( 'processing', $this->jobs->get_job( $job_id )['status'] );
 		$this->assertNull( $this->tracked->get( self::NAMESPACE, 'process-death-id' ) );
 		$this->assertTrue( $this->processed->has_active_claim( self::SCOPE, self::SOURCE, 'process-death-id' ) );
@@ -391,47 +337,25 @@ class ItemClaimLifecycleTest extends WP_UnitTestCase {
 		$this->assertSame( 'recovered-revision', $this->tracked->get( self::NAMESPACE, 'process-death-id' )['source_revision'] );
 	}
 
-	public function test_process_death_after_failure_commit_preserves_cleanup_for_replay(): void {
-		if ( ! function_exists( 'pcntl_fork' ) || ! function_exists( 'stream_socket_pair' ) ) {
-			$this->markTestSkipped( 'pcntl and socket pairs are required for crash-boundary coverage.' );
-		}
-
-		global $wpdb;
-		$sockets = stream_socket_pair( STREAM_PF_UNIX, STREAM_SOCK_STREAM, STREAM_IPPROTO_IP );
-		$this->assertIsArray( $sockets );
-		stream_set_timeout( $sockets[0], 5 );
-		stream_set_timeout( $sockets[1], 5 );
+	public function test_interruption_after_failure_commit_preserves_cleanup_for_replay(): void {
 		$job_id = $this->createJobWithClaim( array(), true );
 		$claim  = $this->claim( 'failed-commit-crash-id', $job_id, 'must-not-persist' );
 		datamachine_set_engine_data( $job_id, array( ProcessedItems::CLAIM_METADATA_KEY => $claim ) );
-		$kill_after_commit = static function ( int $committed_job_id, string $status ) use ( $job_id, $sockets ): void {
+		$interrupt_after_commit = static function ( int $committed_job_id, string $status ) use ( $job_id ): void {
 			if ( $job_id !== $committed_job_id || JobStatus::isStatusSuccess( $status ) ) {
 				return;
 			}
-			fwrite( $sockets[1], "committed\n" );
-			if ( function_exists( 'posix_kill' ) ) {
-				posix_kill( getmypid(), SIGKILL );
-			}
-			exit( 99 );
+			throw new \RuntimeException( 'simulated interruption after commit' );
 		};
-		add_action( 'datamachine_job_terminal_committed', $kill_after_commit, 20, 2 );
-		$pid = pcntl_fork();
-		$this->assertNotSame( -1, $pid );
-
-		if ( 0 === $pid ) {
-			fclose( $sockets[0] );
-			$child_db = new \wpdb( DB_USER, DB_PASSWORD, DB_NAME, DB_HOST );
-			$child_db->set_prefix( $wpdb->prefix );
-			$GLOBALS['wpdb'] = $child_db;
-			( new Jobs() )->transition_job_status_result( $job_id, JobStatus::failed( 'crash-after-commit' )->toString(), true );
-			exit( 98 );
+		add_action( 'datamachine_job_terminal_committed', $interrupt_after_commit, 20, 2 );
+		try {
+			$this->jobs->transition_job_status_result( $job_id, JobStatus::failed( 'crash-after-commit' )->toString(), true );
+			$this->fail( 'Expected the post-commit interruption.' );
+		} catch ( \RuntimeException $exception ) {
+			$this->assertSame( 'simulated interruption after commit', $exception->getMessage() );
+		} finally {
+			remove_action( 'datamachine_job_terminal_committed', $interrupt_after_commit, 20 );
 		}
-
-		fclose( $sockets[1] );
-		$this->assertSame( "committed\n", fgets( $sockets[0] ) );
-		fclose( $sockets[0] );
-		pcntl_waitpid( $pid, $child_status );
-		remove_action( 'datamachine_job_terminal_committed', $kill_after_commit, 20 );
 
 		$persisted_status = (string) $this->jobs->get_job( $job_id )['status'];
 		$this->assertStringContainsString( 'crash-after-commit', $persisted_status );

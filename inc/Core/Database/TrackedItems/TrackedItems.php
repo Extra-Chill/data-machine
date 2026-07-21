@@ -63,11 +63,13 @@ class TrackedItems extends BaseRepository {
 				$formats,
 				array( '%d' )
 			);
+			$stored = array_merge( $existing, $row );
 		} else {
 			$row['first_seen_at'] = '' !== $normalized['first_seen_at'] ? $normalized['first_seen_at'] : $now;
 			$formats[]            = '%s';
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 			$result = $this->wpdb->insert( $this->table_name, $row, $formats );
+			$stored = array_merge( array( 'id' => (int) $this->wpdb->insert_id ), $row );
 		}
 
 		if ( false === $result ) {
@@ -81,7 +83,7 @@ class TrackedItems extends BaseRepository {
 			return null;
 		}
 
-		return $this->get( $normalized['namespace'], $normalized['item_id'] );
+		return self::normalize_row( $stored );
 	}
 
 	/**

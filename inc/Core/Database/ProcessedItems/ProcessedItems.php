@@ -21,9 +21,6 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class ProcessedItems extends BaseRepository {
 
-	/** Monotonic suffix for connection-local nested claim savepoints. */
-	private static int $savepoint_sequence = 0;
-
 	const TABLE_NAME                = 'datamachine_processed_items';
 	const STATUS_CLAIMED            = 'claimed';
 	const STATUS_PROCESSED          = 'processed';
@@ -376,41 +373,38 @@ class ProcessedItems extends BaseRepository {
 			return false;
 		}
 
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared -- Nested query is prepared with typed placeholders.
-		$upserted = $this->wpdb->query(
-			// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Table identifier uses %i; all values use typed placeholders.
-			$this->wpdb->prepare(
-				'INSERT INTO %i (flow_step_id, source_type, item_identifier, job_id, status, claim_expires_at, claim_token)
+		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Table identifier uses %i; all values use typed placeholders.
+		$upsert_query = $this->wpdb->prepare(
+			'INSERT INTO %i (flow_step_id, source_type, item_identifier, job_id, status, claim_expires_at, claim_token)
 				VALUES (%s, %s, %s, %d, %s, %s, %s)
 				ON DUPLICATE KEY UPDATE id = id',
-				$this->table_name,
-				$identity_scope,
-				$source_type,
-				$item_identifier,
-				$job_id,
-				self::STATUS_CLAIMED,
-				$expires_at,
-				$claim_token
-			)
+			$this->table_name,
+			$identity_scope,
+			$source_type,
+			$item_identifier,
+			$job_id,
+			self::STATUS_CLAIMED,
+			$expires_at,
+			$claim_token
 		);
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared -- Query is prepared immediately above.
+		$upserted = $this->wpdb->query( $upsert_query );
 		if ( false === $upserted ) {
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 			$this->wpdb->query( 'ROLLBACK' );
 			return false;
 		}
 
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared -- Nested query is prepared with typed placeholders.
-		$row = $this->wpdb->get_row(
-			// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Table identifier uses %i; all values use typed placeholders.
-			$this->wpdb->prepare(
-				'SELECT id, status, claim_expires_at, claim_token FROM %i WHERE flow_step_id = %s AND source_type = %s AND item_identifier = %s FOR UPDATE',
-				$this->table_name,
-				$identity_scope,
-				$source_type,
-				$item_identifier
-			),
-			ARRAY_A
+		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Table identifier uses %i; all values use typed placeholders.
+		$lock_query = $this->wpdb->prepare(
+			'SELECT id, status, claim_expires_at, claim_token FROM %i WHERE flow_step_id = %s AND source_type = %s AND item_identifier = %s FOR UPDATE',
+			$this->table_name,
+			$identity_scope,
+			$source_type,
+			$item_identifier
 		);
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared -- Query is prepared immediately above.
+		$row = $this->wpdb->get_row( $lock_query, ARRAY_A );
 
 		if ( ! is_array( $row ) ) {
 			// A different full identifier may share the 191-character unique-key prefix.
@@ -475,21 +469,20 @@ class ProcessedItems extends BaseRepository {
 		}
 
 		$now = current_time( 'mysql', true );
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared -- Nested query is prepared with typed placeholders.
-		return $this->wpdb->query(
-			// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Table identifier uses %i; all values use typed placeholders.
-			$this->wpdb->prepare(
-				'UPDATE %i SET status = %s, processed_timestamp = %s, claim_expires_at = NULL, claim_token = NULL WHERE flow_step_id = %s AND source_type = %s AND item_identifier = %s AND job_id = %d AND status = %s',
-				$this->table_name,
-				self::STATUS_PROCESSED,
-				$now,
-				$flow_step_id,
-				$source_type,
-				$item_identifier,
-				$job_id,
-				self::STATUS_CLAIMED
-			)
+		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Table identifier uses %i; all values use typed placeholders.
+		$query = $this->wpdb->prepare(
+			'UPDATE %i SET status = %s, processed_timestamp = %s, claim_expires_at = NULL, claim_token = NULL WHERE flow_step_id = %s AND source_type = %s AND item_identifier = %s AND job_id = %d AND status = %s',
+			$this->table_name,
+			self::STATUS_PROCESSED,
+			$now,
+			$flow_step_id,
+			$source_type,
+			$item_identifier,
+			$job_id,
+			self::STATUS_CLAIMED
 		);
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared -- Query is prepared immediately above.
+		return $this->wpdb->query( $query );
 	}
 
 	/**
@@ -514,10 +507,7 @@ class ProcessedItems extends BaseRepository {
 		}
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-		$nested   = 1 === (int) $this->wpdb->get_var( 'SELECT @@in_transaction' );
-		$savepoint = 'datamachine_claim_completion_' . ( ++self::$savepoint_sequence );
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQL.NotPrepared -- Savepoint is a code-owned identifier.
-		$transaction_started = $this->wpdb->query( $nested ? "SAVEPOINT {$savepoint}" : 'START TRANSACTION' );
+		$transaction_started = $this->wpdb->query( 'START TRANSACTION' );
 		if ( false === $transaction_started ) {
 			return false;
 		}
@@ -531,24 +521,16 @@ class ProcessedItems extends BaseRepository {
 			$retain_processed
 		);
 		if ( ! $completed ) {
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQL.NotPrepared -- Savepoint is a code-owned identifier.
-			$this->wpdb->query( $nested ? "ROLLBACK TO SAVEPOINT {$savepoint}" : 'ROLLBACK' );
-			if ( $nested ) {
-				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQL.NotPrepared -- Savepoint is a code-owned identifier.
-				$this->wpdb->query( "RELEASE SAVEPOINT {$savepoint}" );
-			}
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			$this->wpdb->query( 'ROLLBACK' );
 			return false;
 		}
 
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQL.NotPrepared -- Savepoint is a code-owned identifier.
-		$committed = false !== $this->wpdb->query( $nested ? "RELEASE SAVEPOINT {$savepoint}" : 'COMMIT' );
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$committed = false !== $this->wpdb->query( 'COMMIT' );
 		if ( ! $committed ) {
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQL.NotPrepared -- Savepoint is a code-owned identifier.
-			$this->wpdb->query( $nested ? "ROLLBACK TO SAVEPOINT {$savepoint}" : 'ROLLBACK' );
-			if ( $nested ) {
-				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQL.NotPrepared -- Savepoint is a code-owned identifier.
-				$this->wpdb->query( "RELEASE SAVEPOINT {$savepoint}" );
-			}
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			$this->wpdb->query( 'ROLLBACK' );
 		}
 		return $committed;
 	}
@@ -572,25 +554,19 @@ class ProcessedItems extends BaseRepository {
 		if ( '' === $claim_token ) {
 			return false;
 		}
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-		if ( 1 !== (int) $this->wpdb->get_var( 'SELECT @@in_transaction' ) ) {
-			return false;
-		}
-
 		$now = current_time( 'mysql', true );
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared -- Nested query is prepared with typed placeholders.
-		$owned = $this->wpdb->get_var(
-			// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Table identifier uses %i; all values use typed placeholders.
-			$this->wpdb->prepare(
-				'SELECT claim_token FROM %i WHERE flow_step_id = %s AND source_type = %s AND item_identifier = %s AND claim_token = %s AND status = %s FOR UPDATE',
-				$this->table_name,
-				$identity_scope,
-				$source_type,
-				$item_identifier,
-				$claim_token,
-				self::STATUS_CLAIMED
-			)
+		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Table identifier uses %i; all values use typed placeholders.
+		$ownership_query = $this->wpdb->prepare(
+			'SELECT claim_token FROM %i WHERE flow_step_id = %s AND source_type = %s AND item_identifier = %s AND claim_token = %s AND status = %s FOR UPDATE',
+			$this->table_name,
+			$identity_scope,
+			$source_type,
+			$item_identifier,
+			$claim_token,
+			self::STATUS_CLAIMED
 		);
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared -- Query is prepared immediately above.
+		$owned = $this->wpdb->get_var( $ownership_query );
 
 		if ( ! is_string( $owned ) || ! hash_equals( $claim_token, $owned ) ) {
 			return false;
@@ -606,22 +582,21 @@ class ProcessedItems extends BaseRepository {
 		}
 
 		if ( $retain_processed ) {
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared -- Nested query is prepared with typed placeholders.
-			$transitioned = $this->wpdb->query(
-				// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Table identifier uses %i; all values use typed placeholders.
-				$this->wpdb->prepare(
-					'UPDATE %i SET status = %s, job_id = %d, processed_timestamp = %s, claim_expires_at = NULL WHERE flow_step_id = %s AND source_type = %s AND item_identifier = %s AND claim_token = %s AND status = %s',
-					$this->table_name,
-					self::STATUS_PROCESSED,
-					$job_id,
-					$now,
-					$identity_scope,
-					$source_type,
-					$item_identifier,
-					$claim_token,
-					self::STATUS_CLAIMED
-				)
+			// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Table identifier uses %i; all values use typed placeholders.
+			$transition_query = $this->wpdb->prepare(
+				'UPDATE %i SET status = %s, job_id = %d, processed_timestamp = %s, claim_expires_at = NULL WHERE flow_step_id = %s AND source_type = %s AND item_identifier = %s AND claim_token = %s AND status = %s',
+				$this->table_name,
+				self::STATUS_PROCESSED,
+				$job_id,
+				$now,
+				$identity_scope,
+				$source_type,
+				$item_identifier,
+				$claim_token,
+				self::STATUS_CLAIMED
 			);
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared -- Query is prepared immediately above.
+			$transitioned = $this->wpdb->query( $transition_query );
 		} else {
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 			$transitioned = $this->wpdb->delete(
