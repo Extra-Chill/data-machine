@@ -91,7 +91,7 @@ class PipelinesCommand extends BaseCommand {
 	 *   Use --step to target a specific step when multiple exist.
 	 *
  * [--agent=<slug_or_id>]
- * : Agent slug or ID. For update: set the pipeline's agent_id.
+ * : Agent slug or ID. For create/update: set the pipeline's agent_id.
  *   For reassign: see --from-agent / --to-agent instead.
  *   For list: filter by agent.
  *
@@ -578,10 +578,19 @@ class PipelinesCommand extends BaseCommand {
 		$pipeline_name = $assoc_args['name'] ?? null;
 		$dry_run       = isset( $assoc_args['dry-run'] );
 		$format        = $assoc_args['format'] ?? 'table';
+		$agent_id      = null;
 
 		if ( ! $pipeline_name ) {
 			WP_CLI::error( 'Required: --name=<name>' );
 			return;
+		}
+
+		if ( isset( $assoc_args['agent'] ) ) {
+			$agent_id = AgentResolver::resolve( $assoc_args );
+			if ( null === $agent_id ) {
+				WP_CLI::error( 'Could not resolve --agent to a valid agent.' );
+				return;
+			}
 		}
 
 		$steps = array();
@@ -602,6 +611,9 @@ class PipelinesCommand extends BaseCommand {
 			'pipeline_name' => $pipeline_name,
 			'steps'         => $steps,
 		);
+		if ( null !== $agent_id ) {
+			$input['agent_id'] = $agent_id;
+		}
 
 		if ( $dry_run ) {
 			$input['validate_only'] = true;
