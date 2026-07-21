@@ -201,6 +201,12 @@ class PendingActionStore {
 		$context              = is_array( $payload['context'] ?? null ) ? $payload['context'] : array();
 		$context['wordpress'] = $context['wordpress'] ?? WordPressWorkspaceScope::metadata();
 		$payload['context']   = $context;
+		$metadata             = is_array( $payload['metadata'] ?? null ) ? $payload['metadata'] : array();
+		$datamachine          = is_array( $metadata['datamachine'] ?? null ) ? $metadata['datamachine'] : array();
+		$datamachine_context  = is_array( $datamachine['context'] ?? null ) ? $datamachine['context'] : array();
+		$datamachine['context'] = array_replace_recursive( $datamachine_context, $context );
+		$metadata['datamachine'] = $datamachine;
+		$payload['metadata']     = $metadata;
 
 		if ( ! self::has_database() ) {
 			if ( ! self::allows_transient_fallback() ) {

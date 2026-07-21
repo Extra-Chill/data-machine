@@ -12,7 +12,9 @@ use DataMachine\Api\Chat\ChatOrchestrator;
 use DataMachine\Core\Agents\AgentIdentity;
 use DataMachine\Core\Agents\AgentIdentityResolver;
 use DataMachine\Core\PluginSettings;
+use DataMachine\Core\Workspace\WordPressWorkspaceScope;
 use DataMachine\Engine\AI\Tools\ToolPolicyResolver;
+use AgentsAPI\Core\Workspace\WP_Agent_Workspace_Scope;
 use WP_Error;
 
 defined( 'ABSPATH' ) || exit;
@@ -132,6 +134,11 @@ class AgentsChatHandler {
 			return new WP_Error( 'model_required', __( 'AI model is required. Set a default in Data Machine settings.', 'data-machine' ), array( 'status' => 400 ) );
 		}
 
+		$workspace = $this->resolveTranscriptWorkspace( $input );
+		if ( is_wp_error( $workspace ) ) {
+			return $workspace;
+		}
+
 		$result = ChatOrchestrator::processChat(
 			$message,
 			sanitize_text_field( $provider ),
@@ -155,6 +162,7 @@ class AgentsChatHandler {
 				'event_sink'            => $input['event_sink'] ?? null,
 				'session_owner'         => is_array( $input['session_owner'] ?? null ) ? $input['session_owner'] : null,
 				'transcript_owner'      => is_array( $input['transcript_owner'] ?? null ) ? $input['transcript_owner'] : null,
+				'workspace'             => $workspace,
 			)
 		);
 
@@ -241,6 +249,35 @@ class AgentsChatHandler {
 		}
 
 		return $identity->owner_id;
+	}
+
+	/**
+	 * Resolve the canonical transcript workspace from trusted runtime input.
+	 *
+	 * Opaque client context is intentionally ignored. Transport adapters that
+	 * select a workspace must place the canonical value at the top-level input.
+	 *
+	 * @param array $input Canonical agents/chat input.
+	 * @return WP_Agent_Workspace_Scope|WP_Error
+	 */
+	private function resolveTranscriptWorkspace( array $input ): WP_Agent_Workspace_Scope|WP_Error {
+		if ( ! array_key_exists( 'workspace', $input ) ) {
+			return WordPressWorkspaceScope::current();
+		}
+
+		if ( $input['workspace'] instanceof WP_Agent_Workspace_Scope ) {
+			return $input['workspace'];
+		}
+
+		if ( ! is_array( $input['workspace'] ) ) {
+			return new WP_Error( 'invalid_transcript_workspace', __( 'Transcript workspace must be a canonical workspace object.', 'data-machine' ), array( 'status' => 400 ) );
+		}
+
+		try {
+			return WP_Agent_Workspace_Scope::from_array( $input['workspace'] );
+		} catch ( \InvalidArgumentException $exception ) {
+			return new WP_Error( 'invalid_transcript_workspace', $exception->getMessage(), array( 'status' => 400 ) );
+		}
 	}
 
 	/**

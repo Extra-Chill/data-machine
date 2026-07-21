@@ -258,6 +258,12 @@ class ResolvePendingActionAbility {
 			);
 		}
 
+		$origin_blog_id = self::originBlogIdFromInput( $input );
+		$current_blog_id = function_exists( 'get_current_blog_id' ) ? (int) get_current_blog_id() : 0;
+		if ( empty( $input['_origin_routed'] ) && $origin_blog_id > 0 && $origin_blog_id !== $current_blog_id ) {
+			return self::resolveAtOrigin( $input, $origin_blog_id );
+		}
+
 		$decision = self::approvalDecisionFromValue( $decision_value );
 		if ( null === $decision ) {
 			return array(
@@ -273,6 +279,14 @@ class ResolvePendingActionAbility {
 			return array(
 				'success'   => false,
 				'error'     => 'Pending action not found or expired.',
+				'action_id' => $action_id,
+			);
+		}
+
+		if ( $origin_blog_id > 0 && ! self::payloadMatchesOrigin( $payload, $origin_blog_id ) ) {
+			return array(
+				'success'   => false,
+				'error'     => 'Pending action origin could not be verified.',
 				'action_id' => $action_id,
 			);
 		}
@@ -428,6 +442,66 @@ class ResolvePendingActionAbility {
 			'kind'      => $kind,
 			'result'    => is_array( $result ) ? $result : array( 'value' => $result ),
 		);
+	}
+
+	/**
+	 * Resolve in the site-local store identified by an untrusted routing hint.
+	 *
+	 * The switched store remains authoritative: the loaded action must repeat the
+	 * same stamped blog ID before authorization, handler execution, or audit.
+	 *
+	 * @param array $input          Resolver input.
+	 * @param int   $origin_blog_id Claimed originating blog ID.
+	 * @return array
+	 */
+	private static function resolveAtOrigin( array $input, int $origin_blog_id ): array {
+		$action_id = isset( $input['action_id'] ) ? sanitize_text_field( $input['action_id'] ) : '';
+		if ( ! function_exists( 'switch_to_blog' ) || ! function_exists( 'restore_current_blog' )
+			|| ( function_exists( 'get_site' ) && ! get_site( $origin_blog_id ) ) ) {
+			return array(
+				'success'   => false,
+				'error'     => 'Pending action origin could not be verified.',
+				'action_id' => $action_id,
+			);
+		}
+
+		if ( ! switch_to_blog( $origin_blog_id ) ) {
+			return array(
+				'success'   => false,
+				'error'     => 'Pending action origin could not be verified.',
+				'action_id' => $action_id,
+			);
+		}
+
+		try {
+			$input['_origin_routed'] = true;
+			return self::resolve_with_datamachine_handlers( $input );
+		} finally {
+			restore_current_blog();
+		}
+	}
+
+	/**
+	 * Read the WordPress origin supplied with the canonical pending action.
+	 *
+	 * @param array $input Resolver input.
+	 */
+	private static function originBlogIdFromInput( array $input ): int {
+		$context   = is_array( $input['context'] ?? null ) ? $input['context'] : array();
+		$wordpress = is_array( $context['wordpress'] ?? null ) ? $context['wordpress'] : array();
+		return isset( $wordpress['blog_id'] ) ? absint( $wordpress['blog_id'] ) : 0;
+	}
+
+	/**
+	 * Verify a routing hint against canonical metadata loaded from the store.
+	 *
+	 * @param array $payload        Stored pending action.
+	 * @param int   $origin_blog_id Claimed originating blog ID.
+	 */
+	private static function payloadMatchesOrigin( array $payload, int $origin_blog_id ): bool {
+		$context   = is_array( $payload['context'] ?? null ) ? $payload['context'] : array();
+		$wordpress = is_array( $context['wordpress'] ?? null ) ? $context['wordpress'] : array();
+		return $origin_blog_id === absint( $wordpress['blog_id'] ?? 0 );
 	}
 
 	/**

@@ -161,7 +161,8 @@ class PendingActionHelper {
 			'resolver_grants' => $grants,
 			'creator'         => $payload['creator'],
 			'agent'           => $payload['agent'],
-			'metadata'        => $payload['metadata'],
+			'workspace'       => $stored_payload['workspace'] ?? null,
+			'metadata'        => $stored_payload['metadata'] ?? $payload['metadata'],
 			'created_at'      => gmdate( 'c', $created_at ),
 			'expires_at'      => null !== $expires_at ? gmdate( 'c', $expires_at ) : null,
 		);
