@@ -70,7 +70,7 @@ class TestCommand extends BaseCommand {
 	 * : Return complete text/JSON packet envelopes instead of compact previews.
 	 *
 	 * [--byte-limit=<bytes>]
-	 * : Maximum serialized packet bytes returned with --raw (default 1048576, maximum 5242880).
+	 * : Maximum bytes for the complete --raw JSON response (default 1048576, range 4096-5242880).
 	 *
 	 * [--list]
 	 * : List all available fetch handlers.
@@ -247,7 +247,7 @@ class TestCommand extends BaseCommand {
 		$limit       = (int) ( $assoc_args['limit'] ?? 5 );
 		$raw         = isset( $assoc_args['raw'] );
 		$byte_limit  = isset( $assoc_args['byte-limit'] ) ? (int) $assoc_args['byte-limit'] : null;
-		if ( $raw && 'table' === $format ) {
+		if ( $raw ) {
 			$format = 'json';
 		}
 
