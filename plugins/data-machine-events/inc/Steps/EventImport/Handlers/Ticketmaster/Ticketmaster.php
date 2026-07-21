@@ -8,6 +8,7 @@
 namespace DataMachineEvents\Steps\EventImport\Handlers\Ticketmaster;
 
 use DataMachine\Core\ExecutionContext;
+use DataMachineEvents\Core\DuplicateDetection\EventDuplicateStrategy;
 use DataMachineEvents\Steps\EventImport\Handlers\EventImportHandler;
 use DataMachineEvents\Steps\EventImport\JunkPayloadFilter;
 use DataMachine\Core\Steps\HandlerRegistrationTrait;
@@ -35,6 +36,11 @@ class Ticketmaster extends EventImportHandler {
 	);
 
 	const MAX_PAGE = 19;
+
+	/**
+	 * Bound the default child-job fan-out from one city flow run.
+	 */
+	const DEFAULT_MAX_ITEMS = 100;
 
 	/**
 	 * Maximum number of retry attempts when the Discovery API answers HTTP 429
@@ -147,6 +153,13 @@ class Ticketmaster extends EventImportHandler {
 	}
 
 	/**
+	 * Keep one Ticketmaster run from creating an unbounded child-job batch.
+	 */
+	protected function getDefaultMaxItems(): int {
+		return self::DEFAULT_MAX_ITEMS;
+	}
+
+	/**
 	 * Execute fetch logic
 	 */
 	protected function executeFetch( array $config, ExecutionContext $context ): array {
@@ -171,9 +184,15 @@ class Ticketmaster extends EventImportHandler {
 			return array();
 		}
 
-		$current_page   = 0;
-		$has_more_pages = false;
-		$eligible_items = array();
+		$current_page          = 0;
+		$has_more_pages        = false;
+		$eligible_items        = array();
+		$seen_source_ids       = array();
+		$fetched_count         = 0;
+		$pre_fanout_deduped    = 0;
+		$already_processed     = 0;
+		$existing_event_count  = 0;
+		$repeated_source_count = 0;
 
 		do {
 			$search_params['page'] = $current_page;
@@ -199,6 +218,8 @@ class Ticketmaster extends EventImportHandler {
 			);
 
 			foreach ( $raw_events as $raw_event ) {
+				++$fetched_count;
+
 				$event_status = $raw_event['dates']['status']['code'] ?? '';
 				if ( 'onsale' !== $event_status ) {
 					continue;
@@ -228,11 +249,48 @@ class Ticketmaster extends EventImportHandler {
 					continue;
 				}
 
+				$source_id = trim( (string) ( $raw_event['id'] ?? '' ) );
+				if ( '' !== $source_id && isset( $seen_source_ids[ $source_id ] ) ) {
+					++$pre_fanout_deduped;
+					++$repeated_source_count;
+					continue;
+				}
+
+				if ( '' !== $source_id ) {
+					$seen_source_ids[ $source_id ] = true;
+				}
+
 				$event_identifier = \DataMachineEvents\Utilities\EventIdentifierGenerator::generate(
 					$standardized_event['title'],
 					$standardized_event['startDate'] ?? '',
 					$standardized_event['venue'] ?? ''
 				);
+				$item_identifier  = '' !== $source_id ? $source_id : $event_identifier;
+
+				if ( $context->isItemProcessed( $item_identifier ) || $context->isItemClaimed( $item_identifier ) ) {
+					++$pre_fanout_deduped;
+					++$already_processed;
+					continue;
+				}
+
+				$existing_event = EventDuplicateStrategy::check(
+					array(
+						'title'   => $standardized_event['title'],
+						'context' => array(
+							'venue'     => $standardized_event['venue'] ?? '',
+							'startDate' => $standardized_event['startDate'] ?? '',
+							'ticketUrl' => $standardized_event['ticketUrl'] ?? '',
+							'address'   => $standardized_event['venueAddress'] ?? '',
+							'city'      => $standardized_event['venueCity'] ?? '',
+						),
+					)
+				);
+
+				if ( $existing_event ) {
+					++$pre_fanout_deduped;
+					++$existing_event_count;
+					continue;
+				}
 
 				$context->log(
 					'info',
@@ -265,7 +323,7 @@ class Ticketmaster extends EventImportHandler {
 						'flow_id'          => $context->getFlowId(),
 						'original_title'   => $standardized_event['title'],
 						'event_identifier' => $event_identifier,
-						'item_identifier'  => $event_identifier,
+						'item_identifier'  => $item_identifier,
 						'import_timestamp' => time(),
 						'_engine_data'     => $engine_data,
 					),
@@ -278,6 +336,27 @@ class Ticketmaster extends EventImportHandler {
 			++$current_page;
 
 		} while ( $has_more_pages );
+
+		$fanout_limit        = (int) ( $config['max_items'] ?? $this->getDefaultMaxItems() );
+		$schedule_candidates = $fanout_limit > 0
+			? min( count( $eligible_items ), $fanout_limit )
+			: count( $eligible_items );
+
+		$context->log(
+			'info',
+			'Ticketmaster: Import fan-out summary',
+			array(
+				'fetched'                 => $fetched_count,
+				'pre_fanout_deduped'      => $pre_fanout_deduped,
+				'already_processed'       => $already_processed,
+				'existing_events'         => $existing_event_count,
+				'repeated_source_ids'     => $repeated_source_count,
+				'eligible'                => count( $eligible_items ),
+				'fanout_limit'            => $fanout_limit,
+				'schedule_candidates'     => $schedule_candidates,
+				'pages_searched'          => $current_page,
+			)
+		);
 
 		if ( empty( $eligible_items ) ) {
 			$context->log(
@@ -449,7 +528,7 @@ class Ticketmaster extends EventImportHandler {
 		return self::get_classifications( $api_key );
 	}
 
-	private function fetch_events( array $params, ExecutionContext $context ): array {
+	protected function fetch_events( array $params, ExecutionContext $context ): array {
 		$url = self::API_BASE . 'events.json?' . http_build_query( $params );
 
 		$result = $this->request_events_page( $url, $context );
