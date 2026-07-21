@@ -2,6 +2,14 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.165.2] - 2026-07-21
+
+### Fixed
+- preserve transcript and approval origins
+- preserve semantic flow config strings
+- make flow creation validation atomic
+- exclude runtime metadata from agent exports
+
 ## [0.165.1] - 2026-07-21
 
 ### Changed
