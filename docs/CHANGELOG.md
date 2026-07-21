@@ -2,6 +2,16 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.165.1] - 2026-07-21
+
+### Changed
+- fix Homeboy workflow startup_failure from undeclared autofix inputs
+
+### Fixed
+- avoid duplicate artifact registration during inspection
+- consume authoritative tool bindings
+- preserve direct job ownership and idempotency
+
 ## [0.165.0] - 2026-07-20
 
 ### Added
