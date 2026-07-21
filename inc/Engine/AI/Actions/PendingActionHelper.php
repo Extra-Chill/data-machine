@@ -104,6 +104,11 @@ class PendingActionHelper {
 				'resolve_with'    => 'resolve_pending_action',
 			)
 		);
+		$authorization = isset( $args['authorization'] ) && is_array( $args['authorization'] ) ? $args['authorization'] : array();
+		$metadata['datamachine']['authorization'] = array(
+			'operation' => (string) ( $authorization['operation'] ?? $kind ),
+			'target'    => $authorization['target'] ?? $apply_input,
+		);
 
 		$payload = array(
 			'kind'            => $kind,
