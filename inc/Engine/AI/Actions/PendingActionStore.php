@@ -453,7 +453,15 @@ class PendingActionStore {
 			if ( ! is_array( $payload ) || 'applying' !== ( $payload['status'] ?? null ) || ! hash_equals( (string) ( $payload['receipt_nonce'] ?? '' ), $nonce ) ) {
 				return false;
 			}
-			$payload['status'] = $status;
+			$resolved_at                    = time();
+			$payload['status']              = $status;
+			$payload['resolved_at']         = $resolved_at;
+			$payload['resolved_at_iso']     = gmdate( 'c', $resolved_at );
+			$payload['resolved_by']         = get_current_user_id();
+			$payload['resolver']            = self::nullable_string( $resolver ?? self::current_resolver() );
+			$payload['resolution_result']   = $result;
+			$payload['resolution_error']    = $error;
+			$payload['resolution_metadata'] = $metadata;
 			$completed = set_transient( self::TRANSIENT_PREFIX . $action_id, $payload, self::resolve_ttl( $payload ) );
 			if ( $completed && in_array( $status, array( WP_Agent_Pending_Action_Status::ACCEPTED, WP_Agent_Pending_Action_Status::REJECTED ), true ) ) {
 				$action = self::action_from_payload( $payload );
