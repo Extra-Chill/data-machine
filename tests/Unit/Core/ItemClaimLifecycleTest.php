@@ -341,6 +341,28 @@ class ItemClaimLifecycleTest extends WP_UnitTestCase {
 		$this->assertFalse( $this->processed->has_active_claim( self::SCOPE, self::SOURCE, 'legacy-' . $status ) );
 	}
 
+	public function test_descriptorless_success_completes_job_owned_claim(): void {
+		$job_id = $this->createJobWithClaim( array(), true );
+		$this->assertTrue( $this->processed->claim_item( self::SCOPE, self::SOURCE, 'legacy-success', $job_id ) );
+
+		StepLifecycleHandler::handleCompleted( $job_id, $this->legacyEngineData( 'legacy-success' ) );
+
+		$this->assertTrue( $this->processed->has_item_been_processed( self::SCOPE, self::SOURCE, 'legacy-success' ) );
+	}
+
+	public function test_stale_descriptorless_success_cannot_overwrite_replacement_owner(): void {
+		$legacy_job_id = $this->createJobWithClaim( array(), true );
+		$this->assertTrue( $this->processed->claim_item( self::SCOPE, self::SOURCE, 'legacy-replaced', $legacy_job_id ) );
+		$this->expireClaim( 'legacy-replaced' );
+		$replacement = $this->claim( 'legacy-replaced', 905, 'replacement-revision' );
+
+		StepLifecycleHandler::handleCompleted( $legacy_job_id, $this->legacyEngineData( 'legacy-replaced' ) );
+
+		$this->assertTrue( $this->processed->has_active_claim( self::SCOPE, self::SOURCE, 'legacy-replaced' ) );
+		StepLifecycleHandler::handleCompleted( 905, array( ProcessedItems::CLAIM_METADATA_KEY => $replacement ) );
+		$this->assertSame( 'replacement-revision', $this->tracked->get( self::NAMESPACE, 'legacy-replaced' )['source_revision'] );
+	}
+
 	public function legacy_terminal_status_provider(): array {
 		return array(
 			'failure'      => array( JobStatus::failed( 'legacy' )->toString() ),
@@ -414,6 +436,16 @@ class ItemClaimLifecycleTest extends WP_UnitTestCase {
 			'type'     => 'fetch',
 			'data'     => array( 'title' => 'Claimed item', 'body' => 'body' ),
 			'metadata' => array( ProcessedItems::CLAIM_METADATA_KEY => $claim ),
+		);
+	}
+
+	private function legacyEngineData( string $item_id ): array {
+		return array(
+			'item_identifier' => $item_id,
+			'source_type'     => self::SOURCE,
+			'flow_config'     => array(
+				self::SCOPE => array( 'step_type' => 'fetch' ),
+			),
 		);
 	}
 

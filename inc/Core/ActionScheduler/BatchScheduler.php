@@ -418,8 +418,8 @@ class BatchScheduler {
 		foreach ( $chunk as $index => $item ) {
 			$latest = EngineData::retrieve( $parent_job_id );
 			if ( ! empty( $latest['cancelled'] ) ) {
-				$cancelled        = true;
-				$remaining        = array_slice( $chunk, $index );
+				$cancelled         = true;
+				$remaining         = array_slice( $chunk, $index );
 				$remaining_cleanup = array_slice( $cleanup_contexts, $offset + $index, count( $remaining ) );
 				if ( $remaining ) {
 					do_action( 'datamachine_batch_items_discarded', $remaining, $parent_job_id, (string) $context, $remaining_cleanup );
@@ -561,14 +561,14 @@ class BatchScheduler {
 				$context                 = (string) ( $current['batch_context'] ?? '' );
 				$state                   = is_array( $current['batch_state'] ?? null ) ? $current['batch_state'] : array();
 				if ( $state && ! isset( $state['discarded_from'] ) ) {
-					$in_flight    = is_array( $state['in_flight'] ?? null ) ? $state['in_flight'] : array();
-					$discard_from = $in_flight
+					$in_flight               = is_array( $state['in_flight'] ?? null ) ? $state['in_flight'] : array();
+					$discard_from            = $in_flight
 						? (int) ( $in_flight['end'] ?? $state['offset'] ?? 0 )
 						: (int) ( $state['offset'] ?? 0 );
-					$remaining                 = array_slice( is_array( $state['items'] ?? null ) ? $state['items'] : array(), $discard_from );
-					$remaining_cleanup         = array_slice( is_array( $state['cleanup_contexts'] ?? null ) ? $state['cleanup_contexts'] : array(), $discard_from );
-					$state['discarded_from']   = $discard_from;
-					$current['batch_state']     = $state;
+					$remaining               = array_slice( is_array( $state['items'] ?? null ) ? $state['items'] : array(), $discard_from );
+					$remaining_cleanup       = array_slice( is_array( $state['cleanup_contexts'] ?? null ) ? $state['cleanup_contexts'] : array(), $discard_from );
+					$state['discarded_from'] = $discard_from;
+					$current['batch_state']  = $state;
 				}
 
 				return $current;

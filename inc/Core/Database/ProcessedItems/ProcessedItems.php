@@ -419,11 +419,11 @@ class ProcessedItems extends BaseRepository {
 		}
 
 		$owned_token = is_string( $row['claim_token'] ?? null ) ? $row['claim_token'] : '';
-		$inserted     = hash_equals( $claim_token, $owned_token );
-		$expired      = self::STATUS_CLAIMED === ( $row['status'] ?? '' )
+		$inserted    = hash_equals( $claim_token, $owned_token );
+		$expired     = self::STATUS_CLAIMED === ( $row['status'] ?? '' )
 			&& ! empty( $row['claim_expires_at'] )
 			&& $row['claim_expires_at'] <= $now;
-		$available    = self::STATUS_PROCESSED === ( $row['status'] ?? '' ) || $expired;
+		$available   = self::STATUS_PROCESSED === ( $row['status'] ?? '' ) || $expired;
 
 		if ( ! $inserted && ! $available ) {
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
@@ -436,8 +436,8 @@ class ProcessedItems extends BaseRepository {
 			$updated = $this->wpdb->update(
 				$this->table_name,
 				array(
-					'job_id'          => $job_id,
-					'status'          => self::STATUS_CLAIMED,
+					'job_id'           => $job_id,
+					'status'           => self::STATUS_CLAIMED,
 					'claim_expires_at' => $expires_at,
 					'claim_token'      => $claim_token,
 				),
@@ -454,6 +454,44 @@ class ProcessedItems extends BaseRepository {
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		return false !== $this->wpdb->query( 'COMMIT' ) ? $claim_token : false;
+	}
+
+	/**
+	 * Complete a descriptor-less claim while the completing job still owns it.
+	 *
+	 * Reacquisition replaces job_id, so a stale legacy completion cannot mutate
+	 * a token-owned replacement generation.
+	 *
+	 * @param string $flow_step_id    Flow step identity scope.
+	 * @param string $source_type     Source type.
+	 * @param string $item_identifier Unique item identifier.
+	 * @param int    $job_id          Completing legacy job ID.
+	 * @return bool Whether the job completed its current claim.
+	 */
+	public function complete_claim_for_job( string $flow_step_id, string $source_type, string $item_identifier, int $job_id ): bool {
+		if ( $job_id < 1 ) {
+			return false;
+		}
+
+		$now = current_time( 'mysql', true );
+		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared -- Prepared with a %i table placeholder.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$updated = $this->wpdb->query(
+			$this->wpdb->prepare(
+				'UPDATE %i SET status = %s, processed_timestamp = %s, claim_expires_at = NULL, claim_token = NULL WHERE flow_step_id = %s AND source_type = %s AND item_identifier = %s AND job_id = %d AND status = %s',
+				$this->table_name,
+				self::STATUS_PROCESSED,
+				$now,
+				$flow_step_id,
+				$source_type,
+				$item_identifier,
+				$job_id,
+				self::STATUS_CLAIMED
+			)
+		);
+		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
+
+		return false !== $updated && $updated > 0;
 	}
 
 	/**

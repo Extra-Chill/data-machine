@@ -83,13 +83,16 @@ class StepLifecycleHandler {
 			return;
 		}
 
-		\do_action(
-			'datamachine_mark_item_processed',
+		$completed = ( new ProcessedItems() )->complete_claim_for_job(
 			$source_flow_step_id,
-			$source_type,
-			$item_identifier,
+			(string) $source_type,
+			(string) $item_identifier,
 			$job_id
 		);
+		if ( ! $completed ) {
+			return;
+		}
+		RunMetrics::increment( $job_id, 'processed' );
 
 		\do_action(
 			'datamachine_log',
