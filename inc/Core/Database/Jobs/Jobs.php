@@ -2127,7 +2127,7 @@ class Jobs extends BaseRepository {
 	private function get_job_for_update( int $job_id ): ?array {
 		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Table identifier uses %i; value uses a typed placeholder.
 		$query = $this->wpdb->prepare( 'SELECT * FROM %i WHERE job_id = %d FOR UPDATE', $this->table_name, $job_id );
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared -- Query is prepared immediately above.
 		$job = $this->wpdb->get_row(
 			$query,
 			ARRAY_A

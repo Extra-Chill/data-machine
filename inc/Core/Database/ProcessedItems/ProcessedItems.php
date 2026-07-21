@@ -376,7 +376,7 @@ class ProcessedItems extends BaseRepository {
 			return false;
 		}
 
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared -- Nested query is prepared with typed placeholders.
 		$upserted = $this->wpdb->query(
 			// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Table identifier uses %i; all values use typed placeholders.
 			$this->wpdb->prepare(
@@ -399,7 +399,7 @@ class ProcessedItems extends BaseRepository {
 			return false;
 		}
 
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared -- Nested query is prepared with typed placeholders.
 		$row = $this->wpdb->get_row(
 			// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Table identifier uses %i; all values use typed placeholders.
 			$this->wpdb->prepare(
@@ -475,7 +475,7 @@ class ProcessedItems extends BaseRepository {
 		}
 
 		$now = current_time( 'mysql', true );
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared -- Nested query is prepared with typed placeholders.
 		return $this->wpdb->query(
 			// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Table identifier uses %i; all values use typed placeholders.
 			$this->wpdb->prepare(
@@ -514,9 +514,9 @@ class ProcessedItems extends BaseRepository {
 		}
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-		$nested = 1 === (int) $this->wpdb->get_var( 'SELECT @@in_transaction' );
-		$savepoint = 'datamachine_claim_completion_' . ++self::$savepoint_sequence;
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Savepoint is a code-owned identifier.
+		$nested   = 1 === (int) $this->wpdb->get_var( 'SELECT @@in_transaction' );
+		$savepoint = 'datamachine_claim_completion_' . ( ++self::$savepoint_sequence );
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQL.NotPrepared -- Savepoint is a code-owned identifier.
 		$transaction_started = $this->wpdb->query( $nested ? "SAVEPOINT {$savepoint}" : 'START TRANSACTION' );
 		if ( false === $transaction_started ) {
 			return false;
@@ -531,22 +531,22 @@ class ProcessedItems extends BaseRepository {
 			$retain_processed
 		);
 		if ( ! $completed ) {
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Savepoint is a code-owned identifier.
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQL.NotPrepared -- Savepoint is a code-owned identifier.
 			$this->wpdb->query( $nested ? "ROLLBACK TO SAVEPOINT {$savepoint}" : 'ROLLBACK' );
 			if ( $nested ) {
-				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Savepoint is a code-owned identifier.
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQL.NotPrepared -- Savepoint is a code-owned identifier.
 				$this->wpdb->query( "RELEASE SAVEPOINT {$savepoint}" );
 			}
 			return false;
 		}
 
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Savepoint is a code-owned identifier.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQL.NotPrepared -- Savepoint is a code-owned identifier.
 		$committed = false !== $this->wpdb->query( $nested ? "RELEASE SAVEPOINT {$savepoint}" : 'COMMIT' );
 		if ( ! $committed ) {
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Savepoint is a code-owned identifier.
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQL.NotPrepared -- Savepoint is a code-owned identifier.
 			$this->wpdb->query( $nested ? "ROLLBACK TO SAVEPOINT {$savepoint}" : 'ROLLBACK' );
 			if ( $nested ) {
-				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Savepoint is a code-owned identifier.
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQL.NotPrepared -- Savepoint is a code-owned identifier.
 				$this->wpdb->query( "RELEASE SAVEPOINT {$savepoint}" );
 			}
 		}
@@ -578,7 +578,7 @@ class ProcessedItems extends BaseRepository {
 		}
 
 		$now = current_time( 'mysql', true );
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared -- Nested query is prepared with typed placeholders.
 		$owned = $this->wpdb->get_var(
 			// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Table identifier uses %i; all values use typed placeholders.
 			$this->wpdb->prepare(
@@ -606,7 +606,7 @@ class ProcessedItems extends BaseRepository {
 		}
 
 		if ( $retain_processed ) {
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared -- Nested query is prepared with typed placeholders.
 			$transitioned = $this->wpdb->query(
 				// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Table identifier uses %i; all values use typed placeholders.
 				$this->wpdb->prepare(

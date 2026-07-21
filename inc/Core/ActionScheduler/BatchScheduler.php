@@ -299,19 +299,8 @@ class BatchScheduler {
 		// Cancellation without an in-flight owner may discard from the durable
 		// offset. An in-flight owner is responsible for its own chunk boundary.
 		if ( ! empty( $parent_engine['cancelled'] ) ) {
-			if ( is_array( $batch_state['in_flight'] ?? null ) ) {
-				return array(
-					'scheduled' => 0,
-					'offset'    => (int) ( $batch_state['offset'] ?? 0 ),
-					'total'     => (int) ( $batch_state['total'] ?? 0 ),
-					'more'      => false,
-					'cancelled' => true,
-					'missing'   => false,
-					'duplicate' => true,
-				);
-			}
-
-			if ( ! isset( $batch_state['discarded_from'] ) ) {
+			$duplicate = is_array( $batch_state['in_flight'] ?? null );
+			if ( ! $duplicate && ! isset( $batch_state['discarded_from'] ) ) {
 				$discard_from      = (int) ( $batch_state['offset'] ?? 0 );
 				$remaining         = array_slice( is_array( $batch_state['items'] ?? null ) ? $batch_state['items'] : array(), $discard_from );
 				$remaining_cleanup = array_slice( is_array( $batch_state['cleanup_contexts'] ?? null ) ? $batch_state['cleanup_contexts'] : array(), $discard_from );
@@ -320,16 +309,18 @@ class BatchScheduler {
 				}
 			}
 
-			EngineData::mutate(
-				$parent_job_id,
-				static function ( array $current ): array {
-					if ( ! is_array( $current['batch_state']['in_flight'] ?? null ) ) {
-						unset( $current['batch_state'] );
-					}
-					return $current;
-				},
-				'batch_cancelled_cleanup'
-			);
+			if ( ! $duplicate ) {
+				EngineData::mutate(
+					$parent_job_id,
+					static function ( array $current ): array {
+						if ( ! is_array( $current['batch_state']['in_flight'] ?? null ) ) {
+							unset( $current['batch_state'] );
+						}
+						return $current;
+					},
+					'batch_cancelled_cleanup'
+				);
+			}
 
 			return array(
 				'scheduled' => 0,
@@ -338,7 +329,7 @@ class BatchScheduler {
 				'more'      => false,
 				'cancelled' => true,
 				'missing'   => false,
-				'duplicate' => false,
+				'duplicate' => $duplicate,
 			);
 		}
 
@@ -486,7 +477,7 @@ class BatchScheduler {
 						'parent_job_id' => $parent_job_id,
 						'offset'        => $new_offset,
 					),
-					'data-machine'
+					GroupRegistrar::GROUP
 				);
 			} catch ( \Throwable $exception ) {
 				$action_id = 0;
