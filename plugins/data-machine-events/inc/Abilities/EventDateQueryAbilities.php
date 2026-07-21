@@ -27,6 +27,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class EventDateQueryAbilities {
 	private const CAPTURE_IDS_QUERY_VAR = '_data_machine_events_capture_ids_sql';
+	private const MAX_PUBLIC_RESULTS = 100;
+	private const DEFAULT_PUBLIC_RESULTS = 50;
 
 	private static bool $registered = false;
 
@@ -92,13 +94,35 @@ class EventDateQueryAbilities {
 							),
 							'geo'         => array(
 								'type'       => 'object',
+								'anyOf'      => array(
+									array( 'required' => array( 'lat', 'lng' ) ),
+									array(
+										'required'   => array( 'empty_result_behavior' ),
+										'properties' => array(
+											'empty_result_behavior' => array( 'enum' => array( 'ignore_geo' ) ),
+										),
+									),
+								),
 								'properties' => array(
-									'lat'    => array( 'type' => 'number' ),
-									'lng'    => array( 'type' => 'number' ),
+									'lat'    => array(
+										'type'    => 'number',
+										'minimum' => -90,
+										'maximum' => 90,
+									),
+									'lng'    => array(
+										'type'    => 'number',
+										'minimum' => -180,
+										'maximum' => 180,
+									),
 									'radius' => array( 'type' => 'number' ),
 									'unit'   => array(
 										'type' => 'string',
 										'enum' => array( 'mi', 'km' ),
+									),
+									'empty_result_behavior' => array(
+										'type'        => 'string',
+										'enum'        => array( 'empty', 'ignore_geo' ),
+										'description' => 'Behavior when no venues are inside the radius. Default: empty. Use ignore_geo to explicitly fall back to the remaining filters.',
 									),
 								),
 							),
@@ -109,25 +133,19 @@ class EventDateQueryAbilities {
 							),
 							'per_page'    => array(
 								'type'        => 'integer',
-								'description' => 'Posts per page. -1 for all. Default: -1.',
+								'minimum'     => 1,
+								'maximum'     => self::MAX_PUBLIC_RESULTS,
+								'description' => 'Events per page. Default: 50. Maximum: 100.',
 							),
 							'fields'      => array(
 								'type'        => 'string',
 								'enum'        => array( 'all', 'ids', 'count' ),
-								'description' => 'Return format: all (WP_Post objects), ids (post IDs), count (just total). Default: all.',
+								'description' => 'Return format: all (structured events), ids (post IDs), count (just total). Default: all.',
 							),
 							'order'       => array(
 								'type'        => 'string',
 								'enum'        => array( 'ASC', 'DESC' ),
 								'description' => 'Sort direction for event start_datetime. Default: ASC.',
-							),
-							'status'      => array(
-								'type'        => 'string',
-								'description' => 'Post status. Default: publish.',
-							),
-							'meta_query'  => array(
-								'type'        => 'array',
-								'description' => 'Additional meta_query clauses (for non-date meta like ticket_url, flow_id).',
 							),
 						),
 					),
@@ -136,7 +154,22 @@ class EventDateQueryAbilities {
 						'properties' => array(
 							'posts'      => array(
 								'type'        => 'array',
-								'description' => 'WP_Post objects, post IDs, or empty (for count mode).',
+								'description' => 'Structured published events, post IDs, or empty (for count mode).',
+								'items'       => array(
+									'oneOf' => array(
+										array( 'type' => 'integer' ),
+										array(
+											'type'       => 'object',
+											'properties' => array(
+												'event_id'       => array( 'type' => 'integer' ),
+												'title'          => array( 'type' => 'string' ),
+												'permalink'      => array( 'type' => 'string' ),
+												'start_datetime' => array( 'type' => 'string' ),
+												'end_datetime'   => array( 'type' => array( 'string', 'null' ) ),
+											),
+										),
+									),
+								),
 							),
 							'total'      => array(
 								'type'        => 'integer',
@@ -148,7 +181,7 @@ class EventDateQueryAbilities {
 							),
 						),
 					),
-					'execute_callback'    => array( $this, 'executeQueryEvents' ),
+					'execute_callback'    => array( $this, 'executePublicQueryEvents' ),
 					'permission_callback' => '__return_true',
 					'meta'                => array(
 						'show_in_rest' => true,
@@ -162,6 +195,58 @@ class EventDateQueryAbilities {
 		};
 
 		add_action( 'wp_abilities_api_init', $register_callback );
+	}
+
+	/**
+	 * Execute the REST-visible, publish-only event query.
+	 *
+	 * The internal executeQueryEvents() method intentionally retains status and
+	 * meta controls for authorized operational abilities and PHP callers. This
+	 * public boundary strips those controls, caps hydration, and never exposes
+	 * WP_Post objects.
+	 *
+	 * @param array $input Public input parameters.
+	 * @return array { posts: array, total: int, post_count: int }
+	 */
+	public function executePublicQueryEvents( array $input ): array {
+		unset( $input['status'], $input['meta_query'] );
+
+		if ( array_key_exists( 'geo', $input ) ) {
+			$geo        = is_array( $input['geo'] ) ? $input['geo'] : array();
+			$ignore_geo = 'ignore_geo' === ( $geo['empty_result_behavior'] ?? 'empty' );
+			$valid_geo  = array_key_exists( 'lat', $geo )
+				&& array_key_exists( 'lng', $geo )
+				&& class_exists( 'DataMachineEvents\\Blocks\\Calendar\\Geo_Query' )
+				&& \DataMachineEvents\Blocks\Calendar\Geo_Query::validate_params( $geo['lat'], $geo['lng'], $geo['radius'] ?? 25 );
+
+			if ( ! $valid_geo && ! $ignore_geo ) {
+				return array(
+					'posts'      => array(),
+					'total'      => 0,
+					'post_count' => 0,
+				);
+			}
+		}
+
+		$input['status']   = 'publish';
+		$input['per_page'] = min(
+			self::MAX_PUBLIC_RESULTS,
+			max( 1, (int) ( $input['per_page'] ?? self::DEFAULT_PUBLIC_RESULTS ) )
+		);
+
+		$result = $this->executeQueryEvents( $input );
+		if ( 'all' !== ( $input['fields'] ?? 'all' ) ) {
+			return $result;
+		}
+
+		$result['posts'] = array_values(
+			array_filter(
+				array_map( array( $this, 'serializePublicEvent' ), $result['posts'] )
+			)
+		);
+		$result['post_count'] = count( $result['posts'] );
+
+		return $result;
 	}
 
 	/**
@@ -264,41 +349,37 @@ class EventDateQueryAbilities {
 			$query_args['tax_query'] = $tax_query;
 		}
 
-		// Geo filter (venue proximity).
-		if ( ! empty( $geo['lat'] ) && ! empty( $geo['lng'] ) ) {
-			$geo_lat    = (float) $geo['lat'];
-			$geo_lng    = (float) $geo['lng'];
-			$geo_radius = (float) ( $geo['radius'] ?? 25 );
-			$geo_unit   = $geo['unit'] ?? 'mi';
+		// Geo filter (venue proximity). Any non-empty invalid geo envelope fails
+		// closed unless the caller explicitly requests the documented fallback.
+		if ( ! empty( $geo ) ) {
+			$nearby_venue_ids = array();
+			$ignore_empty_geo = 'ignore_geo' === ( $geo['empty_result_behavior'] ?? 'empty' );
+			$has_coordinates  = array_key_exists( 'lat', $geo ) && array_key_exists( 'lng', $geo );
+			$geo_radius       = $geo['radius'] ?? 25;
+			$valid_geo        = $has_coordinates
+				&& class_exists( 'DataMachineEvents\\Blocks\\Calendar\\Geo_Query' )
+				&& \DataMachineEvents\Blocks\Calendar\Geo_Query::validate_params( $geo['lat'], $geo['lng'], $geo_radius );
 
-			if ( class_exists( 'DataMachineEvents\\Blocks\\Calendar\\Geo_Query' )
-				&& \DataMachineEvents\Blocks\Calendar\Geo_Query::validate_params( $geo_lat, $geo_lng, $geo_radius ) ) {
-
+			if ( $valid_geo ) {
 				$nearby_venue_ids = \DataMachineEvents\Blocks\Calendar\Geo_Query::get_venue_ids_within_radius(
-					$geo_lat,
-					$geo_lng,
-					$geo_radius,
-					$geo_unit
+					(float) $geo['lat'],
+					(float) $geo['lng'],
+					(float) $geo_radius,
+					$geo['unit'] ?? 'mi'
+				);
+			}
+
+			if ( ! empty( $nearby_venue_ids ) || ! $ignore_empty_geo ) {
+				$tax_query             = isset( $query_args['tax_query'] ) ? $query_args['tax_query'] : array();
+				$tax_query['relation'] = 'AND';
+				$tax_query[]           = array(
+					'taxonomy' => 'venue',
+					'field'    => 'term_id',
+					'terms'    => empty( $nearby_venue_ids ) ? array( 0 ) : $nearby_venue_ids,
+					'operator' => 'IN',
 				);
 
-				// Only constrain by venue proximity when the haversine actually
-				// found venues in radius. An empty match means "no additional
-				// geo signal" — drop the geo constraint and fall back to the
-				// other constraints (e.g. the location term + date filters)
-				// instead of forcing terms => [0], which would guarantee an
-				// empty result even when the location term has events. See #378.
-				if ( ! empty( $nearby_venue_ids ) ) {
-					$tax_query             = isset( $query_args['tax_query'] ) ? $query_args['tax_query'] : array();
-					$tax_query['relation'] = 'AND';
-					$tax_query[]           = array(
-						'taxonomy' => 'venue',
-						'field'    => 'term_id',
-						'terms'    => $nearby_venue_ids,
-						'operator' => 'IN',
-					);
-
-					$query_args['tax_query'] = $tax_query;
-				}
+				$query_args['tax_query'] = $tax_query;
 			}
 		}
 
@@ -477,7 +558,7 @@ class EventDateQueryAbilities {
 			} elseif ( 'upcoming' === $scope ) {
 				// Canonical upcoming — delegates to UpcomingFilter.
 				if ( $days_ahead > 0 ) {
-					$end_date          = gmdate( 'Y-m-d 23:59:59', strtotime( "+{$days_ahead} days" ) );
+					$end_date          = current_datetime()->modify( "+{$days_ahead} days" )->setTime( 23, 59, 59 )->format( 'Y-m-d H:i:s' );
 					$clauses['where'] .= ' AND ' . UpcomingFilter::upcoming_bounded_where( $now, $end_date );
 				} else {
 					$clauses['where'] .= ' AND ' . UpcomingFilter::upcoming_where( $now );
@@ -495,6 +576,32 @@ class EventDateQueryAbilities {
 
 			return $clauses;
 		};
+	}
+
+	/**
+	 * Serialize one published event into the bounded public contract.
+	 *
+	 * @param mixed $post Event post returned by WP_Query.
+	 * @return array|null Structured event, or null when unavailable.
+	 */
+	private function serializePublicEvent( $post ): ?array {
+		if ( ! $post instanceof \WP_Post || 'publish' !== $post->post_status ) {
+			return null;
+		}
+
+		$dates     = EventDatesTable::get( (int) $post->ID );
+		$permalink = get_permalink( $post );
+		if ( ! $dates || ! is_string( $permalink ) ) {
+			return null;
+		}
+
+		return array(
+			'event_id'       => (int) $post->ID,
+			'title'          => html_entity_decode( get_the_title( $post ), ENT_QUOTES, 'UTF-8' ),
+			'permalink'      => $permalink,
+			'start_datetime' => (string) $dates->start_datetime,
+			'end_datetime'   => null === $dates->end_datetime ? null : (string) $dates->end_datetime,
+		);
 	}
 
 	/**

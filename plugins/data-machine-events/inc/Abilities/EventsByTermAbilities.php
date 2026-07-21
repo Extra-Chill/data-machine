@@ -19,6 +19,7 @@
 
 namespace DataMachineEvents\Abilities;
 
+use DataMachineEvents\Blocks\Calendar\Query\UpcomingFilter;
 use DataMachineEvents\Core\EventDatesTable;
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -301,53 +302,30 @@ class EventsByTermAbilities {
 		$ed_table = EventDatesTable::table_name();
 		$now      = current_time( 'mysql' );
 
-		// Two fully-literal query strings keep the date comparator and sort
-		// direction out of variable interpolation so $wpdb->prepare() sees a
-		// stable placeholder count. The only interpolated token is the table
-		// name (a trusted internal constant); the taxonomy is passed as a %s
-		// placeholder, matching the sibling UpcomingCountAbilities pattern.
 		$timing = ( 'upcoming' === $scope ) ? 'upcoming' : 'past';
+		$where  = 'upcoming' === $scope
+			? UpcomingFilter::upcoming_where( $now )
+			: UpcomingFilter::past_where( $now );
 
-		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- $ed_table is a trusted internal constant; the two literal query strings keep placeholder counts stable.
-		if ( 'upcoming' === $scope ) {
-			$rows = $wpdb->get_results(
-				$wpdb->prepare(
-					"SELECT ed.post_id AS post_id, ed.start_datetime AS start_datetime
-					FROM {$ed_table} ed
-					INNER JOIN {$wpdb->term_relationships} tr ON tr.object_id = ed.post_id
-					INNER JOIN {$wpdb->term_taxonomy} tt ON tr.term_taxonomy_id = tt.term_taxonomy_id
-					WHERE tt.taxonomy = %s
-					AND tt.term_id = %d
-					AND ed.post_status = 'publish'
-					AND ed.start_datetime >= %s
-					ORDER BY ed.start_datetime ASC
-					LIMIT %d",
-					$taxonomy,
-					$term_id,
-					$now,
-					$limit
-				)
-			);
-		} else {
-			$rows = $wpdb->get_results(
-				$wpdb->prepare(
-					"SELECT ed.post_id AS post_id, ed.start_datetime AS start_datetime
-					FROM {$ed_table} ed
-					INNER JOIN {$wpdb->term_relationships} tr ON tr.object_id = ed.post_id
-					INNER JOIN {$wpdb->term_taxonomy} tt ON tr.term_taxonomy_id = tt.term_taxonomy_id
-					WHERE tt.taxonomy = %s
-					AND tt.term_id = %d
-					AND ed.post_status = 'publish'
-					AND ed.start_datetime < %s
-					ORDER BY ed.start_datetime DESC
-					LIMIT %d",
-					$taxonomy,
-					$term_id,
-					$now,
-					$limit
-				)
-			);
-		}
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Trusted table, prepared canonical predicate, and fixed sort values are interpolated.
+		$order = 'upcoming' === $scope ? 'ASC' : 'DESC';
+		$rows  = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT ed.post_id AS post_id, ed.start_datetime AS start_datetime
+				FROM {$ed_table} ed
+				INNER JOIN {$wpdb->term_relationships} tr ON tr.object_id = ed.post_id
+				INNER JOIN {$wpdb->term_taxonomy} tt ON tr.term_taxonomy_id = tt.term_taxonomy_id
+				WHERE tt.taxonomy = %s
+				AND tt.term_id = %d
+				AND ed.post_status = 'publish'
+				AND {$where}
+				ORDER BY ed.start_datetime {$order}
+				LIMIT %d",
+				$taxonomy,
+				$term_id,
+				$limit
+			)
+		);
 		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 
 		if ( empty( $rows ) ) {

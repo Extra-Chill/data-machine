@@ -19,6 +19,7 @@
 namespace DataMachineEvents\Abilities;
 
 use DataMachineEvents\Blocks\Calendar\Geo_Query;
+use DataMachineEvents\Blocks\Calendar\Query\UpcomingFilter;
 use DataMachineEvents\Core\Event_Post_Type;
 use DataMachineEvents\Core\Venue_Taxonomy;
 
@@ -550,7 +551,8 @@ class VenueMapAbilities {
 	 *
 	 * Single batched query keyed by the IDs being rendered, returning a
 	 * `term_id => count` map. "Upcoming" means events with a
-	 * `start_datetime >= today` row in the event_dates table — matching
+	 * canonical upcoming event row in the event_dates table, including events
+	 * still in progress and excluding events that already ended today. This matches
 	 * the semantics of the venue popup label ("X upcoming events") and
 	 * the location-archive venue badge graph (Extra-Chill/extrachill-events#88).
 	 *
@@ -569,7 +571,7 @@ class VenueMapAbilities {
 		global $wpdb;
 
 		$post_type = Event_Post_Type::POST_TYPE;
-		$today     = gmdate( 'Y-m-d 00:00:00' );
+		$upcoming  = UpcomingFilter::upcoming_where( current_time( 'mysql' ) );
 
 		$placeholders = implode( ',', array_fill( 0, count( $venue_ids ), '%d' ) );
 
@@ -587,9 +589,9 @@ class VenueMapAbilities {
 			AND tt.term_id IN ($placeholders)
 			AND p.post_type = %s
 			AND p.post_status = 'publish'
-			AND ed.start_datetime >= %s
+			AND {$upcoming}
 			GROUP BY tt.term_id",
-			array_merge( $venue_ids, array( $post_type, $today ) )
+			array_merge( $venue_ids, array( $post_type ) )
 		);
 		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 
@@ -635,7 +637,7 @@ class VenueMapAbilities {
 		global $wpdb;
 
 		$post_type = Event_Post_Type::POST_TYPE;
-		$today     = gmdate( 'Y-m-d 00:00:00' );
+		$upcoming  = UpcomingFilter::upcoming_where( current_time( 'mysql' ) );
 
 		$placeholders = implode( ',', array_fill( 0, count( $venue_ids ), '%d' ) );
 
@@ -661,13 +663,13 @@ class VenueMapAbilities {
 			AND venue_tt.term_id IN ($placeholders)
 			AND p.post_type = %s
 			AND p.post_status = 'publish'
-			AND ed.start_datetime >= %s
+			AND {$upcoming}
 			AND filter_tt.taxonomy = %s
 			AND filter_tt.term_id = %d
 			ORDER BY venue_tt.term_id ASC, ed.start_datetime ASC",
 			array_merge(
 				$venue_ids,
-				array( $post_type, $today, $filter_taxonomy, $filter_term_id )
+				array( $post_type, $filter_taxonomy, $filter_term_id )
 			)
 		);
 		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared

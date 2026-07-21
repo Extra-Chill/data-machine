@@ -9,6 +9,7 @@ namespace DataMachineEvents\Tests\Unit;
 
 use DataMachineEvents\Abilities\EventsByTermAbilities;
 use DataMachineEvents\Core\EventDatesTable;
+use DataMachineEvents\Core\Event_Post_Type;
 use WP_UnitTestCase;
 
 class EventsByTermAbilitiesTest extends WP_UnitTestCase {
@@ -18,6 +19,12 @@ class EventsByTermAbilitiesTest extends WP_UnitTestCase {
 		parent::setUp();
 
 		EventDatesTable::create_table();
+		if ( ! post_type_exists( Event_Post_Type::POST_TYPE ) ) {
+			Event_Post_Type::register();
+		}
+		if ( ! taxonomy_exists( 'term_timing_test' ) ) {
+			register_taxonomy( 'term_timing_test', Event_Post_Type::POST_TYPE );
+		}
 		$this->abilities = new EventsByTermAbilities();
 	}
 
@@ -34,6 +41,20 @@ class EventsByTermAbilitiesTest extends WP_UnitTestCase {
 
 	private function execute( array $input ): array|\WP_Error {
 		return $this->abilities->executeEventsByTerm( $input );
+	}
+
+	private function seed_event( string $title, int $term_id, string $start, string $end ): int {
+		$post_id = self::factory()->post->create(
+			array(
+				'post_title'  => $title,
+				'post_type'   => Event_Post_Type::POST_TYPE,
+				'post_status' => 'publish',
+			)
+		);
+		EventDatesTable::upsert( $post_id, $start, $end, 'publish' );
+		wp_set_object_terms( $post_id, array( $term_id ), 'term_timing_test' );
+
+		return $post_id;
 	}
 
 	public function test_events_blog_defaults_to_current_site(): void {
@@ -184,5 +205,33 @@ class EventsByTermAbilitiesTest extends WP_UnitTestCase {
 		$this->assertTrue( $result['found'] );
 		$this->assertSame( $term_id, $result['term_id'] );
 		$this->assertSame( 'legacy-slug', $result['term_slug'] );
+	}
+
+	public function test_term_scopes_use_canonical_ongoing_and_completed_predicates(): void {
+		$term_id   = $this->create_term( 'term_timing_test', 'timing-' . uniqid() );
+		$now       = current_datetime();
+		$ongoing   = $this->seed_event(
+			'Ongoing term event',
+			$term_id,
+			$now->modify( '-1 day' )->format( 'Y-m-d H:i:s' ),
+			$now->modify( '+1 hour' )->format( 'Y-m-d H:i:s' )
+		);
+		$completed = $this->seed_event(
+			'Completed term event',
+			$term_id,
+			$now->modify( '-2 hours' )->format( 'Y-m-d H:i:s' ),
+			$now->modify( '-1 hour' )->format( 'Y-m-d H:i:s' )
+		);
+
+		$result = $this->execute(
+			array(
+				'taxonomy' => 'term_timing_test',
+				'term_id'  => $term_id,
+			)
+		);
+
+		$this->assertNotWPError( $result );
+		$this->assertSame( array( $ongoing ), array_column( $result['upcoming'], 'event_id' ) );
+		$this->assertSame( array( $completed ), array_column( $result['past'], 'event_id' ) );
 	}
 }

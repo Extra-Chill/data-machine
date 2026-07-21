@@ -159,6 +159,10 @@ class Geo_Query {
 		$lat = (float) $lat;
 		$lng = (float) $lng;
 
+		if ( ! is_finite( $lat ) || ! is_finite( $lng ) ) {
+			return false;
+		}
+
 		if ( $lat < -90 || $lat > 90 ) {
 			return false;
 		}
@@ -168,7 +172,7 @@ class Geo_Query {
 		}
 
 		if ( null !== $radius ) {
-			if ( ! is_numeric( $radius ) || (float) $radius <= 0 ) {
+			if ( ! is_numeric( $radius ) || ! is_finite( (float) $radius ) || (float) $radius <= 0 ) {
 				return false;
 			}
 		}
