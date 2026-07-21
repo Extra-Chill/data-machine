@@ -42,6 +42,10 @@ defined( 'ABSPATH' ) || exit;
 
 class EventUpsert extends UpsertHandler {
 
+	public const SOURCE_IDENTITY_META_KEY = '_datamachine_event_source_identity';
+	public const SOURCE_NAME_META_KEY     = '_datamachine_event_source';
+	public const SOURCE_ID_META_KEY       = '_datamachine_event_source_id';
+
 	protected $taxonomy_handler;
 
 	/**
@@ -76,6 +80,23 @@ class EventUpsert extends UpsertHandler {
 		TaxonomyHandler::addCustomHandler( 'venue', array( $this->taxonomy_assigner, 'assignVenueTaxonomy' ) );
 		// Register custom handler for promoter taxonomy
 		TaxonomyHandler::addCustomHandler( 'promoter', array( $this->taxonomy_assigner, 'assignPromoterTaxonomy' ) );
+	}
+
+	/**
+	 * Run the canonical event upsert without workflow/job context.
+	 *
+	 * This is the supported entry point for the public event upsert ability.
+	 * Workflow handlers continue to use handle_tool_call() and executeUpsert().
+	 *
+	 * @param array $event          Canonical event fields.
+	 * @param array $handler_config Post and taxonomy settings.
+	 * @return array Canonical handler result.
+	 */
+	public function upsertCanonicalEvent( array $event, array $handler_config = array() ): array {
+		$event['engine'] = new EngineData( $event, 0 );
+		$event['job_id'] = 0;
+
+		return $this->executeUpsert( $event, $handler_config );
 	}
 
 	/**
@@ -143,11 +164,9 @@ class EventUpsert extends UpsertHandler {
 			)
 		);
 
-		// Acquire advisory lock to prevent race conditions between concurrent
-		// flows importing the same event. Lock key is derived from the date and
-		// normalized title so that two flows processing "Eggy" at Charleston Pour
-		// House on 2026-03-20 will serialize instead of both creating a new post.
-		$lock_key = $this->acquireUpsertLock( $title, $startDate );
+		// Acquire an advisory lock to prevent concurrent duplicate creation. Public
+		// callers lock on source identity; workflow imports retain title/date locking.
+		$lock_key = $this->acquireUpsertLock( $title, $startDate, (string) ( $parameters['source_identity'] ?? '' ) );
 
 		try {
 			return $this->executeUpsertWithinLock( $title, $venue, $startDate, $ticketUrl, $parameters, $handler_config, $engine );
@@ -235,16 +254,20 @@ class EventUpsert extends UpsertHandler {
 		$venueCity        = (string) ( $engine->get( 'venueCity' ) ?? $parameters['venueCity'] ?? '' );
 		$venueState       = (string) ( $engine->get( 'venueState' ) ?? $parameters['venueState'] ?? '' );
 		$venueCountry     = (string) ( $engine->get( 'venueCountry' ) ?? $parameters['venueCountry'] ?? '' );
-		$existing_post_id = (int) $this->findExistingEventViaAbility(
-			$title,
-			$venue,
-			$startDate,
-			$ticketUrl,
-			$venueAddress,
-			$venueCity,
-			$venueState,
-			$venueCountry
-		);
+		$source_identity   = (string) ( $parameters['source_identity'] ?? '' );
+		$existing_post_id = $this->findExistingEventBySourceIdentity( $source_identity );
+		if ( $existing_post_id <= 0 ) {
+			$existing_post_id = (int) $this->findExistingEventViaAbility(
+				$title,
+				$venue,
+				$startDate,
+				$ticketUrl,
+				$venueAddress,
+				$venueCity,
+				$venueState,
+				$venueCountry
+			);
+		}
 
 		// 2. Build event data.
 		$event_data = $this->buildEventData( $parameters, $handler_config, $engine, $existing_post_id );
@@ -270,6 +293,13 @@ class EventUpsert extends UpsertHandler {
 			'meta_input'   => $meta_input,
 		);
 
+		if ( '' !== $source_identity ) {
+			$upsert_input['identity_meta'] = array(
+				'key'   => self::SOURCE_IDENTITY_META_KEY,
+				'value' => $source_identity,
+			);
+		}
+
 		if ( $existing_post_id > 0 ) {
 			$upsert_input['post_id'] = $existing_post_id;
 		} else {
@@ -292,6 +322,11 @@ class EventUpsert extends UpsertHandler {
 
 		$post_id = (int) $result['post_id'];
 		$action  = $result['action'];
+		if ( '' !== $source_identity ) {
+			update_post_meta( $post_id, self::SOURCE_IDENTITY_META_KEY, $source_identity );
+			update_post_meta( $post_id, self::SOURCE_NAME_META_KEY, sanitize_text_field( (string) ( $parameters['source'] ?? '' ) ) );
+			update_post_meta( $post_id, self::SOURCE_ID_META_KEY, sanitize_text_field( (string) ( $parameters['source_id'] ?? '' ) ) );
+		}
 
 		// 7. Content idempotency does not imply taxonomy or identity integrity.
 		// Skip image work for unchanged content, but always reconcile indexed state.
@@ -369,6 +404,36 @@ class EventUpsert extends UpsertHandler {
 				'action'   => $action,
 			)
 		);
+	}
+
+	/**
+	 * Resolve a caller-supplied source identity before domain deduplication.
+	 *
+	 * @param string $source_identity Stable hashed source identity.
+	 * @return int Matching event ID, or 0 when no event is associated.
+	 */
+	private function findExistingEventBySourceIdentity( string $source_identity ): int {
+		if ( '' === $source_identity ) {
+			return 0;
+		}
+
+		$query = new \WP_Query(
+			array(
+				'post_type'      => Event_Post_Type::POST_TYPE,
+				'post_status'    => 'any',
+				'posts_per_page' => 1,
+				'fields'         => 'ids',
+				'no_found_rows'  => true,
+				'meta_query'     => array(
+					array(
+						'key'   => self::SOURCE_IDENTITY_META_KEY,
+						'value' => $source_identity,
+					),
+				),
+			)
+		);
+
+		return empty( $query->posts ) ? 0 : (int) $query->posts[0];
 	}
 
 	/**
@@ -490,8 +555,8 @@ class EventUpsert extends UpsertHandler {
 	 * Acquire a MySQL advisory lock for an event identity.
 	 *
 	 * Uses GET_LOCK() to serialize concurrent upserts for the same event.
-	 * The lock key is derived from the date and normalized title, so two
-	 * flows importing the same event will queue instead of racing.
+	 * Public ability calls use their source identity; workflow calls use the
+	 * date and normalized title so equivalent events queue instead of racing.
 	 *
 	 * MySQL advisory locks are:
 	 * - Per-connection (each PHP-FPM worker has its own connection)
@@ -499,16 +564,18 @@ class EventUpsert extends UpsertHandler {
 	 * - Non-blocking for unrelated events (different lock keys)
 	 *
 	 * @since 0.17.3
-	 * @param string $title     Event title.
-	 * @param string $startDate Event start date.
+	 * @param string $title           Event title.
+	 * @param string $startDate       Event start date.
+	 * @param string $source_identity Optional caller-supplied source identity.
 	 * @return string The lock key (needed for release).
 	 */
-	private function acquireUpsertLock( string $title, string $startDate ): string {
+	private function acquireUpsertLock( string $title, string $startDate, string $source_identity = '' ): string {
 		global $wpdb;
 
 		$date_only  = self::extractDateForQuery( $startDate );
 		$normalized = SimilarityEngine::normalizeTitle( $title );
-		$lock_key   = 'dme_' . md5( $date_only . '|' . $normalized );
+		$lock_value = '' !== $source_identity ? 'source|' . $source_identity : $date_only . '|' . $normalized;
+		$lock_key   = 'dme_' . md5( $lock_value );
 
 		// MySQL lock names are limited to 64 characters; md5 = 36 + prefix = 40, safe.
 		// Try up to 3 times with increasing timeouts (5s, 10s, 15s).
@@ -689,6 +756,13 @@ class EventUpsert extends UpsertHandler {
 	 */
 	private function buildEventMetaInput( array $event_data, array $parameters, EngineData $engine ): array {
 		$meta_input = array();
+		$source_identity = (string) ( $parameters['source_identity'] ?? '' );
+
+		if ( '' !== $source_identity ) {
+			$meta_input[ self::SOURCE_IDENTITY_META_KEY ] = $source_identity;
+			$meta_input[ self::SOURCE_NAME_META_KEY ]     = sanitize_text_field( (string) ( $parameters['source'] ?? '' ) );
+			$meta_input[ self::SOURCE_ID_META_KEY ]       = sanitize_text_field( (string) ( $parameters['source_id'] ?? '' ) );
+		}
 
 		$submission = $engine->get( 'submission' );
 		if ( is_array( $submission ) ) {

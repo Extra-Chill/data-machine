@@ -334,6 +334,11 @@ class DATAMACHINE_Events {
 			new \DataMachineEvents\Abilities\EventUpdateAbilities();
 		}
 
+		if ( file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/EventUpsertAbilities.php' ) ) {
+			require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/EventUpsertAbilities.php';
+			new \DataMachineEvents\Abilities\EventUpsertAbilities();
+		}
+
 		if ( file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/MoveEventAbilities.php' ) ) {
 			require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/MoveEventAbilities.php';
 			new \DataMachineEvents\Abilities\MoveEventAbilities();
