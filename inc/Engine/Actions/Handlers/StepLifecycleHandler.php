@@ -208,7 +208,7 @@ class StepLifecycleHandler {
 			$claim['ownership_token'],
 			$job_id,
 			$callback,
-			( $completion['retain_processed'] ?? true ) !== false
+			false !== ( $completion['retain_processed'] ?? true )
 		);
 		if ( ! $owned ) {
 			self::releaseClaim( $claim );

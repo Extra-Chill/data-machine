@@ -357,7 +357,7 @@ class ProcessedItems extends BaseRepository {
 	 * @return string|false Opaque ownership token, or false when unavailable.
 	 */
 	public function claim_item_owned( string $identity_scope, string $source_type, string $item_identifier, int $job_id, int $ttl_seconds = self::DEFAULT_CLAIM_TTL_SECONDS ): string|false {
-		if ( $ttl_seconds < 1 ) {
+		if ( 1 > $ttl_seconds ) {
 			$ttl_seconds = self::DEFAULT_CLAIM_TTL_SECONDS;
 		}
 
@@ -373,9 +373,9 @@ class ProcessedItems extends BaseRepository {
 			return false;
 		}
 
-		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared -- Prepared with a %i table placeholder.
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		$upserted = $this->wpdb->query(
+			// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Table identifier uses %i; all values use typed placeholders.
 			$this->wpdb->prepare(
 				'INSERT INTO %i (flow_step_id, source_type, item_identifier, job_id, status, claim_expires_at, claim_token)
 				VALUES (%s, %s, %s, %d, %s, %s, %s)
@@ -390,16 +390,15 @@ class ProcessedItems extends BaseRepository {
 				$claim_token
 			)
 		);
-		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
 		if ( false === $upserted ) {
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 			$this->wpdb->query( 'ROLLBACK' );
 			return false;
 		}
 
-		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared -- Prepared with a %i table placeholder.
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		$row = $this->wpdb->get_row(
+			// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Table identifier uses %i; all values use typed placeholders.
 			$this->wpdb->prepare(
 				'SELECT id, status, claim_expires_at, claim_token FROM %i WHERE flow_step_id = %s AND source_type = %s AND item_identifier = %s FOR UPDATE',
 				$this->table_name,
@@ -409,7 +408,6 @@ class ProcessedItems extends BaseRepository {
 			),
 			ARRAY_A
 		);
-		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
 
 		if ( ! is_array( $row ) ) {
 			// A different full identifier may share the 191-character unique-key prefix.
@@ -422,7 +420,7 @@ class ProcessedItems extends BaseRepository {
 		$inserted    = hash_equals( $claim_token, $owned_token );
 		$expired     = self::STATUS_CLAIMED === ( $row['status'] ?? '' )
 			&& ! empty( $row['claim_expires_at'] )
-			&& $row['claim_expires_at'] <= $now;
+			&& $now >= $row['claim_expires_at'];
 		$available   = self::STATUS_PROCESSED === ( $row['status'] ?? '' ) || $expired;
 
 		if ( ! $inserted && ! $available ) {
@@ -445,7 +443,7 @@ class ProcessedItems extends BaseRepository {
 				array( '%d', '%s', '%s', '%s' ),
 				array( '%d' )
 			);
-			if ( false === $updated || $updated < 1 ) {
+			if ( false === $updated || 1 > $updated ) {
 				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 				$this->wpdb->query( 'ROLLBACK' );
 				return false;
@@ -469,14 +467,14 @@ class ProcessedItems extends BaseRepository {
 	 * @return bool Whether the job completed its current claim.
 	 */
 	public function complete_claim_for_job( string $flow_step_id, string $source_type, string $item_identifier, int $job_id ): bool {
-		if ( $job_id < 1 ) {
+		if ( 1 > $job_id ) {
 			return false;
 		}
 
 		$now = current_time( 'mysql', true );
-		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared -- Prepared with a %i table placeholder.
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		$updated = $this->wpdb->query(
+			// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Table identifier uses %i; all values use typed placeholders.
 			$this->wpdb->prepare(
 				'UPDATE %i SET status = %s, processed_timestamp = %s, claim_expires_at = NULL, claim_token = NULL WHERE flow_step_id = %s AND source_type = %s AND item_identifier = %s AND job_id = %d AND status = %s',
 				$this->table_name,
@@ -489,9 +487,8 @@ class ProcessedItems extends BaseRepository {
 				self::STATUS_CLAIMED
 			)
 		);
-		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
 
-		return false !== $updated && $updated > 0;
+		return false !== $updated && 0 < $updated;
 	}
 
 	/**
@@ -522,9 +519,9 @@ class ProcessedItems extends BaseRepository {
 			return false;
 		}
 
-		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared -- Prepared with a %i table placeholder.
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		$owned = $this->wpdb->get_var(
+			// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Table identifier uses %i; all values use typed placeholders.
 			$this->wpdb->prepare(
 				'SELECT claim_token FROM %i WHERE flow_step_id = %s AND source_type = %s AND item_identifier = %s AND claim_token = %s AND status = %s FOR UPDATE',
 				$this->table_name,
@@ -535,7 +532,6 @@ class ProcessedItems extends BaseRepository {
 				self::STATUS_CLAIMED
 			)
 		);
-		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
 
 		if ( ! is_string( $owned ) || ! hash_equals( $claim_token, $owned ) ) {
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
@@ -557,9 +553,9 @@ class ProcessedItems extends BaseRepository {
 		}
 
 		if ( $retain_processed ) {
-			// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared -- Prepared with a %i table placeholder.
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 			$transitioned = $this->wpdb->query(
+				// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Table identifier uses %i; all values use typed placeholders.
 				$this->wpdb->prepare(
 					'UPDATE %i SET status = %s, job_id = %d, processed_timestamp = %s, claim_expires_at = NULL WHERE flow_step_id = %s AND source_type = %s AND item_identifier = %s AND claim_token = %s AND status = %s',
 					$this->table_name,
@@ -573,7 +569,6 @@ class ProcessedItems extends BaseRepository {
 					self::STATUS_CLAIMED
 				)
 			);
-			// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
 		} else {
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 			$transitioned = $this->wpdb->delete(
@@ -589,7 +584,7 @@ class ProcessedItems extends BaseRepository {
 			);
 		}
 
-		if ( false === $transitioned || $transitioned < 1 ) {
+		if ( false === $transitioned || 1 > $transitioned ) {
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 			$this->wpdb->query( 'ROLLBACK' );
 			return false;
