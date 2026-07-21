@@ -39,6 +39,7 @@ use DataMachine\Abilities\Engine\RunFlowAbility;
 use DataMachine\Engine\AI\Tools\Global\AgentDailyMemory;
 use DataMachine\Engine\Bundle\AgentBundleArrayAdapter;
 use DataMachine\Engine\Bundle\AgentBundleArtifactState;
+use DataMachine\Engine\Bundle\AgentBundleDirectory;
 use DataMachine\Engine\Bundle\AgentBundleInstalledArtifact;
 use DataMachine\Engine\Bundle\AgentBundleManifest;
 use DataMachine\Engine\Bundle\BundleSchema;
@@ -119,6 +120,7 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 	private FlowsRepository $flows_repo;
 	private int $owner_id;
 	private $memory_store_filter = null;
+	private $agent_config_projection_filter = null;
 
 	public function set_up(): void {
 		parent::set_up();
@@ -154,6 +156,10 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 		if ( null !== $this->memory_store_filter ) {
 			remove_filter( 'wp_agent_memory_store', $this->memory_store_filter, 10 );
 			$this->memory_store_filter = null;
+		}
+		if ( null !== $this->agent_config_projection_filter ) {
+			remove_filter( 'datamachine_agent_config_artifact_projection_policies', $this->agent_config_projection_filter, 10 );
+			$this->agent_config_projection_filter = null;
 		}
 		PermissionHelper::clear_agent_context();
 
@@ -946,6 +952,83 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 			$after['agent_config']['intelligence']['context_servers']['wporg'],
 			'Bundle context server args do not overwrite local runtime config without approval.'
 		);
+	}
+
+	public function test_backup_export_restores_tracking_excluded_agent_config_to_fresh_agent(): void {
+		$this->agent_config_projection_filter = static function ( array $policies ): array {
+			$policies['plugin_runtime'] = array(
+				'tracking' => 'exclude',
+				'merge'    => 'preserve_local',
+				'reason'   => 'preserve_plugin_runtime_config',
+			);
+			$policies['backup_private'] = array(
+				'tracking'      => 'exclude',
+				'backup_egress' => 'exclude',
+				'merge'         => 'preserve_local',
+				'reason'        => 'exclude_private_backup_config',
+			);
+			return $policies;
+		};
+		add_filter( 'datamachine_agent_config_artifact_projection_policies', $this->agent_config_projection_filter, 10, 1 );
+
+		$source_config = array(
+			'default_provider'        => 'openai',
+			'default_model'           => 'gpt-5.5',
+			'tool_policy'             => array( 'allow' => array( 'datamachine/search' ) ),
+			'intelligence_wiki_brain' => array( 'graph' => array( 'enabled' => true ) ),
+			'intelligence'            => array(
+				'context_servers' => array( 'events' => array( 'url' => 'https://runtime.example.test' ) ),
+				'auth_refs'       => array( 'events' => 'runtime:events' ),
+			),
+			'plugin_runtime'          => array( 'endpoint' => 'https://plugin-runtime.example.test' ),
+			'backup_private'          => array( 'token' => 'do-not-export' ),
+			'datamachine_bundle'      => array(
+				'adopted'          => true,
+				'bundle_slug'      => 'backup-source',
+				'bundle_version'   => '1.2.3',
+				'source_revision'  => 'source-only-revision',
+			),
+		);
+		$source_id = $this->agents_repo->create_if_missing( 'backup-source', 'Backup Source', $this->owner_id, $source_config, 7 );
+		$this->assertIsInt( $source_id );
+
+		$exports = array();
+		foreach ( array( 'share', 'backup', 'fork' ) as $profile ) {
+			$result = $this->bundler->export_directory_object( 'backup-source', array( 'profile' => $profile ) );
+			$this->assertTrue( (bool) $result['success'], "{$profile} export succeeds." );
+			$this->assertInstanceOf( AgentBundleDirectory::class, $result['directory'] ?? null );
+			$exports[ $profile ] = AgentBundleArrayAdapter::to_array_bundle( $result['directory'] );
+		}
+
+		$share_config  = $exports['share']['agent']['agent_config'];
+		$backup_config = $exports['backup']['agent']['agent_config'];
+		$fork_config   = $exports['fork']['agent']['agent_config'];
+
+		$this->assertArrayNotHasKey( 'datamachine_bundle', $share_config );
+		$this->assertArrayNotHasKey( 'datamachine_bundle', $backup_config );
+		$this->assertArrayNotHasKey( 'datamachine_bundle', $fork_config );
+		$this->assertArrayNotHasKey( 'plugin_runtime', $share_config, 'Share follows lifecycle tracking exclusions.' );
+		$this->assertArrayNotHasKey( 'plugin_runtime', $fork_config, 'Fork follows lifecycle tracking exclusions.' );
+		$this->assertSame( 'https://plugin-runtime.example.test', $backup_config['plugin_runtime']['endpoint'] ?? null, 'Backup preserves tracking-excluded restorable config.' );
+		$this->assertSame( 'https://runtime.example.test', $backup_config['intelligence']['context_servers']['events']['url'] ?? null );
+		$this->assertSame( 'runtime:events', $backup_config['intelligence']['auth_refs']['events'] ?? null );
+		$this->assertArrayNotHasKey( 'backup_private', $backup_config, 'Backup honors explicit backup egress exclusion.' );
+
+		$restore = $this->bundler->import( $exports['backup'], 'backup-restored', $this->owner_id );
+		$this->assertTrue( (bool) $restore['success'], 'Backup imports into a fresh agent.' );
+
+		$restored        = $this->agents_repo->get_by_slug( 'backup-restored' );
+		$restored_config = $restored['agent_config'] ?? array();
+		$this->assertSame( 7, (int) ( $restored['site_scope'] ?? 0 ), 'Fresh restore preserves site scope.' );
+		$this->assertSame( 'openai', $restored_config['default_provider'] ?? null );
+		$this->assertSame( 'gpt-5.5', $restored_config['default_model'] ?? null );
+		$this->assertSame( array( 'datamachine/search' ), $restored_config['tool_policy']['allow'] ?? null );
+		$this->assertTrue( $restored_config['intelligence_wiki_brain']['graph']['enabled'] ?? false );
+		$this->assertSame( 'https://runtime.example.test', $restored_config['intelligence']['context_servers']['events']['url'] ?? null );
+		$this->assertSame( 'runtime:events', $restored_config['intelligence']['auth_refs']['events'] ?? null );
+		$this->assertSame( 'https://plugin-runtime.example.test', $restored_config['plugin_runtime']['endpoint'] ?? null );
+		$this->assertArrayNotHasKey( 'backup_private', $restored_config );
+		$this->assertNotSame( 'source-only-revision', $restored_config['datamachine_bundle']['source_revision'] ?? null, 'Source install metadata does not survive the restore.' );
 	}
 
 	/**

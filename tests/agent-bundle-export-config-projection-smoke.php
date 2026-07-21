@@ -246,41 +246,6 @@ foreach ( array( 'share', 'backup', 'fork' ) as $profile ) {
 	export_config_assert_equals( "{$profile} keeps site scope", 7, $round_trip['agent']['site_scope'] ?? null );
 }
 
-if ( isset( $GLOBALS['wpdb'] ) && function_exists( 'get_current_user_id' ) ) {
-	echo "\n[restore] Real WordPress export imports into a fresh agent\n";
-	$source_slug   = 'events-bot-source-' . getmypid();
-	$restored_slug = 'events-bot-restored-' . getmypid();
-	$owner_id      = max( 1, get_current_user_id() );
-	$repository    = new Agents();
-	$source_id     = $repository->create_if_missing( $source_slug, 'Events Bot Source', $owner_id, $agent['agent_config'], 7 );
-	export_config_assert( 'real source agent is created', false !== $source_id && $source_id > 0 );
-
-	if ( false !== $source_id && $source_id > 0 ) {
-		$export          = ( new AgentBundler() )->export_directory_object( $source_slug, array( 'profile' => 'backup' ) );
-		$backup          = isset( $export['directory'] ) ? AgentBundleArrayAdapter::to_array_bundle( $export['directory'] ) : array();
-		$backup_config   = $backup['agent']['agent_config'] ?? array();
-		$restore         = ( new AgentBundler() )->import( $backup, $restored_slug, $owner_id );
-		$restored_agent  = $repository->get_by_slug( $restored_slug );
-		$restored_config = $restored_agent['agent_config'] ?? array();
-
-		export_config_assert( 'real backup omits source package metadata', ! isset( $backup_config['datamachine_bundle'] ) );
-		export_config_assert( 'fresh restore succeeds', ! empty( $restore['success'] ) );
-		export_config_assert_equals( 'fresh restore keeps plugin runtime context', 'https://runtime.example.test', $restored_config['intelligence']['context_servers']['events']['url'] ?? null );
-		export_config_assert_equals( 'fresh restore keeps plugin auth refs', 'runtime:events', $restored_config['intelligence']['auth_refs']['events'] ?? null );
-		export_config_assert_equals( 'fresh restore keeps tracking-excluded plugin config', 'https://plugin-runtime.example.test', $restored_config['plugin_runtime']['endpoint'] ?? null );
-		export_config_assert( 'fresh restore honors explicit backup-private exclusion', ! isset( $restored_config['backup_private'] ) );
-		export_config_assert_equals( 'fresh restore keeps normalized provider', 'openai', $restored_config['default_provider'] ?? null );
-		export_config_assert_equals( 'fresh restore keeps normalized model', 'gpt-5.5', $restored_config['default_model'] ?? null );
-		export_config_assert_equals( 'fresh restore keeps site scope', 7, $restored_agent['site_scope'] ?? null );
-
-		$table = $GLOBALS['wpdb']->base_prefix . Agents::TABLE_NAME;
-		$GLOBALS['wpdb']->delete( $table, array( 'agent_id' => (int) $source_id ), array( '%d' ) );
-		if ( is_array( $restored_agent ) ) {
-			$GLOBALS['wpdb']->delete( $table, array( 'agent_id' => (int) $restored_agent['agent_id'] ), array( '%d' ) );
-		}
-	}
-}
-
 if ( ! empty( $failures ) ) {
 	echo "\nFAILED: " . count( $failures ) . " export config projection assertions failed.\n";
 	exit( 1 );
