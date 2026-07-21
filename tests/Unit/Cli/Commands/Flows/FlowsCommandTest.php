@@ -12,6 +12,7 @@
 
 namespace DataMachine\Tests\Unit\Cli\Commands\Flows;
 
+use DataMachine\Core\Database\Flows\Flows as FlowsRepository;
 use WP_UnitTestCase;
 
 class FlowsCommandTest extends WP_UnitTestCase {
@@ -234,6 +235,36 @@ class FlowsCommandTest extends WP_UnitTestCase {
 		$this->assertTrue( $result['success'] );
 		$this->assertArrayHasKey( 'flow_id', $result );
 		$this->assertIsInt( $result['flow_id'] );
+	}
+
+	public function test_repository_create_and_update_preserve_semantic_config_strings(): void {
+		$repo   = new FlowsRepository();
+		$config = array(
+			'test_step' => array(
+				'handler_configs' => array(
+					'test' => array(
+						'source_url' => 'https://example.com/events/',
+						'path'       => 'C:\\Temp\\events.json',
+					),
+				),
+				'prompt_queue'    => array(
+					array( 'prompt' => 'Process start/end with \\d+ items.' ),
+				),
+			),
+		);
+		$flow_id = $repo->create_flow(
+			array(
+				'pipeline_id'       => $this->test_pipeline_id,
+				'flow_name'         => 'String Round Trip',
+				'flow_config'       => $config,
+				'scheduling_config' => array( 'interval' => 'manual' ),
+			)
+		);
+
+		$this->assertIsInt( $flow_id );
+		$this->assertSame( $config, $repo->get_flow( $flow_id )['flow_config'] );
+		$this->assertTrue( $repo->update_flow( $flow_id, array( 'flow_config' => $config ) ) );
+		$this->assertSame( $config, $repo->get_flow( $flow_id )['flow_config'] );
 	}
 
 	public function test_delete_flow(): void {

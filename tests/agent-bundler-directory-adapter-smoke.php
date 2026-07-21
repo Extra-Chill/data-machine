@@ -156,8 +156,11 @@ $array_bundle = array(
 					'handler_slugs'      => array( 'mcp' ),
 					'handler_configs'    => array(
 						'mcp' => array(
-							'provider' => 'github',
-							'auth_ref' => 'github:default',
+							'provider'   => 'github',
+							'auth_ref'   => 'github:default',
+							'source_url' => 'https://example.com/events/',
+							'path'       => 'C:\\Temp\\events.json',
+							'regexp'     => '\\d+\\s+events',
 						),
 					),
 					'config_patch_queue' => array(
@@ -193,7 +196,7 @@ $array_bundle = array(
 					'disabled_tools'   => array( 'datamachine/delete-flow' ),
 					'prompt_queue'     => array(
 						array(
-							'prompt'   => 'Review PR #1',
+							'prompt'   => 'Review PR #1 start/end with \\d+ items',
 							'added_at' => '2026-04-28T12:00:00Z',
 						),
 					),
@@ -242,8 +245,11 @@ assert_adapter_equals( 'pipeline document strips runtime pipeline_step_id', fals
 assert_adapter_equals(
 	'flow document preserves handler config',
 	array(
-		'provider' => 'github',
-		'auth_ref' => 'github:default',
+		'provider'   => 'github',
+		'auth_ref'   => 'github:default',
+		'source_url' => 'https://example.com/events/',
+		'path'       => 'C:\\Temp\\events.json',
+		'regexp'     => '\\d+\\s+events',
 	),
 	$flow['steps'][0]['handler_configs']['mcp'] ?? null
 );
@@ -253,7 +259,7 @@ assert_adapter_equals( 'flow document preserves AI enabled tools', array( 'datam
 assert_adapter_equals( 'flow document preserves AI disabled tools', array( 'datamachine/delete-flow' ), $flow['steps'][1]['disabled_tools'] );
 assert_adapter_equals( 'flow document preserves completion assertions', array( 'create_github_pull_request', 'comment_github_pull_request' ), $flow['steps'][1]['completion_assertions']['required_tool_names'] ?? null );
 assert_adapter_equals( 'flow document preserves tool runtime rules', 4, $flow['steps'][1]['tool_runtime_rules'][0]['max_calls'] ?? null );
-assert_adapter_equals( 'flow document preserves prompt queue', 'Review PR #1', $flow['steps'][1]['prompt_queue'][0]['prompt'] );
+assert_adapter_equals( 'flow document preserves prompt queue', 'Review PR #1 start/end with \\d+ items', $flow['steps'][1]['prompt_queue'][0]['prompt'] );
 assert_adapter_equals( 'flow document preserves queue mode', 'loop', $flow['steps'][1]['queue_mode'] );
 assert_adapter_equals( 'flow document preserves system task settings', 'wiki_graph_extract', $flow['steps'][2]['flow_step_settings']['task_type'] ?? null );
 assert_adapter_equals( 'flow document preserves scheduling interval', 'hourly', $flow['schedule'] );
@@ -284,8 +290,11 @@ assert_adapter_equals( 'round-trip preserves flow file memory', "{}\n", $round_t
 assert_adapter_equals(
 	'round-trip preserves handler config',
 	array(
-		'auth_ref' => 'github:default',
-		'provider' => 'github',
+		'auth_ref'   => 'github:default',
+		'path'       => 'C:\\Temp\\events.json',
+		'provider'   => 'github',
+		'regexp'     => '\\d+\\s+events',
+		'source_url' => 'https://example.com/events/',
 	),
 	$round_steps[0]['handler_configs']['mcp'] ?? null
 );
@@ -296,7 +305,7 @@ assert_adapter_equals( 'round-trip preserves enabled tools', array( 'datamachine
 assert_adapter_equals( 'round-trip preserves disabled tools', array( 'datamachine/delete-flow' ), $round_steps[1]['disabled_tools'] );
 assert_adapter_equals( 'round-trip preserves completion assertions', array( 'create_github_pull_request', 'comment_github_pull_request' ), $round_steps[1]['completion_assertions']['required_tool_names'] ?? null );
 assert_adapter_equals( 'round-trip preserves tool runtime rules', array( 'workspace_edit', 'create_github_issue' ), $round_steps[1]['tool_runtime_rules'][0]['then_require_one_of'] ?? null );
-assert_adapter_equals( 'round-trip preserves prompt queue', 'Review PR #1', $round_steps[1]['prompt_queue'][0]['prompt'] );
+assert_adapter_equals( 'round-trip preserves prompt queue', 'Review PR #1 start/end with \\d+ items', $round_steps[1]['prompt_queue'][0]['prompt'] );
 assert_adapter_equals( 'round-trip preserves queue mode', 'loop', $round_steps[1]['queue_mode'] );
 assert_adapter_equals( 'round-trip preserves system task settings', 'wiki_graph_extract', $round_steps[2]['flow_step_settings']['task_type'] ?? null );
 assert_adapter_equals( 'round-trip preserves system task params', 'wordpress-com', $round_steps[2]['flow_step_settings']['params']['root'] ?? null );

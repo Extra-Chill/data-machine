@@ -13,6 +13,7 @@
 namespace DataMachine\Cli\Commands\Flows;
 
 use WP_CLI;
+use DataMachine\Cli\JsonInput;
 use DataMachine\Cli\BaseCommand;
 use DataMachine\Abilities\FlowStep\ConfigureFlowStepsAbility;
 
@@ -108,7 +109,7 @@ class BulkConfigCommand extends BaseCommand {
 			return;
 		}
 
-		$handler_config = json_decode( wp_unslash( $config_json ), true );
+		$handler_config = JsonInput::decode_array( (string) $config_json );
 		if ( ! is_array( $handler_config ) ) {
 			WP_CLI::error( 'Invalid JSON in --config. Example: --config=\'{"max_items":5}\'' );
 			return;
