@@ -19,18 +19,21 @@ final class AgentConfigArtifactProjector {
 	 *
 	 * Supported policy fields:
 	 * - tracking: include|exclude
+	 * - backup_egress: include|exclude
 	 * - merge: three_way|preserve_local
 	 * - reason: decision reason for merge output
 	 * - redactor: callable applied to tracked values before hashing/comparison
+	 * - backup_redactor: callable applied to backup values before export
 	 *
 	 * @return array<string,array<string,mixed>>
 	 */
 	public static function policies(): array {
 		$policies = array(
 			'datamachine_bundle'           => array(
-				'tracking' => 'exclude',
-				'merge'    => 'preserve_local',
-				'reason'   => 'preserve_runtime_bundle_metadata',
+				'tracking'      => 'exclude',
+				'backup_egress' => 'exclude',
+				'merge'         => 'preserve_local',
+				'reason'        => 'preserve_runtime_bundle_metadata',
 			),
 			'intelligence.context_servers' => array(
 				'tracking' => 'exclude',
@@ -60,7 +63,8 @@ final class AgentConfigArtifactProjector {
 		 * Filter agent_config artifact projection ownership policies.
 		 *
 		 * Plugins can mark their own agent_config namespaces as runtime-local,
-		 * excluded from core bundle drift checks, or redacted before comparison.
+		 * excluded from core bundle drift checks, redacted before comparison, or
+		 * explicitly excluded/redacted during restorable backup egress.
 		 *
 		 * @param array<string,array<string,mixed>> $policies Policy map keyed by dot path.
 		 */
@@ -84,6 +88,33 @@ final class AgentConfigArtifactProjector {
 
 			if ( is_callable( $policy['redactor'] ?? null ) && self::path_exists( $config, $path ) ) {
 				$redactor = $policy['redactor'];
+				self::set_path( $config, $path, $redactor( self::get_path( $config, $path ), $path ) );
+			}
+		}
+
+		self::sort_recursive( $config );
+		return $config;
+	}
+
+	/**
+	 * Return restorable config for backup egress.
+	 *
+	 * Tracking exclusions do not apply because a fresh restore has no local
+	 * config to preserve. Paths are removed or redacted only when their policy
+	 * explicitly opts out of backup egress.
+	 *
+	 * @param array<string,mixed> $config Agent config.
+	 * @return array<string,mixed>
+	 */
+	public static function backup_payload( array $config ): array {
+		foreach ( self::policies() as $path => $policy ) {
+			if ( 'exclude' === ( $policy['backup_egress'] ?? '' ) ) {
+				self::unset_path( $config, $path );
+				continue;
+			}
+
+			if ( is_callable( $policy['backup_redactor'] ?? null ) && self::path_exists( $config, $path ) ) {
+				$redactor = $policy['backup_redactor'];
 				self::set_path( $config, $path, $redactor( self::get_path( $config, $path ), $path ) );
 			}
 		}
@@ -138,15 +169,20 @@ final class AgentConfigArtifactProjector {
 				continue;
 			}
 
-			$tracking = (string) ( $policy['tracking'] ?? 'include' );
-			$merge    = (string) ( $policy['merge'] ?? 'three_way' );
+			$tracking      = (string) ( $policy['tracking'] ?? 'include' );
+			$backup_egress = (string) ( $policy['backup_egress'] ?? 'include' );
+			$merge         = (string) ( $policy['merge'] ?? 'three_way' );
 			$entry    = array(
-				'tracking' => in_array( $tracking, array( 'include', 'exclude' ), true ) ? $tracking : 'include',
-				'merge'    => in_array( $merge, array( 'three_way', 'preserve_local' ), true ) ? $merge : 'three_way',
-				'reason'   => self::sanitize_key( (string) ( $policy['reason'] ?? 'agent_config_projection_policy' ) ),
+				'tracking'      => in_array( $tracking, array( 'include', 'exclude' ), true ) ? $tracking : 'include',
+				'backup_egress' => in_array( $backup_egress, array( 'include', 'exclude' ), true ) ? $backup_egress : 'include',
+				'merge'         => in_array( $merge, array( 'three_way', 'preserve_local' ), true ) ? $merge : 'three_way',
+				'reason'        => self::sanitize_key( (string) ( $policy['reason'] ?? 'agent_config_projection_policy' ) ),
 			);
 			if ( is_callable( $policy['redactor'] ?? null ) ) {
 				$entry['redactor'] = $policy['redactor'];
+			}
+			if ( is_callable( $policy['backup_redactor'] ?? null ) ) {
+				$entry['backup_redactor'] = $policy['backup_redactor'];
 			}
 
 			$normalized[ $path ] = $entry;
