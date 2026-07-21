@@ -28,4 +28,19 @@ final class AgentBundleAgentConfig {
 	public static function tracked_payload( array $config ): array {
 		return AgentConfigArtifactProjector::tracked_payload( AgentConfigFactory::normalize( $config ) );
 	}
+
+	/**
+	 * Return agent config for an export profile.
+	 *
+	 * @param array<string,mixed> $config  Agent config.
+	 * @param string              $profile Export profile.
+	 * @return array<string,mixed>
+	 */
+	public static function export_payload( array $config, string $profile ): array {
+		$config = AgentConfigFactory::normalize( $config );
+
+		return 'backup' === $profile
+			? AgentConfigArtifactProjector::backup_payload( $config )
+			: AgentConfigArtifactProjector::tracked_payload( $config );
+	}
 }
