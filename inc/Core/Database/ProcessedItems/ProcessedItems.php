@@ -387,8 +387,10 @@ class ProcessedItems extends BaseRepository {
 			$expires_at,
 			$claim_token
 		);
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared -- Query is prepared immediately above.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared -- Dynamic identifier is prepared with %i; every value uses a typed placeholder.
 		$upserted = $this->wpdb->query( $upsert_query );
+		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
 		if ( false === $upserted ) {
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 			$this->wpdb->query( 'ROLLBACK' );
@@ -403,8 +405,10 @@ class ProcessedItems extends BaseRepository {
 			$source_type,
 			$item_identifier
 		);
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared -- Query is prepared immediately above.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared -- Dynamic identifier is prepared with %i; every value uses a typed placeholder.
 		$row = $this->wpdb->get_row( $lock_query, ARRAY_A );
+		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
 
 		if ( ! is_array( $row ) ) {
 			// A different full identifier may share the 191-character unique-key prefix.
@@ -481,8 +485,11 @@ class ProcessedItems extends BaseRepository {
 			$job_id,
 			self::STATUS_CLAIMED
 		);
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared -- Query is prepared immediately above.
-		return $this->wpdb->query( $query );
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared -- Dynamic identifier is prepared with %i; every value uses a typed placeholder.
+		$result = $this->wpdb->query( $query );
+		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
+		return $result;
 	}
 
 	/**
@@ -565,8 +572,10 @@ class ProcessedItems extends BaseRepository {
 			$claim_token,
 			self::STATUS_CLAIMED
 		);
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared -- Query is prepared immediately above.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared -- Dynamic identifier is prepared with %i; every value uses a typed placeholder.
 		$owned = $this->wpdb->get_var( $ownership_query );
+		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
 
 		if ( ! is_string( $owned ) || ! hash_equals( $claim_token, $owned ) ) {
 			return false;
@@ -595,8 +604,10 @@ class ProcessedItems extends BaseRepository {
 				$claim_token,
 				self::STATUS_CLAIMED
 			);
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared -- Query is prepared immediately above.
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared -- Dynamic identifier is prepared with %i; every value uses a typed placeholder.
 			$transitioned = $this->wpdb->query( $transition_query );
+			// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
 		} else {
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 			$transitioned = $this->wpdb->delete(

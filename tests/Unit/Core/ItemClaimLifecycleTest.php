@@ -309,9 +309,7 @@ class ItemClaimLifecycleTest extends WP_UnitTestCase {
 
 	public function test_interleaved_status_write_before_terminal_cas_rolls_back_and_recovers(): void {
 		global $wpdb;
-		$job_id = $this->createJobWithClaim( array(), true );
-		$claim  = $this->claim( 'process-death-id', $job_id, 'recovered-revision' );
-		datamachine_set_engine_data( $job_id, array( ProcessedItems::CLAIM_METADATA_KEY => $claim ) );
+		$job_id     = $this->createProcessingJobWithTrackedClaim( 'process-death-id', 'recovered-revision' );
 		$interleave = static function ( string $status, int $filtered_job_id ) use ( $wpdb ): string {
 			$wpdb->update(
 				( new Jobs() )->get_table_name(),
@@ -338,9 +336,7 @@ class ItemClaimLifecycleTest extends WP_UnitTestCase {
 	}
 
 	public function test_interruption_after_failure_commit_preserves_cleanup_for_replay(): void {
-		$job_id = $this->createJobWithClaim( array(), true );
-		$claim  = $this->claim( 'failed-commit-crash-id', $job_id, 'must-not-persist' );
-		datamachine_set_engine_data( $job_id, array( ProcessedItems::CLAIM_METADATA_KEY => $claim ) );
+		$job_id                 = $this->createProcessingJobWithTrackedClaim( 'failed-commit-crash-id', 'must-not-persist' );
 		$interrupt_after_commit = static function ( int $committed_job_id, string $status ) use ( $job_id ): void {
 			if ( $job_id !== $committed_job_id || JobStatus::isStatusSuccess( $status ) ) {
 				return;
@@ -426,7 +422,7 @@ class ItemClaimLifecycleTest extends WP_UnitTestCase {
 		$this->assertTrue( $this->jobs->complete_job( $job_id, JobStatus::COMPLETED ) );
 		$this->assertSame( 'success-revision', $this->tracked->get( self::NAMESPACE, 'success-id' )['source_revision'] );
 		$this->assertFalse( $this->processed->has_active_claim( self::SCOPE, self::SOURCE, 'success-id' ) );
-		$this->assertSame( 1, datamachine_get_engine_data( $job_id )[ RunMetrics::KEY ]['counts']['processed'] );
+		$this->assertSame( 1, RunMetrics::fromJob( $this->jobs->get_job( $job_id ) )['counts']['processed'] );
 	}
 
 	public function test_ordinary_terminal_failure_releases_claim(): void {
@@ -673,7 +669,7 @@ class ItemClaimLifecycleTest extends WP_UnitTestCase {
 		$this->assertSame( 'mixed-success-revision', $this->tracked->get( self::NAMESPACE, 'mixed-success-owned' )['source_revision'] );
 		$this->assertTrue( $this->processed->has_item_been_processed( self::SCOPE, self::SOURCE, 'mixed-success-legacy' ) );
 		$this->assertFalse( $this->processed->has_active_claim( self::SCOPE, self::SOURCE, 'mixed-success-owned' ) );
-		$this->assertSame( 2, datamachine_get_engine_data( $job_id )[ RunMetrics::KEY ]['counts']['processed'] );
+		$this->assertSame( 2, RunMetrics::fromJob( $this->jobs->get_job( $job_id ) )['counts']['processed'] );
 	}
 
 	public function test_malformed_content_addressed_ref_releases_sidecar_claim(): void {
@@ -772,6 +768,13 @@ class ItemClaimLifecycleTest extends WP_UnitTestCase {
 			$this->jobs->start_job( $job_id );
 		}
 		datamachine_set_engine_data( $job_id, $claim ? array( ProcessedItems::CLAIM_METADATA_KEY => $claim ) : array() );
+		return $job_id;
+	}
+
+	private function createProcessingJobWithTrackedClaim( string $item_id, string $revision ): int {
+		$job_id = $this->createJobWithClaim( array(), true );
+		$claim  = $this->claim( $item_id, $job_id, $revision );
+		datamachine_set_engine_data( $job_id, array( ProcessedItems::CLAIM_METADATA_KEY => $claim ) );
 		return $job_id;
 	}
 
