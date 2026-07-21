@@ -20,6 +20,9 @@ use DataMachine\Core\Steps\FlowStepConfig;
 defined( 'ABSPATH' ) || exit;
 
 class TestHandlerAbility {
+	private const DEFAULT_RAW_BYTE_LIMIT = 1048576;
+	private const MAX_RAW_BYTE_LIMIT     = 5242880;
+	private const MAX_RAW_PACKET_LIMIT   = 100;
 
 	private static bool $registered = false;
 
@@ -38,18 +41,20 @@ class TestHandlerAbility {
 				'datamachine/test-handler',
 				array(
 					'label'               => __( 'Test Handler', 'data-machine' ),
-					'description'         => __( 'Dry-run any fetch handler with a config and return packet summaries.', 'data-machine' ),
+					'description'         => __( 'Dry-run any fetch handler with a config and return compact summaries or bounded raw packets.', 'data-machine' ),
 					'category'            => 'datamachine-pipeline',
 					'input_schema'        => array(
-						'type'       => 'object',
-						'properties' => array(
+						'type'                 => 'object',
+						'additionalProperties' => false,
+						'properties'           => array(
 							'handler_slug' => array(
 								'type'        => 'string',
 								'description' => __( 'Handler slug to test (required unless flow_id provided)', 'data-machine' ),
 							),
 							'config'       => array(
-								'type'        => 'object',
-								'description' => __( 'Handler configuration overrides', 'data-machine' ),
+								'type'                 => 'object',
+								'description'          => __( 'Handler configuration overrides', 'data-machine' ),
+								'additionalProperties' => true,
 							),
 							'flow_id'      => array(
 								'type'        => 'integer',
@@ -57,23 +62,82 @@ class TestHandlerAbility {
 							),
 							'limit'        => array(
 								'type'        => 'integer',
-								'description' => __( 'Max packets to return (default 5)', 'data-machine' ),
+								'description' => __( 'Max packets to return (default 5). Compact mode accepts 0 for all packets; raw mode is always bounded to 1-100 packets.', 'data-machine' ),
 								'default'     => 5,
+								'minimum'     => 0,
+							),
+							'output_mode'  => array(
+								'type'        => 'string',
+								'description' => __( 'Packet output mode. Compact returns the backward-compatible preview; raw returns complete text/JSON packet envelopes within explicit limits.', 'data-machine' ),
+								'enum'        => array( 'compact', 'raw' ),
+								'default'     => 'compact',
+							),
+							'byte_limit'   => array(
+								'type'        => 'integer',
+								'description' => __( 'Maximum serialized packet bytes returned in raw mode (default 1048576, maximum 5242880). Whole packets are omitted rather than partially truncated.', 'data-machine' ),
+								'default'     => self::DEFAULT_RAW_BYTE_LIMIT,
+								'minimum'     => 1,
+								'maximum'     => self::MAX_RAW_BYTE_LIMIT,
 							),
 						),
 					),
 					'output_schema'       => array(
-						'type'       => 'object',
-						'properties' => array(
+						'type'                 => 'object',
+						'additionalProperties' => false,
+						'properties'           => array(
 							'success'           => array( 'type' => 'boolean' ),
 							'handler_slug'      => array( 'type' => 'string' ),
 							'handler_label'     => array( 'type' => 'string' ),
-							'config_used'       => array( 'type' => 'object' ),
-							'packets'           => array( 'type' => 'array' ),
+							'config_used'       => array( 'type' => 'object', 'additionalProperties' => true ),
+							'packets'           => array(
+								'type'        => 'array',
+								'description' => __( 'Compact packet summaries, or raw packet envelopes containing type, timestamp, data, and metadata.', 'data-machine' ),
+								'items'       => array(
+									'type'                 => 'object',
+									'additionalProperties' => true,
+									'properties'           => array(
+										'title'           => array( 'type' => 'string' ),
+										'content_preview' => array( 'type' => 'string' ),
+										'source_url'      => array( 'type' => 'string' ),
+										'type'            => array( 'type' => 'string' ),
+										'timestamp'       => array( 'type' => 'integer' ),
+										'data'            => array( 'type' => 'object' ),
+										'metadata'        => array( 'type' => 'object' ),
+									),
+								),
+							),
 							'packet_count'      => array( 'type' => 'integer' ),
-							'warnings'          => array( 'type' => 'array' ),
+							'warnings'          => array( 'type' => 'array', 'items' => array( 'type' => 'string' ) ),
 							'execution_time_ms' => array( 'type' => 'number' ),
 							'error'             => array( 'type' => 'string' ),
+							'output_mode'       => array(
+								'type' => 'string',
+								'enum' => array( 'raw' ),
+							),
+							'limits'            => array(
+								'type'                 => 'object',
+								'additionalProperties' => false,
+								'required'             => array( 'packet_count', 'bytes' ),
+								'properties'           => array(
+									'packet_count' => array( 'type' => 'integer', 'minimum' => 1, 'maximum' => self::MAX_RAW_PACKET_LIMIT ),
+									'bytes'        => array( 'type' => 'integer', 'minimum' => 1, 'maximum' => self::MAX_RAW_BYTE_LIMIT ),
+								),
+							),
+							'truncation'        => array(
+								'type'                 => 'object',
+								'additionalProperties' => false,
+								'required'             => array( 'truncated', 'reasons', 'original_packet_count', 'returned_packet_count', 'omitted_packet_count', 'returned_bytes', 'redacted_fields', 'binary_fields' ),
+								'properties'           => array(
+									'truncated'             => array( 'type' => 'boolean' ),
+									'reasons'               => array( 'type' => 'array', 'items' => array( 'type' => 'string', 'enum' => array( 'packet_limit', 'byte_limit', 'binary_content' ) ) ),
+									'original_packet_count' => array( 'type' => 'integer' ),
+									'returned_packet_count' => array( 'type' => 'integer' ),
+									'omitted_packet_count'  => array( 'type' => 'integer' ),
+									'returned_bytes'        => array( 'type' => 'integer' ),
+									'redacted_fields'       => array( 'type' => 'array', 'items' => array( 'type' => 'string' ) ),
+									'binary_fields'         => array( 'type' => 'array', 'items' => array( 'type' => 'string' ) ),
+								),
+							),
 						),
 					),
 					'execute_callback'    => array( $this, 'execute' ),
@@ -106,6 +170,8 @@ class TestHandlerAbility {
 		$config       = $input['config'] ?? array();
 		$flow_id      = isset( $input['flow_id'] ) ? (int) $input['flow_id'] : null;
 		$limit        = (int) ( $input['limit'] ?? 5 );
+		$output_mode  = 'raw' === ( $input['output_mode'] ?? 'compact' ) ? 'raw' : 'compact';
+		$byte_limit   = (int) ( $input['byte_limit'] ?? self::DEFAULT_RAW_BYTE_LIMIT );
 		$warnings     = array();
 
 		// Resolve from flow if flow_id provided.
@@ -183,6 +249,47 @@ class TestHandlerAbility {
 		}
 
 		$total_count = count( $packets );
+
+		if ( 'raw' === $output_mode ) {
+			$packet_limit = max( 1, min( self::MAX_RAW_PACKET_LIMIT, $limit > 0 ? $limit : 5 ) );
+			$byte_limit   = max( 1, min( self::MAX_RAW_BYTE_LIMIT, $byte_limit ) );
+			$raw_output   = $this->formatRawPackets( $packets, $packet_limit, $byte_limit );
+			$config_used  = $this->sanitizeRawValue( $config, 'config', $raw_output['redacted_fields'], $raw_output['binary_fields'] );
+
+			$raw_output['truncation']['redacted_fields'] = $raw_output['redacted_fields'];
+			$raw_output['truncation']['binary_fields']   = $raw_output['binary_fields'];
+			if ( ! empty( $raw_output['binary_fields'] ) && ! in_array( 'binary_content', $raw_output['truncation']['reasons'], true ) ) {
+				$raw_output['truncation']['reasons'][] = 'binary_content';
+				$raw_output['truncation']['truncated'] = true;
+			}
+
+			if ( $raw_output['truncation']['truncated'] ) {
+				$warnings[] = sprintf(
+					'Raw packet output truncated: returned %d of %d packets (%d of %d byte limit).',
+					$raw_output['truncation']['returned_packet_count'],
+					$total_count,
+					$raw_output['truncation']['returned_bytes'],
+					$byte_limit
+				);
+			}
+
+			return array(
+				'success'           => true,
+				'handler_slug'      => $handler_slug,
+				'handler_label'     => $handler_label,
+				'config_used'       => $config_used,
+				'packets'           => $raw_output['packets'],
+				'packet_count'      => $total_count,
+				'warnings'          => $warnings,
+				'execution_time_ms' => $elapsed_ms,
+				'output_mode'       => 'raw',
+				'limits'            => array(
+					'packet_count' => $packet_limit,
+					'bytes'        => $byte_limit,
+				),
+				'truncation'        => $raw_output['truncation'],
+			);
+		}
 
 		if ( $limit > 0 && $total_count > $limit ) {
 			$packets    = array_slice( $packets, 0, $limit );
@@ -292,5 +399,120 @@ class TestHandlerAbility {
 			'metadata'        => $metadata,
 			'source_url'      => $metadata['source_url'] ?? '',
 		);
+	}
+
+	/**
+	 * Serialize complete text packets without cutting through a packet body.
+	 *
+	 * @param array $packets      DataPacket instances.
+	 * @param int   $packet_limit Maximum packets to return.
+	 * @param int   $byte_limit   Maximum serialized packet bytes to return.
+	 * @return array Raw packets and explicit truncation metadata.
+	 */
+	private function formatRawPackets( array $packets, int $packet_limit, int $byte_limit ): array {
+		$returned        = array();
+		$returned_bytes  = 0;
+		$reasons         = array();
+		$redacted_fields = array();
+		$binary_fields   = array();
+		$total_count     = count( $packets );
+
+		foreach ( array_slice( $packets, 0, $packet_limit ) as $index => $packet ) {
+			$serialized = $packet->addTo( array() );
+			$entry      = $serialized[0] ?? array();
+			$entry      = $this->sanitizeRawValue( $entry, 'packets.' . $index, $redacted_fields, $binary_fields );
+			$encoded    = wp_json_encode( $entry, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );
+			$bytes      = strlen( (string) $encoded );
+
+			if ( $returned_bytes + $bytes > $byte_limit ) {
+				$reasons[] = 'byte_limit';
+				break;
+			}
+
+			$returned[]      = $entry;
+			$returned_bytes += $bytes;
+		}
+
+		if ( $total_count > $packet_limit ) {
+			$reasons[] = 'packet_limit';
+		}
+		if ( ! empty( $binary_fields ) ) {
+			$reasons[] = 'binary_content';
+		}
+
+		$reasons        = array_values( array_unique( $reasons ) );
+		$returned_count = count( $returned );
+
+		return array(
+			'packets'         => $returned,
+			'redacted_fields' => $redacted_fields,
+			'binary_fields'   => $binary_fields,
+			'truncation'      => array(
+				'truncated'             => ! empty( $reasons ),
+				'reasons'               => $reasons,
+				'original_packet_count' => $total_count,
+				'returned_packet_count' => $returned_count,
+				'omitted_packet_count'  => $total_count - $returned_count,
+				'returned_bytes'        => $returned_bytes,
+				'redacted_fields'       => $redacted_fields,
+				'binary_fields'         => $binary_fields,
+			),
+		);
+	}
+
+	/**
+	 * Apply the artifact-output secret and binary policy recursively.
+	 *
+	 * @param mixed    $value           Value to sanitize.
+	 * @param string   $path            Dot path used in output metadata.
+	 * @param string[] $redacted_fields Redacted paths, passed by reference.
+	 * @param string[] $binary_fields   Binary paths, passed by reference.
+	 * @return mixed Sanitized value.
+	 */
+	private function sanitizeRawValue( $value, string $path, array &$redacted_fields, array &$binary_fields ) {
+		if ( is_array( $value ) ) {
+			$sanitized = array();
+			foreach ( $value as $key => $child ) {
+				$child_path = $path . '.' . $key;
+				if ( preg_match( '/(api[_-]?key|auth|bearer|cookie|credential|nonce|password|secret|signature|token)/i', (string) $key ) ) {
+					$sanitized[ $key ]  = '[redacted]';
+					$redacted_fields[] = $child_path;
+					continue;
+				}
+
+				$sanitized[ $key ] = $this->sanitizeRawValue( $child, $child_path, $redacted_fields, $binary_fields );
+			}
+
+			return $sanitized;
+		}
+
+		if ( is_object( $value ) ) {
+			return $this->sanitizeRawValue( get_object_vars( $value ), $path, $redacted_fields, $binary_fields );
+		}
+
+		if ( ! is_string( $value ) ) {
+			return $value;
+		}
+
+		if ( false !== strpos( $value, "\0" ) || ! mb_check_encoding( $value, 'UTF-8' ) ) {
+			$binary_fields[] = $path;
+			return '[binary omitted]';
+		}
+
+		$decoded = json_decode( $value, true );
+		if ( JSON_ERROR_NONE === json_last_error() && is_array( $decoded ) ) {
+			$sanitized_json = $this->sanitizeRawValue( $decoded, $path, $redacted_fields, $binary_fields );
+			if ( $sanitized_json !== $decoded ) {
+				return wp_json_encode( $sanitized_json, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );
+			}
+		}
+
+		$redacted = preg_replace( '/Bearer\s+[A-Za-z0-9._~+\/\-]+=*/i', 'Bearer [redacted]', $value );
+		$redacted = preg_replace( '/\b(api[_-]?key|token|secret|password)\b\s*[:=]\s*\S+/i', '$1: [redacted]', $redacted ?? $value );
+		if ( $redacted !== $value ) {
+			$redacted_fields[] = $path;
+		}
+
+		return $redacted;
 	}
 }

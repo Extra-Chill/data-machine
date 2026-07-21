@@ -29,6 +29,14 @@ namespace DataMachine\Engine\AI {
 	}
 }
 
+namespace DataMachine\Abilities\Handler {
+	if ( ! function_exists( __NAMESPACE__ . '\\wp_json_encode' ) ) {
+		function wp_json_encode( $data, $options = 0, $depth = 512 ) {
+			return json_encode( $data, $options, $depth );
+		}
+	}
+}
+
 // The Agents API registers ability categories and abilities from callbacks that
 // live in this namespace and call the helpers unqualified.
 namespace AgentsAPI\AI\Auth {
