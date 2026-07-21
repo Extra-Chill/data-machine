@@ -166,6 +166,7 @@ require_once dirname( __DIR__ ) . '/inc/Core/Workspace/WordPressWorkspaceScope.p
 require_once dirname( __DIR__ ) . '/inc/Engine/AI/Actions/PendingActionObservers.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/AI/Actions/WordPressActionDispatchObserver.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/AI/Actions/PendingActionStore.php';
+require_once dirname( __DIR__ ) . '/inc/Engine/AI/Actions/PendingActionHelper.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/AI/Actions/PendingActionScope.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/AI/Actions/PendingActionResolverAdapter.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/AI/Actions/ResolvePendingActionAbility.php';
@@ -176,6 +177,7 @@ use AgentsAPI\AI\Approvals\WP_Agent_Pending_Action_Handler;
 use AgentsAPI\AI\Approvals\WP_Agent_Pending_Action_Observer;
 use AgentsAPI\AI\Approvals\WP_Agent_Pending_Action_Resolver;
 use DataMachine\Engine\AI\Actions\PendingActionObservers;
+use DataMachine\Engine\AI\Actions\PendingActionHelper;
 use DataMachine\Engine\AI\Actions\PendingActionStore;
 use DataMachine\Engine\AI\Actions\ResolvePendingActionAbility;
 
@@ -605,21 +607,30 @@ add_filter(
 );
 
 switch_to_blog( 7 );
-PendingActionStore::store(
-	'act_origin_accept',
+$origin_envelope = PendingActionHelper::stage(
 	array(
+		'action_id'   => 'act_00000000-0000-4000-8000-000000000007',
 		'kind'        => 'origin_kind',
 		'summary'     => 'Resolve at origin.',
 		'apply_input' => array( 'target' => 'origin' ),
-		'created_by'  => 123,
-		'creator'     => 'user:123',
+		'user_id'     => 123,
+		'context'     => array(
+			'wordpress' => array( 'blog_id' => 1 ),
+			'trace_id'  => 'caller-context-preserved',
+		),
 	)
 );
+$origin_action_id = $origin_envelope['action_id'] ?? '';
+$origin_stored    = PendingActionStore::get( $origin_action_id );
 restore_current_blog();
 $GLOBALS['__resolver_current_blog'] = 2;
 
+resolver_smoke_assert( 7 === ( $origin_stored['context']['wordpress']['blog_id'] ?? null ), 'store overwrites forged WordPress origin with the actual staging blog', $failures, $passes );
+resolver_smoke_assert( 'caller-context-preserved' === ( $origin_stored['context']['trace_id'] ?? null ), 'store preserves non-reserved caller context', $failures, $passes );
+resolver_smoke_assert( 7 === ( $origin_envelope['payload']['metadata']['datamachine']['context']['wordpress']['blog_id'] ?? null ), 'approval envelope exposes the actual server-owned origin', $failures, $passes );
+
 $origin_result = $adapter->resolve_pending_action(
-	'act_origin_accept',
+	$origin_action_id,
 	WP_Agent_Approval_Decision::accepted(),
 	'user:123',
 	array(),

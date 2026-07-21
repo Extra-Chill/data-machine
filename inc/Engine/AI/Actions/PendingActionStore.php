@@ -199,7 +199,7 @@ class PendingActionStore {
 			: WordPressWorkspaceScope::current();
 		$payload['workspace'] = $workspace->to_array();
 		$context              = is_array( $payload['context'] ?? null ) ? $payload['context'] : array();
-		$context['wordpress'] = $context['wordpress'] ?? WordPressWorkspaceScope::metadata();
+		$context['wordpress'] = WordPressWorkspaceScope::metadata();
 		$payload['context']   = $context;
 		$metadata             = is_array( $payload['metadata'] ?? null ) ? $payload['metadata'] : array();
 		$datamachine          = is_array( $metadata['datamachine'] ?? null ) ? $metadata['datamachine'] : array();
