@@ -107,6 +107,7 @@ class PendingActionStore {
 			resolution_result longtext NULL,
 			resolution_error text NULL,
 			resolution_metadata longtext NULL,
+			receipt_nonce varchar(64) NULL,
 			PRIMARY KEY  (action_id),
 			KEY workspace (workspace_type, workspace_id),
 			KEY status (status),
@@ -147,6 +148,11 @@ class PendingActionStore {
 		if ( ! self::column_exists( $table_name, 'workspace_id' ) ) {
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
 			$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i ADD COLUMN workspace_id varchar(191) NULL', $table_name ) );
+		}
+
+		if ( ! self::column_exists( $table_name, 'receipt_nonce' ) ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
+			$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i ADD COLUMN receipt_nonce varchar(64) NULL', $table_name ) );
 		}
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
@@ -260,9 +266,10 @@ class PendingActionStore {
 			'resolution_result'   => null,
 			'resolution_error'    => null,
 			'resolution_metadata' => null,
+			'receipt_nonce'       => null,
 		);
 
-		$formats = array( '%s', '%s', '%s', '%s', '%s', '%d', '%s', '%s', '%s', '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%s', '%s', '%s', '%s' );
+		$formats = array( '%s', '%s', '%s', '%s', '%s', '%d', '%s', '%s', '%s', '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%s', '%s', '%s', '%s', '%s' );
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
 		$stored = $wpdb->replace( self::get_table_name(), $row, $formats );
@@ -287,7 +294,10 @@ class PendingActionStore {
 			}
 
 			$data = get_transient( self::TRANSIENT_PREFIX . $action_id );
-			return is_array( $data ) ? $data : null;
+			if ( ! is_array( $data ) || ( ! $include_resolved && WP_Agent_Pending_Action_Status::PENDING !== ( $data['status'] ?? null ) ) ) {
+				return null;
+			}
+			return $data;
 		}
 
 		$row = self::get_row( $action_id );
@@ -398,6 +408,71 @@ class PendingActionStore {
 		}
 
 		return false !== $updated;
+	}
+
+	/**
+	 * Atomically claim a pending action before a handler can apply it.
+	 *
+	 * @return array|null Claimed payload, or null when another resolver won.
+	 */
+	public static function claim_for_resolution( string $action_id, ?string $resolver = null ): ?array {
+		$nonce = bin2hex( random_bytes( 24 ) );
+		if ( ! self::has_database() ) {
+			if ( ! self::allows_transient_fallback() ) {
+				self::warn_database_unavailable( 'claim_for_resolution' );
+				return null;
+			}
+			$payload = get_transient( self::TRANSIENT_PREFIX . $action_id );
+			if ( ! is_array( $payload ) || WP_Agent_Pending_Action_Status::PENDING !== ( $payload['status'] ?? null ) || (int) ( $payload['expires_at'] ?? 0 ) <= time() ) {
+				return null;
+			}
+			$payload['status']        = 'applying';
+			$payload['receipt_nonce'] = $nonce;
+			$payload['resolver']      = self::nullable_string( $resolver ?? self::current_resolver() );
+			set_transient( self::TRANSIENT_PREFIX . $action_id, $payload, self::resolve_ttl( $payload ) );
+			return $payload;
+		}
+
+		global $wpdb;
+		// A status predicate makes this a cross-process compare-and-swap claim.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
+		$updated = $wpdb->query( $wpdb->prepare( 'UPDATE %i SET status = %s, receipt_nonce = %s, resolver = %s WHERE action_id = %s AND status = %s AND ( expires_at IS NULL OR expires_at > UTC_TIMESTAMP() )', self::get_table_name(), 'applying', $nonce, self::nullable_string( $resolver ?? self::current_resolver() ), $action_id, WP_Agent_Pending_Action_Status::PENDING ) );
+		if ( 1 !== $updated ) {
+			return null;
+		}
+		return self::get( $action_id, true );
+	}
+
+	/** Complete a claim only when its receipt nonce still owns the applying row. */
+	public static function complete_claim( string $action_id, string $nonce, string $status, $result = null, ?string $error = null, ?string $resolver = null, array $metadata = array() ): bool {
+		if ( ! in_array( $status, array( WP_Agent_Pending_Action_Status::ACCEPTED, WP_Agent_Pending_Action_Status::REJECTED, 'failed' ), true ) ) {
+			return false;
+		}
+		if ( ! self::has_database() ) {
+			$payload = get_transient( self::TRANSIENT_PREFIX . $action_id );
+			if ( ! is_array( $payload ) || 'applying' !== ( $payload['status'] ?? null ) || ! hash_equals( (string) ( $payload['receipt_nonce'] ?? '' ), $nonce ) ) {
+				return false;
+			}
+			$payload['status'] = $status;
+			$completed = set_transient( self::TRANSIENT_PREFIX . $action_id, $payload, self::resolve_ttl( $payload ) );
+			if ( $completed && in_array( $status, array( WP_Agent_Pending_Action_Status::ACCEPTED, WP_Agent_Pending_Action_Status::REJECTED ), true ) ) {
+				$action = self::action_from_payload( $payload );
+				if ( null !== $action ) {
+					self::dispatch_resolution( $action, $status, $resolver ?? self::current_resolver() );
+				}
+			}
+			return $completed;
+		}
+		global $wpdb;
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
+		$updated = $wpdb->update( self::get_table_name(), array( 'status' => $status, 'resolved_at' => current_time( 'mysql', true ), 'resolved_by' => get_current_user_id(), 'resolver' => self::nullable_string( $resolver ?? self::current_resolver() ), 'resolution_result' => self::encode_json( $result ), 'resolution_error' => $error, 'resolution_metadata' => self::encode_json( $metadata ) ), array( 'action_id' => $action_id, 'status' => 'applying', 'receipt_nonce' => $nonce ), array( '%s', '%s', '%d', '%s', '%s', '%s', '%s' ), array( '%s', '%s', '%s' ) );
+		if ( 1 === $updated && in_array( $status, array( WP_Agent_Pending_Action_Status::ACCEPTED, WP_Agent_Pending_Action_Status::REJECTED ), true ) ) {
+			$action = self::get_action( $action_id, true );
+			if ( null !== $action ) {
+				self::dispatch_resolution( $action, $status, $resolver ?? self::current_resolver() );
+			}
+		}
+		return 1 === $updated;
 	}
 
 	/**
@@ -779,6 +854,7 @@ class PendingActionStore {
 			'resolution_result'   => self::decode_json( $row['resolution_result'] ?? null ),
 			'resolution_error'    => isset( $row['resolution_error'] ) ? (string) $row['resolution_error'] : null,
 			'resolution_metadata' => self::decode_json( $row['resolution_metadata'] ?? null ),
+			'receipt_nonce'       => isset( $row['receipt_nonce'] ) ? (string) $row['receipt_nonce'] : '',
 		);
 	}
 

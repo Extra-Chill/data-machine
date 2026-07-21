@@ -167,6 +167,7 @@ require_once dirname( __DIR__ ) . '/inc/Engine/AI/Actions/PendingActionObservers
 require_once dirname( __DIR__ ) . '/inc/Engine/AI/Actions/WordPressActionDispatchObserver.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/AI/Actions/PendingActionStore.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/AI/Actions/PendingActionHelper.php';
+require_once dirname( __DIR__ ) . '/inc/Engine/AI/Actions/PendingActionAuthorizationReceipt.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/AI/Actions/PendingActionScope.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/AI/Actions/PendingActionResolverAdapter.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/AI/Actions/ResolvePendingActionAbility.php';

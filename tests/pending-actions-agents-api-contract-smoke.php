@@ -114,8 +114,8 @@ datamachine_pending_actions_assert( str_contains( $store_source, 'datamachine_pe
 datamachine_pending_actions_assert( str_contains( $store_source, 'public static function get( string $action_id, bool $include_resolved = false )' ), 'legacy get defaults to live-pending rows only', $failures, $passes );
 datamachine_pending_actions_assert( str_contains( $store_source, 'public static function inspect( string $action_id ): ?array' ), 'inspect surface can fetch resolved audit rows', $failures, $passes );
 datamachine_pending_actions_assert( str_contains( $store_source, 'WP_Agent_Pending_Action_Status::normalize' ), 'lifecycle vocabulary is delegated to Agents API WP_Agent_Pending_Action_Status', $failures, $passes );
-datamachine_pending_actions_assert( str_contains( $resolver_source, 'record_resolution( $action_id, WP_Agent_Pending_Action_Status::ACCEPTED' ), 'accepted resolutions are retained instead of transient-deleted', $failures, $passes );
-datamachine_pending_actions_assert( str_contains( $resolver_source, 'record_resolution( $action_id, WP_Agent_Pending_Action_Status::REJECTED' ), 'rejected resolutions are retained instead of transient-deleted', $failures, $passes );
+datamachine_pending_actions_assert( str_contains( $resolver_source, 'complete_claim( $action_id, (string) $claimed[\'receipt_nonce\'], WP_Agent_Pending_Action_Status::ACCEPTED' ), 'accepted claims are retained as audited terminal rows', $failures, $passes );
+datamachine_pending_actions_assert( str_contains( $resolver_source, 'complete_claim( $action_id, (string) $claimed[\'receipt_nonce\'], WP_Agent_Pending_Action_Status::REJECTED' ), 'rejected claims are retained as audited terminal rows', $failures, $passes );
 
 echo "\n[3] List/get/summary surfaces are registered for agents and operators:\n";
 foreach ( array( 'datamachine/list-pending-actions', 'datamachine/get-pending-action', 'datamachine/summarize-pending-actions' ) as $ability ) {
