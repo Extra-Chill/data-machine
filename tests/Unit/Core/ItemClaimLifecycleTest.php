@@ -31,8 +31,9 @@ class ItemClaimLifecycleTest extends WP_UnitTestCase {
 	private TrackedItems $tracked;
 	private Jobs $jobs;
 	private int $admin_id;
-	private ?Closure $schedule_failure_filter = null;
-	private ?Closure $chunk_size_filter       = null;
+	private ?Closure $schedule_failure_filter   = null;
+	private ?Closure $chunk_size_filter         = null;
+	private ?Closure $completion_handler_filter = null;
 
 	public function set_up(): void {
 		parent::set_up();
@@ -52,6 +53,9 @@ class ItemClaimLifecycleTest extends WP_UnitTestCase {
 		}
 		if ( null !== $this->chunk_size_filter ) {
 			remove_filter( 'datamachine_batch_chunk_size', $this->chunk_size_filter );
+		}
+		if ( null !== $this->completion_handler_filter ) {
+			remove_filter( 'datamachine_item_claim_completion_handlers', $this->completion_handler_filter );
 		}
 		$this->deleteTestRows();
 		parent::tear_down();
@@ -117,6 +121,44 @@ class ItemClaimLifecycleTest extends WP_UnitTestCase {
 		$this->assertFalse( $result );
 		$this->assertNull( $this->tracked->get( self::NAMESPACE, 'rollback-id' ) );
 		$this->assertTrue( $this->processed->has_active_claim( self::SCOPE, self::SOURCE, 'rollback-id' ) );
+	}
+
+	public function test_terminal_completion_callback_failure_fails_job_and_releases_for_retry(): void {
+		$job_id = $this->createJobWithClaim( array(), true );
+		$claim  = $this->claimWithCompletion(
+			'terminal-rollback-id',
+			$job_id,
+			array(
+				'handler'          => 'failing_test',
+				'retain_processed' => false,
+			)
+		);
+		datamachine_set_engine_data( $job_id, array( ProcessedItems::CLAIM_METADATA_KEY => $claim ) );
+		$this->completion_handler_filter = function ( array $handlers ): array {
+			$handlers['failing_test'] = function ( array $payload, int $job_id, array $claim ): bool {
+				unset( $payload, $job_id, $claim );
+				$this->tracked->upsert(
+					array(
+						'namespace'       => self::NAMESPACE,
+						'item_id'         => 'terminal-rollback-id',
+						'source_revision' => 'must-rollback',
+					)
+				);
+				return false;
+			};
+			return $handlers;
+		};
+		add_filter( 'datamachine_item_claim_completion_handlers', $this->completion_handler_filter );
+
+		$this->assertTrue( $this->jobs->complete_job( $job_id, JobStatus::COMPLETED ) );
+
+		$job = $this->jobs->get_job( $job_id );
+		$this->assertIsArray( $job );
+		$this->assertFalse( JobStatus::isStatusSuccess( (string) $job['status'] ) );
+		$this->assertStringContainsString( 'item_claim_completion_failed', (string) $job['status'] );
+		$this->assertNull( $this->tracked->get( self::NAMESPACE, 'terminal-rollback-id' ) );
+		$this->assertFalse( $this->processed->has_active_claim( self::SCOPE, self::SOURCE, 'terminal-rollback-id' ) );
+		$this->assertIsArray( $this->context( 'retry-flow-step', $job_id + 1000 )->claimItemOwnership( self::SCOPE, 'terminal-rollback-id' ) );
 	}
 
 	public function test_gated_inline_continuation_completes_every_claim(): void {
@@ -389,6 +431,25 @@ class ItemClaimLifecycleTest extends WP_UnitTestCase {
 		$this->assertFalse( $this->processed->has_active_claim( self::SCOPE, self::SOURCE, 'mixed-legacy' ) );
 	}
 
+	public function test_mixed_descriptor_and_legacy_claims_are_both_completed(): void {
+		$job_id = $this->createJobWithClaim( array(), true );
+		$claim  = $this->claim( 'mixed-success-owned', $job_id, 'mixed-success-revision' );
+		$this->assertTrue( $this->processed->claim_item( self::SCOPE, self::SOURCE, 'mixed-success-legacy', $job_id ) );
+		datamachine_set_engine_data(
+			$job_id,
+			array_merge(
+				$this->legacyEngineData( 'mixed-success-legacy' ),
+				array( ProcessedItems::CLAIM_METADATA_KEY => $claim )
+			)
+		);
+
+		$this->assertTrue( $this->jobs->complete_job( $job_id, JobStatus::COMPLETED ) );
+
+		$this->assertSame( 'mixed-success-revision', $this->tracked->get( self::NAMESPACE, 'mixed-success-owned' )['source_revision'] );
+		$this->assertTrue( $this->processed->has_item_been_processed( self::SCOPE, self::SOURCE, 'mixed-success-legacy' ) );
+		$this->assertFalse( $this->processed->has_active_claim( self::SCOPE, self::SOURCE, 'mixed-success-owned' ) );
+	}
+
 	public function test_malformed_content_addressed_ref_releases_sidecar_claim(): void {
 		$claim     = $this->claim( 'malformed-ref', 904, 'malformed-revision' );
 		$parent_id = $this->createJobWithClaim( array(), true );
@@ -409,10 +470,9 @@ class ItemClaimLifecycleTest extends WP_UnitTestCase {
 	}
 
 	private function claim( string $item_id, int $job_id, string $revision ): array {
-		$claim = $this->context( 'actual-flow-step', $job_id )->claimItemOwnership(
-			self::SCOPE,
+		return $this->claimWithCompletion(
 			$item_id,
-			ProcessedItems::DEFAULT_CLAIM_TTL_SECONDS,
+			$job_id,
 			array(
 				'handler'          => 'tracked_item',
 				'retain_processed' => false,
@@ -426,6 +486,15 @@ class ItemClaimLifecycleTest extends WP_UnitTestCase {
 					),
 				),
 			)
+		);
+	}
+
+	private function claimWithCompletion( string $item_id, int $job_id, array $completion ): array {
+		$claim = $this->context( 'actual-flow-step', $job_id )->claimItemOwnership(
+			self::SCOPE,
+			$item_id,
+			ProcessedItems::DEFAULT_CLAIM_TTL_SECONDS,
+			$completion
 		);
 		$this->assertIsArray( $claim );
 		return $claim;

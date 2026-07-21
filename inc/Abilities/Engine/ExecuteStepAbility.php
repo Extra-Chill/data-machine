@@ -585,6 +585,15 @@ class ExecuteStepAbility {
 				$context = datamachine_get_file_context( $flow_id );
 				$cleanup->cleanup_job_data_packets( $job_id, $context );
 			}
+			if ( JobStatus::isStatusSuccess( $status_override ) && ! JobStatus::isStatusSuccess( $transition['status'] ) ) {
+				return array(
+					'success'      => false,
+					'step_success' => false,
+					'outcome'      => 'claim_completion_failed',
+					'reason'       => 'item_claim_completion_failed',
+					'status'       => $transition['status'],
+				);
+			}
 
 			do_action(
 				'datamachine_log',
@@ -739,6 +748,15 @@ class ExecuteStepAbility {
 				$cleanup = new FileCleanup();
 				$context = datamachine_get_file_context( $flow_id );
 				$cleanup->cleanup_job_data_packets( $job_id, $context );
+			}
+			if ( ! JobStatus::isStatusSuccess( $transition['status'] ) ) {
+				return array(
+					'success'      => false,
+					'step_success' => false,
+					'outcome'      => 'claim_completion_failed',
+					'reason'       => 'item_claim_completion_failed',
+					'status'       => $transition['status'],
+				);
 			}
 
 			do_action(

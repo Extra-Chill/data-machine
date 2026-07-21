@@ -464,16 +464,16 @@ class ProcessedItems extends BaseRepository {
 	 * @param string $source_type     Source type.
 	 * @param string $item_identifier Unique item identifier.
 	 * @param int    $job_id          Completing legacy job ID.
-	 * @return bool Whether the job completed its current claim.
+	 * @return int|false Number of completed claims, or false on error.
 	 */
-	public function complete_claim_for_job( string $flow_step_id, string $source_type, string $item_identifier, int $job_id ): bool {
+	public function complete_claim_for_job( string $flow_step_id, string $source_type, string $item_identifier, int $job_id ): int|false {
 		if ( 1 > $job_id ) {
 			return false;
 		}
 
 		$now = current_time( 'mysql', true );
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-		$updated = $this->wpdb->query(
+		return $this->wpdb->query(
 			// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Table identifier uses %i; all values use typed placeholders.
 			$this->wpdb->prepare(
 				'UPDATE %i SET status = %s, processed_timestamp = %s, claim_expires_at = NULL, claim_token = NULL WHERE flow_step_id = %s AND source_type = %s AND item_identifier = %s AND job_id = %d AND status = %s',
@@ -487,8 +487,6 @@ class ProcessedItems extends BaseRepository {
 				self::STATUS_CLAIMED
 			)
 		);
-
-		return false !== $updated && 0 < $updated;
 	}
 
 	/**

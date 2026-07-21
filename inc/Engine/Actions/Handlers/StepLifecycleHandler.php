@@ -61,50 +61,44 @@ class StepLifecycleHandler {
 	 *
 	 * @param int        $job_id      Completed job ID.
 	 * @param array|null $engine_data Optional engine data snapshot.
+	 * @return bool Whether all owned descriptor and legacy claims completed.
 	 */
-	public static function handleCompleted( int $job_id, ?array $engine_data = null ): void {
+	public static function handleCompleted( int $job_id, ?array $engine_data = null ): bool {
 		$engine_data = is_array( $engine_data ) ? $engine_data : \datamachine_get_engine_data( $job_id );
 		$claims      = self::claimsFromEngine( $engine_data );
 		if ( ! empty( $claims ) ) {
 			foreach ( $claims as $claim ) {
-				self::completeClaim( $claim, $job_id );
+				if ( ! self::completeClaim( $claim, $job_id ) ) {
+					return false;
+				}
 			}
-			return;
 		}
 
 		$item_identifier = $engine_data['item_identifier'] ?? null;
 		$source_type     = $engine_data['source_type'] ?? null;
 		if ( empty( $item_identifier ) || empty( $source_type ) ) {
-			return;
+			return true;
 		}
 
 		$source_flow_step_id = self::resolveSourceIngestionFlowStepId( $engine_data );
 		if ( empty( $source_flow_step_id ) ) {
-			return;
+			return true;
 		}
 
-		$completed = ( new ProcessedItems() )->complete_claim_for_job(
+		$legacy_completed = ( new ProcessedItems() )->complete_claim_for_job(
 			$source_flow_step_id,
 			(string) $source_type,
 			(string) $item_identifier,
 			$job_id
 		);
-		if ( ! $completed ) {
-			return;
+		if ( false === $legacy_completed ) {
+			return false;
 		}
-		RunMetrics::increment( $job_id, 'processed' );
+		if ( 0 < $legacy_completed ) {
+			RunMetrics::increment( $job_id, 'processed' );
+		}
 
-		\do_action(
-			'datamachine_log',
-			'debug',
-			'Deferred mark-as-processed on pipeline completion',
-			array(
-				'job_id'             => $job_id,
-				'item_identifier'    => $item_identifier,
-				'source_type'        => $source_type,
-				'fetch_flow_step_id' => $source_flow_step_id,
-			)
-		);
+		return true;
 	}
 
 	/**
@@ -134,13 +128,32 @@ class StepLifecycleHandler {
 	 * @param string $status Final job status.
 	 */
 	public static function handleTerminal( int $job_id, string $status ): void {
-		$engine_data = \datamachine_get_engine_data( $job_id );
 		if ( JobStatus::isStatusSuccess( $status ) ) {
-			\do_action( 'datamachine_step_lifecycle_completed', $job_id, $engine_data );
 			return;
 		}
 
-		\do_action( 'datamachine_step_lifecycle_failed', $job_id, $engine_data );
+		\do_action( 'datamachine_step_lifecycle_failed', $job_id, \datamachine_get_engine_data( $job_id ) );
+	}
+
+	/**
+	 * Complete owned claims before a successful terminal status is persisted.
+	 *
+	 * @param string $status Requested terminal status.
+	 * @param int    $job_id Job ID.
+	 * @param array  $job    Current job row.
+	 * @return string Original success status or an observable failure status.
+	 */
+	public static function filterTerminalStatus( string $status, int $job_id, array $job ): string {
+		unset( $job );
+		if ( ! JobStatus::isStatusSuccess( $status ) ) {
+			return $status;
+		}
+
+		if ( self::handleCompleted( $job_id ) ) {
+			return $status;
+		}
+
+		return JobStatus::failed( 'item_claim_completion_failed' )->toString();
 	}
 
 	/**
@@ -182,8 +195,9 @@ class StepLifecycleHandler {
 	 *
 	 * @param array $claim  Validated claim descriptor.
 	 * @param int   $job_id Completing job ID.
+	 * @return bool Whether the descriptor claim and its callback completed.
 	 */
-	private static function completeClaim( array $claim, int $job_id ): void {
+	private static function completeClaim( array $claim, int $job_id ): bool {
 		$processed  = new ProcessedItems();
 		$completion = is_array( $claim['completion'] ?? null ) ? $claim['completion'] : array();
 		$handler_id = is_string( $completion['handler'] ?? null ) ? $completion['handler'] : '';
@@ -194,8 +208,7 @@ class StepLifecycleHandler {
 			$handlers = apply_filters( 'datamachine_item_claim_completion_handlers', array() );
 			$handler  = $handlers[ $handler_id ] ?? null;
 			if ( ! is_callable( $handler ) ) {
-				self::releaseClaim( $claim );
-				return;
+				return false;
 			}
 
 			$callback = static fn(): bool => true === call_user_func( $handler, $payload, $job_id, $claim );
@@ -211,10 +224,10 @@ class StepLifecycleHandler {
 			false !== ( $completion['retain_processed'] ?? true )
 		);
 		if ( ! $owned ) {
-			self::releaseClaim( $claim );
-			return;
+			return false;
 		}
 		RunMetrics::increment( $job_id, 'processed' );
+		return true;
 	}
 
 	/**

@@ -1903,11 +1903,6 @@ class Jobs extends BaseRepository {
 			);
 		}
 
-		// Truncate to fit varchar(255) column.
-		if ( strlen( $status ) > 255 ) {
-			$status = substr( $status, 0, 252 ) . '...';
-		}
-
 		$job = $this->get_job( $job_id );
 		if ( ! is_array( $job ) ) {
 			return array(
@@ -1935,6 +1930,31 @@ class Jobs extends BaseRepository {
 				'current_status' => $current_status,
 				'status'         => $status,
 			);
+		}
+
+		if ( $is_final ) {
+			/**
+			 * Filter a terminal status before its irreversible database transition.
+			 *
+			 * @param string $status Current terminal status.
+			 * @param int    $job_id Job ID.
+			 * @param array  $job Current job row.
+			 */
+			$status   = (string) apply_filters( 'datamachine_job_terminal_status', $status, $job_id, $job );
+			$is_final = JobStatus::isStatusFinal( $status );
+			if ( ! $is_final ) {
+				return array(
+					'success'        => false,
+					'changed'        => false,
+					'current_status' => $current_status,
+					'status'         => $status,
+				);
+			}
+		}
+
+		// Truncate to fit varchar(255) column.
+		if ( strlen( $status ) > 255 ) {
+			$status = substr( $status, 0, 252 ) . '...';
 		}
 
 		$update_data = array();

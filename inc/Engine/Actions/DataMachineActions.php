@@ -72,6 +72,7 @@ function datamachine_register_core_actions() {
 	add_action( 'datamachine_step_lifecycle_completed', array( StepLifecycleHandler::class, 'handleCompleted' ), 10, 2 );
 	add_action( 'datamachine_step_lifecycle_failed', array( StepLifecycleHandler::class, 'handleFailed' ), 10, 2 );
 	add_action( 'datamachine_job_complete', array( StepLifecycleHandler::class, 'handleTerminal' ), 5, 2 );
+	add_filter( 'datamachine_job_terminal_status', array( StepLifecycleHandler::class, 'filterTerminalStatus' ), 10, 3 );
 	add_action( 'datamachine_batch_items_discarded', array( StepLifecycleHandler::class, 'handleDiscardedPackets' ), 10, 4 );
 	add_filter( 'datamachine_batch_item_cleanup_context', array( StepLifecycleHandler::class, 'captureBatchItemCleanupContext' ), 10, 2 );
 	add_filter( 'datamachine_item_claim_completion_handlers', array( TrackedItems::class, 'registerClaimCompletionHandler' ) );
