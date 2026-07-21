@@ -14,7 +14,6 @@
 namespace DataMachine\Core\Database\ProcessedItems;
 
 use DataMachine\Core\Database\BaseRepository;
-use DataMachine\Core\Database\LifecycleStateTransition;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit; // Exit if accessed directly.
@@ -27,6 +26,7 @@ class ProcessedItems extends BaseRepository {
 	const STATUS_PROCESSED          = 'processed';
 	const DEFAULT_CLAIM_TTL_SECONDS = 3600;
 	const CLAIM_METADATA_KEY        = '_datamachine_item_claim';
+	const CLAIMS_METADATA_KEY       = '_datamachine_item_claims';
 
 
 	/**
@@ -363,91 +363,100 @@ class ProcessedItems extends BaseRepository {
 			$ttl_seconds = self::DEFAULT_CLAIM_TTL_SECONDS;
 		}
 
-		$this->delete_expired_claims();
-
-		$expires_at = gmdate( 'Y-m-d H:i:s', time() + $ttl_seconds );
+		$now         = current_time( 'mysql', true );
+		$expires_at  = gmdate( 'Y-m-d H:i:s', time() + $ttl_seconds );
 		$claim_token = bin2hex( random_bytes( 16 ) );
 
-		// If the reprocess filter let a completed row through, atomically convert
-		// that processed row into a claim. Active claims remain untouched, so a
-		// parallel fetch still loses the race.
-		$claimed_existing_processed = LifecycleStateTransition::compare_and_set(
-			$this->wpdb,
-			$this->table_name,
-			array(
-				'flow_step_id'    => $identity_scope,
-				'source_type'     => $source_type,
-				'item_identifier' => $item_identifier,
-			),
-			'status',
-			self::STATUS_PROCESSED,
-			self::STATUS_CLAIMED,
-			array(
-				'job_id'           => $job_id,
-				'claim_expires_at' => $expires_at,
-				'claim_token'      => $claim_token,
-			),
-			array( '%s', '%s', '%s' ),
-			array( '%d', '%s', '%s' )
-		);
-
-		if ( false !== $claimed_existing_processed && $claimed_existing_processed > 0 ) {
-			return $claim_token;
-		}
-
-		if ( $this->has_active_claim( $identity_scope, $source_type, $item_identifier ) ) {
-			return false;
-		}
-
+		// One upsert handles absent-row races, processed-row reprocessing, and
+		// expired-claim takeover without surfacing duplicate-key errors. Assignment
+		// order is intentional: status is changed last so every condition observes
+		// the row state that existed when this statement acquired its lock.
+		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared -- Prepared with a %i table placeholder.
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-		$result = $this->wpdb->insert(
-			$this->table_name,
-			array(
-				'flow_step_id'     => $identity_scope,
-				'source_type'      => $source_type,
-				'item_identifier'  => $item_identifier,
-				'job_id'           => $job_id,
-				'status'           => self::STATUS_CLAIMED,
-				'claim_expires_at' => $expires_at,
-				'claim_token'      => $claim_token,
-			),
-			array( '%s', '%s', '%s', '%d', '%s', '%s', '%s' )
+		$this->wpdb->query(
+			$this->wpdb->prepare(
+				'INSERT INTO %i (flow_step_id, source_type, item_identifier, job_id, status, claim_expires_at, claim_token)
+				VALUES (%s, %s, %s, %d, %s, %s, %s)
+				ON DUPLICATE KEY UPDATE
+				claim_token = IF(item_identifier = VALUES(item_identifier) AND (status = %s OR (status = %s AND claim_expires_at IS NOT NULL AND claim_expires_at <= %s)), VALUES(claim_token), claim_token),
+				job_id = IF(item_identifier = VALUES(item_identifier) AND (status = %s OR (status = %s AND claim_expires_at IS NOT NULL AND claim_expires_at <= %s)), VALUES(job_id), job_id),
+				claim_expires_at = IF(item_identifier = VALUES(item_identifier) AND (status = %s OR (status = %s AND claim_expires_at IS NOT NULL AND claim_expires_at <= %s)), VALUES(claim_expires_at), claim_expires_at),
+				status = IF(item_identifier = VALUES(item_identifier) AND (status = %s OR (status = %s AND claim_expires_at IS NOT NULL AND claim_expires_at <= %s)), VALUES(status), status)',
+				$this->table_name,
+				$identity_scope,
+				$source_type,
+				$item_identifier,
+				$job_id,
+				self::STATUS_CLAIMED,
+				$expires_at,
+				$claim_token,
+				self::STATUS_PROCESSED,
+				self::STATUS_CLAIMED,
+				$now,
+				self::STATUS_PROCESSED,
+				self::STATUS_CLAIMED,
+				$now,
+				self::STATUS_PROCESSED,
+				self::STATUS_CLAIMED,
+				$now,
+				self::STATUS_PROCESSED,
+				self::STATUS_CLAIMED,
+				$now
+			)
 		);
+		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
 
-		if ( false !== $result ) {
-			return $claim_token;
-		}
+		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared -- Prepared with a %i table placeholder.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$owned_token = $this->wpdb->get_var(
+			$this->wpdb->prepare(
+				'SELECT claim_token FROM %i WHERE flow_step_id = %s AND source_type = %s AND item_identifier = %s AND status = %s',
+				$this->table_name,
+				$identity_scope,
+				$source_type,
+				$item_identifier,
+				self::STATUS_CLAIMED
+			)
+		);
+		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
 
-		return false;
+		return is_string( $owned_token ) && hash_equals( $claim_token, $owned_token ) ? $claim_token : false;
 	}
 
 	/**
-	 * Complete a claim only while the supplied token owns it.
+	 * Atomically run completion work and transition an owned claim.
 	 *
-	 * Processed rows retain the token until optional completion state is safely
-	 * persisted and an ephemeral claim row is removed.
+	 * The callback runs after an ownership-locking SELECT and before the claim
+	 * transition in the same transaction. Returning false or a failed transition
+	 * rolls back both the callback's database writes and the claim mutation.
 	 *
 	 * @param string $identity_scope  Claim identity scope.
 	 * @param string $source_type     Source type.
 	 * @param string $item_identifier Unique item identifier.
 	 * @param string $claim_token     Opaque ownership token.
 	 * @param int    $job_id          Completing job ID.
+	 * @param callable|null $completion Optional callback returning true on success.
+	 * @param bool   $retain_processed Whether to retain a processed row after completion.
 	 * @return bool Whether the token completed its owned claim.
 	 */
-	public function complete_owned_claim( string $identity_scope, string $source_type, string $item_identifier, string $claim_token, int $job_id ): bool {
+	public function complete_owned_claim( string $identity_scope, string $source_type, string $item_identifier, string $claim_token, int $job_id, ?callable $completion = null, bool $retain_processed = true ): bool {
 		if ( '' === $claim_token ) {
 			return false;
 		}
 
 		$now = current_time( 'mysql', true );
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-		$updated = $this->wpdb->query(
+		$transaction_started = $this->wpdb->query( 'START TRANSACTION' );
+		if ( false === $transaction_started ) {
+			return false;
+		}
+
+		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared -- Prepared with a %i table placeholder.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$owned = $this->wpdb->get_var(
 			$this->wpdb->prepare(
-				'UPDATE %i SET status = %s, job_id = %d, processed_timestamp = %s, claim_expires_at = NULL WHERE flow_step_id = %s AND source_type = %s AND item_identifier = %s AND claim_token = %s AND status = %s AND claim_expires_at > %s',
+				'SELECT claim_token FROM %i WHERE flow_step_id = %s AND source_type = %s AND item_identifier = %s AND claim_token = %s AND status = %s AND claim_expires_at > %s FOR UPDATE',
 				$this->table_name,
-				self::STATUS_PROCESSED,
-				$job_id,
-				$now,
 				$identity_scope,
 				$source_type,
 				$item_identifier,
@@ -456,8 +465,69 @@ class ProcessedItems extends BaseRepository {
 				$now
 			)
 		);
+		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
 
-		return false !== $updated && $updated > 0;
+		if ( ! is_string( $owned ) || ! hash_equals( $claim_token, $owned ) ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			$this->wpdb->query( 'ROLLBACK' );
+			return false;
+		}
+
+		try {
+			if ( null !== $completion && true !== $completion() ) {
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+				$this->wpdb->query( 'ROLLBACK' );
+				return false;
+			}
+		} catch ( \Throwable $exception ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			$this->wpdb->query( 'ROLLBACK' );
+			do_action( 'datamachine_log', 'error', 'Item claim completion callback failed.', array( 'exception' => $exception->getMessage() ) );
+			return false;
+		}
+
+		if ( $retain_processed ) {
+			// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared -- Prepared with a %i table placeholder.
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			$transitioned = $this->wpdb->query(
+				$this->wpdb->prepare(
+					'UPDATE %i SET status = %s, job_id = %d, processed_timestamp = %s, claim_expires_at = NULL WHERE flow_step_id = %s AND source_type = %s AND item_identifier = %s AND claim_token = %s AND status = %s AND claim_expires_at > %s',
+					$this->table_name,
+					self::STATUS_PROCESSED,
+					$job_id,
+					$now,
+					$identity_scope,
+					$source_type,
+					$item_identifier,
+					$claim_token,
+					self::STATUS_CLAIMED,
+					$now
+				)
+			);
+			// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
+		} else {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			$transitioned = $this->wpdb->delete(
+				$this->table_name,
+				array(
+					'flow_step_id'    => $identity_scope,
+					'source_type'     => $source_type,
+					'item_identifier' => $item_identifier,
+					'claim_token'     => $claim_token,
+					'status'          => self::STATUS_CLAIMED,
+				),
+				array( '%s', '%s', '%s', '%s', '%s' )
+			);
+		}
+
+		if ( false === $transitioned || $transitioned < 1 ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			$this->wpdb->query( 'ROLLBACK' );
+			return false;
+		}
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		return false !== $this->wpdb->query( 'COMMIT' );
 	}
 
 	/**

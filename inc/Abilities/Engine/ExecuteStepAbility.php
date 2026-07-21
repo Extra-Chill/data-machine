@@ -52,15 +52,15 @@ class ExecuteStepAbility {
 						'type'       => 'object',
 						'required'   => array( 'job_id', 'flow_step_id' ),
 						'properties' => array(
-							'job_id'       => array(
+							'job_id'               => array(
 								'type'        => 'integer',
 								'description' => __( 'Job ID for the execution.', 'data-machine' ),
 							),
-							'flow_step_id' => array(
+							'flow_step_id'          => array(
 								'type'        => 'string',
 								'description' => __( 'Flow step ID to execute.', 'data-machine' ),
 							),
-							'operation_generation' => array(
+							'operation_generation'  => array(
 								'type'        => 'integer',
 								'minimum'     => 0,
 								'description' => __( 'Direct workflow execution generation.', 'data-machine' ),
@@ -74,13 +74,13 @@ class ExecuteStepAbility {
 					'output_schema'       => array(
 						'type'       => 'object',
 						'properties' => array(
-							'success'      => array( 'type' => 'boolean' ),
-							'step_success' => array( 'type' => 'boolean' ),
-							'outcome'      => array( 'type' => 'string' ),
+							'success'          => array( 'type' => 'boolean' ),
+							'step_success'     => array( 'type' => 'boolean' ),
+							'outcome'          => array( 'type' => 'string' ),
 							'stale_generation' => array( 'type' => 'boolean' ),
 							'deferred'         => array( 'type' => 'boolean' ),
 							'retryable'        => array( 'type' => 'boolean' ),
-							'error'        => array( 'type' => 'string' ),
+							'error'            => array( 'type' => 'string' ),
 						),
 					),
 					'execute_callback'    => array( $this, 'execute' ),
@@ -107,11 +107,11 @@ class ExecuteStepAbility {
 	 * @return array Result with step execution outcome.
 	 */
 	public function execute( array $input ): array {
-		$job_id       = (int) ( $input['job_id'] ?? 0 );
-		$flow_step_id = (string) ( $input['flow_step_id'] ?? '' );
-		$operation_generation = max( 0, (int) ( $input['operation_generation'] ?? 0 ) );
+		$job_id                = (int) ( $input['job_id'] ?? 0 );
+		$flow_step_id          = (string) ( $input['flow_step_id'] ?? '' );
+		$operation_generation  = max( 0, (int) ( $input['operation_generation'] ?? 0 ) );
 		$operation_claim_token = (string) ( $input['operation_claim_token'] ?? '' );
-		$job          = $this->db_jobs->get_job( $job_id );
+		$job                   = $this->db_jobs->get_job( $job_id );
 
 		if ( ! $job ) {
 			return array(
@@ -237,7 +237,7 @@ class ExecuteStepAbility {
 				'engine'       => $engine,
 			);
 
-			$step_output      = $flow_step->execute( $payload );
+			$step_output = $flow_step->execute( $payload );
 			if ( $operation_generation > 0 ) {
 				$job_after_execution = $this->db_jobs->get_job( $job_id );
 				if ( ! is_array( $job_after_execution ) || 'committed' !== $this->operationGenerationAdmission( $job_after_execution, $operation_generation, $operation_claim_token ) ) {
@@ -370,7 +370,7 @@ class ExecuteStepAbility {
 		if ( $generation <= 0 ) {
 			return 'committed';
 		}
-		if ( '' === $token || $generation !== (int) ( $job['operation_generation'] ?? 0 ) || ! hash_equals( $token, (string) ( $job['operation_claim_token'] ?? '' ) ) ) {
+		if ( '' === $token || (int) ( $job['operation_generation'] ?? 0 ) !== $generation || ! hash_equals( $token, (string) ( $job['operation_claim_token'] ?? '' ) ) ) {
 			return 'stale';
 		}
 		if ( 'enqueued' === ( $job['operation_state'] ?? '' ) && (int) ( $job['operation_action_id'] ?? 0 ) > 0 ) {
@@ -386,10 +386,10 @@ class ExecuteStepAbility {
 				time() + 1,
 				'datamachine_execute_step',
 				array(
-					'job_id'               => $job_id,
-					'flow_step_id'         => $flow_step_id,
-					'operation_generation' => $generation,
-					'operation_claim_token' => $token,
+					'job_id'                => $job_id,
+					'flow_step_id'           => $flow_step_id,
+					'operation_generation'   => $generation,
+					'operation_claim_token'  => $token,
 				),
 				'data-machine'
 			)

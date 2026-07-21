@@ -155,6 +155,10 @@ class BatchScheduler {
 		string $context = '',
 		string $completion_strategy = ''
 	): array {
+		$cleanup_contexts = array_map(
+			static fn( mixed $item ): array => (array) apply_filters( 'datamachine_batch_item_cleanup_context', array(), $item ),
+			$items
+		);
 		$items      = array_map( array( DataPacketStore::class, 'reference_packet_collections_in_value' ), $items );
 		$total      = count( $items );
 		$chunk_size = self::chunkSize( $context );
@@ -170,11 +174,12 @@ class BatchScheduler {
 				'batch_completion_strategy' => $completion_strategy,
 				'started_at'                => current_time( 'mysql' ),
 				'batch_state'               => array(
-					'offset' => 0,
-					'total'  => $total,
-					'items'  => $items,
-					'extra'  => $extra,
-					'hook'   => $hook,
+					'offset'           => 0,
+					'total'            => $total,
+					'items'            => $items,
+					'cleanup_contexts' => $cleanup_contexts,
+					'extra'            => $extra,
+					'hook'             => $hook,
 				),
 			)
 		);
@@ -212,7 +217,7 @@ class BatchScheduler {
 		}
 
 		if ( ! $action_id ) {
-			do_action( 'datamachine_batch_items_discarded', $items, $parent_job_id, $context );
+			do_action( 'datamachine_batch_items_discarded', $items, $parent_job_id, $context, $cleanup_contexts );
 			$engine = datamachine_get_engine_data( $parent_job_id );
 			unset( $engine['batch_state'] );
 			$engine['batch_schedule_failed'] = true;
@@ -290,12 +295,16 @@ class BatchScheduler {
 		// Cancellation flag set on the parent's engine_data short-circuits
 		// any further child creation.
 		if ( ! empty( $parent_engine['cancelled'] ) ) {
-			$remaining = array_slice(
+			$remaining         = array_slice(
 				is_array( $batch_state['items'] ?? null ) ? $batch_state['items'] : array(),
 				(int) ( $batch_state['offset'] ?? 0 )
 			);
+			$remaining_cleanup = array_slice(
+				is_array( $batch_state['cleanup_contexts'] ?? null ) ? $batch_state['cleanup_contexts'] : array(),
+				(int) ( $batch_state['offset'] ?? 0 )
+			);
 			if ( $remaining ) {
-				do_action( 'datamachine_batch_items_discarded', $remaining, $parent_job_id, (string) ( $parent_engine['batch_context'] ?? '' ) );
+				do_action( 'datamachine_batch_items_discarded', $remaining, $parent_job_id, (string) ( $parent_engine['batch_context'] ?? '' ), $remaining_cleanup );
 			}
 			unset( $parent_engine['batch_state'] );
 			datamachine_set_engine_data( $parent_job_id, $parent_engine );
@@ -371,23 +380,30 @@ class BatchScheduler {
 		$chunk_size = self::chunkSize( $context );
 		$delay      = self::chunkDelay( $context );
 
-		$total  = (int) ( $batch_state['total'] ?? 0 );
-		$offset = (int) ( $batch_state['offset'] ?? 0 );
-		$items  = is_array( $batch_state['items'] ?? null ) ? $batch_state['items'] : array();
-		$extra  = is_array( $batch_state['extra'] ?? null ) ? $batch_state['extra'] : array();
-		$hook   = (string) ( $batch_state['hook'] ?? '' );
+		$total            = (int) ( $batch_state['total'] ?? 0 );
+		$offset           = (int) ( $batch_state['offset'] ?? 0 );
+		$items            = is_array( $batch_state['items'] ?? null ) ? $batch_state['items'] : array();
+		$cleanup_contexts = is_array( $batch_state['cleanup_contexts'] ?? null ) ? $batch_state['cleanup_contexts'] : array();
+		$extra            = is_array( $batch_state['extra'] ?? null ) ? $batch_state['extra'] : array();
+		$hook             = (string) ( $batch_state['hook'] ?? '' );
 
 		$chunk           = array_slice( $items, $offset, $chunk_size );
 		$scheduled       = 0;
 		$schedule_failed = false;
 
-		foreach ( $chunk as $item ) {
-			$item   = DataPacketStore::hydrate_packet_collections_in_value( $item );
+		foreach ( $chunk as $index => $item ) {
+			$cleanup_context = $cleanup_contexts[ $offset + $index ] ?? array();
+			$hydration       = DataPacketStore::hydrate_packet_collections_with_status( $item );
+			$item            = $hydration['value'];
+			if ( empty( $hydration['success'] ) ) {
+				do_action( 'datamachine_batch_items_discarded', array( $item ), $parent_job_id, (string) $context, array( $cleanup_context ) );
+				continue;
+			}
 			$result = $createItem( $item, $extra, $parent_job_id );
 			if ( $result ) {
 				++$scheduled;
 			} else {
-				do_action( 'datamachine_batch_items_discarded', array( $item ), $parent_job_id, (string) $context );
+				do_action( 'datamachine_batch_items_discarded', array( $item ), $parent_job_id, (string) $context, array( $cleanup_context ) );
 			}
 		}
 
@@ -443,9 +459,10 @@ class BatchScheduler {
 			}
 
 			if ( ! $action_id ) {
-				$remaining = array_slice( $items, $new_offset );
+				$remaining         = array_slice( $items, $new_offset );
+				$remaining_cleanup = array_slice( $cleanup_contexts, $new_offset );
 				if ( $remaining ) {
-					do_action( 'datamachine_batch_items_discarded', $remaining, $parent_job_id, (string) $context );
+					do_action( 'datamachine_batch_items_discarded', $remaining, $parent_job_id, (string) $context, $remaining_cleanup );
 				}
 				EngineData::mutate(
 					$parent_job_id,
@@ -496,10 +513,14 @@ class BatchScheduler {
 			is_array( $batch_state['items'] ?? null ) ? $batch_state['items'] : array(),
 			(int) ( $batch_state['offset'] ?? 0 )
 		);
+		$remaining_cleanup             = array_slice(
+			is_array( $batch_state['cleanup_contexts'] ?? null ) ? $batch_state['cleanup_contexts'] : array(),
+			(int) ( $batch_state['offset'] ?? 0 )
+		);
 		datamachine_set_engine_data( $parent_job_id, $parent_engine );
 
 		if ( $remaining ) {
-			do_action( 'datamachine_batch_items_discarded', $remaining, $parent_job_id, (string) ( $parent_engine['batch_context'] ?? '' ) );
+			do_action( 'datamachine_batch_items_discarded', $remaining, $parent_job_id, (string) ( $parent_engine['batch_context'] ?? '' ), $remaining_cleanup );
 		}
 
 		return true;

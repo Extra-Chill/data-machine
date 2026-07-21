@@ -181,17 +181,52 @@ class DataPacketStore {
 	 * @return mixed Value with packet collections hydrated.
 	 */
 	public static function hydrate_packet_collections_in_value( mixed $value ): mixed {
+		return self::hydrate_packet_collections_with_status( $value )['value'];
+	}
+
+	/**
+	 * Hydrate known packet collections and report missing/corrupt references.
+	 *
+	 * @param mixed $value Arbitrary value.
+	 * @return array{value:mixed,success:bool} Hydrated value and aggregate status.
+	 */
+	public static function hydrate_packet_collections_with_status( mixed $value ): array {
 		if ( ! is_array( $value ) ) {
-			return $value;
+			return array(
+				'value'   => $value,
+				'success' => true,
+			);
 		}
 
+		$success = true;
 		foreach ( array( 'data_packets', 'packets' ) as $key ) {
 			if ( isset( $value[ $key ] ) && is_array( $value[ $key ] ) ) {
-				$value[ $key ] = self::hydrate_many( $value[ $key ] );
+				$hydrated = array();
+				foreach ( $value[ $key ] as $packet ) {
+					if ( ! is_array( $packet ) ) {
+						$hydrated[] = $packet;
+						continue;
+					}
+					if ( ! empty( $packet['is_data_packet_ref'] ) && ! self::is_ref( $packet ) ) {
+						$success = false;
+						continue;
+					}
+
+					$packet_value = self::hydrate( $packet );
+					if ( null === $packet_value ) {
+						$success = false;
+						continue;
+					}
+					$hydrated[] = $packet_value;
+				}
+				$value[ $key ] = $hydrated;
 			}
 		}
 
-		return $value;
+		return array(
+			'value'   => $value,
+			'success' => $success,
+		);
 	}
 
 	/**

@@ -53,6 +53,7 @@ use DataMachine\Engine\Actions\Handlers\FailJobHandler;
 use DataMachine\Engine\Actions\Handlers\JobCompleteHandler;
 use DataMachine\Engine\Actions\Handlers\LogHandler;
 use DataMachine\Engine\Actions\Handlers\StepLifecycleHandler;
+use DataMachine\Core\Database\TrackedItems\TrackedItems;
 use AgentsAPI\AI\Approvals\WP_Agent_Approval_Decision;
 use AgentsAPI\AI\Approvals\WP_Agent_Pending_Action;
 
@@ -71,7 +72,9 @@ function datamachine_register_core_actions() {
 	add_action( 'datamachine_step_lifecycle_completed', array( StepLifecycleHandler::class, 'handleCompleted' ), 10, 2 );
 	add_action( 'datamachine_step_lifecycle_failed', array( StepLifecycleHandler::class, 'handleFailed' ), 10, 2 );
 	add_action( 'datamachine_job_complete', array( StepLifecycleHandler::class, 'handleTerminal' ), 5, 2 );
-	add_action( 'datamachine_batch_items_discarded', array( StepLifecycleHandler::class, 'handleDiscardedPackets' ), 10, 3 );
+	add_action( 'datamachine_batch_items_discarded', array( StepLifecycleHandler::class, 'handleDiscardedPackets' ), 10, 4 );
+	add_filter( 'datamachine_batch_item_cleanup_context', array( StepLifecycleHandler::class, 'captureBatchItemCleanupContext' ), 10, 2 );
+	add_filter( 'datamachine_item_claim_completion_handlers', array( TrackedItems::class, 'registerClaimCompletionHandler' ) );
 	add_action(
 		'datamachine_pending_action_staged',
 		function ( string $action_id, array $payload ): void {

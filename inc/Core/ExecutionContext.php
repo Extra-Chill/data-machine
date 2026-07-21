@@ -346,8 +346,9 @@ class ExecutionContext {
 	 *
 	 * Attach the returned descriptor to DataPacket metadata under
 	 * ProcessedItems::CLAIM_METADATA_KEY. Data Machine propagates it to child
-	 * work and owns terminal completion/release. The optional completion payload
-	 * may contain a `tracked_item` array and `keep_processed` boolean.
+	 * work and owns terminal completion/release. Completion behavior is selected
+	 * through a registered handler ID plus opaque payload; `retain_processed`
+	 * controls whether successful completion retains the dedupe row.
 	 *
 	 * @param string $identity_scope  Caller-provided stable identity scope.
 	 * @param string $item_identifier Stable item identifier within the scope.

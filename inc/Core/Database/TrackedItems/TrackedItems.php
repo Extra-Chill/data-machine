@@ -8,8 +8,6 @@
 namespace DataMachine\Core\Database\TrackedItems;
 
 use DataMachine\Core\Database\BaseRepository;
-use DataMachine\Core\Database\ProcessedItems\ProcessedItems;
-
 defined( 'ABSPATH' ) || exit;
 
 class TrackedItems extends BaseRepository {
@@ -87,70 +85,31 @@ class TrackedItems extends BaseRepository {
 	}
 
 	/**
-	 * Upsert a tracked item only while an in-flight token owns its claim.
+	 * Register tracked-item completion with the generic claim lifecycle.
 	 *
-	 * The INSERT ... SELECT performs ownership validation and the ledger write
-	 * in one SQL statement. A claim deleted or replaced after TTL expiry cannot
-	 * satisfy the SELECT and therefore cannot overwrite a newer revision.
-	 *
-	 * @param array<string,mixed> $item  Tracked item payload.
-	 * @param array<string,mixed> $claim Claim lifecycle descriptor.
-	 * @return array<string,mixed>|null Stored row, or null without ownership/on failure.
+	 * @param array<string,callable> $handlers Registered completion handlers.
+	 * @return array<string,callable> Registered completion handlers.
 	 */
-	public function upsert_owned( array $item, array $claim ): ?array {
-		$normalized = $this->normalize_item( $item );
-		$scope      = (string) ( $claim['identity_scope'] ?? '' );
-		$source     = (string) ( $claim['source_type'] ?? '' );
-		$item_id    = (string) ( $claim['item_identifier'] ?? '' );
-		$token      = (string) ( $claim['ownership_token'] ?? '' );
-		if ( '' === $normalized['namespace'] || '' === $normalized['item_id'] || '' === $scope || '' === $source || '' === $item_id || '' === $token ) {
-			return null;
+	public static function registerClaimCompletionHandler( array $handlers ): array {
+		$handlers['tracked_item'] = array( self::class, 'completeClaim' );
+		return $handlers;
+	}
+
+	/**
+	 * Persist a tracked item inside the owning claim transaction.
+	 *
+	 * @param array<string,mixed> $payload Completion payload.
+	 * @param int                 $job_id Completing job ID.
+	 * @return bool Whether the tracked item was persisted.
+	 */
+	public static function completeClaim( array $payload, int $job_id ): bool {
+		$item = is_array( $payload['item'] ?? null ) ? $payload['item'] : array();
+		if ( empty( $item ) ) {
+			return false;
 		}
 
-		$now          = current_time( 'mysql', true );
-		$last_seen_at = '' !== $normalized['last_seen_at'] ? $normalized['last_seen_at'] : $now;
-		$first_seen_at = '' !== $normalized['first_seen_at'] ? $normalized['first_seen_at'] : $now;
-		$processed     = new ProcessedItems();
-
-		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared -- Prepared with %i table placeholders.
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-		$result = $this->wpdb->query(
-			$this->wpdb->prepare(
-				'INSERT INTO %i (namespace, item_id, item_type, state, source_ref, source_revision, source_path, source_line, output_ref, metadata_json, first_seen_at, last_seen_at, last_job_id, updated_at)
-				SELECT %s, %s, %s, %s, %s, %s, %s, %d, %s, %s, %s, %s, %d, %s FROM %i
-				WHERE flow_step_id = %s AND source_type = %s AND item_identifier = %s AND status = %s AND claim_token = %s AND claim_expires_at > %s
-				ON DUPLICATE KEY UPDATE item_type = VALUES(item_type), state = VALUES(state), source_ref = VALUES(source_ref), source_revision = VALUES(source_revision), source_path = VALUES(source_path), source_line = VALUES(source_line), output_ref = VALUES(output_ref), metadata_json = VALUES(metadata_json), last_seen_at = VALUES(last_seen_at), last_job_id = VALUES(last_job_id), updated_at = VALUES(updated_at)',
-				$this->table_name,
-				$normalized['namespace'],
-				$normalized['item_id'],
-				$normalized['item_type'],
-				$normalized['state'],
-				$normalized['source_ref'],
-				$normalized['source_revision'],
-				$normalized['source_path'],
-				$normalized['source_line'],
-				$normalized['output_ref'],
-				wp_json_encode( $normalized['metadata'], JSON_UNESCAPED_SLASHES ),
-				$first_seen_at,
-				$last_seen_at,
-				$normalized['last_job_id'],
-				$now,
-				$processed->get_table_name(),
-				$scope,
-				$source,
-				$item_id,
-				ProcessedItems::STATUS_CLAIMED,
-				$token,
-				$now
-			)
-		);
-		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
-
-		if ( false === $result || 0 === $result ) {
-			return null;
-		}
-
-		return $this->get( $normalized['namespace'], $normalized['item_id'] );
+		$item['last_job_id'] = $job_id;
+		return null !== ( new self() )->upsert( $item );
 	}
 
 	/**
