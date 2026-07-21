@@ -143,6 +143,70 @@ class EventDuplicateStrategyTest extends WP_UnitTestCase {
 		wp_delete_term( $term_id, 'venue' );
 	}
 
+	public function test_geographic_conflict_cannot_fall_through_to_name_only_duplicate_match(): void {
+		$venue_name = 'Cross City Duplicate Guard ' . uniqid();
+		[ $term_id, $existing_post_id ] = $this->seedVenueWithEvent(
+			'Same Night Show',
+			'2026-08-15 20:00:00',
+			$venue_name
+		);
+		update_term_meta( $term_id, '_venue_address', '100 Main Street' );
+		update_term_meta( $term_id, '_venue_city', 'Charleston' );
+		update_term_meta( $term_id, '_venue_state', 'SC' );
+		update_term_meta( $term_id, '_venue_country', 'US' );
+
+		$result = EventDuplicateStrategy::check(
+			array(
+				'title'   => 'Same Night Show',
+				'context' => array(
+					'venue'     => $venue_name,
+					'startDate' => '2026-08-15T20:30:00',
+					'ticketUrl' => '',
+					'address'   => '200 Main Street',
+					'city'      => 'Atlanta',
+					'state'     => 'GA',
+					'country'   => 'US',
+				),
+			)
+		);
+
+		$this->assertNull( $result, 'Conflicting geography must block all name-only duplicate fallbacks.' );
+		$this->cleanup( $term_id, $existing_post_id );
+	}
+
+	public function test_equivalent_geography_forms_still_allow_duplicate_match(): void {
+		$venue_name = 'Equivalent Geography Venue ' . uniqid();
+		[ $term_id, $existing_post_id ] = $this->seedVenueWithEvent(
+			'Equivalent Geography Show',
+			'2026-08-16 20:00:00',
+			$venue_name
+		);
+		update_term_meta( $term_id, '_venue_address', '300 King Street' );
+		update_term_meta( $term_id, '_venue_city', 'Charleston' );
+		update_term_meta( $term_id, '_venue_state', 'SC' );
+		update_term_meta( $term_id, '_venue_country', 'US' );
+
+		$result = EventDuplicateStrategy::check(
+			array(
+				'title'   => 'Equivalent Geography Show',
+				'context' => array(
+					'venue'     => $venue_name,
+					'startDate' => '2026-08-16T20:30:00',
+					'ticketUrl' => '',
+					'address'   => '300 King St.',
+					'city'      => 'Charleston',
+					'state'     => 'South Carolina',
+					'country'   => 'USA',
+				),
+			)
+		);
+
+		$this->assertIsArray( $result );
+		$this->assertSame( 'duplicate', $result['verdict'] );
+		$this->assertSame( $existing_post_id, $result['match']['post_id'] );
+		$this->cleanup( $term_id, $existing_post_id );
+	}
+
 	// ---------------------------------------------------------------------
 	// findByExactTitle() — term-id short-circuit + 2-hour time-window guard
 	// ---------------------------------------------------------------------

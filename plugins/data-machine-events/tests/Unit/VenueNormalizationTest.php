@@ -196,6 +196,206 @@ class VenueNormalizationTest extends WP_UnitTestCase {
 		);
 	}
 
+	public function test_same_name_in_different_city_returns_ambiguity_without_merging(): void {
+		$name  = 'The Foundry Collision ' . uniqid();
+		$first = Venue_Taxonomy::find_or_create_venue(
+			$name,
+			array(
+				'address' => '100 Main Street',
+				'city'    => 'Charleston',
+				'state'   => 'SC',
+				'country' => 'US',
+			)
+		);
+		$result = Venue_Taxonomy::find_or_create_venue(
+			$name,
+			array(
+				'address' => '200 Main Street',
+				'city'    => 'Atlanta',
+				'state'   => 'GA',
+				'country' => 'US',
+				'phone'   => '555-0100',
+			)
+		);
+
+		$this->assertNull( $result['term_id'] );
+		$this->assertSame( 'ambiguous', $result['match_status'] );
+		$this->assertSame( '', get_term_meta( $first['term_id'], '_venue_phone', true ) );
+	}
+
+	public function test_missing_address_preserves_safe_name_match(): void {
+		$name  = 'Incomplete Evidence Venue ' . uniqid();
+		$first = Venue_Taxonomy::find_or_create_venue(
+			$name,
+			array(
+				'address' => '300 King Street',
+				'city'    => 'Charleston',
+				'state'   => 'SC',
+			)
+		);
+		$result = Venue_Taxonomy::find_or_create_venue(
+			$name,
+			array(
+				'city'  => 'Charleston',
+				'phone' => '555-0101',
+			)
+		);
+
+		$this->assertSame( $first['term_id'], $result['term_id'] );
+		$this->assertSame( '555-0101', get_term_meta( $first['term_id'], '_venue_phone', true ) );
+	}
+
+	public function test_state_and_country_conflicts_reject_address_identity(): void {
+		$name  = 'Border Venue ' . uniqid();
+		$first = Venue_Taxonomy::find_or_create_venue(
+			$name,
+			array(
+				'address' => '400 State Street',
+				'city'    => 'Springfield',
+				'state'   => 'IL',
+				'country' => 'US',
+			)
+		);
+
+		$state_conflict = Venue_Taxonomy::find_or_create_venue(
+			$name,
+			array(
+				'address' => '400 State Street',
+				'city'    => 'Springfield',
+				'state'   => 'MO',
+				'country' => 'US',
+			)
+		);
+		$country_conflict = Venue_Taxonomy::find_or_create_venue(
+			$name,
+			array(
+				'address' => '400 State Street',
+				'city'    => 'Springfield',
+				'state'   => 'IL',
+				'country' => 'CA',
+			)
+		);
+
+		$this->assertNotNull( $first['term_id'] );
+		$this->assertNull(
+			Venue_Taxonomy::find_venue_by_address( '400 State St.', 'Springfield', 'MO', 'US' )
+		);
+		$this->assertNull(
+			Venue_Taxonomy::find_venue_by_address( '400 State St.', 'Springfield', 'IL', 'CA' )
+		);
+		$this->assertNull( $state_conflict['term_id'] );
+		$this->assertNull( $country_conflict['term_id'] );
+		$this->assertSame( 'ambiguous', $state_conflict['match_status'] );
+		$this->assertSame( 'ambiguous', $country_conflict['match_status'] );
+	}
+
+	public function test_equivalent_state_and_country_forms_preserve_identity(): void {
+		$name  = 'Geography Alias Venue ' . uniqid();
+		$first = Venue_Taxonomy::find_or_create_venue(
+			$name,
+			array(
+				'address' => '600 Meeting Street',
+				'city'    => 'Charleston',
+				'state'   => 'SC',
+				'country' => 'US',
+			)
+		);
+		$full_names = Venue_Taxonomy::find_or_create_venue(
+			$name,
+			array(
+				'address' => '600 Meeting St.',
+				'city'    => 'Charleston',
+				'state'   => 'South Carolina',
+				'country' => 'United States',
+			)
+		);
+		$country_code = Venue_Taxonomy::find_or_create_venue(
+			$name,
+			array(
+				'city'    => 'Charleston',
+				'state'   => 'SC',
+				'country' => 'USA',
+			)
+		);
+
+		$this->assertSame( $first['term_id'], $full_names['term_id'] );
+		$this->assertSame( $first['term_id'], $country_code['term_id'] );
+		$this->assertSame( 'matched', $full_names['match_status'] );
+		$this->assertSame( 'matched', $country_code['match_status'] );
+	}
+
+	public function test_article_toggle_does_not_cross_city_boundaries(): void {
+		$base  = 'Article Collision ' . uniqid();
+		$first = Venue_Taxonomy::find_or_create_venue(
+			'The ' . $base,
+			array(
+				'city'  => 'Nashville',
+				'state' => 'TN',
+			)
+		);
+		$result = Venue_Taxonomy::find_or_create_venue(
+			$base,
+			array(
+				'city'  => 'Austin',
+				'state' => 'TX',
+			)
+		);
+
+		$this->assertNotNull( $first['term_id'] );
+		$this->assertNull( $result['term_id'] );
+		$this->assertSame( 'ambiguous', $result['match_status'] );
+	}
+
+	public function test_normalized_name_collision_does_not_cross_city_boundaries(): void {
+		$suffix = uniqid();
+		$first  = Venue_Taxonomy::find_or_create_venue(
+			'Rock - House ' . $suffix,
+			array(
+				'city'  => 'Denver',
+				'state' => 'CO',
+			)
+		);
+		$result = Venue_Taxonomy::find_or_create_venue(
+			'Rock House ' . $suffix,
+			array(
+				'city'  => 'Phoenix',
+				'state' => 'AZ',
+			)
+		);
+
+		$this->assertNotNull( $first['term_id'] );
+		$this->assertNull( $result['term_id'] );
+		$this->assertSame( 'ambiguous', $result['match_status'] );
+	}
+
+	public function test_compatible_identity_fills_empty_metadata_without_overwriting(): void {
+		$name    = 'Metadata Merge Venue ' . uniqid();
+		$created = Venue_Taxonomy::find_or_create_venue(
+			$name,
+			array(
+				'address'     => '500 Market Street',
+				'city'        => 'Philadelphia',
+				'website'     => 'https://existing.example',
+				'coordinates' => '39.9526,-75.1652',
+			)
+		);
+		$result  = Venue_Taxonomy::find_or_create_venue(
+			$name,
+			array(
+				'address' => '500 Market St.',
+				'city'    => 'Philadelphia',
+				'state'   => 'PA',
+				'country' => 'US',
+				'website' => 'https://incoming.example',
+			)
+		);
+
+		$this->assertSame( $created['term_id'], $result['term_id'] );
+		$this->assertSame( 'PA', get_term_meta( $created['term_id'], '_venue_state', true ) );
+		$this->assertSame( 'US', get_term_meta( $created['term_id'], '_venue_country', true ) );
+		$this->assertSame( 'https://existing.example', get_term_meta( $created['term_id'], '_venue_website', true ) );
+	}
+
 	// ---------------------------------------------------------------------
 	// Part C: address-in-name extraction (#433)
 	// ---------------------------------------------------------------------

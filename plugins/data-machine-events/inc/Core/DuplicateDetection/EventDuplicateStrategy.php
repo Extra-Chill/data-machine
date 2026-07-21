@@ -70,7 +70,7 @@ class EventDuplicateStrategy {
 	 * @param array $input {
 	 *     @type string $title      Event title.
 	 *     @type string $post_type  Post type (data_machine_events).
-	 *     @type array  $context    { venue, startDate, ticketUrl, address, city }
+	 *     @type array  $context    { venue, startDate, ticketUrl, address, city, state, country }
 	 * }
 	 * @return array|null Duplicate result or null if clear.
 	 */
@@ -82,6 +82,8 @@ class EventDuplicateStrategy {
 		$ticketUrl = $context['ticketUrl'] ?? '';
 		$address   = $context['address'] ?? '';
 		$city      = $context['city'] ?? '';
+		$state     = $context['state'] ?? '';
+		$country   = $context['country'] ?? '';
 
 		if ( empty( $title ) || empty( $startDate ) ) {
 			return null;
@@ -94,7 +96,8 @@ class EventDuplicateStrategy {
 		// Venue_Taxonomy::find_or_create_venue (address-first, then name).
 		// Reused across strategies so dedup matches the canonicalization
 		// that the upsert path will perform.
-		$venue_term = self::resolveVenueTerm( $venue, $address, $city );
+		$venue_identity = self::resolveVenueIdentity( $venue, $address, $city, $state, $country );
+		$venue_term     = $venue_identity['term'];
 
 		// Strategy 1: Ticket URL + date (most reliable).
 		if ( ! empty( $ticketUrl ) ) {
@@ -102,6 +105,13 @@ class EventDuplicateStrategy {
 			if ( $match ) {
 				return $match;
 			}
+		}
+
+		// A geographically conflicting venue name must not fall through to the
+		// later name-only confirmations. Ticket identity remains authoritative,
+		// but venue/title strategies cannot safely mark this event duplicate.
+		if ( 'ambiguous' === $venue_identity['match_status'] ) {
+			return null;
 		}
 
 		// Strategy 2: Venue + date + fuzzy title.
@@ -508,60 +518,53 @@ class EventDuplicateStrategy {
 	}
 
 	/**
-	 * Resolve a venue name to a WP_Term with cascading lookup.
-	 *
-	 * Mirrors the address-first cascade used by
-	 * Venue_Taxonomy::find_or_create_venue() so that dedup resolves the
-	 * same canonical term the upsert path will land on:
-	 *
-	 * 1. Address + city match (most authoritative — survives venue rename/alias)
-	 * 2. Exact name match
-	 * 3. Slug-based match (catches minor name variations)
-	 * 4. Normalized name match (strips punctuation, dashes, apostrophes, case)
-	 *
-	 * Without step 1, dedup misses cases where the incoming venue string
-	 * differs from the canonical term name but matches by address — e.g.
-	 * "Monks Jazz" vs term "Monks", "Humphreys Backstage Live" vs term
-	 * "Humphreys Concerts By the Bay". See issue #252.
+	 * Resolve a venue using the venue taxonomy's canonical identity rules.
 	 *
 	 * @param string $venue   Venue name from import source.
 	 * @param string $address Optional street address (enables address-first lookup).
 	 * @param string $city    Optional city name (required alongside address).
+	 * @param string $state   Optional state or region.
+	 * @param string $country Optional country.
 	 * @return \WP_Term|null Resolved venue term or null.
 	 */
-	private static function resolveVenueTerm( string $venue, string $address = '', string $city = '' ): ?\WP_Term {
-		// 1. Address + city match (mirrors find_or_create_venue).
-		if ( '' !== $address && '' !== $city ) {
-			$venue_term = \DataMachineEvents\Core\Venue_Taxonomy::find_venue_by_address_public( $address, $city );
-			if ( $venue_term ) {
-				return $venue_term;
-			}
-		}
+	private static function resolveVenueTerm(
+		string $venue,
+		string $address = '',
+		string $city = '',
+		string $state = '',
+		string $country = ''
+	): ?\WP_Term {
+		$identity = self::resolveVenueIdentity( $venue, $address, $city, $state, $country );
 
-		if ( '' === $venue ) {
-			return null;
-		}
+		return $identity['term'];
+	}
 
-		// 2. Exact name match.
-		$venue_term = get_term_by( 'name', $venue, 'venue' );
-		if ( $venue_term ) {
-			return $venue_term;
-		}
-
-		// 3. Slug-based lookup.
-		$venue_slug = sanitize_title( $venue );
-		$venue_term = get_term_by( 'slug', $venue_slug, 'venue' );
-		if ( $venue_term ) {
-			return $venue_term;
-		}
-
-		// 4. Normalized name match via Venue_Taxonomy.
-		$venue_term = \DataMachineEvents\Core\Venue_Taxonomy::find_venue_by_normalized_name_public( $venue );
-		if ( $venue_term ) {
-			return $venue_term;
-		}
-
-		return null;
+	/**
+	 * Resolve a venue while retaining ambiguity for duplicate-check control flow.
+	 *
+	 * @param string $venue   Venue name from import source.
+	 * @param string $address Optional street address.
+	 * @param string $city    Optional city.
+	 * @param string $state   Optional state or region.
+	 * @param string $country Optional country.
+	 * @return array{term: \WP_Term|null, term_id: int|null, match_status: string, venue_name: string}
+	 */
+	private static function resolveVenueIdentity(
+		string $venue,
+		string $address = '',
+		string $city = '',
+		string $state = '',
+		string $country = ''
+	): array {
+		return \DataMachineEvents\Core\Venue_Taxonomy::resolve_venue_identity(
+			$venue,
+			array(
+				'address' => $address,
+				'city'    => $city,
+				'state'   => $state,
+				'country' => $country,
+			)
+		);
 	}
 
 	/**

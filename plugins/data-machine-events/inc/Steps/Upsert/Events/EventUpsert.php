@@ -224,7 +224,7 @@ class EventUpsert extends UpsertHandler {
 		EngineData $engine
 	): array {
 		// 1. Find existing event via domain-specific duplicate detection.
-		// Pass venue address + city so dedup can resolve the incoming venue
+		// Pass complete venue geography so dedup can resolve the incoming venue
 		// via the same address-first cascade the upsert path uses
 		// (Venue_Taxonomy::find_or_create_venue). Without this, dupes slip
 		// through whenever the incoming venue string differs from the
@@ -233,7 +233,18 @@ class EventUpsert extends UpsertHandler {
 		// Normalize to int (0 = no match) so downstream type contracts hold.
 		$venueAddress     = (string) ( $engine->get( 'venueAddress' ) ?? $parameters['venueAddress'] ?? '' );
 		$venueCity        = (string) ( $engine->get( 'venueCity' ) ?? $parameters['venueCity'] ?? '' );
-		$existing_post_id = (int) $this->findExistingEventViaAbility( $title, $venue, $startDate, $ticketUrl, $venueAddress, $venueCity );
+		$venueState       = (string) ( $engine->get( 'venueState' ) ?? $parameters['venueState'] ?? '' );
+		$venueCountry     = (string) ( $engine->get( 'venueCountry' ) ?? $parameters['venueCountry'] ?? '' );
+		$existing_post_id = (int) $this->findExistingEventViaAbility(
+			$title,
+			$venue,
+			$startDate,
+			$ticketUrl,
+			$venueAddress,
+			$venueCity,
+			$venueState,
+			$venueCountry
+		);
 
 		// 2. Build event data.
 		$event_data = $this->buildEventData( $parameters, $handler_config, $engine, $existing_post_id );
@@ -371,7 +382,7 @@ class EventUpsert extends UpsertHandler {
 	 * so recurring series (same title/venue, different date) are never
 	 * falsely matched. See #423.
 	 *
-	 * The `address` and `city` context fields let EventDuplicateStrategy
+	 * The geographic context fields let EventDuplicateStrategy
 	 * resolve the incoming venue via the same address-first cascade the
 	 * upsert path uses (Venue_Taxonomy::find_or_create_venue). See #252.
 	 *
@@ -381,9 +392,20 @@ class EventUpsert extends UpsertHandler {
 	 * @param string $ticketUrl Ticket URL.
 	 * @param string $address   Venue street address (for address-aware venue resolution).
 	 * @param string $city      Venue city (required alongside address).
+	 * @param string $state     Venue state or region.
+	 * @param string $country   Venue country.
 	 * @return int|null Post ID if found, null otherwise.
 	 */
-	private function findExistingEventViaAbility( string $title, string $venue, string $startDate, string $ticketUrl, string $address = '', string $city = '' ): ?int {
+	private function findExistingEventViaAbility(
+		string $title,
+		string $venue,
+		string $startDate,
+		string $ticketUrl,
+		string $address = '',
+		string $city = '',
+		string $state = '',
+		string $country = ''
+	): ?int {
 		// The indexed EventDuplicateStrategy owns all event duplicate
 		// detection. If the index class or ability is unavailable (DM core
 		// too old), there is no safe fallback — return null so a new event
@@ -412,6 +434,8 @@ class EventUpsert extends UpsertHandler {
 					'ticketUrl' => $ticketUrl,
 					'address'   => $address,
 					'city'      => $city,
+					'state'     => $state,
+					'country'   => $country,
 				),
 			)
 		);

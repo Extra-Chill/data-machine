@@ -62,6 +62,10 @@ class PreAIEventDedupGate {
 		$venue     = $engine->get( 'venue' ) ?? '';
 		$startDate = $engine->get( 'startDate' ) ?? '';
 		$ticketUrl = $engine->get( 'ticketUrl' ) ?? '';
+		$address   = $engine->get( 'venueAddress' ) ?? '';
+		$city      = $engine->get( 'venueCity' ) ?? '';
+		$state     = $engine->get( 'venueState' ) ?? '';
+		$country   = $engine->get( 'venueCountry' ) ?? '';
 
 		// Need at least title + startDate for a meaningful lookup.
 		// Without these, let the AI step run normally.
@@ -76,6 +80,10 @@ class PreAIEventDedupGate {
 				'venue'     => $venue,
 				'startDate' => $startDate,
 				'ticketUrl' => $ticketUrl,
+				'address'   => $address,
+				'city'      => $city,
+				'state'     => $state,
+				'country'   => $country,
 			),
 		) );
 
