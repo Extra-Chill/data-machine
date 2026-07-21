@@ -52,7 +52,7 @@ class ExecuteStepAbility {
 						'type'       => 'object',
 						'required'   => array( 'job_id', 'flow_step_id' ),
 						'properties' => array(
-							'job_id'               => array(
+							'job_id'                => array(
 								'type'        => 'integer',
 								'description' => __( 'Job ID for the execution.', 'data-machine' ),
 							),
@@ -387,9 +387,9 @@ class ExecuteStepAbility {
 				'datamachine_execute_step',
 				array(
 					'job_id'                => $job_id,
-					'flow_step_id'           => $flow_step_id,
-					'operation_generation'   => $generation,
-					'operation_claim_token'  => $token,
+					'flow_step_id'          => $flow_step_id,
+					'operation_generation'  => $generation,
+					'operation_claim_token' => $token,
 				),
 				'data-machine'
 			)

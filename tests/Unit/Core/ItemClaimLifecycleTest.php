@@ -84,6 +84,16 @@ class ItemClaimLifecycleTest extends WP_UnitTestCase {
 		$this->assertFalse( $this->processed->has_active_claim( self::SCOPE, self::SOURCE, 'expiry-id' ) );
 	}
 
+	public function test_expired_current_owner_can_complete_without_replacement(): void {
+		$claim = $this->claim( 'long-running-id', 2021, 'long-running-revision' );
+		$this->expireClaim( 'long-running-id' );
+
+		StepLifecycleHandler::handleCompleted( 2021, array( ProcessedItems::CLAIM_METADATA_KEY => $claim ) );
+
+		$this->assertSame( 'long-running-revision', $this->tracked->get( self::NAMESPACE, 'long-running-id' )['source_revision'] );
+		$this->assertFalse( $this->processed->has_active_claim( self::SCOPE, self::SOURCE, 'long-running-id' ) );
+	}
+
 	public function test_completion_callback_failure_rolls_back_side_effect(): void {
 		$claim  = $this->claim( 'rollback-id', 203, 'rolled-back-revision' );
 		$result = $this->processed->complete_owned_claim(
@@ -235,6 +245,43 @@ class ItemClaimLifecycleTest extends WP_UnitTestCase {
 
 		$this->assertTrue( BatchScheduler::cancel( $parent_id ) );
 		$this->assertFalse( $this->processed->has_active_claim( self::SCOPE, self::SOURCE, 'cancel-id' ) );
+	}
+
+	public function test_batch_cancellation_during_active_chunk_preserves_created_child_claim(): void {
+		$first     = $this->claim( 'cancel-race-a', 9011, 'revision-a' );
+		$second    = $this->claim( 'cancel-race-b', 9011, 'revision-b' );
+		$third     = $this->claim( 'cancel-race-c', 9011, 'revision-c' );
+		$fourth    = $this->claim( 'cancel-race-d', 9011, 'revision-d' );
+		$parent_id = $this->createJobWithClaim( array(), true );
+		$this->chunk_size_filter = static fn() => 2;
+		add_filter( 'datamachine_batch_chunk_size', $this->chunk_size_filter );
+		BatchScheduler::start(
+			$parent_id,
+			'test_batch_hook',
+			array( $this->packet( $first ), $this->packet( $second ), $this->packet( $third ), $this->packet( $fourth ) ),
+			array(),
+			'pipeline'
+		);
+		$this->unscheduleTestBatch( $parent_id );
+		$created = 0;
+
+		$result = BatchScheduler::processChunk(
+			$parent_id,
+			static function () use ( $parent_id, &$created ): bool {
+				++$created;
+				BatchScheduler::cancel( $parent_id );
+				return true;
+			},
+			0
+		);
+
+		$this->assertTrue( $result['cancelled'] );
+		$this->assertSame( 1, $created );
+		$this->assertTrue( $this->processed->has_active_claim( self::SCOPE, self::SOURCE, 'cancel-race-a' ) );
+		$this->assertFalse( $this->processed->has_active_claim( self::SCOPE, self::SOURCE, 'cancel-race-b' ) );
+		$this->assertFalse( $this->processed->has_active_claim( self::SCOPE, self::SOURCE, 'cancel-race-c' ) );
+		$this->assertFalse( $this->processed->has_active_claim( self::SCOPE, self::SOURCE, 'cancel-race-d' ) );
+		StepLifecycleHandler::handleFailed( 9011, array( ProcessedItems::CLAIM_METADATA_KEY => $first ) );
 	}
 
 	public function test_later_chunk_scheduling_failure_releases_remaining_claims(): void {

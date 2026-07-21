@@ -55,8 +55,6 @@ class ProcessedItems extends BaseRepository {
 	 * @return bool True when an active claim exists.
 	 */
 	public function has_active_claim( string $flow_step_id, string $source_type, string $item_identifier ): bool {
-		$this->delete_expired_claims();
-
 		$now = current_time( 'mysql', true );
 
 		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared -- Prepared with %i table placeholder.
@@ -367,21 +365,21 @@ class ProcessedItems extends BaseRepository {
 		$expires_at  = gmdate( 'Y-m-d H:i:s', time() + $ttl_seconds );
 		$claim_token = bin2hex( random_bytes( 16 ) );
 
-		// One upsert handles absent-row races, processed-row reprocessing, and
-		// expired-claim takeover without surfacing duplicate-key errors. Assignment
-		// order is intentional: status is changed last so every condition observes
-		// the row state that existed when this statement acquired its lock.
+		// Insert-or-lock avoids duplicate-key errors under contention. The no-op
+		// duplicate update acquires the existing row lock on both MySQL and MariaDB;
+		// the locked read below then decides whether this generation may take over.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		if ( false === $this->wpdb->query( 'START TRANSACTION' ) ) {
+			return false;
+		}
+
 		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared -- Prepared with a %i table placeholder.
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-		$this->wpdb->query(
+		$upserted = $this->wpdb->query(
 			$this->wpdb->prepare(
 				'INSERT INTO %i (flow_step_id, source_type, item_identifier, job_id, status, claim_expires_at, claim_token)
 				VALUES (%s, %s, %s, %d, %s, %s, %s)
-				ON DUPLICATE KEY UPDATE
-				claim_token = IF(item_identifier = VALUES(item_identifier) AND (status = %s OR (status = %s AND claim_expires_at IS NOT NULL AND claim_expires_at <= %s)), VALUES(claim_token), claim_token),
-				job_id = IF(item_identifier = VALUES(item_identifier) AND (status = %s OR (status = %s AND claim_expires_at IS NOT NULL AND claim_expires_at <= %s)), VALUES(job_id), job_id),
-				claim_expires_at = IF(item_identifier = VALUES(item_identifier) AND (status = %s OR (status = %s AND claim_expires_at IS NOT NULL AND claim_expires_at <= %s)), VALUES(claim_expires_at), claim_expires_at),
-				status = IF(item_identifier = VALUES(item_identifier) AND (status = %s OR (status = %s AND claim_expires_at IS NOT NULL AND claim_expires_at <= %s)), VALUES(status), status)',
+				ON DUPLICATE KEY UPDATE id = id',
 				$this->table_name,
 				$identity_scope,
 				$source_type,
@@ -389,38 +387,73 @@ class ProcessedItems extends BaseRepository {
 				$job_id,
 				self::STATUS_CLAIMED,
 				$expires_at,
-				$claim_token,
-				self::STATUS_PROCESSED,
-				self::STATUS_CLAIMED,
-				$now,
-				self::STATUS_PROCESSED,
-				self::STATUS_CLAIMED,
-				$now,
-				self::STATUS_PROCESSED,
-				self::STATUS_CLAIMED,
-				$now,
-				self::STATUS_PROCESSED,
-				self::STATUS_CLAIMED,
-				$now
+				$claim_token
 			)
 		);
 		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
+		if ( false === $upserted ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			$this->wpdb->query( 'ROLLBACK' );
+			return false;
+		}
 
 		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared -- Prepared with a %i table placeholder.
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-		$owned_token = $this->wpdb->get_var(
+		$row = $this->wpdb->get_row(
 			$this->wpdb->prepare(
-				'SELECT claim_token FROM %i WHERE flow_step_id = %s AND source_type = %s AND item_identifier = %s AND status = %s',
+				'SELECT id, status, claim_expires_at, claim_token FROM %i WHERE flow_step_id = %s AND source_type = %s AND item_identifier = %s FOR UPDATE',
 				$this->table_name,
 				$identity_scope,
 				$source_type,
-				$item_identifier,
-				self::STATUS_CLAIMED
-			)
+				$item_identifier
+			),
+			ARRAY_A
 		);
 		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
 
-		return is_string( $owned_token ) && hash_equals( $claim_token, $owned_token ) ? $claim_token : false;
+		if ( ! is_array( $row ) ) {
+			// A different full identifier may share the 191-character unique-key prefix.
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			$this->wpdb->query( 'ROLLBACK' );
+			return false;
+		}
+
+		$owned_token = is_string( $row['claim_token'] ?? null ) ? $row['claim_token'] : '';
+		$inserted     = hash_equals( $claim_token, $owned_token );
+		$expired      = self::STATUS_CLAIMED === ( $row['status'] ?? '' )
+			&& ! empty( $row['claim_expires_at'] )
+			&& $row['claim_expires_at'] <= $now;
+		$available    = self::STATUS_PROCESSED === ( $row['status'] ?? '' ) || $expired;
+
+		if ( ! $inserted && ! $available ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			$this->wpdb->query( 'ROLLBACK' );
+			return false;
+		}
+
+		if ( ! $inserted ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			$updated = $this->wpdb->update(
+				$this->table_name,
+				array(
+					'job_id'          => $job_id,
+					'status'          => self::STATUS_CLAIMED,
+					'claim_expires_at' => $expires_at,
+					'claim_token'      => $claim_token,
+				),
+				array( 'id' => (int) $row['id'] ),
+				array( '%d', '%s', '%s', '%s' ),
+				array( '%d' )
+			);
+			if ( false === $updated || $updated < 1 ) {
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+				$this->wpdb->query( 'ROLLBACK' );
+				return false;
+			}
+		}
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		return false !== $this->wpdb->query( 'COMMIT' ) ? $claim_token : false;
 	}
 
 	/**
@@ -455,14 +488,13 @@ class ProcessedItems extends BaseRepository {
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		$owned = $this->wpdb->get_var(
 			$this->wpdb->prepare(
-				'SELECT claim_token FROM %i WHERE flow_step_id = %s AND source_type = %s AND item_identifier = %s AND claim_token = %s AND status = %s AND claim_expires_at > %s FOR UPDATE',
+				'SELECT claim_token FROM %i WHERE flow_step_id = %s AND source_type = %s AND item_identifier = %s AND claim_token = %s AND status = %s FOR UPDATE',
 				$this->table_name,
 				$identity_scope,
 				$source_type,
 				$item_identifier,
 				$claim_token,
-				self::STATUS_CLAIMED,
-				$now
+				self::STATUS_CLAIMED
 			)
 		);
 		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
@@ -491,7 +523,7 @@ class ProcessedItems extends BaseRepository {
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 			$transitioned = $this->wpdb->query(
 				$this->wpdb->prepare(
-					'UPDATE %i SET status = %s, job_id = %d, processed_timestamp = %s, claim_expires_at = NULL WHERE flow_step_id = %s AND source_type = %s AND item_identifier = %s AND claim_token = %s AND status = %s AND claim_expires_at > %s',
+					'UPDATE %i SET status = %s, job_id = %d, processed_timestamp = %s, claim_expires_at = NULL WHERE flow_step_id = %s AND source_type = %s AND item_identifier = %s AND claim_token = %s AND status = %s',
 					$this->table_name,
 					self::STATUS_PROCESSED,
 					$job_id,
@@ -500,8 +532,7 @@ class ProcessedItems extends BaseRepository {
 					$source_type,
 					$item_identifier,
 					$claim_token,
-					self::STATUS_CLAIMED,
-					$now
+					self::STATUS_CLAIMED
 				)
 			);
 			// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
@@ -600,7 +631,10 @@ class ProcessedItems extends BaseRepository {
 	}
 
 	/**
-	 * Delete expired in-flight claims.
+	 * Delete expired legacy claims that have no ownership generation.
+	 *
+	 * Token-owned rows remain available for either completion by the current
+	 * generation or atomic takeover by a replacement generation.
 	 *
 	 * @return int|false Number of rows deleted, or false on error.
 	 */
@@ -611,7 +645,7 @@ class ProcessedItems extends BaseRepository {
 		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared -- Prepared with %i table placeholder.
 		$result = $this->wpdb->query(
 			$this->wpdb->prepare(
-				'DELETE FROM %i WHERE status = %s AND claim_expires_at IS NOT NULL AND claim_expires_at <= %s',
+				'DELETE FROM %i WHERE status = %s AND claim_token IS NULL AND claim_expires_at IS NOT NULL AND claim_expires_at <= %s',
 				$this->table_name,
 				self::STATUS_CLAIMED,
 				$now

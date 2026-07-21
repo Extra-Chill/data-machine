@@ -491,8 +491,8 @@ class PipelineBatchScheduler {
 			return;
 		}
 
-		$total_children = (int) $counts['total'];
-		$active         = (int) $counts['active'];
+		$total_children  = (int) $counts['total'];
+		$active          = (int) $counts['active'];
 		$batch_scheduled = (int) ( $parent_engine['batch_scheduled'] ?? $total_children );
 		$batch_pending   = isset( $parent_engine['batch_state'] );
 
