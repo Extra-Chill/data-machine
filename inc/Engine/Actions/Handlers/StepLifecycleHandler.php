@@ -112,19 +112,23 @@ class StepLifecycleHandler {
 	 *
 	 * @param int        $job_id      Failed job ID.
 	 * @param array|null $engine_data Optional engine data snapshot.
+	 * @return bool Whether every descriptor and legacy claim was released.
 	 */
-	public static function handleFailed( int $job_id, ?array $engine_data = null ): void {
+	public static function handleFailed( int $job_id, ?array $engine_data = null ): bool {
 		$engine_data = is_array( $engine_data ) ? $engine_data : \datamachine_get_engine_data( $job_id );
 		$claims      = self::claimsFromEngine( $engine_data );
+		$processed   = new ProcessedItems();
 		if ( ! empty( $claims ) ) {
 			foreach ( $claims as $claim ) {
-				self::releaseClaim( $claim );
+				if ( false === self::releaseClaim( $claim, $processed ) ) {
+					return false;
+				}
 			}
 		}
 
 		// Pre-descriptor and partially migrated jobs still own claims by job_id.
 		// Reacquisition replaces job_id, so this cannot release a newer worker's row.
-		( new ProcessedItems() )->release_claims_for_job( $job_id );
+		return false !== $processed->release_claims_for_job( $job_id );
 	}
 
 	/**
@@ -134,12 +138,8 @@ class StepLifecycleHandler {
 	 * @param string $status Final job status.
 	 */
 	public static function handleTerminal( int $job_id, string $status ): void {
-		if ( JobStatus::isStatusSuccess( $status ) ) {
-			return;
-		}
-
+		unset( $status );
 		unset( self::$pending_processed_metrics[ $job_id ] );
-		\do_action( 'datamachine_step_lifecycle_failed', $job_id, \datamachine_get_engine_data( $job_id ) );
 	}
 
 	/** Clear request-local completion state after a database rollback. */
@@ -165,19 +165,21 @@ class StepLifecycleHandler {
 	 * @return string|\WP_Error Original status or a rollback signal.
 	 */
 	public static function filterTerminalStatus( string $status, int $job_id, array $job ): string|\WP_Error {
-		if ( ! JobStatus::isStatusSuccess( $status ) ) {
-			return $status;
-		}
-
 		$engine_data = is_array( $job['engine_data'] ?? null ) ? $job['engine_data'] : array();
-		if ( self::handleCompleted( $job_id, $engine_data, true ) ) {
+		$prepared    = JobStatus::isStatusSuccess( $status )
+			? self::handleCompleted( $job_id, $engine_data, true )
+			: self::handleFailed( $job_id, $engine_data );
+		if ( $prepared ) {
 			return $status;
 		}
 
+		$reason = JobStatus::isStatusSuccess( $status )
+			? 'item_claim_completion_failed'
+			: 'item_claim_release_failed';
 		return new \WP_Error(
-			'item_claim_completion_failed',
-			'Item claim completion failed inside terminal ownership boundary.',
-			array( 'status' => JobStatus::failed( 'item_claim_completion_failed' )->toString() )
+			$reason,
+			'Item claim transition failed inside terminal ownership boundary.',
+			array( 'status' => JobStatus::failed( $reason )->toString() )
 		);
 	}
 
@@ -272,10 +274,13 @@ class StepLifecycleHandler {
 	/**
 	 * Release one validated claim descriptor.
 	 *
-	 * @param array $claim Validated claim descriptor.
+	 * @param array               $claim     Validated claim descriptor.
+	 * @param ProcessedItems|null $processed Shared repository instance.
+	 * @return int|false Number of released rows, or false on error.
 	 */
-	private static function releaseClaim( array $claim ): void {
-		( new ProcessedItems() )->release_owned_claim(
+	private static function releaseClaim( array $claim, ?ProcessedItems $processed = null ): int|false {
+		$processed = $processed ?? new ProcessedItems();
+		return $processed->release_owned_claim(
 			$claim['identity_scope'],
 			$claim['source_type'],
 			$claim['item_identifier'],

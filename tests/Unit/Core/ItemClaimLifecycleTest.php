@@ -378,6 +378,76 @@ class ItemClaimLifecycleTest extends WP_UnitTestCase {
 		$this->assertSame( 'recovered-revision', $this->tracked->get( self::NAMESPACE, 'process-death-id' )['source_revision'] );
 	}
 
+	public function test_process_death_after_failure_commit_preserves_cleanup_for_replay(): void {
+		if ( ! function_exists( 'pcntl_fork' ) || ! function_exists( 'stream_socket_pair' ) ) {
+			$this->markTestSkipped( 'pcntl and socket pairs are required for crash-boundary coverage.' );
+		}
+
+		global $wpdb;
+		$sockets = stream_socket_pair( STREAM_PF_UNIX, STREAM_SOCK_STREAM, STREAM_IPPROTO_IP );
+		$this->assertIsArray( $sockets );
+		stream_set_timeout( $sockets[0], 5 );
+		stream_set_timeout( $sockets[1], 5 );
+		$job_id = $this->createJobWithClaim( array(), true );
+		$claim  = $this->claim( 'failed-commit-crash-id', $job_id, 'must-not-persist' );
+		datamachine_set_engine_data( $job_id, array( ProcessedItems::CLAIM_METADATA_KEY => $claim ) );
+		$kill_after_commit = static function ( int $committed_job_id, string $status ) use ( $job_id, $sockets ): void {
+			if ( $job_id !== $committed_job_id || JobStatus::isStatusSuccess( $status ) ) {
+				return;
+			}
+			fwrite( $sockets[1], "committed\n" );
+			if ( function_exists( 'posix_kill' ) ) {
+				posix_kill( getmypid(), SIGKILL );
+			}
+			exit( 99 );
+		};
+		add_action( 'datamachine_job_terminal_committed', $kill_after_commit, 20, 2 );
+		$pid = pcntl_fork();
+		$this->assertNotSame( -1, $pid );
+
+		if ( 0 === $pid ) {
+			fclose( $sockets[0] );
+			$child_db = new \wpdb( DB_USER, DB_PASSWORD, DB_NAME, DB_HOST );
+			$child_db->set_prefix( $wpdb->prefix );
+			$GLOBALS['wpdb'] = $child_db;
+			( new Jobs() )->transition_job_status_result( $job_id, JobStatus::failed( 'crash-after-commit' )->toString(), true );
+			exit( 98 );
+		}
+
+		fclose( $sockets[1] );
+		$this->assertSame( "committed\n", fgets( $sockets[0] ) );
+		fclose( $sockets[0] );
+		pcntl_waitpid( $pid, $child_status );
+		remove_action( 'datamachine_job_terminal_committed', $kill_after_commit, 20 );
+
+		$persisted_status = (string) $this->jobs->get_job( $job_id )['status'];
+		$this->assertStringContainsString( 'crash-after-commit', $persisted_status );
+		$this->assertFalse( $this->processed->has_active_claim( self::SCOPE, self::SOURCE, 'failed-commit-crash-id' ) );
+		$this->assertNull( $this->tracked->get( self::NAMESPACE, 'failed-commit-crash-id' ) );
+		$this->assertTrue( $this->jobs->complete_job( $job_id, $persisted_status ) );
+		$this->assertFalse( $this->processed->has_active_claim( self::SCOPE, self::SOURCE, 'failed-commit-crash-id' ) );
+	}
+
+	public function test_cancellation_atomically_releases_mixed_descriptor_and_legacy_claims(): void {
+		$job_id = $this->createJobWithClaim( array(), true );
+		$claim  = $this->claim( 'cancel-mixed-owned', $job_id, 'must-not-persist' );
+		$this->assertTrue( $this->processed->claim_item( self::SCOPE, self::SOURCE, 'cancel-mixed-legacy', $job_id ) );
+		datamachine_set_engine_data(
+			$job_id,
+			array_merge(
+				$this->legacyEngineData( 'cancel-mixed-legacy' ),
+				array( ProcessedItems::CLAIM_METADATA_KEY => $claim )
+			)
+		);
+
+		$this->assertTrue( $this->jobs->complete_job( $job_id, JobStatus::CANCELLED ) );
+
+		$this->assertSame( JobStatus::CANCELLED, $this->jobs->get_job( $job_id )['status'] );
+		$this->assertFalse( $this->processed->has_active_claim( self::SCOPE, self::SOURCE, 'cancel-mixed-owned' ) );
+		$this->assertFalse( $this->processed->has_active_claim( self::SCOPE, self::SOURCE, 'cancel-mixed-legacy' ) );
+		$this->assertNull( $this->tracked->get( self::NAMESPACE, 'cancel-mixed-owned' ) );
+	}
+
 	public function test_gated_inline_continuation_completes_every_claim(): void {
 		$first  = $this->claim( 'inline-success-a', 211, 'revision-a' );
 		$second = $this->claim( 'inline-success-b', 211, 'revision-b' );

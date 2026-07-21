@@ -2022,43 +2022,50 @@ class Jobs extends BaseRepository {
 			return $this->status_transition_result( false, false, $current_status, $current_status );
 		}
 
-		$status = $requested_status;
-		if ( JobStatus::isStatusSuccess( $status ) ) {
-			try {
-				/**
-				 * Prepare a successful terminal transition inside the locked job transaction.
-				 *
-				 * Return WP_Error to roll back all preparation and persist its failure status.
-				 *
-				 * @param string $status Current terminal status.
-				 * @param int    $job_id Job ID.
-				 * @param array  $job Locked job row.
-				 */
-				$prepared_status = apply_filters( 'datamachine_job_terminal_status', $status, $job_id, $job );
-			} catch ( \Throwable $exception ) {
-				$prepared_status = new \WP_Error(
-					'terminal_preparation_exception',
-					$exception->getMessage(),
-					array( 'status' => JobStatus::failed( 'terminal_preparation_exception' )->toString() )
-				);
-			}
+		$status            = $requested_status;
+		$requested_success = JobStatus::isStatusSuccess( $requested_status );
+		try {
+			/**
+			 * Prepare required claim transitions inside the locked job transaction.
+			 *
+			 * Return WP_Error to roll back all claim and callback changes.
+			 *
+			 * @param string $status Current terminal status.
+			 * @param int    $job_id Job ID.
+			 * @param array  $job Locked job row.
+			 */
+			$prepared_status = apply_filters( 'datamachine_job_terminal_status', $status, $job_id, $job );
+		} catch ( \Throwable $exception ) {
+			$prepared_status = new \WP_Error(
+				'terminal_preparation_exception',
+				$exception->getMessage(),
+				array( 'status' => JobStatus::failed( 'terminal_preparation_exception' )->toString() )
+			);
+		}
 
-			if ( is_wp_error( $prepared_status ) ) {
-				$this->rollback_terminal_transition( $job_id );
-				$failure_data   = $prepared_status->get_error_data();
-				$failure_status = is_array( $failure_data ) && is_string( $failure_data['status'] ?? null )
-					? $failure_data['status']
-					: JobStatus::failed( 'terminal_preparation_failed' )->toString();
-				return $this->transition_job_status_result( $job_id, $failure_status, true );
+		if ( is_wp_error( $prepared_status ) ) {
+			$this->rollback_terminal_transition( $job_id );
+			if ( ! $requested_success ) {
+				return $this->status_transition_result( false, false, $current_status, $current_status );
 			}
-			$status = is_string( $prepared_status ) ? $prepared_status : '';
-			if ( ! JobStatus::isStatusSuccess( $status ) ) {
-				$this->rollback_terminal_transition( $job_id );
-				$failure_status = JobStatus::isStatusFinal( $status )
-					? $status
-					: JobStatus::failed( 'terminal_preparation_failed' )->toString();
-				return $this->transition_job_status_result( $job_id, $failure_status, true );
-			}
+			$failure_data   = $prepared_status->get_error_data();
+			$failure_status = is_array( $failure_data ) && is_string( $failure_data['status'] ?? null )
+				? $failure_data['status']
+				: JobStatus::failed( 'terminal_preparation_failed' )->toString();
+			return $this->transition_job_status_result( $job_id, $failure_status, true );
+		}
+
+		$status = is_string( $prepared_status ) ? $prepared_status : '';
+		if ( $requested_success && ! JobStatus::isStatusSuccess( $status ) ) {
+			$this->rollback_terminal_transition( $job_id );
+			$failure_status = JobStatus::isStatusFinal( $status )
+				? $status
+				: JobStatus::failed( 'terminal_preparation_failed' )->toString();
+			return $this->transition_job_status_result( $job_id, $failure_status, true );
+		}
+		if ( ! $requested_success && JobStatus::isStatusSuccess( $status ) ) {
+			$this->rollback_terminal_transition( $job_id );
+			return $this->status_transition_result( false, false, $current_status, $current_status );
 		}
 
 		if ( ! JobStatus::isStatusFinal( $status ) ) {
