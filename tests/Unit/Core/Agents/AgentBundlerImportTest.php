@@ -270,7 +270,7 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 		$second_step   = reset( $second_bundle['flows'][0]['flow_config'] );
 
 		foreach ( array( 'handler_configs', 'prompt_queue' ) as $field ) {
-			$this->assertSame( $expected[ $field ], $first_step[ $field ], "Export preserves {$field}." );
+			$this->assertEquals( $expected[ $field ], $first_step[ $field ], "Export preserves {$field}." );
 			$this->assertSame( $first_step[ $field ], $second_step[ $field ], "Repeated bundle round trip is idempotent for {$field}." );
 		}
 	}

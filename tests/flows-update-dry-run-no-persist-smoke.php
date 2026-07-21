@@ -270,6 +270,7 @@ namespace DataMachine\Core\Database\Flows {
 
 namespace {
 
+	require_once dirname( __DIR__ ) . '/inc/Cli/JsonInput.php';
 	require_once dirname( __DIR__ ) . '/inc/Cli/Commands/Flows/FlowsCommand.php';
 
 	use DataMachine\Cli\Commands\Flows\FlowsCommand;

@@ -613,14 +613,20 @@ class FlowsCommand extends BaseCommand {
 			return;
 		}
 
-		$repo = new \DataMachine\Core\Database\Flows\Flows();
-		$flow = $repo->get_flow( $flow_id );
-		if ( ! $flow ) {
+		$repo                 = new \DataMachine\Core\Database\Flows\Flows();
+		$expected_config_json = $repo->get_flow_config_json( $flow_id );
+		if ( null === $expected_config_json ) {
 			WP_CLI::error( sprintf( 'Flow %d not found.', $flow_id ) );
 			return;
 		}
 
-		$repair  = FlowConfigEscaping::repair( is_array( $flow['flow_config'] ?? null ) ? $flow['flow_config'] : array() );
+		$flow_config = json_decode( $expected_config_json, true );
+		if ( ! is_array( $flow_config ) ) {
+			WP_CLI::error( sprintf( 'Flow %d has invalid flow_config JSON.', $flow_id ) );
+			return;
+		}
+
+		$repair  = FlowConfigEscaping::repair( $flow_config );
 		$changes = $repair['changes'];
 		$apply   = isset( $assoc_args['apply'] );
 		$format  = (string) ( $assoc_args['format'] ?? 'table' );
@@ -630,8 +636,8 @@ class FlowsCommand extends BaseCommand {
 			return;
 		}
 
-		if ( $apply && ! $repo->update_flow( $flow_id, array( 'flow_config' => $repair['config'] ) ) ) {
-			WP_CLI::error( sprintf( 'Failed to repair flow %d.', $flow_id ) );
+		if ( $apply && ! $repo->compare_and_swap_flow_config( $flow_id, $expected_config_json, $repair['config'] ) ) {
+			WP_CLI::error( sprintf( 'Flow %d changed after the repair preview was read; no changes were written. Review the latest config and retry.', $flow_id ) );
 			return;
 		}
 
