@@ -787,13 +787,20 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 				clusterGroup.addLayers( markersToAdd );
 			}
 
-			// Fit bounds to the full route on the FIRST successful render.
+			// Fit bounds to the full route and any explicit map center on the
+			// FIRST successful render. The center anchors the viewport
+			// without becoming a stop in the chronological route polyline.
 			// Subsequent refetches (filter changes, bounds events) keep
 			// the current viewport so the user isn't yanked around.
 			if ( ! chronologicalRouteFitOnceRef.current ) {
-				const latlngs = orderedLatLngs.length > 0
-					? orderedLatLngs
-					: routeVenues.map( ( v ) => [ v.lat, v.lon ] as L.LatLngExpression );
+				const latlngs = [
+					...( orderedLatLngs.length > 0
+						? orderedLatLngs
+						: routeVenues.map( ( v ) => [ v.lat, v.lon ] as L.LatLngExpression ) ),
+				];
+				if ( hasCenter ) {
+					latlngs.push( [ centerLat!, centerLon! ] );
+				}
 				if ( latlngs.length > 0 ) {
 					const bounds = L.latLngBounds( latlngs );
 					map.fitBounds( bounds.pad( 0.15 ) );
