@@ -2,6 +2,24 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.50.0] - 2026-07-21
+
+### Added
+- support local term IDs in events-by-term
+
+### Changed
+- align controller assignments
+
+### Fixed
+- harden public event query semantics
+- include explicit center in route bounds
+- prevent cross-city venue identity collisions
+- dedupe Ticketmaster events before fan-out
+- preserve event index integrity across mutations
+- create calendar table before transactions
+- align optimized upcoming boundaries
+- avoid PHPUnit run method collision
+
 ## [0.49.4] - 2026-07-20
 
 ### Fixed
