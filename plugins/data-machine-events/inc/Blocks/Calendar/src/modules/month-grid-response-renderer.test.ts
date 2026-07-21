@@ -17,6 +17,7 @@ jest.mock( './date-group-renderer', () => ( {
 } ) );
 
 import { renderMonthGridResponse } from './month-grid-response-renderer';
+import { renderDateGroup } from './date-group-renderer';
 
 import type { CalendarDataResponse } from '../types';
 
@@ -25,19 +26,88 @@ function response(): CalendarDataResponse {
 		success: true,
 		schema: {
 			name: 'calendar-data',
-			version: 3,
+			version: 4,
 			phase: 1,
 			issue: 298,
 		},
-		events: [],
+		events: [
+			{
+				id: 7,
+				title: 'Seeded event',
+				permalink: 'https://producer.invalid/events/7',
+				date: {
+					start_date: '2026-08-10',
+					start_time: '19:30:00',
+					end_date: '2026-08-10',
+					end_time: '22:00:00',
+					venue_timezone: 'America/New_York',
+				},
+				venue: {
+					term_id: 11,
+					name: 'Seeded Hall',
+					slug: 'seeded-hall',
+					address: '100 Fixture Way',
+					formatted_address: '100 Fixture Way, Seed City, SC 29000',
+					city: 'Seed City',
+					state: 'SC',
+					zip: '29000',
+					country: 'US',
+					coordinates: '32.000000,-80.000000',
+					timezone: 'America/New_York',
+					website: 'https://venue.invalid',
+				},
+				organizer: {
+					name: 'Seeded Productions',
+					url: 'https://producer.invalid',
+					type: 'Organization',
+				},
+				ticket: { url: 'https://tickets.invalid/seeded-show' },
+				performer: {
+					name: 'The Seeded Performers',
+					type: 'PerformingGroup',
+				},
+				status: 'EventRescheduled',
+				address: '100 Fixture Way, Seed City, SC 29000',
+				taxonomies: {
+					artist: [
+						{
+							term_id: 12,
+							name: 'The Seeded Performers',
+							slug: 'the-seeded-performers',
+							link: 'https://producer.invalid/artist',
+						},
+					],
+				},
+			},
+		],
 		grouping: {
 			ordered_dates: [ '2026-08-10' ],
 			by_date: {
 				'2026-08-10': [
 					{
 						post_id: 7,
-						display_context: {} as never,
-						display: {} as never,
+						display_context: {
+							is_multi_day: false,
+							is_start_day: true,
+							is_end_day: true,
+							is_continuation: false,
+							display_date: '2026-08-10',
+							original_start_date: '2026-08-10',
+							original_end_date: '2026-08-10',
+							day_number: 1,
+							total_days: 1,
+						},
+						display: {
+							formatted_time_display: '7:30 - 10:00 PM',
+							multi_day_label: '',
+							iso_start_date: '2026-08-10T19:30:00-04:00',
+							venue_name: 'Seeded Hall',
+							performer_name: 'The Seeded Performers',
+							show_performer: false,
+							show_ticket_link: true,
+							is_continuation: false,
+							is_multi_day: false,
+						},
 					},
 				],
 			},
@@ -108,6 +178,20 @@ describe( 'month-grid response rendering', () => {
 		expect(
 			calendar.querySelectorAll( '.data-machine-events-pagination a' )
 		).toHaveLength( 2 );
+		const eventsById = ( renderDateGroup as jest.Mock ).mock
+			.calls[ 0 ][ 2 ];
+		expect( eventsById.get( 7 ) ).toMatchObject( {
+			venue: {
+				city: 'Seed City',
+				coordinates: '32.000000,-80.000000',
+				timezone: 'America/New_York',
+			},
+			performer: {
+				name: 'The Seeded Performers',
+				type: 'PerformingGroup',
+			},
+			status: 'EventRescheduled',
+		} );
 		expect( updated ).toHaveBeenCalledTimes( 1 );
 	} );
 

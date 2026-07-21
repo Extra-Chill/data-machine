@@ -43,7 +43,7 @@ full-response cache key (`CalendarCache::generate_full_response_key()`).
   "success": true,
   "schema": {
     "name": "calendar-data",
-    "version": 3,
+    "version": 4,
     "phase": 1,
     "issue": 298
   },
@@ -83,7 +83,7 @@ full-response cache key (`CalendarCache::generate_full_response_key()`).
 ### `schema`
 
 Identifies the schema for forward compatibility. Clients should check
-`schema.name === 'calendar-data'` and `schema.version === 3` before
+`schema.name === 'calendar-data'` and `schema.version === 4` before
 reading the rest. Future phases bump `phase`; backward-incompatible
 shape changes bump `version`.
 
@@ -127,15 +127,23 @@ page — its multi-day expansion is represented in `grouping.by_date`.
     "term_id": 678,
     "name":    "The Royal American",
     "slug":    "the-royal-american",
-    "address": "970 Morrison Dr, Charleston, SC 29403"
+    "address": "970 Morrison Dr",
+    "formatted_address": "970 Morrison Dr, Charleston, SC 29403",
+    "city": "Charleston",
+    "state": "SC",
+    "zip": "29403",
+    "country": "US",
+    "coordinates": "32.8007,-79.9362",
+    "timezone": "America/New_York"
   },
   "organizer": {
     "name": "Local Promoter",
     "url":  "https://example.com",
-    "type": "promoter"
+    "type": "Organization"
   },
   "ticket":    { "url": "https://etix.com/..." },
-  "performer": { "name": "Headliner Name" },
+  "performer": { "name": "Headliner Name", "type": "MusicGroup" },
+  "status": "EventScheduled",
   "address":   "970 Morrison Dr, Charleston, SC 29403",
   "taxonomies": {
     "artist": [

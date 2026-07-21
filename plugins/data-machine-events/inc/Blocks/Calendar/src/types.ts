@@ -47,7 +47,7 @@ export interface ArchiveContext {
 /* ------------------------------------------------------------------ */
 
 /** Keyed by taxonomy slug, values are term IDs. */
-export type TaxFilters = Record<string, number[]>;
+export type TaxFilters = Record< string, number[] >;
 
 export interface TaxonomyTerm {
 	term_id: number;
@@ -141,7 +141,7 @@ export interface CalendarResponse {
 /** Identifies the schema version + phase the server returned. */
 export interface CalendarDataSchemaMeta {
 	name: 'calendar-data';
-	version: 3;
+	version: 4;
 	phase: 1;
 	issue: 298;
 }
@@ -161,6 +161,14 @@ export interface CalendarEventVenue {
 	name: string;
 	slug: string;
 	address: string;
+	formatted_address: string;
+	city: string;
+	state: string;
+	zip: string;
+	country: string;
+	coordinates: string;
+	timezone: string;
+	website: string;
 }
 
 /** Organizer (promoter) attached to an event, or null when none. */
@@ -187,9 +195,10 @@ export interface CalendarEventItem {
 	venue: CalendarEventVenue | null;
 	organizer: CalendarEventOrganizer | null;
 	ticket: { url: string };
-	performer: { name: string };
+	performer: { name: string; type: string };
+	status: string;
 	address: string;
-	taxonomies: Record<string, CalendarEventTaxonomyTerm[]>;
+	taxonomies: Record< string, CalendarEventTaxonomyTerm[] >;
 	/**
 	 * Server-rendered, filter-applied badge markup from
 	 * `Badges::render_taxonomy_badges()`. When present, the event renderer
@@ -265,9 +274,9 @@ export interface CalendarGrouping {
 	/** Ordered list of dates as rendered on this page. */
 	ordered_dates: string[];
 	/** `Y-m-d => occurrence[]` map matching `ordered_dates`. */
-	by_date: Record<string, CalendarEventOccurrence[]>;
+	by_date: Record< string, CalendarEventOccurrence[] >;
 	/** `Y-m-d => gap_days` map; gaps >= 2 days from `DateGrouper::detect_time_gaps`. */
-	gaps: Record<string, number>;
+	gaps: Record< string, number >;
 }
 
 /** Pagination metadata as JSON — no HTML. */
@@ -309,7 +318,7 @@ export interface CalendarDataResponse {
 
 export interface FilterResponse {
 	success: boolean;
-	taxonomies: Record<string, TaxonomyData>;
+	taxonomies: Record< string, TaxonomyData >;
 	archive_context?: ArchiveContext;
 	geo_context?: {
 		active: boolean;
@@ -363,5 +372,5 @@ export interface FlatpickrInstance {
 export interface CarouselObserverEntry {
 	observer: ResizeObserver;
 	wrapper: HTMLElement;
-	events: NodeListOf<HTMLElement>;
+	events: NodeListOf< HTMLElement >;
 }

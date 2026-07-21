@@ -1,0 +1,88 @@
+{
+    "event": {
+        "id": 507001,
+        "title": "Seeded Calendar Contract Event",
+        "date": {
+            "start_date": "2099-07-21",
+            "start_time": "19:30:00",
+            "end_date": "2099-07-22",
+            "end_time": "00:30:00",
+            "venue_timezone": "America/New_York"
+        },
+        "venue": {
+            "term_id": 507101,
+            "name": "Seeded Hall",
+            "slug": "seeded-hall",
+            "address": "100 Fixture Way",
+            "formatted_address": "100 Fixture Way, Seed City, SC, 29000",
+            "city": "Seed City",
+            "state": "SC",
+            "zip": "29000",
+            "country": "US",
+            "coordinates": "32.000000,-80.000000",
+            "timezone": "America/New_York",
+            "website": "https://venue.invalid"
+        },
+        "organizer": {
+            "name": "Seeded Productions",
+            "url": "https://producer.invalid",
+            "type": "Organization"
+        },
+        "ticket": {
+            "url": "https://tickets.invalid/seeded-show"
+        },
+        "performer": {
+            "name": "The Seeded Performers",
+            "type": "PerformingGroup"
+        },
+        "status": "EventRescheduled",
+        "taxonomies": {
+            "artist": [
+                {
+                    "term_id": 507102,
+                    "name": "The Seeded Performers",
+                    "slug": "the-seeded-performers"
+                }
+            ],
+            "location": [
+                {
+                    "term_id": 507103,
+                    "name": "Seed City",
+                    "slug": "seed-city"
+                }
+            ],
+            "promoter": [
+                {
+                    "term_id": 507104,
+                    "name": "Seeded Productions",
+                    "slug": "seeded-productions"
+                }
+            ]
+        }
+    },
+    "occurrence": {
+        "post_id": 507001,
+        "display_context": {
+            "is_multi_day": true,
+            "is_start_day": true,
+            "is_end_day": false,
+            "is_continuation": false,
+            "display_date": "2099-07-21",
+            "original_start_date": "2099-07-21",
+            "original_end_date": "2099-07-22",
+            "day_number": 1,
+            "total_days": 1
+        },
+        "display": {
+            "formatted_time_display": "7:30 PM",
+            "multi_day_label": "through Jul 22",
+            "iso_start_date": "2099-07-21T19:30:00-04:00",
+            "venue_name": "Seeded Hall",
+            "performer_name": "The Seeded Performers",
+            "show_performer": false,
+            "show_ticket_link": true,
+            "is_continuation": false,
+            "is_multi_day": true
+        }
+    }
+}

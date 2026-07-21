@@ -7,6 +7,9 @@
         "php": ">=8.2",
         "johngrogg/ics-parser": "^3.5"
     },
+    "require-dev": {
+        "phpunit/phpunit": "^9.6"
+    },
     "autoload": {
         "psr-4": {
             "DataMachineEvents\\": "inc/"

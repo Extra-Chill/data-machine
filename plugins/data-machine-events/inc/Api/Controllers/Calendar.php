@@ -28,6 +28,8 @@
  * Both envelopes are cached independently via
  * `CalendarCache::generate_full_response_key()`, which includes
  * `format` in its key surface as of this phase.
+ *
+ * @package DataMachineEvents\Api\Controllers
  */
 
 namespace DataMachineEvents\Api\Controllers;
@@ -37,6 +39,7 @@ defined( 'ABSPATH' ) || exit;
 use WP_REST_Request;
 use DataMachineEvents\Abilities\CalendarAbilities;
 use DataMachineEvents\Api\BrowserNavigationGuard;
+use DataMachineEvents\Api\Serializers\CalendarOccurrence;
 use DataMachineEvents\Blocks\Calendar\Cache\CalendarCache;
 use DataMachineEvents\Blocks\Calendar\Display\DisplayVars;
 use DataMachineEvents\Blocks\Calendar\Display\EventRenderer;
@@ -59,13 +62,14 @@ class Calendar {
 	 *
 	 * v2 (#381): per-occurrence `display` block added to `grouping.by_date`.
 	 * v3 (#465): canonical server-rendered empty-state fragment added.
+	 * v4 (#507): complete performer, status, and venue context added.
 	 */
-	const DATA_SCHEMA_VERSION = 3;
+	const DATA_SCHEMA_VERSION = 4;
 
 	/**
 	 * Calendar endpoint implementation
 	 *
-	 * @param WP_REST_Request $request REST request object
+	 * @param WP_REST_Request $request REST request object.
 	 * @return \WP_REST_Response
 	 */
 	public function calendar( WP_REST_Request $request ) {
@@ -185,11 +189,11 @@ class Calendar {
 
 		// Flatten paged_date_groups (already serialized by
 		// CalendarAbilities::serializeDateGroups()) into:
-		//   - `events`: a deduplicated array of structured event objects.
-		//   - `grouping.by_date`: a `Y-m-d => [post_id, ...]` index that
-		//     preserves the day-bucket ordering AND multi-day expansion
-		//     produced by DateGrouper (a multi-day event appears under
-		//     every spanned date, in order).
+		// - `events`: a deduplicated array of structured event objects.
+		// - `grouping.by_date`: a `Y-m-d => [post_id, ...]` index that
+		// preserves the day-bucket ordering AND multi-day expansion
+		// produced by DateGrouper (a multi-day event appears under
+		// every spanned date, in order).
 		//
 		// Deduplication is keyed on post_id so a multi-day event ships
 		// once in `events` but reappears as needed in `grouping.by_date`.
@@ -221,25 +225,17 @@ class Calendar {
 			$grouping[ $date_key ] = array();
 
 			foreach ( $date_group['events'] as $event_entry ) {
-				$post_id = (int) ( $event_entry['post_id'] ?? 0 );
+				$serialized = $this->serialize_occurrence( $event_entry );
+				$post_id    = (int) ( $serialized['event']['id'] ?? 0 );
 				if ( $post_id <= 0 ) {
 					continue;
 				}
 
 				if ( ! isset( $events_by_id[ $post_id ] ) ) {
-					$events_by_id[ $post_id ] = $this->serialize_event( $post_id, $event_entry );
+					$events_by_id[ $post_id ] = $serialized['event'];
 				}
 
-				$display_context = $event_entry['display_context'] ?? array();
-
-				$grouping[ $date_key ][] = array(
-					'post_id'         => $post_id,
-					'display_context' => $display_context,
-					'display'         => $this->serialize_display(
-						$event_entry['event_data'] ?? array(),
-						$display_context
-					),
-				);
+				$grouping[ $date_key ][] = $serialized['occurrence'];
 			}
 		}
 
@@ -292,6 +288,47 @@ class Calendar {
 			),
 			'empty_html' => $empty_html,
 		);
+	}
+
+	/**
+	 * Serialize one canonical calendar event occurrence.
+	 *
+	 * This is the shared producer boundary for the REST data response and the
+	 * pinned calendar occurrence contract artifact. Consumers should adapt this
+	 * output rather than reconstructing event, taxonomy, venue, or occurrence
+	 * fields independently.
+	 *
+	 * @param array $event_entry Serialized CalendarAbilities event entry.
+	 * @return array{event: array<string,mixed>, occurrence: array<string,mixed>}
+	 */
+	public function serialize_occurrence( array $event_entry ): array {
+		$post_id         = (int) ( $event_entry['post_id'] ?? 0 );
+		$event_data      = $event_entry['event_data'] ?? array();
+		$display_context = $event_entry['display_context'] ?? array();
+
+		return array(
+			'event'      => $this->serialize_event( $post_id, $event_entry ),
+			'occurrence' => array(
+				'post_id'         => $post_id,
+				'display_context' => $display_context,
+				'display'         => $this->serialize_display( $event_data, $display_context ),
+			),
+		);
+	}
+
+	/**
+	 * Serialize the pinned, presentation-neutral occurrence contract.
+	 *
+	 * The REST producer carries additional HTML and URL presentation fields.
+	 * This artifact surface selects only canonical event, taxonomy, venue, and
+	 * occurrence data while still deriving every value through the same
+	 * serializer used by the REST response.
+	 *
+	 * @param array $event_entry Serialized CalendarAbilities event entry.
+	 * @return array{event: array<string,mixed>, occurrence: array<string,mixed>}
+	 */
+	public function serialize_contract_occurrence( array $event_entry ): array {
+		return CalendarOccurrence::serialize( $this->serialize_occurrence( $event_entry ) );
 	}
 
 	/**
@@ -348,8 +385,10 @@ class Calendar {
 				'url' => (string) ( $event_data['ticketUrl'] ?? '' ),
 			),
 			'performer'      => array(
-				'name' => (string) ( $event_data['performerName'] ?? '' ),
+				'name' => (string) ( $event_data['performer'] ?? '' ),
+				'type' => (string) ( $event_data['performerType'] ?? '' ),
 			),
+			'status'         => (string) ( $event_data['eventStatus'] ?? '' ),
 			'address'        => (string) ( $event_data['address'] ?? '' ),
 			'taxonomies'     => $this->serialize_taxonomies( $post_id ),
 			// Server-filtered badge HTML so client-rendered (Load More)
@@ -425,13 +464,22 @@ class Calendar {
 		if ( ! $venue_terms || is_wp_error( $venue_terms ) ) {
 			return null;
 		}
-		$term = $venue_terms[0];
+		$term       = $venue_terms[0];
+		$venue_data = \DataMachineEvents\Core\Venue_Taxonomy::get_venue_data( $term->term_id );
 
 		return array(
-			'term_id' => (int) $term->term_id,
-			'name'    => (string) ( $event_data['venue'] ?? $term->name ),
-			'slug'    => (string) $term->slug,
-			'address' => (string) ( $event_data['address'] ?? '' ),
+			'term_id'           => (int) $term->term_id,
+			'name'              => (string) ( $event_data['venue'] ?? $term->name ),
+			'slug'              => (string) $term->slug,
+			'address'           => (string) ( $venue_data['address'] ?? '' ),
+			'formatted_address' => (string) ( $event_data['address'] ?? '' ),
+			'city'              => (string) ( $venue_data['city'] ?? '' ),
+			'state'             => (string) ( $venue_data['state'] ?? '' ),
+			'zip'               => (string) ( $venue_data['zip'] ?? '' ),
+			'country'           => (string) ( $venue_data['country'] ?? '' ),
+			'coordinates'       => (string) ( $venue_data['coordinates'] ?? '' ),
+			'timezone'          => (string) ( $venue_data['timezone'] ?? $event_data['venueTimezone'] ?? '' ),
+			'website'           => (string) ( $venue_data['website'] ?? '' ),
 		);
 	}
 
