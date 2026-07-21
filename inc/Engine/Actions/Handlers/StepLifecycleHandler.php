@@ -242,6 +242,10 @@ class StepLifecycleHandler {
 			$callback = static fn(): bool => true === call_user_func( $handler, $payload, $job_id, $claim );
 		}
 
+		$retain_processed = true;
+		if ( isset( $completion['retain_processed'] ) && false === $completion['retain_processed'] ) {
+			$retain_processed = false;
+		}
 		$method = $within_transaction ? 'complete_owned_claim_in_transaction' : 'complete_owned_claim';
 		$owned  = $processed->{$method}(
 			$claim['identity_scope'],
@@ -250,7 +254,7 @@ class StepLifecycleHandler {
 			$claim['ownership_token'],
 			$job_id,
 			$callback,
-			false !== ( $completion['retain_processed'] ?? true )
+			$retain_processed
 		);
 		if ( ! $owned ) {
 			return false;

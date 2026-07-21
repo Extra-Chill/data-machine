@@ -2094,17 +2094,18 @@ class Jobs extends BaseRepository {
 		);
 		if ( 1 !== $updated ) {
 			$this->rollback_terminal_transition( $job_id );
-			$winner = $this->get_job( $job_id );
+			$winner        = $this->get_job( $job_id );
 			$winner_status = is_array( $winner ) && is_string( $winner['status'] ?? null ) ? $winner['status'] : $current_status;
 			return $this->status_transition_result( false, false, $winner_status, $winner_status );
 		}
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		$committed = false !== $this->wpdb->query( 'COMMIT' );
+
 		self::$terminalizing_job = null;
 		if ( ! $committed ) {
 			$this->rollback_terminal_transition( $job_id );
-			$winner = $this->get_job( $job_id );
+			$winner        = $this->get_job( $job_id );
 			$winner_status = is_array( $winner ) && is_string( $winner['status'] ?? null ) ? $winner['status'] : $current_status;
 			return $this->status_transition_result( $status === $winner_status, false, $winner_status, $winner_status );
 		}
@@ -2124,10 +2125,11 @@ class Jobs extends BaseRepository {
 	 * @return array|null Locked job row.
 	 */
 	private function get_job_for_update( int $job_id ): ?array {
+		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Table identifier uses %i; value uses a typed placeholder.
+		$query = $this->wpdb->prepare( 'SELECT * FROM %i WHERE job_id = %d FOR UPDATE', $this->table_name, $job_id );
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		$job = $this->wpdb->get_row(
-			// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Table identifier uses %i; value uses a typed placeholder.
-			$this->wpdb->prepare( 'SELECT * FROM %i WHERE job_id = %d FOR UPDATE', $this->table_name, $job_id ),
+			$query,
 			ARRAY_A
 		);
 		if ( is_array( $job ) && isset( $job['engine_data'] ) && is_string( $job['engine_data'] ) ) {

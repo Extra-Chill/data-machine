@@ -42,6 +42,7 @@ class ItemClaimLifecycleTest extends WP_UnitTestCase {
 		$this->jobs      = new Jobs();
 		$this->processed->create_table();
 		$this->tracked->create_table();
+		add_filter( 'datamachine_item_claim_completion_handlers', array( TrackedItems::class, 'registerClaimCompletionHandler' ) );
 		$this->admin_id = self::factory()->user->create( array( 'role' => 'administrator' ) );
 		wp_set_current_user( $this->admin_id );
 		$this->deleteTestRows();
@@ -57,6 +58,7 @@ class ItemClaimLifecycleTest extends WP_UnitTestCase {
 		if ( null !== $this->completion_handler_filter ) {
 			remove_filter( 'datamachine_item_claim_completion_handlers', $this->completion_handler_filter );
 		}
+		remove_filter( 'datamachine_item_claim_completion_handlers', array( TrackedItems::class, 'registerClaimCompletionHandler' ) );
 		$this->deleteTestRows();
 		parent::tear_down();
 	}
@@ -199,10 +201,15 @@ class ItemClaimLifecycleTest extends WP_UnitTestCase {
 		add_filter( 'datamachine_job_terminal_status', $crash, 20 );
 
 		try {
-			$this->assertTrue( $this->jobs->complete_job( $job_id, JobStatus::COMPLETED ) );
+			$this->assertFalse( $this->jobs->complete_job( $job_id, JobStatus::COMPLETED ) );
 		} finally {
 			remove_filter( 'datamachine_job_terminal_status', $crash, 20 );
 		}
+
+		$this->assertSame( 'processing', $this->jobs->get_job( $job_id )['status'] );
+		$this->assertNull( $this->tracked->get( self::NAMESPACE, 'crash-boundary-id' ) );
+		$this->assertTrue( $this->processed->has_active_claim( self::SCOPE, self::SOURCE, 'crash-boundary-id' ) );
+		$this->assertTrue( $this->jobs->complete_job( $job_id, JobStatus::failed( 'terminal_preparation_exception' )->toString() ) );
 
 		$job = $this->jobs->get_job( $job_id );
 		$this->assertIsArray( $job );
