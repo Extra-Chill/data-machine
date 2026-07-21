@@ -145,7 +145,7 @@ class BatchScheduler {
 	 * @param array  $extra         Arbitrary per-batch state cloned to chunks (engine_snapshot, task_type, ...).
 	 * @param string $context       Consumer context, used for chunk-size/delay filter dispatch.
 	 * @param string $completion_strategy Declared parent-completion strategy.
-	 * @return array{parent_job_id:int,total:int,chunk_size:int} Batch summary.
+	 * @return array{parent_job_id:int,total:int,chunk_size:int,action_id:int,scheduled:bool} Batch summary.
 	 */
 	public static function start(
 		int $parent_job_id,
@@ -188,20 +188,43 @@ class BatchScheduler {
 			)
 		);
 
-		as_schedule_single_action(
-			time(),
-			$hook,
-			array(
-				'parent_job_id' => $parent_job_id,
-				'offset'        => 0,
-			),
-			'data-machine'
-		);
+		try {
+			$action_id = as_schedule_single_action(
+				time(),
+				$hook,
+				array(
+					'parent_job_id' => $parent_job_id,
+					'offset'        => 0,
+				),
+				'data-machine'
+			);
+		} catch ( \Throwable $exception ) {
+			$action_id = 0;
+			do_action(
+				'datamachine_log',
+				'error',
+				'Batch scheduler failed to schedule initial chunk',
+				array(
+					'parent_job_id' => $parent_job_id,
+					'exception'     => $exception->getMessage(),
+				)
+			);
+		}
+
+		if ( ! $action_id ) {
+			do_action( 'datamachine_batch_items_discarded', $items, $parent_job_id, $context );
+			$engine = datamachine_get_engine_data( $parent_job_id );
+			unset( $engine['batch_state'] );
+			$engine['batch_schedule_failed'] = true;
+			datamachine_set_engine_data( $parent_job_id, $engine );
+		}
 
 		return array(
 			'parent_job_id' => $parent_job_id,
 			'total'         => $total,
 			'chunk_size'    => $chunk_size,
+			'action_id'     => (int) $action_id,
+			'scheduled'     => (bool) $action_id,
 		);
 	}
 
@@ -228,7 +251,8 @@ class BatchScheduler {
 	 *     more:bool,
 	 *     cancelled:bool,
 	 *     missing:bool,
-	 *     duplicate:bool
+	 *     duplicate:bool,
+	 *     schedule_failed?:bool
 	 * } Chunk result. `missing` is true only when the batch_state key
 	 *   has been lost; consumer must fail the parent in that case.
 	 */
@@ -266,6 +290,13 @@ class BatchScheduler {
 		// Cancellation flag set on the parent's engine_data short-circuits
 		// any further child creation.
 		if ( ! empty( $parent_engine['cancelled'] ) ) {
+			$remaining = array_slice(
+				is_array( $batch_state['items'] ?? null ) ? $batch_state['items'] : array(),
+				(int) ( $batch_state['offset'] ?? 0 )
+			);
+			if ( $remaining ) {
+				do_action( 'datamachine_batch_items_discarded', $remaining, $parent_job_id, (string) ( $parent_engine['batch_context'] ?? '' ) );
+			}
 			unset( $parent_engine['batch_state'] );
 			datamachine_set_engine_data( $parent_job_id, $parent_engine );
 
@@ -346,14 +377,17 @@ class BatchScheduler {
 		$extra  = is_array( $batch_state['extra'] ?? null ) ? $batch_state['extra'] : array();
 		$hook   = (string) ( $batch_state['hook'] ?? '' );
 
-		$chunk     = array_slice( $items, $offset, $chunk_size );
-		$scheduled = 0;
+		$chunk           = array_slice( $items, $offset, $chunk_size );
+		$scheduled       = 0;
+		$schedule_failed = false;
 
 		foreach ( $chunk as $item ) {
 			$item   = DataPacketStore::hydrate_packet_collections_in_value( $item );
 			$result = $createItem( $item, $extra, $parent_job_id );
 			if ( $result ) {
 				++$scheduled;
+			} else {
+				do_action( 'datamachine_batch_items_discarded', array( $item ), $parent_job_id, (string) $context );
 			}
 		}
 
@@ -384,26 +418,58 @@ class BatchScheduler {
 		);
 
 		if ( $more ) {
+			try {
+				$action_id = as_schedule_single_action(
+					time() + $delay,
+					$hook,
+					array(
+						'parent_job_id' => $parent_job_id,
+						'offset'        => $new_offset,
+					),
+					'data-machine'
+				);
+			} catch ( \Throwable $exception ) {
+				$action_id = 0;
+				do_action(
+					'datamachine_log',
+					'error',
+					'Batch scheduler failed to schedule next chunk',
+					array(
+						'parent_job_id' => $parent_job_id,
+						'offset'        => $new_offset,
+						'exception'     => $exception->getMessage(),
+					)
+				);
+			}
 
-			as_schedule_single_action(
-				time() + $delay,
-				$hook,
-				array(
-					'parent_job_id' => $parent_job_id,
-					'offset'        => $new_offset,
-				),
-				'data-machine'
-			);
+			if ( ! $action_id ) {
+				$remaining = array_slice( $items, $new_offset );
+				if ( $remaining ) {
+					do_action( 'datamachine_batch_items_discarded', $remaining, $parent_job_id, (string) $context );
+				}
+				EngineData::mutate(
+					$parent_job_id,
+					static function ( array $current ): array {
+						unset( $current['batch_state'] );
+						$current['batch_schedule_failed'] = true;
+						return $current;
+					},
+					'batch_chunk_schedule_failure'
+				);
+				$more            = false;
+				$schedule_failed = true;
+			}
 		}
 
 		return array(
-			'scheduled' => $scheduled,
-			'offset'    => min( $new_offset, $total ),
-			'total'     => $total,
-			'more'      => $more,
-			'cancelled' => false,
-			'missing'   => false,
-			'duplicate' => false,
+			'scheduled'       => $scheduled,
+			'offset'          => min( $new_offset, $total ),
+			'total'           => $total,
+			'more'            => $more,
+			'cancelled'       => false,
+			'missing'         => false,
+			'duplicate'       => false,
+			'schedule_failed' => $schedule_failed,
 		);
 	}
 
@@ -425,7 +491,16 @@ class BatchScheduler {
 
 		$parent_engine['cancelled']    = true;
 		$parent_engine['cancelled_at'] = current_time( 'mysql' );
+		$batch_state                   = is_array( $parent_engine['batch_state'] ?? null ) ? $parent_engine['batch_state'] : array();
+		$remaining                     = array_slice(
+			is_array( $batch_state['items'] ?? null ) ? $batch_state['items'] : array(),
+			(int) ( $batch_state['offset'] ?? 0 )
+		);
 		datamachine_set_engine_data( $parent_job_id, $parent_engine );
+
+		if ( $remaining ) {
+			do_action( 'datamachine_batch_items_discarded', $remaining, $parent_job_id, (string) ( $parent_engine['batch_context'] ?? '' ) );
+		}
 
 		return true;
 	}

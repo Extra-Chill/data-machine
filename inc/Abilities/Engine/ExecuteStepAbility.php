@@ -581,12 +581,6 @@ class ExecuteStepAbility {
 		if ( $status_override ) {
 			$transition = $this->db_jobs->transition_job_status_result( $job_id, $status_override, true );
 			if ( $transition['changed'] ) {
-				if ( str_starts_with( $status_override, JobStatus::FAILED ) === false ) {
-					$this->handleStepLifecycleCompleted( $job_id );
-				} else {
-					$this->handleStepLifecycleFailed( $job_id );
-				}
-
 				$cleanup = new FileCleanup();
 				$context = datamachine_get_file_context( $flow_id );
 				$cleanup->cleanup_job_data_packets( $job_id, $context );
@@ -742,9 +736,6 @@ class ExecuteStepAbility {
 
 			$transition = $this->db_jobs->transition_job_status_result( $job_id, JobStatus::COMPLETED, true );
 			if ( $transition['changed'] ) {
-				// Notify lifecycle handlers after the full pipeline succeeds.
-				$this->handleStepLifecycleCompleted( $job_id );
-
 				$cleanup = new FileCleanup();
 				$context = datamachine_get_file_context( $flow_id );
 				$cleanup->cleanup_job_data_packets( $job_id, $context );
@@ -968,24 +959,6 @@ class ExecuteStepAbility {
 	 */
 	private function handleStepLifecycleInlineContinuation( int $job_id, array $flow_step_config, array $routed_packets ): void {
 		do_action( 'datamachine_step_lifecycle_inline_continuation', $job_id, $flow_step_config, $routed_packets );
-	}
-
-	/**
-	 * Notify step lifecycle handlers that a job completed successfully.
-	 *
-	 * @param int $job_id Completed job ID.
-	 */
-	private function handleStepLifecycleCompleted( int $job_id ): void {
-		do_action( 'datamachine_step_lifecycle_completed', $job_id, datamachine_get_engine_data( $job_id ) );
-	}
-
-	/**
-	 * Notify step lifecycle handlers that a job failed outside datamachine_fail_job.
-	 *
-	 * @param int $job_id Failed job ID.
-	 */
-	private function handleStepLifecycleFailed( int $job_id ): void {
-		do_action( 'datamachine_step_lifecycle_failed', $job_id, datamachine_get_engine_data( $job_id ) );
 	}
 
 	/**

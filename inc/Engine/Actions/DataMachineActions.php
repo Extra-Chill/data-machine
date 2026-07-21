@@ -70,6 +70,8 @@ function datamachine_register_core_actions() {
 	add_action( 'datamachine_step_lifecycle_inline_continuation', array( StepLifecycleHandler::class, 'handleInlineContinuation' ), 10, 3 );
 	add_action( 'datamachine_step_lifecycle_completed', array( StepLifecycleHandler::class, 'handleCompleted' ), 10, 2 );
 	add_action( 'datamachine_step_lifecycle_failed', array( StepLifecycleHandler::class, 'handleFailed' ), 10, 2 );
+	add_action( 'datamachine_job_complete', array( StepLifecycleHandler::class, 'handleTerminal' ), 5, 2 );
+	add_action( 'datamachine_batch_items_discarded', array( StepLifecycleHandler::class, 'handleDiscardedPackets' ), 10, 3 );
 	add_action(
 		'datamachine_pending_action_staged',
 		function ( string $action_id, array $payload ): void {

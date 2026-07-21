@@ -97,7 +97,7 @@ datamachine_strategy_assert(
 	'pipeline completion still lives in onChildComplete()'
 );
 datamachine_strategy_assert(
-	str_contains( $pipeline_batch, '$active > 0 || $total_children < $batch_total' ),
+	str_contains( $pipeline_batch, '$active > 0 || $batch_pending || $total_children < $batch_scheduled' ),
 	'pipeline parent still waits for children to finish and all children to be scheduled'
 );
 datamachine_strategy_assert(

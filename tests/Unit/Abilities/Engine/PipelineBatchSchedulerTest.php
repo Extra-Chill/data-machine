@@ -10,6 +10,7 @@ namespace DataMachine\Tests\Unit\Abilities\Engine;
 
 use DataMachine\Abilities\Engine\PipelineBatchScheduler;
 use DataMachine\Core\Database\Jobs\Jobs;
+use DataMachine\Core\Database\ProcessedItems\ProcessedItems;
 use DataMachine\Core\JobStatus;
 use WP_UnitTestCase;
 
@@ -257,6 +258,29 @@ class PipelineBatchSchedulerTest extends WP_UnitTestCase {
 		// Check parent progress was updated.
 		$parent_engine = datamachine_get_engine_data( $parent_id );
 		$this->assertEquals( 2, $parent_engine['batch_scheduled'] );
+	}
+
+	public function test_process_chunk_propagates_claim_ownership_to_children(): void {
+		$parent_id = $this->create_parent_job();
+		$engine    = $this->make_engine_snapshot( $parent_id );
+		$claim     = array(
+			'identity_scope'  => 'shared:source',
+			'source_type'     => 'source',
+			'item_identifier' => 'item-1',
+			'ownership_token' => 'opaque-token',
+			'completion'      => array(),
+		);
+		$packet = $this->make_data_packet( 'Claimed Event' );
+		$packet['metadata'][ ProcessedItems::CLAIM_METADATA_KEY ] = $claim;
+
+		$scheduler = new PipelineBatchScheduler();
+		$scheduler->fanOut( $parent_id, 'step_abc_123', array( $packet ), $engine );
+		$scheduler->processChunk( $parent_id );
+
+		global $wpdb;
+		$child_id    = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT job_id FROM %i WHERE parent_job_id = %d', $wpdb->prefix . 'datamachine_jobs', $parent_id ) );
+		$child_engine = datamachine_get_engine_data( $child_id );
+		$this->assertSame( $claim, $child_engine[ ProcessedItems::CLAIM_METADATA_KEY ] );
 	}
 
 	public function test_process_chunk_respects_cancellation(): void {

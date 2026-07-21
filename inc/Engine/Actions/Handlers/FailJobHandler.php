@@ -125,7 +125,6 @@ class FailJobHandler {
 		}
 
 		$db_processed_items->delete_processed_items( array( 'job_id' => $job_id ) );
-		do_action( 'datamachine_step_lifecycle_failed', $job_id, $engine_data );
 
 		$cleanup_files = \DataMachine\Core\PluginSettings::get( 'cleanup_job_data_on_failure', true );
 		$files_cleaned = false;

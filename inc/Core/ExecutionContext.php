@@ -260,18 +260,39 @@ class ExecutionContext {
 		 *     @type int    $job_id          Current job ID (0 if unavailable).
 		 * }
 		 */
-		$skip = (bool) apply_filters(
+		return $this->shouldSkipItem( $skip, $item_identifier );
+	}
+
+	/**
+	 * Apply the public reprocess policy with the actual flow-step context.
+	 *
+	 * Consumers with their own revision ledger can supply its skip decision and
+	 * additional context without substituting a synthetic identity scope for the
+	 * flow step that is actually executing.
+	 *
+	 * @param bool   $skip               Consumer's default skip decision.
+	 * @param string $item_identifier    Item identifier being evaluated.
+	 * @param array  $additional_context Additional public filter context.
+	 * @return bool Filtered skip decision.
+	 */
+	public function shouldSkipItem( bool $skip, string $item_identifier, array $additional_context = array() ): bool {
+		if ( $this->isDirect() || $this->isStandalone() || ! $this->flow_step_id ) {
+			return $skip;
+		}
+
+		return (bool) apply_filters(
 			'datamachine_should_reprocess_item',
 			$skip,
-			array(
-				'flow_step_id'    => $this->flow_step_id,
-				'source_type'     => $this->handler_type,
-				'item_identifier' => $item_identifier,
-				'job_id'          => (int) $this->job_id,
+			array_merge(
+				$additional_context,
+				array(
+					'flow_step_id'    => $this->flow_step_id,
+					'source_type'     => $this->handler_type,
+					'item_identifier' => $item_identifier,
+					'job_id'          => (int) $this->job_id,
+				)
 			)
 		);
-
-		return $skip;
 	}
 
 	/**
@@ -311,16 +332,55 @@ class ExecutionContext {
 			return true;
 		}
 
-		if ( empty( $this->job_id ) ) {
+		$claim = $this->claimItemOwnership( $this->flow_step_id, $item_identifier );
+		if ( false === $claim ) {
 			return false;
 		}
 
-		$db_processed_items = new ProcessedItems();
-		return $db_processed_items->claim_item(
-			$this->flow_step_id,
+		$this->storeEngineData( array( ProcessedItems::CLAIM_METADATA_KEY => $claim ) );
+		return true;
+	}
+
+	/**
+	 * Claim an item under a caller-provided identity scope.
+	 *
+	 * Attach the returned descriptor to DataPacket metadata under
+	 * ProcessedItems::CLAIM_METADATA_KEY. Data Machine propagates it to child
+	 * work and owns terminal completion/release. The optional completion payload
+	 * may contain a `tracked_item` array and `keep_processed` boolean.
+	 *
+	 * @param string $identity_scope  Caller-provided stable identity scope.
+	 * @param string $item_identifier Stable item identifier within the scope.
+	 * @param int    $ttl_seconds     Claim lifetime in seconds.
+	 * @param array  $completion      Optional successful-completion behavior.
+	 * @return array<string,mixed>|false Opaque lifecycle descriptor, or false on contention.
+	 */
+	public function claimItemOwnership( string $identity_scope, string $item_identifier, int $ttl_seconds = ProcessedItems::DEFAULT_CLAIM_TTL_SECONDS, array $completion = array() ): array|false {
+		if ( $this->isDirect() || $this->isStandalone() ) {
+			return array( 'persisted' => false );
+		}
+
+		if ( '' === trim( $identity_scope ) || '' === $item_identifier || empty( $this->job_id ) ) {
+			return false;
+		}
+
+		$token = ( new ProcessedItems() )->claim_item_owned(
+			$identity_scope,
 			$this->handler_type,
 			$item_identifier,
-			(int) $this->job_id
+			(int) $this->job_id,
+			$ttl_seconds
+		);
+		if ( false === $token ) {
+			return false;
+		}
+
+		return array(
+			'identity_scope'  => $identity_scope,
+			'source_type'     => $this->handler_type,
+			'item_identifier' => $item_identifier,
+			'ownership_token' => $token,
+			'completion'      => $completion,
 		);
 	}
 
