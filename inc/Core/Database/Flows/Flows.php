@@ -344,7 +344,7 @@ class Flows extends BaseRepository {
 		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared
 		$result = $this->wpdb->query(
 			$this->wpdb->prepare(
-				'UPDATE %i SET flow_config = %s WHERE flow_id = %d AND flow_config = %s',
+				'UPDATE %i SET flow_config = %s WHERE flow_id = %d AND HEX(flow_config) = HEX(%s)',
 				$this->table_name,
 				$new_config_json,
 				$flow_id,
