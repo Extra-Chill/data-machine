@@ -358,7 +358,11 @@ class RecurringScheduler {
 	 * @return array{option_name:string,token:string}|\WP_Error
 	 */
 	private static function acquireScheduleLock( string $hook, array $args, string $group ) {
-		$option_name = self::SCHEDULE_LOCK_PREFIX . md5( serialize( array( $hook, $args, $group ) ) );
+		$signature = wp_json_encode( array( $hook, $args, $group ) );
+		if ( false === $signature ) {
+			return self::error( 'invalid_schedule_signature', 'Schedule arguments must be JSON-serializable.' );
+		}
+		$option_name = self::SCHEDULE_LOCK_PREFIX . md5( $signature );
 
 		for ( $attempt = 0; $attempt < self::SCHEDULE_LOCK_RETRY_ATTEMPTS; ++$attempt ) {
 			$now     = time();

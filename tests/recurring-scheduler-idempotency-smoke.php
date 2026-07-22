@@ -70,6 +70,12 @@ if ( ! function_exists( 'wp_date' ) ) {
 	}
 }
 
+if ( ! function_exists( 'wp_json_encode' ) ) {
+	function wp_json_encode( $value ) {
+		return json_encode( $value );
+	}
+}
+
 if ( ! function_exists( 'apply_filters' ) ) {
 	function apply_filters( string $hook, $value ) {
 		if ( 'datamachine_scheduler_intervals' === $hook ) {
