@@ -16,6 +16,7 @@ use WP_CLI;
 use DataMachine\Cli\AbilityRunner;
 use DataMachine\Cli\BaseCommand;
 use DataMachine\Cli\AgentResolver;
+use DataMachine\Cli\JobLivenessClassifier;
 use DataMachine\Cli\UserResolver;
 use DataMachine\Abilities\Job\DeleteJobsAbility;
 use DataMachine\Abilities\Job\FailJobAbility;
