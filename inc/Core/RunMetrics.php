@@ -176,7 +176,7 @@ class RunMetrics {
 		return ! empty( $result['success'] );
 	}
 
-	public static function complete( int $job_id, string $status ): bool {
+	public static function complete( int $job_id, string $status, ?string $completed_at = null, int $processed_claim_count = 0 ): bool {
 		if ( $job_id <= 0 ) {
 			return false;
 		}
@@ -186,12 +186,18 @@ class RunMetrics {
 		// snapshot — the lost-update race behind batch_state_missing. See #2762.
 		$result = EngineData::mutate(
 			$job_id,
-			static function ( array $engine ) use ( $status, $job_id ): array {
+			static function ( array $engine ) use ( $status, $job_id, $completed_at, $processed_claim_count ): array {
 				$metrics = self::normalize( $engine[ self::KEY ] ?? array() );
+				$applied = max( 0, (int) ( $metrics['terminal_processed_claims_applied'] ?? 0 ) );
+				if ( $processed_claim_count > $applied ) {
+					$metrics['counts']['processed']              += $processed_claim_count - $applied;
+					$metrics['terminal_processed_claims_applied'] = $processed_claim_count;
+				}
 				if ( $status === $metrics['terminal_status'] && ! empty( $metrics['completed_at'] ) && is_array( $engine[ self::RUN_RESULT_KEY ] ?? null ) ) {
+					$engine[ self::KEY ] = $metrics;
 					return $engine;
 				}
-				$now     = self::now();
+				$now = ! empty( $completed_at ) ? $completed_at : self::now();
 
 				if ( empty( $metrics['started_at'] ) ) {
 					$metrics['started_at'] = $engine['started_at'] ?? ( $engine['job']['created_at'] ?? $now );
@@ -276,13 +282,14 @@ class RunMetrics {
 		}
 
 		return array(
-			'counts'           => $counts,
-			'started_at'       => isset( $metrics['started_at'] ) ? (string) $metrics['started_at'] : null,
-			'last_activity_at' => isset( $metrics['last_activity_at'] ) ? (string) $metrics['last_activity_at'] : null,
-			'completed_at'     => isset( $metrics['completed_at'] ) ? (string) $metrics['completed_at'] : null,
-			'duration_seconds' => isset( $metrics['duration_seconds'] ) ? max( 0, (int) $metrics['duration_seconds'] ) : null,
-			'terminal_status'  => isset( $metrics['terminal_status'] ) ? (string) $metrics['terminal_status'] : null,
-			'context'          => is_array( $metrics['context'] ?? null ) ? $metrics['context'] : array(),
+			'counts'                            => $counts,
+			'started_at'                        => isset( $metrics['started_at'] ) ? (string) $metrics['started_at'] : null,
+			'last_activity_at'                  => isset( $metrics['last_activity_at'] ) ? (string) $metrics['last_activity_at'] : null,
+			'completed_at'                      => isset( $metrics['completed_at'] ) ? (string) $metrics['completed_at'] : null,
+			'duration_seconds'                  => isset( $metrics['duration_seconds'] ) ? max( 0, (int) $metrics['duration_seconds'] ) : null,
+			'terminal_status'                   => isset( $metrics['terminal_status'] ) ? (string) $metrics['terminal_status'] : null,
+			'terminal_processed_claims_applied' => max( 0, (int) ( $metrics['terminal_processed_claims_applied'] ?? 0 ) ),
+			'context'                           => is_array( $metrics['context'] ?? null ) ? $metrics['context'] : array(),
 		);
 	}
 

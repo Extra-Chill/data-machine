@@ -668,36 +668,64 @@ class JobsCommand extends BaseCommand {
 		$rows    = $jobs_db->get_incomplete_terminal_accounting( $limit );
 		$items   = array();
 		$summary = array(
-			'incomplete' => $jobs_db->count_incomplete_terminal_accounting(),
-			'inspected'  => count( $rows ),
-			'reconciled' => 0,
-			'failed'     => 0,
+			'incomplete'  => $jobs_db->count_incomplete_terminal_accounting(),
+			'inspected'   => count( $rows ),
+			'reconciled'  => 0,
+			'in_progress' => 0,
+			'failed'      => 0,
 		);
 
 		foreach ( $rows as $row ) {
 			$before = (int) $row['terminal_accounting_state'];
-			$result = $dry_run
-				? array(
-					'success'  => true,
-					'state'    => $before,
-					'complete' => false,
-				)
-				: $jobs_db->reconcile_terminal_accounting( (int) $row['job_id'] );
+			try {
+				$result = $dry_run
+					? array(
+						'success'     => true,
+						'state'       => $before,
+						'complete'    => false,
+						'in_progress' => false,
+						'errors'      => array(),
+					)
+					: $jobs_db->reconcile_terminal_accounting( (int) $row['job_id'] );
+			} catch ( \Throwable $exception ) {
+				$result = array(
+					'success'     => false,
+					'state'       => $before,
+					'complete'    => false,
+					'in_progress' => false,
+					'stage'       => 'reconcile',
+					'errors'      => array(
+						array(
+							'stage'   => 'reconcile',
+							'code'    => 'reconciliation_exception',
+							'message' => $exception->getMessage(),
+						),
+					),
+				);
+			}
 
 			if ( ! $dry_run ) {
 				if ( ! empty( $result['complete'] ) ) {
 					++$summary['reconciled'];
+				} elseif ( ! empty( $result['in_progress'] ) ) {
+					++$summary['in_progress'];
 				} else {
 					++$summary['failed'];
 				}
 			}
+			$errors      = is_array( $result['errors'] ?? null ) ? $result['errors'] : array();
+			$error_codes = implode( ',', array_filter( array_column( $errors, 'code' ), 'is_string' ) );
+			$action      = $dry_run ? 'would_reconcile' : ( ! empty( $result['complete'] ) ? 'reconciled' : ( ! empty( $result['in_progress'] ) ? 'in_progress' : 'failed' ) );
 
 			$items[] = array(
 				'job_id'       => (int) $row['job_id'],
 				'status'       => (string) $row['status'],
 				'before_state' => $before,
 				'after_state'  => (int) ( $result['state'] ?? $before ),
-				'action'       => $dry_run ? 'would_reconcile' : ( ! empty( $result['complete'] ) ? 'reconciled' : 'failed' ),
+				'stage'        => (string) ( $result['stage'] ?? '' ),
+				'action'       => $action,
+				'error_codes'  => $error_codes,
+				'errors'       => $errors,
 			);
 		}
 
@@ -719,8 +747,8 @@ class JobsCommand extends BaseCommand {
 			return;
 		}
 
-		$this->format_items( $items, array( 'job_id', 'status', 'before_state', 'after_state', 'action' ), $assoc_args, 'job_id' );
-		WP_CLI::log( sprintf( 'Inspected %d of %d incomplete terminal jobs; %d reconciled; %d failed.', $summary['inspected'], $summary['incomplete'], $summary['reconciled'], $summary['failed'] ) );
+		$this->format_items( $items, array( 'job_id', 'status', 'before_state', 'after_state', 'stage', 'action', 'error_codes' ), $assoc_args, 'job_id' );
+		WP_CLI::log( sprintf( 'Inspected %d of %d incomplete terminal jobs; %d reconciled; %d in progress; %d failed.', $summary['inspected'], $summary['incomplete'], $summary['reconciled'], $summary['in_progress'], $summary['failed'] ) );
 	}
 
 	/**
