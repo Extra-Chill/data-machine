@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.167.0] - 2026-07-22
+
+### Added
+- add bulk source eligibility classification ([#2951](https://github.com/Extra-Chill/data-machine/pull/2951)) (by Chris Huber)
+
 ## [0.166.0] - 2026-07-22
 
 ### Added
