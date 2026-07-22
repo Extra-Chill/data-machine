@@ -27,6 +27,7 @@ class ProcessedItems extends BaseRepository {
 	const DEFAULT_CLAIM_TTL_SECONDS = 3600;
 	const CLAIM_METADATA_KEY        = '_datamachine_item_claim';
 	const CLAIMS_METADATA_KEY       = '_datamachine_item_claims';
+	private const READ_CHUNK_SIZE   = 500;
 
 
 	/**
@@ -72,6 +73,54 @@ class ProcessedItems extends BaseRepository {
 		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
 
 		return $count > 0;
+	}
+
+	/**
+	 * Read persisted lifecycle state for a bounded set of source identifiers.
+	 *
+	 * Missing identifiers are omitted. Expired claims are returned as inactive
+	 * state and are never deleted by this observational read.
+	 *
+	 * @param string   $flow_step_id    Flow step ID.
+	 * @param string   $source_type     Source type.
+	 * @param string[] $item_identifiers Candidate identifiers.
+	 * @return array<string,array{processed:bool,actively_claimed:bool}>
+	 */
+	public function get_item_lifecycle_states( string $flow_step_id, string $source_type, array $item_identifiers ): array {
+		$identifiers = array_values( array_unique( array_map( 'strval', $item_identifiers ) ) );
+		if ( empty( $identifiers ) ) {
+			return array();
+		}
+
+		$now    = current_time( 'mysql', true );
+		$states = array();
+
+		foreach ( array_chunk( $identifiers, self::READ_CHUNK_SIZE ) as $chunk ) {
+			$placeholders = implode( ',', array_fill( 0, count( $chunk ), '%s' ) );
+			$sql          = sprintf(
+				'SELECT item_identifier, status, claim_expires_at FROM %%i WHERE flow_step_id = %%s AND source_type = %%s AND item_identifier IN (%s)',
+				$placeholders
+			);
+			/** @var literal-string $sql */
+			$prepare_args = array_merge( array( $this->table_name, $flow_step_id, $source_type ), $chunk );
+
+			// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Dynamic IN() list is bounded and every value uses a placeholder.
+			$rows = $this->wpdb->get_results( $this->wpdb->prepare( $sql, ...$prepare_args ), ARRAY_A );
+
+			foreach ( (array) $rows as $row ) {
+				$identifier = (string) $row['item_identifier'];
+				$status     = (string) $row['status'];
+				$expires_at = $row['claim_expires_at'] ?? null;
+
+				$states[ $identifier ] = array(
+					'processed'        => self::STATUS_PROCESSED === $status,
+					'actively_claimed' => self::STATUS_CLAIMED === $status
+						&& ( empty( $expires_at ) || $expires_at > $now ),
+				);
+			}
+		}
+
+		return $states;
 	}
 
 	/**

@@ -27,9 +27,14 @@ defined( 'ABSPATH' ) || exit;
 
 class ExecutionContext {
 
-	public const MODE_DIRECT     = 'direct';
-	public const MODE_FLOW       = 'flow';
-	public const MODE_STANDALONE = 'standalone';
+	public const MODE_DIRECT                       = 'direct';
+	public const MODE_FLOW                         = 'flow';
+	public const MODE_STANDALONE                   = 'standalone';
+	public const ITEM_ELIGIBLE                     = 'eligible';
+	public const ITEM_PROCESSED_SKIPPED            = 'processed-skipped';
+	public const ITEM_PROCESSED_REPROCESS_ELIGIBLE = 'processed-reprocess-eligible';
+	public const ITEM_ACTIVELY_CLAIMED             = 'actively-claimed';
+	public const ITEM_ELIGIBLE_OUTSIDE_MAX_ITEMS   = 'eligible-outside-max-items';
 
 	private string $mode;
 	private int|string|null $pipeline_id;
@@ -315,6 +320,106 @@ class ExecutionContext {
 			$this->flow_step_id,
 			$this->handler_type,
 			$item_identifier
+		);
+	}
+
+	/**
+	 * Classify ordered source identifiers without mutating lifecycle state.
+	 *
+	 * The result preserves input order and applies the same reprocess policy and
+	 * claim precedence as production fetch selection. A max_items value of zero
+	 * leaves selection unlimited.
+	 *
+	 * @param string[] $item_identifiers Ordered source identifiers.
+	 * @param int      $max_items        Maximum eligible identifiers to select.
+	 * @return array{
+	 *   classifications:array<int,array{item_identifier:string,status:string,processed:bool,reprocess_eligible:bool,actively_claimed:bool,selected:bool}>,
+	 *   selected_identifiers:string[],
+	 *   diagnostics:array{total:int,unique:int,duplicates:int,eligible:int,processed_skipped:int,processed_reprocess_eligible:int,actively_claimed:int,eligible_outside_max_items:int,selected:int,max_items:int}
+	 * }
+	 */
+	public function classifySourceItems( array $item_identifiers, int $max_items = 0 ): array {
+		$identifiers = array_values( array_map( 'strval', $item_identifiers ) );
+		$max_items   = max( 0, $max_items );
+		$states      = array();
+
+		if ( $this->isFlow() && $this->flow_step_id && ! empty( $identifiers ) ) {
+			$states = ( new ProcessedItems() )->get_item_lifecycle_states(
+				$this->flow_step_id,
+				$this->handler_type,
+				$identifiers
+			);
+		}
+
+		$seen            = array();
+		$classifications = array();
+		$selected        = array();
+		$diagnostics     = array(
+			'total'                         => count( $identifiers ),
+			'unique'                        => 0,
+			'duplicates'                    => 0,
+			'eligible'                      => 0,
+			'processed_skipped'             => 0,
+			'processed_reprocess_eligible' => 0,
+			'actively_claimed'             => 0,
+			'eligible_outside_max_items'   => 0,
+			'selected'                     => 0,
+			'max_items'                    => $max_items,
+		);
+
+		foreach ( $identifiers as $identifier ) {
+			if ( isset( $seen[ $identifier ] ) ) {
+				++$diagnostics['duplicates'];
+			} else {
+				$seen[ $identifier ] = true;
+				++$diagnostics['unique'];
+			}
+
+			$state            = $states[ $identifier ] ?? array();
+			$processed        = (bool) ( $state['processed'] ?? false );
+			$actively_claimed = (bool) ( $state['actively_claimed'] ?? false );
+			$skip             = $this->shouldSkipItem( $processed, $identifier );
+			$reprocess        = $processed && ! $skip;
+			$selected_item    = false;
+
+			if ( $skip ) {
+				$status = self::ITEM_PROCESSED_SKIPPED;
+				++$diagnostics['processed_skipped'];
+			} elseif ( $actively_claimed ) {
+				$status = self::ITEM_ACTIVELY_CLAIMED;
+				++$diagnostics['actively_claimed'];
+			} else {
+				++$diagnostics['eligible'];
+				if ( $reprocess ) {
+					++$diagnostics['processed_reprocess_eligible'];
+				}
+
+				if ( 0 === $max_items || count( $selected ) < $max_items ) {
+					$status        = $reprocess ? self::ITEM_PROCESSED_REPROCESS_ELIGIBLE : self::ITEM_ELIGIBLE;
+					$selected[]    = $identifier;
+					$selected_item = true;
+				} else {
+					$status = self::ITEM_ELIGIBLE_OUTSIDE_MAX_ITEMS;
+					++$diagnostics['eligible_outside_max_items'];
+				}
+			}
+
+			$classifications[] = array(
+				'item_identifier'    => $identifier,
+				'status'             => $status,
+				'processed'          => $processed,
+				'reprocess_eligible' => $reprocess,
+				'actively_claimed'   => $actively_claimed,
+				'selected'           => $selected_item,
+			);
+		}
+
+		$diagnostics['selected'] = count( $selected );
+
+		return array(
+			'classifications'      => $classifications,
+			'selected_identifiers' => $selected,
+			'diagnostics'          => $diagnostics,
 		);
 	}
 

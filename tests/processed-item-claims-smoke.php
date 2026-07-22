@@ -140,7 +140,7 @@ assert_claims_smoke( 'repository conditionally releases owned claims', str_conta
 assert_claims_smoke( 'completion side effects share the claim transaction', str_contains( $processed_items, "'START TRANSACTION'" ) && str_contains( $processed_items, "'COMMIT'" ) && str_contains( $processed_items, "'ROLLBACK'" ) );
 assert_claims_smoke( 'claim acquisition handles duplicate contention without bare insert', str_contains( $processed_items, 'ON DUPLICATE KEY UPDATE' ) );
 assert_claims_smoke( 'repository ensures claim columns', str_contains( $processed_items, 'function ensure_claim_columns' ) );
-assert_claims_smoke( 'fetch filters active claims', str_contains( $fetch_handler, 'isItemClaimed' ) );
+assert_claims_smoke( 'fetch filters active claims through bulk classification', str_contains( $fetch_handler, 'classifySourceItems' ) && str_contains( $processed_items, "'actively_claimed'" ) );
 assert_claims_smoke( 'fetch claims after max_items', strpos( $fetch_handler, 'array_slice' ) < strpos( $fetch_handler, 'claimItems' ) );
 assert_claims_smoke( 'all terminal statuses use one lifecycle hook', str_contains( $actions, "add_action( 'datamachine_job_complete', array( StepLifecycleHandler::class, 'handleTerminal' )" ) );
 assert_claims_smoke( 'lifecycle uses owner-conditional completion and release', str_contains( $lifecycle, 'complete_owned_claim' ) && str_contains( $lifecycle, 'release_owned_claim' ) );
