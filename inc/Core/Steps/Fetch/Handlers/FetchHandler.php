@@ -128,14 +128,30 @@ abstract class FetchHandler {
 	 * @return array Filtered items array (new items only).
 	 */
 	private function filterProcessed( array $items, ExecutionContext $context ): array {
-		$result = array();
-
+		$identifiers = array();
+		$candidates  = array();
 		foreach ( $items as $item ) {
 			if ( ! is_array( $item ) ) {
 				continue;
 			}
-
 			$item_identifier = $item['metadata']['item_identifier'] ?? null;
+			$candidates[]    = array(
+				'item'            => $item,
+				'item_identifier' => $item_identifier,
+			);
+			if ( null !== $item_identifier && '' !== $item_identifier ) {
+				$identifiers[] = (string) $item_identifier;
+			}
+		}
+
+		$classification = $context->classifySourceItems( $identifiers );
+		$decisions      = $classification['classifications'];
+		$decision_index = 0;
+		$result         = array();
+
+		foreach ( $candidates as $candidate ) {
+			$item            = $candidate['item'];
+			$item_identifier = $candidate['item_identifier'];
 
 			// No item_identifier — pass through.
 			if ( null === $item_identifier || '' === $item_identifier ) {
@@ -143,12 +159,9 @@ abstract class FetchHandler {
 				continue;
 			}
 
-			// Already processed or actively claimed by another in-flight run — skip.
-			if ( $context->isItemProcessed( (string) $item_identifier ) ) {
-				continue;
-			}
-
-			if ( $context->isItemClaimed( (string) $item_identifier ) ) {
+			$decision = $decisions[ $decision_index ] ?? null;
+			++$decision_index;
+			if ( ! is_array( $decision ) || ! $decision['selected'] ) {
 				continue;
 			}
 
