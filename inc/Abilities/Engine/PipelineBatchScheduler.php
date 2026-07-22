@@ -415,23 +415,24 @@ class PipelineBatchScheduler {
 	 *
 	 * @param int    $job_id Job ID that just completed.
 	 * @param string $status The completion status.
+	 * @return bool Whether parent completion is durable or no parent work applies.
 	 */
-	public static function onChildComplete( int $job_id, string $status ): void {
+	public static function onChildComplete( int $job_id, string $status ): bool {
 		$status;
 		$jobs_db = new Jobs();
 		$job     = $jobs_db->get_job( $job_id );
 
 		if ( ! $job ) {
-			return;
+			return true;
 		}
 
 		$parent_job_id = $job['parent_job_id'] ?? 0;
 
 		if ( empty( $parent_job_id ) ) {
-			return; // Not a child job.
+			return true; // Not a child job.
 		}
 
-		self::maybeCompleteParent( (int) $parent_job_id );
+		return self::maybeCompleteParent( (int) $parent_job_id );
 	}
 
 	/**
@@ -443,26 +444,27 @@ class PipelineBatchScheduler {
 	 * no future scheduler action.
 	 *
 	 * @param int $parent_job_id Parent job ID.
+	 * @return bool Whether parent completion is durable or no completion is due.
 	 */
-	private static function maybeCompleteParent( int $parent_job_id ): void {
+	private static function maybeCompleteParent( int $parent_job_id ): bool {
 		$jobs_db = new Jobs();
 		$parent  = $jobs_db->get_job( $parent_job_id );
 
 		if ( ! $parent || JobStatus::PROCESSING !== ( $parent['status'] ?? '' ) ) {
-			return;
+			return true;
 		}
 
 		// Check parent is a pipeline batch.
 		$parent_engine = datamachine_get_engine_data( (int) $parent_job_id );
 		if ( empty( $parent_engine['batch'] ) ) {
-			return; // Not a pipeline batch parent.
+			return true; // Not a pipeline batch parent.
 		}
 
 		// Pipeline-only — system-task batches use the same engine_data
 		// shape but their parent is completed inline by TaskScheduler.
 		$context = $parent_engine['batch_context'] ?? '';
 		if ( '' !== $context && self::BATCH_CONTEXT !== $context ) {
-			return;
+			return true;
 		}
 
 		// Count child statuses.
@@ -488,7 +490,7 @@ class PipelineBatchScheduler {
 		// phpcs:enable WordPress.DB.PreparedSQLPlaceholders, WordPress.DB.PreparedSQL
 
 		if ( ! $counts ) {
-			return;
+			return false;
 		}
 
 		$total_children  = (int) $counts['total'];
@@ -498,7 +500,7 @@ class PipelineBatchScheduler {
 
 		// Still have active children or not all scheduled yet.
 		if ( $active > 0 || $batch_pending || $total_children < $batch_scheduled ) {
-			return;
+			return true;
 		}
 
 		// All children are done. Complete the parent.
@@ -525,8 +527,27 @@ class PipelineBatchScheduler {
 			'total'     => $total_children,
 		);
 
-		datamachine_set_engine_data( (int) $parent_job_id, $parent_engine );
-		$jobs_db->complete_job( (int) $parent_job_id, $parent_status );
+		$persist_parent = apply_filters(
+			'datamachine_pipeline_batch_parent_engine_persister',
+			'datamachine_set_engine_data',
+			$parent_job_id,
+			$parent_engine
+		);
+		if ( ! is_callable( $persist_parent ) || false === call_user_func( $persist_parent, $parent_job_id, $parent_engine ) ) {
+			return false;
+		}
+
+		$complete_parent = apply_filters(
+			'datamachine_pipeline_batch_parent_completer',
+			static function () use ( $jobs_db, $parent_job_id, $parent_status ): bool {
+				return $jobs_db->complete_job( (int) $parent_job_id, $parent_status );
+			},
+			$parent_job_id,
+			$parent_status
+		);
+		if ( ! is_callable( $complete_parent ) || false === call_user_func( $complete_parent, $parent_job_id, $parent_status ) ) {
+			return false;
+		}
 
 		$flow_name = $parent_engine['flow']['name'] ?? '';
 
@@ -547,6 +568,8 @@ class PipelineBatchScheduler {
 				'total'         => $total_children,
 			)
 		);
+
+		return true;
 	}
 
 	/**

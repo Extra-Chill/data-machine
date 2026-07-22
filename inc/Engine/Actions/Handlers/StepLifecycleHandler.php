@@ -147,13 +147,12 @@ class StepLifecycleHandler {
 		unset( self::$pending_processed_metrics[ $job_id ] );
 	}
 
-	/** Flush deferred metrics after commit and before final metric aggregation. */
-	public static function handleTerminalCommit( int $job_id, string $status ): void {
+	/** Persist transaction-derived accounting before the terminal commit. */
+	public static function filterTerminalAccountingContext( array $context, int $job_id, string $status ): array {
 		$completed = self::$pending_processed_metrics[ $job_id ] ?? 0;
 		unset( self::$pending_processed_metrics[ $job_id ] );
-		if ( JobStatus::isStatusSuccess( $status ) && 0 < $completed ) {
-			RunMetrics::increment( $job_id, 'processed', $completed );
-		}
+		$context['processed_claim_count'] = JobStatus::isStatusSuccess( $status ) ? max( 0, $completed ) : 0;
+		return $context;
 	}
 
 	/**
