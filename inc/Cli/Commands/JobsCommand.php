@@ -95,7 +95,7 @@ class JobsCommand extends BaseCommand {
 	 * : Scope recovery to one exact job ID.
 	 *
 	 * [--limit=<limit>]
-	 * : Hard mutation limit for this invocation (maximum 100).
+	 * : Hard attempted storage-touch limit for this invocation (maximum 100).
 	 * ---
 	 * default: 25
 	 * ---
@@ -195,7 +195,7 @@ class JobsCommand extends BaseCommand {
 		);
 		WP_CLI::log(
 			sprintf(
-				'Recovery scope: processing jobs only; pending AI deferrals excluded; job=%s flow=%s mutation-limit=%d pathless-apply=%s.',
+				'Recovery scope: processing jobs only; pending AI deferrals excluded; job=%s flow=%s touch-limit=%d pathless-apply=%s.',
 				$job_id ? (string) $job_id : 'all',
 				$flow_id ? (string) $flow_id : 'all',
 				$limit,
@@ -297,6 +297,9 @@ class JobsCommand extends BaseCommand {
 		$claimed_elsewhere = (int) ( $result['claimed_elsewhere'] ?? 0 );
 		$pathless_policy_skipped = (int) ( $result['pathless_policy_skipped'] ?? 0 );
 		$mutations         = (int) ( $result['mutations'] ?? 0 );
+		$attempted         = (int) ( $result['attempted'] ?? 0 );
+		$touched           = (int) ( $result['touched'] ?? 0 );
+		$mutated           = (int) ( $result['mutated'] ?? 0 );
 
 		return array(
 			'recovered'     => $recovered,
@@ -308,6 +311,9 @@ class JobsCommand extends BaseCommand {
 			'claimed_elsewhere' => $claimed_elsewhere,
 			'pathless_policy_skipped' => $pathless_policy_skipped,
 			'mutations'     => $mutations,
+			'attempted'     => $attempted,
+			'touched'       => $touched,
+			'mutated'       => $mutated,
 			'apply_limit'   => (int) ( $result['apply_limit'] ?? 0 ),
 			'limit_reached' => ! empty( $result['limit_reached'] ) ? 1 : 0,
 			'actionable'    => $recovered + $timed_out + $stale_actions + $pathless_requeued + $pathless_terminal,
@@ -1155,6 +1161,14 @@ class JobsCommand extends BaseCommand {
 			ARRAY_A
 		);
 		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+
+		foreach ( $rows as &$row ) {
+			$args = json_decode( (string) ( $row['args'] ?? '' ), true );
+			if ( is_array( $args ) ) {
+				$row['decoded_args'] = $args;
+			}
+		}
+		unset( $row );
 
 		return array_values(
 			array_filter(

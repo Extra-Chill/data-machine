@@ -16,10 +16,12 @@ namespace DataMachine\Abilities\Engine;
 
 use DataMachine\Abilities\StepTypeAbilities;
 use DataMachine\Core\EngineData;
+use DataMachine\Core\ChildJobRecoveryPolicy;
 use DataMachine\Core\FilesRepository\FileCleanup;
 use DataMachine\Core\FilesRepository\FileRetrieval;
 use DataMachine\Core\JobStatus;
 use DataMachine\Core\RunMetrics;
+use DataMachine\Core\RecoveryExecutionFence;
 use DataMachine\Core\StepExecutionResult;
 use DataMachine\Core\Steps\FlowStepConfig;
 use DataMachine\Core\Steps\Step;
@@ -137,11 +139,7 @@ class ExecuteStepAbility {
 			);
 		}
 		if ( $recovery_generation > 0 && ! $this->recoveryGenerationAdmission( $job, $recovery_generation, $recovery_claim_token ) ) {
-			return array(
-				'success'              => false,
-				'stale_recovery_owner' => true,
-				'error'                => sprintf( 'Job %d recovery generation %d is stale or lacks a committed receipt.', $job_id, $recovery_generation ),
-			);
+			return $this->staleRecoveryGeneration( $job_id, $recovery_generation, 'is stale or lacks a committed receipt' );
 		}
 
 		if ( $operation_generation > 0 ) {
@@ -162,6 +160,7 @@ class ExecuteStepAbility {
 				'terminal_state' => $current_status,
 			);
 		}
+		$recovery_fence = $recovery_generation > 0 ? new RecoveryExecutionFence( $job_id, $recovery_claim_token, $recovery_generation ) : null;
 
 		// Transition job to 'processing' now that Action Scheduler is actually
 		// executing it. For parent jobs this is a no-op (already processing via
@@ -197,6 +196,9 @@ class ExecuteStepAbility {
 			$flow_step_config = $this->resolveFlowStepConfig( $engine, $flow_step_id, $job_id, $engine_snapshot );
 
 			if ( ! isset( $flow_step_config['flow_id'] ) || empty( $flow_step_config['flow_id'] ) ) {
+				if ( ! $this->recoveryGenerationStillOwned( $job_id, $recovery_generation, $recovery_claim_token ) ) {
+					return $this->staleRecoveryGeneration( $job_id, $recovery_generation, 'was superseded before missing-flow failure routing' );
+				}
 				do_action(
 					'datamachine_fail_job',
 					$job_id,
@@ -226,6 +228,9 @@ class ExecuteStepAbility {
 			}
 
 			if ( ! isset( $flow_step_config['step_type'] ) || empty( $flow_step_config['step_type'] ) ) {
+				if ( ! $this->recoveryGenerationStillOwned( $job_id, $recovery_generation, $recovery_claim_token ) ) {
+					return $this->staleRecoveryGeneration( $job_id, $recovery_generation, 'was superseded before missing-step failure routing' );
+				}
 				do_action(
 					'datamachine_fail_job',
 					$job_id,
@@ -242,9 +247,22 @@ class ExecuteStepAbility {
 			}
 
 			$step_type       = $flow_step_config['step_type'];
-			$step_definition = $this->resolveStepDefinition( $step_type, $flow_step_id, $job_id );
+			$step_definition = $this->resolveStepDefinition( $step_type );
 
 			if ( ! $step_definition ) {
+				if ( ! $this->recoveryGenerationStillOwned( $job_id, $recovery_generation, $recovery_claim_token ) ) {
+					return $this->staleRecoveryGeneration( $job_id, $recovery_generation, 'was superseded before registry failure routing' );
+				}
+				do_action(
+					'datamachine_fail_job',
+					$job_id,
+					'step_execution_failure',
+					array(
+						'flow_step_id' => $flow_step_id,
+						'step_type'    => $step_type,
+						'reason'       => 'step_type_not_found_in_registry',
+					)
+				);
 				return array(
 					'success' => false,
 					'error'   => sprintf( 'Step type "%s" not found in registry.', $step_type ),
@@ -265,6 +283,9 @@ class ExecuteStepAbility {
 			);
 
 			$step_output = $flow_step->execute( $payload );
+			if ( ! $this->recoveryGenerationStillOwned( $job_id, $recovery_generation, $recovery_claim_token ) ) {
+				return $this->staleRecoveryGeneration( $job_id, $recovery_generation, 'was superseded during execution' );
+			}
 			if ( $operation_generation > 0 ) {
 				$job_after_execution = $this->db_jobs->get_job( $job_id );
 				if ( ! is_array( $job_after_execution ) || 'committed' !== $this->operationGenerationAdmission( $job_after_execution, $operation_generation, $operation_claim_token ) ) {
@@ -315,6 +336,9 @@ class ExecuteStepAbility {
 					return $this->staleOperationGeneration( $job_id, $operation_generation, 'was superseded before routing' );
 				}
 			}
+			if ( ! $this->recoveryGenerationStillOwned( $job_id, $recovery_generation, $recovery_claim_token ) ) {
+				return $this->staleRecoveryGeneration( $job_id, $recovery_generation, 'was superseded before routing' );
+			}
 
 			$result = $this->routeAfterExecution(
 				$job_id,
@@ -327,8 +351,13 @@ class ExecuteStepAbility {
 				$payload,
 				$step_success,
 				$status_override,
-				$execution_result
+				$execution_result,
+				$recovery_generation,
+				$recovery_claim_token
 			);
+			if ( ! empty( $result['stale_recovery_owner'] ) ) {
+				return $result;
+			}
 
 			$recorded_status = $status_override ? $status_override : ( $result['outcome'] ?? null );
 
@@ -349,6 +378,9 @@ class ExecuteStepAbility {
 
 			return $result;
 		} catch ( \Throwable $e ) {
+			if ( ! $this->recoveryGenerationStillOwned( $job_id, $recovery_generation, $recovery_claim_token ) ) {
+				return $this->staleRecoveryGeneration( $job_id, $recovery_generation, 'threw after being superseded' );
+			}
 			if ( $operation_generation > 0 ) {
 				$job_after_exception = $this->db_jobs->get_job( $job_id );
 				if ( ! is_array( $job_after_exception ) || 'committed' !== $this->operationGenerationAdmission( $job_after_exception, $operation_generation, $operation_claim_token ) ) {
@@ -408,15 +440,43 @@ class ExecuteStepAbility {
 	}
 
 	private function recoveryGenerationAdmission( array $job, int $generation, string $token ): bool {
-		$engine  = is_array( $job['engine_data'] ?? null ) ? $job['engine_data'] : array();
-		$owner   = is_array( $engine['scheduler_recovery'] ?? null ) ? $engine['scheduler_recovery'] : array();
-		$receipt = is_array( $owner['receipt'] ?? null ) ? $owner['receipt'] : array();
+		$engine = is_array( $job['engine_data'] ?? null ) ? $job['engine_data'] : array();
+		return ChildJobRecoveryPolicy::recoveryExecutionMatches( $engine, $generation, $token );
+	}
 
-		return '' !== $token
-			&& 'requeued' === (string) ( $owner['state'] ?? '' )
-			&& (int) ( $owner['generation'] ?? 0 ) === $generation
-			&& (int) ( $receipt['generation'] ?? 0 ) === $generation
-			&& hash_equals( $token, (string) ( $owner['token'] ?? '' ) );
+	private function recoveryGenerationStillOwned( int $job_id, int $generation, string $token ): bool {
+		if ( $generation <= 0 ) {
+			return true;
+		}
+
+		$job = $this->db_jobs->get_job( $job_id );
+		return is_array( $job ) && $this->recoveryGenerationAdmission( $job, $generation, $token );
+	}
+
+	private function staleRecoveryGeneration( int $job_id, int $generation, string $reason ): array {
+		return array(
+			'success'              => true,
+			'step_success'         => false,
+			'outcome'              => 'stale_recovery_noop',
+			'stale_recovery_owner' => true,
+			'reason'               => sprintf( 'Job %d recovery generation %d %s.', $job_id, $generation, $reason ),
+		);
+	}
+
+	private function transitionTerminalWithRecoveryFence( int $job_id, string $status, int $generation, string $token ): array {
+		if ( $generation <= 0 ) {
+			return $this->db_jobs->transition_job_status_result( $job_id, $status, true );
+		}
+
+		return $this->db_jobs->transition_recovery_execution_owned_job( $job_id, $status, $token, $generation );
+	}
+
+	private function staleRejectedTerminalTransition( int $job_id, int $generation, string $token, array $transition ): ?array {
+		if ( $generation <= 0 || ! empty( $transition['success'] ) || $this->recoveryGenerationStillOwned( $job_id, $generation, $token ) ) {
+			return null;
+		}
+
+		return $this->staleRecoveryGeneration( $job_id, $generation, 'lost ownership at the terminal commit fence' );
 	}
 
 	private function deferOperationGeneration( int $job_id, string $flow_step_id, int $generation, string $token ): array {
@@ -484,29 +544,13 @@ class ExecuteStepAbility {
 	 * Resolve and validate step type definition from the abilities registry.
 	 *
 	 * @param string $step_type    Step type identifier.
-	 * @param string $flow_step_id Flow step ID (for error context).
-	 * @param int    $job_id       Job ID (for error context).
 	 * @return array|null Step definition or null on failure.
 	 */
-	private function resolveStepDefinition( string $step_type, string $flow_step_id, int $job_id ): ?array {
+	private function resolveStepDefinition( string $step_type ): ?array {
 		$step_type_abilities = new StepTypeAbilities();
 		$step_definition     = $step_type_abilities->getStepType( $step_type );
 
-		if ( ! $step_definition ) {
-			do_action(
-				'datamachine_fail_job',
-				$job_id,
-				'step_execution_failure',
-				array(
-					'flow_step_id' => $flow_step_id,
-					'step_type'    => $step_type,
-					'reason'       => 'step_type_not_found_in_registry',
-				)
-			);
-			return null;
-		}
-
-		return $step_definition;
+		return $step_definition ? $step_definition : null;
 	}
 
 	/**
@@ -592,7 +636,9 @@ class ExecuteStepAbility {
 		array $payload,
 		bool $step_success,
 		$status_override,
-		array $execution_result = array()
+		array $execution_result = array(),
+		int $recovery_generation = 0,
+		string $recovery_claim_token = ''
 	): array {
 		$pipeline_id = $flow_step_config['pipeline_id'] ?? null;
 
@@ -618,7 +664,14 @@ class ExecuteStepAbility {
 
 		// Status override: complete with override status and clean up.
 		if ( $status_override ) {
-			$transition = $this->db_jobs->transition_job_status_result( $job_id, $status_override, true );
+			if ( ! $this->recoveryGenerationStillOwned( $job_id, $recovery_generation, $recovery_claim_token ) ) {
+				return $this->staleRecoveryGeneration( $job_id, $recovery_generation, 'was superseded before override terminal routing' );
+			}
+			$transition       = $this->transitionTerminalWithRecoveryFence( $job_id, $status_override, $recovery_generation, $recovery_claim_token );
+			$stale_transition = $this->staleRejectedTerminalTransition( $job_id, $recovery_generation, $recovery_claim_token, $transition );
+			if ( null !== $stale_transition ) {
+				return $stale_transition;
+			}
 			if ( $transition['changed'] ) {
 				$cleanup = new FileCleanup();
 				$context = datamachine_get_file_context( $flow_id );
@@ -677,6 +730,9 @@ class ExecuteStepAbility {
 
 				if ( 'fail' === $transition_route['mode'] ) {
 					$transition_failure_reason = $transition_route['reason'] ?? 'transition_route_failed';
+					if ( ! $this->recoveryGenerationStillOwned( $job_id, $recovery_generation, $recovery_claim_token ) ) {
+						return $this->staleRecoveryGeneration( $job_id, $recovery_generation, 'was superseded before transition failure routing' );
+					}
 					do_action(
 						'datamachine_fail_job',
 						$job_id,
@@ -711,8 +767,14 @@ class ExecuteStepAbility {
 				// producing one packet per event). A single packet is just
 				// the same job continuing to the next step.
 				if ( 'inline' === $transition_route['mode'] || $packet_count <= 1 ) {
+					if ( ! $this->recoveryGenerationStillOwned( $job_id, $recovery_generation, $recovery_claim_token ) ) {
+						return $this->staleRecoveryGeneration( $job_id, $recovery_generation, 'was superseded before inline lifecycle routing' );
+					}
 					$this->handleStepLifecycleInlineContinuation( $job_id, $flow_step_config, $routed_packets );
 
+					if ( ! $this->recoveryGenerationStillOwned( $job_id, $recovery_generation, $recovery_claim_token ) ) {
+						return $this->staleRecoveryGeneration( $job_id, $recovery_generation, 'was superseded before next-step scheduling' );
+					}
 					do_action(
 						'datamachine_schedule_next_step',
 						$job_id,
@@ -745,6 +807,9 @@ class ExecuteStepAbility {
 
 				$engine_snapshot = datamachine_get_engine_data( $job_id );
 				$adapter         = new ParallelMapFanoutAdapter();
+				if ( ! $this->recoveryGenerationStillOwned( $job_id, $recovery_generation, $recovery_claim_token ) ) {
+					return $this->staleRecoveryGeneration( $job_id, $recovery_generation, 'was superseded before fan-out routing' );
+				}
 				$parallel_result = $adapter->dispatch(
 					$parallel_step,
 					$job_id,
@@ -756,8 +821,14 @@ class ExecuteStepAbility {
 				// continuation — the routed packets continue on this job
 				// instead of spawning children.
 				if ( ParallelMapFanoutAdapter::SHAPE_INLINE === ( $parallel_result['shape'] ?? '' ) ) {
+					if ( ! $this->recoveryGenerationStillOwned( $job_id, $recovery_generation, $recovery_claim_token ) ) {
+						return $this->staleRecoveryGeneration( $job_id, $recovery_generation, 'was superseded before gated inline lifecycle routing' );
+					}
 					$this->handleStepLifecycleInlineContinuation( $job_id, $flow_step_config, $routed_packets );
 
+					if ( ! $this->recoveryGenerationStillOwned( $job_id, $recovery_generation, $recovery_claim_token ) ) {
+						return $this->staleRecoveryGeneration( $job_id, $recovery_generation, 'was superseded before gated next-step scheduling' );
+					}
 					do_action(
 						'datamachine_schedule_next_step',
 						$job_id,
@@ -782,7 +853,14 @@ class ExecuteStepAbility {
 				);
 			}
 
-			$transition = $this->db_jobs->transition_job_status_result( $job_id, JobStatus::COMPLETED, true );
+			if ( ! $this->recoveryGenerationStillOwned( $job_id, $recovery_generation, $recovery_claim_token ) ) {
+				return $this->staleRecoveryGeneration( $job_id, $recovery_generation, 'was superseded before successful terminal routing' );
+			}
+			$transition       = $this->transitionTerminalWithRecoveryFence( $job_id, JobStatus::COMPLETED, $recovery_generation, $recovery_claim_token );
+			$stale_transition = $this->staleRejectedTerminalTransition( $job_id, $recovery_generation, $recovery_claim_token, $transition );
+			if ( null !== $stale_transition ) {
+				return $stale_transition;
+			}
 			if ( $transition['changed'] ) {
 				$cleanup = new FileCleanup();
 				$context = datamachine_get_file_context( $flow_id );
@@ -848,7 +926,14 @@ class ExecuteStepAbility {
 		// Fetch/event_import legacy empty outputs classify this way, and explicit
 		// result-shaped step returns can also choose it without emitting packets.
 		if ( 'completed_no_items' === ( $execution_result['status'] ?? '' ) ) {
-			$transition = $this->db_jobs->transition_job_status_result( $job_id, JobStatus::COMPLETED_NO_ITEMS, true );
+			if ( ! $this->recoveryGenerationStillOwned( $job_id, $recovery_generation, $recovery_claim_token ) ) {
+				return $this->staleRecoveryGeneration( $job_id, $recovery_generation, 'was superseded before no-items terminal routing' );
+			}
+			$transition       = $this->transitionTerminalWithRecoveryFence( $job_id, JobStatus::COMPLETED_NO_ITEMS, $recovery_generation, $recovery_claim_token );
+			$stale_transition = $this->staleRejectedTerminalTransition( $job_id, $recovery_generation, $recovery_claim_token, $transition );
+			if ( null !== $stale_transition ) {
+				return $stale_transition;
+			}
 			if ( ! $transition['success'] || ! JobStatus::isStatusSuccess( $transition['status'] ) ) {
 				return array(
 					'success'      => false,
@@ -889,6 +974,9 @@ class ExecuteStepAbility {
 		// and (when the second reason is non-retryable) trigger
 		// `cleanup_job_data_packets` even though a retry is still pending,
 		// orphaning the next attempt with no input data.
+		if ( ! $this->recoveryGenerationStillOwned( $job_id, $recovery_generation, $recovery_claim_token ) ) {
+			return $this->staleRecoveryGeneration( $job_id, $recovery_generation, 'was superseded before empty-packet failure routing' );
+		}
 		do_action(
 			'datamachine_log',
 			'error',

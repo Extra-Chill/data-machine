@@ -505,6 +505,35 @@ class ProcessedItems extends BaseRepository {
 		return false !== $this->wpdb->query( 'COMMIT' ) ? $claim_token : false;
 	}
 
+	/** Validate that one persisted descriptor is still actively owned by a job. */
+	public function owns_active_claim( array $claim, int $job_id ): bool {
+		$identity_scope  = (string) ( $claim['identity_scope'] ?? '' );
+		$source_type     = (string) ( $claim['source_type'] ?? '' );
+		$item_identifier = (string) ( $claim['item_identifier'] ?? '' );
+		$token           = (string) ( $claim['ownership_token'] ?? '' );
+		if ( $job_id <= 0 || '' === $identity_scope || '' === $source_type || '' === $item_identifier || '' === $token ) {
+			return false;
+		}
+
+		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Table identifier uses %i; all values use typed placeholders.
+		$query = $this->wpdb->prepare(
+			'SELECT claim_token FROM %i WHERE flow_step_id = %s AND source_type = %s AND item_identifier = %s AND job_id = %d AND status = %s AND claim_expires_at > %s LIMIT 1',
+			$this->table_name,
+			$identity_scope,
+			$source_type,
+			$item_identifier,
+			$job_id,
+			self::STATUS_CLAIMED,
+			current_time( 'mysql', true )
+		);
+		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared -- Query is fully prepared above with an escaped identifier and typed values.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- Evidence-only exact ownership query.
+		$owned = $this->wpdb->get_var( $query );
+		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
+
+		return is_string( $owned ) && hash_equals( $token, $owned );
+	}
+
 	/**
 	 * Complete a descriptor-less claim while the completing job still owns it.
 	 *

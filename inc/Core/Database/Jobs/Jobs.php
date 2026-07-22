@@ -20,6 +20,7 @@ use DataMachine\Core\Database\BaseRepository;
 use DataMachine\Core\Database\LifecycleStateTransition;
 use DataMachine\Core\Database\RunMetadata\RunMetadata;
 use DataMachine\Core\ExecutionQuery;
+use DataMachine\Core\ChildJobRecoveryPolicy;
 use DataMachine\Core\JobStatus;
 use DataMachine\Core\RunMetrics;
 use DataMachine\Core\RunLifecycleStore;
@@ -41,6 +42,37 @@ class Jobs extends BaseRepository {
 
 	/** Job currently owning the connection-wide terminal transaction. */
 	private static ?int $terminalizing_job = null;
+	/** @var array<int,array<int,array{token:string,generation:int,mode:string}>> */
+	private static array $recovery_execution_fences = array();
+
+	/** Fence every terminal callback issued while a recovery action executes. */
+	public static function begin_recovery_execution_fence( int $job_id, string $token, int $generation ): void {
+		if ( 0 < $job_id && '' !== $token && 0 < $generation ) {
+			self::$recovery_execution_fences[ $job_id ][] = array(
+				'token'      => $token,
+				'generation' => $generation,
+				'mode'       => 'execution',
+			);
+		}
+	}
+
+	/** Clear only the exact request-local recovery execution fence owner. */
+	public static function end_recovery_execution_fence( int $job_id, string $token, int $generation ): void {
+		$stack = self::$recovery_execution_fences[ $job_id ] ?? array();
+		for ( $index = count( $stack ) - 1; $index >= 0; --$index ) {
+			$current = $stack[ $index ];
+			if ( (int) ( $current['generation'] ?? 0 ) !== $generation || ! hash_equals( $token, (string) ( $current['token'] ?? '' ) ) ) {
+				continue;
+			}
+			unset( $stack[ $index ] );
+			break;
+		}
+		if ( empty( $stack ) ) {
+			unset( self::$recovery_execution_fences[ $job_id ] );
+		} else {
+			self::$recovery_execution_fences[ $job_id ] = array_values( $stack );
+		}
+	}
 
 	/**
 	 * Known compound status suffixes for exact-match queries.
@@ -1959,6 +1991,24 @@ class Jobs extends BaseRepository {
 			array(
 				'token'      => $token,
 				'generation' => $generation,
+				'mode'       => 'lease',
+			)
+		);
+	}
+
+	/** Commit a terminal execution result only while its recovery generation still owns the job. */
+	public function transition_recovery_execution_owned_job( int $job_id, string $status, string $token, int $generation ): array {
+		if ( ! JobStatus::isStatusFinal( $status ) || '' === $token || $generation <= 0 ) {
+			return $this->status_transition_result( false, false, null, $status );
+		}
+
+		return $this->transition_terminal_job_status_result(
+			$job_id,
+			$status,
+			array(
+				'token'      => $token,
+				'generation' => $generation,
+				'mode'       => 'execution',
 			)
 		);
 	}
@@ -2195,6 +2245,11 @@ class Jobs extends BaseRepository {
 	 * @return array{success: bool, changed: bool, current_status: ?string, status: string}
 	 */
 	private function transition_terminal_job_status_result( int $job_id, string $requested_status, ?array $recovery_owner = null ): array {
+		if ( null === $recovery_owner && isset( self::$recovery_execution_fences[ $job_id ] ) ) {
+			$fence_stack    = self::$recovery_execution_fences[ $job_id ];
+			$recovery_owner = end( $fence_stack );
+			$recovery_owner = is_array( $recovery_owner ) ? $recovery_owner : null;
+		}
 		if ( null !== self::$terminalizing_job ) {
 			return $this->status_transition_result( false, false, null, $requested_status );
 		}
@@ -2211,7 +2266,7 @@ class Jobs extends BaseRepository {
 			$this->rollback_terminal_transition( $job_id );
 			return $this->status_transition_result( false, false, null, $requested_status );
 		}
-		if ( is_array( $recovery_owner ) && ! $this->recovery_owner_matches( $job, (string) ( $recovery_owner['token'] ?? '' ), (int) ( $recovery_owner['generation'] ?? 0 ) ) ) {
+		if ( is_array( $recovery_owner ) && ! $this->terminal_recovery_owner_matches( $job, $recovery_owner ) ) {
 			$this->rollback_terminal_transition( $job_id );
 			return $this->status_transition_result( false, false, (string) ( $job['status'] ?? '' ), $requested_status );
 		}
@@ -2290,8 +2345,11 @@ class Jobs extends BaseRepository {
 		}
 		$processed_claim_count = is_array( $accounting_context ) ? max( 0, (int) ( $accounting_context['processed_claim_count'] ?? 0 ) ) : 0;
 		if ( is_array( $recovery_owner ) ) {
-			$latest_job = $this->get_job_for_update( $job_id );
-			if ( ! $this->renew_recovery_owner_on_locked_job( $latest_job, (string) ( $recovery_owner['token'] ?? '' ), (int) ( $recovery_owner['generation'] ?? 0 ) ) ) {
+			$latest_job  = $this->get_job_for_update( $job_id );
+			$owner_valid = 'execution' === (string) ( $recovery_owner['mode'] ?? '' )
+				? $this->terminal_recovery_owner_matches( $latest_job, $recovery_owner )
+				: $this->renew_recovery_owner_on_locked_job( $latest_job, (string) ( $recovery_owner['token'] ?? '' ), (int) ( $recovery_owner['generation'] ?? 0 ) );
+			if ( ! $owner_valid ) {
 				$this->rollback_terminal_transition( $job_id );
 				return $this->status_transition_result( false, false, $current_status, $current_status );
 			}
@@ -2625,6 +2683,22 @@ class Jobs extends BaseRepository {
 			&& hash_equals( $token, (string) ( $lease['token'] ?? '' ) )
 			&& false !== $expiry
 			&& time() < $expiry;
+	}
+
+	/** Validate either a recovery lease owner or a committed recovery action owner. */
+	private function terminal_recovery_owner_matches( ?array $job, array $owner ): bool {
+		if ( ! is_array( $job ) ) {
+			return false;
+		}
+
+		$token      = (string) ( $owner['token'] ?? '' );
+		$generation = (int) ( $owner['generation'] ?? 0 );
+		if ( 'execution' !== (string) ( $owner['mode'] ?? '' ) ) {
+			return $this->recovery_owner_matches( $job, $token, $generation );
+		}
+
+		$engine = is_array( $job['engine_data'] ?? null ) ? $job['engine_data'] : array();
+		return ChildJobRecoveryPolicy::recoveryExecutionMatches( $engine, $generation, $token );
 	}
 
 	/** Atomically renew an exact recovery owner while its jobs row is locked. */

@@ -19,11 +19,12 @@ $jobs    = file_get_contents( __DIR__ . '/../inc/Core/Database/Jobs/Jobs.php' ) 
 $cli     = file_get_contents( __DIR__ . '/../inc/Cli/Commands/JobsCommand.php' ) ?: '';
 
 echo "=== recover-stuck-bounded-apply-smoke ===\n";
-$assert( 'ability exposes exact job scope and hard limit', str_contains( $ability, "'job_id'" ) && str_contains( $ability, 'MAX_APPLY_LIMIT' ) && str_contains( $ability, '$mutations >= $apply_limit' ) );
+$assert( 'ability exposes exact job scope and hard touch limit', str_contains( $ability, "'job_id'" ) && str_contains( $ability, 'MAX_APPLY_LIMIT' ) && str_contains( $ability, '$touched >= $apply_limit' ) && str_contains( $ability, 'consumeTouchBudget' ) );
 $assert( 'pathless apply requires explicit policy', str_contains( $ability, 'recover_pathless_children' ) && str_contains( $ability, 'pathless_child_apply_policy_required' ) );
+$assert( 'compound touches reserve capacity before claim or queue restoration', str_contains( $ability, 'hasTouchCapacity' ) && str_contains( $ability, 'queued_prompt_backup' ) && str_contains( $ability, '$required_touches' ) );
 $assert( 'worker runs recovery once with bounded mutations', str_contains( $worker, '! $recovery_ran' ) && str_contains( $worker, "'limit'         => 5") );
 $assert( 'worker does not auto-apply historical children', str_contains( $worker, "'recover_pathless_children' => false") );
-$assert( 'worker reports every recovery disposition', str_contains( $worker, 'pathless_children_requeued' ) && str_contains( $worker, 'pathless_children_terminal' ) && str_contains( $worker, 'recovery_claim_conflicts' ) && str_contains( $worker, 'pathless_policy_skipped' ) && str_contains( $worker, 'recovery_mutations' ) && str_contains( $worker, 'recovery_requeued' ) && str_contains( $worker, 'recovery_skipped' ) );
+$assert( 'worker reports every recovery disposition', str_contains( $worker, 'pathless_children_requeued' ) && str_contains( $worker, 'pathless_children_terminal' ) && str_contains( $worker, 'recovery_claim_conflicts' ) && str_contains( $worker, 'pathless_policy_skipped' ) && str_contains( $worker, 'recovery_mutations' ) && str_contains( $worker, 'recovery_requeued' ) && str_contains( $worker, 'recovery_skipped' ) && str_contains( $worker, 'recovery_attempted' ) && str_contains( $worker, 'recovery_touched' ) && str_contains( $worker, 'recovery_mutated' ) );
 $assert( 'requeue schedule and receipt share locked transaction', str_contains( $jobs, 'commit_recovery_owned_requeue' ) && str_contains( $jobs, 'get_job_for_update' ) && str_contains( $jobs, "'receipt_commit_failed'") );
 $assert( 'terminal recovery validates locked owner', str_contains( $jobs, 'transition_recovery_owned_child' ) && str_contains( $jobs, 'recovery_owner_matches' ) );
 $assert( 'locked owner is renewed before side effects', str_contains( $jobs, 'renew_recovery_owner_on_locked_job' ) && str_contains( $jobs, 'RECOVERY_LEASE_TTL' ) );

@@ -244,6 +244,9 @@ class WorkerCommand extends BaseCommand {
 		$recovery_mutations = 0;
 		$recovery_requeued = 0;
 		$recovery_skipped = 0;
+		$recovery_attempted = 0;
+		$recovery_touched = 0;
+		$recovery_mutated = 0;
 		$recovery_limit_reached = 0;
 		$recovery_ran = false;
 		$completions = 0;
@@ -298,6 +301,9 @@ class WorkerCommand extends BaseCommand {
 						$recovery_mutations += (int) ( $recovery['mutations'] ?? 0 );
 						$recovery_requeued += (int) ( $recovery['requeued'] ?? 0 );
 						$recovery_skipped += (int) ( $recovery['skipped'] ?? 0 );
+						$recovery_attempted += (int) ( $recovery['attempted'] ?? 0 );
+						$recovery_touched += (int) ( $recovery['touched'] ?? 0 );
+						$recovery_mutated += (int) ( $recovery['mutated'] ?? 0 );
 						$recovery_limit_reached += ! empty( $recovery['limit_reached'] ) ? 1 : 0;
 					}
 				}
@@ -346,6 +352,9 @@ class WorkerCommand extends BaseCommand {
 				'recovery_mutations'         => $recovery_mutations,
 				'recovery_requeued'           => $recovery_requeued,
 				'recovery_skipped'            => $recovery_skipped,
+				'recovery_attempted'          => $recovery_attempted,
+				'recovery_touched'            => $recovery_touched,
+				'recovery_mutated'            => $recovery_mutated,
 				'recovery_limit_reached'     => $recovery_limit_reached,
 				'action_completions'       => $completions,
 				'action_failures'          => $failures,
@@ -395,6 +404,9 @@ class WorkerCommand extends BaseCommand {
 		$recovery_mutations = 0;
 		$recovery_requeued = 0;
 		$recovery_skipped = 0;
+		$recovery_attempted = 0;
+		$recovery_touched = 0;
+		$recovery_mutated = 0;
 		$recovery_limit_reached = 0;
 		$recovery_ran = false;
 		$job_claims  = 0;
@@ -451,6 +463,9 @@ class WorkerCommand extends BaseCommand {
 					$recovery_mutations += (int) ( $recovery['mutations'] ?? 0 );
 					$recovery_requeued += (int) ( $recovery['requeued'] ?? 0 );
 					$recovery_skipped += (int) ( $recovery['skipped'] ?? 0 );
+					$recovery_attempted += (int) ( $recovery['attempted'] ?? 0 );
+					$recovery_touched += (int) ( $recovery['touched'] ?? 0 );
+					$recovery_mutated += (int) ( $recovery['mutated'] ?? 0 );
 					$recovery_limit_reached += ! empty( $recovery['limit_reached'] ) ? 1 : 0;
 				}
 			}
@@ -520,6 +535,9 @@ class WorkerCommand extends BaseCommand {
 			'recovery_mutations'         => $recovery_mutations,
 			'recovery_requeued'           => $recovery_requeued,
 			'recovery_skipped'            => $recovery_skipped,
+			'recovery_attempted'          => $recovery_attempted,
+			'recovery_touched'            => $recovery_touched,
+			'recovery_mutated'            => $recovery_mutated,
 			'recovery_limit_reached'     => $recovery_limit_reached,
 			'job_claims'               => $job_claims,
 			'job_completions'          => $completed,

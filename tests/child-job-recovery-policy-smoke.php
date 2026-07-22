@@ -72,5 +72,23 @@ $assert( 'batch child with pending canonical action remains guarded', $batch_chi
 $assert( 'job 42 does not own job 420 action args', ! ChildJobRecoveryPolicy::actionBelongsToJob( array( 'job_id' => 420 ), 42 ) );
 $assert( 'job 42 owns only exact decoded args', ChildJobRecoveryPolicy::actionBelongsToJob( array( 'job_id' => 42 ), 42 ) );
 
+$active_lease = ChildJobRecoveryPolicy::recoveryOwnershipEvidence(
+	array( 'scheduler_recovery' => array( 'state' => 'claimed', 'token' => 'lease', 'generation' => 2, 'claimed_at' => '2026-07-22T11:59:00Z', 'expires_at' => '2026-07-22T12:05:00Z' ) ),
+	strtotime( '2026-07-22T12:00:00Z' )
+);
+$assert( 'only unexpired exact lease is reported active', 'active' === $active_lease['state'] && 2 === $active_lease['generation'] );
+
+$expired_lease = ChildJobRecoveryPolicy::recoveryOwnershipEvidence(
+	array( 'scheduler_recovery' => array( 'state' => 'claimed', 'token' => 'lease', 'generation' => 2, 'expires_at' => '2026-07-22T11:55:00Z' ) ),
+	strtotime( '2026-07-22T12:00:00Z' )
+);
+$assert( 'expired lease does not expose token or generation as valid', 'expired' === $expired_lease['state'] && '' === $expired_lease['token'] && 0 === $expired_lease['generation'] );
+
+$invalid_receipt = ChildJobRecoveryPolicy::recoveryOwnershipEvidence(
+	array( 'scheduler_recovery' => array( 'state' => 'requeued', 'token' => 'owner', 'generation' => 3, 'receipt' => array( 'generation' => 2, 'action_id' => 99 ) ) ),
+	time()
+);
+$assert( 'mismatched receipt is reported invalid', 'invalid' === $invalid_receipt['state'] && 'invalid' === $invalid_receipt['receipt_state'] );
+
 echo "\nChild job recovery policy smoke complete: {$total} assertions, {$failed} failures.\n";
 exit( $failed > 0 ? 1 : 0 );

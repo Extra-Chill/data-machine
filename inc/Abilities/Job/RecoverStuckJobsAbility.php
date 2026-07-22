@@ -77,7 +77,7 @@ class RecoverStuckJobsAbility {
 								'minimum'     => 1,
 								'maximum'     => self::MAX_APPLY_LIMIT,
 								'default'     => self::DEFAULT_APPLY_LIMIT,
-								'description' => __( 'Hard maximum mutations in one invocation', 'data-machine' ),
+								'description' => __( 'Hard maximum attempted storage touches in one invocation', 'data-machine' ),
 							),
 							'recover_pathless_children' => array(
 								'type'        => 'boolean',
@@ -110,6 +110,9 @@ class RecoverStuckJobsAbility {
 							'claimed_elsewhere' => array( 'type' => 'integer' ),
 							'pathless_policy_skipped' => array( 'type' => 'integer' ),
 							'mutations'     => array( 'type' => 'integer' ),
+							'attempted'     => array( 'type' => 'integer' ),
+							'touched'       => array( 'type' => 'integer' ),
+							'mutated'       => array( 'type' => 'integer' ),
 							'apply_limit'   => array( 'type' => 'integer' ),
 							'limit_reached' => array( 'type' => 'boolean' ),
 							'scope'         => array( 'type' => 'object' ),
@@ -162,6 +165,9 @@ class RecoverStuckJobsAbility {
 		$jobs_omitted   = 0;
 		$jobs_truncated = false;
 		$mutations      = 0;
+		$attempted      = 0;
+		$touched        = 0;
+		$mutated        = 0;
 		$limit_reached  = false;
 
 		$last_job_id = 0;
@@ -193,7 +199,7 @@ class RecoverStuckJobsAbility {
 			}
 
 			foreach ( $stuck_jobs as $job ) {
-				if ( ! $dry_run && $mutations >= $apply_limit ) {
+				if ( ! $dry_run && $touched >= $apply_limit ) {
 					$limit_reached = true;
 					break 2;
 				}
@@ -226,11 +232,16 @@ class RecoverStuckJobsAbility {
 						'target_status' => $status,
 					) );
 				} else {
+					if ( ! $this->consumeTouchBudget( $attempted, $touched, $apply_limit ) ) {
+						$limit_reached = true;
+						break 2;
+					}
 					$result = $this->db_jobs->transition_job_status( (int) $job->job_id, $status, true );
 
 					if ( $result ) {
 						++$recovered;
 						++$mutations;
+						++$mutated;
 						$this->appendJobDetail( $jobs, $jobs_omitted, array(
 							'job_id'        => (int) $job->job_id,
 							'flow_id'       => (int) $job->flow_id,
@@ -290,7 +301,7 @@ class RecoverStuckJobsAbility {
 			}
 
 			foreach ( $timed_out_jobs as $job ) {
-				if ( ! $dry_run && $mutations >= $apply_limit ) {
+				if ( ! $dry_run && $touched >= $apply_limit ) {
 					$limit_reached = true;
 					break 2;
 				}
@@ -336,6 +347,12 @@ class RecoverStuckJobsAbility {
 						$this->appendJobDetail( $jobs, $jobs_omitted, $this->childRecoveryEvidence( $job_row, $child_diagnosis, 'skipped', $recovery_trigger, 'pathless_child_apply_policy_required' ) );
 						continue;
 					}
+					// Diagnosis can change after claiming, so reserve claim + rollback/requeue + finish/terminal.
+					$required_touches = 3;
+					if ( ! $this->hasTouchCapacity( $touched, $apply_limit, $required_touches ) || ! $this->consumeTouchBudget( $attempted, $touched, $apply_limit ) ) {
+						$limit_reached = true;
+						break 2;
+					}
 
 					$claim = $this->claimPathlessChildRecovery( $job_id, $recovery_trigger );
 					if ( empty( $claim['owned'] ) ) {
@@ -344,6 +361,7 @@ class RecoverStuckJobsAbility {
 						$this->appendJobDetail( $jobs, $jobs_omitted, $this->childRecoveryEvidence( $job_row, $child_diagnosis, 'skipped', $recovery_trigger, 'recovery_claim_not_owned' ) );
 						continue;
 					}
+					++$mutated;
 
 					$engine_data  = $this->getJobEngineData( $job_id );
 					$claimed_job  = $this->db_jobs->get_job( $job_id );
@@ -351,12 +369,16 @@ class RecoverStuckJobsAbility {
 					$child_diagnosis = ChildJobRecoveryPolicy::diagnose( $claimed_job, $engine_data, $this->getStepActionHistory( $job_id ), $timeout_hours * HOUR_IN_SECONDS, time() );
 					if ( ! empty( $child_diagnosis['has_active_path'] ) ) {
 						++$skipped;
-						$this->finishPathlessChildRecovery( $job_id, (string) $claim['token'], (int) $claim['generation'], 'scheduler_path_observed', array() );
+						$this->consumeTouchBudget( $attempted, $touched, $apply_limit );
+						if ( $this->finishPathlessChildRecovery( $job_id, (string) $claim['token'], (int) $claim['generation'], 'scheduler_path_observed', array() ) ) {
+							++$mutated;
+						}
 						$this->appendJobDetail( $jobs, $jobs_omitted, $this->childRecoveryEvidence( $job_row, $child_diagnosis, 'skipped', $recovery_trigger, 'scheduler_path_appeared_after_claim' ) );
 						continue;
 					}
 
 					if ( ! empty( $child_diagnosis['retry_eligible'] ) ) {
+						$this->consumeTouchBudget( $attempted, $touched, $apply_limit );
 						$retry_args = array_merge(
 							$child_diagnosis['retry_args'],
 							array(
@@ -375,6 +397,7 @@ class RecoverStuckJobsAbility {
 							++$requeued;
 							++$pathless_requeued;
 							++$mutations;
+							++$mutated;
 							$this->appendJobDetail( $jobs, $jobs_omitted, $this->childRecoveryEvidence( $job_row, $child_diagnosis, 'requeued_pathless_child', $recovery_trigger ) + array( 'recovery_action_id' => (int) $action_id ) );
 							continue;
 						}
@@ -383,16 +406,21 @@ class RecoverStuckJobsAbility {
 						$race_diagnosis = ChildJobRecoveryPolicy::diagnose( $race_job, $this->getJobEngineData( $job_id ), $this->getStepActionHistory( $job_id ), $timeout_hours * HOUR_IN_SECONDS, time() );
 						if ( ! empty( $race_diagnosis['has_active_path'] ) ) {
 							++$skipped;
-							$this->finishPathlessChildRecovery( $job_id, (string) $claim['token'], (int) $claim['generation'], 'scheduler_path_observed', array() );
+							$this->consumeTouchBudget( $attempted, $touched, $apply_limit );
+							if ( $this->finishPathlessChildRecovery( $job_id, (string) $claim['token'], (int) $claim['generation'], 'scheduler_path_observed', array() ) ) {
+								++$mutated;
+							}
 							$this->appendJobDetail( $jobs, $jobs_omitted, $this->childRecoveryEvidence( $job_row, $race_diagnosis, 'skipped', $recovery_trigger, 'concurrent_scheduler_path_won' ) );
 							continue;
 						}
 					}
 
+					$this->consumeTouchBudget( $attempted, $touched, $apply_limit );
 					$result = $this->db_jobs->transition_recovery_owned_child( $job_id, JobStatus::failed( 'scheduler_path_lost' )->toString(), (string) $claim['token'], (int) $claim['generation'] );
 					if ( ! empty( $result['success'] ) ) {
 						++$pathless_terminal;
 						++$mutations;
+						++$mutated;
 						$this->appendJobDetail( $jobs, $jobs_omitted, $this->childRecoveryEvidence( $job_row, $child_diagnosis, 'transitioned_pathless_child', $recovery_trigger ) );
 					} else {
 						++$skipped;
@@ -423,20 +451,31 @@ class RecoverStuckJobsAbility {
 						'status'  => 'would_timeout',
 					) );
 				} else {
+					$backup = $engine_data['queued_prompt_backup'] ?? array();
+					$required_touches = empty( $backup ) ? 1 : 2;
+					if ( ! $this->hasTouchCapacity( $touched, $apply_limit, $required_touches ) || ! $this->consumeTouchBudget( $attempted, $touched, $apply_limit ) ) {
+						$limit_reached = true;
+						break 2;
+					}
 					$result = $this->db_jobs->transition_job_status( $job_id, JobStatus::FAILED, true );
 
 					if ( $result ) {
 						++$timed_out;
 						++$mutations;
+						++$mutated;
 						$this->appendJobDetail( $jobs, $jobs_omitted, array(
 							'job_id'  => $job_id,
 							'flow_id' => $job_flow_id,
 							'status'  => 'timed_out',
 						) );
 						// Restore drain-mode queued_prompt_backup if the prior run removed an entry.
-						$backup = $engine_data['queued_prompt_backup'] ?? array();
-						if ( ! empty( $backup ) && $this->restoreQueuedPromptBackup( $job_flow_id, $backup ) ) {
-							++$requeued;
+						if ( ! empty( $backup ) ) {
+							$this->consumeTouchBudget( $attempted, $touched, $apply_limit );
+							if ( $this->restoreQueuedPromptBackup( $job_flow_id, $backup ) ) {
+								++$requeued;
+								++$mutations;
+								++$mutated;
+							}
 						}
 					} else {
 						$this->appendJobDetail( $jobs, $jobs_omitted, array(
@@ -452,7 +491,11 @@ class RecoverStuckJobsAbility {
 
 		$terminal_actions = $this->getTerminalBackedInProgressActions( $flow_id, $job_id_scope );
 		foreach ( $terminal_actions as $action ) {
-			if ( ! $dry_run && $mutations >= $apply_limit ) {
+			if ( ! $dry_run && $touched >= $apply_limit ) {
+				$limit_reached = true;
+				break;
+			}
+			if ( ! $dry_run && ! $this->consumeTouchBudget( $attempted, $touched, $apply_limit ) ) {
 				$limit_reached = true;
 				break;
 			}
@@ -478,6 +521,7 @@ class RecoverStuckJobsAbility {
 			if ( $this->completeTerminalBackedAction( $action_id, $action_hook, $job_id, $terminal_state ) ) {
 				++$stale_actions;
 				++$mutations;
+				++$mutated;
 				$this->appendJobDetail( $jobs, $jobs_omitted, array(
 					'job_id'        => $job_id,
 					'flow_id'       => $job_flow_id,
@@ -503,7 +547,7 @@ class RecoverStuckJobsAbility {
 
 		$message = $dry_run
 			? sprintf( 'Dry run complete. Would recover %d jobs, timeout %d jobs, requeue %d pathless children, terminalize %d pathless children, and reconcile %d terminal-backed actions.', $recovered, $timed_out, $pathless_requeued, $pathless_terminal, $stale_actions )
-			: sprintf( 'Recovery complete. Mutations: %d/%d, Recovered: %d, Timed out: %d, Pathless requeued: %d, Pathless terminal: %d, Reconciled actions: %d, Policy-skipped: %d', $mutations, $apply_limit, $recovered, $timed_out, $pathless_requeued, $pathless_terminal, $stale_actions, $pathless_policy_skipped );
+			: sprintf( 'Recovery complete. Attempted/touched/mutated: %d/%d/%d (limit %d), outcomes: %d, recovered: %d, timed out: %d, pathless requeued: %d, pathless terminal: %d, reconciled actions: %d, policy-skipped: %d', $attempted, $touched, $mutated, $apply_limit, $mutations, $recovered, $timed_out, $pathless_requeued, $pathless_terminal, $stale_actions, $pathless_policy_skipped );
 
 		if ( ! $dry_run && ( $mutations > 0 || $claimed_elsewhere > 0 || $pathless_policy_skipped > 0 ) ) {
 			do_action(
@@ -520,6 +564,9 @@ class RecoverStuckJobsAbility {
 					'claimed_elsewhere' => $claimed_elsewhere,
 					'pathless_policy_skipped' => $pathless_policy_skipped,
 					'mutations'     => $mutations,
+					'attempted'     => $attempted,
+					'touched'       => $touched,
+					'mutated'       => $mutated,
 					'apply_limit'   => $apply_limit,
 					'limit_reached' => $limit_reached,
 					'job_id'        => $job_id_scope,
@@ -540,6 +587,9 @@ class RecoverStuckJobsAbility {
 			'claimed_elsewhere' => $claimed_elsewhere,
 			'pathless_policy_skipped' => $pathless_policy_skipped,
 			'mutations'      => $mutations,
+			'attempted'      => $attempted,
+			'touched'        => $touched,
+			'mutated'        => $mutated,
 			'apply_limit'    => $apply_limit,
 			'limit_reached'  => $limit_reached,
 			'scope'          => array(
@@ -716,14 +766,15 @@ class RecoverStuckJobsAbility {
 		}
 		$action = is_array( $diagnosis['active_action'] ?? null ) ? $diagnosis['active_action'] : ( is_array( $diagnosis['latest_action'] ?? null ) ? $diagnosis['latest_action'] : array() );
 		$args    = is_array( $action['decoded_args'] ?? null ) ? $action['decoded_args'] : array();
-		$engine  = is_array( $job['engine_data'] ?? null ) ? $job['engine_data'] : array();
-		$lease   = is_array( $engine['scheduler_recovery'] ?? null ) ? $engine['scheduler_recovery'] : array();
-		$receipt = is_array( $lease['receipt'] ?? null ) ? $lease['receipt'] : array();
-		$item_claim = is_array( $engine['_datamachine_item_claim'] ?? null ) ? $engine['_datamachine_item_claim'] : array();
+		$action_generation = (int) ( $args['recovery_generation'] ?? $args['ai_resume_generation'] ?? $args['operation_generation'] ?? 0 );
+		$action_generation_valid = 0 < $action_generation && ( ! empty( $diagnosis['has_active_path'] ) || ! empty( $diagnosis['retry_eligible'] ) );
+		$engine     = is_array( $job['engine_data'] ?? null ) ? $job['engine_data'] : array();
+		$ownership  = ChildJobRecoveryPolicy::recoveryOwnershipEvidence( $engine, time() );
+		$claim      = $this->activeClaimEvidence( $engine, (int) ( $job['job_id'] ?? 0 ) );
 		$created    = strtotime( (string) ( $job['created_at'] ?? '' ) . ' UTC' );
-		$claimed_at = strtotime( (string) ( $lease['claimed_at'] ?? '' ) );
-		$lease_at   = strtotime( (string) ( $lease['renewed_at'] ?? $lease['claimed_at'] ?? '' ) );
-		$token      = (string) ( $lease['token'] ?? '' );
+		$claimed_at = strtotime( (string) ( $ownership['claimed_at'] ?? '' ) );
+		$lease_at   = strtotime( (string) ( $ownership['renewed_at'] ?? $ownership['claimed_at'] ?? '' ) );
+		$token      = (string) ( $ownership['token'] ?? '' );
 		return array(
 			'job_id'             => (int) ( $job['job_id'] ?? 0 ),
 			'flow_id'            => (int) ( $job['flow_id'] ?? 0 ),
@@ -738,23 +789,61 @@ class RecoverStuckJobsAbility {
 			'action_hook'        => (string) ( $action['hook'] ?? '' ),
 			'action_status'      => (string) ( $action['status'] ?? '' ),
 			'action_claim_id'    => (int) ( $action['claim_id'] ?? 0 ),
-			'action_generation'  => (int) ( $args['recovery_generation'] ?? $args['ai_resume_generation'] ?? $args['operation_generation'] ?? 0 ),
+			'action_generation'  => $action_generation_valid ? $action_generation : 0,
+			'action_generation_state' => $action_generation_valid ? 'valid' : ( 0 === $action_generation ? 'legacy_unfenced' : 'invalid' ),
 			'operation_state'    => (string) ( $job['operation_state'] ?? '' ),
 			'operation_generation' => (int) ( $job['operation_generation'] ?? 0 ),
-			'recovery_lease_state' => (string) ( $lease['state'] ?? 'none' ),
-			'recovery_lease_generation' => (int) ( $lease['generation'] ?? 0 ),
-			'recovery_lease_token_state' => '' === $token ? 'missing' : 'present',
+			'recovery_lease_state' => (string) ( $ownership['state'] ?? 'none' ),
+			'recovery_lease_generation' => (int) ( $ownership['generation'] ?? 0 ),
+			'recovery_lease_token_state' => '' === $token ? 'invalid_or_missing' : 'valid',
 			'recovery_lease_age_seconds' => false === $lease_at ? 0 : max( 0, time() - $lease_at ),
 			'recovery_lease_claim_age_seconds' => false === $claimed_at ? 0 : max( 0, time() - $claimed_at ),
-			'recovery_lease_expires_at' => (string) ( $lease['expires_at'] ?? '' ),
-			'receipt_state'      => empty( $receipt ) ? 'missing' : 'committed',
-			'receipt_action_id'  => (int) ( $receipt['action_id'] ?? 0 ),
-			'item_claim_state'   => empty( $item_claim ) ? 'none' : 'owned',
-			'item_claim_job_id'  => (int) ( $item_claim['job_id'] ?? 0 ),
+			'recovery_lease_expires_at' => (string) ( $ownership['expires_at'] ?? '' ),
+			'receipt_state'      => (string) ( $ownership['receipt_state'] ?? 'missing' ),
+			'receipt_action_id'  => (int) ( $ownership['receipt_action_id'] ?? 0 ),
+			'item_claim_state'   => (string) $claim['state'],
+			'item_claim_job_id'  => $claim['active'] > 0 ? (int) ( $job['job_id'] ?? 0 ) : 0,
+			'item_claim_declared_count' => $claim['declared'],
+			'item_claim_active_count' => $claim['active'],
 			'terminal_accounting_state' => isset( $job['terminal_accounting_state'] ) ? (int) $job['terminal_accounting_state'] : null,
 			'terminal_accounting_owner_state' => empty( $job['terminal_accounting_owner'] ) ? 'none' : 'present',
 			'retry_eligible'     => ! empty( $diagnosis['retry_eligible'] ),
 			'recovery_trigger'   => $trigger,
+		);
+	}
+
+	/** Validate persisted claim descriptors against current repository ownership. */
+	private function activeClaimEvidence( array $engine, int $job_id ): array {
+		$candidates = array();
+		if ( is_array( $engine['_datamachine_item_claim'] ?? null ) ) {
+			$candidates[] = $engine['_datamachine_item_claim'];
+		}
+		if ( is_array( $engine['_datamachine_item_claims'] ?? null ) ) {
+			$candidates = array_merge( $candidates, $engine['_datamachine_item_claims'] );
+		}
+
+		$declared = 0;
+		$active   = 0;
+		$seen     = array();
+		foreach ( $candidates as $claim ) {
+			if ( ! is_array( $claim ) ) {
+				continue;
+			}
+			$token = (string) ( $claim['ownership_token'] ?? '' );
+			if ( '' === $token || isset( $seen[ $token ] ) ) {
+				continue;
+			}
+			$seen[ $token ] = true;
+			++$declared;
+			if ( $this->db_processed_items->owns_active_claim( $claim, $job_id ) ) {
+				++$active;
+			}
+		}
+
+		return array(
+			'state'    => 0 < $active ? 'active_owned' : ( 0 < $declared ? 'stale_or_unowned' : 'none' ),
+			'declared' => $declared,
+			'active'   => $active,
 		);
 	}
 
@@ -795,6 +884,22 @@ class RecoverStuckJobsAbility {
 		}
 
 		++$jobs_omitted;
+	}
+
+	/** Reserve one attempted storage touch before invoking it. */
+	private function consumeTouchBudget( int &$attempted, int &$touched, int $limit ): bool {
+		if ( $touched >= $limit ) {
+			return false;
+		}
+
+		++$attempted;
+		++$touched;
+		return true;
+	}
+
+	/** Ensure a compound recovery path can finish without touching N+1. */
+	private function hasTouchCapacity( int $touched, int $limit, int $required ): bool {
+		return $required > 0 && ( $touched + $required ) <= $limit;
 	}
 
 	/**

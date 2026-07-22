@@ -16,6 +16,79 @@ class ChildJobRecoveryPolicy {
 		return $job_id > 0 && (int) ( $args['job_id'] ?? 0 ) === $job_id;
 	}
 
+	/** Validate one scheduler action against current operation, AI, and recovery ownership. */
+	public static function actionGenerationMatches( array $job, array $engine_data, array $action ): bool {
+		$args = is_array( $action['decoded_args'] ?? null ) ? $action['decoded_args'] : array();
+		if ( 'datamachine_resume_ai_step' === (string) ( $action['hook'] ?? '' ) ) {
+			$owner       = is_array( $engine_data['ai_concurrency_resume_ownership'] ?? null ) ? $engine_data['ai_concurrency_resume_ownership'] : array();
+			$generation  = (int) ( $args['ai_resume_generation'] ?? 0 );
+			$owner_state = 'pending' === (string) ( $action['status'] ?? '' ) ? 'scheduled' : 'running';
+
+			return 0 < $generation
+				&& (int) ( $owner['generation'] ?? 0 ) === $generation
+				&& (string) ( $owner['status'] ?? '' ) === $owner_state
+				&& (string) ( $args['flow_step_id'] ?? '' ) === (string) ( $owner['flow_step_id'] ?? '' )
+				&& ( 0 === (int) ( $owner['action_id'] ?? 0 ) || (int) ( $action['action_id'] ?? 0 ) === (int) $owner['action_id'] );
+		}
+
+		return self::recoveryGenerationMatches( $engine_data, $action, $args )
+			&& self::operationGenerationMatches( $job, $args );
+	}
+
+	/** Describe only validated lease and receipt ownership evidence. */
+	public static function recoveryOwnershipEvidence( array $engine_data, int $now ): array {
+		$owner      = is_array( $engine_data['scheduler_recovery'] ?? null ) ? $engine_data['scheduler_recovery'] : array();
+		$receipt    = is_array( $owner['receipt'] ?? null ) ? $owner['receipt'] : array();
+		$token      = (string) ( $owner['token'] ?? '' );
+		$generation = (int) ( $owner['generation'] ?? 0 );
+		$expiry     = strtotime( (string) ( $owner['expires_at'] ?? '' ) );
+		$lease_valid = 'claimed' === (string) ( $owner['state'] ?? '' )
+			&& '' !== $token
+			&& 0 < $generation
+			&& false !== $expiry
+			&& $now < $expiry;
+		$action_receipt_valid = 'requeued' === (string) ( $owner['state'] ?? '' )
+			&& '' !== $token
+			&& 0 < $generation
+			&& (int) ( $receipt['generation'] ?? 0 ) === $generation
+			&& 0 < (int) ( $receipt['action_id'] ?? 0 );
+		$terminal_receipt_valid = 'terminalized' === (string) ( $owner['state'] ?? '' )
+			&& '' !== $token
+			&& 0 < $generation
+			&& (int) ( $receipt['generation'] ?? 0 ) === $generation
+			&& '' !== (string) ( $receipt['terminal_status'] ?? '' );
+		$receipt_valid = $action_receipt_valid || $terminal_receipt_valid;
+
+		$state = 'none';
+		if ( ! empty( $owner ) ) {
+			$state = $lease_valid ? 'active' : ( $receipt_valid ? 'committed' : ( 'claimed' === (string) ( $owner['state'] ?? '' ) && false !== $expiry && $now >= $expiry ? 'expired' : 'invalid' ) );
+		}
+
+		return array(
+			'state'          => $state,
+			'lease_valid'    => $lease_valid,
+			'receipt_valid'  => $receipt_valid,
+			'token'          => ( $lease_valid || $receipt_valid ) ? $token : '',
+			'generation'     => ( $lease_valid || $receipt_valid ) ? $generation : 0,
+			'expires_at'     => $lease_valid ? (string) ( $owner['expires_at'] ?? '' ) : '',
+			'claimed_at'     => $lease_valid ? (string) ( $owner['claimed_at'] ?? '' ) : '',
+			'renewed_at'     => $lease_valid ? (string) ( $owner['renewed_at'] ?? '' ) : '',
+			'receipt_action_id' => $action_receipt_valid ? (int) $receipt['action_id'] : 0,
+			'receipt_state'  => $action_receipt_valid ? 'committed' : ( $terminal_receipt_valid ? 'terminal_committed' : ( empty( $receipt ) ? 'missing' : 'invalid' ) ),
+		);
+	}
+
+	/** Validate a committed recovery action generation after execution. */
+	public static function recoveryExecutionMatches( array $engine_data, int $generation, string $token ): bool {
+		$evidence = self::recoveryOwnershipEvidence( $engine_data, time() );
+
+		return 0 < $generation
+			&& 'committed' === $evidence['state']
+			&& $generation === (int) $evidence['generation']
+			&& '' !== $token
+			&& hash_equals( (string) $evidence['token'], $token );
+	}
+
 	/**
 	 * Diagnose scheduler ownership and replay eligibility.
 	 *
@@ -70,23 +143,7 @@ class ChildJobRecoveryPolicy {
 			}
 		}
 
-		$args = is_array( $action['decoded_args'] ?? null ) ? $action['decoded_args'] : array();
-		if ( 'datamachine_resume_ai_step' === (string) ( $action['hook'] ?? '' ) ) {
-			$owner      = is_array( $engine_data['ai_concurrency_resume_ownership'] ?? null ) ? $engine_data['ai_concurrency_resume_ownership'] : array();
-			$generation = (int) ( $args['ai_resume_generation'] ?? 0 );
-			$owner_state = 'pending' === $status ? 'scheduled' : 'running';
-
-			return 0 < $generation
-				&& (int) ( $owner['generation'] ?? 0 ) === $generation
-				&& (string) ( $owner['status'] ?? '' ) === $owner_state
-				&& (string) ( $args['flow_step_id'] ?? '' ) === (string) ( $owner['flow_step_id'] ?? '' )
-				&& ( 0 === (int) ( $owner['action_id'] ?? 0 ) || (int) ( $action['action_id'] ?? 0 ) === (int) $owner['action_id'] );
-		}
-		if ( ! self::recoveryGenerationMatches( $engine_data, $action, $args ) ) {
-			return false;
-		}
-
-		return self::operationGenerationMatches( $job, $args );
+		return self::actionGenerationMatches( $job, $engine_data, $action );
 	}
 
 	private static function recoveryGenerationMatches( array $engine_data, array $action, array $args ): bool {
@@ -104,7 +161,8 @@ class ChildJobRecoveryPolicy {
 			&& (int) ( $owner['generation'] ?? 0 ) === $generation
 			&& (int) ( $receipt['generation'] ?? 0 ) === $generation
 			&& hash_equals( $token, (string) ( $owner['token'] ?? '' ) )
-			&& ( 0 === (int) ( $receipt['action_id'] ?? 0 ) || (int) ( $action['action_id'] ?? 0 ) === (int) $receipt['action_id'] );
+			&& 0 < (int) ( $receipt['action_id'] ?? 0 )
+			&& (int) ( $action['action_id'] ?? 0 ) === (int) $receipt['action_id'];
 	}
 
 	private static function operationGenerationMatches( array $job, array $args ): bool {
