@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.168.1] - 2026-07-22
+
+### Fixed
+- replay terminal job accounting safely
+
 ## [0.167.0] - 2026-07-22
 
 ### Added
