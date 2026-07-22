@@ -52,7 +52,18 @@ class RecurringScheduler {
 	 */
 	public const MAX_DISTRIBUTION_WINDOW_SECONDS = 86400;
 
-	private const SCHEDULE_LOCK_PREFIX         = 'datamachine_schedule_lock_';
+	private const SCHEDULE_LOCK_PREFIX = 'datamachine_schedule_lock_';
+	/**
+	 * Durable, non-autoloaded tombstones keyed by schedule identity.
+	 *
+	 * They are intentionally retained after manual/delete transitions: a fetched
+	 * running recurrence can repeat after its callback, so deleting its generation
+	 * would remove the only resurrection fence. Retention is therefore unbounded in
+	 * time, while storage is bounded to one non-autoloaded scalar per distinct
+	 * schedule signature rather than one row per execution. Do not bulk-delete these
+	 * options without first proving no pending, running, or fetched action for the
+	 * signature can repeat.
+	 */
 	private const SCHEDULE_GENERATION_PREFIX   = 'datamachine_schedule_generation_';
 	private const SCHEDULE_LOCK_TTL            = 30;
 	private const SCHEDULE_LOCK_RETRY_ATTEMPTS = 5;
@@ -436,7 +447,7 @@ class RecurringScheduler {
 	 * @param string $hook  Action Scheduler hook.
 	 * @param array  $args  Action arguments.
 	 * @param string $group Action Scheduler group.
-	 * @return array{option_name:string,generation_option:string,token:string}|\WP_Error
+	 * @return array{option_name:string,generation_option:string,token:string,lease_payload:array<string,mixed>}|\WP_Error
 	 */
 	private static function acquireScheduleLock( string $hook, array $args, string $group ) {
 		$options = self::scheduleOptionNames( $hook, $args, $group );
@@ -446,10 +457,17 @@ class RecurringScheduler {
 
 		$generation = get_option( $options['generation_option'], false );
 		if ( false === $generation ) {
-			$initial_generation = wp_generate_uuid4();
-			if ( ! add_option( $options['generation_option'], $initial_generation, '', false ) ) {
+			for ( $attempt = 0; $attempt < self::SCHEDULE_LOCK_RETRY_ATTEMPTS && false === $generation; ++$attempt ) {
+				$initial_generation = wp_generate_uuid4();
+				if ( add_option( $options['generation_option'], $initial_generation, '', false ) ) {
+					$generation = $initial_generation;
+					break;
+				}
 				$generation = get_option( $options['generation_option'], false );
 			}
+		}
+		if ( ! is_string( $generation ) || '' === $generation ) {
+			return self::error( 'schedule_generation_unavailable', 'Unable to initialize schedule generation.', array( 'status' => 503 ) );
 		}
 		$option_name = $options['lock_option'];
 
@@ -468,6 +486,7 @@ class RecurringScheduler {
 					'option_name'       => $option_name,
 					'generation_option' => $options['generation_option'],
 					'token'             => $token,
+					'lease_payload'     => $payload,
 				);
 			}
 
@@ -512,15 +531,26 @@ class RecurringScheduler {
 	 * @return array|\WP_Error Updated lease or ownership error.
 	 */
 	private static function beginScheduleMutation( array $lock ) {
-		if ( ! self::refreshScheduleLock( $lock ) ) {
+		$lease_payload = self::refreshScheduleLock( $lock );
+		if ( false === $lease_payload ) {
 			return self::lockLostError();
 		}
 
-		$generation = wp_generate_uuid4();
-		update_option( $lock['generation_option'], $generation, false );
-		$lock['generation'] = $generation;
+		$current_generation = get_option( $lock['generation_option'], '' );
+		$generation         = wp_generate_uuid4();
+		if ( ! OptionLeaseStore::compareAndSwapWhileOwned(
+			$lock['generation_option'],
+			$current_generation,
+			$generation,
+			$lock['option_name'],
+			$lease_payload
+		) ) {
+			return self::lockLostError();
+		}
+		$lock['generation']    = $generation;
+		$lock['lease_payload'] = $lease_payload;
 
-		return self::refreshScheduleLock( $lock ) && self::isMutationGenerationCurrent( $lock )
+		return false !== self::refreshScheduleLock( $lock ) && self::isMutationGenerationCurrent( $lock )
 			? $lock
 			: self::lockLostError();
 	}
@@ -529,11 +559,14 @@ class RecurringScheduler {
 	 * Refresh and verify ownership immediately before a destructive mutation.
 	 */
 	private static function assertMutationOwner( array $lock ): bool {
-		return self::refreshScheduleLock( $lock ) && self::isMutationGenerationCurrent( $lock );
+		return false !== self::refreshScheduleLock( $lock ) && self::isMutationGenerationCurrent( $lock );
 	}
 
-	private static function refreshScheduleLock( array $lock ): bool {
-		return OptionLeaseStore::refresh( $lock['option_name'], $lock['token'], self::SCHEDULE_LOCK_TTL );
+	/**
+	 * @return array<string,mixed>|false
+	 */
+	private static function refreshScheduleLock( array $lock ) {
+		return OptionLeaseStore::refreshOwned( $lock['option_name'], $lock['token'], self::SCHEDULE_LOCK_TTL );
 	}
 
 	private static function isMutationGenerationCurrent( array $lock ): bool {
@@ -562,7 +595,10 @@ class RecurringScheduler {
 		if ( ! self::assertMutationOwner( $lock ) ) {
 			return self::lockLostError();
 		}
-		self::unschedule( $hook, $args, $group );
+		self::rawUnschedule( $hook, $args, $group );
+		if ( ! self::assertMutationOwner( $lock ) ) {
+			return self::lockLostError();
+		}
 		return true;
 	}
 
@@ -573,7 +609,8 @@ class RecurringScheduler {
 		if ( ! self::assertMutationOwner( $lock ) ) {
 			return self::lockLostError();
 		}
-		return as_schedule_single_action( $timestamp, $hook, $args, $group );
+		$action_id = as_schedule_single_action( $timestamp, $hook, $args, $group );
+		return self::assertMutationOwner( $lock ) ? $action_id : self::lockLostError();
 	}
 
 	/**
@@ -583,7 +620,8 @@ class RecurringScheduler {
 		if ( ! self::assertMutationOwner( $lock ) ) {
 			return self::lockLostError();
 		}
-		return as_schedule_recurring_action( $timestamp, $interval, $hook, $args, $group, $unique );
+		$action_id = as_schedule_recurring_action( $timestamp, $interval, $hook, $args, $group, $unique );
+		return self::assertMutationOwner( $lock ) ? $action_id : self::lockLostError();
 	}
 
 	/**
@@ -593,18 +631,26 @@ class RecurringScheduler {
 		if ( ! self::assertMutationOwner( $lock ) ) {
 			return self::lockLostError();
 		}
-		return as_schedule_cron_action( $timestamp, $expression, $hook, $args, $group, $unique );
+		$action_id = as_schedule_cron_action( $timestamp, $expression, $hook, $args, $group, $unique );
+		return self::assertMutationOwner( $lock ) ? $action_id : self::lockLostError();
 	}
 
 	/**
-	 * Unschedule all Action Scheduler actions matching (hook, args, group).
+	 * Preserve the public unschedule API while routing through the fenced path.
 	 *
 	 * @param string $hook  Hook name.
 	 * @param array  $args  Action args (signature).
 	 * @param string $group AS group.
 	 * @return void
 	 */
-	private static function unschedule( string $hook, array $args, string $group = self::GROUP ): void {
+	public static function unschedule( string $hook, array $args, string $group = self::GROUP ): void {
+		self::ensureSchedule( $hook, $args, 'manual', array( 'group' => $group ) );
+	}
+
+	/**
+	 * Unschedule pending actions after ownership has already been fenced.
+	 */
+	private static function rawUnschedule( string $hook, array $args, string $group ): void {
 		if ( function_exists( 'as_unschedule_all_actions' ) ) {
 			as_unschedule_all_actions( $hook, $args, $group );
 		}
@@ -670,6 +716,22 @@ class RecurringScheduler {
 	 */
 	public static function isReady(): bool {
 		return self::isActionSchedulerDataStoreReady();
+	}
+
+	/**
+	 * Normalize scheduler error metadata for ability and cleanup callers.
+	 */
+	public static function errorMetadata( \WP_Error $error ): array {
+		$data = $error->get_error_data();
+		$data = is_array( $data ) ? $data : array();
+
+		return array(
+			'error'          => $error->get_error_message(),
+			'error_code'     => $error->get_error_code(),
+			'status'         => (int) ( $data['status'] ?? 500 ),
+			'retryable'      => (bool) ( $data['retryable'] ?? false ),
+			'retry_after_ms' => (int) ( $data['retry_after_ms'] ?? 0 ),
+		);
 	}
 
 	/**

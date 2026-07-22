@@ -105,6 +105,7 @@ class PauseFlowAbility {
 
 		$paused  = 0;
 		$skipped = 0;
+		$errors  = 0;
 		$details = array();
 
 		foreach ( $flows as $flow ) {
@@ -121,16 +122,35 @@ class PauseFlowAbility {
 				continue;
 			}
 
-			// Set enabled=false, preserving all other scheduling fields.
-			$scheduling['enabled'] = false;
-			$this->db_flows->update_flow_scheduling( $fid, $scheduling );
-
-			// Unschedule Action Scheduler hooks so paused flows don't fire.
-			\DataMachine\Engine\Tasks\RecurringScheduler::ensureSchedule(
+			// Fence the recurrence before reporting or persisting a successful pause.
+			$schedule_result = \DataMachine\Engine\Tasks\RecurringScheduler::ensureSchedule(
 				'datamachine_run_flow_now',
 				array( $fid ),
 				'manual'
 			);
+			if ( is_wp_error( $schedule_result ) ) {
+				++$errors;
+				$details[] = array_merge(
+					array(
+						'flow_id' => $fid,
+						'status'  => 'pause_error',
+					),
+					\DataMachine\Engine\Tasks\RecurringScheduler::errorMetadata( $schedule_result )
+				);
+				continue;
+			}
+
+			$scheduling['enabled'] = false;
+			if ( ! $this->db_flows->update_flow_scheduling( $fid, $scheduling ) ) {
+				++$errors;
+				$details[] = array(
+					'flow_id'    => $fid,
+					'status'     => 'pause_error',
+					'error'      => 'Failed to persist paused scheduling state.',
+					'error_code' => 'pause_persistence_failed',
+				);
+				continue;
+			}
 
 			++$paused;
 			$details[] = array(
@@ -148,13 +168,15 @@ class PauseFlowAbility {
 			array(
 				'paused'  => $paused,
 				'skipped' => $skipped,
+				'errors'  => $errors,
 			)
 		);
 
 		return array(
-			'success' => true,
+			'success' => 0 === $errors,
 			'paused'  => $paused,
 			'skipped' => $skipped,
+			'errors'  => $errors,
 			'flows'   => $details,
 			'message' => sprintf( 'Paused %d flow(s), skipped %d (already paused).', $paused, $skipped ),
 		);

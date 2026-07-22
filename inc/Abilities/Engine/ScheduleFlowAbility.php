@@ -271,16 +271,9 @@ class ScheduleFlowAbility {
 	 * Preserve scheduler retry/status metadata at the ability boundary.
 	 */
 	private function scheduleError( \WP_Error $error ): array {
-		$data = $error->get_error_data();
-		$data = is_array( $data ) ? $data : array();
-
-		return array(
-			'success'        => false,
-			'error'          => $error->get_error_message(),
-			'error_code'     => $error->get_error_code(),
-			'status'         => (int) ( $data['status'] ?? 500 ),
-			'retryable'      => (bool) ( $data['retryable'] ?? false ),
-			'retry_after_ms' => (int) ( $data['retry_after_ms'] ?? 0 ),
+		return array_merge(
+			array( 'success' => false ),
+			\DataMachine\Engine\Tasks\RecurringScheduler::errorMetadata( $error )
 		);
 	}
 }

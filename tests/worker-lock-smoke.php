@@ -95,6 +95,13 @@ $before_refresh = (int) $GLOBALS['datamachine_worker_lock_options']['datamachine
 assert_worker_lock_true( OptionLeaseStore::refresh( 'datamachine_worker_runtime_lock', (string) $first['lock_token'], 120, time() + 5 ), 'owned lease refresh succeeds' );
 assert_worker_lock_true( (int) $GLOBALS['datamachine_worker_lock_options']['datamachine_worker_runtime_lock']['expires_at'] > $before_refresh, 'refresh extends the owned lease' );
 assert_worker_lock_true( ! OptionLeaseStore::refresh( 'datamachine_worker_runtime_lock', 'wrong-token', 120 ), 'wrong token cannot refresh a lease' );
+$lease_payload = OptionLeaseStore::refreshOwned( 'datamachine_worker_runtime_lock', (string) $first['lock_token'], 120 );
+add_option( 'datamachine_test_generation', 'generation-1', '', 'no' );
+assert_worker_lock_true( is_array( $lease_payload ), 'refresh returns the exact owned lease payload' );
+assert_worker_lock_true( OptionLeaseStore::compareAndSwapWhileOwned( 'datamachine_test_generation', 'generation-1', 'generation-2', 'datamachine_worker_runtime_lock', $lease_payload ), 'generation CAS succeeds under the exact lease payload' );
+$GLOBALS['datamachine_worker_lock_options']['datamachine_worker_runtime_lock']['token'] = 'takeover-token';
+assert_worker_lock_true( ! OptionLeaseStore::compareAndSwapWhileOwned( 'datamachine_test_generation', 'generation-2', 'generation-3', 'datamachine_worker_runtime_lock', $lease_payload ), 'stale owner cannot CAS generation after takeover' );
+$GLOBALS['datamachine_worker_lock_options']['datamachine_worker_runtime_lock'] = $lease_payload;
 
 $second = WorkerLock::acquire( 'worker two', 120 );
 assert_worker_lock_true( false === $second['acquired'], 'overlapping worker skips cleanly' );

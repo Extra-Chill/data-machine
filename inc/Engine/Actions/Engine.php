@@ -123,11 +123,23 @@ function datamachine_register_execution_engine() {
 			// If flow was deleted without cleaning up scheduled actions,
 			// cancel the orphaned actions to prevent recurring errors.
 			if ( ! datamachine_flow_exists( $flow_id ) ) {
-				\DataMachine\Engine\Tasks\RecurringScheduler::ensureSchedule(
+				$schedule_result = \DataMachine\Engine\Tasks\RecurringScheduler::ensureSchedule(
 					'datamachine_run_flow_now',
 					array( $flow_id ),
 					'manual'
 				);
+				if ( is_wp_error( $schedule_result ) ) {
+					do_action(
+						'datamachine_log',
+						'error',
+						'Orphaned schedule cleanup deferred after ownership failure',
+						array_merge(
+							array( 'flow_id' => $flow_id ),
+							\DataMachine\Engine\Tasks\RecurringScheduler::errorMetadata( $schedule_result )
+						)
+					);
+					return;
+				}
 				do_action(
 					'datamachine_log',
 					'warning',

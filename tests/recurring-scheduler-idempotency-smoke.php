@@ -256,6 +256,7 @@ $GLOBALS['datamachine_rs_reentrant_race']      = false;
 $GLOBALS['datamachine_rs_reentrant_result']    = null;
 $GLOBALS['datamachine_rs_single_reentrant']    = null;
 $GLOBALS['datamachine_rs_steal_lock_on_query'] = false;
+$GLOBALS['datamachine_rs_expire_lock_on_query'] = false;
 
 function datamachine_rs_key( string $hook, array $args, string $group ): string {
 	return $group . '|' . $hook . '|' . serialize( $args );
@@ -293,6 +294,7 @@ function datamachine_rs_reset(): void {
 	$GLOBALS['datamachine_rs_reentrant_result']    = null;
 	$GLOBALS['datamachine_rs_single_reentrant']    = null;
 	$GLOBALS['datamachine_rs_steal_lock_on_query'] = false;
+	$GLOBALS['datamachine_rs_expire_lock_on_query'] = false;
 	$GLOBALS['datamachine_rs_options']             = array();
 	$GLOBALS['datamachine_rs_add_option_failures'] = 0;
 	$GLOBALS['datamachine_rs_add_option_calls']    = 0;
@@ -304,6 +306,15 @@ function datamachine_rs_counter( string $key ): int {
 }
 
 function as_get_scheduled_actions( array $args = array(), $return_format = OBJECT ): array {
+	if ( $GLOBALS['datamachine_rs_expire_lock_on_query'] ) {
+		$GLOBALS['datamachine_rs_expire_lock_on_query'] = false;
+		foreach ( $GLOBALS['datamachine_rs_options'] as $name => $payload ) {
+			if ( str_starts_with( $name, 'datamachine_schedule_lock_' ) && is_array( $payload ) ) {
+				$GLOBALS['datamachine_rs_options'][ $name ]['expires_at'] = time() - 1;
+				break;
+			}
+		}
+	}
 	if ( $GLOBALS['datamachine_rs_steal_lock_on_query'] ) {
 		$GLOBALS['datamachine_rs_steal_lock_on_query'] = false;
 		foreach ( $GLOBALS['datamachine_rs_options'] as $name => $payload ) {
@@ -669,5 +680,57 @@ datamachine_assert_schedule_result( RecurringScheduler::ensureSchedule( 'datamac
 datamachine_assert( ! $old_action->get_schedule()->is_recurring(), 'cron transition invalidates the old fetched interval recurrence' );
 $new_action = reset( $GLOBALS['datamachine_rs_actions'][ $key ]['pending'] );
 datamachine_assert( '0 0 * * *' === $new_action->get_schedule()->get_recurrence(), 'cron transition installs only the desired cron successor' );
+
+echo "\n[29] expired owner cannot revive its lease or overwrite generation\n";
+datamachine_rs_reset();
+datamachine_assert_schedule_result( RecurringScheduler::ensureSchedule( 'datamachine_expired_owner', array( 18 ), 'hourly' ) );
+$generation_before = '';
+foreach ( $GLOBALS['datamachine_rs_options'] as $name => $value ) {
+	if ( str_starts_with( $name, 'datamachine_schedule_generation_' ) ) {
+		$generation_before = $value;
+		break;
+	}
+}
+$GLOBALS['datamachine_rs_expire_lock_on_query'] = true;
+$result = RecurringScheduler::ensureSchedule( 'datamachine_expired_owner', array( 18 ), 'daily' );
+datamachine_assert( $result instanceof WP_Error, 'expired owner returns an ownership error' );
+datamachine_assert( 'schedule_lock_lost' === $result->get_error_code(), 'expired owner cannot refresh after expiry' );
+$generation_after = '';
+foreach ( $GLOBALS['datamachine_rs_options'] as $name => $value ) {
+	if ( str_starts_with( $name, 'datamachine_schedule_generation_' ) ) {
+		$generation_after = $value;
+		break;
+	}
+}
+datamachine_assert( $generation_before === $generation_after, 'expired owner cannot overwrite the persisted generation' );
+
+echo "\n[30] public unschedule compatibility uses the fenced primitive\n";
+datamachine_rs_reset();
+datamachine_assert_schedule_result( RecurringScheduler::ensureSchedule( 'datamachine_public_unschedule', array( 19 ), 'hourly' ) );
+$GLOBALS['datamachine_rs_unscheduled'] = 0;
+RecurringScheduler::unschedule( 'datamachine_public_unschedule', array( 19 ) );
+datamachine_assert( 0 === datamachine_rs_pending_count( 'datamachine_public_unschedule', array( 19 ), RecurringScheduler::GROUP ), 'legacy public unschedule removes the pending schedule' );
+datamachine_assert( 1 === datamachine_rs_counter( 'datamachine_rs_unscheduled' ), 'legacy public unschedule performs one fenced mutation' );
+
+echo "\n[31] destructive callers reject or record scheduler failures\n";
+$delete_flow_source     = file_get_contents( __DIR__ . '/../inc/Abilities/Flow/DeleteFlowAbility.php' ) ?: '';
+$delete_pipeline_source = file_get_contents( __DIR__ . '/../inc/Abilities/Pipeline/DeletePipelineAbility.php' ) ?: '';
+$pause_flow_source      = file_get_contents( __DIR__ . '/../inc/Abilities/Flow/PauseFlowAbility.php' ) ?: '';
+$create_flow_source     = file_get_contents( __DIR__ . '/../inc/Abilities/Flow/CreateFlowAbility.php' ) ?: '';
+$engine_source          = file_get_contents( __DIR__ . '/../inc/Engine/Actions/Engine.php' ) ?: '';
+datamachine_assert( str_contains( $delete_flow_source, 'is_wp_error( $schedule_result )' ), 'flow deletion stops on scheduler failure' );
+datamachine_assert( strpos( $delete_pipeline_source, 'is_wp_error( $schedule_result )' ) < strpos( $delete_pipeline_source, 'delete_flow( (int) $flow_id )' ), 'pipeline deletion fences every flow before database deletion' );
+datamachine_assert( str_contains( $pause_flow_source, "'status'  => 'pause_error'" ), 'pause reports scheduler failure instead of success' );
+datamachine_assert( str_contains( $create_flow_source, "'schedule_cleanup'" ), 'creation rollback records failed schedule compensation' );
+datamachine_assert( str_contains( $engine_source, 'Orphaned schedule cleanup deferred after ownership failure' ), 'orphan cleanup records retryable scheduler failure' );
+datamachine_assert( str_contains( $schedule_flow_source, 'SCHEDULE_GENERATION_PREFIX' ) || str_contains( file_get_contents( __DIR__ . '/../inc/Engine/Tasks/RecurringScheduler.php' ) ?: '', 'Do not bulk-delete' ), 'generation tombstones document bounded retention and prohibit blind deletion' );
+
+echo "\n[32] generation fence matches bundled Action Scheduler repeat order\n";
+$queue_runner_source = file_get_contents( __DIR__ . '/../vendor/woocommerce/action-scheduler/classes/abstracts/ActionScheduler_Abstract_QueueRunner.php' ) ?: '';
+$factory_source      = file_get_contents( __DIR__ . '/../vendor/woocommerce/action-scheduler/classes/ActionScheduler_ActionFactory.php' ) ?: '';
+$execute_position    = strpos( $queue_runner_source, '$action->execute()' );
+$repeat_position     = strpos( $queue_runner_source, '$action->get_schedule()->is_recurring()' );
+datamachine_assert( false !== $execute_position && false !== $repeat_position && $execute_position < $repeat_position, 'bundled AS re-reads the fetched action schedule after callback execution' );
+datamachine_assert( str_contains( $factory_source, '$schedule = $action->get_schedule();' ) && str_contains( $factory_source, '$this->store( $new_action )' ), 'bundled AS repeats from the fetched action schedule object' );
 
 echo "\nAll recurring scheduler idempotency assertions passed.\n";

@@ -190,6 +190,15 @@ class OptionLeaseStore {
 	 * @param int|null $now         Current timestamp.
 	 */
 	public static function refresh( string $option_name, string $token, int $ttl, ?int $now = null ): bool {
+		return false !== self::refreshOwned( $option_name, $token, $ttl, $now );
+	}
+
+	/**
+	 * Atomically extend and return the exact refreshed owner payload.
+	 *
+	 * @return array<string,mixed>|false Refreshed payload, or false after ownership loss.
+	 */
+	public static function refreshOwned( string $option_name, string $token, int $ttl, ?int $now = null ) {
 		if ( '' === $token ) {
 			return false;
 		}
@@ -198,11 +207,15 @@ class OptionLeaseStore {
 		if ( ! is_array( $current ) || ! hash_equals( (string) ( $current['token'] ?? '' ), $token ) ) {
 			return false;
 		}
+		$now = $now ?? time();
+		if ( (int) ( $current['expires_at'] ?? 0 ) <= $now ) {
+			return false;
+		}
 
 		$replacement               = $current;
 		$replacement['expires_at'] = max(
 			(int) ( $current['expires_at'] ?? 0 ) + 1,
-			( $now ?? time() ) + max( 1, $ttl )
+			$now + max( 1, $ttl )
 		);
 
 		global $wpdb;
@@ -224,7 +237,7 @@ class OptionLeaseStore {
 			}
 
 			wp_cache_delete( $option_name, 'options' );
-			return true;
+			return $replacement;
 		}
 
 		// Lightweight test runtimes may not provide wpdb; retain token verification.
@@ -232,7 +245,65 @@ class OptionLeaseStore {
 			return false;
 		}
 		$stored = get_option( $option_name, array() );
-		return is_array( $stored ) && hash_equals( $token, (string) ( $stored['token'] ?? '' ) );
+		return is_array( $stored ) && hash_equals( $token, (string) ( $stored['token'] ?? '' ) )
+			? $replacement
+			: false;
+	}
+
+	/**
+	 * Compare-and-swap an option only while an exact, unexpired lease is stored.
+	 *
+	 * @param string              $option_name  Target option.
+	 * @param mixed               $expected     Exact target value expected.
+	 * @param mixed               $replacement  New target value.
+	 * @param string              $lease_name   Lease option.
+	 * @param array<string,mixed> $lease_payload Exact refreshed lease payload.
+	 * @param int|null            $now           Current timestamp.
+	 */
+	public static function compareAndSwapWhileOwned(
+		string $option_name,
+		$expected,
+		$replacement,
+		string $lease_name,
+		array $lease_payload,
+		?int $now = null
+	): bool {
+		$now = $now ?? time();
+		if ( (int) ( $lease_payload['expires_at'] ?? 0 ) <= $now ) {
+			return false;
+		}
+
+		global $wpdb;
+		if ( isset( $wpdb->options ) && method_exists( $wpdb, 'query' ) && method_exists( $wpdb, 'prepare' ) ) {
+			// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared -- Atomic target CAS is fenced by the exact lease row.
+			$updated = $wpdb->query(
+				$wpdb->prepare(
+					'UPDATE %i SET option_value = %s WHERE option_name = %s AND option_value = %s AND EXISTS (SELECT 1 FROM %i WHERE option_name = %s AND option_value = %s)',
+					$wpdb->options,
+					maybe_serialize( $replacement ),
+					$option_name,
+					maybe_serialize( $expected ),
+					$wpdb->options,
+					$lease_name,
+					maybe_serialize( $lease_payload )
+				)
+			);
+			// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared
+
+			if ( 1 !== $updated ) {
+				return false;
+			}
+
+			wp_cache_delete( $option_name, 'options' );
+			return true;
+		}
+
+		// Lightweight test fallback preserves both exact comparisons.
+		if ( get_option( $lease_name, null ) !== $lease_payload || get_option( $option_name, null ) !== $expected ) {
+			return false;
+		}
+		update_option( $option_name, $replacement, false );
+		return get_option( $lease_name, null ) === $lease_payload && get_option( $option_name, null ) === $replacement;
 	}
 
 	/**

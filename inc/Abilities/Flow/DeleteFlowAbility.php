@@ -91,11 +91,17 @@ class DeleteFlowAbility {
 
 		$pipeline_id = (int) ( $flow['pipeline_id'] ?? 0 );
 
-		\DataMachine\Engine\Tasks\RecurringScheduler::ensureSchedule(
+		$schedule_result = \DataMachine\Engine\Tasks\RecurringScheduler::ensureSchedule(
 			'datamachine_run_flow_now',
 			array( $flow_id ),
 			'manual'
 		);
+		if ( is_wp_error( $schedule_result ) ) {
+			return array_merge(
+				array( 'success' => false ),
+				\DataMachine\Engine\Tasks\RecurringScheduler::errorMetadata( $schedule_result )
+			);
+		}
 
 		$success = $this->db_flows->delete_flow( $flow_id );
 

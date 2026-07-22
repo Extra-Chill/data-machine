@@ -10,6 +10,7 @@
 
 namespace DataMachine\Abilities\Pipeline;
 
+use DataMachine\Api\Flows\FlowScheduling;
 use DataMachine\Core\FilesRepository\FileCleanup;
 
 defined( 'ABSPATH' ) || exit;
@@ -96,18 +97,38 @@ class DeletePipelineAbility {
 		$affected_flows = $this->db_flows->get_flows_for_pipeline( $pipeline_id );
 		$flow_count     = count( $affected_flows );
 
+		// Fence every recurrence before deleting any flow so a lock failure cannot
+		// produce a partially deleted pipeline with surviving schedules.
+		$fenced_flows = array();
 		foreach ( $affected_flows as $flow ) {
 			$flow_id = $flow['flow_id'] ?? null;
 			if ( ! $flow_id ) {
 				continue;
 			}
 
-			\DataMachine\Engine\Tasks\RecurringScheduler::ensureSchedule(
+			$fenced_flows[]  = $flow;
+			$schedule_result = \DataMachine\Engine\Tasks\RecurringScheduler::ensureSchedule(
 				'datamachine_run_flow_now',
 				array( (int) $flow_id ),
 				'manual'
 			);
+			if ( is_wp_error( $schedule_result ) ) {
+				return array_merge(
+					array(
+						'success'                 => false,
+						'flow_id'                 => (int) $flow_id,
+						'schedule_reconciliation' => $this->reconcileFlowSchedules( $fenced_flows ),
+					),
+					\DataMachine\Engine\Tasks\RecurringScheduler::errorMetadata( $schedule_result )
+				);
+			}
+		}
 
+		foreach ( $affected_flows as $flow ) {
+			$flow_id = $flow['flow_id'] ?? null;
+			if ( ! $flow_id ) {
+				continue;
+			}
 			$this->db_flows->delete_flow( (int) $flow_id );
 		}
 
@@ -155,5 +176,31 @@ class DeletePipelineAbility {
 				$flow_count
 			),
 		);
+	}
+
+	/**
+	 * Restore persisted schedules after a multi-flow preflight fails partway.
+	 *
+	 * @param array $flows Flows whose schedule may have been fenced already.
+	 */
+	private function reconcileFlowSchedules( array $flows ): array {
+		$results = array();
+		foreach ( $flows as $flow ) {
+			$flow_id = (int) ( $flow['flow_id'] ?? 0 );
+			if ( $flow_id <= 0 ) {
+				continue;
+			}
+
+			$result              = FlowScheduling::handle_scheduling_update(
+				$flow_id,
+				$flow['scheduling_config'] ?? array( 'interval' => 'manual' ),
+				true
+			);
+			$results[ $flow_id ] = is_wp_error( $result )
+				? array_merge( array( 'success' => false ), \DataMachine\Engine\Tasks\RecurringScheduler::errorMetadata( $result ) )
+				: array( 'success' => true );
+		}
+
+		return $results;
 	}
 }
