@@ -24,7 +24,7 @@ class TestHandlerRawFailureStub {
 
 	public function get_fetch_data( $pipeline_id, array $config, $job_id ): array {
 		self::$received_config = $config;
-		$credential_values     = array_intersect_key( $config, array_flip( array( 'imap_password', 'api_secret', 'access_token_v2' ) ) );
+		$credential_values     = array_intersect_key( $config, array_flip( array( 'imap_password', 'api_secret', 'access_token_v2', 'cookie', 'cookies' ) ) );
 		throw new RuntimeException( 'Request failed with credentials ' . implode( ' ', $credential_values ) );
 	}
 }
@@ -131,8 +131,12 @@ $packets    = array(
 			'api_secret'      => 'packet-api-secret',
 			'access_token_v2' => 'packet-access-token',
 			'clientSecret'    => 'packet-client-secret',
+			'cookie'          => 'packet-cookie',
 		),
-		array( 'authorization_header' => 'packet-authorization' ),
+		array(
+			'authorization_header' => 'packet-authorization',
+			'cookies'              => 'packet-cookies',
+		),
 		'fetch'
 	),
 );
@@ -142,7 +146,8 @@ assert_test_handler_raw( 'events-shaped JSON body round-trips byte-for-byte', $e
 assert_test_handler_raw( 'raw HTML and ordinary Token prose remain unchanged', $event_html === $raw['packets'][1]['data']['body'] );
 assert_test_handler_raw( 'events-shaped structured venue metadata is retained', 'Charleston' === $raw['packets'][0]['data']['venue']['city'] );
 assert_test_handler_raw( 'production packet credential keys are redacted', '[redacted]' === $raw['packets'][2]['data']['imap_password'] && '[redacted]' === $raw['packets'][2]['data']['api_secret'] && '[redacted]' === $raw['packets'][2]['data']['access_token_v2'] && '[redacted]' === $raw['packets'][2]['data']['clientSecret'] && '[redacted]' === $raw['packets'][2]['metadata']['authorization_header'] );
-assert_test_handler_raw( 'production packet credential values never serialize', ! str_contains( json_encode( $raw ), 'packet-imap-secret' ) && ! str_contains( json_encode( $raw ), 'packet-api-secret' ) && ! str_contains( json_encode( $raw ), 'packet-access-token' ) && ! str_contains( json_encode( $raw ), 'packet-client-secret' ) && ! str_contains( json_encode( $raw ), 'packet-authorization' ) );
+assert_test_handler_raw( 'singular packet cookie and plural metadata cookies are redacted', '[redacted]' === $raw['packets'][2]['data']['cookie'] && '[redacted]' === $raw['packets'][2]['metadata']['cookies'] );
+assert_test_handler_raw( 'production packet credential values never serialize', ! str_contains( json_encode( $raw ), 'packet-imap-secret' ) && ! str_contains( json_encode( $raw ), 'packet-api-secret' ) && ! str_contains( json_encode( $raw ), 'packet-access-token' ) && ! str_contains( json_encode( $raw ), 'packet-client-secret' ) && ! str_contains( json_encode( $raw ), 'packet-authorization' ) && ! str_contains( json_encode( $raw ), 'packet-cookie' ) && ! str_contains( json_encode( $raw ), 'packet-cookies' ) );
 assert_test_handler_raw( 'complete response byte count is exact and within limit', test_handler_transport_size( $raw ) === $raw['truncation']['returned_bytes'] && $raw['truncation']['returned_bytes'] <= 12000 );
 
 $nested = array();
@@ -191,6 +196,8 @@ $structured = sanitize_test_handler_value(
 		'api_secret'      => 'secret-value',
 		'access_token_v2' => 'token-value',
 		'clientSecret'    => 'client-secret-value',
+		'cookie'          => 'cookie-value',
+		'cookies'         => 'cookies-value',
 		'author'          => 'Token Adams',
 		'secretary'       => 'The Secretary',
 		'note'            => 'Token prose is legitimate event content.',
@@ -198,6 +205,7 @@ $structured = sanitize_test_handler_value(
 );
 assert_test_handler_raw( 'exact credential key is redacted', '[redacted]' === $structured['output']['api_key'] );
 assert_test_handler_raw( 'compound and camel-case credential keys are redacted', '[redacted]' === $structured['output']['imap_password'] && '[redacted]' === $structured['output']['api_secret'] && '[redacted]' === $structured['output']['access_token_v2'] && '[redacted]' === $structured['output']['clientSecret'] );
+assert_test_handler_raw( 'singular and plural cookie segments are redacted', '[redacted]' === $structured['output']['cookie'] && '[redacted]' === $structured['output']['cookies'] );
 assert_test_handler_raw( 'author and secretary false positives are retained', 'Token Adams' === $structured['output']['author'] && 'The Secretary' === $structured['output']['secretary'] );
 assert_test_handler_raw( 'ordinary Token prose is never rewritten', 'Token prose is legitimate event content.' === $structured['output']['note'] );
 
@@ -210,10 +218,13 @@ $config_raw = build_test_handler_raw(
 		'imap_password'   => 'config-imap-secret',
 		'api_secret'      => 'config-api-secret',
 		'access_token_v2' => 'config-access-token',
+		'cookie'          => 'config-cookie',
+		'cookies'         => 'config-cookies',
 	)
 );
 assert_test_handler_raw( 'successful raw config redacts production credential keys', '[redacted]' === $config_raw['config_used']['imap_password'] && '[redacted]' === $config_raw['config_used']['api_secret'] && '[redacted]' === $config_raw['config_used']['access_token_v2'] );
-assert_test_handler_raw( 'successful raw config never serializes production credential values', ! str_contains( json_encode( $config_raw ), 'config-imap-secret' ) && ! str_contains( json_encode( $config_raw ), 'config-api-secret' ) && ! str_contains( json_encode( $config_raw ), 'config-access-token' ) );
+assert_test_handler_raw( 'successful raw config redacts singular and plural cookies', '[redacted]' === $config_raw['config_used']['cookie'] && '[redacted]' === $config_raw['config_used']['cookies'] );
+assert_test_handler_raw( 'successful raw config never serializes production credential values', ! str_contains( json_encode( $config_raw ), 'config-imap-secret' ) && ! str_contains( json_encode( $config_raw ), 'config-api-secret' ) && ! str_contains( json_encode( $config_raw ), 'config-access-token' ) && ! str_contains( json_encode( $config_raw ), 'config-cookie' ) && ! str_contains( json_encode( $config_raw ), 'config-cookies' ) );
 
 $resource = fopen( 'php://memory', 'r' );
 $unsafe   = sanitize_test_handler_value(
@@ -287,14 +298,18 @@ $failure = $ability->execute(
 			'imap_password'   => 'failure-imap-secret',
 			'api_secret'      => 'failure-api-secret',
 			'access_token_v2' => 'failure-access-token',
+			'cookie'          => 'failure-cookie',
+			'cookies'         => 'failure-cookies',
 		),
 		'output_mode'  => 'raw',
 	)
 );
 assert_test_handler_raw( 'handler receives real production credentials required for execution', 'failure-imap-secret' === TestHandlerRawFailureStub::$received_config['imap_password'] && 'failure-api-secret' === TestHandlerRawFailureStub::$received_config['api_secret'] && 'failure-access-token' === TestHandlerRawFailureStub::$received_config['access_token_v2'] );
+assert_test_handler_raw( 'handler receives real singular and plural cookies required for execution', 'failure-cookie' === TestHandlerRawFailureStub::$received_config['cookie'] && 'failure-cookies' === TestHandlerRawFailureStub::$received_config['cookies'] );
 assert_test_handler_raw( 'raw execution bounds handler materialization through max_items', 5 === TestHandlerRawFailureStub::$received_config['max_items'] );
 assert_test_handler_raw( 'failure config compound credentials are sanitized before output is built', '[redacted]' === $failure['config_used']['imap_password'] && '[redacted]' === $failure['config_used']['api_secret'] && '[redacted]' === $failure['config_used']['access_token_v2'] );
-assert_test_handler_raw( 'failure message cannot echo applied credentials', 'Handler execution failed.' === $failure['error'] && ! str_contains( json_encode( $failure ), 'failure-imap-secret' ) && ! str_contains( json_encode( $failure ), 'failure-api-secret' ) && ! str_contains( json_encode( $failure ), 'failure-access-token' ) );
+assert_test_handler_raw( 'failure config redacts singular and plural cookies', '[redacted]' === $failure['config_used']['cookie'] && '[redacted]' === $failure['config_used']['cookies'] );
+assert_test_handler_raw( 'failure message cannot echo applied credentials', 'Handler execution failed.' === $failure['error'] && ! str_contains( json_encode( $failure ), 'failure-imap-secret' ) && ! str_contains( json_encode( $failure ), 'failure-api-secret' ) && ! str_contains( json_encode( $failure ), 'failure-access-token' ) && ! str_contains( json_encode( $failure ), 'failure-cookie' ) && ! str_contains( json_encode( $failure ), 'failure-cookies' ) );
 
 $bounded_failure = $ability->execute(
 	array(

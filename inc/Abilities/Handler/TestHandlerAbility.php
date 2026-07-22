@@ -755,7 +755,7 @@ class TestHandlerAbility {
 			return false;
 		}
 
-		$sensitive_segments = array( 'authorization', 'bearer', 'cookie', 'credential', 'credentials', 'nonce', 'password', 'secret', 'signature', 'token' );
+		$sensitive_segments = array( 'authorization', 'bearer', 'cookie', 'cookies', 'credential', 'credentials', 'nonce', 'password', 'secret', 'signature', 'token' );
 		if ( array_intersect( $segments, $sensitive_segments ) ) {
 			return true;
 		}
