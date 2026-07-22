@@ -101,6 +101,117 @@ class PluginSettings {
 	}
 
 	/**
+	 * Redact secret-bearing settings recursively for presentation.
+	 *
+	 * Stored values are never changed. Secret keys use bounded credential-name
+	 * patterns while arrays and objects retain their serializable structure.
+	 *
+	 * @param string $key    Setting key.
+	 * @param mixed  $value  Setting value.
+	 * @param bool   $reveal Whether to reveal raw values.
+	 * @return mixed Redacted or raw value.
+	 */
+	public static function redactForDisplay( string $key, mixed $value, bool $reveal = false ): mixed {
+		if ( $reveal ) {
+			return $value;
+		}
+
+		return self::redactForDisplayRecursive( $key, $value, new \SplObjectStorage(), 0 );
+	}
+
+	/**
+	 * Recursively redact settings with cycle and depth protection.
+	 */
+	private static function redactForDisplayRecursive( string $key, mixed $value, \SplObjectStorage $seen, int $depth ): mixed {
+		if ( self::isSecretKey( $key ) ) {
+			return self::redactedValue( $value );
+		}
+
+		if ( $depth >= 32 ) {
+			return '[redacted]';
+		}
+
+		if ( is_array( $value ) ) {
+			$redacted = array();
+			foreach ( $value as $nested_key => $nested_value ) {
+				$redacted[ $nested_key ] = self::redactForDisplayRecursive(
+					(string) $nested_key,
+					$nested_value,
+					$seen,
+					$depth + 1
+				);
+			}
+			return $redacted;
+		}
+
+		if ( is_object( $value ) ) {
+			if ( $seen->contains( $value ) ) {
+				return '[redacted]';
+			}
+
+			$seen->attach( $value );
+			$redacted = new \stdClass();
+			foreach ( get_object_vars( $value ) as $nested_key => $nested_value ) {
+				$redacted->{$nested_key} = self::redactForDisplayRecursive(
+					(string) $nested_key,
+					$nested_value,
+					$seen,
+					$depth + 1
+				);
+			}
+			$seen->detach( $value );
+			return $redacted;
+		}
+
+		return $value;
+	}
+
+	/**
+	 * Determine whether a setting key conventionally contains a credential.
+	 */
+	private static function isSecretKey( string $key ): bool {
+		$normalized = preg_replace( '/([a-z0-9])([A-Z])/', '$1_$2', trim( $key ) ) ?? $key;
+		$normalized = strtolower( $normalized );
+		$normalized = trim( preg_replace( '/[^a-z0-9]+/', '_', $normalized ) ?? $normalized, '_' );
+
+		if ( 1 === preg_match( '/^(?:access_|refresh_)?tokens?_(?:expires_at|expires|expiry|expiration|ttl|type)$/', $normalized ) ) {
+			return false;
+		}
+
+		if ( 1 === preg_match( '/^credential_(?:id|label|mode|profile_id)$/', $normalized ) ) {
+			return false;
+		}
+
+		if ( 1 === preg_match( '/^(?:[a-z0-9]+_)*credential_profiles$/', $normalized ) ) {
+			return false;
+		}
+
+		if ( 'key' === $normalized || str_ends_with( $normalized, '_key' ) ) {
+			return true;
+		}
+
+		return 1 === preg_match(
+			'/(?:^|_)(?:auth|authentication|authorization|oauth|api_?key|private_key|signing_key|secret_key|access_key|bearer|cookie|passwd|password|passphrase|pat|secret|tokens?|credentials?)(?:_|$)/',
+			$normalized
+		);
+	}
+
+	/**
+	 * Collapse a recognized secret value so container keys cannot leak.
+	 */
+	private static function redactedValue( mixed $value ): mixed {
+		if ( null === $value || '' === $value || array() === $value ) {
+			return $value;
+		}
+
+		if ( is_object( $value ) && array() === get_object_vars( $value ) ) {
+			return new \stdClass();
+		}
+
+		return '[redacted]';
+	}
+
+	/**
 	 * Get a specific per-site setting value (no cascade).
 	 *
 	 * @param string $key     Setting key
