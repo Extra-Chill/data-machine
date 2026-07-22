@@ -12,6 +12,7 @@ use DataMachine\Core\Database\Jobs\LegacyAIConcurrencyReconciler;
 use DataMachine\Core\JobStatus;
 use DataMachine\Engine\AI\AIConcurrencyBackpressure;
 use DataMachine\Engine\Actions\Handlers\StepLifecycleHandler;
+use DataMachine\Abilities\Job\RecoverStuckJobsAbility;
 use WP_UnitTestCase;
 
 class JobLifecycleTransitionTest extends WP_UnitTestCase {
@@ -40,6 +41,23 @@ class JobLifecycleTransitionTest extends WP_UnitTestCase {
 
 		$job = $this->db_jobs->get_job( $job_id );
 		$this->assertSame( JobStatus::FAILED, $job['status'] );
+	}
+
+	public function test_concurrent_pathless_child_recovery_has_one_owner(): void {
+		$parent_id = $this->db_jobs->create_job( array( 'label' => 'Recovery parent' ) );
+		$child_id  = $this->db_jobs->create_job( array( 'label' => 'Recovery child', 'parent_job_id' => $parent_id ) );
+		$this->assertIsInt( $parent_id );
+		$this->assertIsInt( $child_id );
+		$this->assertTrue( $this->db_jobs->start_job( $child_id ) );
+
+		$ability = new RecoverStuckJobsAbility();
+		$method  = new \ReflectionMethod( $ability, 'claimPathlessChildRecovery' );
+		$first   = $method->invoke( $ability, $child_id, 'test' );
+		$second  = $method->invoke( $ability, $child_id, 'test' );
+
+		$this->assertTrue( $first['owned'] );
+		$this->assertFalse( $second['owned'] );
+		$this->assertNotSame( $first['token'], $second['token'] );
 	}
 
 	public function test_terminal_transition_hook_only_fires_when_status_changes(): void {

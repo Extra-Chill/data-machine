@@ -1,4 +1,5 @@
 <?php
+// phpcs:disable WordPress.Arrays.MultipleStatementAlignment.DoubleArrowNotAligned -- Worker option keys are intentionally descriptive.
 /**
  * WP-CLI Data Machine worker command.
  *
@@ -268,6 +269,7 @@ class WorkerCommand extends BaseCommand {
 						array(
 							'dry_run'       => false,
 							'timeout_hours' => $stuck_timeout,
+							'recovery_trigger' => 'automatic_worker',
 						)
 					);
 
@@ -392,6 +394,7 @@ class WorkerCommand extends BaseCommand {
 					array(
 						'dry_run'       => false,
 						'timeout_hours' => $stuck_timeout,
+						'recovery_trigger' => 'automatic_worker',
 					)
 				);
 

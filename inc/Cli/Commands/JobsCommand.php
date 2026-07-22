@@ -1,4 +1,5 @@
 <?php
+// phpcs:disable Generic.Formatting.MultipleStatementAlignment,WordPress.Arrays.MultipleStatementAlignment.DoubleArrowNotAligned -- Structured command summaries use descriptive keys.
 // phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange -- Data Machine owns custom operational tables and these paths require fresh runtime state or one-time schema mutation.
 /**
  * WP-CLI Jobs Command
@@ -233,14 +234,18 @@ class JobsCommand extends BaseCommand {
 		$timed_out     = (int) ( $result['timed_out'] ?? 0 );
 		$stale_actions = (int) ( $result['stale_actions'] ?? 0 );
 		$skipped       = (int) ( $result['skipped'] ?? 0 );
+		$pathless_requeued = (int) ( $result['pathless_requeued'] ?? 0 );
+		$pathless_terminal = (int) ( $result['pathless_terminal'] ?? 0 );
 
 		return array(
 			'recovered'     => $recovered,
 			'timed_out'     => $timed_out,
 			'stale_actions' => $stale_actions,
 			'skipped'       => $skipped,
-			'actionable'    => $recovered + $timed_out + $stale_actions,
-			'total'         => $recovered + $timed_out + $stale_actions + $skipped,
+			'pathless_requeued' => $pathless_requeued,
+			'pathless_terminal' => $pathless_terminal,
+			'actionable'    => $recovered + $timed_out + $stale_actions + $pathless_requeued + $pathless_terminal,
+			'total'         => $recovered + $timed_out + $stale_actions + $pathless_requeued + $pathless_terminal + $skipped,
 			'requeued'      => (int) ( $result['requeued'] ?? 0 ),
 			'jobs_omitted'  => (int) ( $result['jobs_omitted'] ?? 0 ),
 		);
