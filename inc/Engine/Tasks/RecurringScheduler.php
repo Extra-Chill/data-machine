@@ -974,7 +974,7 @@ class RecurringScheduler {
 	 * @return bool True if a pending action exists.
 	 */
 	public static function isScheduled( string $hook, array $args, string $group = self::GROUP ): bool {
-		return self::isExactScheduled( $hook, $args, $group ) || self::hasLogicalCoverage( $hook, $args, $group );
+		return self::isExactScheduled( $hook, $args, $group );
 	}
 
 	private static function isExactScheduled( string $hook, array $args, string $group ): bool {

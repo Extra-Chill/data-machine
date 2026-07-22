@@ -368,6 +368,7 @@ class FlowScheduleReconcilerTest extends WP_UnitTestCase {
 		);
 
 		$flow_id = (int) $result['flow_id'];
+		$this->deleteLogicalActions( $flow_id );
 		$this->flows->update_flow_scheduling( $flow_id, $scheduling );
 		$this->flow_ids[] = $flow_id;
 		$this->flows->flow_ids[] = $flow_id;
@@ -392,5 +393,13 @@ class FlowScheduleReconcilerTest extends WP_UnitTestCase {
 				static fn($action): bool => is_object( $action ) && (int) ( $action->get_args()[0] ?? 0 ) === $flow_id
 			)
 		);
+	}
+
+	private function deleteLogicalActions( int $flow_id ): void {
+		foreach ( array( 'pending', 'in-progress' ) as $status ) {
+			foreach ( $this->logicalActionIds( $flow_id, $status ) as $action_id ) {
+				\ActionScheduler_Store::instance()->delete_action( (int) $action_id );
+			}
+		}
 	}
 }
