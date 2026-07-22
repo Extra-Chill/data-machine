@@ -29,6 +29,12 @@ if ( ! function_exists( 'sanitize_key' ) ) {
 	}
 }
 
+if ( ! function_exists( 'wp_json_encode' ) ) {
+	function wp_json_encode( $value, int $flags = 0, int $depth = 512 ) {
+		return json_encode( $value, $flags, $depth );
+	}
+}
+
 require_once __DIR__ . '/../inc/Core/JobStatus.php';
 require_once __DIR__ . '/../inc/Core/StepExecutionResult.php';
 require_once __DIR__ . '/../inc/Core/Database/BaseRepository.php';
@@ -113,6 +119,8 @@ $assert( 'step fails when only an AI fallback packet exists', false === $evaluat
 
 echo "\n[4] reconcile-status command exists with repair markers\n";
 $jobs_command = file_get_contents( __DIR__ . '/../inc/Cli/Commands/JobsCommand.php' );
+$jobs_repository = file_get_contents( __DIR__ . '/../inc/Core/Database/Jobs/Jobs.php' );
+$contention_reconciler = file_get_contents( __DIR__ . '/../inc/Core/Database/Jobs/LegacyAIConcurrencyReconciler.php' );
 $assert( 'CLI exposes reconcile-status subcommand', str_contains( $jobs_command, '@subcommand reconcile-status' ) );
 $assert( 'CLI detects successful wiki update artifacts', str_contains( $jobs_command, 'Updated wiki article:' ) );
 $assert( 'CLI detects source rejection artifacts', str_contains( $jobs_command, 'Source rejected:' ) );
@@ -120,6 +128,8 @@ $assert( 'CLI inspects processing rows with terminal artifacts', str_contains( $
 $assert( 'CLI requires successful runtime provenance', str_contains( $jobs_command, 'engine_data_has_successful_runtime' ) );
 $assert( 'CLI requires successful handler tool summary', str_contains( $jobs_command, 'engine_data_has_successful_handler_tool' ) );
 $assert( 'CLI supports dry-run output', str_contains( $jobs_command, "'dry_run' => $" ) || str_contains( $jobs_command, "'dry_run' => \$dry_run" ) );
+$assert( 'historical concurrency failures reconcile without replay', str_contains( $contention_reconciler, 'failed - ai_concurrency_defer_exhausted' ) && str_contains( $contention_reconciler, 'cancelled - ai_concurrency_stranded' ) );
+$assert( 'historical contention uses exact repository reconciliation', str_contains( $jobs_command, 'LegacyAIConcurrencyReconciler' ) );
 
 echo "\n[5] compact job summary avoids heavyweight breakdowns\n";
 $summary_ability = file_get_contents( __DIR__ . '/../inc/Abilities/Job/JobsSummaryAbility.php' );
@@ -128,7 +138,6 @@ $assert( 'jobs summary has compact helper', str_contains( $summary_ability, 'get
 $assert( 'compact summary skips database breakdown helpers', ! str_contains( $summary_ability, 'get_pipeline_summary_rows' ) && ! str_contains( $summary_ability, 'get_flow_summary_rows' ) );
 
 echo "\n[6] job status transitions use one terminal primitive\n";
-$jobs_repository = file_get_contents( __DIR__ . '/../inc/Core/Database/Jobs/Jobs.php' );
 $recover_ability = file_get_contents( __DIR__ . '/../inc/Abilities/Job/RecoverStuckJobsAbility.php' );
 $retry_ability   = file_get_contents( __DIR__ . '/../inc/Abilities/Job/RetryJobAbility.php' );
 $fail_ability    = file_get_contents( __DIR__ . '/../inc/Abilities/Job/FailJobAbility.php' );
@@ -136,7 +145,11 @@ $fail_ability    = file_get_contents( __DIR__ . '/../inc/Abilities/Job/FailJobAb
 $assert( 'Jobs repository exposes transition primitive', str_contains( $jobs_repository, 'function transition_job_status' ) );
 $assert( 'complete_job delegates to transition primitive', str_contains( $jobs_repository, 'return $this->transition_job_status( $job_id, $status, true );' ) );
 $assert( 'update_job_status delegates to transition primitive', str_contains( $jobs_repository, 'return $this->transition_job_status( $job_id, $status );' ) );
-$assert( 'transition primitive owns terminal hooks', 1 === substr_count( $jobs_repository, "do_action( 'datamachine_job_complete'" ) );
+$assert(
+	'terminal accounting owns terminal hooks',
+	str_contains( $jobs_repository, "array( 'datamachine_job_terminal_committed', 'datamachine_job_complete' )" )
+		&& str_contains( $jobs_repository, 'reconcile_terminal_accounting' )
+);
 $assert( 'recover-stuck uses transition primitive for terminal repairs', str_contains( $recover_ability, 'transition_job_status' ) );
 $assert( 'recover-stuck no longer fires manual completion hooks', ! str_contains( $recover_ability, "do_action( 'datamachine_job_complete'" ) );
 $assert( 'retry ability no longer fires duplicate completion hook', ! str_contains( $retry_ability, "do_action( 'datamachine_job_complete'" ) );

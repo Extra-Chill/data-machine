@@ -32,6 +32,7 @@ use DataMachine\Core\RunMetrics;
 use DataMachine\Core\Database\Chat\Chat;
 use DataMachine\Core\Database\Chat\ConversationStoreFactory;
 use DataMachine\Core\Database\Jobs\Jobs;
+use DataMachine\Core\Database\Jobs\LegacyAIConcurrencyReconciler;
 use AgentsAPI\AI\WP_Agent_Message;
 use DataMachine\Engine\AI\System\Tasks\SystemTask;
 use DataMachine\Engine\Tasks\TaskRegistry;
@@ -52,7 +53,7 @@ class JobsCommand extends BaseCommand {
 	 *
 	 * @var array
 	 */
-	private array $liveness_fields = array( 'id', 'flow_id', 'classification', 'age_hours', 'pending_actions', 'in_progress_actions', 'oldest_pending', 'latest_attempt' );
+	private array $liveness_fields = array( 'id', 'flow_id', 'classification', 'age_hours', 'defer_count', 'defer_age_seconds', 'pending_actions', 'in_progress_actions', 'oldest_pending', 'latest_attempt' );
 
 	/**
 	 * Recover stuck jobs that have job_status in engine_data but status is 'processing'.
@@ -245,7 +246,7 @@ class JobsCommand extends BaseCommand {
 	}
 
 	/**
-	 * Diagnose liveness for processing jobs.
+	 * Diagnose liveness for processing jobs and pending backpressure deferrals.
 	 *
 	 * Processing is a broad lifecycle state. This command reports whether each
 	 * processing job is actively executing, waiting on a scheduler action, or
@@ -298,7 +299,7 @@ class JobsCommand extends BaseCommand {
 		$format          = $assoc_args['format'] ?? 'table';
 
 		$jobs_table = $wpdb->prefix . 'datamachine_jobs';
-		$where      = "WHERE status = 'processing'";
+		$where      = "WHERE (status = 'processing' OR (status = 'pending' AND JSON_EXTRACT(engine_data, '$.ai_concurrency_throttle') IS NOT NULL))";
 		$values     = array();
 
 		if ( $flow_id ) {
@@ -320,13 +321,14 @@ class JobsCommand extends BaseCommand {
 
 		$items   = array();
 		$summary = array(
-			'total'             => 0,
-			'active_processing' => 0,
-			'queued_next_step'  => 0,
-			'waiting_children'  => 0,
-			'scheduler_starved' => 0,
-			'stale_in_progress' => 0,
-			'no_scheduler_path' => 0,
+			'total'                   => 0,
+			'active_processing'       => 0,
+			'queued_next_step'        => 0,
+			'waiting_children'        => 0,
+			'scheduler_starved'       => 0,
+			'stale_in_progress'       => 0,
+			'no_scheduler_path'       => 0,
+			'ai_concurrency_deferred' => 0,
 		);
 
 		foreach ( $jobs as $job ) {
@@ -361,10 +363,11 @@ class JobsCommand extends BaseCommand {
 		if ( 'table' === $format ) {
 			WP_CLI::log(
 				sprintf(
-					'Inspected %d processing jobs: %d active, %d queued, %d waiting on children, %d scheduler-starved, %d stale in-progress, %d without scheduler path.',
+					'Inspected %d active jobs: %d active, %d queued, %d AI concurrency-deferred, %d waiting on children, %d scheduler-starved, %d stale in-progress, %d without scheduler path.',
 					$summary['total'],
 					$summary['active_processing'],
 					$summary['queued_next_step'],
+					$summary['ai_concurrency_deferred'],
 					$summary['waiting_children'],
 					$summary['scheduler_starved'],
 					$summary['stale_in_progress'],
@@ -540,30 +543,32 @@ class JobsCommand extends BaseCommand {
 		$limit   = isset( $assoc_args['limit'] ) ? max( 1, min( 5000, (int) $assoc_args['limit'] ) ) : 500;
 		$format  = $assoc_args['format'] ?? 'table';
 
-		$jobs_table         = $wpdb->prefix . 'datamachine_jobs';
-		$jobs_db            = new Jobs();
-		$failed_like        = $wpdb->esc_like( 'failed' ) . '%';
-		$agent_skipped_like = $wpdb->esc_like( 'agent_skipped' ) . '%';
+		$jobs_table                   = $wpdb->prefix . 'datamachine_jobs';
+		$jobs_db                      = new Jobs();
+		$failed_like                  = $wpdb->esc_like( 'failed' ) . '%';
+		$agent_skipped_like           = $wpdb->esc_like( 'agent_skipped' ) . '%';
+		$historical_contention_status = LegacyAIConcurrencyReconciler::SOURCE_STATUS;
 
 		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name is from $wpdb->prefix.
 		$rows = $wpdb->get_results(
 			$wpdb->prepare(
 				"SELECT job_id, flow_id, parent_job_id, status, label, engine_data
 				FROM {$jobs_table}
-				WHERE (status LIKE %s OR status = 'processing')
+				WHERE ((status LIKE %s OR status = 'processing')
 				AND (
 					engine_data LIKE %s
 					OR engine_data LIKE %s
 					OR JSON_UNQUOTE(JSON_EXTRACT(engine_data, '$.job_status')) LIKE %s
 					OR JSON_UNQUOTE(JSON_EXTRACT(engine_data, '$.runtime_provenance.status.status')) = 'completed'
 					OR JSON_UNQUOTE(JSON_EXTRACT(engine_data, '$.runtime_provenance.status.completed')) = 'true'
-				)
+				)) OR status = %s
 				ORDER BY COALESCE(completed_at, created_at) DESC
 				LIMIT %d",
 				$failed_like,
 				'%Updated wiki article:%',
 				'%Source rejected:%',
 				$agent_skipped_like,
+				$historical_contention_status,
 				$limit
 			),
 			ARRAY_A
@@ -574,7 +579,8 @@ class JobsCommand extends BaseCommand {
 		$updated = 0;
 
 		foreach ( $rows as $row ) {
-			$target_status = $this->resolve_reconciled_job_status( $row );
+			$plan          = $this->resolve_reconciled_job_plan( $row );
+			$target_status = $plan['target_status'];
 			if ( '' === $target_status ) {
 				continue;
 			}
@@ -584,11 +590,20 @@ class JobsCommand extends BaseCommand {
 				'flow_id'       => (int) $row['flow_id'],
 				'from_status'   => (string) $row['status'],
 				'target_status' => $target_status,
-				'reason'        => str_starts_with( $target_status, 'agent_skipped' ) ? 'source_rejected' : 'successful_handler_artifact',
+				'reason'        => str_contains( $target_status, 'ai_concurrency_stranded' ) ? 'historical_concurrency_contention' : ( str_starts_with( $target_status, 'agent_skipped' ) ? 'source_rejected' : 'successful_handler_artifact' ),
 				'label'         => (string) ( $row['label'] ?? '' ),
 			);
 
-			if ( ! $dry_run && $jobs_db->complete_job( (int) $row['job_id'], $target_status ) ) {
+			$reconciled = false;
+			if ( ! $dry_run && 'legacy_ai_concurrency' === $plan['strategy'] ) {
+				$transition             = ( new LegacyAIConcurrencyReconciler() )->reconcile( (int) $row['job_id'] );
+				$reconciled             = ! empty( $transition['success'] );
+				$item['reconciliation'] = $transition['reconciliation'] ?? array();
+			} elseif ( ! $dry_run ) {
+				$reconciled = $jobs_db->complete_job( (int) $row['job_id'], $target_status );
+			}
+
+			if ( $reconciled ) {
 				++$updated;
 				$item['status'] = 'reconciled';
 			} else {
@@ -758,6 +773,10 @@ class JobsCommand extends BaseCommand {
 	 * @return string Corrected status, or empty string when the row is not safe to repair.
 	 */
 	private function resolve_reconciled_job_status( array $row ): string {
+		if ( LegacyAIConcurrencyReconciler::SOURCE_STATUS === (string) ( $row['status'] ?? '' ) ) {
+			return LegacyAIConcurrencyReconciler::TARGET_STATUS;
+		}
+
 		$engine_data = $this->decode_job_engine_data( $row['engine_data'] ?? null );
 
 		$job_status = isset( $engine_data['job_status'] ) ? (string) $engine_data['job_status'] : '';
@@ -778,6 +797,20 @@ class JobsCommand extends BaseCommand {
 		}
 
 		return '';
+	}
+
+	/**
+	 * Resolve both the target and the only authorized transition mechanism.
+	 *
+	 * @return array{target_status:string,strategy:string}
+	 */
+	private function resolve_reconciled_job_plan( array $row ): array {
+		$is_legacy_contention = LegacyAIConcurrencyReconciler::SOURCE_STATUS === (string) ( $row['status'] ?? '' );
+
+		return array(
+			'target_status' => $this->resolve_reconciled_job_status( $row ),
+			'strategy'      => $is_legacy_contention ? 'legacy_ai_concurrency' : 'terminal_transition',
+		);
 	}
 
 	/**
@@ -989,7 +1022,7 @@ class JobsCommand extends BaseCommand {
 	}
 
 	/**
-	 * Diagnose one processing job's scheduler liveness.
+	 * Diagnose one active job's scheduler liveness.
 	 *
 	 * @param array<string,mixed> $job Job row.
 	 * @param int                 $overdue_minutes Overdue threshold in minutes.
@@ -999,63 +1032,15 @@ class JobsCommand extends BaseCommand {
 		$job_id  = (int) ( $job['job_id'] ?? 0 );
 		$actions = $this->get_job_scheduler_actions( $job_id );
 
-		$pending     = array_values( array_filter( $actions, fn( $action ) => 'pending' === ( $action['status'] ?? '' ) ) );
-		$in_progress = array_values( array_filter( $actions, fn( $action ) => 'in-progress' === ( $action['status'] ?? '' ) ) );
-		$complete    = array_values( array_filter( $actions, fn( $action ) => 'complete' === ( $action['status'] ?? '' ) ) );
-		$failed      = array_values( array_filter( $actions, fn( $action ) => 'failed' === ( $action['status'] ?? '' ) ) );
-
-		$oldest_pending      = $this->oldest_action_datetime( $pending, 'scheduled_date_gmt' );
-		$oldest_in_progress  = $this->oldest_action_datetime( $in_progress, 'scheduled_date_gmt' );
-		$latest_attempt      = $this->latest_action_datetime( $actions, 'last_attempt_gmt' );
-		$oldest_pending_age  = $this->minutes_since( $oldest_pending );
-		$oldest_progress_age = $this->minutes_since( $oldest_in_progress );
-
 		$engine_data = json_decode( (string) ( $job['engine_data'] ?? '' ), true );
 		if ( ! is_array( $engine_data ) ) {
 			$engine_data = array();
 		}
 
-		$child_counts    = ! empty( $engine_data['batch'] ) ? $this->get_child_status_counts( $job_id ) : array();
-		$active_children = (int) ( $child_counts['active'] ?? 0 );
-		$total_children  = (int) ( $child_counts['total'] ?? 0 );
-		$batch_total     = (int) ( $engine_data['batch_total'] ?? 0 );
+		$job['engine_data'] = $engine_data;
+		$child_counts       = ! empty( $engine_data['batch'] ) ? $this->get_child_status_counts( $job_id ) : array();
 
-		if ( ! empty( $in_progress ) && $oldest_progress_age > $overdue_minutes ) {
-			$classification = 'stale_in_progress';
-		} elseif ( ! empty( $in_progress ) ) {
-			$classification = 'active_processing';
-		} elseif ( ! empty( $pending ) && $oldest_pending_age > $overdue_minutes ) {
-			$classification = 'scheduler_starved';
-		} elseif ( ! empty( $pending ) ) {
-			$classification = 'queued_next_step';
-		} elseif ( $active_children > 0 || ( $batch_total > 0 && $total_children < $batch_total ) ) {
-			$classification = 'waiting_children';
-		} else {
-			$classification = 'no_scheduler_path';
-		}
-
-		$last_activity = $engine_data['run_metrics']['last_activity_at'] ?? null;
-
-		return array(
-			'id'                  => $job_id,
-			'flow_id'             => (string) ( $job['flow_id'] ?? '' ),
-			'pipeline_id'         => (string) ( $job['pipeline_id'] ?? '' ),
-			'agent_id'            => isset( $job['agent_id'] ) ? (int) $job['agent_id'] : null,
-			'classification'      => $classification,
-			'created_at'          => (string) ( $job['created_at'] ?? '' ),
-			'age_hours'           => round( $this->minutes_since( (string) ( $job['created_at'] ?? '' ) ) / 60, 1 ),
-			'last_activity_at'    => is_string( $last_activity ) ? $last_activity : '',
-			'pending_actions'     => count( $pending ),
-			'in_progress_actions' => count( $in_progress ),
-			'complete_actions'    => count( $complete ),
-			'failed_actions'      => count( $failed ),
-			'child_jobs'          => $total_children,
-			'active_children'     => $active_children,
-			'batch_total'         => $batch_total,
-			'oldest_pending'      => $oldest_pending,
-			'oldest_in_progress'  => $oldest_in_progress,
-			'latest_attempt'      => $latest_attempt,
-		);
+		return JobLivenessClassifier::diagnose( $job, $actions, $child_counts, $overdue_minutes, time() );
 	}
 
 	/**
@@ -1080,10 +1065,11 @@ class JobsCommand extends BaseCommand {
 			$wpdb->prepare(
 				"SELECT action_id, hook, status, scheduled_date_gmt, last_attempt_gmt, attempts, args
 				 FROM {$actions_table}
-				 WHERE hook IN (%s, %s)
+				 WHERE hook IN (%s, %s, %s)
 				 AND (args LIKE %s OR args LIKE %s)
 				 ORDER BY action_id ASC",
 				'datamachine_execute_step',
+				'datamachine_resume_ai_step',
 				PipelineBatchScheduler::BATCH_HOOK,
 				$like_job_id,
 				$like_parent_job_id
@@ -1187,61 +1173,6 @@ class JobsCommand extends BaseCommand {
 		}
 
 		return 0;
-	}
-
-	/**
-	 * Get the oldest non-empty action datetime for a field.
-	 *
-	 * @param array<int,array<string,mixed>> $actions Action rows.
-	 * @param string                         $field Field name.
-	 * @return string Datetime or empty string.
-	 */
-	private function oldest_action_datetime( array $actions, string $field ): string {
-		$values = array_filter( array_map( fn( $action ) => (string) ( $action[ $field ] ?? '' ), $actions ), array( $this, 'is_real_datetime' ) );
-		sort( $values );
-		return $values[0] ?? '';
-	}
-
-	/**
-	 * Get the latest non-empty action datetime for a field.
-	 *
-	 * @param array<int,array<string,mixed>> $actions Action rows.
-	 * @param string                         $field Field name.
-	 * @return string Datetime or empty string.
-	 */
-	private function latest_action_datetime( array $actions, string $field ): string {
-		$values = array_filter( array_map( fn( $action ) => (string) ( $action[ $field ] ?? '' ), $actions ), array( $this, 'is_real_datetime' ) );
-		rsort( $values );
-		return $values[0] ?? '';
-	}
-
-	/**
-	 * Whether a datetime string represents a real Action Scheduler timestamp.
-	 *
-	 * @param string $datetime Datetime string.
-	 * @return bool
-	 */
-	private function is_real_datetime( string $datetime ): bool {
-		return '' !== $datetime && '0000-00-00 00:00:00' !== $datetime;
-	}
-
-	/**
-	 * Minutes since a GMT datetime.
-	 *
-	 * @param string $datetime GMT datetime.
-	 * @return int Minutes elapsed, or 0 for empty/invalid dates.
-	 */
-	private function minutes_since( string $datetime ): int {
-		if ( ! $this->is_real_datetime( $datetime ) ) {
-			return 0;
-		}
-
-		$timestamp = strtotime( $datetime . ' UTC' );
-		if ( false === $timestamp ) {
-			return 0;
-		}
-
-		return max( 0, (int) floor( ( time() - $timestamp ) / 60 ) );
 	}
 
 	/**

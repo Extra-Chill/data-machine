@@ -14,6 +14,7 @@ use DataMachine\Core\Steps\FlowStepConfig;
 use DataMachine\Core\Steps\AI\ToolPolicy\PipelineToolPolicyArgs;
 use DataMachine\Core\Steps\StepTypeRegistrationTrait;
 use DataMachine\Core\Steps\QueueableTrait;
+use DataMachine\Engine\AI\AIConcurrencyBackpressure;
 use DataMachine\Engine\AI\ConversationManager;
 use DataMachine\Engine\AI\DataPacketPromptProjector;
 use DataMachine\Engine\AI\PipelineAIConcurrencyLease;
@@ -42,19 +43,16 @@ class AIStep extends Step {
 	use QueueableTrait;
 
 	/**
-	 * Maximum number of times an AI step may defer itself because the pipeline
-	 * AI concurrency slot is saturated before it gives up and fails.
+	 * Maximum age for ordinary AI concurrency contention before work is
+	 * classified as stranded for operator review.
 	 *
-	 * Without this ceiling a saturated single-slot limiter (the default
-	 * `pipeline_ai_concurrency_limit` is 1) lets every contending job
-	 * reschedule its own `datamachine_execute_step` action every throttle
-	 * delay, indefinitely. Under a sustained backlog that turns into millions
-	 * of self-rescheduling actions a day (see #2793). Capping the defers makes
-	 * a saturated queue fail loudly and boundedly instead of churning forever.
+	 * A count is not a safe terminal bound because a healthy single-slot queue
+	 * can legitimately contend many times. The absolute age bounds truly
+	 * stranded work while ordinary contention remains pending (#2929).
 	 *
-	 * Filterable via `datamachine_ai_concurrency_max_defers`.
+	 * Filterable via `datamachine_ai_concurrency_max_defer_age`.
 	 */
-	private const AI_CONCURRENCY_MAX_DEFERS = 30;
+	private const AI_CONCURRENCY_MAX_DEFER_AGE = DAY_IN_SECONDS;
 
 	/**
 	 * Ceiling (seconds) for the exponential backoff applied between AI
@@ -230,6 +228,7 @@ class AIStep extends Step {
 			return array();
 		}
 
+		$this->resolveAIConcurrencyContention();
 		$ai_concurrency_lease = $lease_result['lease'] ?? null;
 
 		try {
@@ -654,10 +653,6 @@ class AIStep extends Step {
 	 * @param array  $lease_result  Limiter result.
 	 */
 	private function deferForAIConcurrency( string $provider_name, array $lease_result ): void {
-		// Count defers per job/step so a permanently saturated slot cannot
-		// reschedule this step forever. The throttle state is keyed by
-		// flow_step_id: a job that legitimately advances to a different AI
-		// step starts its own budget rather than inheriting the prior step's.
 		$existing_throttle = $this->engine instanceof \DataMachine\Core\EngineData
 			? $this->engine->get( 'ai_concurrency_throttle' )
 			: null;
@@ -667,61 +662,50 @@ class AIStep extends Step {
 		if ( (string) ( $existing_throttle['flow_step_id'] ?? '' ) === $this->flow_step_id ) {
 			$prior_attempts = (int) ( $existing_throttle['attempts'] ?? 0 );
 		}
-		$attempt = $prior_attempts + 1;
 
-		$max_defers = max(
-			1,
+		$max_defer_age = max(
+			60,
 			(int) apply_filters(
-				'datamachine_ai_concurrency_max_defers',
-				self::AI_CONCURRENCY_MAX_DEFERS,
+				'datamachine_ai_concurrency_max_defer_age',
+				self::AI_CONCURRENCY_MAX_DEFER_AGE,
 				$provider_name,
 				$this->job_id
 			)
 		);
 
-		// Budget exhausted: stop self-rescheduling and route through the normal
-		// failure path. This bounds the runaway — a saturated queue fails loudly
-		// instead of generating self-rescheduling actions indefinitely (#2793).
-		if ( $attempt > $max_defers ) {
+		$now             = time();
+		$contention      = AIConcurrencyBackpressure::nextState( $existing_throttle, $this->flow_step_id, $now, $max_defer_age );
+		$attempt         = (int) $contention['attempts'];
+		$contention_data = array_merge(
+			$contention,
+			array(
+				'reason'       => 'ai_concurrency_limit',
+				'provider'     => $provider_name,
+				'flow_step_id' => $this->flow_step_id,
+				'limit'        => (int) ( $lease_result['limit'] ?? 0 ),
+				'active'       => (int) ( $lease_result['active'] ?? 0 ),
+			)
+		);
+
+		if ( 'stranded' === $contention['state'] ) {
+			$contention_data['terminal_reason'] = 'ai_concurrency_stranded';
+			$contention_data['next_retry_at']   = null;
+			datamachine_merge_engine_data( $this->job_id, array( 'ai_concurrency_throttle' => $contention_data ) );
+			( new Jobs() )->complete_job( $this->job_id, 'cancelled - ai_concurrency_stranded' );
+
 			do_action(
 				'datamachine_log',
-				'error',
-				'Pipeline AI step exhausted concurrency defer budget; failing job',
+				'warning',
+				'Pipeline AI step exceeded maximum contention age; job requires operator review',
 				array(
-					'job_id'       => $this->job_id,
-					'flow_step_id' => $this->flow_step_id,
-					'provider'     => $provider_name,
-					'attempts'     => $prior_attempts,
-					'max_defers'   => $max_defers,
-					'limit'        => (int) ( $lease_result['limit'] ?? 0 ),
-					'active'       => (int) ( $lease_result['active'] ?? 0 ),
-				)
-			);
-
-			// Clear the throttle marker so ExecuteStepAbility does not treat the
-			// empty packet list as an already-routed retry and swallow the failure.
-			datamachine_merge_engine_data(
-				$this->job_id,
-				array( 'ai_concurrency_throttle' => array() )
-			);
-
-			do_action(
-				'datamachine_fail_job',
-				$this->job_id,
-				'ai_concurrency_defer_exhausted',
-				array(
-					'flow_step_id'  => $this->flow_step_id,
-					'ai_provider'   => $provider_name,
-					'attempts'      => $prior_attempts,
-					'max_defers'    => $max_defers,
-					// Terminal, not retryable: the defer budget IS the retry
-					// budget for this contention. Retrying would re-enter the
-					// same starvation and reopen the runaway (#2793).
-					'retryable'     => false,
-					'error_message' => sprintf(
-						'AI concurrency slot saturated; gave up after %d defers.',
-						$prior_attempts
-					),
+					'job_id'                => $this->job_id,
+					'flow_step_id'          => $this->flow_step_id,
+					'provider'              => $provider_name,
+					'attempts'              => $attempt,
+					'defer_age_seconds'     => (int) $contention['defer_age_seconds'],
+					'max_defer_age_seconds' => $max_defer_age,
+					'limit'                 => (int) ( $lease_result['limit'] ?? 0 ),
+					'active'                => (int) ( $lease_result['active'] ?? 0 ),
 				)
 			);
 			return;
@@ -730,61 +714,72 @@ class AIStep extends Step {
 		// Exponential backoff between defers, capped, so a long-saturated queue
 		// backs off instead of polling the limiter on the base delay forever.
 		$base_delay    = max( 1, (int) ( $lease_result['delay'] ?? 10 ) );
-		$delay_seconds = min(
-			self::AI_CONCURRENCY_MAX_DEFER_DELAY,
-			$base_delay * ( 2 ** min( $prior_attempts, 16 ) )
+		$delay_seconds = AIConcurrencyBackpressure::delaySeconds(
+			$base_delay,
+			$prior_attempts,
+			self::AI_CONCURRENCY_MAX_DEFER_DELAY
 		);
-		$timestamp     = time() + $delay_seconds;
-		$action_id     = false;
+		$timestamp     = $now + $delay_seconds;
 		$action_args   = array(
-			'job_id'       => $this->job_id,
-			'flow_step_id' => $this->flow_step_id,
+			'job_id'                => $this->job_id,
+			'flow_step_id'          => $this->flow_step_id,
+			'operation_generation'  => 0,
+			'operation_claim_token' => '',
 		);
+
 		$job = ( new \DataMachine\Core\Database\Jobs\Jobs() )->get_job( $this->job_id );
 		if ( 'direct' === (string) ( $job['flow_id'] ?? '' ) && (int) ( $job['operation_generation'] ?? 0 ) > 0 ) {
-			$action_args['operation_generation'] = (int) $job['operation_generation'];
+			$action_args['operation_generation']  = (int) $job['operation_generation'];
 			$action_args['operation_claim_token'] = (string) ( $job['operation_claim_token'] ?? '' );
 		}
-
-		if ( function_exists( 'as_schedule_single_action' ) ) {
-			$action_id = as_schedule_single_action(
-				$timestamp,
-				'datamachine_execute_step',
-				$action_args,
-				'data-machine'
-			);
-		}
-
-		if ( false === $action_id ) {
-			do_action(
-				'datamachine_fail_job',
-				$this->job_id,
-				'ai_concurrency_defer_failed',
-				array(
-					'flow_step_id'  => $this->flow_step_id,
-					'ai_provider'   => $provider_name,
-					'error_message' => 'AI concurrency throttle could not reschedule the step.',
-				)
-			);
+		$source_generation = max( 0, (int) $this->engine->get( '_runtime_ai_resume_generation', 0 ) );
+		$claim             = AIConcurrencyBackpressure::claimNextGeneration(
+			$this->job_id,
+			$this->flow_step_id,
+			$source_generation,
+			$now
+		);
+		if ( empty( $claim['success'] ) || empty( $claim['owned'] ) ) {
+			( new Jobs() )->update_job_status( $this->job_id, 'pending' );
 			return;
 		}
+
+		$resume_generation                   = (int) $claim['generation'];
+		$action_args['ai_resume_generation'] = $resume_generation;
+		unset( $contention_data['action_id'] );
+		$contention_data['resume_generation'] = $resume_generation;
+
+		$schedule_result = AIConcurrencyBackpressure::scheduleContinuation( $timestamp, $action_args );
+		$action_id       = (int) $schedule_result['action_id'];
+
+		if ( empty( $schedule_result['success'] ) || $action_id <= 0 ) {
+			$contention_data['state']           = 'stranded';
+			$contention_data['terminal_reason'] = 'ai_concurrency_defer_schedule_failed';
+			$contention_data['next_retry_at']   = null;
+			datamachine_merge_engine_data( $this->job_id, array( 'ai_concurrency_throttle' => $contention_data ) );
+			( new Jobs() )->complete_job( $this->job_id, 'cancelled - ai_concurrency_defer_schedule_failed' );
+			return;
+		}
+		AIConcurrencyBackpressure::recordScheduledAction(
+			$this->job_id,
+			$this->flow_step_id,
+			$resume_generation,
+			(string) $claim['token'],
+			$action_id
+		);
 
 		( new Jobs() )->update_job_status( $this->job_id, 'pending' );
 
 		datamachine_merge_engine_data(
 			$this->job_id,
 			array(
-				'ai_concurrency_throttle' => array(
-					'next_retry_at'           => gmdate( 'c', $timestamp ),
-					'rescheduled_for_seconds' => $delay_seconds,
-					'reason'                  => 'ai_concurrency_limit',
-					'provider'                => $provider_name,
-					'flow_step_id'            => $this->flow_step_id,
-					'attempts'                => $attempt,
-					'max_defers'              => $max_defers,
-					'limit'                   => (int) ( $lease_result['limit'] ?? 0 ),
-					'active'                  => (int) ( $lease_result['active'] ?? 0 ),
-					'action_id'               => $action_id,
+				'ai_concurrency_throttle' => array_merge(
+					$contention_data,
+					array(
+						'next_retry_at'           => gmdate( 'c', $timestamp ),
+						'rescheduled_for_seconds' => $delay_seconds,
+						'action_id'               => $action_id,
+					)
 				),
 			)
 		);
@@ -799,13 +794,48 @@ class AIStep extends Step {
 				'provider'                => $provider_name,
 				'reason'                  => 'ai_concurrency_limit',
 				'attempts'                => $attempt,
-				'max_defers'              => $max_defers,
+				'defer_age_seconds'       => (int) $contention['defer_age_seconds'],
+				'max_defer_age_seconds'   => $max_defer_age,
 				'limit'                   => (int) ( $lease_result['limit'] ?? 0 ),
 				'active'                  => (int) ( $lease_result['active'] ?? 0 ),
 				'rescheduled_for_seconds' => $delay_seconds,
 				'action_id'               => $action_id,
 			)
 		);
+	}
+
+	/** Archive resolved contention and remove the active throttle marker. */
+	private function resolveAIConcurrencyContention(): void {
+		$result = \DataMachine\Core\EngineData::mutate(
+			$this->job_id,
+			function ( array $engine ): array {
+				$throttle = is_array( $engine['ai_concurrency_throttle'] ?? null ) ? $engine['ai_concurrency_throttle'] : array();
+				if ( empty( $throttle ) || (string) ( $throttle['flow_step_id'] ?? '' ) !== $this->flow_step_id ) {
+					return $engine;
+				}
+
+				$history                          = is_array( $engine['ai_concurrency_history'] ?? null ) ? $engine['ai_concurrency_history'] : array();
+				$history[]                        = AIConcurrencyBackpressure::resolvedState( $throttle, time() );
+				$engine['ai_concurrency_history'] = array_slice( $history, -20 );
+				unset( $engine['ai_concurrency_throttle'] );
+				unset( $engine['ai_concurrency_resume_ownership'] );
+
+				return $engine;
+			},
+			'ai_concurrency_resolved'
+		);
+
+		if ( empty( $result['success'] ) ) {
+			do_action(
+				'datamachine_log',
+				'warning',
+				'AI concurrency contention resolved but history could not be persisted',
+				array(
+					'job_id'       => $this->job_id,
+					'flow_step_id' => $this->flow_step_id,
+				)
+			);
+		}
 	}
 
 	/**

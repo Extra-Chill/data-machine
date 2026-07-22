@@ -10,8 +10,17 @@
 if ( ! defined( 'ABSPATH' ) ) {
 	define( 'ABSPATH', __DIR__ . '/' );
 }
+defined( 'DAY_IN_SECONDS' ) || define( 'DAY_IN_SECONDS', 86400 );
+
+if ( ! function_exists( 'wp_json_encode' ) ) {
+	function wp_json_encode( $value, int $flags = 0, int $depth = 512 ) {
+		return json_encode( $value, $flags, $depth );
+	}
+}
 
 require_once __DIR__ . '/../inc/Core/JobStatus.php';
+require_once __DIR__ . '/../inc/Core/JobArtifactSurfaces.php';
+require_once __DIR__ . '/../inc/Core/StepResult.php';
 require_once __DIR__ . '/../inc/Core/RunMetrics.php';
 
 use DataMachine\Core\RunMetrics;
@@ -185,7 +194,51 @@ $assert( 'missing handler packet class is exposed from step result', array( 'mis
 $metrics = RunMetrics::fromJob( $job( 'failed - item-deferred', array() ) );
 $assert( 'item deferred class is exposed from status reason', array( 'item_deferred' ) === $metrics['outcome_classes'] );
 
-echo "\n[6] CLI/source integration markers exist\n";
+echo "\n[6] AI concurrency backpressure is structured and not a failure\n";
+$first_deferred_at = gmdate( 'c', time() - 90 );
+$metrics           = RunMetrics::fromJob(
+	$job(
+		'pending',
+		array(
+			'ai_concurrency_throttle' => array(
+				'state'                 => 'deferred',
+				'reason'                => 'ai_concurrency_limit',
+				'provider'              => 'openai',
+				'flow_step_id'          => 'ai-1',
+				'attempts'              => 42,
+				'first_deferred_at'     => $first_deferred_at,
+				'last_deferred_at'      => gmdate( 'c' ),
+				'next_retry_at'         => gmdate( 'c', time() + 60 ),
+				'max_defer_age_seconds' => DAY_IN_SECONDS,
+				'active'                => 1,
+				'limit'                 => 1,
+			),
+		)
+	)
+);
+$assert( 'contention defer count is machine readable', 42 === $metrics['backpressure']['defer_count'] );
+$assert( 'contention defer age is machine readable', $metrics['backpressure']['defer_age_seconds'] >= 90 );
+$assert( 'contention capacity is machine readable', 1 === $metrics['backpressure']['active'] && 1 === $metrics['backpressure']['limit'] );
+$assert( 'ordinary contention does not increment failed count', 0 === $metrics['counts']['failed'] );
+
+$resolved_metrics = RunMetrics::fromJob(
+	$job(
+		'processing',
+		array(
+			'ai_concurrency_history' => array(
+				array(
+					'state'             => 'resolved',
+					'defer_count'       => 42,
+					'defer_age_seconds' => 90,
+				),
+			),
+		)
+	)
+);
+$assert( 'resolved contention is no longer reported as active backpressure', array() === $resolved_metrics['backpressure'] );
+$assert( 'resolved contention history preserves count and duration', 42 === $resolved_metrics['backpressure_history'][0]['defer_count'] && 90 === $resolved_metrics['backpressure_history'][0]['defer_age_seconds'] );
+
+echo "\n[7] CLI/source integration markers exist\n";
 $jobs_command = file_get_contents( __DIR__ . '/../inc/Cli/Commands/JobsCommand.php' ) ?: '';
 $fetch_step   = file_get_contents( __DIR__ . '/../inc/Core/Steps/Fetch/FetchStep.php' ) ?: '';
 $disposition  = file_get_contents( __DIR__ . '/../inc/Core/Steps/Fetch/Tools/FetchItemDispositionTool.php' ) ?: '';

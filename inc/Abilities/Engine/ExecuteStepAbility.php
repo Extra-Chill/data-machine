@@ -69,6 +69,11 @@ class ExecuteStepAbility {
 								'type'        => 'string',
 								'description' => __( 'Direct workflow enqueue ownership token.', 'data-machine' ),
 							),
+							'ai_resume_generation'  => array(
+								'type'        => 'integer',
+								'minimum'     => 0,
+								'description' => __( 'AI contention resume ownership generation.', 'data-machine' ),
+							),
 						),
 					),
 					'output_schema'       => array(
@@ -111,6 +116,7 @@ class ExecuteStepAbility {
 		$flow_step_id          = (string) ( $input['flow_step_id'] ?? '' );
 		$operation_generation  = max( 0, (int) ( $input['operation_generation'] ?? 0 ) );
 		$operation_claim_token = (string) ( $input['operation_claim_token'] ?? '' );
+		$ai_resume_generation  = max( 0, (int) ( $input['ai_resume_generation'] ?? 0 ) );
 		$job                   = $this->db_jobs->get_job( $job_id );
 
 		if ( ! $job ) {
@@ -165,7 +171,10 @@ class ExecuteStepAbility {
 
 		try {
 			$engine_snapshot = datamachine_get_engine_data( $job_id );
-			$engine          = new EngineData( $engine_snapshot, $job_id );
+
+			$engine_snapshot['_runtime_ai_resume_generation'] = $ai_resume_generation;
+
+			$engine = new EngineData( $engine_snapshot, $job_id );
 
 			$flow_step_config = $this->resolveFlowStepConfig( $engine, $flow_step_id, $job_id, $engine_snapshot );
 
@@ -923,7 +932,7 @@ class ExecuteStepAbility {
 			return null;
 		}
 
-		if ( JobStatus::isStatusFailure( $status ) ) {
+		if ( JobStatus::isStatusFinal( $status ) ) {
 			return $status;
 		}
 
