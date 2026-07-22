@@ -494,6 +494,75 @@ class PipelineBatchSchedulerTest extends WP_UnitTestCase {
 		$this->assertStringContainsString( 'failed', $parent_job['status'] );
 	}
 
+	public function test_parent_engine_write_failure_keeps_child_core_stage_retryable(): void {
+		[ $parent_id, $child_id ] = $this->create_terminal_ready_batch();
+		$failure                  = $this->fail_parent_query_once( $parent_id, 'engine_data' );
+
+		add_filter( 'query', $failure );
+		try {
+			$this->assertTrue( $this->jobs_db->complete_job( $child_id, JobStatus::COMPLETED ) );
+		} finally {
+			remove_filter( 'query', $failure );
+		}
+
+		$this->assertSame( JobStatus::PROCESSING, $this->jobs_db->get_job( $parent_id )['status'] );
+		$this->assertSame( 1, (int) $this->jobs_db->get_job( $child_id )['terminal_accounting_state'] );
+
+		$replayed = ( new Jobs() )->reconcile_terminal_accounting( $child_id );
+		$this->assertTrue( $replayed['complete'] );
+		$this->assertSame( JobStatus::COMPLETED, $this->jobs_db->get_job( $parent_id )['status'] );
+	}
+
+	public function test_parent_completion_failure_keeps_child_core_stage_retryable(): void {
+		[ $parent_id, $child_id ] = $this->create_terminal_ready_batch();
+		$failure                  = $this->fail_parent_query_once( $parent_id, 'terminal_accounting_state' );
+
+		add_filter( 'query', $failure );
+		try {
+			$this->assertTrue( $this->jobs_db->complete_job( $child_id, JobStatus::COMPLETED ) );
+		} finally {
+			remove_filter( 'query', $failure );
+		}
+
+		$this->assertSame( JobStatus::PROCESSING, $this->jobs_db->get_job( $parent_id )['status'] );
+		$this->assertSame( 1, (int) $this->jobs_db->get_job( $child_id )['terminal_accounting_state'] );
+
+		$replayed = ( new Jobs() )->reconcile_terminal_accounting( $child_id );
+		$this->assertTrue( $replayed['complete'] );
+		$this->assertSame( JobStatus::COMPLETED, $this->jobs_db->get_job( $parent_id )['status'] );
+	}
+
+	public function test_replay_after_durable_parent_completion_is_idempotent(): void {
+		[ $parent_id, $child_id ] = $this->create_terminal_ready_batch();
+		$interrupted              = false;
+		$interrupt                = static function ( bool $should_interrupt, string $boundary, int $job_id ) use ( $child_id, &$interrupted ): bool {
+			if ( ! $interrupted && $child_id === $job_id && 'after_operation:core_callbacks' === $boundary ) {
+				$interrupted = true;
+				return true;
+			}
+			return $should_interrupt;
+		};
+
+		add_filter( 'datamachine_job_terminal_accounting_interrupt', $interrupt, 10, 3 );
+		try {
+			$this->jobs_db->complete_job( $child_id, JobStatus::COMPLETED );
+			$this->fail( 'Expected interruption after durable parent completion.' );
+		} catch ( \RuntimeException $exception ) {
+			$this->assertSame( 'Terminal accounting interrupted at after_operation:core_callbacks', $exception->getMessage() );
+		} finally {
+			remove_filter( 'datamachine_job_terminal_accounting_interrupt', $interrupt, 10 );
+		}
+
+		$parent = $this->jobs_db->get_job( $parent_id );
+		$this->assertSame( JobStatus::COMPLETED, $parent['status'] );
+		$completed_at = $parent['completed_at'];
+		$this->expire_terminal_accounting_lease( $child_id );
+
+		$replayed = ( new Jobs() )->reconcile_terminal_accounting( $child_id );
+		$this->assertTrue( $replayed['complete'] );
+		$this->assertSame( $completed_at, $this->jobs_db->get_job( $parent_id )['completed_at'] );
+	}
+
 	public function test_final_chunk_completes_parent_when_children_already_terminal(): void {
 		$parent_id = $this->create_parent_job();
 		$engine    = $this->make_engine_snapshot( $parent_id );
@@ -700,5 +769,56 @@ class PipelineBatchSchedulerTest extends WP_UnitTestCase {
 
 		$parent_job = $this->jobs_db->get_job( $parent_id );
 		$this->assertEquals( 'processing', $parent_job['status'] );
+	}
+
+	/** @return array{int,int} */
+	private function create_terminal_ready_batch(): array {
+		$parent_id = $this->create_parent_job();
+		$engine    = datamachine_get_engine_data( $parent_id );
+		$engine['batch']           = true;
+		$engine['batch_total']     = 1;
+		$engine['batch_scheduled'] = 1;
+		$engine['batch_context']   = PipelineBatchScheduler::BATCH_CONTEXT;
+		$this->assertTrue( datamachine_set_engine_data( $parent_id, $engine ) );
+
+		$child_id = $this->jobs_db->create_job(
+			array(
+				'pipeline_id'   => $this->test_pipeline_id,
+				'flow_id'       => $this->test_flow_id,
+				'source'        => 'pipeline',
+				'label'         => 'Terminal accounting child',
+				'parent_job_id' => $parent_id,
+			)
+		);
+		$this->assertIsInt( $child_id );
+		$this->assertTrue( $this->jobs_db->start_job( $child_id ) );
+
+		return array( $parent_id, $child_id );
+	}
+
+	private function fail_parent_query_once( int $parent_id, string $required_fragment ): callable {
+		global $wpdb;
+		$table  = $wpdb->prefix . 'datamachine_jobs';
+		$failed = false;
+
+		return static function ( string $query ) use ( $parent_id, $required_fragment, $table, &$failed ): string {
+			$targets_parent = 1 === preg_match( '/(?:`job_id`|job_id)\s*=\s*[\'\"]?' . $parent_id . '[\'\"]?/', $query );
+			if ( ! $failed && str_contains( $query, 'UPDATE ' . $table ) && str_contains( $query, $required_fragment ) && $targets_parent ) {
+				$failed = true;
+				return 'INVALID SQL FOR PIPELINE PARENT FAILURE TEST';
+			}
+			return $query;
+		};
+	}
+
+	private function expire_terminal_accounting_lease( int $job_id ): void {
+		global $wpdb;
+		$wpdb->update(
+			$this->jobs_db->get_table_name(),
+			array( 'terminal_accounting_claimed_at' => '2000-01-01 00:00:00' ),
+			array( 'job_id' => $job_id ),
+			array( '%s' ),
+			array( '%d' )
+		);
 	}
 }
