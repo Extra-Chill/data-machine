@@ -10,6 +10,7 @@ namespace DataMachine\Tests\Unit\Core\Database;
 use DataMachine\Core\Database\Jobs\Jobs;
 use DataMachine\Core\Database\Jobs\LegacyAIConcurrencyReconciler;
 use DataMachine\Core\JobStatus;
+use DataMachine\Engine\AI\AIConcurrencyBackpressure;
 use WP_UnitTestCase;
 
 class JobLifecycleTransitionTest extends WP_UnitTestCase {
@@ -156,6 +157,33 @@ class JobLifecycleTransitionTest extends WP_UnitTestCase {
 		$job = $this->db_jobs->get_job( $job_id );
 		$this->assertSame( 'failed - handler_failure', $job['status'] );
 		$this->assertArrayNotHasKey( 'status_reconciliation', $job['engine_data'] );
+	}
+
+	public function test_ai_resume_generation_ownership_advances_with_cas(): void {
+		$job_id = $this->db_jobs->create_job( array( 'label' => 'AI resume generation ownership' ) );
+		$this->assertIsInt( $job_id );
+
+		$generation_one = AIConcurrencyBackpressure::claimNextGeneration( $job_id, 'ai-1', 0, time() );
+		$duplicate_one  = AIConcurrencyBackpressure::claimNextGeneration( $job_id, 'ai-1', 0, time() );
+		$this->assertTrue( $generation_one['success'] );
+		$this->assertTrue( $generation_one['owned'] );
+		$this->assertSame( 1, $generation_one['generation'] );
+		$this->assertTrue( $duplicate_one['success'] );
+		$this->assertFalse( $duplicate_one['owned'] );
+		$this->assertSame( 1, $duplicate_one['generation'] );
+
+		$this->assertTrue( AIConcurrencyBackpressure::recordScheduledAction( $job_id, 'ai-1', 1, $generation_one['token'], 101 ) );
+		$this->assertTrue( AIConcurrencyBackpressure::beginGeneration( $job_id, 'ai-1', 1, time() ) );
+		$this->assertFalse( AIConcurrencyBackpressure::beginGeneration( $job_id, 'ai-1', 1, time() ) );
+
+		$generation_two = AIConcurrencyBackpressure::claimNextGeneration( $job_id, 'ai-1', 1, time() );
+		$duplicate_two  = AIConcurrencyBackpressure::claimNextGeneration( $job_id, 'ai-1', 1, time() );
+		$this->assertTrue( $generation_two['success'] );
+		$this->assertTrue( $generation_two['owned'] );
+		$this->assertSame( 2, $generation_two['generation'] );
+		$this->assertTrue( $duplicate_two['success'] );
+		$this->assertFalse( $duplicate_two['owned'] );
+		$this->assertFalse( AIConcurrencyBackpressure::beginGeneration( $job_id, 'ai-1', 1, time() ) );
 	}
 
 	public function test_create_or_get_job_returns_existing_job_for_same_idempotency_key(): void {

@@ -721,8 +721,10 @@ class AIStep extends Step {
 		);
 		$timestamp     = $now + $delay_seconds;
 		$action_args   = array(
-			'job_id'       => $this->job_id,
-			'flow_step_id' => $this->flow_step_id,
+			'job_id'                => $this->job_id,
+			'flow_step_id'          => $this->flow_step_id,
+			'operation_generation'  => 0,
+			'operation_claim_token' => '',
 		);
 
 		$job = ( new \DataMachine\Core\Database\Jobs\Jobs() )->get_job( $this->job_id );
@@ -730,6 +732,22 @@ class AIStep extends Step {
 			$action_args['operation_generation']  = (int) $job['operation_generation'];
 			$action_args['operation_claim_token'] = (string) ( $job['operation_claim_token'] ?? '' );
 		}
+		$source_generation = max( 0, (int) $this->engine->get( '_runtime_ai_resume_generation', 0 ) );
+		$claim             = AIConcurrencyBackpressure::claimNextGeneration(
+			$this->job_id,
+			$this->flow_step_id,
+			$source_generation,
+			$now
+		);
+		if ( empty( $claim['success'] ) || empty( $claim['owned'] ) ) {
+			( new Jobs() )->update_job_status( $this->job_id, 'pending' );
+			return;
+		}
+
+		$resume_generation                   = (int) $claim['generation'];
+		$action_args['ai_resume_generation'] = $resume_generation;
+		unset( $contention_data['action_id'] );
+		$contention_data['resume_generation'] = $resume_generation;
 
 		$schedule_result = AIConcurrencyBackpressure::scheduleContinuation( $timestamp, $action_args );
 		$action_id       = (int) $schedule_result['action_id'];
@@ -742,6 +760,13 @@ class AIStep extends Step {
 			( new Jobs() )->complete_job( $this->job_id, 'cancelled - ai_concurrency_defer_schedule_failed' );
 			return;
 		}
+		AIConcurrencyBackpressure::recordScheduledAction(
+			$this->job_id,
+			$this->flow_step_id,
+			$resume_generation,
+			(string) $claim['token'],
+			$action_id
+		);
 
 		( new Jobs() )->update_job_status( $this->job_id, 'pending' );
 
@@ -793,6 +818,7 @@ class AIStep extends Step {
 				$history[]                        = AIConcurrencyBackpressure::resolvedState( $throttle, time() );
 				$engine['ai_concurrency_history'] = array_slice( $history, -20 );
 				unset( $engine['ai_concurrency_throttle'] );
+				unset( $engine['ai_concurrency_resume_ownership'] );
 
 				return $engine;
 			},

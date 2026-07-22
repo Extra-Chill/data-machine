@@ -7,12 +7,15 @@
 
 namespace DataMachine\Engine\AI;
 
+use DataMachine\Core\EngineData;
+
 defined( 'ABSPATH' ) || exit;
 
 class AIConcurrencyBackpressure {
 	public const RESUME_HOOK = 'datamachine_resume_ai_step';
 
 	private const RESUME_GROUP_PREFIX = 'data-machine-ai-resume-';
+	private const OWNERSHIP_KEY       = 'ai_concurrency_resume_ownership';
 
 	/**
 	 * Resolve the next durable contention state.
@@ -99,9 +102,146 @@ class AIConcurrencyBackpressure {
 	public static function continuationGroup( array $args ): string {
 		$job_id       = max( 0, (int) ( $args['job_id'] ?? 0 ) );
 		$flow_step_id = (string) ( $args['flow_step_id'] ?? '' );
-		$scope        = $job_id . ':' . $flow_step_id;
+		$generation   = max( 0, (int) ( $args['ai_resume_generation'] ?? 0 ) );
+		$scope        = $job_id . ':' . $flow_step_id . ':' . $generation;
 
-		return self::RESUME_GROUP_PREFIX . $job_id . '-' . substr( hash( 'sha256', $scope ), 0, 16 );
+		return self::RESUME_GROUP_PREFIX . $job_id . '-' . $generation . '-' . substr( hash( 'sha256', $scope ), 0, 16 );
+	}
+
+	/**
+	 * Atomically claim or reuse the next resume generation.
+	 *
+	 * @return array{success:bool,owned:bool,generation:int,action_id:int,token:string}
+	 */
+	public static function claimNextGeneration( int $job_id, string $flow_step_id, int $source_generation, int $now ): array {
+		$token  = bin2hex( random_bytes( 16 ) );
+		$result = EngineData::mutate(
+			$job_id,
+			static function ( array $engine ) use ( $flow_step_id, $source_generation, $token, $now ): ?array {
+				$current = is_array( $engine[ self::OWNERSHIP_KEY ] ?? null ) ? $engine[ self::OWNERSHIP_KEY ] : array();
+				$next    = self::nextGenerationState( $current, $flow_step_id, $source_generation, $token, $now );
+				if ( null === $next ) {
+					return null;
+				}
+
+				$engine[ self::OWNERSHIP_KEY ] = $next;
+				return $engine;
+			},
+			'ai_resume_generation_claim'
+		);
+
+		$state      = is_array( $result['snapshot'][ self::OWNERSHIP_KEY ] ?? null ) ? $result['snapshot'][ self::OWNERSHIP_KEY ] : array();
+		$generation = max( 0, (int) ( $state['generation'] ?? 0 ) );
+		$valid      = ! empty( $result['success'] )
+			&& (string) ( $state['flow_step_id'] ?? '' ) === $flow_step_id
+			&& (int) ( $state['source_generation'] ?? -1 ) === $source_generation
+			&& 'scheduled' === (string) ( $state['status'] ?? '' );
+
+		return array(
+			'success'    => $valid,
+			'owned'      => $valid && (string) ( $state['token'] ?? '' ) === $token,
+			'generation' => $generation,
+			'action_id'  => max( 0, (int) ( $state['action_id'] ?? 0 ) ),
+			'token'      => $token,
+		);
+	}
+
+	/**
+	 * Resolve the next ownership projection without persistence.
+	 *
+	 * @return array<string,mixed>|null
+	 */
+	public static function nextGenerationState( array $state, string $flow_step_id, int $source_generation, string $token, int $now ): ?array {
+		$source_generation = max( 0, $source_generation );
+		if ( empty( $state ) || (string) ( $state['flow_step_id'] ?? '' ) !== $flow_step_id ) {
+			if ( 0 !== $source_generation ) {
+				return null;
+			}
+			return self::newGenerationState( $flow_step_id, 0, $token, $now );
+		}
+
+		$current_generation = max( 0, (int) ( $state['generation'] ?? 0 ) );
+		if ( $source_generation < $current_generation ) {
+			$is_existing_next = (int) ( $state['source_generation'] ?? -1 ) === $source_generation
+				&& 'scheduled' === (string) ( $state['status'] ?? '' );
+			return $is_existing_next ? $state : null;
+		}
+		if ( 0 !== $current_generation - $source_generation || 'running' !== (string) ( $state['status'] ?? '' ) ) {
+			return null;
+		}
+
+		return self::newGenerationState( $flow_step_id, $source_generation, $token, $now );
+	}
+
+	/** Mark an exact scheduled generation as running before executing it. */
+	public static function beginGeneration( int $job_id, string $flow_step_id, int $generation, int $now ): bool {
+		$result = EngineData::mutate(
+			$job_id,
+			static function ( array $engine ) use ( $flow_step_id, $generation, $now ): ?array {
+				$current = is_array( $engine[ self::OWNERSHIP_KEY ] ?? null ) ? $engine[ self::OWNERSHIP_KEY ] : array();
+				$next    = self::beginGenerationState( $current, $flow_step_id, $generation, $now );
+				if ( null === $next ) {
+					return null;
+				}
+
+				$engine[ self::OWNERSHIP_KEY ] = $next;
+				return $engine;
+			},
+			'ai_resume_generation_begin'
+		);
+
+		return ! empty( $result['success'] );
+	}
+
+	/** @return array<string,mixed>|null */
+	public static function beginGenerationState( array $state, string $flow_step_id, int $generation, int $now ): ?array {
+		if ( 0 >= $generation
+			|| (string) ( $state['flow_step_id'] ?? '' ) !== $flow_step_id
+			|| (int) ( $state['generation'] ?? 0 ) !== $generation
+			|| 'scheduled' !== (string) ( $state['status'] ?? '' )
+		) {
+			return null;
+		}
+
+		$state['status']     = 'running';
+		$state['started_at'] = gmdate( 'c', $now );
+		return $state;
+	}
+
+	/** Persist the Action Scheduler ID for the generation owned by this token. */
+	public static function recordScheduledAction( int $job_id, string $flow_step_id, int $generation, string $token, int $action_id ): bool {
+		$result = EngineData::mutate(
+			$job_id,
+			static function ( array $engine ) use ( $flow_step_id, $generation, $token, $action_id ): ?array {
+				$state = is_array( $engine[ self::OWNERSHIP_KEY ] ?? null ) ? $engine[ self::OWNERSHIP_KEY ] : array();
+				if ( (string) ( $state['flow_step_id'] ?? '' ) !== $flow_step_id
+					|| (int) ( $state['generation'] ?? 0 ) !== $generation
+					|| (string) ( $state['token'] ?? '' ) !== $token
+					|| 'scheduled' !== (string) ( $state['status'] ?? '' )
+				) {
+					return null;
+				}
+
+				$state['action_id']            = $action_id;
+				$engine[ self::OWNERSHIP_KEY ] = $state;
+				return $engine;
+			},
+			'ai_resume_action_recorded'
+		);
+
+		return ! empty( $result['success'] );
+	}
+
+	private static function newGenerationState( string $flow_step_id, int $source_generation, string $token, int $now ): array {
+		return array(
+			'flow_step_id'      => $flow_step_id,
+			'generation'        => $source_generation + 1,
+			'source_generation' => $source_generation,
+			'status'            => 'scheduled',
+			'token'             => $token,
+			'action_id'         => 0,
+			'claimed_at'        => gmdate( 'c', $now ),
+		);
 	}
 
 	/**

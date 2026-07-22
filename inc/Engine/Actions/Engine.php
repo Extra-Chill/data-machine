@@ -63,7 +63,7 @@ function datamachine_flow_exists( int $flow_id ): bool {
  * Both initial execution and AI contention resumes use this callback so a
  * resume cannot drift into a parallel execution implementation.
  */
-function datamachine_execute_step_action( $job_id, string $flow_step_id, $operation_generation = 0, $operation_claim_token = '' ): void {
+function datamachine_execute_step_action( $job_id, string $flow_step_id, $operation_generation = 0, $operation_claim_token = '', $ai_resume_generation = 0 ): void {
 	$ability = wp_get_ability( 'datamachine/execute-step' );
 	if ( $ability ) {
 		$ability->execute(
@@ -72,9 +72,31 @@ function datamachine_execute_step_action( $job_id, string $flow_step_id, $operat
 				'flow_step_id'          => $flow_step_id,
 				'operation_generation'  => is_numeric( $operation_generation ) ? (int) $operation_generation : 0,
 				'operation_claim_token' => is_string( $operation_claim_token ) ? $operation_claim_token : '',
+				'ai_resume_generation'  => is_numeric( $ai_resume_generation ) ? (int) $ai_resume_generation : 0,
 			)
 		);
 	}
+}
+
+/** Validate durable resume ownership before entering canonical step execution. */
+function datamachine_resume_ai_step_action( $job_id, string $flow_step_id, $operation_generation = 0, $operation_claim_token = '', $ai_resume_generation = 0 ): void {
+	$job_id               = (int) $job_id;
+	$ai_resume_generation = is_numeric( $ai_resume_generation ) ? (int) $ai_resume_generation : 0;
+	if ( ! \DataMachine\Engine\AI\AIConcurrencyBackpressure::beginGeneration( $job_id, $flow_step_id, $ai_resume_generation, time() ) ) {
+		do_action(
+			'datamachine_log',
+			'warning',
+			'Stale AI concurrency resume generation rejected',
+			array(
+				'job_id'               => $job_id,
+				'flow_step_id'         => $flow_step_id,
+				'ai_resume_generation' => $ai_resume_generation,
+			)
+		);
+		return;
+	}
+
+	datamachine_execute_step_action( $job_id, $flow_step_id, $operation_generation, $operation_claim_token, $ai_resume_generation );
 }
 
 /**
@@ -133,15 +155,15 @@ function datamachine_register_execution_engine() {
 		'datamachine_execute_step',
 		'datamachine_execute_step_action',
 		10,
-		4
+		5
 	);
 
 	/** Dedicated resume bridge avoids collision with the running execute action. */
 	add_action(
 		'datamachine_resume_ai_step',
-		'datamachine_execute_step_action',
+		'datamachine_resume_ai_step_action',
 		10,
-		4
+		5
 	);
 
 	/**
