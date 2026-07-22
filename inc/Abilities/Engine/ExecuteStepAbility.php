@@ -923,7 +923,7 @@ class ExecuteStepAbility {
 			return null;
 		}
 
-		if ( JobStatus::isStatusFailure( $status ) ) {
+		if ( JobStatus::isStatusFinal( $status ) ) {
 			return $status;
 		}
 

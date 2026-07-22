@@ -29,6 +29,12 @@ if ( ! function_exists( 'sanitize_key' ) ) {
 	}
 }
 
+if ( ! function_exists( 'wp_json_encode' ) ) {
+	function wp_json_encode( $value, int $flags = 0, int $depth = 512 ) {
+		return json_encode( $value, $flags, $depth );
+	}
+}
+
 require_once __DIR__ . '/../inc/Core/JobStatus.php';
 require_once __DIR__ . '/../inc/Core/StepExecutionResult.php';
 require_once __DIR__ . '/../inc/Core/Database/BaseRepository.php';
@@ -120,6 +126,7 @@ $assert( 'CLI inspects processing rows with terminal artifacts', str_contains( $
 $assert( 'CLI requires successful runtime provenance', str_contains( $jobs_command, 'engine_data_has_successful_runtime' ) );
 $assert( 'CLI requires successful handler tool summary', str_contains( $jobs_command, 'engine_data_has_successful_handler_tool' ) );
 $assert( 'CLI supports dry-run output', str_contains( $jobs_command, "'dry_run' => $" ) || str_contains( $jobs_command, "'dry_run' => \$dry_run" ) );
+$assert( 'historical concurrency failures reconcile without replay', str_contains( $jobs_command, 'failed - ai_concurrency_defer_exhausted' ) && str_contains( $jobs_command, 'cancelled - ai_concurrency_stranded' ) );
 
 echo "\n[5] compact job summary avoids heavyweight breakdowns\n";
 $summary_ability = file_get_contents( __DIR__ . '/../inc/Abilities/Job/JobsSummaryAbility.php' );

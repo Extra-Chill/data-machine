@@ -8,6 +8,7 @@
  */
 
 define( 'ABSPATH', __DIR__ );
+defined( 'DAY_IN_SECONDS' ) || define( 'DAY_IN_SECONDS', 86400 );
 
 $failed = 0;
 $total  = 0;
@@ -115,10 +116,12 @@ require_once __DIR__ . '/../inc/Core/OptionLeaseStore.php';
 require_once __DIR__ . '/../inc/Core/ActionScheduler/GroupRegistrar.php';
 require_once __DIR__ . '/../inc/Engine/AI/PipelineAIConcurrencyLease.php';
 require_once __DIR__ . '/../inc/Engine/AI/PipelineAIConcurrencyLimiter.php';
+require_once __DIR__ . '/../inc/Engine/AI/AIConcurrencyBackpressure.php';
 
 use DataMachine\Core\ActionScheduler\GroupRegistrar;
 use DataMachine\Engine\AI\PipelineAIConcurrencyLease;
 use DataMachine\Engine\AI\PipelineAIConcurrencyLimiter;
+use DataMachine\Engine\AI\AIConcurrencyBackpressure;
 
 echo "Case 1: first AI step acquires the single site slot\n";
 $first = PipelineAIConcurrencyLimiter::acquire( 'openai', array( 'job_id' => 101, 'flow_step_id' => 'ai-1' ) );
@@ -182,14 +185,24 @@ assert_ai_backpressure_smoke( 'existing transport retry classifier remains intac
 assert_ai_backpressure_smoke( 'throttle log includes requested metadata', str_contains( $ai_src, 'rescheduled_for_seconds' ) && str_contains( $ai_src, "'active'" ) && str_contains( $ai_src, "'limit'" ) );
 assert_ai_backpressure_smoke( 'limiter checks for advanced owner leases generically', str_contains( file_get_contents( __DIR__ . '/../inc/Engine/AI/PipelineAIConcurrencyLimiter.php' ) ?: '', 'isAdvancedOwnerLease' ) );
 
-echo "Case 6: concurrency defers are bounded (#2793 runaway guard)\n";
-assert_ai_backpressure_smoke( 'defer attempt budget constant exists', str_contains( $ai_src, 'AI_CONCURRENCY_MAX_DEFERS' ) );
-assert_ai_backpressure_smoke( 'defer budget is filterable', str_contains( $ai_src, 'datamachine_ai_concurrency_max_defers' ) );
-assert_ai_backpressure_smoke( 'defer increments a per-step attempt counter', str_contains( $ai_src, "'attempts'" ) && str_contains( $ai_src, '$prior_attempts + 1' ) );
-assert_ai_backpressure_smoke( 'attempt counter resets when the AI step advances', str_contains( $ai_src, "( \$existing_throttle['flow_step_id'] ?? '' ) === \$this->flow_step_id" ) );
-assert_ai_backpressure_smoke( 'exhausted budget fails the job terminally', str_contains( $ai_src, 'ai_concurrency_defer_exhausted' ) && str_contains( $ai_src, "'retryable'     => false" ) );
-assert_ai_backpressure_smoke( 'exhausted budget clears the throttle marker so the failure is not swallowed', str_contains( $ai_src, "'ai_concurrency_throttle' => array()" ) );
-assert_ai_backpressure_smoke( 'defers back off exponentially under a capped ceiling', str_contains( $ai_src, 'AI_CONCURRENCY_MAX_DEFER_DELAY' ) && str_contains( $ai_src, '2 ** ' ) );
+echo "Case 6: sustained contention stays deferred without failure inflation\n";
+$now   = strtotime( '2026-07-22T00:00:00Z' );
+$state = array();
+for ( $attempt = 1; $attempt <= 100; ++$attempt ) {
+	$state = AIConcurrencyBackpressure::nextState( $state, 'ai-1', $now + $attempt, DAY_IN_SECONDS );
+}
+assert_ai_backpressure_smoke( 'ordinary sustained contention remains deferred past the old count budget', 'deferred' === $state['state'] );
+assert_ai_backpressure_smoke( 'defer count remains machine readable', 100 === $state['attempts'] );
+assert_ai_backpressure_smoke( 'defer age remains machine readable', 99 === $state['defer_age_seconds'] );
+assert_ai_backpressure_smoke( 'ordinary contention does not call the failure path', ! str_contains( $ai_src, 'ai_concurrency_defer_exhausted' ) );
+
+echo "Case 7: age-bounded stranded work terminates distinctly\n";
+$stranded = AIConcurrencyBackpressure::nextState( $state, 'ai-1', $now + DAY_IN_SECONDS + 1, DAY_IN_SECONDS );
+assert_ai_backpressure_smoke( 'maximum contention age marks work stranded', 'stranded' === $stranded['state'] );
+assert_ai_backpressure_smoke( 'stranded work is cancelled instead of failed', str_contains( $ai_src, 'cancelled - ai_concurrency_stranded' ) );
+assert_ai_backpressure_smoke( 'maximum contention age is filterable', str_contains( $ai_src, 'datamachine_ai_concurrency_max_defer_age' ) );
+assert_ai_backpressure_smoke( 'backoff remains capped', 600 === AIConcurrencyBackpressure::delaySeconds( 10, 30, 600 ) );
+assert_ai_backpressure_smoke( 'only one matching future action is retained', str_contains( $ai_src, 'as_next_scheduled_action' ) );
 
 echo "\nAI step backpressure smoke complete: {$total} assertions, {$failed} failures.\n";
 if ( $failed > 0 ) {

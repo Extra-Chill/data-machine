@@ -52,7 +52,7 @@ class JobsCommand extends BaseCommand {
 	 *
 	 * @var array
 	 */
-	private array $liveness_fields = array( 'id', 'flow_id', 'classification', 'age_hours', 'pending_actions', 'in_progress_actions', 'oldest_pending', 'latest_attempt' );
+	private array $liveness_fields = array( 'id', 'flow_id', 'classification', 'age_hours', 'defer_count', 'defer_age_seconds', 'pending_actions', 'in_progress_actions', 'oldest_pending', 'latest_attempt' );
 
 	/**
 	 * Recover stuck jobs that have job_status in engine_data but status is 'processing'.
@@ -245,7 +245,7 @@ class JobsCommand extends BaseCommand {
 	}
 
 	/**
-	 * Diagnose liveness for processing jobs.
+	 * Diagnose liveness for processing jobs and pending backpressure deferrals.
 	 *
 	 * Processing is a broad lifecycle state. This command reports whether each
 	 * processing job is actively executing, waiting on a scheduler action, or
@@ -298,7 +298,7 @@ class JobsCommand extends BaseCommand {
 		$format          = $assoc_args['format'] ?? 'table';
 
 		$jobs_table = $wpdb->prefix . 'datamachine_jobs';
-		$where      = "WHERE status = 'processing'";
+		$where      = "WHERE (status = 'processing' OR (status = 'pending' AND JSON_EXTRACT(engine_data, '$.ai_concurrency_throttle') IS NOT NULL))";
 		$values     = array();
 
 		if ( $flow_id ) {
@@ -320,13 +320,14 @@ class JobsCommand extends BaseCommand {
 
 		$items   = array();
 		$summary = array(
-			'total'             => 0,
-			'active_processing' => 0,
-			'queued_next_step'  => 0,
-			'waiting_children'  => 0,
-			'scheduler_starved' => 0,
-			'stale_in_progress' => 0,
-			'no_scheduler_path' => 0,
+			'total'                   => 0,
+			'active_processing'       => 0,
+			'queued_next_step'        => 0,
+			'waiting_children'        => 0,
+			'scheduler_starved'       => 0,
+			'stale_in_progress'       => 0,
+			'no_scheduler_path'       => 0,
+			'ai_concurrency_deferred' => 0,
 		);
 
 		foreach ( $jobs as $job ) {
@@ -361,10 +362,11 @@ class JobsCommand extends BaseCommand {
 		if ( 'table' === $format ) {
 			WP_CLI::log(
 				sprintf(
-					'Inspected %d processing jobs: %d active, %d queued, %d waiting on children, %d scheduler-starved, %d stale in-progress, %d without scheduler path.',
+					'Inspected %d active jobs: %d active, %d queued, %d AI concurrency-deferred, %d waiting on children, %d scheduler-starved, %d stale in-progress, %d without scheduler path.',
 					$summary['total'],
 					$summary['active_processing'],
 					$summary['queued_next_step'],
+					$summary['ai_concurrency_deferred'],
 					$summary['waiting_children'],
 					$summary['scheduler_starved'],
 					$summary['stale_in_progress'],
@@ -540,30 +542,32 @@ class JobsCommand extends BaseCommand {
 		$limit   = isset( $assoc_args['limit'] ) ? max( 1, min( 5000, (int) $assoc_args['limit'] ) ) : 500;
 		$format  = $assoc_args['format'] ?? 'table';
 
-		$jobs_table         = $wpdb->prefix . 'datamachine_jobs';
-		$jobs_db            = new Jobs();
-		$failed_like        = $wpdb->esc_like( 'failed' ) . '%';
-		$agent_skipped_like = $wpdb->esc_like( 'agent_skipped' ) . '%';
+		$jobs_table                   = $wpdb->prefix . 'datamachine_jobs';
+		$jobs_db                      = new Jobs();
+		$failed_like                  = $wpdb->esc_like( 'failed' ) . '%';
+		$agent_skipped_like           = $wpdb->esc_like( 'agent_skipped' ) . '%';
+		$historical_contention_status = 'failed - ai_concurrency_defer_exhausted';
 
 		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name is from $wpdb->prefix.
 		$rows = $wpdb->get_results(
 			$wpdb->prepare(
 				"SELECT job_id, flow_id, parent_job_id, status, label, engine_data
 				FROM {$jobs_table}
-				WHERE (status LIKE %s OR status = 'processing')
+				WHERE ((status LIKE %s OR status = 'processing')
 				AND (
 					engine_data LIKE %s
 					OR engine_data LIKE %s
 					OR JSON_UNQUOTE(JSON_EXTRACT(engine_data, '$.job_status')) LIKE %s
 					OR JSON_UNQUOTE(JSON_EXTRACT(engine_data, '$.runtime_provenance.status.status')) = 'completed'
 					OR JSON_UNQUOTE(JSON_EXTRACT(engine_data, '$.runtime_provenance.status.completed')) = 'true'
-				)
+				)) OR status = %s
 				ORDER BY COALESCE(completed_at, created_at) DESC
 				LIMIT %d",
 				$failed_like,
 				'%Updated wiki article:%',
 				'%Source rejected:%',
 				$agent_skipped_like,
+				$historical_contention_status,
 				$limit
 			),
 			ARRAY_A
@@ -584,7 +588,7 @@ class JobsCommand extends BaseCommand {
 				'flow_id'       => (int) $row['flow_id'],
 				'from_status'   => (string) $row['status'],
 				'target_status' => $target_status,
-				'reason'        => str_starts_with( $target_status, 'agent_skipped' ) ? 'source_rejected' : 'successful_handler_artifact',
+				'reason'        => str_contains( $target_status, 'ai_concurrency_stranded' ) ? 'historical_concurrency_contention' : ( str_starts_with( $target_status, 'agent_skipped' ) ? 'source_rejected' : 'successful_handler_artifact' ),
 				'label'         => (string) ( $row['label'] ?? '' ),
 			);
 
@@ -658,6 +662,10 @@ class JobsCommand extends BaseCommand {
 
 		if ( $this->engine_data_has_successful_runtime( $engine_data ) && $this->engine_data_has_successful_handler_tool( $engine_data ) ) {
 			return 'completed';
+		}
+
+		if ( 'failed - ai_concurrency_defer_exhausted' === (string) ( $row['status'] ?? '' ) ) {
+			return 'cancelled - ai_concurrency_stranded';
 		}
 
 		return '';
@@ -872,7 +880,7 @@ class JobsCommand extends BaseCommand {
 	}
 
 	/**
-	 * Diagnose one processing job's scheduler liveness.
+	 * Diagnose one active job's scheduler liveness.
 	 *
 	 * @param array<string,mixed> $job Job row.
 	 * @param int                 $overdue_minutes Overdue threshold in minutes.
@@ -902,6 +910,9 @@ class JobsCommand extends BaseCommand {
 		$active_children = (int) ( $child_counts['active'] ?? 0 );
 		$total_children  = (int) ( $child_counts['total'] ?? 0 );
 		$batch_total     = (int) ( $engine_data['batch_total'] ?? 0 );
+		$throttle        = is_array( $engine_data['ai_concurrency_throttle'] ?? null ) ? $engine_data['ai_concurrency_throttle'] : array();
+		$first_deferred  = strtotime( (string) ( $throttle['first_deferred_at'] ?? '' ) );
+		$defer_age       = false === $first_deferred ? (int) ( $throttle['defer_age_seconds'] ?? 0 ) : max( 0, time() - $first_deferred );
 
 		if ( ! empty( $in_progress ) && $oldest_progress_age > $overdue_minutes ) {
 			$classification = 'stale_in_progress';
@@ -909,6 +920,8 @@ class JobsCommand extends BaseCommand {
 			$classification = 'active_processing';
 		} elseif ( ! empty( $pending ) && $oldest_pending_age > $overdue_minutes ) {
 			$classification = 'scheduler_starved';
+		} elseif ( ! empty( $throttle ) && 'deferred' === ( $throttle['state'] ?? 'deferred' ) && ! empty( $pending ) ) {
+			$classification = 'ai_concurrency_deferred';
 		} elseif ( ! empty( $pending ) ) {
 			$classification = 'queued_next_step';
 		} elseif ( $active_children > 0 || ( $batch_total > 0 && $total_children < $batch_total ) ) {
@@ -928,6 +941,10 @@ class JobsCommand extends BaseCommand {
 			'created_at'          => (string) ( $job['created_at'] ?? '' ),
 			'age_hours'           => round( $this->minutes_since( (string) ( $job['created_at'] ?? '' ) ) / 60, 1 ),
 			'last_activity_at'    => is_string( $last_activity ) ? $last_activity : '',
+			'defer_count'         => max( 0, (int) ( $throttle['attempts'] ?? 0 ) ),
+			'defer_age_seconds'   => $defer_age,
+			'contention_active'   => ! empty( $throttle ) && 'deferred' === ( $throttle['state'] ?? 'deferred' ),
+			'contention_provider' => (string) ( $throttle['provider'] ?? '' ),
 			'pending_actions'     => count( $pending ),
 			'in_progress_actions' => count( $in_progress ),
 			'complete_actions'    => count( $complete ),
