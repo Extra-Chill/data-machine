@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.168.2] - 2026-07-22
+
+### Fixed
+- keep AI concurrency contention non-failing ([#2958](https://github.com/Extra-Chill/data-machine/pull/2958)) (by Chris Huber)
+
 ## [0.168.1] - 2026-07-22
 
 ### Fixed
