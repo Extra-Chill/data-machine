@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.168.3] - 2026-07-22
+
+### Fixed
+- load job liveness classifier correctly ([#2962](https://github.com/Extra-Chill/data-machine/pull/2962)) (by Chris Huber)
+
 ## [0.168.2] - 2026-07-22
 
 ### Fixed
