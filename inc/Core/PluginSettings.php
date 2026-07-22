@@ -174,11 +174,15 @@ class PluginSettings {
 		$normalized = strtolower( $normalized );
 		$normalized = trim( preg_replace( '/[^a-z0-9]+/', '_', $normalized ) ?? $normalized, '_' );
 
-		if ( 1 === preg_match( '/(?:^|_)(?:access_|refresh_)?tokens?_(?:expires_at|expires|expiry|expiration|ttl|type)$/', $normalized ) ) {
+		if ( 1 === preg_match( '/^(?:access_|refresh_)?tokens?_(?:expires_at|expires|expiry|expiration|ttl|type)$/', $normalized ) ) {
 			return false;
 		}
 
-		if ( 1 === preg_match( '/(?:^|_)credential_(?:id|label|mode|profile_id|profiles?)$/', $normalized ) ) {
+		if ( 1 === preg_match( '/^credential_(?:id|label|mode|profile_id)$/', $normalized ) ) {
+			return false;
+		}
+
+		if ( 1 === preg_match( '/^(?:[a-z0-9]+_)*credential_profiles$/', $normalized ) ) {
 			return false;
 		}
 
@@ -187,7 +191,7 @@ class PluginSettings {
 		}
 
 		return 1 === preg_match(
-			'/(?:^|_)(?:authorization|bearer|cookie|credential|password|pat|secret|tokens?)(?:_|$)/',
+			'/(?:^|_)(?:auth|authentication|authorization|oauth|api_?key|private_key|signing_key|secret_key|access_key|bearer|cookie|passwd|password|passphrase|pat|secret|tokens?|credentials?)(?:_|$)/',
 			$normalized
 		);
 	}

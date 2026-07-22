@@ -47,7 +47,7 @@ namespace {
 	};
 
 	$redacted = SettingsCommand::redactSecretsForDisplay(
-		'github_credentials',
+		'github_credential_profiles',
 		array(
 			'profiles' => array(
 				array(

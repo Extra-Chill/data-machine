@@ -52,7 +52,7 @@ class PluginSettingsTest extends WP_UnitTestCase {
 					'pat'           => 'SENTINEL_NESTED_PAT',
 					'repositories'  => array( 'owner/repository' ),
 					'credential_id' => 'credential-1',
-					'credentials'   => (object) array(
+					'profile_data'  => (object) array(
 						'private_key'         => 'SENTINEL_PRIVATE_KEY',
 						'client_secret'       => 'SENTINEL_CLIENT_SECRET',
 						'access_token'        => 'SENTINEL_ACCESS_TOKEN',
@@ -63,11 +63,21 @@ class PluginSettingsTest extends WP_UnitTestCase {
 						'secret_value'        => 'SENTINEL_SECRET_VALUE',
 						'credential_data'     => 'SENTINEL_CREDENTIAL_DATA',
 						'access_tokens'       => array( 'SENTINEL_ACCESS_TOKENS' ),
-						'clientSecret'        => 'SENTINEL_CAMEL_CLIENT_SECRET',
-						'apiKey'              => 'SENTINEL_CAMEL_API_KEY',
-						'secret_map'          => array( 'SENTINEL_SECRET_MAP_KEY' => 'value' ),
-						'token_expires_at'    => 1234567890,
+						'clientSecret'           => 'SENTINEL_CAMEL_CLIENT_SECRET',
+						'apiKey'                 => 'SENTINEL_CAMEL_API_KEY',
+						'apikey'                 => 'SENTINEL_APIKEY_ALIAS',
+						'api_key_value'          => 'SENTINEL_API_KEY_VALUE',
+						'passwd'                 => 'SENTINEL_PASSWD_ALIAS',
+						'auth'                   => 'SENTINEL_AUTH_ALIAS',
+						'authentication'         => 'SENTINEL_AUTHENTICATION_ALIAS',
+						'private_key_passphrase' => 'SENTINEL_PRIVATE_KEY_PASSPHRASE',
+						'signing_key_value'      => 'SENTINEL_SIGNING_KEY_VALUE',
+						'secret_map'             => array( 'SENTINEL_SECRET_MAP_KEY' => 'value' ),
+						'token_expires_at'       => 1234567890,
+						'token_type'             => 'Bearer',
 					),
+					'credentials'        => (object) array( 'value' => 'SENTINEL_GENERIC_CREDENTIALS_OBJECT' ),
+					'backup_credentials' => array( 'value' => 'SENTINEL_GENERIC_CREDENTIALS_MAP' ),
 				),
 			),
 			'enabled'                    => true,
@@ -77,7 +87,7 @@ class PluginSettingsTest extends WP_UnitTestCase {
 
 		$redacted    = PluginSettings::redactForDisplay( '', PluginSettings::all() );
 		$profile     = $redacted['github_credential_profiles'][0];
-		$credentials = $profile['credentials'];
+		$credentials = $profile['profile_data'];
 
 		$this->assertTrue( '[redacted]' === $redacted['github_pat'], 'Top-level PAT should be redacted.' );
 		$this->assertTrue( '[redacted]' === $profile['pat'], 'Nested profile PAT should be redacted.' );
@@ -93,13 +103,23 @@ class PluginSettingsTest extends WP_UnitTestCase {
 		$this->assertTrue( '[redacted]' === $credentials->access_tokens, 'Plural token variants should be redacted.' );
 		$this->assertTrue( '[redacted]' === $credentials->clientSecret, 'Camel-case client secrets should be redacted.' );
 		$this->assertTrue( '[redacted]' === $credentials->apiKey, 'Camel-case API keys should be redacted.' );
+		$this->assertTrue( '[redacted]' === $credentials->apikey, 'Compact API key aliases should be redacted.' );
+		$this->assertTrue( '[redacted]' === $credentials->api_key_value, 'API key value variants should be redacted.' );
+		$this->assertTrue( '[redacted]' === $credentials->passwd, 'Password aliases should be redacted.' );
+		$this->assertTrue( '[redacted]' === $credentials->auth, 'Auth aliases should be redacted.' );
+		$this->assertTrue( '[redacted]' === $credentials->authentication, 'Authentication aliases should be redacted.' );
+		$this->assertTrue( '[redacted]' === $credentials->private_key_passphrase, 'Private-key passphrases should be redacted.' );
+		$this->assertTrue( '[redacted]' === $credentials->signing_key_value, 'Signing-key variants should be redacted.' );
 		$this->assertTrue( '[redacted]' === $credentials->secret_map, 'Secret containers should collapse before map keys serialize.' );
+		$this->assertTrue( '[redacted]' === $profile['credentials'], 'Generic credential objects should collapse.' );
+		$this->assertTrue( '[redacted]' === $profile['backup_credentials'], 'Generic credential maps should collapse.' );
 		$this->assertSame( 'profile-1', $profile['id'] );
 		$this->assertSame( 'Release profile', $profile['label'] );
 		$this->assertSame( 'pat', $profile['mode'] );
 		$this->assertSame( array( 'owner/repository' ), $profile['repositories'] );
 		$this->assertSame( 'credential-1', $profile['credential_id'] );
 		$this->assertSame( 1234567890, $credentials->token_expires_at );
+		$this->assertSame( 'Bearer', $credentials->token_type );
 		$this->assertTrue(
 			$settings === get_option( 'datamachine_settings', array() ),
 			'Display redaction must not mutate stored settings.'
@@ -121,7 +141,16 @@ class PluginSettingsTest extends WP_UnitTestCase {
 			'SENTINEL_ACCESS_TOKENS',
 			'SENTINEL_CAMEL_CLIENT_SECRET',
 			'SENTINEL_CAMEL_API_KEY',
+			'SENTINEL_APIKEY_ALIAS',
+			'SENTINEL_API_KEY_VALUE',
+			'SENTINEL_PASSWD_ALIAS',
+			'SENTINEL_AUTH_ALIAS',
+			'SENTINEL_AUTHENTICATION_ALIAS',
+			'SENTINEL_PRIVATE_KEY_PASSPHRASE',
+			'SENTINEL_SIGNING_KEY_VALUE',
 			'SENTINEL_SECRET_MAP_KEY',
+			'SENTINEL_GENERIC_CREDENTIALS_OBJECT',
+			'SENTINEL_GENERIC_CREDENTIALS_MAP',
 		);
 		foreach ( $sentinels as $sentinel ) {
 			$this->assertFalse(

@@ -78,8 +78,8 @@ class SettingsCommandTest extends WP_UnitTestCase {
 			),
 		);
 
-		$redacted = \DataMachine\Cli\Commands\SettingsCommand::redactSecretsForDisplay( 'credentials', $settings );
-		$revealed = \DataMachine\Cli\Commands\SettingsCommand::redactSecretsForDisplay( 'credentials', $settings, true );
+		$redacted = \DataMachine\Cli\Commands\SettingsCommand::redactSecretsForDisplay( 'github_credential_profiles', $settings );
+		$revealed = \DataMachine\Cli\Commands\SettingsCommand::redactSecretsForDisplay( 'github_credential_profiles', $settings, true );
 
 		$this->assertSame( 'Visible profile', $redacted['profiles'][0]['label'] );
 		$this->assertTrue( '[redacted]' === $redacted['profiles'][0]['pat'], 'Command output should redact nested PATs.' );
