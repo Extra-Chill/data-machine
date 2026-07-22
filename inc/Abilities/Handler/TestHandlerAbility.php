@@ -100,94 +100,143 @@ class TestHandlerAbility {
 	 */
 	public static function getOutputSchema(): array {
 		return array(
+			'type'                 => 'object',
+			'additionalProperties' => false,
+			'properties'           => array(
+				'success'           => array( 'type' => 'boolean' ),
+				'handler_slug'      => array( 'type' => 'string' ),
+				'handler_label'     => array( 'type' => 'string' ),
+				'config_used'       => array(
+					'type'                 => 'object',
+					'additionalProperties' => true,
+				),
+				'packets'           => array(
+					'type'        => 'array',
+					'description' => __( 'Compact packet summaries, or raw packet envelopes containing type, timestamp, data, and metadata.', 'data-machine' ),
+					'items'       => array(
 						'type'                 => 'object',
-						'additionalProperties' => false,
+						'additionalProperties' => true,
 						'properties'           => array(
-							'success'           => array( 'type' => 'boolean' ),
-							'handler_slug'      => array( 'type' => 'string' ),
-							'handler_label'     => array( 'type' => 'string' ),
-							'config_used'       => array( 'type' => 'object', 'additionalProperties' => true ),
-							'packets'           => array(
-								'type'        => 'array',
-								'description' => __( 'Compact packet summaries, or raw packet envelopes containing type, timestamp, data, and metadata.', 'data-machine' ),
-								'items'       => array(
-									'type'                 => 'object',
-									'additionalProperties' => true,
-									'properties'           => array(
-										'title'           => array( 'type' => 'string' ),
-										'content_preview' => array( 'type' => 'string' ),
-										'source_url'      => array( 'type' => 'string' ),
-										'type'            => array( 'type' => 'string' ),
-										'timestamp'       => array( 'type' => 'integer' ),
-										'data'            => array( 'type' => 'object' ),
-										'metadata'        => array( 'type' => 'object' ),
-									),
-								),
-							),
-							'packet_count'      => array( 'type' => 'integer' ),
-							'warnings'          => array( 'type' => 'array', 'items' => array( 'type' => 'string' ) ),
-							'execution_time_ms' => array( 'type' => 'number' ),
-							'error'             => array( 'type' => 'string' ),
-							'output_mode'       => array(
+							'title'           => array( 'type' => 'string' ),
+							'content_preview' => array( 'type' => 'string' ),
+							'source_url'      => array( 'type' => 'string' ),
+							'type'            => array( 'type' => 'string' ),
+							'timestamp'       => array( 'type' => 'integer' ),
+							'data'            => array( 'type' => 'object' ),
+							'metadata'        => array( 'type' => 'object' ),
+						),
+					),
+				),
+				'packet_count'      => array( 'type' => 'integer' ),
+				'warnings'          => array(
+					'type'  => 'array',
+					'items' => array( 'type' => 'string' ),
+				),
+				'execution_time_ms' => array( 'type' => 'number' ),
+				'error'             => array( 'type' => 'string' ),
+				'output_mode'       => array(
+					'type' => 'string',
+					'enum' => array( 'compact', 'raw' ),
+				),
+				'limits'            => array(
+					'type'                 => 'object',
+					'additionalProperties' => false,
+					'required'             => array( 'packet_count', 'bytes' ),
+					'properties'           => array(
+						'packet_count' => array(
+							'type'    => 'integer',
+							'minimum' => 1,
+							'maximum' => self::MAX_RAW_PACKET_LIMIT,
+						),
+						'bytes'        => array(
+							'type'    => 'integer',
+							'minimum' => self::MIN_RAW_BYTE_LIMIT,
+							'maximum' => self::MAX_RAW_BYTE_LIMIT,
+						),
+					),
+				),
+				'truncation'        => array(
+					'type'                 => 'object',
+					'additionalProperties' => false,
+					'required'             => array( 'truncated', 'reasons', 'materialized_packet_count', 'returned_packet_count', 'omitted_packet_count', 'returned_bytes', 'materialization_limited', 'redacted_fields', 'binary_fields', 'omitted_fields', 'omitted_field_count' ),
+					'properties'           => array(
+						'truncated'                 => array( 'type' => 'boolean' ),
+						'reasons'                   => array(
+							'type'  => 'array',
+							'items' => array(
 								'type' => 'string',
-								'enum' => array( 'compact', 'raw' ),
+								'enum' => array( 'packet_limit', 'byte_limit', 'response_limit', 'config_limit', 'binary_content', 'invalid_utf8', 'unsupported_type', 'json_encode_failure' ),
 							),
-							'limits'            => array(
-								'type'                 => 'object',
-								'additionalProperties' => false,
-								'required'             => array( 'packet_count', 'bytes' ),
-								'properties'           => array(
-									'packet_count' => array( 'type' => 'integer', 'minimum' => 1, 'maximum' => self::MAX_RAW_PACKET_LIMIT ),
-									'bytes'        => array( 'type' => 'integer', 'minimum' => self::MIN_RAW_BYTE_LIMIT, 'maximum' => self::MAX_RAW_BYTE_LIMIT ),
-								),
-							),
-							'truncation'        => array(
-								'type'                 => 'object',
-								'additionalProperties' => false,
-								'required'             => array( 'truncated', 'reasons', 'materialized_packet_count', 'returned_packet_count', 'omitted_packet_count', 'returned_bytes', 'materialization_limited', 'redacted_fields', 'binary_fields', 'omitted_fields', 'omitted_field_count' ),
-								'properties'           => array(
-									'truncated'             => array( 'type' => 'boolean' ),
-									'reasons'               => array( 'type' => 'array', 'items' => array( 'type' => 'string', 'enum' => array( 'packet_limit', 'byte_limit', 'response_limit', 'config_limit', 'binary_content', 'invalid_utf8', 'unsupported_type', 'json_encode_failure' ) ) ),
-									'materialized_packet_count' => array( 'type' => 'integer' ),
-									'returned_packet_count' => array( 'type' => 'integer' ),
-									'omitted_packet_count'  => array( 'type' => 'integer' ),
-									'returned_bytes'        => array( 'type' => 'integer' ),
-									'materialization_limited' => array( 'type' => 'boolean' ),
-									'redacted_fields'       => array( 'type' => 'array', 'items' => array( 'type' => 'string' ) ),
-									'binary_fields'         => array( 'type' => 'array', 'items' => array( 'type' => 'string' ) ),
-									'omitted_fields'        => array(
-										'type'  => 'array',
-										'items' => array(
-											'type'       => 'object',
-											'required'   => array( 'path', 'reason' ),
-											'properties' => array(
-												'path'   => array( 'type' => 'string' ),
-												'reason' => array( 'type' => 'string' ),
-											),
-										),
-									),
-									'omitted_field_count'   => array( 'type' => 'integer' ),
+						),
+						'materialized_packet_count' => array( 'type' => 'integer' ),
+						'returned_packet_count'     => array( 'type' => 'integer' ),
+						'omitted_packet_count'      => array( 'type' => 'integer' ),
+						'returned_bytes'            => array( 'type' => 'integer' ),
+						'materialization_limited'   => array( 'type' => 'boolean' ),
+						'redacted_fields'           => array(
+							'type'  => 'array',
+							'items' => array( 'type' => 'string' ),
+						),
+						'binary_fields'             => array(
+							'type'  => 'array',
+							'items' => array( 'type' => 'string' ),
+						),
+						'omitted_fields'            => array(
+							'type'  => 'array',
+							'items' => array(
+								'type'       => 'object',
+								'required'   => array( 'path', 'reason' ),
+								'properties' => array(
+									'path'   => array( 'type' => 'string' ),
+									'reason' => array( 'type' => 'string' ),
 								),
 							),
 						),
-						'oneOf'      => array(
-							array(
-								'type'       => 'object',
-								'required'   => array( 'success', 'error' ),
-								'properties' => array( 'success' => array( 'type' => 'boolean', 'enum' => array( false ) ) ),
-							),
-							array(
-								'type'       => 'object',
-								'required'   => array( 'success', 'output_mode', 'packets', 'packet_count', 'warnings', 'execution_time_ms' ),
-								'properties' => array( 'success' => array( 'type' => 'boolean', 'enum' => array( true ) ), 'output_mode' => array( 'type' => 'string', 'enum' => array( 'compact' ) ) ),
-							),
-							array(
-								'type'       => 'object',
-								'required'   => array( 'success', 'output_mode', 'packets', 'packet_count', 'warnings', 'execution_time_ms', 'limits', 'truncation' ),
-								'properties' => array( 'success' => array( 'type' => 'boolean', 'enum' => array( true ) ), 'output_mode' => array( 'type' => 'string', 'enum' => array( 'raw' ) ) ),
-							),
+						'omitted_field_count'       => array( 'type' => 'integer' ),
+					),
+				),
+			),
+			'oneOf'                => array(
+				array(
+					'type'       => 'object',
+					'required'   => array( 'success', 'error' ),
+					'properties' => array(
+						'success' => array(
+							'type' => 'boolean',
+							'enum' => array( false ),
 						),
-					);
+					),
+				),
+				array(
+					'type'       => 'object',
+					'required'   => array( 'success', 'output_mode', 'packets', 'packet_count', 'warnings', 'execution_time_ms' ),
+					'properties' => array(
+						'success'     => array(
+							'type' => 'boolean',
+							'enum' => array( true ),
+						),
+						'output_mode' => array(
+							'type' => 'string',
+							'enum' => array( 'compact' ),
+						),
+					),
+				),
+				array(
+					'type'       => 'object',
+					'required'   => array( 'success', 'output_mode', 'packets', 'packet_count', 'warnings', 'execution_time_ms', 'limits', 'truncation' ),
+					'properties' => array(
+						'success'     => array(
+							'type' => 'boolean',
+							'enum' => array( true ),
+						),
+						'output_mode' => array(
+							'type' => 'string',
+							'enum' => array( 'raw' ),
+						),
+					),
+				),
+			),
+		);
 	}
 
 	/**
@@ -530,7 +579,10 @@ class TestHandlerAbility {
 				'warnings'          => array( 'Raw response metadata exceeded byte_limit; all optional output was omitted.' ),
 				'execution_time_ms' => $base['execution_time_ms'] ?? 0,
 				'output_mode'       => 'raw',
-				'limits'            => array( 'packet_count' => $packet_limit, 'bytes' => $byte_limit ),
+				'limits'            => array(
+					'packet_count' => $packet_limit,
+					'bytes'        => $byte_limit,
+				),
 				'truncation'        => array(
 					'truncated'                 => true,
 					'reasons'                   => array( 'response_limit' ),
@@ -554,7 +606,7 @@ class TestHandlerAbility {
 	 * Compose the complete response from bounded, JSON-safe values.
 	 */
 	private function composeRawResponse( array $base, array $packets, int $total_count, int $packet_limit, int $byte_limit, array $report, bool $materialization_limited ): array {
-		$reasons = array_values( array_unique( $report['reasons'] ) );
+		$reasons  = array_values( array_unique( $report['reasons'] ) );
 		$response = $base;
 
 		$response['packets']      = $packets;
@@ -630,7 +682,7 @@ class TestHandlerAbility {
 			return 'limit';
 		}
 
-		$is_list   = array_is_list( $value );
+		$is_list    = array_is_list( $value );
 		$remaining -= 2;
 		$output     = array();
 		$first      = true;
@@ -672,7 +724,7 @@ class TestHandlerAbility {
 				$this->recordPath( $report['redacted_fields'], $child_path );
 			}
 
-			$remaining -= $prefix_bytes;
+			$remaining   -= $prefix_bytes;
 			$child_output = null;
 			$status       = $this->sanitizeBoundedValue( $child, $child_path, $remaining, $report, $child_output, $depth + 1 );
 			if ( 'limit' === $status ) {
@@ -695,12 +747,21 @@ class TestHandlerAbility {
 	}
 
 	private function isSensitiveKey( string $key ): bool {
-		$key = strtolower( str_replace( '-', '_', $key ) );
-		return in_array(
-			$key,
-			array( 'api_key', 'apikey', 'authorization', 'auth_token', 'access_token', 'refresh_token', 'bearer', 'cookie', 'credential', 'credentials', 'nonce', 'password', 'secret', 'client_secret', 'signature', 'token' ),
-			true
-		);
+		$normalized = preg_replace( '/([a-z0-9])([A-Z])/', '$1_$2', $key );
+		$normalized = strtolower( is_string( $normalized ) ? $normalized : $key );
+		$segments   = preg_split( '/[^a-z0-9]+/', $normalized, -1, PREG_SPLIT_NO_EMPTY );
+
+		if ( false === $segments ) {
+			return false;
+		}
+
+		$sensitive_segments = array( 'authorization', 'bearer', 'cookie', 'credential', 'credentials', 'nonce', 'password', 'secret', 'signature', 'token' );
+		if ( array_intersect( $segments, $sensitive_segments ) ) {
+			return true;
+		}
+
+		$joined = implode( '_', $segments );
+		return in_array( $joined, array( 'api_key', 'apikey', 'private_key' ), true );
 	}
 
 	private function newSanitizationReport(): array {

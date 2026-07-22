@@ -16,6 +16,7 @@ require_once dirname( __DIR__ ) . '/inc/Core/DataPacket.php';
 require_once dirname( __DIR__ ) . '/inc/Abilities/Handler/TestHandlerAbility.php';
 
 use DataMachine\Abilities\Handler\TestHandlerAbility;
+use DataMachine\Abilities\HandlerAbilities;
 use DataMachine\Core\DataPacket;
 
 class TestHandlerRawFailureStub {
@@ -23,7 +24,8 @@ class TestHandlerRawFailureStub {
 
 	public function get_fetch_data( $pipeline_id, array $config, $job_id ): array {
 		self::$received_config = $config;
-		throw new RuntimeException( 'Request failed with credential ' . $config['api_key'] );
+		$credential_values     = array_intersect_key( $config, array_flip( array( 'imap_password', 'api_secret', 'access_token_v2' ) ) );
+		throw new RuntimeException( 'Request failed with credentials ' . implode( ' ', $credential_values ) );
 	}
 }
 
@@ -60,7 +62,7 @@ function build_test_handler_raw( object $ability, array $packets, int $packet_li
 		$sanitized['output'] = array( '_omitted' => 'byte_limit' );
 		invoke_test_handler_private( $ability, 'recordOmission', array( &$sanitized['report'], 'config', 'config_limit' ) );
 	}
-	$base      = array(
+	$base = array(
 		'success'           => true,
 		'handler_slug'      => 'events-shaped',
 		'handler_label'     => 'Events Shaped',
@@ -84,7 +86,14 @@ $ability    = $reflection->newInstanceWithoutConstructor();
 $summarize  = $reflection->getMethod( 'summarizePacket' );
 
 $long_body = str_repeat( 'a', 220 );
-$packet    = new DataPacket( array( 'title' => 'Preview', 'body' => $long_body ), array( 'source_url' => 'https://example.com/item' ), 'fetch' );
+$packet    = new DataPacket(
+	array(
+		'title' => 'Preview',
+		'body'  => $long_body,
+	),
+	array( 'source_url' => 'https://example.com/item' ),
+	'fetch'
+);
 $summary   = $summarize->invoke( $ability, $packet );
 assert_test_handler_raw( 'default summary retains compact keys', array( 'title', 'content_preview', 'metadata', 'source_url' ) === array_keys( $summary ) );
 assert_test_handler_raw( 'default summary retains 200-character preview behavior', str_repeat( 'a', 200 ) . '...' === $summary['content_preview'] );
@@ -96,25 +105,62 @@ $packets    = array(
 		array(
 			'title' => 'Events-shaped JSON',
 			'body'  => $event_json,
-			'venue' => array( 'name' => 'The Royal American', 'city' => 'Charleston' ),
+			'venue' => array(
+				'name' => 'The Royal American',
+				'city' => 'Charleston',
+			),
 		),
-		array( 'source_url' => 'https://events.example/show', 'event_id' => 42 ),
+		array(
+			'source_url' => 'https://events.example/show',
+			'event_id'   => 42,
+		),
 		'fetch'
 	),
-	new DataPacket( array( 'title' => 'HTML', 'body' => $event_html ), array(), 'fetch' ),
+	new DataPacket(
+		array(
+			'title' => 'HTML',
+			'body'  => $event_html,
+		),
+		array(),
+		'fetch'
+	),
+	new DataPacket(
+		array(
+			'title'           => 'Production credentials',
+			'imap_password'   => 'packet-imap-secret',
+			'api_secret'      => 'packet-api-secret',
+			'access_token_v2' => 'packet-access-token',
+			'clientSecret'    => 'packet-client-secret',
+		),
+		array( 'authorization_header' => 'packet-authorization' ),
+		'fetch'
+	),
 );
-$raw = build_test_handler_raw( $ability, $packets, 5, 12000 );
+$raw        = build_test_handler_raw( $ability, $packets, 5, 12000 );
 
 assert_test_handler_raw( 'events-shaped JSON body round-trips byte-for-byte', $event_json === $raw['packets'][0]['data']['body'] );
 assert_test_handler_raw( 'raw HTML and ordinary Token prose remain unchanged', $event_html === $raw['packets'][1]['data']['body'] );
 assert_test_handler_raw( 'events-shaped structured venue metadata is retained', 'Charleston' === $raw['packets'][0]['data']['venue']['city'] );
+assert_test_handler_raw( 'production packet credential keys are redacted', '[redacted]' === $raw['packets'][2]['data']['imap_password'] && '[redacted]' === $raw['packets'][2]['data']['api_secret'] && '[redacted]' === $raw['packets'][2]['data']['access_token_v2'] && '[redacted]' === $raw['packets'][2]['data']['clientSecret'] && '[redacted]' === $raw['packets'][2]['metadata']['authorization_header'] );
+assert_test_handler_raw( 'production packet credential values never serialize', ! str_contains( json_encode( $raw ), 'packet-imap-secret' ) && ! str_contains( json_encode( $raw ), 'packet-api-secret' ) && ! str_contains( json_encode( $raw ), 'packet-access-token' ) && ! str_contains( json_encode( $raw ), 'packet-client-secret' ) && ! str_contains( json_encode( $raw ), 'packet-authorization' ) );
 assert_test_handler_raw( 'complete response byte count is exact and within limit', test_handler_transport_size( $raw ) === $raw['truncation']['returned_bytes'] && $raw['truncation']['returned_bytes'] <= 12000 );
 
 $nested = array();
 for ( $index = 0; $index < 35; ++$index ) {
-	$nested[ 'item_' . $index ] = array( 'venue' => 'Royal American', 'city' => 'Charleston', 'date' => '2026-08-01' );
+	$nested[ 'item_' . $index ] = array(
+		'venue' => 'Royal American',
+		'city'  => 'Charleston',
+		'date'  => '2026-08-01',
+	);
 }
-$nested_packet = new DataPacket( array( 'title' => 'Nested expansion', 'body' => $nested ), array(), 'fetch' );
+$nested_packet = new DataPacket(
+	array(
+		'title' => 'Nested expansion',
+		'body'  => $nested,
+	),
+	array(),
+	'fetch'
+);
 $nested_probe  = build_test_handler_raw( $ability, array( $nested_packet ), 5, 65536 );
 $nested_min    = strlen( json_encode( $nested_probe, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES ) );
 $nested_pretty = strlen( json_encode( $nested_probe, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) ) + 1;
@@ -122,7 +168,14 @@ assert_test_handler_raw( 'nested probe reproduces minified-under/pretty-over tra
 $nested_bounded = build_test_handler_raw( $ability, array( $nested_packet ), 5, 4096 );
 assert_test_handler_raw( 'nested probe emitted response fits both actual transports', test_handler_transport_size( $nested_bounded ) <= 4096 && array() === $nested_bounded['packets'] );
 
-$emoji_packet = new DataPacket( array( 'title' => 'Emoji expansion', 'body' => str_repeat( '🥶', 300 ) ), array(), 'fetch' );
+$emoji_packet = new DataPacket(
+	array(
+		'title' => 'Emoji expansion',
+		'body'  => str_repeat( '🥶', 300 ),
+	),
+	array(),
+	'fetch'
+);
 $emoji_probe  = build_test_handler_raw( $ability, array( $emoji_packet ), 5, 12000 );
 $emoji_min    = strlen( json_encode( $emoji_probe, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES ) );
 $emoji_rest   = strlen( json_encode( $emoji_probe ) );
@@ -133,26 +186,45 @@ assert_test_handler_raw( '300-emoji probe emitted response fits REST and CLI tra
 $structured = sanitize_test_handler_value(
 	$ability,
 	array(
-		'api_key'   => 'credential-value',
-		'author'    => 'Token Adams',
-		'secretary' => 'The Secretary',
-		'note'      => 'Token prose is legitimate event content.',
+		'api_key'         => 'credential-value',
+		'imap_password'   => 'imap-value',
+		'api_secret'      => 'secret-value',
+		'access_token_v2' => 'token-value',
+		'clientSecret'    => 'client-secret-value',
+		'author'          => 'Token Adams',
+		'secretary'       => 'The Secretary',
+		'note'            => 'Token prose is legitimate event content.',
 	)
 );
 assert_test_handler_raw( 'exact credential key is redacted', '[redacted]' === $structured['output']['api_key'] );
+assert_test_handler_raw( 'compound and camel-case credential keys are redacted', '[redacted]' === $structured['output']['imap_password'] && '[redacted]' === $structured['output']['api_secret'] && '[redacted]' === $structured['output']['access_token_v2'] && '[redacted]' === $structured['output']['clientSecret'] );
 assert_test_handler_raw( 'author and secretary false positives are retained', 'Token Adams' === $structured['output']['author'] && 'The Secretary' === $structured['output']['secretary'] );
 assert_test_handler_raw( 'ordinary Token prose is never rewritten', 'Token prose is legitimate event content.' === $structured['output']['note'] );
+
+$config_raw = build_test_handler_raw(
+	$ability,
+	array(),
+	5,
+	12000,
+	array(
+		'imap_password'   => 'config-imap-secret',
+		'api_secret'      => 'config-api-secret',
+		'access_token_v2' => 'config-access-token',
+	)
+);
+assert_test_handler_raw( 'successful raw config redacts production credential keys', '[redacted]' === $config_raw['config_used']['imap_password'] && '[redacted]' === $config_raw['config_used']['api_secret'] && '[redacted]' === $config_raw['config_used']['access_token_v2'] );
+assert_test_handler_raw( 'successful raw config never serializes production credential values', ! str_contains( json_encode( $config_raw ), 'config-imap-secret' ) && ! str_contains( json_encode( $config_raw ), 'config-api-secret' ) && ! str_contains( json_encode( $config_raw ), 'config-access-token' ) );
 
 $resource = fopen( 'php://memory', 'r' );
 $unsafe   = sanitize_test_handler_value(
 	$ability,
 	array(
-		'binary'      => "image\0bytes",
-		'invalid'     => "bad\xB1utf8",
-		'resource'    => $resource,
-		'object'      => new stdClass(),
+		'binary'       => "image\0bytes",
+		'invalid'      => "bad\xB1utf8",
+		'resource'     => $resource,
+		'object'       => new stdClass(),
 		'not_a_number' => INF,
-		"bad\xB1key" => 'value',
+		"bad\xB1key"   => 'value',
 	)
 );
 fclose( $resource );
@@ -161,7 +233,14 @@ assert_test_handler_raw( 'invalid keys and json_encode failures are omitted', ! 
 assert_test_handler_raw( 'all unsafe omissions are explicitly reported', $unsafe['report']['omitted_field_count'] >= 6 && in_array( 'binary_content', $unsafe['report']['reasons'], true ) && in_array( 'invalid_utf8', $unsafe['report']['reasons'], true ) && in_array( 'unsupported_type', $unsafe['report']['reasons'], true ) && in_array( 'json_encode_failure', $unsafe['report']['reasons'], true ) );
 assert_test_handler_raw( 'sanitized unsafe output always serializes', false !== json_encode( $unsafe['output'] ) );
 
-$multibyte = new DataPacket( array( 'title' => 'Emoji', 'body' => str_repeat( '🥶', 900 ) ), array(), 'fetch' );
+$multibyte = new DataPacket(
+	array(
+		'title' => 'Emoji',
+		'body'  => str_repeat( '🥶', 900 ),
+	),
+	array(),
+	'fetch'
+);
 $raw       = build_test_handler_raw( $ability, array( $multibyte ), 5, 4096 );
 assert_test_handler_raw( 'multibyte packet is omitted whole at the boundary', array() === $raw['packets'] && in_array( 'byte_limit', $raw['truncation']['reasons'], true ) );
 assert_test_handler_raw( 'multibyte truncation response remains valid UTF-8 JSON under the complete-response cap', false !== json_encode( $raw, JSON_UNESCAPED_UNICODE ) && test_handler_transport_size( $raw ) <= 4096 );
@@ -186,34 +265,55 @@ $raw = build_test_handler_raw( $ability, $packets, 1, 12000 );
 assert_test_handler_raw( 'packet cap returns only complete packets', 1 === count( $raw['packets'] ) );
 assert_test_handler_raw( 'packet cap and materialization bound are explicit', in_array( 'packet_limit', $raw['truncation']['reasons'], true ) && true === $raw['truncation']['materialization_limited'] );
 
-$GLOBALS['datamachine_test_handlers'] = array(
+$failure_handlers       = array(
 	'failure-stub' => array(
 		'label' => 'Failure Stub',
 		'class' => TestHandlerRawFailureStub::class,
 	),
 );
+$failure_handler_filter = static function ( array $handlers ) use ( $failure_handlers ): array {
+	return array_merge( $handlers, $failure_handlers );
+};
+if ( function_exists( 'add_filter' ) ) {
+	add_filter( 'datamachine_handlers', $failure_handler_filter, 10, 2 );
+	HandlerAbilities::clearCache();
+} else {
+	$GLOBALS['datamachine_test_handlers'] = $failure_handlers;
+}
 $failure = $ability->execute(
 	array(
 		'handler_slug' => 'failure-stub',
-		'config'       => array( 'api_key' => 'credential-value' ),
+		'config'       => array(
+			'imap_password'   => 'failure-imap-secret',
+			'api_secret'      => 'failure-api-secret',
+			'access_token_v2' => 'failure-access-token',
+		),
 		'output_mode'  => 'raw',
 	)
 );
-assert_test_handler_raw( 'handler receives the real credential required for execution', 'credential-value' === TestHandlerRawFailureStub::$received_config['api_key'] );
+assert_test_handler_raw( 'handler receives real production credentials required for execution', 'failure-imap-secret' === TestHandlerRawFailureStub::$received_config['imap_password'] && 'failure-api-secret' === TestHandlerRawFailureStub::$received_config['api_secret'] && 'failure-access-token' === TestHandlerRawFailureStub::$received_config['access_token_v2'] );
 assert_test_handler_raw( 'raw execution bounds handler materialization through max_items', 5 === TestHandlerRawFailureStub::$received_config['max_items'] );
-assert_test_handler_raw( 'failure config is sanitized before execution output is built', '[redacted]' === $failure['config_used']['api_key'] );
-assert_test_handler_raw( 'failure message cannot echo applied credentials', 'Handler execution failed.' === $failure['error'] );
+assert_test_handler_raw( 'failure config compound credentials are sanitized before output is built', '[redacted]' === $failure['config_used']['imap_password'] && '[redacted]' === $failure['config_used']['api_secret'] && '[redacted]' === $failure['config_used']['access_token_v2'] );
+assert_test_handler_raw( 'failure message cannot echo applied credentials', 'Handler execution failed.' === $failure['error'] && ! str_contains( json_encode( $failure ), 'failure-imap-secret' ) && ! str_contains( json_encode( $failure ), 'failure-api-secret' ) && ! str_contains( json_encode( $failure ), 'failure-access-token' ) );
 
 $bounded_failure = $ability->execute(
 	array(
 		'handler_slug' => 'failure-stub',
-		'config'       => array( 'description' => str_repeat( 'x', 5000 ), 'api_key' => 'later-credential' ),
+		'config'       => array(
+			'description' => str_repeat( 'x', 5000 ),
+			'api_key'     => 'later-credential',
+		),
 		'output_mode'  => 'raw',
 		'byte_limit'   => 4096,
 	)
 );
 assert_test_handler_raw( 'oversized failure config is replaced before handler execution returns', 'byte_limit' === $bounded_failure['config_used']['_omitted'] );
 assert_test_handler_raw( 'failure stays credential-safe when a secret follows oversized config', 'Handler execution failed.' === $bounded_failure['error'] && ! str_contains( json_encode( $bounded_failure ), 'later-credential' ) );
+
+if ( function_exists( 'remove_filter' ) ) {
+	remove_filter( 'datamachine_handlers', $failure_handler_filter, 10 );
+	HandlerAbilities::clearCache();
+}
 
 $command = file_get_contents( dirname( __DIR__ ) . '/inc/Cli/Commands/TestCommand.php' ) ?: '';
 assert_test_handler_raw( 'CLI adapter maps --raw and --byte-limit', str_contains( $command, "\$input['output_mode'] = 'raw';" ) && str_contains( $command, "\$input['byte_limit'] = \$byte_limit;" ) );

@@ -29,7 +29,10 @@ class TestHandlerAbilitySchemaTest extends WP_UnitTestCase {
 
 		$raw                = $compact;
 		$raw['output_mode'] = 'raw';
-		$raw['limits']      = array( 'packet_count' => 5, 'bytes' => 4096 );
+		$raw['limits']      = array(
+			'packet_count' => 5,
+			'bytes'        => 4096,
+		);
 		$raw['truncation']  = array(
 			'truncated'                 => false,
 			'reasons'                   => array(),
