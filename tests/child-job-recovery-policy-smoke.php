@@ -69,5 +69,8 @@ $assert( 'historical AI generation is irrelevant', ! $wrong_ai['has_active_path'
 $batch_child = $diagnose( $job, $engine, array( $action( 14, 'datamachine_execute_step', 'pending', array( 'job_id' => 42, 'flow_step_id' => $step ) ) ) );
 $assert( 'batch child with pending canonical action remains guarded', $batch_child['has_active_path'] );
 
+$assert( 'job 42 does not own job 420 action args', ! ChildJobRecoveryPolicy::actionBelongsToJob( array( 'job_id' => 420 ), 42 ) );
+$assert( 'job 42 owns only exact decoded args', ChildJobRecoveryPolicy::actionBelongsToJob( array( 'job_id' => 42 ), 42 ) );
+
 echo "\nChild job recovery policy smoke complete: {$total} assertions, {$failed} failures.\n";
 exit( $failed > 0 ? 1 : 0 );

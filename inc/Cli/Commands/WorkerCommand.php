@@ -1,5 +1,5 @@
 <?php
-// phpcs:disable WordPress.Arrays.MultipleStatementAlignment.DoubleArrowNotAligned -- Worker option keys are intentionally descriptive.
+// phpcs:disable WordPress.Arrays.MultipleStatementAlignment.DoubleArrowNotAligned,Generic.Formatting.MultipleStatementAlignment -- Worker result and option keys are intentionally descriptive.
 /**
  * WP-CLI Data Machine worker command.
  *
@@ -237,6 +237,15 @@ class WorkerCommand extends BaseCommand {
 		$recoveries  = 0;
 		$timed_out   = 0;
 		$reconciled  = 0;
+		$pathless_requeued = 0;
+		$pathless_terminal = 0;
+		$recovery_claim_conflicts = 0;
+		$pathless_policy_skipped = 0;
+		$recovery_mutations = 0;
+		$recovery_requeued = 0;
+		$recovery_skipped = 0;
+		$recovery_limit_reached = 0;
+		$recovery_ran = false;
 		$completions = 0;
 		$failures    = 0;
 		$warnings    = 0;
@@ -264,12 +273,15 @@ class WorkerCommand extends BaseCommand {
 
 				++$passes;
 
-				if ( $recover_stuck ) {
+				if ( $recover_stuck && ! $recovery_ran ) {
+					$recovery_ran = true;
 					$recovery = ( new RecoverStuckJobsAbility() )->execute(
 						array(
 							'dry_run'       => false,
 							'timeout_hours' => $stuck_timeout,
 							'recovery_trigger' => 'automatic_worker',
+							'limit'         => 5,
+							'recover_pathless_children' => false,
 						)
 					);
 
@@ -279,6 +291,14 @@ class WorkerCommand extends BaseCommand {
 						$recoveries += (int) ( $recovery['recovered'] ?? 0 );
 						$timed_out  += (int) ( $recovery['timed_out'] ?? 0 );
 						$reconciled += (int) ( $recovery['stale_actions'] ?? 0 );
+						$pathless_requeued += (int) ( $recovery['pathless_requeued'] ?? 0 );
+						$pathless_terminal += (int) ( $recovery['pathless_terminal'] ?? 0 );
+						$recovery_claim_conflicts += (int) ( $recovery['claimed_elsewhere'] ?? 0 );
+						$pathless_policy_skipped += (int) ( $recovery['pathless_policy_skipped'] ?? 0 );
+						$recovery_mutations += (int) ( $recovery['mutations'] ?? 0 );
+						$recovery_requeued += (int) ( $recovery['requeued'] ?? 0 );
+						$recovery_skipped += (int) ( $recovery['skipped'] ?? 0 );
+						$recovery_limit_reached += ! empty( $recovery['limit_reached'] ) ? 1 : 0;
 					}
 				}
 
@@ -319,6 +339,14 @@ class WorkerCommand extends BaseCommand {
 				'job_recoveries'           => $recoveries,
 				'job_timeouts'             => $timed_out,
 				'stale_actions_reconciled' => $reconciled,
+				'pathless_children_requeued' => $pathless_requeued,
+				'pathless_children_terminal' => $pathless_terminal,
+				'recovery_claim_conflicts'   => $recovery_claim_conflicts,
+				'pathless_policy_skipped'    => $pathless_policy_skipped,
+				'recovery_mutations'         => $recovery_mutations,
+				'recovery_requeued'           => $recovery_requeued,
+				'recovery_skipped'            => $recovery_skipped,
+				'recovery_limit_reached'     => $recovery_limit_reached,
 				'action_completions'       => $completions,
 				'action_failures'          => $failures,
 				'pending_actions'          => (int) $status['pending_actions'],
@@ -360,6 +388,15 @@ class WorkerCommand extends BaseCommand {
 		$recoveries  = 0;
 		$timed_out   = 0;
 		$reconciled  = 0;
+		$pathless_requeued = 0;
+		$pathless_terminal = 0;
+		$recovery_claim_conflicts = 0;
+		$pathless_policy_skipped = 0;
+		$recovery_mutations = 0;
+		$recovery_requeued = 0;
+		$recovery_skipped = 0;
+		$recovery_limit_reached = 0;
+		$recovery_ran = false;
 		$job_claims  = 0;
 		$bootstraps  = 0;
 		$completed   = 0;
@@ -389,12 +426,15 @@ class WorkerCommand extends BaseCommand {
 
 			++$passes;
 
-			if ( $recover_stuck ) {
+			if ( $recover_stuck && ! $recovery_ran ) {
+				$recovery_ran = true;
 				$recovery = ( new RecoverStuckJobsAbility() )->execute(
 					array(
 						'dry_run'       => false,
 						'timeout_hours' => $stuck_timeout,
 						'recovery_trigger' => 'automatic_worker',
+						'limit'         => 5,
+						'recover_pathless_children' => false,
 					)
 				);
 
@@ -404,6 +444,14 @@ class WorkerCommand extends BaseCommand {
 					$recoveries += (int) ( $recovery['recovered'] ?? 0 );
 					$timed_out  += (int) ( $recovery['timed_out'] ?? 0 );
 					$reconciled += (int) ( $recovery['stale_actions'] ?? 0 );
+					$pathless_requeued += (int) ( $recovery['pathless_requeued'] ?? 0 );
+					$pathless_terminal += (int) ( $recovery['pathless_terminal'] ?? 0 );
+					$recovery_claim_conflicts += (int) ( $recovery['claimed_elsewhere'] ?? 0 );
+					$pathless_policy_skipped += (int) ( $recovery['pathless_policy_skipped'] ?? 0 );
+					$recovery_mutations += (int) ( $recovery['mutations'] ?? 0 );
+					$recovery_requeued += (int) ( $recovery['requeued'] ?? 0 );
+					$recovery_skipped += (int) ( $recovery['skipped'] ?? 0 );
+					$recovery_limit_reached += ! empty( $recovery['limit_reached'] ) ? 1 : 0;
 				}
 			}
 
@@ -465,6 +513,14 @@ class WorkerCommand extends BaseCommand {
 			'job_recoveries'           => $recoveries,
 			'job_timeouts'             => $timed_out,
 			'stale_actions_reconciled' => $reconciled,
+			'pathless_children_requeued' => $pathless_requeued,
+			'pathless_children_terminal' => $pathless_terminal,
+			'recovery_claim_conflicts'   => $recovery_claim_conflicts,
+			'pathless_policy_skipped'    => $pathless_policy_skipped,
+			'recovery_mutations'         => $recovery_mutations,
+			'recovery_requeued'           => $recovery_requeued,
+			'recovery_skipped'            => $recovery_skipped,
+			'recovery_limit_reached'     => $recovery_limit_reached,
 			'job_claims'               => $job_claims,
 			'job_completions'          => $completed,
 			'bootstrap_actions'        => $bootstraps,

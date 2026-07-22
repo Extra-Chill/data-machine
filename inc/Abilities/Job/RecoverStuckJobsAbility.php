@@ -24,7 +24,10 @@ class RecoverStuckJobsAbility {
 	private const CANDIDATE_BATCH_SIZE = 50;
 	private const JOB_DETAIL_LIMIT     = 100;
 	private const ACTION_HISTORY_LIMIT = 20;
+	private const ACTION_SCAN_PAGE_SIZE = 50;
 	private const RECOVERY_CLAIM_TTL   = 300;
+	private const DEFAULT_APPLY_LIMIT   = 25;
+	private const MAX_APPLY_LIMIT       = 100;
 
 	/**
 	 * Data Machine-owned Action Scheduler hooks that may be reconciled.
@@ -64,6 +67,23 @@ class RecoverStuckJobsAbility {
 								'type'        => array( 'integer', 'null' ),
 								'description' => __( 'Filter to recover jobs only for a specific flow ID', 'data-machine' ),
 							),
+							'job_id'        => array(
+								'type'        => array( 'integer', 'null' ),
+								'minimum'     => 1,
+								'description' => __( 'Recover one exact job ID', 'data-machine' ),
+							),
+							'limit'         => array(
+								'type'        => 'integer',
+								'minimum'     => 1,
+								'maximum'     => self::MAX_APPLY_LIMIT,
+								'default'     => self::DEFAULT_APPLY_LIMIT,
+								'description' => __( 'Hard maximum mutations in one invocation', 'data-machine' ),
+							),
+							'recover_pathless_children' => array(
+								'type'        => 'boolean',
+								'default'     => false,
+								'description' => __( 'Explicitly authorize applying pathless child recovery', 'data-machine' ),
+							),
 							'timeout_hours' => array(
 								'type'        => 'integer',
 								'default'     => 2,
@@ -88,6 +108,11 @@ class RecoverStuckJobsAbility {
 							'pathless_terminal' => array( 'type' => 'integer' ),
 							'pathless_requeued' => array( 'type' => 'integer' ),
 							'claimed_elsewhere' => array( 'type' => 'integer' ),
+							'pathless_policy_skipped' => array( 'type' => 'integer' ),
+							'mutations'     => array( 'type' => 'integer' ),
+							'apply_limit'   => array( 'type' => 'integer' ),
+							'limit_reached' => array( 'type' => 'boolean' ),
+							'scope'         => array( 'type' => 'object' ),
 							'dry_run'       => array( 'type' => 'boolean' ),
 							'jobs'          => array( 'type' => 'array' ),
 							'message'       => array( 'type' => 'string' ),
@@ -116,16 +141,28 @@ class RecoverStuckJobsAbility {
 	public function execute( array $input ): array {
 		global $wpdb;
 		$table = $wpdb->prefix . 'datamachine_jobs';
+		$requested_job_id = array_key_exists( 'job_id', $input ) && null !== $input['job_id'] ? filter_var( $input['job_id'], FILTER_VALIDATE_INT ) : null;
+		if ( array_key_exists( 'job_id', $input ) && null !== $input['job_id'] && ( false === $requested_job_id || $requested_job_id <= 0 ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'job_id must be a positive integer.',
+			);
+		}
 
 		$dry_run       = ! empty( $input['dry_run'] );
 		$flow_id       = isset( $input['flow_id'] ) && is_numeric( $input['flow_id'] ) ? (int) $input['flow_id'] : null;
+		$job_id_scope  = is_int( $requested_job_id ) ? $requested_job_id : null;
 		$timeout_hours = isset( $input['timeout_hours'] ) && is_numeric( $input['timeout_hours'] ) ? max( 1, (int) $input['timeout_hours'] ) : 2;
+		$apply_limit   = isset( $input['limit'] ) && is_numeric( $input['limit'] ) ? max( 1, min( self::MAX_APPLY_LIMIT, (int) $input['limit'] ) ) : self::DEFAULT_APPLY_LIMIT;
+		$recover_pathless_children = ! empty( $input['recover_pathless_children'] );
 
 		$recovered      = 0;
 		$skipped        = 0;
 		$jobs           = array();
 		$jobs_omitted   = 0;
 		$jobs_truncated = false;
+		$mutations      = 0;
+		$limit_reached  = false;
 
 		$last_job_id = 0;
 		while ( true ) {
@@ -136,6 +173,9 @@ class RecoverStuckJobsAbility {
 			);
 			if ( $flow_id ) {
 				$where_clause .= $wpdb->prepare( ' AND flow_id = %d', $flow_id );
+			}
+			if ( $job_id_scope ) {
+				$where_clause .= $wpdb->prepare( ' AND job_id = %d', $job_id_scope );
 			}
 
 			// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQL.NotPrepared -- Dynamic WHERE clause is prepared above; limit is an internal constant.
@@ -153,6 +193,10 @@ class RecoverStuckJobsAbility {
 			}
 
 			foreach ( $stuck_jobs as $job ) {
+				if ( ! $dry_run && $mutations >= $apply_limit ) {
+					$limit_reached = true;
+					break 2;
+				}
 				$last_job_id = max( $last_job_id, (int) $job->job_id );
 				$engine_data = $this->getJobEngineData( (int) $job->job_id );
 				$status      = $engine_data['job_status'] ?? null;
@@ -186,6 +230,7 @@ class RecoverStuckJobsAbility {
 
 					if ( $result ) {
 						++$recovered;
+						++$mutations;
 						$this->appendJobDetail( $jobs, $jobs_omitted, array(
 							'job_id'        => (int) $job->job_id,
 							'flow_id'       => (int) $job->flow_id,
@@ -212,6 +257,7 @@ class RecoverStuckJobsAbility {
 		$pathless_terminal = 0;
 		$pathless_requeued = 0;
 		$claimed_elsewhere = 0;
+		$pathless_policy_skipped = 0;
 		$recovery_trigger = isset( $input['recovery_trigger'] ) ? sanitize_key( (string) $input['recovery_trigger'] ) : 'operator';
 
 		$last_job_id = 0;
@@ -224,6 +270,9 @@ class RecoverStuckJobsAbility {
 			);
 			if ( $flow_id ) {
 				$timeout_where .= $wpdb->prepare( ' AND flow_id = %d', $flow_id );
+			}
+			if ( $job_id_scope ) {
+				$timeout_where .= $wpdb->prepare( ' AND job_id = %d', $job_id_scope );
 			}
 
 			// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQL.NotPrepared -- Dynamic WHERE clause is prepared above; limit is an internal constant.
@@ -241,6 +290,10 @@ class RecoverStuckJobsAbility {
 			}
 
 			foreach ( $timed_out_jobs as $job ) {
+				if ( ! $dry_run && $mutations >= $apply_limit ) {
+					$limit_reached = true;
+					break 2;
+				}
 				$last_job_id = max( $last_job_id, (int) $job->job_id );
 				$engine_data = $this->getJobEngineData( (int) $job->job_id );
 
@@ -277,6 +330,12 @@ class RecoverStuckJobsAbility {
 						$this->appendJobDetail( $jobs, $jobs_omitted, $this->childRecoveryEvidence( $job_row, $child_diagnosis, $planned_status, $recovery_trigger ) );
 						continue;
 					}
+					if ( ! $recover_pathless_children ) {
+						++$skipped;
+						++$pathless_policy_skipped;
+						$this->appendJobDetail( $jobs, $jobs_omitted, $this->childRecoveryEvidence( $job_row, $child_diagnosis, 'skipped', $recovery_trigger, 'pathless_child_apply_policy_required' ) );
+						continue;
+					}
 
 					$claim = $this->claimPathlessChildRecovery( $job_id, $recovery_trigger );
 					if ( empty( $claim['owned'] ) ) {
@@ -292,17 +351,30 @@ class RecoverStuckJobsAbility {
 					$child_diagnosis = ChildJobRecoveryPolicy::diagnose( $claimed_job, $engine_data, $this->getStepActionHistory( $job_id ), $timeout_hours * HOUR_IN_SECONDS, time() );
 					if ( ! empty( $child_diagnosis['has_active_path'] ) ) {
 						++$skipped;
-						$this->finishPathlessChildRecovery( $job_id, (string) $claim['token'], 'scheduler_path_observed', array() );
+						$this->finishPathlessChildRecovery( $job_id, (string) $claim['token'], (int) $claim['generation'], 'scheduler_path_observed', array() );
 						$this->appendJobDetail( $jobs, $jobs_omitted, $this->childRecoveryEvidence( $job_row, $child_diagnosis, 'skipped', $recovery_trigger, 'scheduler_path_appeared_after_claim' ) );
 						continue;
 					}
 
 					if ( ! empty( $child_diagnosis['retry_eligible'] ) ) {
-						$action_id = as_schedule_single_action( time(), 'datamachine_execute_step', $child_diagnosis['retry_args'], 'data-machine', true );
-						if ( is_numeric( $action_id ) && (int) $action_id > 0 && $this->db_jobs->update_job_status( $job_id, JobStatus::PENDING ) ) {
+						$retry_args = array_merge(
+							$child_diagnosis['retry_args'],
+							array(
+								'recovery_generation'  => (int) $claim['generation'],
+								'recovery_claim_token' => (string) $claim['token'],
+							)
+						);
+						$requeue = $this->db_jobs->commit_recovery_owned_requeue(
+							$job_id,
+							(string) $claim['token'],
+							(int) $claim['generation'],
+							static fn(): int => (int) as_schedule_single_action( time(), 'datamachine_execute_step', $retry_args, 'data-machine', true )
+						);
+						$action_id = (int) ( $requeue['action_id'] ?? 0 );
+						if ( ! empty( $requeue['success'] ) && $action_id > 0 ) {
 							++$requeued;
 							++$pathless_requeued;
-							$this->finishPathlessChildRecovery( $job_id, (string) $claim['token'], 'requeued', array( 'action_id' => (int) $action_id ) );
+							++$mutations;
 							$this->appendJobDetail( $jobs, $jobs_omitted, $this->childRecoveryEvidence( $job_row, $child_diagnosis, 'requeued_pathless_child', $recovery_trigger ) + array( 'recovery_action_id' => (int) $action_id ) );
 							continue;
 						}
@@ -311,16 +383,16 @@ class RecoverStuckJobsAbility {
 						$race_diagnosis = ChildJobRecoveryPolicy::diagnose( $race_job, $this->getJobEngineData( $job_id ), $this->getStepActionHistory( $job_id ), $timeout_hours * HOUR_IN_SECONDS, time() );
 						if ( ! empty( $race_diagnosis['has_active_path'] ) ) {
 							++$skipped;
-							$this->finishPathlessChildRecovery( $job_id, (string) $claim['token'], 'scheduler_path_observed', array() );
+							$this->finishPathlessChildRecovery( $job_id, (string) $claim['token'], (int) $claim['generation'], 'scheduler_path_observed', array() );
 							$this->appendJobDetail( $jobs, $jobs_omitted, $this->childRecoveryEvidence( $job_row, $race_diagnosis, 'skipped', $recovery_trigger, 'concurrent_scheduler_path_won' ) );
 							continue;
 						}
 					}
 
-					$this->finishPathlessChildRecovery( $job_id, (string) $claim['token'], 'terminal_transition', array() );
-					$result = $this->db_jobs->transition_job_status( $job_id, JobStatus::failed( 'scheduler_path_lost' )->toString(), true );
-					if ( $result ) {
+					$result = $this->db_jobs->transition_recovery_owned_child( $job_id, JobStatus::failed( 'scheduler_path_lost' )->toString(), (string) $claim['token'], (int) $claim['generation'] );
+					if ( ! empty( $result['success'] ) ) {
 						++$pathless_terminal;
+						++$mutations;
 						$this->appendJobDetail( $jobs, $jobs_omitted, $this->childRecoveryEvidence( $job_row, $child_diagnosis, 'transitioned_pathless_child', $recovery_trigger ) );
 					} else {
 						++$skipped;
@@ -355,6 +427,7 @@ class RecoverStuckJobsAbility {
 
 					if ( $result ) {
 						++$timed_out;
+						++$mutations;
 						$this->appendJobDetail( $jobs, $jobs_omitted, array(
 							'job_id'  => $job_id,
 							'flow_id' => $job_flow_id,
@@ -377,8 +450,12 @@ class RecoverStuckJobsAbility {
 			}
 		}
 
-		$terminal_actions = $this->getTerminalBackedInProgressActions( $flow_id );
+		$terminal_actions = $this->getTerminalBackedInProgressActions( $flow_id, $job_id_scope );
 		foreach ( $terminal_actions as $action ) {
+			if ( ! $dry_run && $mutations >= $apply_limit ) {
+				$limit_reached = true;
+				break;
+			}
 			$job_id         = (int) $action['job_id'];
 			$action_id      = (int) $action['action_id'];
 			$job_flow_id    = (int) $action['flow_id'];
@@ -400,6 +477,7 @@ class RecoverStuckJobsAbility {
 
 			if ( $this->completeTerminalBackedAction( $action_id, $action_hook, $job_id, $terminal_state ) ) {
 				++$stale_actions;
+				++$mutations;
 				$this->appendJobDetail( $jobs, $jobs_omitted, array(
 					'job_id'        => $job_id,
 					'flow_id'       => $job_flow_id,
@@ -424,10 +502,10 @@ class RecoverStuckJobsAbility {
 		$jobs_truncated = $jobs_omitted > 0;
 
 		$message = $dry_run
-			? sprintf( 'Dry run complete. Would recover %d jobs, timeout %d jobs, reconcile %d terminal-backed actions.', $recovered, $timed_out, $stale_actions )
-			: sprintf( 'Recovery complete. Recovered: %d, Timed out: %d, Reconciled actions: %d, Requeued: %d', $recovered, $timed_out, $stale_actions, $requeued );
+			? sprintf( 'Dry run complete. Would recover %d jobs, timeout %d jobs, requeue %d pathless children, terminalize %d pathless children, and reconcile %d terminal-backed actions.', $recovered, $timed_out, $pathless_requeued, $pathless_terminal, $stale_actions )
+			: sprintf( 'Recovery complete. Mutations: %d/%d, Recovered: %d, Timed out: %d, Pathless requeued: %d, Pathless terminal: %d, Reconciled actions: %d, Policy-skipped: %d', $mutations, $apply_limit, $recovered, $timed_out, $pathless_requeued, $pathless_terminal, $stale_actions, $pathless_policy_skipped );
 
-		if ( ! $dry_run && ( $recovered > 0 || $timed_out > 0 || $stale_actions > 0 ) ) {
+		if ( ! $dry_run && ( $mutations > 0 || $claimed_elsewhere > 0 || $pathless_policy_skipped > 0 ) ) {
 			do_action(
 				'datamachine_log',
 				'info',
@@ -437,6 +515,14 @@ class RecoverStuckJobsAbility {
 					'timed_out'     => $timed_out,
 					'stale_actions' => $stale_actions,
 					'requeued'      => $requeued,
+					'pathless_requeued' => $pathless_requeued,
+					'pathless_terminal' => $pathless_terminal,
+					'claimed_elsewhere' => $claimed_elsewhere,
+					'pathless_policy_skipped' => $pathless_policy_skipped,
+					'mutations'     => $mutations,
+					'apply_limit'   => $apply_limit,
+					'limit_reached' => $limit_reached,
+					'job_id'        => $job_id_scope,
 					'flow_id'       => $flow_id,
 				)
 			);
@@ -452,6 +538,17 @@ class RecoverStuckJobsAbility {
 			'pathless_terminal' => $pathless_terminal,
 			'pathless_requeued' => $pathless_requeued,
 			'claimed_elsewhere' => $claimed_elsewhere,
+			'pathless_policy_skipped' => $pathless_policy_skipped,
+			'mutations'      => $mutations,
+			'apply_limit'    => $apply_limit,
+			'limit_reached'  => $limit_reached,
+			'scope'          => array(
+				'job_id'                    => $job_id_scope,
+				'flow_id'                   => $flow_id,
+				'statuses'                  => array( 'processing' ),
+				'includes_pending_ai'       => false,
+				'recover_pathless_children' => $recover_pathless_children,
+			),
 			'dry_run'        => $dry_run,
 			'jobs'           => $jobs,
 			'jobs_omitted'   => $jobs_omitted,
@@ -491,45 +588,65 @@ class RecoverStuckJobsAbility {
 	private function getStepActionHistory( int $job_id ): array {
 		global $wpdb;
 		$actions_table = $wpdb->prefix . 'actionscheduler_actions';
-		$like_job_id   = '%"job_id":' . $wpdb->esc_like( (string) $job_id ) . '%';
+		$job_arg_prefix = '%"job_id":' . $wpdb->esc_like( (string) $job_id );
+		$like_job_comma = $job_arg_prefix . ',%';
+		$like_job_end   = $job_arg_prefix . '}%';
+		$history      = array();
+		$history_count = 0;
+		$before_id    = PHP_INT_MAX;
 
-		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name is generated from the WP prefix; limit is internal.
-		$rows = $wpdb->get_results(
-			$wpdb->prepare(
-				"SELECT action_id, hook, status, claim_id, scheduled_date_gmt, last_attempt_gmt, attempts, args
-				 FROM {$actions_table}
-				 WHERE hook IN (%s, %s)
-				 AND args LIKE %s
-				 ORDER BY action_id DESC
-				 LIMIT %d",
-				'datamachine_execute_step',
-				'datamachine_resume_ai_step',
-				$like_job_id,
-				self::ACTION_HISTORY_LIMIT
-			),
-			ARRAY_A
-		);
-		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-
-		$history = array();
-		foreach ( $rows as $row ) {
-			$args = json_decode( (string) ( $row['args'] ?? '' ), true );
-			if ( ! is_array( $args ) || (int) ( $args['job_id'] ?? 0 ) !== $job_id ) {
-				continue;
+		while ( $history_count < self::ACTION_HISTORY_LIMIT ) {
+			// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name is generated from the WP prefix.
+			$rows = $wpdb->get_results(
+				$wpdb->prepare(
+					"SELECT action_id, hook, status, claim_id, scheduled_date_gmt, last_attempt_gmt, attempts, args
+					 FROM {$actions_table}
+					 WHERE hook IN (%s, %s)
+					 AND (args LIKE %s OR args LIKE %s)
+					 AND action_id < %d
+					 ORDER BY action_id DESC
+					 LIMIT %d",
+					'datamachine_execute_step',
+					'datamachine_resume_ai_step',
+					$like_job_comma,
+					$like_job_end,
+					$before_id,
+					self::ACTION_SCAN_PAGE_SIZE
+				),
+				ARRAY_A
+			);
+			// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			if ( empty( $rows ) ) {
+				break;
 			}
-			$row['decoded_args'] = $args;
-			$history[]           = $row;
+
+			$last_row  = end( $rows );
+			$before_id = is_array( $last_row ) ? (int) ( $last_row['action_id'] ?? 0 ) : 0;
+			foreach ( $rows as $row ) {
+				$args = json_decode( (string) ( $row['args'] ?? '' ), true );
+				if ( ! is_array( $args ) || ! ChildJobRecoveryPolicy::actionBelongsToJob( $args, $job_id ) ) {
+					continue;
+				}
+				$row['decoded_args'] = $args;
+				$history[]           = $row;
+				++$history_count;
+				if ( self::ACTION_HISTORY_LIMIT <= $history_count ) {
+					break;
+				}
+			}
 		}
 		return $history;
 	}
 
-	/** @return array{owned:bool,token:string} */
+	/** @return array{owned:bool,token:string,generation:int,expires_at:string} */
 	private function claimPathlessChildRecovery( int $job_id, string $trigger ): array {
 		$job = $this->db_jobs->get_job( $job_id );
 		if ( ! is_array( $job ) || JobStatus::PROCESSING !== ( $job['status'] ?? '' ) || (int) ( $job['parent_job_id'] ?? 0 ) <= 0 ) {
 			return array(
 				'owned' => false,
 				'token' => '',
+				'generation' => 0,
+				'expires_at' => '',
 			);
 		}
 
@@ -538,9 +655,9 @@ class RecoverStuckJobsAbility {
 		$result = EngineData::mutate(
 			$job_id,
 			static function ( array $engine ) use ( $token, $trigger, $now ): ?array {
-				$current    = is_array( $engine['scheduler_recovery'] ?? null ) ? $engine['scheduler_recovery'] : array();
-				$claimed_at = strtotime( (string) ( $current['claimed_at'] ?? '' ) );
-				if ( 'claimed' === ( $current['state'] ?? '' ) && false !== $claimed_at && ( $now - $claimed_at ) < self::RECOVERY_CLAIM_TTL ) {
+				$current = is_array( $engine['scheduler_recovery'] ?? null ) ? $engine['scheduler_recovery'] : array();
+				$expiry  = strtotime( (string) ( $current['expires_at'] ?? '' ) );
+				if ( 'claimed' === ( $current['state'] ?? '' ) && false !== $expiry && $now < $expiry ) {
 					return null;
 				}
 				$engine['scheduler_recovery'] = array(
@@ -550,6 +667,7 @@ class RecoverStuckJobsAbility {
 					'generation' => max( 0, (int) ( $current['generation'] ?? 0 ) ) + 1,
 					'trigger'    => $trigger,
 					'claimed_at' => gmdate( 'c', $now ),
+					'expires_at' => gmdate( 'c', $now + self::RECOVERY_CLAIM_TTL ),
 				);
 				return $engine;
 			},
@@ -560,16 +678,19 @@ class RecoverStuckJobsAbility {
 		return array(
 			'owned' => ! empty( $result['success'] ) && hash_equals( $token, (string) ( $state['token'] ?? '' ) ),
 			'token' => $token,
+			'generation' => (int) ( $state['generation'] ?? 0 ),
+			'expires_at' => (string) ( $state['expires_at'] ?? '' ),
 		);
 	}
 
 	/** @param array<string,mixed> $extra */
-	private function finishPathlessChildRecovery( int $job_id, string $token, string $state, array $extra ): bool {
+	private function finishPathlessChildRecovery( int $job_id, string $token, int $generation, string $state, array $extra ): bool {
 		$result = EngineData::mutate(
 			$job_id,
-			static function ( array $engine ) use ( $token, $state, $extra ): ?array {
+			static function ( array $engine ) use ( $token, $generation, $state, $extra ): ?array {
 				$current = is_array( $engine['scheduler_recovery'] ?? null ) ? $engine['scheduler_recovery'] : array();
-				if ( ! hash_equals( $token, (string) ( $current['token'] ?? '' ) ) || 'claimed' !== ( $current['state'] ?? '' ) ) {
+				$expiry  = strtotime( (string) ( $current['expires_at'] ?? '' ) );
+				if ( ! hash_equals( $token, (string) ( $current['token'] ?? '' ) ) || (int) ( $current['generation'] ?? 0 ) !== $generation || 'claimed' !== ( $current['state'] ?? '' ) || false === $expiry || $expiry <= time() ) {
 					return null;
 				}
 				$engine['scheduler_recovery'] = array_merge(
@@ -589,22 +710,49 @@ class RecoverStuckJobsAbility {
 
 	/** @return array<string,mixed> */
 	private function childRecoveryEvidence( array $job, array $diagnosis, string $status, string $trigger, string $reason = '' ): array {
+		$current_job = $this->db_jobs->get_job( (int) ( $job['job_id'] ?? 0 ) );
+		if ( is_array( $current_job ) ) {
+			$job = $current_job;
+		}
 		$action = is_array( $diagnosis['active_action'] ?? null ) ? $diagnosis['active_action'] : ( is_array( $diagnosis['latest_action'] ?? null ) ? $diagnosis['latest_action'] : array() );
-		$created = strtotime( (string) ( $job['created_at'] ?? '' ) . ' UTC' );
+		$args    = is_array( $action['decoded_args'] ?? null ) ? $action['decoded_args'] : array();
+		$engine  = is_array( $job['engine_data'] ?? null ) ? $job['engine_data'] : array();
+		$lease   = is_array( $engine['scheduler_recovery'] ?? null ) ? $engine['scheduler_recovery'] : array();
+		$receipt = is_array( $lease['receipt'] ?? null ) ? $lease['receipt'] : array();
+		$item_claim = is_array( $engine['_datamachine_item_claim'] ?? null ) ? $engine['_datamachine_item_claim'] : array();
+		$created    = strtotime( (string) ( $job['created_at'] ?? '' ) . ' UTC' );
+		$claimed_at = strtotime( (string) ( $lease['claimed_at'] ?? '' ) );
+		$lease_at   = strtotime( (string) ( $lease['renewed_at'] ?? $lease['claimed_at'] ?? '' ) );
+		$token      = (string) ( $lease['token'] ?? '' );
 		return array(
 			'job_id'             => (int) ( $job['job_id'] ?? 0 ),
 			'flow_id'            => (int) ( $job['flow_id'] ?? 0 ),
 			'parent_job_id'      => (int) ( $job['parent_job_id'] ?? 0 ),
 			'status'             => $status,
+			'disposition'        => $status,
 			'reason'             => '' !== $reason ? $reason : (string) ( $diagnosis['reason'] ?? '' ),
+			'owner'              => '' === $token ? 'none' : substr( hash( 'sha256', $token ), 0, 16 ),
 			'job_age_seconds'    => false === $created ? 0 : max( 0, time() - $created ),
 			'scheduler_path'     => ! empty( $diagnosis['has_active_path'] ) ? 'active' : 'none',
 			'action_id'          => (int) ( $action['action_id'] ?? 0 ),
 			'action_hook'        => (string) ( $action['hook'] ?? '' ),
 			'action_status'      => (string) ( $action['status'] ?? '' ),
 			'action_claim_id'    => (int) ( $action['claim_id'] ?? 0 ),
+			'action_generation'  => (int) ( $args['recovery_generation'] ?? $args['ai_resume_generation'] ?? $args['operation_generation'] ?? 0 ),
 			'operation_state'    => (string) ( $job['operation_state'] ?? '' ),
 			'operation_generation' => (int) ( $job['operation_generation'] ?? 0 ),
+			'recovery_lease_state' => (string) ( $lease['state'] ?? 'none' ),
+			'recovery_lease_generation' => (int) ( $lease['generation'] ?? 0 ),
+			'recovery_lease_token_state' => '' === $token ? 'missing' : 'present',
+			'recovery_lease_age_seconds' => false === $lease_at ? 0 : max( 0, time() - $lease_at ),
+			'recovery_lease_claim_age_seconds' => false === $claimed_at ? 0 : max( 0, time() - $claimed_at ),
+			'recovery_lease_expires_at' => (string) ( $lease['expires_at'] ?? '' ),
+			'receipt_state'      => empty( $receipt ) ? 'missing' : 'committed',
+			'receipt_action_id'  => (int) ( $receipt['action_id'] ?? 0 ),
+			'item_claim_state'   => empty( $item_claim ) ? 'none' : 'owned',
+			'item_claim_job_id'  => (int) ( $item_claim['job_id'] ?? 0 ),
+			'terminal_accounting_state' => isset( $job['terminal_accounting_state'] ) ? (int) $job['terminal_accounting_state'] : null,
+			'terminal_accounting_owner_state' => empty( $job['terminal_accounting_owner'] ) ? 'none' : 'present',
 			'retry_eligible'     => ! empty( $diagnosis['retry_eligible'] ),
 			'recovery_trigger'   => $trigger,
 		);
@@ -655,7 +803,7 @@ class RecoverStuckJobsAbility {
 	 * @param int|null $flow_id Optional flow filter.
 	 * @return array<int,array{action_id:int,hook:string,job_id:int,flow_id:int,job_status:string}>
 	 */
-	private function getTerminalBackedInProgressActions( ?int $flow_id ): array {
+	private function getTerminalBackedInProgressActions( ?int $flow_id, ?int $job_id_scope = null ): array {
 		global $wpdb;
 
 		$actions_table = $wpdb->prefix . 'actionscheduler_actions';
@@ -710,6 +858,10 @@ class RecoverStuckJobsAbility {
 		if ( $flow_id ) {
 			$sql         .= ' AND flow_id = %d';
 			$query_args[] = $flow_id;
+		}
+		if ( $job_id_scope ) {
+			$sql         .= ' AND job_id = %d';
+			$query_args[] = $job_id_scope;
 		}
 
 		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQL.NotPrepared -- Dynamic placeholder list is prepared below.

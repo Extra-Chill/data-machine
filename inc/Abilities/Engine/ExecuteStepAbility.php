@@ -74,6 +74,15 @@ class ExecuteStepAbility {
 								'minimum'     => 0,
 								'description' => __( 'AI contention resume ownership generation.', 'data-machine' ),
 							),
+							'recovery_generation'   => array(
+								'type'        => 'integer',
+								'minimum'     => 0,
+								'description' => __( 'Pathless-child recovery ownership generation.', 'data-machine' ),
+							),
+							'recovery_claim_token'  => array(
+								'type'        => 'string',
+								'description' => __( 'Pathless-child recovery ownership token.', 'data-machine' ),
+							),
 						),
 					),
 					'output_schema'       => array(
@@ -117,12 +126,21 @@ class ExecuteStepAbility {
 		$operation_generation  = max( 0, (int) ( $input['operation_generation'] ?? 0 ) );
 		$operation_claim_token = (string) ( $input['operation_claim_token'] ?? '' );
 		$ai_resume_generation  = max( 0, (int) ( $input['ai_resume_generation'] ?? 0 ) );
+		$recovery_generation   = max( 0, (int) ( $input['recovery_generation'] ?? 0 ) );
+		$recovery_claim_token  = (string) ( $input['recovery_claim_token'] ?? '' );
 		$job                   = $this->db_jobs->get_job( $job_id );
 
 		if ( ! $job ) {
 			return array(
 				'success' => false,
 				'error'   => sprintf( 'Job %d not found.', $job_id ),
+			);
+		}
+		if ( $recovery_generation > 0 && ! $this->recoveryGenerationAdmission( $job, $recovery_generation, $recovery_claim_token ) ) {
+			return array(
+				'success'              => false,
+				'stale_recovery_owner' => true,
+				'error'                => sprintf( 'Job %d recovery generation %d is stale or lacks a committed receipt.', $job_id, $recovery_generation ),
 			);
 		}
 
@@ -387,6 +405,18 @@ class ExecuteStepAbility {
 		}
 
 		return 'enqueuing' === ( $job['operation_state'] ?? '' ) ? 'pending_commit' : 'stale';
+	}
+
+	private function recoveryGenerationAdmission( array $job, int $generation, string $token ): bool {
+		$engine  = is_array( $job['engine_data'] ?? null ) ? $job['engine_data'] : array();
+		$owner   = is_array( $engine['scheduler_recovery'] ?? null ) ? $engine['scheduler_recovery'] : array();
+		$receipt = is_array( $owner['receipt'] ?? null ) ? $owner['receipt'] : array();
+
+		return '' !== $token
+			&& 'requeued' === (string) ( $owner['state'] ?? '' )
+			&& (int) ( $owner['generation'] ?? 0 ) === $generation
+			&& (int) ( $receipt['generation'] ?? 0 ) === $generation
+			&& hash_equals( $token, (string) ( $owner['token'] ?? '' ) );
 	}
 
 	private function deferOperationGeneration( int $job_id, string $flow_step_id, int $generation, string $token ): array {

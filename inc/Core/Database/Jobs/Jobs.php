@@ -37,6 +37,7 @@ class Jobs extends BaseRepository {
 	private const TERMINAL_ACCOUNTING_LIFECYCLE = 2;
 	private const TERMINAL_ACCOUNTING_NOTIFY    = 3;
 	public const TERMINAL_ACCOUNTING_COMPLETE   = 4;
+	private const RECOVERY_LEASE_TTL            = 300;
 
 	/** Job currently owning the connection-wide terminal transaction. */
 	private static ?int $terminalizing_job = null;
@@ -1942,6 +1943,137 @@ class Jobs extends BaseRepository {
 	}
 
 	/**
+	 * Commit a pathless-child terminal transition while its recovery lease owns the locked row.
+	 *
+	 * @return array{success:bool,changed:bool,current_status:?string,status:string}
+	 */
+	// phpcs:disable Generic.Formatting.MultipleStatementAlignment,WordPress.Arrays.MultipleStatementAlignment.DoubleArrowNotAligned -- Recovery receipts use descriptive keys.
+	public function transition_recovery_owned_child( int $job_id, string $status, string $token, int $generation ): array {
+		if ( ! JobStatus::isStatusFinal( $status ) || '' === $token || $generation <= 0 ) {
+			return $this->status_transition_result( false, false, null, $status );
+		}
+
+		return $this->transition_terminal_job_status_result(
+			$job_id,
+			$status,
+			array(
+				'token'      => $token,
+				'generation' => $generation,
+			)
+		);
+	}
+
+	/**
+	 * Schedule and receipt one child requeue inside the recovery owner's locked transaction.
+	 *
+	 * The scheduler callback uses the same database transaction, so a crash or failed receipt
+	 * rolls back both the Action Scheduler insert and the jobs-row mutation.
+	 *
+	 * @param callable():int $schedule Scheduler callback returning an action ID.
+	 * @return array{success:bool,action_id:int,reason:string}
+	 */
+	public function commit_recovery_owned_requeue( int $job_id, string $token, int $generation, callable $schedule ): array {
+		$result = array(
+			'success'   => false,
+			'action_id' => 0,
+			'reason'    => 'lease_not_owned',
+		);
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		if ( false === $this->wpdb->query( 'START TRANSACTION' ) ) {
+			$result['reason'] = 'transaction_start_failed';
+			return $result;
+		}
+
+		$job = $this->get_job_for_update( $job_id );
+		if ( JobStatus::PROCESSING !== ( $job['status'] ?? '' ) || (int) ( $job['parent_job_id'] ?? 0 ) <= 0 || ! $this->renew_recovery_owner_on_locked_job( $job, $token, $generation ) ) {
+			$this->wpdb->query( 'ROLLBACK' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			return $result;
+		}
+
+		$engine  = is_array( $job['engine_data'] ?? null ) ? $job['engine_data'] : array();
+		$receipt = is_array( $engine['scheduler_recovery']['receipt'] ?? null ) ? $engine['scheduler_recovery']['receipt'] : array();
+		if ( (int) ( $receipt['generation'] ?? 0 ) === $generation && (int) ( $receipt['action_id'] ?? 0 ) > 0 ) {
+			$this->wpdb->query( 'ROLLBACK' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			return array(
+				'success'   => true,
+				'action_id' => (int) $receipt['action_id'],
+				'reason'    => 'receipt_reused',
+			);
+		}
+
+		try {
+			$action_id = (int) $schedule();
+		} catch ( \Throwable ) {
+			$this->wpdb->query( 'ROLLBACK' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			$result['reason'] = 'scheduler_exception';
+			return $result;
+		}
+		if ( $action_id <= 0 ) {
+			$this->wpdb->query( 'ROLLBACK' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			$result['reason'] = 'schedule_failed';
+			return $result;
+		}
+		if ( ! $this->recovery_owner_matches( $job, $token, $generation ) ) {
+			$this->wpdb->query( 'ROLLBACK' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			$result['reason'] = 'lease_expired_after_schedule';
+			return $result;
+		}
+
+		$engine['scheduler_recovery']['state']        = 'requeued';
+		$engine['scheduler_recovery']['completed_at'] = gmdate( 'c' );
+		$engine['scheduler_recovery']['receipt']      = array(
+			'generation'   => $generation,
+			'action_id'    => $action_id,
+			'committed_at' => gmdate( 'c' ),
+		);
+		$run_lifecycle = is_array( $engine['run_lifecycle'] ?? null ) ? $engine['run_lifecycle'] : array();
+		$run_lifecycle['run_id']        = (string) ( $run_lifecycle['run_id'] ?? 'job:' . $job_id );
+		$run_lifecycle['job_id']        = $job_id;
+		$run_lifecycle['attempt']       = max( 1, (int) ( $run_lifecycle['attempt'] ?? 1 ) );
+		$run_lifecycle['replay_events'] = is_array( $run_lifecycle['replay_events'] ?? null ) ? array_values( $run_lifecycle['replay_events'] ) : array();
+		$run_lifecycle['artifact_refs'] = is_array( $run_lifecycle['artifact_refs'] ?? null ) ? array_values( $run_lifecycle['artifact_refs'] ) : array();
+		$run_lifecycle['status']        = JobStatus::PENDING;
+		$run_lifecycle['updated_at']    = current_time( 'mysql', true );
+		$engine['run_lifecycle']        = $run_lifecycle;
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$updated = $this->wpdb->update(
+			$this->table_name,
+			array(
+				'status'      => JobStatus::PENDING,
+				'engine_data' => wp_json_encode( $engine ),
+			),
+			array(
+				'job_id' => $job_id,
+				'status' => JobStatus::PROCESSING,
+			),
+			array( '%s', '%s' ),
+			array( '%d', '%s' )
+		);
+		if ( 1 !== (int) $updated ) {
+			$this->wpdb->query( 'ROLLBACK' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			$result['reason'] = 'receipt_commit_failed';
+			return $result;
+		}
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		if ( false === $this->wpdb->query( 'COMMIT' ) ) {
+			$this->wpdb->query( 'ROLLBACK' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			$result['reason'] = 'transaction_commit_failed';
+			return $result;
+		}
+
+		wp_cache_delete( $job_id, 'datamachine_engine_data' );
+		return array(
+			'success'   => true,
+			'action_id' => $action_id,
+			'reason'    => 'requeued',
+		);
+	}
+	// phpcs:enable Generic.Formatting.MultipleStatementAlignment,WordPress.Arrays.MultipleStatementAlignment.DoubleArrowNotAligned
+
+	/**
 	 * Transition a job status with compare-and-set/idempotent lifecycle details.
 	 *
 	 * Non-terminal jobs may move to another non-terminal state or to a terminal
@@ -2062,7 +2194,7 @@ class Jobs extends BaseRepository {
 	 * @param string $requested_status Requested final status.
 	 * @return array{success: bool, changed: bool, current_status: ?string, status: string}
 	 */
-	private function transition_terminal_job_status_result( int $job_id, string $requested_status ): array {
+	private function transition_terminal_job_status_result( int $job_id, string $requested_status, ?array $recovery_owner = null ): array {
 		if ( null !== self::$terminalizing_job ) {
 			return $this->status_transition_result( false, false, null, $requested_status );
 		}
@@ -2078,6 +2210,10 @@ class Jobs extends BaseRepository {
 		if ( ! is_array( $job ) ) {
 			$this->rollback_terminal_transition( $job_id );
 			return $this->status_transition_result( false, false, null, $requested_status );
+		}
+		if ( is_array( $recovery_owner ) && ! $this->recovery_owner_matches( $job, (string) ( $recovery_owner['token'] ?? '' ), (int) ( $recovery_owner['generation'] ?? 0 ) ) ) {
+			$this->rollback_terminal_transition( $job_id );
+			return $this->status_transition_result( false, false, (string) ( $job['status'] ?? '' ), $requested_status );
 		}
 
 		$current_status = is_string( $job['status'] ?? null ) ? $job['status'] : '';
@@ -2153,25 +2289,49 @@ class Jobs extends BaseRepository {
 			return $this->status_transition_result( false, false, $current_status, $current_status );
 		}
 		$processed_claim_count = is_array( $accounting_context ) ? max( 0, (int) ( $accounting_context['processed_claim_count'] ?? 0 ) ) : 0;
+		if ( is_array( $recovery_owner ) ) {
+			$latest_job = $this->get_job_for_update( $job_id );
+			if ( ! $this->renew_recovery_owner_on_locked_job( $latest_job, (string) ( $recovery_owner['token'] ?? '' ), (int) ( $recovery_owner['generation'] ?? 0 ) ) ) {
+				$this->rollback_terminal_transition( $job_id );
+				return $this->status_transition_result( false, false, $current_status, $current_status );
+			}
+			$job = $latest_job;
+		}
 
 		// The locked row makes this a non-retrying ownership CAS. Any failure rolls
 		// back the whole callback/claim/job unit instead of retrying one statement.
+		// phpcs:disable Generic.Formatting.MultipleStatementAlignment,WordPress.Arrays.MultipleStatementAlignment.DoubleArrowNotAligned -- Terminal recovery receipt extends the existing update envelope.
+		$update_data = array(
+			'status'                              => $status,
+			'completed_at'                        => current_time( 'mysql', true ),
+			'terminal_accounting_state'           => 0,
+			'terminal_accounting_owner'           => null,
+			'terminal_accounting_claimed_at'      => null,
+			'terminal_accounting_processed_count' => $processed_claim_count,
+		);
+		$update_formats = array( '%s', '%s', '%d', null, null, '%d' );
+		if ( is_array( $recovery_owner ) ) {
+			$engine = is_array( $job['engine_data'] ?? null ) ? $job['engine_data'] : array();
+			$engine['scheduler_recovery']['state']        = 'terminalized';
+			$engine['scheduler_recovery']['completed_at'] = gmdate( 'c' );
+			$engine['scheduler_recovery']['receipt']      = array(
+				'generation'      => (int) ( $recovery_owner['generation'] ?? 0 ),
+				'terminal_status' => $status,
+				'committed_at'    => gmdate( 'c' ),
+			);
+			$update_data['engine_data'] = wp_json_encode( $engine );
+			$update_formats[]           = '%s';
+		}
+		// phpcs:enable Generic.Formatting.MultipleStatementAlignment,WordPress.Arrays.MultipleStatementAlignment.DoubleArrowNotAligned
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		$updated = $this->wpdb->update(
 			$this->table_name,
-			array(
-				'status'                              => $status,
-				'completed_at'                        => current_time( 'mysql', true ),
-				'terminal_accounting_state'           => 0,
-				'terminal_accounting_owner'           => null,
-				'terminal_accounting_claimed_at'      => null,
-				'terminal_accounting_processed_count' => $processed_claim_count,
-			),
+			$update_data,
 			array(
 				'job_id' => $job_id,
 				'status' => $current_status,
 			),
-			array( '%s', '%s', '%d', null, null, '%d' ),
+			$update_formats,
 			array( '%d', '%s' )
 		);
 		if ( 1 !== $updated ) {
@@ -2190,6 +2350,9 @@ class Jobs extends BaseRepository {
 			$winner        = $this->get_job( $job_id );
 			$winner_status = is_array( $winner ) && is_string( $winner['status'] ?? null ) ? $winner['status'] : $current_status;
 			return $this->status_transition_result( $status === $winner_status, false, $winner_status, $winner_status );
+		}
+		if ( is_array( $recovery_owner ) ) {
+			wp_cache_delete( $job_id, 'datamachine_engine_data' );
 		}
 
 		$this->reconcile_terminal_accounting( $job_id );
@@ -2445,6 +2608,54 @@ class Jobs extends BaseRepository {
 		}
 
 		return is_array( $job ) ? $job : null;
+	}
+
+	/** Check the exact unexpired recovery fence on a locked jobs row. */
+	private function recovery_owner_matches( ?array $job, string $token, int $generation ): bool {
+		if ( ! is_array( $job ) || '' === $token || $generation <= 0 ) {
+			return false;
+		}
+
+		$engine = is_array( $job['engine_data'] ?? null ) ? $job['engine_data'] : array();
+		$lease  = is_array( $engine['scheduler_recovery'] ?? null ) ? $engine['scheduler_recovery'] : array();
+		$expiry = strtotime( (string) ( $lease['expires_at'] ?? '' ) );
+
+		return 'claimed' === (string) ( $lease['state'] ?? '' )
+			&& (int) ( $lease['generation'] ?? 0 ) === $generation
+			&& hash_equals( $token, (string) ( $lease['token'] ?? '' ) )
+			&& false !== $expiry
+			&& time() < $expiry;
+	}
+
+	/** Atomically renew an exact recovery owner while its jobs row is locked. */
+	private function renew_recovery_owner_on_locked_job( ?array &$job, string $token, int $generation ): bool {
+		if ( ! $this->recovery_owner_matches( $job, $token, $generation ) ) {
+			return false;
+		}
+
+		$engine = is_array( $job['engine_data'] ?? null ) ? $job['engine_data'] : array();
+		$now    = time();
+
+		$engine['scheduler_recovery']['renewed_at'] = gmdate( 'c', $now );
+		$engine['scheduler_recovery']['expires_at'] = gmdate( 'c', $now + self::RECOVERY_LEASE_TTL );
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- Locked transactional lease renewal.
+		$updated = $this->wpdb->update(
+			$this->table_name,
+			array( 'engine_data' => wp_json_encode( $engine ) ),
+			array(
+				'job_id' => (int) $job['job_id'],
+				'status' => JobStatus::PROCESSING,
+			),
+			array( '%s' ),
+			array( '%d', '%s' )
+		);
+		if ( 1 !== (int) $updated ) {
+			return false;
+		}
+
+		$job['engine_data'] = $engine;
+		return true;
 	}
 
 	/** Roll back a terminal ownership boundary and clear request-shared state. */

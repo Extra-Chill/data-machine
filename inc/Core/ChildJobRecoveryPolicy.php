@@ -11,6 +11,10 @@ namespace DataMachine\Core;
 defined( 'ABSPATH' ) || exit;
 
 class ChildJobRecoveryPolicy {
+	/** Exact decoded scheduler ownership check; avoids numeric-prefix collisions. */
+	public static function actionBelongsToJob( array $args, int $job_id ): bool {
+		return $job_id > 0 && (int) ( $args['job_id'] ?? 0 ) === $job_id;
+	}
 
 	/**
 	 * Diagnose scheduler ownership and replay eligibility.
@@ -39,6 +43,7 @@ class ChildJobRecoveryPolicy {
 			&& 'datamachine_execute_step' === (string) ( $latest['hook'] ?? '' )
 			&& '' !== $step
 			&& isset( $engine_data['flow_config'][ $step ] )
+			&& self::recoveryGenerationMatches( $engine_data, $latest, $args )
 			&& self::operationGenerationMatches( $job, $args );
 
 		return array(
@@ -77,8 +82,29 @@ class ChildJobRecoveryPolicy {
 				&& (string) ( $args['flow_step_id'] ?? '' ) === (string) ( $owner['flow_step_id'] ?? '' )
 				&& ( 0 === (int) ( $owner['action_id'] ?? 0 ) || (int) ( $action['action_id'] ?? 0 ) === (int) $owner['action_id'] );
 		}
+		if ( ! self::recoveryGenerationMatches( $engine_data, $action, $args ) ) {
+			return false;
+		}
 
 		return self::operationGenerationMatches( $job, $args );
+	}
+
+	private static function recoveryGenerationMatches( array $engine_data, array $action, array $args ): bool {
+		$generation = (int) ( $args['recovery_generation'] ?? 0 );
+		if ( 0 === $generation ) {
+			return true;
+		}
+
+		$owner   = is_array( $engine_data['scheduler_recovery'] ?? null ) ? $engine_data['scheduler_recovery'] : array();
+		$receipt = is_array( $owner['receipt'] ?? null ) ? $owner['receipt'] : array();
+		$token   = (string) ( $args['recovery_claim_token'] ?? '' );
+
+		return '' !== $token
+			&& 'requeued' === (string) ( $owner['state'] ?? '' )
+			&& (int) ( $owner['generation'] ?? 0 ) === $generation
+			&& (int) ( $receipt['generation'] ?? 0 ) === $generation
+			&& hash_equals( $token, (string) ( $owner['token'] ?? '' ) )
+			&& ( 0 === (int) ( $receipt['action_id'] ?? 0 ) || (int) ( $action['action_id'] ?? 0 ) === (int) $receipt['action_id'] );
 	}
 
 	private static function operationGenerationMatches( array $job, array $args ): bool {
