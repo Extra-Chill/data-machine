@@ -228,6 +228,7 @@ class AIStep extends Step {
 			return array();
 		}
 
+		$this->resolveAIConcurrencyContention();
 		$ai_concurrency_lease = $lease_result['lease'] ?? null;
 
 		try {
@@ -719,7 +720,6 @@ class AIStep extends Step {
 			self::AI_CONCURRENCY_MAX_DEFER_DELAY
 		);
 		$timestamp     = $now + $delay_seconds;
-		$action_id     = false;
 		$action_args   = array(
 			'job_id'       => $this->job_id,
 			'flow_step_id' => $this->flow_step_id,
@@ -731,21 +731,10 @@ class AIStep extends Step {
 			$action_args['operation_claim_token'] = (string) ( $job['operation_claim_token'] ?? '' );
 		}
 
-		$existing_action = function_exists( 'as_next_scheduled_action' )
-			? as_next_scheduled_action( 'datamachine_execute_step', $action_args, 'data-machine' )
-			: false;
-		if ( false !== $existing_action ) {
-			$action_id = (int) ( $existing_throttle['action_id'] ?? 0 );
-		} elseif ( function_exists( 'as_schedule_single_action' ) ) {
-			$action_id = as_schedule_single_action(
-				$timestamp,
-				'datamachine_execute_step',
-				$action_args,
-				'data-machine'
-			);
-		}
+		$schedule_result = AIConcurrencyBackpressure::scheduleContinuation( $timestamp, $action_args );
+		$action_id       = (int) $schedule_result['action_id'];
 
-		if ( false === $action_id ) {
+		if ( empty( $schedule_result['success'] ) || $action_id <= 0 ) {
 			$contention_data['state']           = 'stranded';
 			$contention_data['terminal_reason'] = 'ai_concurrency_defer_schedule_failed';
 			$contention_data['next_retry_at']   = null;
@@ -788,6 +777,39 @@ class AIStep extends Step {
 				'action_id'               => $action_id,
 			)
 		);
+	}
+
+	/** Archive resolved contention and remove the active throttle marker. */
+	private function resolveAIConcurrencyContention(): void {
+		$result = \DataMachine\Core\EngineData::mutate(
+			$this->job_id,
+			function ( array $engine ): array {
+				$throttle = is_array( $engine['ai_concurrency_throttle'] ?? null ) ? $engine['ai_concurrency_throttle'] : array();
+				if ( empty( $throttle ) || (string) ( $throttle['flow_step_id'] ?? '' ) !== $this->flow_step_id ) {
+					return $engine;
+				}
+
+				$history                          = is_array( $engine['ai_concurrency_history'] ?? null ) ? $engine['ai_concurrency_history'] : array();
+				$history[]                        = AIConcurrencyBackpressure::resolvedState( $throttle, time() );
+				$engine['ai_concurrency_history'] = array_slice( $history, -20 );
+				unset( $engine['ai_concurrency_throttle'] );
+
+				return $engine;
+			},
+			'ai_concurrency_resolved'
+		);
+
+		if ( empty( $result['success'] ) ) {
+			do_action(
+				'datamachine_log',
+				'warning',
+				'AI concurrency contention resolved but history could not be persisted',
+				array(
+					'job_id'       => $this->job_id,
+					'flow_step_id' => $this->flow_step_id,
+				)
+			);
+		}
 	}
 
 	/**

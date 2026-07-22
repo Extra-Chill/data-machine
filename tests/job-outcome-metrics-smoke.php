@@ -221,6 +221,23 @@ $assert( 'contention defer age is machine readable', $metrics['backpressure']['d
 $assert( 'contention capacity is machine readable', 1 === $metrics['backpressure']['active'] && 1 === $metrics['backpressure']['limit'] );
 $assert( 'ordinary contention does not increment failed count', 0 === $metrics['counts']['failed'] );
 
+$resolved_metrics = RunMetrics::fromJob(
+	$job(
+		'processing',
+		array(
+			'ai_concurrency_history' => array(
+				array(
+					'state'             => 'resolved',
+					'defer_count'       => 42,
+					'defer_age_seconds' => 90,
+				),
+			),
+		)
+	)
+);
+$assert( 'resolved contention is no longer reported as active backpressure', array() === $resolved_metrics['backpressure'] );
+$assert( 'resolved contention history preserves count and duration', 42 === $resolved_metrics['backpressure_history'][0]['defer_count'] && 90 === $resolved_metrics['backpressure_history'][0]['defer_age_seconds'] );
+
 echo "\n[7] CLI/source integration markers exist\n";
 $jobs_command = file_get_contents( __DIR__ . '/../inc/Cli/Commands/JobsCommand.php' ) ?: '';
 $fetch_step   = file_get_contents( __DIR__ . '/../inc/Core/Steps/Fetch/FetchStep.php' ) ?: '';

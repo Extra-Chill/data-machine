@@ -32,6 +32,7 @@ use DataMachine\Core\RunMetrics;
 use DataMachine\Core\Database\Chat\Chat;
 use DataMachine\Core\Database\Chat\ConversationStoreFactory;
 use DataMachine\Core\Database\Jobs\Jobs;
+use DataMachine\Core\Database\Jobs\LegacyAIConcurrencyReconciler;
 use AgentsAPI\AI\WP_Agent_Message;
 use DataMachine\Engine\AI\System\Tasks\SystemTask;
 use DataMachine\Engine\Tasks\TaskRegistry;
@@ -546,7 +547,7 @@ class JobsCommand extends BaseCommand {
 		$jobs_db                      = new Jobs();
 		$failed_like                  = $wpdb->esc_like( 'failed' ) . '%';
 		$agent_skipped_like           = $wpdb->esc_like( 'agent_skipped' ) . '%';
-		$historical_contention_status = 'failed - ai_concurrency_defer_exhausted';
+		$historical_contention_status = LegacyAIConcurrencyReconciler::SOURCE_STATUS;
 
 		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name is from $wpdb->prefix.
 		$rows = $wpdb->get_results(
@@ -592,7 +593,16 @@ class JobsCommand extends BaseCommand {
 				'label'         => (string) ( $row['label'] ?? '' ),
 			);
 
-			if ( ! $dry_run && $jobs_db->complete_job( (int) $row['job_id'], $target_status ) ) {
+			$reconciled = false;
+			if ( ! $dry_run && LegacyAIConcurrencyReconciler::TARGET_STATUS === $target_status ) {
+				$transition             = ( new LegacyAIConcurrencyReconciler() )->reconcile( (int) $row['job_id'] );
+				$reconciled             = ! empty( $transition['success'] );
+				$item['reconciliation'] = $transition['reconciliation'] ?? array();
+			} elseif ( ! $dry_run ) {
+				$reconciled = $jobs_db->complete_job( (int) $row['job_id'], $target_status );
+			}
+
+			if ( $reconciled ) {
 				++$updated;
 				$item['status'] = 'reconciled';
 			} else {
@@ -664,8 +674,8 @@ class JobsCommand extends BaseCommand {
 			return 'completed';
 		}
 
-		if ( 'failed - ai_concurrency_defer_exhausted' === (string) ( $row['status'] ?? '' ) ) {
-			return 'cancelled - ai_concurrency_stranded';
+		if ( LegacyAIConcurrencyReconciler::SOURCE_STATUS === (string) ( $row['status'] ?? '' ) ) {
+			return LegacyAIConcurrencyReconciler::TARGET_STATUS;
 		}
 
 		return '';

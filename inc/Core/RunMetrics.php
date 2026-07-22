@@ -234,30 +234,31 @@ class RunMetrics {
 		$outcome_classes = self::outcomeClasses( $job, $engine, $counts );
 
 		$summary = array(
-			'job_id'           => (int) ( $job['job_id'] ?? 0 ),
-			'source'           => $job['source'] ?? null,
-			'label'            => $job['label'] ?? ( $job['display_label'] ?? null ),
-			'flow_id'          => $job['flow_id'] ?? null,
-			'pipeline_id'      => $job['pipeline_id'] ?? null,
-			'parent_job_id'    => isset( $job['parent_job_id'] ) ? (int) $job['parent_job_id'] : 0,
-			'status'           => $status,
-			'counts'           => $counts,
-			'outcome_classes'  => $outcome_classes,
-			'child_jobs'       => self::childTotals( (int) ( $job['job_id'] ?? 0 ) ),
-			'timestamps'       => array(
+			'job_id'               => (int) ( $job['job_id'] ?? 0 ),
+			'source'               => $job['source'] ?? null,
+			'label'                => $job['label'] ?? ( $job['display_label'] ?? null ),
+			'flow_id'              => $job['flow_id'] ?? null,
+			'pipeline_id'          => $job['pipeline_id'] ?? null,
+			'parent_job_id'        => isset( $job['parent_job_id'] ) ? (int) $job['parent_job_id'] : 0,
+			'status'               => $status,
+			'counts'               => $counts,
+			'outcome_classes'      => $outcome_classes,
+			'child_jobs'           => self::childTotals( (int) ( $job['job_id'] ?? 0 ) ),
+			'timestamps'           => array(
 				'created_at'       => $job['created_at'] ?? null,
 				'started_at'       => $started_at,
 				'last_activity_at' => $last,
 				'completed_at'     => $ended_at,
 			),
-			'duration_seconds' => self::durationSeconds( $started_at, $duration_end ),
-			'outcome'          => self::outcomeDetails( $job, $engine, $counts, $outcome_classes ),
-			'step_results'     => self::stepResults( $engine ),
-			'run_result'       => self::runResult( $engine, $status ),
-			'context'          => $metrics['context'],
-			'token_usage'      => self::tokenUsage( $engine ),
-			'cost'             => self::cost( $engine ),
-			'backpressure'     => self::backpressure( $engine ),
+			'duration_seconds'     => self::durationSeconds( $started_at, $duration_end ),
+			'outcome'              => self::outcomeDetails( $job, $engine, $counts, $outcome_classes ),
+			'step_results'         => self::stepResults( $engine ),
+			'run_result'           => self::runResult( $engine, $status ),
+			'context'              => $metrics['context'],
+			'token_usage'          => self::tokenUsage( $engine ),
+			'cost'                 => self::cost( $engine ),
+			'backpressure'         => self::backpressure( $engine ),
+			'backpressure_history' => self::backpressureHistory( $engine ),
 		);
 
 		$summary['run_result'] = is_array( $engine[ self::RUN_RESULT_KEY ] ?? null ) ? $engine[ self::RUN_RESULT_KEY ] : RunResult::fromJobSummary( $job, $summary );
@@ -296,6 +297,12 @@ class RunMetrics {
 			'limit'                 => max( 0, (int) ( $throttle['limit'] ?? 0 ) ),
 			'action_id'             => max( 0, (int) ( $throttle['action_id'] ?? 0 ) ),
 		);
+	}
+
+	/** @return array<int,array<string,mixed>> */
+	private static function backpressureHistory( array $engine ): array {
+		$history = is_array( $engine['ai_concurrency_history'] ?? null ) ? $engine['ai_concurrency_history'] : array();
+		return array_values( array_filter( $history, 'is_array' ) );
 	}
 
 	public static function normalize( $metrics ): array {
