@@ -237,76 +237,7 @@ class SettingsCommand extends BaseCommand {
 	 * @return mixed Redacted or raw value.
 	 */
 	public static function redactSecretsForDisplay( string $key, mixed $value, bool $reveal = false ): mixed {
-		if ( $reveal ) {
-			return $value;
-		}
-
-		if ( self::isSecretKey( $key ) ) {
-			return self::redactedValue( $value );
-		}
-
-		if ( is_array( $value ) ) {
-			$redacted = array();
-			foreach ( $value as $nested_key => $nested_value ) {
-				$redacted[ $nested_key ] = self::redactSecretsForDisplay( (string) $nested_key, $nested_value, false );
-			}
-			return $redacted;
-		}
-
-		return $value;
-	}
-
-	private static function isSecretKey( string $key ): bool {
-		$normalized = strtolower( $key );
-		if ( 'github_pat' === $normalized ) {
-			return true;
-		}
-
-		$needles = array(
-			'api_key',
-			'app_private_key',
-			'authorization',
-			'bearer',
-			'client_secret',
-			'cookie',
-			'password',
-			'private_key',
-			'refresh_token',
-			'secret',
-			'token',
-		);
-
-		if ( 'key' === $normalized || str_ends_with( $normalized, '_key' ) ) {
-			return true;
-		}
-
-		foreach ( $needles as $needle ) {
-			if ( str_contains( $normalized, $needle ) ) {
-				return true;
-			}
-		}
-
-		return false;
-	}
-
-	private static function redactedValue( mixed $value ): mixed {
-		if ( is_array( $value ) ) {
-			$redacted = array();
-			foreach ( $value as $key => $nested_value ) {
-				$redacted[ $key ] = self::redactedValue( $nested_value );
-			}
-			return $redacted;
-		}
-
-		if ( is_object( $value ) ) {
-			return '[redacted]';
-		}
-
-		if ( null === $value || '' === $value ) {
-			return $value;
-		}
-
-		return '[redacted]';
+		return PluginSettings::redactForDisplay( $key, $value, $reveal );
 	}
 
 	private function format_setting_value( string $key, mixed $value ): string {

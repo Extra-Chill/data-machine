@@ -101,6 +101,103 @@ class PluginSettings {
 	}
 
 	/**
+	 * Redact secret-bearing settings recursively for presentation.
+	 *
+	 * Stored values are never changed. Secret keys use bounded credential-name
+	 * patterns while arrays and objects retain their serializable structure.
+	 *
+	 * @param string $key    Setting key.
+	 * @param mixed  $value  Setting value.
+	 * @param bool   $reveal Whether to reveal raw values.
+	 * @return mixed Redacted or raw value.
+	 */
+	public static function redactForDisplay( string $key, mixed $value, bool $reveal = false ): mixed {
+		if ( $reveal ) {
+			return $value;
+		}
+
+		if ( self::isSecretKey( $key ) ) {
+			return self::redactedValue( $value );
+		}
+
+		if ( is_array( $value ) ) {
+			$redacted = array();
+			foreach ( $value as $nested_key => $nested_value ) {
+				$redacted[ $nested_key ] = self::redactForDisplay( (string) $nested_key, $nested_value );
+			}
+			return $redacted;
+		}
+
+		if ( is_object( $value ) ) {
+			$redacted = new \stdClass();
+			foreach ( get_object_vars( $value ) as $nested_key => $nested_value ) {
+				$redacted->{$nested_key} = self::redactForDisplay( (string) $nested_key, $nested_value );
+			}
+			return $redacted;
+		}
+
+		return $value;
+	}
+
+	/**
+	 * Determine whether a setting key conventionally contains a credential.
+	 */
+	private static function isSecretKey( string $key ): bool {
+		$normalized = strtolower( trim( $key ) );
+		$normalized = preg_replace( '/[^a-z0-9]+/', '_', $normalized ) ?? $normalized;
+
+		if ( 'key' === $normalized || str_ends_with( $normalized, '_key' ) ) {
+			return true;
+		}
+
+		$secret_suffixes = array(
+			'authorization',
+			'bearer',
+			'cookie',
+			'credential',
+			'password',
+			'pat',
+			'secret',
+			'token',
+		);
+
+		foreach ( $secret_suffixes as $suffix ) {
+			if ( $suffix === $normalized || str_ends_with( $normalized, '_' . $suffix ) ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * Replace every populated leaf beneath a secret key.
+	 */
+	private static function redactedValue( mixed $value ): mixed {
+		if ( is_array( $value ) ) {
+			$redacted = array();
+			foreach ( $value as $key => $nested_value ) {
+				$redacted[ $key ] = self::redactedValue( $nested_value );
+			}
+			return $redacted;
+		}
+
+		if ( is_object( $value ) ) {
+			$redacted = new \stdClass();
+			foreach ( get_object_vars( $value ) as $key => $nested_value ) {
+				$redacted->{$key} = self::redactedValue( $nested_value );
+			}
+			return $redacted;
+		}
+
+		if ( null === $value || '' === $value ) {
+			return $value;
+		}
+
+		return '[redacted]';
+	}
+
+	/**
 	 * Get a specific per-site setting value (no cascade).
 	 *
 	 * @param string $key     Setting key
