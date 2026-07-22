@@ -10,6 +10,7 @@ namespace DataMachine\Tests\Unit\Abilities;
 use DataMachine\Abilities\Flow\CreateFlowAbility;
 use DataMachine\Core\Database\Flows\Flows;
 use DataMachine\Core\Database\Pipelines\Pipelines;
+use DataMachine\Engine\Tasks\GenerationFencedAction;
 use DataMachine\Engine\Tasks\RecurringScheduler;
 use ReflectionMethod;
 use WP_UnitTestCase;
@@ -76,6 +77,28 @@ class ScheduleMutationFailureTest extends WP_UnitTestCase {
 		$this->assertTrue( $result['retryable'] );
 		$this->assertNotNull( $this->flows->get_flow( $this->flow_id ) );
 		$this->assertNotFalse( as_next_scheduled_action( self::FLOW_HOOK, array( $this->flow_id ), RecurringScheduler::GROUP ) );
+	}
+
+	public function test_actual_action_scheduler_fetched_recurrence_cannot_repeat_after_generation_change(): void {
+		$generation_option = 'datamachine_test_generation_' . wp_generate_uuid4();
+		$generation        = wp_generate_uuid4();
+		add_option( $generation_option, $generation, '', false );
+		$schedule = new \ActionScheduler_IntervalSchedule( new \DateTime( '+1 hour' ), HOUR_IN_SECONDS );
+		$action   = new GenerationFencedAction(
+			self::FLOW_HOOK,
+			array( $this->flow_id ),
+			$schedule,
+			RecurringScheduler::GROUP,
+			$generation_option,
+			$generation
+		);
+
+		$this->assertTrue( $action->get_schedule()->is_recurring() );
+		update_option( $generation_option, wp_generate_uuid4(), false );
+		$this->assertInstanceOf( \ActionScheduler_CanceledSchedule::class, $action->get_schedule() );
+		$this->assertFalse( $action->get_schedule()->is_recurring() );
+
+		delete_option( $generation_option );
 	}
 
 	public function test_pause_flow_keeps_enabled_state_when_recurrence_cannot_be_fenced(): void {
