@@ -222,18 +222,22 @@ class RunLifecycleStore {
 	/**
 	 * Mirror an existing job status transition into generic run metadata.
 	 */
-	public function mark_job_status( int $job_id, string $status ): bool {
+	public function mark_job_status( int $job_id, string $status, ?string $completed_at = null ): bool {
 		if ( $job_id <= 0 || '' === $status ) {
 			return false;
 		}
 
 		$result = $this->mutate_run(
 			$job_id,
-			function ( array $meta ) use ( $status ): array {
+			function ( array $meta ) use ( $status, $completed_at ): array {
+				if ( ( $meta['status'] ?? null ) === $status && ( ! JobStatus::isStatusFinal( $status ) || ! empty( $meta['completed_at'] ) ) ) {
+					return $meta;
+				}
+				$terminal_time      = JobStatus::isStatusFinal( $status ) && ! empty( $completed_at ) ? $completed_at : $this->now();
 				$meta['status']     = $status;
-				$meta['updated_at'] = $this->now();
+				$meta['updated_at'] = $terminal_time;
 				if ( JobStatus::isStatusFinal( $status ) ) {
-					$meta['completed_at'] = $meta['completed_at'] ?? $meta['updated_at'];
+					$meta['completed_at'] = $meta['completed_at'] ?? $terminal_time;
 				}
 				return $meta;
 			}

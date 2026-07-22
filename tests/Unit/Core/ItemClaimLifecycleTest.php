@@ -335,30 +335,39 @@ class ItemClaimLifecycleTest extends WP_UnitTestCase {
 		$this->assertSame( 'recovered-revision', $this->tracked->get( self::NAMESPACE, 'process-death-id' )['source_revision'] );
 	}
 
-	public function test_interruption_after_failure_commit_preserves_cleanup_for_replay(): void {
-		$job_id                 = $this->createProcessingJobWithTrackedClaim( 'failed-commit-crash-id', 'must-not-persist' );
-		$interrupt_after_commit = static function ( int $committed_job_id, string $status ) use ( $job_id ): void {
-			if ( $job_id !== $committed_job_id || JobStatus::isStatusSuccess( $status ) ) {
-				return;
-			}
-			throw new \RuntimeException( 'simulated interruption after commit' );
+	public function test_process_death_after_commit_replays_persisted_processed_claim_count(): void {
+		global $wpdb;
+		$job_id    = $this->createProcessingJobWithTrackedClaim( 'commit-crash-id', 'committed-revision' );
+		$interrupt = static function ( bool $should_interrupt, string $boundary, int $filtered_job_id ) use ( $job_id ): bool {
+			return $should_interrupt || ( $job_id === $filtered_job_id && 'before:run_metrics' === $boundary );
 		};
-		add_action( 'datamachine_job_terminal_committed', $interrupt_after_commit, 20, 2 );
+		add_filter( 'datamachine_job_terminal_accounting_interrupt', $interrupt, 20, 3 );
 		try {
-			$this->jobs->transition_job_status_result( $job_id, JobStatus::failed( 'crash-after-commit' )->toString(), true );
+			$this->jobs->transition_job_status_result( $job_id, JobStatus::COMPLETED, true );
 			$this->fail( 'Expected the post-commit interruption.' );
 		} catch ( \RuntimeException $exception ) {
-			$this->assertSame( 'simulated interruption after commit', $exception->getMessage() );
+			$this->assertSame( 'Terminal accounting interrupted at before:run_metrics', $exception->getMessage() );
 		} finally {
-			remove_action( 'datamachine_job_terminal_committed', $interrupt_after_commit, 20 );
+			remove_filter( 'datamachine_job_terminal_accounting_interrupt', $interrupt, 20 );
 		}
 
-		$persisted_status = (string) $this->jobs->get_job( $job_id )['status'];
-		$this->assertStringContainsString( 'crash-after-commit', $persisted_status );
-		$this->assertFalse( $this->processed->has_active_claim( self::SCOPE, self::SOURCE, 'failed-commit-crash-id' ) );
-		$this->assertNull( $this->tracked->get( self::NAMESPACE, 'failed-commit-crash-id' ) );
-		$this->assertTrue( $this->jobs->complete_job( $job_id, $persisted_status ) );
-		$this->assertFalse( $this->processed->has_active_claim( self::SCOPE, self::SOURCE, 'failed-commit-crash-id' ) );
+		$committed = $this->jobs->get_job( $job_id );
+		$this->assertSame( JobStatus::COMPLETED, $committed['status'] );
+		$this->assertSame( 1, (int) $committed['terminal_accounting_processed_count'] );
+		$this->assertSame( 'committed-revision', $this->tracked->get( self::NAMESPACE, 'commit-crash-id' )['source_revision'] );
+		$this->assertFalse( $this->processed->has_active_claim( self::SCOPE, self::SOURCE, 'commit-crash-id' ) );
+
+		StepLifecycleHandler::handleTerminalRollback( $job_id );
+		$wpdb->update(
+			$this->jobs->get_table_name(),
+			array( 'terminal_accounting_claimed_at' => '2000-01-01 00:00:00' ),
+			array( 'job_id' => $job_id ),
+			array( '%s' ),
+			array( '%d' )
+		);
+		$this->assertTrue( ( new Jobs() )->reconcile_terminal_accounting( $job_id )['complete'] );
+		$this->assertTrue( ( new Jobs() )->reconcile_terminal_accounting( $job_id )['complete'] );
+		$this->assertSame( 1, RunMetrics::fromJob( $this->jobs->get_job( $job_id ) )['counts']['processed'] );
 	}
 
 	public function test_cancellation_atomically_releases_mixed_descriptor_and_legacy_claims(): void {

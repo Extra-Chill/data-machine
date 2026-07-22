@@ -650,6 +650,123 @@ class JobsCommand extends BaseCommand {
 	}
 
 	/**
+	 * Reconcile terminal jobs with incomplete post-commit accounting.
+	 *
+	 * ## OPTIONS
+	 *
+	 * [--dry-run]
+	 * : Report incomplete jobs without replaying accounting.
+	 *
+	 * [--limit=<limit>]
+	 * : Maximum rows to inspect.
+	 * ---
+	 * default: 100
+	 * ---
+	 *
+	 * [--format=<format>]
+	 * : Output format.
+	 * ---
+	 * default: table
+	 * options:
+	 *   - table
+	 *   - json
+	 *   - yaml
+	 * ---
+	 *
+	 * @subcommand reconcile-terminal-accounting
+	 */
+	public function reconcile_terminal_accounting( array $args, array $assoc_args ): void {
+		$dry_run = isset( $assoc_args['dry-run'] );
+		$limit   = isset( $assoc_args['limit'] ) ? max( 1, min( 5000, (int) $assoc_args['limit'] ) ) : 100;
+		$format  = $assoc_args['format'] ?? 'table';
+		$jobs_db = new Jobs();
+		$rows    = $jobs_db->get_incomplete_terminal_accounting( $limit );
+		$items   = array();
+		$summary = array(
+			'incomplete'  => $jobs_db->count_incomplete_terminal_accounting(),
+			'inspected'   => count( $rows ),
+			'reconciled'  => 0,
+			'in_progress' => 0,
+			'failed'      => 0,
+		);
+
+		foreach ( $rows as $row ) {
+			$before = (int) $row['terminal_accounting_state'];
+			try {
+				$result = $dry_run
+					? array(
+						'success'     => true,
+						'state'       => $before,
+						'complete'    => false,
+						'in_progress' => false,
+						'errors'      => array(),
+					)
+					: $jobs_db->reconcile_terminal_accounting( (int) $row['job_id'] );
+			} catch ( \Throwable $exception ) {
+				$result = array(
+					'success'     => false,
+					'state'       => $before,
+					'complete'    => false,
+					'in_progress' => false,
+					'stage'       => 'reconcile',
+					'errors'      => array(
+						array(
+							'stage'   => 'reconcile',
+							'code'    => 'reconciliation_exception',
+							'message' => $exception->getMessage(),
+						),
+					),
+				);
+			}
+
+			if ( ! $dry_run ) {
+				if ( ! empty( $result['complete'] ) ) {
+					++$summary['reconciled'];
+				} elseif ( ! empty( $result['in_progress'] ) ) {
+					++$summary['in_progress'];
+				} else {
+					++$summary['failed'];
+				}
+			}
+			$errors      = is_array( $result['errors'] ?? null ) ? $result['errors'] : array();
+			$error_codes = implode( ',', array_filter( array_column( $errors, 'code' ), 'is_string' ) );
+			$action      = $dry_run ? 'would_reconcile' : ( ! empty( $result['complete'] ) ? 'reconciled' : ( ! empty( $result['in_progress'] ) ? 'in_progress' : 'failed' ) );
+
+			$items[] = array(
+				'job_id'       => (int) $row['job_id'],
+				'status'       => (string) $row['status'],
+				'before_state' => $before,
+				'after_state'  => (int) ( $result['state'] ?? $before ),
+				'stage'        => (string) ( $result['stage'] ?? '' ),
+				'action'       => $action,
+				'error_codes'  => $error_codes,
+				'errors'       => $errors,
+			);
+		}
+
+		$output = array(
+			'success'        => 0 === $summary['failed'],
+			'dry_run'        => $dry_run,
+			'complete_state' => Jobs::TERMINAL_ACCOUNTING_COMPLETE,
+			'summary'        => $summary,
+			'jobs'           => $items,
+		);
+
+		if ( 'table' !== $format ) {
+			WP_CLI::print_value( $output, array( 'format' => $format ) );
+			return;
+		}
+
+		if ( empty( $items ) ) {
+			WP_CLI::success( 'No terminal jobs have incomplete accounting.' );
+			return;
+		}
+
+		$this->format_items( $items, array( 'job_id', 'status', 'before_state', 'after_state', 'stage', 'action', 'error_codes' ), $assoc_args, 'job_id' );
+		WP_CLI::log( sprintf( 'Inspected %d of %d incomplete terminal jobs; %d reconciled; %d in progress; %d failed.', $summary['inspected'], $summary['incomplete'], $summary['reconciled'], $summary['in_progress'], $summary['failed'] ) );
+	}
+
+	/**
 	 * Resolve the corrected terminal status for a job row.
 	 *
 	 * @param array<string,mixed> $row Job row.
