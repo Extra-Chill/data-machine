@@ -83,6 +83,52 @@ if ( ! function_exists( 'apply_filters' ) ) {
 	}
 }
 
+if ( ! function_exists( 'is_wp_error' ) ) {
+	function is_wp_error( $value ): bool {
+		return $value instanceof WP_Error;
+	}
+}
+
+$GLOBALS['datamachine_rs_options']            = array();
+$GLOBALS['datamachine_rs_add_option_failures'] = 0;
+$GLOBALS['datamachine_rs_add_option_calls']    = 0;
+
+function get_option( string $name, $default = false ) {
+	return $GLOBALS['datamachine_rs_options'][ $name ] ?? $default;
+}
+
+function add_option( string $name, $value, string $deprecated = '', bool $autoload = false ): bool {
+	unset( $deprecated, $autoload );
+	++$GLOBALS['datamachine_rs_add_option_calls'];
+	if ( $GLOBALS['datamachine_rs_add_option_failures'] > 0 ) {
+		--$GLOBALS['datamachine_rs_add_option_failures'];
+		return false;
+	}
+	if ( isset( $GLOBALS['datamachine_rs_options'][ $name ] ) ) {
+		return false;
+	}
+	$GLOBALS['datamachine_rs_options'][ $name ] = $value;
+	return true;
+}
+
+function update_option( string $name, $value, bool $autoload = false ): bool {
+	unset( $autoload );
+	$GLOBALS['datamachine_rs_options'][ $name ] = $value;
+	return true;
+}
+
+function delete_option( string $name ): bool {
+	if ( ! isset( $GLOBALS['datamachine_rs_options'][ $name ] ) ) {
+		return false;
+	}
+	unset( $GLOBALS['datamachine_rs_options'][ $name ] );
+	return true;
+}
+
+function wp_generate_uuid4(): string {
+	return uniqid( 'dm-test-', true );
+}
+
 /**
  * Action Scheduler datastore-readiness stub.
  *
@@ -150,6 +196,8 @@ $GLOBALS['datamachine_rs_unscheduled']         = 0;
 $GLOBALS['datamachine_rs_recurring_unique']    = array();
 $GLOBALS['datamachine_rs_cron_unique']         = array();
 $GLOBALS['datamachine_rs_schedule_race']       = false;
+$GLOBALS['datamachine_rs_reentrant_race']      = false;
+$GLOBALS['datamachine_rs_reentrant_result']    = null;
 
 function datamachine_rs_key( string $hook, array $args, string $group ): string {
 	return $group . '|' . $hook . '|' . serialize( $args );
@@ -161,17 +209,17 @@ function datamachine_rs_key( string $hook, array $args, string $group ): string 
  * The store keeps a LIST per signature so the harness can model the live
  * duplicate-chain bug (two parallel pending actions for one hook/args/group).
  */
-function datamachine_rs_seed_action( string $hook, array $args, string $group, DmRecurringSchedulerFakeSchedule $schedule ): void {
+function datamachine_rs_seed_action( string $hook, array $args, string $group, DmRecurringSchedulerFakeSchedule $schedule, string $status = 'pending' ): void {
 	$key = datamachine_rs_key( $hook, $args, $group );
-	if ( ! isset( $GLOBALS['datamachine_rs_actions'][ $key ] ) ) {
-		$GLOBALS['datamachine_rs_actions'][ $key ] = array();
+	if ( ! isset( $GLOBALS['datamachine_rs_actions'][ $key ][ $status ] ) ) {
+		$GLOBALS['datamachine_rs_actions'][ $key ][ $status ] = array();
 	}
-	$GLOBALS['datamachine_rs_actions'][ $key ][] = new DmRecurringSchedulerFakeAction( $schedule );
+	$GLOBALS['datamachine_rs_actions'][ $key ][ $status ][] = new DmRecurringSchedulerFakeAction( $schedule );
 }
 
 function datamachine_rs_pending_count( string $hook, array $args, string $group ): int {
 	$key = datamachine_rs_key( $hook, $args, $group );
-	return isset( $GLOBALS['datamachine_rs_actions'][ $key ] ) ? count( $GLOBALS['datamachine_rs_actions'][ $key ] ) : 0;
+	return isset( $GLOBALS['datamachine_rs_actions'][ $key ]['pending'] ) ? count( $GLOBALS['datamachine_rs_actions'][ $key ]['pending'] ) : 0;
 }
 
 function datamachine_rs_reset(): void {
@@ -183,6 +231,11 @@ function datamachine_rs_reset(): void {
 	$GLOBALS['datamachine_rs_recurring_unique']    = array();
 	$GLOBALS['datamachine_rs_cron_unique']         = array();
 	$GLOBALS['datamachine_rs_schedule_race']       = false;
+	$GLOBALS['datamachine_rs_reentrant_race']      = false;
+	$GLOBALS['datamachine_rs_reentrant_result']    = null;
+	$GLOBALS['datamachine_rs_options']             = array();
+	$GLOBALS['datamachine_rs_add_option_failures'] = 0;
+	$GLOBALS['datamachine_rs_add_option_calls']    = 0;
 	ActionScheduler::$initialized         = true;
 }
 
@@ -192,7 +245,8 @@ function datamachine_rs_counter( string $key ): int {
 
 function as_get_scheduled_actions( array $args = array(), $return_format = OBJECT ): array {
 	$key      = datamachine_rs_key( $args['hook'], $args['args'] ?? array(), $args['group'] ?? '' );
-	$matches  = $GLOBALS['datamachine_rs_actions'][ $key ] ?? array();
+	$status   = $args['status'] ?? 'pending';
+	$matches  = $GLOBALS['datamachine_rs_actions'][ $key ][ $status ] ?? array();
 	$per_page = isset( $args['per_page'] ) ? (int) $args['per_page'] : count( $matches );
 	if ( $per_page > 0 ) {
 		$matches = array_slice( $matches, 0, $per_page );
@@ -207,17 +261,17 @@ function as_get_scheduled_actions( array $args = array(), $return_format = OBJEC
 
 function as_next_scheduled_action( string $hook, ?array $args = null, string $group = '' ) {
 	$key = datamachine_rs_key( $hook, $args ?? array(), $group );
-	if ( empty( $GLOBALS['datamachine_rs_actions'][ $key ] ) ) {
+	if ( empty( $GLOBALS['datamachine_rs_actions'][ $key ]['pending'] ) ) {
 		return false;
 	}
 
-	$first = reset( $GLOBALS['datamachine_rs_actions'][ $key ] );
+	$first = reset( $GLOBALS['datamachine_rs_actions'][ $key ]['pending'] );
 	return $first->get_schedule()->get_date()->getTimestamp();
 }
 
 function as_unschedule_all_actions( string $hook, array $args = array(), string $group = '' ): void {
 	++$GLOBALS['datamachine_rs_unscheduled'];
-	unset( $GLOBALS['datamachine_rs_actions'][ datamachine_rs_key( $hook, $args, $group ) ] );
+	unset( $GLOBALS['datamachine_rs_actions'][ datamachine_rs_key( $hook, $args, $group ) ]['pending'] );
 }
 
 function as_schedule_single_action( int $timestamp, string $hook, array $args = array(), string $group = '' ): int {
@@ -229,6 +283,10 @@ function as_schedule_single_action( int $timestamp, string $hook, array $args = 
 function as_schedule_recurring_action( int $timestamp, int $interval, string $hook, array $args = array(), string $group = '', bool $unique = false ): int {
 	++$GLOBALS['datamachine_rs_scheduled_recurring'];
 	$GLOBALS['datamachine_rs_recurring_unique'][] = $unique;
+	if ( $GLOBALS['datamachine_rs_reentrant_race'] ) {
+		$GLOBALS['datamachine_rs_reentrant_race']   = false;
+		$GLOBALS['datamachine_rs_reentrant_result'] = \DataMachine\Engine\Tasks\RecurringScheduler::ensureSchedule( $hook, $args, 'hourly', array( 'group' => $group ) );
+	}
 	if ( $GLOBALS['datamachine_rs_schedule_race'] ) {
 		$GLOBALS['datamachine_rs_schedule_race'] = false;
 		datamachine_rs_seed_action( $hook, $args, $group, new DmRecurringSchedulerFakeSchedule( true, $interval, $timestamp ) );
@@ -248,6 +306,7 @@ function as_schedule_cron_action( int $timestamp, string $expression, string $ho
 	return 303;
 }
 
+require_once __DIR__ . '/../inc/Core/OptionLeaseStore.php';
 require_once __DIR__ . '/../inc/Engine/Tasks/RecurringScheduler.php';
 
 use DataMachine\Engine\Tasks\RecurringScheduler;
@@ -414,5 +473,27 @@ datamachine_assert_schedule_result( RecurringScheduler::ensureSchedule( 'datamac
 datamachine_assert( array( false, false ) === $GLOBALS['datamachine_rs_recurring_unique'], 'argument-bearing schedules do not use hook/group-only Action Scheduler uniqueness' );
 datamachine_assert( 1 === datamachine_rs_pending_count( 'datamachine_per_flow', array( 'flow_id' => 1 ), RecurringScheduler::GROUP ), 'first argument tuple has its own pending chain' );
 datamachine_assert( 1 === datamachine_rs_pending_count( 'datamachine_per_flow', array( 'flow_id' => 2 ), RecurringScheduler::GROUP ), 'second argument tuple has its own pending chain' );
+
+echo "\n[18] reentrant argument-bearing reconciliation cannot create a parallel chain\n";
+datamachine_rs_reset();
+$GLOBALS['datamachine_rs_reentrant_race'] = true;
+datamachine_assert_schedule_result( RecurringScheduler::ensureSchedule( 'datamachine_per_flow', array( 42 ), 'hourly' ) );
+datamachine_assert( $GLOBALS['datamachine_rs_reentrant_result'] instanceof WP_Error, 'contending reconciliation receives a retryable lock error' );
+datamachine_assert( 'schedule_lock_timeout' === $GLOBALS['datamachine_rs_reentrant_result']->get_error_code(), 'contention reports schedule_lock_timeout' );
+datamachine_assert( 1 === datamachine_rs_pending_count( 'datamachine_per_flow', array( 42 ), RecurringScheduler::GROUP ), 'outer owner creates exactly one pending chain' );
+
+echo "\n[19] transient lease contention retries before scheduling\n";
+datamachine_rs_reset();
+$GLOBALS['datamachine_rs_add_option_failures'] = 1;
+datamachine_assert_schedule_result( RecurringScheduler::ensureSchedule( 'datamachine_retry', array( 7 ), 'hourly' ) );
+datamachine_assert( $GLOBALS['datamachine_rs_add_option_calls'] >= 2, 'scheduler retries after losing the first atomic lease attempt' );
+datamachine_assert( 1 === datamachine_rs_pending_count( 'datamachine_retry', array( 7 ), RecurringScheduler::GROUP ), 'retry creates one pending chain without action loss' );
+
+echo "\n[20] matching running recurrence owns coverage\n";
+datamachine_rs_reset();
+datamachine_rs_seed_action( 'datamachine_running', array( 9 ), RecurringScheduler::GROUP, new DmRecurringSchedulerFakeSchedule( true, 3600, time() ), 'in-progress' );
+$result = datamachine_assert_schedule_result( RecurringScheduler::ensureSchedule( 'datamachine_running', array( 9 ), 'hourly' ) );
+datamachine_assert( true === ( $result['preserved'] ?? false ), 'running recurrence is preserved as the current owner' );
+datamachine_assert( 0 === datamachine_rs_counter( 'datamachine_rs_scheduled_recurring' ), 'running recurrence does not spawn a parallel pending chain' );
 
 echo "\nAll recurring scheduler idempotency assertions passed.\n";

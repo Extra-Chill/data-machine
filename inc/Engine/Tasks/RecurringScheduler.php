@@ -28,6 +28,8 @@
 
 namespace DataMachine\Engine\Tasks;
 
+use DataMachine\Core\OptionLeaseStore;
+
 defined( 'ABSPATH' ) || exit;
 
 class RecurringScheduler {
@@ -49,6 +51,11 @@ class RecurringScheduler {
 	 * Maximum explicit fleet distribution window in seconds.
 	 */
 	public const MAX_DISTRIBUTION_WINDOW_SECONDS = 86400;
+
+	private const SCHEDULE_LOCK_PREFIX         = 'datamachine_schedule_lock_';
+	private const SCHEDULE_LOCK_TTL            = 30;
+	private const SCHEDULE_LOCK_RETRY_ATTEMPTS = 5;
+	private const SCHEDULE_LOCK_RETRY_DELAY_US = 25000;
 
 	/**
 	 * Ensure an Action Scheduler schedule matches the requested configuration.
@@ -109,6 +116,35 @@ class RecurringScheduler {
 		?string $interval,
 		array $options = array(),
 		bool $enabled = true
+	) {
+		$lock = self::acquireScheduleLock( $hook, $args, (string) ( $options['group'] ?? self::GROUP ) );
+		if ( is_wp_error( $lock ) ) {
+			return $lock;
+		}
+
+		try {
+			return self::ensureScheduleUnlocked( $hook, $args, $interval, $options, $enabled );
+		} finally {
+			OptionLeaseStore::release( $lock['option_name'], $lock['token'] );
+		}
+	}
+
+	/**
+	 * Reconcile one schedule while its signature lease is held.
+	 *
+	 * @param string      $hook     Action Scheduler hook.
+	 * @param array       $args     Action arguments.
+	 * @param string|null $interval Requested interval.
+	 * @param array       $options  Scheduling options.
+	 * @param bool        $enabled  Whether the schedule is enabled.
+	 * @return array|\WP_Error Schedule metadata or an error.
+	 */
+	private static function ensureScheduleUnlocked(
+		string $hook,
+		array $args,
+		?string $interval,
+		array $options,
+		bool $enabled
 	) {
 		$group = $options['group'] ?? self::GROUP;
 
@@ -310,6 +346,50 @@ class RecurringScheduler {
 	}
 
 	/**
+	 * Acquire the option-row lease for one hook/args/group signature.
+	 *
+	 * Argument-bearing actions cannot use Action Scheduler's native uniqueness,
+	 * because it is scoped to hook and group. This lease serializes the complete
+	 * read/unschedule/create sequence without coupling independent argument sets.
+	 *
+	 * @param string $hook  Action Scheduler hook.
+	 * @param array  $args  Action arguments.
+	 * @param string $group Action Scheduler group.
+	 * @return array{option_name:string,token:string}|\WP_Error
+	 */
+	private static function acquireScheduleLock( string $hook, array $args, string $group ) {
+		$option_name = self::SCHEDULE_LOCK_PREFIX . md5( serialize( array( $hook, $args, $group ) ) );
+
+		for ( $attempt = 0; $attempt < self::SCHEDULE_LOCK_RETRY_ATTEMPTS; ++$attempt ) {
+			$now     = time();
+			$token   = function_exists( 'wp_generate_uuid4' ) ? wp_generate_uuid4() : uniqid( 'dm-schedule-', true );
+			$payload = array(
+				'token'      => $token,
+				'started_at' => $now,
+				'expires_at' => $now + self::SCHEDULE_LOCK_TTL,
+			);
+			$lease   = OptionLeaseStore::acquire( $option_name, $payload, self::SCHEDULE_LOCK_TTL, $now, null, true );
+
+			if ( $lease['acquired'] ) {
+				return array(
+					'option_name' => $option_name,
+					'token'       => $token,
+				);
+			}
+
+			if ( $attempt + 1 < self::SCHEDULE_LOCK_RETRY_ATTEMPTS ) {
+				usleep( self::SCHEDULE_LOCK_RETRY_DELAY_US );
+			}
+		}
+
+		return self::error(
+			'schedule_lock_timeout',
+			'Another request is updating this schedule; retry shortly.',
+			array( 'status' => 409 )
+		);
+	}
+
+	/**
 	 * Unschedule all Action Scheduler actions matching (hook, args, group).
 	 *
 	 * @param string $hook  Hook name.
@@ -424,6 +504,31 @@ class RecurringScheduler {
 	 * @return object|null ActionScheduler_Action-like object, or null.
 	 */
 	private static function getPendingAction( string $hook, array $args, string $group ): ?object {
+		return self::getActionByStatuses( $hook, $args, $group, array( 'pending' ) );
+	}
+
+	/**
+	 * Find the next pending or running action that owns a schedule slot.
+	 *
+	 * @param string $hook  Hook name.
+	 * @param array  $args  Action args.
+	 * @param string $group AS group.
+	 * @return object|null ActionScheduler_Action-like object, or null.
+	 */
+	private static function getCoveringAction( string $hook, array $args, string $group ): ?object {
+		return self::getActionByStatuses( $hook, $args, $group, array( 'pending', 'in-progress' ) );
+	}
+
+	/**
+	 * Find the next action matching one of the supplied statuses.
+	 *
+	 * @param string   $hook     Hook name.
+	 * @param array    $args     Action args.
+	 * @param string   $group    AS group.
+	 * @param string[] $statuses Action Scheduler statuses in priority order.
+	 * @return object|null ActionScheduler_Action-like object, or null.
+	 */
+	private static function getActionByStatuses( string $hook, array $args, string $group, array $statuses ): ?object {
 		if ( ! function_exists( 'as_get_scheduled_actions' ) ) {
 			return null;
 		}
@@ -432,21 +537,27 @@ class RecurringScheduler {
 			return null;
 		}
 
-		$actions = as_get_scheduled_actions(
-			array(
-				'hook'     => $hook,
-				'args'     => $args,
-				'group'    => $group,
-				'status'   => 'pending',
-				'orderby'  => 'date',
-				'order'    => 'ASC',
-				'per_page' => 1,
-			),
-			'OBJECT'
-		);
+		foreach ( $statuses as $status ) {
+			$actions = as_get_scheduled_actions(
+				array(
+					'hook'     => $hook,
+					'args'     => $args,
+					'group'    => $group,
+					'status'   => $status,
+					'orderby'  => 'date',
+					'order'    => 'ASC',
+					'per_page' => 1,
+				),
+				'OBJECT'
+			);
 
-		$action = reset( $actions );
-		return is_object( $action ) ? $action : null;
+			$action = reset( $actions );
+			if ( is_object( $action ) ) {
+				return $action;
+			}
+		}
+
+		return null;
 	}
 
 	/**
@@ -495,7 +606,7 @@ class RecurringScheduler {
 	 * @return bool True when the existing pending action already matches.
 	 */
 	private static function hasMatchingSingleAction( string $hook, array $args, string $group, int $timestamp ): bool {
-		$action = self::getPendingAction( $hook, $args, $group );
+		$action = self::getCoveringAction( $hook, $args, $group );
 		if ( ! $action || ! method_exists( $action, 'get_schedule' ) ) {
 			return false;
 		}
@@ -518,7 +629,7 @@ class RecurringScheduler {
 	 * @return bool True when the existing pending action already matches.
 	 */
 	private static function hasMatchingRecurringAction( string $hook, array $args, string $group, int $interval_seconds ): bool {
-		$action = self::getPendingAction( $hook, $args, $group );
+		$action = self::getCoveringAction( $hook, $args, $group );
 		if ( ! $action || ! method_exists( $action, 'get_schedule' ) ) {
 			return false;
 		}
@@ -544,7 +655,7 @@ class RecurringScheduler {
 	 * @return bool True when the existing pending action already matches.
 	 */
 	private static function hasMatchingCronAction( string $hook, array $args, string $group, string $cron_expression ): bool {
-		$action = self::getPendingAction( $hook, $args, $group );
+		$action = self::getCoveringAction( $hook, $args, $group );
 		if ( ! $action || ! method_exists( $action, 'get_schedule' ) ) {
 			return false;
 		}
