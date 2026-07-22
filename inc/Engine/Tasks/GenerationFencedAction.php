@@ -55,4 +55,12 @@ class GenerationFencedAction extends \ActionScheduler_Action {
 
 		return new \ActionScheduler_CanceledSchedule( $schedule->get_date() );
 	}
+
+	public function getGenerationOption(): string {
+		return $this->generation_option;
+	}
+
+	public function getExpectedGeneration(): string {
+		return $this->expected_generation;
+	}
 }

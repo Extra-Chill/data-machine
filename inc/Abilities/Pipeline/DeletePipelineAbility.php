@@ -10,7 +10,6 @@
 
 namespace DataMachine\Abilities\Pipeline;
 
-use DataMachine\Api\Flows\FlowScheduling;
 use DataMachine\Core\FilesRepository\FileCleanup;
 
 defined( 'ABSPATH' ) || exit;
@@ -95,41 +94,59 @@ class DeletePipelineAbility {
 
 		$pipeline_name  = $pipeline['pipeline_name'];
 		$affected_flows = $this->db_flows->get_flows_for_pipeline( $pipeline_id );
-		$flow_count     = count( $affected_flows );
 
-		// Fence every recurrence before deleting any flow so a lock failure cannot
-		// produce a partially deleted pipeline with surviving schedules.
-		$fenced_flows = array();
+		$deleted_flows     = 0;
+		$schedule_failures = array();
 		foreach ( $affected_flows as $flow ) {
-			$flow_id = $flow['flow_id'] ?? null;
-			if ( ! $flow_id ) {
+			$flow_id = (int) ( $flow['flow_id'] ?? 0 );
+			if ( $flow_id <= 0 ) {
 				continue;
 			}
 
-			$fenced_flows[]  = $flow;
-			$schedule_result = \DataMachine\Engine\Tasks\RecurringScheduler::ensureSchedule(
+			$schedule_result = \DataMachine\Engine\Tasks\RecurringScheduler::commitDesiredSchedule(
 				'datamachine_run_flow_now',
-				array( (int) $flow_id ),
-				'manual'
+				array( $flow_id ),
+				'manual',
+				array(),
+				true,
+				fn(): bool => $this->db_flows->delete_flow( $flow_id ),
+				static function ( $result ) use ( $flow_id ): bool {
+					if ( is_wp_error( $result ) ) {
+						do_action(
+							'datamachine_log',
+							'error',
+							'Deleted pipeline flow has schedule reconciliation drift',
+							array_merge(
+								array( 'flow_id' => $flow_id ),
+								\DataMachine\Engine\Tasks\RecurringScheduler::errorMetadata( $result )
+							)
+						);
+					}
+					return true;
+				}
 			);
 			if ( is_wp_error( $schedule_result ) ) {
-				return array_merge(
-					array(
-						'success'                 => false,
-						'flow_id'                 => (int) $flow_id,
-						'schedule_reconciliation' => $this->reconcileFlowSchedules( $fenced_flows ),
-					),
-					\DataMachine\Engine\Tasks\RecurringScheduler::errorMetadata( $schedule_result )
+				$schedule_failures[ $flow_id ] = array_merge(
+					\DataMachine\Engine\Tasks\RecurringScheduler::errorMetadata( $schedule_result ),
+					array( 'desired_state_committed' => null === $this->db_flows->get_flow( $flow_id ) )
 				);
-			}
-		}
-
-		foreach ( $affected_flows as $flow ) {
-			$flow_id = $flow['flow_id'] ?? null;
-			if ( ! $flow_id ) {
 				continue;
 			}
-			$this->db_flows->delete_flow( (int) $flow_id );
+			++$deleted_flows;
+		}
+
+		$commit_failures = array_filter(
+			$schedule_failures,
+			static fn(array $failure): bool => empty( $failure['desired_state_committed'] )
+		);
+		if ( ! empty( $commit_failures ) ) {
+			return array(
+				'success'           => false,
+				'error'             => 'Pipeline deletion did not commit every flow deletion.',
+				'error_code'        => 'pipeline_flow_deletion_incomplete',
+				'schedule_failures' => $schedule_failures,
+				'deleted_flows'     => $deleted_flows,
+			);
 		}
 
 		$cleanup            = new FileCleanup();
@@ -161,46 +178,28 @@ class DeletePipelineAbility {
 			array(
 				'pipeline_id'   => $pipeline_id,
 				'pipeline_name' => $pipeline_name,
-				'deleted_flows' => $flow_count,
+				'deleted_flows' => $deleted_flows,
 			)
 		);
 
-		return array(
-			'success'       => true,
-			'pipeline_id'   => $pipeline_id,
-			'pipeline_name' => $pipeline_name,
-			'deleted_flows' => $flow_count,
-			'message'       => sprintf(
+		$result = array(
+			'success'          => empty( $schedule_failures ),
+			'pipeline_id'      => $pipeline_id,
+			'pipeline_name'    => $pipeline_name,
+			'deleted_flows'    => $deleted_flows,
+			'pipeline_deleted' => true,
+			'message'          => sprintf(
 				'Pipeline "%s" deleted successfully. %d flows were also deleted.',
 				$pipeline_name,
-				$flow_count
+				$deleted_flows
 			),
 		);
-	}
-
-	/**
-	 * Restore persisted schedules after a multi-flow preflight fails partway.
-	 *
-	 * @param array $flows Flows whose schedule may have been fenced already.
-	 */
-	private function reconcileFlowSchedules( array $flows ): array {
-		$results = array();
-		foreach ( $flows as $flow ) {
-			$flow_id = (int) ( $flow['flow_id'] ?? 0 );
-			if ( $flow_id <= 0 ) {
-				continue;
-			}
-
-			$result              = FlowScheduling::handle_scheduling_update(
-				$flow_id,
-				$flow['scheduling_config'] ?? array( 'interval' => 'manual' ),
-				true
-			);
-			$results[ $flow_id ] = is_wp_error( $result )
-				? array_merge( array( 'success' => false ), \DataMachine\Engine\Tasks\RecurringScheduler::errorMetadata( $result ) )
-				: array( 'success' => true );
+		if ( ! empty( $schedule_failures ) ) {
+			$result['error']             = 'Pipeline was deleted with retryable schedule reconciliation drift.';
+			$result['error_code']        = 'pipeline_schedule_reconciliation_drift';
+			$result['schedule_failures'] = $schedule_failures;
 		}
 
-		return $results;
+		return $result;
 	}
 }

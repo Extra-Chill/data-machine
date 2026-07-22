@@ -33,6 +33,8 @@ use DataMachine\Core\OptionLeaseStore;
 defined( 'ABSPATH' ) || exit;
 
 class RecurringScheduler {
+	/** @var array<string,array{generation_option:string,expected_generation:string}> */
+	private static array $executed_recurrence_generations = array();
 
 	/**
 	 * Default Action Scheduler group for all DM-managed schedules.
@@ -142,6 +144,52 @@ class RecurringScheduler {
 	}
 
 	/**
+	 * Persist desired state and reconcile its schedule under one signature lease.
+	 *
+	 * The commit runs before any Action Scheduler mutation. The recorder runs after
+	 * reconciliation, while the same lease is still held, and may persist drift or
+	 * derived scheduling metadata.
+	 *
+	 * @param callable $commit Desired-state commit. Return true or WP_Error.
+	 * @param callable $record Reconciliation recorder receiving array|WP_Error.
+	 * @return array|\WP_Error
+	 */
+	public static function commitDesiredSchedule(
+		string $hook,
+		array $args,
+		?string $interval,
+		array $options,
+		bool $enabled,
+		callable $commit,
+		callable $record
+	) {
+		$lock = self::acquireScheduleLock( $hook, $args, (string) ( $options['group'] ?? self::GROUP ) );
+		if ( is_wp_error( $lock ) ) {
+			return $lock;
+		}
+
+		try {
+			$committed = $commit();
+			if ( is_wp_error( $committed ) ) {
+				return $committed;
+			}
+			if ( true !== $committed ) {
+				return self::retryableError( 'schedule_state_commit_failed', 'Failed to persist desired schedule state.' );
+			}
+
+			$result   = self::ensureScheduleUnlocked( $hook, $args, $interval, $options, $enabled, $lock );
+			$recorded = $record( $result );
+			if ( is_wp_error( $recorded ) ) {
+				return $recorded;
+			}
+
+			return $result;
+		} finally {
+			OptionLeaseStore::release( $lock['option_name'], $lock['token'] );
+		}
+	}
+
+	/**
 	 * Reconcile one schedule while its signature lease is held.
 	 *
 	 * @param string      $hook     Action Scheduler hook.
@@ -190,10 +238,9 @@ class RecurringScheduler {
 			}
 
 			if ( ! function_exists( 'as_schedule_single_action' ) ) {
-				return self::error(
+				return self::retryableError(
 					'scheduler_unavailable',
-					'Action Scheduler not available',
-					array( 'status' => 500 )
+					'Action Scheduler not available'
 				);
 			}
 
@@ -202,10 +249,9 @@ class RecurringScheduler {
 			// unschedule would be a no-op while the schedule later succeeds,
 			// creating a duplicate chain. Bail so the caller retries later.
 			if ( ! self::isActionSchedulerDataStoreReady() ) {
-				return self::error(
+				return self::retryableError(
 					'datastore_not_ready',
-					'Action Scheduler datastore not ready; deferring schedule to avoid creating a duplicate chain.',
-					array( 'status' => 503 )
+					'Action Scheduler datastore not ready; deferring schedule to avoid creating a duplicate chain.'
 				);
 			}
 
@@ -274,10 +320,9 @@ class RecurringScheduler {
 		}
 
 		if ( ! function_exists( 'as_schedule_recurring_action' ) ) {
-			return self::error(
+			return self::retryableError(
 				'scheduler_unavailable',
-				'Action Scheduler not available',
-				array( 'status' => 500 )
+				'Action Scheduler not available'
 			);
 		}
 
@@ -287,10 +332,9 @@ class RecurringScheduler {
 		// later succeeds in the same request — creating a SECOND parallel
 		// recurring chain. Bail so the caller retries when AS is ready.
 		if ( ! self::isActionSchedulerDataStoreReady() ) {
-			return self::error(
+			return self::retryableError(
 				'datastore_not_ready',
-				'Action Scheduler datastore not ready; deferring schedule to avoid creating a duplicate chain.',
-				array( 'status' => 503 )
+				'Action Scheduler datastore not ready; deferring schedule to avoid creating a duplicate chain.'
 			);
 		}
 
@@ -336,10 +380,9 @@ class RecurringScheduler {
 				}
 
 				if ( ! self::isScheduled( $hook, $args, $group ) ) {
-					return self::error(
+					return self::retryableError(
 						'schedule_not_persisted',
-						'Action Scheduler accepted the schedule but no pending action was found. AS tables may not be ready.',
-						array( 'status' => 500 )
+						'Action Scheduler accepted the schedule but no pending action was found. AS tables may not be ready.'
 					);
 				}
 
@@ -378,10 +421,9 @@ class RecurringScheduler {
 		// Verify persistence. AS can silently drop actions when its tables
 		// aren't ready (e.g. CLI context during plugin activation).
 		if ( ! self::isScheduled( $hook, $args, $group ) ) {
-			return self::error(
+			return self::retryableError(
 				'schedule_not_persisted',
-				'Action Scheduler accepted the schedule but no pending action was found. AS tables may not be ready.',
-				array( 'status' => 500 )
+				'Action Scheduler accepted the schedule but no pending action was found. AS tables may not be ready.'
 			);
 		}
 
@@ -398,6 +440,62 @@ class RecurringScheduler {
 	 */
 	public static function registerGenerationFence(): void {
 		add_filter( 'action_scheduler_stored_action_instance', array( self::class, 'fenceStoredAction' ), 10, 6 );
+		add_action( 'action_scheduler_before_execute', array( self::class, 'clearExecutedRecurrenceGenerations' ), 0, 0 );
+		add_action( 'action_scheduler_after_execute', array( self::class, 'captureExecutedRecurrenceGeneration' ), PHP_INT_MAX, 2 );
+		add_action( 'action_scheduler_stored_action', array( self::class, 'reconcileStoredRecurrenceSuccessor' ), PHP_INT_MAX );
+	}
+
+	public static function clearExecutedRecurrenceGenerations(): void {
+		self::$executed_recurrence_generations = array();
+	}
+
+	/**
+	 * Capture the generation that native Action Scheduler repeat() is about to clone.
+	 */
+	public static function captureExecutedRecurrenceGeneration( int $action_id, $action ): void {
+		unset( $action_id );
+		if ( ! $action instanceof GenerationFencedAction || ! $action->get_schedule()->is_recurring() ) {
+			return;
+		}
+
+		$key = self::scheduleSignatureKey( $action->get_hook(), $action->get_args(), $action->get_group() );
+		if ( null === $key ) {
+			return;
+		}
+
+		self::$executed_recurrence_generations[ $key ] = array(
+			'generation_option'   => $action->getGenerationOption(),
+			'expected_generation' => $action->getExpectedGeneration(),
+		);
+	}
+
+	/**
+	 * Cancel a successor stored from a stale schedule cached inside repeat().
+	 */
+	public static function reconcileStoredRecurrenceSuccessor( int $action_id ): void {
+		if ( empty( self::$executed_recurrence_generations ) ) {
+			return;
+		}
+
+		try {
+			$action = \ActionScheduler_Store::instance()->fetch_action( $action_id );
+		} catch ( \Throwable $exception ) {
+			return;
+		}
+
+		$key = self::scheduleSignatureKey( $action->get_hook(), $action->get_args(), $action->get_group() );
+		if ( null === $key || ! isset( self::$executed_recurrence_generations[ $key ] ) ) {
+			return;
+		}
+
+		$context = self::$executed_recurrence_generations[ $key ];
+		unset( self::$executed_recurrence_generations[ $key ] );
+		$current = get_option( $context['generation_option'], '' );
+		if ( is_string( $current ) && hash_equals( $context['expected_generation'], $current ) ) {
+			return;
+		}
+
+		\ActionScheduler_Store::instance()->cancel_action( $action_id );
 	}
 
 	/**
@@ -512,16 +610,20 @@ class RecurringScheduler {
 	 * @return array{lock_option:string,generation_option:string}|\WP_Error
 	 */
 	private static function scheduleOptionNames( string $hook, array $args, string $group ) {
-		$signature = wp_json_encode( array( $hook, $args, $group ) );
-		if ( false === $signature ) {
+		$hash = self::scheduleSignatureKey( $hook, $args, $group );
+		if ( null === $hash ) {
 			return self::error( 'invalid_schedule_signature', 'Schedule arguments must be JSON-serializable.', array( 'status' => 400 ) );
 		}
 
-		$hash = md5( $signature );
 		return array(
 			'lock_option'       => self::SCHEDULE_LOCK_PREFIX . $hash,
 			'generation_option' => self::SCHEDULE_GENERATION_PREFIX . $hash,
 		);
+	}
+
+	private static function scheduleSignatureKey( string $hook, array $args, string $group ): ?string {
+		$signature = wp_json_encode( array( $hook, $args, $group ) );
+		return false === $signature ? null : md5( $signature );
 	}
 
 	/**
@@ -641,10 +743,11 @@ class RecurringScheduler {
 	 * @param string $hook  Hook name.
 	 * @param array  $args  Action args (signature).
 	 * @param string $group AS group.
-	 * @return void
+	 * @return array|\WP_Error Observable reconciliation result. Existing callers
+	 *                         may continue ignoring the return value.
 	 */
-	public static function unschedule( string $hook, array $args, string $group = self::GROUP ): void {
-		self::ensureSchedule( $hook, $args, 'manual', array( 'group' => $group ) );
+	public static function unschedule( string $hook, array $args, string $group = self::GROUP ) {
+		return self::ensureSchedule( $hook, $args, 'manual', array( 'group' => $group ) );
 	}
 
 	/**
@@ -761,6 +864,18 @@ class RecurringScheduler {
 	 */
 	private static function error( string $code, string $message, array $data = array() ): \WP_Error {
 		return new \WP_Error( $code, $message, $data );
+	}
+
+	private static function retryableError( string $code, string $message, int $status = 503 ): \WP_Error {
+		return self::error(
+			$code,
+			$message,
+			array(
+				'status'         => $status,
+				'retryable'      => true,
+				'retry_after_ms' => 250,
+			)
+		);
 	}
 
 	/**
@@ -1120,10 +1235,9 @@ class RecurringScheduler {
 		}
 
 		if ( ! function_exists( 'as_schedule_cron_action' ) ) {
-			return self::error(
+			return self::retryableError(
 				'scheduler_unavailable',
-				'Action Scheduler not available',
-				array( 'status' => 500 )
+				'Action Scheduler not available'
 			);
 		}
 
@@ -1131,10 +1245,9 @@ class RecurringScheduler {
 		// branches: a not-ready unschedule is a no-op but the schedule succeeds,
 		// duplicating the chain. Bail and let the caller retry when AS is ready.
 		if ( ! self::isActionSchedulerDataStoreReady() ) {
-			return self::error(
+			return self::retryableError(
 				'datastore_not_ready',
-				'Action Scheduler datastore not ready; deferring cron schedule to avoid creating a duplicate chain.',
-				array( 'status' => 503 )
+				'Action Scheduler datastore not ready; deferring cron schedule to avoid creating a duplicate chain.'
 			);
 		}
 
@@ -1160,10 +1273,9 @@ class RecurringScheduler {
 				}
 
 				if ( ! self::isScheduled( $hook, $args, $group ) ) {
-					return self::error(
+					return self::retryableError(
 						'schedule_not_persisted',
-						'Action Scheduler accepted the cron schedule but no pending action was found.',
-						array( 'status' => 500 )
+						'Action Scheduler accepted the cron schedule but no pending action was found.'
 					);
 				}
 
@@ -1199,10 +1311,9 @@ class RecurringScheduler {
 		}
 
 		if ( ! self::isScheduled( $hook, $args, $group ) ) {
-			return self::error(
+			return self::retryableError(
 				'schedule_not_persisted',
-				'Action Scheduler accepted the cron schedule but no pending action was found.',
-				array( 'status' => 500 )
+				'Action Scheduler accepted the cron schedule but no pending action was found.'
 			);
 		}
 

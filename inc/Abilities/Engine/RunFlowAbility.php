@@ -173,7 +173,7 @@ class RunFlowAbility {
 		}
 
 		if ( isset( $scheduling_config['datamachine_last_suppressed_run'] ) ) {
-			$this->clearSuppressedRun( $flow_id, $scheduling_config );
+			$this->clearSuppressedRun( $flow_id );
 		}
 
 		$agent_identity = null;
@@ -541,7 +541,7 @@ class RunFlowAbility {
 	private function recordSuppressedRun( int $flow_id, array $scheduling_config, array $skip ): void {
 		$suppressed_at = current_time( 'mysql', true );
 
-		$scheduling_config['datamachine_last_suppressed_run'] = array(
+		$suppressed_run = array(
 			'reason'        => (string) ( $skip['reason'] ?? 'empty_drain_queue' ),
 			'flow_step_id'  => (string) ( $skip['flow_step_id'] ?? '' ),
 			'queue_mode'    => (string) ( $skip['queue_mode'] ?? 'drain' ),
@@ -549,18 +549,19 @@ class RunFlowAbility {
 			'backoff_until' => $this->getSuppressedRunBackoffUntil( $scheduling_config, $suppressed_at ),
 		);
 
-		$this->db_flows->update_flow_scheduling( $flow_id, $scheduling_config );
+		$this->db_flows->update_flow_scheduling_metadata(
+			$flow_id,
+			array( 'datamachine_last_suppressed_run' => $suppressed_run )
+		);
 	}
 
 	/**
 	 * Clear stale suppression metadata once the flow can start normally.
 	 *
-	 * @param int   $flow_id           Flow ID.
-	 * @param array $scheduling_config Current scheduling config.
+	 * @param int $flow_id Flow ID.
 	 */
-	private function clearSuppressedRun( int $flow_id, array $scheduling_config ): void {
-		unset( $scheduling_config['datamachine_last_suppressed_run'] );
-		$this->db_flows->update_flow_scheduling( $flow_id, $scheduling_config );
+	private function clearSuppressedRun( int $flow_id ): void {
+		$this->db_flows->update_flow_scheduling_metadata( $flow_id, array(), array( 'datamachine_last_suppressed_run' ) );
 	}
 
 	/**

@@ -17,6 +17,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 class FlowScheduling {
+	private const RECONCILIATION_KEY = 'schedule_reconciliation';
 
 	/**
 	 * Action Scheduler hook fired when a flow is due to run.
@@ -124,7 +125,15 @@ class FlowScheduling {
 			}
 		}
 
-		// Delegate AS scheduling to the primitive.
+		$desired             = $scheduling_config;
+		$desired['interval'] = $interval ?? 'manual';
+		foreach ( array( 'interval_seconds', 'first_run', 'scheduled_time', 'action_id' ) as $derived_key ) {
+			unset( $desired[ $derived_key ] );
+		}
+
+		$effective_interval = false === ( $desired['enabled'] ?? true ) ? 'manual' : $interval;
+		$operation_token    = wp_generate_uuid4();
+
 		$options = array(
 			'stagger_seed'     => (int) $flow_id,
 			'force_reschedule' => $force,
@@ -136,57 +145,100 @@ class FlowScheduling {
 			$options['cron_expression'] = $cron_expression;
 		}
 
-		$result = RecurringScheduler::ensureSchedule(
+		$result = RecurringScheduler::commitDesiredSchedule(
 			self::FLOW_HOOK,
 			array( (int) $flow_id ),
-			$interval,
+			$effective_interval,
 			$options,
-			true
+			true,
+			static function () use ( $db_flows, $flow_id, $desired, $operation_token ): bool {
+				$pending                             = $desired;
+				$pending[ self::RECONCILIATION_KEY ] = array(
+					'status'     => 'pending',
+					'token'      => $operation_token,
+					'updated_at' => time(),
+				);
+				return $db_flows->update_flow_scheduling( (int) $flow_id, $pending );
+			},
+			static function ( $schedule_result ) use ( $db_flows, $flow_id, $operation_token ): bool|\WP_Error {
+				$stored = $db_flows->get_flow_scheduling( (int) $flow_id );
+				if ( ! is_array( $stored ) || ( $stored[ self::RECONCILIATION_KEY ]['token'] ?? '' ) !== $operation_token ) {
+					return new \WP_Error(
+						'schedule_desired_state_superseded',
+						'Desired schedule state changed before reconciliation completed.',
+						array(
+							'status'         => 409,
+							'retryable'      => true,
+							'retry_after_ms' => 250,
+						)
+					);
+				}
+				if ( is_wp_error( $schedule_result ) ) {
+					$updates = array(
+						self::RECONCILIATION_KEY => array_merge(
+							array(
+								'status'     => 'drift',
+								'token'      => $operation_token,
+								'updated_at' => time(),
+							),
+							RecurringScheduler::errorMetadata( $schedule_result )
+						),
+					);
+					$remove  = array();
+				} else {
+					$updates = self::scheduleMetadataUpdates( $stored, $schedule_result );
+					$remove  = array( self::RECONCILIATION_KEY );
+				}
+
+				if ( ! $db_flows->update_flow_scheduling_metadata( (int) $flow_id, $updates, $remove ) ) {
+					return new \WP_Error(
+						'schedule_reconciliation_record_failed',
+						'Desired schedule was committed but reconciliation status could not be recorded.',
+						array(
+							'status'         => 503,
+							'retryable'      => true,
+							'retry_after_ms' => 250,
+						)
+					);
+				}
+
+				return true;
+			}
 		);
 
 		if ( is_wp_error( $result ) ) {
 			return $result;
 		}
 
-		// Persist to flows table based on what was actually scheduled.
-		$storage = array( 'interval' => $result['interval'] );
-		switch ( $result['interval'] ) {
-			case 'manual':
-				$db_flows->update_flow_scheduling( $flow_id, $storage );
-				break;
-
-			case 'one_time':
-				$storage['timestamp']      = $result['timestamp'];
-				$storage['scheduled_time'] = $result['scheduled_time'];
-				$db_flows->update_flow_scheduling( $flow_id, $storage );
-				break;
-
-			case 'cron':
-				$storage['cron_expression'] = $result['cron_expression'];
-				$storage['first_run']       = $result['first_run'];
-				$db_flows->update_flow_scheduling( $flow_id, $storage );
-
-				do_action(
-					'datamachine_log',
-					'info',
-					'Flow scheduled with cron expression',
-					array(
-						'flow_id'         => $flow_id,
-						'cron_expression' => $result['cron_expression'],
-						'next_run'        => $result['first_run'],
-						'action_id'       => $result['action_id'] ?? null,
-					)
-				);
-				break;
-
-			default:
-				// Recurring by interval key.
-				$storage['interval_seconds'] = $result['interval_seconds'];
-				$storage['first_run']        = $result['first_run'];
-				$db_flows->update_flow_scheduling( $flow_id, $storage );
-				break;
+		if ( 'cron' === $result['interval'] ) {
+			do_action(
+				'datamachine_log',
+				'info',
+				'Flow scheduled with cron expression',
+				array(
+					'flow_id'         => $flow_id,
+					'cron_expression' => $result['cron_expression'],
+					'next_run'        => $result['first_run'],
+					'action_id'       => $result['action_id'] ?? null,
+				)
+			);
 		}
 
 		return true;
+	}
+
+	private static function scheduleMetadataUpdates( array $desired, array $result ): array {
+		$updates = array();
+		if ( false !== ( $desired['enabled'] ?? true ) ) {
+			$updates['interval'] = $result['interval'];
+		}
+
+		foreach ( array( 'timestamp', 'scheduled_time', 'cron_expression', 'interval_seconds', 'first_run', 'action_id' ) as $key ) {
+			if ( array_key_exists( $key, $result ) ) {
+				$updates[ $key ] = $result[ $key ];
+			}
+		}
+
+		return $updates;
 	}
 }

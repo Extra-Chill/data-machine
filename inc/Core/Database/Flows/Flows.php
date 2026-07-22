@@ -996,6 +996,61 @@ class Flows extends BaseRepository {
 		return true;
 	}
 
+	/**
+	 * Patch non-authoritative scheduling metadata without overwriting desired state.
+	 *
+	 * @param int   $flow_id Flow ID.
+	 * @param array $set     Metadata keys to set.
+	 * @param array $remove  Metadata keys to remove.
+	 */
+	public function update_flow_scheduling_metadata( int $flow_id, array $set = array(), array $remove = array() ): bool {
+		for ( $attempt = 0; $attempt < 3; ++$attempt ) {
+			$query = $this->wpdb->prepare( 'SELECT scheduling_config FROM %i WHERE flow_id = %d', $this->table_name, $flow_id );
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared -- Prepared immediately above.
+			$current_json = $this->wpdb->get_var( $query );
+			if ( ! is_string( $current_json ) ) {
+				return false;
+			}
+
+			$current = json_decode( $current_json, true );
+			$current = is_array( $current ) ? $current : array();
+			foreach ( $set as $key => $value ) {
+				$current[ $key ] = $value;
+			}
+			foreach ( $remove as $key ) {
+				unset( $current[ $key ] );
+			}
+
+			$replacement = wp_json_encode( $current );
+			if ( false === $replacement ) {
+				return false;
+			}
+			if ( $replacement === $current_json ) {
+				return true;
+			}
+
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			$updated = $this->wpdb->update(
+				$this->table_name,
+				array( 'scheduling_config' => $replacement ),
+				array(
+					'flow_id'           => $flow_id,
+					'scheduling_config' => $current_json,
+				),
+				array( '%s' ),
+				array( '%d', '%s' )
+			);
+			if ( 1 === $updated ) {
+				return true;
+			}
+			if ( false === $updated ) {
+				return false;
+			}
+		}
+
+		return false;
+	}
+
 	public function get_flow_scheduling( int $flow_id ): ?array {
         // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 		$scheduling_config_json = $this->wpdb->get_var( $this->wpdb->prepare( 'SELECT scheduling_config FROM %i WHERE flow_id = %d', $this->table_name, $flow_id ) );

@@ -708,7 +708,8 @@ echo "\n[30] public unschedule compatibility uses the fenced primitive\n";
 datamachine_rs_reset();
 datamachine_assert_schedule_result( RecurringScheduler::ensureSchedule( 'datamachine_public_unschedule', array( 19 ), 'hourly' ) );
 $GLOBALS['datamachine_rs_unscheduled'] = 0;
-RecurringScheduler::unschedule( 'datamachine_public_unschedule', array( 19 ) );
+$unschedule_result = RecurringScheduler::unschedule( 'datamachine_public_unschedule', array( 19 ) );
+datamachine_assert_schedule_result( $unschedule_result );
 datamachine_assert( 0 === datamachine_rs_pending_count( 'datamachine_public_unschedule', array( 19 ), RecurringScheduler::GROUP ), 'legacy public unschedule removes the pending schedule' );
 datamachine_assert( 1 === datamachine_rs_counter( 'datamachine_rs_unscheduled' ), 'legacy public unschedule performs one fenced mutation' );
 
@@ -718,8 +719,8 @@ $delete_pipeline_source = file_get_contents( __DIR__ . '/../inc/Abilities/Pipeli
 $pause_flow_source      = file_get_contents( __DIR__ . '/../inc/Abilities/Flow/PauseFlowAbility.php' ) ?: '';
 $create_flow_source     = file_get_contents( __DIR__ . '/../inc/Abilities/Flow/CreateFlowAbility.php' ) ?: '';
 $engine_source          = file_get_contents( __DIR__ . '/../inc/Engine/Actions/Engine.php' ) ?: '';
-datamachine_assert( str_contains( $delete_flow_source, 'is_wp_error( $schedule_result )' ), 'flow deletion stops on scheduler failure' );
-datamachine_assert( strpos( $delete_pipeline_source, 'is_wp_error( $schedule_result )' ) < strpos( $delete_pipeline_source, 'delete_flow( (int) $flow_id )' ), 'pipeline deletion fences every flow before database deletion' );
+datamachine_assert( str_contains( $delete_flow_source, 'commitDesiredSchedule' ), 'flow deletion commits desired absence under the schedule lease' );
+datamachine_assert( str_contains( $delete_pipeline_source, "'schedule_failures'" ), 'pipeline deletion aggregates schedule reconciliation failures' );
 datamachine_assert( str_contains( $pause_flow_source, "'status'  => 'pause_error'" ), 'pause reports scheduler failure instead of success' );
 datamachine_assert( str_contains( $create_flow_source, "'schedule_cleanup'" ), 'creation rollback records failed schedule compensation' );
 datamachine_assert( str_contains( $engine_source, 'Orphaned schedule cleanup deferred after ownership failure' ), 'orphan cleanup records retryable scheduler failure' );
@@ -728,9 +729,59 @@ datamachine_assert( str_contains( $schedule_flow_source, 'SCHEDULE_GENERATION_PR
 echo "\n[32] generation fence matches bundled Action Scheduler repeat order\n";
 $queue_runner_source = file_get_contents( __DIR__ . '/../vendor/woocommerce/action-scheduler/classes/abstracts/ActionScheduler_Abstract_QueueRunner.php' ) ?: '';
 $factory_source      = file_get_contents( __DIR__ . '/../vendor/woocommerce/action-scheduler/classes/ActionScheduler_ActionFactory.php' ) ?: '';
+$scheduler_source    = file_get_contents( __DIR__ . '/../inc/Engine/Tasks/RecurringScheduler.php' ) ?: '';
 $execute_position    = strpos( $queue_runner_source, '$action->execute()' );
 $repeat_position     = strpos( $queue_runner_source, '$action->get_schedule()->is_recurring()' );
 datamachine_assert( false !== $execute_position && false !== $repeat_position && $execute_position < $repeat_position, 'bundled AS re-reads the fetched action schedule after callback execution' );
 datamachine_assert( str_contains( $factory_source, '$schedule = $action->get_schedule();' ) && str_contains( $factory_source, '$this->store( $new_action )' ), 'bundled AS repeats from the fetched action schedule object' );
+datamachine_assert( str_contains( $scheduler_source, "'action_scheduler_stored_action'" ) && str_contains( $scheduler_source, 'cancel_action( $action_id )' ), 'post-store reconciliation cancels a stale native successor' );
+
+echo "\n[33] desired-state persistence failure prevents schedule mutation\n";
+datamachine_rs_reset();
+datamachine_assert_schedule_result( RecurringScheduler::ensureSchedule( 'datamachine_commit_failure', array( 20 ), 'hourly' ) );
+$GLOBALS['datamachine_rs_unscheduled'] = 0;
+$result = RecurringScheduler::commitDesiredSchedule(
+	'datamachine_commit_failure',
+	array( 20 ),
+	'daily',
+	array(),
+	true,
+	static fn(): bool => false,
+	static fn(): bool => true
+);
+datamachine_assert( $result instanceof WP_Error, 'failed desired-state commit returns an error' );
+datamachine_assert( 'schedule_state_commit_failed' === $result->get_error_code(), 'persistence failure is observable' );
+datamachine_assert( true === ( $result->get_error_data()['retryable'] ?? false ), 'persistence failure is explicitly retryable' );
+datamachine_assert( 0 === datamachine_rs_counter( 'datamachine_rs_unscheduled' ), 'persistence failure performs no destructive AS mutation' );
+$key = datamachine_rs_key( 'datamachine_commit_failure', array( 20 ), RecurringScheduler::GROUP );
+$preserved_action = reset( $GLOBALS['datamachine_rs_actions'][ $key ]['pending'] );
+datamachine_assert( 3600 === $preserved_action->get_schedule()->get_recurrence(), 'old schedule remains intact when desired state cannot commit' );
+
+echo "\n[34] desired commit and drift recording remain inside the signature lease\n";
+datamachine_rs_reset();
+datamachine_assert_schedule_result( RecurringScheduler::ensureSchedule( 'datamachine_commit_race', array( 21 ), 'hourly' ) );
+$commit_contender = null;
+$record_contender = null;
+$result = RecurringScheduler::commitDesiredSchedule(
+	'datamachine_commit_race',
+	array( 21 ),
+	'daily',
+	array(),
+	true,
+	static function () use ( &$commit_contender ): bool {
+		$commit_contender = RecurringScheduler::ensureSchedule( 'datamachine_commit_race', array( 21 ), 'manual' );
+		return true;
+	},
+	static function () use ( &$record_contender ): bool {
+		$record_contender = RecurringScheduler::ensureSchedule( 'datamachine_commit_race', array( 21 ), 'manual' );
+		return true;
+	}
+);
+datamachine_assert_schedule_result( $result );
+datamachine_assert( $commit_contender instanceof WP_Error && 'schedule_lock_timeout' === $commit_contender->get_error_code(), 'contender cannot mutate between desired commit and reconciliation' );
+datamachine_assert( $record_contender instanceof WP_Error && 'schedule_lock_timeout' === $record_contender->get_error_code(), 'contender cannot mutate before reconciliation status persistence' );
+$key = datamachine_rs_key( 'datamachine_commit_race', array( 21 ), RecurringScheduler::GROUP );
+$committed_action = reset( $GLOBALS['datamachine_rs_actions'][ $key ]['pending'] );
+datamachine_assert( 86400 === $committed_action->get_schedule()->get_recurrence(), 'committed desired cadence wins both races' );
 
 echo "\nAll recurring scheduler idempotency assertions passed.\n";

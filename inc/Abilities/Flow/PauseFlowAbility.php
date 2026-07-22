@@ -122,12 +122,8 @@ class PauseFlowAbility {
 				continue;
 			}
 
-			// Fence the recurrence before reporting or persisting a successful pause.
-			$schedule_result = \DataMachine\Engine\Tasks\RecurringScheduler::ensureSchedule(
-				'datamachine_run_flow_now',
-				array( $fid ),
-				'manual'
-			);
+			$scheduling['enabled'] = false;
+			$schedule_result       = FlowScheduling::handle_scheduling_update( $fid, $scheduling, true );
 			if ( is_wp_error( $schedule_result ) ) {
 				++$errors;
 				$details[] = array_merge(
@@ -136,18 +132,6 @@ class PauseFlowAbility {
 						'status'  => 'pause_error',
 					),
 					\DataMachine\Engine\Tasks\RecurringScheduler::errorMetadata( $schedule_result )
-				);
-				continue;
-			}
-
-			$scheduling['enabled'] = false;
-			if ( ! $this->db_flows->update_flow_scheduling( $fid, $scheduling ) ) {
-				++$errors;
-				$details[] = array(
-					'flow_id'    => $fid,
-					'status'     => 'pause_error',
-					'error'      => 'Failed to persist paused scheduling state.',
-					'error_code' => 'pause_persistence_failed',
 				);
 				continue;
 			}
