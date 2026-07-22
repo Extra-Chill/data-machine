@@ -15,11 +15,12 @@ if ( ! class_exists( 'WP_Error' ) ) {
 	class WP_Error {
 		private string $code;
 		private string $message;
+		private array $data;
 
 		public function __construct( string $code = '', string $message = '', array $data = array() ) {
 			$this->code    = $code;
 			$this->message = $message;
-			unset( $data );
+			$this->data    = $data;
 		}
 
 		public function get_error_code(): string {
@@ -31,7 +32,11 @@ if ( ! class_exists( 'WP_Error' ) ) {
 		}
 
 		public function add_data( array $data ): void {
-			unset( $data );
+			$this->data = $data;
+		}
+
+		public function get_error_data(): array {
+			return $this->data;
 		}
 	}
 }
@@ -155,7 +160,52 @@ class ActionScheduler {
 	}
 }
 
-class DmRecurringSchedulerFakeSchedule {
+if ( ! class_exists( 'ActionScheduler_Schedule' ) ) {
+	abstract class ActionScheduler_Schedule {
+		abstract public function is_recurring(): bool;
+		abstract public function get_date(): DateTimeImmutable;
+	}
+}
+
+if ( ! class_exists( 'ActionScheduler_Action' ) ) {
+	class ActionScheduler_Action {
+		private ActionScheduler_Schedule $schedule;
+		private int $priority = 10;
+
+		public function __construct( string $hook, array $args, ActionScheduler_Schedule $schedule, string $group ) {
+			unset( $hook, $args, $group );
+			$this->schedule = $schedule;
+		}
+
+		public function get_schedule(): ActionScheduler_Schedule {
+			return $this->schedule;
+		}
+
+		public function set_priority( int $priority ): void {
+			$this->priority = $priority;
+		}
+	}
+}
+
+if ( ! class_exists( 'ActionScheduler_CanceledSchedule' ) ) {
+	class ActionScheduler_CanceledSchedule extends ActionScheduler_Schedule {
+		private DateTimeImmutable $date;
+
+		public function __construct( DateTimeImmutable $date ) {
+			$this->date = $date;
+		}
+
+		public function is_recurring(): bool {
+			return false;
+		}
+
+		public function get_date(): DateTimeImmutable {
+			return $this->date;
+		}
+	}
+}
+
+class DmRecurringSchedulerFakeSchedule extends ActionScheduler_Schedule {
 	private bool $recurring;
 	/**
 	 * @var int|string|null
@@ -204,6 +254,8 @@ $GLOBALS['datamachine_rs_cron_unique']         = array();
 $GLOBALS['datamachine_rs_schedule_race']       = false;
 $GLOBALS['datamachine_rs_reentrant_race']      = false;
 $GLOBALS['datamachine_rs_reentrant_result']    = null;
+$GLOBALS['datamachine_rs_single_reentrant']    = null;
+$GLOBALS['datamachine_rs_steal_lock_on_query'] = false;
 
 function datamachine_rs_key( string $hook, array $args, string $group ): string {
 	return $group . '|' . $hook . '|' . serialize( $args );
@@ -239,6 +291,8 @@ function datamachine_rs_reset(): void {
 	$GLOBALS['datamachine_rs_schedule_race']       = false;
 	$GLOBALS['datamachine_rs_reentrant_race']      = false;
 	$GLOBALS['datamachine_rs_reentrant_result']    = null;
+	$GLOBALS['datamachine_rs_single_reentrant']    = null;
+	$GLOBALS['datamachine_rs_steal_lock_on_query'] = false;
 	$GLOBALS['datamachine_rs_options']             = array();
 	$GLOBALS['datamachine_rs_add_option_failures'] = 0;
 	$GLOBALS['datamachine_rs_add_option_calls']    = 0;
@@ -250,6 +304,15 @@ function datamachine_rs_counter( string $key ): int {
 }
 
 function as_get_scheduled_actions( array $args = array(), $return_format = OBJECT ): array {
+	if ( $GLOBALS['datamachine_rs_steal_lock_on_query'] ) {
+		$GLOBALS['datamachine_rs_steal_lock_on_query'] = false;
+		foreach ( $GLOBALS['datamachine_rs_options'] as $name => $payload ) {
+			if ( str_starts_with( $name, 'datamachine_schedule_lock_' ) && is_array( $payload ) ) {
+				$GLOBALS['datamachine_rs_options'][ $name ]['token'] = 'stale-owner-taken-over';
+				break;
+			}
+		}
+	}
 	$key      = datamachine_rs_key( $args['hook'], $args['args'] ?? array(), $args['group'] ?? '' );
 	$status   = $args['status'] ?? 'pending';
 	$matches  = $GLOBALS['datamachine_rs_actions'][ $key ][ $status ] ?? array();
@@ -282,6 +345,16 @@ function as_unschedule_all_actions( string $hook, array $args = array(), string 
 
 function as_schedule_single_action( int $timestamp, string $hook, array $args = array(), string $group = '' ): int {
 	++$GLOBALS['datamachine_rs_scheduled_single'];
+	if ( is_array( $GLOBALS['datamachine_rs_single_reentrant'] ) ) {
+		$requested                                  = $GLOBALS['datamachine_rs_single_reentrant'];
+		$GLOBALS['datamachine_rs_single_reentrant'] = null;
+		$GLOBALS['datamachine_rs_reentrant_result'] = \DataMachine\Engine\Tasks\RecurringScheduler::ensureSchedule(
+			$hook,
+			$args,
+			$requested['interval'],
+			$requested['options'] + array( 'group' => $group )
+		);
+	}
 	datamachine_rs_seed_action( $hook, $args, $group, new DmRecurringSchedulerFakeSchedule( false, null, $timestamp ) );
 	return 101;
 }
@@ -313,6 +386,7 @@ function as_schedule_cron_action( int $timestamp, string $expression, string $ho
 }
 
 require_once __DIR__ . '/../inc/Core/OptionLeaseStore.php';
+require_once __DIR__ . '/../inc/Engine/Tasks/GenerationFencedAction.php';
 require_once __DIR__ . '/../inc/Engine/Tasks/RecurringScheduler.php';
 
 use DataMachine\Engine\Tasks\RecurringScheduler;
@@ -458,7 +532,7 @@ $GLOBALS['datamachine_rs_schedule_race'] = true;
 $result                                  = datamachine_assert_schedule_result( RecurringScheduler::ensureSchedule( 'datamachine_recurring_retention_as_actions', array(), 'hourly' ) );
 datamachine_assert( 1 === datamachine_rs_pending_count( 'datamachine_recurring_retention_as_actions', array(), RecurringScheduler::GROUP ), 'concurrent reconciliation preserves exactly one pending chain' );
 datamachine_assert( array( true ) === $GLOBALS['datamachine_rs_recurring_unique'], 'recurring reconciliation requests Action Scheduler uniqueness' );
-datamachine_assert( 0 === datamachine_rs_counter( 'datamachine_rs_unscheduled' ), 'initial reconciliation does not cancel a concurrent healthy chain' );
+datamachine_assert( 1 === datamachine_rs_counter( 'datamachine_rs_unscheduled' ), 'fenced reconciliation clears the pre-existing slot before atomic unique creation' );
 
 echo "\n[15] all recurring and cron replacement paths request Action Scheduler uniqueness (#2892)\n";
 datamachine_rs_reset();
@@ -486,6 +560,9 @@ $GLOBALS['datamachine_rs_reentrant_race'] = true;
 datamachine_assert_schedule_result( RecurringScheduler::ensureSchedule( 'datamachine_per_flow', array( 42 ), 'hourly' ) );
 datamachine_assert( $GLOBALS['datamachine_rs_reentrant_result'] instanceof WP_Error, 'contending reconciliation receives a retryable lock error' );
 datamachine_assert( 'schedule_lock_timeout' === $GLOBALS['datamachine_rs_reentrant_result']->get_error_code(), 'contention reports schedule_lock_timeout' );
+$lock_data = $GLOBALS['datamachine_rs_reentrant_result']->get_error_data();
+datamachine_assert( 409 === ( $lock_data['status'] ?? 0 ), 'lock timeout preserves conflict status metadata' );
+datamachine_assert( true === ( $lock_data['retryable'] ?? false ), 'lock timeout is explicitly retryable' );
 datamachine_assert( 1 === datamachine_rs_pending_count( 'datamachine_per_flow', array( 42 ), RecurringScheduler::GROUP ), 'outer owner creates exactly one pending chain' );
 
 echo "\n[19] transient lease contention retries before scheduling\n";
@@ -501,5 +578,96 @@ datamachine_rs_seed_action( 'datamachine_running', array( 9 ), RecurringSchedule
 $result = datamachine_assert_schedule_result( RecurringScheduler::ensureSchedule( 'datamachine_running', array( 9 ), 'hourly' ) );
 datamachine_assert( true === ( $result['preserved'] ?? false ), 'running recurrence is preserved as the current owner' );
 datamachine_assert( 0 === datamachine_rs_counter( 'datamachine_rs_scheduled_recurring' ), 'running recurrence does not spawn a parallel pending chain' );
+
+echo "\n[21] concurrent one-time callers create exactly one action\n";
+datamachine_rs_reset();
+$one_time = time() + 3600;
+$GLOBALS['datamachine_rs_single_reentrant'] = array(
+	'interval' => 'one_time',
+	'options'  => array( 'timestamp' => $one_time ),
+);
+datamachine_assert_schedule_result( RecurringScheduler::ensureSchedule( 'datamachine_once_race', array( 11 ), 'one_time', array( 'timestamp' => $one_time ) ) );
+datamachine_assert( $GLOBALS['datamachine_rs_reentrant_result'] instanceof WP_Error, 'second one-time caller is fenced while the owner schedules' );
+datamachine_assert( 1 === datamachine_rs_pending_count( 'datamachine_once_race', array( 11 ), RecurringScheduler::GROUP ), 'one-time race leaves exactly one pending action' );
+
+echo "\n[22] cross-caller mutation cannot cancel a locked one-time owner\n";
+datamachine_rs_reset();
+$GLOBALS['datamachine_rs_single_reentrant'] = array(
+	'interval' => 'hourly',
+	'options'  => array(),
+);
+datamachine_assert_schedule_result( RecurringScheduler::ensureSchedule( 'datamachine_cross_caller', array( 12 ), 'one_time', array( 'timestamp' => $one_time ) ) );
+datamachine_assert( 'schedule_lock_timeout' === $GLOBALS['datamachine_rs_reentrant_result']->get_error_code(), 'cross-caller cadence update cannot enter the owner mutation' );
+datamachine_assert( 1 === datamachine_rs_pending_count( 'datamachine_cross_caller', array( 12 ), RecurringScheduler::GROUP ), 'locked one-time action survives the contending cadence update' );
+
+echo "\n[23] manual transition fences a running recurrence before AS repeat\n";
+datamachine_rs_reset();
+datamachine_assert_schedule_result( RecurringScheduler::ensureSchedule( 'datamachine_running_disable', array( 13 ), 'hourly' ) );
+$old_schedule = new DmRecurringSchedulerFakeSchedule( true, 3600, time() );
+$old_action   = RecurringScheduler::fenceStoredAction( new ActionScheduler_Action( 'datamachine_running_disable', array( 13 ), $old_schedule, RecurringScheduler::GROUP ), 'datamachine_running_disable', array( 13 ), $old_schedule, RecurringScheduler::GROUP, 10 );
+datamachine_assert( $old_action->get_schedule()->is_recurring(), 'fetched running action starts on the current generation' );
+datamachine_assert_schedule_result( RecurringScheduler::ensureSchedule( 'datamachine_running_disable', array( 13 ), 'manual' ) );
+datamachine_assert( ! $old_action->get_schedule()->is_recurring(), 'manual transition makes the fetched old action non-recurring before repeat' );
+datamachine_assert( 0 === datamachine_rs_pending_count( 'datamachine_running_disable', array( 13 ), RecurringScheduler::GROUP ), 'manual transition leaves no successor' );
+
+echo "\n[24] cadence transition fences the old running schedule\n";
+datamachine_rs_reset();
+datamachine_assert_schedule_result( RecurringScheduler::ensureSchedule( 'datamachine_running_change', array( 14 ), 'hourly' ) );
+$old_schedule = new DmRecurringSchedulerFakeSchedule( true, 3600, time() );
+$old_action   = RecurringScheduler::fenceStoredAction( new ActionScheduler_Action( 'datamachine_running_change', array( 14 ), $old_schedule, RecurringScheduler::GROUP ), 'datamachine_running_change', array( 14 ), $old_schedule, RecurringScheduler::GROUP, 10 );
+$key          = datamachine_rs_key( 'datamachine_running_change', array( 14 ), RecurringScheduler::GROUP );
+$GLOBALS['datamachine_rs_actions'][ $key ]['pending'] = array();
+datamachine_rs_seed_action( 'datamachine_running_change', array( 14 ), RecurringScheduler::GROUP, $old_schedule, 'in-progress' );
+datamachine_assert_schedule_result( RecurringScheduler::ensureSchedule( 'datamachine_running_change', array( 14 ), 'daily' ) );
+datamachine_assert( ! $old_action->get_schedule()->is_recurring(), 'old fetched hourly action cannot repeat after daily transition' );
+$new_action = reset( $GLOBALS['datamachine_rs_actions'][ $key ]['pending'] );
+datamachine_assert( 86400 === $new_action->get_schedule()->get_recurrence(), 'exactly one daily successor owns the new generation' );
+
+echo "\n[25] stale owner cannot mutate after lease takeover during a slow query\n";
+datamachine_rs_reset();
+datamachine_assert_schedule_result( RecurringScheduler::ensureSchedule( 'datamachine_stale_owner', array( 15 ), 'hourly' ) );
+$GLOBALS['datamachine_rs_steal_lock_on_query'] = true;
+$result = RecurringScheduler::ensureSchedule( 'datamachine_stale_owner', array( 15 ), 'daily' );
+datamachine_assert( $result instanceof WP_Error, 'owner that lost its lease returns an error' );
+datamachine_assert( 'schedule_lock_lost' === $result->get_error_code(), 'stale owner reports schedule_lock_lost' );
+datamachine_assert( true === ( $result->get_error_data()['retryable'] ?? false ), 'lost ownership propagates retry metadata' );
+datamachine_assert( 1 === datamachine_rs_pending_count( 'datamachine_stale_owner', array( 15 ), RecurringScheduler::GROUP ), 'stale owner leaves the existing cadence untouched' );
+
+echo "\n[26] ScheduleFlowAbility has no direct Action Scheduler mutation path\n";
+$schedule_flow_source    = file_get_contents( __DIR__ . '/../inc/Abilities/Engine/ScheduleFlowAbility.php' ) ?: '';
+$plugin_source           = file_get_contents( __DIR__ . '/../data-machine.php' ) ?: '';
+$flow_scheduling_source = file_get_contents( __DIR__ . '/../inc/Api/Flows/FlowScheduling.php' ) ?: '';
+datamachine_assert( ! str_contains( $schedule_flow_source, 'as_unschedule_all_actions' ), 'schedule-flow ability does not unschedule outside the primitive' );
+datamachine_assert( ! str_contains( $schedule_flow_source, 'as_schedule_single_action' ), 'schedule-flow ability does not create one-time actions outside the primitive' );
+datamachine_assert( str_contains( $schedule_flow_source, "array( 'interval' => 'manual' )" ), 'manual transition delegates to FlowScheduling' );
+datamachine_assert( str_contains( $schedule_flow_source, "'interval'  => 'one_time'" ), 'one-time transition delegates to FlowScheduling' );
+datamachine_assert( str_contains( $schedule_flow_source, "'retry_after_ms'" ), 'ability response preserves retry/status metadata' );
+datamachine_assert( str_contains( $plugin_source, 'RecurringScheduler::registerGenerationFence()' ), 'generation fence is registered for every Action Scheduler runner request' );
+datamachine_assert( str_contains( $flow_scheduling_source, "'force_reschedule' => \$force" ), 'flow force transitions reach the fenced primitive' );
+
+echo "\n[27] forced replacement fences the fetched running generation\n";
+datamachine_rs_reset();
+datamachine_assert_schedule_result( RecurringScheduler::ensureSchedule( 'datamachine_running_force', array( 16 ), 'hourly' ) );
+$old_schedule = new DmRecurringSchedulerFakeSchedule( true, 3600, time() );
+$old_action   = RecurringScheduler::fenceStoredAction( new ActionScheduler_Action( 'datamachine_running_force', array( 16 ), $old_schedule, RecurringScheduler::GROUP ), 'datamachine_running_force', array( 16 ), $old_schedule, RecurringScheduler::GROUP, 10 );
+$key          = datamachine_rs_key( 'datamachine_running_force', array( 16 ), RecurringScheduler::GROUP );
+$GLOBALS['datamachine_rs_actions'][ $key ]['pending'] = array();
+datamachine_rs_seed_action( 'datamachine_running_force', array( 16 ), RecurringScheduler::GROUP, $old_schedule, 'in-progress' );
+datamachine_assert_schedule_result( RecurringScheduler::ensureSchedule( 'datamachine_running_force', array( 16 ), 'hourly', array( 'force_reschedule' => true ) ) );
+datamachine_assert( ! $old_action->get_schedule()->is_recurring(), 'forced replacement invalidates the old fetched recurrence' );
+datamachine_assert( 1 === datamachine_rs_pending_count( 'datamachine_running_force', array( 16 ), RecurringScheduler::GROUP ), 'forced replacement installs exactly one successor' );
+
+echo "\n[28] cron transition fences the fetched interval generation\n";
+datamachine_rs_reset();
+datamachine_assert_schedule_result( RecurringScheduler::ensureSchedule( 'datamachine_running_cron', array( 17 ), 'hourly' ) );
+$old_schedule = new DmRecurringSchedulerFakeSchedule( true, 3600, time() );
+$old_action   = RecurringScheduler::fenceStoredAction( new ActionScheduler_Action( 'datamachine_running_cron', array( 17 ), $old_schedule, RecurringScheduler::GROUP ), 'datamachine_running_cron', array( 17 ), $old_schedule, RecurringScheduler::GROUP, 10 );
+$key          = datamachine_rs_key( 'datamachine_running_cron', array( 17 ), RecurringScheduler::GROUP );
+$GLOBALS['datamachine_rs_actions'][ $key ]['pending'] = array();
+datamachine_rs_seed_action( 'datamachine_running_cron', array( 17 ), RecurringScheduler::GROUP, $old_schedule, 'in-progress' );
+datamachine_assert_schedule_result( RecurringScheduler::ensureSchedule( 'datamachine_running_cron', array( 17 ), 'cron', array( 'cron_expression' => '0 0 * * *' ) ) );
+datamachine_assert( ! $old_action->get_schedule()->is_recurring(), 'cron transition invalidates the old fetched interval recurrence' );
+$new_action = reset( $GLOBALS['datamachine_rs_actions'][ $key ]['pending'] );
+datamachine_assert( '0 0 * * *' === $new_action->get_schedule()->get_recurrence(), 'cron transition installs only the desired cron successor' );
 
 echo "\nAll recurring scheduler idempotency assertions passed.\n";

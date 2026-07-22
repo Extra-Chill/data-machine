@@ -102,7 +102,11 @@ class DeletePipelineAbility {
 				continue;
 			}
 
-			as_unschedule_all_actions( 'datamachine_run_flow_now', array( (int) $flow_id ), 'data-machine' );
+			\DataMachine\Engine\Tasks\RecurringScheduler::ensureSchedule(
+				'datamachine_run_flow_now',
+				array( (int) $flow_id ),
+				'manual'
+			);
 
 			$this->db_flows->delete_flow( (int) $flow_id );
 		}

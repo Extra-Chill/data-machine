@@ -53,6 +53,7 @@ class RecurringScheduler {
 	public const MAX_DISTRIBUTION_WINDOW_SECONDS = 86400;
 
 	private const SCHEDULE_LOCK_PREFIX         = 'datamachine_schedule_lock_';
+	private const SCHEDULE_GENERATION_PREFIX   = 'datamachine_schedule_generation_';
 	private const SCHEDULE_LOCK_TTL            = 30;
 	private const SCHEDULE_LOCK_RETRY_ATTEMPTS = 5;
 	private const SCHEDULE_LOCK_RETRY_DELAY_US = 25000;
@@ -123,7 +124,7 @@ class RecurringScheduler {
 		}
 
 		try {
-			return self::ensureScheduleUnlocked( $hook, $args, $interval, $options, $enabled );
+			return self::ensureScheduleUnlocked( $hook, $args, $interval, $options, $enabled, $lock );
 		} finally {
 			OptionLeaseStore::release( $lock['option_name'], $lock['token'] );
 		}
@@ -137,6 +138,7 @@ class RecurringScheduler {
 	 * @param string|null $interval Requested interval.
 	 * @param array       $options  Scheduling options.
 	 * @param bool        $enabled  Whether the schedule is enabled.
+	 * @param array       $lock     Owned schedule lease.
 	 * @return array|\WP_Error Schedule metadata or an error.
 	 */
 	private static function ensureScheduleUnlocked(
@@ -144,13 +146,21 @@ class RecurringScheduler {
 		array $args,
 		?string $interval,
 		array $options,
-		bool $enabled
+		bool $enabled,
+		array $lock
 	) {
 		$group = $options['group'] ?? self::GROUP;
 
 		// Disabled / manual / null → unschedule and return.
 		if ( ! $enabled || null === $interval || 'manual' === $interval ) {
-			self::unschedule( $hook, $args, $group );
+			$lock = self::beginScheduleMutation( $lock );
+			if ( is_wp_error( $lock ) ) {
+				return $lock;
+			}
+			$unscheduled = self::mutateUnschedule( $lock, $hook, $args, $group );
+			if ( is_wp_error( $unscheduled ) ) {
+				return $unscheduled;
+			}
 			return array(
 				'interval'  => 'manual',
 				'scheduled' => false,
@@ -198,15 +208,26 @@ class RecurringScheduler {
 				);
 			}
 
-			self::unschedule( $hook, $args, $group );
+			$lock = self::beginScheduleMutation( $lock );
+			if ( is_wp_error( $lock ) ) {
+				return $lock;
+			}
+			$unscheduled = self::mutateUnschedule( $lock, $hook, $args, $group );
+			if ( is_wp_error( $unscheduled ) ) {
+				return $unscheduled;
+			}
 
-			as_schedule_single_action( $timestamp, $hook, $args, $group );
+			$action_id = self::mutateScheduleSingle( $lock, (int) $timestamp, $hook, $args, $group );
+			if ( is_wp_error( $action_id ) ) {
+				return $action_id;
+			}
 
 			return array(
 				'interval'       => 'one_time',
 				'scheduled'      => true,
 				'timestamp'      => $timestamp,
 				'scheduled_time' => wp_date( 'c', $timestamp ),
+				'action_id'      => $action_id,
 			);
 		}
 
@@ -220,12 +241,12 @@ class RecurringScheduler {
 					array( 'status' => 400 )
 				);
 			}
-			return self::scheduleCron( $hook, $args, $cron_expression, $group, $options );
+			return self::scheduleCron( $hook, $args, $cron_expression, $group, $options, $lock );
 		}
 
 		// Auto-detect cron expression passed as the interval value.
 		if ( self::looksLikeCronExpression( $interval ) ) {
-			return self::scheduleCron( $hook, $args, $interval, $group, $options );
+			return self::scheduleCron( $hook, $args, $interval, $group, $options, $lock );
 		}
 
 		// Recurring by interval key (with alias resolution).
@@ -290,8 +311,18 @@ class RecurringScheduler {
 			// ONE matching pending chain for this signature, collapse them to a
 			// single chain now instead of preserving the duplicates.
 			if ( self::countMatchingPendingActions( $hook, $args, $group ) > 1 ) {
-				self::unschedule( $hook, $args, $group );
-				as_schedule_recurring_action( $first_run_time, $interval_seconds, $hook, $args, $group, $unique );
+				$lock = self::beginScheduleMutation( $lock );
+				if ( is_wp_error( $lock ) ) {
+					return $lock;
+				}
+				$unscheduled = self::mutateUnschedule( $lock, $hook, $args, $group );
+				if ( is_wp_error( $unscheduled ) ) {
+					return $unscheduled;
+				}
+				$scheduled = self::mutateScheduleRecurring( $lock, $first_run_time, (int) $interval_seconds, $hook, $args, $group, $unique );
+				if ( is_wp_error( $scheduled ) ) {
+					return $scheduled;
+				}
 
 				if ( ! self::isScheduled( $hook, $args, $group ) ) {
 					return self::error(
@@ -319,13 +350,19 @@ class RecurringScheduler {
 			);
 		}
 
-		if ( self::getPendingAction( $hook, $args, $group ) ) {
-			self::unschedule( $hook, $args, $group );
+		$lock = self::beginScheduleMutation( $lock );
+		if ( is_wp_error( $lock ) ) {
+			return $lock;
+		}
+		$unscheduled = self::mutateUnschedule( $lock, $hook, $args, $group );
+		if ( is_wp_error( $unscheduled ) ) {
+			return $unscheduled;
 		}
 
-		// A reconciliation can race another request during activation, upgrades,
-		// or cron. Let Action Scheduler atomically preserve the first chain.
-		as_schedule_recurring_action( $first_run_time, $interval_seconds, $hook, $args, $group, $unique );
+		$scheduled = self::mutateScheduleRecurring( $lock, $first_run_time, (int) $interval_seconds, $hook, $args, $group, $unique );
+		if ( is_wp_error( $scheduled ) ) {
+			return $scheduled;
+		}
 
 		// Verify persistence. AS can silently drop actions when its tables
 		// aren't ready (e.g. CLI context during plugin activation).
@@ -346,23 +383,75 @@ class RecurringScheduler {
 	}
 
 	/**
-	 * Acquire the option-row lease for one hook/args/group signature.
+	 * Register the fetched-action generation fence.
+	 */
+	public static function registerGenerationFence(): void {
+		add_filter( 'action_scheduler_stored_action_instance', array( self::class, 'fenceStoredAction' ), 10, 6 );
+	}
+
+	/**
+	 * Wrap a managed fetched recurrence with its current generation snapshot.
 	 *
-	 * Argument-bearing actions cannot use Action Scheduler's native uniqueness,
-	 * because it is scoped to hook and group. This lease serializes the complete
-	 * read/unschedule/create sequence without coupling independent argument sets.
+	 * @param object $action   Stored Action Scheduler action.
+	 * @param string $hook     Action hook.
+	 * @param array  $args     Action arguments.
+	 * @param object $schedule Action Scheduler schedule.
+	 * @param string $group    Action group.
+	 * @param int    $priority Action priority.
+	 * @return object Original or generation-fenced action.
+	 */
+	public static function fenceStoredAction( $action, string $hook, array $args, $schedule, string $group, int $priority ) {
+		if ( $action instanceof GenerationFencedAction
+			|| ! $schedule instanceof \ActionScheduler_Schedule
+			|| ! $schedule->is_recurring()
+		) {
+			return $action;
+		}
+
+		$options = self::scheduleOptionNames( $hook, $args, $group );
+		if ( is_wp_error( $options ) ) {
+			return $action;
+		}
+
+		$generation = get_option( $options['generation_option'], false );
+		if ( false === $generation && self::GROUP === $group ) {
+			$generation = wp_generate_uuid4();
+			if ( ! add_option( $options['generation_option'], $generation, '', false ) ) {
+				$generation = get_option( $options['generation_option'], false );
+			}
+		}
+
+		if ( ! is_string( $generation ) || '' === $generation ) {
+			return $action;
+		}
+
+		$fenced = new GenerationFencedAction( $hook, $args, $schedule, $group, $options['generation_option'], $generation );
+		$fenced->set_priority( $priority );
+		return $fenced;
+	}
+
+	/**
+	 * Acquire the option-row lease for one hook/args/group signature.
 	 *
 	 * @param string $hook  Action Scheduler hook.
 	 * @param array  $args  Action arguments.
 	 * @param string $group Action Scheduler group.
-	 * @return array{option_name:string,token:string}|\WP_Error
+	 * @return array{option_name:string,generation_option:string,token:string}|\WP_Error
 	 */
 	private static function acquireScheduleLock( string $hook, array $args, string $group ) {
-		$signature = wp_json_encode( array( $hook, $args, $group ) );
-		if ( false === $signature ) {
-			return self::error( 'invalid_schedule_signature', 'Schedule arguments must be JSON-serializable.' );
+		$options = self::scheduleOptionNames( $hook, $args, $group );
+		if ( is_wp_error( $options ) ) {
+			return $options;
 		}
-		$option_name = self::SCHEDULE_LOCK_PREFIX . md5( $signature );
+
+		$generation = get_option( $options['generation_option'], false );
+		if ( false === $generation ) {
+			$initial_generation = wp_generate_uuid4();
+			if ( ! add_option( $options['generation_option'], $initial_generation, '', false ) ) {
+				$generation = get_option( $options['generation_option'], false );
+			}
+		}
+		$option_name = $options['lock_option'];
 
 		for ( $attempt = 0; $attempt < self::SCHEDULE_LOCK_RETRY_ATTEMPTS; ++$attempt ) {
 			$now     = time();
@@ -376,8 +465,9 @@ class RecurringScheduler {
 
 			if ( $lease['acquired'] ) {
 				return array(
-					'option_name' => $option_name,
-					'token'       => $token,
+					'option_name'       => $option_name,
+					'generation_option' => $options['generation_option'],
+					'token'             => $token,
 				);
 			}
 
@@ -389,8 +479,121 @@ class RecurringScheduler {
 		return self::error(
 			'schedule_lock_timeout',
 			'Another request is updating this schedule; retry shortly.',
-			array( 'status' => 409 )
+			array(
+				'status'         => 409,
+				'retryable'      => true,
+				'retry_after_ms' => ( self::SCHEDULE_LOCK_RETRY_ATTEMPTS - 1 ) * (int) ( self::SCHEDULE_LOCK_RETRY_DELAY_US / 1000 ),
+			)
 		);
+	}
+
+	/**
+	 * Resolve stable option names for one schedule signature.
+	 *
+	 * @return array{lock_option:string,generation_option:string}|\WP_Error
+	 */
+	private static function scheduleOptionNames( string $hook, array $args, string $group ) {
+		$signature = wp_json_encode( array( $hook, $args, $group ) );
+		if ( false === $signature ) {
+			return self::error( 'invalid_schedule_signature', 'Schedule arguments must be JSON-serializable.', array( 'status' => 400 ) );
+		}
+
+		$hash = md5( $signature );
+		return array(
+			'lock_option'       => self::SCHEDULE_LOCK_PREFIX . $hash,
+			'generation_option' => self::SCHEDULE_GENERATION_PREFIX . $hash,
+		);
+	}
+
+	/**
+	 * Advance the persisted generation before the first schedule mutation.
+	 *
+	 * @param array $lock Owned lease, updated with the mutation generation.
+	 * @return array|\WP_Error Updated lease or ownership error.
+	 */
+	private static function beginScheduleMutation( array $lock ) {
+		if ( ! self::refreshScheduleLock( $lock ) ) {
+			return self::lockLostError();
+		}
+
+		$generation = wp_generate_uuid4();
+		update_option( $lock['generation_option'], $generation, false );
+		$lock['generation'] = $generation;
+
+		return self::refreshScheduleLock( $lock ) && self::isMutationGenerationCurrent( $lock )
+			? $lock
+			: self::lockLostError();
+	}
+
+	/**
+	 * Refresh and verify ownership immediately before a destructive mutation.
+	 */
+	private static function assertMutationOwner( array $lock ): bool {
+		return self::refreshScheduleLock( $lock ) && self::isMutationGenerationCurrent( $lock );
+	}
+
+	private static function refreshScheduleLock( array $lock ): bool {
+		return OptionLeaseStore::refresh( $lock['option_name'], $lock['token'], self::SCHEDULE_LOCK_TTL );
+	}
+
+	private static function isMutationGenerationCurrent( array $lock ): bool {
+		$current = get_option( $lock['generation_option'], '' );
+		return isset( $lock['generation'] ) && is_string( $current ) && hash_equals( (string) $lock['generation'], $current );
+	}
+
+	private static function lockLostError(): \WP_Error {
+		return self::error(
+			'schedule_lock_lost',
+			'Schedule ownership changed during reconciliation; retry without mutating the existing schedule.',
+			array(
+				'status'         => 409,
+				'retryable'      => true,
+				'retry_after_ms' => 100,
+			)
+		);
+	}
+
+	/**
+	 * Unschedule pending actions only while the mutation generation is owned.
+	 *
+	 * @return true|\WP_Error
+	 */
+	private static function mutateUnschedule( array $lock, string $hook, array $args, string $group ) {
+		if ( ! self::assertMutationOwner( $lock ) ) {
+			return self::lockLostError();
+		}
+		self::unschedule( $hook, $args, $group );
+		return true;
+	}
+
+	/**
+	 * @return int|\WP_Error
+	 */
+	private static function mutateScheduleSingle( array $lock, int $timestamp, string $hook, array $args, string $group ) {
+		if ( ! self::assertMutationOwner( $lock ) ) {
+			return self::lockLostError();
+		}
+		return as_schedule_single_action( $timestamp, $hook, $args, $group );
+	}
+
+	/**
+	 * @return int|\WP_Error
+	 */
+	private static function mutateScheduleRecurring( array $lock, int $timestamp, int $interval, string $hook, array $args, string $group, bool $unique ) {
+		if ( ! self::assertMutationOwner( $lock ) ) {
+			return self::lockLostError();
+		}
+		return as_schedule_recurring_action( $timestamp, $interval, $hook, $args, $group, $unique );
+	}
+
+	/**
+	 * @return int|\WP_Error
+	 */
+	private static function mutateScheduleCron( array $lock, int $timestamp, string $expression, string $hook, array $args, string $group, bool $unique ) {
+		if ( ! self::assertMutationOwner( $lock ) ) {
+			return self::lockLostError();
+		}
+		return as_schedule_cron_action( $timestamp, $expression, $hook, $args, $group, $unique );
 	}
 
 	/**
@@ -401,7 +604,7 @@ class RecurringScheduler {
 	 * @param string $group AS group.
 	 * @return void
 	 */
-	public static function unschedule( string $hook, array $args, string $group = self::GROUP ): void {
+	private static function unschedule( string $hook, array $args, string $group = self::GROUP ): void {
 		if ( function_exists( 'as_unschedule_all_actions' ) ) {
 			as_unschedule_all_actions( $hook, $args, $group );
 		}
@@ -487,7 +690,7 @@ class RecurringScheduler {
 	}
 
 	/**
-	 * Create a WP_Error with optional data without tripping scoped PHPStan stubs.
+	 * Create a WP_Error with status and retry metadata when supplied.
 	 *
 	 * @param string $code    Error code.
 	 * @param string $message Error message.
@@ -495,8 +698,7 @@ class RecurringScheduler {
 	 * @return \WP_Error Error object.
 	 */
 	private static function error( string $code, string $message, array $data = array() ): \WP_Error {
-		unset( $data );
-		return new \WP_Error( $code, $message );
+		return new \WP_Error( $code, $message, $data );
 	}
 
 	/**
@@ -842,9 +1044,10 @@ class RecurringScheduler {
 	 * @param string $cron_expression Cron expression.
 	 * @param string $group           AS group.
 	 * @param array  $options         Scheduling options.
+	 * @param array  $lock            Owned schedule lease.
 	 * @return array{interval:'cron',scheduled:true,cron_expression:string,first_run?:string|null,action_id?:int,preserved?:bool}|\WP_Error
 	 */
-	private static function scheduleCron( string $hook, array $args, string $cron_expression, string $group, array $options = array() ) {
+	private static function scheduleCron( string $hook, array $args, string $cron_expression, string $group, array $options, array $lock ) {
 		$force_reschedule = ! empty( $options['force_reschedule'] );
 		if ( ! self::isValidCronExpression( $cron_expression ) ) {
 			return self::error(
@@ -881,8 +1084,18 @@ class RecurringScheduler {
 			// Self-healing dedup: collapse an already-duplicated signature to a
 			// single chain instead of preserving the duplicates.
 			if ( self::countMatchingPendingActions( $hook, $args, $group ) > 1 ) {
-				self::unschedule( $hook, $args, $group );
-				$action_id = as_schedule_cron_action( self::cronStartTimestamp( $options ), $cron_expression, $hook, $args, $group, $unique );
+				$lock = self::beginScheduleMutation( $lock );
+				if ( is_wp_error( $lock ) ) {
+					return $lock;
+				}
+				$unscheduled = self::mutateUnschedule( $lock, $hook, $args, $group );
+				if ( is_wp_error( $unscheduled ) ) {
+					return $unscheduled;
+				}
+				$action_id = self::mutateScheduleCron( $lock, self::cronStartTimestamp( $options ), $cron_expression, $hook, $args, $group, $unique );
+				if ( is_wp_error( $action_id ) ) {
+					return $action_id;
+				}
 
 				if ( ! self::isScheduled( $hook, $args, $group ) ) {
 					return self::error(
@@ -909,11 +1122,19 @@ class RecurringScheduler {
 			);
 		}
 
-		if ( self::getPendingAction( $hook, $args, $group ) ) {
-			self::unschedule( $hook, $args, $group );
+		$lock = self::beginScheduleMutation( $lock );
+		if ( is_wp_error( $lock ) ) {
+			return $lock;
+		}
+		$unscheduled = self::mutateUnschedule( $lock, $hook, $args, $group );
+		if ( is_wp_error( $unscheduled ) ) {
+			return $unscheduled;
 		}
 
-		$action_id = as_schedule_cron_action( self::cronStartTimestamp( $options ), $cron_expression, $hook, $args, $group, $unique );
+		$action_id = self::mutateScheduleCron( $lock, self::cronStartTimestamp( $options ), $cron_expression, $hook, $args, $group, $unique );
+		if ( is_wp_error( $action_id ) ) {
+			return $action_id;
+		}
 
 		if ( ! self::isScheduled( $hook, $args, $group ) ) {
 			return self::error(

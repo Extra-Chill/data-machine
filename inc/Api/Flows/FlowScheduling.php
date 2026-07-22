@@ -46,10 +46,10 @@ class FlowScheduling {
 			return false;
 		}
 
-		// Both manual — no change.
+		// Both manual — only unchanged when no stale schedule still owns coverage.
 		if ( ( 'manual' === $current_interval || null === $current_interval )
 			&& ( 'manual' === $interval || null === $interval ) ) {
-			return true;
+			return $flow_id <= 0 || ! RecurringScheduler::hasCoverage( self::FLOW_HOOK, array( $flow_id ) );
 		}
 
 		// Config matches — but verify the AS action actually exists.
@@ -126,7 +126,8 @@ class FlowScheduling {
 
 		// Delegate AS scheduling to the primitive.
 		$options = array(
-			'stagger_seed' => (int) $flow_id,
+			'stagger_seed'     => (int) $flow_id,
+			'force_reschedule' => $force,
 		);
 		if ( 'one_time' === $interval ) {
 			$options['timestamp'] = $scheduling_config['timestamp'] ?? null;

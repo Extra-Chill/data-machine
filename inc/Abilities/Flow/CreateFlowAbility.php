@@ -492,7 +492,7 @@ class CreateFlowAbility {
 	 * @param int $flow_id Flow ID allocated in this scope.
 	 */
 	private function compensateFlowSchedule( int $flow_id ): void {
-		RecurringScheduler::unschedule( FlowScheduling::FLOW_HOOK, array( $flow_id ), RecurringScheduler::GROUP );
+		RecurringScheduler::ensureSchedule( FlowScheduling::FLOW_HOOK, array( $flow_id ), 'manual' );
 	}
 
 	/**

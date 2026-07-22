@@ -123,7 +123,11 @@ function datamachine_register_execution_engine() {
 			// If flow was deleted without cleaning up scheduled actions,
 			// cancel the orphaned actions to prevent recurring errors.
 			if ( ! datamachine_flow_exists( $flow_id ) ) {
-				as_unschedule_all_actions( 'datamachine_run_flow_now', array( $flow_id ), 'data-machine' );
+				\DataMachine\Engine\Tasks\RecurringScheduler::ensureSchedule(
+					'datamachine_run_flow_now',
+					array( $flow_id ),
+					'manual'
+				);
 				do_action(
 					'datamachine_log',
 					'warning',

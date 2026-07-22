@@ -91,7 +91,11 @@ class DeleteFlowAbility {
 
 		$pipeline_id = (int) ( $flow['pipeline_id'] ?? 0 );
 
-		as_unschedule_all_actions( 'datamachine_run_flow_now', array( $flow_id ), 'data-machine' );
+		\DataMachine\Engine\Tasks\RecurringScheduler::ensureSchedule(
+			'datamachine_run_flow_now',
+			array( $flow_id ),
+			'manual'
+		);
 
 		$success = $this->db_flows->delete_flow( $flow_id );
 

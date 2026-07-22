@@ -182,6 +182,60 @@ class OptionLeaseStore {
 	}
 
 	/**
+	 * Atomically extend a lease only while the caller still owns its token.
+	 *
+	 * @param string   $option_name Option name.
+	 * @param string   $token       Current owner token.
+	 * @param int      $ttl         Extension in seconds.
+	 * @param int|null $now         Current timestamp.
+	 */
+	public static function refresh( string $option_name, string $token, int $ttl, ?int $now = null ): bool {
+		if ( '' === $token ) {
+			return false;
+		}
+
+		$current = get_option( $option_name, array() );
+		if ( ! is_array( $current ) || ! hash_equals( (string) ( $current['token'] ?? '' ), $token ) ) {
+			return false;
+		}
+
+		$replacement               = $current;
+		$replacement['expires_at'] = max(
+			(int) ( $current['expires_at'] ?? 0 ) + 1,
+			( $now ?? time() ) + max( 1, $ttl )
+		);
+
+		global $wpdb;
+		if ( isset( $wpdb->options ) && method_exists( $wpdb, 'query' ) && method_exists( $wpdb, 'prepare' ) ) {
+			// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared -- Conditional update is the fencing primitive.
+			$updated = $wpdb->query(
+				$wpdb->prepare(
+					'UPDATE %i SET option_value = %s WHERE option_name = %s AND option_value = %s',
+					$wpdb->options,
+					maybe_serialize( $replacement ),
+					$option_name,
+					maybe_serialize( $current )
+				)
+			);
+			// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared
+
+			if ( 1 !== $updated ) {
+				return false;
+			}
+
+			wp_cache_delete( $option_name, 'options' );
+			return true;
+		}
+
+		// Lightweight test runtimes may not provide wpdb; retain token verification.
+		if ( ! update_option( $option_name, $replacement, false ) ) {
+			return false;
+		}
+		$stored = get_option( $option_name, array() );
+		return is_array( $stored ) && hash_equals( $token, (string) ( $stored['token'] ?? '' ) );
+	}
+
+	/**
 	 * Delete a stale lease when present.
 	 */
 	public static function cleanupStale(
