@@ -104,8 +104,9 @@ class ProcessedItems extends BaseRepository {
 			/** @var literal-string $sql */
 			$prepare_args = array_merge( array( $this->table_name, $flow_step_id, $source_type ), $chunk );
 
-			// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Dynamic IN() list is bounded and every value uses a placeholder.
+			// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared -- Dynamic IN() list is bounded and every value uses a placeholder.
 			$rows = $this->wpdb->get_results( $this->wpdb->prepare( $sql, ...$prepare_args ), ARRAY_A );
+			// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
 
 			foreach ( (array) $rows as $row ) {
 				$identifier = (string) $row['item_identifier'];

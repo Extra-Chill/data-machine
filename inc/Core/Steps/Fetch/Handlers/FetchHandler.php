@@ -142,7 +142,7 @@ abstract class FetchHandler {
 		$classification = $context->classifySourceItems( $identifiers );
 		$decisions      = $classification['classifications'];
 		$decision_index = 0;
-		$result = array();
+		$result         = array();
 
 		foreach ( $items as $item ) {
 			if ( ! is_array( $item ) ) {

@@ -355,11 +355,11 @@ class ExecutionContext {
 		$classifications = array();
 		$selected        = array();
 		$diagnostics     = array(
-			'total'                         => count( $identifiers ),
-			'unique'                        => 0,
-			'duplicates'                    => 0,
-			'eligible'                      => 0,
-			'processed_skipped'             => 0,
+			'total'                        => count( $identifiers ),
+			'unique'                       => 0,
+			'duplicates'                   => 0,
+			'eligible'                     => 0,
+			'processed_skipped'            => 0,
 			'processed_reprocess_eligible' => 0,
 			'actively_claimed'             => 0,
 			'eligible_outside_max_items'   => 0,
