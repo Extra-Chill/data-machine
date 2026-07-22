@@ -174,14 +174,17 @@ class FlowScheduling {
 					);
 				}
 				if ( is_wp_error( $schedule_result ) ) {
+					$error_metadata                = RecurringScheduler::errorMetadata( $schedule_result );
+					$error_metadata['http_status'] = $error_metadata['status'];
+					unset( $error_metadata['status'] );
 					$updates = array(
 						self::RECONCILIATION_KEY => array_merge(
+							$error_metadata,
 							array(
 								'status'     => 'drift',
 								'token'      => $operation_token,
 								'updated_at' => time(),
-							),
-							RecurringScheduler::errorMetadata( $schedule_result )
+							)
 						),
 					);
 					$remove  = array();

@@ -127,11 +127,11 @@ class PauseFlowAbility {
 			if ( is_wp_error( $schedule_result ) ) {
 				++$errors;
 				$details[] = array_merge(
+					\DataMachine\Engine\Tasks\RecurringScheduler::errorMetadata( $schedule_result ),
 					array(
 						'flow_id' => $fid,
 						'status'  => 'pause_error',
-					),
-					\DataMachine\Engine\Tasks\RecurringScheduler::errorMetadata( $schedule_result )
+					)
 				);
 				continue;
 			}

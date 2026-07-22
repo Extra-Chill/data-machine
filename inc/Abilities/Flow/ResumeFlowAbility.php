@@ -128,11 +128,11 @@ class ResumeFlowAbility {
 			if ( is_wp_error( $result ) ) {
 				++$errors;
 				$details[] = array_merge(
+					\DataMachine\Engine\Tasks\RecurringScheduler::errorMetadata( $result ),
 					array(
 						'flow_id' => $fid,
 						'status'  => 'resume_error',
-					),
-					\DataMachine\Engine\Tasks\RecurringScheduler::errorMetadata( $result )
+					)
 				);
 				continue;
 			}

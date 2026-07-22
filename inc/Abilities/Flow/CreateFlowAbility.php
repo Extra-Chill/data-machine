@@ -332,13 +332,8 @@ class CreateFlowAbility {
 		}
 
 		if ( $validate_only ) {
-			$schedule_error = $this->compensateFlowSchedule(
-				$flow_id,
-				function () use ( $transaction_scope ): bool {
-					$this->rollbackCreationTransactionScope( $transaction_scope );
-					return true;
-				}
-			);
+			$this->rollbackCreationTransactionScope( $transaction_scope );
+			$schedule_error = $this->compensateFlowSchedule( $flow_id );
 			if ( $schedule_error ) {
 				return array_merge(
 					array( 'success' => false ),
@@ -405,13 +400,8 @@ class CreateFlowAbility {
 	 * @return array Failure result.
 	 */
 	private function rollbackCreation( array $transaction_scope, int $flow_id, string $error, array $configuration_errors = array() ): array {
-		$schedule_error = $this->compensateFlowSchedule(
-			$flow_id,
-			function () use ( $transaction_scope ): bool {
-				$this->rollbackCreationTransactionScope( $transaction_scope );
-				return true;
-			}
-		);
+		$this->rollbackCreationTransactionScope( $transaction_scope );
+		$schedule_error = $this->compensateFlowSchedule( $flow_id );
 
 		$result = array(
 			'success' => false,
@@ -508,27 +498,10 @@ class CreateFlowAbility {
 	/**
 	 * Remove any Action Scheduler side effect created for a rolled-back flow.
 	 *
-	 * @param int      $flow_id Flow ID allocated in this scope.
-	 * @param callable $rollback Desired-state rollback executed under the schedule lease.
+	 * @param int $flow_id Flow ID allocated in this scope.
 	 */
-	private function compensateFlowSchedule( int $flow_id, callable $rollback ): ?\WP_Error {
-		$rolled_back = false;
-		$result      = RecurringScheduler::commitDesiredSchedule(
-			FlowScheduling::FLOW_HOOK,
-			array( $flow_id ),
-			'manual',
-			array(),
-			true,
-			static function () use ( $rollback, &$rolled_back ): bool {
-				$rollback();
-				$rolled_back = true;
-				return true;
-			},
-			static fn(): bool => true
-		);
-		if ( ! $rolled_back ) {
-			$rollback();
-		}
+	private function compensateFlowSchedule( int $flow_id ): ?\WP_Error {
+		$result = RecurringScheduler::ensureSchedule( FlowScheduling::FLOW_HOOK, array( $flow_id ), 'manual' );
 		return is_wp_error( $result ) ? $result : null;
 	}
 
