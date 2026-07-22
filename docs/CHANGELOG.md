@@ -2,6 +2,14 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.166.0] - 2026-07-22
+
+### Added
+- expose bounded raw test handler output ([#2948](https://github.com/Extra-Chill/data-machine/pull/2948)) (by Chris Huber)
+
+### Fixed
+- make cross-flow claims owner safe ([#2937](https://github.com/Extra-Chill/data-machine/pull/2937)) (by Chris Huber)
+
 ## [0.165.3] - 2026-07-22
 
 ### Changed
