@@ -2,6 +2,15 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.165.3] - 2026-07-22
+
+### Changed
+- enforce datamachine prefix policy ([#2941](https://github.com/Extra-Chill/data-machine/pull/2941)) (by Chris Huber)
+- Require signed pending-action authorization receipts ([#2942](https://github.com/Extra-Chill/data-machine/pull/2942)) (by Chris Huber)
+
+### Fixed
+- redact nested settings credentials ([#2950](https://github.com/Extra-Chill/data-machine/pull/2950)) (by Chris Huber)
+
 ## [0.165.2] - 2026-07-21
 
 ### Fixed
