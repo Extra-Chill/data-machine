@@ -68,6 +68,27 @@ class SettingsCommandTest extends WP_UnitTestCase {
 		);
 	}
 
+	public function test_presentation_entry_point_redacts_nested_values_and_honors_reveal(): void {
+		$settings = array(
+			'profiles' => array(
+				array(
+					'label' => 'Visible profile',
+					'pat'   => 'SENTINEL_COMMAND_PAT',
+				),
+			),
+		);
+
+		$redacted = \DataMachine\Cli\Commands\SettingsCommand::redactSecretsForDisplay( 'credentials', $settings );
+		$revealed = \DataMachine\Cli\Commands\SettingsCommand::redactSecretsForDisplay( 'credentials', $settings, true );
+
+		$this->assertSame( 'Visible profile', $redacted['profiles'][0]['label'] );
+		$this->assertTrue( '[redacted]' === $redacted['profiles'][0]['pat'], 'Command output should redact nested PATs.' );
+		$this->assertTrue(
+			'SENTINEL_COMMAND_PAT' === $revealed['profiles'][0]['pat'],
+			'The explicit reveal flag should preserve nested values.'
+		);
+	}
+
 	public function test_get_settings_returns_settings(): void {
 		$ability = wp_get_ability( 'datamachine/get-settings' );
 		$this->assertNotNull( $ability );

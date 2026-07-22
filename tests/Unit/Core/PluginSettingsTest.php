@@ -46,18 +46,27 @@ class PluginSettingsTest extends WP_UnitTestCase {
 			'github_pat'                 => 'SENTINEL_TOP_LEVEL_PAT',
 			'github_credential_profiles' => array(
 				array(
-					'id'           => 'profile-1',
-					'label'        => 'Release profile',
-					'mode'         => 'pat',
-					'pat'          => 'SENTINEL_NESTED_PAT',
-					'repositories' => array( 'owner/repository' ),
-					'credentials'  => (object) array(
-						'private_key'      => 'SENTINEL_PRIVATE_KEY',
-						'client_secret'    => 'SENTINEL_CLIENT_SECRET',
-						'access_token'     => 'SENTINEL_ACCESS_TOKEN',
-						'refresh_token'    => 'SENTINEL_REFRESH_TOKEN',
-						'password'         => 'SENTINEL_PASSWORD',
-						'token_expires_at' => 1234567890,
+					'id'            => 'profile-1',
+					'label'         => 'Release profile',
+					'mode'          => 'pat',
+					'pat'           => 'SENTINEL_NESTED_PAT',
+					'repositories'  => array( 'owner/repository' ),
+					'credential_id' => 'credential-1',
+					'credentials'   => (object) array(
+						'private_key'         => 'SENTINEL_PRIVATE_KEY',
+						'client_secret'       => 'SENTINEL_CLIENT_SECRET',
+						'access_token'        => 'SENTINEL_ACCESS_TOKEN',
+						'refresh_token'       => 'SENTINEL_REFRESH_TOKEN',
+						'password'            => 'SENTINEL_PASSWORD',
+						'authorization_header' => 'SENTINEL_AUTHORIZATION_HEADER',
+						'token_value'         => 'SENTINEL_TOKEN_VALUE',
+						'secret_value'        => 'SENTINEL_SECRET_VALUE',
+						'credential_data'     => 'SENTINEL_CREDENTIAL_DATA',
+						'access_tokens'       => array( 'SENTINEL_ACCESS_TOKENS' ),
+						'clientSecret'        => 'SENTINEL_CAMEL_CLIENT_SECRET',
+						'apiKey'              => 'SENTINEL_CAMEL_API_KEY',
+						'secret_map'          => array( 'SENTINEL_SECRET_MAP_KEY' => 'value' ),
+						'token_expires_at'    => 1234567890,
 					),
 				),
 			),
@@ -77,17 +86,26 @@ class PluginSettingsTest extends WP_UnitTestCase {
 		$this->assertTrue( '[redacted]' === $credentials->access_token, 'Nested access token should be redacted.' );
 		$this->assertTrue( '[redacted]' === $credentials->refresh_token, 'Nested refresh token should be redacted.' );
 		$this->assertTrue( '[redacted]' === $credentials->password, 'Nested password should be redacted.' );
+		$this->assertTrue( '[redacted]' === $credentials->authorization_header, 'Authorization variants should be redacted.' );
+		$this->assertTrue( '[redacted]' === $credentials->token_value, 'Token variants should be redacted.' );
+		$this->assertTrue( '[redacted]' === $credentials->secret_value, 'Secret variants should be redacted.' );
+		$this->assertTrue( '[redacted]' === $credentials->credential_data, 'Credential variants should be redacted.' );
+		$this->assertTrue( '[redacted]' === $credentials->access_tokens, 'Plural token variants should be redacted.' );
+		$this->assertTrue( '[redacted]' === $credentials->clientSecret, 'Camel-case client secrets should be redacted.' );
+		$this->assertTrue( '[redacted]' === $credentials->apiKey, 'Camel-case API keys should be redacted.' );
+		$this->assertTrue( '[redacted]' === $credentials->secret_map, 'Secret containers should collapse before map keys serialize.' );
 		$this->assertSame( 'profile-1', $profile['id'] );
 		$this->assertSame( 'Release profile', $profile['label'] );
 		$this->assertSame( 'pat', $profile['mode'] );
 		$this->assertSame( array( 'owner/repository' ), $profile['repositories'] );
+		$this->assertSame( 'credential-1', $profile['credential_id'] );
 		$this->assertSame( 1234567890, $credentials->token_expires_at );
 		$this->assertTrue(
 			$settings === get_option( 'datamachine_settings', array() ),
 			'Display redaction must not mutate stored settings.'
 		);
 
-		$encoded   = wp_json_encode( $redacted );
+		$encoded   = (string) wp_json_encode( $redacted );
 		$sentinels = array(
 			'SENTINEL_TOP_LEVEL_PAT',
 			'SENTINEL_NESTED_PAT',
@@ -96,6 +114,14 @@ class PluginSettingsTest extends WP_UnitTestCase {
 			'SENTINEL_ACCESS_TOKEN',
 			'SENTINEL_REFRESH_TOKEN',
 			'SENTINEL_PASSWORD',
+			'SENTINEL_AUTHORIZATION_HEADER',
+			'SENTINEL_TOKEN_VALUE',
+			'SENTINEL_SECRET_VALUE',
+			'SENTINEL_CREDENTIAL_DATA',
+			'SENTINEL_ACCESS_TOKENS',
+			'SENTINEL_CAMEL_CLIENT_SECRET',
+			'SENTINEL_CAMEL_API_KEY',
+			'SENTINEL_SECRET_MAP_KEY',
 		);
 		foreach ( $sentinels as $sentinel ) {
 			$this->assertFalse(
@@ -103,6 +129,17 @@ class PluginSettingsTest extends WP_UnitTestCase {
 				'Serialized display settings must omit every synthetic secret.'
 			);
 		}
+	}
+
+	public function test_redact_for_display_bounds_cyclic_objects(): void {
+		$profile        = new \stdClass();
+		$profile->label = 'Cycle-safe profile';
+		$profile->self  = $profile;
+
+		$redacted = PluginSettings::redactForDisplay( 'profile', $profile );
+
+		$this->assertSame( 'Cycle-safe profile', $redacted->label );
+		$this->assertTrue( '[redacted]' === $redacted->self, 'Object cycles should terminate with a redacted marker.' );
 	}
 
 	public function test_redact_for_display_preserves_empty_secrets_and_safe_scalars(): void {

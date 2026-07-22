@@ -116,23 +116,50 @@ class PluginSettings {
 			return $value;
 		}
 
+		return self::redactForDisplayRecursive( $key, $value, new \SplObjectStorage(), 0 );
+	}
+
+	/**
+	 * Recursively redact settings with cycle and depth protection.
+	 */
+	private static function redactForDisplayRecursive( string $key, mixed $value, \SplObjectStorage $seen, int $depth ): mixed {
 		if ( self::isSecretKey( $key ) ) {
 			return self::redactedValue( $value );
+		}
+
+		if ( $depth >= 32 ) {
+			return '[redacted]';
 		}
 
 		if ( is_array( $value ) ) {
 			$redacted = array();
 			foreach ( $value as $nested_key => $nested_value ) {
-				$redacted[ $nested_key ] = self::redactForDisplay( (string) $nested_key, $nested_value );
+				$redacted[ $nested_key ] = self::redactForDisplayRecursive(
+					(string) $nested_key,
+					$nested_value,
+					$seen,
+					$depth + 1
+				);
 			}
 			return $redacted;
 		}
 
 		if ( is_object( $value ) ) {
+			if ( $seen->contains( $value ) ) {
+				return '[redacted]';
+			}
+
+			$seen->attach( $value );
 			$redacted = new \stdClass();
 			foreach ( get_object_vars( $value ) as $nested_key => $nested_value ) {
-				$redacted->{$nested_key} = self::redactForDisplay( (string) $nested_key, $nested_value );
+				$redacted->{$nested_key} = self::redactForDisplayRecursive(
+					(string) $nested_key,
+					$nested_value,
+					$seen,
+					$depth + 1
+				);
 			}
+			$seen->detach( $value );
 			return $redacted;
 		}
 
@@ -143,55 +170,38 @@ class PluginSettings {
 	 * Determine whether a setting key conventionally contains a credential.
 	 */
 	private static function isSecretKey( string $key ): bool {
-		$normalized = strtolower( trim( $key ) );
-		$normalized = preg_replace( '/[^a-z0-9]+/', '_', $normalized ) ?? $normalized;
+		$normalized = preg_replace( '/([a-z0-9])([A-Z])/', '$1_$2', trim( $key ) ) ?? $key;
+		$normalized = strtolower( $normalized );
+		$normalized = trim( preg_replace( '/[^a-z0-9]+/', '_', $normalized ) ?? $normalized, '_' );
+
+		if ( 1 === preg_match( '/(?:^|_)(?:access_|refresh_)?tokens?_(?:expires_at|expires|expiry|expiration|ttl|type)$/', $normalized ) ) {
+			return false;
+		}
+
+		if ( 1 === preg_match( '/(?:^|_)credential_(?:id|label|mode|profile_id|profiles?)$/', $normalized ) ) {
+			return false;
+		}
 
 		if ( 'key' === $normalized || str_ends_with( $normalized, '_key' ) ) {
 			return true;
 		}
 
-		$secret_suffixes = array(
-			'authorization',
-			'bearer',
-			'cookie',
-			'credential',
-			'password',
-			'pat',
-			'secret',
-			'token',
+		return 1 === preg_match(
+			'/(?:^|_)(?:authorization|bearer|cookie|credential|password|pat|secret|tokens?)(?:_|$)/',
+			$normalized
 		);
-
-		foreach ( $secret_suffixes as $suffix ) {
-			if ( $suffix === $normalized || str_ends_with( $normalized, '_' . $suffix ) ) {
-				return true;
-			}
-		}
-
-		return false;
 	}
 
 	/**
-	 * Replace every populated leaf beneath a secret key.
+	 * Collapse a recognized secret value so container keys cannot leak.
 	 */
 	private static function redactedValue( mixed $value ): mixed {
-		if ( is_array( $value ) ) {
-			$redacted = array();
-			foreach ( $value as $key => $nested_value ) {
-				$redacted[ $key ] = self::redactedValue( $nested_value );
-			}
-			return $redacted;
-		}
-
-		if ( is_object( $value ) ) {
-			$redacted = new \stdClass();
-			foreach ( get_object_vars( $value ) as $key => $nested_value ) {
-				$redacted->{$key} = self::redactedValue( $nested_value );
-			}
-			return $redacted;
-		}
-
-		if ( null === $value || '' === $value ) {
+		if ( null === $value || '' === $value || array() === $value ) {
 			return $value;
+		}
+
+		if ( is_object( $value ) && array() === get_object_vars( $value ) ) {
+			return new \stdClass();
 		}
 
 		return '[redacted]';
