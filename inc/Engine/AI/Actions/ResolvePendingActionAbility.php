@@ -341,7 +341,11 @@ class ResolvePendingActionAbility {
 		if ( ! is_array( $handler ) || empty( $handler['apply'] ) || ! self::isApplyHandler( $handler['apply'] ) ) {
 			// No handler registered — can't apply, but reject is still safe.
 			if ( $decision->is_rejected() ) {
-				PendingActionStore::record_resolution( $action_id, WP_Agent_Pending_Action_Status::REJECTED, null, null, $resolver, array( 'reason' => 'no_handler_rejected' ) );
+				$claimed = PendingActionStore::claim_for_resolution( $action_id, $resolver );
+				if ( null === $claimed ) {
+					return self::claimed_elsewhere_response( $action_id, $kind );
+				}
+				PendingActionStore::complete_claim( $action_id, (string) $claimed['receipt_nonce'], WP_Agent_Pending_Action_Status::REJECTED, null, null, $resolver, array( 'reason' => 'no_handler_rejected' ) );
 				return array(
 					'success'   => true,
 					'decision'  => 'rejected',
@@ -398,7 +402,11 @@ class ResolvePendingActionAbility {
 		}
 
 		if ( $decision->is_rejected() ) {
-			PendingActionStore::record_resolution( $action_id, WP_Agent_Pending_Action_Status::REJECTED, null, null, $resolver );
+			$claimed = PendingActionStore::claim_for_resolution( $action_id, $resolver );
+			if ( null === $claimed ) {
+				return self::claimed_elsewhere_response( $action_id, $kind );
+			}
+			PendingActionStore::complete_claim( $action_id, (string) $claimed['receipt_nonce'], WP_Agent_Pending_Action_Status::REJECTED, null, null, $resolver );
 			return array(
 				'success'   => true,
 				'decision'  => 'rejected',
@@ -407,11 +415,18 @@ class ResolvePendingActionAbility {
 			);
 		}
 
+		$claimed = PendingActionStore::claim_for_resolution( $action_id, $resolver );
+		if ( null === $claimed ) {
+			return self::claimed_elsewhere_response( $action_id, $kind );
+		}
+		$receipt          = PendingActionAuthorizationReceipt::issue( $claimed, $resolver );
+		$resolver_context = array_merge( $resolver_context, array( 'authorization_receipt' => $receipt, 'pending_action' => $claimed ) );
+
 		// Accepted: invoke the apply handler with the stored input.
-		$result = self::applyHandler( $handler, $decision, $apply_input, $payload, $resolver_payload, $resolver_context, $pending_action );
+		$result = self::applyHandler( $handler, $decision, $apply_input, $payload, $resolver_payload, $resolver_context, $pending_action, $receipt );
 
 		if ( is_wp_error( $result ) ) {
-			PendingActionStore::record_resolution( $action_id, WP_Agent_Pending_Action_Status::ACCEPTED, null, $result->get_error_message(), $resolver );
+			PendingActionStore::complete_claim( $action_id, (string) $claimed['receipt_nonce'], 'failed', null, $result->get_error_message(), $resolver );
 			return array(
 				'success'   => false,
 				'decision'  => 'accepted',
@@ -422,7 +437,7 @@ class ResolvePendingActionAbility {
 		}
 
 		if ( is_array( $result ) && array_key_exists( 'success', $result ) && false === $result['success'] ) {
-			PendingActionStore::record_resolution( $action_id, WP_Agent_Pending_Action_Status::ACCEPTED, $result, $result['error'] ?? 'Apply handler reported failure.', $resolver );
+			PendingActionStore::complete_claim( $action_id, (string) $claimed['receipt_nonce'], 'failed', $result, $result['error'] ?? 'Apply handler reported failure.', $resolver );
 			return array(
 				'success'   => false,
 				'decision'  => 'accepted',
@@ -433,7 +448,7 @@ class ResolvePendingActionAbility {
 			);
 		}
 
-		PendingActionStore::record_resolution( $action_id, WP_Agent_Pending_Action_Status::ACCEPTED, $result, null, $resolver );
+		PendingActionStore::complete_claim( $action_id, (string) $claimed['receipt_nonce'], WP_Agent_Pending_Action_Status::ACCEPTED, $result, null, $resolver );
 
 		return array(
 			'success'   => true,
@@ -544,7 +559,7 @@ class ResolvePendingActionAbility {
 	 * @param array            $resolver_context Optional resolver context.
 	 * @return mixed
 	 */
-	private static function applyHandler( array $handler, WP_Agent_Approval_Decision $decision, array $apply_input, array $payload, array $resolver_payload = array(), array $resolver_context = array(), ?WP_Agent_Pending_Action $pending_action = null ) {
+	private static function applyHandler( array $handler, WP_Agent_Approval_Decision $decision, array $apply_input, array $payload, array $resolver_payload = array(), array $resolver_context = array(), ?WP_Agent_Pending_Action $pending_action = null, array $receipt = array() ) {
 		$apply = $handler['apply'];
 		if ( $apply instanceof WP_Agent_Pending_Action_Handler ) {
 			if ( null === $pending_action ) {
@@ -554,7 +569,12 @@ class ResolvePendingActionAbility {
 			return $apply->handle_pending_action( $pending_action, $decision, $resolver_payload, $resolver_context );
 		}
 
-		return call_user_func( $apply, $apply_input, $payload );
+		// The third argument is additive: legacy two-argument handlers remain valid.
+		return call_user_func( $apply, $apply_input, $payload, $receipt );
+	}
+
+	private static function claimed_elsewhere_response( string $action_id, string $kind ): array {
+		return array( 'success' => false, 'error' => 'Pending action has already been claimed or resolved.', 'action_id' => $action_id, 'kind' => $kind );
 	}
 
 	/**

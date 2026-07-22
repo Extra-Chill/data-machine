@@ -4,6 +4,8 @@ Data Machine implements the Agents API pending-action approval storage contract 
 
 Pending actions are approval and audit records. Normal runtime requires the durable `datamachine_pending_actions` table; if database access is unavailable, store/resolution operations fail closed and emit `datamachine_pending_action_store_unavailable`. The transient store path is reserved for pure-PHP smoke tests or explicit pre-table boot by defining `DATAMACHINE_PENDING_ACTION_TRANSIENT_FALLBACK`.
 
+Resolution atomically claims a row as `pending -> applying -> accepted|rejected|failed`. Accepted handlers receive an `authorization_receipt` in resolver context (or as the third argument for callable compatibility handlers). Mutators can call `PendingActionAuthorizationReceipt::validate( $receipt, $kind, $operation, $target, $input, $subject, $workspace )`; validation binds the receipt to the pending action, kind, operation, target, input, subject, workspace, resolver, expiry, and one-time claim nonce.
+
 ## Boundary
 
 - Agents API owns generic approval vocabulary, contracts, and the canonical pending-action abilities.

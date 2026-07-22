@@ -172,9 +172,13 @@ require_once dirname( __DIR__ ) . '/inc/Abilities/PermissionHelper.php';
 require_once dirname( __DIR__ ) . '/inc/Core/Workspace/WordPressWorkspaceScope.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/AI/Actions/PendingActionObservers.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/AI/Actions/PendingActionStore.php';
+require_once dirname( __DIR__ ) . '/inc/Engine/AI/Actions/PendingActionAuthorizationReceipt.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/AI/Actions/PendingActionScope.php';
+require_once dirname( __DIR__ ) . '/inc/Engine/AI/Actions/PendingActionResolverAdapter.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/AI/Actions/ResolvePendingActionAbility.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/AI/Actions/SignPendingActionResolutionAbility.php';
+
+add_filter( 'wp_agent_pending_action_resolver', static fn() => \DataMachine\Engine\AI\Actions\ResolvePendingActionAbility::adapter() );
 
 $failures = array();
 $passes   = 0;
@@ -182,6 +186,8 @@ $passes   = 0;
 echo "signed-pending-action-resolution-smoke\n";
 
 $action_id = 'act_signed_smoke';
+$GLOBALS['__signed_applies'] = 0;
+$GLOBALS['__signed_receipt'] = array();
 \DataMachine\Engine\AI\Actions\PendingActionStore::store(
 	$action_id,
 	array(
@@ -192,6 +198,7 @@ $action_id = 'act_signed_smoke';
 		'created_by'   => 0,
 		'agent_id'     => 0,
 		'context'      => array(),
+		'metadata'     => array( 'datamachine' => array( 'authorization' => array( 'operation' => 'signed_smoke', 'target' => array( 'action' => 'signed' ) ) ) ),
 	)
 );
 
@@ -199,10 +206,30 @@ add_filter(
 	'datamachine_pending_action_handlers',
 	static function ( array $handlers ): array {
 		$handlers['signed_smoke'] = array(
-			'apply' => static function ( array $apply_input ): array {
+			'apply' => static function ( array $apply_input, array $payload, array $receipt ): array {
+				++$GLOBALS['__signed_applies'];
+				$GLOBALS['__signed_receipt'] = $receipt;
+				$subject = (string) ( $payload['agent'] ?? $payload['creator'] ?? '' );
+				$workspace = $payload['workspace'] ?? array();
+				$valid = \DataMachine\Engine\AI\Actions\PendingActionAuthorizationReceipt::validate( $receipt, 'signed_smoke', 'signed_smoke', array( 'action' => 'signed' ), $apply_input, $subject, $workspace );
+				if ( is_wp_error( $valid ) ) {
+					return array( 'success' => false, 'error' => $valid->get_error_message() );
+				}
+				$wrong_kind = \DataMachine\Engine\AI\Actions\PendingActionAuthorizationReceipt::validate( $receipt, 'other_kind', 'signed_smoke', array( 'action' => 'signed' ), $apply_input, $subject, $workspace );
+				$wrong_target = \DataMachine\Engine\AI\Actions\PendingActionAuthorizationReceipt::validate( $receipt, 'signed_smoke', 'signed_smoke', array( 'action' => 'other' ), $apply_input, $subject, $workspace );
+				$wrong_operation = \DataMachine\Engine\AI\Actions\PendingActionAuthorizationReceipt::validate( $receipt, 'signed_smoke', 'other_operation', array( 'action' => 'signed' ), $apply_input, $subject, $workspace );
+				$wrong_input = \DataMachine\Engine\AI\Actions\PendingActionAuthorizationReceipt::validate( $receipt, 'signed_smoke', 'signed_smoke', array( 'action' => 'signed' ), array( 'value' => 0 ), $subject, $workspace );
+				$wrong_subject = \DataMachine\Engine\AI\Actions\PendingActionAuthorizationReceipt::validate( $receipt, 'signed_smoke', 'signed_smoke', array( 'action' => 'signed' ), $apply_input, 'other-subject', $workspace );
+				$wrong_workspace = \DataMachine\Engine\AI\Actions\PendingActionAuthorizationReceipt::validate( $receipt, 'signed_smoke', 'signed_smoke', array( 'action' => 'signed' ), $apply_input, $subject, array( 'workspace_id' => 'other' ) );
 				return array(
 					'success' => true,
 					'value'   => $apply_input['value'] ?? null,
+					'wrong_kind_rejected' => is_wp_error( $wrong_kind ),
+					'mismatch_rejected' => is_wp_error( $wrong_target ),
+					'wrong_operation_rejected' => is_wp_error( $wrong_operation ),
+					'wrong_input_rejected' => is_wp_error( $wrong_input ),
+					'wrong_subject_rejected' => is_wp_error( $wrong_subject ),
+					'wrong_workspace_rejected' => is_wp_error( $wrong_workspace ),
 				);
 			},
 		);
@@ -231,7 +258,39 @@ $resolved = \DataMachine\Engine\AI\Actions\SignPendingActionResolutionAbility::r
 datamachine_signed_assert( true === ( $resolved['success'] ?? false ), 'valid approve token resolves action', $failures, $passes );
 datamachine_signed_assert( 'accepted' === ( $resolved['decision'] ?? null ), 'approve token records accepted decision', $failures, $passes );
 datamachine_signed_assert( 'signed_smoke' === ( $resolved['kind'] ?? null ), 'resolution keeps pending action kind', $failures, $passes );
-datamachine_signed_assert( null === \DataMachine\Engine\AI\Actions\PendingActionStore::get( $action_id ), 'resolved transient action is no longer pending', $failures, $passes );
+datamachine_signed_assert( true === ( $resolved['result']['wrong_kind_rejected'] ?? false ), 'receipt rejects a mismatched kind', $failures, $passes );
+datamachine_signed_assert( true === ( $resolved['result']['mismatch_rejected'] ?? false ), 'receipt rejects a mismatched target', $failures, $passes );
+datamachine_signed_assert( true === ( $resolved['result']['wrong_operation_rejected'] ?? false ), 'receipt rejects a mismatched operation', $failures, $passes );
+datamachine_signed_assert( true === ( $resolved['result']['wrong_input_rejected'] ?? false ), 'receipt rejects mismatched input', $failures, $passes );
+datamachine_signed_assert( true === ( $resolved['result']['wrong_subject_rejected'] ?? false ), 'receipt rejects a mismatched subject', $failures, $passes );
+datamachine_signed_assert( true === ( $resolved['result']['wrong_workspace_rejected'] ?? false ), 'receipt rejects a mismatched workspace', $failures, $passes );
+datamachine_signed_assert( 1 === $GLOBALS['__signed_applies'], 'accepted action applies exactly once', $failures, $passes );
+
+$second = \DataMachine\Engine\AI\Actions\ResolvePendingActionAbility::execute( array( 'action_id' => $action_id, 'decision' => 'accepted', 'resolver' => 'email_approval' ) );
+datamachine_signed_assert( false === ( $second['success'] ?? true ), 'a second acceptance cannot claim the action', $failures, $passes );
+datamachine_signed_assert( null === \DataMachine\Engine\AI\Actions\PendingActionStore::get( $action_id ) && 'accepted' === ( \DataMachine\Engine\AI\Actions\PendingActionStore::inspect( $action_id )['status'] ?? null ), 'resolved action is retained as an accepted audit row', $failures, $passes );
+datamachine_signed_assert( is_wp_error( \DataMachine\Engine\AI\Actions\PendingActionAuthorizationReceipt::validate( $GLOBALS['__signed_receipt'], 'signed_smoke', 'signed_smoke', array( 'action' => 'signed' ), array( 'value' => 42 ), '', $GLOBALS['__signed_receipt']['claims']['workspace'] ) ), 'consumed receipt cannot be reused', $failures, $passes );
+
+$rejected_action_id = 'act_rejected_smoke';
+\DataMachine\Engine\AI\Actions\PendingActionStore::store(
+	$rejected_action_id,
+	array(
+		'kind'        => 'signed_smoke',
+		'summary'     => 'Rejected receipt smoke action',
+		'apply_input' => array( 'value' => 42 ),
+		'metadata'    => array( 'datamachine' => array( 'authorization' => array( 'operation' => 'signed_smoke', 'target' => array( 'action' => 'signed' ) ) ) ),
+	)
+);
+$rejected_claim = \DataMachine\Engine\AI\Actions\PendingActionStore::claim_for_resolution( $rejected_action_id, 'email_approval' );
+$rejected_receipt = \DataMachine\Engine\AI\Actions\PendingActionAuthorizationReceipt::issue( $rejected_claim, 'email_approval' );
+\DataMachine\Engine\AI\Actions\PendingActionStore::complete_claim( $rejected_action_id, (string) $rejected_claim['receipt_nonce'], 'rejected', null, null, 'email_approval' );
+datamachine_signed_assert( is_wp_error( \DataMachine\Engine\AI\Actions\PendingActionAuthorizationReceipt::validate( $rejected_receipt, 'signed_smoke', 'signed_smoke', array( 'action' => 'signed' ), array( 'value' => 42 ), '', $rejected_receipt['claims']['workspace'] ) ), 'rejected receipt cannot be used', $failures, $passes );
+
+$expired_claims = $GLOBALS['__signed_receipt']['claims'];
+$expired_claims['expires_at'] = time() - 1;
+$expired_encoded = rtrim( strtr( base64_encode( wp_json_encode( $expired_claims ) ), '+/', '-_' ), '=' );
+$expired_receipt = array( 'token' => $expired_encoded . '.' . rtrim( strtr( base64_encode( hash_hmac( 'sha256', $expired_encoded, $GLOBALS['__signed_options']['datamachine_pending_action_receipt_secret'], true ) ), '+/', '-_' ), '=' ) );
+datamachine_signed_assert( is_wp_error( \DataMachine\Engine\AI\Actions\PendingActionAuthorizationReceipt::validate( $expired_receipt, 'signed_smoke', 'signed_smoke', array( 'action' => 'signed' ), array( 'value' => 42 ), '', $expired_claims['workspace'] ) ), 'expired receipt is rejected before use', $failures, $passes );
 
 \DataMachine\Engine\AI\Actions\SignPendingActionResolutionAbility::rotate_secret();
 $after_rotation = \DataMachine\Engine\AI\Actions\SignPendingActionResolutionAbility::resolve_token( (string) ( $query['t'] ?? '' ) );

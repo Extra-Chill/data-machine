@@ -24,9 +24,7 @@ namespace DataMachine\Cli {
 }
 
 namespace DataMachine\Core {
-	if ( ! class_exists(PluginSettings::class) ) {
-		class PluginSettings {}
-	}
+	require_once __DIR__ . '/../inc/Core/PluginSettings.php';
 }
 
 namespace {
@@ -49,10 +47,11 @@ namespace {
 	};
 
 	$redacted = SettingsCommand::redactSecretsForDisplay(
-		'github_credentials',
+		'github_credential_profiles',
 		array(
 			'profiles' => array(
 				array(
+					'pat'             => 'SENTINEL_PROFILE_PAT',
 					'id'              => 'default',
 					'app_private_key' => '-----BEGIN PRIVATE KEY-----secret',
 					'token'           => 'ghs_nested_secret',
@@ -69,6 +68,7 @@ namespace {
 	);
 
 	$encoded_default = json_encode( $redacted );
+	$assert('[redacted]' === ( $redacted['profiles'][0]['pat'] ?? null ), 'nested PAT is redacted');
 	$assert('[redacted]' === ( $redacted['profiles'][0]['app_private_key'] ?? null ), 'nested app_private_key is redacted');
 	$assert('[redacted]' === ( $redacted['profiles'][0]['token'] ?? null ), 'nested token is redacted');
 	$assert('[redacted]' === ( $redacted['profiles'][0]['password'] ?? null ), 'nested password is redacted');
@@ -76,6 +76,7 @@ namespace {
 	$assert('[redacted]' === ( $redacted['profiles'][0]['provider']['client_secret'] ?? null ), 'nested client_secret is redacted');
 	$assert('chubes4/wp-docs' === ( $redacted['profiles'][0]['default_repo'] ?? null ), 'non-secret nested values remain visible');
 	$assert(false === strpos( $encoded_default, '-----BEGIN PRIVATE KEY-----secret' ), 'default output omits private key value');
+	$assert(false === strpos( $encoded_default, 'SENTINEL_PROFILE_PAT' ), 'default output omits nested PAT value');
 	$assert(false === strpos( $encoded_default, 'ghs_nested_secret' ), 'default output omits token value');
 	$assert(false === strpos( $encoded_default, 'nested-password' ), 'default output omits password value');
 	$assert(false === strpos( $encoded_default, 'sk-provider-secret' ), 'default output omits api key value');

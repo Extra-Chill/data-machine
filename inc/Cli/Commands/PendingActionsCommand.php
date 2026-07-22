@@ -19,6 +19,31 @@ defined( 'ABSPATH' ) || exit;
  */
 class PendingActionsCommand extends BaseCommand {
 
+	/** Resolve a pending action through the canonical resolver. */
+	public function accept( array $args, array $assoc_args ): void {
+		$this->resolve( $args, $assoc_args, 'accepted' );
+	}
+
+	/** Resolve a pending action through the canonical resolver. */
+	public function reject( array $args, array $assoc_args ): void {
+		$this->resolve( $args, $assoc_args, 'rejected' );
+	}
+
+	private function resolve( array $args, array $assoc_args, string $decision ): void {
+		$action_id = isset( $args[0] ) ? (string) $args[0] : '';
+		if ( '' === $action_id ) {
+			WP_CLI::error( 'action_id is required.' );
+		}
+		$result = \DataMachine\Engine\AI\Actions\ResolvePendingActionAbility::execute( array( 'action_id' => $action_id, 'decision' => $decision, 'resolver' => 'cli:' . get_current_user_id(), 'context' => array( 'resolution_transport' => 'cli' ) ) );
+		if ( empty( $result['success'] ) ) {
+			WP_CLI::error( (string) ( $result['error'] ?? 'Pending action could not be resolved.' ) );
+		}
+		WP_CLI::success( sprintf( 'Pending action %s.', $decision ) );
+		if ( 'json' === ( $assoc_args['format'] ?? '' ) ) {
+			WP_CLI::line( wp_json_encode( $result ) );
+		}
+	}
+
 	/**
 	 * List pending actions.
 	 *
