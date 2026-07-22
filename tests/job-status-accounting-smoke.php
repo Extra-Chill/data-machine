@@ -145,7 +145,11 @@ $fail_ability    = file_get_contents( __DIR__ . '/../inc/Abilities/Job/FailJobAb
 $assert( 'Jobs repository exposes transition primitive', str_contains( $jobs_repository, 'function transition_job_status' ) );
 $assert( 'complete_job delegates to transition primitive', str_contains( $jobs_repository, 'return $this->transition_job_status( $job_id, $status, true );' ) );
 $assert( 'update_job_status delegates to transition primitive', str_contains( $jobs_repository, 'return $this->transition_job_status( $job_id, $status );' ) );
-$assert( 'transition primitive owns terminal hooks', 1 === substr_count( $jobs_repository, "do_action( 'datamachine_job_complete'" ) );
+$assert(
+	'terminal accounting owns terminal hooks',
+	str_contains( $jobs_repository, "array( 'datamachine_job_terminal_committed', 'datamachine_job_complete' )" )
+		&& str_contains( $jobs_repository, 'reconcile_terminal_accounting' )
+);
 $assert( 'recover-stuck uses transition primitive for terminal repairs', str_contains( $recover_ability, 'transition_job_status' ) );
 $assert( 'recover-stuck no longer fires manual completion hooks', ! str_contains( $recover_ability, "do_action( 'datamachine_job_complete'" ) );
 $assert( 'retry ability no longer fires duplicate completion hook', ! str_contains( $retry_ability, "do_action( 'datamachine_job_complete'" ) );
