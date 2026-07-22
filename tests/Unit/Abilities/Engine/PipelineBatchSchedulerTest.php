@@ -496,13 +496,13 @@ class PipelineBatchSchedulerTest extends WP_UnitTestCase {
 
 	public function test_parent_engine_write_failure_keeps_child_core_stage_retryable(): void {
 		[ $parent_id, $child_id ] = $this->create_terminal_ready_batch();
-		$failure                  = $this->fail_parent_query_once( $parent_id, 'engine_data' );
+		$failure                  = static fn() => static fn(): bool => false;
 
-		add_filter( 'query', $failure );
+		add_filter( 'datamachine_pipeline_batch_parent_engine_persister', $failure );
 		try {
 			$this->assertTrue( $this->jobs_db->complete_job( $child_id, JobStatus::COMPLETED ) );
 		} finally {
-			remove_filter( 'query', $failure );
+			remove_filter( 'datamachine_pipeline_batch_parent_engine_persister', $failure );
 		}
 
 		$this->assertSame( JobStatus::PROCESSING, $this->jobs_db->get_job( $parent_id )['status'] );
@@ -515,13 +515,13 @@ class PipelineBatchSchedulerTest extends WP_UnitTestCase {
 
 	public function test_parent_completion_failure_keeps_child_core_stage_retryable(): void {
 		[ $parent_id, $child_id ] = $this->create_terminal_ready_batch();
-		$failure                  = $this->fail_parent_query_once( $parent_id, 'terminal_accounting_state' );
+		$failure                  = static fn() => static fn(): bool => false;
 
-		add_filter( 'query', $failure );
+		add_filter( 'datamachine_pipeline_batch_parent_completer', $failure );
 		try {
 			$this->assertTrue( $this->jobs_db->complete_job( $child_id, JobStatus::COMPLETED ) );
 		} finally {
-			remove_filter( 'query', $failure );
+			remove_filter( 'datamachine_pipeline_batch_parent_completer', $failure );
 		}
 
 		$this->assertSame( JobStatus::PROCESSING, $this->jobs_db->get_job( $parent_id )['status'] );
@@ -794,21 +794,6 @@ class PipelineBatchSchedulerTest extends WP_UnitTestCase {
 		$this->assertTrue( $this->jobs_db->start_job( $child_id ) );
 
 		return array( $parent_id, $child_id );
-	}
-
-	private function fail_parent_query_once( int $parent_id, string $required_fragment ): callable {
-		global $wpdb;
-		$table  = $wpdb->prefix . 'datamachine_jobs';
-		$failed = false;
-
-		return static function ( string $query ) use ( $parent_id, $required_fragment, $table, &$failed ): string {
-			$targets_parent = 1 === preg_match( '/(?:`job_id`|job_id)\s*=\s*[\'\"]?' . $parent_id . '[\'\"]?/', $query );
-			if ( ! $failed && str_contains( $query, 'UPDATE ' . $table ) && str_contains( $query, $required_fragment ) && $targets_parent ) {
-				$failed = true;
-				return 'INVALID SQL FOR PIPELINE PARENT FAILURE TEST';
-			}
-			return $query;
-		};
 	}
 
 	private function expire_terminal_accounting_lease( int $job_id ): void {

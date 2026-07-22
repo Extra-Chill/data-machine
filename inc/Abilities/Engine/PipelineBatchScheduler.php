@@ -527,11 +527,25 @@ class PipelineBatchScheduler {
 			'total'     => $total_children,
 		);
 
-		if ( ! datamachine_set_engine_data( (int) $parent_job_id, $parent_engine ) ) {
+		$persist_parent = apply_filters(
+			'datamachine_pipeline_batch_parent_engine_persister',
+			'datamachine_set_engine_data',
+			$parent_job_id,
+			$parent_engine
+		);
+		if ( ! is_callable( $persist_parent ) || false === call_user_func( $persist_parent, $parent_job_id, $parent_engine ) ) {
 			return false;
 		}
-		$parent_completed = $jobs_db->complete_job( (int) $parent_job_id, $parent_status );
-		if ( ! $parent_completed ) {
+
+		$complete_parent = apply_filters(
+			'datamachine_pipeline_batch_parent_completer',
+			static function () use ( $jobs_db, $parent_job_id, $parent_status ): bool {
+				return $jobs_db->complete_job( (int) $parent_job_id, $parent_status );
+			},
+			$parent_job_id,
+			$parent_status
+		);
+		if ( ! is_callable( $complete_parent ) || false === call_user_func( $complete_parent, $parent_job_id, $parent_status ) ) {
 			return false;
 		}
 
