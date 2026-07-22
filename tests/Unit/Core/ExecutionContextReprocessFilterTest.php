@@ -124,6 +124,25 @@ class ExecutionContextReprocessFilterTest extends WP_UnitTestCase {
 		$this->assertSame( 7, $captured['job_id'] );
 	}
 
+	public function test_custom_revision_policy_preserves_actual_flow_step_context(): void {
+		$captured = null;
+		add_filter(
+			'datamachine_should_reprocess_item',
+			static function ( bool $skip, array $context ) use ( &$captured ): bool {
+				$captured = $context;
+				return $skip;
+			},
+			10,
+			2
+		);
+
+		$ctx = ExecutionContext::fromFlow( $this->pipeline_id, $this->flow_id, $this->flow_step_id, '9', $this->handler_type );
+		$ctx->shouldSkipItem( true, $this->item_identifier, array( 'identity_scope' => 'shared:source' ) );
+
+		$this->assertSame( $this->flow_step_id, $captured['flow_step_id'] );
+		$this->assertSame( 'shared:source', $captured['identity_scope'] );
+	}
+
 	public function test_filter_not_invoked_in_direct_mode(): void {
 		$invoked = false;
 

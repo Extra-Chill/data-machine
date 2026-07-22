@@ -411,6 +411,10 @@ class TaskScheduler {
 			self::BATCH_CONTEXT,
 			BatchScheduler::COMPLETION_STRATEGY_CHUNKS_SCHEDULED
 		);
+		if ( empty( $result['scheduled'] ) ) {
+			$jobs_db->complete_job( (int) $batch_job_id, JobStatus::failed( 'batch_schedule_failed' )->toString() );
+			return false;
+		}
 
 		// Surface task-specific identifiers alongside the BatchScheduler
 		// metadata so getBatchStatus() and CLI consumers see the same
@@ -538,6 +542,11 @@ class TaskScheduler {
 					'total'        => $result['total'],
 				)
 			);
+			return;
+		}
+
+		if ( ! empty( $result['schedule_failed'] ) ) {
+			$jobs_db->complete_job( $parent_job_id, JobStatus::failed( 'batch_schedule_failed' )->toString() );
 			return;
 		}
 

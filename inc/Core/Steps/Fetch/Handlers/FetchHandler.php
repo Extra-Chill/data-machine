@@ -19,6 +19,7 @@ namespace DataMachine\Core\Steps\Fetch\Handlers;
 
 use DataMachine\Abilities\AuthAbilities;
 use DataMachine\Core\DataPacket;
+use DataMachine\Core\Database\ProcessedItems\ProcessedItems;
 use DataMachine\Core\ExecutionContext;
 use DataMachine\Core\FilesRepository\FileStorage;
 use DataMachine\Core\Steps\Fetch\Tools\FetchItemDispositionTool;
@@ -184,9 +185,12 @@ abstract class FetchHandler {
 				continue;
 			}
 
-			if ( ! $context->claimItemForProcessing( (string) $item_identifier ) ) {
+			$claim = $context->claimItemOwnership( (string) $context->getFlowStepId(), (string) $item_identifier );
+			if ( false === $claim ) {
 				continue;
 			}
+
+			$item['metadata'][ ProcessedItems::CLAIM_METADATA_KEY ] = $claim;
 
 			$result[] = $item;
 		}

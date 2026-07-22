@@ -29,6 +29,7 @@ namespace DataMachine\Abilities\Engine;
 use DataMachine\Core\PacketEngineData;
 use DataMachine\Core\ActionScheduler\BatchScheduler;
 use DataMachine\Core\Database\Jobs\Jobs;
+use DataMachine\Core\Database\ProcessedItems\ProcessedItems;
 use DataMachine\Core\JobStatus;
 
 defined( 'ABSPATH' ) || exit;
@@ -89,6 +90,10 @@ class PipelineBatchScheduler {
 			self::BATCH_CONTEXT,
 			BatchScheduler::COMPLETION_STRATEGY_CHILDREN_COMPLETE
 		);
+
+		if ( empty( $result['scheduled'] ) ) {
+			$this->db_jobs->complete_job( $parent_job_id, JobStatus::failed( 'batch_schedule_failed' )->toString() );
+		}
 
 		// Surface next_flow_step_id at the top level for legacy consumers
 		// that read it without descending into batch_state. Parity with
@@ -209,12 +214,14 @@ class PipelineBatchScheduler {
 				return;
 			}
 
-			do_action(
-				'datamachine_log',
-				'info',
-				sprintf( 'Pipeline batch: all %d items scheduled', $result['total'] ),
-				array( 'parent_job_id' => $parent_job_id )
-			);
+			if ( empty( $result['schedule_failed'] ) ) {
+				do_action(
+					'datamachine_log',
+					'info',
+					sprintf( 'Pipeline batch: all %d items scheduled', $result['total'] ),
+					array( 'parent_job_id' => $parent_job_id )
+				);
+			}
 
 			self::maybeCompleteParent( $parent_job_id );
 		}
@@ -339,11 +346,15 @@ class PipelineBatchScheduler {
 		// parent, but now the fetch step no longer marks items eagerly.
 		$item_identifier = $single_packet['metadata']['item_identifier'] ?? null;
 		$source_type     = $single_packet['metadata']['source_type'] ?? null;
+		$item_claim      = $single_packet['metadata'][ ProcessedItems::CLAIM_METADATA_KEY ] ?? null;
 		if ( ! empty( $item_identifier ) ) {
 			$child_engine['item_identifier'] = $item_identifier;
 		}
 		if ( ! empty( $source_type ) ) {
 			$child_engine['source_type'] = $source_type;
+		}
+		if ( is_array( $item_claim ) ) {
+			$child_engine[ ProcessedItems::CLAIM_METADATA_KEY ] = $item_claim;
 		}
 
 		datamachine_set_engine_data( $child_job_id, $child_engine );
@@ -480,12 +491,13 @@ class PipelineBatchScheduler {
 			return;
 		}
 
-		$total_children = (int) $counts['total'];
-		$active         = (int) $counts['active'];
-		$batch_total    = (int) ( $parent_engine['batch_total'] ?? $total_children );
+		$total_children  = (int) $counts['total'];
+		$active          = (int) $counts['active'];
+		$batch_scheduled = (int) ( $parent_engine['batch_scheduled'] ?? $total_children );
+		$batch_pending   = isset( $parent_engine['batch_state'] );
 
 		// Still have active children or not all scheduled yet.
-		if ( $active > 0 || $total_children < $batch_total ) {
+		if ( $active > 0 || $batch_pending || $total_children < $batch_scheduled ) {
 			return;
 		}
 
@@ -494,7 +506,9 @@ class PipelineBatchScheduler {
 		$failed    = (int) $counts['failed'];
 		$skipped   = (int) $counts['skipped'];
 
-		if ( $completed > 0 ) {
+		if ( ! empty( $parent_engine['batch_schedule_failed'] ) ) {
+			$parent_status = JobStatus::failed( 'batch_schedule_failed' )->toString();
+		} elseif ( $completed > 0 ) {
 			$parent_status = JobStatus::COMPLETED;
 		} elseif ( $failed === $total_children ) {
 			$parent_status = JobStatus::failed(

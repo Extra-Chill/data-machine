@@ -52,15 +52,15 @@ class ExecuteStepAbility {
 						'type'       => 'object',
 						'required'   => array( 'job_id', 'flow_step_id' ),
 						'properties' => array(
-							'job_id'       => array(
+							'job_id'                => array(
 								'type'        => 'integer',
 								'description' => __( 'Job ID for the execution.', 'data-machine' ),
 							),
-							'flow_step_id' => array(
+							'flow_step_id'          => array(
 								'type'        => 'string',
 								'description' => __( 'Flow step ID to execute.', 'data-machine' ),
 							),
-							'operation_generation' => array(
+							'operation_generation'  => array(
 								'type'        => 'integer',
 								'minimum'     => 0,
 								'description' => __( 'Direct workflow execution generation.', 'data-machine' ),
@@ -74,13 +74,13 @@ class ExecuteStepAbility {
 					'output_schema'       => array(
 						'type'       => 'object',
 						'properties' => array(
-							'success'      => array( 'type' => 'boolean' ),
-							'step_success' => array( 'type' => 'boolean' ),
-							'outcome'      => array( 'type' => 'string' ),
+							'success'          => array( 'type' => 'boolean' ),
+							'step_success'     => array( 'type' => 'boolean' ),
+							'outcome'          => array( 'type' => 'string' ),
 							'stale_generation' => array( 'type' => 'boolean' ),
 							'deferred'         => array( 'type' => 'boolean' ),
 							'retryable'        => array( 'type' => 'boolean' ),
-							'error'        => array( 'type' => 'string' ),
+							'error'            => array( 'type' => 'string' ),
 						),
 					),
 					'execute_callback'    => array( $this, 'execute' ),
@@ -107,11 +107,11 @@ class ExecuteStepAbility {
 	 * @return array Result with step execution outcome.
 	 */
 	public function execute( array $input ): array {
-		$job_id       = (int) ( $input['job_id'] ?? 0 );
-		$flow_step_id = (string) ( $input['flow_step_id'] ?? '' );
-		$operation_generation = max( 0, (int) ( $input['operation_generation'] ?? 0 ) );
+		$job_id                = (int) ( $input['job_id'] ?? 0 );
+		$flow_step_id          = (string) ( $input['flow_step_id'] ?? '' );
+		$operation_generation  = max( 0, (int) ( $input['operation_generation'] ?? 0 ) );
 		$operation_claim_token = (string) ( $input['operation_claim_token'] ?? '' );
-		$job          = $this->db_jobs->get_job( $job_id );
+		$job                   = $this->db_jobs->get_job( $job_id );
 
 		if ( ! $job ) {
 			return array(
@@ -237,7 +237,7 @@ class ExecuteStepAbility {
 				'engine'       => $engine,
 			);
 
-			$step_output      = $flow_step->execute( $payload );
+			$step_output = $flow_step->execute( $payload );
 			if ( $operation_generation > 0 ) {
 				$job_after_execution = $this->db_jobs->get_job( $job_id );
 				if ( ! is_array( $job_after_execution ) || 'committed' !== $this->operationGenerationAdmission( $job_after_execution, $operation_generation, $operation_claim_token ) ) {
@@ -370,7 +370,7 @@ class ExecuteStepAbility {
 		if ( $generation <= 0 ) {
 			return 'committed';
 		}
-		if ( '' === $token || $generation !== (int) ( $job['operation_generation'] ?? 0 ) || ! hash_equals( $token, (string) ( $job['operation_claim_token'] ?? '' ) ) ) {
+		if ( '' === $token || (int) ( $job['operation_generation'] ?? 0 ) !== $generation || ! hash_equals( $token, (string) ( $job['operation_claim_token'] ?? '' ) ) ) {
 			return 'stale';
 		}
 		if ( 'enqueued' === ( $job['operation_state'] ?? '' ) && (int) ( $job['operation_action_id'] ?? 0 ) > 0 ) {
@@ -386,9 +386,9 @@ class ExecuteStepAbility {
 				time() + 1,
 				'datamachine_execute_step',
 				array(
-					'job_id'               => $job_id,
-					'flow_step_id'         => $flow_step_id,
-					'operation_generation' => $generation,
+					'job_id'                => $job_id,
+					'flow_step_id'          => $flow_step_id,
+					'operation_generation'  => $generation,
 					'operation_claim_token' => $token,
 				),
 				'data-machine'
@@ -581,15 +581,18 @@ class ExecuteStepAbility {
 		if ( $status_override ) {
 			$transition = $this->db_jobs->transition_job_status_result( $job_id, $status_override, true );
 			if ( $transition['changed'] ) {
-				if ( str_starts_with( $status_override, JobStatus::FAILED ) === false ) {
-					$this->handleStepLifecycleCompleted( $job_id );
-				} else {
-					$this->handleStepLifecycleFailed( $job_id );
-				}
-
 				$cleanup = new FileCleanup();
 				$context = datamachine_get_file_context( $flow_id );
 				$cleanup->cleanup_job_data_packets( $job_id, $context );
+			}
+			if ( JobStatus::isStatusSuccess( $status_override ) && ( ! $transition['success'] || ! JobStatus::isStatusSuccess( $transition['status'] ) ) ) {
+				return array(
+					'success'      => false,
+					'step_success' => false,
+					'outcome'      => 'claim_completion_failed',
+					'reason'       => 'item_claim_completion_failed',
+					'status'       => $transition['status'],
+				);
 			}
 
 			do_action(
@@ -742,12 +745,18 @@ class ExecuteStepAbility {
 
 			$transition = $this->db_jobs->transition_job_status_result( $job_id, JobStatus::COMPLETED, true );
 			if ( $transition['changed'] ) {
-				// Notify lifecycle handlers after the full pipeline succeeds.
-				$this->handleStepLifecycleCompleted( $job_id );
-
 				$cleanup = new FileCleanup();
 				$context = datamachine_get_file_context( $flow_id );
 				$cleanup->cleanup_job_data_packets( $job_id, $context );
+			}
+			if ( ! $transition['success'] || ! JobStatus::isStatusSuccess( $transition['status'] ) ) {
+				return array(
+					'success'      => false,
+					'step_success' => false,
+					'outcome'      => 'claim_completion_failed',
+					'reason'       => 'item_claim_completion_failed',
+					'status'       => $transition['status'],
+				);
 			}
 
 			do_action(
@@ -800,7 +809,16 @@ class ExecuteStepAbility {
 		// Fetch/event_import legacy empty outputs classify this way, and explicit
 		// result-shaped step returns can also choose it without emitting packets.
 		if ( 'completed_no_items' === ( $execution_result['status'] ?? '' ) ) {
-			$this->db_jobs->complete_job( $job_id, JobStatus::COMPLETED_NO_ITEMS );
+			$transition = $this->db_jobs->transition_job_status_result( $job_id, JobStatus::COMPLETED_NO_ITEMS, true );
+			if ( ! $transition['success'] || ! JobStatus::isStatusSuccess( $transition['status'] ) ) {
+				return array(
+					'success'      => false,
+					'step_success' => false,
+					'outcome'      => 'claim_completion_failed',
+					'reason'       => 'item_claim_completion_failed',
+					'status'       => $transition['status'],
+				);
+			}
 			do_action(
 				'datamachine_log',
 				'info',
@@ -968,24 +986,6 @@ class ExecuteStepAbility {
 	 */
 	private function handleStepLifecycleInlineContinuation( int $job_id, array $flow_step_config, array $routed_packets ): void {
 		do_action( 'datamachine_step_lifecycle_inline_continuation', $job_id, $flow_step_config, $routed_packets );
-	}
-
-	/**
-	 * Notify step lifecycle handlers that a job completed successfully.
-	 *
-	 * @param int $job_id Completed job ID.
-	 */
-	private function handleStepLifecycleCompleted( int $job_id ): void {
-		do_action( 'datamachine_step_lifecycle_completed', $job_id, datamachine_get_engine_data( $job_id ) );
-	}
-
-	/**
-	 * Notify step lifecycle handlers that a job failed outside datamachine_fail_job.
-	 *
-	 * @param int $job_id Failed job ID.
-	 */
-	private function handleStepLifecycleFailed( int $job_id ): void {
-		do_action( 'datamachine_step_lifecycle_failed', $job_id, datamachine_get_engine_data( $job_id ) );
 	}
 
 	/**

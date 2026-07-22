@@ -8,7 +8,6 @@
 namespace DataMachine\Core\Database\TrackedItems;
 
 use DataMachine\Core\Database\BaseRepository;
-
 defined( 'ABSPATH' ) || exit;
 
 class TrackedItems extends BaseRepository {
@@ -64,11 +63,13 @@ class TrackedItems extends BaseRepository {
 				$formats,
 				array( '%d' )
 			);
+			$stored = array_merge( $existing, $row );
 		} else {
 			$row['first_seen_at'] = '' !== $normalized['first_seen_at'] ? $normalized['first_seen_at'] : $now;
 			$formats[]            = '%s';
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 			$result = $this->wpdb->insert( $this->table_name, $row, $formats );
+			$stored = array_merge( array( 'id' => (int) $this->wpdb->insert_id ), $row );
 		}
 
 		if ( false === $result ) {
@@ -82,7 +83,35 @@ class TrackedItems extends BaseRepository {
 			return null;
 		}
 
-		return $this->get( $normalized['namespace'], $normalized['item_id'] );
+		return self::normalize_row( $stored );
+	}
+
+	/**
+	 * Register tracked-item completion with the generic claim lifecycle.
+	 *
+	 * @param array<string,callable> $handlers Registered completion handlers.
+	 * @return array<string,callable> Registered completion handlers.
+	 */
+	public static function registerClaimCompletionHandler( array $handlers ): array {
+		$handlers['tracked_item'] = array( self::class, 'completeClaim' );
+		return $handlers;
+	}
+
+	/**
+	 * Persist a tracked item inside the owning claim transaction.
+	 *
+	 * @param array<string,mixed> $payload Completion payload.
+	 * @param int                 $job_id Completing job ID.
+	 * @return bool Whether the tracked item was persisted.
+	 */
+	public static function completeClaim( array $payload, int $job_id ): bool {
+		$item = is_array( $payload['item'] ?? null ) ? $payload['item'] : array();
+		if ( empty( $item ) ) {
+			return false;
+		}
+
+		$item['last_job_id'] = $job_id;
+		return null !== ( new self() )->upsert( $item );
 	}
 
 	/**
