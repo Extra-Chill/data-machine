@@ -26,6 +26,7 @@ class TestHandlerAbility {
 	private const MAX_RAW_PACKET_LIMIT   = 100;
 	private const MAX_REPORT_PATHS       = 8;
 	private const MAX_SANITIZE_DEPTH     = 32;
+	private const TRANSPORT_ENTRY_BUDGET = 132;
 
 	private static bool $registered = false;
 
@@ -83,7 +84,22 @@ class TestHandlerAbility {
 							),
 						),
 					),
-					'output_schema'       => array(
+					'output_schema'       => self::getOutputSchema(),
+					'execute_callback'    => array( $this, 'execute' ),
+					'permission_callback' => array( $this, 'checkPermission' ),
+					'meta'                => array( 'show_in_rest' => true ),
+				)
+			);
+		};
+
+		\DataMachine\Abilities\AbilityRegistration::on_abilities_api_init( $register_callback );
+	}
+
+	/**
+	 * Return the registered output schema for runtime and validation tests.
+	 */
+	public static function getOutputSchema(): array {
+		return array(
 						'type'                 => 'object',
 						'additionalProperties' => false,
 						'properties'           => array(
@@ -156,27 +172,22 @@ class TestHandlerAbility {
 						),
 						'oneOf'      => array(
 							array(
+								'type'       => 'object',
 								'required'   => array( 'success', 'error' ),
-								'properties' => array( 'success' => array( 'enum' => array( false ) ) ),
+								'properties' => array( 'success' => array( 'type' => 'boolean', 'enum' => array( false ) ) ),
 							),
 							array(
+								'type'       => 'object',
 								'required'   => array( 'success', 'output_mode', 'packets', 'packet_count', 'warnings', 'execution_time_ms' ),
-								'properties' => array( 'success' => array( 'enum' => array( true ) ), 'output_mode' => array( 'enum' => array( 'compact' ) ) ),
+								'properties' => array( 'success' => array( 'type' => 'boolean', 'enum' => array( true ) ), 'output_mode' => array( 'type' => 'string', 'enum' => array( 'compact' ) ) ),
 							),
 							array(
+								'type'       => 'object',
 								'required'   => array( 'success', 'output_mode', 'packets', 'packet_count', 'warnings', 'execution_time_ms', 'limits', 'truncation' ),
-								'properties' => array( 'success' => array( 'enum' => array( true ) ), 'output_mode' => array( 'enum' => array( 'raw' ) ) ),
+								'properties' => array( 'success' => array( 'type' => 'boolean', 'enum' => array( true ) ), 'output_mode' => array( 'type' => 'string', 'enum' => array( 'raw' ) ) ),
 							),
 						),
-					),
-					'execute_callback'    => array( $this, 'execute' ),
-					'permission_callback' => array( $this, 'checkPermission' ),
-					'meta'                => array( 'show_in_rest' => true ),
-				)
-			);
-		};
-
-		\DataMachine\Abilities\AbilityRegistration::on_abilities_api_init( $register_callback );
+					);
 	}
 
 	/**
@@ -442,7 +453,7 @@ class TestHandlerAbility {
 		$base['handler_label'] = $this->boundOutputString( (string) ( $base['handler_label'] ?? '' ), 256 );
 
 		$empty_response = $this->composeRawResponse( $base, array(), $total_count, $packet_limit, $byte_limit, $report, $materialization_limited );
-		$envelope_bytes = $this->serializedSize( $empty_response );
+		$envelope_bytes = $this->transportSize( $empty_response, true );
 		$packet_budget  = max( 0, $byte_limit - $envelope_bytes - 1024 );
 
 		foreach ( $packets as $index => $packet ) {
@@ -606,7 +617,7 @@ class TestHandlerAbility {
 				$this->recordOmission( $report, $path, 'json_encode_failure' );
 				return 'omit';
 			}
-			$bytes = strlen( $encoded );
+			$bytes = $this->transportSize( $value, false );
 			if ( $bytes > $remaining ) {
 				return 'limit';
 			}
@@ -625,10 +636,10 @@ class TestHandlerAbility {
 		$first      = true;
 
 		foreach ( $value as $key => $child ) {
-			if ( $remaining < 1 ) {
+			if ( $remaining < self::TRANSPORT_ENTRY_BUDGET ) {
 				return 'limit';
 			}
-			--$remaining;
+			$remaining -= self::TRANSPORT_ENTRY_BUDGET;
 
 			$key_bytes  = 0;
 			$child_path = $path;
@@ -740,19 +751,25 @@ class TestHandlerAbility {
 		return mb_strcut( $value, 0, max( 0, $max_bytes - 3 ), 'UTF-8' ) . '...';
 	}
 
-	private function serializedSize( array $value ): int {
-		$encoded = wp_json_encode( $value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );
-		return false === $encoded ? PHP_INT_MAX : strlen( $encoded );
+	private function transportSize( $value, bool $complete_response ): int {
+		$rest = wp_json_encode( $value );
+		$cli  = wp_json_encode( $value, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES );
+		if ( false === $rest || false === $cli ) {
+			return PHP_INT_MAX;
+		}
+
+		$cli_bytes = strlen( $cli ) + ( $complete_response ? 1 : 0 );
+		return max( strlen( $rest ), $cli_bytes );
 	}
 
 	private function stabilizeReturnedBytes( array &$response ): int {
 		for ( $iteration = 0; $iteration < 4; ++$iteration ) {
-			$bytes = $this->serializedSize( $response );
+			$bytes = $this->transportSize( $response, true );
 			if ( $response['truncation']['returned_bytes'] === $bytes ) {
 				return $bytes;
 			}
 			$response['truncation']['returned_bytes'] = $bytes;
 		}
-		return $this->serializedSize( $response );
+		return $this->transportSize( $response, true );
 	}
 }

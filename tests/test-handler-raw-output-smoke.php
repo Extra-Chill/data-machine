@@ -9,7 +9,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	define( 'ABSPATH', dirname( __DIR__ ) . '/' );
 }
 
-require_once __DIR__ . '/fixtures/namespaced-wp-fn-stubs.php';
+require_once __DIR__ . '/fixtures/test-handler-wp-fn-stubs.php';
 require_once dirname( __DIR__ ) . '/inc/Abilities/AbilityRegistration.php';
 require_once dirname( __DIR__ ) . '/inc/Abilities/HandlerAbilities.php';
 require_once dirname( __DIR__ ) . '/inc/Core/DataPacket.php';
@@ -71,6 +71,12 @@ function build_test_handler_raw( object $ability, array $packets, int $packet_li
 	return invoke_test_handler_private( $ability, 'buildRawResponse', array( $packets, $packet_limit, $byte_limit, $base, $sanitized['report'], true ) );
 }
 
+function test_handler_transport_size( array $response ): int {
+	$rest = json_encode( $response );
+	$cli  = json_encode( $response, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES );
+	return max( strlen( $rest ), strlen( $cli ) + 1 );
+}
+
 echo "=== test-handler-raw-output-smoke ===\n";
 
 $reflection = new ReflectionClass( TestHandlerAbility::class );
@@ -102,7 +108,27 @@ $raw = build_test_handler_raw( $ability, $packets, 5, 12000 );
 assert_test_handler_raw( 'events-shaped JSON body round-trips byte-for-byte', $event_json === $raw['packets'][0]['data']['body'] );
 assert_test_handler_raw( 'raw HTML and ordinary Token prose remain unchanged', $event_html === $raw['packets'][1]['data']['body'] );
 assert_test_handler_raw( 'events-shaped structured venue metadata is retained', 'Charleston' === $raw['packets'][0]['data']['venue']['city'] );
-assert_test_handler_raw( 'complete response byte count is exact and within limit', strlen( json_encode( $raw, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES ) ) === $raw['truncation']['returned_bytes'] && $raw['truncation']['returned_bytes'] <= 12000 );
+assert_test_handler_raw( 'complete response byte count is exact and within limit', test_handler_transport_size( $raw ) === $raw['truncation']['returned_bytes'] && $raw['truncation']['returned_bytes'] <= 12000 );
+
+$nested = array();
+for ( $index = 0; $index < 35; ++$index ) {
+	$nested[ 'item_' . $index ] = array( 'venue' => 'Royal American', 'city' => 'Charleston', 'date' => '2026-08-01' );
+}
+$nested_packet = new DataPacket( array( 'title' => 'Nested expansion', 'body' => $nested ), array(), 'fetch' );
+$nested_probe  = build_test_handler_raw( $ability, array( $nested_packet ), 5, 65536 );
+$nested_min    = strlen( json_encode( $nested_probe, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES ) );
+$nested_pretty = strlen( json_encode( $nested_probe, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) ) + 1;
+assert_test_handler_raw( 'nested probe reproduces minified-under/pretty-over transport expansion', $nested_min < 4096 && $nested_pretty > 4096 );
+$nested_bounded = build_test_handler_raw( $ability, array( $nested_packet ), 5, 4096 );
+assert_test_handler_raw( 'nested probe emitted response fits both actual transports', test_handler_transport_size( $nested_bounded ) <= 4096 && array() === $nested_bounded['packets'] );
+
+$emoji_packet = new DataPacket( array( 'title' => 'Emoji expansion', 'body' => str_repeat( '🥶', 300 ) ), array(), 'fetch' );
+$emoji_probe  = build_test_handler_raw( $ability, array( $emoji_packet ), 5, 12000 );
+$emoji_min    = strlen( json_encode( $emoji_probe, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES ) );
+$emoji_rest   = strlen( json_encode( $emoji_probe ) );
+assert_test_handler_raw( '300-emoji probe reproduces canonical-under/REST-over expansion', $emoji_min < 4096 && $emoji_rest > 4096 );
+$emoji_bounded = build_test_handler_raw( $ability, array( $emoji_packet ), 5, 4096 );
+assert_test_handler_raw( '300-emoji probe emitted response fits REST and CLI transports', test_handler_transport_size( $emoji_bounded ) <= 4096 && array() === $emoji_bounded['packets'] );
 
 $structured = sanitize_test_handler_value(
 	$ability,
@@ -138,7 +164,7 @@ assert_test_handler_raw( 'sanitized unsafe output always serializes', false !== 
 $multibyte = new DataPacket( array( 'title' => 'Emoji', 'body' => str_repeat( '🥶', 900 ) ), array(), 'fetch' );
 $raw       = build_test_handler_raw( $ability, array( $multibyte ), 5, 4096 );
 assert_test_handler_raw( 'multibyte packet is omitted whole at the boundary', array() === $raw['packets'] && in_array( 'byte_limit', $raw['truncation']['reasons'], true ) );
-assert_test_handler_raw( 'multibyte truncation response remains valid UTF-8 JSON under the complete-response cap', false !== json_encode( $raw, JSON_UNESCAPED_UNICODE ) && strlen( json_encode( $raw, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES ) ) <= 4096 );
+assert_test_handler_raw( 'multibyte truncation response remains valid UTF-8 JSON under the complete-response cap', false !== json_encode( $raw, JSON_UNESCAPED_UNICODE ) && test_handler_transport_size( $raw ) <= 4096 );
 
 $oversized = new DataPacket( array( 'body' => str_repeat( 'x', 20000 ) ), array(), 'fetch' );
 $raw       = build_test_handler_raw( $ability, array( $oversized ), 5, 4096, array( 'description' => str_repeat( 'c', 5000 ) ) );
