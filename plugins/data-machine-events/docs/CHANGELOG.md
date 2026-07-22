@@ -2,6 +2,19 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.51.0] - 2026-07-22
+
+### Added
+- expose canonical event upsert ability ([#510](https://github.com/Extra-Chill/data-machine-events/pull/510)) (by Chris Huber)
+- publish canonical calendar occurrence contract ([#508](https://github.com/Extra-Chill/data-machine-events/pull/508)) (by Chris Huber)
+
+### Changed
+- satisfy release coding standards ([#523](https://github.com/Extra-Chill/data-machine-events/pull/523)) (by Chris Huber)
+
+### Fixed
+- make scraper qualification config-aware ([#517](https://github.com/Extra-Chill/data-machine-events/pull/517)) (by Chris Huber)
+- preserve Ticketmaster update and retry semantics ([#506](https://github.com/Extra-Chill/data-machine-events/pull/506)) (by Chris Huber)
+
 ## [0.50.0] - 2026-07-21
 
 ### Added
