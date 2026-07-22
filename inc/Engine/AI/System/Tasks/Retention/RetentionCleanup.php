@@ -101,7 +101,8 @@ class RetentionCleanup {
 			// is millions of rows. Prune them within ~1h to cap steady-state
 			// rows. The row-count ceiling (see actionSchedulerHookMaxRows)
 			// bounds the table regardless of generation rate as a backstop.
-			'datamachine_execute_step' => 1 / 24,
+			'datamachine_execute_step'   => 1 / 24,
+			'datamachine_resume_ai_step' => 1 / 24,
 		);
 
 		$overrides = apply_filters( 'datamachine_as_actions_hook_max_age_days', $defaults );
@@ -149,7 +150,8 @@ class RetentionCleanup {
 			// completions/second this is well under an hour of history — more
 			// than enough for diagnostics — while guaranteeing the table can
 			// never balloon into the millions during a generation spike.
-			'datamachine_execute_step' => 100000,
+			'datamachine_execute_step'   => 100000,
+			'datamachine_resume_ai_step' => 100000,
 		);
 
 		$overrides = apply_filters( 'datamachine_as_actions_hook_max_rows', $defaults );

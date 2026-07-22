@@ -1,53 +1,77 @@
 <?php
-/**
- * Static smoke test for job liveness CLI diagnostics.
- *
- * Run with: php tests/job-liveness-cli-smoke.php
- *
- * @package DataMachine\Tests
- */
+/** Behavioral smoke test for job liveness classification. */
+
+define( 'ABSPATH', __DIR__ . '/' );
+define( 'MINUTE_IN_SECONDS', 60 );
+
+require_once __DIR__ . '/../inc/Cli/JobLivenessClassifier.php';
+
+use DataMachine\Cli\JobLivenessClassifier;
 
 $failed = 0;
 $total  = 0;
-
-function assert_job_liveness_cli_smoke( string $name, bool $condition, string $detail = '' ): void {
-	global $failed, $total;
+$assert = static function ( string $label, bool $condition ) use ( &$failed, &$total ): void {
 	++$total;
-
 	if ( $condition ) {
-		echo "  [PASS] {$name}\n";
+		echo "  [PASS] {$label}\n";
 		return;
 	}
-
-	echo "  [FAIL] {$name}" . ( $detail ? " - {$detail}" : '' ) . "\n";
 	++$failed;
-}
+	echo "  [FAIL] {$label}\n";
+};
 
-$source = file_get_contents( __DIR__ . '/../inc/Cli/Commands/JobsCommand.php' ) ?: '';
+$now = strtotime( '2026-07-22 12:00:00 UTC' );
+$job = static fn( array $engine = array() ): array => array(
+	'job_id'     => 42,
+	'flow_id'    => 7,
+	'pipeline_id' => 3,
+	'created_at' => '2026-07-22 08:00:00',
+	'engine_data' => $engine,
+);
+$action = static fn( string $status, string $scheduled ): array => array(
+	'hook'               => 'datamachine_resume_ai_step',
+	'status'             => $status,
+	'scheduled_date_gmt' => $scheduled,
+	'last_attempt_gmt'   => '0000-00-00 00:00:00',
+);
+$classify = static function ( array $job_row, array $actions = array(), array $children = array() ) use ( $now ): array {
+	return JobLivenessClassifier::diagnose( $job_row, $actions, $children, 120, $now );
+};
 
-echo "Case 1: liveness command is registered and read-only\n";
-assert_job_liveness_cli_smoke( 'liveness subcommand exists', str_contains( $source, '@subcommand liveness' ) );
-assert_job_liveness_cli_smoke( 'diagnostic queries processing jobs and pending contention', str_contains( $source, "status = 'processing' OR (status = 'pending'" ) && str_contains( $source, "$.ai_concurrency_throttle" ) );
-assert_job_liveness_cli_smoke( 'diagnostic reads execute-step actions', str_contains( $source, 'datamachine_execute_step' ) );
-assert_job_liveness_cli_smoke( 'diagnostic reads pipeline batch actions', str_contains( $source, 'PipelineBatchScheduler::BATCH_HOOK' ) );
-assert_job_liveness_cli_smoke( 'diagnostic does not update database rows', ! str_contains( strstr( $source, 'public function liveness' ) ?: '', '$wpdb->update(' ) );
+echo "=== job-liveness-cli-smoke ===\n";
+$active = $classify( $job(), array( $action( 'in-progress', '2026-07-22 11:30:00' ) ) );
+$assert( 'fresh running action is active processing', 'active_processing' === $active['classification'] );
 
-echo "Case 2: liveness classification exposes scheduler starvation\n";
-assert_job_liveness_cli_smoke( 'scheduler-starved classification exists', str_contains( $source, "'scheduler_starved'") );
-assert_job_liveness_cli_smoke( 'queued-next-step classification exists', str_contains( $source, "'queued_next_step'") );
-assert_job_liveness_cli_smoke( 'waiting-children classification exists', str_contains( $source, "'waiting_children'") );
-assert_job_liveness_cli_smoke( 'stale-in-progress classification exists', str_contains( $source, "'stale_in_progress'") );
-assert_job_liveness_cli_smoke( 'no-scheduler-path classification exists', str_contains( $source, "'no_scheduler_path'") );
-assert_job_liveness_cli_smoke( 'AI concurrency deferral classification exists', str_contains( $source, "'ai_concurrency_deferred'") );
-assert_job_liveness_cli_smoke( 'contention metrics include count and age', str_contains( $source, "'defer_count'") && str_contains( $source, "'defer_age_seconds'") );
-assert_job_liveness_cli_smoke( 'overdue threshold is configurable', str_contains( $source, '[--overdue-minutes=<minutes>]' ) );
+$stale = $classify( $job(), array( $action( 'in-progress', '2026-07-22 09:00:00' ) ) );
+$assert( 'overdue running action is stale in progress', 'stale_in_progress' === $stale['classification'] );
 
-echo "Case 3: structured output carries summary and jobs\n";
-assert_job_liveness_cli_smoke( 'json example exists', str_contains( $source, 'jobs liveness --overdue-minutes=120 --format=json' ) );
-assert_job_liveness_cli_smoke( 'structured output includes summary', str_contains( $source, "'summary'         => $" . 'summary' ) );
-assert_job_liveness_cli_smoke( 'structured output includes jobs', str_contains( $source, "'jobs'            => $" . 'items' ) );
+$starved = $classify( $job(), array( $action( 'pending', '2026-07-22 09:00:00' ) ) );
+$assert( 'overdue pending action is scheduler starved', 'scheduler_starved' === $starved['classification'] );
+
+$deferred_job = $job(
+	array(
+		'ai_concurrency_throttle' => array(
+			'state'             => 'deferred',
+			'attempts'          => 8,
+			'provider'          => 'openai',
+			'first_deferred_at' => '2026-07-22T11:00:00Z',
+		),
+	)
+);
+$deferred = $classify( $deferred_job, array( $action( 'pending', '2026-07-22 11:50:00' ) ) );
+$assert( 'fresh resume action with throttle is concurrency deferred', 'ai_concurrency_deferred' === $deferred['classification'] );
+$assert( 'deferred metrics expose count and age', 8 === $deferred['defer_count'] && 3600 === $deferred['defer_age_seconds'] );
+$assert( 'deferred contention is active', true === $deferred['contention_active'] );
+
+$queued = $classify( $job(), array( $action( 'pending', '2026-07-22 11:50:00' ) ) );
+$assert( 'fresh pending action without throttle is queued', 'queued_next_step' === $queued['classification'] );
+
+$waiting = $classify( $job( array( 'batch' => true, 'batch_total' => 3 ) ), array(), array( 'active' => 1, 'total' => 2 ) );
+$assert( 'active batch children classify as waiting', 'waiting_children' === $waiting['classification'] );
+
+$resolved = $classify( $job( array( 'ai_concurrency_history' => array( array( 'state' => 'resolved' ) ) ) ) );
+$assert( 'resolved history does not report active contention', false === $resolved['contention_active'] );
+$assert( 'job without active scheduler path is classified directly', 'no_scheduler_path' === $resolved['classification'] );
 
 echo "\nJob liveness CLI smoke complete: {$total} assertions, {$failed} failures.\n";
-if ( $failed > 0 ) {
-	exit( 1 );
-}
+exit( $failed > 0 ? 1 : 0 );

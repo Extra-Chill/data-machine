@@ -29,6 +29,7 @@ class RecoverStuckJobsAbility {
 	 */
 	private const RECOVERABLE_ACTION_HOOK_ARGS = array(
 		'datamachine_execute_step'         => 'job_id',
+		'datamachine_resume_ai_step'       => 'job_id',
 		'datamachine_pipeline_batch_chunk' => 'parent_job_id',
 		'datamachine_run_flow_now'         => 'job_id',
 	);
@@ -575,10 +576,11 @@ class RecoverStuckJobsAbility {
 			$wpdb->prepare(
 				"SELECT action_id, args, status, scheduled_date_gmt, last_attempt_gmt
 				 FROM {$actions_table}
-				 WHERE hook = %s
+				 WHERE hook IN ( %s, %s )
 				 AND status IN ( %s, %s )
 				 AND args LIKE %s",
 				'datamachine_execute_step',
+				'datamachine_resume_ai_step',
 				'pending',
 				'in-progress',
 				$like_job_id

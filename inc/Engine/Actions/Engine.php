@@ -58,6 +58,26 @@ function datamachine_flow_exists( int $flow_id ): bool {
 }
 
 /**
+ * Bridge an Action Scheduler step action into the canonical execute ability.
+ *
+ * Both initial execution and AI contention resumes use this callback so a
+ * resume cannot drift into a parallel execution implementation.
+ */
+function datamachine_execute_step_action( $job_id, string $flow_step_id, $operation_generation = 0, $operation_claim_token = '' ): void {
+	$ability = wp_get_ability( 'datamachine/execute-step' );
+	if ( $ability ) {
+		$ability->execute(
+			array(
+				'job_id'                => (int) $job_id,
+				'flow_step_id'          => $flow_step_id,
+				'operation_generation'  => is_numeric( $operation_generation ) ? (int) $operation_generation : 0,
+				'operation_claim_token' => is_string( $operation_claim_token ) ? $operation_claim_token : '',
+			)
+		);
+	}
+}
+
+/**
  * Register execution engine action hooks as thin bridges to abilities.
  *
  * Action Scheduler fires do_action() — these hooks delegate immediately
@@ -111,19 +131,15 @@ function datamachine_register_execution_engine() {
 	 */
 	add_action(
 		'datamachine_execute_step',
-		function ( $job_id, string $flow_step_id, $operation_generation = 0, $operation_claim_token = '' ) {
-			$ability = wp_get_ability( 'datamachine/execute-step' );
-			if ( $ability ) {
-				$ability->execute(
-					array(
-						'job_id'               => (int) $job_id,
-						'flow_step_id'          => $flow_step_id,
-						'operation_generation' => is_numeric( $operation_generation ) ? (int) $operation_generation : 0,
-						'operation_claim_token' => is_string( $operation_claim_token ) ? $operation_claim_token : '',
-					)
-				);
-			}
-		},
+		'datamachine_execute_step_action',
+		10,
+		4
+	);
+
+	/** Dedicated resume bridge avoids collision with the running execute action. */
+	add_action(
+		'datamachine_resume_ai_step',
+		'datamachine_execute_step_action',
 		10,
 		4
 	);

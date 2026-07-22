@@ -10,8 +10,9 @@ namespace DataMachine\Engine\AI;
 defined( 'ABSPATH' ) || exit;
 
 class AIConcurrencyBackpressure {
-	private const EXECUTE_STEP_HOOK = 'datamachine_execute_step';
-	private const SCHEDULER_GROUP   = 'data-machine';
+	public const RESUME_HOOK = 'datamachine_resume_ai_step';
+
+	private const RESUME_GROUP_PREFIX = 'data-machine-ai-resume-';
 
 	/**
 	 * Resolve the next durable contention state.
@@ -69,11 +70,12 @@ class AIConcurrencyBackpressure {
 			);
 		}
 
+		$group     = self::continuationGroup( $args );
 		$scheduled = as_schedule_single_action(
 			$timestamp,
-			self::EXECUTE_STEP_HOOK,
+			self::RESUME_HOOK,
 			$args,
-			self::SCHEDULER_GROUP,
+			$group,
 			true
 		);
 		$action_id = is_numeric( $scheduled ) ? (int) $scheduled : 0;
@@ -85,12 +87,21 @@ class AIConcurrencyBackpressure {
 			);
 		}
 
-		$action_id = self::pendingContinuationId( $args );
+		$action_id = self::pendingContinuationId( $args, $group );
 		return array(
 			'success'   => $action_id > 0,
 			'action_id' => $action_id,
 			'reused'    => $action_id > 0,
 		);
+	}
+
+	/** Resolve the Action Scheduler uniqueness scope for one job/step. */
+	public static function continuationGroup( array $args ): string {
+		$job_id       = max( 0, (int) ( $args['job_id'] ?? 0 ) );
+		$flow_step_id = (string) ( $args['flow_step_id'] ?? '' );
+		$scope        = $job_id . ':' . $flow_step_id;
+
+		return self::RESUME_GROUP_PREFIX . $job_id . '-' . substr( hash( 'sha256', $scope ), 0, 16 );
 	}
 
 	/**
@@ -115,16 +126,16 @@ class AIConcurrencyBackpressure {
 		);
 	}
 
-	private static function pendingContinuationId( array $args ): int {
+	private static function pendingContinuationId( array $args, string $group ): int {
 		if ( ! function_exists( 'as_get_scheduled_actions' ) ) {
 			return 0;
 		}
 
 		$action_ids = as_get_scheduled_actions(
 			array(
-				'hook'     => self::EXECUTE_STEP_HOOK,
+				'hook'     => self::RESUME_HOOK,
 				'args'     => $args,
-				'group'    => self::SCHEDULER_GROUP,
+				'group'    => $group,
 				'status'   => 'pending',
 				'per_page' => 1,
 			),

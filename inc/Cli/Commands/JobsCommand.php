@@ -579,7 +579,8 @@ class JobsCommand extends BaseCommand {
 		$updated = 0;
 
 		foreach ( $rows as $row ) {
-			$target_status = $this->resolve_reconciled_job_status( $row );
+			$plan          = $this->resolve_reconciled_job_plan( $row );
+			$target_status = $plan['target_status'];
 			if ( '' === $target_status ) {
 				continue;
 			}
@@ -594,7 +595,7 @@ class JobsCommand extends BaseCommand {
 			);
 
 			$reconciled = false;
-			if ( ! $dry_run && LegacyAIConcurrencyReconciler::TARGET_STATUS === $target_status ) {
+			if ( ! $dry_run && 'legacy_ai_concurrency' === $plan['strategy'] ) {
 				$transition             = ( new LegacyAIConcurrencyReconciler() )->reconcile( (int) $row['job_id'] );
 				$reconciled             = ! empty( $transition['success'] );
 				$item['reconciliation'] = $transition['reconciliation'] ?? array();
@@ -655,6 +656,10 @@ class JobsCommand extends BaseCommand {
 	 * @return string Corrected status, or empty string when the row is not safe to repair.
 	 */
 	private function resolve_reconciled_job_status( array $row ): string {
+		if ( LegacyAIConcurrencyReconciler::SOURCE_STATUS === (string) ( $row['status'] ?? '' ) ) {
+			return LegacyAIConcurrencyReconciler::TARGET_STATUS;
+		}
+
 		$engine_data = $this->decode_job_engine_data( $row['engine_data'] ?? null );
 
 		$job_status = isset( $engine_data['job_status'] ) ? (string) $engine_data['job_status'] : '';
@@ -674,11 +679,21 @@ class JobsCommand extends BaseCommand {
 			return 'completed';
 		}
 
-		if ( LegacyAIConcurrencyReconciler::SOURCE_STATUS === (string) ( $row['status'] ?? '' ) ) {
-			return LegacyAIConcurrencyReconciler::TARGET_STATUS;
-		}
-
 		return '';
+	}
+
+	/**
+	 * Resolve both the target and the only authorized transition mechanism.
+	 *
+	 * @return array{target_status:string,strategy:string}
+	 */
+	private function resolve_reconciled_job_plan( array $row ): array {
+		$is_legacy_contention = LegacyAIConcurrencyReconciler::SOURCE_STATUS === (string) ( $row['status'] ?? '' );
+
+		return array(
+			'target_status' => $this->resolve_reconciled_job_status( $row ),
+			'strategy'      => $is_legacy_contention ? 'legacy_ai_concurrency' : 'terminal_transition',
+		);
 	}
 
 	/**
@@ -900,72 +915,15 @@ class JobsCommand extends BaseCommand {
 		$job_id  = (int) ( $job['job_id'] ?? 0 );
 		$actions = $this->get_job_scheduler_actions( $job_id );
 
-		$pending     = array_values( array_filter( $actions, fn( $action ) => 'pending' === ( $action['status'] ?? '' ) ) );
-		$in_progress = array_values( array_filter( $actions, fn( $action ) => 'in-progress' === ( $action['status'] ?? '' ) ) );
-		$complete    = array_values( array_filter( $actions, fn( $action ) => 'complete' === ( $action['status'] ?? '' ) ) );
-		$failed      = array_values( array_filter( $actions, fn( $action ) => 'failed' === ( $action['status'] ?? '' ) ) );
-
-		$oldest_pending      = $this->oldest_action_datetime( $pending, 'scheduled_date_gmt' );
-		$oldest_in_progress  = $this->oldest_action_datetime( $in_progress, 'scheduled_date_gmt' );
-		$latest_attempt      = $this->latest_action_datetime( $actions, 'last_attempt_gmt' );
-		$oldest_pending_age  = $this->minutes_since( $oldest_pending );
-		$oldest_progress_age = $this->minutes_since( $oldest_in_progress );
-
 		$engine_data = json_decode( (string) ( $job['engine_data'] ?? '' ), true );
 		if ( ! is_array( $engine_data ) ) {
 			$engine_data = array();
 		}
 
-		$child_counts    = ! empty( $engine_data['batch'] ) ? $this->get_child_status_counts( $job_id ) : array();
-		$active_children = (int) ( $child_counts['active'] ?? 0 );
-		$total_children  = (int) ( $child_counts['total'] ?? 0 );
-		$batch_total     = (int) ( $engine_data['batch_total'] ?? 0 );
-		$throttle        = is_array( $engine_data['ai_concurrency_throttle'] ?? null ) ? $engine_data['ai_concurrency_throttle'] : array();
-		$first_deferred  = strtotime( (string) ( $throttle['first_deferred_at'] ?? '' ) );
-		$defer_age       = false === $first_deferred ? (int) ( $throttle['defer_age_seconds'] ?? 0 ) : max( 0, time() - $first_deferred );
+		$job['engine_data'] = $engine_data;
+		$child_counts       = ! empty( $engine_data['batch'] ) ? $this->get_child_status_counts( $job_id ) : array();
 
-		if ( ! empty( $in_progress ) && $oldest_progress_age > $overdue_minutes ) {
-			$classification = 'stale_in_progress';
-		} elseif ( ! empty( $in_progress ) ) {
-			$classification = 'active_processing';
-		} elseif ( ! empty( $pending ) && $oldest_pending_age > $overdue_minutes ) {
-			$classification = 'scheduler_starved';
-		} elseif ( ! empty( $throttle ) && 'deferred' === ( $throttle['state'] ?? 'deferred' ) && ! empty( $pending ) ) {
-			$classification = 'ai_concurrency_deferred';
-		} elseif ( ! empty( $pending ) ) {
-			$classification = 'queued_next_step';
-		} elseif ( $active_children > 0 || ( $batch_total > 0 && $total_children < $batch_total ) ) {
-			$classification = 'waiting_children';
-		} else {
-			$classification = 'no_scheduler_path';
-		}
-
-		$last_activity = $engine_data['run_metrics']['last_activity_at'] ?? null;
-
-		return array(
-			'id'                  => $job_id,
-			'flow_id'             => (string) ( $job['flow_id'] ?? '' ),
-			'pipeline_id'         => (string) ( $job['pipeline_id'] ?? '' ),
-			'agent_id'            => isset( $job['agent_id'] ) ? (int) $job['agent_id'] : null,
-			'classification'      => $classification,
-			'created_at'          => (string) ( $job['created_at'] ?? '' ),
-			'age_hours'           => round( $this->minutes_since( (string) ( $job['created_at'] ?? '' ) ) / 60, 1 ),
-			'last_activity_at'    => is_string( $last_activity ) ? $last_activity : '',
-			'defer_count'         => max( 0, (int) ( $throttle['attempts'] ?? 0 ) ),
-			'defer_age_seconds'   => $defer_age,
-			'contention_active'   => ! empty( $throttle ) && 'deferred' === ( $throttle['state'] ?? 'deferred' ),
-			'contention_provider' => (string) ( $throttle['provider'] ?? '' ),
-			'pending_actions'     => count( $pending ),
-			'in_progress_actions' => count( $in_progress ),
-			'complete_actions'    => count( $complete ),
-			'failed_actions'      => count( $failed ),
-			'child_jobs'          => $total_children,
-			'active_children'     => $active_children,
-			'batch_total'         => $batch_total,
-			'oldest_pending'      => $oldest_pending,
-			'oldest_in_progress'  => $oldest_in_progress,
-			'latest_attempt'      => $latest_attempt,
-		);
+		return JobLivenessClassifier::diagnose( $job, $actions, $child_counts, $overdue_minutes, time() );
 	}
 
 	/**
@@ -990,10 +948,11 @@ class JobsCommand extends BaseCommand {
 			$wpdb->prepare(
 				"SELECT action_id, hook, status, scheduled_date_gmt, last_attempt_gmt, attempts, args
 				 FROM {$actions_table}
-				 WHERE hook IN (%s, %s)
+				 WHERE hook IN (%s, %s, %s)
 				 AND (args LIKE %s OR args LIKE %s)
 				 ORDER BY action_id ASC",
 				'datamachine_execute_step',
+				'datamachine_resume_ai_step',
 				PipelineBatchScheduler::BATCH_HOOK,
 				$like_job_id,
 				$like_parent_job_id
@@ -1097,61 +1056,6 @@ class JobsCommand extends BaseCommand {
 		}
 
 		return 0;
-	}
-
-	/**
-	 * Get the oldest non-empty action datetime for a field.
-	 *
-	 * @param array<int,array<string,mixed>> $actions Action rows.
-	 * @param string                         $field Field name.
-	 * @return string Datetime or empty string.
-	 */
-	private function oldest_action_datetime( array $actions, string $field ): string {
-		$values = array_filter( array_map( fn( $action ) => (string) ( $action[ $field ] ?? '' ), $actions ), array( $this, 'is_real_datetime' ) );
-		sort( $values );
-		return $values[0] ?? '';
-	}
-
-	/**
-	 * Get the latest non-empty action datetime for a field.
-	 *
-	 * @param array<int,array<string,mixed>> $actions Action rows.
-	 * @param string                         $field Field name.
-	 * @return string Datetime or empty string.
-	 */
-	private function latest_action_datetime( array $actions, string $field ): string {
-		$values = array_filter( array_map( fn( $action ) => (string) ( $action[ $field ] ?? '' ), $actions ), array( $this, 'is_real_datetime' ) );
-		rsort( $values );
-		return $values[0] ?? '';
-	}
-
-	/**
-	 * Whether a datetime string represents a real Action Scheduler timestamp.
-	 *
-	 * @param string $datetime Datetime string.
-	 * @return bool
-	 */
-	private function is_real_datetime( string $datetime ): bool {
-		return '' !== $datetime && '0000-00-00 00:00:00' !== $datetime;
-	}
-
-	/**
-	 * Minutes since a GMT datetime.
-	 *
-	 * @param string $datetime GMT datetime.
-	 * @return int Minutes elapsed, or 0 for empty/invalid dates.
-	 */
-	private function minutes_since( string $datetime ): int {
-		if ( ! $this->is_real_datetime( $datetime ) ) {
-			return 0;
-		}
-
-		$timestamp = strtotime( $datetime . ' UTC' );
-		if ( false === $timestamp ) {
-			return 0;
-		}
-
-		return max( 0, (int) floor( ( time() - $timestamp ) / 60 ) );
 	}
 
 	/**
