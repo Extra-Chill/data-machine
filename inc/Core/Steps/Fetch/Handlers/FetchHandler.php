@@ -129,11 +129,16 @@ abstract class FetchHandler {
 	 */
 	private function filterProcessed( array $items, ExecutionContext $context ): array {
 		$identifiers = array();
+		$candidates  = array();
 		foreach ( $items as $item ) {
 			if ( ! is_array( $item ) ) {
 				continue;
 			}
 			$item_identifier = $item['metadata']['item_identifier'] ?? null;
+			$candidates[]    = array(
+				'item'            => $item,
+				'item_identifier' => $item_identifier,
+			);
 			if ( null !== $item_identifier && '' !== $item_identifier ) {
 				$identifiers[] = (string) $item_identifier;
 			}
@@ -144,12 +149,9 @@ abstract class FetchHandler {
 		$decision_index = 0;
 		$result         = array();
 
-		foreach ( $items as $item ) {
-			if ( ! is_array( $item ) ) {
-				continue;
-			}
-
-			$item_identifier = $item['metadata']['item_identifier'] ?? null;
+		foreach ( $candidates as $candidate ) {
+			$item            = $candidate['item'];
+			$item_identifier = $candidate['item_identifier'];
 
 			// No item_identifier — pass through.
 			if ( null === $item_identifier || '' === $item_identifier ) {
