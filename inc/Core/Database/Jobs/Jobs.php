@@ -32,6 +32,12 @@ class Jobs extends BaseRepository {
 
 	const TABLE_NAME = 'datamachine_jobs';
 
+	private const TERMINAL_ACCOUNTING_COMMITTED_HOOK = 1;
+	private const TERMINAL_ACCOUNTING_METRICS        = 2;
+	private const TERMINAL_ACCOUNTING_COMPLETE_HOOK  = 4;
+	private const TERMINAL_ACCOUNTING_LIFECYCLE      = 8;
+	public const TERMINAL_ACCOUNTING_COMPLETE        = 15;
+
 	/** Job currently owning the connection-wide terminal transaction. */
 	private static ?int $terminalizing_job = null;
 
@@ -462,7 +468,7 @@ class Jobs extends BaseRepository {
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		$updated = $this->wpdb->query(
 			$this->wpdb->prepare(
-				"UPDATE %i SET status = 'pending', completed_at = NULL, operation_state = 'preparing', operation_claimed_at = NULL, operation_claim_token = NULL, operation_action_id = NULL WHERE job_id = %d AND status LIKE 'failed%'",
+				"UPDATE %i SET status = 'pending', completed_at = NULL, terminal_accounting_state = NULL, operation_state = 'preparing', operation_claimed_at = NULL, operation_claim_token = NULL, operation_action_id = NULL WHERE job_id = %d AND status LIKE 'failed%'",
 				$this->table_name,
 				$job_id
 			)
@@ -629,6 +635,41 @@ class Jobs extends BaseRepository {
 		return (int) $this->wpdb->get_var( $query );
 	}
 
+	/** Count terminal jobs whose durable post-commit accounting is incomplete. */
+	public function count_incomplete_terminal_accounting( array $args = array() ): int {
+		$where_parts  = $this->build_jobs_summary_where( $args, 'j' );
+		$where_sql    = '' === $where_parts['sql'] ? 'WHERE' : $where_parts['sql'] . ' AND';
+		$where_values = $where_parts['values'];
+		$query_args   = array_merge( array( $this->table_name ), $where_values, array( self::TERMINAL_ACCOUNTING_COMPLETE ) );
+		$query        = $this->wpdb->prepare(
+			"SELECT COUNT(j.job_id) FROM %i j {$where_sql} j.terminal_accounting_state IS NOT NULL AND j.terminal_accounting_state < %d",
+			...$query_args
+		);
+
+		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- Fully prepared bounded aggregate on plugin-owned table.
+		return (int) $this->wpdb->get_var( $query );
+	}
+
+	/**
+	 * Get a bounded batch of terminal jobs needing post-commit accounting.
+	 *
+	 * @return array<int,array<string,mixed>>
+	 */
+	public function get_incomplete_terminal_accounting( int $limit = 100 ): array {
+		$limit = max( 1, min( 5000, $limit ) );
+		$query = $this->wpdb->prepare(
+			'SELECT job_id, status, completed_at, terminal_accounting_state FROM %i WHERE terminal_accounting_state IS NOT NULL AND terminal_accounting_state < %d ORDER BY job_id ASC LIMIT %d',
+			$this->table_name,
+			self::TERMINAL_ACCOUNTING_COMPLETE,
+			$limit
+		);
+
+		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- Fully prepared bounded query on plugin-owned table.
+		$rows = $this->wpdb->get_results( $query, ARRAY_A );
+
+		return is_array( $rows ) ? $rows : array();
+	}
+
 	/**
 	 * Get memory-safe aggregate job summary counts.
 	 *
@@ -644,14 +685,15 @@ class Jobs extends BaseRepository {
 		$where_values = $where_parts['values'];
 
 		return array(
-			'total'                  => $this->get_jobs_count( $args ),
-			'failed_count'           => $this->get_jobs_count( array_merge( $args, array( 'status' => 'failed' ) ) ),
-			'stuck_processing_count' => $this->get_stuck_processing_count( $args ),
-			'status'                 => $this->get_status_summary_rows( $where_sql, $where_values ),
-			'pipeline'               => $this->get_pipeline_summary_rows( $where_sql, $where_values ),
-			'flow'                   => $this->get_flow_summary_rows( $where_sql, $where_values ),
-			'handler'                => $this->get_handler_summary_rows( $args, $where_sql, $where_values ),
-			'filters'                => $this->summarize_job_filters( $args ),
+			'total'                                => $this->get_jobs_count( $args ),
+			'failed_count'                         => $this->get_jobs_count( array_merge( $args, array( 'status' => 'failed' ) ) ),
+			'stuck_processing_count'               => $this->get_stuck_processing_count( $args ),
+			'incomplete_terminal_accounting_count' => $this->count_incomplete_terminal_accounting( $args ),
+			'status'                               => $this->get_status_summary_rows( $where_sql, $where_values ),
+			'pipeline'                             => $this->get_pipeline_summary_rows( $where_sql, $where_values ),
+			'flow'                                 => $this->get_flow_summary_rows( $where_sql, $where_values ),
+			'handler'                              => $this->get_handler_summary_rows( $args, $where_sql, $where_values ),
+			'filters'                              => $this->summarize_job_filters( $args ),
 		);
 	}
 
@@ -1878,7 +1920,7 @@ class Jobs extends BaseRepository {
 	 *
 	 * Non-terminal jobs may move to another non-terminal state or to a terminal
 	 * state. Terminal jobs are immutable; repeating the same terminal state is an
-	 * idempotent success and does not run terminal side effects again.
+	 * idempotent success that replays only missing post-commit accounting stages.
 	 *
 	 * @param int    $job_id        The job ID.
 	 * @param string $status        The new status.
@@ -2015,10 +2057,12 @@ class Jobs extends BaseRepository {
 		$current_status = is_string( $job['status'] ?? null ) ? $job['status'] : '';
 		if ( $current_status === $requested_status ) {
 			$this->rollback_terminal_transition( $job_id );
+			$this->reconcile_terminal_accounting( $job_id );
 			return $this->status_transition_result( true, false, $current_status, $current_status );
 		}
 		if ( JobStatus::isStatusFinal( $current_status ) ) {
 			$this->rollback_terminal_transition( $job_id );
+			$this->reconcile_terminal_accounting( $job_id );
 			return $this->status_transition_result( false, false, $current_status, $current_status );
 		}
 
@@ -2082,14 +2126,15 @@ class Jobs extends BaseRepository {
 		$updated = $this->wpdb->update(
 			$this->table_name,
 			array(
-				'status'       => $status,
-				'completed_at' => current_time( 'mysql', true ),
+				'status'                    => $status,
+				'completed_at'              => current_time( 'mysql', true ),
+				'terminal_accounting_state' => 0,
 			),
 			array(
 				'job_id' => $job_id,
 				'status' => $current_status,
 			),
-			array( '%s', '%s' ),
+			array( '%s', '%s', '%d' ),
 			array( '%d', '%s' )
 		);
 		if ( 1 !== $updated ) {
@@ -2110,12 +2155,124 @@ class Jobs extends BaseRepository {
 			return $this->status_transition_result( $status === $winner_status, false, $winner_status, $winner_status );
 		}
 
-		do_action( 'datamachine_job_terminal_committed', $job_id, $status );
-		RunMetrics::complete( $job_id, $status );
-		do_action( 'datamachine_job_complete', $job_id, $status );
-		( new RunLifecycleStore( $this ) )->mark_job_status( $job_id, $status );
+		$this->reconcile_terminal_accounting( $job_id );
 
 		return $this->status_transition_result( true, true, $current_status, $status );
+	}
+
+	/**
+	 * Replay missing terminal post-commit accounting stages.
+	 *
+	 * Internal stores are idempotent and receive their bit after success. Hook
+	 * dispatches claim their bit first, giving arbitrary external listeners an
+	 * honest at-most-once contract: process death between the claim and callback
+	 * invocation can lose delivery, but replay never duplicates notifications.
+	 *
+	 * @return array{success:bool,job_id:int,status:?string,state:?int,complete:bool}
+	 */
+	public function reconcile_terminal_accounting( int $job_id ): array {
+		$job    = $this->get_job( $job_id );
+		$status = is_array( $job ) && is_string( $job['status'] ?? null ) ? $job['status'] : null;
+		$state  = is_array( $job ) && null !== ( $job['terminal_accounting_state'] ?? null ) ? (int) $job['terminal_accounting_state'] : null;
+
+		if ( null === $status || ! JobStatus::isStatusFinal( $status ) || null === $state ) {
+			return $this->terminal_accounting_result( false, $job_id, $status, $state );
+		}
+
+		if ( ! $this->terminal_accounting_has_bit( $job_id, self::TERMINAL_ACCOUNTING_COMMITTED_HOOK ) ) {
+			$this->maybe_interrupt_terminal_accounting( $job_id, $status, 'before', 'terminal_committed_hook' );
+			if ( $this->claim_terminal_accounting_bit( $job_id, self::TERMINAL_ACCOUNTING_COMMITTED_HOOK ) ) {
+				do_action( 'datamachine_job_terminal_committed', $job_id, $status );
+				$this->maybe_interrupt_terminal_accounting( $job_id, $status, 'after', 'terminal_committed_hook' );
+			}
+		}
+
+		if ( ! $this->terminal_accounting_has_bit( $job_id, self::TERMINAL_ACCOUNTING_METRICS ) ) {
+			$this->maybe_interrupt_terminal_accounting( $job_id, $status, 'before', 'run_metrics' );
+			if ( ! RunMetrics::complete( $job_id, $status ) ) {
+				return $this->terminal_accounting_result( false, $job_id, $status, $this->get_terminal_accounting_state( $job_id ) );
+			}
+			$this->maybe_interrupt_terminal_accounting( $job_id, $status, 'after', 'run_metrics' );
+			if ( ! $this->claim_terminal_accounting_bit( $job_id, self::TERMINAL_ACCOUNTING_METRICS ) && ! $this->terminal_accounting_has_bit( $job_id, self::TERMINAL_ACCOUNTING_METRICS ) ) {
+				return $this->terminal_accounting_result( false, $job_id, $status, $this->get_terminal_accounting_state( $job_id ) );
+			}
+		}
+
+		if ( ! $this->terminal_accounting_has_bit( $job_id, self::TERMINAL_ACCOUNTING_COMPLETE_HOOK ) ) {
+			$this->maybe_interrupt_terminal_accounting( $job_id, $status, 'before', 'job_complete_hook' );
+			if ( $this->claim_terminal_accounting_bit( $job_id, self::TERMINAL_ACCOUNTING_COMPLETE_HOOK ) ) {
+				do_action( 'datamachine_job_complete', $job_id, $status );
+				$this->maybe_interrupt_terminal_accounting( $job_id, $status, 'after', 'job_complete_hook' );
+			}
+		}
+
+		if ( ! $this->terminal_accounting_has_bit( $job_id, self::TERMINAL_ACCOUNTING_LIFECYCLE ) ) {
+			$this->maybe_interrupt_terminal_accounting( $job_id, $status, 'before', 'run_lifecycle' );
+			if ( ! ( new RunLifecycleStore( $this ) )->mark_job_status( $job_id, $status ) ) {
+				return $this->terminal_accounting_result( false, $job_id, $status, $this->get_terminal_accounting_state( $job_id ) );
+			}
+			$this->maybe_interrupt_terminal_accounting( $job_id, $status, 'after', 'run_lifecycle' );
+			if ( ! $this->claim_terminal_accounting_bit( $job_id, self::TERMINAL_ACCOUNTING_LIFECYCLE ) && ! $this->terminal_accounting_has_bit( $job_id, self::TERMINAL_ACCOUNTING_LIFECYCLE ) ) {
+				return $this->terminal_accounting_result( false, $job_id, $status, $this->get_terminal_accounting_state( $job_id ) );
+			}
+		}
+
+		$state = $this->get_terminal_accounting_state( $job_id );
+		return $this->terminal_accounting_result( self::TERMINAL_ACCOUNTING_COMPLETE === $state, $job_id, $status, $state );
+	}
+
+	/** Atomically claim one accounting receipt bit. */
+	private function claim_terminal_accounting_bit( int $job_id, int $bit ): bool {
+		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared -- The query is prepared immediately below with typed placeholders.
+		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Table identifier and scalar values use typed placeholders.
+		$query = $this->wpdb->prepare(
+			'UPDATE %i SET terminal_accounting_state = terminal_accounting_state | %d WHERE job_id = %d AND terminal_accounting_state IS NOT NULL AND (terminal_accounting_state & %d) = 0',
+			$this->table_name,
+			$bit,
+			$job_id,
+			$bit
+		);
+		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- Fully prepared atomic receipt claim.
+		$claimed = 1 === (int) $this->wpdb->query( $query );
+		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
+		return $claimed;
+	}
+
+	private function terminal_accounting_has_bit( int $job_id, int $bit ): bool {
+		$state = $this->get_terminal_accounting_state( $job_id );
+		// phpcs:ignore WordPress.PHP.YodaConditions.NotYoda -- Bitmask expression is clearest with the requested bit first.
+		return null !== $state && $bit === ( $state & $bit );
+	}
+
+	private function get_terminal_accounting_state( int $job_id ): ?int {
+		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared -- The query is prepared immediately below with typed placeholders.
+		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Table identifier and job ID use typed placeholders.
+		$query = $this->wpdb->prepare( 'SELECT terminal_accounting_state FROM %i WHERE job_id = %d', $this->table_name, $job_id );
+		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- Fully prepared fresh receipt read.
+		$state = $this->wpdb->get_var( $query );
+		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
+
+		return null === $state ? null : (int) $state;
+	}
+
+	/** Deterministic interruption seam for post-commit boundary tests. */
+	private function maybe_interrupt_terminal_accounting( int $job_id, string $status, string $phase, string $stage ): void {
+		$interrupt = apply_filters( 'datamachine_job_terminal_accounting_interrupt', false, $phase . ':' . $stage, $job_id, $status );
+		if ( $interrupt ) {
+			// phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- Internal fixed stage names are diagnostic data, not rendered output.
+			throw new \RuntimeException( sprintf( 'Terminal accounting interrupted at %s:%s', $phase, $stage ) );
+		}
+	}
+
+	/** Build a machine-readable terminal accounting result. */
+	private function terminal_accounting_result( bool $success, int $job_id, ?string $status, ?int $state ): array {
+		return array(
+			'success'  => $success,
+			'job_id'   => $job_id,
+			'status'   => $status,
+			'state'    => $state,
+			'complete' => self::TERMINAL_ACCOUNTING_COMPLETE === $state,
+		);
 	}
 
 	/**
@@ -2371,6 +2528,7 @@ class Jobs extends BaseRepository {
 			operation_claim_token varchar(64) NULL DEFAULT NULL,
 			operation_generation bigint(20) unsigned NOT NULL DEFAULT 0,
 			operation_action_id bigint(20) unsigned NULL DEFAULT NULL,
+			terminal_accounting_state tinyint unsigned NULL DEFAULT NULL,
             created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
             completed_at datetime NULL DEFAULT NULL,
             PRIMARY KEY  (job_id),
@@ -2383,7 +2541,8 @@ class Jobs extends BaseRepository {
             KEY idx_created_at (created_at),
             KEY idx_flow_created (flow_id, created_at),
             KEY idx_status_created (status(50), created_at),
-            KEY idx_source_created (source, created_at),
+			KEY idx_source_created (source, created_at),
+			KEY idx_terminal_accounting (terminal_accounting_state, job_id),
             UNIQUE KEY idx_idempotency_key (idempotency_key)
         ) $charset_collate;";
 
@@ -2394,6 +2553,7 @@ class Jobs extends BaseRepository {
 		self::migrate_handler_slug_column( $table_name );
 		self::migrate_idempotency_key_column( $table_name );
 		self::migrate_operation_columns( $table_name );
+		self::migrate_terminal_accounting_column( $table_name );
 		self::migrate_indexes( $table_name );
 
 		do_action(
@@ -2825,13 +2985,13 @@ class Jobs extends BaseRepository {
 		global $wpdb;
 
 		$columns = array(
-			'request_fingerprint'  => 'char(64) NULL DEFAULT NULL',
-			'operation_state'      => 'varchar(32) NULL DEFAULT NULL',
-			'operation_step_id'    => 'varchar(191) NULL DEFAULT NULL',
-			'operation_claimed_at' => 'datetime NULL DEFAULT NULL',
+			'request_fingerprint'   => 'char(64) NULL DEFAULT NULL',
+			'operation_state'       => 'varchar(32) NULL DEFAULT NULL',
+			'operation_step_id'     => 'varchar(191) NULL DEFAULT NULL',
+			'operation_claimed_at'  => 'datetime NULL DEFAULT NULL',
 			'operation_claim_token' => 'varchar(64) NULL DEFAULT NULL',
-			'operation_generation' => 'bigint(20) unsigned NOT NULL DEFAULT 0',
-			'operation_action_id'  => 'bigint(20) unsigned NULL DEFAULT NULL',
+			'operation_generation'  => 'bigint(20) unsigned NOT NULL DEFAULT 0',
+			'operation_action_id'   => 'bigint(20) unsigned NULL DEFAULT NULL',
 		);
 
 		foreach ( $columns as $column => $definition ) {
@@ -2842,6 +3002,24 @@ class Jobs extends BaseRepository {
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.SchemaChange,WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Fixed schema identifiers and definitions.
 			$wpdb->query( "ALTER TABLE {$table_name} ADD COLUMN {$column} {$definition}" );
 		}
+	}
+
+	/** Add the terminal post-commit receipt column. */
+	private static function migrate_terminal_accounting_column( string $table_name ): void {
+		global $wpdb;
+
+		if ( ! BaseRepository::column_exists( $table_name, 'terminal_accounting_state', $wpdb ) ) {
+			// phpcs:disable WordPress.DB.PreparedSQL -- Fixed plugin-owned schema identifier and integer constant.
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.SchemaChange
+			$added = $wpdb->query( "ALTER TABLE {$table_name} ADD COLUMN terminal_accounting_state tinyint unsigned NULL DEFAULT NULL" );
+			if ( false === $added ) {
+				return;
+			}
+		}
+
+		// NULL deliberately means pre-receipt or non-terminal. Legacy terminals
+		// cannot safely replay arbitrary hooks, so only new state-0 rows reconcile.
+		self::ensure_jobs_index( $table_name, 'idx_terminal_accounting', 'INDEX', '(terminal_accounting_state, job_id)' );
 	}
 
 	/**
@@ -2901,11 +3079,12 @@ class Jobs extends BaseRepository {
 		$index_names = array_unique( array_column( $existing, 'Key_name' ) );
 
 		$indexes_to_add = array(
-			'idx_created_at'     => '(created_at)',
-			'idx_flow_created'   => '(flow_id, created_at)',
-			'idx_status_created' => '(status(50), created_at)',
-			'idx_source_created' => '(source, created_at)',
-			'idx_handler_slug'   => '(handler_slug)',
+			'idx_created_at'          => '(created_at)',
+			'idx_flow_created'        => '(flow_id, created_at)',
+			'idx_status_created'      => '(status(50), created_at)',
+			'idx_source_created'      => '(source, created_at)',
+			'idx_handler_slug'        => '(handler_slug)',
+			'idx_terminal_accounting' => '(terminal_accounting_state, job_id)',
 		);
 
 		$added = array();

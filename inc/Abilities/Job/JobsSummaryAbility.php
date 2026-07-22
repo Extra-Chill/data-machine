@@ -131,10 +131,11 @@ class JobsSummaryAbility {
 	 */
 	private function getCompactSummary( array $filters ): array {
 		return array(
-			'total'                  => $this->db_jobs->get_jobs_count( $filters ),
-			'failed_count'           => $this->db_jobs->get_jobs_count( array_merge( $filters, array( 'status' => 'failed' ) ) ),
-			'stuck_processing_count' => 0,
-			'status'                 => array(
+			'total'                                => $this->db_jobs->get_jobs_count( $filters ),
+			'failed_count'                         => $this->db_jobs->get_jobs_count( array_merge( $filters, array( 'status' => 'failed' ) ) ),
+			'stuck_processing_count'               => 0,
+			'incomplete_terminal_accounting_count' => $this->db_jobs->count_incomplete_terminal_accounting( $filters ),
+			'status'                               => array(
 				array(
 					'status' => 'processing',
 					'count'  => $this->db_jobs->get_jobs_count( array_merge( $filters, array( 'status' => 'processing' ) ) ),
@@ -148,10 +149,10 @@ class JobsSummaryAbility {
 					'count'  => $this->db_jobs->get_jobs_count( array_merge( $filters, array( 'status' => 'failed' ) ) ),
 				),
 			),
-			'pipeline'               => array(),
-			'flow'                   => array(),
-			'handler'                => array(),
-			'filters'                => $filters,
+			'pipeline'                             => array(),
+			'flow'                                 => array(),
+			'handler'                              => array(),
+			'filters'                              => $filters,
 		);
 	}
 }

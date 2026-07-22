@@ -230,6 +230,9 @@ class RunLifecycleStore {
 		$result = $this->mutate_run(
 			$job_id,
 			function ( array $meta ) use ( $status ): array {
+				if ( $status === ( $meta['status'] ?? null ) && ( ! JobStatus::isStatusFinal( $status ) || ! empty( $meta['completed_at'] ) ) ) {
+					return $meta;
+				}
 				$meta['status']     = $status;
 				$meta['updated_at'] = $this->now();
 				if ( JobStatus::isStatusFinal( $status ) ) {

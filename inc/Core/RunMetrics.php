@@ -188,6 +188,9 @@ class RunMetrics {
 			$job_id,
 			static function ( array $engine ) use ( $status, $job_id ): array {
 				$metrics = self::normalize( $engine[ self::KEY ] ?? array() );
+				if ( $status === $metrics['terminal_status'] && ! empty( $metrics['completed_at'] ) && is_array( $engine[ self::RUN_RESULT_KEY ] ?? null ) ) {
+					return $engine;
+				}
 				$now     = self::now();
 
 				if ( empty( $metrics['started_at'] ) ) {
