@@ -416,7 +416,7 @@ class Venue_Taxonomy {
 				$venues,
 				static fn( $venue ) => $normalized_name === self::normalize_venue_name_for_matching( $venue->name )
 			);
-		$tiers = array(
+		$tiers                 = array(
 			array_filter(
 				$venues,
 				static fn( $venue ) => 0 === strcasecmp( trim( $venue->name ), trim( $venue_name ) )
@@ -427,7 +427,7 @@ class Venue_Taxonomy {
 			),
 			$normalized_candidates,
 		);
-		$had_candidates = false;
+		$had_candidates        = false;
 
 		foreach ( $tiers as $candidates ) {
 			if ( empty( $candidates ) ) {

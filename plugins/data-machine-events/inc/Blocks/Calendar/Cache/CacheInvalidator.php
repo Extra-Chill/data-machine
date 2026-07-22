@@ -130,7 +130,7 @@ class CacheInvalidator {
 			return;
 		}
 
-		$key = self::relationship_key( (int) $post_id, (string) $taxonomy );
+		$key                         = self::relationship_key( (int) $post_id, (string) $taxonomy );
 		self::$added_terms[ $key ]   = self::$added_terms[ $key ] ?? array();
 		self::$added_terms[ $key ][] = (int) $tt_id;
 		self::$added_terms[ $key ]   = self::normalize_term_ids( self::$added_terms[ $key ] );

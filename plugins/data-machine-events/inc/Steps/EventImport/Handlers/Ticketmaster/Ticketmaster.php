@@ -285,8 +285,8 @@ class Ticketmaster extends EventImportHandler {
 					)
 				);
 
-				$venue_metadata = $this->extractVenueMetadata( $standardized_event );
-				$engine_data    = $this->buildEventEngineData( $standardized_event, $venue_metadata );
+				$venue_metadata                 = $this->extractVenueMetadata( $standardized_event );
+				$engine_data                    = $this->buildEventEngineData( $standardized_event, $venue_metadata );
 				$engine_data['item_identifier'] = $item_identifier;
 				$engine_data['source_type']     = 'ticketmaster';
 				$engine_data[ TicketmasterSourceIdentity::ENGINE_KEY ] = array(
@@ -359,17 +359,17 @@ class Ticketmaster extends EventImportHandler {
 			'info',
 			'Ticketmaster: Import fan-out summary',
 			array(
-				'fetched'                 => $fetched_count,
-				'pre_fanout_deduped'      => $pre_fanout_deduped,
-				'unchanged_revisions'     => $unchanged_count,
-				'repeated_source_ids'     => $repeated_source_count,
-				'contended_claims'        => $contended_count,
-				'eligible_before_bound'   => $eligible_count,
-				'overflow'                => $overflow_count,
-				'fanout_limit'            => $fanout_limit,
-				'source_claimed'          => count( $eligible_items ),
-				'packets_ready'           => count( $eligible_items ),
-				'pages_searched'          => $current_page,
+				'fetched'               => $fetched_count,
+				'pre_fanout_deduped'    => $pre_fanout_deduped,
+				'unchanged_revisions'   => $unchanged_count,
+				'repeated_source_ids'   => $repeated_source_count,
+				'contended_claims'      => $contended_count,
+				'eligible_before_bound' => $eligible_count,
+				'overflow'              => $overflow_count,
+				'fanout_limit'          => $fanout_limit,
+				'source_claimed'        => count( $eligible_items ),
+				'packets_ready'         => count( $eligible_items ),
+				'pages_searched'        => $current_page,
 			)
 		);
 

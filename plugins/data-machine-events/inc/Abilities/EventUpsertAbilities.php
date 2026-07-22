@@ -111,11 +111,11 @@ class EventUpsertAbilities {
 		$dates       = \DataMachineEvents\Core\EventDatesTable::get( $post_id );
 
 		return array(
-			'success'   => true,
-			'event_id'  => $post_id,
-			'event_url' => (string) ( $result['data']['post_url'] ?? get_permalink( $post_id ) ),
-			'action'    => (string) $result['data']['action'],
-			'source'    => array(
+			'success'    => true,
+			'event_id'   => $post_id,
+			'event_url'  => (string) ( $result['data']['post_url'] ?? get_permalink( $post_id ) ),
+			'action'     => (string) $result['data']['action'],
+			'source'     => array(
 				'name'     => $source,
 				'id'       => $source_id,
 				'identity' => $event['source_identity'],
@@ -168,10 +168,25 @@ class EventUpsertAbilities {
 			'type'       => 'object',
 			'required'   => array( 'source', 'source_id', 'event' ),
 			'properties' => array(
-				'source'      => array( 'type' => 'string', 'minLength' => 1, 'description' => 'Stable caller/source namespace.' ),
-				'source_id'   => array( 'type' => 'string', 'minLength' => 1, 'description' => 'Stable item ID within the source namespace.' ),
-				'post_status' => array( 'type' => 'string', 'enum' => array( 'draft', 'publish', 'pending', 'private' ), 'default' => 'publish' ),
-				'post_author' => array( 'type' => 'integer', 'minimum' => 1 ),
+				'source'      => array(
+					'type'        => 'string',
+					'minLength'   => 1,
+					'description' => 'Stable caller/source namespace.',
+				),
+				'source_id'   => array(
+					'type'        => 'string',
+					'minLength'   => 1,
+					'description' => 'Stable item ID within the source namespace.',
+				),
+				'post_status' => array(
+					'type'    => 'string',
+					'enum'    => array( 'draft', 'publish', 'pending', 'private' ),
+					'default' => 'publish',
+				),
+				'post_author' => array(
+					'type'    => 'integer',
+					'minimum' => 1,
+				),
 				'event'       => array(
 					'type'       => 'object',
 					'required'   => array( 'title', 'startDate' ),
@@ -182,7 +197,10 @@ class EventUpsertAbilities {
 						'startTime'         => $string,
 						'endDate'           => $string,
 						'endTime'           => $string,
-						'occurrenceDates'   => array( 'type' => 'array', 'items' => $string ),
+						'occurrenceDates'   => array(
+							'type'  => 'array',
+							'items' => $string,
+						),
 						'venue'             => $string,
 						'venueAddress'      => $string,
 						'venueCity'         => $string,
@@ -196,13 +214,19 @@ class EventUpsertAbilities {
 						'venueTimezone'     => $string,
 						'price'             => $string,
 						'priceCurrency'     => $string,
-						'ticketUrl'         => array( 'type' => 'string', 'format' => 'uri' ),
+						'ticketUrl'         => array(
+							'type'   => 'string',
+							'format' => 'uri',
+						),
 						'offerAvailability' => $string,
 						'performer'         => $string,
 						'performerType'     => $string,
 						'organizer'         => $string,
 						'organizerType'     => $string,
-						'organizerUrl'      => array( 'type' => 'string', 'format' => 'uri' ),
+						'organizerUrl'      => array(
+							'type'   => 'string',
+							'format' => 'uri',
+						),
 						'eventStatus'       => $string,
 						'previousStartDate' => $string,
 						'eventType'         => $string,
@@ -220,7 +244,10 @@ class EventUpsertAbilities {
 				'success'    => array( 'type' => 'boolean' ),
 				'event_id'   => array( 'type' => 'integer' ),
 				'event_url'  => array( 'type' => 'string' ),
-				'action'     => array( 'type' => 'string', 'enum' => array( 'created', 'updated', 'no_change' ) ),
+				'action'     => array(
+					'type' => 'string',
+					'enum' => array( 'created', 'updated', 'no_change' ),
+				),
 				'source'     => array(
 					'type'       => 'object',
 					'required'   => array( 'name', 'id', 'identity' ),

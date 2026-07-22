@@ -254,7 +254,7 @@ class EventUpsert extends UpsertHandler {
 		$venueCity        = (string) ( $engine->get( 'venueCity' ) ?? $parameters['venueCity'] ?? '' );
 		$venueState       = (string) ( $engine->get( 'venueState' ) ?? $parameters['venueState'] ?? '' );
 		$venueCountry     = (string) ( $engine->get( 'venueCountry' ) ?? $parameters['venueCountry'] ?? '' );
-		$source_identity   = (string) ( $parameters['source_identity'] ?? '' );
+		$source_identity  = (string) ( $parameters['source_identity'] ?? '' );
 		$existing_post_id = $this->findExistingEventBySourceIdentity( $source_identity );
 		if ( $existing_post_id <= 0 ) {
 			$existing_post_id = (int) $this->findExistingEventViaAbility(
@@ -755,7 +755,7 @@ class EventUpsert extends UpsertHandler {
 	 * @return array Meta key/value pairs.
 	 */
 	private function buildEventMetaInput( array $event_data, array $parameters, EngineData $engine ): array {
-		$meta_input = array();
+		$meta_input      = array();
 		$source_identity = (string) ( $parameters['source_identity'] ?? '' );
 
 		if ( '' !== $source_identity ) {

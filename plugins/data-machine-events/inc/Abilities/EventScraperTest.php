@@ -56,7 +56,7 @@ class EventScraperTest {
 							'required'             => array( 'target_url' ),
 							'additionalProperties' => false,
 							'properties'           => array(
-								'target_url' => array(
+								'target_url'     => array(
 									'type'        => 'string',
 									'format'      => 'uri',
 									'description' => 'Target URL to test. Overrides handler_config.source_url.',
@@ -66,7 +66,10 @@ class EventScraperTest {
 									'description'          => 'Optional persisted universal web scraper config to apply during source extraction.',
 									'additionalProperties' => false,
 									'properties'           => array(
-										'source_url'       => array( 'type' => 'string', 'format' => 'uri' ),
+										'source_url'       => array(
+											'type'   => 'string',
+											'format' => 'uri',
+										),
 										'search'           => array( 'type' => 'string' ),
 										'exclude_keywords' => array( 'type' => 'string' ),
 										'venue'            => array( 'type' => array( 'integer', 'string' ) ),
@@ -94,7 +97,10 @@ class EventScraperTest {
 									'type' => 'string',
 									'enum' => array( 'ok', 'warning', 'error' ),
 								),
-								'target_url'      => array( 'type' => 'string', 'format' => 'uri' ),
+								'target_url'      => array(
+									'type'   => 'string',
+									'format' => 'uri',
+								),
 								'event_data'      => array(
 									'type'                 => 'object',
 									'additionalProperties' => false,
@@ -111,13 +117,16 @@ class EventScraperTest {
 										'venueCity'    => array( 'type' => 'string' ),
 										'venueState'   => array( 'type' => 'string' ),
 										'venueZip'     => array( 'type' => 'string' ),
-										'event_count'  => array( 'type' => 'integer', 'minimum' => 0 ),
+										'event_count'  => array(
+											'type'    => 'integer',
+											'minimum' => 0,
+										),
 										'items'        => array(
 											'type'  => 'array',
 											'items' => array(
-												'type'                 => 'object',
+												'type' => 'object',
 												'additionalProperties' => false,
-												'properties'           => array(
+												'properties' => array(
 													'title'     => array( 'type' => 'string' ),
 													'startDate' => array( 'type' => 'string' ),
 													'startTime' => array( 'type' => 'string' ),
@@ -149,36 +158,74 @@ class EventScraperTest {
 										'context_supplied',
 									),
 									'properties'           => array(
-										'packet_title'              => array( 'type' => 'string' ),
-										'source_type'               => array( 'type' => 'string' ),
-										'extraction_method'         => array( 'type' => 'string' ),
-										'payload_type'              => array( 'type' => 'string', 'enum' => array( 'event', 'raw_html', 'vision_flyer' ) ),
-										'event_count'               => array( 'type' => 'integer', 'minimum' => 0, 'description' => 'Unique structured events extracted from the source.' ),
-										'extracted_packet_count'    => array( 'type' => 'integer', 'minimum' => 0, 'description' => 'All packets returned by direct handler execution before stable-identifier deduplication.' ),
-										'unique_source_event_count' => array( 'type' => 'integer', 'minimum' => 0, 'description' => 'Unique structured events after stable-identifier deduplication.' ),
-										'duplicate_packet_count'    => array( 'type' => 'integer', 'minimum' => 0, 'description' => 'Packets removed because their stable identifier repeated.' ),
-										'production_max_items'      => array( 'type' => array( 'integer', 'null' ), 'minimum' => 0, 'description' => 'Configured production cap, reported but not applied to diagnostic extraction.' ),
-										'candidate_packet_count'    => array( 'type' => 'integer', 'minimum' => 0, 'description' => 'Non-structured raw-section and flyer candidate packets.' ),
-										'raw_section_count'         => array( 'type' => 'integer', 'minimum' => 0, 'description' => 'Raw HTML section candidates requiring downstream interpretation.' ),
-										'flyer_candidate_count'     => array( 'type' => 'integer', 'minimum' => 0, 'description' => 'Vision flyer candidates requiring downstream interpretation.' ),
-										'context_supplied'          => array( 'type' => 'boolean' ),
-										'requires_ai_step'          => array( 'type' => 'boolean' ),
-										'image_file_stored'         => array( 'type' => 'boolean' ),
+										'packet_title'     => array( 'type' => 'string' ),
+										'source_type'      => array( 'type' => 'string' ),
+										'extraction_method' => array( 'type' => 'string' ),
+										'payload_type'     => array(
+											'type' => 'string',
+											'enum' => array( 'event', 'raw_html', 'vision_flyer' ),
+										),
+										'event_count'      => array(
+											'type'        => 'integer',
+											'minimum'     => 0,
+											'description' => 'Unique structured events extracted from the source.',
+										),
+										'extracted_packet_count' => array(
+											'type'        => 'integer',
+											'minimum'     => 0,
+											'description' => 'All packets returned by direct handler execution before stable-identifier deduplication.',
+										),
+										'unique_source_event_count' => array(
+											'type'        => 'integer',
+											'minimum'     => 0,
+											'description' => 'Unique structured events after stable-identifier deduplication.',
+										),
+										'duplicate_packet_count' => array(
+											'type'        => 'integer',
+											'minimum'     => 0,
+											'description' => 'Packets removed because their stable identifier repeated.',
+										),
+										'production_max_items' => array(
+											'type'        => array( 'integer', 'null' ),
+											'minimum'     => 0,
+											'description' => 'Configured production cap, reported but not applied to diagnostic extraction.',
+										),
+										'candidate_packet_count' => array(
+											'type'        => 'integer',
+											'minimum'     => 0,
+											'description' => 'Non-structured raw-section and flyer candidate packets.',
+										),
+										'raw_section_count' => array(
+											'type'        => 'integer',
+											'minimum'     => 0,
+											'description' => 'Raw HTML section candidates requiring downstream interpretation.',
+										),
+										'flyer_candidate_count' => array(
+											'type'        => 'integer',
+											'minimum'     => 0,
+											'description' => 'Vision flyer candidates requiring downstream interpretation.',
+										),
+										'context_supplied' => array( 'type' => 'boolean' ),
+										'requires_ai_step' => array( 'type' => 'boolean' ),
+										'image_file_stored' => array( 'type' => 'boolean' ),
 									),
 								),
 								'coverage_issues' => array(
 									'type'                 => 'object',
 									'additionalProperties' => false,
 									'properties'           => array(
-										'missing_time'       => array( 'type' => 'boolean' ),
-										'missing_venue'      => array( 'type' => 'boolean' ),
+										'missing_time'  => array( 'type' => 'boolean' ),
+										'missing_venue' => array( 'type' => 'boolean' ),
 										'incomplete_address' => array( 'type' => 'boolean' ),
-										'time_data_warning'  => array( 'type' => 'boolean' ),
-										'raw_html_fallback'  => array( 'type' => 'boolean' ),
-										'vision_flyer'       => array( 'type' => 'boolean' ),
+										'time_data_warning' => array( 'type' => 'boolean' ),
+										'raw_html_fallback' => array( 'type' => 'boolean' ),
+										'vision_flyer'  => array( 'type' => 'boolean' ),
 									),
 								),
-								'warnings'        => array( 'type' => 'array', 'items' => array( 'type' => 'string' ) ),
+								'warnings'        => array(
+									'type'  => 'array',
+									'items' => array( 'type' => 'string' ),
+								),
 								'logs'            => array(
 									'type'  => 'array',
 									'items' => array(
@@ -236,7 +283,7 @@ class EventScraperTest {
 			3
 		);
 
-		$config = array_merge(
+		$config               = array_merge(
 			$handler_config ?? array(),
 			array(
 				'source_url'   => $target_url,
@@ -542,11 +589,11 @@ class EventScraperTest {
 	 * @return array{packet_entries:array,extraction_info:array}
 	 */
 	private function analyzePacketEntries( array $packet_entries, bool $context_supplied, ?int $production_max_items ): array {
-		$extracted_packet_count    = count( $packet_entries );
-		$packet_entries            = $this->uniquePacketEntries( $packet_entries );
-		$structured_event_count    = 0;
-		$raw_section_count         = 0;
-		$flyer_candidate_count     = 0;
+		$extracted_packet_count = count( $packet_entries );
+		$packet_entries         = $this->uniquePacketEntries( $packet_entries );
+		$structured_event_count = 0;
+		$raw_section_count      = 0;
+		$flyer_candidate_count  = 0;
 		foreach ( $packet_entries as $entry ) {
 			$body    = (string) ( $entry['data']['body'] ?? '' );
 			$payload = json_decode( $body, true );
@@ -581,5 +628,4 @@ class EventScraperTest {
 			),
 		);
 	}
-
 }

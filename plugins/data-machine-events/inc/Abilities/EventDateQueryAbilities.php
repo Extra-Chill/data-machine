@@ -26,8 +26,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 class EventDateQueryAbilities {
-	private const CAPTURE_IDS_QUERY_VAR = '_data_machine_events_capture_ids_sql';
-	private const MAX_PUBLIC_RESULTS = 100;
+	private const CAPTURE_IDS_QUERY_VAR  = '_data_machine_events_capture_ids_sql';
+	private const MAX_PUBLIC_RESULTS     = 100;
 	private const DEFAULT_PUBLIC_RESULTS = 50;
 
 	private static bool $registered = false;
@@ -161,11 +161,11 @@ class EventDateQueryAbilities {
 										array(
 											'type'       => 'object',
 											'properties' => array(
-												'event_id'       => array( 'type' => 'integer' ),
-												'title'          => array( 'type' => 'string' ),
-												'permalink'      => array( 'type' => 'string' ),
+												'event_id' => array( 'type' => 'integer' ),
+												'title'    => array( 'type' => 'string' ),
+												'permalink' => array( 'type' => 'string' ),
 												'start_datetime' => array( 'type' => 'string' ),
-												'end_datetime'   => array( 'type' => array( 'string', 'null' ) ),
+												'end_datetime' => array( 'type' => array( 'string', 'null' ) ),
 											),
 										),
 									),
@@ -239,7 +239,7 @@ class EventDateQueryAbilities {
 			return $result;
 		}
 
-		$result['posts'] = array_values(
+		$result['posts']      = array_values(
 			array_filter(
 				array_map( array( $this, 'serializePublicEvent' ), $result['posts'] )
 			)

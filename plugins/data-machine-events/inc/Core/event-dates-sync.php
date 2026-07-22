@@ -198,10 +198,10 @@ function data_machine_events_sync_datetime_meta( $post_id, $post, $update ) {
 	foreach ( $blocks as $block ) {
 		if ( 'data-machine-events/event-details' === $block['blockName'] ) {
 			$event_details_found = true;
-			$start_date         = $block['attrs']['startDate'] ?? '';
-			$start_time         = $block['attrs']['startTime'] ?? '';
-			$end_date           = $block['attrs']['endDate'] ?? '';
-			$end_time           = $block['attrs']['endTime'] ?? '';
+			$start_date          = $block['attrs']['startDate'] ?? '';
+			$start_time          = $block['attrs']['startTime'] ?? '';
+			$end_date            = $block['attrs']['endDate'] ?? '';
+			$end_time            = $block['attrs']['endTime'] ?? '';
 
 			$start_time_parts = $start_time ? explode( ':', $start_time ) : array();
 			if ( $start_time && count( $start_time_parts ) === 2 ) {
