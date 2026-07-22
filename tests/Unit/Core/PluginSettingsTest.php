@@ -85,9 +85,10 @@ class PluginSettingsTest extends WP_UnitTestCase {
 		update_option( 'datamachine_settings', $settings );
 		PluginSettings::clearCache();
 
-		$redacted    = PluginSettings::redactForDisplay( '', PluginSettings::all() );
-		$profile     = $redacted['github_credential_profiles'][0];
-		$credentials = $profile['profile_data'];
+		$stored_before = maybe_serialize( get_option( 'datamachine_settings', array() ) );
+		$redacted      = PluginSettings::redactForDisplay( '', PluginSettings::all() );
+		$profile       = $redacted['github_credential_profiles'][0];
+		$credentials   = $profile['profile_data'];
 
 		$this->assertTrue( '[redacted]' === $redacted['github_pat'], 'Top-level PAT should be redacted.' );
 		$this->assertTrue( '[redacted]' === $profile['pat'], 'Nested profile PAT should be redacted.' );
@@ -120,8 +121,9 @@ class PluginSettingsTest extends WP_UnitTestCase {
 		$this->assertSame( 'credential-1', $profile['credential_id'] );
 		$this->assertSame( 1234567890, $credentials->token_expires_at );
 		$this->assertSame( 'Bearer', $credentials->token_type );
-		$this->assertTrue(
-			$settings === get_option( 'datamachine_settings', array() ),
+		$this->assertSame(
+			$stored_before,
+			maybe_serialize( get_option( 'datamachine_settings', array() ) ),
 			'Display redaction must not mutate stored settings.'
 		);
 
