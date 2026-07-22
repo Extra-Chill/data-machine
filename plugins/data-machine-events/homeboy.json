@@ -5,7 +5,10 @@
     "wordpress": {
       "php": "8.3",
       "node": "20",
-      "database_type": "mysql"
+      "database_type": "mysql",
+      "settings": {
+        "validation_dependencies": ["data-machine"]
+      }
     }
   },
   "id": "data-machine-events",

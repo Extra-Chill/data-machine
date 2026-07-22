@@ -90,6 +90,14 @@ class TicketmasterSettings {
 				'placeholder' => __( 'trivia, karaoke, brunch, bingo', 'data-machine-events' ),
 				'required'    => false,
 			),
+			'max_items'           => array(
+				'type'        => 'number',
+				'label'       => __( 'Max Items Per Run', 'data-machine-events' ),
+				'description' => __( 'Maximum Ticketmaster events selected for child-job fan-out per run. Items beyond the bound remain eligible for later runs.', 'data-machine-events' ),
+				'default'     => Ticketmaster::DEFAULT_MAX_ITEMS,
+				'min'         => 1,
+				'max'         => Ticketmaster::DEFAULT_MAX_ITEMS,
+			),
 		);
 	}
 
@@ -108,6 +116,7 @@ class TicketmasterSettings {
 			'venue_id'            => sanitize_text_field( $raw_settings['venue_id'] ?? '' ),
 			'search'              => sanitize_text_field( $raw_settings['search'] ?? '' ),
 			'exclude_keywords'    => sanitize_text_field( $raw_settings['exclude_keywords'] ?? '' ),
+			'max_items'           => max( 1, min( Ticketmaster::DEFAULT_MAX_ITEMS, absint( $raw_settings['max_items'] ?? Ticketmaster::DEFAULT_MAX_ITEMS ) ) ),
 		);
 	}
 
@@ -135,6 +144,7 @@ class TicketmasterSettings {
 			'venue_id'            => '',
 			'search'              => '',
 			'exclude_keywords'    => '',
+			'max_items'           => Ticketmaster::DEFAULT_MAX_ITEMS,
 		);
 	}
 }

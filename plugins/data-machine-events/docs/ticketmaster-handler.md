@@ -15,13 +15,13 @@ The Ticketmaster handler (`inc/Steps/EventImport/Handlers/Ticketmaster/Ticketmas
 
 ## Unique Capabilities
 
-Ticketmaster uses its stable upstream event ID for Data Machine processed-item tracking. Before creating packets, it removes repeated IDs from the current paginated response, skips processed or claimed IDs for the current flow, and checks the event identity index so neighboring city flows do not schedule child jobs for events that another city already imported. It sets `startDateTime` to one hour in the future, filters to events with `dates.status.code === "onsale"`, and supports include/exclude keyword filters.
+Ticketmaster uses its stable upstream event ID plus a revision hash of the mapped event fields. A shared atomic source claim prevents neighboring city flows from selecting the same ID concurrently. Successful child jobs persist the revision in Data Machine's tracked-item ledger; failed jobs release the claim without persisting it. Unchanged revisions are skipped before fan-out, while changed dates, times, venues, titles, prices, and ticket URLs continue to EventUpsert. The generic `datamachine_should_reprocess_item` policy can also make an unchanged revision eligible again.
 
 ## Pagination
 
 The handler paginates Ticketmaster API results up to `MAX_PAGE = 19`. Fan-out defaults to 100 child jobs per run; flows can set `max_items` explicitly when a lower rollout bound is appropriate. Items beyond the cap remain unclaimed so later runs can process them.
 
-Each run logs an `Import fan-out summary` with fetched, pre-fan-out deduped, eligible, fan-out limit, and schedule-candidate counts. When adding cities, start with `max_items` between 25 and 50, verify the deduped-to-scheduled ratio and parent completion time, then increase toward the default only if the worker queue remains healthy.
+Each run logs an `Import fan-out summary` with fetched, unchanged, contended, overflow, source-claimed, and packets-ready counts. `source_claimed` and `packets_ready` are measured after the handler's bound and atomic claims; Data Machine's pipeline-batch log remains authoritative for child jobs actually scheduled. When adding cities, start with `max_items` between 25 and 50, compare `pre_fanout_deduped` with `packets_ready`, and confirm parent completion time and worker queue health before increasing toward the 100-item default.
 
 ## Event Flow
 

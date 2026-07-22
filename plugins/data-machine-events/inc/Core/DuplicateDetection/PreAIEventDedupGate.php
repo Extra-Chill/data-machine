@@ -50,6 +50,13 @@ class PreAIEventDedupGate {
 			return $result;
 		}
 
+		// Ticketmaster suppresses unchanged source revisions before fan-out.
+		// Changed revisions must reach upsert so mutable future event data is not
+		// frozen by the post identity index.
+		if ( 'ticketmaster' === $engine->get( 'source_type' ) ) {
+			return null;
+		}
+
 		// Only activate for event pipelines.
 		// Check if any adjacent step has upsert_event as a handler.
 		if ( ! self::isEventPipeline( $engine ) ) {
