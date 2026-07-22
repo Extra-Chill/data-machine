@@ -150,7 +150,10 @@ class FlowScheduleReconciler {
 					return $this->failure( 'Flow schedule reconciliation lost its apply lock.', true, 'flow_schedule_reconciliation_lock_lost' );
 				}
 
-				$options = array( 'stagger_seed' => $flow_id );
+				$options = array(
+					'stagger_seed'              => $flow_id,
+					'generation_argument_index' => FlowScheduling::GENERATION_ARGUMENT_INDEX,
+				);
 				if ( null !== $window_hours ) {
 					$options['distribution_window_seconds'] = $window_hours * HOUR_IN_SECONDS;
 				}
@@ -378,7 +381,7 @@ class FlowScheduleReconciler {
 		$coverage = array();
 		foreach ( $rows as $row ) {
 			$args    = $row['action_args'] ?? $this->decodeActionArgs( $row );
-			$flow_id = is_array( $args ) && 1 === count( $args ) ? (int) reset( $args ) : 0;
+			$flow_id = is_array( $args ) && isset( $args[0] ) ? (int) $args[0] : 0;
 			if ( $flow_id <= 0 || ! array_key_exists( $flow_id, $expected ) ) {
 				continue;
 			}
@@ -390,6 +393,15 @@ class FlowScheduleReconciler {
 				);
 			}
 			++$coverage[ $flow_id ]['total'];
+			if ( isset( $args[ FlowScheduling::GENERATION_ARGUMENT_INDEX ] )
+				&& ! RecurringScheduler::isActionGenerationCurrent(
+					FlowScheduling::FLOW_HOOK,
+					array( $flow_id ),
+					RecurringScheduler::GROUP,
+					$args[ FlowScheduling::GENERATION_ARGUMENT_INDEX ]
+				) ) {
+				continue;
+			}
 
 			if ( 'in-progress' === ( $row['status'] ?? '' ) ) {
 				++$coverage[ $flow_id ]['in_progress'];

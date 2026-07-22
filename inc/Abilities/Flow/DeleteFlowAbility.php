@@ -95,7 +95,7 @@ class DeleteFlowAbility {
 			'datamachine_run_flow_now',
 			array( $flow_id ),
 			'manual',
-			array(),
+			array( 'generation_argument_index' => \DataMachine\Api\Flows\FlowScheduling::GENERATION_ARGUMENT_INDEX ),
 			true,
 			fn(): bool => $this->db_flows->delete_flow( $flow_id ),
 			static function ( $result ) use ( $flow_id ): bool {

@@ -24,6 +24,7 @@ namespace DataMachine\Core\Database\Flows {
 namespace DataMachine\Api\Flows {
 	class FlowScheduling {
 		public const FLOW_HOOK = 'datamachine_run_flow_now';
+		public const GENERATION_ARGUMENT_INDEX = 2;
 		public static array $calls = array();
 
 		public static function handle_scheduling_update( int $flow_id, array $scheduling, bool $force = false ) {

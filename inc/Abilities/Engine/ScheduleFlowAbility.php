@@ -159,18 +159,8 @@ class ScheduleFlowAbility {
 		if ( is_wp_error( $result ) ) {
 			return $this->scheduleError( $result );
 		}
-		$action_ids      = as_get_scheduled_actions(
-			array(
-				'hook'     => 'datamachine_run_flow_now',
-				'args'     => array( $flow_id ),
-				'group'    => 'data-machine',
-				'status'   => 'pending',
-				'per_page' => 1,
-			),
-			'ids'
-		);
-		$first_action_id = reset( $action_ids );
-		$action_id       = false !== $first_action_id ? (int) $first_action_id : 0;
+		$scheduling = ( new \DataMachine\Core\Database\Flows\Flows() )->get_flow_scheduling( $flow_id );
+		$action_id  = is_array( $scheduling ) ? (int) ( $scheduling['action_id'] ?? 0 ) : 0;
 
 		do_action(
 			'datamachine_log',

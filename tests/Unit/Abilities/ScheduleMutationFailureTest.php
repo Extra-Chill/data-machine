@@ -18,10 +18,12 @@ use WP_UnitTestCase;
 
 class GenerationTransitionActionFactory extends \ActionScheduler_ActionFactory {
 	public \Closure $before_store;
+	public int $last_stored_id = 0;
 
 	protected function store( \ActionScheduler_Action $action ) {
-		( $this->before_store )();
-		return parent::store( $action );
+		( $this->before_store )( $action );
+		$this->last_stored_id = (int) parent::store( $action );
+		return $this->last_stored_id;
 	}
 }
 
@@ -64,15 +66,27 @@ class ScheduleMutationFailureTest extends WP_UnitTestCase {
 
 		$this->assertNotInstanceOf(
 			\WP_Error::class,
-			RecurringScheduler::ensureSchedule( self::FLOW_HOOK, array( $this->flow_id ), 'hourly' )
+			RecurringScheduler::ensureSchedule(
+				self::FLOW_HOOK,
+				array( $this->flow_id ),
+				'hourly',
+				array( 'generation_argument_index' => FlowScheduling::GENERATION_ARGUMENT_INDEX )
+			)
 		);
 	}
 
 	public function tear_down(): void {
 		foreach ( $this->managed_flow_ids as $flow_id ) {
 			$this->releaseScheduleLock( $flow_id );
-			RecurringScheduler::ensureSchedule( self::FLOW_HOOK, array( $flow_id ), 'manual' );
+			RecurringScheduler::ensureSchedule(
+				self::FLOW_HOOK,
+				array( $flow_id ),
+				'manual',
+				array( 'generation_argument_index' => FlowScheduling::GENERATION_ARGUMENT_INDEX )
+			);
+			$this->flows->delete_flow( $flow_id );
 		}
+		$this->pipelines->delete_pipeline( $this->pipeline_id );
 
 		parent::tear_down();
 	}
@@ -86,7 +100,7 @@ class ScheduleMutationFailureTest extends WP_UnitTestCase {
 		$this->assertSame( 'schedule_lock_timeout', $result['error_code'] );
 		$this->assertTrue( $result['retryable'] );
 		$this->assertNotNull( $this->flows->get_flow( $this->flow_id ) );
-		$this->assertNotFalse( as_next_scheduled_action( self::FLOW_HOOK, array( $this->flow_id ), RecurringScheduler::GROUP ) );
+		$this->assertTrue( RecurringScheduler::hasLogicalCoverage( self::FLOW_HOOK, array( $this->flow_id ) ) );
 	}
 
 	public function test_stale_successor_is_canceled_when_generation_changes_between_repeat_read_and_store(): void {
@@ -94,9 +108,17 @@ class ScheduleMutationFailureTest extends WP_UnitTestCase {
 		$generation        = wp_generate_uuid4();
 		add_option( $generation_option, $generation, '', false );
 		$schedule = new \ActionScheduler_IntervalSchedule( new \DateTime( '+1 hour' ), HOUR_IN_SECONDS );
-		$action   = new GenerationFencedAction(
+		$generated_args = array(
+			$this->flow_id,
+			null,
+			array(
+				'_datamachine_schedule_generation'      => $generation,
+				'_datamachine_signature_argument_count' => 1,
+			),
+		);
+		$action = new GenerationFencedAction(
 			'datamachine_test_repeat_race',
-			array( $this->flow_id ),
+			$generated_args,
 			$schedule,
 			RecurringScheduler::GROUP,
 			$generation_option,
@@ -114,9 +136,10 @@ class ScheduleMutationFailureTest extends WP_UnitTestCase {
 		$this->assertSame( \ActionScheduler_Store::STATUS_CANCELED, \ActionScheduler_Store::instance()->get_status( $successor_id ) );
 
 		$current_generation    = (string) get_option( $generation_option );
-		$current_action        = new GenerationFencedAction(
+		$generated_args[2]['_datamachine_schedule_generation'] = $current_generation;
+		$current_action = new GenerationFencedAction(
 			'datamachine_test_repeat_race',
-			array( $this->flow_id ),
+			$generated_args,
 			$schedule,
 			RecurringScheduler::GROUP,
 			$generation_option,
@@ -131,6 +154,97 @@ class ScheduleMutationFailureTest extends WP_UnitTestCase {
 		delete_option( $generation_option );
 	}
 
+	public function test_legacy_adoption_is_bounded_once_current_generation_exists(): void {
+		RecurringScheduler::ensureSchedule(
+			self::FLOW_HOOK,
+			array( $this->flow_id ),
+			'manual',
+			array( 'generation_argument_index' => FlowScheduling::GENERATION_ARGUMENT_INDEX )
+		);
+		$legacy_ids = array(
+			as_schedule_recurring_action( time() + 60, HOUR_IN_SECONDS, self::FLOW_HOOK, array( $this->flow_id ), RecurringScheduler::GROUP ),
+			as_schedule_recurring_action( time() + 120, HOUR_IN_SECONDS, self::FLOW_HOOK, array( $this->flow_id ), RecurringScheduler::GROUP ),
+		);
+
+		$first  = FlowScheduling::adopt_legacy_action( $this->flow_id );
+		$second = FlowScheduling::adopt_legacy_action( $this->flow_id );
+
+		$this->assertTrue( $first );
+		$this->assertWPError( $second );
+		$this->assertSame( 'stale_legacy_schedule_generation', $second->get_error_code() );
+		foreach ( $legacy_ids as $legacy_id ) {
+			$this->assertSame( \ActionScheduler_Store::STATUS_CANCELED, \ActionScheduler_Store::instance()->get_status( $legacy_id ) );
+		}
+		$this->assertTrue( RecurringScheduler::hasLogicalCoverage( self::FLOW_HOOK, array( $this->flow_id ), RecurringScheduler::GROUP, true ) );
+	}
+
+	public function test_legacy_adoption_cannot_overwrite_newer_manual_state(): void {
+		$snapshot = $this->flows->get_flow_scheduling( $this->flow_id );
+		$this->assertIsArray( $snapshot );
+		RecurringScheduler::ensureSchedule(
+			self::FLOW_HOOK,
+			array( $this->flow_id ),
+			'manual',
+			array( 'generation_argument_index' => FlowScheduling::GENERATION_ARGUMENT_INDEX )
+		);
+		$this->assertTrue( $this->flows->update_flow_scheduling( $this->flow_id, array( 'interval' => 'manual' ) ) );
+
+		$result = FlowScheduling::handle_scheduling_update( $this->flow_id, $snapshot, true, true );
+
+		$this->assertWPError( $result );
+		$this->assertSame( 'legacy_schedule_generation_conflict', $result->get_error_code() );
+		$this->assertSame( 'manual', $this->flows->get_flow_scheduling( $this->flow_id )['interval'] );
+		$this->assertFalse( RecurringScheduler::hasLogicalCoverage( self::FLOW_HOOK, array( $this->flow_id ) ) );
+	}
+
+	public function test_store_takeover_cancels_exact_stale_action_and_preserves_current_action(): void {
+		$options            = $this->scheduleOptionNames( $this->flow_id );
+		$factory_property   = new \ReflectionProperty( \ActionScheduler::class, 'factory' );
+		$original_factory   = $factory_property->getValue();
+		$factory            = new GenerationTransitionActionFactory();
+		$current_action_id  = 0;
+		$factory->before_store = static function ( \ActionScheduler_Action $action ) use ( $options, &$current_action_id ): void {
+			$current_generation = wp_generate_uuid4();
+			update_option(
+				$options['lock'],
+				array(
+					'token'      => 'takeover-owner',
+					'started_at' => time(),
+					'expires_at' => time() + 300,
+				),
+				false
+			);
+			update_option( $options['generation'], $current_generation, false );
+
+			$args = $action->get_args();
+			$args[2]['_datamachine_schedule_generation'] = $current_generation;
+			$current = new \ActionScheduler_Action( $action->get_hook(), $args, $action->get_schedule(), $action->get_group() );
+			$current_action_id = (int) \ActionScheduler_Store::instance()->save_action( $current );
+		};
+		$factory_property->setValue( null, $factory );
+
+		try {
+			$result = RecurringScheduler::ensureSchedule(
+				self::FLOW_HOOK,
+				array( $this->flow_id ),
+				'daily',
+				array(
+					'force_reschedule'          => true,
+					'generation_argument_index' => FlowScheduling::GENERATION_ARGUMENT_INDEX,
+				)
+			);
+		} finally {
+			$factory_property->setValue( null, $original_factory );
+		}
+
+		$this->assertWPError( $result );
+		$this->assertSame( 'schedule_lock_lost', $result->get_error_code() );
+		$this->assertGreaterThan( 0, $factory->last_stored_id );
+		$this->assertSame( \ActionScheduler_Store::STATUS_CANCELED, \ActionScheduler_Store::instance()->get_status( $factory->last_stored_id ) );
+		$this->assertGreaterThan( 0, $current_action_id );
+		$this->assertSame( \ActionScheduler_Store::STATUS_PENDING, \ActionScheduler_Store::instance()->get_status( $current_action_id ) );
+	}
+
 	public function test_pause_flow_keeps_enabled_state_when_recurrence_cannot_be_fenced(): void {
 		$this->holdScheduleLock( $this->flow_id );
 
@@ -141,7 +255,7 @@ class ScheduleMutationFailureTest extends WP_UnitTestCase {
 		$this->assertSame( 1, $result['errors'] );
 		$this->assertSame( 'pause_error', $result['flows'][0]['status'] );
 		$this->assertTrue( $flow['scheduling_config']['enabled'] );
-		$this->assertNotFalse( as_next_scheduled_action( self::FLOW_HOOK, array( $this->flow_id ), RecurringScheduler::GROUP ) );
+		$this->assertTrue( RecurringScheduler::hasLogicalCoverage( self::FLOW_HOOK, array( $this->flow_id ) ) );
 	}
 
 	public function test_desired_state_records_reconciliation_drift_after_scheduler_failure(): void {
@@ -172,7 +286,12 @@ class ScheduleMutationFailureTest extends WP_UnitTestCase {
 			)
 		);
 		$this->managed_flow_ids[] = $blocked_flow_id;
-		RecurringScheduler::ensureSchedule( self::FLOW_HOOK, array( $blocked_flow_id ), 'hourly' );
+		RecurringScheduler::ensureSchedule(
+			self::FLOW_HOOK,
+			array( $blocked_flow_id ),
+			'hourly',
+			array( 'generation_argument_index' => FlowScheduling::GENERATION_ARGUMENT_INDEX )
+		);
 		$this->holdScheduleLock( $blocked_flow_id );
 
 		$result = wp_get_ability( 'datamachine/delete-pipeline' )->execute( array( 'pipeline_id' => $this->pipeline_id ) );
@@ -184,8 +303,8 @@ class ScheduleMutationFailureTest extends WP_UnitTestCase {
 		$this->assertNotNull( $this->pipelines->get_pipeline( $this->pipeline_id ) );
 		$this->assertNull( $this->flows->get_flow( $this->flow_id ) );
 		$this->assertNotNull( $this->flows->get_flow( $blocked_flow_id ) );
-		$this->assertFalse( as_next_scheduled_action( self::FLOW_HOOK, array( $this->flow_id ), RecurringScheduler::GROUP ) );
-		$this->assertNotFalse( as_next_scheduled_action( self::FLOW_HOOK, array( $blocked_flow_id ), RecurringScheduler::GROUP ) );
+		$this->assertFalse( RecurringScheduler::hasLogicalCoverage( self::FLOW_HOOK, array( $this->flow_id ) ) );
+		$this->assertTrue( RecurringScheduler::hasLogicalCoverage( self::FLOW_HOOK, array( $blocked_flow_id ) ) );
 	}
 
 	public function test_creation_rollback_records_failed_schedule_compensation(): void {
@@ -203,7 +322,12 @@ class ScheduleMutationFailureTest extends WP_UnitTestCase {
 			)
 		);
 		$this->managed_flow_ids[] = $flow_id;
-		RecurringScheduler::ensureSchedule( self::FLOW_HOOK, array( $flow_id ), 'hourly' );
+		RecurringScheduler::ensureSchedule(
+			self::FLOW_HOOK,
+			array( $flow_id ),
+			'hourly',
+			array( 'generation_argument_index' => FlowScheduling::GENERATION_ARGUMENT_INDEX )
+		);
 		$this->holdScheduleLock( $flow_id );
 
 		$result = ( new ReflectionMethod( $ability, 'rollbackCreation' ) )->invoke( $ability, $scope, $flow_id, 'Forced rollback' );

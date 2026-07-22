@@ -333,6 +333,7 @@ class CreateFlowAbility {
 
 		if ( $validate_only ) {
 			$this->rollbackCreationTransactionScope( $transaction_scope );
+			RecurringScheduler::invalidateGenerationCache( FlowScheduling::FLOW_HOOK, array( $flow_id ) );
 			$schedule_error = $this->compensateFlowSchedule( $flow_id );
 			if ( $schedule_error ) {
 				return array_merge(
@@ -401,6 +402,7 @@ class CreateFlowAbility {
 	 */
 	private function rollbackCreation( array $transaction_scope, int $flow_id, string $error, array $configuration_errors = array() ): array {
 		$this->rollbackCreationTransactionScope( $transaction_scope );
+		RecurringScheduler::invalidateGenerationCache( FlowScheduling::FLOW_HOOK, array( $flow_id ) );
 		$schedule_error = $this->compensateFlowSchedule( $flow_id );
 
 		$result = array(
@@ -501,7 +503,12 @@ class CreateFlowAbility {
 	 * @param int $flow_id Flow ID allocated in this scope.
 	 */
 	private function compensateFlowSchedule( int $flow_id ): ?\WP_Error {
-		$result = RecurringScheduler::ensureSchedule( FlowScheduling::FLOW_HOOK, array( $flow_id ), 'manual' );
+		$result = RecurringScheduler::ensureSchedule(
+			FlowScheduling::FLOW_HOOK,
+			array( $flow_id ),
+			'manual',
+			array( 'generation_argument_index' => FlowScheduling::GENERATION_ARGUMENT_INDEX )
+		);
 		return is_wp_error( $result ) ? $result : null;
 	}
 

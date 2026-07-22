@@ -654,7 +654,7 @@ datamachine_assert( str_contains( $schedule_flow_source, "array( 'interval' => '
 datamachine_assert( str_contains( $schedule_flow_source, "'interval'  => 'one_time'" ), 'one-time transition delegates to FlowScheduling' );
 datamachine_assert( str_contains( $schedule_flow_source, "'retry_after_ms'" ), 'ability response preserves retry/status metadata' );
 datamachine_assert( str_contains( $plugin_source, 'RecurringScheduler::registerGenerationFence()' ), 'generation fence is registered for every Action Scheduler runner request' );
-datamachine_assert( str_contains( $flow_scheduling_source, "'force_reschedule' => \$force" ), 'flow force transitions reach the fenced primitive' );
+datamachine_assert( str_contains( $flow_scheduling_source, "'force_reschedule'" ) && str_contains( $flow_scheduling_source, '$force' ), 'flow force transitions reach the fenced primitive' );
 
 echo "\n[27] forced replacement fences the fetched running generation\n";
 datamachine_rs_reset();
@@ -734,7 +734,7 @@ $execute_position    = strpos( $queue_runner_source, '$action->execute()' );
 $repeat_position     = strpos( $queue_runner_source, '$action->get_schedule()->is_recurring()' );
 datamachine_assert( false !== $execute_position && false !== $repeat_position && $execute_position < $repeat_position, 'bundled AS re-reads the fetched action schedule after callback execution' );
 datamachine_assert( str_contains( $factory_source, '$schedule = $action->get_schedule();' ) && str_contains( $factory_source, '$this->store( $new_action )' ), 'bundled AS repeats from the fetched action schedule object' );
-datamachine_assert( str_contains( $scheduler_source, "'action_scheduler_stored_action'" ) && str_contains( $scheduler_source, 'cancel_action( $action_id )' ), 'post-store reconciliation cancels a stale native successor' );
+datamachine_assert( str_contains( $scheduler_source, "'action_scheduler_stored_action'" ) && str_contains( $scheduler_source, 'cancelExactAction( $action_id )' ), 'post-store reconciliation cancels a stale native successor by exact action ID' );
 
 echo "\n[33] desired-state persistence failure prevents schedule mutation\n";
 datamachine_rs_reset();

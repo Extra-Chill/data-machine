@@ -116,8 +116,31 @@ function datamachine_register_execution_engine() {
 	 */
 	add_action(
 		'datamachine_run_flow_now',
-		function ( $flow_id, $job_id = null ) {
+		function ( $flow_id, $job_id = null, $schedule_generation = null ) {
 			$flow_id = (int) $flow_id;
+			if ( null !== $schedule_generation
+				&& ! \DataMachine\Engine\Tasks\RecurringScheduler::isActionGenerationCurrent(
+					\DataMachine\Api\Flows\FlowScheduling::FLOW_HOOK,
+					array( $flow_id ),
+					\DataMachine\Engine\Tasks\RecurringScheduler::GROUP,
+					$schedule_generation
+				) ) {
+				do_action( 'datamachine_log', 'warning', 'Stale schedule generation skipped', array( 'flow_id' => $flow_id ) );
+				return;
+			}
+
+			if ( null === $schedule_generation && \DataMachine\Engine\Tasks\RecurringScheduler::isExecutingRecurringAction() ) {
+				$adopted = \DataMachine\Api\Flows\FlowScheduling::adopt_legacy_action( $flow_id );
+				if ( is_wp_error( $adopted ) ) {
+					do_action(
+						'datamachine_log',
+						'warning',
+						'Legacy scheduled action skipped during bounded generation adoption',
+						array_merge( array( 'flow_id' => $flow_id ), \DataMachine\Engine\Tasks\RecurringScheduler::errorMetadata( $adopted ) )
+					);
+					return;
+				}
+			}
 
 			// Defensive: Check if flow exists before executing.
 			// If flow was deleted without cleaning up scheduled actions,
@@ -126,7 +149,8 @@ function datamachine_register_execution_engine() {
 				$schedule_result = \DataMachine\Engine\Tasks\RecurringScheduler::ensureSchedule(
 					'datamachine_run_flow_now',
 					array( $flow_id ),
-					'manual'
+					'manual',
+					array( 'generation_argument_index' => \DataMachine\Api\Flows\FlowScheduling::GENERATION_ARGUMENT_INDEX )
 				);
 				if ( is_wp_error( $schedule_result ) ) {
 					do_action(
@@ -161,7 +185,7 @@ function datamachine_register_execution_engine() {
 			}
 		},
 		10,
-		2
+		3
 	);
 
 	/**
