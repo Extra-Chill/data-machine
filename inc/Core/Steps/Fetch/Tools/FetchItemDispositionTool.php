@@ -3,9 +3,8 @@
  * Fetch Item Disposition Tool
  *
  * Handler tool that allows the pipeline agent to explicitly reject or defer
- * a fetched source item. Rejections mark the source as processed so it will
- * not be refetched; deferrals release the source claim so the item remains
- * eligible for a later retry.
+ * a fetched source item. The terminal job lifecycle completes rejected claims
+ * or releases deferred claims after the disposition status is committed.
  *
  * This provides a safety net when keyword exclusions or other filters
  * miss items that shouldn't be processed (e.g., non-music events).
@@ -45,7 +44,7 @@ class FetchItemDispositionTool {
 	}
 
 	/**
-	 * Mark the current source item as rejected/processed.
+	 * Mark the current source item as rejected.
 	 *
 	 * @param array $parameters Tool parameters from AI.
 	 * @param array $tool_def Tool definition with handler_config.
@@ -95,43 +94,6 @@ class FetchItemDispositionTool {
 		$source_type     = $engine->get( 'source_type' );
 		$flow_step_id    = $this->resolveFetchFlowStepId( $engine ) ?? ( $parameters['flow_step_id'] ?? $engine->get( 'flow_step_id' ) );
 		$diagnostic      = $this->buildDispositionDiagnostic( self::DISPOSITION_REJECT_SOURCE, $tool_name, $reason, $flow_step_id, $item_identifier, $source_type, $parameters );
-
-		// Mark item as processed so it won't be refetched
-		if ( $flow_step_id && $item_identifier && $source_type ) {
-			do_action(
-				'datamachine_mark_item_processed',
-				$flow_step_id,
-				$source_type,
-				$item_identifier,
-				$job_id
-			);
-
-			do_action(
-				'datamachine_log',
-				'info',
-				'FetchItemDispositionTool: Source rejected and marked as processed',
-				array(
-					'job_id'          => $job_id,
-					'flow_step_id'    => $flow_step_id,
-					'item_identifier' => $item_identifier,
-					'source_type'     => $source_type,
-					'reason'          => $reason,
-				)
-			);
-		} else {
-			do_action(
-				'datamachine_log',
-				'warning',
-				'FetchItemDispositionTool: Could not mark rejected source as processed - missing identifiers',
-				array(
-					'job_id'          => $job_id,
-					'flow_step_id'    => $flow_step_id,
-					'item_identifier' => $item_identifier,
-					'source_type'     => $source_type,
-					'reason'          => $reason,
-				)
-			);
-		}
 
 		// Set job status override for engine to use at completion
 		$status = JobStatus::agentSkipped( 'source-rejected' );
@@ -188,7 +150,7 @@ class FetchItemDispositionTool {
 	}
 
 	/**
-	 * Release the current source item claim without marking it processed.
+	 * Defer the current source item without marking it processed.
 	 *
 	 * @param array $parameters Tool parameters from AI.
 	 * @param array $tool_def Tool definition with handler_config.
@@ -236,12 +198,7 @@ class FetchItemDispositionTool {
 		$item_identifier = $engine->get( 'item_identifier' );
 		$source_type     = $engine->get( 'source_type' );
 		$flow_step_id    = $this->resolveFetchFlowStepId( $engine ) ?? ( $parameters['flow_step_id'] ?? $engine->get( 'flow_step_id' ) );
-		$released        = null;
 		$diagnostic      = $this->buildDispositionDiagnostic( self::DISPOSITION_DEFER_ITEM, $tool_name, $reason, $flow_step_id, $item_identifier, $source_type, $parameters );
-
-		if ( $flow_step_id && $item_identifier && $source_type ) {
-			$released = ( new \DataMachine\Core\Database\ProcessedItems\ProcessedItems() )->release_claim( $flow_step_id, (string) $source_type, (string) $item_identifier );
-		}
 
 		$status = JobStatus::failed( 'item-deferred' );
 		datamachine_merge_engine_data(
@@ -277,14 +234,13 @@ class FetchItemDispositionTool {
 		do_action(
 			'datamachine_log',
 			'info',
-			'FetchItemDispositionTool: Item deferred and source claim released',
+			'FetchItemDispositionTool: Item deferred for terminal claim release',
 			array(
 				'job_id'          => $job_id,
 				'flow_step_id'    => $flow_step_id,
 				'item_identifier' => $item_identifier,
 				'source_type'     => $source_type,
 				'reason'          => $reason,
-				'released'        => $released,
 				'status'          => $status->toString(),
 			)
 		);
@@ -297,7 +253,6 @@ class FetchItemDispositionTool {
 			'tool_name'       => $tool_name,
 			'disposition'     => self::DISPOSITION_DEFER_ITEM,
 			'reason'          => $reason,
-			'released'        => $released,
 		);
 	}
 

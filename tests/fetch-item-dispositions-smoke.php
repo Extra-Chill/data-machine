@@ -158,7 +158,7 @@ namespace {
 		),
 	);
 
-	echo "Case 1: reject_source marks processed\n";
+	echo "Case 1: reject_source defers claim completion to terminal lifecycle\n";
 	$reject = $tool->handle_tool_call(
 		array(
 			'job_id'       => 1814,
@@ -171,7 +171,7 @@ namespace {
 	);
 	assert_fetch_disposition_smoke( 'reject_source succeeds', true === ( $reject['success'] ?? false ) );
 	assert_fetch_disposition_smoke( 'reject_source reports explicit tool name', 'reject_source' === ( $reject['tool_name'] ?? '' ) );
-	assert_fetch_disposition_smoke( 'reject_source marks fetch step processed', array( 'fetch-step_7', 'rss', 'source-123', 1814 ) === ( $GLOBALS['fetch_disposition_smoke_processed'][0] ?? null ) );
+	assert_fetch_disposition_smoke( 'reject_source does not eagerly mark the claim processed', array() === $GLOBALS['fetch_disposition_smoke_processed'] );
 	assert_fetch_disposition_smoke( 'reject_source sets source-rejected status', 'agent_skipped - source-rejected' === ( $GLOBALS['fetch_disposition_smoke_engine'][1814]['job_status'] ?? '' ) );
 	$reject_diagnostic = $GLOBALS['fetch_disposition_smoke_engine'][1814]['disposition_diagnostic'] ?? array();
 	assert_fetch_disposition_smoke( 'reject_source persists disposition diagnostic', 'reject_source' === ( $reject_diagnostic['disposition'] ?? '' ) && 'duplicate-source' === ( $reject_diagnostic['reason'] ?? '' ) );
@@ -179,7 +179,7 @@ namespace {
 	assert_fetch_disposition_smoke( 'reject_source diagnostic includes packet count and bounded excerpt', 1 === ( $reject_diagnostic['packet_count'] ?? 0 ) && 1200 === ( $reject_diagnostic['excerpt_limit'] ?? 0 ) && 1200 >= strlen( $reject_diagnostic['excerpt'] ?? '' ) );
 	assert_fetch_disposition_smoke( 'reject_source diagnostic redacts obvious secrets', ! str_contains( $reject_diagnostic['excerpt'] ?? '', 'secret-value' ) && ! str_contains( $reject_diagnostic['source_url'] ?? '', 'secret-value' ) );
 
-	echo "Case 2: defer_item releases claim without marking processed\n";
+	echo "Case 2: defer_item defers claim release to terminal lifecycle\n";
 	$GLOBALS['fetch_disposition_smoke_processed'] = array();
 	$defer = $tool->handle_tool_call(
 		array(
@@ -193,7 +193,7 @@ namespace {
 	);
 	assert_fetch_disposition_smoke( 'defer_item succeeds', true === ( $defer['success'] ?? false ) );
 	assert_fetch_disposition_smoke( 'defer_item reports explicit tool name', 'defer_item' === ( $defer['tool_name'] ?? '' ) );
-	assert_fetch_disposition_smoke( 'defer_item releases fetch step claim', array( 'fetch-step_7', 'rss', 'source-123' ) === ( $GLOBALS['fetch_disposition_smoke_released'][0] ?? null ) );
+	assert_fetch_disposition_smoke( 'defer_item does not eagerly release the claim', array() === $GLOBALS['fetch_disposition_smoke_released'] );
 	assert_fetch_disposition_smoke( 'defer_item does not mark processed', array() === $GLOBALS['fetch_disposition_smoke_processed'] );
 	assert_fetch_disposition_smoke( 'tool-error deferral remains retry eligible', 'failed - item-deferred' === ( $GLOBALS['fetch_disposition_smoke_engine'][1815]['job_status'] ?? '' ) );
 	$defer_diagnostic = $GLOBALS['fetch_disposition_smoke_engine'][1815]['disposition_diagnostic'] ?? array();
@@ -219,7 +219,7 @@ namespace {
 		array( 'disposition' => 'reject_source' )
 	);
 	assert_fetch_disposition_smoke( 'reject_source succeeds with persisted engine data', true === ( $reject_hydrated['success'] ?? false ) );
-	assert_fetch_disposition_smoke( 'persisted engine data marks processed source identity', array( 'fetch-step_8', 'mcp', 'source-456', 1816 ) === ( $GLOBALS['fetch_disposition_smoke_processed'][0] ?? null ) );
+	assert_fetch_disposition_smoke( 'persisted engine data still defers claim completion', array() === $GLOBALS['fetch_disposition_smoke_processed'] );
 
 	echo "Case 2c: dispositions are first-write-wins (#2609)\n";
 	$GLOBALS['fetch_disposition_smoke_processed'] = array();
@@ -260,11 +260,12 @@ namespace {
 
 	echo "Case 2d: disposition tools declare terminal completion signal (#2609)\n";
 	$fetch_handler_src = file_get_contents( __DIR__ . '/../inc/Core/Steps/Fetch/Handlers/FetchHandler.php' );
-	assert_fetch_disposition_smoke( 'both disposition tool definitions declare runtime completion_signal terminal', 2 === substr_count( $fetch_handler_src, "'runtime'                 => array( 'completion_signal' => 'terminal' )" ) );
+	assert_fetch_disposition_smoke( 'both disposition tool definitions declare runtime completion_signal terminal', 2 === substr_count( $fetch_handler_src, "'completion_signal' => 'terminal'" ) );
 
 	echo "Case 3: production tool surface exposes positive affordances\n";
 	$fetch_handler = file_get_contents( __DIR__ . '/../inc/Core/Steps/Fetch/Handlers/FetchHandler.php' );
-	$execute_step  = file_get_contents( __DIR__ . '/../inc/Abilities/Engine/ExecuteStepAbility.php' );
+	$disposition   = file_get_contents( __DIR__ . '/../inc/Core/Steps/Fetch/Tools/FetchItemDispositionTool.php' );
+	$lifecycle     = file_get_contents( __DIR__ . '/../inc/Engine/Actions/Handlers/StepLifecycleHandler.php' );
 	assert_fetch_disposition_smoke( 'fetch surface exposes reject_source', str_contains( $fetch_handler, "'reject_source'" ) );
 	assert_fetch_disposition_smoke( 'fetch surface exposes defer_item', str_contains( $fetch_handler, "'defer_item'" ) );
 	assert_fetch_disposition_smoke( 'fetch surface avoids legacy skip tool registration', ! str_contains( $fetch_handler, "'skip_item'" ) );
@@ -273,7 +274,7 @@ namespace {
 	assert_fetch_disposition_smoke( 'fetch disposition schemas avoid property-level required flags', ! str_contains( $fetch_handler, "'required'    => true" ) );
 	assert_fetch_disposition_smoke( 'reject_source describes reasoned content/source rejection', str_contains( $fetch_handler, 'reasoned content/source evaluation' ) );
 	assert_fetch_disposition_smoke( 'defer_item describes safe completion and retry eligibility', str_contains( $fetch_handler, 'cannot safely complete processing now' ) && str_contains( $fetch_handler, 'remain eligible' ) );
-	assert_fetch_disposition_smoke( 'normal completion still marks processed', str_contains( $execute_step, '$this->markCompletedItemProcessed( $job_id );' ) && str_contains( $execute_step, 'JobStatus::COMPLETED' ) );
+	assert_fetch_disposition_smoke( 'terminal lifecycle owns claim completion and release', ! str_contains( $disposition, 'datamachine_mark_item_processed' ) && ! str_contains( $disposition, 'release_claim(' ) && str_contains( $lifecycle, 'complete_owned_claim_in_transaction' ) && str_contains( $lifecycle, 'release_owned_claim(' ) );
 
 	echo "\nFetch item dispositions smoke complete: {$total} assertions, {$failed} failures.\n";
 	if ( $failed > 0 ) {
