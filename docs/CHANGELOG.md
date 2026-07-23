@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.168.6] - 2026-07-23
+
+### Fixed
+- recover pathless child jobs safely
+
 ## [0.168.5] - 2026-07-23
 
 ### Fixed
