@@ -171,6 +171,7 @@ require_once __DIR__ . '/../inc/Core/NetworkSettings.php';
 require_once __DIR__ . '/../inc/Core/PluginSettings.php';
 require_once __DIR__ . '/../inc/Core/OptionLeaseStore.php';
 require_once __DIR__ . '/../inc/Core/ActionScheduler/GroupRegistrar.php';
+require_once __DIR__ . '/../inc/Engine/Tasks/ScheduleActionIdentity.php';
 require_once __DIR__ . '/../inc/Engine/AI/PipelineAIConcurrencyLease.php';
 require_once __DIR__ . '/../inc/Engine/AI/PipelineAIConcurrencyLimiter.php';
 require_once __DIR__ . '/../inc/Engine/AI/AIConcurrencyBackpressure.php';
@@ -232,6 +233,7 @@ $ai_src       = file_get_contents( __DIR__ . '/../inc/Core/Steps/AI/AIStep.php' 
 $engine_src   = file_get_contents( __DIR__ . '/../inc/Abilities/Engine/ExecuteStepAbility.php' ) ?: '';
 $retry_src    = file_get_contents( __DIR__ . '/../inc/Core/JobRetryPolicy.php' ) ?: '';
 $backpressure_src = file_get_contents( __DIR__ . '/../inc/Engine/AI/AIConcurrencyBackpressure.php' ) ?: '';
+$schedule_failure_src = file_get_contents( __DIR__ . '/../inc/Engine/AI/AIConcurrencyScheduleFailure.php' ) ?: '';
 $reconciler_src = file_get_contents( __DIR__ . '/../inc/Core/Database/Jobs/LegacyAIConcurrencyReconciler.php' ) ?: '';
 $fetch_src    = file_get_contents( __DIR__ . '/../inc/Core/Steps/Fetch/FetchStep.php' ) ?: '';
 $upsert_files = glob( __DIR__ . '/../inc/Core/Steps/Upsert/*.php' ) ?: array();
@@ -361,7 +363,7 @@ assert_ai_backpressure_smoke( 'duplicate generation two execution is rejected', 
 assert_ai_backpressure_smoke( 'only exact actionless scheduled generation can be released', AIConcurrencyBackpressure::isReleasableUnscheduledGeneration( $generation_two, 'ai-1', 2, 'token-2' ) );
 assert_ai_backpressure_smoke( 'wrong token cannot release generation ownership', ! AIConcurrencyBackpressure::isReleasableUnscheduledGeneration( $generation_two, 'ai-1', 2, 'token-other' ) );
 assert_ai_backpressure_smoke( 'running generation cannot be released as unscheduled', ! AIConcurrencyBackpressure::isReleasableUnscheduledGeneration( $running_two, 'ai-1', 2, 'token-2' ) );
-assert_ai_backpressure_smoke( 'schedule exhaustion routes through retryable fail-job instead of cancellation', str_contains( $ai_src, "'datamachine_fail_job'" ) && str_contains( $ai_src, "'ai_concurrency_defer_schedule_failed'" ) && ! str_contains( $ai_src, "cancelled - ai_concurrency_defer_schedule_failed" ) );
+assert_ai_backpressure_smoke( 'schedule exhaustion routes through retryable fail-job instead of cancellation', str_contains( $schedule_failure_src, "'datamachine_fail_job'" ) && str_contains( $schedule_failure_src, "'ai_concurrency_defer_schedule_failed'" ) && ! str_contains( $ai_src, "cancelled - ai_concurrency_defer_schedule_failed" ) );
 assert_ai_backpressure_smoke( 'in-progress continuation does not regress job status to pending', str_contains( $ai_src, "'in-progress' !== (string) ( \$schedule_result['action_status'] ?? '' )" ) );
 assert_ai_backpressure_smoke( 'in-progress continuation returns before stale throttle merge', str_contains( $ai_src, "} else {\n\t\t\treturn;\n\t\t}" ) );
 

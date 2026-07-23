@@ -15,6 +15,7 @@ use DataMachine\Core\Steps\AI\ToolPolicy\PipelineToolPolicyArgs;
 use DataMachine\Core\Steps\StepTypeRegistrationTrait;
 use DataMachine\Core\Steps\QueueableTrait;
 use DataMachine\Engine\AI\AIConcurrencyBackpressure;
+use DataMachine\Engine\AI\AIConcurrencyScheduleFailure;
 use DataMachine\Engine\AI\ConversationManager;
 use DataMachine\Engine\AI\DataPacketPromptProjector;
 use DataMachine\Engine\AI\PipelineAIConcurrencyLease;
@@ -757,63 +758,14 @@ class AIStep extends Step {
 		$action_id       = (int) $schedule_result['action_id'];
 
 		if ( empty( $schedule_result['success'] ) || $action_id <= 0 ) {
-			$released = AIConcurrencyBackpressure::releaseUnscheduledGeneration(
+			AIConcurrencyScheduleFailure::handle(
 				$this->job_id,
 				$this->flow_step_id,
+				$provider_name,
 				$resume_generation,
-				(string) $claim['token']
-			);
-			if ( ! $released ) {
-				$execution_state = AIConcurrencyBackpressure::generationExecutionState( $this->job_id, $this->flow_step_id, $resume_generation, (string) $claim['token'] );
-				if ( 'scheduled' === $execution_state ) {
-					( new Jobs() )->update_job_status( $this->job_id, 'pending' );
-				}
-				do_action(
-					'datamachine_log',
-					'' === $execution_state ? 'error' : 'info',
-					'' === $execution_state
-						? 'AI continuation scheduling failed and generation ownership could not be released'
-						: 'AI continuation scheduling raced existing generation execution',
-					array(
-						'job_id'            => $this->job_id,
-						'flow_step_id'      => $this->flow_step_id,
-						'resume_generation' => $resume_generation,
-						'execution_state'   => $execution_state,
-						'scheduler'         => $schedule_result,
-					)
-				);
-				return;
-			}
-			$contention_data['state']           = 'deferred';
-			$contention_data['terminal_reason'] = 'ai_concurrency_defer_schedule_failed';
-			$contention_data['next_retry_at']   = null;
-			$contention_data['action_id']       = null;
-			$contention_data['scheduler']       = array(
-				'attempts'      => (int) ( $schedule_result['attempts'] ?? 0 ),
-				'error_message' => (string) ( $schedule_result['error_message'] ?? '' ),
-				'claim_released' => $released,
-			);
-			EngineData::mutate(
-				$this->job_id,
-				static function ( array $engine ) use ( $contention_data ): array {
-					$engine['ai_concurrency_throttle'] = $contention_data;
-					return $engine;
-				},
-				'ai_concurrency_defer_schedule_failed'
-			);
-			do_action(
-				'datamachine_fail_job',
-				$this->job_id,
-				'ai_concurrency_defer_schedule_failed',
-				array(
-					'flow_step_id'    => $this->flow_step_id,
-					'ai_provider'     => $provider_name,
-					'retryable'       => $released,
-					'resume_generation' => $resume_generation,
-					'scheduler_attempts' => (int) ( $schedule_result['attempts'] ?? 0 ),
-					'error_message'   => (string) ( $schedule_result['error_message'] ?? '' ),
-					'claim_released'  => $released,
-				)
+				(string) $claim['token'],
+				$contention_data,
+				$schedule_result
 			);
 			return;
 		}

@@ -124,6 +124,26 @@ final class ScheduleActionIdentity {
 		return null;
 	}
 
+	public static function exactActionId( string $hook, array $args, string $group, string $status ): int {
+		if ( ! function_exists( 'as_get_scheduled_actions' ) ) {
+			return 0;
+		}
+
+		$action_ids = as_get_scheduled_actions(
+			array(
+				'hook'     => $hook,
+				'args'     => $args,
+				'group'    => $group,
+				'status'   => $status,
+				'per_page' => 1,
+			),
+			'ids'
+		);
+		$action_id = is_array( $action_ids ) ? reset( $action_ids ) : 0;
+
+		return is_numeric( $action_id ) && (int) $action_id > 0 ? (int) $action_id : 0;
+	}
+
 	public static function countExactPending( string $hook, array $args, string $group ): int {
 		if ( ! function_exists( 'as_get_scheduled_actions' ) ) {
 			return 0;

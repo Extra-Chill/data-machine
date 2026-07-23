@@ -8,6 +8,7 @@
 namespace DataMachine\Engine\AI;
 
 use DataMachine\Core\EngineData;
+use DataMachine\Engine\Tasks\ScheduleActionIdentity;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -67,15 +68,7 @@ class AIConcurrencyBackpressure {
 	 */
 	public static function scheduleContinuation( int $timestamp, array $args ): array {
 		if ( ! function_exists( 'as_schedule_single_action' ) ) {
-			return array(
-				'success'       => false,
-				'action_id'     => 0,
-				'action_status' => '',
-				'reused'        => false,
-				'attempts'      => 0,
-				'retryable'     => true,
-				'error_message' => 'Action Scheduler is unavailable.',
-			);
+			return self::scheduleFailure( 0, 'Action Scheduler is unavailable.' );
 		}
 
 		$group         = self::continuationGroup( $args );
@@ -124,14 +117,9 @@ class AIConcurrencyBackpressure {
 			}
 		}
 
-		return array(
-			'success'       => false,
-			'action_id'     => 0,
-			'action_status' => '',
-			'reused'        => false,
-			'attempts'      => self::SCHEDULE_ATTEMPTS,
-			'retryable'     => true,
-			'error_message' => $error_message ?: 'Action Scheduler returned no action ID.',
+		return self::scheduleFailure(
+			self::SCHEDULE_ATTEMPTS,
+			'' !== $error_message ? $error_message : 'Action Scheduler returned no action ID.'
 		);
 	}
 
@@ -352,28 +340,32 @@ class AIConcurrencyBackpressure {
 
 	/** @return array{action_id:int,status:string} */
 	private static function activeContinuation( array $args, string $group ): array {
-		if ( ! function_exists( 'as_get_scheduled_actions' ) ) {
-			return array( 'action_id' => 0, 'status' => '' );
-		}
-
 		foreach ( array( 'pending', 'in-progress' ) as $status ) {
-			$action_ids = as_get_scheduled_actions(
-				array(
-					'hook'     => self::RESUME_HOOK,
-					'args'     => $args,
-					'group'    => $group,
-					'status'   => $status,
-					'per_page' => 1,
-				),
-				'ids'
-			);
-
-			$action_id = is_array( $action_ids ) ? reset( $action_ids ) : 0;
-			if ( is_numeric( $action_id ) && (int) $action_id > 0 ) {
-				return array( 'action_id' => (int) $action_id, 'status' => $status );
+			$action_id = ScheduleActionIdentity::exactActionId( self::RESUME_HOOK, $args, $group, $status );
+			if ( $action_id > 0 ) {
+				return array(
+					'action_id' => $action_id,
+					'status'    => $status,
+				);
 			}
 		}
 
-		return array( 'action_id' => 0, 'status' => '' );
+		return array(
+			'action_id' => 0,
+			'status'    => '',
+		);
+	}
+
+	/** @return array{success:bool,action_id:int,action_status:string,reused:bool,attempts:int,retryable:bool,error_message:string} */
+	private static function scheduleFailure( int $attempts, string $error_message ): array {
+		return array(
+			'success'       => false,
+			'action_id'     => 0,
+			'action_status' => '',
+			'reused'        => false,
+			'attempts'      => $attempts,
+			'retryable'     => true,
+			'error_message' => $error_message,
+		);
 	}
 }
