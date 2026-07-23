@@ -26,7 +26,7 @@ class RecoverStuckJobsAbility {
 	private const ACTION_HISTORY_LIMIT = 20;
 	private const ACTION_SCAN_PAGE_SIZE = 50;
 	private const RECOVERY_CLAIM_TTL   = 300;
-	private const DEFAULT_APPLY_LIMIT   = 25;
+	private const DEFAULT_APPLY_LIMIT   = 3;
 	private const MAX_APPLY_LIMIT       = 100;
 
 	/**
@@ -635,7 +635,7 @@ class RecoverStuckJobsAbility {
 	}
 
 	/** @return array<int,array<string,mixed>> */
-	private function getStepActionHistory( int $job_id ): array {
+	private function getStepActionHistory( int $job_id, int $required_action_id = 0 ): array {
 		global $wpdb;
 		$actions_table = $wpdb->prefix . 'actionscheduler_actions';
 		$job_arg_prefix = '%"job_id":' . $wpdb->esc_like( (string) $job_id );
@@ -685,6 +685,25 @@ class RecoverStuckJobsAbility {
 				}
 			}
 		}
+
+		if ( $required_action_id > 0 && ! in_array( $required_action_id, array_map( 'intval', array_column( $history, 'action_id' ) ), true ) ) {
+			// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name is generated from the WP prefix.
+			$required = $wpdb->get_row(
+				$wpdb->prepare(
+					"SELECT action_id, hook, status, claim_id, scheduled_date_gmt, last_attempt_gmt, attempts, args FROM {$actions_table} WHERE action_id = %d AND hook IN (%s, %s)",
+					$required_action_id,
+					'datamachine_execute_step',
+					'datamachine_resume_ai_step'
+				),
+				ARRAY_A
+			);
+			// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			$args = is_array( $required ) ? json_decode( (string) ( $required['args'] ?? '' ), true ) : null;
+			if ( is_array( $required ) && is_array( $args ) && ChildJobRecoveryPolicy::actionBelongsToJob( $args, $job_id ) ) {
+				$required['decoded_args'] = $args;
+				$history[]                = $required;
+			}
+		}
 		return $history;
 	}
 
@@ -699,15 +718,35 @@ class RecoverStuckJobsAbility {
 				'expires_at' => '',
 			);
 		}
+		$engine_data       = is_array( $job['engine_data'] ?? null ) ? $job['engine_data'] : array();
+		$owner             = is_array( $engine_data['scheduler_recovery'] ?? null ) ? $engine_data['scheduler_recovery'] : array();
+		$receipt           = is_array( $owner['receipt'] ?? null ) ? $owner['receipt'] : array();
+		$actions           = $this->getStepActionHistory( $job_id, (int) ( $receipt['action_id'] ?? 0 ) );
+		if ( ! ChildJobRecoveryPolicy::canClaimNextGeneration( $job, $engine_data, $actions, time() ) ) {
+			return array(
+				'owned'      => false,
+				'token'      => '',
+				'generation' => 0,
+				'expires_at' => '',
+			);
+		}
+		$observed_owner = is_array( $engine_data['scheduler_recovery'] ?? null ) ? $engine_data['scheduler_recovery'] : array();
 
 		$token = bin2hex( random_bytes( 16 ) );
 		$now   = time();
 		$result = EngineData::mutate(
 			$job_id,
-			static function ( array $engine ) use ( $token, $trigger, $now ): ?array {
+			static function ( array $engine ) use ( $token, $trigger, $now, $job, $actions, $observed_owner ): ?array {
 				$current = is_array( $engine['scheduler_recovery'] ?? null ) ? $engine['scheduler_recovery'] : array();
-				$expiry  = strtotime( (string) ( $current['expires_at'] ?? '' ) );
-				if ( 'claimed' === ( $current['state'] ?? '' ) && false !== $expiry && $now < $expiry ) {
+				if ( empty( $observed_owner ) !== empty( $current ) ) {
+					return null;
+				}
+				if ( ! empty( $observed_owner ) && ( (int) ( $current['generation'] ?? 0 ) !== (int) ( $observed_owner['generation'] ?? 0 ) || ! hash_equals( (string) ( $observed_owner['token'] ?? '' ), (string) ( $current['token'] ?? '' ) ) ) ) {
+					return null;
+				}
+				$current_job                = $job;
+				$current_job['engine_data'] = $engine;
+				if ( ! ChildJobRecoveryPolicy::canClaimNextGeneration( $current_job, $engine, $actions, $now ) ) {
 					return null;
 				}
 				$engine['scheduler_recovery'] = array(

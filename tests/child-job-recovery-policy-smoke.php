@@ -90,5 +90,44 @@ $invalid_receipt = ChildJobRecoveryPolicy::recoveryOwnershipEvidence(
 );
 $assert( 'mismatched receipt is reported invalid', 'invalid' === $invalid_receipt['state'] && 'invalid' === $invalid_receipt['receipt_state'] );
 
+$generation_job = array( 'job_id' => 42, 'operation_state' => '' );
+$running_engine = array(
+	'scheduler_recovery' => array(
+		'state'      => 'running',
+		'token'      => 'generation-n',
+		'generation' => 4,
+		'expires_at' => '2026-07-22T11:55:00Z',
+		'receipt'    => array( 'generation' => 4, 'action_id' => 55 ),
+	),
+);
+$running_action = array(
+	'action_id'    => 55,
+	'hook'         => 'datamachine_execute_step',
+	'status'       => 'in-progress',
+	'decoded_args' => array( 'job_id' => 42, 'flow_step_id' => 'step', 'recovery_generation' => 4, 'recovery_claim_token' => 'generation-n' ),
+);
+$assert(
+	'N+1 claim is denied while exact N action is in progress despite expired lease',
+	! ChildJobRecoveryPolicy::canClaimNextGeneration( $generation_job, $running_engine, array( $running_action ), strtotime( '2026-07-22T12:00:00Z' ) )
+);
+
+$failed_action           = $running_action;
+$failed_action['status'] = 'failed';
+$assert(
+	'N+1 claim is allowed after exact N action fails',
+	ChildJobRecoveryPolicy::canClaimNextGeneration( $generation_job, $running_engine, array( $failed_action ), strtotime( '2026-07-22T12:00:00Z' ) )
+);
+$assert(
+	'N+1 claim is allowed after exact N action disappears and lease is stale',
+	ChildJobRecoveryPolicy::canClaimNextGeneration( $generation_job, $running_engine, array(), strtotime( '2026-07-22T12:00:00Z' ) )
+);
+
+$fresh_running_engine = $running_engine;
+$fresh_running_engine['scheduler_recovery']['expires_at'] = '2026-07-22T12:05:00Z';
+$assert(
+	'N+1 claim remains denied without action while execution heartbeat is fresh',
+	! ChildJobRecoveryPolicy::canClaimNextGeneration( $generation_job, $fresh_running_engine, array(), strtotime( '2026-07-22T12:00:00Z' ) )
+);
+
 echo "\nChild job recovery policy smoke complete: {$total} assertions, {$failed} failures.\n";
 exit( $failed > 0 ? 1 : 0 );

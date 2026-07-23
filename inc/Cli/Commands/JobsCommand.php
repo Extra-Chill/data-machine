@@ -97,7 +97,7 @@ class JobsCommand extends BaseCommand {
 	 * [--limit=<limit>]
 	 * : Hard attempted storage-touch limit for this invocation (maximum 100).
 	 * ---
-	 * default: 25
+	 * default: 3
 	 * ---
 	 *
 	 * [--recover-pathless-children]
@@ -112,7 +112,7 @@ class JobsCommand extends BaseCommand {
 	 *     wp datamachine jobs recover-stuck
 	 *
 	 *     # Recover one reviewed pathless child
-	 *     wp datamachine jobs recover-stuck --job-id=123 --recover-pathless-children --limit=1
+	 *     wp datamachine jobs recover-stuck --job-id=123 --recover-pathless-children --limit=3
 	 *
 	 *     # Recover stuck jobs for a specific flow
 	 *     wp datamachine jobs recover-stuck --flow=98
@@ -136,7 +136,7 @@ class JobsCommand extends BaseCommand {
 			return;
 		}
 		$job_id  = is_int( $requested_job_id ) ? $requested_job_id : null;
-		$limit   = isset( $assoc_args['limit'] ) ? max( 1, min( 100, (int) $assoc_args['limit'] ) ) : 25;
+		$limit   = isset( $assoc_args['limit'] ) ? max( 1, min( 100, (int) $assoc_args['limit'] ) ) : 3;
 		$recover_pathless_children = isset( $assoc_args['recover-pathless-children'] );
 
 		$result = AbilityRunner::execute(

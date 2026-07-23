@@ -282,6 +282,9 @@ class ExecuteStepAbility {
 				'engine'       => $engine,
 			);
 
+			if ( $recovery_generation > 0 && ! $this->db_jobs->renew_recovery_execution_owner( $job_id, $recovery_claim_token, $recovery_generation ) ) {
+				return $this->staleRecoveryGeneration( $job_id, $recovery_generation, 'lost ownership before handler execution' );
+			}
 			$step_output = $flow_step->execute( $payload );
 			if ( ! $this->recoveryGenerationStillOwned( $job_id, $recovery_generation, $recovery_claim_token ) ) {
 				return $this->staleRecoveryGeneration( $job_id, $recovery_generation, 'was superseded during execution' );

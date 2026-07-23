@@ -2013,6 +2013,56 @@ class Jobs extends BaseRepository {
 		);
 	}
 
+	/** Renew the exact recovery generation immediately before handler execution. */
+	public function renew_recovery_execution_owner( int $job_id, string $token, int $generation ): bool {
+		if ( $job_id <= 0 || '' === $token || $generation <= 0 ) {
+			return false;
+		}
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		if ( false === $this->wpdb->query( 'START TRANSACTION' ) ) {
+			return false;
+		}
+
+		$job   = $this->get_job_for_update( $job_id );
+		$owner = array(
+			'token'      => $token,
+			'generation' => $generation,
+			'mode'       => 'execution',
+		);
+		if ( ! is_array( $job ) || JobStatus::PROCESSING !== ( $job['status'] ?? '' ) || ! $this->terminal_recovery_owner_matches( $job, $owner ) ) {
+			$this->wpdb->query( 'ROLLBACK' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			return false;
+		}
+
+		$engine = is_array( $job['engine_data'] ?? null ) ? $job['engine_data'] : array();
+		$now    = time();
+		$engine['scheduler_recovery']['state']        = 'running';
+		$engine['scheduler_recovery']['heartbeat_at'] = gmdate( 'c', $now );
+		$engine['scheduler_recovery']['expires_at']   = gmdate( 'c', $now + self::RECOVERY_LEASE_TTL );
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$updated = $this->wpdb->update(
+			$this->table_name,
+			array( 'engine_data' => wp_json_encode( $engine ) ),
+			array(
+				'job_id' => $job_id,
+				'status' => JobStatus::PROCESSING,
+			),
+			array( '%s' ),
+			array( '%d', '%s' )
+		);
+		if ( 1 !== (int) $updated ) {
+			$this->wpdb->query( 'ROLLBACK' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			return false;
+		}
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$committed = false !== $this->wpdb->query( 'COMMIT' );
+		wp_cache_delete( $job_id, 'datamachine_engine_data' );
+		return $committed;
+	}
+
 	/**
 	 * Schedule and receipt one child requeue inside the recovery owner's locked transaction.
 	 *

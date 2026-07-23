@@ -35,6 +35,47 @@ class ChildJobRecoveryPolicy {
 			&& self::operationGenerationMatches( $job, $args );
 	}
 
+	/** Exact pending/in-progress action ownership is a timeout-independent heartbeat. */
+	public static function hasActiveGenerationAction( array $job, array $engine_data, array $actions ): bool {
+		foreach ( $actions as $action ) {
+			if ( in_array( (string) ( $action['status'] ?? '' ), array( 'pending', 'in-progress' ), true ) && self::actionGenerationMatches( $job, $engine_data, $action ) ) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/** Detect a failed exact action that makes its generation reclaimable immediately. */
+	public static function hasFailedGenerationAction( array $job, array $engine_data, array $actions ): bool {
+		foreach ( $actions as $action ) {
+			if ( 'failed' === (string) ( $action['status'] ?? '' ) && self::actionGenerationMatches( $job, $engine_data, $action ) ) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/** Decide whether a new recovery generation may replace current ownership. */
+	public static function canClaimNextGeneration( array $job, array $engine_data, array $actions, int $now ): bool {
+		if ( self::hasActiveGenerationAction( $job, $engine_data, $actions ) ) {
+			return false;
+		}
+
+		$owner = is_array( $engine_data['scheduler_recovery'] ?? null ) ? $engine_data['scheduler_recovery'] : array();
+		if ( empty( $owner ) ) {
+			return true;
+		}
+		if ( 'terminalized' === (string) ( $owner['state'] ?? '' ) ) {
+			return false;
+		}
+		if ( self::hasFailedGenerationAction( $job, $engine_data, $actions ) ) {
+			return true;
+		}
+
+		$expiry = strtotime( (string) ( $owner['expires_at'] ?? '' ) );
+		return false === $expiry || $expiry <= $now;
+	}
+
 	/** Describe only validated lease and receipt ownership evidence. */
 	public static function recoveryOwnershipEvidence( array $engine_data, int $now ): array {
 		$owner      = is_array( $engine_data['scheduler_recovery'] ?? null ) ? $engine_data['scheduler_recovery'] : array();
@@ -47,7 +88,7 @@ class ChildJobRecoveryPolicy {
 			&& 0 < $generation
 			&& false !== $expiry
 			&& $now < $expiry;
-		$action_receipt_valid = 'requeued' === (string) ( $owner['state'] ?? '' )
+		$action_receipt_valid = in_array( (string) ( $owner['state'] ?? '' ), array( 'requeued', 'running' ), true )
 			&& '' !== $token
 			&& 0 < $generation
 			&& (int) ( $receipt['generation'] ?? 0 ) === $generation
@@ -157,7 +198,7 @@ class ChildJobRecoveryPolicy {
 		$token   = (string) ( $args['recovery_claim_token'] ?? '' );
 
 		return '' !== $token
-			&& 'requeued' === (string) ( $owner['state'] ?? '' )
+			&& in_array( (string) ( $owner['state'] ?? '' ), array( 'requeued', 'running' ), true )
 			&& (int) ( $owner['generation'] ?? 0 ) === $generation
 			&& (int) ( $receipt['generation'] ?? 0 ) === $generation
 			&& hash_equals( $token, (string) ( $owner['token'] ?? '' ) )
