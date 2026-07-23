@@ -2,6 +2,12 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.51.1] - 2026-07-23
+
+### Fixed
+- make event source identities time-aware
+- serialize canonical event upserts
+
 ## [0.51.0] - 2026-07-22
 
 ### Added
