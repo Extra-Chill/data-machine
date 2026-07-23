@@ -41,8 +41,49 @@ class EventTaxonomyAssigner {
 	 * @param array $parameters Event parameters
 	 * @param EngineData $engine Engine data helper
 	 * @param array $handler_config Handler configuration with taxonomy selections
+	 * @param array|null $resolution Previously resolved venue operation.
+	 * @return array Assignment result.
 	 */
-	public function processVenue( int $post_id, array $parameters, EngineData $engine, array $handler_config = array() ): void {
+	public function processVenue( int $post_id, array $parameters, EngineData $engine, array $handler_config = array(), ?array $resolution = null ): array {
+		$resolution = $resolution ?? $this->resolveVenue( $parameters, $engine, $handler_config, $post_id );
+
+		if ( 'clear' === $resolution['action'] ) {
+			$result = wp_set_post_terms( $post_id, array(), 'venue' );
+			return is_wp_error( $result )
+				? array(
+					'success' => false,
+					'error'   => $result->get_error_message(),
+				)
+				: array(
+					'success' => true,
+					'error'   => null,
+				);
+		}
+
+		if ( 'assign' !== $resolution['action'] || empty( $resolution['term_id'] ) ) {
+			return array(
+				'success' => true,
+				'error'   => null,
+				'skipped' => true,
+			);
+		}
+
+		return Venue::assign_venue_to_event(
+			$post_id,
+			array( 'venue' => (int) $resolution['term_id'] )
+		);
+	}
+
+	/**
+	 * Resolve the exact venue operation once for persistence and assignment.
+	 *
+	 * @param array      $parameters     Event parameters.
+	 * @param EngineData $engine         Engine data helper.
+	 * @param array      $handler_config Handler configuration.
+	 * @param int        $post_id        Event post ID for log context.
+	 * @return array{term_id:int, action:string} Venue resolution.
+	 */
+	public function resolveVenue( array $parameters, EngineData $engine, array $handler_config = array(), int $post_id = 0 ): array {
 		$venue_name = $engine->get( 'venue' ) ?? $parameters['venue'] ?? '';
 
 		if ( empty( $venue_name ) ) {
@@ -53,8 +94,10 @@ class EventTaxonomyAssigner {
 		}
 
 		if ( empty( $venue_name ) ) {
-			wp_set_post_terms( $post_id, array(), 'venue' );
-			return;
+			return array(
+				'term_id' => 0,
+				'action'  => 'clear',
+			);
 		}
 
 		if ( $this->isVenueNameMatchingArtist( $venue_name, $handler_config ) ) {
@@ -68,7 +111,10 @@ class EventTaxonomyAssigner {
 					'artist_name' => $this->getPreSelectedArtistName( $handler_config ),
 				)
 			);
-			return;
+			return array(
+				'term_id' => 0,
+				'action'  => 'skip',
+			);
 		}
 
 		// Merge engine data with AI parameters (engine takes precedence)
@@ -77,14 +123,10 @@ class EventTaxonomyAssigner {
 
 		$venue_result = Venue_Taxonomy::find_or_create_venue( $venue_name, $venue_metadata );
 
-		if ( $venue_result['term_id'] ) {
-			Venue::assign_venue_to_event(
-				$post_id,
-				array(
-					'venue' => $venue_result['term_id'],
-				)
-			);
-		}
+		return array(
+			'term_id' => absint( $venue_result['term_id'] ?? 0 ),
+			'action'  => ! empty( $venue_result['term_id'] ) ? 'assign' : 'skip',
+		);
 	}
 
 	/**

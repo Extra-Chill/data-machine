@@ -152,6 +152,9 @@ class EventUpsertTest extends WP_UnitTestCase {
 
 	public function tearDown(): void {
 		remove_filter( 'query', $this->lock_query_filter );
+		remove_all_filters( 'datamachine_events_before_event_upsert_persistence' );
+		remove_all_actions( 'datamachine_events_after_event_upsert_persistence' );
+		remove_all_filters( 'wp_insert_post_empty_content' );
 		parent::tearDown();
 	}
 

@@ -146,6 +146,9 @@ class EventUpdateAbilities {
 										'updated_fields' => array( 'type' => 'array' ),
 										'warnings'       => array( 'type' => 'array' ),
 										'error'          => array( 'type' => 'string' ),
+										'error_code'     => array( 'type' => 'string' ),
+										'error_data'     => array( 'type' => 'object' ),
+										'error_status'   => array( 'type' => 'integer' ),
 									),
 								),
 							),
@@ -272,6 +275,20 @@ class EventUpdateAbilities {
 			);
 		}
 
+		$venue_requested   = array_key_exists( 'venue', $event_update );
+		$content_requested = array_key_exists( 'description', $event_update )
+			|| ! empty( array_intersect( self::UPDATABLE_FIELDS, array_keys( $event_update ) ) );
+		if ( $venue_requested && $content_requested ) {
+			return $this->updateErrorResult(
+				$post,
+				new \WP_Error(
+					'event_update_mixed_venue_content_unsupported',
+					'Venue and event content must be updated in separate operations.',
+					array( 'status' => 409 )
+				)
+			);
+		}
+
 		$updated_fields = array();
 		$warnings       = array();
 
@@ -290,15 +307,6 @@ class EventUpdateAbilities {
 		$existing_attrs = $blocks[ $block_index ]['attrs'] ?? array();
 		$new_attrs      = $this->buildUpdatedAttributes( $existing_attrs, $event_update, $updated_fields );
 
-		if ( ! empty( $event_update['venue'] ) ) {
-			$venue_result = $this->updateVenue( $post_id, (int) $event_update['venue'] );
-			if ( $venue_result['success'] ) {
-				$updated_fields[] = 'venue';
-			} else {
-				$warnings[] = $venue_result['warning'];
-			}
-		}
-
 		if ( array_key_exists( 'description', $event_update ) ) {
 			$description_value = $event_update['description'] ?? '';
 			$inner_blocks      = $this->generateDescriptionInnerBlocks( $description_value );
@@ -306,7 +314,30 @@ class EventUpdateAbilities {
 			$updated_fields[] = 'description';
 		}
 
-		if ( empty( $updated_fields ) && empty( $warnings ) ) {
+		$requested_venue_id = $venue_requested ? absint( $event_update['venue'] ) : 0;
+		$previous_venue_ids = wp_get_object_terms( $post_id, 'venue', array( 'fields' => 'ids' ) );
+		if ( is_wp_error( $previous_venue_ids ) ) {
+			return $this->updateErrorResult(
+				$post,
+				new \WP_Error(
+					'event_venue_read_failed',
+					'The existing event venue could not be read safely.',
+					array(
+						'status'         => 503,
+						'database_error' => $previous_venue_ids->get_error_message(),
+						'cause'          => $previous_venue_ids->get_error_code(),
+					)
+				)
+			);
+		}
+		$previous_venue_ids   = array_values( array_unique( array_filter( array_map( 'absint', $previous_venue_ids ) ) ) );
+		$next_venue_id        = 1 === count( $previous_venue_ids ) ? (int) reset( $previous_venue_ids ) : 0;
+		$requested_venue_term = $venue_requested ? get_term( $requested_venue_id, 'venue' ) : null;
+		if ( $venue_requested && $requested_venue_term && ! is_wp_error( $requested_venue_term ) ) {
+			$next_venue_id = $requested_venue_id;
+		}
+
+		if ( empty( $updated_fields ) && ! $venue_requested ) {
 			return array(
 				'post_id' => $post_id,
 				'title'   => $post->post_title,
@@ -315,34 +346,81 @@ class EventUpdateAbilities {
 			);
 		}
 
-		if ( ! empty( $updated_fields ) && array( 'venue' ) !== $updated_fields ) {
-			$blocks[ $block_index ]['attrs'] = $new_attrs;
-			$new_content                     = serialize_blocks( $blocks );
+		$context          = array(
+			'invocation_id'      => wp_generate_uuid4(),
+			'post_id'            => $post_id,
+			'post_status'        => (string) $post->post_status,
+			'event'              => $new_attrs,
+			'next_venue_id'      => $next_venue_id,
+			'previous_venue_ids' => $previous_venue_ids,
+		);
+		$lifecycle_result = null;
 
-			$update_result = wp_update_post(
-				array(
-					'ID'           => $post_id,
-					'post_content' => $new_content,
-				),
-				true
-			);
-
-			if ( is_wp_error( $update_result ) ) {
-				return array(
-					'post_id' => $post_id,
-					'title'   => $post->post_title,
-					'status'  => 'failed',
-					'error'   => 'Failed to update post: ' . $update_result->get_error_message(),
-				);
+		try {
+			$preflight = apply_filters( 'datamachine_events_before_event_update_persistence', true, $context );
+			if ( false === $preflight ) {
+				$preflight = new \WP_Error( 'event_update_persistence_denied', 'Event update persistence was denied.', array( 'status' => 403 ) );
 			}
+			if ( is_wp_error( $preflight ) ) {
+				$lifecycle_result = $this->updateErrorResult( $post, $preflight );
+				return $lifecycle_result;
+			}
+
+			if ( $venue_requested ) {
+				$venue_result = $this->updateVenue( $post_id, $requested_venue_id );
+				if ( ! $venue_result['success'] ) {
+					$error            = $venue_result['error'] ?? new \WP_Error( 'event_venue_assignment_failed', (string) ( $venue_result['warning'] ?? 'Failed to assign venue.' ) );
+					$lifecycle_result = $this->updateErrorResult( $post, $error );
+					return $lifecycle_result;
+				}
+				$updated_fields[] = 'venue';
+			}
+
+			if ( ! empty( array_diff( $updated_fields, array( 'venue' ) ) ) ) {
+				$blocks[ $block_index ]['attrs'] = $new_attrs;
+				$new_content                     = serialize_blocks( $blocks );
+				$update_result                   = wp_update_post(
+					array(
+						'ID'           => $post_id,
+						'post_content' => $new_content,
+					),
+					true
+				);
+
+				if ( is_wp_error( $update_result ) ) {
+					$lifecycle_result = $this->updateErrorResult( $post, $update_result, 'Failed to update post: ' );
+					return $lifecycle_result;
+				}
+			}
+
+			$lifecycle_result = array(
+				'post_id'        => $post_id,
+				'title'          => $post->post_title,
+				'status'         => 'updated',
+				'updated_fields' => $updated_fields,
+				'warnings'       => $warnings,
+			);
+			return $lifecycle_result;
+		} finally {
+			do_action( 'datamachine_events_after_event_update_persistence', $context, $lifecycle_result );
 		}
+	}
+
+	/** Build one structured failed update item without discarding error status. */
+	private function updateErrorResult( \WP_Post $post, \WP_Error $error, string $prefix = '' ): array {
+		$data           = $error->get_error_data();
+		$data           = is_array( $data ) ? $data : array();
+		$status         = (int) ( $data['status'] ?? 500 );
+		$data['status'] = $status;
 
 		return array(
-			'post_id'        => $post_id,
-			'title'          => $post->post_title,
-			'status'         => 'updated',
-			'updated_fields' => $updated_fields,
-			'warnings'       => $warnings,
+			'post_id'      => (int) $post->ID,
+			'title'        => $post->post_title,
+			'status'       => 'failed',
+			'error'        => $prefix . $error->get_error_message(),
+			'error_code'   => $error->get_error_code(),
+			'error_data'   => $data,
+			'error_status' => $status,
 		);
 	}
 
@@ -432,6 +510,10 @@ class EventUpdateAbilities {
 	/**
 	 * Update venue taxonomy assignment.
 	 *
+	 * This lifecycle covers direct venue changes owned by the event update
+	 * ability. Upsert venue reconciliation remains covered by EventUpsert's
+	 * broader permission and completion lifecycle and does not duplicate these hooks.
+	 *
 	 * @param int $post_id Event post ID
 	 * @param int $venue_id Venue term ID
 	 * @return array Result with 'success' and optionally 'warning'
@@ -446,16 +528,58 @@ class EventUpdateAbilities {
 			);
 		}
 
-		$result = wp_set_post_terms( $post_id, array( $venue_id ), 'venue' );
+		$context            = 'event_update_ability';
+		$next_venue_ids     = array( absint( $venue_id ) );
+		$previous_venue_ids = wp_get_object_terms( $post_id, 'venue', array( 'fields' => 'ids' ) );
+		$previous_venue_ids = is_wp_error( $previous_venue_ids )
+			? array()
+			: array_values( array_unique( array_filter( array_map( 'absint', $previous_venue_ids ) ) ) );
+		$result             = null;
 
-		if ( is_wp_error( $result ) ) {
-			return array(
-				'success' => false,
-				'warning' => 'Failed to assign venue: ' . $result->get_error_message(),
+		try {
+			$preflight = apply_filters(
+				'datamachine_events_before_event_venue_mutation',
+				true,
+				$post_id,
+				$next_venue_ids,
+				$previous_venue_ids,
+				$context
+			);
+			if ( false === $preflight ) {
+				$preflight = new \WP_Error( 'event_venue_mutation_denied', 'Venue mutation was denied.', array( 'status' => 403 ) );
+			}
+
+			if ( is_wp_error( $preflight ) ) {
+				$result = $preflight;
+
+				return array(
+					'success' => false,
+					'warning' => 'Failed to assign venue: ' . $preflight->get_error_message(),
+					'error'   => $preflight,
+				);
+			}
+
+			$result = wp_set_post_terms( $post_id, $next_venue_ids, 'venue' );
+
+			if ( is_wp_error( $result ) ) {
+				return array(
+					'success' => false,
+					'warning' => 'Failed to assign venue: ' . $result->get_error_message(),
+					'error'   => $result,
+				);
+			}
+
+			return array( 'success' => true );
+		} finally {
+			do_action(
+				'datamachine_events_after_event_venue_mutation',
+				$post_id,
+				$next_venue_ids,
+				$previous_venue_ids,
+				$context,
+				$result
 			);
 		}
-
-		return array( 'success' => true );
 	}
 
 	/**

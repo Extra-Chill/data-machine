@@ -41,6 +41,9 @@ class EventTaxonomyAssignerTest extends WP_UnitTestCase {
 				)
 			);
 		}
+		if ( ! taxonomy_exists( 'artist' ) ) {
+			register_taxonomy( 'artist', 'data_machine_events' );
+		}
 
 		$this->assigner = new EventTaxonomyAssigner();
 	}
@@ -62,8 +65,9 @@ class EventTaxonomyAssignerTest extends WP_UnitTestCase {
 		$venue_name = 'Test Assigner Venue ' . uniqid();
 		$engine     = new \DataMachine\Core\EngineData( array( 'venue' => $venue_name ), 0 );
 
-		$this->assigner->processVenue( $post_id, array(), $engine );
+		$result = $this->assigner->processVenue( $post_id, array(), $engine );
 
+		$this->assertTrue( $result['success'] );
 		$terms = wp_get_object_terms( $post_id, 'venue' );
 		$this->assertNotWPError( $terms );
 		$this->assertCount( 1, $terms, 'processVenue must assign exactly one venue term.' );
@@ -86,8 +90,9 @@ class EventTaxonomyAssignerTest extends WP_UnitTestCase {
 		// No venue in engine data or parameters.
 		$engine = new \DataMachine\Core\EngineData( array(), 0 );
 
-		$this->assigner->processVenue( $post_id, array(), $engine );
+		$result = $this->assigner->processVenue( $post_id, array(), $engine );
 
+		$this->assertTrue( $result['success'] );
 		$terms = wp_get_object_terms( $post_id, 'venue' );
 		$this->assertNotWPError( $terms );
 		$this->assertCount( 0, $terms, 'processVenue must not assign a venue when none is provided.' );
@@ -136,12 +141,66 @@ class EventTaxonomyAssignerTest extends WP_UnitTestCase {
 		$this->assertNotWPError( $venue );
 		wp_set_object_terms( $post_id, array( $venue['term_id'] ), 'venue' );
 
-		$this->assigner->processVenue( $post_id, array(), new \DataMachine\Core\EngineData( array(), 0 ) );
+		$result = $this->assigner->processVenue( $post_id, array(), new \DataMachine\Core\EngineData( array(), 0 ) );
 
+		$this->assertTrue( $result['success'] );
 		$this->assertSame( array(), wp_get_object_terms( $post_id, 'venue', array( 'fields' => 'ids' ) ) );
 
 		wp_delete_post( $post_id, true );
 		wp_delete_term( $venue['term_id'], 'venue' );
+	}
+
+	public function test_process_venue_artist_name_skip_preserves_existing_assignment(): void {
+		$post_id = $this->make_event_post();
+		$venue   = wp_insert_term( 'Preserved Artist Skip Venue ' . uniqid(), 'venue' );
+		$artist  = wp_insert_term( 'Matching Artist ' . uniqid(), 'artist' );
+		$this->assertNotWPError( $venue );
+		$this->assertNotWPError( $artist );
+		wp_set_post_terms( $post_id, array( $venue['term_id'] ), 'venue' );
+
+		$result = $this->assigner->processVenue(
+			$post_id,
+			array(),
+			new \DataMachine\Core\EngineData( array( 'venue' => get_term( $artist['term_id'], 'artist' )->name ), 0 ),
+			array( 'taxonomy_artist_selection' => (string) $artist['term_id'] )
+		);
+
+		$this->assertTrue( $result['success'] );
+		$this->assertTrue( $result['skipped'] );
+		$this->assertSame( array( $venue['term_id'] ), wp_get_object_terms( $post_id, 'venue', array( 'fields' => 'ids' ) ) );
+	}
+
+	public function test_process_venue_failed_resolution_skips_without_mutation(): void {
+		$post_id = $this->make_event_post();
+		$venue   = wp_insert_term( 'Preserved Failed Resolution Venue ' . uniqid(), 'venue' );
+		$this->assertNotWPError( $venue );
+		wp_set_post_terms( $post_id, array( $venue['term_id'] ), 'venue' );
+
+		$result = $this->assigner->processVenue(
+			$post_id,
+			array(),
+			new \DataMachine\Core\EngineData( array(), 0 ),
+			array(),
+			array( 'term_id' => 0, 'action' => 'skip' )
+		);
+
+		$this->assertTrue( $result['success'] );
+		$this->assertTrue( $result['skipped'] );
+		$this->assertSame( array( $venue['term_id'] ), wp_get_object_terms( $post_id, 'venue', array( 'fields' => 'ids' ) ) );
+	}
+
+	public function test_process_venue_assignment_failure_returns_error_array(): void {
+		$result = $this->assigner->processVenue(
+			$this->make_event_post(),
+			array(),
+			new \DataMachine\Core\EngineData( array(), 0 ),
+			array(),
+			array( 'term_id' => PHP_INT_MAX, 'action' => 'assign' )
+		);
+
+		$this->assertIsArray( $result );
+		$this->assertFalse( $result['success'] );
+		$this->assertSame( 'Venue term does not exist', $result['error'] );
 	}
 
 	public function test_process_promoter_skips_when_selection_is_skip() {

@@ -289,7 +289,42 @@ class EventUpsert extends UpsertHandler {
 		}
 
 		// 2. Build event data.
-		$event_data = $this->buildEventData( $parameters, $handler_config, $engine, $existing_post_id );
+		$event_data             = $this->buildEventData( $parameters, $handler_config, $engine, $existing_post_id );
+		$venue_resolution       = $this->taxonomy_assigner->resolveVenue( $parameters, $engine, $handler_config );
+		$authoritative_venue_id = (int) $venue_resolution['term_id'];
+		if ( 'skip' === $venue_resolution['action'] && $existing_post_id > 0 ) {
+			$existing_venues = wp_get_object_terms( $existing_post_id, 'venue', array( 'fields' => 'ids' ) );
+			if ( is_wp_error( $existing_venues ) ) {
+				return $this->lifecycleErrorResponse(
+					new \WP_Error(
+						'event_retained_venue_read_failed',
+						'The existing event venue could not be read safely.',
+						array(
+							'status'    => 503,
+							'retryable' => true,
+						)
+					),
+					$title
+				);
+			}
+			$existing_venues = array_values( array_unique( array_filter( array_map( 'absint', $existing_venues ) ) ) );
+			if ( count( $existing_venues ) > 1 ) {
+				return $this->lifecycleErrorResponse(
+					new \WP_Error(
+						'event_retained_venue_ambiguous',
+						'The existing event has multiple venue assignments and cannot be updated safely.',
+						array(
+							'status'    => 409,
+							'venue_ids' => $existing_venues,
+						)
+					),
+					$title
+				);
+			}
+			if ( 1 === count( $existing_venues ) ) {
+				$authoritative_venue_id = (int) reset( $existing_venues );
+			}
+		}
 
 		// 3. Generate block content and compute hash for idempotency.
 		$block_content = $this->content_builder->generate_event_block_content( $event_data, $parameters );
@@ -330,99 +365,185 @@ class EventUpsert extends UpsertHandler {
 			return $this->errorResponse( 'datamachine/upsert-post ability not available' );
 		}
 
-		$result = $ability->execute( $upsert_input );
+		$context          = array(
+			'invocation_id'    => wp_generate_uuid4(),
+			'venue_term_id'    => $authoritative_venue_id,
+			'event'            => $event_data,
+			'post_status'      => $post_status,
+			'existing_post_id' => $existing_post_id,
+			'source'           => (string) ( $parameters['source'] ?? '' ),
+			'source_id'        => (string) ( $parameters['source_id'] ?? '' ),
+			'source_identity'  => $source_identity,
+		);
+		$post_id          = 0;
+		$lifecycle_result = null;
+		$warnings         = array();
 
-		if ( empty( $result['success'] ) ) {
-			return $this->errorResponse(
-				$result['error'] ?? 'Event upsert failed',
-				array( 'title' => $title )
+		try {
+			/**
+			 * Filters whether an event may cross the canonical persistence boundary.
+			 *
+			 * @param bool|\WP_Error $preflight True to continue, or an error to abort.
+			 * @param array          $context   Normalized event persistence context.
+			 */
+			$preflight = apply_filters( 'datamachine_events_before_event_upsert_persistence', true, $context );
+			if ( false === $preflight ) {
+				$preflight = new \WP_Error(
+					'event_upsert_persistence_denied',
+					'Event persistence was denied.',
+					array( 'status' => 403 )
+				);
+			}
+			if ( is_wp_error( $preflight ) ) {
+				$lifecycle_result = $preflight;
+				return $this->lifecycleErrorResponse( $preflight, $title );
+			}
+
+			$result = $ability->execute( $upsert_input );
+
+			if ( empty( $result['success'] ) ) {
+				$error_data = is_array( $result['error_data'] ?? null ) ? $result['error_data'] : array();
+				foreach ( array( 'status', 'retryable', 'transient', 'rule' ) as $field ) {
+					if ( array_key_exists( $field, $result ) ) {
+						$error_data[ $field ] = $result[ $field ];
+					}
+				}
+				$error_data['status'] = (int) ( $error_data['status'] ?? ( ! empty( $error_data['retryable'] ) || ! empty( $error_data['transient'] ) ? 503 : 400 ) );
+				$lifecycle_result     = new \WP_Error(
+					(string) ( $result['error_code'] ?? 'event_upsert_persistence_failed' ),
+					(string) ( $result['error'] ?? 'Event upsert failed' ),
+					$error_data
+				);
+				return $this->lifecycleErrorResponse( $lifecycle_result, $title );
+			}
+
+			$post_id = (int) $result['post_id'];
+			$action  = $result['action'];
+			if ( '' !== $source_identity ) {
+				update_post_meta( $post_id, self::SOURCE_IDENTITY_META_KEY, $source_identity );
+				update_post_meta( $post_id, self::SOURCE_NAME_META_KEY, sanitize_text_field( (string) ( $parameters['source'] ?? '' ) ) );
+				update_post_meta( $post_id, self::SOURCE_ID_META_KEY, sanitize_text_field( (string) ( $parameters['source_id'] ?? '' ) ) );
+			}
+
+			// 7. Content idempotency does not imply taxonomy or identity integrity.
+			// Skip image work for unchanged content, but always reconcile indexed state.
+			if ( 'no_change' !== $action ) {
+				$this->processEventFeaturedImage( $post_id, $handler_config, $engine );
+			}
+			$venue_assignment = $this->taxonomy_assigner->processVenue( $post_id, $parameters, $engine, $handler_config, $venue_resolution );
+			if ( empty( $venue_assignment['success'] ) ) {
+				$warnings[] = (string) ( $venue_assignment['error'] ?? 'Venue assignment failed.' );
+				do_action(
+					'datamachine_log',
+					'warning',
+					'Event upsert completed without venue assignment',
+					array(
+						'post_id' => $post_id,
+						'warning' => end( $warnings ),
+					)
+				);
+			}
+			$this->taxonomy_assigner->processPromoter( $post_id, $parameters, $engine, $handler_config );
+
+			// Derive location from the event's actual venue city rather than the
+			// pipeline's ingest center. processLocation returns true when it took
+			// ownership of the location term (PRE_SELECTED mode), in which case the
+			// generic taxonomy pass below must skip location so it doesn't
+			// re-stamp the pipeline-center term. See data-machine-events#379.
+			$location_handled = $this->taxonomy_assigner->processLocation( $post_id, $parameters, $engine, $handler_config );
+
+			// Map performer to artist taxonomy if not explicitly provided.
+			if ( empty( $parameters['artist'] ) && ! empty( $event_data['performer'] ) ) {
+				$parameters['artist'] = $event_data['performer'];
+			}
+
+			$handler_config_for_tax                                = $handler_config;
+			$handler_config_for_tax['taxonomy_venue_selection']    = 'skip';
+			$handler_config_for_tax['taxonomy_promoter_selection'] = 'skip';
+			if ( $location_handled ) {
+				$handler_config_for_tax['taxonomy_location_selection'] = 'skip';
+			}
+			$engine_data_array = $engine instanceof EngineData ? $engine->all() : array();
+			$this->taxonomy_handler->processTaxonomies( $post_id, $parameters, $handler_config_for_tax, $engine_data_array );
+
+			do_action( 'datamachine_event_taxonomy_processed', $post_id );
+
+			// 8. Sync identity index after taxonomy reconciliation.
+			EventIdentityWriter::syncIdentityRow( $post_id, $title, datamachine_normalize_ticket_url( $ticketUrl ) ?: null );
+
+			if ( 'no_change' === $action ) {
+				$lifecycle_result             = $this->successResponse(
+					array(
+						'post_id'  => $post_id,
+						'post_url' => get_permalink( $post_id ),
+						'action'   => 'no_change',
+					)
+				);
+				$lifecycle_result['warnings'] = $warnings;
+				return $lifecycle_result;
+			}
+
+			// 9. Sync engine data for pipeline continuation (create path only).
+			$job_id = (int) ( $parameters['job_id'] ?? 0 );
+			if ( 'created' === $action && $job_id ) {
+				datamachine_merge_engine_data(
+					$job_id,
+					array(
+						'event_id'  => $post_id,
+						'event_url' => get_permalink( $post_id ),
+					)
+				);
+			}
+
+			// 10. Log and return.
+			$log_level = 'created' === $action ? 'info' : 'info';
+			$log_msg   = 'created' === $action ? 'Created new event' : 'Updated existing event';
+			do_action(
+				'datamachine_log',
+				$log_level,
+				"Event Upsert: {$log_msg}",
+				array(
+					'post_id' => $post_id,
+					'title'   => $title,
+				)
 			);
-		}
 
-		$post_id = (int) $result['post_id'];
-		$action  = $result['action'];
-		if ( '' !== $source_identity ) {
-			update_post_meta( $post_id, self::SOURCE_IDENTITY_META_KEY, $source_identity );
-			update_post_meta( $post_id, self::SOURCE_NAME_META_KEY, sanitize_text_field( (string) ( $parameters['source'] ?? '' ) ) );
-			update_post_meta( $post_id, self::SOURCE_ID_META_KEY, sanitize_text_field( (string) ( $parameters['source_id'] ?? '' ) ) );
-		}
-
-		// 7. Content idempotency does not imply taxonomy or identity integrity.
-		// Skip image work for unchanged content, but always reconcile indexed state.
-		if ( 'no_change' !== $action ) {
-			$this->processEventFeaturedImage( $post_id, $handler_config, $engine );
-		}
-		$this->taxonomy_assigner->processVenue( $post_id, $parameters, $engine, $handler_config );
-		$this->taxonomy_assigner->processPromoter( $post_id, $parameters, $engine, $handler_config );
-
-		// Derive location from the event's actual venue city rather than the
-		// pipeline's ingest center. processLocation returns true when it took
-		// ownership of the location term (PRE_SELECTED mode), in which case the
-		// generic taxonomy pass below must skip location so it doesn't
-		// re-stamp the pipeline-center term. See data-machine-events#379.
-		$location_handled = $this->taxonomy_assigner->processLocation( $post_id, $parameters, $engine, $handler_config );
-
-		// Map performer to artist taxonomy if not explicitly provided.
-		if ( empty( $parameters['artist'] ) && ! empty( $event_data['performer'] ) ) {
-			$parameters['artist'] = $event_data['performer'];
-		}
-
-		$handler_config_for_tax                                = $handler_config;
-		$handler_config_for_tax['taxonomy_venue_selection']    = 'skip';
-		$handler_config_for_tax['taxonomy_promoter_selection'] = 'skip';
-		if ( $location_handled ) {
-			$handler_config_for_tax['taxonomy_location_selection'] = 'skip';
-		}
-		$engine_data_array = $engine instanceof EngineData ? $engine->all() : array();
-		$this->taxonomy_handler->processTaxonomies( $post_id, $parameters, $handler_config_for_tax, $engine_data_array );
-
-		do_action( 'datamachine_event_taxonomy_processed', $post_id );
-
-		// 8. Sync identity index after taxonomy reconciliation.
-		EventIdentityWriter::syncIdentityRow( $post_id, $title, datamachine_normalize_ticket_url( $ticketUrl ) ?: null );
-
-		if ( 'no_change' === $action ) {
-			return $this->successResponse(
+			$lifecycle_result             = $this->successResponse(
 				array(
 					'post_id'  => $post_id,
 					'post_url' => get_permalink( $post_id ),
-					'action'   => 'no_change',
+					'action'   => $action,
 				)
 			);
+			$lifecycle_result['warnings'] = $warnings;
+			return $lifecycle_result;
+		} catch ( \Throwable $throwable ) {
+			$lifecycle_result = new \WP_Error( 'event_upsert_persistence_exception', 'Event persistence failed unexpectedly.', array( 'exception' => get_class( $throwable ) ) );
+			throw $throwable;
+		} finally {
+			/**
+			 * Fires after the canonical event persistence lifecycle completes.
+			 *
+			 * @param array                $context Event persistence context.
+			 * @param int                  $post_id Persisted post ID, or zero before persistence.
+			 * @param array|\WP_Error|null $result  Success response, failure, or null on an unexpected abort.
+			 */
+			do_action( 'datamachine_events_after_event_upsert_persistence', $context, $post_id, $lifecycle_result );
 		}
+	}
 
-		// 9. Sync engine data for pipeline continuation (create path only).
-		$job_id = (int) ( $parameters['job_id'] ?? 0 );
-		if ( 'created' === $action && $job_id ) {
-			datamachine_merge_engine_data(
-				$job_id,
-				array(
-					'event_id'  => $post_id,
-					'event_url' => get_permalink( $post_id ),
-				)
-			);
-		}
-
-		// 10. Log and return.
-		$log_level = 'created' === $action ? 'info' : 'info';
-		$log_msg   = 'created' === $action ? 'Created new event' : 'Updated existing event';
-		do_action(
-			'datamachine_log',
-			$log_level,
-			"Event Upsert: {$log_msg}",
-			array(
-				'post_id' => $post_id,
-				'title'   => $title,
-			)
-		);
-
-		return $this->successResponse(
-			array(
-				'post_id'  => $post_id,
-				'post_url' => get_permalink( $post_id ),
-				'action'   => $action,
-			)
-		);
+	/** Preserve a lifecycle WP_Error while retaining the handler array contract. */
+	private function lifecycleErrorResponse( \WP_Error $error, string $title ): array {
+		$response               = $this->errorResponse( $error->get_error_message(), array( 'title' => $title ) );
+		$data                   = $error->get_error_data();
+		$data                   = is_array( $data ) ? $data : array();
+		$response['error_code'] = $error->get_error_code();
+		$response['error_data'] = $data;
+		$response['status']     = (int) ( $data['status'] ?? 400 );
+		$response['retryable']  = ! empty( $data['retryable'] ) || ! empty( $data['transient'] ) || $response['status'] >= 500;
+		$response['transient']  = ! empty( $data['transient'] ) || $response['retryable'];
+		$response['rule']       = $data['rule'] ?? null;
+		return $response;
 	}
 
 	/**

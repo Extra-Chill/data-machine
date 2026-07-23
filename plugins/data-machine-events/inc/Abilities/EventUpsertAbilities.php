@@ -117,17 +117,18 @@ class EventUpsertAbilities {
 
 		$result = ( new EventUpsert() )->upsertCanonicalEvent( $event, $config );
 		if ( empty( $result['success'] ) ) {
-			$retryable  = ! empty( $result['retryable'] );
-			$error_code = (string) ( $result['error_code'] ?? $result['rule'] ?? 'event_upsert_failed' );
+			$retryable               = ! empty( $result['retryable'] );
+			$error_code              = (string) ( $result['error_code'] ?? $result['rule'] ?? 'event_upsert_failed' );
+			$status                  = (int) ( $result['status'] ?? ( $retryable ? 503 : 400 ) );
+			$error_data              = is_array( $result['error_data'] ?? null ) ? $result['error_data'] : array();
+			$error_data['status']    = $status;
+			$error_data['rule']      = $result['rule'] ?? ( $error_data['rule'] ?? null );
+			$error_data['retryable'] = $retryable;
+			$error_data['transient'] = ! empty( $result['transient'] ) || $retryable;
 			return new \WP_Error(
 				$error_code,
 				(string) ( $result['error'] ?? 'Event upsert failed.' ),
-				array(
-					'status'    => $retryable ? 503 : 400,
-					'rule'      => $result['rule'] ?? null,
-					'retryable' => $retryable,
-					'transient' => $retryable,
-				)
+				$error_data
 			);
 		}
 
