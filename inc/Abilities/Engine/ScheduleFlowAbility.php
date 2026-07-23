@@ -208,10 +208,9 @@ class ScheduleFlowAbility {
 
 		// Read back the scheduling config to get the computed next run.
 		$flow              = $this->db_flows->get_flow( $flow_id );
-		$scheduling_config = array();
-		if ( $flow ) {
-			$scheduling_config = json_decode( $flow['scheduling_config'] ?? '{}', true );
-		}
+		$scheduling_config = $flow && is_array( $flow['scheduling_config'] ?? null )
+			? $flow['scheduling_config']
+			: array();
 
 		return array(
 			'success'         => true,
@@ -244,10 +243,9 @@ class ScheduleFlowAbility {
 
 		// Read back the scheduling config to get the computed first_run.
 		$flow              = $this->db_flows->get_flow( $flow_id );
-		$scheduling_config = array();
-		if ( $flow ) {
-			$scheduling_config = json_decode( $flow['scheduling_config'] ?? '{}', true );
-		}
+		$scheduling_config = $flow && is_array( $flow['scheduling_config'] ?? null )
+			? $flow['scheduling_config']
+			: array();
 
 		return array(
 			'success'        => true,

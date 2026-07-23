@@ -7,6 +7,7 @@
 
 namespace DataMachine\Tests\Unit\Abilities;
 
+use DataMachine\Abilities\Engine\ScheduleFlowAbility;
 use DataMachine\Abilities\Flow\CreateFlowAbility;
 use DataMachine\Api\Flows\FlowScheduling;
 use DataMachine\Core\Database\Flows\Flows;
@@ -101,6 +102,34 @@ class ScheduleMutationFailureTest extends WP_UnitTestCase {
 		$this->assertTrue( $result['retryable'] );
 		$this->assertNotNull( $this->flows->get_flow( $this->flow_id ) );
 		$this->assertTrue( RecurringScheduler::hasLogicalCoverage( self::FLOW_HOOK, array( $this->flow_id ) ) );
+	}
+
+	public function test_recurring_schedule_response_reads_normalized_config(): void {
+		$result = ( new ScheduleFlowAbility() )->execute(
+			array(
+				'flow_id'               => $this->flow_id,
+				'interval_or_timestamp' => 'daily',
+			)
+		);
+
+		$this->assertTrue( $result['success'] );
+		$this->assertSame( 'recurring', $result['schedule_type'] );
+		$this->assertNotEmpty( $result['scheduled_time'] );
+		$this->assertIsArray( $this->flows->get_flow( $this->flow_id )['scheduling_config'] );
+	}
+
+	public function test_cron_schedule_response_reads_normalized_config(): void {
+		$result = ( new ScheduleFlowAbility() )->execute(
+			array(
+				'flow_id'               => $this->flow_id,
+				'interval_or_timestamp' => '0 9 * * 1-5',
+			)
+		);
+
+		$this->assertTrue( $result['success'] );
+		$this->assertSame( 'cron', $result['schedule_type'] );
+		$this->assertNotEmpty( $result['scheduled_time'] );
+		$this->assertIsArray( $this->flows->get_flow( $this->flow_id )['scheduling_config'] );
 	}
 
 	public function test_stale_successor_is_canceled_when_generation_changes_between_repeat_read_and_store(): void {
