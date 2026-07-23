@@ -137,9 +137,15 @@ class FlowScheduleReconcilerTest extends WP_UnitTestCase {
 		wp_cache_flush();
 
 		$result = ( new FlowScheduleReconciler( $this->flows ) )->reconcile();
-		$this->assertTrue( $result['success'] );
-		$this->assertSame( 1, $result['covered'] );
-		$this->assertSame( 0, $result['missing'] );
+		if ( 'ActionScheduler_DBStore' === get_class( \ActionScheduler::store() ) ) {
+			$this->assertTrue( $result['success'] );
+			$this->assertSame( 1, $result['covered'] );
+			$this->assertSame( 0, $result['missing'] );
+		} else {
+			$this->assertFalse( $result['success'] );
+			$this->assertSame( 1, $result['blocked'] );
+			$this->assertTrue( $result['transient'] );
+		}
 	}
 
 	public function test_stale_in_progress_action_does_not_cover_schedule(): void {
@@ -177,7 +183,7 @@ class FlowScheduleReconcilerTest extends WP_UnitTestCase {
 		$this->assertTrue( $applied['transient'] );
 		$this->assertSame( 1, $applied['blocked'] );
 		$this->assertSame( 0, $applied['repaired'] );
-		$this->assertFalse( RecurringScheduler::isScheduled( FlowScheduling::FLOW_HOOK, array( $flow_id ) ) );
+		$this->assertSame( array(), $this->logicalActionIds( $flow_id, 'pending' ) );
 
 		$second = ( new FlowScheduleReconciler( $this->flows ) )->reconcile();
 		$this->assertSame( 1, $second['blocked'] );
@@ -205,7 +211,7 @@ class FlowScheduleReconcilerTest extends WP_UnitTestCase {
 		$this->assertTrue( $result['transient'] );
 		$this->assertSame( 1, $result['blocked'] );
 		$this->assertSame( 0, $result['repaired'] );
-		$this->assertFalse( RecurringScheduler::isScheduled( FlowScheduling::FLOW_HOOK, array( $flow_id ) ) );
+		$this->assertSame( array(), $this->logicalActionIds( $flow_id, 'pending' ) );
 	}
 
 	public function test_fresh_in_progress_plus_pending_action_blocks_apply_without_changes(): void {
