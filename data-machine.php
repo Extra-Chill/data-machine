@@ -890,6 +890,7 @@ function datamachine_ensure_all_tables() {
 
 	$db_identity_index = new \DataMachine\Core\Database\PostIdentityIndex\PostIdentityIndex();
 	$db_identity_index->create_table();
+	\DataMachine\Core\Database\PostIdentityReservations\PostIdentityReservations::create_table();
 
 	\DataMachine\Core\Database\BundleArtifacts\InstalledBundleArtifacts::create_table();
 	\DataMachine\Core\Database\RunMetadata\RunMetadata::create_table();

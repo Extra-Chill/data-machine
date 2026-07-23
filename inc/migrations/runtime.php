@@ -37,6 +37,30 @@ function datamachine_run_schema_migrations(): void {
 }
 
 /**
+ * Install the independently versioned post identity reservation schema.
+ *
+ * Identity-backed writes fail closed until this table exists on the current
+ * site, so its rollout does not depend on the general plugin version gate.
+ */
+function datamachine_maybe_install_post_identity_reservations(): void {
+	$version    = \DataMachine\Core\Database\PostIdentityReservations\PostIdentityReservations::SCHEMA_VERSION;
+	$repository = new \DataMachine\Core\Database\PostIdentityReservations\PostIdentityReservations();
+	$validation = $repository->validate_schema();
+	if ( (int) get_option( 'datamachine_post_identity_reservations_schema', 0 ) === $version && true === $validation ) {
+		return;
+	}
+	if ( true !== $validation ) {
+		update_option( 'datamachine_post_identity_reservations_schema', 0, true );
+	}
+
+	\DataMachine\Core\Database\PostIdentityReservations\PostIdentityReservations::create_table();
+	$repository = new \DataMachine\Core\Database\PostIdentityReservations\PostIdentityReservations();
+	if ( true === $repository->validate_schema() ) {
+		update_option( 'datamachine_post_identity_reservations_schema', $version, true );
+	}
+}
+
+/**
  * Maybe ensure current schema on plugins_loaded.
  *
  * Reads the persisted `datamachine_db_version` option and compares it to
@@ -88,3 +112,4 @@ function datamachine_maybe_run_deferred_migrations(): void {
 // and upgraded installs; the option-gate inside the function avoids
 // double-running when activation already migrated this request.
 add_action( 'plugins_loaded', 'datamachine_maybe_run_deferred_migrations', 5 );
+add_action( 'plugins_loaded', 'datamachine_maybe_install_post_identity_reservations', 5 );

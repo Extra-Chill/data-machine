@@ -51,6 +51,7 @@ function datamachine_uninstall_site() {
 	delete_option( \DataMachine\Abilities\SettingsAbilities::HANDLER_DEFAULTS_OPTION );
 	delete_option( 'datamachine_agent_ping_callback_token' );
 	delete_option( 'datamachine_page_hook_suffixes' );
+	delete_option( 'datamachine_post_identity_reservations_schema' );
 
 	// Unified auth data.
 	delete_option( 'datamachine_auth_data' );
@@ -69,6 +70,7 @@ function datamachine_uninstall_site() {
 		// datamachine_uninstall_network_tables(), not here — dropping it per-site
 		// would destroy the shared table on the first subsite uninstall.
 		$datamachine_tables_to_drop = array(
+			$wpdb->prefix . 'datamachine_post_identity_reservations',
 			$wpdb->prefix . 'datamachine_processed_items',
 			$wpdb->prefix . 'datamachine_jobs',
 			$wpdb->prefix . 'datamachine_flows',

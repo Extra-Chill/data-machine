@@ -26,6 +26,7 @@ namespace DataMachine\Abilities\Content;
 
 use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Core\Content\ContentFormat;
+use DataMachine\Core\Database\PostIdentityReservations\PostIdentityReservations;
 use DataMachine\Core\SourceDate;
 use DataMachine\Core\WordPress\ResolvePostByPath;
 use DataMachine\Core\WordPress\PostTracking;
@@ -388,12 +389,51 @@ class UpsertPostAbility {
 			$parent_id = (int) $resolved;
 		}
 
-		// Resolve existing post.
+		$write_context = array(
+			'post_type'         => $post_type,
+			'title'             => $title,
+			'stored_content'    => $stored_content,
+			'slug'              => $slug,
+			'parent_id'         => $parent_id,
+			'content_hash'      => $content_hash,
+			'raw_source'        => $raw_source,
+			'source_url'        => $source_url,
+			'original_date_gmt' => $original_date_gmt,
+			'post_status'       => $post_status,
+			'post_author'       => $post_author,
+			'post_excerpt'      => $post_excerpt,
+			'taxonomies'        => $taxonomies,
+			'meta_input'        => $meta_input,
+		);
+
+		if ( $post_id > 0 ) {
+			$existing_id = self::resolve_existing_post( $post_id, $slug, $parent_id, is_array( $identity_meta ) ? $identity_meta : array(), $post_type );
+			if ( is_wp_error( $existing_id ) ) {
+				return array(
+					'success' => false,
+					'error'   => $existing_id->get_error_message(),
+				);
+			}
+
+			return self::execute_resolved_write( $write_context, (int) $existing_id );
+		}
+
+		if ( self::has_usable_identity_meta( $identity_meta ) ) {
+			return self::execute_identity_backed(
+				$write_context,
+				$identity_meta,
+				$slug,
+				$parent_id
+			);
+		}
+
+		// Preserve explicit > identity > slug resolution for omitted, partial,
+		// empty, and otherwise unusable identity_meta direct-execute inputs.
 		$existing_id = self::resolve_existing_post(
 			$post_id,
 			$slug,
 			$parent_id,
-			$identity_meta,
+			is_array( $identity_meta ) ? $identity_meta : array(),
 			$post_type
 		);
 
@@ -404,6 +444,154 @@ class UpsertPostAbility {
 			);
 		}
 
+		return self::execute_resolved_write( $write_context, (int) $existing_id );
+	}
+
+	/**
+	 * Execute an identity-backed write while holding its advisory fence.
+	 *
+	 * @param array $context       Normalized write context.
+	 * @param array $identity_meta Identity meta input.
+	 * @param string $slug         Slug fallback.
+	 * @param int   $parent_id     Slug parent scope.
+	 * @return array
+	 */
+	private static function execute_identity_backed(
+		array $context,
+		array $identity_meta,
+		string $slug,
+		int $parent_id
+	): array {
+		$post_type = $context['post_type'];
+
+		$slug_fallback_id = 0;
+		if ( '' !== $slug ) {
+			$slug_fallback_id = self::resolve_existing_post( 0, $slug, $parent_id, array(), $post_type );
+			if ( is_wp_error( $slug_fallback_id ) ) {
+				return array(
+					'success'    => false,
+					'error'      => $slug_fallback_id->get_error_message(),
+					'error_code' => $slug_fallback_id->get_error_code(),
+				);
+			}
+		}
+
+		$identity = PostIdentityReservations::normalize_identity( $post_type, $identity_meta );
+		if ( is_wp_error( $identity ) ) {
+			return array(
+				'success'    => false,
+				'error'      => $identity->get_error_message(),
+				'error_code' => $identity->get_error_code(),
+				'error_data' => $identity->get_error_data(),
+			);
+		}
+
+		$shell = array(
+			'post_author'    => $context['post_author'] > 0 ? $context['post_author'] : get_current_user_id(),
+			'comment_status' => get_default_comment_status( $post_type ),
+			'ping_status'    => get_default_comment_status( $post_type, 'pingback' ),
+			'post_date'      => current_time( 'mysql' ),
+			'post_date_gmt'  => current_time( 'mysql', true ),
+			'guid'           => 'urn:uuid:' . wp_generate_uuid4(),
+		);
+
+		$reservations = new PostIdentityReservations();
+		$locked       = $reservations->acquire_lock( $identity['identity_hash'] );
+		if ( is_wp_error( $locked ) ) {
+			return array(
+				'success'    => false,
+				'error'      => $locked->get_error_message(),
+				'error_code' => $locked->get_error_code(),
+				'error_data' => $locked->get_error_data(),
+			);
+		}
+
+		$result   = array();
+		$released = false;
+		try {
+			$reservation = $reservations->reserve_and_resolve(
+				$post_type,
+				$identity_meta,
+				0,
+				(int) $slug_fallback_id,
+				$shell
+			);
+			if ( is_wp_error( $reservation ) ) {
+				$result = array(
+					'success'    => false,
+					'error'      => $reservation->get_error_message(),
+					'error_code' => $reservation->get_error_code(),
+					'error_data' => $reservation->get_error_data(),
+				);
+			} else {
+				do_action( 'datamachine_upsert_post_identity_before_population', (int) $reservation['post_id'] );
+
+				$result = self::execute_resolved_write( $context, (int) $reservation['post_id'], $reservation, $reservations );
+			}
+		} catch ( \Throwable ) {
+			try {
+				$reservations->record_error( $identity['identity_hash'], 'identity_population_exception' );
+			} catch ( \Throwable $diagnostic_exception ) {
+				// Diagnostic persistence must not replace the retryable ability result.
+				unset( $diagnostic_exception );
+			}
+			$result = array(
+				'success'    => false,
+				'error'      => 'Post identity population failed unexpectedly; retry is required.',
+				'error_code' => 'identity_population_exception',
+				'error_data' => array( 'retryable' => true ),
+			);
+		} finally {
+			try {
+				$released = $reservations->release_lock( $identity['identity_hash'] );
+			} catch ( \Throwable ) {
+				$released = false;
+			}
+		}
+
+		if ( ! $released ) {
+			return array(
+				'success'    => false,
+				'error'      => 'Post identity lock release is uncertain; retry is required.',
+				'error_code' => 'identity_lock_release_uncertain',
+				'error_data' => array( 'retryable' => true ),
+			);
+		}
+
+		return $result;
+	}
+
+	/**
+	 * Populate or update one already-resolved post through normal WordPress APIs.
+	 *
+	 * @param array                         $context      Normalized write context.
+	 * @param int                           $existing_id  Existing or linked post ID.
+	 * @param array|null                    $reservation Reservation outcome.
+	 * @param PostIdentityReservations|null $reservations Reservation repository.
+	 * @return array
+	 */
+	private static function execute_resolved_write(
+		array $context,
+		int $existing_id,
+		?array $reservation = null,
+		?PostIdentityReservations $reservations = null
+	): array {
+		$post_type         = $context['post_type'];
+		$title             = $context['title'];
+		$stored_content    = $context['stored_content'];
+		$slug              = $context['slug'];
+		$parent_id         = $context['parent_id'];
+		$content_hash      = $context['content_hash'];
+		$raw_source        = $context['raw_source'];
+		$source_url        = $context['source_url'];
+		$original_date_gmt = $context['original_date_gmt'];
+		$post_status       = $context['post_status'];
+		$post_author       = $context['post_author'];
+		$post_excerpt      = $context['post_excerpt'];
+		$taxonomies        = $context['taxonomies'];
+		$meta_input        = $context['meta_input'];
+		$has_reservation   = null !== $reservation && $reservations instanceof PostIdentityReservations;
+
 		// Idempotency check. Parent/slug changes still need a write even when
 		// the content hash is unchanged.
 		if ( $existing_id > 0 && '' !== $content_hash ) {
@@ -411,8 +599,21 @@ class UpsertPostAbility {
 			$post        = get_post( $existing_id );
 			$same_parent = ! $post instanceof \WP_Post || $parent_id <= 0 || (int) $post->post_parent === $parent_id;
 			$same_slug   = ! $post instanceof \WP_Post || '' === $slug || (string) $post->post_name === $slug;
-			if ( $stored_hash === $content_hash && $same_parent && $same_slug ) {
+
+			$identity_complete = ! $has_reservation
+				|| (string) get_post_meta( $existing_id, $reservation['identity']['meta_key'], true ) === $reservation['identity']['meta_value'];
+			if ( $stored_hash === $content_hash && $same_parent && $same_slug && $identity_complete ) {
 				self::applySourceMetadata( $existing_id, $source_url, $original_date_gmt );
+				if ( $has_reservation ) {
+					$completed = $reservations->mark_complete( $reservation['identity'], $existing_id );
+					if ( is_wp_error( $completed ) ) {
+						return array(
+							'success'    => false,
+							'error'      => $completed->get_error_message(),
+							'error_code' => $completed->get_error_code(),
+						);
+					}
+				}
 				$post_title = $post instanceof \WP_Post ? $post->post_title : $title;
 				return array(
 					'success'  => true,
@@ -452,7 +653,13 @@ class UpsertPostAbility {
 
 		if ( $existing_id > 0 ) {
 			$post_data['ID'] = $existing_id;
-			$action          = 'updated';
+			$was_allocated   = $has_reservation && ! empty( $reservation['allocated'] );
+			$action          = $was_allocated ? 'created' : 'updated';
+			if ( $was_allocated ) {
+				$post_data['post_author']    = $reservation['shell']['post_author'];
+				$post_data['comment_status'] = $reservation['shell']['comment_status'];
+				$post_data['ping_status']    = $reservation['shell']['ping_status'];
+			}
 		} else {
 			$action = 'created';
 			if ( $post_author > 0 ) {
@@ -462,6 +669,9 @@ class UpsertPostAbility {
 
 		// Merge caller-supplied meta_input.
 		$all_meta = is_array( $meta_input ) ? $meta_input : array();
+		if ( $has_reservation ) {
+			$all_meta[ $reservation['identity']['meta_key'] ] = wp_slash( $reservation['identity']['meta_value'] );
+		}
 
 		if ( '' !== $content_hash ) {
 			$all_meta[ self::META_CONTENT_HASH ] = $content_hash;
@@ -486,6 +696,9 @@ class UpsertPostAbility {
 		$id = wp_insert_post( $post_data, true );
 
 		if ( is_wp_error( $id ) ) {
+			if ( $has_reservation ) {
+				$reservations->record_error( $reservation['identity']['identity_hash'], (string) $id->get_error_code() );
+			}
 			return array(
 				'success' => false,
 				'error'   => $id->get_error_message(),
@@ -527,6 +740,17 @@ class UpsertPostAbility {
 			}
 		}
 
+		if ( $has_reservation ) {
+			$completed = $reservations->mark_complete( $reservation['identity'], (int) $id );
+			if ( is_wp_error( $completed ) ) {
+				return array(
+					'success'    => false,
+					'error'      => $completed->get_error_message(),
+					'error_code' => $completed->get_error_code(),
+				);
+			}
+		}
+
 		$post       = get_post( (int) $id );
 		$post_title = $post instanceof \WP_Post ? $post->post_title : $title;
 
@@ -538,6 +762,16 @@ class UpsertPostAbility {
 			'post_url' => get_permalink( (int) $id ),
 			'path'     => ResolvePostByPath::build_path( (int) $id ),
 		);
+	}
+
+	/** Match the historical direct-execute identity_meta truthiness contract. */
+	private static function has_usable_identity_meta( $identity_meta ): bool {
+		if ( ! is_array( $identity_meta ) || empty( $identity_meta['key'] ) || empty( $identity_meta['value'] ) ) {
+			return false;
+		}
+
+		return '' !== sanitize_key( (string) $identity_meta['key'] )
+			&& '' !== sanitize_text_field( (string) $identity_meta['value'] );
 	}
 
 	/**
