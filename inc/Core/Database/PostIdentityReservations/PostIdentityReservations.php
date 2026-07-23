@@ -213,19 +213,80 @@ class PostIdentityReservations extends BaseRepository {
 		}
 
 		$required_columns = array(
-			'identity_hash'     => array( 'type' => 'char', 'length' => 64, 'unsigned' => false, 'nullable' => false ),
-			'post_type_hash'    => array( 'type' => 'char', 'length' => 64, 'unsigned' => false, 'nullable' => false ),
-			'meta_key_hash'     => array( 'type' => 'char', 'length' => 64, 'unsigned' => false, 'nullable' => false ),
-			'meta_value_hash'   => array( 'type' => 'char', 'length' => 64, 'unsigned' => false, 'nullable' => false ),
-			'post_id'           => array( 'type' => 'bigint', 'unsigned' => true, 'nullable' => true ),
-			'state'             => array( 'type' => 'varchar', 'length' => 20, 'unsigned' => false, 'nullable' => false, 'default' => 'reserved' ),
-			'attempt_count'     => array( 'type' => 'bigint', 'unsigned' => true, 'nullable' => false, 'default' => '1' ),
-			'last_attempt_at'   => array( 'type' => 'datetime', 'unsigned' => false, 'nullable' => false ),
-			'last_error_code'   => array( 'type' => 'varchar', 'length' => 64, 'unsigned' => false, 'nullable' => true ),
-			'last_error_message'=> array( 'type' => 'varchar', 'length' => 255, 'unsigned' => false, 'nullable' => true ),
-			'created_at'        => array( 'type' => 'datetime', 'unsigned' => false, 'nullable' => false ),
-			'updated_at'        => array( 'type' => 'datetime', 'unsigned' => false, 'nullable' => false ),
-			'completed_at'      => array( 'type' => 'datetime', 'unsigned' => false, 'nullable' => true ),
+			'identity_hash'      => array(
+				'type'     => 'char',
+				'length'   => 64,
+				'unsigned' => false,
+				'nullable' => false,
+			),
+			'post_type_hash'     => array(
+				'type'     => 'char',
+				'length'   => 64,
+				'unsigned' => false,
+				'nullable' => false,
+			),
+			'meta_key_hash'      => array(
+				'type'     => 'char',
+				'length'   => 64,
+				'unsigned' => false,
+				'nullable' => false,
+			),
+			'meta_value_hash'    => array(
+				'type'     => 'char',
+				'length'   => 64,
+				'unsigned' => false,
+				'nullable' => false,
+			),
+			'post_id'            => array(
+				'type'     => 'bigint',
+				'unsigned' => true,
+				'nullable' => true,
+			),
+			'state'              => array(
+				'type'     => 'varchar',
+				'length'   => 20,
+				'unsigned' => false,
+				'nullable' => false,
+				'default'  => 'reserved',
+			),
+			'attempt_count'      => array(
+				'type'     => 'bigint',
+				'unsigned' => true,
+				'nullable' => false,
+				'default'  => '1',
+			),
+			'last_attempt_at'    => array(
+				'type'     => 'datetime',
+				'unsigned' => false,
+				'nullable' => false,
+			),
+			'last_error_code'    => array(
+				'type'     => 'varchar',
+				'length'   => 64,
+				'unsigned' => false,
+				'nullable' => true,
+			),
+			'last_error_message' => array(
+				'type'     => 'varchar',
+				'length'   => 255,
+				'unsigned' => false,
+				'nullable' => true,
+			),
+			'created_at'         => array(
+				'type'     => 'datetime',
+				'unsigned' => false,
+				'nullable' => false,
+			),
+			'updated_at'         => array(
+				'type'     => 'datetime',
+				'unsigned' => false,
+				'nullable' => false,
+			),
+			'completed_at'       => array(
+				'type'     => 'datetime',
+				'unsigned' => false,
+				'nullable' => true,
+			),
 		);
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		$columns = $this->wpdb->get_results( $this->wpdb->prepare( 'SHOW COLUMNS FROM %i', $this->table_name ), ARRAY_A );
@@ -343,11 +404,13 @@ class PostIdentityReservations extends BaseRepository {
 			if ( '' === $name ) {
 				continue;
 			}
-			$indexes[ $name ] ??= array(
-				'non_unique' => 1 === (int) ( $row['Non_unique'] ?? $row['non_unique'] ?? 0 ),
-				'parts'      => array(),
-			);
-			$sequence = (int) ( $row['Seq_in_index'] ?? $row['seq_in_index'] ?? 0 );
+			if ( ! isset( $indexes[ $name ] ) ) {
+				$indexes[ $name ] = array(
+					'non_unique' => 1 === (int) ( $row['Non_unique'] ?? $row['non_unique'] ?? 0 ),
+					'parts'      => array(),
+				);
+			}
+			$sequence                               = (int) ( $row['Seq_in_index'] ?? $row['seq_in_index'] ?? 0 );
 			$indexes[ $name ]['parts'][ $sequence ] = (string) ( $row['Column_name'] ?? $row['column_name'] ?? '' );
 		}
 		foreach ( $indexes as &$index ) {
