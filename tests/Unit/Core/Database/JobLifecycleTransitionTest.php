@@ -191,6 +191,22 @@ class JobLifecycleTransitionTest extends WP_UnitTestCase {
 		$this->assertSame( 0, $result['mutated'] );
 		$this->assertArrayNotHasKey( 'scheduler_recovery', datamachine_get_engine_data( $child_id ) );
 		$this->assertSame( JobStatus::PROCESSING, $this->db_jobs->get_job( $child_id )['status'] );
+
+		$result = ( new RecoverStuckJobsAbility() )->execute(
+			array(
+				'job_id'                    => $child_id,
+				'limit'                     => 3,
+				'timeout_hours'             => 1,
+				'recover_pathless_children' => true,
+			)
+		);
+		$this->assertFalse( $result['limit_reached'] );
+		$this->assertSame( 1, $result['mutations'] );
+		$this->assertSame( 2, $result['attempted'] );
+		$this->assertSame( 2, $result['touched'] );
+		$this->assertSame( 2, $result['mutated'] );
+		$this->assertSame( 1, $result['pathless_terminal'] );
+		$this->assertSame( JobStatus::FAILED, $this->db_jobs->get_job( $child_id )['status'] );
 	}
 
 	public function test_long_running_recovery_takeover_blocks_terminal_callbacks(): void {

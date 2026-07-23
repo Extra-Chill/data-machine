@@ -480,7 +480,12 @@ class ItemClaimLifecycleTest extends WP_UnitTestCase {
 		$job_id = $this->createJobWithClaim( $claim, true );
 		datamachine_merge_engine_data( $job_id, array( 'job_status' => JobStatus::failed( 'stale' )->toString() ) );
 
-		$result = ( new RecoverStuckJobsAbility() )->execute( array( 'dry_run' => false ) );
+		$result = ( new RecoverStuckJobsAbility() )->execute(
+			array(
+				'dry_run' => false,
+				'job_id'  => $job_id,
+			)
+		);
 
 		$this->assertGreaterThanOrEqual( 1, $result['recovered'] );
 		$this->assertFalse( $this->processed->has_active_claim( self::SCOPE, self::SOURCE, 'stale-id' ) );
@@ -647,7 +652,12 @@ class ItemClaimLifecycleTest extends WP_UnitTestCase {
 		$this->assertTrue( $this->processed->claim_item( self::SCOPE, self::SOURCE, 'legacy-recovery', $job_id ) );
 		datamachine_merge_engine_data( $job_id, array( 'job_status' => JobStatus::failed( 'stale' )->toString() ) );
 
-		( new RecoverStuckJobsAbility() )->execute( array( 'dry_run' => false ) );
+		( new RecoverStuckJobsAbility() )->execute(
+			array(
+				'dry_run' => false,
+				'job_id'  => $job_id,
+			)
+		);
 		$this->assertFalse( $this->processed->has_active_claim( self::SCOPE, self::SOURCE, 'legacy-recovery' ) );
 	}
 
