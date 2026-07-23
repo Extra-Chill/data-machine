@@ -41,7 +41,7 @@ class EventUpsertAbilities {
 				'input_schema'        => $this->getInputSchema(),
 				'output_schema'       => $this->getOutputSchema(),
 				'execute_callback'    => array( $this, 'executeUpsertEvent' ),
-				'permission_callback' => AbilityPermissions::canWrite(),
+				'permission_callback' => array( $this, 'canUpsertEvent' ),
 				'meta'                => array(
 					'show_in_rest' => true,
 					'mcp'          => array( 'public' => true ),
@@ -53,6 +53,29 @@ class EventUpsertAbilities {
 				),
 			)
 		);
+	}
+
+	/**
+	 * Check access to the canonical event upsert boundary.
+	 *
+	 * The ability keeps the shared write gate as its default. Consumers may
+	 * narrowly grant or deny this one operation from the validated ability
+	 * input without changing permissions for unrelated event mutations.
+	 *
+	 * @param array $input Validated ability input.
+	 * @return bool
+	 */
+	public function canUpsertEvent( array $input = array() ): bool {
+		$can_write = AbilityPermissions::canWrite();
+		$allowed   = (bool) $can_write();
+
+		/**
+		 * Filter permission for the canonical event upsert ability only.
+		 *
+		 * @param bool  $allowed Shared DME write-gate decision.
+		 * @param array $input   Validated event-upsert input.
+		 */
+		return (bool) apply_filters( 'datamachine_events_upsert_event_permission', $allowed, $input );
 	}
 
 	/**

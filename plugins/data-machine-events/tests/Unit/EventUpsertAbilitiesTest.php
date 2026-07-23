@@ -8,6 +8,7 @@
 namespace DataMachineEvents\Tests\Unit;
 
 use DataMachine\Core\Database\PostIdentityIndex\PostIdentityIndex;
+use DataMachineEvents\Abilities\AbilityPermissions;
 use DataMachineEvents\Abilities\EventUpsertAbilities;
 use DataMachineEvents\Core\EventDatesTable;
 use DataMachineEvents\Core\Event_Post_Type;
@@ -49,7 +50,51 @@ class EventUpsertAbilitiesTest extends WP_UnitTestCase {
 
 	public function tearDown(): void {
 		remove_filter( 'query', $this->lock_query_filter );
+		remove_all_filters( 'datamachine_events_upsert_event_permission' );
+		wp_set_current_user( 0 );
 		parent::tearDown();
+	}
+
+	public function test_upsert_permission_uses_shared_write_gate_by_default(): void {
+		$editor_id = self::factory()->user->create( array( 'role' => 'editor' ) );
+		wp_set_current_user( $editor_id );
+
+		$this->assertTrue( $this->ability->canUpsertEvent( $this->validInput() ) );
+	}
+
+	public function test_upsert_permission_denies_callers_without_write_access(): void {
+		$subscriber_id = self::factory()->user->create( array( 'role' => 'subscriber' ) );
+		wp_set_current_user( $subscriber_id );
+
+		$this->assertFalse( $this->ability->canUpsertEvent( $this->validInput() ) );
+	}
+
+	public function test_upsert_permission_can_narrowly_grant_from_input(): void {
+		$subscriber_id = self::factory()->user->create( array( 'role' => 'subscriber' ) );
+		wp_set_current_user( $subscriber_id );
+		$input = $this->validInput();
+
+		add_filter(
+			'datamachine_events_upsert_event_permission',
+			static function ( bool $allowed, array $candidate ) use ( $input ): bool {
+				return $allowed || $input['event']['venue'] === ( $candidate['event']['venue'] ?? '' );
+			},
+			10,
+			2
+		);
+
+		$this->assertTrue( $this->ability->canUpsertEvent( $input ) );
+	}
+
+	public function test_upsert_permission_filter_does_not_widen_other_write_abilities(): void {
+		$subscriber_id = self::factory()->user->create( array( 'role' => 'subscriber' ) );
+		wp_set_current_user( $subscriber_id );
+		add_filter( 'datamachine_events_upsert_event_permission', '__return_true' );
+
+		$can_write = AbilityPermissions::canWrite();
+
+		$this->assertTrue( $this->ability->canUpsertEvent( $this->validInput() ) );
+		$this->assertFalse( $can_write() );
 	}
 
 	public function test_creates_canonical_event_and_returns_normalized_metadata(): void {
