@@ -184,12 +184,12 @@ class ScheduleNextStepAbility {
 					'job_id'       => $job_id,
 					'flow_step_id' => $flow_step_id,
 					'action_id'    => $action_id,
-					'success'      => ( false !== $action_id ),
+					'success'      => is_numeric( $action_id ) && (int) $action_id > 0,
 				)
 			);
 		}
 
-		if ( false === $action_id ) {
+		if ( ! is_numeric( $action_id ) || (int) $action_id <= 0 ) {
 			$this->failScheduling(
 				$job_id,
 				$flow_step_id,
@@ -199,7 +199,7 @@ class ScheduleNextStepAbility {
 		}
 
 		return array(
-			'success'   => false !== $action_id,
+			'success'   => is_numeric( $action_id ) && (int) $action_id > 0,
 			'action_id' => $action_id,
 		);
 	}

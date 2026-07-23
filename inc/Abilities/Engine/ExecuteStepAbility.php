@@ -900,6 +900,19 @@ class ExecuteStepAbility {
 			);
 		}
 
+		if ( 'blocked' === ( $execution_result['status'] ?? '' ) ) {
+			$current_job    = $this->db_jobs->get_job( $job_id );
+			$current_status = is_array( $current_job ) ? (string) ( $current_job['status'] ?? '' ) : '';
+			if ( ! JobStatus::isStatusFinal( $current_status ) ) {
+				return array(
+					'success'      => true,
+					'step_success' => false,
+					'outcome'      => 'blocked',
+					'reason'       => $execution_result['reason'] ?? 'blocked',
+				);
+			}
+		}
+
 		$prior_status = $this->getPriorTerminalStatus( $job_id );
 		if ( null !== $prior_status ) {
 			do_action(

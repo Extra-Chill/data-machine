@@ -28,6 +28,7 @@ function assert_ai_backpressure_smoke( string $name, bool $cond, string $detail 
 $GLOBALS['datamachine_ai_backpressure_options'] = array();
 $GLOBALS['datamachine_ai_backpressure_actions'] = array();
 $GLOBALS['datamachine_ai_backpressure_schedule_error'] = false;
+$GLOBALS['datamachine_ai_backpressure_schedule_calls'] = 0;
 $GLOBALS['datamachine_ai_backpressure_next_action_id'] = 1;
 $GLOBALS['datamachine_ai_backpressure_registered_hooks'] = array();
 $GLOBALS['datamachine_ai_backpressure_ability_inputs'] = array();
@@ -126,7 +127,12 @@ function as_get_scheduled_actions( array $query = array(), string $return_format
 }
 
 function as_schedule_single_action( int $timestamp, string $hook, array $args = array(), string $group = '', bool $unique = false ): int {
-	if ( $GLOBALS['datamachine_ai_backpressure_schedule_error'] ) {
+	++$GLOBALS['datamachine_ai_backpressure_schedule_calls'];
+	if ( true === $GLOBALS['datamachine_ai_backpressure_schedule_error'] ) {
+		return 0;
+	}
+	if ( is_int( $GLOBALS['datamachine_ai_backpressure_schedule_error'] ) && $GLOBALS['datamachine_ai_backpressure_schedule_error'] > 0 ) {
+		--$GLOBALS['datamachine_ai_backpressure_schedule_error'];
 		return 0;
 	}
 	if ( $unique ) {
@@ -234,6 +240,8 @@ $upsert_src   = implode( "\n", array_map( static fn( string $path ): string => f
 assert_ai_backpressure_smoke( 'AIStep acquires before prompt queue consumption', strpos( $ai_src, 'PipelineAIConcurrencyLimiter::acquire' ) < strpos( $ai_src, 'consumeFromPromptQueue' ) );
 assert_ai_backpressure_smoke( 'AIStep throttles by rescheduling same step', str_contains( $ai_src, 'deferForAIConcurrency' ) && str_contains( $backpressure_src, 'datamachine_resume_ai_step' ) );
 assert_ai_backpressure_smoke( 'executor treats AI throttle as routed pending work', str_contains( $engine_src, 'hasPendingAIConcurrencyThrottle' ) && str_contains( $engine_src, 'ai_concurrency_throttle' ) );
+assert_ai_backpressure_smoke( 'blocked AI handoff bypasses empty-packet failure routing', str_contains( $ai_src, "'status'  => 'blocked'" ) && str_contains( $engine_src, "'blocked' === ( \$execution_result['status'] ?? '' )" ) );
+assert_ai_backpressure_smoke( 'nonterminal blocked handoff is routed before pending retry fallback', strpos( $engine_src, "'blocked' === ( \$execution_result['status'] ?? '' )" ) < strpos( $engine_src, '$prior_status = $this->getPriorTerminalStatus' ) && str_contains( $engine_src, 'JobStatus::isStatusFinal( $current_status )' ) );
 assert_ai_backpressure_smoke( 'fetch steps do not use AI limiter', ! str_contains( $fetch_src, 'PipelineAIConcurrencyLimiter' ) );
 assert_ai_backpressure_smoke( 'upsert steps do not use AI limiter', ! str_contains( $upsert_src, 'PipelineAIConcurrencyLimiter' ) );
 assert_ai_backpressure_smoke( 'existing transport retry classifier remains intact', str_contains( $retry_src, 'transport_connect_timeout' ) && str_contains( $retry_src, 'AI_TRANSPORT_BASE_DELAY' ) );
@@ -293,8 +301,25 @@ assert_ai_backpressure_smoke( 'another job uses a separate uniqueness group', $o
 $GLOBALS['datamachine_ai_backpressure_schedule_error'] = true;
 $schedule_error = AIConcurrencyBackpressure::scheduleContinuation( $now + 60, array( 'job_id' => 302, 'flow_step_id' => 'ai-1' ) );
 $GLOBALS['datamachine_ai_backpressure_schedule_error'] = false;
-assert_ai_backpressure_smoke( 'zero without a matching pending action is a scheduling failure', ! $schedule_error['success'] && 0 === $schedule_error['action_id'] );
-assert_ai_backpressure_smoke( 'scheduler call requests native uniqueness', str_contains( $backpressure_src, "\$group,\n\t\t\ttrue" ) );
+assert_ai_backpressure_smoke( 'zero without a matching pending action is a retryable scheduling failure', ! $schedule_error['success'] && 0 === $schedule_error['action_id'] && 3 === $schedule_error['attempts'] && $schedule_error['retryable'] );
+assert_ai_backpressure_smoke( 'scheduler call requests native uniqueness', 1 === preg_match( '/\$group,\s+true/', $backpressure_src ) );
+
+$GLOBALS['datamachine_ai_backpressure_schedule_error'] = 1;
+$transient_schedule = AIConcurrencyBackpressure::scheduleContinuation( $now + 60, array( 'job_id' => 304, 'flow_step_id' => 'ai-1' ) );
+assert_ai_backpressure_smoke( 'transient scheduler failure succeeds on a bounded retry', $transient_schedule['success'] && 2 === $transient_schedule['attempts'] && ! $transient_schedule['reused'] );
+
+$running_args = array( 'job_id' => 305, 'flow_step_id' => 'ai-1', 'ai_resume_generation' => 1 );
+$GLOBALS['datamachine_ai_backpressure_actions'][] = new DataMachineAIBackpressureSmokeAction(
+	array(
+		'action_id' => 905,
+		'hook'      => AIConcurrencyBackpressure::RESUME_HOOK,
+		'args'      => $running_args,
+		'group'     => AIConcurrencyBackpressure::continuationGroup( $running_args ),
+		'status'    => 'in-progress',
+	)
+);
+$running_schedule = AIConcurrencyBackpressure::scheduleContinuation( $now + 60, $running_args );
+assert_ai_backpressure_smoke( 'equivalent in-progress continuation is reused without pending handoff', $running_schedule['success'] && $running_schedule['reused'] && 905 === $running_schedule['action_id'] && 'in-progress' === $running_schedule['action_status'] );
 
 echo "Case 9: slot recovery archives and clears active contention\n";
 $resolved = AIConcurrencyBackpressure::resolvedState( $state, $now + 120 );
@@ -332,6 +357,13 @@ assert_ai_backpressure_smoke( 'stale generation one replay cannot claim newer ow
 $running_two = AIConcurrencyBackpressure::beginGenerationState( $generation_two, 'ai-1', 2, $now + 3 );
 assert_ai_backpressure_smoke( 'exact generation two can begin once', 'running' === $running_two['status'] );
 assert_ai_backpressure_smoke( 'duplicate generation two execution is rejected', null === AIConcurrencyBackpressure::beginGenerationState( $running_two, 'ai-1', 2, $now + 4 ) );
+
+assert_ai_backpressure_smoke( 'only exact actionless scheduled generation can be released', AIConcurrencyBackpressure::isReleasableUnscheduledGeneration( $generation_two, 'ai-1', 2, 'token-2' ) );
+assert_ai_backpressure_smoke( 'wrong token cannot release generation ownership', ! AIConcurrencyBackpressure::isReleasableUnscheduledGeneration( $generation_two, 'ai-1', 2, 'token-other' ) );
+assert_ai_backpressure_smoke( 'running generation cannot be released as unscheduled', ! AIConcurrencyBackpressure::isReleasableUnscheduledGeneration( $running_two, 'ai-1', 2, 'token-2' ) );
+assert_ai_backpressure_smoke( 'schedule exhaustion routes through retryable fail-job instead of cancellation', str_contains( $ai_src, "'datamachine_fail_job'" ) && str_contains( $ai_src, "'ai_concurrency_defer_schedule_failed'" ) && ! str_contains( $ai_src, "cancelled - ai_concurrency_defer_schedule_failed" ) );
+assert_ai_backpressure_smoke( 'in-progress continuation does not regress job status to pending', str_contains( $ai_src, "'in-progress' !== (string) ( \$schedule_result['action_status'] ?? '' )" ) );
+assert_ai_backpressure_smoke( 'in-progress continuation returns before stale throttle merge', str_contains( $ai_src, "} else {\n\t\t\treturn;\n\t\t}" ) );
 
 $bounded_state = array();
 for ( $generation = 1; $generation <= 20; ++$generation ) {

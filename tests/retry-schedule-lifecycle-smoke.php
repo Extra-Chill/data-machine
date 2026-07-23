@@ -24,6 +24,22 @@ namespace DataMachine\Core\Database\Jobs {
 	}
 }
 
+namespace DataMachine\Core {
+	class EngineData {
+		public static function mutate( int $job_id, callable $callback, string $event_type = 'mutation' ): array {
+			unset( $job_id, $event_type );
+			$current = $GLOBALS['engine_data'] ?? array();
+			$next    = $callback( $current );
+			if ( null === $next ) {
+				return array( 'success' => false );
+			}
+
+			$GLOBALS['engine_data'] = $next;
+			return array( 'success' => true );
+		}
+	}
+}
+
 namespace {
 	define( 'ABSPATH', __DIR__ );
 
@@ -78,7 +94,7 @@ namespace {
 	echo "Case 1: scheduler failure leaves no pending retry metadata\n";
 	$GLOBALS['engine_data']           = array();
 	$GLOBALS['merged_engine_data']    = array();
-	$GLOBALS['schedule_retry_result'] = false;
+	$GLOBALS['schedule_retry_result'] = 0;
 	$GLOBALS['scheduled_retry']       = null;
 	$jobs                             = new \DataMachine\Core\Database\Jobs\Jobs();
 	$result                           = \DataMachine\Core\JobRetryPolicy::maybeRetry(
@@ -96,6 +112,18 @@ namespace {
 	assert_retry_schedule_lifecycle( 'job status remains processing when no retry action exists', 'processing' === $jobs->status );
 	assert_retry_schedule_lifecycle( 'next_retry_at is not exposed in result', ! isset( $result['next_retry_at'] ) );
 	assert_retry_schedule_lifecycle( 'next_retry_at is not persisted without action', ! isset( $GLOBALS['merged_engine_data']['retry']['next_retry_at'] ) );
+
+	$GLOBALS['engine_data'] = array( 'retry' => array( 'next_retry_at' => '2026-07-23T12:00:00Z' ) );
+	\DataMachine\Core\JobRetryPolicy::maybeRetry(
+		123,
+		'transient_failure',
+		array(
+			'flow_step_id' => 'step-1',
+			'retryable'    => true,
+		),
+		$jobs
+	);
+	assert_retry_schedule_lifecycle( 'failed later schedule clears stale retry ownership', ! isset( $GLOBALS['engine_data']['retry']['next_retry_at'] ) );
 
 	echo "Case 2: scheduler success publishes pending retry metadata\n";
 	$GLOBALS['engine_data']           = array();

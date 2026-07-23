@@ -29,9 +29,9 @@ $helper  = strstr( $source, 'private function failScheduling' ) ?: '';
 
 echo "Case 1: schedule-next-step owns Action Scheduler failures\n";
 assert_schedule_next_step_failure_smoke( 'helper exists', str_contains( $source, 'private function failScheduling' ) );
-assert_schedule_next_step_failure_smoke( 'action scheduler failure is checked', str_contains( $execute, 'if ( false === $action_id )' ) );
+assert_schedule_next_step_failure_smoke( 'non-positive action scheduler result is checked', str_contains( $execute, '(int) $action_id <= 0' ) );
 assert_schedule_next_step_failure_smoke( 'failed scheduling routes through helper', str_contains( $execute, "'next_step_schedule_failed'") );
-assert_schedule_next_step_failure_smoke( 'helper failure happens before returning action result', strpos( $execute, 'if ( false === $action_id )' ) < strpos( $execute, "'success'   => false !== $" . 'action_id' ) );
+assert_schedule_next_step_failure_smoke( 'helper failure happens before returning action result', strpos( $execute, 'if ( ! is_numeric( $action_id )' ) < strrpos( $execute, "'success'   => is_numeric( $" . 'action_id' ) );
 
 echo "Case 2: unscheduled jobs are requeued or finalized through fail-job\n";
 assert_schedule_next_step_failure_smoke( 'helper calls fail-job action', str_contains( $helper, "'datamachine_fail_job'") );

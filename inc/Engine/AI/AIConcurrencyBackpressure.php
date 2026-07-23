@@ -16,6 +16,7 @@ class AIConcurrencyBackpressure {
 
 	private const RESUME_GROUP_PREFIX = 'data-machine-ai-resume-';
 	private const OWNERSHIP_KEY       = 'ai_concurrency_resume_ownership';
+	private const SCHEDULE_ATTEMPTS   = 3;
 
 	/**
 	 * Resolve the next durable contention state.
@@ -62,39 +63,75 @@ class AIConcurrencyBackpressure {
 	 * Schedule one unique continuation, resolving a zero return only when the
 	 * scheduler can prove that an equivalent pending action won the race.
 	 *
-	 * @return array{success:bool,action_id:int,reused:bool}
+	 * @return array{success:bool,action_id:int,action_status:string,reused:bool,attempts:int,retryable:bool,error_message:string}
 	 */
 	public static function scheduleContinuation( int $timestamp, array $args ): array {
 		if ( ! function_exists( 'as_schedule_single_action' ) ) {
 			return array(
-				'success'   => false,
-				'action_id' => 0,
-				'reused'    => false,
+				'success'       => false,
+				'action_id'     => 0,
+				'action_status' => '',
+				'reused'        => false,
+				'attempts'      => 0,
+				'retryable'     => true,
+				'error_message' => 'Action Scheduler is unavailable.',
 			);
 		}
 
-		$group     = self::continuationGroup( $args );
-		$scheduled = as_schedule_single_action(
-			$timestamp,
-			self::RESUME_HOOK,
-			$args,
-			$group,
-			true
-		);
-		$action_id = is_numeric( $scheduled ) ? (int) $scheduled : 0;
-		if ( $action_id > 0 ) {
-			return array(
-				'success'   => true,
-				'action_id' => $action_id,
-				'reused'    => false,
+		$group         = self::continuationGroup( $args );
+		$error_message = '';
+		for ( $attempt = 1; $attempt <= self::SCHEDULE_ATTEMPTS; ++$attempt ) {
+			$scheduled = as_schedule_single_action(
+				$timestamp,
+				self::RESUME_HOOK,
+				$args,
+				$group,
+				true
 			);
+			$action_id = is_numeric( $scheduled ) ? (int) $scheduled : 0;
+			if ( $action_id > 0 ) {
+				return array(
+					'success'       => true,
+					'action_id'     => $action_id,
+					'action_status' => 'pending',
+					'reused'        => false,
+					'attempts'      => $attempt,
+					'retryable'     => false,
+					'error_message' => '',
+				);
+			}
+
+			global $wpdb;
+			if ( isset( $wpdb ) && is_string( $wpdb->last_error ?? null ) && '' !== $wpdb->last_error ) {
+				$error_message = $wpdb->last_error;
+			}
+
+			$active = self::activeContinuation( $args, $group );
+			if ( $active['action_id'] > 0 ) {
+				return array(
+					'success'       => true,
+					'action_id'     => $active['action_id'],
+					'action_status' => $active['status'],
+					'reused'        => true,
+					'attempts'      => $attempt,
+					'retryable'     => false,
+					'error_message' => $error_message,
+				);
+			}
+
+			if ( $attempt < self::SCHEDULE_ATTEMPTS ) {
+				usleep( random_int( 10000, 50000 ) );
+			}
 		}
 
-		$action_id = self::pendingContinuationId( $args, $group );
 		return array(
-			'success'   => $action_id > 0,
-			'action_id' => $action_id,
-			'reused'    => $action_id > 0,
+			'success'       => false,
+			'action_id'     => 0,
+			'action_status' => '',
+			'reused'        => false,
+			'attempts'      => self::SCHEDULE_ATTEMPTS,
+			'retryable'     => true,
+			'error_message' => $error_message ?: 'Action Scheduler returned no action ID.',
 		);
 	}
 
@@ -232,6 +269,53 @@ class AIConcurrencyBackpressure {
 		return ! empty( $result['success'] );
 	}
 
+	/** Release an exact generation that never acquired scheduler ownership. */
+	public static function releaseUnscheduledGeneration( int $job_id, string $flow_step_id, int $generation, string $token ): bool {
+		$result = EngineData::mutate(
+			$job_id,
+			static function ( array $engine ) use ( $flow_step_id, $generation, $token ): ?array {
+				$state = is_array( $engine[ self::OWNERSHIP_KEY ] ?? null ) ? $engine[ self::OWNERSHIP_KEY ] : array();
+				if ( ! self::isReleasableUnscheduledGeneration( $state, $flow_step_id, $generation, $token ) ) {
+					return null;
+				}
+
+				unset( $engine[ self::OWNERSHIP_KEY ] );
+				return $engine;
+			},
+			'ai_resume_generation_schedule_failed'
+		);
+
+		return ! empty( $result['success'] );
+	}
+
+	/** Determine whether the caller owns an exact actionless scheduled generation. */
+	public static function isReleasableUnscheduledGeneration( array $state, string $flow_step_id, int $generation, string $token ): bool {
+		return (string) ( $state['flow_step_id'] ?? '' ) === $flow_step_id
+			&& (int) ( $state['generation'] ?? 0 ) === $generation
+			&& (string) ( $state['token'] ?? '' ) === $token
+			&& 'scheduled' === (string) ( $state['status'] ?? '' )
+			&& 0 === (int) ( $state['action_id'] ?? 0 );
+	}
+
+	/** Resolve scheduler or runner ownership after an ambiguous release. */
+	public static function generationExecutionState( int $job_id, string $flow_step_id, int $generation, string $token ): string {
+		$engine = EngineData::retrieve( $job_id );
+		$state  = is_array( $engine[ self::OWNERSHIP_KEY ] ?? null ) ? $engine[ self::OWNERSHIP_KEY ] : array();
+
+		if ( (string) ( $state['flow_step_id'] ?? '' ) !== $flow_step_id
+			|| (int) ( $state['generation'] ?? 0 ) !== $generation
+			|| (string) ( $state['token'] ?? '' ) !== $token
+		) {
+			return '';
+		}
+
+		if ( 'running' === (string) ( $state['status'] ?? '' ) ) {
+			return 'running';
+		}
+
+		return (int) ( $state['action_id'] ?? 0 ) > 0 ? 'scheduled' : '';
+	}
+
 	private static function newGenerationState( string $flow_step_id, int $source_generation, string $token, int $now ): array {
 		return array(
 			'flow_step_id'      => $flow_step_id,
@@ -266,23 +350,30 @@ class AIConcurrencyBackpressure {
 		);
 	}
 
-	private static function pendingContinuationId( array $args, string $group ): int {
+	/** @return array{action_id:int,status:string} */
+	private static function activeContinuation( array $args, string $group ): array {
 		if ( ! function_exists( 'as_get_scheduled_actions' ) ) {
-			return 0;
+			return array( 'action_id' => 0, 'status' => '' );
 		}
 
-		$action_ids = as_get_scheduled_actions(
-			array(
-				'hook'     => self::RESUME_HOOK,
-				'args'     => $args,
-				'group'    => $group,
-				'status'   => 'pending',
-				'per_page' => 1,
-			),
-			'ids'
-		);
+		foreach ( array( 'pending', 'in-progress' ) as $status ) {
+			$action_ids = as_get_scheduled_actions(
+				array(
+					'hook'     => self::RESUME_HOOK,
+					'args'     => $args,
+					'group'    => $group,
+					'status'   => $status,
+					'per_page' => 1,
+				),
+				'ids'
+			);
 
-		$action_id = is_array( $action_ids ) ? reset( $action_ids ) : 0;
-		return is_numeric( $action_id ) && (int) $action_id > 0 ? (int) $action_id : 0;
+			$action_id = is_array( $action_ids ) ? reset( $action_ids ) : 0;
+			if ( is_numeric( $action_id ) && (int) $action_id > 0 ) {
+				return array( 'action_id' => (int) $action_id, 'status' => $status );
+			}
+		}
+
+		return array( 'action_id' => 0, 'status' => '' );
 	}
 }
