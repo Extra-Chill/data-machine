@@ -139,7 +139,7 @@ final class ScheduleActionIdentity {
 			),
 			'ids'
 		);
-		$action_id = is_array( $action_ids ) ? reset( $action_ids ) : 0;
+		$action_id  = is_array( $action_ids ) ? reset( $action_ids ) : 0;
 
 		return is_numeric( $action_id ) && (int) $action_id > 0 ? (int) $action_id : 0;
 	}
