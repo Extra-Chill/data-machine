@@ -68,8 +68,8 @@ class WorkerCommand extends BaseCommand {
 	 * default: 2
 	 * ---
 	 *
-	 * [--no-recover-stuck]
-	 * : Skip stuck-job recovery.
+	 * [--[no-]recover-stuck]
+	 * : Run stuck-job recovery before draining. Enabled by default; use --no-recover-stuck to skip it.
 	 *
 	 * [--stop-on-pending-actions]
 	 * : Stop when pending approval actions exist.
@@ -138,7 +138,7 @@ class WorkerCommand extends BaseCommand {
 			'drain_time_limit'        => isset( $assoc_args['drain-time-limit'] ) ? max( 1, (int) $assoc_args['drain-time-limit'] ) : 120,
 			'sleep'                   => isset( $assoc_args['sleep'] ) ? max( 0, (int) $assoc_args['sleep'] ) : 30,
 			'stuck_timeout'           => isset( $assoc_args['stuck-timeout'] ) ? max( 1, (int) $assoc_args['stuck-timeout'] ) : 2,
-			'recover_stuck'           => ! isset( $assoc_args['no-recover-stuck'] ),
+			'recover_stuck'           => \WP_CLI\Utils\get_flag_value( $assoc_args, 'recover-stuck', true ),
 			'stop_on_pending_actions' => isset( $assoc_args['stop-on-pending-actions'] ),
 			'max_passes'              => isset( $assoc_args['max-passes'] ) ? max( 0, (int) $assoc_args['max-passes'] ) : 0,
 			'stop_before_timeout'     => isset( $assoc_args['stop-before-timeout'] ) ? max( 0, (int) $assoc_args['stop-before-timeout'] ) : 30,
