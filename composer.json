@@ -39,6 +39,9 @@
 	},
 	"config": {
 		"process-timeout": 0,
+		"platform": {
+			"php": "8.2.0"
+		},
 		"allow-plugins": {
 			"dealerdirect/phpcodesniffer-composer-installer": true
 		}
