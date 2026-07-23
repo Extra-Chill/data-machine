@@ -2,6 +2,14 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.168.9] - 2026-07-23
+
+### Changed
+- Make post identity reservations crash-safe
+
+### Fixed
+- defer disposition claims to terminal lifecycle
+
 ## [0.168.8] - 2026-07-23
 
 ### Fixed
