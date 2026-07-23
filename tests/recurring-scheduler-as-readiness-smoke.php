@@ -36,6 +36,7 @@ function as_next_scheduled_action( string $hook, ?array $args = null, string $gr
 	return time() + 3600;
 }
 
+require_once __DIR__ . '/../inc/Engine/Tasks/ScheduleActionIdentity.php';
 require_once __DIR__ . '/../inc/Engine/Tasks/RecurringScheduler.php';
 
 use DataMachine\Engine\Tasks\RecurringScheduler;

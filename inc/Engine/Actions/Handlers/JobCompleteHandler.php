@@ -50,15 +50,28 @@ class JobCompleteHandler {
 			return;
 		}
 
-		$scheduling = is_string( $flow->scheduling_config )
-			? json_decode( $flow->scheduling_config, true )
-			: (array) $flow->scheduling_config;
+		$stored_scheduling = $flow['scheduling_config'] ?? array();
+		$scheduling        = is_string( $stored_scheduling )
+			? json_decode( $stored_scheduling, true )
+			: (array) $stored_scheduling;
 
 		if ( ( $scheduling['interval'] ?? '' ) === 'one_time' ) {
-			$db_flows->update_flow_scheduling(
-				$job->flow_id,
-				array( 'interval' => 'manual' )
+			$result = \DataMachine\Api\Flows\FlowScheduling::handle_scheduling_update(
+				(int) $job->flow_id,
+				array( 'interval' => 'manual' ),
+				true
 			);
+			if ( is_wp_error( $result ) ) {
+				do_action(
+					'datamachine_log',
+					'error',
+					'One-time flow completion left schedule reconciliation drift',
+					array_merge(
+						array( 'flow_id' => (int) $job->flow_id ),
+						\DataMachine\Engine\Tasks\RecurringScheduler::errorMetadata( $result )
+					)
+				);
+			}
 		}
 	}
 }

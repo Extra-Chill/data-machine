@@ -60,6 +60,10 @@ class ScheduleFlowAbility {
 							'action_id'      => array( 'type' => 'integer' ),
 							'scheduled_time' => array( 'type' => 'string' ),
 							'error'          => array( 'type' => 'string' ),
+							'error_code'     => array( 'type' => 'string' ),
+							'status'         => array( 'type' => 'integer' ),
+							'retryable'      => array( 'type' => 'boolean' ),
+							'retry_after_ms' => array( 'type' => 'integer' ),
 						),
 					),
 					'execute_callback'    => array( $this, 'execute' ),
@@ -89,9 +93,6 @@ class ScheduleFlowAbility {
 		$flow_id               = (int) ( $input['flow_id'] ?? 0 );
 		$interval_or_timestamp = $input['interval_or_timestamp'] ?? null;
 
-		// Always unschedule existing to prevent duplicates.
-		as_unschedule_all_actions( 'datamachine_run_flow_now', array( $flow_id ), 'data-machine' );
-
 		if ( 'manual' === $interval_or_timestamp ) {
 			return $this->clearSchedule( $flow_id );
 		}
@@ -117,9 +118,14 @@ class ScheduleFlowAbility {
 	 * @return array Result.
 	 */
 	private function clearSchedule( int $flow_id ): array {
-		$scheduling_config = array( 'interval' => 'manual' );
-		$this->db_flows->update_flow_scheduling( $flow_id, $scheduling_config );
-
+		$result = \DataMachine\Api\Flows\FlowScheduling::handle_scheduling_update(
+			$flow_id,
+			array( 'interval' => 'manual' ),
+			true
+		);
+		if ( is_wp_error( $result ) ) {
+			return $this->scheduleError( $result );
+		}
 		do_action(
 			'datamachine_log',
 			'info',
@@ -142,19 +148,19 @@ class ScheduleFlowAbility {
 	 * @return array Result.
 	 */
 	private function scheduleOneTime( int $flow_id, int $timestamp ): array {
-		$action_id = as_schedule_single_action(
-			$timestamp,
-			'datamachine_run_flow_now',
-			array( $flow_id ),
-			'data-machine'
+		$result = \DataMachine\Api\Flows\FlowScheduling::handle_scheduling_update(
+			$flow_id,
+			array(
+				'interval'  => 'one_time',
+				'timestamp' => $timestamp,
+			),
+			true
 		);
-
-		$scheduling_config = array(
-			'interval'       => 'one_time',
-			'timestamp'      => $timestamp,
-			'scheduled_time' => wp_date( 'c', $timestamp ),
-		);
-		$this->db_flows->update_flow_scheduling( $flow_id, $scheduling_config );
+		if ( is_wp_error( $result ) ) {
+			return $this->scheduleError( $result );
+		}
+		$scheduling = ( new \DataMachine\Core\Database\Flows\Flows() )->get_flow_scheduling( $flow_id );
+		$action_id  = is_array( $scheduling ) ? (int) ( $scheduling['action_id'] ?? 0 ) : 0;
 
 		do_action(
 			'datamachine_log',
@@ -197,18 +203,14 @@ class ScheduleFlowAbility {
 		);
 
 		if ( is_wp_error( $result ) ) {
-			return array(
-				'success' => false,
-				'error'   => $result->get_error_message(),
-			);
+			return $this->scheduleError( $result );
 		}
 
 		// Read back the scheduling config to get the computed next run.
 		$flow              = $this->db_flows->get_flow( $flow_id );
-		$scheduling_config = array();
-		if ( $flow ) {
-			$scheduling_config = json_decode( $flow['scheduling_config'] ?? '{}', true );
-		}
+		$scheduling_config = $flow && is_array( $flow['scheduling_config'] ?? null )
+			? $flow['scheduling_config']
+			: array();
 
 		return array(
 			'success'         => true,
@@ -236,24 +238,30 @@ class ScheduleFlowAbility {
 		);
 
 		if ( is_wp_error( $result ) ) {
-			return array(
-				'success' => false,
-				'error'   => $result->get_error_message(),
-			);
+			return $this->scheduleError( $result );
 		}
 
 		// Read back the scheduling config to get the computed first_run.
 		$flow              = $this->db_flows->get_flow( $flow_id );
-		$scheduling_config = array();
-		if ( $flow ) {
-			$scheduling_config = json_decode( $flow['scheduling_config'] ?? '{}', true );
-		}
+		$scheduling_config = $flow && is_array( $flow['scheduling_config'] ?? null )
+			? $flow['scheduling_config']
+			: array();
 
 		return array(
 			'success'        => true,
 			'flow_id'        => $flow_id,
 			'schedule_type'  => 'recurring',
 			'scheduled_time' => $scheduling_config['first_run'] ?? null,
+		);
+	}
+
+	/**
+	 * Preserve scheduler retry/status metadata at the ability boundary.
+	 */
+	private function scheduleError( \WP_Error $error ): array {
+		return array_merge(
+			array( 'success' => false ),
+			\DataMachine\Engine\Tasks\RecurringScheduler::errorMetadata( $error )
 		);
 	}
 }

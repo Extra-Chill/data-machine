@@ -332,8 +332,15 @@ class CreateFlowAbility {
 		}
 
 		if ( $validate_only ) {
-			$this->compensateFlowSchedule( $flow_id );
 			$this->rollbackCreationTransactionScope( $transaction_scope );
+			RecurringScheduler::invalidateGenerationCache( FlowScheduling::FLOW_HOOK, array( $flow_id ) );
+			$schedule_error = $this->compensateFlowSchedule( $flow_id );
+			if ( $schedule_error ) {
+				return array_merge(
+					array( 'success' => false ),
+					RecurringScheduler::errorMetadata( $schedule_error )
+				);
+			}
 
 			return array(
 				'success'      => true,
@@ -394,8 +401,9 @@ class CreateFlowAbility {
 	 * @return array Failure result.
 	 */
 	private function rollbackCreation( array $transaction_scope, int $flow_id, string $error, array $configuration_errors = array() ): array {
-		$this->compensateFlowSchedule( $flow_id );
 		$this->rollbackCreationTransactionScope( $transaction_scope );
+		RecurringScheduler::invalidateGenerationCache( FlowScheduling::FLOW_HOOK, array( $flow_id ) );
+		$schedule_error = $this->compensateFlowSchedule( $flow_id );
 
 		$result = array(
 			'success' => false,
@@ -404,6 +412,9 @@ class CreateFlowAbility {
 
 		if ( ! empty( $configuration_errors ) ) {
 			$result['configuration_errors'] = $configuration_errors;
+		}
+		if ( $schedule_error ) {
+			$result['schedule_cleanup'] = RecurringScheduler::errorMetadata( $schedule_error );
 		}
 
 		return $result;
@@ -491,8 +502,14 @@ class CreateFlowAbility {
 	 *
 	 * @param int $flow_id Flow ID allocated in this scope.
 	 */
-	private function compensateFlowSchedule( int $flow_id ): void {
-		RecurringScheduler::unschedule( FlowScheduling::FLOW_HOOK, array( $flow_id ), RecurringScheduler::GROUP );
+	private function compensateFlowSchedule( int $flow_id ): ?\WP_Error {
+		$result = RecurringScheduler::ensureSchedule(
+			FlowScheduling::FLOW_HOOK,
+			array( $flow_id ),
+			'manual',
+			array( 'generation_argument_index' => FlowScheduling::GENERATION_ARGUMENT_INDEX )
+		);
+		return is_wp_error( $result ) ? $result : null;
 	}
 
 	/**

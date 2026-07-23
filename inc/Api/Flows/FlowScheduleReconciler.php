@@ -69,13 +69,20 @@ class FlowScheduleReconciler {
 	private function reconcileUnlocked( bool $apply, ?int $spread_hours, ?string $lock_token ): array {
 		$eligible       = array();
 		$invalid        = array();
+		$drift_cleanup  = array();
 		$excluded_count = 0;
 
 		foreach ( $this->flows->get_flow_schedules() as $flow ) {
 			$scheduling = $flow['scheduling_config'] ?? array();
 			$interval   = $scheduling['interval'] ?? null;
 
+			$has_drift = ! empty( $scheduling['schedule_reconciliation'] );
 			if ( ! Flows::is_flow_enabled( $scheduling ) || empty( $interval ) || in_array( $interval, array( 'manual', 'one_time' ), true ) ) {
+				if ( $has_drift ) {
+					$flow['force_reconcile'] = true;
+					$drift_cleanup[]         = $flow;
+					continue;
+				}
 				++$excluded_count;
 				continue;
 			}
@@ -88,6 +95,7 @@ class FlowScheduleReconciler {
 			}
 
 			$flow['expected_recurrence'] = $expected;
+			$flow['force_reconcile']     = $has_drift;
 			$eligible[]                  = $flow;
 		}
 
@@ -104,10 +112,11 @@ class FlowScheduleReconciler {
 			if ( isset( $coverage['blocked'][ $flow_id ] ) ) {
 				$flow['blocked_reason'] = $coverage['blocked'][ $flow_id ];
 				$blocked[]              = $flow;
-			} elseif ( ! isset( $coverage['covered'][ $flow_id ] ) ) {
+			} elseif ( ! isset( $coverage['covered'][ $flow_id ] ) || ! empty( $flow['force_reconcile'] ) ) {
 				$missing[] = $flow;
 			}
 		}
+		$missing = array_merge( $missing, $drift_cleanup );
 
 		$missing_count = count( $missing );
 		$window_hours  = $spread_hours;
@@ -141,7 +150,10 @@ class FlowScheduleReconciler {
 					return $this->failure( 'Flow schedule reconciliation lost its apply lock.', true, 'flow_schedule_reconciliation_lock_lost' );
 				}
 
-				$options = array( 'stagger_seed' => $flow_id );
+				$options = array(
+					'stagger_seed'              => $flow_id,
+					'generation_argument_index' => FlowScheduling::GENERATION_ARGUMENT_INDEX,
+				);
 				if ( null !== $window_hours ) {
 					$options['distribution_window_seconds'] = $window_hours * HOUR_IN_SECONDS;
 				}
@@ -149,12 +161,16 @@ class FlowScheduleReconciler {
 					$options['cron_expression'] = $scheduling['cron_expression'];
 				}
 
-				$result = RecurringScheduler::ensureSchedule(
-					FlowScheduling::FLOW_HOOK,
-					array( $flow_id ),
-					(string) $scheduling['interval'],
-					$options
-				);
+				if ( ! empty( $flow['force_reconcile'] ) ) {
+					$result = FlowScheduling::handle_scheduling_update( $flow_id, $scheduling, true );
+				} else {
+					$result = RecurringScheduler::ensureSchedule(
+						FlowScheduling::FLOW_HOOK,
+						array( $flow_id ),
+						(string) $scheduling['interval'],
+						$options
+					);
+				}
 
 				if ( is_wp_error( $result ) ) {
 					++$failed;
@@ -173,7 +189,7 @@ class FlowScheduleReconciler {
 			'success'                   => 0 === $failed && empty( $blocked ),
 			'transient'                 => $failed > 0 || ! empty( $blocked ),
 			'applied'                   => $apply,
-			'total'                     => count( $eligible ) + count( $invalid ) + $excluded_count,
+			'total'                     => count( $eligible ) + count( $invalid ) + count( $drift_cleanup ) + $excluded_count,
 			'eligible'                  => count( $eligible ),
 			'covered'                   => count( $coverage['covered'] ),
 			'missing'                   => $missing_count,
@@ -365,7 +381,7 @@ class FlowScheduleReconciler {
 		$coverage = array();
 		foreach ( $rows as $row ) {
 			$args    = $row['action_args'] ?? $this->decodeActionArgs( $row );
-			$flow_id = is_array( $args ) && 1 === count( $args ) ? (int) reset( $args ) : 0;
+			$flow_id = is_array( $args ) && isset( $args[0] ) ? (int) $args[0] : 0;
 			if ( $flow_id <= 0 || ! array_key_exists( $flow_id, $expected ) ) {
 				continue;
 			}
@@ -377,6 +393,15 @@ class FlowScheduleReconciler {
 				);
 			}
 			++$coverage[ $flow_id ]['total'];
+			if ( isset( $args[ FlowScheduling::GENERATION_ARGUMENT_INDEX ] )
+				&& ! RecurringScheduler::isActionGenerationCurrent(
+					FlowScheduling::FLOW_HOOK,
+					array( $flow_id ),
+					RecurringScheduler::GROUP,
+					$args[ FlowScheduling::GENERATION_ARGUMENT_INDEX ]
+				) ) {
+				continue;
+			}
 
 			if ( 'in-progress' === ( $row['status'] ?? '' ) ) {
 				++$coverage[ $flow_id ]['in_progress'];

@@ -162,7 +162,11 @@ class FlowFormatter {
 			return null;
 		}
 
-		$next_timestamp = as_next_scheduled_action( 'datamachine_run_flow_now', array( $flow_id ), 'data-machine' );
+		$next_timestamp = \DataMachine\Engine\Tasks\RecurringScheduler::nextLogicalScheduledAction(
+			'datamachine_run_flow_now',
+			array( $flow_id ),
+			'data-machine'
+		);
 
 		return $next_timestamp ? wp_date( 'Y-m-d H:i:s', $next_timestamp, new \DateTimeZone( 'UTC' ) ) : null;
 	}

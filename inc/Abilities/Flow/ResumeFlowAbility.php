@@ -122,23 +122,19 @@ class ResumeFlowAbility {
 				continue;
 			}
 
-			// Remove the enabled key (default is enabled) and re-register schedule.
+			// Commit resumed intent and reconcile under the shared schedule lease.
 			unset( $scheduling['enabled'] );
-			$this->db_flows->update_flow_scheduling( $fid, $scheduling );
-
-			// Re-register Action Scheduler hooks from the preserved schedule.
-			$interval = $scheduling['interval'] ?? 'manual';
-			if ( 'manual' !== $interval ) {
-				$result = FlowScheduling::handle_scheduling_update( $fid, $scheduling, true );
-				if ( is_wp_error( $result ) ) {
-					++$errors;
-					$details[] = array(
+			$result = FlowScheduling::handle_scheduling_update( $fid, $scheduling, true );
+			if ( is_wp_error( $result ) ) {
+				++$errors;
+				$details[] = array_merge(
+					\DataMachine\Engine\Tasks\RecurringScheduler::errorMetadata( $result ),
+					array(
 						'flow_id' => $fid,
 						'status'  => 'resume_error',
-						'error'   => $result->get_error_message(),
-					);
-					continue;
-				}
+					)
+				);
+				continue;
 			}
 
 			++$resumed;

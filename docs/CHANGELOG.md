@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.168.4] - 2026-07-23
+
+### Fixed
+- serialize argument-bearing schedule updates
+
 ## [0.168.3] - 2026-07-22
 
 ### Fixed

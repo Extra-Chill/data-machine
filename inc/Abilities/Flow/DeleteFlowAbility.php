@@ -91,33 +91,53 @@ class DeleteFlowAbility {
 
 		$pipeline_id = (int) ( $flow['pipeline_id'] ?? 0 );
 
-		as_unschedule_all_actions( 'datamachine_run_flow_now', array( $flow_id ), 'data-machine' );
-
-		$success = $this->db_flows->delete_flow( $flow_id );
-
-		if ( $success ) {
-			do_action(
-				'datamachine_log',
-				'info',
-				'Flow deleted successfully',
+		$schedule_result = \DataMachine\Engine\Tasks\RecurringScheduler::commitDesiredSchedule(
+			'datamachine_run_flow_now',
+			array( $flow_id ),
+			'manual',
+			array( 'generation_argument_index' => \DataMachine\Api\Flows\FlowScheduling::GENERATION_ARGUMENT_INDEX ),
+			true,
+			fn(): bool => $this->db_flows->delete_flow( $flow_id ),
+			static function ( $result ) use ( $flow_id ): bool {
+				if ( is_wp_error( $result ) ) {
+					do_action(
+						'datamachine_log',
+						'error',
+						'Deleted flow has schedule reconciliation drift',
+						array_merge(
+							array( 'flow_id' => $flow_id ),
+							\DataMachine\Engine\Tasks\RecurringScheduler::errorMetadata( $result )
+						)
+					);
+				}
+				return true;
+			}
+		);
+		if ( is_wp_error( $schedule_result ) ) {
+			return array_merge(
 				array(
-					'flow_id'     => $flow_id,
-					'pipeline_id' => $pipeline_id,
-				)
-			);
-
-			return array(
-				'success'     => true,
-				'flow_id'     => $flow_id,
-				'pipeline_id' => $pipeline_id,
-				'message'     => 'Flow deleted successfully',
+					'success'                 => false,
+					'desired_state_committed' => null === $this->db_flows->get_flow( $flow_id ),
+				),
+				\DataMachine\Engine\Tasks\RecurringScheduler::errorMetadata( $schedule_result )
 			);
 		}
 
-		do_action( 'datamachine_log', 'error', 'Failed to delete flow', array( 'flow_id' => $flow_id ) );
+		do_action(
+			'datamachine_log',
+			'info',
+			'Flow deleted successfully',
+			array(
+				'flow_id'     => $flow_id,
+				'pipeline_id' => $pipeline_id,
+			)
+		);
+
 		return array(
-			'success' => false,
-			'error'   => 'Failed to delete flow',
+			'success'     => true,
+			'flow_id'     => $flow_id,
+			'pipeline_id' => $pipeline_id,
+			'message'     => 'Flow deleted successfully',
 		);
 	}
 }
