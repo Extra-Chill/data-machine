@@ -18,6 +18,7 @@ use DataMachine\Core\Database\TrackedItems\TrackedItems;
 use DataMachine\Core\ExecutionContext;
 use DataMachine\Core\JobStatus;
 use DataMachine\Core\RunMetrics;
+use DataMachine\Core\Steps\Fetch\Tools\FetchItemDispositionTool;
 use DataMachine\Engine\Actions\Handlers\FailJobHandler;
 use DataMachine\Engine\Actions\Handlers\StepLifecycleHandler;
 use Closure;
@@ -305,6 +306,59 @@ class ItemClaimLifecycleTest extends WP_UnitTestCase {
 		$this->assertSame( JobStatus::COMPLETED, $owner_result['status'] );
 		$this->assertSame( 1, $callback_count );
 		$this->assertFalse( $this->processed->has_active_claim( self::SCOPE, self::SOURCE, 'concurrent-terminal-id' ) );
+	}
+
+	public function test_reject_source_defers_owned_claim_completion_to_terminal_lifecycle(): void {
+		$job_id = $this->createJobWithClaim( array(), true );
+		$claim  = $this->claim( 'rejected-by-agent', $job_id, 'rejected-revision' );
+		datamachine_set_engine_data(
+			$job_id,
+			array_merge(
+				$this->legacyEngineData( 'rejected-by-agent' ),
+				array( ProcessedItems::CLAIM_METADATA_KEY => $claim )
+			)
+		);
+
+		$result = ( new FetchItemDispositionTool() )->handle_tool_call(
+			array(
+				'job_id' => $job_id,
+				'reason' => 'not an event',
+			),
+			array( 'disposition' => 'reject_source' )
+		);
+
+		$this->assertTrue( $result['success'] );
+		$this->assertTrue( $this->processed->has_active_claim( self::SCOPE, self::SOURCE, 'rejected-by-agent' ) );
+		$this->assertTrue( $this->jobs->complete_job( $job_id, JobStatus::agentSkipped( 'source-rejected' )->toString() ) );
+		$this->assertSame( 'rejected-revision', $this->tracked->get( self::NAMESPACE, 'rejected-by-agent' )['source_revision'] );
+		$this->assertFalse( $this->processed->has_active_claim( self::SCOPE, self::SOURCE, 'rejected-by-agent' ) );
+		$this->assertStringNotContainsString( 'item_claim_completion_failed', $this->jobs->get_job( $job_id )['status'] );
+	}
+
+	public function test_defer_item_defers_owned_claim_release_to_terminal_lifecycle(): void {
+		$job_id = $this->createJobWithClaim( array(), true );
+		$claim  = $this->claim( 'deferred-by-agent', $job_id, 'deferred-revision' );
+		datamachine_set_engine_data(
+			$job_id,
+			array_merge(
+				$this->legacyEngineData( 'deferred-by-agent' ),
+				array( ProcessedItems::CLAIM_METADATA_KEY => $claim )
+			)
+		);
+
+		$result = ( new FetchItemDispositionTool() )->handle_tool_call(
+			array(
+				'job_id' => $job_id,
+				'reason' => 'temporary tool failure',
+			),
+			array( 'disposition' => 'defer_item' )
+		);
+
+		$this->assertTrue( $result['success'] );
+		$this->assertTrue( $this->processed->has_active_claim( self::SCOPE, self::SOURCE, 'deferred-by-agent' ) );
+		$this->assertTrue( $this->jobs->complete_job( $job_id, JobStatus::failed( 'item-deferred' )->toString() ) );
+		$this->assertFalse( $this->processed->has_active_claim( self::SCOPE, self::SOURCE, 'deferred-by-agent' ) );
+		$this->assertIsArray( $this->context( 'deferred-retry-step', $job_id + 3000 )->claimItemOwnership( self::SCOPE, 'deferred-by-agent' ) );
 	}
 
 	public function test_interleaved_status_write_before_terminal_cas_rolls_back_and_recovers(): void {
