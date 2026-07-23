@@ -74,9 +74,11 @@ $root           = dirname( __DIR__ );
 $handler_source = (string) file_get_contents( $root . '/inc/Abilities/Chat/AgentsChatHandler.php' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Source smoke fixture.
 $orchestrator   = (string) file_get_contents( $root . '/inc/Api/Chat/ChatOrchestrator.php' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Source smoke fixture.
 $chat_abilities = (string) file_get_contents( $root . '/inc/Abilities/ChatAbilities.php' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Source smoke fixture.
+$bootstrap      = (string) file_get_contents( $root . '/inc/bootstrap.php' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Source smoke fixture.
 $chat_api       = (string) file_get_contents( $root . '/inc/Api/Chat/Chat.php' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Source smoke fixture.
 
 $assert( str_contains( $chat_abilities, 'new AgentsChatHandler();' ), 'ChatAbilities registers Data Machine as the Agents API chat handler' );
+$assert( str_contains( $bootstrap, 'new ChatAbilities();' ), 'Plugin bootstrap initializes canonical chat abilities' );
 $assert( str_contains( $handler_source, "register_chat_handler( array( $" . "this, 'execute' ) )" ), 'AgentsChatHandler attaches to canonical Agents API chat handler seam' );
 $assert( ! str_contains( $handler_source, "wp_agent_chat_handler" ), 'AgentsChatHandler no longer falls back to legacy chat handler filter' );
 $assert( str_contains( $handler_source, 'ChatOrchestrator::processChat(' ), 'AgentsChatHandler owns the single ChatOrchestrator runtime call' );
