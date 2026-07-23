@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.168.8] - 2026-07-23
+
+### Fixed
+- accept worker recovery negation flag
+
 ## [0.168.7] - 2026-07-23
 
 ### Fixed
