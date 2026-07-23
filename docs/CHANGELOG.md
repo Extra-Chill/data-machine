@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.168.5] - 2026-07-23
+
+### Fixed
+- read normalized flow scheduling responses
+
 ## [0.168.4] - 2026-07-23
 
 ### Fixed
