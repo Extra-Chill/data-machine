@@ -69,8 +69,6 @@ class RecurringScheduler {
 	 * signature can repeat.
 	 */
 	private const SCHEDULE_GENERATION_PREFIX   = 'datamachine_schedule_generation_';
-	private const GENERATION_ARGUMENT_KEY      = '_datamachine_schedule_generation';
-	private const SIGNATURE_ARGUMENT_COUNT_KEY = '_datamachine_signature_argument_count';
 	private const SCHEDULE_LOCK_TTL            = 30;
 	private const SCHEDULE_LOCK_RETRY_ATTEMPTS = 5;
 	private const SCHEDULE_LOCK_RETRY_DELAY_US = 25000;
@@ -177,7 +175,7 @@ class RecurringScheduler {
 				? max( count( $args ), (int) $options['generation_argument_index'] )
 				: null;
 			if ( ! empty( $options['legacy_adoption'] )
-				&& self::getCoveringAction( $hook, self::scheduleActionArgs( $args, $lock ), (string) ( $options['group'] ?? self::GROUP ) ) ) {
+				&& ScheduleActionIdentity::exactAction( $hook, self::scheduleActionArgs( $args, $lock ), (string) ( $options['group'] ?? self::GROUP ), array( 'pending', 'in-progress' ) ) ) {
 				return self::error(
 					'stale_legacy_schedule_generation',
 					'A generated schedule already owns this flow; the legacy action is stale.',
@@ -506,7 +504,7 @@ class RecurringScheduler {
 		self::$executed_recurrence_generations[ $key ] = array(
 			'generation_option'   => $action->getGenerationOption(),
 			'expected_generation' => $action->getExpectedGeneration(),
-			'legacy'              => null === self::generationFromActionArgs( $action->get_args() ),
+			'legacy'              => null === ScheduleActionIdentity::generationFromArgs( $action->get_args() ),
 		);
 	}
 
@@ -536,7 +534,7 @@ class RecurringScheduler {
 			return;
 		}
 
-		self::cancelExactAction( $action_id );
+		ScheduleActionIdentity::cancelExact( $action_id );
 	}
 
 	/**
@@ -558,13 +556,13 @@ class RecurringScheduler {
 			return $action;
 		}
 
-		$logical_args = self::logicalArgsFromActionArgs( $args );
+		$logical_args = ScheduleActionIdentity::logicalArgs( $args );
 		$options      = self::scheduleOptionNames( $hook, $logical_args, $group );
 		if ( is_wp_error( $options ) ) {
 			return $action;
 		}
 
-		$generation = self::generationFromActionArgs( $args );
+		$generation = ScheduleActionIdentity::generationFromArgs( $args );
 		if ( null === $generation ) {
 			$generation = get_option( $options['generation_option'], false );
 		}
@@ -690,7 +688,7 @@ class RecurringScheduler {
 	 * here; the flow handler performs the bounded legacy transition.
 	 */
 	public static function isActionGenerationCurrent( string $hook, array $args, string $group, $generation_argument ): bool {
-		$generation = self::generationFromArgument( $generation_argument );
+		$generation = ScheduleActionIdentity::generationFromArgument( $generation_argument );
 		if ( null === $generation ) {
 			return false;
 		}
@@ -712,43 +710,7 @@ class RecurringScheduler {
 			return $args;
 		}
 
-		$logical_count = count( $args );
-		$target_count  = (int) $lock['generation_argument_index'];
-		for ( $argument_count = $logical_count; $argument_count < $target_count; ++$argument_count ) {
-			$args[] = null;
-		}
-		$args[] = array(
-			self::GENERATION_ARGUMENT_KEY      => (string) $lock['generation'],
-			self::SIGNATURE_ARGUMENT_COUNT_KEY => $logical_count,
-		);
-
-		return $args;
-	}
-
-	private static function generationFromArgument( $argument ): ?string {
-		if ( ! is_array( $argument ) || empty( $argument[ self::GENERATION_ARGUMENT_KEY ] ) || ! is_string( $argument[ self::GENERATION_ARGUMENT_KEY ] ) ) {
-			return null;
-		}
-
-		return $argument[ self::GENERATION_ARGUMENT_KEY ];
-	}
-
-	private static function generationFromActionArgs( array $args ): ?string {
-		return empty( $args ) ? null : self::generationFromArgument( end( $args ) );
-	}
-
-	private static function logicalArgsFromActionArgs( array $args ): array {
-		if ( empty( $args ) ) {
-			return $args;
-		}
-
-		$marker = end( $args );
-		if ( null === self::generationFromArgument( $marker ) ) {
-			return $args;
-		}
-
-		$count = isset( $marker[ self::SIGNATURE_ARGUMENT_COUNT_KEY ] ) ? (int) $marker[ self::SIGNATURE_ARGUMENT_COUNT_KEY ] : count( $args ) - 1;
-		return array_slice( $args, 0, max( 0, $count ) );
+		return ScheduleActionIdentity::withGeneration( $args, (string) $lock['generation'], (int) $lock['generation_argument_index'] );
 	}
 
 	private static function scheduleSignatureKey( string $hook, array $args, string $group ): ?string {
@@ -875,7 +837,7 @@ class RecurringScheduler {
 	 * Cancel only the action returned by a store call after ownership was lost.
 	 */
 	private static function cleanupAfterLostScheduleOwnership( int $action_id ): \WP_Error {
-		if ( $action_id > 0 && self::cancelExactAction( $action_id ) ) {
+		if ( $action_id > 0 && ScheduleActionIdentity::cancelExact( $action_id ) ) {
 			return self::lockLostError();
 		}
 
@@ -889,21 +851,6 @@ class RecurringScheduler {
 				'action_id'      => $action_id,
 			)
 		);
-	}
-
-	private static function cancelExactAction( int $action_id ): bool {
-		if ( $action_id <= 0 || ! class_exists( '\\ActionScheduler_Store' ) ) {
-			return false;
-		}
-
-		try {
-			$store = \ActionScheduler_Store::instance();
-			$store->cancel_action( $action_id );
-			return \ActionScheduler_Store::STATUS_CANCELED === $store->get_status( $action_id );
-		} catch ( \Throwable $throwable ) {
-			unset( $throwable );
-			return false;
-		}
 	}
 
 	/**
@@ -935,31 +882,18 @@ class RecurringScheduler {
 			return self::retryableError( 'scheduler_unavailable', 'Action Scheduler exact cleanup is unavailable.' );
 		}
 
-		$actions = as_get_scheduled_actions(
-			array(
-				'hook'     => $hook,
-				'group'    => $group,
-				'status'   => 'pending',
-				'per_page' => -1,
-			),
-			'OBJECT'
-		);
-		foreach ( $actions as $action_id => $action ) {
-			if ( ! is_object( $action ) || ! method_exists( $action, 'get_args' ) || self::logicalArgsFromActionArgs( $action->get_args() ) !== $args ) {
-				continue;
-			}
-			if ( ! self::cancelExactAction( (int) $action_id ) ) {
-				return self::error(
-					'schedule_exact_cleanup_failed',
-					'Unable to cancel an exact superseded schedule action.',
-					array(
-						'status'         => 503,
-						'retryable'      => true,
-						'retry_after_ms' => 250,
-						'action_id'      => (int) $action_id,
-					)
-				);
-			}
+		$failed_action_id = ScheduleActionIdentity::cancelPending( $hook, $args, $group );
+		if ( $failed_action_id > 0 ) {
+			return self::error(
+				'schedule_exact_cleanup_failed',
+				'Unable to cancel an exact superseded schedule action.',
+				array(
+					'status'         => 503,
+					'retryable'      => true,
+					'retry_after_ms' => 250,
+					'action_id'      => $failed_action_id,
+				)
+			);
 		}
 
 		return true;
@@ -1030,29 +964,7 @@ class RecurringScheduler {
 			return false;
 		}
 
-		foreach ( array( 'pending', 'in-progress' ) as $status ) {
-			$actions = as_get_scheduled_actions(
-				array(
-					'hook'     => $hook,
-					'group'    => $group,
-					'status'   => $status,
-					'per_page' => -1,
-				),
-				'OBJECT'
-			);
-			foreach ( $actions as $action ) {
-				if ( ! is_object( $action ) || ! method_exists( $action, 'get_args' ) ) {
-					continue;
-				}
-				$action_args = $action->get_args();
-				if ( self::logicalArgsFromActionArgs( $action_args ) === $args
-					&& ( ! $generated_only || null !== self::generationFromActionArgs( $action_args ) ) ) {
-					return true;
-				}
-			}
-		}
-
-		return false;
+		return ScheduleActionIdentity::hasCoverage( $hook, $args, $group, $generated_only );
 	}
 
 	/**
@@ -1065,26 +977,7 @@ class RecurringScheduler {
 			return false;
 		}
 
-		$actions = as_get_scheduled_actions(
-			array(
-				'hook'     => $hook,
-				'group'    => $group,
-				'status'   => 'pending',
-				'orderby'  => 'date',
-				'order'    => 'ASC',
-				'per_page' => -1,
-			),
-			'OBJECT'
-		);
-		foreach ( $actions as $action ) {
-			if ( ! is_object( $action ) || ! method_exists( $action, 'get_args' ) || self::logicalArgsFromActionArgs( $action->get_args() ) !== $args ) {
-				continue;
-			}
-			$date = $action->get_schedule()->get_date();
-			return $date ? $date->getTimestamp() : false;
-		}
-
-		return false;
+		return ScheduleActionIdentity::nextTimestamp( $hook, $args, $group );
 	}
 
 	/**
@@ -1153,132 +1046,15 @@ class RecurringScheduler {
 		);
 	}
 
-	/**
-	 * Find the next pending action object for a schedule slot.
-	 *
-	 * @param string $hook  Hook name.
-	 * @param array  $args  Action args.
-	 * @param string $group AS group.
-	 * @return object|null ActionScheduler_Action-like object, or null.
-	 */
-	private static function getPendingAction( string $hook, array $args, string $group ): ?object {
-		return self::getActionByStatuses( $hook, $args, $group, array( 'pending' ) );
-	}
-
-	/**
-	 * Find the next pending or running action that owns a schedule slot.
-	 *
-	 * @param string $hook  Hook name.
-	 * @param array  $args  Action args.
-	 * @param string $group AS group.
-	 * @return object|null ActionScheduler_Action-like object, or null.
-	 */
-	private static function getCoveringAction( string $hook, array $args, string $group ): ?object {
-		return self::getActionByStatuses( $hook, $args, $group, array( 'pending', 'in-progress' ) );
-	}
-
-	/**
-	 * Find the next action matching one of the supplied statuses.
-	 *
-	 * @param string   $hook     Hook name.
-	 * @param array    $args     Action args.
-	 * @param string   $group    AS group.
-	 * @param string[] $statuses Action Scheduler statuses in priority order.
-	 * @return object|null ActionScheduler_Action-like object, or null.
-	 */
-	private static function getActionByStatuses( string $hook, array $args, string $group, array $statuses ): ?object {
-		if ( ! function_exists( 'as_get_scheduled_actions' ) ) {
-			return null;
-		}
-
-		if ( ! self::isActionSchedulerDataStoreReady() ) {
-			return null;
-		}
-
-		foreach ( $statuses as $status ) {
-			$actions = as_get_scheduled_actions(
-				array(
-					'hook'     => $hook,
-					'args'     => $args,
-					'group'    => $group,
-					'status'   => $status,
-					'orderby'  => 'date',
-					'order'    => 'ASC',
-					'per_page' => 1,
-				),
-				'OBJECT'
-			);
-
-			$action = reset( $actions );
-			if ( is_object( $action ) ) {
-				return $action;
-			}
-		}
-
-		return null;
-	}
-
-	/**
-	 * Count ALL pending Action Scheduler actions matching (hook, args, group).
-	 *
-	 * Used to detect duplicate recurring/cron chains for the same signature so
-	 * ensureSchedule can self-heal (collapse N>1 chains to exactly one) even on
-	 * the preserve fast path. Unlike getPendingAction() (per_page=1), this asks
-	 * for more than one row so duplicates are visible.
-	 *
-	 * @param string $hook  Hook name.
-	 * @param array  $args  Action args.
-	 * @param string $group AS group.
-	 * @return int Number of matching pending actions (0 when AS is not ready).
-	 */
-	private static function countMatchingPendingActions( string $hook, array $args, string $group ): int {
-		if ( ! function_exists( 'as_get_scheduled_actions' ) ) {
-			return 0;
-		}
-
-		if ( ! self::isActionSchedulerDataStoreReady() ) {
-			return 0;
-		}
-
-		$actions = as_get_scheduled_actions(
-			array(
-				'hook'     => $hook,
-				'args'     => $args,
-				'group'    => $group,
-				'status'   => 'pending',
-				'per_page' => 100,
-			),
-			'ids'
-		);
-
-		return is_array( $actions ) ? count( $actions ) : 0;
-	}
-
 	private static function countPendingActionsForSignature( string $hook, array $logical_args, array $schedule_args, string $group, array $lock ): int {
 		if ( null === ( $lock['generation_argument_index'] ?? null ) ) {
-			return self::countMatchingPendingActions( $hook, $schedule_args, $group );
+			return ScheduleActionIdentity::countExactPending( $hook, $schedule_args, $group );
 		}
 		if ( ! function_exists( 'as_get_scheduled_actions' ) || ! self::isActionSchedulerDataStoreReady() ) {
 			return 0;
 		}
 
-		$actions = as_get_scheduled_actions(
-			array(
-				'hook'     => $hook,
-				'group'    => $group,
-				'status'   => 'pending',
-				'per_page' => -1,
-			),
-			'OBJECT'
-		);
-		$count   = 0;
-		foreach ( $actions as $action ) {
-			if ( is_object( $action ) && method_exists( $action, 'get_args' ) && self::logicalArgsFromActionArgs( $action->get_args() ) === $logical_args ) {
-				++$count;
-			}
-		}
-
-		return $count;
+		return ScheduleActionIdentity::countPending( $hook, $logical_args, $group );
 	}
 
 	/**
@@ -1291,7 +1067,7 @@ class RecurringScheduler {
 	 * @return bool True when the existing pending action already matches.
 	 */
 	private static function hasMatchingSingleAction( string $hook, array $args, string $group, int $timestamp ): bool {
-		$action = self::getCoveringAction( $hook, $args, $group );
+		$action = ScheduleActionIdentity::exactAction( $hook, $args, $group, array( 'pending', 'in-progress' ) );
 		if ( ! $action || ! method_exists( $action, 'get_schedule' ) ) {
 			return false;
 		}
@@ -1314,7 +1090,7 @@ class RecurringScheduler {
 	 * @return bool True when the existing pending action already matches.
 	 */
 	private static function hasMatchingRecurringAction( string $hook, array $args, string $group, int $interval_seconds ): bool {
-		$action = self::getCoveringAction( $hook, $args, $group );
+		$action = ScheduleActionIdentity::exactAction( $hook, $args, $group, array( 'pending', 'in-progress' ) );
 		if ( ! $action || ! method_exists( $action, 'get_schedule' ) ) {
 			return false;
 		}
@@ -1340,7 +1116,7 @@ class RecurringScheduler {
 	 * @return bool True when the existing pending action already matches.
 	 */
 	private static function hasMatchingCronAction( string $hook, array $args, string $group, string $cron_expression ): bool {
-		$action = self::getCoveringAction( $hook, $args, $group );
+		$action = ScheduleActionIdentity::exactAction( $hook, $args, $group, array( 'pending', 'in-progress' ) );
 		if ( ! $action || ! method_exists( $action, 'get_schedule' ) ) {
 			return false;
 		}

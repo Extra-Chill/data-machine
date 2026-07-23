@@ -398,6 +398,7 @@ function as_schedule_cron_action( int $timestamp, string $expression, string $ho
 
 require_once __DIR__ . '/../inc/Core/OptionLeaseStore.php';
 require_once __DIR__ . '/../inc/Engine/Tasks/GenerationFencedAction.php';
+require_once __DIR__ . '/../inc/Engine/Tasks/ScheduleActionIdentity.php';
 require_once __DIR__ . '/../inc/Engine/Tasks/RecurringScheduler.php';
 
 use DataMachine\Engine\Tasks\RecurringScheduler;
@@ -730,11 +731,12 @@ echo "\n[32] generation fence matches bundled Action Scheduler repeat order\n";
 $queue_runner_source = file_get_contents( __DIR__ . '/../vendor/woocommerce/action-scheduler/classes/abstracts/ActionScheduler_Abstract_QueueRunner.php' ) ?: '';
 $factory_source      = file_get_contents( __DIR__ . '/../vendor/woocommerce/action-scheduler/classes/ActionScheduler_ActionFactory.php' ) ?: '';
 $scheduler_source    = file_get_contents( __DIR__ . '/../inc/Engine/Tasks/RecurringScheduler.php' ) ?: '';
+$identity_source     = file_get_contents( __DIR__ . '/../inc/Engine/Tasks/ScheduleActionIdentity.php' ) ?: '';
 $execute_position    = strpos( $queue_runner_source, '$action->execute()' );
 $repeat_position     = strpos( $queue_runner_source, '$action->get_schedule()->is_recurring()' );
 datamachine_assert( false !== $execute_position && false !== $repeat_position && $execute_position < $repeat_position, 'bundled AS re-reads the fetched action schedule after callback execution' );
 datamachine_assert( str_contains( $factory_source, '$schedule = $action->get_schedule();' ) && str_contains( $factory_source, '$this->store( $new_action )' ), 'bundled AS repeats from the fetched action schedule object' );
-datamachine_assert( str_contains( $scheduler_source, "'action_scheduler_stored_action'" ) && str_contains( $scheduler_source, 'cancelExactAction( $action_id )' ), 'post-store reconciliation cancels a stale native successor by exact action ID' );
+datamachine_assert( str_contains( $scheduler_source, "'action_scheduler_stored_action'" ) && str_contains( $scheduler_source, 'ScheduleActionIdentity::cancelExact( $action_id )' ) && str_contains( $identity_source, 'cancel_action( $action_id )' ), 'post-store reconciliation cancels a stale native successor by exact action ID' );
 
 echo "\n[33] desired-state persistence failure prevents schedule mutation\n";
 datamachine_rs_reset();
