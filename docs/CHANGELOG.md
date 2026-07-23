@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.168.10] - 2026-07-23
+
+### Fixed
+- recover AI continuation scheduling failures
+
 ## [0.168.9] - 2026-07-23
 
 ### Changed
