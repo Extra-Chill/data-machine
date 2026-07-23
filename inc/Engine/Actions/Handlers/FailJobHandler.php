@@ -128,7 +128,8 @@ class FailJobHandler {
 
 		$cleanup_files = \DataMachine\Core\PluginSettings::get( 'cleanup_job_data_on_failure', true );
 		$files_cleaned = false;
-		$retry_pending = self::hasPendingRetry( $engine_data );
+		$terminal_job  = $db_jobs->get_job( $job_id );
+		$retry_pending = self::hasPendingRetry( $engine_data, is_array( $terminal_job ) ? (string) ( $terminal_job['status'] ?? '' ) : '' );
 
 		// Skip cleanup whenever a retry is already scheduled for this job.
 		// JobRetryPolicy::recordRetry writes next_retry_at only after Action
@@ -170,11 +171,12 @@ class FailJobHandler {
 	 * only after Action Scheduler accepts the next attempt. Any non-empty value
 	 * means the policy has taken ownership of the failure path.
 	 *
-	 * @param array $engine_data Engine snapshot read prior to fail finalization.
+	 * @param array  $engine_data Engine snapshot read prior to fail finalization.
+	 * @param string $job_status  Current persisted job status.
 	 * @return bool
 	 */
-	private static function hasPendingRetry( array $engine_data ): bool {
+	private static function hasPendingRetry( array $engine_data, string $job_status ): bool {
 		$retry = is_array( $engine_data['retry'] ?? null ) ? $engine_data['retry'] : array();
-		return ! empty( $retry['next_retry_at'] );
+		return 'pending' === $job_status && ! empty( $retry['next_retry_at'] );
 	}
 }

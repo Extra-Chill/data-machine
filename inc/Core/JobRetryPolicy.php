@@ -57,6 +57,7 @@ class JobRetryPolicy {
 		$max_attempts = max( 1, (int) ( $policy['max_attempts'] ?? self::DEFAULT_MAX_ATTEMPTS ) );
 
 		if ( empty( $policy['retryable'] ) ) {
+			self::clearPendingRetryOwnership( $job_id );
 			return array(
 				'retried'      => false,
 				'exhausted'    => false,
@@ -67,6 +68,7 @@ class JobRetryPolicy {
 		}
 
 		if ( $attempt >= $max_attempts ) {
+			self::clearPendingRetryOwnership( $job_id );
 			self::recordPoisonItem( $job_id, $reason, $context_data, $engine_data, $attempt, $max_attempts );
 
 			return array(
@@ -95,6 +97,7 @@ class JobRetryPolicy {
 		}
 
 		if ( '' === $flow_step_id ) {
+			self::clearPendingRetryOwnership( $job_id );
 			return array(
 				'retried'      => false,
 				'exhausted'    => false,
@@ -109,7 +112,7 @@ class JobRetryPolicy {
 			'flow_step_id' => $flow_step_id,
 		);
 		if ( 'direct' === (string) ( $job['flow_id'] ?? '' ) && (int) ( $job['operation_generation'] ?? 0 ) > 0 ) {
-			$action_args['operation_generation'] = (int) $job['operation_generation'];
+			$action_args['operation_generation']  = (int) $job['operation_generation'];
 			$action_args['operation_claim_token'] = (string) ( $job['operation_claim_token'] ?? '' );
 		}
 
@@ -120,7 +123,8 @@ class JobRetryPolicy {
 			'data-machine'
 		);
 
-		if ( false === $action_id ) {
+		if ( ! is_numeric( $action_id ) || (int) $action_id <= 0 ) {
+			self::clearPendingRetryOwnership( $job_id );
 			return array(
 				'retried'      => false,
 				'exhausted'    => false,
@@ -159,6 +163,22 @@ class JobRetryPolicy {
 			'next_retry_at' => gmdate( 'c', $timestamp ),
 			'retry_after'   => $delay_seconds,
 			'retry_class'   => $policy['retry_class'] ?? 'generic',
+		);
+	}
+
+	/** Clear scheduler ownership metadata before a terminal failure path. */
+	private static function clearPendingRetryOwnership( int $job_id ): void {
+		EngineData::mutate(
+			$job_id,
+			static function ( array $engine ): ?array {
+				if ( empty( $engine['retry']['next_retry_at'] ) ) {
+					return null;
+				}
+
+				unset( $engine['retry']['next_retry_at'] );
+				return $engine;
+			},
+			'retry_schedule_ownership_cleared'
 		);
 	}
 

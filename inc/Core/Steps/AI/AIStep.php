@@ -15,6 +15,7 @@ use DataMachine\Core\Steps\AI\ToolPolicy\PipelineToolPolicyArgs;
 use DataMachine\Core\Steps\StepTypeRegistrationTrait;
 use DataMachine\Core\Steps\QueueableTrait;
 use DataMachine\Engine\AI\AIConcurrencyBackpressure;
+use DataMachine\Engine\AI\AIConcurrencyScheduleFailure;
 use DataMachine\Engine\AI\ConversationManager;
 use DataMachine\Engine\AI\DataPacketPromptProjector;
 use DataMachine\Engine\AI\PipelineAIConcurrencyLease;
@@ -225,7 +226,11 @@ class AIStep extends Step {
 
 		if ( empty( $lease_result['acquired'] ) ) {
 			$this->deferForAIConcurrency( $provider_name, $lease_result );
-			return array();
+			return array(
+				'status'  => 'blocked',
+				'packets' => array(),
+				'reason'  => 'ai_concurrency_deferred',
+			);
 		}
 
 		$this->resolveAIConcurrencyContention();
@@ -753,22 +758,30 @@ class AIStep extends Step {
 		$action_id       = (int) $schedule_result['action_id'];
 
 		if ( empty( $schedule_result['success'] ) || $action_id <= 0 ) {
-			$contention_data['state']           = 'stranded';
-			$contention_data['terminal_reason'] = 'ai_concurrency_defer_schedule_failed';
-			$contention_data['next_retry_at']   = null;
-			datamachine_merge_engine_data( $this->job_id, array( 'ai_concurrency_throttle' => $contention_data ) );
-			( new Jobs() )->complete_job( $this->job_id, 'cancelled - ai_concurrency_defer_schedule_failed' );
+			AIConcurrencyScheduleFailure::handle(
+				$this->job_id,
+				$this->flow_step_id,
+				$provider_name,
+				$resume_generation,
+				(string) $claim['token'],
+				$contention_data,
+				$schedule_result
+			);
 			return;
 		}
-		AIConcurrencyBackpressure::recordScheduledAction(
-			$this->job_id,
-			$this->flow_step_id,
-			$resume_generation,
-			(string) $claim['token'],
-			$action_id
-		);
+		if ( 'in-progress' !== (string) ( $schedule_result['action_status'] ?? '' ) ) {
+			AIConcurrencyBackpressure::recordScheduledAction(
+				$this->job_id,
+				$this->flow_step_id,
+				$resume_generation,
+				(string) $claim['token'],
+				$action_id
+			);
 
-		( new Jobs() )->update_job_status( $this->job_id, 'pending' );
+			( new Jobs() )->update_job_status( $this->job_id, 'pending' );
+		} else {
+			return;
+		}
 
 		datamachine_merge_engine_data(
 			$this->job_id,
