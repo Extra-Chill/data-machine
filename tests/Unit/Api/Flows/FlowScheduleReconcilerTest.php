@@ -14,10 +14,25 @@ use DataMachine\Core\Database\Flows\Flows;
 use DataMachine\Engine\Tasks\RecurringScheduler;
 use WP_UnitTestCase;
 
+class ScopedFlowSchedules extends Flows {
+	/** @var int[] */
+	public array $flow_ids = array();
+
+	public function get_flow_schedules(): array {
+		$flow_ids = array_flip( $this->flow_ids );
+		return array_values(
+			array_filter(
+				parent::get_flow_schedules(),
+				static fn(array $flow): bool => isset( $flow_ids[ (int) $flow['flow_id'] ] )
+			)
+		);
+	}
+}
+
 class FlowScheduleReconcilerTest extends WP_UnitTestCase {
 
 	private int $pipeline_id;
-	private Flows $flows;
+	private ScopedFlowSchedules $flows;
 	private array $flow_ids = array();
 
 	public function set_up(): void {
@@ -26,13 +41,20 @@ class FlowScheduleReconcilerTest extends WP_UnitTestCase {
 		wp_set_current_user( self::factory()->user->create( array( 'role' => 'administrator' ) ) );
 		$pipeline         = wp_get_ability( 'datamachine/create-pipeline' )->execute( array( 'pipeline_name' => 'Schedule reconciliation' ) );
 		$this->pipeline_id = (int) $pipeline['pipeline_id'];
-		$this->flows       = new Flows();
+		$this->flows       = new ScopedFlowSchedules();
 	}
 
 	public function tear_down(): void {
 		foreach ( $this->flow_ids as $flow_id ) {
-			RecurringScheduler::unschedule( FlowScheduling::FLOW_HOOK, array( $flow_id ) );
+			RecurringScheduler::unschedule(
+				FlowScheduling::FLOW_HOOK,
+				array( $flow_id ),
+				RecurringScheduler::GROUP,
+				array( 'generation_argument_index' => FlowScheduling::GENERATION_ARGUMENT_INDEX )
+			);
+			$this->flows->delete_flow( $flow_id );
 		}
+		( new \DataMachine\Core\Database\Pipelines\Pipelines() )->delete_pipeline( $this->pipeline_id );
 		delete_option( 'datamachine_flow_schedule_reconciliation_lock' );
 
 		parent::tear_down();
@@ -115,9 +137,15 @@ class FlowScheduleReconcilerTest extends WP_UnitTestCase {
 		wp_cache_flush();
 
 		$result = ( new FlowScheduleReconciler( $this->flows ) )->reconcile();
-		$this->assertTrue( $result['success'] );
-		$this->assertSame( 1, $result['covered'] );
-		$this->assertSame( 0, $result['missing'] );
+		if ( 'ActionScheduler_DBStore' === get_class( \ActionScheduler::store() ) ) {
+			$this->assertTrue( $result['success'] );
+			$this->assertSame( 1, $result['covered'] );
+			$this->assertSame( 0, $result['missing'] );
+		} else {
+			$this->assertFalse( $result['success'] );
+			$this->assertSame( 1, $result['blocked'] );
+			$this->assertTrue( $result['transient'] );
+		}
 	}
 
 	public function test_stale_in_progress_action_does_not_cover_schedule(): void {
@@ -155,7 +183,7 @@ class FlowScheduleReconcilerTest extends WP_UnitTestCase {
 		$this->assertTrue( $applied['transient'] );
 		$this->assertSame( 1, $applied['blocked'] );
 		$this->assertSame( 0, $applied['repaired'] );
-		$this->assertFalse( RecurringScheduler::isScheduled( FlowScheduling::FLOW_HOOK, array( $flow_id ) ) );
+		$this->assertSame( array(), $this->logicalActionIds( $flow_id, 'pending' ) );
 
 		$second = ( new FlowScheduleReconciler( $this->flows ) )->reconcile();
 		$this->assertSame( 1, $second['blocked'] );
@@ -183,7 +211,7 @@ class FlowScheduleReconcilerTest extends WP_UnitTestCase {
 		$this->assertTrue( $result['transient'] );
 		$this->assertSame( 1, $result['blocked'] );
 		$this->assertSame( 0, $result['repaired'] );
-		$this->assertFalse( RecurringScheduler::isScheduled( FlowScheduling::FLOW_HOOK, array( $flow_id ) ) );
+		$this->assertSame( array(), $this->logicalActionIds( $flow_id, 'pending' ) );
 	}
 
 	public function test_fresh_in_progress_plus_pending_action_blocks_apply_without_changes(): void {
@@ -289,17 +317,26 @@ class FlowScheduleReconcilerTest extends WP_UnitTestCase {
 		$applied = ( new FlowScheduleReconciler( $this->flows ) )->reconcile( true );
 		$this->assertTrue( $applied['success'] );
 		$this->assertSame( 1, $applied['repaired'] );
-		$action_ids = as_get_scheduled_actions(
-			array(
-				'hook'     => FlowScheduling::FLOW_HOOK,
-				'args'     => array( $flow_id ),
-				'group'    => RecurringScheduler::GROUP,
-				'status'   => 'pending',
-				'per_page' => 10,
-			),
-			'ids'
-		);
+		$action_ids = $this->logicalActionIds( $flow_id, 'pending' );
 		$this->assertCount( 1, $action_ids );
+	}
+
+	public function test_current_generation_plus_legacy_row_converges_to_one_action(): void {
+		$flow_id = $this->create_flow( 'Generated plus legacy', array( 'interval' => 'hourly' ) );
+		$this->assertTrue( FlowScheduling::handle_scheduling_update( $flow_id, array( 'interval' => 'hourly' ), true ) );
+		as_schedule_recurring_action( time() + 120, HOUR_IN_SECONDS, FlowScheduling::FLOW_HOOK, array( $flow_id ), RecurringScheduler::GROUP, false );
+
+		$dry_run = ( new FlowScheduleReconciler( $this->flows ) )->reconcile();
+		$this->assertSame( 1, $dry_run['missing'] );
+
+		$applied = ( new FlowScheduleReconciler( $this->flows ) )->reconcile( true );
+		$this->assertTrue( $applied['success'] );
+		$this->assertSame( 1, $applied['repaired'] );
+		$this->assertCount( 1, $this->logicalActionIds( $flow_id, 'pending' ) );
+
+		$verified = ( new FlowScheduleReconciler( $this->flows ) )->reconcile();
+		$this->assertSame( 1, $verified['covered'] );
+		$this->assertSame( 0, $verified['missing'] );
 	}
 
 	public function test_invalid_definitions_are_reported_without_failing_apply(): void {
@@ -337,9 +374,38 @@ class FlowScheduleReconcilerTest extends WP_UnitTestCase {
 		);
 
 		$flow_id = (int) $result['flow_id'];
+		$this->deleteLogicalActions( $flow_id );
 		$this->flows->update_flow_scheduling( $flow_id, $scheduling );
 		$this->flow_ids[] = $flow_id;
+		$this->flows->flow_ids[] = $flow_id;
 
 		return $flow_id;
+	}
+
+	private function logicalActionIds( int $flow_id, string $status ): array {
+		$actions = as_get_scheduled_actions(
+			array(
+				'hook'     => FlowScheduling::FLOW_HOOK,
+				'group'    => RecurringScheduler::GROUP,
+				'status'   => $status,
+				'per_page' => 100,
+			),
+			'OBJECT'
+		);
+
+		return array_keys(
+			array_filter(
+				$actions,
+				static fn($action): bool => is_object( $action ) && (int) ( $action->get_args()[0] ?? 0 ) === $flow_id
+			)
+		);
+	}
+
+	private function deleteLogicalActions( int $flow_id ): void {
+		foreach ( array( 'pending', 'in-progress' ) as $status ) {
+			foreach ( $this->logicalActionIds( $flow_id, $status ) as $action_id ) {
+				\ActionScheduler_Store::instance()->delete_action( (int) $action_id );
+			}
+		}
 	}
 }

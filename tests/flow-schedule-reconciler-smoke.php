@@ -24,6 +24,20 @@ namespace DataMachine\Core\Database\Flows {
 namespace DataMachine\Api\Flows {
 	class FlowScheduling {
 		public const FLOW_HOOK = 'datamachine_run_flow_now';
+		public const GENERATION_ARGUMENT_INDEX = 2;
+		public static array $calls = array();
+
+		public static function handle_scheduling_update( int $flow_id, array $scheduling, bool $force = false ) {
+			self::$calls[] = compact( 'flow_id', 'scheduling', 'force' );
+			$interval      = false === ( $scheduling['enabled'] ?? true )
+				? 'manual'
+				: (string) ( $scheduling['interval'] ?? 'manual' );
+			return \DataMachine\Engine\Tasks\RecurringScheduler::ensureSchedule(
+				self::FLOW_HOOK,
+				array( $flow_id ),
+				$interval
+			);
+		}
 	}
 
 	class FlowScheduleReconciliationLock {
@@ -437,6 +451,24 @@ namespace {
 	$fresh_mixed_result = ( new FlowScheduleReconciler( $fresh_mixed ) )->reconcile( true );
 	datamachine_reconciler_assert( 1 === $fresh_mixed_result['blocked'] && true === $fresh_mixed_result['transient'], 'fresh in-progress plus pending mixed ownership blocks apply' );
 	datamachine_reconciler_assert( $calls_before_fresh_mixed === count( RecurringScheduler::$calls ), 'mixed fresh in-progress apply schedules nothing' );
+
+	$paused_drift            = new Flows();
+	$paused_drift->schedules = array(
+		datamachine_reconciler_flow(
+			408,
+			array(
+				'interval'                => 'hourly',
+				'enabled'                 => false,
+				'schedule_reconciliation' => array( 'status' => 'drift' ),
+			)
+		),
+	);
+	$paused_drift_audit = ( new FlowScheduleReconciler( $paused_drift ) )->reconcile();
+	datamachine_reconciler_assert( 1 === $paused_drift_audit['missing'], 'paused desired-state drift remains visible to reconciliation' );
+	$paused_drift_apply = ( new FlowScheduleReconciler( $paused_drift ) )->reconcile( true );
+	$drift_call         = \DataMachine\Api\Flows\FlowScheduling::$calls[ count( \DataMachine\Api\Flows\FlowScheduling::$calls ) - 1 ];
+	datamachine_reconciler_assert( 1 === $paused_drift_apply['repaired'], 'reconciler retries paused schedule cleanup' );
+	datamachine_reconciler_assert( true === $drift_call['force'] && false === $drift_call['scheduling']['enabled'], 'drift repair replays authoritative persisted intent' );
 
 	echo "\nAll flow schedule reconciler assertions passed.\n";
 }

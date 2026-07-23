@@ -28,6 +28,7 @@ use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_Store;
 use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_Store_Capabilities;
 use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_Write_Result;
 use DataMachine\Abilities\PermissionHelper;
+use DataMachine\Api\Flows\FlowScheduling;
 use DataMachine\Core\Agents\AgentBundler;
 use DataMachine\Core\ActionScheduler\GroupRegistrar;
 use DataMachine\Core\Database\Agents\Agents as AgentsRepository;
@@ -38,6 +39,7 @@ use DataMachine\Core\Database\Pipelines\Pipelines as PipelinesRepository;
 use DataMachine\Abilities\Engine\RunFlowAbility;
 use DataMachine\Engine\AI\Tools\Global\AgentDailyMemory;
 use DataMachine\Engine\Bundle\AgentBundleArrayAdapter;
+use DataMachine\Engine\Tasks\RecurringScheduler;
 use DataMachine\Engine\Bundle\AgentBundleArtifactState;
 use DataMachine\Engine\Bundle\AgentBundleDirectory;
 use DataMachine\Engine\Bundle\AgentBundleInstalledArtifact;
@@ -632,8 +634,13 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 		$flow     = $this->flows_repo->get_by_portable_slug( (int) $pipeline['pipeline_id'], 'static-site-flow' );
 		$flow_id  = (int) $flow['flow_id'];
 
-		as_unschedule_all_actions( 'datamachine_run_flow_now', array( $flow_id ), GroupRegistrar::GROUP );
-		$this->assertFalse( as_next_scheduled_action( 'datamachine_run_flow_now', array( $flow_id ), GroupRegistrar::GROUP ), 'Test setup removes the scheduled action while preserving flow row scheduling.' );
+		RecurringScheduler::unschedule(
+			FlowScheduling::FLOW_HOOK,
+			array( $flow_id ),
+			GroupRegistrar::GROUP,
+			array( 'generation_argument_index' => FlowScheduling::GENERATION_ARGUMENT_INDEX )
+		);
+		$this->assertFalse( RecurringScheduler::hasLogicalCoverage( FlowScheduling::FLOW_HOOK, array( $flow_id ), GroupRegistrar::GROUP ), 'Test setup removes the scheduled action while preserving flow row scheduling.' );
 
 		$second = $this->bundler->import(
 			$bundle,
@@ -644,7 +651,7 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 		);
 
 		$this->assertTrue( (bool) $second['success'], 'Upgrade import succeeds when only the scheduled action is missing.' );
-		$this->assertNotFalse( as_next_scheduled_action( 'datamachine_run_flow_now', array( $flow_id ), GroupRegistrar::GROUP ), 'Importer re-creates the missing scheduled action for an enabled non-manual flow.' );
+		$this->assertTrue( RecurringScheduler::hasLogicalCoverage( FlowScheduling::FLOW_HOOK, array( $flow_id ), GroupRegistrar::GROUP ), 'Importer re-creates the missing scheduled action for an enabled non-manual flow.' );
 	}
 
 	public function test_reconcile_runtime_replaces_local_modified_flow_queue_and_schedule(): void {

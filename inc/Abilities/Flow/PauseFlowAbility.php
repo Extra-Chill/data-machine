@@ -105,6 +105,7 @@ class PauseFlowAbility {
 
 		$paused  = 0;
 		$skipped = 0;
+		$errors  = 0;
 		$details = array();
 
 		foreach ( $flows as $flow ) {
@@ -121,12 +122,19 @@ class PauseFlowAbility {
 				continue;
 			}
 
-			// Set enabled=false, preserving all other scheduling fields.
 			$scheduling['enabled'] = false;
-			$this->db_flows->update_flow_scheduling( $fid, $scheduling );
-
-			// Unschedule Action Scheduler hooks so paused flows don't fire.
-			as_unschedule_all_actions( 'datamachine_run_flow_now', array( $fid ), 'data-machine' );
+			$schedule_result       = FlowScheduling::handle_scheduling_update( $fid, $scheduling, true );
+			if ( is_wp_error( $schedule_result ) ) {
+				++$errors;
+				$details[] = array_merge(
+					\DataMachine\Engine\Tasks\RecurringScheduler::errorMetadata( $schedule_result ),
+					array(
+						'flow_id' => $fid,
+						'status'  => 'pause_error',
+					)
+				);
+				continue;
+			}
 
 			++$paused;
 			$details[] = array(
@@ -144,13 +152,15 @@ class PauseFlowAbility {
 			array(
 				'paused'  => $paused,
 				'skipped' => $skipped,
+				'errors'  => $errors,
 			)
 		);
 
 		return array(
-			'success' => true,
+			'success' => 0 === $errors,
 			'paused'  => $paused,
 			'skipped' => $skipped,
+			'errors'  => $errors,
 			'flows'   => $details,
 			'message' => sprintf( 'Paused %d flow(s), skipped %d (already paused).', $paused, $skipped ),
 		);
