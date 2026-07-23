@@ -206,7 +206,7 @@ class JobLifecycleTransitionTest extends WP_UnitTestCase {
 		$this->assertSame( 2, $result['touched'] );
 		$this->assertSame( 2, $result['mutated'] );
 		$this->assertSame( 1, $result['pathless_terminal'] );
-		$this->assertSame( JobStatus::FAILED, $this->db_jobs->get_job( $child_id )['status'] );
+		$this->assertSame( JobStatus::failed( 'scheduler_path_lost' )->toString(), $this->db_jobs->get_job( $child_id )['status'] );
 	}
 
 	public function test_long_running_recovery_takeover_blocks_terminal_callbacks(): void {
