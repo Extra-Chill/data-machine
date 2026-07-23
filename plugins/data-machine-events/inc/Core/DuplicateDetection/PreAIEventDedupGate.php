@@ -6,7 +6,7 @@
  * conversation entirely when the event already exists in the database.
  *
  * The child job's engine_data already contains identity fields (title,
- * venue, startDate, ticketUrl) from the fetch handler. By checking the
+ * venue, startDate, startTime, ticketUrl) from the fetch handler. By checking the
  * PostIdentityIndex BEFORE burning AI tokens, we eliminate the most
  * expensive form of waste: running a full AI conversation just to have
  * upsert_event return "no_change".
@@ -18,6 +18,7 @@
 namespace DataMachineEvents\Core\DuplicateDetection;
 
 use DataMachine\Core\EngineData;
+use DataMachineEvents\Utilities\EventIdentifierGenerator;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -67,7 +68,11 @@ class PreAIEventDedupGate {
 		// These are set by the fetch handler (Ticketmaster, Dice, venue scrapers).
 		$title     = $engine->get( 'title' ) ?? $engine->get( 'label' ) ?? '';
 		$venue     = $engine->get( 'venue' ) ?? '';
-		$startDate = $engine->get( 'startDate' ) ?? '';
+		$startDate = EventIdentifierGenerator::normalizeStartDateTime(
+			(string) ( $engine->get( 'startDate' ) ?? '' ),
+			(string) ( $engine->get( 'startTime' ) ?? '' ),
+			(string) ( $engine->get( 'venueTimezone' ) ?? '' )
+		);
 		$ticketUrl = $engine->get( 'ticketUrl' ) ?? '';
 		$address   = $engine->get( 'venueAddress' ) ?? '';
 		$city      = $engine->get( 'venueCity' ) ?? '';

@@ -272,16 +272,10 @@ class EventDuplicateStrategy {
 	 *                                           term name.
 	 * @param string        $startDate           Full datetime (YYYY-MM-DDTHH:MM or
 	 *                                           similar) used to enforce a 2-hour
-	 *                                           window before any exact-title
-	 *                                           match is accepted. Without it, two
-	 *                                           genuinely distinct shows that
-	 *                                           share a title hash and venue term
-	 *                                           on the same date but at very
-	 *                                           different times (e.g. an early
-	 *                                           and a late show at a multi-room
-	 *                                           venue) could be falsely merged.
-	 *                                           When empty, the time window is
-	 *                                           skipped (matches legacy behavior).
+	 *                                           window for every exact-title
+	 *                                           confirmation. When either side
+	 *                                           lacks a time, matching retains the
+	 *                                           legacy date-only behavior.
 	 * @return array|null Duplicate result or null.
 	 */
 	private static function findByExactTitle( string $title, string $venue, string $date_only, string $identity_confidence, ?\WP_Term $venue_term = null, string $startDate = '' ): ?array {
@@ -295,7 +289,6 @@ class EventDuplicateStrategy {
 			$index->find_by_date( $date_only, PHP_INT_MAX ),
 			static fn( array $candidate ): bool => ( $candidate['title_hash'] ?? '' ) === $title_hash
 		);
-
 		foreach ( $candidates as $candidate ) {
 			$post_id = (int) $candidate['post_id'];
 			if ( ! self::isValidPost( $post_id ) ) {

@@ -263,7 +263,9 @@ class Ticketmaster extends EventImportHandler {
 				$event_identifier = \DataMachineEvents\Utilities\EventIdentifierGenerator::generate(
 					$standardized_event['title'],
 					$standardized_event['startDate'] ?? '',
-					$standardized_event['venue'] ?? ''
+					$standardized_event['venue'] ?? '',
+					$standardized_event['startTime'] ?? '',
+					$standardized_event['venueTimezone'] ?? ''
 				);
 				$item_identifier  = '' !== $source_id ? $source_id : $event_identifier;
 				$source_revision  = TicketmasterSourceIdentity::revision( $standardized_event );

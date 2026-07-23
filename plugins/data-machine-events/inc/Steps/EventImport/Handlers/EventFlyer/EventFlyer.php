@@ -99,7 +99,9 @@ class EventFlyer extends EventImportHandler {
 		$event_identifier = EventIdentifierGenerator::generate(
 			$event_data['title'] ? $event_data['title'] : 'pending-extraction',
 			$event_data['startDate'] ? $event_data['startDate'] : '',
-			$event_data['venue'] ? $event_data['venue'] : ''
+			$event_data['venue'] ? $event_data['venue'] : '',
+			$event_data['startTime'] ? $event_data['startTime'] : '',
+			$event_data['venueTimezone'] ?? ''
 		);
 
 		$venue_metadata = $this->extractVenueMetadata( $event_data );

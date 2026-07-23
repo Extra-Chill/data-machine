@@ -13,6 +13,7 @@ namespace DataMachineEvents\Steps\EventImport\Handlers\WebScraper;
 use DataMachine\Core\ExecutionContext;
 use DataMachineEvents\Steps\EventImport\EventEngineData;
 use DataMachineEvents\Steps\EventImport\Handlers\EventImportHandler;
+use DataMachineEvents\Utilities\EventSourceIdentity;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -70,11 +71,8 @@ class StructuredDataProcessor {
 
 			$this->applyVenueConfigOverride( $event, $config );
 
-			$event_identifier = \DataMachineEvents\Utilities\EventIdentifierGenerator::generate(
-				$event['title'],
-				$event['startDate'] ?? '',
-				$event['venue'] ?? ''
-			);
+			$source_identity  = EventSourceIdentity::resolve( $event, $context );
+			$event_identifier = $source_identity['event_identifier'];
 
 			$venue_from_config = ! empty( $config['venue'] ) || ! empty( $config['venue_name'] );
 			if ( ! $venue_from_config && empty( trim( (string) ( $event['venue'] ?? '' ) ) ) ) {
@@ -128,7 +126,7 @@ class StructuredDataProcessor {
 					'flow_id'           => $context->getFlowId(),
 					'original_title'    => $event['title'],
 					'event_identifier'  => $event_identifier,
-					'item_identifier'   => $event_identifier,
+					'item_identifier'   => $source_identity['item_identifier'],
 					'import_timestamp'  => time(),
 					'_engine_data'      => $engine_data,
 				),

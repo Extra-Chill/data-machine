@@ -131,11 +131,8 @@ class DiceFm extends EventImportHandler {
 				continue;
 			}
 
-			$event_identifier = \DataMachineEvents\Utilities\EventIdentifierGenerator::generate(
-				$standardized_event['title'],
-				$standardized_event['startDate'] ?? '',
-				$standardized_event['venue'] ?? ''
-			);
+			$source_identity  = \DataMachineEvents\Utilities\EventSourceIdentity::resolve( $standardized_event, $context );
+			$event_identifier = $source_identity['event_identifier'];
 
 			$context->log(
 				'info',
@@ -167,7 +164,7 @@ class DiceFm extends EventImportHandler {
 					'flow_id'          => $context->getFlowId(),
 					'original_title'   => $standardized_event['title'],
 					'event_identifier' => $event_identifier,
-					'item_identifier'  => $event_identifier,
+					'item_identifier'  => $source_identity['item_identifier'],
 					'import_timestamp' => time(),
 					'_engine_data'     => $engine_data,
 				),

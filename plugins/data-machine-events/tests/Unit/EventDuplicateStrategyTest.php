@@ -20,8 +20,10 @@
 
 namespace DataMachineEvents\Tests\Unit;
 
+use DataMachine\Core\EngineData;
 use WP_UnitTestCase;
 use DataMachineEvents\Core\DuplicateDetection\EventDuplicateStrategy;
+use DataMachineEvents\Core\DuplicateDetection\PreAIEventDedupGate;
 use DataMachineEvents\Core\Event_Post_Type;
 use DataMachineEvents\Core\EventDatesTable;
 use DataMachineEvents\Core\Venue_Taxonomy;
@@ -300,6 +302,54 @@ class EventDuplicateStrategyTest extends WP_UnitTestCase {
 		$this->cleanup( $term_id, $existing_post_id );
 	}
 
+	public function test_exact_same_venue_name_matches_within_time_window(): void {
+		$venue_name = 'Exact Venue Within Window ' . uniqid();
+		[ $term_id, $existing_post_id ] = $this->seedVenueWithEvent(
+			'Showcase',
+			'2026-05-20 18:00:00',
+			$venue_name
+		);
+
+		$result = EventDuplicateStrategy::check(
+			array(
+				'title'   => 'Showcase',
+				'context' => array(
+					'venue'     => $venue_name,
+					'startDate' => '2026-05-20 19:30:00',
+					'ticketUrl' => '',
+				),
+			)
+		);
+
+		$this->assertIsArray( $result );
+		$this->assertSame( 'duplicate', $result['verdict'] );
+		$this->assertSame( $existing_post_id, $result['match']['post_id'] );
+		$this->cleanup( $term_id, $existing_post_id );
+	}
+
+	public function test_exact_same_venue_name_is_distinct_outside_time_window(): void {
+		$venue_name = 'Exact Venue Outside Window ' . uniqid();
+		[ $term_id, $existing_post_id ] = $this->seedVenueWithEvent(
+			'Showcase',
+			'2026-05-21 13:30:00',
+			$venue_name
+		);
+
+		$result = EventDuplicateStrategy::check(
+			array(
+				'title'   => 'Showcase',
+				'context' => array(
+					'venue'     => $venue_name,
+					'startDate' => '2026-05-21 21:30:00',
+					'ticketUrl' => '',
+				),
+			)
+		);
+
+		$this->assertNull( $result, 'Exact title and venue names must not merge known start times more than two hours apart.' );
+		$this->cleanup( $term_id, $existing_post_id );
+	}
+
 	/**
 	 * Belt-and-suspenders: when no $startDate is passed (legacy
 	 * call shape), the time-window guard is skipped and the term_id
@@ -504,6 +554,73 @@ class EventDuplicateStrategyTest extends WP_UnitTestCase {
 		$this->cleanup( $term_id, $existing_post_id );
 	}
 
+	public function test_exact_ticket_identity_remains_authoritative_across_same_day_times(): void {
+		$venue_name = 'Authoritative Ticket Venue ' . uniqid();
+		$ticket_url = 'https://tickets.example.com/event/stable-' . uniqid();
+		[ $term_id, $existing_post_id ] = $this->seedVenueWithEvent(
+			'Authoritative Ticket Show',
+			'2026-04-24 13:30:00',
+			$venue_name,
+			$ticket_url
+		);
+
+		$result = EventDuplicateStrategy::check(
+			array(
+				'title'   => 'Different Source Title',
+				'context' => array(
+					'venue'     => $venue_name,
+					'startDate' => '2026-04-24 21:30:00',
+					'ticketUrl' => $ticket_url,
+				),
+			)
+		);
+
+		$this->assertIsArray( $result );
+		$this->assertSame( 'duplicate', $result['verdict'] );
+		$this->assertSame( $existing_post_id, $result['match']['post_id'] );
+		$this->assertStringContainsString( 'ticket_url_exact', $result['reason'], 'Stable ticket identity is intentionally authoritative over time-window heuristics.' );
+		$this->cleanup( $term_id, $existing_post_id );
+	}
+
+	public function test_pre_ai_gate_allows_exact_venue_late_show(): void {
+		$venue_name = 'Pre AI Exact Venue Late ' . uniqid();
+		[ $term_id, $existing_post_id ] = $this->seedVenueWithEvent(
+			'Pre AI Showcase',
+			'2026-05-22 13:30:00',
+			$venue_name
+		);
+
+		$result = PreAIEventDedupGate::check(
+			null,
+			$this->preAIEngine( 'Pre AI Showcase', $venue_name, '2026-05-22', '21:30' ),
+			array(),
+			219
+		);
+
+		$this->assertNull( $result, 'The pre-AI gate must compose split time fields and allow a distinct late show.' );
+		$this->cleanup( $term_id, $existing_post_id );
+	}
+
+	public function test_pre_ai_gate_skips_exact_venue_show_within_time_window(): void {
+		$venue_name = 'Pre AI Exact Venue Within ' . uniqid();
+		[ $term_id, $existing_post_id ] = $this->seedVenueWithEvent(
+			'Pre AI Showcase',
+			'2026-05-23 13:30:00',
+			$venue_name
+		);
+
+		$result = PreAIEventDedupGate::check(
+			null,
+			$this->preAIEngine( 'Pre AI Showcase', $venue_name, '2026-05-23', '15:00' ),
+			array(),
+			220
+		);
+
+		$this->assertIsArray( $result );
+		$this->assertTrue( $result['skip'] );
+		$this->cleanup( $term_id, $existing_post_id );
+	}
+
 	/**
 	 * Venue + date + fuzzy title match → IS a duplicate.
 	 *
@@ -539,6 +656,21 @@ class EventDuplicateStrategyTest extends WP_UnitTestCase {
 	// ---------------------------------------------------------------------
 	// Helpers
 	// ---------------------------------------------------------------------
+
+	private function preAIEngine( string $title, string $venue, string $start_date, string $start_time ): EngineData {
+		return new EngineData(
+			array(
+				'title'       => $title,
+				'venue'       => $venue,
+				'startDate'   => $start_date,
+				'startTime'   => $start_time,
+				'flow_config' => array(
+					'upsert' => array( 'handler_slugs' => array( 'upsert_event' ) ),
+				),
+			),
+			null
+		);
+	}
 
 	/**
 	 * Create a venue term (with address meta) + an event post tagged

@@ -13,7 +13,6 @@ namespace DataMachineEvents\Steps\EventImport\Handlers\SingleRecurring;
 
 use DataMachine\Core\ExecutionContext;
 use DataMachineEvents\Steps\EventImport\Handlers\EventImportHandler;
-use DataMachineEvents\Utilities\EventIdentifierGenerator;
 use DataMachine\Core\Steps\HandlerRegistrationTrait;
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -102,10 +101,10 @@ class SingleRecurring extends EventImportHandler {
 		$next_occurrence = $this->calculateNextOccurrence( $day_of_week );
 		$next_date       = $next_occurrence->format( 'Y-m-d' );
 
-		$venue_name       = $config['venue_name'] ?? '';
-		$event_identifier = EventIdentifierGenerator::generate( $event_title, $next_date, $venue_name );
-
 		$standardized_event = $this->buildEventData( $config, $next_date );
+		$venue_name         = $config['venue_name'] ?? '';
+		$source_identity    = \DataMachineEvents\Utilities\EventSourceIdentity::resolve( $standardized_event, $context );
+		$event_identifier   = $source_identity['event_identifier'];
 
 		$context->log(
 			'info',
@@ -138,7 +137,7 @@ class SingleRecurring extends EventImportHandler {
 				'flow_id'          => $context->getFlowId(),
 				'original_title'   => $event_title,
 				'event_identifier' => $event_identifier,
-				'item_identifier'  => $event_identifier,
+				'item_identifier'  => $source_identity['item_identifier'],
 				'import_timestamp' => time(),
 				'_engine_data'     => $engine_data,
 			),

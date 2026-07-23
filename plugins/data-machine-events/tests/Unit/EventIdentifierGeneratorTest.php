@@ -150,6 +150,39 @@ class EventIdentifierGeneratorTest extends WP_UnitTestCase {
 		$this->assertEquals( $hash1, $hash2, 'Article variations should produce same hash' );
 	}
 
+	public function test_generate_distinguishes_same_event_at_different_times(): void {
+		$early = EventIdentifierGenerator::generate( 'Two-Set Showcase', '2026-04-26', 'Charleston Pour House', '13:30' );
+		$late  = EventIdentifierGenerator::generate( 'Two-Set Showcase', '2026-04-26', 'Charleston Pour House', '21:30' );
+
+		$this->assertNotSame( $early, $late, 'Different local start times must have distinct source identities.' );
+	}
+
+	public function test_generate_normalizes_equivalent_datetime_formats_and_timezones(): void {
+		$local = EventIdentifierGenerator::generate(
+			'Motown Throwdown',
+			'2026-04-26',
+			'Charleston Pour House',
+			'1:30 PM',
+			'America/New_York'
+		);
+		$utc   = EventIdentifierGenerator::generate(
+			'Motown Throwdown',
+			'2026-04-26T17:30:00Z',
+			'Charleston Pour House',
+			'',
+			'America/New_York'
+		);
+
+		$this->assertSame( $local, $utc, 'Equivalent absolute and local source times must normalize to one local identity.' );
+	}
+
+	public function test_date_only_source_preserves_legacy_identifier(): void {
+		$current = EventIdentifierGenerator::generate( 'All Day Festival', '2026-04-26', 'Charleston Pour House' );
+		$legacy  = EventIdentifierGenerator::generateLegacy( 'All Day Festival', '2026-04-26', 'Charleston Pour House' );
+
+		$this->assertSame( $legacy, $current, 'Genuinely date-only sources must not churn persisted identities.' );
+	}
+
 	/**
 	 * Test earliest delimiter extraction
 	 *

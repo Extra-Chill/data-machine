@@ -17,6 +17,9 @@
 namespace DataMachineEvents\Utilities;
 
 use DataMachine\Core\Similarity\SimilarityEngine;
+use DateTimeImmutable;
+use DateTimeZone;
+use Exception;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -30,22 +33,105 @@ class EventIdentifierGenerator {
 	/**
 	 * Generate event identifier from normalized event data
 	 *
-	 * Creates stable identifier based on title, start date, and venue.
+	 * Creates stable source identifier based on title, local start datetime, and venue.
 	 * Normalizes text to handle variations like:
 	 * - "The Blue Note" vs "Blue Note"
 	 * - "Foo Bar" vs "foo bar"
 	 * - Extra whitespace variations
 	 *
-	 * @param string $title     Event title
-	 * @param string $startDate Event start date (YYYY-MM-DD)
-	 * @param string $venue     Venue name
+	 * @param string $title     Event title.
+	 * @param string $startDate Event start date or datetime.
+	 * @param string $venue     Venue name.
+	 * @param string $startTime Optional local start time.
+	 * @param string $timezone  Optional venue timezone used to localize an absolute datetime.
 	 * @return string MD5 hash identifier
 	 */
-	public static function generate( string $title, string $startDate, string $venue ): string {
+	public static function generate( string $title, string $startDate, string $venue, string $startTime = '', string $timezone = '' ): string {
 		$normalized_title = SimilarityEngine::normalizeBasic( $title );
 		$normalized_venue = SimilarityEngine::normalizeBasic( $venue );
+		$normalized_start = self::normalizeStartDateTime( $startDate, $startTime, $timezone );
 
-		return md5( $normalized_title . $startDate . $normalized_venue );
+		return md5( $normalized_title . $normalized_start . $normalized_venue );
+	}
+
+	/**
+	 * Generate the date-only identifier used before time-aware source identity.
+	 *
+	 * Kept solely for bounded processed-history transition checks.
+	 *
+	 * @param string $title     Event title.
+	 * @param string $startDate Event start date.
+	 * @param string $venue     Venue name.
+	 * @return string Legacy MD5 hash identifier.
+	 */
+	public static function generateLegacy( string $title, string $startDate, string $venue ): string {
+		$normalized_title = SimilarityEngine::normalizeBasic( $title );
+		$normalized_venue = SimilarityEngine::normalizeBasic( $venue );
+		$date_only        = self::normalizeStartDateTime( $startDate );
+
+		return md5( $normalized_title . $date_only . $normalized_venue );
+	}
+
+	/**
+	 * Normalize a source start value to local wall-clock identity.
+	 *
+	 * Separate date/time values are interpreted as already local to the venue.
+	 * Datetimes with an embedded offset are converted to the supplied venue timezone.
+	 * The timezone name itself is not hashed: equivalent representations of the same
+	 * local event time must produce the same source identity. Genuine date-only values
+	 * retain a deterministic YYYY-MM-DD identity.
+	 *
+	 * @param string $startDate Event start date or datetime.
+	 * @param string $startTime Optional local start time.
+	 * @param string $timezone  Optional venue timezone.
+	 * @return string Normalized local datetime, date, or deterministic raw fallback.
+	 */
+	public static function normalizeStartDateTime( string $startDate, string $startTime = '', string $timezone = '' ): string {
+		$start_date = trim( $startDate );
+		$start_time = trim( $startTime );
+
+		if ( '' === $start_date ) {
+			return '';
+		}
+
+		$datetime_string = '' !== $start_time ? $start_date . ' ' . $start_time : $start_date;
+		if ( ! preg_match( '/^\d{4}-\d{2}-\d{2}/', $start_date ) ) {
+			return trim( preg_replace( '/\s+/', ' ', $datetime_string ) );
+		}
+
+		if ( '' === $start_time && preg_match( '/^\d{4}-\d{2}-\d{2}$/', $start_date ) ) {
+			return $start_date;
+		}
+
+		$timezone_object = null;
+		if ( '' !== $timezone ) {
+			try {
+				$timezone_object = new DateTimeZone( $timezone );
+			} catch ( Exception $e ) {
+				$timezone_object = null;
+			}
+		}
+
+		try {
+			$datetime = new DateTimeImmutable( $datetime_string, $timezone_object );
+			if ( null !== $timezone_object && self::hasEmbeddedTimezone( $datetime_string ) ) {
+				$datetime = $datetime->setTimezone( $timezone_object );
+			}
+
+			return $datetime->format( 'Y-m-d H:i' );
+		} catch ( Exception $e ) {
+			return trim( preg_replace( '/\s+/', ' ', $datetime_string ) );
+		}
+	}
+
+	/**
+	 * Determine whether a datetime carries an explicit timezone or offset.
+	 *
+	 * @param string $datetime Datetime value.
+	 * @return bool True when timezone information is embedded.
+	 */
+	private static function hasEmbeddedTimezone( string $datetime ): bool {
+		return (bool) preg_match( '/(?:Z|[+-]\d{2}:?\d{2}|\b[A-Za-z_]+\/[A-Za-z_]+)\s*$/', trim( $datetime ) );
 	}
 
 	/**
