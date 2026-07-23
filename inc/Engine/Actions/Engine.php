@@ -63,7 +63,7 @@ function datamachine_flow_exists( int $flow_id ): bool {
  * Both initial execution and AI contention resumes use this callback so a
  * resume cannot drift into a parallel execution implementation.
  */
-function datamachine_execute_step_action( $job_id, string $flow_step_id, $operation_generation = 0, $operation_claim_token = '', $ai_resume_generation = 0 ): void {
+function datamachine_execute_step_action( $job_id, string $flow_step_id, $operation_generation = 0, $operation_claim_token = '', $ai_resume_generation = 0, $recovery_generation = 0, $recovery_claim_token = '' ): void {
 	$ability = wp_get_ability( 'datamachine/execute-step' );
 	if ( $ability ) {
 		$ability->execute(
@@ -73,6 +73,8 @@ function datamachine_execute_step_action( $job_id, string $flow_step_id, $operat
 				'operation_generation'  => is_numeric( $operation_generation ) ? (int) $operation_generation : 0,
 				'operation_claim_token' => is_string( $operation_claim_token ) ? $operation_claim_token : '',
 				'ai_resume_generation'  => is_numeric( $ai_resume_generation ) ? (int) $ai_resume_generation : 0,
+				'recovery_generation'   => is_numeric( $recovery_generation ) ? (int) $recovery_generation : 0,
+				'recovery_claim_token'  => is_string( $recovery_claim_token ) ? $recovery_claim_token : '',
 			)
 		);
 	}
@@ -195,7 +197,7 @@ function datamachine_register_execution_engine() {
 		'datamachine_execute_step',
 		'datamachine_execute_step_action',
 		10,
-		5
+		7
 	);
 
 	/** Dedicated resume bridge avoids collision with the running execute action. */

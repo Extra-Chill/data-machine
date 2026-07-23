@@ -1,0 +1,133 @@
+<?php
+/** Behavioral tests for pathless child recovery policy. */
+
+define( 'ABSPATH', __DIR__ . '/' );
+
+require_once __DIR__ . '/../inc/Core/ChildJobRecoveryPolicy.php';
+
+use DataMachine\Core\ChildJobRecoveryPolicy;
+
+$failed = 0;
+$total  = 0;
+$assert = static function ( string $label, bool $condition ) use ( &$failed, &$total ): void {
+	++$total;
+	if ( $condition ) {
+		echo "  [PASS] {$label}\n";
+		return;
+	}
+	++$failed;
+	echo "  [FAIL] {$label}\n";
+};
+
+$now = strtotime( '2026-07-22 20:00:00 UTC' );
+$job = array(
+	'job_id'              => 42,
+	'parent_job_id'       => 7,
+	'operation_state'     => '',
+	'operation_generation' => 0,
+	'operation_claim_token' => '',
+);
+$step = 'pipeline-step-2';
+$engine = array( 'flow_config' => array( $step => array( 'step_type' => 'upsert' ) ) );
+$action = static fn( int $id, string $hook, string $status, array $args ): array => array(
+	'action_id'         => $id,
+	'hook'              => $hook,
+	'status'            => $status,
+	'scheduled_date_gmt' => '2026-07-22 19:55:00',
+	'last_attempt_gmt'  => '2026-07-22 19:56:00',
+	'decoded_args'      => $args,
+);
+$diagnose = static fn( array $job_row, array $engine_data, array $actions ): array => ChildJobRecoveryPolicy::diagnose( $job_row, $engine_data, $actions, 7200, $now );
+
+echo "=== child-job-recovery-policy-smoke ===\n";
+
+$failed_action = $diagnose( $job, $engine, array( $action( 10, 'datamachine_execute_step', 'failed', array( 'job_id' => 42, 'flow_step_id' => $step ) ) ) );
+$assert( 'failed canonical action is replayable', $failed_action['retry_eligible'] && ! $failed_action['has_active_path'] );
+
+$missing = $diagnose( $job, $engine, array() );
+$assert( 'missing action requires terminal transition', 'missing_action' === $missing['reason'] && ! $missing['retry_eligible'] );
+
+$stale_generation_job = array_merge( $job, array( 'operation_state' => 'enqueued', 'operation_generation' => 2, 'operation_claim_token' => 'current' ) );
+$stale_action = $action( 11, 'datamachine_execute_step', 'pending', array( 'job_id' => 42, 'flow_step_id' => $step, 'operation_generation' => 1, 'operation_claim_token' => 'old' ) );
+$stale = $diagnose( $stale_generation_job, $engine, array( $stale_action ) );
+$assert( 'stale operation action is not a valid path', ! $stale['has_active_path'] && ! $stale['retry_eligible'] );
+
+$ai_engine = $engine + array(
+	'ai_concurrency_resume_ownership' => array(
+		'flow_step_id' => $step,
+		'generation'   => 3,
+		'status'       => 'scheduled',
+		'action_id'    => 12,
+	),
+);
+$ai = $diagnose( $job, $ai_engine, array( $action( 12, 'datamachine_resume_ai_step', 'pending', array( 'job_id' => 42, 'flow_step_id' => $step, 'ai_resume_generation' => 3 ) ) ) );
+$assert( 'active AI resume generation remains owned', $ai['has_active_path'] && ! $ai['retry_eligible'] );
+
+$wrong_ai = $diagnose( $job, $ai_engine, array( $action( 13, 'datamachine_resume_ai_step', 'pending', array( 'job_id' => 42, 'flow_step_id' => $step, 'ai_resume_generation' => 2 ) ) ) );
+$assert( 'historical AI generation is irrelevant', ! $wrong_ai['has_active_path'] );
+
+$batch_child = $diagnose( $job, $engine, array( $action( 14, 'datamachine_execute_step', 'pending', array( 'job_id' => 42, 'flow_step_id' => $step ) ) ) );
+$assert( 'batch child with pending canonical action remains guarded', $batch_child['has_active_path'] );
+
+$assert( 'job 42 does not own job 420 action args', ! ChildJobRecoveryPolicy::actionBelongsToJob( array( 'job_id' => 420 ), 42 ) );
+$assert( 'job 42 owns only exact decoded args', ChildJobRecoveryPolicy::actionBelongsToJob( array( 'job_id' => 42 ), 42 ) );
+
+$active_lease = ChildJobRecoveryPolicy::recoveryOwnershipEvidence(
+	array( 'scheduler_recovery' => array( 'state' => 'claimed', 'token' => 'lease', 'generation' => 2, 'claimed_at' => '2026-07-22T11:59:00Z', 'expires_at' => '2026-07-22T12:05:00Z' ) ),
+	strtotime( '2026-07-22T12:00:00Z' )
+);
+$assert( 'only unexpired exact lease is reported active', 'active' === $active_lease['state'] && 2 === $active_lease['generation'] );
+
+$expired_lease = ChildJobRecoveryPolicy::recoveryOwnershipEvidence(
+	array( 'scheduler_recovery' => array( 'state' => 'claimed', 'token' => 'lease', 'generation' => 2, 'expires_at' => '2026-07-22T11:55:00Z' ) ),
+	strtotime( '2026-07-22T12:00:00Z' )
+);
+$assert( 'expired lease does not expose token or generation as valid', 'expired' === $expired_lease['state'] && '' === $expired_lease['token'] && 0 === $expired_lease['generation'] );
+
+$invalid_receipt = ChildJobRecoveryPolicy::recoveryOwnershipEvidence(
+	array( 'scheduler_recovery' => array( 'state' => 'requeued', 'token' => 'owner', 'generation' => 3, 'receipt' => array( 'generation' => 2, 'action_id' => 99 ) ) ),
+	time()
+);
+$assert( 'mismatched receipt is reported invalid', 'invalid' === $invalid_receipt['state'] && 'invalid' === $invalid_receipt['receipt_state'] );
+
+$generation_job = array( 'job_id' => 42, 'operation_state' => '' );
+$running_engine = array(
+	'scheduler_recovery' => array(
+		'state'      => 'running',
+		'token'      => 'generation-n',
+		'generation' => 4,
+		'expires_at' => '2026-07-22T11:55:00Z',
+		'receipt'    => array( 'generation' => 4, 'action_id' => 55 ),
+	),
+);
+$running_action = array(
+	'action_id'    => 55,
+	'hook'         => 'datamachine_execute_step',
+	'status'       => 'in-progress',
+	'decoded_args' => array( 'job_id' => 42, 'flow_step_id' => 'step', 'recovery_generation' => 4, 'recovery_claim_token' => 'generation-n' ),
+);
+$assert(
+	'N+1 claim is denied while exact N action is in progress despite expired lease',
+	! ChildJobRecoveryPolicy::canClaimNextGeneration( $generation_job, $running_engine, array( $running_action ), strtotime( '2026-07-22T12:00:00Z' ) )
+);
+
+$failed_action           = $running_action;
+$failed_action['status'] = 'failed';
+$assert(
+	'N+1 claim is allowed after exact N action fails',
+	ChildJobRecoveryPolicy::canClaimNextGeneration( $generation_job, $running_engine, array( $failed_action ), strtotime( '2026-07-22T12:00:00Z' ) )
+);
+$assert(
+	'N+1 claim is allowed after exact N action disappears and lease is stale',
+	ChildJobRecoveryPolicy::canClaimNextGeneration( $generation_job, $running_engine, array(), strtotime( '2026-07-22T12:00:00Z' ) )
+);
+
+$fresh_running_engine = $running_engine;
+$fresh_running_engine['scheduler_recovery']['expires_at'] = '2026-07-22T12:05:00Z';
+$assert(
+	'N+1 claim remains denied without action while execution heartbeat is fresh',
+	! ChildJobRecoveryPolicy::canClaimNextGeneration( $generation_job, $fresh_running_engine, array(), strtotime( '2026-07-22T12:00:00Z' ) )
+);
+
+echo "\nChild job recovery policy smoke complete: {$total} assertions, {$failed} failures.\n";
+exit( $failed > 0 ? 1 : 0 );

@@ -7,6 +7,8 @@
 
 namespace DataMachine\Cli;
 
+use DataMachine\Core\ChildJobRecoveryPolicy;
+
 defined( 'ABSPATH' ) || exit;
 
 class JobLivenessClassifier {
@@ -19,6 +21,17 @@ class JobLivenessClassifier {
 	 * @return array<string,mixed>
 	 */
 	public static function diagnose( array $job, array $actions, array $child_counts, int $overdue_minutes, int $now ): array {
+		$engine_data = is_array( $job['engine_data'] ?? null ) ? $job['engine_data'] : array();
+		$actions     = array_values(
+			array_filter(
+				$actions,
+				static function ( array $action ) use ( $job, $engine_data ): bool {
+					$hook = (string) ( $action['hook'] ?? '' );
+					return ! in_array( $hook, array( 'datamachine_execute_step', 'datamachine_resume_ai_step' ), true )
+						|| ChildJobRecoveryPolicy::actionGenerationMatches( $job, $engine_data, $action );
+				}
+			)
+		);
 		$pending     = array_values( array_filter( $actions, fn( $action ) => 'pending' === ( $action['status'] ?? '' ) ) );
 		$in_progress = array_values( array_filter( $actions, fn( $action ) => 'in-progress' === ( $action['status'] ?? '' ) ) );
 		$complete    = array_values( array_filter( $actions, fn( $action ) => 'complete' === ( $action['status'] ?? '' ) ) );
@@ -30,7 +43,6 @@ class JobLivenessClassifier {
 		$oldest_pending_age  = self::minutesSince( $oldest_pending, $now );
 		$oldest_progress_age = self::minutesSince( $oldest_in_progress, $now );
 
-		$engine_data     = is_array( $job['engine_data'] ?? null ) ? $job['engine_data'] : array();
 		$job_id          = (int) ( $job['job_id'] ?? 0 );
 		$active_children = (int) ( $child_counts['active'] ?? 0 );
 		$total_children  = (int) ( $child_counts['total'] ?? 0 );

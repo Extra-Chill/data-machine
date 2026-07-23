@@ -29,7 +29,7 @@ $timeout_loop = strstr( $source, 'foreach ( $timed_out_jobs as $job )' ) ?: '';
 echo "Case 1: timed-out recovery skips jobs with active scheduler work\n";
 assert_recover_stuck_guard_smoke( 'active scheduler work method exists', str_contains( $source, 'private function hasActiveSchedulerWork' ) );
 assert_recover_stuck_guard_smoke( 'active step guard method exists', str_contains( $source, 'private function hasActiveStepAction' ) );
-assert_recover_stuck_guard_smoke( 'timeout loop invokes scheduler guard before dry-run timeout', strpos( $timeout_loop, '$this->hasActiveSchedulerWork( $job_id, $engine_data, $timeout_hours )' ) < strpos( $timeout_loop, 'if ( $dry_run )' ) );
+assert_recover_stuck_guard_smoke( 'timeout loop diagnoses child ownership before dry-run recovery', strpos( $timeout_loop, 'ChildJobRecoveryPolicy::diagnose' ) < strpos( $timeout_loop, 'if ( $dry_run )' ) );
 assert_recover_stuck_guard_smoke( 'guard records skipped status', str_contains( $source, "'status'  => 'skipped'") && str_contains( $source, 'Pending or in-progress scheduler work exists' ) );
 
 echo "Case 2: guard is limited to executable Data Machine step actions\n";

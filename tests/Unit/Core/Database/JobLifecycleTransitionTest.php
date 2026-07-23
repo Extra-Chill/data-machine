@@ -10,8 +10,13 @@ namespace DataMachine\Tests\Unit\Core\Database;
 use DataMachine\Core\Database\Jobs\Jobs;
 use DataMachine\Core\Database\Jobs\LegacyAIConcurrencyReconciler;
 use DataMachine\Core\JobStatus;
+use DataMachine\Core\RecoveryExecutionFence;
+use DataMachine\Core\ChildJobRecoveryPolicy;
+use DataMachine\Core\Database\ProcessedItems\ProcessedItems;
 use DataMachine\Engine\AI\AIConcurrencyBackpressure;
 use DataMachine\Engine\Actions\Handlers\StepLifecycleHandler;
+use DataMachine\Abilities\Job\RecoverStuckJobsAbility;
+use DataMachine\Abilities\Engine\ExecuteStepAbility;
 use WP_UnitTestCase;
 
 class JobLifecycleTransitionTest extends WP_UnitTestCase {
@@ -40,6 +45,271 @@ class JobLifecycleTransitionTest extends WP_UnitTestCase {
 
 		$job = $this->db_jobs->get_job( $job_id );
 		$this->assertSame( JobStatus::FAILED, $job['status'] );
+	}
+
+	public function test_concurrent_pathless_child_recovery_has_one_owner(): void {
+		$parent_id = $this->db_jobs->create_job( array( 'label' => 'Recovery parent' ) );
+		$child_id  = $this->db_jobs->create_job( array( 'label' => 'Recovery child', 'parent_job_id' => $parent_id ) );
+		$this->assertIsInt( $parent_id );
+		$this->assertIsInt( $child_id );
+		$this->assertTrue( $this->db_jobs->start_job( $child_id ) );
+
+		$ability = new RecoverStuckJobsAbility();
+		$method  = new \ReflectionMethod( $ability, 'claimPathlessChildRecovery' );
+		$first   = $method->invoke( $ability, $child_id, 'test' );
+		$second  = $method->invoke( $ability, $child_id, 'test' );
+
+		$this->assertTrue( $first['owned'] );
+		$this->assertFalse( $second['owned'] );
+		$this->assertNotSame( $first['token'], $second['token'] );
+	}
+
+	public function test_stale_recovery_owner_cannot_finish_or_terminalize_after_reclaim(): void {
+		$parent_id = $this->db_jobs->create_job( array( 'label' => 'Stale recovery parent' ) );
+		$child_id  = $this->db_jobs->create_job( array( 'label' => 'Stale recovery child', 'parent_job_id' => $parent_id ) );
+		$this->assertTrue( $this->db_jobs->start_job( $child_id ) );
+
+		$ability = new RecoverStuckJobsAbility();
+		$claim   = new \ReflectionMethod( $ability, 'claimPathlessChildRecovery' );
+		$finish  = new \ReflectionMethod( $ability, 'finishPathlessChildRecovery' );
+		$first   = $claim->invoke( $ability, $child_id, 'test' );
+		$engine  = datamachine_get_engine_data( $child_id );
+		$engine['scheduler_recovery']['expires_at'] = gmdate( 'c', time() - 1 );
+		$this->assertTrue( datamachine_set_engine_data( $child_id, $engine ) );
+
+		$second = $claim->invoke( $ability, $child_id, 'test' );
+		$this->assertTrue( $second['owned'] );
+		$this->assertGreaterThan( $first['generation'], $second['generation'] );
+		$this->assertFalse( $finish->invoke( $ability, $child_id, $first['token'], $first['generation'], 'stale_finish', array() ) );
+
+		$stale_terminal = $this->db_jobs->transition_recovery_owned_child( $child_id, 'failed - stale_owner', $first['token'], $first['generation'] );
+		$this->assertFalse( $stale_terminal['success'] );
+		$this->assertSame( JobStatus::PROCESSING, $this->db_jobs->get_job( $child_id )['status'] );
+
+		$winner = $this->db_jobs->transition_recovery_owned_child( $child_id, 'failed - scheduler_path_lost', $second['token'], $second['generation'] );
+		$this->assertTrue( $winner['success'] );
+	}
+
+	public function test_recovery_requeue_rolls_back_scheduler_exception_and_can_retry(): void {
+		$parent_id = $this->db_jobs->create_job( array( 'label' => 'Receipt parent' ) );
+		$child_id  = $this->db_jobs->create_job( array( 'label' => 'Receipt child', 'parent_job_id' => $parent_id ) );
+		$this->assertTrue( $this->db_jobs->start_job( $child_id ) );
+
+		$ability = new RecoverStuckJobsAbility();
+		$claim   = ( new \ReflectionMethod( $ability, 'claimPathlessChildRecovery' ) )->invoke( $ability, $child_id, 'test' );
+		$crashed = $this->db_jobs->commit_recovery_owned_requeue(
+			$child_id,
+			$claim['token'],
+			$claim['generation'],
+			static function () use ( $child_id ): int {
+				as_schedule_single_action( time(), 'datamachine_execute_step', array( 'job_id' => $child_id, 'flow_step_id' => 'crashed' ), 'data-machine' );
+				throw new \RuntimeException( 'simulated crash' );
+			}
+		);
+		$this->assertFalse( $crashed['success'] );
+		$this->assertSame( JobStatus::PROCESSING, $this->db_jobs->get_job( $child_id )['status'] );
+		$this->assertArrayNotHasKey( 'receipt', datamachine_get_engine_data( $child_id )['scheduler_recovery'] );
+		$this->assertFalse( as_has_scheduled_action( 'datamachine_execute_step', array( 'job_id' => $child_id, 'flow_step_id' => 'crashed' ), 'data-machine' ) );
+
+		$retried = $this->db_jobs->commit_recovery_owned_requeue(
+			$child_id,
+			$claim['token'],
+			$claim['generation'],
+			static fn(): int => (int) as_schedule_single_action( time(), 'datamachine_execute_step', array( 'job_id' => $child_id, 'flow_step_id' => 'retried' ), 'data-machine', true )
+		);
+		$this->assertTrue( $retried['success'] );
+		$this->assertGreaterThan( 0, $retried['action_id'] );
+		$this->assertSame( JobStatus::PENDING, $this->db_jobs->get_job( $child_id )['status'] );
+		$this->assertSame( $retried['action_id'], datamachine_get_engine_data( $child_id )['scheduler_recovery']['receipt']['action_id'] );
+		$this->assertSame( JobStatus::PENDING, datamachine_get_engine_data( $child_id )['run_lifecycle']['status'] );
+	}
+
+	public function test_recovery_apply_limit_bounds_multiple_candidate_batches(): void {
+		$job_ids = array();
+		for ( $index = 0; $index < 55; ++$index ) {
+			$job_id = $this->db_jobs->create_job( array( 'label' => 'Bounded recovery ' . $index ) );
+			$this->assertTrue( $this->db_jobs->start_job( $job_id ) );
+			datamachine_merge_engine_data( $job_id, array( 'job_status' => 'failed - bounded_recovery' ) );
+			$job_ids[] = $job_id;
+		}
+
+		$result = ( new RecoverStuckJobsAbility() )->execute( array( 'dry_run' => false, 'limit' => 52 ) );
+		$this->assertSame( 52, $result['mutations'] );
+		$this->assertSame( 52, $result['attempted'] );
+		$this->assertSame( 52, $result['touched'] );
+		$this->assertSame( 52, $result['mutated'] );
+		$this->assertSame( 52, $result['recovered'] );
+		$this->assertTrue( $result['limit_reached'] );
+
+		$processing = array_filter( $job_ids, fn( int $job_id ): bool => JobStatus::PROCESSING === $this->db_jobs->get_job( $job_id )['status'] );
+		$this->assertCount( 3, $processing );
+	}
+
+	public function test_action_history_overfetches_past_numeric_prefix_collisions(): void {
+		$exact_id = as_schedule_single_action( time(), 'datamachine_execute_step', array( 'job_id' => 42, 'flow_step_id' => 'exact' ), 'data-machine' );
+		for ( $index = 0; $index < 75; ++$index ) {
+			as_schedule_single_action( time(), 'datamachine_execute_step', array( 'job_id' => 420, 'flow_step_id' => 'collision-' . $index ), 'data-machine' );
+		}
+
+		$ability = new RecoverStuckJobsAbility();
+		$history = ( new \ReflectionMethod( $ability, 'getStepActionHistory' ) )->invoke( $ability, 42 );
+		$this->assertCount( 1, $history );
+		$this->assertSame( $exact_id, (int) $history[0]['action_id'] );
+		$this->assertSame( 42, (int) $history[0]['decoded_args']['job_id'] );
+	}
+
+	public function test_recovery_rejects_invalid_exact_job_scope(): void {
+		$result = ( new RecoverStuckJobsAbility() )->execute( array( 'job_id' => '1.5' ) );
+		$this->assertFalse( $result['success'] );
+		$this->assertSame( 'job_id must be a positive integer.', $result['error'] );
+	}
+
+	public function test_touch_limit_stops_before_partial_pathless_claim(): void {
+		global $wpdb;
+		$parent_id = $this->db_jobs->create_job( array( 'label' => 'Touch-bound parent' ) );
+		$child_id  = $this->db_jobs->create_job( array( 'label' => 'Touch-bound child', 'parent_job_id' => $parent_id ) );
+		$this->assertTrue( $this->db_jobs->start_job( $child_id ) );
+		$wpdb->update(
+			$wpdb->prefix . 'datamachine_jobs',
+			array( 'created_at' => gmdate( 'Y-m-d H:i:s', time() - 3 * HOUR_IN_SECONDS ) ),
+			array( 'job_id' => $child_id ),
+			array( '%s' ),
+			array( '%d' )
+		);
+
+		$result = ( new RecoverStuckJobsAbility() )->execute(
+			array(
+				'job_id'                    => $child_id,
+				'limit'                     => 2,
+				'timeout_hours'             => 1,
+				'recover_pathless_children' => true,
+			)
+		);
+		$this->assertTrue( $result['limit_reached'] );
+		$this->assertSame( 0, $result['attempted'] );
+		$this->assertSame( 0, $result['touched'] );
+		$this->assertSame( 0, $result['mutated'] );
+		$this->assertArrayNotHasKey( 'scheduler_recovery', datamachine_get_engine_data( $child_id ) );
+		$this->assertSame( JobStatus::PROCESSING, $this->db_jobs->get_job( $child_id )['status'] );
+
+		$result = ( new RecoverStuckJobsAbility() )->execute(
+			array(
+				'job_id'                    => $child_id,
+				'limit'                     => 3,
+				'timeout_hours'             => 1,
+				'recover_pathless_children' => true,
+			)
+		);
+		$this->assertFalse( $result['limit_reached'] );
+		$this->assertSame( 1, $result['mutations'] );
+		$this->assertSame( 2, $result['attempted'] );
+		$this->assertSame( 2, $result['touched'] );
+		$this->assertSame( 2, $result['mutated'] );
+		$this->assertSame( 1, $result['pathless_terminal'] );
+		$this->assertSame( JobStatus::failed( 'scheduler_path_lost' )->toString(), $this->db_jobs->get_job( $child_id )['status'] );
+	}
+
+	public function test_long_running_recovery_takeover_blocks_terminal_callbacks(): void {
+		$parent_id = $this->db_jobs->create_job( array( 'label' => 'Generation parent' ) );
+		$child_id  = $this->db_jobs->create_job( array( 'label' => 'Generation child', 'parent_job_id' => $parent_id ) );
+		$this->assertTrue( $this->db_jobs->start_job( $child_id ) );
+		$engine = datamachine_get_engine_data( $child_id );
+		$engine['scheduler_recovery'] = array(
+			'schema'     => 'datamachine.scheduler-recovery.v1',
+			'state'      => 'requeued',
+			'token'      => 'generation-one',
+			'generation' => 1,
+			'receipt'    => array( 'generation' => 1, 'action_id' => 101 ),
+		);
+		$this->assertTrue( datamachine_set_engine_data( $child_id, $engine ) );
+
+		$terminal_callbacks = 0;
+		$callback = static function ( string $status ) use ( &$terminal_callbacks ): string {
+			++$terminal_callbacks;
+			return $status;
+		};
+		add_filter( 'datamachine_job_terminal_status', $callback, 1, 1 );
+		$fence = new RecoveryExecutionFence( $child_id, 'generation-one', 1 );
+		$nested_fence = new RecoveryExecutionFence( $child_id, 'generation-one', 1 );
+		unset( $nested_fence );
+
+		$takeover = datamachine_get_engine_data( $child_id );
+		$takeover['scheduler_recovery'] = array(
+			'schema'     => 'datamachine.scheduler-recovery.v1',
+			'state'      => 'claimed',
+			'token'      => 'generation-two',
+			'generation' => 2,
+			'claimed_at' => gmdate( 'c' ),
+			'expires_at' => gmdate( 'c', time() + 300 ),
+		);
+		$this->assertTrue( datamachine_set_engine_data( $child_id, $takeover ) );
+
+		$this->assertFalse( $this->db_jobs->transition_job_status( $child_id, JobStatus::COMPLETED, true ) );
+		$this->assertSame( 0, $terminal_callbacks );
+		$this->assertSame( JobStatus::PROCESSING, $this->db_jobs->get_job( $child_id )['status'] );
+		$executor = new ExecuteStepAbility();
+		$still_owned = ( new \ReflectionMethod( $executor, 'recoveryGenerationStillOwned' ) )->invoke( $executor, $child_id, 1, 'generation-one' );
+		$noop = ( new \ReflectionMethod( $executor, 'staleRejectedTerminalTransition' ) )->invoke(
+			$executor,
+			$child_id,
+			1,
+			'generation-one',
+			array( 'success' => false )
+		);
+		$this->assertFalse( $still_owned );
+		$this->assertTrue( $noop['success'] );
+		$this->assertSame( 'stale_recovery_noop', $noop['outcome'] );
+		unset( $fence );
+		remove_filter( 'datamachine_job_terminal_status', $callback, 1 );
+	}
+
+	public function test_recovery_evidence_validates_active_claim_ownership(): void {
+		$job_id    = $this->db_jobs->create_job( array( 'label' => 'Claim evidence' ) );
+		$processed = new ProcessedItems();
+		$token     = $processed->claim_item_owned( 'scope', 'source', 'item', $job_id, 600 );
+		$this->assertIsString( $token );
+		$claim = array(
+			'identity_scope'  => 'scope',
+			'source_type'     => 'source',
+			'item_identifier' => 'item',
+			'ownership_token' => $token,
+		);
+		$ability  = new RecoverStuckJobsAbility();
+		$evidence = ( new \ReflectionMethod( $ability, 'activeClaimEvidence' ) )->invoke( $ability, array( '_datamachine_item_claim' => $claim ), $job_id );
+		$this->assertSame( 'active_owned', $evidence['state'] );
+		$this->assertSame( 1, $evidence['active'] );
+
+		$this->assertSame( 1, $processed->release_owned_claim( 'scope', 'source', 'item', $token ) );
+		$stale = ( new \ReflectionMethod( $ability, 'activeClaimEvidence' ) )->invoke( $ability, array( '_datamachine_item_claim' => $claim ), $job_id );
+		$this->assertSame( 'stale_or_unowned', $stale['state'] );
+		$this->assertSame( 0, $stale['active'] );
+	}
+
+	public function test_recovery_evidence_does_not_label_absent_generation_valid(): void {
+		$parent_id = $this->db_jobs->create_job( array( 'label' => 'Evidence parent' ) );
+		$child_id  = $this->db_jobs->create_job( array( 'label' => 'Evidence child', 'parent_job_id' => $parent_id ) );
+		$engine    = datamachine_get_engine_data( $child_id );
+		$engine['flow_config'] = array( 'step' => array( 'step_type' => 'fetch' ) );
+		$this->assertTrue( datamachine_set_engine_data( $child_id, $engine ) );
+		$job = $this->db_jobs->get_job( $child_id );
+		$diagnosis = ChildJobRecoveryPolicy::diagnose(
+			$job,
+			$engine,
+			array(
+				array(
+					'action_id'   => 77,
+					'hook'        => 'datamachine_execute_step',
+					'status'      => 'failed',
+					'decoded_args' => array( 'job_id' => $child_id, 'flow_step_id' => 'step' ),
+				),
+			),
+			HOUR_IN_SECONDS,
+			time()
+		);
+		$ability  = new RecoverStuckJobsAbility();
+		$evidence = ( new \ReflectionMethod( $ability, 'childRecoveryEvidence' ) )->invoke( $ability, $job, $diagnosis, 'would_requeue_pathless_child', 'test' );
+		$this->assertSame( 0, $evidence['action_generation'] );
+		$this->assertSame( 'legacy_unfenced', $evidence['action_generation_state'] );
 	}
 
 	public function test_terminal_transition_hook_only_fires_when_status_changes(): void {

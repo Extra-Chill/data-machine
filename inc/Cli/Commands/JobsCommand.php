@@ -1,4 +1,5 @@
 <?php
+// phpcs:disable Generic.Formatting.MultipleStatementAlignment,WordPress.Arrays.MultipleStatementAlignment.DoubleArrowNotAligned -- Structured command summaries use descriptive keys.
 // phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange -- Data Machine owns custom operational tables and these paths require fresh runtime state or one-time schema mutation.
 /**
  * WP-CLI Jobs Command
@@ -90,13 +91,28 @@ class JobsCommand extends BaseCommand {
 	 *   - yaml
 	 * ---
 	 *
+	 * [--job-id=<job-id>]
+	 * : Scope recovery to one exact job ID.
+	 *
+	 * [--limit=<limit>]
+	 * : Hard attempted storage-touch limit for this invocation (maximum 100).
+	 * ---
+	 * default: 3
+	 * ---
+	 *
+	 * [--recover-pathless-children]
+	 * : Explicitly authorize applying historical pathless-child recovery. Dry-runs diagnose them without this flag.
+	 *
 	 * ## EXAMPLES
 	 *
 	 *     # Preview stuck jobs recovery
 	 *     wp datamachine jobs recover-stuck --dry-run
 	 *
-	 *     # Recover all stuck jobs
+	 *     # Recover up to the default mutation limit (pathless children remain guarded)
 	 *     wp datamachine jobs recover-stuck
+	 *
+	 *     # Recover one reviewed pathless child
+	 *     wp datamachine jobs recover-stuck --job-id=123 --recover-pathless-children --limit=3
 	 *
 	 *     # Recover stuck jobs for a specific flow
 	 *     wp datamachine jobs recover-stuck --flow=98
@@ -114,6 +130,14 @@ class JobsCommand extends BaseCommand {
 		$flow_id = isset( $assoc_args['flow'] ) ? (int) $assoc_args['flow'] : null;
 		$timeout = isset( $assoc_args['timeout'] ) ? max( 1, (int) $assoc_args['timeout'] ) : 2;
 		$format  = $assoc_args['format'] ?? 'table';
+		$requested_job_id = isset( $assoc_args['job-id'] ) ? filter_var( $assoc_args['job-id'], FILTER_VALIDATE_INT ) : null;
+		if ( isset( $assoc_args['job-id'] ) && ( false === $requested_job_id || $requested_job_id <= 0 ) ) {
+			WP_CLI::error( '--job-id must be a positive integer.' );
+			return;
+		}
+		$job_id  = is_int( $requested_job_id ) ? $requested_job_id : null;
+		$limit   = isset( $assoc_args['limit'] ) ? max( 1, min( 100, (int) $assoc_args['limit'] ) ) : 3;
+		$recover_pathless_children = isset( $assoc_args['recover-pathless-children'] );
 
 		$result = AbilityRunner::execute(
 			'datamachine/recover-stuck-jobs',
@@ -121,6 +145,10 @@ class JobsCommand extends BaseCommand {
 				'dry_run'       => $dry_run,
 				'flow_id'       => $flow_id,
 				'timeout_hours' => $timeout,
+				'job_id'        => $job_id,
+				'limit'         => $limit,
+				'recover_pathless_children' => $recover_pathless_children,
+				'recovery_trigger' => 'operator_cli',
 			)
 		);
 
@@ -144,6 +172,7 @@ class JobsCommand extends BaseCommand {
 					'jobs_omitted'   => (int) ( $result['jobs_omitted'] ?? 0 ),
 					'jobs_truncated' => ! empty( $result['jobs_truncated'] ),
 					'message'        => $result['message'] ?? '',
+					'scope'          => $result['scope'] ?? array(),
 				),
 				array(
 					'format' => $format,
@@ -164,6 +193,15 @@ class JobsCommand extends BaseCommand {
 				$summary['skipped']
 			)
 		);
+		WP_CLI::log(
+			sprintf(
+				'Recovery scope: processing jobs only; pending AI deferrals excluded; job=%s flow=%s touch-limit=%d pathless-apply=%s.',
+				$job_id ? (string) $job_id : 'all',
+				$flow_id ? (string) $flow_id : 'all',
+				$limit,
+				$recover_pathless_children ? 'enabled' : 'disabled'
+			)
+		);
 
 		if ( $dry_run ) {
 			WP_CLI::log( 'Dry run - no changes will be made.' );
@@ -171,6 +209,27 @@ class JobsCommand extends BaseCommand {
 		}
 
 		foreach ( $jobs as $job ) {
+			if ( isset( $job['disposition'] ) ) {
+				WP_CLI::log(
+					sprintf(
+						'Job %d disposition=%s reason=%s action=%s/%d generation=%d lease=%s:%d age=%ds receipt=%s:%d claim=%s owner=%s',
+						(int) $job['job_id'],
+						(string) $job['disposition'],
+						(string) ( $job['reason'] ?? '' ),
+						(string) ( $job['action_status'] ?? 'none' ),
+						(int) ( $job['action_id'] ?? 0 ),
+						(int) ( $job['action_generation'] ?? 0 ),
+						(string) ( $job['recovery_lease_state'] ?? 'none' ),
+						(int) ( $job['recovery_lease_generation'] ?? 0 ),
+						(int) ( $job['recovery_lease_age_seconds'] ?? 0 ),
+						(string) ( $job['receipt_state'] ?? 'missing' ),
+						(int) ( $job['receipt_action_id'] ?? 0 ),
+						(string) ( $job['item_claim_state'] ?? 'none' ),
+						(string) ( $job['owner'] ?? 'none' )
+					)
+				);
+				continue;
+			}
 			if ( 'skipped' === $job['status'] ) {
 				WP_CLI::warning( sprintf( 'Job %d: %s', $job['job_id'], $job['reason'] ?? 'Unknown reason' ) );
 			} elseif ( 'would_recover' === $job['status'] ) {
@@ -233,14 +292,32 @@ class JobsCommand extends BaseCommand {
 		$timed_out     = (int) ( $result['timed_out'] ?? 0 );
 		$stale_actions = (int) ( $result['stale_actions'] ?? 0 );
 		$skipped       = (int) ( $result['skipped'] ?? 0 );
+		$pathless_requeued = (int) ( $result['pathless_requeued'] ?? 0 );
+		$pathless_terminal = (int) ( $result['pathless_terminal'] ?? 0 );
+		$claimed_elsewhere = (int) ( $result['claimed_elsewhere'] ?? 0 );
+		$pathless_policy_skipped = (int) ( $result['pathless_policy_skipped'] ?? 0 );
+		$mutations         = (int) ( $result['mutations'] ?? 0 );
+		$attempted         = (int) ( $result['attempted'] ?? 0 );
+		$touched           = (int) ( $result['touched'] ?? 0 );
+		$mutated           = (int) ( $result['mutated'] ?? 0 );
 
 		return array(
 			'recovered'     => $recovered,
 			'timed_out'     => $timed_out,
 			'stale_actions' => $stale_actions,
 			'skipped'       => $skipped,
-			'actionable'    => $recovered + $timed_out + $stale_actions,
-			'total'         => $recovered + $timed_out + $stale_actions + $skipped,
+			'pathless_requeued' => $pathless_requeued,
+			'pathless_terminal' => $pathless_terminal,
+			'claimed_elsewhere' => $claimed_elsewhere,
+			'pathless_policy_skipped' => $pathless_policy_skipped,
+			'mutations'     => $mutations,
+			'attempted'     => $attempted,
+			'touched'       => $touched,
+			'mutated'       => $mutated,
+			'apply_limit'   => (int) ( $result['apply_limit'] ?? 0 ),
+			'limit_reached' => ! empty( $result['limit_reached'] ) ? 1 : 0,
+			'actionable'    => $recovered + $timed_out + $stale_actions + $pathless_requeued + $pathless_terminal,
+			'total'         => $recovered + $timed_out + $stale_actions + $pathless_requeued + $pathless_terminal + $skipped,
 			'requeued'      => (int) ( $result['requeued'] ?? 0 ),
 			'jobs_omitted'  => (int) ( $result['jobs_omitted'] ?? 0 ),
 		);
@@ -346,6 +423,11 @@ class JobsCommand extends BaseCommand {
 				array(
 					'success'         => true,
 					'overdue_minutes' => $overdue_minutes,
+					'scope'           => array(
+						'statuses'            => array( 'processing', 'pending' ),
+						'pending_requirement' => 'ai_concurrency_throttle',
+						'note'                => 'Recovery scope excludes pending AI deferrals and inspects processing jobs only.',
+					),
 					'summary'         => $summary,
 					'jobs'            => $items,
 				),
@@ -362,6 +444,7 @@ class JobsCommand extends BaseCommand {
 		$this->format_items( $items, $this->liveness_fields, $assoc_args, 'id' );
 
 		if ( 'table' === $format ) {
+			WP_CLI::log( 'Liveness scope includes processing jobs plus pending AI concurrency deferrals; recover-stuck applies only to processing jobs.' );
 			WP_CLI::log(
 				sprintf(
 					'Inspected %d active jobs: %d active, %d queued, %d AI concurrency-deferred, %d waiting on children, %d scheduler-starved, %d stale in-progress, %d without scheduler path.',
@@ -1078,6 +1161,14 @@ class JobsCommand extends BaseCommand {
 			ARRAY_A
 		);
 		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+
+		foreach ( $rows as &$row ) {
+			$args = json_decode( (string) ( $row['args'] ?? '' ), true );
+			if ( is_array( $args ) ) {
+				$row['decoded_args'] = $args;
+			}
+		}
+		unset( $row );
 
 		return array_values(
 			array_filter(
