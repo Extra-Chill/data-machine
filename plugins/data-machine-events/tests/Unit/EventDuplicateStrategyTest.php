@@ -335,6 +335,53 @@ class EventDuplicateStrategyTest extends WP_UnitTestCase {
 		$this->cleanup( $term_id, $existing_post_id );
 	}
 
+	public function test_low_confidence_replay_scans_all_same_day_exact_title_candidates(): void {
+		$venue_name = 'Multiple Showcase Venue ' . uniqid();
+		[ $term_id, $early_post_id ] = $this->seedVenueWithEvent( 'Showcase', '2026-05-22 13:00:00', $venue_name );
+
+		$late_post_id = wp_insert_post(
+			array(
+				'post_title'  => 'Showcase',
+				'post_type'   => Event_Post_Type::POST_TYPE,
+				'post_status' => 'publish',
+			)
+		);
+		$this->assertGreaterThan( 0, $late_post_id );
+		wp_set_object_terms( $late_post_id, array( $term_id ), 'venue' );
+		EventDatesTable::upsert( $late_post_id, '2026-05-22 21:00:00' );
+		( new \DataMachine\Core\Database\PostIdentityIndex\PostIdentityIndex() )->upsert(
+			$late_post_id,
+			array(
+				'post_type'     => Event_Post_Type::POST_TYPE,
+				'event_date'    => '2026-05-22',
+				'venue_term_id' => $term_id,
+				'title_hash'    => EventDuplicateStrategy::computeTitleHash( 'Showcase' ),
+			)
+		);
+
+		$result = EventDuplicateStrategy::check(
+			array(
+				'title'   => 'Showcase',
+				'context' => array(
+					'venue'     => $venue_name,
+					'startDate' => '2026-05-22 21:30:00',
+					'ticketUrl' => '',
+				),
+			)
+		);
+
+		$this->assertIsArray( $result );
+		$this->assertSame( $late_post_id, $result['match']['post_id'], 'Replay must skip the arbitrary early candidate and reuse the in-window late show.' );
+
+		global $wpdb;
+		foreach ( array( $early_post_id, $late_post_id ) as $post_id ) {
+			$wpdb->delete( $wpdb->prefix . 'datamachine_post_identity', array( 'post_id' => $post_id ), array( '%d' ) );
+			$wpdb->delete( EventDatesTable::table_name(), array( 'post_id' => $post_id ), array( '%d' ) );
+			wp_delete_post( $post_id, true );
+		}
+		wp_delete_term( $term_id, 'venue' );
+	}
+
 	// ---------------------------------------------------------------------
 	// check() — date-aware end-to-end cascade tests (#423)
 	// ---------------------------------------------------------------------

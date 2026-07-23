@@ -164,14 +164,33 @@ class EventUpsert extends UpsertHandler {
 			)
 		);
 
-		// Acquire an advisory lock to prevent concurrent duplicate creation. Public
-		// callers lock on source identity; workflow imports retain title/date locking.
-		$lock_key = $this->acquireUpsertLock( $title, $startDate, (string) ( $parameters['source_identity'] ?? '' ) );
+		$identity_start = self::composeIdentityStart( $startDate, $start_time );
+		$lock_keys      = $this->acquireUpsertLocks(
+			$title,
+			$venue,
+			$identity_start,
+			(string) ( $parameters['source_identity'] ?? '' ),
+			array(
+				'address' => (string) ( $engine->get( 'venueAddress' ) ?? $parameters['venueAddress'] ?? '' ),
+				'city'    => (string) ( $engine->get( 'venueCity' ) ?? $parameters['venueCity'] ?? '' ),
+				'state'   => (string) ( $engine->get( 'venueState' ) ?? $parameters['venueState'] ?? '' ),
+				'country' => (string) ( $engine->get( 'venueCountry' ) ?? $parameters['venueCountry'] ?? '' ),
+			)
+		);
+		if ( null === $lock_keys ) {
+			return array(
+				'success'    => false,
+				'error'      => 'Event upsert lock unavailable; retry the event.',
+				'error_code' => 'event_upsert_lock_unavailable',
+				'retryable'  => true,
+				'tool_name'  => static::class,
+			);
+		}
 
 		try {
-			return $this->executeUpsertWithinLock( $title, $venue, $startDate, $ticketUrl, $parameters, $handler_config, $engine );
+			return $this->executeUpsertWithinLock( $title, $venue, $identity_start, $ticketUrl, $parameters, $handler_config, $engine );
 		} finally {
-			$this->releaseUpsertLock( $lock_key );
+			$this->releaseUpsertLocks( $lock_keys );
 		}
 	}
 
@@ -552,11 +571,12 @@ class EventUpsert extends UpsertHandler {
 	}
 
 	/**
-	 * Acquire a MySQL advisory lock for an event identity.
+	 * Acquire deterministic MySQL advisory locks for an event identity.
 	 *
-	 * Uses GET_LOCK() to serialize concurrent upserts for the same event.
-	 * Public ability calls use their source identity; workflow calls use the
-	 * date and normalized title so equivalent events queue instead of racing.
+	 * A concrete source lock serializes updates even when source data changes its
+	 * title, date, or venue. Canonical venue/time locks serialize different feeds
+	 * whose fuzzy titles can resolve to the same event. Keys are globally sorted
+	 * before acquisition so overlapping key sets cannot deadlock each other.
 	 *
 	 * MySQL advisory locks are:
 	 * - Per-connection (each PHP-FPM worker has its own connection)
@@ -565,64 +585,171 @@ class EventUpsert extends UpsertHandler {
 	 *
 	 * @since 0.17.3
 	 * @param string $title           Event title.
-	 * @param string $startDate       Event start date.
-	 * @param string $source_identity Optional caller-supplied source identity.
-	 * @return string The lock key (needed for release).
+	 * @param string $venue           Event venue.
+	 * @param string $startDate       Event start date or datetime.
+	 * @param string $source_identity Optional stable source identity.
+	 * @param array  $venue_context   Venue address geography.
+	 * @return array|null The acquired lock keys, or null on timeout/error.
 	 */
-	private function acquireUpsertLock( string $title, string $startDate, string $source_identity = '' ): string {
+	private function acquireUpsertLocks( string $title, string $venue, string $startDate, string $source_identity = '', array $venue_context = array() ): ?array {
 		global $wpdb;
 
-		$date_only  = self::extractDateForQuery( $startDate );
-		$normalized = SimilarityEngine::normalizeTitle( $title );
-		$lock_value = '' !== $source_identity ? 'source|' . $source_identity : $date_only . '|' . $normalized;
-		$lock_key   = 'dme_' . md5( $lock_value );
+		$lock_keys = $this->buildUpsertLockKeys( $title, $venue, $startDate, $source_identity, $venue_context );
+		$acquired  = array();
+		$deadline  = microtime( true ) + 10;
+		$complete  = false;
 
-		// MySQL lock names are limited to 64 characters; md5 = 36 + prefix = 40, safe.
-		// Try up to 3 times with increasing timeouts (5s, 10s, 15s).
-		// If all attempts fail, proceed without lock — better to risk a dupe
-		// than deadlock the pipeline entirely.
-		$timeouts = array( 5, 10, 15 );
-		$acquired = false;
+		try {
+			foreach ( $lock_keys as $lock_key ) {
+				$timeout = max( 0, (int) ceil( $deadline - microtime( true ) ) );
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+				$result = $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK(%s, %d)', $lock_key, $timeout ) );
 
-		foreach ( $timeouts as $attempt => $timeout ) {
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-			$result = $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK(%s, %d)', $lock_key, $timeout ) );
+				if ( '1' === (string) $result ) {
+					$acquired[] = $lock_key;
+					continue;
+				}
 
-			if ( '1' === (string) $result ) {
-				$acquired = true;
-				break;
+				do_action(
+					'datamachine_log',
+					'warning',
+					'Event Upsert: Advisory lock unavailable; returning retryable failure',
+					array(
+						'lock_key'  => $lock_key,
+						'lock_keys' => $lock_keys,
+						'title'     => $title,
+						'startDate' => $startDate,
+						'result'    => null === $result ? 'error' : 'timeout',
+					)
+				);
+
+				return null;
 			}
-		}
 
-		if ( ! $acquired ) {
+			$complete = true;
+
+			return $acquired;
+		} catch ( \Throwable $throwable ) {
 			do_action(
 				'datamachine_log',
 				'warning',
-				'Event Upsert: Advisory lock failed after 3 attempts, proceeding without lock',
+				'Event Upsert: Advisory lock acquisition failed; returning retryable failure',
 				array(
-					'lock_key'        => $lock_key,
-					'title'           => $title,
-					'startDate'       => $startDate,
-					'normalized'      => $normalized,
-					'total_wait_secs' => array_sum( $timeouts ),
+					'lock_keys' => $lock_keys,
+					'acquired'  => $acquired,
+					'title'     => $title,
+					'startDate' => $startDate,
+					'exception' => $throwable->getMessage(),
 				)
 			);
-		}
 
-		return $lock_key;
+			return null;
+		} finally {
+			if ( ! $complete ) {
+				$this->releaseUpsertLocks( $acquired );
+			}
+		}
 	}
 
 	/**
-	 * Release a MySQL advisory lock.
+	 * Build globally ordered source and canonical collision-domain lock keys.
+	 *
+	 * Known times acquire their own two-hour bucket and its predecessor. This is a
+	 * conservative adjacent-bucket collision domain, not an exact two-hour range:
+	 * starts beyond 120 minutes can briefly serialize when their bucket sets overlap.
+	 * Fuzzy equivalence has no exact narrow key, so that bounded false contention is
+	 * the correctness tradeoff. Different venue/geography scopes and distant bucket
+	 * sets remain parallel. An unknown time acquires 12 venue/day buckets so it
+	 * overlaps any time-aware equivalent. Unknown venues include a stable title
+	 * prefix fingerprint so venue-less events remain bounded.
+	 *
+	 * @param string $title           Event title.
+	 * @param string $venue           Event venue.
+	 * @param string $startDate       Event start date or datetime.
+	 * @param string $source_identity Optional stable source identity.
+	 * @param array  $venue_context   Venue address geography.
+	 * @return array Ordered advisory lock keys.
+	 */
+	private function buildUpsertLockKeys( string $title, string $venue, string $startDate, string $source_identity = '', array $venue_context = array() ): array {
+		$blog_id   = get_current_blog_id();
+		$date_only = self::extractDateForQuery( $startDate );
+		$identity  = \DataMachineEvents\Core\Venue_Taxonomy::resolve_venue_identity( $venue, $venue_context );
+
+		if ( ! empty( $identity['term_id'] ) ) {
+			$venue_scopes = array( 'term:' . (int) $identity['term_id'] );
+		} elseif ( '' !== trim( $venue ) ) {
+			$venue_scopes = array( 'name:' . SimilarityEngine::normalizeBasic( $venue ) );
+		} else {
+			$normalized_title = SimilarityEngine::normalizeTitle( $title );
+			$title_tokens     = array_slice( array_filter( explode( ' ', $normalized_title ) ), 0, 3 );
+			$venue_scopes     = array( 'unknown:' . implode( ' ', $title_tokens ) );
+		}
+
+		$normalized_address = \DataMachineEvents\Core\Venue_Taxonomy::normalize_address_for_matching(
+			(string) ( $venue_context['address'] ?? '' )
+		);
+		if ( '' !== $normalized_address ) {
+			// Address is intentionally independent of optional city/state/country.
+			// Partial source geography must still converge on the same physical key.
+			$venue_scopes[] = 'geo:address:' . $normalized_address;
+		}
+		$venue_scopes = array_values( array_unique( $venue_scopes ) );
+
+		$domains = array();
+		if ( '' !== $source_identity ) {
+			$domains[] = 'source|' . $blog_id . '|' . $source_identity;
+		}
+
+		if ( preg_match( '/\b(\d{1,2}):(\d{2})/', $startDate, $matches ) ) {
+			$minutes = ( (int) $matches[1] * 60 ) + (int) $matches[2];
+			$bucket  = (int) floor( $minutes / 120 );
+			foreach ( $venue_scopes as $venue_scope ) {
+				foreach ( array( $bucket - 1, $bucket ) as $time_bucket ) {
+					$domains[] = 'canonical|' . $blog_id . '|' . $date_only . '|' . $venue_scope . '|time:' . $time_bucket;
+				}
+			}
+		} else {
+			foreach ( $venue_scopes as $venue_scope ) {
+				foreach ( range( 0, 11 ) as $time_bucket ) {
+					$domains[] = 'canonical|' . $blog_id . '|' . $date_only . '|' . $venue_scope . '|time:' . $time_bucket;
+				}
+			}
+		}
+
+		$lock_keys = array_map(
+			static fn( string $domain ): string => 'dme:' . md5( $domain ),
+			array_unique( $domains )
+		);
+		sort( $lock_keys, SORT_STRING );
+
+		return $lock_keys;
+	}
+
+	/**
+	 * Release acquired MySQL advisory locks.
 	 *
 	 * @since 0.17.3
-	 * @param string $lock_key The lock key to release.
+	 * @param array $lock_keys Lock keys to release.
 	 */
-	private function releaseUpsertLock( string $lock_key ): void {
+	private function releaseUpsertLocks( array $lock_keys ): void {
 		global $wpdb;
 
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-		$wpdb->query( $wpdb->prepare( 'SELECT RELEASE_LOCK(%s)', $lock_key ) );
+		foreach ( array_reverse( $lock_keys ) as $lock_key ) {
+			try {
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+				$wpdb->query( $wpdb->prepare( 'SELECT RELEASE_LOCK(%s)', $lock_key ) );
+			} catch ( \Throwable $throwable ) {
+				do_action(
+					'datamachine_log',
+					'warning',
+					'Event Upsert: Advisory lock release failed',
+					array(
+						'lock_key'  => $lock_key,
+						'exception' => $throwable->getMessage(),
+					)
+				);
+			}
+		}
 	}
 
 	/**
@@ -639,6 +766,21 @@ class EventUpsert extends UpsertHandler {
 			return $matches[1];
 		}
 		return $datetime;
+	}
+
+	/**
+	 * Compose the time-aware identity used by duplicate detection.
+	 *
+	 * @param string $start_date Event start date or datetime.
+	 * @param string $start_time Event start time when stored separately.
+	 * @return string Date or datetime suitable for duplicate comparison.
+	 */
+	private static function composeIdentityStart( string $start_date, string $start_time ): string {
+		if ( '' === $start_time || preg_match( '/\d{2}:\d{2}/', $start_date ) ) {
+			return $start_date;
+		}
+
+		return trim( $start_date ) . ' ' . trim( $start_time );
 	}
 
 	/**

@@ -18,6 +18,7 @@ use WP_UnitTestCase;
 class EventUpsertAbilitiesTest extends WP_UnitTestCase {
 
 	private EventUpsertAbilities $ability;
+	private \Closure $lock_query_filter;
 
 	public function setUp(): void {
 		parent::setUp();
@@ -34,8 +35,21 @@ class EventUpsertAbilitiesTest extends WP_UnitTestCase {
 		if ( class_exists( PostIdentityIndex::class ) ) {
 			( new PostIdentityIndex() )->create_table();
 		}
+		$this->lock_query_filter = static function ( string $query ): string {
+			if ( str_contains( $query, 'GET_LOCK' ) || str_contains( $query, 'RELEASE_LOCK' ) ) {
+				return 'SELECT 1';
+			}
+
+			return $query;
+		};
+		add_filter( 'query', $this->lock_query_filter );
 
 		$this->ability = new EventUpsertAbilities();
+	}
+
+	public function tearDown(): void {
+		remove_filter( 'query', $this->lock_query_filter );
+		parent::tearDown();
 	}
 
 	public function test_creates_canonical_event_and_returns_normalized_metadata(): void {
@@ -100,6 +114,22 @@ class EventUpsertAbilitiesTest extends WP_UnitTestCase {
 		$this->assertSame( 'ambiguous_venue', $result->get_error_code() );
 		$this->assertSame( 409, $result->get_error_data()['status'] );
 		$this->assertSame( 0, $this->countEventsWithTitle( $input['event']['title'] ) );
+	}
+
+	public function test_lock_timeout_preserves_retryable_transient_contract(): void {
+		$force_timeout = static function ( string $query ): string {
+			return str_contains( $query, 'GET_LOCK' ) ? 'SELECT 0' : $query;
+		};
+		add_filter( 'query', $force_timeout, 9 );
+
+		$result = $this->ability->executeUpsertEvent( $this->validInput() );
+
+		remove_filter( 'query', $force_timeout, 9 );
+		$this->assertWPError( $result );
+		$this->assertSame( 'event_upsert_lock_unavailable', $result->get_error_code() );
+		$this->assertSame( 503, $result->get_error_data()['status'] ?? null );
+		$this->assertTrue( $result->get_error_data()['retryable'] ?? false );
+		$this->assertTrue( $result->get_error_data()['transient'] ?? false );
 	}
 
 	private function validInput(): array {

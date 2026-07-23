@@ -52,6 +52,14 @@ jobs:
           app-id: ${{ secrets.HOMEBOY_APP_ID }}
           private-key: ${{ secrets.HOMEBOY_APP_PRIVATE_KEY }}
 
+      - name: Verify MySQL advisory-lock contract
+        if: matrix.command == 'review test'
+        env:
+          DME_MYSQL_TEST_DSN: mysql:host=127.0.0.1;port=3306;dbname=homeboy_wptests
+          DME_MYSQL_TEST_USER: root
+          DME_MYSQL_TEST_PASSWORD: ''
+        run: php tests/Integration/mysql-lock-smoke.php
+
       - name: Run Homeboy ${{ matrix.command }}
         uses: Extra-Chill/homeboy-action@v2
         with:
