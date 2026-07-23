@@ -49,6 +49,11 @@ function assert_runtime( string $name, bool $condition ): void {
 $GLOBALS['__test_options']      = array();
 $GLOBALS['__test_actions']      = array();
 $GLOBALS['__test_schema_calls'] = array();
+$GLOBALS['__test_identity_table_exists'] = false;
+$GLOBALS['__test_identity_schema_valid'] = false;
+$GLOBALS['__test_identity_create_success'] = true;
+$GLOBALS['__test_identity_create_calls'] = array();
+$GLOBALS['wpdb'] = (object) array( 'prefix' => 'wp_' );
 
 if ( ! function_exists( 'get_option' ) ) {
 	function get_option( $name, $default_value = false ) {
@@ -76,6 +81,7 @@ if ( ! function_exists( 'add_action' ) ) {
 
 $schema_chain = array(
 	'datamachine_migrate_bundle_artifacts_table',
+	'datamachine_migrate_run_metadata_table',
 	'datamachine_migrate_processed_item_claims',
 	'datamachine_migrate_pending_actions_table',
 	'datamachine_migrate_chat_sessions_to_network',
@@ -87,6 +93,41 @@ foreach ( $schema_chain as $fn ) {
 	}
 	$captured = $fn;
 	eval( "function {$fn}() { \$GLOBALS['__test_schema_calls'][] = '{$captured}'; }" );
+}
+
+if ( ! class_exists( '\DataMachine\Core\Database\PostIdentityReservations\PostIdentityReservations' ) ) {
+	eval(
+		'namespace DataMachine\Core\Database\PostIdentityReservations;
+		class PostIdentityReservations {
+			public const SCHEMA_VERSION = 1;
+			public static function create_table(): void {
+				$GLOBALS["__test_identity_create_calls"][] = $GLOBALS["wpdb"]->prefix;
+				if ($GLOBALS["__test_identity_create_success"]) {
+					$GLOBALS["__test_identity_table_exists"] = true;
+					$GLOBALS["__test_identity_schema_valid"] = true;
+				}
+			}
+			public function get_table_name(): string {
+				return $GLOBALS["wpdb"]->prefix . "datamachine_post_identity_reservations";
+			}
+			public function validate_schema() {
+				$GLOBALS["__test_identity_checked_table"] = $this->get_table_name();
+				return $GLOBALS["__test_identity_table_exists"] && $GLOBALS["__test_identity_schema_valid"];
+			}
+		}'
+	);
+}
+
+if ( ! class_exists( '\DataMachine\Core\Database\BaseRepository' ) ) {
+	eval(
+		'namespace DataMachine\Core\Database;
+		class BaseRepository {
+			public static function database_table_exists(string $table_name): bool {
+				$GLOBALS["__test_identity_checked_table"] = $table_name;
+				return $GLOBALS["__test_identity_table_exists"];
+			}
+		}'
+	);
 }
 
 require_once dirname( __DIR__ ) . '/inc/migrations/runtime.php';
@@ -110,6 +151,65 @@ $GLOBALS['__test_options']['datamachine_db_version'] = '0.1.0-stale';
 datamachine_maybe_run_deferred_migrations();
 assert_runtime( 'current schema ensures called when option lags', $schema_chain === $GLOBALS['__test_schema_calls'] );
 assert_runtime( 'option bumped to current DATAMACHINE_VERSION', DATAMACHINE_VERSION === $GLOBALS['__test_options']['datamachine_db_version'] );
+
+echo "\n[identity-schema:1] Option/table mismatch installs and records schema\n";
+$GLOBALS['__test_identity_table_exists'] = false;
+$GLOBALS['__test_identity_schema_valid'] = false;
+$GLOBALS['__test_identity_create_success'] = true;
+$GLOBALS['__test_identity_create_calls'] = array();
+$GLOBALS['__test_options']['datamachine_post_identity_reservations_schema'] = 0;
+datamachine_maybe_install_post_identity_reservations();
+assert_runtime( 'missing table triggers one install', array( 'wp_' ) === $GLOBALS['__test_identity_create_calls'] );
+assert_runtime( 'successful install stores schema version', 1 === $GLOBALS['__test_options']['datamachine_post_identity_reservations_schema'] );
+
+echo "\n[identity-schema:2] Failed install does not advance option\n";
+$GLOBALS['__test_identity_table_exists'] = false;
+$GLOBALS['__test_identity_schema_valid'] = false;
+$GLOBALS['__test_identity_create_success'] = false;
+$GLOBALS['__test_identity_create_calls'] = array();
+$GLOBALS['__test_options']['datamachine_post_identity_reservations_schema'] = 0;
+datamachine_maybe_install_post_identity_reservations();
+assert_runtime( 'failed install was attempted', array( 'wp_' ) === $GLOBALS['__test_identity_create_calls'] );
+assert_runtime( 'failed install leaves option stale', 0 === $GLOBALS['__test_options']['datamachine_post_identity_reservations_schema'] );
+
+echo "\n[identity-schema:3] Matching option and table are idempotent\n";
+$GLOBALS['__test_identity_table_exists'] = true;
+$GLOBALS['__test_identity_schema_valid'] = true;
+$GLOBALS['__test_identity_create_success'] = true;
+$GLOBALS['__test_identity_create_calls'] = array();
+$GLOBALS['__test_options']['datamachine_post_identity_reservations_schema'] = 1;
+datamachine_maybe_install_post_identity_reservations();
+assert_runtime( 'matching option and table skip dbDelta', array() === $GLOBALS['__test_identity_create_calls'] );
+
+echo "\n[identity-schema:4] Matching option with missing table repairs current site\n";
+$GLOBALS['wpdb']->prefix = 'wp_2_';
+$GLOBALS['__test_identity_table_exists'] = false;
+$GLOBALS['__test_identity_schema_valid'] = false;
+$GLOBALS['__test_identity_create_calls'] = array();
+datamachine_maybe_install_post_identity_reservations();
+assert_runtime( 'switched-site prefix is used for install', array( 'wp_2_' ) === $GLOBALS['__test_identity_create_calls'] );
+assert_runtime( 'switched-site table name is checked', 'wp_2_datamachine_post_identity_reservations' === $GLOBALS['__test_identity_checked_table'] );
+$GLOBALS['wpdb']->prefix = 'wp_';
+
+echo "\n[identity-schema:5] Matching option with malformed schema repairs before advancing\n";
+$GLOBALS['__test_identity_table_exists'] = true;
+$GLOBALS['__test_identity_schema_valid'] = false;
+$GLOBALS['__test_identity_create_success'] = true;
+$GLOBALS['__test_identity_create_calls'] = array();
+$GLOBALS['__test_options']['datamachine_post_identity_reservations_schema'] = 1;
+datamachine_maybe_install_post_identity_reservations();
+assert_runtime( 'malformed schema triggers dbDelta repair', array( 'wp_' ) === $GLOBALS['__test_identity_create_calls'] );
+assert_runtime( 'option remains current only after successful validation', 1 === $GLOBALS['__test_options']['datamachine_post_identity_reservations_schema'] && $GLOBALS['__test_identity_schema_valid'] );
+
+echo "\n[identity-schema:6] Failed malformed-schema repair leaves option stale\n";
+$GLOBALS['__test_identity_table_exists'] = true;
+$GLOBALS['__test_identity_schema_valid'] = false;
+$GLOBALS['__test_identity_create_success'] = false;
+$GLOBALS['__test_identity_create_calls'] = array();
+$GLOBALS['__test_options']['datamachine_post_identity_reservations_schema'] = 1;
+datamachine_maybe_install_post_identity_reservations();
+assert_runtime( 'failed malformed repair was attempted', array( 'wp_' ) === $GLOBALS['__test_identity_create_calls'] );
+assert_runtime( 'failed malformed repair resets option stale', 0 === $GLOBALS['__test_options']['datamachine_post_identity_reservations_schema'] );
 
 echo "\n[hook:1] Runtime is hooked before main bootstrap\n";
 $matching_hook = null;
