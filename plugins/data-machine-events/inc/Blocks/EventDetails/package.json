@@ -8,20 +8,21 @@
     "start": "wp-scripts start",
     "format": "wp-scripts format",
     "lint:css": "wp-scripts lint-style",
-    "lint:js": "wp-scripts lint-js",
+    "lint:js": "eslint src",
     "lint:md:docs": "wp-scripts lint-md-docs",
     "lint:pkg-json": "wp-scripts lint-pkg-json",
     "packages-update": "wp-scripts packages-update",
     "plugin-zip": "wp-scripts plugin-zip",
     "test:e2e": "wp-scripts test-e2e",
-    "test:unit": "wp-scripts test-unit-js"
+    "test:unit": "wp-scripts test-unit-js --passWithNoTests"
   },
   "devDependencies": {
-    "@wordpress/scripts": "31.1.0"
+    "@wordpress/eslint-plugin": "^25.7.0",
+    "@wordpress/scripts": "31.1.0",
+    "eslint": "^9.0.0"
   },
   "overrides": {
     "rimraf": "^4.4.1",
-    "glob": "^9.3.5",
-    "eslint": "^9.0.0"
+    "glob": "^9.3.5"
   }
 }

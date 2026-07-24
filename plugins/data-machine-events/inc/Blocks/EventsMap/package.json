@@ -5,6 +5,7 @@
   "main": "build/index.js",
   "scripts": {
     "build": "wp-scripts build",
+    "lint:js": "eslint src",
     "start": "wp-scripts start"
   },
   "dependencies": {
@@ -14,11 +15,12 @@
   },
   "devDependencies": {
     "@types/leaflet": "^1.9.17",
-    "@wordpress/scripts": "31.1.0"
+    "@wordpress/eslint-plugin": "^25.7.0",
+    "@wordpress/scripts": "31.1.0",
+    "eslint": "^9.0.0"
   },
   "overrides": {
     "rimraf": "^4.4.1",
-    "glob": "^9.3.5",
-    "eslint": "^9.0.0"
+    "glob": "^9.3.5"
   }
 }
