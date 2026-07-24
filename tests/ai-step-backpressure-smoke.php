@@ -32,6 +32,7 @@ $GLOBALS['datamachine_ai_backpressure_schedule_calls'] = 0;
 $GLOBALS['datamachine_ai_backpressure_next_action_id'] = 1;
 $GLOBALS['datamachine_ai_backpressure_registered_hooks'] = array();
 $GLOBALS['datamachine_ai_backpressure_ability_inputs'] = array();
+$GLOBALS['datamachine_ai_backpressure_concurrency_limit_filter'] = null;
 
 class DataMachineAIBackpressureSmokeAction {
 	public function __construct( private array $action ) {}
@@ -90,9 +91,9 @@ if ( ! function_exists( 'delete_option' ) ) {
 if ( ! function_exists( 'apply_filters' ) ) {
     function apply_filters( string $hook, mixed $value, mixed ...$args ): mixed {
     	unset( $args );
-    	if ( 'datamachine_pipeline_ai_concurrency_limit' === $hook ) {
-    		return 1;
-    	}
+		if ( 'datamachine_pipeline_ai_concurrency_limit' === $hook && null !== $GLOBALS['datamachine_ai_backpressure_concurrency_limit_filter'] ) {
+			return $GLOBALS['datamachine_ai_backpressure_concurrency_limit_filter'];
+		}
     	if ( 'datamachine_pipeline_ai_throttle_delay' === $hook ) {
     		return 7;
     	}
@@ -182,10 +183,24 @@ use DataMachine\Engine\AI\PipelineAIConcurrencyLease;
 use DataMachine\Engine\AI\PipelineAIConcurrencyLimiter;
 use DataMachine\Engine\AI\AIConcurrencyBackpressure;
 
+echo "Case 0: concurrency settings use the canonical default and preserve overrides\n";
+$default_limit = PipelineAIConcurrencyLimiter::acquire( 'openai' );
+assert_ai_backpressure_smoke( 'absent concurrency setting uses canonical default', 3 === ( $default_limit['limit'] ?? 0 ) );
+$default_limit['lease']->release();
+
+$GLOBALS['datamachine_ai_backpressure_options']['datamachine_settings'] = array( 'pipeline_ai_concurrency_limit' => 2 );
+\DataMachine\Core\PluginSettings::clearCache();
+$explicit_limit = PipelineAIConcurrencyLimiter::acquire( 'openai' );
+assert_ai_backpressure_smoke( 'explicit concurrency setting overrides canonical default', 2 === ( $explicit_limit['limit'] ?? 0 ) );
+$explicit_limit['lease']->release();
+
+$GLOBALS['datamachine_ai_backpressure_concurrency_limit_filter'] = 1;
+
 echo "Case 1: first AI step acquires the single site slot\n";
 $first = PipelineAIConcurrencyLimiter::acquire( 'openai', array( 'job_id' => 101, 'flow_step_id' => 'ai-1' ) );
 assert_ai_backpressure_smoke( 'first acquire succeeds', true === $first['acquired'] );
 assert_ai_backpressure_smoke( 'first acquire returns lease', ( $first['lease'] ?? null ) instanceof PipelineAIConcurrencyLease );
+assert_ai_backpressure_smoke( 'concurrency filter overrides explicit setting', 1 === ( $first['limit'] ?? 0 ) );
 
 echo "Case 2: second concurrent AI step is throttled\n";
 $second = PipelineAIConcurrencyLimiter::acquire( 'openai', array( 'job_id' => 102, 'flow_step_id' => 'ai-1' ) );

@@ -17,7 +17,6 @@ defined( 'ABSPATH' ) || exit;
  */
 class PipelineAIConcurrencyLimiter {
 
-	private const DEFAULT_LIMIT          = 1;
 	private const DEFAULT_THROTTLE_DELAY = 10;
 	private const DEFAULT_TTL            = 600;
 	private const OPTION_PREFIX          = 'datamachine_pipeline_ai_lease_';
@@ -58,7 +57,7 @@ class PipelineAIConcurrencyLimiter {
 		return array(
 			'acquired' => true,
 			'lease'    => new PipelineAIConcurrencyLease( $acquired, $token ),
-			'limit'    => $scopes[0]['limit'] ?? self::DEFAULT_LIMIT,
+			'limit'    => $scopes[0]['limit'],
 			'active'   => count( $acquired ),
 			'delay'    => self::throttleDelay( $provider, $context ),
 			'provider' => $provider,
@@ -71,7 +70,7 @@ class PipelineAIConcurrencyLimiter {
 	 * @return array<int,array{name:string,limit:int}>
 	 */
 	private static function resolveScopes( string $provider, array $context ): array {
-		$site_limit = max( 1, (int) PluginSettings::resolve( 'pipeline_ai_concurrency_limit', self::DEFAULT_LIMIT ) );
+		$site_limit = max( 1, (int) PluginSettings::resolve( 'pipeline_ai_concurrency_limit', PluginSettings::DEFAULT_PIPELINE_AI_CONCURRENCY_LIMIT ) );
 
 		/**
 		 * Filter site-wide pipeline AI concurrency.
