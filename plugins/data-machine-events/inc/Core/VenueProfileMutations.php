@@ -91,14 +91,14 @@ class VenueProfileMutations {
 	 * WordPress has no WP_Error-returning pre-update hook. wp_die() is therefore
 	 * the only reliable failure channel that prevents the native write.
 	 *
-	 * @param int    $parent   Parsed parent term ID.
+	 * @param int    $parent_term_id Parsed parent term ID.
 	 * @param int    $term_id  Term ID.
 	 * @param string $taxonomy Taxonomy slug.
 	 * @return int
 	 */
-	public static function guardNativeTermEdit( int $parent, int $term_id, string $taxonomy ): int {
+	public static function guardNativeTermEdit( int $parent_term_id, int $term_id, string $taxonomy ): int {
 		if ( self::$internal_term_update || self::TAXONOMY !== $taxonomy ) {
-			return $parent;
+			return $parent_term_id;
 		}
 		if ( in_array( self::lockName( $term_id ), self::$native_term_locks, true ) ) {
 			self::abortNativeTermEdit( new \WP_Error( 'venue_mutation_reentrant', 'Recursive native mutation of the same venue is not supported.', array( 'status' => 409 ) ) );
@@ -108,7 +108,7 @@ class VenueProfileMutations {
 		if ( is_wp_error( $error ) ) {
 			self::abortNativeTermEdit( $error );
 		}
-		return $parent;
+		return $parent_term_id;
 	}
 
 	/**
