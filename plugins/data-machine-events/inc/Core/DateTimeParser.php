@@ -238,15 +238,19 @@ class DateTimeParser {
 		}
 
 		try {
-			$dt      = new DateTime( $datetime );
-			$tz      = $dt->getTimezone();
-			$tz_name = $tz ? $tz->getName() : '';
+			if ( self::hasTimezoneAbbreviation( $datetime ) ) {
+				return $result;
+			}
 
-			// Check if timezone was actually embedded or just defaulted
-			$has_embedded_tz = self::hasEmbeddedTimezone( $datetime );
+			$has_embedded_tz = self::hasEmbeddedTimezone( $datetime ) || preg_match( '/Z$/i', $datetime );
+			$constructor_tz  = ! $has_embedded_tz && self::isValidTimezone( $fallback_timezone )
+				? new DateTimeZone( $fallback_timezone )
+				: null;
+			$dt              = new DateTime( $datetime, $constructor_tz );
+			$tz              = $dt->getTimezone();
+			$tz_name         = $tz ? $tz->getName() : '';
 
-			if ( ! $has_embedded_tz && ! empty( $fallback_timezone ) && self::isValidTimezone( $fallback_timezone ) ) {
-				$dt->setTimezone( new DateTimeZone( $fallback_timezone ) );
+			if ( null !== $constructor_tz ) {
 				$tz_name = $fallback_timezone;
 			}
 
@@ -332,12 +336,7 @@ class DateTimeParser {
 			return false;
 		}
 
-		try {
-			new DateTimeZone( $timezone );
-			return true;
-		} catch ( Exception $e ) {
-			return false;
-		}
+		return in_array( $timezone, timezone_identifiers_list( DateTimeZone::ALL_WITH_BC ), true );
 	}
 
 	/**
@@ -347,8 +346,7 @@ class DateTimeParser {
 	 * @return bool True if timezone is embedded
 	 */
 	private static function hasEmbeddedTimezone( string $datetime ): bool {
-		// Z suffix means UTC, not an embedded timezone that should be preserved
-		// We want to convert UTC times to calendar timezone
+		// ICS parsing handles Z separately so it can convert to calendar timezone.
 		if ( preg_match( '/Z$/i', $datetime ) ) {
 			return false;
 		}
@@ -358,12 +356,25 @@ class DateTimeParser {
 			return true;
 		}
 
-		// Check for timezone abbreviation or name in string
-		if ( preg_match( '/\s[A-Z]{2,5}$/', $datetime ) ) {
-			return true;
+		if ( preg_match( '/\s([^\s]+)$/', $datetime, $matches ) ) {
+			return self::isValidTimezone( $matches[1] );
 		}
 
 		return false;
+	}
+
+	/**
+	 * Check for an ambiguous timezone abbreviation suffix.
+	 *
+	 * @param string $datetime Datetime string to check.
+	 * @return bool True when an abbreviation is present.
+	 */
+	private static function hasTimezoneAbbreviation( string $datetime ): bool {
+		if ( ! preg_match( '/\s([A-Z]{2,5})$/', $datetime, $matches ) ) {
+			return false;
+		}
+
+		return ! self::isValidTimezone( $matches[1] );
 	}
 
 	/**

@@ -142,7 +142,67 @@ class DateTimeParserTest extends WP_UnitTestCase {
 	public function test_parse_uses_fallback_timezone() {
 		$result = DateTimeParser::parse( '2026-01-15 19:30', 'America/Chicago' );
 
+		$this->assertEquals( '2026-01-15', $result['date'] );
+		$this->assertEquals( '19:30', $result['time'] );
 		$this->assertEquals( 'America/Chicago', $result['timezone'] );
+	}
+
+	public function test_parse_date_only_uses_fallback_timezone_without_shifting_day() {
+		$result = DateTimeParser::parse( '2026-04-06', 'America/Chicago' );
+
+		$this->assertEquals( '2026-04-06', $result['date'] );
+		$this->assertEquals( '00:00', $result['time'] );
+		$this->assertEquals( 'America/Chicago', $result['timezone'] );
+	}
+
+	public function test_parse_preserves_wall_clock_time_across_dst_transition() {
+		$before = DateTimeParser::parse( '2026-03-07 00:30', 'America/New_York' );
+		$after  = DateTimeParser::parse( '2026-03-09 00:30', 'America/New_York' );
+
+		$this->assertEquals( '2026-03-07 00:30', $before['date'] . ' ' . $before['time'] );
+		$this->assertEquals( '2026-03-09 00:30', $after['date'] . ' ' . $after['time'] );
+		$this->assertEquals( 'America/New_York', $before['timezone'] );
+		$this->assertEquals( 'America/New_York', $after['timezone'] );
+	}
+
+	public function test_parse_preserves_explicit_utc() {
+		$result = DateTimeParser::parse( '2026-03-08T04:30:00Z', 'America/New_York' );
+
+		$this->assertEquals( '2026-03-08', $result['date'] );
+		$this->assertEquals( '04:30', $result['time'] );
+		$this->assertEquals( 'Z', $result['timezone'] );
+	}
+
+	public function test_parse_preserves_literal_utc_identifier() {
+		$result = DateTimeParser::parse( '2026-03-08 04:30 UTC', 'America/New_York' );
+
+		$this->assertEquals( '2026-03-08', $result['date'] );
+		$this->assertEquals( '04:30', $result['time'] );
+		$this->assertEquals( 'UTC', $result['timezone'] );
+	}
+
+	public function test_parse_preserves_explicit_offset() {
+		$result = DateTimeParser::parse( '2026-03-08T01:30:00-08:00', 'America/New_York' );
+
+		$this->assertEquals( '2026-03-08', $result['date'] );
+		$this->assertEquals( '01:30', $result['time'] );
+		$this->assertEquals( '-08:00', $result['timezone'] );
+	}
+
+	public function test_parse_preserves_embedded_iana_timezone() {
+		$result = DateTimeParser::parse( '2026-03-08 01:30 America/Los_Angeles', 'America/New_York' );
+
+		$this->assertEquals( '2026-03-08', $result['date'] );
+		$this->assertEquals( '01:30', $result['time'] );
+		$this->assertEquals( 'America/Los_Angeles', $result['timezone'] );
+	}
+
+	public function test_parse_rejects_timezone_abbreviation() {
+		$result = DateTimeParser::parse( '2026-03-08 01:30 CST', 'America/New_York' );
+
+		$this->assertEquals( '', $result['date'] );
+		$this->assertEquals( '', $result['time'] );
+		$this->assertEquals( '', $result['timezone'] );
 	}
 
 	public function test_is_valid_timezone_returns_true_for_valid() {
