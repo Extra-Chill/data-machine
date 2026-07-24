@@ -210,51 +210,9 @@ class CacheInvalidator {
 
 	/**
 	 * Invalidate all calendar caches
-	 *
-	 * Uses database query to find and delete all calendar transients.
 	 */
 	public static function invalidate_all(): void {
-		global $wpdb;
-
-		// Find calendar-specific transient keys before deleting from DB.
-		$transient_keys = $wpdb->get_col(
-			$wpdb->prepare(
-				"SELECT REPLACE(option_name, '_transient_', '') FROM {$wpdb->options} WHERE option_name LIKE %s",
-				'_transient_' . CalendarCache::PREFIX . '%'
-			)
-		);
-
-		// Delete from DB (for non-persistent cache environments).
-		$wpdb->query(
-			$wpdb->prepare(
-				"DELETE FROM {$wpdb->options} WHERE option_name LIKE %s OR option_name LIKE %s",
-				'_transient_' . CalendarCache::PREFIX . '%',
-				'_transient_timeout_' . CalendarCache::PREFIX . '%'
-			)
-		);
-
-		// Delete specific keys from object cache instead of flushing the entire
-		// transient group. Flushing the group killed ALL transients site-wide on
-		// every event save, preventing any transient from surviving pipeline activity.
-		foreach ( $transient_keys as $key ) {
-			wp_cache_delete( $key, 'transient' );
-			wp_cache_delete( $key, 'site-transient' );
-		}
-
-		// Flush the dedicated full-response cache group. This is safe to
-		// flush wholesale because the group is private to the calendar —
-		// nothing else writes to `data-machine-calendar`.
-		if ( function_exists( 'wp_cache_flush_group' ) ) {
-			wp_cache_flush_group( CalendarCache::GROUP );
-		} else {
-			// On WP < 6.1 / object-cache drop-ins lacking flush_group support,
-			// the transient layer above still serves as the source of truth.
-			// The wp_cache entries will age out within TTL_FULL_PAST (24h).
-			// Acceptable downside for a fallback path that won't hit on
-			// extrachill.com (Redis Object Cache supports flush_group).
-			$noop = true;
-			unset( $noop );
-		}
+		CalendarCache::invalidate();
 	}
 }
 

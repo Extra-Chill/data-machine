@@ -453,7 +453,7 @@ class CalendarAbilities {
 	 */
 	private static function compute_event_counts_via_ability(): array {
 		$cache_key = 'data-machine_cal_counts';
-		$cached    = get_transient( $cache_key );
+		$cached    = CalendarCache::get( $cache_key );
 		if ( false !== $cached ) {
 			return $cached;
 		}
@@ -474,7 +474,7 @@ class CalendarAbilities {
 			'future' => $future['total'],
 		);
 
-		set_transient( $cache_key, $result, 10 * MINUTE_IN_SECONDS );
+		CalendarCache::set( $cache_key, $result, 10 * MINUTE_IN_SECONDS );
 		return $result;
 	}
 

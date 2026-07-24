@@ -35,6 +35,7 @@ class CalendarCache {
 	const PREFIX            = 'data-machine_cal_';
 	const FULL_PREFIX       = 'data-machine_cal_full_';
 	const GROUP             = 'data-machine-calendar';
+	const GENERATION_OPTION = 'data_machine_events_calendar_cache_generation';
 	const TTL_DATES         = 30 * MINUTE_IN_SECONDS;
 	const TTL_COUNTS        = 30 * MINUTE_IN_SECONDS;
 	const TTL_FULL_UPCOMING = HOUR_IN_SECONDS;
@@ -47,7 +48,7 @@ class CalendarCache {
 	 * @return mixed Cached value or false if not found.
 	 */
 	public static function get( string $key ) {
-		return get_transient( $key );
+		return get_transient( self::storage_key( $key ) );
 	}
 
 	/**
@@ -59,7 +60,7 @@ class CalendarCache {
 	 * @return bool True on success.
 	 */
 	public static function set( string $key, $value, int $ttl ): bool {
-		return set_transient( $key, $value, $ttl );
+		return set_transient( self::storage_key( $key ), $value, $ttl );
 	}
 
 	/**
@@ -167,6 +168,7 @@ class CalendarCache {
 	 * @return mixed Cached envelope array or false on miss.
 	 */
 	public static function get_full_response( string $key ) {
+		$key    = self::storage_key( $key );
 		$found  = false;
 		$cached = wp_cache_get( $key, self::GROUP, false, $found );
 		if ( $found && false !== $cached ) {
@@ -201,8 +203,39 @@ class CalendarCache {
 	 * @return bool True on success.
 	 */
 	public static function set_full_response( string $key, $value, int $ttl ): bool {
+		$key = self::storage_key( $key );
 		wp_cache_set( $key, $value, self::GROUP, $ttl );
 		return set_transient( $key, $value, $ttl );
+	}
+
+	/**
+	 * Rotate the owner-scoped generation used by every calendar cache layer.
+	 */
+	public static function invalidate(): void {
+		self::get_generation();
+		update_option( self::GENERATION_OPTION, wp_generate_uuid4(), false );
+	}
+
+	/**
+	 * Get the current owner-scoped cache generation.
+	 */
+	public static function get_generation(): string {
+		$generation = get_option( self::GENERATION_OPTION );
+		if ( false === $generation ) {
+			$generation = wp_generate_uuid4();
+			if ( ! add_option( self::GENERATION_OPTION, $generation, '', false ) ) {
+				$generation = get_option( self::GENERATION_OPTION );
+			}
+		}
+
+		return (string) $generation;
+	}
+
+	/**
+	 * Resolve a logical calendar key to its current generation.
+	 */
+	private static function storage_key( string $key ): string {
+		return $key . '_' . self::get_generation();
 	}
 
 	/**

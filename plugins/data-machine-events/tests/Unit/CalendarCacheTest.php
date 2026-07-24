@@ -365,6 +365,43 @@ class CalendarCacheTest extends WP_UnitTestCase {
 		$this->assertSame( 1, $invalidations );
 	}
 
+	/**
+	 * @dataProvider object_cache_modes
+	 */
+	public function test_real_venue_mutation_makes_calendar_caches_unreadable_without_flushing_other_transients( bool $persistent ): void {
+		$original_mode = wp_using_ext_object_cache();
+		wp_using_ext_object_cache( $persistent );
+
+		$post_id       = self::factory()->post->create( array( 'post_type' => Event_Post_Type::POST_TYPE ) );
+		$venue         = wp_insert_term( 'Cache Outcome Venue ' . uniqid(), 'venue' );
+		$bucket_key    = CalendarCache::generate_key( array(), 'dates' );
+		$response_key  = CalendarCache::generate_full_response_key( array() );
+		$unrelated_key = 'unrelated_calendar_invalidation_' . uniqid();
+		$this->assertNotWPError( $venue );
+
+		CalendarCache::set( $bucket_key, 'stale bucket', HOUR_IN_SECONDS );
+		CalendarCache::set_full_response( $response_key, 'stale response', HOUR_IN_SECONDS );
+		set_transient( $unrelated_key, 'preserved', HOUR_IN_SECONDS );
+
+		try {
+			wp_set_object_terms( $post_id, array( $venue['term_id'] ), 'venue' );
+
+			$this->assertFalse( CalendarCache::get( $bucket_key ) );
+			$this->assertFalse( CalendarCache::get_full_response( $response_key ) );
+			$this->assertSame( 'preserved', get_transient( $unrelated_key ) );
+		} finally {
+			delete_transient( $unrelated_key );
+			wp_using_ext_object_cache( $original_mode );
+		}
+	}
+
+	public function object_cache_modes(): array {
+		return array(
+			'nonpersistent object cache' => array( false ),
+			'persistent object cache'    => array( true ),
+		);
+	}
+
 	public function test_identical_venue_append_does_not_invalidate_calendar_cache(): void {
 		$post_id = self::factory()->post->create( array( 'post_type' => Event_Post_Type::POST_TYPE ) );
 		$venue   = wp_insert_term( 'Cache Identical Append Venue ' . uniqid(), 'venue' );
@@ -449,7 +486,6 @@ class CalendarCacheTest extends WP_UnitTestCase {
 	}
 
 	public function test_same_relationship_key_nested_removals_use_lifo_state(): void {
-		$this->markTestSkipped( 'Persistent calendar cache invalidation is tracked separately in issue #574.' );
 		$post_id = self::factory()->post->create( array( 'post_type' => Event_Post_Type::POST_TYPE ) );
 		$first   = wp_insert_term( 'Cache Nested Removal First ' . uniqid(), 'venue' );
 		$second  = wp_insert_term( 'Cache Nested Removal Second ' . uniqid(), 'venue' );
@@ -569,11 +605,10 @@ class CalendarCacheTest extends WP_UnitTestCase {
 	}
 
 	private function count_calendar_invalidations( callable $operation ): int {
-		$this->markTestSkipped( 'Persistent calendar cache invalidation is tracked separately in issue #574.' );
 		$count          = 0;
 		$external_cache = wp_using_ext_object_cache();
 		wp_using_ext_object_cache( false );
-		$cache_key      = $this->prime_invalidation_sentinel();
+		$cache_key = $this->prime_invalidation_sentinel();
 		$observer  = static function () use ( $cache_key, &$count ): void {
 			if ( false === CalendarCache::get( $cache_key ) ) {
 				++$count;
