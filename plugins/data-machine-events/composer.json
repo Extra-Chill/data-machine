@@ -15,6 +15,14 @@
             "DataMachineEvents\\": "inc/"
         }
     },
+    "scripts": {
+        "test": [
+            "@test:contracts",
+            "@test:wordpress"
+        ],
+        "test:contracts": "phpunit --configuration phpunit.contracts.xml",
+        "test:wordpress": "phpunit --configuration phpunit.xml"
+    },
     "authors": [
         {
             "name": "Chris Huber",

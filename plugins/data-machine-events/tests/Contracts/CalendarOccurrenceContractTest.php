@@ -2,10 +2,10 @@
 /**
  * Canonical calendar occurrence artifact tests.
  *
- * @package DataMachineEvents\Tests\Unit
+ * @package DataMachineEvents\Tests\Contracts
  */
 
-namespace DataMachineEvents\Tests\Unit;
+namespace DataMachineEvents\Tests\Contracts;
 
 use PHPUnit\Framework\TestCase;
 use DataMachineEvents\Api\Controllers\Calendar;
