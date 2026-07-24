@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.168.11] - 2026-07-24
+
+### Fixed
+- align AI concurrency fallback with plugin defaults
+
 ## [0.168.10] - 2026-07-23
 
 ### Fixed
