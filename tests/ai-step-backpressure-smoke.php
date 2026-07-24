@@ -7,22 +7,25 @@
  * @package DataMachine\Tests
  */
 
-define( 'ABSPATH', __DIR__ );
+$is_wordpress_runtime = defined( 'WPINC' );
+defined( 'ABSPATH' ) || define( 'ABSPATH', __DIR__ );
 defined( 'DAY_IN_SECONDS' ) || define( 'DAY_IN_SECONDS', 86400 );
 
 $failed = 0;
 $total  = 0;
 
-function assert_ai_backpressure_smoke( string $name, bool $cond, string $detail = '' ): void {
-	global $failed, $total;
-	++$total;
-	if ( $cond ) {
-		echo "  [PASS] $name\n";
-		return;
-	}
+if ( ! function_exists( 'assert_ai_backpressure_smoke' ) ) {
+	function assert_ai_backpressure_smoke( string $name, bool $cond, string $detail = '' ): void {
+		global $failed, $total;
+		++$total;
+		if ( $cond ) {
+			echo "  [PASS] $name\n";
+			return;
+		}
 
-	echo "  [FAIL] $name" . ( $detail ? " - $detail" : '' ) . "\n";
-	++$failed;
+		echo "  [FAIL] $name" . ( $detail ? " - $detail" : '' ) . "\n";
+		++$failed;
+	}
 }
 
 $GLOBALS['datamachine_ai_backpressure_options'] = array();
@@ -34,30 +37,38 @@ $GLOBALS['datamachine_ai_backpressure_registered_hooks'] = array();
 $GLOBALS['datamachine_ai_backpressure_ability_inputs'] = array();
 $GLOBALS['datamachine_ai_backpressure_concurrency_limit_filter'] = null;
 
-class DataMachineAIBackpressureSmokeAction {
-	public function __construct( private array $action ) {}
+if ( ! class_exists( 'DataMachineAIBackpressureSmokeAction' ) ) {
+	class DataMachineAIBackpressureSmokeAction {
+		public function __construct( private array $action ) {}
 
-	public function get_args(): array {
-		return $this->action['args'] ?? array();
-	}
+		public function get_args(): array {
+			return $this->action['args'] ?? array();
+		}
 
-	public function get_field( string $field ): mixed {
-		return $this->action[ $field ] ?? null;
-	}
-}
-
-class DataMachineAIBackpressureSmokeAbility {
-	public function execute( array $input ): void {
-		$GLOBALS['datamachine_ai_backpressure_ability_inputs'][] = $input;
+		public function get_field( string $field ): mixed {
+			return $this->action[ $field ] ?? null;
+		}
 	}
 }
 
-function add_action( string $hook, mixed $callback, int $priority = 10, int $accepted_args = 1 ): void {
-	$GLOBALS['datamachine_ai_backpressure_registered_hooks'][ $hook ] = array( $callback, $priority, $accepted_args );
+if ( ! class_exists( 'DataMachineAIBackpressureSmokeAbility' ) ) {
+	class DataMachineAIBackpressureSmokeAbility {
+		public function execute( array $input ): void {
+			$GLOBALS['datamachine_ai_backpressure_ability_inputs'][] = $input;
+		}
+	}
 }
 
-function wp_get_ability( string $name ): ?DataMachineAIBackpressureSmokeAbility {
-	return 'datamachine/execute-step' === $name ? new DataMachineAIBackpressureSmokeAbility() : null;
+if ( ! function_exists( 'add_action' ) ) {
+	function add_action( string $hook, mixed $callback, int $priority = 10, int $accepted_args = 1 ): void {
+		$GLOBALS['datamachine_ai_backpressure_registered_hooks'][ $hook ] = array( $callback, $priority, $accepted_args );
+	}
+}
+
+if ( ! function_exists( 'wp_get_ability' ) ) {
+	function wp_get_ability( string $name ): ?DataMachineAIBackpressureSmokeAbility {
+		return 'datamachine/execute-step' === $name ? new DataMachineAIBackpressureSmokeAbility() : null;
+	}
 }
 
 if ( ! function_exists( 'get_option' ) ) {
@@ -101,65 +112,71 @@ if ( ! function_exists( 'apply_filters' ) ) {
     }
 }
 
-function as_get_scheduled_actions( array $query = array(), string $return_format = 'OBJECT' ): array {
-	$actions = array_values(
-		array_filter(
-			$GLOBALS['datamachine_ai_backpressure_actions'],
-			static function ( DataMachineAIBackpressureSmokeAction $action ) use ( $query ): bool {
-				foreach ( array( 'hook', 'group', 'status' ) as $field ) {
-					if ( isset( $query[ $field ] ) && $action->get_field( $field ) !== $query[ $field ] ) {
+if ( ! function_exists( 'as_get_scheduled_actions' ) ) {
+	function as_get_scheduled_actions( array $query = array(), string $return_format = 'OBJECT' ): array {
+		$actions = array_values(
+			array_filter(
+				$GLOBALS['datamachine_ai_backpressure_actions'],
+				static function ( DataMachineAIBackpressureSmokeAction $action ) use ( $query ): bool {
+					foreach ( array( 'hook', 'group', 'status' ) as $field ) {
+						if ( isset( $query[ $field ] ) && $action->get_field( $field ) !== $query[ $field ] ) {
+							return false;
+						}
+					}
+					if ( isset( $query['args'] ) && $action->get_args() !== $query['args'] ) {
 						return false;
 					}
-				}
-				if ( isset( $query['args'] ) && $action->get_args() !== $query['args'] ) {
-					return false;
-				}
 
-				return true;
-			}
-		)
-	);
+					return true;
+				}
+			)
+		);
 
-	if ( 'ids' === strtolower( $return_format ) ) {
-		return array_map( static fn( DataMachineAIBackpressureSmokeAction $action ): int => (int) $action->get_field( 'action_id' ), $actions );
+		if ( 'ids' === strtolower( $return_format ) ) {
+			return array_map( static fn( DataMachineAIBackpressureSmokeAction $action ): int => (int) $action->get_field( 'action_id' ), $actions );
+		}
+
+		return $actions;
 	}
-
-	return $actions;
 }
 
-function as_schedule_single_action( int $timestamp, string $hook, array $args = array(), string $group = '', bool $unique = false ): int {
-	++$GLOBALS['datamachine_ai_backpressure_schedule_calls'];
-	if ( true === $GLOBALS['datamachine_ai_backpressure_schedule_error'] ) {
-		return 0;
-	}
-	if ( is_int( $GLOBALS['datamachine_ai_backpressure_schedule_error'] ) && $GLOBALS['datamachine_ai_backpressure_schedule_error'] > 0 ) {
-		--$GLOBALS['datamachine_ai_backpressure_schedule_error'];
-		return 0;
-	}
-	if ( $unique ) {
-		foreach ( array( 'pending', 'in-progress' ) as $blocking_status ) {
-			if ( ! empty( as_get_scheduled_actions( array( 'hook' => $hook, 'group' => $group, 'status' => $blocking_status ) ) ) ) {
-				return 0;
+if ( ! function_exists( 'as_schedule_single_action' ) ) {
+	function as_schedule_single_action( int $timestamp, string $hook, array $args = array(), string $group = '', bool $unique = false ): int {
+		++$GLOBALS['datamachine_ai_backpressure_schedule_calls'];
+		if ( true === $GLOBALS['datamachine_ai_backpressure_schedule_error'] ) {
+			return 0;
+		}
+		if ( is_int( $GLOBALS['datamachine_ai_backpressure_schedule_error'] ) && $GLOBALS['datamachine_ai_backpressure_schedule_error'] > 0 ) {
+			--$GLOBALS['datamachine_ai_backpressure_schedule_error'];
+			return 0;
+		}
+		if ( $unique ) {
+			foreach ( array( 'pending', 'in-progress' ) as $blocking_status ) {
+				if ( ! empty( as_get_scheduled_actions( array( 'hook' => $hook, 'group' => $group, 'status' => $blocking_status ) ) ) ) {
+					return 0;
+				}
 			}
 		}
-	}
 
-	$action_id = $GLOBALS['datamachine_ai_backpressure_next_action_id']++;
-	$GLOBALS['datamachine_ai_backpressure_actions'][] = new DataMachineAIBackpressureSmokeAction(
-		array(
-			'action_id' => $action_id,
-			'hook'      => $hook,
-			'args'      => $args,
-			'group'     => $group,
-			'status'    => 'pending',
-			'timestamp' => $timestamp,
-		)
-	);
-	return $action_id;
+		$action_id = $GLOBALS['datamachine_ai_backpressure_next_action_id']++;
+		$GLOBALS['datamachine_ai_backpressure_actions'][] = new DataMachineAIBackpressureSmokeAction(
+			array(
+				'action_id' => $action_id,
+				'hook'      => $hook,
+				'args'      => $args,
+				'group'     => $group,
+				'status'    => 'pending',
+				'timestamp' => $timestamp,
+			)
+		);
+		return $action_id;
+	}
 }
 
-function did_action( string $hook ): int {
-	return 'action_scheduler_init' === $hook ? 1 : 0;
+if ( ! function_exists( 'did_action' ) ) {
+	function did_action( string $hook ): int {
+		return 'action_scheduler_init' === $hook ? 1 : 0;
+	}
 }
 
 if ( ! function_exists( 'sanitize_key' ) ) {
@@ -182,6 +199,56 @@ use DataMachine\Core\ActionScheduler\GroupRegistrar;
 use DataMachine\Engine\AI\PipelineAIConcurrencyLease;
 use DataMachine\Engine\AI\PipelineAIConcurrencyLimiter;
 use DataMachine\Engine\AI\AIConcurrencyBackpressure;
+
+if ( $is_wordpress_runtime ) {
+	$missing_settings  = new stdClass();
+	$original_settings = get_option( 'datamachine_settings', $missing_settings );
+	delete_option( 'datamachine_settings' );
+	\DataMachine\Core\PluginSettings::clearCache();
+
+	$concurrency_filter = static function ( int $limit ): int {
+		return null === $GLOBALS['datamachine_ai_backpressure_concurrency_limit_filter']
+			? $limit
+			: (int) $GLOBALS['datamachine_ai_backpressure_concurrency_limit_filter'];
+	};
+	$throttle_filter = static fn(): int => 7;
+	add_filter( 'datamachine_pipeline_ai_concurrency_limit', $concurrency_filter, PHP_INT_MAX );
+	add_filter( 'datamachine_pipeline_ai_throttle_delay', $throttle_filter, PHP_INT_MAX );
+
+	echo "WordPress runtime: concurrency settings use the canonical default and preserve overrides\n";
+	$default_limit = PipelineAIConcurrencyLimiter::acquire( 'openai' );
+	assert_ai_backpressure_smoke( 'absent concurrency setting uses canonical default', 3 === ( $default_limit['limit'] ?? 0 ) );
+	$default_limit['lease']->release();
+
+	update_option( 'datamachine_settings', array( 'pipeline_ai_concurrency_limit' => 2 ) );
+	\DataMachine\Core\PluginSettings::clearCache();
+	$explicit_limit = PipelineAIConcurrencyLimiter::acquire( 'openai' );
+	assert_ai_backpressure_smoke( 'explicit concurrency setting overrides canonical default', 2 === ( $explicit_limit['limit'] ?? 0 ) );
+	$explicit_limit['lease']->release();
+
+	$GLOBALS['datamachine_ai_backpressure_concurrency_limit_filter'] = 1;
+	$first = PipelineAIConcurrencyLimiter::acquire( 'openai' );
+	assert_ai_backpressure_smoke( 'concurrency filter overrides explicit setting', 1 === ( $first['limit'] ?? 0 ) );
+	$second = PipelineAIConcurrencyLimiter::acquire( 'openai' );
+	assert_ai_backpressure_smoke( 'filtered site limit enforces real-runtime backpressure', false === $second['acquired'] );
+	assert_ai_backpressure_smoke( 'throttle delay remains filterable in real runtime', 7 === ( $second['delay'] ?? 0 ) );
+	$first['lease']->release();
+
+	remove_filter( 'datamachine_pipeline_ai_concurrency_limit', $concurrency_filter, PHP_INT_MAX );
+	remove_filter( 'datamachine_pipeline_ai_throttle_delay', $throttle_filter, PHP_INT_MAX );
+	if ( $missing_settings === $original_settings ) {
+		delete_option( 'datamachine_settings' );
+	} else {
+		update_option( 'datamachine_settings', $original_settings );
+	}
+	\DataMachine\Core\PluginSettings::clearCache();
+
+	echo "\nAI step backpressure WordPress smoke complete: {$total} assertions, {$failed} failures.\n";
+	if ( $failed > 0 ) {
+		exit( 1 );
+	}
+	return;
+}
 
 echo "Case 0: concurrency settings use the canonical default and preserve overrides\n";
 $default_limit = PipelineAIConcurrencyLimiter::acquire( 'openai' );
