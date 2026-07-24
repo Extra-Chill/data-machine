@@ -4,16 +4,16 @@
  * Server-side rendered block — editor shows a placeholder preview
  * with InspectorControls for height, zoom, map style, and dynamic mode.
  *
- * @package DataMachineEvents
+ * @package
  * @since 0.5.0
  */
 
+/**
+ * WordPress dependencies
+ */
 import { registerBlockType } from '@wordpress/blocks';
 import { __ } from '@wordpress/i18n';
-import {
-	useBlockProps,
-	InspectorControls,
-} from '@wordpress/block-editor';
+import { useBlockProps, InspectorControls } from '@wordpress/block-editor';
 import {
 	PanelBody,
 	RangeControl,
@@ -21,11 +21,14 @@ import {
 	ToggleControl,
 } from '@wordpress/components';
 
+/**
+ * Internal dependencies
+ */
 import type { MapAttributes, MapType } from './types';
 
 interface EditProps {
 	attributes: MapAttributes;
-	setAttributes: ( attrs: Partial<MapAttributes> ) => void;
+	setAttributes: ( attrs: Partial< MapAttributes > ) => void;
 }
 
 const MAP_STYLE_OPTIONS: { label: string; value: MapType }[] = [
@@ -36,7 +39,7 @@ const MAP_STYLE_OPTIONS: { label: string; value: MapType }[] = [
 	{ label: 'Humanitarian', value: 'humanitarian' },
 ];
 
-registerBlockType<MapAttributes>( 'data-machine-events/events-map', {
+registerBlockType< MapAttributes >( 'data-machine-events/events-map', {
 	edit: function Edit( { attributes, setAttributes }: EditProps ) {
 		const { height, zoom, mapType, collapsible, defaultCollapsed } =
 			attributes;
@@ -62,7 +65,10 @@ registerBlockType<MapAttributes>( 'data-machine-events/events-map', {
 							step={ 50 }
 						/>
 						<RangeControl
-							label={ __( 'Default Zoom', 'data-machine-events' ) }
+							label={ __(
+								'Default Zoom',
+								'data-machine-events'
+							) }
 							value={ zoom }
 							onChange={ ( value ) =>
 								setAttributes( { zoom: value } )
@@ -70,22 +76,19 @@ registerBlockType<MapAttributes>( 'data-machine-events/events-map', {
 							min={ 4 }
 							max={ 18 }
 						/>
-					<SelectControl
-						label={ __( 'Map Style', 'data-machine-events' ) }
-						value={ mapType }
-						options={ MAP_STYLE_OPTIONS }
-						onChange={ ( value ) =>
-							setAttributes( { mapType: value as MapType } )
-						}
-					/>
+						<SelectControl
+							label={ __( 'Map Style', 'data-machine-events' ) }
+							value={ mapType }
+							options={ MAP_STYLE_OPTIONS }
+							onChange={ ( value ) =>
+								setAttributes( { mapType: value as MapType } )
+							}
+						/>
 						<ToggleControl
-							label={ __(
-								'Collapsible',
-								'data-machine-events',
-							) }
+							label={ __( 'Collapsible', 'data-machine-events' ) }
 							help={ __(
 								'Add an expand/collapse control so the map can be hidden behind a toggle.',
-								'data-machine-events',
+								'data-machine-events'
 							) }
 							checked={ !! collapsible }
 							onChange={ ( value ) =>
@@ -96,11 +99,11 @@ registerBlockType<MapAttributes>( 'data-machine-events/events-map', {
 							<ToggleControl
 								label={ __(
 									'Collapsed by default',
-									'data-machine-events',
+									'data-machine-events'
 								) }
 								help={ __(
 									'Start with the map collapsed; visitors expand it via the toggle.',
-									'data-machine-events',
+									'data-machine-events'
 								) }
 								checked={ !! defaultCollapsed }
 								onChange={ ( value ) =>
@@ -133,7 +136,7 @@ registerBlockType<MapAttributes>( 'data-machine-events/events-map', {
 						>
 							{ __(
 								'Events Map — renders on the frontend',
-								'data-machine-events',
+								'data-machine-events'
 							) }
 						</span>
 					</div>

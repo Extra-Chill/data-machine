@@ -10,24 +10,33 @@
  * - Marker diffing: only add/remove changed markers on pan/zoom
  * - Viewport-based loading with debounced fetching
  *
- * @package DataMachineEvents
+ * @package
  * @since 0.5.0
  */
 
-import { createRoot } from '@wordpress/element';
+/**
+ * WordPress dependencies
+ */
+import {
+	createRoot,
+	useCallback,
+	useEffect,
+	useRef,
+	useState,
+} from '@wordpress/element';
+
+/**
+ * External dependencies
+ */
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import 'leaflet.markercluster';
 import 'leaflet.markercluster/dist/MarkerCluster.css';
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
 
-import {
-	useState,
-	useEffect,
-	useRef,
-	useCallback,
-} from '@wordpress/element';
-
+/**
+ * Internal dependencies
+ */
 import { fetchVenues } from './api-client';
 import { TILE_URLS } from './types';
 import type {
@@ -57,17 +66,25 @@ function buildPopupHtml( venue: Venue ): string {
 	let html = '<div class="venue-popup">';
 
 	if ( venue.url ) {
-		html += `<a href="${ escapeHtml( venue.url ) }" class="venue-popup-name">${ escapeHtml( venue.name ) }</a>`;
+		html += `<a href="${ escapeHtml(
+			venue.url
+		) }" class="venue-popup-name">${ escapeHtml( venue.name ) }</a>`;
 	} else {
-		html += `<span class="venue-popup-name">${ escapeHtml( venue.name ) }</span>`;
+		html += `<span class="venue-popup-name">${ escapeHtml(
+			venue.name
+		) }</span>`;
 	}
 
 	if ( venue.event_count > 0 ) {
-		html += `<span class="venue-popup-events">${ venue.event_count } upcoming event${ venue.event_count !== 1 ? 's' : '' }</span>`;
+		html += `<span class="venue-popup-events">${
+			venue.event_count
+		} upcoming event${ venue.event_count !== 1 ? 's' : '' }</span>`;
 	}
 
 	if ( venue.address ) {
-		html += `<span class="venue-popup-address">${ escapeHtml( venue.address ) }</span>`;
+		html += `<span class="venue-popup-address">${ escapeHtml(
+			venue.address
+		) }</span>`;
 	}
 
 	html += '</div>';
@@ -78,9 +95,14 @@ function buildPopupHtml( venue: Venue ): string {
  * Format YYYY-MM-DD (+ HH:MM:SS) into a short human label like
  * "Sep 23, 2099 · 8:00 PM". Falls back to the raw date if parsing fails so
  * the popup is never blank.
+ *
+ * @param date Event date.
+ * @param time Event time.
  */
 function formatEventDateTime( date: string, time: string ): string {
-	if ( ! date ) return '';
+	if ( ! date ) {
+		return '';
+	}
 
 	// Build a date object using local time semantics. The server already
 	// stored start_datetime in the site timezone, so treat it as local.
@@ -113,33 +135,48 @@ function formatEventDateTime( date: string, time: string ): string {
  * Chronological-route popup. Lists every upcoming show at this venue for the
  * scoped taxonomy term, chronologically. The same shape is used for first,
  * last, and middle markers — only the marker icon differs by route position.
+ *
+ * @param venue Venue whose events should be rendered.
  */
 function buildChronologicalRoutePopupHtml( venue: Venue ): string {
 	let html = '<div class="venue-popup venue-popup--chronological-route">';
 
 	if ( venue.url ) {
-		html += `<a href="${ escapeHtml( venue.url ) }" class="venue-popup-name">${ escapeHtml( venue.name ) }</a>`;
+		html += `<a href="${ escapeHtml(
+			venue.url
+		) }" class="venue-popup-name">${ escapeHtml( venue.name ) }</a>`;
 	} else {
-		html += `<span class="venue-popup-name">${ escapeHtml( venue.name ) }</span>`;
+		html += `<span class="venue-popup-name">${ escapeHtml(
+			venue.name
+		) }</span>`;
 	}
 
 	if ( venue.address ) {
-		html += `<span class="venue-popup-address">${ escapeHtml( venue.address ) }</span>`;
+		html += `<span class="venue-popup-address">${ escapeHtml(
+			venue.address
+		) }</span>`;
 	}
 
 	const shows = venue.upcoming_events_at_venue ?? [];
 	if ( shows.length > 0 ) {
 		html += '<ul class="venue-popup-shows">';
 		for ( const show of shows ) {
-			const label = formatEventDateTime( show.start_date, show.start_time );
+			const label = formatEventDateTime(
+				show.start_date,
+				show.start_time
+			);
 			const title = show.title || label || 'Event';
 			if ( show.permalink ) {
-				html += `<li><a href="${ escapeHtml( show.permalink ) }">${ escapeHtml( title ) }</a>`;
+				html += `<li><a href="${ escapeHtml(
+					show.permalink
+				) }">${ escapeHtml( title ) }</a>`;
 			} else {
 				html += `<li><span>${ escapeHtml( title ) }</span>`;
 			}
 			if ( label && label !== title ) {
-				html += ` <span class="venue-popup-show-date">${ escapeHtml( label ) }</span>`;
+				html += ` <span class="venue-popup-show-date">${ escapeHtml(
+					label
+				) }</span>`;
 			}
 			html += '</li>';
 		}
@@ -172,14 +209,18 @@ function createVenueIcon(): L.DivIcon {
  *
  * v1 keeps numbered badges out of scope (per #310 design notes); revisit
  * once Chris weighs in on the live render.
+ *
+ * @param position Position of the venue in the route.
  */
-function createChronologicalRouteIcon( position: 'first' | 'last' | 'middle' ): L.DivIcon {
-	const color =
-		position === 'first'
-			? '#22c55e'
-			: position === 'last'
-				? '#ef4444'
-				: '#475569';
+function createChronologicalRouteIcon(
+	position: 'first' | 'last' | 'middle'
+): L.DivIcon {
+	let color = '#475569';
+	if ( position === 'first' ) {
+		color = '#22c55e';
+	} else if ( position === 'last' ) {
+		color = '#ef4444';
+	}
 
 	const html = `<span class="chronological-route-pin chronological-route-pin--${ position }" style="background:${ color };"></span>`;
 
@@ -197,17 +238,25 @@ function createChronologicalRouteIcon( position: 'first' | 'last' | 'middle' ): 
  * "YYYY-MM-DD HH:MM:SS" string. Used to order venues chronologically when
  * drawing the chronological-route polyline. Returns null when no events
  * were attached (which means we should skip the venue from the route).
+ *
+ * @param venue Venue whose earliest event should be found.
  */
 function earliestEventKey( venue: Venue ): string | null {
 	const shows = venue.upcoming_events_at_venue ?? [];
-	if ( shows.length === 0 ) return null;
+	if ( shows.length === 0 ) {
+		return null;
+	}
 
 	// The REST response already sorts ascending per venue, so shows[0] is
 	// the earliest. Defensive guard for callers that might re-order.
 	let earliest = '';
 	for ( const show of shows ) {
-		const key = `${ show.start_date || '' } ${ show.start_time || '' }`.trim();
-		if ( ! key ) continue;
+		const key = `${ show.start_date || '' } ${
+			show.start_time || ''
+		}`.trim();
+		if ( ! key ) {
+			continue;
+		}
 		if ( ! earliest || key < earliest ) {
 			earliest = key;
 		}
@@ -247,20 +296,20 @@ function dispatchBoundsChanged( map: L.Map ): void {
 	};
 
 	document.dispatchEvent(
-		new CustomEvent( 'data-machine-map-bounds-changed', { detail } ),
+		new CustomEvent( 'data-machine-map-bounds-changed', { detail } )
 	);
 }
 
 /* ---------- debounce ---------- */
 
-function debounce<T extends ( ...args: unknown[] ) => void>(
-	fn: T,
-	ms: number,
-): ( ...args: Parameters<T> ) => void {
-	let timer: ReturnType<typeof setTimeout>;
-	return ( ...args: Parameters<T> ) => {
+function debounce(
+	fn: ( map: L.Map ) => void,
+	ms: number
+): ( map: L.Map ) => void {
+	let timer: ReturnType< typeof setTimeout >;
+	return ( map: L.Map ) => {
 		clearTimeout( timer );
-		timer = setTimeout( () => fn( ...args ), ms );
+		timer = setTimeout( () => fn( map ), ms );
 	};
 }
 
@@ -283,7 +332,7 @@ function LocationSearch( {
 	const [ loading, setLoading ] = useState( false );
 	const [ error, setError ] = useState( '' );
 	const [ placeholder, setPlaceholder ] = useState(
-		'Enter a city or address...',
+		'Enter a city or address...'
 	);
 
 	const handleSubmit = useCallback(
@@ -291,14 +340,16 @@ function LocationSearch( {
 			e.preventDefault();
 
 			const trimmed = query.trim();
-			if ( ! trimmed ) return;
+			if ( ! trimmed ) {
+				return;
+			}
 
 			setLoading( true );
 			setError( '' );
 
 			try {
 				const url = `${ geocodeUrl }?query=${ encodeURIComponent(
-					trimmed,
+					trimmed
 				) }`;
 				const response = await fetch( url, {
 					headers: { Accept: 'application/json' },
@@ -316,7 +367,7 @@ function LocationSearch( {
 					data.results.length === 0
 				) {
 					setError(
-						'Location not found. Try a different city or address.',
+						'Location not found. Try a different city or address.'
 					);
 					return;
 				}
@@ -336,13 +387,13 @@ function LocationSearch( {
 				onLocationFound( lat, lng, label );
 			} catch {
 				setError(
-					'Could not look up that location. Please try again.',
+					'Could not look up that location. Please try again.'
 				);
 			} finally {
 				setLoading( false );
 			}
 		},
-		[ query, geocodeUrl, onLocationFound ],
+		[ query, geocodeUrl, onLocationFound ]
 	);
 
 	return (
@@ -404,36 +455,35 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 		scopeToken,
 	} = props;
 
-	const mapRef = useRef<L.Map | null>( null );
-	const clusterGroupRef = useRef<L.MarkerClusterGroup | null>( null );
-	const markerMapRef = useRef<Map<number, L.Marker>>( new Map() );
-	const userMarkerRef = useRef<L.Marker | null>( null );
+	const mapRef = useRef< L.Map | null >( null );
+	const clusterGroupRef = useRef< L.MarkerClusterGroup | null >( null );
+	const markerMapRef = useRef< Map< number, L.Marker > >( new Map() );
+	const userMarkerRef = useRef< L.Marker | null >( null );
 	// Single L.polyline holding the chronological route. Recreated from
 	// scratch whenever venues change so we don't manage segment-level
 	// diffing — the route is at most a few dozen points.
-	const chronologicalRoutePolylineRef = useRef<L.Polyline | null>( null );
+	const chronologicalRoutePolylineRef = useRef< L.Polyline | null >( null );
 	// Tracks whether the chronological-route effect has already fit bounds
 	// once. Without this we'd re-fit on every bounds-change refetch and
 	// trap the user inside the route.
-	const chronologicalRouteFitOnceRef = useRef<boolean>( false );
-	const containerRef = useRef<HTMLDivElement | null>( null );
-	const gestureOverlayRef = useRef<HTMLDivElement | null>( null );
-	const gestureTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
-		null,
+	const chronologicalRouteFitOnceRef = useRef< boolean >( false );
+	const containerRef = useRef< HTMLDivElement | null >( null );
+	const gestureOverlayRef = useRef< HTMLDivElement | null >( null );
+	const gestureTimeoutRef = useRef< ReturnType< typeof setTimeout > | null >(
+		null
 	);
 
-	const [ venues, setVenues ] = useState<Venue[]>( initialVenues );
-	const [ loading, setLoading ] = useState( false );
-
+	const [ venues, setVenues ] = useState< Venue[] >( initialVenues );
 	const hasCenter = centerLat !== null && centerLon !== null;
 	const hasUserLocation = userLat !== null && userLon !== null;
 
 	/* --- fetch venues from REST API --- */
 	const loadVenues = useCallback(
 		async ( bounds?: MapBounds ) => {
-			if ( ! restUrl ) return;
+			if ( ! restUrl ) {
+				return;
+			}
 
-			setLoading( true );
 			try {
 				const result = await fetchVenues( restUrl, nonce, {
 					bounds,
@@ -453,11 +503,9 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 			} catch ( err ) {
 				// eslint-disable-next-line no-console
 				console.error( 'Events map: failed to fetch venues', err );
-			} finally {
-				setLoading( false );
 			}
 		},
-		[ restUrl, nonce, taxonomy, termId, chronologicalRouteMode, scopeToken ],
+		[ restUrl, nonce, taxonomy, termId, chronologicalRouteMode, scopeToken ]
 	);
 
 	/* --- debounced bounds handler --- */
@@ -468,24 +516,26 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 			loadVenues( bounds );
 			dispatchBoundsChanged( map );
 		}, 500 ),
-		[ loadVenues ],
+		[ loadVenues ]
 	);
 
 	/* --- initialize map --- */
 	useEffect( () => {
 		const el = containerRef.current;
-		if ( ! el || mapRef.current ) return;
+		if ( ! el || mapRef.current ) {
+			return;
+		}
 
-		const initialLat = hasCenter
-			? centerLat!
-			: venues.length > 0
-			? venues[ 0 ].lat
-			: 30.2672; // fallback: Austin, TX
-		const initialLon = hasCenter
-			? centerLon!
-			: venues.length > 0
-			? venues[ 0 ].lon
-			: -97.7431;
+		const markerMap = markerMapRef.current;
+		let initialLat = 30.2672; // fallback: Austin, TX
+		let initialLon = -97.7431;
+		if ( hasCenter ) {
+			initialLat = centerLat!;
+			initialLon = centerLon!;
+		} else if ( venues.length > 0 ) {
+			initialLat = venues[ 0 ].lat;
+			initialLon = venues[ 0 ].lon;
+		}
 
 		const isTouch = isTouchDevice();
 
@@ -496,13 +546,15 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 			// scrolls the page. Users pinch-zoom or use two fingers.
 			dragging: ! isTouch,
 			tap: ! isTouch,
-		} ).setView( [ initialLat, initialLon ], zoom );
+		} as L.MapOptions ).setView( [ initialLat, initialLon ], zoom );
 
 		if ( isTouch ) {
 			// Show gesture hint when user tries single-finger drag.
 			const showGestureHint = () => {
 				const overlay = gestureOverlayRef.current;
-				if ( ! overlay ) return;
+				if ( ! overlay ) {
+					return;
+				}
 
 				overlay.style.opacity = '1';
 
@@ -514,19 +566,27 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 				}, 1500 );
 			};
 
-			el.addEventListener( 'touchstart', ( e: TouchEvent ) => {
-				if ( e.touches.length === 1 ) {
-					showGestureHint();
-				} else if ( e.touches.length >= 2 ) {
-					// Two-finger gesture — enable dragging temporarily.
-					map.dragging.enable();
-				}
-			}, { passive: true } );
+			el.addEventListener(
+				'touchstart',
+				( e: TouchEvent ) => {
+					if ( e.touches.length === 1 ) {
+						showGestureHint();
+					} else if ( e.touches.length >= 2 ) {
+						// Two-finger gesture — enable dragging temporarily.
+						map.dragging.enable();
+					}
+				},
+				{ passive: true }
+			);
 
-			el.addEventListener( 'touchend', () => {
-				// Re-disable dragging after gesture ends.
-				map.dragging.disable();
-			}, { passive: true } );
+			el.addEventListener(
+				'touchend',
+				() => {
+					// Re-disable dragging after gesture ends.
+					map.dragging.disable();
+				},
+				{ passive: true }
+			);
 		} else {
 			// Desktop: Ctrl/Cmd + scroll to zoom.
 			el.addEventListener(
@@ -537,7 +597,7 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 						map.scrollWheelZoom.enable();
 					}
 				},
-				{ passive: false },
+				{ passive: false }
 			);
 			map.on( 'mouseout', () => map.scrollWheelZoom.disable() );
 		}
@@ -594,7 +654,7 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 		};
 		el.addEventListener(
 			'data-machine-map-invalidate-size',
-			handleInvalidateSize,
+			handleInvalidateSize
 		);
 
 		// Fetch venues on mount and notify other blocks (e.g. calendar geo-sync).
@@ -605,7 +665,9 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 				// regardless of the default viewport, then it auto-fits
 				// to those points. Passing bounds here would clip the
 				// route on first paint.
-				const bounds = chronologicalRouteMode ? undefined : getBoundsFromMap( map );
+				const bounds = chronologicalRouteMode
+					? undefined
+					: getBoundsFromMap( map );
 				loadVenues( bounds );
 				dispatchBoundsChanged( map );
 			}, 200 );
@@ -614,14 +676,14 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 		return () => {
 			el.removeEventListener(
 				'data-machine-map-invalidate-size',
-				handleInvalidateSize,
+				handleInvalidateSize
 			);
 			map.remove();
 			mapRef.current = null;
 			clusterGroupRef.current = null;
 			chronologicalRoutePolylineRef.current = null;
 			chronologicalRouteFitOnceRef.current = false;
-			markerMapRef.current.clear();
+			markerMap.clear();
 		};
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [] );
@@ -630,25 +692,34 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 	useEffect( () => {
 		const handler = ( e: Event ) => {
 			const map = mapRef.current;
-			if ( ! map ) return;
+			if ( ! map ) {
+				return;
+			}
 
-			const detail = ( e as CustomEvent< {
-				lat: number;
-				lng: number;
-				zoom?: number;
-			} > ).detail;
+			const detail = (
+				e as CustomEvent< {
+					lat: number;
+					lng: number;
+					zoom?: number;
+				} >
+			 ).detail;
 
-			if ( ! detail?.lat || ! detail?.lng ) return;
+			if ( ! detail?.lat || ! detail?.lng ) {
+				return;
+			}
 
 			map.setView(
 				[ detail.lat, detail.lng ],
-				detail.zoom ?? map.getZoom(),
+				detail.zoom ?? map.getZoom()
 			);
 		};
 
 		document.addEventListener( 'data-machine-map-recenter', handler );
 		return () => {
-			document.removeEventListener( 'data-machine-map-recenter', handler );
+			document.removeEventListener(
+				'data-machine-map-recenter',
+				handler
+			);
 		};
 	}, [] );
 
@@ -656,14 +727,20 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 	useEffect( () => {
 		const handler = ( e: Event ) => {
 			const map = mapRef.current;
-			if ( ! map ) return;
+			if ( ! map ) {
+				return;
+			}
 
-			const detail = ( e as CustomEvent< {
-				lat: number;
-				lng: number;
-			} > ).detail;
+			const detail = (
+				e as CustomEvent< {
+					lat: number;
+					lng: number;
+				} >
+			 ).detail;
 
-			if ( ! detail?.lat || ! detail?.lng ) return;
+			if ( ! detail?.lat || ! detail?.lng ) {
+				return;
+			}
 
 			// Remove old user marker if present.
 			if ( userMarkerRef.current ) {
@@ -674,7 +751,7 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 			const marker = L.marker( [ detail.lat, detail.lng ], { icon } )
 				.addTo( map )
 				.bindPopup(
-					'<div class="venue-popup"><span class="venue-popup-name">You are here</span></div>',
+					'<div class="venue-popup"><span class="venue-popup-name">You are here</span></div>'
 				);
 
 			userMarkerRef.current = marker;
@@ -682,12 +759,12 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 
 		document.addEventListener(
 			'data-machine-map-set-user-location',
-			handler,
+			handler
 		);
 		return () => {
 			document.removeEventListener(
 				'data-machine-map-set-user-location',
-				handler,
+				handler
 			);
 		};
 	}, [] );
@@ -696,7 +773,9 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 	useEffect( () => {
 		const map = mapRef.current;
 		const clusterGroup = clusterGroupRef.current;
-		if ( ! map || ! clusterGroup ) return;
+		if ( ! map || ! clusterGroup ) {
+			return;
+		}
 
 		// Always tear down any previously-drawn route polyline first.
 		// Whether or not this redraw ends up creating a new one, the stale
@@ -725,10 +804,23 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 			// Venues without events have no position in the route and
 			// would clutter the map with orphan pins.
 			const routeVenues = venues
-				.filter( ( v ) => v.lat && v.lon && ( v.upcoming_events_at_venue?.length ?? 0 ) > 0 )
+				.filter(
+					( v ) =>
+						v.lat &&
+						v.lon &&
+						( v.upcoming_events_at_venue?.length ?? 0 ) > 0
+				)
 				.map( ( v ) => ( { venue: v, key: earliestEventKey( v ) } ) )
-				.filter( ( entry ): entry is { venue: Venue; key: string } => entry.key !== null )
-				.sort( ( a, b ) => ( a.key < b.key ? -1 : a.key > b.key ? 1 : 0 ) )
+				.filter(
+					( entry ): entry is { venue: Venue; key: string } =>
+						entry.key !== null
+				)
+				.sort( ( a, b ) => {
+					if ( a.key === b.key ) {
+						return 0;
+					}
+					return a.key < b.key ? -1 : 1;
+				} )
 				.map( ( entry ) => entry.venue );
 
 			// Per #310: <2 distinct venues = no route. Host plugins also
@@ -746,7 +838,9 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 			const orderedLatLngs: L.LatLngExpression[] = [];
 			let lastTermId = -1;
 			for ( const v of routeVenues ) {
-				if ( v.term_id === lastTermId ) continue;
+				if ( v.term_id === lastTermId ) {
+					continue;
+				}
 				orderedLatLngs.push( [ v.lat, v.lon ] );
 				lastTermId = v.term_id;
 			}
@@ -768,12 +862,12 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 			// Build markers with position-aware icons + multi-date popups.
 			const markersToAdd: L.Marker[] = [];
 			routeVenues.forEach( ( venue, idx ) => {
-				const position: 'first' | 'last' | 'middle' =
-					idx === 0
-						? 'first'
-						: idx === routeVenues.length - 1
-							? 'last'
-							: 'middle';
+				let position: 'first' | 'last' | 'middle' = 'middle';
+				if ( idx === 0 ) {
+					position = 'first';
+				} else if ( idx === routeVenues.length - 1 ) {
+					position = 'last';
+				}
 
 				const marker = L.marker( [ venue.lat, venue.lon ], {
 					icon: createChronologicalRouteIcon( position ),
@@ -796,7 +890,9 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 				const latlngs = [
 					...( orderedLatLngs.length > 0
 						? orderedLatLngs
-						: routeVenues.map( ( v ) => [ v.lat, v.lon ] as L.LatLngExpression ) ),
+						: routeVenues.map(
+								( v ) => [ v.lat, v.lon ] as L.LatLngExpression
+						  ) ),
 				];
 				if ( hasCenter ) {
 					latlngs.push( [ centerLat!, centerLon! ] );
@@ -816,13 +912,15 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 		// ============================================================
 		const icon = createVenueIcon();
 		const currentMarkers = markerMapRef.current;
-		const newVenueIds = new Set<number>();
+		const newVenueIds = new Set< number >();
 
 		// Collect new venues that need markers.
 		const markersToAdd: L.Marker[] = [];
 
 		venues.forEach( ( venue ) => {
-			if ( ! venue.lat || ! venue.lon ) return;
+			if ( ! venue.lat || ! venue.lon ) {
+				return;
+			}
 
 			newVenueIds.add( venue.term_id );
 
@@ -835,18 +933,19 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 			}
 
 			// Create new marker.
-			const marker = L.marker( [ venue.lat, venue.lon ], { icon } )
-				.bindPopup( buildPopupHtml( venue ) );
+			const marker = L.marker( [ venue.lat, venue.lon ], {
+				icon,
+			} ).bindPopup( buildPopupHtml( venue ) );
 			currentMarkers.set( venue.term_id, marker );
 			markersToAdd.push( marker );
 		} );
 
 		// Remove markers for venues no longer in the dataset.
 		const markersToRemove: L.Marker[] = [];
-		currentMarkers.forEach( ( marker, termId ) => {
-			if ( ! newVenueIds.has( termId ) ) {
+		currentMarkers.forEach( ( marker, venueTermId ) => {
+			if ( ! newVenueIds.has( venueTermId ) ) {
 				markersToRemove.push( marker );
-				currentMarkers.delete( termId );
+				currentMarkers.delete( venueTermId );
 			}
 		} );
 
@@ -868,10 +967,7 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 			} else if ( allLayers.length > 1 ) {
 				const group = L.featureGroup( allLayers );
 				map.fitBounds( group.getBounds().pad( 0.1 ) );
-			} else if (
-				allLayers.length === 1 &&
-				! hasCenter
-			) {
+			} else if ( allLayers.length === 1 && ! hasCenter ) {
 				map.setView( [ venues[ 0 ].lat, venues[ 0 ].lon ], 13 );
 			}
 		}
@@ -881,7 +977,9 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 	/* --- user location marker --- */
 	useEffect( () => {
 		const map = mapRef.current;
-		if ( ! map || ! hasUserLocation ) return;
+		if ( ! map || ! hasUserLocation ) {
+			return;
+		}
 
 		if ( userMarkerRef.current ) {
 			map.removeLayer( userMarkerRef.current );
@@ -891,7 +989,7 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 		const marker = L.marker( [ userLat!, userLon! ], { icon } )
 			.addTo( map )
 			.bindPopup(
-				'<div class="venue-popup"><span class="venue-popup-name">You are here</span></div>',
+				'<div class="venue-popup"><span class="venue-popup-name">You are here</span></div>'
 			);
 
 		userMarkerRef.current = marker;
@@ -906,21 +1004,20 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 	}, [ userLat, userLon ] );
 
 	/* --- handle location search result --- */
-	const handleLocationFound = useCallback(
-		( lat: number, lng: number, _label: string ) => {
-			const map = mapRef.current;
-			if ( ! map ) return;
+	const handleLocationFound = useCallback( ( lat: number, lng: number ) => {
+		const map = mapRef.current;
+		if ( ! map ) {
+			return;
+		}
 
-			map.setView( [ lat, lng ], 12 );
+		map.setView( [ lat, lng ], 12 );
 
-			// Update URL for shareability.
-			const url = new URL( window.location.href );
-			url.searchParams.set( 'lat', lat.toFixed( 6 ) );
-			url.searchParams.set( 'lng', lng.toFixed( 6 ) );
-			window.history.replaceState( {}, '', url.toString() );
-		},
-		[],
-	);
+		// Update URL for shareability.
+		const url = new URL( window.location.href );
+		url.searchParams.set( 'lat', lat.toFixed( 6 ) );
+		url.searchParams.set( 'lng', lng.toFixed( 6 ) );
+		window.history.replaceState( {}, '', url.toString() );
+	}, [] );
 
 	return (
 		<>
@@ -957,7 +1054,9 @@ function parseMapProps( container: HTMLElement ): MapProps {
 	const data = container.dataset;
 
 	const parseOptionalFloat = ( val?: string ): number | null => {
-		if ( ! val || val === '' ) return null;
+		if ( ! val || val === '' ) {
+			return null;
+		}
 		const n = parseFloat( val );
 		return isNaN( n ) ? null : n;
 	};
@@ -988,9 +1087,13 @@ function parseMapProps( container: HTMLElement ): MapProps {
  *
  * Idempotent via the `initialized` dataset flag so the deferred-expand path
  * and the normal path can both call it safely.
+ *
+ * @param container Map root container.
  */
 function mountMap( container: HTMLElement ): void {
-	if ( container.dataset.initialized === '1' ) return;
+	if ( container.dataset.initialized === '1' ) {
+		return;
+	}
 	container.dataset.initialized = '1';
 
 	const props = parseMapProps( container );
@@ -1012,10 +1115,13 @@ function mountMap( container: HTMLElement ): void {
  * Returns true when the map's mount is being managed here (collapsed defer),
  * so the caller skips its own immediate mount.
  *
+ * @param container Map root container.
  * @return Whether the immediate mount should be skipped (deferred to expand).
  */
 function setupCollapsible( container: HTMLElement ): boolean {
-	if ( container.dataset.collapsible !== '1' ) return false;
+	if ( container.dataset.collapsible !== '1' ) {
+		return false;
+	}
 	if ( container.dataset.collapsibleBound === '1' ) {
 		// Already wired; report current defer state.
 		return container.dataset.initialized !== '1';
@@ -1024,19 +1130,17 @@ function setupCollapsible( container: HTMLElement ): boolean {
 
 	const toggleId = container.dataset.toggleId || '';
 	const regionId = container.dataset.regionId || '';
-	const toggle = toggleId
-		? document.getElementById( toggleId )
-		: null;
-	const region = regionId
-		? document.getElementById( regionId )
-		: null;
+	const toggle = toggleId ? document.getElementById( toggleId ) : null;
+	const region = regionId ? document.getElementById( regionId ) : null;
 	const wrapper = container.closest(
-		'.data-machine-events-map-collapsible',
+		'.data-machine-events-map-collapsible'
 	) as HTMLElement | null;
 
 	// If the expected markup is missing, fall back to non-collapsible
 	// behavior so the map still renders.
-	if ( ! toggle || ! region ) return false;
+	if ( ! toggle || ! region ) {
+		return false;
+	}
 
 	const startCollapsed = container.dataset.defaultCollapsed === '1';
 
@@ -1064,7 +1168,7 @@ function setupCollapsible( container: HTMLElement ): boolean {
 				mountMap( container );
 			} else {
 				container.dispatchEvent(
-					new CustomEvent( 'data-machine-map-invalidate-size' ),
+					new CustomEvent( 'data-machine-map-invalidate-size' )
 				);
 			}
 		}
@@ -1081,15 +1185,19 @@ function setupCollapsible( container: HTMLElement ): boolean {
 }
 
 function initEventsMap(): void {
-	const containers = document.querySelectorAll<HTMLElement>(
-		'.data-machine-events-map-root',
+	const containers = document.querySelectorAll< HTMLElement >(
+		'.data-machine-events-map-root'
 	);
 
 	containers.forEach( ( container ) => {
-		if ( container.dataset.initialized === '1' ) return;
+		if ( container.dataset.initialized === '1' ) {
+			return;
+		}
 
 		const deferMount = setupCollapsible( container );
-		if ( deferMount ) return;
+		if ( deferMount ) {
+			return;
+		}
 
 		mountMap( container );
 	} );

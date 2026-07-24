@@ -3,7 +3,7 @@
  *
  * Shared interfaces for the events-map block editor and frontend.
  *
- * @package DataMachineEvents
+ * @package
  * @since 0.5.0
  */
 
@@ -122,10 +122,12 @@ export interface BoundsChangedEvent {
 /**
  * Tile URL templates keyed by MapType.
  */
-export const TILE_URLS: Record<MapType, string> = {
+export const TILE_URLS: Record< MapType, string > = {
 	'osm-standard': 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-	'carto-positron': 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
-	'carto-voyager': 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
+	'carto-positron':
+		'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
+	'carto-voyager':
+		'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
 	'carto-dark': 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
-	'humanitarian': 'https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png',
+	humanitarian: 'https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png',
 };

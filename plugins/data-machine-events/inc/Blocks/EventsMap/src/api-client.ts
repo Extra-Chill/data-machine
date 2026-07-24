@@ -3,11 +3,14 @@
  *
  * Fetches venue data from the public REST endpoint.
  *
- * @package DataMachineEvents
+ * @package
  * @since 0.5.0
  */
 
-import type { VenueListResponse, MapBounds } from './types';
+/**
+ * Internal dependencies
+ */
+import type { MapBounds, VenueListResponse } from './types';
 
 interface FetchVenuesParams {
 	bounds?: MapBounds;
@@ -40,21 +43,24 @@ interface FetchVenuesParams {
  * routes — this happens on client-side navigation where the nonce
  * from the original page render goes stale.
  *
- * @param restUrl  Base REST URL (e.g. /wp-json/datamachine/v1/events/venues).
- * @param _nonce   Deprecated — kept for API compatibility but no longer sent.
- * @param params   Optional filter parameters.
- * @returns Promise resolving to the venue list response.
+ * @param restUrl Base REST URL (e.g. /wp-json/datamachine/v1/events/venues).
+ * @param _nonce  Deprecated — kept for API compatibility but no longer sent.
+ * @param params  Optional filter parameters.
+ * @return Promise resolving to the venue list response.
  */
 export async function fetchVenues(
 	restUrl: string,
 	_nonce: string,
-	params: FetchVenuesParams = {},
-): Promise<VenueListResponse> {
+	params: FetchVenuesParams = {}
+): Promise< VenueListResponse > {
 	const url = new URL( restUrl, window.location.origin );
 
 	if ( params.bounds ) {
 		const { swLat, swLng, neLat, neLng } = params.bounds;
-		url.searchParams.set( 'bounds', `${ swLat },${ swLng },${ neLat },${ neLng }` );
+		url.searchParams.set(
+			'bounds',
+			`${ swLat },${ swLng },${ neLat },${ neLng }`
+		);
 	}
 
 	if ( params.lat !== undefined && params.lng !== undefined ) {
@@ -91,8 +97,10 @@ export async function fetchVenues(
 	} );
 
 	if ( ! response.ok ) {
-		throw new Error( `Venue fetch failed: ${ response.status } ${ response.statusText }` );
+		throw new Error(
+			`Venue fetch failed: ${ response.status } ${ response.statusText }`
+		);
 	}
 
-	return response.json() as Promise<VenueListResponse>;
+	return response.json() as Promise< VenueListResponse >;
 }
