@@ -11,15 +11,15 @@
 namespace DataMachineEvents\Tests\Unit;
 
 use WP_UnitTestCase;
-use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\StructuredDataProcessor;
+use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\JsonLdExtractor;
 
 class UniversalWebScraperTest extends WP_UnitTestCase {
 
-	private StructuredDataProcessor $processor;
+	private JsonLdExtractor $extractor;
 
 	public function setUp(): void {
 		parent::setUp();
-		$this->processor = new StructuredDataProcessor();
+		$this->extractor = new JsonLdExtractor();
 	}
 
 	public function test_json_ld_extraction_parses_single_event() {
@@ -32,7 +32,7 @@ class UniversalWebScraperTest extends WP_UnitTestCase {
     "@context": "https://schema.org",
     "@type": "MusicEvent",
     "name": "Test Concert",
-    "startDate": "2026-02-15T20:00:00-07:00",
+    "startDate": "2099-02-15T20:00:00-07:00",
     "location": {
         "@type": "Place",
         "name": "Red Rocks Amphitheatre",
@@ -50,7 +50,7 @@ class UniversalWebScraperTest extends WP_UnitTestCase {
 </html>
 HTML;
 
-		$events = $this->processor->extract( $html, 'https://example.com/events' );
+		$events = $this->extractor->extract( $html, 'https://example.com/events' );
 
 		$this->assertNotEmpty( $events, 'Should extract events from JSON-LD' );
 
@@ -70,13 +70,13 @@ HTML;
         "@context": "https://schema.org",
         "@type": "MusicEvent",
         "name": "Event One",
-        "startDate": "2026-02-15T20:00:00"
+        "startDate": "2099-02-15T20:00:00"
     },
     {
         "@context": "https://schema.org",
         "@type": "MusicEvent",
         "name": "Event Two",
-        "startDate": "2026-02-16T21:00:00"
+        "startDate": "2099-02-16T21:00:00"
     }
 ]
 </script>
@@ -85,7 +85,7 @@ HTML;
 </html>
 HTML;
 
-		$events = $this->processor->extract( $html, 'https://example.com/events' );
+		$events = $this->extractor->extract( $html, 'https://example.com/events' );
 
 		$this->assertCount( 2, $events, 'Should extract both events from array' );
 		$this->assertEquals( 'Event One', $events[0]['title'] );
@@ -101,9 +101,9 @@ HTML;
 </html>
 HTML;
 
-		$events = $this->processor->extract( $html, 'https://example.com' );
+		$events = $this->extractor->extract( $html, 'https://example.com' );
 
-		$this->assertIsArray( $events );
+		$this->assertSame( array(), $events );
 	}
 
 	public function test_extraction_handles_malformed_json_ld() {
@@ -119,9 +119,9 @@ HTML;
 </html>
 HTML;
 
-		$events = $this->processor->extract( $html, 'https://example.com' );
+		$events = $this->extractor->extract( $html, 'https://example.com' );
 
-		$this->assertIsArray( $events );
+		$this->assertSame( array(), $events );
 	}
 
 	public function test_extraction_includes_ticket_url() {
@@ -134,7 +134,7 @@ HTML;
     "@context": "https://schema.org",
     "@type": "MusicEvent",
     "name": "Ticketed Event",
-    "startDate": "2026-03-01T19:00:00",
+    "startDate": "2099-03-01T19:00:00",
     "offers": {
         "@type": "Offer",
         "url": "https://tickets.example.com/buy"
@@ -146,7 +146,7 @@ HTML;
 </html>
 HTML;
 
-		$events = $this->processor->extract( $html, 'https://example.com/events' );
+		$events = $this->extractor->extract( $html, 'https://example.com/events' );
 
 		$this->assertNotEmpty( $events );
 		$event = $events[0];
@@ -163,7 +163,7 @@ HTML;
     "@context": "https://schema.org",
     "@type": "MusicEvent",
     "name": "Band Concert",
-    "startDate": "2026-03-01T19:00:00",
+    "startDate": "2099-03-01T19:00:00",
     "performer": {
         "@type": "MusicGroup",
         "name": "The Test Band"
@@ -175,25 +175,14 @@ HTML;
 </html>
 HTML;
 
-		$events = $this->processor->extract( $html, 'https://example.com/events' );
+		$events = $this->extractor->extract( $html, 'https://example.com/events' );
 
 		$this->assertNotEmpty( $events );
 		$event = $events[0];
 		$this->assertEquals( 'The Test Band', $event['performer'] ?? '' );
 	}
 
-	public function test_get_extraction_method_returns_type() {
-		$html_with_json_ld = <<<HTML
-<html>
-<head>
-<script type="application/ld+json">{"@type": "Event", "name": "Test"}</script>
-</head>
-</html>
-HTML;
-
-		$method = $this->processor->getExtractionMethod( $html_with_json_ld, 'https://example.com' );
-
-		// Should return the extractor method or null if no match
-		$this->assertTrue( null=== $method || is_string( $method ) );
+	public function test_extraction_method_is_jsonld() {
+		$this->assertSame( 'jsonld', $this->extractor->getMethod() );
 	}
 }

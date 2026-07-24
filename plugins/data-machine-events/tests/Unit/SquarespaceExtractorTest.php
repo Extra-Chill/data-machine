@@ -486,16 +486,15 @@ class SquarespaceExtractorTest extends WP_UnitTestCase {
 	/**
 	 * Mock the WP HTTP layer with a URL → JSON-payload routing table.
 	 *
-	 * Matches on a substring of the requested URL so callers don't have to
-	 * worry about HttpClient adding extra query args. Unknown URLs return
-	 * a WP_Error so the extractor exercises its failure paths.
+	 * Matches the URL passed through HttpClient exactly. Unknown URLs return a
+	 * WP_Error so the extractor exercises its failure paths.
 	 */
 	private function mockHttpRoutes( array $routes ): void {
 		add_filter(
 			'pre_http_request',
 			static function ( $preempt, $args, $url ) use ( $routes ) {
-				foreach ( $routes as $needle => $payload ) {
-					if ( false !== strpos( $url, $needle ) ) {
+				foreach ( $routes as $route => $payload ) {
+					if ( $route === $url ) {
 						return array(
 							'headers'  => array(),
 							'body'     => is_string( $payload ) ? $payload : wp_json_encode( $payload ),

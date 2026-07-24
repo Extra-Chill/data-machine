@@ -39,12 +39,9 @@ class TicketmasterHandlerTest extends WP_UnitTestCase {
 	}
 
 	public function tearDown(): void {
+		remove_filter( 'data_machine_events_junk_payload_patterns', array( $this->handler, 'register_junk_patterns' ), 10 );
 		delete_transient( 'data_machine_events_ticketmaster_classifications' );
 		parent::tearDown();
-	}
-
-	public function test_handler_type() {
-		$this->assertEquals( 'ticketmaster', $this->handler->getHandlerType() );
 	}
 
 	public function test_handler_extends_event_import_handler() {
@@ -67,7 +64,7 @@ class TicketmasterHandlerTest extends WP_UnitTestCase {
 			'url'       => 'https://www.ticketmaster.com/event/123',
 			'dates'     => array(
 				'start'    => array(
-					'localDate' => '2026-03-15',
+					'localDate' => '2099-03-15',
 					'localTime' => '19:30:00',
 				),
 				'timezone' => 'America/Denver',
@@ -100,7 +97,7 @@ class TicketmasterHandlerTest extends WP_UnitTestCase {
 		$this->assertIsArray( $result );
 		$this->assertEquals( 'Test Concert', $result['title'] );
 		$this->assertEquals( 'Test Arena', $result['venue'] );
-		$this->assertEquals( '2026-03-15', $result['startDate'] );
+		$this->assertEquals( '2099-03-15', $result['startDate'] );
 		$this->assertEquals( '19:30', $result['startTime'] );
 	}
 
@@ -189,7 +186,7 @@ class TicketmasterHandlerTest extends WP_UnitTestCase {
 		$changed                                      = $initial;
 		$changed['name']                              = 'Updated Title';
 		$changed['url']                               = 'https://www.ticketmaster.com/event/' . $item_id . '-updated';
-		$changed['dates']['start']['localDate']       = '2027-08-16';
+		$changed['dates']['start']['localDate']       = '2099-08-16';
 		$changed['dates']['start']['localTime']       = '21:30:00';
 		$changed['_embedded']['venues'][0]['name']    = 'Updated Arena';
 		$changed['priceRanges'][0]                    = array( 'min' => 45, 'max' => 60, 'currency' => 'USD' );
@@ -199,7 +196,7 @@ class TicketmasterHandlerTest extends WP_UnitTestCase {
 		$this->assertCount( 1, $second, 'A changed source revision must reach EventUpsert.' );
 		$body = json_decode( $second[0]->addTo( array() )[0]['data']['body'], true );
 		$this->assertSame( 'Updated Title', $body['event']['title'] );
-		$this->assertSame( '2027-08-16', $body['event']['startDate'] );
+		$this->assertSame( '2099-08-16', $body['event']['startDate'] );
 		$this->assertSame( 'Updated Arena', $body['event']['venue'] );
 		$this->assertSame( '$45.00 - $60.00', $body['event']['price'] );
 		$this->failPacket( $second[0]->addTo( array() )[0], 1202 );
@@ -299,7 +296,7 @@ class TicketmasterHandlerTest extends WP_UnitTestCase {
 			'id'    => 'TM789',
 			'dates' => array(
 				'start' => array(
-					'localDate' => '2026-04-01',
+					'localDate' => '2099-04-01',
 				),
 			),
 		);
@@ -326,7 +323,7 @@ class TicketmasterHandlerTest extends WP_UnitTestCase {
 			),
 			'dates'       => array(
 				'start' => array(
-					'localDate' => '2026-05-01',
+					'localDate' => '2099-05-01',
 				),
 			),
 		);
@@ -352,7 +349,7 @@ class TicketmasterHandlerTest extends WP_UnitTestCase {
 			),
 			'dates'       => array(
 				'start' => array(
-					'localDate' => '2026-06-01',
+					'localDate' => '2099-06-01',
 				),
 			),
 		);
@@ -372,7 +369,7 @@ class TicketmasterHandlerTest extends WP_UnitTestCase {
 			'id'    => 'TM999',
 			'dates' => array(
 				'start' => array(
-					'localDate' => '2026-07-01',
+					'localDate' => '2099-07-01',
 				),
 			),
 		);
@@ -608,7 +605,7 @@ class TicketmasterHandlerTest extends WP_UnitTestCase {
 			'dates' => array(
 				'status' => array( 'code' => 'onsale' ),
 				'start'  => array(
-					'localDate' => '2027-08-15',
+					'localDate' => '2099-08-15',
 					'localTime' => '20:00:00',
 				),
 			),
@@ -666,7 +663,7 @@ class TicketmasterHandlerTest extends WP_UnitTestCase {
 		$this->assertGreaterThan( 0, $post_id );
 		wp_set_object_terms( $post_id, array( $term_id ), 'venue' );
 		update_post_meta( $post_id, \DataMachineEvents\Core\EVENT_TICKET_URL_META_KEY, $ticket_url );
-		EventDatesTable::upsert( $post_id, '2027-08-15 20:00:00' );
+		EventDatesTable::upsert( $post_id, '2099-08-15 20:00:00' );
 		EventIdentityWriter::syncIdentityRow( $post_id, $title, $ticket_url );
 
 		return array( $post_id, $term_id );

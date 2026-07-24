@@ -216,13 +216,15 @@ class WeeblyExtractorTest extends WP_UnitTestCase {
 				6:40 Brian Ashley Jones<br/>
 				7:30 Mount Pom<br/>
 				8:20 Anders Thomsen<br/>
-				9:10 Tanner Dane
+				9:10 Tanner Dane<br/>
+				Barn Jam May 20<br/>
+				5:50 Second Week Opener
 			</div>
 		' );
 
 		$events = $this->extractor->extract( $html, 'https://example.com/showcase' );
 
-		$this->assertCount( 1, $events );
+		$this->assertCount( 2, $events );
 		$event = $events[0];
 
 		// First artist at 5:00 PM = 17:00.

@@ -23,12 +23,14 @@ class IcsExtractorTest extends WP_UnitTestCase {
 	}
 
 	public function test_can_extract_detects_ics_content() {
-		$ics_content = "BEGIN:VCALENDAR\nVERSION:2.0\nBEGIN:VEVENT\nDTSTART:20260119T180000\nSUMMARY:Test Event\nEND:VEVENT\nEND:VCALENDAR";
+		$date        = gmdate( 'Ymd', strtotime( '+14 days' ) );
+		$ics_content = "BEGIN:VCALENDAR\nVERSION:2.0\nBEGIN:VEVENT\nDTSTART:{$date}T180000\nSUMMARY:Test Event\nEND:VEVENT\nEND:VCALENDAR";
 
 		$this->assertTrue( $this->extractor->canExtract( $ics_content ) );
 	}
 
 	public function test_floating_time_not_converted() {
+		$date        = gmdate( 'Ymd', strtotime( '+14 days' ) );
 		$ics_content = <<<ICS
 BEGIN:VCALENDAR
 VERSION:2.0
@@ -38,8 +40,8 @@ BEGIN:VTIMEZONE
 TZID:America/Chicago
 END:VTIMEZONE
 BEGIN:VEVENT
-DTSTART:20260119T180000
-DTEND:20260119T200000
+DTSTART:{$date}T180000
+DTEND:{$date}T200000
 SUMMARY:Floating Time Test
 LOCATION:Test Venue
 END:VEVENT
@@ -59,6 +61,7 @@ ICS;
 	}
 
 	public function test_explicit_utc_time_is_converted() {
+		$date        = gmdate( 'Ymd', strtotime( '+14 days' ) );
 		$ics_content = <<<ICS
 BEGIN:VCALENDAR
 VERSION:2.0
@@ -68,8 +71,8 @@ BEGIN:VTIMEZONE
 TZID:America/Chicago
 END:VTIMEZONE
 BEGIN:VEVENT
-DTSTART:20260119T180000Z
-DTEND:20260119T200000Z
+DTSTART:{$date}T180000Z
+DTEND:{$date}T200000Z
 SUMMARY:UTC Time Test
 LOCATION:Test Venue
 END:VEVENT
@@ -82,13 +85,17 @@ ICS;
 
 		$event = $events[0];
 
-		// Explicit UTC (Z suffix) SHOULD be converted to local timezone
-		// 18:00 UTC = 12:00 Central (CST is -6)
-		$this->assertEquals( '12:00', $event['startTime'], 'Explicit UTC time should be converted to local timezone' );
-		$this->assertEquals( '14:00', $event['endTime'], 'Explicit UTC end time should be converted to local timezone' );
+		$start = new \DateTime( $date . ' 18:00:00', new \DateTimeZone( 'UTC' ) );
+		$end   = new \DateTime( $date . ' 20:00:00', new \DateTimeZone( 'UTC' ) );
+		$start->setTimezone( new \DateTimeZone( 'America/Chicago' ) );
+		$end->setTimezone( new \DateTimeZone( 'America/Chicago' ) );
+
+		$this->assertEquals( $start->format( 'H:i' ), $event['startTime'], 'Explicit UTC time should be converted to local timezone' );
+		$this->assertEquals( $end->format( 'H:i' ), $event['endTime'], 'Explicit UTC end time should be converted to local timezone' );
 	}
 
 	public function test_explicit_tzid_time_preserved() {
+		$date        = gmdate( 'Ymd', strtotime( '+14 days' ) );
 		$ics_content = <<<ICS
 BEGIN:VCALENDAR
 VERSION:2.0
@@ -97,8 +104,8 @@ BEGIN:VTIMEZONE
 TZID:America/Chicago
 END:VTIMEZONE
 BEGIN:VEVENT
-DTSTART;TZID=America/Chicago:20260119T180000
-DTEND;TZID=America/Chicago:20260119T200000
+DTSTART;TZID=America/Chicago:{$date}T180000
+DTEND;TZID=America/Chicago:{$date}T200000
 SUMMARY:TZID Time Test
 LOCATION:Test Venue
 END:VEVENT

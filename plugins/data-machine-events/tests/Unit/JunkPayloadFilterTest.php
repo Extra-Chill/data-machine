@@ -10,14 +10,22 @@ namespace DataMachineEvents\Tests\Unit;
 
 use WP_UnitTestCase;
 use DataMachineEvents\Steps\EventImport\JunkPayloadFilter;
+use DataMachineEvents\Steps\EventImport\Handlers\Ticketmaster\Ticketmaster;
 
 class JunkPayloadFilterTest extends WP_UnitTestCase {
 
 	private JunkPayloadFilter $filter;
+	private Ticketmaster $ticketmaster;
 
 	public function setUp(): void {
 		parent::setUp();
-		$this->filter = new JunkPayloadFilter();
+		$this->ticketmaster = new Ticketmaster();
+		$this->filter       = new JunkPayloadFilter();
+	}
+
+	public function tearDown(): void {
+		remove_filter( 'data_machine_events_junk_payload_patterns', array( $this->ticketmaster, 'register_junk_patterns' ), 10 );
+		parent::tearDown();
 	}
 
 	public function test_explicit_test_flag_drops_payload() {
