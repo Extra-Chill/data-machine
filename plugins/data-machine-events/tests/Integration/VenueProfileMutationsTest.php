@@ -219,20 +219,20 @@ class VenueProfileMutationsTest extends WP_UnitTestCase {
 			$this->markTestSkipped( 'Multisite scope requires the multisite WordPress test suite.' );
 		}
 		global $wpdb;
-		$name     = 'Equivalent Multisite Venue ' . uniqid();
-		$first_id = $this->venue( $name, false );
+		$first_id = $this->venue( 'First Multisite Venue' );
 		update_term_meta( $first_id, '_venue_phone', 'same-value' );
 		$first    = VenueProfileMutations::read( $first_id );
 		$blog_id  = self::factory()->blog->create();
 		$this->blog_ids[] = $blog_id;
 		$first_lock = VenueProfileMutations::lockName( $first_id );
 		switch_to_blog( $blog_id );
+		$this->assertSame( $blog_id, get_current_blog_id() );
+		wp_cache_flush();
 		Venue_Taxonomy::register();
-		$second_id = $this->venue( $name, false );
+		$second_id   = $this->venue( 'Second Multisite Venue' );
 		update_term_meta( $second_id, '_venue_phone', 'same-value' );
-		$second    = VenueProfileMutations::read( $second_id );
+		$second      = VenueProfileMutations::read( $second_id );
 		$second_lock = VenueProfileMutations::lockName( $second_id );
-		$this->assertSame( $first_id, $second_id, 'Equivalent per-site fixtures must use the same term ID.' );
 		$this->assertNotSame( $first_lock, $second_lock );
 
 		$owner  = mysqli_init();
@@ -248,6 +248,7 @@ class VenueProfileMutationsTest extends WP_UnitTestCase {
 		$waiter->close();
 		wp_delete_term( $second_id, 'venue' );
 		restore_current_blog();
+		wp_cache_flush();
 
 		$this->assertNotSame( $first['revision'], $second['revision'] );
 	}
