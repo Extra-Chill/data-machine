@@ -21,6 +21,15 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 abstract class BaseExtractor implements ExtractorInterface {
 
+	/** {@inheritdoc} */
+	abstract public function canExtract( string $html ): bool;
+
+	/** {@inheritdoc} */
+	abstract public function extract( string $html, string $source_url ): array;
+
+	/** {@inheritdoc} */
+	abstract public function getMethod(): string;
+
 	/**
 	 * Parse UTC timestamp and convert to local timezone.
 	 *
