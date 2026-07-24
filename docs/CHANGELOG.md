@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.168.14] - 2026-07-24
+
+### Changed
+- Refine Data Machine agent routing guidance
+
 ## [0.168.13] - 2026-07-24
 
 ### Fixed
