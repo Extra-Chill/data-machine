@@ -29,9 +29,7 @@ class VenueProfileMutationsTest extends WP_UnitTestCase {
 		$wpdb->query( 'SET autocommit = 1' );
 		$this->had_settings    = false !== get_option( Settings_Page::OPTION_KEY, false );
 		$this->settings_before = get_option( Settings_Page::OPTION_KEY, null );
-		if ( ! taxonomy_exists( 'venue' ) ) {
-			Venue_Taxonomy::register();
-		}
+		Venue_Taxonomy::register();
 	}
 
 	public function tearDown(): void {
@@ -296,27 +294,49 @@ class VenueProfileMutationsTest extends WP_UnitTestCase {
 	}
 
 	public function test_native_wordpress_edit_fails_when_serialization_is_unavailable(): void {
-		$this->markTestSkipped( 'Native WordPress lock failure is tracked separately in issue #575.' );
 		if ( ! extension_loaded( 'mysqli' ) ) {
 			$this->markTestSkipped( 'Native venue lock coverage requires mysqli.' );
 		}
 		$term_id  = $this->venue( 'Native Lock Failure' );
+		$original = get_term( $term_id, 'venue' )->name;
 		$lock_key = VenueProfileMutations::lockName( $term_id );
 		$owner    = mysqli_init();
 		$owner->real_connect( DB_HOST, DB_USER, DB_PASSWORD, DB_NAME );
 		$this->assertSame( 1, $this->namedLock( $owner, 'GET_LOCK', $lock_key ) );
 		add_filter( 'data_machine_events_venue_lock_timeout', '__return_zero' );
+		$rejected = false;
 		try {
 			wp_update_term( $term_id, 'venue', array( 'name' => 'Should Not Persist' ) );
 		} catch ( \WPDieException ) {
-			// The WordPress test harness may expose wp_die() as an exception.
+			$rejected = true;
 		} finally {
 			remove_filter( 'data_machine_events_venue_lock_timeout', '__return_zero' );
 			$this->namedLock( $owner, 'RELEASE_LOCK', $lock_key );
 			$owner->close();
 		}
+		$this->assertTrue( $rejected );
+		$this->assertSame( $original, get_term( $term_id, 'venue' )->name );
+	}
 
-		$this->assertStringStartsWith( 'Native Lock Failure', get_term( $term_id, 'venue' )->name );
+	public function test_native_wordpress_edit_releases_serialization_after_saved_hooks(): void {
+		if ( ! extension_loaded( 'mysqli' ) ) {
+			$this->markTestSkipped( 'Native venue lock coverage requires mysqli.' );
+		}
+		$term_id  = $this->venue( 'Native Lock Success' );
+		$lock_key = VenueProfileMutations::lockName( $term_id );
+		$observer = mysqli_init();
+		$observer->real_connect( DB_HOST, DB_USER, DB_PASSWORD, DB_NAME );
+
+		try {
+			$result = wp_update_term( $term_id, 'venue', array( 'name' => 'Native Lock Persisted' ) );
+
+			$this->assertNotWPError( $result );
+			$this->assertSame( 'Native Lock Persisted', get_term( $term_id, 'venue' )->name );
+			$this->assertSame( 1, $this->namedLock( $observer, 'GET_LOCK', $lock_key ), 'saved_venue must release the native edit lock.' );
+		} finally {
+			$this->namedLock( $observer, 'RELEASE_LOCK', $lock_key );
+			$observer->close();
+		}
 	}
 
 	public function test_uncertain_commit_requires_a_fresh_read(): void {

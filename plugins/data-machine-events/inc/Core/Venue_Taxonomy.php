@@ -1388,7 +1388,7 @@ class Venue_Taxonomy {
 
 	private static function init_admin_hooks() {
 		add_filter( 'wp_update_term_parent', array( VenueProfileMutations::class, 'guardNativeTermEdit' ), 10, 3 );
-		add_action( 'edit_terms', array( VenueProfileMutations::class, 'beginNativeTermEdit' ), 10, 2 );
+		add_filter( 'wp_update_term_data', array( VenueProfileMutations::class, 'serializeNativeTermEdit' ), 10, 3 );
 		add_action( 'saved_venue', array( VenueProfileMutations::class, 'endNativeTermEdit' ), 99 );
 
 		add_action( 'venue_add_form_fields', array( __CLASS__, 'add_venue_form_fields' ) );

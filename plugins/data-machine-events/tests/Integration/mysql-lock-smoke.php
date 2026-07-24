@@ -116,6 +116,7 @@ namespace {
 	function wp_term_is_shared(): bool { return false; }
 	function metadata_exists( string $type, int $term_id, string $key ): bool { return array() !== get_term_meta( $term_id, $key, false ); }
 	function add_filter( string $name, callable $callback ): void { $GLOBALS['dme_test_filters'][ $name ][] = $callback; }
+	function add_action( string $name, callable $callback ): void { add_filter( $name, $callback ); }
 	function remove_all_filters( string $name ): void { unset( $GLOBALS['dme_test_filters'][ $name ] ); }
 	function apply_filters( string $name, mixed $value, mixed ...$args ): mixed {
 		foreach ( $GLOBALS['dme_test_filters'][ $name ] ?? array() as $callback ) {
@@ -123,7 +124,12 @@ namespace {
 		}
 		return $value;
 	}
-	function do_action( string $name, mixed ...$args ): void { $GLOBALS['dme_test_actions'][ $name ][] = $args; }
+	function do_action( string $name, mixed ...$args ): void {
+		$GLOBALS['dme_test_actions'][ $name ][] = $args;
+		foreach ( $GLOBALS['dme_test_filters'][ $name ] ?? array() as $callback ) {
+			$callback( ...$args );
+		}
+	}
 	function wp_die( mixed $message = '' ): never { throw new \RuntimeException( (string) $message ); }
 
 	function dme_test_table(): string { return '`' . $GLOBALS['dme_test_table'] . '`'; }
@@ -173,8 +179,20 @@ namespace {
 		if ( ! $term ) {
 			return new WP_Error( 'invalid_term', 'Invalid term.' );
 		}
-		$statement = $wpdb->dbh->prepare( 'UPDATE ' . dme_test_table() . ' SET name = ?, description = ? WHERE term_id = ?' );
-		$statement->execute( array( $args['name'] ?? $term->name, $args['description'] ?? $term->description, $term_id ) );
+		$args['parent'] = apply_filters( 'wp_update_term_parent', $args['parent'] ?? 0, $term_id, $taxonomy );
+		$data           = apply_filters(
+			'wp_update_term_data',
+			array(
+				'name'        => $args['name'] ?? $term->name,
+				'description' => $args['description'] ?? $term->description,
+			),
+			$term_id,
+			$taxonomy,
+			$args
+		);
+		$statement      = $wpdb->dbh->prepare( 'UPDATE ' . dme_test_table() . ' SET name = ?, description = ? WHERE term_id = ?' );
+		$statement->execute( array( $data['name'], $data['description'], $term_id ) );
+		do_action( 'saved_' . $taxonomy, $term_id, $term_id, true, $args );
 		return array( 'term_id' => $term_id, 'term_taxonomy_id' => $term_id );
 	}
 }
@@ -199,6 +217,10 @@ namespace {
 	require_once dirname( __DIR__, 2 ) . '/inc/Core/VenueProfileMutations.php';
 
 	use DataMachineEvents\Core\VenueProfileMutations;
+
+	add_filter( 'wp_update_term_parent', array( VenueProfileMutations::class, 'guardNativeTermEdit' ) );
+	add_filter( 'wp_update_term_data', array( VenueProfileMutations::class, 'serializeNativeTermEdit' ) );
+	add_action( 'saved_venue', array( VenueProfileMutations::class, 'endNativeTermEdit' ) );
 
 	class DmeCommitUncertain extends VenueProfileMutations {
 		protected static function query( string $sql ): int|bool {
@@ -340,6 +362,27 @@ namespace {
 		remove_all_filters( 'update_term_metadata' );
 		dme_assert( ! is_wp_error( $result ) && is_wp_error( $nested ) && 'venue_mutation_reentrant' === $nested->get_error_code(), 'Same-venue reentrancy was not rejected.' );
 
+		dme_stage( 'native-term-serialization' );
+		$original_name = get_term( $term_id, 'venue' )->name;
+		dme_assert( 1 === dme_lock( $owner, 'GET_LOCK', $lock_key ), 'Owner could not acquire the native edit lock.' );
+		add_filter( 'data_machine_events_venue_lock_timeout', static fn() => 0 );
+		$rejected = false;
+		try {
+			wp_update_term( $term_id, 'venue', array( 'name' => 'Should Not Persist' ) );
+		} catch ( \RuntimeException ) {
+			$rejected = true;
+		}
+		remove_all_filters( 'data_machine_events_venue_lock_timeout' );
+		dme_assert( $rejected, 'Native venue edit did not fail closed when serialization was unavailable.' );
+		dme_assert( $original_name === get_term( $term_id, 'venue' )->name, 'Rejected native venue edit changed the term.' );
+		dme_assert( 1 === dme_lock( $owner, 'RELEASE_LOCK', $lock_key ), 'Owner could not release the native edit lock.' );
+
+		$result = wp_update_term( $term_id, 'venue', array( 'name' => 'Native Lock Persisted' ) );
+		dme_assert( ! is_wp_error( $result ), 'Serialized native venue edit failed.' );
+		dme_assert( 'Native Lock Persisted' === get_term( $term_id, 'venue' )->name, 'Serialized native venue edit did not persist.' );
+		dme_assert( 1 === dme_lock( $owner, 'GET_LOCK', $lock_key ), 'Successful native edit retained its advisory lock.' );
+		dme_assert( 1 === dme_lock( $owner, 'RELEASE_LOCK', $lock_key ), 'Observer could not release the post-save lock.' );
+
 		dme_stage( 'commit-uncertainty' );
 		$result = DmeCommitUncertain::updateSystem( $term_id, array( 'capacity' => '500' ) );
 		dme_assert( is_wp_error( $result ) && 'venue_commit_uncertain' === $result->get_error_code(), 'Uncertain commit was not surfaced.' );
@@ -371,7 +414,7 @@ namespace {
 		dme_lock( $owner, 'RELEASE_LOCK', $first_lock );
 
 		dme_stage( 'complete' );
-		fwrite( STDOUT, "PASS: actual venue mutation class passed race, duplicate, ordering, reentrancy, uncertainty, and multisite checks.\n" );
+		fwrite( STDOUT, "PASS: actual venue mutation class passed race, native serialization, ordering, reentrancy, uncertainty, and multisite checks.\n" );
 	} catch ( \Throwable $throwable ) {
 		fwrite( STDERR, 'FAIL: ' . $throwable->getMessage() . "\n" );
 		$exit_code = 1;

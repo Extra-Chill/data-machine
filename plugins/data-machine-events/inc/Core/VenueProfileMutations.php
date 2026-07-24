@@ -112,14 +112,16 @@ class VenueProfileMutations {
 	}
 
 	/**
-	 * Acquire canonical serialization immediately before a native term write.
+	 * Acquire canonical serialization at WordPress's final pre-write filter.
 	 *
+	 * @param array  $data     Term data about to be written.
 	 * @param int    $term_id  Term ID.
 	 * @param string $taxonomy Taxonomy slug.
+	 * @return array
 	 */
-	public static function beginNativeTermEdit( int $term_id, string $taxonomy ): void {
+	public static function serializeNativeTermEdit( array $data, int $term_id, string $taxonomy ): array {
 		if ( self::$internal_term_update || self::TAXONOMY !== $taxonomy ) {
-			return;
+			return $data;
 		}
 
 		$lock_key = self::acquireLock( $term_id );
@@ -128,6 +130,7 @@ class VenueProfileMutations {
 		}
 		self::$native_term_locks[] = $lock_key;
 		self::registerShutdownCleanup();
+		return $data;
 	}
 
 	/**
