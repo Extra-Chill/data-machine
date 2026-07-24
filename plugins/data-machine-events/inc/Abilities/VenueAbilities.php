@@ -451,41 +451,21 @@ class VenueAbilities {
 			return new \WP_Error( 'venue_not_found', "Venue '{$venue_identifier}' not found", array( 'status' => 404 ) );
 		}
 
-		$updated_fields = array();
-
-		$term_updates = array();
-		if ( ! empty( $input['name'] ) ) {
-			$term_updates['name'] = sanitize_text_field( $input['name'] );
-			$updated_fields[]     = 'name';
-		}
-		if ( isset( $input['description'] ) && '' !== $input['description'] ) {
-			$term_updates['description'] = wp_kses_post( $input['description'] );
-			$updated_fields[]            = 'description';
-		}
-
-		if ( ! empty( $term_updates ) ) {
-			$result = wp_update_term( $term->term_id, 'venue', $term_updates );
-			if ( is_wp_error( $result ) ) {
-				return new \WP_Error( 'update_failed', 'Failed to update venue: ' . $result->get_error_message(), array( 'status' => 500 ) );
-			}
-		}
-
 		$meta_keys = array( 'address', 'city', 'state', 'zip', 'country', 'phone', 'website', 'capacity', 'coordinates', 'timezone' );
-		$meta_data = array();
+		$changes   = array();
 
-		foreach ( $meta_keys as $key ) {
-			if ( array_key_exists( $key, $input ) && null !== $input[ $key ] && '' !== $input[ $key ] ) {
-				$meta_data[ $key ] = $input[ $key ];
-				$updated_fields[]  = $key;
+		foreach ( array_merge( array( 'name', 'description' ), $meta_keys ) as $key ) {
+			if ( array_key_exists( $key, $input ) && null !== $input[ $key ] ) {
+				$changes[ $key ] = $input[ $key ];
 			}
 		}
 
-		if ( ! empty( $meta_data ) ) {
-			Venue_Taxonomy::update_venue_meta( $term->term_id, $meta_data );
-		}
-
-		if ( empty( $updated_fields ) ) {
+		if ( empty( $changes ) ) {
 			return new \WP_Error( 'no_fields', 'No fields provided to update', array( 'status' => 400 ) );
+		}
+		$result = \DataMachineEvents\Core\VenueProfileMutations::updateSystem( (int) $term->term_id, $changes );
+		if ( is_wp_error( $result ) ) {
+			return $result;
 		}
 
 		$updated_term = get_term( $term->term_id, 'venue' );
@@ -494,9 +474,9 @@ class VenueAbilities {
 		return array(
 			'term_id'        => $term->term_id,
 			'name'           => $updated_term->name,
-			'updated_fields' => $updated_fields,
+			'updated_fields' => $result['updated_fields'],
 			'venue_data'     => $venue_data,
-			'message'        => "Updated venue '{$updated_term->name}': " . implode( ', ', $updated_fields ),
+			'message'        => "Updated venue '{$updated_term->name}': " . implode( ', ', $result['updated_fields'] ),
 		);
 	}
 

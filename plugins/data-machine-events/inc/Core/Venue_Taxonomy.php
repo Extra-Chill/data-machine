@@ -20,7 +20,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 class Venue_Taxonomy {
 
-	public static $meta_fields = array(
+	public static array $meta_fields = array(
 		'address'     => '_venue_address',
 		'city'        => '_venue_city',
 		'state'       => '_venue_state',
@@ -799,37 +799,17 @@ class Venue_Taxonomy {
 	 * Smartly merge new venue data into existing venue
 	 * Only updates fields that are currently empty in the database
 	 *
-	 * Composes MergeTermMetaAbility (fill_empty strategy) with the
-	 * venue-specific post-write side effects (geocoding, timezone derivation).
+	 * Uses the canonical venue mutation contract's fill-empty strategy so the
+	 * decision is rechecked after its per-venue lock is acquired.
 	 *
 	 * @param int $term_id Venue term ID
 	 * @param array $venue_data New venue data
 	 */
 	private static function smart_merge_venue_meta( $term_id, $venue_data ) {
-		$result = \DataMachine\Abilities\Taxonomy\MergeTermMetaAbility::merge(
-			(int) $term_id,
-			'venue',
-			$venue_data,
-			self::$meta_fields,
-			\DataMachine\Abilities\Taxonomy\MergeTermMetaAbility::STRATEGY_FILL_EMPTY
-		);
+		$result = VenueProfileMutations::updateSystem( (int) $term_id, $venue_data, VenueProfileMutations::STRATEGY_FILL_EMPTY );
 
-		if ( empty( $result['success'] ) ) {
+		if ( is_wp_error( $result ) || empty( $result['success'] ) ) {
 			return;
-		}
-
-		$updated           = $result['updated'] ?? array();
-		$address_fields    = array( 'address', 'city', 'state', 'zip', 'country' );
-		$address_updated   = (bool) array_intersect( $updated, $address_fields );
-		$coordinates_added = in_array( 'coordinates', $updated, true );
-
-		if ( $address_updated ) {
-			self::maybe_geocode_venue( $term_id );
-		} elseif ( $coordinates_added ) {
-			$coordinates = get_term_meta( $term_id, '_venue_coordinates', true );
-			if ( ! empty( $coordinates ) ) {
-				self::maybe_derive_timezone( $term_id, $coordinates );
-			}
 		}
 	}
 
@@ -840,9 +820,8 @@ class Venue_Taxonomy {
 	 * This allows updating only changed fields without overwriting unchanged ones.
 	 * Automatically geocodes address to coordinates if address fields are updated.
 	 *
-	 * Composes MergeTermMetaAbility (overwrite strategy) with the venue-specific
-	 * post-write side effects (clear-and-regeocode on address change, derive
-	 * timezone when coordinates land).
+	 * Uses the canonical venue mutation contract's overwrite strategy, including
+	 * atomic clear-and-rederive behavior for location fields.
 	 *
 	 * @param int $term_id Venue term ID
 	 * @param array $venue_data Venue data array (can contain subset of fields)
@@ -853,31 +832,10 @@ class Venue_Taxonomy {
 			return false;
 		}
 
-		$result = \DataMachine\Abilities\Taxonomy\MergeTermMetaAbility::merge(
-			(int) $term_id,
-			'venue',
-			$venue_data,
-			self::$meta_fields,
-			\DataMachine\Abilities\Taxonomy\MergeTermMetaAbility::STRATEGY_OVERWRITE
-		);
+		$result = VenueProfileMutations::updateSystem( (int) $term_id, $venue_data );
 
-		if ( empty( $result['success'] ) ) {
+		if ( is_wp_error( $result ) || empty( $result['success'] ) ) {
 			return false;
-		}
-
-		$updated         = $result['updated'] ?? array();
-		$address_fields  = array( 'address', 'city', 'state', 'zip', 'country' );
-		$address_changed = (bool) array_intersect( $updated, $address_fields );
-		$coordinates_set = in_array( 'coordinates', $updated, true );
-
-		if ( $address_changed ) {
-			delete_term_meta( $term_id, '_venue_coordinates' );
-			self::maybe_geocode_venue( $term_id );
-		} elseif ( $coordinates_set ) {
-			$coordinates = get_term_meta( $term_id, '_venue_coordinates', true );
-			if ( ! empty( $coordinates ) ) {
-				self::maybe_derive_timezone( $term_id, $coordinates );
-			}
 		}
 
 		return true;
@@ -904,9 +862,8 @@ class Venue_Taxonomy {
 		$coordinates = self::geocode_address( $venue_data );
 
 		if ( $coordinates ) {
-			update_term_meta( $term_id, '_venue_coordinates', $coordinates );
-			self::maybe_derive_timezone( $term_id, $coordinates );
-			return true;
+			$result = VenueProfileMutations::updateSystem( (int) $term_id, array( 'coordinates' => $coordinates ) );
+			return ! is_wp_error( $result ) && ! empty( $result['success'] );
 		}
 
 		return false;
@@ -947,8 +904,8 @@ class Venue_Taxonomy {
 		$timezone = GeoNamesService::getTimezoneFromCoordinates( $coordinates );
 
 		if ( $timezone ) {
-			update_term_meta( $term_id, '_venue_timezone', $timezone );
-			return true;
+			$result = VenueProfileMutations::updateSystem( (int) $term_id, array( 'timezone' => $timezone ) );
+			return ! is_wp_error( $result ) && ! empty( $result['success'] );
 		}
 
 		return false;
@@ -1430,6 +1387,10 @@ class Venue_Taxonomy {
 	}
 
 	private static function init_admin_hooks() {
+		add_filter( 'wp_update_term_parent', array( VenueProfileMutations::class, 'guardNativeTermEdit' ), 10, 3 );
+		add_action( 'edit_terms', array( VenueProfileMutations::class, 'beginNativeTermEdit' ), 10, 2 );
+		add_action( 'saved_venue', array( VenueProfileMutations::class, 'endNativeTermEdit' ), 99 );
+
 		add_action( 'venue_add_form_fields', array( __CLASS__, 'add_venue_form_fields' ) );
 
 		add_action( 'venue_edit_form_fields', array( __CLASS__, 'edit_venue_form_fields' ) );
@@ -1476,27 +1437,20 @@ class Venue_Taxonomy {
 	}
 
 	public static function save_venue_meta( $term_id ) {
-		$address_fields  = array( 'address', 'city', 'state', 'zip', 'country' );
-		$address_updated = false;
+		if ( VenueProfileMutations::isInternalTermUpdate() ) {
+			return;
+		}
+
+		$changes = array();
 
 		foreach ( self::$meta_fields as $key => $meta_key ) {
 			if ( isset( $_POST[ $meta_key ] ) ) {
-				$new_value = sanitize_text_field( wp_unslash( $_POST[ $meta_key ] ) );
-				$old_value = get_term_meta( $term_id, $meta_key, true );
-
-				if ( $new_value !== $old_value ) {
-					update_term_meta( $term_id, $meta_key, $new_value );
-
-					if ( in_array( $key, $address_fields, true ) ) {
-						$address_updated = true;
-					}
-				}
+				$changes[ $key ] = wp_unslash( $_POST[ $meta_key ] );
 			}
 		}
 
-		if ( $address_updated ) {
-			delete_term_meta( $term_id, '_venue_coordinates' );
-			self::maybe_geocode_venue( $term_id );
+		if ( ! empty( $changes ) ) {
+			VenueProfileMutations::updateSystem( (int) $term_id, $changes );
 		}
 	}
 

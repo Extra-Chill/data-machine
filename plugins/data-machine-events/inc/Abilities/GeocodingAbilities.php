@@ -352,7 +352,13 @@ class GeocodingAbilities {
 
 			// Clear existing coordinates if force mode.
 			if ( $force && ! empty( $coords ) ) {
-				delete_term_meta( $venue->term_id, '_venue_coordinates' );
+				\DataMachineEvents\Core\VenueProfileMutations::updateSystem(
+					(int) $venue->term_id,
+					array(
+						'coordinates' => '',
+						'timezone'    => '',
+					)
+				);
 			}
 
 			$geocoded = Venue_Taxonomy::maybe_geocode_venue( $venue->term_id );

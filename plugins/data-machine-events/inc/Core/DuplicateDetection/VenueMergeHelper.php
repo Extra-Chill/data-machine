@@ -238,23 +238,30 @@ class VenueMergeHelper {
 	 * @return array<int,string> Meta keys filled (e.g. ["_venue_phone", "_venue_zip"]).
 	 */
 	private static function fill_empty_meta( int $winner_id, int $loser_id ): array {
-		$filled = array();
+		$incoming = array();
 
 		foreach ( Venue_Taxonomy::$meta_fields as $field => $meta_key ) {
-			$winner_value = get_term_meta( $winner_id, $meta_key, true );
-			if ( ! empty( $winner_value ) ) {
-				continue;
-			}
-
 			$loser_value = get_term_meta( $loser_id, $meta_key, true );
-			if ( empty( $loser_value ) ) {
-				continue;
+			if ( ! empty( $loser_value ) ) {
+				$incoming[ $field ] = $loser_value;
 			}
-
-			update_term_meta( $winner_id, $meta_key, $loser_value );
-			$filled[] = $meta_key;
 		}
 
+		$result = \DataMachineEvents\Core\VenueProfileMutations::updateSystem(
+			$winner_id,
+			$incoming,
+			\DataMachineEvents\Core\VenueProfileMutations::STRATEGY_FILL_EMPTY
+		);
+		if ( is_wp_error( $result ) ) {
+			return array();
+		}
+
+		$filled = array();
+		foreach ( $result['updated_fields'] as $field ) {
+			if ( isset( Venue_Taxonomy::$meta_fields[ $field ] ) ) {
+				$filled[] = Venue_Taxonomy::$meta_fields[ $field ];
+			}
+		}
 		return $filled;
 	}
 

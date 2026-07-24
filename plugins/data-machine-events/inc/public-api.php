@@ -243,6 +243,37 @@ if ( ! function_exists( 'data_machine_events_get_venue_address' ) ) {
 	}
 }
 
+if ( ! function_exists( 'data_machine_events_get_venue_profile' ) ) {
+	/**
+	 * Read the bounded editable venue profile and optimistic revision.
+	 *
+	 * Consumers must authorize the caller before invoking this function.
+	 *
+	 * @param int $term_id Venue term ID.
+	 * @return array|\WP_Error
+	 */
+	function data_machine_events_get_venue_profile( int $term_id ): array|\WP_Error {
+		return \DataMachineEvents\Core\VenueProfileMutations::read( $term_id );
+	}
+}
+
+if ( ! function_exists( 'data_machine_events_update_venue_profile' ) ) {
+	/**
+	 * Update bounded editable venue fields with optimistic concurrency.
+	 *
+	 * Consumers must authorize the caller before invoking this function.
+	 * Coordinates, timezone, slug, identity, and unrelated metadata are owner-only.
+	 *
+	 * @param int    $term_id           Venue term ID.
+	 * @param array  $changes           Editable field changes.
+	 * @param string $expected_revision Revision returned by the read contract.
+	 * @return array|\WP_Error
+	 */
+	function data_machine_events_update_venue_profile( int $term_id, array $changes, string $expected_revision ): array|\WP_Error {
+		return \DataMachineEvents\Core\VenueProfileMutations::updateProfile( $term_id, $changes, $expected_revision );
+	}
+}
+
 if ( ! function_exists( 'data_machine_events_get_promoter_data' ) ) {
 	/**
 	 * Get raw promoter term metadata.

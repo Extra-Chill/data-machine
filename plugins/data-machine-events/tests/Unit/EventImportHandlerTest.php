@@ -23,7 +23,7 @@ class EventImportHandlerTest extends WP_UnitTestCase {
 
 		// Create a concrete implementation for testing
 		$this->handler = new class( 'test_handler' ) extends EventImportHandler {
-			public function get_fetch_data( \DataMachine\Core\ExecutionContext $context ): array {
+			protected function executeFetch( array $config, \DataMachine\Core\ExecutionContext $context ): array {
 				return array();
 			}
 		};

@@ -419,7 +419,15 @@ class TimezoneAbilities {
 				)
 			);
 		} elseif ( ! empty( $timezone ) ) {
-			update_term_meta( $venue_id, '_venue_timezone', sanitize_text_field( $timezone ) );
+			$result = \DataMachineEvents\Core\VenueProfileMutations::updateSystem( (int) $venue_id, array( 'timezone' => $timezone ) );
+			if ( is_wp_error( $result ) ) {
+				return array(
+					'event'  => $event_id,
+					'title'  => $post->post_title,
+					'status' => 'failed',
+					'error'  => $result->get_error_message(),
+				);
+			}
 			$timezone_source = 'provided';
 
 			do_action(

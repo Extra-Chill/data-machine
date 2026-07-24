@@ -52,15 +52,24 @@ jobs:
           app-id: ${{ secrets.HOMEBOY_APP_ID }}
           private-key: ${{ secrets.HOMEBOY_APP_PRIVATE_KEY }}
 
-      - name: Verify MySQL advisory-lock contract
+      - name: Verify canonical venue mutation contract
         if: matrix.command == 'review test'
+        timeout-minutes: 2
         env:
           DME_MYSQL_TEST_DSN: mysql:host=127.0.0.1;port=3306;dbname=homeboy_wptests
           DME_MYSQL_TEST_USER: root
           DME_MYSQL_TEST_PASSWORD: ''
         run: php tests/Integration/mysql-lock-smoke.php
 
+      - name: Prepare Data Machine validation dependency
+        run: |
+          git clone --depth 1 https://github.com/Extra-Chill/data-machine.git /tmp/data-machine
+          composer install --working-dir=/tmp/data-machine --no-dev --no-interaction --no-progress --prefer-dist --classmap-authoritative
+
       - name: Run Homeboy ${{ matrix.command }}
+        env:
+          HOMEBOY_SETTINGS_JSON: '{"database_type":"mysql","validation_dependencies":["/tmp/data-machine"]}'
+          HOMEBOY_WORDPRESS_DEPENDENCY_PATHS: /tmp/data-machine
         uses: Extra-Chill/homeboy-action@v2
         with:
           commands: ${{ matrix.command }}

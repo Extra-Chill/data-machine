@@ -52,13 +52,28 @@ class StubbedMissingVenueAddressesCommand extends CheckMissingVenueAddressesComm
 }
 
 class CheckMissingVenueAddressesCommandTest extends WP_UnitTestCase {
+	/** @var int[] */
+	private array $term_ids = array();
 
 	public function setUp(): void {
 		parent::setUp();
+		global $wpdb;
+		$wpdb->query( 'COMMIT' );
+		$wpdb->query( 'SET autocommit = 1' );
 
 		if ( ! taxonomy_exists( 'venue' ) ) {
 			Venue_Taxonomy::register();
 		}
+	}
+
+	public function tearDown(): void {
+		global $wpdb;
+		foreach ( array_reverse( $this->term_ids ) as $term_id ) {
+			wp_delete_term( $term_id, 'venue' );
+		}
+		$wpdb->query( 'SET autocommit = 0' );
+		$wpdb->query( 'START TRANSACTION' );
+		parent::tearDown();
 	}
 
 	private function make_venue( string $name, array $meta = array() ): int {
@@ -66,6 +81,7 @@ class CheckMissingVenueAddressesCommandTest extends WP_UnitTestCase {
 		$this->assertNotInstanceOf( \WP_Error::class, $term );
 
 		$term_id = (int) $term['term_id'];
+		$this->term_ids[] = $term_id;
 		foreach ( $meta as $key => $value ) {
 			update_term_meta( $term_id, $key, $value );
 		}

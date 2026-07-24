@@ -51,6 +51,7 @@ namespace DataMachineEvents\Cli\Check;
 use DataMachineEvents\Core\NominatimClient;
 use DataMachineEvents\Core\Venue_Taxonomy;
 use DataMachineEvents\Core\DuplicateDetection\VenueMergeHelper;
+use DataMachineEvents\Core\VenueProfileMutations;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -297,6 +298,7 @@ class CheckMissingVenueAddressesCommand {
 	 */
 	private function apply_smart_merge( int $term_id, array $components, bool $dry_run ): array {
 		$filled = array();
+		$pending = array();
 
 		foreach ( self::ADDRESS_META_KEYS as $field => $meta_key ) {
 			$existing = (string) get_term_meta( $term_id, $meta_key, true );
@@ -304,19 +306,30 @@ class CheckMissingVenueAddressesCommand {
 				continue;
 			}
 
-			$incoming = trim( (string) ( $components[ $field ] ?? '' ) );
-			if ( '' === $incoming ) {
+			$incoming_value = trim( (string) ( $components[ $field ] ?? '' ) );
+			if ( '' === $incoming_value ) {
 				continue;
 			}
 
-			if ( ! $dry_run ) {
-				update_term_meta( $term_id, $meta_key, $incoming );
-			}
-
-			$filled[] = $meta_key;
+			$filled[]          = $meta_key;
+			$pending[ $field ] = $incoming_value;
 		}
 
-		return $filled;
+		if ( $dry_run || empty( $pending ) ) {
+			return $filled;
+		}
+
+		$result = VenueProfileMutations::updateSystem( $term_id, $pending, VenueProfileMutations::STRATEGY_FILL_EMPTY );
+		if ( is_wp_error( $result ) ) {
+			return array();
+		}
+
+		return array_values(
+			array_intersect(
+				array_values( self::ADDRESS_META_KEYS ),
+				array_map( static fn( string $field ): string => self::ADDRESS_META_KEYS[ $field ] ?? '', $result['updated_fields'] )
+			)
+		);
 	}
 
 	/**
