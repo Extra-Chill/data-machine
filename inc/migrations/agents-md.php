@@ -16,8 +16,8 @@
  *   no-noise behavior on installs with no coding agent.
  * - ON: core registers the AGENTS.md composable file (so `wp datamachine memory
  *   compose AGENTS.md` writes it and auto-regeneration keeps it fresh) and the
- *   core-owned sections, including the `datamachine` section whose command list
- *   is REFLECTED from core's registered command classes (never hand-typed).
+ *   core-owned sections, including concise Data Machine routing and discovery
+ *   guidance. The live CLI help remains the complete command authority.
  *
  * Why composition lives in core: core already owns SectionRegistry,
  * MemoryFileRegistry, ComposableFileGenerator, ComposableFileInvalidation, and
@@ -32,7 +32,6 @@ defined( 'ABSPATH' ) || exit;
 
 use DataMachine\Engine\AI\MemoryFileRegistry;
 use DataMachine\Engine\AI\SectionRegistry;
-use DataMachine\Cli\CommandRegistry;
 
 /**
  * Whether AGENTS.md composition is enabled for this install.
@@ -86,7 +85,7 @@ function datamachine_register_agents_md_file(): void {
  *
  * Sections registered here describe Data Machine itself. The external coding
  * runtime installer owns generic WordPress coding guidance, while Data Machine
- * Code owns its `datamachine-code` section and workspace inventory.
+ * Code owns its workspace lifecycle section.
  *
  * @return void
  */
@@ -119,7 +118,7 @@ MD;
 		array_merge( $core_meta, array( 'freshness' => 'generated' ) )
 	);
 
-	// The reflected `datamachine` command-surface section.
+	// Data Machine routing and discovery guidance.
 	SectionRegistry::register(
 		'AGENTS.md',
 		'datamachine',
@@ -127,8 +126,8 @@ MD;
 		'datamachine_agents_md_render_datamachine_section',
 		array(
 			'owner'      => 'data-machine',
-			'freshness'  => 'snapshot',
-			'conditions' => 'Registered when DATAMACHINE_COMPOSE_AGENTS_MD is enabled; command list reflected from registered command classes.',
+			'freshness'  => 'static',
+			'conditions' => 'Registered when DATAMACHINE_COMPOSE_AGENTS_MD is enabled.',
 		)
 	);
 
@@ -157,159 +156,30 @@ MD;
 /**
  * Render the `## Data Machine` AGENTS.md section.
  *
- * The command list is reflected from CommandRegistry::map() — the same map that
- * feeds WP-CLI registration in Bootstrap.php — so adding or renaming a
- * `datamachine` subcommand surfaces here automatically with no heredoc edit, and
- * a command removed from core (e.g. the now-relocated `analytics`) disappears
- * from the documentation by construction.
+ * Persistent agent context carries ownership, routing, and discovery guidance.
+ * The live WP-CLI help remains authoritative for the complete command map.
  *
  * @return string
  */
 function datamachine_agents_md_render_datamachine_section(): string {
 	$wp = datamachine_agents_md_wp_cli_cmd();
 
-	$lines   = array();
-	$lines[] = '## Data Machine';
-	$lines[] = '';
-	$lines[] = 'Data Machine is your operating layer — memory, automation, and orchestration via WP-CLI.';
-	$lines[] = '';
-	$lines[] = "Discover the full command surface: `{$wp} datamachine --help`. Always run `--help` on any subcommand to see its options.";
-	$lines[] = '';
+	return <<<MD
+## Data Machine
 
-	foreach ( datamachine_agents_md_command_groups() as $command => $subcommands ) {
-		$pipe = implode( '|', $subcommands );
+Data Machine is the WordPress-side operating layer for memory, automation, content operations, communication, agent configuration, and system execution.
 
-		if ( '' !== $pipe ) {
-			$lines[] = "- `{$wp} {$command} {$pipe}`";
-		} else {
-			$lines[] = "- `{$wp} {$command}`";
-		}
-	}
+**Default routing**
+- Memory and composed context: `{$wp} datamachine memory --help`
+- Flows and pipelines: `{$wp} datamachine flows` and `{$wp} datamachine pipelines`
+- Job and worker state: `{$wp} datamachine jobs --help` and `{$wp} datamachine worker --help`
+- Content and media operations: `{$wp} datamachine posts --help`, `{$wp} datamachine blocks --help`, or `{$wp} datamachine image --help`
+- Communication and approval queues: `{$wp} datamachine email --help` and `{$wp} datamachine pending-actions --help`
+- Agent and system configuration: `{$wp} datamachine agent --help` and `{$wp} datamachine system --help`
 
-	$lines[] = '';
-	$lines[] = 'Use `--help` on any command to discover options and subcommands.';
-
-	return implode( "\n", $lines );
-}
-
-/**
- * Build the ordered command => subcommand-names map for the section.
- *
- * Reflects each command class via the shared CliCommandIntrospector (preferred)
- * and degrades to a local reflection fallback when the shared helper is
- * unavailable or lacks the method. De-duplicates by class so singular/plural
- * aliases that resolve to the same class document once, preserving the first
- * registered spelling.
- *
- * @return array<string, string[]> Command label => ordered subcommand names.
- */
-function datamachine_agents_md_command_groups(): array {
-	$groups = array();
-	$seen   = array();
-
-	foreach ( CommandRegistry::map() as $command => $command_class ) {
-		if ( isset( $seen[ $command_class ] ) ) {
-			continue;
-		}
-		$seen[ $command_class ] = true;
-
-		$groups[ $command ] = datamachine_agents_md_subcommand_names( $command_class );
-	}
-
-	return $groups;
-}
-
-/**
- * Resolve a command class's subcommand names, preferring the shared helper.
- *
- * @param class-string $command_class Command class.
- * @return string[] Ordered subcommand names ('__default' omitted).
- */
-function datamachine_agents_md_subcommand_names( string $command_class ): array {
-	$introspector = '\\DataMachine\\Engine\\AI\\CliCommandIntrospector';
-
-	if ( class_exists( $introspector ) && method_exists( $introspector, 'describe_class' ) ) {
-		$subcommands = call_user_func( array( $introspector, 'describe_class' ), $command_class );
-		$names       = array();
-		foreach ( (array) $subcommands as $sub ) {
-			$name = is_array( $sub ) ? ( $sub['name'] ?? '' ) : '';
-			if ( '' === $name || '__default' === $name ) {
-				continue;
-			}
-			$names[] = $name;
-		}
-
-		// describe_class returns [] for classes whose only subcommand is an
-		// __invoke (flat invoke commands) on helper versions that predate
-		// __invoke support (#2639). Fall back locally so those still document.
-		if ( ! empty( $names ) ) {
-			return $names;
-		}
-	}
-
-	return datamachine_agents_md_reflect_subcommand_names( $command_class );
-}
-
-/**
- * Local reflection fallback for subcommand names.
- *
- * Context-safe: reflects over the class source without touching the live WP-CLI
- * runner. Mirrors WP-CLI's subcommand resolution — public, non-static,
- * own-declared methods; `@subcommand <name>` annotation wins over the method
- * name; magic methods are skipped except `__invoke`, which maps to the namespace
- * itself ('__default') and is therefore omitted from the documented list.
- *
- * @param class-string $command_class Command class.
- * @return string[] Ordered subcommand names.
- */
-function datamachine_agents_md_reflect_subcommand_names( string $command_class ): array {
-	if ( ! class_exists( $command_class ) ) {
-		return array();
-	}
-
-	try {
-		$reflection = new \ReflectionClass( $command_class );
-	} catch ( \Throwable $e ) {
-		return array();
-	}
-
-	$names = array();
-
-	foreach ( $reflection->getMethods( \ReflectionMethod::IS_PUBLIC ) as $method ) {
-		if ( $method->isStatic() ) {
-			continue;
-		}
-		if ( $method->getDeclaringClass()->getName() !== $reflection->getName() ) {
-			continue;
-		}
-
-		$method_name = $method->getName();
-		$doc         = $method->getDocComment();
-		$doc         = is_string( $doc ) ? $doc : '';
-
-		$annotated = '';
-		if ( preg_match( '/@subcommand\s+(\S+)/', $doc, $m ) ) {
-			$annotated = $m[1];
-		}
-
-		if ( '__invoke' === $method_name && '' === $annotated ) {
-			// Flat invoke command — the namespace itself, no sub-word.
-			continue;
-		}
-
-		if ( '' !== $annotated ) {
-			$names[] = $annotated;
-			continue;
-		}
-
-		if ( 0 === strpos( $method_name, '__' ) ) {
-			continue;
-		}
-
-		$names[] = str_replace( '_', '-', $method_name );
-	}
-
-	return $names;
+**Discovery**
+Use `{$wp} datamachine --help` for the live command map and `{$wp} datamachine <command> --help` for the current options and subcommands.
+MD;
 }
 
 /**

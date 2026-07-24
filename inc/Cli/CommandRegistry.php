@@ -3,16 +3,14 @@
  * Command Registry
  *
  * Single source of truth mapping `wp datamachine ...` command strings to their
- * implementing command classes. Both the WP-CLI bootstrap (which calls
- * WP_CLI::add_command for each entry) and the gated AGENTS.md `datamachine`
- * section generator (which reflects over each class to enumerate real
- * subcommands) read from this map, so the documented CLI surface can never
- * drift from what is actually registered.
+ * implementing command classes. The WP-CLI bootstrap calls
+ * WP_CLI::add_command for each entry. Generated agent guidance advertises a
+ * bounded set of routing entrypoints and tests those roots against this map;
+ * live `--help` remains authoritative for the complete command surface.
  *
- * This mirrors the pattern proven in extrachill-cli's CommandRegistry — the map
- * is the registration source AND the documentation source, eliminating the
- * hand-typed heredoc that previously narrated core's command surface from a
- * downstream plugin (Extra-Chill/data-machine#2640, #2613).
+ * This keeps command registration centralized while Data Machine itself owns
+ * the concise routing guidance previously narrated by a downstream plugin
+ * (Extra-Chill/data-machine#2640, #2613).
  *
  * @package DataMachine\Cli
  */
@@ -28,12 +26,11 @@ class CommandRegistry {
 	 *
 	 * Keys are the exact strings passed to WP_CLI::add_command (the command
 	 * namespace, e.g. "datamachine memory" or "datamachine step-types").
-	 * Order here determines both registration order and documentation order.
+	 * Order here determines registration order.
 	 *
 	 * Singular/plural aliases that resolve to the same class are intentionally
 	 * included so `WP_CLI::add_command` registers every accepted spelling. The
-	 * AGENTS.md section generator de-duplicates by class when grouping, so the
-	 * documented surface lists each command once.
+	 * AGENTS.md introspection helpers de-duplicate by class when grouping.
 	 *
 	 * @return array<string, class-string>
 	 */
