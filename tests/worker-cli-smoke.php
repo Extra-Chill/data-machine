@@ -46,9 +46,12 @@ assert_worker_contains( 'DrainCommand::ensureCliMemoryLimit()', $worker_src, 'wo
 assert_worker_contains( "'acquire_lock' => false", $worker_src, 'worker internal drain does not fight outer lock' );
 assert_worker_contains( 'PendingActionStore::summary', $worker_src, 'worker reads pending-action gate through the store' );
 assert_worker_contains( 'if ( $stop_on_pending_actions && self::pendingActionCount() > 0 )', $worker_src, 'worker only reads pending-action gate when the stop option is enabled' );
-assert_worker_contains( 'JobsSummaryAbility', $worker_src, 'worker reads job status through the existing summary ability' );
-assert_worker_contains( "'compact' => true", $worker_src, 'worker status uses compact job summary' );
-assert_worker_contains( 'jobStatusCount', $worker_src, 'worker reads normalized job status buckets' );
+assert_worker_contains( 'jobStatusCounts', $worker_src, 'worker reads global job status through the repository' );
+assert_worker_contains( "get_jobs_count( array( 'status' => 'processing' ), true )", $worker_src, 'worker counts processing jobs without loading job rows' );
+assert_worker_contains( "get_jobs_count( array( 'status' => 'pending' ), true )", $worker_src, 'worker counts pending jobs without loading job rows' );
+assert_worker_contains( "get_jobs_count( array( 'status' => 'failed' ), true )", $worker_src, 'worker counts failed jobs without loading job rows' );
+assert_worker_not_contains( 'JobsSummaryAbility', $worker_src, 'worker does not cross the ownership-gated jobs summary ability' );
+assert_worker_contains( "PendingActionStore::summary( array( 'status' => 'pending' ) )", $worker_src, 'pending-action gate avoids building the full worker status snapshot' );
 assert_worker_contains( 'stop_on_pending_actions', $worker_src, 'worker can stop at approval gates' );
 assert_worker_contains( 'max_passes', $worker_src, 'worker supports bounded pass counts' );
 assert_worker_contains( 'stop_before_timeout', $worker_src, 'worker exits before external supervisor timeouts' );
