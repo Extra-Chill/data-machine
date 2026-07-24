@@ -16,13 +16,22 @@ use WP_REST_Server;
 use DataMachineEvents\Core\Event_Post_Type;
 use DataMachineEvents\Core\EventDatesTable;
 use DataMachineEvents\Core\Venue_Taxonomy;
+use const DataMachineEvents\Api\API_NAMESPACE;
 
 class EventRestControllerTest extends WP_UnitTestCase {
 
 	protected $server;
+	private int $original_user_id;
 
 	public function setUp(): void {
+		// Create the table before WP_UnitTestCase rewrites CREATE TABLE as temporary.
+		if ( ! EventDatesTable::table_exists() ) {
+			EventDatesTable::create_table();
+		}
+
 		parent::setUp();
+		$this->original_user_id = get_current_user_id();
+		wp_set_current_user( 0 );
 
 		global $wp_rest_server;
 		$this->server = $wp_rest_server = new WP_REST_Server();
@@ -40,14 +49,21 @@ class EventRestControllerTest extends WP_UnitTestCase {
 	public function tearDown(): void {
 		global $wp_rest_server;
 		$wp_rest_server = null;
+		wp_set_current_user( $this->original_user_id );
 		parent::tearDown();
+	}
+
+	private function calendar_request(): WP_REST_Request {
+		$request = new WP_REST_Request( 'GET', '/' . API_NAMESPACE . '/events/calendar' );
+		$request->set_header( 'X-Requested-With', 'XMLHttpRequest' );
+		return $request;
 	}
 
 	public function test_calendar_endpoint_registered() {
 		$routes = $this->server->get_routes();
 
 		$this->assertArrayHasKey(
-			'/datamachine/v1/events/calendar',
+			'/' . API_NAMESPACE . '/events/calendar',
 			$routes,
 			'Calendar endpoint should be registered'
 		);
@@ -58,7 +74,7 @@ class EventRestControllerTest extends WP_UnitTestCase {
 
 		$has_venues_endpoint = false;
 		foreach ( array_keys( $routes ) as $route ) {
-			if ( strpos( $route, '/datamachine/v1/events/venues' ) !== false ) {
+			if ( strpos( $route, '/' . API_NAMESPACE . '/events/venues' ) !== false ) {
 				$has_venues_endpoint = true;
 				break;
 			}
@@ -71,7 +87,7 @@ class EventRestControllerTest extends WP_UnitTestCase {
 		$routes = $this->server->get_routes();
 
 		$this->assertArrayHasKey(
-			'/datamachine/v1/events/filters',
+			'/' . API_NAMESPACE . '/events/filters',
 			$routes,
 			'Filters endpoint should be registered'
 		);
@@ -88,16 +104,17 @@ class EventRestControllerTest extends WP_UnitTestCase {
 		);
 
 		// Set event datetime in the future (table is the query source of truth).
-		$future_datetime = date( 'Y-m-d H:i:s', strtotime( '+1 week' ) );
+		$future_datetime = current_datetime()->modify( '+1 week' )->format( 'Y-m-d H:i:s' );
 		EventDatesTable::upsert( $post_id, $future_datetime );
 
-		$request  = new WP_REST_Request( 'GET', '/datamachine/v1/events/calendar' );
+		$request  = $this->calendar_request();
+		$request->set_param( 'format', 'data' );
 		$response = $this->server->dispatch( $request );
 
-		$this->assertEquals( 200, $response->get_status() );
+		$this->assertSame( 200, $response->get_status() );
 
 		$data = $response->get_data();
-		$this->assertIsArray( $data );
+		$this->assertSame( array( $post_id ), array_column( $data['events'], 'id' ) );
 
 		// Cleanup
 		wp_delete_post( $post_id, true );
@@ -114,59 +131,61 @@ class EventRestControllerTest extends WP_UnitTestCase {
 			)
 		);
 
-		$future_datetime = date( 'Y-m-d H:i:s', strtotime( '+1 week' ) );
+		$future_datetime = current_datetime()->modify( '+1 week' )->format( 'Y-m-d H:i:s' );
 		EventDatesTable::upsert( $post_id, $future_datetime );
 
-		$request = new WP_REST_Request( 'GET', '/datamachine/v1/events/calendar' );
+		$request = $this->calendar_request();
 		$request->set_param( 'event_search', $unique_term );
+		$request->set_param( 'format', 'data' );
 		$response = $this->server->dispatch( $request );
 
-		$this->assertEquals( 200, $response->get_status() );
+		$this->assertSame( 200, $response->get_status() );
+		$this->assertSame( array( $post_id ), array_column( $response->get_data()['events'], 'id' ) );
 
 		// Cleanup
 		wp_delete_post( $post_id, true );
 	}
 
 	public function test_calendar_endpoint_accepts_date_range() {
-		$request = new WP_REST_Request( 'GET', '/datamachine/v1/events/calendar' );
-		$request->set_param( 'date_start', '2026-01-01' );
-		$request->set_param( 'date_end', '2026-12-31' );
+		$request = $this->calendar_request();
+		$date    = current_datetime()->modify( '+1 month' );
+		$request->set_param( 'date_start', $date->format( 'Y-m-01' ) );
+		$request->set_param( 'date_end', $date->format( 'Y-m-t' ) );
 		$response = $this->server->dispatch( $request );
 
-		$this->assertEquals( 200, $response->get_status() );
+		$this->assertSame( 200, $response->get_status() );
 	}
 
 	public function test_calendar_endpoint_accepts_pagination() {
-		$request = new WP_REST_Request( 'GET', '/datamachine/v1/events/calendar' );
+		$request = $this->calendar_request();
 		$request->set_param( 'paged', 1 );
 		$response = $this->server->dispatch( $request );
 
-		$this->assertEquals( 200, $response->get_status() );
+		$this->assertSame( 200, $response->get_status() );
 
 		$data = $response->get_data();
 		$this->assertIsArray( $data );
 	}
 
 	public function test_calendar_data_response_uses_canonical_empty_state(): void {
-		$request = new WP_REST_Request( 'GET', '/datamachine/v1/events/calendar' );
-		$request->set_header( 'X-Requested-With', 'XMLHttpRequest' );
+		$request = $this->calendar_request();
 		$request->set_param( 'format', 'data' );
 		$request->set_param( 'month', '2999-12' );
 		$response = $this->server->dispatch( $request );
 		$data     = $response->get_data();
 
 		$this->assertSame( 200, $response->get_status() );
-		$this->assertSame( 3, $data['schema']['version'] );
+		$this->assertSame( 4, $data['schema']['version'] );
 		$this->assertSame( array(), $data['grouping']['ordered_dates'] );
 		$this->assertStringContainsString( 'data-machine-events-no-events', $data['empty_html'] );
 		$this->assertStringContainsString( 'data-machine-events-no-events-today-link', $data['empty_html'] );
 	}
 
 	public function test_filters_endpoint_returns_taxonomies() {
-		$request  = new WP_REST_Request( 'GET', '/datamachine/v1/events/filters' );
+		$request  = new WP_REST_Request( 'GET', '/' . API_NAMESPACE . '/events/filters' );
 		$response = $this->server->dispatch( $request );
 
-		$this->assertEquals( 200, $response->get_status() );
+		$this->assertSame( 200, $response->get_status() );
 
 		$data = $response->get_data();
 		$this->assertIsArray( $data );
@@ -174,7 +193,7 @@ class EventRestControllerTest extends WP_UnitTestCase {
 
 	public function test_venues_check_duplicate_requires_auth() {
 		// Test that non-authenticated requests are rejected
-		$request = new WP_REST_Request( 'GET', '/datamachine/v1/events/venues/check-duplicate' );
+		$request = new WP_REST_Request( 'GET', '/' . API_NAMESPACE . '/events/venues/check-duplicate' );
 		$request->set_param( 'name', 'Test Venue' );
 		$response = $this->server->dispatch( $request );
 
@@ -191,17 +210,15 @@ class EventRestControllerTest extends WP_UnitTestCase {
 		$admin_id = $this->factory->user->create( array( 'role' => 'administrator' ) );
 		wp_set_current_user( $admin_id );
 
-		$request = new WP_REST_Request( 'GET', '/datamachine/v1/events/venues/check-duplicate' );
+		$request = new WP_REST_Request( 'GET', '/' . API_NAMESPACE . '/events/venues/check-duplicate' );
 		$request->set_param( 'name', 'Non Existent Venue ' . uniqid() );
 		$response = $this->server->dispatch( $request );
 
-		$this->assertEquals( 200, $response->get_status() );
+		$this->assertSame( 200, $response->get_status() );
 
 		$data = $response->get_data();
 		$this->assertArrayHasKey( 'is_duplicate', $data );
 		$this->assertFalse( $data['is_duplicate'] );
 
-		// Cleanup
-		wp_set_current_user( 0 );
 	}
 }

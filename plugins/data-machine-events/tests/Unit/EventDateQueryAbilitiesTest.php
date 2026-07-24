@@ -218,8 +218,6 @@ class EventDateQueryAbilitiesTest extends WP_UnitTestCase {
 	}
 
 	public function test_matching_ids_sql_preserves_consumer_constraints_without_querying(): void {
-		global $wpdb;
-
 		$filter = static function ( array $query_args, array $input ): array {
 			if ( 'sql-capture-scope' === ( $input['scope_token'] ?? '' ) ) {
 				$query_args['post__in'] = array( 123, 456 );
@@ -227,7 +225,12 @@ class EventDateQueryAbilitiesTest extends WP_UnitTestCase {
 			return $query_args;
 		};
 		add_filter( 'data_machine_events_calendar_query_args', $filter, 10, 2 );
-		$queries_before = $wpdb->num_queries;
+		$executed_queries = array();
+		$query_observer   = static function ( string $query ) use ( &$executed_queries ): string {
+			$executed_queries[] = $query;
+			return $query;
+		};
+		add_filter( 'query', $query_observer );
 		try {
 			$sql = ( new EventDateQueryAbilities() )->buildMatchingPostIdsSql(
 				array(
@@ -238,9 +241,10 @@ class EventDateQueryAbilitiesTest extends WP_UnitTestCase {
 			);
 		} finally {
 			remove_filter( 'data_machine_events_calendar_query_args', $filter, 10 );
+			remove_filter( 'query', $query_observer );
 		}
 
-		$this->assertSame( $queries_before, $wpdb->num_queries );
+		$this->assertSame( array(), $executed_queries );
 		$this->assertStringContainsString( 'SELECT DISTINCT', $sql );
 		$this->assertStringContainsString( '123,456', str_replace( ' ', '', $sql ) );
 		$this->assertStringContainsString( 'needle', $sql );
@@ -249,22 +253,26 @@ class EventDateQueryAbilitiesTest extends WP_UnitTestCase {
 	}
 
 	public function test_matching_ids_sql_handles_large_consumer_sets_without_materializing_results(): void {
-		global $wpdb;
-
 		$large_set = range( 1, 17000 );
 		$filter    = static function ( array $query_args ) use ( $large_set ): array {
 			$query_args['post__in'] = $large_set;
 			return $query_args;
 		};
 		add_filter( 'data_machine_events_calendar_query_args', $filter );
-		$queries_before = $wpdb->num_queries;
+		$executed_queries = array();
+		$query_observer   = static function ( string $query ) use ( &$executed_queries ): string {
+			$executed_queries[] = $query;
+			return $query;
+		};
+		add_filter( 'query', $query_observer );
 		try {
 			$sql = ( new EventDateQueryAbilities() )->buildMatchingPostIdsSql( array( 'scope_token' => 'large-set' ) );
 		} finally {
 			remove_filter( 'data_machine_events_calendar_query_args', $filter );
+			remove_filter( 'query', $query_observer );
 		}
 
-		$this->assertSame( $queries_before, $wpdb->num_queries );
+		$this->assertSame( array(), $executed_queries );
 		$this->assertStringContainsString( '17000', $sql );
 		$this->assertStringNotContainsString( '%d', $sql );
 		$this->assertStringNotContainsString( ' LIMIT ', strtoupper( $sql ) );

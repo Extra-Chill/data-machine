@@ -11,7 +11,6 @@
 namespace DataMachineEvents\Tests\Unit;
 
 use WP_UnitTestCase;
-use function WP_Block_Type_Registry\get_instance;
 
 class BlockRegistrationTest extends WP_UnitTestCase {
 
@@ -25,7 +24,7 @@ class BlockRegistrationTest extends WP_UnitTestCase {
 		foreach ( $GLOBALS['wp_filter'][ 'init' ]->callbacks as $priority => $callbacks ) {
 			foreach ( $callbacks as $callback ) {
 				if ( is_array( $callback['function'] ) ) {
-					if ( $callback['function'][0] === $plugin && 'register_blocks'=== $callback['function'][1] ) {
+					if ( $callback['function'][0] === $plugin && 'register_blocks' === $callback['function'][1] ) {
 						$has_init_hook = true;
 						break 2;
 					}
@@ -37,14 +36,22 @@ class BlockRegistrationTest extends WP_UnitTestCase {
 	}
 
 	public function test_blocks_registered_after_user_initialization() {
-		$this->assertTrue( current_user_can( 'read' ), 'Current user should be initialized' );
+		$original_user_id = get_current_user_id();
+		$user_id          = self::factory()->user->create( array( 'role' => 'subscriber' ) );
+		wp_set_current_user( $user_id );
 
-		$block_registry      = \WP_Block_Type_Registry::get_instance();
-		$calendar_block      = $block_registry->get_registered( 'data-machine-events/calendar' );
-		$event_details_block = $block_registry->get_registered( 'data-machine-events/event-details' );
+		try {
+			$this->assertTrue( current_user_can( 'read' ), 'Current user should be initialized' );
 
-		$this->assertNotNull( $calendar_block, 'Calendar block should be registered' );
-		$this->assertNotNull( $event_details_block, 'Event Details block should be registered' );
+			$block_registry      = \WP_Block_Type_Registry::get_instance();
+			$calendar_block      = $block_registry->get_registered( 'data-machine-events/calendar' );
+			$event_details_block = $block_registry->get_registered( 'data-machine-events/event-details' );
+
+			$this->assertNotNull( $calendar_block, 'Calendar block should be registered' );
+			$this->assertNotNull( $event_details_block, 'Event Details block should be registered' );
+		} finally {
+			wp_set_current_user( $original_user_id );
+		}
 	}
 
 	public function test_calendar_block_has_required_metadata() {
@@ -52,7 +59,7 @@ class BlockRegistrationTest extends WP_UnitTestCase {
 		$block          = $block_registry->get_registered( 'data-machine-events/calendar' );
 
 		$this->assertNotNull( $block, 'Calendar block should be registered' );
-		$this->assertEquals( 'widgets', $block->category, 'Block should be in widgets category' );
+		$this->assertSame( 'widgets', $block->category, 'Block should be in widgets category' );
 	}
 
 	public function test_event_details_block_has_required_metadata() {
@@ -60,6 +67,6 @@ class BlockRegistrationTest extends WP_UnitTestCase {
 		$block          = $block_registry->get_registered( 'data-machine-events/event-details' );
 
 		$this->assertNotNull( $block, 'Event Details block should be registered' );
-		$this->assertEquals( 'widgets', $block->category, 'Block should be in widgets category' );
+		$this->assertSame( 'data-machine-events', $block->category, 'Block should use the plugin category' );
 	}
 }

@@ -11,7 +11,6 @@
 namespace DataMachineEvents\Tests\Unit;
 
 use WP_UnitTestCase;
-use DataMachineEvents\Blocks\Calendar\Calendar;
 use DataMachineEvents\Blocks\Calendar\Pagination\Renderer as Pagination;
 
 class CalendarBlockTest extends WP_UnitTestCase {
@@ -37,31 +36,33 @@ class CalendarBlockTest extends WP_UnitTestCase {
 		$this->assertNotNull( $block->render_callback, 'Block should have render callback' );
 	}
 
-	public function test_pagination_builds_args_correctly() {
-		$pagination = new Pagination();
-
-		$args = $pagination->build_pagination_args( 1, 3 );
-
-		$this->assertIsArray( $args );
-		$this->assertEquals( 1, $args['current'] );
-		$this->assertEquals( 3, $args['total'] );
-	}
-
-	public function test_pagination_sanitizes_query_params() {
-		$pagination = new Pagination();
-
-		$params = array(
-			'page'   => '2',
+	public function test_pagination_exposes_sanitized_public_arguments(): void {
+		$original_get = $_GET;
+		$_GET         = array(
+			'paged'  => '2',
 			'search' => '<script>alert("xss")</script>Test',
-			'nested' => array(
-				'value' => 'test<tag>',
-			),
+			'nested' => array( 'value' => 'test<tag>' ),
 		);
+		$observed_args = null;
+		$filter        = static function ( array $args ) use ( &$observed_args ): array {
+			$observed_args = $args;
+			return $args;
+		};
+		add_filter( 'data_machine_events_pagination_args', $filter );
 
-		$sanitized = $pagination->sanitize_query_params( $params );
+		try {
+			$html = Pagination::render_pagination( 1, 3 );
+		} finally {
+			remove_filter( 'data_machine_events_pagination_args', $filter );
+			$_GET = $original_get;
+		}
 
-		$this->assertIsArray( $sanitized );
-		$this->assertStringNotContainsString( '<script>', $sanitized['search'] ?? '' );
+		$this->assertSame( 1, $observed_args['current'] );
+		$this->assertSame( 3, $observed_args['total'] );
+		$this->assertArrayNotHasKey( 'paged', $observed_args['add_args'] );
+		$this->assertStringNotContainsString( '<script>', $observed_args['add_args']['search'] );
+		$this->assertSame( 'test', $observed_args['add_args']['nested']['value'] );
+		$this->assertStringContainsString( 'data-machine-events-pagination', $html );
 	}
 
 	public function test_calendar_query_args_filter_applied() {
@@ -214,12 +215,6 @@ class CalendarBlockTest extends WP_UnitTestCase {
 		$template_path = DATA_MACHINE_EVENTS_PATH . 'inc/Blocks/Calendar/templates/date-group.php';
 
 		$this->assertFileExists( $template_path, 'Date group template should exist' );
-	}
-
-	public function test_pagination_template_exists() {
-		$template_path = DATA_MACHINE_EVENTS_PATH . 'inc/Blocks/Calendar/templates/pagination.php';
-
-		$this->assertFileExists( $template_path, 'Pagination template should exist' );
 	}
 
 	public function test_no_events_template_exists() {

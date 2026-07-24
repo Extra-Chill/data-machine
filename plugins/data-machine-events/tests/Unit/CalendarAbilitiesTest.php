@@ -7,7 +7,6 @@
 
 namespace DataMachineEvents\Tests\Unit;
 
-use DateTimeImmutable;
 use WP_UnitTestCase;
 use DataMachineEvents\Abilities\CalendarAbilities;
 use DataMachineEvents\Core\Event_Post_Type;
@@ -81,7 +80,7 @@ class CalendarAbilitiesTest extends WP_UnitTestCase {
 	}
 
 	public function test_past_mode_returns_only_completed_events_with_chronological_boundaries(): void {
-		$now         = new DateTimeImmutable( current_time( 'mysql' ) );
+		$now         = current_datetime();
 		$older_past  = $now->modify( '-4 days' );
 		$recent_past = $now->modify( '-1 day' );
 		$future      = $now->modify( '+4 days' );
@@ -107,7 +106,7 @@ class CalendarAbilitiesTest extends WP_UnitTestCase {
 		$term = wp_insert_term( 'Past calendar venue ' . uniqid(), 'venue' );
 		$this->assertNotWPError( $term );
 		$venue_id = (int) $term['term_id'];
-		$now      = new DateTimeImmutable( current_time( 'mysql' ) );
+		$now      = current_datetime();
 		$past     = $now->modify( '-2 days' );
 		$future   = $now->modify( '+2 days' );
 
@@ -129,7 +128,7 @@ class CalendarAbilitiesTest extends WP_UnitTestCase {
 	}
 
 	public function test_upcoming_boundaries_exclude_past_dates_from_ongoing_multi_day_events(): void {
-		$today = new DateTimeImmutable( current_time( 'Y-m-d' ) . ' 12:00:00' );
+		$today = current_datetime()->setTime( 12, 0 );
 		$start = $today->modify( '-3 days' );
 		$end   = $today->modify( '+2 days' );
 
@@ -146,14 +145,19 @@ class CalendarAbilitiesTest extends WP_UnitTestCase {
 		$this->assertSame( $today->format( 'Y-m-d' ), $result['date_boundaries']['start_date'] );
 		$this->assertSame( $end->format( 'Y-m-d' ), $result['date_boundaries']['end_date'] );
 		$this->assertSame( $today->format( 'Y-m-d' ), $result['paged_date_groups'][0]['date'] );
-		$this->assertSame( array( $event_id ), $this->result_post_ids( $result ) );
+		$this->assertSame( 1, $result['event_count'], 'The page count reports unique event posts.' );
+		$this->assertSame(
+			array_fill( 0, 3, $event_id ),
+			$this->result_post_ids( $result ),
+			'A multi-day event has one occurrence in each visible date group.'
+		);
 	}
 
 	public function test_taxonomy_filtered_upcoming_boundaries_include_ongoing_multi_day_events(): void {
 		$term = wp_insert_term( 'Ongoing calendar venue ' . uniqid(), 'venue' );
 		$this->assertNotWPError( $term );
 		$venue_id = (int) $term['term_id'];
-		$today    = new DateTimeImmutable( current_time( 'Y-m-d' ) . ' 12:00:00' );
+		$today    = current_datetime()->setTime( 12, 0 );
 		$start    = $today->modify( '-3 days' );
 		$end      = $today->modify( '+2 days' );
 
@@ -172,11 +176,11 @@ class CalendarAbilitiesTest extends WP_UnitTestCase {
 		$this->assertSame( $today->format( 'Y-m-d' ), $result['date_boundaries']['start_date'] );
 		$this->assertSame( $end->format( 'Y-m-d' ), $result['date_boundaries']['end_date'] );
 		$this->assertSame( $today->format( 'Y-m-d' ), $result['paged_date_groups'][0]['date'] );
-		$this->assertSame( array( $event_id ), $this->result_post_ids( $result ) );
+		$this->assertSame( array_fill( 0, 3, $event_id ), $this->result_post_ids( $result ) );
 	}
 
 	public function test_month_intersects_explicit_date_range(): void {
-		$month_start = new DateTimeImmutable( 'first day of +2 months 00:00:00' );
+		$month_start = current_datetime()->modify( 'first day of +2 months' )->setTime( 0, 0 );
 		$outside     = $month_start->modify( '+4 days' );
 		$inside      = $month_start->modify( '+9 days' );
 		$this->seed_event( 'Outside explicit range', $outside->format( 'Y-m-d 20:00:00' ), $outside->format( 'Y-m-d 22:00:00' ) );
@@ -198,7 +202,7 @@ class CalendarAbilitiesTest extends WP_UnitTestCase {
 	}
 
 	public function test_month_intersects_resolved_scope_and_can_be_empty(): void {
-		$today         = new DateTimeImmutable( current_time( 'Y-m-d' ) . ' 12:00:00' );
+		$today         = current_datetime()->setTime( 12, 0 );
 		$tomorrow      = $today->modify( '+1 day' );
 		$today_id      = $this->seed_event( 'Today scoped event', $today->format( 'Y-m-d 12:00:00' ), $today->format( 'Y-m-d 14:00:00' ) );
 		$future_id     = $this->seed_event( 'Tomorrow unscoped event', $tomorrow->format( 'Y-m-d 12:00:00' ), $tomorrow->format( 'Y-m-d 14:00:00' ) );
@@ -232,7 +236,7 @@ class CalendarAbilitiesTest extends WP_UnitTestCase {
 	}
 
 	public function test_search_constrains_totals_boundaries_and_repeated_date_rows(): void {
-		$date       = new DateTimeImmutable( '+7 days' );
+		$date       = current_datetime()->modify( '+7 days' );
 		$search     = 'needle-' . uniqid();
 		$first_id   = $this->seed_event( "{$search} first", $date->format( 'Y-m-d 18:00:00' ), $date->format( 'Y-m-d 20:00:00' ) );
 		$second_id  = $this->seed_event( "{$search} second", $date->format( 'Y-m-d 21:00:00' ), $date->format( 'Y-m-d 23:00:00' ) );
@@ -254,7 +258,7 @@ class CalendarAbilitiesTest extends WP_UnitTestCase {
 	}
 
 	public function test_search_with_no_matches_returns_empty_boundaries(): void {
-		$date = new DateTimeImmutable( '+8 days' );
+		$date = current_datetime()->modify( '+8 days' );
 		$this->seed_event( 'Existing event', $date->format( 'Y-m-d 20:00:00' ), $date->format( 'Y-m-d 22:00:00' ) );
 
 		$result = $this->abilities->executeGetCalendarPage(
@@ -274,7 +278,7 @@ class CalendarAbilitiesTest extends WP_UnitTestCase {
 	public function test_geo_constrains_totals_boundaries_and_rows(): void {
 		$near_venue = $this->seed_venue( 'Nearby venue', '32.7765,-79.9311' );
 		$far_venue  = $this->seed_venue( 'Far venue', '40.7128,-74.0060' );
-		$near_date  = new DateTimeImmutable( '+9 days' );
+		$near_date  = current_datetime()->modify( '+9 days' );
 		$far_date   = $near_date->modify( '+1 day' );
 		$near_id    = $this->seed_event( 'Nearby event', $near_date->format( 'Y-m-d 20:00:00' ), $near_date->format( 'Y-m-d 22:00:00' ), $near_venue );
 		$this->seed_event( 'Far event', $far_date->format( 'Y-m-d 20:00:00' ), $far_date->format( 'Y-m-d 22:00:00' ), $far_venue );
@@ -307,7 +311,7 @@ class CalendarAbilitiesTest extends WP_UnitTestCase {
 		$this->assertNotWPError( $style );
 		$this->assertNotWPError( $other_style );
 
-		$date   = new DateTimeImmutable( '+10 days' );
+		$date   = current_datetime()->modify( '+10 days' );
 		$search = 'combined-' . uniqid();
 		$terms  = array(
 			'calendar_test_region' => (int) $region['term_id'],
@@ -345,7 +349,7 @@ class CalendarAbilitiesTest extends WP_UnitTestCase {
 	}
 
 	public function test_search_pagination_boundaries_do_not_include_unmatched_dates(): void {
-		$global_start = new DateTimeImmutable( '+12 days' );
+		$global_start = current_datetime()->modify( '+12 days' );
 		$search_start = $global_start->modify( '+10 days' );
 		$search       = 'paged-' . uniqid();
 
@@ -386,7 +390,7 @@ class CalendarAbilitiesTest extends WP_UnitTestCase {
 	}
 
 	public function test_scope_tokens_isolate_warm_boundary_caches_and_rows(): void {
-		$first_date = new DateTimeImmutable( '+30 days' );
+		$first_date = current_datetime()->modify( '+30 days' );
 		$second_date = $first_date->modify( '+1 day' );
 		$first_id = $this->seed_event( 'First scoped event', $first_date->format( 'Y-m-d 20:00:00' ), $first_date->format( 'Y-m-d 22:00:00' ) );
 		$second_id = $this->seed_event( 'Second scoped event', $second_date->format( 'Y-m-d 20:00:00' ), $second_date->format( 'Y-m-d 22:00:00' ) );
@@ -428,7 +432,7 @@ class CalendarAbilitiesTest extends WP_UnitTestCase {
 	}
 
 	public function test_scope_token_keeps_pagination_counter_and_deferred_dates_aligned(): void {
-		$start       = new DateTimeImmutable( '+45 days' );
+		$start       = current_datetime()->modify( '+45 days' );
 		$allowed_ids = array();
 		for ( $day = 0; $day < 6; ++$day ) {
 			$date = $start->modify( "+{$day} days" );
@@ -472,7 +476,7 @@ class CalendarAbilitiesTest extends WP_UnitTestCase {
 	}
 
 	public function test_scope_token_preserves_multi_day_boundary_expansion(): void {
-		$start = new DateTimeImmutable( '+60 days' );
+		$start = current_datetime()->modify( '+60 days' );
 		$end   = $start->modify( '+2 days' );
 		$allowed_id = $this->seed_event( 'Scoped multi-day event', $start->format( 'Y-m-d 20:00:00' ), $end->format( 'Y-m-d 22:00:00' ) );
 		$this->seed_event( 'Unscoped middle event', $start->modify( '+1 day' )->format( 'Y-m-d 20:00:00' ), $start->modify( '+1 day' )->format( 'Y-m-d 22:00:00' ) );
@@ -495,12 +499,13 @@ class CalendarAbilitiesTest extends WP_UnitTestCase {
 		$this->assertSame( 1, $result['total_event_count'] );
 		$this->assertSame( $start->format( 'Y-m-d' ), $result['date_boundaries']['start_date'] );
 		$this->assertSame( $end->format( 'Y-m-d' ), $result['date_boundaries']['end_date'] );
-		$this->assertSame( array( $allowed_id ), $this->result_post_ids( $result ) );
+		$this->assertSame( 1, $result['event_count'] );
+		$this->assertSame( array_fill( 0, 3, $allowed_id ), $this->result_post_ids( $result ) );
 	}
 
 	public function test_search_geo_and_consumer_scope_constraints_stay_aligned(): void {
 		$venue  = $this->seed_venue( 'Scoped search venue', '32.7765,-79.9311' );
-		$date   = new DateTimeImmutable( '+70 days' );
+		$date   = current_datetime()->modify( '+70 days' );
 		$target = $this->seed_event( 'Scoped needle target', $date->format( 'Y-m-d 20:00:00' ), $date->format( 'Y-m-d 22:00:00' ), $venue );
 		$this->seed_event( 'Scoped needle excluded', $date->format( 'Y-m-d 21:00:00' ), $date->format( 'Y-m-d 23:00:00' ), $venue );
 
