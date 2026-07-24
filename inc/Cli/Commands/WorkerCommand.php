@@ -9,10 +9,10 @@
 namespace DataMachine\Cli\Commands;
 
 use DataMachine\Abilities\Engine\DrainJobAbility;
-use DataMachine\Abilities\Job\JobsSummaryAbility;
 use DataMachine\Abilities\Job\RecoverStuckJobsAbility;
 use DataMachine\Cli\BaseCommand;
 use DataMachine\Cli\WorkerLock;
+use DataMachine\Core\Database\Jobs\Jobs;
 use DataMachine\Engine\AI\Actions\PendingActionStore;
 use WP_CLI;
 
@@ -614,8 +614,7 @@ class WorkerCommand extends BaseCommand {
 		$lane            = self::normalizeLane( $lane );
 		$pending_summary = PendingActionStore::summary( array( 'status' => 'pending' ) );
 		$drain_status    = DrainCommand::status( array( 'lane' => $lane ) );
-		$jobs_summary    = ( new JobsSummaryAbility() )->execute( array( 'compact' => true ) );
-		$jobs            = ! empty( $jobs_summary['success'] ) && is_array( $jobs_summary['summary'] ?? null ) ? $jobs_summary['summary'] : array();
+		$job_counts      = self::jobStatusCounts();
 		$stuck_jobs      = RecoverStuckJobsAbility::countStuckCandidates();
 		$lock            = WorkerLock::snapshot( null, 600, $lane );
 
@@ -625,29 +624,30 @@ class WorkerCommand extends BaseCommand {
 			'due_actions'           => (int) ( $drain_status['due_pending'] ?? 0 ),
 			'total_pending_actions' => (int) ( $drain_status['total_pending'] ?? 0 ),
 			'action_hooks'          => (string) ( $drain_status['hooks'] ?? '' ),
-			'processing_jobs'       => self::jobStatusCount( $jobs, 'processing' ),
-			'pending_jobs'          => self::jobStatusCount( $jobs, 'pending' ),
-			'failed_jobs'           => (int) ( $jobs['failed_count'] ?? self::jobStatusCount( $jobs, 'failed' ) ),
+			'processing_jobs'       => $job_counts['processing'],
+			'pending_jobs'          => $job_counts['pending'],
+			'failed_jobs'           => $job_counts['failed'],
 			'stuck_jobs'            => $stuck_jobs,
 			'lane'                  => $lane,
 		) + self::publicLockStatus( $lock );
 	}
 
 	/**
-	 * Read one normalized status bucket from a jobs summary result.
+	 * Count global job status buckets for the operator worker process.
 	 *
-	 * @param array<string,mixed> $jobs   Jobs summary payload.
-	 * @param string              $status Normalized status bucket.
-	 * @return int Bucket count.
+	 * This intentionally uses the repository rather than the user-facing jobs
+	 * summary ability, whose ownership checks require an acting user.
+	 *
+	 * @return array{processing:int,pending:int,failed:int} Status counts.
 	 */
-	private static function jobStatusCount( array $jobs, string $status ): int {
-		foreach ( (array) ( $jobs['status'] ?? array() ) as $row ) {
-			if ( (string) ( $row['status'] ?? '' ) === $status ) {
-				return (int) ( $row['count'] ?? 0 );
-			}
-		}
+	private static function jobStatusCounts(): array {
+		$jobs = new Jobs();
 
-		return 0;
+		return array(
+			'processing' => $jobs->get_jobs_count( array( 'status' => 'processing' ), true ),
+			'pending'    => $jobs->get_jobs_count( array( 'status' => 'pending' ), true ),
+			'failed'     => $jobs->get_jobs_count( array( 'status' => 'failed' ), true ),
+		);
 	}
 
 	/**
@@ -834,7 +834,7 @@ class WorkerCommand extends BaseCommand {
 	 * Count pending approval actions.
 	 */
 	private static function pendingActionCount(): int {
-		$status = self::statusSnapshot();
-		return (int) $status['pending_actions'];
+		$summary = PendingActionStore::summary( array( 'status' => 'pending' ) );
+		return (int) ( $summary['total'] ?? 0 );
 	}
 }
