@@ -567,13 +567,14 @@ class Jobs extends BaseRepository {
 	/**
 	 * Get jobs count with optional filtering.
 	 *
-	 * @param array $args Filter arguments:
+	 * @param array $args          Filter arguments:
 	 *                    - flow_id: Filter by flow ID or 'direct' (optional)
 	 *                    - pipeline_id: Filter by pipeline ID or 'direct' (optional)
 	 *                    - status: Filter by status (optional)
+	 * @param bool  $fail_on_error Throw when the database query fails.
 	 * @return int Total count
 	 */
-	public function get_jobs_count( array $args = array() ): int {
+	public function get_jobs_count( array $args = array(), bool $fail_on_error = false ): int {
 		$where_clauses = array();
 		$where_values  = array();
 
@@ -647,6 +648,10 @@ class Jobs extends BaseRepository {
 		// phpcs:disable WordPress.DB.PreparedSQL -- The query variable is fully prepared immediately above.
 		$count = $this->wpdb->get_var( $query );
 		// phpcs:enable WordPress.DB.PreparedSQL
+		if ( null === $count && $fail_on_error ) {
+			$error = (string) $this->wpdb->last_error;
+			throw new \RuntimeException( '' !== $error ? 'Unable to count jobs: ' . esc_html( $error ) : 'Unable to count jobs: database query returned no result.' );
+		}
 
 		return (int) $count;
 	}
