@@ -23,8 +23,7 @@
         }
 
         // Check if Leaflet is loaded
-        if (typeof L === 'undefined') {
-            console.error('Leaflet library not loaded. Cannot initialize venue maps.');
+        if (!window.L) {
             return;
         }
 
@@ -35,7 +34,7 @@
 
     /**
      * Initialize a single venue map
-     * @param container
+     * @param {HTMLElement} container Map container.
      */
     function initSingleMap(container) {
         // Get map data from attributes
@@ -47,7 +46,6 @@
 
         // Validate coordinates
         if (isNaN(lat) || isNaN(lon)) {
-            console.warn('Invalid coordinates for venue map:', { lat, lon });
             container.innerHTML = '<p style="padding: 20px; text-align: center; color: #666;">Map unavailable (invalid coordinates)</p>';
             return;
         }
@@ -59,7 +57,7 @@
 
         try {
             // Create the map
-            const map = L.map(container.id).setView([lat, lon], 15);
+            const map = window.L.map(container.id).setView([lat, lon], 15);
 
             // Get tile layer configuration based on map type
             const tileConfigs = {
@@ -88,14 +86,14 @@
             const tileConfig = tileConfigs[mapType] || tileConfigs['osm-standard'];
 
             // Add tile layer with selected configuration
-            L.tileLayer(tileConfig.url, {
+            window.L.tileLayer(tileConfig.url, {
                 attribution: '', // Attribution handled in template
                 maxZoom: 19,
                 minZoom: 10
             }).addTo(map);
 
             // Create custom emoji marker icon
-            const emojiIcon = L.divIcon({
+            const emojiIcon = window.L.divIcon({
                 html: '<span style="font-size: 32px; line-height: 1; display: block;">📍</span>',
                 className: 'emoji-marker',
                 iconSize: [32, 32],
@@ -104,7 +102,7 @@
             });
 
             // Add marker with emoji icon
-            const marker = L.marker([lat, lon], { icon: emojiIcon }).addTo(map);
+            const marker = window.L.marker([lat, lon], { icon: emojiIcon }).addTo(map);
 
             // Create popup content
             let popupContent = `<div class="venue-popup"><strong>${escapeHtml(venueName)}</strong>`;
@@ -124,15 +122,15 @@
                 map.invalidateSize();
             }, 100);
 
-        } catch (error) {
-            console.error('Error initializing venue map:', error);
+        } catch {
             container.innerHTML = '<p style="padding: 20px; text-align: center; color: #666;">Map failed to load</p>';
         }
     }
 
     /**
      * Escape HTML to prevent XSS
-     * @param text
+     * @param {string} text Text to escape.
+     * @return {string} Escaped HTML.
      */
     function escapeHtml(text) {
         const div = document.createElement('div');

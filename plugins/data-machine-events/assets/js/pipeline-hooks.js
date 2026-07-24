@@ -36,7 +36,9 @@
 
 	/**
 	 * Check if a value is a valid venue term ID (numeric string or number)
-	 * @param value
+	 *
+	 * @param {string|number} value Potential venue term ID.
+	 * @return {boolean} Whether the value is a venue term ID.
 	 */
 	function isValidVenueTermId( value ) {
 		if ( ! value ) {
@@ -47,7 +49,9 @@
 
 	/**
 	 * Fetch venue data from REST API and map to form fields
-	 * @param venueId
+	 *
+	 * @param {string|number} venueId Venue term ID.
+	 * @return {Promise<Object<string, string>|null>} Mapped venue fields.
 	 */
 	async function fetchVenueData( venueId ) {
 		const response = await apiFetch( {
@@ -86,7 +90,7 @@
 	addFilter(
 		'datamachine.handlerSettings.init',
 		'data-machine-events/venue-enrichment',
-		async function( settingsPromise, handlerSlug, fieldsSchema ) {
+		async function( settingsPromise ) {
 			const settings = await settingsPromise;
 
 			if ( ! isValidVenueTermId( settings.venue ) ) {
@@ -98,8 +102,8 @@
 				if ( venueData ) {
 					return { ...settings, ...venueData };
 				}
-			} catch ( error ) {
-				console.error( 'DM Events: Failed to load venue data:', error );
+			} catch {
+				// Venue enrichment is optional; retain the original settings on failure.
 			}
 
 			return settings;
@@ -116,7 +120,7 @@
 	addFilter(
 		'datamachine.handlerSettings.fieldChange',
 		'data-machine-events/venue-change',
-		async function( changesPromise, fieldKey, value, handlerSlug, currentData ) {
+		async function( changesPromise, fieldKey, value ) {
 			const changes = await changesPromise;
 
 			if ( fieldKey !== 'venue' ) {
@@ -129,8 +133,8 @@
 					if ( venueData ) {
 						return { ...changes, ...venueData };
 					}
-				} catch ( error ) {
-					console.error( 'DM Events: Failed to load venue data on change:', error );
+				} catch {
+					// Keep the selected value when its optional metadata cannot be loaded.
 				}
 			} else {
 				return { ...changes, ...getEmptyVenueFields() };

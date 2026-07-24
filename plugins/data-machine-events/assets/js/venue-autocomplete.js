@@ -11,6 +11,10 @@
 (function() {
     'use strict';
 
+    /** @typedef {Object<string, string>} NominatimAddress */
+
+    /** @typedef {{display_name: string, address: (NominatimAddress|undefined)}} NominatimPlace */
+
     // Nominatim API configuration
     const NOMINATIM_API = 'https://nominatim.openstreetmap.org/search';
     // User-Agent is localized from PHP off the deploying site host so a
@@ -53,7 +57,7 @@
 
     /**
      * Setup autocomplete for a single field
-     * @param field
+     * @param {HTMLInputElement} field Address input.
      */
     function setupAutocomplete(field) {
         // Wrap field in container
@@ -88,7 +92,7 @@
 
     /**
      * Handle input event with debouncing
-     * @param e
+     * @param {Event} e Input event.
      */
     function handleInput(e) {
         const field = e.target;
@@ -116,7 +120,7 @@
 
     /**
      * Handle keyboard navigation
-     * @param e
+     * @param {KeyboardEvent} e Keyboard event.
      */
     function handleKeydown(e) {
         const field = e.target;
@@ -157,7 +161,7 @@
 
     /**
      * Update visual selection in dropdown
-     * @param items
+     * @param {NodeList} items Dropdown items.
      */
     function updateSelection(items) {
         items.forEach((item, index) => {
@@ -172,8 +176,8 @@
 
     /**
      * Search address using Nominatim API
-     * @param field
-     * @param query
+     * @param {HTMLInputElement} field Address input.
+     * @param {string}           query Address query.
      */
     function searchAddress(field, query) {
         // Check cache first
@@ -223,16 +227,15 @@
             cacheResults(query, data);
             displayResults(field, data);
         })
-        .catch(error => {
-            console.error('Venue autocomplete error:', error);
+        .catch(() => {
             showError(field, 'Failed to load address suggestions. Please try again.');
         });
     }
 
     /**
      * Display search results in dropdown
-     * @param field
-     * @param results
+     * @param {HTMLInputElement} field   Address input.
+     * @param {NominatimPlace[]} results Search results.
      */
     function displayResults(field, results) {
         const dropdown = field.autocompleteDropdown;
@@ -244,7 +247,7 @@
             return;
         }
 
-        results.forEach((place, index) => {
+        results.forEach(place => {
             const item = document.createElement('div');
             item.className = 'venue-autocomplete-item';
             item.innerHTML = `
@@ -264,8 +267,8 @@
 
     /**
      * Select a place and populate dependent fields
-     * @param field
-     * @param place
+     * @param {HTMLInputElement} field Address input.
+     * @param {NominatimPlace}   place Selected place.
      */
     function selectPlace(field, place) {
         const address = place.address || {};
@@ -308,7 +311,7 @@
 
     /**
      * Build street address from Nominatim address components
-     * @param address
+     * @param {NominatimAddress} address Structured address.
      */
     function buildStreetAddress(address) {
         const components = [];
@@ -328,8 +331,8 @@
 
     /**
      * Set value of a dependent field
-     * @param fieldName
-     * @param value
+     * @param {string} fieldName Dependent field name.
+     * @param {string} value     Field value.
      */
     function setFieldValue(fieldName, value) {
         // Try multiple selector strategies to find the field
@@ -352,7 +355,7 @@
 
     /**
      * Show loading state
-     * @param field
+     * @param {HTMLInputElement} field Address input.
      */
     function showLoading(field) {
         const dropdown = field.autocompleteDropdown;
@@ -363,8 +366,8 @@
 
     /**
      * Show error message
-     * @param field
-     * @param message
+     * @param {HTMLInputElement} field   Address input.
+     * @param {string}           message Error message.
      */
     function showError(field, message) {
         const dropdown = field.autocompleteDropdown;
@@ -386,8 +389,8 @@
 
     /**
      * Cache results in sessionStorage
-     * @param query
-     * @param results
+     * @param {string}           query   Address query.
+     * @param {NominatimPlace[]} results Search results.
      */
     function cacheResults(query, results) {
         try {
@@ -397,15 +400,15 @@
                 timestamp: Date.now()
             };
             sessionStorage.setItem(CACHE_KEY, JSON.stringify(cache));
-        } catch (e) {
+        } catch {
             // SessionStorage might be full or unavailable
-            console.warn('Failed to cache autocomplete results:', e);
         }
     }
 
     /**
      * Get cached results if available and not expired
-     * @param query
+     * @param {string} query Address query.
+     * @return {NominatimPlace[]|null} Cached results, if fresh.
      */
     function getCachedResults(query) {
         try {
@@ -415,8 +418,8 @@
             if (cached && (Date.now() - cached.timestamp < CACHE_EXPIRY)) {
                 return cached.results;
             }
-        } catch (e) {
-            console.warn('Failed to retrieve cached results:', e);
+        } catch {
+            return null;
         }
 
         return null;
@@ -429,7 +432,7 @@
         try {
             const cacheStr = sessionStorage.getItem(CACHE_KEY);
             return cacheStr ? JSON.parse(cacheStr) : {};
-        } catch (e) {
+        } catch {
             return {};
         }
     }
@@ -465,7 +468,8 @@
 
     /**
      * Escape HTML to prevent XSS
-     * @param text
+     * @param {string} text Text to escape.
+     * @return {string} Escaped HTML.
      */
     function escapeHtml(text) {
         const div = document.createElement('div');

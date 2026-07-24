@@ -279,7 +279,7 @@
 	addFilter(
 		'datamachine.handlerSettings.fieldComponent',
 		'data-machine-events/address-autocomplete',
-		function( component, fieldType, fieldKey, handlerSlug ) {
+		function( component, fieldType ) {
 			if ( fieldType === 'address-autocomplete' ) {
 				return AddressAutocompleteField;
 			}

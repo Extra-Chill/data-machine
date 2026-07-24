@@ -49,7 +49,7 @@
 
     /**
      * Handle venue dropdown change event
-     * @param e
+     * @param {Event} e Change event.
      */
     function handleVenueChange(e) {
         const termId = e.target.value;
@@ -68,7 +68,7 @@
     /**
      * Toggle venue_name field visibility
      * Show when creating new venue, hide when editing existing
-     * @param show
+     * @param {boolean} show Whether to show the field.
      */
     function toggleVenueNameField(show) {
         const venueNameField = document.querySelector('[name="venue_name"]');
@@ -98,10 +98,11 @@
     /**
      * Load venue data via REST API and populate fields
      *
-     * @param {number} termId Venue term ID
+     * @param {string} termId Venue term ID
      */
     function loadVenueData(termId) {
-        if (!termId || typeof dmEventsVenue === 'undefined') {
+        const config = window.dmEventsVenue;
+        if (!termId || !config) {
             return;
         }
 
@@ -109,10 +110,10 @@
         const loadingIndicator = showLoadingState();
 
         // Make REST API request
-        fetch(dmEventsVenue.restUrl + '/events/venues/' + termId, {
+        fetch(config.restUrl + '/events/venues/' + termId, {
             method: 'GET',
             headers: {
-                'X-WP-Nonce': dmEventsVenue.nonce
+                'X-WP-Nonce': config.nonce
             }
         })
         .then(function(response) {
@@ -124,14 +125,12 @@
             if (data.success && data.data) {
                 populateVenueFields(data.data);
             } else {
-                console.error('DM Events: Failed to load venue data', data);
-                alert('Failed to load venue data. Please try again.');
+                showErrorState('Failed to load venue data. Please try again.');
             }
         })
-        .catch(function(error) {
+        .catch(function() {
             hideLoadingState(loadingIndicator);
-            console.error('DM Events: Error loading venue data', error);
-            alert('Error loading venue data. Please check your connection and try again.');
+            showErrorState('Error loading venue data. Please check your connection and try again.');
         });
     }
 
@@ -201,9 +200,31 @@
     }
 
     /**
+     * Show an inline venue loading error.
+     *
+     * @param {string} message Error message.
+     */
+    function showErrorState(message) {
+        const previousNotice = document.querySelector('.data-machine-events-venue-error');
+        if (previousNotice) {
+            previousNotice.remove();
+        }
+
+        const notice = document.createElement('div');
+        notice.className = 'notice notice-error inline data-machine-events-venue-error';
+        const text = document.createElement('p');
+        text.textContent = message;
+        notice.appendChild(text);
+
+        if (venueSelector && venueSelector.parentNode) {
+            venueSelector.parentNode.insertBefore(notice, venueSelector.nextSibling);
+        }
+    }
+
+    /**
      * Get changed fields by comparing current values with originals
      *
-     * @return {Object} Object containing only changed fields
+     * @return {Object<string, string>} Object containing only changed fields
      */
     function getChangedFields() {
         const changes = {};
@@ -228,10 +249,11 @@
      *
      * @param {string} venueName    Venue name
      * @param {string} venueAddress Venue address
-     * @return {Promise} Promise resolving to true if can proceed, false if duplicate
+     * @return {Promise<boolean>} Whether venue creation can proceed.
      */
     function checkDuplicateVenue(venueName, venueAddress) {
-        if (!venueName || typeof dmEventsVenue === 'undefined') {
+        const config = window.dmEventsVenue;
+        if (!venueName || !config) {
             return Promise.resolve(true);
         }
 
@@ -241,10 +263,10 @@
             address: venueAddress || ''
         });
 
-        return fetch(dmEventsVenue.restUrl + '/events/venues/check-duplicate?' + params.toString(), {
+        return fetch(config.restUrl + '/events/venues/check-duplicate?' + params.toString(), {
             method: 'GET',
             headers: {
-                'X-WP-Nonce': dmEventsVenue.nonce
+                'X-WP-Nonce': config.nonce
             }
         })
         .then(function(response) {
@@ -255,15 +277,69 @@
                 const message = data.data.message ||
                     'A venue with this name and address already exists. Create duplicate anyway?';
 
-                return confirm(message);
+                return confirmDuplicate(message);
             }
 
             return true;
         })
-        .catch(function(error) {
-            console.error('DM Events: Error checking duplicate venue', error);
+        .catch(function() {
             // On error, allow creation (fail open)
             return true;
+        });
+    }
+
+    /**
+     * Ask whether a duplicate venue should be created.
+     *
+     * @param {string} message Confirmation message.
+     * @return {Promise<boolean>} Whether duplicate creation was confirmed.
+     */
+    function confirmDuplicate(message) {
+        return new Promise(function(resolve) {
+            const dialog = document.createElement('dialog');
+            dialog.className = 'data-machine-events-confirm';
+
+            const text = document.createElement('p');
+            text.textContent = message;
+            dialog.appendChild(text);
+
+            const actions = document.createElement('div');
+            actions.className = 'data-machine-events-confirm-actions';
+
+            const cancelButton = document.createElement('button');
+            cancelButton.type = 'button';
+            cancelButton.className = 'button';
+            cancelButton.textContent = 'Cancel';
+
+            const confirmButton = document.createElement('button');
+            confirmButton.type = 'button';
+            confirmButton.className = 'button button-primary';
+            confirmButton.textContent = 'Create Duplicate';
+
+            actions.appendChild(cancelButton);
+            actions.appendChild(confirmButton);
+            dialog.appendChild(actions);
+            document.body.appendChild(dialog);
+
+            function finish(confirmed) {
+                dialog.close();
+                dialog.remove();
+                resolve(confirmed);
+            }
+
+            cancelButton.addEventListener('click', function() {
+                finish(false);
+            });
+            confirmButton.addEventListener('click', function() {
+                finish(true);
+            });
+            dialog.addEventListener('cancel', function(event) {
+                event.preventDefault();
+                finish(false);
+            });
+
+            dialog.showModal();
+            confirmButton.focus();
         });
     }
 
