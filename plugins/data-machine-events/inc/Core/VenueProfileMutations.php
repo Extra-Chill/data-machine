@@ -311,8 +311,8 @@ class VenueProfileMutations {
 			if ( false === static::query( 'COMMIT' ) ) {
 				$transaction_open       = false;
 				$connection_quarantined = true;
-				$quarantine              = self::quarantineConnection( $term_id );
-				$quarantine_closed       = $quarantine['closed'];
+				$quarantine             = self::quarantineConnection( $term_id );
+				$quarantine_closed      = $quarantine['closed'];
 				return new \WP_Error(
 					'venue_commit_uncertain',
 					'The database did not confirm the venue commit; the connection was quarantined and callers must read again before retrying.',
@@ -348,8 +348,8 @@ class VenueProfileMutations {
 			if ( $transaction_open ) {
 				if ( false === static::query( 'ROLLBACK' ) ) {
 					$connection_quarantined = true;
-					$quarantine              = self::quarantineConnection( $term_id );
-					$quarantine_closed       = $quarantine['closed'];
+					$quarantine             = self::quarantineConnection( $term_id );
+					$quarantine_closed      = $quarantine['closed'];
 				}
 				self::clearCaches( $term_id );
 			}
@@ -397,8 +397,8 @@ class VenueProfileMutations {
 	 */
 	private static function inTransaction(): bool|\WP_Error {
 		global $wpdb;
-		$probe           = 'dme_venue_probe_' . substr( md5( uniqid( '', true ) ), 0, 12 );
-		$suppress_errors = $wpdb->suppress_errors();
+		$probe            = 'dme_venue_probe_' . substr( md5( uniqid( '', true ) ), 0, 12 );
+		$suppress_errors  = $wpdb->suppress_errors();
 		$wpdb->last_error = '';
 		$created          = static::query( 'SAVEPOINT ' . $probe );
 		$released         = false !== $created ? static::query( 'RELEASE SAVEPOINT ' . $probe ) : false;
@@ -563,8 +563,8 @@ class VenueProfileMutations {
 		if ( false === static::query( 'ROLLBACK' ) ) {
 			$transaction_open       = false;
 			$connection_quarantined = true;
-			$quarantine              = self::quarantineConnection( $term_id );
-			$quarantine_closed       = $quarantine['closed'];
+			$quarantine             = self::quarantineConnection( $term_id );
+			$quarantine_closed      = $quarantine['closed'];
 			return new \WP_Error(
 				'venue_rollback_uncertain',
 				'The database did not confirm the venue rollback; the connection was quarantined.',
@@ -600,7 +600,7 @@ class VenueProfileMutations {
 			);
 		}
 		self::$native_term_locks = array();
-		$recovered = true === $wpdb->check_connection( false );
+		$recovered               = true === $wpdb->check_connection( false );
 		if ( $recovered ) {
 			self::clearCaches( $term_id );
 		}

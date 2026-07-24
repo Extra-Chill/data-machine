@@ -297,7 +297,7 @@ class CheckMissingVenueAddressesCommand {
 	 * @return array<int,string> Meta keys that were (or would be) filled.
 	 */
 	private function apply_smart_merge( int $term_id, array $components, bool $dry_run ): array {
-		$filled = array();
+		$filled  = array();
 		$pending = array();
 
 		foreach ( self::ADDRESS_META_KEYS as $field => $meta_key ) {
