@@ -537,6 +537,15 @@ class EventUpdateAbilities {
 		$result             = null;
 
 		try {
+			/**
+			 * Filters whether a direct event venue mutation may proceed.
+			 *
+			 * @param bool|\WP_Error $preflight         Permission result.
+			 * @param int            $post_id           Event post ID.
+			 * @param int[]          $next_venue_ids    Venue term IDs to assign.
+			 * @param int[]          $previous_venue_ids Previously assigned venue term IDs.
+			 * @param string         $context           Mutation context.
+			 */
 			$preflight = apply_filters(
 				'datamachine_events_before_event_venue_mutation',
 				true,
@@ -568,9 +577,19 @@ class EventUpdateAbilities {
 					'error'   => $result,
 				);
 			}
+			$result = array_values( array_unique( array_filter( array_map( 'absint', $result ) ) ) );
 
 			return array( 'success' => true );
 		} finally {
+			/**
+			 * Fires after a direct event venue mutation attempt.
+			 *
+			 * @param int             $post_id           Event post ID.
+			 * @param int[]           $next_venue_ids     Requested venue term IDs.
+			 * @param int[]           $previous_venue_ids Previously assigned venue term IDs.
+			 * @param string          $context            Mutation context.
+			 * @param int[]|\WP_Error|null $result         Canonical assigned term-taxonomy IDs, an error, or null.
+			 */
 			do_action(
 				'datamachine_events_after_event_venue_mutation',
 				$post_id,

@@ -37,12 +37,12 @@ class EventUpdateAbilitiesTest extends WP_UnitTestCase {
 	public function test_venue_mutation_success_assigns_term_and_returns_taxonomy_result(): void {
 		$event_id = $this->makeEvent();
 		$venue    = $this->makeVenue( 'Success Venue' );
-		$result   = null;
+		$payload  = null;
 
 		add_action(
 			'datamachine_events_after_event_venue_mutation',
-			static function ( int $post_id, array $next_ids, array $previous_ids, string $context, $mutation_result ) use ( &$result ): void {
-				$result = $mutation_result;
+			static function ( int $post_id, array $next_ids, array $previous_ids, string $context, $mutation_result ) use ( &$payload ): void {
+				$payload = array( $post_id, $next_ids, $previous_ids, $context, $mutation_result );
 			},
 			10,
 			5
@@ -57,7 +57,10 @@ class EventUpdateAbilitiesTest extends WP_UnitTestCase {
 
 		$this->assertSame( 'updated', $response['results'][0]['status'] );
 		$this->assertSame( array( $venue ), wp_get_object_terms( $event_id, 'venue', array( 'fields' => 'ids' ) ) );
-		$this->assertSame( array( (int) get_term( $venue, 'venue' )->term_taxonomy_id ), $result );
+		$this->assertSame(
+			array( $event_id, array( $venue ), array(), 'event_update_ability', array( (int) get_term( $venue, 'venue' )->term_taxonomy_id ) ),
+			$payload
+		);
 	}
 
 	public function test_venue_mutation_hooks_receive_exact_payload_in_order(): void {
@@ -94,6 +97,54 @@ class EventUpdateAbilitiesTest extends WP_UnitTestCase {
 			array(
 				array( 'before', $event_id, array( $next ), array( $previous ), 'event_update_ability' ),
 				array( 'after', $event_id, array( $next ), array( $previous ), 'event_update_ability', array( (int) get_term( $next, 'venue' )->term_taxonomy_id ) ),
+			),
+			$observed
+		);
+	}
+
+	public function test_venue_mutation_hooks_normalize_string_and_invalid_previous_ids(): void {
+		$event_id = $this->makeEvent();
+		$previous = $this->makeVenue( 'String Previous Venue' );
+		$next     = $this->makeVenue( 'Integer Next Venue' );
+		$observed = array();
+		wp_set_post_terms( $event_id, array( $previous ), 'venue' );
+
+		$stringify_ids = static function ( array $terms, array $object_ids, array $taxonomies, array $args ) use ( $previous ): array {
+			if ( array( 'venue' ) === $taxonomies && 'ids' === $args['fields'] ) {
+				return array( (string) $previous, '0', 'invalid', (string) $previous );
+			}
+
+			return $terms;
+		};
+		add_filter( 'get_object_terms', $stringify_ids, 10, 4 );
+		add_filter(
+			'datamachine_events_before_event_venue_mutation',
+			static function ( $allowed, int $post_id, array $next_ids, array $previous_ids ) use ( &$observed ) {
+				$observed[] = array( 'before', $post_id, $next_ids, $previous_ids );
+				return $allowed;
+			},
+			10,
+			4
+		);
+		add_action(
+			'datamachine_events_after_event_venue_mutation',
+			static function ( int $post_id, array $next_ids, array $previous_ids, string $context, $result ) use ( &$observed ): void {
+				$observed[] = array( 'after', $post_id, $next_ids, $previous_ids, $result );
+			},
+			10,
+			5
+		);
+
+		try {
+			$this->ability->executeUpdateEvent( array( 'event' => $event_id, 'venue' => $next ) );
+		} finally {
+			remove_filter( 'get_object_terms', $stringify_ids, 10 );
+		}
+
+		$this->assertSame(
+			array(
+				array( 'before', $event_id, array( $next ), array( $previous ) ),
+				array( 'after', $event_id, array( $next ), array( $previous ), array( (int) get_term( $next, 'venue' )->term_taxonomy_id ) ),
 			),
 			$observed
 		);
@@ -222,6 +273,7 @@ class EventUpdateAbilitiesTest extends WP_UnitTestCase {
 
 	public function test_update_lifecycle_completes_once_on_post_failure(): void {
 		$completions = array();
+		$event_id    = $this->makeEvent();
 		add_filter( 'wp_insert_post_empty_content', '__return_true' );
 		add_action(
 			'datamachine_events_after_event_update_persistence',
@@ -232,7 +284,7 @@ class EventUpdateAbilitiesTest extends WP_UnitTestCase {
 			2
 		);
 
-		$response = $this->ability->executeUpdateEvent( array( 'event' => $this->makeEvent(), 'startTime' => '22:00' ) );
+		$response = $this->ability->executeUpdateEvent( array( 'event' => $event_id, 'startTime' => '22:00' ) );
 
 		$this->assertSame( 'failed', $response['results'][0]['status'] );
 		$this->assertCount( 1, $completions );
@@ -334,7 +386,7 @@ class EventUpdateAbilitiesTest extends WP_UnitTestCase {
 	}
 
 	private function makeEvent(): int {
-		return self::factory()->post->create(
+		$event_id = self::factory()->post->create(
 			array(
 				'post_title'   => 'Venue Mutation Event ' . uniqid(),
 				'post_type'    => Event_Post_Type::POST_TYPE,
@@ -342,11 +394,23 @@ class EventUpdateAbilitiesTest extends WP_UnitTestCase {
 				'post_content' => '<!-- wp:data-machine-events/event-details {"startDate":"2027-01-01","startTime":"20:00"} --><div></div><!-- /wp:data-machine-events/event-details -->',
 			)
 		);
+		if ( is_wp_error( $event_id ) ) {
+			$this->fail( 'Event fixture creation failed: ' . $event_id->get_error_message() );
+		}
+		$this->assertIsInt( $event_id, 'Event fixture creation must return an integer post ID.' );
+		$this->assertGreaterThan( 0, $event_id, 'Event fixture creation must return a positive post ID.' );
+
+		return $event_id;
 	}
 
 	private function makeVenue( string $name ): int {
 		$term = wp_insert_term( $name . ' ' . uniqid(), 'venue' );
-		$this->assertNotWPError( $term );
+		if ( is_wp_error( $term ) ) {
+			$this->fail( 'Venue fixture creation failed: ' . $term->get_error_message() );
+		}
+		$this->assertArrayHasKey( 'term_id', $term, 'Venue fixture creation must return a term ID.' );
+		$this->assertGreaterThan( 0, (int) $term['term_id'], 'Venue fixture creation must return a positive term ID.' );
+
 		return (int) $term['term_id'];
 	}
 
