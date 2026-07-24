@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.168.13] - 2026-07-24
+
+### Fixed
+- preserve meaningful colon title suffixes
+
 ## [0.168.12] - 2026-07-23
 
 ### Changed
