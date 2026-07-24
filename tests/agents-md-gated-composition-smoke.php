@@ -5,11 +5,9 @@
  * Verifies:
  *  1. The gate `datamachine_agents_md_enabled()` is constant-only and default-OFF.
  *  2. When OFF, the file/section registration helpers are no-ops.
- *  3. The reflected `datamachine` section renders core commands with subcommand
- *     names sourced from reflection — and the relocated `analytics` command is
- *     absent from the CommandRegistry map by construction.
- *  4. The local reflection fallback resolves @subcommand annotations and treats
- *     a flat __invoke command as the namespace itself (omitted from the list).
+ *  3. The `datamachine` section renders bounded routing and live-help discovery
+ *     rather than an exhaustive command map.
+ *  4. The CommandRegistry remains authoritative and excludes relocated commands.
  *
  * Run with: php tests/agents-md-gated-composition-smoke.php
  *
@@ -77,9 +75,27 @@ datamachine_register_agents_md_file();
 datamachine_register_agents_md_sections();
 datamachine_assert( true, 'File + section registration helpers are no-ops while gate OFF', $failures );
 
-// --- 3. CommandRegistry map: analytics is gone, real commands present. ------
+// --- 3. Generated section is routing-oriented, not an exhaustive CLI map. ----
+
+$rendered = datamachine_agents_md_render_datamachine_section();
+datamachine_assert( str_contains( $rendered, '## Data Machine' ), 'Section has a Data Machine heading', $failures );
+datamachine_assert( str_contains( $rendered, '**Default routing**' ), 'Section provides default routing', $failures );
+datamachine_assert( str_contains( $rendered, 'datamachine memory --help' ), 'Section routes memory work', $failures );
+datamachine_assert( str_contains( $rendered, 'datamachine jobs --help' ), 'Section routes job and evidence work', $failures );
+datamachine_assert( str_contains( $rendered, 'datamachine --help' ), 'Section points to live command discovery', $failures );
+datamachine_assert( ! str_contains( $rendered, 'artifact-content|artifacts|cleanup' ), 'Section omits exhaustive reflected subcommands', $failures );
+
+// --- 4. CommandRegistry map: analytics is gone, real commands present. ------
 
 $map = \DataMachine\Cli\CommandRegistry::map();
+
+foreach ( array( 'memory', 'flows', 'pipelines', 'jobs', 'worker', 'posts', 'blocks', 'image', 'email', 'pending-actions', 'agent', 'system' ) as $advertised_root ) {
+	datamachine_assert(
+		isset( $map[ 'datamachine ' . $advertised_root ] ),
+		"Advertised routing root `datamachine {$advertised_root}` is registered",
+		$failures
+	);
+}
 
 datamachine_assert(
 	! array_key_exists( 'datamachine analytics', $map ),
@@ -98,48 +114,6 @@ datamachine_assert( ! $has_analytics_class, 'No analytics command/class anywhere
 datamachine_assert(
 	isset( $map['datamachine memory'] ) && isset( $map['datamachine drain'] ) && isset( $map['datamachine retention'] ),
 	'Map contains real core commands (memory, drain, retention)',
-	$failures
-);
-
-// --- 4. Local reflection fallback resolves subcommands correctly. -----------
-
-// @subcommand-annotated command.
-final class DM_Smoke_AnnotatedCommand {
-	/**
-	 * Read a thing.
-	 *
-	 * @subcommand read
-	 */
-	public function read(): void {}
-
-	/**
-	 * Write a thing.
-	 *
-	 * @subcommand write
-	 */
-	public function write(): void {}
-}
-
-$names = datamachine_agents_md_reflect_subcommand_names( DM_Smoke_AnnotatedCommand::class );
-sort( $names );
-datamachine_assert(
-	array( 'read', 'write' ) === $names,
-	'Reflection fallback resolves @subcommand-annotated methods (read, write)',
-	$failures
-);
-
-// Flat __invoke command — the namespace itself, omitted from the list.
-final class DM_Smoke_InvokeCommand {
-	/**
-	 * Run the thing.
-	 */
-	public function __invoke(): void {}
-}
-
-$invoke_names = datamachine_agents_md_reflect_subcommand_names( DM_Smoke_InvokeCommand::class );
-datamachine_assert(
-	array() === $invoke_names,
-	'Reflection fallback omits a flat __invoke command from the subcommand list',
 	$failures
 );
 
