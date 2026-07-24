@@ -14,9 +14,11 @@
  * Bound via event delegation on `document` so dynamically inserted widgets
  * keep working (e.g. server-rendered HTML swapped into the page).
  *
- * @package DataMachineEvents
+ * @package
  * @since   0.40.0
  */
+
+/* global Element, requestAnimationFrame */
 
 (function () {
 	'use strict';
@@ -25,17 +27,19 @@
 		return;
 	}
 
-	var WIDGET_SELECTOR = '[data-dm-add-to-calendar]';
-	var TOGGLE_SELECTOR = '.dm-events-add-to-calendar-toggle';
-	var MENU_SELECTOR = '.dm-events-add-to-calendar-menu';
-	var ITEM_SELECTOR = '[role="menuitem"]';
-	var RIGHT_ALIGN_CLASS = 'is-right-aligned';
+	const WIDGET_SELECTOR = '[data-dm-add-to-calendar]';
+	const TOGGLE_SELECTOR = '.dm-events-add-to-calendar-toggle';
+	const MENU_SELECTOR = '.dm-events-add-to-calendar-menu';
+	const ITEM_SELECTOR = '[role="menuitem"]';
+	const RIGHT_ALIGN_CLASS = 'is-right-aligned';
 
 	/**
 	 * Resolve the menu element for a given toggle.
+	 *
+	 * @param {Element} toggle Menu toggle element.
 	 */
 	function getMenu( toggle ) {
-		var widget = toggle.closest( WIDGET_SELECTOR );
+		const widget = toggle.closest( WIDGET_SELECTOR );
 		if ( ! widget ) {
 			return null;
 		}
@@ -51,7 +55,7 @@
 	}
 
 	function openMenu( toggle ) {
-		var menu = getMenu( toggle );
+		const menu = getMenu( toggle );
 		if ( ! menu ) {
 			return;
 		}
@@ -67,7 +71,7 @@
 	}
 
 	function closeMenu( toggle, opts ) {
-		var menu = getMenu( toggle );
+		const menu = getMenu( toggle );
 		if ( ! menu ) {
 			return;
 		}
@@ -80,8 +84,8 @@
 	}
 
 	function closeAllMenus( exceptToggle ) {
-		var toggles = document.querySelectorAll( TOGGLE_SELECTOR );
-		for ( var i = 0; i < toggles.length; i++ ) {
+		const toggles = document.querySelectorAll( TOGGLE_SELECTOR );
+		for ( let i = 0; i < toggles.length; i++ ) {
 			if ( toggles[ i ] !== exceptToggle && isOpen( toggles[ i ] ) ) {
 				closeMenu( toggles[ i ] );
 			}
@@ -92,12 +96,16 @@
 	 * Position the menu so it stays within the viewport.
 	 * Default anchor is left-aligned (CSS `left: 0`). When the menu would
 	 * overflow the right edge, add `.is-right-aligned` so CSS can flip it.
+	 *
+	 * @param {Element} toggle Menu toggle element.
+	 * @param {Element} menu   Menu element.
 	 */
 	function applyEdgeAlignment( toggle, menu ) {
 		// Defer measurement until layout is done.
 		requestAnimationFrame( function () {
-			var menuRect = menu.getBoundingClientRect();
-			var viewportWidth = document.documentElement.clientWidth || window.innerWidth;
+			const menuRect = menu.getBoundingClientRect();
+			const viewportWidth =
+				document.documentElement.clientWidth || window.innerWidth;
 			if ( menuRect.right > viewportWidth - 8 ) {
 				menu.classList.add( RIGHT_ALIGN_CLASS );
 			} else {
@@ -107,22 +115,23 @@
 	}
 
 	function focusItemAt( menu, index ) {
-		var items = getItems( menu );
+		const items = getItems( menu );
 		if ( ! items.length ) {
 			return;
 		}
-		var bounded = ( ( index % items.length ) + items.length ) % items.length;
+		const bounded =
+			( ( index % items.length ) + items.length ) % items.length;
 		items[ bounded ].focus();
 	}
 
 	// Toggle click — open/close.
 	document.addEventListener( 'click', function ( event ) {
-		var target = event.target;
+		const target = event.target;
 		if ( ! ( target instanceof Element ) ) {
 			return;
 		}
 
-		var toggle = target.closest( TOGGLE_SELECTOR );
+		const toggle = target.closest( TOGGLE_SELECTOR );
 		if ( toggle ) {
 			event.preventDefault();
 			event.stopPropagation();
@@ -135,7 +144,7 @@
 		}
 
 		// Click outside any open menu → close it.
-		var widget = target.closest( WIDGET_SELECTOR );
+		const widget = target.closest( WIDGET_SELECTOR );
 		if ( ! widget ) {
 			closeAllMenus( null );
 		}
@@ -143,14 +152,14 @@
 
 	// Keyboard handling.
 	document.addEventListener( 'keydown', function ( event ) {
-		var target = event.target;
+		const target = event.target;
 		if ( ! ( target instanceof Element ) ) {
 			return;
 		}
 
 		// Escape: close any open menu, return focus to its toggle.
 		if ( event.key === 'Escape' || event.key === 'Esc' ) {
-			var openToggle = document.querySelector(
+			const openToggle = document.querySelector(
 				TOGGLE_SELECTOR + '[aria-expanded="true"]'
 			);
 			if ( openToggle ) {
@@ -161,14 +170,14 @@
 		}
 
 		// Arrow keys on the toggle: open the menu and focus the first item.
-		var toggle = target.closest( TOGGLE_SELECTOR );
+		const toggle = target.closest( TOGGLE_SELECTOR );
 		if ( toggle ) {
 			if ( event.key === 'ArrowDown' || event.key === 'Down' ) {
 				event.preventDefault();
 				if ( ! isOpen( toggle ) ) {
 					openMenu( toggle );
 				}
-				var menuDown = getMenu( toggle );
+				const menuDown = getMenu( toggle );
 				if ( menuDown ) {
 					focusItemAt( menuDown, 0 );
 				}
@@ -179,9 +188,9 @@
 				if ( ! isOpen( toggle ) ) {
 					openMenu( toggle );
 				}
-				var menuUp = getMenu( toggle );
+				const menuUp = getMenu( toggle );
 				if ( menuUp ) {
-					var items = getItems( menuUp );
+					const items = getItems( menuUp );
 					focusItemAt( menuUp, items.length - 1 );
 				}
 				return;
@@ -190,16 +199,16 @@
 		}
 
 		// Keys on a menu item: arrows + Home/End.
-		var item = target.closest( ITEM_SELECTOR );
+		const item = target.closest( ITEM_SELECTOR );
 		if ( ! item ) {
 			return;
 		}
-		var menu = item.closest( MENU_SELECTOR );
+		const menu = item.closest( MENU_SELECTOR );
 		if ( ! menu ) {
 			return;
 		}
-		var menuItems = getItems( menu );
-		var currentIndex = menuItems.indexOf( item );
+		const menuItems = getItems( menu );
+		const currentIndex = menuItems.indexOf( item );
 
 		switch ( event.key ) {
 			case 'ArrowDown':
@@ -229,11 +238,11 @@
 	document.addEventListener(
 		'focusin',
 		function ( event ) {
-			var target = event.target;
+			const target = event.target;
 			if ( ! ( target instanceof Element ) ) {
 				return;
 			}
-			var widget = target.closest( WIDGET_SELECTOR );
+			const widget = target.closest( WIDGET_SELECTOR );
 			if ( widget ) {
 				return;
 			}

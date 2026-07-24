@@ -43,10 +43,10 @@ const DESCRIPTION_TEMPLATE = [
 registerBlockType('data-machine-events/event-details', {
     /**
      * Block editor component with comprehensive event data fields and InnerBlocks support
-     * @param root0
-     * @param root0.attributes
-     * @param root0.setAttributes
-     * @param root0.clientId
+     * @param {Object}   root0               Block editor properties.
+     * @param {Object}   root0.attributes    Event detail attributes.
+     * @param {Function} root0.setAttributes Updates event detail attributes.
+     * @param {string}   root0.clientId      Unique block client ID.
      */
     edit: function Edit({ attributes, setAttributes, clientId }) {
         const {
@@ -59,14 +59,8 @@ registerBlockType('data-machine-events/event-details', {
             price,
             ticketUrl,
             performer,
-            performerType,
             organizer,
-            organizerType,
             organizerUrl,
-            eventStatus,
-            previousStartDate,
-            priceCurrency,
-            offerAvailability
         } = attributes;
 
         const blockProps = useBlockProps({
@@ -99,32 +93,44 @@ registerBlockType('data-machine-events/event-details', {
                             <h4>{__('Event Dates & Times', 'data-machine-events')}</h4>
                             <div className="date-time-grid">
                                 <div className="date-time-field">
-                                    <label>{__('Start Date', 'data-machine-events')}</label>
+                                    <label htmlFor={`event-start-date-${clientId}`}>
+                                        {__('Start Date', 'data-machine-events')}
+                                    </label>
                                     <input
+                                        id={`event-start-date-${clientId}`}
                                         type="date"
                                         value={startDate}
                                         onChange={(e) => handleAttributeChange('startDate', e.target.value)}
                                     />
                                 </div>
                                 <div className="date-time-field">
-                                    <label>{__('Start Time', 'data-machine-events')}</label>
+                                    <label htmlFor={`event-start-time-${clientId}`}>
+                                        {__('Start Time', 'data-machine-events')}
+                                    </label>
                                     <input
+                                        id={`event-start-time-${clientId}`}
                                         type="time"
                                         value={startTime}
                                         onChange={(e) => handleTimeChange('startTime', e.target.value)}
                                     />
                                 </div>
                                 <div className="date-time-field">
-                                    <label>{__('End Date', 'data-machine-events')}</label>
+                                    <label htmlFor={`event-end-date-${clientId}`}>
+                                        {__('End Date', 'data-machine-events')}
+                                    </label>
                                     <input
+                                        id={`event-end-date-${clientId}`}
                                         type="date"
                                         value={endDate}
                                         onChange={(e) => handleAttributeChange('endDate', e.target.value)}
                                     />
                                 </div>
                                 <div className="date-time-field">
-                                    <label>{__('End Time', 'data-machine-events')}</label>
+                                    <label htmlFor={`event-end-time-${clientId}`}>
+                                        {__('End Time', 'data-machine-events')}
+                                    </label>
                                     <input
+                                        id={`event-end-time-${clientId}`}
                                         type="time"
                                         value={endTime}
                                         onChange={(e) => handleTimeChange('endTime', e.target.value)}
@@ -205,4 +211,4 @@ registerBlockType('data-machine-events/event-details', {
             </div>
         );
     }
-}); 
+});
