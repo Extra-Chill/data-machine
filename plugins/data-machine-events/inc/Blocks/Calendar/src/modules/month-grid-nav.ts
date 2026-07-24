@@ -12,6 +12,9 @@
  * legacy HTML-string envelope stays the contract for list mode.
  */
 
+/**
+ * Internal dependencies
+ */
 import { buildCalendarRequest } from './api-client';
 import { renderMonthGridResponse } from './month-grid-response-renderer';
 
@@ -109,6 +112,7 @@ class MonthGridController {
 	/**
 	 * Public entry point called by frontend.ts when a filter changes
 	 * in grid mode.
+	 * @param params
 	 */
 	async handleFilterChange( params: URLSearchParams ): Promise< boolean > {
 		return this.navigateToMonth(
@@ -122,6 +126,10 @@ class MonthGridController {
 	/**
 	 * Public entry point for callers that want to jump to a specific
 	 * month (kept narrow so future external callers can re-use it).
+	 * @param month
+	 * @param source
+	 * @param pushHistory
+	 * @param syncGeoState
 	 */
 	async navigateToMonth(
 		month: string,
@@ -228,7 +236,7 @@ class MonthGridController {
 			return true;
 		} catch ( error ) {
 			if ( requestId === this.requestSequence ) {
-				console.error( 'Month-grid fetch failed:', error );
+				window.console.error( 'Month-grid fetch failed:', error );
 			}
 			return false;
 		} finally {
@@ -298,6 +306,7 @@ class MonthGridController {
 	/**
 	 * Base URL used by the renderer for prev/next/today hrefs.
 	 * Preserves every URL param except `month`/`paged`/`past`.
+	 * @param params
 	 */
 	private buildBaseUrl( params: URLSearchParams ): string {
 		const url = new URL( window.location.href );

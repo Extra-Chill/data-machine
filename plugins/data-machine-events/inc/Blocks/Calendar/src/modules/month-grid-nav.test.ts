@@ -13,6 +13,9 @@ jest.mock( './month-grid-response-renderer', () => ( {
 	),
 } ) );
 
+/**
+ * Internal dependencies
+ */
 import { renderMonthGridResponse } from './month-grid-response-renderer';
 import {
 	destroyMonthGridNav,

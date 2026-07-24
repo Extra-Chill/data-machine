@@ -16,6 +16,9 @@ jest.mock( './date-group-renderer', () => ( {
 	} ),
 } ) );
 
+/**
+ * Internal dependencies
+ */
 import { renderMonthGridResponse } from './month-grid-response-renderer';
 import { renderDateGroup } from './date-group-renderer';
 

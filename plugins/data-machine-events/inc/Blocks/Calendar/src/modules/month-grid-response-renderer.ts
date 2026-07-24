@@ -2,6 +2,9 @@
  * Synchronize every month-grid presentation from one data response.
  */
 
+/**
+ * Internal dependencies
+ */
 import { renderDateGroup } from './date-group-renderer';
 import { renderGapSeparator } from './gap-renderer';
 import { renderMonthGrid } from './month-grid-renderer';

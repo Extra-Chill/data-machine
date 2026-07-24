@@ -13,6 +13,9 @@
  * - If the user scrolls fast, at most they see a brief skeleton
  */
 
+/**
+ * Internal dependencies
+ */
 import type { ArchiveContext } from '../types';
 import { buildCalendarRequest } from './api-client';
 import { initLazyRender } from './lazy-render';
@@ -97,6 +100,10 @@ export function destroyDayLoader( calendar: HTMLElement ): void {
  * Prefetch all deferred days sequentially (in display order).
  * Each fetch starts as soon as the previous one completes,
  * so we don't slam the server with concurrent requests.
+ * @param wrappers
+ * @param calendar
+ * @param archiveContext
+ * @param geoContext
  */
 async function prefetchAllDays(
 	wrappers: NodeListOf< HTMLElement >,
@@ -143,6 +150,9 @@ async function prefetchAllDays(
 
 /**
  * Fetch a single day's events HTML from REST.
+ * @param date
+ * @param archiveContext
+ * @param geoContext
  */
 async function fetchDayHtml(
 	date: string,
@@ -200,6 +210,9 @@ async function fetchDayHtml(
 
 /**
  * Inject fetched HTML into a deferred wrapper.
+ * @param wrapper
+ * @param html
+ * @param calendar
  */
 function injectDayHtml(
 	wrapper: HTMLElement,
@@ -229,6 +242,10 @@ function injectDayHtml(
 
 /**
  * Show error UI in a failed wrapper with retry.
+ * @param wrapper
+ * @param calendar
+ * @param archiveContext
+ * @param geoContext
  */
 function showError(
 	wrapper: HTMLElement,

@@ -7,6 +7,9 @@
  */
 import flatpickr from 'flatpickr';
 
+/**
+ * Internal dependencies
+ */
 import type { FlatpickrInstance } from '../types';
 
 interface DatePickerData {

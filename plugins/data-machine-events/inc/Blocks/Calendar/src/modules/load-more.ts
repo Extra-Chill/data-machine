@@ -43,6 +43,9 @@
  *      the content; a "you reached the end" chip is chrome.
  */
 
+/**
+ * Internal dependencies
+ */
 import type {
 	ArchiveContext,
 	CalendarDataResponse,
@@ -69,6 +72,7 @@ const instances = new WeakMap< HTMLElement, LoadMoreState >();
  * the click handler. No-op when there's no nav (max_pages <= 1).
  *
  * Idempotent: re-init on the same calendar is a no-op.
+ * @param calendar
  */
 export function initLoadMore( calendar: HTMLElement ): void {
 	if ( instances.has( calendar ) ) {
@@ -109,6 +113,8 @@ export function destroyLoadMore( calendar: HTMLElement ): void {
  * `buildCalendarRequest()` would pick it up anyway — this exposed
  * setter is a belt-and-suspenders path for code that doesn't go
  * through the URL.
+ * @param calendar
+ * @param geo
  */
 export function setLoadMoreGeo(
 	calendar: HTMLElement,
@@ -133,6 +139,7 @@ export function setLoadMoreGeo(
  * Page bounds are read from the server-rendered nav: the current page
  * is the `.page-numbers.current` span, and total_pages is the highest
  * numeric link / span inside the nav.
+ * @param calendar
  */
 function replacePaginationWithLoadMore(
 	calendar: HTMLElement
@@ -296,7 +303,7 @@ function createClickHandler(
 		} catch ( err ) {
 			// Surface the error inline; let the user retry. The
 			// existing `.data-machine-events-error` styles apply.
-			console.error( 'Load More failed:', err );
+			window.console.error( 'Load More failed:', err );
 			button.textContent = 'Retry';
 			// Leave the button clickable so retry works. Don't hide.
 		} finally {
@@ -377,6 +384,8 @@ async function fetchPage(
  * page matches the last date of the existing rendered content: in
  * that case, append the new occurrences to the existing date
  * group's `.data-machine-events-wrapper`, not a duplicate group.
+ * @param calendar
+ * @param data
  */
 function appendPage(
 	calendar: HTMLElement,
@@ -511,6 +520,7 @@ function isPastMode( calendar: HTMLElement ): boolean {
  * `[data-date="..."]` selector. `Y-m-d` strings only contain
  * digits + hyphens, which are safe — but we sanitize defensively in
  * case the server ever ships a date in a different shape.
+ * @param value
  */
 function cssEscape( value: string ): string {
 	if ( typeof window !== 'undefined' && typeof window.CSS !== 'undefined' && typeof window.CSS.escape === 'function' ) {

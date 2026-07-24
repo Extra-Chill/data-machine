@@ -295,13 +295,14 @@ async function loadFilters(
 	const container = modal.querySelector< HTMLElement >(
 		'.data-machine-filter-taxonomies'
 	);
-	const loading = modal.querySelector< HTMLElement >(
-		'.data-machine-filter-loading'
-	);
 
 	if ( ! container ) {
 		return;
 	}
+
+	const loading = modal.querySelector< HTMLElement >(
+		'.data-machine-filter-loading'
+	);
 
 	modal._filterAbortController?.abort();
 	const controller = new AbortController();

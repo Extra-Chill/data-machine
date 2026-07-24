@@ -1,3 +1,6 @@
+/**
+ * Internal dependencies
+ */
 import { getFilterState, destroyFilterState } from './filter-state';
 
 const STORAGE_KEY = 'data_machine_events_calendar_state';

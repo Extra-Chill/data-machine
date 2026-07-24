@@ -9,10 +9,13 @@
  * is derived from the viewport bounds (center-to-corner distance). No
  * separate radius control is needed — the map zoom level is the control.
  *
- * @package DataMachineEvents
+ * @package
  * @since 0.14.0
  */
 
+/**
+ * Internal dependencies
+ */
 import { buildCalendarRequest, fetchCalendarEvents } from './api-client';
 import { getFilterState } from './filter-state';
 
@@ -48,6 +51,8 @@ const instances = new WeakMap< HTMLElement, GeoSyncState >();
  *
  * Listens for map bounds-changed events and re-fetches the calendar
  * via REST, updating the DOM in-place.
+ * @param calendar
+ * @param onGridUpdate
  */
 export function initGeoSync(
 	calendar: HTMLElement,
@@ -78,6 +83,7 @@ export function initGeoSync(
 
 /**
  * Destroy geo sync listener for a calendar element.
+ * @param calendar
  */
 export function destroyGeoSync( calendar: HTMLElement ): void {
 	const state = instances.get( calendar );
@@ -98,6 +104,8 @@ export function destroyGeoSync( calendar: HTMLElement ): void {
  *
  * Used by external orchestrators (e.g. near-me page) to push geo
  * updates without waiting for a map bounds-changed event.
+ * @param calendar
+ * @param geo
  */
 export function updateCalendarGeo(
 	calendar: HTMLElement,
@@ -151,6 +159,8 @@ function createBoundsHandler(
 
 /**
  * Fetch calendar data via REST API and update the DOM.
+ * @param calendar
+ * @param geo
  */
 async function fetchAndUpdate(
 	calendar: HTMLElement,
@@ -216,6 +226,8 @@ async function fetchAndUpdate(
  * Calculates the haversine distance from the center to the NE corner
  * of the bounding box. This makes the calendar query match the map
  * viewport — the map zoom IS the radius.
+ * @param bounds
+ * @param center
  */
 function boundsToRadius(
 	bounds: BoundsChangedDetail[ 'bounds' ],

@@ -20,6 +20,9 @@
  * exactly one place (PHP) that knows how to format an event. See #381.
  */
 
+/**
+ * Internal dependencies
+ */
 import type {
 	CalendarEventItem,
 	CalendarEventOccurrence,
@@ -219,6 +222,7 @@ function renderBadges( event: CalendarEventItem ): HTMLElement | null {
  * produced by `Taxonomy\Badges::render_taxonomy_badges()` — a single
  * `.data-machine-taxonomy-badges` wrapper element — so we lift that first
  * element child out of the parse container.
+ * @param badgesHtml
  */
 function renderServerBadges( badgesHtml?: string ): HTMLElement | null {
 	const html = ( badgesHtml || '' ).trim();

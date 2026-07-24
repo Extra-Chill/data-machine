@@ -32,6 +32,9 @@
  * way `DisplayVars::build` does for time strings.
  */
 
+/**
+ * Internal dependencies
+ */
 import { renderEventCard } from './event-renderer';
 
 import type {
@@ -42,11 +45,11 @@ import type {
 /**
  * Render a complete date group with its embedded event cards.
  *
- * @param date         The `Y-m-d` date this group represents.
- * @param occurrences  Per-occurrence list from `grouping.by_date[date]`.
- * @param eventsById   Lookup map from `event.id` → CalendarEventItem.
- *                     Built once at the call site so multi-day events
- *                     aren't deserialized repeatedly.
+ * @param date        The `Y-m-d` date this group represents.
+ * @param occurrences Per-occurrence list from `grouping.by_date[date]`.
+ * @param eventsById  Lookup map from `event.id` → CalendarEventItem.
+ *                    Built once at the call site so multi-day events
+ *                    aren't deserialized repeatedly.
  */
 export function renderDateGroup(
 	date: string,
@@ -117,6 +120,7 @@ export function renderDateGroup(
  * shift). `new Date( 'YYYY-MM-DD' )` parses as UTC midnight and can
  * roll over the weekday in negative offsets; explicit constructor
  * avoids that.
+ * @param date
  */
 function parseLocalDate( date: string ): Date | null {
 	const parts = date.split( '-' );
@@ -167,6 +171,7 @@ function weekdayName( date: Date ): string {
  * Server canonical format lives in
  * `EventRenderer::render_date_groups()` (`$date_obj->format( 'l, F jS' )`).
  * Mirror it locally because the data envelope only ships `Y-m-d`.
+ * @param date
  */
 function formatDateLabel( date: Date ): string {
 	const weekday = WEEKDAY_NAMES[ date.getDay() ] || '';

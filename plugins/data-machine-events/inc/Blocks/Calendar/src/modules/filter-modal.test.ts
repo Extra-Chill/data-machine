@@ -1,3 +1,6 @@
+/**
+ * Internal dependencies
+ */
 import { destroyFilterModal, initFilterModal } from './filter-modal';
 import { destroyFilterState } from './filter-state';
 

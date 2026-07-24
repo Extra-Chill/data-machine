@@ -52,6 +52,7 @@ function isMonthGridMode( calendar: HTMLElement ): boolean {
  * emitted server-side in render.php and read here the same way
  * `isMonthGridMode` reads `data-display-mode`. Multi-day scopes
  * (this-week/this-weekend) keep the carousel. #428.
+ * @param calendar
  */
 function isSingleDayScope( calendar: HTMLElement ): boolean {
 	const scope = calendar.getAttribute( 'data-scope' );
@@ -287,6 +288,7 @@ function initSearchInput( calendar: HTMLElement ): void {
  * set server-side. In grid mode (#318) the month-grid controller
  * re-fetches the data envelope and swaps the grid in place so the
  * visible month doesn't reset.
+ * @param calendar
  */
 function handleFilterChange( calendar: HTMLElement ): void {
 	const filterState = getFilterState( calendar );
@@ -323,6 +325,7 @@ function handleMonthGridChange(
 
 /**
  * Navigate to URL with params (full page reload).
+ * @param params
  */
 function navigateToUrl( params: URLSearchParams ): void {
 	const queryString = params.toString();
@@ -347,6 +350,7 @@ window.addEventListener( 'beforeunload', function () {
 		.forEach( function ( calendar ) {
 			destroyDatePicker( calendar );
 			destroyCarousel( calendar );
+			destroyFilterModal( calendar );
 			destroyLazyRender( calendar );
 			destroyDayLoader( calendar );
 			destroyGeoSync( calendar );

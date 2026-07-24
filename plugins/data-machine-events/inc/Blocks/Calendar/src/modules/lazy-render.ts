@@ -5,6 +5,9 @@
  * approach the viewport during horizontal scroll.
  */
 
+/**
+ * Internal dependencies
+ */
 import type { EventDisplayVars, EventPlaceholderData } from '../types';
 
 interface LazyObserverEntry {
@@ -90,7 +93,7 @@ function hydratePlaceholder( placeholder: HTMLElement ): void {
 	try {
 		data = JSON.parse( jsonData ) as EventPlaceholderData;
 	} catch ( e ) {
-		console.error( 'Failed to parse event placeholder data:', e );
+		window.console.error( 'Failed to parse event placeholder data:', e );
 		return;
 	}
 

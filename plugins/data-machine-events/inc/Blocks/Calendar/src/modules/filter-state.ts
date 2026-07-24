@@ -8,6 +8,9 @@
  * Archive context is read from DOM data attributes (page-level, not user state).
  */
 
+/**
+ * Internal dependencies
+ */
 import type {
 	ArchiveContext,
 	DateContext,
@@ -177,6 +180,7 @@ class FilterStateManager {
 	/**
 	 * Build URLSearchParams from current UI state.
 	 * Reads from: search input, date picker, filter checkboxes, location input.
+	 * @param datePicker
 	 */
 	buildParams( datePicker: FlatpickrInstance | null = null ): URLSearchParams {
 		const params = new URLSearchParams();
@@ -283,6 +287,8 @@ class FilterStateManager {
 
 	/**
 	 * Apply shareable URL state back to controls after history navigation.
+	 * @param params
+	 * @param datePicker
 	 */
 	applyParams(
 		params: URLSearchParams,
@@ -331,10 +337,11 @@ class FilterStateManager {
 		if ( datePicker ) {
 			const start = params.get( 'date_start' );
 			const end = params.get( 'date_end' );
-			datePicker.setDate(
-				start ? ( end ? [ start, end ] : start ) : [],
-				false
-			);
+			let selectedDates: string | string[] = [];
+			if ( start ) {
+				selectedDates = end ? [ start, end ] : start;
+			}
+			datePicker.setDate( selectedDates, false );
 			this.calendar
 				.querySelector( '.data-machine-events-date-clear-btn' )
 				?.classList.toggle( 'visible', Boolean( start ) );
@@ -363,6 +370,7 @@ class FilterStateManager {
 
 	/**
 	 * Update URL via History API and save state to localStorage.
+	 * @param params
 	 */
 	updateUrl( params: URLSearchParams ): void {
 		const queryString = params.toString();
@@ -376,6 +384,7 @@ class FilterStateManager {
 
 	/**
 	 * Save taxonomy filters to localStorage (not dates or geo — geo has its own storage).
+	 * @param params
 	 */
 	saveToStorage( params: URLSearchParams ): void {
 		if ( ! this.isPersistenceEnabled() ) {
@@ -410,6 +419,7 @@ class FilterStateManager {
 
 	/**
 	 * Save geo state to localStorage.
+	 * @param geo
 	 */
 	saveGeoToStorage( geo: StoredGeo ): void {
 		try {
@@ -459,6 +469,7 @@ class FilterStateManager {
 	 * history in place would leave the URL and results contradictory. A replace
 	 * navigation gives the server one authoritative filtered request without
 	 * adding a duplicate history entry.
+	 * @param navigate
 	 */
 	restoreFromStorage(
 		navigate: ( url: string ) => void = ( url ) =>
@@ -560,6 +571,7 @@ class FilterStateManager {
 
 	/**
 	 * Format date as YYYY-MM-DD.
+	 * @param date
 	 */
 	private formatDate( date: Date ): string {
 		const year = date.getFullYear();
@@ -573,6 +585,7 @@ const instances = new WeakMap< HTMLElement, FilterStateManager >();
 
 /**
  * Get or create FilterStateManager instance for a calendar element.
+ * @param calendar
  */
 export function getFilterState( calendar: HTMLElement ): FilterStateManager {
 	if ( ! instances.has( calendar ) ) {
@@ -583,6 +596,7 @@ export function getFilterState( calendar: HTMLElement ): FilterStateManager {
 
 /**
  * Destroy FilterStateManager instance for a calendar element.
+ * @param calendar
  */
 export function destroyFilterState( calendar: HTMLElement ): void {
 	instances.delete( calendar );

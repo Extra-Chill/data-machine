@@ -11,6 +11,9 @@
  * the existing CSS rules apply uniformly.
  */
 
+/**
+ * Internal dependencies
+ */
 import type {
 	CalendarDataResponse,
 	CalendarEventItem,
@@ -72,6 +75,9 @@ interface RowPayload {
 
 /**
  * Build the DOM for a month grid from the data-only REST envelope.
+ * @param month
+ * @param data
+ * @param baseUrl
  */
 export function renderMonthGrid(
 	month: string,

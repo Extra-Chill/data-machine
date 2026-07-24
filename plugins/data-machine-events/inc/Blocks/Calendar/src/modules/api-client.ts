@@ -2,6 +2,9 @@
  * REST API communication and calendar DOM updates.
  */
 
+/**
+ * Internal dependencies
+ */
 import type {
 	ArchiveContext,
 	CalendarRequest,
@@ -71,6 +74,11 @@ const CALENDAR_PASSTHROUGH_KEYS: ( keyof CalendarRequest )[] = [
  * resets `paged` on geo change) can `params.delete( 'paged' )` on
  * the returned object — the helper intentionally does not encode
  * deletion semantics so the override semantics stay simple.
+ * @param opts
+ * @param opts.archiveContext
+ * @param opts.geoContext
+ * @param opts.overrides
+ * @param opts.source
  */
 export function buildCalendarRequest(
 	opts: {
@@ -200,7 +208,7 @@ export async function fetchCalendarEvents(
 
 		return data;
 	} catch ( error ) {
-		console.error( 'Error fetching filtered events:', error );
+		window.console.error( 'Error fetching filtered events:', error );
 		content.innerHTML =
 			'<div class="data-machine-events-error"><p>Error loading events. Please try again.</p></div>';
 		return {
@@ -218,6 +226,12 @@ export async function fetchCalendarEvents(
 /**
  * Fetch filter options from REST API with active filters, date context,
  * archive context, and geo context.
+ * @param activeFilters
+ * @param dateContext
+ * @param archiveContext
+ * @param geoContext
+ * @param requestContext
+ * @param signal
  */
 export async function fetchFilters(
 	activeFilters: TaxFilters = {},

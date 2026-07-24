@@ -6,7 +6,13 @@ jest.mock(
 	{ virtual: true }
 );
 
+/**
+ * WordPress dependencies
+ */
 import { __ } from '@wordpress/i18n';
+/**
+ * Internal dependencies
+ */
 import { initCarousel } from './carousel';
 
 const mockTranslate = __ as jest.Mock;
@@ -89,7 +95,7 @@ describe( 'calendar carousel controls', () => {
 
 		next.focus();
 		next.click();
-		expect( document.activeElement ).toBe( next );
+		expect( calendar.ownerDocument.activeElement ).toBe( next );
 		expect( wrapper.scrollBy ).toHaveBeenCalledWith( {
 			left: 300,
 			behavior: 'smooth',

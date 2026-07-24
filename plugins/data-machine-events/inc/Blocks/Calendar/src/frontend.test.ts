@@ -49,6 +49,9 @@ jest.mock( './modules/month-grid-response-renderer', () => ( {
 	),
 } ) );
 
+/**
+ * Internal dependencies
+ */
 import { renderMonthGridResponse } from './modules/month-grid-response-renderer';
 import { initCalendarInstance } from './frontend';
 

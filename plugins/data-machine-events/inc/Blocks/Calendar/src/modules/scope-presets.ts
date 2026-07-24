@@ -19,10 +19,10 @@ const ACTIVE_CLASS = 'data-machine-events-scope-chip-active';
 /**
  * Wire scope-preset chip clicks to the shared filter-change flow.
  *
- * @param calendar        The calendar root element.
- * @param onFilterChange  The same callback the search/date controls fire;
- *                        it rebuilds params (including the now-active
- *                        scope) and re-fetches via the existing path.
+ * @param calendar       The calendar root element.
+ * @param onFilterChange The same callback the search/date controls fire;
+ *                       it rebuilds params (including the now-active
+ *                       scope) and re-fetches via the existing path.
  */
 export function initScopePresets(
 	calendar: HTMLElement,
@@ -57,6 +57,8 @@ export function initScopePresets(
 /**
  * Mark a single chip active and reset the rest, keeping `aria-pressed` in
  * sync for assistive tech.
+ * @param group
+ * @param activeChip
  */
 function setActiveChip(
 	group: HTMLElement,
