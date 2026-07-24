@@ -17,7 +17,7 @@ class BlockRegistrationTest extends WP_UnitTestCase {
 	public function test_blocks_registered_on_init_hook() {
 		$this->assertTrue( class_exists( 'DATAMACHINE_Events' ), 'DATAMACHINE_Events class should exist' );
 
-		$plugin = DATAMACHINE_Events::get_instance();
+		$plugin = \DATAMACHINE_Events::get_instance();
 
 		$has_init_hook = false;
 

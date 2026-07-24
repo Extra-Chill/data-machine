@@ -42,6 +42,7 @@ class EventUpsertTest extends WP_UnitTestCase {
 		if ( class_exists( PostIdentityIndex::class ) ) {
 			( new PostIdentityIndex() )->create_table();
 		}
+		wp_set_current_user( self::factory()->user->create( array( 'role' => 'administrator' ) ) );
 		$ability_registry = \WP_Abilities_Registry::get_instance();
 		if ( ! $ability_registry->is_registered( 'datamachine/upsert-post' ) ) {
 			$category_registry = \WP_Ability_Categories_Registry::get_instance();
@@ -155,6 +156,7 @@ class EventUpsertTest extends WP_UnitTestCase {
 		remove_all_filters( 'datamachine_events_before_event_upsert_persistence' );
 		remove_all_actions( 'datamachine_events_after_event_upsert_persistence' );
 		remove_all_filters( 'wp_insert_post_empty_content' );
+		wp_set_current_user( 0 );
 		parent::tearDown();
 	}
 
@@ -178,12 +180,14 @@ class EventUpsertTest extends WP_UnitTestCase {
 	}
 
 	public function test_venue_taxonomy_handler_registered() {
-		$handlers = \DataMachine\Core\WordPress\TaxonomyHandler::getCustomHandlers();
+		$property = new \ReflectionProperty( \DataMachine\Core\WordPress\TaxonomyHandler::class, 'custom_handlers' );
+		$handlers = $property->getValue();
 		$this->assertArrayHasKey( 'venue', $handlers );
 	}
 
 	public function test_promoter_taxonomy_handler_registered() {
-		$handlers = \DataMachine\Core\WordPress\TaxonomyHandler::getCustomHandlers();
+		$property = new \ReflectionProperty( \DataMachine\Core\WordPress\TaxonomyHandler::class, 'custom_handlers' );
+		$handlers = $property->getValue();
 		$this->assertArrayHasKey( 'promoter', $handlers );
 	}
 

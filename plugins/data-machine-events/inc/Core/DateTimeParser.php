@@ -87,7 +87,7 @@ class DateTimeParser {
 				$tz = wp_timezone();
 				if ( $tz instanceof DateTimeZone ) {
 					$name = $tz->getName();
-					if ( ! empty( $name ) ) {
+					if ( self::isValidTimezone( $name ) ) {
 						return $name;
 					}
 				}

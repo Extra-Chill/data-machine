@@ -12,6 +12,8 @@ namespace DataMachineEvents\Tests\Unit;
 
 use WP_UnitTestCase;
 use DataMachineEvents\Blocks\Calendar\Pagination\Renderer as Pagination;
+use DataMachineEvents\Blocks\Calendar\Cache\CalendarCache;
+use DataMachineEvents\Blocks\Calendar\Query\CalendarRequest;
 
 class CalendarBlockTest extends WP_UnitTestCase {
 
@@ -91,7 +93,7 @@ class CalendarBlockTest extends WP_UnitTestCase {
 
 		add_filter(
 			'data_machine_events_calendar_request_args',
-			function ( $args, $render_context ) use ( &$context ) {
+			function ( $args, $render_context ) use ( &$context, &$parsed_input ) {
 				$context                  = $render_context;
 				$args['lat']              = '32.7765<script>';
 				$args['lng']              = '-79.9311';
@@ -100,22 +102,14 @@ class CalendarBlockTest extends WP_UnitTestCase {
 				$args['tax_filter']       = array(
 					'Festival<script>' => array( '42', '-3', 'invalid' ),
 				);
+				$parsed_input             = CalendarRequest::fromQueryArgs( $args, $render_context['archive_term'] )->toAbilitiesArgs();
 
 				return $args;
 			},
 			10,
 			2
 		);
-		add_filter(
-			'data_machine_events_calendar_query_args',
-			function ( $args, $input ) use ( &$parsed_input ) {
-				$parsed_input = $input;
-				return $args;
-			},
-			10,
-			2
-		);
-
+		CalendarCache::invalidate();
 		$html = $this->render_calendar( array( 'displayMode' => 'date-groups', 'showSearch' => false ) );
 
 		$this->assertSame( array(), $_GET, 'Consumers do not need to mutate request globals.' );
@@ -143,26 +137,19 @@ class CalendarBlockTest extends WP_UnitTestCase {
 
 		add_filter(
 			'data_machine_events_calendar_request_args',
-			function ( $args ) {
+			function ( $args ) use ( &$parsed_input ) {
 				$args += array(
 					'lat'        => 'invalid-default',
 					'lng'        => 'invalid-default',
 					'tax_filter' => array( 'festival' => array( 42 ) ),
 					'month'     => 'not-a-month',
 				);
+				$parsed_input = CalendarRequest::fromQueryArgs( $args )->toAbilitiesArgs();
 				return $args;
 			}
 		);
-		add_filter(
-			'data_machine_events_calendar_query_args',
-			function ( $args, $input ) use ( &$parsed_input ) {
-				$parsed_input = $input;
-				return $args;
-			},
-			10,
-			2
-		);
 
+		CalendarCache::invalidate();
 		$this->render_calendar();
 
 		$this->assertSame( '40.7128', $parsed_input['geo_lat'] );

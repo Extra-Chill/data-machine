@@ -217,8 +217,9 @@ class EventRestControllerTest extends WP_UnitTestCase {
 		$this->assertSame( 200, $response->get_status() );
 
 		$data = $response->get_data();
-		$this->assertArrayHasKey( 'is_duplicate', $data );
-		$this->assertFalse( $data['is_duplicate'] );
+		$this->assertTrue( $data['success'] );
+		$this->assertArrayHasKey( 'is_duplicate', $data['data'] );
+		$this->assertFalse( $data['data']['is_duplicate'] );
 
 	}
 }

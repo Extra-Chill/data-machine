@@ -161,7 +161,8 @@ class EventQueryAbilitiesTest extends WP_UnitTestCase {
 			)
 		);
 
-		$this->assertIsArray( $result );
-		$this->assertTrue( isset( $result['error'] ) || isset( $result['events'] ) );
+		$this->assertWPError( $result );
+		$this->assertSame( 'venue_not_found', $result->get_error_code() );
+		$this->assertSame( 404, $result->get_error_data()['status'] );
 	}
 }

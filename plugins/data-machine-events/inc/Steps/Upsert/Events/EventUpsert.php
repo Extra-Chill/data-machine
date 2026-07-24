@@ -687,6 +687,18 @@ class EventUpsert extends UpsertHandler {
 
 					return null;
 				}
+
+				$existing_identity_start = self::composeIdentityStart( $existing_startDate, (string) ( $existing_data['startTime'] ?? '' ) );
+				$existing_timestamp      = strtotime( $existing_identity_start );
+				$incoming_timestamp      = strtotime( $startDate );
+				if ( preg_match( '/\d{2}:\d{2}/', $existing_identity_start )
+					&& preg_match( '/\d{2}:\d{2}/', $startDate )
+					&& false !== $existing_timestamp
+					&& false !== $incoming_timestamp
+					&& abs( $existing_timestamp - $incoming_timestamp ) > 7200
+				) {
+					return null;
+				}
 			}
 		}
 

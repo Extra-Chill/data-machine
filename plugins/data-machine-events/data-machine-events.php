@@ -196,6 +196,7 @@ class DATAMACHINE_Events {
 			}
 		}
 
+		$this->register_ability_hooks();
 		add_action( 'init', array( $this, 'init_data_machine_integration' ), 25 );
 
 		// Fire the public integration loaded action. Consumers gate filter
@@ -242,6 +243,50 @@ class DATAMACHINE_Events {
 		}
 
 		$this->load_data_machine_components();
+	}
+
+	/**
+	 * Attach lightweight ability registrations before the lazy registries fire.
+	 */
+	private function register_ability_hooks(): void {
+		require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/AbilityCategories.php';
+		require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/AbilityPermissions.php';
+		\DataMachineEvents\Abilities\AbilityCategories::ensure_registered();
+
+		$ability_classes = array(
+			\DataMachineEvents\Abilities\EventScraperTest::class,
+			\DataMachineEvents\Abilities\TimezoneAbilities::class,
+			\DataMachineEvents\Abilities\EventQueryAbilities::class,
+			\DataMachineEvents\Abilities\EventHealthAbilities::class,
+			\DataMachineEvents\Abilities\EventUpdateAbilities::class,
+			\DataMachineEvents\Abilities\EventUpsertAbilities::class,
+			\DataMachineEvents\Abilities\MoveEventAbilities::class,
+			\DataMachineEvents\Abilities\DeleteEventAbilities::class,
+			\DataMachineEvents\Abilities\BatchTimeFixAbilities::class,
+			\DataMachineEvents\Abilities\EncodingFixAbilities::class,
+			\DataMachineEvents\Abilities\VenueAbilities::class,
+			\DataMachineEvents\Abilities\VenueMapAbilities::class,
+			\DataMachineEvents\Abilities\CalendarAbilities::class,
+			\DataMachineEvents\Abilities\TicketUrlResyncAbilities::class,
+			\DataMachineEvents\Abilities\TicketmasterTest::class,
+			\DataMachineEvents\Abilities\DiceFmTest::class,
+			\DataMachineEvents\Abilities\GeocodingAbilities::class,
+			\DataMachineEvents\Abilities\VenueStatsAbilities::class,
+			\DataMachineEvents\Abilities\FilterAbilities::class,
+			\DataMachineEvents\Abilities\EventQualityAuditAbilities::class,
+			\DataMachineEvents\Abilities\SettingsAbilities::class,
+			\DataMachineEvents\Abilities\DuplicateDetectionAbilities::class,
+			\DataMachineEvents\Abilities\UpcomingCountAbilities::class,
+			\DataMachineEvents\Abilities\EventDateQueryAbilities::class,
+			\DataMachineEvents\Abilities\EventsByTermAbilities::class,
+			\DataMachineEvents\Abilities\MergedBillDetectAbilities::class,
+			\DataMachineEvents\Abilities\MergeEventPostsAbilities::class,
+			\DataMachineEvents\Abilities\MergedBillDecideAbilities::class,
+		);
+
+		foreach ( $ability_classes as $ability_class ) {
+			new $ability_class();
+		}
 	}
 
 	private function load_data_machine_components() {

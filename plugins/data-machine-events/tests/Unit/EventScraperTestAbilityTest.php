@@ -319,6 +319,8 @@ class EventScraperTestAbilityTest extends WP_UnitTestCase {
 		}
 
 		$html         = (string) file_get_contents( $fixture_path );
+		$future_year  = (int) current_time( 'Y' ) + 1;
+		$html         = str_replace( '2026', (string) $future_year, $html );
 		$target_url   = 'https://elephantroom.com/calendar';
 		$direct       = ( new BandzoogleExtractor() )->extract( $html, $target_url );
 		$direct_count = count( $direct );
@@ -374,6 +376,7 @@ class EventScraperTestAbilityTest extends WP_UnitTestCase {
 		}
 
 		$html         = (string) file_get_contents( $fixture_path );
+		$html         = str_replace( '2026-', ( (int) gmdate( 'Y' ) + 5 ) . '-', $html );
 		$target_url   = 'https://charlestonpourhouse.com';
 		$direct       = ( new JsonLdExtractor() )->extract( $html, $target_url );
 		$direct_count = count( $direct );

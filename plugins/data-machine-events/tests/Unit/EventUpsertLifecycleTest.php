@@ -36,6 +36,7 @@ class EventUpsertLifecycleTest extends WP_UnitTestCase {
 		if ( class_exists( PostIdentityIndex::class ) ) {
 			( new PostIdentityIndex() )->create_table();
 		}
+		wp_set_current_user( self::factory()->user->create( array( 'role' => 'administrator' ) ) );
 
 		$ability_registry = \WP_Abilities_Registry::get_instance();
 		if ( ! $ability_registry->is_registered( 'datamachine/upsert-post' ) ) {
@@ -147,6 +148,7 @@ class EventUpsertLifecycleTest extends WP_UnitTestCase {
 		remove_all_filters( 'datamachine_events_before_event_upsert_persistence' );
 		remove_all_actions( 'datamachine_events_after_event_upsert_persistence' );
 		remove_all_filters( 'wp_insert_post_empty_content' );
+		wp_set_current_user( 0 );
 		parent::tearDown();
 	}
 
@@ -536,11 +538,12 @@ class EventUpsertLifecycleTest extends WP_UnitTestCase {
 		$post_id         = (int) $created['data']['post_id'];
 		$old_venue_id   = (int) reset( wp_get_object_terms( $post_id, 'venue', array( 'fields' => 'ids' ) ) );
 		$candidate      = 'Ambiguous Candidate ' . uniqid();
-		Venue_Taxonomy::find_or_create_venue( $candidate, array( 'address' => '100 Main Street', 'city' => 'Charleston', 'state' => 'SC', 'country' => 'US' ) );
+		$this->assertNotWPError( wp_insert_term( $candidate . '!', 'venue' ) );
+		$this->assertNotWPError( wp_insert_term( $candidate . '?', 'venue' ) );
 		$observed = 0;
 		add_filter( 'datamachine_events_before_event_upsert_persistence', static function ( $allowed, array $context ) use ( &$observed ) { $observed = $context['venue_term_id']; return $allowed; }, 10, 2 );
 
-		$result = $this->invoke_upsert( array( 'title' => 'Resolution Skip Event', 'venue' => $candidate, 'venueAddress' => '200 Main Street', 'venueCity' => 'Atlanta', 'venueState' => 'GA', 'venueCountry' => 'US', 'startDate' => '2027-03-06', 'startTime' => '21:00', 'source_identity' => $source_identity ) );
+		$result = $this->invoke_upsert( array( 'title' => 'Resolution Skip Event', 'venue' => $candidate, 'startDate' => '2027-03-06', 'startTime' => '21:00', 'source_identity' => $source_identity ) );
 
 		$this->assertTrue( $result['success'] ?? false, wp_json_encode( $result ) );
 		$this->assertSame( $old_venue_id, $observed );

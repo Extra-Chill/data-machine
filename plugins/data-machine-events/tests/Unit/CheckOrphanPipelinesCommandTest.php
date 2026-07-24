@@ -65,29 +65,38 @@ class CheckOrphanPipelinesCommandTest extends WP_UnitTestCase {
 	private function insert_pipeline( int $pipeline_id, string $name, ?string $config ): void {
 		global $wpdb;
 
-		$wpdb->insert(
+		$result = $wpdb->insert(
 			$wpdb->prefix . 'datamachine_pipelines',
 			array(
 				'pipeline_id'     => $pipeline_id,
+				'user_id'         => 0,
 				'pipeline_name'   => $name,
 				'pipeline_config' => $config,
+				'created_at'      => current_time( 'mysql', true ),
+				'updated_at'      => current_time( 'mysql', true ),
 			),
-			array( '%d', '%s', '%s' )
+			array( '%d', '%d', '%s', '%s', '%s', '%s' )
 		);
+
+		$this->assertSame( 1, $result, $wpdb->last_error );
 	}
 
 	private function insert_flow( int $pipeline_id, string $flow_config_json ): int {
 		global $wpdb;
 
-		$wpdb->insert(
+		$result = $wpdb->insert(
 			$wpdb->prefix . 'datamachine_flows',
 			array(
-				'pipeline_id' => $pipeline_id,
-				'flow_name'   => 'test flow',
-				'flow_config' => $flow_config_json,
+				'pipeline_id'       => $pipeline_id,
+				'user_id'           => 0,
+				'flow_name'         => 'test flow',
+				'flow_config'       => $flow_config_json,
+				'scheduling_config' => '{}',
 			),
-			array( '%d', '%s' )
+			array( '%d', '%d', '%s', '%s', '%s' )
 		);
+
+		$this->assertSame( 1, $result, $wpdb->last_error );
 
 		return (int) $wpdb->insert_id;
 	}

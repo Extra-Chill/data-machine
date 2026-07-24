@@ -36,6 +36,7 @@ class EventUpsertAbilitiesTest extends WP_UnitTestCase {
 		if ( class_exists( PostIdentityIndex::class ) ) {
 			( new PostIdentityIndex() )->create_table();
 		}
+		wp_set_current_user( self::factory()->user->create( array( 'role' => 'administrator' ) ) );
 		$this->lock_query_filter = static function ( string $query ): string {
 			if ( str_contains( $query, 'GET_LOCK' ) || str_contains( $query, 'RELEASE_LOCK' ) ) {
 				return 'SELECT 1';
@@ -141,18 +142,8 @@ class EventUpsertAbilitiesTest extends WP_UnitTestCase {
 		$input = $this->validInput();
 		$name  = $input['event']['venue'];
 
-		Venue_Taxonomy::find_or_create_venue(
-			$name,
-			array(
-				'address' => '100 Main Street',
-				'city'    => 'Charleston',
-				'state'   => 'SC',
-				'country' => 'US',
-			)
-		);
-		$input['event']['venueAddress'] = '200 Main Street';
-		$input['event']['venueCity']    = 'Atlanta';
-		$input['event']['venueState']   = 'GA';
+		$this->assertNotWPError( wp_insert_term( $name . '!', 'venue' ) );
+		$this->assertNotWPError( wp_insert_term( $name . '?', 'venue' ) );
 
 		$result = $this->ability->executeUpsertEvent( $input );
 

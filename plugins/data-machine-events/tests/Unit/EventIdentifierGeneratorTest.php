@@ -214,19 +214,17 @@ class EventIdentifierGeneratorTest extends WP_UnitTestCase {
 	}
 
 	/**
-	 * Test that em dash with/without surrounding content produces matching titles.
+	 * Test that punctuation variants do not override the current similarity threshold.
 	 *
-	 * The original bug: "Burgundy: Soul Nite — Bill Wilson & The Ingredients"
-	 * vs "Burgundy: Soul Nite Bill Wilson & The Ingredients" should match
-	 * because both normalize to the same core ("burgundy").
+	 * Data Machine #2988 stopped collapsing both titles to the colon prefix.
 	 */
 	public function test_burgundy_soul_nite_em_dash_variant_match(): void {
-		$this->assertTrue(
+		$this->assertFalse(
 			EventIdentifierGenerator::titlesMatch(
 				'Burgundy: Soul Nite — Bill Wilson & The Ingredients',
 				'Burgundy: Soul Nite Bill Wilson & The Ingredients'
 			),
-			'Em dash variant should match (both normalize to same core via colon split)'
+			'Punctuation alone must not force a match below the current similarity threshold.'
 		);
 	}
 
