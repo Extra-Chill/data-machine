@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.168.15] - 2026-07-24
+
+### Fixed
+- report real job counts in worker status
+
 ## [0.168.14] - 2026-07-24
 
 ### Changed
