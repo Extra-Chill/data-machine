@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.168.12] - 2026-07-23
+
+### Changed
+- move generic AGENTS guidance ownership
+
 ## [0.168.11] - 2026-07-24
 
 ### Fixed
