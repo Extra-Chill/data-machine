@@ -84,10 +84,9 @@ function datamachine_register_agents_md_file(): void {
  * off this is a no-op, so even if a stray AGENTS.md file exists it composes to
  * nothing from core.
  *
- * Sections registered here are the generic shell DMC historically owned plus
- * the reflected `datamachine` section this change introduces. Data Machine Code
- * keeps only its own `datamachine-code` section (and the workspace inventory),
- * which slot in by priority when DMC is active.
+ * Sections registered here describe Data Machine itself. The external coding
+ * runtime installer owns generic WordPress coding guidance, while Data Machine
+ * Code owns its `datamachine-code` section and workspace inventory.
  *
  * @return void
  */
@@ -98,7 +97,7 @@ function datamachine_register_agents_md_sections(): void {
 
 	$wp = datamachine_agents_md_wp_cli_cmd();
 
-	$generic_meta = array(
+	$core_meta = array(
 		'owner'      => 'data-machine',
 		'freshness'  => 'static',
 		'conditions' => 'Registered when DATAMACHINE_COMPOSE_AGENTS_MD is enabled.',
@@ -117,7 +116,7 @@ function datamachine_register_agents_md_sections(): void {
 <!-- edit registered sections in their owning plugins, not this file -->
 MD;
 		},
-		array_merge( $generic_meta, array( 'freshness' => 'generated' ) )
+		array_merge( $core_meta, array( 'freshness' => 'generated' ) )
 	);
 
 	// The reflected `datamachine` command-surface section.
@@ -131,42 +130,6 @@ MD;
 			'freshness'  => 'snapshot',
 			'conditions' => 'Registered when DATAMACHINE_COMPOSE_AGENTS_MD is enabled; command list reflected from registered command classes.',
 		)
-	);
-
-	// Abilities.
-	SectionRegistry::register(
-		'AGENTS.md',
-		'abilities',
-		20,
-		function () {
-			return <<<'MD'
-## Abilities
-
-WordPress Abilities are the universal tool surface. Plugins register abilities that are automatically available via REST API, MCP, and chat.
-
-Use the active runtime tool listings exposed to MCP/chat/REST, and plugin-specific `--help` output, before assuming what's available.
-MD;
-		},
-		$generic_meta
-	);
-
-	// WordPress source (read-only reference).
-	SectionRegistry::register(
-		'AGENTS.md',
-		'wordpress-source',
-		30,
-		function () {
-			return <<<'MD'
-## WordPress Source (Read-Only Reference)
-
-These directories are **read-only reference material** — grep and read them to understand code, but never edit them directly.
-
-- `wp-content/plugins/` — plugin source (read-only)
-- `wp-content/themes/` — theme source (read-only)
-- `wp-includes/` — WordPress core (read-only)
-MD;
-		},
-		$generic_meta
 	);
 
 	// Multisite (only on multisite installs).
@@ -186,7 +149,7 @@ This is a WordPress multisite. Use `--url` to target specific sites:
 Without `--url`, commands default to the main site.
 MD;
 			},
-			array_merge( $generic_meta, array( 'conditions' => 'Only registered on multisite installs when the gate is enabled.' ) )
+			array_merge( $core_meta, array( 'conditions' => 'Only registered on multisite installs when the gate is enabled.' ) )
 		);
 	}
 }
