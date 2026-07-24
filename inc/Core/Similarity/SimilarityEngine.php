@@ -129,6 +129,9 @@ class SimilarityEngine {
 	 * 2. Prefix match (one core title starts with the other, min 5 chars)
 	 * 3. Levenshtein distance (≤15% diff for titles ≥15 chars)
 	 *
+	 * Distinct meaningful suffixes on two colon-delimited titles short-circuit
+	 * this cascade with a no-match result and score 0.0. Thresholds are unchanged.
+	 *
 	 * Returns a SimilarityResult with match, score, and strategy.
 	 *
 	 * @param string $title1 First title.
@@ -138,6 +141,30 @@ class SimilarityEngine {
 	public static function titlesMatch( string $title1, string $title2 ): SimilarityResult {
 		$core1 = self::normalizeTitle( $title1 );
 		$core2 = self::normalizeTitle( $title2 );
+
+		// When both titles have meaningful colon suffixes, require those suffixes
+		// to be equivalent before the shared prefix can produce a match. Prefix
+		// matching is intentionally excluded because added suffix words may carry
+		// the distinguishing identity.
+		$colon1 = strpos( $title1, ':' );
+		$colon2 = strpos( $title2, ':' );
+		if ( false !== $colon1 && false !== $colon2 ) {
+			$suffix1 = self::normalizeTitle( substr( $title1, $colon1 + 1 ) );
+			$suffix2 = self::normalizeTitle( substr( $title2, $colon2 + 1 ) );
+			$suffix1 = preg_match( '/[a-z0-9]/i', $suffix1 ) ? $suffix1 : '';
+			$suffix2 = preg_match( '/[a-z0-9]/i', $suffix2 ) ? $suffix2 : '';
+
+			if ( '' !== $suffix1 && '' !== $suffix2 && $suffix1 !== $suffix2 ) {
+				$max_suffix_length = max( strlen( $suffix1 ), strlen( $suffix2 ) );
+				$suffixes_match    = strlen( $suffix1 ) >= self::MIN_LEVENSHTEIN_LENGTH
+					&& strlen( $suffix2 ) >= self::MIN_LEVENSHTEIN_LENGTH
+					&& levenshtein( $suffix1, $suffix2 ) <= (int) ( $max_suffix_length * self::DEFAULT_LEVENSHTEIN_TOLERANCE );
+
+				if ( ! $suffixes_match ) {
+					return SimilarityResult::noMatch( $core1, $core2 );
+				}
+			}
+		}
 
 		// Strategy 1: Exact match after normalization.
 		if ( $core1 === $core2 ) {
@@ -230,7 +257,7 @@ class SimilarityEngine {
 	 * - Unicode dash normalization
 	 * - Subreddit reference removal (core DuplicateDetection)
 	 * - Reaction/attribution suffix removal (core DuplicateDetection)
-	 * - Delimiter splitting: dashes, colons, pipes, featuring/with/+
+	 * - Delimiter splitting: dashes, pipes, featuring/with/+
 	 *   (events EventIdentifierGenerator)
 	 * - Comma-separated artist list handling (events EventIdentifierGenerator)
 	 * - Article removal, non-alnum stripping, whitespace collapse
@@ -277,8 +304,6 @@ class SimilarityEngine {
 			' - ',           // ASCII hyphen with spaces (catches normalized em/en dash)
 			' — ',           // em dash with spaces (pre-normalization)
 			' – ',           // en dash with spaces (pre-normalization)
-			' : ',           // colon with spaces
-			': ',            // colon
 			' | ',           // pipe with spaces
 			'|',             // pipe
 			' featuring ',
@@ -305,6 +330,10 @@ class SimilarityEngine {
 		if ( null !== $best_delim ) {
 			$text = substr( $text, 0, $best_pos );
 		}
+
+		// Colons separate meaningful title segments rather than disposable
+		// supporting information. Preserve each segment as normalized words.
+		$text = str_replace( ':', ' ', $text );
 
 		// Comma-separated artist lists: treat first segment as the headliner.
 		// "Comfort Club, Valories, Barb" → "Comfort Club"

@@ -100,6 +100,14 @@ class SimilarityEngineTest extends WP_UnitTestCase {
 		$this->assertSame( 'andy frasco', $result );
 	}
 
+	public function test_normalize_title_preserves_colon_segments(): void {
+		$this->assertSame( 'archive chapter one', SimilarityEngine::normalizeTitle( 'Archive: Chapter One' ) );
+	}
+
+	public function test_normalize_title_handles_empty_and_repeated_colon_segments(): void {
+		$this->assertSame( 'archive chapter one', SimilarityEngine::normalizeTitle( 'Archive:: Chapter One:' ) );
+	}
+
 	public function test_normalize_title_short_fallback(): void {
 		// Very short title falls back to normalizeBasic.
 		$result = SimilarityEngine::normalizeTitle( 'Hi' );
@@ -176,6 +184,75 @@ class SimilarityEngineTest extends WP_UnitTestCase {
 			'Andy Frasco & The U.N.'
 		);
 		$this->assertTrue( $result->match );
+	}
+
+	/**
+	 * @dataProvider colon_titles_provider
+	 */
+	public function test_colon_title_matching( string $title1, string $title2, bool $expected ): void {
+		$result = SimilarityEngine::titlesMatch( $title1, $title2 );
+
+		$this->assertSame( $expected, $result->match );
+		if ( ! $expected ) {
+			$this->assertSame( 0.0, $result->score );
+			$this->assertSame( SimilarityResult::STRATEGY_NONE, $result->strategy );
+		}
+	}
+
+	public function colon_titles_provider(): array {
+		return array(
+			'distinct suffixes after shared prefix' => array(
+				'Burgundy: Soul Nite',
+				'Burgundy: Funk Nite',
+				false,
+			),
+			'distinct suffixes after long prefix'   => array(
+				'The Complete Archive Collection: Chapter One',
+				'The Complete Archive Collection: Chapter Two',
+				false,
+			),
+			'distinct nested colon suffixes'        => array(
+				'Archive: Volume One: Red Edition',
+				'Archive: Volume One: Blue Edition',
+				false,
+			),
+			'added meaningful suffix words'          => array(
+				'Archive: Holiday Special',
+				'Archive: Holiday Special Extended Edition',
+				false,
+			),
+			'distinct short suffixes'               => array( 'Series: A', 'Series: B', false ),
+			'equivalent case and punctuation'       => array(
+				'Archive: The Holiday Special!',
+				'archive : holiday special',
+				true,
+			),
+			'equivalent whitespace'                 => array(
+				'Archive:   Holiday Special',
+				'Archive : Holiday   Special',
+				true,
+			),
+			'equivalent without colon'              => array(
+				'Archive: Holiday Special',
+				'Archive Holiday Special',
+				true,
+			),
+			'empty suffix'                          => array( 'Archive:', 'Archive', true ),
+			'empty suffixes on both titles'          => array( 'Archive:', 'Archive::', true ),
+			'punctuation-only suffixes'              => array( 'Archive: :', 'Archive:::', true ),
+			'repeated empty suffixes'               => array( 'Archive::', 'Archive', true ),
+			'repeated meaningful segments'           => array(
+				'Archive:: Volume One:: Red Edition',
+				'Archive: Volume One: Blue Edition',
+				false,
+			),
+			'one-sided meaningful suffix'           => array( 'Jazz Night: Holiday Special', 'Jazz Night', true ),
+			'close meaningful suffix variants'      => array(
+				'Series: Advanced Programming Techniques',
+				'Series: Advanced Programing Techniques',
+				true,
+			),
+		);
 	}
 
 	public function test_titles_match_returns_similarity_result(): void {
