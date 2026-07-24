@@ -1,0 +1,66 @@
+{
+  "name": "automattic/blocks-engine-php-transformer",
+  "description": "PHP primitives for transforming HTML, Markdown, and website artifacts into WordPress block outputs.",
+  "type": "library",
+  "license": "GPL-3.0-or-later",
+  "authors": [
+    {
+      "name": "Automattic"
+    }
+  ],
+  "keywords": [
+    "blocks",
+    "html",
+    "markdown",
+    "wordpress"
+  ],
+  "homepage": "https://github.com/Automattic/blocks-engine/tree/trunk/php-transformer",
+  "support": {
+    "issues": "https://github.com/Automattic/blocks-engine/issues",
+    "source": "https://github.com/Automattic/blocks-engine/tree/trunk/php-transformer"
+  },
+  "autoload": {
+    "psr-4": {
+      "Automattic\\BlocksEngine\\PhpTransformer\\": "src/"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "Automattic\\BlocksEngine\\PhpTransformer\\Tests\\": "tests/"
+    }
+  },
+  "require": {
+    "league/commonmark": "^2.5",
+    "league/html-to-markdown": "^5.1",
+    "php": ">=8.1"
+  },
+  "scripts": {
+    "parity": "@test:parity",
+    "test": [
+      "@test:canonical",
+      "@test:parity",
+      "@test:packaging"
+    ],
+    "test:canonical": [
+      "php tests/contract/runtime-no-wordpress.php",
+      "php tests/contract/runtime-wordpress-stubs.php",
+      "php tests/contract/plugin-bootstrap.php",
+      "php tests/contract/run.php"
+    ],
+    "test:parity": "php tests/parity/run.php",
+    "test:migration:examples": "php tests/migration/examples.php",
+    "test:migration:legacy-parity": "BLOCKS_ENGINE_PARITY_LEGACY=1 php tests/parity/run.php --migration-comparison",
+    "test:packaging": "php tests/packaging/install-proof.php"
+  },
+  "config": {
+    "platform": {
+      "php": "8.1.0"
+    },
+    "sort-packages": true
+  },
+  "extra": {
+    "branch-alias": {
+      "dev-trunk": "0.1.x-dev"
+    }
+  }
+}

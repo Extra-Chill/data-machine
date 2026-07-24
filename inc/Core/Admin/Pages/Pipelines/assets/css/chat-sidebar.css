@@ -1,0 +1,105 @@
+/**
+ * Chat Sidebar Styles
+ *
+ * Entry point for all chat CSS. Imports component-aligned sub-files.
+ * Sidebar container, header, actions bar, and processing indicator live here.
+ */
+
+@import url("chat-messages.css");
+@import url("chat-input.css");
+@import url("chat-sessions.css");
+
+/* ===== LAYOUT ===== */
+
+.datamachine-pipelines-layout {
+	display: flex;
+}
+
+.datamachine-pipelines-main {
+	flex: 1;
+	min-width: 0;
+	padding: 20px;
+}
+
+.datamachine-header__right {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+/* ===== CHAT TOGGLE ===== */
+
+.datamachine-chat-toggle {
+	margin-left: 8px;
+}
+
+.datamachine-chat-toggle.is-active {
+	background: #007cba;
+	color: #fff;
+}
+
+/* ===== CHAT SIDEBAR ===== */
+
+.datamachine-chat-sidebar {
+	width: 280px;
+	flex-shrink: 0;
+	border-left: 1px solid #ddd;
+	background: #fff;
+	display: flex;
+	flex-direction: column;
+	height: calc(100vh - 32px);
+	position: sticky;
+	top: 32px;
+}
+
+.datamachine-chat-sidebar__header {
+	padding: 12px 16px;
+	border-bottom: 1px solid #ddd;
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	flex-shrink: 0;
+}
+
+.datamachine-chat-sidebar__title {
+	margin: 0;
+	font-size: 14px;
+	font-weight: 600;
+}
+
+.datamachine-chat-sidebar__close {
+	padding: 0;
+}
+
+.datamachine-chat-sidebar__actions {
+	padding: 8px 16px;
+	border-bottom: 1px solid #eee;
+	flex-shrink: 0;
+	display: flex;
+	gap: 8px;
+	position: relative;
+}
+
+.datamachine-chat-sidebar__copy {
+	font-size: 12px;
+}
+
+/* ===== RESPONSIVE ===== */
+
+@media (max-width: 960px) {
+	.datamachine-chat-sidebar {
+		position: fixed;
+		right: 0;
+		top: 32px;
+		z-index: 100;
+		box-shadow: -2px 0 8px rgba(0, 0, 0, 0.1);
+	}
+}
+
+@media (max-width: 600px) {
+	.datamachine-chat-sidebar {
+		width: 100%;
+		top: 46px;
+		height: calc(100vh - 46px);
+	}
+}
