@@ -295,6 +295,151 @@ class EventUpsertLifecycleTest extends WP_UnitTestCase {
 		$this->assertSame( 'event_upsert_persistence_failed', $after_calls[0][1]->get_error_code() );
 	}
 
+	public function test_upsert_wp_error_preserves_structured_failure_and_context_once(): void {
+		$source_identity = 'wp-error-' . uniqid();
+		$created         = $this->invoke_upsert(
+			array(
+				'title'           => 'WP Error Existing Event',
+				'venue'           => 'WP Error Venue ' . uniqid(),
+				'startDate'       => '2027-03-03',
+				'startTime'       => '20:30',
+				'source'          => 'wp-error-source',
+				'source_id'       => 'wp-error-source-id',
+				'source_identity' => $source_identity,
+			)
+		);
+		$existing_post_id = (int) $created['data']['post_id'];
+		$failure          = new \WP_Error(
+			'upstream_write_throttled',
+			'Upstream write was throttled.',
+			array(
+				'status'    => 429,
+				'retryable' => true,
+				'cause'     => 'upstream_rate_limit',
+			)
+		);
+		$after_calls      = array();
+		add_action(
+			'datamachine_events_after_event_upsert_persistence',
+			static function ( array $context, int $post_id, $result ) use ( &$after_calls ): void {
+				$after_calls[] = array( $context, $post_id, $result );
+			},
+			10,
+			3
+		);
+
+		$result = $this->invoke_upsert_with_ability_result(
+			$failure,
+			array(
+				'title'           => 'WP Error Existing Event',
+				'venue'           => 'WP Error Venue Updated',
+				'startDate'       => '2027-03-03',
+				'startTime'       => '21:00',
+				'source'          => 'wp-error-source',
+				'source_id'       => 'wp-error-source-id',
+				'source_identity' => $source_identity,
+			)
+		);
+
+		$this->assertFalse( $result['success'] ?? true );
+		$this->assertSame( 'upstream_write_throttled', $result['error_code'] );
+		$this->assertSame( 'Upstream write was throttled.', $result['error'] );
+		$this->assertSame( 429, $result['status'] );
+		$this->assertTrue( $result['retryable'] );
+		$this->assertSame( 'upstream_rate_limit', $result['error_data']['cause'] );
+		$this->assertCount( 1, $after_calls );
+		$this->assertSame( 0, $after_calls[0][1] );
+		$this->assertSame( $existing_post_id, $after_calls[0][0]['existing_post_id'] );
+		$this->assertSame( 'wp-error-source', $after_calls[0][0]['source'] );
+		$this->assertSame( 'wp-error-source-id', $after_calls[0][0]['source_id'] );
+		$this->assertSame( $source_identity, $after_calls[0][0]['source_identity'] );
+		$this->assertWPError( $after_calls[0][2] );
+		$this->assertSame( 'upstream_write_throttled', $after_calls[0][2]->get_error_code() );
+		$this->assertSame( $failure->get_error_data(), $after_calls[0][2]->get_error_data() );
+	}
+
+	public function test_upsert_array_failure_preserves_structured_failure_once(): void {
+		$after_calls = array();
+		add_action(
+			'datamachine_events_after_event_upsert_persistence',
+			static function ( array $context, int $post_id, $result ) use ( &$after_calls ): void {
+				$after_calls[] = array( $context, $post_id, $result );
+			},
+			10,
+			3
+		);
+
+		$result = $this->invoke_upsert_with_ability_result(
+			array(
+				'success'    => false,
+				'error'      => 'Legacy persistence failed.',
+				'error_code' => 'legacy_persistence_failed',
+				'error_data' => array(
+					'status'    => 503,
+					'retryable' => true,
+					'cause'     => 'database_unavailable',
+				),
+			),
+			array(
+				'title'     => 'Array Failure Event ' . uniqid(),
+				'venue'     => 'Array Failure Venue ' . uniqid(),
+				'startDate' => '2027-03-03',
+				'startTime' => '22:00',
+			)
+		);
+
+		$this->assertFalse( $result['success'] ?? true );
+		$this->assertSame( 'legacy_persistence_failed', $result['error_code'] );
+		$this->assertSame( 'Legacy persistence failed.', $result['error'] );
+		$this->assertSame( 503, $result['status'] );
+		$this->assertTrue( $result['retryable'] );
+		$this->assertSame( 'database_unavailable', $result['error_data']['cause'] );
+		$this->assertCount( 1, $after_calls );
+		$this->assertSame( 0, $after_calls[0][1] );
+		$this->assertWPError( $after_calls[0][2] );
+		$this->assertSame( 'legacy_persistence_failed', $after_calls[0][2]->get_error_code() );
+	}
+
+	public function test_upsert_array_success_completes_lifecycle_once(): void {
+		$post_id = self::factory()->post->create(
+			array(
+				'post_type'   => Event_Post_Type::POST_TYPE,
+				'post_status' => 'publish',
+				'post_title'  => 'Array Success Event',
+			)
+		);
+		$after_calls = array();
+		add_action(
+			'datamachine_events_after_event_upsert_persistence',
+			static function ( array $context, int $observed_post_id, $result ) use ( &$after_calls ): void {
+				$after_calls[] = array( $context, $observed_post_id, $result );
+			},
+			10,
+			3
+		);
+
+		$result = $this->invoke_upsert_with_ability_result(
+			array(
+				'success' => true,
+				'post_id' => $post_id,
+				'action'  => 'created',
+			),
+			array(
+				'title'     => 'Array Success Event',
+				'venue'     => 'Array Success Venue ' . uniqid(),
+				'startDate' => '2027-03-04',
+				'startTime' => '20:00',
+			)
+		);
+
+		$this->assertTrue( $result['success'] ?? false, wp_json_encode( $result ) );
+		$this->assertSame( $post_id, $result['data']['post_id'] );
+		$this->assertSame( 'created', $result['data']['action'] );
+		$this->assertCount( 1, $after_calls );
+		$this->assertSame( $post_id, $after_calls[0][1] );
+		$this->assertSame( $result, $after_calls[0][2] );
+	}
+
 	public function test_venue_assignment_failure_remains_successful_and_warns(): void {
 		$after = array();
 		add_filter(
@@ -445,5 +590,19 @@ class EventUpsertLifecycleTest extends WP_UnitTestCase {
 		$config['post_status'] = $config['post_status'] ?? 'publish';
 
 		return $method->invoke( $this->handler, $parameters, $config );
+	}
+
+	/** Execute an upsert with a controlled Data Machine ability result. */
+	private function invoke_upsert_with_ability_result( array|\WP_Error $ability_result, array $parameters ): array {
+		$ability  = wp_get_ability( 'datamachine/upsert-post' );
+		$property = new \ReflectionProperty( \WP_Ability::class, 'execute_callback' );
+		$callback = $property->getValue( $ability );
+		$property->setValue( $ability, static fn() => $ability_result );
+
+		try {
+			return $this->invoke_upsert( $parameters );
+		} finally {
+			$property->setValue( $ability, $callback );
+		}
 	}
 }

@@ -21,6 +21,7 @@
 
 namespace DataMachineEvents\Steps\Upsert\Events;
 
+use DataMachine\Core\AbilityResult;
 use DataMachine\Core\EngineData;
 use DataMachine\Core\PluginSettings;
 use DataMachineEvents\Steps\EventImport\JunkPayloadFilter;
@@ -399,18 +400,19 @@ class EventUpsert extends UpsertHandler {
 				return $this->lifecycleErrorResponse( $preflight, $title );
 			}
 
-			$result = $ability->execute( $upsert_input );
+			$result = AbilityResult::normalize( $ability->execute( $upsert_input ) );
 
 			if ( empty( $result['success'] ) ) {
-				$error_data = is_array( $result['error_data'] ?? null ) ? $result['error_data'] : array();
-				foreach ( array( 'status', 'retryable', 'transient', 'rule' ) as $field ) {
+				$error_data = $result['error_data'] ?? $result['wp_error_data'] ?? array();
+				$error_data = is_array( $error_data ) ? $error_data : array();
+				foreach ( array( 'status', 'retryable', 'transient', 'rule', 'cause' ) as $field ) {
 					if ( array_key_exists( $field, $result ) ) {
 						$error_data[ $field ] = $result[ $field ];
 					}
 				}
 				$error_data['status'] = (int) ( $error_data['status'] ?? ( ! empty( $error_data['retryable'] ) || ! empty( $error_data['transient'] ) ? 503 : 400 ) );
 				$lifecycle_result     = new \WP_Error(
-					(string) ( $result['error_code'] ?? 'event_upsert_persistence_failed' ),
+					(string) ( $result['error_code'] ?? $result['wp_error_code'] ?? 'event_upsert_persistence_failed' ),
 					(string) ( $result['error'] ?? 'Event upsert failed' ),
 					$error_data
 				);
