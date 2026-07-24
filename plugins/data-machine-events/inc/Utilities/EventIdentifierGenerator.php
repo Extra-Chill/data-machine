@@ -208,7 +208,15 @@ class EventIdentifierGenerator {
 
 		$token_count = count( array_filter( explode( ' ', $normalized ) ) );
 
-		return $token_count >= 3 && ! self::isLowConfidenceTitle( $title );
+		if ( $token_count >= 3 ) {
+			return ! self::isLowConfidenceTitle( $title );
+		}
+
+		if ( 2 !== $token_count ) {
+			return false;
+		}
+
+		return self::hasStrongTokenSignal( $normalized, 2 ) && ! self::isLowConfidenceTitle( $title );
 	}
 
 	/**
@@ -218,14 +226,19 @@ class EventIdentifierGenerator {
 	 * hardcoded event/festival words here.
 	 *
 	 * @param string $normalized_title Normalized title.
-	 * @return bool True when any token appears specific enough.
+	 * @param int    $required_count   Minimum number of strong tokens required.
+	 * @return bool True when enough tokens appear specific.
 	 */
-	private static function hasStrongTokenSignal( string $normalized_title ): bool {
+	private static function hasStrongTokenSignal( string $normalized_title, int $required_count = 1 ): bool {
 		$tokens = array_filter( explode( ' ', $normalized_title ) );
+		$count  = 0;
 
 		foreach ( $tokens as $token ) {
 			if ( strlen( $token ) >= 5 ) {
-				return true;
+				++$count;
+				if ( $count >= $required_count ) {
+					return true;
+				}
 			}
 		}
 

@@ -288,6 +288,39 @@ class EventIdentifierGeneratorTest extends WP_UnitTestCase {
 		$this->assertSame( 'medium', EventIdentifierGenerator::getIdentityConfidence( 'The California Honeydrops - Shine Delight Tour 2026', '2026-03-10', '' ) );
 	}
 
+	/**
+	 * @dataProvider get_specific_two_token_artist_titles
+	 */
+	public function test_specific_two_token_artist_title_with_date_is_medium_confidence( string $title ): void {
+		$this->assertSame( 'medium', EventIdentifierGenerator::getIdentityConfidence( $title, '2026-03-10', '' ) );
+	}
+
+	public function get_specific_two_token_artist_titles(): array {
+		return array(
+			'billy_strings' => array( 'Billy Strings' ),
+			'molly_tuttle'  => array( 'Molly Tuttle' ),
+		);
+	}
+
+	/**
+	 * @dataProvider get_generic_two_token_titles
+	 */
+	public function test_generic_two_token_title_with_date_remains_low_confidence( string $title ): void {
+		$this->assertSame( 'low', EventIdentifierGenerator::getIdentityConfidence( $title, '2026-03-10', '' ) );
+	}
+
+	public function get_generic_two_token_titles(): array {
+		return array(
+			'live_music' => array( 'Live Music' ),
+			'open_mic'   => array( 'Open Mic' ),
+			'jazz_night' => array( 'Jazz Night' ),
+		);
+	}
+
+	public function test_specific_two_token_artist_title_without_date_remains_low_confidence(): void {
+		$this->assertSame( 'low', EventIdentifierGenerator::getIdentityConfidence( 'Billy Strings', '', '' ) );
+	}
+
 	public function test_specific_title_with_venue_is_high_confidence(): void {
 		$this->assertSame( 'high', EventIdentifierGenerator::getIdentityConfidence( 'The California Honeydrops - Shine Delight Tour 2026', '2026-03-10', 'ACL Live' ) );
 	}
