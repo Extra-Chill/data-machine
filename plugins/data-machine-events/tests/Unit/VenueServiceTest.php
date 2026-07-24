@@ -15,14 +15,46 @@ use DataMachineEvents\Core\VenueService;
 use DataMachineEvents\Core\Venue_Taxonomy;
 
 class VenueServiceTest extends WP_UnitTestCase {
+	/** @var int[] */
+	private array $existing_venue_ids = array();
 
 	public function setUp(): void {
 		parent::setUp();
+		global $wpdb;
+		$wpdb->query( 'COMMIT' );
+		$wpdb->query( 'SET autocommit = 1' );
 
 		// Ensure venue taxonomy is registered
 		if ( ! taxonomy_exists( 'venue' ) ) {
 			Venue_Taxonomy::register();
 		}
+		$existing_ids = get_terms(
+			array(
+				'taxonomy'   => 'venue',
+				'hide_empty' => false,
+				'fields'     => 'ids',
+			)
+		);
+		$this->assertNotWPError( $existing_ids );
+		$this->existing_venue_ids = array_map( 'intval', $existing_ids );
+	}
+
+	public function tearDown(): void {
+		global $wpdb;
+		$current_ids = get_terms(
+			array(
+				'taxonomy'   => 'venue',
+				'hide_empty' => false,
+				'fields'     => 'ids',
+			)
+		);
+		$this->assertNotWPError( $current_ids );
+		foreach ( array_diff( array_map( 'intval', $current_ids ), $this->existing_venue_ids ) as $term_id ) {
+			wp_delete_term( $term_id, 'venue' );
+		}
+		$wpdb->query( 'SET autocommit = 0' );
+		$wpdb->query( 'START TRANSACTION' );
+		parent::tearDown();
 	}
 
 	public function test_normalize_venue_data_sanitizes_name() {
@@ -121,10 +153,10 @@ class VenueServiceTest extends WP_UnitTestCase {
 		$this->assertIsInt( $term_id );
 
 		// Check metadata was saved
-		$saved_address = get_term_meta( $term_id, 'venue_address', true );
+		$saved_address = get_term_meta( $term_id, '_venue_address', true );
 		$this->assertEquals( '789 Meta St', $saved_address );
 
-		$saved_city = get_term_meta( $term_id, 'venue_city', true );
+		$saved_city = get_term_meta( $term_id, '_venue_city', true );
 		$this->assertEquals( 'Fort Collins', $saved_city );
 	}
 }

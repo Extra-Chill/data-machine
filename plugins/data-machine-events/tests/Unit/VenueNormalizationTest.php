@@ -19,13 +19,45 @@ use WP_UnitTestCase;
 use DataMachineEvents\Core\Venue_Taxonomy;
 
 class VenueNormalizationTest extends WP_UnitTestCase {
+	/** @var int[] */
+	private array $existing_venue_ids = array();
 
 	public function setUp(): void {
 		parent::setUp();
+		global $wpdb;
+		$wpdb->query( 'COMMIT' );
+		$wpdb->query( 'SET autocommit = 1' );
 
 		if ( ! taxonomy_exists( 'venue' ) ) {
 			Venue_Taxonomy::register();
 		}
+		$existing_ids = get_terms(
+			array(
+				'taxonomy'   => 'venue',
+				'hide_empty' => false,
+				'fields'     => 'ids',
+			)
+		);
+		$this->assertNotWPError( $existing_ids );
+		$this->existing_venue_ids = array_map( 'intval', $existing_ids );
+	}
+
+	public function tearDown(): void {
+		global $wpdb;
+		$current_ids = get_terms(
+			array(
+				'taxonomy'   => 'venue',
+				'hide_empty' => false,
+				'fields'     => 'ids',
+			)
+		);
+		$this->assertNotWPError( $current_ids );
+		foreach ( array_diff( array_map( 'intval', $current_ids ), $this->existing_venue_ids ) as $term_id ) {
+			wp_delete_term( $term_id, 'venue' );
+		}
+		$wpdb->query( 'SET autocommit = 0' );
+		$wpdb->query( 'START TRANSACTION' );
+		parent::tearDown();
 	}
 
 	// ---------------------------------------------------------------------
@@ -159,6 +191,7 @@ class VenueNormalizationTest extends WP_UnitTestCase {
 		$first = Venue_Taxonomy::find_or_create_venue( 'Hook & Ladder Theater', $venue_data );
 		$this->assertIsArray( $first );
 		$this->assertNotNull( $first['term_id'], 'First call should create a venue term.' );
+		$this->assertSame( 'created', $first['match_status'], 'First venue fixture must be created.' );
 		$this->assertTrue( $first['was_created'] );
 
 		$second = Venue_Taxonomy::find_or_create_venue( 'Hook and Ladder Theater', $venue_data );
@@ -181,6 +214,7 @@ class VenueNormalizationTest extends WP_UnitTestCase {
 		$first = Venue_Taxonomy::find_or_create_venue( 'Hook and Ladder Theater', $venue_data_plain );
 		$this->assertIsArray( $first );
 		$this->assertNotNull( $first['term_id'] );
+		$this->assertSame( 'created', $first['match_status'], 'First venue fixture must be created.' );
 
 		$venue_data_suite = array(
 			'address' => '3010 Minnehaha Ave STE 420',
@@ -379,6 +413,8 @@ class VenueNormalizationTest extends WP_UnitTestCase {
 				'coordinates' => '39.9526,-75.1652',
 			)
 		);
+		$this->assertNotNull( $created['term_id'], 'Canonical venue fixture must be created.' );
+		$this->assertSame( 'created', $created['match_status'] );
 		$result  = Venue_Taxonomy::find_or_create_venue(
 			$name,
 			array(
@@ -456,6 +492,7 @@ class VenueNormalizationTest extends WP_UnitTestCase {
 		$clean = Venue_Taxonomy::find_or_create_venue( 'The Dinghy Test ' . uniqid() );
 		$this->assertIsArray( $clean );
 		$this->assertNotNull( $clean['term_id'] );
+		$this->assertSame( 'created', $clean['match_status'], 'Clean venue fixture must be created.' );
 
 		$clean_term = get_term( $clean['term_id'], 'venue' );
 

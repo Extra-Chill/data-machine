@@ -21,9 +21,17 @@ use DataMachineEvents\Core\DuplicateDetection\VenueMergeHelper;
 use DataMachineEvents\Cli\Check\CheckMergeDuplicateVenuesCommand;
 
 class VenueMergeHelperTest extends WP_UnitTestCase {
+	/** @var int[] */
+	private array $term_ids = array();
+
+	/** @var int[] */
+	private array $post_ids = array();
 
 	public function setUp(): void {
 		parent::setUp();
+		global $wpdb;
+		$wpdb->query( 'COMMIT' );
+		$wpdb->query( 'SET autocommit = 1' );
 
 		if ( ! post_type_exists( Event_Post_Type::POST_TYPE ) ) {
 			Event_Post_Type::register();
@@ -34,6 +42,22 @@ class VenueMergeHelperTest extends WP_UnitTestCase {
 		}
 
 		$this->ensure_flows_table();
+	}
+
+	public function tearDown(): void {
+		global $wpdb;
+		foreach ( array_reverse( $this->post_ids ) as $post_id ) {
+			wp_delete_post( $post_id, true );
+		}
+		foreach ( array_reverse( $this->term_ids ) as $term_id ) {
+			if ( get_term( $term_id, 'venue' ) instanceof \WP_Term ) {
+				wp_delete_term( $term_id, 'venue' );
+			}
+		}
+		$wpdb->query( "TRUNCATE TABLE {$wpdb->prefix}datamachine_flows" );
+		$wpdb->query( 'SET autocommit = 0' );
+		$wpdb->query( 'START TRANSACTION' );
+		parent::tearDown();
 	}
 
 	private function ensure_flows_table(): void {
@@ -60,12 +84,18 @@ class VenueMergeHelperTest extends WP_UnitTestCase {
 	}
 
 	private function make_venue( string $name, array $meta = array() ): int {
-		$term = wp_insert_term( $name, 'venue' );
+		$term = wp_insert_term(
+			$name,
+			'venue',
+			array( 'slug' => sanitize_title( $name ) . '-' . wp_generate_uuid4() )
+		);
 		$this->assertNotInstanceOf( \WP_Error::class, $term );
 
 		$term_id = (int) $term['term_id'];
-		foreach ( $meta as $key => $value ) {
-			update_term_meta( $term_id, $key, $value );
+		$this->term_ids[] = $term_id;
+		foreach ( $meta as $meta_key => $value ) {
+			$this->assertStringStartsWith( '_venue_', $meta_key, 'Venue fixtures must use canonical metadata keys.' );
+			$this->assertNotFalse( update_term_meta( $term_id, $meta_key, $value ) );
 		}
 
 		return $term_id;
@@ -82,15 +112,17 @@ class VenueMergeHelperTest extends WP_UnitTestCase {
 
 		$this->assertIsInt( $post_id );
 		$this->assertGreaterThan( 0, $post_id );
+		$this->post_ids[] = $post_id;
 
-		wp_set_object_terms( $post_id, array( $venue_term_id ), 'venue', false );
+		$assigned = wp_set_object_terms( $post_id, array( $venue_term_id ), 'venue', false );
+		$this->assertNotWPError( $assigned, 'Venue fixture relationship must persist.' );
 		return $post_id;
 	}
 
 	private function insert_flow( string $flow_config_json ): int {
 		global $wpdb;
 
-		$wpdb->insert(
+		$inserted = $wpdb->insert(
 			$wpdb->prefix . 'datamachine_flows',
 			array(
 				'pipeline_id' => 1,
@@ -99,6 +131,7 @@ class VenueMergeHelperTest extends WP_UnitTestCase {
 			),
 			array( '%d', '%s', '%s' )
 		);
+		$this->assertSame( 1, $inserted, 'Flow fixture must persist.' );
 
 		return (int) $wpdb->insert_id;
 	}
