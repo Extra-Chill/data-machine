@@ -592,17 +592,18 @@ class UpsertPostAbility {
 		$meta_input        = $context['meta_input'];
 		$has_reservation   = null !== $reservation && $reservations instanceof PostIdentityReservations;
 
-		// Idempotency check. Parent/slug changes still need a write even when
-		// the content hash is unchanged.
+		// Idempotency check. Parent/slug/status changes still need a write even
+		// when the content hash is unchanged.
 		if ( $existing_id > 0 && '' !== $content_hash ) {
 			$stored_hash = get_post_meta( $existing_id, self::META_CONTENT_HASH, true );
 			$post        = get_post( $existing_id );
 			$same_parent = ! $post instanceof \WP_Post || $parent_id <= 0 || (int) $post->post_parent === $parent_id;
 			$same_slug   = ! $post instanceof \WP_Post || '' === $slug || (string) $post->post_name === $slug;
+			$same_status = ! $post instanceof \WP_Post || (string) $post->post_status === $post_status;
 
 			$identity_complete = ! $has_reservation
 				|| (string) get_post_meta( $existing_id, $reservation['identity']['meta_key'], true ) === $reservation['identity']['meta_value'];
-			if ( $stored_hash === $content_hash && $same_parent && $same_slug && $identity_complete ) {
+			if ( $stored_hash === $content_hash && $same_parent && $same_slug && $same_status && $identity_complete ) {
 				self::applySourceMetadata( $existing_id, $source_url, $original_date_gmt );
 				if ( $has_reservation ) {
 					$completed = $reservations->mark_complete( $reservation['identity'], $existing_id );

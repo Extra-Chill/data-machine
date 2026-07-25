@@ -142,6 +142,36 @@ class UpsertPostAbilityTest extends WP_UnitTestCase {
 		$this->assertSame( 'complete', $this->repository->get_reservation( $identity['identity_hash'] )['state'] );
 	}
 
+	public function test_trashed_post_with_matching_content_is_republished(): void {
+		$post_id = $this->create_hashed_post( 'trash' );
+
+		$result = UpsertPostAbility::execute( $this->status_input( $post_id, 'publish' ) );
+
+		$this->assertTrue( $result['success'] );
+		$this->assertSame( 'updated', $result['action'] );
+		$this->assertSame( 'publish', get_post_status( $post_id ) );
+	}
+
+	public function test_draft_post_with_matching_content_is_published(): void {
+		$post_id = $this->create_hashed_post( 'draft' );
+
+		$result = UpsertPostAbility::execute( $this->status_input( $post_id, 'publish' ) );
+
+		$this->assertTrue( $result['success'] );
+		$this->assertSame( 'updated', $result['action'] );
+		$this->assertSame( 'publish', get_post_status( $post_id ) );
+	}
+
+	public function test_matching_status_and_content_remains_no_change(): void {
+		$post_id = $this->create_hashed_post( 'publish' );
+
+		$result = UpsertPostAbility::execute( $this->status_input( $post_id, 'publish' ) );
+
+		$this->assertTrue( $result['success'] );
+		$this->assertSame( 'no_change', $result['action'] );
+		$this->assertSame( 'publish', get_post_status( $post_id ) );
+	}
+
 	public function test_empty_partial_and_zero_identity_values_keep_slug_fallback_behavior(): void {
 		$cases = array(
 			array(),
@@ -448,6 +478,36 @@ class UpsertPostAbilityTest extends WP_UnitTestCase {
 				'key'   => '_source',
 				'value' => $value,
 			),
+		);
+	}
+
+	private function create_hashed_post( string $post_status ): int {
+		$content = '<!-- wp:paragraph --><p>Status body</p><!-- /wp:paragraph -->';
+		$post_id = self::factory()->post->create(
+			array(
+				'post_title'   => 'Status reconciliation',
+				'post_content' => $content,
+				'post_status'  => 'trash' === $post_status ? 'publish' : $post_status,
+			)
+		);
+		if ( 'trash' === $post_status ) {
+			wp_trash_post( $post_id );
+		}
+		update_post_meta( $post_id, UpsertPostAbility::META_CONTENT_HASH, hash( 'sha256', $content ) );
+
+		return $post_id;
+	}
+
+	private function status_input( int $post_id, string $post_status ): array {
+		$content = '<!-- wp:paragraph --><p>Status body</p><!-- /wp:paragraph -->';
+
+		return array(
+			'post_type'    => 'post',
+			'post_id'      => $post_id,
+			'title'        => 'Status reconciliation',
+			'content'      => $content,
+			'content_hash' => hash( 'sha256', $content ),
+			'post_status'  => $post_status,
 		);
 	}
 
