@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.168.16] - 2026-07-25
+
+### Fixed
+- reconcile status during post upserts
+
 ## [0.168.15] - 2026-07-24
 
 ### Fixed
