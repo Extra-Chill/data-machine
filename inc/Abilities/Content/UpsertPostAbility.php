@@ -591,12 +591,12 @@ class UpsertPostAbility {
 		$taxonomies        = $context['taxonomies'];
 		$meta_input        = $context['meta_input'];
 		$has_reservation   = null !== $reservation && $reservations instanceof PostIdentityReservations;
+		$post              = $existing_id > 0 ? get_post( $existing_id ) : null;
 
 		// Idempotency check. Parent/slug/status changes still need a write even
 		// when the content hash is unchanged.
 		if ( $existing_id > 0 && '' !== $content_hash ) {
 			$stored_hash = get_post_meta( $existing_id, self::META_CONTENT_HASH, true );
-			$post        = get_post( $existing_id );
 			$same_parent = ! $post instanceof \WP_Post || $parent_id <= 0 || (int) $post->post_parent === $parent_id;
 			$same_slug   = ! $post instanceof \WP_Post || '' === $slug || (string) $post->post_name === $slug;
 			$same_status = ! $post instanceof \WP_Post || (string) $post->post_status === $post_status;
@@ -623,6 +623,17 @@ class UpsertPostAbility {
 					'post_id'  => $existing_id,
 					'post_url' => get_permalink( $existing_id ),
 					'path'     => ResolvePostByPath::build_path( $existing_id ),
+				);
+			}
+		}
+
+		if ( $post instanceof \WP_Post && 'trash' === $post->post_status && 'trash' !== $post_status ) {
+			$untrashed = wp_untrash_post( $existing_id );
+			if ( ! $untrashed || 'trash' === get_post_status( $existing_id ) ) {
+				return array(
+					'success'    => false,
+					'error'      => 'Post could not be restored from the Trash.',
+					'error_code' => 'post_untrash_failed',
 				);
 			}
 		}
