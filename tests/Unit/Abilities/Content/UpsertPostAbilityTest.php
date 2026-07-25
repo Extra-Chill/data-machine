@@ -142,6 +142,68 @@ class UpsertPostAbilityTest extends WP_UnitTestCase {
 		$this->assertSame( 'complete', $this->repository->get_reservation( $identity['identity_hash'] )['state'] );
 	}
 
+	public function test_trashed_post_is_untrashed_before_republishing(): void {
+		$post_id    = $this->create_hashed_post( 'publish' );
+		$comment_id = self::factory()->comment->create(
+			array(
+				'comment_post_ID'  => $post_id,
+				'comment_approved' => '1',
+			)
+		);
+		wp_trash_post( $post_id );
+
+		$this->assertSame( 'publish', get_post_meta( $post_id, '_wp_trash_meta_status', true ) );
+		$this->assertNotEmpty( get_post_meta( $post_id, '_wp_trash_meta_time', true ) );
+		$this->assertSame( 'post-trashed', get_comment( $comment_id )->comment_approved );
+
+		$before_hooks = array();
+		$after_hooks  = array();
+		$before_hook  = static function ( int $hook_post_id, string $previous_status ) use ( &$before_hooks ): void {
+			$before_hooks[] = array( $hook_post_id, $previous_status, get_post_status( $hook_post_id ) );
+		};
+		$after_hook   = static function ( int $hook_post_id, string $previous_status ) use ( &$after_hooks ): void {
+			$after_hooks[] = array( $hook_post_id, $previous_status, get_post_status( $hook_post_id ) );
+		};
+		add_action( 'untrash_post', $before_hook, 10, 2 );
+		add_action( 'untrashed_post', $after_hook, 10, 2 );
+		try {
+			$result = UpsertPostAbility::execute( $this->status_input( $post_id, 'publish' ) );
+		} finally {
+			remove_action( 'untrash_post', $before_hook, 10 );
+			remove_action( 'untrashed_post', $after_hook, 10 );
+		}
+
+		$this->assertTrue( $result['success'] );
+		$this->assertSame( 'updated', $result['action'] );
+		$this->assertSame( 'publish', get_post_status( $post_id ) );
+		$this->assertSame( '', get_post_meta( $post_id, '_wp_trash_meta_status', true ) );
+		$this->assertSame( '', get_post_meta( $post_id, '_wp_trash_meta_time', true ) );
+		$this->assertSame( '', get_post_meta( $post_id, '_wp_trash_meta_comments_status', true ) );
+		$this->assertSame( '1', get_comment( $comment_id )->comment_approved );
+		$this->assertSame( array( array( $post_id, 'publish', 'trash' ) ), $before_hooks );
+		$this->assertSame( array( array( $post_id, 'publish', 'draft' ) ), $after_hooks );
+	}
+
+	public function test_draft_post_with_matching_content_is_published(): void {
+		$post_id = $this->create_hashed_post( 'draft' );
+
+		$result = UpsertPostAbility::execute( $this->status_input( $post_id, 'publish' ) );
+
+		$this->assertTrue( $result['success'] );
+		$this->assertSame( 'updated', $result['action'] );
+		$this->assertSame( 'publish', get_post_status( $post_id ) );
+	}
+
+	public function test_matching_status_and_content_remains_no_change(): void {
+		$post_id = $this->create_hashed_post( 'publish' );
+
+		$result = UpsertPostAbility::execute( $this->status_input( $post_id, 'publish' ) );
+
+		$this->assertTrue( $result['success'] );
+		$this->assertSame( 'no_change', $result['action'] );
+		$this->assertSame( 'publish', get_post_status( $post_id ) );
+	}
+
 	public function test_empty_partial_and_zero_identity_values_keep_slug_fallback_behavior(): void {
 		$cases = array(
 			array(),
@@ -448,6 +510,33 @@ class UpsertPostAbilityTest extends WP_UnitTestCase {
 				'key'   => '_source',
 				'value' => $value,
 			),
+		);
+	}
+
+	private function create_hashed_post( string $post_status ): int {
+		$content = '<!-- wp:paragraph --><p>Status body</p><!-- /wp:paragraph -->';
+		$post_id = self::factory()->post->create(
+			array(
+				'post_title'   => 'Status reconciliation',
+				'post_content' => $content,
+				'post_status'  => $post_status,
+			)
+		);
+		update_post_meta( $post_id, UpsertPostAbility::META_CONTENT_HASH, hash( 'sha256', $content ) );
+
+		return $post_id;
+	}
+
+	private function status_input( int $post_id, string $post_status ): array {
+		$content = '<!-- wp:paragraph --><p>Status body</p><!-- /wp:paragraph -->';
+
+		return array(
+			'post_type'    => 'post',
+			'post_id'      => $post_id,
+			'title'        => 'Status reconciliation',
+			'content'      => $content,
+			'content_hash' => hash( 'sha256', $content ),
+			'post_status'  => $post_status,
 		);
 	}
 
