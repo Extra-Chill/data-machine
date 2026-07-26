@@ -91,6 +91,73 @@ class FetchRedditAbilityTest extends WP_UnitTestCase {
 		$this->assertSame( 2, $request_count );
 	}
 
+	public function test_rate_limit_error_preserves_upstream_details_for_cli(): void {
+		$this->mockRedditError(
+			429,
+			array(
+				'error'   => 429,
+				'message' => 'Too Many Requests',
+			),
+			array(
+				'retry-after'          => '60',
+				'x-ratelimit-remaining' => '0',
+				'x-ratelimit-reset'     => '60',
+			)
+		);
+
+		$result = ( new FetchRedditAbility() )->execute( $this->fetchInput() );
+
+		$this->assertWPError( $result );
+		$this->assertSame( 'api_error', $result->get_error_code() );
+		$this->assertSame( 'Reddit API request failed (HTTP 429): Too Many Requests', $result->get_error_message() );
+		$this->assertSame( 429, $result->get_error_data()['status'] );
+		$this->assertSame( 429, $result->get_error_data()['upstream_code'] );
+		$this->assertSame( 'Too Many Requests', $result->get_error_data()['upstream_message'] );
+		$this->assertSame( '60', $result->get_error_data()['rate_limit']['retry_after'] );
+		$this->assertSame( '0', $result->get_error_data()['rate_limit']['remaining'] );
+	}
+
+	public function test_nested_error_payload_is_normalized_to_non_empty_message(): void {
+		$this->mockRedditError(
+			401,
+			array(
+				'error' => array(
+					'code'    => 'invalid_token',
+					'message' => 'Token expired',
+				),
+			)
+		);
+
+		$result = ( new FetchRedditAbility() )->execute( $this->fetchInput() );
+
+		$this->assertWPError( $result );
+		$this->assertSame( 'Reddit API request failed (HTTP 401, code invalid_token): Token expired', $result->get_error_message() );
+		$this->assertSame( 'invalid_token', $result->get_error_data()['upstream_code'] );
+	}
+
+	public function test_missing_error_payload_uses_http_response_message(): void {
+		$this->mockRedditError( 503, array(), array(), 'Service Unavailable' );
+
+		$result = ( new FetchRedditAbility() )->execute( $this->fetchInput() );
+
+		$this->assertWPError( $result );
+		$this->assertSame( 'Reddit API request failed (HTTP 503): Service Unavailable', $result->get_error_message() );
+		$this->assertNotSame( '', $result->get_error_message() );
+	}
+
+	public function test_transport_error_is_normalized_for_cli(): void {
+		add_filter(
+			'pre_http_request',
+			static fn() => new \WP_Error( 'http_request_failed', 'Connection timed out' )
+		);
+
+		$result = ( new FetchRedditAbility() )->execute( $this->fetchInput() );
+
+		$this->assertWPError( $result );
+		$this->assertSame( 'Reddit API request failed: Connection timed out', $result->get_error_message() );
+		$this->assertSame( 'http_request_failed', $result->get_error_data()['upstream_code'] );
+	}
+
 	/**
 	 * @param array<int,array{after:?string,posts:array<int,array<string,mixed>>}> $pages
 	 */
@@ -126,6 +193,24 @@ class FetchRedditAbilityTest extends WP_UnitTestCase {
 							),
 						)
 					),
+				);
+			},
+			10,
+			3
+		);
+	}
+
+	private function mockRedditError( int $status_code, array $body, array $headers = array(), string $message = '' ): void {
+		add_filter(
+			'pre_http_request',
+			static function () use ( $status_code, $body, $headers, $message ): array {
+				return array(
+					'response' => array(
+						'code'    => $status_code,
+						'message' => $message,
+					),
+					'headers'  => $headers,
+					'body'     => wp_json_encode( $body ),
 				);
 			},
 			10,
