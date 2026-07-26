@@ -353,8 +353,8 @@ final class DelegatedOperationService {
 		$configs = WorkflowConfigFactory::buildEphemeralConfigs( $prepared['workflow'] );
 		try {
 			$first_step_id = ExecutionPlan::from_flow_config( $configs['flow_config'] )->first_step_id();
-		} catch ( \InvalidArgumentException $exception ) {
-			do_action( 'datamachine_log', 'error', 'Delegated operation workflow validation failed', array( 'exception' => $exception->getMessage() ) );
+		} catch ( \InvalidArgumentException ) {
+			do_action( 'datamachine_log', 'error', 'Delegated operation workflow validation failed', array( 'error_code' => 'delegated_action_prepare_failed' ) );
 			return new \WP_Error( 'delegated_action_prepare_failed', __( 'The owner workflow is invalid.', 'data-machine' ) );
 		}
 		if ( ! $first_step_id ) {

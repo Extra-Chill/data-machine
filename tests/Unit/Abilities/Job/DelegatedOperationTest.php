@@ -491,13 +491,13 @@ final class DelegatedOperationTest extends WP_UnitTestCase {
 		$job = $this->job( 'retained-cancelled' );
 		$old = '2000-01-01 00:00:00';
 		$wpdb->update(
-			$wpdb->prefix . 'datamachine_jobs',
+			$wpdb->prefix . Jobs::TABLE_NAME,
 			array( 'created_at' => $old ),
 			array( 'job_id' => $job['job_id'] )
 		);
 		$this->assertSame( 0, ( new Jobs() )->delete_old_jobs( 'cancelled', 1 ) );
 		$wpdb->update(
-			$wpdb->prefix . 'datamachine_jobs',
+			$wpdb->prefix . Jobs::TABLE_NAME,
 			array(
 				'completed_at' => $old,
 			),
