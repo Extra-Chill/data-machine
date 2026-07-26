@@ -186,17 +186,26 @@ class SystemTaskStep extends Step {
 		// SystemTask::requiresAgentContext().
 		$parent_job_snapshot = $this->engine->getJobContext();
 		$identity            = $this->resolveAgentIdentityForExecution( $parent_job_snapshot );
-		if ( null === $identity && $task_for_passthrough->requiresAgentContext() ) {
+		$jobs_db             = new Jobs();
+		$parent_job          = $jobs_db->get_job( $this->job_id );
+		$delegated_owner_id  = $this->resolveAgentlessDelegatedOwnerForExecution( $parent_job );
+		if ( is_wp_error( $delegated_owner_id ) ) {
+			$this->failInvalidDelegatedOwner( $parent_job_snapshot, $task_type, $delegated_owner_id );
+			return array();
+		}
+		if ( null !== $delegated_owner_id ) {
+			$identity = null;
+		}
+		if ( null === $identity && null === $delegated_owner_id && $task_for_passthrough->requiresAgentContext() ) {
 			$this->failMissingAgentContext( $parent_job_snapshot, $task_type );
 			return array();
 		}
 
 		$parent_agent_id   = null !== $identity ? $identity->agent_id : 0;
 		$parent_agent_slug = null !== $identity ? $identity->agent_slug : '';
-		$parent_user_id    = null !== $identity ? $identity->owner_id : 0;
+		$parent_user_id    = null !== $identity ? $identity->owner_id : ( $delegated_owner_id ?? 0 );
 
 		// Create a child job for independent tracking.
-		$jobs_db      = new Jobs();
 		$job_context  = $parent_job_snapshot;
 		$child_job_id = (int) $jobs_db->create_job(
 			array(
@@ -310,15 +319,18 @@ class SystemTaskStep extends Step {
 		// context, never a broad user-only fallback.
 		$owner_id = $parent_user_id;
 
-		$previous_user_id = get_current_user_id();
-		$context_set      = false;
+		$previous_user_id      = get_current_user_id();
+		$previous_switch_depth = count( $GLOBALS['_wp_switched_stack'] ?? array() );
+		$context_set           = false;
 
 		// Execute the task synchronously via executeTask().
 		$success   = true;
 		$error_msg = '';
 
 		try {
-			if ( $owner_id > 0 && $parent_agent_id > 0 ) {
+			if ( $delegated_owner_id > 0 ) {
+				wp_set_current_user( $delegated_owner_id );
+			} elseif ( $owner_id > 0 && $parent_agent_id > 0 ) {
 				wp_set_current_user( $owner_id );
 				PermissionHelper::set_agent_context( $parent_agent_id, $owner_id );
 				$context_set = true;
@@ -348,6 +360,15 @@ class SystemTaskStep extends Step {
 		} finally {
 			if ( $context_set ) {
 				PermissionHelper::clear_agent_context();
+			}
+			if ( $delegated_owner_id > 0 ) {
+				$current_switch_depth = count( $GLOBALS['_wp_switched_stack'] ?? array() );
+				while ( $current_switch_depth > $previous_switch_depth ) {
+					if ( ! restore_current_blog() ) {
+						break;
+					}
+					--$current_switch_depth;
+				}
 			}
 			if ( $owner_id > 0 && $previous_user_id !== $owner_id ) {
 				wp_set_current_user( $previous_user_id );
@@ -482,6 +503,56 @@ class SystemTaskStep extends Step {
 		} catch ( \InvalidArgumentException $e ) {
 			return null;
 		}
+	}
+
+	/**
+	 * Resolve the frozen user owner for an agentless delegated operation.
+	 *
+	 * @param array|null $parent_job Persisted parent job row.
+	 * @return int|\WP_Error|null Owner ID, validation failure, or null for non-delegated/agent-backed work.
+	 */
+	private function resolveAgentlessDelegatedOwnerForExecution( ?array $parent_job ): int|\WP_Error|null {
+		if ( 'delegated' !== ( $parent_job['source'] ?? '' ) ) {
+			return null;
+		}
+
+		$operation_envelope  = is_array( $parent_job['operation_envelope'] ?? null ) ? $parent_job['operation_envelope'] : array();
+		$delegated_operation = is_array( $operation_envelope['delegated_operation'] ?? null ) ? $operation_envelope['delegated_operation'] : array();
+		$execution_owner     = is_array( $delegated_operation['execution_owner'] ?? null ) ? $delegated_operation['execution_owner'] : array();
+		if ( ! empty( $execution_owner['agent_id'] ) || ! empty( $execution_owner['agent_slug'] ) ) {
+			return null;
+		}
+
+		$owner_id = (int) ( $execution_owner['user_id'] ?? 0 );
+		if ( $owner_id <= 0 || ! get_user_by( 'id', $owner_id ) ) {
+			return new \WP_Error(
+				'system_task_delegated_owner_invalid',
+				__( 'The delegated system task execution owner is missing or invalid.', 'data-machine' )
+			);
+		}
+
+		return $owner_id;
+	}
+
+	/**
+	 * Fail an agentless delegated task whose frozen execution owner is invalid.
+	 *
+	 * @param array     $parent_job_snapshot Parent job snapshot from engine data.
+	 * @param string    $task_type           System task type currently executing.
+	 * @param \WP_Error $error               Owner validation failure.
+	 */
+	private function failInvalidDelegatedOwner( array $parent_job_snapshot, string $task_type, \WP_Error $error ): void {
+		do_action(
+			'datamachine_fail_job',
+			$this->job_id,
+			$error->get_error_code(),
+			array(
+				'parent_job_id' => $this->job_id,
+				'flow_id'       => (int) ( $parent_job_snapshot['flow_id'] ?? 0 ),
+				'task_type'     => $task_type,
+				'error_message' => $error->get_error_message(),
+			)
+		);
 	}
 
 	/**
