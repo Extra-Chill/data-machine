@@ -2,6 +2,15 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.169.1] - 2026-07-26
+
+### Changed
+- tighten delegated operation regressions
+
+### Fixed
+- expose scheduler dispatcher starvation health
+- harden delegated operation lifecycle
+
 ## [0.169.0] - 2026-07-26
 
 ### Added
