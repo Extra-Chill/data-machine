@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.169.0] - 2026-07-26
+
+### Added
+- add delegated operation contract
+
 ## [0.168.18] - 2026-07-26
 
 ### Fixed
