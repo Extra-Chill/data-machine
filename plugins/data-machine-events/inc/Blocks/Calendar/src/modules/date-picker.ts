@@ -8,6 +8,11 @@
 import flatpickr from 'flatpickr';
 
 /**
+ * WordPress dependencies
+ */
+import { __ } from '@wordpress/i18n';
+
+/**
  * Internal dependencies
  */
 import type { FlatpickrInstance } from '../types';
@@ -16,9 +21,37 @@ interface DatePickerData {
 	picker: FlatpickrInstance;
 	clearBtn: HTMLElement | null;
 	clearHandler: () => void;
+	navControls: AccessibleNavControl[];
+}
+
+interface AccessibleNavControl {
+	element: HTMLElement;
+	keydownHandler: ( event: KeyboardEvent ) => void;
 }
 
 const datePickers = new Map< HTMLElement, DatePickerData >();
+
+function makeNavigationControlAccessible(
+	element: HTMLElement,
+	label: string
+): AccessibleNavControl {
+	element.setAttribute( 'role', 'button' );
+	element.setAttribute( 'tabindex', '0' );
+	element.setAttribute( 'aria-label', label );
+
+	const keydownHandler = ( event: KeyboardEvent ): void => {
+		if ( event.key !== 'Enter' && event.key !== ' ' ) {
+			return;
+		}
+
+		event.preventDefault();
+		element.click();
+	};
+
+	element.addEventListener( 'keydown', keydownHandler );
+
+	return { element, keydownHandler };
+}
 
 export function initDatePicker(
 	calendar: HTMLElement,
@@ -45,10 +78,10 @@ export function initDatePicker(
 	let defaultDate: string | string[] | undefined;
 
 	if ( initialStart ) {
-		defaultDate = initialEnd
-			? [ initialStart, initialEnd ]
-			: initialStart;
+		defaultDate = initialEnd ? [ initialStart, initialEnd ] : initialStart;
 	}
+
+	let navControls: AccessibleNavControl[] = [];
 
 	const picker = flatpickr( dateRangeInput, {
 		mode: 'range',
@@ -57,6 +90,18 @@ export function initDatePicker(
 		allowInput: false,
 		clickOpens: true,
 		defaultDate,
+		onReady( _selectedDates, _dateStr, instance ) {
+			navControls = [
+				makeNavigationControlAccessible(
+					instance.prevMonthNav,
+					__( 'Previous month', 'data-machine-events' )
+				),
+				makeNavigationControlAccessible(
+					instance.nextMonthNav,
+					__( 'Next month', 'data-machine-events' )
+				),
+			];
+		},
 		onChange( selectedDates: Date[] ) {
 			if ( onChange ) {
 				onChange( selectedDates );
@@ -84,13 +129,14 @@ export function initDatePicker(
 		picker.clear();
 	};
 
-	datePickers.set( calendar, { picker, clearBtn, clearHandler } );
+	datePickers.set( calendar, {
+		picker,
+		clearBtn,
+		clearHandler,
+		navControls,
+	} );
 
-	if (
-		picker.selectedDates &&
-		picker.selectedDates.length > 0 &&
-		clearBtn
-	) {
+	if ( picker.selectedDates && picker.selectedDates.length > 0 && clearBtn ) {
 		clearBtn.classList.add( 'visible' );
 	}
 
@@ -104,11 +150,15 @@ export function initDatePicker(
 export function destroyDatePicker( calendar: HTMLElement ): void {
 	const data = datePickers.get( calendar );
 	if ( data ) {
-		const { picker, clearBtn, clearHandler } = data;
+		const { picker, clearBtn, clearHandler, navControls } = data;
 
 		if ( clearBtn && clearHandler ) {
 			clearBtn.removeEventListener( 'click', clearHandler );
 		}
+
+		navControls.forEach( ( { element, keydownHandler } ) => {
+			element.removeEventListener( 'keydown', keydownHandler );
+		} );
 
 		if ( picker ) {
 			try {

@@ -23,6 +23,7 @@
     "eslint": "^9.0.0"
   },
   "dependencies": {
+    "@wordpress/i18n": "^6.24.0",
     "flatpickr": "^4.6.13"
   },
   "overrides": {

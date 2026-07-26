@@ -59,18 +59,20 @@ $scope_preset_slugs = $show_scope_presets
 <div class="data-machine-events-filter-bar">
 	<div class="data-machine-events-filter-row">
 		<div class="data-machine-events-search">
+			<label class="screen-reader-text" for="<?php echo esc_attr( $search_id ); ?>"><?php esc_html_e( 'Search events', 'data-machine-events' ); ?></label>
 			<input type="text" 
 					id="<?php echo esc_attr( $search_id ); ?>" 
 					value="<?php echo esc_attr( $search_value ); ?>"
 					placeholder="<?php esc_html_e( 'Search events...', 'data-machine-events' ); ?>" 
 					class="data-machine-events-search-input">
-			<button type="button" class="data-machine-events-search-btn">
-				<span class="dashicons dashicons-search"></span>
+			<button type="button" class="data-machine-events-search-btn" aria-label="<?php esc_attr_e( 'Search events', 'data-machine-events' ); ?>">
+				<span class="dashicons dashicons-search" aria-hidden="true"></span>
 			</button>
 		</div>
 		
 		<div class="data-machine-events-date-filter">
 			<div class="data-machine-events-date-range-wrapper">
+				<label class="screen-reader-text" for="<?php echo esc_attr( $date_range_id ); ?>"><?php esc_html_e( 'Filter by date range', 'data-machine-events' ); ?></label>
 				<input type="text" 
 						id="<?php echo esc_attr( $date_range_id ); ?>"
 						class="data-machine-events-date-range-input" data-date-start="<?php echo esc_attr( $date_start ); ?>" data-date-end="<?php echo esc_attr( $date_end ); ?>" 

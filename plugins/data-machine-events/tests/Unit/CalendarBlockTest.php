@@ -177,6 +177,25 @@ class CalendarBlockTest extends WP_UnitTestCase {
 		$this->assertStringContainsString( 'data-filter-persistence="0"', $scoped_html );
 	}
 
+	public function test_filter_controls_have_unique_associated_labels_and_button_name() {
+		$first_html  = $this->render_calendar();
+		$second_html = $this->render_calendar();
+		$html        = $first_html . $second_html;
+
+		preg_match_all( '/<label class="screen-reader-text" for="([^"]+)">([^<]+)<\/label>/', $html, $label_matches );
+
+		$this->assertCount( 4, $label_matches[1] );
+		$this->assertCount( 4, array_unique( $label_matches[1] ), 'Each label should target a unique control ID.' );
+		$this->assertSame( array( 'Search events', 'Filter by date range', 'Search events', 'Filter by date range' ), $label_matches[2] );
+
+		foreach ( $label_matches[1] as $control_id ) {
+			$this->assertSame( 1, substr_count( $html, 'id="' . $control_id . '"' ) );
+		}
+
+		$this->assertSame( 2, substr_count( $html, 'class="data-machine-events-search-btn" aria-label="Search events"' ) );
+		$this->assertSame( 2, substr_count( $html, 'class="dashicons dashicons-search" aria-hidden="true"' ) );
+	}
+
 	public function test_calendar_renders_no_events_state() {
 		// Create a mock render with no events
 		$block_registry = \WP_Block_Type_Registry::get_instance();

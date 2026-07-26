@@ -1927,8 +1927,8 @@
 .data-machine-month-grid__ribbon.data-machine-day-friday    { background: var(--data-machine-day-friday-rgba); }
 .data-machine-month-grid__ribbon.data-machine-day-saturday  { background: var(--data-machine-day-saturday-rgba); }
 
-/* Hide the prev-month / next-month `screen-reader-text` only for AT. */
-.data-machine-month-grid .screen-reader-text {
+/* Keep calendar control labels available only to assistive technology. */
+.data-machine-events-calendar .screen-reader-text {
     clip: rect(1px, 1px, 1px, 1px);
     clip-path: inset(50%);
     height: 1px;

@@ -68,6 +68,12 @@
     fill: var(--data-machine-text-accent);
 }
 
+.flatpickr-months .flatpickr-prev-month:focus-visible,
+.flatpickr-months .flatpickr-next-month:focus-visible {
+    outline: 2px solid var(--data-machine-text-accent);
+    outline-offset: -2px;
+}
+
 /* Weekday Headers */
 .flatpickr-weekdays {
     background: var(--data-machine-background-secondary);
