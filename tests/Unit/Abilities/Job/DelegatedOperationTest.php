@@ -449,22 +449,12 @@ final class DelegatedOperationTest extends WP_UnitTestCase {
 		$retrying = $service->reconcile( $this->operationRequest( $submitted ) );
 		$this->assertSame( 'retrying', $retrying['status'] );
 		$this->assertSame( 1, $retrying['retry']['attempt'] );
-		$cancel_retry = $service->cancel(
-			array(
-				'action'        => 'owner/write-record',
-				'operation_ref' => $submitted['operation_ref'],
-			)
-		);
+		$cancel_retry = $service->cancel( $this->operationRequest( $submitted ) );
 		$this->assertSame( 'delegated_operation_not_cancellable', $cancel_retry['error_code'] );
 
 		$this->assertTrue( ( new Jobs() )->complete_job( (int) $retrying_job['job_id'], 'failed - retry-fence' ) );
 		$this->retry_safe = false;
-		$unsafe           = $service->retry(
-			array(
-				'action'        => 'owner/write-record',
-				'operation_ref' => $submitted['operation_ref'],
-			)
-		);
+		$unsafe           = $service->retry( $this->operationRequest( $submitted ) );
 		$this->assertSame( 'delegated_operation_retry_unsafe', $unsafe['error_code'] );
 	}
 
