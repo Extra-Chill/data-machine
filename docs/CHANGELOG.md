@@ -2,6 +2,14 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.169.2] - 2026-07-26
+
+### Changed
+- remove delegated retry duplication
+
+### Fixed
+- make multisite root composition deterministic
+
 ## [0.169.1] - 2026-07-26
 
 ### Changed
