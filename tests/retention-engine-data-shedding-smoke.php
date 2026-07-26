@@ -117,8 +117,8 @@ namespace {
 			&& str_contains( $cleanup, 'LIMIT %d' )
 	);
 	assert_eds(
-		'shed targets terminal rows via completed_at + non-empty engine_data',
-		str_contains( $cleanup, "completed_at IS NOT NULL AND completed_at < %s AND engine_data IS NOT NULL AND engine_data != ''" )
+		'shed targets terminal non-delegated rows with non-empty engine_data',
+		str_contains( $cleanup, "completed_at IS NOT NULL AND completed_at < %s AND source != 'delegated' AND engine_data IS NOT NULL AND engine_data != ''" )
 	);
 	assert_eds(
 		'shed reuses shared batch / iteration / runtime caps (#2617)',
@@ -257,6 +257,9 @@ namespace {
 		private function matching_jobs( string $cutoff ): array {
 			$out = array();
 			foreach ( $this->jobs as $id => $row ) {
+				if ( 'delegated' === ( $row['source'] ?? '' ) ) {
+					continue;
+				}
 				if ( null === $row['completed_at'] ) {
 					continue;
 				}
@@ -284,6 +287,7 @@ namespace {
 	for ( $i = 0; $i < 2500; $i++ ) {
 		$fake_wpdb->jobs[ $jid ] = array(
 			'job_id'       => $jid,
+			'source'       => 'direct',
 			'completed_at' => $two_days,
 			'engine_data'  => $blob,
 		);
@@ -292,6 +296,7 @@ namespace {
 	for ( $i = 0; $i < 5; $i++ ) {
 		$fake_wpdb->jobs[ $jid ] = array(
 			'job_id'       => $jid,
+			'source'       => 'direct',
 			'completed_at' => $one_hour,
 			'engine_data'  => $blob,
 		);
@@ -300,7 +305,17 @@ namespace {
 	for ( $i = 0; $i < 10; $i++ ) {
 		$fake_wpdb->jobs[ $jid ] = array(
 			'job_id'       => $jid,
+			'source'       => 'direct',
 			'completed_at' => null,
+			'engine_data'  => $blob,
+		);
+		++$jid;
+	}
+	for ( $i = 0; $i < 3; $i++ ) {
+		$fake_wpdb->jobs[ $jid ] = array(
+			'job_id'       => $jid,
+			'source'       => 'delegated',
+			'completed_at' => $two_days,
 			'engine_data'  => $blob,
 		);
 		++$jid;
@@ -356,12 +371,12 @@ namespace {
 		2500 === count( $shed )
 	);
 	assert_eds(
-		'fresh + in-flight jobs kept engine_data (15)',
-		15 === count( $kept )
+		'fresh, in-flight, and delegated jobs kept engine_data (18)',
+		18 === count( $kept )
 	);
 	assert_eds(
 		'shedding keeps the row (no jobs deleted)',
-		2515 === $rows,
+		2518 === $rows,
 		"rows={$rows}"
 	);
 

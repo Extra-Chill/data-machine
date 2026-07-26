@@ -1952,6 +1952,15 @@ class Jobs extends BaseRepository {
 	}
 
 	/**
+	 * Cancel a pending direct operation while atomically fencing its generation.
+	 *
+	 * @return array{success: bool, changed: bool, current_status: ?string, status: string}
+	 */
+	public function cancel_pending_direct_operation( int $job_id ): array {
+		return $this->transition_terminal_job_status_result( $job_id, JobStatus::CANCELLED, null, true );
+	}
+
+	/**
 	 * Update job status.
 	 *
 	 * @param int    $job_id The job ID.
@@ -2299,7 +2308,7 @@ class Jobs extends BaseRepository {
 	 * @param string $requested_status Requested final status.
 	 * @return array{success: bool, changed: bool, current_status: ?string, status: string}
 	 */
-	private function transition_terminal_job_status_result( int $job_id, string $requested_status, ?array $recovery_owner = null ): array {
+	private function transition_terminal_job_status_result( int $job_id, string $requested_status, ?array $recovery_owner = null, bool $pending_direct_cancel = false ): array {
 		if ( null === $recovery_owner && isset( self::$recovery_execution_fences[ $job_id ] ) ) {
 			$fence_stack    = self::$recovery_execution_fences[ $job_id ];
 			$recovery_owner = end( $fence_stack );
@@ -2327,6 +2336,10 @@ class Jobs extends BaseRepository {
 		}
 
 		$current_status = is_string( $job['status'] ?? null ) ? $job['status'] : '';
+		if ( $pending_direct_cancel && ( 'direct' !== (string) ( $job['flow_id'] ?? '' ) || JobStatus::PENDING !== $current_status ) ) {
+			$this->rollback_terminal_transition( $job_id );
+			return $this->status_transition_result( false, false, $current_status, $current_status );
+		}
 		if ( $current_status === $requested_status ) {
 			$this->rollback_terminal_transition( $job_id );
 			$this->reconcile_terminal_accounting( $job_id );
@@ -2423,6 +2436,14 @@ class Jobs extends BaseRepository {
 			'terminal_accounting_processed_count' => $processed_claim_count,
 		);
 		$update_formats = array( '%s', '%s', '%d', null, null, '%d' );
+		if ( $pending_direct_cancel ) {
+			$update_data['operation_state']       = 'cancelled';
+			$update_data['operation_claimed_at']  = null;
+			$update_data['operation_claim_token'] = null;
+			$update_data['operation_action_id']   = null;
+			$update_data['operation_generation']  = max( 0, (int) ( $job['operation_generation'] ?? 0 ) ) + 1;
+			array_push( $update_formats, '%s', null, null, null, '%d' );
+		}
 		if ( is_array( $recovery_owner ) ) {
 			$engine = is_array( $job['engine_data'] ?? null ) ? $job['engine_data'] : array();
 			$engine['scheduler_recovery']['state']        = 'terminalized';
