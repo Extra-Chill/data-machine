@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.168.17] - 2026-07-26
+
+### Fixed
+- preserve metadata for HTTP error responses
+
 ## [0.168.16] - 2026-07-25
 
 ### Fixed
