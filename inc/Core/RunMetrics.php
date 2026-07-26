@@ -30,6 +30,9 @@ class RunMetrics {
 		'fetch_packets',
 		'no_content',
 		'true_empty_query',
+		'lifecycle_suppressed',
+		'claim_contention',
+		'fetch_empty_unclassified',
 		'provider_error',
 		'hydration_failed',
 		'hydration_partial',
@@ -432,6 +435,7 @@ class RunMetrics {
 				'classes'                 => $outcome_classes,
 				'class_counts'            => $class_counts,
 				'fetch_packet_count'      => (int) ( $counts['fetch_packets'] ?? 0 ),
+				'fetch_stages'            => self::firstStepField( $engine, 'fetch_stages' ),
 				'no_content'              => ! empty( $counts['no_content'] ) || JobStatus::COMPLETED_NO_ITEMS === $job_status->getBaseStatus(),
 				'source_rejected'         => $is_source_rejected,
 				'source_rejection_reason' => $source_rejection['reason'] ?? ( $is_source_rejected ? $job_status->getReason() : null ),
@@ -452,7 +456,7 @@ class RunMetrics {
 			$classes = array_merge( $classes, self::classesFromStepResult( $step_result, $status ) );
 		}
 
-		foreach ( array( 'true_empty_query', 'provider_error', 'hydration_failed', 'hydration_partial', 'ai_empty_packet', 'ai_required_handler_not_called', 'ai_handler_tool_failed', 'ai_empty_response', 'ai_completion_assertions_missing', 'missing_handler_packet', 'source_rejected', 'item_deferred' ) as $class ) {
+		foreach ( array( 'true_empty_query', 'lifecycle_suppressed', 'claim_contention', 'fetch_empty_unclassified', 'provider_error', 'hydration_failed', 'hydration_partial', 'ai_empty_packet', 'ai_required_handler_not_called', 'ai_handler_tool_failed', 'ai_empty_response', 'ai_completion_assertions_missing', 'missing_handler_packet', 'source_rejected', 'item_deferred' ) as $class ) {
 			if ( ! empty( $counts[ $class ] ) ) {
 				$classes[] = $class;
 			}
@@ -470,7 +474,7 @@ class RunMetrics {
 		}
 
 		if ( in_array( $result, array( 'no_content', 'completed_no_items' ), true ) ) {
-			$classes[] = 'true_empty_query';
+			$classes = array_merge( $classes, self::fetchEmptyClasses( $step_result ) );
 		}
 		if ( 'source_rejected' === $result || ! empty( $step_result['source_rejection_reason'] ) ) {
 			$classes[] = 'source_rejected';
@@ -486,11 +490,39 @@ class RunMetrics {
 		$job_status = JobStatus::fromString( $status );
 		$classes    = self::classesFromReason( (string) $job_status->getReason() );
 
-		if ( JobStatus::COMPLETED_NO_ITEMS === $job_status->getBaseStatus() ) {
-			$classes[] = 'true_empty_query';
+		return array_values( array_unique( array_filter( $classes ) ) );
+	}
+
+	/**
+	 * Classify a no-content fetch from time-aligned stage diagnostics.
+	 *
+	 * @param array $step_result Persisted step result.
+	 * @return string[] Generic outcome classes.
+	 */
+	private static function fetchEmptyClasses( array $step_result ): array {
+		$stages = is_array( $step_result['fetch_stages'] ?? null ) ? $step_result['fetch_stages'] : array();
+		if ( empty( $stages ) ) {
+			return array( 'fetch_empty_unclassified' );
 		}
 
-		return array_values( array_unique( array_filter( $classes ) ) );
+		$source_items    = max( 0, (int) ( $stages['source_materialized'] ?? 0 ) );
+		$final_packets   = max( 0, (int) ( $stages['final_packets'] ?? 0 ) );
+		$claim_conflicts = max( 0, (int) ( $stages['claim_conflicts'] ?? 0 ) );
+		$lifecycle_skips = max( 0, (int) ( $stages['processed_skipped'] ?? 0 ) )
+			+ max( 0, (int) ( $stages['actively_claimed'] ?? 0 ) );
+
+		$classes = array();
+		if ( 0 === $source_items ) {
+			$classes[] = 'true_empty_query';
+		}
+		if ( 0 === $final_packets && $claim_conflicts > 0 ) {
+			$classes[] = 'claim_contention';
+		}
+		if ( 0 === $final_packets && $lifecycle_skips > 0 ) {
+			$classes[] = 'lifecycle_suppressed';
+		}
+
+		return empty( $classes ) ? array( 'fetch_empty_unclassified' ) : $classes;
 	}
 
 	private static function classesFromReason( string $reason ): array {

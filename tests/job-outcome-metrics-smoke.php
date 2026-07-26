@@ -97,8 +97,72 @@ $metrics = RunMetrics::fromJob(
 );
 $assert( 'base status is completed_no_items', 'completed_no_items' === $metrics['outcome']['base_status'] );
 $assert( 'no_content boolean is true', true === $metrics['outcome']['no_content'] );
-$assert( 'true empty query class is exposed', in_array( 'true_empty_query', $metrics['outcome_classes'], true ) );
-$assert( 'true empty query count is exposed', 1 === $metrics['counts']['true_empty_query'] );
+$assert( 'legacy empty fetch is explicitly unclassified', in_array( 'fetch_empty_unclassified', $metrics['outcome_classes'], true ) );
+$assert( 'legacy empty fetch is not asserted source-empty', 0 === $metrics['counts']['true_empty_query'] );
+
+echo "\n[2a] fetch stage diagnostics distinguish empty outcomes\n";
+$empty_step = static function ( array $stages ): array {
+	return array(
+		'flow_step_id' => 'fetch_1',
+		'step_type'    => 'fetch',
+		'result'       => 'no_content',
+		'packet_count' => 0,
+		'fetch_stages' => array_merge(
+			array(
+				'source_materialized'        => 0,
+				'processed_skipped'           => 0,
+				'actively_claimed'            => 0,
+				'claim_conflicts'             => 0,
+				'final_packets'               => 0,
+			),
+			$stages
+		),
+	);
+};
+
+$metrics = RunMetrics::fromJob(
+	$job(
+		'completed_no_items',
+		array( 'step_results' => array( 'fetch_1' => $empty_step( array() ) ) )
+	)
+);
+$assert( 'source count zero is true empty query', array( 'true_empty_query' ) === $metrics['outcome_classes'] );
+$assert( 'fetch stage diagnostics are machine readable', 0 === ( $metrics['outcome']['fetch_stages']['source_materialized'] ?? -1 ) );
+
+$metrics = RunMetrics::fromJob(
+	$job(
+		'completed_no_items',
+		array(
+			'step_results' => array(
+				'fetch_1' => $empty_step(
+					array(
+						'source_materialized' => 5,
+						'processed_skipped'    => 5,
+					)
+				),
+			),
+		)
+	)
+);
+$assert( 'processed suppression is lifecycle class', array( 'lifecycle_suppressed' ) === $metrics['outcome_classes'] );
+
+$metrics = RunMetrics::fromJob(
+	$job(
+		'completed_no_items',
+		array(
+			'step_results' => array(
+				'fetch_1' => $empty_step(
+					array(
+						'source_materialized' => 5,
+						'processed_skipped'    => 2,
+						'claim_conflicts'      => 5,
+					)
+				),
+			),
+		)
+	)
+);
+$assert( 'mixed lifecycle and claim loss retains both classes', array( 'claim_contention', 'lifecycle_suppressed' ) === $metrics['outcome_classes'] );
 
 echo "\n[3] failed status exposes failure base status\n";
 $metrics = RunMetrics::fromJob( $job( 'failed - api-timeout', array() ) );
