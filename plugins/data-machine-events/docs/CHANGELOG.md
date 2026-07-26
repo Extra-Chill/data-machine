@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.52.1] - 2026-07-26
+
+### Fixed
+- reconcile stable ticket identity variants
+
 ## [0.52.0] - 2026-07-26
 
 ### Added
