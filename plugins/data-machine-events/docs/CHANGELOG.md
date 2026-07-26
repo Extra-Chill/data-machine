@@ -2,6 +2,41 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.52.0] - 2026-07-26
+
+### Added
+- own canonical venue profile mutations
+- add canonical event persistence lifecycle
+- allow scoped event upsert authorization
+
+### Changed
+- restore managed WordPress runtime parity
+- align venue mutation coverage with MySQL
+- refresh extractor contracts
+- align calendar public contracts
+- separate portable calendar contracts
+- remove stale artist URL coverage
+
+### Fixed
+- preserve event URLs across cleanup
+- align audit convention contracts
+- restore managed PHPUnit baseline
+- install shared ESLint config dependencies
+- invalidate calendar caches by generation
+- serialize native venue term edits
+- preserve datetime parser timezone semantics
+- classify nested ESLint dependencies
+- recognize specific two-token event titles
+- normalize venue mutation hook IDs
+- clear Calendar source lint findings
+- clear root asset JavaScript lint
+- restore nested block ESLint compatibility
+- clear EventsMap source lint baseline
+- preserve event upsert ability failures
+- clear EventDetails source lint findings
+- rename reserved venue profile parameter
+- align venue assignment formatting
+
 ## [0.51.1] - 2026-07-23
 
 ### Fixed
