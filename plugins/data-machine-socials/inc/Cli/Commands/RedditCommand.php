@@ -514,6 +514,9 @@ class RedditCommand {
 	 * [--search=<search>]
 	 * : Comma-separated search terms to filter posts locally (client-side).
 	 *
+	 * [--limit=<count>]
+	 * : Maximum eligible posts to return. Must be between 1 and 500.
+	 *
 	 * [--format=<format>]
 	 * : Output format.
 	 * ---
@@ -528,25 +531,32 @@ class RedditCommand {
 	 *
 	 *     # Fetch from a subreddit
 	 *     wp datamachine-socials reddit fetch jambands
-	 *     wp datamachine-socials reddit fetch festivals --sort=top --min-upvotes=50
+	 *     wp datamachine-socials reddit fetch festivals --sort=top --min-upvotes=50 --limit=25
 	 *     wp datamachine-socials reddit fetch bonnaroo --timeframe=7_days --comments=5
 	 *
 	 *     # Global search across all of Reddit
-	 *     wp datamachine-socials reddit fetch --query="best live music calendar" --sort=relevance --timeframe=30_days
+	 *     wp datamachine-socials reddit fetch --query="best live music calendar" --sort=relevance --timeframe=30_days --limit=10
 	 *     wp datamachine-socials reddit fetch --query="concert events near me" --min-upvotes=5 --comments=3
 	 *
 	 *     # Search within a specific subreddit
 	 *     wp datamachine-socials reddit fetch Austin --query="live music tonight"
 	 */
 	public function fetch( $args, $assoc_args ) {
-		$subreddit    = $args[0] ?? '';
-		$query        = $assoc_args['query'] ?? '';
-		$access_token = $this->get_access_token();
+		$subreddit = $args[0] ?? '';
+		$query     = $assoc_args['query'] ?? '';
 
 		// Validate: must have at least one of subreddit or query.
 		if ( empty( $subreddit ) && empty( $query ) ) {
 			WP_CLI::error( 'Provide a subreddit name or --query (or both).' );
 		}
+
+		try {
+			$limit_input = $this->applyFetchLimit( array(), $assoc_args );
+		} catch ( \InvalidArgumentException $exception ) {
+			WP_CLI::error( $exception->getMessage() );
+		}
+
+		$access_token = $this->get_access_token();
 
 		// Default sort to 'relevance' for search queries.
 		$default_sort = ! empty( $query ) ? 'relevance' : 'hot';
@@ -566,6 +576,7 @@ class RedditCommand {
 			'max_pages'         => 5,
 			'download_images'   => false, // CLI doesn't download images by default.
 		);
+		$input = array_merge( $input, $limit_input );
 
 		if ( ! empty( $subreddit ) && ! empty( $query ) ) {
 			WP_CLI::log( "Searching r/{$subreddit} for \"{$query}\" (sort: {$input['sort_by']})..." );
@@ -623,6 +634,23 @@ class RedditCommand {
 
 		WP_CLI::success( count( $rows ) . ' posts found' );
 		WP_CLI\Utils\format_items( 'table', $rows, array( 'score', 'comments', 'subreddit', 'author', 'title' ) );
+	}
+
+	/**
+	 * Validate and map the optional CLI limit to the direct ability contract.
+	 */
+	private function applyFetchLimit( array $input, array $assoc_args ): array {
+		if ( ! array_key_exists( 'limit', $assoc_args ) ) {
+			return $input;
+		}
+
+		$limit = $assoc_args['limit'];
+		if ( ! is_string( $limit ) || ! preg_match( '/^[1-9][0-9]*$/', $limit ) || (int) $limit > 500 ) {
+			throw new \InvalidArgumentException( '--limit must be a whole number between 1 and 500.' );
+		}
+
+		$input['max_items'] = (int) $limit;
+		return $input;
 	}
 
 	/**

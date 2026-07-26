@@ -95,6 +95,12 @@ class FetchRedditAbility extends AbstractSocialAbility {
 								'default'     => 5,
 								'description' => __( 'Maximum number of pages to fetch', 'data-machine-socials' ),
 							),
+							'max_items'         => array(
+								'type'        => 'integer',
+								'minimum'     => 1,
+								'maximum'     => 500,
+								'description' => __( 'Maximum eligible posts to return for direct ability calls', 'data-machine-socials' ),
+							),
 							'download_images'   => array(
 								'type'        => 'boolean',
 								'default'     => true,
@@ -134,7 +140,8 @@ class FetchRedditAbility extends AbstractSocialAbility {
 	 * Used for direct ability invocations (REST, MCP, ad-hoc PHP calls) where
 	 * there is no Data Machine pipeline context to consult for processed/claim
 	 * state. Returns every Reddit-side eligible post the pagination loop
-	 * surfaces, capped only by `max_pages` and Reddit's natural pagination.
+	 * surfaces, optionally capped by `max_items`, plus `max_pages` and Reddit's
+	 * natural pagination.
 	 *
 	 * Pipeline-driven fetches go through `executeWithCollector()` so that the
 	 * Data Machine core `FreshCandidateCollector` owns processed/claimed/
@@ -194,7 +201,16 @@ class FetchRedditAbility extends AbstractSocialAbility {
 		$search_term           = $config['search'];
 		$fetch_batch_size      = $config['fetch_batch_size'];
 		$max_pages             = $config['max_pages'];
+		$max_items             = null === $collector ? $config['max_items'] : null;
 		$download_images       = $config['download_images'];
+
+		if ( null !== $max_items && ( ! is_int( $max_items ) || $max_items < 1 || $max_items > 500 ) ) {
+			return new \WP_Error(
+				'invalid_param',
+				'max_items must be an integer between 1 and 500',
+				array( 'status' => 400 )
+			);
+		}
 
 		// Determine mode: global search vs subreddit fetch.
 		$is_global_search    = ! empty( $query ) && empty( $subreddit );
@@ -525,8 +541,11 @@ class FetchRedditAbility extends AbstractSocialAbility {
 
 				if ( null === $collector ) {
 					// Direct REST/MCP/ad-hoc invocation — no DM core eligibility
-					// surface to consult; surface every Reddit-side eligible item.
+					// surface to consult; honor only the direct-call result cap.
 					$eligible_items[] = $candidate;
+					if ( null !== $max_items && count( $eligible_items ) >= $max_items ) {
+						break;
+					}
 					continue;
 				}
 
@@ -544,6 +563,15 @@ class FetchRedditAbility extends AbstractSocialAbility {
 				if ( $collector->isFull() ) {
 					break;
 				}
+			}
+
+			if ( null === $collector && null !== $max_items && count( $eligible_items ) >= $max_items ) {
+				$logs[] = array(
+					'level'   => 'debug',
+					'message' => 'Reddit: Direct result limit reached, ending pagination.',
+					'data'    => array( 'page' => $pages_fetched ),
+				);
+				break;
 			}
 
 			if ( null !== $collector && $collector->isFull() ) {
@@ -628,6 +656,7 @@ class FetchRedditAbility extends AbstractSocialAbility {
 			'search'            => '',
 			'fetch_batch_size'  => 100,
 			'max_pages'         => 5,
+			'max_items'         => null,
 			'download_images'   => true,
 		);
 

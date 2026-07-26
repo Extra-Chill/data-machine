@@ -38,12 +38,13 @@ Fetches posts from Reddit subreddits via OAuth 2.0 with timeframe filtering, key
 | `min_upvotes` | int | No | Minimum upvote threshold (default: 0) |
 | `min_comment_count` | int | No | Minimum comment count threshold (default: 0) |
 | `search` | string | No | Keyword filter for post titles and content |
+| `max_items` | int | No | Direct ability result cap (1-500); pipeline fetches remain governed by their collector |
 
 ## Fetch Behavior
 
 1. Authenticates via `RedditAuth::get_valid_access_token()` (auto-refreshes expired tokens)
 2. Delegates to `FetchRedditAbility::execute()` with config parameters
-3. Fetches up to `fetch_batch_size` (100) posts across `max_pages` (5) pages
+3. Fetches up to `fetch_batch_size` (100) posts across `max_pages` (5) pages, stopping early when a direct `max_items` cap or pipeline collector target is met
 4. Filters by upvotes, comment count, and keywords
 5. Checks processed items for dedup
 6. Downloads images for eligible posts via `ExecutionContext::downloadFile()`
@@ -80,7 +81,8 @@ Each eligible item contains:
 ## CLI Commands
 
 `RedditCommand` provides WP-CLI access:
-- `wp datamachine reddit fetch` — fetch posts from a subreddit
+- `wp datamachine-socials reddit fetch <subreddit> --limit=25` — bounded subreddit fetch
+- `wp datamachine-socials reddit fetch --query="live music" --limit=10` — bounded global search
 
 ## Chat Tools
 

@@ -91,6 +91,72 @@ class FetchRedditAbilityTest extends WP_UnitTestCase {
 		$this->assertSame( 2, $request_count );
 	}
 
+	public function test_direct_limit_caps_items_and_stops_pagination_early(): void {
+		$request_count = 0;
+		$this->mockRedditPages(
+			array(
+				array(
+					'after' => 'page-2',
+					'posts' => array(
+						$this->redditPost( 'first', 'First post' ),
+						$this->redditPost( 'second', 'Second post' ),
+						$this->redditPost( 'third', 'Third post' ),
+					),
+				),
+				array(
+					'after' => null,
+					'posts' => array( $this->redditPost( 'fourth', 'Fourth post' ) ),
+				),
+			),
+			$request_count
+		);
+
+		$result = ( new FetchRedditAbility() )->execute( $this->fetchInput( array( 'max_items' => 2 ) ) );
+
+		$this->assertTrue( $result['success'] );
+		$this->assertSame( array( 'first', 'second' ), array_column( $result['items'], 'item_id' ) );
+		$this->assertSame( 1, $request_count );
+	}
+
+	public function test_direct_limit_returns_fewer_items_when_source_is_exhausted(): void {
+		$this->mockRedditPages(
+			array(
+				array(
+					'after' => null,
+					'posts' => array( $this->redditPost( 'only', 'Only post' ) ),
+				),
+			)
+		);
+
+		$result = ( new FetchRedditAbility() )->execute( $this->fetchInput( array( 'max_items' => 3 ) ) );
+
+		$this->assertTrue( $result['success'] );
+		$this->assertSame( array( 'only' ), array_column( $result['items'], 'item_id' ) );
+	}
+
+	public function test_direct_limit_does_not_override_collector_authority(): void {
+		$this->mockRedditPages(
+			array(
+				array(
+					'after' => null,
+					'posts' => array(
+						$this->redditPost( 'first', 'First post' ),
+						$this->redditPost( 'second', 'Second post' ),
+					),
+				),
+			)
+		);
+
+		$collector = new FreshCandidateCollector( $this->buildContext(), 2 );
+		$result    = ( new FetchRedditAbility() )->executeWithCollector(
+			$this->fetchInput( array( 'max_items' => 1 ) ),
+			$collector
+		);
+
+		$this->assertTrue( $result['success'] );
+		$this->assertSame( array( 'first', 'second' ), array_column( $result['items'], 'item_id' ) );
+	}
+
 	public function test_rate_limit_error_preserves_upstream_details_for_cli(): void {
 		$this->mockRedditError(
 			429,
@@ -308,13 +374,16 @@ class FetchRedditAbilityTest extends WP_UnitTestCase {
 		return $context;
 	}
 
-	private function fetchInput(): array {
-		return array(
-			'subreddit'        => 'WordPress',
-			'access_token'     => 'reddit-token',
-			'fetch_batch_size' => 100,
-			'max_pages'        => 5,
-			'download_images'  => false,
+	private function fetchInput( array $overrides = array() ): array {
+		return array_merge(
+			array(
+				'subreddit'        => 'WordPress',
+				'access_token'     => 'reddit-token',
+				'fetch_batch_size' => 100,
+				'max_pages'        => 5,
+				'download_images'  => false,
+			),
+			$overrides
 		);
 	}
 
