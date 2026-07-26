@@ -214,6 +214,7 @@ describe( 'calendar frontend month-grid integration', () => {
 					bounds: { swLat: 32, swLng: -80, neLat: 33, neLng: -79 },
 					zoom: 10,
 					center: { lat: 32.78, lng: -79.93 },
+					authority: 'user-interaction',
 				},
 			} )
 		);
@@ -262,6 +263,7 @@ describe( 'calendar frontend month-grid integration', () => {
 					bounds: { swLat: 32, swLng: -80, neLat: 33, neLng: -79 },
 					zoom: 10,
 					center: { lat: 32.78, lng: -79.93 },
+					authority: 'user-interaction',
 				},
 			} )
 		);

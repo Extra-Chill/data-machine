@@ -33,7 +33,21 @@ interface BoundsChangedDetail {
 	};
 	zoom: number;
 	center: { lat: number; lng: number };
+	authority?:
+		| 'server'
+		| 'user-location'
+		| 'external'
+		| 'manual-search'
+		| 'user-interaction';
 }
+
+const GEO_AUTHORITY_SOURCES = new Set( [
+	'server',
+	'user-location',
+	'external',
+	'manual-search',
+	'user-interaction',
+] );
 
 /**
  * Per-calendar state for the geo sync listener.
@@ -123,14 +137,16 @@ export function updateCalendarGeo(
 /*  Internal helpers                                                   */
 /* ------------------------------------------------------------------ */
 
-function createBoundsHandler(
-	calendar: HTMLElement
-): ( e: Event ) => void {
+function createBoundsHandler( calendar: HTMLElement ): ( e: Event ) => void {
 	let debounceTimer: ReturnType< typeof setTimeout >;
 
 	return function ( e: Event ): void {
 		const detail = ( e as CustomEvent< BoundsChangedDetail > ).detail;
-		if ( ! detail?.center ) {
+		if (
+			! detail?.center ||
+			! detail.authority ||
+			! GEO_AUTHORITY_SOURCES.has( detail.authority )
+		) {
 			return;
 		}
 
@@ -258,4 +274,3 @@ function boundsToRadius(
 	// Clamp to reasonable range.
 	return Math.max( 1, Math.min( 500, Math.round( distance ) ) );
 }
-

@@ -6,7 +6,8 @@
   "scripts": {
     "build": "wp-scripts build",
     "lint:js": "eslint src",
-    "start": "wp-scripts start"
+    "start": "wp-scripts start",
+    "test": "wp-scripts test-unit-js"
   },
   "dependencies": {
     "@types/leaflet.markercluster": "^1.5.6",

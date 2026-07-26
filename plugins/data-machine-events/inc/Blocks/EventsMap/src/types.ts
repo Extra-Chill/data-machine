@@ -117,6 +117,12 @@ export interface BoundsChangedEvent {
 	bounds: MapBounds;
 	zoom: number;
 	center: { lat: number; lng: number };
+	authority:
+		| 'server'
+		| 'user-location'
+		| 'external'
+		| 'manual-search'
+		| 'user-interaction';
 }
 
 /**

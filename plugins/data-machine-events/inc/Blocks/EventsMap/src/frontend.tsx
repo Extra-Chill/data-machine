@@ -38,6 +38,7 @@ import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
  * Internal dependencies
  */
 import { fetchVenues } from './api-client';
+import { createGeoAuthorityTracker, resolveInitialView } from './geo-authority';
 import { TILE_URLS } from './types';
 import type {
 	Venue,
@@ -46,6 +47,7 @@ import type {
 	MapBounds,
 	BoundsChangedEvent,
 } from './types';
+import type { GeoAuthoritySource } from './geo-authority';
 
 import './frontend.css';
 
@@ -285,7 +287,10 @@ function getBoundsFromMap( map: L.Map ): MapBounds {
 	};
 }
 
-function dispatchBoundsChanged( map: L.Map ): void {
+function dispatchBoundsChanged(
+	map: L.Map,
+	authority: GeoAuthoritySource
+): void {
 	const bounds = getBoundsFromMap( map );
 	const center = map.getCenter();
 
@@ -293,6 +298,7 @@ function dispatchBoundsChanged( map: L.Map ): void {
 		bounds,
 		zoom: map.getZoom(),
 		center: { lat: center.lat, lng: center.lng },
+		authority,
 	};
 
 	document.dispatchEvent(
@@ -303,13 +309,13 @@ function dispatchBoundsChanged( map: L.Map ): void {
 /* ---------- debounce ---------- */
 
 function debounce(
-	fn: ( map: L.Map ) => void,
+	fn: ( map: L.Map, authority: GeoAuthoritySource | null ) => void,
 	ms: number
-): ( map: L.Map ) => void {
+): ( map: L.Map, authority: GeoAuthoritySource | null ) => void {
 	let timer: ReturnType< typeof setTimeout >;
-	return ( map: L.Map ) => {
+	return ( map: L.Map, authority: GeoAuthoritySource | null ) => {
 		clearTimeout( timer );
-		timer = setTimeout( () => fn( map ), ms );
+		timer = setTimeout( () => fn( map, authority ), ms );
 	};
 }
 
@@ -459,6 +465,7 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 	const clusterGroupRef = useRef< L.MarkerClusterGroup | null >( null );
 	const markerMapRef = useRef< Map< number, L.Marker > >( new Map() );
 	const userMarkerRef = useRef< L.Marker | null >( null );
+	const geoAuthorityRef = useRef( createGeoAuthorityTracker() );
 	// Single L.polyline holding the chronological route. Recreated from
 	// scratch whenever venues change so we don't manage segment-level
 	// diffing — the route is at most a few dozen points.
@@ -511,10 +518,12 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 	/* --- debounced bounds handler --- */
 	// eslint-disable-next-line react-hooks/exhaustive-deps
 	const debouncedFetch = useCallback(
-		debounce( ( map: L.Map ) => {
+		debounce( ( map: L.Map, authority: GeoAuthoritySource | null ) => {
 			const bounds = getBoundsFromMap( map );
 			loadVenues( bounds );
-			dispatchBoundsChanged( map );
+			if ( authority ) {
+				dispatchBoundsChanged( map, authority );
+			}
 		}, 500 ),
 		[ loadVenues ]
 	);
@@ -527,15 +536,16 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 		}
 
 		const markerMap = markerMapRef.current;
-		let initialLat = 30.2672; // fallback: Austin, TX
-		let initialLon = -97.7431;
-		if ( hasCenter ) {
-			initialLat = centerLat!;
-			initialLon = centerLon!;
-		} else if ( venues.length > 0 ) {
-			initialLat = venues[ 0 ].lat;
-			initialLon = venues[ 0 ].lon;
-		}
+		const initialView = resolveInitialView( {
+			center: hasCenter ? { lat: centerLat!, lng: centerLon! } : null,
+			userLocation: hasUserLocation
+				? { lat: userLat!, lng: userLon! }
+				: null,
+			venueLocation:
+				venues.length > 0
+					? { lat: venues[ 0 ].lat, lng: venues[ 0 ].lon }
+					: null,
+		} );
 
 		const isTouch = isTouchDevice();
 
@@ -546,7 +556,45 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 			// scrolls the page. Users pinch-zoom or use two fingers.
 			dragging: ! isTouch,
 			tap: ! isTouch,
-		} as L.MapOptions ).setView( [ initialLat, initialLon ], zoom );
+		} as L.MapOptions ).setView(
+			[ initialView.center.lat, initialView.center.lng ],
+			zoom
+		);
+
+		const markUserInteraction = () => {
+			geoAuthorityRef.current.mark( 'user-interaction' );
+		};
+		map.on( 'dragstart boxzoomstart', markUserInteraction );
+		el.addEventListener( 'dblclick', markUserInteraction );
+		el.addEventListener( 'keydown', ( event: KeyboardEvent ) => {
+			if (
+				[
+					'ArrowUp',
+					'ArrowDown',
+					'ArrowLeft',
+					'ArrowRight',
+					'+',
+					'-',
+					'=',
+				].includes( event.key )
+			) {
+				markUserInteraction();
+			}
+		} );
+		el.addEventListener(
+			'click',
+			( event: MouseEvent ) => {
+				const target = event.target as Element | null;
+				if (
+					target?.closest(
+						'.leaflet-control-zoom-in, .leaflet-control-zoom-out, .marker-cluster'
+					)
+				) {
+					markUserInteraction();
+				}
+			},
+			true
+		);
 
 		if ( isTouch ) {
 			// Show gesture hint when user tries single-finger drag.
@@ -573,6 +621,7 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 						showGestureHint();
 					} else if ( e.touches.length >= 2 ) {
 						// Two-finger gesture — enable dragging temporarily.
+						markUserInteraction();
 						map.dragging.enable();
 					}
 				},
@@ -594,6 +643,7 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 				( e: WheelEvent ) => {
 					if ( e.ctrlKey || e.metaKey ) {
 						e.preventDefault();
+						markUserInteraction();
 						map.scrollWheelZoom.enable();
 					}
 				},
@@ -621,6 +671,7 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 			chunkInterval: 100,
 			chunkDelay: 10,
 		} );
+		clusterGroup.on( 'clusterclick', markUserInteraction );
 		map.addLayer( clusterGroup );
 		clusterGroupRef.current = clusterGroup;
 
@@ -632,7 +683,9 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 		// viewport would drop venues that the user just panned away from,
 		// mid-route. Skip the moveend refetch for it.
 		if ( ! chronologicalRouteMode ) {
-			map.on( 'moveend', () => debouncedFetch( map ) );
+			map.on( 'moveend', () => {
+				debouncedFetch( map, geoAuthorityRef.current.consume() );
+			} );
 		}
 
 		// Force a resize check after mount.
@@ -669,7 +722,9 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 					? undefined
 					: getBoundsFromMap( map );
 				loadVenues( bounds );
-				dispatchBoundsChanged( map );
+				if ( initialView.authority ) {
+					dispatchBoundsChanged( map, initialView.authority );
+				}
 			}, 200 );
 		}
 
@@ -708,6 +763,7 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 				return;
 			}
 
+			geoAuthorityRef.current.mark( 'external' );
 			map.setView(
 				[ detail.lat, detail.lng ],
 				detail.zoom ?? map.getZoom()
@@ -1010,6 +1066,7 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 			return;
 		}
 
+		geoAuthorityRef.current.mark( 'manual-search' );
 		map.setView( [ lat, lng ], 12 );
 
 		// Update URL for shareability.
