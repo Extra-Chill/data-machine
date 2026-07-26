@@ -7,9 +7,9 @@
  * (ampersand / HTML-entity / apostrophe + suite-suffix normalization)
  * shipped.
  *
- * Scans every venue term, groups them by normalized name AND normalized
- * address+city, and for each cluster picks the oldest term (lowest ID)
- * as the winner. Loser terms are smart-merged into the winner via
+ * Scans every venue term, groups them by normalized physical location,
+ * then requires venue-name similarity before selecting the oldest term
+ * (lowest ID) as the winner. Loser terms are smart-merged into the winner via
  * VenueMergeHelper: post-term relationships are reassigned, flow
  * handler_config references are rewritten, then the loser term is
  * deleted.
@@ -134,11 +134,11 @@ class CheckMergeDuplicateVenuesCommand {
 	}
 
 	/**
-	 * Walk every venue term and group by normalized name OR normalized
-	 * address+city. Returns only clusters with >=2 terms.
+	 * Walk every venue term and group by normalized physical location.
+	 * Returns only name-compatible clusters with >=2 terms.
 	 *
-	 * The address key intentionally includes the city to keep two
-	 * different "123 Main St" venues (different cities) apart.
+	 * The key includes city, state, and country. False negatives from missing
+	 * geography are safer than a destructive cross-location merge.
 	 *
 	 * @return array<int,array{key:string,term_ids:array<int,int>,terms:array}>
 	 */
@@ -155,102 +155,69 @@ class CheckMergeDuplicateVenuesCommand {
 			return array();
 		}
 
-		$by_name    = array();
 		$by_address = array();
 
 		foreach ( $terms as $term ) {
-			$name_key = Venue_Taxonomy::normalize_venue_name_for_matching( $term->name );
-			if ( strlen( $name_key ) >= 3 ) {
-				$by_name[ $name_key ][] = $term;
-			}
-
 			$address = (string) get_term_meta( $term->term_id, '_venue_address', true );
 			$city    = (string) get_term_meta( $term->term_id, '_venue_city', true );
+			$state   = (string) get_term_meta( $term->term_id, '_venue_state', true );
+			$country = (string) get_term_meta( $term->term_id, '_venue_country', true );
 
 			if ( '' === $address || '' === $city ) {
 				continue;
 			}
 
 			$addr_key = sprintf(
-				'%s|%s',
-				Venue_Taxonomy::normalize_address_for_matching( $address ),
-				strtolower( trim( $city ) )
+				'%s|%s|%s|%s',
+				VenueMergeHelper::normalize_address_for_alias_matching( $address, $city, $state ),
+				Venue_Taxonomy::normalize_geographic_value( $city, 'city' ),
+				Venue_Taxonomy::normalize_geographic_value( $state, 'state' ),
+				Venue_Taxonomy::normalize_geographic_value( $country, 'country' )
 			);
 
-			if ( '|' === $addr_key || str_starts_with( $addr_key, '|' ) ) {
+			if ( str_starts_with( $addr_key, '|' ) ) {
 				continue;
 			}
 
 			$by_address[ $addr_key ][] = $term;
 		}
 
-		$clusters      = array();
-		$seen_term_ids = array();
+		$clusters = array();
 
-		// Emit name-clusters first, then address-clusters. Each term is
-		// emitted in at most one cluster — once seen via name, the
-		// address loop ignores it.
-		//
-		// Name-clusters are accepted as-is: same normalized name = same
-		// venue (this IS Rule 1 of names_are_similar).
-		//
 		// Address-clusters are subdivided by name similarity to suppress
 		// false positives at multi-tenant addresses (issue #281). Two
 		// terms sharing an address+city are only kept together if their
 		// names pass VenueMergeHelper::names_are_similar().
-		foreach ( array(
-			'name' => $by_name,
-			'addr' => $by_address,
-		) as $kind => $groups ) {
-			foreach ( $groups as $key => $group_terms ) {
-				if ( count( $group_terms ) < 2 ) {
+		foreach ( $by_address as $key => $group_terms ) {
+			if ( count( $group_terms ) < 2 ) {
+				continue;
+			}
+
+			$subgroups = $this->split_by_name_similarity( $group_terms );
+
+			foreach ( $subgroups as $subgroup_index => $subgroup_terms ) {
+				if ( count( $subgroup_terms ) < 2 ) {
 					continue;
 				}
 
-				// Drop terms we've already clustered via the name pass.
-				$group_terms = array_values(
-					array_filter(
-						$group_terms,
-						static fn( $t ) => ! in_array( (int) $t->term_id, $seen_term_ids, true )
-					)
+				$ids = array();
+				foreach ( $subgroup_terms as $t ) {
+					$ids[] = (int) $t->term_id;
+				}
+
+				// When an address bucket is split, give each surviving
+				// sub-cluster a disambiguating suffix so the operator
+				// can tell them apart in the dry-run report.
+				$cluster_key = 'addr:' . $key;
+				if ( count( $subgroups ) > 1 ) {
+					$cluster_key .= '#' . ( $subgroup_index + 1 );
+				}
+
+				$clusters[] = array(
+					'key'      => $cluster_key,
+					'term_ids' => $ids,
+					'terms'    => array_values( $subgroup_terms ),
 				);
-
-				if ( count( $group_terms ) < 2 ) {
-					continue;
-				}
-
-				$subgroups = ( 'addr' === $kind )
-					? $this->split_by_name_similarity( $group_terms )
-					: array( $group_terms );
-
-				foreach ( $subgroups as $subgroup_index => $subgroup_terms ) {
-					if ( count( $subgroup_terms ) < 2 ) {
-						continue;
-					}
-
-					$ids = array();
-					foreach ( $subgroup_terms as $t ) {
-						$ids[] = (int) $t->term_id;
-					}
-
-					// When an address bucket is split, give each surviving
-					// sub-cluster a disambiguating suffix so the operator
-					// can tell them apart in the dry-run report.
-					$cluster_key = $kind . ':' . $key;
-					if ( 'addr' === $kind && count( $subgroups ) > 1 ) {
-						$cluster_key .= '#' . ( $subgroup_index + 1 );
-					}
-
-					$clusters[] = array(
-						'key'      => $cluster_key,
-						'term_ids' => $ids,
-						'terms'    => array_values( $subgroup_terms ),
-					);
-
-					foreach ( $ids as $tid ) {
-						$seen_term_ids[] = $tid;
-					}
-				}
 			}
 		}
 
@@ -281,7 +248,12 @@ class CheckMergeDuplicateVenuesCommand {
 				$similar_to_all = true;
 
 				foreach ( $sub_terms as $existing ) {
-					if ( ! VenueMergeHelper::names_are_similar( (string) $term->name, (string) $existing->name ) ) {
+					if ( ! VenueMergeHelper::names_are_similar(
+						(string) $term->name,
+						(string) $existing->name,
+						$this->term_geography( $term ),
+						$this->term_geography( $existing )
+					) ) {
 						$similar_to_all = false;
 						break;
 					}
@@ -300,6 +272,19 @@ class CheckMergeDuplicateVenuesCommand {
 		}
 
 		return $subgroups;
+	}
+
+	/**
+	 * Read the geography that qualifies venue-specific name suffix removal.
+	 *
+	 * @return array{city:string,state:string,country:string}
+	 */
+	private function term_geography( \WP_Term $term ): array {
+		return array(
+			'city'    => (string) get_term_meta( $term->term_id, '_venue_city', true ),
+			'state'   => (string) get_term_meta( $term->term_id, '_venue_state', true ),
+			'country' => (string) get_term_meta( $term->term_id, '_venue_country', true ),
+		);
 	}
 
 	/**

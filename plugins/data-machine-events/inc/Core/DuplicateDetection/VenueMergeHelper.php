@@ -39,13 +39,6 @@ class VenueMergeHelper {
 	public const NO_MERGE_META_KEY = '_venue_no_merge';
 
 	/**
-	 * Jaccard token-overlap threshold for Rule 3 of names_are_similar().
-	 * Stricter is safer for a destructive merge operation — do not lower
-	 * without revisiting the production false-positive set in issue #281.
-	 */
-	public const NAME_SIMILARITY_TOKEN_OVERLAP_THRESHOLD = 0.70;
-
-	/**
 	 * Decide whether two venue names are similar enough that two terms
 	 * sharing an address+city should be treated as the same venue.
 	 *
@@ -56,35 +49,42 @@ class VenueMergeHelper {
 	 * Hollywood — legitimately share a street address but are distinct
 	 * operators that must not be merged.
 	 *
-	 * Three rules — any single rule passing accepts the pair as "similar":
+	 * Two rules — either rule passing accepts the pair as "similar":
 	 *
 	 *   Rule 1: Exact equality after normalize_venue_name_for_matching().
 	 *           Handles "Hi-Fi Indianapolis" vs "HI-FI Indianapolis".
 	 *
-	 *   Rule 2: Substring containment after normalization, where the
-	 *           shorter normalized name is at least 4 characters.
-	 *           Handles "The Abbey" vs "The Abbey-Orlando".
+	 *   Rule 2: Exact token-set equality after stop-word removal. This allows
+	 *           harmless token reordering without treating a parent venue and
+	 *           an added room/annex/patio token as aliases.
 	 *
-	 *   Rule 3: Jaccard token overlap >= 70% after stop-word removal
-	 *           ("the", "a", "an", "and", "of", "at"). Handles
-	 *           "St Augustine Amphitheatre" vs "The St. Augustine
-	 *           Amphitheatre" (4/5 = 0.80). Correctly REJECTS
-	 *           "V Theater at Planet Hollywood" vs "Saxe Theater at
-	 *           Planet Hollywood" (3/5 = 0.60).
-	 *
-	 * If all three rules fail, the names are dissimilar and the pair
+	 * If both rules fail, the names are dissimilar and the pair
 	 * must NOT be clustered as duplicates even if they share an address.
 	 *
-	 * Empty / whitespace-only / sub-threshold inputs return false — when
+	 * Empty or whitespace-only inputs return false. When
 	 * in doubt the safer answer for a destructive merge is "not similar".
 	 *
 	 * @param string $a First venue name.
 	 * @param string $b Second venue name.
-	 * @return bool True if any of the three rules accepts the pair.
+	 * @param array  $geo_a Stored geography for the first venue.
+	 * @param array  $geo_b Stored geography for the second venue.
+	 * @return bool True if either rule accepts the pair.
 	 */
-	public static function names_are_similar( string $a, string $b ): bool {
-		$norm_a = Venue_Taxonomy::normalize_venue_name_for_matching( $a );
-		$norm_b = Venue_Taxonomy::normalize_venue_name_for_matching( $b );
+	public static function names_are_similar( string $a, string $b, array $geo_a = array(), array $geo_b = array() ): bool {
+		if ( ! self::geography_is_compatible( $geo_a, $geo_b ) ) {
+			return false;
+		}
+
+		$norm_a = self::normalize_name_for_alias_matching(
+			$a,
+			(string) ( $geo_a['city'] ?? '' ),
+			(string) ( $geo_a['state'] ?? '' )
+		);
+		$norm_b = self::normalize_name_for_alias_matching(
+			$b,
+			(string) ( $geo_b['city'] ?? '' ),
+			(string) ( $geo_b['state'] ?? '' )
+		);
 
 		if ( '' === $norm_a || '' === $norm_b ) {
 			return false;
@@ -95,16 +95,7 @@ class VenueMergeHelper {
 			return true;
 		}
 
-		// Rule 2: substring containment with a 4-char floor on the shorter
-		// name. The floor stops tiny tokens like "joe" matching every
-		// "Joe's <something>" but allows "joes" (4 chars) through.
-		$shorter = strlen( $norm_a ) <= strlen( $norm_b ) ? $norm_a : $norm_b;
-		$longer  = strlen( $norm_a ) <= strlen( $norm_b ) ? $norm_b : $norm_a;
-		if ( strlen( $shorter ) >= 4 && str_contains( $longer, $shorter ) ) {
-			return true;
-		}
-
-		// Rule 3: Jaccard token overlap on stop-word-stripped tokens.
+		// Rule 2: exact token-set equality after stop-word removal.
 		$stops = array( 'the', 'a', 'an', 'and', 'of', 'at' );
 
 		$tok_a = preg_split( '/\s+/', $norm_a, -1, PREG_SPLIT_NO_EMPTY );
@@ -120,14 +111,103 @@ class VenueMergeHelper {
 			return false;
 		}
 
-		$intersection = count( array_intersect( $tok_a, $tok_b ) );
-		$union        = count( array_unique( array_merge( $tok_a, $tok_b ) ) );
+		sort( $tok_a );
+		sort( $tok_b );
+		return array_values( array_unique( $tok_a ) ) === array_values( array_unique( $tok_b ) );
+	}
 
-		if ( 0 === $union ) {
-			return false;
+	/**
+	 * Normalize venue-only aliases without changing the generic taxonomy normalizer.
+	 *
+	 * Geography suffixes are removed only when they agree with the venue's stored
+	 * city or state. This keeps broad words such as "Denver" meaningful when the
+	 * term does not independently identify Denver as its location.
+	 */
+	public static function normalize_name_for_alias_matching( string $name, string $city = '', string $state = '' ): string {
+		$name = html_entity_decode( $name, ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+
+		do {
+			$before = $name;
+			foreach ( self::geography_suffixes( $city, $state ) as $suffix ) {
+				$name = preg_replace( '/(?:\s|,|-)+' . preg_quote( $suffix, '/' ) . '\s*$/iu', '', $name );
+			}
+		} while ( $before !== $name );
+
+		$normalized = Venue_Taxonomy::normalize_venue_name_for_matching( $name );
+		return str_replace( array( 'amphitheatre', 'theatre' ), array( 'amphitheater', 'theater' ), $normalized );
+	}
+
+	/**
+	 * Normalize venue addresses for the legacy-alias remediation command.
+	 *
+	 * Stored geography qualifies removal of redundant trailing city/state fields,
+	 * while directional words are reduced to their common postal abbreviations.
+	 */
+	public static function normalize_address_for_alias_matching( string $address, string $city = '', string $state = '' ): string {
+		$address = html_entity_decode( $address, ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+
+		$city = trim( $city );
+		if ( '' !== $city ) {
+			$state_suffixes = self::geography_suffixes( '', $state );
+			$state_pattern  = empty( $state_suffixes )
+				? ''
+				: '(?:\s*,?\s*(?:' . implode( '|', array_map( static fn( string $value ): string => preg_quote( $value, '/' ), $state_suffixes ) ) . '))?';
+			$address        = preg_replace(
+				'/\s*,?\s*' . preg_quote( $city, '/' ) . $state_pattern . '\s*$/iu',
+				'',
+				$address
+			);
 		}
 
-		return ( $intersection / $union ) >= self::NAME_SIMILARITY_TOKEN_OVERLAP_THRESHOLD;
+		$address = preg_replace_callback(
+			'/^(\s*\d+[a-z0-9-]*\s+)(north|south|east|west)\s+(?=(?:\d+(?:st|nd|rd|th)?\b|broadway\b))/i',
+			static function ( array $matches ): string {
+				$direction = array(
+					'north' => 'n',
+					'south' => 's',
+					'east'  => 'e',
+					'west'  => 'w',
+				);
+				return $matches[1] . $direction[ strtolower( $matches[2] ) ] . ' ';
+			},
+			$address
+		);
+
+		return Venue_Taxonomy::normalize_address_for_matching( $address );
+	}
+
+	/**
+	 * Return suffixes authorized by stored geography, longest first.
+	 *
+	 * @return array<int,string>
+	 */
+	private static function geography_suffixes( string $city, string $state ): array {
+		$suffixes = array_filter( array( trim( $city ) ) );
+		$suffixes = array_merge( $suffixes, Venue_Taxonomy::state_aliases_for_matching( $state ) );
+
+		$suffixes = array_values( array_unique( $suffixes ) );
+		usort( $suffixes, static fn( string $a, string $b ): int => strlen( $b ) <=> strlen( $a ) );
+		return $suffixes;
+	}
+
+	/**
+	 * Reject conflicting stored geography while allowing either side to omit it.
+	 */
+	private static function geography_is_compatible( array $geo_a, array $geo_b ): bool {
+		foreach ( array( 'city', 'state', 'country' ) as $field ) {
+			$value_a = self::normalize_geography_value( $field, (string) ( $geo_a[ $field ] ?? '' ) );
+			$value_b = self::normalize_geography_value( $field, (string) ( $geo_b[ $field ] ?? '' ) );
+
+			if ( '' !== $value_a && '' !== $value_b && $value_a !== $value_b ) {
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+	private static function normalize_geography_value( string $field, string $value ): string {
+		return Venue_Taxonomy::normalize_geographic_value( $value, $field );
 	}
 
 	/**

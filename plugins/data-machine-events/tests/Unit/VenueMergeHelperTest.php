@@ -152,8 +152,12 @@ class VenueMergeHelperTest extends WP_UnitTestCase {
 	// ---------------------------------------------------------------------
 
 	public function test_merge_command_dry_run_lists_clusters_without_writes(): void {
-		$winner = $this->make_venue( 'Hook and Ladder Theater' );
-		$loser  = $this->make_venue( 'Hook & Ladder Theater' );
+		$meta   = array(
+			'_venue_address' => '3010 Minnehaha Ave',
+			'_venue_city'    => 'Minneapolis',
+		);
+		$winner = $this->make_venue( 'Hook and Ladder Theater', $meta );
+		$loser  = $this->make_venue( 'Hook & Ladder Theater', $meta );
 
 		$winner_post = $this->make_event_with_venue( 'Show A', $winner );
 		$loser_post  = $this->make_event_with_venue( 'Show B', $loser );
@@ -179,7 +183,10 @@ class VenueMergeHelperTest extends WP_UnitTestCase {
 	public function test_merge_command_apply_reassigns_posts_and_deletes_loser(): void {
 		$winner = $this->make_venue(
 			'Hook and Ladder Theater',
-			array( '_venue_city' => 'Minneapolis' )
+			array(
+				'_venue_address' => '3010 Minnehaha Ave',
+				'_venue_city'    => 'Minneapolis',
+			)
 		);
 		$loser  = $this->make_venue(
 			'Hook & Ladder Theater',
@@ -222,8 +229,12 @@ class VenueMergeHelperTest extends WP_UnitTestCase {
 	}
 
 	public function test_merge_command_apply_reassigns_flow_handler_configs(): void {
-		$winner = $this->make_venue( 'Hook and Ladder Theater' );
-		$loser  = $this->make_venue( 'Hook & Ladder Theater' );
+		$meta   = array(
+			'_venue_address' => '3010 Minnehaha Ave',
+			'_venue_city'    => 'Minneapolis',
+		);
+		$winner = $this->make_venue( 'Hook and Ladder Theater', $meta );
+		$loser  = $this->make_venue( 'Hook & Ladder Theater', $meta );
 
 		// Two flow shapes from production: flat venue and nested
 		// universal_web_scraper.venue. Both must be rewritten.
@@ -275,9 +286,19 @@ class VenueMergeHelperTest extends WP_UnitTestCase {
 	public function test_merge_command_respects_no_merge_opt_out(): void {
 		$winner = $this->make_venue(
 			'Hook and Ladder Theater',
-			array( VenueMergeHelper::NO_MERGE_META_KEY => '1' )
+			array(
+				VenueMergeHelper::NO_MERGE_META_KEY => '1',
+				'_venue_address'                     => '3010 Minnehaha Ave',
+				'_venue_city'                        => 'Minneapolis',
+			)
 		);
-		$loser  = $this->make_venue( 'Hook & Ladder Theater' );
+		$loser  = $this->make_venue(
+			'Hook & Ladder Theater',
+			array(
+				'_venue_address' => '3010 Minnehaha Ave',
+				'_venue_city'    => 'Minneapolis',
+			)
+		);
 
 		$loser_post = $this->make_event_with_venue( 'Show B', $loser );
 
@@ -320,7 +341,7 @@ class VenueMergeHelperTest extends WP_UnitTestCase {
 	}
 
 	// ---------------------------------------------------------------------
-	// names_are_similar() — three-rule guard for address-cluster path
+	// names_are_similar() — conservative guard for address-cluster path
 	// (issue #281)
 	// ---------------------------------------------------------------------
 
@@ -331,31 +352,42 @@ class VenueMergeHelperTest extends WP_UnitTestCase {
 		);
 	}
 
-	public function test_names_are_similar_substring_containment(): void {
-		// "the abbey" is substring of "the abbeyorlando" after normalization
-		// strips the dash. Shorter is well above the 4-char floor → Rule 2.
+	public function test_names_are_similar_qualified_city_suffix(): void {
+		$orlando = array( 'city' => 'Orlando' );
 		$this->assertTrue(
-			VenueMergeHelper::names_are_similar( 'The Abbey', 'The Abbey-Orlando' )
+			VenueMergeHelper::names_are_similar( 'The Abbey', 'The Abbey-Orlando', $orlando, $orlando )
 		);
 	}
 
-	public function test_names_are_similar_token_overlap_above_threshold(): void {
-		// Token reordering keeps Rule 3 honest: same bag of tokens but
-		// not a substring of each other. 3/3 = 1.0, well over 0.70.
+	public function test_names_are_similar_accepts_token_reordering(): void {
+		// Token reordering keeps Rule 2 useful without accepting added tokens.
 		$this->assertTrue(
 			VenueMergeHelper::names_are_similar( 'Bowery Ballroom NYC', 'NYC Bowery Ballroom' )
 		);
 	}
 
-	public function test_names_are_similar_token_overlap_below_threshold(): void {
-		// {v, theater, planet, hollywood} vs {saxe, theater, planet, hollywood}
-		// intersection 3, union 5 → 0.60 → below the 0.70 cutoff.
+	public function test_names_are_similar_rejects_different_token_sets(): void {
+		// Distinct token sets must not match even with a shared location suffix.
 		$this->assertFalse(
 			VenueMergeHelper::names_are_similar(
 				'V Theater at Planet Hollywood',
 				'Saxe Theater at Planet Hollywood'
 			)
 		);
+		$this->assertFalse(
+			VenueMergeHelper::names_are_similar(
+				'V Theater at Planet Hollywood Inside the Miracle Mile Mall',
+				'Saxe Theater at Planet Hollywood Inside the Miracle Mile Mall'
+			)
+		);
+	}
+
+	public function test_names_are_similar_rejects_distinct_subvenues(): void {
+		$this->assertFalse( VenueMergeHelper::names_are_similar( 'Georgia Theatre', 'Georgia Theatre Rooftop' ) );
+		$this->assertFalse( VenueMergeHelper::names_are_similar( "Cat's Cradle", "Cat's Cradle Back Room" ) );
+		$this->assertFalse( VenueMergeHelper::names_are_similar( 'Bar Freda', 'Bar Freda - Basement' ) );
+		$this->assertFalse( VenueMergeHelper::names_are_similar( 'Cannery Hall', 'Mainstage at Cannery Hall' ) );
+		$this->assertFalse( VenueMergeHelper::names_are_similar( 'The Lounge at Venue A', 'The Lounge at Venue B' ) );
 	}
 
 	public function test_names_are_similar_completely_different(): void {
@@ -372,16 +404,8 @@ class VenueMergeHelperTest extends WP_UnitTestCase {
 		);
 	}
 
-	public function test_names_are_similar_short_substring_at_threshold(): void {
-		// Edge case: "joes" normalizes to exactly 4 chars, which meets the
-		// >=4 floor of Rule 2, and IS substring of "joes bar and grill"
-		// after normalization. This case PASSES — documenting the floor.
-		//
-		// Real-world impact is bounded: this only fires inside an
-		// address-bucket where both terms ALREADY share a normalized
-		// address+city, so spurious "Joe's" → "Joe's Bar and Grill" cross-
-		// city collisions are not possible.
-		$this->assertTrue(
+	public function test_names_are_similar_rejects_added_tokens(): void {
+		$this->assertFalse(
 			VenueMergeHelper::names_are_similar( 'Joes', "Joe's Bar and Grill" )
 		);
 	}
@@ -390,9 +414,62 @@ class VenueMergeHelperTest extends WP_UnitTestCase {
 		$this->assertFalse( VenueMergeHelper::names_are_similar( '', 'Anything' ) );
 		$this->assertFalse( VenueMergeHelper::names_are_similar( 'Anything', '' ) );
 		$this->assertFalse( VenueMergeHelper::names_are_similar( '   ', 'Anything' ) );
-		// Single-character "Z" normalizes to "z" (1 char) — fails Rule 1
-		// (not equal), Rule 2 (below 4-char floor), Rule 3 (no overlap).
+		// Single-character "Z" normalizes to "z" and has a different token set.
 		$this->assertFalse( VenueMergeHelper::names_are_similar( 'Z', 'Anything' ) );
+	}
+
+	public function test_names_are_similar_for_qualified_legacy_aliases(): void {
+		$denver = array(
+			'city'    => 'Denver',
+			'state'   => 'CO',
+			'country' => 'US',
+		);
+
+		$this->assertTrue( VenueMergeHelper::names_are_similar( 'Bluebird Theater', 'Bluebird Theatre', $denver, $denver ) );
+		$this->assertTrue( VenueMergeHelper::names_are_similar( 'Oriental Theater', 'Oriental Theatre-CO', $denver, $denver ) );
+		$this->assertTrue( VenueMergeHelper::names_are_similar( 'Oriental Theater', 'Oriental Theatre-Denver-CO', $denver, $denver ) );
+		$this->assertTrue( VenueMergeHelper::names_are_similar( 'HQ', 'HQ Denver', $denver, $denver ) );
+		$this->assertTrue( VenueMergeHelper::names_are_similar( 'Red Rocks Amphitheater', 'Red Rocks Amphitheatre', $denver, $denver ) );
+		$this->assertTrue(
+			VenueMergeHelper::names_are_similar(
+				'Example Venue',
+				'Example Venue-NY',
+				array( 'state' => 'New York' ),
+				array( 'state' => 'NY' )
+			)
+		);
+		$this->assertFalse( VenueMergeHelper::names_are_similar( 'HQ', 'HQ Denver' ) );
+		$this->assertFalse(
+			VenueMergeHelper::names_are_similar(
+				'HQ',
+				'HQ Denver',
+				$denver,
+				array(
+					'city'    => 'Denver',
+					'state'   => 'TX',
+					'country' => 'US',
+				)
+			)
+		);
+	}
+
+	public function test_alias_address_normalization_uses_stored_geography(): void {
+		$this->assertSame(
+			VenueMergeHelper::normalize_address_for_alias_matching( '4335 W. 44th Ave.', 'Denver', 'CO' ),
+			VenueMergeHelper::normalize_address_for_alias_matching( '4335 W. 44th Ave., Denver, Colorado', 'Denver', 'CO' )
+		);
+		$this->assertNotSame(
+			VenueMergeHelper::normalize_address_for_alias_matching( '100 West Street', 'Denver', 'CO' ),
+			VenueMergeHelper::normalize_address_for_alias_matching( '100 W Street', 'Denver', 'CO' )
+		);
+		$this->assertSame(
+			VenueMergeHelper::normalize_address_for_alias_matching( '60 South Broadway', 'Denver', 'CO' ),
+			VenueMergeHelper::normalize_address_for_alias_matching( '60 S Broadway', 'Denver', 'Colorado' )
+		);
+		$this->assertSame(
+			VenueMergeHelper::normalize_address_for_alias_matching( '100 West 44th Street', 'Denver', 'CO' ),
+			VenueMergeHelper::normalize_address_for_alias_matching( '100 W 44th Street', 'Denver', 'Colorado' )
+		);
 	}
 
 	/**
@@ -434,8 +511,6 @@ class VenueMergeHelperTest extends WP_UnitTestCase {
 		$pairs = array(
 			// Rule 1 (exact normalized) — case-only variant.
 			array( 'Hi-Fi Indianapolis', 'HI-FI Indianapolis' ),
-			// Rule 2 (substring) — annex/suffix variant.
-			array( 'The Abbey', 'The Abbey-Orlando' ),
 			// Rule 1 — ampersand collapses to "and" via the existing
 			// normalize_venue_name_for_matching() pipeline so both sides
 			// reduce to the identical normalized string.
@@ -598,10 +673,56 @@ class VenueMergeHelperTest extends WP_UnitTestCase {
 		);
 	}
 
-	public function test_name_cluster_unchanged(): void {
-		// Regression guard: name-only clusters (no shared address) still
-		// match by normalized-name equality, which IS Rule 1 of
-		// names_are_similar. The fix must not affect this path.
+	public function test_address_clusters_include_confirmed_denver_aliases(): void {
+		$pairs = array(
+			array( 'Bluebird Theater', '3317 E Colfax Ave', 'Bluebird Theatre', '3317 E. Colfax Avenue' ),
+			array( 'Oriental Theater', '4335 W. 44th Ave.', 'Oriental Theatre-CO', '4335 W. 44th Ave., Denver, CO' ),
+			array( 'HQ', '60 South Broadway', 'HQ Denver', '60 S Broadway' ),
+		);
+		$expected_pairs = array();
+
+		foreach ( $pairs as $pair ) {
+			$expected_pairs[] = array(
+				$this->make_venue(
+					$pair[0],
+					array(
+						'_venue_address' => $pair[1],
+						'_venue_city'    => 'Denver',
+						'_venue_state'   => 'Colorado',
+						'_venue_country' => 'United States',
+					)
+				),
+				$this->make_venue(
+					$pair[2],
+					array(
+						'_venue_address' => $pair[3],
+						'_venue_city'    => 'Denver',
+						'_venue_state'   => 'CO',
+						'_venue_country' => 'US',
+					)
+				),
+			);
+		}
+
+		$cmd        = new CheckMergeDuplicateVenuesCommand();
+		$reflection = new \ReflectionClass( $cmd );
+		$method     = $reflection->getMethod( 'find_clusters' );
+		$method->setAccessible( true );
+		$clusters = $method->invoke( $cmd );
+
+		foreach ( $expected_pairs as $expected ) {
+			$found = false;
+			foreach ( $clusters as $cluster ) {
+				if ( in_array( $expected[0], $cluster['term_ids'], true ) && in_array( $expected[1], $cluster['term_ids'], true ) ) {
+					$found = true;
+					break;
+				}
+			}
+			$this->assertTrue( $found, sprintf( 'Expected venue terms %d and %d to cluster.', $expected[0], $expected[1] ) );
+		}
+	}
+
+	public function test_name_only_cluster_requires_physical_identity(): void {
 		$winner = $this->make_venue( 'Hook and Ladder Theater' );
 		$loser  = $this->make_venue( 'Hook & Ladder Theater' );
 
@@ -614,8 +735,7 @@ class VenueMergeHelperTest extends WP_UnitTestCase {
 		$found = false;
 		foreach ( $clusters as $cluster ) {
 			if (
-				str_starts_with( $cluster['key'], 'name:' )
-				&& in_array( $winner, $cluster['term_ids'], true )
+				in_array( $winner, $cluster['term_ids'], true )
 				&& in_array( $loser, $cluster['term_ids'], true )
 			) {
 				$found = true;
@@ -623,9 +743,9 @@ class VenueMergeHelperTest extends WP_UnitTestCase {
 			}
 		}
 
-		$this->assertTrue(
+		$this->assertFalse(
 			$found,
-			'Name-cluster for ampersand variant must survive the address-cluster guard.'
+			'Name similarity alone must not authorize a destructive venue merge.'
 		);
 	}
 }

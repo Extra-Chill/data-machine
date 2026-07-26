@@ -503,7 +503,7 @@ class Venue_Taxonomy {
 	 * @param string $field Geographic field name.
 	 * @return string
 	 */
-	private static function normalize_geographic_value( string $value, string $field ): string {
+	public static function normalize_geographic_value( string $value, string $field ): string {
 		$value = html_entity_decode( $value, ENT_QUOTES | ENT_HTML5, 'UTF-8' );
 		$value = strtolower( remove_accents( $value ) );
 		$value = preg_replace( '/[^a-z0-9]+/', ' ', $value );
@@ -524,6 +524,23 @@ class Venue_Taxonomy {
 		}
 
 		return $value;
+	}
+
+	/**
+	 * Return equivalent stored forms for a US state or territory.
+	 *
+	 * @return array<int,string>
+	 */
+	public static function state_aliases_for_matching( string $state ): array {
+		$normalized = self::normalize_geographic_value( $state, 'state' );
+		$abbrev     = strtoupper( $normalized );
+
+		if ( isset( self::$us_state_names[ $abbrev ] ) ) {
+			return array( $abbrev, self::$us_state_names[ $abbrev ] );
+		}
+
+		$state = trim( $state );
+		return '' === $state ? array() : array( $state );
 	}
 
 	/**
