@@ -562,7 +562,7 @@ class EventUpsert extends UpsertHandler {
 		$query = new \WP_Query(
 			array(
 				'post_type'      => Event_Post_Type::POST_TYPE,
-				'post_status'    => 'any',
+				'post_status'    => array( 'publish', 'future', 'draft', 'pending', 'private', 'trash' ),
 				'posts_per_page' => 1,
 				'fields'         => 'ids',
 				'no_found_rows'  => true,

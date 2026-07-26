@@ -164,6 +164,61 @@ class EventUpsertTest extends WP_UnitTestCase {
 		$this->assertInstanceOf( EventUpsert::class, $this->handler );
 	}
 
+	public function test_unchanged_trash_reimport_republishes_the_exact_source_post(): void {
+		$parameters = array(
+			'title'           => 'Exact Source Trash Replay ' . uniqid(),
+			'venue'           => 'Exact Source Venue ' . uniqid(),
+			'startDate'       => '2026-11-20',
+			'startTime'       => '20:00',
+			'description'     => 'Stable content for an exact source replay.',
+			'source_identity' => 'source:event-' . uniqid(),
+		);
+		$created = $this->invoke_upsert( $parameters );
+
+		$this->assertTrue( $created['success'] ?? false, wp_json_encode( $created ) );
+		$post_id       = (int) $created['data']['post_id'];
+		$original_slug = get_post_field( 'post_name', $post_id );
+		wp_trash_post( $post_id );
+
+		$this->assertSame( $original_slug, get_post_meta( $post_id, '_wp_desired_post_slug', true ) );
+		$this->assertSame( $original_slug . '__trashed', get_post_field( 'post_name', $post_id ) );
+
+		$reimported = $this->invoke_upsert( $parameters );
+
+		$this->assertTrue( $reimported['success'] ?? false, wp_json_encode( $reimported ) );
+		$this->assertSame( $post_id, (int) $reimported['data']['post_id'] );
+		$this->assertSame( 'updated', $reimported['data']['action'] );
+		$this->assertSame( 'publish', get_post_status( $post_id ) );
+		$this->assertSame( $original_slug, get_post_field( 'post_name', $post_id ) );
+		$this->assertSame( array(), get_post_meta( $post_id, '_wp_desired_post_slug', false ) );
+		$this->assertSame( array(), get_post_meta( $post_id, '_wp_trash_meta_status', false ) );
+		$this->assertSame( array(), get_post_meta( $post_id, '_wp_trash_meta_time', false ) );
+		$this->assertCount(
+			1,
+			get_posts(
+				array(
+					'post_type'      => Event_Post_Type::POST_TYPE,
+					'post_status'    => array( 'publish', 'future', 'draft', 'pending', 'private', 'trash' ),
+					'meta_key'       => EventUpsert::SOURCE_IDENTITY_META_KEY,
+					'meta_value'     => $parameters['source_identity'],
+					'posts_per_page' => -1,
+				)
+			)
+		);
+		$this->assertCount(
+			1,
+			get_posts(
+				array(
+					'post_type'      => Event_Post_Type::POST_TYPE,
+					'post_status'    => array( 'publish', 'future', 'draft', 'pending', 'private', 'trash' ),
+					'title'          => $parameters['title'],
+					'posts_per_page' => -1,
+				)
+			),
+			'Reimport must restore the original slug instead of creating a suffixed replacement.'
+		);
+	}
+
 	public function test_consumer_can_provide_automated_import_author(): void {
 		$user_id = self::factory()->user->create();
 		$callback = static function ( int $author_id ) use ( $user_id ): int {

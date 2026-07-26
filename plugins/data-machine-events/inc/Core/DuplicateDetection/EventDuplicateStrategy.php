@@ -227,7 +227,10 @@ class EventDuplicateStrategy {
 
 		foreach ( $candidates as $candidate ) {
 			$post_id = (int) $candidate['post_id'];
-			$post    = get_post( $post_id );
+			if ( ! self::isValidPost( $post_id ) ) {
+				continue;
+			}
+			$post = get_post( $post_id );
 			if ( ! $post ) {
 				continue;
 			}
@@ -367,7 +370,10 @@ class EventDuplicateStrategy {
 
 		foreach ( $candidates as $candidate ) {
 			$post_id = (int) $candidate['post_id'];
-			$post    = get_post( $post_id );
+			if ( ! self::isValidPost( $post_id ) ) {
+				continue;
+			}
+			$post = get_post( $post_id );
 			if ( ! $post ) {
 				continue;
 			}
