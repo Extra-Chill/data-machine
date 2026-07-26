@@ -291,14 +291,14 @@ final class DelegatedOperationService {
 		}
 		if ( function_exists( 'as_unschedule_action' ) && '' !== $step_id && 0 < $generation && '' !== $token ) {
 			as_unschedule_action(
-				'datamachine_execute_step',
+				DirectJobEnqueuer::HOOK,
 				array(
 					'job_id'                => $job_id,
 					'flow_step_id'          => $step_id,
 					'operation_generation'  => $generation,
 					'operation_claim_token' => $token,
 				),
-				'data-machine'
+				DirectJobEnqueuer::GROUP
 			);
 		}
 		return $this->response( $this->jobs->get_job( $job_id ), $resolved['action'], $resolved['context'], true );

@@ -13,8 +13,8 @@ defined( 'ABSPATH' ) || exit;
 
 class DirectJobEnqueuer {
 
-	private const HOOK  = 'datamachine_execute_step';
-	private const GROUP = 'data-machine';
+	public const HOOK  = 'datamachine_execute_step';
+	public const GROUP = 'data-machine';
 
 	private Jobs $jobs;
 	private \Closure $scheduler;

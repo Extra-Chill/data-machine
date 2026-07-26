@@ -13,7 +13,9 @@ use DataMachine\Core\Database\Jobs\Jobs;
 use DataMachine\Core\Database\Agents\Agents;
 use DataMachine\Core\DelegatedOperations\DelegatedOperationRegistry;
 use DataMachine\Core\DelegatedOperations\DelegatedOperationService;
+use DataMachine\Core\DirectJobEnqueuer;
 use DataMachine\Core\JobStatus;
+use DataMachine\Engine\AI\AIConcurrencyBackpressure;
 use DataMachine\Engine\AI\System\Tasks\Retention\RetentionCleanup;
 use WP_UnitTestCase;
 
@@ -261,18 +263,18 @@ final class DelegatedOperationTest extends WP_UnitTestCase {
 			'operation_generation'  => (int) $job['operation_generation'],
 			'operation_claim_token' => (string) $job['operation_claim_token'],
 		);
-		as_unschedule_action( 'datamachine_execute_step', $args, 'data-machine' );
+		as_unschedule_action( DirectJobEnqueuer::HOOK, $args, DirectJobEnqueuer::GROUP );
 		$args['flow_step_id'] = 'ephemeral_step_1';
-		as_schedule_single_action( time() + 60, 'datamachine_execute_step', $args, 'data-machine' );
+		as_schedule_single_action( time() + 60, DirectJobEnqueuer::HOOK, $args, DirectJobEnqueuer::GROUP );
 		$replayed = $service->submit( $this->submission( 'later-step-live' ) );
 		$this->assertTrue( $replayed['success'] );
 		$this->assertSame( $submitted['operation_ref'], $replayed['operation_ref'] );
 		$this->assertSame( 'submitted', $replayed['status'] );
 
 		$job = $this->job( 'later-step-live' );
-		as_unschedule_action( 'datamachine_execute_step', $args, 'data-machine' );
+		as_unschedule_action( DirectJobEnqueuer::HOOK, $args, DirectJobEnqueuer::GROUP );
 		$args['ai_resume_generation'] = 1;
-		as_schedule_single_action( time() + 60, 'datamachine_resume_ai_step', $args, 'data-machine-ai-resume-test' );
+		as_schedule_single_action( time() + 60, AIConcurrencyBackpressure::RESUME_HOOK, $args, 'data-machine-ai-resume-test' );
 		$engine                            = $job['engine_data'];
 		$engine['ai_concurrency_throttle'] = array(
 			'state'         => 'deferred',
@@ -431,12 +433,7 @@ final class DelegatedOperationTest extends WP_UnitTestCase {
 		$this->assertTrue( ( new Jobs() )->complete_job( (int) $job['job_id'], 'failed - test' ) );
 		$this->assertArrayHasKey( 'run_result', $this->job( 'retry-operation' )['operation_envelope'] );
 
-		$retried = $service->retry(
-			array(
-				'action'        => 'owner/write-record',
-				'operation_ref' => $submitted['operation_ref'],
-			)
-		);
+		$retried = $service->retry( $this->operationRequest( $submitted ) );
 		$this->assertTrue( $retried['success'] );
 		$this->assertSame( 'submitted', $retried['status'] );
 		$this->assertSame( (int) $job['job_id'], (int) $this->job( 'retry-operation' )['job_id'] );
@@ -449,12 +446,7 @@ final class DelegatedOperationTest extends WP_UnitTestCase {
 			'next_retry_at' => gmdate( 'c', time() + 60 ),
 		);
 		$this->assertTrue( ( new Jobs() )->store_engine_data( (int) $retrying_job['job_id'], $engine ) );
-		$retrying = $service->reconcile(
-			array(
-				'action'        => 'owner/write-record',
-				'operation_ref' => $submitted['operation_ref'],
-			)
-		);
+		$retrying = $service->reconcile( $this->operationRequest( $submitted ) );
 		$this->assertSame( 'retrying', $retrying['status'] );
 		$this->assertSame( 1, $retrying['retry']['attempt'] );
 		$cancel_retry = $service->cancel(
@@ -544,11 +536,13 @@ final class DelegatedOperationTest extends WP_UnitTestCase {
 	}
 
 	private function reconcile( DelegatedOperationService $service, array $submitted ): array {
-		return $service->reconcile(
-			array(
-				'action'        => 'owner/write-record',
-				'operation_ref' => $submitted['operation_ref'],
-			)
+		return $service->reconcile( $this->operationRequest( $submitted ) );
+	}
+
+	private function operationRequest( array $submitted ): array {
+		return array(
+			'action'        => 'owner/write-record',
+			'operation_ref' => $submitted['operation_ref'],
 		);
 	}
 
