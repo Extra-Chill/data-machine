@@ -199,8 +199,8 @@ class ScopedDrainService {
 		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
 
 		return array(
-			'oldest_due_gmt'               => $this->normalizeNullableDate( $row['oldest_due_gmt'] ?? null ),
-			'in_progress_actions'           => (int) ( $row['in_progress_actions'] ?? 0 ),
+			'oldest_due_gmt'                 => $this->normalizeNullableDate( $row['oldest_due_gmt'] ?? null ),
+			'in_progress_actions'            => (int) ( $row['in_progress_actions'] ?? 0 ),
 			'latest_in_progress_attempt_gmt' => $this->normalizeNullableDate( $row['latest_in_progress_attempt_gmt'] ?? null ),
 			'concurrency_deferred_actions'   => (int) ( $row['concurrency_deferred_actions'] ?? 0 ),
 		);

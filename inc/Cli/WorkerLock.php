@@ -153,15 +153,15 @@ class WorkerLock {
 		$heartbeat  = max( $started_at, (int) ( $payload['expires_at'] ?? 0 ) - $ttl );
 
 		return array(
-			'lock_status'      => $status,
-			'lock_owner'       => (string) ( $payload['owner'] ?? '' ),
-			'lock_age_seconds' => max( 0, $now - $started_at ),
-			'lock_expires_at'  => (int) ( $payload['expires_at'] ?? 0 ),
-			'lock_token'       => (string) ( $payload['token'] ?? '' ),
-			'lock_lane'        => (string) ( $payload['lane'] ?? '' ),
-			'heartbeat_at'     => $heartbeat,
+			'lock_status'           => $status,
+			'lock_owner'            => (string) ( $payload['owner'] ?? '' ),
+			'lock_age_seconds'      => max( 0, $now - $started_at ),
+			'lock_expires_at'       => (int) ( $payload['expires_at'] ?? 0 ),
+			'lock_token'            => (string) ( $payload['token'] ?? '' ),
+			'lock_lane'             => (string) ( $payload['lane'] ?? '' ),
+			'heartbeat_at'          => $heartbeat,
 			'heartbeat_age_seconds' => max( 0, $now - $heartbeat ),
-			'acquired'         => $acquired,
+			'acquired'              => $acquired,
 		);
 	}
 }

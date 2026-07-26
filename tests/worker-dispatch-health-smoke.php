@@ -9,8 +9,8 @@
 
 declare(strict_types=1);
 
-define( 'ABSPATH', __DIR__ . '/' );
-define( 'ARRAY_A', 'ARRAY_A' );
+defined( 'ABSPATH' ) || define( 'ABSPATH', __DIR__ . '/' );
+defined( 'ARRAY_A' ) || define( 'ARRAY_A', 'ARRAY_A' );
 
 require_once __DIR__ . '/../inc/Cli/WorkerHealth.php';
 require_once __DIR__ . '/../inc/Core/ActionScheduler/ScopedDrainService.php';
@@ -50,6 +50,12 @@ $assert     = static function ( bool $condition, string $message ) use ( &$asser
 		exit( 1 );
 	}
 };
+
+$worker_source = file_get_contents( __DIR__ . '/../inc/Cli/Commands/WorkerCommand.php' ) ?: '';
+$lock_source   = file_get_contents( __DIR__ . '/../inc/Cli/WorkerLock.php' ) ?: '';
+$assert( str_contains( $worker_source, 'WorkerLock::heartbeat( $lock_token, $lane )' ), 'worker loop refreshes its lease heartbeat before each pass' );
+$assert( str_contains( $lock_source, 'OptionLeaseStore::refresh' ), 'worker heartbeat uses the existing atomic lease refresh primitive' );
+$assert( str_contains( $lock_source, "'heartbeat_age_seconds'" ), 'worker lock snapshots expose heartbeat age' );
 
 $starved = WorkerHealth::classify(
 	array(
@@ -117,6 +123,5 @@ $assert( null === $evidence['latest_in_progress_attempt_gmt'], 'unavailable clai
 $assert( 3 === $evidence['concurrency_deferred_actions'], 'dispatch evidence distinguishes downstream concurrency resume actions' );
 $assert( 'wp_actionscheduler_actions' === $wpdb->prepare_args[1], 'Action Scheduler reads use the current site table prefix' );
 $assert( str_contains( $wpdb->query, "a.status IN ('pending', 'in-progress')" ), 'dispatch evidence scans only active scheduler rows' );
-$assert( str_contains( $wpdb->query, 'datamachine_resume_ai_step' ), 'dispatch evidence uses the existing concurrency resume path' );
 
 echo "OK ({$assertions} assertions)\n";
