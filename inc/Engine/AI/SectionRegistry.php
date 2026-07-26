@@ -57,6 +57,8 @@ class SectionRegistry {
 	 *     @type string $source_file   File that registered the section.
 	 *     @type string $source_callback Callback that renders the section.
 	 *     @type string $registered_at WordPress hook active during registration.
+	 *     @type int    $site_id      Blog ID active during registration.
+	 *     @type string $site_url     Home URL active during registration.
 	 * }
 	 * @return void
 	 */
@@ -79,6 +81,8 @@ class SectionRegistry {
 
 		$provenance = array_merge( self::registration_provenance( $callback ), array_intersect_key( $args, array_flip( array( 'source_plugin', 'source_file', 'source_callback', 'registered_at' ) ) ) );
 		$owner      = $args['owner'] ?? $args['source_plugin'] ?? $provenance['source_plugin'];
+		$site_id    = isset( $args['site_id'] ) ? (int) $args['site_id'] : ( function_exists( 'get_current_blog_id' ) ? (int) get_current_blog_id() : 0 );
+		$site_url   = isset( $args['site_url'] ) ? (string) $args['site_url'] : ( function_exists( 'get_home_url' ) && $site_id > 0 ? (string) get_home_url( $site_id, '/' ) : '' );
 
 		self::$sections[ $filename ][ $slug ] = array(
 			'slug'            => $slug,
@@ -93,6 +97,8 @@ class SectionRegistry {
 			'source_file'     => $provenance['source_file'],
 			'source_callback' => $provenance['source_callback'],
 			'registered_at'   => $provenance['registered_at'],
+			'site_id'         => $site_id,
+			'site_url'        => $site_url,
 		);
 
 		WP_Agent_Context_Section_Registry::register(
@@ -114,6 +120,8 @@ class SectionRegistry {
 					'source_file'     => self::$sections[ $filename ][ $slug ]['source_file'],
 					'source_callback' => self::$sections[ $filename ][ $slug ]['source_callback'],
 					'registered_at'   => self::$sections[ $filename ][ $slug ]['registered_at'],
+					'site_id'         => self::$sections[ $filename ][ $slug ]['site_id'],
+					'site_url'        => self::$sections[ $filename ][ $slug ]['site_url'],
 				),
 			)
 		);
@@ -153,7 +161,8 @@ class SectionRegistry {
 		uasort(
 			$sections,
 			function ( $a, $b ) {
-				return $a['priority'] <=> $b['priority'];
+				$priority = $a['priority'] <=> $b['priority'];
+				return 0 !== $priority ? $priority : strcmp( $a['slug'], $b['slug'] );
 			}
 		);
 
@@ -213,8 +222,45 @@ class SectionRegistry {
 		 * @param string $filename Composable filename.
 		 * @param array  $context  Generation context.
 		 */
-		$content = apply_filters( 'datamachine_composable_content', $content, $filename, $context );
+		return self::filter_content( $content, $filename, $context );
+	}
 
+	/**
+	 * Render each section separately for multisite snapshot persistence.
+	 *
+	 * Callbacks remain request-local. Only their rendered content and metadata
+	 * leave the request; callable values are never persisted.
+	 *
+	 * @param string $filename Composable filename.
+	 * @param array  $context  Generation context.
+	 * @return array<string,array<string,mixed>> Rendered sections keyed by slug.
+	 */
+	public static function render_sections( string $filename, array $context = array() ): array {
+		$rendered = array();
+		foreach ( self::get_sections( $filename ) as $slug => $section ) {
+			$content = call_user_func( $section['callback'], $context, $section );
+			if ( ! is_string( $content ) || '' === trim( $content ) ) {
+				continue;
+			}
+
+			unset( $section['callback'] );
+			$section['content'] = $content;
+			$rendered[ $slug ]  = $section;
+		}
+
+		return $rendered;
+	}
+
+	/**
+	 * Apply the assembled-content compatibility filter.
+	 *
+	 * @param string $content  Assembled content.
+	 * @param string $filename Composable filename.
+	 * @param array  $context  Generation context.
+	 * @return string Filtered content.
+	 */
+	public static function filter_content( string $content, string $filename, array $context = array() ): string {
+		$content = apply_filters( 'datamachine_composable_content', $content, $filename, $context );
 		return is_string( $content ) ? $content : '';
 	}
 
