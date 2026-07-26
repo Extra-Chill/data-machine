@@ -22,6 +22,7 @@ use DataMachine\Core\DataPacket;
 use DataMachine\Core\Database\ProcessedItems\ProcessedItems;
 use DataMachine\Core\ExecutionContext;
 use DataMachine\Core\FilesRepository\FileStorage;
+use DataMachine\Core\RunMetrics;
 use DataMachine\Core\Steps\Fetch\Tools\FetchItemDispositionTool;
 use DataMachine\Core\Steps\Handlers\HttpRequestHelpers;
 use DataMachine\Engine\AI\Tools\ToolManager;
@@ -64,10 +65,14 @@ abstract class FetchHandler {
 	final public function get_fetch_data( int|string $pipeline_id, array $handler_config, ?string $job_id = null ): array {
 		$config  = $this->extractConfig( $handler_config );
 		$context = ExecutionContext::fromConfig( $handler_config, $job_id, $this->handler_type );
+		$stages  = $this->initialFetchDiagnostics( $config, $context );
+		$max_items = (int) ( $config['max_items'] ?? $this->getDefaultMaxItems() );
+		$stages['max_items'] = max( 0, $max_items );
 
 		$result = $this->executeFetch( $config, $context );
 
 		if ( empty( $result ) || ! is_array( $result ) ) {
+			$this->recordFetchDiagnostics( $context, $stages );
 			return array();
 		}
 
@@ -78,26 +83,28 @@ abstract class FetchHandler {
 		$items = ( isset( $result['items'] ) && is_array( $result['items'] ) )
 			? $result['items']
 			: array( $result );
+		$stages['source_materialized'] = count( $items );
 
 		// Dedup: filter out already-processed and actively claimed items.
 		// Items with metadata['item_identifier'] are checked against the processed items
 		// database. Already-processed/claimed items are removed. New items are NOT yet
 		// claimed — claim creation happens after the max_items cap so we don't block
 		// items that simply didn't fit in this batch.
-		$items = $this->filterProcessed( $items, $context );
+		$items = $this->filterProcessed( $items, $context, $stages );
 
 		// Apply max_items cap.
 		// Default comes from getDefaultMaxItems() which subclasses can override.
 		// Set to 0 for unlimited.
-		$max_items = (int) ( $config['max_items'] ?? $this->getDefaultMaxItems() );
 		if ( $max_items > 0 && count( $items ) > $max_items ) {
+			$stages['eligible_outside_max_items'] = count( $items ) - $max_items;
 			$items = array_slice( $items, 0, $max_items );
 		}
+		$stages['selected_after_max_items'] = count( $items );
 
 		// Claim only the items this fetch will actually schedule. Claims close the
 		// race between parallel parent flow ticks while still deferring final
 		// processed marking until the downstream pipeline completes successfully.
-		$items = $this->claimItems( $items, $context );
+		$items = $this->claimItems( $items, $context, $stages );
 
 		// NOTE: Items are NOT marked as processed here. Marking is deferred
 		// to ExecuteStepAbility::markCompletedItemProcessed() which runs when
@@ -109,7 +116,11 @@ abstract class FetchHandler {
 		// Items cut by max_items remain naturally unmarked and will be picked
 		// up in future fetch cycles.
 
-		return $this->toDataPackets( $items, $pipeline_id, $flow_id );
+		$packets                 = $this->toDataPackets( $items, $pipeline_id, $flow_id );
+		$stages['final_packets'] = count( $packets );
+		$this->recordFetchDiagnostics( $context, $stages );
+
+		return $packets;
 	}
 
 	/**
@@ -125,14 +136,19 @@ abstract class FetchHandler {
 	 *
 	 * @param array            $items   Normalized items array.
 	 * @param ExecutionContext $context Execution context.
+	 * @param array|null       $diagnostics Optional aggregate diagnostics populated by reference.
 	 * @return array Filtered items array (new items only).
 	 */
-	private function filterProcessed( array $items, ExecutionContext $context ): array {
+	private function filterProcessed( array $items, ExecutionContext $context, ?array &$diagnostics = null ): array {
 		$identifiers = array();
 		$candidates  = array();
+		$valid_items = 0;
 		foreach ( $items as $item ) {
 			if ( ! is_array( $item ) ) {
 				continue;
+			}
+			if ( ! empty( $item['title'] ) || ! empty( $item['content'] ) || ! empty( $item['file_info'] ) ) {
+				++$valid_items;
 			}
 			$item_identifier = $item['metadata']['item_identifier'] ?? null;
 			$candidates[]    = array(
@@ -146,8 +162,23 @@ abstract class FetchHandler {
 
 		$classification = $context->classifySourceItems( $identifiers );
 		$decisions      = $classification['classifications'];
+		$counts         = $classification['diagnostics'];
 		$decision_index = 0;
 		$result         = array();
+
+		if ( is_array( $diagnostics ) ) {
+			$identifierless_items                        = count( $candidates ) - count( $identifiers );
+			$diagnostics['valid_items']                  = $valid_items;
+			$diagnostics['invalid_items']                = max( 0, (int) $diagnostics['source_materialized'] - $valid_items );
+			$diagnostics['identified_items']             = count( $identifiers );
+			$diagnostics['identifierless_items']         = $identifierless_items;
+			$diagnostics['unique_identifiers']           = (int) ( $counts['unique'] ?? 0 );
+			$diagnostics['duplicate_identifiers']        = (int) ( $counts['duplicates'] ?? 0 );
+			$diagnostics['eligible_before_max_items']    = (int) ( $counts['eligible'] ?? 0 ) + $identifierless_items;
+			$diagnostics['processed_skipped']            = (int) ( $counts['processed_skipped'] ?? 0 );
+			$diagnostics['reprocess_eligible']           = (int) ( $counts['processed_reprocess_eligible'] ?? 0 );
+			$diagnostics['actively_claimed']             = (int) ( $counts['actively_claimed'] ?? 0 );
+		}
 
 		foreach ( $candidates as $candidate ) {
 			$item            = $candidate['item'];
@@ -180,10 +211,12 @@ abstract class FetchHandler {
 	 *
 	 * @param array            $items   Items selected for scheduling.
 	 * @param ExecutionContext $context Execution context.
+	 * @param array|null       $diagnostics Optional aggregate diagnostics populated by reference.
 	 * @return array Items whose claim was acquired, plus identifier-less items.
 	 */
-	private function claimItems( array $items, ExecutionContext $context ): array {
-		$result = array();
+	private function claimItems( array $items, ExecutionContext $context, ?array &$diagnostics = null ): array {
+		$result                = array();
+		$attempted_identifiers = array();
 
 		foreach ( $items as $item ) {
 			if ( ! is_array( $item ) ) {
@@ -198,9 +231,24 @@ abstract class FetchHandler {
 				continue;
 			}
 
+			if ( is_array( $diagnostics ) ) {
+				++$diagnostics['claim_attempts'];
+			}
+			$is_duplicate                            = isset( $attempted_identifiers[ (string) $item_identifier ] );
+			$attempted_identifiers[ (string) $item_identifier ] = true;
 			$claim = $context->claimItemOwnership( (string) $context->getFlowStepId(), (string) $item_identifier );
 			if ( false === $claim ) {
+				if ( is_array( $diagnostics ) ) {
+					if ( $is_duplicate ) {
+						++$diagnostics['duplicate_claim_conflicts'];
+					} else {
+						++$diagnostics['claim_conflicts'];
+					}
+				}
 				continue;
+			}
+			if ( is_array( $diagnostics ) ) {
+				++$diagnostics['claims_acquired'];
 			}
 
 			$item['metadata'][ ProcessedItems::CLAIM_METADATA_KEY ] = $claim;
@@ -209,6 +257,116 @@ abstract class FetchHandler {
 		}
 
 		return $result;
+	}
+
+	/**
+	 * Build the bounded diagnostic envelope for one fetch invocation.
+	 *
+	 * @param array            $config  Effective handler configuration.
+	 * @param ExecutionContext $context Execution context.
+	 * @return array<string,int|string>
+	 */
+	private function initialFetchDiagnostics( array $config, ExecutionContext $context ): array {
+		return array(
+			'schema_version'                 => 'datamachine.fetch_stages.v1',
+			'handler_type'                   => $this->handler_type,
+			'execution_mode'                 => $context->getMode(),
+			'config_hash'                    => $this->configHash( $config ),
+			'source_materialized'            => 0,
+			'valid_items'                    => 0,
+			'invalid_items'                  => 0,
+			'identified_items'               => 0,
+			'identifierless_items'            => 0,
+			'unique_identifiers'             => 0,
+			'duplicate_identifiers'          => 0,
+			'eligible_before_max_items'      => 0,
+			'processed_skipped'              => 0,
+			'reprocess_eligible'             => 0,
+			'actively_claimed'               => 0,
+			'max_items'                      => 0,
+			'eligible_outside_max_items'     => 0,
+			'selected_after_max_items'       => 0,
+			'claim_attempts'                 => 0,
+			'claims_acquired'                => 0,
+			'claim_conflicts'                => 0,
+			'duplicate_claim_conflicts'      => 0,
+			'final_packets'                  => 0,
+		);
+	}
+
+	/**
+	 * Persist aggregate fetch-stage evidence in the existing step result.
+	 *
+	 * @param ExecutionContext           $context Execution context.
+	 * @param array<string,int|string>   $stages  Aggregate stage counts.
+	 */
+	private function recordFetchDiagnostics( ExecutionContext $context, array $stages ): void {
+		$job_id       = (int) ( $context->getJobId() ?? 0 );
+		$flow_step_id = (string) ( $context->getFlowStepId() ?? '' );
+		if ( $job_id <= 0 || '' === $flow_step_id ) {
+			return;
+		}
+
+		RunMetrics::recordStepResult(
+			$job_id,
+			$flow_step_id,
+			array(
+				'fetch_stages' => $stages,
+			)
+		);
+	}
+
+	/**
+	 * Hash effective configuration without persisting secret-bearing values.
+	 *
+	 * @param array $config Effective handler configuration.
+	 * @return string SHA-256 configuration hash.
+	 */
+	private function configHash( array $config ): string {
+		$remaining  = 1000;
+		$normalized = $this->normalizeConfigForHash( $config, $remaining );
+		$encoded    = wp_json_encode( $normalized );
+		return hash( 'sha256', false === $encoded ? '' : $encoded );
+	}
+
+	/**
+	 * Build a bounded, secret-redacted configuration shape for hashing.
+	 *
+	 * @param mixed  $value     Configuration value.
+	 * @param int    $remaining Remaining global traversal budget.
+	 * @param int    $depth     Current nesting depth.
+	 * @param string $key       Current configuration key.
+	 * @return mixed Sorted value.
+	 */
+	private function normalizeConfigForHash( mixed $value, int &$remaining, int $depth = 0, string $key = '' ): mixed {
+		if ( $remaining <= 0 ) {
+			return '[entry-limit]';
+		}
+		--$remaining;
+
+		$segmented_key = preg_replace( '/([a-z0-9])([A-Z])/', '$1_$2', $key ) ?? $key;
+		$normalized_key = strtolower( str_replace( '-', '_', $segmented_key ) );
+		if ( '' !== $normalized_key && ( 'key' === $normalized_key || str_ends_with( $normalized_key, '_key' ) || preg_match( '/(?:^|_)(?:auth|authentication|authorization|oauth|api_?key|private_key|signing_key|secret_key|access_key|bearer|cookie|passwd|password|passphrase|pat|secret|tokens?|credentials?)(?:_|$)/', $normalized_key ) ) ) {
+			return '[redacted]';
+		}
+		if ( $depth >= 8 ) {
+			return '[depth-limit]';
+		}
+		if ( ! is_array( $value ) ) {
+			return is_string( $value ) && strlen( $value ) > 1024 ? substr( $value, 0, 1024 ) . '[truncated]' : $value;
+		}
+
+		if ( ! array_is_list( $value ) ) {
+			ksort( $value, SORT_STRING );
+		}
+		$value      = array_slice( $value, 0, 200, true );
+		$normalized = array();
+
+		foreach ( $value as $child_key => $child ) {
+			$normalized[ $child_key ] = $this->normalizeConfigForHash( $child, $remaining, $depth + 1, (string) $child_key );
+		}
+
+		return $normalized;
 	}
 
 	/**

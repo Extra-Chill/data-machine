@@ -178,6 +178,41 @@ class FetchHandlerDataPacketTest extends TestCase {
 		$this->assertSame( 'github', $packets[0]['metadata']['handler'] );
 	}
 
+	public function test_config_hash_redacts_secrets_but_tracks_source_changes(): void {
+		$handler = $this->createStubHandler( 'generic', array() );
+		$method  = new ReflectionMethod( FetchHandler::class, 'configHash' );
+		$method->setAccessible( true );
+
+		$first = $method->invoke(
+			$handler,
+			array(
+				'source_url'  => 'https://example.com/feed',
+				'api_key'     => 'first-secret',
+				'accessToken' => 'first-camel-secret',
+			)
+		);
+		$secret_changed = $method->invoke(
+			$handler,
+			array(
+				'api_key'     => 'second-secret',
+				'accessToken' => 'camel-case-secret',
+				'source_url'  => 'https://example.com/feed',
+			)
+		);
+		$source_changed = $method->invoke(
+			$handler,
+			array(
+				'source_url'  => 'https://example.com/other-feed',
+				'api_key'     => 'first-secret',
+				'accessToken' => 'first-camel-secret',
+			)
+		);
+
+		$this->assertSame( $first, $secret_changed );
+		$this->assertNotSame( $first, $source_changed );
+		$this->assertMatchesRegularExpression( '/^[a-f0-9]{64}$/', $first );
+	}
+
 	public function test_zero_items_returns_empty(): void {
 		$handler = $this->createStubHandler( 'rss', array() );
 		$method  = $this->getToDataPackets();

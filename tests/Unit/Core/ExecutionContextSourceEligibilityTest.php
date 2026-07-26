@@ -8,6 +8,7 @@
 namespace DataMachine\Tests\Unit\Core;
 
 use DataMachine\Core\Database\ProcessedItems\ProcessedItems;
+use DataMachine\Core\Database\Jobs\Jobs;
 use DataMachine\Core\ExecutionContext;
 use DataMachine\Core\Steps\Fetch\Handlers\FetchHandler;
 use WP_UnitTestCase;
@@ -146,6 +147,117 @@ class ExecutionContextSourceEligibilityTest extends WP_UnitTestCase {
 			array( 'fresh' ),
 			$this->context->classifySourceItems( array( 'fresh', 'processed', 'claimed' ) )['selected_identifiers']
 		);
+	}
+
+	public function test_fetch_handler_records_bounded_stage_diagnostics(): void {
+		$jobs   = new Jobs();
+		$job_id = $jobs->create_job(
+			array(
+				'source'      => 'pipeline',
+				'label'       => 'Fetch stage diagnostics',
+				'pipeline_id' => 29,
+				'flow_id'     => 45,
+			)
+		);
+		$this->assertIsInt( $job_id );
+
+		$this->db->add_processed_item( $this->flow_step_id, $this->source_type, 'processed', 1 );
+		$this->db->claim_item( $this->flow_step_id, $this->source_type, 'claimed', 2 );
+
+		$items = array(
+			array( 'title' => 'Fresh one', 'metadata' => array( 'item_identifier' => 'fresh-1' ) ),
+			array( 'title' => 'Untracked' ),
+			array( 'title' => 'Processed', 'metadata' => array( 'item_identifier' => 'processed' ) ),
+			array( 'title' => 'Claimed', 'metadata' => array( 'item_identifier' => 'claimed' ) ),
+			array( 'title' => 'Fresh two', 'metadata' => array( 'item_identifier' => 'fresh-2' ) ),
+			array( 'title' => 'Outside cap', 'metadata' => array( 'item_identifier' => 'fresh-3' ) ),
+		);
+		$handler = new class( $this->source_type, $items ) extends FetchHandler {
+			private array $items;
+
+			public function __construct( string $handler_type, array $items ) {
+				parent::__construct( $handler_type );
+				$this->items = $items;
+			}
+
+			protected function executeFetch( array $config, ExecutionContext $context ): array {
+				return array( 'items' => $this->items );
+			}
+		};
+
+		$packets = $handler->get_fetch_data(
+			29,
+			array(
+				'pipeline_id' => 29,
+				'flow_id' => 45,
+				'flow_step_id' => $this->flow_step_id,
+				'max_items' => 3,
+			),
+			(string) $job_id
+		);
+
+		$this->assertCount( 3, $packets );
+		$engine = datamachine_get_engine_data( $job_id );
+		$stages = $engine['step_results'][ $this->flow_step_id ]['fetch_stages'] ?? array();
+
+		$this->assertSame( 'datamachine.fetch_stages.v1', $stages['schema_version'] ?? '' );
+		$this->assertSame( 6, $stages['source_materialized'] ?? null );
+		$this->assertSame( 6, $stages['valid_items'] ?? null );
+		$this->assertSame( 0, $stages['invalid_items'] ?? null );
+		$this->assertSame( 1, $stages['identifierless_items'] ?? null );
+		$this->assertSame( 4, $stages['eligible_before_max_items'] ?? null );
+		$this->assertSame( 1, $stages['processed_skipped'] ?? null );
+		$this->assertSame( 1, $stages['actively_claimed'] ?? null );
+		$this->assertSame( 1, $stages['eligible_outside_max_items'] ?? null );
+		$this->assertSame( 3, $stages['selected_after_max_items'] ?? null );
+		$this->assertSame( 2, $stages['claim_attempts'] ?? null );
+		$this->assertSame( 2, $stages['claims_acquired'] ?? null );
+		$this->assertSame( 0, $stages['claim_conflicts'] ?? null );
+		$this->assertSame( 3, $stages['final_packets'] ?? null );
+		$this->assertMatchesRegularExpression( '/^[a-f0-9]{64}$/', $stages['config_hash'] ?? '' );
+	}
+
+	public function test_duplicate_identifier_claims_do_not_report_external_contention(): void {
+		$jobs   = new Jobs();
+		$job_id = $jobs->create_job(
+			array(
+				'source'      => 'pipeline',
+				'label'       => 'Duplicate claim diagnostics',
+				'pipeline_id' => 29,
+				'flow_id'     => 45,
+			)
+		);
+		$this->assertIsInt( $job_id );
+
+		$handler = new class( $this->source_type ) extends FetchHandler {
+			protected function executeFetch( array $config, ExecutionContext $context ): array {
+				return array(
+					'items' => array(
+						array( 'title' => 'First', 'metadata' => array( 'item_identifier' => 'duplicate' ) ),
+						array( 'title' => 'Second', 'metadata' => array( 'item_identifier' => 'duplicate' ) ),
+					),
+				);
+			}
+		};
+
+		$packets = $handler->get_fetch_data(
+			29,
+			array(
+				'pipeline_id' => 29,
+				'flow_id' => 45,
+				'flow_step_id' => $this->flow_step_id,
+				'max_items' => 0,
+			),
+			(string) $job_id
+		);
+
+		$this->assertCount( 1, $packets );
+		$engine = datamachine_get_engine_data( $job_id );
+		$stages = $engine['step_results'][ $this->flow_step_id ]['fetch_stages'] ?? array();
+		$this->assertSame( 2, $stages['claim_attempts'] ?? null );
+		$this->assertSame( 1, $stages['claims_acquired'] ?? null );
+		$this->assertSame( 0, $stages['claim_conflicts'] ?? null );
+		$this->assertSame( 1, $stages['duplicate_claim_conflicts'] ?? null );
 	}
 
 	/** @return array<int,array<string,mixed>> */
