@@ -11,6 +11,7 @@ namespace DataMachine\Cli\Commands;
 use DataMachine\Abilities\Engine\DrainJobAbility;
 use DataMachine\Abilities\Job\RecoverStuckJobsAbility;
 use DataMachine\Cli\BaseCommand;
+use DataMachine\Cli\WorkerHealth;
 use DataMachine\Cli\WorkerLock;
 use DataMachine\Core\Database\Jobs\Jobs;
 use DataMachine\Engine\AI\Actions\PendingActionStore;
@@ -273,6 +274,8 @@ class WorkerCommand extends BaseCommand {
 					$stop_reason = 'pending_actions';
 					break;
 				}
+
+				WorkerLock::heartbeat( $lock_token, $lane );
 
 				++$passes;
 
@@ -608,7 +611,7 @@ class WorkerCommand extends BaseCommand {
 	/**
 	 * Build a lightweight worker status snapshot.
 	 *
-	 * @return array<string,int|string>
+	 * @return array<string,mixed>
 	 */
 	private static function statusSnapshot( string $lane = '' ): array {
 		$lane            = self::normalizeLane( $lane );
@@ -617,6 +620,32 @@ class WorkerCommand extends BaseCommand {
 		$job_counts      = self::jobStatusCounts();
 		$stuck_jobs      = RecoverStuckJobsAbility::countStuckCandidates();
 		$lock            = WorkerLock::snapshot( null, 600, $lane );
+		$now             = time();
+		$threshold       = 900;
+		$oldest_due_gmt  = is_string( $drain_status['oldest_due_gmt'] ?? null ) ? $drain_status['oldest_due_gmt'] : null;
+		$oldest_due_at   = null === $oldest_due_gmt ? false : strtotime( $oldest_due_gmt . ' UTC' );
+		$oldest_due_age  = false === $oldest_due_at ? null : max( 0, $now - $oldest_due_at );
+		$latest_attempt  = is_string( $drain_status['latest_in_progress_attempt_gmt'] ?? null ) ? $drain_status['latest_in_progress_attempt_gmt'] : null;
+		$latest_attempt_at = null === $latest_attempt ? false : strtotime( $latest_attempt . ' UTC' );
+		$action_heartbeat_age = false === $latest_attempt_at ? null : max( 0, $now - $latest_attempt_at );
+		$queue_trigger   = self::queueTriggerEvidence( $now, $threshold );
+		$heartbeat_age   = isset( $lock['heartbeat_age_seconds'] ) ? (int) $lock['heartbeat_age_seconds'] : null;
+		$heartbeat_state = 'held' !== (string) ( $lock['lock_status'] ?? '' )
+			? 'absent'
+			: ( null !== $heartbeat_age && $heartbeat_age <= $threshold ? 'fresh' : 'stale' );
+		$dispatch_evidence = array(
+			'due_count'                    => (int) ( $drain_status['due_pending'] ?? 0 ),
+			'oldest_due_gmt'               => $oldest_due_gmt,
+			'oldest_due_age_seconds'       => $oldest_due_age,
+			'in_progress_count'            => (int) ( $drain_status['in_progress_actions'] ?? 0 ),
+			'latest_in_progress_attempt_gmt' => $latest_attempt,
+			'action_heartbeat_state'       => null !== $action_heartbeat_age && $action_heartbeat_age <= $threshold ? 'fresh' : 'absent',
+			'worker_heartbeat_state'       => $heartbeat_state,
+			'worker_heartbeat_at_gmt'      => isset( $lock['heartbeat_at'] ) && (int) $lock['heartbeat_at'] > 0 ? gmdate( 'Y-m-d H:i:s', (int) $lock['heartbeat_at'] ) : null,
+			'worker_heartbeat_age_seconds' => $heartbeat_age,
+			'concurrency_deferred_actions' => (int) ( $drain_status['concurrency_deferred_actions'] ?? 0 ),
+		) + $queue_trigger;
+		$health = WorkerHealth::classify( $dispatch_evidence, $threshold );
 
 		return array(
 			'pending_actions'       => (int) ( $pending_summary['total'] ?? 0 ),
@@ -629,7 +658,35 @@ class WorkerCommand extends BaseCommand {
 			'failed_jobs'           => $job_counts['failed'],
 			'stuck_jobs'            => $stuck_jobs,
 			'lane'                  => $lane,
+			'health'                => $health,
+			'dispatch_evidence'     => $dispatch_evidence,
 		) + self::publicLockStatus( $lock );
+	}
+
+	/**
+	 * Read the existing Action Scheduler WP-Cron queue trigger.
+	 *
+	 * @return array{queue_trigger_state:string,queue_trigger_next_gmt:?string,queue_trigger_overdue_seconds:?int}
+	 */
+	private static function queueTriggerEvidence( int $now, int $stale_threshold_seconds ): array {
+		$next    = wp_next_scheduled( 'action_scheduler_run_queue' );
+		$overdue = is_int( $next ) ? max( 0, $now - $next ) : null;
+
+		if ( ! is_int( $next ) ) {
+			$state = 'missing';
+		} elseif ( $next > $now ) {
+			$state = 'scheduled';
+		} elseif ( $overdue > $stale_threshold_seconds ) {
+			$state = 'overdue';
+		} else {
+			$state = 'due';
+		}
+
+		return array(
+			'queue_trigger_state'           => $state,
+			'queue_trigger_next_gmt'        => is_int( $next ) ? gmdate( 'Y-m-d H:i:s', $next ) : null,
+			'queue_trigger_overdue_seconds' => $overdue,
+		);
 	}
 
 	/**
@@ -692,6 +749,8 @@ class WorkerCommand extends BaseCommand {
 			'lock_age_seconds' => (int) ( $lock['lock_age_seconds'] ?? 0 ),
 			'lock_expires_at'  => (int) ( $lock['lock_expires_at'] ?? 0 ),
 			'lock_lane'        => (string) ( $lock['lock_lane'] ?? '' ),
+			'heartbeat_at'     => (int) ( $lock['heartbeat_at'] ?? 0 ),
+			'heartbeat_age_seconds' => (int) ( $lock['heartbeat_age_seconds'] ?? 0 ),
 		);
 	}
 

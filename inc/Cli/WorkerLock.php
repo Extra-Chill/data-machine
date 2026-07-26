@@ -74,6 +74,20 @@ class WorkerLock {
 	}
 
 	/**
+	 * Refresh the runtime lease and record a current worker heartbeat.
+	 */
+	public static function heartbeat( string $token, string $lane = '' ): bool {
+		if ( '' === $token ) {
+			return false;
+		}
+
+		$payload = get_option( self::optionName( $lane ), array() );
+		$ttl     = is_array( $payload ) ? max( 60, (int) ( $payload['ttl'] ?? self::DEFAULT_TTL ) ) : self::DEFAULT_TTL;
+
+		return OptionLeaseStore::refresh( self::optionName( $lane ), $token, $ttl );
+	}
+
+	/**
 	 * Return a read-only lock snapshot for operator status surfaces.
 	 *
 	 * @param int|null $now  Current timestamp for tests/callers that need stability.
@@ -135,15 +149,19 @@ class WorkerLock {
 	 */
 	private static function formatSnapshot( array $payload, int $now, string $status, bool $acquired ): array {
 		$started_at = (int) ( $payload['started_at'] ?? 0 );
+		$ttl        = max( 1, (int) ( $payload['ttl'] ?? self::DEFAULT_TTL ) );
+		$heartbeat  = max( $started_at, (int) ( $payload['expires_at'] ?? 0 ) - $ttl );
 
 		return array(
-			'lock_status'      => $status,
-			'lock_owner'       => (string) ( $payload['owner'] ?? '' ),
-			'lock_age_seconds' => max( 0, $now - $started_at ),
-			'lock_expires_at'  => (int) ( $payload['expires_at'] ?? 0 ),
-			'lock_token'       => (string) ( $payload['token'] ?? '' ),
-			'lock_lane'        => (string) ( $payload['lane'] ?? '' ),
-			'acquired'         => $acquired,
+			'lock_status'           => $status,
+			'lock_owner'            => (string) ( $payload['owner'] ?? '' ),
+			'lock_age_seconds'      => max( 0, $now - $started_at ),
+			'lock_expires_at'       => (int) ( $payload['expires_at'] ?? 0 ),
+			'lock_token'            => (string) ( $payload['token'] ?? '' ),
+			'lock_lane'             => (string) ( $payload['lane'] ?? '' ),
+			'heartbeat_at'          => $heartbeat,
+			'heartbeat_age_seconds' => max( 0, $now - $heartbeat ),
+			'acquired'              => $acquired,
 		);
 	}
 }

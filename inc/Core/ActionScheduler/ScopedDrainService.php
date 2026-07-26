@@ -144,13 +144,77 @@ class ScopedDrainService {
 		$lane    = $this->normalizeLane( $options['lane'] ?? '' );
 		$hooks   = $this->hooksForLane( $lane, $hooks );
 
-		return array(
+		$status = array(
 			'due_pending'   => $this->getDuePendingCount( $hooks, $job_ids, $lane ),
 			'total_pending' => $this->getPendingCount( $hooks, $job_ids, $lane ),
 			'hooks'         => implode( ',', array_keys( $this->getStatusCounts( $hooks, $job_ids, $lane ) ) ),
 			'job_ids'       => implode( ',', $job_ids ),
 			'lane'          => $lane,
 		);
+
+		if ( '' === $lane ) {
+			$status += $this->getDispatchEvidence( $hooks, $job_ids );
+		}
+
+		return $status;
+	}
+
+	/**
+	 * Return aggregate claim evidence for active actions in the drain scope.
+	 *
+	 * @param string[]|null $hooks   Optional hook scope.
+	 * @param int[]         $job_ids Optional job scope.
+	 * @return array{oldest_due_gmt:?string,in_progress_actions:int,latest_in_progress_attempt_gmt:?string,concurrency_deferred_actions:int}
+	 */
+	private function getDispatchEvidence( ?array $hooks, array $job_ids ): array {
+		global $wpdb;
+
+		$actions_table = $wpdb->prefix . 'actionscheduler_actions';
+		$groups_table  = $wpdb->prefix . 'actionscheduler_groups';
+		$hook_sql      = $this->hookWhereSql( $hooks, $job_ids );
+		$now_gmt       = gmdate( 'Y-m-d H:i:s' );
+		$values        = array_merge(
+			array( $now_gmt, $actions_table, $groups_table ),
+			$hook_sql['values'],
+			array( self::GROUP )
+		);
+
+		// Only active rows are aggregated; Action Scheduler's status/group/date indexes bound this read independently of history size.
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber -- Dynamic hook scope is constructed from normalized placeholders and values.
+		$row = $wpdb->get_row(
+			$wpdb->prepare(
+				'SELECT
+				MIN(CASE WHEN a.status = \'pending\' AND a.scheduled_date_gmt <= %s THEN a.scheduled_date_gmt END) AS oldest_due_gmt,
+				SUM(CASE WHEN a.status = \'in-progress\' THEN 1 ELSE 0 END) AS in_progress_actions,
+				MAX(CASE WHEN a.status = \'in-progress\' THEN a.last_attempt_gmt END) AS latest_in_progress_attempt_gmt,
+				SUM(CASE WHEN a.status = \'pending\' AND a.hook = \'datamachine_resume_ai_step\' THEN 1 ELSE 0 END) AS concurrency_deferred_actions
+				FROM %i a
+				INNER JOIN %i g ON g.group_id = a.group_id
+				WHERE ' . $hook_sql['sql'] . 'g.slug = %s
+				AND a.status IN (\'pending\', \'in-progress\')',
+				$values
+			),
+			ARRAY_A
+		);
+		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
+
+		return array(
+			'oldest_due_gmt'                 => $this->normalizeNullableDate( $row['oldest_due_gmt'] ?? null ),
+			'in_progress_actions'            => (int) ( $row['in_progress_actions'] ?? 0 ),
+			'latest_in_progress_attempt_gmt' => $this->normalizeNullableDate( $row['latest_in_progress_attempt_gmt'] ?? null ),
+			'concurrency_deferred_actions'   => (int) ( $row['concurrency_deferred_actions'] ?? 0 ),
+		);
+	}
+
+	/**
+	 * Normalize an Action Scheduler database date.
+	 */
+	private function normalizeNullableDate( mixed $value ): ?string {
+		if ( ! is_string( $value ) || '' === $value || '0000-00-00 00:00:00' === $value ) {
+			return null;
+		}
+
+		return $value;
 	}
 
 	/**
