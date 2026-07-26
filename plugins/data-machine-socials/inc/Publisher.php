@@ -51,6 +51,7 @@ class Publisher {
 		$video_url     = sanitize_url( $params['video_url'] ?? '' );
 		$cover_url     = sanitize_url( $params['cover_url'] ?? '' );
 		$share_to_feed = $params['share_to_feed'] ?? true;
+		$operation_ref = sanitize_text_field( $params['delegated_operation_ref'] ?? '' );
 
 		if ( empty( $platforms ) || ! is_array( $platforms ) ) {
 			return array(
@@ -84,7 +85,10 @@ class Publisher {
 			);
 		}
 
-		$source_url = $post_id ? get_permalink( $post_id ) : '';
+		$source_url = sanitize_url( $params['source_url'] ?? '' );
+		if ( '' === $source_url && $post_id ) {
+			$source_url = get_permalink( $post_id );
+		}
 
 		$extra = array(
 			'media_kind'    => $media_kind,
@@ -97,28 +101,49 @@ class Publisher {
 		$errors  = array();
 
 		foreach ( $platforms as $platform ) {
-			$result    = self::post_to_platform( $platform, $images, $caption, $source_url, $extra );
-			$results[] = $result;
-
-			if ( ! $result['success'] ) {
-				$errors[] = $platform . ': ' . $result['error'];
-			}
-
+			$existing_share = $post_id && '' !== $operation_ref
+				? SocialShareTracker::get_operation_share( $post_id, $platform, $operation_ref )
+				: null;
+			$result         = $existing_share
+				? array(
+					'platform'         => $platform,
+					'success'          => true,
+					'platform_post_id' => (string) ( $existing_share['platform_post_id'] ?? '' ),
+					'platform_url'     => (string) ( $existing_share['platform_url'] ?? '' ),
+					'media_kind'       => (string) ( $existing_share['media_kind'] ?? '' ),
+					'replayed'         => true,
+				)
+				: self::post_to_platform( $platform, $images, $caption, $source_url, $extra );
 			// Track successful shares via SocialShareTracker when post_id is available.
-			if ( $post_id && ! empty( $result['success'] ) ) {
-				SocialShareTracker::record_from_result(
+			if ( $post_id && ! $existing_share && ! empty( $result['success'] ) ) {
+				$recorded = SocialShareTracker::record_from_result(
 					$post_id,
 					$platform,
 					$result,
-					array( 'media_kind' => $media_kind )
+					array(
+						'media_kind'    => $media_kind,
+						'operation_ref' => $operation_ref,
+					)
 				);
+				if ( '' !== $operation_ref && ! $recorded ) {
+					$result = array(
+						'platform' => $platform,
+						'success'  => false,
+						'error'    => 'delivery_receipt_failed',
+					);
+				}
+			}
+
+			$results[] = $result;
+			if ( ! $result['success'] ) {
+				$errors[] = $platform . ': ' . $result['error'];
 			}
 		}
 
 		return array(
 			'success' => empty( $errors ),
 			'results' => $results,
-			'errors'  => $errors ?: null,
+			'errors'  => $errors ? $errors : null,
 		);
 	}
 
@@ -154,9 +179,20 @@ class Publisher {
 
 		$input = array(
 			'content'    => $caption,
-			'image_urls' => $image_urls,
 			'source_url' => $source_url,
 		);
+		if ( in_array( $platform, array( 'instagram', 'twitter' ), true ) ) {
+			$input['image_urls'] = $image_urls;
+		} elseif ( in_array( $platform, array( 'bluesky', 'facebook', 'threads' ), true ) ) {
+			$input['image_url'] = $image_urls[0] ?? '';
+		} elseif ( 'pinterest' === $platform ) {
+			$input = array(
+				'title'       => mb_substr( wp_strip_all_tags( $caption ), 0, 100 ),
+				'description' => $caption,
+				'image_url'   => $image_urls[0] ?? '',
+				'link'        => $source_url,
+			);
+		}
 
 		$media_kind = $extra['media_kind'] ?? 'image';
 		if ( 'reel' === $media_kind ) {

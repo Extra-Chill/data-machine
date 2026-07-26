@@ -23,6 +23,7 @@ defined( 'ABSPATH' ) || exit;
  * Self-contained ability class for Twitter publishing.
  */
 class TwitterPublishAbility extends AbstractSocialAbility {
+	private const MAX_REMOTE_MEDIA_BYTES = 15 * MB_IN_BYTES;
 
 	/**
 	 * Whether the ability has been registered.
@@ -58,6 +59,15 @@ class TwitterPublishAbility extends AbstractSocialAbility {
 							'image_path'    => array(
 								'type'        => 'string',
 								'description' => 'Path to image file for upload',
+							),
+							'image_urls'    => array(
+								'type'        => 'array',
+								'description' => 'Public image URLs to download and upload (maximum 4)',
+								'items'       => array(
+									'type'   => 'string',
+									'format' => 'uri',
+								),
+								'maxItems'    => 4,
 							),
 							'source_url'    => array(
 								'type'        => 'string',
@@ -132,6 +142,8 @@ class TwitterPublishAbility extends AbstractSocialAbility {
 	public static function execute_publish( array $input ): array|\WP_Error {
 		$content       = $input['content'] ?? '';
 		$media_path    = $input['media_path'] ?? $input['image_path'] ?? '';
+		$image_limit   = empty( $media_path ) ? 4 : 3;
+		$image_urls    = is_array( $input['image_urls'] ?? null ) ? array_slice( $input['image_urls'], 0, $image_limit ) : array();
 		$source_url    = $input['source_url'] ?? '';
 		$link_handling = $input['link_handling'] ?? 'append';
 
@@ -157,27 +169,42 @@ class TwitterPublishAbility extends AbstractSocialAbility {
 		try {
 			$connection->setApiVersion( '2' );
 
-			$v2_payload = array( 'text' => $tweet_text );
-			$media_id   = null;
+			$v2_payload  = array( 'text' => $tweet_text );
+			$media_paths = array();
+			$temporary   = array();
+			$media_ids   = array();
 
 			// Handle media upload if provided — supports images and video via core validation.
 			if ( ! empty( $media_path ) && file_exists( $media_path ) ) {
-				$media_id = self::upload_media( $connection, $media_path );
+				$media_paths[] = $media_path;
+			}
+			foreach ( $image_urls as $image_url ) {
+				$downloaded = self::download_media( (string) $image_url );
+				if ( is_wp_error( $downloaded ) ) {
+					return $downloaded;
+				}
+				$media_paths[] = $downloaded;
+				$temporary[]   = $downloaded;
+			}
+
+			foreach ( $media_paths as $path ) {
+				$media_id = self::upload_media( $connection, $path );
 				if ( ! $media_id ) {
 					return new \WP_Error( 'api_error', 'Failed to upload media', array( 'status' => 500 ) );
 				}
+				$media_ids[] = $media_id;
 			}
 
-			if ( $media_id ) {
-				$v2_payload['media'] = array( 'media_ids' => array( $media_id ) );
+			if ( ! empty( $media_ids ) ) {
+				$v2_payload['media'] = array( 'media_ids' => $media_ids );
 			}
 
 			$response  = $connection->post( 'tweets', $v2_payload, array( 'json' => true ) );
 			$http_code = $connection->getLastHttpCode();
 
 			if ( 201 === $http_code && isset( $response->data->id ) ) {
-				$tweet_id = $response->data->id;
-				$username = $provider->get_username() ?? 'twitter';
+				$tweet_id  = $response->data->id;
+				$username  = $provider->get_username() ?? 'twitter';
 				$tweet_url = "https://twitter.com/{$username}/status/{$tweet_id}";
 
 				$result = array(
@@ -206,7 +233,46 @@ class TwitterPublishAbility extends AbstractSocialAbility {
 			return new \WP_Error( 'api_error', $error_msg, array( 'status' => 500 ) );
 		} catch ( \Exception $e ) {
 			return new \WP_Error( 'api_error', $e->getMessage(), array( 'status' => 500 ) );
+		} finally {
+			foreach ( $temporary ?? array() as $temporary_path ) {
+				wp_delete_file( $temporary_path );
+			}
 		}
+	}
+
+	/**
+	 * Download one public media URL to a temporary local file.
+	 *
+	 * @param string $url Public media URL.
+	 * @return string|\WP_Error Temporary path or download failure.
+	 */
+	private static function download_media( string $url ): string|\WP_Error {
+		if ( ! wp_http_validate_url( $url ) ) {
+			return new \WP_Error( 'invalid_media_url', 'Media URL must be a public HTTP URL', array( 'status' => 400 ) );
+		}
+		if ( ! function_exists( 'wp_tempnam' ) ) {
+			require_once ABSPATH . 'wp-admin/includes/file.php';
+		}
+		$temporary_path = wp_tempnam( $url );
+		if ( ! is_string( $temporary_path ) || '' === $temporary_path ) {
+			return new \WP_Error( 'media_download_failed', 'Could not allocate temporary media storage', array( 'status' => 500 ) );
+		}
+
+		$response = wp_safe_remote_get(
+			$url,
+			array(
+				'timeout'             => 30,
+				'stream'              => true,
+				'filename'            => $temporary_path,
+				'limit_response_size' => self::MAX_REMOTE_MEDIA_BYTES + 1,
+			)
+		);
+		if ( is_wp_error( $response ) || 200 !== wp_remote_retrieve_response_code( $response ) || filesize( $temporary_path ) > self::MAX_REMOTE_MEDIA_BYTES ) {
+			wp_delete_file( $temporary_path );
+			return new \WP_Error( 'media_download_failed', 'Twitter media download failed or exceeded the 15 MB limit', array( 'status' => 400 ) );
+		}
+
+		return $temporary_path;
 	}
 
 	/**
@@ -313,11 +379,13 @@ class TwitterPublishAbility extends AbstractSocialAbility {
 		$media_id = $init_response->media_id_string;
 
 		// APPEND
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fopen -- Twitter's chunked upload requires a streaming file handle.
 		$handle        = fopen( $media_path, 'rb' );
 		$segment_index = 0;
 		$chunk_size    = 1048576; // 1MB
 
 		while ( ! feof( $handle ) ) {
+			// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fread -- Read bounded chunks from the validated local file.
 			$chunk = fread( $handle, $chunk_size );
 			$connection->post(
 				'media/upload',
@@ -331,6 +399,7 @@ class TwitterPublishAbility extends AbstractSocialAbility {
 			);
 			++$segment_index;
 		}
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose -- Close the streaming upload handle opened above.
 		fclose( $handle );
 
 		// FINALIZE

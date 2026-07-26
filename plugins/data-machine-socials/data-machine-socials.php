@@ -172,6 +172,8 @@ function datamachine_socials_bootstrap() {
 		return $tasks;
 	} );
 
+	\DataMachineSocials\Operations\DelegatedCrossPostAction::register();
+
 	// Register image generation templates
 	add_filter( 'datamachine/image_generation/templates', function ( array $templates ): array {
 		$templates['quote_card'] = \DataMachineSocials\ImageGeneration\Templates\QuoteCard::class;

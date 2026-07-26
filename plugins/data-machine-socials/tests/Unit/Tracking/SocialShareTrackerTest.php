@@ -212,6 +212,30 @@ class SocialShareTrackerTest extends WP_UnitTestCase {
 		$this->assertFalse( SocialShareTracker::record( $this->post_id, '', 'id1' ) );
 	}
 
+	public function test_get_operation_share_returns_only_matching_durable_receipt(): void {
+		$operation_ref = 'dop_' . str_repeat( 'a', 64 );
+		SocialShareTracker::record_from_result(
+			$this->post_id,
+			'instagram',
+			array(
+				'success'          => true,
+				'platform_post_id' => 'ig1',
+				'platform_url'     => 'https://instagram.test/ig1',
+			),
+			array( 'operation_ref' => $operation_ref )
+		);
+		SocialShareTracker::record( $this->post_id, 'instagram', 'ig2', 'https://instagram.test/ig2' );
+
+		$share = SocialShareTracker::get_operation_share( $this->post_id, 'instagram', $operation_ref );
+
+		$this->assertIsArray( $share );
+		$this->assertSame( 'ig1', $share['platform_post_id'] );
+		$this->assertArrayNotHasKey( 'operation_ref', $share );
+		$this->assertMatchesRegularExpression( '/^[a-f0-9]{64}$/', $share['operation_hash'] );
+		$this->assertNull( SocialShareTracker::get_operation_share( $this->post_id, 'instagram', 'invalid' ) );
+		$this->assertNull( SocialShareTracker::get_operation_share( $this->post_id, 'twitter', $operation_ref ) );
+	}
+
 	public function test_multiple_platforms_same_post(): void {
 		SocialShareTracker::record( $this->post_id, 'instagram', 'ig1', 'https://ig.com/1' );
 		SocialShareTracker::record( $this->post_id, 'twitter', 'tw1', 'https://x.com/1' );

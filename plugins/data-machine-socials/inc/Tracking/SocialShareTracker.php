@@ -51,15 +51,18 @@ class SocialShareTracker {
 			'platform'         => sanitize_key( $platform ),
 			'platform_post_id' => sanitize_text_field( $platform_post_id ),
 			'platform_url'     => esc_url_raw( $platform_url ),
+			'operation_hash'   => ! empty( $extra['operation_ref'] ) ? hash( 'sha256', (string) $extra['operation_ref'] ) : '',
 			'shared_at'        => time(),
 			'shared_by'        => $extra['shared_by'] ?? get_current_user_id(),
 			'media_kind'       => sanitize_key( $extra['media_kind'] ?? '' ),
-			'job_id'           => intval( $extra['job_id'] ?? 0 ) ?: null,
+			'job_id'           => ! empty( $extra['job_id'] ) ? intval( $extra['job_id'] ) : null,
 		);
 
 		$shares[] = $record;
 
-		update_post_meta( $post_id, self::SHARES_META_KEY, $shares );
+		if ( false === update_post_meta( $post_id, self::SHARES_META_KEY, $shares ) ) {
+			return false;
+		}
 		self::update_platforms_index( $post_id, $shares );
 
 		return true;
@@ -156,6 +159,29 @@ class SocialShareTracker {
 		usort( $shares, fn( $a, $b ) => ( $b['shared_at'] ?? 0 ) <=> ( $a['shared_at'] ?? 0 ) );
 
 		return $shares[0];
+	}
+
+	/**
+	 * Get a share already recorded for one delegated operation and platform.
+	 *
+	 * @param int    $post_id      WordPress post ID.
+	 * @param string $platform     Platform slug.
+	 * @param string $operation_ref Opaque delegated operation reference.
+	 * @return array|null
+	 */
+	public static function get_operation_share( int $post_id, string $platform, string $operation_ref ): ?array {
+		if ( ! preg_match( '/^dop_[a-f0-9]{64}$/', $operation_ref ) ) {
+			return null;
+		}
+		$operation_hash = hash( 'sha256', $operation_ref );
+
+		foreach ( array_reverse( self::get_shares( $post_id, $platform ) ) as $share ) {
+			if ( 'deleted' !== ( $share['status'] ?? 'published' ) && hash_equals( $operation_hash, (string) ( $share['operation_hash'] ?? '' ) ) ) {
+				return $share;
+			}
+		}
+
+		return null;
 	}
 
 	/**
@@ -286,8 +312,8 @@ class SocialShareTracker {
 			return false;
 		}
 
-		$platform_post_id = self::extract_platform_post_id( $platform, $result );
-		$platform_url     = self::extract_platform_url( $platform, $result );
+		$platform_post_id = (string) ( $result['platform_post_id'] ?? self::extract_platform_post_id( $platform, $result ) );
+		$platform_url     = (string) ( $result['platform_url'] ?? self::extract_platform_url( $platform, $result ) );
 
 		// Merge media_kind from result if present.
 		if ( ! empty( $result['media_kind'] ) && empty( $extra['media_kind'] ) ) {
