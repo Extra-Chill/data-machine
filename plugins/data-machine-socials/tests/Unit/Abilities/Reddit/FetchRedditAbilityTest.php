@@ -159,6 +159,75 @@ class FetchRedditAbilityTest extends WP_UnitTestCase {
 	}
 
 	/**
+	 * @dataProvider searchSortProvider
+	 */
+	public function test_global_query_uses_search_endpoint_for_supported_sort( string $sort ): void {
+		$request_url = '';
+
+		add_filter(
+			'pre_http_request',
+			static function ( $preempt, $args, $url ) use ( &$request_url ) {
+				$request_url = $url;
+
+				return array(
+					'response' => array( 'code' => 200 ),
+					'body'     => wp_json_encode(
+						array(
+							'data' => array(
+								'after'    => null,
+								'children' => array(),
+							),
+						)
+					),
+				);
+			},
+			10,
+			3
+		);
+
+		$result = ( new FetchRedditAbility() )->execute(
+			array(
+				'query'           => 'Charleston live music',
+				'access_token'    => 'reddit-token',
+				'sort_by'         => $sort,
+				'timeframe_limit' => '90_days',
+				'download_images' => false,
+			)
+		);
+
+		$this->assertTrue( $result['success'] );
+		$this->assertSame( '/search.json', wp_parse_url( $request_url, PHP_URL_PATH ) );
+
+		parse_str( (string) wp_parse_url( $request_url, PHP_URL_QUERY ), $request_params );
+		$this->assertSame( 'Charleston live music', $request_params['q'] );
+		$this->assertSame( $sort, $request_params['sort'] );
+		$this->assertSame( 'year', $request_params['t'] );
+	}
+
+	public function searchSortProvider(): array {
+		return array(
+			'relevance' => array( 'relevance' ),
+			'hot'       => array( 'hot' ),
+			'top'       => array( 'top' ),
+			'new'       => array( 'new' ),
+			'comments'  => array( 'comments' ),
+		);
+	}
+
+	public function test_global_query_rejects_browse_only_sort(): void {
+		$result = ( new FetchRedditAbility() )->execute(
+			array(
+				'query'        => 'Charleston live music',
+				'access_token' => 'reddit-token',
+				'sort_by'      => 'rising',
+			)
+		);
+
+		$this->assertWPError( $result );
+		$this->assertSame( 'Invalid sort parameter', $result->get_error_message() );
+	}
+
+	/**
 	 * @param array<int,array{after:?string,posts:array<int,array<string,mixed>>}> $pages
 	 */
 	private function mockRedditPages( array $pages, ?int &$request_count = null ): void {

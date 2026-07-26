@@ -475,6 +475,7 @@ class RedditCommand {
 	 *   - rising
 	 *   - controversial
 	 *   - relevance
+	 *   - comments
 	 * ---
 	 *
 	 * [--timeframe=<timeframe>]

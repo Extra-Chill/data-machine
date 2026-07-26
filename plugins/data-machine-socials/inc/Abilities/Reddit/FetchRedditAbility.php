@@ -56,9 +56,9 @@ class FetchRedditAbility extends AbstractSocialAbility {
 							),
 							'sort_by'           => array(
 								'type'        => 'string',
-								'enum'        => array( 'hot', 'new', 'top', 'rising', 'controversial', 'relevance' ),
+								'enum'        => array( 'hot', 'new', 'top', 'rising', 'controversial', 'relevance', 'comments' ),
 								'default'     => 'hot',
-								'description' => __( 'Sort order for posts. Use "relevance" for global search.', 'data-machine-socials' ),
+								'description' => __( 'Sort order for posts. Search supports relevance, hot, top, new, and comments.', 'data-machine-socials' ),
 							),
 							'timeframe_limit'   => array(
 								'type'        => 'string',
@@ -197,7 +197,7 @@ class FetchRedditAbility extends AbstractSocialAbility {
 		$download_images       = $config['download_images'];
 
 		// Determine mode: global search vs subreddit fetch.
-		$is_global_search = ! empty( $query ) && empty( $subreddit );
+		$is_global_search    = ! empty( $query ) && empty( $subreddit );
 		$is_subreddit_search = ! empty( $query ) && ! empty( $subreddit );
 
 		// Validate: must have either subreddit or query.
@@ -232,7 +232,9 @@ class FetchRedditAbility extends AbstractSocialAbility {
 			);
 		}
 
-		$valid_sorts = array( 'hot', 'new', 'top', 'rising', 'controversial', 'relevance' );
+		$valid_sorts = ! empty( $query )
+			? array( 'relevance', 'hot', 'top', 'new', 'comments' )
+			: array( 'hot', 'new', 'top', 'rising', 'controversial' );
 		if ( ! in_array( $sort, $valid_sorts, true ) ) {
 			$logs[] = array(
 				'level'   => 'error',
@@ -257,8 +259,8 @@ class FetchRedditAbility extends AbstractSocialAbility {
 			'level'   => 'info',
 			'message' => sprintf( 'Reddit: Starting fetch (%s, sort: %s).', $mode_label, $sort ),
 			'data'    => array(
-				'subreddit'       => $subreddit,
-				'query'           => $query,
+				'subreddit'        => $subreddit,
+				'query'            => $query,
 				'is_global_search' => $is_global_search,
 			),
 		);
@@ -278,8 +280,6 @@ class FetchRedditAbility extends AbstractSocialAbility {
 				$timeframe_limit,
 				$fetch_batch_size,
 				$after_param,
-				$is_global_search,
-				$is_subreddit_search,
 				$logs
 			);
 
@@ -643,8 +643,6 @@ class FetchRedditAbility extends AbstractSocialAbility {
 	 * @param string      $timeframe_limit     Timeframe filter.
 	 * @param int         $fetch_batch_size    Number of posts per page.
 	 * @param string|null $after_param         Pagination cursor.
-	 * @param bool        $is_global_search    Whether this is a global search.
-	 * @param bool        $is_subreddit_search Whether this is a search within a subreddit.
 	 * @param array       &$logs               Log entries array (passed by reference).
 	 * @return string The full Reddit API URL.
 	 */
@@ -655,8 +653,6 @@ class FetchRedditAbility extends AbstractSocialAbility {
 		string $timeframe_limit,
 		int $fetch_batch_size,
 		?string $after_param,
-		bool $is_global_search,
-		bool $is_subreddit_search,
 		array &$logs
 	): string {
 		$base = 'https://oauth.reddit.com';
@@ -672,7 +668,7 @@ class FetchRedditAbility extends AbstractSocialAbility {
 			'1_year'   => 'year',
 		);
 
-		if ( $is_global_search || $is_subreddit_search ) {
+		if ( ! empty( $query ) ) {
 			// Search endpoint: /search.json or /r/{subreddit}/search.json
 			$params = array(
 				'q'     => $query,
@@ -694,7 +690,7 @@ class FetchRedditAbility extends AbstractSocialAbility {
 				);
 			}
 
-			if ( $is_subreddit_search ) {
+			if ( ! empty( $subreddit ) ) {
 				$params['restrict_sr'] = 'on';
 				$endpoint              = "/r/{$subreddit}/search.json";
 			} else {
