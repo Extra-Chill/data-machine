@@ -4,6 +4,23 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.17.0] - 2026-07-26
+
+### Added
+- add explicit Reddit fetch result limit
+- add official YouTube integration
+- add instance-agnostic Mastodon support
+- add official TikTok publishing integration
+- add Tumblr publishing and discovery
+
+### Changed
+- route write-path abilities through shared HttpClient
+
+### Fixed
+- preserve Reddit queries across search sorts
+- preserve Reddit fetch API errors
+- scrub Extra Chill brand defaults from QuoteCard template
+
 ## [0.16.0] - 2026-06-18
 
 ### Added
