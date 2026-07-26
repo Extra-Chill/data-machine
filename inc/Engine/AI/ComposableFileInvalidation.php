@@ -57,6 +57,17 @@ class ComposableFileInvalidation {
 		add_action( 'activated_plugin', $callback );
 		add_action( 'deactivated_plugin', $callback );
 
+		if ( is_multisite() ) {
+			foreach ( MemoryFileRegistry::get_composable() as $filename => $meta ) {
+				if ( ! empty( $meta['convention_path'] ) && ! MultisiteSectionAggregator::has_current_snapshot( $filename ) ) {
+					// Run after the complete site-local plugin set has registered its
+					// sections. Incomplete network aggregation leaves the root untouched.
+					add_action( 'shutdown', $callback );
+					break;
+				}
+			}
+		}
+
 		/**
 		 * WordPress hook names that should trigger composable file regeneration.
 		 *

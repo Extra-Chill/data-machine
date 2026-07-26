@@ -67,8 +67,14 @@ class ComposableFileGenerator {
 			);
 		}
 
-		// Generate content from registered sections.
-		$content = SectionRegistry::generate( $filename, $context );
+		// A root convention path is shared by every site in a multisite install.
+		// Persist each site's rendered ownership snapshot before aggregating so a
+		// request-local plugin set cannot erase another site's valid sections.
+		if ( ! empty( $meta['convention_path'] ) && is_multisite() ) {
+			$content = MultisiteSectionAggregator::compose( $filename, $context );
+		} else {
+			$content = SectionRegistry::generate( $filename, $context );
+		}
 
 		if ( '' === trim( $content ) ) {
 			return array(
