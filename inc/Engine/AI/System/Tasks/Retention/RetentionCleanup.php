@@ -477,7 +477,7 @@ class RetentionCleanup {
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		return (int) $wpdb->get_var(
 			$wpdb->prepare(
-				"SELECT COUNT(*) FROM %i WHERE completed_at IS NOT NULL AND completed_at < %s AND engine_data IS NOT NULL AND engine_data != ''",
+				"SELECT COUNT(*) FROM %i WHERE completed_at IS NOT NULL AND completed_at < %s AND source != 'delegated' AND engine_data IS NOT NULL AND engine_data != ''",
 				$table,
 				$cutoff
 			)
@@ -512,7 +512,7 @@ class RetentionCleanup {
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		return (int) $wpdb->get_var(
 			$wpdb->prepare(
-				"SELECT COALESCE(SUM(LENGTH(engine_data)), 0) FROM %i WHERE completed_at IS NOT NULL AND completed_at < %s AND engine_data IS NOT NULL AND engine_data != ''",
+				"SELECT COALESCE(SUM(LENGTH(engine_data)), 0) FROM %i WHERE completed_at IS NOT NULL AND completed_at < %s AND source != 'delegated' AND engine_data IS NOT NULL AND engine_data != ''",
 				$table,
 				$cutoff
 			)
@@ -575,7 +575,7 @@ class RetentionCleanup {
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 			$affected = $wpdb->query(
 				$wpdb->prepare(
-					"UPDATE %i SET engine_data = NULL WHERE job_id IN ( SELECT job_id FROM ( SELECT job_id FROM %i WHERE completed_at IS NOT NULL AND completed_at < %s AND engine_data IS NOT NULL AND engine_data != '' LIMIT %d ) AS tmp )",
+					"UPDATE %i SET engine_data = NULL WHERE job_id IN ( SELECT job_id FROM ( SELECT job_id FROM %i WHERE completed_at IS NOT NULL AND completed_at < %s AND source != 'delegated' AND engine_data IS NOT NULL AND engine_data != '' LIMIT %d ) AS tmp )",
 					$table,
 					$table,
 					$cutoff,
