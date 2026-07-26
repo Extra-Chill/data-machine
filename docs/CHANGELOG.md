@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.168.18] - 2026-07-26
+
+### Fixed
+- distinguish fetch suppression outcomes
+
 ## [0.168.17] - 2026-07-26
 
 ### Fixed
