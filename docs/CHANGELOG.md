@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.169.4] - 2026-07-26
+
+### Fixed
+- establish delegated owner context for system tasks
+
 ## [0.169.3] - 2026-07-26
 
 ### Changed
