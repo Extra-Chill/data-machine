@@ -45,7 +45,7 @@ class HttpClient {
 	 *                        - auth_ref: string - Optional provider:account credential reference resolved through registered auth providers
 	 *                        - browser_mode: bool - Use browser-like headers (default false)
 	 *                        - context: string - Context for logging (default 'HTTP Request')
-	 * @return array Response array.
+	 * @return array{success: true, data: string, status_code: int, headers: mixed, response: array}|array{success: false, error: string, data?: string, status_code?: int, headers?: mixed, response?: array} Response array. Received non-2xx responses include HTTP metadata; transport failures do not.
 	 */
 	public static function request( string $method, string $url, array $options = array() ): array {
 		$method       = strtoupper( $method );
@@ -102,7 +102,7 @@ class HttpClient {
 		$success_codes = self::SUCCESS_CODES[ $method ];
 
 		if ( ! in_array( $status_code, $success_codes, true ) ) {
-			return self::handleHttpError( $status_code, $body, $method, $url, $context );
+			return self::handleHttpError( $response, $status_code, $body, $method, $url, $context );
 		}
 
 		return array(
@@ -391,7 +391,7 @@ class HttpClient {
 	/**
 	 * Handle non-success HTTP status code
 	 */
-	private static function handleHttpError( int $status_code, string $body, string $method, string $url, string $context ): array {
+	private static function handleHttpError( array $response, int $status_code, string $body, string $method, string $url, string $context ): array {
 		$error_message = sprintf(
 			'%1$s %2$s returned HTTP %3$d',
 			$context,
@@ -423,8 +423,12 @@ class HttpClient {
 		);
 
 		return array(
-			'success' => false,
-			'error'   => $error_message,
+			'success'     => false,
+			'error'       => $error_message,
+			'data'        => $body,
+			'status_code' => $status_code,
+			'headers'     => wp_remote_retrieve_headers( $response ),
+			'response'    => $response,
 		);
 	}
 
