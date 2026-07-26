@@ -182,14 +182,29 @@ class CalendarBlockTest extends WP_UnitTestCase {
 		$second_html = $this->render_calendar();
 		$html        = $first_html . $second_html;
 
+		preg_match_all( '/data-instance-id="([^"]+)"/', $html, $instance_matches );
+		preg_match_all( '/<input type="text"\s+id="([^"]+)"[^>]+class="data-machine-events-search-input">/', $html, $search_matches );
+		preg_match_all( '/<input type="text"\s+id="([^"]+)"\s+class="data-machine-events-date-range-input"/', $html, $date_matches );
 		preg_match_all( '/<label class="screen-reader-text" for="([^"]+)">([^<]+)<\/label>/', $html, $label_matches );
 
+		$this->assertCount( 2, $instance_matches[1] );
+		$this->assertCount( 2, array_unique( $instance_matches[1] ), 'Each calendar should have a unique root instance ID.' );
+		$this->assertCount( 2, $search_matches[1] );
+		$this->assertCount( 2, $date_matches[1] );
 		$this->assertCount( 4, $label_matches[1] );
-		$this->assertCount( 4, array_unique( $label_matches[1] ), 'Each label should target a unique control ID.' );
+
+		$control_ids = array_merge( $search_matches[1], $date_matches[1] );
+		$this->assertCount( 4, array_unique( $control_ids ), 'Every input ID should be unique across calendar instances.' );
+		$this->assertEqualsCanonicalizing( $control_ids, $label_matches[1], 'Each input should have exactly one associated label.' );
 		$this->assertSame( array( 'Search events', 'Filter by date range', 'Search events', 'Filter by date range' ), $label_matches[2] );
 
-		foreach ( $label_matches[1] as $control_id ) {
+		foreach ( $control_ids as $control_id ) {
 			$this->assertSame( 1, substr_count( $html, 'id="' . $control_id . '"' ) );
+		}
+		foreach ( $instance_matches[1] as $instance_id ) {
+			$this->assertStringStartsWith( 'data-machine-calendar-', $instance_id );
+			$this->assertStringContainsString( 'data-machine-events-search-' . $instance_id, $html );
+			$this->assertStringContainsString( 'data-machine-events-date-range-' . $instance_id, $html );
 		}
 
 		$this->assertSame( 2, substr_count( $html, 'class="data-machine-events-search-btn" aria-label="Search events"' ) );
