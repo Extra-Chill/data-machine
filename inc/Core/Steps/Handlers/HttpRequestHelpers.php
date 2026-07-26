@@ -23,7 +23,7 @@ trait HttpRequestHelpers {
 	 * @param string $method  HTTP method (GET, POST, PUT, DELETE, PATCH).
 	 * @param string $url     Request URL.
 	 * @param array  $options Request options.
-	 * @return array{success: bool, data?: string, status_code?: int, headers?: array, response?: array, error?: string}
+	 * @return array{success: bool, data?: string, status_code?: int, headers?: mixed, response?: array, error?: string} Received non-2xx responses include HTTP metadata; transport failures do not.
 	 */
 	protected function httpRequest( string $method, string $url, array $options = array() ): array {
 		if ( ! isset( $options['context'] ) ) {
