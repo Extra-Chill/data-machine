@@ -16,7 +16,32 @@ defined( 'ABSPATH' ) || exit;
  */
 class RunResult {
 
-	public const SCHEMA_VERSION = 'datamachine.run_result.v1';
+	public const SCHEMA_VERSION      = 'datamachine.run_result.v1';
+	private const MAX_ENVELOPE_BYTES = 163840;
+
+	/** Build a canonical nonterminal projection envelope. */
+	public static function active( string $status ): array {
+		return self::fromStepResults( array(), array( 'status' => $status ) );
+	}
+
+	/** Validate the portable envelope before it crosses a public boundary. */
+	public static function validate( $value ): bool {
+		if ( ! is_array( $value ) || self::SCHEMA_VERSION !== ( $value['schema_version'] ?? null ) || ! is_string( $value['status'] ?? null ) || '' === trim( $value['status'] ) ) {
+			return false;
+		}
+		foreach ( array( 'outputs', 'diagnostics', 'replay' ) as $object_key ) {
+			if ( isset( $value[ $object_key ] ) && ( ! is_array( $value[ $object_key ] ) || ( array() !== $value[ $object_key ] && array_is_list( $value[ $object_key ] ) ) ) ) {
+				return false;
+			}
+		}
+		foreach ( array( 'artifact_refs', 'packet_refs', 'step_results', 'steps', 'child_job_refs', 'child_job_envelopes' ) as $list_key ) {
+			if ( isset( $value[ $list_key ] ) && ( ! is_array( $value[ $list_key ] ) || ! array_is_list( $value[ $list_key ] ) ) ) {
+				return false;
+			}
+		}
+		$encoded = wp_json_encode( $value );
+		return is_string( $encoded ) && strlen( $encoded ) <= self::MAX_ENVELOPE_BYTES;
+	}
 
 	/**
 	 * Build a run envelope from step result envelopes.

@@ -15,6 +15,10 @@ add_filter(
 	static function ( array $actions ): array {
 		$actions['owner/create-record'] = array(
 			'version'         => '1',
+			'versions'        => array(
+				// Full prior callback contracts remain addressable by frozen version.
+				'0' => $version_zero_contract,
+			),
 			'normalize_input' => static function ( array $input, array $context ) {
 				// Return a bounded, deterministic array or WP_Error.
 				return array( 'record_key' => sanitize_key( $input['record_key'] ?? '' ) );
@@ -58,6 +62,9 @@ output, the registration version, stable execution owner, workflow, initial
 data, and requested timestamp form the frozen request fingerprint. The first
 successful submission attests the initiating user/agent separately from the
 stable execution owner. Initiator identity does not affect deduplication.
+Keep complete prior callback contracts in `versions` for at least the whole-row
+retention window so pending and retained operations can resolve their frozen
+authorization, projection, and retry policy after an owner upgrade.
 
 `authorize` receives `phase`, `action`, `operation_id`, `operation_ref`, `actor`,
 and normalized `input`. It must return `true` or `WP_Error`. The owner remains
@@ -84,8 +91,12 @@ workflow state, task classes, and scheduler records are never public inputs or
 outputs. Set `effect_count` to `0` when successful execution produced no
 consequential effect; Data Machine then reports `no-op`.
 
-Data Machine also reports `no-op` for canonical skipped/no-items statuses and
-for a canonical integer `outputs.effect_count` of `0`.
+Data Machine validates exact `datamachine.run_result.v1` envelopes before owner
+projection, retry, or terminal status mapping. Active operations receive a
+canonical active envelope rather than an empty array. Data Machine reports
+`no-op` for canonical skipped/no-items statuses and for a canonical integer
+`outputs.effect_count` of `0`; malformed or legacy terminal envelopes fail
+closed.
 
 `retry` is optional. Without it, explicit retry fails closed. When registered,
 it receives the failed canonical run result and frozen operation context. It
@@ -106,10 +117,16 @@ Execute `datamachine/submit-delegated-operation` with:
 }
 ```
 
-The response contains an opaque `operation_ref`, `status`, replay flag, and the
+The response contains a secret-keyed opaque `operation_ref`, `status`, replay flag, and the
 owner projection. Repeating the same action and operation ID from any authorized
 WordPress user atomically returns the same operation. Reuse with changed input,
 policy, owner, workflow, or schedule returns `delegated_operation_conflict`.
+
+Internal idempotency uses a stable one-way request identity. The public receipt
+is independently keyed by a lazily generated durable site secret, so both
+identity and receipt derivation survive WordPress auth-salt rotation. Reconcile,
+retry, and cancel look up only a stored hash of the public receipt, so knowing
+or guessing an action and operation ID does not reveal a usable receipt.
 
 Successful responses have `success`, `operation_ref`, `status`, and `replayed`,
 with optional `projection` and bounded `retry` metadata. Failures have `success:
@@ -126,14 +143,23 @@ Use these abilities with only `action` and `operation_ref`:
 - `datamachine/cancel-delegated-operation`
 
 Statuses are `submitted`, `executing`, `executed`, `no-op`, `failed`,
-`cancelled`, and `retrying`. Automatic retry metadata is bounded to attempt,
-maximum attempts, and next retry time. Explicit retry reopens only failed work
+`cancelled`, and `retrying`. Automatic retry and AI-concurrency deferral metadata
+is bounded to type, attempt, maximum attempts, and next retry time. Explicit retry reopens only failed work
 after its owner retry callback proves replay safety, and preserves its operation
 identity. Cancellation succeeds only before work
 starts; it atomically fences the queued generation before removing its scheduled
 action. An executing operation cannot claim safe cancellation.
 
-Delegated operation envelopes are excluded from short-window terminal
-`engine_data` shedding because the frozen authorization context and redacted
-canonical reconciliation remain part of the durable operation contract. Normal
-whole-row retention still defines the operation's final storage lifetime.
+The bounded operation envelope is stored separately from executable workflow
+state. Short-window terminal `engine_data` shedding removes normalized runtime,
+workflow, and diagnostic state while preserving the frozen authorization context
+and validated canonical result. Canonical capture is a replayable terminal core
+accounting stage; a failed envelope write prevents that stage from advancing.
+Normal completed/failed/cancelled whole-row retention defines the operation's
+final storage lifetime, with cancelled age measured from cancellation completion.
+
+Cancellation is intentionally conservative. A monotonic row marker is committed
+immediately before the first owner step can execute and survives retry/defer
+transitions. Only a pending operation with no effects-begun marker can be
+cancelled; retrying, concurrency-deferred, later-step, and executing work cannot
+claim safe pre-execution cancellation.

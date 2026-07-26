@@ -257,13 +257,21 @@ class Jobs extends BaseRepository {
 		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 		$job = $this->wpdb->get_row( $this->wpdb->prepare( 'SELECT * FROM %i WHERE idempotency_key = %s LIMIT 1', $this->table_name, $idempotency_key ), ARRAY_A );
 
-		if ( $job && isset( $job['engine_data'] ) && is_string( $job['engine_data'] ) ) {
-			$decoded = json_decode( $job['engine_data'], true );
-			if ( json_last_error() === JSON_ERROR_NONE ) {
-				$job['engine_data'] = $decoded;
-			}
+		$job = $this->decode_job_json( $job );
+
+		return $job ? $job : null;
+	}
+
+	/** Fetch a job by the hash of its public operation receipt. */
+	public function get_job_by_operation_ref_hash( string $operation_ref_hash ): ?array {
+		if ( ! preg_match( '/^[a-f0-9]{64}$/', $operation_ref_hash ) ) {
+			return null;
 		}
 
+		// phpcs:disable WordPress.DB.PreparedSQL -- The nested prepare binds the plugin table identifier and receipt hash.
+		$job = $this->wpdb->get_row( $this->wpdb->prepare( 'SELECT * FROM %i WHERE operation_ref_hash = %s LIMIT 1', $this->table_name, $operation_ref_hash ), ARRAY_A );
+		// phpcs:enable WordPress.DB.PreparedSQL
+		$job = $this->decode_job_json( $job );
 		return $job ? $job : null;
 	}
 
@@ -359,7 +367,16 @@ class Jobs extends BaseRepository {
 			$format[]            = '%s';
 		}
 
-		foreach ( array( 'request_fingerprint', 'operation_state', 'operation_step_id' ) as $operation_field ) {
+		if ( isset( $job_data['operation_envelope'] ) && is_array( $job_data['operation_envelope'] ) ) {
+			$encoded_envelope = wp_json_encode( $job_data['operation_envelope'] );
+			if ( false === $encoded_envelope ) {
+				return false;
+			}
+			$data['operation_envelope'] = $encoded_envelope;
+			$format[]                   = '%s';
+		}
+
+		foreach ( array( 'request_fingerprint', 'operation_state', 'operation_step_id', 'operation_ref_hash' ) as $operation_field ) {
 			if ( isset( $job_data[ $operation_field ] ) && is_scalar( $job_data[ $operation_field ] ) ) {
 				$data[ $operation_field ] = sanitize_text_field( (string) $job_data[ $operation_field ] );
 				$format[]                 = '%s';
@@ -394,6 +411,7 @@ class Jobs extends BaseRepository {
 		$claim_token  = bin2hex( random_bytes( 16 ) );
 		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared -- The nested prepare binds the plugin table identifier and every scalar value.
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		// phpcs:disable WordPress.DB.PreparedSQL -- The nested prepare binds the plugin table identifier and every scalar value.
 		$updated = $this->wpdb->query(
 			$this->wpdb->prepare(
 				"UPDATE %i SET operation_state = 'enqueuing', operation_claimed_at = %s, operation_claim_token = %s, operation_generation = COALESCE(operation_generation, 0) + 1 WHERE job_id = %d AND (operation_state IN ('preparing', 'enqueue_failed') OR (operation_state = 'enqueuing' AND (operation_claimed_at IS NULL OR operation_claimed_at < %s)))",
@@ -404,6 +422,7 @@ class Jobs extends BaseRepository {
 				$lease_cutoff
 			)
 		);
+		// phpcs:enable WordPress.DB.PreparedSQL
 		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
 
 		if ( 1 !== (int) $updated ) {
@@ -445,7 +464,7 @@ class Jobs extends BaseRepository {
 			return false;
 		}
 
-		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared -- The nested prepare binds the plugin table identifier and job ID.
+		// phpcs:disable WordPress.DB.PreparedSQL -- The nested prepare binds the plugin table identifier and job ID.
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		$updated = $this->wpdb->query(
 			$this->wpdb->prepare(
@@ -454,7 +473,7 @@ class Jobs extends BaseRepository {
 				$job_id
 			)
 		);
-		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
+		// phpcs:enable WordPress.DB.PreparedSQL
 
 		return 1 === (int) $updated;
 	}
@@ -474,7 +493,7 @@ class Jobs extends BaseRepository {
 			return false;
 		}
 
-		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared -- The nested prepare binds the plugin table identifier and every scalar value.
+		// phpcs:disable WordPress.DB.PreparedSQL -- The nested prepare binds the plugin table identifier and every scalar value.
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		$updated = $this->wpdb->query(
 			$this->wpdb->prepare(
@@ -488,7 +507,7 @@ class Jobs extends BaseRepository {
 				$token
 			)
 		);
-		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
+		// phpcs:enable WordPress.DB.PreparedSQL
 
 		return 1 === (int) $updated;
 	}
@@ -505,7 +524,7 @@ class Jobs extends BaseRepository {
 		}
 
 		$failed_status = $this->wpdb->esc_like( 'failed' ) . '%';
-		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared -- The nested prepare binds the plugin table identifier, job ID, and escaped LIKE value.
+		// phpcs:disable WordPress.DB.PreparedSQL -- The nested prepare binds the plugin table identifier, job ID, and escaped LIKE value.
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		$updated = $this->wpdb->query(
 			$this->wpdb->prepare(
@@ -515,9 +534,48 @@ class Jobs extends BaseRepository {
 				$failed_status
 			)
 		);
-		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
+		// phpcs:enable WordPress.DB.PreparedSQL
 
 		return 1 === (int) $updated;
+	}
+
+	/** Mark that a direct operation may have entered owner-controlled effects. */
+	public function mark_operation_effects_begun( int $job_id, int $generation, string $token ): bool {
+		if ( 0 >= $job_id || 0 >= $generation || '' === $token ) {
+			return false;
+		}
+		// phpcs:disable WordPress.DB.PreparedSQL -- The nested prepare binds the plugin table identifier and every scalar value.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$updated = $this->wpdb->query(
+			$this->wpdb->prepare(
+				"UPDATE %i SET operation_effects_begun_at = COALESCE(operation_effects_begun_at, %s) WHERE job_id = %d AND flow_id = 'direct' AND operation_generation = %d AND operation_claim_token = %s AND operation_state = 'enqueued' AND completed_at IS NULL",
+				$this->table_name,
+				current_time( 'mysql', true ),
+				$job_id,
+				$generation,
+				$token
+			)
+		);
+		// phpcs:enable WordPress.DB.PreparedSQL
+		if ( 1 === (int) $updated ) {
+			return true;
+		}
+		$job = false !== $updated ? $this->get_job( $job_id ) : null;
+		return is_array( $job )
+			&& 'enqueued' === (string) ( $job['operation_state'] ?? '' )
+			&& (int) ( $job['operation_generation'] ?? 0 ) === $generation
+			&& hash_equals( $token, (string) ( $job['operation_claim_token'] ?? '' ) )
+			&& ! empty( $job['operation_effects_begun_at'] )
+			&& empty( $job['completed_at'] );
+	}
+
+	/** Persist the bounded delegated reconciliation envelope. */
+	public function store_operation_envelope( int $job_id, array $envelope ): bool {
+		$encoded = wp_json_encode( $envelope );
+		if ( $job_id <= 0 || ! is_string( $encoded ) || strlen( $encoded ) > 262144 ) {
+			return false;
+		}
+		return false !== $this->wpdb->update( $this->table_name, array( 'operation_envelope' => $encoded ), array( 'job_id' => $job_id ), array( '%s' ), array( '%d' ) );
 	}
 
 	/**
@@ -554,13 +612,24 @@ class Jobs extends BaseRepository {
 		$job = $this->wpdb->get_row( $this->wpdb->prepare( 'SELECT * FROM %i WHERE job_id = %d', $this->table_name, $job_id ), ARRAY_A );
 		// phpcs:enable WordPress.DB.PreparedSQL
 
-		if ( $job && isset( $job['engine_data'] ) && is_string( $job['engine_data'] ) ) {
-			$decoded = json_decode( $job['engine_data'], true );
-			if ( json_last_error() === JSON_ERROR_NONE ) {
-				$job['engine_data'] = $decoded;
+		$job = $this->decode_job_json( $job );
+
+		return $job;
+	}
+
+	/** Decode JSON-backed columns returned by direct row reads. */
+	private function decode_job_json( $job ) {
+		if ( ! is_array( $job ) ) {
+			return $job;
+		}
+		foreach ( array( 'engine_data', 'operation_envelope' ) as $column ) {
+			if ( isset( $job[ $column ] ) && is_string( $job[ $column ] ) ) {
+				$decoded = json_decode( $job[ $column ], true );
+				if ( JSON_ERROR_NONE === json_last_error() ) {
+					$job[ $column ] = $decoded;
+				}
 			}
 		}
-
 		return $job;
 	}
 
@@ -1535,13 +1604,14 @@ class Jobs extends BaseRepository {
 
 		$cutoff_datetime = gmdate( 'Y-m-d H:i:s', time() - ( $older_than_days * DAY_IN_SECONDS ) );
 		$match           = $this->resolve_status_match( $status_pattern );
+		$age_column      = 'cancelled' === $status_pattern ? 'completed_at' : 'created_at';
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 		if ( 'in' === $match['type'] ) {
 			$placeholders = implode( ',', array_fill( 0, count( $match['values'] ), '%s' ) );
 			$args         = array_merge(
-				array( "DELETE FROM %i WHERE status IN ({$placeholders}) AND created_at < %s", $this->table_name ),
+				array( "DELETE FROM %i WHERE status IN ({$placeholders}) AND {$age_column} < %s", $this->table_name ),
 				$match['values'],
 				array( $cutoff_datetime )
 			);
@@ -1549,7 +1619,7 @@ class Jobs extends BaseRepository {
 		} else {
 			$result = $this->wpdb->query(
 				$this->wpdb->prepare(
-					'DELETE FROM %i WHERE status LIKE %s AND created_at < %s',
+					"DELETE FROM %i WHERE status LIKE %s AND {$age_column} < %s",
 					$this->table_name,
 					$match['pattern'],
 					$cutoff_datetime
@@ -1590,13 +1660,14 @@ class Jobs extends BaseRepository {
 
 		$cutoff_datetime = gmdate( 'Y-m-d H:i:s', time() - ( $older_than_days * DAY_IN_SECONDS ) );
 		$match           = $this->resolve_status_match( $status_pattern );
+		$age_column      = 'cancelled' === $status_pattern ? 'completed_at' : 'created_at';
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 		if ( 'in' === $match['type'] ) {
 			$placeholders = implode( ',', array_fill( 0, count( $match['values'] ), '%s' ) );
 			$args         = array_merge(
-				array( "SELECT COUNT(*) FROM %i WHERE status IN ({$placeholders}) AND created_at < %s", $this->table_name ),
+				array( "SELECT COUNT(*) FROM %i WHERE status IN ({$placeholders}) AND {$age_column} < %s", $this->table_name ),
 				$match['values'],
 				array( $cutoff_datetime )
 			);
@@ -1604,7 +1675,7 @@ class Jobs extends BaseRepository {
 		} else {
 			$count = $this->wpdb->get_var(
 				$this->wpdb->prepare(
-					'SELECT COUNT(*) FROM %i WHERE status LIKE %s AND created_at < %s',
+					"SELECT COUNT(*) FROM %i WHERE status LIKE %s AND {$age_column} < %s",
 					$this->table_name,
 					$match['pattern'],
 					$cutoff_datetime
@@ -2336,7 +2407,7 @@ class Jobs extends BaseRepository {
 		}
 
 		$current_status = is_string( $job['status'] ?? null ) ? $job['status'] : '';
-		if ( $pending_direct_cancel && ( 'direct' !== (string) ( $job['flow_id'] ?? '' ) || JobStatus::PENDING !== $current_status ) ) {
+		if ( $pending_direct_cancel && ( 'direct' !== (string) ( $job['flow_id'] ?? '' ) || JobStatus::PENDING !== $current_status || ! empty( $job['operation_effects_begun_at'] ) ) ) {
 			$this->rollback_terminal_transition( $job_id );
 			return $this->status_transition_result( false, false, $current_status, $current_status );
 		}
@@ -3040,6 +3111,9 @@ class Jobs extends BaseRepository {
 			operation_claim_token varchar(64) NULL DEFAULT NULL,
 			operation_generation bigint(20) unsigned NOT NULL DEFAULT 0,
 			operation_action_id bigint(20) unsigned NULL DEFAULT NULL,
+			operation_ref_hash char(64) NULL DEFAULT NULL,
+			operation_effects_begun_at datetime NULL DEFAULT NULL,
+			operation_envelope longtext NULL,
 			terminal_accounting_state tinyint unsigned NULL DEFAULT NULL,
 			terminal_accounting_owner varchar(64) NULL DEFAULT NULL,
 			terminal_accounting_claimed_at datetime NULL DEFAULT NULL,
@@ -3058,7 +3132,8 @@ class Jobs extends BaseRepository {
             KEY idx_status_created (status(50), created_at),
 			KEY idx_source_created (source, created_at),
 			KEY idx_terminal_accounting (terminal_accounting_state, job_id),
-            UNIQUE KEY idx_idempotency_key (idempotency_key)
+			UNIQUE KEY idx_idempotency_key (idempotency_key),
+			UNIQUE KEY idx_operation_ref_hash (operation_ref_hash)
         ) $charset_collate;";
 
 		dbDelta( $sql );
@@ -3500,13 +3575,16 @@ class Jobs extends BaseRepository {
 		global $wpdb;
 
 		$columns = array(
-			'request_fingerprint'   => 'char(64) NULL DEFAULT NULL',
-			'operation_state'       => 'varchar(32) NULL DEFAULT NULL',
-			'operation_step_id'     => 'varchar(191) NULL DEFAULT NULL',
-			'operation_claimed_at'  => 'datetime NULL DEFAULT NULL',
-			'operation_claim_token' => 'varchar(64) NULL DEFAULT NULL',
-			'operation_generation'  => 'bigint(20) unsigned NOT NULL DEFAULT 0',
-			'operation_action_id'   => 'bigint(20) unsigned NULL DEFAULT NULL',
+			'request_fingerprint'        => 'char(64) NULL DEFAULT NULL',
+			'operation_state'            => 'varchar(32) NULL DEFAULT NULL',
+			'operation_step_id'          => 'varchar(191) NULL DEFAULT NULL',
+			'operation_claimed_at'       => 'datetime NULL DEFAULT NULL',
+			'operation_claim_token'      => 'varchar(64) NULL DEFAULT NULL',
+			'operation_generation'       => 'bigint(20) unsigned NOT NULL DEFAULT 0',
+			'operation_action_id'        => 'bigint(20) unsigned NULL DEFAULT NULL',
+			'operation_ref_hash'         => 'char(64) NULL DEFAULT NULL',
+			'operation_effects_begun_at' => 'datetime NULL DEFAULT NULL',
+			'operation_envelope'         => 'longtext NULL',
 		);
 
 		foreach ( $columns as $column => $definition ) {
@@ -3518,6 +3596,7 @@ class Jobs extends BaseRepository {
 			$wpdb->query( "ALTER TABLE {$table_name} ADD COLUMN {$column} {$definition}" );
 			// phpcs:enable WordPress.DB.PreparedSQL
 		}
+		self::ensure_jobs_index( $table_name, 'idx_operation_ref_hash', 'UNIQUE INDEX', '(operation_ref_hash)' );
 	}
 
 	/** Add terminal post-commit receipt and lease columns. */

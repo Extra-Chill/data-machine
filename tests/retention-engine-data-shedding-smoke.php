@@ -117,8 +117,8 @@ namespace {
 			&& str_contains( $cleanup, 'LIMIT %d' )
 	);
 	assert_eds(
-		'shed targets terminal non-delegated rows with non-empty engine_data',
-		str_contains( $cleanup, "completed_at IS NOT NULL AND completed_at < %s AND source != 'delegated' AND engine_data IS NOT NULL AND engine_data != ''" )
+		'shed targets terminal rows via completed_at + non-empty engine_data',
+		str_contains( $cleanup, "completed_at IS NOT NULL AND completed_at < %s AND engine_data IS NOT NULL AND engine_data != ''" )
 	);
 	assert_eds(
 		'shed reuses shared batch / iteration / runtime caps (#2617)',
@@ -153,7 +153,7 @@ namespace {
 	);
 	assert_eds(
 		'Jobs promotes handler_slug column + populates it from engine_data',
-		str_contains( $jobs, "ADD COLUMN handler_slug varchar(100)" )
+		str_contains( $jobs, 'ADD COLUMN handler_slug varchar(100)' )
 			&& str_contains( $jobs, 'extract_handler_slug' )
 			&& str_contains( $jobs, "\$update_data['handler_slug']" )
 	);
@@ -257,9 +257,6 @@ namespace {
 		private function matching_jobs( string $cutoff ): array {
 			$out = array();
 			foreach ( $this->jobs as $id => $row ) {
-				if ( 'delegated' === ( $row['source'] ?? '' ) ) {
-					continue;
-				}
 				if ( null === $row['completed_at'] ) {
 					continue;
 				}
@@ -311,15 +308,6 @@ namespace {
 		);
 		++$jid;
 	}
-	for ( $i = 0; $i < 3; $i++ ) {
-		$fake_wpdb->jobs[ $jid ] = array(
-			'job_id'       => $jid,
-			'source'       => 'delegated',
-			'completed_at' => $two_days,
-			'engine_data'  => $blob,
-		);
-		++$jid;
-	}
 
 	$GLOBALS['wpdb'] = $fake_wpdb;
 
@@ -363,20 +351,20 @@ namespace {
 		"updated={$result['updated']}"
 	);
 
-	$shed   = array_filter( $fake_wpdb->jobs, static fn( $r ) => null === $r['engine_data'] );
-	$kept   = array_filter( $fake_wpdb->jobs, static fn( $r ) => null !== $r['engine_data'] );
-	$rows   = count( $fake_wpdb->jobs );
+	$shed = array_filter( $fake_wpdb->jobs, static fn( $r ) => null === $r['engine_data'] );
+	$kept = array_filter( $fake_wpdb->jobs, static fn( $r ) => null !== $r['engine_data'] );
+	$rows = count( $fake_wpdb->jobs );
 	assert_eds(
 		'all old terminal jobs had engine_data shed (2500)',
 		2500 === count( $shed )
 	);
 	assert_eds(
-		'fresh, in-flight, and delegated jobs kept engine_data (18)',
-		18 === count( $kept )
+		'fresh + in-flight jobs kept engine_data (15)',
+		15 === count( $kept )
 	);
 	assert_eds(
 		'shedding keeps the row (no jobs deleted)',
-		2518 === $rows,
+		2515 === $rows,
 		"rows={$rows}"
 	);
 
