@@ -285,6 +285,9 @@ class ExecuteStepAbility {
 			if ( $recovery_generation > 0 && ! $this->db_jobs->renew_recovery_execution_owner( $job_id, $recovery_claim_token, $recovery_generation ) ) {
 				return $this->staleRecoveryGeneration( $job_id, $recovery_generation, 'lost ownership before handler execution' );
 			}
+			if ( $operation_generation > 0 && ! $this->db_jobs->mark_operation_effects_begun( $job_id, $operation_generation, $operation_claim_token ) ) {
+				return $this->staleOperationGeneration( $job_id, $operation_generation, 'lost ownership before owner effects began' );
+			}
 			$step_output = $flow_step->execute( $payload );
 			if ( ! $this->recoveryGenerationStillOwned( $job_id, $recovery_generation, $recovery_claim_token ) ) {
 				return $this->staleRecoveryGeneration( $job_id, $recovery_generation, 'was superseded during execution' );
@@ -982,9 +985,9 @@ class ExecuteStepAbility {
 		// Some steps (notably AIStep) call datamachine_fail_job with a precise
 		// reason and then return no packets. The defensive check here covers
 		// two shapes:
-		//   - The step's failure was finalized → status starts with `failed`.
-		//   - The step's failure was caught by JobRetryPolicy, which parked the
-		//     job back to `pending` and scheduled a retry via Action Scheduler.
+		// - The step's failure was finalized → status starts with `failed`.
+		// - The step's failure was caught by JobRetryPolicy, which parked the
+		// job back to `pending` and scheduled a retry via Action Scheduler.
 		// In both cases the per-step failure has already been routed; firing
 		// `datamachine_fail_job` again here would double-record the failure
 		// and (when the second reason is non-retryable) trigger

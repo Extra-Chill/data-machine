@@ -43,10 +43,10 @@ class DirectJobEnqueuer {
 			return $this->failure( 'invalid_enqueue_target' );
 		}
 
-		$job        = $this->jobs->get_job( $job_id );
-		$generation = max( 0, (int) ( $job['operation_generation'] ?? 0 ) );
-		$token      = (string) ( $job['operation_claim_token'] ?? '' );
-		$args       = $this->actionArgs( $job_id, $flow_step_id, $generation, $token );
+		$job                 = $this->jobs->get_job( $job_id );
+		$generation          = max( 0, (int) ( $job['operation_generation'] ?? 0 ) );
+		$token               = (string) ( $job['operation_claim_token'] ?? '' );
+		$args                = $this->actionArgs( $job_id, $flow_step_id, $generation, $token );
 		$scheduled_action_id = in_array( (string) ( $job['operation_state'] ?? '' ), array( 'enqueued', 'enqueuing' ), true )
 			? $this->scheduledActionId( $args )
 			: 0;
@@ -109,34 +109,46 @@ class DirectJobEnqueuer {
 	 * Check for any pending/in-progress step in an operation generation.
 	 */
 	public function hasLiveGenerationAction( int $job_id, int $generation, string $token ): bool {
+		return 'none' !== $this->liveGenerationExecution( $job_id, $generation, $token );
+	}
+
+	/** Find any current-generation step, retry, or AI continuation. */
+	public function liveGenerationExecution( int $job_id, int $generation, string $token ): string {
 		if ( ! function_exists( 'as_get_scheduled_actions' ) || $job_id <= 0 || $generation <= 0 || '' === $token ) {
-			return false;
+			return 'none';
 		}
 
-		$action_ids = as_get_scheduled_actions(
-			array(
-				'hook'                  => self::HOOK,
-				'group'                 => self::GROUP,
-				'args'                  => array(
-					'job_id'               => $job_id,
-					'operation_generation' => $generation,
-					'operation_claim_token' => $token,
+		foreach ( array(
+			self::HOOK                   => 'step',
+			'datamachine_resume_ai_step' => 'ai_continuation',
+		) as $hook => $type ) {
+			$action_ids = as_get_scheduled_actions(
+				array(
+					'hook'                  => $hook,
+					'args'                  => array(
+						'job_id'                => $job_id,
+						'operation_generation'  => $generation,
+						'operation_claim_token' => $token,
+					),
+					'partial_args_matching' => 'like',
+					'status'                => array( 'pending', 'in-progress' ),
+					'per_page'              => 1,
 				),
-				'partial_args_matching' => 'like',
-				'status'                => array( 'pending', 'in-progress' ),
-				'per_page'              => 1,
-			),
-			'ids'
-		);
+				'ids'
+			);
+			if ( ! empty( $action_ids ) ) {
+				return $type;
+			}
+		}
 
-		return ! empty( $action_ids );
+		return 'none';
 	}
 
 	private function actionArgs( int $job_id, string $flow_step_id, int $generation, string $token ): array {
 		return array(
-			'job_id'               => $job_id,
-			'flow_step_id'         => $flow_step_id,
-			'operation_generation' => $generation,
+			'job_id'                => $job_id,
+			'flow_step_id'          => $flow_step_id,
+			'operation_generation'  => $generation,
 			'operation_claim_token' => $token,
 		);
 	}
@@ -182,12 +194,12 @@ class DirectJobEnqueuer {
 	}
 
 	private function reconcileScheduledAction( int $job_id, ?array $job, int $action_id, int $generation, string $token ): array {
-		if ( ! is_array( $job ) || $generation <= 0 || '' === $token ) {
+		if ( ! is_array( $job ) || 0 >= $generation || '' === $token ) {
 			return $this->inProgress( $generation );
 		}
 
 		if ( 'enqueued' === ( $job['operation_state'] ?? '' )
-			&& $generation === (int) ( $job['operation_generation'] ?? 0 )
+			&& (int) ( $job['operation_generation'] ?? 0 ) === $generation
 			&& hash_equals( $token, (string) ( $job['operation_claim_token'] ?? '' ) ) ) {
 			return $this->success( $action_id, $generation );
 		}
@@ -200,7 +212,7 @@ class DirectJobEnqueuer {
 		$reloaded = $this->jobs->get_job( $job_id );
 		if ( is_array( $reloaded )
 			&& 'enqueued' === ( $reloaded['operation_state'] ?? '' )
-			&& $generation === (int) ( $reloaded['operation_generation'] ?? 0 )
+			&& (int) ( $reloaded['operation_generation'] ?? 0 ) === $generation
 			&& hash_equals( $token, (string) ( $reloaded['operation_claim_token'] ?? '' ) ) ) {
 			return $this->success( $action_id, $generation );
 		}
