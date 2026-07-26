@@ -47,7 +47,10 @@ import type {
 	MapBounds,
 	BoundsChangedEvent,
 } from './types';
-import type { GeoAuthoritySource } from './geo-authority';
+import type {
+	GeoAuthoritySource,
+	GeoAuthorityOperation,
+} from './geo-authority';
 
 import './frontend.css';
 
@@ -289,16 +292,19 @@ function getBoundsFromMap( map: L.Map ): MapBounds {
 
 function dispatchBoundsChanged(
 	map: L.Map,
-	authority: GeoAuthoritySource
+	syncId: string,
+	operation: GeoAuthorityOperation
 ): void {
 	const bounds = getBoundsFromMap( map );
 	const center = map.getCenter();
 
 	const detail: BoundsChangedEvent = {
+		syncId,
+		generation: operation.generation,
 		bounds,
 		zoom: map.getZoom(),
 		center: { lat: center.lat, lng: center.lng },
-		authority,
+		authority: operation.source,
 	};
 
 	document.dispatchEvent(
@@ -306,16 +312,60 @@ function dispatchBoundsChanged(
 	);
 }
 
+function moveWithAuthority(
+	map: L.Map,
+	syncId: string,
+	tracker: ReturnType< typeof createGeoAuthorityTracker >,
+	source: GeoAuthoritySource,
+	lat: number,
+	lng: number,
+	zoom: number
+): void {
+	const operation = tracker.prepare( source );
+	map.setView( [ lat, lng ], zoom );
+	const noOp = tracker.completeNoop( operation.generation );
+	if ( noOp ) {
+		dispatchBoundsChanged( map, syncId, noOp );
+	}
+}
+
+function isTargetedToMap(
+	targetSyncId: string | undefined,
+	syncId: string
+): boolean {
+	if ( targetSyncId ) {
+		return targetSyncId === syncId;
+	}
+
+	return (
+		document.querySelectorAll( '.data-machine-events-map-root' ).length ===
+		1
+	);
+}
+
 /* ---------- debounce ---------- */
 
-function debounce(
-	fn: ( map: L.Map, authority: GeoAuthoritySource | null ) => void,
+function createDebounce(
+	fn: ( map: L.Map ) => void,
 	ms: number
-): ( map: L.Map, authority: GeoAuthoritySource | null ) => void {
-	let timer: ReturnType< typeof setTimeout >;
-	return ( map: L.Map, authority: GeoAuthoritySource | null ) => {
-		clearTimeout( timer );
-		timer = setTimeout( () => fn( map, authority ), ms );
+): { schedule: ( map: L.Map ) => void; cancel: () => void } {
+	let timer: ReturnType< typeof setTimeout > | null = null;
+	return {
+		schedule( map ) {
+			if ( timer ) {
+				clearTimeout( timer );
+			}
+			timer = setTimeout( () => {
+				timer = null;
+				fn( map );
+			}, ms );
+		},
+		cancel() {
+			if ( timer ) {
+				clearTimeout( timer );
+				timer = null;
+			}
+		},
 	};
 }
 
@@ -340,6 +390,11 @@ function LocationSearch( {
 	const [ placeholder, setPlaceholder ] = useState(
 		'Enter a city or address...'
 	);
+	const requestRef = useRef< AbortController | null >( null );
+
+	useEffect( () => {
+		return () => requestRef.current?.abort();
+	}, [] );
 
 	const handleSubmit = useCallback(
 		async ( e: React.FormEvent ) => {
@@ -352,6 +407,9 @@ function LocationSearch( {
 
 			setLoading( true );
 			setError( '' );
+			requestRef.current?.abort();
+			const controller = new AbortController();
+			requestRef.current = controller;
 
 			try {
 				const url = `${ geocodeUrl }?query=${ encodeURIComponent(
@@ -359,6 +417,7 @@ function LocationSearch( {
 				) }`;
 				const response = await fetch( url, {
 					headers: { Accept: 'application/json' },
+					signal: controller.signal,
 				} );
 
 				if ( ! response.ok ) {
@@ -391,12 +450,18 @@ function LocationSearch( {
 				setQuery( '' );
 
 				onLocationFound( lat, lng, label );
-			} catch {
+			} catch ( fetchError ) {
+				if ( ( fetchError as Error ).name === 'AbortError' ) {
+					return;
+				}
 				setError(
 					'Could not look up that location. Please try again.'
 				);
 			} finally {
-				setLoading( false );
+				if ( requestRef.current === controller ) {
+					requestRef.current = null;
+					setLoading( false );
+				}
 			}
 		},
 		[ query, geocodeUrl, onLocationFound ]
@@ -440,9 +505,10 @@ function LocationSearch( {
 
 /* ---------- React component ---------- */
 
-function EventsMap( props: MapProps ): JSX.Element | null {
+export function EventsMap( props: MapProps ): JSX.Element | null {
 	const {
 		containerId,
+		syncId,
 		height,
 		zoom,
 		mapType,
@@ -466,6 +532,7 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 	const markerMapRef = useRef< Map< number, L.Marker > >( new Map() );
 	const userMarkerRef = useRef< L.Marker | null >( null );
 	const geoAuthorityRef = useRef( createGeoAuthorityTracker() );
+	const venueRequestRef = useRef< AbortController | null >( null );
 	// Single L.polyline holding the chronological route. Recreated from
 	// scratch whenever venues change so we don't manage segment-level
 	// diffing — the route is at most a few dozen points.
@@ -491,8 +558,13 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 				return;
 			}
 
+			venueRequestRef.current?.abort();
+			const controller = new AbortController();
+			venueRequestRef.current = controller;
+
 			try {
 				const result = await fetchVenues( restUrl, nonce, {
+					signal: controller.signal,
 					bounds,
 					taxonomy: taxonomy || undefined,
 					termId: termId || undefined,
@@ -506,10 +578,19 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 					// endpoint returns the full venue set.
 					scopeToken: scopeToken || undefined,
 				} );
-				setVenues( result.venues );
+				if ( venueRequestRef.current === controller ) {
+					setVenues( result.venues );
+				}
 			} catch ( err ) {
+				if ( ( err as Error ).name === 'AbortError' ) {
+					return;
+				}
 				// eslint-disable-next-line no-console
 				console.error( 'Events map: failed to fetch venues', err );
+			} finally {
+				if ( venueRequestRef.current === controller ) {
+					venueRequestRef.current = null;
+				}
 			}
 		},
 		[ restUrl, nonce, taxonomy, termId, chronologicalRouteMode, scopeToken ]
@@ -518,12 +599,9 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 	/* --- debounced bounds handler --- */
 	// eslint-disable-next-line react-hooks/exhaustive-deps
 	const debouncedFetch = useCallback(
-		debounce( ( map: L.Map, authority: GeoAuthoritySource | null ) => {
+		createDebounce( ( map: L.Map ) => {
 			const bounds = getBoundsFromMap( map );
 			loadVenues( bounds );
-			if ( authority ) {
-				dispatchBoundsChanged( map, authority );
-			}
 		}, 500 ),
 		[ loadVenues ]
 	);
@@ -561,12 +639,68 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 			zoom
 		);
 
-		const markUserInteraction = () => {
-			geoAuthorityRef.current.mark( 'user-interaction' );
+		const authority = geoAuthorityRef.current;
+		const initialOperation = initialView.authority
+			? authority.immediate( initialView.authority )
+			: null;
+		const interactionAbandonTimers = new Set<
+			ReturnType< typeof setTimeout >
+		>();
+		const mountTimers = new Set< ReturnType< typeof setTimeout > >();
+		const cleanupCallbacks: Array< () => void > = [];
+		let activeGestureGeneration: number | null = null;
+		let activeGestureMoved = false;
+		let activeGestureType: 'drag' | 'boxzoom' | null = null;
+		const prepareUserInteraction = () => {
+			const operation = authority.prepare( 'user-interaction' );
+			const timer = setTimeout( () => {
+				authority.abandon( operation.generation );
+				interactionAbandonTimers.delete( timer );
+			}, 750 );
+			interactionAbandonTimers.add( timer );
 		};
-		map.on( 'dragstart boxzoomstart', markUserInteraction );
-		el.addEventListener( 'dblclick', markUserInteraction );
-		el.addEventListener( 'keydown', ( event: KeyboardEvent ) => {
+		const activateUserInteraction = ( type: 'drag' | 'boxzoom' ) => {
+			activeGestureMoved = false;
+			activeGestureType = type;
+			activeGestureGeneration =
+				authority.activate( 'user-interaction' ).generation;
+		};
+		const handleDragStart = () => activateUserInteraction( 'drag' );
+		const handleBoxZoomStart = () => activateUserInteraction( 'boxzoom' );
+		const cancelActiveGesture = () => {
+			if ( activeGestureGeneration !== null ) {
+				authority.cancel( activeGestureGeneration );
+				activeGestureGeneration = null;
+				activeGestureMoved = false;
+				activeGestureType = null;
+			}
+		};
+		const handleMove = () => {
+			if ( activeGestureGeneration !== null ) {
+				activeGestureMoved = true;
+			}
+		};
+		const handleDragEnd = () => {
+			if ( activeGestureGeneration !== null && ! activeGestureMoved ) {
+				cancelActiveGesture();
+			}
+		};
+		const handleMoveStart = () => authority.movementStarted();
+		const handleMoveEnd = () => {
+			if ( ! chronologicalRouteMode ) {
+				debouncedFetch.schedule( map );
+			}
+			const operation = authority.movementEnded();
+			if ( operation ) {
+				if ( activeGestureGeneration === operation.generation ) {
+					activeGestureGeneration = null;
+					activeGestureMoved = false;
+					activeGestureType = null;
+				}
+				dispatchBoundsChanged( map, syncId, operation );
+			}
+		};
+		const handleKeyDown = ( event: KeyboardEvent ) => {
 			if (
 				[
 					'ArrowUp',
@@ -578,23 +712,36 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 					'=',
 				].includes( event.key )
 			) {
-				markUserInteraction();
+				prepareUserInteraction();
 			}
-		} );
-		el.addEventListener(
-			'click',
-			( event: MouseEvent ) => {
-				const target = event.target as Element | null;
-				if (
-					target?.closest(
-						'.leaflet-control-zoom-in, .leaflet-control-zoom-out, .marker-cluster'
-					)
-				) {
-					markUserInteraction();
-				}
-			},
-			true
-		);
+		};
+		const handleDocumentKeyDown = ( event: KeyboardEvent ) => {
+			if ( event.key === 'Escape' && activeGestureType === 'boxzoom' ) {
+				cancelActiveGesture();
+			}
+		};
+		const handleClick = ( event: MouseEvent ) => {
+			const target = event.target as Element | null;
+			if (
+				target?.closest(
+					'.leaflet-control-zoom-in, .leaflet-control-zoom-out, .marker-cluster'
+				)
+			) {
+				prepareUserInteraction();
+			}
+		};
+		const handleDoubleClick = () => prepareUserInteraction();
+
+		map.on( 'movestart', handleMoveStart );
+		map.on( 'move', handleMove );
+		map.on( 'moveend', handleMoveEnd );
+		map.on( 'dragstart', handleDragStart );
+		map.on( 'boxzoomstart', handleBoxZoomStart );
+		map.on( 'dragend', handleDragEnd );
+		el.addEventListener( 'dblclick', handleDoubleClick, true );
+		el.addEventListener( 'keydown', handleKeyDown, true );
+		el.addEventListener( 'click', handleClick, true );
+		document.addEventListener( 'keydown', handleDocumentKeyDown, true );
 
 		if ( isTouch ) {
 			// Show gesture hint when user tries single-finger drag.
@@ -614,42 +761,43 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 				}, 1500 );
 			};
 
-			el.addEventListener(
-				'touchstart',
-				( e: TouchEvent ) => {
-					if ( e.touches.length === 1 ) {
-						showGestureHint();
-					} else if ( e.touches.length >= 2 ) {
-						// Two-finger gesture — enable dragging temporarily.
-						markUserInteraction();
-						map.dragging.enable();
-					}
-				},
-				{ passive: true }
-			);
+			const handleTouchStart = ( e: TouchEvent ) => {
+				if ( e.touches.length === 1 ) {
+					showGestureHint();
+				} else if ( e.touches.length >= 2 ) {
+					// Two-finger gesture — enable dragging temporarily.
+					prepareUserInteraction();
+					map.dragging.enable();
+				}
+			};
 
-			el.addEventListener(
-				'touchend',
-				() => {
-					// Re-disable dragging after gesture ends.
-					map.dragging.disable();
-				},
-				{ passive: true }
-			);
+			const handleTouchEnd = () => map.dragging.disable();
+			el.addEventListener( 'touchstart', handleTouchStart, {
+				passive: true,
+			} );
+			el.addEventListener( 'touchend', handleTouchEnd, {
+				passive: true,
+			} );
+			cleanupCallbacks.push( () => {
+				el.removeEventListener( 'touchstart', handleTouchStart );
+				el.removeEventListener( 'touchend', handleTouchEnd );
+			} );
 		} else {
 			// Desktop: Ctrl/Cmd + scroll to zoom.
-			el.addEventListener(
-				'wheel',
-				( e: WheelEvent ) => {
-					if ( e.ctrlKey || e.metaKey ) {
-						e.preventDefault();
-						markUserInteraction();
-						map.scrollWheelZoom.enable();
-					}
-				},
-				{ passive: false }
-			);
-			map.on( 'mouseout', () => map.scrollWheelZoom.disable() );
+			const handleWheel = ( e: WheelEvent ) => {
+				if ( e.ctrlKey || e.metaKey ) {
+					e.preventDefault();
+					prepareUserInteraction();
+					map.scrollWheelZoom.enable();
+				}
+			};
+			const handleMouseOut = () => map.scrollWheelZoom.disable();
+			el.addEventListener( 'wheel', handleWheel, { passive: false } );
+			map.on( 'mouseout', handleMouseOut );
+			cleanupCallbacks.push( () => {
+				el.removeEventListener( 'wheel', handleWheel );
+				map.off( 'mouseout', handleMouseOut );
+			} );
 		}
 
 		// Tile layer.
@@ -671,7 +819,6 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 			chunkInterval: 100,
 			chunkDelay: 10,
 		} );
-		clusterGroup.on( 'clusterclick', markUserInteraction );
 		map.addLayer( clusterGroup );
 		clusterGroupRef.current = clusterGroup;
 
@@ -682,14 +829,8 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 		// term's events) — the full set is already small and refetching by
 		// viewport would drop venues that the user just panned away from,
 		// mid-route. Skip the moveend refetch for it.
-		if ( ! chronologicalRouteMode ) {
-			map.on( 'moveend', () => {
-				debouncedFetch( map, geoAuthorityRef.current.consume() );
-			} );
-		}
-
 		// Force a resize check after mount.
-		setTimeout( () => map.invalidateSize(), 100 );
+		const resizeTimer = setTimeout( () => map.invalidateSize(), 100 );
 
 		// Collapsible support: when the block is rendered inside a
 		// collapsible region, the container can be hidden (display:none /
@@ -713,7 +854,7 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 		// Fetch venues on mount and notify other blocks (e.g. calendar geo-sync).
 		if ( initialVenues.length === 0 ) {
 			// Small delay so map is fully sized first.
-			setTimeout( () => {
+			const mountTimer = setTimeout( () => {
 				// Chronological-route mode wants the full bounded set
 				// regardless of the default viewport, then it auto-fits
 				// to those points. Passing bounds here would clip the
@@ -722,13 +863,47 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 					? undefined
 					: getBoundsFromMap( map );
 				loadVenues( bounds );
-				if ( initialView.authority ) {
-					dispatchBoundsChanged( map, initialView.authority );
+				if (
+					initialOperation &&
+					authority.isLatest( initialOperation.generation ) &&
+					map.getCenter().lat === initialView.center.lat &&
+					map.getCenter().lng === initialView.center.lng
+				) {
+					dispatchBoundsChanged( map, syncId, initialOperation );
 				}
 			}, 200 );
+			mountTimers.add( mountTimer );
 		}
 
 		return () => {
+			clearTimeout( resizeTimer );
+			mountTimers.forEach( clearTimeout );
+			mountTimers.clear();
+			interactionAbandonTimers.forEach( clearTimeout );
+			interactionAbandonTimers.clear();
+			if ( gestureTimeoutRef.current ) {
+				clearTimeout( gestureTimeoutRef.current );
+				gestureTimeoutRef.current = null;
+			}
+			debouncedFetch.cancel();
+			venueRequestRef.current?.abort();
+			venueRequestRef.current = null;
+			authority.destroy();
+			map.off( 'movestart', handleMoveStart );
+			map.off( 'move', handleMove );
+			map.off( 'moveend', handleMoveEnd );
+			map.off( 'dragstart', handleDragStart );
+			map.off( 'boxzoomstart', handleBoxZoomStart );
+			map.off( 'dragend', handleDragEnd );
+			el.removeEventListener( 'dblclick', handleDoubleClick, true );
+			el.removeEventListener( 'keydown', handleKeyDown, true );
+			el.removeEventListener( 'click', handleClick, true );
+			document.removeEventListener(
+				'keydown',
+				handleDocumentKeyDown,
+				true
+			);
+			cleanupCallbacks.forEach( ( cleanup ) => cleanup() );
 			el.removeEventListener(
 				'data-machine-map-invalidate-size',
 				handleInvalidateSize
@@ -756,16 +931,27 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 					lat: number;
 					lng: number;
 					zoom?: number;
+					syncId?: string;
+					authority?: 'external' | 'user-location';
 				} >
 			 ).detail;
 
-			if ( ! detail?.lat || ! detail?.lng ) {
+			if (
+				! detail ||
+				! Number.isFinite( detail.lat ) ||
+				! Number.isFinite( detail.lng ) ||
+				! isTargetedToMap( detail.syncId, syncId )
+			) {
 				return;
 			}
 
-			geoAuthorityRef.current.mark( 'external' );
-			map.setView(
-				[ detail.lat, detail.lng ],
+			moveWithAuthority(
+				map,
+				syncId,
+				geoAuthorityRef.current,
+				detail.authority ?? 'external',
+				detail.lat,
+				detail.lng,
 				detail.zoom ?? map.getZoom()
 			);
 		};
@@ -777,7 +963,7 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 				handler
 			);
 		};
-	}, [] );
+	}, [ syncId ] );
 
 	/* --- listen for external user-location updates (e.g. geolocation) --- */
 	useEffect( () => {
@@ -791,10 +977,16 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 				e as CustomEvent< {
 					lat: number;
 					lng: number;
+					syncId?: string;
 				} >
 			 ).detail;
 
-			if ( ! detail?.lat || ! detail?.lng ) {
+			if (
+				! detail ||
+				! Number.isFinite( detail.lat ) ||
+				! Number.isFinite( detail.lng ) ||
+				! isTargetedToMap( detail.syncId, syncId )
+			) {
 				return;
 			}
 
@@ -823,7 +1015,7 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 				handler
 			);
 		};
-	}, [] );
+	}, [ syncId ] );
 
 	/* --- update markers when venues change (with diffing) --- */
 	useEffect( () => {
@@ -1060,21 +1252,31 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 	}, [ userLat, userLon ] );
 
 	/* --- handle location search result --- */
-	const handleLocationFound = useCallback( ( lat: number, lng: number ) => {
-		const map = mapRef.current;
-		if ( ! map ) {
-			return;
-		}
+	const handleLocationFound = useCallback(
+		( lat: number, lng: number ) => {
+			const map = mapRef.current;
+			if ( ! map ) {
+				return;
+			}
 
-		geoAuthorityRef.current.mark( 'manual-search' );
-		map.setView( [ lat, lng ], 12 );
+			moveWithAuthority(
+				map,
+				syncId,
+				geoAuthorityRef.current,
+				'manual-search',
+				lat,
+				lng,
+				12
+			);
 
-		// Update URL for shareability.
-		const url = new URL( window.location.href );
-		url.searchParams.set( 'lat', lat.toFixed( 6 ) );
-		url.searchParams.set( 'lng', lng.toFixed( 6 ) );
-		window.history.replaceState( {}, '', url.toString() );
-	}, [] );
+			// Update URL for shareability.
+			const url = new URL( window.location.href );
+			url.searchParams.set( 'lat', lat.toFixed( 6 ) );
+			url.searchParams.set( 'lng', lng.toFixed( 6 ) );
+			window.history.replaceState( {}, '', url.toString() );
+		},
+		[ syncId ]
+	);
 
 	return (
 		<>
@@ -1109,6 +1311,7 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 
 function parseMapProps( container: HTMLElement ): MapProps {
 	const data = container.dataset;
+	const generatedId = container.id || `dm-events-map-${ Date.now() }`;
 
 	const parseOptionalFloat = ( val?: string ): number | null => {
 		if ( ! val || val === '' ) {
@@ -1119,7 +1322,8 @@ function parseMapProps( container: HTMLElement ): MapProps {
 	};
 
 	return {
-		containerId: container.id || `dm-events-map-${ Date.now() }`,
+		containerId: generatedId,
+		syncId: data.syncId || generatedId,
 		height: parseInt( data.height || '400', 10 ),
 		zoom: parseInt( data.zoom || '12', 10 ),
 		mapType: ( data.mapType || 'osm-standard' ) as MapType,

@@ -99,7 +99,11 @@ function deferredResponse(): {
 
 function calendarMarkup( withMap = false, mode = 'month-grid' ): string {
 	return `
-		${ withMap ? '<div class="data-machine-events-map-root"></div>' : '' }
+		${
+			withMap
+				? '<div id="map-a" class="data-machine-events-map-root" data-sync-id="map-a"></div>'
+				: ''
+		}
 		<div class="data-machine-events-calendar" data-display-mode="${ mode }"
 			data-scope="tonight" data-scope-token="opaque-token"
 			data-archive-taxonomy="location" data-archive-term-id="12">
@@ -211,6 +215,8 @@ describe( 'calendar frontend month-grid integration', () => {
 		document.dispatchEvent(
 			new CustomEvent( 'data-machine-map-bounds-changed', {
 				detail: {
+					syncId: 'map-a',
+					generation: 1,
 					bounds: { swLat: 32, swLng: -80, neLat: 33, neLng: -79 },
 					zoom: 10,
 					center: { lat: 32.78, lng: -79.93 },
@@ -260,6 +266,8 @@ describe( 'calendar frontend month-grid integration', () => {
 		document.dispatchEvent(
 			new CustomEvent( 'data-machine-map-bounds-changed', {
 				detail: {
+					syncId: 'map-a',
+					generation: 1,
 					bounds: { swLat: 32, swLng: -80, neLat: 33, neLng: -79 },
 					zoom: 10,
 					center: { lat: 32.78, lng: -79.93 },

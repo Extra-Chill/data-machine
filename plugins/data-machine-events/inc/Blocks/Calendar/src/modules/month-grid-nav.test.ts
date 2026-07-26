@@ -236,4 +236,44 @@ describe( 'month-grid state synchronization', () => {
 		expect( window.location.search ).toContain( 'event_search=latest' );
 		expect( window.location.search ).not.toContain( 'event_search=stale' );
 	} );
+
+	it( 'blocks stale render and history after geo supersession', async () => {
+		const deferred = deferredResponse();
+		mockFetch.mockImplementationOnce( () => deferred.promise );
+		const pushState = jest.spyOn( window.history, 'pushState' );
+		const abortController = new AbortController();
+		initMonthGridNav( calendar );
+		const request = getMonthGridController( calendar )!.handleFilterChange(
+			new URLSearchParams( 'event_search=stale' ),
+			{
+				signal: abortController.signal,
+				shouldApply: () => ! abortController.signal.aborted,
+			}
+		);
+
+		abortController.abort();
+		deferred.resolve();
+		await request;
+
+		expect( mockRenderMonthGridResponse ).not.toHaveBeenCalled();
+		expect( pushState ).not.toHaveBeenCalled();
+		expect( calendar.dataset.geoLat ).toBeUndefined();
+	} );
+
+	it( 'blocks a late response after controller teardown', async () => {
+		const deferred = deferredResponse();
+		mockFetch.mockImplementationOnce( () => deferred.promise );
+		const pushState = jest.spyOn( window.history, 'pushState' );
+		initMonthGridNav( calendar );
+		const request = getMonthGridController( calendar )!.handleFilterChange(
+			new URLSearchParams( 'event_search=destroyed' )
+		);
+
+		destroyMonthGridNav( calendar );
+		deferred.resolve();
+		await request;
+
+		expect( mockRenderMonthGridResponse ).not.toHaveBeenCalled();
+		expect( pushState ).not.toHaveBeenCalled();
+	} );
 } );

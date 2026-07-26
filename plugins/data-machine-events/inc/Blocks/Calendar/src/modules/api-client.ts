@@ -145,14 +145,24 @@ export function buildCalendarRequest(
 export async function fetchCalendarEvents(
 	calendar: HTMLElement,
 	params: URLSearchParams,
-	archiveContext: Partial< ArchiveContext > = {}
+	archiveContext: Partial< ArchiveContext > = {},
+	options: {
+		signal?: AbortSignal;
+		shouldApply?: () => boolean;
+	} = {}
 ): Promise< CalendarResponse > {
 	const content = calendar.querySelector< HTMLElement >(
 		'.data-machine-events-content'
 	);
 
 	if ( ! content ) {
-		return { success: false, html: '', pagination: null, counter: null, navigation: null };
+		return {
+			success: false,
+			html: '',
+			pagination: null,
+			counter: null,
+			navigation: null,
+		};
 	}
 
 	content.classList.add( 'loading' );
@@ -167,6 +177,7 @@ export async function fetchCalendarEvents(
 
 		const response = await fetch( apiUrl, {
 			method: 'GET',
+			signal: options.signal,
 			headers: {
 				'Content-Type': 'application/json',
 				Accept: 'application/json',
@@ -186,6 +197,9 @@ export async function fetchCalendarEvents(
 		}
 
 		const data: CalendarResponse = await response.json();
+		if ( options.signal?.aborted || options.shouldApply?.() === false ) {
+			return data;
+		}
 
 		if ( data.success ) {
 			content.innerHTML = data.html;
@@ -208,6 +222,19 @@ export async function fetchCalendarEvents(
 
 		return data;
 	} catch ( error ) {
+		if (
+			options.signal?.aborted ||
+			options.shouldApply?.() === false ||
+			( error as Error ).name === 'AbortError'
+		) {
+			return {
+				success: false,
+				html: '',
+				pagination: null,
+				counter: null,
+				navigation: null,
+			};
+		}
 		window.console.error( 'Error fetching filtered events:', error );
 		content.innerHTML =
 			'<div class="data-machine-events-error"><p>Error loading events. Please try again.</p></div>';
@@ -219,7 +246,9 @@ export async function fetchCalendarEvents(
 			navigation: null,
 		};
 	} finally {
-		content.classList.remove( 'loading' );
+		if ( options.shouldApply?.() !== false ) {
+			content.classList.remove( 'loading' );
+		}
 	}
 }
 

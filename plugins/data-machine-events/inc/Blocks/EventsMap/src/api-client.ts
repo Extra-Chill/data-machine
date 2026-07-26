@@ -13,6 +13,7 @@
 import type { MapBounds, VenueListResponse } from './types';
 
 interface FetchVenuesParams {
+	signal?: AbortSignal;
 	bounds?: MapBounds;
 	lat?: number;
 	lng?: number;
@@ -94,6 +95,7 @@ export async function fetchVenues(
 
 	const response = await fetch( url.toString(), {
 		headers: { Accept: 'application/json' },
+		signal: params.signal,
 	} );
 
 	if ( ! response.ok ) {

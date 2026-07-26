@@ -101,9 +101,7 @@ class MonthGridController {
 		this.onPopState?.( params );
 		const month = params.get( 'month' );
 		void this.navigateToMonth(
-			month && /^\d{4}-\d{2}$/.test( month )
-				? month
-				: this.initialMonth,
+			month && /^\d{4}-\d{2}$/.test( month ) ? month : this.initialMonth,
 			params,
 			false
 		);
@@ -113,13 +111,23 @@ class MonthGridController {
 	 * Public entry point called by frontend.ts when a filter changes
 	 * in grid mode.
 	 * @param params
+	 * @param requestOptions
+	 * @param requestOptions.signal
+	 * @param requestOptions.shouldApply
 	 */
-	async handleFilterChange( params: URLSearchParams ): Promise< boolean > {
+	async handleFilterChange(
+		params: URLSearchParams,
+		requestOptions: {
+			signal?: AbortSignal;
+			shouldApply?: () => boolean;
+		} = {}
+	): Promise< boolean > {
 		return this.navigateToMonth(
 			this.getCurrentMonth(),
 			params,
 			true,
-			true
+			true,
+			requestOptions
 		);
 	}
 
@@ -130,12 +138,19 @@ class MonthGridController {
 	 * @param source
 	 * @param pushHistory
 	 * @param syncGeoState
+	 * @param requestOptions
+	 * @param requestOptions.signal
+	 * @param requestOptions.shouldApply
 	 */
 	async navigateToMonth(
 		month: string,
 		source: URLSearchParams = new URLSearchParams( window.location.search ),
 		pushHistory = true,
-		syncGeoState = false
+		syncGeoState = false,
+		requestOptions: {
+			signal?: AbortSignal;
+			shouldApply?: () => boolean;
+		} = {}
 	): Promise< boolean > {
 		const requestId = ++this.requestSequence;
 		const publicParams = this.buildPublicParams( source, month );
@@ -190,6 +205,7 @@ class MonthGridController {
 			const apiUrl = `/wp-json/datamachine/v1/events/calendar?${ params.toString() }`;
 			const response = await fetch( apiUrl, {
 				method: 'GET',
+				signal: requestOptions.signal,
 				headers: {
 					'Content-Type': 'application/json',
 					Accept: 'application/json',
@@ -205,7 +221,11 @@ class MonthGridController {
 			if ( ! data?.success ) {
 				throw new Error( 'Calendar response not successful' );
 			}
-			if ( requestId !== this.requestSequence ) {
+			if (
+				requestId !== this.requestSequence ||
+				requestOptions.signal?.aborted ||
+				requestOptions.shouldApply?.() === false
+			) {
 				return false;
 			}
 
@@ -235,12 +255,21 @@ class MonthGridController {
 			);
 			return true;
 		} catch ( error ) {
-			if ( requestId === this.requestSequence ) {
+			if (
+				requestId === this.requestSequence &&
+				! requestOptions.signal?.aborted &&
+				requestOptions.shouldApply?.() !== false &&
+				( error as Error ).name !== 'AbortError'
+			) {
 				window.console.error( 'Month-grid fetch failed:', error );
 			}
 			return false;
 		} finally {
-			if ( requestId === this.requestSequence ) {
+			if (
+				requestId === this.requestSequence &&
+				! requestOptions.signal?.aborted &&
+				requestOptions.shouldApply?.() !== false
+			) {
 				const refreshedGrid = this.calendar.querySelector(
 					'.data-machine-month-grid'
 				);

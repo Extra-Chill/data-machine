@@ -75,6 +75,7 @@ export interface MapAttributes {
  */
 export interface MapProps {
 	containerId: string;
+	syncId: string;
 	height: number;
 	zoom: number;
 	mapType: MapType;
@@ -114,6 +115,8 @@ export interface MapBounds {
  * Custom event dispatched when map bounds change.
  */
 export interface BoundsChangedEvent {
+	syncId: string;
+	generation: number;
 	bounds: MapBounds;
 	zoom: number;
 	center: { lat: number; lng: number };

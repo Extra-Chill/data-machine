@@ -65,6 +65,10 @@ $center = apply_filters( 'data_machine_events_map_center', $center, $context );
 $user_location = apply_filters( 'data_machine_events_map_user_location', null, $context );
 
 $map_id  = wp_unique_id( 'dm-events-map-' );
+$sync_id = (string) apply_filters( 'data_machine_events_map_sync_id', $map_id, $context );
+if ( '' === $sync_id ) {
+	$sync_id = $map_id;
+}
 $wrapper = get_block_wrapper_attributes( array(
 	'class' => 'data-machine-events-map-block',
 ) );
@@ -181,6 +185,7 @@ $hide_label = __( 'Hide map', 'data-machine-events' );
 		<?php endif; ?>
 		<?php endif; ?>
 		data-height="<?php echo esc_attr( $height ); ?>"
+		data-sync-id="<?php echo esc_attr( $sync_id ); ?>"
 		data-zoom="<?php echo esc_attr( $zoom ); ?>"
 		data-map-type="<?php echo esc_attr( $map_type ); ?>"
 		data-center-lat="<?php echo esc_attr( $center['lat'] ?? '' ); ?>"

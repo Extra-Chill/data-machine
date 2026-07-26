@@ -88,6 +88,7 @@ signatures are stable.
 | `data_machine_events_modal_button_classes` | `(array $classes, string $variant)` | Modify CSS classes on filter modal buttons. `$variant` is `'primary'` or `'secondary'`. |
 | `data_machine_events_calendar_request_args` | `(array $query_args, array $context)` | Add contextual calendar defaults immediately before `CalendarRequest` parsing. Request and block values are already assembled, so consumers should add only missing keys; all returned values are sanitized by `CalendarRequest`. Context contains `attributes`, resolved `display_mode`, and `archive_term` (`WP_Term|null`). Parsed taxonomy and geo values automatically reach the initial query, rendered state, controls, and existing frontend REST round-trips. |
 | `data_machine_events_calendar_query_args` | `(array $args, array $params)` | Modify the WP_Query args used by the calendar block. |
+| `data_machine_events_calendar_map_sync_id` | `(string $sync_id, array $context)` | Target this calendar at the Events Map with the same stable sync ID. Required when a page contains multiple maps; a single map is paired automatically. |
 
 ### Event Details block filters
 
@@ -106,10 +107,17 @@ signatures are stable.
 |---|---|---|
 | `data_machine_events_map_center` | `(array $center, array $context)` | Override the map's initial center coordinates. |
 | `data_machine_events_map_user_location` | `(?array $location, array $context)` | Provide a default user location override. |
+| `data_machine_events_map_sync_id` | `(string $sync_id, array $context)` | Set the map's stable generic synchronization ID. Defaults to the generated map ID. Use the same value with `data_machine_events_calendar_map_sync_id` for multi-map pages. |
 | `data_machine_events_map_show_location_search` | `(bool $show, array $context)` | Toggle the location search input. |
 | `data_machine_events_map_summary` | `(string $html, array $venues, array $context)` | Inject custom summary HTML above the map. |
 | `data_machine_events_map_query_args` | `(array $query_args, array $params)` | Modify the resolved venue-map query args before the database query runs. `$query_args['include_ids']` is the candidate venue term ID set (null = unrestricted, empty array = zero results, array of ints = intersected with existing filters). Mirrors `data_machine_events_calendar_query_args`. |
 | `data_machine_events_map_venues` | `(array $venues, array $params)` | Modify the final venue array before it is returned to the caller. Runs after sort + cap. Consumers may mutate per-venue fields, inject `upcoming_events_at_venue` payloads from custom sources (when the built-in `include_events` + taxonomy/term gating does not apply), re-order, or remove venues. Cannot expand beyond `MAX_VENUES`. |
+
+### Map synchronization events
+
+`data-machine-map-recenter` accepts `{ syncId, lat, lng, zoom?, authority? }`. `syncId` targets one map; an omitted target is accepted only when exactly one map exists for backward compatibility. `authority` may be `external` or `user-location` and defaults to `external`.
+
+`data-machine-map-bounds-changed` emits `{ syncId, generation, authority, bounds, center, zoom }`. Calendar instances ignore events for other sync IDs, unknown authorities, and malformed generations. Layout-only movement never emits this event.
 
 ### Event Details / button-row actions
 

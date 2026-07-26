@@ -11,6 +11,8 @@
   },
   "dependencies": {
     "@types/leaflet.markercluster": "^1.5.6",
+    "@wordpress/element": "^6.40.0",
+    "@wordpress/i18n": "^6.24.0",
     "leaflet": "^1.9.4",
     "leaflet.markercluster": "^1.5.3"
   },
@@ -18,7 +20,9 @@
     "@types/leaflet": "^1.9.17",
     "@wordpress/eslint-plugin": "^25.7.0",
     "@wordpress/scripts": "31.1.0",
-    "eslint": "^9.0.0"
+    "eslint": "^9.0.0",
+    "react": "^18.3.0",
+    "react-dom": "^18.3.0"
   },
   "overrides": {
     "rimraf": "^4.4.1",

@@ -1,3 +1,6 @@
+/**
+ * Internal dependencies
+ */
 import {
 	createGeoAuthorityTracker,
 	resolveInitialView,
@@ -57,23 +60,69 @@ describe( 'map geo authority', () => {
 		}
 	);
 
-	it( 'does not let unmarked programmatic movement masquerade as intent', () => {
+	it( 'binds authority to a started movement generation', () => {
 		const tracker = createGeoAuthorityTracker();
+		const operation = tracker.prepare( 'external' );
 
-		expect( tracker.consume() ).toBeNull();
-		tracker.mark( 'user-interaction' );
-		expect( tracker.consume() ).toBe( 'user-interaction' );
-		expect( tracker.consume() ).toBeNull();
+		expect( tracker.movementEnded() ).toBeNull();
+		tracker.movementStarted();
+		expect( tracker.movementEnded() ).toEqual( operation );
+		expect( tracker.movementEnded() ).toBeNull();
 	} );
 
-	it.each( [ 'external', 'manual-search', 'user-interaction' ] as const )(
-		'preserves one %s movement',
-		( source ) => {
-			const tracker = createGeoAuthorityTracker();
-			tracker.mark( source );
+	it( 'completes authoritative no-op requests explicitly', () => {
+		const tracker = createGeoAuthorityTracker();
+		const operation = tracker.prepare( 'manual-search' );
 
-			expect( tracker.consume() ).toBe( source );
-			expect( tracker.consume() ).toBeNull();
-		}
-	);
+		expect( tracker.completeNoop( operation.generation ) ).toEqual(
+			operation
+		);
+		expect( tracker.movementEnded() ).toBeNull();
+	} );
+
+	it( 'clears abandoned marks before later neutral movement', () => {
+		const tracker = createGeoAuthorityTracker();
+		const abandoned = tracker.prepare( 'user-interaction' );
+		tracker.abandon( abandoned.generation );
+
+		tracker.movementStarted();
+		expect( tracker.movementEnded() ).toBeNull();
+	} );
+
+	it( 'does not let neutral movement cancel completed authority', () => {
+		const tracker = createGeoAuthorityTracker();
+		const operation = tracker.activate( 'user-interaction' );
+
+		expect( tracker.movementEnded() ).toEqual( operation );
+		tracker.movementStarted();
+		expect( tracker.movementEnded() ).toBeNull();
+	} );
+
+	it( 'supersedes an unstarted operation with a newer generation', () => {
+		const tracker = createGeoAuthorityTracker();
+		const oldOperation = tracker.prepare( 'external' );
+		const currentOperation = tracker.prepare( 'manual-search' );
+
+		expect( tracker.completeNoop( oldOperation.generation ) ).toBeNull();
+		tracker.movementStarted();
+		expect( tracker.movementEnded() ).toEqual( currentOperation );
+	} );
+
+	it( 'lets user intent supersede delayed initial authority', () => {
+		const tracker = createGeoAuthorityTracker();
+		const initial = tracker.immediate( 'server' );
+		const user = tracker.activate( 'user-interaction' );
+
+		expect( tracker.isLatest( initial.generation ) ).toBe( false );
+		expect( tracker.isLatest( user.generation ) ).toBe( true );
+	} );
+
+	it( 'cancels active gesture authority before neutral movement', () => {
+		const tracker = createGeoAuthorityTracker();
+		const gesture = tracker.activate( 'user-interaction' );
+		tracker.cancel( gesture.generation );
+
+		tracker.movementStarted();
+		expect( tracker.movementEnded() ).toBeNull();
+	} );
 } );

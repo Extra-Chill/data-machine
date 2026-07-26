@@ -59,7 +59,7 @@ jobs:
 
       - name: Run Homeboy ${{ matrix.command }}
         env:
-          HOMEBOY_SETTINGS_JSON: '{"database_type":"mysql","validation_dependencies":["/tmp/data-machine"],"wp_codebox_multisite":true,"wp_codebox_phpunit_bootstrap_mode":"managed","wp_codebox_prepare_steps":[{"command":"npm","args":["ci"],"cwd":"inc/Blocks/Calendar"},{"command":"npm","args":["run","build"],"cwd":"inc/Blocks/Calendar"},{"command":"npm","args":["ci"],"cwd":"inc/Blocks/EventDetails"},{"command":"npm","args":["run","build"],"cwd":"inc/Blocks/EventDetails"},{"command":"npm","args":["ci"],"cwd":"inc/Blocks/EventsMap"},{"command":"npm","args":["run","build"],"cwd":"inc/Blocks/EventsMap"}]}'
+          HOMEBOY_SETTINGS_JSON: '{"database_type":"mysql","wp_codebox_multisite":true,"wp_codebox_phpunit_bootstrap_mode":"managed","wp_codebox_prepare_steps":[{"command":"npm","args":["ci"],"cwd":"inc/Blocks/Calendar"},{"command":"npm","args":["run","build"],"cwd":"inc/Blocks/Calendar"},{"command":"npm","args":["ci"],"cwd":"inc/Blocks/EventDetails"},{"command":"npm","args":["run","build"],"cwd":"inc/Blocks/EventDetails"},{"command":"npm","args":["ci"],"cwd":"inc/Blocks/EventsMap"},{"command":"npm","args":["run","build"],"cwd":"inc/Blocks/EventsMap"}]}'
           HOMEBOY_WORDPRESS_DEPENDENCY_PATHS: /tmp/data-machine
           HOMEBOY_WORDPRESS_MULTISITE: '1'
         uses: Extra-Chill/homeboy-action@v2
