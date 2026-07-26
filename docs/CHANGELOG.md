@@ -2,6 +2,14 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.169.3] - 2026-07-26
+
+### Changed
+- use jobs table constant in delegated retention coverage
+
+### Fixed
+- redact delegated workflow exceptions
+
 ## [0.169.2] - 2026-07-26
 
 ### Changed
