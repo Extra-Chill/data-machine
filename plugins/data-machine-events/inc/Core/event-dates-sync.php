@@ -81,10 +81,12 @@ function datamachine_normalize_ticket_url( string $url ): string {
  * - ticketmaster.evyy.net/c/.../4272?u=<ticketmaster_url>  (affiliate)
  * - www.ticketmaster.com/event/...                          (direct)
  *
- * The result is normalized (scheme + host + path, no query params) for comparison.
+ * Provider URLs with stable event IDs return an opaque provider identity so
+ * source-generated title or lineup slugs do not fragment the same event. Other
+ * URLs fall back to normalized scheme + host + path comparison.
  *
  * @param string $url Ticket URL (may be affiliate-wrapped or direct)
- * @return string Canonical URL for dedup comparison
+ * @return string Canonical ticket identity for dedup comparison
  */
 function datamachine_extract_ticket_identity( string $url ): string {
 	if ( empty( $url ) ) {
@@ -98,6 +100,25 @@ function datamachine_extract_ticket_identity( string $url ): string {
 	$parsed = wp_parse_url( $canonical );
 	if ( ! $parsed || empty( $parsed['host'] ) ) {
 		return '';
+	}
+
+	$host = strtolower( preg_replace( '/^www\./', '', $parsed['host'] ) );
+	$path = $parsed['path'] ?? '';
+
+	// Ticketmaster embeds the stable event ID after /event/, while the
+	// preceding path is generated from the current source title.
+	if ( ( 'ticketmaster.com' === $host || str_ends_with( $host, '.ticketmaster.com' ) )
+		&& preg_match( '#/event/([^/]+)#i', $path, $matches )
+	) {
+		return 'ticketmaster:event:' . strtolower( rawurldecode( $matches[1] ) );
+	}
+
+	// Etix embeds its stable numeric event ID after /ticket/p/ and follows it
+	// with a source-generated lineup slug that can drift between feeds.
+	if ( ( 'etix.com' === $host || str_ends_with( $host, '.etix.com' ) )
+		&& preg_match( '#/ticket/p/([a-z0-9_-]+)#i', $path, $matches )
+	) {
+		return 'etix:event:' . strtolower( rawurldecode( $matches[1] ) );
 	}
 
 	$scheme     = $parsed['scheme'] ?? 'https';

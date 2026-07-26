@@ -17,6 +17,7 @@
  *   - start_datetime >= NOW (upcoming only)
  *
  * Scoring signals (per issue #256):
+ *   - Matching canonical ticket identity +5
  *   - Mutual body-lineup mention      +5
  *   - Identical end_datetime          +2
  *   - Matching price                  +1
@@ -36,6 +37,8 @@ namespace DataMachineEvents\Abilities;
 use DataMachine\Engine\AI\Actions\PendingActionStore;
 use DataMachineEvents\Core\Event_Post_Type;
 use DataMachineEvents\Core\EventDatesTable;
+use function DataMachineEvents\Core\datamachine_extract_ticket_identity;
+use const DataMachineEvents\Core\EVENT_TICKET_URL_META_KEY;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -61,7 +64,7 @@ class MergedBillDetectAbilities {
 				'data-machine-events/merged-bill-detect',
 				array(
 					'label'               => __( 'Detect merged-bill duplicate events', 'data-machine-events' ),
-					'description'         => __( 'Scan upcoming events for same-venue + same-time + different-title pairs that look like the same bill scraped twice. Queues high-confidence pairs to the pending-actions queue for agent resolution.', 'data-machine-events' ),
+					'description'         => __( 'Scan upcoming events for same-venue + same-time + different-title pairs that share canonical ticket or lineup evidence. Queues high-confidence pairs to the pending-actions queue for agent resolution.', 'data-machine-events' ),
 					'category'            => 'datamachine-events-events',
 					'input_schema'        => array(
 						'type'       => 'object',
@@ -293,14 +296,21 @@ class MergedBillDetectAbilities {
 	 */
 	private function scorePair( array $a, array $b ): array {
 		$signals = array(
-			'mutual_lineup_mention' => false,
-			'identical_end'         => false,
-			'matching_price'        => false,
-			'matching_source_host'  => false,
+			'matching_ticket_identity' => false,
+			'mutual_lineup_mention'    => false,
+			'identical_end'            => false,
+			'matching_price'           => false,
+			'matching_source_host'     => false,
 		);
 
 		$detail_a = $this->loadEventDetail( (int) $a['post_id'] );
 		$detail_b = $this->loadEventDetail( (int) $b['post_id'] );
+
+		// Matching canonical ticket identity (+5). Stable provider IDs remain
+		// authoritative when affiliate wrappers or lineup-derived slugs drift.
+		if ( $this->ticketIdentitiesMatch( $detail_a['ticket_url'] ?? '', $detail_b['ticket_url'] ?? '' ) ) {
+			$signals['matching_ticket_identity'] = true;
+		}
 
 		// Mutual lineup mention (+5).
 		$mutual = $this->hasMutualLineupMention(
@@ -333,6 +343,9 @@ class MergedBillDetectAbilities {
 		}
 
 		$score = 0;
+		if ( $signals['matching_ticket_identity'] ) {
+			$score += 5;
+		}
 		if ( $signals['mutual_lineup_mention'] ) {
 			$score += 5;
 		}
@@ -350,6 +363,16 @@ class MergedBillDetectAbilities {
 			'score'   => $score,
 			'signals' => $signals,
 		);
+	}
+
+	/**
+	 * Compare stable provider ticket identities after unwrapping affiliates.
+	 */
+	public function ticketIdentitiesMatch( string $url_a, string $url_b ): bool {
+		$identity_a = datamachine_extract_ticket_identity( $url_a );
+		$identity_b = datamachine_extract_ticket_identity( $url_b );
+
+		return '' !== $identity_a && '' !== $identity_b && $identity_a === $identity_b;
 	}
 
 	/**
@@ -448,15 +471,16 @@ class MergedBillDetectAbilities {
 	 * Kept package-private (public for the chat tool to reuse) so the
 	 * decide step can use the same extraction logic without duplicating it.
 	 *
-	 * @return array{body_text: string, performer: string, price: string}
+	 * @return array{body_text: string, performer: string, price: string, ticket_url: string}
 	 */
 	public function loadEventDetail( int $post_id ): array {
 		$post = get_post( $post_id );
 		if ( ! $post ) {
 			return array(
-				'body_text' => '',
-				'performer' => '',
-				'price'     => '',
+				'body_text'  => '',
+				'performer'  => '',
+				'price'      => '',
+				'ticket_url' => '',
 			);
 		}
 
@@ -490,9 +514,10 @@ class MergedBillDetectAbilities {
 		}
 
 		return array(
-			'body_text' => $body_text,
-			'performer' => $performer,
-			'price'     => $price,
+			'body_text'  => $body_text,
+			'performer'  => $performer,
+			'price'      => $price,
+			'ticket_url' => (string) get_post_meta( $post_id, EVENT_TICKET_URL_META_KEY, true ),
 		);
 	}
 

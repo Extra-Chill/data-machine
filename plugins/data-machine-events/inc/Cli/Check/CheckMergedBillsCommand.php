@@ -33,8 +33,8 @@ class CheckMergedBillsCommand {
 	 * ---
 	 *
 	 * [--threshold=<score>]
-	 * : Minimum score to queue a pair. Mutual lineup mention is +5; the
-	 *   default threshold of 5 makes that the minimum bar.
+	 * : Minimum score to queue a pair. Matching canonical ticket identity
+	 *   and mutual lineup mention are each +5; the default threshold is 5.
 	 * ---
 	 * default: 5
 	 * ---
@@ -93,6 +93,9 @@ class CheckMergedBillsCommand {
 		foreach ( $result['pairs'] as $pair ) {
 			$signals  = $pair['signals'] ?? array();
 			$tag_bits = array();
+			if ( ! empty( $signals['matching_ticket_identity'] ) ) {
+				$tag_bits[] = 'ticket';
+			}
 			if ( ! empty( $signals['mutual_lineup_mention'] ) ) {
 				$tag_bits[] = 'lineup';
 			}

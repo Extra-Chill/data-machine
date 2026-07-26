@@ -135,8 +135,66 @@ class MergedBillDetectScoringTest extends WP_UnitTestCase {
 	}
 
 	// ------------------------------------------------------------------
-	// scorePair via execute() — integration over fixtures requires the
-	// post records to exist. Skip; covered by direct lineup tests above.
+	// Canonical ticket identity
+	// ------------------------------------------------------------------
+
+	public function test_ticket_identity_matches_across_source_suffix_and_lineup_drift(): void {
+		$this->assertTrue(
+			$this->detector->ticketIdentitiesMatch(
+				'https://www.etix.com/ticket/p/80665941/campground-underground-music-showcase-wsinistarrj-bolivarmrfrickganocerval-denver-campground?partner_id=100',
+				'https://www.etix.com/ticket/p/80665941/campground-underground-music-showcase-wsinistarrj-bolivarmrfrickganolevi-double-u-denver-campground?partner_id=100'
+			),
+			'Source-generated lineup suffixes must not hide a shared stable provider event ID.'
+		);
+	}
+
+	public function test_ticket_identity_matches_across_affiliate_wrapped_title_variants(): void {
+		$this->assertTrue(
+			$this->detector->ticketIdentitiesMatch(
+				'https://ticketmaster.evyy.net/c/1191134/264167/4272?u=https%3A%2F%2Fwww.ticketmaster.com%2Freprise-recreating-10291994-at-spartanburg-memorial-charleston-south-carolina-07-30-2026%2Fevent%2F2D00649E9A9BF91F&utm_medium=affiliate',
+				'https://ticketmaster.evyy.net/c/1191134/264167/4272?u=https%3A%2F%2Fwww.ticketmaster.com%2Freprise-charleston-south-carolina-07-30-2026%2Fevent%2F2D00649E9A9BF91F&utm_medium=affiliate'
+			),
+			'Affiliate wrappers and source title variants must resolve to the shared Ticketmaster event ID.'
+		);
+	}
+
+	public function test_distinct_ticket_identities_do_not_match_at_same_venue_and_time(): void {
+		$this->assertFalse(
+			$this->detector->ticketIdentitiesMatch(
+				'https://www.etix.com/ticket/p/80665941/first-show',
+				'https://www.etix.com/ticket/p/80665942/second-show'
+			),
+			'Different provider event IDs must remain distinct even when venue and time collide.'
+		);
+	}
+
+	public function test_missing_ticket_identity_never_matches(): void {
+		$this->assertFalse( $this->detector->ticketIdentitiesMatch( '', '' ) );
+		$this->assertFalse( $this->detector->ticketIdentitiesMatch( 'https://tickets.example.com/show', '' ) );
+	}
+
+	public function test_matching_ticket_identity_reaches_review_threshold_without_lineup_overlap(): void {
+		$post_a = self::factory()->post->create( array( 'post_content' => 'Source A description.' ) );
+		$post_b = self::factory()->post->create( array( 'post_content' => 'Source B description.' ) );
+		update_post_meta( $post_a, \DataMachineEvents\Core\EVENT_TICKET_URL_META_KEY, 'https://www.etix.com/ticket/p/80665941/cerval' );
+		update_post_meta( $post_b, \DataMachineEvents\Core\EVENT_TICKET_URL_META_KEY, 'https://www.etix.com/ticket/p/80665941/levi-double-u' );
+
+		$score_pair = new \ReflectionMethod( MergedBillDetectAbilities::class, 'scorePair' );
+		$score_pair->setAccessible( true );
+		$result = $score_pair->invoke(
+			$this->detector,
+			array( 'post_id' => $post_a, 'title' => 'Campground with Cerval' ),
+			array( 'post_id' => $post_b, 'title' => 'Campground with Levi Double U' )
+		);
+
+		$this->assertSame( MergedBillDetectAbilities::DEFAULT_THRESHOLD, $result['score'] );
+		$this->assertTrue( $result['signals']['matching_ticket_identity'] );
+		$this->assertFalse( $result['signals']['mutual_lineup_mention'] );
+	}
+
+	// ------------------------------------------------------------------
+	// execute() candidate discovery remains covered by the managed database
+	// suite; scorePair() is exercised directly above with real post records.
 	// ------------------------------------------------------------------
 
 	public function test_buildPairKey_is_order_independent(): void {
