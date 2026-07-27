@@ -57,7 +57,6 @@ class SystemAgentServiceProvider {
 	public function __construct() {
 		$this->registerTaskHandlers();
 		$this->registerBuiltInSchedules();
-		$this->initializeRegistry();
 		$this->registerActionSchedulerHooks();
 		// Bootstrap immediately after AS initializes, then let AS's native daily
 		// recurring-ensure action repair schedules that are later interrupted.
@@ -277,15 +276,6 @@ class SystemAgentServiceProvider {
 				)
 			),
 		);
-	}
-
-	/**
-	 * Initialize the TaskRegistry.
-	 *
-	 * @since 0.37.0
-	 */
-	private function initializeRegistry(): void {
-		TaskRegistry::load();
 	}
 
 	/**
