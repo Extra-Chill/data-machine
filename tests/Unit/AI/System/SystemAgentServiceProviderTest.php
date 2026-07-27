@@ -10,6 +10,7 @@ namespace DataMachine\Tests\Unit\AI\System;
 
 use DataMachine\Engine\AI\System\SystemAgentServiceProvider;
 use DataMachine\Engine\AI\System\Tasks\ImageGenerationTask;
+use DataMachine\Engine\Tasks\TaskRegistry;
 use WP_UnitTestCase;
 
 class SystemAgentServiceProviderTest extends WP_UnitTestCase {
@@ -32,6 +33,21 @@ class SystemAgentServiceProviderTest extends WP_UnitTestCase {
 		$tasks = $this->provider->getBuiltInTasks( $existing );
 		$this->assertArrayHasKey( 'custom_task', $tasks );
 		$this->assertArrayHasKey( 'image_generation', $tasks );
+	}
+
+	public function test_registry_remains_lazy_for_extension_task_filters(): void {
+		TaskRegistry::reset();
+		new SystemAgentServiceProvider();
+		$callback = static function ( array $tasks ): array {
+			$tasks['extension_task'] = 'ExtensionTaskClass';
+			return $tasks;
+		};
+		add_filter( 'datamachine_tasks', $callback, 30 );
+
+		$this->assertTrue( TaskRegistry::isRegistered( 'extension_task' ) );
+
+		remove_filter( 'datamachine_tasks', $callback, 30 );
+		TaskRegistry::reset();
 	}
 
 	public function test_task_retry_action_is_registered(): void {
