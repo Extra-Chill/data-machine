@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.169.6] - 2026-07-27
+
+### Fixed
+- avoid CLI autoload during introspection
+
 ## [0.169.5] - 2026-07-27
 
 ### Fixed
