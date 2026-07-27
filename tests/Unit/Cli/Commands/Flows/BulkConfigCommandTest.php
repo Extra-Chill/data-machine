@@ -27,6 +27,32 @@ class BulkConfigCommandTest extends WP_UnitTestCase {
 	private string $flow_step_id_1;
 	private string $flow_step_id_2;
 
+	private function createMutationSpyAbility(): ConfigureFlowStepsAbility {
+		return new class() extends ConfigureFlowStepsAbility {
+			public array $handler_updates = array();
+			public array $message_updates = array();
+
+			protected function updateHandler( string $flow_step_id, string $handler_slug = '', array $handler_settings = array() ): bool {
+				$this->handler_updates[] = array(
+					'flow_step_id'    => $flow_step_id,
+					'handler_slug'    => $handler_slug,
+					'handler_settings' => $handler_settings,
+				);
+
+				return true;
+			}
+
+			protected function updateUserMessage( string $flow_step_id, string $user_message ): bool {
+				$this->message_updates[] = array(
+					'flow_step_id' => $flow_step_id,
+					'user_message' => $user_message,
+				);
+
+				return true;
+			}
+		};
+	}
+
 	public function set_up(): void {
 		parent::set_up();
 
@@ -135,6 +161,52 @@ class BulkConfigCommandTest extends WP_UnitTestCase {
 		$this->assertSame( 10, $config_2['max_items'] );
 	}
 
+	public function test_pipeline_scope_dry_run_never_calls_mutation_methods(): void {
+		$ability = $this->createMutationSpyAbility();
+		$result  = $ability->execute( array(
+			'pipeline_id'    => $this->pipeline_id,
+			'handler_slug'   => 'rss',
+			'handler_config' => array( 'max_items' => 10 ),
+			'validate_only'  => true,
+		) );
+
+		$this->assertTrue( $result['success'] );
+		$this->assertSame( 'validate_only', $result['mode'] );
+		$this->assertCount( 2, $result['would_update'] );
+		$this->assertSame( array(), $ability->handler_updates );
+		$this->assertSame( array(), $ability->message_updates );
+	}
+
+	public function test_pipeline_scope_apply_calls_mutation_once_per_validated_target(): void {
+		$ability = $this->createMutationSpyAbility();
+		$result  = $ability->execute( array(
+			'pipeline_id'    => $this->pipeline_id,
+			'handler_slug'   => 'rss',
+			'handler_config' => array( 'max_items' => 10 ),
+		) );
+
+		$this->assertTrue( $result['success'] );
+		$this->assertSame( 'execute', $result['mode'] );
+		$this->assertSame( 2, $result['steps_modified'] );
+		$this->assertCount( 2, $ability->handler_updates );
+	}
+
+	public function test_pipeline_scope_invalid_patch_never_calls_mutation_methods(): void {
+		foreach ( array( false, true ) as $validate_only ) {
+			$ability = $this->createMutationSpyAbility();
+			$result  = $ability->execute( array(
+				'pipeline_id'    => $this->pipeline_id,
+				'handler_slug'   => 'rss',
+				'handler_config' => array( 'not_a_real_rss_field' => true ),
+				'validate_only'  => $validate_only,
+			) );
+
+			$this->assertFalse( $result['success'] );
+			$this->assertStringContainsString( 'Validation failed', $result['error'] );
+			$this->assertSame( array(), $ability->handler_updates );
+		}
+	}
+
 	public function test_pipeline_scope_preserves_existing_config(): void {
 		$ability = new ConfigureFlowStepsAbility();
 		$ability->execute( array(
@@ -163,7 +235,7 @@ class BulkConfigCommandTest extends WP_UnitTestCase {
 	}
 
 	public function test_global_scope_dry_run(): void {
-		$ability = new ConfigureFlowStepsAbility();
+		$ability = $this->createMutationSpyAbility();
 		$result  = $ability->execute( array(
 			'handler_slug'   => 'rss',
 			'global_scope'   => true,
@@ -175,11 +247,43 @@ class BulkConfigCommandTest extends WP_UnitTestCase {
 		$this->assertTrue( $result['valid'] );
 		$this->assertSame( 'validate_only', $result['mode'] );
 		$this->assertCount( 2, $result['would_update'] );
+		$this->assertSame( array(), $ability->handler_updates );
 
 		// Verify nothing was actually changed.
 		$flow_1 = $this->flows->get_flow( $this->flow_id_1 );
 		$config = FlowStepConfig::getPrimaryHandlerConfig( $flow_1['flow_config'][ $this->flow_step_id_1 ] ?? array() );
 		$this->assertSame( 5, $config['max_items'] );
+	}
+
+	public function test_single_flow_selection_previews_and_applies_only_that_flow(): void {
+		$input = array(
+			'pipeline_id'    => $this->pipeline_id,
+			'handler_slug'   => 'rss',
+			'handler_config' => array(),
+			'flow_configs'   => array(
+				array(
+					'flow_id'        => $this->flow_id_2,
+					'handler_config' => array( 'max_items' => 25 ),
+				),
+			),
+		);
+
+		$preview_input                  = $input;
+		$preview_input['validate_only'] = true;
+		$preview_ability                = $this->createMutationSpyAbility();
+		$preview_result                 = $preview_ability->execute( $preview_input );
+
+		$this->assertTrue( $preview_result['success'] );
+		$this->assertCount( 1, $preview_result['would_update'] );
+		$this->assertSame( $this->flow_id_2, $preview_result['would_update'][0]['flow_id'] );
+		$this->assertSame( array(), $preview_ability->handler_updates );
+
+		$apply_ability = $this->createMutationSpyAbility();
+		$apply_result  = $apply_ability->execute( $input );
+
+		$this->assertTrue( $apply_result['success'] );
+		$this->assertCount( 1, $apply_ability->handler_updates );
+		$this->assertSame( $this->flow_step_id_2, $apply_ability->handler_updates[0]['flow_step_id'] );
 	}
 
 	public function test_global_scope_executes(): void {

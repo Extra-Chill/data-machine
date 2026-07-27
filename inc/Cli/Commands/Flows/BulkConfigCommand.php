@@ -168,13 +168,13 @@ class BulkConfigCommand extends BaseCommand {
 			'pipeline_id'    => $pipeline_id,
 			'handler_slug'   => $handler,
 			'handler_config' => $handler_config,
+			'validate_only'  => $dry_run,
 		);
 
 		if ( $step_type ) {
 			$input['step_type'] = $step_type;
 		}
 
-		// Pipeline mode doesn't have validate_only in the ability — we use the result to show preview.
 		$this->runAbility( $input, $dry_run, $format, "pipeline {$pipeline_id} (handler: {$handler})" );
 	}
 
@@ -198,13 +198,14 @@ class BulkConfigCommand extends BaseCommand {
 		$input = array(
 			'pipeline_id'    => $pipeline_id,
 			'handler_slug'   => $handler,
-			'handler_config' => $handler_config,
+			'handler_config' => array(),
 			'flow_configs'   => array(
 				array(
 					'flow_id'        => $flow_id,
 					'handler_config' => $handler_config,
 				),
 			),
+			'validate_only'  => $dry_run,
 		);
 
 		if ( $step_type ) {
@@ -232,21 +233,10 @@ class BulkConfigCommand extends BaseCommand {
 			return;
 		}
 
-		// Handle dry-run with validate_only result (global/cross-pipeline modes).
+		// Handle validation-only results for every scope.
 		if ( $dry_run && ! empty( $result['would_update'] ) ) {
 			$this->outputDryRunPreview( $result['would_update'] );
 			WP_CLI::success( $result['message'] ?? 'Dry run complete.' );
-			return;
-		}
-
-		// Handle dry-run for pipeline mode (no validate_only, so we show the actual result).
-		if ( $dry_run && ! empty( $result['success'] ) && ! empty( $result['updated_steps'] ) ) {
-			// Pipeline mode executed — but this was supposed to be dry-run.
-			// Show what was updated. Since pipeline mode doesn't support validate_only,
-			// we warn the user. However, to truly support dry-run for pipeline scope,
-			// we'd need to add validate_only support to the pipeline execution path.
-			$this->outputUpdatedSteps( $result );
-			WP_CLI::success( $result['message'] ?? 'Done.' );
 			return;
 		}
 
