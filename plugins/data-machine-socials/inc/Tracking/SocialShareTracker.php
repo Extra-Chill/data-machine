@@ -19,6 +19,7 @@ namespace DataMachineSocials\Tracking;
 defined( 'ABSPATH' ) || exit;
 
 class SocialShareTracker {
+	private const MAX_CAS_ATTEMPTS = 5;
 
 	/**
 	 * Post meta key for full share history.
@@ -45,8 +46,6 @@ class SocialShareTracker {
 			return false;
 		}
 
-		$shares = self::get_shares( $post_id );
-
 		$record = array(
 			'platform'         => sanitize_key( $platform ),
 			'platform_post_id' => sanitize_text_field( $platform_post_id ),
@@ -58,14 +57,30 @@ class SocialShareTracker {
 			'job_id'           => ! empty( $extra['job_id'] ) ? intval( $extra['job_id'] ) : null,
 		);
 
-		$shares[] = $record;
+		for ( $attempt = 0; $attempt < self::MAX_CAS_ATTEMPTS; ++$attempt ) {
+			$shares = self::get_shares( $post_id );
+			if ( '' !== $record['operation_hash'] ) {
+				foreach ( $shares as $share ) {
+					if ( ( $share['platform'] ?? '' ) === $record['platform'] && hash_equals( $record['operation_hash'], (string) ( $share['operation_hash'] ?? '' ) ) ) {
+						return (string) ( $share['platform_post_id'] ?? '' ) === $record['platform_post_id']
+							&& (string) ( $share['platform_url'] ?? '' ) === $record['platform_url'];
+					}
+				}
+			}
 
-		if ( false === update_post_meta( $post_id, self::SHARES_META_KEY, $shares ) ) {
-			return false;
+			$updated   = array_merge( $shares, array( $record ) );
+			$persisted = metadata_exists( 'post', $post_id, self::SHARES_META_KEY )
+				? update_post_meta( $post_id, self::SHARES_META_KEY, $updated, $shares )
+				: add_post_meta( $post_id, self::SHARES_META_KEY, $updated, true );
+			if ( false !== $persisted ) {
+				self::add_platform_to_index( $post_id, $record['platform'] );
+				return true;
+			}
+
+			wp_cache_delete( $post_id, 'post_meta' );
 		}
-		self::update_platforms_index( $post_id, $shares );
 
-		return true;
+		return false;
 	}
 
 	/**
@@ -155,7 +170,8 @@ class SocialShareTracker {
 			return null;
 		}
 
-		// Sort by shared_at descending.
+		// Reverse first so equal timestamps retain append order after PHP's stable sort.
+		$shares = array_reverse( $shares );
 		usort( $shares, fn( $a, $b ) => ( $b['shared_at'] ?? 0 ) <=> ( $a['shared_at'] ?? 0 ) );
 
 		return $shares[0];
@@ -344,6 +360,27 @@ class SocialShareTracker {
 		$active_platforms = array_values( array_unique( $active_platforms ) );
 
 		update_post_meta( $post_id, self::PLATFORMS_META_KEY, $active_platforms );
+	}
+
+	/** Add one platform to the denormalized index without losing concurrent writers. */
+	private static function add_platform_to_index( int $post_id, string $platform ): void {
+		for ( $attempt = 0; $attempt < self::MAX_CAS_ATTEMPTS; ++$attempt ) {
+			$platforms = get_post_meta( $post_id, self::PLATFORMS_META_KEY, true );
+			$platforms = is_array( $platforms ) ? $platforms : array();
+			if ( in_array( $platform, $platforms, true ) ) {
+				return;
+			}
+
+			$updated   = array_values( array_unique( array_merge( $platforms, array( $platform ) ) ) );
+			$persisted = metadata_exists( 'post', $post_id, self::PLATFORMS_META_KEY )
+				? update_post_meta( $post_id, self::PLATFORMS_META_KEY, $updated, $platforms )
+				: add_post_meta( $post_id, self::PLATFORMS_META_KEY, $updated, true );
+			if ( false !== $persisted ) {
+				return;
+			}
+
+			wp_cache_delete( $post_id, 'post_meta' );
+		}
 	}
 
 	/**

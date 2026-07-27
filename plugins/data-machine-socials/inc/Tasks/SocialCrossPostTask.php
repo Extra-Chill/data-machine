@@ -106,6 +106,7 @@ class SocialCrossPostTask extends SystemTask {
 		if ( '' !== $operation_ref ) {
 			$completion_data['output_data_packets']    = self::delegated_result_packets( $results );
 			$completion_data['suppress_result_packet'] = true;
+			$completion_data['job_status']             = 'completed';
 		}
 
 		if ( '' !== $operation_ref && ! empty( $errors ) ) {

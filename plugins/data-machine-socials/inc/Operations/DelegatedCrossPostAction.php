@@ -54,6 +54,7 @@ final class DelegatedCrossPostAction {
 			'authorize'       => array( self::class, 'authorize' ),
 			'prepare'         => array( self::class, 'prepare' ),
 			'project'         => array( self::class, 'project' ),
+			'retry'           => array( self::class, 'retry' ),
 		);
 
 		return $actions;
@@ -277,6 +278,64 @@ final class DelegatedCrossPostAction {
 		);
 	}
 
+	/**
+	 * Prove that replay can only attempt channels without a recorded effect.
+	 *
+	 * @param array $run_result Failed canonical datamachine.run_result.v1 envelope.
+	 * @param array $context    Frozen delegated operation context.
+	 * @return true|\WP_Error
+	 */
+	public static function retry( array $run_result, array $context ) {
+		$input         = is_array( $context['input'] ?? null ) ? $context['input'] : array();
+		$post_id       = self::strict_positive_int( $input['post_id'] ?? null );
+		$operation_ref = is_string( $context['operation_ref'] ?? null ) ? $context['operation_ref'] : '';
+		$channels      = is_array( $input['channels'] ?? null ) ? $input['channels'] : array();
+		if ( ! $post_id || ! preg_match( '/^dop_[a-f0-9]{64}$/', $operation_ref ) || array() === $channels ) {
+			return self::error( 'social_cross_post_retry_unsafe', 'The prior delivery effects cannot be reconciled safely.' );
+		}
+
+		$failures = array();
+		$shares   = array();
+		foreach ( self::packet_refs( $run_result ) as $ref ) {
+			if ( self::RESULT_SOURCE !== ( $ref['source_type'] ?? '' ) ) {
+				continue;
+			}
+
+			$channel = self::bounded_channel( $ref['source_id'] ?? '' );
+			if ( '' === $channel ) {
+				continue;
+			}
+
+			if ( 'social_share_ref' === ( $ref['type'] ?? '' ) ) {
+				$shares[ $channel ] = (string) ( $ref['source_item_id'] ?? '' );
+			} elseif ( 'social_share_error' === ( $ref['type'] ?? '' ) ) {
+				$failures[ $channel ] = (string) ( $ref['source_item_id'] ?? '' );
+			}
+		}
+
+		foreach ( $channels as $channel ) {
+			$channel = self::bounded_channel( $channel );
+			if ( '' === $channel ) {
+				return self::error( 'social_cross_post_retry_unsafe', 'The prior delivery effects cannot be reconciled safely.' );
+			}
+
+			$receipt = \DataMachineSocials\Tracking\SocialShareTracker::get_operation_share( $post_id, $channel, $operation_ref );
+			if ( is_array( $receipt ) ) {
+				$recorded_id = (string) ( $receipt['platform_post_id'] ?? '' );
+				if ( isset( $shares[ $channel ] ) && ! hash_equals( $recorded_id, $shares[ $channel ] ) ) {
+					return self::error( 'social_cross_post_retry_unsafe', 'The prior delivery effects cannot be reconciled safely.' );
+				}
+				continue;
+			}
+
+			if ( isset( $shares[ $channel ] ) || ! in_array( $failures[ $channel ] ?? '', array( 'channel_unavailable', 'publish_failed' ), true ) ) {
+				return self::error( 'social_cross_post_retry_unsafe', 'The prior delivery effects cannot be reconciled safely.' );
+			}
+		}
+
+		return true;
+	}
+
 	/** Map private provider failures to bounded public codes. */
 	public static function classify_error( $error ): string {
 		if ( 'delivery_receipt_failed' === $error ) {
@@ -340,7 +399,7 @@ final class DelegatedCrossPostAction {
 		$limits = array(
 			'bluesky'   => 300,
 			'facebook'  => 63206,
-			'instagram' => 2200,
+			'instagram' => max( 1, 2200 - mb_strlen( "\n\n" . $source_url ) ),
 			'pinterest' => 500,
 			'threads'   => max( 1, 498 - mb_strlen( $source_url ) ),
 			'twitter'   => 256,
