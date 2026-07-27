@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.19.0] - 2026-07-27
+
+### Added
+- add Reddit domain mentions report
+- monitor bounded Reddit comment mentions
+
+### Fixed
+- enforce delegated cross-post effect boundaries
+
 ## [0.18.0] - 2026-07-27
 
 ### Added
