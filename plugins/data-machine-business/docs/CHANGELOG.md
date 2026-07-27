@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 Homeboy maintains this file from conventional commits at release time —
 do not edit by hand.
 
+## [0.16.3] - 2026-07-27
+
+### Changed
+- make business agent guidance intent-based
+
 ## [0.16.2] - 2026-07-18
 
 ### Fixed
