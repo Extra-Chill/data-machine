@@ -141,8 +141,8 @@ add_action( 'plugins_loaded', 'datamachine_business_load_handlers', 20 );
 /**
  * Register the Data Machine Business AGENTS.md section.
  *
- * Runs in every context (web/cron compose, not only WP-CLI) so the generated
- * AGENTS.md always reflects this plugin's registered command surface.
+ * Runs in every context (web/cron compose, not only WP-CLI) so concise routing
+ * guidance remains available wherever memory is composed.
  */
 add_action( 'plugins_loaded', function (): void {
 	\DataMachineBusiness\Runtime\AgentsMdSections::register();
@@ -161,8 +161,7 @@ add_filter( 'datamachine_analytics_ability_map', function ( array $ability_map )
  * Register business-owned WP-CLI commands.
  *
  * The command-string => class map in DataMachineBusiness\Cli\CommandRegistry is
- * the single source of truth shared with the AGENTS.md section generator, so
- * the documented command surface can never drift from what is registered.
+ * the single source of truth for command registration.
  */
 add_action( 'plugins_loaded', function (): void {
 	if ( ! defined( 'WP_CLI' ) || ! WP_CLI || ! class_exists( 'DataMachine\\Cli\\BaseCommand' ) ) {

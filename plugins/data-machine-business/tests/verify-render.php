@@ -1,18 +1,15 @@
 <?php
 /**
- * Standalone verification of the AGENTS.md renderer action enumeration.
- *
- * Stubs the minimal dependencies (BaseCommand, ABSPATH, apply_filters) so the
- * real AgentsMdSections::render() can run outside WordPress against the real
- * CommandRegistry + command classes (which declare static actions()).
+ * Standalone verification of concise AGENTS.md Business routing.
  */
 
-namespace DataMachine\Cli {
-	// Stub the BaseCommand parent the command classes extend. The static
-	// actions() accessor never reaches instance methods, so an empty stub is
-	// enough to let the class files load.
-	if ( ! class_exists( 'DataMachine\Cli\BaseCommand' ) ) {
-		class BaseCommand {}
+namespace DataMachine\Engine\AI {
+	class SectionRegistry {
+		public static array $section = array();
+
+		public static function register( $file, $name, $priority, $callback, $meta ): void {
+			self::$section = compact( 'file', 'name', 'priority', 'callback', 'meta' );
+		}
 	}
 }
 
@@ -21,58 +18,56 @@ namespace {
 		define( 'ABSPATH', '/var/www/extrachill.com/' );
 	}
 
-	if ( ! function_exists( 'apply_filters' ) ) {
-		function apply_filters( $tag, $value ) {
-			return $value;
-		}
+	function apply_filters( $tag, $value ) {
+		return 'datamachine_wp_cli_cmd' === $tag ? 'wp-test --url=example.test' : $value;
 	}
 
-	$root = dirname( __DIR__ );
+	require_once dirname( __DIR__ ) . '/inc/Runtime/AgentsMdSections.php';
 
-	require_once $root . '/inc/Cli/GoogleSearchConsoleCommand.php';
-	require_once $root . '/inc/Cli/GoogleAnalyticsCommand.php';
-	require_once $root . '/inc/Cli/MediavineCommand.php';
-	require_once $root . '/inc/Cli/PageSpeedCommand.php';
-	require_once $root . '/inc/Cli/MediaHygieneCommand.php';
-	require_once $root . '/inc/Cli/Commands/BingWebmasterCommand.php';
-	require_once $root . '/inc/Cli/CommandRegistry.php';
-	require_once $root . '/inc/Runtime/AgentsMdSections.php';
+	\DataMachineBusiness\Runtime\AgentsMdSections::register();
+	$section = \DataMachine\Engine\AI\SectionRegistry::$section;
+	$output  = (string) call_user_func( $section['callback'] );
+	$errors  = array();
 
-	$output = \DataMachineBusiness\Runtime\AgentsMdSections::render();
-
-	echo $output;
-	echo "\n\n--- ASSERTIONS ---\n";
-
-	$gsc_actions = array(
-		'query_stats', 'page_stats', 'query_page_stats', 'date_stats',
-		'inspect_url', 'list_sitemaps', 'get_sitemap', 'submit_sitemap',
+	$expected = array(
+		'## Data Machine Business',
+		'**Default routing**',
+		'wp-test --url=example.test datamachine analytics ga <action>',
+		'wp-test --url=example.test datamachine analytics gsc <action>',
+		'wp-test --url=example.test datamachine analytics bing <action>',
+		'wp-test --url=example.test datamachine analytics mediavine <action>',
+		'wp-test --url=example.test datamachine analytics pagespeed <action>',
+		'wp-test --url=example.test datamachine media <action>',
+		'wp-test --url=example.test datamachine --help',
+		'wp-test --url=example.test datamachine analytics --help',
+		'wp-test --url=example.test help <command>',
+		'Live help is authoritative.',
 	);
 
-	$failures = array();
-	foreach ( $gsc_actions as $action ) {
-		if ( false === strpos( $output, '`' . $action . '`' ) ) {
-			$failures[] = "GSC action '{$action}' missing from rendered output";
+	foreach ( $expected as $needle ) {
+		if ( false === strpos( $output, $needle ) ) {
+			$errors[] = "Missing rendered guidance: {$needle}";
 		}
 	}
 
-	// Confirm a non-GSC action also appears.
-	if ( false === strpos( $output, '`realtime`' ) ) {
-		$failures[] = "GA action 'realtime' missing from rendered output";
-	}
-	if ( false === strpos( $output, '`diagnose`' ) ) {
-		$failures[] = "Media action 'diagnose' missing from rendered output";
-	}
-	if ( false === strpos( $output, '`ad_units`' ) ) {
-		$failures[] = "Mediavine action 'ad_units' missing from rendered output";
+	foreach ( array( 'page_stats', 'inspect_url', 'ad_units', 'delete-unused' ) as $action ) {
+		if ( false !== strpos( $output, $action ) ) {
+			$errors[] = "Exhaustive action leaked into guidance: {$action}";
+		}
 	}
 
-	if ( empty( $failures ) ) {
-		echo "PASS: all expected actions are enumerated in the rendered section.\n";
-		exit( 0 );
+	if ( 'AGENTS.md' !== ( $section['file'] ?? '' ) || 'data-machine-business' !== ( $section['name'] ?? '' ) || 25 !== ( $section['priority'] ?? 0 ) ) {
+		$errors[] = 'Section registration contract changed.';
 	}
 
-	foreach ( $failures as $f ) {
-		echo "FAIL: {$f}\n";
+	echo $output . "\n";
+
+	if ( ! empty( $errors ) ) {
+		foreach ( $errors as $error ) {
+			echo "FAIL: {$error}\n";
+		}
+		exit( 1 );
 	}
-	exit( 1 );
+
+	echo 'PASS: concise routing, discovery, prefix filtering, and registration verified.' . "\n";
 }

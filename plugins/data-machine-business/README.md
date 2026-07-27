@@ -35,7 +35,7 @@ Data Machine Business connects WordPress automation, agents, and pipelines to an
 | Mediavine | Fetch page, aggregate, device, country, normalized-source, and ad-unit publisher revenue reports | Ability, WP-CLI |
 | Content analytics | Category-level engagement audits, editorial triage flags, and GSC opportunity ranking | Abilities |
 | Media hygiene | Detect and safely remove orphan files and unreferenced attachments | Ability, WP-CLI |
-| Agent context | Generate an `AGENTS.md` section from the registered business CLI command map | Data Machine memory composition |
+| Agent context | Generate concise intent-based `AGENTS.md` routing for business integrations | Data Machine memory composition |
 
 ## Abilities
 
@@ -248,7 +248,7 @@ Both endpoints require Data Machine's `view_analytics` permission.
 
 ## Agent Context
 
-Data Machine Business registers its own section with Data Machine's composable `AGENTS.md` memory system. The section is generated from the same `CommandRegistry` used to register WP-CLI commands, including each command's positional actions, so agent instructions stay aligned with the executable CLI surface.
+Data Machine Business registers its own section with Data Machine's composable `AGENTS.md` memory system. The section provides stable intent-based routes while delegating mutable actions and options to the live WP-CLI help contract.
 
 ## Configuration
 
