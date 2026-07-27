@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.170.0] - 2026-07-27
+
+### Added
+- harden batch fan-out worklists
+
 ## [0.169.6] - 2026-07-27
 
 ### Fixed
