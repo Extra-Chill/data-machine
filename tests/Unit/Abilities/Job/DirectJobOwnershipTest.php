@@ -13,6 +13,7 @@ use DataMachine\Abilities\Job\FailJobAbility;
 use DataMachine\Abilities\Job\GetJobsAbility;
 use DataMachine\Abilities\Job\HydrateJobArtifactAbility;
 use DataMachine\Abilities\Job\JobsSummaryAbility;
+use DataMachine\Abilities\Job\RecoverStuckJobsAbility;
 use DataMachine\Abilities\Job\RetryJobAbility;
 use DataMachine\Abilities\Job\RunMetricsAbility;
 use DataMachine\Abilities\PermissionHelper;
@@ -21,6 +22,7 @@ use DataMachine\Core\Database\Agents\Agents;
 use DataMachine\Core\Database\Jobs\Jobs;
 use DataMachine\Core\DirectJobEnqueuer;
 use DataMachine\Core\JobRetryPolicy;
+use DataMachine\Core\JobStatus;
 use WP_UnitTestCase;
 
 class DirectJobOwnershipTest extends WP_UnitTestCase {
@@ -565,6 +567,100 @@ class DirectJobOwnershipTest extends WP_UnitTestCase {
 			)
 		);
 		$this->assertTrue( $stale['stale_generation'] );
+	}
+
+	public function test_stuck_recovery_requeues_missing_direct_operation_action_with_new_generation(): void {
+		global $wpdb;
+		wp_set_current_user( $this->owner_id );
+		$created = $this->execute( 'missing-direct-action-recovery' );
+		$jobs    = new Jobs();
+		$job_id  = (int) $created['job_id'];
+		$before  = $jobs->get_job( $job_id );
+		$old_args = array(
+			'job_id'                => $job_id,
+			'flow_step_id'          => (string) $before['operation_step_id'],
+			'operation_generation'  => (int) $before['operation_generation'],
+			'operation_claim_token' => (string) $before['operation_claim_token'],
+		);
+		$this->assertTrue( $jobs->start_job( $job_id ) );
+		$wpdb->update(
+			$wpdb->prefix . 'datamachine_jobs',
+			array( 'created_at' => gmdate( 'Y-m-d H:i:s', time() - 2 * HOUR_IN_SECONDS ) ),
+			array( 'job_id' => $job_id ),
+			array( '%s' ),
+			array( '%d' )
+		);
+		$this->assertSame( 1, $wpdb->delete( $wpdb->prefix . 'actionscheduler_actions', array( 'action_id' => (int) $before['operation_action_id'] ), array( '%d' ) ) );
+
+		$result = ( new RecoverStuckJobsAbility() )->execute(
+			array(
+				'job_id'        => $job_id,
+				'timeout_hours' => 1,
+				'limit'         => 3,
+			)
+		);
+		$after = $jobs->get_job( $job_id );
+
+		$this->assertSame( 1, $result['requeued'] );
+		$this->assertSame( JobStatus::PENDING, $after['status'] );
+		$this->assertSame( 'enqueued', $after['operation_state'] );
+		$this->assertGreaterThan( (int) $before['operation_generation'], (int) $after['operation_generation'] );
+		$this->assertNotSame( (int) $before['operation_action_id'], (int) $after['operation_action_id'] );
+		$this->assertSame( 'requeued', $after['engine_data']['direct_operation_recovery']['state'] );
+		$this->assertSame( (int) $before['operation_action_id'], (int) $after['engine_data']['direct_operation_recovery']['missing_action_id'] );
+		$this->assertSame( JobStatus::PENDING, $after['engine_data']['run_lifecycle']['status'] );
+		$this->assertSame( 'requeued_missing_direct_action', $result['jobs'][0]['status'] );
+
+		$stale = ( new ExecuteStepAbility() )->execute( $old_args );
+		$this->assertTrue( $stale['stale_generation'] );
+	}
+
+	public function test_missing_direct_action_after_effects_terminalizes_parent_and_system_child(): void {
+		global $wpdb;
+		wp_set_current_user( $this->owner_id );
+		$created = $this->execute( 'missing-direct-action-after-effects' );
+		$jobs    = new Jobs();
+		$job_id  = (int) $created['job_id'];
+		$parent  = $jobs->get_job( $job_id );
+		$this->assertTrue( $jobs->start_job( $job_id ) );
+		$this->assertTrue( $jobs->mark_operation_effects_begun( $job_id, (int) $parent['operation_generation'], (string) $parent['operation_claim_token'] ) );
+		$child_id = $jobs->create_job(
+			array(
+				'pipeline_id'  => 'direct',
+				'flow_id'      => 'direct',
+				'source'       => 'pipeline_system_task',
+				'label'        => 'Interrupted system task',
+				'parent_job_id' => $job_id,
+			)
+		);
+		$this->assertTrue( $jobs->start_job( $child_id ) );
+		$wpdb->update(
+			$wpdb->prefix . 'datamachine_jobs',
+			array( 'created_at' => gmdate( 'Y-m-d H:i:s', time() - 2 * HOUR_IN_SECONDS ) ),
+			array( 'job_id' => $job_id ),
+			array( '%s' ),
+			array( '%d' )
+		);
+		$this->assertSame( 1, $wpdb->delete( $wpdb->prefix . 'actionscheduler_actions', array( 'action_id' => (int) $parent['operation_action_id'] ), array( '%d' ) ) );
+
+		$result = ( new RecoverStuckJobsAbility() )->execute(
+			array(
+				'job_id'        => $job_id,
+				'timeout_hours' => 1,
+				'limit'         => 3,
+			)
+		);
+		$parent_after = $jobs->get_job( $job_id );
+		$child_after  = $jobs->get_job( $child_id );
+
+		$this->assertSame( 1, $result['timed_out'] );
+		$this->assertTrue( JobStatus::isStatusFailure( $parent_after['status'] ) );
+		$this->assertTrue( JobStatus::isStatusFailure( $child_after['status'] ) );
+		$this->assertSame( 'cancelled', $parent_after['operation_state'] );
+		$this->assertGreaterThan( (int) $parent['operation_generation'], (int) $parent_after['operation_generation'] );
+		$this->assertSame( 'terminalized', $parent_after['engine_data']['direct_operation_recovery']['state'] );
+		$this->assertSame( (int) $parent['operation_action_id'], (int) $parent_after['engine_data']['direct_operation_recovery']['missing_action_id'] );
+		$this->assertSame( 1, $result['jobs'][0]['system_children_terminalized'] );
 	}
 
 	public function test_legacy_unowned_job_retains_capability_gated_access(): void {
