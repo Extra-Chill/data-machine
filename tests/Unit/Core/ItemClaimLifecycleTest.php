@@ -12,6 +12,7 @@ use DataMachine\Abilities\Job\FailJobAbility;
 use DataMachine\Abilities\Job\RecoverStuckJobsAbility;
 use DataMachine\Core\ActionScheduler\BatchScheduler;
 use DataMachine\Core\ActionScheduler\GroupRegistrar;
+use DataMachine\Core\Database\BatchItems\BatchItems;
 use DataMachine\Core\Database\Jobs\Jobs;
 use DataMachine\Core\Database\ProcessedItems\ProcessedItems;
 use DataMachine\Core\Database\TrackedItems\TrackedItems;
@@ -557,7 +558,7 @@ class ItemClaimLifecycleTest extends WP_UnitTestCase {
 		$this->assertFalse( $this->processed->has_active_claim( self::SCOPE, self::SOURCE, 'schedule-id' ) );
 	}
 
-	public function test_child_creation_failure_releases_item_claim(): void {
+	public function test_child_creation_failure_preserves_item_claim_for_retry(): void {
 		$claim     = $this->claim( 'child-id', 801, 'child-revision' );
 		$parent_id = $this->createJobWithClaim( array(), true );
 		BatchScheduler::start( $parent_id, 'test_batch_hook', array( $this->packet( $claim ) ), array(), 'pipeline' );
@@ -565,7 +566,8 @@ class ItemClaimLifecycleTest extends WP_UnitTestCase {
 
 		BatchScheduler::processChunk( $parent_id, static fn() => false );
 
-		$this->assertFalse( $this->processed->has_active_claim( self::SCOPE, self::SOURCE, 'child-id' ) );
+		$this->assertTrue( $this->processed->has_active_claim( self::SCOPE, self::SOURCE, 'child-id' ) );
+		BatchScheduler::cancel( $parent_id );
 	}
 
 	public function test_batch_cancellation_releases_unscheduled_claims(): void {
@@ -615,6 +617,27 @@ class ItemClaimLifecycleTest extends WP_UnitTestCase {
 		StepLifecycleHandler::handleFailed( 9011, array( ProcessedItems::CLAIM_METADATA_KEY => $first ) );
 	}
 
+	public function test_batch_cancellation_preserves_ambiguous_active_claim_for_expiry_or_child_completion(): void {
+		$claim      = $this->claim( 'cancel-active', 9012, 'active-revision' );
+		$parent_id  = $this->createJobWithClaim( array(), true );
+		$repository = new BatchItems();
+		BatchScheduler::start( $parent_id, 'test_batch_hook', array( $this->packet( $claim ) ), array(), 'pipeline' );
+		$this->unscheduleTestBatch( $parent_id );
+		$claimed = $repository->claim_chunk( $parent_id, 0, 1, 60 );
+
+		$this->assertTrue( BatchScheduler::cancel( $parent_id ) );
+		$this->assertFalse( $repository->complete( $parent_id, 0, $claimed[0]['lease_token'], 9012 ) );
+		$this->assertArrayHasKey( 'batch_state', datamachine_get_engine_data( $parent_id ) );
+		BatchScheduler::processChunk( $parent_id, static fn(): bool => false, 0 );
+		$this->assertArrayHasKey( 'batch_state', datamachine_get_engine_data( $parent_id ) );
+		$this->assertFalse( BatchScheduler::finalize( $parent_id ) );
+		$this->assertTrue( $this->jobs->complete_job( $parent_id, JobStatus::CANCELLED ) );
+		$this->assertTrue( BatchScheduler::finalize( $parent_id ) );
+		$this->assertArrayNotHasKey( 'batch_state', datamachine_get_engine_data( $parent_id ) );
+		$this->assertTrue( $this->processed->has_active_claim( self::SCOPE, self::SOURCE, 'cancel-active' ) );
+		StepLifecycleHandler::handleFailed( 9012, array( ProcessedItems::CLAIM_METADATA_KEY => $claim ) );
+	}
+
 	public function test_later_chunk_scheduling_failure_releases_remaining_claims(): void {
 		$first     = $this->claim( 'later-a', 902, 'revision-a' );
 		$second    = $this->claim( 'later-b', 902, 'revision-b' );
@@ -645,9 +668,18 @@ class ItemClaimLifecycleTest extends WP_UnitTestCase {
 		BatchScheduler::start( $parent_id, 'test_batch_hook', array( $item ), array(), 'task' );
 		$this->unscheduleTestBatch( $parent_id );
 
-		$engine = datamachine_get_engine_data( $parent_id );
-		$engine['batch_state']['items'][0]['data_packets'][0]['file_path'] = '/missing/data-packet.json';
-		datamachine_set_engine_data( $parent_id, $engine );
+		global $wpdb;
+		$table   = $wpdb->prefix . 'datamachine_batch_items';
+		$payload = json_decode( (string) $wpdb->get_var( $wpdb->prepare( 'SELECT payload FROM %i WHERE batch_job_id = %d AND item_index = 0', $table, $parent_id ) ), true );
+		$payload['data_packets'][0]['file_path'] = '/missing/data-packet.json';
+		$encoded = (string) wp_json_encode( $payload );
+		$wpdb->update(
+			$table,
+			array( 'payload' => $encoded, 'payload_checksum' => hash( 'sha256', $encoded ) ),
+			array( 'batch_job_id' => $parent_id, 'item_index' => 0 ),
+			array( '%s', '%s' ),
+			array( '%d', '%d' )
+		);
 		$called = false;
 		BatchScheduler::processChunk(
 			$parent_id,
@@ -659,6 +691,33 @@ class ItemClaimLifecycleTest extends WP_UnitTestCase {
 
 		$this->assertFalse( $called );
 		$this->assertFalse( $this->processed->has_active_claim( self::SCOPE, self::SOURCE, 'hydrate-id' ) );
+	}
+
+	public function test_corrupt_batch_payload_is_discarded_without_callback(): void {
+		$claim     = $this->claim( 'corrupt-id', 904, 'corrupt-revision' );
+		$parent_id = $this->createJobWithClaim( array(), true );
+		BatchScheduler::start( $parent_id, 'test_batch_hook', array( $this->packet( $claim ) ), array(), 'pipeline' );
+		$this->unscheduleTestBatch( $parent_id );
+
+		global $wpdb;
+		$wpdb->update(
+			$wpdb->prefix . 'datamachine_batch_items',
+			array( 'payload' => '{invalid-json' ),
+			array( 'batch_job_id' => $parent_id, 'item_index' => 0 ),
+			array( '%s' ),
+			array( '%d', '%d' )
+		);
+		$called = false;
+		BatchScheduler::processChunk(
+			$parent_id,
+			static function () use ( &$called ): bool {
+				$called = true;
+				return true;
+			}
+		);
+
+		$this->assertFalse( $called );
+		$this->assertFalse( $this->processed->has_active_claim( self::SCOPE, self::SOURCE, 'corrupt-id' ) );
 	}
 
 	/**

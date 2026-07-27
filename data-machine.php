@@ -885,6 +885,7 @@ function datamachine_ensure_all_tables() {
 
 	$db_processed_items = new \DataMachine\Core\Database\ProcessedItems\ProcessedItems();
 	$db_processed_items->create_table();
+	\DataMachine\Core\Database\BatchItems\BatchItems::create_table();
 
 	$db_tracked_items = new \DataMachine\Core\Database\TrackedItems\TrackedItems();
 	$db_tracked_items->create_table();
