@@ -40,6 +40,7 @@ class HttpClient {
 	 *                        - headers: array - Additional headers to merge
 	 *                        - body: string|array - Request body (for POST/PUT/PATCH)
 	 *                        - timeout: int - Request timeout (default 120)
+	 *                        - limit_response_size: int - Maximum response body bytes (default unlimited)
 	 *                        - proxy_url: string - Optional per-request proxy URL (http, https, socks4, socks5, socks5h)
 	 *                        - auth: array - Optional standard auth config: {type: basic, username, password} or {type: bearer, token}
 	 *                        - auth_ref: string - Optional provider:account credential reference resolved through registered auth providers
@@ -203,7 +204,7 @@ class HttpClient {
 		$headers = array_merge( $default_headers, $options['headers'] ?? array() );
 		$headers = self::applyAuthentication( $headers, $options['auth'] ?? null );
 
-		$args = array(
+		$args                = array(
 			'timeout' => $timeout,
 			'headers' => $headers,
 		);

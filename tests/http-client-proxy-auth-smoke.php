@@ -202,6 +202,12 @@ $provider->save_config(
 $GLOBALS['datamachine_http_client_auth_providers'] = array(
 	HttpBasicAuthProvider::PROVIDER_SLUG => $provider,
 );
+if ( function_exists( 'add_filter' ) ) {
+	add_filter(
+		'datamachine_auth_providers',
+		static fn() => $GLOBALS['datamachine_http_client_auth_providers']
+	);
+}
 
 $resolved_options = http_client_private(
 	'resolveAuthRefOptions',
