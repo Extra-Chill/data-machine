@@ -14,6 +14,7 @@ namespace DataMachine\Abilities\Job;
 use DataMachine\Core\JobStatus;
 use DataMachine\Core\ChildJobRecoveryPolicy;
 use DataMachine\Core\DirectJobEnqueuer;
+use DataMachine\Core\DirectOperationRecoveryPolicy;
 use DataMachine\Core\EngineData;
 
 defined( 'ABSPATH' ) || exit;
@@ -323,10 +324,20 @@ class RecoverStuckJobsAbility {
 						time()
 					);
 				}
-				$direct_recovery = is_array( $job_row ) ? $this->diagnoseMissingDirectOperation( $job_row ) : null;
+				$direct_recovery = null;
+				if ( is_array( $job_row ) ) {
+					$operation_generation = (int) ( $job_row['operation_generation'] ?? 0 );
+					$operation_token      = (string) ( $job_row['operation_claim_token'] ?? '' );
+					$live_execution       = ( new DirectJobEnqueuer( $this->db_jobs ) )->liveGenerationExecution( $job_id, $operation_generation, $operation_token );
+					$direct_recovery      = DirectOperationRecoveryPolicy::diagnose(
+						$job_row,
+						$live_execution,
+						DirectOperationRecoveryPolicy::recordedActionExists( (int) ( $job_row['operation_action_id'] ?? 0 ) )
+					);
+				}
 				if ( is_array( $direct_recovery ) ) {
 					$effects_begun = ! empty( $job_row['operation_effects_begun_at'] );
-					$children      = $effects_begun ? $this->getProcessingSystemTaskChildren( $job_id ) : array();
+					$children      = $effects_begun ? DirectOperationRecoveryPolicy::getProcessingSystemTaskChildren( $job_id ) : array();
 					$disposition   = $effects_begun ? 'terminalize' : 'requeue';
 					if ( $dry_run ) {
 						if ( $effects_begun ) {
@@ -334,7 +345,7 @@ class RecoverStuckJobsAbility {
 						} else {
 							++$requeued;
 						}
-						$this->appendJobDetail( $jobs, $jobs_omitted, $this->directRecoveryEvidence( $job_row, $direct_recovery, 'would_' . $disposition . '_missing_direct_action', $recovery_trigger, count( $children ) ) );
+						$this->appendJobDetail( $jobs, $jobs_omitted, DirectOperationRecoveryPolicy::evidence( $job_row, $direct_recovery, 'would_' . $disposition . '_missing_direct_action', $recovery_trigger, count( $children ) ) );
 						continue;
 					}
 
@@ -372,14 +383,14 @@ class RecoverStuckJobsAbility {
 							$this->appendJobDetail(
 								$jobs,
 								$jobs_omitted,
-								$this->directRecoveryEvidence( $job_row, $direct_recovery, 'requeued_missing_direct_action', $recovery_trigger, 0 ) + array(
+								DirectOperationRecoveryPolicy::evidence( $job_row, $direct_recovery, 'requeued_missing_direct_action', $recovery_trigger, 0 ) + array(
 									'recovery_action_id'             => (int) $result['action_id'],
 									'recovery_operation_generation' => (int) $result['generation'],
 								)
 							);
 						} else {
 							++$skipped;
-							$this->appendJobDetail( $jobs, $jobs_omitted, $this->directRecoveryEvidence( $job_row, $direct_recovery, 'skipped', $recovery_trigger, 0 ) + array( 'reason' => (string) ( $result['reason'] ?? 'direct_operation_requeue_failed' ) ) );
+							$this->appendJobDetail( $jobs, $jobs_omitted, DirectOperationRecoveryPolicy::evidence( $job_row, $direct_recovery, 'skipped', $recovery_trigger, 0 ) + array( 'reason' => (string) ( $result['reason'] ?? 'direct_operation_requeue_failed' ) ) );
 						}
 						continue;
 					}
@@ -395,7 +406,7 @@ class RecoverStuckJobsAbility {
 					);
 					if ( empty( $result['success'] ) ) {
 						++$skipped;
-						$this->appendJobDetail( $jobs, $jobs_omitted, $this->directRecoveryEvidence( $job_row, $direct_recovery, 'skipped', $recovery_trigger, count( $children ) ) + array( 'reason' => 'direct_operation_owner_changed' ) );
+						$this->appendJobDetail( $jobs, $jobs_omitted, DirectOperationRecoveryPolicy::evidence( $job_row, $direct_recovery, 'skipped', $recovery_trigger, count( $children ) ) + array( 'reason' => 'direct_operation_owner_changed' ) );
 						continue;
 					}
 					++$timed_out;
@@ -409,7 +420,7 @@ class RecoverStuckJobsAbility {
 							++$mutated;
 						}
 					}
-					$this->appendJobDetail( $jobs, $jobs_omitted, $this->directRecoveryEvidence( $job_row, $direct_recovery, 'terminalized_missing_direct_action', $recovery_trigger, $children_terminalized ) );
+					$this->appendJobDetail( $jobs, $jobs_omitted, DirectOperationRecoveryPolicy::evidence( $job_row, $direct_recovery, 'terminalized_missing_direct_action', $recovery_trigger, $children_terminalized ) );
 					continue;
 				}
 
@@ -722,90 +733,6 @@ class RecoverStuckJobsAbility {
 		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Dynamic WHERE clause is prepared above.
 		return (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table} {$where}" );
 		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-	}
-
-	/** Return recovery evidence only for an absent, fully fenced direct-operation receipt. */
-	private function diagnoseMissingDirectOperation( array $job ): ?array {
-		$job_id     = (int) ( $job['job_id'] ?? 0 );
-		$action_id  = (int) ( $job['operation_action_id'] ?? 0 );
-		$generation = (int) ( $job['operation_generation'] ?? 0 );
-		$token      = (string) ( $job['operation_claim_token'] ?? '' );
-		$step_id    = (string) ( $job['operation_step_id'] ?? '' );
-		if ( $job_id <= 0
-			|| 'direct' !== (string) ( $job['flow_id'] ?? '' )
-			|| JobStatus::PROCESSING !== (string) ( $job['status'] ?? '' )
-			|| 'enqueued' !== (string) ( $job['operation_state'] ?? '' )
-			|| $action_id <= 0
-			|| $generation <= 0
-			|| '' === $token
-			|| '' === $step_id ) {
-			return null;
-		}
-
-		$execution = ( new DirectJobEnqueuer( $this->db_jobs ) )->liveGenerationExecution( $job_id, $generation, $token );
-		if ( 'none' !== $execution || $this->recordedActionExists( $action_id ) ) {
-			return null;
-		}
-
-		return array(
-			'action_id'  => $action_id,
-			'generation' => $generation,
-			'step_id'    => $step_id,
-			'live_generation_execution' => $execution,
-		);
-	}
-
-	/** Check the durable Action Scheduler receipt by primary key, regardless of current status. */
-	private function recordedActionExists( int $action_id ): bool {
-		global $wpdb;
-		$actions_table = $wpdb->prefix . 'actionscheduler_actions';
-		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name is generated from the WP prefix.
-		$found = $wpdb->get_var( $wpdb->prepare( "SELECT action_id FROM {$actions_table} WHERE action_id = %d", $action_id ) );
-		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-		return null !== $found;
-	}
-
-	/** @return array<int,int> */
-	private function getProcessingSystemTaskChildren( int $parent_job_id ): array {
-		global $wpdb;
-		$table = $wpdb->prefix . 'datamachine_jobs';
-		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name is generated from the WP prefix.
-		$ids = $wpdb->get_col(
-			$wpdb->prepare(
-				"SELECT job_id FROM {$table} WHERE parent_job_id = %d AND source = %s AND status = %s ORDER BY job_id ASC",
-				$parent_job_id,
-				'pipeline_system_task',
-				JobStatus::PROCESSING
-			)
-		);
-		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-		return array_map( 'intval', $ids );
-	}
-
-	/** @return array<string,mixed> */
-	private function directRecoveryEvidence( array $job, array $diagnosis, string $status, string $trigger, int $children_terminalized ): array {
-		$created = strtotime( (string) ( $job['created_at'] ?? '' ) . ' UTC' );
-		return array(
-			'job_id'                       => (int) ( $job['job_id'] ?? 0 ),
-			'flow_id'                      => (string) ( $job['flow_id'] ?? '' ),
-			'parent_job_id'                => (int) ( $job['parent_job_id'] ?? 0 ),
-			'status'                       => $status,
-			'disposition'                  => $status,
-			'reason'                       => 'recorded_operation_action_missing',
-			'job_age_seconds'              => false === $created ? 0 : max( 0, time() - $created ),
-			'scheduler_path'               => 'none',
-			'action_id'                    => (int) $diagnosis['action_id'],
-			'action_status'                => 'missing',
-			'action_generation'            => (int) $diagnosis['generation'],
-			'action_generation_state'      => 'current',
-			'operation_state'              => (string) ( $job['operation_state'] ?? '' ),
-			'operation_generation'         => (int) ( $job['operation_generation'] ?? 0 ),
-			'operation_effects_begun'      => ! empty( $job['operation_effects_begun_at'] ),
-			'operation_step_id'            => (string) $diagnosis['step_id'],
-			'live_generation_execution'    => (string) $diagnosis['live_generation_execution'],
-			'system_children_terminalized' => $children_terminalized,
-			'recovery_trigger'             => $trigger,
-		);
 	}
 
 	/** @return array<int,array<string,mixed>> */
