@@ -53,6 +53,9 @@ defined( 'ABSPATH' ) || exit;
  *
  *     # Upvote a post
  *     wp datamachine-socials reddit vote t3_abc123 --up
+ *
+ *     # Report posts that mention a domain
+ *     wp datamachine-socials reddit mentions example.com --owner=example_user
  */
 class RedditCommand {
 
@@ -634,6 +637,138 @@ class RedditCommand {
 
 		WP_CLI::success( count( $rows ) . ' posts found' );
 		WP_CLI\Utils\format_items( 'table', $rows, array( 'score', 'comments', 'subreddit', 'author', 'title' ) );
+	}
+
+	/**
+	 * Report Reddit posts that link to or mention a domain.
+	 *
+	 * The report uses Reddit post search and does not claim comment coverage.
+	 * Owner usernames classify rows as owned; every other author is organic.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <domain>
+	 * : Domain or root URL to report.
+	 *
+	 * [--owner=<username>]
+	 * : Known owner usernames as a comma-separated list.
+	 *
+	 * [--timeframe=<timeframe>]
+	 * : Fetch timeframe (all_time, 24_hours, 72_hours, 7_days, 30_days, 90_days, 6_months, 1_year).
+	 * ---
+	 * default: all_time
+	 * ---
+	 *
+	 * [--limit=<count>]
+	 * : Maximum deduplicated rows (1-500).
+	 * ---
+	 * default: 100
+	 * ---
+	 *
+	 * [--max-pages=<count>]
+	 * : Maximum Reddit pages fetched per query variant (1-10).
+	 * ---
+	 * default: 5
+	 * ---
+	 *
+	 * [--format=<format>]
+	 * : Output format.
+	 * ---
+	 * default: table
+	 * options:
+	 *   - table
+	 *   - json
+	 * ---
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp datamachine-socials reddit mentions example.com
+	 *     wp datamachine-socials reddit mentions https://example.com/ --owner=account_one,account_two --format=json
+	 *
+	 * @subcommand mentions
+	 */
+	public function mentions( $args, $assoc_args ) {
+		$domain    = $args[0] ?? '';
+		$format    = $assoc_args['format'] ?? 'table';
+		$limit     = $this->parseBoundedInteger( $assoc_args['limit'] ?? '100', '--limit', 1, 500 );
+		$max_pages = $this->parseBoundedInteger( $assoc_args['max-pages'] ?? '5', '--max-pages', 1, 10 );
+		$owners    = $this->parseOwners( $assoc_args['owner'] ?? array() );
+
+		$ability = wp_get_ability( 'datamachine/reddit-domain-mentions' );
+		if ( ! $ability ) {
+			WP_CLI::error( 'datamachine/reddit-domain-mentions ability not registered.' );
+		}
+
+		$result = $ability->execute(
+			array(
+				'domain'          => $domain,
+				'owners'          => $owners,
+				'timeframe_limit' => $assoc_args['timeframe'] ?? 'all_time',
+				'limit'           => $limit,
+				'max_pages'       => $max_pages,
+			)
+		);
+
+		if ( is_wp_error( $result ) || empty( $result['success'] ) ) {
+			WP_CLI::error( is_wp_error( $result ) ? $result->get_error_message() : ( $result['error'] ?? 'Reddit domain mentions report failed.' ) );
+		}
+
+		$report = $result['report'];
+		if ( 'json' === $format ) {
+			WP_CLI::log( wp_json_encode( $report, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+			return;
+		}
+
+		WP_CLI::log( sprintf( 'Domain: %s', $report['domain'] ) );
+		WP_CLI::log( sprintf( 'Total: %d | Owned: %d | Organic: %d', $report['totals']['total'], $report['totals']['owned'], $report['totals']['organic'] ) );
+		WP_CLI::log( 'Truncated: ' . ( $report['truncated'] ? 'yes' : 'no' ) );
+		WP_CLI::log( $report['coverage'] );
+
+		$rows = array_map(
+			static function ( array $row ): array {
+				return array(
+					'date'       => substr( $row['timestamp'], 0, 10 ),
+					'ownership'  => $row['ownership'],
+					'type'       => $row['match_type'],
+					'author'     => $row['author'],
+					'subreddit'  => 'r/' . $row['subreddit'],
+					'host'       => $row['matched_host'],
+					'score'      => $row['score'],
+					'comments'   => $row['comment_count'],
+					'title'      => mb_substr( $row['title'], 0, 55 ),
+					'target_url' => $row['matched_target_url'],
+					'permalink'  => $row['reddit_permalink'],
+				);
+			},
+			$report['rows']
+		);
+
+		if ( empty( $rows ) ) {
+			WP_CLI::warning( 'No matching Reddit posts found.' );
+			return;
+		}
+
+		WP_CLI\Utils\format_items( 'table', $rows, array( 'date', 'ownership', 'type', 'author', 'subreddit', 'host', 'score', 'comments', 'title', 'target_url', 'permalink' ) );
+	}
+
+	private function parseOwners( mixed $input ): array {
+		$values = is_array( $input ) ? $input : array( $input );
+		$owners = array();
+		foreach ( $values as $value ) {
+			$owners = array_merge( $owners, array_map( 'trim', explode( ',', (string) $value ) ) );
+		}
+		return array_values( array_filter( $owners, static fn( string $owner ): bool => '' !== $owner ) );
+	}
+
+	private function parseBoundedInteger( mixed $input, string $option, int $minimum, int $maximum ): int {
+		if ( ! is_scalar( $input ) || ! preg_match( '/^[1-9][0-9]*$/', (string) $input ) ) {
+			WP_CLI::error( sprintf( '%s must be a whole number between %d and %d.', $option, $minimum, $maximum ) );
+		}
+		$value = (int) $input;
+		if ( $value < $minimum || $value > $maximum ) {
+			WP_CLI::error( sprintf( '%s must be a whole number between %d and %d.', $option, $minimum, $maximum ) );
+		}
+		return $value;
 	}
 
 	/**

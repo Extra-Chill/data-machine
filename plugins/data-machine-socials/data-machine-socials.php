@@ -132,6 +132,7 @@ function datamachine_socials_bootstrap() {
 
 	// Reddit
 	new \DataMachineSocials\Abilities\Reddit\FetchRedditAbility();
+	new \DataMachineSocials\Abilities\Reddit\RedditDomainMentionsAbility();
 	new \DataMachineSocials\Abilities\Reddit\RedditCommentDomainMonitorAbility();
 	new \DataMachineSocials\Abilities\Reddit\ReplyRedditAbility();
 	new \DataMachineSocials\Abilities\Reddit\SubmitRedditAbility();

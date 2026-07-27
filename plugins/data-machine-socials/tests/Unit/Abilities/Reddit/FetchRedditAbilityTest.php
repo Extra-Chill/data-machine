@@ -17,6 +17,18 @@ use WP_UnitTestCase;
 
 class FetchRedditAbilityTest extends WP_UnitTestCase {
 
+	public function test_registered_output_schema_describes_items_pagination_and_target_url(): void {
+		new FetchRedditAbility();
+		$ability = wp_get_ability( 'datamachine/fetch-reddit' );
+
+		$this->assertNotNull( $ability );
+		$schema = $ability->get_output_schema();
+		$this->assertContains( 'pagination', $schema['required'] );
+		$this->assertArrayHasKey( 'items', $schema['properties'] );
+		$this->assertArrayHasKey( 'pagination', $schema['properties'] );
+		$this->assertContains( 'target_url', $schema['properties']['items']['items']['properties']['data']['properties']['metadata']['required'] );
+	}
+
 	public function tear_down(): void {
 		remove_all_filters( 'pre_http_request' );
 		parent::tear_down();
@@ -116,6 +128,7 @@ class FetchRedditAbilityTest extends WP_UnitTestCase {
 		$this->assertTrue( $result['success'] );
 		$this->assertSame( array( 'first', 'second' ), array_column( $result['items'], 'item_id' ) );
 		$this->assertSame( 1, $request_count );
+		$this->assertTrue( $result['pagination']['truncated'] );
 	}
 
 	public function test_direct_limit_returns_fewer_items_when_source_is_exhausted(): void {
@@ -132,6 +145,7 @@ class FetchRedditAbilityTest extends WP_UnitTestCase {
 
 		$this->assertTrue( $result['success'] );
 		$this->assertSame( array( 'only' ), array_column( $result['items'], 'item_id' ) );
+		$this->assertFalse( $result['pagination']['truncated'] );
 	}
 
 	public function test_direct_limit_does_not_override_collector_authority(): void {
@@ -224,6 +238,49 @@ class FetchRedditAbilityTest extends WP_UnitTestCase {
 		$this->assertSame( 'http_request_failed', $result->get_error_data()['upstream_code'] );
 	}
 
+	public function test_invalid_json_after_a_successful_page_marks_results_truncated(): void {
+		$request_count = 0;
+		add_filter(
+			'pre_http_request',
+			static function () use ( &$request_count ): array {
+				++$request_count;
+				if ( 1 === $request_count ) {
+					return self::redditListingResponse(
+						'page-2',
+						array(
+							array(
+								'id'           => 'first',
+								'title'        => 'First post',
+								'selftext'     => '',
+								'created_utc'  => time(),
+								'score'        => 1,
+								'num_comments' => 0,
+								'permalink'    => '/r/WordPress/comments/first/',
+								'subreddit'    => 'WordPress',
+								'author'       => 'reddit_user',
+								'is_self'      => true,
+							),
+						)
+					);
+				}
+
+				return array(
+					'response' => array( 'code' => 200 ),
+					'body'     => '{invalid-json',
+				);
+			},
+			10,
+			3
+		);
+
+		$result = ( new FetchRedditAbility() )->execute( $this->fetchInput() );
+
+		$this->assertTrue( $result['success'] );
+		$this->assertSame( array( 'first' ), array_column( $result['items'], 'item_id' ) );
+		$this->assertSame( 2, $result['pagination']['pages_fetched'] );
+		$this->assertTrue( $result['pagination']['truncated'] );
+	}
+
 	/**
 	 * @dataProvider searchSortProvider
 	 */
@@ -235,17 +292,7 @@ class FetchRedditAbilityTest extends WP_UnitTestCase {
 			static function ( $preempt, $args, $url ) use ( &$request_url ) {
 				$request_url = $url;
 
-				return array(
-					'response' => array( 'code' => 200 ),
-					'body'     => wp_json_encode(
-						array(
-							'data' => array(
-								'after'    => null,
-								'children' => array(),
-							),
-						)
-					),
-				);
+				return self::redditListingResponse( null, array() );
 			},
 			10,
 			3
@@ -310,25 +357,7 @@ class FetchRedditAbilityTest extends WP_UnitTestCase {
 					'posts' => array(),
 				);
 
-				return array(
-					'response' => array( 'code' => 200 ),
-					'body'     => wp_json_encode(
-						array(
-							'data' => array(
-								'after'    => $page['after'],
-								'children' => array_map(
-									static function ( array $post ): array {
-										return array(
-											'kind' => 't3',
-											'data' => $post,
-										);
-									},
-									$page['posts']
-								),
-							),
-						)
-					),
-				);
+				return self::redditListingResponse( $page['after'], $page['posts'] );
 			},
 			10,
 			3
@@ -350,6 +379,29 @@ class FetchRedditAbilityTest extends WP_UnitTestCase {
 			},
 			10,
 			3
+		);
+	}
+
+	/**
+	 * @param array<int,array<string,mixed>> $posts
+	 */
+	private static function redditListingResponse( ?string $after, array $posts ): array {
+		return array(
+			'response' => array( 'code' => 200 ),
+			'body'     => wp_json_encode(
+				array(
+					'data' => array(
+						'after'    => $after,
+						'children' => array_map(
+							static fn( array $post ): array => array(
+								'kind' => 't3',
+								'data' => $post,
+							),
+							$posts
+						),
+					),
+				)
+			),
 		);
 	}
 
