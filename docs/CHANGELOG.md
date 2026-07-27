@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.170.1] - 2026-07-27
+
+### Fixed
+- defer task registry initialization
+
 ## [0.170.0] - 2026-07-27
 
 ### Added
