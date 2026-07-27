@@ -127,9 +127,11 @@ class Publisher {
 				);
 				if ( '' !== $operation_ref && ! $recorded ) {
 					$result = array(
-						'platform' => $platform,
-						'success'  => false,
-						'error'    => 'delivery_receipt_failed',
+						'platform'       => $platform,
+						'success'        => false,
+						'error'          => 'delivery_receipt_failed',
+						'error_code'     => 'delivery_receipt_failed',
+						'delivery_state' => 'unknown',
 					);
 				}
 			}
@@ -164,9 +166,11 @@ class Publisher {
 
 		if ( ! $ability ) {
 			return array(
-				'platform' => $platform,
-				'success'  => false,
-				'error'    => "Ability {$ability_slug} not registered",
+				'platform'       => $platform,
+				'success'        => false,
+				'error'          => "Ability {$ability_slug} not registered",
+				'error_code'     => 'channel_unavailable',
+				'delivery_state' => 'undelivered',
 			);
 		}
 
@@ -195,8 +199,9 @@ class Publisher {
 		}
 
 		$media_kind = $extra['media_kind'] ?? 'image';
+
+		$input['media_kind'] = $media_kind;
 		if ( 'reel' === $media_kind ) {
-			$input['media_kind']    = 'reel';
 			$input['video_url']     = $extra['video_url'] ?? '';
 			$input['cover_url']     = $extra['cover_url'] ?? '';
 			$input['share_to_feed'] = $extra['share_to_feed'] ?? true;
@@ -212,26 +217,45 @@ class Publisher {
 
 		if ( is_wp_error( $result ) ) {
 			return array(
-				'platform' => $platform,
-				'success'  => false,
-				'error'    => $result->get_error_message(),
+				'platform'       => $platform,
+				'success'        => false,
+				'error'          => $result->get_error_message(),
+				'error_code'     => $result->get_error_code(),
+				'delivery_state' => self::is_explicitly_undelivered_error( $result->get_error_code() ) ? 'undelivered' : 'unknown',
 			);
 		}
 
 		if ( ! empty( $result['success'] ) ) {
+			$platform_post_id = SocialShareTracker::extract_platform_post_id( $platform, $result );
+			$platform_url     = SocialShareTracker::extract_platform_url( $platform, $result );
+			if ( ! SocialShareTracker::is_safe_platform_reference( $platform, $platform_post_id, $platform_url ) ) {
+				return array(
+					'platform'       => $platform,
+					'success'        => false,
+					'error'          => 'delivery_receipt_failed',
+					'error_code'     => 'delivery_receipt_failed',
+					'delivery_state' => 'unknown',
+				);
+			}
 			return array(
 				'platform'         => $platform,
 				'success'          => true,
-				'platform_post_id' => SocialShareTracker::extract_platform_post_id( $platform, $result ),
-				'platform_url'     => SocialShareTracker::extract_platform_url( $platform, $result ),
+				'platform_post_id' => $platform_post_id,
+				'platform_url'     => $platform_url,
 				'media_kind'       => $result['media_kind'] ?? null,
 			);
 		}
 
 		return array(
-			'platform' => $platform,
-			'success'  => false,
-			'error'    => $result['error'] ?? 'Unknown error',
+			'platform'       => $platform,
+			'success'        => false,
+			'error'          => $result['error'] ?? 'Unknown error',
+			'error_code'     => $result['error_code'] ?? 'publish_failed',
+			'delivery_state' => ! empty( $result['undelivered'] ) ? 'undelivered' : 'unknown',
 		);
+	}
+
+	private static function is_explicitly_undelivered_error( string $error_code ): bool {
+		return in_array( $error_code, array( 'invalid_media_url', 'media_download_failed', 'media_upload_failed', 'missing_auth', 'missing_param', 'not_found' ), true );
 	}
 }

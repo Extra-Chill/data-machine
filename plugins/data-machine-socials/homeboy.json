@@ -2,7 +2,14 @@
   "auto_cleanup": false,
   "changelog_target": "docs/CHANGELOG.md",
   "extensions": {
-    "wordpress": {}
+    "wordpress": {
+      "settings": {
+        "validation_dependencies": [
+          "data-machine"
+        ],
+        "wp_codebox_phpunit_bootstrap_mode": "managed"
+      }
+    }
   },
   "id": "data-machine-socials",
   "remote_path": "wp-content/plugins/data-machine-socials",

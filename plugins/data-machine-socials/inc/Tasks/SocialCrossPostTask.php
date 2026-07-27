@@ -37,6 +37,35 @@ class SocialCrossPostTask extends SystemTask {
 		$video_url     = $params['video_url'] ?? '';
 		$cover_url     = $params['cover_url'] ?? '';
 		$operation_ref = $params['delegated_operation_ref'] ?? '';
+		if ( '' !== $operation_ref ) {
+			$revalidated = DelegatedCrossPostAction::validate_effect(
+				is_array( $params['delegated_input'] ?? null ) ? $params['delegated_input'] : array(),
+				is_array( $params['delegated_actor'] ?? null ) ? $params['delegated_actor'] : array(),
+				$operation_ref
+			);
+			if ( is_wp_error( $revalidated ) ) {
+				$this->complete_delegated_failure( $jobId, is_array( $platforms ) ? $platforms : array(), $revalidated->get_error_code() );
+				return;
+			}
+
+			$params    = array_replace(
+				$params,
+				array(
+					'post_id'       => $revalidated['post_id'],
+					'platforms'     => $revalidated['channels'],
+					'caption'       => $revalidated['caption'],
+					'images'        => $revalidated['images'],
+					'media_kind'    => $revalidated['media_kind'],
+					'video_url'     => $revalidated['video_url'],
+					'cover_url'     => $revalidated['cover_url'],
+					'source_url'    => $revalidated['source_url'],
+					'share_to_feed' => true,
+				)
+			);
+			$post_id   = $revalidated['post_id'];
+			$platforms = $revalidated['channels'];
+			$caption   = $revalidated['caption'];
+		}
 
 		if ( empty( $platforms ) || ! is_array( $platforms ) ) {
 			if ( '' !== $operation_ref ) {
@@ -143,7 +172,7 @@ class SocialCrossPostTask extends SystemTask {
 
 			$item_ref = $success
 				? sanitize_text_field( (string) ( $result['platform_post_id'] ?? '' ) )
-				: DelegatedCrossPostAction::classify_error( $result['error'] ?? '' );
+				: DelegatedCrossPostAction::classify_error( $result );
 
 			$packets[] = array(
 				'type'     => $success ? 'social_share_ref' : 'social_share_error',
@@ -158,6 +187,27 @@ class SocialCrossPostTask extends SystemTask {
 		}
 
 		return $packets;
+	}
+
+	/** Complete a delegated child with bounded failure packets and no automatic task retry. */
+	private function complete_delegated_failure( int $job_id, array $platforms, string $error_code ): void {
+		$results = array_map(
+			static fn( $platform ): array => array(
+				'platform'   => sanitize_key( (string) $platform ),
+				'success'    => false,
+				'error_code' => $error_code,
+			),
+			$platforms
+		);
+		$this->completeJob(
+			$job_id,
+			array(
+				'job_status'             => 'failed - delegated_cross_post_effect_denied',
+				'results'                => $results,
+				'output_data_packets'    => self::delegated_result_packets( $results ),
+				'suppress_result_packet' => true,
+			)
+		);
 	}
 
 	/**

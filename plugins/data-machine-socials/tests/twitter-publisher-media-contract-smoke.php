@@ -94,6 +94,10 @@ namespace DataMachine\Core\FilesRepository {
 
 namespace DataMachineSocials\Tracking {
 	class SocialShareTracker {
+		public static function is_safe_platform_reference( string $platform, string $platform_post_id, string $platform_url ): bool {
+			return 'twitter' === $platform && '' !== $platform_post_id && str_starts_with( $platform_url, 'https://twitter.com/' );
+		}
+
 		public static function extract_platform_post_id( string $platform, array $result ): string {
 			unset( $platform );
 			return (string) ( $result['tweet_id'] ?? '' );

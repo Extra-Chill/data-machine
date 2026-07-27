@@ -13,7 +13,7 @@ final class DelegatedCrossPostAction {
 
 	public const ACTION_ID = 'datamachine-socials/cross-post';
 
-	private const VERSION = '1';
+	private const VERSION = '2';
 
 	private const CHANNELS = array(
 		'bluesky',
@@ -48,16 +48,24 @@ final class DelegatedCrossPostAction {
 	 * @return array
 	 */
 	public static function register_action( array $actions ): array {
-		$actions[ self::ACTION_ID ] = array(
-			'version'         => self::VERSION,
+		$contract = self::contract( self::VERSION );
+
+		$contract['versions'] = array( '1' => self::contract( '1' ) );
+
+		$actions[ self::ACTION_ID ] = $contract;
+
+		return $actions;
+	}
+
+	private static function contract( string $version ): array {
+		return array(
+			'version'         => $version,
 			'normalize_input' => array( self::class, 'normalize_input' ),
 			'authorize'       => array( self::class, 'authorize' ),
 			'prepare'         => array( self::class, 'prepare' ),
 			'project'         => array( self::class, 'project' ),
 			'retry'           => array( self::class, 'retry' ),
 		);
-
-		return $actions;
 	}
 
 	/**
@@ -195,6 +203,8 @@ final class DelegatedCrossPostAction {
 			'share_to_feed'           => true,
 			'source_url'              => $input['source_url'],
 			'delegated_operation_ref' => (string) ( $context['operation_ref'] ?? '' ),
+			'delegated_input'         => self::canonical_input( $input ),
+			'delegated_actor'         => self::bounded_actor( $context['actor'] ?? array() ),
 		);
 
 		return array(
@@ -223,17 +233,26 @@ final class DelegatedCrossPostAction {
 	 * @return array
 	 */
 	public static function project( array $run_result, array $context = array() ): array {
-		unset( $context );
-
 		if ( empty( $run_result ) ) {
 			return array();
 		}
 		if ( in_array( $run_result['status'] ?? '', array( 'submitted', 'executing', 'retrying' ), true ) ) {
 			return array();
 		}
+		if ( str_starts_with( strtolower( (string) ( $run_result['status'] ?? '' ) ), 'cancelled' ) ) {
+			return array(
+				'effect_count'   => 0,
+				'classification' => 'cancelled',
+				'share_refs'     => array(),
+				'error_codes'    => array(),
+			);
+		}
 
-		$share_refs  = array();
-		$error_codes = array();
+		$share_refs    = array();
+		$error_codes   = array();
+		$input         = is_array( $context['input'] ?? null ) ? $context['input'] : array();
+		$post_id       = self::strict_positive_int( $input['post_id'] ?? null );
+		$operation_ref = is_string( $context['operation_ref'] ?? null ) ? $context['operation_ref'] : '';
 		foreach ( self::packet_refs( $run_result ) as $ref ) {
 			if ( self::RESULT_SOURCE !== ( $ref['source_type'] ?? '' ) ) {
 				continue;
@@ -245,13 +264,25 @@ final class DelegatedCrossPostAction {
 			}
 
 			if ( 'social_share_ref' === ( $ref['type'] ?? '' ) ) {
+				$receipt = $post_id && '' !== $operation_ref
+					? \DataMachineSocials\Tracking\SocialShareTracker::get_operation_share( $post_id, $channel, $operation_ref )
+					: null;
+
+				$packet_id = sanitize_text_field( (string) ( $ref['source_item_id'] ?? '' ) );
+				if ( ! is_array( $receipt ) || ! hash_equals( (string) ( $receipt['platform_post_id'] ?? '' ), $packet_id ) ) {
+					$error_codes[] = array(
+						'channel' => $channel,
+						'code'    => 'delivery_receipt_failed',
+					);
+					continue;
+				}
 				$share_refs[] = array(
 					'channel'          => $channel,
-					'platform_post_id' => sanitize_text_field( (string) ( $ref['source_item_id'] ?? '' ) ),
+					'platform_post_id' => $packet_id,
 				);
 			} elseif ( 'social_share_error' === ( $ref['type'] ?? '' ) ) {
 				$code = (string) ( $ref['source_item_id'] ?? '' );
-				if ( in_array( $code, array( 'channel_unavailable', 'publish_failed', 'delivery_receipt_failed' ), true ) ) {
+				if ( in_array( $code, array( 'channel_unavailable', 'delivery_receipt_failed', 'delivery_unknown', 'effect_authorization_failed', 'resource_changed', 'undelivered' ), true ) ) {
 					$error_codes[] = array(
 						'channel' => $channel,
 						'code'    => $code,
@@ -294,6 +325,11 @@ final class DelegatedCrossPostAction {
 			return self::error( 'social_cross_post_retry_unsafe', 'The prior delivery effects cannot be reconciled safely.' );
 		}
 
+		$live_input = self::validate_effect( $input, self::bounded_actor( $context['actor'] ?? array() ), $operation_ref, 'retry' );
+		if ( is_wp_error( $live_input ) ) {
+			return $live_input;
+		}
+
 		$failures = array();
 		$shares   = array();
 		foreach ( self::packet_refs( $run_result ) as $ref ) {
@@ -328,7 +364,7 @@ final class DelegatedCrossPostAction {
 				continue;
 			}
 
-			if ( isset( $shares[ $channel ] ) || ! in_array( $failures[ $channel ] ?? '', array( 'channel_unavailable', 'publish_failed' ), true ) ) {
+			if ( isset( $shares[ $channel ] ) || ! in_array( $failures[ $channel ] ?? '', array( 'channel_unavailable', 'undelivered' ), true ) ) {
 				return self::error( 'social_cross_post_retry_unsafe', 'The prior delivery effects cannot be reconciled safely.' );
 			}
 		}
@@ -338,11 +374,55 @@ final class DelegatedCrossPostAction {
 
 	/** Map private provider failures to bounded public codes. */
 	public static function classify_error( $error ): string {
-		if ( 'delivery_receipt_failed' === $error ) {
-			return 'delivery_receipt_failed';
+		if ( is_array( $error ) ) {
+			if ( 'undelivered' === ( $error['delivery_state'] ?? '' ) ) {
+				return 'undelivered';
+			}
+			$error = $error['error_code'] ?? ( $error['error'] ?? '' );
+		}
+		if ( in_array( $error, array( 'delivery_receipt_failed', 'effect_authorization_failed', 'resource_changed' ), true ) ) {
+			return (string) $error;
+		}
+		if ( is_string( $error ) && str_contains( $error, 'not registered' ) ) {
+			return 'channel_unavailable';
 		}
 
-		return is_string( $error ) && str_contains( $error, 'not registered' ) ? 'channel_unavailable' : 'publish_failed';
+		return 'delivery_unknown';
+	}
+
+	/** Revalidate frozen input and owner authority immediately before effects. */
+	public static function validate_effect( array $input, array $actor, string $operation_ref, string $phase = 'effect' ) {
+		$normalized = self::normalize_input( self::canonical_input( $input ), array( 'phase' => $phase ) );
+		if ( is_wp_error( $normalized ) ) {
+			return self::error( 'resource_changed', 'The approved cross-post resource is no longer valid.' );
+		}
+
+		$authorized = self::authorize(
+			array(
+				'phase'         => $phase,
+				'action'        => self::ACTION_ID,
+				'operation_ref' => $operation_ref,
+				'actor'         => self::bounded_actor( $actor ),
+				'input'         => $normalized,
+			)
+		);
+		if ( is_wp_error( $authorized ) ) {
+			return self::error( 'effect_authorization_failed', 'The initiating actor is no longer authorized for this effect.' );
+		}
+
+		return $normalized;
+	}
+
+	private static function canonical_input( array $input ): array {
+		return array_intersect_key( $input, array_flip( self::INPUT_KEYS ) );
+	}
+
+	private static function bounded_actor( $actor ): array {
+		$actor = is_array( $actor ) ? $actor : array();
+		return array(
+			'user_id'  => max( 0, (int) ( $actor['user_id'] ?? 0 ) ),
+			'agent_id' => max( 0, (int) ( $actor['agent_id'] ?? 0 ) ),
+		);
 	}
 
 	/** @return array<int,array<string,mixed>> */

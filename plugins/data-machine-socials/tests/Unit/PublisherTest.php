@@ -17,7 +17,7 @@ final class PublisherTest extends WP_UnitTestCase {
 			$post_id,
 			'instagram',
 			'ig-existing',
-			'https://instagram.test/ig-existing',
+			'https://www.instagram.com/p/ig-existing/',
 			array(
 				'media_kind'    => 'image',
 				'operation_ref' => $operation_ref,

@@ -69,6 +69,10 @@ class TwitterPublishAbility extends AbstractSocialAbility {
 								),
 								'maxItems'    => 4,
 							),
+							'media_kind'    => array(
+								'type' => 'string',
+								'enum' => array( 'image', 'carousel' ),
+							),
 							'source_url'    => array(
 								'type'        => 'string',
 								'description' => 'Source URL to append/reply with',
@@ -144,11 +148,18 @@ class TwitterPublishAbility extends AbstractSocialAbility {
 		$media_path    = $input['media_path'] ?? $input['image_path'] ?? '';
 		$image_limit   = empty( $media_path ) ? 4 : 3;
 		$image_urls    = is_array( $input['image_urls'] ?? null ) ? array_slice( $input['image_urls'], 0, $image_limit ) : array();
+		$media_kind    = $input['media_kind'] ?? '';
 		$source_url    = $input['source_url'] ?? '';
 		$link_handling = $input['link_handling'] ?? 'append';
 
 		if ( empty( $content ) ) {
 			return new \WP_Error( 'missing_param', 'Content is required', array( 'status' => 400 ) );
+		}
+		if ( in_array( $media_kind, array( 'image', 'carousel' ), true ) && empty( $media_path ) && empty( $image_urls ) ) {
+			return new \WP_Error( 'missing_param', 'Media is required for image publishing', array( 'status' => 400 ) );
+		}
+		if ( in_array( $media_kind, array( 'image', 'carousel' ), true ) && ! empty( $media_path ) && ! file_exists( $media_path ) ) {
+			return new \WP_Error( 'invalid_media_url', 'The required media file is unavailable', array( 'status' => 400 ) );
 		}
 
 		$auth     = new AuthAbilities();
@@ -190,7 +201,7 @@ class TwitterPublishAbility extends AbstractSocialAbility {
 			foreach ( $media_paths as $path ) {
 				$media_id = self::upload_media( $connection, $path );
 				if ( ! $media_id ) {
-					return new \WP_Error( 'api_error', 'Failed to upload media', array( 'status' => 500 ) );
+					return new \WP_Error( 'media_upload_failed', 'Failed to upload media', array( 'status' => 502 ) );
 				}
 				$media_ids[] = $media_id;
 			}

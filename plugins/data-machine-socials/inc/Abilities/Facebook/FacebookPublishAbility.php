@@ -62,6 +62,10 @@ class FacebookPublishAbility extends AbstractSocialAbility {
 								'description' => 'URL to image for the post',
 								'format'      => 'uri',
 							),
+							'media_kind'    => array(
+								'type' => 'string',
+								'enum' => array( 'image' ),
+							),
 							'source_url'    => array(
 								'type'        => 'string',
 								'description' => 'Source URL to include',
@@ -135,11 +139,15 @@ class FacebookPublishAbility extends AbstractSocialAbility {
 		$title         = $input['title'] ?? '';
 		$content       = $input['content'] ?? '';
 		$image_url     = $input['image_url'] ?? '';
+		$media_kind    = $input['media_kind'] ?? '';
 		$source_url    = $input['source_url'] ?? '';
 		$link_handling = $input['link_handling'] ?? 'append';
 
 		if ( empty( $content ) ) {
 			return new \WP_Error( 'missing_param', 'Content is required', array( 'status' => 400 ) );
+		}
+		if ( 'image' === $media_kind && ( empty( $image_url ) || ! filter_var( $image_url, FILTER_VALIDATE_URL ) ) ) {
+			return new \WP_Error( 'missing_param', 'A valid image URL is required for image publishing', array( 'status' => 400 ) );
 		}
 
 		$auth     = new AuthAbilities();
@@ -176,6 +184,9 @@ class FacebookPublishAbility extends AbstractSocialAbility {
 		// Handle image upload
 		if ( ! empty( $image_url ) && filter_var( $image_url, FILTER_VALIDATE_URL ) ) {
 			$image_id = self::upload_photo( $page_id, $page_access_token, $image_url );
+			if ( ! $image_id && 'image' === $media_kind ) {
+				return new \WP_Error( 'media_upload_failed', 'Facebook image upload failed', array( 'status' => 502 ) );
+			}
 			if ( $image_id ) {
 				$post_data['attached_media'] = wp_json_encode( array( array( 'media_fbid' => $image_id ) ) );
 			}

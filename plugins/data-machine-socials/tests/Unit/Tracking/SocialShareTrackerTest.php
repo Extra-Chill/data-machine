@@ -233,7 +233,7 @@ class SocialShareTrackerTest extends WP_UnitTestCase {
 			array(
 				'success'          => true,
 				'platform_post_id' => 'ig1',
-				'platform_url'     => 'https://instagram.test/ig1',
+				'platform_url'     => 'https://www.instagram.com/p/ig1/',
 			),
 			array( 'operation_ref' => $operation_ref )
 		);
@@ -249,6 +249,15 @@ class SocialShareTrackerTest extends WP_UnitTestCase {
 		$this->assertNull( SocialShareTracker::get_operation_share( $this->post_id, 'twitter', $operation_ref ) );
 	}
 
+	public function test_operation_receipt_rejects_missing_malformed_and_deleted_authority(): void {
+		$operation_ref = 'dop_' . str_repeat( 'c', 64 );
+		$this->assertFalse( SocialShareTracker::record( $this->post_id, 'instagram', '', 'https://www.instagram.com/p/invalid/', array( 'operation_ref' => $operation_ref ) ) );
+		$this->assertFalse( SocialShareTracker::record( $this->post_id, 'instagram', 'ig1', 'https://attacker.example/ig1', array( 'operation_ref' => $operation_ref ) ) );
+		$this->assertTrue( SocialShareTracker::record( $this->post_id, 'instagram', 'ig1', 'https://www.instagram.com/p/ig1/', array( 'operation_ref' => $operation_ref ) ) );
+		$this->assertTrue( SocialShareTracker::mark_deleted( $this->post_id, 'instagram', 'ig1' ) );
+		$this->assertNull( SocialShareTracker::get_operation_share( $this->post_id, 'instagram', $operation_ref ) );
+	}
+
 	public function test_record_retries_compare_and_swap_conflict_without_losing_receipts(): void {
 		$this->assertTrue( SocialShareTracker::record( $this->post_id, 'instagram', 'ig-first' ) );
 
@@ -260,12 +269,12 @@ class SocialShareTrackerTest extends WP_UnitTestCase {
 			}
 
 			remove_filter( 'update_post_metadata', $conflict, 10 );
-			$this->assertTrue( SocialShareTracker::record( $this->post_id, 'twitter', 'tw-competing', '', array( 'operation_ref' => $competing_ref ) ) );
+			$this->assertTrue( SocialShareTracker::record( $this->post_id, 'twitter', 'tw-competing', 'https://x.com/example/status/tw-competing', array( 'operation_ref' => $competing_ref ) ) );
 			return false;
 		};
 		add_filter( 'update_post_metadata', $conflict, 10, 3 );
 
-		$result = SocialShareTracker::record( $this->post_id, 'bluesky', 'bs-requested', '', array( 'operation_ref' => $requested_ref ) );
+		$result = SocialShareTracker::record( $this->post_id, 'bluesky', 'bs-requested', 'https://bsky.app/profile/example/post/bs-requested', array( 'operation_ref' => $requested_ref ) );
 
 		remove_filter( 'update_post_metadata', $conflict, 10 );
 		$this->assertTrue( $result );
@@ -278,9 +287,9 @@ class SocialShareTrackerTest extends WP_UnitTestCase {
 	public function test_operation_receipt_dedupes_identical_replay_and_rejects_conflict(): void {
 		$operation_ref = 'dop_' . str_repeat( 'd', 64 );
 
-		$this->assertTrue( SocialShareTracker::record( $this->post_id, 'instagram', 'ig-stable', 'https://instagram.test/stable', array( 'operation_ref' => $operation_ref ) ) );
-		$this->assertTrue( SocialShareTracker::record( $this->post_id, 'instagram', 'ig-stable', 'https://instagram.test/stable', array( 'operation_ref' => $operation_ref ) ) );
-		$this->assertFalse( SocialShareTracker::record( $this->post_id, 'instagram', 'ig-conflict', 'https://instagram.test/conflict', array( 'operation_ref' => $operation_ref ) ) );
+		$this->assertTrue( SocialShareTracker::record( $this->post_id, 'instagram', 'ig-stable', 'https://www.instagram.com/p/stable/', array( 'operation_ref' => $operation_ref ) ) );
+		$this->assertTrue( SocialShareTracker::record( $this->post_id, 'instagram', 'ig-stable', 'https://www.instagram.com/p/stable/', array( 'operation_ref' => $operation_ref ) ) );
+		$this->assertFalse( SocialShareTracker::record( $this->post_id, 'instagram', 'ig-conflict', 'https://www.instagram.com/p/conflict/', array( 'operation_ref' => $operation_ref ) ) );
 		$this->assertSame( 1, SocialShareTracker::count_shares( $this->post_id, 'instagram' ) );
 	}
 

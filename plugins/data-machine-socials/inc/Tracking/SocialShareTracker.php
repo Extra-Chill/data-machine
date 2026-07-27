@@ -45,6 +45,9 @@ class SocialShareTracker {
 		if ( ! $post_id || empty( $platform ) ) {
 			return false;
 		}
+		if ( ! empty( $extra['operation_ref'] ) && ! self::is_safe_platform_reference( $platform, $platform_post_id, $platform_url ) ) {
+			return false;
+		}
 
 		$record = array(
 			'platform'         => sanitize_key( $platform ),
@@ -192,12 +195,46 @@ class SocialShareTracker {
 		$operation_hash = hash( 'sha256', $operation_ref );
 
 		foreach ( array_reverse( self::get_shares( $post_id, $platform ) ) as $share ) {
-			if ( 'deleted' !== ( $share['status'] ?? 'published' ) && hash_equals( $operation_hash, (string) ( $share['operation_hash'] ?? '' ) ) ) {
+			if (
+				'deleted' !== ( $share['status'] ?? 'published' ) &&
+				hash_equals( $operation_hash, (string) ( $share['operation_hash'] ?? '' ) ) &&
+				self::is_safe_platform_reference( $platform, (string) ( $share['platform_post_id'] ?? '' ), (string) ( $share['platform_url'] ?? '' ) )
+			) {
 				return $share;
 			}
 		}
 
 		return null;
+	}
+
+	/** Validate a bounded platform receipt before it becomes delivery authority. */
+	public static function is_safe_platform_reference( string $platform, string $platform_post_id, string $platform_url ): bool {
+		if ( '' === $platform_post_id || strlen( $platform_post_id ) > 512 || preg_match( '/[\x00-\x1F\x7F]/', $platform_post_id ) ) {
+			return false;
+		}
+
+		$hosts = array(
+			'bluesky'   => array( 'bsky.app' ),
+			'facebook'  => array( 'facebook.com' ),
+			'instagram' => array( 'instagram.com' ),
+			'pinterest' => array( 'pinterest.com' ),
+			'threads'   => array( 'threads.net' ),
+			'tiktok'    => array( 'tiktok.com' ),
+			'twitter'   => array( 'twitter.com', 'x.com' ),
+		);
+		$host  = strtolower( (string) wp_parse_url( $platform_url, PHP_URL_HOST ) );
+		$valid = $hosts[ sanitize_key( $platform ) ] ?? array();
+		if ( 'https' !== strtolower( (string) wp_parse_url( $platform_url, PHP_URL_SCHEME ) ) || '' === $host ) {
+			return false;
+		}
+
+		foreach ( $valid as $allowed_host ) {
+			if ( $host === $allowed_host || str_ends_with( $host, '.' . $allowed_host ) ) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	/**

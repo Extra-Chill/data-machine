@@ -128,7 +128,7 @@ namespace DataMachineSocials {
 				$success   = 'twitter' !== $platform;
 				$results[] = $success
 					? array( 'platform' => $platform, 'success' => true, 'platform_post_id' => $platform . '-123' )
-					: array( 'platform' => $platform, 'success' => false, 'error' => 'private provider token diagnostic' );
+					: array( 'platform' => $platform, 'success' => false, 'error' => 'private provider token diagnostic', 'delivery_state' => 'undelivered' );
 				if ( ! $success ) {
 					$errors[] = 'private provider token diagnostic';
 				}
@@ -183,7 +183,7 @@ namespace {
 	DelegatedCrossPostAction::register();
 	$actions = apply_filters( 'datamachine_delegated_operation_actions', array() );
 	$action  = $actions[ DelegatedCrossPostAction::ACTION_ID ] ?? array();
-	$assert( array( 'version', 'normalize_input', 'authorize', 'prepare', 'project', 'retry' ) === array_keys( $action ), 'registers the exact Data Machine owner callback contract with safe retry reconciliation' );
+	$assert( array( 'version', 'normalize_input', 'authorize', 'prepare', 'project', 'retry', 'versions' ) === array_keys( $action ), 'registers the versioned Data Machine owner callback contract with retry reconciliation' );
 	$assert( is_callable( $action['normalize_input'] ?? null ) && is_callable( $action['authorize'] ?? null ) && is_callable( $action['prepare'] ?? null ) && is_callable( $action['project'] ?? null ) && is_callable( $action['retry'] ?? null ), 'all owner callbacks are callable' );
 	$bootstrap = file_get_contents( dirname( __DIR__ ) . '/data-machine-socials.php' );
 	$assert( is_string( $bootstrap ) && str_contains( $bootstrap, 'DelegatedCrossPostAction::register()' ), 'plugin bootstrap installs the delegated action registration filter' );
@@ -202,8 +202,8 @@ namespace {
 	$second_normalized = $action['normalize_input']( $input, array( 'phase' => 'submit', 'actor' => array( 'user_id' => 12 ) ) );
 	$assert( $normalized === $second_normalized, 'normalized fingerprint input is actor-neutral' );
 
-	$prepared = $action['prepare']( $normalized, array( 'operation_ref' => 'dop_' . str_repeat( 'a', 64 ) ) );
-	$second_prepared = $action['prepare']( $second_normalized, array( 'operation_ref' => 'dop_' . str_repeat( 'a', 64 ), 'actor' => array( 'user_id' => 12 ) ) );
+	$prepared = $action['prepare']( $normalized, array( 'operation_ref' => 'dop_' . str_repeat( 'a', 64 ), 'actor' => array( 'user_id' => 11 ) ) );
+	$second_prepared = $action['prepare']( $second_normalized, array( 'operation_ref' => 'dop_' . str_repeat( 'a', 64 ), 'actor' => array( 'user_id' => 11 ) ) );
 	$settings = $prepared['workflow']['steps'][0]['flow_step_settings'] ?? array();
 	$assert( 7 === ( $prepared['owner_user_id'] ?? null ) && 9 === ( $prepared['agent_id'] ?? null ), 'prepare binds a stable owner and registered agent' );
 	$assert( 'system_task' === ( $prepared['workflow']['steps'][0]['step_type'] ?? null ) && 'social_cross_post' === ( $settings['task_type'] ?? null ), 'prepare composes the canonical system-task workflow' );
@@ -272,6 +272,7 @@ namespace {
 		),
 		$packets
 	);
+	$GLOBALS['delegated_cross_post_shares'][42]['instagram'][ 'dop_' . str_repeat( 'a', 64 ) ] = array( 'platform_post_id' => 'instagram-123' );
 	$projection = $action['project'](
 		array(
 			'schema_version' => 'datamachine.run_result.v1',
@@ -280,24 +281,36 @@ namespace {
 			'steps'          => array( array( 'packet_refs' => $packet_refs ) ),
 			'diagnostics'    => array( 'token' => 'private provider token diagnostic' ),
 		),
-		array()
+		array( 'operation_ref' => 'dop_' . str_repeat( 'a', 64 ), 'input' => $normalized )
 	);
 	$assert( 'partial' === ( $projection['classification'] ?? null ) && 1 === ( $projection['effect_count'] ?? null ), 'partial result preserves successful effect count' );
 	$assert( array( array( 'channel' => 'instagram', 'platform_post_id' => 'instagram-123' ) ) === ( $projection['share_refs'] ?? null ), 'projection preserves only safe share references' );
-	$assert( array( array( 'channel' => 'twitter', 'code' => 'publish_failed' ) ) === ( $projection['error_codes'] ?? null ), 'provider failures collapse to bounded error codes' );
+	$assert( array( array( 'channel' => 'twitter', 'code' => 'undelivered' ) ) === ( $projection['error_codes'] ?? null ), 'provider failures collapse to bounded error codes' );
+	unset( $GLOBALS['delegated_cross_post_shares'][42]['instagram'][ 'dop_' . str_repeat( 'a', 64 ) ] );
+	$missing_receipt_projection = $action['project'](
+		array( 'status' => 'failed', 'packet_refs' => $packet_refs ),
+		array( 'operation_ref' => 'dop_' . str_repeat( 'a', 64 ), 'input' => $normalized )
+	);
+	$assert( 0 === $missing_receipt_projection['effect_count'] && 'delivery_receipt_failed' === $missing_receipt_projection['error_codes'][0]['code'], 'projection reloads live receipt authority and rejects missing delivery truth' );
+	$cancelled_projection = $action['project']( array( 'status' => 'cancelled' ), array() );
+	$assert( 'cancelled' === $cancelled_projection['classification'], 'cancelled execution remains distinct from no-op projection' );
 	$encoded_projection = json_encode( $projection );
 	$assert( ! str_contains( $encoded_projection, 'private' ) && ! str_contains( $encoded_projection, 'token' ), 'projection redacts content, credentials, and provider diagnostics' );
 	$assert( array() === $action['project']( array( 'schema_version' => 'datamachine.run_result.v1', 'status' => 'executing' ), array() ), 'active operation envelopes expose no premature result projection' );
 	$retry_context = array(
 		'operation_ref' => 'dop_' . str_repeat( 'a', 64 ),
 		'input'         => $normalized,
+		'actor'         => array( 'user_id' => 12 ),
 	);
 	$GLOBALS['delegated_cross_post_shares'][42]['instagram'][ $retry_context['operation_ref'] ] = array( 'platform_post_id' => 'instagram-123' );
 	$assert( true === $action['retry']( array( 'schema_version' => 'datamachine.run_result.v1', 'status' => 'failed - delegated_cross_post_partial', 'packet_refs' => $packet_refs ), $retry_context ), 'retry reconciles the durable successful effect and failed channel' );
 	unset( $GLOBALS['delegated_cross_post_shares'][42]['instagram'][ $retry_context['operation_ref'] ] );
 	$unsafe_retry = $action['retry']( array( 'schema_version' => 'datamachine.run_result.v1', 'status' => 'failed - delegated_cross_post_partial', 'packet_refs' => $packet_refs ), $retry_context );
 	$assert( is_wp_error( $unsafe_retry ) && 'social_cross_post_retry_unsafe' === $unsafe_retry->get_error_code(), 'retry fails closed when a successful effect has no durable tracker receipt' );
-	$task->executeTask( 52, array_merge( $settings['params'], array( 'platforms' => array( 'twitter' ) ) ) );
+	$twitter_params                                = $settings['params'];
+	$twitter_params['platforms']                   = array( 'twitter' );
+	$twitter_params['delegated_input']['channels'] = array( 'twitter' );
+	$task->executeTask( 52, $twitter_params );
 	$failed_packets = $GLOBALS['delegated_cross_post_jobs'][52]['output_data_packets'] ?? array();
 	$failed_ref     = array(
 		'type'           => $failed_packets[0]['type'] ?? '',
@@ -313,12 +326,16 @@ namespace {
 	$assert( true === $action['retry']( array( 'schema_version' => 'datamachine.run_result.v1', 'status' => 'failed', 'packet_refs' => array( $failed_ref ) ), $twitter_context ), 'a fully accounted provider failure is safe to retry' );
 	$receipt_failure_ref = array_replace( $failed_ref, array( 'source_item_id' => 'delivery_receipt_failed' ) );
 	$assert( is_wp_error( $action['retry']( array( 'schema_version' => 'datamachine.run_result.v1', 'status' => 'failed', 'packet_refs' => array( $receipt_failure_ref ) ), $twitter_context ) ), 'missing durable receipt is never declared retry-safe' );
-	$task->executeTask( 53, array_merge( $settings['params'], array( 'platforms' => array( 'instagram' ) ) ) );
+	$replay_params                                = $settings['params'];
+	$replay_params['platforms']                   = array( 'instagram' );
+	$replay_params['delegated_input']['channels'] = array( 'instagram' );
+	$task->executeTask( 53, $replay_params );
 	$assert( 'completed' === ( $GLOBALS['delegated_cross_post_jobs'][53]['job_status'] ?? null ), 'successful delegated replay clears a stale parent failure override' );
 
-	$empty             = $normalized;
-	$empty['platforms'] = array();
-	$task->executeTask( 51, $empty + array( 'delegated_operation_ref' => 'dop_' . str_repeat( 'b', 64 ) ) );
+	$empty_params                                = $settings['params'];
+	$empty_params['platforms']                   = array();
+	$empty_params['delegated_input']['channels'] = array();
+	$task->executeTask( 51, $empty_params );
 	$assert( 'completed_no_items' === ( $GLOBALS['delegated_cross_post_jobs'][51]['job_status'] ?? null ), 'empty channel work emits canonical no-op status' );
 
 	if ( $failures ) {

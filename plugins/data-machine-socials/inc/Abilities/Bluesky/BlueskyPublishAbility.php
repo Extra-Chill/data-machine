@@ -61,6 +61,10 @@ class BlueskyPublishAbility extends AbstractSocialAbility {
 								'description' => 'URL to image for the post',
 								'format'      => 'uri',
 							),
+							'media_kind' => array(
+								'type' => 'string',
+								'enum' => array( 'image' ),
+							),
 							'source_url' => array(
 								'type'        => 'string',
 								'description' => 'Source URL to include',
@@ -124,10 +128,14 @@ class BlueskyPublishAbility extends AbstractSocialAbility {
 		$content    = $input['content'] ?? '';
 		$title      = $input['title'] ?? '';
 		$image_url  = $input['image_url'] ?? '';
+		$media_kind = $input['media_kind'] ?? '';
 		$source_url = $input['source_url'] ?? '';
 
 		if ( empty( $content ) ) {
 			return new \WP_Error( 'missing_param', 'Content is required', array( 'status' => 400 ) );
+		}
+		if ( 'image' === $media_kind && ( empty( $image_url ) || ! filter_var( $image_url, FILTER_VALIDATE_URL ) ) ) {
+			return new \WP_Error( 'missing_param', 'A valid image URL is required for image publishing', array( 'status' => 400 ) );
 		}
 
 		$auth     = new AuthAbilities();
@@ -151,6 +159,9 @@ class BlueskyPublishAbility extends AbstractSocialAbility {
 		$image_blob = null;
 		if ( ! empty( $image_url ) && filter_var( $image_url, FILTER_VALIDATE_URL ) ) {
 			$image_blob = self::upload_image( $access_token, $image_url );
+			if ( ! $image_blob && 'image' === $media_kind ) {
+				return new \WP_Error( 'media_upload_failed', 'Bluesky image upload failed', array( 'status' => 502 ) );
+			}
 		}
 
 		// Build post text — do NOT append raw URLs, use embeds/facets instead.
