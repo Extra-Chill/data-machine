@@ -105,6 +105,7 @@ class EventUpsertAbilitiesTest extends WP_UnitTestCase {
 		$this->assertIsArray( $result );
 		$this->assertTrue( $result['success'] );
 		$this->assertSame( 'created', $result['action'] );
+		$this->assertMatchesRegularExpression( '/^[a-f0-9]{64}$/', $result['fingerprint'] );
 		$this->assertGreaterThan( 0, $result['event_id'] );
 		$this->assertSame( 'publish', $result['normalized']['post_status'] );
 		$this->assertSame( '2027-02-20 20:00:00', $result['normalized']['start_datetime'] );

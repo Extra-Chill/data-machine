@@ -122,7 +122,7 @@ class EventDatesTable {
 			$post_status = get_post_status( $post_id ) ?: 'publish';
 		}
 
-		$wpdb->replace(
+		$result = $wpdb->replace(
 			self::table_name(),
 			array(
 				'post_id'        => $post_id,
@@ -133,7 +133,7 @@ class EventDatesTable {
 			array( '%d', '%s', $end_datetime ? '%s' : null, '%s' )
 		);
 
-		return true;
+		return false !== $result;
 	}
 
 	/**
@@ -177,17 +177,23 @@ class EventDatesTable {
 	 * Delete an event's dates from the table.
 	 *
 	 * @param int $post_id Post ID.
+	 * @return bool True when the delete was confirmed.
 	 */
-	public static function delete( int $post_id ): void {
+	public static function delete( int $post_id ): bool {
 		global $wpdb;
 
-		$wpdb->delete(
+		$result = $wpdb->delete(
 			self::table_name(),
 			array( 'post_id' => $post_id ),
 			array( '%d' )
 		);
 
-		do_action( 'datamachine_event_dates_deleted', $post_id );
+		if ( false !== $result ) {
+			do_action( 'datamachine_event_dates_deleted', $post_id );
+			return true;
+		}
+
+		return false;
 	}
 
 	/**

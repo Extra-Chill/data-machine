@@ -137,18 +137,23 @@ class EventUpsertAbilities {
 		$venue_term  = ! is_wp_error( $venue_terms ) && ! empty( $venue_terms ) ? $venue_terms[0] : null;
 		$post        = get_post( $post_id );
 		$dates       = \DataMachineEvents\Core\EventDatesTable::get( $post_id );
+		$fingerprint = EventUpdateAbilities::fingerprintForEvent( $post_id, $source, $source_id, $event['source_identity'] );
+		if ( is_wp_error( $fingerprint ) ) {
+			return $fingerprint;
+		}
 
 		return array(
-			'success'    => true,
-			'event_id'   => $post_id,
-			'event_url'  => (string) ( $result['data']['post_url'] ?? get_permalink( $post_id ) ),
-			'action'     => (string) $result['data']['action'],
-			'source'     => array(
+			'success'     => true,
+			'event_id'    => $post_id,
+			'event_url'   => (string) ( $result['data']['post_url'] ?? get_permalink( $post_id ) ),
+			'action'      => (string) $result['data']['action'],
+			'fingerprint' => $fingerprint,
+			'source'      => array(
 				'name'     => $source,
 				'id'       => $source_id,
 				'identity' => $event['source_identity'],
 			),
-			'normalized' => array(
+			'normalized'  => array(
 				'title'          => $post instanceof \WP_Post ? $post->post_title : (string) ( $event['title'] ?? '' ),
 				'post_status'    => $post instanceof \WP_Post ? $post->post_status : $config['post_status'],
 				'start_datetime' => $dates ? (string) $dates->start_datetime : '',
@@ -267,16 +272,17 @@ class EventUpsertAbilities {
 	private function getOutputSchema(): array {
 		return array(
 			'type'       => 'object',
-			'required'   => array( 'success', 'event_id', 'event_url', 'action', 'source', 'normalized' ),
+			'required'   => array( 'success', 'event_id', 'event_url', 'action', 'fingerprint', 'source', 'normalized' ),
 			'properties' => array(
-				'success'    => array( 'type' => 'boolean' ),
-				'event_id'   => array( 'type' => 'integer' ),
-				'event_url'  => array( 'type' => 'string' ),
-				'action'     => array(
+				'success'     => array( 'type' => 'boolean' ),
+				'event_id'    => array( 'type' => 'integer' ),
+				'event_url'   => array( 'type' => 'string' ),
+				'action'      => array(
 					'type' => 'string',
 					'enum' => array( 'created', 'updated', 'no_change' ),
 				),
-				'source'     => array(
+				'fingerprint' => array( 'type' => 'string' ),
+				'source'      => array(
 					'type'       => 'object',
 					'required'   => array( 'name', 'id', 'identity' ),
 					'properties' => array(
@@ -285,7 +291,7 @@ class EventUpsertAbilities {
 						'identity' => array( 'type' => 'string' ),
 					),
 				),
-				'normalized' => array(
+				'normalized'  => array(
 					'type'       => 'object',
 					'required'   => array( 'title', 'post_status', 'start_datetime', 'end_datetime', 'venue', 'venue_id' ),
 					'properties' => array(

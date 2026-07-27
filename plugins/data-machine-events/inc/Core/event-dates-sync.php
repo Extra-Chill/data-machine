@@ -211,6 +211,23 @@ function data_machine_events_sync_datetime_meta( $post_id, $post, $update ) {
 	if ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) {
 		return;
 	}
+	$delete_dates = static function ( int $event_id ): void {
+		if ( EventDatesTable::delete( $event_id ) ) {
+			return;
+		}
+		do_action(
+			'datamachine_event_dates_sync_failed',
+			new \WP_Error(
+				'event_dates_delete_failed',
+				'The derived event dates could not be deleted.',
+				array(
+					'status'    => 503,
+					'retryable' => true,
+				)
+			),
+			$event_id
+		);
+	};
 
 	// Parse blocks to extract event details from Event Details block.
 	$blocks              = parse_blocks( $post->post_content );
@@ -301,21 +318,34 @@ function data_machine_events_sync_datetime_meta( $post_id, $post, $update ) {
 					$end_datetime_val = null;
 				}
 
-				EventDatesTable::upsert( $post_id, $datetime, $end_datetime_val );
-
-				/**
-				 * Fires after event dates are written to the event_dates table.
-				 *
-				 * Replaces the `updated_post_meta`/`added_post_meta` hooks that
-				 * previously fired from update_post_meta() calls.
-				 *
-				 * @param int         $post_id        Post ID.
-				 * @param string      $start_datetime Start datetime.
-				 * @param string|null $end_datetime   End datetime or null.
-				 */
-				do_action( 'datamachine_event_dates_updated', $post_id, $datetime, $end_datetime_val );
+				if ( EventDatesTable::upsert( $post_id, $datetime, $end_datetime_val ) ) {
+					/**
+					 * Fires after event dates are written to the event_dates table.
+					 *
+					 * Replaces the `updated_post_meta`/`added_post_meta` hooks that
+					 * previously fired from update_post_meta() calls.
+					 *
+					 * @param int         $post_id        Post ID.
+					 * @param string      $start_datetime Start datetime.
+					 * @param string|null $end_datetime   End datetime or null.
+					 */
+					do_action( 'datamachine_event_dates_updated', $post_id, $datetime, $end_datetime_val );
+				} else {
+					do_action(
+						'datamachine_event_dates_sync_failed',
+						new \WP_Error(
+							'event_dates_write_failed',
+							'The derived event dates could not be persisted.',
+							array(
+								'status'    => 503,
+								'retryable' => true,
+							)
+						),
+						$post_id
+					);
+				}
 			} else {
-				EventDatesTable::delete( $post_id );
+				$delete_dates( $post_id );
 			}
 
 			// Sync ticket URL for duplicate detection queries.
@@ -331,7 +361,7 @@ function data_machine_events_sync_datetime_meta( $post_id, $post, $update ) {
 	}
 
 	if ( ! $event_details_found ) {
-		EventDatesTable::delete( $post_id );
+		$delete_dates( $post_id );
 		delete_post_meta( $post_id, EVENT_TICKET_URL_META_KEY );
 	}
 }

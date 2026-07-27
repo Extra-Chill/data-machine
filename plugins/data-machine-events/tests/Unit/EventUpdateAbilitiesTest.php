@@ -25,6 +25,7 @@ class EventUpdateAbilitiesTest extends WP_UnitTestCase {
 	}
 
 	public function tearDown(): void {
+		remove_all_filters( 'datamachine_events_update_source_event_permission' );
 		remove_all_filters( 'datamachine_events_before_event_venue_mutation' );
 		remove_all_actions( 'datamachine_events_after_event_venue_mutation' );
 		remove_all_filters( 'datamachine_events_before_event_update_persistence' );
@@ -32,6 +33,228 @@ class EventUpdateAbilitiesTest extends WP_UnitTestCase {
 		remove_all_filters( 'wp_insert_post_empty_content' );
 		$this->registerEventObjects();
 		parent::tearDown();
+	}
+
+	public function test_source_update_requires_narrow_delegated_permission(): void {
+		$event_id = $this->makeSourceEvent();
+		$result   = $this->ability->executeUpdateSourceEvent( $this->sourceInput( $event_id, array( 'startTime' => '21:00' ) ) );
+
+		$this->assertWPError( $result );
+		$this->assertSame( 'source_event_update_forbidden', $result->get_error_code() );
+		$this->assertSame( '20:00', parse_blocks( get_post( $event_id )->post_content )[0]['attrs']['startTime'] );
+	}
+
+	public function test_registered_ability_execution_cannot_bypass_scoped_permission(): void {
+		do_action( 'wp_abilities_api_init' );
+		$registered = wp_get_ability( EventUpdateAbilities::SOURCE_ABILITY_NAME );
+		$this->assertNotNull( $registered );
+		$result = $registered->execute( $this->sourceInput( $this->makeSourceEvent(), array( 'startTime' => '21:00' ) ) );
+
+		$this->assertWPError( $result );
+		$this->assertSame( 'source_event_update_forbidden', $result->get_error_code() );
+	}
+
+	public function test_source_update_rejects_wrong_identity_event_and_stale_fingerprint(): void {
+		add_filter( 'datamachine_events_update_source_event_permission', '__return_true' );
+		$event_id = $this->makeSourceEvent();
+
+		$wrong_source           = $this->sourceInput( $event_id, array( 'startTime' => '21:00' ) );
+		$wrong_source['source'] = 'other-source';
+		$result                 = $this->ability->executeUpdateSourceEvent( $wrong_source );
+		$this->assertWPError( $result );
+		$this->assertSame( 'source_event_identity_mismatch', $result->get_error_code() );
+
+		$wrong_source_id              = $this->sourceInput( $event_id, array( 'startTime' => '21:00' ) );
+		$wrong_source_id['source_id'] = 'other-id';
+		$result                       = $this->ability->executeUpdateSourceEvent( $wrong_source_id );
+		$this->assertWPError( $result );
+		$this->assertSame( 'source_event_identity_mismatch', $result->get_error_code() );
+
+		$wrong_identity                    = $this->sourceInput( $event_id, array( 'startTime' => '21:00' ) );
+		$wrong_identity['source_identity'] = str_repeat( 'b', 64 );
+		$result                            = $this->ability->executeUpdateSourceEvent( $wrong_identity );
+		$this->assertWPError( $result );
+		$this->assertSame( 'source_event_identity_mismatch', $result->get_error_code() );
+
+		$wrong_event          = $this->sourceInput( $event_id, array( 'startTime' => '21:00' ) );
+		$wrong_event['event'] = self::factory()->post->create( array( 'post_type' => 'post' ) );
+		$result               = $this->ability->executeUpdateSourceEvent( $wrong_event );
+		$this->assertWPError( $result );
+		$this->assertSame( 'source_event_not_found', $result->get_error_code() );
+
+		$stale                         = $this->sourceInput( $event_id, array( 'startTime' => '21:00' ) );
+		$stale['expected_fingerprint'] = str_repeat( 'a', 64 );
+		$result                        = $this->ability->executeUpdateSourceEvent( $stale );
+		$this->assertWPError( $result );
+		$this->assertSame( 'source_event_fingerprint_conflict', $result->get_error_code() );
+		$this->assertSame( 409, $result->get_error_data()['status'] );
+		$this->assertFalse( $result->get_error_data()['retryable'] );
+		$this->assertMatchesRegularExpression( '/^[a-f0-9]{64}$/', $result->get_error_data()['fingerprint'] );
+
+		$result = $this->ability->executeUpdateSourceEvent( $this->sourceInput( $event_id, array( 'venue' => PHP_INT_MAX ) ) );
+		$this->assertWPError( $result );
+		$this->assertSame( 'event_venue_assignment_failed', $result->get_error_code() );
+		$this->assertSame( array(), wp_get_object_terms( $event_id, 'venue', array( 'fields' => 'ids' ) ) );
+
+		$result = $this->ability->executeUpdateSourceEvent( $this->sourceInput( $event_id, array( 'startDate' => '2027-99-99' ) ) );
+		$this->assertWPError( $result );
+		$this->assertSame( 'source_event_update_input_invalid', $result->get_error_code() );
+		$this->assertSame( '2027-01-01', parse_blocks( get_post( $event_id )->post_content )[0]['attrs']['startDate'] );
+	}
+
+	public function test_source_update_atomically_changes_venue_and_time_through_lifecycle(): void {
+		add_filter( 'datamachine_events_update_source_event_permission', '__return_true' );
+		$event_id = $this->makeSourceEvent();
+		$previous = $this->makeVenue( 'Source Previous Venue' );
+		$next     = $this->makeVenue( 'Source Next Venue' );
+		$observed = array();
+		wp_set_post_terms( $event_id, array( $previous ), 'venue' );
+		$fingerprint = EventUpdateAbilities::fingerprintForEvent( $event_id, 'booking', 'booking-123' );
+
+		add_filter(
+			'datamachine_events_before_event_update_persistence',
+			static function ( $allowed, array $context ) use ( &$observed ) {
+				$observed[] = array( 'before', $context['next_venue_id'], $context['event']['startTime'] );
+				return $allowed;
+			},
+			10,
+			2
+		);
+		add_action(
+			'datamachine_events_after_event_update_persistence',
+			static function ( array $context, array $result ) use ( &$observed ): void {
+				$observed[] = array( 'after', $result['status'] );
+			},
+			10,
+			2
+		);
+
+		$result = $this->ability->executeUpdateSourceEvent(
+			array(
+				'event'                => $event_id,
+				'source'               => 'booking',
+				'source_id'            => 'booking-123',
+				'source_identity'      => hash( 'sha256', "booking\0booking-123" ),
+				'expected_fingerprint' => $fingerprint,
+				'venue'                => $next,
+				'startTime'            => '21:30',
+			)
+		);
+
+		$this->assertIsArray( $result );
+		$this->assertSame( 'updated', $result['action'] );
+		$this->assertSame( array( 'startTime', 'venue' ), $result['updated_fields'] );
+		$this->assertNotSame( $fingerprint, $result['fingerprint'] );
+		$this->assertSame( array( $next ), wp_get_object_terms( $event_id, 'venue', array( 'fields' => 'ids' ) ) );
+		$this->assertSame( '21:30', parse_blocks( get_post( $event_id )->post_content )[0]['attrs']['startTime'] );
+		$this->assertSame( 'Manual title retained', get_post( $event_id )->post_title );
+		$this->assertSame( array( array( 'before', $next, '21:30' ), array( 'after', 'updated' ) ), $observed );
+	}
+
+	public function test_source_update_rolls_back_venue_when_content_write_fails(): void {
+		add_filter( 'datamachine_events_update_source_event_permission', '__return_true' );
+		$event_id = $this->makeSourceEvent();
+		$previous = $this->makeVenue( 'Rollback Previous Venue' );
+		$next     = $this->makeVenue( 'Rollback Next Venue' );
+		wp_set_post_terms( $event_id, array( $previous ), 'venue' );
+		$input = $this->sourceInput( $event_id, array( 'venue' => $next, 'startTime' => '22:00' ) );
+		add_filter( 'wp_insert_post_empty_content', '__return_true' );
+
+		$result = $this->ability->executeUpdateSourceEvent( $input );
+
+		$this->assertWPError( $result );
+		$this->assertSame( 'empty_content', $result->get_error_code() );
+		$this->assertSame( array( $previous ), wp_get_object_terms( $event_id, 'venue', array( 'fields' => 'ids' ) ) );
+		$this->assertSame( '20:00', parse_blocks( get_post( $event_id )->post_content )[0]['attrs']['startTime'] );
+		$this->assertSame( $input['expected_fingerprint'], EventUpdateAbilities::fingerprintForEvent( $event_id, 'booking', 'booking-123' ) );
+	}
+
+	public function test_source_update_rolls_back_when_derived_date_write_fails(): void {
+		add_filter( 'datamachine_events_update_source_event_permission', '__return_true' );
+		$event_id = $this->makeSourceEvent();
+		$input    = $this->sourceInput( $event_id, array( 'startTime' => '22:30' ) );
+		$fail_date_replace = static function ( string $query ): string {
+			return str_contains( $query, 'REPLACE INTO' ) && str_contains( $query, 'datamachine_event_dates' )
+				? 'INVALID EVENT DATE WRITE'
+				: $query;
+		};
+		add_filter( 'query', $fail_date_replace );
+
+		try {
+			$result = $this->ability->executeUpdateSourceEvent( $input );
+		} finally {
+			remove_filter( 'query', $fail_date_replace );
+		}
+
+		$this->assertWPError( $result );
+		$this->assertSame( 'event_dates_write_failed', $result->get_error_code() );
+		$this->assertTrue( $result->get_error_data()['retryable'] );
+		$this->assertSame( '20:00', parse_blocks( get_post( $event_id )->post_content )[0]['attrs']['startTime'] );
+		$this->assertSame( $input['expected_fingerprint'], EventUpdateAbilities::fingerprintForEvent( $event_id, 'booking', 'booking-123' ) );
+	}
+
+	public function test_source_update_rolls_back_when_derived_date_delete_fails(): void {
+		add_filter( 'datamachine_events_update_source_event_permission', '__return_true' );
+		$event_id = $this->makeSourceEvent();
+		$input    = $this->sourceInput( $event_id, array( 'startDate' => '' ) );
+		$fail_date_delete = static function ( string $query ): string {
+			return str_contains( $query, 'DELETE FROM' ) && str_contains( $query, 'datamachine_event_dates' )
+				? 'INVALID EVENT DATE DELETE'
+				: $query;
+		};
+		add_filter( 'query', $fail_date_delete );
+
+		try {
+			$result = $this->ability->executeUpdateSourceEvent( $input );
+		} finally {
+			remove_filter( 'query', $fail_date_delete );
+		}
+
+		$this->assertWPError( $result );
+		$this->assertSame( 'event_dates_delete_failed', $result->get_error_code() );
+		$this->assertTrue( $result->get_error_data()['retryable'] );
+		$this->assertSame( '2027-01-01', parse_blocks( get_post( $event_id )->post_content )[0]['attrs']['startDate'] );
+		$this->assertSame( $input['expected_fingerprint'], EventUpdateAbilities::fingerprintForEvent( $event_id, 'booking', 'booking-123' ) );
+	}
+
+	public function test_source_update_surfaces_commit_uncertainty_as_retryable(): void {
+		add_filter( 'datamachine_events_update_source_event_permission', '__return_true' );
+		$event_id = $this->makeSourceEvent();
+		$ability  = new class() extends EventUpdateAbilities {
+			protected function transactionQuery( string $sql ) {
+				$result = parent::transactionQuery( $sql );
+				return 'COMMIT' === $sql ? false : $result;
+			}
+		};
+
+		$result = $ability->executeUpdateSourceEvent( $this->sourceInput( $event_id, array( 'startTime' => '23:00' ) ) );
+
+		$this->assertWPError( $result );
+		$this->assertSame( 'source_event_commit_uncertain', $result->get_error_code() );
+		$this->assertTrue( $result->get_error_data()['retryable'] );
+		$this->assertTrue( $result->get_error_data()['connection_closed'] );
+		$this->assertTrue( $result->get_error_data()['connection_recovered'] );
+		$this->assertMatchesRegularExpression( '/^[a-f0-9]{64}$/', $result->get_error_data()['fingerprint'] );
+
+		$retry = $this->sourceInput( $event_id, array( 'startTime' => '23:00' ) );
+		$retry['expected_fingerprint'] = $result->get_error_data()['fingerprint'];
+		$converged = $this->ability->executeUpdateSourceEvent( $retry );
+		$this->assertIsArray( $converged );
+		$this->assertSame( 'no_change', $converged['action'] );
+		$this->assertSame( $retry['expected_fingerprint'], $converged['fingerprint'] );
+	}
+
+	public function test_source_update_returns_stable_no_change_result(): void {
+		add_filter( 'datamachine_events_update_source_event_permission', '__return_true' );
+		$event_id = $this->makeSourceEvent();
+		$input    = $this->sourceInput( $event_id, array( 'startTime' => '20:00' ) );
+
+		$result = $this->ability->executeUpdateSourceEvent( $input );
+
+		$this->assertIsArray( $result );
+		$this->assertSame( 'no_change', $result['action'] );
+		$this->assertSame( array(), $result['updated_fields'] );
+		$this->assertSame( $input['expected_fingerprint'], $result['fingerprint'] );
 	}
 
 	public function test_venue_mutation_success_assigns_term_and_returns_taxonomy_result(): void {
@@ -401,6 +624,28 @@ class EventUpdateAbilitiesTest extends WP_UnitTestCase {
 		$this->assertGreaterThan( 0, $event_id, 'Event fixture creation must return a positive post ID.' );
 
 		return $event_id;
+	}
+
+	private function makeSourceEvent(): int {
+		$event_id = $this->makeEvent();
+		wp_update_post( array( 'ID' => $event_id, 'post_title' => 'Manual title retained' ) );
+		update_post_meta( $event_id, '_datamachine_event_source', 'booking' );
+		update_post_meta( $event_id, '_datamachine_event_source_id', 'booking-123' );
+		update_post_meta( $event_id, '_datamachine_event_source_identity', hash( 'sha256', "booking\0booking-123" ) );
+		return $event_id;
+	}
+
+	private function sourceInput( int $event_id, array $changes ): array {
+		return array_merge(
+			array(
+				'event'                => $event_id,
+				'source'               => 'booking',
+				'source_id'            => 'booking-123',
+				'source_identity'      => hash( 'sha256', "booking\0booking-123" ),
+				'expected_fingerprint' => EventUpdateAbilities::fingerprintForEvent( $event_id, 'booking', 'booking-123' ),
+			),
+			$changes
+		);
 	}
 
 	private function makeVenue( string $name ): int {
