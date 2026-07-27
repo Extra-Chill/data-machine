@@ -132,6 +132,7 @@ function datamachine_socials_bootstrap() {
 
 	// Reddit
 	new \DataMachineSocials\Abilities\Reddit\FetchRedditAbility();
+	new \DataMachineSocials\Abilities\Reddit\RedditCommentDomainMonitorAbility();
 	new \DataMachineSocials\Abilities\Reddit\ReplyRedditAbility();
 	new \DataMachineSocials\Abilities\Reddit\SubmitRedditAbility();
 	new \DataMachineSocials\Abilities\Reddit\VoteRedditAbility();
@@ -213,6 +214,9 @@ add_action( 'plugins_loaded', 'datamachine_socials_register_agents_md_section', 
 
 // Temp file cleanup runs independently (doesn't need DM core)
 \DataMachineSocials\Cleanup::register();
+\DataMachineSocials\Tracking\RedditCommentDomainStore::register();
+
+register_deactivation_hook( __FILE__, array( \DataMachineSocials\Tracking\RedditCommentDomainStore::class, 'deactivate' ) );
 
 /**
  * Enqueue Gutenberg sidebar assets

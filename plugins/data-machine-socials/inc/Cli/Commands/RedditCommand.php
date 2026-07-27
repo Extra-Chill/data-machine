@@ -637,6 +637,208 @@ class RedditCommand {
 	}
 
 	/**
+	 * Poll bounded subreddit comment streams for configured domains.
+	 *
+	 * This is incremental monitoring of explicit subreddit scopes. It is not a
+	 * global or comprehensive historical Reddit comment search.
+	 *
+	 * ## OPTIONS
+	 *
+	 * --domains=<domains>
+	 * : Comma-separated domains to monitor.
+	 *
+	 * --subreddits=<subreddits>
+	 * : Comma-separated subreddit scopes.
+	 *
+	 * [--include-subdomains]
+	 * : Match child hosts in addition to each exact domain.
+	 *
+	 * [--owners=<usernames>]
+	 * : Comma-separated known owner usernames, classified separately from organic mentions.
+	 *
+	 * [--page-size=<count>]
+	 * : Comments per Reddit page, 1-100. Default 100.
+	 *
+	 * [--max-pages=<count>]
+	 * : Maximum pages per scope and invocation, 1-10. Default 5.
+	 *
+	 * [--format=<format>]
+	 * : Output format: table or json. Default table.
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp datamachine-socials reddit monitor-comments --domains=example.com --subreddits=music,festivals
+	 *     wp datamachine-socials reddit monitor-comments --domains=example.com --subreddits=music --include-subdomains --owners=account_name --format=json
+	 *
+	 * @subcommand monitor-comments
+	 */
+	public function monitor_comments( $args, $assoc_args ) {
+		$args;
+		$domains    = $this->csv_values( (string) ( $assoc_args['domains'] ?? '' ) );
+		$subreddits = $this->csv_values( (string) ( $assoc_args['subreddits'] ?? '' ) );
+		if ( empty( $domains ) || empty( $subreddits ) ) {
+			WP_CLI::error( '--domains and --subreddits are required comma-separated lists.' );
+		}
+
+		$page_size = $this->bounded_integer_arg( $assoc_args, 'page-size', 100, 1, 100 );
+		$max_pages = $this->bounded_integer_arg( $assoc_args, 'max-pages', 5, 1, 10 );
+		$format    = $this->format_arg( $assoc_args, array( 'table', 'json' ) );
+		$ability   = wp_get_ability( 'datamachine/reddit-comment-mentions-poll' );
+		if ( ! $ability ) {
+			WP_CLI::error( 'datamachine/reddit-comment-mentions-poll ability not registered.' );
+		}
+		$result = $ability->execute(
+			array(
+				'domains'            => $domains,
+				'subreddits'         => $subreddits,
+				'include_subdomains' => isset( $assoc_args['include-subdomains'] ),
+				'known_owners'       => $this->csv_values( (string) ( $assoc_args['owners'] ?? '' ) ),
+				'page_size'          => $page_size,
+				'max_pages'          => $max_pages,
+			)
+		);
+		if ( is_wp_error( $result ) ) {
+			WP_CLI::error( $result->get_error_message() );
+		}
+		if ( 'json' === $format ) {
+			WP_CLI::log( wp_json_encode( $result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+			return;
+		}
+
+		$rows = array();
+		foreach ( $result['data']['scopes'] ?? array() as $subreddit => $scope ) {
+			$rows[] = array(
+				'subreddit'    => 'r/' . $subreddit,
+				'checked'      => $scope['checked'],
+				'inserted'     => $scope['inserted'],
+				'updated'      => $scope['updated'],
+				'pages'        => $scope['pages'],
+				'truncated'    => $scope['truncated'] ? 'yes' : 'no',
+				'checkpoint'   => $scope['checkpoint'],
+				'continuation' => $scope['continuation'],
+			);
+		}
+		if ( ! empty( $rows ) ) {
+			WP_CLI\Utils\format_items( 'table', $rows, array( 'subreddit', 'checked', 'inserted', 'updated', 'pages', 'truncated', 'checkpoint', 'continuation' ) );
+		}
+		foreach ( $result['data']['errors'] ?? array() as $subreddit => $error ) {
+			WP_CLI::warning( sprintf( 'r/%s: %s', $subreddit, $error['message'] ) );
+		}
+		WP_CLI::log( 'Coverage: bounded incremental subreddit comment streams only; not all Reddit comments or historical global search.' );
+	}
+
+	/**
+	 * Report retained bounded Reddit comment-domain observations.
+	 *
+	 * ## OPTIONS
+	 *
+	 * [--domain=<domain>]
+	 * : Filter by monitored domain.
+	 *
+	 * [--subreddit=<subreddit>]
+	 * : Filter by subreddit.
+	 *
+	 * [--from=<date>]
+	 * : Earliest comment date or timestamp.
+	 *
+	 * [--to=<date>]
+	 * : Latest comment date or timestamp.
+	 *
+	 * [--ownership=<ownership>]
+	 * : all, known_owner, or organic. Default all.
+	 *
+	 * [--owners=<usernames>]
+	 * : Reclassify against comma-separated known owner usernames at report time.
+	 *
+	 * [--min-score=<score>]
+	 * : Minimum current observed score.
+	 *
+	 * [--limit=<count>]
+	 * : Maximum rows, 1-500. Default 100.
+	 *
+	 * [--format=<format>]
+	 * : Output format: table, json, or csv. Default table.
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp datamachine-socials reddit comment-mentions --domain=example.com --ownership=organic
+	 *     wp datamachine-socials reddit comment-mentions --subreddit=music --from=2026-07-01 --format=json
+	 *
+	 * @subcommand comment-mentions
+	 */
+	public function comment_mentions( $args, $assoc_args ) {
+		$args;
+		$format    = $this->format_arg( $assoc_args, array( 'table', 'json', 'csv' ) );
+		$limit     = $this->bounded_integer_arg( $assoc_args, 'limit', 100, 1, 500 );
+		$min_score = $this->signed_integer_arg( $assoc_args, 'min-score', PHP_INT_MIN );
+		$ability   = wp_get_ability( 'datamachine/reddit-comment-mentions-report' );
+		if ( ! $ability ) {
+			WP_CLI::error( 'datamachine/reddit-comment-mentions-report ability not registered.' );
+		}
+		$result = $ability->execute(
+			array(
+				'domain'       => (string) ( $assoc_args['domain'] ?? '' ),
+				'subreddit'    => (string) ( $assoc_args['subreddit'] ?? '' ),
+				'date_from'    => (string) ( $assoc_args['from'] ?? '' ),
+				'date_to'      => (string) ( $assoc_args['to'] ?? '' ),
+				'ownership'    => (string) ( $assoc_args['ownership'] ?? 'all' ),
+				'known_owners' => $this->csv_values( (string) ( $assoc_args['owners'] ?? '' ) ),
+				'min_score'    => $min_score,
+				'limit'        => $limit,
+			)
+		);
+		if ( is_wp_error( $result ) ) {
+			WP_CLI::error( $result->get_error_message() );
+		}
+
+		if ( 'json' === $format ) {
+			WP_CLI::log( wp_json_encode( $result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+			return;
+		}
+		$rows = array_map(
+			static fn( array $record ): array => array(
+				'date'        => gmdate( 'Y-m-d H:i:s', (int) $record['comment_created_utc'] ),
+				'domain'      => $record['domain'],
+				'subreddit'   => 'r/' . $record['subreddit'],
+				'author'      => $record['author'],
+				'ownership'   => $record['known_owner'] ? 'known_owner' : 'organic',
+				'score'       => $record['score'],
+				'matched_url' => $record['matched_url'],
+				'permalink'   => $record['permalink'],
+			),
+			$result['data']['matches'] ?? array()
+		);
+		if ( ! empty( $rows ) ) {
+			WP_CLI\Utils\format_items( $format, $rows, array( 'date', 'domain', 'subreddit', 'author', 'ownership', 'score', 'matched_url', 'permalink' ) );
+		} else {
+			WP_CLI::warning( 'No retained observations matched the filters.' );
+		}
+		WP_CLI::log( 'Coverage: bounded incremental subreddit comment streams only; not all Reddit comments or historical global search.' );
+		if ( ! empty( $result['coverage']['truncated'] ) ) {
+			WP_CLI::warning( 'One or more configured scopes is truncated, pending, or has a cursor gap/error.' );
+		}
+	}
+
+	/**
+	 * Apply Reddit comment observation retention immediately.
+	 *
+	 * @subcommand cleanup-comment-mentions
+	 */
+	public function cleanup_comment_mentions( $args, $assoc_args ) {
+		$args;
+		$assoc_args;
+		$ability = wp_get_ability( 'datamachine/reddit-comment-mentions-cleanup' );
+		if ( ! $ability ) {
+			WP_CLI::error( 'datamachine/reddit-comment-mentions-cleanup ability not registered.' );
+		}
+		$result = $ability->execute( array() );
+		if ( is_wp_error( $result ) ) {
+			WP_CLI::error( $result->get_error_message() );
+		}
+		WP_CLI::success( sprintf( 'Deleted %d observations; %d retained (%d-day retention, %d-record cap).', $result['data']['deleted'], $result['data']['retained'], $result['data']['retention_days'], $result['data']['max_records'] ) );
+	}
+
+	/**
 	 * Validate and map the optional CLI limit to the direct ability contract.
 	 */
 	private function applyFetchLimit( array $input, array $assoc_args ): array {
@@ -651,6 +853,44 @@ class RedditCommand {
 
 		$input['max_items'] = (int) $limit;
 		return $input;
+	}
+
+	/** Parse a comma-separated CLI list. */
+	private function csv_values( string $value ): array {
+		return array_values( array_filter( array_map( 'trim', explode( ',', $value ) ), static fn( string $item ): bool => '' !== $item ) );
+	}
+
+	/** Validate a bounded whole-number option. */
+	private function bounded_integer_arg( array $assoc_args, string $name, int $default_value, int $minimum, int $maximum ): int {
+		if ( ! array_key_exists( $name, $assoc_args ) ) {
+			return $default_value;
+		}
+		$value = $assoc_args[ $name ];
+		if ( ! is_string( $value ) || ! preg_match( '/^[0-9]+$/', $value ) || (int) $value < $minimum || (int) $value > $maximum ) {
+			WP_CLI::error( sprintf( '--%s must be a whole number between %d and %d.', $name, $minimum, $maximum ) );
+		}
+		return (int) $value;
+	}
+
+	/** Validate a signed whole-number option. */
+	private function signed_integer_arg( array $assoc_args, string $name, int $default_value ): int {
+		if ( ! array_key_exists( $name, $assoc_args ) ) {
+			return $default_value;
+		}
+		$value = $assoc_args[ $name ];
+		if ( ! is_string( $value ) || ! preg_match( '/^-?[0-9]+$/', $value ) ) {
+			WP_CLI::error( sprintf( '--%s must be a whole number.', $name ) );
+		}
+		return (int) $value;
+	}
+
+	/** Validate a command output format. */
+	private function format_arg( array $assoc_args, array $allowed ): string {
+		$format = (string) ( $assoc_args['format'] ?? 'table' );
+		if ( ! in_array( $format, $allowed, true ) ) {
+			WP_CLI::error( sprintf( '--format must be one of: %s.', implode( ', ', $allowed ) ) );
+		}
+		return $format;
 	}
 
 	/**
