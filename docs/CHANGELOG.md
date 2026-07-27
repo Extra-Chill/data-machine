@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.170.2] - 2026-07-27
+
+### Fixed
+- report persisted terminal transition state
+
 ## [0.170.1] - 2026-07-27
 
 ### Fixed
