@@ -59,9 +59,7 @@ class FilterStateManager {
 		const filters: TaxFilters = {};
 
 		params.forEach( ( value, key ) => {
-			const match = key.match(
-				/^tax_filter\[([^\]]+)\]\[(?:\d+)?\]$/
-			);
+			const match = key.match( /^tax_filter\[([^\]]+)\]\[(?:\d+)?\]$/ );
 			if ( match ) {
 				const taxonomy = match[ 1 ];
 				if ( ! filters[ taxonomy ] ) {
@@ -104,8 +102,9 @@ class FilterStateManager {
 				lng: urlLng,
 				radius: parseInt( params.get( 'radius' ) || '25', 10 ) || 25,
 				radius_unit:
-					( params.get( 'radius_unit' ) as GeoContext[ 'radius_unit' ] ) ||
-					'mi',
+					( params.get(
+						'radius_unit'
+					) as GeoContext[ 'radius_unit' ] ) || 'mi',
 			};
 		}
 
@@ -120,8 +119,8 @@ class FilterStateManager {
 					parseInt( this.calendar.dataset.geoRadius || '25', 10 ) ||
 					25,
 				radius_unit:
-					( this.calendar.dataset.geoRadiusUnit as GeoContext[ 'radius_unit' ] ) ||
-					'mi',
+					( this.calendar.dataset
+						.geoRadiusUnit as GeoContext[ 'radius_unit' ] ) || 'mi',
 			};
 		}
 
@@ -182,13 +181,14 @@ class FilterStateManager {
 	 * Reads from: search input, date picker, filter checkboxes, location input.
 	 * @param datePicker
 	 */
-	buildParams( datePicker: FlatpickrInstance | null = null ): URLSearchParams {
+	buildParams(
+		datePicker: FlatpickrInstance | null = null
+	): URLSearchParams {
 		const params = new URLSearchParams();
 
-		const searchInput =
-			this.calendar.querySelector< HTMLInputElement >(
-				'.data-machine-events-search-input'
-			);
+		const searchInput = this.calendar.querySelector< HTMLInputElement >(
+			'.data-machine-events-search-input'
+		);
 		if ( searchInput?.value ) {
 			params.set( 'event_search', searchInput.value );
 		}
@@ -214,7 +214,10 @@ class FilterStateManager {
 			}
 		}
 
-		if ( datePicker?.selectedDates?.length && datePicker.selectedDates.length > 0 ) {
+		if (
+			datePicker?.selectedDates?.length &&
+			datePicker.selectedDates.length > 0
+		) {
 			const startDate = datePicker.selectedDates[ 0 ];
 			const endDate = datePicker.selectedDates[ 1 ] || startDate;
 
@@ -424,10 +427,7 @@ class FilterStateManager {
 	saveGeoToStorage( geo: StoredGeo ): void {
 		try {
 			if ( geo.lat && geo.lng ) {
-				localStorage.setItem(
-					GEO_STORAGE_KEY,
-					JSON.stringify( geo )
-				);
+				localStorage.setItem( GEO_STORAGE_KEY, JSON.stringify( geo ) );
 			} else {
 				localStorage.removeItem( GEO_STORAGE_KEY );
 			}

@@ -118,9 +118,7 @@ export function initFilterModal(
 		const target = e.target as HTMLElement;
 		if (
 			target === modal ||
-			target.classList.contains(
-				'data-machine-taxonomy-modal-overlay'
-			)
+			target.classList.contains( 'data-machine-taxonomy-modal-overlay' )
 		) {
 			closeModal();
 		}
@@ -220,10 +218,7 @@ export function destroyFilterModal( calendar: HTMLElement ): void {
 
 	if ( modal._closeBtns && modal._closeModalHandler ) {
 		modal._closeBtns.forEach( function ( btn ) {
-			btn.removeEventListener(
-				'click',
-				modal._closeModalHandler!
-			);
+			btn.removeEventListener( 'click', modal._closeModalHandler! );
 		} );
 	}
 
@@ -239,17 +234,11 @@ export function destroyFilterModal( calendar: HTMLElement ): void {
 	}
 
 	if ( modal._applyBtn && modal._applyHandler ) {
-		modal._applyBtn.removeEventListener(
-			'click',
-			modal._applyHandler
-		);
+		modal._applyBtn.removeEventListener( 'click', modal._applyHandler );
 	}
 
 	if ( modal._resetBtn && modal._resetHandler ) {
-		modal._resetBtn.removeEventListener(
-			'click',
-			modal._resetHandler
-		);
+		modal._resetBtn.removeEventListener( 'click', modal._resetHandler );
 	}
 
 	delete modal._openModalHandler;
@@ -372,7 +361,8 @@ async function loadFilters(
 function cancelFilterRequest( modal: ModalElement ): void {
 	modal._filterAbortController?.abort();
 	modal._filterAbortController = undefined;
-	modal._filterRequestGeneration = ( modal._filterRequestGeneration ?? 0 ) + 1;
+	modal._filterRequestGeneration =
+		( modal._filterRequestGeneration ?? 0 ) + 1;
 	const loading = modal.querySelector< HTMLElement >(
 		'.data-machine-filter-loading'
 	);
@@ -388,7 +378,8 @@ function renderFilterError(
 	container.querySelector( '.data-machine-filter-error' )?.remove();
 	const error = document.createElement( 'div' );
 	error.className = 'data-machine-filter-error';
-	error.innerHTML = '<p>Could not refresh filters. Previous options are still available.</p>';
+	error.innerHTML =
+		'<p>Could not refresh filters. Previous options are still available.</p>';
 	const retry = document.createElement( 'button' );
 	retry.type = 'button';
 	retry.className = 'data-machine-filter-retry';
@@ -502,9 +493,7 @@ function flattenHierarchy(
 	terms.forEach( ( term ) => {
 		flat.push( { ...term, level } );
 		if ( term.children && term.children.length > 0 ) {
-			flat = flat.concat(
-				flattenHierarchy( term.children, level + 1 )
-			);
+			flat = flat.concat( flattenHierarchy( term.children, level + 1 ) );
 		}
 	} );
 

@@ -20,7 +20,7 @@
 
 /* global Element, requestAnimationFrame */
 
-(function () {
+( function () {
 	'use strict';
 
 	if ( typeof document === 'undefined' ) {
@@ -47,7 +47,9 @@
 	}
 
 	function getItems( menu ) {
-		return Array.prototype.slice.call( menu.querySelectorAll( ITEM_SELECTOR ) );
+		return Array.prototype.slice.call(
+			menu.querySelectorAll( ITEM_SELECTOR )
+		);
 	}
 
 	function isOpen( toggle ) {

@@ -33,9 +33,7 @@ export function initLazyRender( calendar: HTMLElement ): void {
 			function ( entries ) {
 				entries.forEach( function ( entry ) {
 					if ( entry.isIntersecting ) {
-						hydratePlaceholder(
-							entry.target as HTMLElement
-						);
+						hydratePlaceholder( entry.target as HTMLElement );
 						observer.unobserve( entry.target );
 					}
 				} );
@@ -155,9 +153,7 @@ function hydratePlaceholder( placeholder: HTMLElement ): void {
 		'<a href="' +
 		escapeAttr( data.permalink ) +
 		'" class="' +
-		escapeAttr(
-			data.button_classes || 'data-machine-more-info-button'
-		) +
+		escapeAttr( data.button_classes || 'data-machine-more-info-button' ) +
 		'">More Info</a>' +
 		'</div>' +
 		'</div>';

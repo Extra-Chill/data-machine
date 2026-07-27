@@ -195,10 +195,7 @@ function readPaginationBounds( nav: HTMLElement ): {
 		'.page-numbers.current'
 	);
 	if ( currentEl ) {
-		const parsed = parseInt(
-			( currentEl.textContent || '' ).trim(),
-			10
-		);
+		const parsed = parseInt( ( currentEl.textContent || '' ).trim(), 10 );
 		if ( ! isNaN( parsed ) && parsed > 0 ) {
 			currentPage = parsed;
 		}
@@ -240,14 +237,8 @@ function createClickHandler(
 	return async function ( e: Event ): Promise< void > {
 		e.preventDefault();
 
-		const currentPage = parseInt(
-			button.dataset.currentPage || '1',
-			10
-		);
-		const totalPages = parseInt(
-			button.dataset.totalPages || '1',
-			10
-		);
+		const currentPage = parseInt( button.dataset.currentPage || '1', 10 );
+		const totalPages = parseInt( button.dataset.totalPages || '1', 10 );
 
 		if ( currentPage >= totalPages ) {
 			button.hidden = true;
@@ -387,10 +378,7 @@ async function fetchPage(
  * @param calendar
  * @param data
  */
-function appendPage(
-	calendar: HTMLElement,
-	data: CalendarDataResponse
-): void {
+function appendPage( calendar: HTMLElement, data: CalendarDataResponse ): void {
 	const content = calendar.querySelector< HTMLElement >(
 		'.data-machine-events-content'
 	);
@@ -523,7 +511,11 @@ function isPastMode( calendar: HTMLElement ): boolean {
  * @param value
  */
 function cssEscape( value: string ): string {
-	if ( typeof window !== 'undefined' && typeof window.CSS !== 'undefined' && typeof window.CSS.escape === 'function' ) {
+	if (
+		typeof window !== 'undefined' &&
+		typeof window.CSS !== 'undefined' &&
+		typeof window.CSS.escape === 'function'
+	) {
 		return window.CSS.escape( value );
 	}
 	return value.replace( /[^a-zA-Z0-9_-]/g, ( ch ) => '\\' + ch );

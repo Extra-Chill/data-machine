@@ -79,16 +79,25 @@ describe( 'dynamic filter modal requests', () => {
 	it( 'sends search, scope, date, geo, and opaque scope token constraints', async () => {
 		mockFetch.mockResolvedValue( response( 'Matching venue' ) );
 		initFilterModal( calendar, jest.fn(), jest.fn() );
-		calendar.querySelector< HTMLButtonElement >( '.data-machine-taxonomy-filter-btn' )!.click();
+		calendar
+			.querySelector< HTMLButtonElement >(
+				'.data-machine-taxonomy-filter-btn'
+			)!
+			.click();
 		await flush();
 
-		const url = new URL( mockFetch.mock.calls[ 0 ][ 0 ], window.location.origin );
+		const url = new URL(
+			mockFetch.mock.calls[ 0 ][ 0 ],
+			window.location.origin
+		);
 		expect( url.searchParams.get( 'event_search' ) ).toBe( 'jam' );
 		expect( url.searchParams.get( 'scope' ) ).toBe( 'this-week' );
 		expect( url.searchParams.get( 'date_start' ) ).toBe( '2026-07-19' );
 		expect( url.searchParams.get( 'date_end' ) ).toBe( '2026-07-20' );
 		expect( url.searchParams.get( 'lat' ) ).toBe( '32.78' );
-		expect( url.searchParams.get( 'scope_token' ) ).toBe( 'opaque.signed.token' );
+		expect( url.searchParams.get( 'scope_token' ) ).toBe(
+			'opaque.signed.token'
+		);
 	} );
 
 	it( 'aborts the previous request and ignores its out-of-order response', async () => {
@@ -104,7 +113,8 @@ describe( 'dynamic filter modal requests', () => {
 		trigger.click();
 		trigger.click();
 
-		const firstSignal = mockFetch.mock.calls[ 0 ][ 1 ].signal as AbortSignal;
+		const firstSignal = mockFetch.mock.calls[ 0 ][ 1 ]
+			.signal as AbortSignal;
 		expect( firstSignal.aborted ).toBe( true );
 		latest.resolve( response( 'Latest venue', 2 ) );
 		await flush();
@@ -114,23 +124,34 @@ describe( 'dynamic filter modal requests', () => {
 		expect( calendar.textContent ).toContain( 'Latest venue' );
 		expect( calendar.textContent ).not.toContain( 'Stale venue' );
 		expect(
-			calendar.querySelector< HTMLElement >( '.data-machine-filter-loading' )!
-				.style.display
+			calendar.querySelector< HTMLElement >(
+				'.data-machine-filter-loading'
+			)!.style.display
 		).toBe( 'none' );
 	} );
 
 	it( 'retains prior options and offers retry after a refresh failure', async () => {
 		mockFetch.mockResolvedValueOnce( response( 'Usable venue' ) );
 		initFilterModal( calendar, jest.fn(), jest.fn() );
-		calendar.querySelector< HTMLButtonElement >( '.data-machine-taxonomy-filter-btn' )!.click();
+		calendar
+			.querySelector< HTMLButtonElement >(
+				'.data-machine-taxonomy-filter-btn'
+			)!
+			.click();
 		await flush();
 
 		mockFetch.mockRejectedValueOnce( new Error( 'network failure' ) );
-		calendar.querySelector< HTMLInputElement >( '.data-machine-term-checkbox' )!.click();
+		calendar
+			.querySelector< HTMLInputElement >( '.data-machine-term-checkbox' )!
+			.click();
 		await flush();
 
 		expect( calendar.textContent ).toContain( 'Usable venue' );
-		expect( calendar.textContent ).toContain( 'Previous options are still available' );
-		expect( calendar.querySelector( '.data-machine-filter-retry' ) ).not.toBeNull();
+		expect( calendar.textContent ).toContain(
+			'Previous options are still available'
+		);
+		expect(
+			calendar.querySelector( '.data-machine-filter-retry' )
+		).not.toBeNull();
 	} );
 } );

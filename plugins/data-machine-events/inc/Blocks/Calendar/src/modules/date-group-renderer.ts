@@ -37,10 +37,7 @@
  */
 import { renderEventCard } from './event-renderer';
 
-import type {
-	CalendarEventItem,
-	CalendarEventOccurrence,
-} from '../types';
+import type { CalendarEventItem, CalendarEventOccurrence } from '../types';
 
 /**
  * Render a complete date group with its embedded event cards.

@@ -293,9 +293,7 @@ function getDateFromWrapper( wrapper: HTMLElement ): string | null {
 	return dateGroup?.dataset.date || null;
 }
 
-function getArchiveContext(
-	calendar: HTMLElement
-): Partial< ArchiveContext > {
+function getArchiveContext( calendar: HTMLElement ): Partial< ArchiveContext > {
 	const taxonomy = calendar.dataset.archiveTaxonomy || '';
 	const termId = calendar.dataset.archiveTermId || '';
 

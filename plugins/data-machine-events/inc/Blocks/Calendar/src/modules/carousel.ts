@@ -31,8 +31,7 @@ export function initCarousel( calendar: HTMLElement ): void {
 			return;
 		}
 
-		const eventCount =
-			parseInt( group.dataset.eventCount || '0', 10 ) || 0;
+		const eventCount = parseInt( group.dataset.eventCount || '0', 10 ) || 0;
 		if ( eventCount <= 1 ) {
 			return;
 		}
@@ -48,8 +47,7 @@ export function initCarousel( calendar: HTMLElement ): void {
 		let holdInterval: ReturnType< typeof setInterval > | null = null;
 
 		const scrollByCard = function ( direction: number ): void {
-			const cardWidth =
-				events[ 0 ]?.getBoundingClientRect().width || 300;
+			const cardWidth = events[ 0 ]?.getBoundingClientRect().width || 300;
 			wrapper.scrollBy( {
 				left: cardWidth * direction,
 				behavior: 'smooth',
@@ -95,11 +93,11 @@ export function initCarousel( calendar: HTMLElement ): void {
 				{ passive: false }
 			);
 
-			( [ 'mouseup', 'mouseleave', 'touchend', 'touchcancel' ] as const ).forEach(
-				function ( event ) {
-					chevron.addEventListener( event, stopHold );
-				}
-			);
+			(
+				[ 'mouseup', 'mouseleave', 'touchend', 'touchcancel' ] as const
+			 ).forEach( function ( event ) {
+				chevron.addEventListener( event, stopHold );
+			} );
 		};
 
 		const updateIndicators = function (): void {
@@ -162,8 +160,7 @@ export function initCarousel( calendar: HTMLElement ): void {
 					const halfWindow = Math.floor( MAX_VISIBLE_DOTS / 2 );
 					const dotUnit = DOT_WIDTH + DOT_GAP;
 					const totalDotsWidth =
-						totalEvents * DOT_WIDTH +
-						( totalEvents - 1 ) * DOT_GAP;
+						totalEvents * DOT_WIDTH + ( totalEvents - 1 ) * DOT_GAP;
 					const visibleWidth =
 						MAX_VISIBLE_DOTS * DOT_WIDTH +
 						( MAX_VISIBLE_DOTS - 1 ) * DOT_GAP;
@@ -173,17 +170,13 @@ export function initCarousel( calendar: HTMLElement ): void {
 
 					if ( activeIndex <= halfWindow ) {
 						shift = 0;
-					} else if (
-						activeIndex >=
-						totalEvents - halfWindow
-					) {
+					} else if ( activeIndex >= totalEvents - halfWindow ) {
 						shift = maxShift;
 					} else {
 						shift = ( activeIndex - halfWindow ) * dotUnit;
 					}
 
-					track.style.transform =
-						'translateX(-' + shift + 'px)';
+					track.style.transform = 'translateX(-' + shift + 'px)';
 				} else {
 					track.style.transform = '';
 				}
@@ -192,8 +185,7 @@ export function initCarousel( calendar: HTMLElement ): void {
 				const useDesktopCollapsed =
 					totalEvents > DESKTOP_MAX_VISIBLE_DOTS;
 
-				const maxScroll =
-					wrapper.scrollWidth - wrapper.clientWidth;
+				const maxScroll = wrapper.scrollWidth - wrapper.clientWidth;
 				const scrollProgress =
 					maxScroll > 0 ? wrapper.scrollLeft / maxScroll : 0;
 				const visibleCards = Math.floor(
@@ -214,15 +206,13 @@ export function initCarousel( calendar: HTMLElement ): void {
 
 				if ( useDesktopCollapsed ) {
 					const rangeMidpoint =
-						firstActiveIndex +
-						Math.floor( visibleCards / 2 );
+						firstActiveIndex + Math.floor( visibleCards / 2 );
 					const halfWindow = Math.floor(
 						DESKTOP_MAX_VISIBLE_DOTS / 2
 					);
 					const dotUnit = DOT_WIDTH + DOT_GAP;
 					const totalDotsWidth =
-						totalEvents * DOT_WIDTH +
-						( totalEvents - 1 ) * DOT_GAP;
+						totalEvents * DOT_WIDTH + ( totalEvents - 1 ) * DOT_GAP;
 					const visibleWidth =
 						DESKTOP_MAX_VISIBLE_DOTS * DOT_WIDTH +
 						( DESKTOP_MAX_VISIBLE_DOTS - 1 ) * DOT_GAP;
@@ -231,18 +221,13 @@ export function initCarousel( calendar: HTMLElement ): void {
 					let shift: number;
 					if ( rangeMidpoint <= halfWindow ) {
 						shift = 0;
-					} else if (
-						rangeMidpoint >=
-						totalEvents - halfWindow
-					) {
+					} else if ( rangeMidpoint >= totalEvents - halfWindow ) {
 						shift = maxShift;
 					} else {
-						shift =
-							( rangeMidpoint - halfWindow ) * dotUnit;
+						shift = ( rangeMidpoint - halfWindow ) * dotUnit;
 					}
 
-					track.style.transform =
-						'translateX(-' + shift + 'px)';
+					track.style.transform = 'translateX(-' + shift + 'px)';
 				} else {
 					track.style.transform = '';
 				}
@@ -263,8 +248,7 @@ export function initCarousel( calendar: HTMLElement ): void {
 		};
 
 		const setupIndicators = function (): void {
-			const hasOverflow =
-				wrapper.scrollWidth > wrapper.clientWidth;
+			const hasOverflow = wrapper.scrollWidth > wrapper.clientWidth;
 
 			indicators = group.querySelector< HTMLElement >(
 				'.data-machine-carousel-indicators'
@@ -298,15 +282,13 @@ export function initCarousel( calendar: HTMLElement ): void {
 
 			if ( ! indicators ) {
 				indicators = document.createElement( 'div' );
-				indicators.className =
-					'data-machine-carousel-indicators';
+				indicators.className = 'data-machine-carousel-indicators';
 				group.appendChild( indicators );
 			}
 			indicators.innerHTML = '';
 
-			const isMobileScreen = window.matchMedia(
-				'(max-width: 768px)'
-			).matches;
+			const isMobileScreen =
+				window.matchMedia( '(max-width: 768px)' ).matches;
 			const maxDotsForViewport = isMobileScreen
 				? MAX_VISIBLE_DOTS
 				: DESKTOP_MAX_VISIBLE_DOTS;

@@ -85,26 +85,23 @@ export function renderMonthGrid(
 	baseUrl: string
 ): HTMLElement {
 	const today = formatLocalDate( new Date() );
-	const parsedMonth = parseMonth( month ) ?? parseMonth( today.slice( 0, 7 ) );
+	const parsedMonth =
+		parseMonth( month ) ?? parseMonth( today.slice( 0, 7 ) );
 	const visibleMonthLabel = parsedMonth
 		? new Date( parsedMonth.year, parsedMonth.month0, 1 ).toLocaleString(
 				undefined,
 				{ month: 'long', year: 'numeric' }
-			)
+		  )
 		: '';
 
 	const monthString = parsedMonth
 		? `${ String( parsedMonth.year ).padStart( 4, '0' ) }-${ String(
 				parsedMonth.month0 + 1
-			).padStart( 2, '0' ) }`
+		  ).padStart( 2, '0' ) }`
 		: today.slice( 0, 7 );
 
-	const prevMonth = parsedMonth
-		? shiftMonth( parsedMonth, -1 )
-		: monthString;
-	const nextMonth = parsedMonth
-		? shiftMonth( parsedMonth, 1 )
-		: monthString;
+	const prevMonth = parsedMonth ? shiftMonth( parsedMonth, -1 ) : monthString;
+	const nextMonth = parsedMonth ? shiftMonth( parsedMonth, 1 ) : monthString;
 	const todayMonth = today.slice( 0, 7 );
 
 	const eventsById = new Map< number, CalendarEventItem >();
@@ -243,12 +240,7 @@ function buildRows(
 			} );
 		}
 
-		const ribbons = buildRowRibbons(
-			rowStart,
-			rowEnd,
-			byDate,
-			eventsById
-		);
+		const ribbons = buildRowRibbons( rowStart, rowEnd, byDate, eventsById );
 
 		rows.push( {
 			start_date: formatLocalDate( rowStart ),
@@ -369,11 +361,7 @@ function parseDateOnly( s: string ): Date | null {
 	if ( ! m ) {
 		return null;
 	}
-	return new Date(
-		Number( m[ 1 ] ),
-		Number( m[ 2 ] ) - 1,
-		Number( m[ 3 ] )
-	);
+	return new Date( Number( m[ 1 ] ), Number( m[ 2 ] ) - 1, Number( m[ 3 ] ) );
 }
 
 /* ------------------------------------------------------------------ */
@@ -457,7 +445,10 @@ function renderRow( row: RowPayload, rowIndex: number ): HTMLElement {
 		( max, r ) => Math.max( max, r.lane + 1 ),
 		0
 	);
-	el.style.setProperty( '--data-machine-month-grid-lanes', String( laneCount ) );
+	el.style.setProperty(
+		'--data-machine-month-grid-lanes',
+		String( laneCount )
+	);
 
 	row.cells.forEach( ( cell ) => {
 		el.appendChild( renderCell( cell ) );

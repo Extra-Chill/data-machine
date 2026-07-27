@@ -134,7 +134,8 @@ export function renderEventCard(
 	// Server-filtered class list (runs `data_machine_events_more_info_button_classes`),
 	// falling back to the default class only when absent. See #381.
 	moreInfo.className =
-		( event.button_classes || '' ).trim() || 'data-machine-more-info-button';
+		( event.button_classes || '' ).trim() ||
+		'data-machine-more-info-button';
 	moreInfo.textContent = 'More Info';
 	meta.appendChild( moreInfo );
 
