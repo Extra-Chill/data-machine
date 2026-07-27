@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.170.4] - 2026-07-27
+
+### Fixed
+- recover missing direct job actions
+
 ## [0.170.3] - 2026-07-27
 
 ### Fixed
