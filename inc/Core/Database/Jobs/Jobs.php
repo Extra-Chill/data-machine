@@ -2386,7 +2386,9 @@ class Jobs extends BaseRepository {
 			$recovery_owner = is_array( $recovery_owner ) ? $recovery_owner : null;
 		}
 		if ( null !== self::$terminalizing_job ) {
-			return $this->status_transition_result( false, false, null, $requested_status );
+			$job            = $this->get_job( $job_id );
+			$current_status = is_array( $job ) && is_string( $job['status'] ?? null ) ? $job['status'] : null;
+			return $this->status_transition_result( false, false, $current_status, $current_status ?? $requested_status );
 		}
 
 		self::$terminalizing_job = $job_id;

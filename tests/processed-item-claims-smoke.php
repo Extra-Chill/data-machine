@@ -127,6 +127,7 @@ echo "Case 5: production files expose the claim contract\n";
 $processed_items = file_get_contents( __DIR__ . '/../inc/Core/Database/ProcessedItems/ProcessedItems.php' );
 $fetch_handler   = file_get_contents( __DIR__ . '/../inc/Core/Steps/Fetch/Handlers/FetchHandler.php' );
 $lifecycle       = file_get_contents( __DIR__ . '/../inc/Engine/Actions/Handlers/StepLifecycleHandler.php' );
+$execute_step    = file_get_contents( __DIR__ . '/../inc/Abilities/Engine/ExecuteStepAbility.php' );
 $actions         = file_get_contents( __DIR__ . '/../inc/Engine/Actions/DataMachineActions.php' );
 $batch_scheduler = file_get_contents( __DIR__ . '/../inc/Core/ActionScheduler/BatchScheduler.php' );
 $packet_store    = file_get_contents( __DIR__ . '/../inc/Core/DataPacketStore.php' );
@@ -144,6 +145,7 @@ assert_claims_smoke( 'fetch filters active claims through bulk classification', 
 assert_claims_smoke( 'fetch claims after max_items', strpos( $fetch_handler, 'array_slice' ) < strpos( $fetch_handler, 'claimItems' ) );
 assert_claims_smoke( 'all terminal statuses register one replayable core lifecycle callback', str_contains( $actions, "\$callbacks['step_lifecycle'] = array( StepLifecycleHandler::class, 'handleTerminal' )" ) );
 assert_claims_smoke( 'lifecycle uses owner-conditional completion and release', str_contains( $lifecycle, 'complete_owned_claim' ) && str_contains( $lifecycle, 'release_owned_claim' ) );
+assert_claims_smoke( 'terminal callers reject lost transitions before reporting success', 3 === substr_count( $execute_step, "! \$transition['success'] || ! JobStatus::isStatusSuccess( \$transition['status'] )" ) );
 assert_claims_smoke( 'lifecycle preserves multiple inline claims', str_contains( $lifecycle, 'CLAIMS_METADATA_KEY' ) && str_contains( $lifecycle, 'uniqueClaims' ) );
 assert_claims_smoke( 'completion consumers register outside generic lifecycle', str_contains( $actions, 'datamachine_item_claim_completion_handlers' ) && ! str_contains( $lifecycle, 'TrackedItems' ) );
 assert_claims_smoke( 'legacy jobs retain terminal job-id cleanup', str_contains( $lifecycle, 'release_claims_for_job' ) );
