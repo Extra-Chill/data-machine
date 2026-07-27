@@ -377,6 +377,10 @@ class HttpClient {
 	 * Redact sensitive HTTP request data before log emission.
 	 */
 	private static function redactRequestArgsForLog( array $args ): array {
+		if ( array_key_exists( 'body', $args ) && null !== $args['body'] && '' !== $args['body'] && array() !== $args['body'] ) {
+			$args['body'] = '[redacted]';
+		}
+
 		if ( ! empty( $args['headers'] ) && is_array( $args['headers'] ) ) {
 			foreach ( $args['headers'] as $name => $value ) {
 				if ( in_array( strtolower( (string) $name ), array( 'authorization', 'proxy-authorization', 'cookie', 'set-cookie' ), true ) ) {

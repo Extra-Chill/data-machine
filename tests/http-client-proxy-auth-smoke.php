@@ -226,6 +226,7 @@ $redacted = http_client_private(
 			'Cookie'              => 'wordpress_logged_in=hidden',
 			'X-Test'              => 'visible',
 		),
+		'body'    => '{"username":"chubes4","password":"top-secret"}',
 	)
 );
 
@@ -233,6 +234,7 @@ http_client_smoke_assert( 'Authorization is redacted', '[redacted]' === ( $redac
 http_client_smoke_assert( 'Proxy-Authorization is redacted', '[redacted]' === ( $redacted['headers']['Proxy-Authorization'] ?? null ) );
 http_client_smoke_assert( 'Cookie is redacted', '[redacted]' === ( $redacted['headers']['Cookie'] ?? null ) );
 http_client_smoke_assert( 'Non-sensitive header remains visible', 'visible' === ( $redacted['headers']['X-Test'] ?? null ) );
+http_client_smoke_assert( 'Request body is redacted', '[redacted]' === ( $redacted['body'] ?? null ) );
 
 echo "\n[4] Proxy scheme mapping\n";
 
