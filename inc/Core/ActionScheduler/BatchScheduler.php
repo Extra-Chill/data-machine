@@ -35,13 +35,17 @@
 namespace DataMachine\Core\ActionScheduler;
 
 use DataMachine\Core\Database\Jobs\Jobs;
+use DataMachine\Core\Database\BatchItems\BatchItems;
 use DataMachine\Core\DataPacketStore;
 use DataMachine\Core\EngineData;
+use DataMachine\Core\JobStatus;
 use DataMachine\Core\PluginSettings;
 
 defined( 'ABSPATH' ) || exit;
 
 class BatchScheduler {
+	public const STORAGE_VERSION = 2;
+	private const INITIAL_RECOVERY_DELAY = 300;
 
 	/**
 	 * Parent completes after all child jobs complete.
@@ -119,9 +123,8 @@ class BatchScheduler {
 	/**
 	 * Initialize a batch on the parent job's engine_data.
 	 *
-	 * Stores the full work list under engine_data['batch_state'], records
-	 * top-level batch metadata, and schedules the first chunk via the
-	 * caller-supplied Action Scheduler hook.
+	 * Stores the worklist in BatchItems, records lightweight metadata on the
+	 * parent, and schedules the first chunk through Action Scheduler.
 	 *
 	 * Storage shape on parent's engine_data:
 	 *
@@ -135,14 +138,14 @@ class BatchScheduler {
 	 *   batch_state        => array(
 	 *       offset       => 0,
 	 *       total        => N,
-	 *       items        => array(...),     // raw work items, consumer-defined shape
-	 *       extra        => array(...),     // arbitrary per-batch payload (engine_snapshot, task_type, ...)
+	 *       checksum     => '...',
+	 *       extra        => array(...),     // lightweight consumer metadata
 	 *   ),
 	 *
 	 * @param int    $parent_job_id The parent job ID (becomes the batch parent).
 	 * @param string $hook          Action Scheduler hook name to fire for each chunk.
 	 * @param array  $items         Raw work items. Shape is consumer-defined.
-	 * @param array  $extra         Arbitrary per-batch state cloned to chunks (engine_snapshot, task_type, ...).
+	 * @param array  $extra         Lightweight per-batch state cloned to chunks.
 	 * @param string $context       Consumer context, used for chunk-size/delay filter dispatch.
 	 * @param string $completion_strategy Declared parent-completion strategy.
 	 * @return array{parent_job_id:int,total:int,chunk_size:int,action_id:int,scheduled:bool} Batch summary.
@@ -162,27 +165,103 @@ class BatchScheduler {
 		$items            = array_map( array( DataPacketStore::class, 'reference_packet_collections_in_value' ), $items );
 		$total            = count( $items );
 		$chunk_size       = self::chunkSize( $context );
-
-		datamachine_merge_engine_data(
-			$parent_job_id,
+		if ( 0 === $total ) {
+			return self::startResult( $parent_job_id, 0, $chunk_size );
+		}
+		// Establish a queue owner before any worklist or parent state commits.
+		if ( ! self::scheduleV2Chunk( $hook, $parent_job_id, 0, time() + self::INITIAL_RECOVERY_DELAY ) ) {
+			self::discardStartItems( $items, $cleanup_contexts, $parent_job_id, $context );
+			return self::startResult( $parent_job_id, $total, $chunk_size );
+		}
+		$checksums        = array();
+		foreach ( $items as $item ) {
+			$encoded = wp_json_encode( $item );
+			if ( false === $encoded ) {
+				self::discardStartItems( $items, $cleanup_contexts, $parent_job_id, $context );
+				return self::startResult( $parent_job_id, $total, $chunk_size );
+			}
+			$checksums[] = hash( 'sha256', $encoded );
+		}
+		$cleanup_checksums = array();
+		foreach ( $cleanup_contexts as $cleanup_context ) {
+			$encoded = wp_json_encode( $cleanup_context );
+			if ( false === $encoded ) {
+				self::discardStartItems( $items, $cleanup_contexts, $parent_job_id, $context );
+				return self::startResult( $parent_job_id, $total, $chunk_size );
+			}
+			$cleanup_checksums[] = hash( 'sha256', $encoded );
+		}
+		$contract = wp_json_encode(
 			array(
-				'batch'                     => true,
-				'batch_total'               => $total,
-				'batch_scheduled'           => 0,
-				'batch_chunk_size'          => $chunk_size,
-				'batch_context'             => $context,
-				'batch_completion_strategy' => $completion_strategy,
-				'started_at'                => current_time( 'mysql' ),
-				'batch_state'               => array(
-					'offset'           => 0,
-					'total'            => $total,
-					'items'            => $items,
-					'cleanup_contexts' => $cleanup_contexts,
-					'extra'            => $extra,
-					'hook'             => $hook,
-				),
+				'items'               => $checksums,
+				'cleanup'             => $cleanup_checksums,
+				'hook'                => $hook,
+				'extra'               => $extra,
+				'context'             => $context,
+				'completion_strategy' => $completion_strategy,
+				'chunk_size'          => $chunk_size,
 			)
 		);
+		if ( false === $contract ) {
+			self::discardStartItems( $items, $cleanup_contexts, $parent_job_id, $context );
+			return self::startResult( $parent_job_id, $total, $chunk_size );
+		}
+		$worklist_checksum = hash( 'sha256', $contract );
+		$repository        = new BatchItems();
+		$insert            = $repository->insert_batch( $parent_job_id, $items, $cleanup_contexts );
+		if ( empty( $insert['success'] ) ) {
+			if ( empty( $insert['existing'] ) ) {
+				self::discardStartItems( $items, $cleanup_contexts, $parent_job_id, $context );
+			}
+			return self::startResult( $parent_job_id, $total, $chunk_size );
+		}
+
+		$mutation = EngineData::mutate(
+			$parent_job_id,
+			static function ( array $current ) use ( $total, $chunk_size, $context, $completion_strategy, $extra, $hook, $worklist_checksum ): ?array {
+				if ( self::STORAGE_VERSION === (int) ( $current['batch_storage_version'] ?? 0 ) ) {
+					$current_checksum = (string) ( $current['batch_state']['checksum'] ?? '' );
+					if ( ! hash_equals( $worklist_checksum, $current_checksum ) ) {
+						return null;
+					}
+					unset( $current['batch_schedule_failed'] );
+					return $current;
+				}
+				return array_merge(
+					$current,
+					array(
+						'batch'                     => true,
+						'batch_storage_version'     => self::STORAGE_VERSION,
+						'batch_total'               => $total,
+						'batch_scheduled'           => 0,
+						'batch_chunk_size'          => $chunk_size,
+						'batch_context'             => $context,
+						'batch_hook'                => $hook,
+						'batch_completion_strategy' => $completion_strategy,
+						'started_at'                => current_time( 'mysql' ),
+						'batch_state'               => array(
+							'offset'   => 0,
+							'total'    => $total,
+							'checksum' => $worklist_checksum,
+							'extra'    => $extra,
+							'hook'     => $hook,
+						),
+					)
+				);
+			},
+			'batch_start_v2'
+		);
+		if ( empty( $mutation['success'] ) ) {
+			$latest            = EngineData::retrieve( $parent_job_id );
+			$adopted_elsewhere = self::STORAGE_VERSION === (int) ( $latest['batch_storage_version'] ?? 0 )
+				&& hash_equals( $worklist_checksum, (string) ( $latest['batch_state']['checksum'] ?? '' ) );
+			if ( ! $adopted_elsewhere && ! empty( $insert['created'] ) ) {
+				if ( self::discardOwnedWorklist( $repository, $parent_job_id, (string) $insert['ownership_token'], $context ) ) {
+					$repository->delete_owned_batch( $parent_job_id, (string) $insert['ownership_token'] );
+				}
+			}
+			return self::startResult( $parent_job_id, $total, $chunk_size );
+		}
 
 		\DataMachine\Core\RunMetrics::start(
 			$parent_job_id,
@@ -215,22 +294,55 @@ class BatchScheduler {
 				)
 			);
 		}
-
-		if ( ! $action_id ) {
-			do_action( 'datamachine_batch_items_discarded', $items, $parent_job_id, $context, $cleanup_contexts );
-			$engine = datamachine_get_engine_data( $parent_job_id );
-			unset( $engine['batch_state'] );
-			$engine['batch_schedule_failed'] = true;
-			datamachine_set_engine_data( $parent_job_id, $engine );
+		if ( ! $action_id && function_exists( 'as_has_scheduled_action' ) ) {
+			$action_id = (int) as_has_scheduled_action(
+				$hook,
+				array(
+					'parent_job_id' => $parent_job_id,
+					'offset'        => 0,
+				),
+				GroupRegistrar::GROUP
+			);
 		}
 
+		if ( ! $action_id ) {
+			if ( ! empty( $insert['created'] ) ) {
+				if ( self::discardOwnedWorklist( $repository, $parent_job_id, (string) $insert['ownership_token'], $context ) ) {
+					$repository->delete_owned_batch( $parent_job_id, (string) $insert['ownership_token'] );
+				}
+			}
+			EngineData::mutate(
+				$parent_job_id,
+				static function ( array $current ) use ( $insert ): array {
+					if ( ! empty( $insert['created'] ) ) {
+						unset( $current['batch_state'] );
+					}
+					$current['batch_schedule_failed'] = true;
+					return $current;
+				},
+				'batch_initial_schedule_failure'
+			);
+		}
+
+		return self::startResult( $parent_job_id, $total, $chunk_size, (int) $action_id );
+	}
+
+	/** Build the stable public start result. */
+	private static function startResult( int $parent_job_id, int $total, int $chunk_size, int $action_id = 0 ): array {
 		return array(
 			'parent_job_id' => $parent_job_id,
 			'total'         => $total,
 			'chunk_size'    => $chunk_size,
-			'action_id'     => (int) $action_id,
+			'action_id'     => $action_id,
 			'scheduled'     => (bool) $action_id,
 		);
+	}
+
+	/** Release item-owned resources when no durable worklist adopted them. */
+	private static function discardStartItems( array $items, array $cleanup_contexts, int $parent_job_id, string $context ): void {
+		if ( $items ) {
+			do_action( 'datamachine_batch_items_discarded', $items, $parent_job_id, $context, $cleanup_contexts );
+		}
 	}
 
 	/**
@@ -239,7 +351,9 @@ class BatchScheduler {
 	 * Delegates per-item child creation to the supplied callback. Handles
 	 * cancellation, offset bookkeeping, and chunk-rescheduling uniformly.
 	 *
-	 * The callback receives `(item, extra, parent_job_id)` and returns the
+	 * V2 callbacks receive `(item, extra, parent_job_id, item_index,
+	 * payload_checksum)`; legacy callbacks retain the original three arguments.
+	 * The callback returns the
 	 * created child id (or any truthy value) on success, falsy on failure.
 	 * Falsy returns count toward `batch_scheduled` only when truthy.
 	 *
@@ -262,6 +376,360 @@ class BatchScheduler {
 	 *   has been lost; consumer must fail the parent in that case.
 	 */
 	public static function processChunk( int $parent_job_id, callable $createItem, ?int $expected_offset = null ): array {
+		$parent_engine = datamachine_get_engine_data( $parent_job_id );
+		if ( self::STORAGE_VERSION === (int) ( $parent_engine['batch_storage_version'] ?? 0 ) ) {
+			return self::processV2Chunk( $parent_job_id, $createItem, $expected_offset, $parent_engine );
+		}
+
+		return self::processLegacyChunk( $parent_job_id, $createItem, $expected_offset );
+	}
+
+	/** Process a durable v2 worklist chunk. */
+	private static function processV2Chunk( int $parent_job_id, callable $createItem, ?int $expected_offset, array $parent_engine ): array {
+		$state = is_array( $parent_engine['batch_state'] ?? null ) ? $parent_engine['batch_state'] : null;
+		$total = (int) ( $parent_engine['batch_total'] ?? 0 );
+		if ( is_array( $state ) && ! empty( $state['worklist_complete'] ) ) {
+			self::scheduleFinalizeRetry( $parent_engine, $parent_job_id );
+			return self::chunkResult(
+				0,
+				(int) ( $parent_engine['batch_offset'] ?? $total ),
+				$total,
+				false,
+				! empty( $parent_engine['cancelled'] ),
+				false,
+				false,
+				! empty( $parent_engine['batch_schedule_failed'] )
+			);
+		}
+		if ( null === $state ) {
+			$cancelled = ! empty( $parent_engine['cancelled'] );
+			if ( $cancelled ) {
+				$repository = new BatchItems();
+				if ( ! self::discardV2Outstanding( $repository, $parent_job_id, (string) ( $parent_engine['batch_context'] ?? '' ) ) ) {
+					self::scheduleFinalizeRetry( $parent_engine, $parent_job_id );
+					return self::chunkResult( 0, (int) ( $parent_engine['batch_offset'] ?? $total ), $total, true, true );
+				}
+				$completed = $repository->count_completed( $parent_job_id );
+				if ( ! self::finishV2State( $parent_job_id, $completed, (int) ( $parent_engine['batch_offset'] ?? 0 ), true ) ) {
+					throw new \RuntimeException( 'Cancelled batch cleanup could not persist parent state.' );
+				}
+			} else {
+				self::scheduleFinalizeRetry( $parent_engine, $parent_job_id );
+			}
+			return self::chunkResult( 0, (int) ( $parent_engine['batch_offset'] ?? $total ), $total, false, $cancelled, ! $cancelled );
+		}
+
+		$context    = (string) ( $parent_engine['batch_context'] ?? '' );
+		$repository = new BatchItems();
+		if ( ! empty( $parent_engine['cancelled'] ) ) {
+			if ( ! self::discardV2Outstanding( $repository, $parent_job_id, $context ) ) {
+				self::scheduleFinalizeRetry( $parent_engine, $parent_job_id );
+				return self::chunkResult( 0, (int) ( $state['offset'] ?? 0 ), $total, true, true );
+			}
+			$completed = $repository->count_completed( $parent_job_id );
+			if ( ! self::finishV2State( $parent_job_id, $completed, (int) ( $state['offset'] ?? 0 ), true ) ) {
+				throw new \RuntimeException( 'Cancelled batch cleanup could not persist parent state.' );
+			}
+			return self::chunkResult( 0, (int) ( $state['offset'] ?? 0 ), $total, false, true );
+		}
+
+		$offset     = null === $expected_offset ? (int) ( $state['offset'] ?? 0 ) : $expected_offset;
+		$chunk_size = max( 1, (int) ( $parent_engine['batch_chunk_size'] ?? self::chunkSize( $context ) ) );
+		$lease      = (int) apply_filters( 'datamachine_batch_item_lease_seconds', BatchItems::DEFAULT_LEASE_SECONDS, $context );
+		// The recovery owner must exist before rows cross the durable claim boundary.
+		if ( ! self::scheduleV2Chunk( (string) $state['hook'], $parent_job_id, $offset, time() + max( 1, $lease ) ) ) {
+			$discarded = self::discardV2Outstanding( $repository, $parent_job_id, $context );
+			$completed = $repository->count_completed( $parent_job_id );
+			if ( $discarded ) {
+				self::finishV2State( $parent_job_id, $completed, $offset, true, true );
+			}
+			return self::chunkResult( 0, $offset, $total, false, false, false, false, true );
+		}
+		$rows       = $repository->claim_chunk( $parent_job_id, $offset, $chunk_size, $lease );
+		if ( ! $rows ) {
+			$outstanding = $repository->first_outstanding_index( $parent_job_id );
+			if ( null === $outstanding ) {
+				$completed = $repository->count_completed( $parent_job_id );
+				if ( ! self::finishV2State( $parent_job_id, $completed, $total, true ) ) {
+					throw new \RuntimeException( 'Terminal batch progress could not persist.' );
+				}
+				return self::chunkResult( 0, $total, $total, false );
+			}
+			return self::chunkResult( 0, $outstanding, $total, true, false, false, true );
+		}
+
+		$extra     = is_array( $state['extra'] ?? null ) ? $state['extra'] : array();
+		$scheduled = 0;
+		$cancelled = false;
+		foreach ( $rows as $row ) {
+			$latest = EngineData::retrieve( $parent_job_id );
+			if ( ! empty( $latest['cancelled'] ) ) {
+				$cancelled = true;
+				if ( $repository->discard_cancel_pending( $parent_job_id, (int) $row['item_index'], (string) $row['lease_token'] ) ) {
+					do_action( 'datamachine_batch_items_discarded', array( $row['payload'] ), $parent_job_id, $context, array( $row['cleanup_context'] ) );
+				}
+				continue;
+			}
+
+			$item = $row['payload'];
+			if ( empty( $row['payload_valid'] ) ) {
+				if ( $repository->discard_claim( $parent_job_id, (int) $row['item_index'], (string) $row['lease_token'] ) ) {
+					self::notifyDiscardedRows( array( $row ), $parent_job_id, $context );
+					do_action(
+						'datamachine_log',
+						'error',
+						'Batch item payload is corrupt',
+						array(
+							'parent_job_id' => $parent_job_id,
+							'item_index'    => (int) $row['item_index'],
+						)
+					);
+				}
+				continue;
+			}
+			$hydration = DataPacketStore::hydrate_packet_collections_with_status( $item );
+			if ( empty( $hydration['success'] ) ) {
+				if ( $repository->discard_claim( $parent_job_id, (int) $row['item_index'], (string) $row['lease_token'] ) ) {
+					do_action( 'datamachine_batch_items_discarded', array( $hydration['value'] ), $parent_job_id, $context, array( $row['cleanup_context'] ) );
+				}
+				continue;
+			}
+
+			$result       = $createItem( $hydration['value'], $extra, $parent_job_id, (int) $row['item_index'], (string) $row['payload_checksum'] );
+			$result_id    = is_scalar( $result ) ? $result : null;
+			$item_finished = $result && $repository->complete( $parent_job_id, (int) $row['item_index'], (string) $row['lease_token'], $result_id );
+			if ( $result && ! $item_finished && ! empty( EngineData::retrieve( $parent_job_id )['cancelled'] ) ) {
+				$item_finished = $repository->complete_cancel_pending( $parent_job_id, (int) $row['item_index'], (string) $row['lease_token'], $result_id );
+			}
+			if ( $item_finished ) {
+				++$scheduled;
+			} elseif ( ! $result ) {
+				$repository->release( $parent_job_id, (int) $row['item_index'], (string) $row['lease_token'] );
+			}
+			if ( ! empty( EngineData::retrieve( $parent_job_id )['cancelled'] ) ) {
+				$cancelled = true;
+			}
+		}
+		if ( $cancelled ) {
+			$discarded = self::discardV2Outstanding( $repository, $parent_job_id, $context );
+			$completed = $repository->count_completed( $parent_job_id );
+			if ( ! $discarded || ! self::finishV2State( $parent_job_id, $completed, $offset, true ) ) {
+				throw new \RuntimeException( 'Cancelled in-flight batch could not finish cleanup.' );
+			}
+			return self::chunkResult( $scheduled, $offset, $total, false, true );
+		}
+
+		$next_offset = $repository->first_outstanding_index( $parent_job_id );
+		$more        = null !== $next_offset;
+		$failed      = false;
+		if ( $more && ! self::scheduleV2Chunk( (string) $state['hook'], $parent_job_id, $next_offset, time() + self::chunkDelay( $context ) ) ) {
+			if ( ! self::discardV2Outstanding( $repository, $parent_job_id, $context ) ) {
+				return self::chunkResult( $scheduled, $offset, $total, true, false, false, true );
+			}
+			$more   = false;
+			$failed = true;
+		}
+
+		$new_offset = $more ? (int) $next_offset : $total;
+		$completed  = $repository->count_completed( $parent_job_id );
+		$persisted  = self::finishV2State( $parent_job_id, $completed, $new_offset, ! $more, $failed );
+		if ( ! $more && ! $persisted ) {
+			throw new \RuntimeException( 'Terminal batch progress could not persist.' );
+		}
+		return self::chunkResult( $scheduled, $new_offset, $total, $more, false, false, false, $failed );
+	}
+
+	/** Build a stable chunk result for both consumers. */
+	private static function chunkResult( int $scheduled, int $offset, int $total, bool $more, bool $cancelled = false, bool $missing = false, bool $duplicate = false, bool $schedule_failed = false ): array {
+		return array(
+			'scheduled'       => $scheduled,
+			'offset'          => $offset,
+			'total'           => $total,
+			'more'            => $more,
+			'cancelled'       => $cancelled,
+			'missing'         => $missing,
+			'duplicate'       => $duplicate,
+			'schedule_failed' => $schedule_failed,
+		);
+	}
+
+	private static function scheduleV2Chunk( string $hook, int $parent_job_id, int $offset, int $timestamp ): bool {
+		$args = array(
+			'parent_job_id' => $parent_job_id,
+			'offset'        => $offset,
+		);
+		try {
+			$action_id = as_schedule_single_action(
+				$timestamp,
+				$hook,
+				$args,
+				GroupRegistrar::GROUP
+			);
+			if ( $action_id ) {
+				return true;
+			}
+		} catch ( \Throwable $exception ) {
+			do_action(
+				'datamachine_log',
+				'error',
+				'Batch scheduler failed to schedule v2 chunk',
+				array(
+					'parent_job_id' => $parent_job_id,
+					'offset'        => $offset,
+					'exception'     => $exception->getMessage(),
+				)
+			);
+		}
+
+		$wp_args = array( $parent_job_id, $offset );
+		if ( is_int( wp_next_scheduled( $hook, $wp_args ) ) ) {
+			return true;
+		}
+		$result = wp_schedule_single_event( $timestamp, $hook, $wp_args, true );
+		return ! is_wp_error( $result ) && true === $result;
+	}
+
+	private static function discardV2Outstanding( BatchItems $repository, int $parent_job_id, string $context ): bool {
+		do {
+			$result = $repository->discard_outstanding( $parent_job_id );
+			if ( empty( $result['success'] ) ) {
+				return false;
+			}
+			self::notifyDiscardedRows( $result['rows'], $parent_job_id, $context );
+		} while ( ! empty( $result['remaining'] ) );
+		return true;
+	}
+
+	/** Fence cancellation and release cleanup only for work not in a callback. */
+	private static function requestV2Cancellation( BatchItems $repository, int $parent_job_id, string $context ): bool {
+		do {
+			$result = $repository->request_cancellation( $parent_job_id );
+			if ( empty( $result['success'] ) ) {
+				return false;
+			}
+			self::notifyDiscardedRows( $result['rows'], $parent_job_id, $context );
+		} while ( ! empty( $result['remaining'] ) );
+		return true;
+	}
+
+	private static function discardOwnedWorklist( BatchItems $repository, int $parent_job_id, string $token, string $context ): bool {
+		do {
+			$result = $repository->discard_owned( $parent_job_id, $token );
+			if ( empty( $result['success'] ) ) {
+				return false;
+			}
+			self::notifyDiscardedRows( $result['rows'], $parent_job_id, $context );
+		} while ( ! empty( $result['remaining'] ) );
+		return true;
+	}
+
+	private static function notifyDiscardedRows( array $rows, int $parent_job_id, string $context ): void {
+		$rows = array_values(
+			array_filter(
+				$rows,
+				static fn( array $row ): bool => BatchItems::STATE_CANCEL_PENDING !== (string) ( $row['state'] ?? '' )
+			)
+		);
+		if ( empty( $rows ) ) {
+			return;
+		}
+		do_action(
+			'datamachine_batch_items_discarded',
+			array_map( static fn( array $row ): array => is_array( $row['payload'] ?? null ) ? $row['payload'] : array(), $rows ),
+			$parent_job_id,
+			$context,
+			array_map( static fn( array $row ): array => is_array( $row['cleanup_context'] ?? null ) ? $row['cleanup_context'] : array(), $rows )
+		);
+	}
+
+	private static function finishV2State( int $parent_job_id, int $scheduled, int $offset, bool $finished, bool $failed = false ): bool {
+		$result = EngineData::mutate(
+			$parent_job_id,
+			static function ( array $current ) use ( $scheduled, $offset, $finished, $failed ): array {
+				$current['batch_scheduled'] = $scheduled;
+				$current['batch_offset']    = $offset;
+				if ( $finished ) {
+					if ( isset( $current['batch_state'] ) ) {
+						$current['batch_state']['offset']            = $offset;
+						$current['batch_state']['worklist_complete'] = true;
+					}
+				} elseif ( isset( $current['batch_state'] ) ) {
+					$current['batch_state']['offset'] = $offset;
+				}
+				if ( $failed ) {
+					$current['batch_schedule_failed'] = true;
+				}
+				return $current;
+			},
+			'batch_v2_progress'
+		);
+		return ! empty( $result['success'] );
+	}
+
+	/**
+	 * Remove a terminal v2 worklist after its consumer durably terminalizes.
+	 *
+	 * Rows are deleted first. If the lightweight parent mutation then loses a
+	 * race, the recovery action sees worklist_complete and safely retries this
+	 * finalization without re-running an item.
+	 */
+	public static function finalize( int $parent_job_id ): bool {
+		$current    = EngineData::retrieve( $parent_job_id );
+		$job        = ( new Jobs() )->get_job( $parent_job_id );
+		if ( ! is_array( $job ) ) {
+			global $wpdb;
+			if ( '' !== (string) $wpdb->last_error ) {
+				self::scheduleFinalizeRetry( $current, $parent_job_id );
+				return false;
+			}
+		}
+		if ( is_array( $job ) && ! JobStatus::isStatusFinal( (string) ( $job['status'] ?? '' ) ) ) {
+			return false;
+		}
+		$repository = new BatchItems();
+		$is_v2      = self::STORAGE_VERSION === (int) ( $current['batch_storage_version'] ?? 0 );
+		$state      = is_array( $current['batch_state'] ?? null ) ? $current['batch_state'] : null;
+		if ( ! $is_v2 || ! is_array( $state ) || empty( $state['worklist_complete'] ) ) {
+			if ( ! self::discardV2Outstanding( $repository, $parent_job_id, (string) ( $current['batch_context'] ?? '' ) ) ) {
+				self::scheduleFinalizeRetry( $current, $parent_job_id );
+				return false;
+			}
+		}
+
+		if ( ! $repository->delete_batch( $parent_job_id ) ) {
+			self::scheduleFinalizeRetry( $current, $parent_job_id );
+			return false;
+		}
+		if ( ! $is_v2 ) {
+			return true;
+		}
+		$result = EngineData::mutate(
+			$parent_job_id,
+			static function ( array $engine ): array {
+				unset( $engine['batch_state'] );
+				return $engine;
+			},
+			'batch_v2_finalize'
+		);
+		$finalized = ! empty( $result['success'] );
+		if ( ! $finalized ) {
+			self::scheduleFinalizeRetry( $current, $parent_job_id );
+		}
+		return $finalized;
+	}
+
+	/** Schedule an idempotent consumer replay when terminal cleanup is not durable. */
+	private static function scheduleFinalizeRetry( array $engine, int $parent_job_id ): bool {
+		$state = is_array( $engine['batch_state'] ?? null ) ? $engine['batch_state'] : array();
+		$hook  = (string) ( $state['hook'] ?? $engine['batch_hook'] ?? '' );
+		if ( '' === $hook ) {
+			return false;
+		}
+		return self::scheduleV2Chunk( $hook, $parent_job_id, (int) ( $state['offset'] ?? $engine['batch_offset'] ?? 0 ), time() + 60 );
+	}
+
+	/** Existing engine_data worklist processor for persisted v1 batches. */
+	private static function processLegacyChunk( int $parent_job_id, callable $createItem, ?int $expected_offset = null ): array {
 		$parent_engine = datamachine_get_engine_data( $parent_job_id );
 		$batch_state   = $parent_engine['batch_state'] ?? null;
 
@@ -535,6 +1003,41 @@ class BatchScheduler {
 	 * @return bool True when the parent was a batch parent and the flag was set.
 	 */
 	public static function cancel( int $parent_job_id ): bool {
+		$current = EngineData::retrieve( $parent_job_id );
+		if ( self::STORAGE_VERSION === (int) ( $current['batch_storage_version'] ?? 0 ) ) {
+			if ( empty( $current['batch'] ) ) {
+				return false;
+			}
+			$mutation = EngineData::mutate(
+				$parent_job_id,
+				static function ( array $engine ): ?array {
+					if ( empty( $engine['batch'] ) ) {
+						return null;
+					}
+					$engine['cancelled']    = true;
+					$engine['cancelled_at'] = current_time( 'mysql' );
+					return $engine;
+				},
+				'batch_v2_cancel'
+			);
+			if ( empty( $mutation['success'] ) ) {
+				return false;
+			}
+			$repository = new BatchItems();
+			$context    = (string) ( $current['batch_context'] ?? '' );
+			if ( ! self::requestV2Cancellation( $repository, $parent_job_id, $context ) ) {
+				return false;
+			}
+			if ( null === $repository->first_outstanding_index( $parent_job_id ) ) {
+				$completed = $repository->count_completed( $parent_job_id );
+				$offset    = (int) ( $current['batch_state']['offset'] ?? 0 );
+				if ( ! self::finishV2State( $parent_job_id, $completed, $offset, true ) ) {
+					return false;
+				}
+			}
+			return true;
+		}
+
 		$remaining         = array();
 		$remaining_cleanup = array();
 		$context           = '';

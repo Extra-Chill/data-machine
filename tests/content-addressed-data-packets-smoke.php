@@ -137,7 +137,6 @@ if ( ! function_exists( 'datamachine_merge_engine_data' ) ) {
 
 require_once __DIR__ . '/../vendor/autoload.php';
 
-use DataMachine\Core\ActionScheduler\BatchScheduler;
 use DataMachine\Core\DataPacketStore;
 use DataMachine\Core\FilesRepository\DirectoryManager;
 use DataMachine\Core\FilesRepository\FileRetrieval;
@@ -209,20 +208,10 @@ file_put_contents( $legacy_job_dir . '/data.json', wp_json_encode( array( $packe
 $legacy_retrieved = ( new FileRetrieval() )->retrieve_data_by_job_id( 43, $context );
 datamachine_packet_smoke_assert( isset( $legacy_retrieved[0]['timestamp'] ), 'legacy raw data.json packet remains readable' );
 
-$batch_result = BatchScheduler::start(
-	101,
-	'datamachine_packet_smoke_batch',
-	array(
-		array( 'data_packets' => array( $packet_a ) ),
-	),
-	array(),
-	'packet-smoke',
-	BatchScheduler::COMPLETION_STRATEGY_CHUNKS_SCHEDULED
+$batch_item = DataPacketStore::reference_packet_collections_in_value(
+	array( 'data_packets' => array( $packet_a ) )
 );
 
-global $engine_snapshots;
-$batch_item = $engine_snapshots[101]['batch_state']['items'][0] ?? array();
-datamachine_packet_smoke_assert( ! empty( $batch_result['parent_job_id'] ), 'batch scheduler starts' );
 datamachine_packet_smoke_assert( DataPacketStore::is_ref( $batch_item['data_packets'][0] ?? array() ), 'child batch item stores packet by ref' );
 
 $child_params = DataPacketStore::hydrate_packet_collections_in_value( $batch_item );

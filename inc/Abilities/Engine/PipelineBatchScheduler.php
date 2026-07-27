@@ -27,7 +27,9 @@
 namespace DataMachine\Abilities\Engine;
 
 use DataMachine\Core\PacketEngineData;
+use DataMachine\Core\EngineData;
 use DataMachine\Core\ActionScheduler\BatchScheduler;
+use DataMachine\Core\ActionScheduler\GroupRegistrar;
 use DataMachine\Core\Database\Jobs\Jobs;
 use DataMachine\Core\Database\ProcessedItems\ProcessedItems;
 use DataMachine\Core\JobStatus;
@@ -85,7 +87,6 @@ class PipelineBatchScheduler {
 			$dataPackets,
 			array(
 				'next_flow_step_id' => $next_flow_step_id,
-				'engine_snapshot'   => $engine_snapshot,
 			),
 			self::BATCH_CONTEXT,
 			BatchScheduler::COMPLETION_STRATEGY_CHILDREN_COMPLETE
@@ -98,9 +99,13 @@ class PipelineBatchScheduler {
 		// Surface next_flow_step_id at the top level for legacy consumers
 		// that read it without descending into batch_state. Parity with
 		// the pre-extraction shape.
-		datamachine_merge_engine_data(
+		EngineData::mutate(
 			$parent_job_id,
-			array( 'next_flow_step_id' => $next_flow_step_id )
+			static function ( array $current ) use ( $next_flow_step_id ): array {
+				$current['next_flow_step_id'] = $next_flow_step_id;
+				return $current;
+			},
+			'pipeline_batch_metadata'
 		);
 
 		do_action(
@@ -131,6 +136,7 @@ class PipelineBatchScheduler {
 	public function processChunk( int $parent_job_id, ?int $expected_offset = null ): void {
 		$parent_job = $this->db_jobs->get_job( $parent_job_id );
 		if ( ! $parent_job || JobStatus::PROCESSING !== ( $parent_job['status'] ?? '' ) ) {
+			BatchScheduler::finalize( $parent_job_id );
 			do_action(
 				'datamachine_log',
 				'warning',
@@ -154,7 +160,9 @@ class PipelineBatchScheduler {
 		}
 
 		if ( $result['missing'] ) {
-			$this->failParentIfStillProcessing( $parent_job_id, 'batch_state_missing' );
+			if ( $this->failParentIfStillProcessing( $parent_job_id, 'batch_state_missing' ) ) {
+				BatchScheduler::finalize( $parent_job_id );
+			}
 			do_action(
 				'datamachine_log',
 				'error',
@@ -165,10 +173,14 @@ class PipelineBatchScheduler {
 		}
 
 		if ( $result['cancelled'] ) {
-			$this->db_jobs->complete_job(
+			$completed = $this->db_jobs->complete_job(
 				$parent_job_id,
 				JobStatus::CANCELLED
 			);
+			if ( ! $completed ) {
+				return;
+			}
+			BatchScheduler::finalize( $parent_job_id );
 			return;
 		}
 
@@ -234,16 +246,18 @@ class PipelineBatchScheduler {
 	 * contract; we forward to the existing createChildJob().
 	 *
 	 * @param array $single_packet  A single DataPacket array.
-	 * @param array $extra          Per-batch state (engine_snapshot, next_flow_step_id).
+	 * @param array $extra          Per-batch state (next_flow_step_id; legacy may include engine_snapshot).
 	 * @param int   $parent_job_id  Parent job ID.
 	 * @return int|false Child job ID or false on failure.
 	 */
-	public function createChildJobFromBatch( array $single_packet, array $extra, int $parent_job_id ): int|false {
+	public function createChildJobFromBatch( array $single_packet, array $extra, int $parent_job_id, int $item_index = 0, string $payload_checksum = '' ): int|false {
 		return $this->createChildJob(
 			$parent_job_id,
 			(string) ( $extra['next_flow_step_id'] ?? '' ),
 			$single_packet,
-			is_array( $extra['engine_snapshot'] ?? null ) ? $extra['engine_snapshot'] : array()
+			is_array( $extra['engine_snapshot'] ?? null ) ? $extra['engine_snapshot'] : datamachine_get_engine_data( $parent_job_id ),
+			$item_index,
+			$payload_checksum
 		);
 	}
 
@@ -264,7 +278,9 @@ class PipelineBatchScheduler {
 		int $parent_job_id,
 		string $next_flow_step_id,
 		array $single_packet,
-		array $engine_snapshot
+		array $engine_snapshot,
+		int $item_index = 0,
+		string $payload_checksum = ''
 	): int|false {
 		$pipeline_id = $engine_snapshot['job']['pipeline_id'] ?? null;
 		$flow_id     = $engine_snapshot['job']['flow_id'] ?? null;
@@ -283,12 +299,17 @@ class PipelineBatchScheduler {
 		$parent_user_id  = (int) ( $engine_snapshot['job']['user_id'] ?? 0 );
 
 		$child_job_args = array(
-			'pipeline_id'   => $pipeline_id,
-			'flow_id'       => $flow_id,
-			'source'        => $pipeline_id ? 'pipeline' : 'direct',
-			'label'         => $item_title,
-			'parent_job_id' => $parent_job_id,
+			'pipeline_id'       => $pipeline_id,
+			'flow_id'           => $flow_id,
+			'source'            => $pipeline_id ? 'pipeline' : 'direct',
+			'label'             => $item_title,
+			'parent_job_id'     => $parent_job_id,
+			'operation_state'   => 'preparing',
+			'operation_step_id' => $next_flow_step_id,
 		);
+		if ( '' !== $payload_checksum ) {
+			$child_job_args['idempotency_key'] = 'pipeline-batch:' . hash( 'sha256', $parent_job_id . ':' . $item_index . ':' . $payload_checksum );
+		}
 
 		if ( $parent_agent_id > 0 ) {
 			$child_job_args['agent_id'] = $parent_agent_id;
@@ -297,7 +318,10 @@ class PipelineBatchScheduler {
 			$child_job_args['user_id'] = $parent_user_id;
 		}
 
-		$child_job_id = $this->db_jobs->create_job( $child_job_args );
+		$creation     = '' !== $payload_checksum
+			? $this->db_jobs->create_or_get_job( $child_job_args )
+			: $this->db_jobs->create_job( $child_job_args );
+		$child_job_id = is_array( $creation ) ? (int) ( $creation['job_id'] ?? 0 ) : (int) $creation;
 
 		if ( ! $child_job_id ) {
 			do_action(
@@ -357,7 +381,10 @@ class PipelineBatchScheduler {
 			$child_engine[ ProcessedItems::CLAIM_METADATA_KEY ] = $item_claim;
 		}
 
-		datamachine_set_engine_data( $child_job_id, $child_engine );
+		$existing_engine = datamachine_get_engine_data( $child_job_id );
+		if ( empty( $existing_engine['job']['job_id'] ) && ! datamachine_set_engine_data( $child_job_id, $child_engine ) ) {
+			return false;
+		}
 
 		// Child job stays 'pending' until Action Scheduler actually picks it up.
 		// ExecuteStepAbility transitions to 'processing' at execution time,
@@ -365,12 +392,9 @@ class PipelineBatchScheduler {
 
 		// Schedule the next step with this single DataPacket.
 		// Uses the normal engine path — the child is a real pipeline job.
-		do_action(
-			'datamachine_schedule_next_step',
-			$child_job_id,
-			$next_flow_step_id,
-			array( $single_packet )
-		);
+		if ( ! $this->ensureChildScheduled( $child_job_id, $next_flow_step_id, $single_packet ) ) {
+			return false;
+		}
 
 		return $child_job_id;
 	}
@@ -403,8 +427,73 @@ class PipelineBatchScheduler {
 		}
 
 		$engine_snapshot['flow_config'] = $flow_config;
+		unset(
+			$engine_snapshot['batch'],
+			$engine_snapshot['batch_state'],
+			$engine_snapshot['batch_storage_version'],
+			$engine_snapshot['batch_total'],
+			$engine_snapshot['batch_scheduled'],
+			$engine_snapshot['batch_chunk_size'],
+			$engine_snapshot['batch_context'],
+			$engine_snapshot['batch_hook'],
+			$engine_snapshot['batch_completion_strategy'],
+			$engine_snapshot['batch_offset'],
+			$engine_snapshot['batch_schedule_failed'],
+			$engine_snapshot['batch_results'],
+			$engine_snapshot['next_flow_step_id'],
+			$engine_snapshot['cancelled'],
+			$engine_snapshot['cancelled_at']
+		);
 
 		return $engine_snapshot;
+	}
+
+	/** Durably enqueue one deterministic child without duplicate step actions. */
+	private function ensureChildScheduled( int $child_job_id, string $next_flow_step_id, array $single_packet ): bool {
+		$job = $this->db_jobs->get_job( $child_job_id );
+		if ( ! is_array( $job ) ) {
+			return false;
+		}
+		if ( 'pending' !== (string) ( $job['status'] ?? '' ) ) {
+			return true;
+		}
+
+		$action_args = array(
+			'job_id'       => $child_job_id,
+			'flow_step_id' => $next_flow_step_id,
+		);
+		if ( 'enqueued' === (string) ( $job['operation_state'] ?? '' ) ) {
+			$existing_action = function_exists( 'as_has_scheduled_action' )
+				? (int) as_has_scheduled_action( 'datamachine_execute_step', $action_args, GroupRegistrar::GROUP )
+				: 0;
+			if ( $existing_action > 0 ) {
+				return true;
+			}
+			$this->db_jobs->reclaim_missing_operation_action( $child_job_id );
+		}
+
+		$claim = $this->db_jobs->claim_operation_enqueue( $child_job_id );
+		if ( ! is_array( $claim ) ) {
+			return false;
+		}
+
+		$action_id = function_exists( 'as_has_scheduled_action' )
+			? (int) as_has_scheduled_action( 'datamachine_execute_step', $action_args, GroupRegistrar::GROUP )
+			: 0;
+		if ( $action_id <= 0 ) {
+			$result    = ( new ScheduleNextStepAbility() )->execute(
+				array(
+					'job_id'       => $child_job_id,
+					'flow_step_id' => $next_flow_step_id,
+					'data_packets' => array( $single_packet ),
+				)
+			);
+			$action_id = ! empty( $result['success'] ) ? (int) ( $result['action_id'] ?? 0 ) : 0;
+		}
+
+		$state = $action_id > 0 ? 'enqueued' : 'enqueue_failed';
+		return $this->db_jobs->finish_operation_enqueue( $child_job_id, $state, $action_id, (string) $claim['token'], (int) $claim['generation'] )
+			&& 'enqueued' === $state;
 	}
 
 	/**
@@ -496,7 +585,7 @@ class PipelineBatchScheduler {
 		$total_children  = (int) $counts['total'];
 		$active          = (int) $counts['active'];
 		$batch_scheduled = (int) ( $parent_engine['batch_scheduled'] ?? $total_children );
-		$batch_pending   = isset( $parent_engine['batch_state'] );
+		$batch_pending   = isset( $parent_engine['batch_state'] ) && empty( $parent_engine['batch_state']['worklist_complete'] );
 
 		// Still have active children or not all scheduled yet.
 		if ( $active > 0 || $batch_pending || $total_children < $batch_scheduled ) {
@@ -548,6 +637,7 @@ class PipelineBatchScheduler {
 		if ( ! is_callable( $complete_parent ) || false === call_user_func( $complete_parent, $parent_job_id, $parent_status ) ) {
 			return false;
 		}
+		BatchScheduler::finalize( $parent_job_id );
 
 		$flow_name = $parent_engine['flow']['name'] ?? '';
 
@@ -578,19 +668,19 @@ class PipelineBatchScheduler {
 	 * @param int    $parent_job_id Parent job ID.
 	 * @param string $reason        Failure reason suffix.
 	 */
-	private function failParentIfStillProcessing( int $parent_job_id, string $reason ): void {
+	private function failParentIfStillProcessing( int $parent_job_id, string $reason ): bool {
 		$job = $this->db_jobs->get_job( $parent_job_id );
 
 		if ( ! $job ) {
-			return;
+			return false;
 		}
 
 		$current_status = $job['status'] ?? '';
 		if ( JobStatus::PROCESSING !== $current_status ) {
-			return;
+			return false;
 		}
 
-		$this->db_jobs->complete_job( $parent_job_id, JobStatus::failed( $reason )->toString() );
+		return $this->db_jobs->complete_job( $parent_job_id, JobStatus::failed( $reason )->toString() );
 	}
 
 	/**

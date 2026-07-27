@@ -28,6 +28,7 @@ use DataMachine\Core\Agents\AgentIdentityResolver;
 use DataMachine\Core\AbilityResult;
 use DataMachine\Core\Database\Jobs\Jobs;
 use DataMachine\Core\DataPacketStore;
+use DataMachine\Core\EngineData;
 use DataMachine\Core\JobStatus;
 use DataMachine\Engine\AI\System\Tasks\SystemTask;
 
@@ -90,7 +91,7 @@ class TaskScheduler {
 	 * @param int    $parentJobId Parent job ID for hierarchy (batch parent, pipeline parent).
 	 * @return int|false Job ID on success, false on failure.
 	 */
-	public static function schedule( string $taskType, array $params, array $context = array(), int $parentJobId = 0 ): int|false {
+	public static function schedule( string $taskType, array $params, array $context = array(), int $parentJobId = 0, string $operationKey = '' ): int|false {
 		self::$last_schedule_error = null;
 		$params                    = DataPacketStore::hydrate_packet_collections_in_value( $params );
 
@@ -252,14 +253,17 @@ class TaskScheduler {
 			$initial_data['resumable'] = true;
 		}
 
+		$execute_input = array(
+			'workflow'     => $workflow,
+			'timestamp'    => $params['scheduled_at'] ?? null,
+			'initial_data' => $initial_data,
+		);
+		if ( '' !== $operationKey ) {
+			$execute_input['operation_key'] = $operationKey;
+		}
+
 		$result = AbilityResult::normalize(
-			( new ExecuteWorkflowAbility( false ) )->executeInternal(
-				array(
-					'workflow'     => $workflow,
-					'timestamp'    => $params['scheduled_at'] ?? null,
-					'initial_data' => $initial_data,
-				)
-			)
+			( new ExecuteWorkflowAbility( false ) )->executeInternal( $execute_input )
 		);
 
 		if ( empty( $result['success'] ) ) {
@@ -426,7 +430,13 @@ class TaskScheduler {
 		if ( $caller_parent_job_id > 0 ) {
 			$batch_engine_merge['caller_parent_job_id'] = $caller_parent_job_id;
 		}
-		datamachine_merge_engine_data( (int) $batch_job_id, $batch_engine_merge );
+		EngineData::mutate(
+			(int) $batch_job_id,
+			static function ( array $current ) use ( $batch_engine_merge ): array {
+				return array_merge( $current, $batch_engine_merge );
+			},
+			'task_batch_metadata'
+		);
 
 		do_action(
 			'datamachine_log',
@@ -480,7 +490,7 @@ class TaskScheduler {
 
 		$result = BatchScheduler::processChunk(
 			$parent_job_id,
-			static function ( array $params, array $extra, int $parent_id ): int|false {
+			static function ( array $params, array $extra, int $parent_id, int $item_index = 0, string $payload_checksum = '' ): int|false {
 				$task_type = (string) ( $extra['task_type'] ?? '' );
 				$context   = is_array( $extra['context'] ?? null ) ? $extra['context'] : array();
 
@@ -495,7 +505,8 @@ class TaskScheduler {
 				$caller_parent_job_id = (int) ( $extra['caller_parent_job_id'] ?? 0 );
 				$child_parent_id      = $caller_parent_job_id > 0 ? $caller_parent_job_id : $parent_id;
 
-				return self::schedule( $task_type, $params, $context, $child_parent_id );
+				$operation_key = '' === $payload_checksum ? '' : 'task-batch:' . $parent_id . ':' . $item_index . ':' . $payload_checksum;
+				return self::schedule( $task_type, $params, $context, $child_parent_id, $operation_key );
 			},
 			$expected_offset
 		);
@@ -515,10 +526,13 @@ class TaskScheduler {
 					'context'       => 'system',
 				)
 			);
-			$jobs_db->complete_job(
+			$completed = $jobs_db->complete_job(
 				$parent_job_id,
 				JobStatus::failed( 'batch_state_missing' )->toString()
 			);
+			if ( $completed ) {
+				BatchScheduler::finalize( $parent_job_id );
+			}
 			return;
 		}
 
@@ -527,7 +541,10 @@ class TaskScheduler {
 		}
 
 		if ( $result['cancelled'] ) {
-			$jobs_db->complete_job( $parent_job_id, 'cancelled' );
+			if ( ! $jobs_db->complete_job( $parent_job_id, 'cancelled' ) ) {
+				return;
+			}
+			BatchScheduler::finalize( $parent_job_id );
 
 			do_action(
 				'datamachine_log',
@@ -546,18 +563,24 @@ class TaskScheduler {
 		}
 
 		if ( ! empty( $result['schedule_failed'] ) ) {
-			$jobs_db->complete_job( $parent_job_id, JobStatus::failed( 'batch_schedule_failed' )->toString() );
+			if ( ! $jobs_db->complete_job( $parent_job_id, JobStatus::failed( 'batch_schedule_failed' )->toString() ) ) {
+				return;
+			}
+			BatchScheduler::finalize( $parent_job_id );
 			return;
 		}
 
 		// Surface progress fields on the parent's engine_data using the
 		// keys CLI / status consumers already know about.
-		datamachine_merge_engine_data(
+		$authoritative_scheduled = (int) ( $parent_engine['batch_scheduled'] ?? 0 );
+		EngineData::mutate(
 			$parent_job_id,
-			array(
-				'offset'          => $result['offset'],
-				'tasks_scheduled' => ( $parent_engine['tasks_scheduled'] ?? 0 ) + $result['scheduled'],
-			)
+			static function ( array $current ) use ( $result, $authoritative_scheduled ): array {
+				$current['offset']          = $result['offset'];
+				$current['tasks_scheduled'] = $authoritative_scheduled;
+				return $current;
+			},
+			'task_batch_progress'
 		);
 
 		do_action(
@@ -582,11 +605,18 @@ class TaskScheduler {
 		);
 
 		if ( ! $result['more'] ) {
-			datamachine_merge_engine_data(
+			EngineData::mutate(
 				$parent_job_id,
-				array( 'completed_at' => current_time( 'mysql' ) )
+				static function ( array $current ): array {
+					$current['completed_at'] = current_time( 'mysql' );
+					return $current;
+				},
+				'task_batch_complete'
 			);
-			$jobs_db->complete_job( $parent_job_id, JobStatus::COMPLETED );
+			if ( ! $jobs_db->complete_job( $parent_job_id, JobStatus::COMPLETED ) ) {
+				return;
+			}
+			BatchScheduler::finalize( $parent_job_id );
 
 			do_action(
 				'datamachine_log',
@@ -677,7 +707,7 @@ class TaskScheduler {
 			'total_items'         => $total,
 			'offset'              => $engine_data['offset'] ?? $engine_data['batch_offset'] ?? 0,
 			'chunk_size'          => $engine_data['batch_chunk_size'] ?? BatchScheduler::DEFAULT_CHUNK_SIZE,
-			'tasks_scheduled'     => $engine_data['tasks_scheduled'] ?? $engine_data['batch_scheduled'] ?? 0,
+			'tasks_scheduled'     => $engine_data['batch_scheduled'] ?? $engine_data['tasks_scheduled'] ?? 0,
 			'status'              => $job['status'] ?? '',
 			'started_at'          => $engine_data['started_at'] ?? '',
 			'completed_at'        => $engine_data['completed_at'] ?? '',

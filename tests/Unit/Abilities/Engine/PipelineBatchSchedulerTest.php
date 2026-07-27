@@ -9,6 +9,8 @@
 namespace DataMachine\Tests\Unit\Abilities\Engine;
 
 use DataMachine\Abilities\Engine\PipelineBatchScheduler;
+use DataMachine\Core\ActionScheduler\BatchScheduler;
+use DataMachine\Core\Database\BatchItems\BatchItems;
 use DataMachine\Core\Database\Jobs\Jobs;
 use DataMachine\Core\Database\ProcessedItems\ProcessedItems;
 use DataMachine\Core\JobStatus;
@@ -140,7 +142,7 @@ class PipelineBatchSchedulerTest extends WP_UnitTestCase {
 		$this->assertEquals( 'step_abc_123', $parent_engine['next_flow_step_id'] );
 	}
 
-	public function test_fanout_stores_batch_state_in_engine_data(): void {
+	public function test_fanout_stores_only_lightweight_batch_state_in_engine_data(): void {
 		$parent_id = $this->create_parent_job();
 		$engine    = $this->make_engine_snapshot( $parent_id );
 		$packets   = array(
@@ -154,12 +156,14 @@ class PipelineBatchSchedulerTest extends WP_UnitTestCase {
 		$this->assertArrayHasKey( 'batch_state', $parent_engine );
 
 		$batch_state = $parent_engine['batch_state'];
+		$this->assertSame( 2, (int) $parent_engine['batch_storage_version'] );
 		$this->assertEquals( 1, $batch_state['total'] );
 		$this->assertEquals( 0, $batch_state['offset'] );
-		$this->assertCount( 1, $batch_state['items'] );
+		$this->assertArrayNotHasKey( 'items', $batch_state );
+		$this->assertArrayNotHasKey( 'cleanup_contexts', $batch_state );
 		$this->assertArrayHasKey( 'extra', $batch_state );
 		$this->assertEquals( 'step_abc_123', $batch_state['extra']['next_flow_step_id'] );
-		$this->assertArrayHasKey( 'engine_snapshot', $batch_state['extra'] );
+		$this->assertArrayNotHasKey( 'engine_snapshot', $batch_state['extra'] );
 		$this->assertEquals( PipelineBatchScheduler::BATCH_HOOK, $batch_state['hook'] );
 
 		// next_flow_step_id is also surfaced top-level for legacy consumers.
@@ -167,6 +171,19 @@ class PipelineBatchSchedulerTest extends WP_UnitTestCase {
 
 		// No transient should exist.
 		$this->assertFalse( get_transient( 'datamachine_pipeline_batch_' . $parent_id ) );
+	}
+
+	public function test_exact_retry_rejects_changed_batch_consumer_contract(): void {
+		$parent_id = $this->create_parent_job();
+		$items     = array( $this->make_data_packet( 'Event A' ) );
+		$first     = BatchScheduler::start( $parent_id, 'first_hook', $items, array( 'route' => 'first' ), 'pipeline', BatchScheduler::COMPLETION_STRATEGY_CHILDREN_COMPLETE );
+		$retry     = BatchScheduler::start( $parent_id, 'second_hook', $items, array( 'route' => 'second' ), 'pipeline', BatchScheduler::COMPLETION_STRATEGY_CHILDREN_COMPLETE );
+
+		$this->assertTrue( $first['scheduled'] );
+		$this->assertFalse( $retry['scheduled'] );
+		$state = datamachine_get_engine_data( $parent_id )['batch_state'];
+		$this->assertSame( 'first_hook', $state['hook'] );
+		$this->assertSame( 'first', $state['extra']['route'] );
 	}
 
 	/**
@@ -338,7 +355,7 @@ class PipelineBatchSchedulerTest extends WP_UnitTestCase {
 
 		$parent_engine = datamachine_get_engine_data( $parent_id );
 		$this->assertSame( 2, (int) $parent_engine['batch_scheduled'] );
-		$this->assertArrayNotHasKey( 'batch_state', $parent_engine );
+		$this->assertTrue( $parent_engine['batch_state']['worklist_complete'] );
 	}
 
 	public function test_process_chunk_marks_parent_failed_when_batch_state_is_missing(): void {
@@ -350,6 +367,24 @@ class PipelineBatchSchedulerTest extends WP_UnitTestCase {
 		$parent_job = $this->jobs_db->get_job( $parent_id );
 		$this->assertStringContainsString( 'failed', $parent_job['status'] );
 		$this->assertStringContainsString( 'batch_state_missing', $parent_job['status'] );
+	}
+
+	public function test_v2_missing_state_fails_parent_and_cleans_orphan_worklist(): void {
+		$parent_id = $this->create_parent_job();
+		$engine    = datamachine_get_engine_data( $parent_id );
+		$engine['batch']                 = true;
+		$engine['batch_storage_version'] = 2;
+		$engine['batch_total']           = 1;
+		$engine['batch_context']         = PipelineBatchScheduler::BATCH_CONTEXT;
+		$engine['batch_hook']            = PipelineBatchScheduler::BATCH_HOOK;
+		$this->assertTrue( datamachine_set_engine_data( $parent_id, $engine ) );
+		$worklist = new BatchItems();
+		$this->assertTrue( $worklist->insert_batch( $parent_id, array( $this->make_data_packet( 'Orphan' ) ), array( array() ) )['success'] );
+
+		( new PipelineBatchScheduler() )->processChunk( $parent_id, 0 );
+
+		$this->assertStringContainsString( 'batch_state_missing', $this->jobs_db->get_job( $parent_id )['status'] );
+		$this->assertNull( $worklist->first_outstanding_index( $parent_id ) );
 	}
 
 	public function test_process_chunk_marks_parent_failed_when_zero_children_scheduled(): void {
@@ -725,7 +760,7 @@ class PipelineBatchSchedulerTest extends WP_UnitTestCase {
 		$this->assertArrayNotHasKey( 'venue', $child_engine );
 	}
 
-	public function test_batch_state_cleaned_up_after_all_chunks_processed(): void {
+	public function test_batch_state_remains_replayable_until_parent_terminalizes(): void {
 		$parent_id = $this->create_parent_job();
 		$engine    = $this->make_engine_snapshot( $parent_id );
 		$packets   = array(
@@ -741,13 +776,21 @@ class PipelineBatchSchedulerTest extends WP_UnitTestCase {
 
 		$scheduler->processChunk( $parent_id );
 
-		// After all chunks processed, batch_state should be removed.
+		// Worklist completion remains replayable until the child terminalizes.
 		$parent_engine = datamachine_get_engine_data( $parent_id );
-		$this->assertArrayNotHasKey( 'batch_state', $parent_engine );
+		$this->assertTrue( $parent_engine['batch_state']['worklist_complete'] );
 
-		// But batch metadata should still exist for onChildComplete.
+		// Batch metadata remains available to onChildComplete.
 		$this->assertTrue( $parent_engine['batch'] );
 		$this->assertEquals( 1, $parent_engine['batch_total'] );
+
+		global $wpdb;
+		$child_id = (int) $wpdb->get_var(
+			$wpdb->prepare( 'SELECT job_id FROM %i WHERE parent_job_id = %d LIMIT 1', $this->jobs_db->get_table_name(), $parent_id )
+		);
+		$this->jobs_db->complete_job( $child_id, JobStatus::COMPLETED );
+		PipelineBatchScheduler::onChildComplete( $child_id, JobStatus::COMPLETED );
+		$this->assertArrayNotHasKey( 'batch_state', datamachine_get_engine_data( $parent_id ) );
 	}
 
 	public function test_on_child_complete_ignores_non_batch_parents(): void {

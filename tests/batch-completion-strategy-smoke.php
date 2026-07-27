@@ -116,7 +116,7 @@ datamachine_strategy_assert(
 	'task batch still completes on the final chunk path'
 );
 datamachine_strategy_assert(
-	str_contains( $task_scheduler, '$jobs_db->complete_job( $parent_job_id, JobStatus::COMPLETED );' ),
+	str_contains( $task_scheduler, '! $jobs_db->complete_job( $parent_job_id, JobStatus::COMPLETED )' ),
 	'task batch parent still completes after chunks are scheduled'
 );
 
