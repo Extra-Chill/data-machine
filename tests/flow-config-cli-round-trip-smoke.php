@@ -227,6 +227,15 @@ namespace DataMachine\Abilities\FlowStep {
 				'ability' => 'configure-flow-steps',
 				'input'   => $input,
 			);
+			if ( ! empty( $input['validate_only'] ) ) {
+				return array(
+					'success'      => true,
+					'valid'        => true,
+					'mode'         => 'validate_only',
+					'would_update' => array(),
+					'message'      => 'validated',
+				);
+			}
 			return array(
 				'success'       => true,
 				'updated_steps' => array(),
@@ -361,6 +370,49 @@ flow_config_cli_reset();
 	)
 );
 flow_config_cli_assert_same( $semantic, $GLOBALS['flow_config_cli_ability_calls'][0]['input']['handler_config'] ?? null, 'bulk-config decodes config exactly once' );
+
+flow_config_cli_reset();
+( new BulkConfigCommand() )->dispatch(
+	array(),
+	array(
+		'scope'   => 'global',
+		'handler' => 'fixture',
+		'config'  => $json,
+		'dry-run' => true,
+		'format'  => 'json',
+	)
+);
+flow_config_cli_assert_same( true, $GLOBALS['flow_config_cli_ability_calls'][0]['input']['validate_only'] ?? null, 'global dry-run uses validation-only ability mode' );
+
+flow_config_cli_reset();
+( new BulkConfigCommand() )->dispatch(
+	array(),
+	array(
+		'scope'       => 'pipeline',
+		'pipeline_id' => 7,
+		'handler'     => 'fixture',
+		'config'      => $json,
+		'dry-run'     => true,
+		'format'      => 'json',
+	)
+);
+flow_config_cli_assert_same( true, $GLOBALS['flow_config_cli_ability_calls'][0]['input']['validate_only'] ?? null, 'pipeline dry-run uses validation-only ability mode' );
+
+flow_config_cli_reset();
+( new BulkConfigCommand() )->dispatch(
+	array(),
+	array(
+		'scope'   => 'flow',
+		'flow_id' => 52,
+		'handler' => 'fixture',
+		'config'  => $json,
+		'dry-run' => true,
+		'format'  => 'json',
+	)
+);
+flow_config_cli_assert_same( true, $GLOBALS['flow_config_cli_ability_calls'][0]['input']['validate_only'] ?? null, 'flow dry-run uses validation-only ability mode' );
+flow_config_cli_assert_same( array(), $GLOBALS['flow_config_cli_ability_calls'][0]['input']['handler_config'] ?? null, 'flow scope does not apply shared config to sibling flows' );
+flow_config_cli_assert_same( $semantic, $GLOBALS['flow_config_cli_ability_calls'][0]['input']['flow_configs'][0]['handler_config'] ?? null, 'flow scope targets its selected flow config' );
 
 flow_config_cli_reset();
 $message = 'Process start/end from C:\\Temp with \\d+ items.';

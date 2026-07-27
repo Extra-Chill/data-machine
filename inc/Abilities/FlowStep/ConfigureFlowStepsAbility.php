@@ -103,7 +103,10 @@ class ConfigureFlowStepsAbility {
 						'type'       => 'object',
 						'properties' => array(
 							'success'        => array( 'type' => 'boolean' ),
+							'valid'          => array( 'type' => 'boolean' ),
+							'mode'           => array( 'type' => 'string' ),
 							'pipeline_id'    => array( 'type' => 'integer' ),
+							'would_update'   => array( 'type' => 'array' ),
 							'updated_steps'  => array( 'type' => 'array' ),
 							'flows_updated'  => array( 'type' => 'integer' ),
 							'steps_modified' => array( 'type' => 'integer' ),
@@ -155,6 +158,7 @@ class ConfigureFlowStepsAbility {
 		$handler_config      = $input['handler_config'] ?? array();
 		$flow_configs        = $input['flow_configs'] ?? array();
 		$user_message        = $input['user_message'] ?? null;
+		$validate_only       = ! empty( $input['validate_only'] );
 
 		if ( ! is_numeric( $pipeline_id ) || (int) $pipeline_id <= 0 ) {
 			return array(
@@ -239,9 +243,9 @@ class ConfigureFlowStepsAbility {
 		$found_flow_ids    = array();
 		$pipeline_flow_ids = array_column( $flows, 'flow_id' );
 
-		$updated_details = array();
-		$errors          = array();
-		$skipped         = array();
+		$operations = array();
+		$errors     = array();
+		$skipped    = array();
 
 		foreach ( $flows as $flow ) {
 			$flow_id     = (int) $flow['flow_id'];
@@ -309,38 +313,21 @@ class ConfigureFlowStepsAbility {
 					}
 				}
 
-				$success = $this->updateHandler( $flow_step_id, $effective_handler_slug, $merged_config );
-				if ( ! $success ) {
-					$errors[] = array(
-						'flow_step_id' => $flow_step_id,
-						'flow_id'      => $flow_id,
-						'error'        => 'Failed to update handler',
-					);
-					continue;
-				}
-
-				if ( ! empty( $user_message ) ) {
-					$message_success = $this->updateUserMessage( $flow_step_id, $user_message );
-					if ( ! $message_success ) {
-						$errors[] = array(
-							'flow_step_id' => $flow_step_id,
-							'flow_id'      => $flow_id,
-							'error'        => 'Failed to update user message',
-						);
-						continue;
-					}
-				}
-
 				$detail = array(
 					'flow_id'      => $flow_id,
 					'flow_name'    => $flow_name,
+					'pipeline_id'  => $pipeline_id,
 					'flow_step_id' => $flow_step_id,
 					'handler_slug' => $effective_handler_slug,
 				);
 				if ( $is_switching ) {
 					$detail['switched_from'] = $existing_handler_slug;
 				}
-				$updated_details[] = $detail;
+				$operations[] = array(
+					'detail'         => $detail,
+					'handler_config' => $merged_config,
+					'user_message'   => $user_message,
+				);
 			}
 		}
 
@@ -374,6 +361,73 @@ class ConfigureFlowStepsAbility {
 			}
 		}
 
+		if ( ! empty( $errors ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'Validation failed for ' . count( $errors ) . ' step(s).',
+				'errors'  => $errors,
+				'skipped' => $skipped,
+			);
+		}
+
+		if ( empty( $operations ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'No matching steps found for the specified criteria',
+				'skipped' => $skipped,
+			);
+		}
+
+		$would_update   = array_column( $operations, 'detail' );
+		$flows_updated  = count( array_unique( array_column( $would_update, 'flow_id' ) ) );
+		$steps_modified = count( $would_update );
+
+		if ( $validate_only ) {
+			$response = array(
+				'success'      => true,
+				'valid'        => true,
+				'mode'         => 'validate_only',
+				'pipeline_id'  => $pipeline_id,
+				'would_update' => $would_update,
+				'message'      => sprintf( 'Validation passed. Would configure %d step(s) across %d flow(s).', $steps_modified, $flows_updated ),
+			);
+
+			if ( ! empty( $skipped ) ) {
+				$response['skipped'] = $skipped;
+			}
+
+			return $response;
+		}
+
+		$updated_details = array();
+		$errors          = array();
+
+		foreach ( $operations as $operation ) {
+			$detail       = $operation['detail'];
+			$flow_step_id = $detail['flow_step_id'];
+			$flow_id      = $detail['flow_id'];
+
+			if ( ! $this->updateHandler( $flow_step_id, $detail['handler_slug'], $operation['handler_config'] ) ) {
+				$errors[] = array(
+					'flow_step_id' => $flow_step_id,
+					'flow_id'      => $flow_id,
+					'error'        => 'Failed to update handler',
+				);
+				continue;
+			}
+
+			if ( ! empty( $operation['user_message'] ) && ! $this->updateUserMessage( $flow_step_id, $operation['user_message'] ) ) {
+				$errors[] = array(
+					'flow_step_id' => $flow_step_id,
+					'flow_id'      => $flow_id,
+					'error'        => 'Failed to update user message',
+				);
+				continue;
+			}
+
+			$updated_details[] = $detail;
+		}
+
 		$flows_updated  = count( array_unique( array_column( $updated_details, 'flow_id' ) ) );
 		$steps_modified = count( $updated_details );
 
@@ -382,14 +436,6 @@ class ConfigureFlowStepsAbility {
 				'success' => false,
 				'error'   => 'No steps were updated. ' . count( $errors ) . ' error(s) occurred.',
 				'errors'  => $errors,
-				'skipped' => $skipped,
-			);
-		}
-
-		if ( 0 === $steps_modified ) {
-			return array(
-				'success' => false,
-				'error'   => 'No matching steps found for the specified criteria',
 				'skipped' => $skipped,
 			);
 		}
@@ -412,6 +458,7 @@ class ConfigureFlowStepsAbility {
 
 		$response = array(
 			'success'        => true,
+			'mode'           => 'execute',
 			'pipeline_id'    => $pipeline_id,
 			'flows_updated'  => $flows_updated,
 			'steps_modified' => $steps_modified,
@@ -748,32 +795,8 @@ class ConfigureFlowStepsAbility {
 			);
 		}
 
-		if ( $validate_only ) {
-			$would_update = array();
-			foreach ( $matching_flows as $match ) {
-				$flow         = $match['flow'];
-				$flow_step_id = $match['flow_step_id'];
-
-				$would_update[] = array(
-					'flow_id'      => $flow['flow_id'],
-					'flow_name'    => $flow['flow_name'] ?? '',
-					'pipeline_id'  => $flow['pipeline_id'] ?? null,
-					'flow_step_id' => $flow_step_id,
-					'handler_slug' => $target_handler_slug ?? $handler_slug,
-				);
-			}
-
-			return array(
-				'success'      => true,
-				'valid'        => true,
-				'mode'         => 'validate_only',
-				'would_update' => $would_update,
-				'message'      => sprintf( 'Validation passed. Would configure %d step(s) across %d flow(s).', count( $would_update ), count( array_unique( array_column( $would_update, 'flow_id' ) ) ) ),
-			);
-		}
-
-		$updated_details = array();
-		$errors          = array();
+		$operations = array();
+		$errors     = array();
 
 		foreach ( $matching_flows as $match ) {
 			$flow         = $match['flow'];
@@ -813,28 +836,6 @@ class ConfigureFlowStepsAbility {
 				}
 			}
 
-			$success = $this->updateHandler( $flow_step_id, $effective_handler_slug, $merged_config );
-			if ( ! $success ) {
-				$errors[] = array(
-					'flow_step_id' => $flow_step_id,
-					'flow_id'      => $flow_id,
-					'error'        => 'Failed to update handler',
-				);
-				continue;
-			}
-
-			if ( ! empty( $user_message ) ) {
-				$message_success = $this->updateUserMessage( $flow_step_id, $user_message );
-				if ( ! $message_success ) {
-					$errors[] = array(
-						'flow_step_id' => $flow_step_id,
-						'flow_id'      => $flow_id,
-						'error'        => 'Failed to update user message',
-					);
-					continue;
-				}
-			}
-
 			$detail = array(
 				'flow_id'      => $flow_id,
 				'flow_name'    => $flow_name,
@@ -845,6 +846,68 @@ class ConfigureFlowStepsAbility {
 			if ( $is_switching ) {
 				$detail['switched_from'] = $existing_handler_slug;
 			}
+			$operations[] = array(
+				'detail'         => $detail,
+				'handler_config' => $merged_config,
+				'user_message'   => $user_message,
+			);
+		}
+
+		if ( ! empty( $errors ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'Validation failed for ' . count( $errors ) . ' step(s).',
+				'errors'  => $errors,
+			);
+		}
+
+		if ( empty( $operations ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'No matching steps found for the specified criteria',
+			);
+		}
+
+		$would_update   = array_column( $operations, 'detail' );
+		$flows_updated  = count( array_unique( array_column( $would_update, 'flow_id' ) ) );
+		$steps_modified = count( $would_update );
+
+		if ( $validate_only ) {
+			return array(
+				'success'      => true,
+				'valid'        => true,
+				'mode'         => 'validate_only',
+				'would_update' => $would_update,
+				'message'      => sprintf( 'Validation passed. Would configure %d step(s) across %d flow(s).', $steps_modified, $flows_updated ),
+			);
+		}
+
+		$updated_details = array();
+		$errors          = array();
+
+		foreach ( $operations as $operation ) {
+			$detail       = $operation['detail'];
+			$flow_step_id = $detail['flow_step_id'];
+			$flow_id      = $detail['flow_id'];
+
+			if ( ! $this->updateHandler( $flow_step_id, $detail['handler_slug'], $operation['handler_config'] ) ) {
+				$errors[] = array(
+					'flow_step_id' => $flow_step_id,
+					'flow_id'      => $flow_id,
+					'error'        => 'Failed to update handler',
+				);
+				continue;
+			}
+
+			if ( ! empty( $operation['user_message'] ) && ! $this->updateUserMessage( $flow_step_id, $operation['user_message'] ) ) {
+				$errors[] = array(
+					'flow_step_id' => $flow_step_id,
+					'flow_id'      => $flow_id,
+					'error'        => 'Failed to update user message',
+				);
+				continue;
+			}
+
 			$updated_details[] = $detail;
 		}
 
@@ -856,13 +919,6 @@ class ConfigureFlowStepsAbility {
 				'success' => false,
 				'error'   => 'No steps were updated. ' . count( $errors ) . ' error(s) occurred.',
 				'errors'  => $errors,
-			);
-		}
-
-		if ( 0 === $steps_modified ) {
-			return array(
-				'success' => false,
-				'error'   => 'No matching steps found for the specified criteria',
 			);
 		}
 
@@ -881,6 +937,7 @@ class ConfigureFlowStepsAbility {
 
 		$response = array(
 			'success'        => true,
+			'mode'           => 'execute',
 			'handler_slug'   => $handler_slug,
 			'global_scope'   => true,
 			'flows_updated'  => $flows_updated,
