@@ -513,6 +513,101 @@ class Jobs extends BaseRepository {
 	}
 
 	/**
+	 * Replace a missing direct-operation action while the recorded generation owns the locked row.
+	 *
+	 * @param callable(int,string):int $schedule Scheduler callback receiving the new generation and token.
+	 * @return array{success:bool,action_id:int,generation:int,token:string,reason:string}
+	 */
+	public function commit_missing_direct_operation_requeue( int $job_id, int $action_id, int $generation, string $token, string $trigger, callable $schedule ): array {
+		$result = array(
+			'success'    => false,
+			'action_id'  => 0,
+			'generation' => 0,
+			'token'      => '',
+			'reason'     => 'operation_not_owned',
+		);
+		if ( $job_id <= 0 || $action_id <= 0 || $generation <= 0 || '' === $token ) {
+			return $result;
+		}
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		if ( false === $this->wpdb->query( 'START TRANSACTION' ) ) {
+			$result['reason'] = 'transaction_start_failed';
+			return $result;
+		}
+
+		$job = $this->get_job_for_update( $job_id );
+		if ( ! $this->missing_direct_operation_owner_matches( $job, $action_id, $generation, $token ) || ! empty( $job['operation_effects_begun_at'] ) ) {
+			$this->wpdb->query( 'ROLLBACK' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			$result['reason'] = ! empty( $job['operation_effects_begun_at'] ) ? 'operation_effects_begun' : 'operation_not_owned';
+			return $result;
+		}
+
+		$new_generation = $generation + 1;
+		$new_token      = bin2hex( random_bytes( 16 ) );
+		try {
+			$new_action_id = (int) $schedule( $new_generation, $new_token );
+		} catch ( \Throwable ) {
+			$this->wpdb->query( 'ROLLBACK' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			$result['reason'] = 'scheduler_exception';
+			return $result;
+		}
+		if ( $new_action_id <= 0 ) {
+			$this->wpdb->query( 'ROLLBACK' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			$result['reason'] = 'schedule_failed';
+			return $result;
+		}
+		$engine                              = is_array( $job['engine_data'] ?? null ) ? $job['engine_data'] : array();
+		$engine['direct_operation_recovery'] = array(
+			'schema'                        => 'datamachine.direct-operation-recovery.v1',
+			'state'                         => 'requeued',
+			'trigger'                       => sanitize_key( $trigger ),
+			'missing_action_id'             => $action_id,
+			'previous_operation_generation' => $generation,
+			'action_id'                     => $new_action_id,
+			'operation_generation'          => $new_generation,
+			'recovered_at'                  => gmdate( 'c' ),
+		);
+		$run_lifecycle                       = is_array( $engine['run_lifecycle'] ?? null ) ? $engine['run_lifecycle'] : array();
+		$run_lifecycle['status']             = JobStatus::PENDING;
+		$run_lifecycle['updated_at']         = current_time( 'mysql', true );
+		$engine['run_lifecycle']             = $run_lifecycle;
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$updated = $this->wpdb->update(
+			$this->table_name,
+			array(
+				'status'                => JobStatus::PENDING,
+				'operation_state'       => 'enqueued',
+				'operation_claimed_at'  => null,
+				'operation_claim_token' => $new_token,
+				'operation_generation'  => $new_generation,
+				'operation_action_id'   => $new_action_id,
+				'engine_data'           => wp_json_encode( $engine ),
+			),
+			array(
+				'job_id' => $job_id,
+				'status' => JobStatus::PROCESSING,
+			),
+			array( '%s', '%s', null, '%s', '%d', '%d', '%s' ),
+			array( '%d', '%s' )
+		);
+		if ( 1 !== (int) $updated || false === $this->wpdb->query( 'COMMIT' ) ) {
+			$this->wpdb->query( 'ROLLBACK' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			$result['reason'] = 'receipt_commit_failed';
+			return $result;
+		}
+
+		return array(
+			'success'    => true,
+			'action_id'  => $new_action_id,
+			'generation' => $new_generation,
+			'token'      => $new_token,
+			'reason'     => 'requeued',
+		);
+	}
+
+	/**
 	 * Reopen a failed job for an explicit retry.
 	 *
 	 * @param int $job_id Job ID.
@@ -2098,6 +2193,25 @@ class Jobs extends BaseRepository {
 		);
 	}
 
+	/** Commit a terminal direct-operation recovery only while the recorded action generation owns the row. */
+	public function transition_missing_direct_operation( int $job_id, string $status, int $action_id, int $generation, string $token, string $trigger ): array {
+		if ( ! JobStatus::isStatusFinal( $status ) || $action_id <= 0 || $generation <= 0 || '' === $token ) {
+			return $this->status_transition_result( false, false, null, $status );
+		}
+
+		return $this->transition_terminal_job_status_result(
+			$job_id,
+			$status,
+			array(
+				'action_id'  => $action_id,
+				'generation' => $generation,
+				'token'      => $token,
+				'trigger'    => sanitize_key( $trigger ),
+				'mode'       => 'operation',
+			)
+		);
+	}
+
 	/** Renew the exact recovery generation immediately before handler execution. */
 	public function renew_recovery_execution_owner( int $job_id, string $token, int $generation ): bool {
 		if ( $job_id <= 0 || '' === $token || $generation <= 0 ) {
@@ -2487,9 +2601,10 @@ class Jobs extends BaseRepository {
 		$processed_claim_count = is_array( $accounting_context ) ? max( 0, (int) ( $accounting_context['processed_claim_count'] ?? 0 ) ) : 0;
 		if ( is_array( $recovery_owner ) ) {
 			$latest_job  = $this->get_job_for_update( $job_id );
-			$owner_valid = 'execution' === (string) ( $recovery_owner['mode'] ?? '' )
-				? $this->terminal_recovery_owner_matches( $latest_job, $recovery_owner )
-				: $this->renew_recovery_owner_on_locked_job( $latest_job, (string) ( $recovery_owner['token'] ?? '' ), (int) ( $recovery_owner['generation'] ?? 0 ) );
+			$owner_mode  = (string) ( $recovery_owner['mode'] ?? '' );
+			$owner_valid = 'lease' === $owner_mode
+				? $this->renew_recovery_owner_on_locked_job( $latest_job, (string) ( $recovery_owner['token'] ?? '' ), (int) ( $recovery_owner['generation'] ?? 0 ) )
+				: $this->terminal_recovery_owner_matches( $latest_job, $recovery_owner );
 			if ( ! $owner_valid ) {
 				$this->rollback_terminal_transition( $job_id );
 				return $this->status_transition_result( false, false, $current_status, $current_status );
@@ -2509,7 +2624,8 @@ class Jobs extends BaseRepository {
 			'terminal_accounting_processed_count' => $processed_claim_count,
 		);
 		$update_formats = array( '%s', '%s', '%d', null, null, '%d' );
-		if ( $pending_direct_cancel ) {
+		$operation_recovery = is_array( $recovery_owner ) && 'operation' === (string) ( $recovery_owner['mode'] ?? '' );
+		if ( $pending_direct_cancel || $operation_recovery ) {
 			$update_data['operation_state']       = 'cancelled';
 			$update_data['operation_claimed_at']  = null;
 			$update_data['operation_claim_token'] = null;
@@ -2517,7 +2633,21 @@ class Jobs extends BaseRepository {
 			$update_data['operation_generation']  = max( 0, (int) ( $job['operation_generation'] ?? 0 ) ) + 1;
 			array_push( $update_formats, '%s', null, null, null, '%d' );
 		}
-		if ( is_array( $recovery_owner ) ) {
+		if ( $operation_recovery ) {
+			$engine = is_array( $job['engine_data'] ?? null ) ? $job['engine_data'] : array();
+			$engine['direct_operation_recovery'] = array(
+				'schema'                        => 'datamachine.direct-operation-recovery.v1',
+				'state'                         => 'terminalized',
+				'trigger'                       => (string) ( $recovery_owner['trigger'] ?? '' ),
+				'missing_action_id'             => (int) ( $recovery_owner['action_id'] ?? 0 ),
+				'previous_operation_generation' => (int) ( $recovery_owner['generation'] ?? 0 ),
+				'terminal_status'               => $status,
+				'recovered_at'                  => gmdate( 'c' ),
+			);
+			$update_data['engine_data'] = wp_json_encode( $engine );
+			$update_formats[]           = '%s';
+		}
+		if ( is_array( $recovery_owner ) && ! $operation_recovery ) {
 			$engine = is_array( $job['engine_data'] ?? null ) ? $job['engine_data'] : array();
 			$engine['scheduler_recovery']['state']        = 'terminalized';
 			$engine['scheduler_recovery']['completed_at'] = gmdate( 'c' );
@@ -2842,12 +2972,30 @@ class Jobs extends BaseRepository {
 
 		$token      = (string) ( $owner['token'] ?? '' );
 		$generation = (int) ( $owner['generation'] ?? 0 );
-		if ( 'execution' !== (string) ( $owner['mode'] ?? '' ) ) {
+		$mode       = (string) ( $owner['mode'] ?? '' );
+		if ( 'operation' === $mode ) {
+			return $this->missing_direct_operation_owner_matches( $job, (int) ( $owner['action_id'] ?? 0 ), $generation, $token );
+		}
+		if ( 'execution' !== $mode ) {
 			return $this->recovery_owner_matches( $job, $token, $generation );
 		}
 
 		$engine = is_array( $job['engine_data'] ?? null ) ? $job['engine_data'] : array();
 		return ChildJobRecoveryPolicy::recoveryExecutionMatches( $engine, $generation, $token );
+	}
+
+	/** Validate the exact durable direct-operation receipt on a locked jobs row. */
+	private function missing_direct_operation_owner_matches( ?array $job, int $action_id, int $generation, string $token ): bool {
+		return is_array( $job )
+			&& 'direct' === (string) ( $job['flow_id'] ?? '' )
+			&& JobStatus::PROCESSING === (string) ( $job['status'] ?? '' )
+			&& 'enqueued' === (string) ( $job['operation_state'] ?? '' )
+			&& $action_id > 0
+			&& (int) ( $job['operation_action_id'] ?? 0 ) === $action_id
+			&& $generation > 0
+			&& (int) ( $job['operation_generation'] ?? 0 ) === $generation
+			&& '' !== $token
+			&& hash_equals( $token, (string) ( $job['operation_claim_token'] ?? '' ) );
 	}
 
 	/** Atomically renew an exact recovery owner while its jobs row is locked. */
