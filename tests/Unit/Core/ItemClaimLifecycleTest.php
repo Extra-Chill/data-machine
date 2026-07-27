@@ -304,9 +304,17 @@ class ItemClaimLifecycleTest extends WP_UnitTestCase {
 		$this->assertTrue( $owner_result['success'] );
 		$this->assertIsArray( $contender_result );
 		$this->assertFalse( $contender_result['success'] );
+		$this->assertSame( JobStatus::PROCESSING, $contender_result['status'] );
+		$this->assertSame( JobStatus::PROCESSING, $contender_result['current_status'] );
 		$this->assertSame( JobStatus::COMPLETED, $owner_result['status'] );
 		$this->assertSame( 1, $callback_count );
 		$this->assertFalse( $this->processed->has_active_claim( self::SCOPE, self::SOURCE, 'concurrent-terminal-id' ) );
+
+		$retry_result = ( new Jobs() )->transition_job_status_result( $job_id, JobStatus::COMPLETED, true );
+		$this->assertTrue( $retry_result['success'] );
+		$this->assertFalse( $retry_result['changed'] );
+		$this->assertSame( JobStatus::COMPLETED, $retry_result['status'] );
+		$this->assertSame( 1, $callback_count );
 	}
 
 	public function test_reject_source_defers_owned_claim_completion_to_terminal_lifecycle(): void {
