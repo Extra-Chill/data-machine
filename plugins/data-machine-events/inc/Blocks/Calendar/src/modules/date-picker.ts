@@ -103,7 +103,7 @@ export function initDatePicker(
 			];
 		},
 		onChange( selectedDates: Date[] ) {
-			if ( onChange ) {
+			if ( selectedDates.length === 0 || selectedDates.length === 2 ) {
 				onChange( selectedDates );
 			}
 
@@ -113,14 +113,6 @@ export function initDatePicker(
 				} else {
 					clearBtn.classList.remove( 'visible' );
 				}
-			}
-		},
-		onClear() {
-			if ( onChange ) {
-				onChange( [] );
-			}
-			if ( clearBtn ) {
-				clearBtn.classList.remove( 'visible' );
 			}
 		},
 	} ) as unknown as FlatpickrInstance;

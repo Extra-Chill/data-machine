@@ -3,7 +3,12 @@ jest.mock( './modules/carousel', () => ( {
 	destroyCarousel: jest.fn(),
 } ) );
 jest.mock( './modules/date-picker', () => ( {
-	initDatePicker: jest.fn(),
+	initDatePicker: jest.fn(
+		( _calendar: HTMLElement, onChange: () => void ) => {
+			mockDateChangeCallback = onChange;
+			return mockPicker;
+		}
+	),
 	destroyDatePicker: jest.fn(),
 	getDatePicker: jest.fn( () => mockPicker ),
 } ) );
@@ -58,6 +63,7 @@ import { initCalendarInstance } from './frontend';
 import type { FlatpickrInstance } from './types';
 
 let mockResetCallback: ( params: URLSearchParams ) => void;
+let mockDateChangeCallback: () => void;
 const mockPicker: FlatpickrInstance = {
 	selectedDates: [ new Date( 2026, 7, 10 ), new Date( 2026, 7, 12 ) ],
 	clear: jest.fn(),
@@ -168,6 +174,21 @@ describe( 'calendar frontend month-grid integration', () => {
 			calendar.querySelector( '.data-machine-events-content' )!
 				.textContent
 		).toBe( 'mobile:2026-08' );
+	} );
+
+	it( 'applies one completed picker range through the month-grid controller', async () => {
+		const calendar = document.querySelector< HTMLElement >(
+			'.data-machine-events-calendar'
+		)!;
+		initCalendarInstance( calendar );
+
+		mockDateChangeCallback();
+		await flush();
+
+		expect( mockFetch ).toHaveBeenCalledTimes( 1 );
+		const request = requestedParams( 0 );
+		expect( request.get( 'date_start' ) ).toBe( '2026-08-10' );
+		expect( request.get( 'date_end' ) ).toBe( '2026-08-12' );
 	} );
 
 	it( 'keeps reset, month navigation, and popstate on the controller path', async () => {

@@ -25,11 +25,14 @@ import { __ } from '@wordpress/i18n';
 import { destroyDatePicker, initDatePicker } from './date-picker';
 
 interface FlatpickrOptions {
+	mode: string;
+	defaultDate?: string | string[];
 	onReady: (
 		selectedDates: Date[],
 		dateStr: string,
 		instance: MockFlatpickrInstance
 	) => void;
+	onChange: ( selectedDates: Date[] ) => void;
 }
 
 interface MockFlatpickrInstance {
@@ -134,5 +137,94 @@ describe( 'Flatpickr month navigation accessibility', () => {
 
 		expect( click ).not.toHaveBeenCalled();
 		expect( picker!.destroy ).toHaveBeenCalledTimes( 1 );
+	} );
+} );
+
+describe( 'Flatpickr range application', () => {
+	let calendar: HTMLElement;
+	let clearButton: HTMLButtonElement;
+	let picker: MockFlatpickrInstance;
+	let options: FlatpickrOptions;
+	let apply: jest.Mock;
+
+	beforeEach( () => {
+		document.body.innerHTML = calendarMarkup( 'range' );
+		calendar = document.querySelector< HTMLElement >( '#range' )!;
+		clearButton = calendar.querySelector< HTMLButtonElement >(
+			'.data-machine-events-date-clear-btn'
+		)!;
+		apply = jest.fn();
+		mockFlatpickr.mockReset();
+		mockFlatpickr.mockImplementation(
+			( _input: HTMLInputElement, config: FlatpickrOptions ) => {
+				options = config;
+				picker = {
+					selectedDates: [],
+					prevMonthNav: document.createElement( 'span' ),
+					nextMonthNav: document.createElement( 'span' ),
+					clear: jest.fn( () => {
+						picker.selectedDates = [];
+						options.onChange( [] );
+					} ),
+					setDate: jest.fn(),
+					destroy: jest.fn(),
+				};
+				config.onReady( [], '', picker );
+				return picker;
+			}
+		);
+	} );
+
+	afterEach( () => {
+		destroyDatePicker( calendar );
+	} );
+
+	it( 'waits for both dates before applying the range', () => {
+		initDatePicker( calendar, apply );
+		const start = new Date( 2026, 7, 10 );
+		const end = new Date( 2026, 7, 12 );
+
+		options.onChange( [ start ] );
+		expect( apply ).not.toHaveBeenCalled();
+		expect( clearButton.classList.contains( 'visible' ) ).toBe( true );
+
+		options.onChange( [ start, end ] );
+		expect( apply ).toHaveBeenCalledTimes( 1 );
+		expect( apply ).toHaveBeenCalledWith( [ start, end ] );
+	} );
+
+	it( 'applies a single day only when the day is selected twice', () => {
+		initDatePicker( calendar, apply );
+		const day = new Date( 2026, 7, 10 );
+
+		options.onChange( [ day ] );
+		options.onChange( [ day, day ] );
+
+		expect( apply ).toHaveBeenCalledTimes( 1 );
+		expect( apply ).toHaveBeenCalledWith( [ day, day ] );
+	} );
+
+	it( 'uses Flatpickr clear as the one intentional reset path', () => {
+		initDatePicker( calendar, apply );
+		clearButton.classList.add( 'visible' );
+
+		clearButton.click();
+
+		expect( picker.clear ).toHaveBeenCalledTimes( 1 );
+		expect( apply ).toHaveBeenCalledTimes( 1 );
+		expect( apply ).toHaveBeenCalledWith( [] );
+		expect( clearButton.classList.contains( 'visible' ) ).toBe( false );
+	} );
+
+	it( 'hydrates initial dates without applying filters', () => {
+		const input = calendar.querySelector< HTMLInputElement >( 'input' )!;
+		input.dataset.dateStart = '2026-08-10';
+		input.dataset.dateEnd = '2026-08-12';
+
+		initDatePicker( calendar, apply );
+
+		expect( options.mode ).toBe( 'range' );
+		expect( options.defaultDate ).toEqual( [ '2026-08-10', '2026-08-12' ] );
+		expect( apply ).not.toHaveBeenCalled();
 	} );
 } );

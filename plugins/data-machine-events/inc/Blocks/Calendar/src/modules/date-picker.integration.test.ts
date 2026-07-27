@@ -107,4 +107,26 @@ describe( 'real Flatpickr navigation lifecycle', () => {
 			remainingMonth + 1
 		);
 	} );
+
+	it( 'emits only complete ranges and explicit clears through the real picker', () => {
+		const calendar = document.querySelector< HTMLElement >( '#first' )!;
+		const apply = jest.fn();
+		const picker = initDatePicker( calendar, apply ) as Instance;
+
+		expect( apply ).not.toHaveBeenCalled();
+
+		picker.setDate( '2026-08-10', true );
+		expect( apply ).not.toHaveBeenCalled();
+
+		picker.setDate( [ '2026-08-10', '2026-08-12' ], true );
+		expect( apply ).toHaveBeenCalledTimes( 1 );
+		expect( apply.mock.calls[ 0 ][ 0 ] ).toEqual( [
+			new Date( 2026, 7, 10 ),
+			new Date( 2026, 7, 12 ),
+		] );
+
+		picker.clear();
+		expect( apply ).toHaveBeenCalledTimes( 2 );
+		expect( apply ).toHaveBeenLastCalledWith( [] );
+	} );
 } );
