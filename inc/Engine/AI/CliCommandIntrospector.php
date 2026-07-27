@@ -4,9 +4,9 @@
  *
  * Context-safe introspection of WP-CLI command classes for AGENTS.md section
  * generators. Given a WP-CLI command class (or a namespace => class map), it
- * reflects over the class's public methods and returns each subcommand's name
- * and short description — derived from the same `@subcommand` annotation and
- * PHPDoc summary that WP-CLI itself uses to build `--help`.
+ * reads the class's public methods and returns each subcommand's name and short
+ * description — derived from the same `@subcommand` annotation and PHPDoc
+ * summary that WP-CLI itself uses to build `--help`.
  *
  * Why reflection instead of the live WP-CLI runtime registry?
  *
@@ -16,7 +16,9 @@
  * live `WP_CLI::get_runner()->find_command_to_run()` tree sees nothing when
  * composing from a web request. Reflecting over the command classes works
  * regardless of whether the WP-CLI runner is loaded — the docblocks live in the
- * class source and are always available. This makes generated AGENTS.md command
+ * class source and are always available. Unloaded command classes are parsed
+ * directly from their Composer source file so resolving WP-CLI-only inheritance
+ * is never required in a web request. This makes generated AGENTS.md command
  * lists derive from registered truth in every execution context.
  *
  * This helper is pure read/derive: no side effects, no WP-CLI invocation, no
@@ -71,17 +73,29 @@ class CliCommandIntrospector {
 	 *         array when the class does not exist.
 	 */
 	public static function describe_class( string $command_class, array $args = array() ): array {
-		if ( ! class_exists( $command_class ) ) {
-			return array();
-		}
-
 		$include_undocumented = ! empty( $args['include_undocumented'] );
 
-		try {
-			$reflection = new ReflectionClass( $command_class );
-		} catch ( \ReflectionException $e ) {
-			return array();
+		if ( class_exists( $command_class, false ) ) {
+			try {
+				$reflection = new ReflectionClass( $command_class );
+			} catch ( \ReflectionException $e ) {
+				return array();
+			}
+
+			return self::describe_reflection( $reflection, $include_undocumented );
 		}
+
+		return self::describe_source( $command_class, $include_undocumented );
+	}
+
+	/**
+	 * Describe a command class that is already loaded.
+	 *
+	 * @param ReflectionClass $reflection            Reflected command class.
+	 * @param bool            $include_undocumented Whether to include undocumented methods.
+	 * @return array<int, array{name: string, description: string}>
+	 */
+	private static function describe_reflection( ReflectionClass $reflection, bool $include_undocumented ): array {
 
 		$subcommands = array();
 
@@ -111,6 +125,204 @@ class CliCommandIntrospector {
 		ksort( $subcommands, SORT_STRING );
 
 		return array_values( $subcommands );
+	}
+
+	/**
+	 * Describe an unloaded command class from its Composer source metadata.
+	 *
+	 * Composer's findFile() resolves a class to a path without requiring the file,
+	 * which keeps WP_CLI_Command inheritance out of normal WordPress requests.
+	 *
+	 * @param class-string $command_class         Fully-qualified command class name.
+	 * @param bool         $include_undocumented Whether to include undocumented methods.
+	 * @return array<int, array{name: string, description: string}>
+	 */
+	private static function describe_source( string $command_class, bool $include_undocumented ): array {
+		$source_file = self::find_source_file( $command_class );
+		if ( null === $source_file ) {
+			return array();
+		}
+
+		$source = file_get_contents( $source_file ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Reading local PHP source metadata without executing it.
+		if ( false === $source ) {
+			return array();
+		}
+
+		$tokens         = token_get_all( $source );
+		$target_class   = ltrim( $command_class, '\\' );
+		$namespace      = '';
+		$brace_depth    = 0;
+		$class_depth    = null;
+		$pending_class  = false;
+		$doc_comment    = '';
+		$visibility     = null;
+		$is_static      = false;
+		$subcommands    = array();
+		$previous_token = null;
+
+		foreach ( $tokens as $index => $token ) {
+			if ( is_string( $token ) ) {
+				if ( '{' === $token ) {
+					++$brace_depth;
+					if ( $pending_class ) {
+						$class_depth   = $brace_depth;
+						$pending_class = false;
+					}
+				} elseif ( '}' === $token ) {
+					if ( null !== $class_depth && $brace_depth === $class_depth ) {
+						break;
+					}
+					--$brace_depth;
+				} elseif ( ';' === $token && null !== $class_depth && $brace_depth === $class_depth ) {
+					$doc_comment = '';
+					$visibility  = null;
+					$is_static   = false;
+				}
+
+				continue;
+			}
+
+			$id = $token[0];
+
+			if ( T_NAMESPACE === $id && null === $class_depth ) {
+				$namespace = self::source_namespace( $tokens, $index + 1 );
+			} elseif ( T_CLASS === $id && T_DOUBLE_COLON !== $previous_token ) {
+				$class_name    = self::next_source_identifier( $tokens, $index + 1 );
+				$full_name     = '' === $namespace ? $class_name : $namespace . '\\' . $class_name;
+				$pending_class = $target_class === $full_name;
+			} elseif ( null !== $class_depth && $brace_depth === $class_depth ) {
+				if ( T_DOC_COMMENT === $id ) {
+					$doc_comment = $token[1];
+				} elseif ( T_PUBLIC === $id || T_PROTECTED === $id || T_PRIVATE === $id ) {
+					$visibility = $id;
+				} elseif ( T_STATIC === $id ) {
+					$is_static = true;
+				} elseif ( T_FUNCTION === $id ) {
+					$method_name = self::next_source_identifier( $tokens, $index + 1 );
+					$is_public   = null === $visibility || T_PUBLIC === $visibility;
+
+					if ( $is_public && ! $is_static && self::is_source_subcommand( $method_name ) && ( '' !== $doc_comment || $include_undocumented ) ) {
+						$name = self::source_subcommand_name( $method_name, $doc_comment );
+
+						$subcommands[ $name ] = array(
+							'name'        => $name,
+							'description' => self::short_description( $doc_comment ),
+						);
+					}
+
+					$doc_comment = '';
+					$visibility  = null;
+					$is_static   = false;
+				} elseif ( T_VARIABLE === $id || T_CONST === $id || T_USE === $id ) {
+					$doc_comment = '';
+					$visibility  = null;
+					$is_static   = false;
+				}
+			}
+
+			if ( T_WHITESPACE !== $id && T_COMMENT !== $id && T_DOC_COMMENT !== $id ) {
+				$previous_token = $id;
+			}
+		}
+
+		ksort( $subcommands, SORT_STRING );
+
+		return array_values( $subcommands );
+	}
+
+	/**
+	 * Find a class source file through registered Composer autoloaders.
+	 *
+	 * @param class-string $class_name Fully-qualified class name.
+	 * @return string|null
+	 */
+	private static function find_source_file( string $class_name ): ?string {
+		foreach ( spl_autoload_functions() as $autoload ) {
+			if ( ! is_array( $autoload ) || ! is_object( $autoload[0] ?? null ) || ! is_callable( array( $autoload[0], 'findFile' ) ) ) {
+				continue;
+			}
+
+			$source_file = $autoload[0]->findFile( $class_name );
+			if ( is_string( $source_file ) && is_readable( $source_file ) ) {
+				return $source_file;
+			}
+		}
+
+		return null;
+	}
+
+	/**
+	 * Read the namespace following a T_NAMESPACE token.
+	 *
+	 * @param array $tokens PHP source tokens.
+	 * @param int   $offset First token after T_NAMESPACE.
+	 * @return string
+	 */
+	private static function source_namespace( array $tokens, int $offset ): string {
+		$namespace = '';
+
+		for ( $index = $offset, $count = count( $tokens ); $index < $count; ++$index ) {
+			$token = $tokens[ $index ];
+			if ( is_string( $token ) ) {
+				if ( ';' === $token || '{' === $token ) {
+					break;
+				}
+				continue;
+			}
+
+			if ( T_STRING === $token[0] || T_NS_SEPARATOR === $token[0] || ( defined( 'T_NAME_QUALIFIED' ) && T_NAME_QUALIFIED === $token[0] ) ) {
+				$namespace .= $token[1];
+			}
+		}
+
+		return trim( $namespace, '\\' );
+	}
+
+	/**
+	 * Read the next identifier from PHP source tokens.
+	 *
+	 * @param array $tokens PHP source tokens.
+	 * @param int   $offset Search offset.
+	 * @return string
+	 */
+	private static function next_source_identifier( array $tokens, int $offset ): string {
+		for ( $index = $offset, $count = count( $tokens ); $index < $count; ++$index ) {
+			if ( is_array( $tokens[ $index ] ) && T_STRING === $tokens[ $index ][0] ) {
+				return $tokens[ $index ][1];
+			}
+
+			if ( '(' === $tokens[ $index ] || '{' === $tokens[ $index ] || ';' === $tokens[ $index ] ) {
+				break;
+			}
+		}
+
+		return '';
+	}
+
+	/**
+	 * Determine whether a source method is a command candidate.
+	 *
+	 * @param string $method_name Method name.
+	 * @return bool
+	 */
+	private static function is_source_subcommand( string $method_name ): bool {
+		return '__invoke' === $method_name || ( '' !== $method_name && 0 !== strpos( $method_name, '__' ) );
+	}
+
+	/**
+	 * Resolve a source method's command name.
+	 *
+	 * @param string $method_name Method name.
+	 * @param string $doc_comment Raw doc comment.
+	 * @return string
+	 */
+	private static function source_subcommand_name( string $method_name, string $doc_comment ): string {
+		$tag = self::get_tag( $doc_comment, 'subcommand' );
+		if ( '' !== $tag ) {
+			return $tag;
+		}
+
+		return '__invoke' === $method_name ? '__default' : str_replace( '_', '-', $method_name );
 	}
 
 	/**

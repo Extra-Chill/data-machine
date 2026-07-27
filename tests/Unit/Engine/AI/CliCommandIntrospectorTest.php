@@ -14,6 +14,7 @@ namespace DataMachine\Tests\Unit\Engine\AI;
 use DataMachine\Engine\AI\CliCommandIntrospector;
 use DataMachine\Tests\Unit\Engine\AI\Fixtures\FixtureCommand;
 use DataMachine\Tests\Unit\Engine\AI\Fixtures\SecondFixtureCommand;
+use DataMachine\Tests\Unit\Engine\AI\Fixtures\WpCliOnlyFixtureCommand;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -99,6 +100,26 @@ class CliCommandIntrospectorTest extends TestCase {
 	 */
 	public function test_describe_class_unknown_class_returns_empty(): void {
 		$this->assertSame( array(), CliCommandIntrospector::describe_class( '\\This\\Class\\Does\\Not\\Exist' ) );
+	}
+
+	/**
+	 * Non-CLI introspection reads source without loading WP-CLI inheritance.
+	 */
+	public function test_describe_class_does_not_autoload_wp_cli_only_command(): void {
+		$this->assertFalse( class_exists( 'WP_CLI_Command', false ) );
+		$this->assertFalse( class_exists( WpCliOnlyFixtureCommand::class, false ) );
+
+		$this->assertSame(
+			array(
+				array(
+					'name'        => 'inspect',
+					'description' => 'Inspect command metadata without loading WP-CLI inheritance.',
+				),
+			),
+			CliCommandIntrospector::describe_class( WpCliOnlyFixtureCommand::class )
+		);
+
+		$this->assertFalse( class_exists( WpCliOnlyFixtureCommand::class, false ) );
 	}
 
 	/**
