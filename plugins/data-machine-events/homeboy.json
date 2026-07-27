@@ -3,7 +3,6 @@
     "convention_exception_globs": [
       "inc/Abilities/AbilityCategories.php",
       "inc/Abilities/AbilityPermissions.php",
-      "inc/Cli/AgentsMdSection.php",
       "inc/Cli/SettingsCommand.php",
       "inc/Core/DuplicateDetection/EventMergeHelper.php",
       "inc/Core/DuplicateDetection/VenueMergeHelper.php"

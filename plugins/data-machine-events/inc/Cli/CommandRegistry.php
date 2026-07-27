@@ -3,18 +3,11 @@
  * CLI Command Registry
  *
  * Single source of truth mapping `wp data-machine-events ...` command strings
- * to their implementing command classes. Both the WP-CLI bootstrap (which calls
- * WP_CLI::add_command for each entry) and the AGENTS.md section generator
- * (which reflects over each class to enumerate real subcommands) read from this
- * map, so the documented CLI surface can never drift from what is actually
- * registered.
+ * to their implementing command classes. The WP-CLI bootstrap calls
+ * WP_CLI::add_command for each entry.
  *
- * Each entry carries the command class's source FILE alongside the class name.
- * The section generator runs on `plugins_loaded` in web/cron compose contexts
- * where the plugin's `vendor/` PSR-4 autoloader may not be present (these
- * command classes are otherwise only required under the `WP_CLI` guard). The
- * file path lets the generator `require_once` the class on demand and reflect
- * over it without relying on any autoloader or the live WP-CLI runner.
+ * Each entry carries the command class's source file because command classes
+ * are loaded only when WP-CLI is active.
  *
  * @package DataMachineEvents\Cli
  */
@@ -34,9 +27,8 @@ class CommandRegistry {
 	 * Map of command string => command descriptor.
 	 *
 	 * Keys are the exact strings passed to WP_CLI::add_command (the command
-	 * namespace, e.g. "data-machine-events check times"). Order here determines
-	 * both registration order and documentation order. Each value is an array
-	 * with:
+	 * namespace, e.g. "data-machine-events check times"). Each value is an
+	 * array with:
 	 *   - `file`  Absolute path to the command class source file.
 	 *   - `class` Fully-qualified command class name.
 	 *

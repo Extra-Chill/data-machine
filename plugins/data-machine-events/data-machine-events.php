@@ -113,22 +113,18 @@ if ( file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Api/Routes.php' ) ) {
 |--------------------------------------------------------------------------
 | AGENTS.md — composable file section registration
 |--------------------------------------------------------------------------
-| Registers the Data Machine Events CLI section in the AGENTS.md composable
-| file so external agent runtimes discover this (largest extension) CLI
-| surface automatically. Runs outside the WP_CLI guard below because compose
-| and auto-regeneration fire in non-CLI (web/cron) contexts where the
-| WP-CLI runner / PSR-4 autoloader are not loaded — the section generator
-| resolves command class files from disk and reflects over them.
+| Registers concise Events ownership, routing, and discovery guidance in the
+| AGENTS.md composable file. Runs outside the WP_CLI guard because compose and
+| auto-regeneration also fire in non-CLI web/cron contexts.
 */
 add_action( 'plugins_loaded', function () {
 	if ( ! class_exists( '\DataMachine\Engine\AI\SectionRegistry' ) ) {
 		return;
 	}
 
-	require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/CommandRegistry.php';
 	require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/AgentsMdSection.php';
 
-	$wp = 'wp --allow-root --path=' . ABSPATH;
+	$wp = 'wp --url=' . untrailingslashit( home_url() ) . ' --allow-root --path=' . ABSPATH;
 
 	\DataMachine\Engine\AI\SectionRegistry::register( 'AGENTS.md', 'data-machine-events', 55, function () use ( $wp ) {
 		return \DataMachineEvents\Cli\AgentsMdSection::render( $wp );
@@ -139,9 +135,7 @@ add_action( 'plugins_loaded', function () {
 	) );
 }, 22 );
 
-// WP-CLI commands — registered from the single-source-of-truth CommandRegistry
-// map, which also drives the AGENTS.md section generator above so the
-// documented surface can never drift from what is actually registered here.
+// WP-CLI commands registered from the single-source-of-truth command map.
 if ( defined( 'WP_CLI' ) && WP_CLI ) {
 	require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/CommandRegistry.php';
 
