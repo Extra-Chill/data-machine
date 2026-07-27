@@ -15,6 +15,8 @@ defined( 'ABSPATH' ) || exit;
 class ScopedDrainService {
 
 	private const GROUP = 'data-machine';
+	private const DISPATCH_EVIDENCE_LIMIT = 100;
+	private const DISPATCH_STALE_THRESHOLD = 900;
 
 	public const HOOK_BATCH_CHUNK = 'datamachine_pipeline_batch_chunk';
 
@@ -136,7 +138,7 @@ class ScopedDrainService {
 	 * Return a read-only status snapshot for a drain scope.
 	 *
 	 * @param array{hooks?:string[],job_ids?:string|int[],lane?:string} $options Status options.
-	 * @return array<string,int|string> Status stats.
+	 * @return array<string,mixed> Status stats.
 	 */
 	public function status( array $options = array() ): array {
 		$hooks   = $this->normalizeHooks( $options['hooks'] ?? null );
@@ -160,11 +162,11 @@ class ScopedDrainService {
 	}
 
 	/**
-	 * Return aggregate claim evidence for active actions in the drain scope.
+	 * Return bounded claim evidence for active actions in the drain scope.
 	 *
 	 * @param string[]|null $hooks   Optional hook scope.
 	 * @param int[]         $job_ids Optional job scope.
-	 * @return array{oldest_due_gmt:?string,in_progress_actions:int,latest_in_progress_attempt_gmt:?string,concurrency_deferred_actions:int}
+	 * @return array{stale_due_sample_gmt:?string,in_progress_actions:int,in_progress_actions_capped:bool,in_progress_attempt_sample_gmt:?string,concurrency_deferred_actions:int,concurrency_deferred_actions_capped:bool}
 	 */
 	private function getDispatchEvidence( ?array $hooks, array $job_ids ): array {
 		global $wpdb;
@@ -172,37 +174,92 @@ class ScopedDrainService {
 		$actions_table = $wpdb->prefix . 'actionscheduler_actions';
 		$groups_table  = $wpdb->prefix . 'actionscheduler_groups';
 		$hook_sql      = $this->hookWhereSql( $hooks, $job_ids );
-		$now_gmt       = gmdate( 'Y-m-d H:i:s' );
-		$values        = array_merge(
-			array( $now_gmt, $actions_table, $groups_table ),
+		$stale_gmt     = gmdate( 'Y-m-d H:i:s', time() - self::DISPATCH_STALE_THRESHOLD );
+
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		$group_id = (int) $wpdb->get_var(
+			$wpdb->prepare(
+				'SELECT group_id FROM %i WHERE slug = %s LIMIT 1',
+				array( $groups_table, self::GROUP )
+			)
+		);
+		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		if ( $group_id <= 0 ) {
+			return array(
+				'stale_due_sample_gmt'                   => null,
+				'in_progress_actions'                    => 0,
+				'in_progress_actions_capped'             => false,
+				'in_progress_attempt_sample_gmt'         => null,
+				'concurrency_deferred_actions'           => 0,
+				'concurrency_deferred_actions_capped'    => false,
+			);
+		}
+
+		$stale_values = array_merge(
+			array( $actions_table ),
 			$hook_sql['values'],
-			array( self::GROUP )
+			array( $group_id, $stale_gmt )
+		);
+		$active_values = array_merge(
+			array( $actions_table ),
+			$hook_sql['values'],
+			array( $group_id, self::DISPATCH_EVIDENCE_LIMIT + 1 )
 		);
 
-		// Only active rows are aggregated; Action Scheduler's status/group/date indexes bound this read independently of history size.
+		// Each read stops after the evidence needed for health classification; stale and claimed reads exclude future and historical rows.
 		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber -- Dynamic hook scope is constructed from normalized placeholders and values.
-		$row = $wpdb->get_row(
+		$stale_row = $wpdb->get_row(
 			$wpdb->prepare(
-				'SELECT
-				MIN(CASE WHEN a.status = \'pending\' AND a.scheduled_date_gmt <= %s THEN a.scheduled_date_gmt END) AS oldest_due_gmt,
-				SUM(CASE WHEN a.status = \'in-progress\' THEN 1 ELSE 0 END) AS in_progress_actions,
-				MAX(CASE WHEN a.status = \'in-progress\' THEN a.last_attempt_gmt END) AS latest_in_progress_attempt_gmt,
-				SUM(CASE WHEN a.status = \'pending\' AND a.hook = \'datamachine_resume_ai_step\' THEN 1 ELSE 0 END) AS concurrency_deferred_actions
+				'SELECT a.scheduled_date_gmt AS stale_due_sample_gmt
 				FROM %i a
-				INNER JOIN %i g ON g.group_id = a.group_id
-				WHERE ' . $hook_sql['sql'] . 'g.slug = %s
-				AND a.status IN (\'pending\', \'in-progress\')',
-				$values
+				WHERE ' . $hook_sql['sql'] . 'a.group_id = %d
+				AND a.status = \'pending\'
+				AND a.scheduled_date_gmt <= %s
+				LIMIT 1',
+				$stale_values
+			),
+			ARRAY_A
+		);
+		$in_progress_row = $wpdb->get_row(
+			$wpdb->prepare(
+				'SELECT COUNT(*) AS in_progress_actions, MAX(active.last_attempt_gmt) AS in_progress_attempt_sample_gmt
+				FROM (
+					SELECT a.last_attempt_gmt
+					FROM %i a
+					WHERE ' . $hook_sql['sql'] . 'a.group_id = %d
+					AND a.status = \'in-progress\'
+					LIMIT %d
+				) active',
+				$active_values
+			),
+			ARRAY_A
+		);
+		$deferred_row = $wpdb->get_row(
+			$wpdb->prepare(
+				'SELECT COUNT(*) AS concurrency_deferred_actions
+				FROM (
+					SELECT a.action_id
+					FROM %i a
+					WHERE ' . $hook_sql['sql'] . 'a.group_id = %d
+					AND a.status = \'pending\'
+					AND a.hook = \'datamachine_resume_ai_step\'
+					LIMIT %d
+				) deferred',
+				$active_values
 			),
 			ARRAY_A
 		);
 		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
+		$in_progress_count = (int) ( $in_progress_row['in_progress_actions'] ?? 0 );
+		$deferred_count    = (int) ( $deferred_row['concurrency_deferred_actions'] ?? 0 );
 
 		return array(
-			'oldest_due_gmt'                 => $this->normalizeNullableDate( $row['oldest_due_gmt'] ?? null ),
-			'in_progress_actions'            => (int) ( $row['in_progress_actions'] ?? 0 ),
-			'latest_in_progress_attempt_gmt' => $this->normalizeNullableDate( $row['latest_in_progress_attempt_gmt'] ?? null ),
-			'concurrency_deferred_actions'   => (int) ( $row['concurrency_deferred_actions'] ?? 0 ),
+			'stale_due_sample_gmt'                => $this->normalizeNullableDate( $stale_row['stale_due_sample_gmt'] ?? null ),
+			'in_progress_actions'                 => min( self::DISPATCH_EVIDENCE_LIMIT, $in_progress_count ),
+			'in_progress_actions_capped'          => $in_progress_count > self::DISPATCH_EVIDENCE_LIMIT,
+			'in_progress_attempt_sample_gmt'      => $this->normalizeNullableDate( $in_progress_row['in_progress_attempt_sample_gmt'] ?? null ),
+			'concurrency_deferred_actions'        => min( self::DISPATCH_EVIDENCE_LIMIT, $deferred_count ),
+			'concurrency_deferred_actions_capped' => $deferred_count > self::DISPATCH_EVIDENCE_LIMIT,
 		);
 	}
 
