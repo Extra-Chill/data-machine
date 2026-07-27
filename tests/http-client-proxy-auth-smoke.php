@@ -183,6 +183,11 @@ http_client_smoke_assert(
 	'Custom manual' === ( $manual_args['headers']['authorization'] ?? null )
 );
 
+$bounded_args = http_client_private( 'buildRequestArgs', 'GET', array( 'limit_response_size' => 1048576 ) );
+http_client_smoke_assert( 'response byte limit is forwarded to WordPress HTTP', 1048576 === ( $bounded_args['limit_response_size'] ?? null ) );
+$unbounded_args = http_client_private( 'buildRequestArgs', 'GET', array( 'limit_response_size' => 0 ) );
+http_client_smoke_assert( 'invalid response byte limit is omitted', ! isset( $unbounded_args['limit_response_size'] ) );
+
 echo "\n[2] Auth ref options\n";
 
 $provider = new HttpBasicAuthProvider();

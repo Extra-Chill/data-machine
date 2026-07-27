@@ -207,6 +207,10 @@ class HttpClient {
 			'timeout' => $timeout,
 			'headers' => $headers,
 		);
+		$limit_response_size = max( 0, (int) ( $options['limit_response_size'] ?? 0 ) );
+		if ( $limit_response_size > 0 ) {
+			$args['limit_response_size'] = $limit_response_size;
+		}
 
 		if ( 'GET' !== $method ) {
 			$args['method'] = $method;
