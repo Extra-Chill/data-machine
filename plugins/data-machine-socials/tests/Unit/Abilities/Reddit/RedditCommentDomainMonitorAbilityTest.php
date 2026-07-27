@@ -213,6 +213,9 @@ class RedditCommentDomainMonitorAbilityTest extends WP_UnitTestCase {
 		$token = RedditCommentDomainStore::acquireLock();
 		$this->assertIsString( $token );
 		$this->assertWPError( RedditCommentDomainStore::acquireLock() );
+		$this->assertTrue( RedditCommentDomainStore::refreshLock( $token ) );
+		$this->assertTrue( RedditCommentDomainStore::refreshLock( $token ), 'A same-second owner refresh must remain idempotent.' );
+		$this->assertFalse( RedditCommentDomainStore::refreshLock( 'different-owner' ) );
 		RedditCommentDomainStore::releaseLock( 'different-owner' );
 		$this->assertWPError( RedditCommentDomainStore::acquireLock() );
 

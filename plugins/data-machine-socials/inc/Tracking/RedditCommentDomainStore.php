@@ -116,6 +116,9 @@ class RedditCommentDomainStore {
 			'token'      => $token,
 			'expires_at' => time() + ( 30 * MINUTE_IN_SECONDS ),
 		);
+		if ( $current === $replacement ) {
+			return true;
+		}
 		return self::replaceLock( $current, $replacement );
 	}
 
