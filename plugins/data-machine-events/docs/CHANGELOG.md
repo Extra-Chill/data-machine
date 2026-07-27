@@ -2,6 +2,18 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.52.2] - 2026-07-27
+
+### Changed
+- make events agent guidance intent-based
+
+### Fixed
+- harden map geo synchronization
+- guarantee unique calendar control IDs
+- make calendar controls accessible
+- require authority for map geo sync
+- reconcile qualified venue aliases
+
 ## [0.52.1] - 2026-07-26
 
 ### Fixed
