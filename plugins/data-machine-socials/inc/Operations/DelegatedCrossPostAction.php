@@ -7,6 +7,8 @@
 
 namespace DataMachineSocials\Operations;
 
+use DataMachine\Core\Database\Jobs\Jobs;
+
 defined( 'ABSPATH' ) || exit;
 
 final class DelegatedCrossPostAction {
@@ -204,7 +206,6 @@ final class DelegatedCrossPostAction {
 			'source_url'              => $input['source_url'],
 			'delegated_operation_ref' => (string) ( $context['operation_ref'] ?? '' ),
 			'delegated_input'         => self::canonical_input( $input ),
-			'delegated_actor'         => self::bounded_actor( $context['actor'] ?? array() ),
 		);
 
 		return array(
@@ -411,6 +412,31 @@ final class DelegatedCrossPostAction {
 		}
 
 		return $normalized;
+	}
+
+	/** Resolve the frozen initiator from the verified delegated parent job. */
+	public static function resolve_effect_actor( int $parent_job_id, string $operation_ref ) {
+		if ( $parent_job_id <= 0 || ! preg_match( '/^dop_[a-f0-9]{64}$/', $operation_ref ) ) {
+			return self::error( 'effect_authorization_failed', 'The initiating actor could not be verified.' );
+		}
+
+		$job       = ( new Jobs() )->get_job( $parent_job_id );
+		$envelope  = is_array( $job['operation_envelope'] ?? null ) ? $job['operation_envelope'] : array();
+		$operation = is_array( $envelope['delegated_operation'] ?? null ) ? $envelope['delegated_operation'] : array();
+		if (
+			'delegated' !== ( $job['source'] ?? '' )
+			|| self::ACTION_ID !== ( $operation['action'] ?? '' )
+			|| ! hash_equals( (string) ( $operation['operation_ref'] ?? '' ), $operation_ref )
+		) {
+			return self::error( 'effect_authorization_failed', 'The initiating actor could not be verified.' );
+		}
+
+		$actor = self::bounded_actor( $operation['initiator'] ?? array() );
+		if ( 0 === $actor['user_id'] && 0 === $actor['agent_id'] ) {
+			return self::error( 'effect_authorization_failed', 'The initiating actor could not be verified.' );
+		}
+
+		return $actor;
 	}
 
 	private static function canonical_input( array $input ): array {

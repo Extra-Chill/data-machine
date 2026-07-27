@@ -9,8 +9,9 @@ use DataMachine\Core\Database\Agents\Agents;
 use DataMachine\Core\Database\Jobs\Jobs;
 use DataMachine\Core\DelegatedOperations\DelegatedOperationRegistry;
 use DataMachine\Core\DelegatedOperations\DelegatedOperationService;
+use DataMachine\Core\EngineData;
+use DataMachine\Core\Steps\SystemTask\SystemTaskStep;
 use DataMachineSocials\Operations\DelegatedCrossPostAction;
-use DataMachineSocials\Tasks\SocialCrossPostTask;
 use DataMachineSocials\Tracking\SocialShareTracker;
 
 final class DelegatedCrossPostIntegrationTest extends WP_UnitTestCase {
@@ -21,6 +22,7 @@ final class DelegatedCrossPostIntegrationTest extends WP_UnitTestCase {
 	private int $post_id;
 	private int $attachment_id;
 	private bool $authority = true;
+	private array $authorization_observations = array();
 
 	public function set_up(): void {
 		parent::set_up();
@@ -49,6 +51,10 @@ final class DelegatedCrossPostIntegrationTest extends WP_UnitTestCase {
 
 	public function authorize( bool $authorized, array $context ): bool {
 		unset( $authorized );
+		$this->authorization_observations[] = array(
+			'phase' => (string) ( $context['phase'] ?? '' ),
+			'actor' => $context['actor'] ?? array(),
+		);
 		return $this->authority && in_array( (int) ( $context['actor']['user_id'] ?? 0 ), array( $this->first_actor, $this->second_actor ), true );
 	}
 
@@ -77,27 +83,34 @@ final class DelegatedCrossPostIntegrationTest extends WP_UnitTestCase {
 
 	public function test_effect_time_authority_and_live_resources_fail_closed(): void {
 		wp_set_current_user( $this->first_actor );
-		$normalized = DelegatedCrossPostAction::normalize_input( $this->submission_input( array( 'twitter' ) ) );
-		$this->assertIsArray( $normalized );
-		$prepared = DelegatedCrossPostAction::prepare(
-			$normalized,
+		$service    = new DelegatedOperationService();
+		$submitted  = $service->submit( $this->submission( 'effect-authority', array( 'twitter' ) ) );
+		$parent_job = $this->job( 'effect-authority' );
+		$actor      = DelegatedCrossPostAction::resolve_effect_actor( (int) $parent_job['job_id'], $submitted['operation_ref'] );
+		$this->assertSame( $this->first_actor, $actor['user_id'] );
+
+		$this->authority                  = false;
+		$this->authorization_observations = array();
+		( new SystemTaskStep() )->execute(
 			array(
-				'operation_ref' => 'dop_' . str_repeat( 'a', 64 ),
-				'actor'         => array( 'user_id' => $this->first_actor, 'agent_id' => 0 ),
+				'job_id'       => (int) $parent_job['job_id'],
+				'flow_step_id' => (string) $parent_job['operation_step_id'],
+				'data'         => array(),
+				'engine'       => new EngineData( $parent_job['engine_data'], (int) $parent_job['job_id'] ),
 			)
 		);
-		$params = $prepared['workflow']['steps'][0]['flow_step_settings']['params'];
-
-		$this->authority = false;
-		$child_job_id    = ( new Jobs() )->create_job( array( 'source' => 'test', 'status' => 'processing', 'engine_data' => array() ) );
-		$this->assertIsInt( $child_job_id );
-		( new SocialCrossPostTask() )->executeTask( $child_job_id, $params );
-		$denied = ( new Jobs() )->get_job( $child_job_id );
+		$this->assertSame( 'effect', $this->authorization_observations[0]['phase'] );
+		$this->assertSame( $this->first_actor, (int) $this->authorization_observations[0]['actor']['user_id'] );
+		$children = ( new Jobs() )->get_children( (int) $parent_job['job_id'] );
+		$this->assertCount( 1, $children );
+		$denied = $children[0];
 		$this->assertSame( 'failed - delegated_cross_post_effect_denied', $denied['engine_data']['job_status'] );
 		$this->assertSame( 'effect_authorization_failed', $denied['engine_data']['output_data_packets'][0]['metadata']['source_item_id'] );
 		$this->assertSame( array(), SocialShareTracker::get_shares( $this->post_id ) );
 
 		$this->authority = true;
+		$normalized      = DelegatedCrossPostAction::normalize_input( $this->submission_input( array( 'twitter' ) ) );
+		$this->assertIsArray( $normalized );
 		wp_update_post( array( 'ID' => $this->post_id, 'post_status' => 'draft' ) );
 		$this->assertWPError( DelegatedCrossPostAction::validate_effect( $normalized, array( 'user_id' => $this->first_actor ), 'dop_' . str_repeat( 'a', 64 ) ) );
 		wp_update_post( array( 'ID' => $this->post_id, 'post_status' => 'publish' ) );
@@ -109,6 +122,32 @@ final class DelegatedCrossPostIntegrationTest extends WP_UnitTestCase {
 		$changed_caption                 = $normalized;
 		$changed_caption['caption']      = 'Changed after approval.';
 		$this->assertWPError( DelegatedCrossPostAction::validate_effect( $changed_caption, array( 'user_id' => $this->first_actor ), 'dop_' . str_repeat( 'a', 64 ) ) );
+	}
+
+	public function test_cross_actor_replay_reuses_receipt_and_job_while_changed_input_conflicts(): void {
+		$service = new DelegatedOperationService();
+		$request = $this->submission( 'cross-actor-replay', array( 'instagram' ) );
+
+		wp_set_current_user( $this->first_actor );
+		$first     = $service->submit( $request );
+		$first_job = $this->job( 'cross-actor-replay' );
+
+		wp_set_current_user( $this->second_actor );
+		$second     = $service->submit( $request );
+		$second_job = $this->job( 'cross-actor-replay' );
+
+		$this->assertTrue( $first['success'] ?? false, wp_json_encode( $first ) );
+		$this->assertTrue( $second['success'] ?? false, wp_json_encode( $second ) );
+		$this->assertTrue( $second['replayed'] );
+		$this->assertSame( $first['operation_ref'], $second['operation_ref'] );
+		$this->assertSame( (int) $first_job['job_id'], (int) $second_job['job_id'] );
+
+		$changed                         = $request;
+		$changed['input']['caption']      = 'A different approved caption.';
+		$changed['input']['content_hash'] = hash( 'sha256', $changed['input']['caption'] );
+		$conflict                        = $service->submit( $changed );
+		$this->assertFalse( $conflict['success'] );
+		$this->assertSame( 'delegated_operation_conflict', $conflict['error_code'] );
 	}
 
 	public function test_cross_actor_partial_retry_reuses_parent_and_live_receipts(): void {

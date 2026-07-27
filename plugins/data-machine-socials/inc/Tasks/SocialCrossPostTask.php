@@ -38,11 +38,14 @@ class SocialCrossPostTask extends SystemTask {
 		$cover_url     = $params['cover_url'] ?? '';
 		$operation_ref = $params['delegated_operation_ref'] ?? '';
 		if ( '' !== $operation_ref ) {
-			$revalidated = DelegatedCrossPostAction::validate_effect(
-				is_array( $params['delegated_input'] ?? null ) ? $params['delegated_input'] : array(),
-				is_array( $params['delegated_actor'] ?? null ) ? $params['delegated_actor'] : array(),
-				$operation_ref
-			);
+			$actor       = DelegatedCrossPostAction::resolve_effect_actor( (int) ( $params['pipeline_job_id'] ?? 0 ), $operation_ref );
+			$revalidated = is_wp_error( $actor )
+				? $actor
+				: DelegatedCrossPostAction::validate_effect(
+					is_array( $params['delegated_input'] ?? null ) ? $params['delegated_input'] : array(),
+					$actor,
+					$operation_ref
+				);
 			if ( is_wp_error( $revalidated ) ) {
 				$this->complete_delegated_failure( $jobId, is_array( $platforms ) ? $platforms : array(), $revalidated->get_error_code() );
 				return;

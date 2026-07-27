@@ -10,6 +10,7 @@ namespace {
 
 	$GLOBALS['delegated_cross_post_filters'] = array();
 	$GLOBALS['delegated_cross_post_jobs']    = array();
+	$GLOBALS['delegated_cross_post_parent_jobs'] = array();
 	$GLOBALS['delegated_cross_post_shares']  = array();
 
 	class WP_Error {
@@ -102,6 +103,14 @@ namespace {
 		102 => array( 'url' => 'https://example.test/uploads/image-two.jpg', 'mime' => 'image/jpeg' ),
 		103 => array( 'url' => 'https://example.test/uploads/video.mp4', 'mime' => 'video/mp4' ),
 	);
+}
+
+namespace DataMachine\Core\Database\Jobs {
+	class Jobs {
+		public function get_job( int $job_id ): ?array {
+			return $GLOBALS['delegated_cross_post_parent_jobs'][ $job_id ] ?? null;
+		}
+	}
 }
 
 namespace DataMachine\Engine\AI\System\Tasks {
@@ -203,13 +212,14 @@ namespace {
 	$assert( $normalized === $second_normalized, 'normalized fingerprint input is actor-neutral' );
 
 	$prepared = $action['prepare']( $normalized, array( 'operation_ref' => 'dop_' . str_repeat( 'a', 64 ), 'actor' => array( 'user_id' => 11 ) ) );
-	$second_prepared = $action['prepare']( $second_normalized, array( 'operation_ref' => 'dop_' . str_repeat( 'a', 64 ), 'actor' => array( 'user_id' => 11 ) ) );
+	$second_prepared = $action['prepare']( $second_normalized, array( 'operation_ref' => 'dop_' . str_repeat( 'a', 64 ), 'actor' => array( 'user_id' => 12 ) ) );
 	$settings = $prepared['workflow']['steps'][0]['flow_step_settings'] ?? array();
 	$assert( 7 === ( $prepared['owner_user_id'] ?? null ) && 9 === ( $prepared['agent_id'] ?? null ), 'prepare binds a stable owner and registered agent' );
 	$assert( 'system_task' === ( $prepared['workflow']['steps'][0]['step_type'] ?? null ) && 'social_cross_post' === ( $settings['task_type'] ?? null ), 'prepare composes the canonical system-task workflow' );
 	$assert( 'dop_' . str_repeat( 'a', 64 ) === ( $settings['params']['delegated_operation_ref'] ?? null ), 'opaque operation identity reaches the idempotent owner task' );
 	$assert( $prepared === $second_prepared, 'two authorized actors compose one frozen owner workflow' );
 	$encoded_prepare = json_encode( $prepared );
+	$assert( ! str_contains( $encoded_prepare, 'delegated_actor' ), 'frozen owner workflow excludes the initiating actor' );
 	$assert( ! str_contains( $encoded_prepare, 'TaskScheduler' ) && ! str_contains( $encoded_prepare, 'execute-workflow' ), 'owner workflow exposes no scheduler or arbitrary ability launch' );
 
 	$bad_hash                 = $input;
@@ -252,6 +262,17 @@ namespace {
 	$assert( is_wp_error( $action['normalize_input']( $instagram_boundary, array() ) ), 'Instagram rejects a caption that its publisher would truncate' );
 
 	$task = new SocialCrossPostTask();
+	$GLOBALS['delegated_cross_post_parent_jobs'][49] = array(
+		'source'             => 'delegated',
+		'operation_envelope' => array(
+			'delegated_operation' => array(
+				'action'        => DelegatedCrossPostAction::ACTION_ID,
+				'operation_ref' => 'dop_' . str_repeat( 'a', 64 ),
+				'initiator'     => array( 'user_id' => 11, 'agent_id' => 0 ),
+			),
+		),
+	);
+	$settings['params']['pipeline_job_id'] = 49;
 	$task->executeTask(
 		50,
 		array_merge(
