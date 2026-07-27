@@ -49,7 +49,7 @@ class BatchItems extends BaseRepository {
 				$batch_job_id
 			)
 		);
-		$preexisting = is_string( $preexisting_token ) && '' !== $preexisting_token;
+		$preexisting       = is_string( $preexisting_token ) && '' !== $preexisting_token;
 		if ( false === $this->wpdb->query( 'START TRANSACTION' ) ) {
 			return $this->insert_result( false, false, $preexisting || '' !== (string) $this->wpdb->last_error );
 		}
@@ -193,7 +193,7 @@ class BatchItems extends BaseRepository {
 
 		$end  = $offset + $limit;
 		$now  = current_time( 'mysql', true );
-		$rows    = $this->wpdb->get_results(
+		$rows = $this->wpdb->get_results(
 			$this->wpdb->prepare(
 				'SELECT * FROM %i WHERE batch_job_id = %d AND item_index >= %d AND item_index < %d ORDER BY item_index ASC FOR UPDATE',
 				$this->table_name,
@@ -395,9 +395,13 @@ class BatchItems extends BaseRepository {
 	 */
 	public function request_cancellation( int $batch_job_id ): array {
 		if ( false === $this->wpdb->query( 'START TRANSACTION' ) ) {
-			return array( 'success' => false, 'rows' => array(), 'remaining' => false );
+			return array(
+				'success'   => false,
+				'rows'      => array(),
+				'remaining' => false,
+			);
 		}
-		$rows = $this->wpdb->get_results(
+		$rows            = $this->wpdb->get_results(
 			$this->wpdb->prepare(
 				'SELECT item_index, payload, payload_checksum, cleanup_context, state FROM %i WHERE batch_job_id = %d AND state IN (%s, %s) ORDER BY item_index ASC LIMIT %d FOR UPDATE',
 				$this->table_name,
@@ -422,7 +426,11 @@ class BatchItems extends BaseRepository {
 		$claim_updated = $this->transition_claims_to_cancel_pending( $batch_job_id, $claimed_indexes );
 		if ( false === $ready_updated || false === $claim_updated || false === $this->wpdb->query( 'COMMIT' ) ) {
 			$this->wpdb->query( 'ROLLBACK' );
-			return array( 'success' => false, 'rows' => array(), 'remaining' => false );
+			return array(
+				'success'   => false,
+				'rows'      => array(),
+				'remaining' => false,
+			);
 		}
 
 		$ready_lookup = array_fill_keys( $ready_indexes, true );
@@ -432,7 +440,7 @@ class BatchItems extends BaseRepository {
 				static fn( array $row ): bool => isset( $ready_lookup[ (int) $row['item_index'] ] )
 			)
 		);
-		$remaining = (int) $this->wpdb->get_var(
+		$remaining    = (int) $this->wpdb->get_var(
 			$this->wpdb->prepare(
 				'SELECT COUNT(*) FROM %i WHERE batch_job_id = %d AND state IN (%s, %s)',
 				$this->table_name,
@@ -469,7 +477,7 @@ class BatchItems extends BaseRepository {
 				'rows'    => array(),
 			);
 		}
-		$rows = $this->wpdb->get_results(
+		$rows    = $this->wpdb->get_results(
 			$this->wpdb->prepare(
 				'SELECT item_index, payload, payload_checksum, cleanup_context FROM %i WHERE batch_job_id = %d AND worklist_token = %s AND state <> %s ORDER BY item_index ASC LIMIT %d FOR UPDATE',
 				$this->table_name,

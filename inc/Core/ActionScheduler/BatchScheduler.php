@@ -44,7 +44,7 @@ use DataMachine\Core\PluginSettings;
 defined( 'ABSPATH' ) || exit;
 
 class BatchScheduler {
-	public const STORAGE_VERSION = 2;
+	public const STORAGE_VERSION         = 2;
 	private const INITIAL_RECOVERY_DELAY = 300;
 
 	/**
@@ -173,7 +173,7 @@ class BatchScheduler {
 			self::discardStartItems( $items, $cleanup_contexts, $parent_job_id, $context );
 			return self::startResult( $parent_job_id, $total, $chunk_size );
 		}
-		$checksums        = array();
+		$checksums = array();
 		foreach ( $items as $item ) {
 			$encoded = wp_json_encode( $item );
 			if ( false === $encoded ) {
@@ -445,7 +445,7 @@ class BatchScheduler {
 			}
 			return self::chunkResult( 0, $offset, $total, false, false, false, false, true );
 		}
-		$rows       = $repository->claim_chunk( $parent_job_id, $offset, $chunk_size, $lease );
+		$rows = $repository->claim_chunk( $parent_job_id, $offset, $chunk_size, $lease );
 		if ( ! $rows ) {
 			$outstanding = $repository->first_outstanding_index( $parent_job_id );
 			if ( null === $outstanding ) {
@@ -495,8 +495,8 @@ class BatchScheduler {
 				continue;
 			}
 
-			$result       = $createItem( $hydration['value'], $extra, $parent_job_id, (int) $row['item_index'], (string) $row['payload_checksum'] );
-			$result_id    = is_scalar( $result ) ? $result : null;
+			$result        = $createItem( $hydration['value'], $extra, $parent_job_id, (int) $row['item_index'], (string) $row['payload_checksum'] );
+			$result_id     = is_scalar( $result ) ? $result : null;
 			$item_finished = $result && $repository->complete( $parent_job_id, (int) $row['item_index'], (string) $row['lease_token'], $result_id );
 			if ( $result && ! $item_finished && ! empty( EngineData::retrieve( $parent_job_id )['cancelled'] ) ) {
 				$item_finished = $repository->complete_cancel_pending( $parent_job_id, (int) $row['item_index'], (string) $row['lease_token'], $result_id );
@@ -674,8 +674,8 @@ class BatchScheduler {
 	 * finalization without re-running an item.
 	 */
 	public static function finalize( int $parent_job_id ): bool {
-		$current    = EngineData::retrieve( $parent_job_id );
-		$job        = ( new Jobs() )->get_job( $parent_job_id );
+		$current = EngineData::retrieve( $parent_job_id );
+		$job     = ( new Jobs() )->get_job( $parent_job_id );
 		if ( ! is_array( $job ) ) {
 			global $wpdb;
 			if ( '' !== (string) $wpdb->last_error ) {
@@ -703,7 +703,7 @@ class BatchScheduler {
 		if ( ! $is_v2 ) {
 			return true;
 		}
-		$result = EngineData::mutate(
+		$result    = EngineData::mutate(
 			$parent_job_id,
 			static function ( array $engine ): array {
 				unset( $engine['batch_state'] );

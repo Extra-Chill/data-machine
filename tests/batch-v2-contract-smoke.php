@@ -18,7 +18,7 @@ $assert = static function ( bool $condition, string $message ) use ( &$failures 
 	}
 };
 
-$assert( str_contains( $batch, "public const STORAGE_VERSION = 2" ), 'new batches declare storage version 2' );
+$assert( 1 === preg_match( '/public const STORAGE_VERSION\s+= 2;/', $batch ), 'new batches declare storage version 2' );
 $assert( ! str_contains( substr( $batch, strpos( $batch, 'public static function start' ), strpos( $batch, 'public static function processChunk' ) - strpos( $batch, 'public static function start' ) ), "'items'            => \$items" ), 'v2 parent metadata omits work items' );
 $assert( str_contains( $database, 'START TRANSACTION' ) && str_contains( $database, 'FOR UPDATE' ), 'repository claims transactionally' );
 $assert( 1 === preg_match( '/private const INSERT_CHUNK_SIZE\s+= 100;/', $database ), 'worklist insertion is bounded to 100 rows' );
