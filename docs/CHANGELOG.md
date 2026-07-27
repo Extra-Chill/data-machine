@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.170.3] - 2026-07-27
+
+### Fixed
+- make bulk config previews non-mutating
+
 ## [0.170.2] - 2026-07-27
 
 ### Fixed
