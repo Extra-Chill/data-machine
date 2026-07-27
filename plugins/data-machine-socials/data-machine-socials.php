@@ -190,13 +190,9 @@ add_action( 'plugins_loaded', 'datamachine_socials_bootstrap', 20 );
 
 /**
  * Register the Data Machine Socials CLI section in the composable AGENTS.md
- * file so external agent runtimes discover the social CLI surface
- * automatically.
- *
+ * file so external agent runtimes discover intent-based social CLI routing.
  * Runs outside the WP_CLI guard because compose/auto-regeneration may fire in
- * non-CLI WordPress contexts (web/cron). The section generator reflects over
- * the command class files directly (resolved from disk via CommandRegistry),
- * so it never depends on the live WP-CLI runner being loaded.
+ * non-CLI WordPress contexts (web/cron).
  */
 function datamachine_socials_register_agents_md_section() {
 	if ( ! class_exists( '\DataMachine\Engine\AI\SectionRegistry' ) ) {
@@ -275,9 +271,7 @@ add_action( 'admin_enqueue_scripts', 'datamachine_socials_enqueue_assets' );
  * Register WP-CLI commands.
  */
 if ( defined( 'WP_CLI' ) && WP_CLI ) {
-	// Single source of truth: CommandRegistry maps every command string to its
-	// class. The AGENTS.md section generator reads the same map, so the
-	// documented CLI surface can never drift from what is registered here.
+	// CommandRegistry is the single source of truth for runtime registration.
 	foreach ( \DataMachineSocials\Cli\CommandRegistry::map() as $command => $class ) {
 		require_once \DataMachineSocials\Cli\CommandRegistry::file_for_class( $class );
 		WP_CLI::add_command( $command, $class );
