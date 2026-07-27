@@ -244,7 +244,7 @@ class SystemAbilities {
 	private function runSchedulerDiagnostics( array $options = array() ): array {
 		$stale_threshold = max( 60, (int) ( $options['stale_threshold_seconds'] ?? 900 ) );
 		$now             = time();
-		$wp_cron_next    = wp_next_scheduled( 'action_scheduler_run_queue' );
+		$wp_cron_next    = wp_next_scheduled( 'action_scheduler_run_queue', array( 'WP Cron' ) );
 		$wp_cron_overdue = is_int( $wp_cron_next ) ? max( 0, $now - $wp_cron_next ) : null;
 		$pending         = $this->getActionSchedulerGroupStats( 'pending' );
 		$complete        = $this->getActionSchedulerGroupStats( 'complete' );

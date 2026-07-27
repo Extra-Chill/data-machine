@@ -30,7 +30,7 @@ if ( false === $system_abilities || false === $system_command ) {
 }
 
 datamachine_scheduler_health_assert_contains( "'scheduler' => array", $system_abilities, 'scheduler check is registered' );
-datamachine_scheduler_health_assert_contains( "wp_next_scheduled( 'action_scheduler_run_queue' )", $system_abilities, 'WP-Cron runner lag is inspected' );
+datamachine_scheduler_health_assert_contains( "wp_next_scheduled( 'action_scheduler_run_queue', array( 'WP Cron' ) )", $system_abilities, 'the exact Action Scheduler WP-Cron runner lag is inspected' );
 datamachine_scheduler_health_assert_contains( 'RecurringScheduler::GROUP', $system_abilities, 'diagnostics scope to Data Machine actions' );
 datamachine_scheduler_health_assert_contains( 'FlowScheduleReconciler', $system_abilities, 'flow schedule coverage is audited' );
 datamachine_scheduler_health_assert_contains( 'flows reconcile-schedules', $system_abilities, 'missing coverage includes operator repair guidance' );
