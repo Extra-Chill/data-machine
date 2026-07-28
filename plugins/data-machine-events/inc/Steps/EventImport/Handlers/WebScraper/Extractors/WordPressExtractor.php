@@ -80,11 +80,32 @@ class WordPressExtractor extends BaseExtractor {
 		}
 
 		$json = $this->fetchJson( $api_url );
-		if ( empty( $json ) ) {
+		if ( null === $json ) {
 			return array();
 		}
 
-		return $this->extractFromJson( $json, $source_url );
+		$events = $this->extractFromJson( $json, $source_url );
+		if ( ! empty( $events ) ) {
+			return $events;
+		}
+
+		// Some sites expose current events through the core Tribe CPT route even
+		// when the legacy Tribe collection is valid but empty.
+		if ( false === strpos( $api_url, '/tribe/events/' ) ) {
+			return array();
+		}
+
+		$wp_rest_base = $this->discoverWpRestBase( $html );
+		if ( null === $wp_rest_base ) {
+			return array();
+		}
+
+		$wp_events = $this->fetchJson( $wp_rest_base . 'wp/v2/tribe_events?per_page=100&_embed=1' );
+		if ( null === $wp_events ) {
+			return array();
+		}
+
+		return $this->extractFromJson( $wp_events, $source_url );
 	}
 
 	public function getMethod(): string {
@@ -120,14 +141,20 @@ class WordPressExtractor extends BaseExtractor {
 		$parsed   = wp_parse_url( $source_url );
 		$base_url = ( $parsed['scheme'] ?? 'https' ) . '://' . ( $parsed['host'] ?? '' );
 
-		// Look for Tribe Events REST API link
-		if ( preg_match( '#/wp-json/tribe/events/v1/events#', $html ) ) {
-			return $base_url . '/wp-json/tribe/events/v1/events?per_page=100';
+		// Prefer the versioned Tribe API root advertised by the page. This keeps
+		// discovery aligned with subdirectory and custom REST installations.
+		if ( preg_match( '#https?://[^"\']+/tribe/events/v\d+/#i', $html, $m ) ) {
+			return trailingslashit( html_entity_decode( $m[0], ENT_QUOTES ) ) . 'events?per_page=100';
+		}
+
+		// Retain support for relative direct collection URLs.
+		if ( preg_match( '#/wp-json/tribe/events/v\d+/events#i', $html, $m ) ) {
+			return $base_url . $m[0] . '?per_page=100';
 		}
 
 		// Look for WP REST API discovery link
-		if ( preg_match( '#<link[^>]+rel=["\']https://api\.w\.org/["\'][^>]+href=["\']([^"\']+)["\']#i', $html, $m ) ) {
-			$api_base = $m[1];
+		$api_base = $this->discoverWpRestBase( $html );
+		if ( null !== $api_base ) {
 			// Try Tribe endpoint first
 			$tribe_url  = rtrim( $api_base, '/' ) . '/tribe/events/v1/events?per_page=100';
 			$tribe_json = $this->fetchJson( $tribe_url );
@@ -140,6 +167,29 @@ class WordPressExtractor extends BaseExtractor {
 		if ( preg_match( '/<(div|section|article|main)[^>]+class=["\'][^"\']*tribe-events[^"\']*["\'][^>]*>/i', $html )
 			|| preg_match( '/<(div|section|article|main)[^>]+id=["\'][^"\']*tribe-events[^"\']*["\'][^>]*>/i', $html ) ) {
 			return $base_url . '/wp-json/tribe/events/v1/events?per_page=100';
+		}
+
+		return null;
+	}
+
+	/**
+	 * Read the WordPress REST root advertised by the page.
+	 */
+	private function discoverWpRestBase( string $html ): ?string {
+		if ( ! preg_match_all( '#<link\b[^>]*>#i', $html, $links ) ) {
+			return null;
+		}
+
+		foreach ( $links[0] as $link ) {
+			if ( ! preg_match( '#\brel=["\']https://api\.w\.org/["\']#i', $link )
+				|| ! preg_match( '#\bhref=["\']([^"\']+)["\']#i', $link, $href ) ) {
+				continue;
+			}
+
+			$url = html_entity_decode( $href[1], ENT_QUOTES );
+			if ( wp_http_validate_url( $url ) ) {
+				return trailingslashit( $url );
+			}
 		}
 
 		return null;
