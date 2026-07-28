@@ -10,6 +10,78 @@
 declare( strict_types = 1 );
 
 namespace {
+	if ( function_exists( 'wp_get_ability' ) ) {
+		require_once dirname( __DIR__ ) . '/vendor/autoload.php';
+		require_once dirname( __DIR__ ) . '/inc/Abilities/AbilityRegistration.php';
+		require_once dirname( __DIR__ ) . '/inc/Abilities/AbilityCategories.php';
+		require_once dirname( __DIR__ ) . '/inc/Abilities/Content/UpsertPostAbility.php';
+		require_once dirname( __DIR__ ) . '/inc/Abilities/DuplicateCheck/DuplicateCheckAbility.php';
+
+		$GLOBALS['datamachine_late_runtime_loads'] = 0;
+
+		if ( ! function_exists( 'datamachine_activate_full_runtime' ) ) {
+			function datamachine_activate_full_runtime( string $reason = '' ): void {
+				if ( 'ability:data-machine-events/upsert-event' !== $reason ) {
+					return;
+				}
+
+				++$GLOBALS['datamachine_late_runtime_loads'];
+				new \DataMachine\Abilities\DuplicateCheck\DuplicateCheckAbility();
+				new \DataMachine\Abilities\Content\UpsertPostAbility();
+			}
+		}
+
+		\DataMachine\Abilities\AbilityCategories::ensure_registered();
+		add_action(
+			'wp_abilities_api_init',
+			static function (): void {
+				wp_register_ability(
+					'data-machine-events/upsert-event',
+					array(
+						'label'               => 'Upsert Event',
+						'description'         => 'Test extension ability that activates Data Machine lazily.',
+						'category'            => 'datamachine-content',
+						'execute_callback'    => \DataMachine\Abilities\AbilityRegistration::runtime_callback(
+							static fn(): array => array( 'success' => true ),
+							'data-machine-events/upsert-event'
+						),
+						'permission_callback' => '__return_true',
+					)
+				);
+			}
+		);
+
+		$event_ability = wp_get_ability( 'data-machine-events/upsert-event' );
+		if ( ! $event_ability ) {
+			fwrite( STDERR, "FAIL: extension ability did not register before lazy activation\n" );
+			exit( 1 );
+		}
+
+		$event_ability->execute();
+		$ability_count = count( wp_get_abilities() );
+		$event_ability->execute();
+
+		$checks = array(
+			'late activation loads the full runtime once' => 1 === $GLOBALS['datamachine_late_runtime_loads'],
+			'late activation registers datamachine/check-duplicate' => null !== wp_get_ability( 'datamachine/check-duplicate' ),
+			'late activation registers datamachine/upsert-post' => null !== wp_get_ability( 'datamachine/upsert-post' ),
+			'late registration preserves category-first validation' => wp_has_ability_category( 'datamachine-agent' ) && wp_has_ability_category( 'datamachine-content' ),
+			'late registration does not duplicate existing abilities' => $ability_count === count( wp_get_abilities() ),
+			'late registration does not replay the one-shot lifecycle' => 1 === did_action( 'wp_abilities_api_init' ),
+		);
+
+		foreach ( $checks as $label => $passed ) {
+			if ( ! $passed ) {
+				fwrite( STDERR, "FAIL: {$label}\n" );
+				exit( 1 );
+			}
+			echo "ok - {$label}\n";
+		}
+
+		echo 'All ' . count( $checks ) . " WordPress lazy-runtime ability assertions passed.\n";
+		return;
+	}
+
 	define( 'ABSPATH', sys_get_temp_dir() . '/datamachine-lazy-runtime-abilities/' );
 
 	$GLOBALS['datamachine_test_state'] = (object) array(
@@ -73,19 +145,21 @@ namespace {
 
 	require_once dirname( __DIR__ ) . '/inc/Abilities/AbilityRegistration.php';
 
-	function datamachine_activate_full_runtime( string $reason = '' ): void {
-		$state = $GLOBALS['datamachine_test_state'];
-		++$state->full_runtime_loads;
+	if ( ! function_exists( 'datamachine_activate_full_runtime' ) ) {
+		function datamachine_activate_full_runtime( string $reason = '' ): void {
+			$state = $GLOBALS['datamachine_test_state'];
+			++$state->full_runtime_loads;
 
-		if ( 'ability:data-machine-events/upsert-event' !== $reason ) {
-			return;
+			if ( 'ability:data-machine-events/upsert-event' !== $reason ) {
+				return;
+			}
+
+			require_once dirname( __DIR__ ) . '/inc/Abilities/Content/UpsertPostAbility.php';
+			require_once dirname( __DIR__ ) . '/inc/Abilities/DuplicateCheck/DuplicateCheckAbility.php';
+
+			new \DataMachine\Abilities\DuplicateCheck\DuplicateCheckAbility();
+			new \DataMachine\Abilities\Content\UpsertPostAbility();
 		}
-
-		require_once dirname( __DIR__ ) . '/inc/Abilities/Content/UpsertPostAbility.php';
-		require_once dirname( __DIR__ ) . '/inc/Abilities/DuplicateCheck/DuplicateCheckAbility.php';
-
-		new \DataMachine\Abilities\DuplicateCheck\DuplicateCheckAbility();
-		new \DataMachine\Abilities\Content\UpsertPostAbility();
 	}
 
 	$assertions = 0;
