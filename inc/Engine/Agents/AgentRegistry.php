@@ -66,6 +66,10 @@ class AgentRegistry {
 	 *                                    Defaults to `DirectoryManager::get_default_agent_user_id()`.
 	 *     @type array    $default_config Initial agent_config persisted on creation.
 	 *                                    Mutations thereafter go through the DB.
+	 *     @type array    $meta           Agents API metadata. Set
+	 *                                    `datamachine_default_materialization` to false
+	 *                                    to keep the definition registered without
+	 *                                    creating a default identity during reconciliation.
 	 * }
 	 * @return void
 	 */
@@ -139,6 +143,7 @@ class AgentRegistry {
 	 * @return array{
 	 *     created: string[],
 	 *     existing: string[],
+	 *     definition_only: string[],
 	 *     skipped: string[],
 	 * }
 	 */

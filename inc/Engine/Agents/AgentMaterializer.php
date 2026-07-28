@@ -35,19 +35,27 @@ class AgentMaterializer {
 	 * @return array{
 	 *     created: string[],
 	 *     existing: string[],
+	 *     definition_only: string[],
 	 *     skipped: string[],
 	 * }
 	 */
 	public static function reconcile( array $definitions ): array {
 		$summary = array(
-			'created'  => array(),
-			'existing' => array(),
-			'skipped'  => array(),
+			'created'         => array(),
+			'existing'        => array(),
+			'definition_only' => array(),
+			'skipped'         => array(),
 		);
 
 		$store = new AgentIdentityStoreAdapter();
 
 		foreach ( $definitions as $slug => $def ) {
+			$meta = is_array( $def['meta'] ?? null ) ? $def['meta'] : array();
+			if ( false === ( $meta['datamachine_default_materialization'] ?? true ) ) {
+				$summary['definition_only'][] = $slug;
+				continue;
+			}
+
 			$owner_id = self::resolve_owner( $def );
 			if ( $owner_id <= 0 ) {
 				$summary['skipped'][] = $slug;
@@ -70,7 +78,7 @@ class AgentMaterializer {
 				$scope,
 				$agent->get_default_config(),
 				array_merge(
-					is_array( $def['meta'] ?? null ) ? $def['meta'] : array(),
+					$meta,
 					array(
 						'label'                  => (string) ( $def['label'] ?? $slug ),
 						'datamachine_definition' => $def,

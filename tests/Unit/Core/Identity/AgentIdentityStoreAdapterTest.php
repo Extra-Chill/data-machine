@@ -180,7 +180,7 @@ class AgentIdentityStoreAdapterTest extends WP_UnitTestCase {
 	}
 
 	public function test_duplicate_key_loser_reconciles_pending_winner(): void {
-		$this->register_agent( 'concurrent-agent' );
+		$this->register_agent( 'concurrent-agent', array( 'meta' => array( 'datamachine_default_materialization' => false ) ) );
 		$scope      = new WP_Agent_Identity_Scope( 'concurrent-agent', $this->owner_a, 'shared-instance' );
 		$repository = new DuplicateLoserAgents();
 		$adapter    = new CountingProvisionAdapter( $repository );
@@ -256,8 +256,8 @@ class AgentIdentityStoreAdapterTest extends WP_UnitTestCase {
 		$this->assertSame( array( 'agent_slug', 'owner_id', 'instance_key_hash' ), array_column( $identity_index, 'Column_name' ) );
 	}
 
-	private function register_agent( string $slug ): void {
-		\WP_Agents_Registry::get_instance()->register( $slug, array( 'label' => $slug ) );
+	private function register_agent( string $slug, array $args = array() ): void {
+		\WP_Agents_Registry::get_instance()->register( $slug, array_merge( array( 'label' => $slug ), $args ) );
 		$this->registered[] = $slug;
 	}
 }

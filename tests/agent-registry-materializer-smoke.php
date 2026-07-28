@@ -261,6 +261,7 @@ namespace {
 	use DataMachine\Core\Database\Agents\AgentAccess;
 	use DataMachine\Core\Database\Agents\Agents;
 	use DataMachine\Core\FilesRepository\DirectoryManager;
+	use DataMachine\Core\Identity\AgentIdentityStoreAdapter;
 	use DataMachine\Engine\Agents\AgentRegistry;
 
 	$failures = array();
@@ -372,7 +373,7 @@ namespace {
 	);
 	do_action( 'init' );
 	$summary = AgentRegistry::reconcile();
-	assert_agent_materializer_equals( array( 'created' => array( 'example-agent' ), 'existing' => array(), 'skipped' => array() ), $summary, 'created summary matches pre-split registry behavior', $failures, $passes );
+	assert_agent_materializer_equals( array( 'created' => array( 'example-agent' ), 'existing' => array(), 'definition_only' => array(), 'skipped' => array() ), $summary, 'created summary matches pre-split registry behavior', $failures, $passes );
 	assert_agent_materializer_equals( 7, Agents::$rows['example-agent:7:default']['owner_id'] ?? 0, 'owner resolver controls created row owner', $failures, $passes );
 	assert_agent_materializer_equals( array( 'default_provider' => 'openai' ), Agents::$rows['example-agent:7:default']['agent_config'] ?? array(), 'default config persists on creation', $failures, $passes );
 	assert_agent_materializer_equals( array( array( 'agent_id' => 100, 'owner_id' => 7 ) ), AgentAccess::$bootstrapped, 'owner access is bootstrapped', $failures, $passes );
@@ -382,11 +383,71 @@ namespace {
 
 	echo "\n[3] existing rows are adopted and mutable fields stay DB-owned:\n";
 	$summary = AgentRegistry::reconcile();
-	assert_agent_materializer_equals( array( 'created' => array(), 'existing' => array( 'example-agent' ), 'skipped' => array() ), $summary, 'second reconcile reports existing row', $failures, $passes );
+	assert_agent_materializer_equals( array( 'created' => array(), 'existing' => array( 'example-agent' ), 'definition_only' => array(), 'skipped' => array() ), $summary, 'second reconcile reports existing row', $failures, $passes );
 	assert_agent_materializer_equals( 1, count( AgentAccess::$bootstrapped ), 'existing row does not bootstrap access again', $failures, $passes );
 	assert_agent_materializer_equals( 1, count( ScaffoldAbilities::$ability->calls ), 'existing row does not scaffold again', $failures, $passes );
 
-	echo "\n[4] materializer owns Data Machine side-effect dependencies:\n";
+	echo "\n[4] definition-only registration skips default reconciliation but supports exact explicit scopes:\n";
+	reset_agent_materializer_smoke();
+	DirectoryManager::$default_user_id = 19;
+	add_action(
+		'wp_agents_api_init',
+		static function (): void {
+			wp_register_agent(
+				'definition-only-agent',
+				array(
+					'label'          => 'Definition Only Agent',
+					'default_config' => array( 'default_provider' => 'openai' ),
+					'meta'           => array( 'datamachine_default_materialization' => false ),
+				)
+			);
+		}
+	);
+	do_action( 'init' );
+	$summary = AgentRegistry::reconcile();
+	assert_agent_materializer_equals( array( 'created' => array(), 'existing' => array(), 'definition_only' => array( 'definition-only-agent' ), 'skipped' => array() ), $summary, 'definition-only summary exposes the opt-out', $failures, $passes );
+	assert_agent_materializer_equals( array(), Agents::$rows, 'definition-only reconciliation creates no default row', $failures, $passes );
+	assert_agent_materializer_equals( array(), AgentAccess::$bootstrapped, 'definition-only reconciliation grants no owner access', $failures, $passes );
+	assert_agent_materializer_equals( array(), DirectoryManager::$ensured, 'definition-only reconciliation creates no directory', $failures, $passes );
+	assert_agent_materializer_equals( array(), ScaffoldAbilities::$ability->calls, 'definition-only reconciliation runs no scaffold', $failures, $passes );
+
+	$identity = wp_materialize_agent_identity(
+		'definition-only-agent',
+		new AgentIdentityStoreAdapter(),
+		array(
+			'owner_user_id' => 23,
+			'instance_key'  => 'workspace:one',
+			'meta'          => array( 'label' => 'Explicit Agent' ),
+		)
+	);
+	$repeat = wp_materialize_agent_identity(
+		'definition-only-agent',
+		new AgentIdentityStoreAdapter(),
+		array(
+			'owner_user_id' => 23,
+			'instance_key'  => 'workspace:one',
+		)
+	);
+	assert_agent_materializer_equals( 23, $identity->scope->owner_user_id ?? 0, 'explicit materialization preserves exact owner scope', $failures, $passes );
+	assert_agent_materializer_equals( 'workspace:one', $identity->scope->instance_key ?? '', 'explicit materialization preserves exact instance scope', $failures, $passes );
+	assert_agent_materializer_equals( $identity->id ?? 0, $repeat->id ?? -1, 'explicit materialization is idempotent', $failures, $passes );
+	assert_agent_materializer_equals( 1, count( Agents::$rows ), 'explicit materialization creates only the requested identity', $failures, $passes );
+	assert_agent_materializer_equals( array( array( 'agent_id' => 100, 'owner_id' => 23 ) ), AgentAccess::$bootstrapped, 'explicit materialization provisions owner access', $failures, $passes );
+	assert_agent_materializer_equals( 1, count( ScaffoldAbilities::$ability->calls ), 'explicit materialization provisions one scaffold', $failures, $passes );
+
+	\WP_Agents_Registry::get_instance()->register(
+		'runtime-bundle-agent',
+		array(
+			'label'          => 'Runtime Bundle Agent',
+			'owner_resolver' => static fn() => 31,
+		)
+	);
+	$result = datamachine_reconcile_runtime_agent_bundle_import( array( 'success' => true, 'agent_slug' => 'runtime-bundle-agent' ) );
+	assert_agent_materializer_equals( 'runtime-bundle-agent', $result['agent_slug'] ?? '', 'runtime import result passes through reconciliation', $failures, $passes );
+	assert_agent_materializer_equals( 31, Agents::$rows['runtime-bundle-agent:31:default']['owner_id'] ?? 0, 'runtime bundle definitions retain default materialization', $failures, $passes );
+	assert_agent_materializer_equals( false, isset( Agents::$rows['definition-only-agent:19:default'] ), 'bundle reconciliation does not materialize definition-only defaults', $failures, $passes );
+
+	echo "\n[5] materializer owns Data Machine side-effect dependencies:\n";
 	$registration_source = (string) file_get_contents( AGENTS_API_PATH . 'src/Registry/register-agents.php' );
 	$registry_source     = (string) file_get_contents( __DIR__ . '/../inc/Engine/Agents/AgentRegistry.php' );
 	$materializer_source = (string) file_get_contents( __DIR__ . '/../inc/Engine/Agents/AgentMaterializer.php' );
