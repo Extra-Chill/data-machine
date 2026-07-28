@@ -25,6 +25,10 @@ class Agents extends BaseRepository {
 	 */
 	const TABLE_NAME = 'datamachine_agents';
 
+	private const DEFAULT_INSTANCE_KEY       = 'default';
+	private const IDENTITY_INDEX_NAME        = 'agent_identity_scope_hash';
+	private const PROVISIONING_LEASE_SECONDS = 300;
+
 	/**
 	 * Use network-level prefix so agents are shared across the multisite network.
 	 *
@@ -55,18 +59,165 @@ class Agents extends BaseRepository {
 			agent_slug VARCHAR(200) NOT NULL,
 			agent_name VARCHAR(200) NOT NULL,
 			owner_id BIGINT(20) UNSIGNED NOT NULL,
+			instance_key LONGTEXT NOT NULL,
+			instance_key_hash CHAR(64) NOT NULL,
+			provisioning_token CHAR(64) NOT NULL DEFAULT '',
+			provisioning_started_at DATETIME NULL DEFAULT NULL,
+			provisioned_at DATETIME NULL DEFAULT CURRENT_TIMESTAMP,
 			site_scope BIGINT(20) UNSIGNED NULL DEFAULT NULL,
 			agent_config LONGTEXT NULL,
 			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 			PRIMARY KEY (agent_id),
-			UNIQUE KEY agent_slug (agent_slug),
+			UNIQUE KEY agent_identity_scope_hash (agent_slug, owner_id, instance_key_hash),
 			KEY owner_id (owner_id),
 			KEY site_scope (site_scope)
 		) {$charset_collate};";
 
 		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 		dbDelta( $sql );
+	}
+
+	/**
+	 * Migrate legacy slug-only identity storage to the Agents API scope tuple.
+	 *
+	 * Existing rows become their owner's default materialized instance. Full
+	 * instance keys remain lossless in LONGTEXT while a fixed-width SHA-256
+	 * digest provides portable MySQL/SQLite uniqueness.
+	 */
+	public static function ensure_identity_scope_schema(): void {
+		global $wpdb;
+
+		$table_name         = $wpdb->base_prefix . self::TABLE_NAME;
+		$had_provisioned_at = BaseRepository::column_exists( $table_name, 'provisioned_at', $wpdb );
+		self::ensure_identity_column( $wpdb, $table_name, 'instance_key', 'LONGTEXT NULL' );
+		self::ensure_identity_column( $wpdb, $table_name, 'instance_key_hash', 'CHAR(64) NULL' );
+		self::ensure_identity_column( $wpdb, $table_name, 'provisioning_token', "CHAR(64) NOT NULL DEFAULT ''" );
+		self::ensure_identity_column( $wpdb, $table_name, 'provisioning_started_at', 'DATETIME NULL DEFAULT NULL' );
+		// SQLite rejects non-constant defaults when ALTER TABLE adds a column.
+		self::ensure_identity_column( $wpdb, $table_name, 'provisioned_at', 'DATETIME NULL DEFAULT NULL' );
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+		self::query_or_throw(
+			$wpdb,
+			$wpdb->prepare( 'UPDATE %i SET instance_key = %s WHERE instance_key IS NULL OR instance_key = %s', $table_name, self::DEFAULT_INSTANCE_KEY, '' ),
+			'backfill legacy agent instance keys'
+		);
+		if ( ! $had_provisioned_at ) {
+			self::query_or_throw(
+				$wpdb,
+				$wpdb->prepare( 'UPDATE %i SET provisioned_at = %s WHERE provisioned_at IS NULL', $table_name, gmdate( 'Y-m-d H:i:s' ) ),
+				'backfill legacy agent provisioning state'
+			);
+		}
+
+		// Hash in PHP so SQLite and MySQL persist byte-for-byte equivalent digests.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$rows = $wpdb->get_results( $wpdb->prepare( 'SELECT agent_id, instance_key, instance_key_hash FROM %i', $table_name ), ARRAY_A );
+		foreach ( $rows as $row ) {
+			$instance_key = (string) ( $row['instance_key'] ?? self::DEFAULT_INSTANCE_KEY );
+			$digest       = self::instance_key_hash( $instance_key );
+			if ( hash_equals( $digest, (string) ( $row['instance_key_hash'] ?? '' ) ) ) {
+				continue;
+			}
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+			if ( false === $wpdb->update( $table_name, array( 'instance_key_hash' => $digest ), array( 'agent_id' => (int) $row['agent_id'] ), array( '%s' ), array( '%d' ) ) ) {
+				throw new \RuntimeException( 'Failed to backfill agent identity scope digest.' );
+			}
+		}
+
+		if ( ! self::is_sqlite() ) {
+			self::query_or_throw( $wpdb, $wpdb->prepare( 'ALTER TABLE %i MODIFY instance_key LONGTEXT NOT NULL', $table_name ), 'make agent instance keys non-null' );
+			self::query_or_throw( $wpdb, $wpdb->prepare( 'ALTER TABLE %i MODIFY instance_key_hash CHAR(64) NOT NULL', $table_name ), 'make agent instance digests non-null' );
+		}
+
+		$indexes = self::get_identity_indexes( $wpdb, $table_name );
+		if ( ! self::has_unique_index( $indexes, array( 'agent_slug', 'owner_id', 'instance_key_hash' ) ) ) {
+			$sql = self::is_sqlite()
+				? $wpdb->prepare( 'CREATE UNIQUE INDEX %i ON %i (agent_slug, owner_id, instance_key_hash)', self::IDENTITY_INDEX_NAME, $table_name )
+				: $wpdb->prepare( 'ALTER TABLE %i ADD UNIQUE KEY %i (agent_slug, owner_id, instance_key_hash)', $table_name, self::IDENTITY_INDEX_NAME );
+			self::query_or_throw( $wpdb, $sql, 'create agent identity scope index' );
+		}
+
+		$indexes = self::get_identity_indexes( $wpdb, $table_name );
+		if ( ! self::has_unique_index( $indexes, array( 'agent_slug', 'owner_id', 'instance_key_hash' ) ) ) {
+			throw new \RuntimeException( 'Agent identity scope index verification failed.' );
+		}
+
+		// Only remove obsolete uniqueness after the digest-backed replacement is verified.
+		foreach ( $indexes as $name => $index ) {
+			if ( ! $index['unique'] || ! in_array( $index['columns'], array( array( 'agent_slug' ), array( 'agent_slug', 'owner_id', 'instance_key' ) ), true ) ) {
+				continue;
+			}
+			$sql = self::is_sqlite()
+				? $wpdb->prepare( 'DROP INDEX %i', $name )
+				: $wpdb->prepare( 'ALTER TABLE %i DROP INDEX %i', $table_name, $name );
+			self::query_or_throw( $wpdb, $sql, 'remove obsolete agent identity index' );
+		}
+
+		$indexes = self::get_identity_indexes( $wpdb, $table_name );
+		if ( ! self::has_unique_index( $indexes, array( 'agent_slug', 'owner_id', 'instance_key_hash' ) ) || self::has_unique_index( $indexes, array( 'agent_slug' ) ) ) {
+			throw new \RuntimeException( 'Agent identity schema migration did not reach a valid final state.' );
+		}
+	}
+
+	private static function ensure_identity_column( \wpdb $wpdb, string $table_name, string $column, string $definition ): void {
+		if ( BaseRepository::column_exists( $table_name, $column, $wpdb ) ) {
+			return;
+		}
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Column and definition are private schema constants, while the table identifier is prepared.
+		self::query_or_throw( $wpdb, $wpdb->prepare( "ALTER TABLE %i ADD COLUMN {$column} {$definition}", $table_name ), "add agent identity column {$column}" );
+	}
+
+	private static function query_or_throw( \wpdb $wpdb, string $sql, string $operation ): void {
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
+		if ( false === $wpdb->query( $sql ) ) {
+			throw new \RuntimeException( sprintf( 'Failed to %s: %s', esc_html( $operation ), esc_html( (string) $wpdb->last_error ) ) );
+		}
+	}
+
+	/** @return array<string,array{unique:bool,columns:string[]}> */
+	private static function get_identity_indexes( \wpdb $wpdb, string $table_name ): array {
+		$indexes = array();
+		if ( self::is_sqlite() ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			$index_rows = $wpdb->get_results( $wpdb->prepare( 'PRAGMA index_list(%i)', $table_name ), ARRAY_A );
+			foreach ( $index_rows as $index_row ) {
+				$name = (string) ( $index_row['name'] ?? '' );
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+				$column_rows      = $wpdb->get_results( $wpdb->prepare( 'PRAGMA index_info(%i)', $name ), ARRAY_A );
+				$indexes[ $name ] = array(
+					'unique'  => 1 === (int) ( $index_row['unique'] ?? 0 ),
+					'columns' => array_values( array_map( static fn( array $column_row ): string => (string) ( $column_row['name'] ?? '' ), $column_rows ) ),
+				);
+			}
+			return $indexes;
+		}
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$index_rows = $wpdb->get_results( $wpdb->prepare( 'SHOW INDEX FROM %i', $table_name ), ARRAY_A );
+		foreach ( $index_rows as $index_row ) {
+			$name = (string) ( $index_row['Key_name'] ?? '' );
+			if ( '' === $name ) {
+				continue;
+			}
+			$indexes[ $name ]['unique'] = 0 === (int) ( $index_row['Non_unique'] ?? 1 );
+			$indexes[ $name ]['columns'][ (int) ( $index_row['Seq_in_index'] ?? 0 ) ] = (string) ( $index_row['Column_name'] ?? '' );
+		}
+		foreach ( $indexes as &$index ) {
+			ksort( $index['columns'] );
+			$index['columns'] = array_values( $index['columns'] );
+		}
+		return $indexes;
+	}
+
+	private static function has_unique_index( array $indexes, array $columns ): bool {
+		foreach ( $indexes as $index ) {
+			if ( $index['unique'] && $columns === $index['columns'] ) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	/**
@@ -250,7 +401,7 @@ class Agents extends BaseRepository {
 		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
 		$row = $this->wpdb->get_row(
 			$this->wpdb->prepare(
-				'SELECT * FROM %i WHERE agent_slug = %s LIMIT 1',
+				'SELECT * FROM %i WHERE agent_slug = %s ORDER BY agent_id ASC LIMIT 1',
 				$this->table_name,
 				$agent_slug
 			),
@@ -264,6 +415,32 @@ class Agents extends BaseRepository {
 
 		$row['agent_config'] = self::decode_agent_config( $row['agent_config'] ?? null );
 
+		return $row;
+	}
+
+	/** Resolve an agent by its complete normalized materialized identity scope. */
+	public function get_by_identity_scope( string $agent_slug, int $owner_id, string $instance_key = 'default' ): ?array {
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
+		$row = $this->wpdb->get_row(
+			$this->wpdb->prepare(
+				'SELECT * FROM %i WHERE agent_slug = %s AND owner_id = %d AND instance_key_hash = %s LIMIT 1',
+				$this->table_name,
+				$agent_slug,
+				$owner_id,
+				self::instance_key_hash( $instance_key )
+			),
+			ARRAY_A
+		);
+		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
+
+		if ( ! $row ) {
+			return null;
+		}
+		if ( ! hash_equals( $instance_key, (string) ( $row['instance_key'] ?? '' ) ) ) {
+			throw new \UnexpectedValueException( 'Agent identity scope digest conflicts with persisted instance key.' );
+		}
+
+		$row['agent_config'] = self::decode_agent_config( $row['agent_config'] ?? null );
 		return $row;
 	}
 
@@ -448,12 +625,14 @@ class Agents extends BaseRepository {
 		}
 
 		$data    = array(
-			'agent_slug'   => $agent_slug,
-			'agent_name'   => $agent_name,
-			'owner_id'     => $owner_id,
-			'agent_config' => wp_json_encode( AgentConfigFactory::normalize( $agent_config ) ),
+			'agent_slug'        => $agent_slug,
+			'agent_name'        => $agent_name,
+			'owner_id'          => $owner_id,
+			'instance_key'      => self::DEFAULT_INSTANCE_KEY,
+			'instance_key_hash' => self::instance_key_hash( self::DEFAULT_INSTANCE_KEY ),
+			'agent_config'      => wp_json_encode( AgentConfigFactory::normalize( $agent_config ) ),
 		);
-		$formats = array( '%s', '%s', '%d', '%s' );
+		$formats = array( '%s', '%s', '%d', '%s', '%s', '%s' );
 
 		// Only write site_scope when the caller is intentional about it. The
 		// `false` sentinel leaves the column to its DB default (NULL = network-wide).
@@ -470,6 +649,112 @@ class Agents extends BaseRepository {
 		);
 
 		return (int) $this->wpdb->insert_id;
+	}
+
+	/**
+	 * Atomically materialize one complete identity scope.
+	 *
+	 * @return array{agent_id:int,created:bool}
+	 */
+	public function create_identity_if_missing( string $agent_slug, string $agent_name, int $owner_id, string $instance_key, array $agent_config = array() ): array {
+		$existing = $this->get_by_identity_scope( $agent_slug, $owner_id, $instance_key );
+		if ( $existing ) {
+			return array(
+				'agent_id' => (int) $existing['agent_id'],
+				'created'  => false,
+			);
+		}
+
+		// The composite unique key serializes concurrent materialization attempts.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+		$data     = array(
+			'agent_slug'              => $agent_slug,
+			'agent_name'              => $agent_name,
+			'owner_id'                => $owner_id,
+			'instance_key'            => $instance_key,
+			'instance_key_hash'       => self::instance_key_hash( $instance_key ),
+			'provisioning_token'      => '',
+			'provisioning_started_at' => null,
+			'provisioned_at'          => null,
+			'agent_config'            => wp_json_encode( AgentConfigFactory::normalize( $agent_config ) ),
+		);
+		$formats  = array( '%s', '%s', '%d', '%s', '%s', '%s', null, null, '%s' );
+		$inserted = $this->insert_identity_row( $data, $formats );
+
+		if ( false !== $inserted && $this->wpdb->insert_id > 0 ) {
+			return array(
+				'agent_id' => (int) $this->wpdb->insert_id,
+				'created'  => true,
+			);
+		}
+
+		$existing = $this->get_by_identity_scope( $agent_slug, $owner_id, $instance_key );
+		return array(
+			'agent_id' => (int) ( $existing['agent_id'] ?? 0 ),
+			'created'  => false,
+		);
+	}
+
+	/**
+	 * @param array<string,mixed>    $data    Identity row data.
+	 * @param array<int,string|null> $formats Identity row formats.
+	 */
+	protected function insert_identity_row( array $data, array $formats ): int|false {
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+		return $this->wpdb->insert( $this->table_name, $data, $formats );
+	}
+
+	public function claim_identity_provisioning( int $agent_id, string $token ): bool {
+		$now    = gmdate( 'Y-m-d H:i:s' );
+		$expiry = gmdate( 'Y-m-d H:i:s', time() - self::PROVISIONING_LEASE_SECONDS );
+		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared -- The complete conditional update is prepared immediately below.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$updated = $this->wpdb->query(
+			$this->wpdb->prepare(
+				"UPDATE %i SET provisioning_token = %s, provisioning_started_at = %s WHERE agent_id = %d AND provisioned_at IS NULL AND (provisioning_token = '' OR provisioning_token IS NULL OR provisioning_started_at IS NULL OR provisioning_started_at < %s)",
+				$this->table_name,
+				$token,
+				$now,
+				$agent_id,
+				$expiry
+			)
+		);
+		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
+		return 1 === $updated;
+	}
+
+	public function complete_identity_provisioning( int $agent_id, string $token ): bool {
+		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared -- The complete conditional update is prepared immediately below.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$updated = $this->wpdb->query(
+			$this->wpdb->prepare(
+				"UPDATE %i SET provisioned_at = %s, provisioning_token = '', provisioning_started_at = NULL WHERE agent_id = %d AND provisioning_token = %s AND provisioned_at IS NULL",
+				$this->table_name,
+				gmdate( 'Y-m-d H:i:s' ),
+				$agent_id,
+				$token
+			)
+		);
+		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
+		return 1 === $updated;
+	}
+
+	public function release_identity_provisioning( int $agent_id, string $token ): void {
+		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared -- The complete conditional update is prepared immediately below.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$this->wpdb->query(
+			$this->wpdb->prepare(
+				"UPDATE %i SET provisioning_token = '', provisioning_started_at = NULL WHERE agent_id = %d AND provisioning_token = %s AND provisioned_at IS NULL",
+				$this->table_name,
+				$agent_id,
+				$token
+			)
+		);
+		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
+	}
+
+	private static function instance_key_hash( string $instance_key ): string {
+		return hash( 'sha256', $instance_key );
 	}
 
 	private static function decode_agent_config( mixed $value ): array {

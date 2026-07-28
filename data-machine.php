@@ -814,6 +814,7 @@ function datamachine_activate_plugin( $network_wide = false ) {
  */
 function datamachine_create_network_agent_tables() {
 	\DataMachine\Core\Database\Agents\Agents::create_table();
+	\DataMachine\Core\Database\Agents\Agents::ensure_identity_scope_schema();
 	\DataMachine\Core\Database\Agents\Agents::ensure_site_scope_column();
 	\DataMachine\Core\Database\Agents\AgentAccess::create_table();
 	\DataMachine\Core\Database\Agents\AgentTokens::create_table();
