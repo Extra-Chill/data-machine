@@ -8,8 +8,9 @@
  *   3. Single-event-detail page extraction
  *   4. Fluid Engine deferral (no live fixture content; see PR body)
  *
- * Plus regression coverage for the classic Squarespace Events Collection
- * shape via the Royal American snapshot.
+ * Issue #625 adds context-backed collection URL resolution, paged items, and
+ * strict event evidence. Classic Events Collection behavior remains covered
+ * via the Royal American snapshot.
  *
  * @package DataMachineEvents\Tests\Unit
  * @since   0.15.x
@@ -59,42 +60,36 @@ class SquarespaceExtractorTest extends WP_UnitTestCase {
 	/* ------------------------------------------------------------------ */
 
 	public function test_summary_block_dereferences_collection_id() {
-		$source_url = 'https://example.com/';
+		$source_url = 'https://venue.test/calendar';
+		$html       = file_get_contents( $this->fixtures_dir . '/summary-context.html' );
 
-		$block_json = wp_json_encode(
-			array(
-				'collectionId'             => 'evt-collection-abc',
-				'design'                   => 'list',
-				'showPastOrUpcomingEvents' => 'upcoming',
-			)
-		);
-
-		$html = '<html><script>Static.SQUARESPACE_CONTEXT = {};</script>'
-			. '<div class="sqs-block-summary-v2" data-block-json="' . esc_attr( $block_json ) . '"></div>'
-			. '</html>';
-
-		// The page-level ?format=json returns a non-events payload so the
-		// classic strategies all whiff and we fall through to improvement 1.
-		// Improvement 1 fires `?format=json&collectionId=evt-collection-abc`
-		// which the mock answers with an upcoming[] array.
 		$this->mockHttpRoutes(
 			array(
-				'https://example.com/?format=json' => array( 'website' => array() ),
-				'https://example.com/?format=json&collectionId=evt-collection-abc' => array(
-					'upcoming' => array(
-						$this->makeRawEvent( 'Show One', '2099-01-15T20:00:00+00:00' ),
-						$this->makeRawEvent( 'Show Two', '2099-02-20T20:00:00+00:00' ),
-						$this->makeRawEvent( 'Show Three', '2099-03-05T20:00:00+00:00' ),
-					),
-				),
+				'https://venue.test/calendar?format=json' => array( 'website' => array() ),
+				'https://venue.test/live-shows?format=json' => file_get_contents( $this->fixtures_dir . '/summary-events-page-1.json' ),
+				'https://venue.test/live-shows?offset=2&format=json' => file_get_contents( $this->fixtures_dir . '/summary-events-page-2.json' ),
 			)
 		);
 
 		$events = $this->extractor->extract( $html, $source_url );
 
-		$this->assertCount( 3, $events, 'Summary Block deref should yield 3 events' );
-		$this->assertSame( 'Show One', $events[0]['title'] );
-		$this->assertSame( '2099-01-15', $events[0]['startDate'] );
+		$this->assertCount( 2, $events, 'Summary Block deref should follow paged event items.' );
+		$this->assertSame( 'Fixture Show One', $events[0]['title'] );
+		$this->assertSame( '2099-07-01', $events[0]['startDate'] );
+		$this->assertSame( 'Fixture Show Two', $events[1]['title'] );
+	}
+
+	public function test_non_event_items_are_not_treated_as_events() {
+		$source_url = 'https://venue.test/news';
+		$html       = '<html><script>Static.SQUARESPACE_CONTEXT = {};</script></html>';
+
+		$this->mockHttpRoutes(
+			array(
+				'https://venue.test/news?format=json' => file_get_contents( $this->fixtures_dir . '/non-event-items.json' ),
+			)
+		);
+
+		$this->assertSame( array(), $this->extractor->extract( $html, $source_url ) );
 	}
 
 	public function test_summary_block_gallery_is_skipped() {
@@ -136,7 +131,7 @@ class SquarespaceExtractorTest extends WP_UnitTestCase {
 			)
 		);
 
-		$html = '<html><script>Static.SQUARESPACE_CONTEXT = {};</script>'
+		$html = '<html><script>Static.SQUARESPACE_CONTEXT = {"website":{"navigation":[{"id":"evt-collection-fail","fullUrl":"/events"}]}};</script>'
 			. '<div class="sqs-block-summary-v2" data-block-json="' . esc_attr( $block_json ) . '"></div>'
 			. '</html>';
 
@@ -162,7 +157,7 @@ class SquarespaceExtractorTest extends WP_UnitTestCase {
 	public function test_user_items_list_dereferences_collection_id() {
 		$source_url = 'https://venue.test/';
 
-		$html = '<html><script>Static.SQUARESPACE_CONTEXT = {};</script>'
+		$html = '<html><script>Static.SQUARESPACE_CONTEXT = {"website":{"navigation":[{"id":"evt-uil-xyz","fullUrl":"/events"}]}};</script>'
 			. '<div class="user-items-list" data-collection-id="evt-uil-xyz">'
 			. '<div class="user-items-list-section">skeleton</div>'
 			. '</div>'
@@ -171,7 +166,7 @@ class SquarespaceExtractorTest extends WP_UnitTestCase {
 		$this->mockHttpRoutes(
 			array(
 				'https://venue.test/?format=json' => array( 'website' => array() ),
-				'https://venue.test/?format=json&collectionId=evt-uil-xyz' => array(
+				'https://venue.test/events?format=json' => array(
 					'upcoming' => array(
 						$this->makeRawEvent( 'UIL Show A', '2099-04-01T20:00:00+00:00' ),
 						$this->makeRawEvent( 'UIL Show B', '2099-04-08T20:00:00+00:00' ),

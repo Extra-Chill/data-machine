@@ -45,19 +45,7 @@ class SquarespaceExtractor extends BaseExtractor {
 			$data = array();
 		}
 
-		$raw_items = array();
-
-		// 1. Check for top-level 'upcoming' array (common in Squarespace event collections)
-		if ( isset( $data['upcoming'] ) && is_array( $data['upcoming'] ) && ! empty( $data['upcoming'] ) ) {
-			$raw_items = $data['upcoming'];
-		}
-
-		if ( empty( $raw_items ) ) {
-			// 2. Check for top-level 'past' array if no upcoming events
-			if ( isset( $data['past'] ) && is_array( $data['past'] ) && ! empty( $data['past'] ) ) {
-				$raw_items = $data['past'];
-			}
-		}
+		$raw_items = $this->extractEventsFromCollection( $data );
 
 		if ( empty( $raw_items ) ) {
 			// 3. Try recursive search for items in collection structure
@@ -248,8 +236,8 @@ class SquarespaceExtractor extends BaseExtractor {
 	 * Strategy per block:
 	 *   1. If the block declares an explicit `collectionUrlId` use
 	 *      `/<urlId>?format=json` directly.
-	 *   2. Otherwise probe the `?collectionId=` query against the source
-	 *      origin which Squarespace honors site-wide.
+	 *   2. Otherwise map `collectionId` to the matching collection `fullUrl`
+	 *      in the page's embedded Squarespace context.
 	 *
 	 * Returns an array of raw items (compatible with normalizeItem()) or an
 	 * empty array on failure. Never throws.
@@ -299,7 +287,7 @@ class SquarespaceExtractor extends BaseExtractor {
 			}
 			$seen_ids[ $collection_id ] = true;
 
-			$items = $this->fetchCollectionItemsById( $collection_id, $base_url, $block );
+			$items = $this->fetchCollectionItemsById( $collection_id, $base_url, $html, $block );
 			if ( ! empty( $items ) ) {
 				return $items;
 			}
@@ -344,7 +332,7 @@ class SquarespaceExtractor extends BaseExtractor {
 					continue;
 				}
 				$seen[ $cid ] = true;
-				$items        = $this->fetchCollectionItemsById( $cid, $base_url );
+				$items        = $this->fetchCollectionItemsById( $cid, $base_url, $html );
 				if ( ! empty( $items ) ) {
 					return $items;
 				}
@@ -360,7 +348,7 @@ class SquarespaceExtractor extends BaseExtractor {
 					continue;
 				}
 				$seen[ $cid ] = true;
-				$items        = $this->fetchCollectionItemsById( $cid, $base_url );
+				$items        = $this->fetchCollectionItemsById( $cid, $base_url, $html );
 				if ( ! empty( $items ) ) {
 					return $items;
 				}
@@ -413,29 +401,30 @@ class SquarespaceExtractor extends BaseExtractor {
 	/**
 	 * Fetch a Squarespace collection's events array by collection ID.
 	 *
-	 * Tries (in order):
-	 *   1. The block's own `collectionUrlId` if present (`/<urlId>?format=json`).
-	 *   2. `?collectionId=` query against the source origin — Squarespace
-	 *      resolves this to the collection root regardless of path.
+	 * Resolves the collection path from the block's `collectionUrlId` or from
+	 * the matching collection object in Static.SQUARESPACE_CONTEXT. Squarespace
+	 * does not resolve arbitrary `?collectionId=` requests to collection JSON.
 	 *
 	 * @since 0.15.x
 	 * @param string $collection_id Squarespace collection ID.
 	 * @param string $base_url      Source origin (scheme + host, no trailing slash).
+	 * @param string $html          Host page HTML containing Squarespace context.
 	 * @param array  $block         Optional originating block payload (for urlId hints).
 	 * @return array Raw event items, or empty array on failure.
 	 */
-	private function fetchCollectionItemsById( string $collection_id, string $base_url, array $block = array() ): array {
+	private function fetchCollectionItemsById( string $collection_id, string $base_url, string $html, array $block = array() ): array {
 		$candidates = array();
 
 		if ( ! empty( $block['collectionUrlId'] ) ) {
-			$candidates[] = $base_url . '/' . ltrim( (string) $block['collectionUrlId'], '/' ) . '?format=json';
+			$candidates[] = add_query_arg( 'format', 'json', $base_url . '/' . ltrim( (string) $block['collectionUrlId'], '/' ) );
 		}
 
-		// Squarespace honors `?collectionId=ID` at any path on the same site.
-		// `/?format=json&collectionId=...` resolves to the collection root JSON.
-		$candidates[] = $base_url . '/?format=json&collectionId=' . rawurlencode( $collection_id );
+		$context_path = $this->findCollectionPathById( $html, $collection_id );
+		if ( $context_path ) {
+			$candidates[] = add_query_arg( 'format', 'json', $base_url . '/' . ltrim( $context_path, '/' ) );
+		}
 
-		foreach ( $candidates as $url ) {
+		foreach ( array_unique( $candidates ) as $url ) {
 			$response = \DataMachine\Core\HttpClient::get(
 				$url,
 				array(
@@ -455,11 +444,97 @@ class SquarespaceExtractor extends BaseExtractor {
 
 			$items = $this->extractEventsFromCollection( $data );
 			if ( ! empty( $items ) ) {
+				if ( ! empty( $data['items'] ) ) {
+					$items = $this->fetchPaginatedCollectionItems( $items, $data, $base_url );
+				}
 				return $items;
 			}
 		}
 
 		return array();
+	}
+
+	/**
+	 * Find a collection's same-site path in embedded Squarespace context.
+	 */
+	private function findCollectionPathById( string $html, string $collection_id ): ?string {
+		$context = $this->extractContextData( $html );
+		if ( empty( $context ) ) {
+			return null;
+		}
+
+		$find = static function ( array $value ) use ( &$find, $collection_id ): ?string {
+			if ( isset( $value['id'] ) && $collection_id === (string) $value['id'] ) {
+				$path = $value['fullUrl'] ?? $value['urlId'] ?? '';
+				if ( is_string( $path ) && '' !== trim( $path ) ) {
+					$parsed = wp_parse_url( $path );
+					return $parsed['path'] ?? null;
+				}
+			}
+
+			foreach ( $value as $child ) {
+				if ( ! is_array( $child ) ) {
+					continue;
+				}
+				$path = $find( $child );
+				if ( $path ) {
+					return $path;
+				}
+			}
+
+			return null;
+		};
+
+		return $find( $context );
+	}
+
+	/**
+	 * Follow same-origin pagination for collection payloads using items[].
+	 */
+	private function fetchPaginatedCollectionItems( array $items, array $data, string $base_url ): array {
+		$seen_urls = array();
+
+		for ( $page = 0; $page < 10; ++$page ) {
+			$next_path = $data['pagination']['nextPageUrl'] ?? '';
+			if ( empty( $data['pagination']['nextPage'] ) || ! is_string( $next_path ) || '' === $next_path ) {
+				break;
+			}
+
+			$parsed = wp_parse_url( $next_path );
+			if ( ! empty( $parsed['host'] ) ) {
+				break;
+			}
+
+			$next_url = add_query_arg( 'format', 'json', $base_url . '/' . ltrim( $next_path, '/' ) );
+			if ( isset( $seen_urls[ $next_url ] ) ) {
+				break;
+			}
+			$seen_urls[ $next_url ] = true;
+
+			$response = \DataMachine\Core\HttpClient::get(
+				$next_url,
+				array(
+					'timeout' => 15,
+					'context' => 'Squarespace Extractor Collection Pagination',
+				)
+			);
+			if ( empty( $response['success'] ) || empty( $response['data'] ) ) {
+				break;
+			}
+
+			$data = json_decode( $response['data'], true );
+			if ( ! is_array( $data ) || JSON_ERROR_NONE !== json_last_error() ) {
+				break;
+			}
+
+			$page_items = $this->filterEventItems( $data['items'] ?? array() );
+			if ( empty( $page_items ) ) {
+				break;
+			}
+			$items = array_merge( $items, $page_items );
+		}
+
+		return $items;
 	}
 
 	/**
@@ -484,28 +559,34 @@ class SquarespaceExtractor extends BaseExtractor {
 		}
 
 		if ( ! empty( $data['items'] ) && is_array( $data['items'] ) ) {
-			$events = array();
-			foreach ( $data['items'] as $item ) {
-				if ( ! is_array( $item ) ) {
-					continue;
-				}
-				// recordType 12 = Squarespace event record. When recordType is
-				// absent (older payloads) but the item carries event-ish
-				// fields, accept it too.
-				$is_event = ( isset( $item['recordType'] ) && 12 === (int) $item['recordType'] )
-					|| ! empty( $item['startDate'] )
-					|| ! empty( $item['endDate'] )
-					|| ! empty( $item['eventDates'] );
-				if ( $is_event ) {
-					$events[] = $item;
-				}
-			}
-			if ( ! empty( $events ) ) {
-				return $events;
-			}
+			return $this->filterEventItems( $data['items'] );
 		}
 
 		return array();
+	}
+
+	/**
+	 * Keep only records with explicit event evidence.
+	 */
+	private function filterEventItems( array $items ): array {
+		$events = array();
+		foreach ( $items as $item ) {
+			if ( ! is_array( $item ) ) {
+				continue;
+			}
+			// recordType 12 = Squarespace event record. When recordType is
+			// absent (older payloads) but the item carries event-ish
+			// fields, accept it too.
+			$is_event = ( isset( $item['recordType'] ) && 12 === (int) $item['recordType'] )
+				|| ! empty( $item['startDate'] )
+				|| ! empty( $item['endDate'] )
+				|| ! empty( $item['eventDates'] );
+			if ( $is_event ) {
+				$events[] = $item;
+			}
+		}
+
+		return $events;
 	}
 
 	/**
@@ -586,26 +667,7 @@ class SquarespaceExtractor extends BaseExtractor {
 					return $data;
 				}
 
-				// 2. Check if page has a Summary Block referencing an events collection
-				$events_collection_url = $this->findEventsCollectionUrl( $html, $source_url );
-				if ( $events_collection_url ) {
-					$collection_response = \DataMachine\Core\HttpClient::get(
-						$events_collection_url,
-						array(
-							'timeout' => 30,
-							'context' => 'Squarespace Extractor Events Collection',
-						)
-					);
-
-					if ( $collection_response['success'] && ! empty( $collection_response['data'] ) ) {
-						$collection_data = json_decode( $collection_response['data'], true );
-						if ( json_last_error() === JSON_ERROR_NONE && ! empty( $collection_data ) ) {
-							return $collection_data;
-						}
-					}
-				}
-
-				// 3. Probe common event collection paths via JSON API.
+				// 2. Probe common event collection paths via JSON API.
 				// Squarespace events are often on a separate collection page
 				// (e.g. /events, /shows) that the homepage doesn't reference
 				// via Summary Blocks.
@@ -618,7 +680,14 @@ class SquarespaceExtractor extends BaseExtractor {
 			}
 		}
 
-		// 3. Fallback to extracting from HTML using string search (avoids regex backtracking)
+		// 3. Fallback to the embedded page context.
+		return $this->extractContextData( $html );
+	}
+
+	/**
+	 * Decode Static.SQUARESPACE_CONTEXT from a page.
+	 */
+	private function extractContextData( string $html ): array {
 		$start_token = 'Static.SQUARESPACE_CONTEXT = ';
 		$pos         = strpos( $html, $start_token );
 		if ( false === $pos ) {
@@ -626,79 +695,12 @@ class SquarespaceExtractor extends BaseExtractor {
 		}
 
 		$json_part = substr( $html, $pos + strlen( $start_token ) );
-
-		// Find the first semicolon that isn't inside a string
-		// Simple approach: look for }; or } followed by </script>
-		if ( preg_match( '/^(\{.*?\});\s*(?:<\/script>|window)/s', $json_part, $matches ) ) {
-			$data = json_decode( $matches[1], true );
-			if ( json_last_error() === JSON_ERROR_NONE && ! empty( $data ) ) {
-				return $data;
-			}
+		if ( ! preg_match( '/^(\{.*?\});\s*(?:<\/script>|window)/s', $json_part, $matches ) ) {
+			return array();
 		}
 
-		return array();
-	}
-
-	/**
-	 * Find events collection URL from Summary Block references in HTML.
-	 *
-	 * Summary Blocks on Squarespace pages reference source collections via collectionId.
-	 * This method extracts that ID and constructs the collection's JSON URL.
-	 */
-	private function findEventsCollectionUrl( string $html, string $source_url ): ?string {
-		// Look for Summary Block with showPastOrUpcomingEvents setting (indicates events collection)
-		if ( ! preg_match( '/data-block-json="([^"]*showPastOrUpcomingEvents[^"]*)"/', $html, $matches ) ) {
-			return null;
-		}
-
-		$block_json = html_entity_decode( $matches[1], ENT_QUOTES, 'UTF-8' );
-		$block_data = json_decode( $block_json, true );
-
-		if ( empty( $block_data['collectionId'] ) ) {
-			return null;
-		}
-
-		// Get the collection URL by fetching the site's navigation/collections
-		// For now, try common event collection paths
-		$parsed   = wp_parse_url( $source_url );
-		$base_url = ( $parsed['scheme'] ?? 'https' ) . '://' . ( $parsed['host'] ?? '' );
-
-		// Try common Squarespace event collection paths
-		$common_paths = array(
-			'/events',
-			'/event-listings',
-			'/calendar',
-			'/shows',
-			'/upcoming-events',
-			'/live-events',
-		);
-
-		foreach ( $common_paths as $path ) {
-			// Skip if it's the current URL
-			$current_path = $parsed['path'] ?? '';
-			if ( rtrim( $path, '/' ) === rtrim( $current_path, '/' ) ) {
-				continue;
-			}
-
-			$test_url = $base_url . $path . '?format=json';
-			$response = \DataMachine\Core\HttpClient::get(
-				$test_url,
-				array(
-					'timeout' => 10,
-					'context' => 'Squarespace Extractor Collection Discovery',
-				)
-			);
-
-			if ( $response['success'] && ! empty( $response['data'] ) ) {
-				$test_data = json_decode( $response['data'], true );
-				// Check if this collection has the events we're looking for
-				if ( isset( $test_data['upcoming'] ) && ! empty( $test_data['upcoming'] ) ) {
-					return $test_url;
-				}
-			}
-		}
-
-		return null;
+		$data = json_decode( $matches[1], true );
+		return JSON_ERROR_NONE === json_last_error() && is_array( $data ) ? $data : array();
 	}
 
 	/**
@@ -776,7 +778,10 @@ class SquarespaceExtractor extends BaseExtractor {
 		if ( isset( $data['blocks'] ) && is_array( $data['blocks'] ) ) {
 			foreach ( $data['blocks'] as $block ) {
 				if ( isset( $block['items'] ) && is_array( $block['items'] ) ) {
-					return $block['items'];
+					$events = $this->filterEventItems( $block['items'] );
+					if ( ! empty( $events ) ) {
+						return $events;
+					}
 				}
 			}
 		}
@@ -798,13 +803,20 @@ class SquarespaceExtractor extends BaseExtractor {
 		}
 
 		if ( isset( $data['collection']['items'] ) && is_array( $data['collection']['items'] ) ) {
-			return $data['collection']['items'];
+			return $this->filterEventItems( $data['collection']['items'] );
 		}
 
 		foreach ( $data as $key => $value ) {
 			if ( is_array( $value ) ) {
 				// If we find an array named 'items' or 'userItems' at any level, it might be what we want
-				if ( ( 'items' === $key || 'userItems' === $key ) && ! empty( $value ) && isset( $value[0]['title'] ) ) {
+				if ( 'items' === $key && ! empty( $value ) ) {
+					$events = $this->filterEventItems( $value );
+					if ( ! empty( $events ) ) {
+						return $events;
+					}
+				}
+
+				if ( 'userItems' === $key && ! empty( $value ) && isset( $value[0]['title'] ) ) {
 					return $value;
 				}
 
