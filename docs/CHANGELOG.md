@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.171.0] - 2026-07-28
+
+### Added
+- support definition-only agents
+
 ## [0.170.8] - 2026-07-28
 
 ### Fixed
