@@ -31,6 +31,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class EventbriteExtractor extends BaseExtractor {
 
+	private const MAX_DISCOVERED_SOURCES = 25;
+
 	/**
 	 * Check if this extractor can handle the given HTML content.
 	 *
@@ -38,14 +40,9 @@ class EventbriteExtractor extends BaseExtractor {
 	 * in JSON-LD data or canonical link tags.
 	 */
 	public function canExtract( string $html ): bool {
-		if ( strpos( $html, 'application/ld+json' ) === false ) {
-			return false;
-		}
-
-		// Eventbrite organizer or event page markers.
-		return strpos( $html, 'eventbrite.com/o/' ) !== false
-			|| strpos( $html, 'eventbrite.com/e/' ) !== false
-			|| strpos( $html, 'evbuc.com' ) !== false;
+		return ( false !== strpos( $html, 'id="__NEXT_DATA__"' ) && false !== strpos( $html, 'organizer-profile' ) )
+			|| ( false !== strpos( $html, 'application/ld+json' ) && $this->containsEventbriteEventUrl( $html ) )
+			|| ! empty( $this->discoverEventbriteSources( $html ) );
 	}
 
 	/**
@@ -57,6 +54,41 @@ class EventbriteExtractor extends BaseExtractor {
 	 * 3. Series/recurring events: detects isSeries flag and uses nextAvailableSession
 	 */
 	public function extract( string $html, string $source_url ): array {
+		$events = array_merge(
+			$this->extractJsonLdEvents( $html ),
+			$this->extractOrganizerListingEvents( $html )
+		);
+
+		if ( empty( $events ) && ! $this->isEventbriteUrl( $source_url ) ) {
+			foreach ( $this->discoverEventbriteSources( $html ) as $eventbrite_url ) {
+				$eventbrite_html = $this->fetchUrl(
+					$eventbrite_url,
+					array(
+						'timeout' => 30,
+						'headers' => array( 'Accept' => 'text/html,application/xhtml+xml' ),
+					),
+					'Eventbrite public page'
+				);
+
+				if ( empty( $eventbrite_html ) ) {
+					continue;
+				}
+
+				$events = array_merge(
+					$events,
+					$this->extractJsonLdEvents( $eventbrite_html ),
+					$this->extractOrganizerListingEvents( $eventbrite_html )
+				);
+			}
+		}
+
+		return $this->deduplicateEvents( $events );
+	}
+
+	/**
+	 * Extract Eventbrite Event objects from public JSON-LD.
+	 */
+	private function extractJsonLdEvents( string $html ): array {
 		if ( ! preg_match_all( '/<script[^>]*type=["\']application\/ld\+json["\'][^>]*>(.*?)<\/script>/is', $html, $matches ) ) {
 			return array();
 		}
@@ -112,6 +144,167 @@ class EventbriteExtractor extends BaseExtractor {
 		}
 
 		return $events;
+	}
+
+	/**
+	 * Extract events from the public server-rendered organizer profile payload.
+	 */
+	private function extractOrganizerListingEvents( string $html ): array {
+		if ( ! preg_match( '/<script[^>]*id=["\']__NEXT_DATA__["\'][^>]*>(.*?)<\/script>/is', $html, $match ) ) {
+			return array();
+		}
+
+		$data = json_decode( trim( $match[1] ), true );
+		if ( JSON_ERROR_NONE !== json_last_error() || ! is_array( $data ) ) {
+			return array();
+		}
+
+		$page_props = $data['props']['pageProps'] ?? array();
+		$organizer  = $page_props['organizer'] ?? array();
+		$raw_events = $page_props['upcomingEvents'] ?? array();
+
+		if ( empty( $organizer['id'] ) || ! is_array( $raw_events ) ) {
+			return array();
+		}
+
+		$events = array();
+		foreach ( $raw_events as $raw_event ) {
+			if ( ! is_array( $raw_event ) || ! empty( $raw_event['is_cancelled'] ) || ! empty( $raw_event['is_protected_event'] ) ) {
+				continue;
+			}
+
+			$event = $this->parseOrganizerListingEvent( $raw_event, $organizer );
+			if ( null !== $event ) {
+				$events[] = $event;
+			}
+		}
+
+		return $events;
+	}
+
+	/**
+	 * Map an organizer profile event card to the standard event shape.
+	 */
+	private function parseOrganizerListingEvent( array $raw_event, array $organizer ): ?array {
+		$title      = html_entity_decode( (string) ( $raw_event['name'] ?? '' ) );
+		$start_date = (string) ( $raw_event['start_date'] ?? '' );
+
+		if ( '' === $title || ! preg_match( '/^\d{4}-\d{2}-\d{2}$/', $start_date ) ) {
+			return null;
+		}
+
+		$venue   = $raw_event['primary_venue'] ?? array();
+		$address = is_array( $venue['address'] ?? null ) ? $venue['address'] : array();
+		$image   = is_array( $raw_event['image'] ?? null ) ? $raw_event['image'] : array();
+		$event   = array(
+			'title'         => $title,
+			'description'   => $raw_event['summary'] ?? '',
+			'startDate'     => $start_date,
+			'startTime'     => $this->normalizeListingTime( $raw_event['start_time'] ?? '' ),
+			'endDate'       => $raw_event['end_date'] ?? '',
+			'endTime'       => $this->normalizeListingTime( $raw_event['end_time'] ?? '' ),
+			'venueTimezone' => $raw_event['timezone'] ?? '',
+			'organizer'     => $organizer['name'] ?? '',
+			'organizerUrl'  => $this->canonicalizeEventbriteUrl( $organizer['profilePageUrl'] ?? '' ),
+			'ticketUrl'     => $this->canonicalizeEventbriteUrl( $raw_event['url'] ?? '' ),
+			'imageUrl'      => $image['url'] ?? '',
+			'venue'         => html_entity_decode( (string) ( $venue['name'] ?? '' ) ),
+			'venueAddress'  => html_entity_decode( (string) ( $address['address_1'] ?? '' ) ),
+			'venueCity'     => html_entity_decode( (string) ( $address['city'] ?? '' ) ),
+			'venueState'    => html_entity_decode( (string) ( $address['region'] ?? '' ) ),
+			'venueZip'      => $address['postal_code'] ?? '',
+			'venueCountry'  => $address['country'] ?? '',
+		);
+
+		if ( ! empty( $address['latitude'] ) && ! empty( $address['longitude'] ) ) {
+			$event['venueCoordinates'] = $address['latitude'] . ',' . $address['longitude'];
+		}
+
+		$availability   = $raw_event['ticket_availability'] ?? array();
+		$minimum        = $availability['minimum_ticket_price']['major_value'] ?? null;
+		$maximum        = $availability['maximum_ticket_price']['major_value'] ?? null;
+		$currency       = $availability['minimum_ticket_price']['currency'] ?? 'USD';
+		$is_free        = isset( $availability['is_free'] ) ? (bool) $availability['is_free'] : null;
+		$event['price'] = $this->formatStructuredPrice(
+			null !== $minimum ? (float) $minimum : null,
+			null !== $maximum ? (float) $maximum : null,
+			(string) $currency,
+			$is_free
+		);
+
+		return $event;
+	}
+
+	/**
+	 * Discover canonical organizer/event pages and documented checkout widgets.
+	 */
+	private function discoverEventbriteSources( string $html ): array {
+		$sources = array();
+
+		if ( preg_match_all( '/\bhref\s*=\s*(["\'])(.*?)\1/is', $html, $matches ) ) {
+			foreach ( $matches[2] as $href ) {
+				$url = $this->canonicalizeEventbriteUrl( html_entity_decode( $href ) );
+				if ( '' !== $url ) {
+					$sources[ $url ] = true;
+				}
+			}
+		}
+
+		if ( preg_match_all( '/EBWidgets\.createWidget\s*\(\s*\{.*?\beventId\s*:\s*(["\']?)(\d{6,})\1.*?\}\s*\)/is', $html, $matches ) ) {
+			foreach ( $matches[2] as $event_id ) {
+				$sources[ 'https://www.eventbrite.com/e/' . $event_id ] = true;
+			}
+		}
+
+		return array_slice( array_keys( $sources ), 0, self::MAX_DISCOVERED_SOURCES );
+	}
+
+	/**
+	 * Normalize a public Eventbrite organizer/event URL and remove tracking data.
+	 */
+	private function canonicalizeEventbriteUrl( string $url ): string {
+		$url   = esc_url_raw( trim( $url ) );
+		$parts = wp_parse_url( $url );
+
+		if ( empty( $parts['host'] ) || empty( $parts['path'] ) ) {
+			return '';
+		}
+
+		$host = strtolower( $parts['host'] );
+		if ( 'eventbrite.com' !== $host && ! str_ends_with( $host, '.eventbrite.com' ) ) {
+			return '';
+		}
+
+		if ( ! preg_match( '#^/(?:o|e)/[^/]+(?:/)?$#i', $parts['path'] ) ) {
+			return '';
+		}
+
+		return 'https://www.eventbrite.com' . rtrim( $parts['path'], '/' );
+	}
+
+	private function isEventbriteUrl( string $url ): bool {
+		$host = strtolower( (string) wp_parse_url( $url, PHP_URL_HOST ) );
+		return 'eventbrite.com' === $host || str_ends_with( $host, '.eventbrite.com' );
+	}
+
+	private function containsEventbriteEventUrl( string $html ): bool {
+		return (bool) preg_match( '#https?://(?:[^/]+\.)?eventbrite\.com/(?:o|e)/#i', $html );
+	}
+
+	private function normalizeListingTime( string $time ): string {
+		return preg_match( '/^(\d{2}:\d{2})(?::\d{2})?$/', $time, $match ) ? $match[1] : '';
+	}
+
+	private function deduplicateEvents( array $events ): array {
+		$deduplicated = array();
+		foreach ( $events as $event ) {
+			$key = $event['ticketUrl'] ?? ( ( $event['title'] ?? '' ) . '|' . ( $event['startDate'] ?? '' ) );
+			if ( '' !== $key ) {
+				$deduplicated[ $key ] = $event;
+			}
+		}
+
+		return array_values( $deduplicated );
 	}
 
 	public function getMethod(): string {
