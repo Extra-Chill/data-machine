@@ -40,6 +40,10 @@ define( 'ARRAY_A', 'ARRAY_A' );
 
 class wpdb {}
 
+function esc_html( string $text ): string {
+	return $text;
+}
+
 require_once __DIR__ . '/../inc/Core/Database/BaseRepository.php';
 
 use DataMachine\Core\Database\BaseRepository;

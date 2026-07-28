@@ -228,12 +228,12 @@ abstract class BaseRepository {
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		$indexes = $wpdb->get_results( $wpdb->prepare( 'SHOW INDEX FROM %i', $table_name ), ARRAY_A );
 		if ( ! is_array( $indexes ) || ! empty( $wpdb->last_error ) ) {
-			throw new \RuntimeException( sprintf( 'Failed to inspect indexes on %s: %s', $table_name, (string) $wpdb->last_error ) );
+			throw new \RuntimeException( sprintf( 'Failed to inspect indexes on %s: %s', esc_html( $table_name ), esc_html( (string) $wpdb->last_error ) ) );
 		}
 
 		$index_exists = false;
 		foreach ( $indexes as $index ) {
-			if ( $index_name === (string) ( $index['Key_name'] ?? '' ) ) {
+			if ( (string) ( $index['Key_name'] ?? '' ) === $index_name ) {
 				$index_exists = true;
 				break;
 			}
@@ -245,14 +245,14 @@ abstract class BaseRepository {
 		if ( ! self::is_sqlite() ) {
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
 			if ( false === $wpdb->query( $wpdb->prepare( 'ALTER TABLE %i DROP INDEX %i', $table_name, $index_name ) ) ) {
-				throw new \RuntimeException( sprintf( 'Failed to drop index %s: %s', $index_name, (string) $wpdb->last_error ) );
+				throw new \RuntimeException( sprintf( 'Failed to drop index %s: %s', esc_html( $index_name ), esc_html( (string) $wpdb->last_error ) ) );
 			}
 			return true;
 		}
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
 		if ( false === $wpdb->query( $wpdb->prepare( 'DROP INDEX %i ON %i', $index_name, $table_name ) ) ) {
-			throw new \RuntimeException( sprintf( 'Failed to drop SQLite index %s: %s', $index_name, (string) $wpdb->last_error ) );
+			throw new \RuntimeException( sprintf( 'Failed to drop SQLite index %s: %s', esc_html( $index_name ), esc_html( (string) $wpdb->last_error ) ) );
 		}
 
 		return true;
