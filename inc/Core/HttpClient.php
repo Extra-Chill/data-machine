@@ -40,6 +40,7 @@ class HttpClient {
 	 *                        - headers: array - Additional headers to merge
 	 *                        - body: string|array - Request body (for POST/PUT/PATCH)
 	 *                        - timeout: int - Request timeout (default 120)
+	 *                        - limit_response_size: int - Maximum response body bytes (default unlimited)
 	 *                        - proxy_url: string - Optional per-request proxy URL (http, https, socks4, socks5, socks5h)
 	 *                        - auth: array - Optional standard auth config: {type: basic, username, password} or {type: bearer, token}
 	 *                        - auth_ref: string - Optional provider:account credential reference resolved through registered auth providers
@@ -203,10 +204,14 @@ class HttpClient {
 		$headers = array_merge( $default_headers, $options['headers'] ?? array() );
 		$headers = self::applyAuthentication( $headers, $options['auth'] ?? null );
 
-		$args = array(
+		$args                = array(
 			'timeout' => $timeout,
 			'headers' => $headers,
 		);
+		$limit_response_size = max( 0, (int) ( $options['limit_response_size'] ?? 0 ) );
+		if ( $limit_response_size > 0 ) {
+			$args['limit_response_size'] = $limit_response_size;
+		}
 
 		if ( 'GET' !== $method ) {
 			$args['method'] = $method;
@@ -377,6 +382,10 @@ class HttpClient {
 	 * Redact sensitive HTTP request data before log emission.
 	 */
 	private static function redactRequestArgsForLog( array $args ): array {
+		if ( array_key_exists( 'body', $args ) && null !== $args['body'] && '' !== $args['body'] && array() !== $args['body'] ) {
+			$args['body'] = '[redacted]';
+		}
+
 		if ( ! empty( $args['headers'] ) && is_array( $args['headers'] ) ) {
 			foreach ( $args['headers'] as $name => $value ) {
 				if ( in_array( strtolower( (string) $name ), array( 'authorization', 'proxy-authorization', 'cookie', 'set-cookie' ), true ) ) {

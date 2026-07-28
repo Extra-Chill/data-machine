@@ -183,6 +183,11 @@ http_client_smoke_assert(
 	'Custom manual' === ( $manual_args['headers']['authorization'] ?? null )
 );
 
+$bounded_args = http_client_private( 'buildRequestArgs', 'GET', array( 'limit_response_size' => 1048576 ) );
+http_client_smoke_assert( 'response byte limit is forwarded to WordPress HTTP', 1048576 === ( $bounded_args['limit_response_size'] ?? null ) );
+$unbounded_args = http_client_private( 'buildRequestArgs', 'GET', array( 'limit_response_size' => 0 ) );
+http_client_smoke_assert( 'invalid response byte limit is omitted', ! isset( $unbounded_args['limit_response_size'] ) );
+
 echo "\n[2] Auth ref options\n";
 
 $provider = new HttpBasicAuthProvider();
@@ -197,6 +202,12 @@ $provider->save_config(
 $GLOBALS['datamachine_http_client_auth_providers'] = array(
 	HttpBasicAuthProvider::PROVIDER_SLUG => $provider,
 );
+if ( function_exists( 'add_filter' ) ) {
+	add_filter(
+		'datamachine_auth_providers',
+		static fn() => $GLOBALS['datamachine_http_client_auth_providers']
+	);
+}
 
 $resolved_options = http_client_private(
 	'resolveAuthRefOptions',
@@ -226,6 +237,7 @@ $redacted = http_client_private(
 			'Cookie'              => 'wordpress_logged_in=hidden',
 			'X-Test'              => 'visible',
 		),
+		'body'    => '{"username":"chubes4","password":"top-secret"}',
 	)
 );
 
@@ -233,6 +245,7 @@ http_client_smoke_assert( 'Authorization is redacted', '[redacted]' === ( $redac
 http_client_smoke_assert( 'Proxy-Authorization is redacted', '[redacted]' === ( $redacted['headers']['Proxy-Authorization'] ?? null ) );
 http_client_smoke_assert( 'Cookie is redacted', '[redacted]' === ( $redacted['headers']['Cookie'] ?? null ) );
 http_client_smoke_assert( 'Non-sensitive header remains visible', 'visible' === ( $redacted['headers']['X-Test'] ?? null ) );
+http_client_smoke_assert( 'Request body is redacted', '[redacted]' === ( $redacted['body'] ?? null ) );
 
 echo "\n[4] Proxy scheme mapping\n";
 
