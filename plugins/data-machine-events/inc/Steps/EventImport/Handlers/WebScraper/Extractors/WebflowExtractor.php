@@ -24,7 +24,17 @@ class WebflowExtractor extends BaseExtractor {
 	/**
 	 * Date pattern: month + day (e.g., "May 16", "Jun 24", "March 5").
 	 */
-	private const DATE_PATTERN = '/\b(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+(\d{1,2})\b/i';
+	private const DATE_PATTERN = '/\b(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?|Enero|Febrero|Marzo|Abril|Mayo|Junio|Julio|Agosto|Septiembre|Octubre|Noviembre|Diciembre)\s+(\d{1,2})\b/iu';
+
+	/**
+	 * Date pattern: day + month (e.g., "07 agosto", "11 September").
+	 */
+	private const DAY_MONTH_PATTERN = '/\b(\d{1,2})\s+(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?|Enero|Febrero|Marzo|Abril|Mayo|Junio|Julio|Agosto|Septiembre|Octubre|Noviembre|Diciembre)\b/iu';
+
+	/**
+	 * Numeric US date pattern used by Webflow CMS text fields.
+	 */
+	private const NUMERIC_DATE_PATTERN = '#\b(\d{1,2})/(\d{1,2})/(\d{2}|\d{4})\b#';
 
 	/**
 	 * Time pattern: 12-hour time (e.g., "7:00 pm", "8:30 PM", "9pm").
@@ -78,23 +88,27 @@ class WebflowExtractor extends BaseExtractor {
 	 * @return array Array of HTML strings, one per dynamic item.
 	 */
 	private function extractDynItems( string $html ): array {
+		$dom = new \DOMDocument();
+		libxml_use_internal_errors( true );
+		$loaded = $dom->loadHTML( $html, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD );
+		libxml_clear_errors();
+
+		if ( ! $loaded ) {
+			return array();
+		}
+
+		$xpath = new \DOMXPath( $dom );
+		$nodes = $xpath->query( '//*[contains(concat(" ", normalize-space(@class), " "), " w-dyn-item ")]' );
 		$items = array();
 
-		// Split by w-dyn-item occurrences and extract each block.
-		// Webflow dynamic items are typically: <div role="listitem" class="... w-dyn-item">...</div>
-		$pattern = '/<div[^>]*\bw-dyn-item\b[^>]*>(.*?)(?=<div[^>]*\bw-dyn-item\b|<\/div>\s*<\/div>\s*<\/div>\s*<\/div>)/si';
-
-		if ( preg_match_all( $pattern, $html, $matches ) ) {
-			return $matches[1];
+		foreach ( $nodes as $node ) {
+			$item_html = $dom->saveHTML( $node );
+			if ( false !== $item_html ) {
+				$items[] = $item_html;
+			}
 		}
 
-		// Fallback: simpler split on role="listitem"
-		$pattern2 = '/<div[^>]*role="listitem"[^>]*class="[^"]*w-dyn-item[^"]*"[^>]*>(.*?)(?=<div[^>]*role="listitem"|$)/si';
-		if ( preg_match_all( $pattern2, $html, $matches ) ) {
-			return $matches[1];
-		}
-
-		return array();
+		return $items;
 	}
 
 	/**
@@ -136,10 +150,18 @@ class WebflowExtractor extends BaseExtractor {
 	 */
 	private function findTitle( string $html ): string {
 		// Try headings first.
-		if ( preg_match( '/<h[1-4][^>]*>(.*?)<\/h[1-4]>/si', $html, $m ) ) {
-			$text = wp_strip_all_tags( $m[1] );
-			if ( strlen( trim( $text ) ) >= 2 ) {
-				return trim( $text );
+		if ( preg_match_all( '/<h[1-4][^>]*>(.*?)<\/h[1-4]>/si', $html, $headings ) ) {
+			foreach ( $headings[1] as $heading ) {
+				$text = trim( wp_strip_all_tags( $heading ) );
+				if (
+					strlen( $text ) >= 2
+					&& ! preg_match( self::DATE_PATTERN, $text )
+					&& ! preg_match( self::DAY_MONTH_PATTERN, $text )
+					&& ! preg_match( self::NUMERIC_DATE_PATTERN, $text )
+					&& ! preg_match( self::TIME_PATTERN, $text )
+				) {
+					return $text;
+				}
 			}
 		}
 
@@ -198,11 +220,33 @@ class WebflowExtractor extends BaseExtractor {
 	private function findDate( string $html, int $current_year ): array {
 		$month_str = '';
 		$day       = 0;
+		$year      = $current_year;
+		$has_year  = false;
+
+		if ( preg_match( self::NUMERIC_DATE_PATTERN, $html, $numeric ) ) {
+			$month    = (int) $numeric[1];
+			$day      = (int) $numeric[2];
+			$year     = (int) $numeric[3];
+			$year     = $year < 100 ? 2000 + $year : $year;
+			$has_year = true;
+
+			if ( ! checkdate( $month, $day, $year ) ) {
+				return array( 'date' => '' );
+			}
+
+			return array( 'date' => sprintf( '%04d-%02d-%02d', $year, $month, $day ) );
+		}
 
 		// First try: month + day in a single text node (e.g., "May 16").
 		if ( preg_match( self::DATE_PATTERN, $html, $m ) ) {
 			$month_str = $m[1];
 			$day       = (int) $m[2];
+		}
+
+		// Webflow text fields also commonly render day-first localized dates.
+		if ( empty( $month_str ) && preg_match( self::DAY_MONTH_PATTERN, $html, $m ) ) {
+			$day       = (int) $m[1];
+			$month_str = $m[2];
 		}
 
 		// Second try: multi-element date pattern where month and day are in
@@ -221,45 +265,57 @@ class WebflowExtractor extends BaseExtractor {
 		}
 
 		// Check if a year is present.
-		$year = $current_year;
 		if ( preg_match( self::YEAR_PATTERN, $html, $ym ) ) {
-			$year = (int) $ym[1];
+			$year     = (int) $ym[1];
+			$has_year = true;
 		}
 
 		$month_map = array(
-			'jan'       => 1,
-			'january'   => 1,
-			'feb'       => 2,
-			'february'  => 2,
-			'mar'       => 3,
-			'march'     => 3,
-			'apr'       => 4,
-			'april'     => 4,
-			'may'       => 5,
-			'jun'       => 6,
-			'june'      => 6,
-			'jul'       => 7,
-			'july'      => 7,
-			'aug'       => 8,
-			'august'    => 8,
-			'sep'       => 9,
-			'september' => 9,
-			'oct'       => 10,
-			'october'   => 10,
-			'nov'       => 11,
-			'november'  => 11,
-			'dec'       => 12,
-			'december'  => 12,
+			'jan'        => 1,
+			'january'    => 1,
+			'feb'        => 2,
+			'february'   => 2,
+			'mar'        => 3,
+			'march'      => 3,
+			'apr'        => 4,
+			'april'      => 4,
+			'may'        => 5,
+			'jun'        => 6,
+			'june'       => 6,
+			'jul'        => 7,
+			'july'       => 7,
+			'aug'        => 8,
+			'august'     => 8,
+			'sep'        => 9,
+			'september'  => 9,
+			'oct'        => 10,
+			'october'    => 10,
+			'nov'        => 11,
+			'november'   => 11,
+			'dec'        => 12,
+			'december'   => 12,
+			'enero'      => 1,
+			'febrero'    => 2,
+			'marzo'      => 3,
+			'abril'      => 4,
+			'mayo'       => 5,
+			'junio'      => 6,
+			'julio'      => 7,
+			'agosto'     => 8,
+			'septiembre' => 9,
+			'octubre'    => 10,
+			'noviembre'  => 11,
+			'diciembre'  => 12,
 		);
 
 		$month = $month_map[ strtolower( $month_str ) ] ?? 0;
-		if ( 0 === $month || $day < 1 || $day > 31 ) {
+		if ( 0 === $month || ! checkdate( $month, $day, $year ) ) {
 			return array( 'date' => '' );
 		}
 
 		// If the date is in the past (e.g., Jan event viewed in Nov), assume next year.
 		$date_str = sprintf( '%04d-%02d-%02d', $year, $month, $day );
-		if ( strtotime( $date_str ) < strtotime( '-7 days' ) && $year === $current_year ) {
+		if ( ! $has_year && strtotime( $date_str ) < strtotime( '-7 days' ) ) {
 			$date_str = sprintf( '%04d-%02d-%02d', $year + 1, $month, $day );
 		}
 
