@@ -225,6 +225,7 @@ class AgentIdentityStoreAdapterTest extends WP_UnitTestCase {
 
 		$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i DROP INDEX %i', $table, 'agent_identity_scope_hash' ) );
 		Agents::ensure_identity_scope_schema();
+		Agents::ensure_identity_scope_schema();
 		$row     = ( new Agents() )->get_agent( $agent_id );
 		$indexes = $wpdb->get_results( $wpdb->prepare( 'SHOW INDEX FROM %i', $table ), ARRAY_A );
 		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
