@@ -63,10 +63,10 @@ abstract class FetchHandler {
 	 * @return DataPacket[] Array of DataPackets (empty on failure/no data).
 	 */
 	final public function get_fetch_data( int|string $pipeline_id, array $handler_config, ?string $job_id = null ): array {
-		$config  = $this->extractConfig( $handler_config );
-		$context = ExecutionContext::fromConfig( $handler_config, $job_id, $this->handler_type );
-		$stages  = $this->initialFetchDiagnostics( $config, $context );
-		$max_items = (int) ( $config['max_items'] ?? $this->getDefaultMaxItems() );
+		$config              = $this->extractConfig( $handler_config );
+		$context             = ExecutionContext::fromConfig( $handler_config, $job_id, $this->handler_type );
+		$stages              = $this->initialFetchDiagnostics( $config, $context );
+		$max_items           = (int) ( $config['max_items'] ?? $this->getDefaultMaxItems() );
 		$stages['max_items'] = max( 0, $max_items );
 
 		$result = $this->executeFetch( $config, $context );
@@ -80,7 +80,7 @@ abstract class FetchHandler {
 
 		// Normalize: if handler returned { items: [...] }, use that list.
 		// Otherwise treat the entire result as a single item.
-		$items = ( isset( $result['items'] ) && is_array( $result['items'] ) )
+		$items                         = ( isset( $result['items'] ) && is_array( $result['items'] ) )
 			? $result['items']
 			: array( $result );
 		$stages['source_materialized'] = count( $items );
@@ -97,7 +97,7 @@ abstract class FetchHandler {
 		// Set to 0 for unlimited.
 		if ( $max_items > 0 && count( $items ) > $max_items ) {
 			$stages['eligible_outside_max_items'] = count( $items ) - $max_items;
-			$items = array_slice( $items, 0, $max_items );
+			$items                                = array_slice( $items, 0, $max_items );
 		}
 		$stages['selected_after_max_items'] = count( $items );
 
@@ -167,17 +167,17 @@ abstract class FetchHandler {
 		$result         = array();
 
 		if ( is_array( $diagnostics ) ) {
-			$identifierless_items                        = count( $candidates ) - count( $identifiers );
-			$diagnostics['valid_items']                  = $valid_items;
-			$diagnostics['invalid_items']                = max( 0, (int) $diagnostics['source_materialized'] - $valid_items );
-			$diagnostics['identified_items']             = count( $identifiers );
-			$diagnostics['identifierless_items']         = $identifierless_items;
-			$diagnostics['unique_identifiers']           = (int) ( $counts['unique'] ?? 0 );
-			$diagnostics['duplicate_identifiers']        = (int) ( $counts['duplicates'] ?? 0 );
-			$diagnostics['eligible_before_max_items']    = (int) ( $counts['eligible'] ?? 0 ) + $identifierless_items;
-			$diagnostics['processed_skipped']            = (int) ( $counts['processed_skipped'] ?? 0 );
-			$diagnostics['reprocess_eligible']           = (int) ( $counts['processed_reprocess_eligible'] ?? 0 );
-			$diagnostics['actively_claimed']             = (int) ( $counts['actively_claimed'] ?? 0 );
+			$identifierless_items                     = count( $candidates ) - count( $identifiers );
+			$diagnostics['valid_items']               = $valid_items;
+			$diagnostics['invalid_items']             = max( 0, (int) $diagnostics['source_materialized'] - $valid_items );
+			$diagnostics['identified_items']          = count( $identifiers );
+			$diagnostics['identifierless_items']      = $identifierless_items;
+			$diagnostics['unique_identifiers']        = (int) ( $counts['unique'] ?? 0 );
+			$diagnostics['duplicate_identifiers']     = (int) ( $counts['duplicates'] ?? 0 );
+			$diagnostics['eligible_before_max_items'] = (int) ( $counts['eligible'] ?? 0 ) + $identifierless_items;
+			$diagnostics['processed_skipped']         = (int) ( $counts['processed_skipped'] ?? 0 );
+			$diagnostics['reprocess_eligible']        = (int) ( $counts['processed_reprocess_eligible'] ?? 0 );
+			$diagnostics['actively_claimed']          = (int) ( $counts['actively_claimed'] ?? 0 );
 		}
 
 		foreach ( $candidates as $candidate ) {
@@ -234,7 +234,7 @@ abstract class FetchHandler {
 			if ( is_array( $diagnostics ) ) {
 				++$diagnostics['claim_attempts'];
 			}
-			$is_duplicate                            = isset( $attempted_identifiers[ (string) $item_identifier ] );
+			$is_duplicate                                       = isset( $attempted_identifiers[ (string) $item_identifier ] );
 			$attempted_identifiers[ (string) $item_identifier ] = true;
 			$claim = $context->claimItemOwnership( (string) $context->getFlowStepId(), (string) $item_identifier );
 			if ( false === $claim ) {
@@ -268,29 +268,29 @@ abstract class FetchHandler {
 	 */
 	private function initialFetchDiagnostics( array $config, ExecutionContext $context ): array {
 		return array(
-			'schema_version'                 => 'datamachine.fetch_stages.v1',
-			'handler_type'                   => $this->handler_type,
-			'execution_mode'                 => $context->getMode(),
-			'config_hash'                    => $this->configHash( $config ),
-			'source_materialized'            => 0,
-			'valid_items'                    => 0,
-			'invalid_items'                  => 0,
-			'identified_items'               => 0,
-			'identifierless_items'            => 0,
-			'unique_identifiers'             => 0,
-			'duplicate_identifiers'          => 0,
-			'eligible_before_max_items'      => 0,
-			'processed_skipped'              => 0,
-			'reprocess_eligible'             => 0,
-			'actively_claimed'               => 0,
-			'max_items'                      => 0,
-			'eligible_outside_max_items'     => 0,
-			'selected_after_max_items'       => 0,
-			'claim_attempts'                 => 0,
-			'claims_acquired'                => 0,
-			'claim_conflicts'                => 0,
-			'duplicate_claim_conflicts'      => 0,
-			'final_packets'                  => 0,
+			'schema_version'             => 'datamachine.fetch_stages.v1',
+			'handler_type'               => $this->handler_type,
+			'execution_mode'             => $context->getMode(),
+			'config_hash'                => $this->configHash( $config ),
+			'source_materialized'        => 0,
+			'valid_items'                => 0,
+			'invalid_items'              => 0,
+			'identified_items'           => 0,
+			'identifierless_items'       => 0,
+			'unique_identifiers'         => 0,
+			'duplicate_identifiers'      => 0,
+			'eligible_before_max_items'  => 0,
+			'processed_skipped'          => 0,
+			'reprocess_eligible'         => 0,
+			'actively_claimed'           => 0,
+			'max_items'                  => 0,
+			'eligible_outside_max_items' => 0,
+			'selected_after_max_items'   => 0,
+			'claim_attempts'             => 0,
+			'claims_acquired'            => 0,
+			'claim_conflicts'            => 0,
+			'duplicate_claim_conflicts'  => 0,
+			'final_packets'              => 0,
 		);
 	}
 
@@ -344,7 +344,7 @@ abstract class FetchHandler {
 		}
 		--$remaining;
 
-		$segmented_key = preg_replace( '/([a-z0-9])([A-Z])/', '$1_$2', $key ) ?? $key;
+		$segmented_key  = preg_replace( '/([a-z0-9])([A-Z])/', '$1_$2', $key ) ?? $key;
 		$normalized_key = strtolower( str_replace( '-', '_', $segmented_key ) );
 		if ( '' !== $normalized_key && ( 'key' === $normalized_key || str_ends_with( $normalized_key, '_key' ) || preg_match( '/(?:^|_)(?:auth|authentication|authorization|oauth|api_?key|private_key|signing_key|secret_key|access_key|bearer|cookie|passwd|password|passphrase|pat|secret|tokens?|credentials?)(?:_|$)/', $normalized_key ) ) ) {
 			return '[redacted]';

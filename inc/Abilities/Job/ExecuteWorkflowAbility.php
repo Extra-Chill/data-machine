@@ -46,7 +46,7 @@ class ExecuteWorkflowAbility {
 						'type'       => 'object',
 						'required'   => array( 'workflow' ),
 						'properties' => array(
-							'workflow'     => array(
+							'workflow'      => array(
 								'type'        => 'object',
 								'description' => __( 'Ephemeral workflow with steps array', 'data-machine' ),
 								'properties'  => array(
@@ -56,15 +56,15 @@ class ExecuteWorkflowAbility {
 									),
 								),
 							),
-							'timestamp'    => array(
+							'timestamp'     => array(
 								'type'        => array( 'integer', 'null' ),
 								'description' => __( 'Future Unix timestamp for delayed execution. Omit for immediate execution.', 'data-machine' ),
 							),
-							'initial_data' => array(
+							'initial_data'  => array(
 								'type'        => 'object',
 								'description' => __( 'Optional initial engine data to merge into the engine data alongside configs.', 'data-machine' ),
 							),
-							'dry_run'      => array(
+							'dry_run'       => array(
 								'type'        => 'boolean',
 								'default'     => false,
 								'description' => __( 'Preview execution without creating posts. Returns preview data instead of publishing.', 'data-machine' ),
@@ -130,10 +130,10 @@ class ExecuteWorkflowAbility {
 	 * @return array
 	 */
 	private function executeWithAuthority( array $input, bool $system_context ): array {
-		$workflow       = $input['workflow'] ?? null;
-		$timestamp      = $input['timestamp'] ?? null;
-		$initial_data   = is_array( $input['initial_data'] ?? null ) ? $input['initial_data'] : array();
-		$operation_key  = is_string( $input['operation_key'] ?? null ) ? trim( $input['operation_key'] ) : '';
+		$workflow      = $input['workflow'] ?? null;
+		$timestamp     = $input['timestamp'] ?? null;
+		$initial_data  = is_array( $input['initial_data'] ?? null ) ? $input['initial_data'] : array();
+		$operation_key = is_string( $input['operation_key'] ?? null ) ? trim( $input['operation_key'] ) : '';
 
 		// Validate workflow structure
 		$validation = WorkflowSpecValidator::validate( $workflow );
@@ -185,12 +185,12 @@ class ExecuteWorkflowAbility {
 			: 'Chat Workflow';
 
 		$create_args = array(
-			'pipeline_id'      => 'direct',
-			'flow_id'          => 'direct',
-			'source'           => $job_source,
-			'label'            => $job_label,
-			'user_id'          => $ownership['user_id'],
-			'operation_state'  => 'preparing',
+			'pipeline_id'       => 'direct',
+			'flow_id'           => 'direct',
+			'source'            => $job_source,
+			'label'             => $job_label,
+			'user_id'           => $ownership['user_id'],
+			'operation_state'   => 'preparing',
 			'operation_step_id' => $first_step_id,
 		);
 		if ( $ownership['agent_id'] > 0 ) {
@@ -228,9 +228,9 @@ class ExecuteWorkflowAbility {
 			$engine_data['dry_run_mode'] = true;
 		}
 
-		$request_fingerprint = $this->requestFingerprint( $engine_data, $timestamp );
+		$request_fingerprint                = $this->requestFingerprint( $engine_data, $timestamp );
 		$create_args['request_fingerprint'] = $request_fingerprint;
-		$engine_data['direct_request']       = array(
+		$engine_data['direct_request']      = array(
 			'operation_key'  => $operation_key,
 			'fingerprint'    => $request_fingerprint,
 			'execution_type' => $timestamp && is_numeric( $timestamp ) && (int) $timestamp > time() ? 'delayed' : 'immediate',
@@ -294,9 +294,9 @@ class ExecuteWorkflowAbility {
 		);
 		if ( empty( $enqueue['success'] ) ) {
 			return array(
-				'success'    => false,
-				'error'      => (string) ( $enqueue['error'] ?? 'enqueue_failed' ),
-				'retryable'  => ! empty( $enqueue['retryable'] ),
+				'success'       => false,
+				'error'         => (string) ( $enqueue['error'] ?? 'enqueue_failed' ),
+				'retryable'     => ! empty( $enqueue['retryable'] ),
 				'enqueue_state' => (string) ( $enqueue['state'] ?? 'enqueue_failed' ),
 			);
 		}
@@ -319,7 +319,7 @@ class ExecuteWorkflowAbility {
 		$agent_id        = max( 0, (int) ( $scope->acting_agent_id() ?? 0 ) );
 		$agent_slug      = '';
 
-		$caller_snapshot = is_array( $initial_data['job'] ?? null ) ? $initial_data['job'] : array();
+		$caller_snapshot  = is_array( $initial_data['job'] ?? null ) ? $initial_data['job'] : array();
 		$identity_context = array_filter(
 			$agent_id > 0
 				? array( 'agent_id' => $agent_id )

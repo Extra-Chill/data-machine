@@ -14,8 +14,8 @@ defined( 'ABSPATH' ) || exit;
  */
 class ScopedDrainService {
 
-	private const GROUP = 'data-machine';
-	private const DISPATCH_EVIDENCE_LIMIT = 100;
+	private const GROUP                    = 'data-machine';
+	private const DISPATCH_EVIDENCE_LIMIT  = 100;
 	private const DISPATCH_STALE_THRESHOLD = 900;
 
 	public const HOOK_BATCH_CHUNK = 'datamachine_pipeline_batch_chunk';
@@ -186,16 +186,16 @@ class ScopedDrainService {
 		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 		if ( $group_id <= 0 ) {
 			return array(
-				'stale_due_sample_gmt'                   => null,
-				'in_progress_actions'                    => 0,
-				'in_progress_actions_capped'             => false,
-				'in_progress_attempt_sample_gmt'         => null,
-				'concurrency_deferred_actions'           => 0,
-				'concurrency_deferred_actions_capped'    => false,
+				'stale_due_sample_gmt'                => null,
+				'in_progress_actions'                 => 0,
+				'in_progress_actions_capped'          => false,
+				'in_progress_attempt_sample_gmt'      => null,
+				'concurrency_deferred_actions'        => 0,
+				'concurrency_deferred_actions_capped' => false,
 			);
 		}
 
-		$stale_values = array_merge(
+		$stale_values  = array_merge(
 			array( $actions_table ),
 			$hook_sql['values'],
 			array( $group_id, $stale_gmt )
@@ -208,7 +208,7 @@ class ScopedDrainService {
 
 		// Each read stops after the evidence needed for health classification; stale and claimed reads exclude future and historical rows.
 		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber -- Dynamic hook scope is constructed from normalized placeholders and values.
-		$stale_row = $wpdb->get_row(
+		$stale_row       = $wpdb->get_row(
 			$wpdb->prepare(
 				'SELECT a.scheduled_date_gmt AS stale_due_sample_gmt
 				FROM %i a
@@ -234,7 +234,7 @@ class ScopedDrainService {
 			),
 			ARRAY_A
 		);
-		$deferred_row = $wpdb->get_row(
+		$deferred_row    = $wpdb->get_row(
 			$wpdb->prepare(
 				'SELECT COUNT(*) AS concurrency_deferred_actions
 				FROM (

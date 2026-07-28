@@ -11,28 +11,31 @@ defined( 'ABSPATH' ) || exit;
 
 final class PendingActionAuthorizationReceipt {
 
-	private const OPTION_SECRET = 'datamachine_pending_action_receipt_secret';
+	private const OPTION_SECRET              = 'datamachine_pending_action_receipt_secret';
 	private static ?string $transient_secret = null;
 
 	/** Issue a signed receipt from an atomically claimed action payload. */
 	public static function issue( array $action, string $resolver ): array {
 		$authorization = self::authorization( $action );
 		$claims        = array(
-			'action_id'    => (string) $action['action_id'],
-			'kind'         => (string) $action['kind'],
-			'operation'    => $authorization['operation'],
-			'target_digest'=> self::digest( $authorization['target'] ),
-			'input_digest' => self::digest( $action['apply_input'] ?? array() ),
-			'subject'      => (string) ( $action['agent'] ?? $action['creator'] ?? '' ),
-			'workspace'    => $action['workspace'] ?? null,
-			'resolver'     => $resolver,
-			'issued_at'    => time(),
-			'expires_at'   => (int) ( $action['expires_at'] ?? 0 ),
-			'nonce'        => (string) ( $action['receipt_nonce'] ?? '' ),
+			'action_id'     => (string) $action['action_id'],
+			'kind'          => (string) $action['kind'],
+			'operation'     => $authorization['operation'],
+			'target_digest' => self::digest( $authorization['target'] ),
+			'input_digest'  => self::digest( $action['apply_input'] ?? array() ),
+			'subject'       => (string) ( $action['agent'] ?? $action['creator'] ?? '' ),
+			'workspace'     => $action['workspace'] ?? null,
+			'resolver'      => $resolver,
+			'issued_at'     => time(),
+			'expires_at'    => (int) ( $action['expires_at'] ?? 0 ),
+			'nonce'         => (string) ( $action['receipt_nonce'] ?? '' ),
 		);
 
 		$encoded = self::base64url_encode( wp_json_encode( $claims ) );
-		return array( 'token' => $encoded . '.' . self::base64url_encode( hash_hmac( 'sha256', $encoded, self::secret(), true ) ), 'claims' => $claims );
+		return array(
+			'token'  => $encoded . '.' . self::base64url_encode( hash_hmac( 'sha256', $encoded, self::secret(), true ) ),
+			'claims' => $claims,
+		);
 	}
 
 	/**
@@ -105,6 +108,13 @@ final class PendingActionAuthorizationReceipt {
 		return $secret;
 	}
 
-	private static function base64url_encode( string $value ): string { return rtrim( strtr( base64_encode( $value ), '+/', '-_' ), '=' ); }
-	private static function base64url_decode( string $value ): string { return (string) base64_decode( strtr( $value, '-_', '+/' ) ); }
+	private static function base64url_encode( string $value ): string {
+		// phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- Base64url encodes the signed receipt for transport.
+		return rtrim( strtr( base64_encode( $value ), '+/', '-_' ), '=' );
+	}
+
+	private static function base64url_decode( string $value ): string {
+		// phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_decode -- Decodes the transport-safe signed receipt.
+		return (string) base64_decode( strtr( $value, '-_', '+/' ) );
+	}
 }
