@@ -53,7 +53,7 @@ class WixEventsExtractor extends BaseExtractor {
 		}
 
 		// Strategy 2: Wix Events API (handles sites that load events client-side).
-		return $this->extractFromApi( $source_url );
+		return $this->extractFromApi( $source_url, $html );
 	}
 
 	public function getMethod(): string {
@@ -104,11 +104,12 @@ class WixEventsExtractor extends BaseExtractor {
 	 *      instance as the Authorization header.
 	 *   4. Paginate until all events are collected.
 	 *
-	 * @param string $source_url The venue's homepage URL.
+	 * @param string $source_url The configured source URL.
+	 * @param string $html       Fetched Wix page HTML.
 	 * @return array Normalized events.
 	 */
-	private function extractFromApi( string $source_url ): array {
-		$base_url = $this->getBaseUrl( $source_url );
+	private function extractFromApi( string $source_url, string $html ): array {
+		$base_url = $this->getBaseUrl( $source_url, $html );
 		if ( empty( $base_url ) ) {
 			return array();
 		}
@@ -402,17 +403,34 @@ class WixEventsExtractor extends BaseExtractor {
 	// ────────────────────────────────────────────────────────────────────────────
 
 	/**
-	 * Extract scheme + host from a URL.
+	 * Resolve the Wix API origin.
 	 *
-	 * @param string $url Full URL.
+	 * Wix rejects an otherwise valid instance token when an HTTP or non-canonical
+	 * host redirects the API request. Prefer the canonical URL from the fetched
+	 * page so API requests use the same site identity Wix rendered.
+	 *
+	 * @param string $source_url Configured source URL.
+	 * @param string $html       Fetched Wix page HTML.
 	 * @return string Base URL (e.g. https://www.example.com), or empty string.
 	 */
-	private function getBaseUrl( string $url ): string {
+	private function getBaseUrl( string $source_url, string $html ): string {
+		$url = $source_url;
+
+		if ( preg_match( '/<link\b(?=[^>]*\brel=["\'][^"\']*\bcanonical\b[^"\']*["\'])(?=[^>]*\bhref=["\']([^"\']+)["\'])[^>]*>/i', $html, $matches ) ) {
+			$url = html_entity_decode( $matches[1], ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+		}
+
 		$parts = wp_parse_url( $url );
 		if ( empty( $parts['host'] ) ) {
 			return '';
 		}
 
-		return ( $parts['scheme'] ?? 'https' ) . '://' . $parts['host'];
+		$scheme = strtolower( $parts['scheme'] ?? 'https' );
+		if ( ! in_array( $scheme, array( 'http', 'https' ), true ) ) {
+			return '';
+		}
+
+		$port = isset( $parts['port'] ) ? ':' . $parts['port'] : '';
+		return $scheme . '://' . $parts['host'] . $port;
 	}
 }
