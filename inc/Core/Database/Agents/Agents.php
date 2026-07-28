@@ -179,21 +179,6 @@ class Agents extends BaseRepository {
 	/** @return array<string,array{unique:bool,columns:string[]}> */
 	private static function get_identity_indexes( \wpdb $wpdb, string $table_name ): array {
 		$indexes = array();
-		if ( self::is_sqlite() ) {
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-			$index_rows = $wpdb->get_results( $wpdb->prepare( 'PRAGMA index_list(%i)', $table_name ), ARRAY_A );
-			foreach ( $index_rows as $index_row ) {
-				$name = (string) ( $index_row['name'] ?? '' );
-				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-				$column_rows      = $wpdb->get_results( $wpdb->prepare( 'PRAGMA index_info(%i)', $name ), ARRAY_A );
-				$indexes[ $name ] = array(
-					'unique'  => 1 === (int) ( $index_row['unique'] ?? 0 ),
-					'columns' => array_values( array_map( static fn( array $column_row ): string => (string) ( $column_row['name'] ?? '' ), $column_rows ) ),
-				);
-			}
-			return $indexes;
-		}
-
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		$index_rows = $wpdb->get_results( $wpdb->prepare( 'SHOW INDEX FROM %i', $table_name ), ARRAY_A );
 		foreach ( $index_rows as $index_row ) {
