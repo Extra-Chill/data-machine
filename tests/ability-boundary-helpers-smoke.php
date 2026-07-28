@@ -9,8 +9,9 @@
 
 namespace DataMachine\Abilities {
 	function doing_action( $hook = '' ) {
-		global $datamachine_test_doing_action;
-		return 'wp_abilities_api_init' === $hook && $datamachine_test_doing_action;
+		global $datamachine_test_doing_action, $wp_current_filter;
+		return 'wp_abilities_api_init' === $hook
+			&& ( $datamachine_test_doing_action || in_array( $hook, $wp_current_filter, true ) );
 	}
 
 	function did_action( $hook = '' ) {
@@ -54,6 +55,7 @@ namespace {
 	$datamachine_test_did_action   = 0;
 	$datamachine_test_actions      = array();
 	$datamachine_test_abilities    = array();
+	$wp_current_filter             = array();
 
 	if ( ! function_exists( 'wp_get_ability' ) ) {
 		function wp_get_ability( string $name ) {
@@ -112,12 +114,14 @@ assert_ability_boundary( 'registration executes while wp_abilities_api_init is r
 $datamachine_test_doing_action = false;
 $datamachine_test_did_action   = 1;
 $before_hook_count             = count( $datamachine_test_actions['wp_abilities_api_init'] ?? array() );
+$called_during_late_context    = false;
 \DataMachine\Abilities\AbilityRegistration::on_abilities_api_init(
-	function () use ( &$called ) {
+	function () use ( &$called, &$called_during_late_context ) {
 		++$called;
+		$called_during_late_context = \DataMachine\Abilities\doing_action( 'wp_abilities_api_init' );
 	}
 );
-assert_ability_boundary( 'registration is a no-op after wp_abilities_api_init has fired', $before_hook_count === count( $datamachine_test_actions['wp_abilities_api_init'] ?? array() ) && 1 === $called );
+assert_ability_boundary( 'late registration executes without replaying wp_abilities_api_init', $before_hook_count === count( $datamachine_test_actions['wp_abilities_api_init'] ?? array() ) && 2 === $called && $called_during_late_context );
 
 $datamachine_test_abilities['datamachine/example'] = new Datamachine_Test_Ability();
 $result = \DataMachine\Cli\AbilityRunner::execute( 'datamachine/example', array( 'example' => true ) );

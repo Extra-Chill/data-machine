@@ -22,7 +22,7 @@ class AbilityRegistration {
 	private static bool $runtime_activated = false;
 
 	/**
-	 * Register now during wp_abilities_api_init, or hook before it fires.
+	 * Register on the Abilities API lifecycle, including after lazy initialization.
 	 *
 	 * @param callable $register_callback Ability registration callback.
 	 */
@@ -34,6 +34,23 @@ class AbilityRegistration {
 
 		if ( ! did_action( 'wp_abilities_api_init' ) ) {
 			add_action( 'wp_abilities_api_init', $register_callback );
+			return;
+		}
+
+		/*
+		 * Core's public registration helper only checks whether this lifecycle is
+		 * in the current hook stack. Run only the newly loaded callback in that
+		 * context instead of firing the one-shot action again, which would rerun
+		 * every existing registration callback and trigger duplicate notices.
+		 */
+		global $wp_current_filter;
+
+		// phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- Match core's doing_action() context without replaying the global action.
+		$wp_current_filter[] = 'wp_abilities_api_init';
+		try {
+			$register_callback();
+		} finally {
+			array_pop( $wp_current_filter );
 		}
 	}
 
