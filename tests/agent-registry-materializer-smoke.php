@@ -63,6 +63,12 @@ namespace {
 		}
 	}
 
+	if ( ! function_exists( 'wp_generate_uuid4' ) ) {
+		function wp_generate_uuid4(): string {
+			return '00000000-0000-4000-8000-000000000001';
+		}
+	}
+
 	if ( ! function_exists( 'add_action' ) ) {
 		function add_action( string $hook, callable $callback, int $priority = 10, int $accepted_args = 1 ): void {
 			unset( $accepted_args );
@@ -126,9 +132,39 @@ namespace DataMachine\Core\Database\Agents {
 				'owner_id'     => $owner_id,
 				'instance_key' => $instance_key,
 				'agent_config' => $agent_config,
+				'provisioned_at' => null,
 			);
 
 			return array( 'agent_id' => $agent_id, 'created' => true );
+		}
+
+		public function claim_identity_provisioning( int $agent_id, string $token ): bool {
+			foreach ( self::$rows as &$row ) {
+				if ( (int) $row['agent_id'] === $agent_id && empty( $row['provisioned_at'] ) && empty( $row['provisioning_token'] ) ) {
+					$row['provisioning_token'] = $token;
+					return true;
+				}
+			}
+			return false;
+		}
+
+		public function complete_identity_provisioning( int $agent_id, string $token ): bool {
+			foreach ( self::$rows as &$row ) {
+				if ( (int) $row['agent_id'] === $agent_id && $token === ( $row['provisioning_token'] ?? '' ) ) {
+					$row['provisioned_at']     = '2026-07-28 00:00:00';
+					$row['provisioning_token'] = '';
+					return true;
+				}
+			}
+			return false;
+		}
+
+		public function release_identity_provisioning( int $agent_id, string $token ): void {
+			foreach ( self::$rows as &$row ) {
+				if ( (int) $row['agent_id'] === $agent_id && $token === ( $row['provisioning_token'] ?? '' ) ) {
+					$row['provisioning_token'] = '';
+				}
+			}
 		}
 
 		public function update_agent( int $agent_id, array $data ): bool {
@@ -186,8 +222,9 @@ namespace DataMachine\Core\FilesRepository {
 			return '/agents/unknown';
 		}
 
-		public function ensure_directory_exists( string $path ): void {
+		public function ensure_directory_exists( string $path ): bool {
 			self::$ensured[] = $path;
+			return true;
 		}
 	}
 }

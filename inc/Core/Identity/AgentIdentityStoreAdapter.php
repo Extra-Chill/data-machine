@@ -58,13 +58,13 @@ class AgentIdentityStoreAdapter implements WP_Agent_Identity_Store {
 	public function resolve( WP_Agent_Identity_Scope $scope ): ?WP_Agent_Materialized_Identity {
 		$scope = $scope->normalize();
 		$row   = $this->agents_repository->get_by_identity_scope( $scope->agent_slug, $scope->owner_user_id, $scope->instance_key );
-		return is_array( $row ) ? $this->identity_from_row( $row, $scope ) : null;
+		return is_array( $row ) && $this->is_provisioned( $row ) ? $this->identity_from_row( $row, $scope ) : null;
 	}
 
 	/** @inheritDoc */
 	public function get( int $identity_id ): ?WP_Agent_Materialized_Identity {
 		$row = $this->agents_repository->get_agent( $identity_id );
-		return is_array( $row ) ? $this->identity_from_row( $row ) : null;
+		return is_array( $row ) && $this->is_provisioned( $row ) ? $this->identity_from_row( $row ) : null;
 	}
 
 	/** @inheritDoc */
@@ -72,7 +72,7 @@ class AgentIdentityStoreAdapter implements WP_Agent_Identity_Store {
 		$scope    = $scope->normalize();
 		$existing = $this->agents_repository->get_by_identity_scope( $scope->agent_slug, $scope->owner_user_id, $scope->instance_key );
 		if ( is_array( $existing ) ) {
-			return $this->identity_from_row( $existing, $scope );
+			return $this->provision( $existing, $scope, $meta );
 		}
 
 		// Only materialize identities that correspond to a registered agent
@@ -111,11 +111,7 @@ class AgentIdentityStoreAdapter implements WP_Agent_Identity_Store {
 			);
 		}
 
-		if ( $creation['created'] ) {
-			$this->after_created( $agent_id, $scope, $meta );
-		}
-
-		return $this->identity_from_row( $row, $scope, $meta );
+		return $this->provision( $row, $scope, $meta );
 	}
 
 	/** @inheritDoc */
@@ -151,20 +147,22 @@ class AgentIdentityStoreAdapter implements WP_Agent_Identity_Store {
 	 * @param WP_Agent_Identity_Scope $scope    Normalized identity scope.
 	 * @param array<string,mixed>     $meta     Materialization metadata.
 	 */
-	private function after_created( int $agent_id, WP_Agent_Identity_Scope $scope, array $meta ): void {
-		if ( class_exists( AgentAccess::class ) ) {
-			( new AgentAccess() )->bootstrap_owner_access( $agent_id, $scope->owner_user_id );
+	protected function provision_identity( int $agent_id, WP_Agent_Identity_Scope $scope, array $meta ): void {
+		if ( class_exists( AgentAccess::class ) && $scope->owner_user_id > 0 && ! ( new AgentAccess() )->bootstrap_owner_access( $agent_id, $scope->owner_user_id ) ) {
+			throw new \RuntimeException( 'Failed to provision materialized agent owner access.' );
 		}
 
 		if ( class_exists( DirectoryManager::class ) ) {
 			$dir_mgr   = new DirectoryManager();
 			$agent_dir = $dir_mgr->resolve_agent_directory( array( 'agent_id' => $agent_id ) );
-			$dir_mgr->ensure_directory_exists( $agent_dir );
+			if ( ! $dir_mgr->ensure_directory_exists( $agent_dir ) ) {
+				throw new \RuntimeException( 'Failed to provision materialized agent directory.' );
+			}
 		}
 
 		$scaffold = ScaffoldAbilities::get_ability();
 		if ( $scaffold ) {
-			$scaffold->execute(
+			$result = $scaffold->execute(
 				array(
 					'layer'         => 'agent',
 					'agent_slug'    => $scope->agent_slug,
@@ -173,9 +171,51 @@ class AgentIdentityStoreAdapter implements WP_Agent_Identity_Store {
 					'instance_key'  => $scope->instance_key,
 				)
 			);
+			if ( is_array( $result ) && empty( $result['success'] ) ) {
+				throw new \RuntimeException( 'Failed to provision materialized agent scaffold.' );
+			}
 		}
 
 		do_action( 'datamachine_registered_agent_reconciled', $agent_id, $scope->agent_slug, $meta['datamachine_definition'] ?? $meta, $scope );
+	}
+
+	/** @param array<string,mixed> $row */
+	private function provision( array $row, WP_Agent_Identity_Scope $scope, array $meta ): WP_Agent_Materialized_Identity {
+		$this->identity_from_row( $row, $scope );
+		if ( $this->is_provisioned( $row ) ) {
+			return $this->identity_from_row( $row, $scope, $meta );
+		}
+
+		$agent_id = (int) ( $row['agent_id'] ?? 0 );
+		$token    = hash( 'sha256', wp_generate_uuid4() . ':' . $agent_id );
+		if ( ! $this->agents_repository->claim_identity_provisioning( $agent_id, $token ) ) {
+			$current = $this->agents_repository->get_agent( $agent_id );
+			if ( is_array( $current ) && $this->is_provisioned( $current ) ) {
+				return $this->identity_from_row( $current, $scope, $meta );
+			}
+			throw new \RuntimeException( sprintf( 'Materialized agent identity %d is currently provisioning; retry.', $agent_id ) );
+		}
+
+		try {
+			$this->provision_identity( $agent_id, $scope, $meta );
+			if ( ! $this->agents_repository->complete_identity_provisioning( $agent_id, $token ) ) {
+				throw new \RuntimeException( sprintf( 'Failed to mark materialized agent identity %d provisioned.', $agent_id ) );
+			}
+		} catch ( \Throwable $throwable ) {
+			$this->agents_repository->release_identity_provisioning( $agent_id, $token );
+			throw $throwable;
+		}
+
+		$current = $this->agents_repository->get_agent( $agent_id );
+		if ( ! is_array( $current ) || ! $this->is_provisioned( $current ) ) {
+			throw new \RuntimeException( sprintf( 'Materialized agent identity %d provisioning state was not persisted.', $agent_id ) );
+		}
+		return $this->identity_from_row( $current, $scope, $meta );
+	}
+
+	/** @param array<string,mixed> $row */
+	private function is_provisioned( array $row ): bool {
+		return is_scalar( $row['provisioned_at'] ?? null ) && '' !== (string) $row['provisioned_at'];
 	}
 
 	/**
