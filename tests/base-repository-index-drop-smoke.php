@@ -6,6 +6,11 @@
  */
 
 $mode = $argv[1] ?? null;
+$wordpress_runtime = defined( 'ABSPATH' ) && function_exists( 'esc_html' );
+
+if ( null === $mode && $wordpress_runtime ) {
+	$mode = defined( 'DATABASE_TYPE' ) && 'sqlite' === DATABASE_TYPE ? 'sqlite' : 'mysql';
+}
 
 if ( null === $mode ) {
 	$failures = array();
@@ -52,7 +57,9 @@ if ( ! function_exists( 'esc_html' ) ) {
 	}
 }
 
-require_once __DIR__ . '/../inc/Core/Database/BaseRepository.php';
+if ( ! class_exists( 'DataMachine\Core\Database\BaseRepository' ) ) {
+	require_once __DIR__ . '/../inc/Core/Database/BaseRepository.php';
+}
 
 use DataMachine\Core\Database\BaseRepository;
 
@@ -62,6 +69,8 @@ class IndexDropSmokeWpdb extends wpdb {
 	public $prepared = array();
 	public $queries = array();
 	public $fail_drop = false;
+
+	public function __construct() {}
 
 	public function prepare( $query, ...$args ): string {
 		$this->prepared[] = array( $query, $args );
