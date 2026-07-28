@@ -14,6 +14,7 @@ use WP_UnitTestCase;
 use DataMachineEvents\Steps\Upsert\Events\EventTaxonomyAssigner;
 use DataMachineEvents\Core\Event_Post_Type;
 use DataMachineEvents\Core\Venue_Taxonomy;
+use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\EventbriteExtractor;
 
 class EventTaxonomyAssignerTest extends WP_UnitTestCase {
 
@@ -76,6 +77,73 @@ class EventTaxonomyAssignerTest extends WP_UnitTestCase {
 
 		wp_delete_post( $post_id, true );
 		wp_delete_term( $terms[0]->term_id, 'venue' );
+	}
+
+	public function test_lofi_eventbrite_url_cannot_replace_canonical_official_website(): void {
+		$source_url = 'https://www.eventbrite.com/o/lo-fi-brewing-14959647606';
+		$ticket_url = 'https://www.eventbrite.com/e/lo-fi-test-event-123';
+		$json       = array(
+			'@context'  => 'https://schema.org',
+			'@type'     => 'Event',
+			'name'      => 'Lo-Fi Regression Event',
+			'startDate' => '2026-08-01T20:00:00-04:00',
+			'url'       => $ticket_url,
+			'organizer' => array(
+				'@type' => 'Organization',
+				'name'  => 'Lo-Fi Brewing',
+				'url'   => $source_url,
+			),
+			'location'  => array(
+				'@type' => 'Place',
+				'name'  => 'Lo-Fi Brewing',
+				'url'   => $source_url,
+			),
+		);
+		$html       = '<script type="application/ld+json">' . wp_json_encode( $json ) . '</script>';
+		$events     = ( new EventbriteExtractor() )->extract( $html, $source_url );
+
+		$this->assertCount( 1, $events );
+		$this->assertArrayNotHasKey( 'venueWebsite', $events[0] );
+		$this->assertSame( $source_url, $events[0]['venueTicketingUrl'] );
+		$this->assertSame( $source_url, $events[0]['organizerUrl'] );
+		$this->assertSame( $ticket_url, $events[0]['ticketUrl'] );
+
+		$venue = wp_insert_term( 'Lo-Fi Brewing', 'venue' );
+		$this->assertNotWPError( $venue );
+		update_term_meta( $venue['term_id'], '_venue_website', 'https://lofibrewing.com' );
+		$post_id = $this->make_event_post();
+		$result  = $this->assigner->processVenue( $post_id, array(), new \DataMachine\Core\EngineData( $events[0], 0 ) );
+
+		$this->assertTrue( $result['success'] );
+		$this->assertSame( 'https://lofibrewing.com', get_term_meta( $venue['term_id'], '_venue_website', true ) );
+		$this->assertSame( $source_url, get_term_meta( $venue['term_id'], '_venue_ticketing_url', true ) );
+
+		wp_delete_post( $post_id, true );
+		wp_delete_term( $venue['term_id'], 'venue' );
+	}
+
+	public function test_ticket_host_website_input_cannot_fill_empty_official_website(): void {
+		$ticketing_url = 'https://www.eventbrite.com/o/lo-fi-brewing-14959647606';
+		$venue_name    = 'Empty Website Guard ' . uniqid();
+		$venue         = wp_insert_term( $venue_name, 'venue' );
+		$this->assertNotWPError( $venue );
+		$post_id = $this->make_event_post();
+		$engine  = new \DataMachine\Core\EngineData(
+			array(
+				'venue'        => $venue_name,
+				'venueWebsite' => $ticketing_url,
+			),
+			0
+		);
+
+		$result = $this->assigner->processVenue( $post_id, array(), $engine );
+
+		$this->assertTrue( $result['success'] );
+		$this->assertSame( '', get_term_meta( $venue['term_id'], '_venue_website', true ) );
+		$this->assertSame( $ticketing_url, get_term_meta( $venue['term_id'], '_venue_ticketing_url', true ) );
+
+		wp_delete_post( $post_id, true );
+		wp_delete_term( $venue['term_id'], 'venue' );
 	}
 
 	public function test_process_venue_skips_when_no_venue() {

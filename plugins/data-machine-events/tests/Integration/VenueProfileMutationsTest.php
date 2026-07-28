@@ -67,6 +67,34 @@ class VenueProfileMutationsTest extends WP_UnitTestCase {
 		$this->assertSame( '', get_term_meta( $term_id, '_venue_website', true ) );
 	}
 
+	public function test_website_and_ticketing_url_are_independently_editable_and_nullable(): void {
+		$term_id = $this->venue( 'Independent Venue URLs' );
+		$profile = VenueProfileMutations::read( $term_id );
+
+		$result = VenueProfileMutations::updateProfile(
+			$term_id,
+			array(
+				'website'       => 'https://venue.example/about',
+				'ticketing_url' => 'https://tickets.example/venue',
+			),
+			$profile['revision']
+		);
+
+		$this->assertNotWPError( $result );
+		$this->assertSame( 'https://venue.example/about', $result['profile']['website'] );
+		$this->assertSame( 'https://tickets.example/venue', $result['profile']['ticketing_url'] );
+
+		$cleared = VenueProfileMutations::updateProfile(
+			$term_id,
+			array( 'website' => '' ),
+			$result['revision']
+		);
+
+		$this->assertNotWPError( $cleared );
+		$this->assertSame( '', $cleared['profile']['website'] );
+		$this->assertSame( 'https://tickets.example/venue', $cleared['profile']['ticketing_url'] );
+	}
+
 	public function test_profile_boundary_excludes_and_ignores_system_fields(): void {
 		$term_id = $this->venue( 'Bounded Profile' );
 		update_term_meta( $term_id, '_venue_coordinates', '32.7765,-79.9311' );

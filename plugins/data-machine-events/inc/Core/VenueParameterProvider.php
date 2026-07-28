@@ -49,7 +49,11 @@ class VenueParameterProvider {
 		),
 		'venueWebsite'     => array(
 			'type'        => 'string',
-			'description' => 'Website URL of the venue',
+			'description' => 'Official website URL of the venue',
+		),
+		'venueTicketingUrl' => array(
+			'type'        => 'string',
+			'description' => 'Public ticketing destination URL for the venue',
 		),
 		'venueCoordinates' => array(
 			'type'        => 'string',
@@ -74,6 +78,7 @@ class VenueParameterProvider {
 		'venueCountry'     => 'country',
 		'venuePhone'       => 'phone',
 		'venueWebsite'     => 'website',
+		'venueTicketingUrl' => 'ticketing_url',
 		'venueCoordinates' => 'coordinates',
 		'venueCapacity'    => 'capacity',
 		'venueTimezone'    => 'timezone',

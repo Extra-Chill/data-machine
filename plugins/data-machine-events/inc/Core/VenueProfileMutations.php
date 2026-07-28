@@ -25,7 +25,7 @@ class VenueProfileMutations {
 	private const LOCK_TIMEOUT = 10;
 
 	/** @var string[] */
-	private const EDITABLE_FIELDS = array( 'address', 'city', 'state', 'zip', 'country', 'phone', 'website', 'capacity' );
+	private const EDITABLE_FIELDS = array( 'address', 'city', 'state', 'zip', 'country', 'phone', 'website', 'ticketing_url', 'capacity' );
 
 	/** @var string[] */
 	private const ADDRESS_FIELDS = array( 'address', 'city', 'state', 'zip', 'country' );
@@ -449,7 +449,7 @@ class VenueProfileMutations {
 			$value = (string) $value;
 			if ( 'description' === $field ) {
 				$normalized[ $field ] = wp_kses_post( $value );
-			} elseif ( 'website' === $field ) {
+			} elseif ( in_array( $field, array( 'website', 'ticketing_url' ), true ) ) {
 				$normalized[ $field ] = esc_url_raw( $value );
 			} else {
 				$normalized[ $field ] = sanitize_text_field( $value );

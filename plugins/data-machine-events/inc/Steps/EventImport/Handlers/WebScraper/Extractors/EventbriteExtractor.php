@@ -23,6 +23,8 @@
 
 namespace DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors;
 
+use DataMachineEvents\Core\VenueService;
+
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
@@ -244,8 +246,13 @@ class EventbriteExtractor extends BaseExtractor {
 			$event['venueCountry'] = $address['addressCountry'] ?? '';
 		}
 
-		$event['venuePhone']   = $location['telephone'] ?? '';
-		$event['venueWebsite'] = $location['url'] ?? '';
+		$event['venuePhone'] = $location['telephone'] ?? '';
+		$location_url        = esc_url_raw( $location['url'] ?? '' );
+		if ( VenueService::is_ticketing_url( $location_url ) ) {
+			$event['venueTicketingUrl'] = $location_url;
+		} elseif ( '' !== $location_url ) {
+			$event['venueWebsite'] = $location_url;
+		}
 
 		if ( ! empty( $location['geo'] ) ) {
 			$geo = $location['geo'];

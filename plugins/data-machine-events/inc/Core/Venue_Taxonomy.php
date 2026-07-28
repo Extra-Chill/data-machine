@@ -16,34 +16,36 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * Comprehensive venue taxonomy with 9 meta fields and admin UI
+ * Comprehensive venue taxonomy with canonical meta fields and admin UI
  */
 class Venue_Taxonomy {
 
 	public static array $meta_fields = array(
-		'address'     => '_venue_address',
-		'city'        => '_venue_city',
-		'state'       => '_venue_state',
-		'zip'         => '_venue_zip',
-		'country'     => '_venue_country',
-		'phone'       => '_venue_phone',
-		'website'     => '_venue_website',
-		'capacity'    => '_venue_capacity',
-		'coordinates' => '_venue_coordinates',
-		'timezone'    => '_venue_timezone',
+		'address'       => '_venue_address',
+		'city'          => '_venue_city',
+		'state'         => '_venue_state',
+		'zip'           => '_venue_zip',
+		'country'       => '_venue_country',
+		'phone'         => '_venue_phone',
+		'website'       => '_venue_website',
+		'ticketing_url' => '_venue_ticketing_url',
+		'capacity'      => '_venue_capacity',
+		'coordinates'   => '_venue_coordinates',
+		'timezone'      => '_venue_timezone',
 	);
 
 	private static $field_labels = array(
-		'address'     => 'Address',
-		'city'        => 'City',
-		'state'       => 'State',
-		'zip'         => 'Postal Code',
-		'country'     => 'Country',
-		'phone'       => 'Phone',
-		'website'     => 'Website',
-		'capacity'    => 'Capacity',
-		'coordinates' => 'Coordinates',
-		'timezone'    => 'Timezone',
+		'address'       => 'Address',
+		'city'          => 'City',
+		'state'         => 'State',
+		'zip'           => 'Postal Code',
+		'country'       => 'Country',
+		'phone'         => 'Phone',
+		'website'       => 'Official Website',
+		'ticketing_url' => 'Ticketing URL',
+		'capacity'      => 'Capacity',
+		'coordinates'   => 'Coordinates',
+		'timezone'      => 'Timezone',
 	);
 
 	/**
@@ -1302,7 +1304,7 @@ class Venue_Taxonomy {
 	}
 
 	/**
-	 * Retrieves complete venue data with all 9 meta fields populated
+	 * Retrieves complete venue data with all canonical meta fields populated
 	 */
 	public static function get_venue_data( $term_id ) {
 		$term = get_term( $term_id, 'venue' );

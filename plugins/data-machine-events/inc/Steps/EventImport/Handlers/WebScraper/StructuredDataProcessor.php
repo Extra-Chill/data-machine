@@ -172,6 +172,7 @@ class StructuredDataProcessor {
 			'country'     => 'venueCountry',
 			'phone'       => 'venuePhone',
 			'website'     => 'venueWebsite',
+			'ticketing_url' => 'venueTicketingUrl',
 			'coordinates' => 'venueCoordinates',
 		);
 
@@ -194,12 +195,13 @@ class StructuredDataProcessor {
 			'venue_country' => 'venueCountry',
 			'venue_phone'   => 'venuePhone',
 			'venue_website' => 'venueWebsite',
+			'venue_ticketing_url' => 'venueTicketingUrl',
 		);
 
 		foreach ( $field_map as $config_key => $event_key ) {
 			if ( ! empty( $config[ $config_key ] ) ) {
 				$value               = $config[ $config_key ];
-				$event[ $event_key ] = 'venue_website' === $config_key
+				$event[ $event_key ] = in_array( $config_key, array( 'venue_website', 'venue_ticketing_url' ), true )
 					? esc_url_raw( $value )
 					: sanitize_text_field( $value );
 			}

@@ -12,6 +12,7 @@
 namespace DataMachineEvents\Abilities;
 
 use DataMachineEvents\Core\Venue_Taxonomy;
+use DataMachineEvents\Core\VenueService;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -20,27 +21,6 @@ if ( ! defined( 'ABSPATH' ) ) {
 class VenueAbilities {
 
 	private const DEFAULT_LIMIT = 25;
-
-	private const TICKET_PLATFORM_DOMAINS = array(
-		'eventbrite.com',
-		'ticketmaster.com',
-		'axs.com',
-		'dice.fm',
-		'seetickets.com',
-		'bandsintown.com',
-		'songkick.com',
-		'livenation.com',
-		'ticketweb.com',
-		'etix.com',
-		'ticketfly.com',
-		'showclix.com',
-		'prekindle.com',
-		'freshtix.com',
-		'tixr.com',
-		'seated.com',
-		'stubhub.com',
-		'vividseats.com',
-	);
 
 	private const SUSPICIOUS_PATH_PATTERNS = array(
 		'/event/',
@@ -126,6 +106,13 @@ class VenueAbilities {
 								'venues' => array( 'type' => 'array' ),
 							),
 						),
+						'ticketing_host_flows' => array(
+							'type'       => 'object',
+							'properties' => array(
+								'count' => array( 'type' => 'integer' ),
+								'flows' => array( 'type' => 'array' ),
+							),
+						),
 						'message'             => array( 'type' => 'string' ),
 					),
 				),
@@ -147,55 +134,59 @@ class VenueAbilities {
 					'type'       => 'object',
 					'required'   => array( 'venue' ),
 					'properties' => array(
-						'venue'       => array(
+						'venue'         => array(
 							'type'        => 'string',
 							'description' => 'Venue identifier (term ID, name, or slug)',
 						),
-						'name'        => array(
+						'name'          => array(
 							'type'        => 'string',
 							'description' => 'New venue name',
 						),
-						'description' => array(
+						'description'   => array(
 							'type'        => 'string',
 							'description' => 'Venue description',
 						),
-						'address'     => array(
+						'address'       => array(
 							'type'        => 'string',
 							'description' => 'Street address',
 						),
-						'city'        => array(
+						'city'          => array(
 							'type'        => 'string',
 							'description' => 'City',
 						),
-						'state'       => array(
+						'state'         => array(
 							'type'        => 'string',
 							'description' => 'State/region',
 						),
-						'zip'         => array(
+						'zip'           => array(
 							'type'        => 'string',
 							'description' => 'Postal/ZIP code',
 						),
-						'country'     => array(
+						'country'       => array(
 							'type'        => 'string',
 							'description' => 'Country',
 						),
-						'phone'       => array(
+						'phone'         => array(
 							'type'        => 'string',
 							'description' => 'Phone number',
 						),
-						'website'     => array(
+						'website'       => array(
 							'type'        => 'string',
-							'description' => 'Website URL',
+							'description' => 'Official venue website URL',
 						),
-						'capacity'    => array(
+						'ticketing_url' => array(
+							'type'        => 'string',
+							'description' => 'Public venue ticketing destination URL',
+						),
+						'capacity'      => array(
 							'type'        => 'string',
 							'description' => 'Venue capacity',
 						),
-						'coordinates' => array(
+						'coordinates'   => array(
 							'type'        => 'string',
 							'description' => 'GPS coordinates as "lat,lng"',
 						),
-						'timezone'    => array(
+						'timezone'      => array(
 							'type'        => 'string',
 							'description' => 'IANA timezone identifier (e.g., America/New_York)',
 						),
@@ -239,21 +230,22 @@ class VenueAbilities {
 				'output_schema'       => array(
 					'type'       => 'object',
 					'properties' => array(
-						'name'        => array( 'type' => 'string' ),
-						'term_id'     => array( 'type' => 'integer' ),
-						'slug'        => array( 'type' => 'string' ),
-						'description' => array( 'type' => 'string' ),
-						'address'     => array( 'type' => 'string' ),
-						'city'        => array( 'type' => 'string' ),
-						'state'       => array( 'type' => 'string' ),
-						'zip'         => array( 'type' => 'string' ),
-						'country'     => array( 'type' => 'string' ),
-						'phone'       => array( 'type' => 'string' ),
-						'website'     => array( 'type' => 'string' ),
-						'capacity'    => array( 'type' => 'string' ),
-						'coordinates' => array( 'type' => 'string' ),
-						'timezone'    => array( 'type' => 'string' ),
-						'error'       => array( 'type' => 'string' ),
+						'name'          => array( 'type' => 'string' ),
+						'term_id'       => array( 'type' => 'integer' ),
+						'slug'          => array( 'type' => 'string' ),
+						'description'   => array( 'type' => 'string' ),
+						'address'       => array( 'type' => 'string' ),
+						'city'          => array( 'type' => 'string' ),
+						'state'         => array( 'type' => 'string' ),
+						'zip'           => array( 'type' => 'string' ),
+						'country'       => array( 'type' => 'string' ),
+						'phone'         => array( 'type' => 'string' ),
+						'website'       => array( 'type' => 'string' ),
+						'ticketing_url' => array( 'type' => 'string' ),
+						'capacity'      => array( 'type' => 'string' ),
+						'coordinates'   => array( 'type' => 'string' ),
+						'timezone'      => array( 'type' => 'string' ),
+						'error'         => array( 'type' => 'string' ),
 					),
 				),
 				'execute_callback'    => array( $this, 'executeGetVenue' ),
@@ -324,10 +316,16 @@ class VenueAbilities {
 			return new \WP_Error( 'query_failed', 'Failed to query venues: ' . $venues->get_error_message(), array( 'status' => 500 ) );
 		}
 
+		$ticketing_host_flows = self::findTicketingHostFlows();
+
 		if ( empty( $venues ) ) {
 			return array(
-				'total_venues' => 0,
-				'message'      => 'No venues found in the system.',
+				'total_venues'         => 0,
+				'ticketing_host_flows' => array(
+					'count' => count( $ticketing_host_flows ),
+					'flows' => array_slice( $ticketing_host_flows, 0, $limit ),
+				),
+				'message'              => 'No venues found in the system.',
 			);
 		}
 
@@ -429,6 +427,10 @@ class VenueAbilities {
 				'count'  => count( $suspicious_website ),
 				'venues' => array_slice( $suspicious_website, 0, $limit ),
 			),
+			'ticketing_host_flows' => array(
+				'count' => count( $ticketing_host_flows ),
+				'flows' => array_slice( $ticketing_host_flows, 0, $limit ),
+			),
 			'message'             => $message,
 		);
 	}
@@ -451,7 +453,7 @@ class VenueAbilities {
 			return new \WP_Error( 'venue_not_found', "Venue '{$venue_identifier}' not found", array( 'status' => 404 ) );
 		}
 
-		$meta_keys = array( 'address', 'city', 'state', 'zip', 'country', 'phone', 'website', 'capacity', 'coordinates', 'timezone' );
+		$meta_keys = array( 'address', 'city', 'state', 'zip', 'country', 'phone', 'website', 'ticketing_url', 'capacity', 'coordinates', 'timezone' );
 		$changes   = array();
 
 		foreach ( array_merge( array( 'name', 'description' ), $meta_keys ) as $key ) {
@@ -602,10 +604,8 @@ class VenueAbilities {
 
 		$host = strtolower( $parsed['host'] );
 
-		foreach ( self::TICKET_PLATFORM_DOMAINS as $domain ) {
-			if ( str_contains( $host, $domain ) ) {
-				return 'ticket_platform_domain';
-			}
+		if ( VenueService::is_ticketing_url( $url ) ) {
+			return 'ticket_platform_domain';
 		}
 
 		$path = strtolower( $parsed['path'] ?? '' );
@@ -616,5 +616,72 @@ class VenueAbilities {
 		}
 
 		return null;
+	}
+
+	/**
+	 * Inventory scheduled flow configuration values on known ticketing hosts.
+	 *
+	 * Ticketing source URLs are valid; reporting them makes affected import
+	 * paths visible during migration without mutating or disabling flows.
+	 *
+	 * @return array<int,array<string,mixed>>
+	 */
+	private static function findTicketingHostFlows(): array {
+		global $wpdb;
+		$table = $wpdb->prefix . 'datamachine_flows';
+		if ( $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table ) ) !== $table ) {
+			return array();
+		}
+		if ( null === $wpdb->get_var( $wpdb->prepare( 'SHOW COLUMNS FROM %i LIKE %s', $table, 'scheduling_config' ) ) ) {
+			return array();
+		}
+
+		$rows = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT flow_id, flow_name, flow_config FROM %i
+				 WHERE scheduling_config NOT IN ('', '[]', '{}')",
+				$table
+			)
+		);
+		$flows = array();
+		foreach ( $rows as $row ) {
+			$config = json_decode( (string) $row->flow_config, true );
+			if ( ! is_array( $config ) ) {
+				continue;
+			}
+			$urls = array();
+			self::collectTicketingHostValues( $config, $urls );
+			if ( empty( $urls ) ) {
+				continue;
+			}
+			$flows[] = array(
+				'flow_id'   => (int) $row->flow_id,
+				'flow_name' => (string) $row->flow_name,
+				'urls'      => $urls,
+			);
+		}
+
+		return $flows;
+	}
+
+	/**
+	 * Collect source and configured venue URLs on known ticketing hosts.
+	 */
+	private static function collectTicketingHostValues( array $node, array &$urls ): void {
+		foreach ( $node as $key => $value ) {
+			if ( is_array( $value ) ) {
+				self::collectTicketingHostValues( $value, $urls );
+				continue;
+			}
+			if ( ! in_array( $key, array( 'source_url', 'venue_website', 'venue_ticketing_url' ), true ) || ! is_string( $value ) ) {
+				continue;
+			}
+			if ( VenueService::is_ticketing_url( $value ) ) {
+				$urls[] = array(
+					'field' => $key,
+					'url'   => $value,
+				);
+			}
+		}
 	}
 }

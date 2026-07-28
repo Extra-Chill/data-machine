@@ -103,9 +103,16 @@ trait VenueFieldsTrait {
 			),
 			'venue_website'  => array(
 				'type'        => 'url',
-				'label'       => __( 'Website', 'data-machine-events' ),
-				'description' => __( 'Venue website URL.', 'data-machine-events' ),
+				'label'       => __( 'Official Website', 'data-machine-events' ),
+				'description' => __( 'Official venue website URL.', 'data-machine-events' ),
 				'placeholder' => __( 'https://www.theroyalamerican.com', 'data-machine-events' ),
+				'required'    => false,
+			),
+			'venue_ticketing_url' => array(
+				'type'        => 'url',
+				'label'       => __( 'Ticketing URL', 'data-machine-events' ),
+				'description' => __( 'Public venue ticketing destination URL.', 'data-machine-events' ),
+				'placeholder' => __( 'https://www.eventbrite.com/o/example', 'data-machine-events' ),
 				'required'    => false,
 			),
 			'venue_capacity' => array(
@@ -134,6 +141,7 @@ trait VenueFieldsTrait {
 			'venue_country'  => '',
 			'venue_phone'    => '',
 			'venue_website'  => '',
+			'venue_ticketing_url' => '',
 			'venue_capacity' => '',
 		);
 	}
@@ -155,6 +163,7 @@ trait VenueFieldsTrait {
 			'venue_country'  => sanitize_text_field( $raw_settings['venue_country'] ?? '' ),
 			'venue_phone'    => sanitize_text_field( $raw_settings['venue_phone'] ?? '' ),
 			'venue_website'  => esc_url_raw( $raw_settings['venue_website'] ?? '' ),
+			'venue_ticketing_url' => esc_url_raw( $raw_settings['venue_ticketing_url'] ?? '' ),
 			'venue_capacity' => ! empty( $raw_settings['venue_capacity'] ) ? absint( $raw_settings['venue_capacity'] ) : '',
 		);
 	}
@@ -180,6 +189,7 @@ trait VenueFieldsTrait {
 			'country'  => $settings['venue_country'] ?? '',
 			'phone'    => $settings['venue_phone'] ?? '',
 			'website'  => $settings['venue_website'] ?? '',
+			'ticketing_url' => $settings['venue_ticketing_url'] ?? '',
 			'capacity' => $settings['venue_capacity'] ?? '',
 		);
 
@@ -227,6 +237,7 @@ trait VenueFieldsTrait {
 			'venue_country',
 			'venue_phone',
 			'venue_website',
+			'venue_ticketing_url',
 			'venue_capacity',
 		);
 	}
@@ -249,6 +260,7 @@ trait VenueFieldsTrait {
 			'venueCountry'  => $config['venue_country'] ?? '',
 			'venuePhone'    => $config['venue_phone'] ?? '',
 			'venueWebsite'  => $config['venue_website'] ?? '',
+			'venueTicketingUrl' => $config['venue_ticketing_url'] ?? '',
 			'venueCapacity' => $config['venue_capacity'] ?? '',
 		);
 	}

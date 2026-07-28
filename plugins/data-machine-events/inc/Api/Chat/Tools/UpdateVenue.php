@@ -67,11 +67,15 @@ class UpdateVenue extends BaseTool {
 						'type'        => 'string',
 						'description' => 'Phone number',
 					),
-					'website'     => array(
+					'website'       => array(
 						'type'        => 'string',
-						'description' => 'Website URL',
+						'description' => 'Official venue website URL',
 					),
-					'capacity'    => array(
+					'ticketing_url' => array(
+						'type'        => 'string',
+						'description' => 'Public venue ticketing destination URL',
+					),
+					'capacity'      => array(
 						'type'        => 'string',
 						'description' => 'Venue capacity',
 					),

@@ -202,7 +202,8 @@ if ( ! function_exists( 'data_machine_events_get_venue_data' ) ) {
 	 * Get raw venue term metadata.
 	 *
 	 * Returns the structured venue data array stored against a venue term —
-	 * address, lat/lng, city, region, country, website, etc. Returns null when
+	 * address, lat/lng, city, region, country, official website, ticketing URL,
+	 * etc. Returns null when
 	 * the term does not exist or has no associated venue data.
 	 *
 	 * @since 0.32.1

@@ -69,14 +69,15 @@ class VenueServiceTest extends WP_UnitTestCase {
 
 	public function test_normalize_venue_data_includes_meta_fields() {
 		$raw_data = array(
-			'name'    => 'Test Venue',
-			'address' => '123 Main St',
-			'city'    => 'Denver',
-			'state'   => 'CO',
-			'zip'     => '80202',
-			'country' => 'USA',
-			'phone'   => '555-1234',
-			'website' => 'https://venue.com',
+			'name'          => 'Test Venue',
+			'address'       => '123 Main St',
+			'city'          => 'Denver',
+			'state'         => 'CO',
+			'zip'           => '80202',
+			'country'       => 'USA',
+			'phone'         => '555-1234',
+			'website'       => 'https://venue.com',
+			'ticketing_url' => 'https://tickets.example.com/venue',
 		);
 
 		$normalized = VenueService::normalize_venue_data( $raw_data );
@@ -86,6 +87,8 @@ class VenueServiceTest extends WP_UnitTestCase {
 		$this->assertEquals( 'Denver', $normalized['city'] );
 		$this->assertEquals( 'CO', $normalized['state'] );
 		$this->assertEquals( '80202', $normalized['zip'] );
+		$this->assertSame( 'https://venue.com', $normalized['website'] );
+		$this->assertSame( 'https://tickets.example.com/venue', $normalized['ticketing_url'] );
 	}
 
 	public function test_normalize_venue_data_handles_missing_fields() {
@@ -97,6 +100,13 @@ class VenueServiceTest extends WP_UnitTestCase {
 
 		$this->assertEquals( 'Minimal Venue', $normalized['name'] );
 		$this->assertEquals( '', $normalized['address'] ?? '' );
+	}
+
+	public function test_ticketing_url_detection_matches_only_host_or_subdomain(): void {
+		$this->assertTrue( VenueService::is_ticketing_url( 'https://www.eventbrite.com/o/example' ) );
+		$this->assertTrue( VenueService::is_ticketing_url( 'https://tickets.ticketmaster.com/event/123' ) );
+		$this->assertFalse( VenueService::is_ticketing_url( 'https://not-eventbrite.com/venue' ) );
+		$this->assertFalse( VenueService::is_ticketing_url( 'https://venue.example/events/' ) );
 	}
 
 	public function test_get_or_create_venue_creates_new_venue() {

@@ -16,6 +16,44 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 class VenueService {
+	private const TICKETING_HOSTS = array(
+		'eventbrite.com',
+		'ticketmaster.com',
+		'axs.com',
+		'dice.fm',
+		'seetickets.com',
+		'bandsintown.com',
+		'songkick.com',
+		'livenation.com',
+		'ticketweb.com',
+		'etix.com',
+		'ticketfly.com',
+		'showclix.com',
+		'prekindle.com',
+		'freshtix.com',
+		'tixr.com',
+		'seated.com',
+		'stubhub.com',
+		'vividseats.com',
+	);
+
+	/**
+	 * Whether a URL belongs to a known public ticketing host.
+	 */
+	public static function is_ticketing_url( string $url ): bool {
+		$host = strtolower( (string) wp_parse_url( $url, PHP_URL_HOST ) );
+		if ( '' === $host ) {
+			return false;
+		}
+
+		foreach ( self::TICKETING_HOSTS as $ticketing_host ) {
+			if ( $host === $ticketing_host || str_ends_with( $host, '.' . $ticketing_host ) ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
 
 	/**
 	 * Normalize raw venue data from import sources.
@@ -29,7 +67,7 @@ class VenueService {
 		);
 
 		foreach ( array_keys( Venue_Taxonomy::$meta_fields ) as $field_key ) {
-			$sanitizer                = ( 'website' === $field_key ) ? 'esc_url_raw' : 'sanitize_text_field';
+			$sanitizer                = in_array( $field_key, array( 'website', 'ticketing_url' ), true ) ? 'esc_url_raw' : 'sanitize_text_field';
 			$normalized[ $field_key ] = $sanitizer( $raw_data[ $field_key ] ?? '' );
 		}
 

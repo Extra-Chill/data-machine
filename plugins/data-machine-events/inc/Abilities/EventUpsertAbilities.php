@@ -242,6 +242,7 @@ class EventUpsertAbilities {
 						'venueCountry'      => $string,
 						'venuePhone'        => $string,
 						'venueWebsite'      => $string,
+						'venueTicketingUrl' => $string,
 						'venueCoordinates'  => $string,
 						'venueCapacity'     => $string,
 						'venueTimezone'     => $string,

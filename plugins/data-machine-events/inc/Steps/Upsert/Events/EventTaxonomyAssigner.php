@@ -210,6 +210,13 @@ class EventTaxonomyAssigner {
 			return null;
 		}
 
+		$website       = $this->getParameterValue( $parameters, 'venueWebsite' ) ?: ( $engine->get( 'venueWebsite' ) ?? '' );
+		$ticketing_url = $this->getParameterValue( $parameters, 'venueTicketingUrl' ) ?: ( $engine->get( 'venueTicketingUrl' ) ?? '' );
+		if ( \DataMachineEvents\Core\VenueService::is_ticketing_url( $website ) ) {
+			$ticketing_url = $ticketing_url ?: $website;
+			$website       = '';
+		}
+
 		$venue_metadata = array(
 			'address'     => $this->getParameterValue( $parameters, 'venueAddress' ) ?: ( $engine->get( 'venueAddress' ) ?? '' ),
 			'city'        => $this->getParameterValue( $parameters, 'venueCity' ) ?: ( $engine->get( 'venueCity' ) ?? '' ),
@@ -217,7 +224,8 @@ class EventTaxonomyAssigner {
 			'zip'         => $this->getParameterValue( $parameters, 'venueZip' ) ?: ( $engine->get( 'venueZip' ) ?? '' ),
 			'country'     => $this->getParameterValue( $parameters, 'venueCountry' ) ?: ( $engine->get( 'venueCountry' ) ?? '' ),
 			'phone'       => $this->getParameterValue( $parameters, 'venuePhone' ) ?: ( $engine->get( 'venuePhone' ) ?? '' ),
-			'website'     => $this->getParameterValue( $parameters, 'venueWebsite' ) ?: ( $engine->get( 'venueWebsite' ) ?? '' ),
+			'website'     => $website,
+			'ticketing_url' => $ticketing_url,
 			'coordinates' => $this->getParameterValue( $parameters, 'venueCoordinates' ) ?: ( $engine->get( 'venueCoordinates' ) ?? '' ),
 			'capacity'    => $this->getParameterValue( $parameters, 'venueCapacity' ) ?: ( $engine->get( 'venueCapacity' ) ?? '' ),
 		);

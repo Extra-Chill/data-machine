@@ -10,6 +10,7 @@
 namespace DataMachineEvents\Cli;
 
 use DataMachineEvents\Abilities\GeocodingAbilities;
+use DataMachineEvents\Abilities\VenueAbilities;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -28,6 +29,9 @@ class AuditVenuesCommand {
 	 * [--limit=<number>]
 	 * : Max venues to list per category (default: 25).
 	 *
+	 * [--ticketing-urls]
+	 * : Dry-run audit of venue websites and scheduled flow URLs on known ticketing hosts.
+	 *
 	 * ## EXAMPLES
 	 *
 	 *     # Quick summary
@@ -45,6 +49,10 @@ class AuditVenuesCommand {
 	public function __invoke( array $args, array $assoc_args ): void {
 		$format = $assoc_args['format'] ?? 'table';
 		$limit  = (int) ( $assoc_args['limit'] ?? 25 );
+		if ( ! empty( $assoc_args['ticketing-urls'] ) ) {
+			$this->auditTicketingUrls( $format, $limit );
+			return;
+		}
 
 		$ability_format = ( 'json' === $format || 'table' === $format ) ? 'detailed' : 'summary';
 
@@ -127,5 +135,60 @@ class AuditVenuesCommand {
 		} else {
 			\WP_CLI::warning( $result['message'] );
 		}
+	}
+
+	/**
+	 * Render read-only migration candidates for separated venue URL roles.
+	 */
+	private function auditTicketingUrls( string $format, int $limit ): void {
+		$result = ( new VenueAbilities() )->executeHealthCheck( array( 'limit' => $limit ) );
+		if ( is_wp_error( $result ) ) {
+			\WP_CLI::error( $result->get_error_message() );
+		}
+
+		$candidates = $result['suspicious_website'] ?? array(
+			'count'  => 0,
+			'venues' => array(),
+		);
+		$flows      = $result['ticketing_host_flows'] ?? array(
+			'count' => 0,
+			'flows' => array(),
+		);
+		$output     = array(
+			'suspicious_website'   => $candidates,
+			'ticketing_host_flows' => $flows,
+			'dry_run'              => true,
+		);
+
+		if ( 'json' === $format ) {
+			\WP_CLI::log( wp_json_encode( $output, JSON_PRETTY_PRINT ) );
+			return;
+		}
+		if ( 'summary' === $format ) {
+			\WP_CLI::log( sprintf( '%d suspicious venue website(s); %d scheduled ticket-host flow(s). No data changed.', $candidates['count'], $flows['count'] ) );
+			return;
+		}
+
+		\WP_CLI::log( '=== Venue URL Migration Candidates (dry run) ===' );
+		\WP_CLI::log( sprintf( 'Suspicious venue websites: %d', $candidates['count'] ) );
+		if ( ! empty( $candidates['venues'] ) ) {
+			\WP_CLI\Utils\format_items( 'table', $candidates['venues'], array( 'term_id', 'name', 'website', 'suspicion_reason' ) );
+		}
+		\WP_CLI::log( sprintf( 'Scheduled ticket-host flows: %d', $flows['count'] ) );
+		if ( ! empty( $flows['flows'] ) ) {
+			$flow_rows = array();
+			foreach ( $flows['flows'] as $flow ) {
+				foreach ( $flow['urls'] as $url ) {
+					$flow_rows[] = array(
+						'flow_id'   => $flow['flow_id'],
+						'flow_name' => $flow['flow_name'],
+						'field'     => $url['field'],
+						'url'       => $url['url'],
+					);
+				}
+			}
+			\WP_CLI\Utils\format_items( 'table', $flow_rows, array( 'flow_id', 'flow_name', 'field', 'url' ) );
+		}
+		\WP_CLI::log( 'Dry run complete. No venue or flow data was changed.' );
 	}
 }
