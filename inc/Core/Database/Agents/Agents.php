@@ -25,8 +25,8 @@ class Agents extends BaseRepository {
 	 */
 	const TABLE_NAME = 'datamachine_agents';
 
-	private const DEFAULT_INSTANCE_KEY = 'default';
-	private const IDENTITY_INDEX_NAME = 'agent_identity_scope_hash';
+	private const DEFAULT_INSTANCE_KEY       = 'default';
+	private const IDENTITY_INDEX_NAME        = 'agent_identity_scope_hash';
 	private const PROVISIONING_LEASE_SECONDS = 300;
 
 	/**
@@ -88,7 +88,7 @@ class Agents extends BaseRepository {
 	public static function ensure_identity_scope_schema(): void {
 		global $wpdb;
 
-		$table_name = $wpdb->base_prefix . self::TABLE_NAME;
+		$table_name         = $wpdb->base_prefix . self::TABLE_NAME;
 		$had_provisioned_at = BaseRepository::column_exists( $table_name, 'provisioned_at', $wpdb );
 		self::ensure_identity_column( $wpdb, $table_name, 'instance_key', 'LONGTEXT NULL' );
 		self::ensure_identity_column( $wpdb, $table_name, 'instance_key_hash', 'CHAR(64) NULL' );
@@ -165,13 +165,14 @@ class Agents extends BaseRepository {
 		if ( BaseRepository::column_exists( $table_name, $column, $wpdb ) ) {
 			return;
 		}
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Column and definition are private schema constants, while the table identifier is prepared.
 		self::query_or_throw( $wpdb, $wpdb->prepare( "ALTER TABLE %i ADD COLUMN {$column} {$definition}", $table_name ), "add agent identity column {$column}" );
 	}
 
 	private static function query_or_throw( \wpdb $wpdb, string $sql, string $operation ): void {
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
 		if ( false === $wpdb->query( $sql ) ) {
-			throw new \RuntimeException( sprintf( 'Failed to %s: %s', $operation, (string) $wpdb->last_error ) );
+			throw new \RuntimeException( sprintf( 'Failed to %s: %s', esc_html( $operation ), esc_html( (string) $wpdb->last_error ) ) );
 		}
 	}
 
@@ -184,7 +185,7 @@ class Agents extends BaseRepository {
 			foreach ( $index_rows as $index_row ) {
 				$name = (string) ( $index_row['name'] ?? '' );
 				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-				$column_rows = $wpdb->get_results( $wpdb->prepare( 'PRAGMA index_info(%i)', $name ), ARRAY_A );
+				$column_rows      = $wpdb->get_results( $wpdb->prepare( 'PRAGMA index_info(%i)', $name ), ARRAY_A );
 				$indexes[ $name ] = array(
 					'unique'  => 1 === (int) ( $index_row['unique'] ?? 0 ),
 					'columns' => array_values( array_map( static fn( array $column_row ): string => (string) ( $column_row['name'] ?? '' ), $column_rows ) ),
@@ -624,12 +625,12 @@ class Agents extends BaseRepository {
 		}
 
 		$data    = array(
-			'agent_slug'   => $agent_slug,
-			'agent_name'   => $agent_name,
-			'owner_id'     => $owner_id,
-			'instance_key' => self::DEFAULT_INSTANCE_KEY,
+			'agent_slug'        => $agent_slug,
+			'agent_name'        => $agent_name,
+			'owner_id'          => $owner_id,
+			'instance_key'      => self::DEFAULT_INSTANCE_KEY,
 			'instance_key_hash' => self::instance_key_hash( self::DEFAULT_INSTANCE_KEY ),
-			'agent_config' => wp_json_encode( AgentConfigFactory::normalize( $agent_config ) ),
+			'agent_config'      => wp_json_encode( AgentConfigFactory::normalize( $agent_config ) ),
 		);
 		$formats = array( '%s', '%s', '%d', '%s', '%s', '%s' );
 
@@ -666,17 +667,17 @@ class Agents extends BaseRepository {
 
 		// The composite unique key serializes concurrent materialization attempts.
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
-		$data = array(
-				'agent_slug'   => $agent_slug,
-				'agent_name'   => $agent_name,
-				'owner_id'     => $owner_id,
-				'instance_key' => $instance_key,
-				'instance_key_hash' => self::instance_key_hash( $instance_key ),
-				'provisioning_token' => '',
-				'provisioning_started_at' => null,
-				'provisioned_at' => null,
-				'agent_config' => wp_json_encode( AgentConfigFactory::normalize( $agent_config ) ),
-			);
+		$data     = array(
+			'agent_slug'              => $agent_slug,
+			'agent_name'              => $agent_name,
+			'owner_id'                => $owner_id,
+			'instance_key'            => $instance_key,
+			'instance_key_hash'       => self::instance_key_hash( $instance_key ),
+			'provisioning_token'      => '',
+			'provisioning_started_at' => null,
+			'provisioned_at'          => null,
+			'agent_config'            => wp_json_encode( AgentConfigFactory::normalize( $agent_config ) ),
+		);
 		$formats  = array( '%s', '%s', '%d', '%s', '%s', '%s', null, null, '%s' );
 		$inserted = $this->insert_identity_row( $data, $formats );
 
@@ -694,7 +695,10 @@ class Agents extends BaseRepository {
 		);
 	}
 
-	/** @param array<string,mixed> $data @param array<int,string|null> $formats */
+	/**
+	 * @param array<string,mixed>    $data    Identity row data.
+	 * @param array<int,string|null> $formats Identity row formats.
+	 */
 	protected function insert_identity_row( array $data, array $formats ): int|false {
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
 		return $this->wpdb->insert( $this->table_name, $data, $formats );
@@ -703,6 +707,7 @@ class Agents extends BaseRepository {
 	public function claim_identity_provisioning( int $agent_id, string $token ): bool {
 		$now    = gmdate( 'Y-m-d H:i:s' );
 		$expiry = gmdate( 'Y-m-d H:i:s', time() - self::PROVISIONING_LEASE_SECONDS );
+		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared -- The complete conditional update is prepared immediately below.
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		$updated = $this->wpdb->query(
 			$this->wpdb->prepare(
@@ -714,10 +719,12 @@ class Agents extends BaseRepository {
 				$expiry
 			)
 		);
+		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
 		return 1 === $updated;
 	}
 
 	public function complete_identity_provisioning( int $agent_id, string $token ): bool {
+		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared -- The complete conditional update is prepared immediately below.
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		$updated = $this->wpdb->query(
 			$this->wpdb->prepare(
@@ -728,10 +735,12 @@ class Agents extends BaseRepository {
 				$token
 			)
 		);
+		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
 		return 1 === $updated;
 	}
 
 	public function release_identity_provisioning( int $agent_id, string $token ): void {
+		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared -- The complete conditional update is prepared immediately below.
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		$this->wpdb->query(
 			$this->wpdb->prepare(
@@ -741,6 +750,7 @@ class Agents extends BaseRepository {
 				$token
 			)
 		);
+		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
 	}
 
 	private static function instance_key_hash( string $instance_key ): string {

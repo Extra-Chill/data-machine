@@ -193,13 +193,13 @@ class AgentIdentityStoreAdapter implements WP_Agent_Identity_Store {
 			if ( is_array( $current ) && $this->is_provisioned( $current ) ) {
 				return $this->identity_from_row( $current, $scope, $meta );
 			}
-			throw new \RuntimeException( sprintf( 'Materialized agent identity %d is currently provisioning; retry.', $agent_id ) );
+			throw new \RuntimeException( sprintf( 'Materialized agent identity %d is currently provisioning; retry.', esc_html( (string) $agent_id ) ) );
 		}
 
 		try {
 			$this->provision_identity( $agent_id, $scope, $meta );
 			if ( ! $this->agents_repository->complete_identity_provisioning( $agent_id, $token ) ) {
-				throw new \RuntimeException( sprintf( 'Failed to mark materialized agent identity %d provisioned.', $agent_id ) );
+				throw new \RuntimeException( sprintf( 'Failed to mark materialized agent identity %d provisioned.', esc_html( (string) $agent_id ) ) );
 			}
 		} catch ( \Throwable $throwable ) {
 			$this->agents_repository->release_identity_provisioning( $agent_id, $token );
@@ -208,7 +208,7 @@ class AgentIdentityStoreAdapter implements WP_Agent_Identity_Store {
 
 		$current = $this->agents_repository->get_agent( $agent_id );
 		if ( ! is_array( $current ) || ! $this->is_provisioned( $current ) ) {
-			throw new \RuntimeException( sprintf( 'Materialized agent identity %d provisioning state was not persisted.', $agent_id ) );
+			throw new \RuntimeException( sprintf( 'Materialized agent identity %d provisioning state was not persisted.', esc_html( (string) $agent_id ) ) );
 		}
 		return $this->identity_from_row( $current, $scope, $meta );
 	}
