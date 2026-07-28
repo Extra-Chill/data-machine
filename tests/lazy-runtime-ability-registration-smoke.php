@@ -80,7 +80,7 @@ namespace {
 
 		echo 'All ' . count( $checks ) . " WordPress lazy-runtime ability assertions passed.\n";
 		return;
-	}
+	} else {
 
 	define( 'ABSPATH', sys_get_temp_dir() . '/datamachine-lazy-runtime-abilities/' );
 
@@ -206,4 +206,5 @@ namespace {
 	$assert( 'late registration restores the WordPress hook stack', array() === $GLOBALS['wp_current_filter'] );
 
 	echo "All {$assertions} lazy-runtime ability assertions passed.\n";
+}
 }
