@@ -3,7 +3,7 @@
  * Plugin Name:     Data Machine
  * Plugin URI:      https://wordpress.org/plugins/data-machine/
  * Description:     AI-powered WordPress operations engine: persistent agent memory, autonomous pipelines and flows, multi-turn chat, email I/O, and a full WP-CLI control surface over the WordPress Abilities API.
- * Version:           0.170.4
+ * Version:           0.170.5
  * Requires at least: 7.0
  * Requires PHP:     8.2
  * Author:          Chris Huber, extrachill
@@ -17,7 +17,7 @@ if ( ! defined( 'WPINC' ) ) {
 	die;
 }
 
-define( 'DATAMACHINE_VERSION', '0.170.4' );
+define( 'DATAMACHINE_VERSION', '0.170.5' );
 
 define( 'DATAMACHINE_PATH', plugin_dir_path( __FILE__ ) );
 define( 'DATAMACHINE_URL', plugin_dir_url( __FILE__ ) );
@@ -814,6 +814,7 @@ function datamachine_activate_plugin( $network_wide = false ) {
  */
 function datamachine_create_network_agent_tables() {
 	\DataMachine\Core\Database\Agents\Agents::create_table();
+	\DataMachine\Core\Database\Agents\Agents::ensure_identity_scope_schema();
 	\DataMachine\Core\Database\Agents\Agents::ensure_site_scope_column();
 	\DataMachine\Core\Database\Agents\AgentAccess::create_table();
 	\DataMachine\Core\Database\Agents\AgentTokens::create_table();
