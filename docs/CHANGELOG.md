@@ -2,6 +2,15 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.170.6] - 2026-07-28
+
+### Changed
+- isolate pure PHP ability fixture
+- cover late abilities in WordPress runtime
+
+### Fixed
+- register abilities after lazy runtime activation
+
 ## [0.170.5] - 2026-07-28
 
 ### Changed
