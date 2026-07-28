@@ -2,6 +2,16 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.170.5] - 2026-07-28
+
+### Changed
+- Support bounded HTTP response bodies
+- Redact HTTP request bodies in logs
+
+### Fixed
+- preserve full materialized agent identity scope
+- Fix HTTP client CI coverage
+
 ## [0.170.4] - 2026-07-27
 
 ### Fixed
