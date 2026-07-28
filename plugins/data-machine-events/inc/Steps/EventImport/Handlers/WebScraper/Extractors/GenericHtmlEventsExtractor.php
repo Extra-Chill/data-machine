@@ -46,24 +46,27 @@ class GenericHtmlEventsExtractor extends BaseExtractor {
 	private const FIELD_PATTERNS = array(
 		'title' => array(
 			'/<(?:div|span|h[1-6])[^>]+class="[^"]*eventTitle[^"]*"[^>]*>.*?<a[^>]+title="([^"]+)"/is',
-			'/<(?:div|span|h[1-6])[^>]+class="[^"]*eventTitle[^"]*"[^>]*>.*?<a[^>]*>(.*?)<\/a>/is',
-			'/<(?:div|span|h[1-6])[^>]+class="[^"]*event-title[^"]*"[^>]*>(.*?)<\/(?:div|span|h[1-6])>/is',
+			'/<(?:div|span|p|h[1-6])[^>]+class="[^"]*eventTitle[^"]*"[^>]*>.*?<a[^>]*>(.*?)<\/a>/is',
+			'/<(?:div|span|p|h[1-6])[^>]+class="[^"]*event-title[^"]*"[^>]*>(.*?)<\/(?:div|span|p|h[1-6])>/is',
+			'/<[^>]+class="[^"]*event-link[^"]*"[^>]*>.*?<a[^>]*>(.*?)<\/a>/is',
 			'/<h[1-6][^>]*>\s*<a[^>]+href="[^"]*event[^"]*"[^>]*>(.*?)<\/a>/is',
 		),
 		'date'  => array(
-			'/<(?:div|span|time)[^>]+class="[^"]*eventDate[^"]*"[^>]*>(.*?)<\/(?:div|span|time)>/is',
-			'/<(?:div|span|time)[^>]+class="[^"]*event-date[^"]*"[^>]*>(.*?)<\/(?:div|span|time)>/is',
+			'/<(?:div|span|p|time)[^>]+class="[^"]*eventDate[^"]*"[^>]*>(.*?)<\/(?:div|span|p|time)>/is',
+			'/<(?:div|span|p|time)[^>]+class="[^"]*event-date[^"]*"[^>]*>(.*?)<\/(?:div|span|p|time)>/is',
+			'/<[^>]+class="[^"]*when[^"]*"[^>]*>(.*?)<\/[^>]+>/is',
 			'/<time[^>]+datetime="([^"]+)"/i',
 		),
 		'time'  => array(
-			'/<(?:div|span)[^>]+class="[^"]*eventTime[^"]*"[^>]*>(.*?)<\/(?:div|span)>/is',
-			'/<(?:div|span)[^>]+class="[^"]*event-time[^"]*"[^>]*>(.*?)<\/(?:div|span)>/is',
+			'/<span[^>]+class="[^"]*event-time[^"]*"[^>]*>(.*?)<\/span>/is',
+			'/<(?:div|span|p)[^>]+class="[^"]*eventTime[^"]*"[^>]*>(.*?)<\/(?:div|span|p)>/is',
 		),
 		'price' => array(
 			'/<(?:div|span)[^>]+class="[^"]*eventPrice[^"]*"[^>]*>(.*?)<\/(?:div|span)>/is',
 			'/<(?:div|span)[^>]+class="[^"]*event-price[^"]*"[^>]*>(.*?)<\/(?:div|span)>/is',
 		),
 		'link'  => array(
+			'/<[^>]+class="[^"]*(?:event-title|event-link)[^"]*"[^>]*>.*?<a[^>]+href="([^"]+)"/is',
 			'/<a[^>]+href="(https?:\/\/[^"]*\/events?\/[^"]+)"/i',
 			'/<a[^>]+href="(\/events?\/[^"]+)"/i',
 		),
@@ -88,18 +91,16 @@ class GenericHtmlEventsExtractor extends BaseExtractor {
 			|| substr_count( $html, 'event-listing' ) >= self::MIN_CONTAINERS
 		);
 
-		if ( ! $has_event_classes ) {
-			return false;
-		}
-
-		// Confirm at least one container pattern actually matches.
-		foreach ( self::CONTAINER_PATTERNS as $pattern ) {
-			if ( preg_match( $pattern, $html ) ) {
-				return true;
+		if ( $has_event_classes ) {
+			// Confirm at least one container pattern actually matches.
+			foreach ( self::CONTAINER_PATTERNS as $pattern ) {
+				if ( preg_match( $pattern, $html ) ) {
+					return true;
+				}
 			}
 		}
 
-		return false;
+		return count( $this->findSemanticContainers( $html ) ) >= self::MIN_CONTAINERS;
 	}
 
 	public function extract( string $html, string $source_url ): array {
@@ -112,6 +113,9 @@ class GenericHtmlEventsExtractor extends BaseExtractor {
 				$containers = $matches[1];
 				break;
 			}
+		}
+		if ( empty( $containers ) ) {
+			$containers = $this->findSemanticContainers( $html );
 		}
 
 		if ( empty( $containers ) ) {
@@ -131,6 +135,70 @@ class GenericHtmlEventsExtractor extends BaseExtractor {
 		}
 
 		return $events;
+	}
+
+	/**
+	 * Find repeated event containers by paired semantic field classes.
+	 *
+	 * Some WordPress plugins and themes do not name the card itself, but do
+	 * consistently expose title/date fields. The nearest ancestor containing
+	 * both fields is the event boundary.
+	 *
+	 * @return string[] Serialized event container HTML.
+	 */
+	private function findSemanticContainers( string $html ): array {
+		if ( '' === $html ) {
+			return array();
+		}
+
+		$loaded = $this->loadDom( $html );
+		$dom    = $loaded['dom'];
+		$xpath  = $loaded['xpath'];
+		$pairs  = array(
+			array( 'event-title', 'event-date' ),
+			array( 'event-link', 'when' ),
+		);
+
+		foreach ( $pairs as [ $title_class, $date_class ] ) {
+			$title_query = sprintf(
+				"//*[contains(concat(' ', normalize-space(@class), ' '), ' %s ')]",
+				$title_class
+			);
+			$title_nodes = $xpath->query( $title_query );
+			$containers  = array();
+
+			if ( false === $title_nodes ) {
+				continue;
+			}
+
+			foreach ( $title_nodes as $title_node ) {
+				$container = $title_node->parentNode;
+
+				for ( $depth = 0; $depth < 4 && $container instanceof \DOMElement; ++$depth ) {
+					$date_query = sprintf(
+						".//*[contains(concat(' ', normalize-space(@class), ' '), ' %s ')]",
+						$date_class
+					);
+					$date_nodes = $xpath->query( $date_query, $container );
+
+					if ( false !== $date_nodes && $date_nodes->length > 0 ) {
+						$path = $container->getNodePath();
+						if ( is_string( $path ) ) {
+							$containers[ $path ] = $dom->saveHTML( $container );
+						}
+						break;
+					}
+
+					$container = $container->parentNode;
+				}
+			}
+
+			if ( count( $containers ) >= self::MIN_CONTAINERS ) {
+				return array_values( $containers );
+			}
+		}
+
+		return array();
 	}
 
 	public function getMethod(): string {
