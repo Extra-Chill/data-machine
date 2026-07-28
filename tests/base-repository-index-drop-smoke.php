@@ -32,16 +32,24 @@ if ( ! in_array( $mode, array( 'mysql', 'sqlite' ), true ) ) {
 	exit( 1 );
 }
 
-if ( 'sqlite' === $mode ) {
+if ( 'sqlite' === $mode && ! defined( 'DATABASE_TYPE' ) ) {
 	define( 'DATABASE_TYPE', 'sqlite' );
 }
-define( 'ABSPATH', __DIR__ . '/' );
-define( 'ARRAY_A', 'ARRAY_A' );
+if ( ! defined( 'ABSPATH' ) ) {
+	define( 'ABSPATH', __DIR__ . '/' );
+}
+if ( ! defined( 'ARRAY_A' ) ) {
+	define( 'ARRAY_A', 'ARRAY_A' );
+}
 
-class wpdb {}
+if ( ! class_exists( 'wpdb' ) ) {
+	class wpdb {}
+}
 
-function esc_html( string $text ): string {
-	return $text;
+if ( ! function_exists( 'esc_html' ) ) {
+	function esc_html( string $text ): string {
+		return $text;
+	}
 }
 
 require_once __DIR__ . '/../inc/Core/Database/BaseRepository.php';
