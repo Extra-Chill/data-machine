@@ -2,6 +2,16 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.53.1] - 2026-07-28
+
+### Fixed
+- parse localized Webflow event listings
+- support Eventbrite venue discovery
+- use canonical origins for Wix event APIs
+- resolve Squarespace summary event collections
+- extract semantic WordPress event listings
+- recover Tribe events from core REST fallback
+
 ## [0.53.0] - 2026-07-28
 
 ### Added
