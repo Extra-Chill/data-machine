@@ -257,6 +257,57 @@ class EventUpdateAbilitiesTest extends WP_UnitTestCase {
 		$this->assertSame( $input['expected_fingerprint'], $result['fingerprint'] );
 	}
 
+	public function test_source_update_round_trips_schema_fields_with_cas_and_exact_retry(): void {
+		add_filter( 'datamachine_events_update_source_event_permission', '__return_true' );
+		$event_id = $this->makeSourceEvent();
+		$input    = $this->sourceInput(
+			$event_id,
+			array(
+				'validFrom' => '2026-12-01T09:00:00-05:00',
+				'eventType' => 'MusicEvent',
+			)
+		);
+
+		$updated = $this->ability->executeUpdateSourceEvent( $input );
+		$this->assertIsArray( $updated );
+		$this->assertSame( 'updated', $updated['action'] );
+		$this->assertSame( array( 'validFrom', 'eventType' ), $updated['updated_fields'] );
+		$this->assertNotSame( $input['expected_fingerprint'], $updated['fingerprint'] );
+		$attrs = parse_blocks( get_post_field( 'post_content', $event_id ) )[0]['attrs'];
+		$this->assertSame( '2026-12-01T09:00:00-05:00', $attrs['validFrom'] );
+		$this->assertSame( 'MusicEvent', $attrs['eventType'] );
+
+		$stale = $this->ability->executeUpdateSourceEvent( $input );
+		$this->assertWPError( $stale );
+		$this->assertSame( 'source_event_fingerprint_conflict', $stale->get_error_code() );
+
+		$input['expected_fingerprint'] = $updated['fingerprint'];
+		$retry                         = $this->ability->executeUpdateSourceEvent( $input );
+		$this->assertIsArray( $retry );
+		$this->assertSame( 'no_change', $retry['action'] );
+		$this->assertSame( $updated['fingerprint'], $retry['fingerprint'] );
+	}
+
+	public function test_source_update_rejects_malformed_schema_fields_without_rewriting(): void {
+		add_filter( 'datamachine_events_update_source_event_permission', '__return_true' );
+		$event_id = $this->makeSourceEvent();
+		$before   = get_post_field( 'post_content', $event_id );
+
+		foreach ( array(
+			array( 'validFrom' => '2026-02-30T09:00:00Z' ),
+			array( 'validFrom' => 'tomorrow' ),
+			array( 'validFrom' => '2026-12-01T09:00:00+24:00' ),
+			array( 'validFrom' => array( '2026-12-01T09:00:00Z' ) ),
+			array( 'eventType' => 'Concert' ),
+			array( 'eventType' => array( 'MusicEvent' ) ),
+		) as $changes ) {
+			$result = $this->ability->executeUpdateSourceEvent( $this->sourceInput( $event_id, $changes ) );
+			$this->assertWPError( $result );
+			$this->assertSame( 'source_event_update_input_invalid', $result->get_error_code() );
+			$this->assertSame( $before, get_post_field( 'post_content', $event_id ) );
+		}
+	}
+
 	public function test_venue_mutation_success_assigns_term_and_returns_taxonomy_result(): void {
 		$event_id = $this->makeEvent();
 		$venue    = $this->makeVenue( 'Success Venue' );

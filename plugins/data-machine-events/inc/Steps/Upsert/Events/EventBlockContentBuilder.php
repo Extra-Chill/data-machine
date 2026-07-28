@@ -46,6 +46,8 @@ class EventBlockContentBuilder {
 			'previousStartDate' => $event_data['previousStartDate'] ?? '',
 			'priceCurrency'     => $event_data['priceCurrency'] ?? 'USD',
 			'offerAvailability' => $event_data['offerAvailability'] ?? 'InStock',
+			'validFrom'         => $event_data['validFrom'] ?? '',
+			'eventType'         => $event_data['eventType'] ?? '',
 
 			'showVenue'         => true,
 			'showPrice'         => true,

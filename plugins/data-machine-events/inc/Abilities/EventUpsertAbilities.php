@@ -7,6 +7,7 @@
 
 namespace DataMachineEvents\Abilities;
 
+use DataMachineEvents\Core\EventSchemaProvider;
 use DataMachineEvents\Core\VenueParameterProvider;
 use DataMachineEvents\Core\Venue_Taxonomy;
 use DataMachineEvents\Steps\Upsert\Events\EventUpsert;
@@ -253,6 +254,10 @@ class EventUpsertAbilities {
 							'format' => 'uri',
 						),
 						'offerAvailability' => $string,
+						'validFrom'         => array(
+							'type'   => 'string',
+							'format' => 'date-time',
+						),
 						'performer'         => $string,
 						'performerType'     => $string,
 						'organizer'         => $string,
@@ -263,7 +268,10 @@ class EventUpsertAbilities {
 						),
 						'eventStatus'       => $string,
 						'previousStartDate' => $string,
-						'eventType'         => $string,
+						'eventType'         => array(
+							'type' => 'string',
+							'enum' => EventSchemaProvider::EVENT_TYPES,
+						),
 					),
 				),
 			),

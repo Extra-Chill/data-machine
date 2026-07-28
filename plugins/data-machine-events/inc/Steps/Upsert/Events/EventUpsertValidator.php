@@ -16,6 +16,7 @@
 namespace DataMachineEvents\Steps\Upsert\Events;
 
 use DataMachine\Core\EngineData;
+use DataMachineEvents\Core\EventSchemaProvider;
 use DataMachineEvents\Steps\EventImport\JunkPayloadFilter;
 
 defined( 'ABSPATH' ) || exit;
@@ -159,6 +160,34 @@ class EventUpsertValidator {
 				),
 				'invalid_start_date'
 			);
+		}
+
+		$valid_from = $engine->get( 'validFrom' );
+		if ( ( null === $valid_from || '' === $valid_from ) && array_key_exists( 'validFrom', $parameters ) ) {
+			$valid_from = $parameters['validFrom'];
+		}
+		if ( ( null !== $valid_from && '' !== $valid_from ) || array_key_exists( 'validFrom', $parameters ) ) {
+			if ( ! is_string( $valid_from ) || ( '' !== $valid_from && ! EventSchemaProvider::isValidValidFrom( $valid_from ) ) ) {
+				return $this->gateRejection(
+					'validFrom must be an ISO-8601 date-time.',
+					array( 'validFrom' => $valid_from ),
+					'invalid_valid_from'
+				);
+			}
+		}
+
+		$event_type = $engine->get( 'eventType' );
+		if ( ( null === $event_type || '' === $event_type ) && array_key_exists( 'eventType', $parameters ) ) {
+			$event_type = $parameters['eventType'];
+		}
+		if ( ( null !== $event_type && '' !== $event_type ) || array_key_exists( 'eventType', $parameters ) ) {
+			if ( ! is_string( $event_type ) || ! in_array( $event_type, EventSchemaProvider::EVENT_TYPES, true ) ) {
+				return $this->gateRejection(
+					'eventType must be a supported Schema.org event type.',
+					array( 'eventType' => $event_type ),
+					'invalid_event_type'
+				);
+			}
 		}
 
 		// 5. Junk / test payload — reuse the filterable JunkPayloadFilter

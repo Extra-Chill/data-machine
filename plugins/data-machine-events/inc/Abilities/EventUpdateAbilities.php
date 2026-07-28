@@ -834,6 +834,20 @@ class EventUpdateAbilities {
 				) );
 			}
 		}
+		if ( array_key_exists( 'validFrom', $input )
+			&& ( ! is_string( $input['validFrom'] ) || ( '' !== $input['validFrom'] && ! EventSchemaProvider::isValidValidFrom( $input['validFrom'] ) ) ) ) {
+			return new \WP_Error( 'source_event_update_input_invalid', 'validFrom must be an ISO-8601 date-time.', array(
+				'status'    => 400,
+				'retryable' => false,
+			) );
+		}
+		if ( array_key_exists( 'eventType', $input )
+			&& ( ! is_string( $input['eventType'] ) || ! in_array( $input['eventType'], EventSchemaProvider::EVENT_TYPES, true ) ) ) {
+			return new \WP_Error( 'source_event_update_input_invalid', 'eventType must be a supported Schema.org event type.', array(
+				'status'    => 400,
+				'retryable' => false,
+			) );
+		}
 		if ( ! hash_equals( hash( 'sha256', $source . "\0" . $source_id ), $identity )
 			|| get_post_meta( $event_id, EventUpsert::SOURCE_NAME_META_KEY, true ) !== $source
 			|| get_post_meta( $event_id, EventUpsert::SOURCE_ID_META_KEY, true ) !== $source_id
@@ -1105,7 +1119,10 @@ class EventUpdateAbilities {
 					'format' => 'uri',
 				),
 				'offerAvailability'    => $string,
-				'validFrom'            => $string,
+				'validFrom'            => array(
+					'type'   => 'string',
+					'format' => 'date-time',
+				),
 				'performer'            => $string,
 				'performerType'        => array(
 					'type' => 'string',

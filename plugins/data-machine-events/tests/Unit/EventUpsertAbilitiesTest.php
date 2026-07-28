@@ -119,6 +119,11 @@ class EventUpsertAbilitiesTest extends WP_UnitTestCase {
 
 	public function test_replay_of_source_identity_returns_same_event(): void {
 		$input  = $this->validInput();
+		$input['event']['price']             = '$25';
+		$input['event']['priceCurrency']     = 'USD';
+		$input['event']['offerAvailability'] = 'InStock';
+		$input['event']['validFrom']         = '2027-01-20T10:30:00-05:00';
+		$input['event']['eventType']         = 'MusicEvent';
 		$first  = $this->ability->executeUpsertEvent( $input );
 		$second = $this->ability->executeUpsertEvent( $input );
 
@@ -126,6 +131,57 @@ class EventUpsertAbilitiesTest extends WP_UnitTestCase {
 		$this->assertIsArray( $second );
 		$this->assertSame( $first['event_id'], $second['event_id'] );
 		$this->assertSame( 'no_change', $second['action'] );
+		$this->assertSame( $first['fingerprint'], $second['fingerprint'] );
+		$attrs = parse_blocks( get_post_field( 'post_content', $first['event_id'] ) )[0]['attrs'];
+		$this->assertSame( '2027-01-20T10:30:00-05:00', $attrs['validFrom'] );
+		$this->assertSame( 'MusicEvent', $attrs['eventType'] );
+		$this->assertSame( '$25', $attrs['price'] );
+		$this->assertSame( 'USD', $attrs['priceCurrency'] );
+		$this->assertSame( 'InStock', $attrs['offerAvailability'] );
+	}
+
+	public function test_schema_fields_update_same_source_event_without_changing_duplicate_identity(): void {
+		$input = $this->validInput();
+		$first = $this->ability->executeUpsertEvent( $input );
+
+		$input['event']['validFrom'] = '2027-01-20T10:30:00Z';
+		$input['event']['eventType'] = 'Festival';
+		$second                      = $this->ability->executeUpsertEvent( $input );
+
+		$this->assertSame( $first['event_id'], $second['event_id'] );
+		$this->assertSame( 'updated', $second['action'] );
+		$this->assertNotSame( $first['fingerprint'], $second['fingerprint'] );
+		$this->assertSame( 1, $this->countEventsWithTitle( $input['event']['title'] ) );
+	}
+
+	public function test_omitted_legacy_fields_remain_omitted_and_idempotent(): void {
+		$input  = $this->validInput();
+		$first  = $this->ability->executeUpsertEvent( $input );
+		$second = $this->ability->executeUpsertEvent( $input );
+		$attrs  = parse_blocks( get_post_field( 'post_content', $first['event_id'] ) )[0]['attrs'];
+
+		$this->assertSame( 'no_change', $second['action'] );
+		$this->assertArrayNotHasKey( 'validFrom', $attrs );
+		$this->assertArrayNotHasKey( 'eventType', $attrs );
+	}
+
+	public function test_malformed_canonical_schema_fields_fail_before_write(): void {
+		foreach ( array(
+			array( 'validFrom', '2027-02-30T10:30:00Z', 'invalid_valid_from' ),
+			array( 'validFrom', 'next Tuesday', 'invalid_valid_from' ),
+			array( 'validFrom', '2027-01-20T10:30:00+24:00', 'invalid_valid_from' ),
+			array( 'validFrom', array( '2027-01-20T10:30:00Z' ), 'invalid_valid_from' ),
+			array( 'eventType', 'Concert', 'invalid_event_type' ),
+			array( 'eventType', array( 'MusicEvent' ), 'invalid_event_type' ),
+		) as [$field, $value, $error_code] ) {
+			$input                    = $this->validInput();
+			$input['event'][ $field ] = $value;
+			$result                   = $this->ability->executeUpsertEvent( $input );
+
+			$this->assertWPError( $result );
+			$this->assertSame( $error_code, $result->get_error_code() );
+			$this->assertSame( 0, $this->countEventsWithTitle( $input['event']['title'] ) );
+		}
 	}
 
 	public function test_validation_failure_returns_machine_readable_error_without_write(): void {

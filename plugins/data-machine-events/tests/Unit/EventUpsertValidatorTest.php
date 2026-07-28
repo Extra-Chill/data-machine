@@ -94,6 +94,45 @@ class EventUpsertValidatorTest extends WP_UnitTestCase {
 		$this->assertNull( $result, 'A valid event must pass the validation gate.' );
 	}
 
+	public function test_gate_uses_parameter_schema_fields_when_engine_placeholders_are_empty() {
+		$engine   = new \DataMachine\Core\EngineData(
+			array(
+				'validFrom' => '',
+				'eventType' => '',
+			),
+			0
+		);
+		$evidence = array(
+			'title'       => 'Schema Field Event',
+			'venue'       => 'Some Venue',
+			'startDate'   => '2026-08-01',
+			'startTime'   => '20:00',
+			'source_type' => '',
+			'artist'      => '',
+		);
+
+		$valid = $this->validator->validateForPublish(
+			$evidence,
+			array(
+				'startDate' => '2026-08-01',
+				'validFrom' => '2026-07-01T10:30:00Z',
+				'eventType' => 'MusicEvent',
+			),
+			$engine
+		);
+		$this->assertNull( $valid );
+
+		$invalid = $this->validator->validateForPublish(
+			$evidence,
+			array(
+				'startDate' => '2026-08-01',
+				'validFrom' => 'tomorrow',
+			),
+			$engine
+		);
+		$this->assertSame( 'invalid_valid_from', $invalid['rule'] ?? '' );
+	}
+
 	public function test_gate_rejects_missing_title() {
 		$engine = new \DataMachine\Core\EngineData( array(), 0 );
 

@@ -317,6 +317,24 @@ class EventSchemaProvider {
 	}
 
 	/**
+	 * Check a validFrom value without changing the caller-provided timestamp.
+	 *
+	 * WordPress's RFC3339 parser accepts timezone-less ISO-8601 timestamps, so
+	 * this follows the core date-time contract while rejecting impossible dates.
+	 */
+	public static function isValidValidFrom( string $value ): bool {
+		if ( false === rest_parse_date( $value ) ) {
+			return false;
+		}
+
+		if ( ! preg_match( '/^(\d{4})-(\d{2})-(\d{2})[Tt ](?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|[+-](?:[01]\d|2[0-3])(?::?[0-5]\d)?)?$/', $value, $matches ) ) {
+			return false;
+		}
+
+		return checkdate( (int) $matches[2], (int) $matches[3], (int) $matches[1] );
+	}
+
+	/**
 	 * Convert a field definition map into a canonical JSON Schema fragment.
 	 *
 	 * Returns `{ properties: {...}, required: [...] }`. The `required` key is
@@ -419,7 +437,7 @@ class EventSchemaProvider {
 			$schema['image'] = $images;
 		}
 
-		if ( ! empty( $event_data['ticketUrl'] ) || ! empty( $event_data['price'] ) ) {
+		if ( ! empty( $event_data['ticketUrl'] ) || ! empty( $event_data['price'] ) || ! empty( $event_data['validFrom'] ) ) {
 			$schema['offers'] = self::buildOffersSchema( $event_data );
 		}
 
