@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.170.8] - 2026-07-28
+
+### Fixed
+- use portable agent index removal
+
 ## [0.170.7] - 2026-07-28
 
 ### Fixed
