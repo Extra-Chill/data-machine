@@ -56,7 +56,8 @@ class AgentIdentityStoreAdapter implements WP_Agent_Identity_Store {
 
 	/** @inheritDoc */
 	public function resolve( WP_Agent_Identity_Scope $scope ): ?WP_Agent_Materialized_Identity {
-		$row = $this->agents_repository->get_by_slug( $scope->normalize()->agent_slug );
+		$scope = $scope->normalize();
+		$row   = $this->agents_repository->get_by_identity_scope( $scope->agent_slug, $scope->owner_user_id, $scope->instance_key );
 		return is_array( $row ) ? $this->identity_from_row( $row, $scope ) : null;
 	}
 
@@ -69,7 +70,7 @@ class AgentIdentityStoreAdapter implements WP_Agent_Identity_Store {
 	/** @inheritDoc */
 	public function materialize( WP_Agent_Identity_Scope $scope, array $default_config = array(), array $meta = array() ): WP_Agent_Materialized_Identity {
 		$scope    = $scope->normalize();
-		$existing = $this->agents_repository->get_by_slug( $scope->agent_slug );
+		$existing = $this->agents_repository->get_by_identity_scope( $scope->agent_slug, $scope->owner_user_id, $scope->instance_key );
 		if ( is_array( $existing ) ) {
 			return $this->identity_from_row( $existing, $scope );
 		}
@@ -83,12 +84,14 @@ class AgentIdentityStoreAdapter implements WP_Agent_Identity_Store {
 			);
 		}
 
-		$agent_id = $this->agents_repository->create_if_missing(
+		$creation = $this->agents_repository->create_identity_if_missing(
 			$scope->agent_slug,
 			$this->label_from_meta( $meta, $scope->agent_slug ),
 			$scope->owner_user_id,
+			$scope->instance_key,
 			$default_config
 		);
+		$agent_id = $creation['agent_id'];
 
 		if ( $agent_id <= 0 ) {
 			throw new \RuntimeException(
@@ -103,19 +106,36 @@ class AgentIdentityStoreAdapter implements WP_Agent_Identity_Store {
 				'agent_slug'   => $scope->agent_slug,
 				'agent_name'   => $this->label_from_meta( $meta, $scope->agent_slug ),
 				'owner_id'     => $scope->owner_user_id,
+				'instance_key' => $scope->instance_key,
 				'agent_config' => $default_config,
 			);
 		}
 
-		$this->after_created( $agent_id, $scope, $meta );
+		if ( $creation['created'] ) {
+			$this->after_created( $agent_id, $scope, $meta );
+		}
 
 		return $this->identity_from_row( $row, $scope, $meta );
 	}
 
 	/** @inheritDoc */
 	public function update( WP_Agent_Materialized_Identity $identity ): WP_Agent_Materialized_Identity {
-		$this->agents_repository->update_agent( $identity->id, array( 'agent_config' => $identity->config ) );
-		return $this->get( $identity->id ) ?? $identity;
+		$row = $this->agents_repository->get_agent( $identity->id );
+		if ( ! is_array( $row ) ) {
+			throw new \InvalidArgumentException( sprintf( 'Cannot update unknown materialized agent identity %d.', esc_html( (string) $identity->id ) ) );
+		}
+
+		$this->identity_from_row( $row, $identity->scope );
+		if ( ! $this->agents_repository->update_agent( $identity->id, array( 'agent_config' => $identity->config ) ) ) {
+			throw new \RuntimeException( sprintf( 'Failed to update materialized agent identity %d.', esc_html( (string) $identity->id ) ) );
+		}
+
+		$updated = $this->get( $identity->id );
+		if ( null === $updated ) {
+			throw new \RuntimeException( sprintf( 'Materialized agent identity %d disappeared after update.', esc_html( (string) $identity->id ) ) );
+		}
+
+		return $updated;
 	}
 
 	/** @inheritDoc */
@@ -138,7 +158,7 @@ class AgentIdentityStoreAdapter implements WP_Agent_Identity_Store {
 
 		if ( class_exists( DirectoryManager::class ) ) {
 			$dir_mgr   = new DirectoryManager();
-			$agent_dir = $dir_mgr->get_agent_identity_directory( $scope->agent_slug );
+			$agent_dir = $dir_mgr->resolve_agent_directory( array( 'agent_id' => $agent_id ) );
 			$dir_mgr->ensure_directory_exists( $agent_dir );
 		}
 
@@ -146,14 +166,16 @@ class AgentIdentityStoreAdapter implements WP_Agent_Identity_Store {
 		if ( $scaffold ) {
 			$scaffold->execute(
 				array(
-					'layer'      => 'agent',
-					'agent_slug' => $scope->agent_slug,
-					'agent_id'   => $agent_id,
+					'layer'         => 'agent',
+					'agent_slug'    => $scope->agent_slug,
+					'agent_id'      => $agent_id,
+					'owner_user_id' => $scope->owner_user_id,
+					'instance_key'  => $scope->instance_key,
 				)
 			);
 		}
 
-		do_action( 'datamachine_registered_agent_reconciled', $agent_id, $scope->agent_slug, $meta['datamachine_definition'] ?? $meta );
+		do_action( 'datamachine_registered_agent_reconciled', $agent_id, $scope->agent_slug, $meta['datamachine_definition'] ?? $meta, $scope );
 	}
 
 	/**
@@ -164,20 +186,26 @@ class AgentIdentityStoreAdapter implements WP_Agent_Identity_Store {
 	 * @param array<string,mixed>          $meta  Additional metadata.
 	 */
 	private function identity_from_row( array $row, ?WP_Agent_Identity_Scope $scope = null, array $meta = array() ): WP_Agent_Materialized_Identity {
-		$scope ??= new WP_Agent_Identity_Scope(
+		$persisted_scope = new WP_Agent_Identity_Scope(
 			(string) ( $row['agent_slug'] ?? '' ),
-			(int) ( $row['owner_id'] ?? 0 )
+			(int) ( $row['owner_id'] ?? 0 ),
+			(string) ( $row['instance_key'] ?? 'default' )
 		);
+		$persisted_scope = $persisted_scope->normalize();
+		if ( null !== $scope && $persisted_scope->key() !== $scope->normalize()->key() ) {
+			throw new \UnexpectedValueException( sprintf( 'Persisted identity %d does not match requested scope.', (int) ( $row['agent_id'] ?? 0 ) ) );
+		}
 
 		return new WP_Agent_Materialized_Identity(
 			(int) ( $row['agent_id'] ?? 0 ),
-			$scope->normalize(),
+			$persisted_scope,
 			is_array( $row['agent_config'] ?? null ) ? $row['agent_config'] : array(),
 			array_merge(
 				$meta,
 				array(
-					'datamachine_agent_id' => (int) ( $row['agent_id'] ?? 0 ),
-					'datamachine_owner_id' => (int) ( $row['owner_id'] ?? 0 ),
+					'datamachine_agent_id'     => (int) ( $row['agent_id'] ?? 0 ),
+					'datamachine_owner_id'     => (int) ( $row['owner_id'] ?? 0 ),
+					'datamachine_instance_key' => (string) ( $row['instance_key'] ?? 'default' ),
 				)
 			),
 			$this->timestamp_from_row( $row, 'created_at' ),

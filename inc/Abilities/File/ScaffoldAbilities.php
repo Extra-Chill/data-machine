@@ -393,14 +393,8 @@ class ScaffoldAbilities {
 				return $dm->get_user_directory( $user_id );
 
 			case MemoryFileRegistry::LAYER_AGENT:
-				$agent_slug = $context['agent_slug'] ?? null;
-				if ( $agent_slug ) {
-					return $dm->get_agent_identity_directory( $agent_slug );
-				}
-				$agent_id = (int) ( $context['agent_id'] ?? 0 );
-				if ( $agent_id > 0 ) {
-					$slug = $dm->resolve_agent_slug( array( 'agent_id' => $agent_id ) );
-					return $dm->get_agent_identity_directory( $slug );
+				if ( ! empty( $context['agent_slug'] ) || (int) ( $context['agent_id'] ?? 0 ) > 0 ) {
+					return $dm->resolve_agent_directory( $context );
 				}
 				$user_id = (int) ( $context['user_id'] ?? 0 );
 				return $dm->get_agent_identity_directory_for_user( $user_id );

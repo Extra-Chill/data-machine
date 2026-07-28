@@ -83,7 +83,16 @@ namespace DataMachine\Core\Database\Agents {
 		public static array $rows = array();
 
 		public function get_by_slug( string $agent_slug ): ?array {
-			return self::$rows[ $agent_slug ] ?? null;
+			foreach ( self::$rows as $row ) {
+				if ( $agent_slug === ( $row['agent_slug'] ?? '' ) ) {
+					return $row;
+				}
+			}
+			return null;
+		}
+
+		public function get_by_identity_scope( string $agent_slug, int $owner_id, string $instance_key = 'default' ): ?array {
+			return self::$rows[ "{$agent_slug}:{$owner_id}:{$instance_key}" ] ?? null;
 		}
 
 		public function get_agent( int $agent_id ): ?array {
@@ -97,20 +106,29 @@ namespace DataMachine\Core\Database\Agents {
 		}
 
 		public function create_if_missing( string $agent_slug, string $agent_name, int $owner_id, array $agent_config = array() ): int {
-			if ( isset( self::$rows[ $agent_slug ] ) ) {
-				return (int) self::$rows[ $agent_slug ]['agent_id'];
+			$existing = $this->get_by_slug( $agent_slug );
+			if ( $existing ) {
+				return (int) $existing['agent_id'];
 			}
+			return $this->create_identity_if_missing( $agent_slug, $agent_name, $owner_id, 'default', $agent_config )['agent_id'];
+		}
 
+		public function create_identity_if_missing( string $agent_slug, string $agent_name, int $owner_id, string $instance_key, array $agent_config = array() ): array {
+			$key = "{$agent_slug}:{$owner_id}:{$instance_key}";
+			if ( isset( self::$rows[ $key ] ) ) {
+				return array( 'agent_id' => (int) self::$rows[ $key ]['agent_id'], 'created' => false );
+			}
 			$agent_id = count( self::$rows ) + 100;
-			self::$rows[ $agent_slug ] = array(
+			self::$rows[ $key ] = array(
 				'agent_id'     => $agent_id,
 				'agent_slug'   => $agent_slug,
 				'agent_name'   => $agent_name,
 				'owner_id'     => $owner_id,
+				'instance_key' => $instance_key,
 				'agent_config' => $agent_config,
 			);
 
-			return $agent_id;
+			return array( 'agent_id' => $agent_id, 'created' => true );
 		}
 
 		public function update_agent( int $agent_id, array $data ): bool {
@@ -157,6 +175,15 @@ namespace DataMachine\Core\FilesRepository {
 
 		public function get_agent_identity_directory( string $slug ): string {
 			return '/agents/' . $slug;
+		}
+
+		public function resolve_agent_directory( array $context ): string {
+			foreach ( \DataMachine\Core\Database\Agents\Agents::$rows as $row ) {
+				if ( (int) $row['agent_id'] === (int) ( $context['agent_id'] ?? 0 ) ) {
+					return $this->get_agent_identity_directory( $row['agent_slug'] );
+				}
+			}
+			return '/agents/unknown';
 		}
 
 		public function ensure_directory_exists( string $path ): void {
@@ -309,11 +336,11 @@ namespace {
 	do_action( 'init' );
 	$summary = AgentRegistry::reconcile();
 	assert_agent_materializer_equals( array( 'created' => array( 'example-agent' ), 'existing' => array(), 'skipped' => array() ), $summary, 'created summary matches pre-split registry behavior', $failures, $passes );
-	assert_agent_materializer_equals( 7, Agents::$rows['example-agent']['owner_id'] ?? 0, 'owner resolver controls created row owner', $failures, $passes );
-	assert_agent_materializer_equals( array( 'default_provider' => 'openai' ), Agents::$rows['example-agent']['agent_config'] ?? array(), 'default config persists on creation', $failures, $passes );
+	assert_agent_materializer_equals( 7, Agents::$rows['example-agent:7:default']['owner_id'] ?? 0, 'owner resolver controls created row owner', $failures, $passes );
+	assert_agent_materializer_equals( array( 'default_provider' => 'openai' ), Agents::$rows['example-agent:7:default']['agent_config'] ?? array(), 'default config persists on creation', $failures, $passes );
 	assert_agent_materializer_equals( array( array( 'agent_id' => 100, 'owner_id' => 7 ) ), AgentAccess::$bootstrapped, 'owner access is bootstrapped', $failures, $passes );
 	assert_agent_materializer_equals( array( '/agents/example-agent' ), DirectoryManager::$ensured, 'agent directory is ensured', $failures, $passes );
-	assert_agent_materializer_equals( array( array( 'layer' => 'agent', 'agent_slug' => 'example-agent', 'agent_id' => 100 ) ), ScaffoldAbilities::$ability->calls, 'agent scaffold ability is executed', $failures, $passes );
+	assert_agent_materializer_equals( array( array( 'layer' => 'agent', 'agent_slug' => 'example-agent', 'agent_id' => 100, 'owner_user_id' => 7, 'instance_key' => 'default' ) ), ScaffoldAbilities::$ability->calls, 'agent scaffold ability is executed', $failures, $passes );
 	assert_agent_materializer_equals( 'example-agent', $GLOBALS['__agent_materializer_actions']['datamachine_registered_agent_reconciled'][0][1] ?? '', 'reconciled action still fires with slug', $failures, $passes );
 
 	echo "\n[3] existing rows are adopted and mutable fields stay DB-owned:\n";

@@ -55,18 +55,74 @@ class Agents extends BaseRepository {
 			agent_slug VARCHAR(200) NOT NULL,
 			agent_name VARCHAR(200) NOT NULL,
 			owner_id BIGINT(20) UNSIGNED NOT NULL,
+			instance_key VARCHAR(200) NOT NULL DEFAULT 'default',
 			site_scope BIGINT(20) UNSIGNED NULL DEFAULT NULL,
 			agent_config LONGTEXT NULL,
 			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 			PRIMARY KEY (agent_id),
-			UNIQUE KEY agent_slug (agent_slug),
+			UNIQUE KEY agent_identity_scope (agent_slug, owner_id, instance_key),
 			KEY owner_id (owner_id),
 			KEY site_scope (site_scope)
 		) {$charset_collate};";
 
 		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 		dbDelta( $sql );
+	}
+
+	/**
+	 * Migrate legacy slug-only identity storage to the Agents API scope tuple.
+	 *
+	 * Existing rows become their owner's default materialized instance. The
+	 * explicit index repair is required because dbDelta does not drop obsolete
+	 * unique indexes from existing tables.
+	 */
+	public static function ensure_identity_scope_schema(): void {
+		global $wpdb;
+
+		$table_name = $wpdb->base_prefix . self::TABLE_NAME;
+		if ( ! BaseRepository::column_exists( $table_name, 'instance_key', $wpdb ) ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+			$wpdb->query( $wpdb->prepare( "ALTER TABLE %i ADD COLUMN instance_key VARCHAR(200) NOT NULL DEFAULT 'default'", $table_name ) );
+		}
+
+		if ( self::is_sqlite() ) {
+			// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
+			$wpdb->query( 'DROP INDEX IF EXISTS agent_slug' );
+			$wpdb->query( $wpdb->prepare( 'CREATE UNIQUE INDEX IF NOT EXISTS agent_identity_scope ON %i (agent_slug, owner_id, instance_key)', $table_name ) );
+			// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
+			return;
+		}
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$index_rows = $wpdb->get_results( $wpdb->prepare( 'SHOW INDEX FROM %i', $table_name ), ARRAY_A );
+		$indexes    = array();
+		foreach ( $index_rows as $index_row ) {
+			$name = (string) ( $index_row['Key_name'] ?? '' );
+			if ( '' === $name ) {
+				continue;
+			}
+			$indexes[ $name ]['unique'] = 0 === (int) ( $index_row['Non_unique'] ?? 1 );
+			$indexes[ $name ]['columns'][ (int) ( $index_row['Seq_in_index'] ?? 0 ) ] = (string) ( $index_row['Column_name'] ?? '' );
+		}
+
+		$has_identity_scope_index = false;
+		foreach ( $indexes as $name => $index ) {
+			ksort( $index['columns'] );
+			$columns = array_values( $index['columns'] );
+			if ( $index['unique'] && array( 'agent_slug' ) === $columns ) {
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+				$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i DROP INDEX %i', $table_name, $name ) );
+			}
+			if ( $index['unique'] && array( 'agent_slug', 'owner_id', 'instance_key' ) === $columns ) {
+				$has_identity_scope_index = true;
+			}
+		}
+
+		if ( ! $has_identity_scope_index ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+			$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i ADD UNIQUE KEY %i (agent_slug, owner_id, instance_key)', $table_name, 'agent_identity_scope' ) );
+		}
 	}
 
 	/**
@@ -250,7 +306,7 @@ class Agents extends BaseRepository {
 		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
 		$row = $this->wpdb->get_row(
 			$this->wpdb->prepare(
-				'SELECT * FROM %i WHERE agent_slug = %s LIMIT 1',
+				'SELECT * FROM %i WHERE agent_slug = %s ORDER BY agent_id ASC LIMIT 1',
 				$this->table_name,
 				$agent_slug
 			),
@@ -264,6 +320,29 @@ class Agents extends BaseRepository {
 
 		$row['agent_config'] = self::decode_agent_config( $row['agent_config'] ?? null );
 
+		return $row;
+	}
+
+	/** Resolve an agent by its complete normalized materialized identity scope. */
+	public function get_by_identity_scope( string $agent_slug, int $owner_id, string $instance_key = 'default' ): ?array {
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
+		$row = $this->wpdb->get_row(
+			$this->wpdb->prepare(
+				'SELECT * FROM %i WHERE agent_slug = %s AND owner_id = %d AND instance_key = %s LIMIT 1',
+				$this->table_name,
+				$agent_slug,
+				$owner_id,
+				$instance_key
+			),
+			ARRAY_A
+		);
+		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
+
+		if ( ! $row ) {
+			return null;
+		}
+
+		$row['agent_config'] = self::decode_agent_config( $row['agent_config'] ?? null );
 		return $row;
 	}
 
@@ -470,6 +549,48 @@ class Agents extends BaseRepository {
 		);
 
 		return (int) $this->wpdb->insert_id;
+	}
+
+	/**
+	 * Atomically materialize one complete identity scope.
+	 *
+	 * @return array{agent_id:int,created:bool}
+	 */
+	public function create_identity_if_missing( string $agent_slug, string $agent_name, int $owner_id, string $instance_key, array $agent_config = array() ): array {
+		$existing = $this->get_by_identity_scope( $agent_slug, $owner_id, $instance_key );
+		if ( $existing ) {
+			return array(
+				'agent_id' => (int) $existing['agent_id'],
+				'created'  => false,
+			);
+		}
+
+		// The composite unique key serializes concurrent materialization attempts.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+		$inserted = $this->wpdb->insert(
+			$this->table_name,
+			array(
+				'agent_slug'   => $agent_slug,
+				'agent_name'   => $agent_name,
+				'owner_id'     => $owner_id,
+				'instance_key' => $instance_key,
+				'agent_config' => wp_json_encode( AgentConfigFactory::normalize( $agent_config ) ),
+			),
+			array( '%s', '%s', '%d', '%s', '%s' )
+		);
+
+		if ( false !== $inserted && $this->wpdb->insert_id > 0 ) {
+			return array(
+				'agent_id' => (int) $this->wpdb->insert_id,
+				'created'  => true,
+			);
+		}
+
+		$existing = $this->get_by_identity_scope( $agent_slug, $owner_id, $instance_key );
+		return array(
+			'agent_id' => (int) ( $existing['agent_id'] ?? 0 ),
+			'created'  => false,
+		);
 	}
 
 	private static function decode_agent_config( mixed $value ): array {

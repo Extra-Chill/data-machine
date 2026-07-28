@@ -360,6 +360,23 @@ class DirectoryManager {
 	 * @return string Full path to agent identity directory.
 	 */
 	public function resolve_agent_directory( array $context ): string {
+		$agent_id = (int) ( $context['agent_id'] ?? 0 );
+		if ( $agent_id > 0 && class_exists( '\\DataMachine\\Core\\Database\\Agents\\Agents' ) ) {
+			$agents_repo = new \DataMachine\Core\Database\Agents\Agents();
+			$agent       = $agents_repo->get_agent( $agent_id );
+			if ( is_array( $agent ) && ! empty( $agent['agent_slug'] ) ) {
+				$slug      = sanitize_title( (string) $agent['agent_slug'] );
+				$canonical = $agents_repo->get_by_slug( $slug );
+				$is_legacy = 'default' === (string) ( $agent['instance_key'] ?? 'default' )
+					&& (int) ( $canonical['agent_id'] ?? 0 ) === $agent_id;
+				if ( ! $is_legacy ) {
+					$scope_key = sprintf( '%s:%d:%s', $slug, (int) ( $agent['owner_id'] ?? 0 ), (string) ( $agent['instance_key'] ?? 'default' ) );
+					$slug     .= '--' . substr( hash( 'sha256', $scope_key ), 0, 16 );
+				}
+				return $this->get_agent_identity_directory( $slug );
+			}
+		}
+
 		return $this->get_agent_identity_directory( $this->resolve_agent_slug( $context ) );
 	}
 
