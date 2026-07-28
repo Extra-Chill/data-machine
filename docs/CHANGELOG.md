@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.170.7] - 2026-07-28
+
+### Fixed
+- make SQLite agent index migration idempotent
+
 ## [0.170.6] - 2026-07-28
 
 ### Changed
