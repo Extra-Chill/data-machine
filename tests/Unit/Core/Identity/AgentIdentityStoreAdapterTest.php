@@ -237,6 +237,24 @@ class AgentIdentityStoreAdapterTest extends WP_UnitTestCase {
 		$this->assertEmpty( array_filter( $indexes, static fn( array $index ): bool => 'agent_slug' === $index['Key_name'] && 0 === (int) $index['Non_unique'] ) );
 	}
 
+	public function test_schema_reconciliation_is_idempotent_with_existing_identity_index(): void {
+		global $wpdb;
+		$table = $wpdb->base_prefix . Agents::TABLE_NAME;
+
+		Agents::ensure_identity_scope_schema();
+		Agents::ensure_identity_scope_schema();
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$indexes = $wpdb->get_results( $wpdb->prepare( 'SHOW INDEX FROM %i', $table ), ARRAY_A );
+		$identity_index = array_filter(
+			$indexes,
+			static fn( array $index ): bool => 'agent_identity_scope_hash' === $index['Key_name']
+		);
+
+		$this->assertCount( 3, $identity_index );
+		$this->assertSame( array( 'agent_slug', 'owner_id', 'instance_key_hash' ), array_column( $identity_index, 'Column_name' ) );
+	}
+
 	private function register_agent( string $slug ): void {
 		\WP_Agents_Registry::get_instance()->register( $slug, array( 'label' => $slug ) );
 		$this->registered[] = $slug;
