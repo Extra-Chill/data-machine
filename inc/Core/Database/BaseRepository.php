@@ -209,10 +209,10 @@ abstract class BaseRepository {
 	}
 
 	/**
-	 * Drop an existing index without routing SQLite through its MySQL parser.
+	 * Drop an existing index using the active database driver's supported syntax.
 	 *
-	 * The index name must be returned by SHOW INDEX before it is interpolated
-	 * into native SQLite SQL. A missing index is already the desired state.
+	 * A missing index is already the desired state. The SQLite integration
+	 * accepts and persists `DROP INDEX <index> ON <table>` through wpdb.
 	 *
 	 * @param string     $table_name Fully-qualified table name.
 	 * @param string     $index_name Index name.
@@ -250,26 +250,9 @@ abstract class BaseRepository {
 			return true;
 		}
 
-		$driver = $wpdb->dbh ?? null;
-		try {
-			if ( is_object( $driver ) && method_exists( $driver, 'execute_sqlite_query' ) && method_exists( $driver, 'get_connection' ) ) {
-				$connection = $driver->get_connection();
-				if ( ! is_object( $connection ) || ! method_exists( $connection, 'quote_identifier' ) ) {
-					throw new \RuntimeException( 'The active SQLite driver cannot quote identifiers.' );
-				}
-				$driver->execute_sqlite_query( 'DROP INDEX ' . $connection->quote_identifier( $index_name ) );
-				return true;
-			}
-
-			$pdo = $GLOBALS['@pdo'] ?? null;
-			if ( ! $pdo instanceof \PDO || 'sqlite' !== $pdo->getAttribute( \PDO::ATTR_DRIVER_NAME ) ) {
-				throw new \RuntimeException( 'No active SQLite connection is available to drop an index.' );
-			}
-			if ( false === $pdo->exec( 'DROP INDEX `' . str_replace( '`', '``', $index_name ) . '`' ) ) {
-				throw new \RuntimeException( sprintf( 'Failed to drop SQLite index %s.', $index_name ) );
-			}
-		} catch ( \Throwable $error ) {
-			throw new \RuntimeException( sprintf( 'Failed to drop SQLite index %s: %s', $index_name, $error->getMessage() ), 0, $error );
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+		if ( false === $wpdb->query( $wpdb->prepare( 'DROP INDEX %i ON %i', $index_name, $table_name ) ) ) {
+			throw new \RuntimeException( sprintf( 'Failed to drop SQLite index %s: %s', $index_name, (string) $wpdb->last_error ) );
 		}
 
 		return true;
