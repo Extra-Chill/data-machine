@@ -149,8 +149,7 @@ class Agents extends BaseRepository {
 			if ( ! $index['unique'] || ! in_array( $index['columns'], array( array( 'agent_slug' ), array( 'agent_slug', 'owner_id', 'instance_key' ) ), true ) ) {
 				continue;
 			}
-			$sql = $wpdb->prepare( 'ALTER TABLE %i DROP INDEX %i', $table_name, $name );
-			self::query_or_throw( $wpdb, $sql, 'remove obsolete agent identity index' );
+			BaseRepository::drop_index( $table_name, $name, $wpdb );
 		}
 
 		$indexes = self::get_identity_indexes( $wpdb, $table_name );

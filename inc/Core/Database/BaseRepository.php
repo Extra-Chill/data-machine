@@ -209,6 +209,73 @@ abstract class BaseRepository {
 	}
 
 	/**
+	 * Drop an existing index without routing SQLite through its MySQL parser.
+	 *
+	 * The index name must be returned by SHOW INDEX before it is interpolated
+	 * into native SQLite SQL. A missing index is already the desired state.
+	 *
+	 * @param string     $table_name Fully-qualified table name.
+	 * @param string     $index_name Index name.
+	 * @param \wpdb|null $wpdb       Optional wpdb instance (defaults to global).
+	 * @return bool True when the index was absent or was dropped.
+	 * @throws \RuntimeException When introspection or the drop operation fails.
+	 */
+	public static function drop_index( string $table_name, string $index_name, ?\wpdb $wpdb = null ): bool {
+		if ( null === $wpdb ) {
+			global $wpdb;
+		}
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$indexes = $wpdb->get_results( $wpdb->prepare( 'SHOW INDEX FROM %i', $table_name ), ARRAY_A );
+		if ( ! is_array( $indexes ) || ! empty( $wpdb->last_error ) ) {
+			throw new \RuntimeException( sprintf( 'Failed to inspect indexes on %s: %s', $table_name, (string) $wpdb->last_error ) );
+		}
+
+		$index_exists = false;
+		foreach ( $indexes as $index ) {
+			if ( $index_name === (string) ( $index['Key_name'] ?? '' ) ) {
+				$index_exists = true;
+				break;
+			}
+		}
+		if ( ! $index_exists ) {
+			return true;
+		}
+
+		if ( ! self::is_sqlite() ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+			if ( false === $wpdb->query( $wpdb->prepare( 'ALTER TABLE %i DROP INDEX %i', $table_name, $index_name ) ) ) {
+				throw new \RuntimeException( sprintf( 'Failed to drop index %s: %s', $index_name, (string) $wpdb->last_error ) );
+			}
+			return true;
+		}
+
+		$driver = $wpdb->dbh ?? null;
+		try {
+			if ( is_object( $driver ) && method_exists( $driver, 'execute_sqlite_query' ) && method_exists( $driver, 'get_connection' ) ) {
+				$connection = $driver->get_connection();
+				if ( ! is_object( $connection ) || ! method_exists( $connection, 'quote_identifier' ) ) {
+					throw new \RuntimeException( 'The active SQLite driver cannot quote identifiers.' );
+				}
+				$driver->execute_sqlite_query( 'DROP INDEX ' . $connection->quote_identifier( $index_name ) );
+				return true;
+			}
+
+			$pdo = $GLOBALS['@pdo'] ?? null;
+			if ( ! $pdo instanceof \PDO || 'sqlite' !== $pdo->getAttribute( \PDO::ATTR_DRIVER_NAME ) ) {
+				throw new \RuntimeException( 'No active SQLite connection is available to drop an index.' );
+			}
+			if ( false === $pdo->exec( 'DROP INDEX `' . str_replace( '`', '``', $index_name ) . '`' ) ) {
+				throw new \RuntimeException( sprintf( 'Failed to drop SQLite index %s.', $index_name ) );
+			}
+		} catch ( \Throwable $error ) {
+			throw new \RuntimeException( sprintf( 'Failed to drop SQLite index %s: %s', $index_name, $error->getMessage() ), 0, $error );
+		}
+
+		return true;
+	}
+
+	/**
 	 * Get column metadata from information_schema (MySQL only).
 	 *
 	 * Returns an object-keyed result set with DATA_TYPE,
