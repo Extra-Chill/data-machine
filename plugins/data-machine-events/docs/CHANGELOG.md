@@ -2,6 +2,15 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.53.0] - 2026-07-28
+
+### Added
+- add atomic source-owned event updates
+
+### Fixed
+- separate venue ticketing destinations
+- wait for complete calendar date ranges
+
 ## [0.52.2] - 2026-07-27
 
 ### Changed
