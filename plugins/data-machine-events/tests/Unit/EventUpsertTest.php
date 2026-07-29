@@ -14,6 +14,8 @@ use DataMachine\Core\Database\PostIdentityIndex\PostIdentityIndex;
 use DataMachine\Core\EngineData;
 use WP_UnitTestCase;
 use DataMachineEvents\Steps\Upsert\Events\EventUpsert;
+use DataMachineEvents\Steps\EventImport\EventEngineData;
+use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\EventbriteExtractor;
 use DataMachineEvents\Core\Event_Post_Type;
 use DataMachineEvents\Core\EventDatesTable;
 use DataMachineEvents\Core\Venue_Taxonomy;
@@ -979,6 +981,34 @@ class EventUpsertTest extends WP_UnitTestCase {
 
 		$this->assertFalse( $result['success'] ?? null, 'Upsert with an unparseable startDate must not succeed.' );
 		$this->assertStringContainsString( 'startDate', $result['error'] ?? '' );
+	}
+
+	public function test_lofi_eventbrite_missing_end_reaches_canonical_upsert(): void {
+		$html  = (string) file_get_contents( dirname( __DIR__ ) . '/Fixtures/eventbrite/lofi-missing-end.html' );
+		$event = ( new EventbriteExtractor() )->extract(
+			$html,
+			'https://www.eventbrite.com/o/lo-fi-brewing-14959647606'
+		)[0];
+		$engine = new EngineData( EventEngineData::buildEngineData( $event, array() ), 0 );
+		$method = new \ReflectionMethod( $this->handler, 'executeUpsert' );
+		$method->setAccessible( true );
+
+		$result = $method->invoke(
+			$this->handler,
+			array(
+				'title'           => $event['title'],
+				'description'     => $event['description'],
+				'source_identity' => 'eventbrite:1992991575452-' . uniqid(),
+				'engine'          => $engine,
+				'job_id'          => 0,
+			),
+			array()
+		);
+
+		$this->assertTrue( $result['success'] ?? false, wp_json_encode( $result ) );
+		$dates = EventDatesTable::get( (int) $result['data']['post_id'] );
+		$this->assertSame( '2099-08-08 19:00:00', $dates->start_datetime );
+		$this->assertNull( $dates->end_datetime );
 	}
 
 	/**

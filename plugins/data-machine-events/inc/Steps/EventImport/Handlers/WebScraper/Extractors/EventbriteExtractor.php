@@ -23,6 +23,7 @@
 
 namespace DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors;
 
+use DataMachineEvents\Core\DateTimeParser;
 use DataMachineEvents\Core\VenueService;
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -201,7 +202,7 @@ class EventbriteExtractor extends BaseExtractor {
 			'description'   => $raw_event['summary'] ?? '',
 			'startDate'     => $start_date,
 			'startTime'     => $this->normalizeListingTime( $raw_event['start_time'] ?? '' ),
-			'endDate'       => $raw_event['end_date'] ?? '',
+			'endDate'       => (string) ( $raw_event['end_date'] ?? '' ),
 			'endTime'       => $this->normalizeListingTime( $raw_event['end_time'] ?? '' ),
 			'venueTimezone' => $raw_event['timezone'] ?? '',
 			'organizer'     => $organizer['name'] ?? '',
@@ -231,6 +232,7 @@ class EventbriteExtractor extends BaseExtractor {
 			(string) $currency,
 			$is_free
 		);
+		$this->normalizeEnd( $event );
 
 		return $event;
 	}
@@ -383,6 +385,33 @@ class EventbriteExtractor extends BaseExtractor {
 			if ( ! empty( $parsed['timezone'] ) ) {
 				$event['venueTimezone'] = $parsed['timezone'];
 			}
+		}
+
+		$this->normalizeEnd( $event );
+	}
+
+	/**
+	 * Omit unusable Eventbrite ends so canonical storage can represent unknown duration.
+	 */
+	private function normalizeEnd( array &$event ): void {
+		$start_date = trim( (string) ( $event['startDate'] ?? '' ) );
+		$start_time = trim( (string) ( $event['startTime'] ?? '' ) );
+		$end_date   = trim( (string) ( $event['endDate'] ?? '' ) );
+		$end_time   = trim( (string) ( $event['endTime'] ?? '' ) );
+		$time_regex = '/^(?:[01]\d|2[0-3]):[0-5]\d$/';
+
+		$valid_date = DateTimeParser::isValidYmd( $start_date ) && DateTimeParser::isValidYmd( $end_date );
+		$valid_time = ( '' === $start_time || preg_match( $time_regex, $start_time ) )
+			&& preg_match( $time_regex, $end_time );
+		$positive   = $valid_date && $valid_time;
+		if ( $positive ) {
+			$start_datetime = $start_date . ' ' . ( '' !== $start_time ? $start_time : '00:00' );
+			$end_datetime   = $end_date . ' ' . $end_time;
+			$positive       = $end_datetime > $start_datetime;
+		}
+
+		if ( ! $positive ) {
+			unset( $event['endDate'], $event['endTime'] );
 		}
 	}
 

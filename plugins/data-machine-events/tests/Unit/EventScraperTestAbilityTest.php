@@ -31,6 +31,7 @@ use WP_UnitTestCase;
 use ReflectionClass;
 use DataMachineEvents\Abilities\EventScraperTest;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\BandzoogleExtractor;
+use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\EventbriteExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\JsonLdExtractor;
 
 class EventScraperTestAbilityTest extends WP_UnitTestCase {
@@ -359,6 +360,25 @@ class EventScraperTestAbilityTest extends WP_UnitTestCase {
 			$result['extraction_info']['event_count'] ?? null,
 			'extraction_info.event_count must mirror event_data.event_count.'
 		);
+	}
+
+	public function test_eventbrite_diagnostic_matches_direct_missing_end_payload(): void {
+		$html       = (string) file_get_contents( $this->fixtures_dir . '/eventbrite/lofi-missing-end.html' );
+		$target_url = 'https://www.eventbrite.com/o/lo-fi-brewing-14959647606';
+		$direct     = ( new EventbriteExtractor() )->extract( $html, $target_url );
+		$this->mockHttpResponse( $html );
+
+		$ability = new EventScraperTest();
+		$result  = $ability->test( $target_url, array( 'venue_name' => 'Lo-Fi Brewing' ) );
+
+		$this->assertTrue( $result['success'] ?? false, wp_json_encode( $result ) );
+		$this->assertCount( 1, $direct );
+		$diagnostic = $result['event_data']['items'][0];
+		$this->assertSame( $direct[0]['title'], $diagnostic['title'] );
+		$this->assertSame( $direct[0]['startDate'], $diagnostic['startDate'] );
+		$this->assertSame( $direct[0]['startTime'], $diagnostic['startTime'] );
+		$this->assertArrayNotHasKey( 'endDate', $diagnostic );
+		$this->assertArrayNotHasKey( 'endTime', $diagnostic );
 	}
 
 	/**
