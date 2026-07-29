@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.171.2] - 2026-07-29
+
+### Fixed
+- make option lease CAS MySQL-safe
+
 ## [0.171.1] - 2026-07-29
 
 ### Fixed
