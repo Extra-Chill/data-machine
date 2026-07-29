@@ -272,6 +272,7 @@ class DATAMACHINE_Events {
 			\DataMachineEvents\Abilities\DuplicateDetectionAbilities::class,
 			\DataMachineEvents\Abilities\UpcomingCountAbilities::class,
 			\DataMachineEvents\Abilities\EventDateQueryAbilities::class,
+			\DataMachineEvents\Abilities\VenueIntervalOverlapAbilities::class,
 			\DataMachineEvents\Abilities\EventsByTermAbilities::class,
 			\DataMachineEvents\Abilities\MergedBillDetectAbilities::class,
 			\DataMachineEvents\Abilities\MergeEventPostsAbilities::class,

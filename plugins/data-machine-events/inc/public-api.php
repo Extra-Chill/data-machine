@@ -197,6 +197,21 @@ if ( ! function_exists( 'data_machine_events_query_events' ) ) {
 	}
 }
 
+if ( ! function_exists( 'data_machine_events_query_venue_interval_overlaps' ) ) {
+	/**
+	 * Query published canonical event ranges that overlap a venue interval.
+	 *
+	 * This is the PHP boundary for the read-only Ability of the same contract.
+	 * Consumers receive public facts and remain responsible for policy decisions.
+	 *
+	 * @param array $params Venue ID, RFC3339 start/end, and bounded pagination.
+	 * @return array|\WP_Error
+	 */
+	function data_machine_events_query_venue_interval_overlaps( array $params ): array|\WP_Error {
+		return ( new \DataMachineEvents\Abilities\VenueIntervalOverlapAbilities() )->execute( $params );
+	}
+}
+
 if ( ! function_exists( 'data_machine_events_get_venue_data' ) ) {
 	/**
 	 * Get raw venue term metadata.
