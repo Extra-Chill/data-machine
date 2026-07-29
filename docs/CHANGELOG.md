@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.171.1] - 2026-07-29
+
+### Fixed
+- drop indexes through native SQLite driver
+
 ## [0.171.0] - 2026-07-28
 
 ### Added
