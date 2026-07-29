@@ -278,14 +278,14 @@ class OptionLeaseStore {
 			// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared -- Atomic target CAS is fenced by the exact lease row.
 			$updated = $wpdb->query(
 				$wpdb->prepare(
-					'UPDATE %i SET option_value = %s WHERE option_name = %s AND option_value = %s AND EXISTS (SELECT 1 FROM %i WHERE option_name = %s AND option_value = %s)',
+					'UPDATE %i AS target INNER JOIN %i AS lease ON lease.option_name = %s AND lease.option_value = %s SET target.option_value = %s WHERE target.option_name = %s AND target.option_value = %s',
 					$wpdb->options,
-					maybe_serialize( $replacement ),
-					$option_name,
-					maybe_serialize( $expected ),
 					$wpdb->options,
 					$lease_name,
-					maybe_serialize( $lease_payload )
+					maybe_serialize( $lease_payload ),
+					maybe_serialize( $replacement ),
+					$option_name,
+					maybe_serialize( $expected )
 				)
 			);
 			// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared
