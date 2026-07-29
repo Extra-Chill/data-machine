@@ -2,6 +2,16 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.54.0] - 2026-07-29
+
+### Added
+- expose canonical venue interval overlaps
+
+### Fixed
+- reject unrepresentable venue overlap times
+- omit invalid Eventbrite end times
+- persist canonical event offer fields
+
 ## [0.53.1] - 2026-07-28
 
 ### Fixed
