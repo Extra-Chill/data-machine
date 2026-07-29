@@ -87,6 +87,37 @@ class VenueIntervalOverlapAbilitiesTest extends WP_UnitTestCase {
 		$this->assertSame( '2027-03-14T03:15:00-04:00', $result['events'][0]['start'] );
 	}
 
+	public function test_fall_back_repeated_hour_and_local_inversion_are_rejected(): void {
+		$repeated = $this->query( '2027-11-07T00:30:00-04:00', '2027-11-07T02:30:00-05:00' );
+		$this->assertWPError( $repeated );
+		$this->assertSame( 'venue_overlap_unrepresentable_interval', $repeated->get_error_code() );
+
+		$inverted = $this->query( '2027-11-07T01:45:00-04:00', '2027-11-07T01:15:00-05:00' );
+		$this->assertWPError( $inverted );
+		$this->assertSame( 'venue_overlap_unrepresentable_interval', $inverted->get_error_code() );
+	}
+
+	public function test_fall_back_repeated_hour_adjacency_remains_queryable(): void {
+		$before = $this->seedEvent( 'Before repeated hour', '2027-11-07 00:30:00', '2027-11-07 00:59:59' );
+		$after  = $this->seedEvent( 'After repeated hour', '2027-11-07 02:00:00', '2027-11-07 03:00:00' );
+
+		$this->assertSame( array( $before ), array_column( $this->query( '2027-11-07T00:00:00-04:00', '2027-11-07T01:00:00-04:00' )['events'], 'event_id' ) );
+		$this->assertSame( array( $after ), array_column( $this->query( '2027-11-07T02:00:00-05:00', '2027-11-07T04:00:00-05:00' )['events'], 'event_id' ) );
+	}
+
+	public function test_ambiguous_and_nonexistent_returned_index_values_fail_closed(): void {
+		$ambiguous = $this->seedEvent( 'Ambiguous index', '2027-11-07 01:30:00', '2027-11-07 03:00:00' );
+		$result    = $this->query( '2027-11-07T02:00:00-05:00', '2027-11-07T04:00:00-05:00' );
+		$this->assertWPError( $result );
+		$this->assertSame( 'venue_overlap_unrepresentable_index', $result->get_error_code() );
+		$this->assertSame( $ambiguous, $result->get_error_data()['event_id'] );
+
+		EventDatesTable::upsert( $ambiguous, '2027-03-14 02:30:00', '2027-03-14 03:30:00', 'publish' );
+		$result = $this->query( '2027-03-14T03:00:00-04:00', '2027-03-14T04:00:00-04:00' );
+		$this->assertWPError( $result );
+		$this->assertSame( 'venue_overlap_unrepresentable_index', $result->get_error_code() );
+	}
+
 	public function test_public_status_filter_excludes_non_published_and_tracks_transitions(): void {
 		$published = $this->seedEvent( 'Published', '2027-08-01 10:00:00', '2027-08-01 11:00:00' );
 		$draft     = $this->seedEvent( 'Draft', '2027-08-01 10:00:00', '2027-08-01 11:00:00', 'draft' );
@@ -161,11 +192,36 @@ class VenueIntervalOverlapAbilitiesTest extends WP_UnitTestCase {
 		return array(
 			'missing offset' => array( array( 'start' => '2027-11-01T10:00:00' ), 'venue_overlap_invalid_datetime' ),
 			'inverted'       => array( array( 'start' => '2027-11-02T00:00:00-04:00' ), 'venue_overlap_invalid_interval' ),
-			'private status' => array( array( 'statuses' => array( 'private' ) ), 'venue_overlap_invalid_statuses' ),
-			'scalar status'  => array( array( 'statuses' => 'publish' ), 'venue_overlap_invalid_statuses' ),
-			'excess exclude' => array( array( 'exclude' => range( 1, 101 ) ), 'venue_overlap_invalid_exclusions' ),
-			'excess page'    => array( array( 'page' => 10001 ), 'venue_overlap_invalid_page' ),
+			'private status' => array( array( 'statuses' => array( 'private' ) ), 'rest_not_in_enum' ),
+			'scalar status'  => array( array( 'statuses' => 'publish' ), 'rest_invalid_type' ),
+			'excess exclude' => array( array( 'exclude' => range( 1, 101 ) ), 'rest_too_many_items' ),
+			'excess page'    => array( array( 'page' => 10001 ), 'rest_out_of_bounds' ),
+			'unknown field'  => array( array( 'unknown' => true ), 'rest_additional_properties_forbidden' ),
+			'string venue'   => array( array( 'venue_id' => '1' ), 'rest_invalid_type' ),
+			'zero venue'     => array( array( 'venue_id' => 0 ), 'rest_out_of_bounds' ),
+			'string page'    => array( array( 'page' => '2' ), 'rest_invalid_type' ),
+			'zero per page'  => array( array( 'per_page' => 0 ), 'rest_out_of_bounds' ),
+			'duplicate IDs'  => array( array( 'exclude' => array( 1, 1 ) ), 'rest_duplicate_items' ),
+			'string ID'      => array( array( 'exclude' => array( '1' ) ), 'rest_invalid_type' ),
+			'duplicate status' => array( array( 'statuses' => array( 'publish', 'publish' ) ), 'rest_too_many_items' ),
+			'invalid offset'   => array( array( 'start' => '2027-11-01T10:00:00+24:00' ), 'venue_overlap_invalid_datetime' ),
 		);
+	}
+
+	public function test_malformed_calendar_date_is_rejected_without_normalization(): void {
+		$result = $this->query( '2027-02-30T10:00:00-05:00', '2027-03-01T10:00:00-05:00' );
+		$this->assertWPError( $result );
+	}
+
+	public function test_public_php_wrapper_uses_the_same_strict_validator(): void {
+		$input             = $this->dayInput( '2027-12-01' );
+		$input['venue_id'] = (string) $this->venue_id;
+
+		$direct  = $this->ability->execute( $input );
+		$wrapper = data_machine_events_query_venue_interval_overlaps( $input );
+		$this->assertWPError( $direct );
+		$this->assertWPError( $wrapper );
+		$this->assertSame( $direct->get_error_code(), $wrapper->get_error_code() );
 	}
 
 	public function test_registered_ability_schema_and_read_contract_are_bounded(): void {
@@ -175,6 +231,7 @@ class VenueIntervalOverlapAbilitiesTest extends WP_UnitTestCase {
 		$input = $registered->get_input_schema();
 		$this->assertSame( array( 'venue_id', 'start', 'end' ), $input['required'] );
 		$this->assertSame( 100, $input['properties']['per_page']['maximum'] );
+		$this->assertSame( 10000, $input['properties']['page']['maximum'] );
 		$this->assertSame( array( 'publish' ), $input['properties']['statuses']['items']['enum'] );
 
 		$this->seedEvent( 'Contract', '2027-12-01 10:00:00', '2027-12-01 11:00:00' );

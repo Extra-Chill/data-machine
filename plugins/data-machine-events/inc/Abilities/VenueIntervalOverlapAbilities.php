@@ -72,8 +72,13 @@ class VenueIntervalOverlapAbilities {
 	public function execute( array $input ): array|\WP_Error {
 		global $wpdb;
 
-		$venue_id = absint( $input['venue_id'] ?? 0 );
-		$venue    = $venue_id > 0 ? get_term( $venue_id, 'venue' ) : null;
+		$valid = self::validateInput( $input );
+		if ( is_wp_error( $valid ) ) {
+			return $valid;
+		}
+
+		$venue_id = $input['venue_id'];
+		$venue    = get_term( $venue_id, 'venue' );
 		if ( ! $venue || is_wp_error( $venue ) ) {
 			return new \WP_Error( 'venue_overlap_invalid_venue', __( 'venue_id must identify a canonical venue term on the current site.', 'data-machine-events' ), array( 'status' => 400 ) );
 		}
@@ -87,24 +92,13 @@ class VenueIntervalOverlapAbilities {
 		if ( $start >= $end ) {
 			return new \WP_Error( 'venue_overlap_invalid_interval', __( 'end must be later than start.', 'data-machine-events' ), array( 'status' => 400 ) );
 		}
-
-		$statuses = $input['statuses'] ?? array( 'publish' );
-		if ( ! is_array( $statuses ) || array( 'publish' ) !== array_values( array_unique( $statuses ) ) ) {
-			return new \WP_Error( 'venue_overlap_invalid_statuses', __( 'The public overlap query supports published events only.', 'data-machine-events' ), array( 'status' => 400 ) );
+		if ( $this->intervalTouchesRepeatedTime( $start, $end, $timezone ) ) {
+			return new \WP_Error( 'venue_overlap_unrepresentable_interval', __( 'The requested interval touches a repeated local time that the canonical event index cannot distinguish.', 'data-machine-events' ), array( 'status' => 400 ) );
 		}
 
-		$exclude = $input['exclude'] ?? array();
-		if ( ! is_array( $exclude ) || count( $exclude ) > self::MAX_EXCLUSIONS ) {
-			return new \WP_Error( 'venue_overlap_invalid_exclusions', __( 'exclude must contain no more than 100 event IDs.', 'data-machine-events' ), array( 'status' => 400 ) );
-		}
-		$exclude = array_values( array_unique( array_filter( array_map( 'absint', $exclude ) ) ) );
-
-		$page = absint( $input['page'] ?? 1 );
-		if ( $page < 1 || $page > self::MAX_PAGE ) {
-			return new \WP_Error( 'venue_overlap_invalid_page', __( 'page must be between 1 and 10000.', 'data-machine-events' ), array( 'status' => 400 ) );
-		}
-
-		$per_page = min( self::MAX_PER_PAGE, max( 1, absint( $input['per_page'] ?? self::DEFAULT_PER_PAGE ) ) );
+		$exclude  = $input['exclude'] ?? array();
+		$page     = $input['page'] ?? 1;
+		$per_page = $input['per_page'] ?? self::DEFAULT_PER_PAGE;
 		$offset   = ( $page - 1 ) * $per_page;
 		$table    = EventDatesTable::table_name();
 
@@ -150,6 +144,29 @@ class VenueIntervalOverlapAbilities {
 		$has_more = count( $rows ) > $per_page;
 		$rows     = array_slice( $rows, 0, $per_page );
 
+		$events = array();
+		foreach ( $rows as $row ) {
+			$event_start = $this->parseIndexedDatetime( $row['start_datetime'], $timezone );
+			$event_end   = $this->parseIndexedDatetime( $row['end_datetime'], $timezone );
+			if ( is_wp_error( $event_start ) || is_wp_error( $event_end ) ) {
+				return new \WP_Error(
+					'venue_overlap_unrepresentable_index',
+					__( 'A returned event contains an ambiguous or nonexistent local datetime in the canonical index.', 'data-machine-events' ),
+					array(
+						'status'   => 500,
+						'event_id' => (int) $row['post_id'],
+					)
+				);
+			}
+
+			$events[] = array(
+				'event_id' => (int) $row['post_id'],
+				'start'    => $event_start->format( DATE_RFC3339 ),
+				'end'      => $event_end->format( DATE_RFC3339 ),
+				'status'   => (string) $row['post_status'],
+			);
+		}
+
 		return array(
 			'venue_id' => $venue_id,
 			'timezone' => $timezone->getName(),
@@ -157,20 +174,71 @@ class VenueIntervalOverlapAbilities {
 				'start' => $start->format( DATE_RFC3339 ),
 				'end'   => $end->format( DATE_RFC3339 ),
 			),
-			'events'   => array_map(
-				function ( array $row ) use ( $timezone ): array {
-					return array(
-						'event_id' => (int) $row['post_id'],
-						'start'    => $this->formatIndexedDatetime( $row['start_datetime'], $timezone ),
-						'end'      => $this->formatIndexedDatetime( $row['end_datetime'], $timezone ),
-						'status'   => (string) $row['post_status'],
-					);
-				},
-				$rows
-			),
+			'events'   => $events,
 			'page'     => $page,
 			'per_page' => $per_page,
 			'has_more' => $has_more,
+		);
+	}
+
+	/**
+	 * Validate the shared PHP, Ability, and REST input contract without coercion.
+	 *
+	 * @param array $input Query input.
+	 * @return true|\WP_Error
+	 */
+	public static function validateInput( array $input ): true|\WP_Error {
+		foreach ( array( 'venue_id', 'page', 'per_page' ) as $property ) {
+			if ( isset( $input[ $property ] ) && ! is_int( $input[ $property ] ) ) {
+				return self::invalidType( $property, sprintf( '%s must be an integer.', $property ) );
+			}
+		}
+
+		foreach ( array( 'statuses', 'exclude' ) as $property ) {
+			if ( isset( $input[ $property ] ) && ( ! is_array( $input[ $property ] ) || ! array_is_list( $input[ $property ] ) ) ) {
+				return self::invalidType( $property, sprintf( '%s must be a JSON array.', $property ) );
+			}
+		}
+		if ( isset( $input['exclude'] ) ) {
+			foreach ( $input['exclude'] as $event_id ) {
+				if ( ! is_int( $event_id ) ) {
+					return self::invalidType( 'exclude', 'exclude must contain integer event IDs.' );
+				}
+			}
+		}
+
+		$valid = rest_validate_value_from_schema( $input, self::inputSchema(), 'venue_interval_overlap' );
+		if ( is_wp_error( $valid ) ) {
+			$data           = (array) $valid->get_error_data();
+			$data['status'] = 400;
+			$valid->add_data( $data );
+			return $valid;
+		}
+
+		foreach ( array( 'start', 'end' ) as $property ) {
+			if ( is_wp_error( self::parseRfc3339( $input[ $property ] ) ) ) {
+				return new \WP_Error(
+					'venue_overlap_invalid_datetime',
+					__( 'start and end must be valid RFC3339 instants with seconds and an explicit offset.', 'data-machine-events' ),
+					array(
+						'status' => 400,
+						'param'  => $property,
+					)
+				);
+			}
+		}
+
+		return true;
+	}
+
+	private static function invalidType( string $property, string $message ): \WP_Error {
+		return new \WP_Error(
+			'rest_invalid_type',
+			$message,
+			array(
+				'status' => 400,
+				'param'  => $property,
+			)
 		);
 	}
 
@@ -184,19 +252,102 @@ class VenueIntervalOverlapAbilities {
 	}
 
 	private function parseInstant( mixed $value, DateTimeZone $timezone ): DateTimeImmutable|\WP_Error {
-		if ( ! is_string( $value ) || ! preg_match( '/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:Z|[+-]\d{2}:\d{2})$/', $value ) ) {
-			return new \WP_Error( 'venue_overlap_invalid_datetime', __( 'start and end must be RFC3339 instants with seconds and an explicit offset.', 'data-machine-events' ), array( 'status' => 400 ) );
-		}
-
-		try {
-			return ( new DateTimeImmutable( $value ) )->setTimezone( $timezone );
-		} catch ( Exception $exception ) {
-			return new \WP_Error( 'venue_overlap_invalid_datetime', __( 'start and end must be valid RFC3339 instants.', 'data-machine-events' ), array( 'status' => 400 ) );
-		}
+		$instant = self::parseRfc3339( $value );
+		return is_wp_error( $instant ) ? $instant : $instant->setTimezone( $timezone );
 	}
 
-	private function formatIndexedDatetime( string $value, DateTimeZone $timezone ): string {
-		return ( new DateTimeImmutable( $value, $timezone ) )->format( DATE_RFC3339 );
+	private static function parseRfc3339( mixed $value ): DateTimeImmutable|\WP_Error {
+		if ( ! is_string( $value ) || ! preg_match( '/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(Z|[+-]\d{2}:\d{2})$/', $value, $parts ) ) {
+			return new \WP_Error( 'venue_overlap_invalid_datetime' );
+		}
+		if ( ! checkdate( (int) $parts[2], (int) $parts[3], (int) $parts[1] ) ) {
+			return new \WP_Error( 'venue_overlap_invalid_datetime' );
+		}
+		if ( (int) $parts[4] > 23 || (int) $parts[5] > 59 || (int) $parts[6] > 59 ) {
+			return new \WP_Error( 'venue_overlap_invalid_datetime' );
+		}
+		if ( 'Z' !== $parts[7] && ( (int) substr( $parts[7], 1, 2 ) > 23 || (int) substr( $parts[7], 4, 2 ) > 59 ) ) {
+			return new \WP_Error( 'venue_overlap_invalid_datetime' );
+		}
+
+		$instant = DateTimeImmutable::createFromFormat( '!Y-m-d\TH:i:sP', $value );
+		$errors  = DateTimeImmutable::getLastErrors();
+		if ( false === $instant || ( false !== $errors && ( $errors['warning_count'] > 0 || $errors['error_count'] > 0 ) ) ) {
+			return new \WP_Error( 'venue_overlap_invalid_datetime' );
+		}
+		$normalized = 'Z' === $parts[7] ? substr( $value, 0, -1 ) . '+00:00' : $value;
+		if ( $instant->format( 'Y-m-d\TH:i:sP' ) !== $normalized ) {
+			return new \WP_Error( 'venue_overlap_invalid_datetime' );
+		}
+
+		return $instant;
+	}
+
+	private function intervalTouchesRepeatedTime( DateTimeImmutable $start, DateTimeImmutable $end, DateTimeZone $timezone ): bool {
+		$start_wall = $this->wallTimestamp( $start->format( 'Y-m-d H:i:s' ) );
+		$end_wall   = $this->wallTimestamp( $end->format( 'Y-m-d H:i:s' ) );
+		if ( null === $start_wall || null === $end_wall || $start_wall >= $end_wall ) {
+			return true;
+		}
+		if ( false === $timezone->getLocation() ) {
+			return false;
+		}
+
+		$transitions     = $timezone->getTransitions( $start->getTimestamp() - DAY_IN_SECONDS, $end->getTimestamp() + DAY_IN_SECONDS );
+		$previous_offset = $transitions[0]['offset'];
+		foreach ( array_slice( $transitions, 1 ) as $transition ) {
+			if ( $transition['offset'] < $previous_offset ) {
+				$repeated_start = $transition['ts'] + $transition['offset'];
+				$repeated_end   = $transition['ts'] + $previous_offset;
+				if ( $start_wall < $repeated_end && $end_wall > $repeated_start ) {
+					return true;
+				}
+			}
+			$previous_offset = $transition['offset'];
+		}
+
+		return false;
+	}
+
+	private function parseIndexedDatetime( string $value, DateTimeZone $timezone ): DateTimeImmutable|\WP_Error {
+		if ( ! preg_match( '/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/', $value ) ) {
+			return new \WP_Error( 'venue_overlap_unrepresentable_index' );
+		}
+		$datetime = DateTimeImmutable::createFromFormat( '!Y-m-d H:i:s', $value, $timezone );
+		$errors   = DateTimeImmutable::getLastErrors();
+		if ( false === $datetime || ( false !== $errors && ( $errors['warning_count'] > 0 || $errors['error_count'] > 0 ) ) || $datetime->format( 'Y-m-d H:i:s' ) !== $value ) {
+			return new \WP_Error( 'venue_overlap_unrepresentable_index' );
+		}
+
+		$wall = $this->wallTimestamp( $value );
+		if ( null === $wall ) {
+			return new \WP_Error( 'venue_overlap_unrepresentable_index' );
+		}
+		if ( false === $timezone->getLocation() ) {
+			return $datetime;
+		}
+
+		$transitions     = $timezone->getTransitions( $datetime->getTimestamp() - DAY_IN_SECONDS, $datetime->getTimestamp() + DAY_IN_SECONDS );
+		$previous_offset = $transitions[0]['offset'];
+		foreach ( array_slice( $transitions, 1 ) as $transition ) {
+			$first  = $transition['ts'] + min( $previous_offset, $transition['offset'] );
+			$second = $transition['ts'] + max( $previous_offset, $transition['offset'] );
+			if ( $wall >= $first && $wall < $second ) {
+				return new \WP_Error( 'venue_overlap_unrepresentable_index' );
+			}
+			$previous_offset = $transition['offset'];
+		}
+
+		return $datetime;
+	}
+
+	private function wallTimestamp( string $value ): ?int {
+		$wall   = DateTimeImmutable::createFromFormat( '!Y-m-d H:i:s', $value, new DateTimeZone( 'UTC' ) );
+		$errors = DateTimeImmutable::getLastErrors();
+		if ( false === $wall || ( false !== $errors && ( $errors['warning_count'] > 0 || $errors['error_count'] > 0 ) ) || $wall->format( 'Y-m-d H:i:s' ) !== $value ) {
+			return null;
+		}
+		return $wall->getTimestamp();
 	}
 
 	private static function inputSchema(): array {
@@ -242,6 +393,7 @@ class VenueIntervalOverlapAbilities {
 				'page'     => array(
 					'type'    => 'integer',
 					'minimum' => 1,
+					'maximum' => self::MAX_PAGE,
 				),
 				'per_page' => array(
 					'type'    => 'integer',
