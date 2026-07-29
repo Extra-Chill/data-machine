@@ -348,8 +348,9 @@ class PostIdentityReservations extends BaseRepository {
 			if ( 'PRIMARY' === $name || $index['non_unique'] || array( 'post_id' ) !== $index['columns'] ) {
 				continue;
 			}
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-			if ( false === $this->wpdb->query( $this->wpdb->prepare( 'ALTER TABLE %i DROP INDEX %i', $this->table_name, $name ) ) ) {
+			try {
+				BaseRepository::drop_index( $this->table_name, $name, $this->wpdb );
+			} catch ( \RuntimeException ) {
 				return false;
 			}
 		}

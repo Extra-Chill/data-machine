@@ -209,6 +209,56 @@ abstract class BaseRepository {
 	}
 
 	/**
+	 * Drop an existing index using the active database driver's supported syntax.
+	 *
+	 * A missing index is already the desired state. The SQLite integration
+	 * accepts and persists `DROP INDEX <index> ON <table>` through wpdb.
+	 *
+	 * @param string     $table_name Fully-qualified table name.
+	 * @param string     $index_name Index name.
+	 * @param \wpdb|null $wpdb       Optional wpdb instance (defaults to global).
+	 * @return bool True when the index was absent or was dropped.
+	 * @throws \RuntimeException When introspection or the drop operation fails.
+	 */
+	public static function drop_index( string $table_name, string $index_name, ?\wpdb $wpdb = null ): bool {
+		if ( null === $wpdb ) {
+			global $wpdb;
+		}
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$indexes = $wpdb->get_results( $wpdb->prepare( 'SHOW INDEX FROM %i', $table_name ), ARRAY_A );
+		if ( ! is_array( $indexes ) || ! empty( $wpdb->last_error ) ) {
+			throw new \RuntimeException( sprintf( 'Failed to inspect indexes on %s: %s', esc_html( $table_name ), esc_html( (string) $wpdb->last_error ) ) );
+		}
+
+		$index_exists = false;
+		foreach ( $indexes as $index ) {
+			if ( (string) ( $index['Key_name'] ?? '' ) === $index_name ) {
+				$index_exists = true;
+				break;
+			}
+		}
+		if ( ! $index_exists ) {
+			return true;
+		}
+
+		if ( ! self::is_sqlite() ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+			if ( false === $wpdb->query( $wpdb->prepare( 'ALTER TABLE %i DROP INDEX %i', $table_name, $index_name ) ) ) {
+				throw new \RuntimeException( sprintf( 'Failed to drop index %s: %s', esc_html( $index_name ), esc_html( (string) $wpdb->last_error ) ) );
+			}
+			return true;
+		}
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+		if ( false === $wpdb->query( $wpdb->prepare( 'DROP INDEX %i ON %i', $index_name, $table_name ) ) ) {
+			throw new \RuntimeException( sprintf( 'Failed to drop SQLite index %s: %s', esc_html( $index_name ), esc_html( (string) $wpdb->last_error ) ) );
+		}
+
+		return true;
+	}
+
+	/**
 	 * Get column metadata from information_schema (MySQL only).
 	 *
 	 * Returns an object-keyed result set with DATA_TYPE,
