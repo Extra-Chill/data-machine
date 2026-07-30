@@ -68,36 +68,52 @@ final class OptionLeaseStoreTest extends WP_UnitTestCase {
 			$this->markTestSkipped( 'Two direct test database connections are unavailable.' );
 		}
 
-		$lease = $this->lease();
-		add_option( $this->lease_name, $lease, '', false );
-		add_option( $this->target_name, 'generation-1', '', false );
+		$lease       = $this->lease();
+		$table       = $this->options_table();
+		$lease_name  = $first->real_escape_string( $this->lease_name );
+		$target_name = $first->real_escape_string( $this->target_name );
 
 		try {
-			$this->assertTrue( $first->query( $this->cas_query( $first, $lease, 'generation-a' ), MYSQLI_ASYNC ) );
+			$this->assertTrue( $first->query( 'SET SESSION innodb_lock_wait_timeout = 2' ) );
+			$this->assertTrue( $second->query( 'SET SESSION innodb_lock_wait_timeout = 2' ) );
+			$this->assertTrue(
+				$first->query(
+					sprintf(
+						"INSERT INTO `{$table}` (option_name, option_value, autoload) VALUES ('%s', '%s', 'no'), ('%s', '%s', 'no')",
+						$lease_name,
+						$first->real_escape_string( maybe_serialize( $lease ) ),
+						$target_name,
+						$first->real_escape_string( maybe_serialize( 'generation-1' ) )
+					)
+				)
+			);
+			$this->assertTrue( $first->query( 'START TRANSACTION' ) );
+			$this->assertTrue( $first->query( $this->cas_query( $first, $lease, 'generation-a' ) ) );
+			$this->assertSame( 1, $first->affected_rows );
 			$this->assertTrue( $second->query( $this->cas_query( $second, $lease, 'generation-b' ), MYSQLI_ASYNC ) );
-			$pending      = array( $first, $second );
-			$affected_rows = array();
-			$deadline     = microtime( true ) + 5;
-			while ( $pending && microtime( true ) < $deadline ) {
-				$read   = $pending;
+			$read   = array( $second );
+			$error  = array();
+			$reject = array();
+			$this->assertSame( 0, \mysqli_poll( $read, $error, $reject, 0, 100000 ), 'The competing CAS must wait for the target row lock.' );
+
+			$this->assertTrue( $first->query( 'COMMIT' ) );
+			$ready = 0;
+			for ( $attempt = 0; $attempt < 20 && 0 === $ready; ++$attempt ) {
+				$read   = array( $second );
 				$error  = array();
 				$reject = array();
-				if ( 0 === \mysqli_poll( $read, $error, $reject, 0, 100000 ) ) {
-					continue;
-				}
-				foreach ( array_merge( $read, $error, $reject ) as $ready ) {
-					$this->assertTrue( $ready->reap_async_query() );
-					$affected_rows[] = $ready->affected_rows;
-					$pending         = array_values( array_filter( $pending, static fn( \mysqli $connection ): bool => $connection !== $ready ) );
-				}
+				$ready  = \mysqli_poll( $read, $error, $reject, 0, 100000 );
 			}
 
-			$this->assertSame( array(), $pending, 'Both concurrent CAS statements must finish.' );
-			sort( $affected_rows, SORT_NUMERIC );
-			$this->assertSame( array( 0, 1 ), $affected_rows );
-			wp_cache_delete( $this->target_name, 'options' );
-			$this->assertContains( get_option( $this->target_name ), array( 'generation-a', 'generation-b' ) );
+			$this->assertSame( 1, $ready, 'The competing CAS should resume after the winner commits.' );
+			$this->assertTrue( $second->reap_async_query() );
+			$this->assertSame( 0, $second->affected_rows );
+			$result = $first->query( "SELECT option_value FROM `{$table}` WHERE option_name = '{$target_name}'" );
+			$this->assertInstanceOf( \mysqli_result::class, $result );
+			$this->assertSame( 'generation-a', maybe_unserialize( $result->fetch_assoc()['option_value'] ) );
 		} finally {
+			$first->query( 'ROLLBACK' );
+			$second->query( 'ROLLBACK' );
 			$first->close();
 			$second->close();
 		}
@@ -113,8 +129,7 @@ final class OptionLeaseStoreTest extends WP_UnitTestCase {
 	}
 
 	private function cas_query( \mysqli $connection, array $lease, string $replacement ): string {
-		global $wpdb;
-		$table = str_replace( '`', '``', $wpdb->options );
+		$table = $this->options_table();
 
 		return sprintf(
 			"UPDATE `{$table}` AS target INNER JOIN `{$table}` AS lease ON lease.option_name = '%s' AND lease.option_value = '%s' SET target.option_value = '%s' WHERE target.option_name = '%s' AND target.option_value = '%s'",
@@ -124,6 +139,12 @@ final class OptionLeaseStoreTest extends WP_UnitTestCase {
 			$connection->real_escape_string( $this->target_name ),
 			$connection->real_escape_string( maybe_serialize( 'generation-1' ) )
 		);
+	}
+
+	private function options_table(): string {
+		global $wpdb;
+
+		return str_replace( '`', '``', $wpdb->options );
 	}
 
 	private function open_mysql_connection(): ?\mysqli {
