@@ -55,8 +55,29 @@ function isMonthGridMode( calendar: HTMLElement ): boolean {
  * @param calendar
  */
 function isSingleDayScope( calendar: HTMLElement ): boolean {
-	const scope = calendar.getAttribute( 'data-scope' );
+	const activeScope = calendar.querySelector< HTMLElement >(
+		'.data-machine-events-scope-chip-active[data-scope]'
+	);
+	const scope = activeScope?.dataset.scope ?? calendar.dataset.scope;
 	return scope === 'tonight' || scope === 'today';
+}
+
+/**
+ * Keep the visual layout aligned with the active time scope.
+ *
+ * The server emits this class for first paint. Scope preset changes replace
+ * only the content region, so the frontend must update the root class too.
+ *
+ * @param calendar
+ */
+function syncSingleDayListLayout( calendar: HTMLElement ): boolean {
+	const useSingleDayList =
+		! isMonthGridMode( calendar ) && isSingleDayScope( calendar );
+	calendar.classList.toggle(
+		'data-machine-events-single-day-list',
+		useSingleDayList
+	);
+	return useSingleDayList;
 }
 
 const calendarInstances = new WeakMap< HTMLElement, true >();
@@ -83,9 +104,9 @@ export function initCalendarInstance( calendar: HTMLElement ): void {
 
 	// #428: skip the horizontal carousel for single-day scopes (tonight/
 	// today) and render a flat vertical list instead. Mirrors the month-grid
-	// skip — `useCarousel` is the single gate for carousel init/destroy so
-	// both the initial mount and the content-updated re-init stay in sync.
-	const useCarousel = ! gridMode && ! isSingleDayScope( calendar );
+	// skip. The root layout class owns CSS while carousel initialization owns
+	// controls; both are recalculated after dynamic content updates.
+	const useCarousel = ! gridMode && ! syncSingleDayListLayout( calendar );
 
 	if ( gridMode ) {
 		// In grid mode the list view is the mobile fallback and the
@@ -206,12 +227,10 @@ export function initCalendarInstance( calendar: HTMLElement ): void {
 		function () {
 			destroyLazyRender( calendar );
 			destroyDayLoader( calendar );
-			if ( useCarousel ) {
-				destroyCarousel( calendar );
-			}
+			destroyCarousel( calendar );
 			initLazyRender( calendar );
 			initDayLoader( calendar );
-			if ( useCarousel ) {
+			if ( ! gridMode && ! syncSingleDayListLayout( calendar ) ) {
 				initCarousel( calendar );
 			}
 

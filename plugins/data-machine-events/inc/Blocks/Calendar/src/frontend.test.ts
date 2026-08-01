@@ -59,6 +59,7 @@ jest.mock( './modules/month-grid-response-renderer', () => ( {
  */
 import { renderMonthGridResponse } from './modules/month-grid-response-renderer';
 import { initCalendarInstance } from './frontend';
+import { initCarousel, destroyCarousel } from './modules/carousel';
 
 import type { FlatpickrInstance } from './types';
 
@@ -72,6 +73,8 @@ const mockPicker: FlatpickrInstance = {
 };
 const mockFetch = jest.fn();
 const mockRenderMonthGridResponse = renderMonthGridResponse as jest.Mock;
+const mockInitCarousel = initCarousel as jest.Mock;
+const mockDestroyCarousel = destroyCarousel as jest.Mock;
 
 function successfulResponse(): Promise< Response > {
 	return Promise.resolve( {
@@ -103,7 +106,11 @@ function deferredResponse(): {
 	};
 }
 
-function calendarMarkup( withMap = false, mode = 'month-grid' ): string {
+function calendarMarkup(
+	withMap = false,
+	mode = 'month-grid',
+	scope = 'tonight'
+): string {
 	return `
 		${
 			withMap
@@ -111,7 +118,7 @@ function calendarMarkup( withMap = false, mode = 'month-grid' ): string {
 				: ''
 		}
 		<div class="data-machine-events-calendar" data-display-mode="${ mode }"
-			data-scope="tonight" data-scope-token="opaque-token"
+			data-scope="${ scope }" data-scope-token="opaque-token"
 			data-archive-taxonomy="location" data-archive-term-id="12">
 			<div class="data-machine-events-filter-bar">
 				<input class="data-machine-events-search-input" value="new search">
@@ -138,10 +145,81 @@ describe( 'calendar frontend month-grid integration', () => {
 		mockFetch.mockImplementation( successfulResponse );
 		global.fetch = mockFetch;
 		mockRenderMonthGridResponse.mockClear();
+		mockInitCarousel.mockClear();
+		mockDestroyCarousel.mockClear();
 		mockPicker.selectedDates = [
 			new Date( 2026, 7, 10 ),
 			new Date( 2026, 7, 12 ),
 		];
+	} );
+
+	it( 'marks single-day scopes as vertical lists without carousel controls', () => {
+		document.body.innerHTML = calendarMarkup(
+			false,
+			'date-groups',
+			'tonight'
+		);
+		const calendar = document.querySelector< HTMLElement >(
+			'.data-machine-events-calendar'
+		)!;
+
+		initCalendarInstance( calendar );
+
+		expect(
+			calendar.classList.contains( 'data-machine-events-single-day-list' )
+		).toBe( true );
+		expect( mockInitCarousel ).not.toHaveBeenCalled();
+	} );
+
+	it( 'keeps multi-day date groups in carousel layout', () => {
+		document.body.innerHTML = calendarMarkup(
+			false,
+			'date-groups',
+			'this-week'
+		);
+		const calendar = document.querySelector< HTMLElement >(
+			'.data-machine-events-calendar'
+		)!;
+
+		initCalendarInstance( calendar );
+
+		expect(
+			calendar.classList.contains( 'data-machine-events-single-day-list' )
+		).toBe( false );
+		expect( mockInitCarousel ).toHaveBeenCalledWith( calendar );
+	} );
+
+	it( 'resynchronizes layout when dynamic scope content changes', () => {
+		document.body.innerHTML = calendarMarkup(
+			false,
+			'date-groups',
+			'this-week'
+		);
+		const calendar = document.querySelector< HTMLElement >(
+			'.data-machine-events-calendar'
+		)!;
+		initCalendarInstance( calendar );
+
+		calendar.dataset.scope = 'tonight';
+		calendar.dispatchEvent(
+			new CustomEvent( 'data-machine-calendar-content-updated' )
+		);
+
+		expect( mockDestroyCarousel ).toHaveBeenCalledWith( calendar );
+		expect(
+			calendar.classList.contains( 'data-machine-events-single-day-list' )
+		).toBe( true );
+		expect( mockInitCarousel ).toHaveBeenCalledTimes( 1 );
+
+		calendar.dataset.scope = 'this-week';
+		calendar.dispatchEvent(
+			new CustomEvent( 'data-machine-calendar-content-updated' )
+		);
+
+		expect(
+			calendar.classList.contains( 'data-machine-events-single-day-list' )
+		).toBe( false );
+		expect( mockInitCarousel ).toHaveBeenCalledTimes( 2 );
 	} );
 
 	afterEach( () => {

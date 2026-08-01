@@ -1091,6 +1091,28 @@
     }
 }
 
+/* Today and Tonight show one chronological, vertically stacked event list. */
+.data-machine-events-calendar.data-machine-events-single-day-list .data-machine-date-group .data-machine-events-wrapper {
+    flex-direction: column;
+    flex-wrap: nowrap;
+    overflow-x: visible;
+}
+
+.data-machine-events-calendar.data-machine-events-single-day-list .data-machine-date-group .data-machine-event-item {
+    width: 100%;
+    min-width: 0;
+    height: auto;
+    flex: 1 1 auto;
+}
+
+.data-machine-events-calendar.data-machine-events-single-day-list .data-machine-date-group .data-machine-event-link {
+    height: auto;
+}
+
+.data-machine-events-calendar.data-machine-events-single-day-list .data-machine-date-group::after {
+    display: none;
+}
+
 /* Day-specific backgrounds */
 .data-machine-events-calendar .data-machine-day-sunday .data-machine-event-item { background: var(--data-machine-day-sunday-rgba); }
 .data-machine-events-calendar .data-machine-day-monday .data-machine-event-item { background: var(--data-machine-day-monday-rgba); }

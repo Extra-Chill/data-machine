@@ -256,10 +256,13 @@ if ( ! empty( $archive_context['taxonomy'] ) && ! empty( $archive_context['term_
 
 \DataMachineEvents\Blocks\Calendar\Template_Loader::init();
 
-$instance_id        = wp_unique_id( 'data-machine-calendar-' );
-$wrapper_class      = $is_month_grid_mode
-	? 'data-machine-events-calendar data-machine-events-date-grouped data-machine-events-month-grid-mode'
-	: 'data-machine-events-calendar data-machine-events-date-grouped';
+$instance_id   = wp_unique_id( 'data-machine-calendar-' );
+$wrapper_class = 'data-machine-events-calendar data-machine-events-date-grouped';
+if ( $is_month_grid_mode ) {
+	$wrapper_class .= ' data-machine-events-month-grid-mode';
+} elseif ( in_array( $scope, array( 'today', 'tonight' ), true ) ) {
+	$wrapper_class .= ' data-machine-events-single-day-list';
+}
 $wrapper_attributes = get_block_wrapper_attributes(
 	array(
 		'class' => $wrapper_class,
@@ -273,7 +276,7 @@ if ( ! empty( $archive_context['taxonomy'] ) ) {
 	$archive_data_attrs = sprintf(
 		' data-archive-taxonomy="%s" data-archive-term-id="%d" data-archive-term-name="%s"',
 		esc_attr( $archive_context['taxonomy'] ),
-		esc_attr( $archive_context['term_id'] ),
+		absint( $archive_context['term_id'] ),
 		esc_attr( $archive_context['term_name'] )
 	);
 }
@@ -284,7 +287,7 @@ if ( ! empty( $geo_lat ) && ! empty( $geo_lng ) ) {
 		' data-geo-lat="%s" data-geo-lng="%s" data-geo-radius="%s" data-geo-radius-unit="%s"',
 		esc_attr( $geo_lat ),
 		esc_attr( $geo_lng ),
-		esc_attr( $geo_radius ),
+		esc_attr( (string) $geo_radius ),
 		esc_attr( $geo_radius_unit )
 	);
 }
@@ -347,7 +350,7 @@ $map_sync_attr              = '' !== $map_sync_id
 	?>
 
 	<?php
-	if ( $is_month_grid_mode && is_array( $grid_payload ) ) :
+	if ( $is_month_grid_mode ) :
 		// Build the base URL for prev/next/today nav. `add_query_arg`
 		// with null/null returns the current request URL (with all
 		// existing query args); `remove_query_arg` strips `month` so

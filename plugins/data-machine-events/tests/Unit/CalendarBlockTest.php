@@ -126,6 +126,19 @@ class CalendarBlockTest extends WP_UnitTestCase {
 		$_GET = $original_get;
 	}
 
+	public function test_single_day_scope_renders_vertical_list_layout_class(): void {
+		$original_get = $_GET;
+		$_GET         = array( 'scope' => 'tonight' );
+
+		try {
+			$html = $this->render_calendar( array( 'displayMode' => 'date-groups' ) );
+		} finally {
+			$_GET = $original_get;
+		}
+
+		$this->assertStringContainsString( 'data-machine-events-single-day-list', $html );
+	}
+
 	public function test_calendar_request_defaults_preserve_explicit_values_and_reject_invalid_state() {
 		$original_get = $_GET;
 		$_GET        = array(
