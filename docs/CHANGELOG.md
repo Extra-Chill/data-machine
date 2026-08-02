@@ -2,6 +2,14 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.171.3] - 2026-08-02
+
+### Changed
+- bound option lease concurrency proof
+
+### Fixed
+- avoid duplicate IMAP sent copies
+
 ## [0.171.2] - 2026-07-29
 
 ### Fixed
