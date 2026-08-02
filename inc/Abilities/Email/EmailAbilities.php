@@ -480,10 +480,12 @@ class EmailAbilities {
 			$headers[] = 'References: ' . $references;
 		}
 
+		$cc_list = array();
 		if ( ! empty( $input['cc'] ) ) {
-			$cc_list = array_map( 'trim', explode( ',', $input['cc'] ) );
-			foreach ( $cc_list as $cc ) {
+			$cc_candidates = array_map( 'trim', explode( ',', $input['cc'] ) );
+			foreach ( $cc_candidates as $cc ) {
 				if ( is_email( $cc ) ) {
+					$cc_list[] = $cc;
 					$headers[] = 'Cc: ' . $cc;
 				}
 			}
@@ -502,9 +504,9 @@ class EmailAbilities {
 		$sent = wp_mail( $to, $input['subject'], $input['body'], $headers );
 
 		if ( $sent ) {
-			// Save a copy to the IMAP Sent folder so the message appears in
-			// the user's email client (e.g. Gmail "Sent Mail" thread view).
-			$this->saveToSentFolder( $to, $input['subject'], $input['body'], $headers );
+			if ( ! $this->isConfiguredMailboxRecipient( $to, $cc_list ) ) {
+				$this->saveToSentFolder( $to, $input['subject'], $input['body'], $headers );
+			}
 
 			return array(
 				'success' => true,
@@ -1271,6 +1273,31 @@ class EmailAbilities {
 	private function getAuthProvider(): ?object {
 		$providers = apply_filters( 'datamachine_auth_providers', array() );
 		return $providers['email_imap'] ?? null;
+	}
+
+	/**
+	 * Check whether the configured mailbox will receive the sent message.
+	 *
+	 * @param array $to Valid To addresses.
+	 * @param array $cc Valid Cc addresses.
+	 */
+	private function isConfiguredMailboxRecipient( array $to, array $cc ): bool {
+		$auth = $this->getAuthProvider();
+		if ( ! $auth ) {
+			return false;
+		}
+
+		$mailbox = strtolower( trim( $auth->getUser() ) );
+		if ( ! is_email( $mailbox ) ) {
+			return false;
+		}
+
+		$recipients = array_map(
+			static fn ( string $address ): string => strtolower( trim( $address ) ),
+			array_merge( $to, $cc )
+		);
+
+		return in_array( $mailbox, $recipients, true );
 	}
 
 	/**
