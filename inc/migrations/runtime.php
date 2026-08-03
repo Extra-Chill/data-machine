@@ -98,12 +98,53 @@ function datamachine_maybe_run_deferred_migrations(): void {
 		return;
 	}
 
-	// Mismatch: a deploy bumped the constant past the persisted option.
+	// Mismatch: a deploy bumped the constant past the persisted option, or the
+	// activation hook never fired for this install at all.
 	datamachine_run_schema_migrations();
+	datamachine_run_deferred_site_setup();
 	if ( function_exists( 'datamachine_mark_flow_schedule_reconciliation' ) ) {
 		datamachine_mark_flow_schedule_reconciliation();
 	}
 	update_option( 'datamachine_db_version', DATAMACHINE_VERSION, true );
+}
+
+/**
+ * Run the non-schema activation work that a deploy or a never-activated install
+ * would otherwise skip.
+ *
+ * `datamachine_run_schema_migrations()` already covers every table, so an
+ * install that was deployed in place rather than activated ends up with a
+ * complete database and an incomplete site: no `datamachine_*` capabilities on
+ * any role, and no seeded settings. That is a confusing half-working state —
+ * the data is right and every capability check fails.
+ *
+ * Three ways an install reaches it:
+ *
+ * - deploy-in-place, where files are updated and activation is never toggled
+ * - a test harness that loads the plugin without activating it
+ * - a must-use plugin, for which `register_activation_hook` never fires at all
+ *
+ * Both calls below are idempotent by construction. `add_cap()` is a no-op for a
+ * capability the role already has, and `datamachine_activate_defaults_for_site()`
+ * uses `add_option()`, which will not overwrite an operator's existing settings.
+ * That matters because this runs on every version bump, not only once.
+ *
+ * Deliberately NOT included: `ComposableFileGenerator::regenerate_all()`. It is
+ * expensive and activation-only by design, and the composable files have their
+ * own invalidation path. Adding it here would put a full regeneration on the
+ * first request after every deploy.
+ *
+ * @since 0.171.4
+ * @return void
+ */
+function datamachine_run_deferred_site_setup(): void {
+	if ( function_exists( 'datamachine_register_capabilities' ) ) {
+		datamachine_register_capabilities();
+	}
+
+	if ( function_exists( 'datamachine_activate_defaults_for_site' ) ) {
+		datamachine_activate_defaults_for_site();
+	}
 }
 
 // Run deferred migrations early in plugins_loaded (priority 5) so that

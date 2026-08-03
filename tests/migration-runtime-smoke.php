@@ -130,6 +130,29 @@ if ( ! class_exists( '\DataMachine\Core\Database\BaseRepository' ) ) {
 	);
 }
 
+// #3047: capabilities and settings defaults only ever ran from the activation
+// hook, so an install deployed in place — or loaded as a must-use plugin, where
+// register_activation_hook never fires — ended up with a fully migrated
+// database and no datamachine_* capability on any role.
+if ( ! function_exists( 'datamachine_register_capabilities' ) ) {
+	function datamachine_register_capabilities(): void {
+		$GLOBALS['__test_site_setup_calls'][] = 'capabilities';
+	}
+}
+
+if ( ! function_exists( 'datamachine_activate_defaults_for_site' ) ) {
+	function datamachine_activate_defaults_for_site(): void {
+		$GLOBALS['__test_site_setup_calls'][] = 'defaults';
+		// Mirrors the real implementation: add_option, never update_option, so
+		// re-running on every version bump cannot clobber operator settings.
+		if ( ! isset( $GLOBALS['__test_options']['datamachine_settings'] ) ) {
+			$GLOBALS['__test_options']['datamachine_settings'] = array( 'seeded' => true );
+		}
+	}
+}
+
+$GLOBALS['__test_site_setup_calls'] = array();
+
 require_once dirname( __DIR__ ) . '/inc/migrations/runtime.php';
 
 echo "=== Current Schema Runtime Smoke ===\n";
@@ -151,6 +174,29 @@ $GLOBALS['__test_options']['datamachine_db_version'] = '0.1.0-stale';
 datamachine_maybe_run_deferred_migrations();
 assert_runtime( 'current schema ensures called when option lags', $schema_chain === $GLOBALS['__test_schema_calls'] );
 assert_runtime( 'option bumped to current DATAMACHINE_VERSION', DATAMACHINE_VERSION === $GLOBALS['__test_options']['datamachine_db_version'] );
+
+echo "\n[deferred:3] Non-schema site setup runs on the same gate (#3047)\n";
+$GLOBALS['__test_site_setup_calls']                  = array();
+$GLOBALS['__test_options']['datamachine_db_version'] = '0.1.0-stale';
+unset( $GLOBALS['__test_options']['datamachine_settings'] );
+datamachine_maybe_run_deferred_migrations();
+assert_runtime( 'capabilities registered without an activation hook', in_array( 'capabilities', $GLOBALS['__test_site_setup_calls'], true ) );
+assert_runtime( 'settings defaults seeded without an activation hook', in_array( 'defaults', $GLOBALS['__test_site_setup_calls'], true ) );
+assert_runtime( 'settings option now exists', isset( $GLOBALS['__test_options']['datamachine_settings'] ) );
+
+echo "\n[deferred:4] Matching option skips site setup too\n";
+$GLOBALS['__test_site_setup_calls']                  = array();
+$GLOBALS['__test_options']['datamachine_db_version'] = DATAMACHINE_VERSION;
+datamachine_maybe_run_deferred_migrations();
+assert_runtime( 'no site setup on the cheap path', array() === $GLOBALS['__test_site_setup_calls'] );
+
+echo "\n[deferred:5] Re-running never clobbers operator settings\n";
+// This path runs on EVERY version bump, not once, so it has to be idempotent
+// by construction rather than by luck.
+$GLOBALS['__test_options']['datamachine_settings']   = array( 'operator' => 'value' );
+$GLOBALS['__test_options']['datamachine_db_version'] = '0.1.0-stale';
+datamachine_maybe_run_deferred_migrations();
+assert_runtime( 'existing settings survive a later deploy', array( 'operator' => 'value' ) === $GLOBALS['__test_options']['datamachine_settings'] );
 
 echo "\n[identity-schema:1] Option/table mismatch installs and records schema\n";
 $GLOBALS['__test_identity_table_exists'] = false;
