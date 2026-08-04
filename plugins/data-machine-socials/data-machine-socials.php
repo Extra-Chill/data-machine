@@ -73,6 +73,8 @@ function datamachine_socials_bootstrap() {
 	}
 
 	// Load Abilities (they self-register)
+	new \DataMachineSocials\Abilities\SocialCommentsAbility();
+
 	// Pinterest
 	new \DataMachineSocials\Abilities\Pinterest\PinterestBoardsAbility();
 	new \DataMachineSocials\Abilities\Pinterest\PinterestPublishAbility();

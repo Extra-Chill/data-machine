@@ -147,9 +147,9 @@ class RestApi {
 				),
 				'media_id' => array(
 					'type'              => 'string',
-					'required'          => true,
+					'required'          => false,
 					'sanitize_callback' => 'sanitize_text_field',
-					'description'       => 'Platform-specific post/media ID.',
+					'description'       => 'Optional platform-specific post/media ID. Omit for recent account comments.',
 				),
 				'all' => array(
 					'type'              => 'boolean',
@@ -720,6 +720,10 @@ class RestApi {
 		$media_id = $request->get_param( 'media_id' );
 		$all      = $request->get_param( 'all' );
 
+		if ( empty( $media_id ) ) {
+			return self::get_recent_comments( $request );
+		}
+
 		$slug_map = array(
 			'instagram' => 'datamachine/instagram-read',
 			'facebook'  => 'datamachine/facebook-read',
@@ -730,13 +734,6 @@ class RestApi {
 			return new \WP_REST_Response( array(
 				'success' => false,
 				'error'   => "Comments not supported for platform: {$platform}",
-			), 400 );
-		}
-
-		if ( empty( $media_id ) ) {
-			return new \WP_REST_Response( array(
-				'success' => false,
-				'error'   => 'media_id is required',
 			), 400 );
 		}
 
@@ -769,6 +766,22 @@ class RestApi {
 		}
 
 		return new \WP_REST_Response( $result, $result['success'] ? 200 : 500 );
+	}
+
+	/** Return recent account comments through the generic owner-layer ability. */
+	public static function get_recent_comments( \WP_REST_Request $request ) {
+		$ability = wp_get_ability( 'datamachine/social-comments' );
+		if ( ! $ability ) {
+			return new \WP_REST_Response( array( 'success' => false, 'error' => 'Social comments ability not registered.' ), 500 );
+		}
+
+		$result = $ability->execute( array(
+			'provider' => $request->get_param( 'platform' ),
+			'limit'    => $request->get_param( 'limit' ),
+			'after'    => $request->get_param( 'after' ),
+		) );
+
+		return new \WP_REST_Response( $result, $result['success'] ? 200 : ( 'unsupported' === ( $result['data']['status'] ?? '' ) ? 400 : 502 ) );
 	}
 
 	/**
