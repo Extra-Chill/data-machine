@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.171.4] - 2026-08-04
+
+### Changed
+- Install capabilities and settings defaults without an activation hook
+
 ## [0.171.3] - 2026-08-02
 
 ### Changed
