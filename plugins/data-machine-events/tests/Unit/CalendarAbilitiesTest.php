@@ -12,6 +12,7 @@ use DataMachineEvents\Abilities\CalendarAbilities;
 use DataMachineEvents\Core\Event_Post_Type;
 use DataMachineEvents\Core\EventDatesTable;
 use DataMachineEvents\Core\Venue_Taxonomy;
+use DataMachineEvents\Blocks\Calendar\Query\ScopeResolver;
 
 class CalendarAbilitiesTest extends WP_UnitTestCase {
 
@@ -202,30 +203,33 @@ class CalendarAbilitiesTest extends WP_UnitTestCase {
 	}
 
 	public function test_month_intersects_resolved_scope_and_can_be_empty(): void {
-		$today         = current_datetime()->setTime( 12, 0 );
-		$tomorrow      = $today->modify( '+1 day' );
-		$today_id      = $this->seed_event( 'Today scoped event', $today->format( 'Y-m-d 12:00:00' ), $today->format( 'Y-m-d 14:00:00' ) );
-		$future_id     = $this->seed_event( 'Tomorrow unscoped event', $tomorrow->format( 'Y-m-d 12:00:00' ), $tomorrow->format( 'Y-m-d 14:00:00' ) );
-		$current_month = $today->format( 'Y-m' );
+		$scope_bounds  = ScopeResolver::resolve( 'today' );
+		$this->assertIsArray( $scope_bounds );
+		$scope_date    = new \DateTimeImmutable( $scope_bounds['date_start'], wp_timezone() );
+		$outside_date  = new \DateTimeImmutable( $scope_bounds['date_end'], wp_timezone() );
+		$outside_date  = $outside_date->modify( '+1 day' );
+		$today_id      = $this->seed_event( 'Today scoped event', $scope_date->format( 'Y-m-d 12:00:00' ), $scope_date->format( 'Y-m-d 14:00:00' ) );
+		$future_id     = $this->seed_event( 'Tomorrow unscoped event', $outside_date->format( 'Y-m-d 12:00:00' ), $outside_date->format( 'Y-m-d 14:00:00' ) );
+		$current_month = $scope_date->format( 'Y-m' );
 
 		$scoped = $this->abilities->executeGetCalendarPage(
 			array(
 				'month'        => $current_month,
 				'scope'        => 'today',
-				'date_start'   => $today->format( 'Y-m-d' ),
-				'date_end'     => $today->format( 'Y-m-d' ),
+				'date_start'   => $scope_date->format( 'Y-m-d' ),
+				'date_end'     => $scope_date->format( 'Y-m-d' ),
 				'include_html' => false,
 			)
 		);
 		$scoped_ids = array_column( $scoped['paged_date_groups'][0]['events'], 'post_id' );
-		$this->assertSame( $today->format( 'Y-m-d' ), $scoped['date_boundaries']['start_date'] );
-		$this->assertSame( $today->format( 'Y-m-d' ), $scoped['date_boundaries']['end_date'] );
+		$this->assertSame( $scope_date->format( 'Y-m-d' ), $scoped['date_boundaries']['start_date'] );
+		$this->assertSame( $scope_date->format( 'Y-m-d' ), $scoped['date_boundaries']['end_date'] );
 		$this->assertContains( $today_id, $scoped_ids );
 		$this->assertNotContains( $future_id, $scoped_ids );
 
 		$empty = $this->abilities->executeGetCalendarPage(
 			array(
-				'month'        => $today->modify( '+2 months' )->format( 'Y-m' ),
+				'month'        => $scope_date->modify( '+2 months' )->format( 'Y-m' ),
 				'scope'        => 'today',
 				'include_html' => false,
 			)

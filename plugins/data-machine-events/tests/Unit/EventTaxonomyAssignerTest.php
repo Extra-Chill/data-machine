@@ -22,6 +22,9 @@ class EventTaxonomyAssignerTest extends WP_UnitTestCase {
 
 	public function setUp(): void {
 		parent::setUp();
+		global $wpdb;
+		$wpdb->query( 'COMMIT' );
+		$wpdb->query( 'SET autocommit = 1' );
 
 		if ( ! post_type_exists( 'data_machine_events' ) ) {
 			Event_Post_Type::register();
@@ -48,6 +51,13 @@ class EventTaxonomyAssignerTest extends WP_UnitTestCase {
 		}
 
 		$this->assigner = new EventTaxonomyAssigner();
+	}
+
+	public function tearDown(): void {
+		global $wpdb;
+		$wpdb->query( 'SET autocommit = 0' );
+		$wpdb->query( 'START TRANSACTION' );
+		parent::tearDown();
 	}
 
 	public function test_assigner_instantiation() {

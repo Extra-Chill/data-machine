@@ -9,12 +9,18 @@ namespace DataMachineEvents\Tests\Integration;
 
 use DataMachineEvents\Abilities\EventUpdateAbilities;
 use DataMachineEvents\Core\Event_Post_Type;
+use DataMachineEvents\Core\EventDatesTable;
 use DataMachineEvents\Core\Venue_Taxonomy;
 use WP_UnitTestCase;
 
 class EventSourceUpdateMySqlAtomicityTest extends WP_UnitTestCase {
 
 	public function setUp(): void {
+		// Create the table before WP_UnitTestCase rewrites CREATE TABLE as temporary.
+		if ( ! EventDatesTable::table_exists() ) {
+			EventDatesTable::create_table();
+		}
+
 		parent::setUp();
 		global $wpdb;
 		if ( ! $wpdb->dbh instanceof \mysqli ) {
@@ -35,7 +41,7 @@ class EventSourceUpdateMySqlAtomicityTest extends WP_UnitTestCase {
 	}
 
 	public function test_second_connection_never_observes_combined_update_half_applied(): void {
-		global $table_prefix;
+		global $wpdb;
 		add_filter( 'datamachine_events_update_source_event_permission', '__return_true' );
 		$previous = wp_insert_term( 'Atomic Previous ' . uniqid(), 'venue' );
 		$next     = wp_insert_term( 'Atomic Next ' . uniqid(), 'venue' );
@@ -55,15 +61,17 @@ class EventSourceUpdateMySqlAtomicityTest extends WP_UnitTestCase {
 		update_post_meta( $event_id, '_datamachine_event_source_identity', $identity );
 		$observed = null;
 
+		$posts_table             = $wpdb->posts;
+		$term_relationships_table = $wpdb->term_relationships;
+		$term_taxonomy_table      = $wpdb->term_taxonomy;
 		add_action(
 			'datamachine_events_after_event_venue_mutation',
-			static function () use ( &$observed, $event_id, $table_prefix ): void {
+			static function () use ( &$observed, $event_id, $posts_table, $term_relationships_table, $term_taxonomy_table ): void {
 				$reader = new \wpdb( DB_USER, DB_PASSWORD, DB_NAME, DB_HOST );
-				$reader->set_prefix( $table_prefix );
-				$content = $reader->get_var( $reader->prepare( "SELECT post_content FROM {$reader->posts} WHERE ID = %d", $event_id ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- Independent connection proves transaction isolation.
+				$content = $reader->get_var( $reader->prepare( "SELECT post_content FROM {$posts_table} WHERE ID = %d", $event_id ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- Independent connection proves transaction isolation.
 				$terms = $reader->get_col(
 					$reader->prepare(
-						"SELECT tt.term_id FROM {$reader->term_relationships} tr INNER JOIN {$reader->term_taxonomy} tt ON tt.term_taxonomy_id = tr.term_taxonomy_id WHERE tr.object_id = %d AND tt.taxonomy = 'venue'",
+						"SELECT tt.term_id FROM {$term_relationships_table} tr INNER JOIN {$term_taxonomy_table} tt ON tt.term_taxonomy_id = tr.term_taxonomy_id WHERE tr.object_id = %d AND tt.taxonomy = 'venue'",
 						$event_id
 					)
 				); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- Independent connection proves transaction isolation.

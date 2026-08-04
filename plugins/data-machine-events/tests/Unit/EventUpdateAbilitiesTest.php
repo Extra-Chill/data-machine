@@ -51,7 +51,7 @@ class EventUpdateAbilitiesTest extends WP_UnitTestCase {
 		$result = $registered->execute( $this->sourceInput( $this->makeSourceEvent(), array( 'startTime' => '21:00' ) ) );
 
 		$this->assertWPError( $result );
-		$this->assertSame( 'source_event_update_forbidden', $result->get_error_code() );
+		$this->assertSame( 'ability_invalid_permissions', $result->get_error_code() );
 	}
 
 	public function test_source_update_rejects_wrong_identity_event_and_stale_fingerprint(): void {

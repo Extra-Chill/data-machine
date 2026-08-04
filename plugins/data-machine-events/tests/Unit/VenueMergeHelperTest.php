@@ -587,7 +587,7 @@ class VenueMergeHelperTest extends WP_UnitTestCase {
 			)
 		);
 		$loser  = $this->make_venue(
-			'HI-FI Indianapolis Suite 4',
+			'HI-FI Indianapolis',
 			array(
 				'_venue_address' => '1043 Virginia Ave',
 				'_venue_city'    => 'Indianapolis',

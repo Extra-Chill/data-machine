@@ -16,6 +16,7 @@ use WP_REST_Server;
 use DataMachineEvents\Core\Event_Post_Type;
 use DataMachineEvents\Core\EventDatesTable;
 use DataMachineEvents\Core\Venue_Taxonomy;
+use DataMachineEvents\Blocks\Calendar\Cache\CalendarCache;
 use const DataMachineEvents\Api\API_NAMESPACE;
 
 class EventRestControllerTest extends WP_UnitTestCase {
@@ -105,7 +106,8 @@ class EventRestControllerTest extends WP_UnitTestCase {
 
 		// Set event datetime in the future (table is the query source of truth).
 		$future_datetime = current_datetime()->modify( '+1 week' )->format( 'Y-m-d H:i:s' );
-		EventDatesTable::upsert( $post_id, $future_datetime );
+		$this->assertTrue( EventDatesTable::upsert( $post_id, $future_datetime ) );
+		CalendarCache::invalidate();
 
 		$request  = $this->calendar_request();
 		$request->set_param( 'format', 'data' );
@@ -132,7 +134,8 @@ class EventRestControllerTest extends WP_UnitTestCase {
 		);
 
 		$future_datetime = current_datetime()->modify( '+1 week' )->format( 'Y-m-d H:i:s' );
-		EventDatesTable::upsert( $post_id, $future_datetime );
+		$this->assertTrue( EventDatesTable::upsert( $post_id, $future_datetime ) );
+		CalendarCache::invalidate();
 
 		$request = $this->calendar_request();
 		$request->set_param( 'event_search', $unique_term );
