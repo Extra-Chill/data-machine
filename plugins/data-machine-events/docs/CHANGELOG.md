@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.54.1] - 2026-08-04
+
+### Fixed
+- stack single-day calendar events vertically
+
 ## [0.54.0] - 2026-07-29
 
 ### Added
