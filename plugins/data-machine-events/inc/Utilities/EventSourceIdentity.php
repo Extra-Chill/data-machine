@@ -8,7 +8,6 @@
 namespace DataMachineEvents\Utilities;
 
 use DataMachine\Core\ExecutionContext;
-use DataMachineEvents\Core\DuplicateDetection\EventDuplicateStrategy;
 use DataMachineEvents\Core\Event_Post_Type;
 
 defined( 'ABSPATH' ) || exit;
@@ -89,16 +88,22 @@ class EventSourceIdentity {
 	}
 
 	/**
-	 * Check the existing event-domain identity index used by upsert.
+	 * Check the canonical duplicate ability used by upsert.
 	 *
 	 * @param array $event Standardized event packet.
 	 * @return bool True when upsert would resolve an existing canonical event.
 	 */
 	private static function canonicalEventExists( array $event ): bool {
-		$result = EventDuplicateStrategy::check(
+		$ability = function_exists( 'wp_get_ability' ) ? wp_get_ability( 'datamachine/check-duplicate' ) : null;
+		if ( ! $ability ) {
+			throw new \RuntimeException( 'Data Machine 0.39.0 or newer is required: datamachine/check-duplicate is unavailable.' );
+		}
+
+		$result = $ability->execute(
 			array(
 				'title'     => (string) ( $event['title'] ?? '' ),
 				'post_type' => Event_Post_Type::POST_TYPE,
+				'scope'     => 'published',
 				'context'   => array(
 					'venue'     => (string) ( $event['venue'] ?? '' ),
 					'startDate' => EventIdentifierGenerator::normalizeStartDateTime(

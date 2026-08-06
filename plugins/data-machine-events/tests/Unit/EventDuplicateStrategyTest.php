@@ -42,13 +42,9 @@ class EventDuplicateStrategyTest extends WP_UnitTestCase {
 			Venue_Taxonomy::register();
 		}
 
-		// Ensure the event_dates and post_identity tables exist for
-		// integration tests that drive findByExactTitle end-to-end.
+		// Ensure the event-owned date table exists for end-to-end queries.
 		if ( ! EventDatesTable::table_exists() ) {
 			EventDatesTable::create_table();
-		}
-		if ( class_exists( '\\DataMachine\\Core\\Database\\PostIdentityIndex\\PostIdentityIndex' ) ) {
-			( new \DataMachine\Core\Database\PostIdentityIndex\PostIdentityIndex() )->create_table();
 		}
 	}
 
@@ -399,15 +395,6 @@ class EventDuplicateStrategyTest extends WP_UnitTestCase {
 		$this->assertGreaterThan( 0, $late_post_id );
 		wp_set_object_terms( $late_post_id, array( $term_id ), 'venue' );
 		EventDatesTable::upsert( $late_post_id, '2026-05-22 21:00:00' );
-		( new \DataMachine\Core\Database\PostIdentityIndex\PostIdentityIndex() )->upsert(
-			$late_post_id,
-			array(
-				'post_type'     => Event_Post_Type::POST_TYPE,
-				'event_date'    => '2026-05-22',
-				'venue_term_id' => $term_id,
-				'title_hash'    => EventDuplicateStrategy::computeTitleHash( 'Showcase' ),
-			)
-		);
 
 		$result = EventDuplicateStrategy::check(
 			array(
@@ -425,7 +412,6 @@ class EventDuplicateStrategyTest extends WP_UnitTestCase {
 
 		global $wpdb;
 		foreach ( array( $early_post_id, $late_post_id ) as $post_id ) {
-			$wpdb->delete( $wpdb->prefix . 'datamachine_post_identity', array( 'post_id' => $post_id ), array( '%d' ) );
 			$wpdb->delete( EventDatesTable::table_name(), array( 'post_id' => $post_id ), array( '%d' ) );
 			wp_delete_post( $post_id, true );
 		}
@@ -480,19 +466,8 @@ class EventDuplicateStrategyTest extends WP_UnitTestCase {
 		);
 		wp_trash_post( $post_id );
 		EventDatesTable::upsert( $post_id, '2026-04-22 21:00:00' );
-		$index = new \DataMachine\Core\Database\PostIdentityIndex\PostIdentityIndex();
-		$index->upsert(
-			$post_id,
-			array(
-				'post_type'     => Event_Post_Type::POST_TYPE,
-				'event_date'    => '2026-04-22',
-				'venue_term_id' => $term_id,
-				'title_hash'    => EventDuplicateStrategy::computeTitleHash( 'Cancelled Event' ),
-			)
-		);
 
-		$this->assertNotNull( EventDatesTable::get( $post_id ), 'The stale date row must remain available to both fuzzy paths.' );
-		$this->assertSame( $post_id, (int) $index->get( $post_id )['post_id'], 'The stale identity candidate must be present after trash.' );
+		$this->assertNotNull( EventDatesTable::get( $post_id ), 'The stale date row remains but trashed posts must be excluded.' );
 
 		$result = EventDuplicateStrategy::check(
 			array(
@@ -664,7 +639,7 @@ class EventDuplicateStrategyTest extends WP_UnitTestCase {
 	 * Venue + date + fuzzy title match → IS a duplicate.
 	 *
 	 * The incoming title is a close variant of the stored title; the
-	 * SimilarityEngine's titlesMatch() should accept it. Both share the
+	 * The public titles-match contract should accept it. Both share the
 	 * same venue and date.
 	 */
 	public function test_venue_date_fuzzy_title_dedups(): void {
@@ -713,13 +688,13 @@ class EventDuplicateStrategyTest extends WP_UnitTestCase {
 
 	/**
 	 * Create a venue term (with address meta) + an event post tagged
-	 * with that term + identity index row + event dates row. Returns
+	 * with that term + event dates row. Returns
 	 * [ $term_id, $post_id ] for use + cleanup.
 	 *
 	 * @param string $title          Event title.
 	 * @param string $start_datetime MySQL datetime (e.g. '2026-05-19 21:00:00').
 	 * @param string $venue_name     Optional venue term name (defaults to 'Monks <uniqid>').
-	 * @param string $ticket_url     Optional ticket URL to seed in postmeta + index.
+	 * @param string $ticket_url     Optional ticket URL to seed in postmeta.
 	 * @return array{0:int,1:int}
 	 */
 	private function seedVenueWithEvent( string $title, string $start_datetime, string $venue_name = '', string $ticket_url = '' ): array {
@@ -756,22 +731,6 @@ class EventDuplicateStrategyTest extends WP_UnitTestCase {
 			update_post_meta( $post_id, EVENT_TICKET_URL_META_KEY, $normalized_ticket_url );
 		}
 
-		// Seed the identity-index row so findByExactTitle's
-		// find_by_date_and_title_hash() lookup finds this post.
-		$index      = new \DataMachine\Core\Database\PostIdentityIndex\PostIdentityIndex();
-		$date_only  = substr( $start_datetime, 0, 10 );
-		$title_hash = EventDuplicateStrategy::computeTitleHash( $title );
-		$index_fields = array(
-			'post_type'     => 'data_machine_events',
-			'event_date'    => $date_only,
-			'venue_term_id' => $term_id,
-			'title_hash'    => $title_hash,
-		);
-		if ( '' !== $normalized_ticket_url ) {
-			$index_fields['ticket_url'] = $normalized_ticket_url;
-		}
-		$index->upsert( $post_id, $index_fields );
-
 		return array( $term_id, $post_id );
 	}
 
@@ -782,13 +741,6 @@ class EventDuplicateStrategyTest extends WP_UnitTestCase {
 	 * @param int $post_id Event post ID.
 	 */
 	private function cleanup( int $term_id, int $post_id ): void {
-		if ( class_exists( '\\DataMachine\\Core\\Database\\PostIdentityIndex\\PostIdentityIndex' ) ) {
-			global $wpdb;
-			$table = $wpdb->prefix . 'datamachine_post_identity';
-			// phpcs:ignore WordPress.DB
-			$wpdb->delete( $table, array( 'post_id' => $post_id ), array( '%d' ) );
-		}
-
 		global $wpdb;
 		// phpcs:ignore WordPress.DB
 		$wpdb->delete( EventDatesTable::table_name(), array( 'post_id' => $post_id ), array( '%d' ) );

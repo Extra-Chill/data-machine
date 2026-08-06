@@ -12,16 +12,21 @@
 
 namespace {
 	define( 'ABSPATH', __DIR__ . '/' );
+	define( 'DATA_MACHINE_EVENTS_POST_TYPE', 'data_machine_events' );
 
 	function do_action(): void {}
-}
 
-namespace DataMachine\Core\Similarity {
-	class SimilarityEngine {
-		public static function normalizeBasic( string $value ): string {
-			$value = strtolower( trim( $value ) );
-			return (string) preg_replace( '/^(the|a|an)\s+/', '', $value );
+	function wp_get_ability( string $name ): ?object {
+		if ( 'datamachine/check-duplicate' !== $name ) {
+			return null;
 		}
+
+		return new class() {
+			public function execute( array $input ): array {
+				return \DataMachineEvents\Core\DuplicateDetection\EventDuplicateStrategy::check( $input )
+					?? array( 'verdict' => 'clear' );
+			}
+		};
 	}
 }
 
@@ -47,6 +52,12 @@ namespace DataMachineEvents\Core\DuplicateDetection {
 			self::$last_input = $input;
 			return null;
 		}
+	}
+}
+
+namespace DataMachineEvents\Core {
+	class Event_Post_Type {
+		public const POST_TYPE = \DATA_MACHINE_EVENTS_POST_TYPE;
 	}
 }
 

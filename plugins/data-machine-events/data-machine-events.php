@@ -301,13 +301,10 @@ class DATAMACHINE_Events {
 			new \DataMachineEvents\Steps\Upsert\Events\EventUpsert();
 		}
 
-		// Register event dedup strategy with DM core's duplicate detection system
-		// and identity writer to keep the PostIdentityIndex in sync.
-		if ( class_exists( 'DataMachine\\Core\\Database\\PostIdentityIndex\\PostIdentityIndex' ) ) {
-			\DataMachineEvents\Core\DuplicateDetection\EventDuplicateStrategy::register();
-			\DataMachineEvents\Core\DuplicateDetection\EventIdentityWriter::register();
-			\DataMachineEvents\Core\DuplicateDetection\PreAIEventDedupGate::register();
-		}
+		// Data Machine invokes this event-owned strategy through its public
+		// duplicate-check contract; no backing storage implementation is probed.
+		\DataMachineEvents\Core\DuplicateDetection\EventDuplicateStrategy::register();
+		\DataMachineEvents\Core\DuplicateDetection\PreAIEventDedupGate::register();
 
 		// Notify submitters when their submitted events are published.
 		\DataMachineEvents\Core\SubmissionNotification::register();

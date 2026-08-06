@@ -7,9 +7,7 @@
 
 namespace DataMachineEvents\Tests\Integration;
 
-use DataMachine\Core\Database\PostIdentityIndex\PostIdentityIndex;
 use DataMachine\Core\EngineData;
-use DataMachineEvents\Core\DuplicateDetection\EventIdentityWriter;
 use DataMachineEvents\Core\EventDatesTable;
 use DataMachineEvents\Core\Event_Post_Type;
 use DataMachineEvents\Core\Venue_Taxonomy;
@@ -40,7 +38,6 @@ class EventUpsertMySqlConcurrencyTest extends WP_UnitTestCase {
 		if ( ! EventDatesTable::table_exists() ) {
 			EventDatesTable::create_table();
 		}
-		( new PostIdentityIndex() )->create_table();
 	}
 
 	public function test_held_lock_excludes_times_out_releases_and_loser_reuses_winner(): void {
@@ -102,7 +99,6 @@ class EventUpsertMySqlConcurrencyTest extends WP_UnitTestCase {
 			)
 		);
 		wp_set_object_terms( $winner_id, array( $venue['term_id'] ), 'venue' );
-		EventIdentityWriter::syncIdentityRow( $winner_id, $title );
 
 		$this->assertSame( 1, $this->release( $owner, $held ) );
 		pcntl_waitpid( $pid, $status );

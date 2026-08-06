@@ -742,23 +742,13 @@ class Venue_Taxonomy {
 	/**
 	 * Normalize a venue name for matching purposes.
 	 *
-	 * Delegates to Data Machine core's canonical, taxonomy-agnostic
-	 * name normalizer (`ResolveTermAbility::normalize_name_for_matching`) so
-	 * venue dedup shares one source of truth with every other taxonomy's
-	 * fuzzy matching. Falls back to an inline copy of the same algorithm when
-	 * core isn't loaded, so this class carries no hard version dependency.
+	 * Venue identity is event-domain state, so its persisted matching key is
+	 * deliberately owned here rather than coupled to another plugin's class.
 	 *
 	 * @param string $name Venue name.
 	 * @return string Normalized name.
 	 */
 	public static function normalize_venue_name_for_matching( string $name ): string {
-		if ( class_exists( '\\DataMachine\\Abilities\\Taxonomy\\ResolveTermAbility' )
-			&& method_exists( '\\DataMachine\\Abilities\\Taxonomy\\ResolveTermAbility', 'normalize_name_for_matching' )
-		) {
-			return \DataMachine\Abilities\Taxonomy\ResolveTermAbility::normalize_name_for_matching( $name );
-		}
-
-		// Fallback: inline copy of the canonical algorithm (core not loaded).
 		$text = html_entity_decode( $name, ENT_QUOTES | ENT_HTML5, 'UTF-8' );
 		$text = remove_accents( $text );
 		$text = strtolower( $text );

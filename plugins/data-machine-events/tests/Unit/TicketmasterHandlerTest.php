@@ -16,7 +16,6 @@ use DataMachine\Core\EngineData;
 use DataMachine\Core\ExecutionContext;
 use DataMachine\Core\Database\ProcessedItems\ProcessedItems;
 use DataMachineEvents\Core\DuplicateDetection\PreAIEventDedupGate;
-use DataMachineEvents\Core\DuplicateDetection\EventIdentityWriter;
 use DataMachineEvents\Core\EventDatesTable;
 use DataMachineEvents\Core\Event_Post_Type;
 use DataMachineEvents\Core\Venue_Taxonomy;
@@ -643,7 +642,6 @@ class TicketmasterHandlerTest extends WP_UnitTestCase {
 		if ( ! EventDatesTable::table_exists() ) {
 			EventDatesTable::create_table();
 		}
-		( new \DataMachine\Core\Database\PostIdentityIndex\PostIdentityIndex() )->create_table();
 	}
 
 	private function seedImportedEvent( string $title, string $ticket_url ): array {
@@ -664,7 +662,6 @@ class TicketmasterHandlerTest extends WP_UnitTestCase {
 		wp_set_object_terms( $post_id, array( $term_id ), 'venue' );
 		update_post_meta( $post_id, \DataMachineEvents\Core\EVENT_TICKET_URL_META_KEY, $ticket_url );
 		EventDatesTable::upsert( $post_id, '2099-08-15 20:00:00' );
-		EventIdentityWriter::syncIdentityRow( $post_id, $title, $ticket_url );
 
 		return array( $post_id, $term_id );
 	}

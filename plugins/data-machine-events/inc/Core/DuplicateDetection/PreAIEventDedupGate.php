@@ -7,7 +7,7 @@
  *
  * The child job's engine_data already contains identity fields (title,
  * venue, startDate, startTime, ticketUrl) from the fetch handler. By checking the
- * PostIdentityIndex BEFORE burning AI tokens, we eliminate the most
+ * canonical duplicate-check ability BEFORE burning AI tokens, we eliminate the most
  * expensive form of waste: running a full AI conversation just to have
  * upsert_event return "no_change".
  *
@@ -85,10 +85,16 @@ class PreAIEventDedupGate {
 			return null;
 		}
 
-		// Use the same dedup strategy that upsert_event uses internally.
-		$match = EventDuplicateStrategy::check( array(
-			'title'   => $title,
-			'context' => array(
+		$duplicate_check = function_exists( 'wp_get_ability' ) ? wp_get_ability( 'datamachine/check-duplicate' ) : null;
+		if ( ! $duplicate_check ) {
+			throw new \RuntimeException( 'Data Machine 0.39.0 or newer is required: datamachine/check-duplicate is unavailable.' );
+		}
+
+		$match = $duplicate_check->execute( array(
+			'title'     => $title,
+			'post_type' => \DataMachineEvents\Core\Event_Post_Type::POST_TYPE,
+			'scope'     => 'published',
+			'context'   => array(
 				'venue'     => $venue,
 				'startDate' => $startDate,
 				'ticketUrl' => $ticketUrl,
@@ -99,12 +105,12 @@ class PreAIEventDedupGate {
 			),
 		) );
 
-		if ( ! $match ) {
+		if ( ! is_array( $match ) || 'duplicate' !== ( $match['verdict'] ?? '' ) ) {
 			return null;
 		}
 
 		// Event exists. Skip the AI step.
-		$existing_post_id = $match['post_id'] ?? 0;
+		$existing_post_id = $match['match']['post_id'] ?? 0;
 		$strategy         = $match['strategy'] ?? 'unknown';
 
 		do_action(

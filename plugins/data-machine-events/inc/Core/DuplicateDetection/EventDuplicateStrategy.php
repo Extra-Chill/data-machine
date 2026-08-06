@@ -4,8 +4,7 @@
  * Event Duplicate Detection Strategy
  *
  * Registered via the `datamachine_duplicate_strategies` filter in DM core.
- * Replaces the 4-method cascade in EventUpsert with indexed lookups against
- * the PostIdentityIndex table.
+ * Replaces the 4-method cascade in EventUpsert with date-scoped event queries.
  *
  * Strategy cascade (same order as the old EventUpsert::findExistingEvent):
  * 1. Ticket URL + date (most reliable — stable platform identifier)
@@ -13,10 +12,11 @@
  * 3. Exact title + date (with venue confirmation)
  * 4. Date + fuzzy title fallback (venue-agnostic last resort)
  *
- * All query logic uses PostIdentityIndex (indexed columns) instead of
- * wp_postmeta LIKE scans.
+ * Candidate discovery uses the event-owned date table and WordPress taxonomy
+ * and metadata APIs. Data Machine invokes this strategy through the public
+ * datamachine/check-duplicate ability contract.
  *
- * Date-awareness: every strategy scopes its index query by date_only
+ * Date-awareness: every strategy scopes its date query by date_only
  * (extracted from startDate in context). This means recurring series —
  * same title and venue but a different calendar date — are never matched
  * as duplicates. The same title + venue + date within a 2-hour time
@@ -28,7 +28,7 @@
 
 namespace DataMachineEvents\Core\DuplicateDetection;
 
-use DataMachine\Core\Database\PostIdentityIndex\PostIdentityIndex;
+use DataMachineEvents\Abilities\EventDateQueryAbilities;
 use DataMachineEvents\Utilities\EventIdentifierGenerator;
 use DataMachineEvents\Core\Event_Post_Type;
 use const DataMachineEvents\Core\EVENT_TICKET_URL_META_KEY;
@@ -159,31 +159,21 @@ class EventDuplicateStrategy {
 			return null;
 		}
 
-		$index = new PostIdentityIndex();
+		$candidates         = self::findCandidatesByDate( $date_only, 100 );
+		$canonical_identity = datamachine_extract_ticket_identity( $ticketUrl );
+		foreach ( $candidates as $candidate ) {
+			$post_id              = (int) $candidate->ID;
+			$candidate_ticket_url = (string) get_post_meta( $post_id, EVENT_TICKET_URL_META_KEY, true );
+			if ( '' === $candidate_ticket_url ) {
+				continue;
+			}
 
-		// Strategy A: exact normalized URL match in the index.
-		$match = $index->find_by_ticket_url_and_date( $normalized_url, $date_only );
-		if ( $match ) {
-			$post_id = (int) $match['post_id'];
-			if ( self::isValidPost( $post_id ) ) {
+			if ( datamachine_normalize_ticket_url( $candidate_ticket_url ) === $normalized_url ) {
 				return self::duplicateResult( $post_id, 'ticket_url_exact' );
 			}
-		}
 
-		// Strategy B: canonical identity comparison (unwrap affiliate wrappers).
-		$canonical_identity = datamachine_extract_ticket_identity( $ticketUrl );
-		if ( empty( $canonical_identity ) || $canonical_identity === $normalized_url ) {
-			return null;
-		}
-
-		$candidates = $index->find_with_ticket_url_on_date( $date_only );
-		foreach ( $candidates as $candidate ) {
-			$candidate_identity = datamachine_extract_ticket_identity( $candidate['ticket_url'] );
-			if ( $canonical_identity === $candidate_identity ) {
-				$post_id = (int) $candidate['post_id'];
-				if ( self::isValidPost( $post_id ) ) {
-					return self::duplicateResult( $post_id, 'ticket_url_canonical' );
-				}
+			if ( '' !== $canonical_identity && datamachine_extract_ticket_identity( $candidate_ticket_url ) === $canonical_identity ) {
+				return self::duplicateResult( $post_id, 'ticket_url_canonical' );
 			}
 		}
 
@@ -197,8 +187,8 @@ class EventDuplicateStrategy {
 	/**
 	 * Find event by venue, date, and fuzzy title match.
 	 *
-	 * Queries the identity index for events at the same venue on the same date,
-	 * then compares titles using the SimilarityEngine and checks time windows.
+	 * Queries the event date table for events at the same venue on the same date,
+	 * then compares titles through the public title-match contract and checks time windows.
 	 *
 	 * @param string        $title      Event title.
 	 * @param string        $venue      Venue name.
@@ -222,20 +212,14 @@ class EventDuplicateStrategy {
 			return null;
 		}
 
-		$index      = new PostIdentityIndex();
-		$candidates = $index->find_by_date_and_venue( $date_only, (int) $venue_term->term_id, 10 );
+		$candidates = self::findCandidatesByDate( $date_only, 10, (int) $venue_term->term_id );
 
 		foreach ( $candidates as $candidate ) {
-			$post_id = (int) $candidate['post_id'];
+			$post_id = (int) $candidate->ID;
 			if ( ! self::isValidPost( $post_id ) ) {
 				continue;
 			}
-			$post = get_post( $post_id );
-			if ( ! $post ) {
-				continue;
-			}
-
-			if ( ! EventIdentifierGenerator::titlesMatch( $title, $post->post_title ) ) {
+			if ( ! EventIdentifierGenerator::titlesMatch( $title, $candidate->post_title ) ) {
 				continue;
 			}
 
@@ -287,13 +271,12 @@ class EventDuplicateStrategy {
 		}
 
 		$title_hash = self::computeTitleHash( $title );
-		$index      = new PostIdentityIndex();
 		$candidates = array_filter(
-			$index->find_by_date( $date_only, PHP_INT_MAX ),
-			static fn( array $candidate ): bool => ( $candidate['title_hash'] ?? '' ) === $title_hash
+			self::findCandidatesByDate( $date_only, -1 ),
+			static fn( \WP_Post $candidate ): bool => self::computeTitleHash( $candidate->post_title ) === $title_hash
 		);
 		foreach ( $candidates as $candidate ) {
-			$post_id = (int) $candidate['post_id'];
+			$post_id = (int) $candidate->ID;
 			if ( ! self::isValidPost( $post_id ) ) {
 				continue;
 			}
@@ -365,20 +348,14 @@ class EventDuplicateStrategy {
 			return null;
 		}
 
-		$index      = new PostIdentityIndex();
-		$candidates = $index->find_by_date( $date_only, 20 );
+		$candidates = self::findCandidatesByDate( $date_only, 20 );
 
 		foreach ( $candidates as $candidate ) {
-			$post_id = (int) $candidate['post_id'];
+			$post_id = (int) $candidate->ID;
 			if ( ! self::isValidPost( $post_id ) ) {
 				continue;
 			}
-			$post = get_post( $post_id );
-			if ( ! $post ) {
-				continue;
-			}
-
-			if ( ! EventIdentifierGenerator::titlesMatch( $title, $post->post_title ) ) {
+			if ( ! EventIdentifierGenerator::titlesMatch( $title, $candidate->post_title ) ) {
 				continue;
 			}
 
@@ -444,16 +421,43 @@ class EventDuplicateStrategy {
 	/**
 	 * Compute a title hash for exact-match lookups.
 	 *
-	 * Uses normalizeBasic (lowercase, trim, remove articles) to create
-	 * a stable hash. The same normalization must be used when writing
-	 * identity rows.
+	 * Uses the event-owned stable identity normalizer.
 	 *
 	 * @param string $title Event title.
 	 * @return string MD5 hash of normalized title.
 	 */
 	public static function computeTitleHash( string $title ): string {
-		$normalized = \DataMachine\Core\Similarity\SimilarityEngine::normalizeBasic( $title );
+		$normalized = EventIdentifierGenerator::normalizeBasic( $title );
 		return md5( $normalized );
+	}
+
+	/**
+	 * Find event candidates through the event-owned date query contract.
+	 *
+	 * @param string   $date_only    Date in YYYY-MM-DD format.
+	 * @param int      $limit        Maximum candidates, or -1 for all.
+	 * @param int|null $venue_term_id Optional venue term constraint.
+	 * @return \WP_Post[]
+	 */
+	private static function findCandidatesByDate( string $date_only, int $limit, ?int $venue_term_id = null ): array {
+		$input = array(
+			'date_match' => $date_only,
+			'per_page'   => $limit,
+			'scope'      => 'all',
+			'status'     => array( 'publish', 'future', 'draft', 'pending', 'private' ),
+		);
+		if ( null !== $venue_term_id ) {
+			$input['tax_filters'] = array( 'venue' => array( $venue_term_id ) );
+		}
+
+		$result = ( new EventDateQueryAbilities() )->executeQueryEvents( $input );
+
+		return array_values(
+			array_filter(
+				$result['posts'] ?? array(),
+				static fn( $post ): bool => $post instanceof \WP_Post && self::isValidPost( (int) $post->ID )
+			)
+		);
 	}
 
 	/**
@@ -565,7 +569,7 @@ class EventDuplicateStrategy {
 
 		return array(
 			'verdict'  => 'duplicate',
-			'source'   => 'identity_index',
+			'source'   => 'event_dates',
 			'match'    => array(
 				'post_id' => $post_id,
 				'title'   => $title,
@@ -577,7 +581,7 @@ class EventDuplicateStrategy {
 				$post_id,
 				$strategy
 			),
-			'strategy' => 'event_identity_index',
+			'strategy' => 'event_date_query',
 		);
 	}
 }

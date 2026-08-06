@@ -4,7 +4,7 @@
  *
  * Event-domain duplicate detection abilities. Venue comparison and the
  * combined find-duplicate-event search remain event-specific. Title
- * comparison delegates to the core SimilarityEngine.
+ * comparison delegates to Data Machine's public title-match ability.
  *
  * Also registers an event strategy on the `datamachine_duplicate_strategies`
  * filter so the unified `datamachine/check-duplicate` ability can find
@@ -16,10 +16,8 @@
 
 namespace DataMachineEvents\Abilities;
 
-use DataMachine\Core\Similarity\SimilarityEngine;
-use DataMachineEvents\Abilities\EventDateQueryAbilities;
-use DataMachineEvents\Utilities\EventIdentifierGenerator;
 use DataMachineEvents\Core\Event_Post_Type;
+use DataMachineEvents\Utilities\EventIdentifierGenerator;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -32,7 +30,6 @@ class DuplicateDetectionAbilities {
 	public function __construct() {
 		if ( ! self::$registered ) {
 			$this->registerAbilities();
-			$this->registerStrategy();
 			self::$registered = true;
 		}
 	}
@@ -44,90 +41,6 @@ class DuplicateDetectionAbilities {
 		};
 
 		add_action( 'wp_abilities_api_init', $register_callback );
-	}
-
-	/**
-	 * Register event duplicate strategy on the unified filter.
-	 *
-	 * When the PostIdentityIndex is available, the strategy is registered
-	 * by EventDuplicateStrategy (priority 5) instead. This legacy strategy
-	 * only registers as a fallback when the identity index doesn't exist yet.
-	 */
-	private function registerStrategy(): void {
-		// Only register the legacy postmeta-based strategy if the new identity
-		// index strategy is NOT available. EventDuplicateStrategy::register()
-		// adds itself at priority 5, so if both are present, the new one wins.
-		if ( class_exists( 'DataMachine\\Core\\Database\\PostIdentityIndex\\PostIdentityIndex' ) ) {
-			return; // EventDuplicateStrategy handles this now.
-		}
-		add_filter( 'datamachine_duplicate_strategies', array( $this, 'addEventStrategy' ) );
-	}
-
-	/**
-	 * Add legacy event duplicate strategy to the strategy registry.
-	 *
-	 * @deprecated 0.18.0 Replaced by EventDuplicateStrategy using PostIdentityIndex.
-	 *
-	 * @param array $strategies Existing strategies.
-	 * @return array Strategies with event strategy appended.
-	 */
-	public function addEventStrategy( array $strategies ): array {
-		$strategies[] = array(
-			'id'        => 'event_venue_date_title',
-			'post_type' => Event_Post_Type::POST_TYPE,
-			'callback'  => array( $this, 'executeEventStrategy' ),
-			'priority'  => 10,
-		);
-		return $strategies;
-	}
-
-	/**
-	 * Legacy event duplicate strategy callback.
-	 *
-	 * @deprecated 0.18.0 Replaced by EventDuplicateStrategy using PostIdentityIndex.
-	 *
-	 * @param array $input { title: string, context: { venue?: string, startDate?: string } }
-	 * @return array Result with verdict key.
-	 */
-	public function executeEventStrategy( array $input ): array {
-		$title     = $input['title'] ?? '';
-		$context   = $input['context'] ?? array();
-		$venue     = $context['venue'] ?? '';
-		$startDate = $context['startDate'] ?? '';
-
-		if ( empty( $title ) || empty( $startDate ) ) {
-			return array( 'verdict' => 'clear' );
-		}
-
-		$result = $this->executeFindDuplicateEvent(
-			array(
-				'title'     => $title,
-				'venue'     => $venue,
-				'startDate' => $startDate,
-			)
-		);
-
-		if ( ! empty( $result['found'] ) ) {
-			return array(
-				'verdict'  => 'duplicate',
-				'source'   => 'event_' . ( $result['match_strategy'] ?? 'fuzzy' ),
-				'match'    => array(
-					'post_id' => $result['post_id'] ?? 0,
-					'title'   => $result['matched_title'] ?? '',
-					'venue'   => $result['matched_venue'] ?? '',
-				),
-				'reason'   => sprintf(
-					'Rejected: "%s" matches existing event "%s" (ID %d) via %s.',
-					$title,
-					$result['matched_title'] ?? '',
-					$result['post_id'] ?? 0,
-					$result['match_strategy'] ?? 'fuzzy'
-				),
-				'strategy' => 'event_venue_date_title',
-			);
-		}
-
-		return array( 'verdict' => 'clear' );
 	}
 
 	// -----------------------------------------------------------------------
@@ -234,8 +147,7 @@ class DuplicateDetectionAbilities {
 	/**
 	 * Find an existing event matching the given identity fields.
 	 *
-	 * When the PostIdentityIndex is available, delegates to EventDuplicateStrategy
-	 * for fast indexed lookups. Otherwise falls back to legacy postmeta queries.
+	 * Delegates to Data Machine's canonical duplicate-check ability.
 	 *
 	 * @param array $input { title: string, venue?: string, startDate: string }
 	 * @return array { found: bool, post_id?: int, matched_title?: string, matched_venue?: string, match_strategy?: string }
@@ -249,114 +161,34 @@ class DuplicateDetectionAbilities {
 			return array( 'found' => false );
 		}
 
-		// Fast path: use the identity index when available.
-		if ( class_exists( 'DataMachineEvents\\Core\\DuplicateDetection\\EventDuplicateStrategy' )
-			&& class_exists( 'DataMachine\\Core\\Database\\PostIdentityIndex\\PostIdentityIndex' ) ) {
+		$ability = function_exists( 'wp_get_ability' ) ? wp_get_ability( 'datamachine/check-duplicate' ) : null;
+		if ( ! $ability ) {
+			throw new \RuntimeException( 'Data Machine 0.39.0 or newer is required: datamachine/check-duplicate is unavailable.' );
+		}
 
-			$result = \DataMachineEvents\Core\DuplicateDetection\EventDuplicateStrategy::check(
-				array(
-					'title'   => $title,
-					'context' => array(
-						'venue'     => $venue,
-						'startDate' => $startDate,
-					),
-				)
-			);
+		$result = $ability->execute(
+			array(
+				'title'     => $title,
+				'post_type' => Event_Post_Type::POST_TYPE,
+				'scope'     => 'published',
+				'context'   => array(
+					'venue'     => $venue,
+					'startDate' => $startDate,
+				),
+			)
+		);
 
-			if ( is_array( $result ) && 'duplicate' === ( $result['verdict'] ?? '' ) ) {
-				$match = $result['match'] ?? array();
-				return array(
-					'found'          => true,
-					'post_id'        => $match['post_id'] ?? 0,
-					'matched_title'  => $match['title'] ?? '',
-					'matched_venue'  => '',
-					'match_strategy' => $result['strategy'] ?? 'identity_index',
-				);
-			}
-
+		if ( ! is_array( $result ) || 'duplicate' !== ( $result['verdict'] ?? '' ) ) {
 			return array( 'found' => false );
 		}
 
-		// Legacy fallback: postmeta LIKE queries.
-		return $this->executeFindDuplicateEventLegacy( $title, $venue, $startDate );
-	}
-
-	/**
-	 * Legacy duplicate event search using postmeta LIKE queries.
-	 *
-	 * @deprecated 0.18.0 Replaced by EventDuplicateStrategy using PostIdentityIndex.
-	 *
-	 * @param string $title     Event title.
-	 * @param string $venue     Venue name.
-	 * @param string $startDate Start date.
-	 * @return array Result array.
-	 */
-	private function executeFindDuplicateEventLegacy( string $title, string $venue, string $startDate ): array {
-		// Strategy 1: venue-scoped fuzzy title match.
-		if ( ! empty( $venue ) ) {
-			$venue_term = get_term_by( 'name', $venue, 'venue' );
-			if ( ! $venue_term ) {
-				$venue_term = get_term_by( 'slug', sanitize_title( $venue ), 'venue' );
-			}
-
-			if ( $venue_term ) {
-				$event_query = new EventDateQueryAbilities();
-				$result      = $event_query->executeQueryEvents( array(
-					'date_match'  => $startDate,
-					'tax_filters' => array( 'venue' => array( $venue_term->term_id ) ),
-					'per_page'    => 10,
-					'status'      => 'any',
-				) );
-				$candidates  = $result['posts'];
-
-				foreach ( $candidates as $candidate ) {
-					if ( EventIdentifierGenerator::titlesMatch( $title, $candidate->post_title ) ) {
-						return array(
-							'found'          => true,
-							'post_id'        => $candidate->ID,
-							'matched_title'  => $candidate->post_title,
-							'matched_venue'  => $venue_term->name,
-							'match_strategy' => 'venue_date_fuzzy_title',
-						);
-					}
-				}
-			}
-		}
-
-		// Strategy 2: date-scoped fuzzy title + venue confirmation.
-		$event_query = new EventDateQueryAbilities();
-		$result      = $event_query->executeQueryEvents( array(
-			'date_match' => $startDate,
-			'per_page'   => 20,
-			'status'     => 'any',
-		) );
-		$candidates  = $result['posts'];
-
-		foreach ( $candidates as $candidate ) {
-			if ( ! EventIdentifierGenerator::titlesMatch( $title, $candidate->post_title ) ) {
-				continue;
-			}
-
-			if ( ! empty( $venue ) ) {
-				$candidate_venues = wp_get_post_terms( $candidate->ID, 'venue', array( 'fields' => 'names' ) );
-				$candidate_venue  = ( ! is_wp_error( $candidate_venues ) && ! empty( $candidate_venues ) ) ? $candidate_venues[0] : '';
-
-				if ( ! empty( $candidate_venue ) && ! EventIdentifierGenerator::venuesMatch( $venue, $candidate_venue ) ) {
-					continue;
-				}
-			}
-
-			$match_venues = wp_get_post_terms( $candidate->ID, 'venue', array( 'fields' => 'names' ) );
-
-			return array(
-				'found'          => true,
-				'post_id'        => $candidate->ID,
-				'matched_title'  => $candidate->post_title,
-				'matched_venue'  => ( ! is_wp_error( $match_venues ) && ! empty( $match_venues ) ) ? $match_venues[0] : '',
-				'match_strategy' => 'date_fuzzy_title_venue_confirm',
-			);
-		}
-
-		return array( 'found' => false );
+		$match = $result['match'] ?? array();
+		return array(
+			'found'          => true,
+			'post_id'        => $match['post_id'] ?? 0,
+			'matched_title'  => $match['title'] ?? '',
+			'matched_venue'  => '',
+			'match_strategy' => $result['strategy'] ?? 'event_date_query',
+		);
 	}
 }

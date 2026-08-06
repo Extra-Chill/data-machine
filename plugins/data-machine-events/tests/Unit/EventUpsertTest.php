@@ -10,7 +10,6 @@
 
 namespace DataMachineEvents\Tests\Unit;
 
-use DataMachine\Core\Database\PostIdentityIndex\PostIdentityIndex;
 use DataMachine\Core\EngineData;
 use WP_UnitTestCase;
 use DataMachineEvents\Steps\Upsert\Events\EventUpsert;
@@ -40,9 +39,6 @@ class EventUpsertTest extends WP_UnitTestCase {
 		}
 		if ( ! EventDatesTable::table_exists() ) {
 			EventDatesTable::create_table();
-		}
-		if ( class_exists( PostIdentityIndex::class ) ) {
-			( new PostIdentityIndex() )->create_table();
 		}
 		wp_set_current_user( self::factory()->user->create( array( 'role' => 'administrator' ) ) );
 		$ability_registry = \WP_Abilities_Registry::get_instance();
@@ -164,6 +160,23 @@ class EventUpsertTest extends WP_UnitTestCase {
 
 	public function test_handler_instantiation() {
 		$this->assertInstanceOf( EventUpsert::class, $this->handler );
+	}
+
+	public function test_missing_duplicate_contract_returns_retryable_capability_error(): void {
+		$registry = \WP_Abilities_Registry::get_instance();
+		$ability  = $registry->unregister( 'datamachine/check-duplicate' );
+		$this->assertNotNull( $ability );
+
+		$method = new \ReflectionMethod( $this->handler, 'findExistingEventViaAbility' );
+		$method->setAccessible( true );
+		$result = $method->invoke( $this->handler, 'Contract Test', 'Test Venue', '2026-10-10', '' );
+
+		$this->assertWPError( $result );
+		$this->assertSame( 'datamachine_duplicate_contract_unavailable', $result->get_error_code() );
+		$this->assertTrue( $result->get_error_data()['retryable'] );
+
+		do_action( 'wp_abilities_api_init' );
+		$this->assertNotNull( wp_get_ability( 'datamachine/check-duplicate' ) );
 	}
 
 	public function test_unchanged_trash_reimport_republishes_the_exact_source_post(): void {
@@ -357,7 +370,7 @@ class EventUpsertTest extends WP_UnitTestCase {
 		$this->assertNull( EventDatesTable::get( $post_id ), 'Removing the source block must delete the stale date index row.' );
 	}
 
-	public function test_no_change_upsert_repairs_indexes_and_invalidates_cache_without_content_or_image_work(): void {
+	public function test_no_change_upsert_repairs_taxonomy_and_invalidates_cache_without_content_or_image_work(): void {
 		$title      = 'No Change Integrity Repair ' . uniqid();
 		$venue_name = 'No Change Repair Venue ' . uniqid();
 		$engine     = new EngineData(
@@ -392,8 +405,6 @@ class EventUpsertTest extends WP_UnitTestCase {
 		$this->assertInstanceOf( \WP_Term::class, $venue );
 
 		wp_set_object_terms( $post_id, array(), 'venue' );
-		$identity = ( new PostIdentityIndex() )->get( $post_id );
-		$this->assertNull( $identity['venue_term_id'] );
 
 		$cache_key = CalendarCache::PREFIX . 'no_change_repair_' . uniqid();
 		CalendarCache::set( $cache_key, 'stale', HOUR_IN_SECONDS );
@@ -423,7 +434,6 @@ class EventUpsertTest extends WP_UnitTestCase {
 		$this->assertSame( 0, $image_attempts, 'The no_change path must not invoke image attachment work.' );
 		$this->assertSame( $attachments_before, (int) wp_count_posts( 'attachment' )->inherit );
 		$this->assertSame( array( $venue->term_id ), wp_get_object_terms( $post_id, 'venue', array( 'fields' => 'ids' ) ) );
-		$this->assertSame( (string) $venue->term_id, (string) ( new PostIdentityIndex() )->get( $post_id )['venue_term_id'] );
 		$this->assertSame( 1, $cache_invalidations, 'A no_change taxonomy repair must invalidate canonical caches exactly once.' );
 		$this->assertFalse( CalendarCache::get( $cache_key ), 'Taxonomy-only repair must invalidate calendar caches.' );
 	}
@@ -457,7 +467,6 @@ class EventUpsertTest extends WP_UnitTestCase {
 				)
 			);
 			wp_set_object_terms( $winner_id, array( $venue['term_id'] ), 'venue' );
-			\DataMachineEvents\Core\DuplicateDetection\EventIdentityWriter::syncIdentityRow( $winner_id, $title );
 			$inserting = false;
 
 			return $query;
@@ -521,7 +530,6 @@ class EventUpsertTest extends WP_UnitTestCase {
 				)
 			);
 			wp_set_object_terms( $winner_id, array( $term['term_id'] ), 'venue' );
-			\DataMachineEvents\Core\DuplicateDetection\EventIdentityWriter::syncIdentityRow( $winner_id, $title );
 			$inserting = false;
 
 			return $query;

@@ -3,9 +3,8 @@
  * EventIdentifierGenerator Tests
  *
  * Tests for duplicate event detection via title normalization.
- * EventIdentifierGenerator now delegates to the core SimilarityEngine
- * for title normalization and matching. These tests verify the
- * delegation works correctly.
+ * EventIdentifierGenerator owns stable identity normalization and delegates
+ * fuzzy comparison through Data Machine's public ability contract.
  *
  * @package DataMachineEvents\Tests\Unit
  * @since 0.10.2
@@ -186,7 +185,7 @@ class EventIdentifierGeneratorTest extends WP_UnitTestCase {
 	/**
 	 * Test earliest delimiter extraction
 	 *
-	 * SimilarityEngine uses leftmost-wins: the earliest delimiter in the
+	 * Event normalization uses leftmost-wins: the earliest delimiter in the
 	 * text is used to split. For "Burgundy: Soul Nite — Bill Wilson":
 	 * - ": " at pos 8 wins over " - " at pos 20
 	 * - Core title is "burgundy"
@@ -262,18 +261,12 @@ class EventIdentifierGeneratorTest extends WP_UnitTestCase {
 	}
 
 	/**
-	 * Test that extractCoreTitle delegates to SimilarityEngine::normalizeTitle
+	 * Test that stable normalization is owned by the event utility.
 	 */
-	public function test_extract_core_title_delegates_to_similarity_engine(): void {
-		if ( ! class_exists( 'DataMachine\Core\Similarity\SimilarityEngine' ) ) {
-			$this->markTestSkipped( 'SimilarityEngine not available (data-machine core not loaded).' );
-		}
+	public function test_extract_core_title_uses_event_owned_normalizer(): void {
+		$title = 'Andy Frasco & the U.N. — Growing Pains Tour';
 
-		$title  = 'Andy Frasco & the U.N. — Growing Pains Tour';
-		$core   = EventIdentifierGenerator::extractCoreTitle( $title );
-		$engine = \DataMachine\Core\Similarity\SimilarityEngine::normalizeTitle( $title );
-
-		$this->assertEquals( $engine, $core, 'extractCoreTitle should delegate to SimilarityEngine::normalizeTitle' );
+		$this->assertSame( EventIdentifierGenerator::normalizeTitle( $title ), EventIdentifierGenerator::extractCoreTitle( $title ) );
 	}
 
 	public function test_low_confidence_short_non_specific_title(): void {

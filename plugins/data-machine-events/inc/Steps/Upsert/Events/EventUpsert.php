@@ -28,16 +28,14 @@ use DataMachineEvents\Steps\EventImport\JunkPayloadFilter;
 use DataMachineEvents\Core\Event_Post_Type;
 use DataMachineEvents\Core\VenueParameterProvider;
 use DataMachineEvents\Core\EventSchemaProvider;
-use DataMachineEvents\Utilities\EventIdentifierGenerator;
 use const DataMachineEvents\Core\EVENT_TICKET_URL_META_KEY;
 use function DataMachineEvents\Core\datamachine_normalize_ticket_url;
 use function DataMachineEvents\Core\datamachine_extract_ticket_identity;
-use DataMachine\Core\Similarity\SimilarityEngine;
 use DataMachine\Core\Steps\Upsert\Handlers\UpsertHandler;
 use DataMachine\Core\WordPress\TaxonomyHandler;
 use DataMachine\Core\WordPress\WordPressSettingsResolver;
 use DataMachine\Core\WordPress\WordPressPublishHelper;
-use DataMachineEvents\Core\DuplicateDetection\EventIdentityWriter;
+use DataMachineEvents\Utilities\EventIdentifierGenerator;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -268,8 +266,7 @@ class EventUpsert extends UpsertHandler {
 		// (Venue_Taxonomy::find_or_create_venue). Without this, dupes slip
 		// through whenever the incoming venue string differs from the
 		// canonical taxonomy term name. See issue #252.
-		// findExistingEventViaAbility() returns ?int — null means no existing post.
-		// Normalize to int (0 = no match) so downstream type contracts hold.
+		// A missing duplicate contract is retryable; it must never become a create.
 		$venueAddress     = (string) ( $engine->get( 'venueAddress' ) ?? $parameters['venueAddress'] ?? '' );
 		$venueCity        = (string) ( $engine->get( 'venueCity' ) ?? $parameters['venueCity'] ?? '' );
 		$venueState       = (string) ( $engine->get( 'venueState' ) ?? $parameters['venueState'] ?? '' );
@@ -277,7 +274,7 @@ class EventUpsert extends UpsertHandler {
 		$source_identity  = (string) ( $parameters['source_identity'] ?? '' );
 		$existing_post_id = $this->findExistingEventBySourceIdentity( $source_identity );
 		if ( $existing_post_id <= 0 ) {
-			$existing_post_id = (int) $this->findExistingEventViaAbility(
+			$duplicate_result = $this->findExistingEventViaAbility(
 				$title,
 				$venue,
 				$startDate,
@@ -287,6 +284,10 @@ class EventUpsert extends UpsertHandler {
 				$venueState,
 				$venueCountry
 			);
+			if ( is_wp_error( $duplicate_result ) ) {
+				return $this->lifecycleErrorResponse( $duplicate_result, $title );
+			}
+			$existing_post_id = $duplicate_result;
 		}
 
 		// 2. Build event data.
@@ -470,9 +471,6 @@ class EventUpsert extends UpsertHandler {
 
 			do_action( 'datamachine_event_taxonomy_processed', $post_id );
 
-			// 8. Sync identity index after taxonomy reconciliation.
-			EventIdentityWriter::syncIdentityRow( $post_id, $title, datamachine_normalize_ticket_url( $ticketUrl ) ?: null );
-
 			if ( 'no_change' === $action ) {
 				$lifecycle_result             = $this->successResponse(
 					array(
@@ -582,8 +580,7 @@ class EventUpsert extends UpsertHandler {
 	 * Find existing event using DM core's duplicate detection system.
 	 *
 	 * Calls the `datamachine/check-duplicate` ability which delegates to
-	 * the registered EventDuplicateStrategy, querying the PostIdentityIndex
-	 * with indexed lookups instead of postmeta LIKE scans.
+	 * the registered EventDuplicateStrategy using event-owned date queries.
 	 *
 	 * The indexed strategy is date-aware: every query scopes by date_only,
 	 * so recurring series (same title/venue, different date) are never
@@ -601,7 +598,7 @@ class EventUpsert extends UpsertHandler {
 	 * @param string $city      Venue city (required alongside address).
 	 * @param string $state     Venue state or region.
 	 * @param string $country   Venue country.
-	 * @return int|null Post ID if found, null otherwise.
+	 * @return int|\WP_Error Post ID, zero when clear, or a contract error.
 	 */
 	private function findExistingEventViaAbility(
 		string $title,
@@ -612,22 +609,18 @@ class EventUpsert extends UpsertHandler {
 		string $city = '',
 		string $state = '',
 		string $country = ''
-	): ?int {
-		// The indexed EventDuplicateStrategy owns all event duplicate
-		// detection. If the index class or ability is unavailable (DM core
-		// too old), there is no safe fallback — return null so a new event
-		// is created rather than silently skipping dedup. In practice core
-		// is network-pinned so this branch is unreachable.
-		if ( ! class_exists( 'DataMachine\Core\Database\PostIdentityIndex\PostIdentityIndex' ) ) {
-			do_action( 'datamachine_log', 'warning', 'Event Upsert: PostIdentityIndex unavailable — skipping dedup, creating new event', array( 'title' => $title ) );
-			return null;
-		}
-
+	): int|\WP_Error {
 		$duplicate_check = wp_get_ability( 'datamachine/check-duplicate' );
 
 		if ( ! $duplicate_check ) {
-			do_action( 'datamachine_log', 'warning', 'Event Upsert: datamachine/check-duplicate ability unavailable — skipping dedup, creating new event', array( 'title' => $title ) );
-			return null;
+			return new \WP_Error(
+				'datamachine_duplicate_contract_unavailable',
+				'Data Machine 0.39.0 or newer is required: datamachine/check-duplicate is unavailable.',
+				array(
+					'status'    => 503,
+					'retryable' => true,
+				)
+			);
 		}
 
 		$result = $duplicate_check->execute(
@@ -648,12 +641,12 @@ class EventUpsert extends UpsertHandler {
 		);
 
 		if ( ! ( is_array( $result ) && 'duplicate' === ( $result['verdict'] ?? '' ) ) ) {
-			return null;
+			return 0;
 		}
 
 		$post_id = (int) ( $result['match']['post_id'] ?? 0 );
 		if ( $post_id <= 0 ) {
-			return null;
+			return 0;
 		}
 
 		// Defensive date guard: EventDuplicateStrategy is date-aware (queries
@@ -685,7 +678,7 @@ class EventUpsert extends UpsertHandler {
 						)
 					);
 
-					return null;
+					return 0;
 				}
 
 				$existing_identity_start = self::composeIdentityStart( $existing_startDate, (string) ( $existing_data['startTime'] ?? '' ) );
@@ -697,7 +690,7 @@ class EventUpsert extends UpsertHandler {
 					&& false !== $incoming_timestamp
 					&& abs( $existing_timestamp - $incoming_timestamp ) > 7200
 				) {
-					return null;
+					return 0;
 				}
 			}
 		}
@@ -813,9 +806,9 @@ class EventUpsert extends UpsertHandler {
 		if ( ! empty( $identity['term_id'] ) ) {
 			$venue_scopes = array( 'term:' . (int) $identity['term_id'] );
 		} elseif ( '' !== trim( $venue ) ) {
-			$venue_scopes = array( 'name:' . SimilarityEngine::normalizeBasic( $venue ) );
+			$venue_scopes = array( 'name:' . EventIdentifierGenerator::normalizeBasic( $venue ) );
 		} else {
-			$normalized_title = SimilarityEngine::normalizeTitle( $title );
+			$normalized_title = EventIdentifierGenerator::normalizeTitle( $title );
 			$title_tokens     = array_slice( array_filter( explode( ' ', $normalized_title ) ), 0, 3 );
 			$venue_scopes     = array( 'unknown:' . implode( ' ', $title_tokens ) );
 		}

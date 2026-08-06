@@ -69,8 +69,7 @@ class Promoter_Taxonomy {
 	/**
 	 * Find or create a promoter with given name and metadata
 	 *
-	 * Composes DM core's ResolveTermAbility (find-or-create the term) with
-	 * MergeTermMetaAbility (write the promoter-specific meta in either
+	 * Composes Data Machine's resolve-term ability with merge-term-meta in either
 	 * fill_empty or overwrite mode depending on whether the term existed).
 	 *
 	 * @param string $promoter_name Promoter name (or numeric ID / slug — resolver matches all three)
@@ -92,12 +91,29 @@ class Promoter_Taxonomy {
 			$term_args['description'] = $promoter_data['description'];
 		}
 
-		$resolved = \DataMachine\Abilities\Taxonomy\ResolveTermAbility::resolve(
-			$promoter_name,
-			'promoter',
-			true,
-			$term_args
+		$resolve_ability = function_exists( 'wp_get_ability' ) ? wp_get_ability( 'datamachine/resolve-term' ) : null;
+		if ( ! $resolve_ability ) {
+			do_action( 'datamachine_log', 'error', 'A compatible Data Machine version is required: datamachine/resolve-term is unavailable.' );
+			return array(
+				'term_id'     => null,
+				'was_created' => false,
+			);
+		}
+
+		$resolved = $resolve_ability->execute(
+			array(
+				'identifier' => $promoter_name,
+				'taxonomy'   => 'promoter',
+				'create'     => true,
+				'args'       => $term_args,
+			)
 		);
+		if ( is_wp_error( $resolved ) ) {
+			$resolved = array(
+				'success' => false,
+				'error'   => $resolved->get_error_message(),
+			);
+		}
 
 		if ( empty( $resolved['success'] ) ) {
 			do_action(
@@ -119,25 +135,16 @@ class Promoter_Taxonomy {
 		$was_created = ! empty( $resolved['created'] );
 
 		if ( ! empty( $promoter_data ) ) {
-			$strategy = $was_created
-				? \DataMachine\Abilities\Taxonomy\MergeTermMetaAbility::STRATEGY_OVERWRITE
-				: \DataMachine\Abilities\Taxonomy\MergeTermMetaAbility::STRATEGY_FILL_EMPTY;
+			$strategy = $was_created ? VenueProfileMutations::STRATEGY_OVERWRITE : VenueProfileMutations::STRATEGY_FILL_EMPTY;
 
-			// Description was already applied by ResolveTermAbility on the create
+			// Description was already applied by resolve-term on the create
 			// path (via wp_insert_term args). Only the existing-term path needs
 			// the merge to consider description, in fill_empty mode.
 			$merge_description = ( ! $was_created && isset( $promoter_data['description'] ) )
 				? (string) $promoter_data['description']
 				: null;
 
-			\DataMachine\Abilities\Taxonomy\MergeTermMetaAbility::merge(
-				$term_id,
-				'promoter',
-				$promoter_data,
-				self::$meta_fields,
-				$strategy,
-				$merge_description
-			);
+			self::merge_promoter_meta( $term_id, $promoter_data, $strategy, $merge_description );
 		}
 
 		return array(
@@ -149,7 +156,7 @@ class Promoter_Taxonomy {
 	/**
 	 * Update promoter term meta with promoter data
 	 *
-	 * Thin wrapper over MergeTermMetaAbility for backwards compatibility with
+	 * Thin wrapper over merge-term-meta for backwards compatibility with
 	 * any external callers. Uses the overwrite strategy to preserve the
 	 * historical "write every supplied field" semantics.
 	 *
@@ -162,15 +169,45 @@ class Promoter_Taxonomy {
 			return false;
 		}
 
-		$result = \DataMachine\Abilities\Taxonomy\MergeTermMetaAbility::merge(
-			(int) $term_id,
-			'promoter',
-			$promoter_data,
-			self::$meta_fields,
-			\DataMachine\Abilities\Taxonomy\MergeTermMetaAbility::STRATEGY_OVERWRITE
-		);
+		$result = self::merge_promoter_meta( (int) $term_id, $promoter_data, 'overwrite' );
 
 		return ! empty( $result['success'] );
+	}
+
+	/** Execute the public term-meta contract and fail explicitly when unavailable. */
+	private static function merge_promoter_meta( int $term_id, array $data, string $strategy, ?string $description = null ): array {
+		$ability = function_exists( 'wp_get_ability' ) ? wp_get_ability( 'datamachine/merge-term-meta' ) : null;
+		if ( ! $ability ) {
+			do_action( 'datamachine_log', 'error', 'A compatible Data Machine version is required: datamachine/merge-term-meta is unavailable.' );
+			return array(
+				'success' => false,
+				'error'   => 'datamachine/merge-term-meta is unavailable',
+			);
+		}
+
+		$input = array(
+			'term_id'   => $term_id,
+			'taxonomy'  => 'promoter',
+			'data'      => $data,
+			'field_map' => self::$meta_fields,
+			'strategy'  => $strategy,
+		);
+		if ( null !== $description ) {
+			$input['description'] = $description;
+		}
+
+		$result = $ability->execute( $input );
+		if ( is_wp_error( $result ) ) {
+			return array(
+				'success' => false,
+				'error'   => $result->get_error_message(),
+			);
+		}
+
+		return is_array( $result ) ? $result : array(
+			'success' => false,
+			'error'   => 'incompatible ability result',
+		);
 	}
 
 	/**

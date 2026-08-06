@@ -7,10 +7,8 @@
 
 namespace DataMachineEvents\Tests\Unit;
 
-use DataMachine\Core\Database\PostIdentityIndex\PostIdentityIndex;
 use DataMachine\Core\Database\ProcessedItems\ProcessedItems;
 use DataMachine\Core\ExecutionContext;
-use DataMachineEvents\Core\DuplicateDetection\EventDuplicateStrategy;
 use DataMachineEvents\Core\EventDatesTable;
 use DataMachineEvents\Core\Event_Post_Type;
 use DataMachineEvents\Core\Venue_Taxonomy;
@@ -39,7 +37,6 @@ class EventSourceIdentityTest extends WP_UnitTestCase {
 			EventDatesTable::create_table();
 		}
 		( new ProcessedItems() )->create_table();
-		( new PostIdentityIndex() )->create_table();
 	}
 
 	public function tearDown(): void {
@@ -47,7 +44,6 @@ class EventSourceIdentityTest extends WP_UnitTestCase {
 
 		foreach ( $this->post_ids as $post_id ) {
 			$wpdb->delete( EventDatesTable::table_name(), array( 'post_id' => $post_id ), array( '%d' ) );
-			$wpdb->delete( $wpdb->prefix . 'datamachine_post_identity', array( 'post_id' => $post_id ), array( '%d' ) );
 			wp_delete_post( $post_id, true );
 		}
 		foreach ( $this->term_ids as $term_id ) {
@@ -143,15 +139,5 @@ class EventSourceIdentityTest extends WP_UnitTestCase {
 		$this->post_ids[] = $post_id;
 		wp_set_object_terms( $post_id, array( $term_id ), 'venue' );
 		EventDatesTable::upsert( $post_id, $event['startDate'] . ' ' . $event['startTime'] . ':00' );
-
-		( new PostIdentityIndex() )->upsert(
-			$post_id,
-			array(
-				'post_type'     => Event_Post_Type::POST_TYPE,
-				'event_date'    => $event['startDate'],
-				'venue_term_id' => $term_id,
-				'title_hash'    => EventDuplicateStrategy::computeTitleHash( $event['title'] ),
-			)
-		);
 	}
 }

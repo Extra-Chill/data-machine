@@ -7,7 +7,6 @@
 
 namespace DataMachineEvents\Tests\Unit;
 
-use DataMachine\Core\Database\PostIdentityIndex\PostIdentityIndex;
 use DataMachine\Core\EngineData;
 use DataMachineEvents\Blocks\Calendar\Cache\CacheInvalidator;
 use DataMachineEvents\Core\EventDatesTable;
@@ -32,9 +31,6 @@ class EventUpsertLifecycleTest extends WP_UnitTestCase {
 		}
 		if ( ! EventDatesTable::table_exists() ) {
 			EventDatesTable::create_table();
-		}
-		if ( class_exists( PostIdentityIndex::class ) ) {
-			( new PostIdentityIndex() )->create_table();
 		}
 		wp_set_current_user( self::factory()->user->create( array( 'role' => 'administrator' ) ) );
 

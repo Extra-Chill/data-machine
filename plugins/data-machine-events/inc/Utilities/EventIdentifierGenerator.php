@@ -6,9 +6,9 @@
  * Normalizes event data (title, venue, date) to create stable identifiers that
  * remain consistent across minor variations in source data.
  *
- * Title normalization and fuzzy matching are delegated to the core
- * SimilarityEngine (DataMachine\Core\Similarity\SimilarityEngine).
- * Venue matching remains here — it's event-domain-specific.
+ * Stable identity normalization is owned here because its output is persisted
+ * by event importers. Fuzzy title comparison uses Data Machine's public
+ * datamachine/titles-match ability contract.
  *
  * @package DataMachineEvents\Utilities
  * @since   0.2.0
@@ -16,7 +16,6 @@
 
 namespace DataMachineEvents\Utilities;
 
-use DataMachine\Core\Similarity\SimilarityEngine;
 use DateTimeImmutable;
 use DateTimeZone;
 use Exception;
@@ -47,8 +46,8 @@ class EventIdentifierGenerator {
 	 * @return string MD5 hash identifier
 	 */
 	public static function generate( string $title, string $startDate, string $venue, string $startTime = '', string $timezone = '' ): string {
-		$normalized_title = SimilarityEngine::normalizeBasic( $title );
-		$normalized_venue = SimilarityEngine::normalizeBasic( $venue );
+		$normalized_title = self::normalizeBasic( $title );
+		$normalized_venue = self::normalizeBasic( $venue );
 		$normalized_start = self::normalizeStartDateTime( $startDate, $startTime, $timezone );
 
 		return md5( $normalized_title . $normalized_start . $normalized_venue );
@@ -65,8 +64,8 @@ class EventIdentifierGenerator {
 	 * @return string Legacy MD5 hash identifier.
 	 */
 	public static function generateLegacy( string $title, string $startDate, string $venue ): string {
-		$normalized_title = SimilarityEngine::normalizeBasic( $title );
-		$normalized_venue = SimilarityEngine::normalizeBasic( $venue );
+		$normalized_title = self::normalizeBasic( $title );
+		$normalized_venue = self::normalizeBasic( $venue );
 		$date_only        = self::normalizeStartDateTime( $startDate );
 
 		return md5( $normalized_title . $date_only . $normalized_venue );
@@ -172,7 +171,7 @@ class EventIdentifierGenerator {
 	 * @return bool True when the title is too weak/generic.
 	 */
 	public static function isLowConfidenceTitle( string $title ): bool {
-		$normalized = SimilarityEngine::normalizeTitle( $title );
+		$normalized = self::normalizeTitle( $title );
 
 		if ( '' === $normalized ) {
 			return true;
@@ -201,7 +200,7 @@ class EventIdentifierGenerator {
 	 * @return bool True when title appears specific enough.
 	 */
 	public static function hasSpecificTitleSignal( string $title ): bool {
-		$normalized = SimilarityEngine::normalizeTitle( $title );
+		$normalized = self::normalizeTitle( $title );
 		if ( '' === $normalized ) {
 			return false;
 		}
@@ -271,28 +270,27 @@ class EventIdentifierGenerator {
 	/**
 	 * Extract core identifying portion of event title
 	 *
-	 * Delegates to the unified SimilarityEngine which consolidates the
-	 * normalization logic from this class and core's DuplicateDetection.
+	 * Uses the normalized output of Data Machine's public title-match contract.
 	 *
 	 * @param string $title Event title
 	 * @return string Core title for comparison
 	 */
 	public static function extractCoreTitle( string $title ): string {
-		return SimilarityEngine::normalizeTitle( $title );
+		return self::normalizeTitle( $title );
 	}
 
 	/**
 	 * Compare two event titles for semantic match
 	 *
-	 * Delegates to the unified SimilarityEngine which runs exact,
-	 * prefix, and Levenshtein strategies.
+	 * Executes Data Machine's stable public title-comparison ability.
 	 *
 	 * @param string $title1 First event title
 	 * @param string $title2 Second event title
 	 * @return bool True if titles represent the same event
 	 */
 	public static function titlesMatch( string $title1, string $title2 ): bool {
-		return SimilarityEngine::titlesMatch( $title1, $title2 )->match;
+		$result = self::compareTitles( $title1, $title2 );
+		return (bool) $result['match'];
 	}
 
 	/**
@@ -349,7 +347,7 @@ class EventIdentifierGenerator {
 		$text = html_entity_decode( $venue, ENT_QUOTES | ENT_HTML5, 'UTF-8' );
 
 		// Normalize unicode dashes to ASCII hyphen.
-		$text = SimilarityEngine::normalizeDashes( $text );
+		$text = self::normalizeDashes( $text );
 
 		// Lowercase.
 		$text = strtolower( $text );
@@ -388,7 +386,7 @@ class EventIdentifierGenerator {
 		$text = html_entity_decode( $venue, ENT_QUOTES | ENT_HTML5, 'UTF-8' );
 
 		// Normalize dashes so we can match consistently.
-		$text = SimilarityEngine::normalizeDashes( $text );
+		$text = self::normalizeDashes( $text );
 
 		// Strip parenthetical suffixes: "(Indoor)", "(NÜTRL Beach Stage)"
 		$text = preg_replace( '/\s*\(.*\)\s*$/', '', $text );
@@ -401,5 +399,50 @@ class EventIdentifierGenerator {
 		}
 
 		return trim( $text );
+	}
+
+	/** Normalize stable event identity text without external implementation dependencies. */
+	public static function normalizeBasic( string $text ): string {
+		$text = html_entity_decode( $text, ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+		$text = self::normalizeDashes( $text );
+		$text = strtolower( $text );
+		$text = trim( preg_replace( '/\s+/', ' ', $text ) );
+
+		return (string) preg_replace( '/^(the|a|an)\s+/i', '', $text );
+	}
+
+	/** Normalize an event title through the public title-match contract. */
+	public static function normalizeTitle( string $title ): string {
+		$result = self::compareTitles( $title, $title );
+		return (string) $result['normalized_a'];
+	}
+
+	/** Execute and validate Data Machine's public title-comparison contract. */
+	private static function compareTitles( string $title1, string $title2 ): array {
+		$ability = function_exists( 'wp_get_ability' ) ? wp_get_ability( 'datamachine/titles-match' ) : null;
+		if ( ! $ability ) {
+			throw new \RuntimeException( 'Data Machine 0.39.0 or newer is required: datamachine/titles-match is unavailable.' );
+		}
+
+		$result = $ability->execute(
+			array(
+				'title1' => $title1,
+				'title2' => $title2,
+			)
+		);
+		if ( ! is_array( $result ) || ! array_key_exists( 'match', $result ) || ! array_key_exists( 'normalized_a', $result ) ) {
+			throw new \RuntimeException( 'The datamachine/titles-match ability returned an incompatible result.' );
+		}
+
+		return $result;
+	}
+
+	/** Normalize Unicode dash characters to an ASCII hyphen. */
+	private static function normalizeDashes( string $text ): string {
+		return str_replace(
+			array( "\u{2010}", "\u{2011}", "\u{2012}", "\u{2013}", "\u{2014}", "\u{2015}", "\u{FE58}", "\u{FE63}", "\u{FF0D}" ),
+			'-',
+			$text
+		);
 	}
 }
