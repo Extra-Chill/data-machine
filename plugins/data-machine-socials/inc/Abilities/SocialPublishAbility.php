@@ -317,8 +317,12 @@ class SocialPublishAbility extends AbstractSocialAbility {
 							'type'  => 'array',
 							'items' => array(
 								'type'                 => 'object',
-								'required'             => array( 'attachment_id', 'role' ),
+								'required'             => array( 'role' ),
 								'properties'           => array(
+									'source_id'     => array(
+										'type'    => 'string',
+										'pattern' => '^[1-9][0-9]*:[1-9][0-9]*$',
+									),
 									'attachment_id' => array(
 										'type'    => 'integer',
 										'minimum' => 1,
@@ -327,6 +331,10 @@ class SocialPublishAbility extends AbstractSocialAbility {
 										'type' => 'string',
 										'enum' => array( 'image', 'video', 'cover' ),
 									),
+								),
+								'oneOf'                => array(
+									array( 'required' => array( 'source_id' ) ),
+									array( 'required' => array( 'attachment_id' ) ),
 								),
 								'additionalProperties' => false,
 							),

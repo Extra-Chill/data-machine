@@ -156,6 +156,10 @@ final class DelegatedCrossPostIntegrationTest extends WP_UnitTestCase {
 		$submitted = $service->submit( $this->submission( 'partial-retry', array( 'instagram', 'twitter' ) ) );
 		$this->assertTrue( $submitted['success'] ?? false, wp_json_encode( $submitted ) );
 		$job       = $this->job( 'partial-retry' );
+		$this->assertSame(
+			get_current_blog_id() . ':' . $this->attachment_id,
+			$job['operation_envelope']['delegated_operation']['input']['asset_refs'][0]['source_id']
+		);
 		$this->assertTrue(
 			SocialShareTracker::record(
 				$this->post_id,

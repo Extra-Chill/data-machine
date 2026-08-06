@@ -30,6 +30,7 @@ final class SocialPublishAbilityTest extends WP_UnitTestCase {
 		$this->assertSame( $this->deliveryRef(), $result['delivery']['delivery_ref'] );
 		$this->assertTrue( $result['delivery']['duplicate'] );
 		$this->assertSame( 'duplicate-key', $ability->requests['submit']['operation_id'] );
+		$this->assertSame( '2:84', $ability->requests['submit']['input']['asset_refs'][0]['source_id'] );
 	}
 
 	public function test_conflicting_idempotency_reuse_has_a_stable_error(): void {
@@ -179,7 +180,7 @@ final class SocialPublishAbilityTest extends WP_UnitTestCase {
 				'source_url'   => 'https://example.org/canonical-post/',
 				'caption'      => $caption,
 				'content_hash' => hash( 'sha256', $caption ),
-				'asset_refs'   => array( array( 'attachment_id' => 84, 'role' => 'image' ) ),
+				'asset_refs'   => array( array( 'source_id' => '2:84', 'role' => 'image' ) ),
 			),
 			'target_policy' => array(
 				'channels'   => array( 'instagram' ),

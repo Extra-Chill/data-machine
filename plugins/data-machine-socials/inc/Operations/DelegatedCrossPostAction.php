@@ -29,6 +29,7 @@ final class DelegatedCrossPostAction {
 	private const MEDIA_KINDS = array( 'image', 'carousel', 'reel', 'story' );
 
 	private const INPUT_KEYS = array(
+		'post_site_id',
 		'post_id',
 		'source_url',
 		'caption',
@@ -79,71 +80,87 @@ final class DelegatedCrossPostAction {
 	 * @return array|\WP_Error
 	 */
 	public static function normalize_input( array $input, array $context = array() ) {
-		unset( $context );
-
 		$unknown_keys = array_diff( array_keys( $input ), self::INPUT_KEYS );
 		if ( ! empty( $unknown_keys ) ) {
 			return self::error( 'social_cross_post_invalid_input', 'Unknown input fields are not allowed.' );
 		}
 
-		$post_id = self::strict_positive_int( $input['post_id'] ?? null );
-		if ( ! $post_id || 'publish' !== get_post_status( $post_id ) ) {
-			return self::error( 'social_cross_post_invalid_post', 'A published canonical post is required.' );
+		$phase = is_string( $context['phase'] ?? null ) ? $context['phase'] : 'submit';
+		if ( 'submit' === $phase && array_key_exists( 'post_site_id', $input ) ) {
+			return self::error( 'social_cross_post_invalid_input', 'The canonical post site is owner-controlled.' );
 		}
 
-		$canonical_url = get_permalink( $post_id );
-		$source_url    = $input['source_url'] ?? null;
-		if ( ! is_string( $source_url ) || ! self::is_public_url( $source_url ) || ! is_string( $canonical_url ) || ! hash_equals( $canonical_url, $source_url ) ) {
-			return self::error( 'social_cross_post_invalid_source_url', 'The source URL must match the canonical post URL.' );
+		$post_site_id = array_key_exists( 'post_site_id', $input )
+			? self::strict_positive_int( $input['post_site_id'] )
+			: get_current_blog_id();
+		if ( ! self::is_valid_site( $post_site_id ) ) {
+			return self::error( 'social_cross_post_invalid_post', 'The canonical post site is invalid.' );
 		}
 
-		$channels = self::normalize_channels( $input['channels'] ?? null );
-		if ( is_wp_error( $channels ) ) {
-			return $channels;
-		}
+		return self::with_site(
+			$post_site_id,
+			static function () use ( $input, $post_site_id ) {
+				$post_id = self::strict_positive_int( $input['post_id'] ?? null );
+				if ( ! $post_id || 'publish' !== get_post_status( $post_id ) ) {
+					return self::error( 'social_cross_post_invalid_post', 'A published canonical post is required.' );
+				}
 
-		$caption = $input['caption'] ?? null;
-		if ( ! is_string( $caption ) || sanitize_textarea_field( $caption ) !== $caption || '' === trim( $caption ) || mb_strlen( $caption ) > self::caption_limit( $channels, $source_url ) ) {
-			return self::error( 'social_cross_post_invalid_caption', 'The approved caption must be canonical text within every selected channel limit.' );
-		}
+				$canonical_url = get_permalink( $post_id );
+				$source_url    = $input['source_url'] ?? null;
+				if ( ! is_string( $source_url ) || ! self::is_public_url( $source_url ) || ! is_string( $canonical_url ) || ! hash_equals( $canonical_url, $source_url ) ) {
+					return self::error( 'social_cross_post_invalid_source_url', 'The source URL must match the canonical post URL.' );
+				}
 
-		$content_hash = $input['content_hash'] ?? null;
-		if ( ! is_string( $content_hash ) || 1 !== preg_match( '/^[a-f0-9]{64}$/', $content_hash ) || ! hash_equals( hash( 'sha256', $caption ), $content_hash ) ) {
-			return self::error( 'social_cross_post_content_hash_mismatch', 'The approved content hash does not match the caption.' );
-		}
+				$channels = self::normalize_channels( $input['channels'] ?? null );
+				if ( is_wp_error( $channels ) ) {
+					return $channels;
+				}
 
-		$media_kind = $input['media_kind'] ?? null;
-		if ( ! is_string( $media_kind ) || ! in_array( $media_kind, self::MEDIA_KINDS, true ) ) {
-			return self::error( 'social_cross_post_unsupported_media_kind', 'The requested media kind is not supported.' );
-		}
+				$caption = $input['caption'] ?? null;
+				if ( ! is_string( $caption ) || sanitize_textarea_field( $caption ) !== $caption || '' === trim( $caption ) || mb_strlen( $caption ) > self::caption_limit( $channels, $source_url ) ) {
+					return self::error( 'social_cross_post_invalid_caption', 'The approved caption must be canonical text within every selected channel limit.' );
+				}
 
-		if ( in_array( $media_kind, array( 'reel', 'story' ), true ) && array_diff( $channels, array( 'instagram' ) ) ) {
-			return self::error( 'social_cross_post_unsupported_channel_media', 'A selected channel does not support the requested media kind.' );
-		}
-		if ( 'carousel' === $media_kind && array_diff( $channels, array( 'instagram', 'twitter' ) ) ) {
-			return self::error( 'social_cross_post_unsupported_channel_media', 'A selected channel does not support carousel publishing.' );
-		}
+				$content_hash = $input['content_hash'] ?? null;
+				if ( ! is_string( $content_hash ) || 1 !== preg_match( '/^[a-f0-9]{64}$/', $content_hash ) || ! hash_equals( hash( 'sha256', $caption ), $content_hash ) ) {
+					return self::error( 'social_cross_post_content_hash_mismatch', 'The approved content hash does not match the caption.' );
+				}
 
-		$assets = self::normalize_asset_refs( $input['asset_refs'] ?? null, $media_kind );
-		if ( is_wp_error( $assets ) ) {
-			return $assets;
-		}
-		if ( 'carousel' === $media_kind && in_array( 'twitter', $channels, true ) && count( $assets['images'] ) > 4 ) {
-			return self::error( 'social_cross_post_unsupported_channel_media', 'Twitter carousels support at most four image assets.' );
-		}
+				$media_kind = $input['media_kind'] ?? null;
+				if ( ! is_string( $media_kind ) || ! in_array( $media_kind, self::MEDIA_KINDS, true ) ) {
+					return self::error( 'social_cross_post_unsupported_media_kind', 'The requested media kind is not supported.' );
+				}
 
-		return array(
-			'post_id'       => $post_id,
-			'source_url'    => $source_url,
-			'caption'       => $caption,
-			'content_hash'  => $content_hash,
-			'channels'      => $channels,
-			'media_kind'    => $media_kind,
-			'asset_refs'    => $assets['refs'],
-			'images'        => $assets['images'],
-			'video_url'     => $assets['video_url'],
-			'cover_url'     => $assets['cover_url'],
-			'share_to_feed' => true,
+				if ( in_array( $media_kind, array( 'reel', 'story' ), true ) && array_diff( $channels, array( 'instagram' ) ) ) {
+					return self::error( 'social_cross_post_unsupported_channel_media', 'A selected channel does not support the requested media kind.' );
+				}
+				if ( 'carousel' === $media_kind && array_diff( $channels, array( 'instagram', 'twitter' ) ) ) {
+					return self::error( 'social_cross_post_unsupported_channel_media', 'A selected channel does not support carousel publishing.' );
+				}
+
+				$assets = self::normalize_asset_refs( $input['asset_refs'] ?? null, $media_kind );
+				if ( is_wp_error( $assets ) ) {
+					return $assets;
+				}
+				if ( 'carousel' === $media_kind && in_array( 'twitter', $channels, true ) && count( $assets['images'] ) > 4 ) {
+					return self::error( 'social_cross_post_unsupported_channel_media', 'Twitter carousels support at most four image assets.' );
+				}
+
+				return array(
+					'post_site_id'  => $post_site_id,
+					'post_id'       => $post_id,
+					'source_url'    => $source_url,
+					'caption'       => $caption,
+					'content_hash'  => $content_hash,
+					'channels'      => $channels,
+					'media_kind'    => $media_kind,
+					'asset_refs'    => $assets['refs'],
+					'images'        => $assets['images'],
+					'video_url'     => $assets['video_url'],
+					'cover_url'     => $assets['cover_url'],
+					'share_to_feed' => true,
+				);
+			}
 		);
 	}
 
@@ -198,6 +215,7 @@ final class DelegatedCrossPostAction {
 		}
 
 		$params = array(
+			'post_site_id'            => $input['post_site_id'],
 			'post_id'                 => $input['post_id'],
 			'platforms'               => $input['channels'],
 			'caption'                 => $input['caption'],
@@ -268,8 +286,12 @@ final class DelegatedCrossPostAction {
 			}
 
 			if ( 'social_share_ref' === ( $ref['type'] ?? '' ) ) {
+				$post_site_id = self::strict_positive_int( $input['post_site_id'] ?? null );
+				if ( 0 === $post_site_id ) {
+					$post_site_id = get_current_blog_id();
+				}
 				$receipt = $post_id && '' !== $operation_ref
-					? \DataMachineSocials\Tracking\SocialShareTracker::get_operation_share( $post_id, $channel, $operation_ref )
+					? self::with_site( $post_site_id, static fn() => \DataMachineSocials\Tracking\SocialShareTracker::get_operation_share( $post_id, $channel, $operation_ref ) )
 					: null;
 
 				$packet_id = sanitize_text_field( (string) ( $ref['source_item_id'] ?? '' ) );
@@ -359,7 +381,11 @@ final class DelegatedCrossPostAction {
 				return self::error( 'social_cross_post_retry_unsafe', 'The prior delivery effects cannot be reconciled safely.' );
 			}
 
-			$receipt = \DataMachineSocials\Tracking\SocialShareTracker::get_operation_share( $post_id, $channel, $operation_ref );
+			$post_site_id = self::strict_positive_int( $live_input['post_site_id'] ?? null );
+			if ( 0 === $post_site_id ) {
+				$post_site_id = get_current_blog_id();
+			}
+			$receipt = self::with_site( $post_site_id, static fn() => \DataMachineSocials\Tracking\SocialShareTracker::get_operation_share( $post_id, $channel, $operation_ref ) );
 			if ( is_array( $receipt ) ) {
 				$recorded_id = (string) ( $receipt['platform_post_id'] ?? '' );
 				if ( isset( $shares[ $channel ] ) && ! hash_equals( $recorded_id, $shares[ $channel ] ) ) {
@@ -540,18 +566,46 @@ final class DelegatedCrossPostAction {
 		$valid_roles = array( 'image', 'video', 'cover' );
 
 		foreach ( $asset_refs as $ref ) {
-			if ( ! is_array( $ref ) || array_diff( array_keys( $ref ), array( 'attachment_id', 'role' ) ) || ! isset( $ref['attachment_id'], $ref['role'] ) ) {
-				return self::error( 'social_cross_post_invalid_asset_ref', 'Each asset reference requires only an attachment ID and role.' );
+			if ( ! is_array( $ref ) || array_diff( array_keys( $ref ), array( 'source_id', 'attachment_id', 'role' ) ) || ! isset( $ref['role'] ) ) {
+				return self::error( 'social_cross_post_invalid_asset_ref', 'Each asset reference requires one canonical identity and role.' );
 			}
 
-			$attachment_id = self::strict_positive_int( $ref['attachment_id'] );
-			$role          = $ref['role'];
-			if ( ! $attachment_id || ! is_string( $role ) || ! in_array( $role, $valid_roles, true ) || in_array( $attachment_id, $seen_ids, true ) || 'attachment' !== get_post_type( $attachment_id ) ) {
+			$has_source_id     = array_key_exists( 'source_id', $ref );
+			$has_attachment_id = array_key_exists( 'attachment_id', $ref );
+			if ( $has_source_id === $has_attachment_id ) {
+				return self::error( 'social_cross_post_invalid_asset_ref', 'Each asset reference requires exactly one canonical identity.' );
+			}
+
+			$identity = $has_source_id
+				? self::parse_asset_source_id( $ref['source_id'] )
+				: array(
+					'site_id'       => get_current_blog_id(),
+					'attachment_id' => self::strict_positive_int( $ref['attachment_id'] ),
+				);
+			$role     = $ref['role'];
+			if ( is_wp_error( $identity ) || ! is_string( $role ) || ! in_array( $role, $valid_roles, true ) ) {
+				return self::error( 'social_cross_post_invalid_asset_ref', 'An asset reference is malformed or duplicated.' );
+			}
+			$site_id       = $identity['site_id'];
+			$attachment_id = $identity['attachment_id'];
+			$source_id     = $site_id . ':' . $attachment_id;
+			if ( in_array( $source_id, $seen_ids, true ) || ! self::is_valid_site( $site_id ) ) {
 				return self::error( 'social_cross_post_invalid_asset_ref', 'An asset reference is malformed or duplicated.' );
 			}
 
-			$url  = wp_get_attachment_url( $attachment_id );
-			$mime = (string) get_post_mime_type( $attachment_id );
+			$asset = self::with_site(
+				$site_id,
+				static fn(): array => array(
+					'type' => get_post_type( $attachment_id ),
+					'url'  => wp_get_attachment_url( $attachment_id ),
+					'mime' => (string) get_post_mime_type( $attachment_id ),
+				)
+			);
+			if ( 'attachment' !== $asset['type'] ) {
+				return self::error( 'social_cross_post_invalid_asset_ref', 'An asset reference is malformed or duplicated.' );
+			}
+			$url  = $asset['url'];
+			$mime = $asset['mime'];
 			if ( ! is_string( $url ) || ! self::is_public_url( $url ) ) {
 				return self::error( 'social_cross_post_asset_not_public', 'Every asset must resolve to a public URL.' );
 			}
@@ -574,10 +628,10 @@ final class DelegatedCrossPostAction {
 			}
 
 			$refs[]     = array(
-				'attachment_id' => $attachment_id,
-				'role'          => $role,
+				'source_id' => $source_id,
+				'role'      => $role,
 			);
-			$seen_ids[] = $attachment_id;
+			$seen_ids[] = $source_id;
 		}
 
 		$image_count = count( $images );
@@ -606,6 +660,54 @@ final class DelegatedCrossPostAction {
 
 	private static function strict_positive_int( $value ): int {
 		return is_int( $value ) && $value > 0 ? $value : 0;
+	}
+
+	/** @return array{site_id:int,attachment_id:int}|\WP_Error */
+	private static function parse_asset_source_id( $source_id ) {
+		if ( ! is_string( $source_id ) || 1 !== preg_match( '/^([1-9][0-9]*):([1-9][0-9]*)$/', $source_id, $matches ) ) {
+			return self::error( 'social_cross_post_invalid_asset_ref', 'The asset identity is invalid.' );
+		}
+
+		$site_id       = filter_var( $matches[1], FILTER_VALIDATE_INT, array( 'options' => array( 'min_range' => 1 ) ) );
+		$attachment_id = filter_var( $matches[2], FILTER_VALIDATE_INT, array( 'options' => array( 'min_range' => 1 ) ) );
+		return false !== $site_id && false !== $attachment_id
+			? array(
+				'site_id'       => $site_id,
+				'attachment_id' => $attachment_id,
+			)
+			: self::error( 'social_cross_post_invalid_asset_ref', 'The asset identity is invalid.' );
+	}
+
+	private static function is_valid_site( int $site_id ): bool {
+		if ( $site_id <= 0 ) {
+			return false;
+		}
+		if ( ! is_multisite() ) {
+			return get_current_blog_id() === $site_id;
+		}
+
+		$site = get_site( $site_id );
+		return $site instanceof \WP_Site
+			&& get_current_network_id() === (int) $site->network_id
+			&& ! $site->archived
+			&& ! $site->deleted
+			&& ! $site->spam;
+	}
+
+	/** @return mixed */
+	private static function with_site( int $site_id, callable $callback ) {
+		$switched = get_current_blog_id() !== $site_id;
+		if ( $switched ) {
+			switch_to_blog( $site_id );
+		}
+
+		try {
+			return $callback();
+		} finally {
+			if ( $switched ) {
+				restore_current_blog();
+			}
+		}
 	}
 
 	private static function is_public_url( string $url ): bool {

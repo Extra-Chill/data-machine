@@ -47,13 +47,14 @@ class SocialCrossPostTask extends SystemTask {
 					$operation_ref
 				);
 			if ( is_wp_error( $revalidated ) ) {
-				$this->complete_delegated_failure( $jobId, is_array( $platforms ) ? $platforms : array(), $revalidated->get_error_code() );
+				$this->complete_delegated_failure( $jobId, is_array( $platforms ) ? $platforms : array(), (string) $revalidated->get_error_code() );
 				return;
 			}
 
 			$params    = array_replace(
 				$params,
 				array(
+					'post_site_id'  => $revalidated['post_site_id'],
 					'post_id'       => $revalidated['post_id'],
 					'platforms'     => $revalidated['channels'],
 					'caption'       => $revalidated['caption'],
@@ -92,7 +93,8 @@ class SocialCrossPostTask extends SystemTask {
 		}
 
 		// Publish directly via Publisher utility (no REST round-trip).
-		$publish_result = Publisher::cross_post( $params );
+		$post_site_id   = absint( $params['post_site_id'] ?? get_current_blog_id() );
+		$publish_result = $this->with_site( $post_site_id, static fn(): array => Publisher::cross_post( $params ) );
 
 		if ( ! empty( $publish_result['error'] ) && empty( $publish_result['results'] ) ) {
 			// Validation-level failure (e.g. missing video_url for reel).
@@ -119,10 +121,14 @@ class SocialCrossPostTask extends SystemTask {
 
 		// Store results in post meta when post_id is available.
 		if ( $post_id ) {
-			$existing_log = get_post_meta( $post_id, '_studio_social_publish_log', true );
-			$existing_log = $existing_log ? $existing_log : array();
-			$merged_log   = array_merge( $existing_log, $log );
-			update_post_meta( $post_id, '_studio_social_publish_log', $merged_log );
+			$this->with_site(
+				$post_site_id,
+				static function () use ( $post_id, $log ): void {
+					$existing_log = get_post_meta( $post_id, '_studio_social_publish_log', true );
+					$existing_log = $existing_log ? $existing_log : array();
+					update_post_meta( $post_id, '_studio_social_publish_log', array_merge( $existing_log, $log ) );
+				}
+			);
 		}
 
 		// Write full results to job engine_data.
@@ -211,6 +217,22 @@ class SocialCrossPostTask extends SystemTask {
 				'suppress_result_packet' => true,
 			)
 		);
+	}
+
+	/** @return mixed */
+	private function with_site( int $site_id, callable $callback ) {
+		$switched = get_current_blog_id() !== $site_id;
+		if ( $switched ) {
+			switch_to_blog( $site_id );
+		}
+
+		try {
+			return $callback();
+		} finally {
+			if ( $switched ) {
+				restore_current_blog();
+			}
+		}
 	}
 
 	/**
