@@ -43,6 +43,7 @@ final class DelegatedCrossPostAction {
 	/** Register the owner action through Data Machine's public filter. */
 	public static function register(): void {
 		add_filter( 'datamachine_delegated_operation_actions', array( self::class, 'register_action' ) );
+		new \DataMachineSocials\Abilities\SocialPublishAbility();
 	}
 
 	/**
@@ -188,7 +189,9 @@ final class DelegatedCrossPostAction {
 		 * @param array $input   Normalized owner input.
 		 * @param array $context Delegated operation context.
 		 */
-		$owner = apply_filters( 'datamachine_socials_delegated_cross_post_execution_owner', $owner, $input, $context );
+		/** @var mixed $filtered_owner Owner filters must remain runtime-validated. */
+		$filtered_owner = apply_filters( 'datamachine_socials_delegated_cross_post_execution_owner', $owner, $input, $context );
+		$owner          = $filtered_owner;
 
 		if ( ! is_array( $owner ) || empty( $owner['user_id'] ) || empty( $owner['agent_id'] ) ) {
 			return self::error( 'social_cross_post_owner_unavailable', 'The stable Socials execution owner is unavailable.' );
@@ -511,7 +514,12 @@ final class DelegatedCrossPostAction {
 			'twitter'   => 256,
 		);
 
-		return empty( $channels ) ? 2200 : min( array_intersect_key( $limits, array_flip( $channels ) ) );
+		if ( empty( $channels ) ) {
+			return 2200;
+		}
+
+		$channel_limits = array_intersect_key( $limits, array_flip( $channels ) );
+		return empty( $channel_limits ) ? 2200 : min( $channel_limits );
 	}
 
 	/**
