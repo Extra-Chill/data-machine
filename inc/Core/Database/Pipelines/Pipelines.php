@@ -116,6 +116,79 @@ class Pipelines extends BaseRepository {
 	}
 
 	/**
+	 * Find pipelines with an exact name match.
+	 *
+	 * The public configuration contract uses this bounded result to distinguish
+	 * a missing stable name from an ambiguous one without exposing table rows.
+	 *
+	 * @param string $pipeline_name Exact pipeline name.
+	 * @return array<int, array<string, mixed>> At most two decoded pipeline rows.
+	 */
+	public function get_pipelines_by_name( string $pipeline_name ): array {
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
+		$results = $this->wpdb->get_results(
+			$this->wpdb->prepare(
+				'SELECT * FROM %i WHERE pipeline_name = %s ORDER BY pipeline_id ASC LIMIT 2',
+				$this->table_name,
+				$pipeline_name
+			),
+			ARRAY_A
+		);
+		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
+
+		if ( ! is_array( $results ) ) {
+			return array();
+		}
+
+		foreach ( $results as &$pipeline ) {
+			$pipeline['pipeline_config'] = json_decode( (string) ( $pipeline['pipeline_config'] ?? '' ), true ) ?? array();
+		}
+		unset( $pipeline );
+
+		return $results;
+	}
+
+	/**
+	 * Get the byte-exact pipeline configuration used for revision checks.
+	 */
+	public function get_pipeline_config_json( int $pipeline_id ): ?string {
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
+		$value = $this->wpdb->get_var(
+			$this->wpdb->prepare(
+				'SELECT pipeline_config FROM %i WHERE pipeline_id = %d',
+				$this->table_name,
+				$pipeline_id
+			)
+		);
+		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
+
+		return null === $value ? null : (string) $value;
+	}
+
+	/**
+	 * Atomically replace pipeline configuration when its snapshot is unchanged.
+	 */
+	public function compare_and_swap_pipeline_config( int $pipeline_id, string $expected_config_json, array $new_pipeline_config ): bool {
+		$new_config_json = wp_json_encode( $new_pipeline_config );
+		$updated_at      = current_time( 'mysql', true );
+
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
+		$result = $this->wpdb->query(
+			$this->wpdb->prepare(
+				'UPDATE %i SET pipeline_config = %s, updated_at = %s WHERE pipeline_id = %d AND HEX(pipeline_config) = HEX(%s)',
+				$this->table_name,
+				$new_config_json,
+				$updated_at,
+				$pipeline_id,
+				$expected_config_json
+			)
+		);
+		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
+
+		return 1 === (int) $result;
+	}
+
+	/**
 	 * Get a pipeline by stable bundle portable slug for an agent.
 	 */
 	public function get_by_portable_slug( int $agent_id, string $portable_slug ): ?array {

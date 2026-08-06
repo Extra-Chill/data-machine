@@ -339,6 +339,15 @@ class Flows extends BaseRepository {
 	 * @return bool True when the compare-and-swap updated one row.
 	 */
 	public function compare_and_swap_flow_config( int $flow_id, string $expected_config_json, array $new_flow_config ): bool {
+		$new_flow_config = $this->prepare_flow_config_for_save(
+			$new_flow_config,
+			$flow_id,
+			array( 'flow_config' => $new_flow_config )
+		);
+		if ( false === $new_flow_config ) {
+			return false;
+		}
+
 		$new_config_json = wp_json_encode( $new_flow_config );
 
 		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared
