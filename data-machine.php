@@ -382,6 +382,7 @@ function datamachine_run_datamachine_plugin() {
 	new \DataMachine\Abilities\Pipeline\DeletePipelineAbility();
 	new \DataMachine\Abilities\Pipeline\DuplicatePipelineAbility();
 	new \DataMachine\Abilities\Pipeline\ImportExportAbility();
+	new \DataMachine\Abilities\Pipeline\PipelineConfigurationAbilities();
 	new \DataMachine\Abilities\PipelineStepAbilities();
 	new \DataMachine\Abilities\DuplicateCheck\DuplicateCheckAbility();
 	new \DataMachine\Abilities\ProcessedItemsAbilities();
