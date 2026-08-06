@@ -33,12 +33,15 @@ class Jobs extends BaseRepository {
 
 	const TABLE_NAME = 'datamachine_jobs';
 
-	private const TERMINAL_ACCOUNTING_METRICS   = 0;
-	private const TERMINAL_ACCOUNTING_CORE      = 1;
-	private const TERMINAL_ACCOUNTING_LIFECYCLE = 2;
-	private const TERMINAL_ACCOUNTING_NOTIFY    = 3;
-	public const TERMINAL_ACCOUNTING_COMPLETE   = 4;
-	private const RECOVERY_LEASE_TTL            = 300;
+	private const TERMINAL_ACCOUNTING_METRICS    = 0;
+	private const TERMINAL_ACCOUNTING_CORE       = 1;
+	private const TERMINAL_ACCOUNTING_LIFECYCLE  = 2;
+	private const TERMINAL_ACCOUNTING_NOTIFY     = 3;
+	public const TERMINAL_ACCOUNTING_COMPLETE    = 4;
+	private const RECOVERY_LEASE_TTL             = 300;
+	private const IDEMPOTENT_INSERT_MAX_ATTEMPTS = 3;
+	private const IDEMPOTENT_INSERT_RETRY_US     = 10000;
+	private const INSERT_FAILURE_LOG_TTL         = 300;
 
 	/** Job currently owning the connection-wide terminal transaction. */
 	private static ?int $terminalizing_job = null;
@@ -191,37 +194,38 @@ class Jobs extends BaseRepository {
 			return false;
 		}
 
-		$inserted = $this->insert_prepared_job( $prepared );
-		if ( false === $inserted ) {
-			$existing = $this->get_job_by_idempotency_key( $idempotency_key );
-			if ( null !== $existing ) {
-				( new RunLifecycleStore( $this ) )->mark_job_created(
-					(int) $existing['job_id'],
-					array(
-						'run_type' => $existing['source'] ?? 'job',
-						'status'   => $existing['status'] ?? JobStatus::PENDING,
-					)
-				);
-
-				return array(
-					'job_id'         => (int) $existing['job_id'],
-					'created'        => false,
-					'already_exists' => true,
-					'job'            => $existing,
-				);
+		$db_error = '';
+		$attempts = 0;
+		while ( $attempts < self::IDEMPOTENT_INSERT_MAX_ATTEMPTS ) {
+			++$attempts;
+			$inserted = $this->insert_prepared_job( $prepared );
+			if ( false !== $inserted ) {
+				break;
 			}
 
-			do_action(
-				'datamachine_log',
-				'error',
-				'Failed to insert idempotent job',
-				array(
-					'pipeline_id'     => $prepared['pipeline_id'],
-					'flow_id'         => $prepared['flow_id'],
-					'idempotency_key' => $idempotency_key,
-					'db_error'        => $this->wpdb->last_error,
-				)
-			);
+			// Preserve the write error before the recovery read resets wpdb::last_error.
+			$db_error = (string) $this->wpdb->last_error;
+			$existing = $this->get_job_by_idempotency_key( $idempotency_key );
+			if ( null !== $existing ) {
+				return $this->existing_idempotent_job_result( $existing );
+			}
+
+			if ( $this->is_duplicate_database_error( $db_error ) ) {
+				$existing = $this->wait_for_idempotent_race_winner( $idempotency_key );
+				if ( null !== $existing ) {
+					return $this->existing_idempotent_job_result( $existing );
+				}
+				break;
+			}
+
+			if ( ! $this->is_retryable_database_error( $db_error ) || $attempts >= self::IDEMPOTENT_INSERT_MAX_ATTEMPTS ) {
+				break;
+			}
+			usleep( self::IDEMPOTENT_INSERT_RETRY_US * $attempts );
+		}
+
+		if ( false === $inserted ) {
+			$this->report_idempotent_insert_failure( $prepared, $idempotency_key, $db_error, $attempts );
 			return false;
 		}
 
@@ -318,7 +322,7 @@ class Jobs extends BaseRepository {
 		$default_source = $is_contextless ? 'direct' : ( $is_direct_execution ? 'direct' : 'pipeline' );
 		$source         = sanitize_key( $job_data['source'] ?? $default_source );
 
-		$label = isset( $job_data['label'] ) ? sanitize_text_field( $job_data['label'] ) : null;
+		$label = isset( $job_data['label'] ) ? mb_substr( sanitize_text_field( $job_data['label'] ), 0, 255, 'UTF-8' ) : null;
 
 		$parent_job_id = isset( $job_data['parent_job_id'] ) ? absint( $job_data['parent_job_id'] ) : 0;
 		$user_id       = isset( $job_data['user_id'] ) ? absint( $job_data['user_id'] ) : 0;
@@ -682,6 +686,73 @@ class Jobs extends BaseRepository {
 	private function insert_prepared_job( array $prepared ): int|false {
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		return $this->wpdb->insert( $this->table_name, $prepared['data'], $prepared['format'] );
+	}
+
+	/** Build the canonical response for a competing idempotent insert winner. */
+	private function existing_idempotent_job_result( array $existing ): array {
+		( new RunLifecycleStore( $this ) )->mark_job_created(
+			(int) $existing['job_id'],
+			array(
+				'run_type' => $existing['source'] ?? 'job',
+				'status'   => $existing['status'] ?? JobStatus::PENDING,
+			)
+		);
+
+		return array(
+			'job_id'         => (int) $existing['job_id'],
+			'created'        => false,
+			'already_exists' => true,
+			'job'            => $existing,
+		);
+	}
+
+	/** Give a committed duplicate-race winner a bounded visibility window. */
+	private function wait_for_idempotent_race_winner( string $idempotency_key ): ?array {
+		for ( $attempt = 1; $attempt < self::IDEMPOTENT_INSERT_MAX_ATTEMPTS; ++$attempt ) {
+			usleep( self::IDEMPOTENT_INSERT_RETRY_US * $attempt );
+			$existing = $this->get_job_by_idempotency_key( $idempotency_key );
+			if ( null !== $existing ) {
+				return $existing;
+			}
+		}
+
+		return null;
+	}
+
+	/** Whether an insert error proves another writer won the unique-key race. */
+	private function is_duplicate_database_error( string $db_error ): bool {
+		return str_contains( $db_error, '1062' ) || false !== stripos( $db_error, 'Duplicate entry' );
+	}
+
+	/** Retry only bounded transaction-contention failures. */
+	private function is_retryable_database_error( string $db_error ): bool {
+		return str_contains( $db_error, '1205' )
+			|| str_contains( $db_error, '1213' )
+			|| false !== stripos( $db_error, 'Lock wait timeout' )
+			|| false !== stripos( $db_error, 'Deadlock found' );
+	}
+
+	/** Emit safe, rate-limited diagnostics while keeping a per-failure signal. */
+	private function report_idempotent_insert_failure( array $prepared, string $idempotency_key, string $db_error, int $attempts ): void {
+		$error_type = $this->is_duplicate_database_error( $db_error ) ? 'duplicate_without_winner' : ( $this->is_retryable_database_error( $db_error ) ? 'contention_exhausted' : 'non_retryable' );
+		$key_type   = str_contains( $idempotency_key, ':' ) ? strstr( $idempotency_key, ':', true ) : 'untyped';
+		$context    = array(
+			'pipeline_id'          => $prepared['pipeline_id'],
+			'flow_id'              => $prepared['flow_id'],
+			'idempotency_key_type' => sanitize_key( $key_type ),
+			'idempotency_key_hash' => hash( 'sha256', $idempotency_key ),
+			'db_error'             => mb_substr( sanitize_text_field( $db_error ), 0, 500, 'UTF-8' ),
+			'error_type'           => $error_type,
+			'attempts'             => $attempts,
+			'log_throttle_seconds' => self::INSERT_FAILURE_LOG_TTL,
+		);
+
+		do_action( 'datamachine_idempotent_job_insert_failed', $context );
+
+		$throttle_key = 'insert_failure_' . hash( 'sha256', $error_type . '|' . $prepared['pipeline_id'] . '|' . $prepared['flow_id'] . '|' . $idempotency_key );
+		if ( wp_cache_add( $throttle_key, 1, 'datamachine_job_insert_failures', self::INSERT_FAILURE_LOG_TTL ) ) {
+			do_action( 'datamachine_log', 'error', 'Failed to insert idempotent job', $context );
+		}
 	}
 
 	/**
