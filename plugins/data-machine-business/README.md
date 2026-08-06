@@ -75,6 +75,9 @@ The plugin registers the following WordPress abilities. Management-oriented abil
 | `datamachine/fetch-messages-discord` | Fetch Discord channel history with before/after pagination |
 | `datamachine/sendy-subscribe` | Subscribe an email address to a Sendy list; intentionally supports public callers |
 | `datamachine/sendy-push-campaign` | Create or update a Sendy campaign |
+| `datamachine/sendy-list-campaigns` | List Sendy campaigns with status and engagement summaries |
+| `datamachine/sendy-get-campaign` | Get one Sendy campaign |
+| `datamachine/sendy-delete-campaign` | Delete a draft Sendy campaign |
 | `datamachine/sendy-metrics` | Read subscriber, campaign, or combined funnel metrics from Sendy |
 
 ### WordPress Operations
@@ -309,7 +312,9 @@ Join Amazon Associates, create Amazon Creators API credentials, and configure th
 
 ### Sendy
 
-Sendy is config-driven: callers pass the Sendy installation URL and API key to each ability. `datamachine/sendy-metrics` can also receive an optional read-only database connection for metrics unavailable through Sendy's API. The plugin does not store Sendy credentials or consumer-specific list and brand IDs.
+Campaign abilities resolve credentials from the DMB-owned `datamachine_sendy_config` network option or `datamachine_sendy_config` filter. Configure `api_key` and `sendy_url` for campaign create/update, plus a `db` array containing `host`, `user`, `pass`, `name`, and optional `port` for list/get/delete. List and get need read access; delete also needs permission to delete draft rows. Credentials are never accepted or returned by the campaign abilities; consumers supply only campaign content, sender identity, IDs, and filters. Consumer-specific list and brand IDs remain consumer policy.
+
+The older subscribe and metrics abilities retain their config input for existing public subscription and analytics consumers. Their migration to integration-owned configuration is separate from the credential-free campaign surface.
 
 ### Mediavine
 

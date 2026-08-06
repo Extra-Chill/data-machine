@@ -1,0 +1,18 @@
+{
+  "create": {
+    "code": 200,
+    "body": "321"
+  },
+  "exists": {
+    "code": 200,
+    "body": "Campaign exists"
+  },
+  "update": {
+    "code": 200,
+    "body": "Campaign updated"
+  },
+  "remote_error": {
+    "code": 500,
+    "body": "Remote failure containing api-secret and db-secret"
+  }
+}

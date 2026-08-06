@@ -5,15 +5,17 @@
  * Generic, config-driven abilities for the Sendy email-marketing service —
  * a sibling to the Slack, Discord, and Google integrations in this plugin.
  *
- * Every ability is keyed entirely by the configuration the caller passes in
- * (api_key, sendy_url, and optional read-only db connection details). These
- * abilities have NO knowledge of any particular consumer's list IDs, brand,
- * or content — that policy stays with the consumer. The mechanics live in
+ * Campaign abilities resolve connection configuration inside this plugin so
+ * credentials never cross the public ability boundary. Consumers continue to
+ * own campaign content and sender identity. The mechanics live in
  * {@see \DataMachineBusiness\Sendy\SendyClient}.
  *
  * Abilities:
  *  - datamachine/sendy-subscribe       Subscribe an email to a list (API).
  *  - datamachine/sendy-push-campaign   Create/update a campaign (API).
+ *  - datamachine/sendy-list-campaigns  List campaigns (read-only DB).
+ *  - datamachine/sendy-get-campaign    Get a campaign (read-only DB).
+ *  - datamachine/sendy-delete-campaign Delete a draft campaign (DB).
  *  - datamachine/sendy-metrics         Email-funnel metrics (read-only DB/API).
  *
  * @package DataMachineBusiness
@@ -32,6 +34,13 @@ defined( 'ABSPATH' ) || exit;
  * Registers the generic, config-driven Sendy abilities.
  */
 class SendyAbilities {
+
+	/**
+	 * Canonical Sendy connection configuration option.
+	 *
+	 * @var string
+	 */
+	public const CONFIG_OPTION = 'datamachine_sendy_config';
 
 	/**
 	 * Guards against double registration.
@@ -88,6 +97,54 @@ class SendyAbilities {
 	}
 
 	/**
+	 * Stable campaign summary schema.
+	 *
+	 * @return array
+	 */
+	private function campaign_summary_schema(): array {
+		return array(
+			'type'       => 'object',
+			'required'   => array(
+				'id',
+				'title',
+				'status',
+				'sent',
+				'sent_date',
+				'scheduled_date',
+				'to_send',
+				'recipients',
+				'opens',
+				'clicks',
+				'open_rate',
+				'click_rate',
+				'opens_tracking',
+				'links_tracking',
+				'stopped',
+			),
+			'properties' => array(
+				'id'             => array( 'type' => 'integer' ),
+				'title'          => array( 'type' => 'string' ),
+				'status'         => array(
+					'type' => 'string',
+					'enum' => array( 'sent', 'sending', 'scheduled', 'draft' ),
+				),
+				'sent'           => array( 'type' => array( 'integer', 'null' ) ),
+				'sent_date'      => array( 'type' => array( 'string', 'null' ) ),
+				'scheduled_date' => array( 'type' => array( 'string', 'null' ) ),
+				'to_send'        => array( 'type' => 'integer' ),
+				'recipients'     => array( 'type' => 'integer' ),
+				'opens'          => array( 'type' => 'integer' ),
+				'clicks'         => array( 'type' => 'integer' ),
+				'open_rate'      => array( 'type' => 'number' ),
+				'click_rate'     => array( 'type' => 'number' ),
+				'opens_tracking' => array( 'type' => 'boolean' ),
+				'links_tracking' => array( 'type' => 'boolean' ),
+				'stopped'        => array( 'type' => 'boolean' ),
+			),
+		);
+	}
+
+	/**
 	 * Register all Sendy abilities.
 	 */
 	public function register_abilities(): void {
@@ -137,10 +194,9 @@ class SendyAbilities {
 				'description'         => __( 'Create or update a Sendy email campaign via the Sendy API. The caller owns the content and sender identity.', 'data-machine-business' ),
 				'category'            => 'datamachine-publishing',
 				'input_schema'        => array(
-					'type'       => 'object',
-					'required'   => array( 'config', 'subject' ),
-					'properties' => array(
-						'config'      => $this->config_schema(),
+					'type'                 => 'object',
+					'required'             => array( 'from_name', 'from_email', 'reply_to', 'subject', 'html_text', 'brand_id' ),
+					'properties'           => array(
 						'campaign_id' => array(
 							'type'        => array( 'string', 'null' ),
 							'description' => __( 'Existing campaign ID to update. Omit to create a new campaign.', 'data-machine-business' ),
@@ -152,16 +208,151 @@ class SendyAbilities {
 						'html_text'   => array( 'type' => 'string' ),
 						'plain_text'  => array( 'type' => 'string' ),
 						'brand_id'    => array( 'type' => 'string' ),
-						'extra'       => array(
-							'type'        => 'object',
-							'description' => __( 'Optional extra Sendy create-campaign parameters.', 'data-machine-business' ),
-						),
+					),
+					'additionalProperties' => false,
+				),
+				'output_schema'       => array(
+					'type'       => 'object',
+					'required'   => array( 'success', 'campaign_id', 'message', 'created' ),
+					'properties' => array(
+						'success'     => array( 'type' => 'boolean' ),
+						'campaign_id' => array( 'type' => array( 'string', 'null' ) ),
+						'message'     => array( 'type' => 'string' ),
+						'created'     => array( 'type' => 'boolean' ),
 					),
 				),
-				'output_schema'       => array( 'type' => 'object' ),
 				'execute_callback'    => array( $this, 'execute_push_campaign' ),
 				'permission_callback' => array( $this, 'check_permission' ),
 				'meta'                => array( 'show_in_rest' => false ),
+			)
+		);
+
+		// ── Campaign Management ──
+		wp_register_ability(
+			'datamachine/sendy-list-campaigns',
+			array(
+				'label'               => __( 'Sendy: List Campaigns', 'data-machine-business' ),
+				'description'         => __( 'List Sendy campaigns from the configured database.', 'data-machine-business' ),
+				'category'            => 'datamachine-publishing',
+				'input_schema'        => array(
+					'type'                 => 'object',
+					'properties'           => array(
+						'per_page' => array(
+							'type'    => 'integer',
+							'minimum' => 1,
+							'maximum' => 100,
+						),
+						'offset'   => array(
+							'type'    => 'integer',
+							'minimum' => 0,
+						),
+						'status'   => array(
+							'type' => 'string',
+							'enum' => array( 'sent', 'draft', 'scheduled' ),
+						),
+					),
+					'additionalProperties' => false,
+				),
+				'output_schema'       => array(
+					'type'       => 'object',
+					'required'   => array( 'total', 'per_page', 'offset', 'campaigns' ),
+					'properties' => array(
+						'total'     => array( 'type' => 'integer' ),
+						'per_page'  => array( 'type' => 'integer' ),
+						'offset'    => array( 'type' => 'integer' ),
+						'campaigns' => array(
+							'type'  => 'array',
+							'items' => $this->campaign_summary_schema(),
+						),
+					),
+				),
+				'execute_callback'    => array( $this, 'execute_list_campaigns' ),
+				'permission_callback' => array( $this, 'check_permission' ),
+				'meta'                => array(
+					'show_in_rest' => false,
+					'annotations'  => array(
+						'readonly'   => true,
+						'idempotent' => true,
+					),
+				),
+			)
+		);
+
+		$campaign_detail_schema                             = $this->campaign_summary_schema();
+		$campaign_detail_schema['properties']['from_name']  = array( 'type' => 'string' );
+		$campaign_detail_schema['properties']['from_email'] = array( 'type' => 'string' );
+		$campaign_detail_schema['properties']['reply_to']   = array( 'type' => 'string' );
+		$campaign_detail_schema['properties']['errors']     = array( 'type' => 'string' );
+		$campaign_detail_schema['required'][]               = 'from_name';
+		$campaign_detail_schema['required'][]               = 'from_email';
+		$campaign_detail_schema['required'][]               = 'reply_to';
+		$campaign_detail_schema['required'][]               = 'errors';
+
+		wp_register_ability(
+			'datamachine/sendy-get-campaign',
+			array(
+				'label'               => __( 'Sendy: Get Campaign', 'data-machine-business' ),
+				'description'         => __( 'Get one Sendy campaign from the configured database.', 'data-machine-business' ),
+				'category'            => 'datamachine-publishing',
+				'input_schema'        => array(
+					'type'                 => 'object',
+					'required'             => array( 'campaign_id' ),
+					'properties'           => array(
+						'campaign_id' => array(
+							'type'    => 'integer',
+							'minimum' => 1,
+						),
+					),
+					'additionalProperties' => false,
+				),
+				'output_schema'       => $campaign_detail_schema,
+				'execute_callback'    => array( $this, 'execute_get_campaign' ),
+				'permission_callback' => array( $this, 'check_permission' ),
+				'meta'                => array(
+					'show_in_rest' => false,
+					'annotations'  => array(
+						'readonly'   => true,
+						'idempotent' => true,
+					),
+				),
+			)
+		);
+
+		wp_register_ability(
+			'datamachine/sendy-delete-campaign',
+			array(
+				'label'               => __( 'Sendy: Delete Campaign', 'data-machine-business' ),
+				'description'         => __( 'Delete a Sendy draft campaign. Sent and sending campaigns are protected.', 'data-machine-business' ),
+				'category'            => 'datamachine-publishing',
+				'input_schema'        => array(
+					'type'                 => 'object',
+					'required'             => array( 'campaign_id' ),
+					'properties'           => array(
+						'campaign_id' => array(
+							'type'    => 'integer',
+							'minimum' => 1,
+						),
+					),
+					'additionalProperties' => false,
+				),
+				'output_schema'       => array(
+					'type'       => 'object',
+					'required'   => array( 'success', 'message' ),
+					'properties' => array(
+						'success' => array( 'type' => 'boolean' ),
+						'message' => array( 'type' => 'string' ),
+					),
+				),
+				'execute_callback'    => array( $this, 'execute_delete_campaign' ),
+				'permission_callback' => array( $this, 'check_permission' ),
+				'meta'                => array(
+					'show_in_rest' => false,
+					'annotations'  => array(
+						'readonly'    => false,
+						'idempotent'  => false,
+						'destructive' => true,
+					),
+				),
 			)
 		);
 
@@ -255,6 +446,71 @@ class SendyAbilities {
 	}
 
 	/**
+	 * Resolve the DMB-owned Sendy configuration for campaign operations.
+	 *
+	 * Deployments may provide secrets through the filter instead of persisting
+	 * them in the network option. The filter remains owned by this integration;
+	 * consumers never pass credentials through an ability input.
+	 *
+	 * @return array
+	 */
+	public static function get_campaign_config(): array {
+		$config = get_site_option( self::CONFIG_OPTION, array() );
+		$config = is_array( $config ) ? $config : array();
+
+		/**
+		 * Filter the canonical Sendy connection configuration.
+		 *
+		 * @param array $config Keys: api_key, sendy_url, and optional db.
+		 */
+		return apply_filters( 'datamachine_sendy_config', $config );
+	}
+
+	/**
+	 * Build a campaign client from canonical configuration.
+	 *
+	 * @param string $requirement Required connection: api or db.
+	 * @return SendyClient|\WP_Error
+	 */
+	private function campaign_client( string $requirement ) {
+		$config = self::get_campaign_config();
+		if ( empty( $config ) ) {
+			return new \WP_Error(
+				'sendy_provider_unavailable',
+				__( 'The Sendy provider is not configured.', 'data-machine-business' )
+			);
+		}
+
+		if ( 'api' === $requirement ) {
+			if ( empty( $config['api_key'] ) || empty( $config['sendy_url'] ) ) {
+				return new \WP_Error(
+					'sendy_config_incomplete',
+					__( 'The Sendy API configuration requires api_key and sendy_url.', 'data-machine-business' )
+				);
+			}
+
+			if ( ! wp_http_validate_url( (string) $config['sendy_url'] ) ) {
+				return new \WP_Error(
+					'sendy_config_invalid',
+					__( 'The configured Sendy URL is invalid.', 'data-machine-business' )
+				);
+			}
+		}
+
+		if ( 'db' === $requirement ) {
+			$db = isset( $config['db'] ) && is_array( $config['db'] ) ? $config['db'] : array();
+			if ( empty( $db['host'] ) || empty( $db['user'] ) || empty( $db['name'] ) ) {
+				return new \WP_Error(
+					'sendy_db_not_configured',
+					__( 'The Sendy database configuration requires host, user, and name.', 'data-machine-business' )
+				);
+			}
+		}
+
+		return new SendyClient( $config );
+	}
+
+	/**
 	 * Execute datamachine/sendy-subscribe.
 	 *
 	 * @param array $input Ability input.
@@ -289,12 +545,38 @@ class SendyAbilities {
 	 * @return array|\WP_Error
 	 */
 	public function execute_push_campaign( array $input ) {
-		$client = $this->client_from_input( $input );
+		$client = $this->campaign_client( 'api' );
 		if ( is_wp_error( $client ) ) {
 			return $client;
 		}
 
-		return $client->push_campaign(
+		$required = array( 'from_name', 'from_email', 'reply_to', 'subject', 'html_text', 'brand_id' );
+		foreach ( $required as $field ) {
+			if ( ! isset( $input[ $field ] ) || '' === trim( (string) $input[ $field ] ) ) {
+				/* translators: %s: Sendy campaign input field name. */
+				$message = sprintf( __( '%s is required.', 'data-machine-business' ), $field );
+				return new \WP_Error(
+					'sendy_validation_error',
+					$message
+				);
+			}
+		}
+
+		if ( ! is_email( (string) $input['from_email'] ) || ! is_email( (string) $input['reply_to'] ) ) {
+			return new \WP_Error(
+				'sendy_validation_error',
+				__( 'from_email and reply_to must be valid email addresses.', 'data-machine-business' )
+			);
+		}
+
+		if ( isset( $input['campaign_id'] ) && ( ! ctype_digit( (string) $input['campaign_id'] ) || (int) $input['campaign_id'] < 1 ) ) {
+			return new \WP_Error(
+				'sendy_validation_error',
+				__( 'campaign_id must be a positive numeric identifier.', 'data-machine-business' )
+			);
+		}
+
+		$result = $client->push_campaign(
 			array(
 				'campaign_id' => isset( $input['campaign_id'] ) ? $input['campaign_id'] : null,
 				'from_name'   => isset( $input['from_name'] ) ? (string) $input['from_name'] : '',
@@ -304,9 +586,76 @@ class SendyAbilities {
 				'html_text'   => isset( $input['html_text'] ) ? (string) $input['html_text'] : '',
 				'plain_text'  => isset( $input['plain_text'] ) ? (string) $input['plain_text'] : '',
 				'brand_id'    => isset( $input['brand_id'] ) ? (string) $input['brand_id'] : '',
-				'extra'       => isset( $input['extra'] ) && is_array( $input['extra'] ) ? $input['extra'] : array(),
 			)
 		);
+
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+
+		// Raw provider responses are internal diagnostics and may contain secrets.
+		unset( $result['raw'] );
+		return $result;
+	}
+
+	/**
+	 * Execute datamachine/sendy-list-campaigns.
+	 *
+	 * @param array $input Ability input.
+	 * @return array|\WP_Error
+	 */
+	public function execute_list_campaigns( array $input ) {
+		$client = $this->campaign_client( 'db' );
+		if ( is_wp_error( $client ) ) {
+			return $client;
+		}
+
+		$per_page = isset( $input['per_page'] ) ? (int) $input['per_page'] : 20;
+		$offset   = isset( $input['offset'] ) ? (int) $input['offset'] : 0;
+		$status   = isset( $input['status'] ) ? (string) $input['status'] : '';
+		if ( $per_page < 1 || $per_page > 100 || $offset < 0 || ( '' !== $status && ! in_array( $status, array( 'sent', 'draft', 'scheduled' ), true ) ) ) {
+			return new \WP_Error( 'sendy_validation_error', __( 'Invalid campaign list parameters.', 'data-machine-business' ) );
+		}
+
+		return $client->list_campaigns(
+			array(
+				'per_page' => $per_page,
+				'offset'   => $offset,
+				'status'   => $status,
+			)
+		);
+	}
+
+	/**
+	 * Execute datamachine/sendy-get-campaign.
+	 *
+	 * @param array $input Ability input.
+	 * @return array|\WP_Error
+	 */
+	public function execute_get_campaign( array $input ) {
+		$campaign_id = isset( $input['campaign_id'] ) ? (int) $input['campaign_id'] : 0;
+		if ( $campaign_id < 1 ) {
+			return new \WP_Error( 'sendy_validation_error', __( 'campaign_id must be a positive integer.', 'data-machine-business' ) );
+		}
+
+		$client = $this->campaign_client( 'db' );
+		return is_wp_error( $client ) ? $client : $client->get_campaign( $campaign_id );
+	}
+
+	/**
+	 * Execute datamachine/sendy-delete-campaign.
+	 *
+	 * @param array $input Ability input.
+	 * @return array|\WP_Error
+	 */
+	public function execute_delete_campaign( array $input ) {
+		$campaign_id = isset( $input['campaign_id'] ) ? (int) $input['campaign_id'] : 0;
+		if ( $campaign_id < 1 ) {
+			return new \WP_Error( 'sendy_validation_error', __( 'campaign_id must be a positive integer.', 'data-machine-business' ) );
+		}
+
+		$client = $this->campaign_client( 'db' );
+		return is_wp_error( $client ) ? $client : $client->delete_campaign( $campaign_id );
 	}
 
 	/**

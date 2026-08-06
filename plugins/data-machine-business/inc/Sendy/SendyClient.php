@@ -259,10 +259,11 @@ class SendyClient {
 	 * create-campaign params).
 	 *
 	 * @param array $campaign Campaign content and sender identity.
-	 * @return array Result keyed by success (bool), campaign_id (string|null),
-	 *               message (string), created (bool), raw (string).
+	 * @return array|\WP_Error Result keyed by success (bool), campaign_id
+	 *                         (string|null), message (string), created (bool),
+	 *                         raw (string); or a normalized transport error.
 	 */
-	public function push_campaign( array $campaign ): array {
+	public function push_campaign( array $campaign ) {
 		if ( ! $this->has_api_config() ) {
 			return array(
 				'success'     => false,
@@ -293,12 +294,15 @@ class SendyClient {
 			);
 
 			if ( is_wp_error( $check ) ) {
-				return array(
-					'success'     => false,
-					'campaign_id' => $campaign_id,
-					'message'     => 'Failed to check campaign status: ' . $check->get_error_message(),
-					'created'     => false,
-					'raw'         => '',
+				return $this->normalize_transport_error( $check );
+			}
+
+			$status_code = wp_remote_retrieve_response_code( $check );
+			if ( $status_code < 200 || $status_code >= 300 ) {
+				return new \WP_Error(
+					'sendy_remote_error',
+					'Sendy returned an unsuccessful response while checking campaign status.',
+					array( 'status' => $status_code )
 				);
 			}
 
@@ -342,12 +346,15 @@ class SendyClient {
 		);
 
 		if ( is_wp_error( $response ) ) {
-			return array(
-				'success'     => false,
-				'campaign_id' => $campaign_id,
-				'message'     => $response->get_error_message(),
-				'created'     => false,
-				'raw'         => '',
+			return $this->normalize_transport_error( $response );
+		}
+
+		$status_code = wp_remote_retrieve_response_code( $response );
+		if ( $status_code < 200 || $status_code >= 300 ) {
+			return new \WP_Error(
+				'sendy_remote_error',
+				'Sendy returned an unsuccessful campaign response.',
+				array( 'status' => $status_code )
 			);
 		}
 
@@ -362,11 +369,14 @@ class SendyClient {
 
 		// Sendy returns the campaign ID (numeric) on success, or an error string.
 		$success = $created || ( '/api/campaigns/update.php' === $endpoint && false === stripos( $raw, 'error' ) );
+		if ( ! $success ) {
+			return new \WP_Error( 'sendy_remote_error', 'Sendy rejected the campaign request.' );
+		}
 
 		return array(
 			'success'     => $success,
 			'campaign_id' => $campaign_id,
-			'message'     => $success ? 'Campaign pushed to Sendy successfully.' : trim( $raw ),
+			'message'     => 'Campaign pushed to Sendy successfully.',
 			'created'     => $created,
 			'raw'         => $raw,
 		);
@@ -526,7 +536,10 @@ class SendyClient {
 			);
 		}
 
-		$db->delete( 'campaigns', array( 'id' => $campaign_id ), array( '%d' ) );
+		$deleted = $db->delete( 'campaigns', array( 'id' => $campaign_id ), array( '%d' ) );
+		if ( false === $deleted ) {
+			return new \WP_Error( 'sendy_db_delete_failed', 'Failed to delete the Sendy campaign.' );
+		}
 
 		return array(
 			'success' => true,
@@ -816,7 +829,7 @@ class SendyClient {
 
 			$sum_open_rate  += $open_rate;
 			$sum_click_rate += $click_rate;
-			$analysed++;
+			++$analysed;
 
 			$campaigns[] = array(
 				'id'         => (int) $c['id'],
@@ -864,6 +877,22 @@ class SendyClient {
 	// ─── Helpers ────────────────────────────────────────────────────────────
 
 	/**
+	 * Normalize HTTP failures without returning provider or credential details.
+	 *
+	 * @param \WP_Error $error WordPress HTTP error.
+	 * @return \WP_Error
+	 */
+	private function normalize_transport_error( \WP_Error $error ): \WP_Error {
+		$code    = strtolower( (string) $error->get_error_code() );
+		$message = strtolower( $error->get_error_message() );
+		if ( false !== strpos( $code, 'timeout' ) || false !== strpos( $message, 'timed out' ) || false !== strpos( $message, 'timeout' ) || false !== strpos( $message, 'curl error 28' ) ) {
+			return new \WP_Error( 'sendy_timeout', 'The Sendy request timed out.' );
+		}
+
+		return new \WP_Error( 'sendy_remote_error', 'The Sendy request failed.' );
+	}
+
+	/**
 	 * Shape a raw campaign DB row into a normalised summary.
 	 *
 	 * @param array $c Raw campaign row.
@@ -880,7 +909,7 @@ class SendyClient {
 			'status'         => $this->campaign_status( $c ),
 			'sent'           => ! empty( $c['sent'] ) ? (int) $c['sent'] : null,
 			'sent_date'      => ! empty( $c['sent'] ) ? gmdate( 'Y-m-d H:i:s', (int) $c['sent'] ) : null,
-			'scheduled_date' => ( ! empty( $c['send_date'] ) && '0' !== (string) $c['send_date'] ) ? gmdate( 'Y-m-d H:i:s', (int) $c['send_date'] ) : null,
+			'scheduled_date' => ! empty( $c['send_date'] ) ? gmdate( 'Y-m-d H:i:s', (int) $c['send_date'] ) : null,
 			'to_send'        => isset( $c['to_send'] ) ? (int) $c['to_send'] : 0,
 			'recipients'     => $recipients,
 			'opens'          => $opens,
@@ -900,14 +929,14 @@ class SendyClient {
 	 * @return string sent|sending|scheduled|draft.
 	 */
 	private function campaign_status( array $campaign ): string {
-		if ( ! empty( $campaign['sent'] ) && '0' !== (string) $campaign['sent'] ) {
+		if ( ! empty( $campaign['sent'] ) ) {
 			if ( isset( $campaign['to_send'], $campaign['recipients'] ) && (int) $campaign['to_send'] > (int) $campaign['recipients'] ) {
 				return 'sending';
 			}
 			return 'sent';
 		}
 
-		if ( ! empty( $campaign['send_date'] ) && '0' !== (string) $campaign['send_date'] ) {
+		if ( ! empty( $campaign['send_date'] ) ) {
 			return 'scheduled';
 		}
 
