@@ -2,6 +2,15 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.172.0] - 2026-08-07
+
+### Added
+- expose safe pipeline configuration contracts
+- expose run artifact read contract
+
+### Fixed
+- bound idempotent job insert recovery
+
 ## [0.171.4] - 2026-08-04
 
 ### Changed
