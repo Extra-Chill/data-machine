@@ -1,0 +1,608 @@
+/**
+ * Data Machine Pipeline+Flow Interface Styles
+ *
+ * Clean slate styles for the Pipeline+Flow two-layer architecture.
+ * Component-based design with proper namespace isolation.
+ * PAGE-LEVEL STYLES ONLY - Modal styles in pipelines-modal.css
+ *
+ * CSS variables defined in root.css (loaded globally across all admin pages)
+ *
+ * @since 1.0.0
+ */
+
+/* ===== LAYOUT & CONTAINER CLASSES ===== */
+
+/* Base page container - no padding here, applied to main content instead */
+.datamachine-pipelines-page {
+    padding: 0;
+}
+
+/* Header layouts */
+.datamachine-header--flex-space-between {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.datamachine-header--flex-start {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+}
+
+.datamachine-header--absolute-top-right {
+    position: absolute;
+    top: 0;
+    right: 0;
+}
+
+/* Spacing utilities */
+
+.datamachine-spacing--margin-bottom-20 {
+    margin-bottom: 20px;
+}
+
+/* Color utilities */
+.datamachine-color--text-muted {
+    color: #757575;
+}
+
+/* Typography utilities */
+
+/* Empty state styling */
+.datamachine-empty-state {
+    padding: 40px 20px;
+    text-align: center;
+}
+
+.datamachine-empty-state p {
+    margin: 0;
+    color: #757575;
+}
+
+.datamachine-empty-state-actions {
+    margin-top: 20px;
+    text-align: center;
+}
+
+/* Table styling */
+
+/* Status badges - base moved to root.css */
+
+/* Pipeline cards */
+.datamachine-pipeline-card {
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: var(--datamachine-border-radius);
+    margin-bottom: 16px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* ===== COMPONENT: PIPELINE HEADER ===== */
+
+.datamachine-pipeline-header {
+	position: relative;
+	border-bottom: 1px solid #eee;
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+}
+
+.datamachine-pipeline-header__title-input {
+	font-size: 20px;
+	font-weight: 600;
+	border: 1px solid transparent;
+	background: transparent;
+	padding: 4px 8px;
+	border-radius: var(--datamachine-border-radius);
+	width: 100%;
+	max-width: 400px;
+	flex: 1;
+	padding-right: 120px; /* Space for action buttons */
+	transition: border-color 0.15s ease-in-out, background-color 0.15s ease-in-out;
+}
+
+.datamachine-pipeline-header__title-input:focus {
+	border-color: #0073aa;
+	background: #fff;
+	outline: none;
+}
+
+/* Pipeline sections */
+
+/* Pipeline steps - horizontal scrolling flex layout */
+.datamachine-pipeline-steps {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 20px;
+    padding: 20px;
+    overflow-x: auto;
+}
+
+/* Step cards */
+.datamachine-step-card {
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: var(--datamachine-border-radius);
+    padding: 12px;
+    height: 100px;
+    width: 100%;
+    overflow: hidden;
+    position: relative;
+}
+
+/* ===== COMPONENT: FLOW CARD ===== */
+
+.datamachine-flow-instance-card {
+	background: #fff;
+	border: 1px solid #ddd;
+	border-radius: var(--datamachine-border-radius);
+	margin-bottom: 16px;
+	box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+/* ===== COMPONENT: FLOW HEADER ===== */
+
+.datamachine-flow-header {
+	padding: 12px 16px;
+	display: flex;
+	align-items: center;
+	position: relative;
+	border-bottom: 1px solid var(--datamachine-border-1);
+	background: var(--datamachine-bg-light);
+	border-radius: var(--datamachine-border-radius);
+}
+
+.datamachine-flow-header__content {
+	display: flex;
+	align-items: baseline;
+	gap: 12px;
+	flex: 1;
+}
+
+.datamachine-flow-header__title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+}
+
+.datamachine-flow-header__title-input {
+	font-size: 16px;
+	font-weight: 500;
+	border: 1px solid transparent;
+	background: transparent;
+	padding: 6px 8px;
+	border-radius: var(--datamachine-border-radius);
+	width: 100%;
+	max-width: 300px;
+	height: 36px; /* Match WordPress button height */
+	box-sizing: border-box;
+	transition: border-color 0.15s ease-in-out, background-color 0.15s ease-in-out;
+}
+
+.datamachine-flow-meta-item--id {
+    font-family: var(--datamachine-font-mono, monospace);
+}
+
+.datamachine-flow-header__title-input:focus {
+	border-color: #0073aa;
+	background: #fff;
+	outline: none;
+}
+
+.datamachine-flow-header__primary-actions {
+	display: flex;
+	gap: 8px;
+	align-items: center;
+}
+
+.datamachine-flow-header__secondary-actions {
+	position: absolute;
+	right: 16px;
+	top: 50%;
+	transform: translateY(-50%);
+	display: flex;
+	gap: 8px;
+	align-items: center;
+}
+
+/* ===== COMPONENT: FLOW STEPS ===== */
+
+.datamachine-flow-steps {
+	display: flex;
+	align-items: center;
+	gap: 20px;
+	overflow-x: auto;
+	padding: 20px;
+}
+
+.datamachine-flow-steps--empty {
+	padding: 20px;
+	text-align: center;
+	background-color: #f9f9f9;
+	border: 1px solid var(--datamachine-border-1);
+	border-radius: var(--datamachine-border-radius);
+}
+
+.datamachine-flow-steps--empty p {
+	color: #757575;
+	margin: 0;
+}
+
+/* ===== COMPONENT: FLOW FOOTER ===== */
+
+.datamachine-flow-footer {
+    padding: 12px 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    border-radius: 0 0 var(--datamachine-border-radius) var(--datamachine-border-radius);
+    background: #fff;
+}
+
+.datamachine-flow-meta-item {
+    font-size: 13px;
+    color: var(--datamachine-text-muted);
+}
+
+.datamachine-flow-meta-item strong {
+    font-weight: 600;
+    color: var(--datamachine-text-secondary);
+}
+
+/* Flow step card inline style replacements */
+.datamachine-step-content {
+	margin-bottom: 12px;
+    padding: 15px;
+}
+
+.datamachine-step-header-row {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin-bottom: 8px;
+}
+
+.datamachine-ai-provider-info {
+	font-size: 12px;
+	color: #757575;
+	margin-bottom: 8px;
+}
+
+.datamachine-ai-config-display {
+	margin-top: 12px;
+}
+
+/* ===== HIGH-IMPACT UTILITIES ===== */
+
+/* Table sticky headers */
+.datamachine-table-sticky-header {
+	position: sticky;
+	top: 0;
+	z-index: 1;
+	background: #f9f9f9;
+	border-bottom: 1px solid var(--datamachine-border-1);
+}
+
+/* Warning boxes */
+.datamachine-warning-box {
+	margin-top: 12px;
+	padding: 12px;
+	background: #fff8e5;
+	border: 1px solid #f0b849;
+	border-radius: var(--datamachine-border-radius);
+}
+
+/* Section headers */
+.datamachine-section-header {
+	margin-bottom: 16px;
+	font-size: 14px;
+	font-weight: 600;
+	color: #1d2327;
+}
+
+/* ===== TABLE UTILITIES ===== */
+
+/* Pipeline table base styles */
+.datamachine-pipeline-table {
+	width: 100%;
+	border-collapse: collapse;
+}
+
+.datamachine-pipeline-table th {
+	padding: 12px 16px;
+	text-align: left;
+	font-weight: 600;
+	background-color: #f5f5f5;
+}
+
+.datamachine-pipeline-table td {
+	padding: 12px 16px;
+}
+
+.datamachine-pipeline-table tbody tr {
+	border-bottom: 1px solid var(--datamachine-border-1);
+}
+
+.datamachine-table-cell--muted {
+	color: #757575;
+}
+
+.datamachine-table-cell--small {
+	font-size: 12px;
+}
+
+.datamachine-table-cell--medium {
+	font-weight: 500;
+}
+
+.datamachine-table-cell--center {
+	text-align: center;
+}
+
+.datamachine-table-container {
+	border: 1px solid var(--datamachine-border-1);
+	border-radius: var(--datamachine-border-radius);
+	max-height: 400px;
+	overflow-y: auto;
+}
+
+.datamachine-table-container--small {
+	max-height: 300px;
+}
+
+/* Status badge variants - base moved to root.css */
+
+/* Individual step containers within flow steps */
+.datamachine-flow-step-container {
+	flex: 0 0 auto;
+	min-width: 300px;
+	max-width: 300px;
+}
+
+/* ===== COMPONENT: FLOWS SECTION ===== */
+
+.datamachine-flows-section__header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	margin-top: 16px;
+	margin-bottom: 16px;
+}
+
+.datamachine-flows-section__title {
+	margin: 0;
+	font-size: 16px;
+	font-weight: 600;
+	color: #333;
+}
+
+.datamachine-flows-section__count {
+	color: #757575;
+	font-size: 14px;
+	font-weight: normal;
+}
+
+.datamachine-flows-list {
+	display: flex;
+	flex-direction: column;
+	gap: 20px;
+}
+
+/* Handler settings display */
+.datamachine-handler-settings-display {
+    margin-top: 8px;
+}
+
+.datamachine-handler-settings-display div {
+    display: inline-block;
+    padding: 2px 6px;
+    margin: 2px 0;
+    border-radius: var(--datamachine-border-radius);
+    font-size: 11px;
+    word-break: break-all;
+    max-width: 100%;
+    box-sizing: border-box;
+    background: #f0f0f0;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .datamachine-pipelines-page {
+        padding: 10px;
+    }
+    
+    .datamachine-pipeline-steps,
+    .datamachine-flow-steps {
+        flex-direction: column;
+    }
+    
+    .datamachine-step-card {
+        min-width: auto;
+        max-width: none;
+        flex: 1;
+    }
+    
+    .datamachine-pipeline-header,
+    .datamachine-flow-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+        position: static; /* Reset positioning for mobile */
+    }
+
+    .datamachine-flow-header__content {
+        width: 100%;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
+    }
+
+    .datamachine-flow-header__secondary-actions {
+        position: static;
+        transform: none;
+        margin-top: 8px;
+        justify-content: flex-start;
+    }
+    
+    .datamachine-flow-instance-card {
+        margin-bottom: 16px;
+    }
+    
+    .datamachine-pipeline-header__title-input,
+    .datamachine-flow-header__title-input {
+        max-width: none;
+        width: 100%;
+    }
+    
+
+}
+
+/* Empty step and flow cards - consolidated styling */
+.datamachine-step-card--empty,
+.datamachine-flow-card--empty {
+    border: var(--datamachine-border-dotted);
+    border-radius: var(--datamachine-border-radius);
+    padding: 40px 20px;
+    text-align: center;
+    background-color: #f9f9f9;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+/* Empty step content styling - uses same card structure as populated steps */
+
+/* Universal data flow arrows - inline flex items */
+.datamachine-data-flow-arrow {
+    color: #666;
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    pointer-events: none;
+}
+
+.datamachine-data-flow-arrow .dashicons {
+    width: 16px;
+    height: 16px;
+    font-size: 16px;
+}
+
+/* Responsive arrows - rotate on mobile */
+@media (max-width: 600px) {
+    .datamachine-data-flow-arrow svg {
+        transform: rotate(90deg);
+    }
+}
+
+/* Flow context - smaller arrows for nested flow steps */
+.datamachine-flow-steps .datamachine-data-flow-arrow {
+    color: #888;
+    font-size: 14px;
+}
+
+.datamachine-flow-steps .datamachine-data-flow-arrow .dashicons {
+    width: 14px;
+    height: 14px;
+    font-size: 14px;
+}
+
+/* Drag & Drop Styling */
+
+/* Hover state for draggable step cards - ONLY pipeline step cards */
+.datamachine-pipeline-steps .datamachine-step-card:not(.datamachine-step-card--empty):hover {
+    cursor: grab;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    border-color: #0073aa;
+    transition: all 0.2s ease;
+}
+
+/* ===== UTILITY CLASSES ===== */
+
+/* Hidden element utility now in root.css */
+
+/* ===== PIPELINE STEP CARD ===== */
+/**
+ * WordPress Components Overrides
+ * Override default WordPress core CardBody padding in Data Machine modals
+ */
+.datamachine-flows-list .components-card-body {
+    padding: 0;
+}
+.datamachine-step-card-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.datamachine-step-card-ai-config {
+    margin-top: 12px;
+}
+
+.datamachine-step-card-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+}
+
+/* ===== PIPELINE STEPS CONTAINER ===== */
+.datamachine-steps-empty-state {
+    padding: 20px;
+    text-align: center;
+}
+
+.datamachine-steps-empty-text {
+    color: #757575;
+    margin-bottom: 16px;
+}
+
+.datamachine-step-card-draggable {
+    flex: 0 0 auto;
+    min-width: 300px;
+    max-width: 300px;
+}
+
+/* Pipeline selector width constraints - desktop only */
+@media screen and (min-width: 783px) {
+    .datamachine-pipeline-selector {
+        min-width: 200px;
+        max-width: 400px;
+        width: auto;
+    }
+}
+
+/* ===== COMPONENT: QUEUE-LINKED USER MESSAGE ===== */
+
+.datamachine-user-message-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.datamachine-queue-indicator {
+    display: inline-flex;
+    align-items: center;
+}
+
+.datamachine-queue-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    font-weight: 500;
+    color: #0073aa;
+    background: rgba(0, 115, 170, 0.08);
+    padding: 2px 8px;
+    border-radius: 10px;
+}
+
+/* Subtle border indicator when queue is linked */
+.datamachine-queue-linked textarea {
+    border-left: 3px solid #0073aa;
+}

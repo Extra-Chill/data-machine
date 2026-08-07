@@ -1,0 +1,231 @@
+<?php
+/**
+ * Update Taxonomy Term Ability
+ *
+ * Handles updating existing taxonomy terms.
+ *
+ * @package DataMachine\Abilities\Taxonomy
+ * @since 0.13.7
+ */
+
+namespace DataMachine\Abilities\Taxonomy;
+
+use DataMachine\Core\WordPress\TaxonomyHandler;
+
+defined( 'ABSPATH' ) || exit;
+
+class UpdateTaxonomyTermAbility extends AbstractTaxonomyAbility {
+
+	protected function getAbilityName(): string {
+		return 'datamachine/update-taxonomy-term';
+	}
+
+	protected function getAbilityArgs(): array {
+		return array(
+			'label'               => __( 'Update Taxonomy Term', 'data-machine' ),
+			'description'         => __( 'Update an existing taxonomy term. Supports updating name, slug, description, and parent.', 'data-machine' ),
+			'category'            => 'datamachine-taxonomy',
+			'input_schema'        => array(
+				'type'       => 'object',
+				'properties' => array(
+					'term'        => array(
+						'type'        => 'string',
+						'required'    => true,
+						'description' => __( 'Term identifier (ID, name, or slug)', 'data-machine' ),
+					),
+					'taxonomy'    => array(
+						'type'        => 'string',
+						'required'    => true,
+						'description' => __( 'Taxonomy slug (category, post_tag, custom taxonomy)', 'data-machine' ),
+					),
+					'name'        => array(
+						'type'        => 'string',
+						'description' => __( 'New term name', 'data-machine' ),
+					),
+					'slug'        => array(
+						'type'        => 'string',
+						'description' => __( 'New term slug', 'data-machine' ),
+					),
+					'description' => array(
+						'type'        => 'string',
+						'description' => __( 'New term description', 'data-machine' ),
+					),
+					'parent'      => array(
+						'type'        => 'integer',
+						'description' => __( 'New parent term ID for hierarchical taxonomies', 'data-machine' ),
+					),
+				),
+				'required'   => array( 'term', 'taxonomy' ),
+			),
+			'output_schema'       => array(
+				'type'       => 'object',
+				'properties' => array(
+					'success'   => array( 'type' => 'boolean' ),
+					'term_id'   => array( 'type' => 'integer' ),
+					'term_name' => array( 'type' => 'string' ),
+					'term_slug' => array( 'type' => 'string' ),
+					'taxonomy'  => array( 'type' => 'string' ),
+					'updated'   => array( 'type' => 'boolean' ),
+					'changes'   => array( 'type' => 'object' ),
+					'error'     => array( 'type' => 'string' ),
+				),
+			),
+			'execute_callback'    => array( $this, 'execute' ),
+			'permission_callback' => array( $this, 'checkPermission' ),
+			'meta'                => array( 'show_in_rest' => true ),
+		);
+	}
+
+	/**
+	 * Execute update taxonomy term ability.
+	 *
+	 * @param array $input Input parameters.
+	 * @return array|\WP_Error Result with updated taxonomy term data or failure.
+	 */
+	public function execute( array $input ): array|\WP_Error {
+		$term_identifier = $input['term'] ?? null;
+		$taxonomy        = $input['taxonomy'] ?? null;
+		$name            = $input['name'] ?? null;
+		$slug            = $input['slug'] ?? null;
+		$description     = $input['description'] ?? null;
+		$parent          = $input['parent'] ?? null;
+
+		// Validate required fields
+		if ( empty( $term_identifier ) ) {
+			return $this->abilityError( 'term_required', 'term parameter is required', 400 );
+		}
+
+		if ( empty( $taxonomy ) ) {
+			return $this->abilityError( 'taxonomy_required', 'taxonomy parameter is required', 400 );
+		}
+
+		// Validate taxonomy
+		if ( ! taxonomy_exists( $taxonomy ) ) {
+			return $this->abilityError( 'taxonomy_not_found', "Taxonomy '{$taxonomy}' does not exist", 404 );
+		}
+
+		if ( TaxonomyHandler::shouldSkipTaxonomy( $taxonomy ) ) {
+			return $this->abilityError( 'taxonomy_not_modifiable', "Taxonomy '{$taxonomy}' is a system taxonomy and cannot be modified", 403 );
+		}
+
+		// Find the term using centralized resolver
+		$resolved = ResolveTermAbility::resolve( $term_identifier, $taxonomy, false );
+		if ( ! $resolved['success'] ) {
+			return $this->abilityError( 'term_not_found', $resolved['error'] ?? "Term '{$term_identifier}' not found in taxonomy '{$taxonomy}'", 404 );
+		}
+		$term = get_term( $resolved['term_id'], $taxonomy );
+
+		// Check if any updates are requested
+		if ( null === $name && null === $slug && null === $description && null === $parent ) {
+			return array(
+				'success'   => true,
+				'term_id'   => $term->term_id,
+				'term_name' => $term->name,
+				'term_slug' => $term->slug,
+				'taxonomy'  => $taxonomy,
+				'updated'   => false,
+				'changes'   => array(),
+			);
+		}
+
+		// Prepare update arguments
+		$args    = array();
+		$changes = array();
+
+		if ( null !== $name ) {
+			$sanitized_name = sanitize_text_field( wp_unslash( $name ) );
+			if ( $sanitized_name !== $term->name ) {
+				$args['name']    = $sanitized_name;
+				$changes['name'] = array(
+					'from' => $term->name,
+					'to'   => $sanitized_name,
+				);
+			}
+		}
+
+		if ( null !== $slug ) {
+			$sanitized_slug = sanitize_title( wp_unslash( $slug ) );
+			if ( $sanitized_slug !== $term->slug ) {
+				$args['slug']    = $sanitized_slug;
+				$changes['slug'] = array(
+					'from' => $term->slug,
+					'to'   => $sanitized_slug,
+				);
+			}
+		}
+
+		if ( null !== $description ) {
+			$sanitized_description = sanitize_text_field( wp_unslash( $description ) );
+			if ( $sanitized_description !== $term->description ) {
+				$args['description']    = $sanitized_description;
+				$changes['description'] = array(
+					'from' => $term->description,
+					'to'   => $sanitized_description,
+				);
+			}
+		}
+
+		if ( null !== $parent ) {
+			$sanitized_parent = absint( $parent );
+			if ( $sanitized_parent !== $term->parent ) {
+				$args['parent']    = $sanitized_parent;
+				$changes['parent'] = array(
+					'from' => $term->parent,
+					'to'   => $sanitized_parent,
+				);
+			}
+		}
+
+		// No changes needed
+		if ( empty( $args ) ) {
+			return array(
+				'success'   => true,
+				'term_id'   => $term->term_id,
+				'term_name' => $term->name,
+				'term_slug' => $term->slug,
+				'taxonomy'  => $taxonomy,
+				'updated'   => false,
+				'changes'   => array(),
+			);
+		}
+
+		// Update the term
+		$result = wp_update_term( $term->term_id, $taxonomy, $args );
+
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+
+		$updated_term = get_term( $term->term_id, $taxonomy );
+
+		if ( ! $updated_term || is_wp_error( $updated_term ) ) {
+			if ( is_wp_error( $updated_term ) ) {
+				return $updated_term;
+			}
+
+			return $this->abilityError( 'term_retrieval_failed', 'Failed to retrieve updated term', 500 );
+		}
+
+		do_action(
+			'datamachine_log',
+			'info',
+			'Taxonomy term updated via ability',
+			array(
+				'term_id'   => $updated_term->term_id,
+				'term_name' => $updated_term->name,
+				'taxonomy'  => $taxonomy,
+				'changes'   => $changes,
+			)
+		);
+
+		return array(
+			'success'   => true,
+			'term_id'   => $updated_term->term_id,
+			'term_name' => $updated_term->name,
+			'term_slug' => $updated_term->slug,
+			'taxonomy'  => $taxonomy,
+			'updated'   => true,
+			'changes'   => $changes,
+		);
+	}
+}

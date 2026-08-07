@@ -1,0 +1,453 @@
+<?php
+/**
+ * Replace Post Blocks Ability
+ *
+ * Replace entire block innerHTML by index. For when AI rewrites a whole
+ * paragraph (e.g. internal linking) rather than doing a find/replace.
+ *
+ * @package DataMachine\Abilities\Content
+ * @since 0.28.0
+ */
+
+namespace DataMachine\Abilities\Content;
+
+use DataMachine\Abilities\PermissionHelper;
+use DataMachine\Core\Content\ContentFormat;
+use DataMachine\Engine\AI\Actions\PendingActionHelper;
+use DataMachine\Engine\AI\Actions\PendingActionStore;
+
+defined( 'ABSPATH' ) || exit;
+
+class ReplacePostBlocksAbility {
+
+	private static bool $registered = false;
+
+	public function __construct() {
+		if ( self::$registered ) {
+			return;
+		}
+
+		$this->registerAbility();
+		$this->registerChatTool();
+		self::$registered = true;
+	}
+
+	private function registerAbility(): void {
+		$register_callback = function () {
+			wp_register_ability(
+				'datamachine/replace-post-blocks',
+				array(
+					'label'               => __( 'Replace Post Blocks', 'data-machine' ),
+					'description'         => __( 'Replace entire block content by index. Use for AI-rewritten paragraphs.', 'data-machine' ),
+					'category'            => 'datamachine-content',
+					'input_schema'        => array(
+						'type'       => 'object',
+						'required'   => array( 'post_id', 'replacements' ),
+						'properties' => array(
+							'post_id'      => array(
+								'type'        => 'integer',
+								'description' => __( 'Post ID to edit', 'data-machine' ),
+							),
+							'blog_id'      => array(
+								'type'        => 'integer',
+								'description' => __( 'Optional. Multisite blog ID the post lives on. Omit to use the current site. The replacement (and its preview/apply) runs in that blog\'s context.', 'data-machine' ),
+							),
+							'replacements' => array(
+								'type'        => 'array',
+								'description' => __( 'Array of block replacement operations', 'data-machine' ),
+								'items'       => array(
+									'type'       => 'object',
+									'required'   => array( 'block_index', 'new_content' ),
+									'properties' => array(
+										'block_index' => array(
+											'type'        => 'integer',
+											'description' => __( 'Zero-based block index to replace', 'data-machine' ),
+										),
+										'new_content' => array(
+											'type'        => 'string',
+											'description' => __( 'New innerHTML for the block', 'data-machine' ),
+										),
+									),
+								),
+							),
+							'preview'      => array(
+								'type'        => 'boolean',
+								'description' => __( 'When true, return diff preview without applying changes', 'data-machine' ),
+							),
+						),
+					),
+					'output_schema'       => array(
+						'type'       => 'object',
+						'properties' => array(
+							'success'         => array( 'type' => 'boolean' ),
+							'post_id'         => array( 'type' => 'integer' ),
+							'post_url'        => array( 'type' => 'string' ),
+							'blocks_replaced' => array(
+								'type'  => 'array',
+								'items' => array( 'type' => 'object' ),
+							),
+							'error'           => array( 'type' => 'string' ),
+						),
+					),
+					'execute_callback'    => array( self::class, 'execute' ),
+					'permission_callback' => fn() => PermissionHelper::can_manage(),
+					'meta'                => array( 'show_in_rest' => true ),
+				)
+			);
+		};
+
+		\DataMachine\Abilities\AbilityRegistration::on_abilities_api_init( $register_callback );
+	}
+
+	private function registerChatTool(): void {
+		add_filter(
+			'datamachine_tools',
+			function ( $tools ) {
+				$tools['replace_post_blocks'] = array(
+					'_callable' => array( self::class, 'getChatTool' ),
+					'modes'     => array( 'chat' ),
+					'ability'   => 'datamachine/replace-post-blocks',
+				);
+				return $tools;
+			}
+		);
+	}
+
+	/**
+	 * Chat tool definition.
+	 *
+	 * @return array
+	 */
+	public static function getChatTool(): array {
+		return array(
+			'class'       => self::class,
+			'method'      => 'handleChatToolCall',
+			'description' => 'Replace entire Gutenberg block content by index. Use get_post_blocks first to find the right indices. Ideal for AI-rewritten paragraphs. Set preview=true to return a diff preview without applying changes.',
+			'parameters'  => array(
+				'post_id'      => array(
+					'type'        => 'integer',
+					'required'    => true,
+					'description' => 'Post ID to edit',
+				),
+				'blog_id'      => array(
+					'type'        => 'integer',
+					'required'    => false,
+					'description' => 'Optional multisite blog ID the post lives on. Omit for the current site.',
+				),
+				'replacements' => array(
+					'type'        => 'array',
+					'items'       => array(
+						'type'       => 'object',
+						'required'   => array( 'block_index', 'new_content' ),
+						'properties' => array(
+							'block_index' => array( 'type' => 'integer' ),
+							'new_content' => array( 'type' => 'string' ),
+						),
+					),
+					'required'    => true,
+					'description' => 'Array of { block_index, new_content } operations',
+				),
+				'preview'      => array(
+					'type'        => 'boolean',
+					'description' => 'When true, return diff preview data without applying changes. The user can then accept or reject.',
+				),
+			),
+		);
+	}
+
+	/**
+	 * Chat tool handler.
+	 *
+	 * @param array $parameters Tool parameters.
+	 * @param array $tool_def   Tool definition.
+	 * @return array
+	 */
+	public static function handleChatToolCall( array $parameters, array $tool_def = array() ): array {
+		$tool_def;
+		$result = self::execute( $parameters );
+
+		return array(
+			'success'   => $result['success'],
+			'data'      => $result,
+			'tool_name' => 'replace_post_blocks',
+		);
+	}
+
+	/**
+	 * Execute the ability.
+	 *
+	 * @param array $input Ability input.
+	 * @return array
+	 */
+	public static function execute( array $input ): array {
+		// Resolve the target blog. On multisite the post may live on another
+		// site than the one this request landed on; switch to it so the post
+		// read and the eventual apply target the right post. blog_id rides
+		// inside apply_input below so the resolve replay re-enters the same
+		// context.
+		//
+		// IMPORTANT: pending-action STAGING must NOT happen inside this switch
+		// — the store is per-blog and the resolve runs on the calling blog, so
+		// staging is bracketed back to the origin blog via
+		// BlogContext::run_on_origin() in the preview branch.
+		$ctx = BlogContext::enter( $input );
+		if ( is_wp_error( $ctx ) ) {
+			return array(
+				'success' => false,
+				'error'   => $ctx->get_error_message(),
+			);
+		}
+
+		try {
+			return self::execute_in_context( $input, $ctx );
+		} finally {
+			BlogContext::leave( $ctx );
+		}
+	}
+
+	/**
+	 * Execute the replacement within the (already-resolved) blog context.
+	 *
+	 * @param array           $input Ability input.
+	 * @param array|\WP_Error $ctx   Blog context token from BlogContext::enter().
+	 * @return array
+	 */
+	private static function execute_in_context( array $input, $ctx ): array {
+		$post_id      = absint( $input['post_id'] ?? 0 );
+		$blog_id      = absint( $input['blog_id'] ?? 0 );
+		$replacements = $input['replacements'] ?? array();
+		$preview      = ! empty( $input['preview'] );
+
+		if ( $post_id <= 0 ) {
+			return array(
+				'success' => false,
+				'error'   => 'Valid post_id is required',
+			);
+		}
+
+		if ( empty( $replacements ) || ! is_array( $replacements ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'At least one replacement is required',
+			);
+		}
+
+		$post = get_post( $post_id );
+		if ( ! $post ) {
+			return array(
+				'success' => false,
+				'error'   => sprintf( 'Post #%d does not exist', $post_id ),
+			);
+		}
+
+		$block_content = ContentFormat::storedToBlocks( (string) $post->post_content, (string) $post->post_type );
+		if ( is_wp_error( $block_content ) ) {
+			return array(
+				'success' => false,
+				'post_id' => $post_id,
+				'error'   => $block_content->get_error_message(),
+			);
+		}
+
+		$blocks       = parse_blocks( $block_content );
+		$total_blocks = count( $blocks );
+		$changes      = array();
+
+		foreach ( $replacements as $replacement ) {
+			$block_index = $replacement['block_index'] ?? null;
+			$new_content = $replacement['new_content'] ?? null;
+
+			if ( null === $block_index || null === $new_content ) {
+				$changes[] = array(
+					'block_index' => $block_index,
+					'success'     => false,
+					'error'       => 'Missing required block_index or new_content',
+				);
+				continue;
+			}
+
+			$block_index = absint( $block_index );
+
+			if ( $block_index >= $total_blocks ) {
+				$changes[] = array(
+					'block_index' => $block_index,
+					'success'     => false,
+					'error'       => sprintf( 'Block index %d out of range (total: %d)', $block_index, $total_blocks ),
+				);
+				continue;
+			}
+
+			$old_html = $blocks[ $block_index ]['innerHTML'] ?? '';
+
+			$blocks[ $block_index ]['innerHTML'] = $new_content;
+
+			// Update innerContent to match.
+			if ( ! empty( $blocks[ $block_index ]['innerContent'] ) ) {
+				// For simple blocks (no inner blocks), innerContent is typically [ html_string ].
+				// Replace the first string entry with the new content.
+				$replaced_inner = false;
+				foreach ( $blocks[ $block_index ]['innerContent'] as $i => $content ) {
+					if ( is_string( $content ) && ! $replaced_inner ) {
+						$blocks[ $block_index ]['innerContent'][ $i ] = $new_content;
+						$replaced_inner                               = true;
+					}
+				}
+			}
+
+			$changes[] = array(
+				'block_index'        => $block_index,
+				'block_name'         => $blocks[ $block_index ]['blockName'] ?? 'unknown',
+				'old_length'         => strlen( $old_html ),
+				'new_length'         => strlen( $new_content ),
+				'originalContent'    => $old_html,
+				'replacementContent' => $new_content,
+				'success'            => true,
+			);
+		}
+
+		$successful = array_filter( $changes, fn( $c ) => ! empty( $c['success'] ) );
+
+		if ( empty( $successful ) ) {
+			return array(
+				'success'         => false,
+				'post_id'         => $post_id,
+				'blocks_replaced' => $changes,
+				'error'           => 'No replacements were applied — all operations failed',
+			);
+		}
+
+		$new_content    = BlockSanitizer::sanitizeAndSerialize( $blocks );
+		$stored_content = ContentFormat::blocksToStored( $new_content, (string) $post->post_type );
+		if ( is_wp_error( $stored_content ) ) {
+			return array(
+				'success' => false,
+				'post_id' => $post_id,
+				'error'   => $stored_content->get_error_message(),
+			);
+		}
+
+		// --- Preview mode: stage pending action, return preview envelope ---
+		if ( $preview ) {
+			$action_id = PendingActionStore::generate_id();
+
+			// Build per-block diff data for the frontend.
+			$diffs = array();
+			foreach ( $successful as $change ) {
+				$diffs[] = array(
+					'block_index'        => $change['block_index'],
+					'originalContent'    => $change['originalContent'],
+					'replacementContent' => $change['replacementContent'],
+				);
+			}
+
+			$diff = CanonicalDiffPreview::build(
+				array(
+					'action_id'           => $action_id,
+					'diff_type'           => 'replace',
+					'original_content'    => implode( "\n", array_column( $diffs, 'originalContent' ) ),
+					'replacement_content' => implode( "\n", array_column( $diffs, 'replacementContent' ) ),
+					'summary'             => 'Preview generated. Accept or reject to apply changes.',
+					'items'               => $diffs,
+				)
+			);
+
+			// Stage on the ORIGIN (calling) blog — see EditPostBlocksAbility for
+			// the full rationale: the per-blog pending-action store must hold
+			// the action where the accept/resolve turn will look for it.
+			$envelope = BlogContext::run_on_origin(
+				$ctx,
+				static function () use ( $action_id, $post_id, $replacements, $blog_id, $diff ) {
+					return PendingActionHelper::stage(
+						array(
+							'action_id'    => $action_id,
+							'kind'         => 'replace_post_blocks',
+							'summary'      => sprintf( 'Preview block replacements on post #%d.', $post_id ),
+							'apply_input'  => BlogContext::with_blog_id(
+								array(
+									'post_id'      => $post_id,
+									'replacements' => $replacements,
+								),
+								$blog_id
+							),
+							'preview_data' => $diff,
+							'context'      => BlogContext::with_blog_id( array( 'post_id' => $post_id ), $blog_id ),
+						)
+					);
+				}
+			);
+
+			if ( empty( $envelope['staged'] ) ) {
+				return array(
+					'success' => false,
+					'post_id' => $post_id,
+					'error'   => $envelope['error'] ?? 'Failed to stage preview.',
+				);
+			}
+
+			// Strip raw HTML from the changes returned to the AI.
+			$clean_changes = array_map(
+				function ( $c ) {
+					unset( $c['originalContent'], $c['replacementContent'] );
+					return $c;
+				},
+				$changes
+			);
+
+			return array_merge(
+				$envelope,
+				array(
+					'success'         => true,
+					'is_preview'      => true,
+					'kind'            => 'replace_post_blocks',
+					'preview'         => $diff,
+					'post_id'         => $post_id,
+					'blocks_replaced' => $clean_changes,
+				)
+			);
+		}
+
+		// --- Normal mode: apply immediately ---
+		$result = wp_update_post(
+			array(
+				'ID'           => $post_id,
+				'post_content' => $stored_content,
+			),
+			true
+		);
+
+		if ( is_wp_error( $result ) ) {
+			return array(
+				'success' => false,
+				'post_id' => $post_id,
+				'error'   => 'Failed to save: ' . $result->get_error_message(),
+			);
+		}
+
+		do_action(
+			'datamachine_log',
+			'info',
+			sprintf( 'Block replacements applied to post #%d (%d blocks)', $post_id, count( $successful ) ),
+			array(
+				'post_id'            => $post_id,
+				'replacements_total' => count( $replacements ),
+				'replacements_ok'    => count( $successful ),
+			)
+		);
+
+		// Strip raw HTML from changes in normal mode too (not needed in response).
+		$clean_changes = array_map(
+			function ( $c ) {
+				unset( $c['originalContent'], $c['replacementContent'] );
+				return $c;
+			},
+			$changes
+		);
+
+		return array(
+			'success'         => true,
+			'post_id'         => $post_id,
+			'post_url'        => get_permalink( $post_id ),
+			'blocks_replaced' => $clean_changes,
+		);
+	}
+}
