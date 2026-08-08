@@ -45,7 +45,7 @@ defined( 'ABSPATH' ) || exit;
 
 class BatchScheduler {
 	public const STORAGE_VERSION         = 2;
-	private const INITIAL_RECOVERY_DELAY = 300;
+	private const RECOVERY_CLAIM_TTL = 300;
 
 	/**
 	 * Parent completes after all child jobs complete.
@@ -168,11 +168,6 @@ class BatchScheduler {
 		if ( 0 === $total ) {
 			return self::startResult( $parent_job_id, 0, $chunk_size );
 		}
-		// Establish a queue owner before any worklist or parent state commits.
-		if ( ! self::scheduleV2Chunk( $hook, $parent_job_id, 0, time() + self::INITIAL_RECOVERY_DELAY ) ) {
-			self::discardStartItems( $items, $cleanup_contexts, $parent_job_id, $context );
-			return self::startResult( $parent_job_id, $total, $chunk_size );
-		}
 		$checksums = array();
 		foreach ( $items as $item ) {
 			$encoded = wp_json_encode( $item );
@@ -262,6 +257,9 @@ class BatchScheduler {
 			}
 			return self::startResult( $parent_job_id, $total, $chunk_size );
 		}
+		if ( ! empty( $insert['existing'] ) ) {
+			return self::startResult( $parent_job_id, $total, $chunk_size, 0, true );
+		}
 
 		\DataMachine\Core\RunMetrics::start(
 			$parent_job_id,
@@ -328,13 +326,13 @@ class BatchScheduler {
 	}
 
 	/** Build the stable public start result. */
-	private static function startResult( int $parent_job_id, int $total, int $chunk_size, int $action_id = 0 ): array {
+	private static function startResult( int $parent_job_id, int $total, int $chunk_size, int $action_id = 0, ?bool $scheduled = null ): array {
 		return array(
 			'parent_job_id' => $parent_job_id,
 			'total'         => $total,
 			'chunk_size'    => $chunk_size,
 			'action_id'     => $action_id,
-			'scheduled'     => (bool) $action_id,
+			'scheduled'     => null === $scheduled ? (bool) $action_id : $scheduled,
 		);
 	}
 
@@ -389,7 +387,6 @@ class BatchScheduler {
 		$state = is_array( $parent_engine['batch_state'] ?? null ) ? $parent_engine['batch_state'] : null;
 		$total = (int) ( $parent_engine['batch_total'] ?? 0 );
 		if ( is_array( $state ) && ! empty( $state['worklist_complete'] ) ) {
-			self::scheduleFinalizeRetry( $parent_engine, $parent_job_id );
 			return self::chunkResult(
 				0,
 				(int) ( $parent_engine['batch_offset'] ?? $total ),
@@ -436,16 +433,13 @@ class BatchScheduler {
 		$offset     = null === $expected_offset ? (int) ( $state['offset'] ?? 0 ) : $expected_offset;
 		$chunk_size = max( 1, (int) ( $parent_engine['batch_chunk_size'] ?? self::chunkSize( $context ) ) );
 		$lease      = (int) apply_filters( 'datamachine_batch_item_lease_seconds', BatchItems::DEFAULT_LEASE_SECONDS, $context );
-		// The recovery owner must exist before rows cross the durable claim boundary.
-		if ( ! self::scheduleV2Chunk( (string) $state['hook'], $parent_job_id, $offset, time() + max( 1, $lease ) ) ) {
-			$discarded = self::discardV2Outstanding( $repository, $parent_job_id, $context );
-			$completed = $repository->count_completed( $parent_job_id );
-			if ( $discarded ) {
-				self::finishV2State( $parent_job_id, $completed, $offset, true, true );
-			}
-			return self::chunkResult( 0, $offset, $total, false, false, false, false, true );
-		}
-		$rows = $repository->claim_chunk( $parent_job_id, $offset, $chunk_size, $lease );
+		$rows = $repository->claim_chunk(
+			$parent_job_id,
+			$offset,
+			$chunk_size,
+			$lease,
+			static fn(): bool => self::scheduleV2Chunk( (string) $state['hook'], $parent_job_id, $offset, time() + max( 1, $lease ) )
+		);
 		if ( ! $rows ) {
 			$outstanding = $repository->first_outstanding_index( $parent_job_id );
 			if ( null === $outstanding ) {
@@ -587,6 +581,54 @@ class BatchScheduler {
 		}
 		$result = wp_schedule_single_event( $timestamp, $hook, $wp_args, true );
 		return ! is_wp_error( $result ) && true === $result;
+	}
+
+	/** Re-establish one scheduler path for a durable pathless v2 batch. */
+	public static function recover( int $parent_job_id ): bool {
+		$engine = EngineData::retrieve( $parent_job_id );
+		$state  = is_array( $engine['batch_state'] ?? null ) ? $engine['batch_state'] : array();
+		$hook   = (string) ( $state['hook'] ?? $engine['batch_hook'] ?? '' );
+		if ( self::STORAGE_VERSION !== (int) ( $engine['batch_storage_version'] ?? 0 ) || '' === $hook || ! empty( $state['worklist_complete'] ) ) {
+			return false;
+		}
+
+		$offset = ( new BatchItems() )->first_outstanding_index( $parent_job_id );
+		if ( null === $offset ) {
+			return false;
+		}
+
+		$token = bin2hex( random_bytes( 16 ) );
+		$claim = EngineData::mutate(
+			$parent_job_id,
+			static function ( array $current ) use ( $token ): ?array {
+				$owner      = is_array( $current['batch_recovery_owner'] ?? null ) ? $current['batch_recovery_owner'] : array();
+				$claimed_at = strtotime( (string) ( $owner['claimed_at'] ?? '' ) . ' UTC' );
+				if ( false !== $claimed_at && ( time() - $claimed_at ) < self::RECOVERY_CLAIM_TTL ) {
+					return null;
+				}
+				$current['batch_recovery_owner'] = array(
+					'token'      => $token,
+					'claimed_at' => current_time( 'mysql', true ),
+				);
+				return $current;
+			},
+			'batch_recovery_claim'
+		);
+		if ( empty( $claim['success'] ) || ! self::scheduleV2Chunk( $hook, $parent_job_id, $offset, time() ) ) {
+			return false;
+		}
+
+		EngineData::mutate(
+			$parent_job_id,
+			static function ( array $current ) use ( $token ): array {
+				if ( hash_equals( $token, (string) ( $current['batch_recovery_owner']['token'] ?? '' ) ) ) {
+					$current['batch_recovery_owner']['scheduled_at'] = current_time( 'mysql', true );
+				}
+				return $current;
+			},
+			'batch_recovery_scheduled'
+		);
+		return true;
 	}
 
 	private static function discardV2Outstanding( BatchItems $repository, int $parent_job_id, string $context ): bool {

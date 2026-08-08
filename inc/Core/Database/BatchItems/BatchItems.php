@@ -185,8 +185,14 @@ class BatchItems extends BaseRepository {
 		);
 	}
 
-	/** Atomically claim ready or expired rows in one chunk boundary. */
-	public function claim_chunk( int $batch_job_id, int $offset, int $limit, int $lease_seconds = self::DEFAULT_LEASE_SECONDS ): array {
+	/**
+	 * Atomically claim ready or expired rows in one chunk boundary.
+	 *
+	 * The optional owner callback runs after rows are locked and updated but
+	 * before commit. A false result rolls the claim back, allowing callers to
+	 * establish an external recovery path before the lease becomes durable.
+	 */
+	public function claim_chunk( int $batch_job_id, int $offset, int $limit, int $lease_seconds = self::DEFAULT_LEASE_SECONDS, ?callable $owner = null ): array {
 		if ( $batch_job_id <= 0 || $limit < 1 || false === $this->wpdb->query( 'START TRANSACTION' ) ) {
 			return array();
 		}
@@ -237,6 +243,11 @@ class BatchItems extends BaseRepository {
 			$row['lease_token']      = $token;
 			$row['lease_expires_at'] = $expires_at;
 			$claimed[]               = $this->decode_row( $row );
+		}
+
+		if ( $claimed && null !== $owner && ! $owner() ) {
+			$this->wpdb->query( 'ROLLBACK' );
+			return array();
 		}
 
 		if ( false === $this->wpdb->query( 'COMMIT' ) ) {

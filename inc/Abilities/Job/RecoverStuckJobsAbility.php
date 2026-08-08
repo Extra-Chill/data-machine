@@ -16,6 +16,7 @@ use DataMachine\Core\ChildJobRecoveryPolicy;
 use DataMachine\Core\DirectJobEnqueuer;
 use DataMachine\Core\DirectOperationRecoveryPolicy;
 use DataMachine\Core\EngineData;
+use DataMachine\Core\ActionScheduler\BatchScheduler;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -541,6 +542,35 @@ class RecoverStuckJobsAbility {
 							'reason'  => 'Pending or in-progress scheduler work exists',
 						)
 					);
+					continue;
+				}
+
+				if ( BatchScheduler::STORAGE_VERSION === (int) ( $engine_data['batch_storage_version'] ?? 0 ) && empty( $engine_data['batch_state']['worklist_complete'] ) ) {
+					if ( $dry_run ) {
+						++$requeued;
+						$this->appendJobDetail( $jobs, $jobs_omitted, array(
+							'job_id'  => $job_id,
+							'flow_id' => $job_flow_id,
+							'status'  => 'would_requeue_pathless_batch',
+						) );
+						continue;
+					}
+					if ( ! $this->consumeTouchBudget( $attempted, $touched, $apply_limit ) ) {
+						$limit_reached = true;
+						break 2;
+					}
+					if ( BatchScheduler::recover( $job_id ) ) {
+						++$requeued;
+						++$mutations;
+						++$mutated;
+						$this->appendJobDetail( $jobs, $jobs_omitted, array(
+							'job_id'  => $job_id,
+							'flow_id' => $job_flow_id,
+							'status'  => 'requeued_pathless_batch',
+						) );
+					} else {
+						++$skipped;
+					}
 					continue;
 				}
 
