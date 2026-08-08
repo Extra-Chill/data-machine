@@ -172,7 +172,7 @@ final class AgentConfigArtifactProjector {
 			$tracking      = (string) ( $policy['tracking'] ?? 'include' );
 			$backup_egress = (string) ( $policy['backup_egress'] ?? 'include' );
 			$merge         = (string) ( $policy['merge'] ?? 'three_way' );
-			$entry    = array(
+			$entry         = array(
 				'tracking'      => in_array( $tracking, array( 'include', 'exclude' ), true ) ? $tracking : 'include',
 				'backup_egress' => in_array( $backup_egress, array( 'include', 'exclude' ), true ) ? $backup_egress : 'include',
 				'merge'         => in_array( $merge, array( 'three_way', 'preserve_local' ), true ) ? $merge : 'three_way',

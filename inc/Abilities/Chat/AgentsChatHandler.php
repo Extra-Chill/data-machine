@@ -108,7 +108,7 @@ class AgentsChatHandler {
 		$agent_id = $identity ? $identity->agent_id : 0;
 
 		$calling_user_id = $this->resolveCallingUserId( $input );
-		$user_id = $this->resolveRuntimeUserId( $identity, (string) ( $input['agent'] ?? '' ), $input );
+		$user_id         = $this->resolveRuntimeUserId( $identity, (string) ( $input['agent'] ?? '' ), $input );
 		if ( $user_id <= 0 ) {
 			return new WP_Error( 'no_user', __( 'No user context available.', 'data-machine' ), array( 'status' => 400 ) );
 		}
@@ -153,7 +153,7 @@ class AgentsChatHandler {
 				'modes'                 => $modes,
 				'agent_id'              => $agent_id,
 				'agent_slug'            => $identity ? $identity->agent_slug : '',
-				'calling_user_id'        => $calling_user_id,
+				'calling_user_id'       => $calling_user_id,
 				'attachments'           => $input['attachments'] ?? array(),
 				'client_context'        => $client_context,
 				'tool_policy'           => is_array( $input['tool_policy'] ?? null ) ? $input['tool_policy'] : null,

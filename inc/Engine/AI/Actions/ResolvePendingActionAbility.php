@@ -258,7 +258,7 @@ class ResolvePendingActionAbility {
 			);
 		}
 
-		$origin_blog_id = self::originBlogIdFromInput( $input );
+		$origin_blog_id  = self::originBlogIdFromInput( $input );
 		$current_blog_id = function_exists( 'get_current_blog_id' ) ? (int) get_current_blog_id() : 0;
 		if ( empty( $input['_origin_routed'] ) && $origin_blog_id > 0 && $origin_blog_id !== $current_blog_id ) {
 			return self::resolveAtOrigin( $input, $origin_blog_id );
@@ -420,7 +420,10 @@ class ResolvePendingActionAbility {
 			return self::claimed_elsewhere_response( $action_id, $kind );
 		}
 		$receipt          = PendingActionAuthorizationReceipt::issue( $claimed, $resolver );
-		$resolver_context = array_merge( $resolver_context, array( 'authorization_receipt' => $receipt, 'pending_action' => $claimed ) );
+		$resolver_context = array_merge( $resolver_context, array(
+			'authorization_receipt' => $receipt,
+			'pending_action'        => $claimed,
+		) );
 
 		// Accepted: invoke the apply handler with the stored input.
 		$result = self::applyHandler( $handler, $decision, $apply_input, $payload, $resolver_payload, $resolver_context, $pending_action, $receipt );
@@ -516,7 +519,7 @@ class ResolvePendingActionAbility {
 	private static function payloadMatchesOrigin( array $payload, int $origin_blog_id ): bool {
 		$context   = is_array( $payload['context'] ?? null ) ? $payload['context'] : array();
 		$wordpress = is_array( $context['wordpress'] ?? null ) ? $context['wordpress'] : array();
-		return $origin_blog_id === absint( $wordpress['blog_id'] ?? 0 );
+		return absint( $wordpress['blog_id'] ?? 0 ) === $origin_blog_id;
 	}
 
 	/**
@@ -574,7 +577,12 @@ class ResolvePendingActionAbility {
 	}
 
 	private static function claimed_elsewhere_response( string $action_id, string $kind ): array {
-		return array( 'success' => false, 'error' => 'Pending action has already been claimed or resolved.', 'action_id' => $action_id, 'kind' => $kind );
+		return array(
+			'success'   => false,
+			'error'     => 'Pending action has already been claimed or resolved.',
+			'action_id' => $action_id,
+			'kind'      => $kind,
+		);
 	}
 
 	/**

@@ -373,5 +373,4 @@ class FetchWordPressMediaAbility {
 
 		return $mime_patterns;
 	}
-
 }

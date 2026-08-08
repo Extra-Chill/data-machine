@@ -142,21 +142,21 @@ class GetJobsAbility {
 	 * @return array Result with jobs list.
 	 */
 	public function execute( array $input ): array {
-		$job_id      = $input['job_id'] ?? null;
-		$flow_id     = $input['flow_id'] ?? null;
-		$pipeline_id = $input['pipeline_id'] ?? null;
-		$user_id     = $input['user_id'] ?? null;
-		$agent_id    = $input['agent_id'] ?? null;
-		$status      = $input['status'] ?? null;
-		$source      = $input['source'] ?? null;
-		$handler     = $input['handler'] ?? null;
-		$since       = $input['since'] ?? null;
-		$per_page    = (int) ( $input['per_page'] ?? self::DEFAULT_PER_PAGE );
-		$offset      = (int) ( $input['offset'] ?? 0 );
-		$orderby     = $input['orderby'] ?? 'j.job_id';
-		$order       = $input['order'] ?? 'DESC';
-		$fields      = $input['fields'] ?? null;
-		$metadata    = \DataMachine\Core\ExecutionQuery::normalize_metadata_filters( $input['metadata'] ?? array() );
+		$job_id          = $input['job_id'] ?? null;
+		$flow_id         = $input['flow_id'] ?? null;
+		$pipeline_id     = $input['pipeline_id'] ?? null;
+		$user_id         = $input['user_id'] ?? null;
+		$agent_id        = $input['agent_id'] ?? null;
+		$status          = $input['status'] ?? null;
+		$source          = $input['source'] ?? null;
+		$handler         = $input['handler'] ?? null;
+		$since           = $input['since'] ?? null;
+		$per_page        = (int) ( $input['per_page'] ?? self::DEFAULT_PER_PAGE );
+		$offset          = (int) ( $input['offset'] ?? 0 );
+		$orderby         = $input['orderby'] ?? 'j.job_id';
+		$order           = $input['order'] ?? 'DESC';
+		$fields          = $input['fields'] ?? null;
+		$metadata        = \DataMachine\Core\ExecutionQuery::normalize_metadata_filters( $input['metadata'] ?? array() );
 		$ownership_scope = $this->jobCollectionScope(
 			null !== $user_id ? (int) $user_id : null,
 			null !== $agent_id ? (int) $agent_id : null

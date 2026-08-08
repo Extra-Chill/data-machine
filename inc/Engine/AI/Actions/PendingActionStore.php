@@ -200,17 +200,17 @@ class PendingActionStore {
 	public static function store( string $action_id, array $payload ): bool {
 		global $wpdb;
 
-		$workspace            = isset( $payload['workspace'] ) && is_array( $payload['workspace'] )
+		$workspace               = isset( $payload['workspace'] ) && is_array( $payload['workspace'] )
 			? \AgentsAPI\Core\Workspace\WP_Agent_Workspace_Scope::from_array( $payload['workspace'] )
 			: WordPressWorkspaceScope::current();
-		$payload['workspace'] = $workspace->to_array();
-		$context              = is_array( $payload['context'] ?? null ) ? $payload['context'] : array();
-		$context['wordpress'] = WordPressWorkspaceScope::metadata();
-		$payload['context']   = $context;
-		$metadata             = is_array( $payload['metadata'] ?? null ) ? $payload['metadata'] : array();
-		$datamachine          = is_array( $metadata['datamachine'] ?? null ) ? $metadata['datamachine'] : array();
-		$datamachine_context  = is_array( $datamachine['context'] ?? null ) ? $datamachine['context'] : array();
-		$datamachine['context'] = array_replace_recursive( $datamachine_context, $context );
+		$payload['workspace']    = $workspace->to_array();
+		$context                 = is_array( $payload['context'] ?? null ) ? $payload['context'] : array();
+		$context['wordpress']    = WordPressWorkspaceScope::metadata();
+		$payload['context']      = $context;
+		$metadata                = is_array( $payload['metadata'] ?? null ) ? $payload['metadata'] : array();
+		$datamachine             = is_array( $metadata['datamachine'] ?? null ) ? $metadata['datamachine'] : array();
+		$datamachine_context     = is_array( $datamachine['context'] ?? null ) ? $datamachine['context'] : array();
+		$datamachine['context']  = array_replace_recursive( $datamachine_context, $context );
 		$metadata['datamachine'] = $datamachine;
 		$payload['metadata']     = $metadata;
 
@@ -462,7 +462,7 @@ class PendingActionStore {
 			$payload['resolution_result']   = $result;
 			$payload['resolution_error']    = $error;
 			$payload['resolution_metadata'] = $metadata;
-			$completed = set_transient( self::TRANSIENT_PREFIX . $action_id, $payload, self::resolve_ttl( $payload ) );
+			$completed                      = set_transient( self::TRANSIENT_PREFIX . $action_id, $payload, self::resolve_ttl( $payload ) );
 			if ( $completed && in_array( $status, array( WP_Agent_Pending_Action_Status::ACCEPTED, WP_Agent_Pending_Action_Status::REJECTED ), true ) ) {
 				$action = self::action_from_payload( $payload );
 				if ( null !== $action ) {
@@ -473,7 +473,19 @@ class PendingActionStore {
 		}
 		global $wpdb;
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
-		$updated = $wpdb->update( self::get_table_name(), array( 'status' => $status, 'resolved_at' => current_time( 'mysql', true ), 'resolved_by' => get_current_user_id(), 'resolver' => self::nullable_string( $resolver ?? self::current_resolver() ), 'resolution_result' => self::encode_json( $result ), 'resolution_error' => $error, 'resolution_metadata' => self::encode_json( $metadata ) ), array( 'action_id' => $action_id, 'status' => 'applying', 'receipt_nonce' => $nonce ), array( '%s', '%s', '%d', '%s', '%s', '%s', '%s' ), array( '%s', '%s', '%s' ) );
+		$updated = $wpdb->update( self::get_table_name(), array(
+			'status'              => $status,
+			'resolved_at'         => current_time( 'mysql', true ),
+			'resolved_by'         => get_current_user_id(),
+			'resolver'            => self::nullable_string( $resolver ?? self::current_resolver() ),
+			'resolution_result'   => self::encode_json( $result ),
+			'resolution_error'    => $error,
+			'resolution_metadata' => self::encode_json( $metadata ),
+		), array(
+			'action_id'     => $action_id,
+			'status'        => 'applying',
+			'receipt_nonce' => $nonce,
+		), array( '%s', '%s', '%d', '%s', '%s', '%s', '%s' ), array( '%s', '%s', '%s' ) );
 		if ( 1 === $updated && in_array( $status, array( WP_Agent_Pending_Action_Status::ACCEPTED, WP_Agent_Pending_Action_Status::REJECTED ), true ) ) {
 			$action = self::get_action( $action_id, true );
 			if ( null !== $action ) {

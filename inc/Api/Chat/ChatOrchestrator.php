@@ -82,7 +82,7 @@ class ChatOrchestrator {
 		if ( ! $workspace instanceof WP_Agent_Workspace_Scope ) {
 			return new WP_Error( 'invalid_transcript_workspace', __( 'A canonical transcript workspace is required.', 'data-machine' ), array( 'status' => 400 ) );
 		}
-		$transcript_owner     = ChatTranscriptOwner::resolve_for_request( $options, $user_id );
+		$transcript_owner = ChatTranscriptOwner::resolve_for_request( $options, $user_id );
 		if ( is_wp_error( $transcript_owner ) ) {
 			return $transcript_owner;
 		}
@@ -425,7 +425,7 @@ class ChatOrchestrator {
 			);
 		}
 
-		$metadata = $session['metadata'] ?? array();
+		$metadata        = $session['metadata'] ?? array();
 		$calling_user_id = null !== $calling_user_id
 			? max( 0, $calling_user_id )
 			: ( array_key_exists( 'calling_user_id', $metadata ) ? max( 0, (int) $metadata['calling_user_id'] ) : $user_id );
@@ -921,15 +921,15 @@ class ChatOrchestrator {
 			$client_context = $options['client_context'] ?? array();
 			$all_tools      = $resolver->resolve(
 				array(
-					'modes'          => $modes,
-					'agent_id'       => $agent_id,
-					'agent_slug'     => $agent_slug,
-					'user_id'        => $user_id,
+					'modes'           => $modes,
+					'agent_id'        => $agent_id,
+					'agent_slug'      => $agent_slug,
+					'user_id'         => $user_id,
 					'calling_user_id' => $calling_user_id,
-					'interactive'    => true,
-					'client_context' => is_array( $client_context ) ? $client_context : array(),
-					'tool_policy'    => is_array( $options['tool_policy'] ?? null ) ? $options['tool_policy'] : null,
-					'allow_only'     => is_array( $options['allow_only'] ?? null ) ? $options['allow_only'] : array(),
+					'interactive'     => true,
+					'client_context'  => is_array( $client_context ) ? $client_context : array(),
+					'tool_policy'     => is_array( $options['tool_policy'] ?? null ) ? $options['tool_policy'] : null,
+					'allow_only'      => is_array( $options['allow_only'] ?? null ) ? $options['allow_only'] : array(),
 				)
 			);
 

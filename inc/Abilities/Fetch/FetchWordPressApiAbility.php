@@ -602,5 +602,4 @@ class FetchWordPressApiAbility {
 
 		return $item_timestamp >= $cutoff;
 	}
-
 }

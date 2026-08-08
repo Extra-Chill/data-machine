@@ -93,8 +93,8 @@ class PendingActionHelper {
 		$grants = apply_filters( 'datamachine_pending_action_resolver_grants', $grants, $args );
 		$grants = is_array( $grants ) ? array_values( array_filter( $grants, 'is_array' ) ) : array();
 
-		$datamachine_metadata    = isset( $metadata['datamachine'] ) && is_array( $metadata['datamachine'] ) ? $metadata['datamachine'] : array();
-		$metadata['datamachine'] = array_merge(
+		$datamachine_metadata                     = isset( $metadata['datamachine'] ) && is_array( $metadata['datamachine'] ) ? $metadata['datamachine'] : array();
+		$metadata['datamachine']                  = array_merge(
 			$datamachine_metadata,
 			array(
 				'agent_id'        => $agent_id,
@@ -104,7 +104,7 @@ class PendingActionHelper {
 				'resolve_with'    => 'resolve_pending_action',
 			)
 		);
-		$authorization = isset( $args['authorization'] ) && is_array( $args['authorization'] ) ? $args['authorization'] : array();
+		$authorization                            = isset( $args['authorization'] ) && is_array( $args['authorization'] ) ? $args['authorization'] : array();
 		$metadata['datamachine']['authorization'] = array(
 			'operation' => (string) ( $authorization['operation'] ?? $kind ),
 			'target'    => $authorization['target'] ?? $apply_input,

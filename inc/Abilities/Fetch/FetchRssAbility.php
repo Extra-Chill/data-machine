@@ -529,5 +529,4 @@ class FetchRssAbility {
 
 		return $item_timestamp >= $cutoff;
 	}
-
 }
