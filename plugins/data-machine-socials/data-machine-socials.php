@@ -72,103 +72,10 @@ function datamachine_socials_bootstrap() {
 		return;
 	}
 
-	// Load Abilities (they self-register)
+	// Load cross-platform abilities before isolated platform providers.
 	new \DataMachineSocials\Abilities\SocialCommentsAbility();
 
-	// Pinterest
-	new \DataMachineSocials\Abilities\Pinterest\PinterestBoardsAbility();
-	new \DataMachineSocials\Abilities\Pinterest\PinterestPublishAbility();
-
-	// Twitter
-	new \DataMachineSocials\Abilities\Twitter\TwitterPublishAbility();
-	new \DataMachineSocials\Abilities\Twitter\TwitterReadAbility();
-	new \DataMachineSocials\Abilities\Twitter\TwitterUpdateAbility();
-	new \DataMachineSocials\Abilities\Twitter\TwitterDeleteAbility();
-
-	// Facebook
-	new \DataMachineSocials\Abilities\Facebook\FacebookPublishAbility();
-	new \DataMachineSocials\Abilities\Facebook\FacebookReadAbility();
-	new \DataMachineSocials\Abilities\Facebook\FacebookUpdateAbility();
-	new \DataMachineSocials\Abilities\Facebook\FacebookDeleteAbility();
-
-	// Bluesky
-	new \DataMachineSocials\Abilities\Bluesky\BlueskyPublishAbility();
-	new \DataMachineSocials\Abilities\Bluesky\BlueskyReadAbility();
-	new \DataMachineSocials\Abilities\Bluesky\BlueskyUpdateAbility();
-	new \DataMachineSocials\Abilities\Bluesky\BlueskyDeleteAbility();
-
-	// Mastodon
-	new \DataMachineSocials\Abilities\Mastodon\MastodonPublishAbility();
-	new \DataMachineSocials\Abilities\Mastodon\MastodonReadAbility();
-	new \DataMachineSocials\Abilities\Mastodon\MastodonUpdateAbility();
-	new \DataMachineSocials\Abilities\Mastodon\MastodonDeleteAbility();
-
-	// Threads
-	new \DataMachineSocials\Abilities\Threads\ThreadsPublishAbility();
-	new \DataMachineSocials\Abilities\Threads\ThreadsReadAbility();
-	new \DataMachineSocials\Abilities\Threads\ThreadsUpdateAbility();
-	new \DataMachineSocials\Abilities\Threads\ThreadsDeleteAbility();
-
-	// Instagram
-	new \DataMachineSocials\Abilities\Instagram\InstagramPublishAbility();
-	new \DataMachineSocials\Abilities\Instagram\InstagramReadAbility();
-	new \DataMachineSocials\Abilities\Instagram\InstagramUpdateAbility();
-	new \DataMachineSocials\Abilities\Instagram\InstagramDeleteAbility();
-	new \DataMachineSocials\Abilities\Instagram\InstagramCommentReplyAbility();
-
-	// TikTok
-	new \DataMachineSocials\Abilities\TikTok\TikTokPublishAbility();
-	new \DataMachineSocials\Abilities\TikTok\TikTokReadAbility();
-
-	// Pinterest
-	new \DataMachineSocials\Abilities\Pinterest\PinterestReadAbility();
-	new \DataMachineSocials\Abilities\Pinterest\PinterestUpdateAbility();
-	new \DataMachineSocials\Abilities\Pinterest\PinterestDeleteAbility();
-	new \DataMachineSocials\Abilities\Pinterest\PinterestAnalyticsAbility();
-
-	// LinkedIn
-	new \DataMachineSocials\Abilities\LinkedIn\LinkedInPublishAbility();
-	new \DataMachineSocials\Abilities\LinkedIn\LinkedInReadAbility();
-	new \DataMachineSocials\Abilities\LinkedIn\LinkedInUpdateAbility();
-	new \DataMachineSocials\Abilities\LinkedIn\LinkedInDeleteAbility();
-
-	// Reddit
-	new \DataMachineSocials\Abilities\Reddit\FetchRedditAbility();
-	new \DataMachineSocials\Abilities\Reddit\RedditDomainMentionsAbility();
-	new \DataMachineSocials\Abilities\Reddit\RedditCommentDomainMonitorAbility();
-	new \DataMachineSocials\Abilities\Reddit\ReplyRedditAbility();
-	new \DataMachineSocials\Abilities\Reddit\SubmitRedditAbility();
-	new \DataMachineSocials\Abilities\Reddit\VoteRedditAbility();
-
-	// YouTube
-	new \DataMachineSocials\Abilities\YouTube\YouTubeUploadAbility();
-	new \DataMachineSocials\Abilities\YouTube\YouTubeSearchAbility();
-	new \DataMachineSocials\Abilities\YouTube\YouTubeAccountAbility();
-
-	// Tumblr
-	new \DataMachineSocials\Abilities\Tumblr\TumblrPublishAbility();
-	new \DataMachineSocials\Abilities\Tumblr\TumblrReadAbility();
-	new \DataMachineSocials\Abilities\Tumblr\TumblrUpdateAbility();
-	new \DataMachineSocials\Abilities\Tumblr\TumblrDeleteAbility();
-	new \DataMachineSocials\Abilities\Tumblr\TumblrEngageAbility();
-
-	// Social Handlers
-	new \DataMachineSocials\Handlers\Twitter\Twitter();
-	new \DataMachineSocials\Handlers\Facebook\Facebook();
-	new \DataMachineSocials\Handlers\Threads\Threads();
-	new \DataMachineSocials\Handlers\Bluesky\Bluesky();
-	new \DataMachineSocials\Handlers\Mastodon\Mastodon();
-	new \DataMachineSocials\Handlers\Pinterest\Pinterest();
-	new \DataMachineSocials\Handlers\Instagram\Instagram();
-	new \DataMachineSocials\Handlers\TikTok\TikTok();
-	new \DataMachineSocials\Handlers\LinkedIn\LinkedIn();
-	new \DataMachineSocials\Handlers\Tumblr\Tumblr();
-
-	// Reddit (Fetch)
-	new \DataMachineSocials\Handlers\Reddit\Reddit();
-
-	// YouTube
-	new \DataMachineSocials\Handlers\YouTube\YouTube();
+	\DataMachineSocials\Bootstrap\PlatformBootstrap::instance()->register();
 
 	// Register task handlers for DM Task System.
 	add_filter( 'datamachine_tasks', function ( array $tasks ): array {
@@ -191,6 +98,15 @@ function datamachine_socials_bootstrap() {
 	\DataMachineSocials\RestApi::register();
 }
 add_action( 'plugins_loaded', 'datamachine_socials_bootstrap', 20 );
+
+/**
+ * Return explicit bootstrap availability for every social platform.
+ *
+ * @return array<string, array<string, mixed>>
+ */
+function datamachine_socials_get_platform_availability() {
+	return \DataMachineSocials\Bootstrap\PlatformBootstrap::instance()->availability();
+}
 
 /**
  * Register the Data Machine Socials CLI section in the composable AGENTS.md
@@ -254,8 +170,9 @@ function datamachine_socials_enqueue_assets( $hook ) {
 	);
 
 	// Pass data to JavaScript
-	$post_id        = get_the_ID();
-	$featured_image = wp_get_attachment_image_src( get_post_thumbnail_id( $post_id ), 'full' );
+	$post_id        = (int) get_the_ID();
+	$thumbnail_id   = (int) get_post_thumbnail_id( $post_id );
+	$featured_image = wp_get_attachment_image_src( $thumbnail_id, 'full' );
 
 	wp_localize_script(
 		'data-machine-socials-editor',
@@ -264,7 +181,7 @@ function datamachine_socials_enqueue_assets( $hook ) {
 			'postId'        => $post_id,
 			'restNonce'     => wp_create_nonce( 'wp_rest' ),
 			'featuredImage' => $featured_image ? array(
-				'id'     => get_post_thumbnail_id( $post_id ),
+				'id'     => $thumbnail_id,
 				'url'    => $featured_image[0],
 				'width'  => $featured_image[1],
 				'height' => $featured_image[2],
@@ -277,9 +194,11 @@ add_action( 'admin_enqueue_scripts', 'datamachine_socials_enqueue_assets' );
 /**
  * Register WP-CLI commands.
  */
-if ( defined( 'WP_CLI' ) && WP_CLI ) {
-	// CommandRegistry is the single source of truth for runtime registration.
-	foreach ( \DataMachineSocials\Cli\CommandRegistry::map() as $command => $class ) {
+if ( defined( 'WP_CLI' ) ) {
+	// Cross-platform commands remain outside platform-local providers.
+	foreach ( array( 'datamachine-socials comments', 'datamachine-socials shares' ) as $command ) {
+		$command_map = \DataMachineSocials\Cli\CommandRegistry::map();
+		$class       = $command_map[ $command ];
 		require_once \DataMachineSocials\Cli\CommandRegistry::file_for_class( $class );
 		WP_CLI::add_command( $command, $class );
 	}
@@ -292,55 +211,8 @@ if ( defined( 'WP_CLI' ) && WP_CLI ) {
  * Only load when Data Machine core's AI engine is available.
  */
 function datamachine_socials_load_chat_tools() {
-	if ( ! class_exists( 'DataMachine\Engine\AI\Tools\BaseTool' ) ) {
-		return;
-	}
-
-	new \DataMachineSocials\Chat\Tools\FetchReddit();
-	new \DataMachineSocials\Chat\Tools\ReplyReddit();
-	new \DataMachineSocials\Chat\Tools\SubmitReddit();
-	new \DataMachineSocials\Chat\Tools\VoteReddit();
-	new \DataMachineSocials\Chat\Tools\ReadInstagram();
-	new \DataMachineSocials\Chat\Tools\UpdateInstagram();
-	new \DataMachineSocials\Chat\Tools\ReplyInstagramComment();
-	new \DataMachineSocials\Chat\Tools\PublishInstagram();
-	new \DataMachineSocials\Chat\Tools\PublishReelInstagram();
-	new \DataMachineSocials\Chat\Tools\PublishStoryInstagram();
-	new \DataMachineSocials\Chat\Tools\PublishTikTok();
-	new \DataMachineSocials\Chat\Tools\PublishTwitter();
-	new \DataMachineSocials\Chat\Tools\PublishFacebook();
-	new \DataMachineSocials\Chat\Tools\PublishBluesky();
-	new \DataMachineSocials\Chat\Tools\PublishThreads();
-	new \DataMachineSocials\Chat\Tools\PublishPinterest();
-	new \DataMachineSocials\Chat\Tools\ReadThreads();
-	new \DataMachineSocials\Chat\Tools\ReadFacebook();
-	new \DataMachineSocials\Chat\Tools\UpdateFacebook();
-	new \DataMachineSocials\Chat\Tools\ReadTwitter();
-	new \DataMachineSocials\Chat\Tools\UpdateTwitter();
-	new \DataMachineSocials\Chat\Tools\ReadBluesky();
-	new \DataMachineSocials\Chat\Tools\UpdateBluesky();
-	new \DataMachineSocials\Chat\Tools\ReadPinterest();
-	new \DataMachineSocials\Chat\Tools\UpdatePinterest();
-	new \DataMachineSocials\Chat\Tools\UpdateThreads();
-	new \DataMachineSocials\Chat\Tools\PublishYouTube();
-	new \DataMachineSocials\Chat\Tools\SearchYouTube();
-
-	// LinkedIn chat tools
-	new \DataMachineSocials\Chat\Tools\PublishLinkedIn();
-	new \DataMachineSocials\Chat\Tools\ReadLinkedIn();
-	new \DataMachineSocials\Chat\Tools\UpdateLinkedIn();
-	new \DataMachineSocials\Chat\Tools\DeleteLinkedIn();
-
-	// Tumblr chat tools
-	new \DataMachineSocials\Chat\Tools\PublishTumblr();
-	new \DataMachineSocials\Chat\Tools\ReadTumblr();
-
-	// Delete chat tools
-	new \DataMachineSocials\Chat\Tools\DeleteInstagram();
-	new \DataMachineSocials\Chat\Tools\DeleteTwitter();
-	new \DataMachineSocials\Chat\Tools\DeleteFacebook();
-	new \DataMachineSocials\Chat\Tools\DeleteThreads();
-	new \DataMachineSocials\Chat\Tools\DeleteBluesky();
-	new \DataMachineSocials\Chat\Tools\DeletePinterest();
+	$bootstrap = \DataMachineSocials\Bootstrap\PlatformBootstrap::instance();
+	$bootstrap->register_tools();
+	$bootstrap->register_cli();
 }
 add_action( 'plugins_loaded', 'datamachine_socials_load_chat_tools', 25 );
