@@ -19,12 +19,12 @@ foreach ( $required_files as $relative_path ) {
 	}
 }
 
-$plugin_file = file_get_contents( $root . '/data-machine-business.php' );
-$readme      = file_get_contents( $root . '/README.md' );
+$providers_file = file_get_contents( $root . '/inc/Bootstrap/ProviderModules.php' );
+$readme         = file_get_contents( $root . '/README.md' );
 
-foreach ( array( 'PageSpeedAbility', 'PageSpeedTool', 'PageSpeedAnalytics', 'PageSpeedCommand' ) as $symbol ) {
-	if ( false === strpos( $plugin_file, $symbol ) ) {
-		$failures[] = "Plugin bootstrap does not reference {$symbol}";
+foreach ( array( 'PageSpeedAbility', 'PageSpeedTool', 'PageSpeedAnalytics' ) as $symbol ) {
+	if ( false === strpos( $providers_file, $symbol ) ) {
+		$failures[] = "PageSpeed provider module does not reference {$symbol}";
 	}
 }
 

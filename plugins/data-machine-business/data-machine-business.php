@@ -63,79 +63,14 @@ function datamachine_business_load_handlers() {
 			</div>
 			<?php
 		} );
-		return;
 	}
 
-	// Load Abilities (they self-register)
-	new \DataMachineBusiness\Abilities\Analytics\GoogleAnalyticsAbilities();
-	new \DataMachineBusiness\Abilities\Analytics\MediavineReportsAbilities();
-	new \DataMachineBusiness\Abilities\Analytics\ContentPerformanceAbility();
-	new \DataMachineBusiness\Abilities\Analytics\ContentFlagsAbility();
-
-	// Global AI tools.
-	new \DataMachineBusiness\Engine\AI\Tools\Global\GoogleAnalytics();
-
-	// Google Sheets
-	new \DataMachineBusiness\Abilities\GoogleSheets\FetchGoogleSheetsAbility();
-	new \DataMachineBusiness\Abilities\GoogleSheets\PublishGoogleSheetsAbility();
-	new \DataMachineBusiness\Abilities\Analytics\GoogleSearchConsoleAbilities();
-	new \DataMachineBusiness\Abilities\Analytics\GscOpportunityAbility();
-
-	// Google Sheets Handlers
-	new \DataMachineBusiness\Handlers\GoogleSheets\GoogleSheetsFetch();
-	new \DataMachineBusiness\Handlers\GoogleSheets\GoogleSheetsPublish();
-
-	// Google Drive (shares the unified GoogleAuth credential — see scope union below)
-	new \DataMachineBusiness\Abilities\GoogleDrive\FetchGoogleDriveAbility();
-	new \DataMachineBusiness\Abilities\GoogleDrive\ListGoogleDriveFilesAbility();
-	new \DataMachineBusiness\Abilities\GoogleDrive\ReadGoogleDriveDocAbility();
-	new \DataMachineBusiness\Abilities\GoogleDrive\DownloadGoogleDriveAbility();
-	new \DataMachineBusiness\Handlers\GoogleDrive\GoogleDriveFetch();
-
-	// PageSpeed Insights
-	new \DataMachineBusiness\Abilities\PageSpeed\PageSpeedAbility();
-	new \DataMachineBusiness\Tools\PageSpeedTool();
-	\DataMachineBusiness\Api\PageSpeedAnalytics::register();
-
-	// Google Custom Search API tool.
-	new \DataMachineBusiness\Tools\GoogleSearch();
-
-	// Google Search Console global tool. Uses the legacy core option key so
-	// existing service-account configuration is adopted without migration.
-	new \DataMachineBusiness\Tools\GoogleSearchConsole();
-	\DataMachineBusiness\Api\GoogleSearchConsoleAnalytics::register();
-
-	// Slack
-	new \DataMachineBusiness\Abilities\Slack\PostMessageSlackAbility();
-	new \DataMachineBusiness\Abilities\Slack\FetchMessagesSlackAbility();
-
-	// Slack Handlers
-	new \DataMachineBusiness\Handlers\Slack\SlackPublish();
-	new \DataMachineBusiness\Handlers\Slack\SlackFetch();
-
-	// Discord
-	new \DataMachineBusiness\Abilities\Discord\PostMessageDiscordAbility();
-	new \DataMachineBusiness\Abilities\Discord\FetchMessagesDiscordAbility();
-
-	// Bing Webmaster Tools.
-	new \DataMachineBusiness\Abilities\Analytics\BingWebmasterAbilities();
-	new \DataMachineBusiness\Tools\BingWebmaster();
-
-	// Discord Handlers
-	new \DataMachineBusiness\Handlers\Discord\DiscordPublish();
-	new \DataMachineBusiness\Handlers\Discord\DiscordFetch();
-
-	// Business AI tools
-	new \DataMachineBusiness\Tools\AmazonAffiliateLink();
-
-	// Media Hygiene — orphan files + unused attachments.
-	new \DataMachineBusiness\Abilities\MediaHygiene\MediaHygieneAbility();
-
-	// Sendy — generic email-marketing integration (subscribe, campaigns, metrics).
-	new \DataMachineBusiness\Abilities\Sendy\SendyAbilities();
+	\DataMachineBusiness\Bootstrap\ProviderBootstrap::boot( \DataMachineBusiness\Bootstrap\ProviderModules::all() );
 }
 
-// Hook into plugins_loaded to ensure Data Machine core is loaded first
+\DataMachineBusiness\Bootstrap\ProviderBootstrap::register_discovery();
+
+// Hook into plugins_loaded to ensure Data Machine core is loaded first.
 add_action( 'plugins_loaded', 'datamachine_business_load_handlers', 20 );
 
 /**
@@ -164,6 +99,7 @@ add_filter( 'datamachine_analytics_ability_map', function ( array $ability_map )
  * the single source of truth for command registration.
  */
 add_action( 'plugins_loaded', function (): void {
+	// @phpstan-ignore-next-line WP_CLI can be false outside the analysis bootstrap.
 	if ( ! defined( 'WP_CLI' ) || ! WP_CLI || ! class_exists( 'DataMachine\\Cli\\BaseCommand' ) ) {
 		return;
 	}

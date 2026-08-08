@@ -7,11 +7,11 @@
 
 $root = dirname( __DIR__ );
 
-$plugin_file = file_get_contents( $root . '/data-machine-business.php' );
-$tool_file   = file_get_contents( $root . '/inc/Tools/GoogleSearch.php' );
+$providers_file = file_get_contents( $root . '/inc/Bootstrap/ProviderModules.php' );
+$tool_file      = file_get_contents( $root . '/inc/Tools/GoogleSearch.php' );
 
 $checks = array(
-	'plugin instantiates Google Search tool' => str_contains( $plugin_file, 'new \\DataMachineBusiness\\Tools\\GoogleSearch();' ),
+	'provider module instantiates Google Search tool' => str_contains( $providers_file, 'new \\DataMachineBusiness\\Tools\\GoogleSearch()' ),
 	'tool registers google_search slug'      => str_contains( $tool_file, "registerTool( 'google_search'" ),
 	'tool keeps existing config option'      => str_contains( $tool_file, "get_site_option( 'datamachine_search_config'" ),
 	'tool uses Custom Search API endpoint'   => str_contains( $tool_file, 'https://www.googleapis.com/customsearch/v1' ),
