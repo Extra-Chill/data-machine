@@ -9,6 +9,7 @@
 namespace DataMachine\Core\ActionScheduler;
 
 use DataMachine\Core\Database\BatchItems\BatchItems;
+use DataMachine\Core\Database\Jobs\Jobs;
 use DataMachine\Core\EngineData;
 
 defined( 'ABSPATH' ) || exit;
@@ -32,7 +33,7 @@ class PathlessBatchRecovery {
 		}
 
 		global $wpdb;
-		$jobs_table = $wpdb->prefix . 'datamachine_jobs';
+		$jobs_table = $wpdb->prefix . Jobs::TABLE_NAME;
 		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name is generated from the WordPress prefix.
 		$active_children = (int) $wpdb->get_var(
 			$wpdb->prepare( "SELECT COUNT(*) FROM {$jobs_table} WHERE parent_job_id = %d AND status IN ( %s, %s )", $parent_job_id, 'pending', 'processing' )
@@ -103,7 +104,7 @@ class PathlessBatchRecovery {
 		$timeout_seconds = max( 1, $timeout_hours ) * HOUR_IN_SECONDS;
 		$now_gmt         = strtotime( current_time( 'mysql', true ) );
 		foreach ( $actions as $action ) {
-			if ( self::extractParentJobId( (string) ( $action->args ?? '' ) ) !== $parent_job_id ) {
+			if ( $parent_job_id !== self::extractParentJobId( (string) ( $action->args ?? '' ) ) ) {
 				continue;
 			}
 			if ( 'pending' === (string) $action->status ) {
