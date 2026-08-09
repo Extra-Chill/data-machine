@@ -131,8 +131,10 @@ assert_retention(
 );
 assert_retention(
 	'file dry-run counter includes old job directories',
-	str_contains( $sources['cleanup'], '$jobs_dir = "{$flow_dir}/jobs";' )
-		&& str_contains( $sources['cleanup'], '++$count;' )
+	str_contains( $sources['cleanup'], 'count_old_files( self::fileRetentionDays() )' )
+		&& str_contains( $sources['files'], '$jobs_dir = "{$flow_dir}/jobs";' )
+		&& str_contains( $sources['files'], 'if ( $count_job_dirs )' )
+		&& str_contains( $sources['files'], '++$matched_count;' )
 );
 assert_retention(
 	'job artifact retention has separate scope policy hook',
