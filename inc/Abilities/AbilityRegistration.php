@@ -15,6 +15,13 @@ defined( 'ABSPATH' ) || exit;
 class AbilityRegistration {
 
 	/**
+	 * Registration callbacks claimed by their concrete provider and declaration.
+	 *
+	 * @var array<string, true>
+	 */
+	private static array $registration_owners = array();
+
+	/**
 	 * Tracks lazy full-runtime activation for ability execution callbacks.
 	 *
 	 * @var bool
@@ -27,6 +34,12 @@ class AbilityRegistration {
 	 * @param callable $register_callback Ability registration callback.
 	 */
 	public static function on_abilities_api_init( callable $register_callback ): void {
+		$owner = self::registration_owner( $register_callback );
+		if ( isset( self::$registration_owners[ $owner ] ) ) {
+			return;
+		}
+		self::$registration_owners[ $owner ] = true;
+
 		if ( doing_action( 'wp_abilities_api_init' ) ) {
 			$register_callback();
 			return;
@@ -52,6 +65,46 @@ class AbilityRegistration {
 		} finally {
 			array_pop( $wp_current_filter );
 		}
+	}
+
+	/**
+	 * Identify one provider registration callback across repeated construction.
+	 *
+	 * Concrete object classes keep inherited provider declarations distinct, while
+	 * the declaration location allows one provider to own multiple callbacks.
+	 *
+	 * @param callable $callback Ability registration callback.
+	 * @return string Stable request-local owner key.
+	 */
+	private static function registration_owner( callable $callback ): string {
+		if ( $callback instanceof \Closure ) {
+			$reflection = new \ReflectionFunction( $callback );
+			$bound      = $reflection->getClosureThis();
+			$scope      = $reflection->getClosureScopeClass();
+			$provider   = null !== $bound ? $bound::class : ( null !== $scope ? $scope->getName() : '' );
+
+			return implode(
+				':',
+				array(
+					$provider,
+					(string) $reflection->getFileName(),
+					(string) $reflection->getStartLine(),
+					(string) $reflection->getEndLine(),
+				)
+			);
+		}
+
+		if ( is_array( $callback ) ) {
+			$provider = is_object( $callback[0] ) ? $callback[0]::class : (string) $callback[0];
+
+			return $provider . '::' . (string) $callback[1];
+		}
+
+		if ( is_object( $callback ) ) {
+			return $callback::class . '::__invoke';
+		}
+
+		return (string) $callback;
 	}
 
 	/**
