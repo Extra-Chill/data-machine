@@ -78,7 +78,7 @@ class LogAbilities {
 						'type'       => 'object',
 						'properties' => array(
 							'agent_id' => array(
-								'type'        => array( 'integer', 'null' ),
+								'anyOf'       => array( array( 'type' => 'integer' ), array( 'type' => 'null' ) ),
 								'description' => 'Agent ID to clear logs for. Null or omitted clears all.',
 							),
 						),
@@ -88,7 +88,7 @@ class LogAbilities {
 						'properties' => array(
 							'success' => array( 'type' => 'boolean' ),
 							'message' => array( 'type' => 'string' ),
-							'deleted' => array( 'type' => array( 'integer', 'null' ) ),
+							'deleted' => array( 'anyOf' => array( array( 'type' => 'integer' ), array( 'type' => 'null' ) ) ),
 						),
 					),
 					'execute_callback'    => array( self::class, 'clear' ),
@@ -107,7 +107,7 @@ class LogAbilities {
 						'type'       => 'object',
 						'properties' => array(
 							'agent_id'    => array(
-								'type'        => array( 'integer', 'null' ),
+								'anyOf'       => array( array( 'type' => 'integer' ), array( 'type' => 'null' ) ),
 								'description' => 'Filter by agent ID. Null = all agents.',
 							),
 							'level'       => array(
@@ -175,7 +175,7 @@ class LogAbilities {
 						'type'       => 'object',
 						'properties' => array(
 							'agent_id' => array(
-								'type'        => array( 'integer', 'null' ),
+								'anyOf'       => array( array( 'type' => 'integer' ), array( 'type' => 'null' ) ),
 								'description' => 'Agent ID to get metadata for. Null = all.',
 							),
 						),
@@ -185,8 +185,8 @@ class LogAbilities {
 						'properties' => array(
 							'success'       => array( 'type' => 'boolean' ),
 							'total_entries' => array( 'type' => 'integer' ),
-							'oldest'        => array( 'type' => array( 'string', 'null' ) ),
-							'newest'        => array( 'type' => array( 'string', 'null' ) ),
+							'oldest'        => array( 'anyOf' => array( array( 'type' => 'string' ), array( 'type' => 'null' ) ) ),
+							'newest'        => array( 'anyOf' => array( array( 'type' => 'string' ), array( 'type' => 'null' ) ) ),
 							'level_counts'  => array( 'type' => 'object' ),
 						),
 					),

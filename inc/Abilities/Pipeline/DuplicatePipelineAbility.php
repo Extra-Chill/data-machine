@@ -43,7 +43,7 @@ class DuplicatePipelineAbility {
 								'description' => __( 'Name for the new pipeline (defaults to "Copy of {original}")', 'data-machine' ),
 							),
 							'agent_id'    => array(
-								'type'        => array( 'integer', 'null' ),
+								'anyOf'       => array( array( 'type' => 'integer' ), array( 'type' => 'null' ) ),
 								'description' => __( 'Agent ID for the new pipeline. Defaults to source pipeline agent_id.', 'data-machine' ),
 							),
 						),

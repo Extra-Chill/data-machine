@@ -46,7 +46,7 @@ class AgentMemoryAbilities {
 						'type'       => 'object',
 						'properties' => array(
 							'agent_id' => array(
-								'type'        => array( 'integer', 'null' ),
+								'anyOf'       => array( array( 'type' => 'integer' ), array( 'type' => 'null' ) ),
 								'description' => 'Agent ID for agent-scoped memory. Takes priority over user_id when provided.',
 							),
 							'user_id'  => array(
@@ -94,7 +94,7 @@ class AgentMemoryAbilities {
 						'type'       => 'object',
 						'properties' => array(
 							'agent_id' => array(
-								'type'        => array( 'integer', 'null' ),
+								'anyOf'       => array( array( 'type' => 'integer' ), array( 'type' => 'null' ) ),
 								'description' => 'Agent ID for agent-scoped memory. Takes priority over user_id when provided.',
 							),
 							'user_id'  => array(
@@ -146,7 +146,7 @@ class AgentMemoryAbilities {
 						'type'       => 'object',
 						'properties' => array(
 							'agent_id'          => array(
-								'type'        => array( 'integer', 'null' ),
+								'anyOf'       => array( array( 'type' => 'integer' ), array( 'type' => 'null' ) ),
 								'description' => 'Optional target agent. Defaults to the current acting agent; other agents require explicit delegation.',
 							),
 							'file'              => array(
@@ -214,7 +214,7 @@ class AgentMemoryAbilities {
 						'required'   => array( 'query' ),
 						'properties' => array(
 							'agent_id' => array(
-								'type'        => array( 'integer', 'null' ),
+								'anyOf'       => array( array( 'type' => 'integer' ), array( 'type' => 'null' ) ),
 								'description' => 'Agent ID for agent-scoped memory. Takes priority over user_id when provided.',
 							),
 							'user_id'  => array(
@@ -273,7 +273,7 @@ class AgentMemoryAbilities {
 						'type'       => 'object',
 						'properties' => array(
 							'agent_id' => array(
-								'type'        => array( 'integer', 'null' ),
+								'anyOf'       => array( array( 'type' => 'integer' ), array( 'type' => 'null' ) ),
 								'description' => 'Agent ID for agent-scoped memory. Takes priority over user_id when provided.',
 							),
 							'user_id'  => array(

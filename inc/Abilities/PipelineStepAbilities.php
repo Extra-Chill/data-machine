@@ -68,7 +68,7 @@ class PipelineStepAbilities {
 							'description' => __( 'Pipeline ID to get steps for (required unless pipeline_step_id provided)', 'data-machine' ),
 						),
 						'pipeline_step_id' => array(
-							'type'        => array( 'string', 'null' ),
+							'anyOf'       => array( array( 'type' => 'string' ), array( 'type' => 'null' ) ),
 							'description' => __( 'Get a specific step by ID (ignores pipeline_id when provided)', 'data-machine' ),
 						),
 					),

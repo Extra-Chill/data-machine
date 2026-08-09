@@ -46,7 +46,7 @@ class ExecuteAgentWorkflowAbility {
 								'description' => __( 'Inputs passed to WP_Agent_Workflow_Runner.', 'data-machine' ),
 							),
 							'run_id'            => array(
-								'type'        => array( 'string', 'null' ),
+								'anyOf'       => array( array( 'type' => 'string' ), array( 'type' => 'null' ) ),
 								'description' => __( 'Optional caller-stable Agents API run ID.', 'data-machine' ),
 							),
 							'continue_on_error' => array(
@@ -59,7 +59,7 @@ class ExecuteAgentWorkflowAbility {
 								'description' => __( 'Optional metadata forwarded to the Agents API workflow result.', 'data-machine' ),
 							),
 							'label'             => array(
-								'type'        => array( 'string', 'null' ),
+								'anyOf'       => array( array( 'type' => 'string' ), array( 'type' => 'null' ) ),
 								'description' => __( 'Optional Data Machine job label.', 'data-machine' ),
 							),
 						),
@@ -68,7 +68,7 @@ class ExecuteAgentWorkflowAbility {
 						'type'       => 'object',
 						'properties' => array(
 							'success'     => array( 'type' => 'boolean' ),
-							'job_id'      => array( 'type' => array( 'integer', 'null' ) ),
+							'job_id'      => array( 'anyOf' => array( array( 'type' => 'integer' ), array( 'type' => 'null' ) ) ),
 							'run_id'      => array( 'type' => 'string' ),
 							'workflow_id' => array( 'type' => 'string' ),
 							'status'      => array( 'type' => 'string' ),

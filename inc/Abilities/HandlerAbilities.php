@@ -95,11 +95,11 @@ class HandlerAbilities {
 					'type'       => 'object',
 					'properties' => array(
 						'handler_slug' => array(
-							'type'        => array( 'string', 'null' ),
+							'anyOf'       => array( array( 'type' => 'string' ), array( 'type' => 'null' ) ),
 							'description' => __( 'Get a specific handler by slug (ignores step_type filter when provided)', 'data-machine' ),
 						),
 						'step_type'    => array(
-							'type'        => array( 'string', 'null' ),
+							'anyOf'       => array( array( 'type' => 'string' ), array( 'type' => 'null' ) ),
 							'description' => __( 'Step type filter (fetch, publish, upsert, etc.)', 'data-machine' ),
 						),
 					),
@@ -137,7 +137,7 @@ class HandlerAbilities {
 							'description' => __( 'Handler slug to validate', 'data-machine' ),
 						),
 						'step_type'    => array(
-							'type'        => array( 'string', 'null' ),
+							'anyOf'       => array( array( 'type' => 'string' ), array( 'type' => 'null' ) ),
 							'description' => __( 'Optional step type constraint', 'data-machine' ),
 						),
 					),
@@ -237,7 +237,7 @@ class HandlerAbilities {
 					'type'       => 'object',
 					'properties' => array(
 						'handler_slug' => array(
-							'type'        => array( 'string', 'null' ),
+							'anyOf'       => array( array( 'type' => 'string' ), array( 'type' => 'null' ) ),
 							'description' => __( 'Optional handler slug to filter defaults', 'data-machine' ),
 						),
 					),

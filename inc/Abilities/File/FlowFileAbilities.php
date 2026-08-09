@@ -213,11 +213,11 @@ class FlowFileAbilities {
 					'type'       => 'object',
 					'properties' => array(
 						'job_id'  => array(
-							'type'        => array( 'integer', 'null' ),
+							'anyOf'       => array( array( 'type' => 'integer' ), array( 'type' => 'null' ) ),
 							'description' => __( 'Job ID to cleanup files for (requires flow_id)', 'data-machine' ),
 						),
 						'flow_id' => array(
-							'type'        => array( 'integer', 'null' ),
+							'anyOf'       => array( array( 'type' => 'integer' ), array( 'type' => 'null' ) ),
 							'description' => __( 'Flow ID to cleanup files for', 'data-machine' ),
 						),
 					),

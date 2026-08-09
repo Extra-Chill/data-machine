@@ -46,7 +46,7 @@ class ScheduleFlowAbility {
 								'description' => __( 'Flow ID to schedule.', 'data-machine' ),
 							),
 							'interval_or_timestamp' => array(
-								'type'        => array( 'string', 'integer' ),
+								'anyOf'       => array( array( 'type' => 'string' ), array( 'type' => 'integer' ) ),
 								'description' => __( "Either 'manual', numeric timestamp, interval key, or cron expression.", 'data-machine' ),
 							),
 						),

@@ -58,7 +58,7 @@ class RuntimeTaskAbility {
 							'schema'      => array( 'type' => 'string' ),
 							'status'      => array( 'type' => 'string' ),
 							'task'        => array( 'type' => 'object' ),
-							'result'      => array( 'type' => array( 'object', 'array', 'string', 'number', 'boolean', 'null' ) ),
+							'result'      => array( 'anyOf' => array( array( 'type' => 'object' ), array( 'type' => 'array' ), array( 'type' => 'string' ), array( 'type' => 'number' ), array( 'type' => 'boolean' ), array( 'type' => 'null' ) ) ),
 							'artifacts'   => array( 'type' => 'array' ),
 							'diagnostics' => array( 'type' => 'array' ),
 							'metrics'     => array( 'type' => 'object' ),

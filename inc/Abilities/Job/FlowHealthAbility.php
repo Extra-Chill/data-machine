@@ -47,7 +47,7 @@ class FlowHealthAbility {
 							'flow_id'              => array( 'type' => 'integer' ),
 							'consecutive_failures' => array( 'type' => 'integer' ),
 							'consecutive_no_items' => array( 'type' => 'integer' ),
-							'latest_job'           => array( 'type' => array( 'object', 'null' ) ),
+							'latest_job'           => array( 'anyOf' => array( array( 'type' => 'object' ), array( 'type' => 'null' ) ) ),
 							'error'                => array( 'type' => 'string' ),
 						),
 					),

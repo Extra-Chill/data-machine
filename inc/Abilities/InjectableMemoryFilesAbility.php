@@ -50,7 +50,7 @@ class InjectableMemoryFilesAbility {
 						'type'       => 'object',
 						'properties' => array(
 							'agent_id' => array(
-								'type'        => array( 'integer', 'null' ),
+								'anyOf'       => array( array( 'type' => 'integer' ), array( 'type' => 'null' ) ),
 								'description' => 'Agent ID. Takes priority over user_id when provided.',
 							),
 							'user_id'  => array(

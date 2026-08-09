@@ -36,7 +36,7 @@ class GetJobsAbility {
 						'type'       => 'object',
 						'properties' => array(
 							'job_id'              => array(
-								'type'        => array( 'integer', 'null' ),
+								'anyOf'       => array( array( 'type' => 'integer' ), array( 'type' => 'null' ) ),
 								'description' => __( 'Get a specific job by ID (ignores pagination/filters when provided)', 'data-machine' ),
 							),
 							'user_id'             => array(
@@ -44,27 +44,27 @@ class GetJobsAbility {
 								'description' => __( 'Filter jobs by WordPress user ID.', 'data-machine' ),
 							),
 							'agent_id'            => array(
-								'type'        => array( 'integer', 'null' ),
+								'anyOf'       => array( array( 'type' => 'integer' ), array( 'type' => 'null' ) ),
 								'description' => __( 'Filter jobs by agent ID. Takes priority over user_id when provided.', 'data-machine' ),
 							),
 							'flow_id'             => array(
-								'type'        => array( 'integer', 'string', 'null' ),
+								'anyOf'       => array( array( 'type' => 'integer' ), array( 'type' => 'string' ), array( 'type' => 'null' ) ),
 								'description' => __( 'Filter jobs by flow ID (integer or "direct")', 'data-machine' ),
 							),
 							'pipeline_id'         => array(
-								'type'        => array( 'integer', 'string', 'null' ),
+								'anyOf'       => array( array( 'type' => 'integer' ), array( 'type' => 'string' ), array( 'type' => 'null' ) ),
 								'description' => __( 'Filter jobs by pipeline ID (integer or "direct")', 'data-machine' ),
 							),
 							'status'              => array(
-								'type'        => array( 'string', 'null' ),
+								'anyOf'       => array( array( 'type' => 'string' ), array( 'type' => 'null' ) ),
 								'description' => __( 'Filter jobs by status (pending, processing, completed, failed, completed_no_items, agent_skipped)', 'data-machine' ),
 							),
 							'source'              => array(
-								'type'        => array( 'string', 'null' ),
+								'anyOf'       => array( array( 'type' => 'string' ), array( 'type' => 'null' ) ),
 								'description' => __( 'Filter jobs by source (pipeline, chat, system, api, direct)', 'data-machine' ),
 							),
 							'handler'             => array(
-								'type'        => array( 'string', 'null' ),
+								'anyOf'       => array( array( 'type' => 'string' ), array( 'type' => 'null' ) ),
 								'description' => __( 'Filter jobs by generic handler slug recorded in job outcome metadata.', 'data-machine' ),
 							),
 							'per_page'            => array(
@@ -92,7 +92,7 @@ class GetJobsAbility {
 								'description' => __( 'Sort order', 'data-machine' ),
 							),
 							'since'               => array(
-								'type'        => array( 'string', 'null' ),
+								'anyOf'       => array( array( 'type' => 'string' ), array( 'type' => 'null' ) ),
 								'description' => __( 'Filter jobs created at or after this datetime (Y-m-d H:i:s)', 'data-machine' ),
 							),
 							'fields'              => array(
@@ -142,21 +142,21 @@ class GetJobsAbility {
 	 * @return array Result with jobs list.
 	 */
 	public function execute( array $input ): array {
-		$job_id      = $input['job_id'] ?? null;
-		$flow_id     = $input['flow_id'] ?? null;
-		$pipeline_id = $input['pipeline_id'] ?? null;
-		$user_id     = $input['user_id'] ?? null;
-		$agent_id    = $input['agent_id'] ?? null;
-		$status      = $input['status'] ?? null;
-		$source      = $input['source'] ?? null;
-		$handler     = $input['handler'] ?? null;
-		$since       = $input['since'] ?? null;
-		$per_page    = (int) ( $input['per_page'] ?? self::DEFAULT_PER_PAGE );
-		$offset      = (int) ( $input['offset'] ?? 0 );
-		$orderby     = $input['orderby'] ?? 'j.job_id';
-		$order       = $input['order'] ?? 'DESC';
-		$fields      = $input['fields'] ?? null;
-		$metadata    = \DataMachine\Core\ExecutionQuery::normalize_metadata_filters( $input['metadata'] ?? array() );
+		$job_id          = $input['job_id'] ?? null;
+		$flow_id         = $input['flow_id'] ?? null;
+		$pipeline_id     = $input['pipeline_id'] ?? null;
+		$user_id         = $input['user_id'] ?? null;
+		$agent_id        = $input['agent_id'] ?? null;
+		$status          = $input['status'] ?? null;
+		$source          = $input['source'] ?? null;
+		$handler         = $input['handler'] ?? null;
+		$since           = $input['since'] ?? null;
+		$per_page        = (int) ( $input['per_page'] ?? self::DEFAULT_PER_PAGE );
+		$offset          = (int) ( $input['offset'] ?? 0 );
+		$orderby         = $input['orderby'] ?? 'j.job_id';
+		$order           = $input['order'] ?? 'DESC';
+		$fields          = $input['fields'] ?? null;
+		$metadata        = \DataMachine\Core\ExecutionQuery::normalize_metadata_filters( $input['metadata'] ?? array() );
 		$ownership_scope = $this->jobCollectionScope(
 			null !== $user_id ? (int) $user_id : null,
 			null !== $agent_id ? (int) $agent_id : null

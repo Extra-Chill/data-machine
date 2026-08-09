@@ -67,11 +67,11 @@ class RecoverStuckJobsAbility {
 								'description' => __( 'Preview what would be updated without making changes', 'data-machine' ),
 							),
 							'flow_id'       => array(
-								'type'        => array( 'integer', 'null' ),
+								'anyOf'       => array( array( 'type' => 'integer' ), array( 'type' => 'null' ) ),
 								'description' => __( 'Filter to recover jobs only for a specific flow ID', 'data-machine' ),
 							),
 							'job_id'        => array(
-								'type'        => array( 'integer', 'null' ),
+								'anyOf'       => array( array( 'type' => 'integer' ), array( 'type' => 'null' ) ),
 								'minimum'     => 1,
 								'description' => __( 'Recover one exact job ID', 'data-machine' ),
 							),
