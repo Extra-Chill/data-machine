@@ -77,6 +77,102 @@ final class OptionLeaseStoreTest extends WP_UnitTestCase {
 		$this->assertSame( $fresh, get_option( $this->lease_name ) );
 	}
 
+	public function test_missing_lease_acquisition_is_non_autoloaded_and_readable_after_cached_miss(): void {
+		$lease = $this->lease();
+		$this->assertFalse( get_option( $this->lease_name, false ) );
+
+		$result = OptionLeaseStore::acquire( $this->lease_name, $lease, 300 );
+
+		$this->assertTrue( $result['acquired'] );
+		$this->assertSame( $lease, get_option( $this->lease_name ) );
+		$this->assertNotContains( $this->stored_autoload_value(), wp_autoload_values_to_autoload(), true );
+		$this->assertArrayNotHasKey( $this->lease_name, wp_load_alloptions() );
+		$notoptions = wp_cache_get( 'notoptions', 'options' );
+		$this->assertTrue( false === $notoptions || ! isset( $notoptions[ $this->lease_name ] ) );
+	}
+
+	public function test_contended_missing_lease_acquisition_reads_the_winner_after_cached_miss(): void {
+		global $wpdb;
+
+		$winner = $this->lease();
+		$loser  = $winner;
+		$loser['token'] = 'other-owner';
+		$this->assertFalse( get_option( $this->lease_name, false ) );
+		$this->assertSame(
+			1,
+			$wpdb->insert(
+				$wpdb->options,
+				array(
+					'option_name'  => $this->lease_name,
+					'option_value' => maybe_serialize( $winner ),
+					'autoload'     => 'off',
+				),
+				array( '%s', '%s', '%s' )
+			)
+		);
+
+		$result = OptionLeaseStore::acquire( $this->lease_name, $loser, 300 );
+
+		$this->assertFalse( $result['acquired'] );
+		$this->assertSame( $winner, $result['payload'] );
+		$this->assertSame( $winner, get_option( $this->lease_name ) );
+		$this->assertArrayNotHasKey( $this->lease_name, wp_load_alloptions() );
+	}
+
+	public function test_two_mysql_sessions_allow_only_one_missing_lease_acquisition(): void {
+		if ( ! class_exists( '\mysqli' ) || ! defined( 'MYSQLI_ASYNC' ) ) {
+			$this->markTestSkipped( 'MySQLi async support is unavailable.' );
+		}
+
+		$first  = $this->open_mysql_connection();
+		$second = $this->open_mysql_connection();
+		if ( ! $first instanceof \mysqli || ! $second instanceof \mysqli ) {
+			$this->markTestSkipped( 'Two direct test database connections are unavailable.' );
+		}
+
+		$winner = $this->lease();
+		$loser  = $winner;
+		$loser['token'] = 'other-owner';
+
+		try {
+			$this->assertTrue( $first->query( 'SET SESSION innodb_lock_wait_timeout = 2' ) );
+			$this->assertTrue( $second->query( 'SET SESSION innodb_lock_wait_timeout = 2' ) );
+			$this->assertTrue( $first->query( 'START TRANSACTION' ) );
+			$this->assertTrue( $first->query( $this->insert_query( $first, $winner ) ) );
+			$this->assertSame( 1, $first->affected_rows );
+			$this->assertTrue( $second->query( $this->insert_query( $second, $loser ), MYSQLI_ASYNC ) );
+			$read   = array( $second );
+			$error  = array();
+			$reject = array();
+			$this->assertSame( 0, \mysqli_poll( $read, $error, $reject, 0, 100000 ), 'The competing insert must wait for the option-name unique key.' );
+
+			$this->assertTrue( $first->query( 'COMMIT' ) );
+			$ready = 0;
+			for ( $attempt = 0; $attempt < 20 && 0 === $ready; ++$attempt ) {
+				$read   = array( $second );
+				$error  = array();
+				$reject = array();
+				$ready  = \mysqli_poll( $read, $error, $reject, 0, 100000 );
+			}
+
+			$this->assertSame( 1, $ready, 'The competing insert should resume after the winner commits.' );
+			$this->assertFalse( $second->reap_async_query() );
+			$this->assertSame( 1062, $second->errno );
+			$table      = $this->options_table();
+			$lease_name = $first->real_escape_string( $this->lease_name );
+			$result     = $first->query( "SELECT option_value, autoload FROM `{$table}` WHERE option_name = '{$lease_name}'" );
+			$this->assertInstanceOf( \mysqli_result::class, $result );
+			$row = $result->fetch_assoc();
+			$this->assertSame( $winner, maybe_unserialize( $row['option_value'] ) );
+			$this->assertNotContains( $row['autoload'], wp_autoload_values_to_autoload(), true );
+		} finally {
+			$first->query( 'ROLLBACK' );
+			$second->query( 'ROLLBACK' );
+			$first->close();
+			$second->close();
+		}
+	}
+
 	public function test_two_mysql_sessions_allow_only_one_stale_lease_takeover(): void {
 		if ( ! class_exists( '\mysqli' ) || ! defined( 'MYSQLI_ASYNC' ) ) {
 			$this->markTestSkipped( 'MySQLi async support is unavailable.' );
@@ -243,6 +339,24 @@ final class OptionLeaseStoreTest extends WP_UnitTestCase {
 			$connection->real_escape_string( maybe_serialize( $replacement ) ),
 			$connection->real_escape_string( $this->lease_name ),
 			$connection->real_escape_string( maybe_serialize( $stale ) )
+		);
+	}
+
+	private function insert_query( \mysqli $connection, array $lease ): string {
+		$table = $this->options_table();
+
+		return sprintf(
+			"INSERT INTO `{$table}` (option_name, option_value, autoload) VALUES ('%s', '%s', 'off')",
+			$connection->real_escape_string( $this->lease_name ),
+			$connection->real_escape_string( maybe_serialize( $lease ) )
+		);
+	}
+
+	private function stored_autoload_value(): string {
+		global $wpdb;
+
+		return (string) $wpdb->get_var(
+			$wpdb->prepare( 'SELECT autoload FROM %i WHERE option_name = %s', $wpdb->options, $this->lease_name )
 		);
 	}
 

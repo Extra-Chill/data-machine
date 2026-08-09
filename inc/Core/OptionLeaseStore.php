@@ -56,7 +56,7 @@ class OptionLeaseStore {
 			);
 		}
 
-		if ( add_option( $option_name, $payload, '', false ) ) {
+		if ( self::insertUnlocked( $option_name, $payload ) ) {
 			return array(
 				'acquired'    => true,
 				'status'      => 'held',
@@ -73,6 +73,42 @@ class OptionLeaseStore {
 			'payload'     => $current['payload'],
 			'option_name' => $option_name,
 		);
+	}
+
+	/**
+	 * Atomically insert a lease only while its option row is absent.
+	 *
+	 * @param array<string,mixed> $payload Lease payload.
+	 */
+	private static function insertUnlocked( string $option_name, array $payload ): bool {
+		global $wpdb;
+		if ( isset( $wpdb->options ) && method_exists( $wpdb, 'query' ) && method_exists( $wpdb, 'prepare' ) ) {
+			$previous_suppression = method_exists( $wpdb, 'suppress_errors' ) ? $wpdb->suppress_errors( true ) : null;
+			// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared -- A plain insert and the option-name unique key are the missing-row fencing primitive.
+			$inserted = $wpdb->query(
+				$wpdb->prepare(
+					'INSERT INTO %i (option_name, option_value, autoload) VALUES (%s, %s, %s)',
+					$wpdb->options,
+					$option_name,
+					maybe_serialize( $payload ),
+					'off'
+				)
+			);
+			// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared
+			if ( null !== $previous_suppression ) {
+				$wpdb->suppress_errors( $previous_suppression );
+			}
+
+			// Both sessions may have cached the missing row before the unique-key race resolves.
+			wp_cache_delete( $option_name, 'options' );
+			wp_cache_delete( 'notoptions', 'options' );
+			wp_cache_delete( 'alloptions', 'options' );
+
+			return 1 === $inserted;
+		}
+
+		// Lightweight test runtimes may not provide wpdb.
+		return add_option( $option_name, $payload, '', false );
 	}
 
 	/**
