@@ -272,16 +272,18 @@ class RetentionCleanup {
 	}
 
 	/**
-	 * Read-only row counts for the Action Scheduler tables.
+	 * Read-only row estimates for the Action Scheduler tables.
 	 *
 	 * Pure read with no side effects — safe for health/diagnostic surfaces.
 	 * Returns the per-table counts plus a `breached` flag against the configured
 	 * threshold. When the threshold is disabled (`<= 0`) `breached` is always
 	 * false but the live counts are still returned for reporting.
 	 *
-	 * NOTE: `SELECT COUNT(*)` on InnoDB is a full index scan. On the very
-	 * installs this guardrail targets (multi-million-row tables) that is not
-	 * free, so callers should treat it as a periodic check, not a hot path.
+	 * InnoDB cannot answer `COUNT(*)` from metadata, so exact counts require a
+	 * full index scan. Use information_schema estimates instead: this guardrail
+	 * only needs to detect orders-of-magnitude bloat and must remain cheap on the
+	 * multi-million-row tables it monitors. SQLite retains exact counts because
+	 * information_schema is unavailable there.
 	 *
 	 * @return array{enabled: bool, threshold: int, actions: int, logs: int, breached: bool}
 	 */
@@ -292,10 +294,27 @@ class RetentionCleanup {
 		$actions_table = $wpdb->prefix . 'actionscheduler_actions';
 		$logs_table    = $wpdb->prefix . 'actionscheduler_logs';
 
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-		$actions_rows = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i', $actions_table ) );
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-		$logs_rows = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i', $logs_table ) );
+		if ( class_exists( BaseRepository::class ) && BaseRepository::is_sqlite() ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			$actions_rows = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i', $actions_table ) );
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			$logs_rows = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i', $logs_table ) );
+		} else {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			$actions_rows = (int) $wpdb->get_var(
+				$wpdb->prepare(
+					'SELECT TABLE_ROWS FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = %s',
+					$actions_table
+				)
+			);
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			$logs_rows = (int) $wpdb->get_var(
+				$wpdb->prepare(
+					'SELECT TABLE_ROWS FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = %s',
+					$logs_table
+				)
+			);
+		}
 
 		$breached = $threshold > 0 && ( $actions_rows > $threshold || $logs_rows > $threshold );
 
@@ -786,11 +805,9 @@ class RetentionCleanup {
 			$cutoff = $window['cutoff'];
 			$hook   = $window['hook'];
 
-			// Logs are FK-children of actions; prune them first so deleting the
-			// parent action never orphans rows. Both passes are batched by id.
-			$logs_deleted += self::deleteActionSchedulerLogsBatched(
+			$deleted          = self::deleteActionSchedulerWindowBatched(
+				$actions_table,
 				$logs_table,
-				$actions_table,
 				$cutoff,
 				$hook,
 				$batch_size,
@@ -799,17 +816,8 @@ class RetentionCleanup {
 				$iterations_used,
 				$hit_limit
 			);
-
-			$actions_deleted += self::deleteActionSchedulerActionsBatched(
-				$actions_table,
-				$cutoff,
-				$hook,
-				$batch_size,
-				$max_iterations,
-				$deadline,
-				$iterations_used,
-				$hit_limit
-			);
+			$actions_deleted += $deleted['actions_deleted'];
+			$logs_deleted    += $deleted['logs_deleted'];
 		}
 
 		// Hard row-count ceiling per high-churn hook. Age windows above can
@@ -886,7 +894,7 @@ class RetentionCleanup {
 	 * For each hook with a configured ceiling, deletes the oldest completed/
 	 * failed/canceled rows (and their FK-child logs) that sit beyond the cap —
 	 * regardless of age. "Oldest beyond cap" is computed by keeping the most
-	 * recent $max_rows rows (by last_attempt_gmt) and deleting everything older
+	 * recent $max_rows rows (by scheduled_date_gmt) and deleting everything older
 	 * for that hook. Shares the caller's batch/iteration/wall-clock budget.
 	 *
 	 * @param string $actions_table   Actions table name.
@@ -918,53 +926,51 @@ class RetentionCleanup {
 				break;
 			}
 
-			// Resolve the cutoff timestamp that keeps the most recent $max_rows
-			// completed/terminal rows for this hook. Everything at or older than
-			// the cutoff is deleted. One bounded OFFSET probe per hook (indexed
-			// on hook + last_attempt_gmt) — cheap relative to the delete loop.
+			// Bound each status arm before combining them. The existing query
+			// sorted every row for the hook because Action Scheduler has no
+			// (hook, last_attempt_gmt) index. Each arm below reads at most
+			// max_rows + 1 entries through its shipped hook/status/date index;
+			// the outer OFFSET therefore sorts at most 3 * (max_rows + 1) rows.
+			$probe_limit = $max_rows + 1;
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 			$cutoff = $wpdb->get_var(
 				$wpdb->prepare(
-					'SELECT last_attempt_gmt FROM %i WHERE status IN (%s, %s, %s) AND hook = %s ORDER BY last_attempt_gmt DESC LIMIT 1 OFFSET %d',
+					'(SELECT scheduled_date_gmt FROM %i FORCE INDEX (hook_status_scheduled_date_gmt) WHERE hook = %s AND status = %s ORDER BY scheduled_date_gmt DESC LIMIT %d) UNION ALL (SELECT scheduled_date_gmt FROM %i FORCE INDEX (hook_status_scheduled_date_gmt) WHERE hook = %s AND status = %s ORDER BY scheduled_date_gmt DESC LIMIT %d) UNION ALL (SELECT scheduled_date_gmt FROM %i FORCE INDEX (hook_status_scheduled_date_gmt) WHERE hook = %s AND status = %s ORDER BY scheduled_date_gmt DESC LIMIT %d) ORDER BY scheduled_date_gmt DESC LIMIT 1 OFFSET %d',
 					$actions_table,
-					'complete',
-					'failed',
-					'canceled',
 					$hook,
+					'complete',
+					$probe_limit,
+					$actions_table,
+					$hook,
+					'failed',
+					$probe_limit,
+					$actions_table,
+					$hook,
+					'canceled',
+					$probe_limit,
 					$max_rows
 				)
 			);
 
-			// Fewer than $max_rows rows exist for this hook — nothing to cap.
 			if ( null === $cutoff || '' === $cutoff ) {
 				continue;
 			}
 
-			// Logs first (FK children), then the actions themselves. Reuse the
-			// shared batched id-subquery deleters with this hook's ceiling
-			// cutoff so all the budget/lock-safety guarantees carry over.
-			$logs_deleted += self::deleteActionSchedulerLogsBatched(
+			$deleted          = self::deleteActionSchedulerWindowBatched(
+				$actions_table,
 				$logs_table,
-				$actions_table,
 				$cutoff,
 				$hook,
 				$batch_size,
 				$max_iterations,
 				$deadline,
 				$iterations_used,
-				$hit_limit
+				$hit_limit,
+				null,
+				false
 			);
-
-			$actions_deleted += self::deleteActionSchedulerActionsBatched(
-				$actions_table,
-				$cutoff,
-				$hook,
-				$batch_size,
-				$max_iterations,
-				$deadline,
-				$iterations_used,
-				$hit_limit
-			);
+			$actions_deleted += $deleted['actions_deleted'];
+			$logs_deleted    += $deleted['logs_deleted'];
 		}
 
 		return array(
@@ -1004,14 +1010,15 @@ class RetentionCleanup {
 	}
 
 	/**
-	 * Batched delete of Action Scheduler log rows by id-subquery.
+	 * Delete one retention window through bounded, index-backed action batches.
 	 *
-	 * The multi-table `DELETE l FROM logs l JOIN actions a ... LIMIT` form does
-	 * not reliably affect rows across all runtimes, so we select a bounded set
-	 * of log_ids and delete by primary key — which is reliable and index-fast.
+	 * Selecting action IDs before touching logs is load-bearing: starting from
+	 * the logs table lets MySQL scan millions of child rows before satisfying a
+	 * LIMIT. Each log DELETE here is constrained to a bounded action-id set and
+	 * a row LIMIT, then the same bounded parent set is deleted by primary key.
 	 *
-	 * @param string  $logs_table      Logs table name.
 	 * @param string  $actions_table   Actions table name.
+	 * @param string  $logs_table      Logs table name.
 	 * @param string  $cutoff          GMT cutoff datetime.
 	 * @param ?string $hook            Hook filter, or null for the global window.
 	 * @param int     $batch_size      Rows per batch.
@@ -1019,140 +1026,131 @@ class RetentionCleanup {
 	 * @param float   $deadline        Wall-clock deadline (microtime float).
 	 * @param int     $iterations_used Shared iteration counter (by reference).
 	 * @param bool    $hit_limit       Set true when a budget cap trips (by reference).
-	 * @return int Total rows deleted.
+	 * @param ?string $status               Optional single terminal status.
+	 * @param bool    $require_last_attempt Whether the cutoff also applies to last_attempt_gmt.
+	 * @return array{actions_deleted:int,logs_deleted:int}
 	 */
-	private static function deleteActionSchedulerLogsBatched(
-		string $logs_table,
+	private static function deleteActionSchedulerWindowBatched(
 		string $actions_table,
+		string $logs_table,
 		string $cutoff,
 		?string $hook,
 		int $batch_size,
 		int $max_iterations,
 		float $deadline,
 		int &$iterations_used,
-		bool &$hit_limit
-	): int {
+		bool &$hit_limit,
+		?string $status = null,
+		bool $require_last_attempt = true
+	): array {
 		global $wpdb;
 
-		$deleted = 0;
+		$actions_deleted = 0;
+		$logs_deleted    = 0;
 
 		do {
 			if ( $iterations_used >= $max_iterations || microtime( true ) >= $deadline ) {
 				$hit_limit = true;
 				break;
 			}
-			++$iterations_used;
 
-			if ( null === $hook ) {
-				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-				$affected = $wpdb->query(
-					$wpdb->prepare(
-						'DELETE FROM %i WHERE log_id IN ( SELECT log_id FROM ( SELECT l.log_id FROM %i l INNER JOIN %i a ON l.action_id = a.action_id WHERE a.status IN (%s, %s, %s) AND a.last_attempt_gmt < %s LIMIT %d ) AS tmp )',
-						$logs_table,
-						$logs_table,
-						$actions_table,
-						'complete',
-						'failed',
-						'canceled',
-						$cutoff,
-						$batch_size
-					)
-				);
-			} else {
-				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-				$affected = $wpdb->query(
-					$wpdb->prepare(
-						'DELETE FROM %i WHERE log_id IN ( SELECT log_id FROM ( SELECT l.log_id FROM %i l INNER JOIN %i a ON l.action_id = a.action_id WHERE a.status IN (%s, %s, %s) AND a.last_attempt_gmt < %s AND a.hook = %s LIMIT %d ) AS tmp )',
-						$logs_table,
-						$logs_table,
-						$actions_table,
-						'complete',
-						'failed',
-						'canceled',
-						$cutoff,
-						$hook,
-						$batch_size
-					)
-				);
+			$action_ids = self::selectActionSchedulerActionIds( $actions_table, $cutoff, $hook, $batch_size, $status, $require_last_attempt );
+			if ( empty( $action_ids ) ) {
+				break;
 			}
 
-			$affected = false !== $affected ? (int) $affected : 0;
-			$deleted += $affected;
+			$placeholders = implode( ', ', array_fill( 0, count( $action_ids ), '%d' ) );
+			do {
+				if ( $iterations_used >= $max_iterations || microtime( true ) >= $deadline ) {
+					$hit_limit = true;
+					break 2;
+				}
+				++$iterations_used;
+				$params = array_merge( array( $logs_table ), $action_ids, array( $batch_size ) );
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+				$affected      = $wpdb->query(
+					$wpdb->prepare( "DELETE FROM %i WHERE action_id IN ({$placeholders}) LIMIT %d", $params ) // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
+				);
+				$affected      = false !== $affected ? (int) $affected : 0;
+				$logs_deleted += $affected;
+			} while ( $affected >= $batch_size );
+
+			if ( $iterations_used >= $max_iterations || microtime( true ) >= $deadline ) {
+				$hit_limit = true;
+				break;
+			}
+
+			++$iterations_used;
+			$params = array_merge( array( $actions_table ), $action_ids );
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			$affected         = $wpdb->query(
+				$wpdb->prepare( "DELETE FROM %i WHERE action_id IN ({$placeholders})", $params ) // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			);
+			$affected         = false !== $affected ? (int) $affected : 0;
+			$actions_deleted += $affected;
 		} while ( $affected > 0 );
 
-		return $deleted;
+		return array(
+			'actions_deleted' => $actions_deleted,
+			'logs_deleted'    => $logs_deleted,
+		);
 	}
 
 	/**
-	 * Batched delete of Action Scheduler action rows by id-subquery.
+	 * Select a bounded action batch using indexes shipped by Action Scheduler.
 	 *
-	 * @param string  $actions_table   Actions table name.
-	 * @param string  $cutoff          GMT cutoff datetime.
-	 * @param ?string $hook            Hook filter, or null for the global window.
-	 * @param int     $batch_size      Rows per batch.
-	 * @param int     $max_iterations  Hard iteration ceiling (shared budget).
-	 * @param float   $deadline        Wall-clock deadline (microtime float).
-	 * @param int     $iterations_used Shared iteration counter (by reference).
-	 * @param bool    $hit_limit       Set true when a budget cap trips (by reference).
-	 * @return int Total rows deleted.
+	 * @return array<int, int> Action IDs.
 	 */
-	private static function deleteActionSchedulerActionsBatched(
+	private static function selectActionSchedulerActionIds(
 		string $actions_table,
 		string $cutoff,
 		?string $hook,
 		int $batch_size,
-		int $max_iterations,
-		float $deadline,
-		int &$iterations_used,
-		bool &$hit_limit
-	): int {
+		?string $only_status,
+		bool $require_last_attempt
+	): array {
 		global $wpdb;
 
-		$deleted = 0;
-
-		do {
-			if ( $iterations_used >= $max_iterations || microtime( true ) >= $deadline ) {
-				$hit_limit = true;
+		$action_ids = array();
+		$statuses   = null === $only_status ? array( 'complete', 'failed', 'canceled' ) : array( $only_status );
+		foreach ( $statuses as $status ) {
+			$remaining = $batch_size - count( $action_ids );
+			if ( $remaining <= 0 ) {
 				break;
 			}
-			++$iterations_used;
 
 			if ( null === $hook ) {
 				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-				$affected = $wpdb->query(
+				$ids = $wpdb->get_col(
 					$wpdb->prepare(
-						'DELETE FROM %i WHERE action_id IN ( SELECT action_id FROM ( SELECT a.action_id FROM %i a WHERE a.status IN (%s, %s, %s) AND a.last_attempt_gmt < %s LIMIT %d ) AS tmp )',
+						'SELECT action_id FROM %i FORCE INDEX (status_last_attempt_gmt) WHERE status = %s AND last_attempt_gmt < %s ORDER BY last_attempt_gmt ASC LIMIT %d',
 						$actions_table,
-						$actions_table,
-						'complete',
-						'failed',
-						'canceled',
+						$status,
 						$cutoff,
-						$batch_size
+						$remaining
 					)
 				);
 			} else {
+				$last_attempt_sql = $require_last_attempt ? ' AND last_attempt_gmt < %s' : '';
+				$params           = array( $actions_table, $hook, $status, $cutoff );
+				if ( $require_last_attempt ) {
+					$params[] = $cutoff;
+				}
+				$params[] = $remaining;
 				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-				$affected = $wpdb->query(
+				$ids = $wpdb->get_col(
+					// phpcs:ignore WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
 					$wpdb->prepare(
-						'DELETE FROM %i WHERE action_id IN ( SELECT action_id FROM ( SELECT a.action_id FROM %i a WHERE a.status IN (%s, %s, %s) AND a.last_attempt_gmt < %s AND a.hook = %s LIMIT %d ) AS tmp )',
-						$actions_table,
-						$actions_table,
-						'complete',
-						'failed',
-						'canceled',
-						$cutoff,
-						$hook,
-						$batch_size
+						"SELECT action_id FROM %i FORCE INDEX (hook_status_scheduled_date_gmt) WHERE hook = %s AND status = %s AND scheduled_date_gmt < %s{$last_attempt_sql} ORDER BY scheduled_date_gmt ASC LIMIT %d", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
+						$params
 					)
 				);
 			}
 
-			$affected = false !== $affected ? (int) $affected : 0;
-			$deleted += $affected;
-		} while ( $affected > 0 );
+			$action_ids = array_merge( $action_ids, array_map( 'intval', is_array( $ids ) ? $ids : array() ) );
+		}
 
-		return $deleted;
+		return $action_ids;
 	}
 
 	/**
