@@ -2,6 +2,14 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.172.7] - 2026-08-09
+
+### Changed
+- follow centralized file retention counter
+
+### Fixed
+- fence stale option lease takeover
+
 ## [0.172.6] - 2026-08-09
 
 ### Fixed
