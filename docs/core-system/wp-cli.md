@@ -353,6 +353,12 @@ wp datamachine system run daily_memory_generation
 # Generate a chat session title
 wp datamachine system title abc-123 --force
 
+# Inspect the current site's Action Scheduler claim index (dry-run by default)
+wp datamachine system action-scheduler-claim-index
+
+# Explicitly build and verify the index after preflight passes
+wp datamachine system action-scheduler-claim-index --apply
+
 # Manage system task prompts
 wp datamachine system prompts
 wp datamachine system prompt-get alt_text_generation system_prompt
@@ -361,6 +367,12 @@ wp datamachine system prompt-reset alt_text_generation system_prompt
 ```
 
 `system run` schedules a job through the system task contract; it does not execute the task inline in the CLI process. Process queued work with `wp datamachine worker run` or `wp datamachine drain`.
+
+`system action-scheduler-claim-index` checks for an index beginning with the exact default claim predicate/order columns: `(claim_id, status, priority, attempts, scheduled_date_gmt, action_id)`. It never builds the index during plugin bootstrap, activation, or deployment. The command reports the site-scoped table, current readiness, server/engine support, row and byte estimates, conservative disk requirements, and generated DDL. `--apply` uses `ALGORITHM=INPLACE, LOCK=NONE`, a bounded metadata-lock wait, an advisory migration lock, and post-DDL index verification; unsupported runtimes fail instead of falling back to copying or blocking DDL.
+
+For a remote `DB_HOST`, the web host cannot measure the database data/tmp filesystems. Establish free space on the database host and pass the byte count explicitly with `--available-disk-bytes=<bytes>`; the command still rejects values below its conservative estimate. The operation is safe to re-run: an already-ready index is a no-op, and an interrupted invocation can be inspected again to determine the physical result.
+
+This is a downstream operator path for an Action Scheduler schema gap, not a replacement schema owned by Data Machine. The upstream claim query and schema are maintained by WooCommerce Action Scheduler; upstream issues [#1104](https://github.com/woocommerce/action-scheduler/issues/1104), [#1250](https://github.com/woocommerce/action-scheduler/pull/1250), and [#1340](https://github.com/woocommerce/action-scheduler/pull/1340) document the same missing claim-order coverage. Once upstream ships an equivalent index, readiness detection accepts it under any name and the migration remains a no-op.
 
 ### datamachine batch
 
