@@ -49,6 +49,9 @@ assert_recover_stuck_guard_smoke( 'active batch guard method exists', str_contai
 assert_recover_stuck_guard_smoke( 'batch guard checks pipeline chunk actions', str_contains( $batch_source, 'datamachine_pipeline_batch_chunk' ) && str_contains( $batch_source, 'parent_job_id' ) );
 assert_recover_stuck_guard_smoke( 'batch guard checks active children', str_contains( $batch_source, 'WHERE parent_job_id = %d' ) && str_contains( $batch_source, 'status IN ( %s, %s )' ) );
 assert_recover_stuck_guard_smoke( 'batch guard confirms exact parent id', str_contains( $batch_source, 'extractParentJobId' ) && str_contains( $batch_source, 'maybe_unserialize' ) );
+assert_recover_stuck_guard_smoke( 'batch guard uses indexed canonical args', str_contains( $batch_source, 'WHERE args = %s AND hook = %s' ) );
+assert_recover_stuck_guard_smoke( 'batch compatibility queries are bounded', str_contains( $batch_source, 'ACTION_QUERY_LIMIT + 1' ) && str_contains( $batch_source, 'LIMIT %d' ) );
+assert_recover_stuck_guard_smoke( 'batch guard fails closed on incomplete evidence', str_contains( $batch_source, 'count( $actions ) > self::ACTION_QUERY_LIMIT' ) && str_contains( $batch_source, "last_error" ) );
 
 echo "\nRecover-stuck active action guard smoke complete: {$total} assertions, {$failed} failures.\n";
 if ( $failed > 0 ) {
