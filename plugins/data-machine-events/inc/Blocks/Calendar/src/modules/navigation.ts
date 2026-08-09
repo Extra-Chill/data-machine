@@ -33,55 +33,125 @@ const STRIP_ON_PAST_TOGGLE = [
 	'archive_term_id',
 ];
 
+const STRIP_ON_TODAY_RECOVERY = [
+	'date_start',
+	'date_end',
+	'past',
+	'paged',
+	'month',
+	'format',
+	'archive_taxonomy',
+	'archive_term_id',
+];
+
+// Recovery resets only temporal navigation. Search, taxonomy, geo, archive
+// context, and opaque scope constraints continue narrowing the result set.
+
+export type CalendarNavigationAction = 'past' | 'upcoming' | 'today';
+
 export function initNavigation(
 	calendar: HTMLElement,
-	onNavigate: ( params: URLSearchParams ) => void
+	onNavigate: (
+		params: URLSearchParams,
+		action: CalendarNavigationAction
+	) => void
 ): void {
-	initPastUpcomingButtons( calendar, onNavigate );
-}
+	calendar.addEventListener( 'click', function ( event: Event ) {
+		const target = event.target as HTMLElement | null;
+		if ( ! target ) {
+			return;
+		}
 
-function initPastUpcomingButtons(
-	calendar: HTMLElement,
-	onNavigate: ( params: URLSearchParams ) => void
-): void {
-	const navContainer = calendar.querySelector< HTMLElement >(
-		'.data-machine-events-past-navigation'
-	);
-	if ( ! navContainer ) {
-		return;
-	}
+		const recoveryButton = target.closest< HTMLButtonElement >(
+			'.data-machine-events-no-events-today-link'
+		);
+		if ( recoveryButton ) {
+			if ( recoveryButton.hidden ) {
+				return;
+			}
+			event.preventDefault();
+			onNavigate( buildTodayRecoveryParams( calendar ), 'today' );
+			return;
+		}
 
-	navContainer.addEventListener( 'click', function ( e: Event ) {
-		const target = e.target as HTMLElement;
 		const pastBtn = target.closest( '.data-machine-events-past-btn' );
 		const upcomingBtn = target.closest(
 			'.data-machine-events-upcoming-btn'
 		);
-
-		if ( pastBtn || upcomingBtn ) {
-			e.preventDefault();
-
-			// Build the target from a CLEAN baseline — never from raw
-			// `window.location.search`, because geo-sync may have pushed
-			// transient viewport state (lat/lng/radius/radius_unit) into
-			// it. See issue #296.
-			//
-			// Non-geo, non-pagination filters the user explicitly applied
-			// (`tax_filter[*]`, `event_search`, `scope`, `date_start`,
-			// `date_end`, etc.) DO carry across the Past/Upcoming toggle
-			// because they're real filter intent, not viewport state.
-			const params = new URLSearchParams( window.location.search );
-			STRIP_ON_PAST_TOGGLE.forEach( ( key ) => params.delete( key ) );
-
-			if ( pastBtn ) {
-				params.set( 'past', '1' );
-			} else {
-				params.delete( 'past' );
-			}
-
-			if ( onNavigate ) {
-				onNavigate( params );
-			}
+		if ( ! pastBtn && ! upcomingBtn ) {
+			return;
 		}
+
+		event.preventDefault();
+		const params = new URLSearchParams( window.location.search );
+		STRIP_ON_PAST_TOGGLE.forEach( ( key ) => params.delete( key ) );
+
+		if ( pastBtn ) {
+			params.set( 'past', '1' );
+		} else {
+			params.delete( 'past' );
+		}
+
+		onNavigate( params, pastBtn ? 'past' : 'upcoming' );
 	} );
+
+	const syncRecoveryAction = (): void => {
+		const recoveryButton = calendar.querySelector< HTMLButtonElement >(
+			'.data-machine-events-no-events-today-link'
+		);
+		if ( recoveryButton ) {
+			recoveryButton.hidden = ! hasTodayRecoveryState( calendar );
+		}
+	};
+
+	syncRecoveryAction();
+	calendar.addEventListener(
+		'data-machine-calendar-content-updated',
+		syncRecoveryAction
+	);
+	calendar.addEventListener(
+		'data-machine-month-grid-updated',
+		syncRecoveryAction
+	);
+}
+
+function buildTodayRecoveryParams( calendar: HTMLElement ): URLSearchParams {
+	const params = new URLSearchParams( window.location.search );
+	STRIP_ON_TODAY_RECOVERY.forEach( ( key ) => params.delete( key ) );
+
+	const scope =
+		new URLSearchParams( window.location.search ).get( 'scope' ) ||
+		calendar.dataset.scope ||
+		'';
+	if ( scope && scope !== 'current' ) {
+		// `current` explicitly overrides a block's default temporal scope.
+		params.set( 'scope', 'current' );
+	}
+
+	return params;
+}
+
+function hasTodayRecoveryState( calendar: HTMLElement ): boolean {
+	const params = new URLSearchParams( window.location.search );
+	if (
+		[ 'date_start', 'date_end', 'past', 'paged' ].some( ( key ) =>
+			params.has( key )
+		)
+	) {
+		return true;
+	}
+
+	const scope = params.get( 'scope' ) || calendar.dataset.scope || '';
+	if ( scope && scope !== 'current' ) {
+		return true;
+	}
+
+	const visibleMonth = calendar.querySelector< HTMLElement >(
+		'.data-machine-month-grid'
+	)?.dataset.month;
+	const todayMonth = calendar.querySelector< HTMLElement >(
+		'.data-machine-month-grid__nav-today'
+	)?.dataset.month;
+
+	return Boolean( visibleMonth && todayMonth && visibleMonth !== todayMonth );
 }

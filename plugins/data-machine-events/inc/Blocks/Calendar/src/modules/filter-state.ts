@@ -304,7 +304,8 @@ class FilterStateManager {
 			searchInput.value = params.get( 'event_search' ) || '';
 		}
 
-		const scope = params.get( 'scope' ) || '';
+		const scopeParam = params.get( 'scope' ) || '';
+		const scope = scopeParam === 'current' ? '' : scopeParam;
 		this.calendar
 			.querySelectorAll< HTMLButtonElement >(
 				'.data-machine-events-scope-chip[data-scope]'

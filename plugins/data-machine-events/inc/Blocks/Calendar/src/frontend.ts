@@ -24,7 +24,10 @@ import {
 	getDatePicker,
 } from './modules/date-picker';
 import { initFilterModal, destroyFilterModal } from './modules/filter-modal';
-import { initNavigation } from './modules/navigation';
+import {
+	initNavigation,
+	type CalendarNavigationAction,
+} from './modules/navigation';
 import { getFilterState, destroyFilterState } from './modules/filter-state';
 import { initLazyRender, destroyLazyRender } from './modules/lazy-render';
 import { initDayLoader, destroyDayLoader } from './modules/day-loader';
@@ -116,8 +119,7 @@ export function initCalendarInstance( calendar: HTMLElement ): void {
 		initLazyRender( calendar );
 		initDayLoader( calendar );
 		initMonthGridNav( calendar, function ( params ) {
-			const currentFilterState = getFilterState( calendar );
-			currentFilterState.applyParams( params, getDatePicker( calendar ) );
+			const currentFilterState = applyFilterParams( calendar, params );
 			currentFilterState.saveToStorage( params );
 			currentFilterState.updateFilterCountBadge();
 		} );
@@ -140,11 +142,7 @@ export function initCalendarInstance( calendar: HTMLElement ): void {
 		},
 		function ( params: URLSearchParams ) {
 			if ( isMonthGridMode( calendar ) ) {
-				const currentFilterState = getFilterState( calendar );
-				currentFilterState.applyParams(
-					params,
-					getDatePicker( calendar )
-				);
+				applyFilterParams( calendar, params );
 			}
 			if ( ! handleMonthGridChange( calendar, params ) ) {
 				navigateToUrl( params );
@@ -152,9 +150,35 @@ export function initCalendarInstance( calendar: HTMLElement ): void {
 		}
 	);
 
-	initNavigation( calendar, function ( params: URLSearchParams ) {
-		navigateToUrl( params );
-	} );
+	initNavigation(
+		calendar,
+		function ( params: URLSearchParams, action: CalendarNavigationAction ) {
+			if ( action === 'today' && isMonthGridMode( calendar ) ) {
+				const currentFilterState = applyFilterParams(
+					calendar,
+					params
+				);
+				currentFilterState.saveToStorage( params );
+
+				const todayMonth = calendar.querySelector< HTMLElement >(
+					'.data-machine-month-grid__nav-today'
+				)?.dataset.month;
+				const controller = getMonthGridController( calendar );
+				if ( todayMonth && controller ) {
+					void controller
+						.navigateToMonth( todayMonth, params )
+						.then( function ( updated ) {
+							if ( updated ) {
+								currentFilterState.updateFilterCountBadge();
+							}
+						} );
+					return;
+				}
+			}
+
+			navigateToUrl( params );
+		}
+	);
 
 	initSearchInput( calendar );
 
@@ -274,6 +298,15 @@ export function initCalendarInstance( calendar: HTMLElement ): void {
 			}
 		}
 	);
+}
+
+function applyFilterParams(
+	calendar: HTMLElement,
+	params: URLSearchParams
+): ReturnType< typeof getFilterState > {
+	const filterState = getFilterState( calendar );
+	filterState.applyParams( params, getDatePicker( calendar ) );
+	return filterState;
 }
 
 function initSearchInput( calendar: HTMLElement ): void {

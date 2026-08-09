@@ -232,8 +232,12 @@ class CalendarBlockTest extends WP_UnitTestCase {
 		if ( $block && $block->render_callback ) {
 			$output = call_user_func( $block->render_callback, array(), '', $block );
 
-			// The output should be a string (HTML)
 			$this->assertIsString( $output );
+			$this->assertStringContainsString(
+				'<button type="button" class="data-machine-events-no-events-today-link">',
+				$output
+			);
+			$this->assertStringContainsString( 'Show events from Today', $output );
 		} else {
 			$this->markTestSkipped( 'Block not registered or no render callback' );
 		}

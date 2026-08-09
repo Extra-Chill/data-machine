@@ -19,7 +19,9 @@ jest.mock( './modules/filter-modal', () => ( {
 	destroyFilterModal: jest.fn(),
 } ) );
 jest.mock( './modules/navigation', () => ( {
-	initNavigation: jest.fn(),
+	initNavigation: jest.fn( ( _calendar, navigate ) => {
+		mockNavigationCallback = navigate;
+	} ),
 } ) );
 jest.mock( './modules/lazy-render', () => ( {
 	initLazyRender: jest.fn(),
@@ -65,6 +67,10 @@ import type { FlatpickrInstance } from './types';
 
 let mockResetCallback: ( params: URLSearchParams ) => void;
 let mockDateChangeCallback: () => void;
+let mockNavigationCallback: (
+	params: URLSearchParams,
+	action: 'past' | 'upcoming' | 'today'
+) => void;
 const mockPicker: FlatpickrInstance = {
 	selectedDates: [ new Date( 2026, 7, 10 ), new Date( 2026, 7, 12 ) ],
 	clear: jest.fn(),
@@ -127,7 +133,9 @@ function calendarMarkup(
 					<input type="checkbox" data-taxonomy="venue" value="42" checked>
 				</div>
 			</div>
-			<div class="data-machine-month-grid" data-month="2026-08"></div>
+			<div class="data-machine-month-grid" data-month="2026-08">
+				<a class="data-machine-month-grid__nav-today" data-month="2026-07" href="#">Today</a>
+			</div>
 			<div class="data-machine-events-content">old mobile</div>
 		</div>`;
 }
@@ -296,6 +304,35 @@ describe( 'calendar frontend month-grid integration', () => {
 		await flush();
 		expect( requestedParams( 2 ).get( 'event_search' ) ).toBe( 'back' );
 		expect( requestedParams( 2 ).get( 'month' ) ).toBe( '2026-07' );
+	} );
+
+	it( 'routes Today recovery through the grid controller and synchronizes controls', async () => {
+		window.history.replaceState(
+			{},
+			'',
+			'/events/?date_start=2026-08-10&past=1&paged=3&event_search=jam&tax_filter%5Bvenue%5D%5B%5D=42'
+		);
+		const calendar = document.querySelector< HTMLElement >(
+			'.data-machine-events-calendar'
+		)!;
+		initCalendarInstance( calendar );
+		const params = new URLSearchParams(
+			'event_search=jam&tax_filter%5Bvenue%5D%5B%5D=42&scope=current'
+		);
+
+		mockNavigationCallback( params, 'today' );
+		await flush();
+
+		const request = requestedParams( 0 );
+		expect( request.get( 'month' ) ).toBe( '2026-07' );
+		expect( request.get( 'event_search' ) ).toBe( 'jam' );
+		expect( request.getAll( 'tax_filter[venue][]' ) ).toEqual( [ '42' ] );
+		expect( request.get( 'scope_token' ) ).toBe( 'opaque-token' );
+		expect( request.has( 'date_start' ) ).toBe( false );
+		expect( request.has( 'past' ) ).toBe( false );
+		expect( request.has( 'paged' ) ).toBe( false );
+		expect( mockPicker.setDate ).toHaveBeenCalledWith( [], false );
+		expect( window.location.search ).toContain( 'month=2026-07' );
 	} );
 
 	it( 'sequences overlapping geo and filter requests globally', async () => {

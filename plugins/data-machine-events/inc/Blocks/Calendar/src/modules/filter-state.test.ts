@@ -189,4 +189,25 @@ describe( 'stored calendar filters', () => {
 			false
 		);
 	} );
+
+	it( 'maps the current scope override back to the All control', () => {
+		calendar.innerHTML = `
+			<button class="data-machine-events-scope-chip" data-scope="" aria-pressed="false"></button>
+			<button class="data-machine-events-scope-chip data-machine-events-scope-chip-active" data-scope="tonight" aria-pressed="true"></button>`;
+
+		getFilterState( calendar ).applyParams(
+			new URLSearchParams( 'scope=current' )
+		);
+
+		expect(
+			calendar
+				.querySelector< HTMLButtonElement >( '[data-scope=""]' )
+				?.getAttribute( 'aria-pressed' )
+		).toBe( 'true' );
+		expect(
+			calendar
+				.querySelector< HTMLButtonElement >( '[data-scope="tonight"]' )
+				?.getAttribute( 'aria-pressed' )
+		).toBe( 'false' );
+	} );
 } );
