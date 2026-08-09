@@ -226,6 +226,13 @@ class PipelineBatchSchedulerTest extends WP_UnitTestCase {
 		$this->assertSame( 1, (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$wpdb->prefix}actionscheduler_actions WHERE hook = %s AND args = %s AND status = 'pending'", PipelineBatchScheduler::BATCH_HOOK, wp_json_encode( array( 'parent_job_id' => $parent_id, 'offset' => 0 ) ) ) ) );
 	}
 
+	public function test_pathless_batch_recovery_preserves_nested_and_serialized_action_args(): void {
+		$extract = new \ReflectionMethod( PathlessBatchRecovery::class, 'extractParentJobId' );
+
+		$this->assertSame( 123, $extract->invoke( null, wp_json_encode( array( array( 'parent_job_id' => 123 ) ) ) ) );
+		$this->assertSame( 456, $extract->invoke( null, serialize( array( array( 'parent_job_id' => 456 ) ) ) ) );
+	}
+
 	/**
 	 * Regression for #2762: a concurrent RunMetrics write must not clobber
 	 * batch_state written by fan-out.

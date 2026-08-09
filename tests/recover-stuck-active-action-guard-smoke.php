@@ -48,7 +48,7 @@ echo "Case 4: batch parents guard chunk actions and active children\n";
 assert_recover_stuck_guard_smoke( 'active batch guard method exists', str_contains( $batch_source, 'public static function hasActiveWork' ) );
 assert_recover_stuck_guard_smoke( 'batch guard checks pipeline chunk actions', str_contains( $batch_source, 'datamachine_pipeline_batch_chunk' ) && str_contains( $batch_source, 'parent_job_id' ) );
 assert_recover_stuck_guard_smoke( 'batch guard checks active children', str_contains( $batch_source, 'WHERE parent_job_id = %d' ) && str_contains( $batch_source, 'status IN ( %s, %s )' ) );
-assert_recover_stuck_guard_smoke( 'batch guard confirms exact parent id', str_contains( $batch_source, '$parent_job_id !== (int) ( $args[\'parent_job_id\'] ?? 0 )' ) );
+assert_recover_stuck_guard_smoke( 'batch guard confirms exact parent id', str_contains( $batch_source, 'extractParentJobId' ) && str_contains( $batch_source, 'maybe_unserialize' ) );
 
 echo "\nRecover-stuck active action guard smoke complete: {$total} assertions, {$failed} failures.\n";
 if ( $failed > 0 ) {
