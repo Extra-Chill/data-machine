@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.172.10] - 2026-08-09
+
+### Fixed
+- bound pathless batch action lookup
+
 ## [0.172.9] - 2026-08-09
 
 ### Fixed
