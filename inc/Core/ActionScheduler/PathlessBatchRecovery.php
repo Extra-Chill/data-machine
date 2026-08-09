@@ -103,8 +103,7 @@ class PathlessBatchRecovery {
 		$timeout_seconds = max( 1, $timeout_hours ) * HOUR_IN_SECONDS;
 		$now_gmt         = strtotime( current_time( 'mysql', true ) );
 		foreach ( $actions as $action ) {
-			$args = json_decode( (string) ( $action->args ?? '' ), true );
-			if ( $parent_job_id !== (int) ( $args['parent_job_id'] ?? 0 ) ) {
+			if ( self::extractParentJobId( (string) ( $action->args ?? '' ) ) !== $parent_job_id ) {
 				continue;
 			}
 			if ( 'pending' === (string) $action->status ) {
@@ -121,6 +120,34 @@ class PathlessBatchRecovery {
 		return false;
 	}
 
+	/** Extract a parent ID from keyed, nested, JSON, or serialized action args. */
+	private static function extractParentJobId( string $args ): int {
+		$decoded = json_decode( $args, true );
+		if ( is_array( $decoded ) ) {
+			if ( isset( $decoded['parent_job_id'] ) && is_numeric( $decoded['parent_job_id'] ) ) {
+				return (int) $decoded['parent_job_id'];
+			}
+			foreach ( $decoded as $value ) {
+				if ( is_array( $value ) && isset( $value['parent_job_id'] ) && is_numeric( $value['parent_job_id'] ) ) {
+					return (int) $value['parent_job_id'];
+				}
+			}
+		}
+
+		$unserialized = maybe_unserialize( $args );
+		if ( is_array( $unserialized ) ) {
+			if ( isset( $unserialized['parent_job_id'] ) && is_numeric( $unserialized['parent_job_id'] ) ) {
+				return (int) $unserialized['parent_job_id'];
+			}
+			foreach ( $unserialized as $value ) {
+				if ( is_array( $value ) && isset( $value['parent_job_id'] ) && is_numeric( $value['parent_job_id'] ) ) {
+					return (int) $value['parent_job_id'];
+				}
+			}
+		}
+		return 0;
+	}
+
 	/** Schedule a recovered chunk without scanning the scheduler table. */
 	private static function schedule( string $hook, int $parent_job_id, int $offset ): bool {
 		$args = array(
@@ -132,7 +159,15 @@ class PathlessBatchRecovery {
 				return true;
 			}
 		} catch ( \Throwable $exception ) {
-			do_action( 'datamachine_log', 'error', 'Pathless batch recovery scheduling failed', array( 'parent_job_id' => $parent_job_id, 'exception' => $exception->getMessage() ) );
+			do_action(
+				'datamachine_log',
+				'error',
+				'Pathless batch recovery scheduling failed',
+				array(
+					'parent_job_id' => $parent_job_id,
+					'exception'     => $exception->getMessage(),
+				)
+			);
 		}
 
 		$result = wp_schedule_single_event( time(), $hook, array( $parent_job_id, $offset ), true );
