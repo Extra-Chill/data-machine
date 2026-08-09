@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.172.5] - 2026-08-09
+
+### Fixed
+- restore native Action Scheduler retention
+
 ## [0.172.4] - 2026-08-09
 
 ### Fixed
