@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.172.1] - 2026-08-09
+
+### Fixed
+- restore high-volume batch queue liveness
+
 ## [0.172.0] - 2026-08-07
 
 ### Added
