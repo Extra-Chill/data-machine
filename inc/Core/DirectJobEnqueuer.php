@@ -19,15 +19,19 @@ class DirectJobEnqueuer {
 	private Jobs $jobs;
 	private \Closure $scheduler;
 	private \Closure $action_finder;
+	private \Closure $action_receipt_exists;
 
-	public function __construct( ?Jobs $jobs = null, ?callable $scheduler = null, ?callable $action_finder = null ) {
-		$this->jobs          = $jobs ?? new Jobs();
-		$this->scheduler     = null !== $scheduler
+	public function __construct( ?Jobs $jobs = null, ?callable $scheduler = null, ?callable $action_finder = null, ?callable $action_receipt_exists = null ) {
+		$this->jobs                  = $jobs ?? new Jobs();
+		$this->scheduler             = null !== $scheduler
 			? \Closure::fromCallable( $scheduler )
 			: static fn( int $run_at, string $hook, array $args, string $group ) => as_schedule_single_action( $run_at, $hook, $args, $group );
-		$this->action_finder = null !== $action_finder
+		$this->action_finder         = null !== $action_finder
 			? \Closure::fromCallable( $action_finder )
 			: fn( array $args ): int => $this->findScheduledActionId( $args );
+		$this->action_receipt_exists = null !== $action_receipt_exists
+			? \Closure::fromCallable( $action_receipt_exists )
+			: static fn( int $action_id ): bool => DirectOperationRecoveryPolicy::recordedActionExists( $action_id );
 	}
 
 	/**
@@ -92,6 +96,10 @@ class DirectJobEnqueuer {
 		if ( ! is_int( $action_id ) || $action_id <= 0 ) {
 			$this->jobs->finish_operation_enqueue( $job_id, 'enqueue_failed', 0, $token, $generation );
 			return $this->failure( 'action_schedule_failed', $generation, true );
+		}
+		if ( ! ( $this->action_receipt_exists )( $action_id ) ) {
+			$this->jobs->finish_operation_enqueue( $job_id, 'enqueue_failed', 0, $token, $generation );
+			return $this->failure( 'action_receipt_missing', $generation, true );
 		}
 
 		if ( ! $this->jobs->finish_operation_enqueue( $job_id, 'enqueued', $action_id, $token, $generation ) ) {

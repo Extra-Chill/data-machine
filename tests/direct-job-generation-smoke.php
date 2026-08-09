@@ -88,7 +88,7 @@ $blocked->job['operation_state'] = 'enqueuing';
 $blocked->job['operation_generation'] = 1;
 $blocked->job['operation_claim_token'] = 'owner-token';
 $blocked->claim_blocked = true;
-$blocked_result         = ( new DirectJobEnqueuer( $blocked, static fn() => 100, static fn() => 0 ) )->enqueue( 42, 'ephemeral_step_0' );
+$blocked_result         = ( new DirectJobEnqueuer( $blocked, static fn() => 100, static fn() => 0, static fn() => true ) )->enqueue( 42, 'ephemeral_step_0' );
 direct_generation_assert( false === $blocked_result['success'], 'non-owner does not acknowledge success without durable action' );
 direct_generation_assert( true === $blocked_result['retryable'] && 'enqueue_in_progress' === $blocked_result['error'], 'non-owner receives explicit retryable in-progress result' );
 
@@ -96,7 +96,7 @@ $crash_recovery = new DirectJobGenerationFakeJobs();
 $crash_recovery->job['operation_state']       = 'enqueuing';
 $crash_recovery->job['operation_generation']  = 1;
 $crash_recovery->job['operation_claim_token'] = 'token-1';
-$recovered = ( new DirectJobEnqueuer( $crash_recovery, static fn() => 999, static fn() => 404 ) )->enqueue( 42, 'ephemeral_step_0' );
+$recovered = ( new DirectJobEnqueuer( $crash_recovery, static fn() => 999, static fn() => 404, static fn() => true ) )->enqueue( 42, 'ephemeral_step_0' );
 direct_generation_assert( true === $recovered['success'], 'replay CAS-commits an action left by a crashed submitter' );
 direct_generation_assert( 'enqueued' === $crash_recovery->job['operation_state'] && 404 === $crash_recovery->job['operation_action_id'], 'crash reconciliation durably records the recovered action' );
 
@@ -108,7 +108,8 @@ $slow_result = ( new DirectJobEnqueuer(
 		$takeover = $interleaved->forceTakeover();
 		return 101;
 	},
-	static fn() => 0
+	static fn() => 0,
+	static fn() => true
 ) )->enqueue( 42, 'ephemeral_step_0' );
 direct_generation_assert( false === $slow_result['success'] && 'enqueue_claim_fenced' === $slow_result['error'], 'expired slow generation cannot finish after takeover' );
 direct_generation_assert( 2 === $takeover['generation'], 'takeover advances enqueue generation' );
@@ -130,10 +131,16 @@ $retry_result = ( new DirectJobEnqueuer(
 	},
 	static function ( array $args ): int {
 		return 1 === (int) ( $args['operation_generation'] ?? 0 ) ? 111 : 0;
-	}
+	},
+	static fn() => true
 ) )->enqueue( 42, 'ephemeral_step_0' );
 direct_generation_assert( true === $retry_result['success'], 'retry generation schedules successfully while prior action exists' );
 direct_generation_assert( 2 === $seen_args['operation_generation'], 'retry action is keyed to the next generation' );
+
+$missing_receipt = new DirectJobGenerationFakeJobs();
+$missing_result  = ( new DirectJobEnqueuer( $missing_receipt, static fn() => 505, static fn() => 0, static fn() => false ) )->enqueue( 42, 'ephemeral_step_0' );
+direct_generation_assert( false === $missing_result['success'] && 'action_receipt_missing' === $missing_result['error'], 'positive scheduler ID without a durable receipt fails enqueue' );
+direct_generation_assert( 'enqueue_failed' === $missing_receipt->job['operation_state'], 'missing action receipt leaves the operation reclaimable' );
 
 $jobs_source = file_get_contents( dirname( __DIR__ ) . '/inc/Core/Database/Jobs/Jobs.php' ) ?: '';
 $step_source = file_get_contents( dirname( __DIR__ ) . '/inc/Abilities/Engine/ExecuteStepAbility.php' ) ?: '';

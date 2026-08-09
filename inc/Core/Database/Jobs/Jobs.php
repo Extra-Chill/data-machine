@@ -21,6 +21,7 @@ use DataMachine\Core\Database\LifecycleStateTransition;
 use DataMachine\Core\Database\RunMetadata\RunMetadata;
 use DataMachine\Core\ExecutionQuery;
 use DataMachine\Core\ChildJobRecoveryPolicy;
+use DataMachine\Core\DirectOperationRecoveryPolicy;
 use DataMachine\Core\JobStatus;
 use DataMachine\Core\RunMetrics;
 use DataMachine\Core\RunLifecycleStore;
@@ -559,6 +560,11 @@ class Jobs extends BaseRepository {
 		if ( $new_action_id <= 0 ) {
 			$this->wpdb->query( 'ROLLBACK' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 			$result['reason'] = 'schedule_failed';
+			return $result;
+		}
+		if ( ! DirectOperationRecoveryPolicy::recordedActionExists( $new_action_id ) ) {
+			$this->wpdb->query( 'ROLLBACK' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			$result['reason'] = 'action_receipt_missing';
 			return $result;
 		}
 		$engine                              = is_array( $job['engine_data'] ?? null ) ? $job['engine_data'] : array();

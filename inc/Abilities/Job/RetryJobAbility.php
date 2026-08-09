@@ -11,6 +11,7 @@
 namespace DataMachine\Abilities\Job;
 
 use DataMachine\Core\DirectJobEnqueuer;
+use DataMachine\Core\DirectOperationRecoveryPolicy;
 use DataMachine\Core\JobRetryPolicy;
 
 defined( 'ABSPATH' ) || exit;
@@ -137,9 +138,11 @@ class RetryJobAbility {
 			}
 
 			if ( 'processing' === $previous_status ) {
-				$generation = (int) ( $job['operation_generation'] ?? 0 );
-				$token      = (string) ( $job['operation_claim_token'] ?? '' );
-				if ( $generation > 0 && '' !== $token && ( new DirectJobEnqueuer( $this->db_jobs ) )->hasLiveGenerationAction( $job_id, $generation, $token ) ) {
+				$generation     = (int) ( $job['operation_generation'] ?? 0 );
+				$token          = (string) ( $job['operation_claim_token'] ?? '' );
+				$enqueuer       = new DirectJobEnqueuer( $this->db_jobs );
+				$live_execution = $generation > 0 && '' !== $token ? $enqueuer->liveGenerationExecution( $job_id, $generation, $token ) : 'none';
+				if ( 'none' !== $live_execution ) {
 					return array(
 						'success'         => false,
 						'job_id'          => $job_id,
@@ -147,6 +150,64 @@ class RetryJobAbility {
 						'retryable'       => true,
 						'error_code'      => 'job_execution_in_progress',
 						'error'           => sprintf( 'Job %d still has live execution for generation %d; retry after it exits or is recovered.', $job_id, $generation ),
+					);
+				}
+
+				$missing_action = DirectOperationRecoveryPolicy::diagnose(
+					$job,
+					$live_execution,
+					DirectOperationRecoveryPolicy::recordedActionExists( (int) ( $job['operation_action_id'] ?? 0 ) )
+				);
+				if ( is_array( $missing_action ) ) {
+					if ( ! empty( $job['operation_effects_begun_at'] ) ) {
+						return array(
+							'success'         => false,
+							'job_id'          => $job_id,
+							'previous_status' => $previous_status,
+							'retryable'       => false,
+							'error_code'      => 'job_effects_begun',
+							'error'           => sprintf( 'Job %d may have begun operation effects and cannot be safely retried.', $job_id ),
+						);
+					}
+
+					$requeue = $this->db_jobs->commit_missing_direct_operation_requeue(
+						$job_id,
+						(int) $missing_action['action_id'],
+						(int) $missing_action['generation'],
+						$token,
+						'manual_retry',
+						static fn( int $new_generation, string $new_token ): int => (int) as_schedule_single_action(
+							time(),
+							DirectJobEnqueuer::HOOK,
+							array(
+								'job_id'                => $job_id,
+								'flow_step_id'          => $flow_step_id,
+								'operation_generation'  => $new_generation,
+								'operation_claim_token' => $new_token,
+							),
+							DirectJobEnqueuer::GROUP,
+							true
+						)
+					);
+					if ( empty( $requeue['success'] ) ) {
+						return array(
+							'success'         => false,
+							'job_id'          => $job_id,
+							'previous_status' => $previous_status,
+							'retryable'       => true,
+							'error_code'      => (string) ( $requeue['reason'] ?? 'retry_enqueue_failed' ),
+							'error'           => sprintf( 'Job %d retry could not establish durable scheduler ownership.', $job_id ),
+						);
+					}
+
+					\DataMachine\Core\RunMetrics::increment( $job_id, 'retried' );
+					return array(
+						'success'         => true,
+						'job_id'          => $job_id,
+						'previous_status' => $previous_status,
+						'prompt_requeued' => false,
+						'direct_requeued' => true,
+						'message'         => sprintf( 'Job %d direct workflow retry enqueued.', $job_id ),
 					);
 				}
 				$this->db_jobs->complete_job( $job_id, 'failed - manual_retry' );
