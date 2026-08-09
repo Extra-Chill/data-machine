@@ -79,13 +79,15 @@ namespace {
 		! str_contains( $cleanup, 'DELETE l FROM %i l' )
 	);
 	assert_batching(
-		'cleanup deletes logs via id-subquery with LIMIT',
-		str_contains( $cleanup, 'DELETE FROM %i WHERE log_id IN (' )
-			&& str_contains( $cleanup, 'LIMIT %d' )
+		'cleanup selects bounded action ids before touching logs',
+		str_contains( $cleanup, 'selectActionSchedulerActionIds' )
+			&& str_contains( $cleanup, 'FORCE INDEX (status_last_attempt_gmt)' )
+			&& ! str_contains( $cleanup, 'SELECT l.log_id FROM %i l INNER JOIN %i a' )
 	);
 	assert_batching(
-		'cleanup deletes actions via id-subquery with LIMIT',
-		str_contains( $cleanup, 'DELETE FROM %i WHERE action_id IN (' )
+		'cleanup deletes logs and actions only from the selected id set',
+		str_contains( $cleanup, 'DELETE FROM %i WHERE action_id IN ({$placeholders}) LIMIT %d' )
+			&& str_contains( $cleanup, 'DELETE FROM %i WHERE action_id IN ({$placeholders})' )
 	);
 	assert_batching(
 		'batch size is filterable',
@@ -97,7 +99,7 @@ namespace {
 	);
 	assert_batching(
 		'default per-hook override targets execute_step',
-		str_contains( $cleanup, "'datamachine_execute_step' => 1 / 24" )
+		(bool) preg_match( "/'datamachine_execute_step'\\s*=>\\s*1 \/ 24/", $cleanup )
 	);
 	assert_batching(
 		'per-hook row-count ceiling is filterable',
@@ -105,11 +107,17 @@ namespace {
 	);
 	assert_batching(
 		'default row-count ceiling targets execute_step',
-		str_contains( $cleanup, "'datamachine_execute_step' => 100000" )
+		(bool) preg_match( "/'datamachine_execute_step'\\s*=>\\s*100000/", $cleanup )
 	);
 	assert_batching(
-		'ceiling probe selects cutoff via OFFSET on max_rows',
-		str_contains( $cleanup, 'ORDER BY last_attempt_gmt DESC LIMIT 1 OFFSET %d' )
+		'ceiling probe bounds indexed status arms before OFFSET',
+		str_contains( $cleanup, 'FORCE INDEX (hook_status_scheduled_date_gmt)' )
+			&& str_contains( $cleanup, 'UNION ALL' )
+			&& str_contains( $cleanup, '$probe_limit = $max_rows + 1' )
+	);
+	assert_batching(
+		'apply-path table guardrail uses metadata estimates instead of full counts',
+		str_contains( $cleanup, 'SELECT TABLE_ROWS FROM information_schema.TABLES' )
 	);
 	assert_batching(
 		'ceiling enforcement is wired into the cleanup pass',
@@ -171,10 +179,15 @@ namespace {
 			$sql  = $prepared['sql'];
 			$args = $prepared['args'];
 
-			// Row-count ceiling probe: return the last_attempt_gmt at OFFSET
+			if ( str_contains( $sql, 'information_schema.TABLES' ) ) {
+				$table = (string) end( $args );
+				return str_contains( $table, '_logs' ) ? count( $this->logs ) : count( $this->actions );
+			}
+
+			// Row-count ceiling probe: return the scheduled date at OFFSET
 			// $max_rows among the most-recent completed/terminal rows for the
 			// hook (or null when fewer than $max_rows exist).
-			if ( str_contains( $sql, 'ORDER BY last_attempt_gmt DESC LIMIT 1 OFFSET' ) ) {
+			if ( str_contains( $sql, 'UNION ALL' ) && str_contains( $sql, 'OFFSET' ) ) {
 				$hook   = $this->extract_hook( $sql, $args );
 				$offset = (int) end( $args );
 				$rows   = array();
@@ -185,7 +198,7 @@ namespace {
 					if ( null !== $hook && $row['hook'] !== $hook ) {
 						continue;
 					}
-					$rows[] = $row['last_attempt_gmt'];
+					$rows[] = $row['scheduled_date_gmt'] ?? $row['last_attempt_gmt'];
 				}
 				rsort( $rows );
 				return $rows[ $offset ] ?? null;
@@ -201,6 +214,33 @@ namespace {
 			return count( $this->matching_actions( $cutoff, $hook ) );
 		}
 
+		public function get_col( $prepared ): array {
+			$sql    = $prepared['sql'];
+			$args   = $prepared['args'];
+			$hook   = $this->extract_hook( $sql, $args );
+			$status = $this->extract_status( $args );
+			$cutoff = $this->extract_cutoff( $args );
+			$limit  = (int) end( $args );
+			$rows   = array();
+
+			foreach ( $this->actions as $id => $row ) {
+				if ( $row['status'] !== $status || ( null !== $hook && $row['hook'] !== $hook ) ) {
+					continue;
+				}
+				$scheduled = $row['scheduled_date_gmt'] ?? $row['last_attempt_gmt'];
+				if ( null === $hook ? $row['last_attempt_gmt'] >= $cutoff : $scheduled >= $cutoff ) {
+					continue;
+				}
+				if ( str_contains( $sql, 'last_attempt_gmt < %s' ) && $row['last_attempt_gmt'] >= $cutoff ) {
+					continue;
+				}
+				$rows[ $id ] = null === $hook ? $row['last_attempt_gmt'] : $scheduled;
+			}
+
+			asort( $rows );
+			return array_slice( array_keys( $rows ), 0, $limit );
+		}
+
 		public function query( $prepared ): int {
 			$sql  = $prepared['sql'];
 			$args = $prepared['args'];
@@ -211,24 +251,34 @@ namespace {
 			}
 
 			++$this->delete_queries;
-			$cutoff              = $this->extract_cutoff( $args );
-			$hook                = $this->extract_hook( $sql, $args );
-			$limit               = (int) end( $args );
-			$this->batch_sizes[] = $limit;
+			$table = (string) array_shift( $args );
 
-			if ( str_contains( $sql, 'log_id IN' ) ) {
-				$matching = array_slice( $this->matching_logs( $cutoff, $hook ), 0, $limit, true );
-				foreach ( array_keys( $matching ) as $log_id ) {
+			if ( str_contains( $table, '_logs' ) ) {
+				$limit               = (int) array_pop( $args );
+				$this->batch_sizes[] = $limit;
+				$action_ids          = array_map( 'intval', $args );
+				$matching            = array();
+				foreach ( $this->logs as $log_id => $row ) {
+					if ( in_array( $row['action_id'], $action_ids, true ) ) {
+						$matching[] = $log_id;
+					}
+				}
+				$matching = array_slice( $matching, 0, $limit );
+				foreach ( $matching as $log_id ) {
 					unset( $this->logs[ $log_id ] );
 				}
 				return count( $matching );
 			}
 
-			$matching = array_slice( $this->matching_actions( $cutoff, $hook ), 0, $limit, true );
-			foreach ( array_keys( $matching ) as $action_id ) {
-				unset( $this->actions[ $action_id ] );
+			$this->batch_sizes[] = count( $args );
+			$deleted             = 0;
+			foreach ( array_map( 'intval', $args ) as $action_id ) {
+				if ( isset( $this->actions[ $action_id ] ) ) {
+					unset( $this->actions[ $action_id ] );
+					++$deleted;
+				}
 			}
-			return count( $matching );
+			return $deleted;
 		}
 
 		private function extract_cutoff( array $args ): string {
@@ -253,6 +303,15 @@ namespace {
 				}
 			}
 			return null;
+		}
+
+		private function extract_status( array $args ): string {
+			foreach ( $args as $arg ) {
+				if ( is_string( $arg ) && in_array( $arg, array( 'complete', 'failed', 'canceled' ), true ) ) {
+					return $arg;
+				}
+			}
+			return '';
 		}
 
 		private function matching_actions( string $cutoff, ?string $hook ): array {
