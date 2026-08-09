@@ -35,7 +35,8 @@ namespace {
 	$total  = 0;
 
 	// Simple in-memory filter registry so apply_filters() returns overrides.
-	$GLOBALS['__retention_filters'] = array();
+	$GLOBALS['__retention_filters']          = array();
+	$GLOBALS['__retention_filter_callbacks'] = array();
 
 	if ( ! function_exists( 'apply_filters' ) ) {
 		function apply_filters( string $hook, $value ) {
@@ -51,6 +52,29 @@ namespace {
 
 	function retention_set_filter( string $hook, $value ): void {
 		$GLOBALS['__retention_filters'][ $hook ] = $value;
+
+		if ( ! function_exists( 'add_filter' ) ) {
+			return;
+		}
+
+		if ( isset( $GLOBALS['__retention_filter_callbacks'][ $hook ] ) ) {
+			remove_filter( $hook, $GLOBALS['__retention_filter_callbacks'][ $hook ], PHP_INT_MAX );
+		}
+
+		$callback = static fn() => $value;
+		add_filter( $hook, $callback, PHP_INT_MAX );
+		$GLOBALS['__retention_filter_callbacks'][ $hook ] = $callback;
+	}
+
+	function retention_reset_filters(): void {
+		if ( function_exists( 'remove_filter' ) ) {
+			foreach ( $GLOBALS['__retention_filter_callbacks'] as $hook => $callback ) {
+				remove_filter( $hook, $callback, PHP_INT_MAX );
+			}
+		}
+
+		$GLOBALS['__retention_filters']          = array();
+		$GLOBALS['__retention_filter_callbacks'] = array();
 	}
 
 	function assert_batching( string $name, bool $condition, string $detail = '' ): void {
@@ -572,7 +596,7 @@ namespace {
 	// ceiling can delete. Seed 25 fresh execute_step rows with distinct, recent
 	// timestamps (within any age window) — 15 should be deleted by the ceiling,
 	// the 10 most-recent must survive.
-	$GLOBALS['__retention_filters'] = array();
+	retention_reset_filters();
 	retention_set_filter( 'datamachine_as_actions_hook_max_age_days', array( 'datamachine_execute_step' => 3650.0 ) );
 	retention_set_filter( 'datamachine_as_actions_hook_max_rows', array( 'datamachine_execute_step' => 10 ) );
 
@@ -663,6 +687,8 @@ namespace {
 		'disabled guardrail returns enabled=false and breached=false',
 		false === $disabled['enabled'] && false === $disabled['breached']
 	);
+
+	retention_reset_filters();
 
 	if ( $failed > 0 ) {
 		echo "\nretention-action-scheduler-batching-smoke failed: {$failed}/{$total} assertions failed.\n";
