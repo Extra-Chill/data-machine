@@ -9,6 +9,7 @@
 namespace DataMachine\Core\ActionScheduler;
 
 use DataMachine\Core\Database\BatchItems\BatchItems;
+use DataMachine\Core\Database\Jobs\Jobs;
 use DataMachine\Core\EngineData;
 
 defined( 'ABSPATH' ) || exit;
@@ -32,7 +33,7 @@ class PathlessBatchRecovery {
 		}
 
 		global $wpdb;
-		$jobs_table = $wpdb->prefix . 'datamachine_jobs';
+		$jobs_table = $wpdb->prefix . Jobs::TABLE_NAME;
 		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name is generated from the WordPress prefix.
 		$active_children = (int) $wpdb->get_var(
 			$wpdb->prepare( "SELECT COUNT(*) FROM {$jobs_table} WHERE parent_job_id = %d AND status IN ( %s, %s )", $parent_job_id, 'pending', 'processing' )
@@ -103,8 +104,7 @@ class PathlessBatchRecovery {
 		$timeout_seconds = max( 1, $timeout_hours ) * HOUR_IN_SECONDS;
 		$now_gmt         = strtotime( current_time( 'mysql', true ) );
 		foreach ( $actions as $action ) {
-			$args = json_decode( (string) ( $action->args ?? '' ), true );
-			if ( $parent_job_id !== (int) ( $args['parent_job_id'] ?? 0 ) ) {
+			if ( ! hash_equals( (string) $parent_job_id, (string) self::extractParentJobId( (string) ( $action->args ?? '' ) ) ) ) {
 				continue;
 			}
 			if ( 'pending' === (string) $action->status ) {
@@ -121,6 +121,33 @@ class PathlessBatchRecovery {
 		return false;
 	}
 
+	/** Extract a parent ID from keyed, nested, JSON, or serialized action args. */
+	private static function extractParentJobId( string $args ): int {
+		$decoded = json_decode( $args, true );
+		if ( is_array( $decoded ) ) {
+			$parent_job_id = self::extractParentJobIdFromArray( $decoded );
+			if ( 0 !== $parent_job_id ) {
+				return $parent_job_id;
+			}
+		}
+
+		$unserialized = maybe_unserialize( $args );
+		return is_array( $unserialized ) ? self::extractParentJobIdFromArray( $unserialized ) : 0;
+	}
+
+	/** Extract a parent ID from keyed or one-level nested action arguments. */
+	private static function extractParentJobIdFromArray( array $args ): int {
+		if ( isset( $args['parent_job_id'] ) && is_numeric( $args['parent_job_id'] ) ) {
+			return (int) $args['parent_job_id'];
+		}
+		foreach ( $args as $value ) {
+			if ( is_array( $value ) && isset( $value['parent_job_id'] ) && is_numeric( $value['parent_job_id'] ) ) {
+				return (int) $value['parent_job_id'];
+			}
+		}
+		return 0;
+	}
+
 	/** Schedule a recovered chunk without scanning the scheduler table. */
 	private static function schedule( string $hook, int $parent_job_id, int $offset ): bool {
 		$args = array(
@@ -132,7 +159,15 @@ class PathlessBatchRecovery {
 				return true;
 			}
 		} catch ( \Throwable $exception ) {
-			do_action( 'datamachine_log', 'error', 'Pathless batch recovery scheduling failed', array( 'parent_job_id' => $parent_job_id, 'exception' => $exception->getMessage() ) );
+			do_action(
+				'datamachine_log',
+				'error',
+				'Pathless batch recovery scheduling failed',
+				array(
+					'parent_job_id' => $parent_job_id,
+					'exception'     => $exception->getMessage(),
+				)
+			);
 		}
 
 		$result = wp_schedule_single_event( time(), $hook, array( $parent_job_id, $offset ), true );
