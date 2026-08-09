@@ -14,6 +14,7 @@ use WP_CLI;
 use DataMachine\Cli\BaseCommand;
 use DataMachine\Abilities\Engine\DrainJobAbility;
 use DataMachine\Abilities\SystemAbilities;
+use DataMachine\Core\ActionScheduler\ClaimIndexMigration;
 use DataMachine\Engine\Tasks\TaskRegistry;
 use DataMachine\Engine\AI\System\Tasks\SystemTask;
 
@@ -170,6 +171,99 @@ class SystemCommand extends BaseCommand {
 		}
 
 		WP_CLI::log( sprintf( 'Available check types: %s', implode( ', ', $result['available'] ) ) );
+	}
+
+	/**
+	 * Inspect or explicitly build the Action Scheduler claim-order index.
+	 *
+	 * This command is inspection-only unless --apply is supplied. The migration
+	 * fails closed unless online DDL and conservative database disk headroom are
+	 * established for the current site's Action Scheduler table.
+	 *
+	 * ## OPTIONS
+	 *
+	 * [--apply]
+	 * : Apply the generated online DDL after all preflight checks pass.
+	 *
+	 * [--available-disk-bytes=<bytes>]
+	 * : Operator-established free bytes on the database data/tmp filesystems.
+	 * Required when DB_HOST is remote and local disk headroom cannot be measured.
+	 *
+	 * [--format=<format>]
+	 * : Output format.
+	 * ---
+	 * default: table
+	 * options:
+	 *   - table
+	 *   - json
+	 * ---
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp datamachine system action-scheduler-claim-index
+	 *     wp datamachine system action-scheduler-claim-index --apply
+	 *     wp datamachine system action-scheduler-claim-index --available-disk-bytes=21474836480 --apply
+	 *
+	 * @subcommand action-scheduler-claim-index
+	 */
+	public function action_scheduler_claim_index( array $args, array $assoc_args ): void {
+		$format = $assoc_args['format'] ?? 'table';
+		$apply  = isset( $assoc_args['apply'] );
+		$disk   = null;
+
+		if ( isset( $assoc_args['available-disk-bytes'] ) ) {
+			$raw_disk = (string) $assoc_args['available-disk-bytes'];
+			if ( ! ctype_digit( $raw_disk ) || (int) $raw_disk < 1 ) {
+				WP_CLI::error( '--available-disk-bytes must be a positive integer.' );
+				return;
+			}
+			$disk = (int) $raw_disk;
+		}
+
+		$migration = new ClaimIndexMigration();
+		try {
+			$result = $apply ? $migration->apply( $disk ) : $migration->inspect( $disk );
+		} catch ( \RuntimeException $error ) {
+			WP_CLI::error( $error->getMessage() );
+			return;
+		}
+
+		if ( 'json' === $format ) {
+			WP_CLI::line( (string) wp_json_encode( $result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+		} else {
+			WP_CLI::log( sprintf( 'Table:          %s', $result['table'] ) );
+			WP_CLI::log( sprintf( 'Index:          %s', $result['matching_index'] ?? $result['index'] ) );
+			WP_CLI::log( sprintf( 'Expected:       %s', implode( ', ', $result['expected_columns'] ) ) );
+			WP_CLI::log( sprintf( 'Status:         %s', $result['status'] ?? 'unknown' ) );
+			if ( isset( $result['runtime'] ) ) {
+				WP_CLI::log( sprintf( 'Runtime:        %s %s / %s', $result['runtime']['vendor'], $result['runtime']['version'], $result['engine'] ) );
+			}
+			if ( isset( $result['rows_estimate'] ) ) {
+				WP_CLI::log( sprintf( 'Rows estimate:  %s', number_format_i18n( $result['rows_estimate'] ) ) );
+			}
+			if ( isset( $result['disk'] ) ) {
+				$free = null === $result['disk']['free_bytes'] ? 'unknown' : size_format( $result['disk']['free_bytes'], 2 );
+				WP_CLI::log( sprintf( 'Disk headroom:  %s available; %s required (%s)', $free, size_format( $result['disk']['required_bytes'], 2 ), $result['disk']['source'] ) );
+			}
+			if ( ! empty( $result['ddl'] ) && ! $result['ready'] ) {
+				WP_CLI::log( 'DDL:            ' . $result['ddl'] );
+			}
+			foreach ( $result['blockers'] ?? array() as $blocker ) {
+				WP_CLI::warning( $blocker );
+			}
+		}
+
+		if ( ! $result['success'] || ( $apply && ! $result['ready'] ) ) {
+			WP_CLI::error( 'Action Scheduler claim index migration is not ready to apply.' );
+			return;
+		}
+
+		if ( $result['ready'] ) {
+			WP_CLI::success( $result['applied'] ? 'Action Scheduler claim index created and verified.' : 'Action Scheduler claim index is ready.' );
+			return;
+		}
+
+		WP_CLI::log( 'Dry run only. Re-run with --apply to execute the displayed online DDL.' );
 	}
 
 	/**
