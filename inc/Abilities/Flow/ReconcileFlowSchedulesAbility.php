@@ -35,7 +35,7 @@ class ReconcileFlowSchedulesAbility {
 								'description' => __( 'Restore missing schedules. Defaults to dry-run.', 'data-machine' ),
 							),
 							'spread_hours' => array(
-								'type'        => array( 'integer', 'null' ),
+								'anyOf'       => array( array( 'type' => 'integer' ), array( 'type' => 'null' ) ),
 								'minimum'     => 1,
 								'maximum'     => 24,
 								'description' => __( 'Explicit fleet distribution window in hours (1-24).', 'data-machine' ),

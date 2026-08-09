@@ -56,7 +56,7 @@ class AgentRemoteCallAbility {
 								'description' => __( 'Path on the remote site starting with "/" (e.g., "/wp-json/wp/v2/posts"). Full URLs are also accepted if the host matches remote_site.', 'data-machine' ),
 							),
 							'body'        => array(
-								'type'        => array( 'object', 'array', 'string' ),
+								'anyOf'       => array( array( 'type' => 'object' ), array( 'type' => 'array' ), array( 'type' => 'string' ) ),
 								'description' => __( 'Request body. Arrays and objects are JSON-encoded with Content-Type: application/json.', 'data-machine' ),
 							),
 							'query'       => array(
@@ -81,7 +81,7 @@ class AgentRemoteCallAbility {
 							'success'     => array( 'type' => 'boolean' ),
 							'status_code' => array( 'type' => 'integer' ),
 							'body'        => array(
-								'type'        => array( 'object', 'array', 'string', 'null' ),
+								'anyOf'       => array( array( 'type' => 'object' ), array( 'type' => 'array' ), array( 'type' => 'string' ), array( 'type' => 'null' ) ),
 								'description' => __( 'Decoded JSON body, or raw string if the response is not JSON.', 'data-machine' ),
 							),
 							'url'         => array( 'type' => 'string' ),

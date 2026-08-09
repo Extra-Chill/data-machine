@@ -391,7 +391,7 @@ class AuthAbilities {
 					'properties' => array(
 						'success'    => array( 'type' => 'boolean' ),
 						'message'    => array( 'type' => 'string' ),
-						'expires_at' => array( 'type' => array( 'string', 'null' ) ),
+						'expires_at' => array( 'anyOf' => array( array( 'type' => 'string' ), array( 'type' => 'null' ) ) ),
 						'error'      => array( 'type' => 'string' ),
 					),
 				),

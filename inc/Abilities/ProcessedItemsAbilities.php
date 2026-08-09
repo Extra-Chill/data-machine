@@ -200,7 +200,7 @@ class ProcessedItemsAbilities {
 					'properties' => array(
 						'success'      => array( 'type' => 'boolean' ),
 						'processed_at' => array(
-							'type'        => array( 'integer', 'null' ),
+							'anyOf'       => array( array( 'type' => 'integer' ), array( 'type' => 'null' ) ),
 							'description' => __( 'Unix timestamp, or null when never processed', 'data-machine' ),
 						),
 						'error'        => array( 'type' => 'string' ),

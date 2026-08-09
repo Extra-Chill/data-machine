@@ -93,7 +93,7 @@ class DuplicateCheckAbility {
 							'description' => __( 'Jaccard similarity threshold for queue checks (default: 0.65)', 'data-machine' ),
 						),
 						'source_url'    => array(
-							'type'        => array( 'string', 'null' ),
+							'anyOf'       => array( array( 'type' => 'string' ), array( 'type' => 'null' ) ),
 							'description' => __( 'Canonical source URL to check for exact-match duplicates before title similarity. Optional; when absent or null, dedup falls back to title matching.', 'data-machine' ),
 						),
 						'context'       => array(

@@ -235,7 +235,7 @@ class AgentAbilities {
 						'type'       => 'object',
 						'properties' => array(
 							'success'           => array( 'type' => 'boolean' ),
-							'active_agent_slug' => array( 'type' => array( 'string', 'null' ) ),
+							'active_agent_slug' => array( 'anyOf' => array( array( 'type' => 'string' ), array( 'type' => 'null' ) ) ),
 							'agents'            => array(
 								'type'  => 'array',
 								'items' => array(
@@ -245,11 +245,11 @@ class AgentAbilities {
 										'agent_slug'  => array( 'type' => 'string' ),
 										'agent_name'  => array( 'type' => 'string' ),
 										'owner_id'    => array( 'type' => 'integer' ),
-										'site_scope'  => array( 'type' => array( 'integer', 'null' ) ),
+										'site_scope'  => array( 'anyOf' => array( array( 'type' => 'integer' ), array( 'type' => 'null' ) ) ),
 										'description' => array( 'type' => 'string' ),
 										'is_owner'    => array( 'type' => 'boolean' ),
 										'is_active'   => array( 'type' => 'boolean' ),
-										'user_role'   => array( 'type' => array( 'string', 'null' ) ),
+										'user_role'   => array( 'anyOf' => array( array( 'type' => 'string' ), array( 'type' => 'null' ) ) ),
 									),
 								),
 							),
@@ -280,8 +280,8 @@ class AgentAbilities {
 						'type'       => 'object',
 						'properties' => array(
 							'success'      => array( 'type' => 'boolean' ),
-							'agent'        => array( 'type' => array( 'object', 'null' ) ),
-							'agent_slug'   => array( 'type' => array( 'string', 'null' ) ),
+							'agent'        => array( 'anyOf' => array( array( 'type' => 'object' ), array( 'type' => 'null' ) ) ),
+							'agent_slug'   => array( 'anyOf' => array( array( 'type' => 'string' ), array( 'type' => 'null' ) ) ),
 							'source'       => array( 'type' => 'string' ),
 							'needs_choice' => array( 'type' => 'boolean' ),
 							'error'        => array( 'type' => 'string' ),
@@ -356,7 +356,7 @@ class AgentAbilities {
 								'description' => 'Agent configuration object.',
 							),
 							'site_scope' => array(
-								'type'        => array( 'integer', 'null' ),
+								'anyOf'       => array( array( 'type' => 'integer' ), array( 'type' => 'null' ) ),
 								'description' => 'Site scope for the agent. Omit or null for network-wide (resolves on every site); a blog ID scopes the agent to that single site. Default network-wide.',
 							),
 						),
@@ -370,7 +370,7 @@ class AgentAbilities {
 							'agent_name' => array( 'type' => 'string' ),
 							'owner_id'   => array( 'type' => 'integer' ),
 							'agent_dir'  => array( 'type' => 'string' ),
-							'site_scope' => array( 'type' => array( 'integer', 'null' ) ),
+							'site_scope' => array( 'anyOf' => array( array( 'type' => 'integer' ), array( 'type' => 'null' ) ) ),
 							'message'    => array( 'type' => 'string' ),
 							'error'      => array( 'type' => 'string' ),
 						),
@@ -395,7 +395,7 @@ class AgentAbilities {
 								'description' => 'Bundle source: local path (directory, .zip, .json) or remote URL (HTTPS to a .zip/.json or a GitHub blob/tree/archive URL).',
 							),
 							'bundle'      => array(
-								'type'        => array( 'object', 'array' ),
+								'anyOf'       => array( array( 'type' => 'object' ), array( 'type' => 'array' ) ),
 								'description' => 'Already-parsed portable Data Machine agent bundle array.',
 							),
 							'slug'        => array(
@@ -1769,11 +1769,11 @@ class AgentAbilities {
 					'description' => 'Initial engine data merged into the ephemeral workflow job.',
 				),
 				'required_outputs'    => array(
-					'type'        => array( 'array', 'object' ),
+					'anyOf'       => array( array( 'type' => 'array' ), array( 'type' => 'object' ) ),
 					'description' => 'Semantic output keys that must be present and non-empty when a completed bundle run is returned.',
 				),
 				'required_artifacts'  => array(
-					'type'        => array( 'array', 'object' ),
+					'anyOf'       => array( array( 'type' => 'array' ), array( 'type' => 'object' ) ),
 					'description' => 'Typed artifact output keys that must be present and non-empty when a completed bundle run is returned.',
 				),
 				'engine_data_outputs' => array(
@@ -1789,7 +1789,7 @@ class AgentAbilities {
 					'description' => 'Optional wp-ai-client model slug to use as the run-scoped pipeline model default.',
 				),
 				'timestamp'           => array(
-					'type'        => array( 'integer', 'null' ),
+					'anyOf'       => array( array( 'type' => 'integer' ), array( 'type' => 'null' ) ),
 					'description' => 'Future Unix timestamp for delayed execution. Omit for immediate execution.',
 				),
 				'dry_run'             => array(
@@ -1843,11 +1843,11 @@ class AgentAbilities {
 					'description' => 'Runtime-scoped Data Machine tool definitions merged through datamachine_resolved_tools only for this run.',
 				),
 				'ability_tools'       => array(
-					'type'        => array( 'object', 'array' ),
+					'anyOf'       => array( array( 'type' => 'object' ), array( 'type' => 'array' ) ),
 					'description' => 'Runtime-scoped generic ability-backed tools. Accepts a keyed map or list entries with name and ability, e.g. [{"name":"my_tool","ability":"plugin/ability"}].',
 				),
 				'tools'               => array(
-					'type'        => array( 'object', 'array' ),
+					'anyOf'       => array( array( 'type' => 'object' ), array( 'type' => 'array' ) ),
 					'description' => 'Alias for runtime_tools; accepts keyed tool definitions or a list with name/tool fields.',
 				),
 				'disable_directives'  => array(

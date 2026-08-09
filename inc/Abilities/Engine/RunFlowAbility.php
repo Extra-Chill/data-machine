@@ -64,7 +64,7 @@ class RunFlowAbility {
 								'description' => __( 'Flow ID to execute.', 'data-machine' ),
 							),
 							'job_id'         => array(
-								'type'        => array( 'integer', 'null' ),
+								'anyOf'       => array( array( 'type' => 'integer' ), array( 'type' => 'null' ) ),
 								'description' => __( 'Pre-created job ID (optional, for API-triggered executions).', 'data-machine' ),
 							),
 							'initial_data'   => array(
@@ -82,7 +82,7 @@ class RunFlowAbility {
 						'properties' => array(
 							'success'    => array( 'type' => 'boolean' ),
 							'flow_id'    => array( 'type' => 'integer' ),
-							'job_id'     => array( 'type' => array( 'integer', 'null' ) ),
+							'job_id'     => array( 'anyOf' => array( array( 'type' => 'integer' ), array( 'type' => 'null' ) ) ),
 							'first_step' => array( 'type' => 'string' ),
 							'skipped'    => array( 'type' => 'boolean' ),
 							'reason'     => array( 'type' => 'string' ),

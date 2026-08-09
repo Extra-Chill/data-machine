@@ -129,7 +129,7 @@ class ImageOptimizationAbilities {
 						'properties' => array(
 							'success'      => array( 'type' => 'boolean' ),
 							'queued_count' => array( 'type' => 'integer' ),
-							'batch_id'     => array( 'type' => array( 'integer', 'null' ) ),
+							'batch_id'     => array( 'anyOf' => array( array( 'type' => 'integer' ), array( 'type' => 'null' ) ) ),
 							'message'      => array( 'type' => 'string' ),
 							'error'        => array( 'type' => 'string' ),
 						),

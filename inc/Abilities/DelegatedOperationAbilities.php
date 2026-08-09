@@ -68,7 +68,7 @@ final class DelegatedOperationAbilities {
 							'maxLength' => 191,
 						),
 						'input'        => array( 'type' => 'object' ),
-						'timestamp'    => array( 'type' => array( 'integer', 'null' ) ),
+						'timestamp'    => array( 'anyOf' => array( array( 'type' => 'integer' ), array( 'type' => 'null' ) ) ),
 					),
 					'additionalProperties' => false,
 				),

@@ -38,7 +38,7 @@ class GetFlowStepsAbility {
 								'description' => __( 'Flow ID to get steps for (required unless flow_step_id provided)', 'data-machine' ),
 							),
 							'flow_step_id' => array(
-								'type'        => array( 'string', 'null' ),
+								'anyOf'       => array( array( 'type' => 'string' ), array( 'type' => 'null' ) ),
 								'description' => __( 'Get a specific step by ID (ignores flow_id when provided)', 'data-machine' ),
 							),
 						),

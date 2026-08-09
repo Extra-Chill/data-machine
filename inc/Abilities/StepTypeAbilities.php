@@ -63,7 +63,7 @@ class StepTypeAbilities {
 					'type'       => 'object',
 					'properties' => array(
 						'step_type_slug' => array(
-							'type'        => array( 'string', 'null' ),
+							'anyOf'       => array( array( 'type' => 'string' ), array( 'type' => 'null' ) ),
 							'description' => __( 'Get a specific step type by slug', 'data-machine' ),
 						),
 					),

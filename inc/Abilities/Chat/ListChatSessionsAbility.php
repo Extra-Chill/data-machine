@@ -41,7 +41,7 @@ class ListChatSessionsAbility {
 								'description' => __( 'User ID to list sessions for.', 'data-machine' ),
 							),
 							'agent_id' => array(
-								'type'        => array( 'integer', 'null' ),
+								'anyOf'       => array( array( 'type' => 'integer' ), array( 'type' => 'null' ) ),
 								'description' => __( 'Agent ID to filter sessions by. Null or omitted returns all agents.', 'data-machine' ),
 							),
 							'limit'    => array(
@@ -55,7 +55,7 @@ class ListChatSessionsAbility {
 								'description' => __( 'Pagination offset.', 'data-machine' ),
 							),
 							'mode'     => array(
-								'type'        => array( 'string', 'null' ),
+								'anyOf'       => array( array( 'type' => 'string' ), array( 'type' => 'null' ) ),
 								'description' => __( 'Mode filter (chat, pipeline, system). Null returns all modes.', 'data-machine' ),
 							),
 						),
@@ -72,7 +72,7 @@ class ListChatSessionsAbility {
 							'total'    => array( 'type' => 'integer' ),
 							'limit'    => array( 'type' => 'integer' ),
 							'offset'   => array( 'type' => 'integer' ),
-							'mode'     => array( 'type' => array( 'string', 'null' ) ),
+							'mode'     => array( 'anyOf' => array( array( 'type' => 'string' ), array( 'type' => 'null' ) ) ),
 							'error'    => array( 'type' => 'string' ),
 						),
 					),

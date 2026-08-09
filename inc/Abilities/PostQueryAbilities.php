@@ -92,7 +92,7 @@ class PostQueryAbilities {
 								'description' => __( 'What to filter posts by', 'data-machine' ),
 							),
 							'filter_value' => array(
-								'type'        => array( 'string', 'integer' ),
+								'anyOf'       => array( array( 'type' => 'string' ), array( 'type' => 'integer' ) ),
 								'description' => __( 'Handler slug, flow ID, or pipeline ID', 'data-machine' ),
 							),
 							'post_type'    => array(
@@ -230,7 +230,7 @@ class PostQueryAbilities {
 					'description' => 'What to filter by: "handler" (slug), "flow" (ID), or "pipeline" (ID)',
 				),
 				'filter_value' => array(
-					'type'        => array( 'string', 'integer' ),
+					'anyOf'       => array( array( 'type' => 'string' ), array( 'type' => 'integer' ) ),
 					'required'    => true,
 					'description' => 'Handler slug (e.g., "universal_web_scraper"), flow ID, or pipeline ID',
 				),

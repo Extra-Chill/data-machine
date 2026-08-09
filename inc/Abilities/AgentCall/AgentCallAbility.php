@@ -42,7 +42,7 @@ class AgentCallAbility {
 										'description' => __( 'Target transport type. Only webhook is supported now.', 'data-machine' ),
 									),
 									'id'   => array(
-										'type'        => array( 'string', 'array' ),
+										'anyOf'       => array( array( 'type' => 'string' ), array( 'type' => 'array' ) ),
 										'description' => __( 'Target identifier. For webhook targets this is one URL, an array of URLs, or newline-separated URLs.', 'data-machine' ),
 									),
 									'auth' => array(

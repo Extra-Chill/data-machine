@@ -196,7 +196,7 @@ class TrackedItemsAbilities {
 			'properties' => array(
 				'success' => array( 'type' => 'boolean' ),
 				'item'    => array(
-					'type' => array( 'object', 'null' ),
+					'anyOf' => array( array( 'type' => 'object' ), array( 'type' => 'null' ) ),
 				),
 				'error'   => array( 'type' => 'string' ),
 			),

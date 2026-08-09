@@ -34,27 +34,27 @@ class JobsSummaryAbility {
 						'type'       => 'object',
 						'properties' => array(
 							'flow_id'     => array(
-								'type'        => array( 'integer', 'string', 'null' ),
+								'anyOf'       => array( array( 'type' => 'integer' ), array( 'type' => 'string' ), array( 'type' => 'null' ) ),
 								'description' => __( 'Filter jobs by flow ID.', 'data-machine' ),
 							),
 							'pipeline_id' => array(
-								'type'        => array( 'integer', 'string', 'null' ),
+								'anyOf'       => array( array( 'type' => 'integer' ), array( 'type' => 'string' ), array( 'type' => 'null' ) ),
 								'description' => __( 'Filter jobs by pipeline ID.', 'data-machine' ),
 							),
 							'handler'     => array(
-								'type'        => array( 'string', 'null' ),
+								'anyOf'       => array( array( 'type' => 'string' ), array( 'type' => 'null' ) ),
 								'description' => __( 'Filter jobs by handler slug recorded in job outcome metadata.', 'data-machine' ),
 							),
 							'status'      => array(
-								'type'        => array( 'string', 'null' ),
+								'anyOf'       => array( array( 'type' => 'string' ), array( 'type' => 'null' ) ),
 								'description' => __( 'Filter jobs by status prefix.', 'data-machine' ),
 							),
 							'source'      => array(
-								'type'        => array( 'string', 'null' ),
+								'anyOf'       => array( array( 'type' => 'string' ), array( 'type' => 'null' ) ),
 								'description' => __( 'Filter jobs by source.', 'data-machine' ),
 							),
 							'since'       => array(
-								'type'        => array( 'string', 'null' ),
+								'anyOf'       => array( array( 'type' => 'string' ), array( 'type' => 'null' ) ),
 								'description' => __( 'Filter jobs created at or after this datetime (Y-m-d H:i:s).', 'data-machine' ),
 							),
 							'compact'     => array(

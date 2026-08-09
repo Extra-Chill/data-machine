@@ -39,7 +39,7 @@ class GetFlowsAbility {
 						'type'       => 'object',
 						'properties' => array(
 							'flow_id'      => array(
-								'type'        => array( 'integer', 'null' ),
+								'anyOf'       => array( array( 'type' => 'integer' ), array( 'type' => 'null' ) ),
 								'description' => __( 'Get a specific flow by ID (ignores pagination when provided)', 'data-machine' ),
 							),
 							'user_id'      => array(
@@ -47,15 +47,15 @@ class GetFlowsAbility {
 								'description' => __( 'Filter flows by WordPress user ID. Defaults to showing all.', 'data-machine' ),
 							),
 							'agent_id'     => array(
-								'type'        => array( 'integer', 'null' ),
+								'anyOf'       => array( array( 'type' => 'integer' ), array( 'type' => 'null' ) ),
 								'description' => __( 'Filter flows by agent ID. Takes priority over user_id when provided.', 'data-machine' ),
 							),
 							'pipeline_id'  => array(
-								'type'        => array( 'integer', 'null' ),
+								'anyOf'       => array( array( 'type' => 'integer' ), array( 'type' => 'null' ) ),
 								'description' => __( 'Filter flows by pipeline ID', 'data-machine' ),
 							),
 							'handler_slug' => array(
-								'type'        => array( 'string', 'null' ),
+								'anyOf'       => array( array( 'type' => 'string' ), array( 'type' => 'null' ) ),
 								'description' => __( 'Filter flows using this handler slug (any step that uses this handler)', 'data-machine' ),
 							),
 							'per_page'     => array(

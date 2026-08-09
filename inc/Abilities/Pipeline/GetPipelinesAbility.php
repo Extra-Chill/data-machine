@@ -36,7 +36,7 @@ class GetPipelinesAbility {
 						'type'       => 'object',
 						'properties' => array(
 							'pipeline_id'   => array(
-								'type'        => array( 'integer', 'null' ),
+								'anyOf'       => array( array( 'type' => 'integer' ), array( 'type' => 'null' ) ),
 								'description' => __( 'Get a specific pipeline by ID (ignores pagination when provided)', 'data-machine' ),
 							),
 							'user_id'       => array(
@@ -45,7 +45,7 @@ class GetPipelinesAbility {
 								'default'     => 0,
 							),
 							'agent_id'      => array(
-								'type'        => array( 'integer', 'null' ),
+								'anyOf'       => array( array( 'type' => 'integer' ), array( 'type' => 'null' ) ),
 								'description' => __( 'Filter pipelines by agent ID. Takes priority over user_id when provided.', 'data-machine' ),
 							),
 							'per_page'      => array(
@@ -62,7 +62,7 @@ class GetPipelinesAbility {
 								'description' => __( 'Offset for pagination', 'data-machine' ),
 							),
 							'search'        => array(
-								'type'        => array( 'string', 'null' ),
+								'anyOf'       => array( array( 'type' => 'string' ), array( 'type' => 'null' ) ),
 								'description' => __( 'Search pipelines by name (SQL LIKE match)', 'data-machine' ),
 							),
 							'output_mode'   => array(
