@@ -10,6 +10,7 @@ namespace DataMachine\Tests\Unit\Abilities\Engine;
 
 use DataMachine\Abilities\Engine\PipelineBatchScheduler;
 use DataMachine\Core\ActionScheduler\BatchScheduler;
+use DataMachine\Core\ActionScheduler\PathlessBatchRecovery;
 use DataMachine\Core\Database\BatchItems\BatchItems;
 use DataMachine\Core\Database\Jobs\Jobs;
 use DataMachine\Core\Database\ProcessedItems\ProcessedItems;
@@ -184,6 +185,45 @@ class PipelineBatchSchedulerTest extends WP_UnitTestCase {
 		$state = datamachine_get_engine_data( $parent_id )['batch_state'];
 		$this->assertSame( 'first_hook', $state['hook'] );
 		$this->assertSame( 'first', $state['extra']['route'] );
+	}
+
+	public function test_exact_retry_adopts_one_existing_chunk_path(): void {
+		global $wpdb;
+		$parent_id = $this->create_parent_job();
+		$items     = array( $this->make_data_packet( 'Event A' ) );
+
+		$first = BatchScheduler::start( $parent_id, PipelineBatchScheduler::BATCH_HOOK, $items, array( 'next_flow_step_id' => 'step_a' ), 'pipeline', BatchScheduler::COMPLETION_STRATEGY_CHILDREN_COMPLETE );
+		$retry = BatchScheduler::start( $parent_id, PipelineBatchScheduler::BATCH_HOOK, $items, array( 'next_flow_step_id' => 'step_a' ), 'pipeline', BatchScheduler::COMPLETION_STRATEGY_CHILDREN_COMPLETE );
+
+		$this->assertTrue( $first['scheduled'] );
+		$this->assertTrue( $retry['scheduled'] );
+		$this->assertSame( 1, (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$wpdb->prefix}actionscheduler_actions WHERE hook = %s AND args = %s AND status = 'pending'", PipelineBatchScheduler::BATCH_HOOK, wp_json_encode( array( 'parent_job_id' => $parent_id, 'offset' => 0 ) ) ) ) );
+	}
+
+	public function test_duplicate_completed_chunk_does_not_perpetuate_recovery_actions(): void {
+		global $wpdb;
+		$parent_id = $this->create_parent_job();
+		$scheduler = new PipelineBatchScheduler();
+		$scheduler->fanOut( $parent_id, 'step_a', array( $this->make_data_packet( 'Event A' ) ), $this->make_engine_snapshot( $parent_id ) );
+		$scheduler->processChunk( $parent_id, 0 );
+		$before = (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$wpdb->prefix}actionscheduler_actions WHERE hook = %s AND args = %s AND status = 'pending'", PipelineBatchScheduler::BATCH_HOOK, wp_json_encode( array( 'parent_job_id' => $parent_id, 'offset' => 0 ) ) ) );
+
+		$scheduler->processChunk( $parent_id, 0 );
+
+		$after = (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$wpdb->prefix}actionscheduler_actions WHERE hook = %s AND args = %s AND status = 'pending'", PipelineBatchScheduler::BATCH_HOOK, wp_json_encode( array( 'parent_job_id' => $parent_id, 'offset' => 0 ) ) ) );
+		$this->assertSame( $before, $after );
+	}
+
+	public function test_pathless_batch_recovery_is_idempotent_without_scheduler_scan(): void {
+		global $wpdb;
+		$parent_id = $this->create_parent_job();
+		$scheduler = new PipelineBatchScheduler();
+		$scheduler->fanOut( $parent_id, 'step_a', array( $this->make_data_packet( 'Event A' ) ), $this->make_engine_snapshot( $parent_id ) );
+		$wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->prefix}actionscheduler_actions WHERE hook = %s AND args = %s", PipelineBatchScheduler::BATCH_HOOK, wp_json_encode( array( 'parent_job_id' => $parent_id, 'offset' => 0 ) ) ) );
+
+		$this->assertTrue( PathlessBatchRecovery::recover( $parent_id ) );
+		$this->assertFalse( PathlessBatchRecovery::recover( $parent_id ) );
+		$this->assertSame( 1, (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$wpdb->prefix}actionscheduler_actions WHERE hook = %s AND args = %s AND status = 'pending'", PipelineBatchScheduler::BATCH_HOOK, wp_json_encode( array( 'parent_job_id' => $parent_id, 'offset' => 0 ) ) ) ) );
 	}
 
 	/**

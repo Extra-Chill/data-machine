@@ -16,6 +16,7 @@ use DataMachine\Core\ChildJobRecoveryPolicy;
 use DataMachine\Core\DirectJobEnqueuer;
 use DataMachine\Core\DirectOperationRecoveryPolicy;
 use DataMachine\Core\EngineData;
+use DataMachine\Core\ActionScheduler\PathlessBatchRecovery;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -541,6 +542,35 @@ class RecoverStuckJobsAbility {
 							'reason'  => 'Pending or in-progress scheduler work exists',
 						)
 					);
+					continue;
+				}
+
+				if ( PathlessBatchRecovery::isRecoverable( $engine_data ) ) {
+					if ( $dry_run ) {
+						++$requeued;
+						$this->appendJobDetail( $jobs, $jobs_omitted, array(
+							'job_id'  => $job_id,
+							'flow_id' => $job_flow_id,
+							'status'  => 'would_requeue_pathless_batch',
+						) );
+						continue;
+					}
+					if ( ! $this->consumeTouchBudget( $attempted, $touched, $apply_limit ) ) {
+						$limit_reached = true;
+						break 2;
+					}
+					if ( PathlessBatchRecovery::recover( $job_id ) ) {
+						++$requeued;
+						++$mutations;
+						++$mutated;
+						$this->appendJobDetail( $jobs, $jobs_omitted, array(
+							'job_id'  => $job_id,
+							'flow_id' => $job_flow_id,
+							'status'  => 'requeued_pathless_batch',
+						) );
+					} else {
+						++$skipped;
+					}
 					continue;
 				}
 
@@ -1166,7 +1196,7 @@ class RecoverStuckJobsAbility {
 			return true;
 		}
 
-		if ( $this->hasActiveBatchWork( $job_id, $engine_data, $timeout_hours ) ) {
+		if ( PathlessBatchRecovery::hasActiveWork( $job_id, $engine_data, $timeout_hours ) ) {
 			return true;
 		}
 
@@ -1233,111 +1263,6 @@ class RecoverStuckJobsAbility {
 				if ( ( $now_gmt - $started_at ) < $timeout_seconds ) {
 					return true;
 				}
-			}
-		}
-
-		return false;
-	}
-
-	/**
-	 * Check whether a pipeline batch parent still has scheduled chunk or child work.
-	 *
-	 * Batch parents wait on `datamachine_pipeline_batch_chunk` actions and child jobs,
-	 * not `datamachine_execute_step` actions. Treat both as live work so recovery
-	 * does not fail a parent while fan-out is still queued or children are active.
-	 *
-	 * @param int                  $parent_job_id Parent job ID.
-	 * @param array<string, mixed> $engine_data Parent engine data.
-	 * @param int                  $timeout_hours Hours before in-progress actions are considered stale.
-	 * @return bool True when batch chunk or child work is still active.
-	 */
-	private function hasActiveBatchWork( int $parent_job_id, array $engine_data, int $timeout_hours ): bool {
-		if ( $parent_job_id <= 0 || empty( $engine_data['batch'] ) ) {
-			return false;
-		}
-
-		if ( $this->hasActiveActionForArg( 'datamachine_pipeline_batch_chunk', 'parent_job_id', $parent_job_id, $timeout_hours ) ) {
-			return true;
-		}
-
-		global $wpdb;
-		$jobs_table = $wpdb->prefix . 'datamachine_jobs';
-
-		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name is generated from the WP prefix.
-		$active_children = (int) $wpdb->get_var(
-			$wpdb->prepare(
-				"SELECT COUNT(*)
-				 FROM {$jobs_table}
-				 WHERE parent_job_id = %d
-				 AND status IN ( %s, %s )",
-				$parent_job_id,
-				'pending',
-				'processing'
-			)
-		);
-		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-
-		return $active_children > 0;
-	}
-
-	/**
-	 * Check for a pending or fresh in-progress Action Scheduler action by arg ID.
-	 *
-	 * @param string $hook Action hook.
-	 * @param string $arg_name Numeric argument name to match.
-	 * @param int    $arg_id Expected numeric argument value.
-	 * @param int    $timeout_hours Hours before in-progress actions are considered stale.
-	 * @return bool True when matching action is pending or freshly in-progress.
-	 */
-	private function hasActiveActionForArg( string $hook, string $arg_name, int $arg_id, int $timeout_hours ): bool {
-		global $wpdb;
-
-		if ( $arg_id <= 0 ) {
-			return false;
-		}
-
-		$actions_table = $wpdb->prefix . 'actionscheduler_actions';
-		$like_arg_id   = '%"' . $wpdb->esc_like( $arg_name ) . '":' . $wpdb->esc_like( (string) $arg_id ) . '%';
-
-		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name is generated from the WP prefix.
-		$actions = $wpdb->get_results(
-			$wpdb->prepare(
-				"SELECT action_id, args, status, scheduled_date_gmt, last_attempt_gmt
-				 FROM {$actions_table}
-				 WHERE hook = %s
-				 AND status IN ( %s, %s )
-				 AND args LIKE %s",
-				$hook,
-				'pending',
-				'in-progress',
-				$like_arg_id
-			)
-		);
-		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-
-		$timeout_seconds = max( 1, $timeout_hours ) * HOUR_IN_SECONDS;
-		$now_gmt         = strtotime( current_time( 'mysql', true ) );
-
-		foreach ( $actions as $action ) {
-			if ( $arg_id !== $this->extractActionArgInt( (string) ( $action->args ?? '' ), $arg_name ) ) {
-				continue;
-			}
-
-			if ( 'pending' === (string) $action->status ) {
-				return true;
-			}
-
-			$last_attempt = (string) ( $action->last_attempt_gmt ?? '' );
-			$scheduled    = (string) ( $action->scheduled_date_gmt ?? '' );
-			$reference    = $last_attempt && '0000-00-00 00:00:00' !== $last_attempt ? $last_attempt : $scheduled;
-			$started_at   = $reference ? strtotime( $reference ) : false;
-
-			if ( false === $started_at || false === $now_gmt ) {
-				return true;
-			}
-
-			if ( ( $now_gmt - $started_at ) < $timeout_seconds ) {
-				return true;
 			}
 		}
 

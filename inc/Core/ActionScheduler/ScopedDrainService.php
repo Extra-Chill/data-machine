@@ -43,12 +43,14 @@ class ScopedDrainService {
 		$terminal_state         = '';
 
 		$started_at    = microtime( true );
+		$timeouts_reset = false;
 		$before_counts = $this->getStatusCounts( $hooks, $job_ids, $lane );
 		$batches       = 0;
 		$warnings      = 0;
 		$stop_reason   = 'empty';
+		$processed     = 0;
 
-		while ( $this->getDuePendingCount( $hooks, $job_ids, $lane ) > 0 ) {
+		while ( $this->hasDuePendingAction( $hooks, $job_ids, $lane ) ) {
 			if ( null !== $terminal_callback ) {
 				$terminal_state = (string) $terminal_callback();
 				if ( '' !== $terminal_state ) {
@@ -57,14 +59,13 @@ class ScopedDrainService {
 				}
 			}
 
-			$stats = $this->buildStats( $before_counts, $this->getStatusCounts( $hooks, $job_ids, $lane ), $batches, $warnings, $hooks, $job_ids, $stop_reason, $lane, $terminal_state );
 			// @phpstan-ignore-next-line
 			if ( $this->isMemorySoftLimitReached() ) {
 				$stop_reason = 'memory_limit';
 				break;
 			}
 
-			if ( $limit > 0 && (int) $stats['actions_processed'] >= $limit ) {
+			if ( $limit > 0 && $processed >= $limit ) {
 				$stop_reason = 'limit';
 				break;
 			}
@@ -82,20 +83,19 @@ class ScopedDrainService {
 
 			$current_batch_size = $batch_size;
 			if ( $limit > 0 ) {
-				$current_batch_size = min( $batch_size, $limit - (int) $stats['actions_processed'] );
+				$current_batch_size = min( $batch_size, $limit - $processed );
 			}
 			if ( $current_batch_size <= 0 ) {
 				$stop_reason = 'limit';
 				break;
 			}
 
-			$due_before    = $this->getDuePendingCount( $hooks, $job_ids, $lane );
-			$status_before = $this->getStatusCounts( $hooks, $job_ids, $lane );
 			$deadline_at   = 0.0;
 			if ( $time_limit_ms > 0 ) {
 				$deadline_at = $started_at + max( 0, $time_limit_ms - $stop_before_timeout_ms ) / 1000;
 			}
-			$result = $this->runActionSchedulerBatch( $current_batch_size, $hooks, $job_ids, $deadline_at, $lane, $execution_context );
+			$result = $this->runActionSchedulerBatch( $current_batch_size, $hooks, $job_ids, $deadline_at, $lane, $execution_context, ! $timeouts_reset );
+			$timeouts_reset = true;
 			++$batches;
 
 			if ( 0 !== (int) $result['return_code'] ) {
@@ -108,13 +108,13 @@ class ScopedDrainService {
 				break;
 			}
 
-			$status_after = $this->getStatusCounts( $hooks, $job_ids, $lane );
-			$progress     = (int) ( $result['actions_processed'] ?? $this->processedDelta( $status_before, $status_after ) );
+			$progress     = (int) ( $result['actions_processed'] ?? 0 );
+			$processed += $progress;
 			if ( '' !== (string) $result['stop_reason'] ) {
 				$stop_reason = (string) $result['stop_reason'];
 				break;
 			}
-			if ( 0 === $progress && $this->getDuePendingCount( $hooks, $job_ids, $lane ) >= $due_before ) {
+			if ( 0 === $progress ) {
 				++$warnings;
 				if ( null !== $warning_callback ) {
 					$warning_callback( 'Drain stopped because Action Scheduler made no observable progress.' );
@@ -338,7 +338,7 @@ class ScopedDrainService {
 	 * @param string        $execution_context Action Scheduler execution context.
 	 * @return array{return_code:int,stdout:string,stderr:string,stop_reason:string,actions_processed:int} Result data.
 	 */
-	private function runActionSchedulerBatch( int $batch_size, ?array $hooks = null, array $job_ids = array(), float $deadline_at = 0.0, string $lane = '', string $execution_context = 'Data Machine drain' ): array {
+	private function runActionSchedulerBatch( int $batch_size, ?array $hooks = null, array $job_ids = array(), float $deadline_at = 0.0, string $lane = '', string $execution_context = 'Data Machine drain', bool $reset_timeouts = true ): array {
 		$store       = \ActionScheduler_Store::instance();
 		$runner      = \ActionScheduler::runner();
 		$warnings    = array();
@@ -349,7 +349,9 @@ class ScopedDrainService {
 
 		try {
 			GroupRegistrar::ensureDataMachineGroup();
-			$this->runActionSchedulerTimeoutCleanup( $store );
+			if ( $reset_timeouts ) {
+				$this->runActionSchedulerTimeoutCleanup( $store );
+			}
 			$claim = $store->stake_claim( $claim_size, null, $hooks ?? array(), self::GROUP );
 		} catch ( \Throwable $throwable ) {
 			return array(
@@ -362,6 +364,7 @@ class ScopedDrainService {
 		}
 
 		try {
+			$claimed_action_ids = array_map( 'intval', $store->find_actions_by_claim_id( $claim->get_id() ) );
 			foreach ( $claim->get_actions() as $action_id ) {
 				if ( $deadline_at > 0 && microtime( true ) >= $deadline_at ) {
 					$stop_reason = 'timeout_margin';
@@ -379,7 +382,6 @@ class ScopedDrainService {
 					continue;
 				}
 
-				$claimed_action_ids = array_map( 'intval', $store->find_actions_by_claim_id( $claim->get_id() ) );
 				if ( ! in_array( $action_id, $claimed_action_ids, true ) ) {
 					$warnings[] = sprintf( 'Action Scheduler claim %d was lost during drain.', $claim->get_id() );
 					break;
@@ -914,6 +916,40 @@ class ScopedDrainService {
 	 */
 	private function getDuePendingCount( ?array $hooks = null, array $job_ids = array(), string $lane = '' ): int {
 		return $this->countActions( true, $hooks, $job_ids, $lane );
+	}
+
+	/** Check for due work without counting the queue. */
+	private function hasDuePendingAction( ?array $hooks = null, array $job_ids = array(), string $lane = '' ): bool {
+		if ( '' !== $lane ) {
+			return $this->getDuePendingCount( $hooks, $job_ids, $lane ) > 0;
+		}
+
+		global $wpdb;
+		$actions_table = $wpdb->prefix . 'actionscheduler_actions';
+		$groups_table  = $wpdb->prefix . 'actionscheduler_groups';
+		$hook_sql      = $this->hookWhereSql( $hooks, $job_ids );
+		$values        = array_merge(
+			array( $actions_table, $groups_table ),
+			$hook_sql['values'],
+			array( self::GROUP, gmdate( 'Y-m-d H:i:s' ) )
+		);
+
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber -- Dynamic normalized scope is prepared with matching values.
+		$action_id = $wpdb->get_var(
+			$wpdb->prepare(
+				'SELECT a.action_id
+				FROM %i a
+				INNER JOIN %i g ON g.group_id = a.group_id
+				WHERE ' . $hook_sql['sql'] . 'a.status = \'pending\'
+				AND g.slug = %s
+				AND a.scheduled_date_gmt <= %s
+				LIMIT 1',
+				$values
+			)
+		);
+		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
+
+		return null !== $action_id;
 	}
 
 	/**

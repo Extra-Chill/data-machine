@@ -83,6 +83,16 @@ class BatchItemsTest extends WP_UnitTestCase {
 		$this->assertNotSame( $first[0]['lease_token'], $second[0]['lease_token'] );
 	}
 
+	public function test_claim_owner_failure_rolls_back_the_lease(): void {
+		global $wpdb;
+		$this->assertTrue( $this->repository->insert_batch( $this->batch_job_id, array( array( 'id' => 1 ) ), array( array() ) )['success'] );
+
+		$claimed = $this->repository->claim_chunk( $this->batch_job_id, 0, 1, 60, static fn(): bool => false );
+
+		$this->assertSame( array(), $claimed );
+		$this->assertSame( BatchItems::STATE_READY, $wpdb->get_var( $wpdb->prepare( 'SELECT state FROM %i WHERE batch_job_id = %d AND item_index = 0', $this->repository->get_table_name(), $this->batch_job_id ) ) );
+	}
+
 	public function test_stale_token_is_fenced_and_release_supports_partial_retry(): void {
 		global $wpdb;
 		$this->assertTrue( $this->repository->insert_batch( $this->batch_job_id, array( array( 'id' => 1 ), array( 'id' => 2 ) ), array( array(), array() ) )['success'] );
