@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.172.8] - 2026-08-09
+
+### Fixed
+- atomically acquire missing option leases
+
 ## [0.172.7] - 2026-08-09
 
 ### Changed
