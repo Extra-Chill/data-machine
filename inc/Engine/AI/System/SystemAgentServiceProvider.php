@@ -58,6 +58,7 @@ class SystemAgentServiceProvider {
 		$this->registerTaskHandlers();
 		$this->registerBuiltInSchedules();
 		$this->registerActionSchedulerHooks();
+		RetentionActionSchedulerTask::registerNativeRetention();
 		// Bootstrap immediately after AS initializes, then let AS's native daily
 		// recurring-ensure action repair schedules that are later interrupted.
 		add_action( 'action_scheduler_init', array( $this, 'manageRecurringTaskSchedules' ) );
