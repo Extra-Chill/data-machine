@@ -23,7 +23,8 @@ function assert_recover_stuck_guard_smoke( string $name, bool $condition, string
 	++$failed;
 }
 
-$source = file_get_contents( __DIR__ . '/../inc/Abilities/Job/RecoverStuckJobsAbility.php' ) ?: '';
+$source       = file_get_contents( __DIR__ . '/../inc/Abilities/Job/RecoverStuckJobsAbility.php' ) ?: '';
+$batch_source = file_get_contents( __DIR__ . '/../inc/Core/ActionScheduler/PathlessBatchRecovery.php' ) ?: '';
 $timeout_loop = strstr( $source, 'foreach ( $timed_out_jobs as $job )' ) ?: '';
 
 echo "Case 1: timed-out recovery skips jobs with active scheduler work\n";
@@ -44,10 +45,10 @@ assert_recover_stuck_guard_smoke( 'pending actions remain guarded unconditionall
 assert_recover_stuck_guard_smoke( 'old in-progress actions can fall through', str_contains( $source, '( $now_gmt - $started_at ) < $timeout_seconds' ) );
 
 echo "Case 4: batch parents guard chunk actions and active children\n";
-assert_recover_stuck_guard_smoke( 'active batch guard method exists', str_contains( $source, 'private function hasActiveBatchWork' ) );
-assert_recover_stuck_guard_smoke( 'batch guard checks pipeline chunk actions', str_contains( $source, 'datamachine_pipeline_batch_chunk' ) && str_contains( $source, 'parent_job_id' ) );
-assert_recover_stuck_guard_smoke( 'batch guard checks active children', str_contains( $source, 'WHERE parent_job_id = %d' ) && str_contains( $source, "status IN ( %s, %s )" ) );
-assert_recover_stuck_guard_smoke( 'generic action arg extractor supports parent ids', str_contains( $source, 'private function extractActionArgInt' ) && str_contains( $source, '$this->extractActionArgInt( (string) ( $action->args ?? \'\' ), $arg_name )' ) );
+assert_recover_stuck_guard_smoke( 'active batch guard method exists', str_contains( $batch_source, 'public static function hasActiveWork' ) );
+assert_recover_stuck_guard_smoke( 'batch guard checks pipeline chunk actions', str_contains( $batch_source, 'datamachine_pipeline_batch_chunk' ) && str_contains( $batch_source, 'parent_job_id' ) );
+assert_recover_stuck_guard_smoke( 'batch guard checks active children', str_contains( $batch_source, 'WHERE parent_job_id = %d' ) && str_contains( $batch_source, 'status IN ( %s, %s )' ) );
+assert_recover_stuck_guard_smoke( 'batch guard confirms exact parent id', str_contains( $batch_source, '$parent_job_id !== (int) ( $args[\'parent_job_id\'] ?? 0 )' ) );
 
 echo "\nRecover-stuck active action guard smoke complete: {$total} assertions, {$failed} failures.\n";
 if ( $failed > 0 ) {

@@ -45,7 +45,6 @@ defined( 'ABSPATH' ) || exit;
 
 class BatchScheduler {
 	public const STORAGE_VERSION         = 2;
-	private const RECOVERY_CLAIM_TTL = 300;
 
 	/**
 	 * Parent completes after all child jobs complete.
@@ -581,54 +580,6 @@ class BatchScheduler {
 		}
 		$result = wp_schedule_single_event( $timestamp, $hook, $wp_args, true );
 		return ! is_wp_error( $result ) && true === $result;
-	}
-
-	/** Re-establish one scheduler path for a durable pathless v2 batch. */
-	public static function recover( int $parent_job_id ): bool {
-		$engine = EngineData::retrieve( $parent_job_id );
-		$state  = is_array( $engine['batch_state'] ?? null ) ? $engine['batch_state'] : array();
-		$hook   = (string) ( $state['hook'] ?? $engine['batch_hook'] ?? '' );
-		if ( self::STORAGE_VERSION !== (int) ( $engine['batch_storage_version'] ?? 0 ) || '' === $hook || ! empty( $state['worklist_complete'] ) ) {
-			return false;
-		}
-
-		$offset = ( new BatchItems() )->first_outstanding_index( $parent_job_id );
-		if ( null === $offset ) {
-			return false;
-		}
-
-		$token = bin2hex( random_bytes( 16 ) );
-		$claim = EngineData::mutate(
-			$parent_job_id,
-			static function ( array $current ) use ( $token ): ?array {
-				$owner      = is_array( $current['batch_recovery_owner'] ?? null ) ? $current['batch_recovery_owner'] : array();
-				$claimed_at = strtotime( (string) ( $owner['claimed_at'] ?? '' ) . ' UTC' );
-				if ( false !== $claimed_at && ( time() - $claimed_at ) < self::RECOVERY_CLAIM_TTL ) {
-					return null;
-				}
-				$current['batch_recovery_owner'] = array(
-					'token'      => $token,
-					'claimed_at' => current_time( 'mysql', true ),
-				);
-				return $current;
-			},
-			'batch_recovery_claim'
-		);
-		if ( empty( $claim['success'] ) || ! self::scheduleV2Chunk( $hook, $parent_job_id, $offset, time() ) ) {
-			return false;
-		}
-
-		EngineData::mutate(
-			$parent_job_id,
-			static function ( array $current ) use ( $token ): array {
-				if ( hash_equals( $token, (string) ( $current['batch_recovery_owner']['token'] ?? '' ) ) ) {
-					$current['batch_recovery_owner']['scheduled_at'] = current_time( 'mysql', true );
-				}
-				return $current;
-			},
-			'batch_recovery_scheduled'
-		);
-		return true;
 	}
 
 	private static function discardV2Outstanding( BatchItems $repository, int $parent_job_id, string $context ): bool {

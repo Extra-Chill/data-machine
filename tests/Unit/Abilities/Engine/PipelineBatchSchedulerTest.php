@@ -10,6 +10,7 @@ namespace DataMachine\Tests\Unit\Abilities\Engine;
 
 use DataMachine\Abilities\Engine\PipelineBatchScheduler;
 use DataMachine\Core\ActionScheduler\BatchScheduler;
+use DataMachine\Core\ActionScheduler\PathlessBatchRecovery;
 use DataMachine\Core\Database\BatchItems\BatchItems;
 use DataMachine\Core\Database\Jobs\Jobs;
 use DataMachine\Core\Database\ProcessedItems\ProcessedItems;
@@ -220,8 +221,8 @@ class PipelineBatchSchedulerTest extends WP_UnitTestCase {
 		$scheduler->fanOut( $parent_id, 'step_a', array( $this->make_data_packet( 'Event A' ) ), $this->make_engine_snapshot( $parent_id ) );
 		$wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->prefix}actionscheduler_actions WHERE hook = %s AND args = %s", PipelineBatchScheduler::BATCH_HOOK, wp_json_encode( array( 'parent_job_id' => $parent_id, 'offset' => 0 ) ) ) );
 
-		$this->assertTrue( BatchScheduler::recover( $parent_id ) );
-		$this->assertFalse( BatchScheduler::recover( $parent_id ) );
+		$this->assertTrue( PathlessBatchRecovery::recover( $parent_id ) );
+		$this->assertFalse( PathlessBatchRecovery::recover( $parent_id ) );
 		$this->assertSame( 1, (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$wpdb->prefix}actionscheduler_actions WHERE hook = %s AND args = %s AND status = 'pending'", PipelineBatchScheduler::BATCH_HOOK, wp_json_encode( array( 'parent_job_id' => $parent_id, 'offset' => 0 ) ) ) ) );
 	}
 
