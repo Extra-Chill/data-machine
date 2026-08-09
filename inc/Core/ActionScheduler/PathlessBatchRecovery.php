@@ -15,7 +15,8 @@ use DataMachine\Core\EngineData;
 defined( 'ABSPATH' ) || exit;
 
 class PathlessBatchRecovery {
-	private const CLAIM_TTL = 300;
+	private const CLAIM_TTL          = 300;
+	private const ACTION_QUERY_LIMIT = 100;
 
 	/** Whether a v2 batch still has work that can be requeued. */
 	public static function isRecoverable( array $engine_data ): bool {
@@ -28,7 +29,7 @@ class PathlessBatchRecovery {
 		if ( $parent_job_id <= 0 || empty( $engine_data['batch'] ) ) {
 			return false;
 		}
-		if ( self::hasActiveAction( $parent_job_id, $timeout_hours ) ) {
+		if ( self::hasActiveAction( $parent_job_id, $engine_data, $timeout_hours ) ) {
 			return true;
 		}
 
@@ -91,18 +92,70 @@ class PathlessBatchRecovery {
 	}
 
 	/** Check exact pending or fresh in-progress chunk actions for one parent. */
-	private static function hasActiveAction( int $parent_job_id, int $timeout_hours ): bool {
+	private static function hasActiveAction( int $parent_job_id, array $engine_data, int $timeout_hours ): bool {
 		global $wpdb;
 		$actions_table = $wpdb->prefix . 'actionscheduler_actions';
-		$like_parent   = '%"parent_job_id":' . $wpdb->esc_like( (string) $parent_job_id ) . '%';
+		$state         = is_array( $engine_data['batch_state'] ?? null ) ? $engine_data['batch_state'] : array();
+		$offset        = (int) ( $state['offset'] ?? $engine_data['batch_offset'] ?? 0 );
+		$canonical     = wp_json_encode(
+			array(
+				'parent_job_id' => $parent_job_id,
+				'offset'        => $offset,
+			)
+		);
+		$query_limit   = self::ACTION_QUERY_LIMIT + 1;
+
+		// Current producers have a complete identity in Action Scheduler's indexed args column.
 		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name is generated from the WordPress prefix.
 		$actions = $wpdb->get_results(
-			$wpdb->prepare( "SELECT args, status, scheduled_date_gmt, last_attempt_gmt FROM {$actions_table} WHERE hook = %s AND status IN ( %s, %s ) AND args LIKE %s", 'datamachine_pipeline_batch_chunk', 'pending', 'in-progress', $like_parent )
+			$wpdb->prepare(
+				"SELECT args, status, scheduled_date_gmt, last_attempt_gmt FROM {$actions_table} WHERE args = %s AND hook = %s AND status IN ( %s, %s ) ORDER BY action_id DESC LIMIT %d",
+				$canonical,
+				'datamachine_pipeline_batch_chunk',
+				'pending',
+				'in-progress',
+				$query_limit
+			)
 		);
 		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-
 		$timeout_seconds = max( 1, $timeout_hours ) * HOUR_IN_SECONDS;
 		$now_gmt         = strtotime( current_time( 'mysql', true ) );
+		if ( self::boundedEvidenceBlocksRecovery( $actions, $parent_job_id, $timeout_seconds, $now_gmt ) ) {
+			return true;
+		}
+
+		// Historical argument shapes cannot use the exact key. Inspect a bounded,
+		// index-ordered window per status and refuse to infer absence if truncated.
+		foreach ( array( 'pending', 'in-progress' ) as $status ) {
+			// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name is generated from the WordPress prefix.
+			$actions = $wpdb->get_results(
+				$wpdb->prepare(
+					"SELECT args, status, scheduled_date_gmt, last_attempt_gmt FROM {$actions_table} WHERE hook = %s AND status = %s ORDER BY scheduled_date_gmt DESC LIMIT %d",
+					'datamachine_pipeline_batch_chunk',
+					$status,
+					$query_limit
+				)
+			);
+			// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			if ( self::boundedEvidenceBlocksRecovery( $actions, $parent_job_id, $timeout_seconds, $now_gmt ) ) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/** Treat active, truncated, or failed scheduler evidence as blocking recovery. */
+	private static function boundedEvidenceBlocksRecovery( mixed $actions, int $parent_job_id, int $timeout_seconds, int|false $now_gmt ): bool {
+		global $wpdb;
+		if ( ! is_array( $actions ) || '' !== (string) $wpdb->last_error ) {
+			return true;
+		}
+		return self::containsActiveAction( array_slice( $actions, 0, self::ACTION_QUERY_LIMIT ), $parent_job_id, $timeout_seconds, $now_gmt )
+			|| count( $actions ) > self::ACTION_QUERY_LIMIT;
+	}
+
+	/** Check exact parent matches in one bounded scheduler result. */
+	private static function containsActiveAction( array $actions, int $parent_job_id, int $timeout_seconds, int|false $now_gmt ): bool {
 		foreach ( $actions as $action ) {
 			if ( ! hash_equals( (string) $parent_job_id, (string) self::extractParentJobId( (string) ( $action->args ?? '' ) ) ) ) {
 				continue;
