@@ -104,7 +104,7 @@ class PathlessBatchRecovery {
 		$timeout_seconds = max( 1, $timeout_hours ) * HOUR_IN_SECONDS;
 		$now_gmt         = strtotime( current_time( 'mysql', true ) );
 		foreach ( $actions as $action ) {
-			if ( $parent_job_id !== self::extractParentJobId( (string) ( $action->args ?? '' ) ) ) {
+			if ( ! hash_equals( (string) $parent_job_id, (string) self::extractParentJobId( (string) ( $action->args ?? '' ) ) ) ) {
 				continue;
 			}
 			if ( 'pending' === (string) $action->status ) {
@@ -125,25 +125,24 @@ class PathlessBatchRecovery {
 	private static function extractParentJobId( string $args ): int {
 		$decoded = json_decode( $args, true );
 		if ( is_array( $decoded ) ) {
-			if ( isset( $decoded['parent_job_id'] ) && is_numeric( $decoded['parent_job_id'] ) ) {
-				return (int) $decoded['parent_job_id'];
-			}
-			foreach ( $decoded as $value ) {
-				if ( is_array( $value ) && isset( $value['parent_job_id'] ) && is_numeric( $value['parent_job_id'] ) ) {
-					return (int) $value['parent_job_id'];
-				}
+			$parent_job_id = self::extractParentJobIdFromArray( $decoded );
+			if ( 0 !== $parent_job_id ) {
+				return $parent_job_id;
 			}
 		}
 
 		$unserialized = maybe_unserialize( $args );
-		if ( is_array( $unserialized ) ) {
-			if ( isset( $unserialized['parent_job_id'] ) && is_numeric( $unserialized['parent_job_id'] ) ) {
-				return (int) $unserialized['parent_job_id'];
-			}
-			foreach ( $unserialized as $value ) {
-				if ( is_array( $value ) && isset( $value['parent_job_id'] ) && is_numeric( $value['parent_job_id'] ) ) {
-					return (int) $value['parent_job_id'];
-				}
+		return is_array( $unserialized ) ? self::extractParentJobIdFromArray( $unserialized ) : 0;
+	}
+
+	/** Extract a parent ID from keyed or one-level nested action arguments. */
+	private static function extractParentJobIdFromArray( array $args ): int {
+		if ( isset( $args['parent_job_id'] ) && is_numeric( $args['parent_job_id'] ) ) {
+			return (int) $args['parent_job_id'];
+		}
+		foreach ( $args as $value ) {
+			if ( is_array( $value ) && isset( $value['parent_job_id'] ) && is_numeric( $value['parent_job_id'] ) ) {
+				return (int) $value['parent_job_id'];
 			}
 		}
 		return 0;
