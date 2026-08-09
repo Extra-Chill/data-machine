@@ -2,6 +2,12 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.172.11] - 2026-08-09
+
+### Fixed
+- bound action scheduler retention queries
+- make direct workflow retry atomic
+
 ## [0.172.10] - 2026-08-09
 
 ### Fixed
