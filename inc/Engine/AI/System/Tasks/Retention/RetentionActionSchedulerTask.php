@@ -7,6 +7,55 @@ defined( 'ABSPATH' ) || exit;
 use DataMachine\Engine\Tasks\TaskScheduler;
 
 class RetentionActionSchedulerTask extends RetentionTask {
+	private const NATIVE_CLEANUP_BATCH_SIZE = 250;
+	private const NATIVE_CLEANUP_BATCH_MAX  = 1000;
+
+	/**
+	 * Register Action Scheduler's native pre-claim retention backstop.
+	 *
+	 * Native cleanup runs before Action Scheduler stakes a queue claim, so it
+	 * remains available when claim failures prevent the richer Data Machine
+	 * recurrence from executing. The recurrence still owns per-hook windows,
+	 * failed actions, row ceilings, diagnostics, and catch-up scheduling.
+	 */
+	public static function registerNativeRetention(): void {
+		add_filter( 'action_scheduler_retention_period', array( self::class, 'filterNativeRetentionPeriod' ), PHP_INT_MAX );
+		add_filter( 'action_scheduler_cleanup_batch_size', array( self::class, 'filterNativeCleanupBatchSize' ), PHP_INT_MAX );
+	}
+
+	/**
+	 * Align Action Scheduler's native window with Data Machine's global policy.
+	 *
+	 * Preserve a shorter window supplied by another integration. Non-positive
+	 * values are replaced because Action Scheduler interprets zero as "now",
+	 * not as disabled retention.
+	 */
+	public static function filterNativeRetentionPeriod( $period ): int {
+		if ( ! self::retentionEnabledForCurrentBlog() ) {
+			return (int) $period;
+		}
+
+		$max_age = RetentionCleanup::actionSchedulerMaxAgeDays() * DAY_IN_SECONDS;
+		$period  = (int) $period;
+		return $period > 0 ? min( $period, $max_age ) : $max_age;
+	}
+
+	/**
+	 * Raise native cleanup throughput while retaining a per-phase safety ceiling.
+	 *
+	 * Action Scheduler applies this batch independently to each terminal status
+	 * and to timeout/failure maintenance. With its two default cleanup statuses,
+	 * the 250-row default permits at most 500 old-action deletions per runner.
+	 */
+	public static function filterNativeCleanupBatchSize( $batch_size ): int {
+		if ( ! self::retentionEnabledForCurrentBlog() ) {
+			return (int) $batch_size;
+		}
+
+		$configured = (int) apply_filters( 'datamachine_as_native_cleanup_batch_size', self::NATIVE_CLEANUP_BATCH_SIZE );
+		$configured = min( self::NATIVE_CLEANUP_BATCH_MAX, max( 20, $configured ) );
+		return min( self::NATIVE_CLEANUP_BATCH_MAX, max( (int) $batch_size, $configured ) );
+	}
 
 	public function getTaskType(): string {
 		return RetentionCleanup::TASK_AS_ACTIONS;
@@ -28,6 +77,13 @@ class RetentionActionSchedulerTask extends RetentionTask {
 		$this->maybeScheduleCatchUp( $result );
 
 		return $result;
+	}
+
+	private static function retentionEnabledForCurrentBlog(): bool {
+		$settings = get_option( 'datamachine_settings', array() );
+		return ! is_array( $settings ) || ! array_key_exists( 'retention_as_actions_enabled', $settings )
+			? true
+			: (bool) $settings['retention_as_actions_enabled'];
 	}
 
 	/**
