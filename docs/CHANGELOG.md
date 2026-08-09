@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.172.9] - 2026-08-09
+
+### Fixed
+- use REST-safe ability union schemas
+
 ## [0.172.8] - 2026-08-09
 
 ### Fixed
