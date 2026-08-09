@@ -118,16 +118,9 @@ class PathlessBatchRecovery {
 			)
 		);
 		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-		if ( ! is_array( $actions ) || '' !== (string) $wpdb->last_error ) {
-			return true;
-		}
-
 		$timeout_seconds = max( 1, $timeout_hours ) * HOUR_IN_SECONDS;
 		$now_gmt         = strtotime( current_time( 'mysql', true ) );
-		if ( self::containsActiveAction( array_slice( $actions, 0, self::ACTION_QUERY_LIMIT ), $parent_job_id, $timeout_seconds, $now_gmt ) ) {
-			return true;
-		}
-		if ( count( $actions ) > self::ACTION_QUERY_LIMIT ) {
+		if ( self::boundedEvidenceBlocksRecovery( $actions, $parent_job_id, $timeout_seconds, $now_gmt ) ) {
 			return true;
 		}
 
@@ -144,17 +137,21 @@ class PathlessBatchRecovery {
 				)
 			);
 			// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-			if ( ! is_array( $actions ) || '' !== (string) $wpdb->last_error ) {
-				return true;
-			}
-			if ( self::containsActiveAction( array_slice( $actions, 0, self::ACTION_QUERY_LIMIT ), $parent_job_id, $timeout_seconds, $now_gmt ) ) {
-				return true;
-			}
-			if ( count( $actions ) > self::ACTION_QUERY_LIMIT ) {
+			if ( self::boundedEvidenceBlocksRecovery( $actions, $parent_job_id, $timeout_seconds, $now_gmt ) ) {
 				return true;
 			}
 		}
 		return false;
+	}
+
+	/** Treat active, truncated, or failed scheduler evidence as blocking recovery. */
+	private static function boundedEvidenceBlocksRecovery( mixed $actions, int $parent_job_id, int $timeout_seconds, int|false $now_gmt ): bool {
+		global $wpdb;
+		if ( ! is_array( $actions ) || '' !== (string) $wpdb->last_error ) {
+			return true;
+		}
+		return self::containsActiveAction( array_slice( $actions, 0, self::ACTION_QUERY_LIMIT ), $parent_job_id, $timeout_seconds, $now_gmt )
+			|| count( $actions ) > self::ACTION_QUERY_LIMIT;
 	}
 
 	/** Check exact parent matches in one bounded scheduler result. */

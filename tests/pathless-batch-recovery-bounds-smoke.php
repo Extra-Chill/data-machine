@@ -54,12 +54,12 @@ final class PathlessRecoveryWpdb {
 	}
 }
 
-function pathless_action( string $args, string $status = 'pending', string $started = '2026-08-09 11:59:00' ): object {
+function pathless_action( string $args, string $status = 'pending' ): object {
 	return (object) array(
 		'args'               => $args,
 		'status'             => $status,
-		'scheduled_date_gmt' => $started,
-		'last_attempt_gmt'   => 'in-progress' === $status ? $started : '0000-00-00 00:00:00',
+		'scheduled_date_gmt' => '2026-08-09 11:59:00',
+		'last_attempt_gmt'   => 'in-progress' === $status ? '2026-08-09 11:59:00' : '0000-00-00 00:00:00',
 	);
 }
 
