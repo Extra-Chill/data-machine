@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.172.4] - 2026-08-09
+
+### Fixed
+- make claim-index migration checks portable
+
 ## [0.172.3] - 2026-08-09
 
 ### Fixed
