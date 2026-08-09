@@ -8,6 +8,8 @@
  * @package DataMachine\Tests
  */
 
+use DataMachine\Abilities\Content\UpsertPostAbility;
+
 $root = dirname( __DIR__ );
 
 if ( ! function_exists( 'wp_get_abilities' ) ) {
@@ -50,7 +52,7 @@ $watch   = static function ( string $function_name, string $message ) use ( &$no
 add_action( 'doing_it_wrong_run', $watch, 10, 2 );
 
 $cases = array(
-	array( 'datamachine/upsert-post', 'content', array( 'Post content.' ) ),
+	array( UpsertPostAbility::ABILITY_NAME, 'content', array( 'Post content.' ) ),
 	array( 'datamachine/get-flows', 'agent_id', array( 7, null ) ),
 	array( 'datamachine/query-posts', 'filter_value', array( 'featured', 7 ) ),
 );
@@ -106,8 +108,8 @@ foreach ( wp_get_abilities() as $name => $ability ) {
 	$walk_schema( $ability->get_output_schema(), $name . '.output' );
 }
 
-$request         = new WP_REST_Request( 'GET', '/wp-abilities/v1/abilities/datamachine/upsert-post' );
-$request['name'] = 'datamachine/upsert-post';
+$request         = new WP_REST_Request( 'GET', '/wp-abilities/v1/abilities/' . UpsertPostAbility::ABILITY_NAME );
+$request['name'] = UpsertPostAbility::ABILITY_NAME;
 $controller      = new WP_REST_Abilities_V1_List_Controller();
 $response        = $controller->get_item( $request );
 $response_data   = $response->get_data();

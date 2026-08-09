@@ -7,6 +7,7 @@
 
 namespace DataMachine\Tests\Unit\Abilities;
 
+use DataMachine\Abilities\Content\UpsertPostAbility;
 use WP_Ability;
 use WP_UnitTestCase;
 
@@ -19,7 +20,7 @@ class RestSchemaValidationTest extends WP_UnitTestCase {
 	 */
 	public function representative_schema_provider(): array {
 		return array(
-			'content value'        => array( 'datamachine/upsert-post', 'content', array( 'Post content.' ) ),
+			'content value'        => array( UpsertPostAbility::ABILITY_NAME, 'content', array( 'Post content.' ) ),
 			'nullable value'       => array( 'datamachine/get-flows', 'agent_id', array( 7, null ) ),
 			'multi-scalar value'   => array( 'datamachine/query-posts', 'filter_value', array( 'featured', 7 ) ),
 		);
@@ -56,8 +57,8 @@ class RestSchemaValidationTest extends WP_UnitTestCase {
 	 * REST exposes the corrected schema without changing its representation.
 	 */
 	public function test_rest_response_exposes_corrected_ability_schema(): void {
-		$request         = new \WP_REST_Request( 'GET', '/wp-abilities/v1/abilities/datamachine/upsert-post' );
-		$request['name'] = 'datamachine/upsert-post';
+		$request         = new \WP_REST_Request( 'GET', '/wp-abilities/v1/abilities/' . UpsertPostAbility::ABILITY_NAME );
+		$request['name'] = UpsertPostAbility::ABILITY_NAME;
 		$controller      = new \WP_REST_Abilities_V1_List_Controller();
 		$response        = $controller->get_item( $request );
 
