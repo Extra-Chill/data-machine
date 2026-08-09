@@ -91,6 +91,18 @@ if ( ! function_exists( 'add_option' ) ) {
     }
 }
 
+if ( ! function_exists( 'update_option' ) ) {
+    function update_option( string $name, mixed $value, mixed $autoload = null ): bool {
+		unset( $autoload );
+		if ( array_key_exists( $name, $GLOBALS['datamachine_ai_backpressure_options'] ) && $GLOBALS['datamachine_ai_backpressure_options'][ $name ] === $value ) {
+			return false;
+		}
+
+		$GLOBALS['datamachine_ai_backpressure_options'][ $name ] = $value;
+		return true;
+    }
+}
+
 if ( ! function_exists( 'delete_option' ) ) {
     function delete_option( string $name ): bool {
     	$existed = array_key_exists( $name, $GLOBALS['datamachine_ai_backpressure_options'] );
