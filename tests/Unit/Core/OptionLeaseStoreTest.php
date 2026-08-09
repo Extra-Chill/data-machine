@@ -57,6 +57,100 @@ final class OptionLeaseStoreTest extends WP_UnitTestCase {
 		$this->assertSame( 'generation-1', get_option( $this->target_name ) );
 	}
 
+	public function test_acquire_replaces_an_exact_stale_lease(): void {
+		$now   = time();
+		$stale = array(
+			'token'      => 'stale-owner',
+			'started_at' => $now - 600,
+			'expires_at' => $now - 300,
+		);
+		$fresh = array(
+			'token'      => 'fresh-owner',
+			'started_at' => $now,
+			'expires_at' => $now + 300,
+		);
+		add_option( $this->lease_name, $stale, '', false );
+
+		$result = OptionLeaseStore::acquire( $this->lease_name, $fresh, 300, $now );
+
+		$this->assertTrue( $result['acquired'] );
+		$this->assertSame( $fresh, get_option( $this->lease_name ) );
+	}
+
+	public function test_two_mysql_sessions_allow_only_one_stale_lease_takeover(): void {
+		if ( ! class_exists( '\mysqli' ) || ! defined( 'MYSQLI_ASYNC' ) ) {
+			$this->markTestSkipped( 'MySQLi async support is unavailable.' );
+		}
+
+		$first  = $this->open_mysql_connection();
+		$second = $this->open_mysql_connection();
+		if ( ! $first instanceof \mysqli || ! $second instanceof \mysqli ) {
+			$this->markTestSkipped( 'Two direct test database connections are unavailable.' );
+		}
+
+		$now   = time();
+		$stale = array(
+			'token'      => 'stale-owner',
+			'started_at' => $now - 600,
+			'expires_at' => $now - 300,
+		);
+		$winner = array(
+			'token'      => 'first-owner',
+			'started_at' => $now,
+			'expires_at' => $now + 300,
+		);
+		$loser = array(
+			'token'      => 'second-owner',
+			'started_at' => $now,
+			'expires_at' => $now + 300,
+		);
+		$table      = $this->options_table();
+		$lease_name = $first->real_escape_string( $this->lease_name );
+
+		try {
+			$this->assertTrue( $first->query( 'SET SESSION innodb_lock_wait_timeout = 2' ) );
+			$this->assertTrue( $second->query( 'SET SESSION innodb_lock_wait_timeout = 2' ) );
+			$this->assertTrue(
+				$first->query(
+					sprintf(
+						"INSERT INTO `{$table}` (option_name, option_value, autoload) VALUES ('%s', '%s', 'no')",
+						$lease_name,
+						$first->real_escape_string( maybe_serialize( $stale ) )
+					)
+				)
+			);
+			$this->assertTrue( $first->query( 'START TRANSACTION' ) );
+			$this->assertTrue( $first->query( $this->takeover_query( $first, $stale, $winner ) ) );
+			$this->assertSame( 1, $first->affected_rows );
+			$this->assertTrue( $second->query( $this->takeover_query( $second, $stale, $loser ), MYSQLI_ASYNC ) );
+			$read   = array( $second );
+			$error  = array();
+			$reject = array();
+			$this->assertSame( 0, \mysqli_poll( $read, $error, $reject, 0, 100000 ), 'The competing takeover must wait for the lease row lock.' );
+
+			$this->assertTrue( $first->query( 'COMMIT' ) );
+			$ready = 0;
+			for ( $attempt = 0; $attempt < 20 && 0 === $ready; ++$attempt ) {
+				$read   = array( $second );
+				$error  = array();
+				$reject = array();
+				$ready  = \mysqli_poll( $read, $error, $reject, 0, 100000 );
+			}
+
+			$this->assertSame( 1, $ready, 'The competing takeover should resume after the winner commits.' );
+			$this->assertTrue( $second->reap_async_query() );
+			$this->assertSame( 0, $second->affected_rows );
+			$result = $first->query( "SELECT option_value FROM `{$table}` WHERE option_name = '{$lease_name}'" );
+			$this->assertInstanceOf( \mysqli_result::class, $result );
+			$this->assertSame( $winner, maybe_unserialize( $result->fetch_assoc()['option_value'] ) );
+		} finally {
+			$first->query( 'ROLLBACK' );
+			$second->query( 'ROLLBACK' );
+			$first->close();
+			$second->close();
+		}
+	}
+
 	public function test_two_mysql_sessions_allow_only_one_generation_replacement(): void {
 		if ( ! class_exists( '\mysqli' ) || ! defined( 'MYSQLI_ASYNC' ) ) {
 			$this->markTestSkipped( 'MySQLi async support is unavailable.' );
@@ -138,6 +232,17 @@ final class OptionLeaseStoreTest extends WP_UnitTestCase {
 			$connection->real_escape_string( maybe_serialize( $replacement ) ),
 			$connection->real_escape_string( $this->target_name ),
 			$connection->real_escape_string( maybe_serialize( 'generation-1' ) )
+		);
+	}
+
+	private function takeover_query( \mysqli $connection, array $stale, array $replacement ): string {
+		$table = $this->options_table();
+
+		return sprintf(
+			"UPDATE `{$table}` SET option_value = '%s' WHERE option_name = '%s' AND option_value = '%s'",
+			$connection->real_escape_string( maybe_serialize( $replacement ) ),
+			$connection->real_escape_string( $this->lease_name ),
+			$connection->real_escape_string( maybe_serialize( $stale ) )
 		);
 	}
 

@@ -22,7 +22,7 @@ class OptionLeaseStore {
 	 * @param int                 $ttl                       Stale fallback TTL in seconds.
 	 * @param int|null            $now                       Current timestamp.
 	 * @param callable|null       $is_stale                  Optional extra stale predicate.
-	 * @param bool                $replace_stale_with_update Whether to update when stale delete/add races.
+	 * @param bool                $replace_stale_with_update Retained for compatibility; stale replacement is always atomic.
 	 * @return array{acquired:bool,status:string,payload:array<string,mixed>,option_name:string}
 	 */
 	public static function acquire(
@@ -35,6 +35,8 @@ class OptionLeaseStore {
 	): array {
 		$now      = $now ?? time();
 		$existing = self::snapshot( $option_name, $ttl, $now, $is_stale );
+		// Stale takeover no longer has a non-atomic mode; retain the argument for named-call compatibility.
+		unset( $replace_stale_with_update );
 
 		if ( 'held' === $existing['status'] ) {
 			return array(
@@ -45,8 +47,13 @@ class OptionLeaseStore {
 			);
 		}
 
-		if ( 'stale' === $existing['status'] ) {
-			delete_option( $option_name );
+		if ( 'stale' === $existing['status'] && self::replaceStale( $option_name, $existing['payload'], $payload ) ) {
+			return array(
+				'acquired'    => true,
+				'status'      => 'held',
+				'payload'     => $payload,
+				'option_name' => $option_name,
+			);
 		}
 
 		if ( add_option( $option_name, $payload, '', false ) ) {
@@ -58,21 +65,6 @@ class OptionLeaseStore {
 			);
 		}
 
-		if ( 'stale' === $existing['status'] && $replace_stale_with_update ) {
-			$after_delete = self::snapshot( $option_name, $ttl, $now, $is_stale );
-			if ( 'held' !== $after_delete['status'] && update_option( $option_name, $payload, false ) ) {
-				$current = get_option( $option_name, array() );
-				if ( is_array( $current ) && hash_equals( (string) ( $payload['token'] ?? '' ), (string) ( $current['token'] ?? '' ) ) ) {
-					return array(
-						'acquired'    => true,
-						'status'      => 'held',
-						'payload'     => $payload,
-						'option_name' => $option_name,
-					);
-				}
-			}
-		}
-
 		$current = self::snapshot( $option_name, $ttl, $now, $is_stale );
 
 		return array(
@@ -81,6 +73,43 @@ class OptionLeaseStore {
 			'payload'     => $current['payload'],
 			'option_name' => $option_name,
 		);
+	}
+
+	/**
+	 * Atomically replace one exact stale lease payload.
+	 *
+	 * @param array<string,mixed> $stale_payload Exact stale payload observed by the caller.
+	 * @param array<string,mixed> $replacement   New lease payload.
+	 */
+	private static function replaceStale( string $option_name, array $stale_payload, array $replacement ): bool {
+		global $wpdb;
+		if ( isset( $wpdb->options ) && method_exists( $wpdb, 'query' ) && method_exists( $wpdb, 'prepare' ) ) {
+			// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared -- Exact-value CAS is the stale takeover fencing primitive.
+			$updated = $wpdb->query(
+				$wpdb->prepare(
+					'UPDATE %i SET option_value = %s WHERE option_name = %s AND option_value = %s',
+					$wpdb->options,
+					maybe_serialize( $replacement ),
+					$option_name,
+					maybe_serialize( $stale_payload )
+				)
+			);
+			// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared
+
+			if ( 1 !== $updated ) {
+				return false;
+			}
+
+			wp_cache_delete( $option_name, 'options' );
+			return true;
+		}
+
+		// Lightweight test runtimes may not provide wpdb; preserve exact-value semantics as closely as possible.
+		if ( get_option( $option_name, null ) !== $stale_payload || ! update_option( $option_name, $replacement, false ) ) {
+			return false;
+		}
+
+		return get_option( $option_name, null ) === $replacement;
 	}
 
 	/**
