@@ -262,6 +262,7 @@ class DATAMACHINE_Events {
 			\DataMachineEvents\Abilities\VenueMapAbilities::class,
 			\DataMachineEvents\Abilities\CalendarAbilities::class,
 			\DataMachineEvents\Abilities\TicketUrlResyncAbilities::class,
+			\DataMachineEvents\Abilities\BatchActionRecoveryAbilities::class,
 			\DataMachineEvents\Abilities\TicketmasterTest::class,
 			\DataMachineEvents\Abilities\DiceFmTest::class,
 			\DataMachineEvents\Abilities\GeocodingAbilities::class,
@@ -414,6 +415,11 @@ class DATAMACHINE_Events {
 		if ( file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/TicketUrlResyncAbilities.php' ) ) {
 			require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/TicketUrlResyncAbilities.php';
 			new \DataMachineEvents\Abilities\TicketUrlResyncAbilities();
+		}
+
+		if ( file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/BatchActionRecoveryAbilities.php' ) ) {
+			require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/BatchActionRecoveryAbilities.php';
+			new \DataMachineEvents\Abilities\BatchActionRecoveryAbilities();
 		}
 
 		if ( file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/TicketmasterTest.php' ) ) {

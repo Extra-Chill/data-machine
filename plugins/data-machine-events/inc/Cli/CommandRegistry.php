@@ -149,6 +149,10 @@ class CommandRegistry {
 				'file'  => $cli . 'BackfillEventDatesCommand.php',
 				'class' => BackfillEventDatesCommand::class,
 			),
+			'data-machine-events recover-batch-actions'  => array(
+				'file'  => $cli . 'BatchActionRecoveryCommand.php',
+				'class' => BatchActionRecoveryCommand::class,
+			),
 		);
 	}
 }
