@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.172.2] - 2026-08-09
+
+### Fixed
+- preserve pathless batch recovery semantics
+
 ## [0.172.1] - 2026-08-09
 
 ### Fixed
