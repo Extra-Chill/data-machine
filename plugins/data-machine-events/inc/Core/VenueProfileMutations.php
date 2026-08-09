@@ -25,7 +25,7 @@ class VenueProfileMutations {
 	private const LOCK_TIMEOUT = 10;
 
 	/** @var string[] */
-	private const EDITABLE_FIELDS = array( 'address', 'city', 'state', 'zip', 'country', 'phone', 'website', 'ticketing_url', 'capacity' );
+	private const EDITABLE_FIELDS = array( 'address', 'city', 'state', 'zip', 'country', 'phone', 'website', 'ticketing_url', 'capacity', 'logo_attachment_id' );
 
 	/** @var string[] */
 	private const ADDRESS_FIELDS = array( 'address', 'city', 'state', 'zip', 'country' );
@@ -50,8 +50,10 @@ class VenueProfileMutations {
 			'description' => (string) $term->description,
 		);
 		foreach ( self::editableMetaFields() as $field => $meta_key ) {
-			$profile[ $field ] = (string) get_term_meta( $term_id, $meta_key, true );
+			$value             = get_term_meta( $term_id, $meta_key, true );
+			$profile[ $field ] = 'logo_attachment_id' === $field ? absint( $value ) : (string) $value;
 		}
+		$profile['logo'] = Venue_Taxonomy::resolve_venue_logo( (int) $profile['logo_attachment_id'] );
 
 		$profile['revision'] = self::revision( $term );
 		return $profile;
@@ -240,8 +242,11 @@ class VenueProfileMutations {
 			}
 
 			$normalized = self::normalizeChanges( $changes );
-			$updated    = array();
-			$term_args  = array();
+			if ( is_wp_error( $normalized ) ) {
+				return self::rollbackError( $term_id, $normalized, $transaction_open, $connection_quarantined, $quarantine_closed );
+			}
+			$updated   = array();
+			$term_args = array();
 			foreach ( array( 'name', 'description' ) as $field ) {
 				if ( ! array_key_exists( $field, $normalized ) ) {
 					continue;
@@ -279,6 +284,17 @@ class VenueProfileMutations {
 
 				$existing_values = array_values( get_term_meta( $term_id, $meta_key, false ) );
 				if ( self::STRATEGY_FILL_EMPTY === $strategy && self::hasNonEmptyValue( $existing_values ) ) {
+					continue;
+				}
+				if ( 'logo_attachment_id' === $field && '' === $normalized[ $field ] ) {
+					if ( empty( $existing_values ) ) {
+						continue;
+					}
+					if ( ! delete_term_meta( $term_id, $meta_key ) ) {
+						$error = new \WP_Error( 'venue_meta_delete_failed', "Could not clear venue field '{$field}'.", array( 'status' => 500 ) );
+						return self::rollbackError( $term_id, $error, $transaction_open, $connection_quarantined, $quarantine_closed );
+					}
+					$updated[] = $field;
 					continue;
 				}
 				$already_canonical = 1 === count( $existing_values ) && (string) $existing_values[0] === $normalized[ $field ];
@@ -438,11 +454,19 @@ class VenueProfileMutations {
 	 * Sanitize values owned by this contract.
 	 *
 	 * @param array $changes Raw changes.
-	 * @return array
+	 * @return array|\WP_Error
 	 */
-	private static function normalizeChanges( array $changes ): array {
+	private static function normalizeChanges( array $changes ): array|\WP_Error {
 		$normalized = array();
 		foreach ( $changes as $field => $value ) {
+			if ( 'logo_attachment_id' === $field ) {
+				$logo = self::normalizeLogoAttachmentId( $value );
+				if ( is_wp_error( $logo ) ) {
+					return $logo;
+				}
+				$normalized[ $field ] = $logo;
+				continue;
+			}
 			if ( ! is_scalar( $value ) && null !== $value ) {
 				continue;
 			}
@@ -456,6 +480,38 @@ class VenueProfileMutations {
 			}
 		}
 		return $normalized;
+	}
+
+	/**
+	 * Validate a canonical logo reference against the active WordPress site.
+	 *
+	 * Upload authorization remains owned by WordPress core's media endpoint;
+	 * consumer authorization remains required before the profile call.
+	 *
+	 * @param mixed $value Requested attachment ID or a clearing value.
+	 * @return string|\WP_Error Canonical attachment ID string or empty string.
+	 */
+	private static function normalizeLogoAttachmentId( mixed $value ): string|\WP_Error {
+		if ( null === $value || '' === $value || 0 === $value || '0' === $value ) {
+			return '';
+		}
+		if ( ( ! is_int( $value ) && ! ( is_string( $value ) && ctype_digit( $value ) ) ) || (int) $value < 1 ) {
+			return new \WP_Error( 'venue_logo_invalid_reference', 'Venue logo must be a positive current-site attachment ID or a clearing value.', array( 'status' => 400 ) );
+		}
+
+		$attachment_id = (int) $value;
+		$attachment    = get_post( $attachment_id );
+		if ( ! $attachment || 'attachment' !== $attachment->post_type || 'trash' === $attachment->post_status ) {
+			return new \WP_Error( 'venue_logo_not_found', 'Venue logo attachment was not found on the current site.', array( 'status' => 400 ) );
+		}
+		if ( ! str_starts_with( (string) $attachment->post_mime_type, 'image/' ) || ! wp_attachment_is_image( $attachment ) ) {
+			return new \WP_Error( 'venue_logo_not_image', 'Venue logo attachment must be an image.', array( 'status' => 400 ) );
+		}
+		if ( null === Venue_Taxonomy::resolve_venue_logo( $attachment_id ) ) {
+			return new \WP_Error( 'venue_logo_unresolvable', 'Venue logo attachment does not have a resolvable public URL.', array( 'status' => 400 ) );
+		}
+
+		return (string) $attachment_id;
 	}
 
 	/**

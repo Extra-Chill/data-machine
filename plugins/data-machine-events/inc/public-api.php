@@ -264,6 +264,10 @@ if ( ! function_exists( 'data_machine_events_get_venue_profile' ) ) {
 	 * Read the bounded editable venue profile and optimistic revision.
 	 *
 	 * Consumers must authorize the caller before invoking this function.
+	 * The `logo_attachment_id` is the stable current-site media reference and
+	 * `logo` is either null or its dynamically resolved public presentation data.
+	 * Upload images with WordPress core's `POST /wp/v2/media`, then pass the
+	 * returned attachment ID to the revisioned update function.
 	 *
 	 * @param int $term_id Venue term ID.
 	 * @return array|\WP_Error
@@ -279,6 +283,8 @@ if ( ! function_exists( 'data_machine_events_update_venue_profile' ) ) {
 	 *
 	 * Consumers must authorize the caller before invoking this function.
 	 * Coordinates, timezone, slug, identity, and unrelated metadata are owner-only.
+	 * Set `logo_attachment_id` to a current-site image attachment ID, or to 0,
+	 * an empty string, or null to detach it without deleting the attachment.
 	 *
 	 * @param int    $term_id           Venue term ID.
 	 * @param array  $changes           Editable field changes.

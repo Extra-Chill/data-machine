@@ -50,16 +50,18 @@ namespace DataMachineEvents\Core {
 	final class Venue_Taxonomy {
 		public static function get_venue_data( int $term_id ): array {
 			return array(
-				'term_id'     => $term_id,
-				'name'        => 'Seeded Hall',
-				'address'     => '100 Fixture Way',
-				'city'        => 'Seed City',
-				'state'       => 'SC',
-				'zip'         => '29000',
-				'country'     => 'US',
-				'coordinates' => '32.000000,-80.000000',
-				'timezone'    => 'America/New_York',
-				'website'     => 'https://venue.invalid',
+				'term_id'            => $term_id,
+				'name'               => 'Seeded Hall',
+				'address'            => '100 Fixture Way',
+				'city'               => 'Seed City',
+				'state'              => 'SC',
+				'zip'                => '29000',
+				'country'            => 'US',
+				'coordinates'        => '32.000000,-80.000000',
+				'timezone'           => 'America/New_York',
+				'website'            => 'https://venue.invalid',
+				'logo_attachment_id' => 0,
+				'logo'               => null,
 			);
 		}
 	}

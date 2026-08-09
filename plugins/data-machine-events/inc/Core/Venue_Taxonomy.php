@@ -21,31 +21,33 @@ if ( ! defined( 'ABSPATH' ) ) {
 class Venue_Taxonomy {
 
 	public static array $meta_fields = array(
-		'address'       => '_venue_address',
-		'city'          => '_venue_city',
-		'state'         => '_venue_state',
-		'zip'           => '_venue_zip',
-		'country'       => '_venue_country',
-		'phone'         => '_venue_phone',
-		'website'       => '_venue_website',
-		'ticketing_url' => '_venue_ticketing_url',
-		'capacity'      => '_venue_capacity',
-		'coordinates'   => '_venue_coordinates',
-		'timezone'      => '_venue_timezone',
+		'address'            => '_venue_address',
+		'city'               => '_venue_city',
+		'state'              => '_venue_state',
+		'zip'                => '_venue_zip',
+		'country'            => '_venue_country',
+		'phone'              => '_venue_phone',
+		'website'            => '_venue_website',
+		'ticketing_url'      => '_venue_ticketing_url',
+		'capacity'           => '_venue_capacity',
+		'logo_attachment_id' => '_venue_logo_attachment_id',
+		'coordinates'        => '_venue_coordinates',
+		'timezone'           => '_venue_timezone',
 	);
 
 	private static $field_labels = array(
-		'address'       => 'Address',
-		'city'          => 'City',
-		'state'         => 'State',
-		'zip'           => 'Postal Code',
-		'country'       => 'Country',
-		'phone'         => 'Phone',
-		'website'       => 'Official Website',
-		'ticketing_url' => 'Ticketing URL',
-		'capacity'      => 'Capacity',
-		'coordinates'   => 'Coordinates',
-		'timezone'      => 'Timezone',
+		'address'            => 'Address',
+		'city'               => 'City',
+		'state'              => 'State',
+		'zip'                => 'Postal Code',
+		'country'            => 'Country',
+		'phone'              => 'Phone',
+		'website'            => 'Official Website',
+		'ticketing_url'      => 'Ticketing URL',
+		'capacity'           => 'Capacity',
+		'logo_attachment_id' => 'Logo Attachment ID',
+		'coordinates'        => 'Coordinates',
+		'timezone'           => 'Timezone',
 	);
 
 	/**
@@ -1310,10 +1312,50 @@ class Venue_Taxonomy {
 		);
 
 		foreach ( self::$meta_fields as $data_key => $meta_key ) {
-			$venue_data[ $data_key ] = get_term_meta( $term_id, $meta_key, true );
+			$value                   = get_term_meta( $term_id, $meta_key, true );
+			$venue_data[ $data_key ] = 'logo_attachment_id' === $data_key ? absint( $value ) : $value;
 		}
+		$venue_data['logo'] = self::resolve_venue_logo( $venue_data['logo_attachment_id'] );
 
 		return $venue_data;
+	}
+
+	/**
+	 * Resolve a current-site image attachment into public venue logo data.
+	 *
+	 * The attachment ID remains the source of truth. A missing, deleted, or no
+	 * longer usable attachment resolves to null without preserving a stale URL.
+	 *
+	 * @param int $attachment_id Current-site WordPress attachment ID.
+	 * @return array{attachment_id:int,site_id:int,url:string,alt:string,mime_type:string,width:int,height:int}|null
+	 */
+	public static function resolve_venue_logo( int $attachment_id ): ?array {
+		if ( $attachment_id < 1 ) {
+			return null;
+		}
+
+		$attachment = get_post( $attachment_id );
+		if ( ! $attachment || 'attachment' !== $attachment->post_type || 'trash' === $attachment->post_status || ! wp_attachment_is_image( $attachment ) ) {
+			return null;
+		}
+
+		$url = wp_get_attachment_url( $attachment_id );
+		if ( ! is_string( $url ) || '' === $url ) {
+			return null;
+		}
+
+		$metadata = wp_get_attachment_metadata( $attachment_id );
+		$metadata = is_array( $metadata ) ? $metadata : array();
+
+		return array(
+			'attachment_id' => $attachment_id,
+			'site_id'       => get_current_blog_id(),
+			'url'           => $url,
+			'alt'           => (string) get_post_meta( $attachment_id, '_wp_attachment_image_alt', true ),
+			'mime_type'     => (string) $attachment->post_mime_type,
+			'width'         => absint( $metadata['width'] ?? 0 ),
+			'height'        => absint( $metadata['height'] ?? 0 ),
+		);
 	}
 
 	/**

@@ -19,6 +19,9 @@ class VenueProfileMutationsTest extends WP_UnitTestCase {
 	/** @var int[] */
 	private array $blog_ids = array();
 
+	/** @var int[] */
+	private array $attachment_ids = array();
+
 	private bool $had_settings = false;
 	private mixed $settings_before = null;
 
@@ -39,6 +42,9 @@ class VenueProfileMutationsTest extends WP_UnitTestCase {
 		}
 		foreach ( array_reverse( $this->term_ids ) as $term_id ) {
 			wp_delete_term( $term_id, 'venue' );
+		}
+		foreach ( array_reverse( $this->attachment_ids ) as $attachment_id ) {
+			wp_delete_attachment( $attachment_id, true );
 		}
 		foreach ( array_reverse( $this->blog_ids ) as $blog_id ) {
 			wpmu_delete_blog( $blog_id, true );
@@ -93,6 +99,190 @@ class VenueProfileMutationsTest extends WP_UnitTestCase {
 		$this->assertNotWPError( $cleared );
 		$this->assertSame( '', $cleared['profile']['website'] );
 		$this->assertSame( 'https://tickets.example/venue', $cleared['profile']['ticketing_url'] );
+	}
+
+	public function test_profile_and_public_data_have_a_stable_absent_logo_shape(): void {
+		$term_id = $this->venue( 'No Logo' );
+
+		$profile = VenueProfileMutations::read( $term_id );
+		$data    = Venue_Taxonomy::get_venue_data( $term_id );
+
+		$this->assertNotWPError( $profile );
+		$this->assertSame( 0, $profile['logo_attachment_id'] );
+		$this->assertNull( $profile['logo'] );
+		$this->assertSame( 0, $data['logo_attachment_id'] );
+		$this->assertNull( $data['logo'] );
+	}
+
+	public function test_valid_current_site_image_is_revisioned_and_publicly_resolved(): void {
+		$term_id      = $this->venue( 'Logo Venue' );
+		$attachment_id = $this->attachment( 'image/png', 'venue-logo.png' );
+		update_post_meta( $attachment_id, '_wp_attachment_image_alt', 'Logo Venue mark' );
+		update_post_meta(
+			$attachment_id,
+			'_wp_attachment_metadata',
+			array(
+				'width'  => 640,
+				'height' => 320,
+			)
+		);
+		$profile = VenueProfileMutations::read( $term_id );
+
+		$result = data_machine_events_update_venue_profile(
+			$term_id,
+			array( 'logo_attachment_id' => $attachment_id ),
+			$profile['revision']
+		);
+
+		$this->assertNotWPError( $result );
+		$this->assertSame( array( 'logo_attachment_id' ), $result['updated_fields'] );
+		$this->assertNotSame( $profile['revision'], $result['revision'] );
+		$this->assertSame( $attachment_id, $result['profile']['logo_attachment_id'] );
+		$this->assertSame(
+			array(
+				'attachment_id' => $attachment_id,
+				'site_id'       => get_current_blog_id(),
+				'url'           => wp_get_attachment_url( $attachment_id ),
+				'alt'           => 'Logo Venue mark',
+				'mime_type'     => 'image/png',
+				'width'         => 640,
+				'height'        => 320,
+			),
+			$result['profile']['logo']
+		);
+		$this->assertSame( $result['profile'], data_machine_events_get_venue_profile( $term_id ) );
+		$this->assertSame( $result['profile']['logo'], data_machine_events_get_venue_data( $term_id )['logo'] );
+	}
+
+	public function test_logo_no_op_preserves_revision_and_reports_no_updated_fields(): void {
+		$term_id       = $this->venue( 'Logo No-op' );
+		$attachment_id = $this->attachment( 'image/jpeg', 'venue-logo.jpg' );
+		$profile       = VenueProfileMutations::read( $term_id );
+		$first         = VenueProfileMutations::updateProfile( $term_id, array( 'logo_attachment_id' => $attachment_id ), $profile['revision'] );
+
+		$this->assertNotWPError( $first );
+		$second = VenueProfileMutations::updateProfile( $term_id, array( 'logo_attachment_id' => (string) $attachment_id ), $first['revision'] );
+
+		$this->assertNotWPError( $second );
+		$this->assertSame( array(), $second['updated_fields'] );
+		$this->assertSame( $first['revision'], $second['revision'] );
+	}
+
+	public function test_logo_removal_detaches_reference_without_deleting_attachment(): void {
+		$term_id       = $this->venue( 'Logo Removal' );
+		$attachment_id = $this->attachment( 'image/webp', 'venue-logo.webp' );
+		update_term_meta( $term_id, '_venue_logo_attachment_id', $attachment_id );
+		$profile = VenueProfileMutations::read( $term_id );
+
+		$result = VenueProfileMutations::updateProfile( $term_id, array( 'logo_attachment_id' => null ), $profile['revision'] );
+
+		$this->assertNotWPError( $result );
+		$this->assertSame( array( 'logo_attachment_id' ), $result['updated_fields'] );
+		$this->assertFalse( metadata_exists( 'term', $term_id, '_venue_logo_attachment_id' ) );
+		$this->assertInstanceOf( \WP_Post::class, get_post( $attachment_id ) );
+		$this->assertSame( 0, $result['profile']['logo_attachment_id'] );
+		$this->assertNull( $result['profile']['logo'] );
+	}
+
+	public function test_deleted_stored_logo_keeps_reference_but_resolves_no_public_data(): void {
+		$term_id       = $this->venue( 'Deleted Stored Logo' );
+		$attachment_id = $this->attachment( 'image/png', 'stored-deleted-logo.png' );
+		update_term_meta( $term_id, '_venue_logo_attachment_id', $attachment_id );
+		wp_delete_attachment( $attachment_id, true );
+		$this->attachment_ids = array_values( array_diff( $this->attachment_ids, array( $attachment_id ) ) );
+
+		$profile = VenueProfileMutations::read( $term_id );
+
+		$this->assertNotWPError( $profile );
+		$this->assertSame( $attachment_id, $profile['logo_attachment_id'] );
+		$this->assertNull( $profile['logo'] );
+	}
+
+	public function test_failed_logo_removal_rolls_back_and_preserves_reference(): void {
+		$term_id       = $this->venue( 'Logo Removal Rollback' );
+		$attachment_id = $this->attachment( 'image/png', 'preserved-logo.png' );
+		update_term_meta( $term_id, '_venue_logo_attachment_id', $attachment_id );
+		$profile = VenueProfileMutations::read( $term_id );
+		$block   = static function ( $check, $object_id, $meta_key ) use ( $term_id ) {
+			return $term_id === (int) $object_id && '_venue_logo_attachment_id' === $meta_key ? false : $check;
+		};
+		add_filter( 'delete_term_metadata', $block, 10, 3 );
+
+		$result = VenueProfileMutations::updateProfile( $term_id, array( 'logo_attachment_id' => 0 ), $profile['revision'] );
+
+		remove_filter( 'delete_term_metadata', $block, 10 );
+		$this->assertWPError( $result );
+		$this->assertSame( 'venue_meta_delete_failed', $result->get_error_code() );
+		$this->assertSame( (string) $attachment_id, get_term_meta( $term_id, '_venue_logo_attachment_id', true ) );
+	}
+
+	public function test_invalid_deleted_non_image_and_malformed_logo_references_are_rejected(): void {
+		$term_id       = $this->venue( 'Logo Validation' );
+		$non_image_id  = $this->attachment( 'application/pdf', 'venue.pdf' );
+		$deleted_id    = $this->attachment( 'image/png', 'deleted-logo.png' );
+		$profile       = VenueProfileMutations::read( $term_id );
+		wp_delete_attachment( $deleted_id, true );
+		$this->attachment_ids = array_values( array_diff( $this->attachment_ids, array( $deleted_id ) ) );
+
+		$cases = array(
+			array( array( 'id' => $non_image_id ), 'venue_logo_invalid_reference' ),
+			array( $non_image_id, 'venue_logo_not_image' ),
+			array( $deleted_id, 'venue_logo_not_found' ),
+			array( 999999999, 'venue_logo_not_found' ),
+		);
+		foreach ( $cases as $case ) {
+			list( $reference, $expected_code ) = $case;
+			$result = VenueProfileMutations::updateProfile( $term_id, array( 'logo_attachment_id' => $reference ), $profile['revision'] );
+			$this->assertWPError( $result );
+			$this->assertSame( $expected_code, $result->get_error_code() );
+		}
+		$this->assertFalse( metadata_exists( 'term', $term_id, '_venue_logo_attachment_id' ) );
+	}
+
+	public function test_foreign_site_attachment_is_rejected(): void {
+		if ( ! is_multisite() ) {
+			$this->markTestSkipped( 'Site affinity requires the multisite WordPress test suite.' );
+		}
+		$term_id = $this->venue( 'Site Affinity' );
+		$profile = VenueProfileMutations::read( $term_id );
+		$blog_id = self::factory()->blog->create();
+		$this->blog_ids[] = $blog_id;
+		switch_to_blog( $blog_id );
+		$foreign_id = $this->attachment( 'image/png', 'foreign-logo.png', 987654321 );
+		array_pop( $this->attachment_ids );
+		restore_current_blog();
+
+		$result = VenueProfileMutations::updateProfile( $term_id, array( 'logo_attachment_id' => $foreign_id ), $profile['revision'] );
+
+		$this->assertWPError( $result );
+		$this->assertSame( 'venue_logo_not_found', $result->get_error_code() );
+		$this->assertFalse( metadata_exists( 'term', $term_id, '_venue_logo_attachment_id' ) );
+	}
+
+	public function test_logo_failure_rolls_back_other_profile_fields(): void {
+		$term_id       = $this->venue( 'Logo Rollback' );
+		$attachment_id = $this->attachment( 'image/png', 'rollback-logo.png' );
+		update_term_meta( $term_id, '_venue_phone', 'before' );
+		$profile = VenueProfileMutations::read( $term_id );
+		$block   = static function ( $check, $object_id, $meta_key ) use ( $term_id ) {
+			return $term_id === (int) $object_id && '_venue_logo_attachment_id' === $meta_key ? false : $check;
+		};
+		add_filter( 'update_term_metadata', $block, 10, 3 );
+
+		$result = VenueProfileMutations::updateProfile(
+			$term_id,
+			array(
+				'phone'              => 'after',
+				'logo_attachment_id' => $attachment_id,
+			),
+			$profile['revision']
+		);
+
+		remove_filter( 'update_term_metadata', $block, 10 );
+		$this->assertWPError( $result );
+		$this->assertSame( 'venue_meta_update_failed', $result->get_error_code() );
+		$this->assertSame( 'before', get_term_meta( $term_id, '_venue_phone', true ) );
+		$this->assertFalse( metadata_exists( 'term', $term_id, '_venue_logo_attachment_id' ) );
 	}
 
 	public function test_profile_boundary_excludes_and_ignores_system_fields(): void {
@@ -430,6 +620,24 @@ class VenueProfileMutationsTest extends WP_UnitTestCase {
 		$term_id          = (int) $result['term_id'];
 		$this->term_ids[] = $term_id;
 		return $term_id;
+	}
+
+	private function attachment( string $mime_type, string $file, int $import_id = 0 ): int {
+		$attachment_id = wp_insert_attachment(
+			array(
+				'import_id'      => $import_id,
+				'post_title'     => $file,
+				'post_status'    => 'inherit',
+				'post_mime_type' => $mime_type,
+			),
+			$file,
+			0,
+			true
+		);
+		$this->assertNotWPError( $attachment_id );
+		$attachment_id       = (int) $attachment_id;
+		$this->attachment_ids[] = $attachment_id;
+		return $attachment_id;
 	}
 
 	private function namedLock( \mysqli $connection, string $operation, string $key ): int {

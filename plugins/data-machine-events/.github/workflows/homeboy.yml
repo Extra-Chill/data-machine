@@ -66,5 +66,6 @@ jobs:
         with:
           commands: ${{ matrix.command }}
           expected-commands: review audit,review lint,review test
+          scope: ${{ matrix.command == 'review test' && 'full' || 'auto' }}
           app-token: ${{ steps.app-token.outputs.token || '' }}
           autofix: 'false'

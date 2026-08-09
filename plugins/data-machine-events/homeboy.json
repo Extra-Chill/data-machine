@@ -5,7 +5,8 @@
       "inc/Abilities/AbilityPermissions.php",
       "inc/Cli/SettingsCommand.php",
       "inc/Core/DuplicateDetection/EventMergeHelper.php",
-      "inc/Core/DuplicateDetection/VenueMergeHelper.php"
+      "inc/Core/DuplicateDetection/VenueMergeHelper.php",
+      "tests/event-identity-pre-ai-smoke.php"
     ]
   },
   "auto_cleanup": false,
