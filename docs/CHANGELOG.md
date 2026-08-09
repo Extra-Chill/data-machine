@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.172.6] - 2026-08-09
+
+### Fixed
+- make ability provider bootstrap idempotent
+
 ## [0.172.5] - 2026-08-09
 
 ### Fixed
