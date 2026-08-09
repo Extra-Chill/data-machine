@@ -12,7 +12,11 @@ if ( ! defined( 'ARRAY_A' ) ) {
 	define( 'ARRAY_A', 'ARRAY_A' );
 }
 if ( ! class_exists( 'wpdb' ) ) {
-	class wpdb {}
+	class wpdb {
+		public $prefix = '';
+		public $last_error = '';
+		public $queries = array();
+	}
 }
 
 require_once __DIR__ . '/../inc/Core/Database/BaseRepository.php';
@@ -21,15 +25,18 @@ require_once __DIR__ . '/../inc/Core/ActionScheduler/ClaimIndexMigration.php';
 use DataMachine\Core\ActionScheduler\ClaimIndexMigration;
 
 class ClaimIndexMigrationSmokeWpdb extends wpdb {
-	public string $prefix = 'wp_7_';
-	public string $last_error = '';
 	public string $version = '10.11.8-MariaDB-ubu2204';
 	public string $version_comment = 'mariadb.org binary distribution';
 	public string $engine = 'InnoDB';
 	public array $indexes = array();
-	public array $queries = array();
 	public bool $fail_alter = false;
 	public bool $fail_index_inspection = false;
+
+	public function __construct() {
+		$this->prefix     = 'wp_7_';
+		$this->last_error = '';
+		$this->queries    = array();
+	}
 
 	public function prepare( $query, ...$args ): string {
 		foreach ( $args as $argument ) {
@@ -42,7 +49,8 @@ class ClaimIndexMigrationSmokeWpdb extends wpdb {
 		return $query;
 	}
 
-	public function get_var( $query ) {
+	public function get_var( $query = null, $x = 0, $y = 0 ) {
+		unset( $x, $y );
 		if ( 'SELECT DATABASE()' === $query ) {
 			return 'wordpress';
 		}
@@ -52,8 +60,8 @@ class ClaimIndexMigrationSmokeWpdb extends wpdb {
 		return null;
 	}
 
-	public function get_row( $query, $output = null ) {
-		unset( $output );
+	public function get_row( $query = null, $output = null, $y = 0 ) {
+		unset( $output, $y );
 		if ( str_contains( $query, 'information_schema.TABLES' ) ) {
 			return array(
 				'ENGINE'       => $this->engine,

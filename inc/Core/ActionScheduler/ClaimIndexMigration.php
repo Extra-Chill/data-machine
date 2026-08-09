@@ -16,7 +16,7 @@ defined( 'ABSPATH' ) || exit;
  */
 class ClaimIndexMigration {
 
-	public const INDEX_NAME = 'claim_id_status_priority_attempts_scheduled_date_gmt';
+	public const INDEX_NAME       = 'claim_id_status_priority_attempts_scheduled_date_gmt';
 	public const REQUIRED_COLUMNS = array(
 		'claim_id',
 		'status',
@@ -26,9 +26,9 @@ class ClaimIndexMigration {
 		'action_id',
 	);
 
-	private const MINIMUM_FREE_BYTES = 1073741824;
+	private const MINIMUM_FREE_BYTES      = 1073741824;
 	private const ESTIMATED_BYTES_PER_ROW = 512;
-	private const METADATA_LOCK_TIMEOUT = 10;
+	private const METADATA_LOCK_TIMEOUT   = 10;
 
 	/** @var \wpdb */
 	private $wpdb;
@@ -86,6 +86,7 @@ class ClaimIndexMigration {
 			return $base;
 		}
 
+		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		$table_info = $this->wpdb->get_row(
 			$this->wpdb->prepare(
@@ -95,13 +96,14 @@ class ClaimIndexMigration {
 			),
 			ARRAY_A
 		);
+		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
 		if ( ! is_array( $table_info ) ) {
 			$base['status']     = 'inspection_failed';
 			$base['blockers'][] = 'The Action Scheduler actions table was not found.';
 			return $base;
 		}
 
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
 		$index_rows = $this->wpdb->get_results( $this->wpdb->prepare( 'SHOW INDEX FROM %i', $table ), ARRAY_A );
 		if ( ! is_array( $index_rows ) || '' !== (string) $this->wpdb->last_error ) {
 			$base['status']     = 'inspection_failed';
@@ -120,9 +122,9 @@ class ClaimIndexMigration {
 		$server = is_array( $server ) ? $server : array();
 		// SHOW VARIABLES is portable to releases predating @@innodb_tmpdir.
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-		$innodb_tmpdir = $this->wpdb->get_row( "SHOW VARIABLES LIKE 'innodb_tmpdir'", ARRAY_A );
+		$innodb_tmpdir           = $this->wpdb->get_row( "SHOW VARIABLES LIKE 'innodb_tmpdir'", ARRAY_A );
 		$server['innodb_tmpdir'] = is_array( $innodb_tmpdir ) ? (string) ( $innodb_tmpdir['Value'] ?? $innodb_tmpdir['value'] ?? '' ) : '';
-		$runtime = self::detectOnlineDdlSupport(
+		$runtime                 = self::detectOnlineDdlSupport(
 			(string) ( $server['version'] ?? '' ),
 			(string) ( $server['version_comment'] ?? '' ),
 			(string) ( $table_info['ENGINE'] ?? '' )
@@ -157,23 +159,23 @@ class ClaimIndexMigration {
 		return array_merge(
 			$base,
 			array(
-				'success'          => true,
-				'status'           => $ready ? 'ready' : ( empty( $blockers ) ? 'migration_required' : 'blocked' ),
-				'database'         => $database,
-				'engine'           => strtoupper( (string) ( $table_info['ENGINE'] ?? '' ) ),
-				'rows_estimate'    => $rows,
-				'data_bytes'       => $data_bytes,
-				'index_bytes'      => $index_bytes,
-				'indexes'          => $indexes,
-				'usable_indexes'   => $usable_indexes,
-				'matching_index'   => $matching_index,
-				'name_collision'   => $name_collision,
-				'ready'            => $ready,
-				'runtime'          => $runtime,
-				'disk'             => $disk,
-				'ddl'              => $ddl,
-				'can_apply'        => ! $ready && empty( $blockers ),
-				'blockers'         => $blockers,
+				'success'        => true,
+				'status'         => $ready ? 'ready' : ( empty( $blockers ) ? 'migration_required' : 'blocked' ),
+				'database'       => $database,
+				'engine'         => strtoupper( (string) ( $table_info['ENGINE'] ?? '' ) ),
+				'rows_estimate'  => $rows,
+				'data_bytes'     => $data_bytes,
+				'index_bytes'    => $index_bytes,
+				'indexes'        => $indexes,
+				'usable_indexes' => $usable_indexes,
+				'matching_index' => $matching_index,
+				'name_collision' => $name_collision,
+				'ready'          => $ready,
+				'runtime'        => $runtime,
+				'disk'           => $disk,
+				'ddl'            => $ddl,
+				'can_apply'      => ! $ready && empty( $blockers ),
+				'blockers'       => $blockers,
 			)
 		);
 	}
@@ -191,7 +193,7 @@ class ClaimIndexMigration {
 		}
 
 		$lock_name = 'datamachine-as-claim-index-' . substr( hash( 'sha256', $inspection['database'] . ':' . $inspection['table'] ), 0, 32 );
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
 		$lock = $this->wpdb->get_var( $this->wpdb->prepare( 'SELECT GET_LOCK(%s, 0)', $lock_name ) );
 		if ( '1' !== (string) $lock ) {
 			$inspection['status']     = 'blocked';
@@ -202,7 +204,7 @@ class ClaimIndexMigration {
 
 		try {
 			// Fail quickly on a metadata-lock conflict rather than waiting behind live traffic indefinitely.
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
 			if ( false === $this->wpdb->query( 'SET SESSION lock_wait_timeout = ' . self::METADATA_LOCK_TIMEOUT ) ) {
 				throw new \RuntimeException( 'Unable to set a bounded metadata lock timeout: ' . $this->wpdb->last_error );
 			}
@@ -213,7 +215,7 @@ class ClaimIndexMigration {
 				throw new \RuntimeException( 'Online index creation failed: ' . $this->wpdb->last_error );
 			}
 		} finally {
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
 			$this->wpdb->get_var( $this->wpdb->prepare( 'SELECT RELEASE_LOCK(%s)', $lock_name ) );
 		}
 
@@ -255,14 +257,14 @@ class ClaimIndexMigration {
 	public static function normalizeUsableIndexes( array $rows ): array {
 		$invalid = array();
 		foreach ( $rows as $row ) {
-			$name       = (string) ( $row['Key_name'] ?? $row['key_name'] ?? '' );
-			$sequence   = (int) ( $row['Seq_in_index'] ?? $row['seq_in_index'] ?? 0 );
-			$sub_part   = $row['Sub_part'] ?? $row['sub_part'] ?? null;
-			$index_type = strtoupper( (string) ( $row['Index_type'] ?? $row['index_type'] ?? '' ) );
-			$collation  = strtoupper( (string) ( $row['Collation'] ?? $row['collation'] ?? '' ) );
-			$visible    = strtoupper( (string) ( $row['Visible'] ?? $row['visible'] ?? 'YES' ) );
-			$ignored    = strtoupper( (string) ( $row['Ignored'] ?? $row['ignored'] ?? 'NO' ) );
-			$expression = $row['Expression'] ?? $row['expression'] ?? null;
+			$name                 = (string) ( $row['Key_name'] ?? $row['key_name'] ?? '' );
+			$sequence             = (int) ( $row['Seq_in_index'] ?? $row['seq_in_index'] ?? 0 );
+			$sub_part             = $row['Sub_part'] ?? $row['sub_part'] ?? null;
+			$index_type           = strtoupper( (string) ( $row['Index_type'] ?? $row['index_type'] ?? '' ) );
+			$collation            = strtoupper( (string) ( $row['Collation'] ?? $row['collation'] ?? '' ) );
+			$visible              = strtoupper( (string) ( $row['Visible'] ?? $row['visible'] ?? 'YES' ) );
+			$ignored              = strtoupper( (string) ( $row['Ignored'] ?? $row['ignored'] ?? 'NO' ) );
+			$expression           = $row['Expression'] ?? $row['expression'] ?? null;
 			$required_prefix_part = $sequence >= 1 && $sequence <= count( self::REQUIRED_COLUMNS );
 			if ( '' === $name || ( $required_prefix_part && ( null !== $sub_part || 'BTREE' !== $index_type || 'A' !== $collation || 'NO' === $visible || 'YES' === $ignored || null !== $expression ) ) ) {
 				$invalid[ $name ] = true;
@@ -300,11 +302,11 @@ class ClaimIndexMigration {
 			// Older clients expose MariaDB's compatibility prefix before the real version.
 			$normalized_version = $matches[0][1];
 		}
-		$minimum_version    = $is_mariadb ? '10.0.0' : '5.6.0';
-		$supported          = 'INNODB' === strtoupper( $engine ) && version_compare( $normalized_version, $minimum_version, '>=' );
-		$reason             = $supported
+		$minimum_version = $is_mariadb ? '10.0.0' : '5.6.0';
+		$supported       = 'INNODB' === strtoupper( $engine ) && version_compare( $normalized_version, $minimum_version, '>=' );
+		$reason          = $supported
 			? sprintf( '%s %s with InnoDB supports explicit ALGORITHM=INPLACE, LOCK=NONE secondary-index creation.', $vendor, $normalized_version )
-			: sprintf( 'Online DDL is not established for %s %s with table engine %s.', $vendor, $normalized_version, $engine ?: 'unknown' );
+			: sprintf( 'Online DDL is not established for %s %s with table engine %s.', $vendor, $normalized_version, $engine ? $engine : 'unknown' );
 
 		return array(
 			'supported' => $supported,
@@ -317,7 +319,7 @@ class ClaimIndexMigration {
 	private function buildDdl( string $table ): string {
 		$columns = implode( ', ', array_map( static fn ( string $column ): string => '`' . $column . '`', self::REQUIRED_COLUMNS ) );
 		return $this->wpdb->prepare(
-			// phpcs:ignore WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare
+			// phpcs:ignore WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 			"ALTER TABLE %i ADD INDEX %i ({$columns}), ALGORITHM=INPLACE, LOCK=NONE",
 			$table,
 			self::INDEX_NAME
@@ -338,13 +340,7 @@ class ClaimIndexMigration {
 		}
 
 		if ( ! self::isLocalDatabaseHost( $this->database_host ) ) {
-			return array(
-				'source'         => 'unavailable',
-				'free_bytes'     => null,
-				'required_bytes' => $required_bytes,
-				'sufficient'     => false,
-				'message'        => 'Database disk headroom cannot be measured for a remote DB_HOST; provide --available-disk-bytes.',
-			);
+			return self::unavailableDiskResult( $required_bytes, 'Database disk headroom cannot be measured for a remote DB_HOST; provide --available-disk-bytes.' );
 		}
 
 		$temp_path = (string) ( $server['innodb_tmpdir'] ?? '' );
@@ -361,13 +357,7 @@ class ClaimIndexMigration {
 		}
 
 		if ( count( $free ) !== count( $paths ) || empty( $free ) ) {
-			return array(
-				'source'         => 'unavailable',
-				'free_bytes'     => null,
-				'required_bytes' => $required_bytes,
-				'sufficient'     => false,
-				'message'        => 'Database data/tmp disk headroom could not be established; provide --available-disk-bytes.',
-			);
+			return self::unavailableDiskResult( $required_bytes, 'Database data/tmp disk headroom could not be established; provide --available-disk-bytes.' );
 		}
 
 		$available  = min( $free );
@@ -378,6 +368,17 @@ class ClaimIndexMigration {
 			'required_bytes' => $required_bytes,
 			'sufficient'     => $sufficient,
 			'message'        => $sufficient ? 'Database data/tmp disk headroom is sufficient.' : 'Database data/tmp disk headroom is insufficient.',
+		);
+	}
+
+	/** @return array{source:string,free_bytes:null,required_bytes:int,sufficient:false,message:string} */
+	private static function unavailableDiskResult( int $required_bytes, string $message ): array {
+		return array(
+			'source'         => 'unavailable',
+			'free_bytes'     => null,
+			'required_bytes' => $required_bytes,
+			'sufficient'     => false,
+			'message'        => $message,
 		);
 	}
 
