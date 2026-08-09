@@ -44,7 +44,7 @@ use DataMachine\Core\PluginSettings;
 defined( 'ABSPATH' ) || exit;
 
 class BatchScheduler {
-	public const STORAGE_VERSION         = 2;
+	public const STORAGE_VERSION = 2;
 
 	/**
 	 * Parent completes after all child jobs complete.
@@ -432,7 +432,7 @@ class BatchScheduler {
 		$offset     = null === $expected_offset ? (int) ( $state['offset'] ?? 0 ) : $expected_offset;
 		$chunk_size = max( 1, (int) ( $parent_engine['batch_chunk_size'] ?? self::chunkSize( $context ) ) );
 		$lease      = (int) apply_filters( 'datamachine_batch_item_lease_seconds', BatchItems::DEFAULT_LEASE_SECONDS, $context );
-		$rows = $repository->claim_chunk(
+		$rows       = $repository->claim_chunk(
 			$parent_job_id,
 			$offset,
 			$chunk_size,

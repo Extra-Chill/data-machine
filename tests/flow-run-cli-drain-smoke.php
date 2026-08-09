@@ -80,7 +80,7 @@ assert_drain_contains( 'ensureCliMemoryLimit()', $drain_src, 'drain raises the C
 assert_drain_contains( "'memory_limit'", $service_src, 'drain reports memory-limit stop reason' );
 assert_drain_contains( "'return_code'       => empty( \$warnings ) ? 0 : 1", $service_src, 'drain surfaces runner failures through a result object' );
 assert_drain_contains( "'actions_processed' => \$processed", $service_src, 'drain reports lane-filtered actions processed by the current batch' );
-assert_drain_contains( "\$progress     = (int) ( \$result['actions_processed']", $service_src, 'drain judges lane progress from actions it processed, not unrelated lane deltas' );
+assert_drain_contains( "\$progress   = (int) ( \$result['actions_processed']", $service_src, 'drain judges lane progress from actions it processed, not unrelated lane deltas' );
 assert_drain_contains( "'remaining_pending'", $service_src, 'drain reports remaining pending actions' );
 assert_drain_contains( 'getDuePendingCount( $hooks, $job_ids, $lane )', $service_src, 'drain reports lane-scoped remaining pending actions' );
 assert_drain_contains( 'getPendingCount( $hooks, $job_ids, $lane )', $service_src, 'drain reports lane-scoped total pending actions' );
