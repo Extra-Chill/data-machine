@@ -32,8 +32,8 @@ namespace {
 	$GLOBALS['dme_test_table']    = 'dme_venue_mutation_' . bin2hex( random_bytes( 6 ) );
 
 	class WP_Error {
-		public function __construct( private string $code, private string $message, private mixed $data = null ) {}
-		public function get_error_code(): string { return $this->code; }
+		public function __construct( private string|int $code = '', private string $message = '', private mixed $data = '' ) {}
+		public function get_error_code(): string|int { return $this->code; }
 		public function get_error_message(): string { return $this->message; }
 		public function get_error_data(): mixed { return $this->data; }
 	}

@@ -45,8 +45,8 @@ class EventSourceIdentity {
 
 		$classification = $context->classifySourceItems( array( $current, $legacy ) );
 		$states         = array();
-		foreach ( $classification['classifications'] ?? array() as $state ) {
-			$states[ (string) ( $state['item_identifier'] ?? '' ) ] = $state;
+		foreach ( $classification['classifications'] as $state ) {
+			$states[ $state['item_identifier'] ] = $state;
 		}
 
 		$current_state = $states[ $current ] ?? array();

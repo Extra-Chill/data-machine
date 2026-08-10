@@ -45,7 +45,7 @@ class EventUpsert extends UpsertHandler {
 	public const SOURCE_NAME_META_KEY     = '_datamachine_event_source';
 	public const SOURCE_ID_META_KEY       = '_datamachine_event_source_id';
 
-	protected $taxonomy_handler;
+	protected TaxonomyHandler $taxonomy_handler;
 
 	/**
 	 * Pre-publish validation gate (title, junk markers, dates, junk payload).
@@ -215,7 +215,7 @@ class EventUpsert extends UpsertHandler {
 	 * @param string $title Event title.
 	 * @return bool True if the title is a junk-marker leak.
 	 */
-	private function isJunkTitle( string $title ): bool {
+	protected function isJunkTitle( string $title ): bool {
 		return $this->validator->isJunkTitle( $title );
 	}
 
@@ -226,7 +226,7 @@ class EventUpsert extends UpsertHandler {
 	 * @param EngineData $engine Engine data helper.
 	 * @return string One of full|date_only|none.
 	 */
-	private function getDateTimeConfidence( array $parameters, EngineData $engine ): string {
+	protected function getDateTimeConfidence( array $parameters, EngineData $engine ): string {
 		return $this->validator->getDateTimeConfidence( $parameters, $engine );
 	}
 
@@ -466,7 +466,7 @@ class EventUpsert extends UpsertHandler {
 			if ( $location_handled ) {
 				$handler_config_for_tax['taxonomy_location_selection'] = 'skip';
 			}
-			$engine_data_array = $engine instanceof EngineData ? $engine->all() : array();
+			$engine_data_array = $engine->all();
 			$this->taxonomy_handler->processTaxonomies( $post_id, $parameters, $handler_config_for_tax, $engine_data_array );
 
 			do_action( 'datamachine_event_taxonomy_processed', $post_id );
@@ -573,7 +573,12 @@ class EventUpsert extends UpsertHandler {
 			)
 		);
 
-		return empty( $query->posts ) ? 0 : (int) $query->posts[0];
+		if ( empty( $query->posts ) ) {
+			return 0;
+		}
+
+		$first_post = $query->posts[0];
+		return $first_post instanceof \WP_Post ? (int) $first_post->ID : (int) $first_post;
 	}
 
 	/**
@@ -927,7 +932,7 @@ class EventUpsert extends UpsertHandler {
 
 		foreach ( $blocks as $block ) {
 			if ( 'data-machine-events/event-details' === $block['blockName'] ) {
-				return $block['attrs'] ?? array();
+				return $block['attrs'];
 			}
 		}
 

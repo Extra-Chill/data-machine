@@ -48,7 +48,7 @@ if ( ! function_exists( 'data_machine_events_sanitize_query_params' ) ) {
 			return array_map( 'data_machine_events_sanitize_query_params', $value );
 		}
 
-		return is_scalar( $value ) ? sanitize_text_field( $value ) : $value;
+		return is_scalar( $value ) ? sanitize_text_field( (string) $value ) : $value;
 	}
 }
 
@@ -136,14 +136,14 @@ add_action( 'plugins_loaded', function () {
 }, 22 );
 
 // WP-CLI commands registered from the single-source-of-truth command map.
-if ( defined( 'WP_CLI' ) && WP_CLI ) {
+if ( defined( 'WP_CLI' ) ) {
 	require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/CommandRegistry.php';
 
 	foreach ( \DataMachineEvents\Cli\CommandRegistry::map() as $command => $entry ) {
-		if ( isset( $entry['file'] ) && is_readable( $entry['file'] ) ) {
+		if ( is_readable( $entry['file'] ) ) {
 			require_once $entry['file'];
 		}
-		if ( isset( $entry['class'] ) && class_exists( $entry['class'] ) ) {
+		if ( class_exists( $entry['class'] ) ) {
 			\WP_CLI::add_command( $command, $entry['class'] );
 		}
 	}
@@ -158,7 +158,7 @@ if ( defined( 'WP_CLI' ) && WP_CLI ) {
  */
 class DATAMACHINE_Events {
 
-	private static $instance = null;
+	private static ?self $instance = null;
 
 	public static function get_instance() {
 		if ( null === self::$instance ) {
@@ -182,8 +182,6 @@ class DATAMACHINE_Events {
 		add_filter( 'allowed_block_types_all', array( $this, 'filter_allowed_block_types' ), 10, 2 );
 
 		if ( is_admin() ) {
-			$this->init_admin();
-
 			// Instantiate Settings_Page to register its hooks
 			if ( class_exists( 'DataMachineEvents\\Admin\\Settings_Page' ) ) {
 				new \DataMachineEvents\Admin\Settings_Page();
@@ -225,10 +223,6 @@ class DATAMACHINE_Events {
 		register_activation_hook( DATA_MACHINE_EVENTS_PLUGIN_FILE, array( $this, 'activate' ) );
 		register_deactivation_hook( DATA_MACHINE_EVENTS_PLUGIN_FILE, array( $this, 'deactivate' ) );
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin_assets' ) );
-	}
-
-	private function init_admin() {
-		// Admin components are bootstrapped individually where required.
 	}
 
 	public function init_data_machine_integration() {
@@ -575,7 +569,12 @@ class DATAMACHINE_Events {
 		$upsert_handler_path = DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Steps/Upsert/Events/';
 		if ( is_dir( $upsert_handler_path ) ) {
 			// Load Filters
-			foreach ( glob( $upsert_handler_path . '*Filters.php' ) as $file ) {
+			$filter_files = glob( $upsert_handler_path . '*Filters.php' );
+			if ( false === $filter_files ) {
+				$filter_files = array();
+			}
+
+			foreach ( $filter_files as $file ) {
 				if ( file_exists( $file ) ) {
 					require_once $file;
 				}
@@ -607,7 +606,7 @@ class DATAMACHINE_Events {
 				'data-machine-events-admin',
 				DATA_MACHINE_EVENTS_PLUGIN_URL . 'assets/css/admin.css',
 				array(),
-				filemtime( $css_file )
+				(string) filemtime( $css_file )
 			);
 		}
 	}
@@ -637,7 +636,7 @@ class DATAMACHINE_Events {
 	 * @return array|null Modified allowed block types
 	 */
 	public function filter_allowed_block_types( $allowed_block_types, $block_editor_context ) {
-		if ( ! isset( $block_editor_context->post ) || ! isset( $block_editor_context->post->post_type ) ) {
+		if ( ! isset( $block_editor_context->post ) ) {
 			return $allowed_block_types;
 		}
 
@@ -661,7 +660,7 @@ class DATAMACHINE_Events {
 			'data-machine-events-root',
 			DATA_MACHINE_EVENTS_PLUGIN_URL . 'inc/Blocks/root.css',
 			array( 'dashicons' ),
-			filemtime( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Blocks/root.css' )
+			(string) filemtime( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Blocks/root.css' )
 		);
 
 		// Register Leaflet CDN assets for event-details block (single venue maps).
@@ -674,7 +673,7 @@ class DATAMACHINE_Events {
 			'data-machine-events-venue-map',
 			DATA_MACHINE_EVENTS_PLUGIN_URL . 'assets/js/venue-map.js',
 			array( 'leaflet' ),
-			filemtime( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'assets/js/venue-map.js' ),
+			(string) filemtime( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'assets/js/venue-map.js' ),
 			true
 		);
 

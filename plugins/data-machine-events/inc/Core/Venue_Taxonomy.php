@@ -35,7 +35,8 @@ class Venue_Taxonomy {
 		'timezone'           => '_venue_timezone',
 	);
 
-	private static $field_labels = array(
+	/** @var array<string,string> */
+	private static array $field_labels = array(
 		'address'            => 'Address',
 		'city'               => 'City',
 		'state'              => 'State',
@@ -664,10 +665,6 @@ class Venue_Taxonomy {
 			$street = implode( ', ', $address_tail );
 		}
 
-		if ( '' === $name ) {
-			return array();
-		}
-
 		return array(
 			'name'    => $name,
 			'address' => $street,
@@ -839,7 +836,7 @@ class Venue_Taxonomy {
 	 * @return bool Success status
 	 */
 	public static function update_venue_meta( $term_id, $venue_data ) {
-		if ( ! $term_id || ! is_array( $venue_data ) ) {
+		if ( ! $term_id ) {
 			return false;
 		}
 
@@ -983,12 +980,12 @@ class Venue_Taxonomy {
 	 * @return array Ordered queries keyed by strategy name
 	 */
 	private static function build_geocode_queries( array $venue_data ): array {
-		$address = html_entity_decode( trim( $venue_data['address'] ?? '' ) );
-		$city    = html_entity_decode( trim( $venue_data['city'] ?? '' ) );
-		$state   = trim( $venue_data['state'] ?? '' );
-		$zip     = trim( $venue_data['zip'] ?? '' );
-		$country = trim( $venue_data['country'] ?? '' );
-		$name    = html_entity_decode( trim( $venue_data['name'] ?? '' ) );
+		$address = html_entity_decode( trim( (string) ( $venue_data['address'] ?? '' ) ) );
+		$city    = html_entity_decode( trim( (string) ( $venue_data['city'] ?? '' ) ) );
+		$state   = trim( (string) ( $venue_data['state'] ?? '' ) );
+		$zip     = trim( (string) ( $venue_data['zip'] ?? '' ) );
+		$country = trim( (string) ( $venue_data['country'] ?? '' ) );
+		$name    = html_entity_decode( trim( (string) ( $venue_data['name'] ?? '' ) ) );
 
 		$queries = array();
 
@@ -1015,11 +1012,9 @@ class Venue_Taxonomy {
 
 		// Strategy 1: Cleaned street + city + state + zip
 		if ( ! empty( $street ) && ! empty( $city ) ) {
-			$parts = array_filter( array( $street, $city, $state, $zip ) );
-			$query = implode( ', ', $parts );
-			if ( ! empty( $query ) ) {
-				$queries['cleaned_address'] = $query;
-			}
+			$parts                      = array_filter( array( $street, $city, $state, $zip ) );
+			$query                      = implode( ', ', $parts );
+			$queries['cleaned_address'] = $query;
 		}
 
 		// Strategy 2: Street + city + state (no zip — zip sometimes causes false negatives)
@@ -1068,7 +1063,11 @@ class Venue_Taxonomy {
 	 * @return string Street portion of the address
 	 */
 	private static function extract_street_from_address( string $address, string $city ): string {
-		$parts        = preg_split( '/,\s*/', $address );
+		$parts = preg_split( '/,\s*/', $address );
+		if ( false === $parts ) {
+			$parts = array();
+		}
+
 		$street_parts = array();
 
 		foreach ( $parts as $part ) {
@@ -1272,27 +1271,6 @@ class Venue_Taxonomy {
 		}
 
 		return 1 === count( $matches ) ? $matches[0] : null;
-	}
-
-	/**
-	 * Check if venue has any metadata populated
-	 *
-	 * @param int $term_id Venue term ID
-	 * @return bool True if venue has at least one metadata field populated
-	 */
-	private static function has_venue_metadata( $term_id ) {
-		if ( ! $term_id ) {
-			return false;
-		}
-
-		foreach ( self::$meta_fields as $data_key => $meta_key ) {
-			$value = get_term_meta( $term_id, $meta_key, true );
-			if ( ! empty( $value ) ) {
-				return true;
-			}
-		}
-
-		return false;
 	}
 
 	/**
@@ -1519,7 +1497,7 @@ class Venue_Taxonomy {
 			'data-machine-events-venue-autocomplete',
 			DATA_MACHINE_EVENTS_PLUGIN_URL . 'assets/js/venue-autocomplete.js',
 			array(),
-			filemtime( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'assets/js/venue-autocomplete.js' ),
+			(string) filemtime( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'assets/js/venue-autocomplete.js' ),
 			true
 		);
 
@@ -1537,7 +1515,7 @@ class Venue_Taxonomy {
 			'data-machine-events-venue-autocomplete',
 			DATA_MACHINE_EVENTS_PLUGIN_URL . 'assets/css/venue-autocomplete.css',
 			array(),
-			filemtime( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'assets/css/venue-autocomplete.css' )
+			(string) filemtime( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'assets/css/venue-autocomplete.css' )
 		);
 	}
 }

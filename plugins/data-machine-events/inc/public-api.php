@@ -313,8 +313,7 @@ if ( ! function_exists( 'data_machine_events_get_promoter_data' ) ) {
 			return null;
 		}
 
-		$data = \DataMachineEvents\Core\Promoter_Taxonomy::get_promoter_data( $term_id );
-		return is_array( $data ) ? $data : null;
+		return \DataMachineEvents\Core\Promoter_Taxonomy::get_promoter_data( $term_id );
 	}
 }
 

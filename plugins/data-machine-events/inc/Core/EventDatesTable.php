@@ -200,7 +200,7 @@ class EventDatesTable {
 	 * Get event dates for a single post.
 	 *
 	 * @param int $post_id Post ID.
-	 * @return object|null Object with start_datetime and end_datetime, or null.
+	 * @return object{start_datetime:string,end_datetime:string|null}|null Event dates, or null.
 	 */
 	public static function get( int $post_id ): ?object {
 		global $wpdb;

@@ -21,14 +21,6 @@ if ( ! defined( 'ABSPATH' ) ) {
 	define( 'ABSPATH', __DIR__ . '/' );
 }
 
-// Minimal WP shims used by build_geocode_queries (pure string logic).
-if ( ! function_exists( 'html_entity_decode' ) ) {
-	// Always available in PHP core; guard for paranoia only.
-	function html_entity_decode( $s ) {
-		return $s;
-	}
-}
-
 require_once dirname( __DIR__ ) . '/inc/Core/Venue_Taxonomy.php';
 
 use DataMachineEvents\Core\Venue_Taxonomy;

@@ -18,12 +18,14 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class Promoter_Taxonomy {
 
-	public static $meta_fields = array(
+	/** @var array<string,string> */
+	public static array $meta_fields = array(
 		'url'  => '_promoter_url',
 		'type' => '_promoter_type',
 	);
 
-	private static $type_options = array(
+	/** @var array<string,string> */
+	private static array $type_options = array(
 		'Organization' => 'Organization',
 		'Person'       => 'Person',
 	);
@@ -165,7 +167,7 @@ class Promoter_Taxonomy {
 	 * @return bool Success status
 	 */
 	public static function update_promoter_meta( $term_id, $promoter_data ) {
-		if ( ! $term_id || ! is_array( $promoter_data ) ) {
+		if ( ! $term_id ) {
 			return false;
 		}
 
