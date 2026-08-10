@@ -15,6 +15,7 @@ use DataMachine\Cli\BaseCommand;
 use DataMachine\Abilities\Engine\DrainJobAbility;
 use DataMachine\Abilities\SystemAbilities;
 use DataMachine\Core\ActionScheduler\ClaimIndexMigration;
+use DataMachine\Core\Bootstrap\DependencyChecker;
 use DataMachine\Engine\Tasks\TaskRegistry;
 use DataMachine\Engine\AI\System\Tasks\SystemTask;
 
@@ -104,8 +105,8 @@ class SystemCommand extends BaseCommand {
 			if ( isset( $check_result['message'] ) ) {
 				WP_CLI::log( sprintf( '  Message:        %s', $check_result['message'] ) );
 			}
-			if ( isset( $check_result['action_scheduler'] ) && is_array( $check_result['action_scheduler'] ) ) {
-				$action_scheduler = $check_result['action_scheduler'];
+			if ( isset( $check_result[ DependencyChecker::CHECK_ACTION_SCHEDULER ] ) && is_array( $check_result[ DependencyChecker::CHECK_ACTION_SCHEDULER ] ) ) {
+				$action_scheduler = $check_result[ DependencyChecker::CHECK_ACTION_SCHEDULER ];
 				WP_CLI::log( sprintf( '  Pending:        %d', (int) ( $action_scheduler['pending_count'] ?? 0 ) ) );
 				WP_CLI::log( sprintf( '  Due now:        %d', (int) ( $action_scheduler['due_count'] ?? 0 ) ) );
 				if ( ! empty( $action_scheduler['oldest_due_gmt'] ) ) {
@@ -242,7 +243,9 @@ class SystemCommand extends BaseCommand {
 				WP_CLI::log( sprintf( 'Rows estimate:  %s', number_format_i18n( $result['rows_estimate'] ) ) );
 			}
 			if ( isset( $result['claim_plan'] ) ) {
-				WP_CLI::log( sprintf( 'Claim plan:     %s; %s rows; %s', $result['claim_plan']['key'] ?: 'no index', number_format_i18n( $result['claim_plan']['rows'] ), $result['claim_plan']['extra'] ?: 'no Extra detail' ) );
+				$plan_key   = '' !== $result['claim_plan']['key'] ? $result['claim_plan']['key'] : 'no index';
+				$plan_extra = '' !== $result['claim_plan']['extra'] ? $result['claim_plan']['extra'] : 'no Extra detail';
+				WP_CLI::log( sprintf( 'Claim plan:     %s; %s rows; %s', $plan_key, number_format_i18n( $result['claim_plan']['rows'] ), $plan_extra ) );
 			}
 			if ( isset( $result['disk'] ) ) {
 				$free = null === $result['disk']['free_bytes'] ? 'unknown' : size_format( $result['disk']['free_bytes'], 2 );

@@ -30,7 +30,7 @@ class ClaimIndexMigrationSmokeWpdb extends wpdb {
 	public string $engine = 'InnoDB';
 	public array $indexes = array();
 	public array $claim_plan = array(
-		'key'   => 'claim_id_status_priority_attempts_scheduled_date_gmt',
+		'key'   => ClaimIndexMigration::INDEX_NAME,
 		'rows'  => 50,
 		'Extra' => 'Using where; Using index',
 	);

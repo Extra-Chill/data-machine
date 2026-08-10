@@ -292,14 +292,14 @@ class ClaimIndexMigration {
 	/** @return array{ready:bool,key:string,rows:int,extra:string,message:string} */
 	private function inspectClaimPlan( string $table, string $matching_index ): array {
 		// Match Action Scheduler's default claim predicate and ordering without acquiring locks.
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
-		$plan = $this->wpdb->get_row(
-			$this->wpdb->prepare(
-				"EXPLAIN SELECT action_id FROM %i WHERE claim_id = 0 AND scheduled_date_gmt <= UTC_TIMESTAMP() AND status = 'pending' ORDER BY priority ASC, attempts ASC, scheduled_date_gmt ASC, action_id ASC LIMIT 50",
-				$table
-			),
-			ARRAY_A
+		$query = $this->wpdb->prepare(
+			'EXPLAIN SELECT action_id FROM %i WHERE claim_id = 0 AND scheduled_date_gmt <= UTC_TIMESTAMP() AND status = %s ORDER BY priority ASC, attempts ASC, scheduled_date_gmt ASC, action_id ASC LIMIT 50',
+			$table,
+			'pending'
 		);
+		// The table identifier and status value are both prepared above; WPCS cannot trace the prepared variable.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
+		$plan = $this->wpdb->get_row( $query, ARRAY_A );
 		if ( ! is_array( $plan ) || '' !== (string) $this->wpdb->last_error ) {
 			return array(
 				'ready'   => false,
