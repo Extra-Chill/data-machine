@@ -2,6 +2,16 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.172.12] - 2026-08-10
+
+### Changed
+- isolate claim migration database mode
+- align autoloaded WP Error contract
+- align WP Error smoke contract
+
+### Fixed
+- verify Action Scheduler claim query plan
+
 ## [0.172.11] - 2026-08-09
 
 ### Fixed
