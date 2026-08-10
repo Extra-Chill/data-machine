@@ -25,7 +25,8 @@ if ( ! class_exists( 'WP_Error' ) ) {
 	class WP_Error {
 		public function __construct(
 			private string $code = '',
-			private string $message = ''
+			private string $message = '',
+			private mixed $data = null
 		) {}
 
 		public function get_error_code(): string {
@@ -34,6 +35,10 @@ if ( ! class_exists( 'WP_Error' ) ) {
 
 		public function get_error_message(): string {
 			return $this->message;
+		}
+
+		public function get_error_data(): mixed {
+			return $this->data;
 		}
 	}
 }
