@@ -433,6 +433,7 @@ class ClaimIndexMigration {
 			|| 1 === preg_match( '/^(?:\[::1\]|::1)(?::\d+)?$/', $host );
 	}
 
+	/** Database driver predicate isolated for MySQL migration tests. */
 	protected function isSqlite(): bool {
 		return BaseRepository::is_sqlite();
 	}
