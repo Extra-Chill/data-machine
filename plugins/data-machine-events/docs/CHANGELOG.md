@@ -2,6 +2,20 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.55.0] - 2026-08-10
+
+### Added
+- add canonical venue logo contract
+
+### Changed
+- use stable Data Machine contracts
+- restore managed PHPUnit baseline
+
+### Fixed
+- clear release lint findings
+- add bounded batch action recovery
+- wire calendar empty-state Today recovery
+
 ## [0.54.1] - 2026-08-04
 
 ### Fixed
