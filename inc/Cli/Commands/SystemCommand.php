@@ -241,6 +241,9 @@ class SystemCommand extends BaseCommand {
 			if ( isset( $result['rows_estimate'] ) ) {
 				WP_CLI::log( sprintf( 'Rows estimate:  %s', number_format_i18n( $result['rows_estimate'] ) ) );
 			}
+			if ( isset( $result['claim_plan'] ) ) {
+				WP_CLI::log( sprintf( 'Claim plan:     %s; %s rows; %s', $result['claim_plan']['key'] ?: 'no index', number_format_i18n( $result['claim_plan']['rows'] ), $result['claim_plan']['extra'] ?: 'no Extra detail' ) );
+			}
 			if ( isset( $result['disk'] ) ) {
 				$free = null === $result['disk']['free_bytes'] ? 'unknown' : size_format( $result['disk']['free_bytes'], 2 );
 				WP_CLI::log( sprintf( 'Disk headroom:  %s available; %s required (%s)', $free, size_format( $result['disk']['required_bytes'], 2 ), $result['disk']['source'] ) );

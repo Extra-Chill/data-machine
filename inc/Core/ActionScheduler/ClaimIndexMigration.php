@@ -114,7 +114,8 @@ class ClaimIndexMigration {
 		$indexes        = self::normalizeIndexes( $index_rows );
 		$usable_indexes = self::normalizeUsableIndexes( $index_rows );
 		$matching_index = self::findCoveringIndex( $usable_indexes );
-		$ready          = null !== $matching_index;
+		$claim_plan     = null !== $matching_index ? $this->inspectClaimPlan( $table, $matching_index ) : null;
+		$ready          = null !== $matching_index && $claim_plan['ready'];
 		$name_collision = isset( $indexes[ self::INDEX_NAME ] ) && null === self::findCoveringIndex( array( self::INDEX_NAME => $usable_indexes[ self::INDEX_NAME ] ?? array() ) );
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
@@ -134,7 +135,7 @@ class ClaimIndexMigration {
 		$data_bytes    = max( 0, (int) ( $table_info['DATA_LENGTH'] ?? 0 ) );
 		$index_bytes   = max( 0, (int) ( $table_info['INDEX_LENGTH'] ?? 0 ) );
 		$required_disk = self::MINIMUM_FREE_BYTES + max( $rows * self::ESTIMATED_BYTES_PER_ROW, (int) ceil( $data_bytes / 2 ) );
-		$disk          = $ready
+		$disk          = null !== $matching_index
 			? array(
 				'source'         => 'not_required',
 				'free_bytes'     => null,
@@ -155,6 +156,9 @@ class ClaimIndexMigration {
 		if ( ! $ready && $name_collision ) {
 			$blockers[] = sprintf( 'Index name %s already exists with a different definition; no automatic drop is permitted.', self::INDEX_NAME );
 		}
+		if ( null !== $claim_plan && ! $claim_plan['ready'] ) {
+			$blockers[] = $claim_plan['message'];
+		}
 
 		return array_merge(
 			$base,
@@ -169,12 +173,13 @@ class ClaimIndexMigration {
 				'indexes'        => $indexes,
 				'usable_indexes' => $usable_indexes,
 				'matching_index' => $matching_index,
+				'claim_plan'     => $claim_plan,
 				'name_collision' => $name_collision,
 				'ready'          => $ready,
 				'runtime'        => $runtime,
 				'disk'           => $disk,
 				'ddl'            => $ddl,
-				'can_apply'      => ! $ready && empty( $blockers ),
+				'can_apply'      => null === $matching_index && empty( $blockers ),
 				'blockers'       => $blockers,
 			)
 		);
@@ -282,6 +287,44 @@ class ClaimIndexMigration {
 			}
 		}
 		return null;
+	}
+
+	/** @return array{ready:bool,key:string,rows:int,extra:string,message:string} */
+	private function inspectClaimPlan( string $table, string $matching_index ): array {
+		// Match Action Scheduler's default claim predicate and ordering without acquiring locks.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
+		$plan = $this->wpdb->get_row(
+			$this->wpdb->prepare(
+				"EXPLAIN SELECT action_id FROM %i WHERE claim_id = 0 AND scheduled_date_gmt <= UTC_TIMESTAMP() AND status = 'pending' ORDER BY priority ASC, attempts ASC, scheduled_date_gmt ASC, action_id ASC LIMIT 50",
+				$table
+			),
+			ARRAY_A
+		);
+		if ( ! is_array( $plan ) || '' !== (string) $this->wpdb->last_error ) {
+			return array(
+				'ready'   => false,
+				'key'     => '',
+				'rows'    => 0,
+				'extra'   => '',
+				'message' => 'Unable to verify the Action Scheduler claim query plan.',
+			);
+		}
+
+		$key       = (string) ( $plan['key'] ?? $plan['Key'] ?? '' );
+		$rows      = max( 0, (int) ( $plan['rows'] ?? $plan['Rows'] ?? 0 ) );
+		$extra     = (string) ( $plan['Extra'] ?? $plan['extra'] ?? '' );
+		$filesorts = str_contains( strtolower( $extra ), 'filesort' );
+		$ready     = $matching_index === $key && ! $filesorts;
+
+		return array(
+			'ready'   => $ready,
+			'key'     => $key,
+			'rows'    => $rows,
+			'extra'   => $extra,
+			'message' => $ready
+				? sprintf( 'Claim plan uses %s without filesort; LIMIT 50 can stop the ordered index walk.', $matching_index )
+				: sprintf( 'Claim plan must use %s without filesort; optimizer chose %s across an estimated %s rows (%s).', $matching_index, $key ? $key : 'no index', number_format( $rows ), $extra ? $extra : 'no Extra detail' ),
+		);
 	}
 
 	/** @return array{supported:bool,vendor:string,version:string,reason:string} */

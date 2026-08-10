@@ -29,6 +29,12 @@ class ClaimIndexMigrationSmokeWpdb extends wpdb {
 	public string $version_comment = 'mariadb.org binary distribution';
 	public string $engine = 'InnoDB';
 	public array $indexes = array();
+	public array $claim_plan = array(
+		'key'   => 'claim_id_status_priority_attempts_scheduled_date_gmt',
+		'rows'  => 50,
+		'Extra' => 'Using where; Using index',
+	);
+	public string $last_explain = '';
 	public bool $fail_alter = false;
 	public bool $fail_index_inspection = false;
 
@@ -62,6 +68,10 @@ class ClaimIndexMigrationSmokeWpdb extends wpdb {
 
 	public function get_row( $query = null, $output = null, $y = 0 ) {
 		unset( $output, $y );
+		if ( str_starts_with( $query, 'EXPLAIN SELECT action_id' ) ) {
+			$this->last_explain = $query;
+			return $this->claim_plan;
+		}
 		if ( str_contains( $query, 'information_schema.TABLES' ) ) {
 			return array(
 				'ENGINE'       => $this->engine,
@@ -210,10 +220,23 @@ $assert( ! $insufficient['can_apply'] && ! $insufficient['disk']['sufficient'], 
 $applied = $migration->apply( 2 * 1024 * 1024 * 1024 );
 $assert( $applied['ready'] && $applied['applied'], 'apply reinspects and verifies the physical index' );
 $assert( 2 === count( $wpdb->queries ), 'apply executes only the session timeout and online DDL mutations' );
+$assert( str_contains( $wpdb->last_explain, 'ORDER BY priority ASC, attempts ASC, scheduled_date_gmt ASC, action_id ASC LIMIT 50' ), 'plan verification preserves priority, retry, date, and stable-ID claim semantics' );
 
 $ready_again = $migration->apply( 2 * 1024 * 1024 * 1024 );
 $assert( $ready_again['ready'] && ! $ready_again['applied'], 're-running apply is an idempotent no-op when ready' );
 $assert( 2 === count( $wpdb->queries ), 'idempotent apply does not execute DDL again' );
+
+$scale_wpdb             = new ClaimIndexMigrationSmokeWpdb();
+$scale_wpdb->indexes    = claim_index_rows( ClaimIndexMigration::INDEX_NAME, ClaimIndexMigration::REQUIRED_COLUMNS );
+$scale_wpdb->claim_plan = array(
+	'key'   => 'status_scheduled_date_gmt',
+	'rows'  => 3075048,
+	'Extra' => 'Using index condition; Using where; Using filesort',
+);
+$scale = ( new ClaimIndexMigration( $scale_wpdb, static fn () => false, 'remote-db.example' ) )->inspect();
+$assert( ! $scale['ready'] && ! $scale['can_apply'], 'a covering index is not declared ready when the optimizer still filesorts' );
+$assert( 3075048 === $scale['claim_plan']['rows'], 'readiness preserves Events-scale optimizer row evidence' );
+$assert( str_contains( $scale['blockers'][0], '3,075,048 rows' ), 'blocked readiness explains the unbounded optimizer estimate' );
 
 $collision_wpdb          = new ClaimIndexMigrationSmokeWpdb();
 $collision_wpdb->indexes = claim_index_rows( ClaimIndexMigration::INDEX_NAME, array( 'claim_id', 'status', 'priority' ) );
