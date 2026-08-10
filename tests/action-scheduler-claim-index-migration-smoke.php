@@ -119,6 +119,12 @@ class ClaimIndexMigrationSmokeWpdb extends wpdb {
 	}
 }
 
+class ClaimIndexMigrationForSmoke extends ClaimIndexMigration {
+	protected function isSqlite(): bool {
+		return false;
+	}
+}
+
 /** @return array<int,array<string,int|string>> */
 function claim_index_rows( string $name, array $columns ): array {
 	$rows = array();
@@ -188,7 +194,7 @@ $assert( ClaimIndexMigration::isLocalDatabaseHost( 'localhost:/run/mysqld/mysqld
 $assert( ! ClaimIndexMigration::isLocalDatabaseHost( 'localhost.example.com' ), 'does not treat a prefixed remote hostname as local' );
 
 $wpdb      = new ClaimIndexMigrationSmokeWpdb();
-$migration = new ClaimIndexMigration( $wpdb, static fn () => false, 'remote-db.example' );
+$migration = new ClaimIndexMigrationForSmoke( $wpdb, static fn () => false, 'remote-db.example' );
 $dry_run   = $migration->inspect( 2 * 1024 * 1024 * 1024 );
 $assert( $dry_run['success'] && $dry_run['can_apply'] && ! $dry_run['ready'], 'dry run reports a migration-ready preflight' );
 $assert( array() === $wpdb->queries, 'dry run never executes a mutation' );
@@ -202,7 +208,7 @@ $assert( ! $blocked['can_apply'] && 'blocked' === $blocked['status'], 'remote da
 $assert( str_contains( implode( ' ', $blocked['blockers'] ), '--available-disk-bytes' ), 'blocked preflight explains the operator disk override' );
 
 $disk_paths      = array();
-$local_migration = new ClaimIndexMigration(
+$local_migration = new ClaimIndexMigrationForSmoke(
 	new ClaimIndexMigrationSmokeWpdb(),
 	static function ( string $path ) use ( &$disk_paths ): int {
 		$disk_paths[] = $path;
@@ -233,24 +239,24 @@ $scale_wpdb->claim_plan = array(
 	'rows'  => 3075048,
 	'Extra' => 'Using index condition; Using where; Using filesort',
 );
-$scale = ( new ClaimIndexMigration( $scale_wpdb, static fn () => false, 'remote-db.example' ) )->inspect();
+$scale = ( new ClaimIndexMigrationForSmoke( $scale_wpdb, static fn () => false, 'remote-db.example' ) )->inspect();
 $assert( ! $scale['ready'] && ! $scale['can_apply'], 'a covering index is not declared ready when the optimizer still filesorts' );
 $assert( 3075048 === $scale['claim_plan']['rows'], 'readiness preserves Events-scale optimizer row evidence' );
 $assert( str_contains( $scale['blockers'][0], '3,075,048 rows' ), 'blocked readiness explains the unbounded optimizer estimate' );
 
 $collision_wpdb          = new ClaimIndexMigrationSmokeWpdb();
 $collision_wpdb->indexes = claim_index_rows( ClaimIndexMigration::INDEX_NAME, array( 'claim_id', 'status', 'priority' ) );
-$collision               = ( new ClaimIndexMigration( $collision_wpdb, static fn () => false, 'remote-db.example' ) )->inspect( 2 * 1024 * 1024 * 1024 );
+$collision               = ( new ClaimIndexMigrationForSmoke( $collision_wpdb, static fn () => false, 'remote-db.example' ) )->inspect( 2 * 1024 * 1024 * 1024 );
 $assert( $collision['name_collision'] && ! $collision['can_apply'], 'same-name malformed index is never dropped automatically' );
 
 $unsupported_wpdb          = new ClaimIndexMigrationSmokeWpdb();
 $unsupported_wpdb->version = '5.5.62';
-$unsupported               = ( new ClaimIndexMigration( $unsupported_wpdb, static fn () => false, 'remote-db.example' ) )->inspect( 2 * 1024 * 1024 * 1024 );
+$unsupported               = ( new ClaimIndexMigrationForSmoke( $unsupported_wpdb, static fn () => false, 'remote-db.example' ) )->inspect( 2 * 1024 * 1024 * 1024 );
 $assert( ! $unsupported['runtime']['supported'] && ! $unsupported['can_apply'], 'unsupported runtime blocks apply even with disk headroom' );
 
 $failed_inspection_wpdb                        = new ClaimIndexMigrationSmokeWpdb();
 $failed_inspection_wpdb->fail_index_inspection = true;
-$failed_inspection                             = ( new ClaimIndexMigration( $failed_inspection_wpdb, static fn () => false, 'remote-db.example' ) )->inspect( 2 * 1024 * 1024 * 1024 );
+$failed_inspection                             = ( new ClaimIndexMigrationForSmoke( $failed_inspection_wpdb, static fn () => false, 'remote-db.example' ) )->inspect( 2 * 1024 * 1024 * 1024 );
 $assert( ! $failed_inspection['success'] && 'inspection_failed' === $failed_inspection['status'], 'SHOW INDEX database errors fail closed' );
 
 if ( $failures ) {
