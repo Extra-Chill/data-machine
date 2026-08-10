@@ -72,7 +72,7 @@ class ClaimIndexMigration {
 			'blockers'         => array(),
 		);
 
-		if ( BaseRepository::is_sqlite() ) {
+		if ( $this->isSqlite() ) {
 			$base['status']     = 'unsupported';
 			$base['blockers'][] = 'SQLite does not support this MySQL/MariaDB online DDL migration.';
 			return $base;
@@ -431,5 +431,9 @@ class ClaimIndexMigration {
 			|| str_starts_with( $host, '/' )
 			|| 1 === preg_match( '#^(?:localhost|127\.0\.0\.1)(?::(?:\d+|/.*))?$#', $host )
 			|| 1 === preg_match( '/^(?:\[::1\]|::1)(?::\d+)?$/', $host );
+	}
+
+	protected function isSqlite(): bool {
+		return BaseRepository::is_sqlite();
 	}
 }
