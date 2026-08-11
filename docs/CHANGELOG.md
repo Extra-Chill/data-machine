@@ -2,6 +2,14 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.172.13] - 2026-08-11
+
+### Changed
+- assert persistence behavior through hooks
+
+### Fixed
+- bound Action Scheduler log snapshots
+
 ## [0.172.12] - 2026-08-10
 
 ### Changed
