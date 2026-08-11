@@ -2,6 +2,12 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.172.14] - 2026-08-11
+
+### Fixed
+- coalesce recurring schedule reconciliation
+- bound pipeline batch action retention
+
 ## [0.172.13] - 2026-08-11
 
 ### Changed
