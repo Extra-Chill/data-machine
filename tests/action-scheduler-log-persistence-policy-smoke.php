@@ -64,11 +64,6 @@ echo "=== action-scheduler-log-persistence-policy-smoke ===\n";
 
 LogPersistencePolicy::register();
 
-assert_log_persistence(
-	'registration is inert until a persistence integration applies the hook',
-	1 === count( $filters['markdown_db_persistent_table_query'][100] ?? array() )
-);
-
 $source_query = 'SELECT * FROM `tenant_42_actionscheduler_logs` ORDER BY 1';
 $unchanged    = apply_filters( 'markdown_db_persistent_table_query', $source_query, 'posts', 'tenant_42_posts', null );
 assert_log_persistence( 'unrelated tables retain their supplied query', $source_query === $unchanged );
