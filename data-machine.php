@@ -133,6 +133,7 @@ if ( ! class_exists( 'ActionScheduler' ) ) {
 	require_once __DIR__ . '/vendor/woocommerce/action-scheduler/action-scheduler.php';
 }
 
+\DataMachine\Core\ActionScheduler\LogPersistencePolicy::register();
 \DataMachine\Engine\Tasks\RecurringScheduler::registerGenerationFence();
 
 add_action(
