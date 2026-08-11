@@ -59,9 +59,8 @@ class SystemAgentServiceProvider {
 		$this->registerBuiltInSchedules();
 		$this->registerActionSchedulerHooks();
 		RetentionActionSchedulerTask::registerNativeRetention();
-		// Bootstrap immediately after AS initializes, then let AS's native daily
-		// recurring-ensure action repair schedules that are later interrupted.
-		add_action( 'action_scheduler_init', array( $this, 'manageRecurringTaskSchedules' ) );
+		// Action Scheduler owns the daily reconciliation cadence so this does not
+		// repeat across every request that initializes its datastore.
 		add_action( 'action_scheduler_ensure_recurring_actions', array( $this, 'manageRecurringTaskSchedules' ) );
 		WakeBriefingTask::registerStalenessGuard();
 	}
@@ -445,15 +444,20 @@ class SystemAgentServiceProvider {
 			);
 
 			if ( $result instanceof \WP_Error ) {
+				$error_code = $result->get_error_code();
+				$level      = in_array( $error_code, array( 'schedule_lock_timeout', 'schedule_lock_lost' ), true )
+					? 'debug'
+					: 'warning';
 				do_action(
 					'datamachine_log',
-					'warning',
+					$level,
 					'Recurring schedule reconciliation failed: ' . $result->get_error_message(),
 					array(
 						'schedule_id' => $schedule['schedule_id'],
 						'task_type'   => $schedule['task_type'],
 						'hook'        => $hook,
 						'interval'    => $schedule['interval'],
+						'error_code'  => $error_code,
 					)
 				);
 			}
