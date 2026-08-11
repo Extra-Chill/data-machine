@@ -122,16 +122,18 @@ namespace {
 		str_contains( $cleanup, "apply_filters( 'datamachine_as_actions_hook_max_age_days'" )
 	);
 	assert_batching(
-		'default per-hook override targets execute_step',
+		'default per-hook override targets high-volume fan-out hooks',
 		(bool) preg_match( "/'datamachine_execute_step'\\s*=>\\s*1 \/ 24/", $cleanup )
+			&& (bool) preg_match( "/'datamachine_pipeline_batch_chunk'\\s*=>\\s*1 \/ 24/", $cleanup )
 	);
 	assert_batching(
 		'per-hook row-count ceiling is filterable',
 		str_contains( $cleanup, "apply_filters( 'datamachine_as_actions_hook_max_rows'" )
 	);
 	assert_batching(
-		'default row-count ceiling targets execute_step',
+		'default row-count ceiling targets high-volume fan-out hooks',
 		(bool) preg_match( "/'datamachine_execute_step'\\s*=>\\s*100000/", $cleanup )
+			&& (bool) preg_match( "/'datamachine_pipeline_batch_chunk'\\s*=>\\s*100000/", $cleanup )
 	);
 	assert_batching(
 		'ceiling probe bounds indexed status arms before OFFSET',
@@ -350,7 +352,7 @@ namespace {
 				if ( null !== $hook && $row['hook'] !== $hook ) {
 					continue;
 				}
-				if ( null === $hook && in_array( $row['hook'], array( 'datamachine_execute_step' ), true ) ) {
+				if ( null === $hook && in_array( $row['hook'], array( 'datamachine_execute_step', 'datamachine_resume_ai_step', 'datamachine_pipeline_batch_chunk' ), true ) ) {
 					// Global window must exclude hooks with their own window.
 					continue;
 				}
@@ -372,10 +374,8 @@ namespace {
 	};
 
 	// Seed enough rows to force the batching loop to iterate past the 1000-row
-	// floor on batch size: 2500 old completed execute_step actions (7h old,
-	// beyond the 6h per-hook window) each with one log, 30 old "other" hook
-	// actions (8 days), plus 5 fresh execute_step actions (within 6h) that must
-	// survive.
+	// floor on batch size: 2500 old completed actions for each high-volume hook,
+	// 30 old "other" hook actions, plus fresh and active actions that must survive.
 	$now       = time();
 	$seven_h   = gmdate( 'Y-m-d H:i:s', $now - ( 7 * 3600 ) );
 	$eight_day = gmdate( 'Y-m-d H:i:s', $now - ( 8 * DAY_IN_SECONDS ) );
@@ -387,6 +387,20 @@ namespace {
 		$fake_wpdb->actions[ $aid ] = array(
 			'action_id'        => $aid,
 			'hook'             => 'datamachine_execute_step',
+			'status'           => 'complete',
+			'last_attempt_gmt' => $seven_h,
+		);
+		$fake_wpdb->logs[ $lid ] = array(
+			'log_id'    => $lid,
+			'action_id' => $aid,
+		);
+		++$aid;
+		++$lid;
+	}
+	for ( $i = 0; $i < 2500; $i++ ) {
+		$fake_wpdb->actions[ $aid ] = array(
+			'action_id'        => $aid,
+			'hook'             => 'datamachine_pipeline_batch_chunk',
 			'status'           => 'complete',
 			'last_attempt_gmt' => $seven_h,
 		);
@@ -412,6 +426,24 @@ namespace {
 			'hook'             => 'datamachine_execute_step',
 			'status'           => 'complete',
 			'last_attempt_gmt' => $fresh,
+		);
+		++$aid;
+	}
+	for ( $i = 0; $i < 5; $i++ ) {
+		$fake_wpdb->actions[ $aid ] = array(
+			'action_id'        => $aid,
+			'hook'             => 'datamachine_pipeline_batch_chunk',
+			'status'           => 'complete',
+			'last_attempt_gmt' => $fresh,
+		);
+		++$aid;
+	}
+	foreach ( array( 'pending', 'in-progress' ) as $status ) {
+		$fake_wpdb->actions[ $aid ] = array(
+			'action_id'        => $aid,
+			'hook'             => 'datamachine_pipeline_batch_chunk',
+			'status'           => $status,
+			'last_attempt_gmt' => $eight_day,
 		);
 		++$aid;
 	}
@@ -471,8 +503,8 @@ namespace {
 			&& 0 === $fake_wpdb->delete_queries
 	);
 	assert_batching(
-		'count includes expired logs attached to canceled Data Machine recurrences (2501 logs + 2531 actions)',
-		5032 === $count_total,
+		'count includes expired high-volume hooks and canceled recurrences (5001 logs + 5031 actions)',
+		10032 === $count_total,
 		"got {$count_total}"
 	);
 
@@ -512,8 +544,19 @@ namespace {
 		0 === count( $stale_execute_step )
 	);
 	assert_batching(
-		'fresh execute_step rows (within 6h) survived',
+		'fresh execute_step rows (within 1h) survived',
 		5 === count( $surviving_execute_step )
+	);
+	$surviving_batch_chunks = array_filter(
+		$fake_wpdb->actions,
+		static fn( $r ) => 'datamachine_pipeline_batch_chunk' === $r['hook']
+	);
+	assert_batching(
+		'pipeline batch retention purges stale terminal rows but preserves fresh and active work',
+		7 === count( $surviving_batch_chunks )
+			&& 5 === count( array_filter( $surviving_batch_chunks, static fn( $r ) => 'complete' === $r['status'] ) )
+			&& 1 === count( array_filter( $surviving_batch_chunks, static fn( $r ) => 'pending' === $r['status'] ) )
+			&& 1 === count( array_filter( $surviving_batch_chunks, static fn( $r ) => 'in-progress' === $r['status'] ) )
 	);
 	assert_batching(
 		'global window purged 8-day-old other-hook rows',
@@ -526,8 +569,8 @@ namespace {
 	);
 	assert_batching(
 		'result reports per-table deletion counts + batch metadata',
-		2531 === $result['actions_deleted']
-			&& 2501 === $result['logs_deleted']
+		5031 === $result['actions_deleted']
+			&& 5001 === $result['logs_deleted']
 			&& 1000 === $result['batch_size']
 			&& isset( $result['iterations'] )
 			&& false === $result['hit_limit'],
@@ -591,21 +634,21 @@ namespace {
 	$fake_wpdb->optimize_calls = 0;
 	$fake_wpdb->batch_sizes    = array();
 
-	// Reset filters from the OPTIMIZE block, then cap execute_step at 10 rows
+	// Reset filters from the OPTIMIZE block, then cap pipeline chunks at 10 rows
 	// and disable the age window for it (large negative-ish window) so ONLY the
-	// ceiling can delete. Seed 25 fresh execute_step rows with distinct, recent
+	// ceiling can delete. Seed 25 fresh pipeline chunk rows with distinct, recent
 	// timestamps (within any age window) — 15 should be deleted by the ceiling,
 	// the 10 most-recent must survive.
 	retention_reset_filters();
-	retention_set_filter( 'datamachine_as_actions_hook_max_age_days', array( 'datamachine_execute_step' => 3650.0 ) );
-	retention_set_filter( 'datamachine_as_actions_hook_max_rows', array( 'datamachine_execute_step' => 10 ) );
+	retention_set_filter( 'datamachine_as_actions_hook_max_age_days', array( 'datamachine_pipeline_batch_chunk' => 3650.0 ) );
+	retention_set_filter( 'datamachine_as_actions_hook_max_rows', array( 'datamachine_pipeline_batch_chunk' => 10 ) );
 
 	$caid = 1;
 	for ( $i = 0; $i < 25; $i++ ) {
 		// Distinct timestamps, all very recent (i seconds ago).
 		$fake_wpdb->actions[ $caid ] = array(
 			'action_id'        => $caid,
-			'hook'             => 'datamachine_execute_step',
+			'hook'             => 'datamachine_pipeline_batch_chunk',
 			'status'           => 'complete',
 			'last_attempt_gmt' => gmdate( 'Y-m-d H:i:s', $now - ( 25 - $i ) ),
 		);
@@ -616,7 +659,7 @@ namespace {
 
 	$surviving = array_filter(
 		$fake_wpdb->actions,
-		static fn( $r ) => 'datamachine_execute_step' === $r['hook']
+		static fn( $r ) => 'datamachine_pipeline_batch_chunk' === $r['hook']
 	);
 
 	// Boundary semantics: the deleters use strictly `< cutoff`, and the cutoff
