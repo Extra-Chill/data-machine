@@ -15,6 +15,7 @@ use DataMachine\Cli\BaseCommand;
 use DataMachine\Abilities\Engine\DrainJobAbility;
 use DataMachine\Abilities\SystemAbilities;
 use DataMachine\Core\ActionScheduler\ClaimIndexMigration;
+use DataMachine\Core\ActionScheduler\ActionInsertReadiness;
 use DataMachine\Core\Bootstrap\DependencyChecker;
 use DataMachine\Engine\Tasks\TaskRegistry;
 use DataMachine\Engine\AI\System\Tasks\SystemTask;
@@ -27,6 +28,66 @@ defined( 'ABSPATH' ) || exit;
  * @since 0.41.0
  */
 class SystemCommand extends BaseCommand {
+
+	/**
+	 * Inspect read-only evidence relevant to Action Scheduler action inserts.
+	 *
+	 * This command does not insert a probe row and cannot prove that a future
+	 * insert will succeed or establish the cause of an earlier engine failure.
+	 *
+	 * ## OPTIONS
+	 *
+	 * [--format=<format>]
+	 * : Output format.
+	 * ---
+	 * default: table
+	 * options:
+	 *   - table
+	 *   - json
+	 * ---
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp datamachine system action-scheduler-insert-readiness
+	 *     wp datamachine system action-scheduler-insert-readiness --format=json
+	 *
+	 * @subcommand action-scheduler-insert-readiness
+	 */
+	public function action_scheduler_insert_readiness( array $args, array $assoc_args ): void {
+		unset( $args );
+		$format = $assoc_args['format'] ?? 'table';
+		$result = ( new ActionInsertReadiness() )->inspect();
+
+		if ( 'json' === $format ) {
+			WP_CLI::line( (string) wp_json_encode( $result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+		} else {
+			WP_CLI::log( sprintf( 'Table:           %s', $result['table'] ) );
+			WP_CLI::log( sprintf( 'Status:          %s', $result['status'] ) );
+			WP_CLI::log( 'Write test:      not performed' );
+			if ( isset( $result['engine'] ) ) {
+				WP_CLI::log( sprintf( 'Engine:          %s', $result['engine'] ) );
+				WP_CLI::log( sprintf( 'Rows estimate:   %s', number_format_i18n( $result['rows_estimate'] ) ) );
+				WP_CLI::log( sprintf( 'AUTO_INCREMENT:  %s', null === $result['auto_increment'] ? 'unknown' : number_format_i18n( $result['auto_increment'] ) ) );
+				WP_CLI::log( sprintf( 'MAX(action_id):  %s', number_format_i18n( $result['max_action_id'] ) ) );
+			}
+			foreach ( $result['errors'] as $error ) {
+				WP_CLI::warning( $error );
+			}
+			foreach ( $result['limitations'] as $limitation ) {
+				WP_CLI::log( 'Limitation:      ' . $limitation );
+			}
+			if ( isset( $result['recommendation'] ) ) {
+				WP_CLI::log( 'Recommendation:  ' . $result['recommendation'] );
+			}
+		}
+
+		if ( ! $result['success'] ) {
+			WP_CLI::error( 'Action Scheduler insert readiness inspection failed.' );
+			return;
+		}
+
+		WP_CLI::success( 'Read-only Action Scheduler insert evidence collected.' );
+	}
 
 	/**
 	 * Run system health checks.

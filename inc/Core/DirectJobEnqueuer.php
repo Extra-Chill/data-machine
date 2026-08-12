@@ -91,8 +91,25 @@ class DirectJobEnqueuer {
 			return $this->failure( 'enqueue_claim_fenced', $generation, true, 'enqueuing' );
 		}
 
-		$run_at    = null !== $timestamp && $timestamp > time() ? $timestamp : time();
-		$action_id = ( $this->scheduler )( $run_at, self::HOOK, $args, self::GROUP );
+		$run_at = null !== $timestamp && $timestamp > time() ? $timestamp : time();
+		try {
+			$action_id = ( $this->scheduler )( $run_at, self::HOOK, $args, self::GROUP );
+		} catch ( \Throwable $error ) {
+			$this->jobs->finish_operation_enqueue( $job_id, 'enqueue_failed', 0, $token, $generation );
+			do_action(
+				'datamachine_log',
+				'error',
+				'Direct operation Action Scheduler enqueue failed',
+				array(
+					'job_id'            => $job_id,
+					'flow_step_id'      => $flow_step_id,
+					'operation_state'   => 'enqueue_failed',
+					'exception_class'   => get_class( $error ),
+					'exception_message' => $error->getMessage(),
+				)
+			);
+			return $this->failure( 'action_schedule_exception', $generation, true );
+		}
 		if ( ! is_int( $action_id ) || $action_id <= 0 ) {
 			$this->jobs->finish_operation_enqueue( $job_id, 'enqueue_failed', 0, $token, $generation );
 			return $this->failure( 'action_schedule_failed', $generation, true );

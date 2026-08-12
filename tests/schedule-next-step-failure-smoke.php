@@ -31,6 +31,8 @@ echo "Case 1: schedule-next-step owns Action Scheduler failures\n";
 assert_schedule_next_step_failure_smoke( 'helper exists', str_contains( $source, 'private function failScheduling' ) );
 assert_schedule_next_step_failure_smoke( 'non-positive action scheduler result is checked', str_contains( $execute, '(int) $action_id <= 0' ) );
 assert_schedule_next_step_failure_smoke( 'failed scheduling routes through helper', str_contains( $execute, "'next_step_schedule_failed'") );
+assert_schedule_next_step_failure_smoke( 'scheduler insert exceptions are contained', str_contains( $execute, 'catch ( \\Throwable $error )' ) && str_contains( $execute, "'next_step_schedule_exception'") );
+assert_schedule_next_step_failure_smoke( 'scheduler exception evidence reaches failure handling', str_contains( $execute, "'exception_message' => null !== \$schedule_exception") );
 assert_schedule_next_step_failure_smoke( 'helper failure happens before returning action result', strpos( $execute, 'if ( ! is_numeric( $action_id )' ) < strrpos( $execute, "'success'   => is_numeric( $" . 'action_id' ) );
 
 echo "Case 2: unscheduled jobs are requeued or finalized through fail-job\n";
