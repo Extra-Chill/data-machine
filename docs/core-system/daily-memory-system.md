@@ -9,7 +9,7 @@ Daily memory has six components:
 1. **DailyMemory service** — filesystem storage with CRUD, search, and date-range queries
 2. **DailyMemoryTask** — AI-powered system task that synthesizes daily summaries and cleans MEMORY.md
 3. **DailyMemoryAbilities** — WordPress 6.9 Abilities API registration
-4. **AgentDailyMemoryDirective** — opt-in injection at Priority 35 for agents that enable it via `agent_config.daily_memory` (chat + pipeline contexts). Since 0.71.0; replaces `DailyMemorySelectorDirective`.
+4. **AgentDailyMemoryDirective** — opt-in injection at Priority 35 for agents that enable it via `agent_config.daily_memory` (chat + pipeline contexts)
 5. **AgentDailyMemory tool** — AI chat tool for agent self-service
 6. **CLI and REST endpoints** — human and programmatic access
 
@@ -248,7 +248,7 @@ wp_execute_ability('datamachine/search-daily-memory', [
 **Priority:** 35
 **Contexts:** `chat`, `pipeline`
 
-Opt-in directive that reads recent daily archive files directly from disk and injects each one as its own `system_text` block into the AI context. Replaces the former `DailyMemorySelectorDirective` + per-flow `flow_config.daily_memory` config.
+Opt-in directive that reads recent daily archive files directly from disk and injects each one as its own `system_text` block into the AI context.
 
 ### Opt-in per agent
 
@@ -293,7 +293,7 @@ Priority 80 — Site Context
 
 ### For precise historical lookups
 
-The directive only injects *recent* days on a rolling window. Anything beyond `recent_days`, or any specific date / date range / month query, should be served by the `agent_daily_memory` tool on demand — it covers every former selector mode with more precision than a pre-configured dropdown ever did.
+The directive only injects recent days on a rolling window. The `agent_daily_memory` tool serves specific dates, date ranges, month queries, and anything beyond `recent_days` on demand.
 
 ## AgentDailyMemory Tool
 

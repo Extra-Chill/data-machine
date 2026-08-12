@@ -73,9 +73,7 @@ WP_Agent_Memory_Stores::get_store(
 );
 ```
 
-The resolver honors a direct `$context['memory_store']` value or an implementation returned by the `wp_agent_memory_store` filter. Data Machine passes the current scope as `$context['scope']`. Return `null` to keep `DiskAgentMemoryStore`.
-
-Data Machine intentionally does not call the previous `agents_api_memory_store` or `datamachine_memory_store` hooks because a dual-hook ladder would become permanent API. Consumers should register on the canonical Agents API hook.
+The resolver honors a direct `$context['memory_store']` value or an implementation returned by the `wp_agent_memory_store` filter. Data Machine passes the current scope as `$context['scope']`. Return `null` to keep `DiskAgentMemoryStore`. Consumers register alternate backends on `wp_agent_memory_store`.
 
 Backend selection should be capability-driven:
 

@@ -29,8 +29,6 @@ Directive outputs are validated by `DirectiveOutputValidator`:
 
 Each registered directive declares which agent **modes** it applies to via the `modes` array. The current built-in modes are `chat`, `pipeline`, and `system`. The literal string `all` matches every mode.
 
-> Historical note: prior to v0.71.0 this field was named `contexts`. The internal terminology was renamed during the AgentMode refactor (#1130). RequestBuilder reads `$directive['modes']`; older `'contexts' =>` registrations are silently treated as `all` because they don't match the canonical key.
-
 ### Priority System
 
 Directives are applied in ascending priority order (lowest number = highest priority).
@@ -47,7 +45,7 @@ Directives are applied in ascending priority order (lowest number = highest prio
 | **45** | `FlowMemoryFilesDirective` | pipeline | `inc/Core/Steps/AI/Directives/FlowMemoryFilesDirective.php` | Per-flow selectable memory files (additive to pipeline memory) |
 | **50** | `PipelineSystemPromptDirective` | pipeline | `inc/Core/Steps/AI/Directives/PipelineSystemPromptDirective.php` | User-configured task instructions + workflow visualization |
 
-> Note: Tools are injected by `RequestBuilder` via `PromptBuilder::setTools()`, not as a directive class. The earlier `GlobalSystemPromptDirective`, `SiteContextDirective`, `PipelineCoreDirective`, `ChatAgentDirective`, and `SystemAgentDirective` classes were removed during the AgentMode refactor — their guidance now lives inline in `AgentModeDirective` and in agent memory files (SITE.md, SOUL.md, MEMORY.md).
+Tools are injected by `RequestBuilder` through `PromptBuilder::setTools()`. `AgentModeDirective` and agent memory files provide runtime and identity guidance.
 
 ## Individual Directives
 
@@ -113,7 +111,7 @@ When `PermissionHelper::in_cross_site_context()` returns false (local request, t
 **Modes**: chat, pipeline
 **Since**: 0.71.0
 
-Injects recent daily archive files for agents that explicitly opt in. Replaces the former `DailyMemorySelectorDirective` + per-flow `flow_config.daily_memory` config.
+Injects recent daily archive files for agents that explicitly opt in.
 
 **Opt-in shape (per agent, in `agent_config`):**
 

@@ -298,24 +298,6 @@ $repo->clear_all();
 
 The Data Machine admin UI includes a dedicated Logs page built with React that consumes these endpoints to provide real-time monitoring of system activity, powerful filtering by context and severity, and deep links to associated jobs and flows. Status updates are managed via TanStack Query for optimal performance and zero page reloads.
 
-## Migration from File-Based Logging
-
-The database-backed logging system replaced the Monolog file-based system:
-
-| Aspect | Before (Monolog) | After (Database) |
-|---|---|---|
-| Storage | Per-agent-type log files in uploads | Single `datamachine_logs` database table |
-| Scoping | `agent_type` parameter (pipeline, chat, system, cli) | `agent_id` integer (specific agent instance) |
-| Filtering | Date-based file filtering | SQL WHERE with indexes |
-| Context | Inline in log messages | Structured JSON column |
-| Clearing | `agent_type` + optional `days` parameter | `agent_id` scoping or clear all |
-| Pagination | File offset/seek | SQL LIMIT/OFFSET with total count |
-
-**Breaking changes from the migration**:
-- The `agent_type` parameter is no longer used — use `agent_id` instead
-- The `days` parameter for clearing old logs is no longer supported — use `prune_before()` at the repository level
-- Log file paths no longer apply — all logs are in the database
-
 ## Related Documentation
 
 - [Jobs](jobs.md) - Job execution monitoring

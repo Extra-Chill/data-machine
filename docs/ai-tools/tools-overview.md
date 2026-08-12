@@ -2,7 +2,7 @@
 
 AI tools should be exposed as WordPress Ability projections whenever a single registered ability already owns the execution contract. `inc/Engine/AI/Tools/ToolServiceProvider.php` still instantiates tool classes so they can register configuration handlers and ability projections, but the model-facing declaration should use `datamachine_register_ability_tool()` instead of a class/method handler when possible.
 
-The legacy `datamachine_tools` class/method registry remains for composite orchestration tools and adjacent handler tools that do not map cleanly to one public ability. Tools declare where they can run (`chat`, `pipeline`, or pipeline-policy mode) and the ability or access level required to execute them.
+The `datamachine_tools` class/method registry serves composite orchestration tools and adjacent handler tools that do not map cleanly to one public ability. Tools declare where they can run (`chat`, `pipeline`, or pipeline-policy mode) and the ability or access level required to execute them.
 
 ## Registered Tool Inventory
 

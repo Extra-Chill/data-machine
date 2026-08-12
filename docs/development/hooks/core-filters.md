@@ -346,22 +346,7 @@ the resolved definition follows the same shape:
 ]
 ```
 
-### `chubes_ai_request` (removed runtime path)
-
-**Purpose**: Historical provider-dispatch filter. Agent runtime requests now go
-through `RequestBuilder::build()` and the wp-ai-client adapter instead.
-
-**Parameters**:
-
-- `$request` (array) - AI request data
-- `$provider` (string) - AI provider slug
-- `$streaming_callback` (mixed) - Streaming callback function
-- `$tools` (array) - Available tools array
-- `$pipeline_step_id` (string|null) - Pipeline step ID for context
-
-**Return**: Historical array response shape.
-
-**Universal Engine Directive System** (@since v0.2.0): Centralized AI request construction via `RequestBuilder` with hierarchical directive application through filter-based architecture.
+**AI Runtime Directive System**: Centralized AI request construction via `RequestBuilder` with hierarchical directive application through filter-based architecture.
 
 **Directive Application via RequestBuilder**:
 All AI requests now use `RequestBuilder::build()` which integrates with `PromptBuilder` for unified directive management with priority-based ordering:
@@ -411,7 +396,7 @@ add_filter('datamachine_directives', function($directives) {
 });
 ```
 
-**Note**: All AI request building now uses `RequestBuilder::build()` to ensure consistent request structure and directive application. Do not add new `chubes_ai_request` dispatch sites.
+All AI request building uses `RequestBuilder::build()` for consistent request structure and directive application.
 
 ### `datamachine_session_title_prompt`
 
@@ -517,9 +502,8 @@ type's canonical stored shape.
 Data Machine owns workflow and storage policy at these boundaries. Format repair,
 mixed-content detection, and malformed-input normalization belong in the runtime
 transformer, which Data Machine detects through `blocks_engine_php_transformer_*`
-helpers or `Automattic\BlocksEngine\PhpTransformer` classes. Legacy Block Format
-Bridge functions remain a runtime-only fallback for sites that still provide
-them, but Data Machine no longer bundles that old converter stack.
+helpers or `Automattic\BlocksEngine\PhpTransformer` classes. Sites may also
+provide Block Format Bridge functions as a runtime fallback.
 
 ### `datamachine_post_content_format`
 
@@ -1168,78 +1152,6 @@ add_filter( 'datamachine_directives_enabled', '__return_false' );
 
 Use this for eval or training runs that need to guarantee Data Machine contributes no hidden system-message context. Returning `false` suppresses every registered directive before per-agent policy resolution and before any directive class `get_outputs()` method is called.
 
-### `datamachine_global_directives` (LEGACY — use `datamachine_directives`)
-
-**Deprecated**: v0.2.5
-**Replacement**: Use `datamachine_directives` with `modes => ['all']`
-
-**Purpose**: Modify global AI system directives applied across all AI interactions (pipeline + chat)
-
-**Migration Example**:
-
-```php
-// LEGACY (pre-v0.2.5)
-add_filter('datamachine_global_directives', function($directives) {
-    $directives[] = [
-        'priority' => 25,
-        'content' => 'Custom global directive'
-    ];
-    return $directives;
-});
-
-// CURRENT (v0.2.5+)
-add_filter('datamachine_directives', function($directives) {
-    $directives[] = [
-        'class' => MyGlobalDirective::class,
-        'priority' => 25,
-        'modes' => ['all']
-    ];
-    return $directives;
-});
-```
-
-### `datamachine_agent_directives` (LEGACY — use `datamachine_directives`)
-
-**Deprecated**: v0.2.5
-**Replacement**: Use `datamachine_directives` with mode-specific `modes` targeting
-
-**Purpose**: Modify AI system directives for specific agent types (pipeline or chat)
-
-**Parameters**:
-
-- `$request` (array) - Current AI request being built
-- `$agent_type` (string) - Legacy agent type ('pipeline' or 'chat')
-- `$provider` (string) - AI provider (openai, anthropic, etc.)
-- `$tools` (array) - Available tools for the agent
-- `$context` (array) - Agent-specific context data
-
-**Return**: Modified request array
-
-**Migration Example**:
-
-```php
-// LEGACY (pre-v0.2.5)
-add_filter('datamachine_agent_directives', function($request, $agent_type, $provider, $tools, $context) {
-    if ($agent_type === 'pipeline') {
-        $request['messages'][] = [
-            'role' => 'system',
-            'content' => 'Pipeline-specific directive'
-        ];
-    }
-    return $request;
-}, 10, 5);
-
-// CURRENT (v0.2.5+)
-add_filter('datamachine_directives', function($directives) {
-    $directives[] = [
-        'class' => MyPipelineDirective::class,
-        'priority' => 30,
-        'modes' => ['pipeline']
-    ];
-    return $directives;
-});
-```
-
 ## Navigation Filters
 
 ### `datamachine_get_next_flow_step_id`
@@ -1509,9 +1421,8 @@ selection, tool declarations, provider-turn assembly, completion policy,
 transcript persistence, event emission, and runtime tool mediation. It then
 delegates loop sequencing directly to `WP_Agent_Conversation_Loop::run()`.
 
-There is no Data Machine or Agents API conversation-runner replacement filter
-in this code path. The Agents API loop is the runner; consumers extend runtime
-behavior through Agents API seams such as the provider-turn adapter, tool
+The Agents API loop is the runner. Consumers extend runtime behavior through
+Agents API seams such as the provider-turn adapter, tool
 executor/mediator, completion policy, transcript persister, interrupt source,
 and event callback.
 
@@ -1620,12 +1531,11 @@ arrays are projection shapes at provider boundaries, not the store contract.
 ### WP_Agent_Memory_Store (`/agents-api/inc/Core/FilesRepository/WP_Agent_Memory_Store.php`)
 
 **Purpose**: Single seam between agent memory operations and the underlying
-persistence backend. The contract is generic agent-memory persistence: it does
-not own section parsing, scaffold/default-file creation, editability, ability
-permissions, prompt injection, flows, jobs, or pipeline behavior. The disk
-default ([`DiskAgentMemoryStore`](../../../inc/Core/FilesRepository/DiskAgentMemoryStore.php))
-preserves byte-for-byte the filesystem behavior the codebase used before this
-seam was introduced.
+persistence backend. The contract is generic agent-memory persistence. Section
+parsing, scaffold/default-file creation, editability, ability permissions,
+prompt injection, flows, jobs, and pipeline behavior remain Data Machine
+responsibilities. The disk default is
+[`DiskAgentMemoryStore`](../../../inc/Core/FilesRepository/DiskAgentMemoryStore.php).
 
 **Current resolver/filter: `WP_Agent_Memory_Stores::get_store()` / `wp_agent_memory_store`**
 
@@ -1639,10 +1549,6 @@ The canonical resolver returns a direct `$context['memory_store']` value or an
 `WP_Agent_Memory_Store` implementation provided through the `wp_agent_memory_store`
 filter. Data Machine passes the current scope as `$context['scope']`. Return `null`
 (the default) to let Data Machine read and write through the filesystem.
-
-Data Machine does not mirror the previous `agents_api_memory_store` or
-`datamachine_memory_store` hooks because that would create a permanent
-compatibility ladder instead of using the Agents API-owned seam.
 
 **Use case**: managed-host environments where the local filesystem is not
 writable (e.g. WordPress.com, VIP). A consumer plugin (e.g. Intelligence)

@@ -46,40 +46,17 @@ That's it. On the next request where `init` fires, DM reconciles the registratio
 | `default_config` | array | Initial `agent_config` persisted on creation. Subsequent config changes go through the DB — the registration never overrides user-edited config. |
 | `meta` | array | Optional registry metadata for future consumers. Data Machine's current materializer ignores it. |
 
-### Category and metadata policy
-
-The current registry intentionally does **not** implement Abilities API-style categories.
-
-Abilities need first-class categories because abilities are many small executable actions exposed through REST discovery and filtering. Agents are runtime definitions; their executable surface should be discovered through abilities/runtime tool declarations and explicit policy, not through a second category hierarchy on the agent object.
-
-Category semantics are not part of `WP_Agent`:
-
-- There is no `WP_Agent_Category` registry.
-- No category-derived permissions, REST visibility, tool policy, or memory policy.
-- Data Machine admin grouping remains Data Machine product behavior.
-- Future descriptive `metadata`, `type`, `capabilities`, or `annotations` fields can be added after the public class contract is finalized, but they must be non-authoritative until a separate issue defines their semantics.
-
 ### Slug semantics
 
-Slugs are passed through `sanitize_title()`. Empty slugs are rejected. They must be unique across a site (DB column has a UNIQUE constraint on `agent_slug`). Two plugins registering the same slug is resolved by **last-wins** — this intentionally diverges from the Abilities API's duplicate rejection. Data Machine relies on hook priority as a fresh-install override mechanism while the registry lives in-repo.
+Slugs are passed through `sanitize_title()`. Empty slugs are rejected. They must be unique across a site because the database column has a unique constraint on `agent_slug`. When two plugins register the same slug, the registration at the later hook priority wins.
 
 `WP_Agent` is a prepared definition object, not a database row. It validates property types, normalizes the slug and memory seed filenames, and exposes getters (`get_slug()`, `get_label()`, `get_description()`, `get_memory_seeds()`, `get_owner_resolver()`, `get_default_config()`, `get_meta()`).
 
 Invalid property types reject the definition with a `_doing_it_wrong()` notice when WordPress provides that function. Unknown properties are ignored with the same notice style so future registry fields do not accidentally become materializer inputs.
 
-## Lifecycle compared to Abilities API
+## Registration Lifecycle
 
-Agents API deliberately follows the Abilities API vocabulary without copying every lifecycle constraint yet:
-
-| Surface | Abilities API | Agents API in Data Machine |
-|---|---|---|
-| Init action | `wp_abilities_api_init` | `wp_agents_api_init` |
-| Registry initialization | Lazy singleton after `init` | Lazy singleton on first registry read or registration |
-| Registration timing | Must happen during `wp_abilities_api_init` | Should happen during `wp_agents_api_init`, but direct registration remains supported |
-| Duplicate registration | Rejected with `_doing_it_wrong()` | Last registration wins |
-| Lookup helpers | `wp_get_ability()`, `wp_get_abilities()`, `wp_has_ability()`, `wp_unregister_ability()` | `wp_get_agent()`, `wp_get_agents()`, `wp_has_agent()`, `wp_unregister_agent()` |
-
-Data Machine's materializer reads the registry from `init` priority 15, and direct registration before that lazy collection path remains supported. New code should use `wp_agents_api_init` so declarations participate in the documented lifecycle.
+The Agents API registry initializes lazily on its first read or registration. Data Machine's materializer reads it from `init` priority 15. Extensions register definitions during `wp_agents_api_init`; direct registration before materialization is also supported.
 
 ## Reconciliation
 

@@ -2,25 +2,7 @@
 
 Data Machine's public service layer is the WordPress Abilities API. REST controllers, WP-CLI commands, chat tools, system tasks, and extension integrations call `datamachine/*` abilities instead of reaching into manager classes or controller internals.
 
-The legacy Services directory has been removed. Current business operations live in focused ability classes under `inc/Abilities/`, with lower-level repositories and core classes kept as implementation details behind those abilities.
-
-## Migration Status
-
-The migration from OOP service managers to WordPress Abilities API is complete:
-
-| Former Service | Replacement | Location |
-|----------------|-------------|----------|
-| `FlowManager` | Flow ability classes | `inc/Abilities/Flow/` |
-| `PipelineManager` | Pipeline ability classes | `inc/Abilities/Pipeline/` |
-| `PipelineStepManager` | `PipelineStepAbilities` | `inc/Abilities/PipelineStepAbilities.php` |
-| `FlowStepManager` | Flow step ability classes | `inc/Abilities/FlowStep/` |
-| `JobManager` | Job ability classes | `inc/Abilities/Job/` |
-| `ProcessedItemsManager` | `ProcessedItemsAbilities` | `inc/Abilities/ProcessedItemsAbilities.php` |
-| `HandlerService` | `HandlerAbilities` | `inc/Abilities/HandlerAbilities.php` |
-| `StepTypeService` | `StepTypeAbilities` | `inc/Abilities/StepTypeAbilities.php` |
-| `LogsManager` | `LogAbilities` | `inc/Abilities/LogAbilities.php` |
-| `CacheManager` | Ability-level/cache-owner invalidation methods | Per-ability class or owning core class |
-| `AuthProviderService` | `AuthAbilities` | `inc/Abilities/AuthAbilities.php` |
+Current business operations live in focused ability classes under `inc/Abilities/`, with lower-level repositories and core classes kept as implementation details behind those abilities.
 
 ## Abilities Overview
 
