@@ -2,11 +2,12 @@
 /**
  * Command Registry
  *
- * Single source of truth mapping `wp datamachine ...` command strings to their
- * implementing command classes. The WP-CLI bootstrap calls
- * WP_CLI::add_command for each entry. Generated agent guidance advertises a
- * bounded set of routing entrypoints and tests those roots against this map;
- * live `--help` remains authoritative for the complete command surface.
+ * Single source of truth declaring canonical `wp datamachine ...` commands,
+ * their compatibility aliases, and implementing command classes. The WP-CLI
+ * bootstrap calls WP_CLI::add_command for each flattened map entry. Generated
+ * agent guidance advertises a bounded set of routing entrypoints and tests
+ * those roots against this map; live `--help` remains authoritative for the
+ * complete command surface.
  *
  * This keeps command registration centralized while Data Machine itself owns
  * the concise routing guidance previously narrated by a downstream plugin
@@ -22,73 +23,114 @@ defined( 'ABSPATH' ) || exit;
 class CommandRegistry {
 
 	/**
-	 * Map of command string => fully-qualified command class.
+	 * Canonical command declarations.
 	 *
-	 * Keys are the exact strings passed to WP_CLI::add_command (the command
-	 * namespace, e.g. "datamachine memory" or "datamachine step-types").
-	 * Order here determines registration order.
+	 * Keys are canonical command strings. Compatibility spellings are declared
+	 * beside the implementation rather than as independent commands.
 	 *
-	 * Singular/plural aliases that resolve to the same class are intentionally
-	 * included so `WP_CLI::add_command` registers every accepted spelling. The
-	 * AGENTS.md introspection helpers de-duplicate by class when grouping.
+	 * @return array<string, array{class: class-string, aliases?: string[]}>
+	 */
+	public static function declarations(): array {
+		return array(
+			'datamachine settings'         => array(
+				'class'   => Commands\SettingsCommand::class,
+				'aliases' => array( 'datamachine setting' ),
+			),
+			'datamachine flows'            => array(
+				'class'   => Commands\Flows\FlowsCommand::class,
+				'aliases' => array( 'datamachine flow' ),
+			),
+			'datamachine alt-text'         => array( 'class' => Commands\AltTextCommand::class ),
+			'datamachine jobs'             => array(
+				'class'   => Commands\JobsCommand::class,
+				'aliases' => array( 'datamachine job' ),
+			),
+			'datamachine cycle'            => array(
+				'class'   => Commands\CycleCommand::class,
+				'aliases' => array( 'datamachine cycles' ),
+			),
+			'datamachine drain'            => array( 'class' => Commands\DrainCommand::class ),
+			'datamachine worker'           => array( 'class' => Commands\WorkerCommand::class ),
+			'datamachine ai'               => array( 'class' => Commands\AICommand::class ),
+			'datamachine pipelines'        => array(
+				'class'   => Commands\PipelinesCommand::class,
+				'aliases' => array( 'datamachine pipeline' ),
+			),
+			'datamachine posts'            => array(
+				'class'   => Commands\PostsCommand::class,
+				'aliases' => array( 'datamachine post' ),
+			),
+			'datamachine logs'             => array(
+				'class'   => Commands\LogsCommand::class,
+				'aliases' => array( 'datamachine log' ),
+			),
+			'datamachine agents'           => array(
+				'class'   => Commands\AgentsCommand::class,
+				'aliases' => array( 'datamachine agent' ),
+			),
+			'datamachine pending-actions'  => array(
+				'class'   => Commands\PendingActionsCommand::class,
+				'aliases' => array( 'datamachine pending-action' ),
+			),
+			'datamachine memory'           => array( 'class' => Commands\MemoryCommand::class ),
+			'datamachine batch'            => array( 'class' => Commands\BatchCommand::class ),
+			'datamachine image'            => array( 'class' => Commands\ImageCommand::class ),
+			'datamachine auth'             => array( 'class' => Commands\AuthCommand::class ),
+			'datamachine email'            => array( 'class' => Commands\EmailCommand::class ),
+			'datamachine system'           => array( 'class' => Commands\SystemCommand::class ),
+			'datamachine handlers'         => array(
+				'class'   => Commands\HandlersCommand::class,
+				'aliases' => array( 'datamachine handler' ),
+			),
+			'datamachine taxonomy'         => array( 'class' => Commands\TaxonomyCommand::class ),
+			'datamachine step-types'       => array(
+				'class'   => Commands\StepTypesCommand::class,
+				'aliases' => array( 'datamachine step-type' ),
+			),
+			'datamachine processed-items'  => array(
+				'class'   => Commands\ProcessedItemsCommand::class,
+				'aliases' => array( 'datamachine processed-item' ),
+			),
+			'datamachine tracked-items'    => array(
+				'class'   => Commands\TrackedItemsCommand::class,
+				'aliases' => array( 'datamachine tracked-item' ),
+			),
+			'datamachine retention'        => array( 'class' => Commands\RetentionCommand::class ),
+			'datamachine test'             => array(
+				'class'   => Commands\TestCommand::class,
+				'aliases' => array( 'datamachine fetch test' ),
+			),
+			'datamachine external'         => array( 'class' => Commands\ExternalCommand::class ),
+			'datamachine links'            => array(
+				'class'   => Commands\LinksCommand::class,
+				'aliases' => array( 'datamachine link' ),
+			),
+			'datamachine blocks'           => array(
+				'class'   => Commands\BlocksCommand::class,
+				'aliases' => array( 'datamachine block' ),
+			),
+			'datamachine meta-description' => array( 'class' => Commands\MetaDescriptionCommand::class ),
+			'datamachine indexnow'         => array( 'class' => Commands\IndexNowCommand::class ),
+			'datamachine chat'             => array( 'class' => Commands\ChatCommand::class ),
+		);
+	}
+
+	/**
+	 * Map every accepted command string to its implementation.
 	 *
 	 * @return array<string, class-string>
 	 */
 	public static function map(): array {
-		return array(
-			// Primary commands.
-			'datamachine settings'         => Commands\SettingsCommand::class,
-			'datamachine flows'            => Commands\Flows\FlowsCommand::class,
-			'datamachine alt-text'         => Commands\AltTextCommand::class,
-			'datamachine jobs'             => Commands\JobsCommand::class,
-			'datamachine cycle'            => Commands\CycleCommand::class,
-			'datamachine cycles'           => Commands\CycleCommand::class,
-			'datamachine drain'            => Commands\DrainCommand::class,
-			'datamachine worker'           => Commands\WorkerCommand::class,
-			'datamachine ai'               => Commands\AICommand::class,
-			'datamachine pipelines'        => Commands\PipelinesCommand::class,
-			'datamachine posts'            => Commands\PostsCommand::class,
-			'datamachine logs'             => Commands\LogsCommand::class,
-			'datamachine agent'            => Commands\AgentsCommand::class,
-			'datamachine agents'           => Commands\AgentsCommand::class,
-			'datamachine pending-actions'  => Commands\PendingActionsCommand::class,
-			'datamachine pending-action'   => Commands\PendingActionsCommand::class,
+		$map = array();
 
-			// Canonical home for agent memory-file operations.
-			'datamachine memory'           => Commands\MemoryCommand::class,
-			'datamachine batch'            => Commands\BatchCommand::class,
-			'datamachine image'            => Commands\ImageCommand::class,
-			'datamachine auth'             => Commands\AuthCommand::class,
-			'datamachine email'            => Commands\EmailCommand::class,
-			'datamachine system'           => Commands\SystemCommand::class,
-			'datamachine handlers'         => Commands\HandlersCommand::class,
-			'datamachine taxonomy'         => Commands\TaxonomyCommand::class,
-			'datamachine step-types'       => Commands\StepTypesCommand::class,
-			'datamachine processed-items'  => Commands\ProcessedItemsCommand::class,
-			'datamachine tracked-items'    => Commands\TrackedItemsCommand::class,
-			'datamachine retention'        => Commands\RetentionCommand::class,
-			'datamachine test'             => Commands\TestCommand::class,
-			'datamachine fetch test'       => Commands\TestCommand::class,
-			'datamachine external'         => Commands\ExternalCommand::class,
+		foreach ( self::declarations() as $command => $declaration ) {
+			$map[ $command ] = $declaration['class'];
 
-			// Aliases for AI agent compatibility (singular/plural variants).
-			'datamachine setting'          => Commands\SettingsCommand::class,
-			'datamachine flow'             => Commands\Flows\FlowsCommand::class,
-			'datamachine job'              => Commands\JobsCommand::class,
-			'datamachine pipeline'         => Commands\PipelinesCommand::class,
-			'datamachine post'             => Commands\PostsCommand::class,
-			'datamachine log'              => Commands\LogsCommand::class,
-			'datamachine links'            => Commands\LinksCommand::class,
-			'datamachine link'             => Commands\LinksCommand::class,
-			'datamachine blocks'           => Commands\BlocksCommand::class,
-			'datamachine block'            => Commands\BlocksCommand::class,
-			'datamachine meta-description' => Commands\MetaDescriptionCommand::class,
-			'datamachine indexnow'         => Commands\IndexNowCommand::class,
-			'datamachine chat'             => Commands\ChatCommand::class,
-			'datamachine handler'          => Commands\HandlersCommand::class,
-			'datamachine step-type'        => Commands\StepTypesCommand::class,
-			'datamachine processed-item'   => Commands\ProcessedItemsCommand::class,
-			'datamachine tracked-item'     => Commands\TrackedItemsCommand::class,
-		);
+			foreach ( $declaration['aliases'] ?? array() as $alias ) {
+				$map[ $alias ] = $declaration['class'];
+			}
+		}
+
+		return $map;
 	}
 }
