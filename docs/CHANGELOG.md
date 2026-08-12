@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.172.21] - 2026-08-12
+
+### Fixed
+- make scheduler insert failures recoverable
+
 ## [0.172.19] - 2026-08-12
 
 ### Changed
