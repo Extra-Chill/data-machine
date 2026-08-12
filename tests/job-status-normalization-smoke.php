@@ -45,7 +45,8 @@ class wpdb {
 	}
 
 	public function get_var( $query ) {
-		$canonical = array_slice( $query[1], 1 );
+		$args      = $query[1];
+		$canonical = 1 === count( $args ) && is_array( $args[0] ) ? array_slice( $args[0], 1 ) : array_slice( $args, 1 );
 		return count( array_filter( $this->rows, static fn( array $row ): bool => ! in_array( $row['status'], $canonical, true ) ) );
 	}
 

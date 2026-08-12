@@ -311,7 +311,7 @@ class JobStatus {
 	 */
 	private static function parseReason( string $status ): ?string {
 		if ( str_contains( $status, ' - ' ) ) {
-			$parts = explode( ' - ', $status, 2 );
+			$parts  = explode( ' - ', $status, 2 );
 			$reason = trim( $parts[1] ?? '' );
 			return '' === $reason ? null : $reason;
 		}

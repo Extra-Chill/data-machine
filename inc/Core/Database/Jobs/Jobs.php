@@ -540,7 +540,7 @@ class Jobs extends BaseRepository {
 			$result['reason'] = 'action_receipt_missing';
 			return $result;
 		}
-		$engine                              = is_array( $job['engine_data'] ?? null ) ? $job['engine_data'] : array();
+		$engine = is_array( $job['engine_data'] ?? null ) ? $job['engine_data'] : array();
 		unset( $engine['job_status_reason'] );
 		$engine['direct_operation_recovery'] = array(
 			'schema'                        => 'datamachine.direct-operation-recovery.v1',
@@ -1066,7 +1066,7 @@ class Jobs extends BaseRepository {
 				WHEN j.status LIKE 'waiting - %' OR j.status LIKE 'waiting:%' THEN 'waiting'
 				WHEN j.status LIKE 'pending - %' OR j.status LIKE 'pending:%' THEN 'pending'
 				ELSE j.status END";
-		$query = $this->wpdb->prepare(
+		$query             = $this->wpdb->prepare(
 			"SELECT {$status_expression} AS status,
 				COUNT(*) AS count
 			 FROM %i j
@@ -1790,7 +1790,7 @@ class Jobs extends BaseRepository {
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
-		$values    = array();
+		$values     = array();
 		$status_sql = $this->status_match_sql( $match, $values );
 		$args       = array_merge( array( "DELETE FROM %i WHERE {$status_sql} AND {$age_column} < %s", $this->table_name ), $values, array( $cutoff_datetime ) );
 		$result     = $this->wpdb->query( $this->wpdb->prepare( ...$args ) );
@@ -2484,7 +2484,7 @@ class Jobs extends BaseRepository {
 		}
 
 		$current_status = is_string( $job['status'] ?? null ) ? $job['status'] : '';
-		$status = $job_status->getBaseStatus();
+		$status         = $job_status->getBaseStatus();
 		$current_engine = is_array( $job['engine_data'] ?? null ) ? $job['engine_data'] : array();
 		$current_reason = is_string( $current_engine['job_status_reason'] ?? null ) ? $current_engine['job_status_reason'] : null;
 		if ( $current_status === $status && $current_reason === $job_status->getReason() ) {

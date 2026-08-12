@@ -769,8 +769,8 @@ class ProcessedItemsCommand extends BaseCommand {
 		$before      = $assoc_args['before'] ?? null;
 
 		$parsed_status = JobStatus::fromString( $job_status );
-		$where_parts  = array( 'pi.status = %s' );
-		$values       = array( $processed_table, $jobs_table, ProcessedItems::STATUS_PROCESSED );
+		$where_parts   = array( 'pi.status = %s' );
+		$values        = array( $processed_table, $jobs_table, ProcessedItems::STATUS_PROCESSED );
 		if ( $parsed_status->hasReason() ) {
 			$where_parts[] = '(j.status = %s OR (j.status = %s AND j.engine_data LIKE %s))';
 			$values[]      = $job_status;

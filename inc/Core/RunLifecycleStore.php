@@ -229,14 +229,14 @@ class RunLifecycleStore {
 
 		$job_status = JobStatus::fromString( $status );
 		$status     = $job_status->getBaseStatus();
-		$result = $this->mutate_run(
+		$result     = $this->mutate_run(
 			$job_id,
 			function ( array $meta ) use ( $status, $completed_at, $job_status ): array {
 				if ( ( $meta['status'] ?? null ) === $status && ( ! JobStatus::isStatusFinal( $status ) || ! empty( $meta['completed_at'] ) ) ) {
 					return $meta;
 				}
-				$terminal_time      = JobStatus::isStatusFinal( $status ) && ! empty( $completed_at ) ? $completed_at : $this->now();
-				$meta['status']     = $status;
+				$terminal_time  = JobStatus::isStatusFinal( $status ) && ! empty( $completed_at ) ? $completed_at : $this->now();
+				$meta['status'] = $status;
 				if ( $job_status->hasReason() ) {
 					$meta['status_reason'] = $job_status->getReason();
 				} else {
@@ -268,7 +268,7 @@ class RunLifecycleStore {
 		return $this->mutate_run(
 			$job_id,
 			function ( array $meta ) use ( $job_status, $timestamp_key, $context ): array {
-				$meta['status']          = $job_status->getBaseStatus();
+				$meta['status'] = $job_status->getBaseStatus();
 				if ( $job_status->hasReason() ) {
 					$meta['status_reason'] = $job_status->getReason();
 				} else {

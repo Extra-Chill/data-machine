@@ -60,7 +60,7 @@ class JobStatusMigration {
 			$status           = (string) $row['status'];
 			$state['cursor']  = max( (int) $state['cursor'], $job_id );
 			$state['scanned'] = (int) $state['scanned'] + 1;
-			$parsed            = JobStatus::fromString( $status );
+			$parsed           = JobStatus::fromString( $status );
 
 			if ( in_array( $status, JobStatus::ALL_STATUSES, true ) ) {
 				continue;
@@ -145,7 +145,15 @@ class JobStatusMigration {
 	private function countNoncanonicalRows(): int {
 		$query = $this->wpdb->prepare(
 			'SELECT COUNT(*) FROM %i WHERE status NOT IN (%s, %s, %s, %s, %s, %s, %s, %s)',
-			...array_merge( array( $this->table ), JobStatus::ALL_STATUSES )
+			$this->table,
+			JobStatus::PENDING,
+			JobStatus::PROCESSING,
+			JobStatus::WAITING,
+			JobStatus::COMPLETED,
+			JobStatus::FAILED,
+			JobStatus::CANCELLED,
+			JobStatus::COMPLETED_NO_ITEMS,
+			JobStatus::AGENT_SKIPPED
 		);
 		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- The query is prepared immediately above from fixed placeholders and canonical constants.
 		return (int) $this->wpdb->get_var( $query );
