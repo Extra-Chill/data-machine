@@ -29,6 +29,7 @@ class ClaimIndexMigration {
 	private const MINIMUM_FREE_BYTES      = 1073741824;
 	private const ESTIMATED_BYTES_PER_ROW = 512;
 	private const METADATA_LOCK_TIMEOUT   = 10;
+	private const CLAIM_BATCH_SIZE        = 50;
 
 	/** @var \wpdb */
 	private $wpdb;
@@ -293,7 +294,7 @@ class ClaimIndexMigration {
 	private function inspectClaimPlan( string $table, string $matching_index ): array {
 		// Match Action Scheduler's default claim predicate and ordering without acquiring locks.
 		$query = $this->wpdb->prepare(
-			'EXPLAIN SELECT action_id FROM %i WHERE claim_id = 0 AND scheduled_date_gmt <= UTC_TIMESTAMP() AND status = %s ORDER BY priority ASC, attempts ASC, scheduled_date_gmt ASC, action_id ASC LIMIT 50',
+			'EXPLAIN SELECT action_id FROM %i WHERE claim_id = 0 AND scheduled_date_gmt <= UTC_TIMESTAMP() AND status = %s ORDER BY priority ASC, attempts ASC, scheduled_date_gmt ASC, action_id ASC LIMIT ' . self::CLAIM_BATCH_SIZE,
 			$table,
 			'pending'
 		);
@@ -314,16 +315,19 @@ class ClaimIndexMigration {
 		$rows      = max( 0, (int) ( $plan['rows'] ?? $plan['Rows'] ?? 0 ) );
 		$extra     = (string) ( $plan['Extra'] ?? $plan['extra'] ?? '' );
 		$filesorts = str_contains( strtolower( $extra ), 'filesort' );
-		$ready     = $matching_index === $key && ! $filesorts;
+		$ordered   = $matching_index === $key && ! $filesorts;
+		$ready     = $ordered || ( $rows > 0 && $rows <= self::CLAIM_BATCH_SIZE );
 
 		return array(
 			'ready'   => $ready,
 			'key'     => $key,
 			'rows'    => $rows,
 			'extra'   => $extra,
-			'message' => $ready
+			'message' => $ordered
 				? sprintf( 'Claim plan uses %s without filesort; LIMIT 50 can stop the ordered index walk.', $matching_index )
-				: sprintf( 'Claim plan must use %s without filesort; optimizer chose %s across an estimated %s rows (%s).', $matching_index, $key ? $key : 'no index', number_format( $rows ), $extra ? $extra : 'no Extra detail' ),
+				: ( $ready
+					? sprintf( 'Claim plan uses %s across an estimated %s rows (%s); the complete candidate set fits within the LIMIT 50 claim batch.', $key ? $key : 'no index', number_format( $rows ), $extra ? $extra : 'no Extra detail' )
+					: sprintf( 'Claim plan must use %s without filesort or estimate at most 50 candidate rows; optimizer chose %s across an estimated %s rows (%s).', $matching_index, $key ? $key : 'no index', number_format( $rows ), $extra ? $extra : 'no Extra detail' ) ),
 		);
 	}
 

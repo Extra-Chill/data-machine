@@ -232,6 +232,26 @@ $ready_again = $migration->apply( 2 * 1024 * 1024 * 1024 );
 $assert( $ready_again['ready'] && ! $ready_again['applied'], 're-running apply is an idempotent no-op when ready' );
 $assert( 2 === count( $wpdb->queries ), 'idempotent apply does not execute DDL again' );
 
+$tiny_wpdb             = new ClaimIndexMigrationSmokeWpdb();
+$tiny_wpdb->indexes    = claim_index_rows( ClaimIndexMigration::INDEX_NAME, ClaimIndexMigration::REQUIRED_COLUMNS );
+$tiny_wpdb->claim_plan = array(
+	'key'   => 'status_scheduled_date_gmt',
+	'rows'  => 1,
+	'Extra' => 'Using index condition; Using where; Using filesort',
+);
+$tiny = ( new ClaimIndexMigrationForSmoke( $tiny_wpdb, static fn () => false, 'remote-db.example' ) )->inspect();
+$assert( $tiny['ready'] && 'ready' === $tiny['status'], 'an exact index remains ready when a one-row due set makes an alternate filesort plan cheaper' );
+$assert( str_contains( $tiny['claim_plan']['message'], 'complete candidate set fits within the LIMIT 50 claim batch' ), 'low-volume readiness reports the bounded evidence used' );
+
+$incomplete_plan_wpdb             = new ClaimIndexMigrationSmokeWpdb();
+$incomplete_plan_wpdb->indexes    = claim_index_rows( ClaimIndexMigration::INDEX_NAME, ClaimIndexMigration::REQUIRED_COLUMNS );
+$incomplete_plan_wpdb->claim_plan = array(
+	'key'   => 'status_scheduled_date_gmt',
+	'Extra' => 'Using where; Using filesort',
+);
+$incomplete_plan = ( new ClaimIndexMigrationForSmoke( $incomplete_plan_wpdb, static fn () => false, 'remote-db.example' ) )->inspect();
+$assert( ! $incomplete_plan['ready'], 'an alternate plan without a positive row estimate fails closed' );
+
 $scale_wpdb             = new ClaimIndexMigrationSmokeWpdb();
 $scale_wpdb->indexes    = claim_index_rows( ClaimIndexMigration::INDEX_NAME, ClaimIndexMigration::REQUIRED_COLUMNS );
 $scale_wpdb->claim_plan = array(
@@ -244,10 +264,17 @@ $assert( ! $scale['ready'] && ! $scale['can_apply'], 'a covering index is not de
 $assert( 3075048 === $scale['claim_plan']['rows'], 'readiness preserves Events-scale optimizer row evidence' );
 $assert( str_contains( $scale['blockers'][0], '3,075,048 rows' ), 'blocked readiness explains the unbounded optimizer estimate' );
 
+$wrong_shape_wpdb             = new ClaimIndexMigrationSmokeWpdb();
+$wrong_shape_wpdb->indexes    = claim_index_rows( 'wrong_order', $wrong_columns );
+$wrong_shape_wpdb->claim_plan = $tiny_wpdb->claim_plan;
+$wrong_shape                  = ( new ClaimIndexMigrationForSmoke( $wrong_shape_wpdb, static fn () => false, 'remote-db.example' ) )->inspect( 2 * 1024 * 1024 * 1024 );
+$assert( ! $wrong_shape['ready'] && $wrong_shape['can_apply'], 'a tiny due set does not bypass exact physical index shape validation' );
+$assert( null === $wrong_shape['claim_plan'], 'plan allowance is not evaluated without a usable covering index' );
+
 $collision_wpdb          = new ClaimIndexMigrationSmokeWpdb();
 $collision_wpdb->indexes = claim_index_rows( ClaimIndexMigration::INDEX_NAME, array( 'claim_id', 'status', 'priority' ) );
 $collision               = ( new ClaimIndexMigrationForSmoke( $collision_wpdb, static fn () => false, 'remote-db.example' ) )->inspect( 2 * 1024 * 1024 * 1024 );
-$assert( $collision['name_collision'] && ! $collision['can_apply'], 'same-name malformed index is never dropped automatically' );
+$assert( $collision['name_collision'] && ! $collision['can_apply'] && ! $collision['ready'], 'same-name malformed index is never accepted or dropped automatically' );
 
 $unsupported_wpdb          = new ClaimIndexMigrationSmokeWpdb();
 $unsupported_wpdb->version = '5.5.62';
