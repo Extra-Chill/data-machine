@@ -9,6 +9,10 @@
 
 require_once __DIR__ . '/bootstrap-unit.php';
 
+if ( ! defined( 'DAY_IN_SECONDS' ) ) {
+	define( 'DAY_IN_SECONDS', 86400 );
+}
+
 if ( ! function_exists( 'wp_json_encode' ) ) {
 	function wp_json_encode( $data, int $flags = 0, int $depth = 512 ) {
 		return json_encode( $data, $flags, $depth );
@@ -56,6 +60,32 @@ if ( ! function_exists( 'trailingslashit' ) ) {
 if ( ! function_exists( 'wp_mkdir_p' ) ) {
 	function wp_mkdir_p( $target ): bool {
 		return is_dir( $target ) || mkdir( $target, 0775, true );
+	}
+}
+
+if ( ! function_exists( 'wp_delete_file' ) ) {
+	function wp_delete_file( string $file ): bool {
+		return is_file( $file ) && unlink( $file );
+	}
+}
+
+if ( ! function_exists( 'do_action' ) ) {
+	function do_action( string $hook, ...$args ): void {
+		unset( $hook, $args );
+	}
+}
+
+if ( ! class_exists( 'WP_Filesystem_Base' ) ) {
+	class WP_Filesystem_Base {
+		public function delete( string $file ): bool { return is_file( $file ) && unlink( $file ); }
+		public function rmdir( string $directory ): bool { return is_dir( $directory ) && rmdir( $directory ); }
+	}
+}
+
+if ( ! function_exists( 'WP_Filesystem' ) ) {
+	function WP_Filesystem(): bool {
+		$GLOBALS['wp_filesystem'] = new WP_Filesystem_Base();
+		return true;
 	}
 }
 
@@ -246,24 +276,30 @@ foreach ( glob( $leftover_temp_glob ) ?: array() as $leftover_temp_path ) {
 	@unlink( $leftover_temp_path );
 }
 file_put_contents( $tool_trace_path, "stale\n" );
+chmod( $artifact_job_dir, 0700 );
+$previous_umask = umask( 0077 );
 
 $file_result = $invoke( $artifacts, 'write_artifact_file', array( 123, 'tool_trace', $tool_trace_artifact ) );
+umask( $previous_umask );
+$assert_true( true === ( $file_result['success'] ?? false ), 'artifact writer succeeds with restrictive producer umask: ' . ( $file_result['error'] ?? 'unknown error' ) );
 $assert_true( true === ( $file_result['success'] ?? false ), 'tool trace artifact file write succeeds' );
-$assert_true( is_file( $file_result['file']['path'] ?? '' ), 'tool trace artifact file exists on disk' );
+$assert_true( is_file( $tool_trace_path ), 'tool trace artifact file exists on disk' );
 $assert_true( 'datamachine-artifacts/jobs/123/tool-trace.json' === ( $file_result['file']['relative_path'] ?? '' ), 'artifact file has stable relative path' );
 $assert_true( $tool_trace_artifact['sha256'] === ( $file_result['file']['payload_sha256'] ?? '' ), 'artifact file references payload hash' );
-$assert_true( hash_file( 'sha256', $file_result['file']['path'] ) === ( $file_result['file']['sha256'] ?? '' ), 'artifact file hash matches written bytes' );
+$assert_true( hash_file( 'sha256', $tool_trace_path ) === ( $file_result['file']['sha256'] ?? '' ), 'artifact file hash matches written bytes' );
 $assert_true( "stale\n" !== file_get_contents( $tool_trace_path ), 'artifact file atomically replaces stale final contents' );
+$assert_true( ( fileperms( $tool_trace_path ) & 0040 ) === 0040, 'artifact file is group-readable after restrictive producer umask' );
+$assert_true( ( fileperms( $artifact_job_dir ) & 0030 ) === 0030, 'artifact directory is group-accessible after restrictive producer umask' );
 
 $second_file_result = $invoke( $artifacts, 'write_artifact_file', array( 123, 'tool_trace', $tool_trace_artifact ) );
 $assert_true( true === ( $second_file_result['success'] ?? false ), 'repeat tool trace artifact write succeeds' );
-$assert_true( $file_result['file']['path'] === ( $second_file_result['file']['path'] ?? '' ), 'repeat artifact write targets same stable path' );
+$assert_true( $file_result['file']['relative_path'] === ( $second_file_result['file']['relative_path'] ?? '' ), 'repeat artifact write targets same stable path' );
 $assert_true( $file_result['file']['sha256'] === ( $second_file_result['file']['sha256'] ?? '' ), 'repeat artifact write is byte-idempotent' );
 $assert_true( array() === ( glob( $leftover_temp_glob ) ?: array() ), 'atomic artifact write leaves no temp files behind' );
 
 $transcript_file_result = $invoke( $artifacts, 'write_artifact_file', array( 123, 'transcript', $transcript_artifact ) );
 $assert_true( true === ( $transcript_file_result['success'] ?? false ), 'transcript artifact file write succeeds' );
-$assert_true( is_file( $transcript_file_result['file']['path'] ?? '' ), 'transcript artifact file exists on disk' );
+$assert_true( is_file( trailingslashit( $artifact_job_dir ) . 'transcript.json' ), 'transcript artifact file exists on disk' );
 $assert_true( 'datamachine-artifacts/jobs/123/transcript.json' === ( $transcript_file_result['file']['relative_path'] ?? '' ), 'transcript artifact file has stable relative path' );
 $assert_true( $transcript_artifact['sha256'] === ( $transcript_file_result['file']['payload_sha256'] ?? '' ), 'transcript artifact file references payload hash' );
 
@@ -282,6 +318,17 @@ $artifact_files = $invoke(
 $assert_true( $transcript_file_result['file']['relative_path'] === ( $artifact_files['transcript']['relative_path'] ?? '' ), 'engine artifact file metadata round-trips transcript relative path' );
 $assert_true( $file_result['file']['relative_path'] === ( $artifact_files['tool_trace']['relative_path'] ?? '' ), 'engine artifact file metadata round-trips relative path' );
 $assert_true( $file_result['file']['sha256'] === ( $artifact_files['tool_trace']['sha256'] ?? '' ), 'engine artifact file metadata round-trips file hash' );
+
+require_once __DIR__ . '/../inc/Core/FilesRepository/DirectoryManager.php';
+require_once __DIR__ . '/../inc/Core/FilesRepository/FilesystemHelper.php';
+require_once __DIR__ . '/../inc/Core/FilesRepository/FileCleanup.php';
+$legacy_path = trailingslashit( $artifact_job_dir ) . 'legacy.json';
+file_put_contents( $legacy_path, wp_json_encode( array( 'retention_scope' => 'job_artifacts' ) ) . "\n" );
+chmod( $legacy_path, 0600 );
+touch( $legacy_path, time() - ( 8 * DAY_IN_SECONDS ) );
+$cleanup = new \DataMachine\Core\FilesRepository\FileCleanup();
+$assert_true( 1 === $cleanup->count_old_job_artifacts( 'job_artifacts', 7 ), 'cleanup can repair legacy private artifact modes before reading' );
+$assert_true( 1 === $cleanup->cleanup_old_job_artifacts( 'job_artifacts', 7 ), 'cleanup deletes repaired legacy artifacts across runtime modes' );
 
 if ( $failures ) {
 	echo "FAILED: " . count( $failures ) . " hashable artifact assertions failed.\n";

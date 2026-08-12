@@ -40,6 +40,12 @@ class FilesystemHelper {
 	 */
 	const AGENT_DIR_PERMISSIONS = 0775;
 
+	/** Group-readable permissions for shared runtime artifact files. */
+	const SHARED_FILE_PERMISSIONS = 0664;
+
+	/** Group-accessible permissions for shared runtime artifact directories. */
+	const SHARED_DIR_PERMISSIONS = 0775;
+
 	/**
 	 * Cached initialization result
 	 *
@@ -99,14 +105,14 @@ class FilesystemHelper {
 	 * @param string $filepath Absolute path to the file.
 	 * @return bool True if the file is (or was made) group-writable, false otherwise.
 	 */
-	public static function make_group_writable( string $filepath ): bool {
+	public static function make_group_writable( string $filepath, int $permissions = self::AGENT_FILE_PERMISSIONS ): bool {
 		if ( ! file_exists( $filepath ) ) {
 			return false;
 		}
 
 		// Already group-writable (commonly via setgid dirs) — nothing to do.
 		$perms = fileperms( $filepath );
-		if ( false !== $perms && ( $perms & 0020 ) === 0020 ) {
+		if ( false !== $perms && ( $perms & 0060 ) === 0060 ) {
 			return true;
 		}
 
@@ -121,7 +127,34 @@ class FilesystemHelper {
 
 		// Suppress any residual warning — a failed chmod is non-fatal here.
 		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_chmod, WordPress.PHP.NoSilencedErrors.Discouraged
-		return @chmod( $filepath, self::AGENT_FILE_PERMISSIONS );
+		return @chmod( $filepath, $permissions );
+	}
+
+	/**
+	 * Make a shared directory accessible to both runtime users.
+	 *
+	 * @param string $directory Absolute directory path.
+	 * @return bool True if the directory is (or was made) group-accessible.
+	 */
+	public static function make_directory_group_accessible( string $directory ): bool {
+		if ( ! is_dir( $directory ) ) {
+			return false;
+		}
+
+		$perms = fileperms( $directory );
+		if ( false !== $perms && ( $perms & 0030 ) === 0030 ) {
+			return true;
+		}
+
+		if ( function_exists( 'posix_getuid' ) ) {
+			$owner = fileowner( $directory );
+			if ( false !== $owner && posix_getuid() !== $owner ) {
+				return false;
+			}
+		}
+
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_chmod, WordPress.PHP.NoSilencedErrors.Discouraged
+		return @chmod( $directory, self::SHARED_DIR_PERMISSIONS );
 	}
 
 	/**
