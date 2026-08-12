@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.55.1] - 2026-08-12
+
+### Fixed
+- bound duplicate candidate date queries
+
 ## [0.55.0] - 2026-08-10
 
 ### Added
