@@ -22,7 +22,6 @@ use DataMachine\Cli\UserResolver;
 use DataMachine\Abilities\Job\DeleteJobsAbility;
 use DataMachine\Abilities\Job\FailJobAbility;
 use DataMachine\Abilities\Job\GetJobsAbility;
-use DataMachine\Abilities\Job\JobsSummaryAbility;
 use DataMachine\Abilities\Job\RecoverStuckJobsAbility;
 use DataMachine\Abilities\Job\RetryJobAbility;
 use DataMachine\Abilities\Engine\PipelineBatchScheduler;
@@ -2376,14 +2375,7 @@ class JobsCommand extends BaseCommand {
 			$input['since'] = gmdate( 'Y-m-d H:i:s', $timestamp );
 		}
 
-		$result = ( new JobsSummaryAbility() )->execute( $input );
-
-		if ( ! $result['success'] ) {
-			WP_CLI::error( $result['error'] ?? 'Unknown error occurred' );
-			return;
-		}
-
-		$summary = $result['summary'] ?? array();
+		$summary = ( new Jobs() )->get_jobs_summary( $input );
 
 		if ( empty( $summary ) ) {
 			WP_CLI::warning( 'No job summary data available.' );
