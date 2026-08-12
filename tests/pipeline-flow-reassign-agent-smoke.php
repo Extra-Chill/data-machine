@@ -161,8 +161,9 @@ smoke_assert(
 // --agent wired into updatePipeline
 smoke_assert(
 	str_contains( $pipelines_cmd_src, "AgentResolver::resolve( \$assoc_args )" )
-	&& str_contains( $pipelines_cmd_src, "update_pipeline( \$pipeline_id, array( 'agent_id' => \$new_agent_id ) )" ),
-	'PipelinesCommand::updatePipeline() handles --agent flag',
+	&& str_contains( $pipelines_cmd_src, "wp_get_ability( 'datamachine/update-pipeline' )" )
+	&& str_contains( $pipelines_cmd_src, "'agent_id'    => \$new_agent_id" ),
+	'PipelinesCommand::updatePipeline() delegates --agent through the registered update ability',
 	$failures,
 	$passes
 );
@@ -233,8 +234,10 @@ smoke_assert(
 
 // --agent wired into updateFlow
 smoke_assert(
-	str_contains( $flows_cmd_src, "\$has_agent      = isset( \$assoc_args['agent'] )" ),
-	'FlowsCommand::updateFlow() checks --agent flag',
+	str_contains( $flows_cmd_src, "\$has_agent    = isset( \$assoc_args['agent'] )" )
+	&& str_contains( $flows_cmd_src, "wp_get_ability( 'datamachine/update-flow' )" )
+	&& str_contains( $flows_cmd_src, "'agent_id' => \$new_agent_id" ),
+	'FlowsCommand::updateFlow() delegates --agent through the registered update ability',
 	$failures,
 	$passes
 );
