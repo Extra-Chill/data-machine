@@ -2,6 +2,16 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.172.18] - 2026-08-12
+
+### Changed
+- support WordPress smoke runtime
+- remove duplicate jobs table slug
+
+### Fixed
+- select sparse status migration candidates
+- allow operator jobs summary diagnostics
+
 ## [0.172.17] - 2026-08-12
 
 ### Fixed
