@@ -92,11 +92,11 @@ class CreateFlow extends BaseTool {
 		$flow_name         = $parameters['flow_name'] ?? 'Flow';
 		$scheduling_config = $parameters['scheduling_config'] ?? array( 'interval' => 'manual' );
 
-		$validation = $this->validateSchedulingConfig( $scheduling_config );
-		if ( true !== $validation ) {
+		$ability = wp_get_ability( 'datamachine/create-flow' );
+		if ( ! $ability ) {
 			return array(
 				'success'   => false,
-				'error'     => $validation,
+				'error'     => 'Create flow ability not available',
 				'tool_name' => 'create_flow',
 			);
 		}
@@ -106,6 +106,19 @@ class CreateFlow extends BaseTool {
 
 		foreach ( $existing_flows as $existing_flow ) {
 			if ( strcasecmp( $existing_flow['flow_name'], $flow_name ) === 0 ) {
+				$validation = $ability->execute(
+					array(
+						'pipeline_id'       => $pipeline_id,
+						'flow_name'         => $flow_name,
+						'scheduling_config' => $scheduling_config,
+						'validate_only'     => true,
+					)
+				);
+				if ( ! $this->isAbilitySuccess( $validation ) ) {
+					$error = $this->getAbilityError( $validation, 'Failed to validate flow configuration.' );
+					return $this->buildErrorResponse( $error, 'create_flow' );
+				}
+
 				$flow_config   = $existing_flow['flow_config'] ?? array();
 				$flow_step_ids = array_keys( $flow_config );
 
@@ -122,15 +135,6 @@ class CreateFlow extends BaseTool {
 					'tool_name' => 'create_flow',
 				);
 			}
-		}
-
-		$ability = wp_get_ability( 'datamachine/create-flow' );
-		if ( ! $ability ) {
-			return array(
-				'success'   => false,
-				'error'     => 'Create flow ability not available',
-				'tool_name' => 'create_flow',
-			);
 		}
 
 		$result = $ability->execute(
@@ -163,7 +167,7 @@ class CreateFlow extends BaseTool {
 			'pipeline_id'   => $result['pipeline_id'],
 			'synced_steps'  => $result['synced_steps'],
 			'flow_step_ids' => $flow_step_ids,
-			'scheduling'    => $scheduling_config['interval'],
+			'scheduling'    => $result['flow_data']['scheduling_config']['interval'] ?? $scheduling_config['interval'],
 		);
 
 		if ( ! empty( $config_results['applied'] ) ) {
@@ -335,30 +339,4 @@ class CreateFlow extends BaseTool {
 		);
 	}
 
-	private function validateSchedulingConfig( array $config ): bool|string {
-		if ( empty( $config ) ) {
-			return true;
-		}
-
-		$interval = $config['interval'] ?? null;
-
-		if ( null === $interval ) {
-			return 'scheduling_config requires an interval property';
-		}
-
-		$intervals       = array_keys( apply_filters( 'datamachine_scheduler_intervals', array() ) );
-		$valid_intervals = array_merge( array( 'manual', 'one_time' ), $intervals );
-		if ( ! in_array( $interval, $valid_intervals, true ) ) {
-			return 'Invalid interval. Must be one of: ' . implode( ', ', $valid_intervals );
-		}
-
-		if ( 'one_time' === $interval ) {
-			$timestamp = $config['timestamp'] ?? null;
-			if ( ! is_numeric( $timestamp ) || (int) $timestamp <= 0 ) {
-				return 'one_time interval requires a valid unix timestamp';
-			}
-		}
-
-		return true;
-	}
 }

@@ -147,6 +147,17 @@ class CreatePipelineAbility {
 		$steps       = $input['steps'] ?? array();
 		$workflow    = isset( $input['workflow'] ) && is_array( $input['workflow'] ) ? $input['workflow'] : array();
 		$flow_config = $input['flow_config'] ?? array();
+		if ( ! empty( $flow_config ) ) {
+			$scheduling_config     = $flow_config['scheduling_config'] ?? array( 'interval' => 'manual' );
+			$scheduling_validation = datamachine_validate_interval( $scheduling_config['interval'] ?? 'manual', $scheduling_config );
+			if ( ! $scheduling_validation['valid'] ) {
+				return array(
+					'success' => false,
+					'error'   => $scheduling_validation['error'],
+				);
+			}
+			$flow_config['scheduling_config']['interval'] = $scheduling_validation['resolved'];
+		}
 
 		// Resolve the owning agent when the caller did not supply one, mirroring
 		// CreateFlowAbility. Without this a pipeline created without an explicit
@@ -333,6 +344,16 @@ class CreatePipelineAbility {
 		// Pre-validation: check handler slugs in template.
 		$template_workflow = isset( $template['workflow'] ) && is_array( $template['workflow'] ) ? $template['workflow'] : array();
 		$template_steps    = $template['steps'] ?? array();
+		if ( isset( $template['scheduling_config'] ) ) {
+			$scheduling_validation = datamachine_validate_interval( $template['scheduling_config']['interval'] ?? 'manual', $template['scheduling_config'] );
+			if ( ! $scheduling_validation['valid'] ) {
+				return array(
+					'success' => false,
+					'error'   => 'Template scheduling validation failed: ' . $scheduling_validation['error'],
+				);
+			}
+			$template['scheduling_config']['interval'] = $scheduling_validation['resolved'];
+		}
 		if ( ! empty( $template_workflow ) ) {
 			$validation = $this->validateWorkflow( $template_workflow );
 			if ( true !== $validation ) {
@@ -372,6 +393,24 @@ class CreatePipelineAbility {
 					'remediation' => 'Provide a "name" property for each pipeline in the pipelines array',
 				);
 				continue;
+			}
+
+			$has_flow_config = isset( $pipeline_config['flow_name'] ) || isset( $pipeline_config['scheduling_config'] ) || isset( $template['scheduling_config'] );
+			if ( $has_flow_config ) {
+				$scheduling_config     = $pipeline_config['scheduling_config'] ?? ( $template['scheduling_config'] ?? array( 'interval' => 'manual' ) );
+				$scheduling_validation = datamachine_validate_interval( $scheduling_config['interval'] ?? 'manual', $scheduling_config );
+				if ( ! $scheduling_validation['valid'] ) {
+					$validation_errors[] = array(
+						'index'       => $index,
+						'name'        => $name,
+						'error'       => $scheduling_validation['error'],
+						'remediation' => 'Fix the scheduling configuration for this pipeline',
+					);
+					continue;
+				}
+				if ( isset( $pipeline_config['scheduling_config'] ) ) {
+					$pipelines[ $index ]['scheduling_config']['interval'] = $scheduling_validation['resolved'];
+				}
 			}
 
 			$per_pipeline_workflow = isset( $pipeline_config['workflow'] ) && is_array( $pipeline_config['workflow'] ) ? $pipeline_config['workflow'] : array();
