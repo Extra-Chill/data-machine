@@ -1,12 +1,10 @@
 # PromptBuilder Pattern
 
-**Since**: 0.2.5
-
-The PromptBuilder provides unified directive management for AI requests with priority-based ordering and agent-specific targeting. It replaces the previous scattered filter-based directive application with a structured builder pattern.
+The PromptBuilder provides unified directive management for AI requests with priority-based ordering and agent-specific targeting.
 
 ## Overview
 
-Prior to v0.2.5, AI directives were applied through separate `datamachine_global_directives` and `datamachine_agent_directives` filters, creating inconsistent ordering and maintenance overhead. The PromptBuilder centralizes this functionality into a single, priority-ordered system.
+PromptBuilder centralizes directive application in a single, priority-ordered system.
 
 ## Architecture
 
@@ -34,7 +32,7 @@ Prior to v0.2.5, AI directives were applied through separate `datamachine_global
 
 - **Priority-Based Ordering**: Lower priority numbers applied first (10=core, 20=global, 30=pipeline, 40=context, 50=site)
 - **Agent Targeting**: Directives can target 'all' agents or specific types ('pipeline', 'chat')
-- **Unified Registration**: Single `datamachine_directives` filter replaces multiple filter types
+- **Unified Registration**: Directives register through `datamachine_directives`
 - **Structured Builder Pattern**: Fluent interface for directive configuration and request building
 
 ## Usage
@@ -105,28 +103,6 @@ $promptBuilder->setMessages($messages)
 
 // Apply directives via PromptBuilder
 $request = $promptBuilder->build($agent_modes, $provider, $context);
-```
-
-## Migration from Legacy System
-
-### Before (v0.2.4 and earlier)
-```php
-// Separate filters with inconsistent ordering
-add_filter('datamachine_global_directives', 'apply_global_directive', 10, 5); // LEGACY - use datamachine_directives instead
-add_filter('datamachine_agent_directives', 'apply_agent_directive', 10, 5); // LEGACY - use datamachine_directives with modes to target 'pipeline'/'chat'
-```
-
-### After (v0.2.5+)
-```php
-// Unified registration with explicit priorities
-add_filter('datamachine_directives', function($directives) {
-    $directives[] = [
-        'class' => MyDirective::class,
-        'priority' => 25,
-        'modes' => ['all']
-    ];
-    return $directives;
-});
 ```
 
 ## Benefits

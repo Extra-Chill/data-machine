@@ -1,8 +1,6 @@
-# Universal Engine Filters
+# AI Runtime Filters
 
-Reference for the WordPress filters used by the Universal Engine to register directives, tools, and authentication providers, and to validate tool configuration.
-
-> Modes vs contexts: prior to v0.71.0 the directive-targeting field was named `contexts`. It was renamed to `modes` during the AgentMode refactor (#1130). Both `RequestBuilder` and `PromptBuilder` now read `modes`. Old `contexts =>` registrations are silently ignored and treated as `all`.
+Reference for the WordPress filters used by the AI runtime to register directives, tools, and authentication providers, and to validate tool configuration.
 
 ## Directive System
 
@@ -43,7 +41,7 @@ add_filter( 'datamachine_directives', function ( $directives ) {
 } );
 ```
 
-**Built-in directives** are listed in [AI Directives System](../../core-system/ai-directives.md) with current priority and mode assignments. The earlier `GlobalSystemPromptDirective`, `SiteContextDirective`, `PipelineCoreDirective`, `ChatAgentDirective`, and `SystemAgentDirective` classes were removed during the AgentMode refactor — their guidance now lives inline in `AgentModeDirective` and in agent memory files (SITE.md, SOUL.md, MEMORY.md).
+**Built-in directives** are listed in [AI Directives System](../../core-system/ai-directives.md) with current priority and mode assignments.
 
 ### datamachine_agent_mode_{slug}
 

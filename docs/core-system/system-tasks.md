@@ -15,8 +15,6 @@ The system tasks framework consists of:
 5. **SystemTaskStep** — pipeline step type that bridges system tasks into pipeline workflows
 6. **RecurringScheduleRegistry** — optional schedule bindings that say when a task should run
 
-> Note: `GitHubIssueTask` was extracted to the `data-machine-code` extension plugin (see PR #926). It is no longer part of core data-machine.
-
 ## SystemTask Base Class
 
 **Source:** `inc/Engine/AI/System/Tasks/SystemTask.php`

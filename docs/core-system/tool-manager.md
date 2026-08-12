@@ -124,7 +124,7 @@ Resolved handler tools automatically receive `handler`, `handler_config`, inheri
 
 `AdjacentHandlerToolSource` reads the previous and next step configs, gathers configured handler slugs through `FlowStepConfig`, and asks `ToolManager::resolveHandlerTools()` for each adjacent handler's dynamic tool definitions.
 
-The generic extension hooks are `agents_api_tool_sources` and `agents_api_tool_sources_for_mode`. Data Machine's legacy `datamachine_tool_sources` filters are not mirrored.
+Extensions register tool sources through `agents_api_tool_sources` and `agents_api_tool_sources_for_mode`.
 
 ## Modes
 

@@ -14,8 +14,6 @@ The system relies on WordPress actions to trigger cache clearing. When a new han
 
 Cache invalidation is typically triggered after ecosystem registration actions, then performed via `HandlerAbilities::clearCache()`, `AuthAbilities::clearCache()`, `StepTypeAbilities::clearCache()`, and `ToolManager::clearCache()`.
 
-> **Migration Note (@since v0.11.7):** `HandlerService` and `StepTypeService` have been deleted and replaced by `HandlerAbilities` and `StepTypeAbilities`.
-
 ## Cache Clearing Methods
 
 Call the static `clearCache()` methods on the relevant classes when registrations change:

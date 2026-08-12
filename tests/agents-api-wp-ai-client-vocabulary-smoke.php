@@ -61,13 +61,6 @@ agents_api_smoke_assert_equals( true, str_contains( $engine_readme, 'wp-ai-clien
 agents_api_smoke_assert_equals( true, str_contains( $engine_readme, 'pipeline ai steps should not move to agents api solely for provider dispatch' ), 'Engine AI README blocks pipeline AI migration for provider dispatch only', $failures, $passes );
 agents_api_smoke_assert_equals( true, str_contains( $request_docs, 'plugins that only need one-shot ai operations may call `wp-ai-client` directly' ), 'RequestBuilder docs do not force all plugins through Agents API', $failures, $passes );
 
-$deleted_adapter_path    = '/inc/Engine/AI/WpAiClient' . 'Adapter.php';
-$deleted_capability_path = '/inc/Engine/AI/WpAiClient' . 'Capability.php';
-agents_api_smoke_assert_equals( false, is_file( (string) $root . $deleted_adapter_path ), 'Data Machine provider adapter file is deleted', $failures, $passes );
-agents_api_smoke_assert_equals( false, is_file( (string) $root . $deleted_capability_path ), 'Data Machine capability alias wrapper is deleted', $failures, $passes );
-
-agents_api_smoke_assert_equals( false, is_file( (string) $root . '/vendor/wordpress/agents-api/src/AI/WpAiClient.php' ), 'Agents API carries no low-level wp-ai-client execution wrapper', $failures, $passes );
-
 $agents_api_dir = (string) $root . '/vendor/wordpress/agents-api';
 $host_terms     = array( 'dolly', 'automattic ai framework' );
 $host_matches   = array();

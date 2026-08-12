@@ -45,13 +45,13 @@ RequestBuilder projects envelopes into wp-ai-client DTOs only for provider dispa
 
 ## Compatibility
 
-`WP_Agent_Message::normalize()` accepts existing `role/content/metadata` rows and versioned envelopes. It also accepts the short-lived `data` envelope key from the initial envelope draft as a read-time compatibility input and rewrites it to `payload`.
+`WP_Agent_Message::normalize()` accepts `role/content/metadata` rows and versioned envelopes. It also accepts `data` as a read-time compatibility input and rewrites it to `payload`.
 
 New writes should store canonical envelopes. Current provider requests use `WP_Agent_Message::to_provider_message()` / `to_provider_messages()` as needed to project envelopes into Data Machine's provider-message shape. That projection folds the envelope `type` and `payload` into provider metadata, after which `RequestBuilder` maps messages to wp-ai-client prompt/history DTOs.
 
 ## Type Payload
 
-Legacy tool-call messages:
+Compatible `role/content/metadata` tool-call messages:
 
 ```php
 [

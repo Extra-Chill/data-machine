@@ -77,6 +77,5 @@ Force a token refresh for a handler.
 
 ## Notes for Agents
 
-- There is no `/auth/{handler_slug}/callback` REST route in `inc/Api/Auth.php`.
-- Browser OAuth initiation/callback URLs are outside this REST controller, for example `/datamachine-auth/{handler}/`.
+- Browser OAuth initiation and callbacks use `/datamachine-auth/{handler}/`.
 - Do not document static provider field sets here; provider config comes from the registered auth provider/handler metadata.
