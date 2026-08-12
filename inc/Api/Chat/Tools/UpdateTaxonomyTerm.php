@@ -14,6 +14,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+use DataMachine\Abilities\Taxonomy\ResolveTermAbility;
 use DataMachine\Core\WordPress\TaxonomyHandler;
 use DataMachine\Engine\AI\Tools\BaseTool;
 
@@ -111,11 +112,19 @@ class UpdateTaxonomyTerm extends BaseTool {
 		}
 
 		// Resolve term
-		$term = $this->resolveTerm( $term_identifier, $taxonomy );
-		if ( ! $term ) {
+		$resolved = ResolveTermAbility::resolve( $term_identifier, $taxonomy, false );
+		if ( empty( $resolved['success'] ) ) {
 			return array(
 				'success'   => false,
-				'error'     => "Term '{$term_identifier}' not found in taxonomy '{$taxonomy}'",
+				'error'     => $resolved['error'] ?? "Term '{$term_identifier}' not found in taxonomy '{$taxonomy}'",
+				'tool_name' => 'update_taxonomy_term',
+			);
+		}
+		$term = get_term( $resolved['term_id'], $taxonomy );
+		if ( ! $term || is_wp_error( $term ) ) {
+			return array(
+				'success'   => false,
+				'error'     => is_wp_error( $term ) ? $term->get_error_message() : 'Failed to retrieve taxonomy term',
 				'tool_name' => 'update_taxonomy_term',
 			);
 		}
@@ -182,37 +191,6 @@ class UpdateTaxonomyTerm extends BaseTool {
 	}
 
 	/**
-	 * Resolve term by ID, name, or slug.
-	 *
-	 * @param string $identifier Term identifier
-	 * @param string $taxonomy Taxonomy slug
-	 * @return \WP_Term|null Term object or null if not found
-	 */
-	private function resolveTerm( string $identifier, string $taxonomy ): ?\WP_Term {
-		// Try as ID first
-		if ( is_numeric( $identifier ) ) {
-			$term = get_term( (int) $identifier, $taxonomy );
-			if ( $term && ! is_wp_error( $term ) ) {
-				return $term;
-			}
-		}
-
-		// Try by name
-		$term = get_term_by( 'name', $identifier, $taxonomy );
-		if ( $term ) {
-			return $term;
-		}
-
-		// Try by slug
-		$term = get_term_by( 'slug', $identifier, $taxonomy );
-		if ( $term ) {
-			return $term;
-		}
-
-		return null;
-	}
-
-	/**
 	 * Get meta keys that are blocked (start with underscore).
 	 *
 	 * @param array $meta Meta key-value pairs
@@ -240,22 +218,21 @@ class UpdateTaxonomyTerm extends BaseTool {
 	 * @return array Result with success status and updated fields
 	 */
 	private function updateCoreFields( \WP_Term $term, string $taxonomy, ?string $name, ?string $slug, ?string $description, ?string $parent_item ): array {
-		$args           = array();
-		$updated_fields = array();
+		$input = array(
+			'term'     => (string) $term->term_id,
+			'taxonomy' => $taxonomy,
+		);
 
 		if ( ! empty( $name ) ) {
-			$args['name']     = sanitize_text_field( $name );
-			$updated_fields[] = 'name';
+			$input['name'] = $name;
 		}
 
 		if ( ! empty( $slug ) ) {
-			$args['slug']     = sanitize_title( $slug );
-			$updated_fields[] = 'slug';
+			$input['slug'] = $slug;
 		}
 
 		if ( null !== $description && '' !== $description ) {
-			$args['description'] = sanitize_textarea_field( $description );
-			$updated_fields[]    = 'description';
+			$input['description'] = $description;
 		}
 
 		if ( ! empty( $parent_item ) ) {
@@ -268,16 +245,17 @@ class UpdateTaxonomyTerm extends BaseTool {
 				);
 			}
 
-			$parent_term = $this->resolveTerm( $parent_item, $taxonomy );
-			if ( ! $parent_term ) {
+			$parent_result = ResolveTermAbility::resolve( $parent_item, $taxonomy, false );
+			if ( empty( $parent_result['success'] ) ) {
 				return array(
 					'success'   => false,
-					'error'     => "Parent term '{$parent_item}' not found in taxonomy '{$taxonomy}'",
+					'error'     => $parent_result['error'] ?? "Parent term '{$parent_item}' not found in taxonomy '{$taxonomy}'",
 					'tool_name' => 'update_taxonomy_term',
 				);
 			}
+			$parent_id = (int) $parent_result['term_id'];
 
-			if ( $parent_term->term_id === $term->term_id ) {
+			if ( $parent_id === $term->term_id ) {
 				return array(
 					'success'   => false,
 					'error'     => 'A term cannot be its own parent',
@@ -285,18 +263,26 @@ class UpdateTaxonomyTerm extends BaseTool {
 				);
 			}
 
-			$args['parent']   = $parent_term->term_id;
-			$updated_fields[] = 'parent';
+			$input['parent'] = $parent_id;
 		}
 
-		if ( empty( $args ) ) {
+		if ( 2 === count( $input ) ) {
 			return array(
 				'success'        => true,
 				'updated_fields' => array(),
 			);
 		}
 
-		$result = wp_update_term( $term->term_id, $taxonomy, $args );
+		$ability = wp_get_ability( 'datamachine/update-taxonomy-term' );
+		if ( ! $ability ) {
+			return array(
+				'success'   => false,
+				'error'     => 'Update taxonomy term ability not available',
+				'tool_name' => 'update_taxonomy_term',
+			);
+		}
+
+		$result = $ability->execute( $input );
 
 		if ( is_wp_error( $result ) ) {
 			return array(
@@ -306,9 +292,17 @@ class UpdateTaxonomyTerm extends BaseTool {
 			);
 		}
 
+		if ( ! is_array( $result ) || empty( $result['success'] ) ) {
+			return array(
+				'success'   => false,
+				'error'     => is_array( $result ) && ! empty( $result['error'] ) ? (string) $result['error'] : 'Failed to update taxonomy term',
+				'tool_name' => 'update_taxonomy_term',
+			);
+		}
+
 		return array(
 			'success'        => true,
-			'updated_fields' => $updated_fields,
+			'updated_fields' => array_keys( is_array( $result['changes'] ?? null ) ? $result['changes'] : array() ),
 		);
 	}
 
