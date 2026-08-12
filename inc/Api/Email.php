@@ -11,7 +11,6 @@
 namespace DataMachine\Api;
 
 use DataMachine\Abilities\PermissionHelper;
-use DataMachine\Core\AbilityResult;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -647,26 +646,9 @@ class Email {
 		return self::to_response( $result );
 	}
 
-	/**
-	 * Convert ability result to REST response.
-	 *
-	 * Accepts WP_Error (from core's WP_Ability::execute() pipeline) or the
-	 * legacy { success: bool, error?: string } array from ability callbacks.
-	 *
-	 * @see https://github.com/Extra-Chill/data-machine/issues/999
-	 */
 	private static function to_response( \WP_Error|array $result ): \WP_REST_Response|\WP_Error {
 		if ( is_wp_error( $result ) ) {
 			return $result;
-		}
-
-		$legacy_error = AbilityResult::legacy_failure_to_wp_error( $result, 'email_error', 'Operation failed', array(), 400 );
-		if ( $legacy_error ) {
-			return $legacy_error;
-		}
-
-		if ( ! ( $result['success'] ?? false ) ) {
-			return new \WP_Error( 'email_error', 'Operation failed', array( 'status' => 400 ) );
 		}
 
 		return rest_ensure_response( $result );

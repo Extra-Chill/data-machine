@@ -397,7 +397,7 @@ class SendEmailQueuedAbility {
 			return;
 		}
 
-		$error_msg = is_array( $result ) ? ( $result['error'] ?? 'unknown error' ) : 'invalid result';
+		$error_msg = is_wp_error( $result ) ? $result->get_error_message() : 'invalid result';
 
 		if ( $attempt >= self::MAX_ATTEMPTS ) {
 			do_action(

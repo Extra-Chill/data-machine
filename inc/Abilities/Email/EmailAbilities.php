@@ -461,7 +461,7 @@ class EmailAbilities {
 	/**
 	 * Reply to an email with threading headers.
 	 */
-	public function executeReply( array $input ): array {
+	public function executeReply( array $input ): array|\WP_Error {
 		$headers = array();
 
 		$content_type = $input['content_type'] ?? 'text/html';
@@ -495,10 +495,7 @@ class EmailAbilities {
 		$to = array_filter( $to, 'is_email' );
 
 		if ( empty( $to ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'No valid recipient address',
-			);
+			return new \WP_Error( 'invalid_email_recipient', 'No valid recipient address', array( 'status' => 400 ) );
 		}
 
 		$sent = wp_mail( $to, $input['subject'], $input['body'], $headers );
@@ -521,18 +518,15 @@ class EmailAbilities {
 			$error = $phpmailer->ErrorInfo ? $phpmailer->ErrorInfo : $error;
 		}
 
-		return array(
-			'success' => false,
-			'error'   => $error,
-		);
+		return new \WP_Error( 'email_reply_failed', $error, array( 'status' => 400 ) );
 	}
 
 	/**
 	 * Delete an email from the IMAP server.
 	 */
-	public function executeDelete( array $input ): array {
+	public function executeDelete( array $input ): array|\WP_Error {
 		$connection = $this->connect( $input['folder'] ?? 'INBOX' );
-		if ( is_array( $connection ) && ! ( $connection['success'] ?? true ) ) {
+		if ( is_wp_error( $connection ) ) {
 			return $connection;
 		}
 
@@ -550,9 +544,9 @@ class EmailAbilities {
 	/**
 	 * Move an email to a different folder.
 	 */
-	public function executeMove( array $input ): array {
+	public function executeMove( array $input ): array|\WP_Error {
 		$connection = $this->connect( $input['folder'] ?? 'INBOX' );
-		if ( is_array( $connection ) && ! ( $connection['success'] ?? true ) ) {
+		if ( is_wp_error( $connection ) ) {
 			return $connection;
 		}
 
@@ -563,10 +557,7 @@ class EmailAbilities {
 		if ( ! $moved ) {
 			$error = imap_last_error();
 			imap_close( $connection );
-			return array(
-				'success' => false,
-				'error'   => 'Move failed: ' . $error,
-			);
+			return new \WP_Error( 'email_move_failed', 'Move failed: ' . $error, array( 'status' => 400 ) );
 		}
 
 		imap_expunge( $connection );
@@ -581,9 +572,9 @@ class EmailAbilities {
 	/**
 	 * Set or clear a flag on an email.
 	 */
-	public function executeFlag( array $input ): array {
+	public function executeFlag( array $input ): array|\WP_Error {
 		$connection = $this->connect( $input['folder'] ?? 'INBOX' );
-		if ( is_array( $connection ) && ! ( $connection['success'] ?? true ) ) {
+		if ( is_wp_error( $connection ) ) {
 			return $connection;
 		}
 
@@ -593,10 +584,7 @@ class EmailAbilities {
 		$valid_flags = array( '\\Seen', '\\Flagged', '\\Answered', '\\Deleted', '\\Draft' );
 		if ( ! in_array( $flag, $valid_flags, true ) ) {
 			imap_close( $connection );
-			return array(
-				'success' => false,
-				'error'   => 'Invalid flag. Valid flags: Seen, Flagged, Answered, Deleted, Draft',
-			);
+			return new \WP_Error( 'invalid_email_flag', 'Invalid flag. Valid flags: Seen, Flagged, Answered, Deleted, Draft', array( 'status' => 400 ) );
 		}
 
 		$action = $input['action'] ?? 'set';
@@ -609,10 +597,7 @@ class EmailAbilities {
 		imap_close( $connection );
 
 		if ( ! $result ) {
-			return array(
-				'success' => false,
-				'error'   => 'Failed to ' . $action . ' flag ' . $flag,
-			);
+			return new \WP_Error( 'email_flag_failed', 'Failed to ' . $action . ' flag ' . $flag, array( 'status' => 400 ) );
 		}
 
 		return array(
@@ -624,22 +609,16 @@ class EmailAbilities {
 	/**
 	 * Test the IMAP connection with stored credentials.
 	 */
-	public function executeTestConnection( array $input ): array {
+	public function executeTestConnection( array $input ): array|\WP_Error {
 		unset( $input );
 
 		if ( ! function_exists( 'imap_open' ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'PHP IMAP extension is not installed',
-			);
+			return new \WP_Error( 'email_imap_unavailable', 'PHP IMAP extension is not installed', array( 'status' => 400 ) );
 		}
 
 		$auth = $this->getAuthProvider();
 		if ( ! $auth || ! $auth->is_authenticated() ) {
-			return array(
-				'success' => false,
-				'error'   => 'IMAP credentials not configured',
-			);
+			return new \WP_Error( 'email_imap_not_configured', 'IMAP credentials not configured', array( 'status' => 400 ) );
 		}
 
 		$mailbox = $this->buildMailboxString(
@@ -653,10 +632,7 @@ class EmailAbilities {
 		$connection = @imap_open( $mailbox, $auth->getUser(), $auth->getPassword() );
 
 		if ( false === $connection ) {
-			return array(
-				'success' => false,
-				'error'   => 'Connection failed: ' . imap_last_error(),
-			);
+			return new \WP_Error( 'email_imap_connection_failed', 'Connection failed: ' . imap_last_error(), array( 'status' => 400 ) );
 		}
 
 		$check = imap_check( $connection );
@@ -695,9 +671,9 @@ class EmailAbilities {
 	 * 2. URL without Post header → HTTP POST attempt, fall back to GET
 	 * 3. mailto: → send email via wp_mail()
 	 */
-	public function executeUnsubscribe( array $input ): array {
+	public function executeUnsubscribe( array $input ): array|\WP_Error {
 		$connection = $this->connect( $input['folder'] ?? 'INBOX' );
-		if ( is_array( $connection ) && ! ( $connection['success'] ?? true ) ) {
+		if ( is_wp_error( $connection ) ) {
 			return $connection;
 		}
 
@@ -707,20 +683,14 @@ class EmailAbilities {
 		$raw_headers = imap_fetchheader( $connection, $uid, FT_UID );
 		if ( empty( $raw_headers ) ) {
 			imap_close( $connection );
-			return array(
-				'success' => false,
-				'error'   => 'Could not fetch message headers',
-			);
+			return new \WP_Error( 'email_headers_fetch_failed', 'Could not fetch message headers', array( 'status' => 400 ) );
 		}
 
 		$parsed = $this->parseUnsubscribeHeaders( $raw_headers );
 		imap_close( $connection );
 
 		if ( empty( $parsed['urls'] ) && empty( $parsed['mailto'] ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'No List-Unsubscribe header found in this message',
-			);
+			return new \WP_Error( 'email_unsubscribe_header_not_found', 'No List-Unsubscribe header found in this message', array( 'status' => 400 ) );
 		}
 
 		// Try One-Click POST first (RFC 8058).
@@ -751,10 +721,7 @@ class EmailAbilities {
 			}
 		}
 
-		return array(
-			'success' => false,
-			'error'   => 'All unsubscribe methods failed',
-		);
+		return new \WP_Error( 'email_unsubscribe_failed', 'All unsubscribe methods failed', array( 'status' => 400 ) );
 	}
 
 	/**
@@ -763,9 +730,9 @@ class EmailAbilities {
 	 * Deduplicates by sender — if you have 100 emails from linkedin.com,
 	 * it only unsubscribes once using the most recent message's headers.
 	 */
-	public function executeBatchUnsubscribe( array $input ): array {
+	public function executeBatchUnsubscribe( array $input ): array|\WP_Error {
 		$connection = $this->connect( $input['folder'] ?? 'INBOX' );
-		if ( is_array( $connection ) && ! ( $connection['success'] ?? true ) ) {
+		if ( is_wp_error( $connection ) ) {
 			return $connection;
 		}
 
@@ -1070,9 +1037,9 @@ class EmailAbilities {
 	/**
 	 * Batch move: search → move all matches to destination.
 	 */
-	public function executeBatchMove( array $input ): array {
+	public function executeBatchMove( array $input ): array|\WP_Error {
 		$connection = $this->connect( $input['folder'] ?? 'INBOX' );
-		if ( is_array( $connection ) && ! ( $connection['success'] ?? true ) ) {
+		if ( is_wp_error( $connection ) ) {
 			return $connection;
 		}
 
@@ -1122,9 +1089,9 @@ class EmailAbilities {
 	/**
 	 * Batch flag: search → set/clear flag on all matches.
 	 */
-	public function executeBatchFlag( array $input ): array {
+	public function executeBatchFlag( array $input ): array|\WP_Error {
 		$connection = $this->connect( $input['folder'] ?? 'INBOX' );
-		if ( is_array( $connection ) && ! ( $connection['success'] ?? true ) ) {
+		if ( is_wp_error( $connection ) ) {
 			return $connection;
 		}
 
@@ -1136,10 +1103,7 @@ class EmailAbilities {
 		$valid_flags = array( '\\Seen', '\\Flagged', '\\Answered', '\\Deleted', '\\Draft' );
 		if ( ! in_array( $flag, $valid_flags, true ) ) {
 			imap_close( $connection );
-			return array(
-				'success' => false,
-				'error'   => 'Invalid flag. Valid: Seen, Flagged, Answered, Deleted, Draft',
-			);
+			return new \WP_Error( 'invalid_email_flag', 'Invalid flag. Valid: Seen, Flagged, Answered, Deleted, Draft', array( 'status' => 400 ) );
 		}
 
 		$uids = imap_search( $connection, $search, SE_UID );
@@ -1182,9 +1146,9 @@ class EmailAbilities {
 	/**
 	 * Batch delete: search → delete all matches.
 	 */
-	public function executeBatchDelete( array $input ): array {
+	public function executeBatchDelete( array $input ): array|\WP_Error {
 		$connection = $this->connect( $input['folder'] ?? 'INBOX' );
-		if ( is_array( $connection ) && ! ( $connection['success'] ?? true ) ) {
+		if ( is_wp_error( $connection ) ) {
 			return $connection;
 		}
 
@@ -1227,22 +1191,16 @@ class EmailAbilities {
 	 * Open an IMAP connection using stored credentials.
 	 *
 	 * @param string $folder Mail folder.
-	 * @return resource|array IMAP connection or error array.
+	 * @return resource|\WP_Error IMAP connection or error.
 	 */
 	private function connect( string $folder = 'INBOX' ) {
 		if ( ! function_exists( 'imap_open' ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'PHP IMAP extension is not installed',
-			);
+			return new \WP_Error( 'email_imap_unavailable', 'PHP IMAP extension is not installed', array( 'status' => 400 ) );
 		}
 
 		$auth = $this->getAuthProvider();
 		if ( ! $auth || ! $auth->is_authenticated() ) {
-			return array(
-				'success' => false,
-				'error'   => 'IMAP credentials not configured',
-			);
+			return new \WP_Error( 'email_imap_not_configured', 'IMAP credentials not configured', array( 'status' => 400 ) );
 		}
 
 		$mailbox = $this->buildMailboxString(
@@ -1256,10 +1214,7 @@ class EmailAbilities {
 		$connection = @imap_open( $mailbox, $auth->getUser(), $auth->getPassword() );
 
 		if ( false === $connection ) {
-			return array(
-				'success' => false,
-				'error'   => 'IMAP connection failed: ' . imap_last_error(),
-			);
+			return new \WP_Error( 'email_imap_connection_failed', 'IMAP connection failed: ' . imap_last_error(), array( 'status' => 400 ) );
 		}
 
 		return $connection;
@@ -1330,18 +1285,18 @@ class EmailAbilities {
 		$sent_folder = '[Gmail]/Sent Mail';
 
 		$connection = $this->connect( $sent_folder );
-		if ( is_array( $connection ) && ! ( $connection['success'] ?? true ) ) {
+		if ( is_wp_error( $connection ) ) {
 			// Non-Gmail server or folder not found — try common alternatives.
 			foreach ( array( 'Sent', 'Sent Items', 'INBOX.Sent' ) as $fallback ) {
 				$connection = $this->connect( $fallback );
-				if ( ! is_array( $connection ) ) {
+				if ( ! is_wp_error( $connection ) ) {
 					$sent_folder = $fallback;
 					break;
 				}
 			}
 
 			// If still no connection, silently skip — sending succeeded, saving is best-effort.
-			if ( is_array( $connection ) ) {
+			if ( is_wp_error( $connection ) ) {
 				return;
 			}
 		}
