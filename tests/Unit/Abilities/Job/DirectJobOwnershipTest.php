@@ -180,11 +180,26 @@ class DirectJobOwnershipTest extends WP_UnitTestCase {
 		$forged_summary = ( new JobsSummaryAbility() )->execute( array( 'user_id' => $this->other_user_id ) );
 		$this->assertSame( 'job_access_denied', $forged_summary['error_code'] );
 
+		$owner_summary = ( new JobsSummaryAbility() )->execute( array() );
+		$this->assertTrue( $owner_summary['success'] );
+		$this->assertSame( $this->owner_id, (int) $owner_summary['summary']['filters']['user_id'] );
+		$this->assertArrayNotHasKey( 'jobs', $owner_summary['summary'] );
+
+		wp_set_current_user( 0 );
+		$anonymous_summary = ( new JobsSummaryAbility() )->execute( array() );
+		$this->assertFalse( $anonymous_summary['success'] );
+		$this->assertSame( 'job_access_denied', $anonymous_summary['error_code'] );
+
 		wp_set_current_user( $this->admin_id );
 		$operator_list = ( new GetJobsAbility() )->execute( array() );
 		$operator_ids  = array_map( 'intval', array_column( $operator_list['jobs'], 'job_id' ) );
 		$this->assertContains( $owned['job_id'], $operator_ids );
 		$this->assertContains( $other['job_id'], $operator_ids );
+
+		$operator_summary = ( new JobsSummaryAbility() )->execute( array() );
+		$this->assertTrue( $operator_summary['success'] );
+		$this->assertArrayNotHasKey( 'user_id', $operator_summary['summary']['filters'] );
+		$this->assertArrayNotHasKey( 'jobs', $operator_summary['summary'] );
 	}
 
 	public function test_artifact_authorization_runs_before_hydration(): void {
