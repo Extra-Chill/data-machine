@@ -14,7 +14,6 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-use DataMachine\Core\WordPress\TaxonomyHandler;
 use DataMachine\Engine\AI\Tools\BaseTool;
 
 class SearchTaxonomyTerms extends BaseTool {
@@ -63,43 +62,45 @@ class SearchTaxonomyTerms extends BaseTool {
 		}
 
 		$taxonomy = sanitize_key( $taxonomy );
-
-		if ( ! taxonomy_exists( $taxonomy ) ) {
+		if ( empty( $taxonomy ) ) {
 			return array(
 				'success'   => false,
-				'error'     => "Taxonomy '{$taxonomy}' does not exist",
+				'error'     => 'taxonomy is required and must be a non-empty string',
 				'tool_name' => 'search_taxonomy_terms',
 			);
 		}
 
-		if ( TaxonomyHandler::shouldSkipTaxonomy( $taxonomy ) ) {
+		$search   = sanitize_text_field( $search );
+		$limit    = max( 1, min( 100, (int) $limit ) );
+		$ability  = wp_get_ability( 'datamachine/get-taxonomy-terms' );
+
+		if ( ! $ability ) {
 			return array(
 				'success'   => false,
-				'error'     => "Taxonomy '{$taxonomy}' is a system taxonomy and cannot be queried",
+				'error'     => 'datamachine/get-taxonomy-terms ability not found',
 				'tool_name' => 'search_taxonomy_terms',
 			);
 		}
 
-		$limit = max( 1, min( 100, (int) $limit ) );
-
-		$args = array(
-			'taxonomy'   => $taxonomy,
-			'hide_empty' => false,
-			'number'     => $limit,
-			'orderby'    => 'count',
-			'order'      => 'DESC',
+		$result = $ability->execute(
+			array(
+				'taxonomy'   => $taxonomy,
+				'search'     => $search,
+				'hide_empty' => false,
+				'number'     => $limit,
+				'orderby'    => 'count',
+				'order'      => 'DESC',
+			)
 		);
 
-		if ( ! empty( $search ) ) {
-			$args['search'] = sanitize_text_field( $search );
-		}
-
-		$terms = get_terms( $args );
-
-		if ( is_wp_error( $terms ) ) {
+		if ( ! $this->isAbilitySuccess( $result ) ) {
+			$error = $this->getAbilityError( $result, 'Failed to search taxonomy terms' );
+			if ( is_wp_error( $result ) && 'taxonomy_not_accessible' === $result->get_error_code() ) {
+				$error = "Taxonomy '{$taxonomy}' is a system taxonomy and cannot be queried";
+			}
 			return array(
 				'success'   => false,
-				'error'     => $terms->get_error_message(),
+				'error'     => $error,
 				'tool_name' => 'search_taxonomy_terms',
 			);
 		}
@@ -107,16 +108,16 @@ class SearchTaxonomyTerms extends BaseTool {
 		$taxonomy_obj = get_taxonomy( $taxonomy );
 		$term_data    = array();
 
-		foreach ( $terms as $term ) {
+		foreach ( $result['terms'] as $term ) {
 			$term_entry = array(
-				'term_id' => $term->term_id,
-				'name'    => $term->name,
-				'slug'    => $term->slug,
-				'count'   => (int) $term->count,
+				'term_id' => $term['term_id'],
+				'name'    => $term['name'],
+				'slug'    => $term['slug'],
+				'count'   => (int) $term['count'],
 			);
 
-			if ( $taxonomy_obj->hierarchical && $term->parent > 0 ) {
-				$parent_term = get_term( $term->parent, $taxonomy );
+			if ( $taxonomy_obj->hierarchical && $term['parent'] > 0 ) {
+				$parent_term = get_term( $term['parent'], $taxonomy );
 				if ( $parent_term && ! is_wp_error( $parent_term ) ) {
 					$term_entry['parent'] = $parent_term->name;
 				}
