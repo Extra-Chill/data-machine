@@ -54,15 +54,17 @@ class ActionInsertReadiness {
 		}
 
 		// This uses only table metadata visible to the WordPress database user; PROCESS is not required.
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$table_info_query = $this->wpdb->prepare(
+			'SELECT ENGINE, TABLE_ROWS, AUTO_INCREMENT, CREATE_TIME, UPDATE_TIME, CHECK_TIME FROM information_schema.TABLES WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s',
+			$database,
+			$table
+		);
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared -- Prepared immediately above with scalar schema and table values.
 		$table_info = $this->wpdb->get_row(
-			$this->wpdb->prepare(
-				'SELECT ENGINE, TABLE_ROWS, AUTO_INCREMENT, CREATE_TIME, UPDATE_TIME, CHECK_TIME FROM information_schema.TABLES WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s',
-				$database,
-				$table
-			),
+			$table_info_query,
 			ARRAY_A
 		);
+		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
 		if ( ! is_array( $table_info ) ) {
 			$base['errors'][] = '' !== (string) $this->wpdb->last_error
 				? 'Unable to inspect the actions table: ' . (string) $this->wpdb->last_error
@@ -71,8 +73,10 @@ class ActionInsertReadiness {
 		}
 
 		// MAX(action_id) is a bounded primary-key lookup, not a table scan.
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-		$max_action_id = $this->wpdb->get_var( $this->wpdb->prepare( 'SELECT MAX(action_id) FROM %i', $table ) );
+		$max_action_id_query = $this->wpdb->prepare( 'SELECT MAX(action_id) FROM %i', $table );
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared -- Prepared immediately above with an identifier placeholder.
+		$max_action_id = $this->wpdb->get_var( $max_action_id_query );
+		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
 		if ( '' !== (string) $this->wpdb->last_error ) {
 			$base['errors'][] = 'Unable to read the maximum action ID: ' . (string) $this->wpdb->last_error;
 			return $base;
@@ -87,19 +91,19 @@ class ActionInsertReadiness {
 		return array_merge(
 			$base,
 			array(
-				'success'          => true,
-				'status'           => $metadata_ready ? 'metadata_coherent' : 'metadata_warning',
-				'database'         => $database,
-				'engine'           => $engine,
-				'rows_estimate'    => max( 0, (int) ( $table_info['TABLE_ROWS'] ?? 0 ) ),
-				'auto_increment'   => $auto_increment,
-				'max_action_id'    => $max_action_id,
-				'next_id_ahead'    => $next_id_ahead,
-				'metadata_ready'   => $metadata_ready,
-				'create_time'      => $table_info['CREATE_TIME'] ?? null,
-				'update_time'      => $table_info['UPDATE_TIME'] ?? null,
-				'check_time'       => $table_info['CHECK_TIME'] ?? null,
-				'recommendation'   => $metadata_ready
+				'success'        => true,
+				'status'         => $metadata_ready ? 'metadata_coherent' : 'metadata_warning',
+				'database'       => $database,
+				'engine'         => $engine,
+				'rows_estimate'  => max( 0, (int) ( $table_info['TABLE_ROWS'] ?? 0 ) ),
+				'auto_increment' => $auto_increment,
+				'max_action_id'  => $max_action_id,
+				'next_id_ahead'  => $next_id_ahead,
+				'metadata_ready' => $metadata_ready,
+				'create_time'    => $table_info['CREATE_TIME'] ?? null,
+				'update_time'    => $table_info['UPDATE_TIME'] ?? null,
+				'check_time'     => $table_info['CHECK_TIME'] ?? null,
+				'recommendation' => $metadata_ready
 					? 'Metadata is coherent at inspection time. Correlate any insert exception with database server logs before choosing an operator-controlled repair.'
 					: 'Metadata is not coherent enough to infer insert readiness. Escalate with this snapshot and database server evidence; do not repair automatically.',
 			)
