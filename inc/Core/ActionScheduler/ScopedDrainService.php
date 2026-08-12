@@ -17,6 +17,7 @@ class ScopedDrainService {
 	private const GROUP                    = 'data-machine';
 	private const DISPATCH_EVIDENCE_LIMIT  = 100;
 	private const DISPATCH_STALE_THRESHOLD = 900;
+	private const MAX_CLAIM_SIZE           = 500;
 
 	public const HOOK_BATCH_CHUNK = 'datamachine_pipeline_batch_chunk';
 
@@ -30,7 +31,7 @@ class ScopedDrainService {
 	 */
 	public function drain( array $options = array() ): array {
 		$limit                  = max( 0, (int) ( $options['limit'] ?? 0 ) );
-		$batch_size             = max( 1, (int) ( $options['batch_size'] ?? 25 ) );
+		$batch_size             = min( self::MAX_CLAIM_SIZE, max( 1, (int) ( $options['batch_size'] ?? 25 ) ) );
 		$time_limit_ms          = isset( $options['time_limit_ms'] ) ? max( 0, (int) $options['time_limit_ms'] ) : max( 0, (int) ( $options['time_limit'] ?? 0 ) ) * 1000;
 		$stop_before_timeout_ms = isset( $options['stop_before_timeout_ms'] ) ? max( 0, (int) $options['stop_before_timeout_ms'] ) : max( 0, (int) ( $options['stop_before_timeout'] ?? 0 ) ) * 1000;
 		$hooks                  = $this->normalizeHooks( $options['hooks'] ?? null );
@@ -423,13 +424,13 @@ class ScopedDrainService {
 	 * @param int[]         $job_ids    Optional job ID scope.
 	 */
 	private function claimSizeForScope( int $batch_size, ?array $hooks, array $job_ids, string $lane ): int {
-		$claim_size = '' === $lane ? $batch_size : max( $batch_size, min( 1000, $batch_size * 20 ) );
+		$claim_size = min( self::MAX_CLAIM_SIZE, '' === $lane ? $batch_size : max( $batch_size, min( 1000, $batch_size * 20 ) ) );
 
 		if ( empty( $job_ids ) ) {
 			return $claim_size;
 		}
 
-		return max( $claim_size, $this->claimSizeThroughFirstJobAction( $hooks, $job_ids ) );
+		return min( self::MAX_CLAIM_SIZE, max( $claim_size, $this->claimSizeThroughFirstJobAction( $hooks, $job_ids ) ) );
 	}
 
 	/**
