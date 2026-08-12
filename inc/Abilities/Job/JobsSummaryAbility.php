@@ -90,20 +90,15 @@ class JobsSummaryAbility {
 	 * are normalized to their base status.
 	 *
 	 * @param array $input Filter parameters.
-	 * @return array Result with summary counts.
+	 * @return array|\WP_Error Result with summary counts or a query failure.
 	 */
-	public function execute( array $input ): array {
+	public function execute( array $input ): array|\WP_Error {
 		$ownership_scope = $this->jobCollectionScope(
 			isset( $input['user_id'] ) ? (int) $input['user_id'] : null,
 			isset( $input['agent_id'] ) ? (int) $input['agent_id'] : null
 		);
-		if ( isset( $ownership_scope['error'] ) ) {
-			return array(
-				'success'    => false,
-				'error_code' => 'job_access_denied',
-				'error'      => $ownership_scope['error'],
-				'status'     => 403,
-			);
+		if ( is_wp_error( $ownership_scope ) ) {
+			return $ownership_scope;
 		}
 
 		$filters = array();
@@ -114,7 +109,11 @@ class JobsSummaryAbility {
 		}
 		$filters = array_merge( $filters, $ownership_scope );
 
-		$summary = empty( $input['compact'] ) ? $this->db_jobs->get_jobs_summary( $filters ) : $this->getCompactSummary( $filters );
+		$summary     = empty( $input['compact'] ) ? $this->db_jobs->get_jobs_summary( $filters ) : $this->getCompactSummary( $filters );
+		$query_error = $this->jobQueryFailed();
+		if ( $query_error ) {
+			return $query_error;
+		}
 
 		return array(
 			'success' => true,
