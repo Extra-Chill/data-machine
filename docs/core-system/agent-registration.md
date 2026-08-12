@@ -1,15 +1,14 @@
 # Agent Registration
 
-Declarative agent registration via the `wp_agents_api_init` action. Plugins (and Data Machine itself) declare agent roles once; the side-effect-free registry collects those declarations, and Data Machine's materializer reconciles them against the `datamachine_agents` table on `init` while Data Machine hosts the in-place substrate.
+Declarative agent registration uses the Agents API `wp_agents_api_init` action. Plugins and Data Machine declare agent roles once; Data Machine's materializer reconciles the registered definitions against the `datamachine_agents` table on `init`.
 
-**Since:** 0.71.0
 **Source:** `agents-api/inc/class-wp-agent.php`, `agents-api/inc/class-wp-agents-registry.php`, `agents-api/inc/register-agents.php`, `inc/Engine/Agents/AgentRegistry.php`, `inc/Engine/Agents/datamachine-register-agents.php`
 
 ## Why
 
-Agents were previously materialized imperatively — either via `AgentAbilities::createAgent()` from CLI/REST, or lazily via `datamachine_resolve_or_create_agent_id()` on first chat turn. That works for per-user personal agents but doesn't give extensions a clean way to ship a bundled agent role (e.g. a wiki-generator, a support-triage bot, a content-reviewer).
+Declarative registration lets extensions ship bundled agent roles such as a wiki generator, support triage agent, or content reviewer. User-created and lazily provisioned personal agents continue to use the imperative ability paths described below.
 
-The registry mirrors the `register_post_type()` / `register_taxonomy()` pattern: plugins declare the role, Data Machine owns today's runtime. The public vocabulary mirrors the Abilities API direction (`wp_register_agent()`, `wp_get_agent()`, `wp_get_agents()`, `wp_has_agent()`, `wp_unregister_agent()`, `WP_Agent`, `WP_Agents_Registry`, `wp_agents_api_init`) so the generic registry can move cleanly if Agents API is extracted later. Data Machine dogfoods it — the default site administrator agent is registered through the same hook.
+The registry mirrors the `register_post_type()` / `register_taxonomy()` pattern: plugins declare roles through Agents API, and Data Machine materializes the product-owned rows and files. The public surface is `wp_register_agent()`, `wp_get_agent()`, `wp_get_agents()`, `wp_has_agent()`, `wp_unregister_agent()`, `WP_Agent`, `WP_Agents_Registry`, and `wp_agents_api_init`. Data Machine registers the default site administrator agent through the same hook.
 
 ## Declaring an agent
 
@@ -53,14 +52,12 @@ The current registry intentionally does **not** implement Abilities API-style ca
 
 Abilities need first-class categories because abilities are many small executable actions exposed through REST discovery and filtering. Agents are runtime definitions; their executable surface should be discovered through abilities/runtime tool declarations and explicit policy, not through a second category hierarchy on the agent object.
 
-Agents API v1 should therefore keep category semantics out of `WP_Agent`:
+Category semantics are not part of `WP_Agent`:
 
-- No `WP_Agent_Category` registry in the first standalone extraction.
+- There is no `WP_Agent_Category` registry.
 - No category-derived permissions, REST visibility, tool policy, or memory policy.
 - Data Machine admin grouping remains Data Machine product behavior.
 - Future descriptive `metadata`, `type`, `capabilities`, or `annotations` fields can be added after the public class contract is finalized, but they must be non-authoritative until a separate issue defines their semantics.
-
-See `docs/development/agents-api-pre-extraction-audit.md` for the extraction checklist and the comparison to Abilities API categories.
 
 ### Slug semantics
 
@@ -82,7 +79,7 @@ Agents API deliberately follows the Abilities API vocabulary without copying eve
 | Duplicate registration | Rejected with `_doing_it_wrong()` | Last registration wins |
 | Lookup helpers | `wp_get_ability()`, `wp_get_abilities()`, `wp_has_ability()`, `wp_unregister_ability()` | `wp_get_agent()`, `wp_get_agents()`, `wp_has_agent()`, `wp_unregister_agent()` |
 
-The timing divergence is intentional for v1. Data Machine's materializer fires registry reads from `init` priority 15, and some tests/consumers register definitions directly before that lazy collection path. Rejecting outside-hook registration would be more core-shaped, but it would be a behavior change for the in-repo substrate. New code should still prefer the hook form so extraction can tighten timing later.
+Data Machine's materializer reads the registry from `init` priority 15, and direct registration before that lazy collection path remains supported. New code should use `wp_agents_api_init` so declarations participate in the documented lifecycle.
 
 ## Reconciliation
 
@@ -92,7 +89,7 @@ Reconciliation runs on `init` at priority 15:
 - **Priority 15: `AgentRegistry::reconcile()` fires the `wp_agents_api_init` action, collects registrations, creates missing DB rows, scaffolds agent-layer memory files.**
 - Priority 20: existing `datamachine_needs_scaffold` transient check. No-op when the registry has already scaffolded.
 
-The `wp_agents_api_init` action is also fired lazily by `AgentRegistry::get_all()` / `get()` / `reconcile()` — so any caller can query the registry regardless of hook ordering. The legacy `datamachine_register_agents` hook and `datamachine_register_agent()` wrapper still fire while this surface lives in Data Machine; new code should use the WordPress-shaped names.
+The `wp_agents_api_init` action is also fired lazily by `AgentRegistry::get_all()` / `get()` / `reconcile()`, so callers can query the registry regardless of hook ordering. Extensions use the Agents API registration functions and `wp_agents_api_init` lifecycle.
 
 ## Memory seed resolution
 

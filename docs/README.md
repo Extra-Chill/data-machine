@@ -27,8 +27,8 @@ Core should expose behavior through abilities, hooks, REST, CLI, handlers, and b
 ## Quick Navigation
 
 ### Core Concepts
-- **Overview**: Product map, pipeline/flow/job model, agent modes, and extension boundaries ([overview.md](overview.md)).
-- **Architecture**: Execution engine, services layer, handler infrastructure, and boundary principles ([architecture.md](architecture.md)).
+- **Architecture**: Start here for the canonical `agent -> pipeline -> flow -> job -> packets/artifacts` model, runtime layers, adapters, and source anchors ([architecture.md](architecture.md)).
+- **Overview**: User-facing product map, agent modes, and capabilities ([overview.md](overview.md)).
 - **Engine Execution**: Bounded execution cycle, Single Item Execution Model, job status logic, and retry behavior ([core-system/engine-execution.md](core-system/engine-execution.md)).
 - **Pipeline Execution Axes**: Queue, fan-out, per-step iteration, and scheduled runs as separate dimensions ([architecture/pipeline-execution-axes.md](architecture/pipeline-execution-axes.md)).
 - **Troubleshooting Problem Flows**: Automated monitoring of consecutive failures/no-items and how to resolve them ([core-system/troubleshooting-problem-flows.md](core-system/troubleshooting-problem-flows.md)).
@@ -36,8 +36,7 @@ Core should expose behavior through abilities, hooks, REST, CLI, handlers, and b
 - **WP-CLI**: Current command surface including cycle, drain, worker, pending actions, retention, bundles, and aliases ([core-system/wp-cli.md](core-system/wp-cli.md)).
 
 ### Architecture Deep Dives
-- **Agents API Boundary**: Why durable agent runtime primitives live in Agents API while Data Machine owns product automation ([development/agents-api-pre-extraction-audit.md](development/agents-api-pre-extraction-audit.md)).
-- **Duplicated Substrate Inventory**: Follow-up map for remaining generic seams and Data Machine adapters ([development/agents-api-duplicated-substrate-inventory.md](development/agents-api-duplicated-substrate-inventory.md)).
+- **AI Runtime Boundary**: Current Data Machine adapter ownership around Agents API and wp-ai-client ([../inc/Engine/AI/README.md](../inc/Engine/AI/README.md)).
 - **Agent Memory Backends**: Store selection model for disk-backed memory, optional guideline-backed stores, and the DMC file-projection boundary ([architecture/agent-memory-backends.md](architecture/agent-memory-backends.md)).
 - **Pipeline Execution Axes**: Queue, fan-out, and per-step iteration semantics ([architecture/pipeline-execution-axes.md](architecture/pipeline-execution-axes.md)).
 - **Policy Resolvers**: Why tool, memory, directive, action, and transcript policies stay as single-purpose classes ([architecture/policy-resolvers.md](architecture/policy-resolvers.md)).
@@ -127,8 +126,6 @@ docs/
 │       ├── internal-links.md          # Link audit and diagnostics routes
 │       └── errors.md                  # Error handling reference
 ├── development/                       # Developer-focused documentation
-│   ├── agents-api-pre-extraction-audit.md # Agents API/Data Machine boundary record
-│   ├── agents-api-duplicated-substrate-inventory.md # Remaining substrate follow-ups
 │   ├── hooks/                         # Core actions, filters, and engine hooks
 │   └── rest-integration.md            # REST API extension patterns
 └── README.md                          # This navigation and orientation page

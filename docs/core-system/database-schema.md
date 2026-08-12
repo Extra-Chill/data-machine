@@ -1,6 +1,17 @@
 # Database Schema
 
-Data Machine uses core tables for managing pipelines, flows, jobs, agents, access control, deduplication tracking, durable source coverage, chat sessions, and centralized logging.
+Data Machine persists workflow definitions, execution state, access control, source tracking, artifacts, chat, approvals, and logs in custom tables. The authoritative installation path is `datamachine_ensure_all_tables()` in `data-machine.php`; table names and columns are authoritative in each repository's `TABLE_NAME` and `create_table()` implementation.
+
+The current install path creates 17 named tables. Agent identity tables use `$wpdb->base_prefix`; workflow tables generally use the current site's `$wpdb->prefix`; the chat repository is network-aware.
+
+| Scope | Tables |
+|---|---|
+| Network agent identity | `datamachine_agents`, `datamachine_agent_access`, `datamachine_agent_principal_access`, `datamachine_agent_tokens` |
+| Workflow and execution | `datamachine_pipelines`, `datamachine_flows`, `datamachine_jobs`, `datamachine_batch_items`, `datamachine_run_metadata` |
+| Source and content identity | `datamachine_processed_items`, `datamachine_tracked_items`, `datamachine_post_identity`, `datamachine_post_identity_reservations` |
+| Artifacts, chat, approvals, and operations | `datamachine_bundle_artifacts`, `datamachine_chat_sessions`, `datamachine_pending_actions`, `datamachine_logs` |
+
+The detailed sections below explain the primary product tables. For tables not expanded here, follow the implementation links implied by the inventory (`inc/Core/Database/` and `inc/Engine/AI/Actions/PendingActionStore.php`) rather than assuming an older abbreviated table list is complete.
 
 ## Core Tables
 
