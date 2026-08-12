@@ -78,33 +78,6 @@ class Jobs extends BaseRepository {
 		}
 	}
 
-	/**
-	 * Known compound status suffixes for exact-match queries.
-	 *
-	 * Each key maps a status prefix to the known variants that share it.
-	 * Used by delete_old_jobs() and count_old_jobs() to build IN clauses
-	 * instead of LIKE, which enables efficient use of the idx_status_created
-	 * composite index.
-	 *
-	 * Only prefixes whose variants are genuinely enumerable belong here.
-	 * `failed` is deliberately absent: real failure statuses embed arbitrary
-	 * error text (e.g. `failed - packet_failure`, `failed: policy not
-	 * satisfied`), so they can never be enumerated and a prefix LIKE
-	 * `failed%` is the honest match. That LIKE is a prefix pattern, so it
-	 * still uses idx_status_created, and it matches both bare `failed` and
-	 * every compound form — matching the LIKE semantics already used by
-	 * get_jobs_count(), get_jobs_for_list_table(), and delete_jobs().
-	 *
-	 * @var array<string, string[]>
-	 */
-	private const STATUS_VARIANTS = array(
-		'completed' => array(
-			'completed',
-			'completed_no_items',
-			'agent_skipped',
-		),
-	);
-
 	// ---------------------------------------------------------------------
 	// CRUD
 	// ---------------------------------------------------------------------
@@ -567,7 +540,8 @@ class Jobs extends BaseRepository {
 			$result['reason'] = 'action_receipt_missing';
 			return $result;
 		}
-		$engine                              = is_array( $job['engine_data'] ?? null ) ? $job['engine_data'] : array();
+		$engine = is_array( $job['engine_data'] ?? null ) ? $job['engine_data'] : array();
+		unset( $engine['job_status_reason'] );
 		$engine['direct_operation_recovery'] = array(
 			'schema'                        => 'datamachine.direct-operation-recovery.v1',
 			'state'                         => 'requeued',
@@ -641,7 +615,18 @@ class Jobs extends BaseRepository {
 		);
 		// phpcs:enable WordPress.DB.PreparedSQL
 
-		return 1 === (int) $updated;
+		if ( 1 !== (int) $updated ) {
+			return false;
+		}
+		EngineData::mutate(
+			$job_id,
+			static function ( array $engine ): array {
+				unset( $engine['job_status_reason'] );
+				return $engine;
+			},
+			'job_reopened'
+		);
+		return true;
 	}
 
 	/** Mark that a direct operation may have entered owner-controlled effects. */
@@ -830,9 +815,7 @@ class Jobs extends BaseRepository {
 		}
 
 		if ( ! empty( $args['status'] ) ) {
-			$status_value    = sanitize_text_field( $args['status'] );
-			$where_clauses[] = 'status LIKE %s';
-			$where_values[]  = $this->wpdb->esc_like( $status_value ) . '%';
+			$this->append_status_filter( $where_clauses, $where_values, 'status', (string) $args['status'] );
 		}
 
 		if ( ! empty( $args['source'] ) ) {
@@ -1018,9 +1001,7 @@ class Jobs extends BaseRepository {
 		}
 
 		if ( ! empty( $args['status'] ) ) {
-			$status_value    = sanitize_text_field( $args['status'] );
-			$where_clauses[] = $prefix . 'status LIKE %s';
-			$where_values[]  = $this->wpdb->esc_like( $status_value ) . '%';
+			$this->append_status_filter( $where_clauses, $where_values, $prefix . 'status', (string) $args['status'] );
 		}
 
 		if ( ! empty( $args['source'] ) ) {
@@ -1073,18 +1054,24 @@ class Jobs extends BaseRepository {
 	 */
 	private function get_status_summary_rows( string $where_sql, array $where_values ): array {
 		// phpcs:disable WordPress.DB.PreparedSQL,WordPress.DB.PreparedSQLPlaceholders -- Dynamic clauses are fixed repository fragments; every value is passed to prepare().
-		$query = $this->wpdb->prepare(
-			"SELECT
-				CASE
-					WHEN LEFT(j.status, 13) = 'agent_skipped' THEN 'agent_skipped'
-					WHEN LEFT(j.status, 18) = 'completed_no_items' THEN 'completed_no_items'
-					WHEN LEFT(j.status, 6) = 'failed' THEN 'failed'
-					ELSE j.status
-				END AS status,
+		$status_expression = JobStatusMigration::isComplete()
+			? 'j.status'
+			: "CASE
+				WHEN j.status LIKE 'agent_skipped - %' OR j.status LIKE 'agent_skipped:%' THEN 'agent_skipped'
+				WHEN j.status LIKE 'completed_no_items - %' OR j.status LIKE 'completed_no_items:%' THEN 'completed_no_items'
+				WHEN j.status LIKE 'completed - %' OR j.status LIKE 'completed:%' THEN 'completed'
+				WHEN j.status LIKE 'failed - %' OR j.status LIKE 'failed:%' THEN 'failed'
+				WHEN j.status LIKE 'cancelled - %' OR j.status LIKE 'cancelled:%' THEN 'cancelled'
+				WHEN j.status LIKE 'processing - %' OR j.status LIKE 'processing:%' THEN 'processing'
+				WHEN j.status LIKE 'waiting - %' OR j.status LIKE 'waiting:%' THEN 'waiting'
+				WHEN j.status LIKE 'pending - %' OR j.status LIKE 'pending:%' THEN 'pending'
+				ELSE j.status END";
+		$query             = $this->wpdb->prepare(
+			"SELECT {$status_expression} AS status,
 				COUNT(*) AS count
 			 FROM %i j
 			 {$where_sql}
-			 GROUP BY status
+			 GROUP BY 1
 			 ORDER BY count DESC",
 			array_merge( array( $this->table_name ), $where_values )
 		);
@@ -1299,10 +1286,7 @@ class Jobs extends BaseRepository {
 		}
 
 		if ( ! empty( $args['status'] ) ) {
-			$status_value = sanitize_text_field( $args['status'] );
-			// Prefix match: --status=failed matches "failed", "failed:reason", etc.
-			$where_clauses[] = 'j.status LIKE %s';
-			$where_values[]  = $this->wpdb->esc_like( $status_value ) . '%';
+			$this->append_status_filter( $where_clauses, $where_values, 'j.status', (string) $args['status'] );
 		}
 
 		if ( ! empty( $args['source'] ) ) {
@@ -1743,17 +1727,43 @@ class Jobs extends BaseRepository {
 	 * @return array{type: 'in', values: string[]} | array{type: 'like', pattern: string}
 	 */
 	private function resolve_status_match( string $status_prefix ): array {
-		if ( isset( self::STATUS_VARIANTS[ $status_prefix ] ) ) {
-			return array(
-				'type'   => 'in',
-				'values' => self::STATUS_VARIANTS[ $status_prefix ],
-			);
-		}
-
+		$values = 'completed' === $status_prefix
+			? array( JobStatus::COMPLETED, JobStatus::COMPLETED_NO_ITEMS, JobStatus::AGENT_SKIPPED )
+			: array( JobStatus::fromString( $status_prefix )->getBaseStatus() );
 		return array(
-			'type'    => 'like',
-			'pattern' => $this->wpdb->esc_like( $status_prefix ) . '%',
+			'type'   => JobStatusMigration::isComplete() ? 'in' : 'mixed',
+			'values' => $values,
 		);
+	}
+
+	/** Build a cleanup predicate that covers only recognized legacy delimiters. */
+	private function status_match_sql( array $status_match, array &$values ): string {
+		$placeholders = implode( ',', array_fill( 0, count( $status_match['values'] ), '%s' ) );
+		$values       = array_merge( $values, $status_match['values'] );
+		$sql          = "status IN ({$placeholders})";
+		if ( 'mixed' !== $status_match['type'] ) {
+			return $sql;
+		}
+		foreach ( $status_match['values'] as $base ) {
+			$sql     .= ' OR status LIKE %s OR status LIKE %s';
+			$values[] = $this->wpdb->esc_like( $base . ' - ' ) . '%';
+			$values[] = $this->wpdb->esc_like( $base . ':' ) . '%';
+		}
+		return '(' . $sql . ')';
+	}
+
+	/** Add an exact canonical filter with a bounded legacy transition fallback. */
+	private function append_status_filter( array &$clauses, array &$values, string $column, string $status ): void {
+		$base = JobStatus::fromString( sanitize_text_field( $status ) )->getBaseStatus();
+		if ( JobStatusMigration::isComplete() ) {
+			$clauses[] = $column . ' = %s';
+			$values[]  = $base;
+			return;
+		}
+		$clauses[] = '(' . $column . ' = %s OR ' . $column . ' LIKE %s OR ' . $column . ' LIKE %s)';
+		$values[]  = $base;
+		$values[]  = $this->wpdb->esc_like( $base . ' - ' ) . '%';
+		$values[]  = $this->wpdb->esc_like( $base . ':' ) . '%';
 	}
 
 	/**
@@ -1780,24 +1790,10 @@ class Jobs extends BaseRepository {
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
-		if ( 'in' === $match['type'] ) {
-			$placeholders = implode( ',', array_fill( 0, count( $match['values'] ), '%s' ) );
-			$args         = array_merge(
-				array( "DELETE FROM %i WHERE status IN ({$placeholders}) AND {$age_column} < %s", $this->table_name ),
-				$match['values'],
-				array( $cutoff_datetime )
-			);
-			$result       = $this->wpdb->query( $this->wpdb->prepare( ...$args ) );
-		} else {
-			$result = $this->wpdb->query(
-				$this->wpdb->prepare(
-					"DELETE FROM %i WHERE status LIKE %s AND {$age_column} < %s",
-					$this->table_name,
-					$match['pattern'],
-					$cutoff_datetime
-				)
-			);
-		}
+		$values     = array();
+		$status_sql = $this->status_match_sql( $match, $values );
+		$args       = array_merge( array( "DELETE FROM %i WHERE {$status_sql} AND {$age_column} < %s", $this->table_name ), $values, array( $cutoff_datetime ) );
+		$result     = $this->wpdb->query( $this->wpdb->prepare( ...$args ) );
 		// phpcs:enable WordPress.DB.PreparedSQL
 
 		do_action(
@@ -1836,24 +1832,10 @@ class Jobs extends BaseRepository {
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
-		if ( 'in' === $match['type'] ) {
-			$placeholders = implode( ',', array_fill( 0, count( $match['values'] ), '%s' ) );
-			$args         = array_merge(
-				array( "SELECT COUNT(*) FROM %i WHERE status IN ({$placeholders}) AND {$age_column} < %s", $this->table_name ),
-				$match['values'],
-				array( $cutoff_datetime )
-			);
-			$count        = $this->wpdb->get_var( $this->wpdb->prepare( ...$args ) );
-		} else {
-			$count = $this->wpdb->get_var(
-				$this->wpdb->prepare(
-					"SELECT COUNT(*) FROM %i WHERE status LIKE %s AND {$age_column} < %s",
-					$this->table_name,
-					$match['pattern'],
-					$cutoff_datetime
-				)
-			);
-		}
+		$values     = array();
+		$status_sql = $this->status_match_sql( $match, $values );
+		$args       = array_merge( array( "SELECT COUNT(*) FROM %i WHERE {$status_sql} AND {$age_column} < %s", $this->table_name ), $values, array( $cutoff_datetime ) );
+		$count      = $this->wpdb->get_var( $this->wpdb->prepare( ...$args ) );
 		// phpcs:enable WordPress.DB.PreparedSQL
 
 		return (int) $count;
@@ -2335,7 +2317,9 @@ class Jobs extends BaseRepository {
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		$committed = false !== $this->wpdb->query( 'COMMIT' );
-		wp_cache_delete( $job_id, 'datamachine_engine_data' );
+		if ( function_exists( 'wp_cache_delete' ) ) {
+			wp_cache_delete( $job_id, 'datamachine_engine_data' );
+		}
 		return $committed;
 	}
 
@@ -2368,6 +2352,7 @@ class Jobs extends BaseRepository {
 		}
 
 		$engine  = is_array( $job['engine_data'] ?? null ) ? $job['engine_data'] : array();
+		unset( $engine['job_status_reason'] );
 		$receipt = is_array( $engine['scheduler_recovery']['receipt'] ?? null ) ? $engine['scheduler_recovery']['receipt'] : array();
 		if ( (int) ( $receipt['generation'] ?? 0 ) === $generation && (int) ( $receipt['action_id'] ?? 0 ) > 0 ) {
 			$this->wpdb->query( 'ROLLBACK' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
@@ -2472,7 +2457,11 @@ class Jobs extends BaseRepository {
 			);
 		}
 
-		$is_final = JobStatus::isStatusFinal( $status );
+		$job_status = JobStatus::fromString( $status );
+		if ( ! $job_status->isCanonical() ) {
+			return $this->status_transition_result( false, false, null, $status );
+		}
+		$is_final = $job_status->isFinal();
 		if ( $require_final && ! $is_final ) {
 			return array(
 				'success'        => false,
@@ -2485,74 +2474,50 @@ class Jobs extends BaseRepository {
 			return $this->transition_terminal_job_status_result( $job_id, $status );
 		}
 
-		$job = $this->get_job( $job_id );
+		if ( false === $this->wpdb->query( 'START TRANSACTION' ) ) {
+			return $this->status_transition_result( false, false, null, $status );
+		}
+		$job = $this->get_job_for_update( $job_id );
 		if ( ! is_array( $job ) ) {
-			return array(
-				'success'        => false,
-				'changed'        => false,
-				'current_status' => null,
-				'status'         => $status,
-			);
+			$this->wpdb->query( 'ROLLBACK' );
+			return $this->status_transition_result( false, false, null, $status );
 		}
 
 		$current_status = is_string( $job['status'] ?? null ) ? $job['status'] : '';
-		if ( $current_status === $status ) {
-			return array(
-				'success'        => true,
-				'changed'        => false,
-				'current_status' => $current_status,
-				'status'         => $status,
-			);
+		$status         = $job_status->getBaseStatus();
+		$current_engine = is_array( $job['engine_data'] ?? null ) ? $job['engine_data'] : array();
+		$current_reason = is_string( $current_engine['job_status_reason'] ?? null ) ? $current_engine['job_status_reason'] : null;
+		if ( $current_status === $status && $current_reason === $job_status->getReason() ) {
+			$this->wpdb->query( 'ROLLBACK' );
+			return $this->status_transition_result( true, false, $current_status, $status );
 		}
 
 		if ( JobStatus::isStatusFinal( $current_status ) ) {
-			return array(
-				'success'        => false,
-				'changed'        => false,
-				'current_status' => $current_status,
-				'status'         => $status,
-			);
+			$this->wpdb->query( 'ROLLBACK' );
+			return $this->status_transition_result( false, false, $current_status, $status );
 		}
 
-		// Truncate to fit varchar(255) column.
-		if ( strlen( $status ) > 255 ) {
-			$status = substr( $status, 0, 252 ) . '...';
-		}
-
-		$updated = LifecycleStateTransition::compare_and_set(
-			$this->wpdb,
+		$engine  = $this->engine_data_with_status_reason( $current_engine, $job_status );
+		$updated = $this->wpdb->update(
 			$this->table_name,
-			array( 'job_id' => $job_id ),
-			'status',
-			$current_status,
-			$status,
-			array(),
-			array( '%d' ),
-			array()
+			array(
+				'status'      => $status,
+				'engine_data' => wp_json_encode( $engine ),
+			),
+			array(
+				'job_id' => $job_id,
+				'status' => $current_status,
+			),
+			array( '%s', '%s' ),
+			array( '%d', '%s' )
 		);
 
-		if ( false === $updated ) {
-			return array(
-				'success'        => false,
-				'changed'        => false,
-				'current_status' => $current_status,
-				'status'         => $status,
-			);
+		if ( 1 !== (int) $updated || false === $this->wpdb->query( 'COMMIT' ) ) {
+			$this->wpdb->query( 'ROLLBACK' );
+			return $this->status_transition_result( false, false, $current_status, $status );
 		}
 
-		if ( 0 === $updated ) {
-			$job_after      = $this->get_job( $job_id );
-			$status_after   = is_array( $job_after ) && is_string( $job_after['status'] ?? null ) ? $job_after['status'] : null;
-			$race_was_no_op = $status_after === $status;
-
-			return array(
-				'success'        => $race_was_no_op,
-				'changed'        => false,
-				'current_status' => $status_after,
-				'status'         => $status,
-			);
-		}
-
+		wp_cache_delete( $job_id, 'datamachine_engine_data' );
 		( new RunLifecycleStore( $this ) )->mark_job_status( $job_id, $status );
 
 		return array(
@@ -2571,6 +2536,10 @@ class Jobs extends BaseRepository {
 	 * @return array{success: bool, changed: bool, current_status: ?string, status: string}
 	 */
 	private function transition_terminal_job_status_result( int $job_id, string $requested_status, ?array $recovery_owner = null, bool $pending_direct_cancel = false ): array {
+		$requested_job_status = JobStatus::fromString( $requested_status );
+		if ( ! $requested_job_status->isCanonical() || ! $requested_job_status->isFinal() ) {
+			return $this->status_transition_result( false, false, null, $requested_status );
+		}
 		if ( null === $recovery_owner && isset( self::$recovery_execution_fences[ $job_id ] ) ) {
 			$fence_stack    = self::$recovery_execution_fences[ $job_id ];
 			$recovery_owner = end( $fence_stack );
@@ -2604,7 +2573,7 @@ class Jobs extends BaseRepository {
 			$this->rollback_terminal_transition( $job_id );
 			return $this->status_transition_result( false, false, $current_status, $current_status );
 		}
-		if ( $current_status === $requested_status ) {
+		if ( $current_status === $requested_job_status->getBaseStatus() ) {
 			$this->rollback_terminal_transition( $job_id );
 			$this->reconcile_terminal_accounting( $job_id );
 			return $this->status_transition_result( true, false, $current_status, $current_status );
@@ -2665,9 +2634,12 @@ class Jobs extends BaseRepository {
 			$this->rollback_terminal_transition( $job_id );
 			return $this->status_transition_result( false, false, $current_status, $current_status );
 		}
-		if ( strlen( $status ) > 255 ) {
-			$status = substr( $status, 0, 252 ) . '...';
+		$prepared_job_status = JobStatus::fromString( $status );
+		if ( ! $prepared_job_status->isCanonical() ) {
+			$this->rollback_terminal_transition( $job_id );
+			return $this->status_transition_result( false, false, $current_status, $current_status );
 		}
+		$status = $prepared_job_status->getBaseStatus();
 
 		try {
 			$accounting_context = apply_filters( 'datamachine_job_terminal_accounting_context', array(), $job_id, $status );
@@ -2701,6 +2673,9 @@ class Jobs extends BaseRepository {
 			'terminal_accounting_processed_count' => $processed_claim_count,
 		);
 		$update_formats = array( '%s', '%s', '%d', null, null, '%d' );
+		$engine = $this->engine_data_with_status_reason( is_array( $job['engine_data'] ?? null ) ? $job['engine_data'] : array(), $prepared_job_status );
+		$update_data['engine_data'] = wp_json_encode( $engine );
+		$update_formats[] = '%s';
 		$operation_recovery = is_array( $recovery_owner ) && 'operation' === (string) ( $recovery_owner['mode'] ?? '' );
 		if ( $pending_direct_cancel || $operation_recovery ) {
 			$update_data['operation_state']       = 'cancelled';
@@ -2711,7 +2686,6 @@ class Jobs extends BaseRepository {
 			array_push( $update_formats, '%s', null, null, null, '%d' );
 		}
 		if ( $operation_recovery ) {
-			$engine = is_array( $job['engine_data'] ?? null ) ? $job['engine_data'] : array();
 			$engine['direct_operation_recovery'] = array(
 				'schema'                        => 'datamachine.direct-operation-recovery.v1',
 				'state'                         => 'terminalized',
@@ -2722,10 +2696,8 @@ class Jobs extends BaseRepository {
 				'recovered_at'                  => gmdate( 'c' ),
 			);
 			$update_data['engine_data'] = wp_json_encode( $engine );
-			$update_formats[]           = '%s';
 		}
 		if ( is_array( $recovery_owner ) && ! $operation_recovery ) {
-			$engine = is_array( $job['engine_data'] ?? null ) ? $job['engine_data'] : array();
 			$engine['scheduler_recovery']['state']        = 'terminalized';
 			$engine['scheduler_recovery']['completed_at'] = gmdate( 'c' );
 			$engine['scheduler_recovery']['receipt']      = array(
@@ -2734,7 +2706,6 @@ class Jobs extends BaseRepository {
 				'committed_at'    => gmdate( 'c' ),
 			);
 			$update_data['engine_data'] = wp_json_encode( $engine );
-			$update_formats[]           = '%s';
 		}
 		// phpcs:enable Generic.Formatting.MultipleStatementAlignment,WordPress.Arrays.MultipleStatementAlignment.DoubleArrowNotAligned
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
@@ -2765,13 +2736,21 @@ class Jobs extends BaseRepository {
 			$winner_status = is_array( $winner ) && is_string( $winner['status'] ?? null ) ? $winner['status'] : $current_status;
 			return $this->status_transition_result( $status === $winner_status, false, $winner_status, $winner_status );
 		}
-		if ( is_array( $recovery_owner ) ) {
-			wp_cache_delete( $job_id, 'datamachine_engine_data' );
-		}
+		wp_cache_delete( $job_id, 'datamachine_engine_data' );
 
 		$this->reconcile_terminal_accounting( $job_id );
 
 		return $this->status_transition_result( true, true, $current_status, $status );
+	}
+
+	/** Keep status detail structured and clear stale detail on later transitions. */
+	private function engine_data_with_status_reason( array $engine, JobStatus $status ): array {
+		if ( $status->hasReason() ) {
+			$engine['job_status_reason'] = $status->getReason();
+		} else {
+			unset( $engine['job_status_reason'] );
+		}
+		return $engine;
 	}
 
 	/**
@@ -2859,8 +2838,11 @@ class Jobs extends BaseRepository {
 		$status       = (string) $job['status'];
 		$completed_at = is_string( $job['completed_at'] ?? null ) ? $job['completed_at'] : null;
 
+		$reason         = is_array( $job['engine_data'] ?? null ) && is_string( $job['engine_data']['job_status_reason'] ?? null ) ? $job['engine_data']['job_status_reason'] : '';
+		$display_status = '' === $reason ? $status : $status . ' - ' . $reason;
+
 		if ( 'run_metrics' === $stage ) {
-			$completed = RunMetrics::complete( $job_id, $status, $completed_at, max( 0, (int) ( $job['terminal_accounting_processed_count'] ?? 0 ) ) );
+			$completed = RunMetrics::complete( $job_id, $display_status, $completed_at, max( 0, (int) ( $job['terminal_accounting_processed_count'] ?? 0 ) ) );
 			return $completed ? array() : array( $this->terminal_accounting_error( $stage, 'run_metrics_failed', 'Run metrics completion failed.' ) );
 		}
 
@@ -2889,7 +2871,7 @@ class Jobs extends BaseRepository {
 		}
 
 		if ( 'run_lifecycle' === $stage ) {
-			$completed = ( new RunLifecycleStore( $this ) )->mark_job_status( $job_id, $status, $completed_at );
+			$completed = ( new RunLifecycleStore( $this ) )->mark_job_status( $job_id, $display_status, $completed_at );
 			return $completed ? array() : array( $this->terminal_accounting_error( $stage, 'run_lifecycle_failed', 'Run lifecycle completion failed.' ) );
 		}
 
@@ -3318,7 +3300,7 @@ class Jobs extends BaseRepository {
 		// - Numeric string: database flow execution (e.g. '123')
 		// - 'direct': ephemeral workflow execution
 		// - NULL: job execution without pipeline/flow context
-		// status is VARCHAR(255) to support compound statuses with reasons
+		// Keep the shipped width during the data migration; values are bounded base states.
 		$sql = "CREATE TABLE $table_name (
             job_id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
             user_id bigint(20) unsigned NOT NULL DEFAULT 0,
@@ -3388,7 +3370,7 @@ class Jobs extends BaseRepository {
 	 * Migrate existing table columns to current schema.
 	 *
 	 * Handles:
-	 * - status column: varchar(20/100) -> varchar(255) for compound statuses with reasons
+	 * - status column: retain the shipped varchar width during status normalization
 	 * - pipeline_id column: bigint -> varchar(20) for 'direct' execution support
 	 * - flow_id column: bigint -> varchar(20) for 'direct' execution support
 	 *

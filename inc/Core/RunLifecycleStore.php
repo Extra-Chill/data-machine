@@ -227,14 +227,21 @@ class RunLifecycleStore {
 			return false;
 		}
 
-		$result = $this->mutate_run(
+		$job_status = JobStatus::fromString( $status );
+		$status     = $job_status->getBaseStatus();
+		$result     = $this->mutate_run(
 			$job_id,
-			function ( array $meta ) use ( $status, $completed_at ): array {
+			function ( array $meta ) use ( $status, $completed_at, $job_status ): array {
 				if ( ( $meta['status'] ?? null ) === $status && ( ! JobStatus::isStatusFinal( $status ) || ! empty( $meta['completed_at'] ) ) ) {
 					return $meta;
 				}
-				$terminal_time      = JobStatus::isStatusFinal( $status ) && ! empty( $completed_at ) ? $completed_at : $this->now();
-				$meta['status']     = $status;
+				$terminal_time  = JobStatus::isStatusFinal( $status ) && ! empty( $completed_at ) ? $completed_at : $this->now();
+				$meta['status'] = $status;
+				if ( $job_status->hasReason() ) {
+					$meta['status_reason'] = $job_status->getReason();
+				} else {
+					unset( $meta['status_reason'] );
+				}
 				$meta['updated_at'] = $terminal_time;
 				if ( JobStatus::isStatusFinal( $status ) ) {
 					$meta['completed_at'] = $meta['completed_at'] ?? $terminal_time;
@@ -252,6 +259,7 @@ class RunLifecycleStore {
 			return false;
 		}
 
+		$job_status = JobStatus::fromString( $status );
 		$transition = $this->jobs->transition_job_status_result( $job_id, $status, $is_final );
 		if ( empty( $transition['success'] ) ) {
 			return false;
@@ -259,13 +267,18 @@ class RunLifecycleStore {
 
 		return $this->mutate_run(
 			$job_id,
-			function ( array $meta ) use ( $status, $timestamp_key, $context ): array {
-				$meta['status']          = $status;
+			function ( array $meta ) use ( $job_status, $timestamp_key, $context ): array {
+				$meta['status'] = $job_status->getBaseStatus();
+				if ( $job_status->hasReason() ) {
+					$meta['status_reason'] = $job_status->getReason();
+				} else {
+					unset( $meta['status_reason'] );
+				}
 				$meta[ $timestamp_key ]  = $meta[ $timestamp_key ] ?? $this->now();
 				$meta['updated_at']      = $this->now();
 				$meta['attempt']         = max( 1, (int) ( $meta['attempt'] ?? 1 ) + (int) ( $context['attempt_delta'] ?? 0 ) );
 				$meta['last_transition'] = array(
-					'status'  => $status,
+					'status'  => $job_status->getBaseStatus(),
 					'context' => $context,
 				);
 				return $meta;

@@ -36,6 +36,16 @@ if ( ! class_exists( 'DataMachine\\Core\\Database\\ProcessedItems\\ProcessedItem
 	eval( 'namespace DataMachine\\Core\\Database\\ProcessedItems; class ProcessedItems { public const STATUS_PROCESSED = "processed"; public function get_table_name(): string { return "wp_datamachine_processed_items"; } }' );
 }
 
+if ( ! class_exists( 'wpdb' ) ) {
+	class wpdb {
+		public function esc_like( string $value ): string {
+			return $value;
+		}
+	}
+}
+$wpdb = new wpdb();
+
+require_once __DIR__ . '/../inc/Core/JobStatus.php';
 require_once __DIR__ . '/../inc/Cli/Commands/ProcessedItemsCommand.php';
 
 use DataMachine\Cli\Commands\ProcessedItemsCommand;
@@ -62,8 +72,8 @@ $result = $query_parts->invoke( $cmd, array(), 'wp_datamachine_processed_items',
 datamachine_source_rejected_assert( str_contains( $result['where_sql'], 'pi.status = %s' ), 'filters processed item status' );
 datamachine_source_rejected_assert( str_contains( $result['where_sql'], 'j.status = %s' ), 'filters owning job status' );
 datamachine_source_rejected_assert(
-	array( 'wp_datamachine_processed_items', 'wp_datamachine_jobs', 'processed', 'agent_skipped - source-rejected' ) === $result['values'],
-	'default values include both table names and exact source-rejected status'
+	array( 'wp_datamachine_processed_items', 'wp_datamachine_jobs', 'processed', 'agent_skipped - source-rejected', 'agent_skipped', '%"job_status_reason":"source-rejected"%' ) === $result['values'],
+	'default values cover legacy storage and normalized structured reason'
 );
 
 echo "Test 2: scope filters are added generically\n";

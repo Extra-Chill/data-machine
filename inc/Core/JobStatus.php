@@ -5,8 +5,8 @@
  * Centralized job status definitions, validation, and categorization.
  * Single source of truth for all job status handling across the ecosystem.
  *
- * Supports compound statuses like "agent_skipped - not a music event" where
- * the base status is "agent_skipped" and the reason is "not a music event".
+ * Accepts legacy compound statuses at input boundaries while exposing the
+ * canonical base state and human-readable reason separately.
  *
  * @package DataMachine\Core
  * @since 0.9.7
@@ -48,6 +48,17 @@ class JobStatus {
 		self::AGENT_SKIPPED,
 	);
 
+	public const ALL_STATUSES = array(
+		self::PENDING,
+		self::PROCESSING,
+		self::WAITING,
+		self::COMPLETED,
+		self::FAILED,
+		self::CANCELLED,
+		self::COMPLETED_NO_ITEMS,
+		self::AGENT_SKIPPED,
+	);
+
 	private string $baseStatus;
 	private ?string $reason;
 
@@ -66,6 +77,9 @@ class JobStatus {
 	 * base status and reason components.
 	 */
 	public static function fromString( string $status ): self {
+		if ( 'pending_runtime_tool' === $status ) {
+			return new self( self::WAITING, 'runtime_tool_request' );
+		}
 		$baseStatus = self::parseBaseStatus( $status );
 		$reason     = self::parseReason( $status );
 
@@ -259,6 +273,16 @@ class JobStatus {
 		return $this->baseStatus;
 	}
 
+	/** Compose a human-readable status without changing its storage contract. */
+	public function toDisplayString(): string {
+		return $this->toString();
+	}
+
+	/** Whether the parsed base is part of Data Machine's bounded vocabulary. */
+	public function isCanonical(): bool {
+		return in_array( $this->baseStatus, self::ALL_STATUSES, true );
+	}
+
 	/**
 	 * Magic method for string casting.
 	 */
@@ -270,25 +294,13 @@ class JobStatus {
 	 * Parse base status from a potentially compound status string.
 	 */
 	private static function parseBaseStatus( string $status ): string {
-		$base_statuses = self::FINAL_STATUSES;
+		$base_statuses = self::ALL_STATUSES;
 		usort( $base_statuses, static fn( string $a, string $b ): int => strlen( $b ) <=> strlen( $a ) );
 
 		foreach ( $base_statuses as $base ) {
-			if ( str_starts_with( $status, $base ) ) {
+			if ( $status === $base || str_starts_with( $status, $base . ' - ' ) || str_starts_with( $status, $base . ':' ) ) {
 				return $base;
 			}
-		}
-
-		if ( str_starts_with( $status, self::PROCESSING ) ) {
-			return self::PROCESSING;
-		}
-
-		if ( str_starts_with( $status, self::WAITING ) ) {
-			return self::WAITING;
-		}
-
-		if ( str_starts_with( $status, self::PENDING ) ) {
-			return self::PENDING;
 		}
 
 		return $status;
@@ -299,8 +311,14 @@ class JobStatus {
 	 */
 	private static function parseReason( string $status ): ?string {
 		if ( str_contains( $status, ' - ' ) ) {
-			$parts = explode( ' - ', $status, 2 );
-			return trim( $parts[1] ?? '' );
+			$parts  = explode( ' - ', $status, 2 );
+			$reason = trim( $parts[1] ?? '' );
+			return '' === $reason ? null : $reason;
+		}
+		if ( str_contains( $status, ':' ) ) {
+			$parts  = explode( ':', $status, 2 );
+			$reason = trim( $parts[1] ?? '' );
+			return '' === $reason ? null : $reason;
 		}
 		return null;
 	}

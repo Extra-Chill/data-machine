@@ -15,6 +15,7 @@ use WP_CLI;
 use DataMachine\Cli\BaseCommand;
 use DataMachine\Abilities\ProcessedItemsAbilities;
 use DataMachine\Core\Database\ProcessedItems\ProcessedItems;
+use DataMachine\Core\JobStatus;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -758,6 +759,8 @@ class ProcessedItemsCommand extends BaseCommand {
 	 * @return array{where_sql:string,values:array<int,mixed>}
 	 */
 	private function build_source_rejected_query_parts( array $assoc_args, string $processed_table, string $jobs_table ): array {
+		global $wpdb;
+
 		$job_status  = (string) ( $assoc_args['job-status'] ?? self::DEFAULT_SOURCE_REJECTED_JOB_STATUS );
 		$pipeline_id = $assoc_args['pipeline'] ?? null;
 		$flow_id     = $assoc_args['flow'] ?? null;
@@ -765,8 +768,18 @@ class ProcessedItemsCommand extends BaseCommand {
 		$after       = $assoc_args['after'] ?? null;
 		$before      = $assoc_args['before'] ?? null;
 
-		$where_parts = array( 'pi.status = %s', 'j.status = %s' );
-		$values      = array( $processed_table, $jobs_table, ProcessedItems::STATUS_PROCESSED, $job_status );
+		$parsed_status = JobStatus::fromString( $job_status );
+		$where_parts   = array( 'pi.status = %s' );
+		$values        = array( $processed_table, $jobs_table, ProcessedItems::STATUS_PROCESSED );
+		if ( $parsed_status->hasReason() ) {
+			$where_parts[] = '(j.status = %s OR (j.status = %s AND j.engine_data LIKE %s))';
+			$values[]      = $job_status;
+			$values[]      = $parsed_status->getBaseStatus();
+			$values[]      = '%' . $wpdb->esc_like( '"job_status_reason":"' . $parsed_status->getReason() . '"' ) . '%';
+		} else {
+			$where_parts[] = 'j.status = %s';
+			$values[]      = $parsed_status->getBaseStatus();
+		}
 
 		if ( null !== $pipeline_id && '' !== (string) $pipeline_id ) {
 			$where_parts[] = 'j.pipeline_id = %s';

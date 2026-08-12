@@ -35,7 +35,7 @@ $assert( 'jobs repository keeps full SELECT as default behavior', str_contains( 
 $assert( 'jobs summary command accepts dashboard filters', str_contains( $jobs_cli, 'wp datamachine jobs summary --pipeline=42 --since=today --format=json' ) );
 $assert( 'jobs summary ability delegates to aggregate repository query', str_contains( $jobs_summary_ability, 'get_jobs_summary( $filters )' ) );
 $assert( 'jobs repository exposes memory-safe aggregate summary query', str_contains( $jobs_db, 'function get_jobs_summary' ) );
-$assert( 'jobs summary groups status with SQL count', str_contains( $jobs_db, 'GROUP BY status' ) && str_contains( $jobs_db, 'COUNT(*) AS count' ) );
+$assert( 'jobs summary groups the canonical status expression with SQL count', str_contains( $jobs_db, 'GROUP BY 1' ) && str_contains( $jobs_db, 'COUNT(*) AS count' ) );
 $assert( 'jobs summary groups pipelines without selecting engine_data blobs', str_contains( $jobs_db, 'function get_pipeline_summary_rows' ) && false === strpos( substr( $jobs_db, strpos( $jobs_db, 'function get_pipeline_summary_rows' ), 1200 ), 'SELECT j.engine_data' ) );
 $assert( 'jobs summary handler aggregation avoids decoding engine_data', str_contains( $jobs_db, 'function get_handler_summary_rows' ) && false === strpos( substr( $jobs_db, strpos( $jobs_db, 'function get_handler_summary_rows' ), 1700 ), 'json_decode' ) );
 

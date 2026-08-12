@@ -19,6 +19,13 @@ namespace DataMachine\Core {
 	}
 }
 
+namespace DataMachine\Core\Database\RunMetadata {
+	class RunMetadata {
+		public function replace_for_engine_data( int $job_id, array $data ): void {
+		}
+	}
+}
+
 namespace {
 	if ( ! defined( 'ABSPATH' ) ) {
 		define( 'ABSPATH', __DIR__ . '/' );
@@ -65,6 +72,23 @@ namespace {
 		function do_action( string $hook, ...$args ): void {}
 	}
 
+	if ( ! function_exists( 'apply_filters' ) ) {
+		function apply_filters( string $hook, $value, ...$args ) {
+			return $value;
+		}
+	}
+
+	if ( ! function_exists( 'is_wp_error' ) ) {
+		function is_wp_error( $value ): bool {
+			return $value instanceof WP_Error;
+		}
+	}
+
+	if ( ! class_exists( 'WP_Error' ) ) {
+		class WP_Error {
+		}
+	}
+
 	if ( ! function_exists( 'wp_cache_get' ) ) {
 		function wp_cache_get( $key, string $group = '' ) {
 			return $GLOBALS['datamachine_run_lifecycle_cache'][ $group ][ $key ] ?? false;
@@ -74,6 +98,13 @@ namespace {
 	if ( ! function_exists( 'wp_cache_set' ) ) {
 		function wp_cache_set( $key, $value, string $group = '' ): bool {
 			$GLOBALS['datamachine_run_lifecycle_cache'][ $group ][ $key ] = $value;
+			return true;
+		}
+	}
+
+	if ( ! function_exists( 'wp_cache_delete' ) ) {
+		function wp_cache_delete( $key, string $group = '' ): bool {
+			unset( $GLOBALS['datamachine_run_lifecycle_cache'][ $group ][ $key ] );
 			return true;
 		}
 	}
@@ -140,6 +171,10 @@ namespace {
 
 		public function prepare( $query, ...$args ) {
 			return array( $query, $args );
+		}
+
+		public function query( $query ) {
+			return 1;
 		}
 
 		public function get_row( $query = null, $output = OBJECT, $y = 0 ) {

@@ -35,6 +35,7 @@ use DataMachine\Core\Database\Chat\Chat;
 use DataMachine\Core\Database\Chat\ConversationStoreFactory;
 use DataMachine\Core\Database\Jobs\Jobs;
 use DataMachine\Core\Database\Jobs\LegacyAIConcurrencyReconciler;
+use DataMachine\Core\Database\Jobs\JobStatusMigration;
 use AgentsAPI\AI\WP_Agent_Message;
 use DataMachine\Engine\AI\System\Tasks\SystemTask;
 use DataMachine\Engine\Tasks\TaskRegistry;
@@ -42,6 +43,57 @@ use DataMachine\Engine\Tasks\TaskRegistry;
 defined( 'ABSPATH' ) || exit;
 
 class JobsCommand extends BaseCommand {
+
+	/**
+	 * Inspect or apply one bounded batch of canonical job-status normalization.
+	 *
+	 * ## OPTIONS
+	 *
+	 * [--apply]
+	 * : Normalize one bounded batch. Without this flag the command is read-only.
+	 *
+	 * [--limit=<count>]
+	 * : Maximum legacy rows to inspect in this invocation (1-1000).
+	 * ---
+	 * default: 250
+	 * ---
+	 *
+	 * [--format=<format>]
+	 * : Output format: table or json.
+	 * ---
+	 * default: table
+	 * ---
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp datamachine jobs normalize-status
+	 *     wp datamachine jobs normalize-status --apply --limit=250
+	 *
+	 * @subcommand normalize-status
+	 */
+	public function normalize_status( array $args, array $assoc_args ): void {
+		$apply  = isset( $assoc_args['apply'] );
+		$limit  = max( 1, min( 1000, (int) ( $assoc_args['limit'] ?? 250 ) ) );
+		$format = $assoc_args['format'] ?? 'table';
+		$migration = new JobStatusMigration();
+		$result = $apply ? $migration->apply( $limit ) : $migration->inspect();
+
+		if ( 'json' === $format ) {
+			WP_CLI::line( (string) wp_json_encode( $result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+		} else {
+			foreach ( array( 'status', 'cursor', 'scanned', 'migrated', 'unknown', 'conflicts', 'errors', 'remaining' ) as $field ) {
+				WP_CLI::log( sprintf( '%-12s %s', ucfirst( $field ) . ':', (string) ( $result[ $field ] ?? 0 ) ) );
+			}
+		}
+
+		if ( $result['complete'] ) {
+			WP_CLI::success( 'Job status storage is normalized.' );
+		} elseif ( $apply ) {
+			WP_CLI::log( 'Batch complete. Re-run with --apply until status is complete; inspect unknown rows before proceeding if remaining stops decreasing.' );
+		} else {
+			WP_CLI::log( 'Dry run only. Re-run with --apply to process one bounded batch.' );
+		}
+	}
 
 	/**
 	 * Default fields for job list output.
@@ -1471,7 +1523,8 @@ class JobsCommand extends BaseCommand {
 				}
 
 				$source         = $j['source'] ?? 'pipeline';
-				$status_display = strlen( $j['status'] ?? '' ) > 40 ? substr( $j['status'], 0, 40 ) . '...' : ( $j['status'] ?? '' );
+				$full_status    = (string) ( $j['status_display'] ?? $j['status'] ?? '' );
+				$status_display = strlen( $full_status ) > 40 ? substr( $full_status, 0, 40 ) . '...' : $full_status;
 
 				if ( 'system' === $source ) {
 					$flow_display = $j['label'] ?? $j['display_label'] ?? 'System Task';

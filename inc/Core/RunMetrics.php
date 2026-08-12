@@ -419,8 +419,9 @@ class RunMetrics {
 	private static function outcomeDetails( array $job, array $engine, array $counts, array $outcome_classes ): array {
 		$status             = (string) ( $job['status'] ?? '' );
 		$job_status         = JobStatus::fromString( $status );
+		$status_reason      = $job_status->getReason() ?? ( is_string( $engine['job_status_reason'] ?? null ) ? $engine['job_status_reason'] : null );
 		$source_rejection   = is_array( $engine['source_rejection'] ?? null ) ? $engine['source_rejection'] : array();
-		$is_source_rejected = ! empty( $counts['source_rejected'] ) || ! empty( $source_rejection ) || 'source-rejected' === $job_status->getReason();
+		$is_source_rejected = ! empty( $counts['source_rejected'] ) || ! empty( $source_rejection ) || 'source-rejected' === $status_reason;
 		$class_counts       = array();
 		foreach ( $outcome_classes as $class ) {
 			$class_counts[ $class ] = (int) ( $counts[ $class ] ?? 0 );
@@ -430,7 +431,7 @@ class RunMetrics {
 			array(
 				'status'                  => $status,
 				'base_status'             => $job_status->getBaseStatus(),
-				'status_reason'           => $job_status->getReason(),
+				'status_reason'           => $status_reason,
 				'primary_class'           => $outcome_classes[0] ?? null,
 				'classes'                 => $outcome_classes,
 				'class_counts'            => $class_counts,
@@ -438,7 +439,7 @@ class RunMetrics {
 				'fetch_stages'            => self::firstStepField( $engine, 'fetch_stages' ),
 				'no_content'              => ! empty( $counts['no_content'] ) || JobStatus::COMPLETED_NO_ITEMS === $job_status->getBaseStatus(),
 				'source_rejected'         => $is_source_rejected,
-				'source_rejection_reason' => $source_rejection['reason'] ?? ( $is_source_rejected ? $job_status->getReason() : null ),
+				'source_rejection_reason' => $source_rejection['reason'] ?? ( $is_source_rejected ? $status_reason : null ),
 				'handler_slug'            => self::firstStepField( $engine, 'handler_slug' ),
 				'provider_id'             => self::firstStepField( $engine, 'provider_id' ),
 				'tool_ids'                => self::mergedStepListField( $engine, 'tool_ids' ),

@@ -17,6 +17,7 @@ use DataMachine\Abilities\PermissionHelper;
 
 use DataMachine\Core\Admin\DateFormatter;
 use DataMachine\Core\JobArtifactSurfaces;
+use DataMachine\Core\JobStatus;
 use DataMachine\Core\Database\Flows\Flows;
 use DataMachine\Core\Database\Jobs\Jobs;
 use DataMachine\Core\Database\Pipelines\Pipelines;
@@ -192,6 +193,18 @@ trait JobHelpers {
 	 * @return array Job data with *_display fields added.
 	 */
 	protected function addDisplayFields( array $job ): array {
+		$stored_status = (string) ( $job['status'] ?? '' );
+		$status        = JobStatus::fromString( $stored_status );
+		$reason        = $status->getReason();
+		if ( null === $reason && is_array( $job['engine_data'] ?? null ) ) {
+			$reason = is_string( $job['engine_data']['job_status_reason'] ?? null ) ? $job['engine_data']['job_status_reason'] : null;
+		}
+		if ( $status->isCanonical() ) {
+			$job['base_status']    = $status->getBaseStatus();
+			$job['status_reason']  = $reason;
+			$job['status_display'] = null === $reason || '' === $reason ? $job['base_status'] : $job['base_status'] . ' - ' . $reason;
+			$job['status']         = $job['status_display'];
+		}
 		if ( isset( $job['created_at'] ) ) {
 			$job['created_at_display'] = DateFormatter::format_for_display( $job['created_at'] );
 		}
