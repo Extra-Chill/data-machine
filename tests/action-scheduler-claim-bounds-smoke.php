@@ -38,7 +38,9 @@ require_once __DIR__ . '/../inc/Core/ActionScheduler/ScopedDrainService.php';
 
 use DataMachine\Core\ActionScheduler\ScopedDrainService;
 
-$GLOBALS['wpdb'] = new wpdb();
+if ( ! isset( $GLOBALS['wpdb'] ) ) {
+	$GLOBALS['wpdb'] = new wpdb();
+}
 
 $failures = array();
 $assert   = static function ( bool $condition, string $label ) use ( &$failures ): void {
