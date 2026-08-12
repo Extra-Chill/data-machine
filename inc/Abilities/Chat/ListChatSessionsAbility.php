@@ -97,30 +97,21 @@ class ListChatSessionsAbility {
 	 *
 	 * @param array $input Input parameters with user_id, optional limit, offset, mode.
 	 *
-	 * @return array Result with sessions list and total count.
+	 * @return array|\WP_Error Result with sessions list and total count.
 	 */
-	public function execute( array $input ): array {
+	public function execute( array $input ): array|\WP_Error {
 		if ( empty( $input['user_id'] ) || ! is_numeric( $input['user_id'] ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'user_id is required and must be a positive integer.',
-			);
+			return new \WP_Error( 'invalid_user_id', __( 'user_id is required and must be a positive integer.', 'data-machine' ), array( 'status' => 400 ) );
 		}
 
 		$user_id = (int) $input['user_id'];
 		$owner   = $this->resolve_transcript_owner( $input, $user_id );
 		if ( is_wp_error( $owner ) ) {
-			return array(
-				'success' => false,
-				'error'   => $owner->get_error_code(),
-			);
+			return $owner;
 		}
 
 		if ( ! $this->can_access_user_sessions( $user_id ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'session_access_denied',
-			);
+			return new \WP_Error( 'session_access_denied', __( 'You do not have access to this user\'s chat sessions.', 'data-machine' ), array( 'status' => 403 ) );
 		}
 
 		$limit    = min( 100, max( 1, (int) ( $input['limit'] ?? 20 ) ) );

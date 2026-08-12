@@ -66,13 +66,13 @@ trait ChatSessionHelpers {
 	 *
 	 * @param string $session_id Session ID to verify.
 	 * @param int    $user_id    User ID to check ownership against.
-	 * @return array|array{error: string} Session data on success, or array with 'error' key on failure.
+	 * @return array|\WP_Error Session data on success, or an error on failure.
 	 */
-	protected function verifySessionOwnership( string $session_id, int $user_id, ?array $transcript_owner = null ): array {
+	protected function verifySessionOwnership( string $session_id, int $user_id, ?array $transcript_owner = null ): array|\WP_Error {
 		$session = $this->chat_db->get_session( $session_id );
 
 		if ( ! $session ) {
-			return array( 'error' => 'session_not_found' );
+			return new \WP_Error( 'session_not_found', __( 'Chat session not found.', 'data-machine' ), array( 'status' => 404 ) );
 		}
 
 		$owns_session = null !== $transcript_owner && method_exists( $this->chat_db, 'session_matches_owner' )
@@ -80,7 +80,7 @@ trait ChatSessionHelpers {
 			: ( (int) $session['user_id'] === $user_id );
 
 		if ( ! $owns_session ) {
-			return array( 'error' => 'session_access_denied' );
+			return new \WP_Error( 'session_access_denied', __( 'You do not have access to this chat session.', 'data-machine' ), array( 'status' => 403 ) );
 		}
 
 		return $session;

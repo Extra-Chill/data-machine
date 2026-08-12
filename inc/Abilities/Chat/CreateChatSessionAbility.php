@@ -90,14 +90,11 @@ class CreateChatSessionAbility {
 	 * Execute create-chat-session ability.
 	 *
 	 * @param array $input Input parameters with user_id, optional mode, source, metadata.
-	 * @return array Result with session_id on success.
+	 * @return array|\WP_Error Result with session_id on success.
 	 */
-	public function execute( array $input ): array {
+	public function execute( array $input ): array|\WP_Error {
 		if ( empty( $input['user_id'] ) || ! is_numeric( $input['user_id'] ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'user_id is required and must be a positive integer.',
-			);
+			return new \WP_Error( 'invalid_user_id', __( 'user_id is required and must be a positive integer.', 'data-machine' ), array( 'status' => 400 ) );
 		}
 
 		$user_id    = (int) $input['user_id'];
@@ -109,10 +106,7 @@ class CreateChatSessionAbility {
 		$source     = ! empty( $input['source'] ) ? sanitize_text_field( $input['source'] ) : null;
 
 		if ( ! $this->can_access_user_sessions( $user_id ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'session_access_denied',
-			);
+			return new \WP_Error( 'session_access_denied', __( 'You do not have access to this user\'s chat sessions.', 'data-machine' ), array( 'status' => 403 ) );
 		}
 
 		$session_metadata = array(
@@ -138,10 +132,7 @@ class CreateChatSessionAbility {
 		$session_id = $this->chat_db->create_session( WordPressWorkspaceScope::current(), $user_id, $agent_slug, $session_metadata, $mode );
 
 		if ( empty( $session_id ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'Failed to create chat session.',
-			);
+			return new \WP_Error( 'chat_session_create_failed', __( 'Failed to create chat session.', 'data-machine' ), array( 'status' => 500 ) );
 		}
 
 		return array(

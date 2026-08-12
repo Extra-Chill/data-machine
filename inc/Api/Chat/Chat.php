@@ -15,7 +15,6 @@
 namespace DataMachine\Api\Chat;
 
 use DataMachine\Abilities\PermissionHelper;
-use DataMachine\Core\AbilityResult;
 use DataMachine\Core\Database\Chat\ConversationStoreFactory;
 use DataMachine\Core\PluginSettings;
 use DataMachine\Core\Workspace\WordPressWorkspaceScope;
@@ -686,10 +685,6 @@ class Chat {
 	 * and converts the result into a REST response. Handles WP_Error returns
 	 * from core's execute() pipeline (input validation, permissions, callback).
 	 *
-	 * For ability callbacks that still return { success: false, error: ... }
-	 * arrays (legacy convention), those are mapped to WP_Error. New abilities
-	 * should return WP_Error directly per core best practices.
-	 *
 	 * @since 0.62.0
 	 *
 	 * @see \WP_Ability::execute()
@@ -715,21 +710,6 @@ class Chat {
 		// Core's execute() returns WP_Error for validation/permission/callback failures.
 		if ( is_wp_error( $result ) ) {
 			return $result;
-		}
-
-		$legacy_error = AbilityResult::legacy_failure_to_wp_error(
-			$result,
-			'ability_failed',
-			'Ability execution failed.',
-			array(
-				'session_not_found'     => 404,
-				'session_access_denied' => 403,
-			),
-			500,
-			true
-		);
-		if ( $legacy_error ) {
-			return $legacy_error;
 		}
 
 		return rest_ensure_response(

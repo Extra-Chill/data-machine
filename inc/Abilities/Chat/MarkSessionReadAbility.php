@@ -73,57 +73,39 @@ class MarkSessionReadAbility {
 	 * Execute mark-session-read ability.
 	 *
 	 * @param array $input Input parameters with session_id and optional user_id.
-	 * @return array Result with last_read_at timestamp.
+	 * @return array|\WP_Error Result with last_read_at timestamp.
 	 */
-	public function execute( array $input ): array {
+	public function execute( array $input ): array|\WP_Error {
 		if ( empty( $input['session_id'] ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'session_id is required.',
-			);
+			return new \WP_Error( 'session_id_required', __( 'session_id is required.', 'data-machine' ), array( 'status' => 400 ) );
 		}
 
 		$session_id = sanitize_text_field( $input['session_id'] );
 		$user_id    = ! empty( $input['user_id'] ) ? (int) $input['user_id'] : get_current_user_id();
 
 		if ( $user_id <= 0 ) {
-			return array(
-				'success' => false,
-				'error'   => 'user_id is required and must be a positive integer.',
-			);
+			return new \WP_Error( 'invalid_user_id', __( 'user_id is required and must be a positive integer.', 'data-machine' ), array( 'status' => 400 ) );
 		}
 
 		if ( ! $this->can_access_user_sessions( $user_id ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'session_access_denied',
-			);
+			return new \WP_Error( 'session_access_denied', __( 'You do not have access to this user\'s chat sessions.', 'data-machine' ), array( 'status' => 403 ) );
 		}
 
 		$owner = $this->resolve_transcript_owner( $input, $user_id );
 		if ( is_wp_error( $owner ) ) {
-			return array(
-				'success' => false,
-				'error'   => $owner->get_error_code(),
-			);
+			return $owner;
 		}
 
 		$session = $this->verifySessionOwnership( $session_id, $user_id, $owner );
 
-		if ( isset( $session['error'] ) ) {
-			return array(
-				'success' => false,
-				'error'   => $session['error'],
-			);
+		if ( is_wp_error( $session ) ) {
+			return $session;
 		}
 
 		$last_read_at = $this->chat_db->mark_session_read( $session_id, $user_id, $owner );
 
 		if ( false === $last_read_at ) {
-			return array(
-				'success' => false,
-				'error'   => 'Failed to mark session as read.',
-			);
+			return new \WP_Error( 'chat_session_mark_read_failed', __( 'Failed to mark session as read.', 'data-machine' ), array( 'status' => 500 ) );
 		}
 
 		return array(

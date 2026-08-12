@@ -16,6 +16,10 @@
 namespace DataMachine\Tests\Unit\Core\Database\Chat;
 
 use DataMachine\Abilities\Chat\ListChatSessionsAbility;
+use DataMachine\Abilities\Chat\CreateChatSessionAbility;
+use DataMachine\Abilities\Chat\DeleteChatSessionAbility;
+use DataMachine\Abilities\Chat\GetChatSessionAbility;
+use DataMachine\Abilities\Chat\MarkSessionReadAbility;
 use DataMachine\Core\Database\Agents\Agents;
 use DataMachine\Core\Database\Chat\Chat;
 use DataMachine\Core\Database\Chat\ConversationReadStateInterface;
@@ -29,6 +33,7 @@ use AgentsAPI\Core\Database\Chat\WP_Agent_Conversation_Lock;
 use AgentsAPI\Core\Database\Chat\WP_Agent_Conversation_Store;
 use AgentsAPI\Core\Workspace\WP_Agent_Workspace_Scope;
 use WP_UnitTestCase;
+use WP_Error;
 
 class ConversationStoreFactoryTest extends WP_UnitTestCase {
 
@@ -450,6 +455,27 @@ class ConversationStoreFactoryTest extends WP_UnitTestCase {
 		$this->assertCount( 1, $result['sessions'] );
 		$this->assertSame( $session_id, $result['sessions'][0]['session_id'] );
 		$this->assertSame( 'hello', $result['sessions'][0]['first_message'] );
+	}
+
+	/**
+	 * @dataProvider chat_ability_validation_provider
+	 */
+	public function test_chat_ability_validation_failures_return_wp_error( object $ability, array $input, string $code ): void {
+		$result = $ability->execute( $input );
+
+		$this->assertInstanceOf( WP_Error::class, $result );
+		$this->assertSame( $code, $result->get_error_code() );
+		$this->assertSame( 400, $result->get_error_data()['status'] ?? null );
+	}
+
+	public function chat_ability_validation_provider(): array {
+		return array(
+			'create session user' => array( new CreateChatSessionAbility(), array(), 'invalid_user_id' ),
+			'delete session id'   => array( new DeleteChatSessionAbility(), array(), 'session_id_required' ),
+			'get session id'      => array( new GetChatSessionAbility(), array(), 'session_id_required' ),
+			'list sessions user'  => array( new ListChatSessionsAbility(), array(), 'invalid_user_id' ),
+			'mark session id'     => array( new MarkSessionReadAbility(), array(), 'session_id_required' ),
+		);
 	}
 
 	public function test_canonical_conversation_session_abilities_route_through_swapped_store(): void {
