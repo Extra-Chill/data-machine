@@ -46,8 +46,12 @@ if ( ! defined( 'WPINC' ) ) {
 require_once __DIR__ . '/ImportExport.php';
 require_once __DIR__ . '/Engine.php';
 
-use DataMachine\Abilities\EngineAbilities;
+use DataMachine\Abilities\Engine\DrainJobAbility;
+use DataMachine\Abilities\Engine\ExecuteStepAbility;
 use DataMachine\Abilities\Engine\PipelineBatchScheduler;
+use DataMachine\Abilities\Engine\RunFlowAbility;
+use DataMachine\Abilities\Engine\ScheduleFlowAbility;
+use DataMachine\Abilities\Engine\ScheduleNextStepAbility;
 use DataMachine\Engine\Actions\Handlers\MarkItemProcessedHandler;
 use DataMachine\Engine\Actions\Handlers\FailJobHandler;
 use DataMachine\Engine\Actions\Handlers\JobCompleteHandler;
@@ -129,6 +133,10 @@ function datamachine_register_core_actions() {
 		2
 	);
 	// Register engine abilities (business logic) before hook bridges.
-	new EngineAbilities();
+	new RunFlowAbility();
+	new DrainJobAbility();
+	new ExecuteStepAbility();
+	new ScheduleNextStepAbility();
+	new ScheduleFlowAbility();
 	datamachine_register_execution_engine();
 }

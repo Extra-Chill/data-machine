@@ -304,7 +304,6 @@ function datamachine_run_datamachine_plugin() {
 	require_once __DIR__ . '/inc/Abilities/AgentMemoryAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/InjectableMemoryFilesAbility.php';
 	require_once __DIR__ . '/inc/Abilities/DailyMemoryAbilities.php';
-	require_once __DIR__ . '/inc/Abilities/ChatAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/InternalLinkingAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/Content/BlockSanitizer.php';
 	require_once __DIR__ . '/inc/Abilities/Content/CanonicalDiffPreview.php';
@@ -421,7 +420,6 @@ function datamachine_run_datamachine_plugin() {
 	new \DataMachine\Abilities\AgentMemoryAbilities();
 	new \DataMachine\Abilities\InjectableMemoryFilesAbility();
 	new \DataMachine\Abilities\DailyMemoryAbilities();
-	new \DataMachine\Abilities\ChatAbilities();
 	new \DataMachine\Abilities\InternalLinkingAbilities();
 	new \DataMachine\Abilities\Content\GetPostBlocksAbility();
 	new \DataMachine\Abilities\Content\EditPostBlocksAbility();
