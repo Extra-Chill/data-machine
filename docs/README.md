@@ -37,8 +37,6 @@ Core should expose behavior through abilities, hooks, REST, CLI, handlers, and b
 
 ### Architecture Deep Dives
 - **AI Runtime Boundary**: Current Data Machine adapter ownership around Agents API and wp-ai-client ([../inc/Engine/AI/README.md](../inc/Engine/AI/README.md)).
-- **Historical Agents API Audit**: Migration record explaining the extraction path; not the current class map ([development/agents-api-pre-extraction-audit.md](development/agents-api-pre-extraction-audit.md)).
-- **Historical Duplicated Substrate Inventory**: Point-in-time follow-up record; verify surviving seams against current source ([development/agents-api-duplicated-substrate-inventory.md](development/agents-api-duplicated-substrate-inventory.md)).
 - **Agent Memory Backends**: Store selection model for disk-backed memory, optional guideline-backed stores, and the DMC file-projection boundary ([architecture/agent-memory-backends.md](architecture/agent-memory-backends.md)).
 - **Pipeline Execution Axes**: Queue, fan-out, and per-step iteration semantics ([architecture/pipeline-execution-axes.md](architecture/pipeline-execution-axes.md)).
 - **Policy Resolvers**: Why tool, memory, directive, action, and transcript policies stay as single-purpose classes ([architecture/policy-resolvers.md](architecture/policy-resolvers.md)).
@@ -128,8 +126,6 @@ docs/
 │       ├── internal-links.md          # Link audit and diagnostics routes
 │       └── errors.md                  # Error handling reference
 ├── development/                       # Developer-focused documentation
-│   ├── agents-api-pre-extraction-audit.md # Agents API/Data Machine boundary record
-│   ├── agents-api-duplicated-substrate-inventory.md # Remaining substrate follow-ups
 │   ├── hooks/                         # Core actions, filters, and engine hooks
 │   └── rest-integration.md            # REST API extension patterns
 └── README.md                          # This navigation and orientation page

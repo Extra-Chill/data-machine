@@ -60,8 +60,6 @@ Agents API v1 should therefore keep category semantics out of `WP_Agent`:
 - Data Machine admin grouping remains Data Machine product behavior.
 - Future descriptive `metadata`, `type`, `capabilities`, or `annotations` fields can be added after the public class contract is finalized, but they must be non-authoritative until a separate issue defines their semantics.
 
-See `docs/development/agents-api-pre-extraction-audit.md` for the extraction checklist and the comparison to Abilities API categories.
-
 ### Slug semantics
 
 Slugs are passed through `sanitize_title()`. Empty slugs are rejected. They must be unique across a site (DB column has a UNIQUE constraint on `agent_slug`). Two plugins registering the same slug is resolved by **last-wins** — this intentionally diverges from the Abilities API's duplicate rejection. Data Machine relies on hook priority as a fresh-install override mechanism while the registry lives in-repo.

@@ -33,7 +33,3 @@ There is no current `AIConversationLoop` Data Machine class and no `WP_Agent_Too
 Tools are model-facing adapters. A chat tool may execute the same ability as a REST controller or CLI command while retaining a model-appropriate name, description, input schema, and result shape. Static product tools, ability projections, and adjacent handler tools are composed into a resolved registry and then filtered by mode and policy.
 
 The `datamachine_tools` filter remains an extension registration point; it is not the preferred way for consumers to discover executable business operations. Use abilities for operations and `ToolManager`/tool sources for resolved model-facing tools. See [Tool Manager](tool-manager.md) and [Tool Execution](tool-execution.md).
-
-## Historical Context
-
-Before the Agents API extraction, Data Machine owned more of the generic conversation loop and message substrate. Documents under `docs/development/` named `agents-api-pre-extraction-audit.md`, `agents-api-extraction-map.md`, and `agents-api-standalone-skeleton-plan.md` preserve that migration history. They are evidence for how the current boundary was reached, not descriptions of the live class layout.

@@ -91,5 +91,3 @@ Choose discovery by boundary instead of treating filters as a service locator:
 - [REST API](api/index.md): product HTTP namespace.
 - [WP-CLI](core-system/wp-cli.md): operator command namespace.
 - [Tool Execution](core-system/tool-execution.md): model-facing tool resolution and execution.
-
-Documents under `docs/development/` whose names include `pre-extraction`, `extraction-map`, `skeleton-plan`, or `audit` are migration records and design evidence. They are not the current architecture contract unless a current page links to a specific surviving boundary.

@@ -36,8 +36,7 @@ Use this quick map before moving or renaming files:
 
 Docs that own the full map:
 
-- `docs/development/agents-api-extraction-map.md`
-- `docs/development/agents-api-pre-extraction-audit.md`
+- `docs/architecture.md`
 - `docs/core-system/ai-conversation-loop.md`
 - `docs/core-system/request-builder.md`
 - `docs/core-system/ai-message-envelope.md`
