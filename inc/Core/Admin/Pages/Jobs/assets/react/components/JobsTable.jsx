@@ -24,11 +24,10 @@ const getStatusClass = ( status ) => {
 	if ( ! status ) {
 		return 'datamachine-status--neutral';
 	}
-	const baseStatus = status.split( ' - ' )[ 0 ];
-	if ( baseStatus === 'failed' ) {
+	if ( status === 'failed' ) {
 		return 'datamachine-status--error';
 	}
-	if ( baseStatus === 'completed' ) {
+	if ( status === 'completed' ) {
 		return 'datamachine-status--success';
 	}
 	return 'datamachine-status--neutral';
@@ -43,26 +42,6 @@ const formatStatus = ( status ) => {
 		status.charAt( 0 ).toUpperCase() +
 		status.slice( 1 ).replace( /_/g, ' ' );
 	return formatted;
-};
-
-/**
- * Extract the base status (before " - " detail separator).
- */
-const getBaseStatus = ( status ) => {
-	if ( ! status ) {
-		return '';
-	}
-	return status.split( ' - ' )[ 0 ];
-};
-
-/**
- * Get the detail portion of a compound status (after " - ").
- */
-const getStatusDetail = ( status ) => {
-	if ( ! status || ! status.includes( ' - ' ) ) {
-		return null;
-	}
-	return status.split( ' - ' ).slice( 1 ).join( ' - ' );
 };
 
 /**
@@ -239,13 +218,13 @@ const ChildRows = ( { parentJobId } ) => {
 			<td>
 				<span
 					className={ getStatusClass( child.status ) }
-					title={ getStatusDetail( child.status ) || undefined }
+					title={ child.status_reason || undefined }
 				>
-					{ formatStatus( getBaseStatus( child.status ) || child.status ) }
+					{ formatStatus( child.status ) }
 				</span>
-				{ getStatusDetail( child.status ) && (
+				{ child.status_reason && (
 					<span className="datamachine-status-detail">
-						{ getStatusDetail( child.status ) }
+						{ child.status_reason }
 					</span>
 				) }
 			</td>
@@ -324,13 +303,13 @@ const JobRow = ( { job, isExpanded, onToggle } ) => {
 				<td>
 					<span
 						className={ getStatusClass( job.status ) }
-						title={ getStatusDetail( job.status ) || undefined }
+						title={ job.status_reason || undefined }
 					>
-						{ formatStatus( getBaseStatus( job.status ) || job.status ) }
+						{ formatStatus( job.status ) }
 					</span>
-					{ getStatusDetail( job.status ) && (
+					{ job.status_reason && (
 						<span className="datamachine-status-detail">
-							{ getStatusDetail( job.status ) }
+							{ job.status_reason }
 						</span>
 					) }
 				</td>

@@ -37,7 +37,7 @@ The Jobs interface is a React-based admin dashboard that lists recent job execut
 **Comprehensive Table**: The primary view displays recent jobs with:
 - **Job ID**: Unique identification and tracking.
 - **Pipeline & Flow**: Combined context showing the template and specific instance.
-- **Status**: Reflects the current state (for example `processing`, `completed`, `failed`, `completed_no_items`, `agent_skipped - {reason}`).
+- **Status**: Reflects the canonical state (for example `processing`, `completed`, `failed`, `completed_no_items`, `agent_skipped`) and renders structured reason detail separately.
 - **Timestamps**: Human-readable creation and completion times.
 
 ## Administrative Controls
@@ -48,6 +48,19 @@ The Jobs interface is a React-based admin dashboard that lists recent job execut
 - **System Maintenance**: Database optimization and cleanup tools.
 
 ## Job Status Management
+
+The indexed `datamachine_jobs.status` column stores only Data Machine's bounded base-state vocabulary. Human-readable detail is stored as `engine_data.job_status_reason` and composed into `status_display` by job abilities, so list/detail output stays scannable without increasing status-index cardinality.
+
+### Legacy Status Migration
+
+Existing compound rows are normalized only through the operator command; plugin bootstrap never scans or rewrites the jobs table.
+
+1. Inspect without mutation: `wp datamachine jobs normalize-status --format=json`.
+2. Apply one bounded batch: `wp datamachine jobs normalize-status --apply --limit=250`.
+3. Repeat apply until `status` is `complete` and `remaining` is `0`.
+4. Verify queue summaries and `SELECT status, COUNT(*) ... GROUP BY status` before considering the migration complete operationally.
+
+Progress is durable and per-site, so interrupted runs resume from the last job ID. Each row is locked and writes its reason metadata and base status in one transaction. Unknown noncanonical states are counted but not rewritten; inspect and resolve their owning code before continuing. During rollout, Data Machine readers match exact base states plus bounded legacy delimiters. Once completion is recorded, readers use exact status predicates and direct grouping. Rollback is code rollback only: the normalized base states remain valid to older code, while reason detail remains available in `engine_data`.
 
 **State Synchronization**: Leveraging TanStack Query for:
 - Automatic background refetching of job statuses.

@@ -1560,7 +1560,7 @@ function datamachine_runtime_tool_request_store(): WP_Agent_Runtime_Tool_Request
 				}
 
 				$jobs_db = new \DataMachine\Core\Database\Jobs\Jobs();
-				$jobs_db->start_job( (int) $job_id, 'pending_runtime_tool' );
+				$jobs_db->start_job( (int) $job_id, \DataMachine\Core\JobStatus::WAITING );
 				$jobs_db->store_engine_data(
 					$job_id,
 					array(

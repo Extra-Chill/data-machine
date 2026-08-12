@@ -31,6 +31,12 @@ if ( ! function_exists( 'sanitize_text_field' ) ) {
 	}
 }
 
+if ( ! function_exists( 'get_option' ) ) {
+	function get_option( string $option, $default = false ) {
+		return $default;
+	}
+}
+
 require_once __DIR__ . '/bootstrap-unit.php';
 
 use DataMachine\Core\Database\Jobs\Jobs;
@@ -128,15 +134,16 @@ final class DM_Jobs_Cleanup_Test_Wpdb {
 	private function parse_where( string $sql ): array {
 		$criteria = array();
 
-		if ( preg_match( "/status LIKE '([^']+)'/", $sql, $m ) ) {
-			$criteria['like'] = $m[1];
-		} elseif ( preg_match( '/status IN \(([^)]+)\)/', $sql, $m ) ) {
+		if ( preg_match( '/status IN \(([^)]+)\)/', $sql, $m ) ) {
 			$criteria['in'] = array_map(
 				static function ( string $v ): string {
 					return trim( $v, "' \"" );
 				},
 				explode( ',', $m[1] )
 			);
+		}
+		if ( preg_match_all( "/status LIKE '([^']+)'/", $sql, $matches ) ) {
+			$criteria['like'] = $matches[1];
 		}
 
 		if ( preg_match( "/created_at < '([^']+)'/", $sql, $m ) ) {
@@ -149,14 +156,12 @@ final class DM_Jobs_Cleanup_Test_Wpdb {
 	private function row_matches( array $row, array $criteria ): bool {
 		$status = $row['status'] ?? '';
 
-		if ( isset( $criteria['like'] ) ) {
-			if ( ! $this->like_match( $status, $criteria['like'] ) ) {
-				return false;
-			}
-		} elseif ( isset( $criteria['in'] ) ) {
-			if ( ! in_array( $status, $criteria['in'], true ) ) {
-				return false;
-			}
+		$status_matches = isset( $criteria['in'] ) && in_array( $status, $criteria['in'], true );
+		foreach ( $criteria['like'] ?? array() as $pattern ) {
+			$status_matches = $status_matches || $this->like_match( $status, $pattern );
+		}
+		if ( ( isset( $criteria['in'] ) || isset( $criteria['like'] ) ) && ! $status_matches ) {
+			return false;
 		}
 
 		if ( isset( $criteria['cutoff'] ) ) {
@@ -246,9 +251,10 @@ dm_cleanup_assert(
 	"expected 3, got {$count}; query: " . $GLOBALS['wpdb']->last_query
 );
 dm_cleanup_assert(
-	'count_old_jobs(failed) uses LIKE (not IN) for the failed prefix',
-	false !== strpos( $GLOBALS['wpdb']->last_query, "status LIKE 'failed%'" )
-		&& false === strpos( $GLOBALS['wpdb']->last_query, "status IN ('failed')" )
+	'count_old_jobs(failed) uses exact base plus bounded legacy delimiters',
+	false !== strpos( $GLOBALS['wpdb']->last_query, "status IN ('failed')" )
+		&& false !== strpos( $GLOBALS['wpdb']->last_query, "status LIKE 'failed - %'" )
+		&& false !== strpos( $GLOBALS['wpdb']->last_query, "status LIKE 'failed:%'" )
 );
 dm_cleanup_assert(
 	'count_old_jobs(failed) applies the age cutoff',
@@ -264,8 +270,8 @@ dm_cleanup_assert(
 	"expected 3, got {$deleted}; query: " . $GLOBALS['wpdb']->last_query
 );
 dm_cleanup_assert(
-	'delete_old_jobs(failed) uses LIKE for the failed prefix',
-	false !== strpos( $GLOBALS['wpdb']->last_query, "status LIKE 'failed%'" )
+	'delete_old_jobs(failed) uses bounded legacy delimiters',
+	false !== strpos( $GLOBALS['wpdb']->last_query, "status LIKE 'failed - %'" )
 );
 
 // Recent failed job survived the age-gated delete.

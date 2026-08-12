@@ -19,6 +19,13 @@ namespace DataMachine\Core {
 	}
 }
 
+namespace DataMachine\Core\Database\RunMetadata {
+	class RunMetadata {
+		public function replace_for_engine_data( int $job_id, array $data ): void {
+		}
+	}
+}
+
 namespace {
 	if ( ! defined( 'ABSPATH' ) ) {
 		define( 'ABSPATH', __DIR__ . '/' );
@@ -67,6 +74,13 @@ namespace {
 		}
 	}
 
+	if ( ! function_exists( 'wp_cache_delete' ) ) {
+		function wp_cache_delete( $key, string $group = '' ): bool {
+			unset( $GLOBALS['datamachine_transition_cache'][ $group ][ $key ] );
+			return true;
+		}
+	}
+
 	$datamachine_transition_hooks = array();
 
 	if ( ! function_exists( 'current_time' ) ) {
@@ -81,6 +95,23 @@ namespace {
 				'hook' => $hook,
 				'args' => $args,
 			);
+		}
+	}
+
+	if ( ! function_exists( 'apply_filters' ) ) {
+		function apply_filters( string $hook, $value, ...$args ) {
+			return $value;
+		}
+	}
+
+	if ( ! function_exists( 'is_wp_error' ) ) {
+		function is_wp_error( $value ): bool {
+			return $value instanceof WP_Error;
+		}
+	}
+
+	if ( ! class_exists( 'WP_Error' ) ) {
+		class WP_Error {
 		}
 	}
 
@@ -130,6 +161,10 @@ namespace {
 
 		public function prepare( $query, ...$args ) {
 			return array( $query, $args );
+		}
+
+		public function query( $query ) {
+			return 1;
 		}
 
 		public function get_row( $query = null, $output = OBJECT, $y = 0 ) {
@@ -186,15 +221,16 @@ namespace {
 
 	$assert( 'non-final update succeeds', $jobs->update_job_status( 10, 'processing' ) );
 	$non_terminal = $status_updates()[0]['data'] ?? array();
-	$assert( 'non-final update writes status only', array( 'status' ) === array_keys( $non_terminal ) );
+	$assert( 'non-final update writes canonical status and synchronized engine data', array( 'status', 'engine_data' ) === array_keys( $non_terminal ) );
 	$assert( 'non-final update does not fire completion hook', 0 === count( $datamachine_transition_hooks ) );
 
 	$assert( 'terminal update succeeds through update_job_status', $jobs->update_job_status( 11, 'completed' ) );
 	$terminal = $status_updates()[1]['data'] ?? array();
 	$assert( 'terminal update writes completed_at', isset( $terminal['completed_at'] ) && is_string( $terminal['completed_at'] ) && '' !== $terminal['completed_at'] );
 	$assert( 'terminal update records run metrics', 'completed' === ( RunMetrics::$completed[11] ?? '' ) );
-	$assert( 'terminal update fires completion hook once', 1 === count( $datamachine_transition_hooks ) );
-	$assert( 'completion hook receives terminal status', 'completed' === ( $datamachine_transition_hooks[0]['args'][1] ?? '' ) );
+	$completion_hooks = array_values( array_filter( $datamachine_transition_hooks, static fn( array $event ): bool => 'datamachine_job_complete' === $event['hook'] ) );
+	$assert( 'terminal update fires completion hook once', 1 === count( $completion_hooks ) );
+	$assert( 'completion hook receives terminal status', 'completed' === ( $completion_hooks[0]['args'][1] ?? '' ) );
 
 	$assert( 'complete_job rejects non-final statuses', false === $jobs->complete_job( 12, 'processing' ) );
 	$assert( 'rejected complete_job does not write', 2 === count( $status_updates() ) );
