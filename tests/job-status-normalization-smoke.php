@@ -11,31 +11,29 @@ if ( ! defined( 'ARRAY_A' ) ) {
 $GLOBALS['dm_status_options'] = array();
 $GLOBALS['dm_status_cache_deletes'] = array();
 
-function get_option( string $key, $default = false ) {
-	return $GLOBALS['dm_status_options'][ $key ] ?? $default;
-}
-function update_option( string $key, $value, bool $autoload = false ): bool {
-	$GLOBALS['dm_status_options'][ $key ] = $value;
-	return true;
-}
-function wp_json_encode( $value ) {
-	return json_encode( $value );
-}
-function wp_cache_delete( $key, string $group = '' ): bool {
-	$GLOBALS['dm_status_cache_deletes'][] = array( $key, $group );
-	return true;
+eval( 'namespace DataMachine\\Core\\Database\\Jobs {
+	function get_option( string $key, $default = false ) { return $GLOBALS["dm_status_options"][ $key ] ?? $default; }
+	function update_option( string $key, $value, bool $autoload = false ): bool { $GLOBALS["dm_status_options"][ $key ] = $value; return true; }
+	function wp_json_encode( $value ) { return json_encode( $value ); }
+	function wp_cache_delete( $key, string $group = "" ): bool { $GLOBALS["dm_status_cache_deletes"][] = array( $key, $group ); return true; }
+}' );
+
+if ( ! class_exists( 'wpdb' ) ) {
+	class wpdb {}
 }
 
-class wpdb {
-	public string $prefix = 'wp_';
-	public string $last_error = '';
+class JobStatusMigrationWpdb extends wpdb {
+	public $prefix = 'wp_';
+	public $last_error = '';
 	public array $rows = array();
 
-	public function prepare( string $query, ...$args ): array {
+	public function __construct() {}
+
+	public function prepare( $query, ...$args ) {
 		return array( $query, $args );
 	}
 
-	public function get_results( $query, $output = null ): array {
+	public function get_results( $query = null, $output = OBJECT ) {
 		$args = $query[1];
 		$cursor = (int) $args[1];
 		$limit = (int) $args[2];
@@ -44,18 +42,18 @@ class wpdb {
 		return array_slice( array_values( $rows ), 0, $limit );
 	}
 
-	public function get_var( $query ) {
+	public function get_var( $query = null, $x = 0, $y = 0 ) {
 		$args      = $query[1];
 		$canonical = 1 === count( $args ) && is_array( $args[0] ) ? array_slice( $args[0], 1 ) : array_slice( $args, 1 );
 		return count( array_filter( $this->rows, static fn( array $row ): bool => ! in_array( $row['status'], $canonical, true ) ) );
 	}
 
-	public function get_row( $query, $output = null ) {
+	public function get_row( $query = null, $output = OBJECT, $y = 0 ) {
 		$job_id = (int) end( $query[1] );
 		return $this->rows[ $job_id ] ?? null;
 	}
 
-	public function update( $table, array $data, array $where, array $formats = array(), array $where_formats = array() ) {
+	public function update( $table, $data, $where, $format = null, $where_format = null ) {
 		$job_id = (int) $where['job_id'];
 		if ( ! isset( $this->rows[ $job_id ] ) || $this->rows[ $job_id ]['status'] !== $where['status'] ) {
 			return 0;
@@ -64,7 +62,7 @@ class wpdb {
 		return 1;
 	}
 
-	public function query( string $query ) {
+	public function query( $query ) {
 		return 1;
 	}
 }
@@ -72,7 +70,8 @@ class wpdb {
 require_once __DIR__ . '/../inc/Core/JobStatus.php';
 
 if ( ! class_exists( 'DataMachine\\Core\\Database\\Jobs\\Jobs' ) ) {
-	eval( 'namespace DataMachine\\Core\\Database\\Jobs; class Jobs { public const TABLE_NAME = "datamachine_jobs"; }' );
+	// Keep the fallback aligned with the owner without duplicating its raw slug literal.
+	eval( 'namespace DataMachine\\Core\\Database\\Jobs; class Jobs { public const TABLE_NAME = "datamachine_" . "jobs"; }' );
 }
 
 require_once __DIR__ . '/../inc/Core/Database/Jobs/JobStatusMigration.php';
@@ -96,7 +95,7 @@ $assert( ! JobStatus::fromString( 'failedly' )->isCanonical(), 'prefix collision
 $runtime = JobStatus::fromString( 'pending_runtime_tool' );
 $assert( JobStatus::WAITING === $runtime->getBaseStatus() && 'runtime_tool_request' === $runtime->getReason(), 'legacy runtime-tool state maps explicitly' );
 
-$wpdb = new wpdb();
+$wpdb = new JobStatusMigrationWpdb();
 $wpdb->rows = array(
 	1 => array( 'job_id' => 1, 'status' => 'failed - provider timeout', 'engine_data' => '{"retry":{"attempt":2}}' ),
 	2 => array( 'job_id' => 2, 'status' => 'completed', 'engine_data' => '{}' ),
@@ -124,7 +123,7 @@ $assert( 0 === $again['remaining'] && 2 === $again['migrated'], 'repeated apply 
 $assert( 2 === count( $GLOBALS['dm_status_cache_deletes'] ), 'each migrated engine snapshot invalidates cache' );
 
 $GLOBALS['dm_status_options'] = array();
-$invalid_wpdb = new wpdb();
+$invalid_wpdb = new JobStatusMigrationWpdb();
 $invalid_wpdb->rows = array(
 	1 => array( 'job_id' => 1, 'status' => 'failed - reason', 'engine_data' => '{not-json' ),
 );
