@@ -38,6 +38,7 @@ use function DataMachineEvents\Core\datamachine_extract_ticket_identity;
 defined( 'ABSPATH' ) || exit;
 
 class EventDuplicateStrategy {
+	private const CANDIDATE_PAGE_SIZE = 100;
 
 	/**
 	 * Register this strategy with DM core's duplicate detection system.
@@ -159,21 +160,22 @@ class EventDuplicateStrategy {
 			return null;
 		}
 
-		$candidates         = self::findCandidatesByDate( $date_only, 100 );
 		$canonical_identity = datamachine_extract_ticket_identity( $ticketUrl );
-		foreach ( $candidates as $candidate ) {
-			$post_id              = (int) $candidate->ID;
-			$candidate_ticket_url = (string) get_post_meta( $post_id, EVENT_TICKET_URL_META_KEY, true );
-			if ( '' === $candidate_ticket_url ) {
-				continue;
-			}
+		foreach ( self::candidatePagesByDate( $date_only ) as $candidates ) {
+			foreach ( $candidates as $candidate ) {
+				$post_id              = (int) $candidate->ID;
+				$candidate_ticket_url = (string) get_post_meta( $post_id, EVENT_TICKET_URL_META_KEY, true );
+				if ( '' === $candidate_ticket_url ) {
+					continue;
+				}
 
-			if ( datamachine_normalize_ticket_url( $candidate_ticket_url ) === $normalized_url ) {
-				return self::duplicateResult( $post_id, 'ticket_url_exact' );
-			}
+				if ( datamachine_normalize_ticket_url( $candidate_ticket_url ) === $normalized_url ) {
+					return self::duplicateResult( $post_id, 'ticket_url_exact' );
+				}
 
-			if ( '' !== $canonical_identity && datamachine_extract_ticket_identity( $candidate_ticket_url ) === $canonical_identity ) {
-				return self::duplicateResult( $post_id, 'ticket_url_canonical' );
+				if ( '' !== $canonical_identity && datamachine_extract_ticket_identity( $candidate_ticket_url ) === $canonical_identity ) {
+					return self::duplicateResult( $post_id, 'ticket_url_canonical' );
+				}
 			}
 		}
 
@@ -212,25 +214,25 @@ class EventDuplicateStrategy {
 			return null;
 		}
 
-		$candidates = self::findCandidatesByDate( $date_only, 10, (int) $venue_term->term_id );
+		foreach ( self::candidatePagesByDate( $date_only, (int) $venue_term->term_id ) as $candidates ) {
+			foreach ( $candidates as $candidate ) {
+				$post_id = (int) $candidate->ID;
+				if ( ! self::isValidPost( $post_id ) ) {
+					continue;
+				}
+				if ( ! EventIdentifierGenerator::titlesMatch( $title, $candidate->post_title ) ) {
+					continue;
+				}
 
-		foreach ( $candidates as $candidate ) {
-			$post_id = (int) $candidate->ID;
-			if ( ! self::isValidPost( $post_id ) ) {
-				continue;
-			}
-			if ( ! EventIdentifierGenerator::titlesMatch( $title, $candidate->post_title ) ) {
-				continue;
-			}
+				// Check time window.
+				$candidate_dates   = \DataMachineEvents\Core\EventDatesTable::get( $post_id );
+				$existing_datetime = $candidate_dates ? $candidate_dates->start_datetime : '';
+				if ( ! self::isWithinTimeWindow( $startDate, $existing_datetime ) ) {
+					continue;
+				}
 
-			// Check time window.
-			$candidate_dates   = \DataMachineEvents\Core\EventDatesTable::get( $post_id );
-			$existing_datetime = $candidate_dates ? $candidate_dates->start_datetime : '';
-			if ( ! self::isWithinTimeWindow( $startDate, $existing_datetime ) ) {
-				continue;
+				return self::duplicateResult( $post_id, 'venue_date_fuzzy_title' );
 			}
-
-			return self::duplicateResult( $post_id, 'venue_date_fuzzy_title' );
 		}
 
 		return null;
@@ -271,48 +273,49 @@ class EventDuplicateStrategy {
 		}
 
 		$title_hash = self::computeTitleHash( $title );
-		$candidates = array_filter(
-			self::findCandidatesByDate( $date_only, -1 ),
-			static fn( \WP_Post $candidate ): bool => self::computeTitleHash( $candidate->post_title ) === $title_hash
-		);
-		foreach ( $candidates as $candidate ) {
-			$post_id = (int) $candidate->ID;
-			if ( ! self::isValidPost( $post_id ) ) {
-				continue;
-			}
-
-			$candidate_dates   = \DataMachineEvents\Core\EventDatesTable::get( $post_id );
-			$existing_datetime = $candidate_dates ? $candidate_dates->start_datetime : '';
-			if ( ! self::isWithinTimeWindow( $startDate, $existing_datetime ) ) {
-				continue;
-			}
-
-			if ( empty( $venue ) && ! $venue_term ) {
-				if ( 'low' !== $identity_confidence ) {
-					return self::duplicateResult( $post_id, 'exact_title_no_venue' );
+		foreach ( self::candidatePagesByDate( $date_only ) as $candidates ) {
+			foreach ( $candidates as $candidate ) {
+				if ( self::computeTitleHash( $candidate->post_title ) !== $title_hash ) {
+					continue;
 				}
-				continue;
-			}
-
-			if ( $venue_term ) {
-				$candidate_term_ids = wp_get_post_terms( $post_id, 'venue', array( 'fields' => 'ids' ) );
-				if ( ! is_wp_error( $candidate_term_ids ) && ! empty( $candidate_term_ids )
-					&& in_array( (int) $venue_term->term_id, array_map( 'intval', $candidate_term_ids ), true ) ) {
-					return self::duplicateResult( $post_id, 'exact_title_venue_term_id_match' );
+				$post_id = (int) $candidate->ID;
+				if ( ! self::isValidPost( $post_id ) ) {
+					continue;
 				}
-			}
 
-			$venue_terms = wp_get_post_terms( $post_id, 'venue', array( 'fields' => 'names' ) );
-			if ( empty( $venue_terms ) || is_wp_error( $venue_terms ) ) {
-				if ( 'low' !== $identity_confidence ) {
-					return self::duplicateResult( $post_id, 'exact_title_no_existing_venue' );
+				$candidate_dates   = \DataMachineEvents\Core\EventDatesTable::get( $post_id );
+				$existing_datetime = $candidate_dates ? $candidate_dates->start_datetime : '';
+				if ( ! self::isWithinTimeWindow( $startDate, $existing_datetime ) ) {
+					continue;
 				}
-				continue;
-			}
 
-			foreach ( $venue_terms as $existing_venue ) {
-				if ( $venue === $existing_venue || EventIdentifierGenerator::venuesMatch( $venue, $existing_venue ) ) {
-					return self::duplicateResult( $post_id, 'exact_title_venue_confirmed' );
+				if ( empty( $venue ) && ! $venue_term ) {
+					if ( 'low' !== $identity_confidence ) {
+						return self::duplicateResult( $post_id, 'exact_title_no_venue' );
+					}
+					continue;
+				}
+
+				if ( $venue_term ) {
+					$candidate_term_ids = wp_get_post_terms( $post_id, 'venue', array( 'fields' => 'ids' ) );
+					if ( ! is_wp_error( $candidate_term_ids ) && ! empty( $candidate_term_ids )
+						&& in_array( (int) $venue_term->term_id, array_map( 'intval', $candidate_term_ids ), true ) ) {
+						return self::duplicateResult( $post_id, 'exact_title_venue_term_id_match' );
+					}
+				}
+
+				$venue_terms = wp_get_post_terms( $post_id, 'venue', array( 'fields' => 'names' ) );
+				if ( empty( $venue_terms ) || is_wp_error( $venue_terms ) ) {
+					if ( 'low' !== $identity_confidence ) {
+						return self::duplicateResult( $post_id, 'exact_title_no_existing_venue' );
+					}
+					continue;
+				}
+
+				foreach ( $venue_terms as $existing_venue ) {
+					if ( $venue === $existing_venue || EventIdentifierGenerator::venuesMatch( $venue, $existing_venue ) ) {
+						return self::duplicateResult( $post_id, 'exact_title_venue_confirmed' );
+					}
 				}
 			}
 		}
@@ -348,54 +351,54 @@ class EventDuplicateStrategy {
 			return null;
 		}
 
-		$candidates = self::findCandidatesByDate( $date_only, 20 );
-
-		foreach ( $candidates as $candidate ) {
-			$post_id = (int) $candidate->ID;
-			if ( ! self::isValidPost( $post_id ) ) {
-				continue;
-			}
-			if ( ! EventIdentifierGenerator::titlesMatch( $title, $candidate->post_title ) ) {
-				continue;
-			}
-
-			$candidate_dates   = \DataMachineEvents\Core\EventDatesTable::get( $post_id );
-			$existing_datetime = $candidate_dates ? $candidate_dates->start_datetime : '';
-			if ( ! self::isWithinTimeWindow( $startDate, $existing_datetime ) ) {
-				continue;
-			}
-
-			// When both sides have venue data, require venue match to avoid
-			// false positives on generic titles at different venues.
-			if ( ! empty( $venue ) || $venue_term ) {
-				// Term-id-aware short-circuit: when the incoming venue resolved
-				// to a term, accept the match if the candidate is tagged with
-				// that same term — regardless of how the venue is spelled in
-				// either post's content.
-				if ( $venue_term ) {
-					$candidate_term_ids = wp_get_post_terms( $post_id, 'venue', array( 'fields' => 'ids' ) );
-					if ( ! is_wp_error( $candidate_term_ids ) && ! empty( $candidate_term_ids )
-						&& in_array( (int) $venue_term->term_id, array_map( 'intval', $candidate_term_ids ), true ) ) {
-						return self::duplicateResult( $post_id, 'date_fuzzy_title_venue_term_id_match' );
-					}
-				}
-
-				if ( '' !== $venue ) {
-					$candidate_venues = wp_get_post_terms( $post_id, 'venue', array( 'fields' => 'names' ) );
-					$candidate_venue  = ( ! is_wp_error( $candidate_venues ) && ! empty( $candidate_venues ) ) ? $candidate_venues[0] : '';
-
-					if ( ! empty( $candidate_venue ) && ! EventIdentifierGenerator::venuesMatch( $venue, $candidate_venue ) ) {
-						continue;
-					}
-				} elseif ( $venue_term ) {
-					// Incoming side has a resolved term but the candidate
-					// doesn't share it; skip to avoid cross-venue false
-					// positives on generic titles.
+		foreach ( self::candidatePagesByDate( $date_only ) as $candidates ) {
+			foreach ( $candidates as $candidate ) {
+				$post_id = (int) $candidate->ID;
+				if ( ! self::isValidPost( $post_id ) ) {
 					continue;
 				}
-			}
+				if ( ! EventIdentifierGenerator::titlesMatch( $title, $candidate->post_title ) ) {
+					continue;
+				}
 
-			return self::duplicateResult( $post_id, 'date_fuzzy_title' );
+				$candidate_dates   = \DataMachineEvents\Core\EventDatesTable::get( $post_id );
+				$existing_datetime = $candidate_dates ? $candidate_dates->start_datetime : '';
+				if ( ! self::isWithinTimeWindow( $startDate, $existing_datetime ) ) {
+					continue;
+				}
+
+				// When both sides have venue data, require venue match to avoid
+				// false positives on generic titles at different venues.
+				if ( ! empty( $venue ) || $venue_term ) {
+					// Term-id-aware short-circuit: when the incoming venue resolved
+					// to a term, accept the match if the candidate is tagged with
+					// that same term — regardless of how the venue is spelled in
+					// either post's content.
+					if ( $venue_term ) {
+						$candidate_term_ids = wp_get_post_terms( $post_id, 'venue', array( 'fields' => 'ids' ) );
+						if ( ! is_wp_error( $candidate_term_ids ) && ! empty( $candidate_term_ids )
+							&& in_array( (int) $venue_term->term_id, array_map( 'intval', $candidate_term_ids ), true ) ) {
+							return self::duplicateResult( $post_id, 'date_fuzzy_title_venue_term_id_match' );
+						}
+					}
+
+					if ( '' !== $venue ) {
+						$candidate_venues = wp_get_post_terms( $post_id, 'venue', array( 'fields' => 'names' ) );
+						$candidate_venue  = ( ! is_wp_error( $candidate_venues ) && ! empty( $candidate_venues ) ) ? $candidate_venues[0] : '';
+
+						if ( ! empty( $candidate_venue ) && ! EventIdentifierGenerator::venuesMatch( $venue, $candidate_venue ) ) {
+							continue;
+						}
+					} elseif ( $venue_term ) {
+						// Incoming side has a resolved term but the candidate
+						// doesn't share it; skip to avoid cross-venue false
+						// positives on generic titles.
+						continue;
+					}
+				}
+
+				return self::duplicateResult( $post_id, 'date_fuzzy_title' );
+			}
 		}
 
 		return null;
@@ -434,30 +437,40 @@ class EventDuplicateStrategy {
 	/**
 	 * Find event candidates through the event-owned date query contract.
 	 *
-	 * @param string   $date_only    Date in YYYY-MM-DD format.
-	 * @param int      $limit        Maximum candidates, or -1 for all.
+	 * Each query is hard-bounded while the generator continues through every
+	 * deterministic page, preserving duplicate detection for crowded dates.
+	 *
+	 * @param string   $date_only     Date in YYYY-MM-DD format.
 	 * @param int|null $venue_term_id Optional venue term constraint.
-	 * @return \WP_Post[]
+	 * @return \Generator<int, \WP_Post[]>
 	 */
-	private static function findCandidatesByDate( string $date_only, int $limit, ?int $venue_term_id = null ): array {
-		$input = array(
-			'date_match' => $date_only,
-			'per_page'   => $limit,
-			'scope'      => 'all',
-			'status'     => array( 'publish', 'future', 'draft', 'pending', 'private' ),
-		);
-		if ( null !== $venue_term_id ) {
-			$input['tax_filters'] = array( 'venue' => array( $venue_term_id ) );
-		}
+	private static function candidatePagesByDate( string $date_only, ?int $venue_term_id = null ): \Generator {
+		$page = 1;
+		do {
+			$input = array(
+				'date_match' => $date_only,
+				'per_page'   => self::CANDIDATE_PAGE_SIZE,
+				'page'       => $page,
+				'order'      => 'ASC',
+				'scope'      => 'all',
+				'status'     => array( 'publish', 'future', 'draft', 'pending', 'private' ),
+			);
+			if ( null !== $venue_term_id ) {
+				$input['tax_filters'] = array( 'venue' => array( $venue_term_id ) );
+			}
 
-		$result = ( new EventDateQueryAbilities() )->executeQueryEvents( $input );
-
-		return array_values(
-			array_filter(
-				$result['posts'] ?? array(),
-				static fn( $post ): bool => $post instanceof \WP_Post && self::isValidPost( (int) $post->ID )
-			)
-		);
+			$result     = ( new EventDateQueryAbilities() )->executeQueryEvents( $input );
+			$candidates = array_values(
+				array_filter(
+					$result['posts'] ?? array(),
+					static fn( $post ): bool => $post instanceof \WP_Post && self::isValidPost( (int) $post->ID )
+				)
+			);
+			if ( ! empty( $candidates ) ) {
+				yield $candidates;
+			}
+			++$page;
+		} while ( (int) ( $result['post_count'] ?? 0 ) === self::CANDIDATE_PAGE_SIZE );
 	}
 
 	/**

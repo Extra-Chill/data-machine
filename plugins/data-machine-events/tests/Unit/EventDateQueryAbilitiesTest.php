@@ -217,6 +217,43 @@ class EventDateQueryAbilitiesTest extends WP_UnitTestCase {
 		}
 	}
 
+	public function test_exact_date_pages_are_indexable_bounded_and_deterministic(): void {
+		$date     = '2026-05-24';
+		$post_ids = array();
+		for ( $index = 0; $index < 3; ++$index ) {
+			$post_ids[] = $this->seed_event( 'Paged event ' . $index, 'publish', $date . ' 20:00:00' );
+		}
+
+		$queries  = array();
+		$observer = static function ( string $sql ) use ( &$queries ): string {
+			if ( false !== strpos( $sql, EventDatesTable::table_name() ) ) {
+				$queries[] = $sql;
+			}
+			return $sql;
+		};
+		add_filter( 'query', $observer );
+		try {
+			$result = ( new EventDateQueryAbilities() )->executeQueryEvents(
+				array(
+					'date_match' => $date,
+					'per_page'   => 2,
+					'page'       => 2,
+					'fields'     => 'ids',
+				)
+			);
+		} finally {
+			remove_filter( 'query', $observer );
+		}
+
+		$this->assertSame( array( $post_ids[2] ), array_map( 'intval', $result['posts'] ) );
+		$this->assertCount( 1, $queries );
+		$this->assertMatchesRegularExpression( '/LIMIT\s+2\s*,\s*2\b/i', $queries[0] );
+		$this->assertStringContainsString( 'start_datetime >=', $queries[0] );
+		$this->assertStringContainsString( 'start_datetime <', $queries[0] );
+		$this->assertStringNotContainsString( 'DATE(', $queries[0] );
+		$this->assertMatchesRegularExpression( '/ORDER BY\s+ed\.start_datetime ASC,\s*[^\s]+\.ID ASC/i', $queries[0] );
+	}
+
 	public function test_matching_ids_sql_preserves_consumer_constraints_without_querying(): void {
 		wp_load_alloptions();
 		$filter = static function ( array $query_args, array $input ): array {

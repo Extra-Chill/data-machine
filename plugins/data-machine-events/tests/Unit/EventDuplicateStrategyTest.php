@@ -418,6 +418,71 @@ class EventDuplicateStrategyTest extends WP_UnitTestCase {
 		wp_delete_term( $term_id, 'venue' );
 	}
 
+	public function test_large_same_date_corpus_uses_bounded_pages_and_finds_later_exact_match(): void {
+		$date     = '2026-05-24';
+		$post_ids = array();
+		for ( $index = 0; $index < 105; ++$index ) {
+			$post_id = wp_insert_post(
+				array(
+					'post_title'  => 'Unrelated Same Day Event ' . $index,
+					'post_type'   => Event_Post_Type::POST_TYPE,
+					'post_status' => 'publish',
+				)
+			);
+			$this->assertGreaterThan( 0, $post_id );
+			EventDatesTable::upsert( $post_id, $date . ' 12:00:00' );
+			$post_ids[] = $post_id;
+		}
+
+		$match_id = wp_insert_post(
+			array(
+				'post_title'  => 'Needle Beyond First Page',
+				'post_type'   => Event_Post_Type::POST_TYPE,
+				'post_status' => 'publish',
+			)
+		);
+		EventDatesTable::upsert( $match_id, $date . ' 20:00:00' );
+		$post_ids[] = $match_id;
+
+		$queries  = array();
+		$observer = static function ( string $sql ) use ( &$queries ): string {
+			if ( false !== strpos( $sql, EventDatesTable::table_name() ) && false !== strpos( $sql, 'LIMIT' ) ) {
+				$queries[] = $sql;
+			}
+			return $sql;
+		};
+		add_filter( 'query', $observer );
+		try {
+			$result = EventDuplicateStrategy::check(
+				array(
+					'title'   => 'Needle Beyond First Page',
+					'context' => array(
+						'startDate' => $date . ' 20:30:00',
+					),
+				)
+			);
+		} finally {
+			remove_filter( 'query', $observer );
+		}
+
+		$this->assertIsArray( $result );
+		$this->assertSame( $match_id, $result['match']['post_id'] );
+		$this->assertGreaterThanOrEqual( 2, count( $queries ), 'The match must be retrieved from a later bounded page.' );
+		foreach ( $queries as $query ) {
+			$this->assertMatchesRegularExpression( '/LIMIT\s+(?:\d+\s*,\s*)?100\b/i', $query );
+			$this->assertStringContainsString( 'start_datetime >=', $query );
+			$this->assertStringContainsString( 'start_datetime <', $query );
+			$this->assertStringNotContainsString( 'DATE(', $query );
+			$this->assertMatchesRegularExpression( '/ORDER BY\s+ed\.start_datetime ASC,\s*[^\s]+\.ID ASC/i', $query );
+		}
+
+		global $wpdb;
+		foreach ( $post_ids as $post_id ) {
+			$wpdb->delete( EventDatesTable::table_name(), array( 'post_id' => $post_id ), array( '%d' ) );
+			wp_delete_post( $post_id, true );
+		}
+	}
+
 	// ---------------------------------------------------------------------
 	// check() — date-aware end-to-end cascade tests (#423)
 	// ---------------------------------------------------------------------

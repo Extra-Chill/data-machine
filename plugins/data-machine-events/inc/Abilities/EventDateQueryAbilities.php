@@ -18,6 +18,7 @@ namespace DataMachineEvents\Abilities;
 use WP_Query;
 use DataMachineEvents\Core\Event_Post_Type;
 use DataMachineEvents\Core\EventDatesTable;
+use DataMachineEvents\Core\DateTimeParser;
 use DataMachineEvents\Blocks\Calendar\Query\ScopeResolver;
 use DataMachineEvents\Blocks\Calendar\Query\UpcomingFilter;
 
@@ -136,6 +137,11 @@ class EventDateQueryAbilities {
 								'minimum'     => 1,
 								'maximum'     => self::MAX_PUBLIC_RESULTS,
 								'description' => 'Events per page. Default: 50. Maximum: 100.',
+							),
+							'page'        => array(
+								'type'        => 'integer',
+								'minimum'     => 1,
+								'description' => 'Results page. Default: 1.',
 							),
 							'fields'      => array(
 								'type'        => 'string',
@@ -269,12 +275,21 @@ class EventDateQueryAbilities {
 		$geo         = is_array( $input['geo'] ?? null ) ? $input['geo'] : array();
 		$exclude     = is_array( $input['exclude'] ?? null ) ? array_map( 'absint', $input['exclude'] ) : array();
 		$per_page    = (int) ( $input['per_page'] ?? -1 );
+		$page        = max( 1, (int) ( $input['page'] ?? 1 ) );
 		$fields      = $input['fields'] ?? 'all';
 		$order       = ! empty( $input[ self::CAPTURE_IDS_QUERY_VAR ] )
 			? ''
 			: ( strtoupper( $input['order'] ?? 'ASC' ) === 'DESC' ? 'DESC' : 'ASC' );
 		$status      = $input['status'] ?? 'publish';
 		$meta_query  = is_array( $input['meta_query'] ?? null ) ? $input['meta_query'] : array();
+
+		if ( '' !== $date_match && ! DateTimeParser::isValidYmd( $date_match ) ) {
+			return array(
+				'posts'      => array(),
+				'total'      => 0,
+				'post_count' => 0,
+			);
+		}
 
 		// #428: resolve a named time scope (today/tonight/this-weekend/
 		// this-week) to concrete date/time boundaries via ScopeResolver —
@@ -303,6 +318,7 @@ class EventDateQueryAbilities {
 			'post_type'      => Event_Post_Type::POST_TYPE,
 			'post_status'    => $status,
 			'posts_per_page' => $per_page,
+			'paged'          => $page,
 			'no_found_rows'  => true, // Avoid deprecated SQL_CALC_FOUND_ROWS; use separate count.
 			'orderby'        => 'none', // Ordering via posts_clauses.
 		);
@@ -535,9 +551,12 @@ class EventDateQueryAbilities {
 
 			$now = current_time( 'mysql' );
 
-			// Exact date match takes priority (dedup queries).
+			// Exact date match takes priority (dedup queries). Use a half-open
+			// datetime range so MySQL can use the start_datetime index.
 			if ( ! empty( $date_match ) ) {
-				$clauses['where'] .= $wpdb->prepare( ' AND DATE(ed.start_datetime) = %s', $date_match );
+				$start             = $date_match . ' 00:00:00';
+				$end               = gmdate( 'Y-m-d H:i:s', strtotime( $start . ' +1 day' ) );
+				$clauses['where'] .= $wpdb->prepare( ' AND ed.start_datetime >= %s AND ed.start_datetime < %s', $start, $end );
 			} elseif ( ! empty( $date_start ) || ! empty( $date_end ) ) {
 				// Explicit date range — delegates to UpcomingFilter.
 				if ( ! empty( $date_start ) ) {
@@ -569,9 +588,10 @@ class EventDateQueryAbilities {
 			}
 			// 'all' scope — no date WHERE clause.
 
-			// ORDER BY — always by start_datetime unless date_match (dedup doesn't need ordering).
-			if ( empty( $date_match ) && '' !== $order ) {
-				$clauses['orderby'] = "ed.start_datetime {$order}";
+			// Post ID breaks datetime ties so bounded pages never overlap or skip
+			// candidates because MySQL chose a different equal-value row order.
+			if ( '' !== $order ) {
+				$clauses['orderby'] = "ed.start_datetime {$order}, {$wpdb->posts}.ID {$order}";
 			}
 
 			return $clauses;
