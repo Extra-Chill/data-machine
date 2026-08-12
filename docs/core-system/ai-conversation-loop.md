@@ -3,7 +3,7 @@
 **File**: `/inc/Engine/AI/conversation-loop.php`
 **Since**: 0.2.0
 
-Data Machine runs multi-turn agent work through the Agents API conversation substrate. The canonical Data Machine entry point is `DataMachine\Engine\AI\datamachine_run_conversation()`; the former `AIConversationLoop` class has been removed.
+Data Machine runs multi-turn agent work through the Agents API conversation substrate. The canonical Data Machine entry point is `DataMachine\Engine\AI\datamachine_run_conversation()`.
 
 ## Current Ownership
 
@@ -42,7 +42,7 @@ $result = datamachine_run_conversation(
 );
 ```
 
-Current callers, including `AIStep` and `ChatOrchestrator`, call this function directly. New code should not introduce `AIConversationLoop::run()` examples; references to that class are historical only.
+Current callers, including `AIStep` and `ChatOrchestrator`, call this function directly.
 
 ## What Data Machine Owns
 
@@ -220,7 +220,3 @@ Representative smoke tests:
 - `tests/agent-conversation-runner-request-smoke.php` verifies that `datamachine_run_conversation()` delegates through the Agents API substrate and returns normalized content, usage, tool results, and events.
 - `tests/agent-conversation-runtime-policy-smoke.php` covers completion assertions, natural completion, nudges, duplicate-tool recovery, runtime rules, and completion diagnostics.
 - `tests/ai-message-envelope-smoke.php` verifies message envelope normalization and result normalization.
-
-## Historical Context
-
-Older docs and changelog entries may mention `AIConversationLoop::run()` or `AIConversationLoop::execute()`. Those references describe the pre-substrate compatibility class. Current runtime docs and examples should use `datamachine_run_conversation()` and `AgentsAPI\AI\WP_Agent_Conversation_Loop::run()`.

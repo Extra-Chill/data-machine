@@ -255,7 +255,3 @@ Representative tests:
 - Keep tool execution outside RequestBuilder.
 - Keep durable multi-turn runtime behavior in `datamachine_run_conversation()` and Agents API, not in RequestBuilder.
 - Prefer wp-ai-client provider plugins over any legacy `chubes_ai_*` path.
-
-## Historical Context
-
-Older docs may show `RequestBuilder::build()` returning a `success/data/error` array. That was the pre-wp-ai-client adapter shape. Current code returns `GenerativeAiResult` or `WP_Error`.

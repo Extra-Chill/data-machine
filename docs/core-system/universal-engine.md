@@ -1,6 +1,6 @@
 # AI Runtime Adapter Layer
 
-> **Historical name:** This area was introduced as the "Universal Engine" in Data Machine 0.2.0. The name describes a consolidation milestone, not a second engine alongside pipeline execution. The current source is Data Machine's AI adapter layer around Agents API and wp-ai-client.
+Data Machine's AI runtime adapts Agents API and wp-ai-client to pipeline, chat, tool, packet, and job semantics. It is part of the Data Machine product runtime, not a separate workflow engine.
 
 ## Current Boundary
 
@@ -25,8 +25,6 @@ See `inc/Engine/AI/README.md` for the source-level ownership map.
 - `ToolResultFinder` interprets tool and adjacent-handler results in packet history.
 - `DataMachineToolRegistrySource` and `AdjacentHandlerToolSource` adapt Data Machine registrations and flow neighbors into runtime tool declarations.
 - Pipeline transcript and completion adapters attach Data Machine job, flow, and handler semantics to the generic Agents API loop.
-
-There is no current `AIConversationLoop` Data Machine class and no `WP_Agent_Tool_Parameters` class. Those names in older documentation describe removed pre-extraction implementations.
 
 ## Tool Surfaces
 

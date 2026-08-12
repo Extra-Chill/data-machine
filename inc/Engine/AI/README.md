@@ -1,6 +1,6 @@
 # Engine AI Runtime Boundary
 
-`DataMachine\Engine\AI` is the Data Machine adapter layer around Agents API and wp-ai-client. It is not itself the extraction boundary.
+`DataMachine\Engine\AI` is the Data Machine adapter layer around Agents API and wp-ai-client.
 
 Layer boundaries:
 

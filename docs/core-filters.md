@@ -4,9 +4,9 @@
 
 ### `wp_agents_api_init`
 
-Fires once per request when the AgentRegistry is first consumed. Plugins declare agent roles inside this callback; DM reconciles declarations against the `datamachine_agents` table on `init` priority 15 while Data Machine hosts the in-place Agents API substrate.
+Fires once per request when the Agents API registry is first consumed. Plugins declare agent roles inside this callback; Data Machine reconciles declarations against the `datamachine_agents` table on `init` priority 15.
 
-Same API DM itself uses to register the default site administrator agent. Registrations are collected statically; last-wins on slug collision so plugins can override via hook priority. The legacy `datamachine_register_agents` action and `datamachine_register_agent()` wrapper still fire while this surface lives in Data Machine, but new code should use the WordPress-shaped names.
+Data Machine uses the same API to register the default site administrator agent. Registrations are collected statically; last-wins on slug collision so plugins can override via hook priority.
 
 **Since:** 0.99.0
 

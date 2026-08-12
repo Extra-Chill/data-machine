@@ -87,7 +87,7 @@ Choose discovery by boundary instead of treating filters as a service locator:
 - [Overview](overview.md): user-facing product model and capabilities.
 - [Engine Execution](core-system/engine-execution.md): job creation, step dispatch, persistence, and scheduling.
 - [Database Schema](core-system/database-schema.md): current persistence inventory and relationships.
-- [Universal Engine](core-system/universal-engine.md): current AI adapter layer and historical name.
+- [AI Runtime Adapter Layer](core-system/universal-engine.md): current Agents API and wp-ai-client integration.
 - [REST API](api/index.md): product HTTP namespace.
 - [WP-CLI](core-system/wp-cli.md): operator command namespace.
 - [Tool Execution](core-system/tool-execution.md): model-facing tool resolution and execution.
