@@ -26,8 +26,8 @@ class JobStatusMigration {
 		if ( null === $wpdb ) {
 			global $wpdb;
 		}
-		$this->wpdb = $wpdb;
-		$this->table = $wpdb->prefix . 'datamachine_jobs';
+		$this->wpdb  = $wpdb;
+		$this->table = $wpdb->prefix . Jobs::TABLE_NAME;
 	}
 
 	/** Inspect durable progress without mutating job rows. */
@@ -38,11 +38,11 @@ class JobStatusMigration {
 		return array_merge(
 			$state,
 			array(
-				'success'             => true,
-				'table'               => $this->table,
-				'remaining'           => $remaining,
-				'complete'            => 0 === $remaining,
-				'status'              => 0 === $remaining ? 'complete' : ( (int) $state['cursor'] > 0 ? 'in_progress' : 'migration_required' ),
+				'success'            => true,
+				'table'              => $this->table,
+				'remaining'          => $remaining,
+				'complete'           => 0 === $remaining,
+				'status'             => 0 === $remaining ? 'complete' : ( (int) $state['cursor'] > 0 ? 'in_progress' : 'migration_required' ),
 				'canonical_statuses' => JobStatus::ALL_STATUSES,
 			)
 		);
@@ -50,14 +50,14 @@ class JobStatusMigration {
 
 	/** Process one bounded, resumable batch. */
 	public function apply( int $limit = 250 ): array {
-		$limit = max( 1, min( self::MAX_BATCH, $limit ) );
-		$state = $this->state();
+		$limit             = max( 1, min( self::MAX_BATCH, $limit ) );
+		$state             = $this->state();
 		$state['complete'] = false;
-		$rows  = $this->windowRows( (int) $state['cursor'], $limit );
+		$rows              = $this->windowRows( (int) $state['cursor'], $limit );
 
 		foreach ( $rows as $row ) {
-			$job_id = (int) $row['job_id'];
-			$status = (string) $row['status'];
+			$job_id           = (int) $row['job_id'];
+			$status           = (string) $row['status'];
 			$state['cursor']  = max( (int) $state['cursor'], $job_id );
 			$state['scanned'] = (int) $state['scanned'] + 1;
 			$parsed            = JobStatus::fromString( $status );
@@ -137,16 +137,17 @@ class JobStatusMigration {
 			$cursor,
 			$limit
 		);
+		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- The query is prepared immediately above with typed identifier and scalar placeholders.
 		$rows = $this->wpdb->get_results( $query, ARRAY_A );
 		return is_array( $rows ) ? $rows : array();
 	}
 
 	private function countNoncanonicalRows(): int {
-		$placeholders = implode( ',', array_fill( 0, count( JobStatus::ALL_STATUSES ), '%s' ) );
 		$query = $this->wpdb->prepare(
-			"SELECT COUNT(*) FROM %i WHERE status NOT IN ({$placeholders})",
+			'SELECT COUNT(*) FROM %i WHERE status NOT IN (%s, %s, %s, %s, %s, %s, %s, %s)',
 			...array_merge( array( $this->table ), JobStatus::ALL_STATUSES )
 		);
+		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- The query is prepared immediately above from fixed placeholders and canonical constants.
 		return (int) $this->wpdb->get_var( $query );
 	}
 
@@ -156,7 +157,8 @@ class JobStatusMigration {
 		}
 
 		$query = $this->wpdb->prepare( 'SELECT status, engine_data FROM %i WHERE job_id = %d FOR UPDATE', $this->table, $job_id );
-		$row   = $this->wpdb->get_row( $query, ARRAY_A );
+		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- The query is prepared immediately above with typed identifier and integer placeholders.
+		$row = $this->wpdb->get_row( $query, ARRAY_A );
 		if ( ! is_array( $row ) || (string) $row['status'] !== $expected_status ) {
 			$this->wpdb->query( 'ROLLBACK' );
 			return 'conflict';

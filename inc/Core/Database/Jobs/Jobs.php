@@ -1737,14 +1737,14 @@ class Jobs extends BaseRepository {
 	}
 
 	/** Build a cleanup predicate that covers only recognized legacy delimiters. */
-	private function status_match_sql( array $match, array &$values ): string {
-		$placeholders = implode( ',', array_fill( 0, count( $match['values'] ), '%s' ) );
-		$values       = array_merge( $values, $match['values'] );
+	private function status_match_sql( array $status_match, array &$values ): string {
+		$placeholders = implode( ',', array_fill( 0, count( $status_match['values'] ), '%s' ) );
+		$values       = array_merge( $values, $status_match['values'] );
 		$sql          = "status IN ({$placeholders})";
-		if ( 'mixed' !== $match['type'] ) {
+		if ( 'mixed' !== $status_match['type'] ) {
 			return $sql;
 		}
-		foreach ( $match['values'] as $base ) {
+		foreach ( $status_match['values'] as $base ) {
 			$sql     .= ' OR status LIKE %s OR status LIKE %s';
 			$values[] = $this->wpdb->esc_like( $base . ' - ' ) . '%';
 			$values[] = $this->wpdb->esc_like( $base . ':' ) . '%';

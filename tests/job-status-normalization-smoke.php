@@ -69,6 +69,11 @@ class wpdb {
 }
 
 require_once __DIR__ . '/../inc/Core/JobStatus.php';
+
+if ( ! class_exists( 'DataMachine\\Core\\Database\\Jobs\\Jobs' ) ) {
+	eval( 'namespace DataMachine\\Core\\Database\\Jobs; class Jobs { public const TABLE_NAME = "datamachine_jobs"; }' );
+}
+
 require_once __DIR__ . '/../inc/Core/Database/Jobs/JobStatusMigration.php';
 
 use DataMachine\Core\JobStatus;

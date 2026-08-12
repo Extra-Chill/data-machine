@@ -22,10 +22,10 @@ $legacy = $harness->present( array( 'status' => 'agent_skipped - source-rejected
 $normalized = $harness->present( array( 'status' => 'failed', 'engine_data' => array( 'job_status_reason' => 'provider timeout' ) ) );
 
 $failures = array();
-if ( 'agent_skipped' !== $legacy['status'] || 'source-rejected' !== $legacy['status_reason'] || 'agent_skipped - source-rejected' !== $legacy['status_display'] ) {
+if ( 'agent_skipped' !== $legacy['base_status'] || 'agent_skipped - source-rejected' !== $legacy['status'] || 'source-rejected' !== $legacy['status_reason'] || 'agent_skipped - source-rejected' !== $legacy['status_display'] ) {
 	$failures[] = 'legacy compound row is not composed correctly';
 }
-if ( 'failed' !== $normalized['status'] || 'provider timeout' !== $normalized['status_reason'] || 'failed - provider timeout' !== $normalized['status_display'] ) {
+if ( 'failed' !== $normalized['base_status'] || 'failed - provider timeout' !== $normalized['status'] || 'provider timeout' !== $normalized['status_reason'] || 'failed - provider timeout' !== $normalized['status_display'] ) {
 	$failures[] = 'normalized row is not composed correctly';
 }
 

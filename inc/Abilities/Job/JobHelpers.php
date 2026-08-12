@@ -200,9 +200,10 @@ trait JobHelpers {
 			$reason = is_string( $job['engine_data']['job_status_reason'] ?? null ) ? $job['engine_data']['job_status_reason'] : null;
 		}
 		if ( $status->isCanonical() ) {
-			$job['status']         = $status->getBaseStatus();
+			$job['base_status']    = $status->getBaseStatus();
 			$job['status_reason']  = $reason;
-			$job['status_display'] = null === $reason || '' === $reason ? $job['status'] : $job['status'] . ' - ' . $reason;
+			$job['status_display'] = null === $reason || '' === $reason ? $job['base_status'] : $job['base_status'] . ' - ' . $reason;
+			$job['status']         = $job['status_display'];
 		}
 		if ( isset( $job['created_at'] ) ) {
 			$job['created_at_display'] = DateFormatter::format_for_display( $job['created_at'] );
