@@ -14,9 +14,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-use DataMachine\Core\WordPress\TaxonomyHandler;
 use DataMachine\Engine\AI\Tools\BaseTool;
-use DataMachine\Abilities\Taxonomy\ResolveTermAbility;
 
 class CreateTaxonomyTerm extends BaseTool {
 
@@ -60,76 +58,11 @@ class CreateTaxonomyTerm extends BaseTool {
 		$parent      = $parameters['parent'] ?? null;
 		$description = $parameters['description'] ?? '';
 
-		// Validate taxonomy
-		if ( empty( $taxonomy ) || ! is_string( $taxonomy ) ) {
-			return array(
-				'success'   => false,
-				'error'     => 'taxonomy is required and must be a non-empty string',
-				'tool_name' => 'create_taxonomy_term',
-			);
-		}
-
-		$taxonomy = sanitize_key( $taxonomy );
-
-		if ( ! taxonomy_exists( $taxonomy ) ) {
-			return array(
-				'success'   => false,
-				'error'     => "Taxonomy '{$taxonomy}' does not exist",
-				'tool_name' => 'create_taxonomy_term',
-			);
-		}
-
-		if ( TaxonomyHandler::shouldSkipTaxonomy( $taxonomy ) ) {
-			return array(
-				'success'   => false,
-				'error'     => "Taxonomy '{$taxonomy}' is a system taxonomy and cannot be modified",
-				'tool_name' => 'create_taxonomy_term',
-			);
-		}
-
-		// Validate name
-		if ( empty( $name ) || ! is_string( $name ) ) {
-			return array(
-				'success'   => false,
-				'error'     => 'name is required and must be a non-empty string',
-				'tool_name' => 'create_taxonomy_term',
-			);
-		}
-
-		$name = sanitize_text_field( $name );
-		if ( empty( $name ) ) {
-			return array(
-				'success'   => false,
-				'error'     => 'name cannot be empty after sanitization',
-				'tool_name' => 'create_taxonomy_term',
-			);
-		}
-
-		// Check if term already exists using centralized resolution (ID, name, or slug).
-		$resolved = ResolveTermAbility::resolve( $name, $taxonomy, false );
-		if ( $resolved['success'] ) {
-			$existing_term = get_term( $resolved['term_id'], $taxonomy );
-			return array(
-				'success'   => true,
-				'data'      => array(
-					'term_id'          => $existing_term->term_id,
-					'term_taxonomy_id' => $existing_term->term_taxonomy_id,
-					'taxonomy'         => $taxonomy,
-					'name'             => $existing_term->name,
-					'slug'             => $existing_term->slug,
-					'parent_id'        => $existing_term->parent,
-					'already_exists'   => true,
-					'message'          => "Term '{$existing_term->name}' already exists in taxonomy '{$taxonomy}'.",
-				),
-				'tool_name' => 'create_taxonomy_term',
-			);
-		}
-
-		// Resolve parent if provided
+		// Parent names and slugs are a chat convenience; the ability accepts an ID.
 		$parent_id = 0;
-		if ( ! empty( $parent ) ) {
+		if ( ! empty( $parent ) && is_string( $taxonomy ) ) {
 			$taxonomy_obj = get_taxonomy( $taxonomy );
-			if ( ! $taxonomy_obj->hierarchical ) {
+			if ( $taxonomy_obj && ! $taxonomy_obj->hierarchical ) {
 				return array(
 					'success'   => false,
 					'error'     => "Cannot set parent: taxonomy '{$taxonomy}' is not hierarchical",
@@ -137,48 +70,76 @@ class CreateTaxonomyTerm extends BaseTool {
 				);
 			}
 
-			$parent_id = $this->resolveParentTerm( $parent, $taxonomy );
-			if ( false === $parent_id ) {
-				return array(
-					'success'   => false,
-					'error'     => "Parent term '{$parent}' not found in taxonomy '{$taxonomy}'",
-					'tool_name' => 'create_taxonomy_term',
-				);
+			if ( $taxonomy_obj ) {
+				$parent_id = $this->resolveParentTerm( $parent, $taxonomy );
+				if ( false === $parent_id ) {
+					return array(
+						'success'   => false,
+						'error'     => "Parent term '{$parent}' not found in taxonomy '{$taxonomy}'",
+						'tool_name' => 'create_taxonomy_term',
+					);
+				}
 			}
 		}
 
-		// Create the term
-		$term_args = array(
-			'parent' => $parent_id,
-		);
-
-		if ( ! empty( $description ) ) {
-			$term_args['description'] = sanitize_textarea_field( $description );
-		}
-
-		$result = wp_insert_term( $name, $taxonomy, $term_args );
-
-		if ( is_wp_error( $result ) ) {
+		$ability = wp_get_ability( 'datamachine/create-taxonomy-term' );
+		if ( ! $ability ) {
 			return array(
 				'success'   => false,
-				'error'     => $result->get_error_message(),
+				'error'     => 'datamachine/create-taxonomy-term ability not found',
 				'tool_name' => 'create_taxonomy_term',
 			);
 		}
 
-		$term = get_term( $result['term_id'], $taxonomy );
+		$input = array(
+			'taxonomy' => $taxonomy,
+			'name'     => $name,
+			'parent'   => $parent_id,
+		);
+
+		if ( ! empty( $description ) ) {
+			$input['description'] = $description;
+		}
+
+		$result = $ability->execute( $input );
+
+		if ( ! $this->isAbilitySuccess( $result ) ) {
+			return array(
+				'success'   => false,
+				'error'     => $this->getAbilityError( $result, 'Failed to create taxonomy term' ),
+				'tool_name' => 'create_taxonomy_term',
+			);
+		}
+
+		$term           = get_term( $result['term_id'], $result['taxonomy'] ?? $taxonomy );
+		$already_exists = ! empty( $result['existed'] );
+		$term_name      = $term && ! is_wp_error( $term ) ? $term->name : $result['term_name'];
+		$term_slug      = $term && ! is_wp_error( $term ) ? $term->slug : $result['term_slug'];
+		$term_parent    = $term && ! is_wp_error( $term ) ? $term->parent : $parent_id;
+		$message        = $already_exists
+			? "Term '{$term_name}' already exists in taxonomy '{$taxonomy}'."
+			: "Created term '{$term_name}' in taxonomy '{$taxonomy}'.";
+
+		$data = array(
+			'term_id'   => $result['term_id'],
+			'taxonomy'  => $taxonomy,
+			'name'      => $term_name,
+			'slug'      => $term_slug,
+			'parent_id' => $term_parent,
+			'message'   => $message,
+		);
+
+		if ( $already_exists ) {
+			$data['already_exists'] = true;
+		}
+
+		if ( $term && ! is_wp_error( $term ) ) {
+			$data['term_taxonomy_id'] = $term->term_taxonomy_id;
+		}
 
 		return array(
 			'success'   => true,
-			'data'      => array(
-				'term_id'          => $result['term_id'],
-				'term_taxonomy_id' => $result['term_taxonomy_id'],
-				'taxonomy'         => $taxonomy,
-				'name'             => $term->name,
-				'slug'             => $term->slug,
-				'parent_id'        => $parent_id,
-				'message'          => "Created term '{$term->name}' in taxonomy '{$taxonomy}'.",
-			),
+			'data'      => $data,
 			'tool_name' => 'create_taxonomy_term',
 		);
 	}
@@ -191,9 +152,18 @@ class CreateTaxonomyTerm extends BaseTool {
 	 * @return int|false Term ID or false if not found
 	 */
 	private function resolveParentTerm( $parent_item, string $taxonomy ) {
-		// Use centralized resolution for parent term lookup.
-		$result = ResolveTermAbility::resolve( (string) $parent_item, $taxonomy, false );
+		if ( is_numeric( $parent_item ) ) {
+			$term = get_term( absint( $parent_item ), $taxonomy );
+			if ( $term && ! is_wp_error( $term ) ) {
+				return $term->term_id;
+			}
+		}
 
-		return $result['success'] ? $result['term_id'] : false;
+		$term = get_term_by( 'name', (string) $parent_item, $taxonomy );
+		if ( ! $term ) {
+			$term = get_term_by( 'slug', sanitize_title( (string) $parent_item ), $taxonomy );
+		}
+
+		return $term ? $term->term_id : false;
 	}
 }
