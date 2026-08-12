@@ -116,6 +116,17 @@ class UpdateFlowAbility {
 			);
 		}
 
+		if ( null !== $scheduling_config ) {
+			$validation = datamachine_validate_interval( $scheduling_config['interval'] ?? 'manual', $scheduling_config );
+			if ( ! $validation['valid'] ) {
+				return array(
+					'success' => false,
+					'error'   => $validation['error'],
+				);
+			}
+			$scheduling_config['interval'] = $validation['resolved'];
+		}
+
 		if ( null !== $flow_name ) {
 			$flow_name = sanitize_text_field( wp_unslash( $flow_name ) );
 			if ( empty( trim( $flow_name ) ) ) {
@@ -153,19 +164,6 @@ class UpdateFlowAbility {
 		}
 
 		if ( null !== $scheduling_config ) {
-			// Validate and resolve interval aliases before scheduling.
-			$interval = $scheduling_config['interval'] ?? null;
-			if ( null !== $interval && 'manual' !== $interval && function_exists( 'datamachine_validate_interval' ) ) {
-				$validation = datamachine_validate_interval( $interval );
-				if ( ! $validation['valid'] ) {
-					return array(
-						'success' => false,
-						'error'   => $validation['error'],
-					);
-				}
-				$scheduling_config['interval'] = $validation['resolved'];
-			}
-
 			$result = FlowScheduling::handle_scheduling_update( $flow_id, $scheduling_config );
 			if ( is_wp_error( $result ) ) {
 				return array(

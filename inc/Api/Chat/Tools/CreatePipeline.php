@@ -16,6 +16,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 use DataMachine\Abilities\StepTypeAbilities;
+use DataMachine\Core\Database\Flows\Flows as FlowsDB;
 use DataMachine\Engine\AI\Tools\BaseTool;
 
 class CreatePipeline extends BaseTool {
@@ -100,25 +101,7 @@ class CreatePipeline extends BaseTool {
 		$flow_name         = $parameters['flow_name'] ?? $pipeline_name;
 		$scheduling_config = $parameters['scheduling_config'] ?? array( 'interval' => 'manual' );
 
-		$scheduling_validation = $this->validateSchedulingConfig( $scheduling_config );
-		if ( true !== $scheduling_validation ) {
-			return array(
-				'success'   => false,
-				'error'     => $scheduling_validation,
-				'tool_name' => 'create_pipeline',
-			);
-		}
-
 		if ( ! empty( $steps ) ) {
-			$steps_validation = $this->validateSteps( $steps );
-			if ( true !== $steps_validation ) {
-				return array(
-					'success'   => false,
-					'error'     => $steps_validation,
-					'tool_name' => 'create_pipeline',
-				);
-			}
-
 			$steps = $this->normalizeSteps( $steps );
 		}
 
@@ -161,6 +144,7 @@ class CreatePipeline extends BaseTool {
 		$flow_id       = $result['flow_id'] ?? null;
 		$flow_step_ids = $result['flow_step_ids'] ?? array();
 		$steps_created = $result['steps_created'] ?? 0;
+		$flow           = $flow_id ? ( new FlowsDB() )->get_flow( (int) $flow_id ) : null;
 
 		return array(
 			'success'   => true,
@@ -171,7 +155,7 @@ class CreatePipeline extends BaseTool {
 				'flow_name'     => $flow_name,
 				'steps_created' => $steps_created,
 				'flow_step_ids' => $flow_step_ids,
-				'scheduling'    => $scheduling_config['interval'],
+				'scheduling'    => $flow['scheduling_config']['interval'] ?? $scheduling_config['interval'],
 				'message'       => 0 === $steps_created
 					? "Pipeline and flow (ID: {$flow_id}) created. Use add_pipeline_step to add steps, then configure_flow_steps to configure handlers."
 					: "Pipeline and flow (ID: {$flow_id}) created with {$steps_created} steps. Use configure_flow_steps with the flow_step_ids to set handler configurations.",
@@ -191,31 +175,15 @@ class CreatePipeline extends BaseTool {
 		$template      = $parameters['template'] ?? array();
 		$validate_only = ! empty( $parameters['validate_only'] );
 
-		// Normalize template steps if provided
+		// Normalize template steps if provided.
 		$template_steps = $template['steps'] ?? array();
 		if ( ! empty( $template_steps ) ) {
-			$steps_validation = $this->validateSteps( $template_steps );
-			if ( true !== $steps_validation ) {
-				return array(
-					'success'   => false,
-					'error'     => 'Template steps validation failed: ' . $steps_validation,
-					'tool_name' => 'create_pipeline',
-				);
-			}
 			$template['steps'] = $this->normalizeSteps( $template_steps );
 		}
 
-		// Validate and normalize per-pipeline steps
+		// Normalize per-pipeline steps before canonical ability validation.
 		foreach ( $pipelines as $index => &$pipeline_config ) {
 			if ( ! empty( $pipeline_config['steps'] ) ) {
-				$steps_validation = $this->validateSteps( $pipeline_config['steps'] );
-				if ( true !== $steps_validation ) {
-					return array(
-						'success'   => false,
-						'error'     => "Pipeline at index {$index} steps validation failed: " . $steps_validation,
-						'tool_name' => 'create_pipeline',
-					);
-				}
 				$pipeline_config['steps'] = $this->normalizeSteps( $pipeline_config['steps'] );
 			}
 		}
@@ -272,64 +240,16 @@ class CreatePipeline extends BaseTool {
 		return $result;
 	}
 
-	private function validateSchedulingConfig( array $config ): bool|string {
-		if ( empty( $config ) ) {
-			return true;
-		}
-
-		$interval = $config['interval'] ?? null;
-
-		if ( null === $interval ) {
-			return 'scheduling_config requires an interval property';
-		}
-
-		$intervals       = array_keys( apply_filters( 'datamachine_scheduler_intervals', array() ) );
-		$valid_intervals = array_merge( array( 'manual', 'one_time' ), $intervals );
-		if ( ! in_array( $interval, $valid_intervals, true ) ) {
-			return 'Invalid interval. Must be one of: ' . implode( ', ', $valid_intervals );
-		}
-
-		if ( 'one_time' === $interval ) {
-			$timestamp = $config['timestamp'] ?? null;
-			if ( ! is_numeric( $timestamp ) || (int) $timestamp <= 0 ) {
-				return 'one_time interval requires a valid unix timestamp';
-			}
-		}
-
-		return true;
-	}
-
-	private function validateSteps( array $steps ): bool|string {
-		foreach ( $steps as $index => $step ) {
-			// Accept shorthand: "event_import" becomes step_type=event_import
-			if ( is_string( $step ) ) {
-				$step = array( 'step_type' => $step );
-			}
-
-			if ( ! is_array( $step ) ) {
-				return "Step at index {$index} must be a string or object";
-			}
-
-			$step_type = $step['step_type'] ?? null;
-			if ( empty( $step_type ) ) {
-				return "Step at index {$index} is missing required step_type";
-			}
-
-			$valid_types = self::getValidStepTypes();
-			if ( ! in_array( $step_type, $valid_types, true ) ) {
-				return "Step at index {$index} has invalid step_type '{$step_type}'. Must be one of: " . implode( ', ', $valid_types );
-			}
-		}
-
-		return true;
-	}
-
 	private function normalizeSteps( array $steps ): array {
 		$normalized = array();
 		foreach ( $steps as $index => $step ) {
 			// Accept shorthand: "event_import" becomes step_type=event_import
 			if ( is_string( $step ) ) {
 				$step = array( 'step_type' => $step );
+			}
+			if ( ! is_array( $step ) || empty( $step['step_type'] ) ) {
+				$normalized[] = $step;
+				continue;
 			}
 
 			$handler_slug   = $step['handler_slug'] ?? null;

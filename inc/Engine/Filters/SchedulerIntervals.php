@@ -96,15 +96,28 @@ function datamachine_resolve_interval_alias( string $interval ): string {
  * Special keys (manual, one_time, cron) and cron expressions are always valid.
  *
  * @param string $interval Interval key, alias, or cron expression.
+ * @param array  $config Optional scheduling configuration for special-key requirements.
  * @return array{valid: bool, resolved: string, error?: string, available?: string[]}
  */
-function datamachine_validate_interval( string $interval ): array {
+function datamachine_validate_interval( string $interval, array $config = array() ): array {
 	// Special scheduling types are always valid.
 	if ( in_array( $interval, array( 'manual', 'one_time', 'cron' ), true ) ) {
-		return array(
+		$validation = array(
 			'valid'    => true,
 			'resolved' => $interval,
 		);
+
+		if ( 'one_time' === $interval && ! empty( $config ) && empty( $config['timestamp'] ) ) {
+			$validation['valid'] = false;
+			$validation['error'] = 'Timestamp required for one-time scheduling';
+		}
+
+		if ( 'cron' === $interval && ! empty( $config ) && empty( $config['cron_expression'] ) ) {
+			$validation['valid'] = false;
+			$validation['error'] = 'cron_expression required when interval is cron';
+		}
+
+		return $validation;
 	}
 
 	// Cron expressions are valid (further validation happens in RecurringScheduler).

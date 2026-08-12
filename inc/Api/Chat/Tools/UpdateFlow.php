@@ -76,17 +76,6 @@ class UpdateFlow extends BaseTool {
 			);
 		}
 
-		if ( ! empty( $scheduling_config ) ) {
-			$validation = $this->validateSchedulingConfig( $scheduling_config );
-			if ( true !== $validation ) {
-				return array(
-					'success'   => false,
-					'error'     => $validation,
-					'tool_name' => 'update_flow',
-				);
-			}
-		}
-
 		$ability = wp_get_ability( 'datamachine/update-flow' );
 		if ( ! $ability ) {
 			return array(
@@ -120,8 +109,8 @@ class UpdateFlow extends BaseTool {
 			$response_data['flow_name'] = $result['flow_name'] ?? $flow_name;
 		}
 		if ( ! empty( $scheduling_config ) ) {
-			$response_data['scheduling']        = $scheduling_config['interval'];
-			$response_data['scheduling_config'] = $scheduling_config;
+			$response_data['scheduling_config'] = $result['flow_data']['scheduling_config'] ?? $scheduling_config;
+			$response_data['scheduling']        = $response_data['scheduling_config']['interval'] ?? 'manual';
 		}
 
 		return array(
@@ -131,26 +120,4 @@ class UpdateFlow extends BaseTool {
 		);
 	}
 
-	private function validateSchedulingConfig( array $config ): bool|string {
-		$interval = $config['interval'] ?? null;
-
-		if ( null === $interval ) {
-			return 'scheduling_config requires an interval property';
-		}
-
-		$intervals       = array_keys( apply_filters( 'datamachine_scheduler_intervals', array() ) );
-		$valid_intervals = array_merge( array( 'manual', 'one_time' ), $intervals );
-		if ( ! in_array( $interval, $valid_intervals, true ) ) {
-			return 'Invalid interval. Must be one of: ' . implode( ', ', $valid_intervals );
-		}
-
-		if ( 'one_time' === $interval ) {
-			$timestamp = $config['timestamp'] ?? null;
-			if ( ! is_numeric( $timestamp ) || (int) $timestamp <= 0 ) {
-				return 'one_time interval requires a valid unix timestamp';
-			}
-		}
-
-		return true;
-	}
 }

@@ -216,18 +216,14 @@ class CreateFlowAbility {
 		}
 
 		// Validate and resolve interval aliases before storing.
-		$interval = $scheduling_config['interval'] ?? 'manual';
-		if ( 'manual' !== $interval && function_exists( 'datamachine_validate_interval' ) ) {
-			$validation = datamachine_validate_interval( $interval );
-			if ( ! $validation['valid'] ) {
-				return array(
-					'success' => false,
-					'error'   => $validation['error'],
-				);
-			}
-			// Use the resolved canonical key (alias → real key).
-			$scheduling_config['interval'] = $validation['resolved'];
+		$validation = datamachine_validate_interval( $scheduling_config['interval'] ?? 'manual', $scheduling_config );
+		if ( ! $validation['valid'] ) {
+			return array(
+				'success' => false,
+				'error'   => $validation['error'],
+			);
 		}
+		$scheduling_config['interval'] = $validation['resolved'];
 
 		// Store the requested scheduling_config immediately so the DB reflects
 		// the caller's intent. handle_scheduling_update() is called with
