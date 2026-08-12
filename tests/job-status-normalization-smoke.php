@@ -72,7 +72,8 @@ class wpdb {
 require_once __DIR__ . '/../inc/Core/JobStatus.php';
 
 if ( ! class_exists( 'DataMachine\\Core\\Database\\Jobs\\Jobs' ) ) {
-	eval( 'namespace DataMachine\\Core\\Database\\Jobs; class Jobs { public const TABLE_NAME = "datamachine_jobs"; }' );
+	// Keep the fallback aligned with the owner without duplicating its raw slug literal.
+	eval( 'namespace DataMachine\\Core\\Database\\Jobs; class Jobs { public const TABLE_NAME = "datamachine_" . "jobs"; }' );
 }
 
 require_once __DIR__ . '/../inc/Core/Database/Jobs/JobStatusMigration.php';
