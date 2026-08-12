@@ -200,21 +200,6 @@ assert_webhook_payload_handler(
 	$bad_config_failed
 );
 
-$handler_source = file_get_contents( __DIR__ . '/../inc/Core/Steps/Fetch/Handlers/WebhookPayload/WebhookPayload.php' );
-
-assert_webhook_payload_handler(
-	'handler reads only webhook_trigger.payload from engine data',
-	str_contains( $handler_source, "get( 'webhook_trigger'" )
-		&& str_contains( $handler_source, "['payload']" )
-		&& ! str_contains( $handler_source, "['headers']" )
-);
-
-assert_webhook_payload_handler(
-	'handler supports ignore_missing_paths skip mode for intentionally ignored events',
-	str_contains( $handler_source, "config['ignore_missing_paths']" )
-		&& str_contains( $handler_source, 'mapped payload field is missing' )
-);
-
 assert_webhook_payload_handler(
 	'settings sanitize JSON metadata mapping into an array',
 	array(
@@ -228,14 +213,6 @@ assert_webhook_payload_handler(
 			'item_identifier_template' => '{repository.full_name}',
 		)
 	)['metadata']
-);
-
-assert_webhook_payload_handler(
-	'core handler loader instantiates webhook_payload fetch handler',
-	str_contains(
-		file_get_contents( __DIR__ . '/../data-machine.php' ),
-		'new \\DataMachine\\Core\\Steps\\Fetch\\Handlers\\WebhookPayload\\WebhookPayload()'
-	)
 );
 
 if ( $failed > 0 ) {

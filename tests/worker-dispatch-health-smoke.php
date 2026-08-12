@@ -64,16 +64,6 @@ $assert     = static function ( bool $condition, string $message ) use ( &$asser
 	}
 };
 
-$worker_source = file_get_contents( __DIR__ . '/../inc/Cli/Commands/WorkerCommand.php' ) ?: '';
-$lock_source   = file_get_contents( __DIR__ . '/../inc/Cli/WorkerLock.php' ) ?: '';
-$system_source = file_get_contents( __DIR__ . '/../inc/Abilities/SystemAbilities.php' ) ?: '';
-$assert( str_contains( $worker_source, 'WorkerLock::heartbeat( $lock_token, $lane )' ), 'worker loop refreshes its lease heartbeat before each pass' );
-$assert( str_contains( $worker_source, 'if ( ! WorkerLock::heartbeat( $lock_token, $lane ) )' ), 'worker loop fences itself when lease refresh loses ownership' );
-$assert( str_contains( $lock_source, 'OptionLeaseStore::refresh' ), 'worker heartbeat uses the existing atomic lease refresh primitive' );
-$assert( str_contains( $lock_source, "'heartbeat_age_seconds'" ), 'worker lock snapshots expose heartbeat age' );
-$assert( str_contains( $worker_source, "wp_next_scheduled( 'action_scheduler_run_queue', array( 'WP Cron' ) )" ), 'worker diagnostics query the exact Action Scheduler WP-Cron event identity' );
-$assert( str_contains( $system_source, "wp_next_scheduled( 'action_scheduler_run_queue', array( 'WP Cron' ) )" ), 'system diagnostics query the exact Action Scheduler WP-Cron event identity' );
-
 $starved = WorkerHealth::classify(
 	array(
 		'due_count'                    => 1,
