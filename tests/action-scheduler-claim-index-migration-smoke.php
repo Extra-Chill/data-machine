@@ -46,11 +46,18 @@ class ClaimIndexMigrationSmokeWpdb extends wpdb {
 
 	public function prepare( $query, ...$args ): string {
 		foreach ( $args as $argument ) {
-			if ( str_contains( $query, '%i' ) ) {
-				$query = preg_replace( '/%i/', '`' . str_replace( '`', '``', (string) $argument ) . '`', $query, 1 );
-			} elseif ( str_contains( $query, '%s' ) ) {
-				$query = preg_replace( '/%s/', "'" . addslashes( (string) $argument ) . "'", $query, 1 );
-			}
+			$query = preg_replace_callback(
+				'/%[ids]/',
+				static function ( array $match ) use ( $argument ): string {
+					return match ( $match[0] ) {
+						'%i' => '`' . str_replace( '`', '``', (string) $argument ) . '`',
+						'%d' => (string) (int) $argument,
+						default => "'" . addslashes( (string) $argument ) . "'",
+					};
+				},
+				$query,
+				1
+			);
 		}
 		return $query;
 	}
