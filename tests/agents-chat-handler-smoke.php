@@ -73,12 +73,15 @@ $assert = static function ( bool $condition, string $label ) use ( &$passes, &$f
 $root           = dirname( __DIR__ );
 $handler_source = (string) file_get_contents( $root . '/inc/Abilities/Chat/AgentsChatHandler.php' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Source smoke fixture.
 $orchestrator   = (string) file_get_contents( $root . '/inc/Api/Chat/ChatOrchestrator.php' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Source smoke fixture.
-$chat_abilities = (string) file_get_contents( $root . '/inc/Abilities/ChatAbilities.php' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Source smoke fixture.
 $bootstrap      = (string) file_get_contents( $root . '/inc/bootstrap.php' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Source smoke fixture.
+$plugin         = (string) file_get_contents( $root . '/data-machine.php' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Source smoke fixture.
 $chat_api       = (string) file_get_contents( $root . '/inc/Api/Chat/Chat.php' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Source smoke fixture.
 
-$assert( str_contains( $chat_abilities, 'new AgentsChatHandler();' ), 'ChatAbilities registers Data Machine as the Agents API chat handler' );
-$assert( str_contains( $bootstrap, 'new ChatAbilities();' ), 'Plugin bootstrap initializes canonical chat abilities' );
+foreach ( array( 'ListChatSessionsAbility', 'GetChatSessionAbility', 'DeleteChatSessionAbility', 'CreateChatSessionAbility', 'MarkSessionReadAbility', 'AgentsChatHandler' ) as $provider ) {
+	$assert( 1 === substr_count( $bootstrap, "new {$provider}();" ), "Plugin bootstrap registers {$provider} exactly once" );
+}
+$assert( ! file_exists( $root . '/inc/Abilities/ChatAbilities.php' ), 'ChatAbilities registration facade is removed' );
+$assert( ! str_contains( $plugin, 'ChatAbilities' ), 'Full runtime bootstrap does not duplicate chat provider registration' );
 $assert( str_contains( $handler_source, "register_chat_handler( array( $" . "this, 'execute' ) )" ), 'AgentsChatHandler attaches to canonical Agents API chat handler seam' );
 $assert( ! str_contains( $handler_source, "wp_agent_chat_handler" ), 'AgentsChatHandler no longer falls back to legacy chat handler filter' );
 $assert( str_contains( $handler_source, 'ChatOrchestrator::processChat(' ), 'AgentsChatHandler owns the single ChatOrchestrator runtime call' );
@@ -102,7 +105,7 @@ $assert( str_contains( $orchestrator, "'workspace' => $" . "workspace->to_array(
 $assert( str_contains( $orchestrator, "'calling_user_id' => $" . "calling_user_id" ), 'ChatOrchestrator passes caller identity to tool resolution and the conversation loop' );
 $assert( str_contains( $orchestrator, '$response_metadata = is_array( $result[\'metadata\'] ?? null )' ), 'ChatOrchestrator exposes loop metadata from the actual turn result' );
 $assert( ! file_exists( $root . '/inc/Abilities/Chat/SendMessageAbility.php' ), 'datamachine/send-message facade class is removed' );
-$assert( ! str_contains( $chat_abilities, 'SendMessageAbility' ), 'ChatAbilities no longer registers datamachine/send-message' );
+$assert( ! str_contains( $bootstrap, 'SendMessageAbility' ), 'Plugin bootstrap does not register datamachine/send-message' );
 $assert( str_contains( $chat_api, "wp_get_ability( 'agents/chat' )" ), 'REST chat endpoint dispatches directly through canonical agents/chat' );
 $assert( ! str_contains( $chat_api, "wp_get_ability( 'datamachine/send-message' )" ), 'REST chat endpoint no longer resolves datamachine/send-message' );
 
