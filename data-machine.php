@@ -134,6 +134,7 @@ if ( ! class_exists( 'ActionScheduler' ) ) {
 }
 
 \DataMachine\Core\ActionScheduler\LogPersistencePolicy::register();
+\DataMachine\Core\Database\CanonicalPersistencePolicy::register();
 \DataMachine\Engine\Tasks\RecurringScheduler::registerGenerationFence();
 
 add_action(
