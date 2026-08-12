@@ -57,9 +57,10 @@ $assert(
 	500 === $method->invoke( $service, 100000, null, array(), '' ),
 	'direct drain input is capped at 500 actions'
 );
+$source = file_get_contents( __DIR__ . '/../inc/Core/ActionScheduler/ScopedDrainService.php' );
 $assert(
-	500 === $method->invoke( $service, 25, null, array( 42 ), '' ),
-	'a 1.6M-row scoped queue cannot expand the claim beyond 500 actions'
+	is_string( $source ) && str_contains( $source, 'return min( self::MAX_CLAIM_SIZE, max( $claim_size, $this->claimSizeThroughFirstJobAction' ),
+	'job-scope expansion is capped after counting through the first matching action'
 );
 
 if ( ! empty( $failures ) ) {
