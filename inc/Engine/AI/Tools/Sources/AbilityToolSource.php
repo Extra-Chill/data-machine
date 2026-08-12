@@ -89,7 +89,6 @@ final class AbilityToolSource {
 
 		$declared = $this->declarationsFromContext( $args );
 		$declared = apply_filters( 'datamachine_ability_tool_projections', $declared, $args );
-		$declared = apply_filters( 'datamachine_ability_tools', $declared, $args );
 		if ( ! is_array( $declared ) ) {
 			foreach ( $diagnostic_tool_names as $tool_name ) {
 				$rejections[ $tool_name ] = $this->rejection( $tool_name, 'no_projection' );
@@ -232,7 +231,7 @@ final class AbilityToolSource {
 		 * @param string $tool_name    Model-facing tool name.
 		 * @param string $ability_slug Registered primary ability slug.
 		 * @param object $ability      Registered primary WP_Ability instance.
-		 * @param array  $declaration  Raw `datamachine_ability_tools` declaration.
+		 * @param array  $declaration  Raw ability tool projection declaration.
 		 * @param array  $args         Tool resolution args.
 		 */
 		$ability_slug = (string) ( $tool['ability'] ?? '' );
