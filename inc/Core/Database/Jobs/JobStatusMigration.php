@@ -53,7 +53,7 @@ class JobStatusMigration {
 		$limit             = max( 1, min( self::MAX_BATCH, $limit ) );
 		$state             = $this->state();
 		$state['complete'] = false;
-		$rows              = $this->windowRows( (int) $state['cursor'], $limit );
+		$rows              = $this->candidateRows( (int) $state['cursor'], $limit );
 
 		foreach ( $rows as $row ) {
 			$job_id           = (int) $row['job_id'];
@@ -62,9 +62,6 @@ class JobStatusMigration {
 			$state['scanned'] = (int) $state['scanned'] + 1;
 			$parsed           = JobStatus::fromString( $status );
 
-			if ( in_array( $status, JobStatus::ALL_STATUSES, true ) ) {
-				continue;
-			}
 			if ( ! $parsed->isCanonical() ) {
 				$state['unknown'] = (int) $state['unknown'] + 1;
 				continue;
@@ -130,11 +127,19 @@ class JobStatusMigration {
 		);
 	}
 
-	private function windowRows( int $cursor, int $limit ): array {
+	private function candidateRows( int $cursor, int $limit ): array {
 		$query = $this->wpdb->prepare(
-			'SELECT job_id, status FROM %i WHERE job_id > %d ORDER BY job_id ASC LIMIT %d',
+			'SELECT job_id, status FROM %i WHERE job_id > %d AND status NOT IN (%s, %s, %s, %s, %s, %s, %s, %s) ORDER BY job_id ASC LIMIT %d',
 			$this->table,
 			$cursor,
+			JobStatus::PENDING,
+			JobStatus::PROCESSING,
+			JobStatus::WAITING,
+			JobStatus::COMPLETED,
+			JobStatus::FAILED,
+			JobStatus::CANCELLED,
+			JobStatus::COMPLETED_NO_ITEMS,
+			JobStatus::AGENT_SKIPPED,
 			$limit
 		);
 		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- The query is prepared immediately above with typed identifier and scalar placeholders.
