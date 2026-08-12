@@ -85,7 +85,10 @@ datamachine_bundle_runner_contains( $abilities, 'array_replace( $raw_input[\'opt
 
 echo "\n[2] Runner projects bundles to ephemeral workflows\n";
 foreach ( array(
-	'AgentBundleArrayAdapter::from_array_bundle' => 'runner consumes portable bundle documents',
+	"AgentBundleDirectory::read( \$resolved )" => 'runner loads schema-v1 directories as the canonical value object',
+	"\$directory = \$loaded['directory'] ?? null" => 'runner carries loaded directory objects into execution',
+	'! $directory instanceof AgentBundleDirectory' => 'runner limits array adaptation to compatibility inputs',
+	'import_directory_object( $directory'       => 'runner preserves direct directory import when runtime identity is absent',
 	'BundleSourceAuth::build_resolve_context'    => 'runner shares bundle token resolution with import/install surfaces',
 	'workflow_from_bundle_flow'                  => 'runner converts selected bundle flow to workflow steps',
 	'workflow_override_from_input'               => 'runner supports caller-supplied workflow overrides',

@@ -60,8 +60,11 @@ final class AgentBundleRunner {
 			return $this->response( $loaded, $input, $runtime_imports );
 		}
 
-		$bundle    = $loaded['bundle'];
-		$directory = AgentBundleArrayAdapter::from_array_bundle( $bundle );
+		$bundle    = is_array( $loaded['bundle'] ?? null ) ? $loaded['bundle'] : array();
+		$directory = $loaded['directory'] ?? null;
+		if ( ! $directory instanceof AgentBundleDirectory ) {
+			$directory = AgentBundleArrayAdapter::from_array_bundle( $bundle );
+		}
 		$selection = $this->select_flow( $directory, (string) ( $input['flow'] ?? $input['flow_slug'] ?? '' ) );
 		if ( empty( $selection['success'] ) ) {
 			return $this->response( $selection, $input, $runtime_imports );
@@ -109,7 +112,7 @@ final class AgentBundleRunner {
 			);
 		}
 
-		$identity = $this->ensure_runtime_agent_identity( $bundle, $input );
+		$identity = $this->ensure_runtime_agent_identity( $directory, $bundle, $input );
 		if ( empty( $identity['success'] ) ) {
 			return $this->response( $identity, $input, $runtime_imports, $selection );
 		}
@@ -704,8 +707,9 @@ final class AgentBundleRunner {
 	}
 
 	/** @return array<string,mixed> */
-	private function ensure_runtime_agent_identity( array $bundle, array $input ): array {
-		$slug = sanitize_title( (string) ( $bundle['agent']['agent_slug'] ?? '' ) );
+	private function ensure_runtime_agent_identity( AgentBundleDirectory $directory, array $bundle, array $input ): array {
+		$manifest = $directory->manifest()->to_array();
+		$slug     = sanitize_title( (string) ( $manifest['agent']['slug'] ?? '' ) );
 		if ( '' === $slug ) {
 			return array(
 				'success' => false,
@@ -725,16 +729,13 @@ final class AgentBundleRunner {
 		}
 
 		$owner_id = $this->runtime_import_owner_id( $input );
-		$result   = $this->bundler->import(
-			$bundle,
-			null,
-			$owner_id,
-			false,
-			array(
-				'is_upgrade'        => true,
-				'reconcile_runtime' => true,
-			)
+		$options = array(
+			'is_upgrade'        => true,
+			'reconcile_runtime' => true,
 		);
+		$result  = empty( $bundle )
+			? $this->bundler->import_directory_object( $directory, null, $owner_id, false, $options )
+			: $this->bundler->import( $bundle, null, $owner_id, false, $options );
 		if ( empty( $result['success'] ) ) {
 			return array(
 				'success' => false,
@@ -856,10 +857,15 @@ final class AgentBundleRunner {
 		}
 
 		$revision = BundleSource::is_remote( $source ) ? BundleSource::last_resolved_revision() : null;
-		$bundle   = null;
+		$bundle    = null;
+		$directory = null;
 		try {
 			if ( is_dir( $resolved ) ) {
-				$bundle = $this->bundler->from_directory( $resolved );
+				try {
+					$directory = AgentBundleDirectory::read( $resolved );
+				} catch ( BundleValidationException $e ) {
+					$bundle = $this->bundler->from_directory( $resolved );
+				}
 			} elseif ( preg_match( '/\.zip$/i', $resolved ) ) {
 				$bundle = $this->bundler->from_zip( $resolved );
 			} elseif ( preg_match( '/\.json$/i', $resolved ) ) {
@@ -874,7 +880,7 @@ final class AgentBundleRunner {
 		}
 
 		BundleSource::cleanup( $resolved, $source );
-		if ( ! is_array( $bundle ) ) {
+		if ( ! $directory instanceof AgentBundleDirectory && ! is_array( $bundle ) ) {
 			return array(
 				'success' => false,
 				'error'   => 'Failed to parse bundle. Use a bundle directory, .json file, or .zip archive.',
@@ -890,6 +896,7 @@ final class AgentBundleRunner {
 		return array(
 			'success'         => true,
 			'bundle'          => $bundle,
+			'directory'       => $directory,
 			'source_revision' => $revision,
 		);
 	}
