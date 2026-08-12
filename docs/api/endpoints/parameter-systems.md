@@ -208,7 +208,7 @@ $parameters = WP_Agent_Tool_Parameters::buildParameters(
 
 ## Handler Configuration Defaults
 
-The system employs a priority-based default application logic via `HandlerService::applyDefaults()`. This ensures consistent configuration across flows while allowing granular overrides.
+The system applies handler defaults through `HandlerAbilities`. This ensures consistent configuration across flows while allowing granular overrides.
 
 ### Priority Order (Highest to Lowest)
 

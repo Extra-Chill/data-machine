@@ -11,7 +11,7 @@ The current install path creates 17 named tables. Agent identity tables use `$wp
 | Source and content identity | `datamachine_processed_items`, `datamachine_tracked_items`, `datamachine_post_identity`, `datamachine_post_identity_reservations` |
 | Artifacts, chat, approvals, and operations | `datamachine_bundle_artifacts`, `datamachine_chat_sessions`, `datamachine_pending_actions`, `datamachine_logs` |
 
-The detailed sections below explain the primary product tables. For tables not expanded here, follow the implementation links implied by the inventory (`inc/Core/Database/` and `inc/Engine/AI/Actions/PendingActionStore.php`) rather than assuming an older abbreviated table list is complete.
+The detailed sections below explain the primary product tables. The implementations under `inc/Core/Database/` and `inc/Engine/AI/Actions/PendingActionStore.php` define tables not expanded here.
 
 ## Core Tables
 

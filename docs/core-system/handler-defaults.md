@@ -87,12 +87,12 @@ The system is exposed via the following REST API endpoints:
 ## Related Documentation
 
 - [Settings API](../api/endpoints/settings.md) - REST API reference
-- [Services Layer](services-layer.md) - Architectural overview (migration in progress)
+- [Services Layer](services-layer.md) - Abilities-first service architecture
 - [Parameter Systems](../api/endpoints/parameter-systems.md) - Data flow patterns
 
-## Migration Note
+## Handler Abilities
 
-As of v0.11.7, `HandlerService` has been deleted and replaced by `HandlerAbilities`. All handler operations now use the WordPress 6.9 Abilities API:
+Handler operations use the WordPress Abilities API:
 
 - `datamachine/get-handlers` - List handlers with optional step_type filter, or get single by handler_slug
 - `datamachine/validate-handler` - Validate handler slug exists

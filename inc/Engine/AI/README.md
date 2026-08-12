@@ -18,7 +18,7 @@ Current conversation ownership:
 - `datamachine_run_conversation()` is Data Machine's public runtime entry point for chat and pipeline turns.
 - `AgentsAPI\AI\WP_Agent_Conversation_Loop::run()` owns generic turn sequencing, budgets, transcripts, locks, events, and normalized result fields.
 - Data Machine's turn runner closure owns `RequestBuilder::build()`, wp-ai-client dispatch, `ToolExecutor::executeTool()`, tool runtime rules, completion assertions, job artifact summaries, and product logging.
-- `RequestBuilder::build()` returns `WordPress\AiClient\Results\DTO\GenerativeAiResult` or `WP_Error`; old `success/data/error` arrays are test compatibility inputs only through `datamachine_wp_ai_client_text_result`.
+- `RequestBuilder::build()` returns `WordPress\AiClient\Results\DTO\GenerativeAiResult` or `WP_Error`; compact arrays are supported as test inputs through `datamachine_wp_ai_client_text_result`.
 - Message storage uses `AgentsAPI\AI\WP_Agent_Message` envelopes. Provider-specific shapes are projections at the wp-ai-client boundary.
 
 Use this quick map before moving or renaming files:

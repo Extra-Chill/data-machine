@@ -65,7 +65,7 @@ if ( $ai_response instanceof \WP_Error ) {
 
 ## Return Types
 
-`RequestBuilder::build()` returns native provider-layer objects, not the older `['success' => true, 'data' => ...]` array shape.
+`RequestBuilder::build()` returns provider-layer result objects.
 
 Success:
 
@@ -157,8 +157,6 @@ If any check fails, `build()` logs `AI request blocked: wp-ai-client unavailable
 ```php
 new \WP_Error( 'wp_ai_client_unavailable', $unavailable_reason );
 ```
-
-Data Machine no longer falls back to `chubes_ai_request` or `ai-http-client` for runtime provider calls.
 
 ## Provider Dispatch
 
@@ -254,4 +252,4 @@ Representative tests:
 - Use the `$request_metadata` output parameter when a caller needs request diagnostics.
 - Keep tool execution outside RequestBuilder.
 - Keep durable multi-turn runtime behavior in `datamachine_run_conversation()` and Agents API, not in RequestBuilder.
-- Prefer wp-ai-client provider plugins over any legacy `chubes_ai_*` path.
+- Use wp-ai-client provider plugins for provider dispatch.
