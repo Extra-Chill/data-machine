@@ -2,6 +2,21 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.172.22] - 2026-08-12
+
+### Changed
+- keep directory imports canonical
+- delegate CLI agent assignments to abilities
+- Add partition policy for high-churn tables
+- delegate taxonomy term core updates
+- delegate taxonomy search queries
+- delegate taxonomy term creation to ability
+- use native errors for job queries
+- keep bundle directories canonical in runner
+
+### Fixed
+- delegate chat scheduling validation
+
 ## [0.172.21] - 2026-08-12
 
 ### Fixed
