@@ -2,6 +2,16 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.172.20] - 2026-08-12
+
+### Changed
+- declare canonical CLI aliases once
+- remove ability registration facades
+
+### Fixed
+- prevent Action Scheduler lock-table exhaustion
+- make artifact permissions cleanup-safe
+
 ## [0.172.18] - 2026-08-12
 
 ### Changed
