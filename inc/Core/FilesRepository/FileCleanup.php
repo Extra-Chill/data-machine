@@ -302,6 +302,20 @@ class FileCleanup {
 	}
 
 	private function artifact_matches_retention_scope( string $file_path, string $retention_scope ): bool {
+		FilesystemHelper::make_group_writable( $file_path, FilesystemHelper::SHARED_FILE_PERMISSIONS );
+		if ( ! is_readable( $file_path ) ) {
+			do_action(
+				'datamachine_log',
+				'warning',
+				'FileCleanup: Artifact is not readable by the cleanup runtime user.',
+				array(
+					'file_path'      => $file_path,
+					'retention_scope' => $retention_scope,
+				)
+			);
+			return false;
+		}
+
 		$contents = file_get_contents( $file_path ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
 		if ( ! is_string( $contents ) || '' === $contents ) {
 			return false;

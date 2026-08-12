@@ -14,6 +14,7 @@ use DataMachine\Core\Database\Chat\ConversationStoreFactory;
 use DataMachine\Core\Database\Jobs\Jobs;
 use DataMachine\Core\FilesRepository\AgentMemory as AgentMemoryFile;
 use DataMachine\Core\FilesRepository\DailyMemory;
+use DataMachine\Core\FilesRepository\FilesystemHelper;
 use DataMachine\Engine\AI\MemoryFileRegistry;
 
 defined( 'ABSPATH' ) || exit;
@@ -712,6 +713,7 @@ class JobArtifacts {
 				'error'   => sprintf( 'Failed to create artifact directory for job %d.', $job_id ),
 			);
 		}
+		FilesystemHelper::make_directory_group_accessible( $base_dir );
 
 		$file_name = sanitize_file_name( str_replace( '_', '-', $artifact_key ) . '.json' );
 		$file_path = trailingslashit( $base_dir ) . $file_name;
@@ -799,6 +801,9 @@ class JobArtifacts {
 
 		if ( ! rename( $temp_path, $file_path ) ) { // phpcs:ignore WordPress.WP.AlternativeFunctions.rename_rename
 			unlink( $temp_path ); // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
+			return false;
+		}
+		if ( ! FilesystemHelper::make_group_writable( $file_path, FilesystemHelper::SHARED_FILE_PERMISSIONS ) ) {
 			return false;
 		}
 
