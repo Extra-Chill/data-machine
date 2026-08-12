@@ -52,7 +52,7 @@ class JobsCommand extends BaseCommand {
 	 * : Normalize one bounded batch. Without this flag the command is read-only.
 	 *
 	 * [--limit=<count>]
-	 * : Maximum legacy rows to inspect in this invocation (1-1000).
+	 * : Maximum noncanonical candidate rows to inspect in this invocation (1-1000).
 	 * ---
 	 * default: 250
 	 * ---
