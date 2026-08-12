@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.172.17] - 2026-08-12
+
+### Fixed
+- normalize persisted job status state
+
 ## [0.172.16] - 2026-08-12
 
 ### Fixed
