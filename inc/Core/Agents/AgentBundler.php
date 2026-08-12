@@ -555,15 +555,41 @@ class AgentBundler {
 			);
 		}
 
-		try {
-			$bundle = $this->canonical_import_bundle( $bundle );
-		} catch ( BundleValidationException $e ) {
-			return array(
-				'success'    => false,
-				'error_code' => 'install_invalid_bundle',
-				'error'      => $e->getMessage(),
+		if ( (string) ( $bundle['bundle_schema_version'] ?? '' ) === (string) BundleSchema::VERSION ) {
+			try {
+				$directory = AgentBundleArrayAdapter::from_array_bundle( $bundle );
+			} catch ( BundleValidationException $e ) {
+				return array(
+					'success'    => false,
+					'error_code' => 'install_invalid_bundle',
+					'error'      => $e->getMessage(),
+				);
+			}
+
+			return $this->import_directory_materialization(
+				$directory,
+				$new_slug,
+				$owner_id,
+				$dry_run,
+				$options,
+				is_array( $bundle['abilities_manifest'] ?? null ) ? $bundle['abilities_manifest'] : array()
 			);
 		}
+
+		return $this->materialize_import_bundle( $bundle, $new_slug, $owner_id, $dry_run, $options );
+	}
+
+	/**
+	 * Materialize an import payload into runtime records.
+	 *
+	 * @param array       $bundle Import materialization payload.
+	 * @param string|null $new_slug Optional override slug.
+	 * @param int         $owner_id WordPress user ID to own the imported agent.
+	 * @param bool        $dry_run If true, validate without writing.
+	 * @param array       $options Import options.
+	 * @return array{success: bool, message?: string, error?: string, error_code?: string, summary?: array}
+	 */
+	private function materialize_import_bundle( array $bundle, ?string $new_slug, int $owner_id, bool $dry_run, array $options ): array {
 
 		$agent_data             = $bundle['agent'];
 		$slug                   = $new_slug
@@ -1322,28 +1348,27 @@ class AgentBundler {
 	 * @return array{success: bool, message?: string, error?: string, error_code?: string, summary?: array}
 	 */
 	public function import_directory_object( AgentBundleDirectory $directory, ?string $new_slug = null, int $owner_id = 0, bool $dry_run = false, array $options = array() ): array {
-		return $this->import( AgentBundleArrayAdapter::to_array_bundle( $directory ), $new_slug, $owner_id, $dry_run, $options );
+		return $this->import_directory_materialization( $directory, $new_slug, $owner_id, $dry_run, $options );
 	}
 
 	/**
-	 * Normalize schema-versioned bundle arrays through directory value objects before import.
+	 * Project a directory bundle once at the runtime materialization boundary.
 	 *
-	 * Legacy backup arrays intentionally keep the raw runtime-config path for compatibility.
-	 *
-	 * @param array $bundle Bundle array.
-	 * @return array Importable bundle array.
+	 * @param AgentBundleDirectory $directory Bundle directory value object.
+	 * @param string|null          $new_slug Optional override slug.
+	 * @param int                  $owner_id WordPress user ID to own the imported agent.
+	 * @param bool                 $dry_run If true, validate without writing.
+	 * @param array                $options Import options.
+	 * @param array                $abilities_manifest Compatibility abilities manifest.
+	 * @return array{success: bool, message?: string, error?: string, error_code?: string, summary?: array}
 	 */
-	private function canonical_import_bundle( array $bundle ): array {
-		if ( (string) ( $bundle['bundle_schema_version'] ?? '' ) !== (string) BundleSchema::VERSION ) {
-			return $bundle;
+	private function import_directory_materialization( AgentBundleDirectory $directory, ?string $new_slug, int $owner_id, bool $dry_run, array $options, array $abilities_manifest = array() ): array {
+		$payload = AgentBundleArrayAdapter::to_import_payload( $directory );
+		if ( ! empty( $abilities_manifest ) ) {
+			$payload['abilities_manifest'] = $abilities_manifest;
 		}
 
-		$canonical = AgentBundleArrayAdapter::to_array_bundle( AgentBundleArrayAdapter::from_array_bundle( $bundle ) );
-		if ( is_array( $bundle['abilities_manifest'] ?? null ) ) {
-			$canonical['abilities_manifest'] = $bundle['abilities_manifest'];
-		}
-
-		return $canonical;
+		return $this->materialize_import_bundle( $payload, $new_slug, $owner_id, $dry_run, $options );
 	}
 
 	/**

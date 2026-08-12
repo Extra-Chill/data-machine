@@ -63,6 +63,20 @@ final class AgentBundleArrayAdapter {
 	 * @return array Bundle array.
 	 */
 	public static function to_array_bundle( AgentBundleDirectory $directory ): array {
+		return self::to_import_payload( $directory );
+	}
+
+	/**
+	 * Project directory value objects into the established importer payload.
+	 *
+	 * Unlike to_array_bundle(), this is an internal materialization boundary,
+	 * not a compatibility export. Source install IDs are synthesized only long
+	 * enough for BundleStepIdRemapper to assign fresh runtime IDs.
+	 *
+	 * @param AgentBundleDirectory $directory Bundle directory value object.
+	 * @return array Import materialization payload.
+	 */
+	public static function to_import_payload( AgentBundleDirectory $directory ): array {
 		$manifest      = $directory->manifest()->to_array();
 		$memory_files  = $directory->memory_files();
 		$pipeline_ids  = array();

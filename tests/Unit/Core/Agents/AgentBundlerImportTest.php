@@ -344,7 +344,7 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 		$this->assertSame( 'broken.json', $data['errors'][0]['source_path'] ?? null );
 	}
 
-	public function test_directory_value_object_import_preserves_workflow_runtime_seed_fields(): void {
+	public function test_directory_and_compatibility_array_imports_converge_without_source_ids(): void {
 		$bundle = $this->fixture_bundle( 'directory-import-agent' );
 		$bundle['flows'][0]['flow_config']['1_step-uuid_1'] = array_merge(
 			$bundle['flows'][0]['flow_config']['1_step-uuid_1'],
@@ -378,6 +378,14 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 
 		$this->assertTrue( (bool) $result['success'], 'Directory value-object import succeeds.' );
 
+		$compatibility_bundle = AgentBundleArrayAdapter::to_array_bundle( $directory );
+		unset( $compatibility_bundle['pipelines'][0]['original_id'], $compatibility_bundle['flows'][0]['original_id'], $compatibility_bundle['flows'][0]['original_pipeline_id'] );
+		$compatibility_result = $this->bundler->import( $compatibility_bundle, 'compatibility-import-agent', $this->owner_id );
+
+		$this->assertTrue( (bool) $compatibility_result['success'], 'Compatibility array import succeeds without source install IDs.' );
+		$this->assertSame( $result['summary']['pipelines_imported'] ?? null, $compatibility_result['summary']['pipelines_imported'] ?? null );
+		$this->assertSame( $result['summary']['flows_imported'] ?? null, $compatibility_result['summary']['flows_imported'] ?? null );
+
 		$agent    = $this->agents_repo->get_by_slug( 'directory-import-agent' );
 		$pipeline = $this->pipelines_repo->get_by_portable_slug( (int) $agent['agent_id'], 'static-site-pipeline' );
 		$flow     = $this->flows_repo->get_by_portable_slug( (int) $pipeline['pipeline_id'], 'static-site-flow' );
@@ -391,6 +399,24 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 		$this->assertFalse( $step['enabled'] ?? true, 'Disabled step state imports from directory document.' );
 		$this->assertSame( 'daily', $flow['scheduling_config']['interval'] ?? null, 'Schedule imports from directory document.' );
 		$this->assertSame( array( 'mcp' => 7 ), $flow['scheduling_config']['max_items'] ?? null, 'Schedule limits import from directory document.' );
+
+		$directory_export     = $this->bundler->export_directory_object( 'directory-import-agent' );
+		$compatibility_export = $this->bundler->export_directory_object( 'compatibility-import-agent' );
+		$this->assertTrue( (bool) $directory_export['success'] );
+		$this->assertTrue( (bool) $compatibility_export['success'] );
+
+		$directory_output     = $directory_export['directory'];
+		$compatibility_output = $compatibility_export['directory'];
+		$this->assertSame(
+			array_map( static fn( $pipeline ) => $pipeline->to_array(), $directory_output->pipelines() ),
+			array_map( static fn( $pipeline ) => $pipeline->to_array(), $compatibility_output->pipelines() ),
+			'Direct directory and compatibility array imports materialize identical pipeline documents.'
+		);
+		$this->assertSame(
+			array_map( static fn( $flow_file ) => $flow_file->to_array(), $directory_output->flows() ),
+			array_map( static fn( $flow_file ) => $flow_file->to_array(), $compatibility_output->flows() ),
+			'Direct directory and compatibility array imports materialize identical flow documents.'
+		);
 	}
 
 	public function test_schema_versioned_array_import_does_not_require_source_install_ids(): void {

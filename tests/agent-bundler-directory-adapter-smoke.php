@@ -366,6 +366,8 @@ assert_adapter( 'export composes AgentBundlePipelineFile directly', false !== st
 assert_adapter( 'export composes AgentBundleFlowFile directly', false !== strpos( $agent_bundler_source, 'new AgentBundleFlowFile' ) );
 assert_adapter( 'to_directory writes AgentBundleArrayAdapter output', false !== strpos( $agent_bundler_source, 'AgentBundleArrayAdapter::from_array_bundle( $bundle )->write( $directory )' ) );
 assert_adapter( 'from_directory reads AgentBundleDirectory before array fallback', false !== strpos( $agent_bundler_source, 'AgentBundleArrayAdapter::to_array_bundle( AgentBundleDirectory::read( $directory ) )' ) );
+assert_adapter( 'directory import projects directly to the materialization payload', false !== strpos( $agent_bundler_source, 'AgentBundleArrayAdapter::to_import_payload( $directory )' ) );
+assert_adapter( 'directory import does not bounce through legacy array import', false === strpos( $agent_bundler_source, 'return $this->import( AgentBundleArrayAdapter::to_array_bundle( $directory )' ) );
 assert_adapter( 'import tracks bundle file artifacts', false !== strpos( $agent_bundler_source, 'self::bundle_file_artifacts( $bundle )' ) );
 
 rm_adapter_tree( $tmp );
