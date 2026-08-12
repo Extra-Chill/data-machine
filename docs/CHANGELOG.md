@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.172.16] - 2026-08-12
+
+### Fixed
+- accept bounded claim index plans
+
 ## [0.172.15] - 2026-08-12
 
 ### Fixed
