@@ -87,14 +87,34 @@ trait JobHelpers {
 		);
 	}
 
+	/** Return the native failure used by read-only job query abilities. */
+	protected function jobQueryAccessDenied( string $message = 'You do not have permission to access this job.' ): \WP_Error {
+		return new \WP_Error( 'job_access_denied', $message, array( 'status' => 403 ) );
+	}
+
+	/** Convert a database query error into the bounded job-query failure contract. */
+	protected function jobQueryFailed(): ?\WP_Error {
+		global $wpdb;
+
+		if ( '' === (string) $wpdb->last_error ) {
+			return null;
+		}
+
+		return new \WP_Error(
+			'job_query_failed',
+			__( 'Unable to query jobs.', 'data-machine' ),
+			array( 'status' => 500 )
+		);
+	}
+
 	/**
 	 * Apply authoritative ownership constraints to a job collection query.
 	 *
 	 * @param int|null $requested_user_id  Caller-selected user filter.
 	 * @param int|null $requested_agent_id Caller-selected agent filter.
-	 * @return array{user_id?:int,agent_id?:int}|array{error:string}
+	 * @return array{user_id?:int,agent_id?:int}|\WP_Error
 	 */
-	protected function jobCollectionScope( ?int $requested_user_id, ?int $requested_agent_id ): array {
+	protected function jobCollectionScope( ?int $requested_user_id, ?int $requested_agent_id ): array|\WP_Error {
 		if ( PermissionHelper::has_privileged_resource_access( 'manage_flows' ) ) {
 			if ( null !== $requested_agent_id ) {
 				return array( 'agent_id' => $requested_agent_id );
@@ -106,7 +126,7 @@ trait JobHelpers {
 		if ( null !== $requested_agent_id ) {
 			return PermissionHelper::can_access_agent( $requested_agent_id )
 				? array( 'agent_id' => $requested_agent_id )
-				: array( 'error' => 'You do not have permission to access jobs for this agent.' );
+				: $this->jobQueryAccessDenied( 'You do not have permission to access jobs for this agent.' );
 		}
 
 		$acting_agent_id = PermissionHelper::get_acting_agent_id();
@@ -115,11 +135,11 @@ trait JobHelpers {
 		}
 
 		if ( null !== $requested_user_id && $requested_user_id !== $acting_user_id ) {
-			return array( 'error' => 'You do not have permission to access jobs for this user.' );
+			return $this->jobQueryAccessDenied( 'You do not have permission to access jobs for this user.' );
 		}
 
 		if ( $acting_user_id <= 0 ) {
-			return array( 'error' => 'An authenticated acting caller is required to list owned jobs.' );
+			return $this->jobQueryAccessDenied( 'An authenticated acting caller is required to list owned jobs.' );
 		}
 
 		return array( 'user_id' => $acting_user_id );

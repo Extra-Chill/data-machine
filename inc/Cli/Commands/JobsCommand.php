@@ -1709,8 +1709,9 @@ class JobsCommand extends BaseCommand {
 
 		$result = ( new GetJobsAbility() )->execute( array( 'job_id' => (int) $job_id ) );
 
-		if ( ! $result['success'] ) {
-			WP_CLI::error( $result['error'] ?? 'Unknown error occurred' );
+		$error = AbilityResult::failure_to_wp_error( $result, 'get_jobs_failed', 'Unknown error occurred' );
+		if ( $error ) {
+			WP_CLI::error( $error->get_error_message() );
 			return;
 		}
 
@@ -1785,8 +1786,9 @@ class JobsCommand extends BaseCommand {
 
 		$result = ( new GetJobsAbility() )->execute( array( 'job_id' => $job_id ) );
 
-		if ( ! $result['success'] ) {
-			WP_CLI::error( $result['error'] ?? 'Unknown error occurred' );
+		$error = AbilityResult::failure_to_wp_error( $result, 'get_jobs_failed', 'Unknown error occurred' );
+		if ( $error ) {
+			WP_CLI::error( $error->get_error_message() );
 			return;
 		}
 

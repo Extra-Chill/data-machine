@@ -139,9 +139,9 @@ class GetJobsAbility {
 	 * Execute get-jobs ability.
 	 *
 	 * @param array $input Input parameters.
-	 * @return array Result with jobs list.
+	 * @return array|\WP_Error Result with jobs list or a query failure.
 	 */
-	public function execute( array $input ): array {
+	public function execute( array $input ): array|\WP_Error {
 		$job_id          = $input['job_id'] ?? null;
 		$flow_id         = $input['flow_id'] ?? null;
 		$pipeline_id     = $input['pipeline_id'] ?? null;
@@ -161,25 +161,21 @@ class GetJobsAbility {
 			null !== $user_id ? (int) $user_id : null,
 			null !== $agent_id ? (int) $agent_id : null
 		);
-		if ( isset( $ownership_scope['error'] ) ) {
-			return array(
-				'success'    => false,
-				'error_code' => 'job_access_denied',
-				'error'      => $ownership_scope['error'],
-				'status'     => 403,
-			);
+		if ( is_wp_error( $ownership_scope ) ) {
+			return $ownership_scope;
 		}
 
 		// Direct job lookup by ID - bypasses pagination and filters.
-		if ( $job_id ) {
+		if ( null !== $job_id ) {
 			if ( ! is_numeric( $job_id ) || (int) $job_id <= 0 ) {
-				return array(
-					'success' => false,
-					'error'   => 'job_id must be a positive integer',
-				);
+				return new \WP_Error( 'invalid_job_id', 'job_id must be a positive integer', array( 'status' => 400 ) );
 			}
 
-			$job = $this->db_jobs->get_job( (int) $job_id );
+			$job         = $this->db_jobs->get_job( (int) $job_id );
+			$query_error = $this->jobQueryFailed();
+			if ( $query_error ) {
+				return $query_error;
+			}
 
 			if ( ! $job ) {
 				return array(
@@ -193,7 +189,7 @@ class GetJobsAbility {
 			}
 
 			if ( ! $this->canAccessJob( $job ) ) {
-				return $this->jobAccessDenied();
+				return $this->jobQueryAccessDenied();
 			}
 
 			$jobs_enriched = $this->enrichJobNames( array( $job ) );
@@ -275,12 +271,25 @@ class GetJobsAbility {
 			$args['metadata']            = $metadata;
 			$args['metadata_scan_limit'] = (int) ( $input['metadata_scan_limit'] ?? 1000 );
 			$metadata_query              = $this->db_jobs->query_executions_by_metadata( $args );
+			$query_error                 = $this->jobQueryFailed();
+			if ( $query_error ) {
+				return $query_error;
+			}
 			$jobs                        = $metadata_query['jobs'];
 			$total                       = $metadata_query['total'];
 			$filters_applied['metadata'] = $metadata;
 		} else {
-			$jobs  = $this->db_jobs->get_jobs_for_list_table( $args );
-			$total = $this->db_jobs->get_jobs_count( $args );
+			$jobs        = $this->db_jobs->get_jobs_for_list_table( $args );
+			$query_error = $this->jobQueryFailed();
+			if ( $query_error ) {
+				return $query_error;
+			}
+
+			try {
+				$total = $this->db_jobs->get_jobs_count( $args, true );
+			} catch ( \RuntimeException ) {
+				return new \WP_Error( 'job_query_failed', __( 'Unable to query jobs.', 'data-machine' ), array( 'status' => 500 ) );
+			}
 		}
 
 		if ( empty( $args['fields'] ) ) {

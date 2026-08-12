@@ -10,6 +10,7 @@ namespace DataMachine\Tests\Unit\Abilities\Job;
 use AgentsAPI\AI\WP_Agent_Execution_Principal;
 use DataMachine\Abilities\Job\ExecuteWorkflowAbility;
 use DataMachine\Abilities\Job\FailJobAbility;
+use DataMachine\Abilities\Job\FlowHealthAbility;
 use DataMachine\Abilities\Job\GetJobsAbility;
 use DataMachine\Abilities\Job\HydrateJobArtifactAbility;
 use DataMachine\Abilities\Job\JobsSummaryAbility;
@@ -24,6 +25,7 @@ use DataMachine\Core\DirectJobEnqueuer;
 use DataMachine\Core\DirectOperationRecoveryPolicy;
 use DataMachine\Core\JobRetryPolicy;
 use DataMachine\Core\JobStatus;
+use DataMachine\Api\Jobs as JobsApi;
 use WP_UnitTestCase;
 
 class DirectJobOwnershipTest extends WP_UnitTestCase {
@@ -117,7 +119,7 @@ class DirectJobOwnershipTest extends WP_UnitTestCase {
 		$this->assertTrue( $internal['success'] );
 
 		wp_set_current_user( $this->other_user_id );
-		$this->assertSame( 'job_access_denied', ( new GetJobsAbility() )->execute( array( 'job_id' => $internal['job_id'] ) )['error_code'] );
+		$this->assertSame( 'job_access_denied', ( new GetJobsAbility() )->execute( array( 'job_id' => $internal['job_id'] ) )->get_error_code() );
 		wp_set_current_user( $this->admin_id );
 		$this->assertTrue( ( new GetJobsAbility() )->execute( array( 'job_id' => $internal['job_id'] ) )['success'] );
 	}
@@ -153,8 +155,8 @@ class DirectJobOwnershipTest extends WP_UnitTestCase {
 
 		wp_set_current_user( $this->other_user_id );
 		$denied = ( new GetJobsAbility() )->execute( array( 'job_id' => $job_id ) );
-		$this->assertFalse( $denied['success'] );
-		$this->assertSame( 'job_access_denied', $denied['error_code'] );
+		$this->assertWPError( $denied );
+		$this->assertSame( 'job_access_denied', $denied->get_error_code() );
 		$this->assertSame( 'job_access_denied', ( new RunMetricsAbility() )->execute( array( 'job_id' => $job_id ) )['error_code'] );
 		$this->assertFalse( ( new FailJobAbility() )->execute( array( 'job_id' => $job_id ) )['success'] );
 		$this->assertSame( 'job_access_denied', ( new RetryJobAbility() )->execute( array( 'job_id' => $job_id ) )['error_code'] );
@@ -175,10 +177,11 @@ class DirectJobOwnershipTest extends WP_UnitTestCase {
 		$this->assertNotContains( $other['job_id'], array_map( 'intval', array_column( $list['jobs'], 'job_id' ) ) );
 
 		$forged = ( new GetJobsAbility() )->execute( array( 'user_id' => $this->other_user_id ) );
-		$this->assertFalse( $forged['success'] );
-		$this->assertSame( 'job_access_denied', $forged['error_code'] );
+		$this->assertWPError( $forged );
+		$this->assertSame( 'job_access_denied', $forged->get_error_code() );
 		$forged_summary = ( new JobsSummaryAbility() )->execute( array( 'user_id' => $this->other_user_id ) );
-		$this->assertSame( 'job_access_denied', $forged_summary['error_code'] );
+		$this->assertWPError( $forged_summary );
+		$this->assertSame( 'job_access_denied', $forged_summary->get_error_code() );
 
 		$owner_summary = ( new JobsSummaryAbility() )->execute( array() );
 		$this->assertTrue( $owner_summary['success'] );
@@ -187,8 +190,8 @@ class DirectJobOwnershipTest extends WP_UnitTestCase {
 
 		wp_set_current_user( 0 );
 		$anonymous_summary = ( new JobsSummaryAbility() )->execute( array() );
-		$this->assertFalse( $anonymous_summary['success'] );
-		$this->assertSame( 'job_access_denied', $anonymous_summary['error_code'] );
+		$this->assertWPError( $anonymous_summary );
+		$this->assertSame( 'job_access_denied', $anonymous_summary->get_error_code() );
 
 		wp_set_current_user( $this->admin_id );
 		$operator_list = ( new GetJobsAbility() )->execute( array() );
@@ -200,6 +203,43 @@ class DirectJobOwnershipTest extends WP_UnitTestCase {
 		$this->assertTrue( $operator_summary['success'] );
 		$this->assertArrayNotHasKey( 'user_id', $operator_summary['summary']['filters'] );
 		$this->assertArrayNotHasKey( 'jobs', $operator_summary['summary'] );
+	}
+
+	public function test_query_validation_and_not_found_use_native_errors(): void {
+		wp_set_current_user( $this->admin_id );
+
+		$invalid_job = ( new GetJobsAbility() )->execute( array( 'job_id' => 0 ) );
+		$this->assertWPError( $invalid_job );
+		$this->assertSame( 'invalid_job_id', $invalid_job->get_error_code() );
+		$this->assertSame( 400, $invalid_job->get_error_data()['status'] );
+
+		$invalid_flow = ( new FlowHealthAbility() )->execute( array( 'flow_id' => 0 ) );
+		$this->assertWPError( $invalid_flow );
+		$this->assertSame( 'invalid_flow_id', $invalid_flow->get_error_code() );
+
+		$missing_flow = ( new FlowHealthAbility() )->execute( array( 'flow_id' => PHP_INT_MAX ) );
+		$this->assertWPError( $missing_flow );
+		$this->assertSame( 'flow_not_found', $missing_flow->get_error_code() );
+		$this->assertSame( 404, $missing_flow->get_error_data()['status'] );
+	}
+
+	public function test_successful_rest_collection_contract_is_unchanged(): void {
+		wp_set_current_user( $this->admin_id );
+		$request = new \WP_REST_Request( 'GET', '/datamachine/v1/jobs' );
+		$request->set_param( 'orderby', 'job_id' );
+		$request->set_param( 'order', 'DESC' );
+		$request->set_param( 'per_page', 50 );
+		$request->set_param( 'offset', 0 );
+
+		$response = JobsApi::handle_get_jobs( $request );
+		$this->assertInstanceOf( \WP_REST_Response::class, $response );
+		$data = $response->get_data();
+		$this->assertTrue( $data['success'] );
+		$this->assertIsArray( $data['data'] );
+		$this->assertArrayHasKey( 'total', $data );
+		$this->assertArrayHasKey( 'per_page', $data );
+		$this->assertArrayHasKey( 'offset', $data );
+		$this->assertArrayHasKey( 'filters_applied', $data );
 	}
 
 	public function test_artifact_authorization_runs_before_hydration(): void {

@@ -65,29 +65,31 @@ class FlowHealthAbility {
 	 * Execute get-flow-health ability.
 	 *
 	 * @param array $input Input parameters with flow_id.
-	 * @return array Result with health metrics.
+	 * @return array|\WP_Error Result with health metrics or a query failure.
 	 */
-	public function execute( array $input ): array {
+	public function execute( array $input ): array|\WP_Error {
 		$flow_id = $input['flow_id'] ?? null;
 
 		if ( ! is_numeric( $flow_id ) || (int) $flow_id <= 0 ) {
-			return array(
-				'success' => false,
-				'error'   => 'flow_id is required and must be a positive integer',
-			);
+			return new \WP_Error( 'invalid_flow_id', 'flow_id is required and must be a positive integer', array( 'status' => 400 ) );
 		}
 
 		$flow_id = (int) $flow_id;
 
-		$flow = $this->db_flows->get_flow( $flow_id );
+		$flow        = $this->db_flows->get_flow( $flow_id );
+		$query_error = $this->jobQueryFailed();
+		if ( $query_error ) {
+			return $query_error;
+		}
 		if ( ! $flow ) {
-			return array(
-				'success' => false,
-				'error'   => sprintf( 'Flow %d not found', $flow_id ),
-			);
+			return new \WP_Error( 'flow_not_found', sprintf( 'Flow %d not found', $flow_id ), array( 'status' => 404 ) );
 		}
 
-		$health = $this->db_jobs->get_flow_health( $flow_id );
+		$health      = $this->db_jobs->get_flow_health( $flow_id );
+		$query_error = $this->jobQueryFailed();
+		if ( $query_error ) {
+			return $query_error;
+		}
 
 		return array(
 			'success'              => true,
