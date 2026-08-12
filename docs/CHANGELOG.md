@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.172.15] - 2026-08-12
+
+### Fixed
+- align retention hook policy arrays
+
 ## [0.172.14] - 2026-08-11
 
 ### Fixed
