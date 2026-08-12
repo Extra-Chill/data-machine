@@ -173,6 +173,7 @@ require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Tools/class-wp-agent
 require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Runtime/class-wp-agent-citation-metadata.php';
 require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Tools/class-wp-agent-tool-result.php';
 require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Tools/class-wp-agent-tool-executor.php';
+require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Tools/class-wp-agent-tool-executor-registry.php';
 require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Tools/class-wp-agent-tool-execution-core.php';
 require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Tools/class-wp-agent-tool-policy-filter.php';
 require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Tools/class-wp-agent-tool-policy.php';
@@ -201,6 +202,7 @@ require_once __DIR__ . '/../inc/Engine/AI/Tools/Sources/RuntimeToolSource.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/Sources/DataMachineToolRegistrySource.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/Sources/AdjacentHandlerToolSource.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/Sources/AbilityToolSource.php';
+require_once __DIR__ . '/../inc/Engine/AI/Tools/HostToolPolicy.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/ToolSourceRegistry.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/ToolPolicyResolver.php';
 
@@ -350,19 +352,6 @@ add_filter(
 );
 
 add_filter(
-	'datamachine_ability_tools',
-	static function ( array $tools ): array {
-		$tools['legacy_alias_demo'] = array(
-			'ability' => 'demo/summarize',
-			'modes'   => array( 'chat' ),
-		);
-		return $tools;
-	},
-	10,
-	1
-);
-
-add_filter(
 	'datamachine_ability_tool_definition',
 	static function ( array $tool, string $tool_name ): array {
 		if ( 'summarize_demo' === $tool_name ) {
@@ -380,7 +369,6 @@ $tools  = $source( array( 'chat' ), array( 'allow_only' => array( 'summarize_dem
 assert_ability_tool_source_equals( true, $helper_registered, 'helper registers a valid ability tool projection', $failures, $passes );
 assert_ability_tool_source_equals( true, isset( $tools['summarize_demo'] ), 'chat mode exposes selected ability tool when opted in', $failures, $passes );
 assert_ability_tool_source_equals( true, isset( $tools['helper_demo'] ), 'helper projection feeds ability tool source', $failures, $passes );
-assert_ability_tool_source_equals( true, isset( $tools['legacy_alias_demo'] ), 'legacy ability tools filter remains supported', $failures, $passes );
 assert_ability_tool_source_equals( 'demo/summarize', $tools['summarize_demo']['ability'] ?? '', 'generated tool links ability slug', $failures, $passes );
 assert_ability_tool_source_equals( 'demo/summarize', $tools['summarize_demo']['execution_ability'] ?? '', 'generated tool declares explicit direct-execution ability marker', $failures, $passes );
 assert_ability_tool_source_equals( 'Summarize Demo', $tools['summarize_demo']['label'] ?? '', 'generated tool carries ability label', $failures, $passes );
