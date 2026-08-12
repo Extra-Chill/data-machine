@@ -168,12 +168,18 @@ class ScheduleNextStepAbility {
 			$action_args['operation_claim_token'] = (string) ( $job['operation_claim_token'] ?? '' );
 		}
 
-		$action_id = as_schedule_single_action(
-			time(),
-			'datamachine_execute_step',
-			$action_args,
-			'data-machine'
-		);
+		$schedule_exception = null;
+		try {
+			$action_id = as_schedule_single_action(
+				time(),
+				'datamachine_execute_step',
+				$action_args,
+				'data-machine'
+			);
+		} catch ( \Throwable $error ) {
+			$action_id          = 0;
+			$schedule_exception = $error;
+		}
 
 		if ( ! empty( $dataPackets ) ) {
 			do_action(
@@ -193,8 +199,15 @@ class ScheduleNextStepAbility {
 			$this->failScheduling(
 				$job_id,
 				$flow_step_id,
-				'next_step_schedule_failed',
-				array( 'packet_count' => count( $dataPackets ) )
+				null !== $schedule_exception ? 'next_step_schedule_exception' : 'next_step_schedule_failed',
+				array_filter(
+					array(
+						'packet_count'      => count( $dataPackets ),
+						'exception_class'   => null !== $schedule_exception ? get_class( $schedule_exception ) : null,
+						'exception_message' => null !== $schedule_exception ? $schedule_exception->getMessage() : null,
+					),
+					static fn ( $value ): bool => null !== $value
+				)
 			);
 		}
 

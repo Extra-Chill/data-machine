@@ -30,6 +30,12 @@ if ( ! function_exists( 'add_action' ) ) {
 	}
 }
 
+if ( ! function_exists( 'do_action' ) ) {
+	function do_action( ...$args ) {
+		// no-op
+	}
+}
+
 require_once __DIR__ . '/agents-api-loader.php';
 datamachine_tests_require_agents_api();
 require_once __DIR__ . '/../vendor/autoload.php';

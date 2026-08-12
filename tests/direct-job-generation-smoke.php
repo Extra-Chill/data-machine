@@ -142,6 +142,20 @@ $missing_result  = ( new DirectJobEnqueuer( $missing_receipt, static fn() => 505
 direct_generation_assert( false === $missing_result['success'] && 'action_receipt_missing' === $missing_result['error'], 'positive scheduler ID without a durable receipt fails enqueue' );
 direct_generation_assert( 'enqueue_failed' === $missing_receipt->job['operation_state'], 'missing action receipt leaves the operation reclaimable' );
 
+$insert_failure = new DirectJobGenerationFakeJobs();
+$failure_result = ( new DirectJobEnqueuer(
+	$insert_failure,
+	static function (): never {
+		throw new RuntimeException( 'Error saving action: Failed to read auto-increment value from storage engine' );
+	},
+	static fn() => 0,
+	static fn() => false
+) )->enqueue( 42, 'ephemeral_step_0' );
+direct_generation_assert( false === $failure_result['success'] && 'action_schedule_exception' === $failure_result['error'], 'scheduler insert exception returns an explicit failure' );
+direct_generation_assert( true === $failure_result['retryable'], 'scheduler insert exception remains recoverable' );
+direct_generation_assert( 'enqueue_failed' === $insert_failure->job['operation_state'], 'scheduler insert exception releases the enqueue claim into a recoverable state' );
+direct_generation_assert( 1 === $insert_failure->job['operation_generation'], 'scheduler insert exception does not create another enqueue generation' );
+
 $jobs_source = file_get_contents( dirname( __DIR__ ) . '/inc/Core/Database/Jobs/Jobs.php' ) ?: '';
 $step_source = file_get_contents( dirname( __DIR__ ) . '/inc/Abilities/Engine/ExecuteStepAbility.php' ) ?: '';
 direct_generation_assert( str_contains( $jobs_source, 'operation_claim_token = %s' ) && str_contains( $jobs_source, 'operation_generation = %d' ), 'enqueue finish is fenced by token and generation' );

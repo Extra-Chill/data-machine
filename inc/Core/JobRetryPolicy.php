@@ -116,12 +116,27 @@ class JobRetryPolicy {
 			$action_args['operation_claim_token'] = (string) ( $job['operation_claim_token'] ?? '' );
 		}
 
-		$action_id = as_schedule_single_action(
-			$timestamp,
-			'datamachine_execute_step',
-			$action_args,
-			'data-machine'
-		);
+		try {
+			$action_id = as_schedule_single_action(
+				$timestamp,
+				'datamachine_execute_step',
+				$action_args,
+				'data-machine'
+			);
+		} catch ( \Throwable $error ) {
+			$action_id = 0;
+			do_action(
+				'datamachine_log',
+				'error',
+				'Job retry Action Scheduler enqueue failed',
+				array(
+					'job_id'            => $job_id,
+					'flow_step_id'      => $flow_step_id,
+					'exception_class'   => get_class( $error ),
+					'exception_message' => $error->getMessage(),
+				)
+			);
+		}
 
 		if ( ! is_numeric( $action_id ) || (int) $action_id <= 0 ) {
 			self::clearPendingRetryOwnership( $job_id );
