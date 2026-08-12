@@ -1,309 +1,80 @@
-# Engine Execution System
+# Engine Execution
 
-The Data Machine engine utilizes a four-action execution cycle (@since v0.8.0) that orchestrates all pipeline workflows through WordPress Action Scheduler. This system implements a **Single Item Execution Model**, processing exactly one item per job execution to ensure maximum reliability and isolation.
+Data Machine executes the `pipeline -> flow -> job -> packets/artifacts` portion of the [canonical architecture](../architecture.md) through engine abilities and Action Scheduler. Business logic lives in `inc/Abilities/Engine/`; `inc/Engine/Actions/Engine.php` registers the action bridges Action Scheduler requires.
 
 ## Execution Cycle
 
-The engine follows a standardized cycle for both database-driven and ephemeral workflows:
+| Scheduler hook | Ability | Responsibility |
+|---|---|---|
+| `datamachine_run_flow_now` | `datamachine/run-flow` | Resolve a flow, create or resume its job, snapshot configuration, and start the first step. |
+| `datamachine_execute_step` | `datamachine/execute-step` | Load the job snapshot and packets, resolve the step definition, execute it, and process its explicit result. |
+| `datamachine_schedule_next_step` | `datamachine/schedule-next-step` | Persist packets and enqueue the next `datamachine_execute_step` action. |
+| `datamachine_run_flow_later` | `datamachine/schedule-flow` | Reconcile manual, one-time, or recurring flow scheduling. |
 
-1.  **`datamachine_run_flow_now`**: Entry point for execution. Loads configurations and initializes the job.
-2.  **`datamachine_execute_step`**: Performs the actual work of a single step (Fetch, AI, Publish, etc.).
-3.  **`datamachine_schedule_next_step`**: Persists data packets and schedules the next step in the sequence.
-4.  **`datamachine_run_flow_later`**: Handles scheduling logic, queuing the flow for future execution.
+The hooks are durable queue adapters, not an alternative business-logic layer. Direct consumers should use abilities or a purpose-built REST, CLI, or chat adapter rather than firing scheduler hooks as service discovery.
 
-## Tool execution
+## Run Flow
 
-The pipeline engine executes step-specific tools through the AI tool system (tool discovery via filters and cached resolution in `ToolManager`).
-## Single Item Execution Model
+`RunFlowAbility` resolves the persisted pipeline and flow configuration, creates or resumes a job, stores an execution snapshot in the job's `engine_data`, finds the first enabled flow step, and dispatches `datamachine_schedule_next_step`. Scheduled callbacks set pipeline agent context and reject stale schedule generations before entering the ability.
 
-At its core, the engine is designed for reliability-first processing. Instead of processing batches of items, which can lead to timeouts or cascading failures, the engine processes **exactly one item per job execution cycle**.
+Ephemeral workflows use `pipeline_id = direct` and `flow_id = direct`. Their generated workflow configuration is stored in the job snapshot, after which they follow the same step engine. See [Ephemeral Workflows](ephemeral-workflows.md).
 
-- **Isolation**: Each item is processed in its own job context. A failure in one item does not affect others.
-- **Reliability**: Minimizes memory usage and execution time per step.
-- **Traceability**: Every processed item is linked to a specific job and log history.
-- **Consistency**: Steps (Fetch, AI, Publish) are built with the expectation of receiving and returning a single primary data packet.
+## Execute Step
 
-## 1. Flow Initiation (`datamachine_run_flow_now`)
-
-**Purpose**: entry point for immediate execution of a workflow.
-
-**Process**:
-1.  **Context Setting**: Sets `AgentContext` to `PIPELINE`.
-2.  **Job Creation**: Uses `JobManager` to create or retrieve a job record.
-3.  **Configuration Loading**: Loads `flow_config` and `pipeline_config`.
-4.  **Snapshotting**: Stores an engine snapshot in `engine_data` for consistency throughout the job.
-5.  **First Step Discovery**: Identifies the step with `execution_order = 0`.
-6.  **Scheduling**: Triggers `datamachine_schedule_next_step` for the first step.
-
-**Usage**:
-```php
-do_action('datamachine_run_flow_now', $flow_id, $job_id);
-```
-
-## 2. Step Execution (`datamachine_execute_step`)
-
-**Purpose**: Processes an individual step within the workflow.
-
-**Parameters**:
-- `$job_id` (int) - Job identifier.
-- `$flow_step_id` (string) - Specific step being executed.
-
-**Process**:
-1.  **Data Retrieval**: Loads data packets from `FilesRepository` using the job context.
-2.  **Config Resolution**: Retrieves step configuration from the engine snapshot.
-3.  **Step Dispatch**: Instantiates the appropriate step class (e.g., `AIStep`) and calls `execute()`.
-4.  **Navigation**: Uses `StepNavigator` to determine if a subsequent step exists.
-5.  **Completion/Transition**: If a next step exists, it calls `datamachine_schedule_next_step`. Otherwise, it marks the job as `completed` and cleans up temporary files.
-
-## 3. Step Scheduling (`datamachine_schedule_next_step`)
-
-**Purpose**: Transitions between steps using Action Scheduler.
-
-**Parameters**:
-- `$job_id` (int) - Job identifier.
-- `$flow_step_id` (string) - Next step to execute.
-- `$dataPackets` (array) - Content to pass to the next step.
-
-**Process**:
-1.  **Data Persistence**: Stores `$dataPackets` in the `FilesRepository` isolated by flow and job.
-2.  **Background Queuing**: Schedules `datamachine_execute_step` via `as_schedule_single_action()` for immediate background processing.
-
-## 4. Deferred Execution (`datamachine_run_flow_later`)
-
-**Purpose**: Manages future or recurring execution logic via the [Scheduling System](../api/endpoints/intervals.md).
-
-**Parameters**:
-- `$flow_id` (int) - Flow to schedule.
-- `$interval_or_timestamp` (string|int) - 'manual', a Unix timestamp, or a recurring interval key (e.g., 'every_5_minutes', 'hourly').
-
-**Process**:
-1.  **Cleanup**: Unscheduled any existing actions for the flow using `as_unschedule_action`.
-2.  **Manual Mode**: Simply updates the database configuration without scheduling new actions.
-3.  **Timestamp Mode**: Schedules a one-time `datamachine_run_flow_now` at the specific Unix timestamp using `as_schedule_single_action`.
-4.  **Interval Mode**: Schedules recurring `datamachine_run_flow_now` actions using `as_schedule_recurring_action`.
-5.  **Database Sync**: Updates the flow's `scheduling_config` in the database to reflect the new state.
-
-**Supported Intervals**:
-- `every_5_minutes`
-- `hourly`
-- `every_2_hours`
-- `every_4_hours`
-- `qtrdaily` (Every 6 hours)
-- `twicedaily` (Every 12 hours)
-- `daily`
-- `weekly`
-
-Developers can add custom intervals via the `datamachine_scheduler_intervals` filter.
-
-## Ephemeral Workflows
-
-The engine supports **Ephemeral Workflows** (@since v0.8.0)—workflows executed without being saved to the database. These are triggered via the `/execute` REST endpoint by passing a `workflow` object instead of a `flow_id`.
-
-- **Sentinel Values**: Use `flow_id = 'direct'` and `pipeline_id = 'direct'`.
-- **Dynamic Config**: Configurations are generated on-the-fly from the request and stored in the job's `engine_data` snapshot.
-- **Execution Flow**: Once initialized, they follow the standard `execute_step` → `schedule_next_step` cycle.
-
-## Step Navigation
-
-The engine uses **StepNavigator** (@since v0.2.1) to determine step transitions during execution:
+`ExecuteStepAbility` loads the job and its snapshot, retrieves the packet set, resolves the step through `StepTypeAbilities`, instantiates the registered class, and passes the common payload:
 
 ```php
-use DataMachine\Engine\StepNavigator;
-
-$step_navigator = new StepNavigator();
-
-// Determine next step after current step completes
-$next_flow_step_id = $step_navigator->get_next_flow_step_id($flow_step_id, [
-    'engine_data' => $engine_data
-]);
-
-if ($next_flow_step_id) {
-    // Schedule next step execution
-    do_action('datamachine_schedule_next_step', $job_id, $next_flow_step_id, $data);
-} else {
-    // Pipeline complete
-    do_action('datamachine_update_job_status', $job_id, 'completed');
-}
-```
-
-**Benefits**:
-- Centralized step navigation logic
-- Support for complex step ordering
-- Rollback capability via `get_previous_flow_step_id()`
-- Performance optimized via engine_data context
-
-**See**: StepNavigator Documentation for complete details
-
-## Data Storage
-
-### Files Repository
-
-Step data is persisted per-job using `FilesRepository` (`FileStorage` + `FileRetrieval`) under the `datamachine-files` uploads directory.
-
-See [FilesRepository](files-repository.md) for the current directory structure and component responsibilities.
-
-
-## Step Discovery
-
-### Step Registration
-
-Steps register via `datamachine_step_types` filter:
-
-```php
-add_filter('datamachine_step_types', function($steps) {
-    $steps['my_step'] = [
-        'name' => __('My Step'),
-        'class' => 'MyStep',
-        'position' => 50
-    ];
-    return $steps;
-});
-```
-
-### Step Implementation
-
-All steps implement the same payload contract:
-
-```php
-class MyStep {
-    public function execute(array $payload): array {
-        $job_id = $payload['job_id'];
-        $flow_step_id = $payload['flow_step_id'];
-        $data = $payload['data'] ?? [];
-
-        // EngineData value object (not a raw array)
-        $engine = $payload['engine'];
-
-        array_unshift($data, [
-            'type' => 'my_step',
-            'content' => ['title' => $title, 'body' => $content],
-            'metadata' => ['source_type' => 'my_source'],
-            'timestamp' => time()
-        ]);
-
-        return $data;
-    }
-}
-```
-
-## Parameter Passing
-
-### Unified Step Payload
-
-Engine now delivers a documented payload array to every step:
-
-```php
-$payload = [
-    'job_id' => $job_id,
+$payload = array(
+    'job_id'       => $job_id,
     'flow_step_id' => $flow_step_id,
-    'data' => $data,
-    'engine' => $engine_data
-];
+    'data'         => $data_packets,
+    'engine'       => $engine_data,
+);
 ```
 
-**Benefits**:
-- ✅ **Explicit Dependencies**: Steps read everything from a single payload without relying on shared globals
-- ✅ **Consistent Evolvability**: New metadata can be appended to the payload without changing method signatures
-- ✅ **Pure Testing**: Steps are testable via simple array fixtures, enabling isolated unit tests
+`DataMachine\Core\Steps\Step` validates and destructures this payload; the `EngineData` object supplies the snapshotted flow-step configuration. Step implementations return packets or an explicit result normalized by `StepExecutionResult`. The engine then schedules the next step, parks the job, fans out work, or commits a terminal state as directed by that result.
 
-**Step Implementation Pattern** remains identical to the example above—extract what you need from `$payload`, process data, and return the updated packet.
+## Core Step Types
 
-## Job Management
+`datamachine_load_step_types()` instantiates the six core registrations:
 
-### Job Status
+| Slug | Class | Runtime behavior |
+|---|---|---|
+| `fetch` | `Core\Steps\Fetch\FetchStep` | Runs a source handler and produces packets; multiple packets can fan out. |
+| `ai` | `Core\Steps\AI\AIStep` | Runs a pipeline agent turn with resolved tools and directives. |
+| `publish` | `Core\Steps\Publish\PublishStep` | Completes one or more destination handler operations. |
+| `upsert` | `Core\Steps\Upsert\UpsertStep` | Completes identity-aware create/update handler operations. |
+| `webhook_gate` | `Core\Steps\WebhookGate\WebhookGateStep` | Persists a waiting state until a verified webhook resumes the job. |
+| `system_task` | `Core\Steps\SystemTask\SystemTaskStep` | Executes a registered system task inline. |
 
-- `pending` - Created but not started
-- `processing` - Currently executing
-- `completed` - Successfully finished (items processed)
-- `completed_no_items` - Finished successfully but no new items are found to process
-- `agent_skipped` - Finished intentionally without processing the current item (supports compound statuses like `agent_skipped - {reason}`)
-- `failed` - Actual execution error occurred
+Step classes register metadata through `StepTypeRegistrationTrait` and the `datamachine_step_types` extension filter. Consumers retrieve the resolved registry through `StepTypeAbilities`; they should not reproduce the filter call and caching rules.
 
-### Flow Monitoring & Problem Flows
+## Packets and Artifacts
 
-The engine tracks execution metrics to identify "Problem Flows" that may require administrative attention:
+`DataPacket` prepends typed packets so the newest contribution is first. Between actions, `ScheduleNextStepAbility` persists packet data through `FilesRepository` rather than passing large payloads through Action Scheduler. Job `engine_data` stores the immutable execution snapshot plus controlled runtime metadata. Dedicated run-artifact abilities expose durable outputs and hydration.
 
-- **Metrics**: Each flow tracks `consecutive_failures` and `consecutive_no_items`.
-- **Threshold**: The `problem_flow_threshold` setting (default: 3) determines when a flow is flagged.
-- **Monitoring**: 
-    - **REST API**: `GET /datamachine/v1/flows/problems` returns flagged flows.
-    - **AI Tools**: `get_problem_flows` allows agents to identify and troubleshoot these flows.
-- **Reset**: Metrics are reset upon the next successful `completed` execution.
+Packet storage is scoped to the job's pipeline/flow context and cleaned according to job/file retention policy. See [Data Packet](data-packet.md), [Engine Data](engine-data.md), and [Files Repository](files-repository.md).
 
-**See**: [Troubleshooting Problem Flows](troubleshooting-problem-flows.md) for detailed guidance.
+## Single-Item Isolation and Fan-Out
 
-### Job Operations
+A child job processes one primary item through the remaining pipeline. A fetch can return multiple eligible packets; `PipelineBatchScheduler` creates child jobs so failures, retries, files, and logs stay isolated per item. The parent job coordinates the batch. This is why "one item per job" and "fetch may return multiple packets" are both true.
 
-**Create Job**:
-```php
-$job_id = $db_jobs->create_job([
-    'pipeline_id' => $pipeline_id,
-    'flow_id' => $flow_id
-]);
-```
+Queue consumption, fan-out, AI iterations, and recurring flow schedules are independent. See [Pipeline Execution Axes](../architecture/pipeline-execution-axes.md).
 
-**Update Status**:
-```php
-$ability = wp_get_ability( 'datamachine/retry-job' );
-$ability->execute( [ 'job_id' => $job_id ] );
-```
+## Scheduling
 
-**Fail Job**:
-```php
-$ability = wp_get_ability( 'datamachine/fail-job' );
-$ability->execute( [
-    'job_id' => $job_id,
-    'reason' => 'step_execution_failure',
-] );
-```
+Action Scheduler is the durable execution queue. `ScheduleFlowAbility`, `Api\Flows\FlowScheduling`, and `Engine\Tasks\RecurringScheduler` own schedule creation, reconciliation, and generation fencing. Supported interval keys come from the scheduling API and `datamachine_scheduler_intervals`; see [Scheduling Intervals](../api/endpoints/intervals.md).
 
-## Error Handling
+The scheduler also carries recovery metadata and AI-concurrency resume actions. Retry and recovery paths re-enter the same `datamachine/execute-step` ability rather than implementing a parallel engine.
 
-### Exception Management
+## Terminal States
 
-All step execution is wrapped in try-catch blocks:
+Common terminal states include `completed`, `completed_no_items`, `agent_skipped`, and `failed`. Waiting, contention, and other nonterminal states remain resumable. Job repository transitions own terminal accounting, cleanup, metrics, and completion hooks; adapters should use job abilities instead of updating rows directly.
 
-```php
-try {
-    $data = $flow_step->execute($parameters);
-    return !empty($data); // Success = non-empty data packet
-} catch (\Throwable $e) {
-    $log_ability = wp_get_ability( 'datamachine/write-to-log' );
-    $log_ability->execute( [
-        'level'   => 'error',
-        'message' => 'Step execution failed: ' . $e->getMessage(),
-        'agent'   => 'pipeline',
-    ] );
+## Extension Boundary
 
-    $fail_ability = wp_get_ability( 'datamachine/fail-job' );
-    $fail_ability->execute( [ 'job_id' => $job_id, 'reason' => 'step_execution_failure' ] );
-    return false;
-}
-```
-
-### Failure Actions
-
-**Job Failure**:
-- Updates job status to 'failed'
-- Logs detailed error information
-- Optionally cleans up job data files
-- Stops pipeline execution
-
-## Performance Considerations
-
-### Action Scheduler Integration
-
-- **Asynchronous Processing** - Steps run in background via WP cron
-- **Immediate Scheduling** - `time()` for next step execution
-- **Queue Management** - WordPress handles scheduling and retry logic
-
-### Data Storage Optimization
-
-- **Reference-Based Passing** - Large data stored in files, not database
-- **Automatic Cleanup** - Completed jobs cleaned from storage
-- **Flow Isolation** - Each flow maintains separate storage directory
-
-### Memory Management
-
-- **Minimal Data Retention** - Only current step data in memory
-- **Garbage Collection** - Automatic cleanup after completion
+- Add reusable operations as abilities.
+- Add step or handler definitions through their documented registration contracts.
+- Use Action Scheduler hooks only when a durable callback bridge is required.
+- Give REST, CLI, and chat consumers purpose-built adapters that own their namespace and presentation semantics.
+- Keep domain handlers and tools in their owning extension plugin.

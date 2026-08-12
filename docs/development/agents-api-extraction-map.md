@@ -1,5 +1,7 @@
 # Agents API Extraction Map
 
+> **Historical migration record:** This map guided the Agents API extraction. It preserves rationale and completed migration context, but it does not define the live runtime. Start with [Data Machine Architecture](../architecture.md) and the current [`inc/Engine/AI/README.md`](../../inc/Engine/AI/README.md).
+
 This map classifies Data Machine's current agent/runtime surface for the Agents API extraction. The in-repo module phase is complete: Data Machine now consumes the standalone `automattic/agents-api` package/plugin for public contracts while keeping Data Machine product adapters in this repository.
 
 Parent issue: [Explore splitting Agents API out of Data Machine](https://github.com/Extra-Chill/data-machine/issues/1561)

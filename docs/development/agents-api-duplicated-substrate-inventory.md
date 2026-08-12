@@ -1,5 +1,7 @@
 # Agents API Duplicated Substrate Inventory
 
+> **Historical audit:** This is a point-in-time extraction inventory. Verify every remaining item against current source before treating it as active architecture. Start with [Data Machine Architecture](../architecture.md) and the current [`inc/Engine/AI/README.md`](../../inc/Engine/AI/README.md).
+
 Issue: [#1762](https://github.com/Extra-Chill/data-machine/issues/1762)
 
 Parent: [#1755](https://github.com/Extra-Chill/data-machine/issues/1755)

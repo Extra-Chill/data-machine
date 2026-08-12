@@ -1,5 +1,7 @@
 # Agents API Pre-Extraction Audit
 
+> **Historical migration record:** This audit captures the pre-extraction architecture and decisions at that time. It is not the current runtime class map. Start with [Data Machine Architecture](../architecture.md) and the current [`inc/Engine/AI/README.md`](../../inc/Engine/AI/README.md).
+
 Parent issue: [Explore splitting Agents API out of Data Machine](https://github.com/Extra-Chill/data-machine/issues/1561)
 
 Strategy issue: [Agents API blocker: update extraction docs around in-repo module strategy](https://github.com/Extra-Chill/data-machine/issues/1640)

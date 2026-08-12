@@ -1,5 +1,7 @@
 # Agents API Standalone Skeleton Plan
 
+> **Historical migration plan:** This document records a pre-extraction implementation plan. It is not current architecture or pending implementation guidance. Start with [Data Machine Architecture](../architecture.md) and the current [`inc/Engine/AI/README.md`](../../inc/Engine/AI/README.md).
+
 Parent issue: [Agents API extraction: create initial standalone plugin skeleton plan](https://github.com/Extra-Chill/data-machine/issues/1618)
 
 Refs: [standalone extraction umbrella](https://github.com/Extra-Chill/data-machine/issues/1596), [pre-extraction audit](agents-api-pre-extraction-audit.md), [extraction map](agents-api-extraction-map.md)

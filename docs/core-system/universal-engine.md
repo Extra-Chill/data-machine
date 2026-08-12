@@ -1,201 +1,39 @@
-# Universal Engine Architecture
+# AI Runtime Adapter Layer
 
-**Since**: 0.2.0
+> **Historical name:** This area was introduced as the "Universal Engine" in Data Machine 0.2.0. The name describes a consolidation milestone, not a second engine alongside pipeline execution. The current source is Data Machine's AI adapter layer around Agents API and wp-ai-client.
 
-The Universal Engine is a shared AI infrastructure layer that provides consistent request building, tool execution, and conversation management for both Pipeline AI and Chat API agents in Data Machine.
+## Current Boundary
 
-## Overview
+| Layer | Responsibility |
+|---|---|
+| WordPress Abilities API | Reusable business operations exposed as `datamachine/*` abilities. |
+| wp-ai-client | Provider/model execution for a single AI request. |
+| Agents API | Generic durable conversation sequencing, transcripts, locks, events, iteration budgets, messages, and portable declarations. |
+| Data Machine | Pipeline/chat product policy, request assembly, directives, tools, handlers, packets, jobs, artifacts, and operator surfaces. |
 
-Prior to v0.2.0, Pipeline AI and Chat agents maintained separate implementations of conversation loops, tool execution, and request building. This architectural duplication created maintenance overhead and potential behavioral drift between agent types.
+`datamachine_run_conversation()` is Data Machine's runtime entry point for chat and pipeline turns. It composes `AgentsAPI\AI\WP_Agent_Conversation_Loop` with Data Machine's turn runner. The generic loop owns sequencing and durable runtime primitives; Data Machine owns `RequestBuilder`, wp-ai-client dispatch, `ToolExecutor`, completion assertions, adjacent-handler behavior, logging, and job artifacts.
 
-The Universal Engine consolidates this shared functionality into a centralized layer at `/inc/Engine/AI/`, enabling both agent types to leverage identical AI infrastructure while maintaining their specialized behaviors through filter-based integration. Since v0.2.2, it includes ToolManager for centralized tool management and BaseTool for unified tool inheritance.
+See `inc/Engine/AI/README.md` for the source-level ownership map.
 
-## Architecture
+## Current Components
 
-```
-┌─────────────────────────────────────────────────────┐
-│          Universal Engine (/inc/Engine/AI/)         │
-│                                                      │
-│  ┌──────────────────┐      ┌──────────────────┐   │
-│  │ AIConversationLoop│      │ RequestBuilder   │   │
-│  │ Multi-turn loops │      │ Centralized AI   │   │
-│  │ Tool coordination│      │ request building │   │
-│  └──────────────────┘      └──────────────────┘   │
-│                                                      │
-│  ┌──────────────────┐      ┌──────────────────┐   │
-│  │ ToolManager      │      │ ToolExecutor     │   │
-│  │ Centralized tool │      │ Tool discovery   │   │
-│  │ management       │      │ Tool execution   │   │
-│  └──────────────────┘      └──────────────────┘   │
-│                                                      │
-│  ┌──────────────────┐      ┌──────────────────┐   │
-│  │ WP_Agent_Tool_Parameters   │      │ ToolResultFinder │   │
-│  │ Parameter        │      │ Result search    │   │
-│  │ building         │      │ utility          │   │
-│  └──────────────────┘      └──────────────────┘   │
-│                                                      │
-│  ┌──────────────────┐      ┌──────────────────┐   │
-│  │ConversationManager│      │ BaseTool         │   │
-│  │ Message utilities│      │ (@since v0.14.10)│   │
-│  │ and validation   │      │                  │   │
-│  └──────────────────┘      └──────────────────┘   │
-└─────────────────────────────────────────────────────┘
-                        │
-        ┌───────────────┴───────────────┐
-        │                               │
-        ▼                               ▼
-┌──────────────────┐          ┌──────────────────┐
-│  Pipeline Agent  │          │    Chat Agent    │
-│  (/inc/Core/     │          │   (/inc/Api/     │
-│   Steps/AI/)     │          │    Chat/)        │
-│                  │          │                  │
-│ • PipelineCore   │          │ • ChatAgent      │
-│   Directive      │          │   Directive      │
-│ • Pipeline       │          │ • Specialized    │
-│   SystemPrompt   │          │   tool           │
-│   Directive      │          │ • Session        │
-│ • PipelineContext│          │   management     │
-│   Directive      │          │                  │
-└──────────────────┘          └──────────────────┘
-```
+- `RequestBuilder` assembles directive-aware wp-ai-client requests.
+- `ConversationManager` normalizes Data Machine messages, logging, and tool-call tracking.
+- `ToolManager` resolves Data Machine tool sources and availability for a mode/context.
+- `ToolPolicyResolver` applies product-specific tool policy.
+- `ToolExecutor` executes resolved tools, including abilities and approval-aware actions.
+- `ToolResultFinder` interprets tool and adjacent-handler results in packet history.
+- `DataMachineToolRegistrySource` and `AdjacentHandlerToolSource` adapt Data Machine registrations and flow neighbors into runtime tool declarations.
+- Pipeline transcript and completion adapters attach Data Machine job, flow, and handler semantics to the generic Agents API loop.
 
-## Core Components
+There is no current `AIConversationLoop` Data Machine class and no `WP_Agent_Tool_Parameters` class. Those names in older documentation describe removed pre-extraction implementations.
 
-The Universal Engine consists of eight core components that provide shared AI infrastructure:
+## Tool Surfaces
 
-- **AIConversationLoop** - Multi-turn conversation execution with automatic tool coordination
-- **RequestBuilder** - Centralized AI request construction with directive application
-- **ToolExecutor** - Universal tool discovery, validation, and execution
-- **ToolManager** - Centralized tool management and validation (@since v0.2.1)
-- **WP_Agent_Tool_Parameters** - Standardized parameter building for tool handlers
-- **ConversationManager** - Message formatting, validation, and conversation utilities
-- **ToolResultFinder** - Universal tool result search and interpretation
-- **BaseTool** - Unified base class for all AI tools with registration and error handling (@since v0.14.10)
+Tools are model-facing adapters. A chat tool may execute the same ability as a REST controller or CLI command while retaining a model-appropriate name, description, input schema, and result shape. Static product tools, ability projections, and adjacent handler tools are composed into a resolved registry and then filtered by mode and policy.
 
-Each component is documented individually in the core system documentation.
+The `datamachine_tools` filter remains an extension registration point; it is not the preferred way for consumers to discover executable business operations. Use abilities for operations and `ToolManager`/tool sources for resolved model-facing tools. See [Tool Manager](tool-manager.md) and [Tool Execution](tool-execution.md).
 
-### ToolManager (@since v0.2.1)
+## Historical Context
 
-**Location**: `/inc/Engine/AI/Tools/ToolManager.php`
-
-Centralized tool management system that replaces distributed tool discovery and validation logic throughout the codebase.
-
-#### Key Responsibilities
-
-- **Tool Discovery**: Discovers all tools available for a given agent type and execution context
-- **Enablement Validation**: Three-layer validation (global settings → step configuration → runtime validation)
-- **Configuration Management**: Checks if tools have required configuration (API keys, OAuth credentials)
-- **Opt-Out Pattern**: WordPress-native tools without configuration requirements
-- **UI Data Aggregation**: Processes tool metadata for admin interface display
-
-#### Core Methods
-
-```php
-// Tool discovery and validation
-$tool_manager = new ToolManager();
-$global_tools = $tool_manager->get_all_tools();
-
-// Check tool availability (includes enablement and configuration)
-$is_available = $tool_manager->is_tool_available('local_search', $step_context_id);
-
-// Configuration checking
-$is_configured = $tool_manager->is_tool_configured('local_search');
-
-// WordPress-native tools (no config needed)
-$opt_out_tools = $tool_manager->get_opt_out_defaults();
-// Returns: ['local_search', 'wordpress_post_reader', 'web_fetch']
-
-// UI data aggregation
-$ui_data = $tool_manager->getToolsForUI();
-```
-
-#### Three-Layer Validation
-
-```
-┌─────────────────────────────────────────────┐
-│ Layer 1: Global Settings                    │
-│ - System-wide tool enablement toggle        │
-│ - Tools can be disabled globally            │
-└─────────────────────────────────────────────┘
-                    ↓
-┌─────────────────────────────────────────────┐
-│ Layer 2: Step Configuration                 │
-│ - Per-step tool selection in builder        │
-│ - Only selected tools available in step     │
-└─────────────────────────────────────────────┘
-                    ↓
-┌─────────────────────────────────────────────┐
-│ Layer 3: Runtime Validation                 │
-│ - Configuration requirements check          │
-│ - API key/OAuth credential validation       │
-│ - Tool execution readiness verification     │
-└─────────────────────────────────────────────┘
-```
-
-#### Benefits
-
-- **Code Reduction**: Eliminates ~60% of tool validation code throughout codebase
-- **Consistency**: Ensures uniform tool validation across all components
-- **Performance**: Implements caching for tool discovery and validation
-- **Maintainability**: Single location for tool management logic
-- **Extensibility**: Filter-based architecture for custom tools
-
-See [Tool Manager](tool-manager.md) for the current registry/source/policy split.
-
-### BaseTool (@since v0.14.10)
-
-**Location**: `/inc/Engine/AI/Tools/BaseTool.php`
-
-Unified abstract base class for all AI tools (global and chat) that provides standardized error handling and tool registration through inheritance.
-
-#### Key Features
-
-- **Unified Inheritance**: Single base class for all tools (global and chat)
-- **Agent-Agnostic Registration**: `registerTool()` method handles all agent types
-- **Dynamic Filter Creation**: Automatically creates `datamachine_{agentType}_tools` filters
-- **Error Handling**: Standardized error response building with classification
-- **Configuration Integration**: Automatic configuration handler registration
-
-#### Usage in Tools
-
-```php
-use DataMachine\Engine\AI\Tools\BaseTool;
-
-class ExternalLookup extends BaseTool {
-
-    public function __construct() {
-        $this->registerTool('external_lookup', [$this, 'getToolDefinition'], ['chat', 'pipeline'], ['access_level' => 'admin']);
-        $this->registerConfigurationHandlers('external_lookup');
-    }
-
-    public function getToolDefinition(): array {
-        return [
-            'class' => self::class,
-            'method' => 'handle_tool_call',
-            'description' => 'Look up data from an external service',
-            'parameters' => [
-                'query' => ['type' => 'string', 'description' => 'Search query'],
-            ]
-        ];
-    }
-}
-```
-
-#### Tools Using BaseTool
-
-**Global Tools:**
-- **LocalSearch** - WordPress internal search
-- **WebFetch** - Web page content retrieval
-- **WordPressPostReader** - Single post analysis
-
-**Chat Tools:** All chat tools in `/inc/Api/Chat/Tools/` extend BaseTool.
-
-#### Benefits
-
-- **Unified Architecture**: One base class for all tools eliminates trait usage
-- **Agent Agnostic**: Dynamic filter creation per agent type
-- **Error Handling**: Standardized error classification (not_found, validation, permission, system)
-- **Extensibility**: Easy to add new agent types without updating tools
-- **Maintainability**: Centralized registration and error handling logic
-
-See [BaseTool documentation](base-tool.md) for complete details.
+Before the Agents API extraction, Data Machine owned more of the generic conversation loop and message substrate. Documents under `docs/development/` named `agents-api-pre-extraction-audit.md`, `agents-api-extraction-map.md`, and `agents-api-standalone-skeleton-plan.md` preserve that migration history. They are evidence for how the current boundary was reached, not descriptions of the live class layout.

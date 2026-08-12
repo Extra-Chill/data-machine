@@ -2,6 +2,20 @@
 
 **AI-first WordPress plugin for automating and orchestrating content workflows with a visual pipeline builder, conversational chat agent, REST API, and extensibility through handlers and tools.**
 
+## Canonical Model
+
+```text
+agent -> pipeline -> flow -> job -> packets/artifacts
+```
+
+- **Agents** own identity, permissions, memory, and scoped resources.
+- **Pipelines** define reusable ordered workflows.
+- **Flows** configure and schedule pipelines for a specific use.
+- **Jobs** record durable executions, including child jobs created for batch fan-out.
+- **Packets and artifacts** carry working data between steps and preserve inspectable outputs.
+
+See [Architecture](architecture.md) for the current runtime layers and source anchors.
+
 ## Agent-First Architecture
 
 Data Machine is designed for AI agents as primary users, not just tool operators.
@@ -25,7 +39,7 @@ While humans use Data Machine to automate content workflows, AI agents can use i
 
 - **Prompt Queue as Project Memory**: Queue items persist across sessions, storing project context that survives context window limits. Your multi-week project becomes a series of queued prompts.
 
-- **Agent Ping for Continuity**: The `agent_ping` step type triggers external agents (via webhook) after pipeline completion. This is how the loop closes — you get notified when it's your turn to act. Agent Ping is outbound-only; inbound triggers use the REST API.
+- **Agent calls for continuity**: The `datamachine/agent-call` ability and `AgentCallTask` provide outbound agent notification. Inbound callbacks use the Agent Ping REST controller; pipeline waiting uses the separate `webhook_gate` step type.
 
 - **Phased Execution**: Complex projects execute in stages over days or weeks. Each stage completes, pings the agent, and the agent queues the next stage.
 
@@ -39,7 +53,7 @@ This transforms Data Machine from a content automation tool into a **self-schedu
 - **Flows** instantiate pipelines with schedule metadata, flow-level overrides, and runtime configuration values stored per flow.
 - **Ephemeral Workflows** (@since v0.8.0) are temporary, on-the-fly workflows triggered via the REST API. They skip database persistence for the workflow definition itself, using sentinel values (`flow_id='direct'`, `pipeline_id='direct'`) and dynamic configuration stored within the job's engine snapshot.
 - **Jobs** track individual flow executions, persist engine parameters, and power the fully React-based Jobs dashboard for real-time monitoring. Jobs support parent-child relationships for batch execution via `parent_job_id`.
-- **Steps** execute sequentially (Fetch → AI → Publish/Update) with shared base classes that enforce validation, logging, and engine data synchronization.
+- **Steps** execute sequentially using the six core types: `fetch`, `ai`, `publish`, `upsert`, `webhook_gate`, and `system_task`. Extensions may register additional types.
 
 ## Multi-Agent Architecture
 
@@ -101,7 +115,7 @@ The ability classes under `inc/Abilities/` provide direct method calls for core 
 - `LogAbilities` and the `LogRepository` aggregate log entries in the `wp_datamachine_logs` table for filtering in the admin UI.
 - Cache invalidation is handled by ability-level `clearCache()` methods to ensure dynamic handler and step type registrations are immediately reflected across the system.
 
-Abilities are the single source of truth for REST endpoints, CLI commands, and Chat tools, ensuring validation and sanitization before persisting data or enqueuing jobs.
+Abilities own reusable business operations. Purpose-built REST controllers, WP-CLI commands, and chat tools commonly delegate to them while retaining stable Data Machine namespaces and consumer-specific request, permission, response, output, and conversational semantics. These adapters are intentional product boundaries, not wrappers scheduled for removal.
 
 ## System Tasks Framework
 
@@ -148,7 +162,7 @@ wp datamachine jobs undo <job_id> --dry-run --allow-root
 - **PromptBuilder + RequestBuilder** apply layered directives via the `datamachine_directives` filter so every request includes identity, context, and site-specific instructions.
 - **Static registry tools** include research, site operations, memory, and workflow-management tools whose `modes` decide whether they appear in chat, pipeline, or system requests.
 - **Adjacent handler tools** are generated from previous/next pipeline steps so AI steps can publish, upsert, or skip items using the neighboring handler configuration.
-- **WP_Agent_Tool_Parameters + ToolResultFinder** gather parameter metadata for tools and interpret results inside data packets to keep conversations consistent.
+- **Tool declarations + ToolResultFinder** provide tool parameter metadata and interpret results inside data packets to keep conversations consistent.
 
 ## Authentication & Security
 
