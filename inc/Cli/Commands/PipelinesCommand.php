@@ -696,11 +696,20 @@ class PipelinesCommand extends BaseCommand {
 				return;
 			}
 
-			$pipelines_repo = new \DataMachine\Core\Database\Pipelines\Pipelines();
-			$success        = $pipelines_repo->update_pipeline( $pipeline_id, array( 'agent_id' => $new_agent_id ) );
+			$ability      = wp_get_ability( 'datamachine/update-pipeline' );
+			$agent_result = $ability->execute(
+				array(
+					'pipeline_id' => $pipeline_id,
+					'agent_id'    => $new_agent_id,
+				)
+			);
 
-			if ( ! $success ) {
-				WP_CLI::error( 'Failed to update pipeline agent_id.' );
+			if ( is_wp_error( $agent_result ) ) {
+				WP_CLI::error( $agent_result->get_error_message() );
+			}
+
+			if ( ! $agent_result['success'] ) {
+				WP_CLI::error( $agent_result['error'] ?? 'Failed to update pipeline agent_id.' );
 				return;
 			}
 

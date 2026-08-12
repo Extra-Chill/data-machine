@@ -1343,11 +1343,20 @@ class FlowsCommand extends BaseCommand {
 			if ( $dry_run ) {
 				WP_CLI::log( sprintf( '[dry-run] would set flow %d agent to agent_id=%d; no changes written', $flow_id, $new_agent_id ) );
 			} else {
-				$flows_repo = new \DataMachine\Core\Database\Flows\Flows();
-				$success    = $flows_repo->update_flow( $flow_id, array( 'agent_id' => $new_agent_id ) );
+				$ability      = wp_get_ability( 'datamachine/update-flow' );
+				$agent_result = $ability->execute(
+					array(
+						'flow_id'  => $flow_id,
+						'agent_id' => $new_agent_id,
+					)
+				);
 
-				if ( ! $success ) {
-					WP_CLI::error( 'Failed to update flow agent_id.' );
+				if ( is_wp_error( $agent_result ) ) {
+					WP_CLI::error( $agent_result->get_error_message() );
+				}
+
+				if ( ! $agent_result['success'] ) {
+					WP_CLI::error( $agent_result['error'] ?? 'Failed to update flow agent_id.' );
 					return;
 				}
 
