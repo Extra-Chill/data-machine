@@ -65,7 +65,6 @@ class UpdateFlowAbility {
 							'flow_name' => array( 'type' => 'string' ),
 							'flow_data' => array( 'type' => 'object' ),
 							'message'   => array( 'type' => 'string' ),
-							'error'     => array( 'type' => 'string' ),
 						),
 					),
 					'execute_callback'    => array( $this, 'execute' ),
@@ -82,47 +81,33 @@ class UpdateFlowAbility {
 	 * Execute update flow ability.
 	 *
 	 * @param array $input Input parameters with flow_id, optional flow_name and scheduling_config.
-	 * @return array Result with updated flow data.
+	 * @return array|\WP_Error Result with updated flow data or failure.
 	 */
-	public function execute( array $input ): array {
+	public function execute( array $input ): array|\WP_Error {
 		$flow_id           = $input['flow_id'] ?? null;
 		$flow_name         = $input['flow_name'] ?? null;
 		$scheduling_config = $input['scheduling_config'] ?? null;
 		$agent_id          = $input['agent_id'] ?? null;
 
 		if ( ! is_numeric( $flow_id ) || (int) $flow_id <= 0 ) {
-			return array(
-				'success' => false,
-				'error'   => 'flow_id is required and must be a positive integer',
-			);
+			return new \WP_Error( 'update_failed', 'flow_id is required and must be a positive integer', array( 'status' => 400 ) );
 		}
 
 		$flow_id = (int) $flow_id;
 
 		if ( null === $flow_name && null === $scheduling_config && null === $agent_id ) {
-			return array(
-				'success' => false,
-				'error'   => 'Must provide flow_name, scheduling_config, or agent_id to update',
-			);
+			return new \WP_Error( 'update_failed', 'Must provide flow_name, scheduling_config, or agent_id to update', array( 'status' => 400 ) );
 		}
 
 		$flow = $this->db_flows->get_flow( $flow_id );
 		if ( ! $flow ) {
-			return array(
-				'success'    => false,
-				'error'      => 'Flow not found',
-				'error_code' => 'flow_not_found',
-				'status'     => 404,
-			);
+			return new \WP_Error( 'flow_not_found', 'Flow not found', array( 'status' => 404 ) );
 		}
 
 		if ( null !== $scheduling_config ) {
 			$validation = datamachine_validate_interval( $scheduling_config['interval'] ?? 'manual', $scheduling_config );
 			if ( ! $validation['valid'] ) {
-				return array(
-					'success' => false,
-					'error'   => $validation['error'],
-				);
+				return new \WP_Error( 'update_failed', $validation['error'], array( 'status' => 400 ) );
 			}
 			$scheduling_config['interval'] = $validation['resolved'];
 		}
@@ -130,10 +115,7 @@ class UpdateFlowAbility {
 		if ( null !== $flow_name ) {
 			$flow_name = sanitize_text_field( wp_unslash( $flow_name ) );
 			if ( empty( trim( $flow_name ) ) ) {
-				return array(
-					'success' => false,
-					'error'   => 'Flow name cannot be empty',
-				);
+				return new \WP_Error( 'update_failed', 'Flow name cannot be empty', array( 'status' => 400 ) );
 			}
 
 			$success = $this->db_flows->update_flow(
@@ -142,10 +124,7 @@ class UpdateFlowAbility {
 			);
 
 			if ( ! $success ) {
-				return array(
-					'success' => false,
-					'error'   => 'Failed to update flow name',
-				);
+				return new \WP_Error( 'update_failed', 'Failed to update flow name', array( 'status' => 400 ) );
 			}
 		}
 
@@ -156,20 +135,14 @@ class UpdateFlowAbility {
 			);
 
 			if ( ! $success ) {
-				return array(
-					'success' => false,
-					'error'   => 'Failed to update flow agent_id',
-				);
+				return new \WP_Error( 'update_failed', 'Failed to update flow agent_id', array( 'status' => 400 ) );
 			}
 		}
 
 		if ( null !== $scheduling_config ) {
 			$result = FlowScheduling::handle_scheduling_update( $flow_id, $scheduling_config );
 			if ( is_wp_error( $result ) ) {
-				return array(
-					'success' => false,
-					'error'   => $result->get_error_message(),
-				);
+				return new \WP_Error( 'update_failed', $result->get_error_message(), array( 'status' => 400 ) );
 			}
 		}
 

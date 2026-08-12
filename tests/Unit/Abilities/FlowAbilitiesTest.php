@@ -518,9 +518,9 @@ class FlowAbilitiesTest extends WP_UnitTestCase {
 			'flow_id' => $this->test_flow_id
 		]);
 
-		$this->assertFalse($result['success']);
-		$this->assertArrayHasKey('error', $result);
-		$this->assertStringContainsString('Must provide', $result['error']);
+		$this->assertWPError( $result );
+		$this->assertSame( 'update_failed', $result->get_error_code() );
+		$this->assertSame( 400, $result->get_error_data()['status'] );
 	}
 
 	public function test_update_flow_with_invalid_id_returns_error(): void {
@@ -529,9 +529,9 @@ class FlowAbilitiesTest extends WP_UnitTestCase {
 			'flow_name' => 'Should Not Update'
 		]);
 
-		$this->assertFalse($result['success']);
-		$this->assertArrayHasKey('error', $result);
-		$this->assertStringContainsString('not found', $result['error']);
+		$this->assertWPError( $result );
+		$this->assertSame( 'flow_not_found', $result->get_error_code() );
+		$this->assertSame( 404, $result->get_error_data()['status'] );
 	}
 
 	public function test_update_flow_with_empty_name_returns_error(): void {
@@ -540,9 +540,8 @@ class FlowAbilitiesTest extends WP_UnitTestCase {
 			'flow_name' => ''
 		]);
 
-		$this->assertFalse($result['success']);
-		$this->assertArrayHasKey('error', $result);
-		$this->assertStringContainsString('empty', $result['error']);
+		$this->assertWPError( $result );
+		$this->assertSame( 'update_failed', $result->get_error_code() );
 	}
 
 	public function test_duplicate_flow_ability_registered(): void {

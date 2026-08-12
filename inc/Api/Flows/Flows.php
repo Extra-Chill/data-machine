@@ -490,16 +490,8 @@ class Flows {
 
 		$result = $ability->execute( array( 'flow_id' => $flow_id ) );
 
-		$error = AbilityResult::failure_to_wp_error( $result, 'flow_not_found', __( 'Flow not found.', 'data-machine' ), 400 );
-		if ( $error || empty( $result['flows'] ) ) {
-			$status = 400;
-			if ( $error && isset( $error->get_error_data()['status'] ) ) {
-				$status = (int) $error->get_error_data()['status'];
-			} elseif ( empty( $result['flows'] ) ) {
-				$status = 404;
-			}
-
-			return $error ? $error : new \WP_Error( 'flow_not_found', __( 'Flow not found.', 'data-machine' ), array( 'status' => $status ) );
+		if ( is_wp_error( $result ) || empty( $result['flows'] ) ) {
+			return is_wp_error( $result ) ? $result : new \WP_Error( 'flow_not_found', __( 'Flow not found.', 'data-machine' ), array( 'status' => 404 ) );
 		}
 
 		return AbilityResult::rest_item_response( $result, $result['flows'][0] );
@@ -544,9 +536,8 @@ class Flows {
 
 		$result = $ability->execute( $input );
 
-		$error = AbilityResult::failure_to_wp_error( $result, 'update_failed', __( 'Failed to update flow', 'data-machine' ), 400 );
-		if ( $error ) {
-			return $error;
+		if ( is_wp_error( $result ) ) {
+			return $result;
 		}
 
 		$flow_id = $result['flow_id'];
@@ -692,9 +683,8 @@ class Flows {
 
 		$result = $ability->execute( $input );
 
-		$error = AbilityResult::failure_to_wp_error( $result, 'get_problem_flows_error', __( 'Failed to get problem flows', 'data-machine' ) );
-		if ( $error ) {
-			return $error;
+		if ( is_wp_error( $result ) ) {
+			return $result;
 		}
 
 		$problem_flows = array_merge( $result['failing'] ?? array(), $result['idle'] ?? array() );
