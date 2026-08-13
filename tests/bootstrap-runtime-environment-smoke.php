@@ -143,6 +143,34 @@ namespace {
 		! DependencyChecker::has( 'missing-check' )
 	);
 
+	$unknown_report = DependencyChecker::report( 'missing-check' );
+	$assert(
+		'unknown dependency reports are explicit',
+		false === $unknown_report['available']
+			&& 'unknown_capability' === $unknown_report['code']
+			&& '' !== $unknown_report['message']
+	);
+
+	$capability_report = DependencyChecker::report_all();
+	$assert(
+		'all named dependencies expose structured diagnostics',
+		array(
+			DependencyChecker::CHECK_ACTION_SCHEDULER,
+			DependencyChecker::CHECK_FILESYSTEM_WRITES,
+			DependencyChecker::CHECK_IMAP,
+			DependencyChecker::CHECK_WORDPRESS_ABILITIES,
+			DependencyChecker::CHECK_ZIP_ARCHIVE,
+		) === array_keys( $capability_report )
+			&& array_reduce(
+				$capability_report,
+				static fn( bool $valid, array $result ): bool => $valid
+					&& is_bool( $result['available'] ?? null )
+					&& in_array( $result['code'] ?? '', array( 'available', 'unavailable' ), true )
+					&& '' !== ( $result['message'] ?? '' ),
+				true
+			)
+	);
+
 	if ( $failed > 0 ) {
 		fwrite( fopen( 'php://stderr', 'w' ), "bootstrap runtime environment smoke failed: {$failed}/{$total}\n" );
 		exit( 1 );

@@ -19,6 +19,7 @@ use DataMachine\Core\Database\Chat\ConversationStoreFactory;
 use DataMachine\Core\Database\Flows\Flows;
 use DataMachine\Core\Database\Pipelines\Pipelines;
 use DataMachine\Core\PluginSettings;
+use DataMachine\Core\Bootstrap\DependencyChecker;
 use DataMachine\Api\Flows\FlowScheduleReconciler;
 use DataMachine\Engine\Tasks\RecurringRejectionTracker;
 use DataMachine\Engine\Tasks\RecurringScheduler;
@@ -222,11 +223,12 @@ class SystemAbilities {
 	// phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found -- Shared diagnostic callback signature receives per-check options.
 	private function runSystemDiagnostics( array $options = array() ): array {
 		return array(
-			'version'     => defined( 'DATAMACHINE_VERSION' ) ? DATAMACHINE_VERSION : 'unknown',
-			'php_version' => PHP_VERSION,
-			'wp_version'  => get_bloginfo( 'version' ),
-			'abilities'   => $this->listRegisteredAbilities(),
-			'rest_status' => $this->checkRestApi(),
+			'version'      => defined( 'DATAMACHINE_VERSION' ) ? DATAMACHINE_VERSION : 'unknown',
+			'php_version'  => PHP_VERSION,
+			'wp_version'   => get_bloginfo( 'version' ),
+			'abilities'    => $this->listRegisteredAbilities(),
+			'rest_status'  => $this->checkRestApi(),
+			'capabilities' => DependencyChecker::report_all(),
 		);
 	}
 
@@ -274,7 +276,7 @@ class SystemAbilities {
 		$rejected_schedules = RecurringRejectionTracker::degraded();
 
 		$status = 'ok';
-		if ( ! function_exists( 'as_get_scheduled_actions' ) || ! class_exists( '\\ActionScheduler' ) ) {
+		if ( ! DependencyChecker::has( DependencyChecker::CHECK_ACTION_SCHEDULER ) ) {
 			$status = 'unavailable';
 		} elseif ( ! empty( $rejected_schedules ) ) {
 			$status = 'failing';
@@ -351,7 +353,7 @@ class SystemAbilities {
 			'stale_threshold_seconds' => $stale_threshold,
 			'rejected_schedules'      => $rejected_report,
 			'action_scheduler'        => array(
-				'available'        => function_exists( 'as_get_scheduled_actions' ),
+				'available'        => DependencyChecker::has( DependencyChecker::CHECK_ACTION_SCHEDULER ),
 				'class_loaded'     => class_exists( '\\ActionScheduler' ),
 				'is_initialized'   => class_exists( '\\ActionScheduler' ) && method_exists( '\\ActionScheduler', 'is_initialized' ) ? \ActionScheduler::is_initialized() : null,
 				'group'            => RecurringScheduler::GROUP,

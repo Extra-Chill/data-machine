@@ -21,6 +21,17 @@ class DependencyChecker {
 	public const CHECK_WORDPRESS_ABILITIES = 'wordpress_abilities';
 	public const CHECK_ZIP_ARCHIVE         = 'zip_archive';
 
+	/** @return array<string,string> */
+	private static function checks(): array {
+		return array(
+			self::CHECK_ACTION_SCHEDULER    => 'Action Scheduler is available.',
+			self::CHECK_FILESYSTEM_WRITES   => 'The Data Machine directory is writable.',
+			self::CHECK_IMAP                => 'The PHP IMAP extension is available.',
+			self::CHECK_WORDPRESS_ABILITIES => 'The WordPress Abilities API is available.',
+			self::CHECK_ZIP_ARCHIVE         => 'The PHP Zip extension is available.',
+		);
+	}
+
 	/**
 	 * Run a named dependency/capability check.
 	 *
@@ -35,6 +46,51 @@ class DependencyChecker {
 			self::CHECK_WORDPRESS_ABILITIES => self::has_wordpress_abilities(),
 			self::CHECK_ZIP_ARCHIVE         => self::has_zip_archive(),
 			default                         => false,
+		};
+	}
+
+	/**
+	 * Return a structured result for one named check.
+	 *
+	 * @return array{available:bool,code:string,message:string}
+	 */
+	public static function report( string $check ): array {
+		$checks = self::checks();
+		if ( ! isset( $checks[ $check ] ) ) {
+			return array(
+				'available' => false,
+				'code'      => 'unknown_capability',
+				'message'   => 'Unknown dependency or capability check.',
+			);
+		}
+
+		$available = self::has( $check );
+
+		return array(
+			'available' => $available,
+			'code'      => $available ? 'available' : 'unavailable',
+			'message'   => $available ? $checks[ $check ] : self::unavailable_message( $check ),
+		);
+	}
+
+	/** @return array<string,array{available:bool,code:string,message:string}> */
+	public static function report_all(): array {
+		$report = array();
+		foreach ( array_keys( self::checks() ) as $check ) {
+			$report[ $check ] = self::report( $check );
+		}
+
+		return $report;
+	}
+
+	private static function unavailable_message( string $check ): string {
+		return match ( $check ) {
+			self::CHECK_ACTION_SCHEDULER    => 'Action Scheduler is unavailable.',
+			self::CHECK_FILESYSTEM_WRITES   => 'The Data Machine directory is not writable.',
+			self::CHECK_IMAP                => 'The PHP IMAP extension is unavailable.',
+			self::CHECK_WORDPRESS_ABILITIES => 'The WordPress Abilities API is unavailable.',
+			self::CHECK_ZIP_ARCHIVE         => 'The PHP Zip extension is unavailable.',
+			default                         => 'The dependency or capability is unavailable.',
 		};
 	}
 
