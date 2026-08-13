@@ -190,8 +190,8 @@ class JobsCommand extends BaseCommand {
 		$limit   = isset( $assoc_args['limit'] ) ? max( 1, min( 100, (int) $assoc_args['limit'] ) ) : 3;
 		$recover_pathless_children = isset( $assoc_args['recover-pathless-children'] );
 
-		$result = AbilityRunner::execute(
-			'datamachine/recover-stuck-jobs',
+		$ability = wp_get_ability( 'datamachine/recover-stuck-jobs' );
+		$result  = $ability->execute(
 			array(
 				'dry_run'       => $dry_run,
 				'flow_id'       => $flow_id,
@@ -203,9 +203,8 @@ class JobsCommand extends BaseCommand {
 			)
 		);
 
-		$error = AbilityResult::failure_to_wp_error( $result, 'get_jobs_failed', 'Unknown error occurred' );
-		if ( $error ) {
-			WP_CLI::error( $error->get_error_message() );
+		if ( is_wp_error( $result ) ) {
+			WP_CLI::error( $result->get_error_message() );
 			return;
 		}
 
@@ -1709,9 +1708,8 @@ class JobsCommand extends BaseCommand {
 
 		$result = ( new GetJobsAbility() )->execute( array( 'job_id' => (int) $job_id ) );
 
-		$error = AbilityResult::failure_to_wp_error( $result, 'get_jobs_failed', 'Unknown error occurred' );
-		if ( $error ) {
-			WP_CLI::error( $error->get_error_message() );
+		if ( is_wp_error( $result ) ) {
+			WP_CLI::error( $result->get_error_message() );
 			return;
 		}
 
@@ -1786,9 +1784,8 @@ class JobsCommand extends BaseCommand {
 
 		$result = ( new GetJobsAbility() )->execute( array( 'job_id' => $job_id ) );
 
-		$error = AbilityResult::failure_to_wp_error( $result, 'get_jobs_failed', 'Unknown error occurred' );
-		if ( $error ) {
-			WP_CLI::error( $error->get_error_message() );
+		if ( is_wp_error( $result ) ) {
+			WP_CLI::error( $result->get_error_message() );
 			return;
 		}
 
@@ -2692,8 +2689,8 @@ class JobsCommand extends BaseCommand {
 			)
 		);
 
-		if ( ! $result['success'] ) {
-			WP_CLI::error( $result['error'] ?? 'Failed to delete jobs' );
+		if ( is_wp_error( $result ) ) {
+			WP_CLI::error( $result->get_error_message() );
 			return;
 		}
 

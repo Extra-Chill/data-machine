@@ -8,6 +8,7 @@
 namespace DataMachine\Tests\Unit\Abilities\Job;
 
 use AgentsAPI\AI\WP_Agent_Execution_Principal;
+use DataMachine\Abilities\Job\DeleteJobsAbility;
 use DataMachine\Abilities\Job\ExecuteWorkflowAbility;
 use DataMachine\Abilities\Job\FailJobAbility;
 use DataMachine\Abilities\Job\FlowHealthAbility;
@@ -213,6 +214,12 @@ class DirectJobOwnershipTest extends WP_UnitTestCase {
 		$this->assertSame( 'invalid_job_id', $invalid_job->get_error_code() );
 		$this->assertSame( 400, $invalid_job->get_error_data()['status'] );
 
+		$invalid_delete = ( new DeleteJobsAbility() )->execute( array( 'type' => 'invalid' ) );
+		$this->assertWPError( $invalid_delete );
+		$this->assertSame( 'delete_failed', $invalid_delete->get_error_code() );
+		$this->assertSame( 'type is required and must be "all" or "failed"', $invalid_delete->get_error_message() );
+		$this->assertSame( 500, $invalid_delete->get_error_data()['status'] );
+
 		$invalid_flow = ( new FlowHealthAbility() )->execute( array( 'flow_id' => 0 ) );
 		$this->assertWPError( $invalid_flow );
 		$this->assertSame( 'invalid_flow_id', $invalid_flow->get_error_code() );
@@ -221,6 +228,26 @@ class DirectJobOwnershipTest extends WP_UnitTestCase {
 		$this->assertWPError( $missing_flow );
 		$this->assertSame( 'flow_not_found', $missing_flow->get_error_code() );
 		$this->assertSame( 404, $missing_flow->get_error_data()['status'] );
+	}
+
+	public function test_jobs_rest_item_and_delete_errors_preserve_contracts(): void {
+		wp_set_current_user( $this->admin_id );
+
+		$get_request = new \WP_REST_Request( 'GET', '/datamachine/v1/jobs/999999' );
+		$get_request->set_param( 'id', 999999 );
+		$get_response = JobsApi::handle_get_job_by_id( $get_request );
+		$this->assertWPError( $get_response );
+		$this->assertSame( 'job_not_found', $get_response->get_error_code() );
+		$this->assertSame( 'Job not found.', $get_response->get_error_message() );
+		$this->assertSame( 404, $get_response->get_error_data()['status'] );
+
+		$delete_request = new \WP_REST_Request( 'DELETE', '/datamachine/v1/jobs' );
+		$delete_request->set_param( 'type', 'invalid' );
+		$delete_response = JobsApi::handle_clear( $delete_request );
+		$this->assertWPError( $delete_response );
+		$this->assertSame( 'delete_failed', $delete_response->get_error_code() );
+		$this->assertSame( 'type is required and must be "all" or "failed"', $delete_response->get_error_message() );
+		$this->assertSame( 500, $delete_response->get_error_data()['status'] );
 	}
 
 	public function test_successful_rest_collection_contract_is_unchanged(): void {

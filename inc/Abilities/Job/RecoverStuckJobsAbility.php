@@ -122,7 +122,6 @@ class RecoverStuckJobsAbility {
 							'dry_run'       => array( 'type' => 'boolean' ),
 							'jobs'          => array( 'type' => 'array' ),
 							'message'       => array( 'type' => 'string' ),
-							'error'         => array( 'type' => 'string' ),
 						),
 					),
 					'execute_callback'    => array( $this, 'execute' ),
@@ -142,17 +141,14 @@ class RecoverStuckJobsAbility {
 	 * and updates them to their intended final status. Also recovers timed-out jobs.
 	 *
 	 * @param array $input Input parameters with optional dry_run, flow_id, and timeout_hours.
-	 * @return array Result with recovered/skipped counts.
+	 * @return array|\WP_Error Result with recovered/skipped counts or validation failure.
 	 */
-	public function execute( array $input ): array {
+	public function execute( array $input ): array|\WP_Error {
 		global $wpdb;
 		$table = $wpdb->prefix . 'datamachine_jobs';
 		$requested_job_id = array_key_exists( 'job_id', $input ) && null !== $input['job_id'] ? filter_var( $input['job_id'], FILTER_VALIDATE_INT ) : null;
 		if ( array_key_exists( 'job_id', $input ) && null !== $input['job_id'] && ( false === $requested_job_id || $requested_job_id <= 0 ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'job_id must be a positive integer.',
-			);
+			return new \WP_Error( 'get_jobs_failed', 'job_id must be a positive integer.', array( 'status' => 500 ) );
 		}
 
 		$dry_run       = ! empty( $input['dry_run'] );

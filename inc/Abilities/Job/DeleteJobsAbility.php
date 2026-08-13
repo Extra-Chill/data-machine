@@ -53,7 +53,6 @@ class DeleteJobsAbility {
 							'deleted_count'           => array( 'type' => 'integer' ),
 							'processed_items_cleaned' => array( 'type' => 'integer' ),
 							'message'                 => array( 'type' => 'string' ),
-							'error'                   => array( 'type' => 'string' ),
 						),
 					),
 					'execute_callback'    => array( $this, 'execute' ),
@@ -70,17 +69,14 @@ class DeleteJobsAbility {
 	 * Execute delete-jobs ability.
 	 *
 	 * @param array $input Input parameters with type and cleanup_processed.
-	 * @return array Result with deleted count.
+	 * @return array|\WP_Error Result with deleted count or deletion failure.
 	 */
-	public function execute( array $input ): array {
+	public function execute( array $input ): array|\WP_Error {
 		$type              = $input['type'] ?? null;
 		$cleanup_processed = (bool) ( $input['cleanup_processed'] ?? false );
 
 		if ( ! in_array( $type, array( 'all', 'failed' ), true ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'type is required and must be "all" or "failed"',
-			);
+			return new \WP_Error( 'delete_failed', 'type is required and must be "all" or "failed"', array( 'status' => 500 ) );
 		}
 
 		$criteria = array();
@@ -93,10 +89,7 @@ class DeleteJobsAbility {
 		$result = $this->deleteJobs( $criteria, $cleanup_processed );
 
 		if ( ! $result['success'] ) {
-			return array(
-				'success' => false,
-				'error'   => 'Failed to delete jobs',
-			);
+			return new \WP_Error( 'delete_failed', 'Failed to delete jobs', array( 'status' => 500 ) );
 		}
 
 		$message_parts = array();

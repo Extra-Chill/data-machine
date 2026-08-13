@@ -243,9 +243,8 @@ class Jobs {
 
 		$result = ( new GetJobsAbility() )->execute( array( 'job_id' => $job_id ) );
 
-		$error = AbilityResult::failure_to_wp_error( $result, 'job_not_found', __( 'Job not found.', 'data-machine' ), 404 );
-		if ( $error || empty( $result['jobs'] ) ) {
-			return $error ? $error : new \WP_Error( 'job_not_found', __( 'Job not found.', 'data-machine' ), array( 'status' => 404 ) );
+		if ( is_wp_error( $result ) || empty( $result['jobs'] ) ) {
+			return is_wp_error( $result ) ? $result : new \WP_Error( 'job_not_found', __( 'Job not found.', 'data-machine' ), array( 'status' => 404 ) );
 		}
 
 		return AbilityResult::rest_item_response( $result, $result['jobs'][0] );
@@ -267,9 +266,8 @@ class Jobs {
 			)
 		);
 
-		$error = AbilityResult::failure_to_wp_error( $result, 'delete_failed', __( 'Failed to delete jobs.', 'data-machine' ) );
-		if ( $error ) {
-			return $error;
+		if ( is_wp_error( $result ) ) {
+			return $result;
 		}
 
 		return rest_ensure_response(
