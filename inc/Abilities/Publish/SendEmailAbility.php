@@ -209,9 +209,9 @@ class SendEmailAbility {
 	 * Execute email send ability.
 	 *
 	 * @param array $input Input parameters.
-	 * @return array Result with success/error and logs.
+	 * @return array|\WP_Error Result with success data or an error.
 	 */
-	public function execute( array $input ): array {
+	public function execute( array $input ): array|\WP_Error {
 		$logs   = array();
 		$config = $this->normalizeConfig( $input );
 
@@ -228,11 +228,7 @@ class SendEmailAbility {
 				'message' => 'Email: No valid recipient addresses provided',
 				'data'    => array( 'raw_to' => $config['to'] ),
 			);
-			return array(
-				'success' => false,
-				'error'   => 'No valid recipient email addresses',
-				'logs'    => $logs,
-			);
+			return new \WP_Error( 'invalid_email_recipient', 'No valid recipient email addresses', array( 'status' => 400 ) );
 		}
 
 		// 2. Build headers.
@@ -296,11 +292,7 @@ class SendEmailAbility {
 						'registered_templates' => is_array( $templates ) ? array_keys( $templates ) : array(),
 					),
 				);
-				return array(
-					'success' => false,
-					'error'   => $error,
-					'logs'    => $logs,
-				);
+				return new \WP_Error( 'email_template_not_found', $error, array( 'status' => 400 ) );
 			}
 
 			$context = is_array( $config['context'] ) ? $config['context'] : array();
@@ -313,11 +305,7 @@ class SendEmailAbility {
 					'message' => 'Email: Template render threw - ' . $e->getMessage(),
 					'data'    => array( 'template' => $template_id ),
 				);
-				return array(
-					'success' => false,
-					'error'   => 'Template render failed: ' . $e->getMessage(),
-					'logs'    => $logs,
-				);
+				return new \WP_Error( 'email_template_render_failed', 'Template render failed: ' . $e->getMessage(), array( 'status' => 400 ) );
 			}
 
 			if ( ! is_string( $rendered ) ) {
@@ -329,11 +317,7 @@ class SendEmailAbility {
 						'returned_type' => gettype( $rendered ),
 					),
 				);
-				return array(
-					'success' => false,
-					'error'   => sprintf( 'Template "%s" did not return a string', $template_id ),
-					'logs'    => $logs,
-				);
+				return new \WP_Error( 'invalid_email_template_result', sprintf( 'Template "%s" did not return a string', $template_id ), array( 'status' => 400 ) );
 			}
 
 			$body_source = $rendered;
@@ -352,11 +336,7 @@ class SendEmailAbility {
 				'level'   => 'error',
 				'message' => 'Email: Neither `body` nor `template` provided',
 			);
-			return array(
-				'success' => false,
-				'error'   => 'Either `body` or `template` is required',
-				'logs'    => $logs,
-			);
+			return new \WP_Error( 'email_body_required', 'Either `body` or `template` is required', array( 'status' => 400 ) );
 		}
 
 		// 4. Process subject + body placeholders. Runs AFTER template render so
@@ -396,11 +376,7 @@ class SendEmailAbility {
 					'message' => 'Email: mail_site_id provided but multisite is not active',
 					'data'    => array( 'mail_site_id' => $mail_site_id ),
 				);
-				return array(
-					'success' => false,
-					'error'   => 'mail_site_id requires a multisite install',
-					'logs'    => $logs,
-				);
+				return new \WP_Error( 'email_mail_site_requires_multisite', 'mail_site_id requires a multisite install', array( 'status' => 400 ) );
 			}
 
 			$blog_details = get_blog_details( $mail_site_id );
@@ -410,11 +386,7 @@ class SendEmailAbility {
 					'message' => 'Email: mail_site_id refers to an unknown blog',
 					'data'    => array( 'mail_site_id' => $mail_site_id ),
 				);
-				return array(
-					'success' => false,
-					'error'   => sprintf( 'Unknown mail_site_id: %d', $mail_site_id ),
-					'logs'    => $logs,
-				);
+				return new \WP_Error( 'email_mail_site_not_found', sprintf( 'Unknown mail_site_id: %d', $mail_site_id ), array( 'status' => 400 ) );
 			}
 
 			$should_switch = true;
@@ -474,11 +446,7 @@ class SendEmailAbility {
 			'message' => 'Email: Send failed - ' . $error_msg,
 		);
 
-		return array(
-			'success' => false,
-			'error'   => $error_msg,
-			'logs'    => $logs,
-		);
+		return new \WP_Error( 'email_send_failed', $error_msg, array( 'status' => 400 ) );
 	}
 
 	/**

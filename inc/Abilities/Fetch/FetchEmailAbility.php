@@ -157,9 +157,9 @@ class FetchEmailAbility {
 	 * - default: fetch with bodies (pipeline mode)
 	 *
 	 * @param array $input Input parameters.
-	 * @return array Result with items or error.
+	 * @return array|\WP_Error Result with items or an error.
 	 */
-	public function execute( array $input ): array {
+	public function execute( array $input ): array|\WP_Error {
 		$logs = array();
 
 		if ( ! function_exists( 'imap_open' ) ) {
@@ -167,11 +167,7 @@ class FetchEmailAbility {
 				'level'   => 'error',
 				'message' => 'Email Fetch: PHP IMAP extension is not installed',
 			);
-			return array(
-				'success' => false,
-				'error'   => 'PHP IMAP extension is required but not installed. Install php-imap and restart your web server.',
-				'logs'    => $logs,
-			);
+			return new \WP_Error( 'email_imap_unavailable', 'PHP IMAP extension is required but not installed. Install php-imap and restart your web server.', array( 'status' => 400 ) );
 		}
 
 		$config = $this->normalizeConfig( $input );
@@ -188,11 +184,7 @@ class FetchEmailAbility {
 
 		if ( false === $connection ) {
 			$imap_error = imap_last_error();
-			return array(
-				'success' => false,
-				'error'   => 'IMAP connection failed: ' . $imap_error,
-				'logs'    => $logs,
-			);
+			return new \WP_Error( 'email_imap_connection_failed', 'IMAP connection failed: ' . $imap_error, array( 'status' => 400 ) );
 		}
 
 		// Single message fetch by UID (detail mode).
@@ -201,11 +193,7 @@ class FetchEmailAbility {
 			imap_close( $connection );
 
 			if ( null === $item ) {
-				return array(
-					'success' => false,
-					'error'   => 'Message UID ' . $config['uid'] . ' not found',
-					'logs'    => $logs,
-				);
+				return new \WP_Error( 'email_message_not_found', 'Message UID ' . $config['uid'] . ' not found', array( 'status' => 400 ) );
 			}
 
 			return array(
