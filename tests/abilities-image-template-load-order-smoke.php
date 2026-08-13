@@ -7,9 +7,9 @@
  *
  * Two kinds of assertions:
  *
- * 1. Source-string assertions — `data-machine.php` must declare
- *    `ImageTemplateAbilities::ensure_registered()` in the lightweight
- *    ability manifest registered at file include time.
+ * 1. Provider assertions — the lightweight provider must declare
+ *    `ImageTemplateAbilities::ensure_registered()` and the plugin must invoke
+ *    that provider unconditionally at file include time.
  *
  * 2. Behavioral assertions — `ImageTemplateAbilities::ensure_registered()`
  *    must handle all three timing states defensively, matching the
@@ -42,35 +42,29 @@ $assert = static function ( string $name, bool $condition ) use ( &$failed, &$to
 
 $plugin_root  = dirname( __DIR__ );
 $bootstrap    = file_get_contents( $plugin_root . '/data-machine.php' );
+$provider     = file_get_contents( $plugin_root . '/inc/Core/Bootstrap/AbilityServiceProvider.php' );
 $class_source = file_get_contents( $plugin_root . '/inc/Abilities/Media/ImageTemplateAbilities.php' );
 
-if ( false === $bootstrap || false === $class_source ) {
+if ( false === $bootstrap || false === $provider || false === $class_source ) {
 	fwrite( fopen( 'php://stderr', 'w' ), "FAIL: unable to read plugin source\n" );
 	exit( 1 );
 }
 
 $assert(
-	'data-machine.php declares ImageTemplateAbilities::ensure_registered() in the lightweight manifest',
-	str_contains( $bootstrap, "'file'   => __DIR__ . '/inc/Abilities/Media/ImageTemplateAbilities.php'," )
-		&& str_contains( $bootstrap, "'class'  => \\DataMachine\\Abilities\\Media\\ImageTemplateAbilities::class," )
-		&& str_contains( $bootstrap, "'method' => 'ensure_registered'," )
+	'lightweight provider declares ImageTemplateAbilities::ensure_registered()',
+	str_contains( $provider, "'/inc/Abilities/Media/ImageTemplateAbilities.php'" )
+		&& str_contains( $provider, "'class'  => \\DataMachine\\Abilities\\Media\\ImageTemplateAbilities::class," )
+		&& str_contains( $provider, "'method' => 'ensure_registered'," )
 );
 
 $assert(
-	'lightweight manifest registration is unconditional at file load',
-	(bool) preg_match(
-		'/^\\\\DataMachine\\\\Abilities\\\\AbilityCategories::ensure_registered\(\);\s*\n/m',
-		$bootstrap
-	)
-		&& (bool) preg_match(
-			'/^\\\\DataMachine\\\\Abilities\\\\AbilityManifest::register\( datamachine_lightweight_ability_manifest\(\) \);\s*$/m',
-			$bootstrap
-		)
+	'lightweight provider registration is unconditional at file load',
+	str_contains( $bootstrap, '\DataMachine\Core\Bootstrap\AbilityServiceProvider::register_lightweight();' )
 );
 
 $assert(
-	'in-runtime instantiation is still present (defensive idempotent path)',
-	str_contains( $bootstrap, "new \\DataMachine\\Abilities\\Media\\ImageTemplateAbilities();" )
+	'full-runtime provider retains defensive instantiation',
+	str_contains( $provider, 'new \\DataMachine\\Abilities\\Media\\ImageTemplateAbilities();' )
 );
 
 // ============================================================
@@ -274,6 +268,17 @@ new \DataMachine\Abilities\Media\ImageTemplateAbilities();
 $assert(
 	'constructor path: instantiating the class triggers ensure_registered()',
 	isset( $GLOBALS['datamachine_2290_state']->registered['datamachine/render-image-template'] )
+);
+
+// --- Provider path: lightweight composition attaches this class's callback.
+$reset();
+require_once $plugin_root . '/inc/Core/Bootstrap/AbilityServiceProvider.php';
+$prior_hook_count = count( $GLOBALS['datamachine_2290_state']->hooked['wp_abilities_api_init'] ?? array() );
+\DataMachine\Core\Bootstrap\AbilityServiceProvider::register_lightweight();
+$provider_callbacks = $GLOBALS['datamachine_2290_state']->hooked['wp_abilities_api_init'] ?? array();
+$assert(
+	'lightweight provider behavior attaches image-template registration',
+	count( $provider_callbacks ) > $prior_hook_count
 );
 
 if ( $failed > 0 ) {

@@ -26,36 +26,34 @@ $assert = static function ( string $name, bool $condition ) use ( &$failed, &$to
 
 $plugin_root = dirname( __DIR__ );
 $bootstrap   = file_get_contents( $plugin_root . '/data-machine.php' );
+$provider    = file_get_contents( $plugin_root . '/inc/Core/Bootstrap/AbilityServiceProvider.php' );
 $send_source = file_get_contents( $plugin_root . '/inc/Abilities/Publish/SendEmailAbility.php' );
 $queue_source = file_get_contents( $plugin_root . '/inc/Abilities/Publish/SendEmailQueuedAbility.php' );
 
-if ( false === $bootstrap || false === $send_source || false === $queue_source ) {
+if ( false === $bootstrap || false === $provider || false === $send_source || false === $queue_source ) {
 	fwrite( fopen( 'php://stderr', 'w' ), "FAIL: unable to read plugin source\n" );
 	exit( 1 );
 }
 
 $assert(
-	'data-machine.php registers send-email abilities unconditionally at file load',
-	str_contains( $bootstrap, 'Register `datamachine/send-email` and `datamachine/send-email-queued`' )
-		&& str_contains( $bootstrap, "require_once __DIR__ . '/inc/Abilities/Publish/SendEmailAbility.php';\nrequire_once __DIR__ . '/inc/Abilities/Publish/SendEmailQueuedAbility.php';\n\\DataMachine\\Abilities\\Publish\\SendEmailAbility::ensure_registered();\n\\DataMachine\\Abilities\\Publish\\SendEmailQueuedAbility::ensure_registered();" )
+	'lightweight provider declares both send-email abilities',
+	str_contains( $provider, "'/inc/Abilities/Publish/SendEmailAbility.php'" )
+		&& str_contains( $provider, "'/inc/Abilities/Publish/SendEmailQueuedAbility.php'" )
 );
 
 $assert(
-	'unconditional call site is outside datamachine_run_datamachine_plugin()',
-	(bool) preg_match(
-		'/^\\\\DataMachine\\\\Abilities\\\\Media\\\\ImageTemplateAbilities::ensure_registered\(\);\s*\n\s*\n\/\*\*\s*\*\s*Register `datamachine\/send-email`/m',
-		$bootstrap
-	)
+	'lightweight provider call is unconditional',
+	str_contains( $bootstrap, '\DataMachine\Core\Bootstrap\AbilityServiceProvider::register_lightweight();' )
 );
 
 $assert(
-	'in-runtime send-email instantiation remains as defensive idempotent path',
-	str_contains( $bootstrap, "new \\DataMachine\\Abilities\\Publish\\SendEmailAbility();" )
+	'full-runtime provider retains send-email instantiation',
+	str_contains( $provider, 'new \\DataMachine\\Abilities\\Publish\\SendEmailAbility();' )
 );
 
 $assert(
-	'in-runtime send-email-queued instantiation remains as defensive idempotent path',
-	str_contains( $bootstrap, "new \\DataMachine\\Abilities\\Publish\\SendEmailQueuedAbility();" )
+	'full-runtime provider retains send-email-queued instantiation',
+	str_contains( $provider, 'new \\DataMachine\\Abilities\\Publish\\SendEmailQueuedAbility();' )
 );
 
 foreach ( array( 'send-email' => $send_source, 'send-email-queued' => $queue_source ) as $label => $source ) {
@@ -161,6 +159,7 @@ if ( ! class_exists( 'DataMachine\\Abilities\\PermissionHelper' ) ) {
 	);
 }
 
+require_once $plugin_root . '/inc/Abilities/AbilityRegistration.php';
 require_once $plugin_root . '/inc/Abilities/Publish/SendEmailAbility.php';
 require_once $plugin_root . '/inc/Abilities/Publish/SendEmailQueuedAbility.php';
 
@@ -242,6 +241,17 @@ $assert(
 	'constructor path: instantiating both classes triggers registration',
 	isset( $GLOBALS['datamachine_2303_state']->registered['datamachine/send-email'] )
 		&& isset( $GLOBALS['datamachine_2303_state']->registered['datamachine/send-email-queued'] )
+);
+
+// --- Provider path: lightweight composition attaches both email callbacks.
+$reset();
+require_once $plugin_root . '/inc/Core/Bootstrap/AbilityServiceProvider.php';
+$prior_hook_count = count( $GLOBALS['datamachine_2303_state']->hooked['wp_abilities_api_init'] ?? array() );
+\DataMachine\Core\Bootstrap\AbilityServiceProvider::register_lightweight();
+$provider_callbacks = $GLOBALS['datamachine_2303_state']->hooked['wp_abilities_api_init'] ?? array();
+$assert(
+	'lightweight provider behavior attaches both email registrations',
+	count( $provider_callbacks ) >= $prior_hook_count + 2
 );
 
 if ( $failed > 0 ) {
