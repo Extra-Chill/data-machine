@@ -2,6 +2,14 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.172.26] - 2026-08-13
+
+### Changed
+- extract ability bootstrap provider
+
+### Fixed
+- remove all plugin tables on uninstall
+
 ## [0.172.25] - 2026-08-13
 
 ### Changed
