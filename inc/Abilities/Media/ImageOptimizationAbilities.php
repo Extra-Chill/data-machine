@@ -29,6 +29,11 @@ class ImageOptimizationAbilities {
 	 */
 	const DEFAULT_QUALITY = 82;
 
+	/**
+	 * Number of attachments inspected per optimization candidate query.
+	 */
+	const OPTIMIZATION_SCAN_PAGE_SIZE = 100;
+
 	private static bool $registered = false;
 
 	public function __construct() {
@@ -127,11 +132,14 @@ class ImageOptimizationAbilities {
 					'output_schema'       => array(
 						'type'       => 'object',
 						'properties' => array(
-							'success'      => array( 'type' => 'boolean' ),
-							'queued_count' => array( 'type' => 'integer' ),
-							'batch_id'     => array( 'anyOf' => array( array( 'type' => 'integer' ), array( 'type' => 'null' ) ) ),
-							'message'      => array( 'type' => 'string' ),
-							'error'        => array( 'type' => 'string' ),
+							'success'        => array( 'type' => 'boolean' ),
+							'queued_count'   => array( 'type' => 'integer' ),
+							'batch_id'       => array( 'anyOf' => array( array( 'type' => 'integer' ), array( 'type' => 'null' ) ) ),
+							'scanned_count'  => array( 'type' => 'integer' ),
+							'eligible_count' => array( 'type' => 'integer' ),
+							'scan_complete'  => array( 'type' => 'boolean' ),
+							'message'        => array( 'type' => 'string' ),
+							'error'          => array( 'type' => 'string' ),
 						),
 					),
 					'execute_callback'    => array( self::class, 'optimizeImages' ),
@@ -270,41 +278,73 @@ class ImageOptimizationAbilities {
 
 		// Resolve eligible attachment IDs.
 		$attachment_ids = array();
+		$scanned_count  = 0;
+		$scan_complete  = true;
 
 		if ( $attachment_id > 0 ) {
 			$attachment_ids[] = $attachment_id;
+			$scanned_count    = 1;
 		} else {
-			$all = get_posts(
-				array(
-					'post_type'      => 'attachment',
-					'post_mime_type' => 'image',
-					'post_status'    => 'inherit',
-					'posts_per_page' => $limit,
-					'fields'         => 'ids',
-					'orderby'        => 'date',
-					'order'          => 'DESC',
-				)
-			);
+			$offset        = 0;
+			$scan_complete = false;
+			$eligible_count = 0;
 
-			foreach ( $all as $id ) {
-				$file_path = get_attached_file( $id );
-				if ( empty( $file_path ) || ! file_exists( $file_path ) ) {
-					continue;
+			while ( $eligible_count < $limit ) {
+				$page = get_posts(
+					array(
+						'post_type'      => 'attachment',
+						'post_mime_type' => 'image',
+						'post_status'    => 'inherit',
+						'posts_per_page' => self::OPTIMIZATION_SCAN_PAGE_SIZE,
+						'offset'         => $offset,
+						'fields'         => 'ids',
+						'orderby'        => array(
+							'date' => 'DESC',
+							'ID'   => 'DESC',
+						),
+						'no_found_rows'  => true,
+					)
+				);
+
+				$page_count = count( $page );
+				$offset    += $page_count;
+
+				foreach ( $page as $id ) {
+					++$scanned_count;
+					$file_path = get_attached_file( $id );
+					if ( empty( $file_path ) || ! file_exists( $file_path ) ) {
+						continue;
+					}
+
+					$file_size = filesize( $file_path );
+					if ( $file_size > $size_threshold ) {
+						$attachment_ids[] = $id;
+						++$eligible_count;
+						if ( $eligible_count >= $limit ) {
+							break;
+						}
+					}
 				}
 
-				$file_size = filesize( $file_path );
-				if ( $file_size > $size_threshold ) {
-					$attachment_ids[] = $id;
+				if ( $scanned_count === $offset && $page_count < self::OPTIMIZATION_SCAN_PAGE_SIZE ) {
+					$scan_complete = true;
+					break;
 				}
 			}
 		}
 
+		$scan_coverage = array(
+			'scanned_count'  => $scanned_count,
+			'eligible_count' => count( $attachment_ids ),
+			'scan_complete'  => $scan_complete,
+		);
+
 		if ( empty( $attachment_ids ) ) {
-			return array(
+			return array_merge( array(
 				'success'      => true,
 				'queued_count' => 0,
 				'message'      => 'No oversized images found to optimize.',
-			);
+			), $scan_coverage );
 		}
 
 		if ( $dry_run ) {
@@ -320,13 +360,13 @@ class ImageOptimizationAbilities {
 				);
 			}
 
-			return array(
+			return array_merge( array(
 				'success'        => true,
 				'queued_count'   => 0,
 				'dry_run'        => true,
 				'would_optimize' => $preview,
 				'message'        => sprintf( '%d image(s) would be optimized (dry run).', count( $preview ) ),
-			);
+			), $scan_coverage );
 		}
 
 		// Build per-item params for batch scheduling.
@@ -356,15 +396,15 @@ class ImageOptimizationAbilities {
 		);
 
 		if ( false === $batch ) {
-			return array(
+			return array_merge( array(
 				'success'      => false,
 				'queued_count' => 0,
 				'message'      => 'Failed to schedule optimization batch.',
 				'error'        => 'Task batch scheduling failed.',
-			);
+			), $scan_coverage );
 		}
 
-		return array(
+		return array_merge( array(
 			'success'      => true,
 			'queued_count' => count( $attachment_ids ),
 			'batch_id'     => $batch['batch_id'] ?? null,
@@ -372,6 +412,6 @@ class ImageOptimizationAbilities {
 				'Image optimization scheduled for %d image(s).',
 				count( $attachment_ids )
 			),
-		);
+		), $scan_coverage );
 	}
 }
