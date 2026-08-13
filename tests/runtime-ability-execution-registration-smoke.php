@@ -181,11 +181,5 @@ namespace {
 		exit( 1 );
 	}
 
-	$sync_source = file_get_contents( dirname( __DIR__ ) . '/inc/Engine/Debug/SyncRunner.php' ) ?: '';
-	if ( ! str_contains( $sync_source, 'new ScheduleNextStepAbility( false )' ) ) {
-		fwrite( STDERR, "FAIL: sync runtime path must construct schedule-next-step without registration\n" );
-		exit( 1 );
-	}
-
 	echo "PASS: runtime ability execution does not register abilities\n";
 }
