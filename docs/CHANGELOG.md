@@ -2,6 +2,16 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.172.25] - 2026-08-13
+
+### Changed
+- remove dead ability error adapter
+- remove fourth source inspection tranche
+- align flow factory fixture with tool recorders
+
+### Fixed
+- diagnose exhausted engine data contention
+
 ## [0.172.24] - 2026-08-13
 
 ### Changed
