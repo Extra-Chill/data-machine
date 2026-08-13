@@ -69,6 +69,7 @@ class PersistedAgentProjector {
 			'description'    => self::description_from_row( $row, $config ),
 			'owner_resolver' => static fn(): int => $owner_id,
 			'default_config' => $config,
+			'subagents'      => AgentSubagentGraph::edges_from_config( $config['subagents'] ?? array(), (string) ( $row['agent_slug'] ?? '' ) ),
 			'meta'           => self::meta_from_row( $row, $config ),
 		);
 	}

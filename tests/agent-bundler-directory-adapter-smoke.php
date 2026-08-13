@@ -311,6 +311,53 @@ assert_adapter_equals( 'round-trip preserves system task settings', 'wiki_graph_
 assert_adapter_equals( 'round-trip preserves system task params', 'wordpress-com', $round_steps[2]['flow_step_settings']['params']['root'] ?? null );
 assert_adapter_equals( 'round-trip preserves scheduling interval', 'hourly', $round_flow['scheduling_config']['interval'] );
 
+echo "\n[2b] Subagent artifacts are file-backed and byte-exact\n";
+$graph_bundle = array(
+	'bundle_version' => 1,
+	'bundle_schema_version' => 1,
+	'agent' => array(
+		'agent_slug' => 'coordinator', 'agent_name' => 'Coordinator',
+		'agent_config' => array( 'model' => 'gpt-5', 'subagents' => array( 'writer' ) ),
+		'subagents' => array( 'writer' ),
+		'tool_policy' => array( 'allow' => array( 'datamachine/read-file' ) ),
+		'skill_policy' => array( 'mode' => 'explicit' ),
+		'skills' => array( 'root.md' => "root \0\xFF" ),
+		'references' => array( 'root-ref.md' => "root reference \xC3\xA9" ),
+	),
+	'files' => array(), 'pipelines' => array(), 'flows' => array(),
+	'subagents' => array(
+		array(
+			'slug' => 'writer', 'label' => 'Writer', 'description' => 'Writes.',
+			'agent_config' => array( 'model' => 'gpt-5-mini' ), 'memory' => array( 'SOUL.md' => "Writer\n" ),
+			'tool_policy' => array( 'allow' => array( 'datamachine/read-file' ) ),
+			'skill_policy' => array( 'mode' => 'explicit', 'allowed' => array( 'compose.md' ) ),
+			'skills' => array( 'compose.md' => "cafe \xC3\xA9\0skill" ),
+			'references' => array( 'guide.bin' => "\0reference\xFF" ),
+			'subagents' => array(),
+		),
+	),
+);
+$graph_directory = AgentBundleArrayAdapter::from_array_bundle( $graph_bundle );
+$graph_tmp = sys_get_temp_dir() . '/datamachine-subagent-package-' . getmypid();
+rm_adapter_tree( $graph_tmp );
+$graph_directory->write( $graph_tmp );
+$graph_manifest = json_decode( file_get_contents( $graph_tmp . '/manifest.json' ), true );
+assert_adapter( 'manifest contains skill artifact path and hash, not bytes', isset( $graph_manifest['subagents'][0]['skills'][0]['path'], $graph_manifest['subagents'][0]['skills'][0]['sha256'] ) && ! isset( $graph_manifest['subagents'][0]['skills']['compose.md'] ) );
+assert_adapter( 'root manifest contains skill path and hash, not bytes', isset( $graph_manifest['agent']['skills'][0]['path'], $graph_manifest['agent']['skills'][0]['sha256'] ) && ! isset( $graph_manifest['agent']['skills']['root.md'] ) );
+assert_adapter_equals( 'root skill bytes use dedicated package directory', "root \0\xFF", file_get_contents( $graph_tmp . '/skills/root.md' ) );
+assert_adapter_equals( 'root reference bytes use dedicated package directory', "root reference \xC3\xA9", file_get_contents( $graph_tmp . '/references/root-ref.md' ) );
+assert_adapter_equals( 'skill bytes written without JSON transport', "cafe \xC3\xA9\0skill", file_get_contents( $graph_tmp . '/subagents/writer/skills/compose.md' ) );
+assert_adapter_equals( 'reference bytes written without JSON transport', "\0reference\xFF", file_get_contents( $graph_tmp . '/subagents/writer/references/guide.bin' ) );
+$graph_round_trip = AgentBundleArrayAdapter::to_import_payload( AgentBundleDirectory::read( $graph_tmp ) );
+assert_adapter_equals( 'skill bytes survive directory package read', "cafe \xC3\xA9\0skill", $graph_round_trip['subagents'][0]['skills']['compose.md'] ?? null );
+assert_adapter_equals( 'reference bytes survive directory package read', "\0reference\xFF", $graph_round_trip['subagents'][0]['references']['guide.bin'] ?? null );
+assert_adapter_equals( 'root skill bytes survive directory package read', "root \0\xFF", $graph_round_trip['agent']['skills']['root.md'] ?? null );
+assert_adapter_equals( 'root reference bytes survive directory package read', "root reference \xC3\xA9", $graph_round_trip['agent']['references']['root-ref.md'] ?? null );
+assert_adapter_equals( 'root skill policy survives directory package read', array( 'mode' => 'explicit' ), $graph_round_trip['agent']['skill_policy'] ?? null );
+assert_adapter_equals( 'root tool policy survives directory package read', array( 'allow' => array( 'datamachine/read-file' ) ), $graph_round_trip['agent']['tool_policy'] ?? null );
+assert_adapter_equals( 'child skill policy survives directory package read', array( 'mode' => 'explicit', 'allowed' => array( 'compose.md' ) ), $graph_round_trip['subagents'][0]['skill_policy'] ?? null );
+rm_adapter_tree( $graph_tmp );
+
 echo "\n[3] Directory read resolves prompt file references relative to bundle root\n";
 if ( ! is_dir( $tmp . '/prompts' ) ) {
 	mkdir( $tmp . '/prompts', 0775, true );

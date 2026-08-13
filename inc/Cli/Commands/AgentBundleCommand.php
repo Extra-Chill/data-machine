@@ -185,6 +185,20 @@ class AgentBundleCommand extends BaseCommand {
 	}
 
 	/**
+	 * Project a persisted coordinator graph for generic runtime adapters.
+	 *
+	 * @subcommand graph
+	 */
+	public function graph( array $args, array $assoc_args ): void {
+		$slug = (string) ( $args[0] ?? '' );
+		if ( '' === $slug ) {
+			WP_CLI::error( 'Agent slug is required.' );
+		}
+		$assoc_args['format'] = $assoc_args['format'] ?? 'json';
+		$this->output( \DataMachine\Abilities\AgentAbilities::projectAgentGraph( array( 'slug' => $slug ) ), $assoc_args, array( 'success', 'coordinator', 'nodes', 'error' ) );
+	}
+
+	/**
 	 * Show installed package status for an agent or package slug.
 	 *
 	 * Includes manifest drift detection when the on-disk bundle directory

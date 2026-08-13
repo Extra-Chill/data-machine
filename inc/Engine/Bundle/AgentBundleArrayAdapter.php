@@ -42,7 +42,8 @@ final class AgentBundleArrayAdapter {
 				'handler_auth' => 'refs',
 			),
 			BundleSchema::normalize_run_artifact_egress_policy( $bundle['run_artifacts'] ?? array() ),
-			is_array( $bundle['capabilities'] ?? null ) ? $bundle['capabilities'] : array()
+			is_array( $bundle['capabilities'] ?? null ) ? $bundle['capabilities'] : array(),
+			is_array( $bundle['subagents'] ?? null ) ? $bundle['subagents'] : array()
 		);
 
 		return new AgentBundleDirectory(
@@ -171,6 +172,9 @@ final class AgentBundleArrayAdapter {
 		if ( ! empty( $manifest['capabilities'] ) && is_array( $manifest['capabilities'] ) ) {
 			$bundle['capabilities'] = $manifest['capabilities'];
 		}
+		if ( ! empty( $manifest['subagents'] ) && is_array( $manifest['subagents'] ) ) {
+			$bundle['subagents'] = $manifest['subagents'];
+		}
 
 		return $bundle;
 	}
@@ -253,6 +257,14 @@ final class AgentBundleArrayAdapter {
 			'description'  => (string) ( $agent['description'] ?? '' ),
 			'agent_config' => is_array( $agent['agent_config'] ?? null ) ? $agent['agent_config'] : array(),
 		);
+		if ( array_key_exists( 'subagents', $agent ) ) {
+			$block['subagents'] = $agent['subagents'];
+		}
+		foreach ( array( 'skills', 'references', 'skill_policy', 'tool_policy' ) as $field ) {
+			if ( array_key_exists( $field, $agent ) ) {
+				$block[ $field ] = $agent[ $field ];
+			}
+		}
 
 		if ( array_key_exists( 'site_scope', $agent ) ) {
 			$scope = BundleSchema::normalize_agent_site_scope( $agent['site_scope'] );
@@ -281,6 +293,14 @@ final class AgentBundleArrayAdapter {
 			'agent_name'   => $agent['label'] ?? ( $agent['slug'] ?? 'Agent' ),
 			'agent_config' => is_array( $agent['agent_config'] ?? null ) ? $agent['agent_config'] : array(),
 		);
+		if ( array_key_exists( 'subagents', $agent ) ) {
+			$block['subagents'] = $agent['subagents'];
+		}
+		foreach ( array( 'skills', 'references', 'skill_policy', 'tool_policy' ) as $field ) {
+			if ( array_key_exists( $field, $agent ) ) {
+				$block[ $field ] = $agent[ $field ];
+			}
+		}
 
 		if ( array_key_exists( 'site_scope', $agent ) ) {
 			$scope = BundleSchema::normalize_agent_site_scope( $agent['site_scope'] );

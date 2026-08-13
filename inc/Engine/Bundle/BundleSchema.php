@@ -45,6 +45,12 @@ final class BundleSchema {
 
 	public const EXTENSIONS_DIR = 'extensions';
 
+	public const SUBAGENTS_DIR = 'subagents';
+
+	public const SKILLS_DIR = 'skills';
+
+	public const REFERENCES_DIR = 'references';
+
 	/**
 	 * Top-level bundle entries that Data Machine owns by name.
 	 *
@@ -69,6 +75,9 @@ final class BundleSchema {
 		self::AUTH_REFS_DIR,
 		self::SEED_QUEUES_DIR,
 		self::EXTENSIONS_DIR,
+		self::SUBAGENTS_DIR,
+		self::SKILLS_DIR,
+		self::REFERENCES_DIR,
 		// Legacy export paths produced by AgentBundler::to_directory():
 		'agent',
 		'USER.md',
@@ -91,6 +100,9 @@ final class BundleSchema {
 		self::AUTH_REFS_DIR,
 		self::SEED_QUEUES_DIR,
 		self::EXTENSIONS_DIR,
+		self::SUBAGENTS_DIR,
+		self::SKILLS_DIR,
+		self::REFERENCES_DIR,
 		'agent',
 	);
 
