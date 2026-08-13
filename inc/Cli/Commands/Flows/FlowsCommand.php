@@ -480,8 +480,8 @@ class FlowsCommand extends BaseCommand {
 			)
 		);
 
-		if ( ! $result['success'] ) {
-			WP_CLI::error( $result['error'] ?? 'Failed to get flows' );
+		if ( is_wp_error( $result ) ) {
+			WP_CLI::error( $result->get_error_message() );
 			return;
 		}
 

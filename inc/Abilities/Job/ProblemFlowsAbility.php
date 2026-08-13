@@ -62,7 +62,6 @@ class ProblemFlowsAbility {
 							'count'     => array( 'type' => 'integer' ),
 							'threshold' => array( 'type' => 'integer' ),
 							'message'   => array( 'type' => 'string' ),
-							'error'     => array( 'type' => 'string' ),
 						),
 					),
 					'execute_callback'    => array( $this, 'execute' ),

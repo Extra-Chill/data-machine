@@ -103,9 +103,9 @@ class GetFlowsAbility {
 	 * Execute get flows ability.
 	 *
 	 * @param array $input Input parameters.
-	 * @return array Result with flows data.
+	 * @return array|\WP_Error Result with flows data or a query failure.
 	 */
-	public function execute( array $input ): array {
+	public function execute( array $input ): array|\WP_Error {
 		try {
 			$flow_id      = $input['flow_id'] ?? null;
 			$pipeline_id  = $input['pipeline_id'] ?? null;
@@ -193,10 +193,9 @@ class GetFlowsAbility {
 				'filters_applied' => $filters_applied,
 			);
 		} catch ( \Exception $e ) {
-			return array(
-				'success' => false,
-				'error'   => $e->getMessage(),
-			);
+			return isset( $input['flow_id'] )
+				? new \WP_Error( 'flow_not_found', $e->getMessage(), array( 'status' => 400 ) )
+				: new \WP_Error( 'ability_error', $e->getMessage(), array( 'status' => 500 ) );
 		}
 	}
 }

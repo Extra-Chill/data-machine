@@ -138,6 +138,29 @@ class FlowsEndpointTest extends WP_UnitTestCase {
 		$this->assertSame('datamachine/get-flows', $ability->get_name());
 	}
 
+	public function test_missing_single_flow_preserves_not_found_response(): void {
+		$request = new WP_REST_Request( 'GET', '/datamachine/v1/flows/999999' );
+		$request->set_param( 'flow_id', 999999 );
+
+		$response = Flows::handle_get_single_flow( $request );
+
+		$this->assertWPError( $response );
+		$this->assertSame( 'flow_not_found', $response->get_error_code() );
+		$this->assertSame( 404, $response->get_error_data()['status'] );
+	}
+
+	public function test_update_failure_passes_native_error_through(): void {
+		$request = new WP_REST_Request( 'PATCH', '/datamachine/v1/flows/999999' );
+		$request->set_param( 'flow_id', 999999 );
+		$request->set_param( 'flow_name', 'Missing flow' );
+
+		$response = Flows::handle_update_flow( $request );
+
+		$this->assertWPError( $response );
+		$this->assertSame( 'flow_not_found', $response->get_error_code() );
+		$this->assertSame( 404, $response->get_error_data()['status'] );
+	}
+
 	public function test_permission_denied_for_non_admin(): void {
 		wp_set_current_user( 0 );
 		add_filter( 'datamachine_cli_bypass_permissions', '__return_false' );
