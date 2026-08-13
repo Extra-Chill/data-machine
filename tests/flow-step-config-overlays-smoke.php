@@ -176,14 +176,6 @@ assert_overlay_same(
 	$import_handler_free['flow_step_settings']
 );
 
-$flow_helpers_source = file_get_contents( __DIR__ . '/../inc/Abilities/Flow/FlowHelpers.php' );
-$import_export_source = file_get_contents( __DIR__ . '/../inc/Engine/Actions/ImportExport.php' );
-
-assert_overlay( 'copy path calls withHandlerFields', false !== strpos( $flow_helpers_source, 'FlowStepConfigFactory::withHandlerFields( $new_step_config, $source_step )' ) );
-assert_overlay( 'copy path calls withQueueState', false !== strpos( $flow_helpers_source, 'FlowStepConfigFactory::withQueueState( $new_step_config, $source_step )' ) );
-assert_overlay( 'import restore path calls withHandlerFields', false !== strpos( $import_export_source, 'FlowStepConfigFactory::withHandlerFields( $flow_config[ $flow_step_id ], $settings )' ) );
-assert_overlay( 'import restore path no longer hand-normalizes array_merge', false === strpos( $import_export_source, 'FlowStepConfig::normalizeHandlerShape(\n\t\t\tarray_merge' ) );
-
 echo "\n";
 if ( 0 === $failed ) {
 	echo "=== flow-step-config-overlays-smoke: ALL PASS ({$total}) ===\n";

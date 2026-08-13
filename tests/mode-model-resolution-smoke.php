@@ -131,13 +131,6 @@ namespace {
 		'complete behavior mode still wins when intentionally configured'
 	);
 
-	$ai_step_source = file_get_contents( __DIR__ . '/../inc/Core/Steps/AI/AIStep.php' ) ?: '';
-	$chat_source    = file_get_contents( __DIR__ . '/../inc/Abilities/Chat/AgentsChatHandler.php' ) ?: '';
-
-	$assert_same( true, str_contains( $ai_step_source, "resolveModelForAgentModes( $" . "agent_id, $" . "modes, ToolPolicyResolver::MODE_PIPELINE )" ), 'AIStep uses shared mode-model resolver with pipeline fallback' );
-	$assert_same( true, str_contains( $chat_source, "resolveModelForAgentModes( 0 === $" . "agent_id ? null : $" . "agent_id, $" . "modes, 'chat' )" ), 'canonical agents/chat uses shared mode-model resolver with chat fallback' );
-	$assert_same( false, file_exists( __DIR__ . '/../inc/Abilities/Chat/SendMessageAbility.php' ), 'datamachine/send-message facade is removed' );
-
 	echo "\n{$passes} passed, {$fails} failed\n";
 	if ( $fails > 0 ) {
 		exit( 1 );

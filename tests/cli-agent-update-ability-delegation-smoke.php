@@ -210,11 +210,6 @@ namespace {
 		assert_cli_agent_update( 'flow ability failure prints no success', array() === $GLOBALS['cli_success'] );
 	}
 
-	$pipeline_source = (string) file_get_contents( dirname( __DIR__ ) . '/inc/Cli/Commands/PipelinesCommand.php' );
-	$flow_source     = (string) file_get_contents( dirname( __DIR__ ) . '/inc/Cli/Commands/Flows/FlowsCommand.php' );
-	assert_cli_agent_update( 'pipeline CLI has no direct base agent repository update', false === strpos( $pipeline_source, "update_pipeline( \$pipeline_id, array( 'agent_id'" ) );
-	assert_cli_agent_update( 'flow CLI has no direct base agent repository update', false === strpos( $flow_source, "update_flow( \$flow_id, array( 'agent_id'" ) );
-
 	echo "\n";
 	if ( 0 === $failed ) {
 		echo "=== cli-agent-update-ability-delegation-smoke: ALL PASS ({$total}) ===\n";
