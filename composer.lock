@@ -794,12 +794,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/Automattic/agents-api.git",
-                "reference": "a4765649ca3cd2dda78aeec35c72b696e2480fa9"
+                "reference": "6da93fc05b1d2282ed335447e898e67cd314e0cc"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/Automattic/agents-api/zipball/a4765649ca3cd2dda78aeec35c72b696e2480fa9",
-                "reference": "a4765649ca3cd2dda78aeec35c72b696e2480fa9",
+                "url": "https://api.github.com/repos/Automattic/agents-api/zipball/6da93fc05b1d2282ed335447e898e67cd314e0cc",
+                "reference": "6da93fc05b1d2282ed335447e898e67cd314e0cc",
                 "shasum": ""
             },
             "require": {
@@ -837,6 +837,7 @@
                     "php tests/registered-agent-materialization-adapter-smoke.php",
                     "php tests/runtime-agent-bundle-importer-smoke.php",
                     "php tests/package-lifecycle-smoke.php",
+                    "php tests/package-duplicate-artifact-identity-smoke.php",
                     "php tests/package-capability-contract-smoke.php",
                     "php tests/package-adoption-orchestration-smoke.php",
                     "php tests/execution-principal-smoke.php",
@@ -847,6 +848,7 @@
                     "php tests/autonomous-capability-ceiling-smoke.php",
                     "php tests/agents-access-ability-smoke.php",
                     "php tests/agents-conversation-session-abilities-smoke.php",
+                    "php tests/conversation-session-authz-smoke.php",
                     "php tests/conversation-session-store-contract-smoke.php",
                     "php tests/action-policy-values-smoke.php",
                     "php tests/consent-policy-smoke.php",
@@ -857,6 +859,7 @@
                     "php tests/runtime-tool-policy-smoke.php",
                     "php tests/write-capable-default-smoke.php",
                     "php tests/runtime-tool-lifecycle-abilities-smoke.php",
+                    "php tests/runtime-tool-terminal-replay-smoke.php",
                     "php tests/tool-tier-resolver-smoke.php",
                     "php tests/action-policy-resolver-smoke.php",
                     "php tests/ability-meta-abilities-smoke.php",
@@ -912,6 +915,7 @@
                     "php tests/canonical-run-lifecycle-smoke.php",
                     "php tests/channels-smoke.php",
                     "php tests/chat-run-control-smoke.php",
+                    "php tests/chat-run-control-multisite-smoke.php",
                     "php tests/external-chat-run-bridge-fixture-smoke.php",
                     "php tests/task-execution-smoke.php",
                     "php tests/frontend-chat-rest-smoke.php",
@@ -920,6 +924,7 @@
                     "php tests/agents-dispatch-message-ability-smoke.php",
                     "php tests/webhook-safety-smoke.php",
                     "php tests/remote-bridge-smoke.php",
+                    "php tests/bridge-store-concurrency-smoke.php",
                     "php tests/context-authority-smoke.php",
                     "php tests/guidelines-substrate-smoke.php",
                     "php tests/workflow-bindings-smoke.php",
@@ -931,10 +936,12 @@
                     "php tests/workflow-branch-concurrency-gate-smoke.php",
                     "php tests/workflow-scoped-drain-smoke.php",
                     "php tests/workflow-run-awaiter-smoke.php",
+                    "php tests/workflow-request-controller-smoke.php",
                     "php tests/workflow-async-branch-payload-smoke.php",
                     "php tests/workflow-async-loopback-target-smoke.php",
                     "php tests/workflow-async-runner-dispatch-result-smoke.php",
                     "php tests/workflow-reconcile-race-smoke.php",
+                    "php tests/workflow-reconcile-branch-authorization-smoke.php",
                     "php tests/workflow-lifecycle-smoke.php",
                     "php tests/agents-workflow-ability-smoke.php",
                     "php tests/routine-smoke.php",
@@ -956,7 +963,7 @@
                 "issues": "https://github.com/Automattic/agents-api/issues",
                 "source": "https://github.com/Automattic/agents-api"
             },
-            "time": "2026-07-20T23:17:53+00:00"
+            "time": "2026-08-01T19:15:31+00:00"
         }
     ],
     "packages-dev": [
