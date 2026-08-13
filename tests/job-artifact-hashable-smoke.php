@@ -69,6 +69,12 @@ if ( ! function_exists( 'wp_delete_file' ) ) {
 	}
 }
 
+if ( ! function_exists( 'wp_is_writable' ) ) {
+	function wp_is_writable( string $path ): bool {
+		return is_writable( $path );
+	}
+}
+
 if ( ! function_exists( 'do_action' ) ) {
 	function do_action( string $hook, ...$args ): void {
 		unset( $hook, $args );
@@ -291,11 +297,25 @@ $assert_true( "stale\n" !== file_get_contents( $tool_trace_path ), 'artifact fil
 $assert_true( ( fileperms( $tool_trace_path ) & 0040 ) === 0040, 'artifact file is group-readable after restrictive producer umask' );
 $assert_true( ( fileperms( $artifact_job_dir ) & 0030 ) === 0030, 'artifact directory is group-accessible after restrictive producer umask' );
 
+$first_inode        = fileinode( $tool_trace_path );
+$first_modified_at  = filemtime( $tool_trace_path );
 $second_file_result = $invoke( $artifacts, 'write_artifact_file', array( 123, 'tool_trace', $tool_trace_artifact ) );
 $assert_true( true === ( $second_file_result['success'] ?? false ), 'repeat tool trace artifact write succeeds' );
 $assert_true( $file_result['file']['relative_path'] === ( $second_file_result['file']['relative_path'] ?? '' ), 'repeat artifact write targets same stable path' );
 $assert_true( $file_result['file']['sha256'] === ( $second_file_result['file']['sha256'] ?? '' ), 'repeat artifact write is byte-idempotent' );
+$assert_true( $first_inode === fileinode( $tool_trace_path ), 'repeat artifact write preserves the existing file inode' );
+$assert_true( $first_modified_at === filemtime( $tool_trace_path ), 'repeat artifact write preserves the existing file modification time' );
 $assert_true( array() === ( glob( $leftover_temp_glob ) ?: array() ), 'atomic artifact write leaves no temp files behind' );
+
+$rename_failure_path = trailingslashit( $artifact_job_dir ) . 'occupied-target';
+wp_mkdir_p( $rename_failure_path );
+file_put_contents( trailingslashit( $rename_failure_path ) . 'keep.txt', 'keep' );
+$rename_failure = $invoke( $artifacts, 'write_atomic_file', array( $rename_failure_path, "replacement\n" ) );
+$assert_true( false === $rename_failure, 'failed atomic rename reports failure' );
+$assert_true( 'keep' === file_get_contents( trailingslashit( $rename_failure_path ) . 'keep.txt' ), 'failed atomic rename preserves the existing destination' );
+$assert_true( array() === ( glob( $leftover_temp_glob ) ?: array() ), 'failed atomic rename removes its temp file' );
+unlink( trailingslashit( $rename_failure_path ) . 'keep.txt' );
+rmdir( $rename_failure_path );
 
 $transcript_file_result = $invoke( $artifacts, 'write_artifact_file', array( 123, 'transcript', $transcript_artifact ) );
 $assert_true( true === ( $transcript_file_result['success'] ?? false ), 'transcript artifact file write succeeds' );

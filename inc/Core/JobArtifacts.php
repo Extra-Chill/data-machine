@@ -784,8 +784,12 @@ class JobArtifacts {
 
 	private function write_atomic_file( string $file_path, string $contents ): bool {
 		$directory = dirname( $file_path );
-		if ( ! is_dir( $directory ) || ! is_writable( $directory ) ) { // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_is_writable
+		if ( ! is_dir( $directory ) || ! wp_is_writable( $directory ) ) {
 			return false;
+		}
+
+		if ( is_file( $file_path ) && filesize( $file_path ) === strlen( $contents ) && hash_equals( hash( 'sha256', $contents ), (string) hash_file( 'sha256', $file_path ) ) ) {
+			return true;
 		}
 
 		$temp_path = tempnam( $directory, '.tmp-artifact-' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_tempnam
@@ -799,13 +803,12 @@ class JobArtifacts {
 			return false;
 		}
 
-		if ( ! rename( $temp_path, $file_path ) ) { // phpcs:ignore WordPress.WP.AlternativeFunctions.rename_rename
-			unlink( $temp_path ); // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
+		if ( ! @rename( $temp_path, $file_path ) ) { // phpcs:ignore WordPress.WP.AlternativeFunctions.rename_rename, WordPress.PHP.NoSilencedErrors.Discouraged
+			@unlink( $temp_path ); // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink, WordPress.PHP.NoSilencedErrors.Discouraged
 			return false;
 		}
-		if ( ! FilesystemHelper::make_group_writable( $file_path, FilesystemHelper::SHARED_FILE_PERMISSIONS ) ) {
-			return false;
-		}
+
+		FilesystemHelper::make_group_writable( $file_path, FilesystemHelper::SHARED_FILE_PERMISSIONS );
 
 		return true;
 	}
