@@ -19,6 +19,12 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class EngineData {
 
+	private const FLOW_RUNTIME_QUEUE_KEYS = array(
+		'prompt_queue',
+		'config_patch_queue',
+		'_queue_consume_revision',
+	);
+
 	/**
 	 * The raw engine data array.
 	 *
@@ -100,6 +106,31 @@ class EngineData {
 		}
 
 		return $success;
+	}
+
+	/**
+	 * Remove live flow queue payloads from a persisted engine snapshot.
+	 *
+	 * Queue consumers read these values from the authoritative flow row. The
+	 * snapshot still retains step definitions, handler configuration, and queue
+	 * mode so execution semantics remain unchanged.
+	 */
+	public static function stripFlowRuntimeQueuePayloads( array $snapshot ): array {
+		$flow_config = is_array( $snapshot['flow_config'] ?? null ) ? $snapshot['flow_config'] : array();
+
+		foreach ( $flow_config as $flow_step_id => $flow_step_config ) {
+			if ( ! is_array( $flow_step_config ) ) {
+				continue;
+			}
+
+			foreach ( self::FLOW_RUNTIME_QUEUE_KEYS as $queue_key ) {
+				unset( $flow_step_config[ $queue_key ] );
+			}
+			$flow_config[ $flow_step_id ] = $flow_step_config;
+		}
+
+		$snapshot['flow_config'] = $flow_config;
+		return $snapshot;
 	}
 
 	/**

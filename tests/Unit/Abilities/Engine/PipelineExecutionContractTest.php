@@ -237,6 +237,12 @@ class PipelineExecutionContractTest extends WP_UnitTestCase
         $this->assertArrayHasKey('flow_ai', $engine_data['flow_config']);
         $this->assertArrayHasKey('flow_publish', $engine_data['flow_config']);
         $this->assertArrayHasKey('pipeline_ai', $engine_data['pipeline_config']);
+		$this->assertArrayNotHasKey('prompt_queue', $engine_data['flow_config']['flow_ai']);
+		$this->assertSame('static', $engine_data['flow_config']['flow_ai']['queue_mode'] ?? '');
+		$this->assertSame(
+			array('fake_fetch' => array('source' => 'contract-test')),
+			$engine_data['flow_config']['flow_fetch']['handler_configs'] ?? array()
+		);
 
         $executor     = new ExecuteStepAbility();
         $fetch_result = $executor->execute(

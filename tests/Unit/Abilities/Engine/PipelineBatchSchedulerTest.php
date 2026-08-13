@@ -174,6 +174,60 @@ class PipelineBatchSchedulerTest extends WP_UnitTestCase {
 		$this->assertFalse( get_transient( 'datamachine_pipeline_batch_' . $parent_id ) );
 	}
 
+	public function test_realistic_batch_keeps_parent_engine_data_bounded(): void {
+		$parent_id = $this->create_parent_job();
+		$engine    = $this->make_engine_snapshot( $parent_id );
+		$packets   = array();
+		for ( $index = 0; $index < 175; $index++ ) {
+			$packet                 = $this->make_data_packet( 'Event ' . $index );
+			$packet['data']['body'] = str_repeat( 'x', 32768 );
+			$packets[]              = $packet;
+		}
+
+		$result = ( new PipelineBatchScheduler() )->fanOut( $parent_id, 'step_abc_123', $packets, $engine );
+
+		$this->assertSame( 175, $result['total'] );
+		$this->assertLessThan( 32768, strlen( (string) wp_json_encode( datamachine_get_engine_data( $parent_id ) ) ) );
+		global $wpdb;
+		$this->assertSame( 175, (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i WHERE batch_job_id = %d', $wpdb->prefix . 'datamachine_batch_items', $parent_id ) ) );
+	}
+
+	public function test_finalize_removes_batch_state_from_historical_large_parent_without_retry(): void {
+		global $wpdb;
+		$parent_id = $this->create_parent_job();
+		$engine    = $this->make_engine_snapshot( $parent_id );
+		$engine['historical_payload']    = str_repeat( 'x', 1024 * 1024 );
+		$engine['unrelated_key']         = array( 'preserved' => true );
+		$engine['batch_storage_version'] = 2;
+		$engine['batch_context']         = PipelineBatchScheduler::BATCH_CONTEXT;
+		$engine['batch_hook']            = PipelineBatchScheduler::BATCH_HOOK;
+		$engine['batch_state']           = array(
+			'hook'              => PipelineBatchScheduler::BATCH_HOOK,
+			'offset'            => 175,
+			'worklist_complete' => true,
+		);
+		$wpdb->update(
+			$this->jobs_db->get_table_name(),
+			array( 'engine_data' => wp_json_encode( $engine ) ),
+			array( 'job_id' => $parent_id ),
+			array( '%s' ),
+			array( '%d' )
+		);
+		wp_cache_delete( $parent_id, 'datamachine_engine_data' );
+		$this->assertTrue( $this->jobs_db->complete_job( $parent_id, JobStatus::COMPLETED ) );
+
+		$before = (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$wpdb->prefix}actionscheduler_actions WHERE hook = %s AND args = %s AND status = 'pending'", PipelineBatchScheduler::BATCH_HOOK, wp_json_encode( array( 'parent_job_id' => $parent_id, 'offset' => 175 ) ) ) );
+		$this->assertTrue( BatchScheduler::finalize( $parent_id ) );
+		$after = (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$wpdb->prefix}actionscheduler_actions WHERE hook = %s AND args = %s AND status = 'pending'", PipelineBatchScheduler::BATCH_HOOK, wp_json_encode( array( 'parent_job_id' => $parent_id, 'offset' => 175 ) ) ) );
+
+		$final = datamachine_get_engine_data( $parent_id );
+		$this->assertArrayNotHasKey( 'batch_state', $final );
+		$this->assertSame( array( 'preserved' => true ), $final['unrelated_key'] );
+		$this->assertSame( 1024 * 1024, strlen( $final['historical_payload'] ) );
+		$this->assertSame( $before, $after );
+		$this->assertSame( JobStatus::COMPLETED, $this->jobs_db->get_job( $parent_id )['status'] );
+	}
+
 	public function test_exact_retry_rejects_changed_batch_consumer_contract(): void {
 		$parent_id = $this->create_parent_job();
 		$items     = array( $this->make_data_packet( 'Event A' ) );

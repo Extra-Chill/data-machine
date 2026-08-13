@@ -31,6 +31,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 class Jobs extends BaseRepository {
+	private ?int $engine_data_query_budget = null;
 
 	const TABLE_NAME = 'datamachine_jobs';
 
@@ -1889,8 +1890,19 @@ class Jobs extends BaseRepository {
 			return false;
 		}
 
-		$encoded          = wp_json_encode( $data );
-		$storage_envelope = $this->engine_data_storage_envelope( $data, is_string( $encoded ) ? $encoded : '' );
+		$encoded = wp_json_encode( $data );
+		if ( ! is_string( $encoded ) ) {
+			$this->log_engine_data_write_rejection( $job_id, 'json_encode_failed', '', null, $data );
+			return false;
+		}
+
+		$estimated_query_bytes = $this->estimate_engine_data_query_bytes( strlen( $encoded ) );
+		if ( $estimated_query_bytes > $this->engine_data_query_budget() ) {
+			$this->log_engine_data_write_rejection( $job_id, 'engine_data_query_oversize', $encoded, null, $data );
+			return false;
+		}
+
+		$storage_envelope = $this->engine_data_storage_envelope( $data, $encoded );
 		$update_data      = $storage_envelope['data'];
 		$format           = $storage_envelope['format'];
 
@@ -1952,10 +1964,22 @@ class Jobs extends BaseRepository {
 		$expected_encoded = wp_json_encode( $expected_data );
 		$new_encoded      = wp_json_encode( $new_data );
 		if ( ! is_string( $expected_encoded ) || ! is_string( $new_encoded ) ) {
+			$this->log_engine_data_write_rejection( $job_id, 'json_encode_failed', is_string( $new_encoded ) ? $new_encoded : '', is_string( $expected_encoded ) ? $expected_encoded : null, $new_data );
 			return array(
 				'updated'  => false,
 				'conflict' => false,
 				'error'    => 'json_encode_failed',
+			);
+		}
+
+		$estimated_query_bytes = $this->estimate_engine_data_query_bytes( strlen( $new_encoded ), strlen( $expected_encoded ) );
+		if ( $estimated_query_bytes > $this->engine_data_query_budget() ) {
+			$this->log_engine_data_write_rejection( $job_id, 'engine_data_query_oversize', $new_encoded, $expected_encoded, $new_data );
+			return array(
+				'updated'   => false,
+				'conflict'  => false,
+				'retryable' => false,
+				'error'     => 'engine_data_query_oversize',
 			);
 		}
 
@@ -2036,6 +2060,109 @@ class Jobs extends BaseRepository {
 			'updated'  => true,
 			'conflict' => false,
 			'error'    => null,
+		);
+	}
+
+	/**
+	 * Remove one top-level key without binding the complete engine_data value.
+	 *
+	 * @return array{updated:bool,retryable:bool,error:string|null}
+	 */
+	public function remove_engine_data_key( int $job_id, string $key ): array {
+		if ( $job_id <= 0 || ! in_array( $key, array( 'batch_state' ), true ) ) {
+			return array(
+				'updated'   => false,
+				'retryable' => false,
+				'error'     => 'invalid_engine_data_key_removal',
+			);
+		}
+
+		$json_path = '$."' . $key . '"';
+		// Atomic JSON mutation avoids binding a potentially oversized snapshot.
+		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared -- The nested prepare binds the plugin table identifier and every scalar value.
+		// phpcs:disable WordPress.DB.PreparedSQL -- The nested prepare binds the plugin table identifier and every scalar value.
+		$result = $this->wpdb->query(
+			$this->wpdb->prepare(
+				'UPDATE %i SET engine_data = JSON_REMOVE(engine_data, %s) WHERE job_id = %d AND JSON_CONTAINS_PATH(engine_data, %s, %s)',
+				$this->table_name,
+				$json_path,
+				$job_id,
+				'one',
+				$json_path
+			)
+		);
+		// phpcs:enable WordPress.DB.PreparedSQL
+		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
+
+		if ( false === $result ) {
+			$db_error  = (string) $this->wpdb->last_error;
+			$retryable = $this->is_retryable_db_error( $db_error );
+			do_action(
+				'datamachine_log',
+				$retryable ? 'warning' : 'error',
+				'Failed to remove engine_data key',
+				array(
+					'job_id'    => $job_id,
+					'key'       => $key,
+					'db_error'  => substr( $db_error, 0, 512 ),
+					'retryable' => $retryable,
+				)
+			);
+			return array(
+				'updated'   => false,
+				'retryable' => $retryable,
+				'error'     => $retryable ? 'deadlock' : 'db_error',
+			);
+		}
+
+		wp_cache_delete( $job_id, 'datamachine_engine_data' );
+		return array(
+			'updated'   => true,
+			'retryable' => false,
+			'error'     => null,
+		);
+	}
+
+	/** Conservatively estimate prepared SQL bytes after string escaping. */
+	private function estimate_engine_data_query_bytes( int $new_bytes, int $expected_bytes = 0 ): int {
+		return 4096 + ( 2 * ( $new_bytes + $expected_bytes ) );
+	}
+
+	/** Keep engine_data statements below the current connection packet limit. */
+	private function engine_data_query_budget(): int {
+		if ( null !== $this->engine_data_query_budget ) {
+			return $this->engine_data_query_budget;
+		}
+
+		$max_allowed_packet             = (int) $this->wpdb->get_var( 'SELECT @@SESSION.max_allowed_packet' );
+		$budget                         = (int) floor( $max_allowed_packet * 0.8 );
+		$this->engine_data_query_budget = max( 0, (int) apply_filters( 'datamachine_engine_data_query_budget', $budget, $max_allowed_packet ) );
+		return $this->engine_data_query_budget;
+	}
+
+	/** Log bounded write diagnostics without exposing engine payload content. */
+	private function log_engine_data_write_rejection( int $job_id, string $error, string $new_encoded, ?string $expected_encoded, array $new_data ): void {
+		$key_sizes = array();
+		foreach ( $new_data as $key => $value ) {
+			$encoded_value              = wp_json_encode( $value );
+			$key_sizes[ (string) $key ] = is_string( $encoded_value ) ? strlen( $encoded_value ) : -1;
+		}
+		arsort( $key_sizes, SORT_NUMERIC );
+		$key_sizes = array_slice( $key_sizes, 0, 10, true );
+
+		$expected_bytes = null === $expected_encoded ? 0 : strlen( $expected_encoded );
+		do_action(
+			'datamachine_log',
+			'error',
+			'Rejected engine_data write before database query',
+			array(
+				'job_id'                => $job_id,
+				'error'                 => $error,
+				'expected_bytes'        => $expected_bytes,
+				'new_bytes'             => strlen( $new_encoded ),
+				'estimated_query_bytes' => $this->estimate_engine_data_query_bytes( strlen( $new_encoded ), $expected_bytes ),
+				'top_level_key_bytes'   => $key_sizes,
+			)
 		);
 	}
 

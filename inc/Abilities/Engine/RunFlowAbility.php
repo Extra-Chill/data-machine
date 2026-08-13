@@ -320,6 +320,7 @@ class RunFlowAbility {
 		if ( is_array( $filtered_snapshot ) ) {
 			$engine_snapshot = $filtered_snapshot;
 		}
+		$engine_snapshot = \DataMachine\Core\EngineData::stripFlowRuntimeQueuePayloads( $engine_snapshot );
 
 		datamachine_set_engine_data( $job_id, $engine_snapshot );
 
