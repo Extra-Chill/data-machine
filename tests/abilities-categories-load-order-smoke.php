@@ -6,11 +6,9 @@
  *
  * Two kinds of assertions:
  *
- * 1. Source-string assertions — `data-machine.php` must call
- *    `AbilityCategories::ensure_registered()` UNCONDITIONALLY at file
- *    include time, NOT only inside the gated runtime function. Categories
- *    are a contract depended on by every extension plugin and must be
- *    available on every request that touches the abilities API.
+ * 1. Provider composition assertions — `data-machine.php` must invoke the
+ *    lightweight provider unconditionally, and both provider paths must
+ *    ensure categories are registered before abilities.
  *
  * 2. Behavioral assertions — `AbilityCategories::ensure_registered()` must
  *    use the public lifecycle-safe registration path:
@@ -45,33 +43,31 @@ $assert = static function ( string $name, bool $condition ) use ( &$failed, &$to
 
 $plugin_root = dirname( __DIR__ );
 $bootstrap   = file_get_contents( $plugin_root . '/data-machine.php' );
+$provider    = file_get_contents( $plugin_root . '/inc/Core/Bootstrap/AbilityServiceProvider.php' );
 $categories  = file_get_contents( $plugin_root . '/inc/Abilities/AbilityCategories.php' );
 
-if ( false === $bootstrap || false === $categories ) {
+if ( false === $bootstrap || false === $provider || false === $categories ) {
 	fwrite( fopen( 'php://stderr', 'w' ), "FAIL: unable to read plugin source\n" );
 	exit( 1 );
 }
 
 $assert(
-	'data-machine.php calls ensure_registered() unconditionally at file load',
-	str_contains( $bootstrap, 'Register ability categories unconditionally on every request' )
-		&& str_contains( $bootstrap, "require_once __DIR__ . '/inc/Abilities/AbilityCategories.php';\n\\DataMachine\\Abilities\\AbilityCategories::ensure_registered();" )
+	'data-machine.php invokes lightweight ability composition unconditionally',
+	str_contains( $bootstrap, '\DataMachine\Core\Bootstrap\AbilityServiceProvider::register_lightweight();' )
 );
 
 $assert(
-	'unconditional call site is OUTSIDE datamachine_run_datamachine_plugin()',
+	'lightweight provider call is outside datamachine_run_datamachine_plugin()',
 	(bool) preg_match(
-		'/^}\s*\/\*\*\s*\*\s*Register ability categories unconditionally on every request\./m',
+		'/^}\s*\/\*\*.*?AbilityServiceProvider::register_lightweight\(\);/ms',
 		$bootstrap
 	)
 );
 
 $assert(
-	'in-runtime call is still present (defensive idempotent path)',
-	substr_count(
-		$bootstrap,
-		'DataMachine\\Abilities\\AbilityCategories::ensure_registered()'
-	) >= 2
+	'both provider paths ensure categories before ability registration',
+	2 === substr_count( $provider, 'AbilityCategories::ensure_registered();' )
+		&& strpos( $provider, 'AbilityCategories::ensure_registered();' ) < strpos( $provider, 'AbilityManifest::register(' )
 );
 
 // ============================================================
@@ -281,6 +277,26 @@ $prior = $state->registered;
 $assert(
 	'idempotent: second ensure_registered() call is a no-op (static guard)',
 	$state->registered === $prior
+);
+
+// --- Provider composition: the lightweight path attaches category and ability hooks.
+$reset();
+require_once $plugin_root . '/inc/Abilities/AbilityRegistration.php';
+if ( ! class_exists( 'DataMachine\\Abilities\\PermissionHelper' ) ) {
+	eval(
+		'namespace DataMachine\Abilities;
+		class PermissionHelper {
+			public static function can_manage(): bool { return true; }
+		}'
+	);
+}
+require_once $plugin_root . '/inc/Core/Bootstrap/AbilityServiceProvider.php';
+\DataMachine\Core\Bootstrap\AbilityServiceProvider::register_lightweight();
+$ability_hooks = count( $state->hooked['wp_abilities_api_init'] ?? array() );
+$assert(
+	'lightweight provider composes categories before lightweight abilities',
+	1 === count( $state->hooked['wp_abilities_api_categories_init'] ?? array() )
+		&& $ability_hooks >= 4
 );
 
 if ( $failed > 0 ) {
