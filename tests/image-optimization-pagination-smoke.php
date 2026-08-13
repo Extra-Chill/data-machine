@@ -17,6 +17,36 @@ $GLOBALS['__image_optimization_files']       = array();
 $GLOBALS['__image_optimization_queries']     = array();
 $GLOBALS['__image_optimization_failures']    = 0;
 
+function image_optimization_assert( bool $condition, string $message ): void {
+	if ( $condition ) {
+		echo "  PASS: {$message}\n";
+		return;
+	}
+
+	echo "  FAIL: {$message}\n";
+	++$GLOBALS['__image_optimization_failures'];
+}
+
+function image_optimization_fixture( array $sizes ): void {
+	$GLOBALS['__image_optimization_attachments'] = array_keys( $sizes );
+	$GLOBALS['__image_optimization_files']       = array();
+	$GLOBALS['__image_optimization_queries']     = array();
+
+	foreach ( $sizes as $attachment_id => $size ) {
+		$file = tempnam( sys_get_temp_dir(), 'dm-image-scan-' );
+		file_put_contents( $file, str_repeat( 'x', $size ) );
+		$GLOBALS['__image_optimization_files'][ $attachment_id ] = $file;
+	}
+}
+
+function image_optimization_cleanup(): void {
+	foreach ( $GLOBALS['__image_optimization_files'] as $file ) {
+		unlink( $file );
+	}
+}
+}
+
+namespace DataMachine\Abilities\Media {
 function absint( $value ): int {
 	return abs( (int) $value );
 }
@@ -45,34 +75,6 @@ function get_post_mime_type( int $attachment_id ): string {
 
 function size_format( int $bytes ): string {
 	return $bytes . ' B';
-}
-
-function image_optimization_assert( bool $condition, string $message ): void {
-	if ( $condition ) {
-		echo "  PASS: {$message}\n";
-		return;
-	}
-
-	echo "  FAIL: {$message}\n";
-	++$GLOBALS['__image_optimization_failures'];
-}
-
-function image_optimization_fixture( array $sizes ): void {
-	$GLOBALS['__image_optimization_attachments'] = array_keys( $sizes );
-	$GLOBALS['__image_optimization_files']       = array();
-	$GLOBALS['__image_optimization_queries']     = array();
-
-	foreach ( $sizes as $attachment_id => $size ) {
-		$file = tempnam( sys_get_temp_dir(), 'dm-image-scan-' );
-		file_put_contents( $file, str_repeat( 'x', $size ) );
-		$GLOBALS['__image_optimization_files'][ $attachment_id ] = $file;
-	}
-}
-
-function image_optimization_cleanup(): void {
-	foreach ( $GLOBALS['__image_optimization_files'] as $file ) {
-		unlink( $file );
-	}
 }
 }
 

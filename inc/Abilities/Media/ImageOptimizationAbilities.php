@@ -287,8 +287,9 @@ class ImageOptimizationAbilities {
 		} else {
 			$offset        = 0;
 			$scan_complete = false;
+			$eligible_count = 0;
 
-			while ( count( $attachment_ids ) < $limit ) {
+			while ( $eligible_count < $limit ) {
 				$page = get_posts(
 					array(
 						'post_type'      => 'attachment',
@@ -318,7 +319,8 @@ class ImageOptimizationAbilities {
 					$file_size = filesize( $file_path );
 					if ( $file_size > $size_threshold ) {
 						$attachment_ids[] = $id;
-						if ( count( $attachment_ids ) >= $limit ) {
+						++$eligible_count;
+						if ( $eligible_count >= $limit ) {
 							break;
 						}
 					}
