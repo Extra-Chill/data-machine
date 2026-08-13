@@ -87,7 +87,6 @@ class GetPipelinesAbility {
 							'per_page'    => array( 'type' => 'integer' ),
 							'offset'      => array( 'type' => 'integer' ),
 							'output_mode' => array( 'type' => 'string' ),
-							'error'       => array( 'type' => 'string' ),
 						),
 					),
 					'execute_callback'    => array( $this, 'execute' ),
@@ -104,9 +103,9 @@ class GetPipelinesAbility {
 	 * Execute get pipelines ability.
 	 *
 	 * @param array $input Input parameters.
-	 * @return array Result with pipelines data.
+	 * @return array|\WP_Error Result with pipelines data or a query failure.
 	 */
-	public function execute( array $input ): array {
+	public function execute( array $input ): array|\WP_Error {
 		try {
 			$pipeline_id   = $input['pipeline_id'] ?? null;
 			$user_id       = isset( $input['user_id'] ) ? (int) $input['user_id'] : null;
@@ -130,10 +129,7 @@ class GetPipelinesAbility {
 			// opt out with include_flows=false.
 			if ( null !== $pipeline_id ) {
 				if ( ! is_numeric( $pipeline_id ) || (int) $pipeline_id <= 0 ) {
-					return array(
-						'success' => false,
-						'error'   => 'pipeline_id must be a positive integer',
-					);
+					return new \WP_Error( 'pipeline_not_found', 'pipeline_id must be a positive integer', array( 'status' => 404 ) );
 				}
 
 				$pipeline = $this->db_pipelines->get_pipeline( (int) $pipeline_id );
@@ -187,10 +183,9 @@ class GetPipelinesAbility {
 				'output_mode' => $output_mode,
 			);
 		} catch ( \Exception $e ) {
-			return array(
-				'success' => false,
-				'error'   => $e->getMessage(),
-			);
+			return isset( $input['pipeline_id'] )
+				? new \WP_Error( 'pipeline_not_found', $e->getMessage(), array( 'status' => 404 ) )
+				: new \WP_Error( 'get_pipelines_failed', $e->getMessage(), array( 'status' => 500 ) );
 		}
 	}
 }

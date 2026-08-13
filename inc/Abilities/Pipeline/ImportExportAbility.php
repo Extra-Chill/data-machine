@@ -101,7 +101,6 @@ class ImportExportAbility {
 						'success' => array( 'type' => 'boolean' ),
 						'data'    => array( 'type' => 'string' ),
 						'count'   => array( 'type' => 'integer' ),
-						'error'   => array( 'type' => 'string' ),
 					),
 				),
 				'execute_callback'    => array( $this, 'executeExport' ),
@@ -151,9 +150,9 @@ class ImportExportAbility {
 	 * Execute export pipelines ability.
 	 *
 	 * @param array $input Input parameters with optional pipeline_ids.
-	 * @return array Result with CSV data.
+	 * @return array|\WP_Error Result with CSV data or an export failure.
 	 */
-	public function executeExport( array $input ): array {
+	public function executeExport( array $input ): array|\WP_Error {
 		$pipeline_ids = $input['pipeline_ids'] ?? array();
 
 		if ( empty( $pipeline_ids ) ) {
@@ -173,10 +172,7 @@ class ImportExportAbility {
 		$csv_content   = $import_export->handle_export( 'pipelines', $pipeline_ids );
 
 		if ( false === $csv_content ) {
-			return array(
-				'success' => false,
-				'error'   => 'Export failed',
-			);
+			return new \WP_Error( 'export_failed', 'Export failed', array( 'status' => 500 ) );
 		}
 
 		return array(
