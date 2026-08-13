@@ -97,6 +97,7 @@ function legacy_workflow_step_config_for_test( array $step, int $index ): array 
 		'queue_mode'       => 'static',
 		'agent_modes'      => array(),
 		'disabled_tools'   => $step['disabled_tools'] ?? array(),
+		'tool_recorders'   => array(),
 		'pipeline_id'      => 'direct',
 		'flow_id'          => 'direct',
 	);
