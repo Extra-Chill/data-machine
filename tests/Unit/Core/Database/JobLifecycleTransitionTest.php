@@ -160,8 +160,10 @@ class JobLifecycleTransitionTest extends WP_UnitTestCase {
 
 	public function test_recovery_rejects_invalid_exact_job_scope(): void {
 		$result = ( new RecoverStuckJobsAbility() )->execute( array( 'job_id' => '1.5' ) );
-		$this->assertFalse( $result['success'] );
-		$this->assertSame( 'job_id must be a positive integer.', $result['error'] );
+		$this->assertWPError( $result );
+		$this->assertSame( 'get_jobs_failed', $result->get_error_code() );
+		$this->assertSame( 'job_id must be a positive integer.', $result->get_error_message() );
+		$this->assertSame( 500, $result->get_error_data()['status'] );
 	}
 
 	public function test_touch_limit_stops_before_partial_pathless_claim(): void {
