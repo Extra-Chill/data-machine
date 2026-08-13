@@ -193,7 +193,7 @@ namespace {
 	$assert( 'post-action constructor registers import-agent via the registry', in_array( 'datamachine/import-agent', $post_registered, true ) );
 	$assert( 'post-action constructor does not defer to an already-fired action', array() === $GLOBALS['datamachine_test_state']->added_actions );
 
-	$plugin_source   = file_get_contents( dirname( __DIR__ ) . '/data-machine.php' ) ?: '';
+	$plugin_source   = file_get_contents( dirname( __DIR__ ) . '/inc/Core/Bootstrap/AbilityServiceProvider.php' ) ?: '';
 	$provider_offset = strpos( $plugin_source, 'new \\DataMachine\\Engine\\AI\\System\\SystemAgentServiceProvider();' );
 	$agent_offset    = strpos( $plugin_source, 'new \\DataMachine\\Abilities\\AgentAbilities();' );
 	$upsert_offset   = strpos( $plugin_source, 'new \\DataMachine\\Abilities\\Content\\UpsertPostAbility();' );

@@ -170,20 +170,21 @@ namespace {
 
 	$plugin_root = dirname( __DIR__ );
 	$plugin_file = file_get_contents( $plugin_root . '/data-machine.php' );
+	$provider_file = file_get_contents( $plugin_root . '/inc/Core/Bootstrap/AbilityServiceProvider.php' );
 	$helper_file = file_get_contents( $plugin_root . '/inc/Abilities/AbilityRegistration.php' );
 
-	if ( false === $plugin_file || false === $helper_file ) {
+	if ( false === $plugin_file || false === $provider_file || false === $helper_file ) {
 		datamachine_smoke_write_error( "FAIL: source files are not readable\n" );
 		exit( 1 );
 	}
 
-	$assert( 'entrypoint declares lightweight ability manifest', str_contains( $plugin_file, 'function datamachine_lightweight_ability_manifest(): array' ) );
-	$assert( 'manifest registrar is used by entrypoint', str_contains( $plugin_file, 'AbilityManifest::register( datamachine_lightweight_ability_manifest() )' ) );
-	$assert( 'agent ability declared lightweight', str_contains( $plugin_file, '\\DataMachine\\Abilities\\AgentAbilities::class' ) );
-	$assert( 'image-template ability declared lightweight', str_contains( $plugin_file, '\\DataMachine\\Abilities\\Media\\ImageTemplateAbilities::class' ) );
-	$assert( 'send-email ability declared lightweight', str_contains( $plugin_file, '\\DataMachine\\Abilities\\Publish\\SendEmailAbility::class' ) );
-	$assert( 'send-email-queued ability declared lightweight', str_contains( $plugin_file, '\\DataMachine\\Abilities\\Publish\\SendEmailQueuedAbility::class' ) );
-	$lightweight_section = substr( $plugin_file, strpos( $plugin_file, 'AbilityManifest::register' ) ?: 0 );
+	$assert( 'provider declares lightweight ability manifest', str_contains( $provider_file, 'function lightweight_ability_manifest(): array' ) );
+	$assert( 'manifest registrar is used by provider', str_contains( $provider_file, 'AbilityManifest::register( self::lightweight_ability_manifest() )' ) );
+	$assert( 'agent ability declared lightweight', str_contains( $provider_file, '\\DataMachine\\Abilities\\AgentAbilities::class' ) );
+	$assert( 'image-template ability declared lightweight', str_contains( $provider_file, '\\DataMachine\\Abilities\\Media\\ImageTemplateAbilities::class' ) );
+	$assert( 'send-email ability declared lightweight', str_contains( $provider_file, '\\DataMachine\\Abilities\\Publish\\SendEmailAbility::class' ) );
+	$assert( 'send-email-queued ability declared lightweight', str_contains( $provider_file, '\\DataMachine\\Abilities\\Publish\\SendEmailQueuedAbility::class' ) );
+	$lightweight_section = substr( $provider_file, strpos( $provider_file, 'private static function lightweight_ability_manifest' ) ?: 0 );
 	$assert( 'old agent ad-hoc registration removed from lightweight section', ! str_contains( $lightweight_section, 'new \\DataMachine\\Abilities\\AgentAbilities();' ) );
 	$assert( 'old image-template ad-hoc registration removed from lightweight section', ! str_contains( $lightweight_section, 'ImageTemplateAbilities::ensure_registered();' ) );
 	$assert( 'old send-email ad-hoc registration removed from lightweight section', ! str_contains( $lightweight_section, 'SendEmailAbility::ensure_registered();' ) );

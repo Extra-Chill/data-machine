@@ -6,7 +6,8 @@
  */
 
 $source = file_get_contents( dirname( __DIR__ ) . '/data-machine.php' );
-if ( false === $source ) {
+$provider = file_get_contents( dirname( __DIR__ ) . '/inc/Core/Bootstrap/RuntimeServiceProvider.php' );
+if ( false === $source || false === $provider ) {
 	fwrite( fopen( 'php://stderr', 'w' ), "FAIL: unable to read data-machine.php\n" );
 	exit( 1 );
 }
@@ -27,6 +28,6 @@ echo "=== Late Plugins Loaded Runtime Smoke ===\n";
 $assert( 'runtime boot checks plugins_loaded state', str_contains( $source, "did_action( 'plugins_loaded' )" ) );
 $assert( 'runtime boots immediately after late inclusion', str_contains( $source, "datamachine_run_datamachine_plugin();\n} else {" ) );
 $assert( 'runtime still hooks normal plugin load', str_contains( $source, "add_action( 'plugins_loaded', 'datamachine_run_datamachine_plugin', 20 );" ) );
-$assert( 'runtime boot is idempotent', str_contains( $source, 'static $runtime_loaded = false;' ) );
+$assert( 'runtime boot is idempotent', str_contains( $provider, 'static $runtime_loaded = false;' ) );
 
 echo "All {$assertions} late plugins_loaded runtime assertions passed.\n";

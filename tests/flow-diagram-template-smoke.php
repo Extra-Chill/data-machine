@@ -37,13 +37,15 @@ $plugin_root = dirname( __DIR__ );
 // -------------------------------------------------------------------------
 
 $bootstrap   = (string) file_get_contents( $plugin_root . '/inc/bootstrap.php' );
+$provider    = (string) file_get_contents( $plugin_root . '/inc/Core/Bootstrap/HostIntegrationServiceProvider.php' );
 $gd_source   = (string) file_get_contents( $plugin_root . '/inc/Abilities/Media/GDRenderer.php' );
 $tmpl_source = (string) file_get_contents( $plugin_root . '/inc/Abilities/Media/Templates/FlowDiagramTemplate.php' );
 
 $assert(
 	'bootstrap registers flow_diagram on the core template filter',
-	str_contains( $bootstrap, "'datamachine/image_generation/templates'" )
-		&& str_contains( $bootstrap, 'FlowDiagramTemplate::class' )
+	str_contains( $bootstrap, 'HostIntegrationServiceProvider::register()' )
+		&& str_contains( $provider, "'datamachine/image_generation/templates'" )
+		&& str_contains( $provider, 'FlowDiagramTemplate::class' )
 );
 
 $assert(

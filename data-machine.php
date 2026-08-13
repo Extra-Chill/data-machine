@@ -119,33 +119,13 @@ function datamachine_log_agents_api_load_warning(): void {
 require_once __DIR__ . '/vendor/autoload.php';
 $datamachine_agents_api_load_state = datamachine_load_bundled_agents_api();
 
-// WP-CLI integration
-// @phpstan-ignore-next-line Runtime constant may be defined false outside PHPStan's configured CLI context.
-if ( defined( 'WP_CLI' ) && (bool) constant( 'WP_CLI' ) ) {
-	require_once __DIR__ . '/inc/Cli/Bootstrap.php';
-}
+\DataMachine\Core\Bootstrap\CliServiceProvider::register();
 
 // Procedural includes and side-effect registrations (see inc/bootstrap.php).
 // Namespaced classes without file-level side effects rely on Composer PSR-4.
 require_once __DIR__ . '/inc/bootstrap.php';
 
-if ( ! class_exists( 'ActionScheduler' ) ) {
-	require_once __DIR__ . '/vendor/woocommerce/action-scheduler/action-scheduler.php';
-}
-
-\DataMachine\Core\ActionScheduler\LogPersistencePolicy::register();
-\DataMachine\Core\Database\CanonicalPersistencePolicy::register();
-\DataMachine\Engine\Tasks\RecurringScheduler::registerGenerationFence();
-
-add_action(
-	'action_scheduler_init',
-	array( \DataMachine\Core\ActionScheduler\GroupRegistrar::class, 'ensureDataMachineGroup' ),
-	0
-);
-
-if ( function_exists( 'wp_installing' ) && wp_installing() ) {
-	add_action( 'wp_loaded', 'datamachine_skip_action_scheduler_migration_during_install', 0 );
-}
+\DataMachine\Core\Bootstrap\AlwaysOnServiceProvider::register_scheduler();
 
 /**
  * Prevent AS migration scheduling during wp-phpunit install bootstrap.
@@ -153,136 +133,11 @@ if ( function_exists( 'wp_installing' ) && wp_installing() ) {
  * @return void
  */
 function datamachine_skip_action_scheduler_migration_during_install(): void {
-	if ( ! class_exists( '\Action_Scheduler\Migration\Controller' ) ) {
-		return;
-	}
-
-	remove_action( 'wp_loaded', array( \Action_Scheduler\Migration\Controller::instance(), 'schedule_migration' ) );
+	\DataMachine\Core\Bootstrap\AlwaysOnServiceProvider::skip_action_scheduler_migration_during_install();
 }
 
-
 function datamachine_run_datamachine_plugin() {
-	if ( ! datamachine_should_load_full_runtime() ) {
-		return;
-	}
-
-	static $runtime_loaded = false;
-	if ( $runtime_loaded ) {
-		return;
-	}
-	$runtime_loaded = true;
-
-	// Set Action Scheduler timeout to 10 minutes (600 seconds) for large tasks
-	add_filter(
-		'action_scheduler_timeout_period',
-		function () {
-			return 600;
-		}
-	);
-
-	// Initialize translation readiness tracking for lazy tool resolution
-	\DataMachine\Engine\AI\Tools\ToolManager::init();
-
-	// Cache invalidation hooks for dynamic registration
-	add_action(
-		'datamachine_handler_registered',
-		function () {
-			\DataMachine\Abilities\HandlerAbilities::clearCache();
-		}
-	);
-	add_action(
-		'datamachine_step_type_registered',
-		function () {
-			\DataMachine\Abilities\StepTypeAbilities::clearCache();
-		}
-	);
-
-	datamachine_register_utility_filters();
-	datamachine_register_admin_filters();
-	datamachine_register_oauth_system();
-	datamachine_register_core_actions();
-	datamachine_log_agents_api_load_warning();
-
-	// Load step types - they self-register via constructors
-	datamachine_load_step_types();
-
-	// Load and instantiate all handlers - they self-register via constructors
-	datamachine_load_handlers();
-	\DataMachine\Engine\Bundle\AuthRefHandlerConfig::register();
-	\DataMachine\Engine\Bundle\BundleSourceAuth::register();
-	\DataMachine\Core\Database\BundleArtifacts\InstalledBundleArtifacts::register();
-
-	// Initialize FetchHandler to register skip_item tool for all fetch-type handlers.
-	\DataMachine\Core\Steps\Fetch\Handlers\FetchHandler::init();
-
-	// Register all tools - must happen AFTER step types and handlers are registered.
-	\DataMachine\Engine\AI\Tools\ToolServiceProvider::register();
-
-	\DataMachine\Api\Execute::register();
-	\DataMachine\Api\WebhookTrigger::register();
-	\DataMachine\Api\Pipelines\Pipelines::register();
-	\DataMachine\Api\Pipelines\PipelineSteps::register();
-	\DataMachine\Api\Pipelines\PipelineFlows::register();
-	\DataMachine\Api\Flows\Flows::register();
-	\DataMachine\Api\Flows\FlowSteps::register();
-	\DataMachine\Api\Flows\FlowQueue::register();
-	\DataMachine\Api\AgentPing::register();
-	\DataMachine\Api\AgentFiles::register();
-	\DataMachine\Api\FlowFiles::register();
-	\DataMachine\Api\Users::register();
-	\DataMachine\Api\Agents::register();
-	\DataMachine\Api\Logs::register();
-	\DataMachine\Api\ProcessedItems::register();
-	\DataMachine\Api\Jobs::register();
-	\DataMachine\Api\Settings::register();
-	\DataMachine\Api\Auth::register();
-	\DataMachine\Api\Chat\Chat::register();
-	\DataMachine\Api\System\System::register();
-	\DataMachine\Api\Handlers::register();
-	\DataMachine\Api\StepTypes::register();
-	\DataMachine\Api\Tools::register();
-	\DataMachine\Api\Providers::register();
-	\DataMachine\Api\Analytics::register();
-	\DataMachine\Api\InternalLinks::register();
-	\DataMachine\Api\Email::register();
-
-	// Agent runtime authentication middleware.
-	new \DataMachine\Core\Auth\AgentAuthMiddleware();
-
-	// Agent browser-based authorization flow.
-	new \DataMachine\Core\Auth\AgentAuthorize();
-
-	// Agent auth callback handler (receives tokens from external DM instances).
-	new \DataMachine\Core\Auth\AgentAuthCallback();
-
-	// External human-login callback routing (separate from credential auth).
-	\DataMachine\Core\Auth\ExternalLoginRouter::register();
-
-	\DataMachine\Core\Bootstrap\AbilityServiceProvider::register_full_runtime();
-
-	// Deferred scaffold: during plugin activation the Abilities API is unavailable
-	// because init fires before the plugin file is included. A transient signals that
-	// the scaffold needs to run on the first normal request where abilities are ready.
-	// @phpstan-ignore-next-line WordPress stubs in CI omit the optional priority argument.
-	add_action(
-		'init',
-		function () {
-			if ( get_transient( 'datamachine_needs_scaffold' ) ) {
-				delete_transient( 'datamachine_needs_scaffold' );
-				datamachine_ensure_default_memory_files();
-			}
-		},
-		20 // After ability registration (priority 10).
-	);
-
-	// Clean up identity index rows when posts are permanently deleted.
-	add_action(
-		'before_delete_post',
-		function ( $post_id ) {
-			$index = new \DataMachine\Core\Database\PostIdentityIndex\PostIdentityIndex();
-			$index->delete( (int) $post_id );
-		}
-	);
+	\DataMachine\Core\Bootstrap\RuntimeServiceProvider::register();
 }
 
 /**
@@ -330,33 +185,17 @@ function datamachine_should_load_full_runtime(): bool {
 }
 
 
-// Plugin activation hook to initialize default settings
-register_activation_hook( __FILE__, 'datamachine_activate_plugin_defaults' );
+\DataMachine\Core\Bootstrap\ActivationServiceProvider::register_defaults_hook( __FILE__ );
+
 function datamachine_activate_plugin_defaults( $network_wide = false ) {
-	if ( is_multisite() && $network_wide ) {
-		datamachine_for_each_site( 'datamachine_activate_defaults_for_site' );
-	} else {
-		datamachine_activate_defaults_for_site();
-	}
+	\DataMachine\Core\Bootstrap\ActivationServiceProvider::activate_defaults( (bool) $network_wide );
 }
 
 /**
  * Set default settings for a single site.
  */
 function datamachine_activate_defaults_for_site() {
-	$default_settings = array(
-		'disabled_tools'              => array(), // Opt-out pattern: empty = all tools enabled
-		'enabled_pages'               => array(
-			'pipelines' => true,
-			'jobs'      => true,
-			'logs'      => true,
-			'settings'  => true,
-		),
-		'site_context_enabled'        => true,
-		'cleanup_job_data_on_failure' => true,
-	);
-
-	add_option( 'datamachine_settings', $default_settings );
+	\DataMachine\Core\Bootstrap\ActivationServiceProvider::activate_defaults_for_site();
 }
 
 if ( did_action( 'plugins_loaded' ) ) {
@@ -399,12 +238,7 @@ if ( did_action( 'plugins_loaded' ) ) {
  * Uses StepTypeRegistrationTrait for standardized registration.
  */
 function datamachine_load_step_types() {
-	new \DataMachine\Core\Steps\Fetch\FetchStep();
-	new \DataMachine\Core\Steps\Publish\PublishStep();
-	new \DataMachine\Core\Steps\Upsert\UpsertStep();
-	new \DataMachine\Core\Steps\AI\AIStep();
-	new \DataMachine\Core\Steps\WebhookGate\WebhookGateStep();
-	new \DataMachine\Core\Steps\SystemTask\SystemTaskStep();
+	\DataMachine\Core\Bootstrap\RuntimeServiceProvider::register_step_types();
 }
 
 /**
@@ -412,34 +246,15 @@ function datamachine_load_step_types() {
  * Clean, explicit approach using composer PSR-4 autoloading.
  */
 function datamachine_load_handlers() {
-	// Publish Handlers (core only - social handlers moved to data-machine-socials plugin)
-	new \DataMachine\Core\Steps\Publish\Handlers\WordPress\WordPress();
-	new \DataMachine\Core\Steps\Publish\Handlers\Email\Email();
-	new \DataMachine\Core\Steps\Publish\Handlers\TypedArtifact\TypedArtifact();
-
-	// Fetch Handlers
-	new \DataMachine\Core\Steps\Fetch\Handlers\WordPress\WordPress();
-	new \DataMachine\Core\Steps\Fetch\Handlers\WordPressAPI\WordPressAPI();
-	new \DataMachine\Core\Steps\Fetch\Handlers\WordPressMedia\WordPressMedia();
-	new \DataMachine\Core\Steps\Fetch\Handlers\Rss\Rss();
-	new \DataMachine\Core\Steps\Fetch\Handlers\Email\Email();
-	new \DataMachine\Core\Steps\Fetch\Handlers\Files\Files();
-	new \DataMachine\Core\Steps\Fetch\Handlers\WebhookPayload\WebhookPayload();
-
-	// Upsert Handlers
-	new \DataMachine\Core\Steps\Upsert\Handlers\WordPress\WordPress();
+	\DataMachine\Core\Bootstrap\RuntimeServiceProvider::register_handlers();
 }
 
 function datamachine_allow_json_upload( $mimes ) {
-	$mimes['json'] = 'application/json';
-	return $mimes;
+	return \DataMachine\Core\Bootstrap\AlwaysOnServiceProvider::allow_json_upload( $mimes );
 }
-add_filter( 'upload_mimes', 'datamachine_allow_json_upload' );
 
-add_action( 'update_option_datamachine_settings', array( \DataMachine\Core\PluginSettings::class, 'clearCache' ) );
-
-register_activation_hook( __FILE__, 'datamachine_activate_plugin' );
-register_deactivation_hook( __FILE__, 'datamachine_deactivate_plugin' );
+\DataMachine\Core\Bootstrap\AlwaysOnServiceProvider::register_wordpress_hooks();
+\DataMachine\Core\Bootstrap\ActivationServiceProvider::register_lifecycle_hooks( __FILE__ );
 
 /**
  * Register Data Machine custom capabilities on roles.
@@ -448,50 +263,7 @@ register_deactivation_hook( __FILE__, 'datamachine_deactivate_plugin' );
  * @return void
  */
 function datamachine_register_capabilities(): void {
-	$capabilities = array(
-		'datamachine_manage_agents',
-		'datamachine_manage_flows',
-		'datamachine_manage_settings',
-		'datamachine_view_analytics',
-		'datamachine_chat',
-		'datamachine_use_tools',
-		'datamachine_view_logs',
-		'datamachine_create_own_agent',
-	);
-
-	$administrator = get_role( 'administrator' );
-	if ( $administrator ) {
-		foreach ( $capabilities as $capability ) {
-			$administrator->add_cap( $capability );
-		}
-	}
-
-	$editor = get_role( 'editor' );
-	if ( $editor ) {
-		$editor->add_cap( 'datamachine_chat' );
-		$editor->add_cap( 'datamachine_use_tools' );
-		$editor->add_cap( 'datamachine_view_logs' );
-		$editor->add_cap( 'datamachine_create_own_agent' );
-	}
-
-	$author = get_role( 'author' );
-	if ( $author ) {
-		$author->add_cap( 'datamachine_chat' );
-		$author->add_cap( 'datamachine_use_tools' );
-		$author->add_cap( 'datamachine_create_own_agent' );
-	}
-
-	$contributor = get_role( 'contributor' );
-	if ( $contributor ) {
-		$contributor->add_cap( 'datamachine_chat' );
-		$contributor->add_cap( 'datamachine_create_own_agent' );
-	}
-
-	$subscriber = get_role( 'subscriber' );
-	if ( $subscriber ) {
-		$subscriber->add_cap( 'datamachine_chat' );
-		$subscriber->add_cap( 'datamachine_create_own_agent' );
-	}
+	\DataMachine\Core\Bootstrap\ActivationServiceProvider::register_capabilities();
 }
 
 /**
@@ -501,45 +273,11 @@ function datamachine_register_capabilities(): void {
  * @return void
  */
 function datamachine_remove_capabilities(): void {
-	$capabilities = array(
-		'datamachine_manage_agents',
-		'datamachine_manage_flows',
-		'datamachine_manage_settings',
-		'datamachine_view_analytics',
-		'datamachine_chat',
-		'datamachine_use_tools',
-		'datamachine_view_logs',
-		'datamachine_create_own_agent',
-	);
-
-	$roles = array( 'administrator', 'editor', 'author', 'contributor', 'subscriber' );
-
-	foreach ( $roles as $role_name ) {
-		$role = get_role( $role_name );
-		if ( ! $role ) {
-			continue;
-		}
-
-		foreach ( $capabilities as $capability ) {
-			$role->remove_cap( $capability );
-		}
-	}
+	\DataMachine\Core\Bootstrap\ActivationServiceProvider::remove_capabilities();
 }
 
 function datamachine_deactivate_plugin() {
-	datamachine_remove_capabilities();
-
-	// Unschedule all recurring maintenance actions.
-	if ( function_exists( 'as_unschedule_all_actions' ) ) {
-		as_unschedule_all_actions( 'datamachine_cleanup_stale_claims', array(), 'datamachine-maintenance' );
-		as_unschedule_all_actions( 'datamachine_cleanup_failed_jobs', array(), 'datamachine-maintenance' );
-		as_unschedule_all_actions( 'datamachine_cleanup_completed_jobs', array(), 'datamachine-maintenance' );
-		as_unschedule_all_actions( 'datamachine_cleanup_logs', array(), 'datamachine-maintenance' );
-		as_unschedule_all_actions( 'datamachine_cleanup_processed_items', array(), 'datamachine-maintenance' );
-		as_unschedule_all_actions( 'datamachine_cleanup_as_actions', array(), 'datamachine-maintenance' );
-		as_unschedule_all_actions( 'datamachine_cleanup_old_files', array(), 'datamachine-files' );
-		as_unschedule_all_actions( 'datamachine_cleanup_chat_sessions', array(), 'datamachine-chat' );
-	}
+	\DataMachine\Core\Bootstrap\ActivationServiceProvider::deactivate();
 }
 
 /**
@@ -551,21 +289,7 @@ function datamachine_deactivate_plugin() {
  * @param bool $network_wide Whether the plugin is being network-activated.
  */
 function datamachine_activate_plugin( $network_wide = false ) {
-	// Agent tables are network-scoped — create once regardless of activation mode.
-	datamachine_create_network_agent_tables();
-
-	if ( is_multisite() && $network_wide ) {
-		datamachine_for_each_site( 'datamachine_activate_for_site' );
-
-		// Per-site activation created the network chat table (base_prefix, idempotent);
-		// now union any legacy per-site chat session tables into it. Idempotent and
-		// guarded by a network option, so re-activation never re-scans every subsite.
-		if ( function_exists( 'datamachine_migrate_chat_sessions_to_network' ) ) {
-			datamachine_migrate_chat_sessions_to_network();
-		}
-	} else {
-		datamachine_activate_for_site();
-	}
+	\DataMachine\Core\Bootstrap\ActivationServiceProvider::activate( (bool) $network_wide );
 }
 
 /**
@@ -578,11 +302,7 @@ function datamachine_activate_plugin( $network_wide = false ) {
  * Safe to call multiple times — dbDelta is idempotent.
  */
 function datamachine_create_network_agent_tables() {
-	\DataMachine\Core\Database\Agents\Agents::create_table();
-	\DataMachine\Core\Database\Agents\Agents::ensure_identity_scope_schema();
-	\DataMachine\Core\Database\Agents\Agents::ensure_site_scope_column();
-	\DataMachine\Core\Database\Agents\AgentAccess::create_table();
-	\DataMachine\Core\Database\Agents\AgentTokens::create_table();
+	\DataMachine\Core\Bootstrap\ActivationServiceProvider::create_network_agent_tables();
 }
 
 /**
@@ -593,32 +313,7 @@ function datamachine_create_network_agent_tables() {
  * new site creation.
  */
 function datamachine_activate_for_site() {
-	datamachine_register_capabilities();
-
-	// Ensure every Data Machine database table exists. dbDelta is idempotent.
-	datamachine_ensure_all_tables();
-
-	// Ensure default agent memory files exist.
-	// During activation the Abilities API is unavailable (init already fired before
-	// the plugin was included for activation inspection, so our init callback that
-	// registers abilities never ran). Set a transient so the scaffold runs on the
-	// first normal request where the full hook sequence fires in order.
-	if ( ! datamachine_ensure_default_memory_files() ) {
-		set_transient( 'datamachine_needs_scaffold', 1, HOUR_IN_SECONDS );
-	}
-
-	// Regenerate every composable memory file (SITE.md, NETWORK.md, AGENTS.md, …)
-	// from their registered sections.
-	// Activation-only — composable regeneration is heavy and shouldn't fire on
-	// every deploy.
-	\DataMachine\Engine\AI\ComposableFileGenerator::regenerate_all();
-
-	// Action Scheduler may not be initialized during activation. Mark this site
-	// for reconciliation on the next initialized scheduler request.
-	datamachine_mark_flow_schedule_reconciliation();
-
-	// Track DB schema version so deploy-time migrations auto-run.
-	update_option( 'datamachine_db_version', DATAMACHINE_VERSION, true );
+	\DataMachine\Core\Bootstrap\ActivationServiceProvider::activate_for_site();
 }
 
 /**
@@ -631,47 +326,7 @@ function datamachine_activate_for_site() {
  * @return void
  */
 function datamachine_ensure_all_tables() {
-	// Create logs table first — other table migrations log messages during creation.
-	\DataMachine\Core\Database\Logs\LogRepository::create_table();
-
-	// Agent tables are network-scoped (base_prefix) — ensure they exist.
-	// Safe to call per-site because dbDelta + base_prefix is idempotent.
-	datamachine_create_network_agent_tables();
-
-	$db_pipelines = new \DataMachine\Core\Database\Pipelines\Pipelines();
-	$db_pipelines->create_table();
-	$db_pipelines->migrate_columns();
-
-	$db_flows = new \DataMachine\Core\Database\Flows\Flows();
-	$db_flows->create_table();
-	$db_flows->migrate_columns();
-
-	$db_jobs = new \DataMachine\Core\Database\Jobs\Jobs();
-	$db_jobs->create_table();
-
-	$db_processed_items = new \DataMachine\Core\Database\ProcessedItems\ProcessedItems();
-	$db_processed_items->create_table();
-	\DataMachine\Core\Database\BatchItems\BatchItems::create_table();
-
-	$db_tracked_items = new \DataMachine\Core\Database\TrackedItems\TrackedItems();
-	$db_tracked_items->create_table();
-
-	$db_identity_index = new \DataMachine\Core\Database\PostIdentityIndex\PostIdentityIndex();
-	$db_identity_index->create_table();
-	\DataMachine\Core\Database\PostIdentityReservations\PostIdentityReservations::create_table();
-
-	\DataMachine\Core\Database\BundleArtifacts\InstalledBundleArtifacts::create_table();
-	\DataMachine\Core\Database\RunMetadata\RunMetadata::create_table();
-
-	\DataMachine\Core\Database\Chat\Chat::create_table();
-	\DataMachine\Core\Database\Chat\Chat::ensure_owner_columns();
-	\DataMachine\Core\Database\Chat\Chat::ensure_mode_column();
-	\DataMachine\Core\Database\Chat\Chat::ensure_workspace_columns();
-	\DataMachine\Core\Database\Chat\Chat::ensure_agent_id_column();
-	\DataMachine\Core\Database\Chat\Chat::ensure_last_read_at_column();
-	\DataMachine\Core\Database\Chat\Chat::ensure_transcript_lock_columns();
-
-	\DataMachine\Engine\AI\Actions\PendingActionStore::create_table();
+	\DataMachine\Core\Bootstrap\ActivationServiceProvider::ensure_all_tables();
 }
 
 /**
@@ -775,12 +430,7 @@ function datamachine_resolve_system_agent_context(): array {
  * @param callable $callback Function to call in each site context.
  */
 function datamachine_for_each_site( callable $callback ) {
-	$sites = get_sites( array( 'fields' => 'ids' ) );
-	foreach ( $sites as $blog_id ) {
-		switch_to_blog( $blog_id );
-		$callback();
-		restore_current_blog();
-	}
+	\DataMachine\Core\Bootstrap\ActivationServiceProvider::for_each_site( $callback );
 }
 
 /**
@@ -791,17 +441,10 @@ function datamachine_for_each_site( callable $callback ) {
  * @param WP_Site $new_site New site object.
  */
 function datamachine_on_new_site( \WP_Site $new_site ) {
-	if ( ! is_plugin_active_for_network( plugin_basename( __FILE__ ) ) ) {
-		return;
-	}
-
-	switch_to_blog( (int) $new_site->blog_id );
-	datamachine_activate_defaults_for_site();
-	datamachine_activate_for_site();
-	restore_current_blog();
+	\DataMachine\Core\Bootstrap\ActivationServiceProvider::on_new_site( $new_site );
 }
-// @phpstan-ignore-next-line WordPress stubs in CI omit the optional priority argument.
-add_action( 'wp_initialize_site', 'datamachine_on_new_site', 200 );
+
+\DataMachine\Core\Bootstrap\ActivationServiceProvider::register_new_site_hook();
 
 // Migrations, scaffolding, and activation helpers.
 require_once __DIR__ . '/inc/migrations/load.php';

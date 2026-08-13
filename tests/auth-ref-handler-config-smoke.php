@@ -217,7 +217,7 @@ $root            = dirname( __DIR__ );
 $fetch_step      = (string) file_get_contents( $root . '/inc/Core/Steps/Fetch/FetchStep.php' );
 $publish_handler = (string) file_get_contents( $root . '/inc/Core/Steps/Publish/Handlers/PublishHandler.php' );
 $upsert_handler  = (string) file_get_contents( $root . '/inc/Core/Steps/Upsert/Handlers/UpsertHandler.php' );
-$bootstrap       = (string) file_get_contents( $root . '/data-machine.php' );
+$bootstrap       = (string) file_get_contents( $root . '/inc/Core/Bootstrap/RuntimeServiceProvider.php' );
 
 $assert( 'fetch step resolves auth_ref before handler execution', str_contains( $fetch_step, 'AuthRefHandlerConfig::resolve_runtime_config' ) );
 $assert( 'publish handler resolves auth_ref before execution', str_contains( $publish_handler, 'AuthRefHandlerConfig::resolve_runtime_config' ) );

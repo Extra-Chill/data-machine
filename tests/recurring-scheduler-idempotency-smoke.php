@@ -647,7 +647,7 @@ datamachine_assert( 1 === datamachine_rs_pending_count( 'datamachine_stale_owner
 
 echo "\n[26] ScheduleFlowAbility has no direct Action Scheduler mutation path\n";
 $schedule_flow_source    = file_get_contents( __DIR__ . '/../inc/Abilities/Engine/ScheduleFlowAbility.php' ) ?: '';
-$plugin_source           = file_get_contents( __DIR__ . '/../data-machine.php' ) ?: '';
+$plugin_source           = file_get_contents( __DIR__ . '/../inc/Core/Bootstrap/AlwaysOnServiceProvider.php' ) ?: '';
 $flow_scheduling_source = file_get_contents( __DIR__ . '/../inc/Api/Flows/FlowScheduling.php' ) ?: '';
 datamachine_assert( ! str_contains( $schedule_flow_source, 'as_unschedule_all_actions' ), 'schedule-flow ability does not unschedule outside the primitive' );
 datamachine_assert( ! str_contains( $schedule_flow_source, 'as_schedule_single_action' ), 'schedule-flow ability does not create one-time actions outside the primitive' );
