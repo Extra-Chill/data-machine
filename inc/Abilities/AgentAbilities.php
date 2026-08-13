@@ -161,7 +161,7 @@ class AgentAbilities {
 						),
 					),
 					'execute_callback'    => array( self::class, 'exportAgent' ),
-					'permission_callback' => fn() => PermissionHelper::can_manage(),
+					'permission_callback' => fn() => PermissionHelper::can( 'manage_agents' ),
 					'meta'                => array( 'show_in_rest' => true ),
 				)
 			);
@@ -462,6 +462,20 @@ class AgentAbilities {
 							'idempotent' => true,
 						),
 					),
+				)
+			);
+
+			self::registerAbility(
+				'datamachine/project-agent-graph',
+				array(
+					'label'               => 'Project Agent Graph',
+					'description'         => 'Return the persisted coordinator graph, identity paths, and generic child runtime policy.',
+					'category'            => 'datamachine-agent',
+					'input_schema'        => array( 'type' => 'object', 'required' => array( 'slug' ), 'properties' => array( 'slug' => array( 'type' => 'string' ) ) ),
+					'output_schema'       => array( 'type' => 'object' ),
+					'execute_callback'    => array( self::class, 'projectAgentGraph' ),
+					'permission_callback' => fn() => PermissionHelper::can( 'manage_agents' ),
+					'meta'                => array( 'show_in_rest' => true, 'annotations' => array( 'readonly' => true, 'idempotent' => true ) ),
 				)
 			);
 
@@ -1535,6 +1549,11 @@ class AgentAbilities {
 	public static function listAgentBundles( array $input = array() ): array {
 		unset( $input );
 		return self::bundleLifecycleService()->list_installed();
+	}
+
+	/** @return array<string,mixed> */
+	public static function projectAgentGraph( array $input ): array {
+		return \DataMachine\Engine\Agents\PersistedAgentGraphProjector::project( (string) ( $input['slug'] ?? '' ) );
 	}
 
 	/**

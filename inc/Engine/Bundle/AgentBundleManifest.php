@@ -7,6 +7,8 @@
 
 namespace DataMachine\Engine\Bundle;
 
+use DataMachine\Engine\Agents\AgentSubagentGraph;
+
 defined( 'ABSPATH' ) || exit;
 
 /**
@@ -24,8 +26,9 @@ final class AgentBundleManifest {
 	private array $included;
 	private array $run_artifacts;
 	private array $capabilities;
+	private array $subagents;
 
-	public function __construct( string $exported_at, string $exported_by, string $bundle_slug, string $bundle_version, string $source_ref, string $source_revision, array $agent, array $included, array $run_artifacts = array(), array $capabilities = array() ) {
+	public function __construct( string $exported_at, string $exported_by, string $bundle_slug, string $bundle_version, string $source_ref, string $source_revision, array $agent, array $included, array $run_artifacts = array(), array $capabilities = array(), array $subagents = array() ) {
 		$this->exported_at     = $exported_at;
 		$this->exported_by     = $exported_by;
 		$this->bundle_slug     = PortableSlug::normalize( $bundle_slug, 'bundle' );
@@ -36,6 +39,10 @@ final class AgentBundleManifest {
 		$this->included        = self::validate_included( $included );
 		$this->run_artifacts   = BundleSchema::normalize_run_artifact_egress_policy( $run_artifacts );
 		$this->capabilities    = self::validate_string_list( $capabilities, 'capabilities' );
+		$this->subagents       = AgentSubagentGraph::normalize( $subagents, (string) $this->agent['slug'] );
+		if ( ! empty( $this->subagents ) ) {
+			$this->agent['subagents'] = AgentSubagentGraph::coordinator_edges( $this->agent['subagents'] ?? array(), $this->subagents, (string) $this->agent['slug'] );
+		}
 	}
 
 	/**
@@ -67,7 +74,8 @@ final class AgentBundleManifest {
 			$data['agent'],
 			$data['included'],
 			is_array( $data['run_artifacts'] ?? null ) ? $data['run_artifacts'] : array(),
-			is_array( $data['capabilities'] ?? null ) ? $data['capabilities'] : array()
+			is_array( $data['capabilities'] ?? null ) ? $data['capabilities'] : array(),
+			is_array( $data['subagents'] ?? null ) ? $data['subagents'] : array()
 		);
 	}
 
@@ -94,6 +102,9 @@ final class AgentBundleManifest {
 		}
 		if ( ! empty( $this->capabilities ) ) {
 			$data['capabilities'] = $this->capabilities;
+		}
+		if ( ! empty( $this->subagents ) ) {
+			$data['subagents'] = $this->subagents;
 		}
 
 		return $data;
@@ -136,6 +147,11 @@ final class AgentBundleManifest {
 		return $this->capabilities;
 	}
 
+	/** @return array<int,array<string,mixed>> */
+	public function subagents(): array {
+		return $this->subagents;
+	}
+
 	private static function validate_agent( array $agent ): array {
 		foreach ( array( 'slug', 'label', 'description', 'agent_config' ) as $field ) {
 			if ( ! array_key_exists( $field, $agent ) ) {
@@ -156,6 +172,42 @@ final class AgentBundleManifest {
 			'description'  => $agent['description'],
 			'agent_config' => $agent['agent_config'],
 		);
+		if ( array_key_exists( 'subagents', $agent ) ) {
+			if ( ! is_array( $agent['subagents'] ) || ! array_is_list( $agent['subagents'] ) ) {
+				throw new BundleValidationException( 'manifest.json agent.subagents must be a list.' );
+			}
+			$validated['subagents'] = AgentSubagentGraph::edges_from_config( $agent['subagents'], $agent['slug'] );
+		}
+		foreach ( array( 'skills', 'references' ) as $kind ) {
+			if ( ! array_key_exists( $kind, $agent ) ) {
+				continue;
+			}
+			if ( ! is_array( $agent[ $kind ] ) || array_is_list( $agent[ $kind ] ) ) {
+				throw new BundleValidationException( sprintf( 'manifest.json agent.%s must be a path-to-bytes object after hydration.', esc_html( $kind ) ) );
+			}
+			$files = array();
+			foreach ( $agent[ $kind ] as $path => $contents ) {
+				$path = str_replace( '\\', '/', (string) $path );
+				if ( '' === $path || str_starts_with( $path, '/' ) || str_contains( $path, '..' ) || str_contains( $path, '//' ) || ! is_string( $contents ) ) {
+					throw new BundleValidationException( sprintf( 'manifest.json agent.%s has an invalid artifact path.', esc_html( $kind ) ) );
+				}
+				$files[ $path ] = $contents;
+			}
+			ksort( $files, SORT_STRING );
+			$validated[ $kind ] = $files;
+		}
+		if ( array_key_exists( 'skill_policy', $agent ) ) {
+			if ( ! is_array( $agent['skill_policy'] ) || array_is_list( $agent['skill_policy'] ) ) {
+				throw new BundleValidationException( 'manifest.json agent.skill_policy must be an object.' );
+			}
+			$validated['skill_policy'] = $agent['skill_policy'];
+		}
+		if ( array_key_exists( 'tool_policy', $agent ) ) {
+			if ( ! is_array( $agent['tool_policy'] ) || array_is_list( $agent['tool_policy'] ) ) {
+				throw new BundleValidationException( 'manifest.json agent.tool_policy must be an object.' );
+			}
+			$validated['tool_policy'] = $agent['tool_policy'];
+		}
 
 		// Carry the agent's site scope through the round-trip. `null` means
 		// network-wide; a positive integer means a specific blog. Anything else

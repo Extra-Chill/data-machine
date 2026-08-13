@@ -104,9 +104,20 @@ Consumer plugins coordinate corpus and Markdown/frontmatter profile semantics ou
 - `bundle_version`: explicit bundle version for upgrade planning.
 - `source_ref` and `source_revision`: optional source coordinates.
 - `exported_at` and `exported_by`: export metadata.
-- `agent`: `slug`, `label`, `description`, and `agent_config` defaults.
+- `agent`: `slug`, `label`, `description`, and `agent_config` defaults. Optional
+  `skills` and `references` are `{path,sha256}` lists backed by package-owned
+  `skills/` and `references/` files; optional `tool_policy` and `skill_policy`
+  are projected with the root runtime graph node.
 - `included`: lists of `memory`, `pipelines`, `flows`, `prompts`, `rubrics`, `tool_policies`, `auth_refs`, and `seed_queues`, plus `handler_auth` mode.
 - `capabilities`: optional package-level capability strings required by the bundle.
+- `subagents`: optional coordinator child definitions. Each child includes its slug,
+  label, description, `agent_config`, identity memory files, tool policy, skills,
+  references, and child edge list. Data Machine validates unique slugs, containment,
+  resolved edges, no self-edge/cycle, and deterministic ordering before install.
+
+The graph is persisted in the existing `agent_config.subagents` field, avoiding a
+schema migration. Runtime adapters read it through the access-controlled
+`datamachine/project-agent-graph` ability or `wp datamachine agent graph <slug>`.
 
 `handler_auth` is one of:
 

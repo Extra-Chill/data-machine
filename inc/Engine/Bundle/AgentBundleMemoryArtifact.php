@@ -170,6 +170,32 @@ final class AgentBundleMemoryArtifact {
 		);
 	}
 
+	/** @return array{artifact_id:string,exists:bool,content:?string}|null */
+	public static function snapshot( int $agent_id, string $artifact_id ): ?array {
+		$filename = self::filename_from_artifact_id( $artifact_id );
+		if ( $agent_id <= 0 || '' === $filename || ! self::is_authored_identity( $filename ) ) {
+			return null;
+		}
+		$memory = new AgentMemory( 0, $agent_id, $filename );
+		$result = $memory->read();
+		return array( 'artifact_id' => $artifact_id, 'exists' => $result->exists, 'content' => $result->exists ? (string) $result->content : null );
+	}
+
+	/** @param array{artifact_id:string,exists:bool,content:?string} $snapshot */
+	public static function restore( int $agent_id, array $snapshot ): void {
+		$filename = self::filename_from_artifact_id( (string) ( $snapshot['artifact_id'] ?? '' ) );
+		if ( $agent_id <= 0 || '' === $filename ) {
+			return;
+		}
+		$memory = new AgentMemory( 0, $agent_id, $filename );
+		$result = ! empty( $snapshot['exists'] )
+			? $memory->replace_all( (string) ( $snapshot['content'] ?? '' ) )
+			: $memory->delete();
+		if ( empty( $result['success'] ) ) {
+			throw new \RuntimeException( sprintf( 'Failed to restore agent memory file "%s".', $filename ) );
+		}
+	}
+
 	/**
 	 * Whether a bundle-carried agent-layer file may be materialized on upgrade.
 	 *

@@ -45,6 +45,7 @@ use DataMachine\Engine\Bundle\AgentBundleDirectory;
 use DataMachine\Engine\Bundle\AgentBundleInstalledArtifact;
 use DataMachine\Engine\Bundle\AgentBundleManifest;
 use DataMachine\Engine\Bundle\BundleSchema;
+use DataMachine\Engine\Agents\PersistedAgentGraphProjector;
 use WP_UnitTestCase;
 
 final class DailyMemoryImportFakeStore implements WP_Agent_Memory_Store {
@@ -123,6 +124,7 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 	private int $owner_id;
 	private $memory_store_filter = null;
 	private $agent_config_projection_filter = null;
+	private $transaction_available_filter = null;
 
 	public function set_up(): void {
 		parent::set_up();
@@ -162,6 +164,10 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 		if ( null !== $this->agent_config_projection_filter ) {
 			remove_filter( 'datamachine_agent_config_artifact_projection_policies', $this->agent_config_projection_filter, 10 );
 			$this->agent_config_projection_filter = null;
+		}
+		if ( null !== $this->transaction_available_filter ) {
+			remove_filter( 'datamachine_bundle_import_transaction_available', $this->transaction_available_filter, 10 );
+			$this->transaction_available_filter = null;
 		}
 		PermissionHelper::clear_agent_context();
 
@@ -919,6 +925,66 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 
 		$this->assertSame( 0, $pipeline_count, 'No orphan pipeline rows.' );
 		$this->assertSame( 0, $flow_count, 'No orphan flow rows.' );
+	}
+
+	public function test_legacy_file_maps_reject_unsafe_paths_before_mutation(): void {
+		$maps = array(
+			'agent'    => static function ( array &$bundle ): void { $bundle['files'] = array( '../escape.md' => 'x' ); },
+			'pipeline' => static function ( array &$bundle ): void { $bundle['pipelines'][0]['memory_file_contents'] = array( 'dir//file.md' => 'x' ); },
+			'flow'     => static function ( array &$bundle ): void { $bundle['flows'][0]['memory_file_contents'] = array( '/escape.md' => 'x' ); },
+		);
+
+		foreach ( $maps as $label => $mutate ) {
+			$bundle = $this->fixture_bundle( 'unsafe-' . $label );
+			$mutate( $bundle );
+			$result = $this->bundler->import( $bundle, null, $this->owner_id );
+
+			$this->assertFalse( (bool) $result['success'], "Unsafe {$label} map is rejected." );
+			$this->assertSame( 'install_invalid_bundle', $result['error_code'] ?? null );
+			$this->assertNull( $this->agents_repo->get_by_slug( 'unsafe-' . $label ), "Unsafe {$label} map creates no agent." );
+		}
+	}
+
+	public function test_transaction_unavailable_fails_before_normal_import_mutates(): void {
+		$this->transaction_available_filter = static fn(): bool => false;
+		add_filter( 'datamachine_bundle_import_transaction_available', $this->transaction_available_filter, 10 );
+
+		$result = $this->bundler->import( $this->fixture_bundle( 'transaction-unavailable-agent' ), null, $this->owner_id );
+
+		$this->assertFalse( (bool) $result['success'] );
+		$this->assertSame( 'install_transaction_unavailable', $result['error_code'] ?? null );
+		$this->assertNull( $this->agents_repo->get_by_slug( 'transaction-unavailable-agent' ), 'No agent row is created without an atomic transaction.' );
+	}
+
+	public function test_subagent_skill_policy_survives_persisted_graph_projection(): void {
+		$bundle                              = $this->fixture_bundle( 'policy-coordinator' );
+		$bundle['agent']['subagents']        = array( 'policy-writer' );
+		$bundle['subagents']                 = array(
+			array(
+				'slug'         => 'policy-writer',
+				'label'        => 'Policy Writer',
+				'description'  => 'Writes with an explicit skill policy.',
+				'agent_config' => array(),
+				'memory'       => array( 'SOUL.md' => "# Policy Writer\n" ),
+				'tool_policy'  => array(),
+				'skill_policy' => array( 'mode' => 'explicit', 'allowed' => array( 'write.md' ) ),
+				'skills'       => array( 'write.md' => "# Write\n" ),
+				'references'   => array(),
+				'subagents'    => array(),
+			),
+		);
+
+		$result = $this->bundler->import( $bundle, null, $this->owner_id );
+		$this->assertTrue( (bool) $result['success'] );
+
+		$projection = PersistedAgentGraphProjector::project( 'policy-coordinator' );
+		$this->assertTrue( (bool) $projection['success'] );
+		$nodes = array_column( $projection['nodes'] ?? array(), null, 'slug' );
+		$this->assertSame(
+			array( 'mode' => 'explicit', 'allowed' => array( 'write.md' ), 'paths' => array( 'write.md' ) ),
+			$nodes['policy-writer']['skill_policy'] ?? null,
+			'Persisted graph projection retains the child policy and installed skill paths.'
+		);
 	}
 
 	/**

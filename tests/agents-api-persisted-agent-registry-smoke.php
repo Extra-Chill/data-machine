@@ -13,6 +13,9 @@ agents_api_smoke_require_module();
 require_once dirname( __DIR__ ) . '/inc/Core/Database/BaseRepository.php';
 require_once dirname( __DIR__ ) . '/inc/Core/Agents/AgentConfigFactory.php';
 require_once dirname( __DIR__ ) . '/inc/Core/Database/Agents/Agents.php';
+require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/BundleValidationException.php';
+require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/PortableSlug.php';
+require_once dirname( __DIR__ ) . '/inc/Engine/Agents/AgentSubagentGraph.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/Agents/PersistedAgentProjector.php';
 
 use DataMachine\Core\Agents\AgentConfigFactory;
@@ -113,6 +116,10 @@ $repository = new DataMachinePersistedAgentProjectorFakeRepository(
 			),
 		),
 		array(
+			'agent_id' => 104, 'agent_slug' => 'coordinator', 'agent_name' => 'Coordinator', 'owner_id' => 7,
+			'agent_config' => array( 'subagents' => array( 'researcher', 'writer' ) ),
+		),
+		array(
 			'agent_id'     => 102,
 			'agent_slug'   => 'woocommerce-wiki',
 			'agent_name'   => 'WooCommerce Wiki',
@@ -142,7 +149,7 @@ do_action( 'init' );
 $agents       = wp_get_agents();
 $agent        = wp_get_agent( 'wordpress-com-wiki' );
 $roadie_agent = wp_get_agent( 'roadie' );
-agents_api_smoke_assert_equals( array( 'wordpress-com-wiki', 'woocommerce-wiki', 'roadie' ), array_keys( $agents ), 'persisted rows are visible through wp_get_agents()', $failures, $passes );
+	agents_api_smoke_assert_equals( array( 'wordpress-com-wiki', 'woocommerce-wiki', 'roadie', 'coordinator' ), array_keys( $agents ), 'persisted rows are visible through wp_get_agents()', $failures, $passes );
 agents_api_smoke_assert_equals( true, $agent instanceof WP_Agent, 'persisted row resolves through wp_get_agent()', $failures, $passes );
 agents_api_smoke_assert_equals( 'WordPress.com Wiki', $agent ? $agent->get_label() : '', 'row agent_name becomes label', $failures, $passes );
 agents_api_smoke_assert_equals( 'Maintains the WordPress.com wiki brain.', $agent ? $agent->get_description() : '', 'extension description source is surfaced', $failures, $passes );
@@ -151,6 +158,7 @@ agents_api_smoke_assert_equals( 7, $agent && is_callable( $agent->get_owner_reso
 agents_api_smoke_assert_equals( 'gpt-5.5', $agent ? $agent->get_default_config()['default_model'] ?? '' : '', 'agent_config becomes default_config', $failures, $passes );
 agents_api_smoke_assert_equals( 'wordpress-com-wiki', $agent ? $agent->get_meta()['source_package'] ?? '' : '', 'bundle slug is exposed as source package', $failures, $passes );
 agents_api_smoke_assert_equals( 'wordpress-com', $agent ? $agent->get_meta()['intelligence_wiki_brain_wiki_slug'] ?? '' : '', 'extension metadata projector is exposed', $failures, $passes );
+agents_api_smoke_assert_equals( array( 'researcher', 'writer' ), wp_get_agent( 'coordinator' ) ? wp_get_agent( 'coordinator' )->get_subagents() : array(), 'persisted config projects exact normalized subagent edges', $failures, $passes );
 
 echo "\n[1b] persisted agent config normalizes legacy model aliases:\n";
 $legacy_config = AgentConfigFactory::normalize(
@@ -183,7 +191,7 @@ add_action(
 do_action( 'init' );
 
 $agents = wp_get_agents();
-agents_api_smoke_assert_equals( array( 'wordpress-com-wiki', 'woocommerce-wiki', 'roadie' ), array_keys( $agents ), 'projection skips duplicate slugs without dropping other rows', $failures, $passes );
+	agents_api_smoke_assert_equals( array( 'wordpress-com-wiki', 'woocommerce-wiki', 'roadie', 'coordinator' ), array_keys( $agents ), 'projection skips duplicate slugs without dropping other rows', $failures, $passes );
 agents_api_smoke_assert_equals( 'Declarative Definition', $agents['wordpress-com-wiki']->get_label(), 'first registered definition wins', $failures, $passes );
 agents_api_smoke_assert_equals( array(), $GLOBALS['__agents_api_smoke_wrong'], 'duplicate skip avoids doing-it-wrong notices', $failures, $passes );
 

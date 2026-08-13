@@ -38,11 +38,13 @@ use DataMachine\Engine\Bundle\AgentConfigArtifactProjector;
 use DataMachine\Engine\Bundle\AgentTemplateMetadata;
 use DataMachine\Engine\Bundle\AgentPackageProjection;
 use DataMachine\Engine\Bundle\BundleSchema;
+use DataMachine\Engine\Bundle\BundleRelativePath;
 use DataMachine\Engine\Bundle\BundleValidationException;
 use DataMachine\Engine\Bundle\PortableSlug;
 use DataMachine\Engine\Bundle\PromptArtifact;
 use DataMachine\Core\Steps\FlowStepConfig;
 use DataMachine\Engine\AI\System\SystemTaskPromptRegistry;
+use DataMachine\Engine\Agents\AgentSubagentGraph;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -72,6 +74,12 @@ class AgentBundler {
 	 * @var DirectoryManager
 	 */
 	private DirectoryManager $directory_manager;
+
+	/** @var array<string,string|null> Original contents, keyed by mutated path. */
+	private array $filesystem_journal = array();
+
+	/** @var array<string,array{agent_id:int,snapshot:array{artifact_id:string,exists:bool,content:?string}}> */
+	private array $identity_journal = array();
 
 	public function __construct() {
 		$this->agents_repo       = new Agents();
@@ -232,6 +240,13 @@ class AgentBundler {
 			\DataMachine\Engine\Bundle\BundleSchema::PROMPTS_DIR => SystemTaskPromptRegistry::bundle_prompt_files(),
 		);
 		$extension_paths = array_map( static fn( array $artifact ) => (string) ( $artifact['source_path'] ?? '' ), $extension_artifacts );
+		$subagents       = $this->export_subagents( is_array( $agent['agent_config'] ?? null ) ? $agent['agent_config'] : array() );
+		$root_subagent   = is_array( $agent['agent_config']['datamachine_subagent'] ?? null ) ? $agent['agent_config']['datamachine_subagent'] : array();
+		$coordinator_edges = AgentSubagentGraph::coordinator_edges(
+			is_array( $agent['agent_config'] ?? null ) ? ( $agent['agent_config']['subagents'] ?? array() ) : array(),
+			$subagents,
+			(string) $agent['agent_slug']
+		);
 		$manifest        = new AgentBundleManifest(
 			gmdate( 'c' ),
 			defined( 'DATAMACHINE_VERSION' ) ? 'data-machine/' . DATAMACHINE_VERSION : 'data-machine/unknown',
@@ -247,6 +262,11 @@ class AgentBundler {
 					is_array( $agent['agent_config'] ?? null ) ? $agent['agent_config'] : array(),
 					(string) ( $context['profile'] ?? 'share' )
 				),
+				'subagents'    => $coordinator_edges,
+				'tool_policy'  => is_array( $root_subagent['tool_policy'] ?? null ) ? $root_subagent['tool_policy'] : array(),
+				'skill_policy' => is_array( $root_subagent['skill_policy'] ?? null ) ? $root_subagent['skill_policy'] : array(),
+				'skills'       => $this->collect_subagent_runtime_artifacts( (string) $agent['agent_slug'], is_array( $root_subagent['skills'] ?? null ) ? $root_subagent['skills'] : array(), 'skills' ),
+				'references'   => $this->collect_subagent_runtime_artifacts( (string) $agent['agent_slug'], is_array( $root_subagent['references'] ?? null ) ? $root_subagent['references'] : array(), 'references' ),
 				// Preserve the agent's actual scope through the bundle round-trip:
 				// null = network-wide, positive int = a specific blog. The manifest
 				// drops legacy/unknown values so import never re-pins to a blog.
@@ -259,7 +279,10 @@ class AgentBundler {
 				'prompts'      => array_keys( $artifact_files[ \DataMachine\Engine\Bundle\BundleSchema::PROMPTS_DIR ] ),
 				'extensions'   => array_values( array_filter( $extension_paths ) ),
 				'handler_auth' => $handler_auth,
-			)
+			),
+			array(),
+			array(),
+			$subagents
 		);
 
 		$extras    = self::collect_export_extras( $agent_id, $agent );
@@ -271,6 +294,40 @@ class AgentBundler {
 			'directory' => $directory,
 			'package'   => AgentPackageProjection::from_directory( $directory ),
 		);
+	}
+
+	/** @return array<int,array<string,mixed>> */
+	private function export_subagents( array $coordinator_config ): array {
+		$edges = AgentSubagentGraph::edges_from_config( $coordinator_config['subagents'] ?? array() );
+		$nodes = array();
+		while ( ! empty( $edges ) ) {
+			$slug = array_shift( $edges );
+			if ( isset( $nodes[ $slug ] ) ) {
+				continue;
+			}
+			$child = $this->agents_repo->get_by_slug( $slug );
+			if ( ! $child ) {
+				throw new BundleValidationException( sprintf( 'Coordinator edge %s does not resolve to a persisted agent.', esc_html( $slug ) ) );
+			}
+			$config    = is_array( $child['agent_config'] ?? null ) ? $child['agent_config'] : array();
+			$subagent  = is_array( $config['datamachine_subagent'] ?? null ) ? $config['datamachine_subagent'] : array();
+			$memory    = $this->collect_agent_files( (string) $child['agent_slug'] );
+			$node      = array(
+				'slug'         => (string) $child['agent_slug'],
+				'label'        => (string) $child['agent_name'],
+				'description'  => (string) ( $config['description'] ?? '' ),
+				'agent_config' => AgentBundleAgentConfig::export_payload( $config ),
+				'memory'       => $memory,
+				'tool_policy'  => is_array( $subagent['tool_policy'] ?? null ) ? $subagent['tool_policy'] : array(),
+				'skill_policy' => is_array( $subagent['skill_policy'] ?? null ) ? $subagent['skill_policy'] : array(),
+				'skills'       => $this->collect_subagent_runtime_artifacts( (string) $child['agent_slug'], is_array( $subagent['skills'] ?? null ) ? $subagent['skills'] : array(), 'skills' ),
+				'references'   => $this->collect_subagent_runtime_artifacts( (string) $child['agent_slug'], is_array( $subagent['references'] ?? null ) ? $subagent['references'] : array(), 'references' ),
+				'subagents'    => AgentSubagentGraph::edges_from_config( $config['subagents'] ?? array(), (string) $child['agent_slug'] ),
+			);
+			$nodes[ $slug ] = $node;
+			$edges          = array_merge( $edges, $node['subagents'] );
+		}
+		return AgentSubagentGraph::normalize( array_values( $nodes ) );
 	}
 
 	/**
@@ -566,14 +623,27 @@ class AgentBundler {
 				);
 			}
 
-			return $this->import_directory_materialization(
-				$directory,
-				$new_slug,
-				$owner_id,
-				$dry_run,
-				$options,
-				is_array( $bundle['abilities_manifest'] ?? null ) ? $bundle['abilities_manifest'] : array()
-			);
+			$payload = AgentBundleArrayAdapter::to_import_payload( $directory );
+			$payload['abilities_manifest'] = is_array( $bundle['abilities_manifest'] ?? null ) ? $bundle['abilities_manifest'] : array();
+			try {
+				$this->validate_import_file_maps( $payload );
+			} catch ( BundleValidationException $e ) {
+				return array( 'success' => false, 'error_code' => 'install_invalid_bundle', 'error' => $e->getMessage() );
+			}
+			if ( ! empty( $payload['subagents'] ) && empty( $options['_graph_node'] ) ) {
+				return $this->import_subagent_graph( $payload, $new_slug, $owner_id, $dry_run, $options );
+			}
+			return $this->materialize_import_bundle( $payload, $new_slug, $owner_id, $dry_run, $options );
+		}
+
+		try {
+			$this->validate_import_file_maps( $bundle );
+		} catch ( BundleValidationException $e ) {
+			return array( 'success' => false, 'error_code' => 'install_invalid_bundle', 'error' => $e->getMessage() );
+		}
+
+		if ( ! empty( $bundle['subagents'] ) && empty( $options['_graph_node'] ) ) {
+			return $this->import_subagent_graph( $bundle, $new_slug, $owner_id, $dry_run, $options );
 		}
 
 		return $this->materialize_import_bundle( $bundle, $new_slug, $owner_id, $dry_run, $options );
@@ -692,7 +762,19 @@ class AgentBundler {
 		$created_agent_id     = 0; // Tracks an agent row this call inserted, for manual rollback.
 		$created_pipeline_ids = array();
 		$created_flow_ids     = array();
-		$transaction_started  = $this->begin_transaction();
+		$root_import          = empty( $options['_graph_transaction'] );
+		if ( $root_import ) {
+			$this->filesystem_journal = array();
+			$this->identity_journal   = array();
+		}
+		$transaction_started  = $root_import ? $this->begin_transaction() : false;
+		if ( $root_import && ! $transaction_started ) {
+			return array(
+				'success'    => false,
+				'error_code' => 'install_transaction_unavailable',
+				'error'      => 'Agent installation requires a database transaction.',
+			);
+		}
 
 		try {
 			// Test fault-injection seam. Production code path is a no-op. Tests load the
@@ -704,12 +786,37 @@ class AgentBundler {
 			$incoming_config = $agent_data['agent_config'] ?? array();
 
 			$incoming_config                = is_array( $incoming_config ) ? $incoming_config : array();
+			$root_artifacts                 = array();
+			foreach ( array( 'skills', 'references' ) as $kind ) {
+				if ( array_key_exists( $kind, $agent_data ) && is_array( $agent_data[ $kind ] ) ) {
+					$root_artifacts[ $kind ] = $agent_data[ $kind ];
+				}
+			}
+			$artifact_file_conflicts = array();
+			$existing_root_metadata  = is_array( $existing['agent_config']['datamachine_subagent'] ?? null ) ? $existing['agent_config']['datamachine_subagent'] : array();
+			foreach ( $root_artifacts as $kind => $files ) {
+				$this->detect_locally_modified_subagent_artifacts( $slug, $kind, $files, is_array( $existing_root_metadata[ $kind ] ?? null ) ? $existing_root_metadata[ $kind ] : array(), $artifact_file_conflicts );
+			}
+			if ( ! empty( $root_artifacts ) || array_key_exists( 'skill_policy', $agent_data ) || array_key_exists( 'tool_policy', $agent_data ) ) {
+				$incoming_config['datamachine_subagent'] = array_merge(
+					is_array( $incoming_config['datamachine_subagent'] ?? null ) ? $incoming_config['datamachine_subagent'] : array(),
+					array_filter(
+						array(
+							'tool_policy'  => is_array( $agent_data['tool_policy'] ?? null ) ? $agent_data['tool_policy'] : null,
+							'skill_policy' => is_array( $agent_data['skill_policy'] ?? null ) ? $agent_data['skill_policy'] : null,
+							'skills'       => isset( $root_artifacts['skills'] ) ? $this->subagent_artifact_metadata( $root_artifacts['skills'] ) : null,
+							'references'   => isset( $root_artifacts['references'] ) ? $this->subagent_artifact_metadata( $root_artifacts['references'] ) : null,
+						),
+						static fn( $value ) => null !== $value
+					)
+				);
+			}
 			$existing_bundle_state          = is_array( $existing['agent_config']['datamachine_bundle'] ?? null )
 				? $existing['agent_config']['datamachine_bundle']
 				: array();
 			$artifact_records               = $existing ? AgentBundleArtifactState::installed_for_agent( $existing ) : array();
 			$artifact_records               = self::index_artifacts( $artifact_records );
-			$config_conflicts               = array();
+			$config_conflicts               = $artifact_file_conflicts;
 			$agent_config_key               = self::artifact_key( 'agent_config', 'config' );
 			$incoming_config_payload        = AgentBundleAgentConfig::tracked_payload( $incoming_config );
 			$current_config_payload         = AgentBundleAgentConfig::tracked_payload( is_array( $existing['agent_config'] ?? null ) ? $existing['agent_config'] : array() );
@@ -788,6 +895,11 @@ class AgentBundler {
 			// (MEMORY.md, WAKE.md, daily/*) must never be clobbered by a deploy.
 			if ( ! $existing ) {
 				$this->write_agent_files( $slug, $agent_id, $owner_id, $bundle['files'] ?? array() );
+			}
+			if ( empty( $config_conflicts ) ) {
+				foreach ( $root_artifacts as $kind => $files ) {
+					$this->write_guarded_subagent_runtime_artifacts( $slug, $kind, $files, is_array( $existing_root_metadata[ $kind ] ?? null ) ? $existing_root_metadata[ $kind ] : array(), $config_conflicts );
+				}
 			}
 
 			// 3. Write USER.md template if provided.
@@ -1121,6 +1233,7 @@ class AgentBundler {
 				// Materialize authored identity through the memory store seam on
 				// BOTH fresh install and upgrade, so non-disk stores receive the
 				// content (write_agent_files only touches the disk store).
+				$this->journal_identity_artifact( $agent_id, (string) $artifact['artifact_id'] );
 				$applied = AgentBundleMemoryArtifact::apply( $artifact, $agent_id );
 				if ( is_wp_error( $applied ) ) {
 					$conflicts[] = array(
@@ -1237,6 +1350,10 @@ class AgentBundler {
 			}
 
 			$this->commit_transaction( $transaction_started );
+			if ( $root_import ) {
+				$this->filesystem_journal = array();
+				$this->identity_journal   = array();
+			}
 
 			$extras = is_array( $bundle['extras'] ?? null ) ? $bundle['extras'] : array();
 			try {
@@ -1313,7 +1430,11 @@ class AgentBundler {
 			// Roll back any DB writes from this call. Run native ROLLBACK first; if the underlying engine
 			// (e.g. the SQLite drop-in) silently no-ops on rollback, fall back to manual cleanup of rows
 			// we created so the next install attempt sees a clean slate.
-			$this->rollback_transaction( $transaction_started );
+			$rollback_error = $this->rollback_transaction( $transaction_started );
+			if ( $root_import ) {
+				$this->rollback_filesystem();
+				$this->rollback_identity();
+			}
 			$this->manual_rollback( $created_agent_id, $created_pipeline_ids, $created_flow_ids );
 
 			do_action(
@@ -1329,10 +1450,14 @@ class AgentBundler {
 				)
 			);
 
+			$error = sprintf( 'Agent install rolled back: %s', $e->getMessage() );
+			if ( null !== $rollback_error ) {
+				$error .= sprintf( ' Rollback also failed: %s', $rollback_error );
+			}
 			return array(
 				'success'    => false,
 				'error_code' => 'install_post_claim_failure',
-				'error'      => sprintf( 'Agent install rolled back: %s', $e->getMessage() ),
+				'error'      => $error,
 			);
 		}
 	}
@@ -1364,21 +1489,204 @@ class AgentBundler {
 	 */
 	private function import_directory_materialization( AgentBundleDirectory $directory, ?string $new_slug, int $owner_id, bool $dry_run, array $options, array $abilities_manifest = array() ): array {
 		$payload = AgentBundleArrayAdapter::to_import_payload( $directory );
+		try {
+			$this->validate_import_file_maps( $payload );
+		} catch ( BundleValidationException $e ) {
+			return array( 'success' => false, 'error_code' => 'install_invalid_bundle', 'error' => $e->getMessage() );
+		}
 		if ( ! empty( $abilities_manifest ) ) {
 			$payload['abilities_manifest'] = $abilities_manifest;
 		}
 
+		if ( ! empty( $payload['subagents'] ) && empty( $options['_graph_node'] ) ) {
+			return $this->import_subagent_graph( $payload, $new_slug, $owner_id, $dry_run, $options );
+		}
+
 		return $this->materialize_import_bundle( $payload, $new_slug, $owner_id, $dry_run, $options );
+	}
+
+	/** Validate every raw legacy file map before an import can mutate the filesystem. */
+	private function validate_import_file_maps( array $bundle ): void {
+		$this->validate_file_map( $bundle['files'] ?? array(), 'agent memory' );
+		foreach ( $bundle['pipelines'] ?? array() as $pipeline ) {
+			if ( is_array( $pipeline ) ) {
+				$this->validate_file_map( $pipeline['memory_file_contents'] ?? array(), 'pipeline memory' );
+			}
+		}
+		foreach ( $bundle['flows'] ?? array() as $flow ) {
+			if ( is_array( $flow ) ) {
+				$this->validate_file_map( $flow['memory_file_contents'] ?? array(), 'flow memory' );
+			}
+		}
+		$this->validate_file_map( $bundle['agent']['skills'] ?? array(), 'agent skill' );
+		$this->validate_file_map( $bundle['agent']['references'] ?? array(), 'agent reference' );
+		foreach ( $bundle['subagents'] ?? array() as $child ) {
+			if ( ! is_array( $child ) ) {
+				continue;
+			}
+			$this->validate_file_map( $child['memory'] ?? array(), 'subagent memory' );
+			$this->validate_file_map( $child['skills'] ?? array(), 'subagent skill' );
+			$this->validate_file_map( $child['references'] ?? array(), 'subagent reference' );
+		}
+	}
+
+	/** @param mixed $files */
+	private function validate_file_map( mixed $files, string $label ): void {
+		if ( ! is_array( $files ) ) {
+			return;
+		}
+		foreach ( $files as $path => $_contents ) {
+			BundleRelativePath::validate( (string) $path, $label );
+		}
+	}
+
+	/**
+	 * Materialize a package coordinator and all of its declared child agents.
+	 *
+	 * The outer transaction covers every database-backed node. Filesystem writes
+	 * retain the existing importer semantics; authored identity upgrades remain
+	 * protected by the per-node artifact ledger.
+	 */
+	private function import_subagent_graph( array $bundle, ?string $new_slug, int $owner_id, bool $dry_run, array $options ): array {
+		try {
+			$coordinator_slug = sanitize_title( (string) ( $new_slug ?? ( $bundle['agent']['agent_slug'] ?? '' ) ) );
+			$children          = AgentSubagentGraph::normalize( $bundle['subagents'], $coordinator_slug );
+			$coordinator_edges = AgentSubagentGraph::coordinator_edges( $bundle['agent']['subagents'] ?? array(), $children, $coordinator_slug );
+		} catch ( BundleValidationException $e ) {
+			return array(
+				'success'    => false,
+				'error_code' => 'install_invalid_subagent_graph',
+				'error'      => $e->getMessage(),
+			);
+		}
+
+		if ( $dry_run ) {
+			$probe                 = $bundle;
+			unset( $probe['subagents'] );
+			$probe['agent']['subagents'] = $coordinator_edges;
+			$result                = $this->import( $probe, $new_slug, $owner_id, true, array_merge( $options, array( '_graph_node' => true ) ) );
+			$result['summary']['subagents'] = $coordinator_edges;
+			return $result;
+		}
+
+		$transaction_started      = $this->begin_transaction();
+		if ( ! $transaction_started ) {
+			return array(
+				'success'    => false,
+				'error_code' => 'install_subagent_graph_transaction_unavailable',
+				'error'      => 'Subagent graph installation requires a database transaction.',
+			);
+		}
+		$this->filesystem_journal = array();
+		$this->identity_journal   = array();
+		$created_graph_agents     = array();
+		try {
+			foreach ( $children as $child ) {
+				$existing_child = $this->agents_repo->get_by_slug( $child['slug'] );
+				if ( ! $existing_child ) {
+					continue;
+				}
+				$metadata = is_array( $existing_child['agent_config']['datamachine_subagent'] ?? null ) ? $existing_child['agent_config']['datamachine_subagent'] : array();
+				$conflicts = array();
+				foreach ( array( 'skills', 'references' ) as $kind ) {
+					$this->detect_locally_modified_subagent_artifacts( $child['slug'], $kind, $child[ $kind ], is_array( $metadata[ $kind ] ?? null ) ? $metadata[ $kind ] : array(), $conflicts );
+				}
+				if ( ! empty( $conflicts ) ) {
+					$this->rollback_transaction( $transaction_started );
+					return array( 'success' => false, 'error_code' => 'install_subagent_graph_local_modified', 'error' => sprintf( 'Subagent %s has locally modified package artifacts.', $child['slug'] ), 'conflicts' => $conflicts );
+				}
+			}
+			foreach ( $children as $child ) {
+				$existing_child = $this->agents_repo->get_by_slug( $child['slug'] );
+				$child_existed = (bool) $existing_child;
+				$child_bundle = array(
+					'bundle_version' => $bundle['bundle_version'],
+					'bundle_slug'    => $bundle['bundle_slug'],
+					'source_ref'     => $bundle['source_ref'] ?? '',
+					'source_revision'=> $bundle['source_revision'] ?? '',
+					'agent'           => array(
+						'agent_slug'   => $child['slug'],
+						'agent_name'   => $child['label'],
+						'agent_config' => array_merge(
+							$child['agent_config'],
+							array(
+								'description'          => $child['description'],
+								'subagents'            => $child['subagents'],
+								'datamachine_subagent' => array(
+									'tool_policy' => $child['tool_policy'],
+									'skill_policy' => $child['skill_policy'],
+									'skills'      => $this->subagent_artifact_metadata( $child['skills'] ),
+									'references'  => $this->subagent_artifact_metadata( $child['references'] ),
+								),
+							)
+						),
+					),
+					'files'          => $child['memory'],
+					'skills'         => $child['skills'],
+					'references'     => $child['references'],
+					'skill_policy'   => $child['skill_policy'],
+					'tool_policy'    => $child['tool_policy'],
+					'pipelines'      => array(),
+					'flows'          => array(),
+				);
+				$result = $this->import( $child_bundle, null, $owner_id, false, array_merge( $options, array( '_graph_node' => true, '_graph_transaction' => true ) ) );
+				if ( empty( $result['success'] ) ) {
+					throw new \RuntimeException( (string) ( $result['error'] ?? 'Failed to import subagent.' ) );
+				}
+				if ( ! $child_existed && ! empty( $result['summary']['agent_id'] ) ) {
+					$created_graph_agents[] = array( 'agent_id' => (int) $result['summary']['agent_id'], 'slug' => $child['slug'] );
+				}
+				$this->write_subagent_runtime_artifacts( $child['slug'], $child['skills'], $child['references'] );
+			}
+
+			unset( $bundle['subagents'] );
+			$bundle['agent']['subagents'] = $coordinator_edges;
+			$bundle['agent']['agent_config'] = array_merge(
+				is_array( $bundle['agent']['agent_config'] ?? null ) ? $bundle['agent']['agent_config'] : array(),
+				array( 'subagents' => $coordinator_edges )
+			);
+			$coordinator_existed = (bool) $this->agents_repo->get_by_slug( $coordinator_slug );
+			$result = $this->import( $bundle, $new_slug, $owner_id, false, array_merge( $options, array( '_graph_node' => true, '_graph_transaction' => true ) ) );
+			if ( empty( $result['success'] ) ) {
+				throw new \RuntimeException( (string) ( $result['error'] ?? 'Failed to import coordinator.' ) );
+			}
+			if ( ! $coordinator_existed && ! empty( $result['summary']['agent_id'] ) ) {
+				$created_graph_agents[] = array( 'agent_id' => (int) $result['summary']['agent_id'], 'slug' => $coordinator_slug );
+			}
+			$this->commit_transaction( $transaction_started );
+			$this->filesystem_journal = array();
+			$this->identity_journal   = array();
+			$result['summary']['subagents'] = $coordinator_edges;
+			return $result;
+		} catch ( \Throwable $e ) {
+			$rollback_error = $this->rollback_transaction( $transaction_started );
+			$this->rollback_filesystem();
+			$this->rollback_identity();
+			foreach ( $created_graph_agents as $created ) {
+				$this->safe_graph_agent_rollback( (int) $created['agent_id'], (string) $created['slug'] );
+			}
+			$error = sprintf( 'Subagent graph install rolled back: %s', $e->getMessage() );
+			if ( null !== $rollback_error ) {
+				$error .= sprintf( ' Rollback also failed: %s', $rollback_error );
+			}
+			return array(
+				'success'    => false,
+				'error_code' => 'install_subagent_graph_rolled_back',
+				'error'      => $error,
+			);
+		}
 	}
 
 	/**
 	 * Open a DB transaction for the import critical section.
 	 *
 	 * Returns true when the engine accepted `START TRANSACTION`. SQLite via the Studio drop-in maps this
-	 * to `BEGIN`. If the engine refuses (returns false), we still proceed — the manual_rollback() path
-	 * is the safety net that cleans up any rows we know we created.
+	 * to `BEGIN`. Imports fail closed when an atomic transaction cannot be opened.
 	 */
 	private function begin_transaction(): bool {
+		if ( ! apply_filters( 'datamachine_bundle_import_transaction_available', true ) ) {
+			return false;
+		}
 		global $wpdb;
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
 		$result = $wpdb->query( 'START TRANSACTION' );
@@ -1392,16 +1700,116 @@ class AgentBundler {
 		}
 		global $wpdb;
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
-		$wpdb->query( 'COMMIT' );
+		if ( false === $wpdb->query( 'COMMIT' ) ) {
+			throw new \RuntimeException( sprintf( 'Database COMMIT failed: %s', (string) ( $wpdb->last_error ?? 'unknown database error' ) ) );
+		}
 	}
 
-	private function rollback_transaction( bool $started ): void {
+	private function rollback_transaction( bool $started ): ?string {
 		if ( ! $started ) {
-			return;
+			return null;
 		}
 		global $wpdb;
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
-		$wpdb->query( 'ROLLBACK' );
+		if ( false === $wpdb->query( 'ROLLBACK' ) ) {
+			return (string) ( $wpdb->last_error ?? 'unknown database error' );
+		}
+		return null;
+	}
+
+	private function write_journaled_file( string $path, string $contents ): void {
+		if ( ! array_key_exists( $path, $this->filesystem_journal ) ) {
+			$this->filesystem_journal[ $path ] = is_file( $path ) ? (string) file_get_contents( $path ) : null;
+		}
+		if ( ! is_dir( dirname( $path ) ) ) {
+			wp_mkdir_p( dirname( $path ) );
+		}
+		if ( false === file_put_contents( $path, $contents ) ) {
+			throw new \RuntimeException( sprintf( 'Failed to write bundle file %s.', $path ) );
+		}
+	}
+
+	private function rollback_filesystem(): void {
+		foreach ( array_reverse( $this->filesystem_journal, true ) as $path => $previous ) {
+			if ( null === $previous ) {
+				if ( is_file( $path ) ) {
+					unlink( $path );
+				}
+			} else {
+				wp_mkdir_p( dirname( $path ) );
+				file_put_contents( $path, $previous );
+			}
+		}
+		$this->filesystem_journal = array();
+	}
+
+	private function journal_identity_artifact( int $agent_id, string $artifact_id ): void {
+		$key = $agent_id . ':' . $artifact_id;
+		if ( isset( $this->identity_journal[ $key ] ) ) {
+			return;
+		}
+		$snapshot = AgentBundleMemoryArtifact::snapshot( $agent_id, $artifact_id );
+		if ( is_array( $snapshot ) ) {
+			$this->identity_journal[ $key ] = array( 'agent_id' => $agent_id, 'snapshot' => $snapshot );
+		}
+	}
+
+	private function rollback_identity(): void {
+		foreach ( array_reverse( $this->identity_journal, true ) as $entry ) {
+			AgentBundleMemoryArtifact::restore( $entry['agent_id'], $entry['snapshot'] );
+		}
+		$this->identity_journal = array();
+	}
+
+	/** @param array<string,string> $skills @param array<string,string> $references */
+	private function write_subagent_runtime_artifacts( string $slug, array $skills, array $references ): void {
+		$root = $this->directory_manager->get_agent_identity_directory( $slug );
+		foreach ( array( 'skills' => $skills, 'references' => $references ) as $kind => $files ) {
+			foreach ( $files as $path => $contents ) {
+				$this->write_journaled_file( BundleRelativePath::contained_join( $root . '/' . $kind, (string) $path, 'subagent artifact' ), $contents );
+			}
+		}
+	}
+
+	/** @param array<string,string> $files @param array<string,string> $installed_hashes @param array<int,array<string,string>> $conflicts */
+	private function write_guarded_subagent_runtime_artifacts( string $slug, string $kind, array $files, array $installed_hashes, array &$conflicts ): void {
+		$root = $this->directory_manager->get_agent_identity_directory( $slug ) . '/' . $kind;
+		foreach ( $files as $path => $contents ) {
+			$path   = (string) $path;
+			$target = BundleRelativePath::contained_join( $root, $path, 'subagent artifact' );
+			$installed_hash = $installed_hashes[ $path ] ?? null;
+			if ( is_string( $installed_hash ) && is_file( $target ) ) {
+				$current = file_get_contents( $target );
+				if ( is_string( $current ) && ! hash_equals( $installed_hash, hash( 'sha256', $current ) ) ) {
+					$conflicts[] = array( 'artifact_type' => 'subagent_' . rtrim( $kind, 's' ), 'artifact_id' => $path, 'reason' => 'local_modified' );
+					continue;
+				}
+			}
+			$this->write_journaled_file( $target, $contents );
+		}
+	}
+
+	/** @param array<string,string> $files @param array<string,string> $installed_hashes @param array<int,array<string,string>> $conflicts */
+	private function detect_locally_modified_subagent_artifacts( string $slug, string $kind, array $files, array $installed_hashes, array &$conflicts ): void {
+		$root = $this->directory_manager->get_agent_identity_directory( $slug ) . '/' . $kind;
+		foreach ( $files as $path => $_contents ) {
+			$path = ltrim( str_replace( '\\', '/', $path ), '/' );
+			$installed_hash = $installed_hashes[ $path ] ?? null;
+			$current = is_file( $root . '/' . $path ) ? file_get_contents( $root . '/' . $path ) : false;
+			if ( is_string( $installed_hash ) && is_string( $current ) && ! hash_equals( $installed_hash, hash( 'sha256', $current ) ) ) {
+				$conflicts[] = array( 'artifact_type' => 'subagent_' . rtrim( $kind, 's' ), 'artifact_id' => $slug . '/' . $path, 'reason' => 'local_modified' );
+			}
+		}
+	}
+
+	/** @param array<string,string> $files @return array<string,string> */
+	private function subagent_artifact_metadata( array $files ): array {
+		$metadata = array();
+		foreach ( $files as $path => $contents ) {
+			$metadata[ $path ] = hash( 'sha256', $contents );
+		}
+		ksort( $metadata, SORT_STRING );
+		return $metadata;
 	}
 
 	/**
@@ -1428,6 +1836,14 @@ class AgentBundler {
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 			$wpdb->delete( $agents_table, array( 'agent_id' => (int) $created_agent_id ), array( '%d' ) );
 		}
+	}
+
+	private function safe_graph_agent_rollback( int $agent_id, string $slug ): void {
+		$row = $this->agents_repo->get_agent( $agent_id );
+		if ( ! $row || (string) ( $row['agent_slug'] ?? '' ) !== $slug ) {
+			return;
+		}
+		$this->manual_rollback( $agent_id, array(), array() );
 	}
 
 	private function bundle_has_portable_artifacts( array $bundle ): bool {
@@ -1670,6 +2086,25 @@ class AgentBundler {
 		return $files;
 	}
 
+	/** @param array<string,string> $metadata @return array<string,string> */
+	private function collect_subagent_runtime_artifacts( string $slug, array $metadata, string $kind ): array {
+		$files = array();
+		$root  = $this->directory_manager->get_agent_identity_directory( $slug ) . '/' . $kind;
+		foreach ( $metadata as $path => $sha256 ) {
+			$path = ltrim( str_replace( '\\', '/', (string) $path ), '/' );
+			if ( '' === $path || str_contains( $path, '..' ) || ! is_string( $sha256 ) ) {
+				throw new BundleValidationException( sprintf( 'Subagent %s has invalid %s metadata.', esc_html( $slug ), esc_html( $kind ) ) );
+			}
+			$contents = file_get_contents( $root . '/' . $path );
+			if ( ! is_string( $contents ) || ! hash_equals( $sha256, hash( 'sha256', $contents ) ) ) {
+				throw new BundleValidationException( sprintf( 'Subagent %s %s artifact is missing or modified: %s.', esc_html( $slug ), esc_html( $kind ), esc_html( $path ) ) );
+			}
+			$files[ $path ] = $contents;
+		}
+		ksort( $files, SORT_STRING );
+		return $files;
+	}
+
 	/**
 	 * Collect USER.md template for the agent owner.
 	 *
@@ -1827,7 +2262,8 @@ class AgentBundler {
 		$this->directory_manager->ensure_directory_exists( $agent_dir );
 
 		foreach ( $files as $relative_path => $content ) {
-			$relative_path = str_replace( '\\', '/', (string) $relative_path );
+			$relative_path = (string) $relative_path;
+			BundleRelativePath::validate( $relative_path, 'agent memory' );
 
 			// Authored identity (SOUL.md) is materialized through the memory
 			// store seam by the importer's memory-artifact block, on both fresh
@@ -1842,7 +2278,7 @@ class AgentBundler {
 				continue;
 			}
 
-			$full_path = $agent_dir . '/' . $relative_path;
+			$full_path = BundleRelativePath::contained_join( $agent_dir, $relative_path, 'agent memory' );
 
 			// Ensure subdirectories exist (e.g., contexts/).
 			$dir = dirname( $full_path );
@@ -1850,7 +2286,7 @@ class AgentBundler {
 				wp_mkdir_p( $dir );
 			}
 
-			file_put_contents( $full_path, $content ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
+			$this->write_journaled_file( $full_path, (string) $content );
 		}
 	}
 
@@ -1875,7 +2311,7 @@ class AgentBundler {
 			wp_mkdir_p( $user_dir );
 		}
 
-		file_put_contents( $path, $content ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
+		$this->write_journaled_file( $path, $content );
 	}
 
 	/**
@@ -1893,12 +2329,12 @@ class AgentBundler {
 		$this->directory_manager->ensure_directory_exists( $pipeline_dir );
 
 		foreach ( $files as $filename => $content ) {
-			$full_path = $pipeline_dir . '/' . $filename;
+			$full_path = BundleRelativePath::contained_join( $pipeline_dir, (string) $filename, 'pipeline memory' );
 			$dir       = dirname( $full_path );
 			if ( ! is_dir( $dir ) ) {
 				wp_mkdir_p( $dir );
 			}
-			file_put_contents( $full_path, $content ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
+			$this->write_journaled_file( $full_path, (string) $content );
 		}
 	}
 
@@ -1918,6 +2354,8 @@ class AgentBundler {
 		$this->directory_manager->ensure_directory_exists( $flow_dir );
 
 		foreach ( $files as $relative_path => $content ) {
+			$relative_path = (string) $relative_path;
+			BundleRelativePath::validate( $relative_path, 'flow memory' );
 			// Handle files/ prefix for flow files directory.
 			if ( str_starts_with( $relative_path, 'files/' ) ) {
 				$flow_files_dir = $this->directory_manager->get_flow_files_directory( $pipeline_id, $flow_id );
@@ -1925,16 +2363,16 @@ class AgentBundler {
 					wp_mkdir_p( $flow_files_dir );
 				}
 				$filename  = substr( $relative_path, 6 ); // Strip 'files/' prefix.
-				$full_path = $flow_files_dir . '/' . $filename;
+				$full_path = BundleRelativePath::contained_join( $flow_files_dir, $filename, 'flow memory' );
 			} else {
-				$full_path = $flow_dir . '/' . $relative_path;
+				$full_path = BundleRelativePath::contained_join( $flow_dir, $relative_path, 'flow memory' );
 			}
 
 			$dir = dirname( $full_path );
 			if ( ! is_dir( $dir ) ) {
 				wp_mkdir_p( $dir );
 			}
-			file_put_contents( $full_path, $content ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
+			$this->write_journaled_file( $full_path, (string) $content );
 		}
 	}
 
