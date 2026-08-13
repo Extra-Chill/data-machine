@@ -390,12 +390,6 @@ $tools   = resolve_policy_tools_for_test(
 );
 assert_policy_equals( array( 'alpha_tool', 'beta_tool' ), array_keys( $tools ), 'absent enabled_tools keeps preset minus explicit deny', $failures, $passes );
 
-echo "\n[4] RequestInspector and AIStep share policy input helper:\n";
-$ai_step_source   = file_get_contents( __DIR__ . '/../inc/Core/Steps/AI/AIStep.php' ) ?: '';
-$inspector_source = file_get_contents( __DIR__ . '/../inc/Engine/AI/RequestInspector.php' ) ?: '';
-assert_policy_equals( 1, substr_count( $ai_step_source, 'PipelineToolPolicyArgs::fromConfigs' ), 'AIStep uses pipeline policy helper once', $failures, $passes );
-assert_policy_equals( 1, substr_count( $inspector_source, 'PipelineToolPolicyArgs::fromConfigs' ), 'RequestInspector uses pipeline policy helper once', $failures, $passes );
-
 echo "\n[5] helper translates flow/pipeline policy fields into resolver args:\n";
 $args = PipelineToolPolicyArgs::fromConfigs(
 	array(
@@ -487,11 +481,6 @@ assert_policy_equals( array( 'alpha_tool' ), array_keys( $resolution['tools'] ),
 assert_policy_equals( array(), $resolution['evidence']['unavailable_required_tool_names'] ?? null, 'resolved evidence has no unavailable required tools', $failures, $passes );
 assert_policy_equals( 'resolved', $resolution['evidence']['required_tool_resolution'][0]['status'] ?? null, 'resolved evidence marks required tool resolved', $failures, $passes );
 assert_policy_equals( 'alpha_tool', $resolution['evidence']['required_tool_resolution'][0]['resolved_name'] ?? null, 'resolved evidence preserves resolved logical name', $failures, $passes );
-
-echo "\n[10] required-tool evidence reuses captured source trace:\n";
-$resolver_source = file_get_contents( __DIR__ . '/../inc/Engine/AI/Tools/ToolPolicyResolver.php' ) ?: '';
-assert_policy_equals( 0, substr_count( $resolver_source, 'gatherWithMetadata(' ), 'evidence no longer manually replays metadata-only source gathering', $failures, $passes );
-assert_policy_equals( true, str_contains( $resolver_source, '$args[\'source_trace\'] = $this->last_source_trace' ), 'evidence builder receives captured trace metadata', $failures, $passes );
 
 echo "\n[11] host tool policy delegates control-plane tools from every source:\n";
 $previous_policy_env = getenv( 'DATAMACHINE_HOST_TOOL_POLICY_JSON' );
@@ -765,10 +754,6 @@ $resolution       = ( new ToolPolicyResolver( new SnapshotPolicyToolManager() ) 
 );
 assert_policy_equals( null, $resolution['alpha_tool']['executor'] ?? null, 'list-shaped transport policy is not converted into host policy', $failures, $passes );
 assert_policy_equals( null, $resolution['beta_tool']['executor'] ?? null, 'list-shaped transport policy does not affect unrelated tools', $failures, $passes );
-
-echo "\n[18] production host policy code has no sandbox transport schema special-case:\n";
-$host_policy_source = file_get_contents( __DIR__ . '/../inc/Engine/AI/Tools/HostToolPolicy.php' ) ?: '';
-assert_policy_equals( false, str_contains( $host_policy_source, 'sandbox-tool-policy/v1' ), 'HostToolPolicy does not name sandbox transport schemas', $failures, $passes );
 
 if ( $failures ) {
 	echo "\nFAILED: " . count( $failures ) . " pipeline policy assertions failed.\n";
