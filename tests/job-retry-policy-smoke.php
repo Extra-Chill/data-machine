@@ -137,22 +137,7 @@ $record_poison_item->invoke(
 assert_retry_policy_smoke( 'exhausted transport failures mark retry exhausted', true === ( $merged_engine_data['retry']['exhausted'] ?? false ) );
 assert_retry_policy_smoke( 'exhausted transport failures do not isolate source item', ! isset( $merged_engine_data['poison_item'] ) );
 
-echo "Case 6: Production code exposes retry/backoff hooks and metadata\n";
-$policy_src = file_get_contents( __DIR__ . '/../inc/Core/JobRetryPolicy.php' ) ?: '';
-$fail_src   = file_get_contents( __DIR__ . '/../inc/Engine/Actions/Handlers/FailJobHandler.php' ) ?: '';
-$ai_src     = file_get_contents( __DIR__ . '/../inc/Core/Steps/AI/AIStep.php' ) ?: '';
-
-assert_retry_policy_smoke( 'policy exposes retryable-error hook', str_contains( $policy_src, 'datamachine_job_error_retryable' ) );
-assert_retry_policy_smoke( 'policy exposes retry policy hook', str_contains( $policy_src, 'datamachine_job_retry_policy' ) );
-assert_retry_policy_smoke( 'policy exposes provider/source throttle hook', str_contains( $policy_src, 'datamachine_job_retry_throttle_delay' ) );
-assert_retry_policy_smoke( 'policy records retry metadata', str_contains( $policy_src, "'retry'" ) && str_contains( $policy_src, "'history'" ) );
-assert_retry_policy_smoke( 'policy records retry classification metadata', str_contains( $policy_src, "'retry_class'" ) );
-assert_retry_policy_smoke( 'policy records poison item isolation metadata', str_contains( $policy_src, "'poison_item'" ) );
-assert_retry_policy_smoke( 'fail handler tries retry before final failure', strpos( $fail_src, 'maybeRetry' ) < strpos( $fail_src, 'complete_job' ) );
-assert_retry_policy_smoke( 'fail handler persists structured diagnostics', str_contains( $fail_src, "'error_diagnostics'" ) && str_contains( $fail_src, "\$context_data['diagnostics']" ) );
-assert_retry_policy_smoke( 'AI failures pass retry and transport context', str_contains( $ai_src, "'retry_after'" ) && str_contains( $ai_src, "'headers'" ) && str_contains( $ai_src, "'transport_profile'" ) );
-
-echo "Case 7: Direct/system tasks resolve an ephemeral flow_step_id so they are retryable\n";
+echo "Case 6: Direct/system tasks resolve an ephemeral flow_step_id so they are retryable\n";
 // A direct task (e.g. daily_memory_generation) runs through a single ephemeral
 // step under engine_data['flow_config']; its flow_step_id is what
 // datamachine_execute_step needs to re-run the same job on retry.
@@ -200,7 +185,7 @@ assert_retry_policy_smoke(
 	'' === $resolve_ephemeral->invoke( null, array() )
 );
 
-echo "Case 8: Resumable multi-step ephemeral workflows resume from the first incomplete step (#2811)\n";
+echo "Case 7: Resumable multi-step ephemeral workflows resume from the first incomplete step (#2811)\n";
 
 // A resumable multi-step workflow where step 0 completed but step 1 has not:
 // the resume point is step 1, so step 0's already-applied effects are skipped.

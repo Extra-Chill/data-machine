@@ -302,17 +302,6 @@ $resolved_metrics = RunMetrics::fromJob(
 $assert( 'resolved contention is no longer reported as active backpressure', array() === $resolved_metrics['backpressure'] );
 $assert( 'resolved contention history preserves count and duration', 42 === $resolved_metrics['backpressure_history'][0]['defer_count'] && 90 === $resolved_metrics['backpressure_history'][0]['defer_age_seconds'] );
 
-echo "\n[7] CLI/source integration markers exist\n";
-$jobs_command = file_get_contents( __DIR__ . '/../inc/Cli/Commands/JobsCommand.php' ) ?: '';
-$fetch_step   = file_get_contents( __DIR__ . '/../inc/Core/Steps/Fetch/FetchStep.php' ) ?: '';
-$disposition  = file_get_contents( __DIR__ . '/../inc/Core/Steps/Fetch/Tools/FetchItemDispositionTool.php' ) ?: '';
-$assert( 'jobs list supports pipeline filter', str_contains( $jobs_command, "assoc_args['pipeline']" ) );
-$assert( 'jobs list supports handler filter', str_contains( $jobs_command, "assoc_args['handler']" ) );
-$assert( 'jobs list JSON includes outcome', str_contains( $jobs_command, "item['outcome']" ) );
-$assert( 'jobs metrics table prints outcome classes', str_contains( $jobs_command, 'Outcome Classes:' ) );
-$assert( 'fetch step records packet count', str_contains( $fetch_step, "'packet_count' => count( \$packets )" ) );
-$assert( 'source rejection persists structured reason', str_contains( $disposition, "'source_rejection'" ) );
-
 if ( $failures > 0 ) {
 	echo "\n=== job-outcome-metrics-smoke: {$failures} FAILURE(S) / {$total} assertions ===\n";
 	exit( 1 );

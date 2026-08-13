@@ -98,8 +98,7 @@ foreach ( $facade_names as $name ) {
 		array_filter(
 			$hits,
 			function ( string $hit ): bool {
-				return 'tests/cleanup-cluster-smoke.php' !== $hit
-					&& 'tests/flow-abilities-proxy-removal-smoke.php' !== $hit;
+				return 'tests/cleanup-cluster-smoke.php' !== $hit;
 			}
 		)
 	);
