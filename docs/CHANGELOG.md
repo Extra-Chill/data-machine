@@ -2,6 +2,17 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.172.28] - 2026-08-13
+
+### Changed
+- thin bootstrap into service providers
+- Add portable subagent bundle graphs
+- Revert "ci: shard Data Machine tests"
+- expose capability diagnostics
+
+### Fixed
+- paginate image optimization candidates
+
 ## [0.172.27] - 2026-08-13
 
 ### Fixed
