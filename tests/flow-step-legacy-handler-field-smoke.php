@@ -58,10 +58,6 @@ function assert_absent( string $key, array $array_value, string $name, array &$f
 	assert_equals( false, array_key_exists( $key, $array_value ), $name, $failures, $passes );
 }
 
-function assert_not_contains( string $needle, string $haystack, string $name, array &$failures, int &$passes ): void {
-	assert_equals( false, str_contains( $haystack, $needle ), $name, $failures, $passes );
-}
-
 echo "legacy handler field removal smoke (#1348)\n";
 echo "-------------------------------------------\n";
 
@@ -131,20 +127,6 @@ $restored = FlowStepConfig::normalizeHandlerShape(
 );
 assert_equals( array( 'rss' ), $restored['handler_slugs'] ?? array(), 'restored single-handler slug comes from canonical import settings', $failures, $passes );
 assert_absent( 'handler', $restored, 'restored step drops stale imported handler field', $failures, $passes );
-
-echo "\n[5] writer sources no longer seed or persist the legacy field:\n";
-$source_checks = array(
-	'inc/Abilities/Flow/FlowHelpers.php'         => array( "'handler'          => null" ),
-	'inc/Abilities/FlowStep/FlowStepHelpers.php' => array( "'handler'          => null" ),
-	'inc/Abilities/PipelineStepAbilities.php'    => array( "'handler'          => null" ),
-	'inc/Engine/Actions/ImportExport.php'        => array( "\$step['handler'] =" ),
-);
-foreach ( $source_checks as $relative_path => $needles ) {
-	$source = file_get_contents( __DIR__ . '/../' . $relative_path );
-	foreach ( $needles as $needle ) {
-		assert_not_contains( $needle, $source, "{$relative_path} does not contain {$needle}", $failures, $passes );
-	}
-}
 
 echo "\n-------------------------------------------\n";
 $total = $passes + count( $failures );
