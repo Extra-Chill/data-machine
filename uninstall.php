@@ -13,6 +13,7 @@ if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
 	exit;
 }
 
+require_once __DIR__ . '/vendor/autoload.php';
 require_once __DIR__ . '/inc/Abilities/Media/ImageGenerationAbilities.php';
 require_once __DIR__ . '/inc/Abilities/SettingsAbilities.php';
 require_once __DIR__ . '/inc/Core/ActionScheduler/GroupRegistrar.php';
@@ -23,8 +24,11 @@ if ( is_multisite() ) {
 	$datamachine_sites = get_sites( array( 'fields' => 'ids' ) );
 	foreach ( $datamachine_sites as $datamachine_blog_id ) {
 		switch_to_blog( $datamachine_blog_id );
-		datamachine_uninstall_site();
-		restore_current_blog();
+		try {
+			datamachine_uninstall_site();
+		} finally {
+			restore_current_blog();
+		}
 	}
 
 	// Drop network-scoped tables once (base_prefix), after every subsite is done.
@@ -70,17 +74,24 @@ function datamachine_uninstall_site() {
 		// datamachine_uninstall_network_tables(), not here — dropping it per-site
 		// would destroy the shared table on the first subsite uninstall.
 		$datamachine_tables_to_drop = array(
-			$wpdb->prefix . 'datamachine_post_identity_reservations',
-			$wpdb->prefix . 'datamachine_processed_items',
-			$wpdb->prefix . 'datamachine_jobs',
-			$wpdb->prefix . 'datamachine_flows',
-			$wpdb->prefix . 'datamachine_pipelines',
+			\DataMachine\Engine\AI\Actions\PendingActionStore::get_table_name(),
+			$wpdb->prefix . \DataMachine\Core\Database\RunMetadata\RunMetadata::TABLE_NAME,
+			$wpdb->prefix . \DataMachine\Core\Database\BundleArtifacts\InstalledBundleArtifacts::TABLE_NAME,
+			$wpdb->prefix . \DataMachine\Core\Database\PostIdentityReservations\PostIdentityReservations::TABLE_NAME,
+			$wpdb->prefix . \DataMachine\Core\Database\PostIdentityIndex\PostIdentityIndex::TABLE_NAME,
+			$wpdb->prefix . \DataMachine\Core\Database\TrackedItems\TrackedItems::TABLE_NAME,
+			$wpdb->prefix . \DataMachine\Core\Database\BatchItems\BatchItems::TABLE_NAME,
+			$wpdb->prefix . \DataMachine\Core\Database\ProcessedItems\ProcessedItems::TABLE_NAME,
+			$wpdb->prefix . \DataMachine\Core\Database\Jobs\Jobs::TABLE_NAME,
+			$wpdb->prefix . \DataMachine\Core\Database\Flows\Flows::TABLE_NAME,
+			$wpdb->prefix . \DataMachine\Core\Database\Pipelines\Pipelines::TABLE_NAME,
+			$wpdb->prefix . \DataMachine\Core\Database\Logs\LogRepository::TABLE_NAME,
 		);
 
 		// On single-site, base_prefix === prefix, so the network table is dropped
 		// here alongside the per-site tables (there is no separate network pass).
 		if ( ! is_multisite() ) {
-			$datamachine_tables_to_drop[] = $wpdb->base_prefix . 'datamachine_chat_sessions';
+			$datamachine_tables_to_drop = array_merge( $datamachine_tables_to_drop, datamachine_get_network_table_names() );
 		}
 
 		foreach ( $datamachine_tables_to_drop as $datamachine_table_name ) {
@@ -129,20 +140,35 @@ function datamachine_uninstall_site() {
  * destroy the shared table on the first subsite uninstall.
  */
 function datamachine_uninstall_network_tables() {
-	global $wpdb;
-
 	if ( ! current_user_can( 'delete_plugins' ) && ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
 		return;
 	}
 
-	$datamachine_network_tables = array(
-		$wpdb->base_prefix . 'datamachine_chat_sessions',
-	);
-
-	foreach ( $datamachine_network_tables as $datamachine_network_table ) {
+	foreach ( datamachine_get_network_table_names() as $datamachine_network_table ) {
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-		$wpdb->query( $wpdb->prepare( 'DROP TABLE IF EXISTS %i', $datamachine_network_table ) );
+		$GLOBALS['wpdb']->query( $GLOBALS['wpdb']->prepare( 'DROP TABLE IF EXISTS %i', $datamachine_network_table ) );
 	}
+}
+
+/**
+ * Get the network-scoped tables created by the current schema setup.
+ *
+ * The repository constants are the canonical unprefixed names used by each
+ * create_table() implementation. Order is reversed from dependencies so agent
+ * credentials and grants are removed before agent identities.
+ *
+ * @return string[] Full network table names.
+ */
+function datamachine_get_network_table_names() {
+	global $wpdb;
+
+	return array(
+		\DataMachine\Core\Database\Chat\Chat::get_prefixed_table_name(),
+		$wpdb->base_prefix . \DataMachine\Core\Database\Agents\AgentTokens::TABLE_NAME,
+		$wpdb->base_prefix . \DataMachine\Core\Database\Agents\AgentAccess::PRINCIPAL_TABLE_NAME,
+		$wpdb->base_prefix . \DataMachine\Core\Database\Agents\AgentAccess::TABLE_NAME,
+		$wpdb->base_prefix . \DataMachine\Core\Database\Agents\Agents::TABLE_NAME,
+	);
 }
 
 /**
