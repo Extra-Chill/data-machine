@@ -95,6 +95,7 @@ assert_provider_bootstrap( 6 === count( $availability ), 'duplicate provider dec
 $actual_modules = ProviderModules::all();
 $actual_ids     = array_map( static fn( ProviderModule $provider ): string => $provider->id(), $actual_modules );
 $expected_ids   = array(
+	'indexnow',
 	'google-analytics',
 	'mediavine',
 	'content-insights',
@@ -122,7 +123,7 @@ foreach ( $expected_ids as $provider_id ) {
 	);
 }
 
-$sendy = $actual_modules[13]->capabilities();
+$sendy = $actual_modules[14]->capabilities();
 assert_provider_bootstrap(
 	array(
 		'datamachine/sendy-subscribe',

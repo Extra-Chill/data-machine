@@ -25,14 +25,15 @@ final class CommandRegistry {
 	 * namespace, e.g. "datamachine analytics ga"). Order here determines
 	 * registration order.
 	 *
-	 * Every command this plugin owns is a flat `__invoke` command — the action
-	 * is a positional argument, not a WP-CLI subcommand — so each reflects to a
-	 * single `__default` entry carrying the command's own short description.
+	 * Most commands this plugin owns are flat `__invoke` commands. Provider
+	 * integrations that preserve an established subcommand contract may expose
+	 * public subcommand methods instead.
 	 *
 	 * @return array<string, class-string>
 	 */
 	public static function map(): array {
 		return array(
+			'datamachine indexnow'            => IndexNowCommand::class,
 			'datamachine analytics ga'        => GoogleAnalyticsCommand::class,
 			'datamachine analytics gsc'       => GoogleSearchConsoleCommand::class,
 			'datamachine analytics mediavine' => MediavineCommand::class,

@@ -28,6 +28,12 @@ final class ProviderModules {
 
 		return array(
 			new ProviderModule(
+				'indexnow',
+				$abilities,
+				array( 'datamachine/indexnow-submit', 'datamachine/indexnow-status', 'datamachine/indexnow-generate-key', 'datamachine/indexnow-verify-key' ),
+				static fn() => new \DataMachineBusiness\Abilities\SEO\IndexNowAbilities()
+			),
+			new ProviderModule(
 				'google-analytics',
 				array_merge( $abilities, $tools ),
 				array( 'datamachine/google-analytics', 'tool:google_analytics' ),

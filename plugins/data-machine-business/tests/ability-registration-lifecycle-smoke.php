@@ -113,6 +113,7 @@ assert_ability_registration(
 );
 
 $ability_files = array(
+	'inc/Abilities/SEO/IndexNowAbilities.php',
 	'inc/Abilities/Analytics/BingWebmasterAbilities.php',
 	'inc/Abilities/Analytics/ContentFlagsAbility.php',
 	'inc/Abilities/Analytics/ContentPerformanceAbility.php',
