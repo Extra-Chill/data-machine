@@ -110,7 +110,6 @@ class CommandRegistry {
 				'aliases' => array( 'datamachine block' ),
 			),
 			'datamachine meta-description' => array( 'class' => Commands\MetaDescriptionCommand::class ),
-			'datamachine indexnow'         => array( 'class' => Commands\IndexNowCommand::class ),
 			'datamachine chat'             => array( 'class' => Commands\ChatCommand::class ),
 		);
 	}

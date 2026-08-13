@@ -149,7 +149,7 @@ class AbilityCategories {
 			),
 			self::SEO        => array(
 				'label'       => __( 'SEO', 'data-machine' ),
-				'description' => __( 'Internal linking, meta descriptions, and IndexNow.', 'data-machine' ),
+				'description' => __( 'Internal linking and meta descriptions.', 'data-machine' ),
 			),
 			self::MEMORY     => array(
 				'label'       => __( 'Memory', 'data-machine' ),

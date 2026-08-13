@@ -50,8 +50,8 @@ $aliases = array(
 $declarations = CommandRegistry::declarations();
 $map          = CommandRegistry::map();
 
-$assert( 32 === count( $declarations ), 'Each implementation has one canonical declaration' );
-$assert( 48 === count( $map ), 'Every existing command string remains registered' );
+$assert( 31 === count( $declarations ), 'Each implementation has one canonical declaration' );
+$assert( 47 === count( $map ), 'Every existing command string remains registered' );
 $assert( count( $declarations ) === count( array_unique( array_column( $declarations, 'class' ) ) ), 'Implementations are not declared more than once' );
 
 foreach ( $aliases as $canonical => $compatibility_aliases ) {

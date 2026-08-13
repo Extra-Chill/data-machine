@@ -70,7 +70,6 @@ final class AbilityServiceProvider {
 		require_once $plugin_root . '/inc/Abilities/Media/BrokenImageReferenceAbilities.php';
 		require_once $plugin_root . '/inc/Abilities/Media/MediaAbilities.php';
 		require_once $plugin_root . '/inc/Abilities/SEO/MetaDescriptionAbilities.php';
-		require_once $plugin_root . '/inc/Abilities/SEO/IndexNowAbilities.php';
 		require_once $plugin_root . '/inc/Abilities/Media/ImageTemplateAbilities.php';
 		require_once $plugin_root . '/inc/Abilities/AgentCallAbilities.php';
 		require_once $plugin_root . '/inc/Abilities/AgentRemoteCallAbilities.php';
@@ -161,7 +160,6 @@ final class AbilityServiceProvider {
 		new \DataMachine\Abilities\Media\BrokenImageReferenceAbilities();
 		new \DataMachine\Abilities\Media\MediaAbilities();
 		new \DataMachine\Abilities\SEO\MetaDescriptionAbilities();
-		new \DataMachine\Abilities\SEO\IndexNowAbilities();
 		new \DataMachine\Abilities\Media\ImageTemplateAbilities();
 		new \DataMachine\Abilities\AgentCallAbilities();
 		new \DataMachine\Abilities\AgentRemoteCallAbilities();
