@@ -167,7 +167,7 @@ $assert_true( true === ( $filter_result['success'] ?? false ) && $filtered_conte
 
 $ability_source = file_get_contents( __DIR__ . '/../inc/Abilities/Job/HydrateJobArtifactAbility.php' ) ?: '';
 $cli_source     = file_get_contents( __DIR__ . '/../inc/Cli/Commands/JobsCommand.php' ) ?: '';
-$bootstrap      = file_get_contents( __DIR__ . '/../data-machine.php' ) ?: '';
+$bootstrap      = file_get_contents( __DIR__ . '/../inc/Core/Bootstrap/AbilityServiceProvider.php' ) ?: '';
 $assert_true( str_contains( $ability_source, "wp_register_ability(\n\t\t\t\t'datamachine/hydrate-job-artifact'" ), 'registers public hydrate-job-artifact ability' );
 $assert_true( str_contains( $ability_source, 'content_base64' ), 'ability returns JSON-safe content payloads' );
 $assert_true( str_contains( $bootstrap, 'new \\DataMachine\\Abilities\\Job\\HydrateJobArtifactAbility();' ), 'plugin bootstrap registers hydrate job artifact ability' );

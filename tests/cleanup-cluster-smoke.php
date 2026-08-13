@@ -76,7 +76,7 @@ function cleanup_cluster_grep_files( string $directory, string $needle, array $e
 }
 
 $root_dir    = dirname( __DIR__ );
-$plugin_main = (string) file_get_contents( $root_dir . '/data-machine.php' );
+$plugin_main = (string) file_get_contents( $root_dir . '/inc/Core/Bootstrap/AbilityServiceProvider.php' );
 
 echo "=== Cleanup Cluster Smoke (#1332, #1334, #1335) ===\n";
 
@@ -105,7 +105,7 @@ foreach ( $facade_names as $name ) {
 	assert_cleanup_cluster( "no PHP source references {$name}", array() === $hits );
 }
 
-echo "\n[bootstrap:1] data-machine.php directly instantiates concrete ability classes\n";
+echo "\n[bootstrap:1] ability provider directly instantiates concrete ability classes\n";
 foreach ( array(
 	'FlowStep\\GetFlowStepsAbility',
 	'FlowStep\\UpdateFlowStepAbility',
@@ -136,7 +136,7 @@ foreach ( array(
 	'Taxonomy\\DeleteTaxonomyTermAbility',
 ) as $class ) {
 	assert_cleanup_cluster(
-		"new \\DataMachine\\Abilities\\{$class}() in data-machine.php",
+		"new \\DataMachine\\Abilities\\{$class}() in AbilityServiceProvider",
 		false !== strpos( $plugin_main, "new \\DataMachine\\Abilities\\{$class}();" )
 	);
 }

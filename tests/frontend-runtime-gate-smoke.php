@@ -10,8 +10,9 @@
 $plugin_file = dirname( __DIR__ ) . '/data-machine.php';
 $source      = file_get_contents( $plugin_file );
 $runtime     = file_get_contents( dirname( __DIR__ ) . '/inc/Core/Bootstrap/RuntimeEnvironment.php' );
+$provider    = file_get_contents( dirname( __DIR__ ) . '/inc/Core/Bootstrap/RuntimeServiceProvider.php' );
 
-if ( false === $source || false === $runtime ) {
+if ( false === $source || false === $runtime || false === $provider ) {
 	fwrite( fopen( 'php://stderr', 'w' ), "FAIL: bootstrap source is not readable\n" );
 	exit( 1 );
 }
@@ -31,7 +32,7 @@ $assert = static function ( string $name, bool $condition ) use ( &$failed, &$to
 };
 
 $assert( 'runtime-gate-function-exists', str_contains( $source, 'function datamachine_should_load_full_runtime(): bool' ) );
-$assert( 'main-runtime-checks-gate-first', (bool) preg_match( '/function datamachine_run_datamachine_plugin\(\) \{\s*if \( ! datamachine_should_load_full_runtime\(\) \)/', $source ) );
+$assert( 'runtime-provider-checks-gate-first', (bool) preg_match( '/public static function register\(\): void \{\s*if \( ! RuntimeEnvironment::should_load_full_runtime\(\) \)/', $provider ) );
 $assert( 'runtime-gate-delegates-to-environment', str_contains( $source, 'RuntimeEnvironment::should_load_full_runtime()' ) );
 $assert( 'wp-tests-get-full-runtime', str_contains( $runtime, "defined( 'WP_TESTS_DOMAIN' )" ) );
 $assert( 'wp-cli-gets-full-runtime', str_contains( $runtime, "defined( 'WP_CLI' ) && (bool) constant( 'WP_CLI' )" ) );

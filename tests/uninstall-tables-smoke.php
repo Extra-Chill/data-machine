@@ -9,6 +9,7 @@
 
 $root      = dirname( __DIR__ );
 $main      = file_get_contents( $root . '/data-machine.php' );
+$activation = file_get_contents( $root . '/inc/Core/Bootstrap/ActivationServiceProvider.php' );
 $uninstall = file_get_contents( $root . '/uninstall.php' );
 $failures  = 0;
 $passes    = 0;
@@ -26,7 +27,7 @@ function datamachine_uninstall_assert( bool $condition, string $message ): void 
 	fwrite( STDERR, "FAIL: {$message}\n" );
 }
 
-preg_match( '/function datamachine_ensure_all_tables\(\) \{(?<body>.*?)\n\}/s', $main, $ensure_match );
+preg_match( '/public static function ensure_all_tables\(\): void \{(?<body>.*?)\n\t\}/s', $activation, $ensure_match );
 $ensure_body = $ensure_match['body'] ?? '';
 
 $site_tables = array(
@@ -58,7 +59,7 @@ foreach ( $site_tables as $cleanup_name => $create_call ) {
 }
 
 foreach ( $network_tables as $cleanup_name => $create_call ) {
-	datamachine_uninstall_assert( str_contains( $main, $create_call ), "schema setup creates network table via {$create_call}" );
+	datamachine_uninstall_assert( str_contains( $activation, $create_call ), "schema setup creates network table via {$create_call}" );
 	datamachine_uninstall_assert( str_contains( $uninstall, $cleanup_name ), "uninstall drops network table via {$cleanup_name}" );
 }
 

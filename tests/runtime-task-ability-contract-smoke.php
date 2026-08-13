@@ -6,7 +6,7 @@
  */
 
 $ability_file = __DIR__ . '/../inc/Abilities/Runtime/RuntimeTaskAbility.php';
-$bootstrap    = __DIR__ . '/../data-machine.php';
+$bootstrap    = __DIR__ . '/../inc/Core/Bootstrap/AbilityServiceProvider.php';
 $source       = file_get_contents( $ability_file ) ?: '';
 $root_source  = file_get_contents( $bootstrap ) ?: '';
 $failures     = array();

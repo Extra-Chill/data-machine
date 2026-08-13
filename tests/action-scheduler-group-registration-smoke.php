@@ -81,6 +81,7 @@ $GLOBALS['action_scheduler_group_terms'] = array();
 
 $root       = dirname( __DIR__ );
 $plugin_src = file_get_contents( $root . '/data-machine.php' ) ?: '';
+$provider_src = file_get_contents( $root . '/inc/Core/Bootstrap/AlwaysOnServiceProvider.php' ) ?: '';
 $group_src  = file_get_contents( $root . '/inc/Core/ActionScheduler/GroupRegistrar.php' ) ?: '';
 $drain_src  = file_get_contents( $root . '/inc/Cli/Commands/DrainCommand.php' ) ?: '';
 require_once $root . '/inc/Core/ActionScheduler/GroupRegistrar.php';
@@ -100,9 +101,10 @@ function assert_action_scheduler_group_contains( string $needle, string $haystac
 	assert_action_scheduler_group_true( false !== strpos( $haystack, $needle ), $message );
 }
 
-assert_action_scheduler_group_contains( 'action_scheduler_init', $plugin_src, 'plugin registers an Action Scheduler init hook' );
-assert_action_scheduler_group_contains( 'GroupRegistrar::class', $plugin_src, 'plugin hooks the Data Machine group registrar' );
-assert_action_scheduler_group_contains( 'ensureDataMachineGroup', $plugin_src, 'plugin ensures Data Machine group during AS init' );
+assert_action_scheduler_group_contains( 'AlwaysOnServiceProvider::register_scheduler()', $plugin_src, 'plugin delegates Action Scheduler integration' );
+assert_action_scheduler_group_contains( 'action_scheduler_init', $provider_src, 'provider registers an Action Scheduler init hook' );
+assert_action_scheduler_group_contains( 'GroupRegistrar::class', $provider_src, 'provider hooks the Data Machine group registrar' );
+assert_action_scheduler_group_contains( 'ensureDataMachineGroup', $provider_src, 'provider ensures Data Machine group during AS init' );
 
 assert_action_scheduler_group_contains( "public const GROUP = '" . \DataMachine\Core\ActionScheduler\GroupRegistrar::GROUP . "'", $group_src, 'group registrar owns the Data Machine group slug' );
 assert_action_scheduler_group_contains( 'ensureCustomTableGroup( self::GROUP )', $group_src, 'group registrar ensures custom-table group storage' );
