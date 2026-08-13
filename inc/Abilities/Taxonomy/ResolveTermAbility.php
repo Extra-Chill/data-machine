@@ -20,8 +20,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class ResolveTermAbility {
 
-	public function __construct() {
-		$this->registerAbility();
+	public function __construct( bool $register = true ) {
+		if ( $register ) {
+			$this->registerAbility();
+		}
 	}
 
 	private function registerAbility(): void {
@@ -370,7 +372,7 @@ class ResolveTermAbility {
 	 * @return array Result with success, term data, or error.
 	 */
 	public static function resolve( string $identifier, string $taxonomy, bool $create = false, array $args = array(), bool $fuzzy = false ): array {
-		$instance = new self();
+		$instance = new self( false );
 		$result   = $instance->execute(
 			array(
 				'identifier' => $identifier,

@@ -22,10 +22,12 @@ class ScheduleNextStepAbility {
 
 	use EngineHelpers;
 
-	public function __construct() {
+	public function __construct( bool $register = true ) {
 		$this->initDatabases();
 
-		$this->registerAbility();
+		if ( $register ) {
+			$this->registerAbility();
+		}
 	}
 
 	/**
