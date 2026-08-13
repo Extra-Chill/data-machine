@@ -151,23 +151,6 @@ class AbilityResult {
 	}
 
 	/**
-	 * Convert ability output into a REST-ready WP_Error when execution failed.
-	 *
-	 * @param mixed  $result          Ability execution result.
-	 * @param string $default_code    Error code to use when the result has no error code.
-	 * @param string $default_message Error message to use when the result has no message.
-	 * @param int    $default_status  Default HTTP status.
-	 * @return \WP_Error|null WP_Error for failures, null for successful results.
-	 */
-	public static function failure_to_wp_error( $result, string $default_code = 'ability_failed', string $default_message = 'Ability execution failed.', int $default_status = 500 ): ?\WP_Error {
-		if ( is_wp_error( $result ) ) {
-			return $result;
-		}
-
-		return self::legacy_failure_to_wp_error( $result, $default_code, $default_message, array(), $default_status );
-	}
-
-	/**
 	 * Present a successful ability collection with Data Machine's canonical page envelope.
 	 *
 	 * @param array  $result     Successful ability result.
@@ -223,7 +206,11 @@ class AbilityResult {
 	 * @return \WP_REST_Response|\WP_Error REST response or error.
 	 */
 	public static function rest_collection_response( $result, string $items_key, array $options = array(), string $default_code = 'ability_failed', string $default_message = 'Ability execution failed.', int $default_status = 500 ) {
-		$error = self::failure_to_wp_error( $result, $default_code, $default_message, $default_status );
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+
+		$error = self::legacy_failure_to_wp_error( $result, $default_code, $default_message, array(), $default_status );
 		if ( $error ) {
 			return $error;
 		}
@@ -262,7 +249,11 @@ class AbilityResult {
 	 * @return \WP_REST_Response|\WP_Error REST response or error.
 	 */
 	public static function rest_item_response( $result, $data = null, array $extra = array(), string $default_code = 'ability_failed', string $default_message = 'Ability execution failed.', int $default_status = 500 ) {
-		$error = self::failure_to_wp_error( $result, $default_code, $default_message, $default_status );
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+
+		$error = self::legacy_failure_to_wp_error( $result, $default_code, $default_message, array(), $default_status );
 		if ( $error ) {
 			return $error;
 		}
