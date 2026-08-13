@@ -190,19 +190,24 @@ $default_code_error = AbilityResult::legacy_failure_to_wp_error(
 $assert( 'legacy failures default to provided error code', 'email_error' === $default_code_error->get_error_code() );
 $assert( 'legacy failures keep error message', 'Human readable failure.' === $default_code_error->get_error_message() );
 
-$status_error = AbilityResult::failure_to_wp_error(
+$status_error = AbilityResult::rest_item_response(
 	array(
 		'success'    => false,
 		'error'      => 'Pipeline not found.',
 		'error_code' => 'pipeline_not_found',
 		'status'     => 404,
 	),
+	null,
+	array(),
 	'pipeline_failed',
 	'Pipeline failed.',
 	500
 );
 $assert( 'machine-readable legacy error_code is preserved', 'pipeline_not_found' === $status_error->get_error_code() );
 $assert( 'machine-readable status controls HTTP status', 404 === ( $status_error->get_error_data()['status'] ?? null ) );
+
+$native_item_error = new WP_Error( 'flow_not_found', 'Flow not found.', array( 'status' => 404 ) );
+$assert( 'REST item presenter preserves native WP_Error', $native_item_error === AbilityResult::rest_item_response( $native_item_error ) );
 
 $collection = AbilityResult::collection_envelope(
 	array(
@@ -238,6 +243,9 @@ $rest_collection_error = AbilityResult::rest_collection_response(
 );
 $assert( 'REST collection presenter returns WP_Error for failed ability results', $rest_collection_error instanceof WP_Error );
 $assert( 'REST collection presenter preserves failure status', 503 === ( $rest_collection_error->get_error_data()['status'] ?? null ) );
+
+$native_collection_error = new WP_Error( 'jobs_forbidden', 'Jobs denied.', array( 'status' => 403 ) );
+$assert( 'REST collection presenter preserves native WP_Error', $native_collection_error === AbilityResult::rest_collection_response( $native_collection_error, 'jobs' ) );
 
 $rest_item = AbilityResult::rest_item_response(
 	array( 'success' => true ),
