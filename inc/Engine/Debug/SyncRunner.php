@@ -194,7 +194,7 @@ class SyncRunner {
 		\add_action(
 			'datamachine_schedule_next_step',
 			static function ( $job_id, $flow_step_id, $data_packets = array() ): void {
-				( new ScheduleNextStepAbility() )->execute(
+				( new ScheduleNextStepAbility( false ) )->execute(
 					array(
 						'job_id'       => (int) $job_id,
 						'flow_step_id' => (string) $flow_step_id,

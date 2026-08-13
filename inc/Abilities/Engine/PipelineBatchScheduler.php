@@ -454,7 +454,7 @@ class PipelineBatchScheduler {
 			? (int) as_has_scheduled_action( 'datamachine_execute_step', $action_args, GroupRegistrar::GROUP )
 			: 0;
 		if ( $action_id <= 0 ) {
-			$result    = ( new ScheduleNextStepAbility() )->execute(
+			$result    = ( new ScheduleNextStepAbility( false ) )->execute(
 				array(
 					'job_id'       => $child_job_id,
 					'flow_step_id' => $next_flow_step_id,
