@@ -2,6 +2,16 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.172.24] - 2026-08-13
+
+### Changed
+- remove another source inspection tranche
+- use native errors for Jobs adapters
+- use native pipeline REST errors
+
+### Fixed
+- separate runtime ability execution from registration
+
 ## [0.172.23] - 2026-08-13
 
 ### Changed
