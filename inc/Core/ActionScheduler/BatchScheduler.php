@@ -696,16 +696,9 @@ class BatchScheduler {
 		if ( ! $is_v2 ) {
 			return true;
 		}
-		$result    = EngineData::mutate(
-			$parent_job_id,
-			static function ( array $engine ): array {
-				unset( $engine['batch_state'] );
-				return $engine;
-			},
-			'batch_v2_finalize'
-		);
-		$finalized = ! empty( $result['success'] );
-		if ( ! $finalized ) {
+		$result    = ( new Jobs() )->remove_engine_data_key( $parent_job_id, 'batch_state' );
+		$finalized = ! empty( $result['updated'] );
+		if ( ! $finalized && ! empty( $result['retryable'] ) ) {
 			self::scheduleFinalizeRetry( $current, $parent_job_id );
 		}
 		return $finalized;

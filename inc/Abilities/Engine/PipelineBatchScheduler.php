@@ -341,7 +341,7 @@ class PipelineBatchScheduler {
 		// like CoreMemoryFilesDirective resolve the correct agent's
 		// MEMORY.md / SOUL.md instead of falling back to the user_id
 		// default-agent lookup.
-		$child_engine        = $this->stripFlowRuntimeQueuePayloads( $engine_snapshot );
+		$child_engine        = $this->stripBatchRuntimeState( \DataMachine\Core\EngineData::stripFlowRuntimeQueuePayloads( $engine_snapshot ) );
 		$child_engine['job'] = array(
 			'job_id'        => $child_job_id,
 			'flow_id'       => $flow_id,
@@ -399,34 +399,7 @@ class PipelineBatchScheduler {
 		return $child_job_id;
 	}
 
-	/**
-	 * Remove large runtime queue payloads before cloning parent engine data.
-	 *
-	 * Queue consumers read live queue state from the flow record. Batch children
-	 * only need the step definitions and queue mode; copying the queue entries
-	 * multiplies stale fetch queues into every child job's engine_data.
-	 *
-	 * @param array $engine_snapshot Parent engine data snapshot.
-	 * @return array Engine data safe to clone to a batch child.
-	 */
-	private function stripFlowRuntimeQueuePayloads( array $engine_snapshot ): array {
-		$flow_config = is_array( $engine_snapshot['flow_config'] ?? null ) ? $engine_snapshot['flow_config'] : array();
-
-		foreach ( $flow_config as $flow_step_id => $flow_step_config ) {
-			if ( ! is_array( $flow_step_config ) ) {
-				continue;
-			}
-
-			unset(
-				$flow_step_config['prompt_queue'],
-				$flow_step_config['config_patch_queue'],
-				$flow_step_config['_queue_consume_revision']
-			);
-
-			$flow_config[ $flow_step_id ] = $flow_step_config;
-		}
-
-		$engine_snapshot['flow_config'] = $flow_config;
+	private function stripBatchRuntimeState( array $engine_snapshot ): array {
 		unset(
 			$engine_snapshot['batch'],
 			$engine_snapshot['batch_state'],
