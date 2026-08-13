@@ -2,6 +2,19 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.172.23] - 2026-08-13
+
+### Changed
+- remove more redundant source inspection smokes
+- return native email ability errors
+- use native errors for flow REST abilities
+- return native chat ability errors
+- remove legacy ability tool projections
+- remove redundant source contract smokes
+
+### Fixed
+- bound engine data persistence
+
 ## [0.172.22] - 2026-08-12
 
 ### Changed
