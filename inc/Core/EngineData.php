@@ -257,6 +257,18 @@ class EngineData {
 			}
 		}
 
+		do_action(
+			'datamachine_log',
+			'error',
+			'EngineData mutation exhausted compare-and-swap attempts',
+			array(
+				'job_id'     => $job_id,
+				'event_type' => $event_type,
+				'attempts'   => $max_attempts,
+				'reason'     => 'conflict_exhausted',
+			)
+		);
+
 		return array(
 			'success'  => false,
 			'conflict' => true,

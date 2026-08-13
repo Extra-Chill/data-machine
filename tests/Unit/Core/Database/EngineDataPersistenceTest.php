@@ -95,6 +95,57 @@ class EngineDataPersistenceTest extends WP_UnitTestCase {
 		$this->assertSame( 'engine_data_query_oversize', $result['error'] );
 	}
 
+	public function test_compare_and_swap_rejects_stale_snapshot_without_losing_concurrent_update(): void {
+		$jobs   = new Jobs();
+		$job_id = $jobs->create_job( array( 'source' => 'pipeline', 'label' => 'Stale snapshot test' ) );
+		$this->assertIsInt( $job_id );
+		$this->assertTrue( $jobs->store_engine_data( $job_id, array( 'revision' => 1 ) ) );
+
+		$stale = $jobs->retrieve_engine_data( $job_id );
+		$this->assertTrue( $jobs->store_engine_data( $job_id, array( 'revision' => 2, 'concurrent' => true ) ) );
+
+		$result = $jobs->compare_and_swap_engine_data( $job_id, $stale, array( 'revision' => 3 ) );
+
+		$this->assertFalse( $result['updated'] );
+		$this->assertTrue( $result['conflict'] );
+		$this->assertSame( array( 'revision' => 2, 'concurrent' => true ), $jobs->retrieve_engine_data( $job_id ) );
+	}
+
+	public function test_mutation_logs_bounded_context_when_conflicts_are_exhausted(): void {
+		$jobs   = new Jobs();
+		$job_id = $jobs->create_job( array( 'source' => 'pipeline', 'label' => 'Conflict exhaustion test' ) );
+		$this->assertIsInt( $job_id );
+		$this->assertTrue( $jobs->store_engine_data( $job_id, array( 'revision' => 0 ) ) );
+
+		$result = EngineData::mutate(
+			$job_id,
+			static function ( array $current ) use ( $jobs, $job_id ): array {
+				$jobs->store_engine_data( $job_id, array( 'revision' => $current['revision'] + 1 ) );
+				$current['mutation'] = true;
+				return $current;
+			},
+			'conflict_test',
+			2
+		);
+
+		$this->assertFalse( $result['success'] );
+		$this->assertTrue( $result['conflict'] );
+		$this->assertSame( 2, $result['attempts'] );
+		$this->assertSame( 'conflict_exhausted', $result['error'] );
+
+		$exhausted = array_values( array_filter( $this->logs, static fn( array $log ): bool => 'EngineData mutation exhausted compare-and-swap attempts' === $log['message'] ) );
+		$this->assertCount( 1, $exhausted );
+		$this->assertSame(
+			array(
+				'job_id'     => $job_id,
+				'event_type' => 'conflict_test',
+				'attempts'   => 2,
+				'reason'     => 'conflict_exhausted',
+			),
+			$exhausted[0]['context']
+		);
+	}
+
 	public function test_runtime_queue_sanitizer_preserves_all_execution_configuration(): void {
 		$snapshot = array(
 			'flow_config'     => array(
