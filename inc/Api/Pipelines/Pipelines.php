@@ -327,9 +327,8 @@ class Pipelines {
 				array( 'pipeline_ids' => $export_ids )
 			);
 
-			$error = AbilityResult::failure_to_wp_error( $result, 'export_failed', __( 'Failed to generate CSV export.', 'data-machine' ) );
-			if ( $error ) {
-				return $error;
+			if ( is_wp_error( $result ) ) {
+				return $result;
 			}
 
 			$response = new \WP_REST_Response( $result['data'] );
@@ -363,12 +362,8 @@ class Pipelines {
 			}
 			$result = ( new GetPipelinesAbility() )->execute( $input );
 
-			if ( ! $result['success'] || empty( $result['pipelines'] ) ) {
-				return new \WP_Error(
-					'pipeline_not_found',
-					$result['error'] ?? __( 'Pipeline not found.', 'data-machine' ),
-					array( 'status' => 404 )
-				);
+			if ( is_wp_error( $result ) || empty( $result['pipelines'] ) ) {
+				return is_wp_error( $result ) ? $result : new \WP_Error( 'pipeline_not_found', __( 'Pipeline not found.', 'data-machine' ), array( 'status' => 404 ) );
 			}
 
 			$pipeline_data = $result['pipelines'][0];
@@ -428,9 +423,8 @@ class Pipelines {
 			}
 			$result = ( new GetPipelinesAbility() )->execute( $input );
 
-			$error = AbilityResult::failure_to_wp_error( $result, 'get_pipelines_failed', __( 'Failed to get pipelines.', 'data-machine' ) );
-			if ( $error ) {
-				return $error;
+			if ( is_wp_error( $result ) ) {
+				return $result;
 			}
 
 			$pipelines = $result['pipelines'];

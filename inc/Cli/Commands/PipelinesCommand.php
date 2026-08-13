@@ -317,8 +317,8 @@ class PipelinesCommand extends BaseCommand {
 				)
 			);
 
-			if ( ! $result['success'] || empty( $result['pipelines'] ) ) {
-				WP_CLI::error( $result['error'] ?? 'Pipeline not found' );
+			if ( is_wp_error( $result ) || empty( $result['pipelines'] ) ) {
+				WP_CLI::error( is_wp_error( $result ) ? $result->get_error_message() : 'Pipeline not found' );
 				return;
 			}
 
@@ -347,8 +347,8 @@ class PipelinesCommand extends BaseCommand {
 
 			$result = ( new GetPipelinesAbility() )->execute( $ability_input );
 
-			if ( ! $result['success'] ) {
-				WP_CLI::error( $result['error'] ?? 'Failed to get pipelines' );
+			if ( is_wp_error( $result ) ) {
+				WP_CLI::error( $result->get_error_message() );
 				return;
 			}
 
@@ -406,8 +406,8 @@ class PipelinesCommand extends BaseCommand {
 			)
 		);
 
-		if ( empty( $result['success'] ) || empty( $result['pipelines'][0] ) ) {
-			WP_CLI::error( $result['error'] ?? 'Pipeline not found' );
+		if ( is_wp_error( $result ) || empty( $result['pipelines'][0] ) ) {
+			WP_CLI::error( is_wp_error( $result ) ? $result->get_error_message() : 'Pipeline not found' );
 			return;
 		}
 
@@ -884,7 +884,7 @@ class PipelinesCommand extends BaseCommand {
 			)
 		);
 
-		if ( ! $result['success'] || empty( $result['pipelines'] ) ) {
+		if ( is_wp_error( $result ) || empty( $result['pipelines'] ) ) {
 			return array( 'error' => 'Pipeline not found' );
 		}
 
@@ -1031,8 +1031,8 @@ class PipelinesCommand extends BaseCommand {
 		// First, get pipeline info for confirmation.
 		$info = ( new GetPipelinesAbility() )->execute( array( 'pipeline_id' => $pipeline_id ) );
 
-		if ( ! $info['success'] || empty( $info['pipelines'] ) ) {
-			WP_CLI::error( 'Pipeline not found' );
+		if ( is_wp_error( $info ) || empty( $info['pipelines'] ) ) {
+			WP_CLI::error( is_wp_error( $info ) ? $info->get_error_message() : 'Pipeline not found' );
 			return;
 		}
 
