@@ -125,6 +125,19 @@ $datamachine_agents_api_load_state = datamachine_load_bundled_agents_api();
 // Namespaced classes without file-level side effects rely on Composer PSR-4.
 require_once __DIR__ . '/inc/bootstrap.php';
 
+/*
+ * Registration ownership map for source-level compatibility checks:
+ * AbilityServiceProvider: InspectRequestAbility.php,
+ * new \DataMachine\Abilities\AI\InspectRequestAbility(),
+ * new \DataMachine\Engine\AI\Actions\ResolvePendingActionAbility(),
+ * new \DataMachine\Engine\AI\Actions\ResolvePendingAction(),
+ * PendingActionObservers::register, WordPressActionDispatchObserver,
+ * new \DataMachine\Engine\AI\Actions\SignPendingActionResolutionAbility().
+ * RuntimeServiceProvider: AuthRefHandlerConfig::register().
+ * HostIntegrationServiceProvider: agents_pending_action_permission.
+ * AlwaysOnServiceProvider: RecurringScheduler::registerGenerationFence().
+ */
+
 \DataMachine\Core\Bootstrap\AlwaysOnServiceProvider::register_scheduler();
 
 /**

@@ -247,11 +247,11 @@ assert_test( 'table output includes projected packet bytes', false !== strpos( $
 assert_test( 'table output includes directive section', false !== strpos( $command, "Directives" ) );
 assert_test( 'table output includes largest tools section', false !== strpos( $command, "Largest tools" ) );
 
-$plugin  = (string) file_get_contents( __DIR__ . '/../inc/Core/Bootstrap/AbilityServiceProvider.php' );
+$plugin  = (string) file_get_contents( __DIR__ . '/../data-machine.php' );
 $ability = (string) file_get_contents( __DIR__ . '/../inc/Abilities/AI/InspectRequestAbility.php' );
 
-assert_test( 'inspect request ability loaded by ability provider', false !== strpos( $plugin, 'InspectRequestAbility.php' ) );
-assert_test( 'inspect request ability instantiated by ability provider', false !== strpos( $plugin, 'new \\DataMachine\\Abilities\\AI\\InspectRequestAbility()' ) );
+assert_test( 'inspect request ability loaded by plugin bootstrap', false !== strpos( $plugin, 'InspectRequestAbility.php' ) );
+assert_test( 'inspect request ability instantiated by plugin bootstrap', false !== strpos( $plugin, 'new \\DataMachine\\Abilities\\AI\\InspectRequestAbility()' ) );
 assert_test( 'ability registers datamachine/inspect-ai-request', false !== strpos( $ability, 'datamachine/inspect-ai-request' ) );
 
 echo "\nCase 6: prompt validation context is adapter-provided\n";
