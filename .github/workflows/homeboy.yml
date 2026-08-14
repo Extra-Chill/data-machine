@@ -37,4 +37,25 @@ jobs:
       # undeclared inputs to a reusable workflow is a hard startup_failure.
       commands: ${{ github.event_name == 'pull_request' && 'review audit,review lint,review test,refactor lint' || github.event_name == 'workflow_dispatch' && 'review audit,review lint,review test' || 'review test' }}
       expected-commands: ${{ github.event_name == 'pull_request' && 'review audit,review lint,review test' || github.event_name == 'workflow_dispatch' && 'review audit,review lint,review test' || 'review test' }}
+      # Fail an oversized changed-scope selection in seconds instead of burning
+      # the whole 1500s test budget and reporting zero test counts.
+      #
+      # Measured on run 31735416840 (3 changed files -> 161 selected tests):
+      # 93 host smokes started and 90 finished inside the budget, at a mean of
+      # 16.6s each (median 16, p90 17, max 25). Those 90 sum to 1492s, so the
+      # smokes ARE the budget -- throughput is ~90 per phase and there is no
+      # meaningful overhead to reclaim.
+      #
+      # Observed selections and outcomes:
+      #   1 -> passed in 3m39s
+      #   95, 137, 161, 177, 312, 459, 464 -> all timed out at 1500s
+      #
+      # 60 x 16.6s ~= 1000s, about two thirds of the budget, leaving ~500s of
+      # headroom for runner variance. Above ~80 the phase is a coin flip and
+      # above ~90 it cannot finish at all.
+      #
+      # This bounds the symptom. The cause is that a 3-file diff selects 161
+      # tests: the WordPress drift/changed-test mapping is too broad, tracked
+      # in Extra-Chill/homeboy#12365.
+      max-changed-test-files: '60'
     secrets: inherit
