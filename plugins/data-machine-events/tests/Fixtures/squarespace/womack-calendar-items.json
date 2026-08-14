@@ -1,0 +1,34 @@
+[
+  {
+    "id": "6a799354b462355ff31b8aec",
+    "collectionId": "6515beb3cb46457500c400c9",
+    "recordType": 12,
+    "urlId": "ill-vibe-5",
+    "title": "ill Vibe",
+    "fullUrl": "/womack-events/ill-vibe-5",
+    "structuredContent": {
+      "_type": "CalendarEvent",
+      "startDate": 1788123600243,
+      "endDate": 1788138000243
+    },
+    "startDate": 1788123600243,
+    "endDate": 1788138000243,
+    "recordTypeLabel": "event"
+  },
+  {
+    "id": "6a79931804b60324bea69627",
+    "collectionId": "6515beb3cb46457500c400c9",
+    "recordType": 12,
+    "urlId": "3jtw3a6l6tch7bcfkgrzbw64xtnrx3",
+    "title": "Groove Candy",
+    "fullUrl": "/womack-events/3jtw3a6l6tch7bcfkgrzbw64xtnrx3",
+    "structuredContent": {
+      "_type": "CalendarEvent",
+      "startDate": 1788062400687,
+      "endDate": 1788073140687
+    },
+    "startDate": 1788062400687,
+    "endDate": 1788073140687,
+    "recordTypeLabel": "event"
+  }
+]

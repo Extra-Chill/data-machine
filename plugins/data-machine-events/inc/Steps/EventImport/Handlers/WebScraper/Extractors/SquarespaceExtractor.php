@@ -15,6 +15,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 class SquarespaceExtractor extends BaseExtractor {
+	private const MAX_CALENDAR_COLLECTIONS = 10;
 
 	public function canExtract( string $html ): bool {
 		return strpos( $html, 'Static.SQUARESPACE_CONTEXT' ) !== false;
@@ -90,6 +91,11 @@ class SquarespaceExtractor extends BaseExtractor {
 		}
 
 		if ( empty( $raw_items ) ) {
+			// Native Calendar blocks load their event collection by month at runtime.
+			$raw_items = $this->parseCalendarBlockCollections( $html, $source_url );
+		}
+
+		if ( empty( $raw_items ) ) {
 			return array();
 		}
 
@@ -152,6 +158,169 @@ class SquarespaceExtractor extends BaseExtractor {
 		}
 
 		return $items;
+	}
+
+	/**
+	 * Fetch upcoming events for native Squarespace Calendar blocks.
+	 *
+	 * Calendar blocks contain only a collection ID in static HTML. The browser
+	 * renderer resolves that ID through Squarespace's public monthly endpoint.
+	 *
+	 * @param string $html       Host page HTML.
+	 * @param string $source_url Source URL used to derive the endpoint origin.
+	 * @return array Raw event items, or an empty array on failure.
+	 */
+	private function parseCalendarBlockCollections( string $html, string $source_url ): array {
+		if ( false === strpos( $html, 'calendar-block' ) || ! preg_match_all( '/<div\b[^>]*class=["\'][^"\']*\bcalendar-block\b[^"\']*["\'][^>]*>/i', $html, $matches ) ) {
+			return array();
+		}
+
+		$parsed     = wp_parse_url( $source_url );
+		$port       = isset( $parsed['port'] ) ? ':' . $parsed['port'] : '';
+		$base_url   = ( $parsed['scheme'] ?? 'https' ) . '://' . ( $parsed['host'] ?? '' ) . $port;
+		$context    = $this->extractContextData( $html );
+		$timezone   = $context['website']['timeZone'] ?? 'UTC';
+		$horizon    = $this->getRecurrenceHorizonDays(
+			array(
+				'source_url' => $source_url,
+				'method'     => $this->getMethod(),
+			)
+		);
+		$max_events = $this->getMaxScrapeEvents(
+			array(
+				'source_url' => $source_url,
+				'method'     => $this->getMethod(),
+			)
+		);
+
+		try {
+			$calendar_timezone = new \DateTimeZone( $timezone );
+		} catch ( \Exception $e ) {
+			$calendar_timezone = new \DateTimeZone( 'UTC' );
+		}
+
+		$now          = $this->getCalendarNow( $calendar_timezone );
+		$cutoff       = $now->modify( '+' . $horizon . ' days' );
+		$month_cursor = $now->modify( 'first day of this month' )->setTime( 0, 0 );
+		$months       = array();
+		while ( $month_cursor <= $cutoff ) {
+			$months[]     = $month_cursor->format( 'm-Y' );
+			$month_cursor = $month_cursor->modify( 'first day of next month' );
+		}
+
+		$seen_ids        = array();
+		$seen_event_keys = array();
+		$events          = array();
+		foreach ( $matches[0] as $tag ) {
+			if ( ! preg_match( '/data-block-json=["\']([^"\']+)["\']/i', $tag, $block_match ) ) {
+				continue;
+			}
+
+			$block = json_decode( html_entity_decode( $block_match[1], ENT_QUOTES, 'UTF-8' ), true );
+			if ( ! is_array( $block ) || empty( $block['collectionId'] ) ) {
+				continue;
+			}
+
+			$collection_id = (string) $block['collectionId'];
+			if ( isset( $seen_ids[ $collection_id ] ) ) {
+				continue;
+			}
+			if ( count( $seen_ids ) >= self::MAX_CALENDAR_COLLECTIONS ) {
+				break;
+			}
+			$seen_ids[ $collection_id ] = true;
+
+			foreach ( $months as $month ) {
+				$url      = add_query_arg(
+					array(
+						'month'        => $month,
+						'collectionId' => $collection_id,
+					),
+					$base_url . '/api/open/GetItemsByMonth'
+				);
+				$response = \DataMachine\Core\HttpClient::get(
+					$url,
+					array(
+						'timeout' => 15,
+						'context' => 'Squarespace Extractor Calendar Block',
+					)
+				);
+
+				if ( empty( $response['success'] ) || empty( $response['data'] ) ) {
+					continue;
+				}
+
+				$items = json_decode( $response['data'], true );
+				if ( ! is_array( $items ) || JSON_ERROR_NONE !== json_last_error() ) {
+					continue;
+				}
+
+				foreach ( $this->filterEventItems( $items ) as $item ) {
+					$start     = $item['startDate'] ?? $item['structuredContent']['startDate'] ?? null;
+					$timestamp = $this->getCalendarItemStartTimestamp( $start, $calendar_timezone );
+					if ( null === $timestamp || $timestamp < $now->getTimestamp() || $timestamp > $cutoff->getTimestamp() ) {
+						continue;
+					}
+
+					$event_keys = array(
+						'event:' . md5( (string) wp_json_encode( array( $item['title'] ?? '', $start, $item['endDate'] ?? '' ) ) ),
+					);
+					if ( ! empty( $item['id'] ) ) {
+						$event_keys[] = 'id:' . $item['id'];
+					}
+					if ( ! empty( $item['fullUrl'] ) ) {
+						$event_keys[] = 'url:' . $item['fullUrl'];
+					}
+
+					if ( array_intersect_key( $seen_event_keys, array_fill_keys( $event_keys, true ) ) ) {
+						continue;
+					}
+					foreach ( $event_keys as $event_key ) {
+						$seen_event_keys[ $event_key ] = true;
+					}
+					$events[] = $item;
+					if ( count( $events ) >= $max_events ) {
+						return $events;
+					}
+				}
+			}
+		}
+
+		return array_slice(
+			$events,
+			0,
+			$max_events
+		);
+	}
+
+	/**
+	 * Resolve a Calendar item start value to a Unix timestamp.
+	 *
+	 * @param mixed         $start    Numeric seconds/milliseconds or a date string.
+	 * @param \DateTimeZone $timezone Calendar timezone for strings without an offset.
+	 */
+	private function getCalendarItemStartTimestamp( $start, \DateTimeZone $timezone ): ?int {
+		if ( is_numeric( $start ) ) {
+			$timestamp = (int) $start;
+			return $timestamp > 1000000000000 ? (int) ( $timestamp / 1000 ) : $timestamp;
+		}
+
+		if ( ! is_string( $start ) || '' === trim( $start ) ) {
+			return null;
+		}
+
+		try {
+			return ( new \DateTimeImmutable( $start, $timezone ) )->getTimestamp();
+		} catch ( \Exception $e ) {
+			return null;
+		}
+	}
+
+	/**
+	 * Current instant in the calendar's timezone.
+	 */
+	protected function getCalendarNow( \DateTimeZone $timezone ): \DateTimeImmutable {
+		return new \DateTimeImmutable( 'now', $timezone );
 	}
 
 	/**

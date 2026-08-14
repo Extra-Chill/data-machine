@@ -34,6 +34,8 @@ class SquarespaceExtractorTest extends WP_UnitTestCase {
 
 	public function tearDown(): void {
 		remove_all_filters( 'pre_http_request' );
+		remove_all_filters( 'data_machine_events_scraper_recurrence_horizon_days' );
+		remove_all_filters( 'data_machine_events_scraper_max_events' );
 		parent::tearDown();
 	}
 
@@ -351,6 +353,188 @@ class SquarespaceExtractorTest extends WP_UnitTestCase {
 		$this->assertSame( '2099-06-01', $events[0]['startDate'] );
 	}
 
+	public function test_native_calendar_blocks_fetch_bounded_months_and_dedupe_events() {
+		$source_url = 'https://www.thewomack.us:8443/calendar';
+		$html       = file_get_contents( $this->fixtures_dir . '/womack-calendar-block.html' );
+		$items      = file_get_contents( $this->fixtures_dir . '/womack-calendar-items.json' );
+		$requests   = array();
+
+		$this->extractor = $this->makeFixedCalendarExtractor();
+
+		add_filter(
+			'pre_http_request',
+			static function ( $preempt, $args, $url ) use ( $items, &$requests ) {
+				if ( 0 === strpos( $url, 'https://www.thewomack.us:8443/api/open/GetItemsByMonth?' ) ) {
+					parse_str( (string) wp_parse_url( $url, PHP_URL_QUERY ), $query );
+					$collection = $query['collectionId'] ?? '';
+					$month      = $query['month'] ?? '';
+					$requests[] = $collection . '|' . $month;
+
+					if ( '6515beb3cb46457500c400c9' === $collection && '08-2026' === $month ) {
+						return array(
+							'headers'  => array(),
+							'body'     => $items,
+							'response' => array(
+								'code'    => 200,
+								'message' => 'OK',
+							),
+							'cookies'  => array(),
+							'filename' => null,
+						);
+					}
+
+					if ( '6515beb3cb46457500c400c9' === $collection && '09-2026' === $month ) {
+						return array(
+							'headers'  => array(),
+							'body'     => '{malformed',
+							'response' => array( 'code' => 200 ),
+						);
+					}
+
+					if ( 'secondary-calendar' === $collection && '08-2026' === $month ) {
+						$secondary = array(
+							json_decode( $items, true )[0],
+							array(
+								'id'         => 'past-event',
+								'recordType' => 12,
+								'title'      => 'Past Event',
+								'startDate'  => 1785565799000,
+							),
+							array(
+								'id'         => 'exact-now',
+								'recordType' => 12,
+								'title'      => 'Exact Now',
+								'startDate'  => '2026-08-01T06:30:00Z',
+							),
+							array(
+								'id'         => 'secondary-event',
+								'recordType' => 12,
+								'title'      => 'Secondary Calendar Show',
+								'fullUrl'    => '/womack-events/secondary-calendar-show',
+								'startDate'  => 1788325200000,
+								'endDate'    => 1788332400000,
+							),
+							array(
+								'id'         => 'exact-cutoff',
+								'recordType' => 12,
+								'title'      => 'Exact Cutoff',
+								'startDate'  => '2026-10-30T06:30:00Z',
+							),
+							array(
+								'id'         => 'string-beyond-cutoff',
+								'recordType' => 12,
+								'title'      => 'String Beyond Cutoff',
+								'startDate'  => '2026-10-30T06:30:01Z',
+							),
+							array(
+								'id'         => 'beyond-horizon',
+								'recordType' => 12,
+								'title'      => 'Beyond Horizon',
+								'startDate'  => 1793491200000,
+							),
+						);
+
+						return array(
+							'headers'  => array(),
+							'body'     => wp_json_encode( $secondary ),
+							'response' => array( 'code' => 200 ),
+						);
+					}
+
+					if ( 'secondary-calendar' === $collection && '09-2026' === $month ) {
+						return new \WP_Error( 'http_request_failed', 'Calendar unavailable' );
+					}
+
+					return array(
+						'headers'  => array(),
+						'body'     => '[]',
+						'response' => array( 'code' => 200 ),
+					);
+				}
+
+				if ( 'https://www.thewomack.us:8443/calendar?format=json' === $url ) {
+					return array(
+						'headers'  => array(),
+						'body'     => '{"collection":{"type":10,"itemCount":0},"mainContent":""}',
+						'response' => array(
+							'code'    => 200,
+							'message' => 'OK',
+						),
+						'cookies'  => array(),
+						'filename' => null,
+					);
+				}
+
+				return new \WP_Error( 'http_request_failed', 'Unmocked URL: ' . $url );
+			},
+			10,
+			3
+		);
+
+		$events = $this->extractor->extract( $html, $source_url );
+
+		$this->assertCount( 5, $events );
+		$this->assertSame( 'ill Vibe', $events[0]['title'] );
+		$this->assertSame( '2026-08-30', $events[0]['startDate'] );
+		$this->assertSame( 'Groove Candy', $events[1]['title'] );
+		$this->assertSame( '/womack-events/3jtw3a6l6tch7bcfkgrzbw64xtnrx3', $events[1]['source_url'] );
+		$this->assertSame(
+			array( 'ill Vibe', 'Groove Candy', 'Exact Now', 'Secondary Calendar Show', 'Exact Cutoff' ),
+			array_column( $events, 'title' )
+		);
+		$this->assertSame(
+			array(
+				'6515beb3cb46457500c400c9|07-2026',
+				'6515beb3cb46457500c400c9|08-2026',
+				'6515beb3cb46457500c400c9|09-2026',
+				'6515beb3cb46457500c400c9|10-2026',
+				'secondary-calendar|07-2026',
+				'secondary-calendar|08-2026',
+				'secondary-calendar|09-2026',
+				'secondary-calendar|10-2026',
+			),
+			$requests,
+			'Phoenix is still in July when the UTC clock has crossed into August.'
+		);
+	}
+
+	public function test_calendar_block_collection_and_event_caps_bound_requests() {
+		$this->extractor = $this->makeFixedCalendarExtractor();
+		$requests        = array();
+		$html            = $this->makeCalendarBlocksHtml(
+			array_map(
+				static fn( int $number ): string => 'collection-' . $number,
+				range( 1, 12 )
+			)
+		);
+
+		$this->mockCalendarBlockRequests( $requests, static fn(): array => array() );
+		$this->assertSame( array(), $this->extractor->extract( $html, 'https://venue.test/calendar' ) );
+		$this->assertCount( 40, $requests, 'Ten collections across four bounded months is the maximum request count.' );
+		$this->assertSame( 'collection-10|10-2026', $requests[39] );
+
+		remove_all_filters( 'pre_http_request' );
+		$requests = array();
+		add_filter( 'data_machine_events_scraper_max_events', static fn(): int => 2 );
+		$this->mockCalendarBlockRequests(
+			$requests,
+			static function ( string $collection, string $month ): array {
+				return array(
+					array(
+						'id'         => $collection . '-' . $month,
+						'recordType' => 12,
+						'title'      => $collection . ' ' . $month,
+						'startDate'  => '07-2026' === $month ? '2026-08-01T06:30:00Z' : '2026-08-02T06:30:00Z',
+					),
+				);
+			}
+		);
+
+		$events = $this->extractor->extract( $html, 'https://venue.test/calendar' );
+		$this->assertCount( 2, $events );
+		$this->assertSame( array( 'collection-1|07-2026', 'collection-1|08-2026' ), $requests );
+	}
+
 	/* ------------------------------------------------------------------ */
 	/* Live fixtures — integration smoke                                  */
 	/* ------------------------------------------------------------------ */
@@ -466,6 +650,54 @@ class SquarespaceExtractorTest extends WP_UnitTestCase {
 	/* ------------------------------------------------------------------ */
 	/* Helpers                                                            */
 	/* ------------------------------------------------------------------ */
+
+	private function makeFixedCalendarExtractor(): SquarespaceExtractor {
+		return new class() extends SquarespaceExtractor {
+			protected function getCalendarNow( \DateTimeZone $timezone ): \DateTimeImmutable {
+				return ( new \DateTimeImmutable( '2026-08-01 06:30:00', new \DateTimeZone( 'UTC' ) ) )->setTimezone( $timezone );
+			}
+		};
+	}
+
+	private function makeCalendarBlocksHtml( array $collection_ids ): string {
+		$blocks = '';
+		foreach ( $collection_ids as $collection_id ) {
+			$block   = esc_attr( wp_json_encode( array( 'collectionId' => $collection_id ) ) );
+			$blocks .= '<div class="sqs-block calendar-block" data-block-json="' . $block . '"></div>';
+		}
+
+		return '<html><script>Static.SQUARESPACE_CONTEXT = {"website":{"timeZone":"America/Phoenix"}};</script><body>' . $blocks . '</body></html>';
+	}
+
+	private function mockCalendarBlockRequests( array &$requests, callable $items_for_request ): void {
+		add_filter(
+			'pre_http_request',
+			static function ( $preempt, $args, $url ) use ( &$requests, $items_for_request ) {
+				if ( false !== strpos( $url, '/api/open/GetItemsByMonth?' ) ) {
+					parse_str( (string) wp_parse_url( $url, PHP_URL_QUERY ), $query );
+					$collection = (string) ( $query['collectionId'] ?? '' );
+					$month      = (string) ( $query['month'] ?? '' );
+					$requests[] = $collection . '|' . $month;
+					$body       = wp_json_encode( $items_for_request( $collection, $month ) );
+				} else {
+					$body = '{"collection":{"type":10,"itemCount":0},"mainContent":""}';
+				}
+
+				return array(
+					'headers'  => array(),
+					'body'     => $body,
+					'response' => array(
+						'code'    => 200,
+						'message' => 'OK',
+					),
+					'cookies'  => array(),
+					'filename' => null,
+				);
+			},
+			10,
+			3
+		);
+	}
 
 	/**
 	 * Build a minimal raw Squarespace event item shaped for normalizeItem().
