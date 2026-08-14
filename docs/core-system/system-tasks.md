@@ -224,7 +224,6 @@ Hooks the `datamachine_tasks` filter to register built-in task types:
 | `dispatch_message` | `DispatchMessageTask` |
 | `emit_data_packets` | `EmitDataPacketsTask` |
 | `image_generation` | `ImageGenerationTask` |
-| `image_optimization` | `ImageOptimizationTask` |
 | `alt_text_generation` | `AltTextTask` |
 | `internal_linking` | `InternalLinkingTask` |
 | `daily_memory_generation` | `DailyMemoryTask` |
@@ -381,21 +380,6 @@ Handles async image generation through the Replicate API. Polls a prediction ID 
 | Max attempts | 24 |
 | JPEG quality | 85 |
 
-### ImageOptimizationTask
-
-**Type:** `image_optimization`
-**Source:** `inc/Engine/AI/System/Tasks/ImageOptimizationTask.php`
-**Undo:** Yes (`attachment_file_modified`, `file_created`)
-
-Compresses oversized images and generates WebP variants using WordPress's native image editor (Imagick or GD). No external API dependencies. Follows a diagnose-then-fix pattern: `ImageOptimizationAbilities::diagnoseImages()` identifies issues, and this task fixes individual images. Compresses JPEG/PNG/WebP in-place at a configurable quality level, then optionally generates a `.webp` sibling file.
-
-| Property | Value |
-|----------|-------|
-| Setting | None (default disabled) |
-| Trigger | On-demand via CLI or ability |
-| Manual run | No |
-| Prompts | None (not an AI task) |
-
 ### AgentCallTask
 
 **Type:** `agent_call`
@@ -462,7 +446,6 @@ The class must extend `SystemTask` and implement `executeTask()` and `getTaskTyp
 | `inc/Engine/AI/System/Tasks/MetaDescriptionTask.php` | AI-powered SEO meta description generation |
 | `inc/Engine/AI/System/Tasks/AltTextTask.php` | AI-powered image alt text generation |
 | `inc/Engine/AI/System/Tasks/ImageGenerationTask.php` | Async image generation via Replicate API |
-| `inc/Engine/AI/System/Tasks/ImageOptimizationTask.php` | Image compression and WebP generation |
 | `inc/Engine/AI/System/Tasks/AgentCallTask.php` | Send structured agent invocation payloads |
 | `inc/Core/Steps/SystemTask/SystemTaskStep.php` | Pipeline step type bridging system tasks |
 | `inc/Core/Steps/SystemTask/SystemTaskSettings.php` | Admin UI settings for the SystemTask step |

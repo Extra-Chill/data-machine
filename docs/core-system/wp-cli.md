@@ -466,7 +466,7 @@ wp datamachine pending-actions summary --status=pending --format=json
 
 ### datamachine image
 
-Image generation and optimization. **Since**: 0.33.0
+Image generation and templates, plus diagnostics supplied by Data Machine Business. **Since**: 0.33.0
 
 ```bash
 # Generate an AI image
@@ -482,6 +482,7 @@ wp datamachine image templates
 # Check image generation config
 wp datamachine image status
 
+# The diagnose, optimize, and broken subcommands require Data Machine Business.
 # Diagnose optimization issues
 wp datamachine image diagnose --size_threshold=500000
 

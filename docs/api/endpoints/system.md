@@ -6,7 +6,7 @@
 
 ## Overview
 
-The System endpoint provides infrastructure operations, monitoring, system task management, and editable prompt definitions for Data Machine. System tasks are background AI operations (alt text generation, daily memory, image optimization, etc.) registered via the `TaskRegistry` and executed through Action Scheduler.
+The System endpoint provides infrastructure operations, monitoring, system task management, and editable prompt definitions for Data Machine. System tasks are background operations (alt text generation, daily memory, retention cleanup, etc.) registered via the `TaskRegistry` and executed through Action Scheduler.
 
 ## Authentication
 
@@ -110,7 +110,6 @@ curl https://example.com/wp-json/datamachine/v1/system/tasks \
 |---|---|---|
 | `agent_call` | `AgentCallTask` | Call a remote or external agent |
 | `image_generation` | `ImageGenerationTask` | Generate images using AI models via Replicate |
-| `image_optimization` | `ImageOptimizationTask` | Optimize images for web delivery |
 | `alt_text_generation` | `AltTextTask` | Generate descriptive alt text for images |
 | `internal_linking` | `InternalLinkingTask` | Analyze and suggest internal link improvements |
 | `daily_memory_generation` | `DailyMemoryTask` | Generate daily memory summaries |

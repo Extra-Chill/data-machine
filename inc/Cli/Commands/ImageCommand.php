@@ -13,10 +13,9 @@
 namespace DataMachine\Cli\Commands;
 
 use WP_CLI;
+use DataMachine\Cli\AbilityRunner;
 use DataMachine\Cli\BaseCommand;
 use DataMachine\Abilities\Media\ImageGenerationAbilities;
-use DataMachine\Abilities\Media\ImageOptimizationAbilities;
-use DataMachine\Abilities\Media\BrokenImageReferenceAbilities;
 use DataMachine\Abilities\Media\ImageTemplateAbilities;
 
 defined( 'ABSPATH' ) || exit;
@@ -434,17 +433,22 @@ class ImageCommand extends BaseCommand {
 	 */
 	public function diagnose( array $args, array $assoc_args ): void {
 		$format         = $assoc_args['format'] ?? 'table';
-		$size_threshold = absint( $assoc_args['size_threshold'] ?? ImageOptimizationAbilities::DEFAULT_SIZE_THRESHOLD );
+		$size_threshold = absint( $assoc_args['size_threshold'] ?? 204800 );
 		$limit          = absint( $assoc_args['limit'] ?? 500 );
 
 		WP_CLI::log( sprintf( 'Scanning up to %d images (threshold: %s)...', $limit, size_format( $size_threshold ) ) );
 
-		$result = ImageOptimizationAbilities::diagnoseImages(
+		$result = AbilityRunner::execute(
+			'datamachine/diagnose-images',
 			array(
 				'size_threshold' => $size_threshold,
 				'limit'          => $limit,
 			)
 		);
+		if ( empty( $result['success'] ) ) {
+			WP_CLI::error( $result['error'] ?? 'Image diagnostics are not available.' );
+			return;
+		}
 
 		if ( 'json' === $format ) {
 			WP_CLI::line( self::encode_json( $result ) );
@@ -545,8 +549,8 @@ class ImageCommand extends BaseCommand {
 	public function optimize( array $args, array $assoc_args ): void {
 		$format         = $assoc_args['format'] ?? 'table';
 		$attachment_id  = absint( $assoc_args['attachment_id'] ?? 0 );
-		$size_threshold = absint( $assoc_args['size_threshold'] ?? ImageOptimizationAbilities::DEFAULT_SIZE_THRESHOLD );
-		$quality        = absint( $assoc_args['quality'] ?? ImageOptimizationAbilities::DEFAULT_QUALITY );
+		$size_threshold = absint( $assoc_args['size_threshold'] ?? 204800 );
+		$quality        = absint( $assoc_args['quality'] ?? 82 );
 		$webp           = ! isset( $assoc_args['no-webp'] );
 		$limit          = absint( $assoc_args['limit'] ?? 50 );
 		$dry_run        = isset( $assoc_args['dry-run'] );
@@ -557,7 +561,8 @@ class ImageCommand extends BaseCommand {
 			WP_CLI::log( sprintf( 'Optimizing images (quality: %d, WebP: %s)...', $quality, $webp ? 'yes' : 'no' ) );
 		}
 
-		$result = ImageOptimizationAbilities::optimizeImages(
+		$result = AbilityRunner::execute(
+			'datamachine/optimize-images',
 			array(
 				'attachment_id'  => $attachment_id,
 				'size_threshold' => $size_threshold,
@@ -677,7 +682,8 @@ class ImageCommand extends BaseCommand {
 		$scope_label = $network ? 'network (all sites)' : 'current site';
 		WP_CLI::log( sprintf( 'Scanning %s for broken image references...', $scope_label ) );
 
-		$result = BrokenImageReferenceAbilities::diagnoseBrokenImageReferences(
+		$result = AbilityRunner::execute(
+			'datamachine/diagnose-broken-image-references',
 			array(
 				'post_type' => $post_type,
 				'post_id'   => $post_id,

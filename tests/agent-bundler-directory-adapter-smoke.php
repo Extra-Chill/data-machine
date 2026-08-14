@@ -355,7 +355,11 @@ assert_adapter_equals( 'root skill bytes survive directory package read', "root 
 assert_adapter_equals( 'root reference bytes survive directory package read', "root reference \xC3\xA9", $graph_round_trip['agent']['references']['root-ref.md'] ?? null );
 assert_adapter_equals( 'root skill policy survives directory package read', array( 'mode' => 'explicit' ), $graph_round_trip['agent']['skill_policy'] ?? null );
 assert_adapter_equals( 'root tool policy survives directory package read', array( 'allow' => array( 'datamachine/read-file' ) ), $graph_round_trip['agent']['tool_policy'] ?? null );
-assert_adapter_equals( 'child skill policy survives directory package read', array( 'mode' => 'explicit', 'allowed' => array( 'compose.md' ) ), $graph_round_trip['subagents'][0]['skill_policy'] ?? null );
+$child_skill_policy = $graph_round_trip['subagents'][0]['skill_policy'] ?? array();
+assert_adapter(
+	'child skill policy survives directory package read',
+	'explicit' === ( $child_skill_policy['mode'] ?? null ) && array( 'compose.md' ) === ( $child_skill_policy['allowed'] ?? null )
+);
 rm_adapter_tree( $graph_tmp );
 
 echo "\n[3] Directory read resolves prompt file references relative to bundle root\n";

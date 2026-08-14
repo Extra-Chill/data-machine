@@ -261,7 +261,7 @@ $assert( 'flat agent_slug present', 'wayward-son' === $initial['agent_slug'] );
 $assert( 'job.agent_slug present', 'wayward-son' === $initial['job']['agent_slug'] );
 
 echo "\n[2] TaskScheduler rejects initial_data without agent context\n";
-$initial = build_task_scheduler_initial_data( 'image_optimization', array(), array(), 0 );
+$initial = build_task_scheduler_initial_data( 'alt_text_generation', array(), array(), 0 );
 $assert( 'agent-less task schedule is rejected', 'task_scheduler_agent_context_required' === $initial['error_code'] );
 
 echo "\n[3] ExecuteWorkflowAbility engine_data['job'] populated from initial_data\n";
@@ -278,7 +278,7 @@ $assert( 'engine_data.job.agent_id carried through', 2 === $engine['job']['agent
 $assert( 'engine_data.job.user_id carried through', 1 === $engine['job']['user_id'] );
 
 echo "\n[4] ExecuteWorkflowAbility receives no agent-less TaskScheduler job\n";
-$initial = build_task_scheduler_initial_data( 'image_optimization', array(), array(), 0 );
+$initial = build_task_scheduler_initial_data( 'alt_text_generation', array(), array(), 0 );
 $assert( 'agent-less task does not build workflow initial_data', 'task_scheduler_agent_context_required' === $initial['error_code'] );
 
 echo "\n[5] SystemTaskStep child engine_data carries parent agent_id\n";
@@ -304,7 +304,7 @@ $assert( 'task params preserved', 42 === $child['attachment_id'] );
 
 echo "\n[6] SystemTaskStep rejects child execution without agent context\n";
 $parent_engine = array( 'job' => array( 'job_id' => 600, 'user_id' => 0 ) );
-$child         = build_system_task_child_engine_data( 600, $parent_engine, 601, 'image_optimization', array() );
+$child         = build_system_task_child_engine_data( 600, $parent_engine, 601, 'alt_text_generation', array() );
 $assert( 'agent-less child execution is rejected', 'system_task_agent_context_required' === $child['error_code'] );
 
 echo "\n[6b] Explicit system maintenance tasks may run without agent context\n";

@@ -26,7 +26,6 @@ use DataMachine\Engine\AI\System\Tasks\DailyMemoryTask;
 use DataMachine\Engine\AI\System\Tasks\DispatchMessageTask;
 use DataMachine\Engine\AI\System\Tasks\EmitDataPacketsTask;
 use DataMachine\Engine\AI\System\Tasks\ImageGenerationTask;
-use DataMachine\Engine\AI\System\Tasks\ImageOptimizationTask;
 use DataMachine\Engine\AI\System\Tasks\InternalLinkingTask;
 use DataMachine\Engine\AI\System\Tasks\MetaDescriptionTask;
 use DataMachine\Engine\AI\System\Tasks\Retention\RetentionActionSchedulerTask;
@@ -95,7 +94,6 @@ class SystemAgentServiceProvider {
 		$tasks['emit_data_packets']                      = EmitDataPacketsTask::class;
 		$tasks['source_inventory']                       = SourceInventoryTask::class;
 		$tasks['image_generation']                       = ImageGenerationTask::class;
-		$tasks['image_optimization']                     = ImageOptimizationTask::class;
 		$tasks['alt_text_generation']                    = AltTextTask::class;
 		$tasks['internal_linking']                       = InternalLinkingTask::class;
 		$tasks['daily_memory_generation']                = DailyMemoryTask::class;

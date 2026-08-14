@@ -45,12 +45,16 @@ if ( ! function_exists( 'do_action' ) ) {
     }
 }
 
-function did_action( string $hook ): int {
-	return 'init' === $hook ? 1 : 0;
+if ( ! function_exists( 'did_action' ) ) {
+	function did_action( string $hook ): int {
+		return 'init' === $hook ? 1 : 0;
+	}
 }
 
-function current_action(): string {
-	return '';
+if ( ! function_exists( 'current_action' ) ) {
+	function current_action(): string {
+		return '';
+	}
 }
 
 if ( ! function_exists( 'get_option' ) ) {
@@ -81,12 +85,15 @@ require_once __DIR__ . '/../inc/Engine/AI/Tools/ToolManager.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/Policy/DataMachineAgentToolPolicyProvider.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/Policy/DataMachineMandatoryToolPolicy.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/Policy/DataMachineToolAccessPolicy.php';
+require_once __DIR__ . '/../inc/Engine/AI/Tools/Sources/AbilityToolSource.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/Sources/RuntimeToolSource.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/Sources/DataMachineToolRegistrySource.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/Sources/AdjacentHandlerToolSource.php';
+require_once __DIR__ . '/../inc/Engine/AI/Tools/HostToolPolicy.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/ToolSourceRegistry.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/ToolPolicyResolver.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/ToolResultFinder.php';
+require_once __DIR__ . '/../inc/Engine/AI/conversation-loop.php';
 require_once __DIR__ . '/../inc/Core/Steps/AI/AIStep.php';
 
 use DataMachine\Core\Steps\AI\AIStep;
