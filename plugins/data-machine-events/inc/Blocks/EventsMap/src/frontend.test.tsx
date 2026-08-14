@@ -134,7 +134,7 @@ import { act } from 'react';
 /**
  * Internal dependencies
  */
-import { EventsMap } from './frontend';
+import { EventsMap, setupCollapsible } from './frontend';
 
 import type { MapProps } from './types';
 
@@ -192,6 +192,56 @@ function collectBoundsEvents(): {
 			),
 	};
 }
+
+describe( 'EventsMap collapsible disclosure', () => {
+	beforeEach( () => {
+		mockMapInstances.length = 0;
+		document.body.innerHTML = `
+			<div class="data-machine-events-map-collapsible is-collapsed">
+				<button
+					id="map-toggle"
+					aria-expanded="false"
+					data-label-show="Show map"
+					data-label-hide="Hide map"
+					disabled
+				>Show map</button>
+				<div id="map-region" hidden>
+					<div
+						id="map-root"
+						class="data-machine-events-map-root"
+						data-collapsible="1"
+						data-toggle-id="map-toggle"
+						data-region-id="map-region"
+						data-default-collapsed="1"
+					></div>
+				</div>
+			</div>
+		`;
+	} );
+
+	it( 'enables the toggle only after binding and expands on first click', () => {
+		const container = document.getElementById( 'map-root' ) as HTMLElement;
+		const toggle = document.getElementById(
+			'map-toggle'
+		) as HTMLButtonElement;
+		const region = document.getElementById( 'map-region' ) as HTMLElement;
+
+		expect( setupCollapsible( container ) ).toBe( true );
+		expect( toggle.disabled ).toBe( false );
+		expect( mockMapInstances ).toHaveLength( 0 );
+
+		act( () => toggle.click() );
+		expect( toggle.getAttribute( 'aria-expanded' ) ).toBe( 'true' );
+		expect( toggle.textContent ).toBe( 'Hide map' );
+		expect( region.hidden ).toBe( false );
+		expect( mockMapInstances ).toHaveLength( 1 );
+
+		act( () => toggle.click() );
+		expect( toggle.getAttribute( 'aria-expanded' ) ).toBe( 'false' );
+		expect( toggle.textContent ).toBe( 'Show map' );
+		expect( region.hidden ).toBe( true );
+	} );
+} );
 
 describe( 'EventsMap geo authority integration', () => {
 	beforeEach( () => {

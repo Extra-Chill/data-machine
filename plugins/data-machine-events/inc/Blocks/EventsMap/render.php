@@ -166,6 +166,7 @@ $hide_label = __( 'Hide map', 'data-machine-events' );
 			aria-controls="<?php echo esc_attr( $region_id ); ?>"
 			data-label-show="<?php echo esc_attr( $show_label ); ?>"
 			data-label-hide="<?php echo esc_attr( $hide_label ); ?>"
+			disabled
 		><?php echo esc_html( $default_collapsed ? $show_label : $hide_label ); ?></button>
 		<div
 			id="<?php echo esc_attr( $region_id ); ?>"

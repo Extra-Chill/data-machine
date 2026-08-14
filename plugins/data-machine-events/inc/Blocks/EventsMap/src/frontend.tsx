@@ -1379,7 +1379,7 @@ function mountMap( container: HTMLElement ): void {
  * @param container Map root container.
  * @return Whether the immediate mount should be skipped (deferred to expand).
  */
-function setupCollapsible( container: HTMLElement ): boolean {
+export function setupCollapsible( container: HTMLElement ): boolean {
 	if ( container.dataset.collapsible !== '1' ) {
 		return false;
 	}
@@ -1439,6 +1439,7 @@ function setupCollapsible( container: HTMLElement ): boolean {
 		const expanded = toggle.getAttribute( 'aria-expanded' ) === 'true';
 		setExpanded( ! expanded );
 	} );
+	toggle.disabled = false;
 
 	// When it starts collapsed, defer the React mount until first expand so
 	// Leaflet never initializes in a zero-height container.
