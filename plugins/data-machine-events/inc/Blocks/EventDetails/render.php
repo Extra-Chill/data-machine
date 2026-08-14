@@ -279,6 +279,11 @@ $event_schema     = EventSchemaProvider::generateSchemaOrg( $event_data, $venue_
 				if ( class_exists( 'DataMachineEvents\\Admin\\Settings_Page' ) ) {
 					$map_display_type = \DataMachineEvents\Admin\Settings_Page::get_map_display_type();
 				}
+				$openstreetmap_url = sprintf(
+					'https://www.openstreetmap.org/?mlat=%1$s&mlon=%2$s#map=15/%1$s/%2$s',
+					rawurlencode( $lat ),
+					rawurlencode( $lon )
+				);
 				?>
 				<div class="data-machine-venue-map-section">
 					<h3 class="venue-map-title"><?php echo esc_html__( 'Venue Location', 'data-machine-events' ); ?></h3>
@@ -291,6 +296,15 @@ $event_schema     = EventSchemaProvider::generateSchemaOrg( $event_data, $venue_
 						data-venue-address="<?php echo esc_attr( $address ); ?>"
 						data-map-type="<?php echo esc_attr( $map_display_type ); ?>"
 					></div>
+					<div class="venue-map-fallback">
+						<strong><?php echo esc_html( $venue ); ?></strong>
+						<?php if ( $address ) : ?>
+							<span><?php echo esc_html( $address ); ?></span>
+						<?php endif; ?>
+						<a href="<?php echo esc_url( $openstreetmap_url ); ?>" target="_blank" rel="noopener">
+							<?php esc_html_e( 'View venue on OpenStreetMap', 'data-machine-events' ); ?>
+						</a>
+					</div>
 					<div class="venue-map-attribution">
 						<small>
 							<?php

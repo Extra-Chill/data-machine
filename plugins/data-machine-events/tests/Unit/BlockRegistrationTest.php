@@ -69,4 +69,22 @@ class BlockRegistrationTest extends WP_UnitTestCase {
 		$this->assertNotNull( $block, 'Event Details block should be registered' );
 		$this->assertSame( 'data-machine-events', $block->category, 'Block should use the plugin category' );
 	}
+
+	public function test_leaflet_assets_are_served_by_the_plugin() {
+		$leaflet_style  = wp_styles()->registered['leaflet'] ?? null;
+		$leaflet_script = wp_scripts()->registered['leaflet'] ?? null;
+
+		$this->assertNotNull( $leaflet_style, 'Leaflet CSS should be registered' );
+		$this->assertNotNull( $leaflet_script, 'Leaflet JavaScript should be registered' );
+		$this->assertSame(
+			DATA_MACHINE_EVENTS_PLUGIN_URL . 'inc/Blocks/EventDetails/build/leaflet.css',
+			$leaflet_style->src
+		);
+		$this->assertSame(
+			DATA_MACHINE_EVENTS_PLUGIN_URL . 'inc/Blocks/EventDetails/build/leaflet.js',
+			$leaflet_script->src
+		);
+		$this->assertStringNotContainsString( 'unpkg.com', $leaflet_style->src );
+		$this->assertStringNotContainsString( 'unpkg.com', $leaflet_script->src );
+	}
 }

@@ -29,6 +29,7 @@
     "@wordpress/block-editor": "^16.0.0",
     "@wordpress/blocks": "^15.24.0",
     "@wordpress/components": "^37.0.0",
-    "@wordpress/i18n": "^6.24.0"
+    "@wordpress/i18n": "^6.24.0",
+    "leaflet": "1.9.4"
   }
 }

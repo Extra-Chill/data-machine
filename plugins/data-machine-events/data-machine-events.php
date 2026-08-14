@@ -663,10 +663,21 @@ class DATAMACHINE_Events {
 			(string) filemtime( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Blocks/root.css' )
 		);
 
-		// Register Leaflet CDN assets for event-details block (single venue maps).
-		// The events-map block bundles Leaflet via webpack and does not need these handles.
-		wp_register_style( 'leaflet', 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css', array(), '1.9.4' );
-		wp_register_script( 'leaflet', 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js', array(), '1.9.4', true );
+		// Register the Event Details block's locally built Leaflet distribution.
+		// The Events Map block bundles its own module-scoped Leaflet runtime.
+		wp_register_style(
+			'leaflet',
+			DATA_MACHINE_EVENTS_PLUGIN_URL . 'inc/Blocks/EventDetails/build/leaflet.css',
+			array(),
+			'1.9.4'
+		);
+		wp_register_script(
+			'leaflet',
+			DATA_MACHINE_EVENTS_PLUGIN_URL . 'inc/Blocks/EventDetails/build/leaflet.js',
+			array(),
+			'1.9.4',
+			true
+		);
 
 		// Register venue map JS for event-details block.
 		wp_register_script(
