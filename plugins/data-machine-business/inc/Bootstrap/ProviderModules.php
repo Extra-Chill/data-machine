@@ -16,6 +16,10 @@ final class ProviderModules {
 		$abilities        = array(
 			'DataMachine\\Abilities\\AbilityRegistration' => static fn(): bool => class_exists( 'DataMachine\\Abilities\\AbilityRegistration' ),
 		);
+		$system_tasks     = array(
+			'DataMachine\\Engine\\AI\\System\\Tasks\\SystemTask' => static fn(): bool => class_exists( 'DataMachine\\Engine\\AI\\System\\Tasks\\SystemTask' ),
+			'DataMachine\\Engine\\Tasks\\TaskScheduler'           => static fn(): bool => class_exists( 'DataMachine\\Engine\\Tasks\\TaskScheduler' ),
+		);
 		$tools            = array(
 			'DataMachine\\Engine\\AI\\Tools\\BaseTool' => static fn(): bool => class_exists( 'DataMachine\\Engine\\AI\\Tools\\BaseTool' ),
 		);
@@ -149,6 +153,21 @@ final class ProviderModules {
 				$abilities,
 				array( 'datamachine/media-hygiene' ),
 				static fn() => new \DataMachineBusiness\Abilities\MediaHygiene\MediaHygieneAbility()
+			),
+			new ProviderModule(
+				'image-diagnostics',
+				array_merge( $abilities, $system_tasks ),
+				array(
+					'datamachine/diagnose-images',
+					'datamachine/optimize-images',
+					'datamachine/diagnose-broken-image-references',
+					'task:image_optimization',
+				),
+				static function (): void {
+					new \DataMachineBusiness\Abilities\Media\ImageOptimizationAbilities();
+					new \DataMachineBusiness\Abilities\Media\BrokenImageReferenceAbilities();
+					\DataMachineBusiness\Engine\AI\System\Tasks\ImageOptimizationTask::register();
+				}
 			),
 			new ProviderModule(
 				'sendy',

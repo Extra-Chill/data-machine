@@ -130,6 +130,8 @@ $ability_files = array(
 	'inc/Abilities/GoogleSheets/FetchGoogleSheetsAbility.php',
 	'inc/Abilities/GoogleSheets/PublishGoogleSheetsAbility.php',
 	'inc/Abilities/MediaHygiene/MediaHygieneAbility.php',
+	'inc/Abilities/Media/BrokenImageReferenceAbilities.php',
+	'inc/Abilities/Media/ImageOptimizationAbilities.php',
 	'inc/Abilities/PageSpeed/PageSpeedAbility.php',
 	'inc/Abilities/Sendy/SendyAbilities.php',
 	'inc/Abilities/Slack/FetchMessagesSlackAbility.php',

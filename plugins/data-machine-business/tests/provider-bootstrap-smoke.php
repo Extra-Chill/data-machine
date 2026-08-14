@@ -109,6 +109,7 @@ $expected_ids   = array(
 	'bing-webmaster',
 	'amazon-affiliate',
 	'media-hygiene',
+	'image-diagnostics',
 	'sendy',
 );
 assert_provider_bootstrap( $expected_ids === $actual_ids, 'production provider order is explicit and deterministic' );
@@ -123,7 +124,7 @@ foreach ( $expected_ids as $provider_id ) {
 	);
 }
 
-$sendy = $actual_modules[14]->capabilities();
+$sendy = $actual_modules[15]->capabilities();
 assert_provider_bootstrap(
 	array(
 		'datamachine/sendy-subscribe',
