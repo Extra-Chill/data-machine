@@ -66,8 +66,6 @@ final class AbilityServiceProvider {
 		require_once $plugin_root . '/inc/Abilities/SystemAbilities.php';
 		require_once $plugin_root . '/inc/Abilities/Media/AltTextAbilities.php';
 		require_once $plugin_root . '/inc/Abilities/Media/ImageGenerationAbilities.php';
-		require_once $plugin_root . '/inc/Abilities/Media/ImageOptimizationAbilities.php';
-		require_once $plugin_root . '/inc/Abilities/Media/BrokenImageReferenceAbilities.php';
 		require_once $plugin_root . '/inc/Abilities/Media/MediaAbilities.php';
 		require_once $plugin_root . '/inc/Abilities/SEO/MetaDescriptionAbilities.php';
 		require_once $plugin_root . '/inc/Abilities/Media/ImageTemplateAbilities.php';
@@ -156,8 +154,6 @@ final class AbilityServiceProvider {
 		new \DataMachine\Abilities\SystemAbilities();
 		new \DataMachine\Abilities\Media\AltTextAbilities();
 		new \DataMachine\Abilities\Media\ImageGenerationAbilities();
-		new \DataMachine\Abilities\Media\ImageOptimizationAbilities();
-		new \DataMachine\Abilities\Media\BrokenImageReferenceAbilities();
 		new \DataMachine\Abilities\Media\MediaAbilities();
 		new \DataMachine\Abilities\SEO\MetaDescriptionAbilities();
 		new \DataMachine\Abilities\Media\ImageTemplateAbilities();

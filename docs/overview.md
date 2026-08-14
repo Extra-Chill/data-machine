@@ -130,7 +130,6 @@ System tasks are background operations that run outside the normal pipeline exec
 | Task Type | Class | Description |
 |-----------|-------|-------------|
 | `image_generation` | `ImageGenerationTask` | AI-powered image generation |
-| `image_optimization` | `ImageOptimizationTask` | Image compression and optimization |
 | `alt_text_generation` | `AltTextTask` | AI-generated alt text for images |
 | `internal_linking` | `InternalLinkingTask` | Automated internal link injection |
 | `daily_memory_generation` | `DailyMemoryTask` | Daily memory synthesis and MEMORY.md cleanup |

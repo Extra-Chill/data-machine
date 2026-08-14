@@ -109,10 +109,9 @@ $assert( 'triggering_user_id is still reported', 0 === $ctx['triggering_user_id'
 echo "\n[5] Production sources use the shared resolver and carry triggering_user_id\n";
 $root    = dirname( __DIR__ );
 $sources = array(
-	'AltTextAbilities'          => $root . '/inc/Abilities/Media/AltTextAbilities.php',
-	'ImageOptimizationAbilities' => $root . '/inc/Abilities/Media/ImageOptimizationAbilities.php',
-	'MetaDescriptionAbilities'  => $root . '/inc/Abilities/SEO/MetaDescriptionAbilities.php',
-	'InternalLinkingAbilities'  => $root . '/inc/Abilities/InternalLinkingAbilities.php',
+	'AltTextAbilities'         => $root . '/inc/Abilities/Media/AltTextAbilities.php',
+	'MetaDescriptionAbilities' => $root . '/inc/Abilities/SEO/MetaDescriptionAbilities.php',
+	'InternalLinkingAbilities' => $root . '/inc/Abilities/InternalLinkingAbilities.php',
 );
 foreach ( $sources as $name => $path ) {
 	$src = (string) file_get_contents( $path );
