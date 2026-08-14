@@ -85,6 +85,7 @@ require_once __DIR__ . '/../inc/Engine/AI/Tools/ToolManager.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/Policy/DataMachineAgentToolPolicyProvider.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/Policy/DataMachineMandatoryToolPolicy.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/Policy/DataMachineToolAccessPolicy.php';
+require_once __DIR__ . '/../inc/Engine/AI/Tools/Sources/AbilityToolSource.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/Sources/RuntimeToolSource.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/Sources/DataMachineToolRegistrySource.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/Sources/AdjacentHandlerToolSource.php';

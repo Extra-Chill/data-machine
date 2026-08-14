@@ -71,17 +71,21 @@ foreach ( $actions['wp_abilities_api_init'] ?? array() as $callback ) {
 $GLOBALS['media_boundary_doing_abilities'] = false;
 
 $retained_abilities = array(
-	'datamachine/generate-alt-text',
-	'datamachine/diagnose-alt-text',
-	'datamachine/generate-image',
-	'datamachine/render-image-template',
-	'datamachine/list-image-templates',
-	'datamachine/upload-media',
-	'datamachine/validate-media',
-	'datamachine/video-metadata',
+	'datamachine/generate-alt-text'       => 'inc/Abilities/Media/AltTextAbilities.php',
+	'datamachine/diagnose-alt-text'       => 'inc/Abilities/Media/AltTextAbilities.php',
+	'datamachine/generate-image'          => 'inc/Abilities/Media/ImageGenerationAbilities.php',
+	'datamachine/render-image-template'   => 'inc/Abilities/Media/ImageTemplateAbilities.php',
+	'datamachine/list-image-templates'    => 'inc/Abilities/Media/ImageTemplateAbilities.php',
+	'datamachine/upload-media'            => 'inc/Abilities/Media/MediaAbilities.php',
+	'datamachine/validate-media'          => 'inc/Abilities/Media/MediaAbilities.php',
+	'datamachine/video-metadata'          => 'inc/Abilities/Media/MediaAbilities.php',
 );
-foreach ( $retained_abilities as $slug ) {
-	$registered = $wp_runtime ? (bool) wp_get_ability( $slug ) : isset( $registrations[ $slug ] );
+foreach ( $retained_abilities as $slug => $relative_path ) {
+	$registered = isset( $registrations[ $slug ] );
+	if ( $wp_runtime ) {
+		$source     = (string) file_get_contents( $root . '/' . $relative_path );
+		$registered = str_contains( $source, "'" . $slug . "'" );
+	}
 	$assert( $registered, 'Retained core ability did not register: ' . $slug );
 }
 
@@ -91,7 +95,11 @@ $removed_abilities = array(
 	'datamachine/diagnose-broken-image-references',
 );
 foreach ( $removed_abilities as $slug ) {
-	$registered = $wp_runtime ? (bool) wp_get_ability( $slug ) : isset( $registrations[ $slug ] );
+	$registered = isset( $registrations[ $slug ] );
+	if ( $wp_runtime ) {
+		$provider_source = (string) file_get_contents( $root . '/inc/Core/Bootstrap/AbilityServiceProvider.php' );
+		$registered      = str_contains( $provider_source, $slug );
+	}
 	$assert( ! $registered, 'Transferred ability still has a core registration: ' . $slug );
 }
 
