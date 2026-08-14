@@ -182,7 +182,7 @@ final class AgentBundleManifest {
 			if ( ! array_key_exists( $kind, $agent ) ) {
 				continue;
 			}
-			if ( ! is_array( $agent[ $kind ] ) || array_is_list( $agent[ $kind ] ) ) {
+			if ( ! is_array( $agent[ $kind ] ) || ( array() !== $agent[ $kind ] && array_is_list( $agent[ $kind ] ) ) ) {
 				throw new BundleValidationException( sprintf( 'manifest.json agent.%s must be a path-to-bytes object after hydration.', esc_html( $kind ) ) );
 			}
 			$files = array();
@@ -197,13 +197,13 @@ final class AgentBundleManifest {
 			$validated[ $kind ] = $files;
 		}
 		if ( array_key_exists( 'skill_policy', $agent ) ) {
-			if ( ! is_array( $agent['skill_policy'] ) || array_is_list( $agent['skill_policy'] ) ) {
+			if ( ! is_array( $agent['skill_policy'] ) || ( array() !== $agent['skill_policy'] && array_is_list( $agent['skill_policy'] ) ) ) {
 				throw new BundleValidationException( 'manifest.json agent.skill_policy must be an object.' );
 			}
 			$validated['skill_policy'] = $agent['skill_policy'];
 		}
 		if ( array_key_exists( 'tool_policy', $agent ) ) {
-			if ( ! is_array( $agent['tool_policy'] ) || array_is_list( $agent['tool_policy'] ) ) {
+			if ( ! is_array( $agent['tool_policy'] ) || ( array() !== $agent['tool_policy'] && array_is_list( $agent['tool_policy'] ) ) ) {
 				throw new BundleValidationException( 'manifest.json agent.tool_policy must be an object.' );
 			}
 			$validated['tool_policy'] = $agent['tool_policy'];
