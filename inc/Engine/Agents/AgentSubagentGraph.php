@@ -25,10 +25,10 @@ final class AgentSubagentGraph {
 				throw new BundleValidationException( 'Subagent edges must contain non-empty slugs.' );
 			}
 			$edge_slug = PortableSlug::normalize( $edge, 'subagent' );
-			if ( $edge_slug !== trim( $edge ) ) {
+			if ( trim( $edge ) !== $edge_slug ) {
 				throw new BundleValidationException( sprintf( 'Invalid subagent edge slug: %s.', esc_html( $edge ) ) );
 			}
-			if ( '' !== $slug && $edge_slug === PortableSlug::normalize( $slug, 'agent' ) ) {
+			if ( '' !== $slug && PortableSlug::normalize( $slug, 'agent' ) === $edge_slug ) {
 				throw new BundleValidationException( sprintf( 'Subagent %s cannot reference itself.', esc_html( $slug ) ) );
 			}
 			if ( in_array( $edge_slug, $normalized, true ) ) {
@@ -70,7 +70,7 @@ final class AgentSubagentGraph {
 			if ( $slug !== $child['slug'] ) {
 				throw new BundleValidationException( sprintf( 'Subagent slug must be canonical: %s.', esc_html( $child['slug'] ) ) );
 			}
-			if ( '' !== $coordinator_slug && $slug === PortableSlug::normalize( $coordinator_slug, 'agent' ) ) {
+			if ( '' !== $coordinator_slug && PortableSlug::normalize( $coordinator_slug, 'agent' ) === $slug ) {
 				throw new BundleValidationException( 'A coordinator cannot declare itself as a subagent.' );
 			}
 			if ( isset( $nodes[ $slug ] ) ) {
@@ -91,7 +91,7 @@ final class AgentSubagentGraph {
 				$memory[ $path ] = $contents;
 			}
 			ksort( $memory, SORT_STRING );
-			$edges = self::edges_from_config( $child['subagents'], $slug );
+			$edges          = self::edges_from_config( $child['subagents'], $slug );
 			$nodes[ $slug ] = array(
 				'slug'         => $slug,
 				'label'        => (string) $child['label'],
@@ -163,7 +163,7 @@ final class AgentSubagentGraph {
 
 	/** @return array<string,string> */
 	private static function normalize_file_map( array $files, string $slug, string $kind ): array {
-		if ( array_is_list( $files ) ) {
+		if ( array() !== $files && array_is_list( $files ) ) {
 			throw new BundleValidationException( sprintf( 'Subagent %s %s artifacts must be a path-to-bytes object.', esc_html( $slug ), esc_html( $kind ) ) );
 		}
 		$normalized = array();

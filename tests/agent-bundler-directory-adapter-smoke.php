@@ -362,6 +362,18 @@ assert_adapter(
 );
 rm_adapter_tree( $graph_tmp );
 
+$empty_graph_bundle = $graph_bundle;
+$empty_graph_bundle['subagents'][0]['skills'] = array();
+$empty_graph_bundle['subagents'][0]['references'] = array();
+$empty_graph_directory = AgentBundleArrayAdapter::from_array_bundle( $empty_graph_bundle );
+$empty_graph_tmp = sys_get_temp_dir() . '/datamachine-empty-subagent-package-' . getmypid();
+rm_adapter_tree( $empty_graph_tmp );
+$empty_graph_directory->write( $empty_graph_tmp );
+$empty_graph_round_trip = AgentBundleArrayAdapter::to_import_payload( AgentBundleDirectory::read( $empty_graph_tmp ) );
+assert_adapter_equals( 'empty subagent skills survive directory package read', array(), $empty_graph_round_trip['subagents'][0]['skills'] ?? null );
+assert_adapter_equals( 'empty subagent references survive directory package read', array(), $empty_graph_round_trip['subagents'][0]['references'] ?? null );
+rm_adapter_tree( $empty_graph_tmp );
+
 echo "\n[3] Directory read resolves prompt file references relative to bundle root\n";
 if ( ! is_dir( $tmp . '/prompts' ) ) {
 	mkdir( $tmp . '/prompts', 0775, true );
