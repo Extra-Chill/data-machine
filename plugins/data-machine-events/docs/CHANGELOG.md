@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.55.4] - 2026-08-14
+
+### Fixed
+- prevent early archive map toggle clicks
+
 ## [0.55.3] - 2026-08-14
 
 ### Fixed
