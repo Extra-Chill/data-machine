@@ -182,7 +182,7 @@ final class AgentBundleManifest {
 			if ( ! array_key_exists( $kind, $agent ) ) {
 				continue;
 			}
-			if ( ! is_array( $agent[ $kind ] ) || array_is_list( $agent[ $kind ] ) ) {
+			if ( ! is_array( $agent[ $kind ] ) || ( array() !== $agent[ $kind ] && array_is_list( $agent[ $kind ] ) ) ) {
 				throw new BundleValidationException( sprintf( 'manifest.json agent.%s must be a path-to-bytes object after hydration.', esc_html( $kind ) ) );
 			}
 			$files = array();

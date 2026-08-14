@@ -895,6 +895,11 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 	 */
 	public function test_post_claim_failure_rolls_back_and_reports_typed_error(): void {
 		$bundle = $this->fixture_bundle();
+		global $wpdb;
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
+		$pipeline_ids_before = array_map( 'intval', $wpdb->get_col( "SELECT pipeline_id FROM {$wpdb->prefix}datamachine_pipelines ORDER BY pipeline_id" ) );
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
+		$flow_ids_before = array_map( 'intval', $wpdb->get_col( "SELECT flow_id FROM {$wpdb->prefix}datamachine_flows ORDER BY flow_id" ) );
 
 		$fault_count = 0;
 		add_action(
@@ -917,14 +922,13 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 			'No half-installed agent row remains after rollback.'
 		);
 
-		global $wpdb;
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
-		$pipeline_count = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}datamachine_pipelines" );
+		$pipeline_ids = array_map( 'intval', $wpdb->get_col( "SELECT pipeline_id FROM {$wpdb->prefix}datamachine_pipelines ORDER BY pipeline_id" ) );
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
-		$flow_count = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}datamachine_flows" );
+		$flow_ids = array_map( 'intval', $wpdb->get_col( "SELECT flow_id FROM {$wpdb->prefix}datamachine_flows ORDER BY flow_id" ) );
 
-		$this->assertSame( 0, $pipeline_count, 'No orphan pipeline rows.' );
-		$this->assertSame( 0, $flow_count, 'No orphan flow rows.' );
+		$this->assertSame( $pipeline_ids_before, $pipeline_ids, 'Failed import leaves the pipeline row set unchanged.' );
+		$this->assertSame( $flow_ids_before, $flow_ids, 'Failed import leaves the flow row set unchanged.' );
 	}
 
 	public function test_legacy_file_maps_reject_unsafe_paths_before_mutation(): void {
