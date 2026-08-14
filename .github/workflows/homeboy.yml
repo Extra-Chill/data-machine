@@ -37,4 +37,5 @@ jobs:
       # undeclared inputs to a reusable workflow is a hard startup_failure.
       commands: ${{ github.event_name == 'pull_request' && 'review audit,review lint,review test,refactor lint' || github.event_name == 'workflow_dispatch' && 'review audit,review lint,review test' || 'review test' }}
       expected-commands: ${{ github.event_name == 'pull_request' && 'review audit,review lint,review test' || github.event_name == 'workflow_dispatch' && 'review audit,review lint,review test' || 'review test' }}
+      test-shards: '4'
     secrets: inherit
