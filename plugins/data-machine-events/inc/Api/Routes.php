@@ -150,11 +150,15 @@ function register_routes() {
 			'args'                => array(
 				'lat'         => array(
 					'type'              => 'number',
-					'sanitize_callback' => 'floatval',
+					'sanitize_callback' => function ( $value ) {
+						return (float) $value;
+					},
 				),
 				'lng'         => array(
 					'type'              => 'number',
-					'sanitize_callback' => 'floatval',
+					'sanitize_callback' => function ( $value ) {
+						return (float) $value;
+					},
 				),
 				'radius'      => array(
 					'type'              => 'integer',
@@ -264,11 +268,15 @@ function register_routes() {
 				),
 				'lat'              => array(
 					'type'              => 'number',
-					'sanitize_callback' => 'floatval',
+					'sanitize_callback' => function ( $value ) {
+						return (float) $value;
+					},
 				),
 				'lng'              => array(
 					'type'              => 'number',
-					'sanitize_callback' => 'floatval',
+					'sanitize_callback' => function ( $value ) {
+						return (float) $value;
+					},
 				),
 				'radius'           => array(
 					'type'              => 'integer',
