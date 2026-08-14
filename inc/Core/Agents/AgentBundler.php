@@ -49,7 +49,7 @@ use DataMachine\Engine\Agents\AgentSubagentGraph;
 defined( 'ABSPATH' ) || exit;
 
 class AgentBundler {
-	private const ACTIVE_AGENT_META_KEY = 'datamachine_active_agent_slug';
+	public const ACTIVE_AGENT_META_KEY = 'datamachine_active_agent_slug';
 
 	/**
 	 * Bundle format version for forward compatibility.

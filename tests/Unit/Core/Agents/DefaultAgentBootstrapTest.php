@@ -7,6 +7,7 @@
 
 namespace DataMachine\Tests\Unit\Core\Agents;
 
+use DataMachine\Core\Agents\AgentBundler;
 use DataMachine\Core\Database\Agents\Agents as AgentsRepository;
 use DataMachine\Core\FilesRepository\DirectoryManager;
 use WP_UnitTestCase;
@@ -23,12 +24,12 @@ class DefaultAgentBootstrapTest extends WP_UnitTestCase {
 		$this->agents_repo    = new AgentsRepository();
 		$this->default_user_id = DirectoryManager::get_default_agent_user_id();
 		$this->clear_agents();
-		delete_user_meta( $this->default_user_id, 'datamachine_active_agent_slug' );
+		delete_user_meta( $this->default_user_id, AgentBundler::ACTIVE_AGENT_META_KEY );
 	}
 
 	public function tear_down(): void {
 		$this->clear_agents();
-		delete_user_meta( $this->default_user_id, 'datamachine_active_agent_slug' );
+		delete_user_meta( $this->default_user_id, AgentBundler::ACTIVE_AGENT_META_KEY );
 		parent::tear_down();
 	}
 
@@ -62,7 +63,7 @@ class DefaultAgentBootstrapTest extends WP_UnitTestCase {
 	public function test_explicit_active_agent_resolves_when_owner_has_multiple_agents(): void {
 		$this->agents_repo->create_if_missing( 'first-agent', 'First Agent', $this->default_user_id, array() );
 		$active_id = $this->agents_repo->create_if_missing( 'active-agent', 'Active Agent', $this->default_user_id, array() );
-		update_user_meta( $this->default_user_id, 'datamachine_active_agent_slug', 'active-agent' );
+		update_user_meta( $this->default_user_id, AgentBundler::ACTIVE_AGENT_META_KEY, 'active-agent' );
 
 		$this->assertSame( $active_id, datamachine_resolve_existing_agent_id( $this->default_user_id ) );
 	}
@@ -71,7 +72,7 @@ class DefaultAgentBootstrapTest extends WP_UnitTestCase {
 		$other_owner_id = self::factory()->user->create( array( 'role' => 'administrator' ) );
 		$this->agents_repo->create_if_missing( 'shared-slug', 'Other Agent', $other_owner_id, array() );
 		$expected_id = $this->agents_repo->create_if_missing( 'shared-slug', 'Default Agent', $this->default_user_id, array() );
-		update_user_meta( $this->default_user_id, 'datamachine_active_agent_slug', 'shared-slug' );
+		update_user_meta( $this->default_user_id, AgentBundler::ACTIVE_AGENT_META_KEY, 'shared-slug' );
 
 		$this->assertSame( $expected_id, datamachine_resolve_existing_agent_id( $this->default_user_id ) );
 	}

@@ -405,7 +405,7 @@ function datamachine_resolve_existing_agent_id( int $user_id ): int {
 
 	$agents_repo = new \DataMachine\Core\Database\Agents\Agents();
 	$owned       = $agents_repo->get_all_by_owner_id( $user_id );
-	$active_slug = sanitize_title( (string) get_user_meta( $user_id, 'datamachine_active_agent_slug', true ) );
+	$active_slug = sanitize_title( (string) get_user_meta( $user_id, \DataMachine\Core\Agents\AgentBundler::ACTIVE_AGENT_META_KEY, true ) );
 	if ( '' !== $active_slug ) {
 		foreach ( $owned as $agent ) {
 			if ( (string) $agent['agent_slug'] === $active_slug ) {
