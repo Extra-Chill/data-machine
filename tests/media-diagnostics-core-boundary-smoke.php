@@ -15,23 +15,32 @@ $root          = dirname( __DIR__ );
 $failures      = array();
 $actions       = array();
 $registrations = array();
+$wp_runtime    = function_exists( 'wp_get_ability' );
 
-function add_action( string $hook, callable $callback, int $priority = 10, int $accepted_args = 1 ): void {
-	unset( $priority, $accepted_args );
-	$GLOBALS['media_boundary_actions'][ $hook ][] = $callback;
+if ( ! function_exists( 'add_action' ) ) {
+	function add_action( string $hook, callable $callback, int $priority = 10, int $accepted_args = 1 ): void {
+		unset( $priority, $accepted_args );
+		$GLOBALS['media_boundary_actions'][ $hook ][] = $callback;
+	}
 }
 
-function doing_action( string $hook ): bool {
-	return 'wp_abilities_api_init' === $hook && ! empty( $GLOBALS['media_boundary_doing_abilities'] );
+if ( ! function_exists( 'doing_action' ) ) {
+	function doing_action( string $hook ): bool {
+		return 'wp_abilities_api_init' === $hook && ! empty( $GLOBALS['media_boundary_doing_abilities'] );
+	}
 }
 
-function did_action( string $hook ): int {
-	return 'wp_abilities_api_init' === $hook ? (int) ( $GLOBALS['media_boundary_did_abilities'] ?? 0 ) : 0;
+if ( ! function_exists( 'did_action' ) ) {
+	function did_action( string $hook ): int {
+		return 'wp_abilities_api_init' === $hook ? (int) ( $GLOBALS['media_boundary_did_abilities'] ?? 0 ) : 0;
+	}
 }
 
-function wp_register_ability( string $name, array $args ): object {
-	$GLOBALS['media_boundary_registrations'][ $name ] = $args;
-	return new stdClass();
+if ( ! function_exists( 'wp_register_ability' ) ) {
+	function wp_register_ability( string $name, array $args ): object {
+		$GLOBALS['media_boundary_registrations'][ $name ] = $args;
+		return new stdClass();
+	}
 }
 
 $GLOBALS['media_boundary_actions']       = &$actions;
@@ -72,7 +81,8 @@ $retained_abilities = array(
 	'datamachine/video-metadata',
 );
 foreach ( $retained_abilities as $slug ) {
-	$assert( isset( $registrations[ $slug ] ), 'Retained core ability did not register: ' . $slug );
+	$registered = $wp_runtime ? (bool) wp_get_ability( $slug ) : isset( $registrations[ $slug ] );
+	$assert( $registered, 'Retained core ability did not register: ' . $slug );
 }
 
 $removed_abilities = array(
@@ -81,7 +91,8 @@ $removed_abilities = array(
 	'datamachine/diagnose-broken-image-references',
 );
 foreach ( $removed_abilities as $slug ) {
-	$assert( ! isset( $registrations[ $slug ] ), 'Transferred ability still has a core registration: ' . $slug );
+	$registered = $wp_runtime ? (bool) wp_get_ability( $slug ) : isset( $registrations[ $slug ] );
+	$assert( ! $registered, 'Transferred ability still has a core registration: ' . $slug );
 }
 
 require_once $root . '/inc/Engine/AI/System/Tasks/Retention/RetentionCleanup.php';

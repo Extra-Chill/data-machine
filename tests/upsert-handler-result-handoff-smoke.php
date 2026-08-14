@@ -45,12 +45,16 @@ if ( ! function_exists( 'do_action' ) ) {
     }
 }
 
-function did_action( string $hook ): int {
-	return 'init' === $hook ? 1 : 0;
+if ( ! function_exists( 'did_action' ) ) {
+	function did_action( string $hook ): int {
+		return 'init' === $hook ? 1 : 0;
+	}
 }
 
-function current_action(): string {
-	return '';
+if ( ! function_exists( 'current_action' ) ) {
+	function current_action(): string {
+		return '';
+	}
 }
 
 if ( ! function_exists( 'get_option' ) ) {
