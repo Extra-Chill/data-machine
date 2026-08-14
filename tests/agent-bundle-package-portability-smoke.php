@@ -248,6 +248,7 @@ add_filter(
 
 do_action( 'init' );
 WP_Agent_Package_Artifacts_Registry::reset_for_tests();
+do_action( 'wp_agent_package_artifacts_init' );
 wp_get_agent_package_artifact_types();
 
 echo "\n[1] Bundle export/import preserves package identity and artifact coverage:\n";

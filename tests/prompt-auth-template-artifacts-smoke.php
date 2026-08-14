@@ -304,6 +304,9 @@ add_filter(
 );
 
 $prompt_list_response = System::get_prompts( new WP_REST_Request() );
+if ( $prompt_list_response instanceof WP_REST_Response ) {
+	$prompt_list_response = $prompt_list_response->get_data();
+}
 /** @var array{data: array<int,array<string,mixed>>} $prompt_list_response */
 $prompt_row           = $prompt_list_response['data'][0] ?? array();
 prompt_artifact_assert_equals( 'REST prompt list exposes artifact ID', 'system-task:fixture_generation:generate', $prompt_row['artifact_id'] ?? null );
@@ -312,6 +315,9 @@ prompt_artifact_assert_equals( 'REST prompt list exposes filtered effective sour
 prompt_artifact_assert_equals( 'REST prompt list hash matches effective content', hash( 'sha256', 'Filtered artifact prompt.' ), $prompt_row['effective_hash'] ?? null );
 
 $prompt_detail_response = System::get_prompt( new WP_REST_Request( array( 'task_type' => 'fixture_generation', 'prompt_key' => 'generate' ) ) );
+if ( $prompt_detail_response instanceof WP_REST_Response ) {
+	$prompt_detail_response = $prompt_detail_response->get_data();
+}
 /** @var array{data: array<string,mixed>} $prompt_detail_response */
 $prompt_detail          = $prompt_detail_response['data'];
 prompt_artifact_assert_equals( 'REST prompt detail exposes artifact source path', 'system-tasks/fixture_generation/generate.md', $prompt_detail['artifact_source_path'] ?? null );
