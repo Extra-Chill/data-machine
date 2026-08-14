@@ -2,6 +2,12 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.55.2] - 2026-08-14
+
+### Fixed
+- Fix Squarespace calendar block event discovery
+- qualify server-rendered event listings
+
 ## [0.55.1] - 2026-08-12
 
 ### Fixed
