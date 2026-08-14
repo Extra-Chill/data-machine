@@ -124,7 +124,10 @@ class MediaHygieneAbility {
 		}
 
 		// Unreachable — guarded by VALID_ACTIONS check above.
-		return array( 'success' => false, 'error' => 'Unhandled action.' );
+		return array(
+			'success' => false,
+			'error'   => 'Unhandled action.',
+		);
 	}
 
 	/**
@@ -145,14 +148,14 @@ class MediaHygieneAbility {
 			'action'  => 'diagnose',
 			'dry_run' => true,
 			'summary' => array(
-				'orphan_files_count'    => count( $orphans ),
-				'orphan_files_bytes'    => $orphan_bytes,
-				'orphan_files_human'    => size_format( $orphan_bytes, 2 ),
-				'unused_attachments'    => count( $unused ),
-				'unused_bytes'          => $unused_bytes,
-				'unused_human'          => size_format( $unused_bytes, 2 ),
-				'total_reclaimable'     => $orphan_bytes + $unused_bytes,
-				'total_human'           => size_format( $orphan_bytes + $unused_bytes, 2 ),
+				'orphan_files_count'      => count( $orphans ),
+				'orphan_files_bytes'      => $orphan_bytes,
+				'orphan_files_human'      => size_format( $orphan_bytes, 2 ),
+				'unused_attachments'      => count( $unused ),
+				'unused_bytes'            => $unused_bytes,
+				'unused_human'            => size_format( $unused_bytes, 2 ),
+				'total_reclaimable'       => $orphan_bytes + $unused_bytes,
+				'total_human'             => size_format( $orphan_bytes + $unused_bytes, 2 ),
 				'scan_limit_per_detector' => $limit,
 			),
 		);
@@ -210,6 +213,7 @@ class MediaHygieneAbility {
 	 * @return array
 	 */
 	private static function delete_orphans( int $limit, bool $apply ): array {
+		global $wp_filesystem;
 		$limit   = $limit > 0 ? min( $limit, self::MAX_DELETE_PER_CALL ) : 100;
 		$orphans = self::scan_orphan_files( $limit );
 
@@ -219,30 +223,47 @@ class MediaHygieneAbility {
 				'action'  => 'delete-orphans',
 				'dry_run' => true,
 				'summary' => array(
-					'would_delete'    => count( $orphans ),
-					'bytes_to_free'   => array_sum( array_column( $orphans, 'size' ) ),
-					'note'            => 'Pass apply=true to actually delete.',
+					'would_delete'  => count( $orphans ),
+					'bytes_to_free' => array_sum( array_column( $orphans, 'size' ) ),
+					'note'          => 'Pass apply=true to actually delete.',
 				),
 				'results' => $orphans,
 			);
 		}
 
-		$deleted      = 0;
-		$bytes_freed  = 0;
-		$failed       = array();
+		if ( ! function_exists( 'WP_Filesystem' ) ) {
+			require_once ABSPATH . 'wp-admin/includes/file.php';
+		}
+		if ( ! WP_Filesystem() || ! $wp_filesystem ) {
+			return array(
+				'success' => false,
+				'action'  => 'delete-orphans',
+				'dry_run' => false,
+				'error'   => 'Unable to initialize the WordPress filesystem.',
+			);
+		}
+
+		$deleted     = 0;
+		$bytes_freed = 0;
+		$failed      = array();
 
 		foreach ( $orphans as $orphan ) {
 			$path = $orphan['path'];
-			if ( ! is_writable( $path ) ) {
-				$failed[] = array( 'path' => $orphan['relative'], 'reason' => 'not_writable' );
+			if ( ! $wp_filesystem->is_writable( $path ) ) {
+				$failed[] = array(
+					'path'   => $orphan['relative'],
+					'reason' => 'not_writable',
+				);
 				continue;
 			}
-			// phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
-			if ( @unlink( $path ) ) {
-				$deleted++;
+			if ( $wp_filesystem->delete( $path, false, 'f' ) ) {
+				++$deleted;
 				$bytes_freed += (int) $orphan['size'];
 			} else {
-				$failed[] = array( 'path' => $orphan['relative'], 'reason' => 'unlink_failed' );
+				$failed[] = array(
+					'path'   => $orphan['relative'],
+					'reason' => 'unlink_failed',
+				);
 			}
 		}
 
@@ -251,9 +272,9 @@ class MediaHygieneAbility {
 			'action'  => 'delete-orphans',
 			'dry_run' => false,
 			'summary' => array(
-				'deleted'       => $deleted,
-				'bytes_freed'   => $bytes_freed,
-				'failed_count'  => count( $failed ),
+				'deleted'      => $deleted,
+				'bytes_freed'  => $bytes_freed,
+				'failed_count' => count( $failed ),
 			),
 			'results' => $failed,
 		);
@@ -296,10 +317,13 @@ class MediaHygieneAbility {
 			$size = (int) $u['size'];
 			$res  = wp_delete_attachment( $id, true );
 			if ( false === $res || null === $res ) {
-				$failed[] = array( 'id' => $id, 'reason' => 'wp_delete_attachment_failed' );
+				$failed[] = array(
+					'id'     => $id,
+					'reason' => 'wp_delete_attachment_failed',
+				);
 				continue;
 			}
-			$deleted++;
+			++$deleted;
 			$bytes_freed += $size;
 		}
 
@@ -333,14 +357,13 @@ class MediaHygieneAbility {
 		}
 
 		$attached = array_flip( array_map( 'strval', MediaHygieneScanner::attached_file_index() ) );
-		$variants = MediaHygieneScanner::variant_index();
+		$variants = MediaHygieneScanner::appended_variant_index(
+			$attached + MediaHygieneScanner::variant_index()
+		);
 
 		$orphans = array();
 		foreach ( $files as $file ) {
 			$rel = $file['relative'];
-			if ( isset( $attached[ $rel ] ) ) {
-				continue;
-			}
 			if ( isset( $variants[ $rel ] ) ) {
 				continue;
 			}
