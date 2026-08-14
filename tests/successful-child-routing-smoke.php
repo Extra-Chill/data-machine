@@ -15,6 +15,7 @@ if ( ! defined( 'WPINC' ) ) {
 }
 
 $datamachine_successful_child_logs = array();
+$datamachine_execute_step_result   = array();
 
 if ( ! function_exists( 'do_action' ) ) {
 	function do_action( string $hook, ...$args ): void {
@@ -38,12 +39,25 @@ if ( ! function_exists( 'sanitize_key' ) ) {
 	}
 }
 
+if ( ! function_exists( 'wp_get_ability' ) ) {
+	function wp_get_ability( string $name ): object {
+		unset( $name );
+		return new class() {
+			public function execute( array $input ): array {
+				unset( $input );
+				return $GLOBALS['datamachine_execute_step_result'];
+			}
+		};
+	}
+}
+
 require_once __DIR__ . '/../inc/Core/JobStatus.php';
 require_once __DIR__ . '/../inc/Core/StepExecutionResult.php';
 require_once __DIR__ . '/../inc/Core/Database/BaseRepository.php';
 require_once __DIR__ . '/../inc/Core/Database/Jobs/Jobs.php';
 require_once __DIR__ . '/../inc/Engine/ExecutionPlan.php';
 require_once __DIR__ . '/../inc/Engine/StepNavigator.php';
+require_once __DIR__ . '/../inc/Engine/Actions/Engine.php';
 require_once __DIR__ . '/../inc/Abilities/Engine/EngineHelpers.php';
 require_once __DIR__ . '/../inc/Abilities/Engine/ExecuteStepAbility.php';
 
@@ -118,6 +132,32 @@ $assert(
 		)
 	)
 );
+
+$GLOBALS['datamachine_execute_step_result'] = array(
+	'success' => false,
+	'outcome' => 'terminal_transition_failed',
+	'reason'  => 'terminal_transition_failed',
+);
+$terminal_failure_surfaced = false;
+try {
+	datamachine_execute_step_action( 2930, 'handler_step' );
+} catch ( RuntimeException $exception ) {
+	$terminal_failure_surfaced = 'Data Machine terminal transition failed.' === $exception->getMessage();
+}
+$assert( 'terminal commit failure keeps the scheduler action failed and recoverable', $terminal_failure_surfaced );
+
+$GLOBALS['datamachine_execute_step_result'] = array(
+	'success'          => false,
+	'stale_generation' => true,
+	'outcome'          => 'stale_generation',
+);
+$stale_generation_noop = true;
+try {
+	datamachine_execute_step_action( 2930, 'handler_step' );
+} catch ( RuntimeException ) {
+	$stale_generation_noop = false;
+}
+$assert( 'stale generation remains a non-failing scheduler no-op', $stale_generation_noop );
 
 echo "\nSuccessful child routing smoke complete: {$failures} failures.\n";
 exit( $failures > 0 ? 1 : 0 );
