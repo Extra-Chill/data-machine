@@ -30,7 +30,7 @@ This audit records which gated abilities have proven frontend-lite consumers. On
 | System | Session title, health, and system-task abilities | Admin/chat/system-task surface. No frontend-lite consumer found. | Keep gated. |
 | Media | `datamachine/generate-alt-text`, `datamachine/diagnose-alt-text`, image generation, media upload/validation/video metadata | Admin/pipeline media surface. No frontend-lite consumer found. | Keep gated. |
 | Image templates | `datamachine/render-image-template`, `datamachine/list-image-templates` | Proven frontend-lite consumers: Extra Chill OG-card and event-roundup generation. | Already hoisted by #2291. |
-| SEO | IndexNow and meta-description abilities | Pipeline/admin SEO surface. No frontend-lite consumer found. | Keep gated. |
+| SEO | Meta-description abilities | Pipeline/admin SEO surface. No frontend-lite consumer found. | Keep gated. |
 | Agent calls | `datamachine/agent-call`, `datamachine/agent-remote-call` | Agent/runtime surface. No frontend-lite consumer found. | Keep gated. |
 | Taxonomy | Resolve, merge meta, get/create/update/delete term abilities | Admin/pipeline taxonomy surface. No frontend-lite consumer found. | Keep gated. |
 | Agent identity and tokens | Agent CRUD/import/export/access/token abilities | Admin/agent management surface. No frontend-lite consumer found. | Keep gated. |

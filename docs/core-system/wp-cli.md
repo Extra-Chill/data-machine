@@ -797,29 +797,6 @@ wp datamachine meta-description generate --post_id=123
 wp datamachine meta-description generate --post_type=post --limit=50 --force
 ```
 
-### datamachine indexnow
-
-IndexNow search engine integration. **Since**: 0.36.0
-
-```bash
-# Submit URLs for indexing
-wp datamachine indexnow submit https://example.com/new-post
-wp datamachine indexnow submit --post-id=123
-wp datamachine indexnow submit --post-type=post --limit=50
-
-# Check status
-wp datamachine indexnow status
-
-# Manage API key
-wp datamachine indexnow key generate
-wp datamachine indexnow key verify
-wp datamachine indexnow key show
-
-# Enable/disable auto-ping
-wp datamachine indexnow enable
-wp datamachine indexnow disable
-```
-
 ### datamachine retention
 
 Inspect and schedule retention cleanup for jobs, logs, processed items, Action Scheduler rows, stale claims, files, and chat sessions.

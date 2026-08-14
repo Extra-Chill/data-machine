@@ -18,7 +18,7 @@ Data Machine follows a WordPress-shaped identifier model: `agent_id` is the stab
 
 ## Registered Ability Domains
 
-The current core registry has 205 `datamachine/*` abilities across these domains:
+The current core registry has 201 `datamachine/*` abilities across these domains:
 
 | Domain | Count | Source anchor | Examples |
 |--------|-------|---------------|----------|
@@ -49,7 +49,7 @@ The current core registry has 205 `datamachine/*` abilities across these domains
 | Post queries | 2 | `inc/Abilities/PostQueryAbilities.php` | query/list Data Machine-created posts |
 | Processed items | 6 | `inc/Abilities/ProcessedItemsAbilities.php` | clear/check/history/stale/never-processed helpers |
 | Publish | 3 | `inc/Abilities/Publish/` | WordPress publish, immediate and queued email sends |
-| SEO | 6 | `inc/Abilities/SEO/` | IndexNow, meta descriptions |
+| SEO | 2 | `inc/Abilities/SEO/` | meta descriptions |
 | Settings | 7 | `inc/Abilities/SettingsAbilities.php` | settings, intervals, tool config, handler defaults |
 | Source inventory | 2 | `inc/Abilities/SourceInventoryAbility.php`, `inc/Abilities/SourceAggregateAbility.php` | source inventory and aggregate reporting |
 | Step types | 2 | `inc/Abilities/StepTypeAbilities.php` | list/validate step types |

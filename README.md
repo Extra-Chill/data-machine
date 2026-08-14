@@ -222,7 +222,6 @@ wp datamachine fetch test        # Fetch-handler test harness
 wp datamachine flow|flows        # Flow CRUD, queue, webhook, scheduling, run
 wp datamachine handler|handlers  # List registered handlers
 wp datamachine image             # Image generation
-wp datamachine indexnow          # IndexNow submission helpers
 wp datamachine job|jobs          # Job management, monitoring, undo, summary
 wp datamachine link|links        # Internal linking
 wp datamachine log|logs          # Log operations
