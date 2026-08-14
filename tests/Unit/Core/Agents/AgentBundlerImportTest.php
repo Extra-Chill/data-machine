@@ -154,6 +154,7 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 		$wpdb->query( "DELETE FROM {$wpdb->prefix}datamachine_jobs" );
 		$wpdb->query( "DELETE FROM {$wpdb->prefix}datamachine_bundle_artifacts" );
 		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
+		delete_user_meta( $this->owner_id, 'datamachine_active_agent_slug' );
 
 		remove_all_actions( 'datamachine_bundle_import_pre_commit' );
 		remove_all_actions( 'datamachine_bundle_import_post_claim_started' );
@@ -242,6 +243,27 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 		$this->assertSame( 'daily', $flow['scheduling_config']['interval'] ?? null, 'Importer preserves the bundle interval.' );
 		$this->assertTrue( $flow['scheduling_config']['enabled'] ?? false, 'Importer keeps scheduled bundle flows enabled.' );
 		$this->assertSame( array( 'mcp' => 5 ), $flow['scheduling_config']['max_items'] ?? null, 'Importer preserves bundle max item caps.' );
+	}
+
+	public function test_first_root_bundle_install_becomes_active_without_overriding_a_preference(): void {
+		$first = $this->bundler->import( $this->fixture_bundle( 'first-root-agent' ), null, $this->owner_id );
+
+		$this->assertTrue( (bool) $first['success'] );
+		$this->assertSame( 'first-root-agent', get_user_meta( $this->owner_id, 'datamachine_active_agent_slug', true ) );
+
+		$second = $this->bundler->import( $this->fixture_bundle( 'second-root-agent' ), null, $this->owner_id );
+
+		$this->assertTrue( (bool) $second['success'] );
+		$this->assertSame( 'first-root-agent', get_user_meta( $this->owner_id, 'datamachine_active_agent_slug', true ) );
+	}
+
+	public function test_bundle_install_preserves_an_existing_ambiguous_owner_choice(): void {
+		$this->agents_repo->create_if_missing( 'existing-agent', 'Existing Agent', $this->owner_id, array() );
+
+		$result = $this->bundler->import( $this->fixture_bundle( 'new-package-agent' ), null, $this->owner_id );
+
+		$this->assertTrue( (bool) $result['success'] );
+		$this->assertSame( '', get_user_meta( $this->owner_id, 'datamachine_active_agent_slug', true ) );
 	}
 
 	public function test_flow_config_strings_are_idempotent_across_import_and_export_round_trips(): void {
@@ -921,6 +943,7 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 			$this->agents_repo->get_by_slug( 'wc-static-site-agent' ),
 			'No half-installed agent row remains after rollback.'
 		);
+		$this->assertSame( '', get_user_meta( $this->owner_id, 'datamachine_active_agent_slug', true ), 'Failed first install leaves no active-agent preference.' );
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
 		$pipeline_ids = array_map( 'intval', $wpdb->get_col( "SELECT pipeline_id FROM {$wpdb->prefix}datamachine_pipelines ORDER BY pipeline_id" ) );
@@ -980,6 +1003,7 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 
 		$result = $this->bundler->import( $bundle, null, $this->owner_id );
 		$this->assertTrue( (bool) $result['success'] );
+		$this->assertSame( 'policy-coordinator', get_user_meta( $this->owner_id, 'datamachine_active_agent_slug', true ) );
 
 		$projection = PersistedAgentGraphProjector::project( 'policy-coordinator' );
 		$this->assertTrue( (bool) $projection['success'] );

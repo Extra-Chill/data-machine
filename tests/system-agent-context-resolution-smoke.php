@@ -100,13 +100,19 @@ $assert(
 	false === task_scheduler_gate_for_test( $old_ctx )
 );
 
-echo "\n[4] Install with no resolvable owner at all still returns zeros (no fatal)\n";
+echo "\n[4] Fresh install with an owner but no agent fails closed without provisioning\n";
+$ctx = resolve_system_agent_context_for_test( 7, 1, static fn(): int => 0 );
+$assert( 'default owner remains attributable', 1 === $ctx['user_id'] );
+$assert( 'no synthetic agent is returned', 0 === $ctx['agent_id'] );
+$assert( 'agent-owned enqueue is rejected until an identity exists', false === task_scheduler_gate_for_test( $ctx ) );
+
+echo "\n[5] Install with no resolvable owner at all still returns zeros (no fatal)\n";
 $ctx = resolve_system_agent_context_for_test( 0, 0, $resolve );
 $assert( 'user_id is 0 when no default owner exists', 0 === $ctx['user_id'] );
 $assert( 'agent_id is 0 when no default owner exists', 0 === $ctx['agent_id'] );
 $assert( 'triggering_user_id is still reported', 0 === $ctx['triggering_user_id'] );
 
-echo "\n[5] Production sources use the shared resolver and carry triggering_user_id\n";
+echo "\n[6] Production sources use the shared resolver and carry triggering_user_id\n";
 $root    = dirname( __DIR__ );
 $sources = array(
 	'AltTextAbilities'         => $root . '/inc/Abilities/Media/AltTextAbilities.php',
@@ -122,14 +128,14 @@ foreach ( $sources as $name => $path ) {
 	);
 }
 
-echo "\n[6] Chat path is untouched — it still auto-provisions via resolve_or_create_agent_id\n";
+echo "\n[7] Chat path is untouched — it still auto-provisions via resolve_or_create_agent_id\n";
 $chat_src = (string) file_get_contents( $root . '/inc/Api/Chat/ChatOrchestrator.php' );
 $assert(
 	'ChatOrchestrator calls datamachine_resolve_or_create_agent_id()',
 	str_contains( $chat_src, 'datamachine_resolve_or_create_agent_id' )
 );
 
-echo "\n[7] The resolver documents the attribution-vs-identity distinction\n";
+echo "\n[8] The resolver documents the attribution-vs-identity distinction\n";
 $plugin_src = (string) file_get_contents( $root . '/data-machine.php' );
 $assert( 'datamachine_resolve_system_agent_context() defined', str_contains( $plugin_src, 'function datamachine_resolve_system_agent_context(): array' ) );
 $assert( 'resolver always falls back to default agent user', str_contains( $plugin_src, '$user_id = (int) \\DataMachine\\Core\\FilesRepository\\DirectoryManager::get_default_agent_user_id();' ) );

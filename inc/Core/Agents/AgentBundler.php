@@ -49,6 +49,7 @@ use DataMachine\Engine\Agents\AgentSubagentGraph;
 defined( 'ABSPATH' ) || exit;
 
 class AgentBundler {
+	private const ACTIVE_AGENT_META_KEY = 'datamachine_active_agent_slug';
 
 	/**
 	 * Bundle format version for forward compatibility.
@@ -682,6 +683,7 @@ class AgentBundler {
 		$is_portable_bundle = ! empty( $bundle['bundle_slug'] ) || $this->bundle_has_portable_artifacts( $bundle );
 		$reconcile_runtime  = ! empty( $options['reconcile_runtime'] );
 		$is_upgrade         = ! empty( $options['is_upgrade'] );
+		$root_import        = empty( $options['_graph_transaction'] );
 
 		// Check for slug collision.
 		// On install: existing slug + (renamed-to-collision OR non-portable bundle) is a hard error.
@@ -707,18 +709,8 @@ class AgentBundler {
 		}
 
 		// Resolve owner.
-		if ( $owner_id <= 0 ) {
-			$owner_id = get_current_user_id();
-			if ( $owner_id <= 0 ) {
-				// WP-CLI context: fall back to first admin.
-				$admins   = get_users( array(
-					'role'   => 'administrator',
-					'number' => 1,
-					'fields' => 'ID',
-				) );
-				$owner_id = ! empty( $admins ) ? (int) $admins[0] : 1;
-			}
-		}
+		$owner_id           = $this->resolve_import_owner_id( $owner_id );
+		$select_first_agent = $root_import && ! $existing && $this->owner_is_agentless( $owner_id );
 
 		// Build summary for dry-run reporting.
 		$summary = array(
@@ -762,7 +754,7 @@ class AgentBundler {
 		$created_agent_id     = 0; // Tracks an agent row this call inserted, for manual rollback.
 		$created_pipeline_ids = array();
 		$created_flow_ids     = array();
-		$root_import          = empty( $options['_graph_transaction'] );
+		$selected_active_agent = false;
 		if ( $root_import ) {
 			$this->filesystem_journal = array();
 			$this->identity_journal   = array();
@@ -1327,10 +1319,6 @@ class AgentBundler {
 				throw new \RuntimeException( 'Failed to persist final agent_config with bundle metadata.' );
 			}
 
-			// Test fault-injection seam — fires after every mutation but before commit so a test handler
-			// can throw and exercise the rollback path without waiting for a SQLite race.
-			do_action( 'datamachine_bundle_import_pre_commit', $bundle_metadata, $slug, $agent_id );
-
 			// Verify persistence end-to-end. SQLite under Studio has been observed silently rolling back the
 			// outer mutations under contention (#1801): the in-memory bundler thinks everything wrote, but a
 			// fresh SELECT shows no agent row and no artifacts. Re-fetching closes the door on that path —
@@ -1349,6 +1337,12 @@ class AgentBundler {
 				) );
 			}
 
+			if ( $select_first_agent ) {
+				$selected_active_agent = $this->select_active_agent( $owner_id, $slug );
+			}
+			// Test fault-injection seam — fires after every mutation but before commit so a test handler
+			// can throw and exercise the rollback path without waiting for a SQLite race.
+			do_action( 'datamachine_bundle_import_pre_commit', $bundle_metadata, $slug, $agent_id );
 			$this->commit_transaction( $transaction_started );
 			if ( $root_import ) {
 				$this->filesystem_journal = array();
@@ -1436,6 +1430,9 @@ class AgentBundler {
 				$this->rollback_identity();
 			}
 			$this->manual_rollback( $created_agent_id, $created_pipeline_ids, $created_flow_ids );
+			if ( $selected_active_agent ) {
+				$this->rollback_active_agent_selection( $owner_id, $slug );
+			}
 
 			do_action(
 				'datamachine_log',
@@ -1569,6 +1566,9 @@ class AgentBundler {
 			return $result;
 		}
 
+		$owner_id           = $this->resolve_import_owner_id( $owner_id );
+		$select_first_agent = $this->owner_is_agentless( $owner_id );
+
 		$transaction_started      = $this->begin_transaction();
 		if ( ! $transaction_started ) {
 			return array(
@@ -1580,6 +1580,7 @@ class AgentBundler {
 		$this->filesystem_journal = array();
 		$this->identity_journal   = array();
 		$created_graph_agents     = array();
+		$selected_active_agent    = false;
 		try {
 			foreach ( $children as $child ) {
 				$existing_child = $this->agents_repo->get_by_slug( $child['slug'] );
@@ -1653,6 +1654,9 @@ class AgentBundler {
 			if ( ! $coordinator_existed && ! empty( $result['summary']['agent_id'] ) ) {
 				$created_graph_agents[] = array( 'agent_id' => (int) $result['summary']['agent_id'], 'slug' => $coordinator_slug );
 			}
+			if ( $select_first_agent ) {
+				$selected_active_agent = $this->select_active_agent( $owner_id, $coordinator_slug );
+			}
 			$this->commit_transaction( $transaction_started );
 			$this->filesystem_journal = array();
 			$this->identity_journal   = array();
@@ -1665,6 +1669,9 @@ class AgentBundler {
 			foreach ( $created_graph_agents as $created ) {
 				$this->safe_graph_agent_rollback( (int) $created['agent_id'], (string) $created['slug'] );
 			}
+			if ( $selected_active_agent ) {
+				$this->rollback_active_agent_selection( $owner_id, $coordinator_slug );
+			}
 			$error = sprintf( 'Subagent graph install rolled back: %s', $e->getMessage() );
 			if ( null !== $rollback_error ) {
 				$error .= sprintf( ' Rollback also failed: %s', $rollback_error );
@@ -1674,6 +1681,64 @@ class AgentBundler {
 				'error_code' => 'install_subagent_graph_rolled_back',
 				'error'      => $error,
 			);
+		}
+	}
+
+	/**
+	 * Resolve the owner used for an import.
+	 */
+	private function resolve_import_owner_id( int $owner_id ): int {
+		if ( $owner_id > 0 ) {
+			return $owner_id;
+		}
+
+		$owner_id = get_current_user_id();
+		if ( $owner_id > 0 ) {
+			return $owner_id;
+		}
+
+		$admins = get_users( array(
+			'role'   => 'administrator',
+			'number' => 1,
+			'fields' => 'ID',
+		) );
+
+		return ! empty( $admins ) ? (int) $admins[0] : 1;
+	}
+
+	/**
+	 * Whether an owner has neither an agent nor an explicit preference.
+	 */
+	private function owner_is_agentless( int $owner_id ): bool {
+		return '' === (string) get_user_meta( $owner_id, self::ACTIVE_AGENT_META_KEY, true )
+			&& array() === $this->agents_repo->get_all_by_owner_id( $owner_id );
+	}
+
+	/**
+	 * Make the first installed root agent the owner's explicit default.
+	 *
+	 * This runs inside the install transaction. A concurrent or existing
+	 * preference remains authoritative and is never overwritten.
+	 */
+	private function select_active_agent( int $owner_id, string $agent_slug ): bool {
+		if ( $owner_id <= 0 ) {
+			return false;
+		}
+
+		if ( add_user_meta( $owner_id, self::ACTIVE_AGENT_META_KEY, $agent_slug, true ) ) {
+			return true;
+		}
+		if ( '' !== (string) get_user_meta( $owner_id, self::ACTIVE_AGENT_META_KEY, true ) ) {
+			return false;
+		}
+
+		throw new \RuntimeException( 'Failed to persist the initial active agent preference.' );
+	}
+
+	/** Remove only the preference written by the failed import. */
+	private function rollback_active_agent_selection( int $owner_id, string $agent_slug ): void {
+		if ( $agent_slug === (string) get_user_meta( $owner_id, self::ACTIVE_AGENT_META_KEY, true ) ) {
+			delete_user_meta( $owner_id, self::ACTIVE_AGENT_META_KEY, $agent_slug );
 		}
 	}
 

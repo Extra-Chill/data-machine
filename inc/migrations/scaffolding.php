@@ -206,11 +206,11 @@ function datamachine_get_scaffold_defaults( string $agent_name = '' ): array {
 }
 
 /**
- * Create a default agent and scaffold its memory files.
+ * Scaffold default shared, user, and existing-agent memory files.
  *
- * Ensures a first-class agent record exists for the default admin user,
- * then scaffolds agent-layer (SOUL.md, MEMORY.md) and user-layer (USER.md)
- * files. Also creates default context files (contexts/{context}.md).
+ * Shared and user files do not require an agent identity. Agent-layer files
+ * are scaffolded only when the default owner already has an unambiguous agent;
+ * activation never invents an agent from the administrator login.
  *
  * Called on activation (directly or via deferred transient) and lazily on
  * any request that reads agent files. Existing files are never overwritten —
@@ -218,27 +218,22 @@ function datamachine_get_scaffold_defaults( string $agent_name = '' ): array {
  *
  * Returns false when the Abilities API is unavailable (e.g. during plugin
  * activation where init callbacks haven't fired), so the caller can defer.
- * The agent record is still created in this case — only the file scaffold
- * is deferred.
- *
  * @since 0.30.0
  * @since 0.65.0 Creates default agent record before scaffolding files.
+ * @since 0.173.0 Fresh installs remain agentless until an identity is explicitly created or installed.
  *
  * @return bool True if scaffold ran, false if abilities were unavailable.
  */
 function datamachine_ensure_default_memory_files(): bool {
 	$default_user_id = \DataMachine\Core\FilesRepository\DirectoryManager::get_default_agent_user_id();
 
-	// Create a default agent record before scaffolding any files.
-	// Without an agent, files would be written to a directory derived from
-	// the user_login fallback — not tied to any real agent identity.
-	$agent_id = datamachine_resolve_or_create_agent_id( $default_user_id );
+	$agent_id = datamachine_resolve_existing_agent_id( $default_user_id );
 
 	// Resolve agent slug for proper directory resolution.
 	$agent_slug = null;
 	if ( $agent_id > 0 ) {
 		$agents_repo = new \DataMachine\Core\Database\Agents\Agents();
-		$agent       = $agents_repo->get_by_owner_id( $default_user_id );
+		$agent       = $agents_repo->get_agent( $agent_id );
 		$agent_slug  = ! empty( $agent['agent_slug'] ) ? $agent['agent_slug'] : null;
 	}
 
@@ -254,7 +249,9 @@ function datamachine_ensure_default_memory_files(): bool {
 	}
 
 	$ability->execute( array( 'layer' => 'shared' ) );
-	$ability->execute( array_merge( $scaffold_context, array( 'layer' => 'agent' ) ) );
+	if ( $agent_id > 0 ) {
+		$ability->execute( array_merge( $scaffold_context, array( 'layer' => 'agent' ) ) );
+	}
 	$ability->execute( array_merge( $scaffold_context, array( 'layer' => 'user' ) ) );
 
 	return true;
