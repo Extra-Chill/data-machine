@@ -79,7 +79,10 @@ final class AgentSubagentGraph {
 			if ( ! is_array( $child['agent_config'] ) || ! is_array( $child['memory'] ) || ! is_array( $child['tool_policy'] ) || ! is_array( $child['skills'] ) || ! is_array( $child['references'] ) || ! is_array( $child['subagents'] ) ) {
 				throw new BundleValidationException( sprintf( 'Subagent %s has an invalid object field.', esc_html( $slug ) ) );
 			}
-			if ( array_key_exists( 'skill_policy', $child ) && ( ! is_array( $child['skill_policy'] ) || array_is_list( $child['skill_policy'] ) ) ) {
+			if ( array() !== $child['tool_policy'] && array_is_list( $child['tool_policy'] ) ) {
+				throw new BundleValidationException( sprintf( 'Subagent %s has an invalid tool policy.', esc_html( $slug ) ) );
+			}
+			if ( array_key_exists( 'skill_policy', $child ) && ( ! is_array( $child['skill_policy'] ) || ( array() !== $child['skill_policy'] && array_is_list( $child['skill_policy'] ) ) ) ) {
 				throw new BundleValidationException( sprintf( 'Subagent %s has an invalid skill policy.', esc_html( $slug ) ) );
 			}
 			$memory = array();

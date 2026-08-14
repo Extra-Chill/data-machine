@@ -363,8 +363,12 @@ assert_adapter(
 rm_adapter_tree( $graph_tmp );
 
 $empty_graph_bundle = $graph_bundle;
+$empty_graph_bundle['agent']['skill_policy'] = array();
+$empty_graph_bundle['agent']['tool_policy'] = array();
 $empty_graph_bundle['subagents'][0]['skills'] = array();
 $empty_graph_bundle['subagents'][0]['references'] = array();
+unset( $empty_graph_bundle['subagents'][0]['skill_policy'] );
+$empty_graph_bundle['subagents'][0]['tool_policy'] = array();
 $empty_graph_directory = AgentBundleArrayAdapter::from_array_bundle( $empty_graph_bundle );
 $empty_graph_tmp = sys_get_temp_dir() . '/datamachine-empty-subagent-package-' . getmypid();
 rm_adapter_tree( $empty_graph_tmp );
@@ -372,7 +376,30 @@ $empty_graph_directory->write( $empty_graph_tmp );
 $empty_graph_round_trip = AgentBundleArrayAdapter::to_import_payload( AgentBundleDirectory::read( $empty_graph_tmp ) );
 assert_adapter_equals( 'empty subagent skills survive directory package read', array(), $empty_graph_round_trip['subagents'][0]['skills'] ?? null );
 assert_adapter_equals( 'empty subagent references survive directory package read', array(), $empty_graph_round_trip['subagents'][0]['references'] ?? null );
+assert_adapter_equals( 'empty root skill policy survives directory package read', array(), $empty_graph_round_trip['agent']['skill_policy'] ?? null );
+assert_adapter_equals( 'empty root tool policy survives directory package read', array(), $empty_graph_round_trip['agent']['tool_policy'] ?? null );
+assert_adapter_equals( 'omitted subagent skill policy survives directory package read as empty', array(), $empty_graph_round_trip['subagents'][0]['skill_policy'] ?? null );
+assert_adapter_equals( 'empty subagent tool policy survives directory package read', array(), $empty_graph_round_trip['subagents'][0]['tool_policy'] ?? null );
 rm_adapter_tree( $empty_graph_tmp );
+
+foreach ( array( 'root skill', 'root tool', 'subagent skill', 'subagent tool' ) as $invalid_policy ) {
+	$invalid_policy_bundle = $graph_bundle;
+	if ( 'root skill' === $invalid_policy ) {
+		$invalid_policy_bundle['agent']['skill_policy'] = array( 'explicit' );
+	} elseif ( 'root tool' === $invalid_policy ) {
+		$invalid_policy_bundle['agent']['tool_policy'] = array( 'datamachine/read-file' );
+	} elseif ( 'subagent skill' === $invalid_policy ) {
+		$invalid_policy_bundle['subagents'][0]['skill_policy'] = array( 'compose.md' );
+	} else {
+		$invalid_policy_bundle['subagents'][0]['tool_policy'] = array( 'datamachine/read-file' );
+	}
+	try {
+		AgentBundleArrayAdapter::from_array_bundle( $invalid_policy_bundle );
+		assert_adapter( "non-empty {$invalid_policy} policy list is rejected", false );
+	} catch ( BundleValidationException $exception ) {
+		assert_adapter( "non-empty {$invalid_policy} policy list is rejected", str_contains( $exception->getMessage(), 'policy' ) );
+	}
+}
 
 echo "\n[3] Directory read resolves prompt file references relative to bundle root\n";
 if ( ! is_dir( $tmp . '/prompts' ) ) {
