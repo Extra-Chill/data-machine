@@ -32,6 +32,7 @@ use ReflectionClass;
 use DataMachineEvents\Abilities\EventScraperTest;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\BandzoogleExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\EventbriteExtractor;
+use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\GenericHtmlEventsExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\JsonLdExtractor;
 
 class EventScraperTestAbilityTest extends WP_UnitTestCase {
@@ -423,6 +424,48 @@ class EventScraperTestAbilityTest extends WP_UnitTestCase {
 			$direct_count,
 			count( $result['event_data']['items'] ?? array() ),
 			'event_data.items[] length must match JsonLdExtractor::extract() count exactly.'
+		);
+	}
+
+	/**
+	 * @dataProvider generic_server_rendered_listing_provider
+	 */
+	public function test_server_rendered_listing_wins_before_fallback( string $fixture, string $target_url ): void {
+		$html   = (string) file_get_contents( $this->fixtures_dir . '/wp-generic/' . $fixture );
+		$direct = ( new GenericHtmlEventsExtractor() )->extract( $html, $target_url );
+		$this->mockHttpResponse( $html );
+
+		$result = ( new EventScraperTest() )->test( $target_url );
+
+		$this->assertTrue( $result['success'] ?? false, wp_json_encode( $result ) );
+		$this->assertCount( 3, $direct );
+		$this->assertSame( 'event', $result['extraction_info']['payload_type'] );
+		$this->assertSame( 'generic_html_events', $result['extraction_info']['extraction_method'] );
+		$this->assertSame( $target_url, $result['target_url'] );
+		$this->assertSame( 3, $result['event_data']['event_count'] );
+		$this->assertSame( 3, $result['extraction_info']['unique_source_event_count'] );
+	}
+
+	public function test_image_only_listing_still_reaches_vision_fallback(): void {
+		$html       = (string) file_get_contents( $this->fixtures_dir . '/wp-generic/image-only-flyers.html' );
+		$target_url = 'https://venue.example.com/flyers/';
+		$this->mockHttpResponse( $html );
+
+		$result = ( new EventScraperTest() )->test( $target_url );
+
+		$this->assertTrue( $result['success'] ?? false, wp_json_encode( $result ) );
+		$this->assertSame( 'vision_flyer', $result['extraction_info']['payload_type'] );
+		$this->assertSame( 'vision', $result['extraction_info']['extraction_method'] );
+		$this->assertSame( 0, $result['extraction_info']['unique_source_event_count'] );
+		$this->assertSame( 1, $result['extraction_info']['flyer_candidate_count'] );
+		$this->assertSame( $target_url, $result['event_data']['page_url'] );
+		$this->assertSame( 'https://venue.example.com/flyer-one.jpg', $result['event_data']['image_url'] );
+	}
+
+	public function generic_server_rendered_listing_provider(): array {
+		return array(
+			'cactus shopify cards' => array( 'shopify-image-with-text-events.html', 'https://cactus.example.com/pages/calendar' ),
+			'roosters event rows'  => array( 'events-manager-resentitem-list.html', 'https://venue.example.com/live-music/' ),
 		);
 	}
 

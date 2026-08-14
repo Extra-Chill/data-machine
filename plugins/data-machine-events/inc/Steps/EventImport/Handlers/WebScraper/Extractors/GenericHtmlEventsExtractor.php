@@ -45,6 +45,8 @@ class GenericHtmlEventsExtractor extends BaseExtractor {
 	 */
 	private const FIELD_PATTERNS = array(
 		'title' => array(
+			'/<h[1-6][^>]+class=["\'][^"\']*image-with-text__heading[^"\']*["\'][^>]*>(.*?)<\/h[1-6]>/is',
+			'/<[^>]+class=["\'][^"\']*resentitem-title[^"\']*["\'][^>]*>.*?<a[^>]*>(.*?)<\/a>/is',
 			'/<(?:div|span|h[1-6])[^>]+class="[^"]*eventTitle[^"]*"[^>]*>.*?<a[^>]+title="([^"]+)"/is',
 			'/<(?:div|span|p|h[1-6])[^>]+class="[^"]*eventTitle[^"]*"[^>]*>.*?<a[^>]*>(.*?)<\/a>/is',
 			'/<(?:div|span|p|h[1-6])[^>]+class="[^"]*event-title[^"]*"[^>]*>(.*?)<\/(?:div|span|p|h[1-6])>/is',
@@ -52,27 +54,33 @@ class GenericHtmlEventsExtractor extends BaseExtractor {
 			'/<h[1-6][^>]*>\s*<a[^>]+href="[^"]*event[^"]*"[^>]*>(.*?)<\/a>/is',
 		),
 		'date'  => array(
+			'/<[^>]+class=["\'][^"\']*date-event[^"\']*["\'][^>]*>(.*?)<\/[^>]+>/is',
+			'/Date:\s*([^<]+)/iu',
 			'/<(?:div|span|p|time)[^>]+class="[^"]*eventDate[^"]*"[^>]*>(.*?)<\/(?:div|span|p|time)>/is',
 			'/<(?:div|span|p|time)[^>]+class="[^"]*event-date[^"]*"[^>]*>(.*?)<\/(?:div|span|p|time)>/is',
 			'/<[^>]+class="[^"]*when[^"]*"[^>]*>(.*?)<\/[^>]+>/is',
 			'/<time[^>]+datetime="([^"]+)"/i',
 		),
 		'time'  => array(
+			'/<[^>]+class=["\'][^"\']*time-event[^"\']*["\'][^>]*>(.*?)<\/[^>]+>/is',
+			'/Time:\s*([^<]+)/iu',
 			'/<span[^>]+class="[^"]*event-time[^"]*"[^>]*>(.*?)<\/span>/is',
 			'/<(?:div|span|p)[^>]+class="[^"]*eventTime[^"]*"[^>]*>(.*?)<\/(?:div|span|p)>/is',
 		),
 		'price' => array(
+			'/Entry Fee:\s*([^<]+)/iu',
 			'/<(?:div|span)[^>]+class="[^"]*eventPrice[^"]*"[^>]*>(.*?)<\/(?:div|span)>/is',
 			'/<(?:div|span)[^>]+class="[^"]*event-price[^"]*"[^>]*>(.*?)<\/(?:div|span)>/is',
 		),
 		'link'  => array(
+			'/<[^>]+class=["\'][^"\']*resentitem-title[^"\']*["\'][^>]*>.*?<a[^>]+href=["\']([^"\']+)["\']/is',
 			'/<[^>]+class="[^"]*(?:event-title|event-link)[^"]*"[^>]*>.*?<a[^>]+href="([^"]+)"/is',
 			'/<a[^>]+href="(https?:\/\/[^"]*\/events?\/[^"]+)"/i',
 			'/<a[^>]+href="(\/events?\/[^"]+)"/i',
 		),
 		'image' => array(
 			'/background-image:\s*url\(([^)]+)\)/i',
-			'/<img[^>]+src="([^"]+)"/i',
+			'/<img[^>]+src=["\']([^"\']+)["\']/i',
 		),
 	);
 
@@ -154,7 +162,13 @@ class GenericHtmlEventsExtractor extends BaseExtractor {
 		$loaded = $this->loadDom( $html );
 		$dom    = $loaded['dom'];
 		$xpath  = $loaded['xpath'];
-		$pairs  = array(
+
+		$explicit_containers = $this->findExplicitContainers( $dom, $xpath );
+		if ( count( $explicit_containers ) >= self::MIN_CONTAINERS ) {
+			return $explicit_containers;
+		}
+
+		$pairs = array(
 			array( 'event-title', 'event-date' ),
 			array( 'event-link', 'when' ),
 		);
@@ -199,6 +213,52 @@ class GenericHtmlEventsExtractor extends BaseExtractor {
 		}
 
 		return array();
+	}
+
+	/**
+	 * Find repeated server-rendered cards whose container classes do not use
+	 * generic event names but whose internal fields are unambiguous.
+	 *
+	 * @return string[] Serialized event container HTML.
+	 */
+	private function findExplicitContainers( \DOMDocument $dom, \DOMXPath $xpath ): array {
+		$containers = array();
+		$queries    = array(
+			"//*[contains(concat(' ', normalize-space(@class), ' '), ' resentitem ')]",
+			"//*[contains(concat(' ', normalize-space(@class), ' '), ' image-with-text ')]",
+		);
+
+		foreach ( $queries as $query ) {
+			$nodes = $xpath->query( $query );
+			if ( false === $nodes ) {
+				continue;
+			}
+
+			foreach ( $nodes as $node ) {
+				$html = $dom->saveHTML( $node );
+				if ( ! is_string( $html ) || ! $this->hasExplicitEventFields( $html ) ) {
+					continue;
+				}
+				$containers[] = $html;
+			}
+
+			if ( count( $containers ) >= self::MIN_CONTAINERS ) {
+				return $containers;
+			}
+			$containers = array();
+		}
+
+		return array();
+	}
+
+	private function hasExplicitEventFields( string $html ): bool {
+		$is_events_manager_row = false !== strpos( $html, 'resentitem-title' )
+			&& false !== strpos( $html, 'date-event' );
+		$is_shopify_event_card = false !== strpos( $html, 'image-with-text__heading' )
+			&& false !== strpos( $html, 'Time:' )
+			&& false !== strpos( $html, 'Date:' );
+
+		return $is_events_manager_row || $is_shopify_event_card;
 	}
 
 	public function getMethod(): string {
@@ -248,7 +308,7 @@ class GenericHtmlEventsExtractor extends BaseExtractor {
 							break 2;
 
 						case 'time':
-							$event['startTime'] = $this->parseTimeString( $value );
+							$event['startTime'] = $this->parseExplicitTime( $value, $block );
 							break 2;
 
 						case 'price':
@@ -265,7 +325,11 @@ class GenericHtmlEventsExtractor extends BaseExtractor {
 
 						case 'image':
 							$url = $value;
-							if ( strpos( $url, '/' ) === 0 ) {
+							if ( str_starts_with( $url, '//' ) ) {
+								$parsed_scheme = wp_parse_url( $base_url, PHP_URL_SCHEME );
+								$scheme        = $parsed_scheme ? $parsed_scheme : 'https';
+								$url           = $scheme . ':' . $url;
+							} elseif ( strpos( $url, '/' ) === 0 ) {
 								$url = $base_url . $url;
 							}
 							$event['imageUrl'] = esc_url_raw( $url );
@@ -276,6 +340,24 @@ class GenericHtmlEventsExtractor extends BaseExtractor {
 		}
 
 		return $event;
+	}
+
+	/**
+	 * Parse the first time in a listing field without changing global handling
+	 * of ambiguous clock values. Events Manager rows omit meridiem but represent
+	 * evening entertainment, while Shopify cards include it explicitly.
+	 */
+	private function parseExplicitTime( string $value, string $block ): string {
+		if ( ! preg_match( '/\b(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)/i', $value, $matches ) ) {
+			return '';
+		}
+
+		$time = trim( $matches[1] );
+		if ( false !== strpos( $block, 'resentitem-title' ) && ! preg_match( '/\b(?:am|pm)\b/i', $time ) ) {
+			$time .= ' pm';
+		}
+
+		return $this->parseTimeString( $time );
 	}
 
 	/**
@@ -307,14 +389,16 @@ class GenericHtmlEventsExtractor extends BaseExtractor {
 		// Strip day name prefix (Mon, Tue, etc.).
 		$date_str = preg_replace( '/^[A-Za-z]{2,3}\s+/', '', $date_str );
 
-		// Try parsing.
-		$ts = strtotime( $date_str );
+		$has_year = (bool) preg_match( '/\b(?:19|20)\d{2}\b|\b\d{1,2}\/\d{1,2}\/\d{2,4}\b/', $date_str );
+		$ts       = strtotime( $date_str );
 		if ( $ts ) {
-			$year = (int) gmdate( 'Y', $ts );
+			$now_year = (int) gmdate( 'Y' );
+			$year     = $has_year
+				? (int) gmdate( 'Y', $ts )
+				: $this->inferYearForMonth( (int) gmdate( 'n', $ts ), (int) gmdate( 'n' ), $now_year );
 
 			// Two-digit year fix: strtotime('03/28/26') → 2026 on most systems,
 			// but verify it's reasonable (within 2 years of now).
-			$now_year = (int) gmdate( 'Y' );
 			if ( $year < 100 ) {
 				$year += 2000;
 			}
@@ -324,5 +408,13 @@ class GenericHtmlEventsExtractor extends BaseExtractor {
 
 			$event['startDate'] = sprintf( '%04d-%02d-%02d', $year, (int) gmdate( 'm', $ts ), (int) gmdate( 'd', $ts ) );
 		}
+	}
+
+	/**
+	 * Treat January-March listings viewed in October-December as the next year.
+	 * All other omitted-year dates remain in the current calendar year.
+	 */
+	private function inferYearForMonth( int $month, int $current_month, int $current_year ): int {
+		return $current_month >= 10 && $month <= 3 ? $current_year + 1 : $current_year;
 	}
 }
