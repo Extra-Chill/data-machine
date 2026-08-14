@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.55.3] - 2026-08-14
+
+### Fixed
+- make REST coordinate sanitizers callback-safe
+
 ## [0.55.2] - 2026-08-14
 
 ### Fixed
