@@ -93,6 +93,7 @@ require_once __DIR__ . '/../inc/Engine/AI/Tools/HostToolPolicy.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/ToolSourceRegistry.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/ToolPolicyResolver.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/ToolResultFinder.php';
+require_once __DIR__ . '/../inc/Engine/AI/conversation-loop.php';
 require_once __DIR__ . '/../inc/Core/Steps/AI/AIStep.php';
 
 use DataMachine\Core\Steps\AI\AIStep;

@@ -233,6 +233,20 @@ add_filter(
 );
 
 add_filter(
+	'datamachine_agent_package_artifact_type_definitions',
+	static function ( array $definitions ): array {
+		$definitions['intelligence/wiki-brain'] = array(
+			'label'           => 'Portable wiki brain',
+			'description'     => 'Fixture extension artifact.',
+			'import_callback' => 'DataMachine\\Engine\\Bundle\\import_datamachine_agent_package_artifact',
+		);
+		return $definitions;
+	},
+	10,
+	1
+);
+
+add_filter(
 	'datamachine_agent_bundle_apply_artifact',
 	static function ( $result, array $artifact ): array {
 		$GLOBALS['__datamachine_portability_applied'][] = $artifact;
