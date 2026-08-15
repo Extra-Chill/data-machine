@@ -386,6 +386,38 @@ function datamachine_resolve_or_create_agent_id( int $user_id ): int {
 }
 
 /**
+ * Resolve an existing default agent without provisioning a new identity.
+ *
+ * The user's explicit active-agent preference is authoritative. A single
+ * owned agent remains a compatibility fallback for existing installations;
+ * multiple owned agents require an explicit choice.
+ *
+ * @since 0.173.0
+ *
+ * @param int $user_id WordPress user ID.
+ * @return int Agent ID, or 0 when no unambiguous existing agent resolves.
+ */
+function datamachine_resolve_existing_agent_id( int $user_id ): int {
+	$user_id = absint( $user_id );
+	if ( $user_id <= 0 ) {
+		return 0;
+	}
+
+	$agents_repo = new \DataMachine\Core\Database\Agents\Agents();
+	$owned       = $agents_repo->get_all_by_owner_id( $user_id );
+	$active_slug = sanitize_title( (string) get_user_meta( $user_id, \DataMachine\Core\Agents\AgentBundler::ACTIVE_AGENT_META_KEY, true ) );
+	if ( '' !== $active_slug ) {
+		foreach ( $owned as $agent ) {
+			if ( (string) $agent['agent_slug'] === $active_slug ) {
+				return (int) $agent['agent_id'];
+			}
+		}
+	}
+
+	return 1 === count( $owned ) ? (int) $owned[0]['agent_id'] : 0;
+}
+
+/**
  * Resolve the acting agent identity for a system/ability-triggered operation.
  *
  * Media, SEO, and linking abilities enqueue agent-owned queued tasks (alt text,
@@ -404,11 +436,12 @@ function datamachine_resolve_or_create_agent_id( int $user_id ): int {
  * @since 0.160.0 Always resolves to the install default agent; never auto-provisions
  *               a per-human agent row for system tasks. ChatOrchestrator remains
  *               the legitimate caller of datamachine_resolve_or_create_agent_id().
+ * @since 0.173.0 Fails closed when no explicit or unambiguous existing agent resolves.
  *
  * @return array{user_id:int,agent_id:int,triggering_user_id:int} Acting user id
  *         (the default agent owner), its agent id, and the original triggering
- *         user id. user_id and agent_id may be 0 only when the install has no
- *         resolvable default owner at all.
+ *         user id. agent_id is 0 when the install has no explicit or unambiguous
+ *         existing agent; user_id is 0 only when no default owner resolves.
  */
 function datamachine_resolve_system_agent_context(): array {
 	$triggering_user_id = function_exists( 'get_current_user_id' ) ? (int) get_current_user_id() : 0;
@@ -421,10 +454,10 @@ function datamachine_resolve_system_agent_context(): array {
 		$user_id = (int) \DataMachine\Core\FilesRepository\DirectoryManager::get_default_agent_user_id();
 	}
 
-	// Resolve (or create) the agent row for the *default owner* only. System
-	// tasks never auto-provision an agent for the triggering human.
-	$agent_id = ( $user_id > 0 && function_exists( 'datamachine_resolve_or_create_agent_id' ) )
-		? datamachine_resolve_or_create_agent_id( $user_id )
+	// System work must use an existing, explicit identity. Fresh installs stay
+	// agentless until an agent is created or a package coordinator is installed.
+	$agent_id = ( $user_id > 0 && function_exists( 'datamachine_resolve_existing_agent_id' ) )
+		? datamachine_resolve_existing_agent_id( $user_id )
 		: 0;
 
 	return array(
