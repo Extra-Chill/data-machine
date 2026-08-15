@@ -1210,21 +1210,7 @@ class AIStep extends Step {
 			: array();
 	}
 
-	/**
-	 * Process AI conversation loop results into data packets.
-	 *
-	 * Only emits actionable packets (handler completions, tool results) that
-	 * downstream steps depend on. Input DataPackets from previous steps are
-	 * NOT carried forward — they already served their purpose as AI conversation
-	 * input, and including them causes the batch scheduler to fan them out as
-	 * ghost child jobs that fail at the next step.
-	 *
-	 * @param array $loop_result Results from AIConversationLoop
-	 * @param array $inputDataPackets Input data packets (used for metadata extraction only)
-	 * @param array $payload Step payload
-	 * @param array $available_tools Tools available during conversation
-	 * @return array Output data packets (tool results only, not input packets)
-	 */
+	/** Process conversation results into actionable output packets. */
 	private static function processLoopResults( array $loop_result, array $inputDataPackets, array $payload, array $available_tools ): array {
 		if ( ! isset( $payload['flow_step_id'] ) || empty( $payload['flow_step_id'] ) ) {
 			throw new \InvalidArgumentException( 'Flow step ID is required in AI step payload' );
@@ -1238,10 +1224,8 @@ class AIStep extends Step {
 		$engine_data            = is_array( $payload['engine_data'] ?? null ) ? $payload['engine_data'] : array();
 		$active_claims          = class_exists( ProcessedItems::class ) ? ProcessedItems::disposition_claims( $engine_data ) : array();
 
-		// Start with an empty output array — input packets are NOT carried forward.
 		$outputPackets = array();
 
-		// Count conversation turns for metadata (not emitted as packets).
 		$turn_count        = 0;
 		$handler_completed = false;
 		$final_ai_content  = '';
@@ -1256,10 +1240,6 @@ class AIStep extends Step {
 			}
 		}
 
-		// Process tool execution results into output packets.
-		// Only handler completions and tool results are emitted — these are
-		// consumed by downstream steps (PublishStep, UpsertStep) via ToolResultFinder.
-		// Input DataPackets are NOT included — they cause ghost child jobs.
 		$input_source_type = $inputDataPackets[0]['metadata']['source_type'] ?? 'unknown';
 
 		foreach ( $tool_execution_results as $tool_execution_result ) {
@@ -1296,7 +1276,6 @@ class AIStep extends Step {
 			$packet_disposition         = (string) ( $tool_result['disposition'] ?? ( ! empty( $tool_result['success'] ) ? 'succeeded' : 'failed' ) );
 
 			if ( $is_handler_tool && ( $tool_result['success'] ?? false ) ) {
-				// Handler tool succeeded - mark completion
 				$clean_tool_parameters = $tool_parameters;
 				$handler_config        = $tool_def['handler_config'] ?? array();
 
@@ -1332,7 +1311,6 @@ class AIStep extends Step {
 
 				$handler_completed = true;
 			} else {
-				// Non-handler tool or failed tool - add tool result data packet
 				$success_message = ConversationManager::generateSuccessMessage( $tool_name, $tool_result, $tool_parameters );
 				$tool_success    = $tool_result['success'] ?? false;
 

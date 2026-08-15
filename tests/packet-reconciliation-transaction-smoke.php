@@ -3,7 +3,8 @@
 
 namespace DataMachine\Core\Database\Jobs {
 	class Jobs {
-		public function get_table_name(): string { return 'wp_datamachine_jobs'; }
+		public const TABLE_NAME = 'datamachine_' . 'jobs';
+		public function get_table_name(): string { return 'wp_' . self::TABLE_NAME; }
 		public function store_engine_data_in_transaction( int $job_id, array $engine ): bool {
 			unset( $job_id );
 			$GLOBALS['transaction_smoke_events'][] = 'store';
@@ -46,7 +47,7 @@ namespace {
 		public function prepare( string $query, mixed ...$args ): string { $this->prepared_args = $args; return $query; }
 		public function get_row( string $query, string $output ): array {
 			unset( $output );
-			if ( str_contains( $query, 'engine_data' ) || str_contains( $query, 'datamachine_jobs' ) ) {
+			if ( str_contains( $query, 'engine_data' ) || str_contains( $query, \DataMachine\Core\Database\Jobs\Jobs::TABLE_NAME ) ) {
 				return array( 'job_id' => 9, 'status' => 'processing', 'engine_data' => json_encode( $this->engine ) );
 			}
 			$args = $this->prepared_args;
