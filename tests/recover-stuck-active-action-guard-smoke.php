@@ -28,8 +28,8 @@ $batch_source = file_get_contents( __DIR__ . '/../inc/Core/ActionScheduler/Pathl
 $timeout_loop = strstr( $source, 'foreach ( $timed_out_jobs as $job )' ) ?: '';
 
 echo "Case 1: timed-out recovery skips jobs with active scheduler work\n";
-assert_recover_stuck_guard_smoke( 'active scheduler work method exists', str_contains( $source, 'private function hasActiveSchedulerWork' ) );
-assert_recover_stuck_guard_smoke( 'active step guard method exists', str_contains( $source, 'private function hasActiveStepAction' ) );
+assert_recover_stuck_guard_smoke( 'active scheduler work evidence method exists', str_contains( $source, 'private function getActiveSchedulerWork' ) );
+assert_recover_stuck_guard_smoke( 'active step guard exposes action IDs', str_contains( $source, 'private function getActiveStepActionIds' ) );
 assert_recover_stuck_guard_smoke( 'timeout loop diagnoses child ownership before dry-run recovery', strpos( $timeout_loop, 'ChildJobRecoveryPolicy::diagnose' ) < strpos( $timeout_loop, 'if ( $dry_run )' ) );
 assert_recover_stuck_guard_smoke( 'guard records skipped status', str_contains( $source, "'status'  => 'skipped'") && str_contains( $source, 'Pending or in-progress scheduler work exists' ) );
 
@@ -39,7 +39,7 @@ assert_recover_stuck_guard_smoke( 'guard checks pending and in-progress actions'
 assert_recover_stuck_guard_smoke( 'guard confirms exact job id from action args', str_contains( $source, '$this->extractActionJobId' ) );
 
 echo "Case 3: stale in-progress step actions do not block timeout recovery forever\n";
-assert_recover_stuck_guard_smoke( 'guard receives timeout window', str_contains( $source, 'private function hasActiveStepAction( int $job_id, int $timeout_hours )' ) );
+assert_recover_stuck_guard_smoke( 'guard receives timeout window', str_contains( $source, 'private function getActiveStepActionIds( int $job_id, int $timeout_hours )' ) );
 assert_recover_stuck_guard_smoke( 'guard reads action attempt timestamps', str_contains( $source, 'last_attempt_gmt' ) && str_contains( $source, 'scheduled_date_gmt' ) );
 assert_recover_stuck_guard_smoke( 'pending actions remain guarded unconditionally', str_contains( $source, 'if ( \'pending\' === (string) $action->status )' ) );
 assert_recover_stuck_guard_smoke( 'old in-progress actions can fall through', str_contains( $source, '( $now_gmt - $started_at ) < $timeout_seconds' ) );
@@ -52,6 +52,7 @@ assert_recover_stuck_guard_smoke( 'batch guard confirms exact parent id', str_co
 assert_recover_stuck_guard_smoke( 'batch guard uses indexed canonical args', str_contains( $batch_source, 'WHERE args = %s AND hook = %s' ) );
 assert_recover_stuck_guard_smoke( 'batch compatibility queries are bounded', str_contains( $batch_source, 'ACTION_QUERY_LIMIT + 1' ) && str_contains( $batch_source, 'LIMIT %d' ) );
 assert_recover_stuck_guard_smoke( 'batch guard fails closed on incomplete evidence', str_contains( $batch_source, 'count( $actions ) > self::ACTION_QUERY_LIMIT' ) && str_contains( $batch_source, "last_error" ) );
+assert_recover_stuck_guard_smoke( 'old child rows age out through shared policy', str_contains( $batch_source, 'public static function diagnoseChildRows' ) && str_contains( $batch_source, "'stale_job_ids'") );
 
 echo "\nRecover-stuck active action guard smoke complete: {$total} assertions, {$failed} failures.\n";
 if ( $failed > 0 ) {

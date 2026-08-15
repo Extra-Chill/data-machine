@@ -36,12 +36,19 @@ class JobLivenessClassifier {
 		$in_progress = array_values( array_filter( $actions, fn( $action ) => 'in-progress' === ( $action['status'] ?? '' ) ) );
 		$complete    = array_values( array_filter( $actions, fn( $action ) => 'complete' === ( $action['status'] ?? '' ) ) );
 		$failed      = array_values( array_filter( $actions, fn( $action ) => 'failed' === ( $action['status'] ?? '' ) ) );
+		$fresh_progress = array_values(
+			array_filter(
+				$in_progress,
+				static fn( array $action ): bool => self::minutesSince( self::actionReference( $action ), $now ) <= $overdue_minutes
+			)
+		);
 
 		$oldest_pending      = self::actionDatetime( $pending, 'scheduled_date_gmt', false );
 		$oldest_in_progress  = self::actionDatetime( $in_progress, 'scheduled_date_gmt', false );
 		$latest_attempt      = self::actionDatetime( $actions, 'last_attempt_gmt', true );
 		$oldest_pending_age  = self::minutesSince( $oldest_pending, $now );
 		$oldest_progress_age = self::minutesSince( $oldest_in_progress, $now );
+		$owner_actions       = array_merge( $pending, $fresh_progress );
 
 		$job_id          = (int) ( $job['job_id'] ?? 0 );
 		$active_children = (int) ( $child_counts['active'] ?? 0 );
@@ -51,10 +58,10 @@ class JobLivenessClassifier {
 		$first_deferred  = strtotime( (string) ( $throttle['first_deferred_at'] ?? '' ) );
 		$defer_age       = false === $first_deferred ? (int) ( $throttle['defer_age_seconds'] ?? 0 ) : max( 0, $now - $first_deferred );
 
-		if ( ! empty( $in_progress ) && $oldest_progress_age > $overdue_minutes ) {
-			$classification = 'stale_in_progress';
-		} elseif ( ! empty( $in_progress ) ) {
+		if ( ! empty( $fresh_progress ) ) {
 			$classification = 'active_processing';
+		} elseif ( ! empty( $in_progress ) ) {
+			$classification = 'stale_in_progress';
 		} elseif ( ! empty( $pending ) && $oldest_pending_age > $overdue_minutes ) {
 			$classification = 'scheduler_starved';
 		} elseif ( ! empty( $throttle ) && 'deferred' === ( $throttle['state'] ?? 'deferred' ) && ! empty( $pending ) ) {
@@ -86,6 +93,9 @@ class JobLivenessClassifier {
 			'in_progress_actions' => count( $in_progress ),
 			'complete_actions'    => count( $complete ),
 			'failed_actions'      => count( $failed ),
+			'owner_action_ids'     => array_values( array_map( 'intval', array_column( $owner_actions, 'action_id' ) ) ),
+			'owner_job_ids'        => array_values( array_map( 'intval', $child_counts['active_ids'] ?? array() ) ),
+			'stale_child_job_ids'  => array_values( array_map( 'intval', $child_counts['stale_ids'] ?? array() ) ),
 			'child_jobs'          => $total_children,
 			'active_children'     => $active_children,
 			'batch_total'         => $batch_total,
@@ -109,6 +119,14 @@ class JobLivenessClassifier {
 
 		sort( $values );
 		return $latest ? (string) end( $values ) : $values[0];
+	}
+
+	/** Use the same in-progress heartbeat preference as timeout recovery. */
+	private static function actionReference( array $action ): string {
+		$last_attempt = (string) ( $action['last_attempt_gmt'] ?? '' );
+		return '' !== $last_attempt && '0000-00-00 00:00:00' !== $last_attempt
+			? $last_attempt
+			: (string) ( $action['scheduled_date_gmt'] ?? '' );
 	}
 
 	private static function minutesSince( string $datetime, int $now ): int {

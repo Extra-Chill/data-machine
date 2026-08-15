@@ -26,21 +26,72 @@ class PathlessBatchRecovery {
 
 	/** Check whether a batch parent still has scheduled chunk or child work. */
 	public static function hasActiveWork( int $parent_job_id, array $engine_data, int $timeout_hours ): bool {
+		return ! empty( self::diagnoseActiveWork( $parent_job_id, $engine_data, $timeout_hours )['owned'] );
+	}
+
+	/** Describe the scheduler action or fresh child rows that currently own a batch. */
+	public static function diagnoseActiveWork( int $parent_job_id, array $engine_data, int $timeout_hours ): array {
 		if ( $parent_job_id <= 0 || empty( $engine_data['batch'] ) ) {
-			return false;
+			return array(
+				'owned'                => false,
+				'chunk_action'         => false,
+				'active_child_job_ids' => array(),
+				'stale_child_job_ids'  => array(),
+			);
 		}
 		if ( self::hasActiveAction( $parent_job_id, $engine_data, $timeout_hours ) ) {
-			return true;
+			return array(
+				'owned'                => true,
+				'chunk_action'         => true,
+				'active_child_job_ids' => array(),
+				'stale_child_job_ids'  => array(),
+			);
 		}
 
 		global $wpdb;
 		$jobs_table = $wpdb->prefix . Jobs::TABLE_NAME;
 		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name is generated from the WordPress prefix.
-		$active_children = (int) $wpdb->get_var(
-			$wpdb->prepare( "SELECT COUNT(*) FROM {$jobs_table} WHERE parent_job_id = %d AND status IN ( %s, %s )", $parent_job_id, 'pending', 'processing' )
+		$children = $wpdb->get_results(
+			$wpdb->prepare( "SELECT job_id, status, created_at FROM {$jobs_table} WHERE parent_job_id = %d AND status IN ( %s, %s )", $parent_job_id, 'pending', 'processing' ),
+			ARRAY_A
 		);
 		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-		return $active_children > 0;
+		$diagnosis = self::diagnoseChildRows( is_array( $children ) ? $children : array(), max( 1, $timeout_hours ) * HOUR_IN_SECONDS, time() );
+
+		return array(
+			'owned'                => ! empty( $diagnosis['active_job_ids'] ),
+			'chunk_action'         => false,
+			'active_child_job_ids' => $diagnosis['active_job_ids'],
+			'stale_child_job_ids'  => $diagnosis['stale_job_ids'],
+		);
+	}
+
+	/**
+	 * Apply the shared child-row ownership grace used by recovery and liveness.
+	 *
+	 * A fresh pending/processing row protects the create-and-schedule race. Once
+	 * the timeout passes, only actual scheduler action evidence may own work.
+	 */
+	public static function diagnoseChildRows( array $children, int $timeout_seconds, int $now ): array {
+		$active_job_ids = array();
+		$stale_job_ids  = array();
+		foreach ( $children as $child ) {
+			$job_id     = (int) ( $child['job_id'] ?? 0 );
+			$created_at = strtotime( (string) ( $child['created_at'] ?? '' ) . ' UTC' );
+			if ( $job_id <= 0 || ! in_array( (string) ( $child['status'] ?? '' ), array( 'pending', 'processing' ), true ) ) {
+				continue;
+			}
+			if ( false === $created_at || ( $now - $created_at ) < max( 1, $timeout_seconds ) ) {
+				$active_job_ids[] = $job_id;
+			} else {
+				$stale_job_ids[] = $job_id;
+			}
+		}
+
+		return array(
+			'active_job_ids' => $active_job_ids,
+			'stale_job_ids'  => $stale_job_ids,
+		);
 	}
 
 	/** Re-establish one scheduler path for a durable pathless v2 batch. */

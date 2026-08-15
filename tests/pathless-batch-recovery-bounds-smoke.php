@@ -122,5 +122,17 @@ $wpdb->responses = array( array(), array(), array() );
 pathless_assert( false === $lookup->invoke( null, 7, $engine, 1 ), 'exhausted exact and compatibility evidence proves absence' );
 pathless_assert( 3 === count( $wpdb->queries ), 'absence requires every bounded status query to be exhausted' );
 
+$children = \DataMachine\Core\ActionScheduler\PathlessBatchRecovery::diagnoseChildRows(
+	array(
+		array( 'job_id' => 70, 'status' => 'pending', 'created_at' => '2026-08-09 11:30:00' ),
+		array( 'job_id' => 71, 'status' => 'processing', 'created_at' => '2026-08-09 09:00:00' ),
+		array( 'job_id' => 72, 'status' => 'completed', 'created_at' => '2026-08-09 11:30:00' ),
+	),
+	HOUR_IN_SECONDS,
+	strtotime( '2026-08-09 12:00:00 UTC' )
+);
+pathless_assert( array( 70 ) === $children['active_job_ids'], 'fresh child row protects the scheduling race' );
+pathless_assert( array( 71 ) === $children['stale_job_ids'], 'old child row ages out of scheduler ownership' );
+
 echo "Pathless batch recovery bounds: {$passes} passed, {$failures} failed.\n";
 exit( $failures > 0 ? 1 : 0 );
