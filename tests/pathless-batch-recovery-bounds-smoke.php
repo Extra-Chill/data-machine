@@ -134,5 +134,39 @@ $children = \DataMachine\Core\ActionScheduler\PathlessBatchRecovery::diagnoseChi
 pathless_assert( array( 70 ) === $children['active_job_ids'], 'fresh child row protects the scheduling race' );
 pathless_assert( array( 71 ) === $children['stale_job_ids'], 'old child row ages out of scheduler ownership' );
 
+$old_child = array( array( 'job_id' => 71, 'status' => 'pending', 'created_at' => '2026-08-09 09:00:00' ) );
+$current_action = array(
+	array(
+		'action_id'          => 901,
+		'args'               => '{"job_id":71,"flow_step_id":"step"}',
+		'status'             => 'pending',
+		'scheduled_date_gmt' => '2026-08-09 11:59:00',
+		'last_attempt_gmt'   => '0000-00-00 00:00:00',
+	),
+);
+$owned = \DataMachine\Core\ActionScheduler\PathlessBatchRecovery::diagnoseChildRows( $old_child, HOUR_IN_SECONDS, strtotime( '2026-08-09 12:00:00 UTC' ), $current_action );
+pathless_assert( array( 71 ) === $owned['active_job_ids'], 'old child with current action still owns parent' );
+pathless_assert( array( 901 ) === $owned['active_action_ids'], 'current child action ID is exposed' );
+
+$stale_action = $current_action;
+$stale_action[0]['status'] = 'in-progress';
+$stale_action[0]['last_attempt_gmt'] = '2026-08-09 09:00:00';
+$historical = \DataMachine\Core\ActionScheduler\PathlessBatchRecovery::diagnoseChildRows( $old_child, HOUR_IN_SECONDS, strtotime( '2026-08-09 12:00:00 UTC' ), $stale_action );
+pathless_assert( array( 71 ) === $historical['stale_job_ids'], 'old child with only stale action ages out' );
+pathless_assert( array() === $historical['active_action_ids'], 'stale child action is not ownership' );
+
+$completed_action = $current_action;
+$completed_action[0]['status'] = 'complete';
+$completed = \DataMachine\Core\ActionScheduler\PathlessBatchRecovery::diagnoseChildRows( $old_child, HOUR_IN_SECONDS, strtotime( '2026-08-09 12:00:00 UTC' ), $completed_action );
+pathless_assert( array( 71 ) === $completed['stale_job_ids'], 'old child with only historical action ages out' );
+
+$incomplete = \DataMachine\Core\ActionScheduler\PathlessBatchRecovery::diagnoseChildRows( $old_child, HOUR_IN_SECONDS, strtotime( '2026-08-09 12:00:00 UTC' ), array(), false );
+pathless_assert( false === $incomplete['evidence_complete'], 'bounded evidence failure is explicit' );
+pathless_assert( array( 71 ) === $incomplete['active_job_ids'], 'bounded evidence failure preserves ownership' );
+
+$source = file_get_contents( __DIR__ . '/../inc/Core/ActionScheduler/PathlessBatchRecovery.php' ) ?: '';
+pathless_assert( str_contains( $source, 'count( $stale_job_ids ) > self::CHILD_QUERY_LIMIT' ), 'child ID scope is bounded before scheduler query' );
+pathless_assert( str_contains( $source, 'count( $actions ) <= self::ACTION_QUERY_LIMIT' ), 'child action result uses truncation sentinel' );
+
 echo "Pathless batch recovery bounds: {$passes} passed, {$failures} failed.\n";
 exit( $failures > 0 ? 1 : 0 );

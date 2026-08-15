@@ -87,6 +87,13 @@ $stale_children = $classify( $job( array( 'batch' => true, 'batch_total' => 2 ) 
 $assert( 'old pathless children do not own the parent', 'no_scheduler_path' === $stale_children['classification'] );
 $assert( 'old pathless child IDs remain diagnostic evidence', array( 43, 44 ) === $stale_children['stale_child_job_ids'] );
 
+$owned_child_action = $classify( $job( array( 'batch' => true, 'batch_total' => 2 ) ), array(), array( 'active' => 1, 'total' => 2, 'active_ids' => array( 43 ), 'stale_ids' => array( 44 ), 'action_ids' => array( 109 ), 'evidence_complete' => true ) );
+$assert( 'old child action keeps parent waiting', 'waiting_children' === $owned_child_action['classification'] );
+$assert( 'child scheduler action and job IDs are exposed', array( 109 ) === $owned_child_action['owner_action_ids'] && array( 43 ) === $owned_child_action['owner_job_ids'] );
+
+$incomplete_children = $classify( $job( array( 'batch' => true, 'batch_total' => 2 ) ), array(), array( 'active' => 1, 'total' => 2, 'active_ids' => array( 43 ), 'stale_ids' => array(), 'action_ids' => array(), 'evidence_complete' => false ) );
+$assert( 'incomplete child evidence fails closed as waiting', 'waiting_children' === $incomplete_children['classification'] && false === $incomplete_children['child_evidence_complete'] );
+
 $resolved = $classify( $job( array( 'ai_concurrency_history' => array( array( 'state' => 'resolved' ) ) ) ) );
 $assert( 'resolved history does not report active contention', false === $resolved['contention_active'] );
 $assert( 'job without active scheduler path is classified directly', 'no_scheduler_path' === $resolved['classification'] );

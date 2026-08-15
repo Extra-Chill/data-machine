@@ -53,6 +53,8 @@ assert_recover_stuck_guard_smoke( 'batch guard uses indexed canonical args', str
 assert_recover_stuck_guard_smoke( 'batch compatibility queries are bounded', str_contains( $batch_source, 'ACTION_QUERY_LIMIT + 1' ) && str_contains( $batch_source, 'LIMIT %d' ) );
 assert_recover_stuck_guard_smoke( 'batch guard fails closed on incomplete evidence', str_contains( $batch_source, 'count( $actions ) > self::ACTION_QUERY_LIMIT' ) && str_contains( $batch_source, "last_error" ) );
 assert_recover_stuck_guard_smoke( 'old child rows age out through shared policy', str_contains( $batch_source, 'public static function diagnoseChildRows' ) && str_contains( $batch_source, "'stale_job_ids'") );
+assert_recover_stuck_guard_smoke( 'stale child candidates receive one bounded bulk action query', str_contains( $batch_source, 'public static function diagnoseChildWork' ) && str_contains( $batch_source, 'CHILD_QUERY_LIMIT' ) );
+assert_recover_stuck_guard_smoke( 'child action and job ownership evidence is returned', str_contains( $source, "'child_step_action'") && str_contains( $batch_source, "'child_action_ids'") );
 
 echo "\nRecover-stuck active action guard smoke complete: {$total} assertions, {$failed} failures.\n";
 if ( $failed > 0 ) {

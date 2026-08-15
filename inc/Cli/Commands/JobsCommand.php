@@ -1238,32 +1238,19 @@ class JobsCommand extends BaseCommand {
 	 * @return array<string,int>
 	 */
 	private function get_child_status_counts( int $parent_job_id, int $overdue_minutes ): array {
-		global $wpdb;
-
 		if ( $parent_job_id <= 0 ) {
 			return array();
 		}
 
-		$jobs_table = $wpdb->prefix . 'datamachine_jobs';
-
-		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name is generated from the WP prefix.
-		$rows = $wpdb->get_results(
-			$wpdb->prepare(
-				"SELECT job_id, status, created_at
-				 FROM {$jobs_table}
-				 WHERE parent_job_id = %d",
-				$parent_job_id
-			),
-			ARRAY_A
-		);
-		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-		$diagnosis = PathlessBatchRecovery::diagnoseChildRows( is_array( $rows ) ? $rows : array(), max( 1, $overdue_minutes ) * MINUTE_IN_SECONDS, time() );
+		$diagnosis = PathlessBatchRecovery::diagnoseChildWork( $parent_job_id, max( 1, $overdue_minutes ) * MINUTE_IN_SECONDS, time() );
 
 		return array(
-			'total'         => is_array( $rows ) ? count( $rows ) : 0,
+			'total'         => (int) $diagnosis['total_children'],
 			'active'        => count( $diagnosis['active_job_ids'] ),
 			'active_ids'    => $diagnosis['active_job_ids'],
 			'stale_ids'     => $diagnosis['stale_job_ids'],
+			'action_ids'    => $diagnosis['active_action_ids'],
+			'evidence_complete' => $diagnosis['evidence_complete'],
 		);
 	}
 

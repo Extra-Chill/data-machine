@@ -1202,11 +1202,20 @@ class RecoverStuckJobsAbility {
 
 		$batch = PathlessBatchRecovery::diagnoseActiveWork( $job_id, $engine_data, $timeout_hours );
 		if ( ! empty( $batch['owned'] ) ) {
+			$type = 'fresh_child_rows';
+			if ( empty( $batch['evidence_complete'] ) ) {
+				$type = 'child_action_evidence_incomplete';
+			} elseif ( ! empty( $batch['chunk_action'] ) ) {
+				$type = 'batch_chunk_action';
+			} elseif ( ! empty( $batch['child_action_ids'] ) ) {
+				$type = 'child_step_action';
+			}
 			return array(
 				'owned'      => true,
-				'type'       => ! empty( $batch['chunk_action'] ) ? 'batch_chunk_action' : 'fresh_child_rows',
-				'action_ids' => array(),
+				'type'       => $type,
+				'action_ids' => array_map( 'intval', $batch['child_action_ids'] ?? array() ),
 				'job_ids'    => array_map( 'intval', $batch['active_child_job_ids'] ?? array() ),
+				'evidence_complete' => ! empty( $batch['evidence_complete'] ),
 			);
 		}
 

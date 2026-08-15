@@ -68,6 +68,8 @@ class JobLivenessClassifier {
 			$classification = 'ai_concurrency_deferred';
 		} elseif ( ! empty( $pending ) ) {
 			$classification = 'queued_next_step';
+		} elseif ( array_key_exists( 'evidence_complete', $child_counts ) && false === $child_counts['evidence_complete'] ) {
+			$classification = 'waiting_children';
 		} elseif ( $active_children > 0 || ( $batch_total > 0 && $total_children < $batch_total ) ) {
 			$classification = 'waiting_children';
 		} else {
@@ -93,9 +95,10 @@ class JobLivenessClassifier {
 			'in_progress_actions' => count( $in_progress ),
 			'complete_actions'    => count( $complete ),
 			'failed_actions'      => count( $failed ),
-			'owner_action_ids'     => array_values( array_map( 'intval', array_column( $owner_actions, 'action_id' ) ) ),
+			'owner_action_ids'     => array_values( array_unique( array_merge( array_map( 'intval', array_column( $owner_actions, 'action_id' ) ), array_map( 'intval', $child_counts['action_ids'] ?? array() ) ) ) ),
 			'owner_job_ids'        => array_values( array_map( 'intval', $child_counts['active_ids'] ?? array() ) ),
 			'stale_child_job_ids'  => array_values( array_map( 'intval', $child_counts['stale_ids'] ?? array() ) ),
+			'child_evidence_complete' => ! array_key_exists( 'evidence_complete', $child_counts ) || true === $child_counts['evidence_complete'],
 			'child_jobs'          => $total_children,
 			'active_children'     => $active_children,
 			'batch_total'         => $batch_total,
