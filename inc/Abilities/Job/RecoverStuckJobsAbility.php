@@ -429,6 +429,12 @@ class RecoverStuckJobsAbility {
 
 				if ( is_array( $child_diagnosis ) ) {
 					$planned_status = ! empty( $child_diagnosis['retry_eligible'] ) ? 'would_requeue_pathless_child' : 'would_transition_pathless_child';
+					if ( ! $recover_pathless_children ) {
+						++$skipped;
+						++$pathless_policy_skipped;
+						$this->appendJobDetail( $jobs, $jobs_omitted, $this->childRecoveryEvidence( $job_row, $child_diagnosis, 'skipped', $recovery_trigger, 'pathless_child_apply_policy_required' ) );
+						continue;
+					}
 					if ( $dry_run ) {
 						if ( ! empty( $child_diagnosis['retry_eligible'] ) ) {
 							++$requeued;
@@ -437,12 +443,6 @@ class RecoverStuckJobsAbility {
 							++$pathless_terminal;
 						}
 						$this->appendJobDetail( $jobs, $jobs_omitted, $this->childRecoveryEvidence( $job_row, $child_diagnosis, $planned_status, $recovery_trigger ) );
-						continue;
-					}
-					if ( ! $recover_pathless_children ) {
-						++$skipped;
-						++$pathless_policy_skipped;
-						$this->appendJobDetail( $jobs, $jobs_omitted, $this->childRecoveryEvidence( $job_row, $child_diagnosis, 'skipped', $recovery_trigger, 'pathless_child_apply_policy_required' ) );
 						continue;
 					}
 					// Diagnosis can change after claiming, so reserve claim + rollback/requeue + finish/terminal.
@@ -675,7 +675,7 @@ class RecoverStuckJobsAbility {
 		$jobs_truncated = $jobs_omitted > 0;
 
 		$message = $dry_run
-			? sprintf( 'Dry run complete. Would recover %d jobs, timeout %d jobs, requeue %d pathless children, terminalize %d pathless children, and reconcile %d terminal-backed actions.', $recovered, $timed_out, $pathless_requeued, $pathless_terminal, $stale_actions )
+			? sprintf( 'Dry run complete. Would recover %d jobs, timeout %d jobs, requeue %d pathless children, terminalize %d pathless children, reconcile %d terminal-backed actions, and guard %d pathless children requiring explicit authorization.', $recovered, $timed_out, $pathless_requeued, $pathless_terminal, $stale_actions, $pathless_policy_skipped )
 			: sprintf( 'Recovery complete. Attempted/touched/mutated: %d/%d/%d (limit %d), outcomes: %d, recovered: %d, timed out: %d, pathless requeued: %d, pathless terminal: %d, reconciled actions: %d, policy-skipped: %d', $attempted, $touched, $mutated, $apply_limit, $mutations, $recovered, $timed_out, $pathless_requeued, $pathless_terminal, $stale_actions, $pathless_policy_skipped );
 
 		if ( ! $dry_run && ( $mutations > 0 || $claimed_elsewhere > 0 || $pathless_policy_skipped > 0 ) ) {
