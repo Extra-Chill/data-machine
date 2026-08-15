@@ -526,7 +526,8 @@ class RecoverStuckJobsAbility {
 					continue;
 				}
 
-				if ( $this->hasActiveSchedulerWork( $job_id, $engine_data, $timeout_hours ) ) {
+				$scheduler_ownership = $this->getActiveSchedulerWork( $job_id, $engine_data, $timeout_hours );
+				if ( ! empty( $scheduler_ownership['owned'] ) ) {
 					++$skipped;
 					$this->appendJobDetail(
 						$jobs,
@@ -536,6 +537,7 @@ class RecoverStuckJobsAbility {
 							'flow_id' => $job_flow_id,
 							'status'  => 'skipped',
 							'reason'  => 'Pending or in-progress scheduler work exists',
+							'scheduler_ownership' => $scheduler_ownership,
 						)
 					);
 					continue;
@@ -1185,18 +1187,43 @@ class RecoverStuckJobsAbility {
 	 * @param int                  $job_id Job ID.
 	 * @param array<string, mixed> $engine_data Job engine data.
 	 * @param int                  $timeout_hours Hours before in-progress actions are considered stale.
-	 * @return bool True when pending or fresh in-progress work exists.
+	 * @return array<string,mixed> Scheduler ownership evidence.
 	 */
-	private function hasActiveSchedulerWork( int $job_id, array $engine_data, int $timeout_hours ): bool {
-		if ( $this->hasActiveStepAction( $job_id, $timeout_hours ) ) {
-			return true;
+	private function getActiveSchedulerWork( int $job_id, array $engine_data, int $timeout_hours ): array {
+		$action_ids = $this->getActiveStepActionIds( $job_id, $timeout_hours );
+		if ( ! empty( $action_ids ) ) {
+			return array(
+				'owned'      => true,
+				'type'       => 'step_action',
+				'action_ids' => $action_ids,
+				'job_ids'    => array( $job_id ),
+			);
 		}
 
-		if ( PathlessBatchRecovery::hasActiveWork( $job_id, $engine_data, $timeout_hours ) ) {
-			return true;
+		$batch = PathlessBatchRecovery::diagnoseActiveWork( $job_id, $engine_data, $timeout_hours );
+		if ( ! empty( $batch['owned'] ) ) {
+			$type = 'fresh_child_rows';
+			if ( empty( $batch['evidence_complete'] ) ) {
+				$type = 'child_action_evidence_incomplete';
+			} elseif ( ! empty( $batch['chunk_action'] ) ) {
+				$type = 'batch_chunk_action';
+			} elseif ( ! empty( $batch['child_action_ids'] ) ) {
+				$type = 'child_step_action';
+			}
+			return array(
+				'owned'      => true,
+				'type'       => $type,
+				'action_ids' => array_map( 'intval', $batch['child_action_ids'] ?? array() ),
+				'job_ids'    => array_map( 'intval', $batch['active_child_job_ids'] ?? array() ),
+				'evidence_complete' => ! empty( $batch['evidence_complete'] ),
+			);
 		}
 
-		return false;
+		return array(
+			'owned'      => false,
+			'action_ids' => array(),
+			'job_ids'    => array(),
+		);
 	}
 
 	/**
@@ -1209,13 +1236,13 @@ class RecoverStuckJobsAbility {
 	 *
 	 * @param int $job_id Job ID.
 	 * @param int $timeout_hours Hours before in-progress actions are considered stale.
-	 * @return bool True when a pending or fresh in-progress step action exists.
+	 * @return array<int,int> Pending or fresh in-progress action IDs.
 	 */
-	private function hasActiveStepAction( int $job_id, int $timeout_hours ): bool {
+	private function getActiveStepActionIds( int $job_id, int $timeout_hours ): array {
 		global $wpdb;
 
 		if ( $job_id <= 0 ) {
-			return false;
+			return array();
 		}
 
 		$actions_table = $wpdb->prefix . 'actionscheduler_actions';
@@ -1241,10 +1268,12 @@ class RecoverStuckJobsAbility {
 		$timeout_seconds = max( 1, $timeout_hours ) * HOUR_IN_SECONDS;
 		$now_gmt         = strtotime( current_time( 'mysql', true ) );
 
+		$active_action_ids = array();
 		foreach ( $actions as $action ) {
 			if ( $job_id === $this->extractActionJobId( (string) ( $action->args ?? '' ) ) ) {
 				if ( 'pending' === (string) $action->status ) {
-					return true;
+					$active_action_ids[] = (int) $action->action_id;
+					continue;
 				}
 
 				$last_attempt = (string) ( $action->last_attempt_gmt ?? '' );
@@ -1253,16 +1282,17 @@ class RecoverStuckJobsAbility {
 				$started_at   = $reference ? strtotime( $reference ) : false;
 
 				if ( false === $started_at || false === $now_gmt ) {
-					return true;
+					$active_action_ids[] = (int) $action->action_id;
+					continue;
 				}
 
 				if ( ( $now_gmt - $started_at ) < $timeout_seconds ) {
-					return true;
+					$active_action_ids[] = (int) $action->action_id;
 				}
 			}
 		}
 
-		return false;
+		return $active_action_ids;
 	}
 
 	/**

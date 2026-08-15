@@ -30,6 +30,7 @@ use DataMachine\Core\AbilityResult;
 use DataMachine\Core\ExecutionQuery;
 use DataMachine\Core\JobArtifacts;
 use DataMachine\Core\RunMetrics;
+use DataMachine\Core\ActionScheduler\PathlessBatchRecovery;
 use DataMachine\Core\Database\Chat\Chat;
 use DataMachine\Core\Database\Chat\ConversationStoreFactory;
 use DataMachine\Core\Database\Jobs\Jobs;
@@ -106,7 +107,7 @@ class JobsCommand extends BaseCommand {
 	 *
 	 * @var array
 	 */
-	private array $liveness_fields = array( 'id', 'flow_id', 'classification', 'age_hours', 'defer_count', 'defer_age_seconds', 'pending_actions', 'in_progress_actions', 'oldest_pending', 'latest_attempt' );
+	private array $liveness_fields = array( 'id', 'flow_id', 'classification', 'age_hours', 'defer_count', 'defer_age_seconds', 'pending_actions', 'in_progress_actions', 'owner_action_ids', 'owner_job_ids', 'oldest_pending', 'latest_attempt' );
 
 	/**
 	 * Recover stuck jobs that have job_status in engine_data but status is 'processing'.
@@ -1172,7 +1173,7 @@ class JobsCommand extends BaseCommand {
 		}
 
 		$job['engine_data'] = $engine_data;
-		$child_counts       = ! empty( $engine_data['batch'] ) ? $this->get_child_status_counts( $job_id ) : array();
+		$child_counts       = ! empty( $engine_data['batch'] ) ? $this->get_child_status_counts( $job_id, $overdue_minutes ) : array();
 
 		return JobLivenessClassifier::diagnose( $job, $actions, $child_counts, $overdue_minutes, time() );
 	}
@@ -1236,32 +1237,20 @@ class JobsCommand extends BaseCommand {
 	 * @param int $parent_job_id Parent job ID.
 	 * @return array<string,int>
 	 */
-	private function get_child_status_counts( int $parent_job_id ): array {
-		global $wpdb;
-
+	private function get_child_status_counts( int $parent_job_id, int $overdue_minutes ): array {
 		if ( $parent_job_id <= 0 ) {
 			return array();
 		}
 
-		$jobs_table = $wpdb->prefix . 'datamachine_jobs';
-
-		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name is generated from the WP prefix.
-		$row = $wpdb->get_row(
-			$wpdb->prepare(
-				"SELECT
-					COUNT(*) as total,
-					SUM(CASE WHEN status = 'processing' OR status = 'pending' THEN 1 ELSE 0 END) as active
-				 FROM {$jobs_table}
-				 WHERE parent_job_id = %d",
-				$parent_job_id
-			),
-			ARRAY_A
-		);
-		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$diagnosis = PathlessBatchRecovery::diagnoseChildWork( $parent_job_id, max( 1, $overdue_minutes ) * MINUTE_IN_SECONDS, time() );
 
 		return array(
-			'total'  => (int) ( $row['total'] ?? 0 ),
-			'active' => (int) ( $row['active'] ?? 0 ),
+			'total'         => (int) $diagnosis['total_children'],
+			'active'        => count( $diagnosis['active_job_ids'] ),
+			'active_ids'    => $diagnosis['active_job_ids'],
+			'stale_ids'     => $diagnosis['stale_job_ids'],
+			'action_ids'    => $diagnosis['active_action_ids'],
+			'evidence_complete' => $diagnosis['evidence_complete'],
 		);
 	}
 

@@ -44,9 +44,13 @@ $classify = static function ( array $job_row, array $actions = array(), array $c
 echo "=== job-liveness-cli-smoke ===\n";
 $active = $classify( $job(), array( $action( 'in-progress', '2026-07-22 11:30:00' ) ) );
 $assert( 'fresh running action is active processing', 'active_processing' === $active['classification'] );
+$assert( 'active diagnostics expose owning action ID', array( 91 ) === $classify( $job(), array( $action( 'in-progress', '2026-07-22 11:30:00', array(), 'datamachine_execute_step', 91 ) ) )['owner_action_ids'] );
 
 $stale = $classify( $job(), array( $action( 'in-progress', '2026-07-22 09:00:00' ) ) );
 $assert( 'overdue running action is stale in progress', 'stale_in_progress' === $stale['classification'] );
+
+$mixed_progress = $classify( $job(), array( $action( 'in-progress', '2026-07-22 09:00:00', array(), 'datamachine_execute_step', 90 ), $action( 'in-progress', '2026-07-22 11:30:00', array(), 'datamachine_execute_step', 91 ) ) );
+$assert( 'fresh action owns work alongside stale history', 'active_processing' === $mixed_progress['classification'] && array( 91 ) === $mixed_progress['owner_action_ids'] );
 
 $starved = $classify( $job(), array( $action( 'pending', '2026-07-22 09:00:00' ) ) );
 $assert( 'overdue pending action is scheduler starved', 'scheduler_starved' === $starved['classification'] );
@@ -75,8 +79,20 @@ $assert( 'deferred contention is active', true === $deferred['contention_active'
 $queued = $classify( $job(), array( $action( 'pending', '2026-07-22 11:50:00' ) ) );
 $assert( 'fresh pending action without throttle is queued', 'queued_next_step' === $queued['classification'] );
 
-$waiting = $classify( $job( array( 'batch' => true, 'batch_total' => 3 ) ), array(), array( 'active' => 1, 'total' => 2 ) );
+$waiting = $classify( $job( array( 'batch' => true, 'batch_total' => 3 ) ), array(), array( 'active' => 1, 'total' => 2, 'active_ids' => array( 43 ) ) );
 $assert( 'active batch children classify as waiting', 'waiting_children' === $waiting['classification'] );
+$assert( 'waiting diagnostics expose owning child ID', array( 43 ) === $waiting['owner_job_ids'] );
+
+$stale_children = $classify( $job( array( 'batch' => true, 'batch_total' => 2 ) ), array(), array( 'active' => 0, 'total' => 2, 'stale_ids' => array( 43, 44 ) ) );
+$assert( 'old pathless children do not own the parent', 'no_scheduler_path' === $stale_children['classification'] );
+$assert( 'old pathless child IDs remain diagnostic evidence', array( 43, 44 ) === $stale_children['stale_child_job_ids'] );
+
+$owned_child_action = $classify( $job( array( 'batch' => true, 'batch_total' => 2 ) ), array(), array( 'active' => 1, 'total' => 2, 'active_ids' => array( 43 ), 'stale_ids' => array( 44 ), 'action_ids' => array( 109 ), 'evidence_complete' => true ) );
+$assert( 'old child action keeps parent waiting', 'waiting_children' === $owned_child_action['classification'] );
+$assert( 'child scheduler action and job IDs are exposed', array( 109 ) === $owned_child_action['owner_action_ids'] && array( 43 ) === $owned_child_action['owner_job_ids'] );
+
+$incomplete_children = $classify( $job( array( 'batch' => true, 'batch_total' => 2 ) ), array(), array( 'active' => 1, 'total' => 2, 'active_ids' => array( 43 ), 'stale_ids' => array(), 'action_ids' => array(), 'evidence_complete' => false ) );
+$assert( 'incomplete child evidence fails closed as waiting', 'waiting_children' === $incomplete_children['classification'] && false === $incomplete_children['child_evidence_complete'] );
 
 $resolved = $classify( $job( array( 'ai_concurrency_history' => array( array( 'state' => 'resolved' ) ) ) ) );
 $assert( 'resolved history does not report active contention', false === $resolved['contention_active'] );
@@ -105,6 +121,9 @@ $invalid_receipt_engine = $recovery_engine;
 $invalid_receipt_engine['scheduler_recovery']['receipt']['action_id'] = 0;
 $invalid_receipt = $classify( $job( $invalid_receipt_engine ), array( $action( 'pending', '2026-07-22 11:50:00', array( 'recovery_generation' => 8, 'recovery_claim_token' => 'current-recovery' ), 'datamachine_execute_step', 108 ) ) );
 $assert( 'zero action receipt is not a liveness path', 'no_scheduler_path' === $invalid_receipt['classification'] );
+
+$historical = $classify( $job(), array( $action( 'complete', '2026-07-01 00:00:00', array(), 'datamachine_execute_step', 55 ) ) );
+$assert( 'old historical action is not scheduler ownership', 'no_scheduler_path' === $historical['classification'] && array() === $historical['owner_action_ids'] );
 
 echo "\nJob liveness CLI smoke complete: {$total} assertions, {$failed} failures.\n";
 exit( $failed > 0 ? 1 : 0 );
