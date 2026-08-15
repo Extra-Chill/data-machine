@@ -39,8 +39,8 @@ class PathlessBatchRecovery {
 			'chunk_action'         => false,
 			'active_child_job_ids' => array(),
 			'stale_child_job_ids'  => array(),
-			'child_action_ids'      => array(),
-			'evidence_complete'     => true,
+			'child_action_ids'     => array(),
+			'evidence_complete'    => true,
 		);
 		if ( $parent_job_id <= 0 || empty( $engine_data['batch'] ) ) {
 			return $diagnosis;
@@ -58,8 +58,8 @@ class PathlessBatchRecovery {
 			'chunk_action'         => false,
 			'active_child_job_ids' => $diagnosis['active_job_ids'],
 			'stale_child_job_ids'  => $diagnosis['stale_job_ids'],
-			'child_action_ids'      => $diagnosis['active_action_ids'],
-			'evidence_complete'     => $diagnosis['evidence_complete'],
+			'child_action_ids'     => $diagnosis['active_action_ids'],
+			'evidence_complete'    => $diagnosis['evidence_complete'],
 		);
 	}
 
@@ -72,7 +72,7 @@ class PathlessBatchRecovery {
 			$wpdb->prepare( "SELECT COUNT(*) FROM {$jobs_table} WHERE parent_job_id = %d", $parent_job_id )
 		);
 		$count_complete = null !== $total_children && '' === (string) $wpdb->last_error;
-		$children = $wpdb->get_results(
+		$children       = $wpdb->get_results(
 			$wpdb->prepare(
 				"SELECT job_id, status, created_at
 				 FROM {$jobs_table}
@@ -97,9 +97,9 @@ class PathlessBatchRecovery {
 			return $diagnosis;
 		}
 
-		$initial       = self::diagnoseChildRows( $children, $timeout_seconds, $now );
+		$initial                   = self::diagnoseChildRows( $children, $timeout_seconds, $now );
 		$initial['total_children'] = (int) $total_children;
-		$stale_job_ids = $initial['stale_job_ids'];
+		$stale_job_ids             = $initial['stale_job_ids'];
 		if ( empty( $stale_job_ids ) ) {
 			return $initial;
 		}
@@ -114,26 +114,24 @@ class PathlessBatchRecovery {
 		}
 		$query_args[] = self::ACTION_QUERY_LIMIT + 1;
 
-		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name and placeholder clauses are generated above.
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber -- Table name and placeholder clauses are generated above; values remain prepared.
 		$actions = $wpdb->get_results(
 			$wpdb->prepare(
 				"SELECT action_id, args, status, scheduled_date_gmt, last_attempt_gmt
 				 FROM {$actions_table}
 				 WHERE hook IN ( %s, %s )
 				 AND status IN ( %s, %s )
-				 AND (" . implode( ' OR ', $clauses ) . ")
-				 ORDER BY action_id DESC
-				 LIMIT %d",
+				 AND (" . implode( ' OR ', $clauses ) . ') ORDER BY action_id DESC LIMIT %d',
 				$query_args
 			),
 			ARRAY_A
 		);
-		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
 		$complete = is_array( $actions )
 			&& '' === (string) $wpdb->last_error
 			&& count( $actions ) <= self::ACTION_QUERY_LIMIT;
 
-		$diagnosis = self::diagnoseChildRows(
+		$diagnosis                   = self::diagnoseChildRows(
 			$children,
 			$timeout_seconds,
 			$now,

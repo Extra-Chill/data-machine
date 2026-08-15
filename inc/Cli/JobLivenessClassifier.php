@@ -21,8 +21,8 @@ class JobLivenessClassifier {
 	 * @return array<string,mixed>
 	 */
 	public static function diagnose( array $job, array $actions, array $child_counts, int $overdue_minutes, int $now ): array {
-		$engine_data = is_array( $job['engine_data'] ?? null ) ? $job['engine_data'] : array();
-		$actions     = array_values(
+		$engine_data    = is_array( $job['engine_data'] ?? null ) ? $job['engine_data'] : array();
+		$actions        = array_values(
 			array_filter(
 				$actions,
 				static function ( array $action ) use ( $job, $engine_data ): bool {
@@ -32,10 +32,10 @@ class JobLivenessClassifier {
 				}
 			)
 		);
-		$pending     = array_values( array_filter( $actions, fn( $action ) => 'pending' === ( $action['status'] ?? '' ) ) );
-		$in_progress = array_values( array_filter( $actions, fn( $action ) => 'in-progress' === ( $action['status'] ?? '' ) ) );
-		$complete    = array_values( array_filter( $actions, fn( $action ) => 'complete' === ( $action['status'] ?? '' ) ) );
-		$failed      = array_values( array_filter( $actions, fn( $action ) => 'failed' === ( $action['status'] ?? '' ) ) );
+		$pending        = array_values( array_filter( $actions, fn( $action ) => 'pending' === ( $action['status'] ?? '' ) ) );
+		$in_progress    = array_values( array_filter( $actions, fn( $action ) => 'in-progress' === ( $action['status'] ?? '' ) ) );
+		$complete       = array_values( array_filter( $actions, fn( $action ) => 'complete' === ( $action['status'] ?? '' ) ) );
+		$failed         = array_values( array_filter( $actions, fn( $action ) => 'failed' === ( $action['status'] ?? '' ) ) );
 		$fresh_progress = array_values(
 			array_filter(
 				$in_progress,
@@ -79,32 +79,32 @@ class JobLivenessClassifier {
 		$last_activity = $engine_data['run_metrics']['last_activity_at'] ?? null;
 
 		return array(
-			'id'                  => $job_id,
-			'flow_id'             => (string) ( $job['flow_id'] ?? '' ),
-			'pipeline_id'         => (string) ( $job['pipeline_id'] ?? '' ),
-			'agent_id'            => isset( $job['agent_id'] ) ? (int) $job['agent_id'] : null,
-			'classification'      => $classification,
-			'created_at'          => (string) ( $job['created_at'] ?? '' ),
-			'age_hours'           => round( self::minutesSince( (string) ( $job['created_at'] ?? '' ), $now ) / 60, 1 ),
-			'last_activity_at'    => is_string( $last_activity ) ? $last_activity : '',
-			'defer_count'         => max( 0, (int) ( $throttle['attempts'] ?? 0 ) ),
-			'defer_age_seconds'   => $defer_age,
-			'contention_active'   => ! empty( $throttle ) && 'deferred' === ( $throttle['state'] ?? 'deferred' ),
-			'contention_provider' => (string) ( $throttle['provider'] ?? '' ),
-			'pending_actions'     => count( $pending ),
-			'in_progress_actions' => count( $in_progress ),
-			'complete_actions'    => count( $complete ),
-			'failed_actions'      => count( $failed ),
-			'owner_action_ids'     => array_values( array_unique( array_merge( array_map( 'intval', array_column( $owner_actions, 'action_id' ) ), array_map( 'intval', $child_counts['action_ids'] ?? array() ) ) ) ),
-			'owner_job_ids'        => array_values( array_map( 'intval', $child_counts['active_ids'] ?? array() ) ),
-			'stale_child_job_ids'  => array_values( array_map( 'intval', $child_counts['stale_ids'] ?? array() ) ),
+			'id'                      => $job_id,
+			'flow_id'                 => (string) ( $job['flow_id'] ?? '' ),
+			'pipeline_id'             => (string) ( $job['pipeline_id'] ?? '' ),
+			'agent_id'                => isset( $job['agent_id'] ) ? (int) $job['agent_id'] : null,
+			'classification'          => $classification,
+			'created_at'              => (string) ( $job['created_at'] ?? '' ),
+			'age_hours'               => round( self::minutesSince( (string) ( $job['created_at'] ?? '' ), $now ) / 60, 1 ),
+			'last_activity_at'        => is_string( $last_activity ) ? $last_activity : '',
+			'defer_count'             => max( 0, (int) ( $throttle['attempts'] ?? 0 ) ),
+			'defer_age_seconds'       => $defer_age,
+			'contention_active'       => ! empty( $throttle ) && 'deferred' === ( $throttle['state'] ?? 'deferred' ),
+			'contention_provider'     => (string) ( $throttle['provider'] ?? '' ),
+			'pending_actions'         => count( $pending ),
+			'in_progress_actions'     => count( $in_progress ),
+			'complete_actions'        => count( $complete ),
+			'failed_actions'          => count( $failed ),
+			'owner_action_ids'        => array_values( array_unique( array_merge( array_map( 'intval', array_column( $owner_actions, 'action_id' ) ), array_map( 'intval', $child_counts['action_ids'] ?? array() ) ) ) ),
+			'owner_job_ids'           => array_values( array_map( 'intval', $child_counts['active_ids'] ?? array() ) ),
+			'stale_child_job_ids'     => array_values( array_map( 'intval', $child_counts['stale_ids'] ?? array() ) ),
 			'child_evidence_complete' => ! array_key_exists( 'evidence_complete', $child_counts ) || true === $child_counts['evidence_complete'],
-			'child_jobs'          => $total_children,
-			'active_children'     => $active_children,
-			'batch_total'         => $batch_total,
-			'oldest_pending'      => $oldest_pending,
-			'oldest_in_progress'  => $oldest_in_progress,
-			'latest_attempt'      => $latest_attempt,
+			'child_jobs'              => $total_children,
+			'active_children'         => $active_children,
+			'batch_total'             => $batch_total,
+			'oldest_pending'          => $oldest_pending,
+			'oldest_in_progress'      => $oldest_in_progress,
+			'latest_attempt'          => $latest_attempt,
 		);
 	}
 
