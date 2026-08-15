@@ -794,12 +794,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/Automattic/agents-api.git",
-                "reference": "6da93fc05b1d2282ed335447e898e67cd314e0cc"
+                "reference": "78906489fb430083800e7afdd19bf2641ea452ea"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/Automattic/agents-api/zipball/6da93fc05b1d2282ed335447e898e67cd314e0cc",
-                "reference": "6da93fc05b1d2282ed335447e898e67cd314e0cc",
+                "url": "https://api.github.com/repos/Automattic/agents-api/zipball/78906489fb430083800e7afdd19bf2641ea452ea",
+                "reference": "78906489fb430083800e7afdd19bf2641ea452ea",
                 "shasum": ""
             },
             "require": {
@@ -893,6 +893,7 @@
                     "php tests/provider-turn-adapter-smoke.php",
                     "php tests/default-provider-turn-adapter-smoke.php",
                     "php tests/agents-chat-ability-smoke.php",
+                    "php tests/chat-permission-parity-smoke.php",
                     "php tests/default-agents-chat-handler-smoke.php",
                     "php tests/tool-observability-smoke.php",
                     "php tests/ability-tool-executor-smoke.php",
@@ -963,7 +964,7 @@
                 "issues": "https://github.com/Automattic/agents-api/issues",
                 "source": "https://github.com/Automattic/agents-api"
             },
-            "time": "2026-08-01T19:15:31+00:00"
+            "time": "2026-08-15T00:32:13+00:00"
         }
     ],
     "packages-dev": [
