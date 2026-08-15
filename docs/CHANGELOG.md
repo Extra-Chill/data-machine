@@ -2,6 +2,15 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.172.31] - 2026-08-15
+
+### Changed
+- Avoid synthetic agents on fresh installs
+
+### Fixed
+- defer fetch acknowledgement until packet disposition
+- preserve successful child scheduler ownership
+
 ## [0.172.30] - 2026-08-15
 
 ### Fixed
