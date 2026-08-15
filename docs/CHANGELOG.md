@@ -2,6 +2,17 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.172.29] - 2026-08-15
+
+### Changed
+- move media diagnostics out of core
+- move IndexNow out of core
+
+### Fixed
+- Fix empty root bundle artifacts
+- Fix empty agent bundle policies
+- Fix empty subagent artifact maps
+
 ## [0.172.28] - 2026-08-13
 
 ### Changed
