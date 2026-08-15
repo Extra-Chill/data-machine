@@ -107,6 +107,33 @@ class RuntimeToolRunStateStore {
 		);
 	}
 
+	/** Build initial state for callers that persist request and run state in one CAS. */
+	public static function initial_state_from_request( array $request ): ?array {
+		$metadata   = is_array( $request['metadata']['datamachine'] ?? null ) ? $request['metadata']['datamachine'] : array();
+		$job_id     = max( 0, (int) ( $metadata['job_id'] ?? 0 ) );
+		$request_id = trim( (string) ( $request['request_id'] ?? '' ) );
+		$tool_name  = trim( (string) ( $request['tool_name'] ?? '' ) );
+		if ( $job_id <= 0 || '' === $request_id || '' === $tool_name ) {
+			return null;
+		}
+
+		$created_at = gmdate( 'c' );
+		return array(
+			'parent_job_id'           => max( 0, (int) ( $metadata['parent_job_id'] ?? 0 ) ),
+			'runtime_tool_request_id' => $request_id,
+			'tool_name'               => $tool_name,
+			'status'                  => self::STATUS_PENDING,
+			'timeout_seconds'         => max( 0, (int) ( $metadata['timeout_seconds'] ?? 0 ) ),
+			'deadline_at'             => (string) ( $request['timeout_at'] ?? $metadata['expires_at'] ?? '' ),
+			'resume_payload'          => null,
+			'finalize_payload'        => null,
+			'created_at'              => $created_at,
+			'updated_at'              => $created_at,
+			'finalized_at'            => null,
+			'resumed_at'              => null,
+		);
+	}
+
 	/**
 	 * Read runtime-tool run state from a request job.
 	 *
@@ -141,7 +168,7 @@ class RuntimeToolRunStateStore {
 	 * @return array<string,mixed>|null
 	 */
 	public function resume( int $job_id, array $payload ): ?array {
-		return $this->transition_once( $job_id, 'resumed_at', 'resume_payload', $payload, self::STATUS_RESUMED );
+		return $this->transition_once( $job_id, 'resumed_at', 'resume_payload', $payload, self::STATUS_RESUMED, false );
 	}
 
 	/**
@@ -154,15 +181,19 @@ class RuntimeToolRunStateStore {
 	 * @param string              $status      New status.
 	 * @return array<string,mixed>|null
 	 */
-	private function transition_once( int $job_id, string $timestamp_key, string $payload_key, array $payload, string $status ): ?array {
+	private function transition_once( int $job_id, string $timestamp_key, string $payload_key, array $payload, string $status, bool $return_existing = true ): ?array {
 		$this->assert_job_id( $job_id );
 
-		$state = null;
-		$this->mutate_engine_data(
+		$state        = null;
+		$transitioned = $this->mutate_engine_data(
 			$job_id,
-			function ( array $engine_data ) use ( $timestamp_key, $payload_key, $payload, $status, &$state ): array {
+			function ( array $engine_data ) use ( $timestamp_key, $payload_key, $payload, $status, $return_existing, &$state ): array {
 				$state = $this->normalize_existing( $engine_data['runtime_tool_run_state'] ?? null );
-				if ( empty( $state ) || ! empty( $state[ $timestamp_key ] ) ) {
+				if ( empty( $state ) ) {
+					return $engine_data;
+				}
+				if ( ! empty( $state[ $timestamp_key ] ) ) {
+					$state = $return_existing ? $state : null;
 					return $engine_data;
 				}
 
@@ -178,7 +209,7 @@ class RuntimeToolRunStateStore {
 			'runtime_tool_run_state_transition'
 		);
 
-		return $state;
+		return $transitioned ? $state : null;
 	}
 
 	/**

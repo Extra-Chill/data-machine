@@ -1944,6 +1944,53 @@ class Jobs extends BaseRepository {
 	}
 
 	/**
+	 * Store engine data inside a caller-owned transaction without publishing cache state.
+	 *
+	 * The caller must hold the job row lock and must call
+	 * publish_committed_engine_data() only after COMMIT succeeds.
+	 */
+	public function store_engine_data_in_transaction( int $job_id, array $data ): bool {
+		if ( $job_id <= 0 ) {
+			return false;
+		}
+
+		$encoded = wp_json_encode( $data );
+		if ( ! is_string( $encoded ) ) {
+			$this->log_engine_data_write_rejection( $job_id, 'json_encode_failed', '', null, $data );
+			return false;
+		}
+		if ( $this->estimate_engine_data_query_bytes( strlen( $encoded ) ) > $this->engine_data_query_budget() ) {
+			$this->log_engine_data_write_rejection( $job_id, 'engine_data_query_oversize', $encoded, null, $data );
+			return false;
+		}
+
+		$storage_envelope = $this->engine_data_storage_envelope( $data, $encoded );
+		$result           = $this->wpdb->update(
+			$this->table_name,
+			$storage_envelope['data'],
+			array( 'job_id' => $job_id ),
+			$storage_envelope['format'],
+			array( '%d' )
+		);
+		if ( false === $result ) {
+			return false;
+		}
+
+		return ( new RunMetadata() )->replace_for_engine_data( $job_id, $data );
+	}
+
+	/** Invalidate cache after commit so an older writer cannot publish over a newer snapshot. */
+	public function publish_committed_engine_data( int $job_id, array $data ): void {
+		unset( $data );
+		wp_cache_delete( $job_id, 'datamachine_engine_data' );
+	}
+
+	/** Whether the current wpdb error requires restarting the complete transaction. */
+	public function has_retryable_transaction_error(): bool {
+		return $this->is_retryable_db_error( (string) $this->wpdb->last_error );
+	}
+
+	/**
 	 * Store engine data only when the persisted snapshot still matches the caller's baseline.
 	 *
 	 * @param int   $job_id        Job ID.
@@ -2801,6 +2848,7 @@ class Jobs extends BaseRepository {
 		);
 		$update_formats = array( '%s', '%s', '%d', null, null, '%d' );
 		$engine = $this->engine_data_with_status_reason( is_array( $job['engine_data'] ?? null ) ? $job['engine_data'] : array(), $prepared_job_status );
+		$engine = (array) apply_filters( 'datamachine_job_terminal_engine_data', $engine, $job_id, $status );
 		$update_data['engine_data'] = wp_json_encode( $engine );
 		$update_formats[] = '%s';
 		$operation_recovery = is_array( $recovery_owner ) && 'operation' === (string) ( $recovery_owner['mode'] ?? '' );

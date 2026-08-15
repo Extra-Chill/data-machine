@@ -15,6 +15,7 @@
 
 namespace DataMachine\Tests\Unit\AI\Tools;
 
+use DataMachine\Core\Database\ProcessedItems\ProcessedItems;
 use DataMachine\Engine\AI\Tools\ToolManager;
 use DataMachine\Engine\AI\Tools\ToolPolicyResolver;
 use WP_UnitTestCase;
@@ -119,6 +120,44 @@ class HandlerToolResolutionTest extends WP_UnitTestCase {
 
 		$this->assertArrayHasKey( 'widget_publish_bound', $resolved );
 		$this->assertSame( array( 'job_id' ), $resolved['widget_publish_bound']['client_context_bindings'] );
+	}
+
+	public function test_claimed_packet_centrally_requires_disposition_id_on_handler_tool(): void {
+		add_filter(
+			'datamachine_tools',
+			function ( array $tools ): array {
+				$tools['__handler_tools_claimed_publish'] = ToolManager::handlerToolDeclaration(
+					static fn(): array => array(
+						'claimed_publish' => array(
+							'description' => 'Publish one claimed packet',
+							'parameters'  => array( 'title' => array( 'type' => 'string', 'required' => true ) ),
+						),
+					),
+					array( 'handler' => 'claimed_publish' )
+				);
+				return $tools;
+			}
+		);
+		$claim = array(
+			'identity_scope'  => 'fetch-step',
+			'source_type'     => 'fixture',
+			'item_identifier' => 'item-2',
+			'ownership_token' => 'opaque-owner-token',
+			'disposition_id'  => ProcessedItems::disposition_identity( 'fetch-step', 'fixture', 'item-2' ),
+		);
+
+		$resolved = $this->tool_manager->resolveHandlerTools(
+			'claimed_publish',
+			array(),
+			array( ProcessedItems::CLAIMS_METADATA_KEY => array( $claim ) ),
+			'claimed-publish-scope'
+		);
+
+		$this->assertTrue( $resolved['claimed_publish']['packet_disposition_bound'] );
+		$this->assertArrayHasKey( 'disposition_id', $resolved['claimed_publish']['parameters']['properties'] );
+		$this->assertContains( 'disposition_id', $resolved['claimed_publish']['parameters']['required'] );
+		$this->assertContains( 'title', $resolved['claimed_publish']['parameters']['required'] );
+		$this->assertStringNotContainsString( 'opaque-owner-token', wp_json_encode( $resolved ) );
 	}
 
 	public function test_resolves_three_param_filter_style_handler_callable_before_static_tool(): void {

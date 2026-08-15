@@ -10,6 +10,8 @@ namespace DataMachine\Tests\Unit\AI\Tools;
 use AgentsAPI\AI\Tools\WP_Agent_Tool_Parameters;
 use AgentsAPI\AI\WP_Agent_Provider_Turn_Request;
 use AgentsAPI\Core\Workspace\WP_Agent_Workspace_Scope;
+use DataMachine\Core\Database\ProcessedItems\ProcessedItems;
+use DataMachine\Core\Database\Jobs\Jobs;
 use DataMachine\Engine\AI\Actions\PendingActionStore;
 use DataMachine\Engine\AI\Tools\ToolExecutor;
 use DataMachine\Engine\AI\Tools\ToolManager;
@@ -237,6 +239,54 @@ class ToolExecutorValidationTest extends WP_UnitTestCase {
 
 		$this->assertTrue( $result['success'] );
 		$this->assertSame( 42, $result['result']['data']['query'] ?? null );
+	}
+
+	public function test_disposition_contract_infers_only_one_claim_and_rejects_ambiguous_or_invalid_ids(): void {
+		$first  = $this->dispositionClaim( 'first' );
+		$second = $this->dispositionClaim( 'second' );
+		$tools  = array(
+			'claimed_handler' => array(
+				'class'                      => TestToolHandler::class,
+				'method'                     => 'handle_tool_call',
+				'packet_disposition_bound'   => true,
+				'parameters'                 => array(
+					'type'       => 'object',
+					'properties' => array( 'disposition_id' => array( 'type' => 'string' ) ),
+					'required'   => array( 'disposition_id' ),
+				),
+			),
+		);
+		$job_id = ( new Jobs() )->create_job( array( 'source' => 'pipeline', 'label' => 'Packet execution reservation validation' ) );
+		$this->assertGreaterThan( 0, $job_id );
+		$this->assertTrue( ( new Jobs() )->store_engine_data( $job_id, array( ProcessedItems::CLAIM_METADATA_KEY => $first ) ) );
+
+		$single = ToolExecutor::executeTool(
+			'claimed_handler',
+			array(),
+			$tools,
+			array( 'job_id' => $job_id, 'engine_data' => array( ProcessedItems::CLAIM_METADATA_KEY => $first ) )
+		);
+		$this->assertTrue( $single['success'] );
+		$this->assertSame( $first['disposition_id'], $single['disposition_id'] );
+		$this->assertSame( $first['disposition_id'], $single['result']['data']['disposition_id'] ?? null );
+
+		$ambiguous = ToolExecutor::executeTool(
+			'claimed_handler',
+			array(),
+			$tools,
+			array( 'engine_data' => array( ProcessedItems::CLAIMS_METADATA_KEY => array( $first, $second ) ) )
+		);
+		$this->assertFalse( $ambiguous['success'] );
+		$this->assertSame( 'invalid_packet_disposition', $ambiguous['code'] );
+
+		$invalid = ToolExecutor::executeTool(
+			'claimed_handler',
+			array( 'disposition_id' => str_repeat( 'f', 64 ) ),
+			$tools,
+			array( 'engine_data' => array( ProcessedItems::CLAIMS_METADATA_KEY => array( $first, $second ) ) )
+		);
+		$this->assertFalse( $invalid['success'] );
+		$this->assertSame( 'invalid_packet_disposition', $invalid['code'] );
 	}
 
 	public function test_execute_tool_applies_authoritative_caller_context_bindings(): void {
@@ -789,6 +839,16 @@ class ToolExecutorValidationTest extends WP_UnitTestCase {
 					),
 				),
 			),
+		);
+	}
+
+	private function dispositionClaim( string $item_identifier ): array {
+		return array(
+			'identity_scope'  => 'fetch-step',
+			'source_type'     => 'fixture',
+			'item_identifier' => $item_identifier,
+			'ownership_token' => 'owner-' . $item_identifier,
+			'disposition_id'  => ProcessedItems::disposition_identity( 'fetch-step', 'fixture', $item_identifier ),
 		);
 	}
 

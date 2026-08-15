@@ -33,6 +33,11 @@ if ( ! function_exists( 'sanitize_key' ) ) {
 		return preg_replace( '/[^a-z0-9_\-]/', '', $key );
 	}
 }
+if ( ! function_exists( 'wp_json_encode' ) ) {
+	function wp_json_encode( mixed $value, int $flags = 0 ): string|false {
+		return json_encode( $value, $flags );
+	}
+}
 
 $datamachine_test_engine_data = array();
 
@@ -47,6 +52,8 @@ require_once __DIR__ . '/../inc/Core/JobStatus.php';
 require_once __DIR__ . '/../inc/Core/StepExecutionResult.php';
 require_once __DIR__ . '/../inc/Core/Database/BaseRepository.php';
 require_once __DIR__ . '/../inc/Core/Database/Jobs/Jobs.php';
+require_once __DIR__ . '/../inc/Core/Database/ProcessedItems/ProcessedItems.php';
+require_once __DIR__ . '/../inc/Engine/Actions/Handlers/StepLifecycleHandler.php';
 require_once __DIR__ . '/../inc/Abilities/Engine/EngineHelpers.php';
 require_once __DIR__ . '/../inc/Abilities/Engine/ExecuteStepAbility.php';
 

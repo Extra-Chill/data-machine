@@ -52,7 +52,7 @@ namespace {
 	}
 
 	if ( ! function_exists( 'datamachine_merge_engine_data' ) ) {
-		function datamachine_merge_engine_data( int $job_id, array $data ): void {
+		function datamachine_merge_engine_data( int $job_id, array $data ): bool {
 			$GLOBALS['fetch_disposition_smoke_engine'][ $job_id ] = array_merge(
 				$GLOBALS['fetch_disposition_smoke_engine'][ $job_id ] ?? array(),
 				$data
@@ -68,6 +68,7 @@ namespace {
 			// Keep the (possibly real) object cache coherent with the snapshot
 			// so EngineData::retrieve() never serves a stale pre-merge value.
 			wp_cache_set( $job_id, $GLOBALS['fetch_disposition_smoke_persisted_engine'][ $job_id ], 'datamachine_engine_data' );
+			return true;
 		}
 	}
 
@@ -90,6 +91,11 @@ namespace {
 			return strip_tags( $text );
 		}
 	}
+	if ( ! function_exists( 'sanitize_key' ) ) {
+		function sanitize_key( string $value ): string {
+			return preg_replace( '/[^a-z0-9_\-]/', '', strtolower( $value ) );
+		}
+	}
 }
 
 namespace DataMachine\Core\Database\Jobs {
@@ -97,11 +103,60 @@ namespace DataMachine\Core\Database\Jobs {
 		public function retrieve_engine_data( int $job_id ): array {
 			return $GLOBALS['fetch_disposition_smoke_persisted_engine'][ $job_id ] ?? array();
 		}
+		public function compare_and_swap_engine_data( int $job_id, array $expected, array $next ): array {
+			$current = $GLOBALS['fetch_disposition_smoke_persisted_engine'][ $job_id ] ?? array();
+			if ( is_array( $GLOBALS['fetch_disposition_smoke_cas_injection'][ $job_id ] ?? null ) ) {
+				$current['packet_dispositions'] = array_replace(
+					is_array( $current['packet_dispositions'] ?? null ) ? $current['packet_dispositions'] : array(),
+					$GLOBALS['fetch_disposition_smoke_cas_injection'][ $job_id ]
+				);
+				$GLOBALS['fetch_disposition_smoke_persisted_engine'][ $job_id ] = $current;
+				unset( $GLOBALS['fetch_disposition_smoke_cas_injection'][ $job_id ] );
+				return array( 'updated' => false, 'conflict' => true, 'error' => null );
+			}
+			if ( $current !== $expected ) {
+				return array( 'updated' => false, 'conflict' => true, 'error' => null );
+			}
+			$GLOBALS['fetch_disposition_smoke_persisted_engine'][ $job_id ] = $next;
+			$GLOBALS['fetch_disposition_smoke_engine'][ $job_id ] = $next;
+			return array( 'updated' => true, 'conflict' => false, 'error' => null );
+		}
 	}
 }
 
 namespace DataMachine\Core\Database\ProcessedItems {
 	class ProcessedItems {
+		public const CLAIM_METADATA_KEY          = '_datamachine_item_claim';
+		public const CLAIMS_METADATA_KEY         = '_datamachine_item_claims';
+		public const DISPOSITION_ID_METADATA_KEY = '_datamachine_packet_disposition_id';
+
+		public static function disposition_identity( string $scope, string $source, string $item ): string {
+			return hash( 'sha256', implode( "\0", array( $scope, $source, $item ) ) );
+		}
+
+		public static function disposition_claims( array $container ): array {
+			$candidates = isset( $container[ self::CLAIM_METADATA_KEY ] ) ? array( $container[ self::CLAIM_METADATA_KEY ] ) : array();
+			$candidates = array_merge( $candidates, is_array( $container[ self::CLAIMS_METADATA_KEY ] ?? null ) ? $container[ self::CLAIMS_METADATA_KEY ] : array() );
+			$claims     = array();
+			foreach ( $candidates as $claim ) {
+				if ( ! is_array( $claim ) ) {
+					continue;
+				}
+				$id                    = $claim['disposition_id'] ?? self::disposition_identity( $claim['identity_scope'], $claim['source_type'], $claim['item_identifier'] );
+				$claim['disposition_id'] = $id;
+				$claims[ $id ]         = $claim;
+			}
+			return $claims;
+		}
+
+		public static function resolve_disposition_claim( array $container, string $id = '', bool $infer_single = true ): ?array {
+			$claims = self::disposition_claims( $container );
+			if ( '' !== $id ) {
+				return $claims[ $id ] ?? null;
+			}
+			return $infer_single && 1 === count( $claims ) ? reset( $claims ) : null;
+		}
+
 		public function release_claim( string $flow_step_id, string $source_type, string $item_identifier ): int|false {
 			$GLOBALS['fetch_disposition_smoke_released'][] = array( $flow_step_id, $source_type, $item_identifier );
 			return 1;
@@ -130,6 +185,13 @@ namespace {
 		}
 	}
 
+	$claim = array(
+		'identity_scope'  => 'fetch-step_7',
+		'source_type'     => 'rss',
+		'item_identifier' => 'source-123',
+		'ownership_token' => 'opaque-owner-token',
+	);
+	$claim['disposition_id'] = DataMachine\Core\Database\ProcessedItems\ProcessedItems::disposition_identity( $claim['identity_scope'], $claim['source_type'], $claim['item_identifier'] );
 	$engine = new FetchDispositionSmokeEngine(
 		array(
 			'item_identifier' => 'source-123',
@@ -138,6 +200,7 @@ namespace {
 				'fetch-step_7' => array( 'step_type' => 'fetch' ),
 				'ai-step_7'    => array( 'step_type' => 'ai' ),
 			),
+			DataMachine\Core\Database\ProcessedItems\ProcessedItems::CLAIM_METADATA_KEY => $claim,
 		)
 	);
 
@@ -172,8 +235,8 @@ namespace {
 	assert_fetch_disposition_smoke( 'reject_source succeeds', true === ( $reject['success'] ?? false ) );
 	assert_fetch_disposition_smoke( 'reject_source reports explicit tool name', 'reject_source' === ( $reject['tool_name'] ?? '' ) );
 	assert_fetch_disposition_smoke( 'reject_source does not eagerly mark the claim processed', array() === $GLOBALS['fetch_disposition_smoke_processed'] );
-	assert_fetch_disposition_smoke( 'reject_source sets source-rejected status', 'agent_skipped - source-rejected' === ( $GLOBALS['fetch_disposition_smoke_engine'][1814]['job_status'] ?? '' ) );
-	$reject_diagnostic = $GLOBALS['fetch_disposition_smoke_engine'][1814]['disposition_diagnostic'] ?? array();
+	assert_fetch_disposition_smoke( 'reject_source preserves exact safe identity', $claim['disposition_id'] === ( $reject['disposition_id'] ?? '' ) );
+	$reject_diagnostic = $GLOBALS['fetch_disposition_smoke_engine'][1814]['packet_dispositions'][ $claim['disposition_id'] ]['diagnostic'] ?? array();
 	assert_fetch_disposition_smoke( 'reject_source persists disposition diagnostic', 'reject_source' === ( $reject_diagnostic['disposition'] ?? '' ) && 'duplicate-source' === ( $reject_diagnostic['reason'] ?? '' ) );
 	assert_fetch_disposition_smoke( 'reject_source diagnostic includes source identity', 'source-123' === ( $reject_diagnostic['item_identifier'] ?? '' ) && 'fixture-provider' === ( $reject_diagnostic['provider'] ?? '' ) && 'fetch-step_7' === ( $reject_diagnostic['flow_step_id'] ?? '' ) );
 	assert_fetch_disposition_smoke( 'reject_source diagnostic includes packet count and bounded excerpt', 1 === ( $reject_diagnostic['packet_count'] ?? 0 ) && 1200 === ( $reject_diagnostic['excerpt_limit'] ?? 0 ) && 1200 >= strlen( $reject_diagnostic['excerpt'] ?? '' ) );
@@ -195,8 +258,8 @@ namespace {
 	assert_fetch_disposition_smoke( 'defer_item reports explicit tool name', 'defer_item' === ( $defer['tool_name'] ?? '' ) );
 	assert_fetch_disposition_smoke( 'defer_item does not eagerly release the claim', array() === $GLOBALS['fetch_disposition_smoke_released'] );
 	assert_fetch_disposition_smoke( 'defer_item does not mark processed', array() === $GLOBALS['fetch_disposition_smoke_processed'] );
-	assert_fetch_disposition_smoke( 'tool-error deferral remains retry eligible', 'failed - item-deferred' === ( $GLOBALS['fetch_disposition_smoke_engine'][1815]['job_status'] ?? '' ) );
-	$defer_diagnostic = $GLOBALS['fetch_disposition_smoke_engine'][1815]['disposition_diagnostic'] ?? array();
+	assert_fetch_disposition_smoke( 'tool-error deferral remains packet scoped', ! isset( $GLOBALS['fetch_disposition_smoke_engine'][1815]['job_status'] ) );
+	$defer_diagnostic = $GLOBALS['fetch_disposition_smoke_engine'][1815]['packet_dispositions'][ $claim['disposition_id'] ]['diagnostic'] ?? array();
 	assert_fetch_disposition_smoke( 'defer_item persists disposition diagnostic', 'defer_item' === ( $defer_diagnostic['disposition'] ?? '' ) && 'tool-error' === ( $defer_diagnostic['reason'] ?? '' ) );
 
 	echo "Case 2b: reject_source hydrates engine data from job_id when runtime engine is absent\n";
@@ -207,6 +270,12 @@ namespace {
 		'flow_config'     => array(
 			'fetch-step_8' => array( 'step_type' => 'fetch' ),
 			'ai-step_8'    => array( 'step_type' => 'ai' ),
+		),
+		DataMachine\Core\Database\ProcessedItems\ProcessedItems::CLAIM_METADATA_KEY => array(
+			'identity_scope'  => 'fetch-step_8',
+			'source_type'     => 'mcp',
+			'item_identifier' => 'source-456',
+			'ownership_token' => 'opaque-owner-token-456',
 		),
 	);
 	$reject_hydrated = $tool->handle_tool_call(
@@ -237,9 +306,9 @@ namespace {
 	assert_fetch_disposition_smoke( 'second disposition returns success (no error-retry loop)', true === ( $defer_after_reject['success'] ?? false ) );
 	assert_fetch_disposition_smoke( 'second disposition reports already_dispositioned', true === ( $defer_after_reject['already_dispositioned'] ?? false ) );
 	assert_fetch_disposition_smoke( 'second disposition message references existing disposition', str_contains( $defer_after_reject['message'] ?? '', 'already dispositioned (source-rejected)' ) );
-	assert_fetch_disposition_smoke( 'defer_item does not downgrade source-rejected status', 'agent_skipped - source-rejected' === ( $GLOBALS['fetch_disposition_smoke_engine'][1814]['job_status'] ?? '' ) );
-	assert_fetch_disposition_smoke( 'second disposition preserves original disposition record', 'reject_source' === ( $GLOBALS['fetch_disposition_smoke_engine'][1814]['disposition_diagnostic']['disposition'] ?? '' ) );
-	assert_fetch_disposition_smoke( 'second disposition does not write item_deferral record', ! isset( $GLOBALS['fetch_disposition_smoke_engine'][1814]['item_deferral'] ) );
+	assert_fetch_disposition_smoke( 'defer_item does not downgrade source rejection', 'reject_source' === ( $defer_after_reject['disposition'] ?? '' ) );
+	assert_fetch_disposition_smoke( 'second disposition preserves original disposition record', 'reject_source' === ( $GLOBALS['fetch_disposition_smoke_engine'][1814]['packet_dispositions'][ $claim['disposition_id'] ]['disposition'] ?? '' ) );
+	assert_fetch_disposition_smoke( 'second disposition does not write a second packet record', 1 === count( $GLOBALS['fetch_disposition_smoke_engine'][1814]['packet_dispositions'] ?? array() ) );
 	assert_fetch_disposition_smoke( 'second disposition does not release the processed claim', array() === $GLOBALS['fetch_disposition_smoke_released'] );
 	assert_fetch_disposition_smoke( 'second disposition does not re-mark processed', array() === $GLOBALS['fetch_disposition_smoke_processed'] );
 
@@ -255,10 +324,25 @@ namespace {
 	);
 	assert_fetch_disposition_smoke( 'reject_source after defer_item returns success', true === ( $reject_after_defer['success'] ?? false ) );
 	assert_fetch_disposition_smoke( 'reject_source after defer_item reports already_dispositioned', true === ( $reject_after_defer['already_dispositioned'] ?? false ) );
-	assert_fetch_disposition_smoke( 'reject_source does not overwrite item-deferred status', 'failed - item-deferred' === ( $GLOBALS['fetch_disposition_smoke_engine'][1815]['job_status'] ?? '' ) );
+	assert_fetch_disposition_smoke( 'reject_source does not overwrite packet deferral', 'defer_item' === ( $reject_after_defer['disposition'] ?? '' ) );
 	assert_fetch_disposition_smoke( 'reject_source after defer does not mark processed', array() === $GLOBALS['fetch_disposition_smoke_processed'] );
 
-	echo "Case 2d: disposition tools declare terminal completion signal (#2609)\n";
+	echo "Case 2d: concurrent dispositions preserve the first CAS winner\n";
+	$GLOBALS['fetch_disposition_smoke_persisted_engine'][1816] = array(
+		DataMachine\Core\Database\ProcessedItems\ProcessedItems::CLAIM_METADATA_KEY => $claim,
+		'flow_config' => array( 'fetch-step_7' => array( 'step_type' => 'fetch' ) ),
+	);
+	$GLOBALS['fetch_disposition_smoke_cas_injection'][1816] = array(
+		$claim['disposition_id'] => array( 'disposition' => 'defer_item', 'reason' => 'competing-winner' ),
+	);
+	$contention = $tool->handle_tool_call(
+		array( 'job_id' => 1816, 'reason' => 'losing-rejection', 'engine' => $engine ),
+		array( 'disposition' => 'reject_source' )
+	);
+	assert_fetch_disposition_smoke( 'CAS loser returns idempotent success', true === ( $contention['success'] ?? false ) && true === ( $contention['already_dispositioned'] ?? false ) );
+	assert_fetch_disposition_smoke( 'CAS loser cannot overwrite first disposition', 'defer_item' === ( $contention['disposition'] ?? '' ) && 'competing-winner' === ( $contention['reason'] ?? '' ) );
+
+	echo "Case 2e: disposition tools declare terminal completion signal (#2609)\n";
 	$fetch_handler_src = file_get_contents( __DIR__ . '/../inc/Core/Steps/Fetch/Handlers/FetchHandler.php' );
 	assert_fetch_disposition_smoke( 'both disposition tool definitions declare runtime completion_signal terminal', 2 === substr_count( $fetch_handler_src, "'completion_signal' => 'terminal'" ) );
 

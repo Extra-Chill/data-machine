@@ -39,6 +39,8 @@ class ItemClaimLifecycleTest extends WP_UnitTestCase {
 	private ?Closure $chunk_size_filter         = null;
 	private ?Closure $tracked_handler_filter    = null;
 	private ?Closure $completion_handler_filter = null;
+	private ?Closure $reconciliation_claim_filter = null;
+	private ?Closure $reconciliation_persist_filter = null;
 
 	public function set_up(): void {
 		parent::set_up();
@@ -66,6 +68,12 @@ class ItemClaimLifecycleTest extends WP_UnitTestCase {
 		}
 		if ( null !== $this->tracked_handler_filter ) {
 			remove_filter( 'datamachine_item_claim_completion_handlers', $this->tracked_handler_filter );
+		}
+		if ( null !== $this->reconciliation_claim_filter ) {
+			remove_filter( 'datamachine_packet_reconciliation_claim_mutation', $this->reconciliation_claim_filter );
+		}
+		if ( null !== $this->reconciliation_persist_filter ) {
+			remove_filter( 'datamachine_packet_reconciliation_engine_persist', $this->reconciliation_persist_filter );
 		}
 		$this->deleteTestRows();
 		parent::tear_down();
@@ -701,6 +709,217 @@ class ItemClaimLifecycleTest extends WP_UnitTestCase {
 		$this->assertFalse( $this->processed->has_active_claim( self::SCOPE, self::SOURCE, 'hydrate-id' ) );
 	}
 
+	public function test_non_contiguous_ai_output_replaces_claims_and_only_omissions_retry(): void {
+		$job_id = $this->createJobWithClaim( array(), true );
+		$claims = array(
+			'a' => $this->claim( 'subset-a', $job_id, 'revision-a' ),
+			'b' => $this->claim( 'subset-b', $job_id, 'revision-b' ),
+			'c' => $this->claim( 'subset-c', $job_id, 'revision-c' ),
+			'd' => $this->claim( 'subset-d', $job_id, 'revision-d' ),
+		);
+		datamachine_set_engine_data( $job_id, array( ProcessedItems::CLAIMS_METADATA_KEY => array_values( $claims ) ) );
+
+		$reconciled = StepLifecycleHandler::reconcileStepOutput(
+			$job_id,
+			array( 'step_type' => 'ai', 'flow_step_id' => 'ai-subset' ),
+			array( $this->dispositionPacket( $claims['b'], 'succeeded' ), $this->dispositionPacket( $claims['d'], 'succeeded' ) ),
+			true
+		);
+
+		$this->assertTrue( $reconciled['success'] );
+		$this->assertSame( 2, $reconciled['retained'] );
+		$this->assertSame( 2, $reconciled['omitted'] );
+		$engine = datamachine_get_engine_data( $job_id );
+		$this->assertSame(
+			array( $claims['b']['disposition_id'], $claims['d']['disposition_id'] ),
+			array_column( $engine[ ProcessedItems::CLAIMS_METADATA_KEY ], 'disposition_id' )
+		);
+		$this->assertCount( 2, $engine[ ProcessedItems::CLAIMS_METADATA_KEY ], 'Exact replacement must not retain stale numeric tails.' );
+		$this->assertSame(
+			array( $claims['a']['disposition_id'], $claims['c']['disposition_id'] ),
+			$engine['packet_disposition_evidence'][0]['omitted_ids']
+		);
+
+		$this->assertTrue( $this->jobs->complete_job( $job_id, JobStatus::COMPLETED ) );
+		$this->assertNotNull( $this->tracked->get( self::NAMESPACE, 'subset-b' ) );
+		$this->assertNotNull( $this->tracked->get( self::NAMESPACE, 'subset-d' ) );
+		$this->assertNull( $this->tracked->get( self::NAMESPACE, 'subset-a' ) );
+		$this->assertNull( $this->tracked->get( self::NAMESPACE, 'subset-c' ) );
+		$this->assertIsArray( $this->context( 'retry-a', $job_id + 100 )->claimItemOwnership( self::SCOPE, 'subset-a' ) );
+		$this->assertIsArray( $this->context( 'retry-c', $job_id + 101 )->claimItemOwnership( self::SCOPE, 'subset-c' ) );
+		$this->assertFalse( $this->context( 'retry-b', $job_id + 102 )->claimItemOwnership( self::SCOPE, 'subset-b' ) );
+	}
+
+	public function test_zero_output_and_terminal_ai_boundaries_release_or_complete_exact_claims(): void {
+		$zero_job = $this->createJobWithClaim( array(), true );
+		$zero     = $this->claim( 'zero-output', $zero_job, 'zero-revision' );
+		datamachine_set_engine_data( $zero_job, array( ProcessedItems::CLAIM_METADATA_KEY => $zero ) );
+		$zero_result = StepLifecycleHandler::reconcileStepOutput( $zero_job, array( 'step_type' => 'ai' ), array(), false );
+		$this->assertTrue( $zero_result['success'] );
+		$this->assertSame( 1, $zero_result['omitted'] );
+		$this->assertIsArray( $this->context( 'zero-retry', $zero_job + 100 )->claimItemOwnership( self::SCOPE, 'zero-output' ) );
+
+		$terminal_job = $this->createJobWithClaim( array(), true );
+		$terminal     = $this->claim( 'terminal-ai-success', $terminal_job, 'terminal-revision' );
+		datamachine_set_engine_data( $terminal_job, array( ProcessedItems::CLAIM_METADATA_KEY => $terminal ) );
+		$terminal_result = StepLifecycleHandler::reconcileStepOutput(
+			$terminal_job,
+			array( 'step_type' => 'ai' ),
+			array( $this->dispositionPacket( $terminal, 'succeeded' ) ),
+			true
+		);
+		$this->assertTrue( $terminal_result['success'] );
+		$this->assertTrue( $this->jobs->complete_job( $terminal_job, JobStatus::COMPLETED ) );
+		$this->assertNotNull( $this->tracked->get( self::NAMESPACE, 'terminal-ai-success' ) );
+	}
+
+	public function test_multi_item_reject_and_defer_are_isolated_and_legacy_single_infers_identity(): void {
+		$job_id   = $this->createJobWithClaim( array(), true );
+		$rejected = $this->claim( 'isolated-reject', $job_id, 'reject-revision' );
+		$deferred = $this->claim( 'isolated-defer', $job_id, 'defer-revision' );
+		datamachine_set_engine_data( $job_id, array( ProcessedItems::CLAIMS_METADATA_KEY => array( $rejected, $deferred ) ) );
+		$tool = new FetchItemDispositionTool();
+		$reject_result = $tool->handle_tool_call(
+			array( 'job_id' => $job_id, 'disposition_id' => $rejected['disposition_id'], 'reason' => 'irrelevant' ),
+			array( 'disposition' => 'reject_source' )
+		);
+		$defer_result = $tool->handle_tool_call(
+			array( 'job_id' => $job_id, 'disposition_id' => $deferred['disposition_id'], 'reason' => 'temporary' ),
+			array( 'disposition' => 'defer_item' )
+		);
+		$this->assertTrue( $reject_result['success'] );
+		$this->assertTrue( $defer_result['success'] );
+		$this->assertSame( $rejected['disposition_id'], $reject_result['disposition_id'] );
+		$this->assertSame( $deferred['disposition_id'], $defer_result['disposition_id'] );
+
+		$reconciled = StepLifecycleHandler::reconcileStepOutput(
+			$job_id,
+			array( 'step_type' => 'ai' ),
+			array( $this->dispositionPacket( $rejected, 'reject_source' ), $this->dispositionPacket( $deferred, 'defer_item' ) ),
+			true
+		);
+		$this->assertTrue( $reconciled['success'] );
+		$this->assertSame( 1, $reconciled['completed'] );
+		$this->assertSame( 1, $reconciled['released'] );
+		$this->assertNotNull( $this->tracked->get( self::NAMESPACE, 'isolated-reject' ) );
+		$this->assertNull( $this->tracked->get( self::NAMESPACE, 'isolated-defer' ) );
+		$this->assertIsArray( $this->context( 'defer-retry', $job_id + 200 )->claimItemOwnership( self::SCOPE, 'isolated-defer' ) );
+
+		$legacy_job = $this->createJobWithClaim( array(), true );
+		$legacy     = $this->claim( 'legacy-single-inference', $legacy_job, 'legacy-revision' );
+		datamachine_set_engine_data( $legacy_job, array( ProcessedItems::CLAIM_METADATA_KEY => $legacy ) );
+		$legacy_result = $tool->handle_tool_call(
+			array( 'job_id' => $legacy_job, 'reason' => 'single legacy caller' ),
+			array( 'disposition' => 'defer_item' )
+		);
+		$this->assertTrue( $legacy_result['success'] );
+		$this->assertSame( $legacy['disposition_id'], $legacy_result['disposition_id'] );
+	}
+
+	public function test_reconciliation_reports_release_ownership_failure(): void {
+		$job_id = $this->createJobWithClaim( array(), true );
+		$old    = $this->claim( 'release-race', $job_id, 'old-revision' );
+		datamachine_set_engine_data( $job_id, array( ProcessedItems::CLAIM_METADATA_KEY => $old ) );
+		$this->expireClaim( 'release-race' );
+		$replacement = $this->claim( 'release-race', $job_id + 1, 'replacement-revision' );
+
+		$result = StepLifecycleHandler::reconcileStepOutput( $job_id, array( 'step_type' => 'ai' ), array(), false );
+
+		$this->assertFalse( $result['success'] );
+		$this->assertTrue( $this->processed->owns_active_claim( $replacement, $job_id + 1 ) );
+	}
+
+	public function test_mid_batch_reconciliation_failure_rolls_back_every_claim_mutation(): void {
+		$job_id = $this->createJobWithClaim( array(), true );
+		$first  = $this->claim( 'mid-batch-first', $job_id, 'first-revision' );
+		$second = $this->claim( 'mid-batch-second', $job_id, 'second-revision' );
+		datamachine_set_engine_data( $job_id, array( ProcessedItems::CLAIMS_METADATA_KEY => array( $first, $second ) ) );
+		$this->reconciliation_claim_filter = static fn( bool $allowed, int $index ): bool => $allowed && 1 !== $index;
+		add_filter( 'datamachine_packet_reconciliation_claim_mutation', $this->reconciliation_claim_filter, 10, 2 );
+
+		$result = StepLifecycleHandler::reconcileStepOutput( $job_id, array( 'step_type' => 'ai' ), array(), false );
+
+		$this->assertFalse( $result['success'] );
+		$this->assertTrue( $this->processed->owns_active_claim( $first, $job_id ) );
+		$this->assertTrue( $this->processed->owns_active_claim( $second, $job_id ) );
+		$this->assertCount( 2, datamachine_get_engine_data( $job_id )[ ProcessedItems::CLAIMS_METADATA_KEY ] );
+	}
+
+	public function test_engine_persist_failure_rolls_back_claim_mutations_and_can_retry(): void {
+		$job_id = $this->createJobWithClaim( array(), true );
+		$first  = $this->claim( 'persist-failure-first', $job_id, 'first-revision' );
+		$second = $this->claim( 'persist-failure-second', $job_id, 'second-revision' );
+		datamachine_set_engine_data( $job_id, array( ProcessedItems::CLAIMS_METADATA_KEY => array( $first, $second ) ) );
+		$this->reconciliation_persist_filter = static fn(): bool => false;
+		add_filter( 'datamachine_packet_reconciliation_engine_persist', $this->reconciliation_persist_filter );
+
+		$failed = StepLifecycleHandler::reconcileStepOutput( $job_id, array( 'step_type' => 'ai' ), array( $this->dispositionPacket( $second, 'succeeded' ) ), true );
+		$this->assertFalse( $failed['success'] );
+		$this->assertTrue( $this->processed->owns_active_claim( $first, $job_id ) );
+		$this->assertTrue( $this->processed->owns_active_claim( $second, $job_id ) );
+		remove_filter( 'datamachine_packet_reconciliation_engine_persist', $this->reconciliation_persist_filter );
+		$this->reconciliation_persist_filter = null;
+
+		$retried = StepLifecycleHandler::reconcileStepOutput( $job_id, array( 'step_type' => 'ai' ), array( $this->dispositionPacket( $second, 'succeeded' ) ), true );
+		$this->assertTrue( $retried['success'] );
+		$this->assertIsArray( $this->context( 'persist-failure-retry', $job_id + 500 )->claimItemOwnership( self::SCOPE, 'persist-failure-first' ) );
+		$this->assertTrue( $this->processed->owns_active_claim( $second, $job_id ) );
+	}
+
+	public function test_mysql_reconciliation_lock_order_serializes_job_then_claim_rows(): void {
+		if ( ! class_exists( '\mysqli' ) || ! defined( 'MYSQLI_ASYNC' ) ) {
+			$this->markTestSkipped( 'MySQLi async support is unavailable.' );
+		}
+		$first  = $this->openMysqlConnection();
+		$second = $this->openMysqlConnection();
+		if ( ! $first instanceof \mysqli || ! $second instanceof \mysqli ) {
+			$this->markTestSkipped( 'Two direct test database connections are unavailable.' );
+		}
+
+		$job_id = $this->createJobWithClaim( array(), true );
+		$claim  = $this->claim( 'mysql-lock-order', $job_id, 'mysql-lock-revision' );
+		$jobs_table = str_replace( '`', '``', $this->jobs->get_table_name() );
+		$claims_table = str_replace( '`', '``', $this->processed->get_table_name() );
+		$claim_lock = sprintf(
+			"SELECT claim_token FROM `{$claims_table}` WHERE flow_step_id = '%s' AND source_type = '%s' AND item_identifier = '%s' AND claim_token = '%s' FOR UPDATE",
+			$first->real_escape_string( $claim['identity_scope'] ),
+			$first->real_escape_string( $claim['source_type'] ),
+			$first->real_escape_string( $claim['item_identifier'] ),
+			$first->real_escape_string( $claim['ownership_token'] )
+		);
+
+		try {
+			$this->assertTrue( $first->query( 'SET SESSION innodb_lock_wait_timeout = 2' ) );
+			$this->assertTrue( $second->query( 'SET SESSION innodb_lock_wait_timeout = 2' ) );
+			$this->assertTrue( $first->query( 'START TRANSACTION' ) );
+			$this->assertInstanceOf( \mysqli_result::class, $first->query( "SELECT job_id FROM `{$jobs_table}` WHERE job_id = {$job_id} FOR UPDATE" ) );
+			$this->assertInstanceOf( \mysqli_result::class, $first->query( $claim_lock ) );
+			$this->assertTrue( $second->query( 'START TRANSACTION' ) );
+			$this->assertTrue( $second->query( "SELECT job_id FROM `{$jobs_table}` WHERE job_id = {$job_id} FOR UPDATE", MYSQLI_ASYNC ) );
+			$read = array( $second );
+			$error = array();
+			$reject = array();
+			$this->assertSame( 0, \mysqli_poll( $read, $error, $reject, 0, 100000 ), 'The second reconciliation must wait on the job row before claim rows.' );
+			$this->assertTrue( $first->query( 'COMMIT' ) );
+			$ready = 0;
+			for ( $attempt = 0; $attempt < 20 && 0 === $ready; ++$attempt ) {
+				$read = array( $second );
+				$error = array();
+				$reject = array();
+				$ready = \mysqli_poll( $read, $error, $reject, 0, 100000 );
+			}
+			$this->assertSame( 1, $ready );
+			$this->assertInstanceOf( \mysqli_result::class, $second->reap_async_query() );
+			$this->assertInstanceOf( \mysqli_result::class, $second->query( str_replace( "'" . $first->real_escape_string( $claim['ownership_token'] ) . "'", "'" . $second->real_escape_string( $claim['ownership_token'] ) . "'", $claim_lock ) ) );
+			$this->assertTrue( $second->query( 'COMMIT' ) );
+		} finally {
+			$first->query( 'ROLLBACK' );
+			$second->query( 'ROLLBACK' );
+			$first->close();
+			$second->close();
+		}
+	}
+
 	public function test_corrupt_batch_payload_is_discarded_without_callback(): void {
 		$claim     = $this->claim( 'corrupt-id', 904, 'corrupt-revision' );
 		$parent_id = $this->createJobWithClaim( array(), true );
@@ -868,6 +1087,38 @@ class ItemClaimLifecycleTest extends WP_UnitTestCase {
 			'data'     => array( 'title' => 'Claimed item', 'body' => 'body' ),
 			'metadata' => array( ProcessedItems::CLAIM_METADATA_KEY => $claim ),
 		);
+	}
+
+	private function dispositionPacket( array $claim, string $disposition ): array {
+		return array(
+			'type'     => 'ai_handler_complete',
+			'data'     => array( 'title' => 'Dispositioned item' ),
+			'metadata' => array(
+				ProcessedItems::CLAIM_METADATA_KEY          => $claim,
+				ProcessedItems::DISPOSITION_ID_METADATA_KEY => $claim['disposition_id'],
+				'disposition_id'                            => $claim['disposition_id'],
+				'packet_disposition'                        => $disposition,
+				'step_execution_success'                    => true,
+			),
+		);
+	}
+
+	private function openMysqlConnection(): ?\mysqli {
+		$host   = DB_HOST;
+		$port   = null;
+		$socket = null;
+		if ( preg_match( '/^([^:]+):(\d+)$/', $host, $matches ) ) {
+			$host = $matches[1];
+			$port = (int) $matches[2];
+		} elseif ( preg_match( '/^([^:]+):(.+)$/', $host, $matches ) ) {
+			$host   = $matches[1];
+			$socket = $matches[2];
+		}
+		$connection = \mysqli_init();
+		if ( false === $connection || ! @$connection->real_connect( $host, DB_USER, DB_PASSWORD, DB_NAME, $port, $socket ) ) {
+			return null;
+		}
+		return $connection;
 	}
 
 	private function legacyEngineData( string $item_id ): array {

@@ -15,7 +15,9 @@
 
 namespace DataMachine\Engine\AI\Tools;
 
+use DataMachine\Core\Database\ProcessedItems\ProcessedItems;
 use DataMachine\Core\PluginSettings;
+use DataMachine\Engine\AI\ToolSchemaNormalizer;
 use DataMachine\Engine\AI\Tools\Sources\AbilityToolSource;
 
 defined( 'ABSPATH' ) || exit;
@@ -365,7 +367,7 @@ class ToolManager {
 					continue;
 				}
 
-				$tool_def = $this->withHandlerToolContext( $tool_def, $definition, $handler_slug, $handler_config );
+				$tool_def = $this->withHandlerToolContext( $tool_def, $definition, $handler_slug, $handler_config, $engine_data );
 
 				// Apply registry-level meta unless the resolved tool
 				// explicitly overrides.
@@ -397,9 +399,10 @@ class ToolManager {
 	 * @param array  $declaration    Normalized handler-tool declaration.
 	 * @param string $handler_slug   Adjacent step handler slug.
 	 * @param array  $handler_config Handler configuration from flow step.
+	 * @param array  $engine_data    Current engine snapshot.
 	 * @return array<string,mixed> Tool definition with handler context.
 	 */
-	private function withHandlerToolContext( array $tool_def, array $declaration, string $handler_slug, array $handler_config ): array {
+	private function withHandlerToolContext( array $tool_def, array $declaration, string $handler_slug, array $handler_config, array $engine_data ): array {
 		if ( ! isset( $tool_def['handler'] ) ) {
 			$tool_def['handler'] = $handler_slug;
 		}
@@ -419,6 +422,21 @@ class ToolManager {
 		// declaration so ownership is visible before the callback is invoked.
 		if ( 'handle_tool_call' === ( $tool_def['method'] ?? '' ) ) {
 			$tool_def['client_context_bindings'] = self::mergeContextBindings( $tool_def['client_context_bindings'] ?? array(), array( 'job_id' ) );
+		}
+
+		if ( class_exists( ProcessedItems::class ) && ! empty( ProcessedItems::disposition_claims( $engine_data ) ) ) {
+			$parameters                         = ToolSchemaNormalizer::normalize( $tool_def['parameters'] ?? array() );
+			$properties                         = is_array( $parameters['properties'] ?? null ) ? $parameters['properties'] : array();
+			$properties['disposition_id']        = array(
+				'type'        => 'string',
+				'description' => 'Stable packet disposition identity from the input packet. Return the identity for the exact packet this tool call handles.',
+			);
+			$parameters['properties']            = $properties;
+			$required                            = is_array( $parameters['required'] ?? null ) ? $parameters['required'] : array();
+			$required[]                          = 'disposition_id';
+			$parameters['required']              = array_values( array_unique( $required ) );
+			$tool_def['parameters']               = $parameters;
+			$tool_def['packet_disposition_bound'] = true;
 		}
 
 		return $tool_def;
@@ -468,6 +486,7 @@ class ToolManager {
 		$job_id       = (int) ( $engine_data['job_id'] ?? $job_snapshot['job_id'] ?? 0 );
 		$config_json  = wp_json_encode( $handler_config );
 		$config_hash  = md5( false === $config_json ? '' : $config_json );
+		$claim_bound  = class_exists( ProcessedItems::class ) && ! empty( ProcessedItems::disposition_claims( $engine_data ) );
 
 		return implode(
 			'|',
@@ -477,6 +496,7 @@ class ToolManager {
 				$handler_slug,
 				'job:' . $job_id,
 				'config:' . $config_hash,
+				'claims:' . ( $claim_bound ? 'bound' : 'unbound' ),
 			)
 		);
 	}

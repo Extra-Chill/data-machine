@@ -203,9 +203,11 @@ namespace {
 	// (PipelineBatchScheduler) directly as a second fan-out entry point.
 	parallel_map_assert( true, str_contains( $execute_source, 'new ParallelMapFanoutAdapter()' ), 'ExecuteStepAbility dispatches via the adapter', $failures, $passes );
 	parallel_map_assert( false, str_contains( $execute_source, 'new PipelineBatchScheduler()' ), 'ExecuteStepAbility has no direct PipelineBatchScheduler fan-out path', $failures, $passes );
-	// The gate is evaluated once, inside the adapter. ExecuteStepAbility must
-	// not pre-evaluate ParallelMapFanoutAdapter::shouldFanOut itself.
-	parallel_map_assert( false, str_contains( $execute_source, 'ParallelMapFanoutAdapter::shouldFanOut' ), 'ExecuteStepAbility does not re-evaluate the fan-out gate', $failures, $passes );
+	// Claim transfer must know the gate decision before dispatch. ExecuteStepAbility
+	// evaluates it once and passes that decision into the adapter, which must not
+	// evaluate the filter a second time when the precomputed value is supplied.
+	parallel_map_assert( true, str_contains( $execute_source, 'ParallelMapFanoutAdapter::shouldFanOut' ), 'ExecuteStepAbility precomputes the single fan-out gate decision', $failures, $passes );
+	parallel_map_assert( true, str_contains( $adapter_source, 'null === $should_fanout ? self::shouldFanOut' ), 'adapter reuses a supplied gate decision without re-evaluation', $failures, $passes );
 	// The inline-vs-fanned decision keys off the adapter's contract shape.
 	parallel_map_assert( true, str_contains( $execute_source, 'ParallelMapFanoutAdapter::SHAPE_INLINE' ), 'ExecuteStepAbility branches on the adapter contract shape', $failures, $passes );
 

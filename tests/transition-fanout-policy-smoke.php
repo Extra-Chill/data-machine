@@ -121,6 +121,19 @@ transition_fanout_assert_same( 'inline', $route['mode'], 'multi-handler completi
 transition_fanout_assert_same( 2, count( $route['packets'] ), 'multi-handler completions are both available to next step', $failures, $passes );
 
 $route = ExecuteStepAbility::resolveTransitionRoute(
+	array( 'step_type' => 'ai' ),
+	array( 'step_type' => 'upsert', 'handler_slugs' => array( 'upsert_event' ) ),
+	array(
+		transition_fanout_packet( 'ai_handler_complete', array( 'tool_name' => 'upsert_event', 'handler_tool' => 'upsert_event', 'disposition_id' => 'packet-a' ) ),
+		transition_fanout_packet( 'ai_handler_complete', array( 'tool_name' => 'upsert_event', 'handler_tool' => 'upsert_event', 'disposition_id' => 'packet-b' ) ),
+		transition_fanout_packet( 'ai_handler_complete', array( 'tool_name' => 'upsert_event', 'handler_tool' => 'upsert_event', 'disposition_id' => 'packet-a' ) ),
+	)
+);
+
+transition_fanout_assert_same( 'inline', $route['mode'], 'same handler remains inline for claimed packet set', $failures, $passes );
+transition_fanout_assert_same( 2, count( $route['packets'] ), 'same handler preserves distinct identities and removes only exact duplicates', $failures, $passes );
+
+$route = ExecuteStepAbility::resolveTransitionRoute(
 	array( 'step_type' => 'fetch' ),
 	array( 'step_type' => 'ai' ),
 	array(

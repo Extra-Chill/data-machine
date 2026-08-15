@@ -390,8 +390,16 @@ class PipelineBatchSchedulerTest extends WP_UnitTestCase {
 			'ownership_token' => 'opaque-token',
 			'completion'      => array(),
 		);
+		$claim['disposition_id'] = ProcessedItems::disposition_identity( $claim['identity_scope'], $claim['source_type'], $claim['item_identifier'] );
+		$sibling = array(
+			'identity_scope'  => 'shared:source',
+			'source_type'     => 'source',
+			'item_identifier' => 'sibling-item',
+			'ownership_token' => 'sibling-token',
+		);
 		$packet = $this->make_data_packet( 'Claimed Event' );
 		$packet['metadata'][ ProcessedItems::CLAIM_METADATA_KEY ] = $claim;
+		$packet['metadata']['_engine_data'][ ProcessedItems::CLAIMS_METADATA_KEY ] = array( $sibling );
 
 		$scheduler = new PipelineBatchScheduler();
 		$scheduler->fanOut( $parent_id, 'step_abc_123', array( $packet ), $engine );
@@ -401,6 +409,7 @@ class PipelineBatchSchedulerTest extends WP_UnitTestCase {
 		$child_id    = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT job_id FROM %i WHERE parent_job_id = %d', $wpdb->prefix . 'datamachine_jobs', $parent_id ) );
 		$child_engine = datamachine_get_engine_data( $child_id );
 		$this->assertSame( $claim, $child_engine[ ProcessedItems::CLAIM_METADATA_KEY ] );
+		$this->assertArrayNotHasKey( ProcessedItems::CLAIMS_METADATA_KEY, $child_engine );
 	}
 
 	public function test_process_chunk_respects_cancellation(): void {

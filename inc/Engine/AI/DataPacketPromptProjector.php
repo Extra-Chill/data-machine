@@ -7,6 +7,8 @@
 
 namespace DataMachine\Engine\AI;
 
+use DataMachine\Core\Database\ProcessedItems\ProcessedItems;
+
 defined( 'ABSPATH' ) || exit;
 
 /**
@@ -49,7 +51,10 @@ class DataPacketPromptProjector {
 	 * @return array Prompt-facing packet.
 	 */
 	private static function projectPacket( array $packet, array $context ): array {
-		$projected = $packet;
+		$projected      = $packet;
+		$metadata       = is_array( $packet['metadata'] ?? null ) ? $packet['metadata'] : array();
+		$packet_claims  = class_exists( ProcessedItems::class ) ? ProcessedItems::disposition_claims( $metadata ) : array();
+		$disposition_id = 1 === count( $packet_claims ) ? (string) array_key_first( $packet_claims ) : '';
 		if ( isset( $projected['data'] ) && is_array( $projected['data'] ) ) {
 			$projected['data'] = self::sanitizePacketData( $projected['data'] );
 		}
@@ -57,11 +62,30 @@ class DataPacketPromptProjector {
 		if ( function_exists( 'apply_filters' ) ) {
 			$filtered = apply_filters( 'datamachine_ai_project_data_packet', $projected, $packet, $context );
 			if ( is_array( $filtered ) ) {
-				return $filtered;
+				$projected = $filtered;
 			}
+		}
+		$projected = self::redactOwnershipTokens( $projected );
+		if ( '' !== $disposition_id ) {
+			$projected['metadata']                                       = is_array( $projected['metadata'] ?? null ) ? $projected['metadata'] : array();
+			$projected['metadata']['_datamachine_packet_disposition_id'] = $disposition_id;
 		}
 
 		return $projected;
+	}
+
+	/** Recursively remove opaque ownership credentials from prompt-facing data. */
+	private static function redactOwnershipTokens( array $value ): array {
+		foreach ( $value as $key => $child ) {
+			if ( 'ownership_token' === $key ) {
+				unset( $value[ $key ] );
+				continue;
+			}
+			if ( is_array( $child ) ) {
+				$value[ $key ] = self::redactOwnershipTokens( $child );
+			}
+		}
+		return $value;
 	}
 
 	/**

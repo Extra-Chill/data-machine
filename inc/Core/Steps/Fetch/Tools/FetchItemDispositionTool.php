@@ -3,8 +3,8 @@
  * Fetch Item Disposition Tool
  *
  * Handler tool that allows the pipeline agent to explicitly reject or defer
- * a fetched source item. The terminal job lifecycle completes rejected claims
- * or releases deferred claims after the disposition status is committed.
+	 * a fetched source item. The step lifecycle completes or releases only the
+	 * exact packet claim identified by the successful tool result.
  *
  * This provides a safety net when keyword exclusions or other filters
  * miss items that shouldn't be processed (e.g., non-music events).
@@ -15,9 +15,9 @@
 
 namespace DataMachine\Core\Steps\Fetch\Tools;
 
-use DataMachine\Core\JobStatus;
 use DataMachine\Core\RunMetrics;
 use DataMachine\Core\EngineData;
+use DataMachine\Core\Database\ProcessedItems\ProcessedItems;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -73,12 +73,6 @@ class FetchItemDispositionTool {
 			);
 		}
 
-		// Dispositions are first-write-wins: never overwrite an earlier terminal disposition.
-		$existing = $this->existingDisposition( $job_id );
-		if ( null !== $existing ) {
-			return $this->alreadyDispositionedResult( $tool_name, $existing, $job_id );
-		}
-
 		// Get engine data for item identification.
 		$engine = $this->resolveEngineData( $parameters, $job_id );
 		if ( ! $engine ) {
@@ -90,27 +84,34 @@ class FetchItemDispositionTool {
 		}
 
 		// Get item identifier and source type from engine data (set by fetch handler)
-		$item_identifier = $engine->get( 'item_identifier' );
-		$source_type     = $engine->get( 'source_type' );
+		$target          = $this->resolveTargetClaim( $engine, $parameters );
+		$item_identifier = $target['item_identifier'] ?? null;
+		$source_type     = $target['source_type'] ?? null;
+		$disposition_id  = $target['disposition_id'] ?? null;
+		if ( ! $target ) {
+			return array( 'success' => false, 'error' => 'packet disposition identity is required', 'tool_name' => $tool_name );
+		}
 		$flow_step_id    = $this->resolveFetchFlowStepId( $engine ) ?? ( $parameters['flow_step_id'] ?? $engine->get( 'flow_step_id' ) );
 		$diagnostic      = $this->buildDispositionDiagnostic( self::DISPOSITION_REJECT_SOURCE, $tool_name, $reason, $flow_step_id, $item_identifier, $source_type, $parameters );
 
-		// Set job status override for engine to use at completion
-		$status = JobStatus::agentSkipped( 'source-rejected' );
-		datamachine_merge_engine_data(
+		$persisted = $this->persistDisposition(
 			$job_id,
+			(string) $disposition_id,
 			array(
-				'job_status'             => $status->toString(),
-				'disposition_diagnostic' => $diagnostic,
-				'source_rejection'       => array(
-					'reason'          => $reason,
-					'flow_step_id'    => $flow_step_id,
-					'item_identifier' => $item_identifier,
-					'source_type'     => $source_type,
-					'diagnostic'      => $diagnostic,
-				),
+				'disposition'     => self::DISPOSITION_REJECT_SOURCE,
+				'reason'          => $reason,
+				'flow_step_id'    => $flow_step_id,
+				'item_identifier' => $item_identifier,
+				'source_type'     => $source_type,
+				'diagnostic'      => $diagnostic,
 			)
 		);
+		if ( empty( $persisted['success'] ) ) {
+			return array( 'success' => false, 'error' => 'packet rejection could not be persisted', 'tool_name' => $tool_name, 'disposition_id' => $disposition_id );
+		}
+		if ( empty( $persisted['created'] ) ) {
+			return $this->alreadyDispositionedResult( $tool_name, $persisted['record'], $job_id, (string) $disposition_id );
+		}
 
 		if ( $flow_step_id && class_exists( RunMetrics::class ) ) {
 			RunMetrics::recordStepResult(
@@ -130,10 +131,9 @@ class FetchItemDispositionTool {
 		do_action(
 			'datamachine_log',
 			'info',
-			'FetchItemDispositionTool: Job status set to source rejected',
+			'FetchItemDispositionTool: Packet rejection persisted',
 			array(
 				'job_id' => $job_id,
-				'status' => $status->toString(),
 				'reason' => $reason,
 			)
 		);
@@ -141,10 +141,10 @@ class FetchItemDispositionTool {
 		return array(
 			'success'         => true,
 			'message'         => "Source rejected: {$reason}",
-			'status'          => $status->toString(),
 			'item_identifier' => $item_identifier,
 			'tool_name'       => $tool_name,
 			'disposition'     => self::DISPOSITION_REJECT_SOURCE,
+			'disposition_id'  => $disposition_id,
 			'reason'          => $reason,
 		);
 	}
@@ -179,13 +179,6 @@ class FetchItemDispositionTool {
 			);
 		}
 
-		// Dispositions are first-write-wins: defer_item must never downgrade an
-		// earlier rejection (agent_skipped - source-rejected) to a failed status.
-		$existing = $this->existingDisposition( $job_id );
-		if ( null !== $existing ) {
-			return $this->alreadyDispositionedResult( $tool_name, $existing, $job_id );
-		}
-
 		$engine = $this->resolveEngineData( $parameters, $job_id );
 		if ( ! $engine ) {
 			return array(
@@ -195,26 +188,34 @@ class FetchItemDispositionTool {
 			);
 		}
 
-		$item_identifier = $engine->get( 'item_identifier' );
-		$source_type     = $engine->get( 'source_type' );
+		$target          = $this->resolveTargetClaim( $engine, $parameters );
+		$item_identifier = $target['item_identifier'] ?? null;
+		$source_type     = $target['source_type'] ?? null;
+		$disposition_id  = $target['disposition_id'] ?? null;
+		if ( ! $target ) {
+			return array( 'success' => false, 'error' => 'packet disposition identity is required', 'tool_name' => $tool_name );
+		}
 		$flow_step_id    = $this->resolveFetchFlowStepId( $engine ) ?? ( $parameters['flow_step_id'] ?? $engine->get( 'flow_step_id' ) );
 		$diagnostic      = $this->buildDispositionDiagnostic( self::DISPOSITION_DEFER_ITEM, $tool_name, $reason, $flow_step_id, $item_identifier, $source_type, $parameters );
 
-		$status = JobStatus::failed( 'item-deferred' );
-		datamachine_merge_engine_data(
+		$persisted = $this->persistDisposition(
 			$job_id,
+			(string) $disposition_id,
 			array(
-				'job_status'             => $status->toString(),
-				'disposition_diagnostic' => $diagnostic,
-				'item_deferral'          => array(
-					'reason'          => $reason,
-					'flow_step_id'    => $flow_step_id,
-					'item_identifier' => $item_identifier,
-					'source_type'     => $source_type,
-					'diagnostic'      => $diagnostic,
-				),
+				'disposition'     => self::DISPOSITION_DEFER_ITEM,
+				'reason'          => $reason,
+				'flow_step_id'    => $flow_step_id,
+				'item_identifier' => $item_identifier,
+				'source_type'     => $source_type,
+				'diagnostic'      => $diagnostic,
 			)
 		);
+		if ( empty( $persisted['success'] ) ) {
+			return array( 'success' => false, 'error' => 'packet deferral could not be persisted', 'tool_name' => $tool_name, 'disposition_id' => $disposition_id );
+		}
+		if ( empty( $persisted['created'] ) ) {
+			return $this->alreadyDispositionedResult( $tool_name, $persisted['record'], $job_id, (string) $disposition_id );
+		}
 
 		if ( $flow_step_id && class_exists( RunMetrics::class ) ) {
 			RunMetrics::recordStepResult(
@@ -234,64 +235,60 @@ class FetchItemDispositionTool {
 		do_action(
 			'datamachine_log',
 			'info',
-			'FetchItemDispositionTool: Item deferred for terminal claim release',
+			'FetchItemDispositionTool: Packet deferral persisted',
 			array(
 				'job_id'          => $job_id,
 				'flow_step_id'    => $flow_step_id,
 				'item_identifier' => $item_identifier,
 				'source_type'     => $source_type,
 				'reason'          => $reason,
-				'status'          => $status->toString(),
 			)
 		);
 
 		return array(
 			'success'         => true,
 			'message'         => "Item deferred for retry: {$reason}",
-			'status'          => $status->toString(),
 			'item_identifier' => $item_identifier,
 			'tool_name'       => $tool_name,
 			'disposition'     => self::DISPOSITION_DEFER_ITEM,
+			'disposition_id'  => $disposition_id,
 			'reason'          => $reason,
 		);
 	}
 
 	/**
-	 * Return the disposition already recorded for a job, if any.
+	 * Atomically persist the first disposition recorded for a packet identity.
 	 *
-	 * Reads the persisted engine snapshot rather than the runtime engine object
-	 * because the runtime snapshot may predate an earlier disposition call in
-	 * the same conversation.
-	 *
-	 * @param int $job_id Job ID.
-	 * @return array{disposition:string,job_status:string,reason:string}|null
+	 * @return array{success:bool,created:bool,record:array{disposition:string,reason:string}}
 	 */
-	private function existingDisposition( int $job_id ): ?array {
-		$engine_data = EngineData::retrieve( $job_id );
+	private function persistDisposition( int $job_id, string $disposition_id, array $record ): array {
+		$created  = false;
+		$selected = array();
+		$result   = EngineData::mutate(
+			$job_id,
+			static function ( array $engine ) use ( $disposition_id, $record, &$created, &$selected ): array {
+				$existing = is_array( $engine['packet_dispositions'][ $disposition_id ] ?? null ) ? $engine['packet_dispositions'][ $disposition_id ] : array();
+				if ( '' !== (string) ( $existing['disposition'] ?? '' ) ) {
+					$created  = false;
+					$selected = $existing;
+					return $engine;
+				}
 
-		$diagnostic  = is_array( $engine_data['disposition_diagnostic'] ?? null ) ? $engine_data['disposition_diagnostic'] : array();
-		$disposition = (string) ( $diagnostic['disposition'] ?? '' );
-
-		if ( '' === $disposition && isset( $engine_data['source_rejection'] ) ) {
-			$disposition = self::DISPOSITION_REJECT_SOURCE;
-		}
-
-		if ( '' === $disposition && isset( $engine_data['item_deferral'] ) ) {
-			$disposition = self::DISPOSITION_DEFER_ITEM;
-		}
-
-		if ( '' === $disposition ) {
-			return null;
-		}
-
-		$record = self::DISPOSITION_DEFER_ITEM === $disposition
-			? ( is_array( $engine_data['item_deferral'] ?? null ) ? $engine_data['item_deferral'] : array() )
-			: ( is_array( $engine_data['source_rejection'] ?? null ) ? $engine_data['source_rejection'] : array() );
+				$created  = true;
+				$selected = $record;
+				$engine['packet_dispositions'][ $disposition_id ] = $record;
+				return $engine;
+			},
+			'packet_disposition_first_write'
+		);
 
 		return array(
-			'disposition' => $disposition,
-			'job_status'  => (string) ( $engine_data['job_status'] ?? '' ),
-			'reason'      => (string) ( $record['reason'] ?? $diagnostic['reason'] ?? '' ),
+			'success' => ! empty( $result['success'] ),
+			'created' => $created,
+			'record'  => array(
+				'disposition' => (string) ( $selected['disposition'] ?? '' ),
+				'reason'      => (string) ( $selected['reason'] ?? '' ),
+			),
 		);
 	}
 
@@ -299,14 +296,14 @@ class FetchItemDispositionTool {
 	 * Build the idempotent success result for an already-dispositioned job.
 	 *
 	 * Returned as success so the model is not pushed into error-retry loops;
-	 * the original disposition remains authoritative (first-write-wins).
+	 * the original disposition for this packet remains authoritative.
 	 *
 	 * @param string                                              $tool_name Tool that attempted the second disposition.
-	 * @param array{disposition:string,job_status:string,reason:string} $existing  Existing disposition record.
+	 * @param array{disposition:string,reason:string} $existing  Existing disposition record.
 	 * @param int                                                 $job_id    Job ID.
 	 * @return array Tool result.
 	 */
-	private function alreadyDispositionedResult( string $tool_name, array $existing, int $job_id ): array {
+	private function alreadyDispositionedResult( string $tool_name, array $existing, int $job_id, string $disposition_id ): array {
 		$label = self::DISPOSITION_DEFER_ITEM === $existing['disposition'] ? 'item-deferred' : 'source-rejected';
 
 		do_action(
@@ -317,16 +314,16 @@ class FetchItemDispositionTool {
 				'job_id'               => $job_id,
 				'attempted_tool'       => $tool_name,
 				'existing_disposition' => $existing['disposition'],
-				'existing_job_status'  => $existing['job_status'],
+				'disposition_id'       => $disposition_id,
 			)
 		);
 
 		return array(
 			'success'              => true,
 			'message'              => "Item already dispositioned ({$label}); no further action needed.",
-			'status'               => $existing['job_status'],
 			'tool_name'            => $tool_name,
 			'disposition'          => $existing['disposition'],
+			'disposition_id'       => $disposition_id,
 			'reason'               => $existing['reason'],
 			'already_dispositioned' => true,
 		);
@@ -342,6 +339,15 @@ class FetchItemDispositionTool {
 		$disposition = $tool_def['disposition'] ?? self::DISPOSITION_REJECT_SOURCE;
 
 		return self::DISPOSITION_DEFER_ITEM === $disposition ? self::DISPOSITION_DEFER_ITEM : self::DISPOSITION_REJECT_SOURCE;
+	}
+
+	/** Resolve a stable packet identity against engine-owned claim descriptors. */
+	private function resolveTargetClaim( object $engine, array $parameters ): array {
+		$container = array(
+			ProcessedItems::CLAIM_METADATA_KEY  => $engine->get( ProcessedItems::CLAIM_METADATA_KEY ),
+			ProcessedItems::CLAIMS_METADATA_KEY => $engine->get( ProcessedItems::CLAIMS_METADATA_KEY ),
+		);
+		return ProcessedItems::resolve_disposition_claim( $container, (string) ( $parameters['disposition_id'] ?? '' ), true ) ?? array();
 	}
 
 	/**

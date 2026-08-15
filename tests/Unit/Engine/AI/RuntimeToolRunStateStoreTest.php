@@ -58,7 +58,7 @@ class RuntimeToolRunStateStoreTest extends TestCase {
 		$this->assertSame( RuntimeToolRunStateStore::STATUS_FINALIZED, $second['status'] );
 	}
 
-	public function test_resume_is_idempotent(): void {
+	public function test_resume_returns_state_only_to_first_winner(): void {
 		$jobs  = new RuntimeToolRunStateJobsDouble();
 		$store = new RuntimeToolRunStateStore( $jobs );
 
@@ -73,9 +73,9 @@ class RuntimeToolRunStateStoreTest extends TestCase {
 		$first  = $store->resume( 42, array( 'session_id' => 'session-a' ) );
 		$second = $store->resume( 42, array( 'session_id' => 'session-b' ) );
 
-		$this->assertSame( $first, $second );
-		$this->assertSame( 'session-a', $second['resume_payload']['session_id'] );
-		$this->assertSame( RuntimeToolRunStateStore::STATUS_RESUMED, $second['status'] );
+		$this->assertSame( 'session-a', $first['resume_payload']['session_id'] );
+		$this->assertSame( RuntimeToolRunStateStore::STATUS_RESUMED, $first['status'] );
+		$this->assertNull( $second );
 	}
 
 	public function test_finalize_retries_conflicting_engine_data_write(): void {

@@ -8,6 +8,7 @@
 namespace DataMachine\Tests\Unit\Core\Steps\AI;
 
 use DataMachine\Core\Steps\AI\AIStep;
+use DataMachine\Core\Database\ProcessedItems\ProcessedItems;
 use DataMachine\Engine\AI\DataPacketPromptProjector;
 use DataMachine\Engine\AI\Tools\ToolResultFinder;
 use DataMachine\Engine\AI\Tools\ToolPolicyResolver;
@@ -255,6 +256,40 @@ class AIStepTest extends TestCase {
 		$this->assertSame( $context, $received );
 	}
 
+	public function test_prompt_projection_recursively_redacts_tokens_after_filters_and_retains_safe_identity(): void {
+		$disposition_id = hash( 'sha256', 'safe-packet' );
+		$canonical      = array(
+			array(
+				'type'     => 'fetch',
+				'data'     => array( 'title' => 'Claimed packet' ),
+				'metadata' => array(
+					'_datamachine_packet_disposition_id' => $disposition_id,
+					'_datamachine_item_claim' => array(
+						'disposition_id' => $disposition_id,
+						'ownership_token' => 'top-secret-token',
+					),
+					'_datamachine_item_claims' => array(
+						array( 'ownership_token' => 'nested-secret-token' ),
+					),
+				),
+			),
+		);
+		add_filter(
+			'datamachine_ai_project_data_packet',
+			static fn( array $projected, array $packet ): array => $packet,
+			10,
+			2
+		);
+
+		$projected = DataPacketPromptProjector::project( $canonical );
+		$encoded   = wp_json_encode( $projected );
+
+		$this->assertStringNotContainsString( 'top-secret-token', $encoded );
+		$this->assertStringNotContainsString( 'nested-secret-token', $encoded );
+		$this->assertSame( $disposition_id, $projected[0]['metadata']['_datamachine_packet_disposition_id'] );
+		$this->assertSame( $disposition_id, $canonical[0]['metadata']['_datamachine_item_claim']['disposition_id'] );
+	}
+
 	/**
 	 * Test that processLoopResults does NOT carry forward input DataPackets.
 	 *
@@ -363,6 +398,48 @@ class AIStepTest extends TestCase {
 		);
 
 		$this->assertSame( 'ticketmaster', $result[0]['metadata']['source_type'] );
+	}
+
+	public function test_process_loop_results_correlates_non_contiguous_outputs_by_disposition_id(): void {
+		$method = new ReflectionMethod( AIStep::class, 'processLoopResults' );
+		$method->setAccessible( true );
+		$claims = array();
+		foreach ( array( 'a', 'b', 'c', 'd' ) as $item ) {
+			$claims[ $item ] = array(
+				'identity_scope'  => 'fetch-step',
+				'source_type'     => 'fixture',
+				'item_identifier' => $item,
+				'ownership_token' => 'owner-' . $item,
+				'disposition_id'  => ProcessedItems::disposition_identity( 'fetch-step', 'fixture', $item ),
+			);
+		}
+		$tool_results = array();
+		foreach ( array( 'd', 'b' ) as $item ) {
+			$tool_results[] = array(
+				'tool_name'       => 'fixture_upsert',
+				'result'          => array( 'success' => true, 'disposition_id' => $claims[ $item ]['disposition_id'] ),
+				'parameters'      => array( 'title' => strtoupper( $item ) ),
+				'is_handler_tool' => true,
+			);
+		}
+
+		$result = $method->invoke(
+			null,
+			array( 'messages' => array(), 'tool_execution_results' => $tool_results ),
+			array( array( 'metadata' => array( 'source_type' => 'fixture' ) ) ),
+			array(
+				'flow_step_id' => 'ai-step',
+				'engine_data'  => array( ProcessedItems::CLAIMS_METADATA_KEY => array_values( $claims ) ),
+			),
+			array( 'fixture_upsert' => array( 'handler' => 'fixture_upsert', 'handler_config' => array() ) )
+		);
+
+		$this->assertSame(
+			array( $claims['d']['disposition_id'], $claims['b']['disposition_id'] ),
+			array_column( array_column( $result, 'metadata' ), 'disposition_id' )
+		);
+		$this->assertSame( 'd', $result[0]['metadata'][ ProcessedItems::CLAIM_METADATA_KEY ]['item_identifier'] );
+		$this->assertSame( 'b', $result[1]['metadata'][ ProcessedItems::CLAIM_METADATA_KEY ]['item_identifier'] );
 	}
 
 	public function test_successful_handler_tool_result_is_findable_by_downstream_handler_slug(): void {

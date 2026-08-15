@@ -99,16 +99,17 @@ class PipelineBatchScheduler {
 		// Surface next_flow_step_id at the top level for legacy consumers
 		// that read it without descending into batch_state. Parity with
 		// the pre-extraction shape.
-		EngineData::mutate(
-			$parent_job_id,
-			static function ( array $current ) use ( $next_flow_step_id ): array {
-				$current['next_flow_step_id'] = $next_flow_step_id;
-				return $current;
-			},
-			'pipeline_batch_metadata'
-		);
+		try {
+			EngineData::mutate(
+				$parent_job_id,
+				static function ( array $current ) use ( $next_flow_step_id ): array {
+					$current['next_flow_step_id'] = $next_flow_step_id;
+					return $current;
+				},
+				'pipeline_batch_metadata'
+			);
 
-		do_action(
+			do_action(
 			'datamachine_log',
 			'info',
 			sprintf( 'Pipeline batch: fanning out %d items for flow "%s"', $total, $flow_name ),
@@ -119,7 +120,14 @@ class PipelineBatchScheduler {
 				'total'             => $total,
 				'next_flow_step_id' => $next_flow_step_id,
 			)
-		);
+			);
+		} catch ( \Throwable $exception ) {
+			if ( empty( $result['adopted'] ) ) {
+				throw $exception;
+			}
+			// The durable worklist is authoritative once adopted; observer failures
+			// must not send ownership back to the parent.
+		}
 
 		return $result;
 	}
@@ -282,9 +290,18 @@ class PipelineBatchScheduler {
 		int $item_index = 0,
 		string $payload_checksum = ''
 	): int|false {
-		$pipeline_id = $engine_snapshot['job']['pipeline_id'] ?? null;
-		$flow_id     = $engine_snapshot['job']['flow_id'] ?? null;
-		$item_title  = $single_packet['data']['title'] ?? 'Untitled';
+		$pipeline_id     = $engine_snapshot['job']['pipeline_id'] ?? null;
+		$flow_id         = $engine_snapshot['job']['flow_id'] ?? null;
+		$item_title      = $single_packet['data']['title'] ?? 'Untitled';
+		$packet_metadata = is_array( $single_packet['metadata'] ?? null ) ? $single_packet['metadata'] : array();
+		if ( ProcessedItems::has_claim_metadata( $packet_metadata ) && ! ProcessedItems::has_valid_claim_metadata( $packet_metadata ) ) {
+			return false;
+		}
+		$packet_claims = ProcessedItems::disposition_claims( $packet_metadata );
+		if ( count( $packet_claims ) > 1 ) {
+			return false;
+		}
+		$item_claim = 1 === count( $packet_claims ) ? reset( $packet_claims ) : null;
 
 		// Normalize: 0 → null when no pipeline/flow context.
 		$pipeline_id = ( empty( $pipeline_id ) && ! is_string( $pipeline_id ) ) ? null : $pipeline_id;
@@ -341,7 +358,8 @@ class PipelineBatchScheduler {
 		// like CoreMemoryFilesDirective resolve the correct agent's
 		// MEMORY.md / SOUL.md instead of falling back to the user_id
 		// default-agent lookup.
-		$child_engine        = $this->stripBatchRuntimeState( \DataMachine\Core\EngineData::stripFlowRuntimeQueuePayloads( $engine_snapshot ) );
+		$child_engine = $this->stripBatchRuntimeState( \DataMachine\Core\EngineData::stripFlowRuntimeQueuePayloads( $engine_snapshot ) );
+		unset( $child_engine[ ProcessedItems::CLAIM_METADATA_KEY ], $child_engine[ ProcessedItems::CLAIMS_METADATA_KEY ] );
 		$child_engine['job'] = array(
 			'job_id'        => $child_job_id,
 			'flow_id'       => $flow_id,
@@ -362,6 +380,7 @@ class PipelineBatchScheduler {
 			$item_engine_data = PacketEngineData::sanitize( $item_engine_data, $parent_job_id );
 			$child_engine     = array_merge( $child_engine, $item_engine_data );
 		}
+		unset( $child_engine[ ProcessedItems::CLAIM_METADATA_KEY ], $child_engine[ ProcessedItems::CLAIMS_METADATA_KEY ] );
 
 		// Seed dedup context (item_identifier + source_type) from DataPacket metadata.
 		// This enables deferred mark-as-processed: when the child job completes
@@ -370,7 +389,6 @@ class PipelineBatchScheduler {
 		// parent, but now the fetch step no longer marks items eagerly.
 		$item_identifier = $single_packet['metadata']['item_identifier'] ?? null;
 		$source_type     = $single_packet['metadata']['source_type'] ?? null;
-		$item_claim      = $single_packet['metadata'][ ProcessedItems::CLAIM_METADATA_KEY ] ?? null;
 		if ( ! empty( $item_identifier ) ) {
 			$child_engine['item_identifier'] = $item_identifier;
 		}
@@ -414,6 +432,7 @@ class PipelineBatchScheduler {
 			$engine_snapshot['batch_schedule_failed'],
 			$engine_snapshot['batch_results'],
 			$engine_snapshot['next_flow_step_id'],
+			$engine_snapshot['packet_fanout_transfer'],
 			$engine_snapshot['cancelled'],
 			$engine_snapshot['cancelled_at']
 		);
