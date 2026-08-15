@@ -110,7 +110,7 @@ class JobsCommand extends BaseCommand {
 	private array $liveness_fields = array( 'id', 'flow_id', 'classification', 'age_hours', 'defer_count', 'defer_age_seconds', 'pending_actions', 'in_progress_actions', 'owner_action_ids', 'owner_job_ids', 'oldest_pending', 'latest_attempt' );
 
 	/**
-	 * Recover stuck jobs that have job_status in engine_data but status is 'processing'.
+	 * Recover stuck processing jobs and expired pending AI deferrals with no scheduler action.
 	 *
 	 * Jobs can become stuck when the engine stores a status override (e.g., from skip_item)
 	 * in engine_data but the main status column doesn't get updated. This command finds
@@ -246,7 +246,7 @@ class JobsCommand extends BaseCommand {
 		);
 		WP_CLI::log(
 			sprintf(
-				'Recovery scope: processing jobs only; pending AI deferrals excluded; job=%s flow=%s touch-limit=%d pathless-apply=%s.',
+				'Recovery scope: processing jobs plus expired pending AI deferrals with absent exact action receipts; job=%s flow=%s touch-limit=%d pathless-apply=%s.',
 				$job_id ? (string) $job_id : 'all',
 				$flow_id ? (string) $flow_id : 'all',
 				$limit,
@@ -300,6 +300,10 @@ class JobsCommand extends BaseCommand {
 				WP_CLI::log( sprintf( 'Would timeout job %d (flow %d)', $job['job_id'], $job['flow_id'] ) );
 			} elseif ( 'timed_out' === $job['status'] ) {
 				WP_CLI::log( sprintf( 'Timed out job %d (flow %d)', $job['job_id'], $job['flow_id'] ) );
+			} elseif ( 'would_terminalize_expired_ai_deferral' === $job['status'] ) {
+				WP_CLI::log( sprintf( 'Would terminalize expired pending AI deferral %d (flow %d, missing action %d)', $job['job_id'], $job['flow_id'], $job['action_id'] ) );
+			} elseif ( 'terminalized_expired_ai_deferral' === $job['status'] ) {
+				WP_CLI::log( sprintf( 'Terminalized expired pending AI deferral %d (flow %d, missing action %d)', $job['job_id'], $job['flow_id'], $job['action_id'] ) );
 			} elseif ( 'would_reconcile_action' === $job['status'] ) {
 				WP_CLI::log(
 					sprintf(
@@ -347,6 +351,8 @@ class JobsCommand extends BaseCommand {
 		$pathless_terminal = (int) ( $result['pathless_terminal'] ?? 0 );
 		$claimed_elsewhere = (int) ( $result['claimed_elsewhere'] ?? 0 );
 		$pathless_policy_skipped = (int) ( $result['pathless_policy_skipped'] ?? 0 );
+		$pending_ai_terminalized = (int) ( $result['pending_ai_terminalized'] ?? 0 );
+		$pending_ai_guarded = (int) ( $result['pending_ai_guarded'] ?? 0 );
 		$mutations         = (int) ( $result['mutations'] ?? 0 );
 		$attempted         = (int) ( $result['attempted'] ?? 0 );
 		$touched           = (int) ( $result['touched'] ?? 0 );
@@ -361,14 +367,16 @@ class JobsCommand extends BaseCommand {
 			'pathless_terminal' => $pathless_terminal,
 			'claimed_elsewhere' => $claimed_elsewhere,
 			'pathless_policy_skipped' => $pathless_policy_skipped,
+			'pending_ai_terminalized' => $pending_ai_terminalized,
+			'pending_ai_guarded' => $pending_ai_guarded,
 			'mutations'     => $mutations,
 			'attempted'     => $attempted,
 			'touched'       => $touched,
 			'mutated'       => $mutated,
 			'apply_limit'   => (int) ( $result['apply_limit'] ?? 0 ),
 			'limit_reached' => ! empty( $result['limit_reached'] ) ? 1 : 0,
-			'actionable'    => $recovered + $timed_out + $stale_actions + $pathless_requeued + $pathless_terminal,
-			'total'         => $recovered + $timed_out + $stale_actions + $pathless_requeued + $pathless_terminal + $skipped,
+			'actionable'    => $pending_ai_terminalized + $recovered + $timed_out + $stale_actions + $pathless_requeued + $pathless_terminal,
+			'total'         => $pending_ai_terminalized + $recovered + $timed_out + $stale_actions + $pathless_requeued + $pathless_terminal + $skipped,
 			'requeued'      => (int) ( $result['requeued'] ?? 0 ),
 			'jobs_omitted'  => (int) ( $result['jobs_omitted'] ?? 0 ),
 		);
@@ -477,7 +485,7 @@ class JobsCommand extends BaseCommand {
 					'scope'           => array(
 						'statuses'            => array( 'processing', 'pending' ),
 						'pending_requirement' => 'ai_concurrency_throttle',
-						'note'                => 'Recovery scope excludes pending AI deferrals and inspects processing jobs only.',
+						'note'                => 'Recovery includes only expired pending AI deferrals whose exact recorded action is absent.',
 					),
 					'summary'         => $summary,
 					'jobs'            => $items,
@@ -495,7 +503,7 @@ class JobsCommand extends BaseCommand {
 		$this->format_items( $items, $this->liveness_fields, $assoc_args, 'id' );
 
 		if ( 'table' === $format ) {
-			WP_CLI::log( 'Liveness scope includes processing jobs plus pending AI concurrency deferrals; recover-stuck applies only to processing jobs.' );
+			WP_CLI::log( 'Liveness scope includes processing jobs plus pending AI concurrency deferrals; recover-stuck also handles expired deferrals with absent exact action receipts.' );
 			WP_CLI::log(
 				sprintf(
 					'Inspected %d active jobs: %d active, %d queued, %d AI concurrency-deferred, %d waiting on children, %d scheduler-starved, %d stale in-progress, %d without scheduler path.',

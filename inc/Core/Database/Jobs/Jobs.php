@@ -2445,6 +2445,32 @@ class Jobs extends BaseRepository {
 		);
 	}
 
+	/** Terminalize an expired pending AI deferral only while its exact action receipt remains absent. */
+	public function transition_expired_ai_deferral( int $job_id, string $status, array $ownership, string $trigger ): array {
+		$action_id  = (int) ( $ownership['action_id'] ?? 0 );
+		$generation = (int) ( $ownership['generation'] ?? 0 );
+		$legacy     = ! empty( $ownership['legacy'] );
+		$flow_step  = (string) ( $ownership['flow_step_id'] ?? '' );
+		$retry_at   = (string) ( $ownership['next_retry_at'] ?? '' );
+		if ( ! JobStatus::isStatusFinal( $status ) || $action_id <= 0 || ( ! $legacy && $generation <= 0 ) || '' === $flow_step || '' === $retry_at ) {
+			return $this->status_transition_result( false, false, null, $status );
+		}
+
+		return $this->transition_terminal_job_status_result(
+			$job_id,
+			$status,
+			array(
+				'action_id'     => $action_id,
+				'generation'    => $generation,
+				'legacy'        => $legacy,
+				'flow_step_id'  => $flow_step,
+				'next_retry_at' => $retry_at,
+				'trigger'       => sanitize_key( $trigger ),
+				'mode'          => 'ai_deferral',
+			)
+		);
+	}
+
 	/** Renew the exact recovery generation immediately before handler execution. */
 	public function renew_recovery_execution_owner( int $job_id, string $token, int $generation ): bool {
 		if ( $job_id <= 0 || '' === $token || $generation <= 0 ) {
@@ -2851,7 +2877,9 @@ class Jobs extends BaseRepository {
 		$engine = (array) apply_filters( 'datamachine_job_terminal_engine_data', $engine, $job_id, $status );
 		$update_data['engine_data'] = wp_json_encode( $engine );
 		$update_formats[] = '%s';
-		$operation_recovery = is_array( $recovery_owner ) && 'operation' === (string) ( $recovery_owner['mode'] ?? '' );
+		$owner_mode         = is_array( $recovery_owner ) ? (string) ( $recovery_owner['mode'] ?? '' ) : '';
+		$operation_recovery = 'operation' === $owner_mode;
+		$ai_deferral_recovery = 'ai_deferral' === $owner_mode;
 		if ( $pending_direct_cancel || $operation_recovery ) {
 			$update_data['operation_state']       = 'cancelled';
 			$update_data['operation_claimed_at']  = null;
@@ -2872,7 +2900,29 @@ class Jobs extends BaseRepository {
 			);
 			$update_data['engine_data'] = wp_json_encode( $engine );
 		}
-		if ( is_array( $recovery_owner ) && ! $operation_recovery ) {
+		if ( $ai_deferral_recovery ) {
+			$throttle = is_array( $engine['ai_concurrency_throttle'] ?? null ) ? $engine['ai_concurrency_throttle'] : array();
+			$engine['ai_concurrency_history'] = array_slice(
+				array_merge(
+					is_array( $engine['ai_concurrency_history'] ?? null ) ? $engine['ai_concurrency_history'] : array(),
+					array(
+						array_merge(
+							$throttle,
+							array(
+								'state'       => 'stranded',
+								'reason'      => 'scheduler_action_missing',
+								'recovered_at' => gmdate( 'c' ),
+								'trigger'     => (string) ( $recovery_owner['trigger'] ?? '' ),
+							)
+						),
+					)
+				),
+				-20
+			);
+			unset( $engine['ai_concurrency_throttle'], $engine['ai_concurrency_resume_ownership'] );
+			$update_data['engine_data'] = wp_json_encode( $engine );
+		}
+		if ( is_array( $recovery_owner ) && ! $operation_recovery && ! $ai_deferral_recovery ) {
 			$engine['scheduler_recovery']['state']        = 'terminalized';
 			$engine['scheduler_recovery']['completed_at'] = gmdate( 'c' );
 			$engine['scheduler_recovery']['receipt']      = array(
@@ -3210,12 +3260,62 @@ class Jobs extends BaseRepository {
 		if ( 'operation' === $mode ) {
 			return $this->missing_direct_operation_owner_matches( $job, (int) ( $owner['action_id'] ?? 0 ), $generation, $token );
 		}
+		if ( 'ai_deferral' === $mode ) {
+			return $this->expired_ai_deferral_owner_matches( $job, $owner );
+		}
 		if ( 'execution' !== $mode ) {
 			return $this->recovery_owner_matches( $job, $token, $generation );
 		}
 
 		$engine = is_array( $job['engine_data'] ?? null ) ? $job['engine_data'] : array();
 		return ChildJobRecoveryPolicy::recoveryExecutionMatches( $engine, $generation, $token );
+	}
+
+	/** Validate an expired AI receipt and prove its exact scheduler action is absent. */
+	private function expired_ai_deferral_owner_matches( ?array $job, array $owner ): bool {
+		if ( ! is_array( $job ) || JobStatus::PENDING !== (string) ( $job['status'] ?? '' ) ) {
+			return false;
+		}
+
+		$engine     = is_array( $job['engine_data'] ?? null ) ? $job['engine_data'] : array();
+		$throttle   = is_array( $engine['ai_concurrency_throttle'] ?? null ) ? $engine['ai_concurrency_throttle'] : array();
+		$resume     = is_array( $engine['ai_concurrency_resume_ownership'] ?? null ) ? $engine['ai_concurrency_resume_ownership'] : array();
+		$action_id  = (int) ( $owner['action_id'] ?? 0 );
+		$generation = (int) ( $owner['generation'] ?? 0 );
+		$legacy     = ! empty( $owner['legacy'] );
+		$flow_step  = (string) ( $owner['flow_step_id'] ?? '' );
+		$retry_at   = (string) ( $owner['next_retry_at'] ?? '' );
+		$retry_time = strtotime( $retry_at );
+
+		$throttle_state = (string) ( $throttle['state'] ?? 'deferred' );
+		$modern_owner_matches = ! $legacy
+			&& $generation > 0
+			&& $generation === (int) ( $throttle['resume_generation'] ?? 0 )
+			&& 'scheduled' === (string) ( $resume['status'] ?? '' )
+			&& $action_id === (int) ( $resume['action_id'] ?? 0 )
+			&& $generation === (int) ( $resume['generation'] ?? 0 )
+			&& $flow_step === (string) ( $resume['flow_step_id'] ?? '' );
+		$legacy_owner_matches = $legacy
+			&& empty( $resume )
+			&& ! isset( $throttle['resume_generation'] );
+
+		if ( 'deferred' !== $throttle_state
+			|| $action_id <= 0
+			|| $action_id !== (int) ( $throttle['action_id'] ?? 0 )
+			|| $flow_step !== (string) ( $throttle['flow_step_id'] ?? '' )
+			|| $retry_at !== (string) ( $throttle['next_retry_at'] ?? '' )
+			|| false === $retry_time
+			|| $retry_time >= time()
+			|| ( ! $modern_owner_matches && ! $legacy_owner_matches )
+		) {
+			return false;
+		}
+
+		$actions_table = $this->wpdb->prefix . 'actionscheduler_actions';
+		$this->wpdb->last_error = '';
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Exact receipt absence is the recovery ownership fence.
+		$exists = $this->wpdb->get_var( $this->wpdb->prepare( "SELECT action_id FROM {$actions_table} WHERE action_id = %d LIMIT 1", $action_id ) );
+		return '' === (string) $this->wpdb->last_error && null === $exists;
 	}
 
 	/** Validate the exact durable direct-operation receipt on a locked jobs row. */

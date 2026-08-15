@@ -76,6 +76,14 @@ $assert( 'fresh resume action with throttle is concurrency deferred', 'ai_concur
 $assert( 'deferred metrics expose count and age', 8 === $deferred['defer_count'] && 3600 === $deferred['defer_age_seconds'] );
 $assert( 'deferred contention is active', true === $deferred['contention_active'] );
 
+$orphaned_deferral = $classify( $deferred_job );
+$assert( 'stale throttle metadata without current scheduler ownership is not active contention', false === $orphaned_deferral['contention_active'] );
+$assert( 'orphaned pending deferral has no scheduler path', 'no_scheduler_path' === $orphaned_deferral['classification'] );
+
+$legacy_throttle = $job( array( 'ai_concurrency_throttle' => array( 'flow_step_id' => 'step', 'action_id' => 77 ) ) );
+$legacy_active = $classify( $legacy_throttle, array( $action( 'pending', '2026-07-22 11:50:00', array(), 'datamachine_resume_ai_step', 77 ) ) );
+$assert( 'legacy exact resume receipt remains active scheduler ownership', true === $legacy_active['contention_active'] && 'ai_concurrency_deferred' === $legacy_active['classification'] );
+
 $queued = $classify( $job(), array( $action( 'pending', '2026-07-22 11:50:00' ) ) );
 $assert( 'fresh pending action without throttle is queued', 'queued_next_step' === $queued['classification'] );
 
