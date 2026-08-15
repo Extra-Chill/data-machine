@@ -252,6 +252,7 @@ abstract class FetchHandler {
 			}
 
 			$item['metadata'][ ProcessedItems::CLAIM_METADATA_KEY ] = $claim;
+			$item['metadata'][ ProcessedItems::DISPOSITION_ID_METADATA_KEY ] = $claim['disposition_id'];
 
 			$result[] = $item;
 		}

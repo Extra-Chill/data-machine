@@ -486,6 +486,7 @@ class ExecutionContext {
 			'source_type'     => $this->handler_type,
 			'item_identifier' => $item_identifier,
 			'ownership_token' => $token,
+			'disposition_id'  => ProcessedItems::disposition_identity( $identity_scope, $this->handler_type, $item_identifier ),
 			'completion'      => $completion,
 		);
 	}

@@ -203,7 +203,8 @@ class ParallelMapFanoutAdapter {
 		array $step,
 		int $parent_job_id,
 		string $next_flow_step_id,
-		array $engine_snapshot
+		array $engine_snapshot,
+		?bool $should_fanout = null
 	): array {
 		self::assertSubstrateAvailable();
 
@@ -217,7 +218,8 @@ class ParallelMapFanoutAdapter {
 			'step_id'           => (string) ( $step['id'] ?? '' ),
 		);
 
-		if ( ! self::shouldFanOut( $step, $context ) ) {
+		$should_fanout = null === $should_fanout ? self::shouldFanOut( $step, $context ) : $should_fanout;
+		if ( ! $should_fanout ) {
 			return array(
 				'shape'    => self::SHAPE_INLINE,
 				'count'    => $count,

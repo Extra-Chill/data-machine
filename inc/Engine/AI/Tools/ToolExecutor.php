@@ -15,6 +15,9 @@ use AgentsAPI\AI\Tools\WP_Agent_Action_Policy;
 use AgentsAPI\AI\Tools\WP_Agent_Tool_Execution_Core;
 use AgentsAPI\Core\Workspace\WP_Agent_Workspace_Scope;
 use DataMachine\Abilities\PermissionHelper;
+use DataMachine\Core\Database\Jobs\Jobs;
+use DataMachine\Core\Database\ProcessedItems\ProcessedItems;
+use DataMachine\Core\EngineData;
 use DataMachine\Core\Workspace\WordPressWorkspaceScope;
 use DataMachine\Core\WordPress\PostTracking;
 use DataMachine\Engine\AI\Actions\ActionPolicyResolver;
@@ -61,6 +64,26 @@ class ToolExecutor {
 		int $agent_id = 0,
 		array $client_context = array()
 	): array {
+		$disposition_claim = null;
+		$reservation_token = '';
+		$raw_tool_def      = is_array( $available_tools[ $tool_name ] ?? null ) ? $available_tools[ $tool_name ] : array();
+		if ( ! empty( $raw_tool_def['packet_disposition_bound'] ) ) {
+			$engine_data = is_array( $payload['engine_data'] ?? null ) ? $payload['engine_data'] : array();
+			$provided_id = is_string( $tool_parameters['disposition_id'] ?? null ) ? trim( $tool_parameters['disposition_id'] ) : '';
+			$disposition_claim = ProcessedItems::resolve_disposition_claim( $engine_data, $provided_id, true );
+			if ( null === $disposition_claim ) {
+				return array(
+					'success'   => false,
+					'error'     => '' === $provided_id
+						? 'disposition_id is required when more than one packet claim is active'
+						: 'disposition_id does not identify an active packet claim',
+					'tool_name' => $tool_name,
+					'code'      => 'invalid_packet_disposition',
+				);
+			}
+			$tool_parameters['disposition_id'] = $disposition_claim['disposition_id'];
+		}
+
 		$core                             = new WP_Agent_Tool_Execution_Core();
 		$execution                        = new ToolExecutionCore();
 		$caller_context                   = $payload;
@@ -181,7 +204,34 @@ class ToolExecutor {
 		}
 
 		// Policy is 'direct' — execute the tool normally.
-		$tool_result = $core->executePreparedTool( $tool_call, $tool_def, $execution, $tool_context );
+		if ( is_array( $disposition_claim ) ) {
+			$reservation = self::beginPacketExecution( $tool_name, $disposition_claim['disposition_id'], $payload );
+			if ( empty( $reservation['acquired'] ) ) {
+				return $reservation['result'];
+			}
+			$reservation_token = (string) $reservation['token'];
+		}
+		$reservation_finalized = ! is_array( $disposition_claim );
+		try {
+			$tool_result = $core->executePreparedTool( $tool_call, $tool_def, $execution, $tool_context );
+			if ( is_array( $disposition_claim ) ) {
+				$tool_result['disposition_id'] = $disposition_claim['disposition_id'];
+				$state = ! empty( $tool_result['success'] ) ? 'succeeded' : 'failed';
+				$reservation_finalized = self::finishPacketExecution( $tool_name, $disposition_claim['disposition_id'], $payload, $reservation_token, $state );
+				if ( ! $reservation_finalized ) {
+					return self::ambiguousPacketExecutionResult( $tool_name, $disposition_claim['disposition_id'], 'Handler returned, but its durable execution outcome could not be persisted.' );
+				}
+			}
+		} catch ( \Throwable $exception ) {
+			if ( is_array( $disposition_claim ) ) {
+				$reservation_finalized = self::finishPacketExecution( $tool_name, $disposition_claim['disposition_id'], $payload, $reservation_token, 'ambiguous' );
+			}
+			throw $exception;
+		} finally {
+			if ( is_array( $disposition_claim ) && ! $reservation_finalized ) {
+				self::finishPacketExecution( $tool_name, $disposition_claim['disposition_id'], $payload, $reservation_token, 'ambiguous' );
+			}
+		}
 		$tool_result = self::attachToolAuditContext( $tool_result, array_merge( $audit_context, array( 'result_status' => ! empty( $tool_result['success'] ) ? 'success' : 'error' ) ) );
 		self::dispatchToolAudit( $tool_result['metadata']['datamachine']['audit_context'] ?? array_merge( $audit_context, array( 'result_status' => ! empty( $tool_result['success'] ) ? 'success' : 'error' ) ) );
 
@@ -202,6 +252,204 @@ class ToolExecutor {
 		}
 
 		return $tool_result;
+	}
+
+	/** Return an idempotent success before repeating one handler/disposition side effect. */
+	public static function existingPacketExecutionResult( string $tool_name, string $disposition_id, array $payload ): ?array {
+		foreach ( (array) ( $payload['prior_tool_results'] ?? array() ) as $entry ) {
+			if ( ! is_array( $entry ) || $tool_name !== (string) ( $entry['tool_name'] ?? $entry['name'] ?? '' ) ) {
+				continue;
+			}
+			$result = is_array( $entry['result'] ?? null ) ? $entry['result'] : array();
+			if ( ! empty( $result['success'] ) && empty( $result['staged'] ) && empty( $result['pending'] ) && hash_equals( $disposition_id, (string) ( $result['disposition_id'] ?? '' ) ) ) {
+				return self::duplicatePacketExecutionResult( $tool_name, $disposition_id );
+			}
+		}
+
+		$job_id = (int) ( $payload['job_id'] ?? 0 );
+		$engine = $job_id > 0 ? EngineData::retrieve( $job_id ) : ( is_array( $payload['engine_data'] ?? null ) ? $payload['engine_data'] : array() );
+		$execution = is_array( $engine['packet_tool_executions'][ $tool_name ][ $disposition_id ] ?? null ) ? $engine['packet_tool_executions'][ $tool_name ][ $disposition_id ] : array();
+		if ( 'succeeded' === ( $execution['state'] ?? '' ) || ! empty( $engine['successful_packet_tool_executions'][ $tool_name ][ $disposition_id ] ) ) {
+			return self::duplicatePacketExecutionResult( $tool_name, $disposition_id );
+		}
+		if ( in_array( (string) ( $execution['state'] ?? '' ), array( 'executing', 'pending', 'ambiguous' ), true ) ) {
+			return self::ambiguousPacketExecutionResult( $tool_name, $disposition_id, 'A prior execution may already have applied side effects; automatic replay is blocked.' );
+		}
+		return null;
+	}
+
+	/** Atomically reserve one packet-bound handler execution before side effects. */
+	public static function beginPacketExecution( string $tool_name, string $disposition_id, array $payload ): array {
+		$prior = self::existingPacketExecutionResult( $tool_name, $disposition_id, $payload );
+		if ( null !== $prior ) {
+			return array( 'acquired' => false, 'token' => '', 'result' => $prior );
+		}
+
+		$job_id = (int) ( $payload['job_id'] ?? 0 );
+		if ( $job_id <= 0 ) {
+			return array(
+				'acquired' => false,
+				'token'    => '',
+				'result'   => self::ambiguousPacketExecutionResult( $tool_name, $disposition_id, 'A durable job ID is required before packet-bound side effects.' ),
+			);
+		}
+
+		$token    = bin2hex( random_bytes( 16 ) );
+		$decision = 'error';
+		$result = EngineData::mutate(
+			$job_id,
+			static function ( array $engine ) use ( $tool_name, $disposition_id, $token, &$decision ): array {
+				$current = is_array( $engine['packet_tool_executions'][ $tool_name ][ $disposition_id ] ?? null ) ? $engine['packet_tool_executions'][ $tool_name ][ $disposition_id ] : array();
+				$state   = (string) ( $current['state'] ?? '' );
+				if ( 'succeeded' === $state || ! empty( $engine['successful_packet_tool_executions'][ $tool_name ][ $disposition_id ] ) ) {
+					$decision = 'duplicate';
+					return $engine;
+				}
+				if ( in_array( $state, array( 'executing', 'pending', 'ambiguous' ), true ) ) {
+					$decision = 'ambiguous';
+					return $engine;
+				}
+				$decision = 'acquired';
+				$engine['packet_tool_executions'][ $tool_name ][ $disposition_id ] = array(
+					'state'      => 'executing',
+					'token'      => $token,
+					'started_at' => gmdate( 'c' ),
+				);
+				return $engine;
+			},
+			'packet_tool_reserve'
+		);
+		if ( empty( $result['success'] ) ) {
+			return array( 'acquired' => false, 'token' => '', 'result' => self::ambiguousPacketExecutionResult( $tool_name, $disposition_id, 'The durable execution reservation could not be persisted.' ) );
+		}
+		if ( 'duplicate' === $decision ) {
+			return array( 'acquired' => false, 'token' => '', 'result' => self::duplicatePacketExecutionResult( $tool_name, $disposition_id ) );
+		}
+		if ( 'acquired' !== $decision ) {
+			return array( 'acquired' => false, 'token' => '', 'result' => self::ambiguousPacketExecutionResult( $tool_name, $disposition_id, 'A prior execution may already have applied side effects; automatic replay is blocked.' ) );
+		}
+
+		return array( 'acquired' => true, 'token' => $token, 'result' => array() );
+	}
+
+	/** Durably finalize an execution reservation after the handler returns. */
+	public static function finishPacketExecution( string $tool_name, string $disposition_id, array $payload, string $token, string $state, string $request_id = '' ): bool {
+		$job_id = (int) ( $payload['job_id'] ?? 0 );
+		if ( $job_id <= 0 || '' === $token || ! in_array( $state, array( 'succeeded', 'failed', 'pending', 'ambiguous' ), true ) || ( 'pending' === $state && '' === $request_id ) ) {
+			return false;
+		}
+
+		$owned  = false;
+		$result = EngineData::mutate(
+			$job_id,
+			static function ( array $engine ) use ( $tool_name, $disposition_id, $token, $state, $request_id, &$owned ): array {
+				$owned   = false;
+				$current = is_array( $engine['packet_tool_executions'][ $tool_name ][ $disposition_id ] ?? null ) ? $engine['packet_tool_executions'][ $tool_name ][ $disposition_id ] : array();
+				if ( 'executing' !== ( $current['state'] ?? '' ) || ! hash_equals( $token, (string) ( $current['token'] ?? '' ) ) ) {
+					return $engine;
+				}
+				$owned = true;
+				$engine['packet_tool_executions'][ $tool_name ][ $disposition_id ] = array(
+					'state'       => $state,
+					'token'       => $token,
+					'started_at'  => (string) ( $current['started_at'] ?? '' ),
+					'finished_at' => gmdate( 'c' ),
+				);
+				if ( '' !== $request_id ) {
+					$engine['packet_tool_executions'][ $tool_name ][ $disposition_id ]['request_id'] = $request_id;
+				}
+				return $engine;
+			},
+			'packet_tool_finalize'
+		);
+
+		return $owned && ! empty( $result['success'] );
+	}
+
+	/** Finalize an asynchronously fulfilled external execution from its durable pending state. */
+	public static function finishPendingPacketExecution( string $tool_name, string $disposition_id, int $job_id, string $state, string $token, string $request_id ): bool {
+		if ( $job_id <= 0 || '' === $token || '' === $request_id || ! in_array( $state, array( 'succeeded', 'failed' ), true ) ) {
+			return false;
+		}
+
+		$owned  = false;
+		$result = EngineData::mutate(
+			$job_id,
+			static function ( array $engine ) use ( $tool_name, $disposition_id, $state, $token, $request_id, &$owned ): array {
+				$owned   = false;
+				$current = is_array( $engine['packet_tool_executions'][ $tool_name ][ $disposition_id ] ?? null ) ? $engine['packet_tool_executions'][ $tool_name ][ $disposition_id ] : array();
+				$identity_matches = hash_equals( $token, (string) ( $current['token'] ?? '' ) )
+					&& hash_equals( $request_id, (string) ( $current['request_id'] ?? '' ) );
+				if ( ! $identity_matches ) {
+					return $engine;
+				}
+				if ( $state === ( $current['state'] ?? '' ) ) {
+					$owned = true;
+					return $engine;
+				}
+				if ( 'pending' !== ( $current['state'] ?? '' ) ) {
+					return $engine;
+				}
+				$owned = true;
+				$engine['packet_tool_executions'][ $tool_name ][ $disposition_id ] = array(
+					'state'       => $state,
+					'token'       => (string) ( $current['token'] ?? '' ),
+					'started_at'  => (string) ( $current['started_at'] ?? '' ),
+					'finished_at' => gmdate( 'c' ),
+					'request_id'  => $request_id,
+				);
+				return $engine;
+			},
+			'packet_tool_async_finalize'
+		);
+
+		return $owned && ! empty( $result['success'] );
+	}
+
+	/** Finalize an asynchronous execution using only its server-side reservation. */
+	public static function finishPendingPacketExecutionForRequest( string $tool_name, string $disposition_id, int $job_id, string $state, string $request_id ): bool {
+		if ( $job_id <= 0 || '' === $request_id || ! in_array( $state, array( 'succeeded', 'failed' ), true ) ) {
+			return false;
+		}
+
+		$engine  = ( new Jobs() )->retrieve_engine_data( $job_id );
+		$current = is_array( $engine['packet_tool_executions'][ $tool_name ][ $disposition_id ] ?? null ) ? $engine['packet_tool_executions'][ $tool_name ][ $disposition_id ] : array();
+		$token   = (string) ( $current['token'] ?? '' );
+		if ( '' === $token || ! hash_equals( $request_id, (string) ( $current['request_id'] ?? '' ) ) ) {
+			return false;
+		}
+
+		return self::finishPendingPacketExecution( $tool_name, $disposition_id, $job_id, $state, $token, $request_id );
+	}
+
+	/** Backward-compatible success recorder for callers that already own a reservation. */
+	public static function recordPacketExecutionSuccess( string $tool_name, string $disposition_id, array $payload ): bool {
+		$reservation = self::beginPacketExecution( $tool_name, $disposition_id, $payload );
+		if ( empty( $reservation['acquired'] ) ) {
+			return ! empty( $reservation['result']['success'] );
+		}
+		return self::finishPacketExecution( $tool_name, $disposition_id, $payload, (string) $reservation['token'], 'succeeded' );
+	}
+
+	private static function duplicatePacketExecutionResult( string $tool_name, string $disposition_id ): array {
+		return array(
+			'success'               => true,
+			'tool_name'             => $tool_name,
+			'disposition_id'        => $disposition_id,
+			'already_dispositioned' => true,
+			'message'               => 'This handler already completed successfully for the packet identity.',
+		);
+	}
+
+	private static function ambiguousPacketExecutionResult( string $tool_name, string $disposition_id, string $message ): array {
+		return array(
+			'success'                => false,
+			'tool_name'              => $tool_name,
+			'disposition_id'         => $disposition_id,
+			'code'                   => 'packet_execution_outcome_ambiguous',
+			'automatic_replay_blocked' => true,
+			'error'                  => $message,
+		);
 	}
 
 	/**

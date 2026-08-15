@@ -25,9 +25,115 @@ class ProcessedItems extends BaseRepository {
 	const STATUS_CLAIMED            = 'claimed';
 	const STATUS_PROCESSED          = 'processed';
 	const DEFAULT_CLAIM_TTL_SECONDS = 3600;
-	const CLAIM_METADATA_KEY        = '_datamachine_item_claim';
-	const CLAIMS_METADATA_KEY       = '_datamachine_item_claims';
+	const CLAIM_METADATA_KEY          = '_datamachine_item_claim';
+	const CLAIMS_METADATA_KEY         = '_datamachine_item_claims';
+	const DISPOSITION_ID_METADATA_KEY = '_datamachine_packet_disposition_id';
 	private const READ_CHUNK_SIZE   = 500;
+
+	/** Return a stable, non-secret packet disposition identity. */
+	public static function disposition_identity( string $identity_scope, string $source_type, string $item_identifier ): string {
+		return hash( 'sha256', implode( "\0", array( $identity_scope, $source_type, $item_identifier ) ) );
+	}
+
+	/**
+	 * Return valid owned claims keyed by their non-secret disposition identity.
+	 *
+	 * @param array $container Engine data or packet metadata.
+	 * @return array<string,array<string,mixed>>
+	 */
+	public static function disposition_claims( array $container ): array {
+		$candidates = array();
+		if ( is_array( $container[ self::CLAIM_METADATA_KEY ] ?? null ) ) {
+			$candidates[] = $container[ self::CLAIM_METADATA_KEY ];
+		}
+		if ( is_array( $container[ self::CLAIMS_METADATA_KEY ] ?? null ) ) {
+			$candidates = array_merge( $candidates, $container[ self::CLAIMS_METADATA_KEY ] );
+		}
+
+		$claims = array();
+		foreach ( $candidates as $claim ) {
+			if ( ! is_array( $claim ) || false === ( $claim['persisted'] ?? true ) ) {
+				continue;
+			}
+			foreach ( array( 'identity_scope', 'source_type', 'item_identifier', 'ownership_token' ) as $key ) {
+				if ( ! is_string( $claim[ $key ] ?? null ) || '' === $claim[ $key ] ) {
+					continue 2;
+				}
+			}
+
+			$disposition_id = self::disposition_identity( $claim['identity_scope'], $claim['source_type'], $claim['item_identifier'] );
+			if ( isset( $claim['disposition_id'] ) && ( ! is_string( $claim['disposition_id'] ) || ! hash_equals( $disposition_id, $claim['disposition_id'] ) ) ) {
+				continue;
+			}
+			$claim['disposition_id']     = $disposition_id;
+			$claims[ $disposition_id ] = $claim;
+		}
+
+		return $claims;
+	}
+
+	/** Resolve an explicit ID, or infer it only when exactly one claim exists. */
+	public static function resolve_disposition_claim( array $container, string $disposition_id = '', bool $infer_single = true ): ?array {
+		$claims = self::disposition_claims( $container );
+		if ( '' !== $disposition_id ) {
+			foreach ( $claims as $claim_id => $claim ) {
+				if ( hash_equals( $claim_id, $disposition_id ) ) {
+					return $claim;
+				}
+			}
+			return null;
+		}
+
+		return $infer_single && 1 === count( $claims ) ? reset( $claims ) : null;
+	}
+
+	/** Whether a container explicitly carries singular or collection claim metadata. */
+	public static function has_claim_metadata( array $container ): bool {
+		return array_key_exists( self::CLAIM_METADATA_KEY, $container )
+			|| array_key_exists( self::CLAIMS_METADATA_KEY, $container );
+	}
+
+	/** Whether every explicitly supplied claim descriptor is valid and uniquely identified. */
+	public static function has_valid_claim_metadata( array $container ): bool {
+		if ( ! self::has_claim_metadata( $container ) ) {
+			return true;
+		}
+
+		$candidates = array();
+		if ( array_key_exists( self::CLAIM_METADATA_KEY, $container ) ) {
+			if ( ! is_array( $container[ self::CLAIM_METADATA_KEY ] ) ) {
+				return false;
+			}
+			$candidates[] = $container[ self::CLAIM_METADATA_KEY ];
+		}
+		if ( array_key_exists( self::CLAIMS_METADATA_KEY, $container ) ) {
+			if ( ! is_array( $container[ self::CLAIMS_METADATA_KEY ] ) ) {
+				return false;
+			}
+			$candidates = array_merge( $candidates, $container[ self::CLAIMS_METADATA_KEY ] );
+		}
+
+		if ( empty( $candidates ) ) {
+			return false;
+		}
+		foreach ( $candidates as $candidate ) {
+			if ( ! is_array( $candidate ) ) {
+				return false;
+			}
+		}
+
+		$persisted = array_values(
+			array_filter(
+				$candidates,
+				static fn( mixed $claim ): bool => is_array( $claim ) && false !== ( $claim['persisted'] ?? true )
+			)
+		);
+		if ( empty( $persisted ) ) {
+			return true;
+		}
+
+		return count( $persisted ) === count( self::disposition_claims( $container ) );
+	}
 
 
 	/**
@@ -532,6 +638,58 @@ class ProcessedItems extends BaseRepository {
 		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
 
 		return is_string( $owned ) && hash_equals( $token, $owned );
+	}
+
+	/** Lock and validate one token-owned claim inside a caller-managed transaction. */
+	public function lock_owned_claim_in_transaction( array $claim ): bool {
+		$identity_scope  = (string) ( $claim['identity_scope'] ?? '' );
+		$source_type     = (string) ( $claim['source_type'] ?? '' );
+		$item_identifier = (string) ( $claim['item_identifier'] ?? '' );
+		$token           = (string) ( $claim['ownership_token'] ?? '' );
+		if ( '' === $identity_scope || '' === $source_type || '' === $item_identifier || '' === $token ) {
+			return false;
+		}
+
+		$query = $this->wpdb->prepare(
+			'SELECT claim_token FROM %i WHERE flow_step_id = %s AND source_type = %s AND item_identifier = %s AND claim_token = %s AND status = %s FOR UPDATE',
+			$this->table_name,
+			$identity_scope,
+			$source_type,
+			$item_identifier,
+			$token,
+			self::STATUS_CLAIMED
+		);
+		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- Fully prepared lock query on the plugin table.
+		$owned = $this->wpdb->get_var( $query );
+		return is_string( $owned ) && hash_equals( $token, $owned );
+	}
+
+	/** Renew one locked token-owned claim inside a caller-managed transaction. */
+	public function renew_owned_claim_in_transaction( array $claim, int $job_id, int $ttl_seconds = self::DEFAULT_CLAIM_TTL_SECONDS ): bool {
+		if ( $job_id <= 0 || ! $this->lock_owned_claim_in_transaction( $claim ) ) {
+			return false;
+		}
+
+		$ttl_seconds = max( 1, $ttl_seconds );
+		$updated     = $this->wpdb->update(
+			$this->table_name,
+			array(
+				'job_id'           => $job_id,
+				'claim_expires_at' => gmdate( 'Y-m-d H:i:s', time() + $ttl_seconds ),
+			),
+			array(
+				'flow_step_id'    => $claim['identity_scope'],
+				'source_type'     => $claim['source_type'],
+				'item_identifier' => $claim['item_identifier'],
+				'claim_token'     => $claim['ownership_token'],
+				'status'          => self::STATUS_CLAIMED,
+			),
+			array( '%d', '%s' ),
+			array( '%s', '%s', '%s', '%s', '%s' )
+		);
+
+		// A renewal in the same second may be a no-op after the ownership lock.
+		return false !== $updated;
 	}
 
 	/**

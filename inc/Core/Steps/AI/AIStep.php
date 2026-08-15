@@ -7,6 +7,7 @@ use DataMachine\Core\Agents\AgentIdentity;
 use DataMachine\Core\Agents\AgentIdentityResolver;
 use DataMachine\Core\DataPacket;
 use DataMachine\Core\Database\Jobs\Jobs;
+use DataMachine\Core\Database\ProcessedItems\ProcessedItems;
 use DataMachine\Core\PluginSettings;
 use DataMachine\Core\RunMetrics;
 use DataMachine\Core\Steps\Step;
@@ -1234,6 +1235,8 @@ class AIStep extends Step {
 		$tool_execution_results = $loop_result['tool_execution_results'] ?? array();
 		$loop_metadata          = datamachine_conversation_metadata( $loop_result );
 		$assertions_satisfied   = ! empty( $loop_metadata['completion_assertions_satisfied'] ) && empty( $loop_metadata['completion_assertions_missing'] );
+		$engine_data           = is_array( $payload['engine_data'] ?? null ) ? $payload['engine_data'] : array();
+		$active_claims         = class_exists( ProcessedItems::class ) ? ProcessedItems::disposition_claims( $engine_data ) : array();
 
 		// Start with an empty output array — input packets are NOT carried forward.
 		$outputPackets = array();
@@ -1272,7 +1275,25 @@ class AIStep extends Step {
 
 			$tool_def = $available_tools[ $tool_name ] ?? null;
 
+			$disposition_id = (string) ( $tool_result['disposition_id'] ?? $tool_parameters['disposition_id'] ?? '' );
+			$matched_claim  = '' !== $disposition_id && class_exists( ProcessedItems::class ) ? ProcessedItems::resolve_disposition_claim( $engine_data, $disposition_id, false ) : null;
+			if ( $is_handler_tool && ! empty( $active_claims ) && null === $matched_claim ) {
+				$tool_result = array(
+					'success'   => false,
+					'error'     => 'Successful handler output did not identify an active packet claim.',
+					'code'      => 'invalid_packet_disposition',
+					'tool_name' => $tool_name,
+				);
+			}
 			$projected_tool_result_data = ToolResultFinder::projectEnvelopeData( $tool_result );
+			$packet_claim_metadata      = null !== $matched_claim
+				? array(
+					ProcessedItems::CLAIM_METADATA_KEY          => $matched_claim,
+					ProcessedItems::DISPOSITION_ID_METADATA_KEY => $matched_claim['disposition_id'],
+					'disposition_id'                            => $matched_claim['disposition_id'],
+				)
+				: array();
+			$packet_disposition         = (string) ( $tool_result['disposition'] ?? ( ! empty( $tool_result['success'] ) ? 'succeeded' : 'failed' ) );
 
 			if ( $is_handler_tool && ( $tool_result['success'] ?? false ) ) {
 				// Handler tool succeeded - mark completion
@@ -1289,17 +1310,21 @@ class AIStep extends Step {
 						'title' => 'Handler Tool Executed: ' . $tool_name,
 						'body'  => 'Tool executed successfully by AI agent in ' . $result_turn_count . ' conversation turns',
 					),
-					array(
-						'tool_name'              => $tool_name,
-						'handler_tool'           => $tool_def['handler'] ?? null,
-						'tool_parameters'        => $clean_tool_parameters,
-						'handler_config'         => $handler_config,
-						'source_type'            => $input_source_type,
-						'flow_step_id'           => $flow_step_id,
-						'conversation_turn'      => $result_turn_count,
-						'tool_result_envelope'   => $tool_result,
-						'tool_result_data'       => $projected_tool_result_data,
-						'step_execution_success' => true,
+					array_merge(
+						array(
+							'tool_name'              => $tool_name,
+							'handler_tool'           => $tool_def['handler'] ?? null,
+							'tool_parameters'        => $clean_tool_parameters,
+							'handler_config'         => $handler_config,
+							'source_type'            => $input_source_type,
+							'flow_step_id'           => $flow_step_id,
+							'conversation_turn'      => $result_turn_count,
+							'tool_result_envelope'   => $tool_result,
+							'tool_result_data'       => $projected_tool_result_data,
+							'step_execution_success' => true,
+							'packet_disposition'     => $packet_disposition,
+						),
+						$packet_claim_metadata
 					),
 					'ai_handler_complete'
 				);
@@ -1316,15 +1341,19 @@ class AIStep extends Step {
 						'title' => ucwords( str_replace( '_', ' ', $tool_name ) ) . ' Result',
 						'body'  => $success_message,
 					),
-					array(
-						'tool_name'              => $tool_name,
-						'handler_tool'           => $tool_def['handler'] ?? null,
-						'tool_parameters'        => $tool_parameters,
-						'tool_success'           => $tool_success,
-						'tool_failure_non_fatal' => false === (bool) $tool_success && $assertions_satisfied,
-						'tool_result_envelope'   => $tool_result,
-						'tool_result_data'       => $projected_tool_result_data,
-						'source_type'            => $input_source_type,
+					array_merge(
+						array(
+							'tool_name'              => $tool_name,
+							'handler_tool'           => $tool_def['handler'] ?? null,
+							'tool_parameters'        => $tool_parameters,
+							'tool_success'           => $tool_success,
+							'tool_failure_non_fatal' => false === (bool) $tool_success && $assertions_satisfied,
+							'tool_result_envelope'   => $tool_result,
+							'tool_result_data'       => $projected_tool_result_data,
+							'source_type'            => $input_source_type,
+							'packet_disposition'     => $packet_disposition,
+						),
+						$packet_claim_metadata
 					),
 					'tool_result'
 				);

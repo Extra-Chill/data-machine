@@ -147,7 +147,7 @@ class BatchScheduler {
 	 * @param array  $extra         Lightweight per-batch state cloned to chunks.
 	 * @param string $context       Consumer context, used for chunk-size/delay filter dispatch.
 	 * @param string $completion_strategy Declared parent-completion strategy.
-	 * @return array{parent_job_id:int,total:int,chunk_size:int,action_id:int,scheduled:bool} Batch summary.
+	 * @return array{parent_job_id:int,total:int,chunk_size:int,action_id:int,scheduled:bool,adopted:bool} Batch summary.
 	 */
 	public static function start(
 		int $parent_job_id,
@@ -213,15 +213,15 @@ class BatchScheduler {
 		$mutation = EngineData::mutate(
 			$parent_job_id,
 			static function ( array $current ) use ( $total, $chunk_size, $context, $completion_strategy, $extra, $hook, $worklist_checksum ): ?array {
-				if ( self::STORAGE_VERSION === (int) ( $current['batch_storage_version'] ?? 0 ) ) {
+				if ( self::STORAGE_VERSION === (int) ( $current['batch_storage_version'] ?? 0 ) && is_array( $current['batch_state'] ?? null ) ) {
 					$current_checksum = (string) ( $current['batch_state']['checksum'] ?? '' );
 					if ( ! hash_equals( $worklist_checksum, $current_checksum ) ) {
 						return null;
 					}
 					unset( $current['batch_schedule_failed'] );
-					return $current;
+					return (array) apply_filters( 'datamachine_batch_engine_adoption_state', $current, $context, $worklist_checksum );
 				}
-				return array_merge(
+				$next = array_merge(
 					$current,
 					array(
 						'batch'                     => true,
@@ -242,6 +242,7 @@ class BatchScheduler {
 						),
 					)
 				);
+				return (array) apply_filters( 'datamachine_batch_engine_adoption_state', $next, $context, $worklist_checksum );
 			},
 			'batch_start_v2'
 		);
@@ -256,31 +257,63 @@ class BatchScheduler {
 			}
 			return self::startResult( $parent_job_id, $total, $chunk_size );
 		}
-		if ( ! empty( $insert['existing'] ) ) {
-			return self::startResult( $parent_job_id, $total, $chunk_size, 0, true );
+		if ( ! empty( $insert['created'] ) ) {
+			\DataMachine\Core\RunMetrics::start(
+				$parent_job_id,
+				array(
+					'batch_context'             => $context,
+					'batch_total'               => $total,
+					'batch_completion_strategy' => $completion_strategy,
+				)
+			);
 		}
 
-		\DataMachine\Core\RunMetrics::start(
-			$parent_job_id,
-			array(
-				'batch_context'             => $context,
-				'batch_total'               => $total,
-				'batch_completion_strategy' => $completion_strategy,
-			)
-		);
+		$action_id = self::ensureInitialChunkScheduled( $hook, $parent_job_id );
 
-		try {
-			$action_id = as_schedule_single_action(
-				time(),
-				$hook,
-				array(
-					'parent_job_id' => $parent_job_id,
-					'offset'        => 0,
-				),
-				'data-machine'
+		if ( ! $action_id ) {
+			$ownership_restored = false;
+			$rollback           = EngineData::mutate(
+				$parent_job_id,
+				static function ( array $current ) use ( $context, $worklist_checksum, &$ownership_restored ): array {
+					$had_transfer = is_array( $current['packet_fanout_transfer'] ?? null );
+					$current      = (array) apply_filters( 'datamachine_batch_engine_adoption_rollback_state', $current, $context, $worklist_checksum );
+					$ownership_restored = $had_transfer && ! isset( $current['packet_fanout_transfer'] );
+					unset( $current['batch_state'] );
+					$current['batch_schedule_failed'] = true;
+					return $current;
+				},
+				'batch_initial_schedule_failure'
 			);
+			if ( ! empty( $rollback['success'] ) && ! empty( $insert['created'] ) && $ownership_restored ) {
+				$repository->delete_owned_batch( $parent_job_id, (string) $insert['ownership_token'] );
+			} elseif ( ! empty( $rollback['success'] ) && ! empty( $insert['created'] ) ) {
+				if ( self::discardOwnedWorklist( $repository, $parent_job_id, (string) $insert['ownership_token'], $context ) ) {
+					$repository->delete_owned_batch( $parent_job_id, (string) $insert['ownership_token'] );
+				}
+			}
+		}
+
+		return self::startResult( $parent_job_id, $total, $chunk_size, (int) $action_id, null, (bool) $action_id );
+	}
+
+	/** Find or idempotently create the initial chunk action. */
+	private static function ensureInitialChunkScheduled( string $hook, int $parent_job_id ): int {
+		$args = array(
+			'parent_job_id' => $parent_job_id,
+			'offset'        => 0,
+		);
+		if ( function_exists( 'as_has_scheduled_action' ) ) {
+			$existing = (int) as_has_scheduled_action( $hook, $args, GroupRegistrar::GROUP );
+			if ( $existing > 0 ) {
+				return $existing;
+			}
+		}
+		try {
+			$action_id = (int) as_schedule_single_action( time(), $hook, $args, GroupRegistrar::GROUP );
+			if ( $action_id > 0 ) {
+				return $action_id;
+			}
 		} catch ( \Throwable $exception ) {
-			$action_id = 0;
 			do_action(
 				'datamachine_log',
 				'error',
@@ -291,47 +324,20 @@ class BatchScheduler {
 				)
 			);
 		}
-		if ( ! $action_id && function_exists( 'as_has_scheduled_action' ) ) {
-			$action_id = (int) as_has_scheduled_action(
-				$hook,
-				array(
-					'parent_job_id' => $parent_job_id,
-					'offset'        => 0,
-				),
-				GroupRegistrar::GROUP
-			);
-		}
-
-		if ( ! $action_id ) {
-			if ( ! empty( $insert['created'] ) ) {
-				if ( self::discardOwnedWorklist( $repository, $parent_job_id, (string) $insert['ownership_token'], $context ) ) {
-					$repository->delete_owned_batch( $parent_job_id, (string) $insert['ownership_token'] );
-				}
-			}
-			EngineData::mutate(
-				$parent_job_id,
-				static function ( array $current ) use ( $insert ): array {
-					if ( ! empty( $insert['created'] ) ) {
-						unset( $current['batch_state'] );
-					}
-					$current['batch_schedule_failed'] = true;
-					return $current;
-				},
-				'batch_initial_schedule_failure'
-			);
-		}
-
-		return self::startResult( $parent_job_id, $total, $chunk_size, (int) $action_id );
+		return function_exists( 'as_has_scheduled_action' )
+			? (int) as_has_scheduled_action( $hook, $args, GroupRegistrar::GROUP )
+			: 0;
 	}
 
 	/** Build the stable public start result. */
-	private static function startResult( int $parent_job_id, int $total, int $chunk_size, int $action_id = 0, ?bool $scheduled = null ): array {
+	private static function startResult( int $parent_job_id, int $total, int $chunk_size, int $action_id = 0, ?bool $scheduled = null, bool $adopted = false ): array {
 		return array(
 			'parent_job_id' => $parent_job_id,
 			'total'         => $total,
 			'chunk_size'    => $chunk_size,
 			'action_id'     => $action_id,
 			'scheduled'     => null === $scheduled ? (bool) $action_id : $scheduled,
+			'adopted'       => $adopted,
 		);
 	}
 

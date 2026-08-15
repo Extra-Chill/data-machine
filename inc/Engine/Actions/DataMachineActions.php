@@ -71,10 +71,12 @@ function datamachine_register_core_actions() {
 	add_action( 'datamachine_mark_item_processed', array( MarkItemProcessedHandler::class, 'handle' ), 10, 4 );
 	add_action( 'datamachine_fail_job', array( FailJobHandler::class, 'handle' ), 10, 3 );
 	add_action( 'datamachine_log', array( LogHandler::class, 'handle' ), 10, 3 );
-	add_action( 'datamachine_step_lifecycle_inline_continuation', array( StepLifecycleHandler::class, 'handleInlineContinuation' ), 10, 3 );
 	add_action( 'datamachine_step_lifecycle_completed', array( StepLifecycleHandler::class, 'handleCompleted' ), 10, 2 );
 	add_action( 'datamachine_step_lifecycle_failed', array( StepLifecycleHandler::class, 'handleFailed' ), 10, 2 );
 	add_filter( 'datamachine_job_terminal_status', array( StepLifecycleHandler::class, 'filterTerminalStatus' ), 10, 3 );
+	add_filter( 'datamachine_job_terminal_engine_data', array( StepLifecycleHandler::class, 'filterTerminalEngineData' ), 10, 3 );
+	add_filter( 'datamachine_batch_engine_adoption_state', array( StepLifecycleHandler::class, 'filterBatchAdoptionState' ), 10, 3 );
+	add_filter( 'datamachine_batch_engine_adoption_rollback_state', array( StepLifecycleHandler::class, 'filterBatchAdoptionRollbackState' ), 10, 3 );
 	add_filter( 'datamachine_job_terminal_accounting_context', array( StepLifecycleHandler::class, 'filterTerminalAccountingContext' ), 10, 3 );
 	add_action( 'datamachine_job_terminal_rolled_back', array( StepLifecycleHandler::class, 'handleTerminalRollback' ) );
 	add_filter(
