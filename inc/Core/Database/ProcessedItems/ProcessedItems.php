@@ -21,14 +21,14 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class ProcessedItems extends BaseRepository {
 
-	const TABLE_NAME                = 'datamachine_processed_items';
-	const STATUS_CLAIMED            = 'claimed';
-	const STATUS_PROCESSED          = 'processed';
-	const DEFAULT_CLAIM_TTL_SECONDS = 3600;
+	const TABLE_NAME                  = 'datamachine_processed_items';
+	const STATUS_CLAIMED              = 'claimed';
+	const STATUS_PROCESSED            = 'processed';
+	const DEFAULT_CLAIM_TTL_SECONDS   = 3600;
 	const CLAIM_METADATA_KEY          = '_datamachine_item_claim';
 	const CLAIMS_METADATA_KEY         = '_datamachine_item_claims';
 	const DISPOSITION_ID_METADATA_KEY = '_datamachine_packet_disposition_id';
-	private const READ_CHUNK_SIZE   = 500;
+	private const READ_CHUNK_SIZE     = 500;
 
 	/** Return a stable, non-secret packet disposition identity. */
 	public static function disposition_identity( string $identity_scope, string $source_type, string $item_identifier ): string {
@@ -65,7 +65,7 @@ class ProcessedItems extends BaseRepository {
 			if ( isset( $claim['disposition_id'] ) && ( ! is_string( $claim['disposition_id'] ) || ! hash_equals( $disposition_id, $claim['disposition_id'] ) ) ) {
 				continue;
 			}
-			$claim['disposition_id']     = $disposition_id;
+			$claim['disposition_id']   = $disposition_id;
 			$claims[ $disposition_id ] = $claim;
 		}
 
@@ -659,8 +659,10 @@ class ProcessedItems extends BaseRepository {
 			$token,
 			self::STATUS_CLAIMED
 		);
-		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- Fully prepared lock query on the plugin table.
+		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared -- Query is fully prepared above with an escaped identifier and typed values.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- Transactional ownership lock on the plugin table.
 		$owned = $this->wpdb->get_var( $query );
+		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
 		return is_string( $owned ) && hash_equals( $token, $owned );
 	}
 

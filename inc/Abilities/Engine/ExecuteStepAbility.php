@@ -648,8 +648,11 @@ class ExecuteStepAbility {
 		int $recovery_generation = 0,
 		string $recovery_claim_token = ''
 	): array {
-		$pipeline_id = $flow_step_config['pipeline_id'] ?? null;
-		$transfer_recovery = array( 'success' => true, 'stale' => false );
+		$pipeline_id       = $flow_step_config['pipeline_id'] ?? null;
+		$transfer_recovery = array(
+			'success' => true,
+			'stale'   => false,
+		);
 		$transfer_snapshot = datamachine_get_engine_data( $job_id );
 		if ( is_array( $transfer_snapshot['packet_fanout_transfer'] ?? null ) ) {
 			$transfer_recovery = StepLifecycleHandler::recoverPreparedFanoutTransfer( $job_id, $recovery_generation, $recovery_claim_token );
@@ -662,9 +665,12 @@ class ExecuteStepAbility {
 		// Waiting is not a disposition boundary; retain every claim for resume.
 		if ( $status_override && JobStatus::isStatusWaiting( $status_override ) ) {
 			$parked_snapshot = datamachine_get_engine_data( $job_id );
-			$renewed = ProcessedItems::has_claim_metadata( $parked_snapshot )
+			$renewed         = ProcessedItems::has_claim_metadata( $parked_snapshot )
 				? StepLifecycleHandler::renewParkedClaims( $job_id, $recovery_generation, $recovery_claim_token )
-				: array( 'success' => true, 'stale' => false );
+				: array(
+					'success' => true,
+					'stale'   => false,
+				);
 			if ( ! $renewed['success'] ) {
 				return ! empty( $renewed['stale'] )
 					? $this->staleRecoveryGeneration( $job_id, $recovery_generation, 'lost ownership while renewing waiting packet claims' )
@@ -690,16 +696,19 @@ class ExecuteStepAbility {
 		$retry_owns_work = 'blocked' === ( $execution_result['status'] ?? '' ) || $this->retryOwnsCurrentWork( $job_id );
 		if ( $retry_owns_work ) {
 			$parked_snapshot = datamachine_get_engine_data( $job_id );
-			$renewed = ProcessedItems::has_claim_metadata( $parked_snapshot )
+			$renewed         = ProcessedItems::has_claim_metadata( $parked_snapshot )
 				? StepLifecycleHandler::renewParkedClaims( $job_id, $recovery_generation, $recovery_claim_token )
-				: array( 'success' => true, 'stale' => false );
+				: array(
+					'success' => true,
+					'stale'   => false,
+				);
 			if ( ! $renewed['success'] ) {
 				return ! empty( $renewed['stale'] )
 					? $this->staleRecoveryGeneration( $job_id, $recovery_generation, 'lost ownership while renewing parked packet claims' )
 					: $this->claimReconciliationFailure( $job_id, $flow_step_id, $step_type );
 			}
 		}
-		$reconciled  = array(
+		$reconciled = array(
 			'success'   => true,
 			'handled'   => false,
 			'retained'  => 0,
@@ -727,8 +736,8 @@ class ExecuteStepAbility {
 				$job_id,
 				'packet_claim_reconciliation_failed',
 				array(
-					'flow_step_id' => $flow_step_id,
-					'step_type'    => $step_type,
+					'flow_step_id'   => $flow_step_id,
+					'step_type'      => $step_type,
 					'reconciliation' => $reconciled,
 				)
 			);
@@ -912,13 +921,21 @@ class ExecuteStepAbility {
 				if ( ! $this->recoveryGenerationStillOwned( $job_id, $recovery_generation, $recovery_claim_token ) ) {
 					return $this->staleRecoveryGeneration( $job_id, $recovery_generation, 'was superseded before fan-out routing' );
 				}
-				$should_fanout = ParallelMapFanoutAdapter::shouldFanOut(
+				$should_fanout   = ParallelMapFanoutAdapter::shouldFanOut(
 					$parallel_step,
-					array( 'job_id' => $job_id, 'next_flow_step_id' => $next_flow_step_id, 'item_count' => $packet_count, 'step_id' => $next_flow_step_id )
+					array(
+						'job_id'            => $job_id,
+						'next_flow_step_id' => $next_flow_step_id,
+						'item_count'        => $packet_count,
+						'step_id'           => $next_flow_step_id,
+					)
 				);
 				$fanout_transfer = $should_fanout
 					? StepLifecycleHandler::transferClaimsToFanout( $job_id, $routed_packets, $recovery_generation, $recovery_claim_token )
-					: array( 'success' => true, 'stale' => false );
+					: array(
+						'success' => true,
+						'stale'   => false,
+					);
 				if ( ! $fanout_transfer['success'] ) {
 					return ! empty( $fanout_transfer['stale'] )
 						? $this->staleRecoveryGeneration( $job_id, $recovery_generation, 'lost ownership during fanout claim transfer' )
@@ -942,7 +959,7 @@ class ExecuteStepAbility {
 					);
 				} catch ( \Throwable $exception ) {
 					$transfer_id = (string) ( $fanout_transfer['transfer_id'] ?? '' );
-					$recovered = '' === $transfer_id
+					$recovered   = '' === $transfer_id
 						? array( 'success' => true )
 						: StepLifecycleHandler::recoverPreparedFanoutTransfer( $job_id, $recovery_generation, $recovery_claim_token );
 					if ( empty( $recovered['success'] ) ) {
@@ -950,7 +967,7 @@ class ExecuteStepAbility {
 					}
 					throw $exception;
 				}
-				$transfer_id = (string) ( $fanout_transfer['transfer_id'] ?? '' );
+				$transfer_id   = (string) ( $fanout_transfer['transfer_id'] ?? '' );
 				$batch_adopted = ! empty( $parallel_result['batch']['adopted'] );
 				if ( $should_fanout && '' !== $transfer_id && ! $batch_adopted ) {
 					if ( ! StepLifecycleHandler::restorePreparedFanoutTransfer( $job_id, $transfer_id, $recovery_generation, $recovery_claim_token ) ) {
@@ -959,7 +976,7 @@ class ExecuteStepAbility {
 					return $this->claimReconciliationFailure( $job_id, $flow_step_id, $step_type );
 				}
 				if ( $should_fanout && '' !== $transfer_id ) {
-					$adopted = StepLifecycleHandler::adoptPreparedFanoutTransfer( $job_id, $transfer_id, $recovery_generation, $recovery_claim_token );
+					$adopted   = StepLifecycleHandler::adoptPreparedFanoutTransfer( $job_id, $transfer_id, $recovery_generation, $recovery_claim_token );
 					$finalized = $adopted && StepLifecycleHandler::finalizePreparedFanoutTransfer( $job_id, $transfer_id, $recovery_generation, $recovery_claim_token );
 					if ( ! $finalized ) {
 						return $this->claimReconciliationFailure( $job_id, $flow_step_id, $step_type );
@@ -1317,12 +1334,28 @@ class ExecuteStepAbility {
 			}
 		}
 		do_action( 'datamachine_step_lifecycle_inline_continuation', $job_id, $flow_step_config, $routed_packets );
-		return array( 'success' => true, 'stale' => false );
+		return array(
+			'success' => true,
+			'stale'   => false,
+		);
 	}
 
 	private function claimReconciliationFailure( int $job_id, string $flow_step_id, string $step_type ): array {
-		do_action( 'datamachine_fail_job', $job_id, 'packet_claim_reconciliation_failed', compact( 'flow_step_id', 'step_type' ) );
-		return array( 'success' => false, 'step_success' => false, 'outcome' => 'claim_reconciliation_failed', 'reason' => 'packet_claim_reconciliation_failed' );
+		do_action(
+			'datamachine_fail_job',
+			$job_id,
+			'packet_claim_reconciliation_failed',
+			array(
+				'flow_step_id' => $flow_step_id,
+				'step_type'    => $step_type,
+			)
+		);
+		return array(
+			'success'      => false,
+			'step_success' => false,
+			'outcome'      => 'claim_reconciliation_failed',
+			'reason'       => 'packet_claim_reconciliation_failed',
+		);
 	}
 
 	/**

@@ -1235,8 +1235,8 @@ class AIStep extends Step {
 		$tool_execution_results = $loop_result['tool_execution_results'] ?? array();
 		$loop_metadata          = datamachine_conversation_metadata( $loop_result );
 		$assertions_satisfied   = ! empty( $loop_metadata['completion_assertions_satisfied'] ) && empty( $loop_metadata['completion_assertions_missing'] );
-		$engine_data           = is_array( $payload['engine_data'] ?? null ) ? $payload['engine_data'] : array();
-		$active_claims         = class_exists( ProcessedItems::class ) ? ProcessedItems::disposition_claims( $engine_data ) : array();
+		$engine_data            = is_array( $payload['engine_data'] ?? null ) ? $payload['engine_data'] : array();
+		$active_claims          = class_exists( ProcessedItems::class ) ? ProcessedItems::disposition_claims( $engine_data ) : array();
 
 		// Start with an empty output array — input packets are NOT carried forward.
 		$outputPackets = array();
@@ -1288,9 +1288,9 @@ class AIStep extends Step {
 			$projected_tool_result_data = ToolResultFinder::projectEnvelopeData( $tool_result );
 			$packet_claim_metadata      = null !== $matched_claim
 				? array(
-					ProcessedItems::CLAIM_METADATA_KEY          => $matched_claim,
+					ProcessedItems::CLAIM_METADATA_KEY => $matched_claim,
 					ProcessedItems::DISPOSITION_ID_METADATA_KEY => $matched_claim['disposition_id'],
-					'disposition_id'                            => $matched_claim['disposition_id'],
+					'disposition_id'                   => $matched_claim['disposition_id'],
 				)
 				: array();
 			$packet_disposition         = (string) ( $tool_result['disposition'] ?? ( ! empty( $tool_result['success'] ) ? 'succeeded' : 'failed' ) );

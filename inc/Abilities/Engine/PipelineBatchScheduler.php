@@ -290,9 +290,9 @@ class PipelineBatchScheduler {
 		int $item_index = 0,
 		string $payload_checksum = ''
 	): int|false {
-		$pipeline_id = $engine_snapshot['job']['pipeline_id'] ?? null;
-		$flow_id     = $engine_snapshot['job']['flow_id'] ?? null;
-		$item_title  = $single_packet['data']['title'] ?? 'Untitled';
+		$pipeline_id     = $engine_snapshot['job']['pipeline_id'] ?? null;
+		$flow_id         = $engine_snapshot['job']['flow_id'] ?? null;
+		$item_title      = $single_packet['data']['title'] ?? 'Untitled';
 		$packet_metadata = is_array( $single_packet['metadata'] ?? null ) ? $single_packet['metadata'] : array();
 		if ( ProcessedItems::has_claim_metadata( $packet_metadata ) && ! ProcessedItems::has_valid_claim_metadata( $packet_metadata ) ) {
 			return false;
@@ -358,7 +358,7 @@ class PipelineBatchScheduler {
 		// like CoreMemoryFilesDirective resolve the correct agent's
 		// MEMORY.md / SOUL.md instead of falling back to the user_id
 		// default-agent lookup.
-		$child_engine        = $this->stripBatchRuntimeState( \DataMachine\Core\EngineData::stripFlowRuntimeQueuePayloads( $engine_snapshot ) );
+		$child_engine = $this->stripBatchRuntimeState( \DataMachine\Core\EngineData::stripFlowRuntimeQueuePayloads( $engine_snapshot ) );
 		unset( $child_engine[ ProcessedItems::CLAIM_METADATA_KEY ], $child_engine[ ProcessedItems::CLAIMS_METADATA_KEY ] );
 		$child_engine['job'] = array(
 			'job_id'        => $child_job_id,

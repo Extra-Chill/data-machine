@@ -275,8 +275,8 @@ class BatchScheduler {
 			$rollback           = EngineData::mutate(
 				$parent_job_id,
 				static function ( array $current ) use ( $context, $worklist_checksum, &$ownership_restored ): array {
-					$had_transfer = is_array( $current['packet_fanout_transfer'] ?? null );
-					$current      = (array) apply_filters( 'datamachine_batch_engine_adoption_rollback_state', $current, $context, $worklist_checksum );
+					$had_transfer       = is_array( $current['packet_fanout_transfer'] ?? null );
+					$current            = (array) apply_filters( 'datamachine_batch_engine_adoption_rollback_state', $current, $context, $worklist_checksum );
 					$ownership_restored = $had_transfer && ! isset( $current['packet_fanout_transfer'] );
 					unset( $current['batch_state'] );
 					$current['batch_schedule_failed'] = true;

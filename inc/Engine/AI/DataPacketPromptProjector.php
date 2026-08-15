@@ -51,7 +51,7 @@ class DataPacketPromptProjector {
 	 * @return array Prompt-facing packet.
 	 */
 	private static function projectPacket( array $packet, array $context ): array {
-		$projected     = $packet;
+		$projected      = $packet;
 		$metadata       = is_array( $packet['metadata'] ?? null ) ? $packet['metadata'] : array();
 		$packet_claims  = class_exists( ProcessedItems::class ) ? ProcessedItems::disposition_claims( $metadata ) : array();
 		$disposition_id = 1 === count( $packet_claims ) ? (string) array_key_first( $packet_claims ) : '';
@@ -67,7 +67,7 @@ class DataPacketPromptProjector {
 		}
 		$projected = self::redactOwnershipTokens( $projected );
 		if ( '' !== $disposition_id ) {
-			$projected['metadata'] = is_array( $projected['metadata'] ?? null ) ? $projected['metadata'] : array();
+			$projected['metadata']                                       = is_array( $projected['metadata'] ?? null ) ? $projected['metadata'] : array();
 			$projected['metadata']['_datamachine_packet_disposition_id'] = $disposition_id;
 		}
 

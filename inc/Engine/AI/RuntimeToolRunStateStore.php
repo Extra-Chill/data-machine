@@ -109,8 +109,8 @@ class RuntimeToolRunStateStore {
 
 	/** Build initial state for callers that persist request and run state in one CAS. */
 	public static function initial_state_from_request( array $request ): ?array {
-		$metadata = is_array( $request['metadata']['datamachine'] ?? null ) ? $request['metadata']['datamachine'] : array();
-		$job_id   = max( 0, (int) ( $metadata['job_id'] ?? 0 ) );
+		$metadata   = is_array( $request['metadata']['datamachine'] ?? null ) ? $request['metadata']['datamachine'] : array();
+		$job_id     = max( 0, (int) ( $metadata['job_id'] ?? 0 ) );
 		$request_id = trim( (string) ( $request['request_id'] ?? '' ) );
 		$tool_name  = trim( (string) ( $request['tool_name'] ?? '' ) );
 		if ( $job_id <= 0 || '' === $request_id || '' === $tool_name ) {
@@ -184,7 +184,7 @@ class RuntimeToolRunStateStore {
 	private function transition_once( int $job_id, string $timestamp_key, string $payload_key, array $payload, string $status, bool $return_existing = true ): ?array {
 		$this->assert_job_id( $job_id );
 
-		$state = null;
+		$state        = null;
 		$transitioned = $this->mutate_engine_data(
 			$job_id,
 			function ( array $engine_data ) use ( $timestamp_key, $payload_key, $payload, $status, $return_existing, &$state ): array {

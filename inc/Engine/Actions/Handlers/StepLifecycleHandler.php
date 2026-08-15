@@ -77,7 +77,7 @@ class StepLifecycleHandler {
 					$result['success'] = false;
 					return $result;
 				}
-				$current  = array_replace( $current, ProcessedItems::disposition_claims( $metadata ) );
+				$current = array_replace( $current, ProcessedItems::disposition_claims( $metadata ) );
 				if ( empty( $seed_data ) && is_array( $metadata['_engine_data'] ?? null ) ) {
 					$seed_data = PacketEngineData::sanitize( $metadata['_engine_data'], $job_id );
 				}
@@ -101,7 +101,7 @@ class StepLifecycleHandler {
 			$result['success'] = false;
 			return $result;
 		}
-		$current     = ProcessedItems::disposition_claims( $engine_data );
+		$current = ProcessedItems::disposition_claims( $engine_data );
 		if ( empty( $current ) ) {
 			return $result;
 		}
@@ -109,7 +109,7 @@ class StepLifecycleHandler {
 		$resolved          = array();
 		if ( $step_success ) {
 			foreach ( $packets as $packet ) {
-				$metadata      = is_array( $packet['metadata'] ?? null ) ? $packet['metadata'] : array();
+				$metadata = is_array( $packet['metadata'] ?? null ) ? $packet['metadata'] : array();
 				if ( ProcessedItems::has_claim_metadata( $metadata ) && ! ProcessedItems::has_valid_claim_metadata( $metadata ) ) {
 					$result['success'] = false;
 					return $result;
@@ -185,7 +185,7 @@ class StepLifecycleHandler {
 		$jobs       = new Jobs();
 		$jobs_table = $jobs->get_table_name();
 		if ( false === $wpdb->query( 'START TRANSACTION' ) ) {
-			$result['success'] = false;
+			$result['success']    = false;
 			$result['_retryable'] = $jobs->has_retryable_transaction_error();
 			return $result;
 		}
@@ -198,8 +198,8 @@ class StepLifecycleHandler {
 			return $result;
 		}
 		$encoded = $job_row['engine_data'] ?? null;
-		$engine = is_string( $encoded ) ? json_decode( $encoded, true ) : $encoded;
-		$engine = is_array( $engine ) ? $engine : array();
+		$engine  = is_string( $encoded ) ? json_decode( $encoded, true ) : $encoded;
+		$engine  = is_array( $engine ) ? $engine : array();
 		if ( $recovery_generation > 0 && ! ChildJobRecoveryPolicy::recoveryExecutionMatches( $engine, $recovery_generation, $recovery_claim_token ) ) {
 			$wpdb->query( 'ROLLBACK' );
 			$result['success'] = false;
@@ -220,11 +220,11 @@ class StepLifecycleHandler {
 				return $result;
 			}
 		}
-		$retained = array();
-		$completed = array();
-		$released = array();
-		$omitted = array();
-		$index = 0;
+		$retained    = array();
+		$completed   = array();
+		$released    = array();
+		$omitted     = array();
+		$index       = 0;
 		$is_transfer = in_array( 'transferred', $resolved, true );
 		foreach ( $current as $disposition_id => $claim ) {
 			$default     = ( empty( $resolved ) && ! empty( $source_claims ) ) || $is_transfer ? 'succeeded' : '';
@@ -241,7 +241,7 @@ class StepLifecycleHandler {
 			if ( ! $allowed ) {
 				$wpdb->query( 'ROLLBACK' );
 				wp_cache_delete( $job_id, 'datamachine_engine_data' );
-				$result['success'] = false;
+				$result['success']    = false;
 				$result['_retryable'] = false;
 				return $result;
 			}
@@ -251,7 +251,7 @@ class StepLifecycleHandler {
 					$retryable = $jobs->has_retryable_transaction_error();
 					$wpdb->query( 'ROLLBACK' );
 					wp_cache_delete( $job_id, 'datamachine_engine_data' );
-					$result['success'] = false;
+					$result['success']    = false;
 					$result['_retryable'] = $retryable;
 					return $result;
 				}
@@ -262,7 +262,7 @@ class StepLifecycleHandler {
 				$retryable = $jobs->has_retryable_transaction_error();
 				$wpdb->query( 'ROLLBACK' );
 				wp_cache_delete( $job_id, 'datamachine_engine_data' );
-				$result['success'] = false;
+				$result['success']    = false;
 				$result['_retryable'] = $retryable;
 				return $result;
 			}
@@ -281,16 +281,16 @@ class StepLifecycleHandler {
 		if ( ! empty( $retained ) ) {
 			$engine[ ProcessedItems::CLAIMS_METADATA_KEY ] = array_values( $retained );
 		}
-		$history                                = is_array( $engine['packet_disposition_evidence'] ?? null ) ? $engine['packet_disposition_evidence'] : array();
-		$history[]                              = $evidence;
+		$history                               = is_array( $engine['packet_disposition_evidence'] ?? null ) ? $engine['packet_disposition_evidence'] : array();
+		$history[]                             = $evidence;
 		$engine['packet_disposition_evidence'] = array_slice( $history, -20 );
-		$engine = self::compactPacketRuntimeState( $engine, array_keys( $retained ) );
-		$persist = apply_filters( 'datamachine_packet_reconciliation_engine_persist', true, $job_id, $engine );
+		$engine                                = self::compactPacketRuntimeState( $engine, array_keys( $retained ) );
+		$persist                               = apply_filters( 'datamachine_packet_reconciliation_engine_persist', true, $job_id, $engine );
 		if ( ! $persist || ! $jobs->store_engine_data_in_transaction( $job_id, $engine ) ) {
 			$retryable = $persist && $jobs->has_retryable_transaction_error();
 			$wpdb->query( 'ROLLBACK' );
 			wp_cache_delete( $job_id, 'datamachine_engine_data' );
-			$result['success'] = false;
+			$result['success']    = false;
 			$result['_retryable'] = $retryable;
 			return $result;
 		}
@@ -303,12 +303,12 @@ class StepLifecycleHandler {
 			return $result;
 		}
 		$jobs->publish_committed_engine_data( $job_id, $engine );
-		$result['retained']  = count( $retained );
-		$result['completed'] = count( $completed );
-		$result['released']  = count( $released );
-		$result['omitted']   = count( $omitted );
-		$result['explicit']  = count( $resolved );
-		$result['evidence']  = $evidence;
+		$result['retained']   = count( $retained );
+		$result['completed']  = count( $completed );
+		$result['released']   = count( $released );
+		$result['omitted']    = count( $omitted );
+		$result['explicit']   = count( $resolved );
+		$result['evidence']   = $evidence;
 		$result['_retryable'] = false;
 		return $result;
 	}
@@ -316,7 +316,11 @@ class StepLifecycleHandler {
 	/** Renew every retained claim while a waiting or retryable execution is parked. */
 	public static function renewParkedClaims( int $job_id, int $recovery_generation = 0, string $recovery_claim_token = '' ): array {
 		global $wpdb;
-		$result     = array( 'success' => false, 'stale' => false, 'renewed' => 0 );
+		$result     = array(
+			'success' => false,
+			'stale'   => false,
+			'renewed' => 0,
+		);
 		$jobs       = new Jobs();
 		$jobs_table = $jobs->get_table_name();
 		if ( $job_id <= 0 || false === $wpdb->query( 'START TRANSACTION' ) ) {
@@ -331,7 +335,7 @@ class StepLifecycleHandler {
 		}
 		$encoded = $job['engine_data'] ?? null;
 		$engine  = is_string( $encoded ) ? json_decode( $encoded, true ) : $encoded;
-		$engine = is_array( $engine ) ? $engine : array();
+		$engine  = is_array( $engine ) ? $engine : array();
 		if ( JobStatus::isStatusFinal( (string) ( $job['status'] ?? '' ) ) ) {
 			$wpdb->query( 'ROLLBACK' );
 			return $result;
@@ -371,33 +375,51 @@ class StepLifecycleHandler {
 		foreach ( $packets as $packet ) {
 			$metadata = is_array( $packet['metadata'] ?? null ) ? $packet['metadata'] : array();
 			if ( ProcessedItems::has_claim_metadata( $metadata ) && ! ProcessedItems::has_valid_claim_metadata( $metadata ) ) {
-				return array( 'success' => false, 'stale' => false );
+				return array(
+					'success' => false,
+					'stale'   => false,
+				);
 			}
 			$packet_claims = ProcessedItems::disposition_claims( $metadata );
 			if ( count( $packet_claims ) > 1 ) {
-				return array( 'success' => false, 'stale' => false );
+				return array(
+					'success' => false,
+					'stale'   => false,
+				);
 			}
 			$claims = array_replace( $claims, $packet_claims );
 		}
 		if ( empty( $claims ) ) {
-			return array( 'success' => true, 'stale' => false );
+			return array(
+				'success' => true,
+				'stale'   => false,
+			);
 		}
-		$transfer_id = bin2hex( random_bytes( 16 ) );
-		$result = self::commitReconciliation(
+		$transfer_id           = bin2hex( random_bytes( 16 ) );
+		$result                = self::commitReconciliation(
 			$job_id,
 			array( 'step_type' => 'fanout_transfer' ),
 			$claims,
 			array_fill_keys( array_keys( $claims ), 'transferred' ),
 			array(
 				'packet_fanout_transfer' => array(
-					'transfer_id' => $transfer_id,
-					'state'       => 'prepared',
-					'prepared_at' => gmdate( 'c' ),
+					'transfer_id'         => $transfer_id,
+					'state'               => 'prepared',
+					'prepared_at'         => gmdate( 'c' ),
 					'recovery_generation' => $recovery_generation,
-					'claims'      => $claims,
+					'claims'              => $claims,
 				),
 			),
-			array( 'success' => true, 'handled' => true, 'retained' => 0, 'completed' => 0, 'released' => 0, 'omitted' => 0, 'explicit' => 0, 'stale' => false ),
+			array(
+				'success'   => true,
+				'handled'   => true,
+				'retained'  => 0,
+				'completed' => 0,
+				'released'  => 0,
+				'omitted'   => 0,
+				'explicit'  => 0,
+				'stale'     => false,
+			),
 			$recovery_generation,
 			$recovery_claim_token
 		);
@@ -459,7 +481,13 @@ class StepLifecycleHandler {
 	/** Transactionally fence fanout adoption, restoration, finalization, and recovery. */
 	private static function mutateFanoutTransfer( int $job_id, string $transfer_id, string $action, int $recovery_generation, string $recovery_claim_token ): array {
 		global $wpdb;
-		$result     = array( 'success' => false, 'stale' => false, 'adopted' => false, 'restored' => false, 'handled' => false );
+		$result     = array(
+			'success'  => false,
+			'stale'    => false,
+			'adopted'  => false,
+			'restored' => false,
+			'handled'  => false,
+		);
 		$jobs       = new Jobs();
 		$jobs_table = $jobs->get_table_name();
 		if ( $job_id <= 0 || false === $wpdb->query( 'START TRANSACTION' ) ) {
@@ -474,7 +502,7 @@ class StepLifecycleHandler {
 		}
 		$encoded = $job['engine_data'] ?? null;
 		$engine  = is_string( $encoded ) ? json_decode( $encoded, true ) : $encoded;
-		$engine = is_array( $engine ) ? $engine : array();
+		$engine  = is_array( $engine ) ? $engine : array();
 		if ( JobStatus::isStatusFinal( (string) ( $job['status'] ?? '' ) ) ) {
 			$wpdb->query( 'ROLLBACK' );
 			return $result;
@@ -485,7 +513,7 @@ class StepLifecycleHandler {
 			return $result;
 		}
 
-		$transfer = is_array( $engine['packet_fanout_transfer'] ?? null ) ? $engine['packet_fanout_transfer'] : array();
+		$transfer   = is_array( $engine['packet_fanout_transfer'] ?? null ) ? $engine['packet_fanout_transfer'] : array();
 		$current_id = (string) ( $transfer['transfer_id'] ?? '' );
 		if ( '' === $current_id ) {
 			$wpdb->query( 'ROLLBACK' );
@@ -507,7 +535,7 @@ class StepLifecycleHandler {
 			}
 			$engine['packet_fanout_transfer']['state']      = 'adopted';
 			$engine['packet_fanout_transfer']['adopted_at'] = gmdate( 'c' );
-			$result['adopted'] = true;
+			$result['adopted']                              = true;
 		} elseif ( 'finalize' === $effective_action ) {
 			if ( ! $durably_adopted ) {
 				$wpdb->query( 'ROLLBACK' );
@@ -537,7 +565,7 @@ class StepLifecycleHandler {
 			$current = array_replace( $current, $claims );
 			unset( $engine[ ProcessedItems::CLAIM_METADATA_KEY ], $engine['packet_fanout_transfer'] );
 			$engine[ ProcessedItems::CLAIMS_METADATA_KEY ] = array_values( $current );
-			$result['restored'] = true;
+			$result['restored']                            = true;
 		} else {
 			$wpdb->query( 'ROLLBACK' );
 			return $result;
@@ -570,7 +598,7 @@ class StepLifecycleHandler {
 	private static function compactPacketRuntimeState( array $engine, array $active_ids ): array {
 		$active = array_fill_keys( $active_ids, true );
 		foreach ( array( 'packet_dispositions' ) as $key ) {
-			$records = is_array( $engine[ $key ] ?? null ) ? $engine[ $key ] : array();
+			$records        = is_array( $engine[ $key ] ?? null ) ? $engine[ $key ] : array();
 			$engine[ $key ] = array_intersect_key( $records, $active );
 			if ( empty( $engine[ $key ] ) ) {
 				unset( $engine[ $key ] );
@@ -720,7 +748,10 @@ class StepLifecycleHandler {
 				'datamachine_log',
 				'error',
 				'Terminal transition blocked by malformed packet claim metadata.',
-				array( 'job_id' => $job_id, 'status' => $status )
+				array(
+					'job_id' => $job_id,
+					'status' => $status,
+				)
 			);
 			return new \WP_Error(
 				'item_claim_metadata_invalid',
@@ -728,7 +759,7 @@ class StepLifecycleHandler {
 				array( 'status' => JobStatus::failed( 'item_claim_metadata_invalid' )->toString() )
 			);
 		}
-		$prepared    = JobStatus::isStatusSuccess( $status )
+		$prepared = JobStatus::isStatusSuccess( $status )
 			? self::handleCompleted( $job_id, $engine_data, true )
 			: self::handleFailed( $job_id, $engine_data );
 		if ( $prepared ) {
