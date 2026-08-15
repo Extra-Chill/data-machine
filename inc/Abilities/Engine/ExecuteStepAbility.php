@@ -668,6 +668,23 @@ class ExecuteStepAbility {
 			);
 		}
 
+		// Only terminal overrides may short-circuit normal continuation routing.
+		// A stale processing/pending marker must not consume the current action
+		// without either scheduling the next step or completing the job.
+		if ( $status_override && ! JobStatus::isStatusFinal( $status_override ) ) {
+			do_action(
+				'datamachine_log',
+				'warning',
+				'Ignoring non-terminal job status override after successful step execution',
+				array(
+					'job_id'          => $job_id,
+					'flow_step_id'    => $flow_step_id,
+					'status_override' => $status_override,
+				)
+			);
+			$status_override = null;
+		}
+
 		// Status override: complete with override status and clean up.
 		if ( $status_override ) {
 			if ( ! $this->recoveryGenerationStillOwned( $job_id, $recovery_generation, $recovery_claim_token ) ) {
@@ -683,7 +700,16 @@ class ExecuteStepAbility {
 				$context = datamachine_get_file_context( $flow_id );
 				$cleanup->cleanup_job_data_packets( $job_id, $context );
 			}
-			if ( JobStatus::isStatusSuccess( $status_override ) && ( ! $transition['success'] || ! JobStatus::isStatusSuccess( $transition['status'] ) ) ) {
+			if ( ! $transition['success'] || ! JobStatus::isStatusFinal( $transition['status'] ) ) {
+				return array(
+					'success'      => false,
+					'step_success' => false,
+					'outcome'      => 'terminal_transition_failed',
+					'reason'       => 'terminal_transition_failed',
+					'status'       => $transition['status'],
+				);
+			}
+			if ( JobStatus::isStatusSuccess( $status_override ) && ! JobStatus::isStatusSuccess( $transition['status'] ) ) {
 				return array(
 					'success'      => false,
 					'step_success' => false,

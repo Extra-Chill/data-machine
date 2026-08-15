@@ -66,7 +66,7 @@ function datamachine_flow_exists( int $flow_id ): bool {
 function datamachine_execute_step_action( $job_id, string $flow_step_id, $operation_generation = 0, $operation_claim_token = '', $ai_resume_generation = 0, $recovery_generation = 0, $recovery_claim_token = '' ): void {
 	$ability = wp_get_ability( 'datamachine/execute-step' );
 	if ( $ability ) {
-		$ability->execute(
+		$result = $ability->execute(
 			array(
 				'job_id'                => (int) $job_id,
 				'flow_step_id'          => $flow_step_id,
@@ -77,6 +77,9 @@ function datamachine_execute_step_action( $job_id, string $flow_step_id, $operat
 				'recovery_claim_token'  => is_string( $recovery_claim_token ) ? $recovery_claim_token : '',
 			)
 		);
+		if ( in_array( (string) ( $result['outcome'] ?? '' ), array( 'claim_completion_failed', 'terminal_transition_failed' ), true ) ) {
+			throw new \RuntimeException( 'Data Machine terminal transition failed.' );
+		}
 	}
 }
 
