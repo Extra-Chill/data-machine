@@ -10,7 +10,9 @@ namespace DataMachine\Core\ActionScheduler;
 
 use DataMachine\Core\Database\BatchItems\BatchItems;
 use DataMachine\Core\Database\Jobs\Jobs;
+use DataMachine\Core\DirectJobEnqueuer;
 use DataMachine\Core\EngineData;
+use DataMachine\Engine\AI\AIConcurrencyBackpressure;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -32,25 +34,21 @@ class PathlessBatchRecovery {
 
 	/** Describe the scheduler action or fresh child rows that currently own a batch. */
 	public static function diagnoseActiveWork( int $parent_job_id, array $engine_data, int $timeout_hours ): array {
+		$diagnosis = array(
+			'owned'                => false,
+			'chunk_action'         => false,
+			'active_child_job_ids' => array(),
+			'stale_child_job_ids'  => array(),
+			'child_action_ids'      => array(),
+			'evidence_complete'     => true,
+		);
 		if ( $parent_job_id <= 0 || empty( $engine_data['batch'] ) ) {
-			return array(
-				'owned'                => false,
-				'chunk_action'         => false,
-				'active_child_job_ids' => array(),
-				'stale_child_job_ids'  => array(),
-				'child_action_ids'      => array(),
-				'evidence_complete'     => true,
-			);
+			return $diagnosis;
 		}
 		if ( self::hasActiveAction( $parent_job_id, $engine_data, $timeout_hours ) ) {
-			return array(
-				'owned'                => true,
-				'chunk_action'         => true,
-				'active_child_job_ids' => array(),
-				'stale_child_job_ids'  => array(),
-				'child_action_ids'      => array(),
-				'evidence_complete'     => true,
-			);
+			$diagnosis['owned']        = true;
+			$diagnosis['chunk_action'] = true;
+			return $diagnosis;
 		}
 
 		$diagnosis = self::diagnoseChildWork( $parent_job_id, max( 1, $timeout_hours ) * HOUR_IN_SECONDS, time() );
@@ -70,27 +68,45 @@ class PathlessBatchRecovery {
 		global $wpdb;
 		$jobs_table = $wpdb->prefix . Jobs::TABLE_NAME;
 		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name is generated from the WordPress prefix.
+		$total_children = $wpdb->get_var(
+			$wpdb->prepare( "SELECT COUNT(*) FROM {$jobs_table} WHERE parent_job_id = %d", $parent_job_id )
+		);
+		$count_complete = null !== $total_children && '' === (string) $wpdb->last_error;
 		$children = $wpdb->get_results(
-			$wpdb->prepare( "SELECT job_id, status, created_at FROM {$jobs_table} WHERE parent_job_id = %d", $parent_job_id ),
+			$wpdb->prepare(
+				"SELECT job_id, status, created_at
+				 FROM {$jobs_table}
+				 WHERE parent_job_id = %d AND status IN ( %s, %s )
+				 ORDER BY job_id ASC
+				 LIMIT %d",
+				$parent_job_id,
+				'pending',
+				'processing',
+				self::CHILD_QUERY_LIMIT + 1
+			),
 			ARRAY_A
 		);
 		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-		if ( ! is_array( $children ) || '' !== (string) $wpdb->last_error ) {
-			return self::diagnoseChildRows( array(), $timeout_seconds, $now, array(), false );
+		$children_complete = is_array( $children )
+			&& '' === (string) $wpdb->last_error
+			&& count( $children ) <= self::CHILD_QUERY_LIMIT;
+		$children          = is_array( $children ) ? array_slice( $children, 0, self::CHILD_QUERY_LIMIT ) : array();
+		if ( ! $count_complete || ! $children_complete ) {
+			$diagnosis                   = self::diagnoseChildRows( $children, $timeout_seconds, $now, array(), false );
+			$diagnosis['total_children'] = $count_complete ? (int) $total_children : count( $children );
+			return $diagnosis;
 		}
 
 		$initial       = self::diagnoseChildRows( $children, $timeout_seconds, $now );
+		$initial['total_children'] = (int) $total_children;
 		$stale_job_ids = $initial['stale_job_ids'];
 		if ( empty( $stale_job_ids ) ) {
 			return $initial;
 		}
-		if ( count( $stale_job_ids ) > self::CHILD_QUERY_LIMIT ) {
-			return self::diagnoseChildRows( $children, $timeout_seconds, $now, array(), false );
-		}
 
 		$actions_table = $wpdb->prefix . 'actionscheduler_actions';
 		$clauses       = array();
-		$query_args    = array( 'datamachine_execute_step', 'datamachine_resume_ai_step', 'pending', 'in-progress' );
+		$query_args    = array( DirectJobEnqueuer::HOOK, AIConcurrencyBackpressure::RESUME_HOOK, 'pending', 'in-progress' );
 		foreach ( $stale_job_ids as $job_id ) {
 			$clauses[]    = '(args LIKE %s OR args LIKE %s)';
 			$query_args[] = '%"job_id":' . $wpdb->esc_like( (string) $job_id ) . ',%';
@@ -117,13 +133,15 @@ class PathlessBatchRecovery {
 			&& '' === (string) $wpdb->last_error
 			&& count( $actions ) <= self::ACTION_QUERY_LIMIT;
 
-		return self::diagnoseChildRows(
+		$diagnosis = self::diagnoseChildRows(
 			$children,
 			$timeout_seconds,
 			$now,
 			is_array( $actions ) ? array_slice( $actions, 0, self::ACTION_QUERY_LIMIT ) : array(),
 			$complete
 		);
+		$diagnosis['total_children'] = (int) $total_children;
+		return $diagnosis;
 	}
 
 	/**

@@ -165,7 +165,8 @@ pathless_assert( false === $incomplete['evidence_complete'], 'bounded evidence f
 pathless_assert( array( 71 ) === $incomplete['active_job_ids'], 'bounded evidence failure preserves ownership' );
 
 $source = file_get_contents( __DIR__ . '/../inc/Core/ActionScheduler/PathlessBatchRecovery.php' ) ?: '';
-pathless_assert( str_contains( $source, 'count( $stale_job_ids ) > self::CHILD_QUERY_LIMIT' ), 'child ID scope is bounded before scheduler query' );
+pathless_assert( str_contains( $source, 'self::CHILD_QUERY_LIMIT + 1' ), 'active child query uses a truncation sentinel' );
+pathless_assert( str_contains( $source, 'count( $children ) <= self::CHILD_QUERY_LIMIT' ), 'child evidence fails closed when truncated' );
 pathless_assert( str_contains( $source, 'count( $actions ) <= self::ACTION_QUERY_LIMIT' ), 'child action result uses truncation sentinel' );
 
 echo "Pathless batch recovery bounds: {$passes} passed, {$failures} failed.\n";
