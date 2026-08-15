@@ -2,6 +2,12 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.172.30] - 2026-08-15
+
+### Fixed
+- honor pathless recovery policy in dry runs
+- reconcile stale job scheduler ownership
+
 ## [0.172.29] - 2026-08-15
 
 ### Changed
