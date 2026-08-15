@@ -17,6 +17,7 @@ use DataMachine\Engine\AI\AIConcurrencyBackpressure;
 use DataMachine\Engine\Actions\Handlers\StepLifecycleHandler;
 use DataMachine\Abilities\Job\RecoverStuckJobsAbility;
 use DataMachine\Abilities\Engine\ExecuteStepAbility;
+use DataMachine\Cli\Commands\JobsCommand;
 use WP_UnitTestCase;
 
 class JobLifecycleTransitionTest extends WP_UnitTestCase {
@@ -164,6 +165,62 @@ class JobLifecycleTransitionTest extends WP_UnitTestCase {
 		$this->assertSame( 'get_jobs_failed', $result->get_error_code() );
 		$this->assertSame( 'job_id must be a positive integer.', $result->get_error_message() );
 		$this->assertSame( 500, $result->get_error_data()['status'] );
+	}
+
+	public function test_pathless_dry_run_summaries_honor_apply_authorization(): void {
+		global $wpdb;
+		$parent_id = $this->db_jobs->create_job( array( 'label' => 'Dry-run policy parent' ) );
+		$child_id  = $this->db_jobs->create_job( array( 'label' => 'Dry-run policy child', 'parent_job_id' => $parent_id ) );
+		$this->assertTrue( $this->db_jobs->start_job( $child_id ) );
+		$wpdb->update(
+			$wpdb->prefix . 'datamachine_jobs',
+			array( 'created_at' => gmdate( 'Y-m-d H:i:s', time() - 2 * HOUR_IN_SECONDS ) ),
+			array( 'job_id' => $child_id ),
+			array( '%s' ),
+			array( '%d' )
+		);
+
+		$guarded = ( new RecoverStuckJobsAbility() )->execute(
+			array(
+				'dry_run'       => true,
+				'job_id'        => $child_id,
+				'timeout_hours' => 1,
+			)
+		);
+		$summary_method = new \ReflectionMethod( JobsCommand::class, 'summarize_recover_stuck_result' );
+		$guarded_summary = $summary_method->invoke( new JobsCommand(), $guarded );
+
+		$this->assertFalse( $guarded['scope']['recover_pathless_children'] );
+		$this->assertSame( 0, $guarded['pathless_terminal'] );
+		$this->assertSame( 0, $guarded['pathless_requeued'] );
+		$this->assertSame( 1, $guarded['pathless_policy_skipped'] );
+		$this->assertSame( 1, $guarded['skipped'] );
+		$this->assertSame( 'skipped', $guarded['jobs'][0]['status'] );
+		$this->assertSame( 'pathless_child_apply_policy_required', $guarded['jobs'][0]['reason'] );
+		$this->assertStringContainsString( 'guard 1 pathless children requiring explicit authorization', $guarded['message'] );
+		$this->assertSame( 0, $guarded_summary['actionable'] );
+		$this->assertSame( 1, $guarded_summary['skipped'] );
+		$this->assertSame( 1, $guarded_summary['total'] );
+
+		$authorized = ( new RecoverStuckJobsAbility() )->execute(
+			array(
+				'dry_run'                    => true,
+				'job_id'                     => $child_id,
+				'timeout_hours'               => 1,
+				'recover_pathless_children' => true,
+			)
+		);
+		$authorized_summary = $summary_method->invoke( new JobsCommand(), $authorized );
+
+		$this->assertTrue( $authorized['scope']['recover_pathless_children'] );
+		$this->assertSame( 1, $authorized['pathless_terminal'] );
+		$this->assertSame( 0, $authorized['pathless_policy_skipped'] );
+		$this->assertSame( 0, $authorized['skipped'] );
+		$this->assertSame( 'would_transition_pathless_child', $authorized['jobs'][0]['status'] );
+		$this->assertStringContainsString( 'terminalize 1 pathless children', $authorized['message'] );
+		$this->assertSame( 1, $authorized_summary['actionable'] );
+		$this->assertSame( 0, $authorized_summary['skipped'] );
+		$this->assertSame( 1, $authorized_summary['total'] );
 	}
 
 	public function test_touch_limit_stops_before_partial_pathless_claim(): void {
