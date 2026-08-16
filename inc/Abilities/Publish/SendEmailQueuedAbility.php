@@ -277,16 +277,28 @@ class SendEmailQueuedAbility {
 			'token_id'  => absint( PermissionHelper::get_acting_token_id() ),
 		);
 		if ( $context['user_id'] <= 0 ) {
-			return array( 'success' => false, 'error' => 'An identified issuer is required to queue email.', 'logs' => $logs );
+			return array(
+				'success' => false,
+				'error'   => 'An identified issuer is required to queue email.',
+				'logs'    => $logs,
+			);
 		}
 		if ( ! empty( $input['auth_ref'] ) ) {
 			$providers = apply_filters( 'datamachine_auth_providers', array() );
 			$auth      = $providers['email_imap'] ?? null;
 			if ( ! $auth || ! method_exists( $auth, 'resolve_mailbox' ) || is_wp_error( $auth->resolve_mailbox( $input['auth_ref'], 'send' ) ) ) {
-				return array( 'success' => false, 'error' => 'Mailbox send authorization failed.', 'logs' => $logs );
+				return array(
+					'success' => false,
+					'error'   => 'Mailbox send authorization failed.',
+					'logs'    => $logs,
+				);
 			}
 		} elseif ( ! $this->canUseLegacySender() ) {
-			return array( 'success' => false, 'error' => 'An authorized mailbox ref is required to queue email.', 'logs' => $logs );
+			return array(
+				'success' => false,
+				'error'   => 'An authorized mailbox ref is required to queue email.',
+				'logs'    => $logs,
+			);
 		}
 
 		// Validate the bare minimum here. The underlying ability re-validates
@@ -472,7 +484,7 @@ class SendEmailQueuedAbility {
 			'issuer_type'  => (int) $context['agent_id'] > 0 ? ( (int) $context['token_id'] > 0 ? 'agent_token' : 'agent' ) : 'user',
 			'issued_at'    => $issued_at,
 			'nonce'        => $nonce,
-			'legacy_sender'=> empty( $input['auth_ref'] ),
+			'legacy_sender' => empty( $input['auth_ref'] ),
 		);
 		$grant['signature'] = hash_hmac( 'sha256', $this->mailboxGrantPayload( $input, $grant ), wp_salt( 'auth' ) );
 		return $grant;
@@ -523,7 +535,7 @@ class SendEmailQueuedAbility {
 		}
 
 		$agent = ( new Agents() )->get_agent( $agent_id );
-		if ( ! is_array( $agent ) || $user_id !== absint( $agent['owner_id'] ?? 0 ) ) {
+		if ( ! is_array( $agent ) || absint( $agent['owner_id'] ?? 0 ) !== $user_id ) {
 			return false;
 		}
 		if ( 'agent' === $issuer_type ) {

@@ -182,7 +182,10 @@ class EmailAuth extends BaseAuthProvider {
 			}
 			$resolved = array(
 				'ref'         => $ref,
-				'owner'       => array( 'type' => self::AUTH_SCOPE_SITE, 'id' => 0 ),
+				'owner'       => array(
+					'type' => self::AUTH_SCOPE_SITE,
+					'id'   => 0,
+				),
 				'credentials' => $credentials,
 			);
 			$this->audit( $resolved, $operations, $context, $agent_id, $user_id, 'allowed' );
@@ -201,7 +204,10 @@ class EmailAuth extends BaseAuthProvider {
 
 		$resolved = array(
 			'ref'         => $ref,
-			'owner'       => array( 'type' => $allowed[0]['owner_type'], 'id' => $allowed[0]['owner_id'] ),
+			'owner'       => array(
+				'type' => $allowed[0]['owner_type'],
+				'id'   => $allowed[0]['owner_id'],
+			),
 			'credentials' => $allowed[0]['account'],
 		);
 		$this->audit( $resolved, $operations, $context, $agent_id, $user_id, 'allowed' );
@@ -333,7 +339,7 @@ class EmailAuth extends BaseAuthProvider {
 			return false;
 		}
 		$agent = ( new Agents() )->get_agent( $agent_id );
-		return is_array( $agent ) && $user_id === (int) ( $agent['owner_id'] ?? 0 );
+		return is_array( $agent ) && (int) ( $agent['owner_id'] ?? 0 ) === $user_id;
 	}
 
 	private function can_access( array $match, string|array $operations, int $agent_id, int $user_id ): bool {
@@ -378,15 +384,42 @@ class EmailAuth extends BaseAuthProvider {
 	}
 
 	private function audit_error( string $code, string $ref, string|array $operations, array $context, int $agent_id, int $user_id ): \WP_Error {
-		$this->audit( array( 'ref' => $ref, 'owner' => null ), $operations, $context, $agent_id, $user_id, 'denied' );
-		return new \WP_Error( $code, sprintf( __( 'Mailbox ref "%s" could not be resolved or authorized.', 'data-machine' ), $ref ), array( 'status' => 403 ) );
+		$this->audit(
+			array(
+				'ref'   => $ref,
+				'owner' => null,
+			),
+			$operations,
+			$context,
+			$agent_id,
+			$user_id,
+			'denied'
+		);
+		return new \WP_Error(
+			$code,
+			sprintf(
+				/* translators: %s: mailbox auth reference. */
+				__( 'Mailbox ref "%s" could not be resolved or authorized.', 'data-machine' ),
+				$ref
+			),
+			array( 'status' => 403 )
+		);
 	}
 
 	private function audit( array $mailbox, string|array $operations, array $context, int $agent_id, int $user_id, string $result ): void {
+		$acting_principal = $agent_id > 0
+			? array(
+				'type' => 'agent',
+				'id'   => $agent_id,
+			)
+			: array(
+				'type' => 'user',
+				'id'   => $user_id,
+			);
 		$metadata = array(
 			'mailbox_ref'     => $mailbox['ref'],
 			'owner_principal' => $mailbox['owner'],
-			'acting_principal'=> $agent_id > 0 ? array( 'type' => 'agent', 'id' => $agent_id ) : array( 'type' => 'user', 'id' => $user_id ),
+			'acting_principal' => $acting_principal,
 			'operation'       => array_values( (array) $operations ),
 			'result'          => $result,
 		);

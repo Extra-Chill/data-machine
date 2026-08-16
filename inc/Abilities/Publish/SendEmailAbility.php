@@ -530,7 +530,7 @@ class SendEmailAbility {
 			'agent_id'     => $agent_id,
 			'token_id'     => absint( $grant['token_id'] ?? 0 ),
 			'issuer_type'  => (string) ( $grant['issuer_type'] ?? '' ),
-			'legacy_sender'=> ! empty( $grant['legacy_sender'] ),
+			'legacy_sender' => ! empty( $grant['legacy_sender'] ),
 		);
 	}
 
