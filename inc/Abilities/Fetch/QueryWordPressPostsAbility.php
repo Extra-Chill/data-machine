@@ -344,5 +344,4 @@ class QueryWordPressPostsAbility {
 
 		return array_merge( $defaults, $input );
 	}
-
 }
