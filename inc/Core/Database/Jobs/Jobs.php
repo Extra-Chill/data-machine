@@ -3303,7 +3303,7 @@ class Jobs extends BaseRepository {
 
 		$actions_table = $this->wpdb->prefix . 'actionscheduler_actions';
 		$this->wpdb->last_error = '';
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Exact receipt absence is the recovery ownership fence.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQL.NotPrepared -- Exact receipt absence is the recovery ownership fence.
 		$exists = $this->wpdb->get_var( $this->wpdb->prepare( "SELECT action_id FROM {$actions_table} WHERE action_id = %d LIMIT 1", $action_id ) );
 		return '' === (string) $this->wpdb->last_error && null === $exists;
 	}
