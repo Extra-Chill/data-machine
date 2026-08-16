@@ -335,6 +335,39 @@ class BaseAuthProviderTest extends WP_UnitTestCase {
 		$this->assertTrue( $this->provider->delete_site_account() );
 	}
 
+	public function test_named_accounts_support_multiple_exact_principal_slots(): void {
+		$this->assertTrue( $this->provider->save_named_account( 'primary', array( 'access_token' => 'site-primary' ) ) );
+		$this->assertTrue( $this->provider->save_named_account( 'archive', array( 'access_token' => 'site-archive' ) ) );
+		$this->assertTrue( $this->provider->save_named_account( 'user-primary', array( 'access_token' => 'user-primary' ), BaseAuthProvider::AUTH_SCOPE_USER, 42 ) );
+		$this->assertTrue( $this->provider->save_named_account( 'agent-primary', array( 'access_token' => 'agent-primary' ), BaseAuthProvider::AUTH_SCOPE_AGENT, 303 ) );
+
+		$this->assertSame( 'site-primary', $this->provider->get_named_account( 'primary' )['access_token'] );
+		$this->assertSame( 'site-archive', $this->provider->get_named_account( 'archive' )['access_token'] );
+		$this->assertSame( 'user-primary', $this->provider->get_named_account( 'user-primary', BaseAuthProvider::AUTH_SCOPE_USER, 42 )['access_token'] );
+		$this->assertSame( 'agent-primary', $this->provider->get_named_account( 'agent-primary', BaseAuthProvider::AUTH_SCOPE_AGENT, 303 )['access_token'] );
+		$this->assertNull( $this->provider->get_named_account( 'archive', BaseAuthProvider::AUTH_SCOPE_USER, 42 ) );
+		$this->assertFalse( $this->provider->save_named_account( 'primary', array( 'access_token' => 'duplicate' ), BaseAuthProvider::AUTH_SCOPE_USER, 42 ) );
+	}
+
+	public function test_named_account_delete_preserves_siblings_and_legacy_slots(): void {
+		$this->provider->save_site_account( array( 'access_token' => 'legacy' ) );
+		$this->provider->save_named_account( 'one', array( 'access_token' => 'one' ) );
+		$this->provider->save_named_account( 'two', array( 'access_token' => 'two' ) );
+
+		$this->assertTrue( $this->provider->delete_named_account( 'one' ) );
+		$this->assertNull( $this->provider->get_named_account( 'one' ) );
+		$this->assertSame( 'two', $this->provider->get_named_account( 'two' )['access_token'] );
+		$this->assertSame( 'legacy', $this->provider->get_site_account()['access_token'] );
+	}
+
+	public function test_named_accounts_reject_invalid_names_and_encrypt_secrets(): void {
+		$this->assertFalse( $this->provider->save_named_account( 'Bad Ref!', array( 'access_token' => 'secret' ) ) );
+		$this->assertTrue( $this->provider->save_named_account( 'valid-ref', array( 'access_token' => 'secret' ) ) );
+
+		$raw = get_site_option( 'datamachine_auth_data', array() );
+		$this->assertStringStartsWith( 'dm:enc:v1:', $raw['test_provider']['accounts']['valid-ref']['access_token'] );
+	}
+
 	public function test_site_account_methods_do_not_consult_scope_policy(): void {
 		add_filter(
 			'datamachine_auth_scope_policy',

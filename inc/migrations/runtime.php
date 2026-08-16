@@ -34,6 +34,7 @@ function datamachine_run_schema_migrations(): void {
 	datamachine_migrate_processed_item_claims();
 	datamachine_migrate_pending_actions_table();
 	datamachine_migrate_chat_sessions_to_network();
+	datamachine_migrate_legacy_email_flow_auth();
 }
 
 /**

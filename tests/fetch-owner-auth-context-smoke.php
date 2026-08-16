@@ -48,6 +48,11 @@ assert_fetch_owner_auth_context(
 );
 
 assert_fetch_owner_auth_context(
+	'FetchStep marks only genuinely principal-less system execution',
+	str_contains( $file, "'principal_less_system' => 0 === \$owner_user_id && 0 === \$agent_id," )
+);
+
+assert_fetch_owner_auth_context(
 	'FetchStep executes handlers as owner user',
 	str_contains( $file, 'private function execute_handler_as_owner' ) && str_contains( $file, 'wp_set_current_user( $owner_user_id );' )
 );

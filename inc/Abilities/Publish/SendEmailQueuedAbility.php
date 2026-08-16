@@ -23,6 +23,8 @@ namespace DataMachine\Abilities\Publish;
 
 use DataMachine\Abilities\AbilityRegistration;
 use DataMachine\Abilities\PermissionHelper;
+use DataMachine\Core\Database\Agents\Agents;
+use DataMachine\Core\Database\Agents\AgentTokens;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -133,6 +135,10 @@ class SendEmailQueuedAbility {
 					// underlying ability runs.
 					'required'   => array( 'to', 'subject' ),
 					'properties' => array(
+						'auth_ref'     => array(
+							'type'        => 'string',
+							'description' => __( 'Optional non-secret mailbox auth ref authorizing the sender identity', 'data-machine' ),
+						),
 						'to'           => array(
 							'type'        => 'string',
 							'description' => __( 'Comma-separated recipient email addresses', 'data-machine' ),
@@ -254,7 +260,7 @@ class SendEmailQueuedAbility {
 	 * @return bool True if user has permission.
 	 */
 	public function checkPermission(): bool {
-		return PermissionHelper::can_manage();
+		return PermissionHelper::can( 'use_tools' ) || PermissionHelper::can_manage();
 	}
 
 	/**
@@ -265,6 +271,35 @@ class SendEmailQueuedAbility {
 	 */
 	public function execute( array $input ): array {
 		$logs = array();
+		$context = array(
+			'user_id'   => PermissionHelper::acting_user_id(),
+			'agent_id'  => absint( PermissionHelper::get_acting_agent_id() ),
+			'token_id'  => absint( PermissionHelper::get_acting_token_id() ),
+		);
+		if ( $context['user_id'] <= 0 ) {
+			return array(
+				'success' => false,
+				'error'   => 'An identified issuer is required to queue email.',
+				'logs'    => $logs,
+			);
+		}
+		if ( ! empty( $input['auth_ref'] ) ) {
+			$providers = apply_filters( 'datamachine_auth_providers', array() );
+			$auth      = $providers['email_imap'] ?? null;
+			if ( ! $auth || ! method_exists( $auth, 'resolve_mailbox' ) || is_wp_error( $auth->resolve_mailbox( $input['auth_ref'], 'send' ) ) ) {
+				return array(
+					'success' => false,
+					'error'   => 'Mailbox send authorization failed.',
+					'logs'    => $logs,
+				);
+			}
+		} elseif ( ! $this->canUseLegacySender() ) {
+			return array(
+				'success' => false,
+				'error'   => 'An authorized mailbox ref is required to queue email.',
+				'logs'    => $logs,
+			);
+		}
 
 		// Validate the bare minimum here. The underlying ability re-validates
 		// the full payload when the worker runs.
@@ -283,6 +318,7 @@ class SendEmailQueuedAbility {
 		// Strip control fields from payload before scheduling.
 		$priority = isset( $input['priority'] ) ? (int) $input['priority'] : 10;
 		unset( $input['priority'] );
+		$input['_mailbox_grant'] = $this->createMailboxGrant( $input, $context );
 
 		// Initialize the attempt counter. `_attempt` is internal — not part of
 		// the public input schema.
@@ -363,6 +399,11 @@ class SendEmailQueuedAbility {
 		}
 
 		$attempt = isset( $payload['_attempt'] ) ? max( 1, (int) $payload['_attempt'] ) : 1;
+		$grant = $this->verifyMailboxGrant( $payload );
+		if ( is_wp_error( $grant ) || ! $this->currentIssuerAuthorized( $grant ) ) {
+			do_action( 'datamachine_log', 'error', 'Email worker: queued authorization denied', array( 'attempt' => $attempt ) );
+			return;
+		}
 
 		$ability = wp_get_ability( 'datamachine/send-email' );
 		if ( ! $ability ) {
@@ -431,6 +472,138 @@ class SendEmailQueuedAbility {
 				'error'           => $error_msg,
 			)
 		);
+	}
+
+	private function createMailboxGrant( array $input, array $context ): array {
+		$issued_at = time();
+		$nonce     = wp_generate_uuid4();
+		$grant     = array(
+			'user_id'      => (int) $context['user_id'],
+			'agent_id'     => (int) $context['agent_id'],
+			'token_id'     => (int) $context['token_id'],
+			'issuer_type'  => (int) $context['agent_id'] > 0 ? ( (int) $context['token_id'] > 0 ? 'agent_token' : 'agent' ) : 'user',
+			'issued_at'    => $issued_at,
+			'nonce'        => $nonce,
+			'legacy_sender' => empty( $input['auth_ref'] ),
+		);
+		$grant['signature'] = hash_hmac( 'sha256', $this->mailboxGrantPayload( $input, $grant ), wp_salt( 'auth' ) );
+		return $grant;
+	}
+
+	private function verifyMailboxGrant( array $payload ): array|\WP_Error {
+		$grant = $payload['_mailbox_grant'] ?? null;
+		if ( ! is_array( $grant ) || empty( $grant['signature'] ) ) {
+			return new \WP_Error( 'email_queue_grant_missing', 'Queued email authorization is missing.' );
+		}
+		$expected = hash_hmac( 'sha256', $this->mailboxGrantPayload( $payload, $grant ), wp_salt( 'auth' ) );
+		if ( ! hash_equals( $expected, (string) $grant['signature'] ) ) {
+			return new \WP_Error( 'email_queue_grant_invalid', 'Queued email authorization is invalid.' );
+		}
+		return $grant;
+	}
+
+	private function mailboxGrantPayload( array $input, array $grant ): string {
+		$payload = $input;
+		unset( $payload['_attempt'], $payload['_mailbox_grant'] );
+		$payload = $this->canonicalizeGrantValue( $payload );
+		return implode( '|', array(
+			hash( 'sha256', serialize( $payload ) ),
+			(string) absint( $grant['user_id'] ?? 0 ),
+			(string) absint( $grant['agent_id'] ?? 0 ),
+			(string) absint( $grant['token_id'] ?? 0 ),
+			(string) ( $grant['issuer_type'] ?? '' ),
+			(string) absint( $grant['issued_at'] ?? 0 ),
+			(string) ( $grant['nonce'] ?? '' ),
+			! empty( $grant['legacy_sender'] ) ? '1' : '0',
+		) );
+	}
+
+	private function currentIssuerAuthorized( array $grant ): bool {
+		$user_id     = absint( $grant['user_id'] ?? 0 );
+		$agent_id    = absint( $grant['agent_id'] ?? 0 );
+		$token_id    = absint( $grant['token_id'] ?? 0 );
+		$issuer_type = (string) ( $grant['issuer_type'] ?? '' );
+		if ( $user_id <= 0 || ! get_user_by( 'id', $user_id ) ) {
+			return false;
+		}
+
+		if ( 'user' === $issuer_type ) {
+			return 0 === $agent_id && 0 === $token_id && $this->userHasQueueCapability( $user_id );
+		}
+		if ( ! in_array( $issuer_type, array( 'agent', 'agent_token' ), true ) || $agent_id <= 0 ) {
+			return false;
+		}
+
+		$agent = ( new Agents() )->get_agent( $agent_id );
+		if ( ! is_array( $agent ) || absint( $agent['owner_id'] ?? 0 ) !== $user_id ) {
+			return false;
+		}
+		if ( 'agent' === $issuer_type ) {
+			return 0 === $token_id && $this->userHasQueueCapability( $user_id );
+		}
+		if ( $token_id <= 0 ) {
+			return false;
+		}
+
+		$token = ( new AgentTokens() )->get_token( $token_id );
+		if ( ! $token instanceof \WP_Agent_Token || $token->is_expired() || $agent_id !== (int) $token->agent_id || $user_id !== $token->owner_user_id ) {
+			return false;
+		}
+		if ( ! $this->userHasQueueCapability( $user_id, $token->allowed_capabilities ) ) {
+			return false;
+		}
+
+		$scope = isset( $token->metadata['datamachine_scope'] ) && is_array( $token->metadata['datamachine_scope'] )
+			? $token->metadata['datamachine_scope']
+			: $token->allowed_capabilities;
+		return $this->scopeAllowsQueuedEmail( $scope );
+	}
+
+	private function userHasQueueCapability( int $user_id, ?array $ceiling = null ): bool {
+		foreach ( array( 'datamachine_use_tools', 'datamachine_manage_flows', 'datamachine_manage_settings', 'datamachine_manage_agents' ) as $capability ) {
+			if ( null !== $ceiling && ! in_array( $capability, $ceiling, true ) ) {
+				continue;
+			}
+			if ( user_can( $user_id, $capability ) || user_can( $user_id, 'manage_options' ) ) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	private function scopeAllowsQueuedEmail( ?array $payload ): bool {
+		$scope = AgentTokens::normalize_capability_payload( $payload )['stored_payload'];
+		if ( null === $scope || array_is_list( $scope ) ) {
+			return true;
+		}
+		$ability = 'datamachine/send-email-queued';
+		if ( in_array( $ability, (array) ( $scope['ability_deny'] ?? array() ), true ) ) {
+			return false;
+		}
+		if ( in_array( $ability, (array) ( $scope['ability_allow'] ?? array() ), true ) ) {
+			return true;
+		}
+		$categories = (array) ( $scope['ability_categories'] ?? array() );
+		return array() === $categories || in_array( 'datamachine-publishing', $categories, true );
+	}
+
+	private function canonicalizeGrantValue( array $value ): array {
+		if ( ! array_is_list( $value ) ) {
+			ksort( $value, SORT_STRING );
+		}
+		foreach ( $value as $key => $item ) {
+			if ( is_array( $item ) ) {
+				$value[ $key ] = $this->canonicalizeGrantValue( $item );
+			}
+		}
+		return $value;
+	}
+
+	private function canUseLegacySender(): bool {
+		if ( defined( 'WP_CLI' ) && WP_CLI ) {
+			return PermissionHelper::can_manage();
+		}
+		return PermissionHelper::acting_user_id() > 0 && PermissionHelper::can_manage();
 	}
 
 	/**

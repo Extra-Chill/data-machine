@@ -24,6 +24,12 @@ class EmailCommand extends BaseCommand {
 	 *
 	 * ## OPTIONS
 	 *
+	 * [--auth-ref=<ref>]
+	 * : Authorized mailbox ref. Required for non-management callers.
+	 *
+	 * [--mailbox=<name>]
+	 * : Mailbox name shorthand for email_imap:<name>.
+	 *
 	 * --to=<emails>
 	 * : Comma-separated recipient email addresses.
 	 *
@@ -71,6 +77,7 @@ class EmailCommand extends BaseCommand {
 		}
 
 		$input = array(
+			'auth_ref'     => $this->mailboxRef( $assoc_args, false ),
 			'to'           => $assoc_args['to'],
 			'subject'      => $assoc_args['subject'],
 			'body'         => $assoc_args['body'],
@@ -108,6 +115,12 @@ class EmailCommand extends BaseCommand {
 	 * invokes `datamachine/send-email` under the hood.
 	 *
 	 * ## OPTIONS
+	 *
+	 * [--auth-ref=<ref>]
+	 * : Authorized mailbox ref. Required for non-management callers.
+	 *
+	 * [--mailbox=<name>]
+	 * : Mailbox name shorthand for email_imap:<name>.
 	 *
 	 * --to=<emails>
 	 * : Comma-separated recipient email addresses.
@@ -175,6 +188,7 @@ class EmailCommand extends BaseCommand {
 		}
 
 		$input = array(
+			'auth_ref'     => $this->mailboxRef( $assoc_args, false ),
 			'to'           => $assoc_args['to'],
 			'subject'      => $assoc_args['subject'],
 			'body'         => $assoc_args['body'] ?? '',
@@ -224,6 +238,12 @@ class EmailCommand extends BaseCommand {
 	 * Fetch emails from IMAP inbox.
 	 *
 	 * ## OPTIONS
+	 *
+	 * [--auth-ref=<ref>]
+	 * : Authorized mailbox ref.
+	 *
+	 * [--mailbox=<name>]
+	 * : Mailbox name shorthand for email_imap:<name>.
 	 *
 	 * [--folder=<folder>]
 	 * : Mail folder to fetch from.
@@ -285,22 +305,13 @@ class EmailCommand extends BaseCommand {
 	 * @subcommand fetch
 	 */
 	public function fetch( array $args, array $assoc_args ): void {
-		$auth = $this->getAuthProvider();
-		if ( ! $auth || ! $auth->is_authenticated() ) {
-			WP_CLI::error( 'IMAP credentials not configured. Run: wp datamachine auth save email_imap' );
-		}
-
 		$ability = wp_get_ability( 'datamachine/fetch-email' );
 		if ( ! $ability ) {
 			WP_CLI::error( 'Fetch email ability not available.' );
 		}
 
 		$input = array(
-			'imap_host'            => $auth->getHost(),
-			'imap_port'            => $auth->getPort(),
-			'imap_encryption'      => $auth->getEncryption(),
-			'imap_user'            => $auth->getUser(),
-			'imap_password'        => $auth->getPassword(),
+			'auth_ref'             => $this->mailboxRef( $assoc_args ),
 			'folder'               => $assoc_args['folder'] ?? 'INBOX',
 			'search_criteria'      => $assoc_args['search'] ?? 'UNSEEN',
 			'max_messages'         => (int) ( $assoc_args['max'] ?? 10 ),
@@ -375,6 +386,12 @@ class EmailCommand extends BaseCommand {
 	 *
 	 * ## OPTIONS
 	 *
+	 * [--auth-ref=<ref>]
+	 * : Authorized mailbox ref.
+	 *
+	 * [--mailbox=<name>]
+	 * : Mailbox name shorthand for email_imap:<name>.
+	 *
 	 * <uid>
 	 * : Message UID to read.
 	 *
@@ -406,22 +423,13 @@ class EmailCommand extends BaseCommand {
 			WP_CLI::error( 'Invalid message UID.' );
 		}
 
-		$auth = $this->getAuthProvider();
-		if ( ! $auth || ! $auth->is_authenticated() ) {
-			WP_CLI::error( 'IMAP credentials not configured.' );
-		}
-
 		$ability = wp_get_ability( 'datamachine/fetch-email' );
 		if ( ! $ability ) {
 			WP_CLI::error( 'Fetch email ability not available.' );
 		}
 
 		$result = $ability->execute( array(
-			'imap_host'       => $auth->getHost(),
-			'imap_port'       => $auth->getPort(),
-			'imap_encryption' => $auth->getEncryption(),
-			'imap_user'       => $auth->getUser(),
-			'imap_password'   => $auth->getPassword(),
+			'auth_ref'        => $this->mailboxRef( $assoc_args ),
 			'folder'          => $assoc_args['folder'] ?? 'INBOX',
 			'uid'             => $uid,
 		) );
@@ -470,6 +478,12 @@ class EmailCommand extends BaseCommand {
 	 *
 	 * ## OPTIONS
 	 *
+	 * [--auth-ref=<ref>]
+	 * : Authorized mailbox ref.
+	 *
+	 * [--mailbox=<name>]
+	 * : Mailbox name shorthand for email_imap:<name>.
+	 *
 	 * --to=<email>
 	 * : Recipient email address.
 	 *
@@ -507,6 +521,7 @@ class EmailCommand extends BaseCommand {
 		}
 
 		$input = array(
+			'auth_ref'     => $this->mailboxRef( $assoc_args ),
 			'to'           => $assoc_args['to'],
 			'subject'      => $assoc_args['subject'],
 			'body'         => $assoc_args['body'],
@@ -533,6 +548,12 @@ class EmailCommand extends BaseCommand {
 	 * Delete an email from the server.
 	 *
 	 * ## OPTIONS
+	 *
+	 * [--auth-ref=<ref>]
+	 * : Authorized mailbox ref.
+	 *
+	 * [--mailbox=<name>]
+	 * : Mailbox name shorthand for email_imap:<name>.
 	 *
 	 * <uid>
 	 * : Message UID to delete.
@@ -569,6 +590,7 @@ class EmailCommand extends BaseCommand {
 		}
 
 		$result = $ability->execute( array(
+			'auth_ref' => $this->mailboxRef( $assoc_args ),
 			'uid'    => $uid,
 			'folder' => $assoc_args['folder'] ?? 'INBOX',
 		) );
@@ -588,6 +610,12 @@ class EmailCommand extends BaseCommand {
 	 * Move an email to a different folder.
 	 *
 	 * ## OPTIONS
+	 *
+	 * [--auth-ref=<ref>]
+	 * : Authorized mailbox ref.
+	 *
+	 * [--mailbox=<name>]
+	 * : Mailbox name shorthand for email_imap:<name>.
 	 *
 	 * <uid>
 	 * : Message UID to move.
@@ -622,6 +650,7 @@ class EmailCommand extends BaseCommand {
 		}
 
 		$result = $ability->execute( array(
+			'auth_ref'     => $this->mailboxRef( $assoc_args ),
 			'uid'         => $uid,
 			'destination' => $destination,
 			'folder'      => $assoc_args['folder'] ?? 'INBOX',
@@ -642,6 +671,12 @@ class EmailCommand extends BaseCommand {
 	 * Set or clear a flag on an email.
 	 *
 	 * ## OPTIONS
+	 *
+	 * [--auth-ref=<ref>]
+	 * : Authorized mailbox ref.
+	 *
+	 * [--mailbox=<name>]
+	 * : Mailbox name shorthand for email_imap:<name>.
 	 *
 	 * <uid>
 	 * : Message UID.
@@ -685,6 +720,7 @@ class EmailCommand extends BaseCommand {
 		}
 
 		$result = $ability->execute( array(
+			'auth_ref' => $this->mailboxRef( $assoc_args ),
 			'uid'    => $uid,
 			'flag'   => $flag,
 			'action' => $assoc_args['action'] ?? 'set',
@@ -706,6 +742,12 @@ class EmailCommand extends BaseCommand {
 	 * Move all emails matching a search to a folder.
 	 *
 	 * ## OPTIONS
+	 *
+	 * [--auth-ref=<ref>]
+	 * : Authorized mailbox ref.
+	 *
+	 * [--mailbox=<name>]
+	 * : Mailbox name shorthand for email_imap:<name>.
 	 *
 	 * --search=<criteria>
 	 * : IMAP search criteria (e.g., FROM "github.com", SUBJECT "newsletter").
@@ -754,6 +796,7 @@ class EmailCommand extends BaseCommand {
 		}
 
 		$result = $ability->execute( array(
+			'auth_ref'     => $this->mailboxRef( $assoc_args ),
 			'search'      => $search,
 			'destination' => $destination,
 			'folder'      => $assoc_args['folder'] ?? 'INBOX',
@@ -775,6 +818,12 @@ class EmailCommand extends BaseCommand {
 	 * Set or clear a flag on all emails matching a search.
 	 *
 	 * ## OPTIONS
+	 *
+	 * [--auth-ref=<ref>]
+	 * : Authorized mailbox ref.
+	 *
+	 * [--mailbox=<name>]
+	 * : Mailbox name shorthand for email_imap:<name>.
 	 *
 	 * --search=<criteria>
 	 * : IMAP search criteria.
@@ -833,6 +882,7 @@ class EmailCommand extends BaseCommand {
 		}
 
 		$result = $ability->execute( array(
+			'auth_ref' => $this->mailboxRef( $assoc_args ),
 			'search' => $search,
 			'flag'   => $flag,
 			'action' => $action,
@@ -855,6 +905,12 @@ class EmailCommand extends BaseCommand {
 	 * Delete all emails matching a search.
 	 *
 	 * ## OPTIONS
+	 *
+	 * [--auth-ref=<ref>]
+	 * : Authorized mailbox ref.
+	 *
+	 * [--mailbox=<name>]
+	 * : Mailbox name shorthand for email_imap:<name>.
 	 *
 	 * --search=<criteria>
 	 * : IMAP search criteria.
@@ -897,6 +953,7 @@ class EmailCommand extends BaseCommand {
 		}
 
 		$result = $ability->execute( array(
+			'auth_ref' => $this->mailboxRef( $assoc_args ),
 			'search' => $search,
 			'folder' => $assoc_args['folder'] ?? 'INBOX',
 			'max'    => (int) ( $assoc_args['max'] ?? 100 ),
@@ -920,6 +977,12 @@ class EmailCommand extends BaseCommand {
 	 * the unsubscribe via One-Click POST, URL GET, or mailto.
 	 *
 	 * ## OPTIONS
+	 *
+	 * [--auth-ref=<ref>]
+	 * : Authorized mailbox ref.
+	 *
+	 * [--mailbox=<name>]
+	 * : Mailbox name shorthand for email_imap:<name>.
 	 *
 	 * <uid>
 	 * : Message UID to unsubscribe from.
@@ -948,6 +1011,7 @@ class EmailCommand extends BaseCommand {
 		}
 
 		$result = $ability->execute( array(
+			'auth_ref' => $this->mailboxRef( $assoc_args ),
 			'uid'    => $uid,
 			'folder' => $assoc_args['folder'] ?? 'INBOX',
 		) );
@@ -970,6 +1034,12 @@ class EmailCommand extends BaseCommand {
 	 * From address using the most recent message's headers.
 	 *
 	 * ## OPTIONS
+	 *
+	 * [--auth-ref=<ref>]
+	 * : Authorized mailbox ref.
+	 *
+	 * [--mailbox=<name>]
+	 * : Mailbox name shorthand for email_imap:<name>.
 	 *
 	 * --search=<criteria>
 	 * : IMAP search criteria.
@@ -1013,6 +1083,7 @@ class EmailCommand extends BaseCommand {
 		}
 
 		$result = $ability->execute( array(
+			'auth_ref' => $this->mailboxRef( $assoc_args ),
 			'search' => $search,
 			'folder' => $assoc_args['folder'] ?? 'INBOX',
 			'max'    => (int) ( $assoc_args['max'] ?? 20 ),
@@ -1044,6 +1115,14 @@ class EmailCommand extends BaseCommand {
 	/**
 	 * Test the IMAP connection.
 	 *
+	 * ## OPTIONS
+	 *
+	 * [--auth-ref=<ref>]
+	 * : Authorized mailbox ref.
+	 *
+	 * [--mailbox=<name>]
+	 * : Mailbox name shorthand for email_imap:<name>.
+	 *
 	 * ## EXAMPLES
 	 *
 	 *     wp datamachine email test-connection
@@ -1056,7 +1135,7 @@ class EmailCommand extends BaseCommand {
 			WP_CLI::error( 'Email test connection ability not available.' );
 		}
 
-		$result = $ability->execute( array() );
+		$result = $ability->execute( array( 'auth_ref' => $this->mailboxRef( $assoc_args ) ) );
 
 		if ( is_wp_error( $result ) ) {
 			WP_CLI::error( $result->get_error_message() );
@@ -1086,5 +1165,13 @@ class EmailCommand extends BaseCommand {
 	private function getAuthProvider(): ?object {
 		$providers = apply_filters( 'datamachine_auth_providers', array() );
 		return $providers['email_imap'] ?? null;
+	}
+
+	private function mailboxRef( array $assoc_args, bool $default = true ): string {
+		$ref = trim( (string) ( $assoc_args['auth-ref'] ?? '' ) );
+		if ( '' === $ref && ! empty( $assoc_args['mailbox'] ) ) {
+			$ref = 'email_imap:' . trim( (string) $assoc_args['mailbox'] );
+		}
+		return '' !== $ref ? $ref : ( $default ? 'email_imap:default' : '' );
 	}
 }
