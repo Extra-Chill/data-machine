@@ -32,6 +32,7 @@ namespace {
 	define( 'ABSPATH', __DIR__ . '/' );
 	$GLOBALS['named_mailbox_options'] = array();
 	$GLOBALS['named_mailbox_audit']   = array();
+	$GLOBALS['named_mailbox_option_updates'] = array();
 
 	class WP_Error {
 		public function __construct( private string $code, private string $message = '', private array $data = array() ) {}
@@ -44,7 +45,7 @@ namespace {
 	function sanitize_key( $value ): string { return preg_replace( '/[^a-z0-9_\-]/', '', strtolower( (string) $value ) ); }
 	function user_can( int $user_id, string $capability ): bool { return 1 === $user_id; }
 	function get_site_option( string $name, $default = false ) { return $GLOBALS['named_mailbox_options'][ $name ] ?? $default; }
-	function update_site_option( string $name, $value ): bool { $GLOBALS['named_mailbox_options'][ $name ] = $value; return true; }
+	function update_site_option( string $name, $value ): bool { $GLOBALS['named_mailbox_options'][ $name ] = $value; $GLOBALS['named_mailbox_option_updates'][] = $value; return true; }
 	function wp_salt( string $scheme = 'auth' ): string { return 'named-mailbox-test-salt-' . $scheme; }
 	function apply_filters( string $hook, $value ) { return $value; }
 	function do_action( string $hook, ...$args ): void {
@@ -109,7 +110,10 @@ namespace {
 	$assert( is_wp_error( $auth->resolve_mailbox_for_principal( 'archive', 'read', array( 'agent_id' => 303 ) ) ), 'normalized revoke removes the live grant used by queued reauthorization' );
 
 	$assert( $auth->grant_agent( 'personal', BaseAuthProvider::AUTH_SCOPE_USER, 42, 303, array( 'read' ) ), 'delete/recreate fixture has a delegation' );
+	$updates_before_delete = count( $GLOBALS['named_mailbox_option_updates'] );
 	$assert( $auth->delete_named_account( 'personal', BaseAuthProvider::AUTH_SCOPE_USER, 42 ), 'named mailbox deletion succeeds' );
+	$delete_updates = array_slice( $GLOBALS['named_mailbox_option_updates'], $updates_before_delete );
+	$assert( 1 === count( $delete_updates ) && ! isset( $delete_updates[0]['email_imap']['principals']['user:42']['accounts']['personal'] ) && ! isset( $delete_updates[0]['email_imap']['delegations']['user:42']['personal'] ), 'one option mutation removes the account and exact delegation together' );
 	$assert( $auth->save_named_account( 'personal', $credentials( 'recreated@example.test' ), BaseAuthProvider::AUTH_SCOPE_USER, 42 ), 'same mailbox name can be recreated' );
 	$assert( is_wp_error( $auth->resolve_mailbox_for_principal( 'personal', 'read', array( 'agent_id' => 303 ) ) ), 'delete and recreate does not resurrect prior delegations' );
 

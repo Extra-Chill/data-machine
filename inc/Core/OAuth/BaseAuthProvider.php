@@ -435,7 +435,7 @@ abstract class BaseAuthProvider {
 	/**
 	 * @return string|null|false Scope key, null for site, or false when invalid.
 	 */
-	private function named_account_scope( string $owner_type, int $owner_id ) {
+	protected function named_account_scope( string $owner_type, int $owner_id ) {
 		if ( self::AUTH_SCOPE_SITE === $owner_type ) {
 			return null;
 		}

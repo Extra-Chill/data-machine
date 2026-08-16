@@ -43,6 +43,7 @@ $GLOBALS['ec_scheduled']       = array();
 $GLOBALS['ec_abilities']       = array();
 $GLOBALS['ec_action_id_seq']   = 1000;
 $GLOBALS['ec_manage_users']    = array( 1 => true );
+$GLOBALS['ec_users']           = array( 1 => true, 42 => true );
 
 if ( ! function_exists( 'add_filter' ) ) {
     function add_filter( string $hook, callable $cb, int $priority = 10, int $accepted_args = 1 ): bool {
@@ -127,6 +128,12 @@ if ( ! function_exists( 'is_email' ) ) {
 if ( ! function_exists( 'user_can' ) ) {
 	function user_can( int $user_id, string $capability ): bool {
 		return ! empty( $GLOBALS['ec_manage_users'][ $user_id ] );
+	}
+}
+
+if ( ! function_exists( 'get_user_by' ) ) {
+	function get_user_by( string $field, int $user_id ) {
+		return ! empty( $GLOBALS['ec_users'][ $user_id ] ) ? (object) array( 'ID' => $user_id ) : false;
 	}
 }
 
@@ -216,7 +223,18 @@ if ( ! function_exists( '__' ) ) {
  * -------------------------------------------------------------------------*/
 
 if ( ! class_exists( '\\DataMachine\\Abilities\\PermissionHelper' ) ) {
-	eval( 'namespace DataMachine\\Abilities; class PermissionHelper { public static bool $manage = true; public static int $user_id = 1; public static int $agent_id = 0; public static function can_manage(): bool { return self::$manage; } public static function can( string $action ): bool { return self::$manage; } public static function acting_user_id(): int { return self::$user_id; } public static function get_acting_agent_id(): ?int { return self::$agent_id ?: null; } }' );
+	eval( 'namespace DataMachine\\Abilities; class PermissionHelper { public static bool $manage = true; public static int $user_id = 1; public static int $agent_id = 0; public static int $token_id = 0; public static function can_manage(): bool { return self::$manage; } public static function can( string $action ): bool { return self::$manage; } public static function acting_user_id(): int { return self::$user_id; } public static function get_acting_agent_id(): ?int { return self::$agent_id ?: null; } public static function get_acting_token_id(): ?int { return self::$token_id ?: null; } }' );
+}
+
+if ( ! class_exists( 'WP_Agent_Token' ) ) {
+	class WP_Agent_Token {
+		public function __construct( public int $token_id, public string $agent_id, public int $owner_user_id, public ?array $allowed_capabilities = null, public array $metadata = array(), public bool $expired = false ) {}
+		public function is_expired(): bool { return $this->expired; }
+	}
+}
+
+if ( ! class_exists( '\\DataMachine\\Core\\Database\\Agents\\Agents' ) ) {
+	eval( 'namespace DataMachine\\Core\\Database\\Agents; class Agents { public static array $rows = array(); public function get_agent(int $agent_id): ?array { return self::$rows[$agent_id] ?? null; } } class AgentTokens { public static array $tokens = array(); public function get_token(int $token_id): ?\\WP_Agent_Token { return self::$tokens[$token_id] ?? null; } public static function normalize_capability_payload(?array $payload): array { if (null === $payload) { return array("allowed_capabilities" => null, "stored_payload" => null); } $is_list = array_is_list($payload); return array("allowed_capabilities" => $is_list ? $payload : (array) ($payload["capabilities"] ?? array()), "stored_payload" => $payload); } }' );
 }
 
 if ( ! class_exists( 'WP_Error' ) ) {
@@ -395,6 +413,12 @@ echo "\nCase 6: queued enqueue async\n";
 $GLOBALS['ec_scheduled'] = array();
 $queued = wp_get_ability( 'datamachine/send-email-queued' );
 
+\DataMachine\Abilities\PermissionHelper::$user_id = 0;
+$GLOBALS['ec_scheduled'] = array();
+$res = $queued->execute( array( 'to' => 'user@example.com', 'subject' => 'No issuer', 'body' => 'body' ) );
+ec_assert( 'queued email rejects principal-less ambient execution', false === ( $res['success'] ?? true ) && 0 === count( $GLOBALS['ec_scheduled'] ) );
+\DataMachine\Abilities\PermissionHelper::$user_id = 1;
+
 $res = $queued->execute( array(
 	'to'      => 'user@example.com',
 	'subject' => 'Subject',
@@ -541,6 +565,8 @@ add_filter( 'datamachine_auth_providers', static function ( array $providers ) u
 \DataMachine\Abilities\PermissionHelper::$manage   = false;
 \DataMachine\Abilities\PermissionHelper::$user_id  = 42;
 \DataMachine\Abilities\PermissionHelper::$agent_id = 303;
+$GLOBALS['ec_manage_users'][42] = true;
+\DataMachine\Core\Database\Agents\Agents::$rows[303] = array( 'owner_id' => 42 );
 $GLOBALS['ec_scheduled'] = array();
 $queued->execute( array(
 	'auth_ref' => 'email_imap:delegated',
@@ -557,6 +583,77 @@ ec_assert( 'worker rechecks and denies revoked mailbox grant', 0 === count( $GLO
 \DataMachine\Abilities\PermissionHelper::$manage   = true;
 \DataMachine\Abilities\PermissionHelper::$user_id  = 1;
 \DataMachine\Abilities\PermissionHelper::$agent_id = 0;
+
+echo "\nCase 10: queued named-mailbox issuer authority revalidation\n";
+$enqueue_named = static function () use ( $queued ): array {
+	$GLOBALS['ec_mailbox_revoked'] = false;
+	$GLOBALS['ec_scheduled']       = array();
+	$queued->execute( array( 'auth_ref' => 'email_imap:delegated', 'to' => 'user@example.com', 'subject' => 'Authority', 'body' => 'body' ) );
+	$scheduled = reset( $GLOBALS['ec_scheduled'] );
+	return $scheduled['args'][0] ?? array();
+};
+
+\DataMachine\Abilities\PermissionHelper::$user_id  = 1;
+\DataMachine\Abilities\PermissionHelper::$agent_id = 0;
+\DataMachine\Abilities\PermissionHelper::$token_id = 0;
+$user_payload = $enqueue_named();
+$GLOBALS['ec_manage_users'][1] = false;
+$GLOBALS['ec_wp_mail_calls']   = array();
+$worker->runWorker( $user_payload );
+ec_assert( 'named queue denies user capability demotion after enqueue', 0 === count( $GLOBALS['ec_wp_mail_calls'] ) );
+$GLOBALS['ec_manage_users'][1] = true;
+$user_payload = $enqueue_named();
+$GLOBALS['ec_users'][1]        = false;
+$GLOBALS['ec_wp_mail_calls']   = array();
+$worker->runWorker( $user_payload );
+ec_assert( 'named queue denies deleted user after enqueue', 0 === count( $GLOBALS['ec_wp_mail_calls'] ) );
+$GLOBALS['ec_users'][1] = true;
+
+\DataMachine\Abilities\PermissionHelper::$user_id  = 42;
+\DataMachine\Abilities\PermissionHelper::$agent_id = 303;
+$agent_payload = $enqueue_named();
+unset( \DataMachine\Core\Database\Agents\Agents::$rows[303] );
+$GLOBALS['ec_wp_mail_calls'] = array();
+$worker->runWorker( $agent_payload );
+ec_assert( 'named queue denies deleted agent after enqueue', 0 === count( $GLOBALS['ec_wp_mail_calls'] ) );
+\DataMachine\Core\Database\Agents\Agents::$rows[303] = array( 'owner_id' => 42 );
+$agent_payload = $enqueue_named();
+$GLOBALS['ec_manage_users'][42] = false;
+$GLOBALS['ec_wp_mail_calls']    = array();
+$worker->runWorker( $agent_payload );
+ec_assert( 'named queue denies revoked agent owner capability ceiling', 0 === count( $GLOBALS['ec_wp_mail_calls'] ) );
+$GLOBALS['ec_manage_users'][42] = true;
+
+\DataMachine\Abilities\PermissionHelper::$token_id = 900;
+$valid_token = static fn ( ?array $caps = array( 'datamachine_use_tools' ), array $metadata = array() ): WP_Agent_Token => new WP_Agent_Token( 900, '303', 42, $caps, $metadata );
+\DataMachine\Core\Database\Agents\AgentTokens::$tokens[900] = $valid_token();
+$valid_token_payload = $enqueue_named();
+$GLOBALS['ec_wp_mail_calls'] = array();
+$worker->runWorker( $valid_token_payload );
+ec_assert( 'named queue allows unchanged live token authority', 1 === count( $GLOBALS['ec_wp_mail_calls'] ) );
+
+$GLOBALS['ec_scheduled'] = array();
+$token_payload = $enqueue_named();
+unset( \DataMachine\Core\Database\Agents\AgentTokens::$tokens[900] );
+$GLOBALS['ec_wp_mail_calls'] = array();
+$worker->runWorker( $token_payload );
+ec_assert( 'named queue denies revoked token after enqueue', 0 === count( $GLOBALS['ec_wp_mail_calls'] ) );
+
+\DataMachine\Core\Database\Agents\AgentTokens::$tokens[900] = $valid_token();
+$token_payload = $enqueue_named();
+\DataMachine\Core\Database\Agents\AgentTokens::$tokens[900] = $valid_token( array() );
+$GLOBALS['ec_wp_mail_calls'] = array();
+$worker->runWorker( $token_payload );
+ec_assert( 'named queue denies narrowed token capability ceiling', 0 === count( $GLOBALS['ec_wp_mail_calls'] ) );
+
+\DataMachine\Core\Database\Agents\AgentTokens::$tokens[900] = $valid_token();
+$token_payload = $enqueue_named();
+$denied_scope = array( 'capabilities' => array( 'datamachine_use_tools' ), 'ability_deny' => array( 'datamachine/send-email-queued' ) );
+\DataMachine\Core\Database\Agents\AgentTokens::$tokens[900] = $valid_token( array( 'datamachine_use_tools' ), array( 'datamachine_scope' => $denied_scope ) );
+$GLOBALS['ec_wp_mail_calls'] = array();
+$worker->runWorker( $token_payload );
+ec_assert( 'named queue denies revoked token ability scope', 0 === count( $GLOBALS['ec_wp_mail_calls'] ) );
+\DataMachine\Abilities\PermissionHelper::$token_id = 0;
 
 /* ---------------------------------------------------------------------------
  * Summary

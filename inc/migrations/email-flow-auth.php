@@ -20,10 +20,11 @@ function datamachine_migrate_legacy_email_flow_auth(): void {
 	}
 
 	global $wpdb;
-	$table = $wpdb->prefix . 'datamachine_flows';
+	$table      = $wpdb->prefix . 'datamachine_flows';
+	$repository = new \DataMachine\Core\Database\Flows\Flows();
 
 	// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- Trusted table name; one-time migration.
-	$flows = $wpdb->get_results( "SELECT flow_id, agent_id, flow_config FROM {$table} WHERE agent_id > 0", ARRAY_A );
+	$flows = $wpdb->get_results( "SELECT flow_id, agent_id FROM {$table} WHERE agent_id > 0", ARRAY_A );
 	if ( ! is_array( $flows ) ) {
 		return;
 	}
@@ -31,45 +32,61 @@ function datamachine_migrate_legacy_email_flow_auth(): void {
 	foreach ( $flows as $flow ) {
 		$flow_id = absint( $flow['flow_id'] ?? 0 );
 		$agent_id = absint( $flow['agent_id'] ?? 0 );
-		$config   = json_decode( (string) ( $flow['flow_config'] ?? '' ), true );
-		if ( $flow_id <= 0 || $agent_id <= 0 || ! is_array( $config ) ) {
+		if ( $flow_id <= 0 || $agent_id <= 0 ) {
 			continue;
 		}
 
-		$changed = false;
-		foreach ( $config as $flow_step_id => &$step ) {
-			if ( ! is_array( $step ) || ! in_array( 'email', (array) ( $step['handler_slugs'] ?? array() ), true ) ) {
-				continue;
+		$handled = false;
+		for ( $attempt = 0; $attempt < 3; ++$attempt ) {
+			$expected_json = $repository->get_flow_config_json( $flow_id );
+			$config        = null === $expected_json ? null : json_decode( $expected_json, true );
+			if ( ! is_array( $config ) ) {
+				$handled = true;
+				break;
 			}
-			$email_config = $step['handler_configs']['email'] ?? null;
-			if ( ! is_array( $email_config ) || ! empty( $email_config['auth_ref'] ) ) {
-				continue;
+
+			$changed = datamachine_mark_legacy_email_flow_auth_config( $config, $flow_id, $agent_id );
+			if ( ! $changed ) {
+				$handled = true;
+				break;
 			}
-
-			$step['handler_configs']['email']['_legacy_default_auth'] = \DataMachine\Core\Steps\Fetch\Handlers\Email\EmailAuth::legacy_default_marker(
-				$flow_id,
-				(string) $flow_step_id,
-				$agent_id
-			);
-			$changed = true;
+			if ( $repository->compare_and_swap_flow_config( $flow_id, $expected_json, $config ) ) {
+				$handled = true;
+				break;
+			}
 		}
-		unset( $step );
-
-		if ( ! $changed ) {
-			continue;
-		}
-
-		$updated = $wpdb->update(
-			$table,
-			array( 'flow_config' => wp_json_encode( $config ) ),
-			array( 'flow_id' => $flow_id ),
-			array( '%s' ),
-			array( '%d' )
-		);
-		if ( false === $updated ) {
+		if ( ! $handled ) {
 			return;
 		}
 	}
 
 	update_option( 'datamachine_legacy_email_flow_auth_migrated', 1, true );
+}
+
+/**
+ * Add exact legacy markers to one decoded flow config.
+ *
+ * @param array<string,mixed> $config Flow config, mutated by reference.
+ */
+function datamachine_mark_legacy_email_flow_auth_config( array &$config, int $flow_id, int $agent_id ): bool {
+	$changed = false;
+	foreach ( $config as $flow_step_id => &$step ) {
+		if ( ! is_array( $step ) || ! in_array( 'email', (array) ( $step['handler_slugs'] ?? array() ), true ) ) {
+			continue;
+		}
+		$email_config = $step['handler_configs']['email'] ?? null;
+		if ( ! is_array( $email_config ) || ! empty( $email_config['auth_ref'] ) || ! empty( $email_config['_legacy_default_auth'] ) ) {
+			continue;
+		}
+
+		$step['handler_configs']['email']['_legacy_default_auth'] = \DataMachine\Core\Steps\Fetch\Handlers\Email\EmailAuth::legacy_default_marker(
+			$flow_id,
+			(string) $flow_step_id,
+			$agent_id
+		);
+		$changed = true;
+	}
+	unset( $step );
+
+	return $changed;
 }

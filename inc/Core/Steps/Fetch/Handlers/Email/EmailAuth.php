@@ -296,22 +296,30 @@ class EmailAuth extends BaseAuthProvider {
 
 	public function delete_named_account( string $account_name, string $owner_type = self::AUTH_SCOPE_SITE, int $owner_id = 0 ): bool {
 		$account_name = $this->normalize_named_account_name( $account_name );
-		if ( '' === $account_name ) {
+		$scope        = $this->named_account_scope( $owner_type, $owner_id );
+		if ( '' === $account_name || false === $scope ) {
 			return false;
 		}
 
-		$data      = get_site_option( 'datamachine_auth_data', array() );
-		$owner_key = $owner_type . ':' . $owner_id;
-		if ( isset( $data['email_imap']['delegations'][ $owner_key ][ $account_name ] ) ) {
-			unset( $data['email_imap']['delegations'][ $owner_key ][ $account_name ] );
-			update_site_option( 'datamachine_auth_data', $data );
-			$current = get_site_option( 'datamachine_auth_data', array() );
-			if ( isset( $current['email_imap']['delegations'][ $owner_key ][ $account_name ] ) ) {
-				return false;
-			}
+		$data       = get_site_option( 'datamachine_auth_data', array() );
+		$owner_id   = self::AUTH_SCOPE_SITE === $owner_type ? 0 : $owner_id;
+		$owner_key  = $owner_type . ':' . $owner_id;
+		$has_grants = isset( $data['email_imap']['delegations'][ $owner_key ][ $account_name ] );
+		$has_account = null === $scope
+			? isset( $data['email_imap']['accounts'][ $account_name ] )
+			: isset( $data['email_imap']['principals'][ $scope ]['accounts'][ $account_name ] );
+		if ( ! $has_account && ! $has_grants ) {
+			return true;
 		}
 
-		return parent::delete_named_account( $account_name, $owner_type, $owner_id );
+		if ( null === $scope ) {
+			unset( $data['email_imap']['accounts'][ $account_name ] );
+		} else {
+			unset( $data['email_imap']['principals'][ $scope ]['accounts'][ $account_name ] );
+		}
+		unset( $data['email_imap']['delegations'][ $owner_key ][ $account_name ] );
+
+		return update_site_option( 'datamachine_auth_data', $data );
 	}
 
 	private function user_can_manage_agent_owner( int $user_id, int $agent_id ): bool {

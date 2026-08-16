@@ -13,6 +13,28 @@ namespace DataMachine\Core\Steps\Fetch\Handlers\Email {
 	}
 }
 
+namespace DataMachine\Core\Database\Flows {
+	class Flows {
+		public function get_flow_config_json( int $flow_id ): ?string {
+			return $GLOBALS['wpdb']->flows[ $flow_id ]['flow_config'] ?? null;
+		}
+		public function compare_and_swap_flow_config( int $flow_id, string $expected, array $replacement ): bool {
+			if ( ! empty( $GLOBALS['migration_conflict_once'] ) ) {
+				$GLOBALS['migration_conflict_once'] = false;
+				$concurrent = json_decode( $GLOBALS['wpdb']->flows[ $flow_id ]['flow_config'], true );
+				$concurrent['step-email']['handler_configs']['email']['folder'] = 'Concurrent Edit';
+				$GLOBALS['wpdb']->flows[ $flow_id ]['flow_config'] = json_encode( $concurrent );
+				return false;
+			}
+			if ( $expected !== ( $GLOBALS['wpdb']->flows[ $flow_id ]['flow_config'] ?? null ) ) {
+				return false;
+			}
+			$GLOBALS['wpdb']->flows[ $flow_id ]['flow_config'] = json_encode( $replacement );
+			return true;
+		}
+	}
+}
+
 namespace {
 	define( 'ABSPATH', __DIR__ . '/' );
 	define( 'ARRAY_A', 'ARRAY_A' );
@@ -29,15 +51,6 @@ namespace {
 		public function get_results( string $query, string $format ): array {
 			return array_values( array_filter( $this->flows, static fn ( array $flow ): bool => (int) $flow['agent_id'] > 0 ) );
 		}
-		public function update( string $table, array $data, array $where, array $formats, array $where_formats ): int|false {
-			foreach ( $this->flows as &$flow ) {
-				if ( (int) $flow['flow_id'] === (int) $where['flow_id'] ) {
-					$flow['flow_config'] = $data['flow_config'];
-					return 1;
-				}
-			}
-			return false;
-		}
 	}
 
 	$legacy_config = array(
@@ -48,19 +61,22 @@ namespace {
 	);
 	$new_config = $legacy_config;
 	$GLOBALS['wpdb'] = new EmailFlowMigrationWpdb();
-	$GLOBALS['wpdb']->flows[1] = array( 'flow_id' => 91, 'agent_id' => 303, 'flow_config' => json_encode( $legacy_config ) );
+	$GLOBALS['wpdb']->flows[91] = array( 'flow_id' => 91, 'agent_id' => 303, 'flow_config' => json_encode( $legacy_config ) );
+	$GLOBALS['migration_conflict_once'] = true;
 
 	require_once __DIR__ . '/../inc/migrations/email-flow-auth.php';
 	datamachine_migrate_legacy_email_flow_auth();
 
-	$migrated = json_decode( $GLOBALS['wpdb']->flows[1]['flow_config'], true );
+	$migrated = json_decode( $GLOBALS['wpdb']->flows[91]['flow_config'], true );
 	$legacy_marker = $migrated['step-email']['handler_configs']['email']['_legacy_default_auth'] ?? '';
-	$passed = 'signed:91:step-email:303' === $legacy_marker;
+	$passed = 'signed:91:step-email:303' === $legacy_marker
+		&& 'Concurrent Edit' === ( $migrated['step-email']['handler_configs']['email']['folder'] ?? '' );
 	echo ( $passed ? 'PASS' : 'FAIL' ) . ": existing persisted flow receives bound marker\n";
+	echo ( $passed ? 'PASS' : 'FAIL' ) . ": CAS retry preserves concurrent flow edit\n";
 
-	$GLOBALS['wpdb']->flows[2] = array( 'flow_id' => 92, 'agent_id' => 303, 'flow_config' => json_encode( $new_config ) );
+	$GLOBALS['wpdb']->flows[92] = array( 'flow_id' => 92, 'agent_id' => 303, 'flow_config' => json_encode( $new_config ) );
 	datamachine_migrate_legacy_email_flow_auth();
-	$new_after = json_decode( $GLOBALS['wpdb']->flows[2]['flow_config'], true );
+	$new_after = json_decode( $GLOBALS['wpdb']->flows[92]['flow_config'], true );
 	$new_unmarked = ! isset( $new_after['step-email']['handler_configs']['email']['_legacy_default_auth'] );
 	echo ( $new_unmarked ? 'PASS' : 'FAIL' ) . ": newly created omission remains unmarked and denied\n";
 
