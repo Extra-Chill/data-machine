@@ -210,7 +210,13 @@ class EmailAuth extends BaseAuthProvider {
 
 	private function can_use_legacy_default( array $context, int $agent_id, int $user_id ): bool {
 		if ( $agent_id > 0 ) {
-			return false;
+			$expected = self::legacy_default_marker(
+				absint( $context['flow_id'] ?? 0 ),
+				(string) ( $context['flow_step_id'] ?? '' ),
+				$agent_id
+			);
+			$provided = (string) ( $context['legacy_default_auth'] ?? '' );
+			return ! empty( $context['_trusted_execution'] ) && '' !== $provided && hash_equals( $expected, $provided );
 		}
 		if ( ! empty( $context['principal_less_system'] ) && ! empty( $context['_trusted_execution'] ) ) {
 			return true;
@@ -221,7 +227,13 @@ class EmailAuth extends BaseAuthProvider {
 		return $this->user_has_management_capability( $user_id );
 	}
 
+	public static function legacy_default_marker( int $flow_id, string $flow_step_id, int $agent_id ): string {
+		$payload = implode( '|', array( 'email-default-v1', (string) $flow_id, $flow_step_id, (string) $agent_id ) );
+		return hash_hmac( 'sha256', $payload, wp_salt( 'auth' ) );
+	}
+
 	public function grant_agent( string $account, string $owner_type, int $owner_id, int $agent_id, array $operations ): bool {
+		$account = $this->normalize_named_account_name( $account );
 		if ( $agent_id <= 0 || null === $this->get_named_account( $account, $owner_type, $owner_id ) ) {
 			return false;
 		}
@@ -244,7 +256,7 @@ class EmailAuth extends BaseAuthProvider {
 			return false;
 		}
 		$data = get_site_option( 'datamachine_auth_data', array() );
-		$data['email_imap']['delegations'][ $owner_type . ':' . $owner_id ][ strtolower( $account ) ][ 'agent:' . $agent_id ] = array(
+		$data['email_imap']['delegations'][ $owner_type . ':' . $owner_id ][ $account ][ 'agent:' . $agent_id ] = array(
 			'operations' => $operations,
 			'granted_at' => gmdate( 'c' ),
 			'granted_by' => $acting_user,
@@ -253,6 +265,10 @@ class EmailAuth extends BaseAuthProvider {
 	}
 
 	public function revoke_agent( string $account, string $owner_type, int $owner_id, int $agent_id ): bool {
+		$account = $this->normalize_named_account_name( $account );
+		if ( '' === $account || $agent_id <= 0 ) {
+			return false;
+		}
 		$acting_agent = class_exists( PermissionHelper::class ) ? absint( PermissionHelper::get_acting_agent_id() ) : 0;
 		$acting_user  = class_exists( PermissionHelper::class ) ? absint( PermissionHelper::acting_user_id() ) : 0;
 		if ( $acting_agent > 0 && ( self::AUTH_SCOPE_AGENT !== $owner_type || $acting_agent !== $owner_id ) ) {
@@ -273,7 +289,29 @@ class EmailAuth extends BaseAuthProvider {
 			return true;
 		}
 		unset( $data['email_imap']['delegations'][ $key ][ $account ][ 'agent:' . $agent_id ] );
-		return update_site_option( 'datamachine_auth_data', $data );
+		update_site_option( 'datamachine_auth_data', $data );
+		$current = get_site_option( 'datamachine_auth_data', array() );
+		return ! isset( $current['email_imap']['delegations'][ $key ][ $account ][ 'agent:' . $agent_id ] );
+	}
+
+	public function delete_named_account( string $account_name, string $owner_type = self::AUTH_SCOPE_SITE, int $owner_id = 0 ): bool {
+		$account_name = $this->normalize_named_account_name( $account_name );
+		if ( '' === $account_name ) {
+			return false;
+		}
+
+		$data      = get_site_option( 'datamachine_auth_data', array() );
+		$owner_key = $owner_type . ':' . $owner_id;
+		if ( isset( $data['email_imap']['delegations'][ $owner_key ][ $account_name ] ) ) {
+			unset( $data['email_imap']['delegations'][ $owner_key ][ $account_name ] );
+			update_site_option( 'datamachine_auth_data', $data );
+			$current = get_site_option( 'datamachine_auth_data', array() );
+			if ( isset( $current['email_imap']['delegations'][ $owner_key ][ $account_name ] ) ) {
+				return false;
+			}
+		}
+
+		return parent::delete_named_account( $account_name, $owner_type, $owner_id );
 	}
 
 	private function user_can_manage_agent_owner( int $user_id, int $agent_id ): bool {

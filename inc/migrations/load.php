@@ -15,6 +15,7 @@ require_once __DIR__ . '/scaffolding.php';
 require_once __DIR__ . '/site-md.php';
 require_once __DIR__ . '/agents-md.php';
 require_once __DIR__ . '/flows.php';
+require_once __DIR__ . '/email-flow-auth.php';
 require_once __DIR__ . '/bundle-artifacts.php';
 require_once __DIR__ . '/run-metadata.php';
 require_once __DIR__ . '/processed-item-claims.php';

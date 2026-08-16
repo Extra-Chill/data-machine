@@ -12,6 +12,7 @@ $api        = (string) file_get_contents( $root . '/inc/Api/Email.php' );
 $cli        = (string) file_get_contents( $root . '/inc/Cli/Commands/EmailCommand.php' );
 $handler    = (string) file_get_contents( $root . '/inc/Core/Steps/Fetch/Handlers/Email/Email.php' );
 $queue      = (string) file_get_contents( $root . '/inc/Abilities/Publish/SendEmailQueuedAbility.php' );
+$migration  = (string) file_get_contents( $root . '/inc/migrations/email-flow-auth.php' );
 $failures   = array();
 
 $assert = static function ( bool $condition, string $message ) use ( &$failures ): void {
@@ -34,6 +35,8 @@ $assert( substr_count( $api, '...self::mailbox_args()' ) >= 12 && str_contains( 
 $assert( str_contains( $api, "'auth_ref' => array(" ) && str_contains( $api, "'mailbox'  => array(" ), 'REST schema declares auth_ref and mailbox' );
 $assert( substr_count( $cli, '[--auth-ref=<ref>]' ) >= 14 && substr_count( $cli, '[--mailbox=<name>]' ) >= 14, 'all email CLI commands document both mailbox selectors' );
 $assert( str_contains( $handler, "null === \$context->getAgentId() && 0 === get_current_user_id()" ), 'legacy omission compatibility is limited to unscoped system execution' );
+$assert( str_contains( $handler, "'legacy_default_auth' => (string) ( \$config['_legacy_default_auth'] ?? '' )" ), 'email handler forwards only the persisted legacy marker' );
+$assert( str_contains( $migration, "WHERE agent_id > 0" ) && str_contains( $migration, "! empty( \$email_config['auth_ref'] )" ), 'legacy migration targets persisted agent flows that omitted auth_ref' );
 $assert( strpos( $queue, 'verifyMailboxGrant( $payload )' ) < strpos( $queue, "wp_get_ability( 'datamachine/send-email' )" ), 'queue worker verifies signed authorization before ability execution' );
 
 if ( $failures ) {

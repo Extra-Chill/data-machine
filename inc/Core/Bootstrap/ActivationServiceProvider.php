@@ -121,6 +121,7 @@ final class ActivationServiceProvider {
 	public static function activate_for_site(): void {
 		self::register_capabilities();
 		self::ensure_all_tables();
+		datamachine_migrate_legacy_email_flow_auth();
 
 		if ( ! datamachine_ensure_default_memory_files() ) {
 			set_transient( 'datamachine_needs_scaffold', 1, HOUR_IN_SECONDS );

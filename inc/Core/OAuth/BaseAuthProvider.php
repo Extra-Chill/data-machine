@@ -427,7 +427,7 @@ abstract class BaseAuthProvider {
 		return $matches;
 	}
 
-	private function normalize_named_account_name( string $account_name ): string {
+	protected function normalize_named_account_name( string $account_name ): string {
 		$account_name = strtolower( trim( $account_name ) );
 		return preg_match( '/^[a-z0-9][a-z0-9._-]*$/', $account_name ) ? $account_name : '';
 	}

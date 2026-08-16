@@ -255,7 +255,10 @@ class SendEmailAbility {
 			$config['reply_to']   = $resolved['credentials']['imap_user'];
 			$config['from_name']  = (string) ( $resolved['credentials']['display_name'] ?? '' );
 		} else {
-			if ( ! $this->canUseLegacySender() && ( ! is_array( $queued_context ) || empty( $queued_context['legacy_sender'] ) ) ) {
+			$legacy_sender_allowed = is_array( $queued_context )
+				? ! empty( $queued_context['legacy_sender'] ) && $this->userCanManageLegacySender( absint( $queued_context['user_id'] ?? 0 ) )
+				: $this->canUseLegacySender();
+			if ( ! $legacy_sender_allowed ) {
 				return new \WP_Error( 'email_auth_ref_required', 'An authorized mailbox ref is required to send email.', array( 'status' => 403 ) );
 			}
 		}
@@ -560,6 +563,18 @@ class SendEmailAbility {
 			return PermissionHelper::can_manage();
 		}
 		return PermissionHelper::acting_user_id() > 0 && PermissionHelper::can_manage();
+	}
+
+	private function userCanManageLegacySender( int $user_id ): bool {
+		if ( $user_id <= 0 || ! function_exists( 'user_can' ) ) {
+			return false;
+		}
+		foreach ( array( 'manage_options', 'datamachine_manage_flows', 'datamachine_manage_settings', 'datamachine_manage_agents' ) as $capability ) {
+			if ( user_can( $user_id, $capability ) ) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	/**

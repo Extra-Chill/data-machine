@@ -42,6 +42,7 @@ $GLOBALS['ec_is_multisite']    = true;
 $GLOBALS['ec_scheduled']       = array();
 $GLOBALS['ec_abilities']       = array();
 $GLOBALS['ec_action_id_seq']   = 1000;
+$GLOBALS['ec_manage_users']    = array( 1 => true );
 
 if ( ! function_exists( 'add_filter' ) ) {
     function add_filter( string $hook, callable $cb, int $priority = 10, int $accepted_args = 1 ): bool {
@@ -121,6 +122,12 @@ if ( ! function_exists( 'is_email' ) ) {
     	}
     	return preg_match( '/^[^@\s]+@[^@\s]+\.[^@\s]+$/', $email ) ? $email : false;
     }
+}
+
+if ( ! function_exists( 'user_can' ) ) {
+	function user_can( int $user_id, string $capability ): bool {
+		return ! empty( $GLOBALS['ec_manage_users'][ $user_id ] );
+	}
 }
 
 if ( ! function_exists( 'get_bloginfo' ) ) {
@@ -400,6 +407,13 @@ $first = reset( $GLOBALS['ec_scheduled'] );
 ec_assert( 'queued async used async action', ( $first['kind'] ?? '' ) === 'async' );
 ec_assert( 'queued async hook is worker', ( $first['hook'] ?? '' ) === 'datamachine_send_email_worker' );
 $legacy_payload = $first['args'][0] ?? array();
+
+$GLOBALS['ec_manage_users'][1] = false;
+$GLOBALS['ec_wp_mail_calls']    = array();
+$worker_for_demotion = new \DataMachine\Abilities\Publish\SendEmailQueuedAbility();
+$worker_for_demotion->runWorker( $legacy_payload );
+ec_assert( 'legacy queued send denies issuer demoted after enqueue', 0 === count( $GLOBALS['ec_wp_mail_calls'] ) );
+$GLOBALS['ec_manage_users'][1] = true;
 
 \DataMachine\Abilities\PermissionHelper::$manage  = false;
 \DataMachine\Abilities\PermissionHelper::$user_id = 2;

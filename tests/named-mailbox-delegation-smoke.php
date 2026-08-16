@@ -94,6 +94,9 @@ namespace {
 	$assert( is_wp_error( $auth->resolve_mailbox_for_principal( 'personal', 'delete', array( 'agent_id' => 303 ) ) ), 'undelegated delete is denied' );
 	$assert( is_wp_error( $auth->resolve_mailbox_for_principal( 'personal', 'read', array( 'agent_id' => 404 ) ) ), 'undelegated agent is denied' );
 	$assert( is_wp_error( $auth->resolve_mailbox_for_principal( 'default', 'read', array( 'agent_id' => 404 ) ) ), 'agent denial never falls back to legacy default' );
+	$legacy_marker = EmailAuth::legacy_default_marker( 91, 'step-email', 303 );
+	$assert( ! is_wp_error( $auth->resolve_mailbox_for_principal( 'default', 'read', array( 'agent_id' => 303, 'flow_id' => 91, 'flow_step_id' => 'step-email', 'legacy_default_auth' => $legacy_marker ) ) ), 'migrated legacy agent flow retains default mailbox access' );
+	$assert( is_wp_error( $auth->resolve_mailbox_for_principal( 'default', 'read', array( 'agent_id' => 303, 'flow_id' => 92, 'flow_step_id' => 'step-email', 'legacy_default_auth' => $legacy_marker ) ) ), 'legacy marker cannot be copied to a newly created flow' );
 	$assert( ! is_wp_error( $auth->resolve_mailbox( 'default', 'read' ) ), 'legacy default remains compatible for administrators' );
 	PermissionHelper::$user_id = 2;
 	$assert( is_wp_error( $auth->resolve_mailbox( 'default', 'read' ) ), 'lower-privilege user cannot resolve legacy default' );
@@ -101,6 +104,14 @@ namespace {
 	$assert( is_wp_error( $auth->resolve_mailbox( 'default', 'read' ) ), 'principal-less pre-auth context cannot resolve legacy default' );
 	$assert( is_wp_error( $auth->resolve_mailbox_for_principal( 'default', 'read', array( 'agent_id' => 303, 'principal_less_system' => true ) ) ), 'new agent flow omission cannot opt into legacy default' );
 	PermissionHelper::$user_id = 1;
+	$assert( $auth->grant_agent( 'archive', BaseAuthProvider::AUTH_SCOPE_USER, 42, 303, array( 'read' ) ), 'mixed-case revoke fixture is delegated' );
+	$assert( $auth->revoke_agent( '  ArChIvE  ', BaseAuthProvider::AUTH_SCOPE_USER, 42, 303 ), 'revoke normalizes mailbox name identically to grant' );
+	$assert( is_wp_error( $auth->resolve_mailbox_for_principal( 'archive', 'read', array( 'agent_id' => 303 ) ) ), 'normalized revoke removes the live grant used by queued reauthorization' );
+
+	$assert( $auth->grant_agent( 'personal', BaseAuthProvider::AUTH_SCOPE_USER, 42, 303, array( 'read' ) ), 'delete/recreate fixture has a delegation' );
+	$assert( $auth->delete_named_account( 'personal', BaseAuthProvider::AUTH_SCOPE_USER, 42 ), 'named mailbox deletion succeeds' );
+	$assert( $auth->save_named_account( 'personal', $credentials( 'recreated@example.test' ), BaseAuthProvider::AUTH_SCOPE_USER, 42 ), 'same mailbox name can be recreated' );
+	$assert( is_wp_error( $auth->resolve_mailbox_for_principal( 'personal', 'read', array( 'agent_id' => 303 ) ) ), 'delete and recreate does not resurrect prior delegations' );
 
 	$raw = get_site_option( 'datamachine_auth_data', array() );
 	$assert( str_starts_with( $raw['email_imap']['principals']['user:42']['accounts']['personal']['imap_password'], 'dm:enc:v1:' ), 'IMAP passwords are encrypted at rest' );
