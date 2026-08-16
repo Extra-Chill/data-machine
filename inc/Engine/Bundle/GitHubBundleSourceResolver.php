@@ -41,10 +41,12 @@ final class GitHubBundleSourceResolver implements BundleSourceResolverInterface 
 		}
 
 		if ( preg_match( '#^https?://github\.com/([^/]+)/([^/]+)/blob/(.+)$#i', $url, $m ) ) {
+			// phpcs:ignore PluginCheck.CodeAnalysis.Offloading.OffloadedContent -- A user-selected GitHub bundle file is mapped only to GitHub's official raw-download endpoint, never to plugin-hosted content.
 			return "https://raw.githubusercontent.com/{$m[1]}/{$m[2]}/{$m[3]}";
 		}
 
 		if ( preg_match( '#^https?://github\.com/([^/]+)/([^/]+)/raw/(.+)$#i', $url, $m ) ) {
+			// phpcs:ignore PluginCheck.CodeAnalysis.Offloading.OffloadedContent -- A user-selected GitHub bundle file is mapped only to GitHub's official raw-download endpoint, never to plugin-hosted content.
 			return "https://raw.githubusercontent.com/{$m[1]}/{$m[2]}/{$m[3]}";
 		}
 

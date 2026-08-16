@@ -115,6 +115,7 @@ final class GitHubBundleSourceAuthResolver implements BundleSourceAuthResolverIn
 
 	private function is_github_host( string $host ): bool {
 		return 'github.com' === $host
+			// phpcs:ignore PluginCheck.CodeAnalysis.Offloading.OffloadedContent -- User-directed GitHub bundle retrieval may authenticate GitHub's official raw endpoint; no plugin content is offloaded.
 			|| 'raw.githubusercontent.com' === $host
 			|| 'api.github.com' === $host;
 	}
