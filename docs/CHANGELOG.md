@@ -2,6 +2,14 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.173.0] - 2026-08-16
+
+### Added
+- add principal-scoped named mailboxes
+
+### Changed
+- support packet cache checks in WordPress
+
 ## [0.172.31] - 2026-08-15
 
 ### Changed
