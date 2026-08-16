@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.174.1] - 2026-08-16
+
+### Fixed
+- recover orphaned pending AI deferrals
+
 ## [0.174.0] - 2026-08-16
 
 ### Added
