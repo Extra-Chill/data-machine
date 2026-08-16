@@ -3277,23 +3277,23 @@ class Jobs extends BaseRepository {
 		$retry_at   = (string) ( $owner['next_retry_at'] ?? '' );
 		$retry_time = strtotime( $retry_at );
 
-		$throttle_state = (string) ( $throttle['state'] ?? 'deferred' );
+		$throttle_state       = (string) ( $throttle['state'] ?? 'deferred' );
 		$modern_owner_matches = ! $legacy
-			&& $generation > 0
-			&& $generation === (int) ( $throttle['resume_generation'] ?? 0 )
+			&& 0 < $generation
+			&& (int) ( $throttle['resume_generation'] ?? 0 ) === $generation
 			&& 'scheduled' === (string) ( $resume['status'] ?? '' )
-			&& $action_id === (int) ( $resume['action_id'] ?? 0 )
-			&& $generation === (int) ( $resume['generation'] ?? 0 )
-			&& $flow_step === (string) ( $resume['flow_step_id'] ?? '' );
+			&& (int) ( $resume['action_id'] ?? 0 ) === $action_id
+			&& (int) ( $resume['generation'] ?? 0 ) === $generation
+			&& (string) ( $resume['flow_step_id'] ?? '' ) === $flow_step;
 		$legacy_owner_matches = $legacy
 			&& empty( $resume )
 			&& ! isset( $throttle['resume_generation'] );
 
 		if ( 'deferred' !== $throttle_state
-			|| $action_id <= 0
-			|| $action_id !== (int) ( $throttle['action_id'] ?? 0 )
-			|| $flow_step !== (string) ( $throttle['flow_step_id'] ?? '' )
-			|| $retry_at !== (string) ( $throttle['next_retry_at'] ?? '' )
+			|| 0 >= $action_id
+			|| (int) ( $throttle['action_id'] ?? 0 ) !== $action_id
+			|| (string) ( $throttle['flow_step_id'] ?? '' ) !== $flow_step
+			|| (string) ( $throttle['next_retry_at'] ?? '' ) !== $retry_at
 			|| false === $retry_time
 			|| $retry_time >= time()
 			|| ( ! $modern_owner_matches && ! $legacy_owner_matches )
@@ -3301,10 +3301,10 @@ class Jobs extends BaseRepository {
 			return false;
 		}
 
-		$actions_table = $this->wpdb->prefix . 'actionscheduler_actions';
+		$actions_table          = $this->wpdb->prefix . 'actionscheduler_actions';
 		$this->wpdb->last_error = '';
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQL.NotPrepared -- Exact receipt absence is the recovery ownership fence.
-		$exists = $this->wpdb->get_var( $this->wpdb->prepare( "SELECT action_id FROM {$actions_table} WHERE action_id = %d LIMIT 1", $action_id ) );
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared -- Exact receipt absence is the recovery ownership fence.
+		$exists = $this->wpdb->get_var( $this->wpdb->prepare( 'SELECT action_id FROM %i WHERE action_id = %d LIMIT 1', $actions_table, $action_id ) );
 		return '' === (string) $this->wpdb->last_error && null === $exists;
 	}
 

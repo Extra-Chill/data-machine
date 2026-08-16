@@ -193,20 +193,24 @@ class RecoverStuckJobsAbility {
 				'flow_step_id'  => (string) ( $throttle['flow_step_id'] ?? '' ),
 				'next_retry_at' => (string) ( $throttle['next_retry_at'] ?? '' ),
 			);
-			$retry_time = strtotime( $ownership['next_retry_at'] );
+			$retry_time    = strtotime( $ownership['next_retry_at'] );
 			$legacy_receipt = empty( $resume ) && 0 === $ownership['generation'];
-			$modern_receipt = $ownership['generation'] > 0
+			$modern_receipt = 0 < $ownership['generation']
 				&& 'scheduled' === (string) ( $resume['status'] ?? '' )
-				&& $ownership['action_id'] === (int) ( $resume['action_id'] ?? 0 )
-				&& $ownership['generation'] === (int) ( $resume['generation'] ?? 0 )
-				&& $ownership['flow_step_id'] === (string) ( $resume['flow_step_id'] ?? '' );
+				&& (int) ( $resume['action_id'] ?? 0 ) === $ownership['action_id']
+				&& (int) ( $resume['generation'] ?? 0 ) === $ownership['generation']
+				&& (string) ( $resume['flow_step_id'] ?? '' ) === $ownership['flow_step_id'];
 			$valid_receipt = $ownership['action_id'] > 0
 				&& '' !== $ownership['flow_step_id']
 				&& false !== $retry_time
 				&& $retry_time < time()
 				&& ( $modern_receipt || $legacy_receipt );
 			$ownership['legacy'] = $legacy_receipt;
-			$action_evidence = $valid_receipt ? $this->getRecordedActionEvidence( $ownership['action_id'] ) : array( 'complete' => true, 'exists' => false, 'status' => '' );
+			$action_evidence = $valid_receipt ? $this->getRecordedActionEvidence( $ownership['action_id'] ) : array(
+				'complete' => true,
+				'exists'   => false,
+				'status'   => '',
+			);
 
 			if ( ! $valid_receipt || empty( $action_evidence['complete'] ) || ! empty( $action_evidence['exists'] ) ) {
 				++$skipped;
@@ -912,10 +916,10 @@ class RecoverStuckJobsAbility {
 	/** Read an exact Action Scheduler receipt and fail closed on query errors. */
 	private function getRecordedActionEvidence( int $action_id ): array {
 		global $wpdb;
-		$actions_table   = $wpdb->prefix . 'actionscheduler_actions';
+		$actions_table    = $wpdb->prefix . 'actionscheduler_actions';
 		$wpdb->last_error = '';
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Exact action receipt is required ownership evidence.
-		$row = $wpdb->get_row( $wpdb->prepare( "SELECT action_id, status FROM {$actions_table} WHERE action_id = %d LIMIT 1", $action_id ), ARRAY_A );
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- Exact action receipt is required ownership evidence.
+		$row = $wpdb->get_row( $wpdb->prepare( 'SELECT action_id, status FROM %i WHERE action_id = %d LIMIT 1', $actions_table, $action_id ), ARRAY_A );
 		return array(
 			'complete' => '' === (string) $wpdb->last_error,
 			'exists'   => is_array( $row ),
