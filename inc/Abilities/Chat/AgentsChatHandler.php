@@ -43,6 +43,7 @@ class AgentsChatHandler {
 	public function checkPermission( bool $allowed, array $input ): bool {
 		if ( ! $allowed ) {
 			$principal = $this->resolveCallerPrincipal( $input );
+			// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- Shared Agents API runtime contract consumed by WP Codebox.
 			if ( null !== $principal && (bool) apply_filters( 'agents_chat_runtime_principal_permission', false, $principal, $input ) ) {
 				return true;
 			}

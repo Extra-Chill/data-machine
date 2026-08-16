@@ -23,6 +23,7 @@ final class DelegatedOperationRegistry {
 			return new \WP_Error( 'delegated_action_invalid', __( 'The delegated action identifier is invalid.', 'data-machine' ) );
 		}
 
+		// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.DynamicHooknameFound -- The constant is the canonical Data Machine delegated-operation registry hook.
 		$actions = apply_filters( self::FILTER, array() );
 		$action  = is_array( $actions ) && is_array( $actions[ $action_id ] ?? null ) ? $actions[ $action_id ] : null;
 		if ( null === $action ) {

@@ -3045,6 +3045,7 @@ class Jobs extends BaseRepository {
 			$errors = array();
 			foreach ( array( 'datamachine_job_terminal_committed', 'datamachine_job_complete' ) as $hook ) {
 				try {
+					// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.DynamicHooknameFound -- The bounded literal set contains only Data Machine lifecycle actions.
 					do_action( $hook, $job_id, $status );
 				} catch ( \Throwable $exception ) {
 					$errors[] = $this->terminal_accounting_error( $stage, 'extension_notification_failed', $exception->getMessage(), $hook );

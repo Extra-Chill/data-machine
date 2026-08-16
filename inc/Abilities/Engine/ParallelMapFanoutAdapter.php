@@ -155,6 +155,7 @@ class ParallelMapFanoutAdapter {
 		 * @param array $step    The `parallel`-map step spec.
 		 * @param array $context Caller context.
 		 */
+		// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.DynamicHooknameFound -- The constant is the canonical external Agents API contract hook.
 		return (bool) apply_filters( self::FANOUT_GATE_FILTER, true, $step, $context );
 	}
 
