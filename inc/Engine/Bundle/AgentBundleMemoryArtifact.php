@@ -178,7 +178,11 @@ final class AgentBundleMemoryArtifact {
 		}
 		$memory = new AgentMemory( 0, $agent_id, $filename );
 		$result = $memory->read();
-		return array( 'artifact_id' => $artifact_id, 'exists' => $result->exists, 'content' => $result->exists ? (string) $result->content : null );
+		return array(
+			'artifact_id' => $artifact_id,
+			'exists'      => $result->exists,
+			'content'     => $result->exists ? (string) $result->content : null,
+		);
 	}
 
 	/** @param array{artifact_id:string,exists:bool,content:?string} $snapshot */
