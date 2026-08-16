@@ -55,6 +55,7 @@ class AgentBundler {
 	 * Bundle format version for forward compatibility.
 	 */
 	const BUNDLE_VERSION = 1;
+	private const REPRODUCIBLE_EXPORTED_AT = '1970-01-01T00:00:00+00:00';
 
 	/**
 	 * @var Agents
@@ -249,7 +250,7 @@ class AgentBundler {
 			(string) $agent['agent_slug']
 		);
 		$manifest          = new AgentBundleManifest(
-			gmdate( 'c' ),
+			self::exported_at_for_context( $context ),
 			defined( 'DATAMACHINE_VERSION' ) ? 'data-machine/' . DATAMACHINE_VERSION : 'data-machine/unknown',
 			sanitize_title( (string) $agent['agent_slug'] ),
 			(string) self::BUNDLE_VERSION,
@@ -295,6 +296,16 @@ class AgentBundler {
 			'directory' => $directory,
 			'package'   => AgentPackageProjection::from_directory( $directory ),
 		);
+	}
+
+	/**
+	 * Resolve export metadata without wall-clock drift when requested.
+	 *
+	 * @param array<string,mixed> $context Export context.
+	 * @return string ISO-8601 export timestamp.
+	 */
+	private static function exported_at_for_context( array $context ): string {
+		return ! empty( $context['reproducible'] ) ? self::REPRODUCIBLE_EXPORTED_AT : gmdate( 'c' );
 	}
 
 	/** @return array<int,array<string,mixed>> */
