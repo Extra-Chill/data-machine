@@ -212,12 +212,7 @@ class StepLifecycleHandler {
 		$processed = new ProcessedItems();
 		foreach ( $current as $claim ) {
 			if ( ! $processed->lock_owned_claim_in_transaction( $claim ) ) {
-				$retryable = $jobs->has_retryable_transaction_error();
-				$wpdb->query( 'ROLLBACK' );
-				wp_cache_delete( $job_id, 'datamachine_engine_data' );
-				$result['success']    = false;
-				$result['_retryable'] = $retryable;
-				return $result;
+				return self::rollbackReconciliationFailure( $jobs, $job_id, $result );
 			}
 		}
 		$retained    = array();
@@ -248,23 +243,13 @@ class StepLifecycleHandler {
 			++$index;
 			if ( 'reject_source' === $disposition ) {
 				if ( ! self::completeClaim( $claim, $job_id, true ) ) {
-					$retryable = $jobs->has_retryable_transaction_error();
-					$wpdb->query( 'ROLLBACK' );
-					wp_cache_delete( $job_id, 'datamachine_engine_data' );
-					$result['success']    = false;
-					$result['_retryable'] = $retryable;
-					return $result;
+					return self::rollbackReconciliationFailure( $jobs, $job_id, $result );
 				}
 				$completed[] = $disposition_id;
 				continue;
 			}
 			if ( 1 !== self::releaseClaim( $claim ) ) {
-				$retryable = $jobs->has_retryable_transaction_error();
-				$wpdb->query( 'ROLLBACK' );
-				wp_cache_delete( $job_id, 'datamachine_engine_data' );
-				$result['success']    = false;
-				$result['_retryable'] = $retryable;
-				return $result;
+				return self::rollbackReconciliationFailure( $jobs, $job_id, $result );
 			}
 			$released[] = $disposition_id;
 			if ( '' === $disposition ) {
@@ -288,19 +273,10 @@ class StepLifecycleHandler {
 		$persist                               = apply_filters( 'datamachine_packet_reconciliation_engine_persist', true, $job_id, $engine );
 		if ( ! $persist || ! $jobs->store_engine_data_in_transaction( $job_id, $engine ) ) {
 			$retryable = $persist && $jobs->has_retryable_transaction_error();
-			$wpdb->query( 'ROLLBACK' );
-			wp_cache_delete( $job_id, 'datamachine_engine_data' );
-			$result['success']    = false;
-			$result['_retryable'] = $retryable;
-			return $result;
+			return self::rollbackReconciliationFailure( $jobs, $job_id, $result, $retryable );
 		}
 		if ( false === $wpdb->query( 'COMMIT' ) ) {
-			$retryable = $jobs->has_retryable_transaction_error();
-			$wpdb->query( 'ROLLBACK' );
-			wp_cache_delete( $job_id, 'datamachine_engine_data' );
-			$result['success']    = false;
-			$result['_retryable'] = $retryable;
-			return $result;
+			return self::rollbackReconciliationFailure( $jobs, $job_id, $result );
 		}
 		$jobs->publish_committed_engine_data( $job_id, $engine );
 		$result['retained']   = count( $retained );
@@ -310,6 +286,17 @@ class StepLifecycleHandler {
 		$result['explicit']   = count( $resolved );
 		$result['evidence']   = $evidence;
 		$result['_retryable'] = false;
+		return $result;
+	}
+
+	/** Roll back a failed claim mutation and preserve retryability. */
+	private static function rollbackReconciliationFailure( Jobs $jobs, int $job_id, array $result, ?bool $retryable = null ): array {
+		global $wpdb;
+		$retryable ??= $jobs->has_retryable_transaction_error();
+		$wpdb->query( 'ROLLBACK' );
+		wp_cache_delete( $job_id, 'datamachine_engine_data' );
+		$result['success']    = false;
+		$result['_retryable'] = $retryable;
 		return $result;
 	}
 

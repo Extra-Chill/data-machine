@@ -305,6 +305,147 @@ abstract class BaseAuthProvider {
 	}
 
 	/**
+	 * Get an exact named account from a site or principal scope.
+	 *
+	 * Named account lookups never consult scope policy and never fall back.
+	 *
+	 * @param string      $account_name Stable account name.
+	 * @param string      $owner_type   site, user, or agent.
+	 * @param int         $owner_id     User/agent ID; ignored for site accounts.
+	 * @return array|null Decrypted account data, or null when missing.
+	 */
+	public function get_named_account( string $account_name, string $owner_type = self::AUTH_SCOPE_SITE, int $owner_id = 0 ): ?array {
+		$account_name = $this->normalize_named_account_name( $account_name );
+		$scope        = $this->named_account_scope( $owner_type, $owner_id );
+		if ( '' === $account_name || false === $scope ) {
+			return null;
+		}
+
+		$all_auth_data = get_site_option( 'datamachine_auth_data', array() );
+		$provider_data = $all_auth_data[ $this->provider_slug ] ?? array();
+		$account       = null === $scope
+			? ( $provider_data['accounts'][ $account_name ] ?? null )
+			: ( $provider_data['principals'][ $scope ]['accounts'][ $account_name ] ?? null );
+
+		return is_array( $account ) && ! empty( $account ) ? $this->decrypt_fields( $account ) : null;
+	}
+
+	/**
+	 * Save an exact named account in a site or principal scope.
+	 */
+	public function save_named_account( string $account_name, array $account, string $owner_type = self::AUTH_SCOPE_SITE, int $owner_id = 0 ): bool {
+		$account_name = $this->normalize_named_account_name( $account_name );
+		$scope        = $this->named_account_scope( $owner_type, $owner_id );
+		if ( '' === $account_name || false === $scope || empty( $account ) ) {
+			return false;
+		}
+		foreach ( $this->find_named_accounts( $account_name ) as $existing ) {
+			if ( $existing['owner_type'] !== $owner_type || (int) $existing['owner_id'] !== $owner_id ) {
+				return false;
+			}
+		}
+
+		$all_auth_data = get_site_option( 'datamachine_auth_data', array() );
+		if ( ! isset( $all_auth_data[ $this->provider_slug ] ) || ! is_array( $all_auth_data[ $this->provider_slug ] ) ) {
+			$all_auth_data[ $this->provider_slug ] = array();
+		}
+
+		if ( null === $scope ) {
+			$all_auth_data[ $this->provider_slug ]['accounts'][ $account_name ] = $this->encrypt_fields( $account );
+		} else {
+			$all_auth_data[ $this->provider_slug ]['principals'][ $scope ]['accounts'][ $account_name ] = $this->encrypt_fields( $account );
+		}
+
+		return update_site_option( 'datamachine_auth_data', $all_auth_data );
+	}
+
+	/**
+	 * Delete one exact named account without affecting sibling accounts.
+	 */
+	public function delete_named_account( string $account_name, string $owner_type = self::AUTH_SCOPE_SITE, int $owner_id = 0 ): bool {
+		$account_name = $this->normalize_named_account_name( $account_name );
+		$scope        = $this->named_account_scope( $owner_type, $owner_id );
+		if ( '' === $account_name || false === $scope ) {
+			return false;
+		}
+
+		$all_auth_data = get_site_option( 'datamachine_auth_data', array() );
+		if ( null === $scope ) {
+			if ( ! isset( $all_auth_data[ $this->provider_slug ]['accounts'][ $account_name ] ) ) {
+				return true;
+			}
+			unset( $all_auth_data[ $this->provider_slug ]['accounts'][ $account_name ] );
+		} else {
+			if ( ! isset( $all_auth_data[ $this->provider_slug ]['principals'][ $scope ]['accounts'][ $account_name ] ) ) {
+				return true;
+			}
+			unset( $all_auth_data[ $this->provider_slug ]['principals'][ $scope ]['accounts'][ $account_name ] );
+		}
+
+		return update_site_option( 'datamachine_auth_data', $all_auth_data );
+	}
+
+	/**
+	 * Find every exact owner of a named account. Ambiguity is left to callers.
+	 *
+	 * @return array<int,array{owner_type:string,owner_id:int,account:array}>
+	 */
+	public function find_named_accounts( string $account_name ): array {
+		$account_name = $this->normalize_named_account_name( $account_name );
+		if ( '' === $account_name ) {
+			return array();
+		}
+
+		$all_auth_data = get_site_option( 'datamachine_auth_data', array() );
+		$provider_data = $all_auth_data[ $this->provider_slug ] ?? array();
+		$matches       = array();
+
+		if ( isset( $provider_data['accounts'][ $account_name ] ) && is_array( $provider_data['accounts'][ $account_name ] ) ) {
+			$matches[] = array(
+				'account_name' => $account_name,
+				'owner_type' => self::AUTH_SCOPE_SITE,
+				'owner_id'   => 0,
+				'account'    => $this->decrypt_fields( $provider_data['accounts'][ $account_name ] ),
+			);
+		}
+
+		foreach ( (array) ( $provider_data['principals'] ?? array() ) as $scope => $principal_data ) {
+			if ( ! isset( $principal_data['accounts'][ $account_name ] ) || ! is_array( $principal_data['accounts'][ $account_name ] ) ) {
+				continue;
+			}
+			if ( ! preg_match( '/^(user|agent):(\d+)$/', (string) $scope, $parts ) ) {
+				continue;
+			}
+			$matches[] = array(
+				'account_name' => $account_name,
+				'owner_type' => $parts[1],
+				'owner_id'   => (int) $parts[2],
+				'account'    => $this->decrypt_fields( $principal_data['accounts'][ $account_name ] ),
+			);
+		}
+
+		return $matches;
+	}
+
+	protected function normalize_named_account_name( string $account_name ): string {
+		$account_name = strtolower( trim( $account_name ) );
+		return preg_match( '/^[a-z0-9][a-z0-9._-]*$/', $account_name ) ? $account_name : '';
+	}
+
+	/**
+	 * @return string|null|false Scope key, null for site, or false when invalid.
+	 */
+	protected function named_account_scope( string $owner_type, int $owner_id ) {
+		if ( self::AUTH_SCOPE_SITE === $owner_type ) {
+			return null;
+		}
+		if ( ! in_array( $owner_type, array( self::AUTH_SCOPE_USER, self::AUTH_SCOPE_AGENT ), true ) || $owner_id <= 0 ) {
+			return false;
+		}
+		return $owner_type . ':' . $owner_id;
+	}
+
+	/**
 	 * Get OAuth account data directly from options.
 	 *
 	 * Automatically decrypts any encrypted fields. Principal-scoped credentials

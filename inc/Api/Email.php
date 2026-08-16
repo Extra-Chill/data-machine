@@ -30,8 +30,9 @@ class Email {
 			array(
 				'methods'             => 'POST',
 				'callback'            => array( self::class, 'handle_send' ),
-				'permission_callback' => array( self::class, 'check_permission' ),
+				'permission_callback' => self::ability_permission( 'datamachine/send-email' ),
 				'args'                => array(
+					...self::mailbox_args(),
 					'to'           => array(
 						'type'     => 'string',
 						'required' => true,
@@ -83,8 +84,9 @@ class Email {
 			array(
 				'methods'             => 'GET',
 				'callback'            => array( self::class, 'handle_fetch' ),
-				'permission_callback' => array( self::class, 'check_permission' ),
+				'permission_callback' => self::ability_permission( 'datamachine/fetch-email' ),
 				'args'                => array(
+					...self::mailbox_args(),
 					'folder'               => array(
 						'type'    => 'string',
 						'default' => 'INBOX',
@@ -124,8 +126,9 @@ class Email {
 			array(
 				'methods'             => 'GET',
 				'callback'            => array( self::class, 'handle_read' ),
-				'permission_callback' => array( self::class, 'check_permission' ),
+				'permission_callback' => self::ability_permission( 'datamachine/fetch-email' ),
 				'args'                => array(
+					...self::mailbox_args(),
 					'uid'    => array(
 						'type'     => 'integer',
 						'required' => true,
@@ -145,8 +148,9 @@ class Email {
 			array(
 				'methods'             => 'POST',
 				'callback'            => array( self::class, 'handle_reply' ),
-				'permission_callback' => array( self::class, 'check_permission' ),
+				'permission_callback' => self::ability_permission( 'datamachine/email-reply' ),
 				'args'                => array(
+					...self::mailbox_args(),
 					'to'           => array(
 						'type'     => 'string',
 						'required' => true,
@@ -186,8 +190,9 @@ class Email {
 			array(
 				'methods'             => 'DELETE',
 				'callback'            => array( self::class, 'handle_delete' ),
-				'permission_callback' => array( self::class, 'check_permission' ),
+				'permission_callback' => self::ability_permission( 'datamachine/email-delete' ),
 				'args'                => array(
+					...self::mailbox_args(),
 					'uid'    => array(
 						'type'     => 'integer',
 						'required' => true,
@@ -207,8 +212,9 @@ class Email {
 			array(
 				'methods'             => 'POST',
 				'callback'            => array( self::class, 'handle_move' ),
-				'permission_callback' => array( self::class, 'check_permission' ),
+				'permission_callback' => self::ability_permission( 'datamachine/email-move' ),
 				'args'                => array(
+					...self::mailbox_args(),
 					'uid'         => array(
 						'type'     => 'integer',
 						'required' => true,
@@ -232,8 +238,9 @@ class Email {
 			array(
 				'methods'             => 'POST',
 				'callback'            => array( self::class, 'handle_flag' ),
-				'permission_callback' => array( self::class, 'check_permission' ),
+				'permission_callback' => self::ability_permission( 'datamachine/email-flag' ),
 				'args'                => array(
+					...self::mailbox_args(),
 					'uid'    => array(
 						'type'     => 'integer',
 						'required' => true,
@@ -261,8 +268,9 @@ class Email {
 			array(
 				'methods'             => 'POST',
 				'callback'            => array( self::class, 'handle_batch_move' ),
-				'permission_callback' => array( self::class, 'check_permission' ),
+				'permission_callback' => self::ability_permission( 'datamachine/email-batch-move' ),
 				'args'                => array(
+					...self::mailbox_args(),
 					'search'      => array(
 						'type'     => 'string',
 						'required' => true,
@@ -290,8 +298,9 @@ class Email {
 			array(
 				'methods'             => 'POST',
 				'callback'            => array( self::class, 'handle_batch_flag' ),
-				'permission_callback' => array( self::class, 'check_permission' ),
+				'permission_callback' => self::ability_permission( 'datamachine/email-batch-flag' ),
 				'args'                => array(
+					...self::mailbox_args(),
 					'search' => array(
 						'type'     => 'string',
 						'required' => true,
@@ -323,8 +332,9 @@ class Email {
 			array(
 				'methods'             => 'POST',
 				'callback'            => array( self::class, 'handle_batch_delete' ),
-				'permission_callback' => array( self::class, 'check_permission' ),
+				'permission_callback' => self::ability_permission( 'datamachine/email-batch-delete' ),
 				'args'                => array(
+					...self::mailbox_args(),
 					'search' => array(
 						'type'     => 'string',
 						'required' => true,
@@ -348,8 +358,9 @@ class Email {
 			array(
 				'methods'             => 'POST',
 				'callback'            => array( self::class, 'handle_unsubscribe' ),
-				'permission_callback' => array( self::class, 'check_permission' ),
+				'permission_callback' => self::ability_permission( 'datamachine/email-unsubscribe' ),
 				'args'                => array(
+					...self::mailbox_args(),
 					'uid'    => array(
 						'type'     => 'integer',
 						'required' => true,
@@ -369,8 +380,9 @@ class Email {
 			array(
 				'methods'             => 'POST',
 				'callback'            => array( self::class, 'handle_batch_unsubscribe' ),
-				'permission_callback' => array( self::class, 'check_permission' ),
+				'permission_callback' => self::ability_permission( 'datamachine/email-batch-unsubscribe' ),
 				'args'                => array(
+					...self::mailbox_args(),
 					'search' => array(
 						'type'     => 'string',
 						'required' => true,
@@ -394,14 +406,25 @@ class Email {
 			array(
 				'methods'             => 'POST',
 				'callback'            => array( self::class, 'handle_test_connection' ),
-				'permission_callback' => array( self::class, 'check_permission' ),
+				'permission_callback' => self::ability_permission( 'datamachine/email-test-connection' ),
+				'args'                => self::mailbox_args(),
 			)
 		);
 	}
 
+	private static function ability_permission( string $ability_name ): callable {
+		return static fn( \WP_REST_Request $request ): bool => self::check_ability_permission( $request, $ability_name );
+	}
+
 	// phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found -- REST permission callbacks receive the request by contract.
-	public static function check_permission( \WP_REST_Request $request ): bool {
-		return PermissionHelper::can_manage();
+	private static function check_ability_permission( \WP_REST_Request $request, string $ability_name ): bool {
+		if ( ! PermissionHelper::can( 'use_tools' ) && ! PermissionHelper::can_manage() ) {
+			return false;
+		}
+
+		$ability  = wp_get_ability( $ability_name );
+		$category = is_object( $ability ) && method_exists( $ability, 'get_category' ) ? (string) $ability->get_category() : '';
+		return PermissionHelper::can_use_ability( $ability_name, $category );
 	}
 
 	public static function handle_send( \WP_REST_Request $request ): \WP_REST_Response|\WP_Error {
@@ -411,6 +434,7 @@ class Email {
 		}
 
 		$result = $ability->execute( array(
+			'auth_ref'     => self::mailbox_ref( $request, false ),
 			'to'           => $request->get_param( 'to' ),
 			'subject'      => $request->get_param( 'subject' ),
 			'body'         => $request->get_param( 'body' ),
@@ -427,22 +451,13 @@ class Email {
 	}
 
 	public static function handle_fetch( \WP_REST_Request $request ): \WP_REST_Response|\WP_Error {
-		$auth = self::get_imap_auth();
-		if ( is_wp_error( $auth ) ) {
-			return $auth;
-		}
-
 		$ability = wp_get_ability( 'datamachine/fetch-email' );
 		if ( ! $ability ) {
 			return new \WP_Error( 'ability_not_found', 'Fetch email ability not available', array( 'status' => 500 ) );
 		}
 
 		$result = $ability->execute( array(
-			'imap_host'            => $auth->getHost(),
-			'imap_port'            => $auth->getPort(),
-			'imap_encryption'      => $auth->getEncryption(),
-			'imap_user'            => $auth->getUser(),
-			'imap_password'        => $auth->getPassword(),
+			'auth_ref'             => self::mailbox_ref( $request ),
 			'folder'               => $request->get_param( 'folder' ) ?? 'INBOX',
 			'search_criteria'      => $request->get_param( 'search' ) ?? 'UNSEEN',
 			'max_messages'         => (int) ( $request->get_param( 'max' ) ?? 10 ),
@@ -456,41 +471,18 @@ class Email {
 	}
 
 	public static function handle_read( \WP_REST_Request $request ): \WP_REST_Response|\WP_Error {
-		$auth = self::get_imap_auth();
-		if ( is_wp_error( $auth ) ) {
-			return $auth;
-		}
-
 		$ability = wp_get_ability( 'datamachine/fetch-email' );
 		if ( ! $ability ) {
 			return new \WP_Error( 'ability_not_found', 'Fetch email ability not available', array( 'status' => 500 ) );
 		}
 
 		$result = $ability->execute( array(
-			'imap_host'       => $auth->getHost(),
-			'imap_port'       => $auth->getPort(),
-			'imap_encryption' => $auth->getEncryption(),
-			'imap_user'       => $auth->getUser(),
-			'imap_password'   => $auth->getPassword(),
+			'auth_ref'        => self::mailbox_ref( $request ),
 			'folder'          => $request->get_param( 'folder' ) ?? 'INBOX',
 			'uid'             => (int) $request->get_param( 'uid' ),
 		) );
 
 		return self::to_response( $result );
-	}
-
-	/**
-	 * Get IMAP auth provider or WP_Error.
-	 */
-	private static function get_imap_auth(): object {
-		$providers = apply_filters( 'datamachine_auth_providers', array() );
-		$auth      = $providers['email_imap'] ?? null;
-
-		if ( ! $auth || ! $auth->is_authenticated() ) {
-			return new \WP_Error( 'not_configured', 'IMAP credentials not configured', array( 'status' => 400 ) );
-		}
-
-		return $auth;
 	}
 
 	public static function handle_reply( \WP_REST_Request $request ): \WP_REST_Response|\WP_Error {
@@ -500,6 +492,7 @@ class Email {
 		}
 
 		$result = $ability->execute( array(
+			'auth_ref'     => self::mailbox_ref( $request ),
 			'to'           => $request->get_param( 'to' ),
 			'subject'      => $request->get_param( 'subject' ),
 			'body'         => $request->get_param( 'body' ),
@@ -519,6 +512,7 @@ class Email {
 		}
 
 		$result = $ability->execute( array(
+			'auth_ref' => self::mailbox_ref( $request ),
 			'uid'    => (int) $request->get_param( 'uid' ),
 			'folder' => $request->get_param( 'folder' ) ?? 'INBOX',
 		) );
@@ -533,6 +527,7 @@ class Email {
 		}
 
 		$result = $ability->execute( array(
+			'auth_ref'     => self::mailbox_ref( $request ),
 			'uid'         => (int) $request->get_param( 'uid' ),
 			'destination' => $request->get_param( 'destination' ),
 			'folder'      => $request->get_param( 'folder' ) ?? 'INBOX',
@@ -548,6 +543,7 @@ class Email {
 		}
 
 		$result = $ability->execute( array(
+			'auth_ref' => self::mailbox_ref( $request ),
 			'uid'    => (int) $request->get_param( 'uid' ),
 			'flag'   => $request->get_param( 'flag' ),
 			'action' => $request->get_param( 'action' ) ?? 'set',
@@ -564,6 +560,7 @@ class Email {
 		}
 
 		$result = $ability->execute( array(
+			'auth_ref'     => self::mailbox_ref( $request ),
 			'search'      => $request->get_param( 'search' ),
 			'destination' => $request->get_param( 'destination' ),
 			'folder'      => $request->get_param( 'folder' ) ?? 'INBOX',
@@ -580,6 +577,7 @@ class Email {
 		}
 
 		$result = $ability->execute( array(
+			'auth_ref' => self::mailbox_ref( $request ),
 			'search' => $request->get_param( 'search' ),
 			'flag'   => $request->get_param( 'flag' ),
 			'action' => $request->get_param( 'action' ) ?? 'set',
@@ -597,6 +595,7 @@ class Email {
 		}
 
 		$result = $ability->execute( array(
+			'auth_ref' => self::mailbox_ref( $request ),
 			'search' => $request->get_param( 'search' ),
 			'folder' => $request->get_param( 'folder' ) ?? 'INBOX',
 			'max'    => (int) ( $request->get_param( 'max' ) ?? 100 ),
@@ -612,6 +611,7 @@ class Email {
 		}
 
 		$result = $ability->execute( array(
+			'auth_ref' => self::mailbox_ref( $request ),
 			'uid'    => (int) $request->get_param( 'uid' ),
 			'folder' => $request->get_param( 'folder' ) ?? 'INBOX',
 		) );
@@ -626,6 +626,7 @@ class Email {
 		}
 
 		$result = $ability->execute( array(
+			'auth_ref' => self::mailbox_ref( $request ),
 			'search' => $request->get_param( 'search' ),
 			'folder' => $request->get_param( 'folder' ) ?? 'INBOX',
 			'max'    => (int) ( $request->get_param( 'max' ) ?? 20 ),
@@ -641,7 +642,7 @@ class Email {
 			return new \WP_Error( 'ability_not_found', 'Email test connection ability not available', array( 'status' => 500 ) );
 		}
 
-		$result = $ability->execute( array() );
+		$result = $ability->execute( array( 'auth_ref' => self::mailbox_ref( $request ) ) );
 
 		return self::to_response( $result );
 	}
@@ -652,5 +653,27 @@ class Email {
 		}
 
 		return rest_ensure_response( $result );
+	}
+
+	private static function mailbox_ref( \WP_REST_Request $request, bool $default = true ): string {
+		$ref = trim( (string) $request->get_param( 'auth_ref' ) );
+		if ( '' === $ref ) {
+			$mailbox = trim( (string) $request->get_param( 'mailbox' ) );
+			$ref     = '' !== $mailbox ? 'email_imap:' . $mailbox : '';
+		}
+		return '' !== $ref ? $ref : ( $default ? 'email_imap:default' : '' );
+	}
+
+	private static function mailbox_args(): array {
+		return array(
+			'auth_ref' => array(
+				'type'        => 'string',
+				'description' => 'Non-secret mailbox auth ref, for example email_imap:event-submissions.',
+			),
+			'mailbox'  => array(
+				'type'        => 'string',
+				'description' => 'Mailbox account name shorthand for email_imap:<name>.',
+			),
+		);
 	}
 }

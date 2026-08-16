@@ -45,6 +45,16 @@ function is_email( $email ) {
 	return is_string( $email ) && false !== filter_var( $email, FILTER_VALIDATE_EMAIL ) ? $email : false;
 }
 
+function wp_parse_url( string $url ) {
+	return parse_url( $url );
+}
+
+$GLOBALS['email_reply_mail_calls'] = array();
+function wp_mail( $to, $subject, $body, $headers = array() ): bool {
+	$GLOBALS['email_reply_mail_calls'][] = compact( 'to', 'subject', 'body', 'headers' );
+	return true;
+}
+
 function is_wp_error( $value ): bool {
 	return $value instanceof WP_Error;
 }
@@ -82,7 +92,17 @@ email_reply_assert(
 	! $method->invoke( $ability, array( 'person@example.net' ), array( 'copy@example.org' ) )
 );
 
-echo "\n[2] Reply ability failure channel\n";
+echo "\n[2] Mailto unsubscribe sender identity\n";
+$mailbox_property = $reflection->getProperty( 'activeMailbox' );
+$mailbox_property->setValue( $ability, array( 'credentials' => array( 'imap_user' => 'authorized@example.com' ) ) );
+$mailto_method = $reflection->getMethod( 'executeMailtoUnsubscribe' );
+$result = $mailto_method->invoke( $ability, 'mailto:unsubscribe@example.net?subject=remove' );
+$headers = $GLOBALS['email_reply_mail_calls'][0]['headers'] ?? array();
+email_reply_assert( 'mailto unsubscribe succeeds', true === ( $result['success'] ?? false ) );
+email_reply_assert( 'mailto unsubscribe pins From identity', in_array( 'From: authorized@example.com', $headers, true ) );
+email_reply_assert( 'mailto unsubscribe pins Reply-To identity', in_array( 'Reply-To: authorized@example.com', $headers, true ) );
+
+echo "\n[3] Reply ability failure channel\n";
 $result = $ability->executeReply(
 	array(
 		'to'          => 'not-an-email',

@@ -112,6 +112,10 @@ class SendEmailAbility {
 					// continue to work unchanged.
 					'required'   => array( 'to', 'subject' ),
 					'properties' => array(
+						'auth_ref'     => array(
+							'type'        => 'string',
+							'description' => __( 'Optional non-secret mailbox auth ref authorizing the sender identity', 'data-machine' ),
+						),
 						'to'           => array(
 							'type'        => 'string',
 							'description' => __( 'Comma-separated recipient email addresses', 'data-machine' ),
@@ -202,7 +206,7 @@ class SendEmailAbility {
 	 * @return bool True if user has permission.
 	 */
 	public function checkPermission(): bool {
-		return PermissionHelper::can_manage();
+		return PermissionHelper::can( 'use_tools' ) || PermissionHelper::can_manage();
 	}
 
 	/**
@@ -212,7 +216,11 @@ class SendEmailAbility {
 	 * @return array|\WP_Error Result with success data or an error.
 	 */
 	public function execute( array $input ): array|\WP_Error {
-		$logs   = array();
+		$logs           = array();
+		$queued_context = $this->verifiedMailboxContext( $input );
+		if ( is_wp_error( $queued_context ) ) {
+			return $queued_context;
+		}
 		$config = $this->normalizeConfig( $input );
 
 		// 1. Parse and validate recipients.
@@ -229,6 +237,30 @@ class SendEmailAbility {
 				'data'    => array( 'raw_to' => $config['to'] ),
 			);
 			return new \WP_Error( 'invalid_email_recipient', 'No valid recipient email addresses', array( 'status' => 400 ) );
+		}
+
+		if ( ! empty( $config['auth_ref'] ) ) {
+			$providers = apply_filters( 'datamachine_auth_providers', array() );
+			$auth      = $providers['email_imap'] ?? null;
+			if ( ! $auth || ! method_exists( $auth, 'resolve_mailbox' ) ) {
+				return new \WP_Error( 'email_imap_not_configured', 'Email IMAP provider is not registered.', array( 'status' => 400 ) );
+			}
+			$resolved = null === $queued_context
+				? $auth->resolve_mailbox( $config['auth_ref'], 'send' )
+				: $auth->resolve_mailbox_for_principal( $config['auth_ref'], 'send', $queued_context );
+			if ( is_wp_error( $resolved ) ) {
+				return $resolved;
+			}
+			$config['from_email'] = $resolved['credentials']['imap_user'];
+			$config['reply_to']   = $resolved['credentials']['imap_user'];
+			$config['from_name']  = (string) ( $resolved['credentials']['display_name'] ?? '' );
+		} else {
+			$legacy_sender_allowed = is_array( $queued_context )
+				? ! empty( $queued_context['legacy_sender'] ) && $this->userCanManageLegacySender( absint( $queued_context['user_id'] ?? 0 ) )
+				: $this->canUseLegacySender();
+			if ( ! $legacy_sender_allowed ) {
+				return new \WP_Error( 'email_auth_ref_required', 'An authorized mailbox ref is required to send email.', array( 'status' => 403 ) );
+			}
 		}
 
 		// 2. Build headers.
@@ -457,6 +489,7 @@ class SendEmailAbility {
 	 */
 	private function normalizeConfig( array $input ): array {
 		$defaults = array(
+			'auth_ref'     => '',
 			'to'           => '',
 			'cc'           => '',
 			'bcc'          => '',
@@ -473,6 +506,79 @@ class SendEmailAbility {
 		);
 
 		return array_merge( $defaults, $input );
+	}
+
+	private function verifiedMailboxContext( array $config ): array|null|\WP_Error {
+		$grant = $config['_mailbox_grant'] ?? null;
+		if ( null === $grant ) {
+			return null;
+		}
+		if ( ! is_array( $grant ) || empty( $grant['signature'] ) ) {
+			return new \WP_Error( 'email_queue_grant_invalid', 'Queued mailbox authorization is invalid.', array( 'status' => 403 ) );
+		}
+		$user_id  = absint( $grant['user_id'] ?? 0 );
+		$agent_id = absint( $grant['agent_id'] ?? 0 );
+		$issued_at = absint( $grant['issued_at'] ?? 0 );
+		$nonce     = (string) ( $grant['nonce'] ?? '' );
+		$payload   = $this->mailboxGrantPayload( $config, $user_id, $agent_id, $issued_at, $nonce );
+		$expected = hash_hmac( 'sha256', $payload, wp_salt( 'auth' ) );
+		if ( ! hash_equals( $expected, (string) $grant['signature'] ) ) {
+			return new \WP_Error( 'email_queue_grant_invalid', 'Queued mailbox authorization is invalid.', array( 'status' => 403 ) );
+		}
+		return array(
+			'user_id'      => $user_id,
+			'agent_id'     => $agent_id,
+			'token_id'     => absint( $grant['token_id'] ?? 0 ),
+			'issuer_type'  => (string) ( $grant['issuer_type'] ?? '' ),
+			'legacy_sender' => ! empty( $grant['legacy_sender'] ),
+		);
+	}
+
+	private function mailboxGrantPayload( array $config, int $user_id, int $agent_id, int $issued_at, string $nonce ): string {
+		$payload = $config;
+		unset( $payload['_attempt'], $payload['_mailbox_grant'] );
+		$payload = $this->canonicalizeGrantValue( $payload );
+		return implode( '|', array(
+			hash( 'sha256', serialize( $payload ) ),
+			(string) $user_id,
+			(string) $agent_id,
+			(string) absint( $config['_mailbox_grant']['token_id'] ?? 0 ),
+			(string) ( $config['_mailbox_grant']['issuer_type'] ?? '' ),
+			(string) $issued_at,
+			$nonce,
+			! empty( $config['_mailbox_grant']['legacy_sender'] ) ? '1' : '0',
+		) );
+	}
+
+	private function canonicalizeGrantValue( array $value ): array {
+		if ( ! array_is_list( $value ) ) {
+			ksort( $value, SORT_STRING );
+		}
+		foreach ( $value as $key => $item ) {
+			if ( is_array( $item ) ) {
+				$value[ $key ] = $this->canonicalizeGrantValue( $item );
+			}
+		}
+		return $value;
+	}
+
+	private function canUseLegacySender(): bool {
+		if ( defined( 'WP_CLI' ) && WP_CLI ) {
+			return PermissionHelper::can_manage();
+		}
+		return PermissionHelper::acting_user_id() > 0 && PermissionHelper::can_manage();
+	}
+
+	private function userCanManageLegacySender( int $user_id ): bool {
+		if ( $user_id <= 0 || ! function_exists( 'user_can' ) ) {
+			return false;
+		}
+		foreach ( array( 'manage_options', 'datamachine_manage_flows', 'datamachine_manage_settings', 'datamachine_manage_agents' ) as $capability ) {
+			if ( user_can( $user_id, $capability ) ) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	/**

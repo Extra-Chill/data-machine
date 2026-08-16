@@ -20,6 +20,7 @@ defined( 'ABSPATH' ) || exit;
 class EmailAbilities {
 
 	private static bool $registered = false;
+	private ?array $activeMailbox = null;
 
 	public function __construct() {
 		if ( self::$registered ) {
@@ -43,6 +44,7 @@ class EmailAbilities {
 						'type'       => 'object',
 						'required'   => array( 'to', 'subject', 'body', 'in_reply_to' ),
 						'properties' => array(
+							'auth_ref'     => self::authRefProperty(),
 							'to'           => array(
 								'type'        => 'string',
 								'description' => __( 'Recipient email address', 'data-machine' ),
@@ -100,6 +102,7 @@ class EmailAbilities {
 						'type'       => 'object',
 						'required'   => array( 'uid' ),
 						'properties' => array(
+							'auth_ref' => self::authRefProperty(),
 							'uid'    => array(
 								'type'        => 'integer',
 								'description' => __( 'Message UID to delete', 'data-machine' ),
@@ -135,6 +138,7 @@ class EmailAbilities {
 						'type'       => 'object',
 						'required'   => array( 'uid', 'destination' ),
 						'properties' => array(
+							'auth_ref'     => self::authRefProperty(),
 							'uid'         => array(
 								'type'        => 'integer',
 								'description' => __( 'Message UID to move', 'data-machine' ),
@@ -174,6 +178,7 @@ class EmailAbilities {
 						'type'       => 'object',
 						'required'   => array( 'uid', 'flag' ),
 						'properties' => array(
+							'auth_ref' => self::authRefProperty(),
 							'uid'    => array(
 								'type'        => 'integer',
 								'description' => __( 'Message UID', 'data-machine' ),
@@ -218,6 +223,7 @@ class EmailAbilities {
 						'type'       => 'object',
 						'required'   => array( 'search', 'destination' ),
 						'properties' => array(
+							'auth_ref'     => self::authRefProperty(),
 							'search'      => array(
 								'type'        => 'string',
 								'description' => __( 'IMAP search criteria (e.g., FROM "github.com")', 'data-machine' ),
@@ -264,6 +270,7 @@ class EmailAbilities {
 						'type'       => 'object',
 						'required'   => array( 'search', 'flag' ),
 						'properties' => array(
+							'auth_ref' => self::authRefProperty(),
 							'search' => array(
 								'type'        => 'string',
 								'description' => __( 'IMAP search criteria', 'data-machine' ),
@@ -314,6 +321,7 @@ class EmailAbilities {
 						'type'       => 'object',
 						'required'   => array( 'search' ),
 						'properties' => array(
+							'auth_ref' => self::authRefProperty(),
 							'search' => array(
 								'type'        => 'string',
 								'description' => __( 'IMAP search criteria', 'data-machine' ),
@@ -356,6 +364,7 @@ class EmailAbilities {
 						'type'       => 'object',
 						'required'   => array( 'uid' ),
 						'properties' => array(
+							'auth_ref' => self::authRefProperty(),
 							'uid'    => array(
 								'type'        => 'integer',
 								'description' => __( 'Message UID to unsubscribe from', 'data-machine' ),
@@ -392,6 +401,7 @@ class EmailAbilities {
 						'type'       => 'object',
 						'required'   => array( 'search' ),
 						'properties' => array(
+							'auth_ref' => self::authRefProperty(),
 							'search' => array(
 								'type'        => 'string',
 								'description' => __( 'IMAP search criteria', 'data-machine' ),
@@ -433,7 +443,7 @@ class EmailAbilities {
 					'category'            => 'datamachine-email',
 					'input_schema'        => array(
 						'type'       => 'object',
-						'properties' => new \stdClass(),
+						'properties' => array( 'auth_ref' => self::authRefProperty() ),
 					),
 					'output_schema'       => array(
 						'type'       => 'object',
@@ -455,7 +465,15 @@ class EmailAbilities {
 	}
 
 	public function checkPermission(): bool {
-		return PermissionHelper::can_manage();
+		return PermissionHelper::can( 'use_tools' ) || PermissionHelper::can_manage();
+	}
+
+	private static function authRefProperty(): array {
+		return array(
+			'type'        => 'string',
+			'default'     => 'email_imap:default',
+			'description' => __( 'Non-secret mailbox auth ref', 'data-machine' ),
+		);
 	}
 
 	/**
@@ -498,11 +516,17 @@ class EmailAbilities {
 			return new \WP_Error( 'invalid_email_recipient', 'No valid recipient address', array( 'status' => 400 ) );
 		}
 
+		$mailbox = $this->resolveMailbox( $input, 'reply' );
+		if ( is_wp_error( $mailbox ) ) {
+			return $mailbox;
+		}
+		$headers[] = 'From: ' . $mailbox['credentials']['imap_user'];
+
 		$sent = wp_mail( $to, $input['subject'], $input['body'], $headers );
 
 		if ( $sent ) {
 			if ( ! $this->isConfiguredMailboxRecipient( $to, $cc_list ) ) {
-				$this->saveToSentFolder( $to, $input['subject'], $input['body'], $headers );
+				$this->saveToSentFolder( $to, $input['subject'], $input['body'], $headers, $input );
 			}
 
 			return array(
@@ -525,7 +549,7 @@ class EmailAbilities {
 	 * Delete an email from the IMAP server.
 	 */
 	public function executeDelete( array $input ): array|\WP_Error {
-		$connection = $this->connect( $input['folder'] ?? 'INBOX' );
+		$connection = $this->connect( $input, 'delete' );
 		if ( is_wp_error( $connection ) ) {
 			return $connection;
 		}
@@ -545,7 +569,7 @@ class EmailAbilities {
 	 * Move an email to a different folder.
 	 */
 	public function executeMove( array $input ): array|\WP_Error {
-		$connection = $this->connect( $input['folder'] ?? 'INBOX' );
+		$connection = $this->connect( $input, array( 'organize', 'delete' ) );
 		if ( is_wp_error( $connection ) ) {
 			return $connection;
 		}
@@ -573,7 +597,8 @@ class EmailAbilities {
 	 * Set or clear a flag on an email.
 	 */
 	public function executeFlag( array $input ): array|\WP_Error {
-		$connection = $this->connect( $input['folder'] ?? 'INBOX' );
+		$operation  = 'deleted' === strtolower( (string) ( $input['flag'] ?? '' ) ) ? 'delete' : 'organize';
+		$connection = $this->connect( $input, $operation );
 		if ( is_wp_error( $connection ) ) {
 			return $connection;
 		}
@@ -610,26 +635,25 @@ class EmailAbilities {
 	 * Test the IMAP connection with stored credentials.
 	 */
 	public function executeTestConnection( array $input ): array|\WP_Error {
-		unset( $input );
-
 		if ( ! function_exists( 'imap_open' ) ) {
 			return new \WP_Error( 'email_imap_unavailable', 'PHP IMAP extension is not installed', array( 'status' => 400 ) );
 		}
 
-		$auth = $this->getAuthProvider();
-		if ( ! $auth || ! $auth->is_authenticated() ) {
-			return new \WP_Error( 'email_imap_not_configured', 'IMAP credentials not configured', array( 'status' => 400 ) );
+		$resolved = $this->resolveMailbox( $input, 'read' );
+		if ( is_wp_error( $resolved ) ) {
+			return $resolved;
 		}
+		$credentials = $resolved['credentials'];
 
 		$mailbox = $this->buildMailboxString(
-			$auth->getHost(),
-			$auth->getPort(),
-			$auth->getEncryption(),
+			$credentials['imap_host'],
+			(int) ( $credentials['imap_port'] ?? 993 ),
+			$credentials['imap_encryption'] ?? 'ssl',
 			'INBOX'
 		);
 
 		// phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
-		$connection = @imap_open( $mailbox, $auth->getUser(), $auth->getPassword() );
+		$connection = @imap_open( $mailbox, $credentials['imap_user'], $credentials['imap_password'] );
 
 		if ( false === $connection ) {
 			return new \WP_Error( 'email_imap_connection_failed', 'Connection failed: ' . imap_last_error(), array( 'status' => 400 ) );
@@ -637,17 +661,17 @@ class EmailAbilities {
 
 		$check = imap_check( $connection );
 		$info  = array(
-			'mailbox'   => $check->Mailbox ?? '',
+			'mailbox'   => $resolved['ref'],
 			'messages'  => $check->Nmsgs ?? 0,
 			'recent'    => $check->Recent ?? 0,
 			'connected' => true,
 		);
 
 		// List available folders.
-		$folders     = imap_list( $connection, $this->buildMailboxString( $auth->getHost(), $auth->getPort(), $auth->getEncryption(), '' ), '*' );
+		$folders     = imap_list( $connection, $this->buildMailboxString( $credentials['imap_host'], (int) ( $credentials['imap_port'] ?? 993 ), $credentials['imap_encryption'] ?? 'ssl', '' ), '*' );
 		$folder_list = array();
 		if ( is_array( $folders ) ) {
-			$prefix = $this->buildMailboxString( $auth->getHost(), $auth->getPort(), $auth->getEncryption(), '' );
+			$prefix = $this->buildMailboxString( $credentials['imap_host'], (int) ( $credentials['imap_port'] ?? 993 ), $credentials['imap_encryption'] ?? 'ssl', '' );
 			foreach ( $folders as $folder ) {
 				$folder_list[] = str_replace( $prefix, '', imap_utf7_decode( $folder ) );
 			}
@@ -658,7 +682,7 @@ class EmailAbilities {
 
 		return array(
 			'success'      => true,
-			'message'      => sprintf( 'Connected to %s — %d messages in INBOX', $auth->getHost(), $info['messages'] ),
+			'message'      => sprintf( 'Connected to %s — %d messages in INBOX', $resolved['ref'], $info['messages'] ),
 			'mailbox_info' => $info,
 		);
 	}
@@ -672,7 +696,7 @@ class EmailAbilities {
 	 * 3. mailto: → send email via wp_mail()
 	 */
 	public function executeUnsubscribe( array $input ): array|\WP_Error {
-		$connection = $this->connect( $input['folder'] ?? 'INBOX' );
+		$connection = $this->connect( $input, array( 'unsubscribe', 'read' ) );
 		if ( is_wp_error( $connection ) ) {
 			return $connection;
 		}
@@ -731,7 +755,7 @@ class EmailAbilities {
 	 * it only unsubscribes once using the most recent message's headers.
 	 */
 	public function executeBatchUnsubscribe( array $input ): array|\WP_Error {
-		$connection = $this->connect( $input['folder'] ?? 'INBOX' );
+		$connection = $this->connect( $input, array( 'unsubscribe', 'read', 'search' ) );
 		if ( is_wp_error( $connection ) ) {
 			return $connection;
 		}
@@ -1018,7 +1042,14 @@ class EmailAbilities {
 			$subject = 'unsubscribe';
 		}
 
-		$sent = wp_mail( $address, $subject, 'unsubscribe' );
+		$headers     = array();
+		$credentials = $this->activeMailbox['credentials'] ?? array();
+		$identity    = (string) ( $credentials['imap_user'] ?? '' );
+		if ( is_email( $identity ) ) {
+			$headers[] = 'From: ' . $identity;
+			$headers[] = 'Reply-To: ' . $identity;
+		}
+		$sent = wp_mail( $address, $subject, 'unsubscribe', $headers );
 
 		if ( $sent ) {
 			return array(
@@ -1038,7 +1069,7 @@ class EmailAbilities {
 	 * Batch move: search → move all matches to destination.
 	 */
 	public function executeBatchMove( array $input ): array|\WP_Error {
-		$connection = $this->connect( $input['folder'] ?? 'INBOX' );
+		$connection = $this->connect( $input, array( 'organize', 'delete', 'search' ) );
 		if ( is_wp_error( $connection ) ) {
 			return $connection;
 		}
@@ -1090,7 +1121,8 @@ class EmailAbilities {
 	 * Batch flag: search → set/clear flag on all matches.
 	 */
 	public function executeBatchFlag( array $input ): array|\WP_Error {
-		$connection = $this->connect( $input['folder'] ?? 'INBOX' );
+		$operation  = 'deleted' === strtolower( (string) ( $input['flag'] ?? '' ) ) ? 'delete' : 'organize';
+		$connection = $this->connect( $input, array( $operation, 'search' ) );
 		if ( is_wp_error( $connection ) ) {
 			return $connection;
 		}
@@ -1147,7 +1179,7 @@ class EmailAbilities {
 	 * Batch delete: search → delete all matches.
 	 */
 	public function executeBatchDelete( array $input ): array|\WP_Error {
-		$connection = $this->connect( $input['folder'] ?? 'INBOX' );
+		$connection = $this->connect( $input, array( 'delete', 'search' ) );
 		if ( is_wp_error( $connection ) ) {
 			return $connection;
 		}
@@ -1190,28 +1222,30 @@ class EmailAbilities {
 	/**
 	 * Open an IMAP connection using stored credentials.
 	 *
-	 * @param string $folder Mail folder.
+	 * @param array  $input Input containing auth_ref and folder.
+	 * @param string|array $operation Required mailbox operation(s).
 	 * @return resource|\WP_Error IMAP connection or error.
 	 */
-	private function connect( string $folder = 'INBOX' ) {
+	private function connect( array $input, string|array $operation ) {
 		if ( ! function_exists( 'imap_open' ) ) {
 			return new \WP_Error( 'email_imap_unavailable', 'PHP IMAP extension is not installed', array( 'status' => 400 ) );
 		}
 
-		$auth = $this->getAuthProvider();
-		if ( ! $auth || ! $auth->is_authenticated() ) {
-			return new \WP_Error( 'email_imap_not_configured', 'IMAP credentials not configured', array( 'status' => 400 ) );
+		$mailbox = $this->resolveMailbox( $input, $operation );
+		if ( is_wp_error( $mailbox ) ) {
+			return $mailbox;
 		}
+		$credentials = $mailbox['credentials'];
 
 		$mailbox = $this->buildMailboxString(
-			$auth->getHost(),
-			$auth->getPort(),
-			$auth->getEncryption(),
-			$folder
+			$credentials['imap_host'],
+			(int) ( $credentials['imap_port'] ?? 993 ),
+			$credentials['imap_encryption'] ?? 'ssl',
+			$input['folder'] ?? 'INBOX'
 		);
 
 		// phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
-		$connection = @imap_open( $mailbox, $auth->getUser(), $auth->getPassword() );
+		$connection = @imap_open( $mailbox, $credentials['imap_user'], $credentials['imap_password'] );
 
 		if ( false === $connection ) {
 			return new \WP_Error( 'email_imap_connection_failed', 'IMAP connection failed: ' . imap_last_error(), array( 'status' => 400 ) );
@@ -1230,6 +1264,18 @@ class EmailAbilities {
 		return $providers['email_imap'] ?? null;
 	}
 
+	private function resolveMailbox( array $input, string|array $operation ): array|\WP_Error {
+		$auth = $this->getAuthProvider();
+		if ( ! $auth || ! method_exists( $auth, 'resolve_mailbox' ) ) {
+			return new \WP_Error( 'email_imap_not_configured', 'IMAP credentials not configured', array( 'status' => 400 ) );
+		}
+		$mailbox = $auth->resolve_mailbox( $input['auth_ref'] ?? 'email_imap:default', $operation );
+		if ( ! is_wp_error( $mailbox ) ) {
+			$this->activeMailbox = $mailbox;
+		}
+		return $mailbox;
+	}
+
 	/**
 	 * Check whether the configured mailbox will receive the sent message.
 	 *
@@ -1237,12 +1283,18 @@ class EmailAbilities {
 	 * @param array $cc Valid Cc addresses.
 	 */
 	private function isConfiguredMailboxRecipient( array $to, array $cc ): bool {
-		$auth = $this->getAuthProvider();
-		if ( ! $auth ) {
+		$credentials = $this->activeMailbox['credentials'] ?? null;
+		if ( ! is_array( $credentials ) ) {
+			$auth = $this->getAuthProvider();
+			if ( $auth && method_exists( $auth, 'getUser' ) ) {
+				$credentials = array( 'imap_user' => $auth->getUser() );
+			}
+		}
+		if ( ! is_array( $credentials ) ) {
 			return false;
 		}
 
-		$mailbox = strtolower( trim( $auth->getUser() ) );
+		$mailbox = strtolower( trim( (string) ( $credentials['imap_user'] ?? '' ) ) );
 		if ( ! is_email( $mailbox ) ) {
 			return false;
 		}
@@ -1280,15 +1332,17 @@ class EmailAbilities {
 	 * @param string $body    Email body.
 	 * @param array  $headers Email headers (Content-Type, In-Reply-To, References, etc.).
 	 */
-	private function saveToSentFolder( array $to, string $subject, string $body, array $headers ): void {
+	private function saveToSentFolder( array $to, string $subject, string $body, array $headers, array $input ): void {
 		// Determine the Sent folder name. Gmail uses "[Gmail]/Sent Mail".
 		$sent_folder = '[Gmail]/Sent Mail';
 
-		$connection = $this->connect( $sent_folder );
+		$input['folder'] = $sent_folder;
+		$connection      = $this->connect( $input, 'reply' );
 		if ( is_wp_error( $connection ) ) {
 			// Non-Gmail server or folder not found — try common alternatives.
 			foreach ( array( 'Sent', 'Sent Items', 'INBOX.Sent' ) as $fallback ) {
-				$connection = $this->connect( $fallback );
+				$input['folder'] = $fallback;
+				$connection      = $this->connect( $input, 'reply' );
 				if ( ! is_wp_error( $connection ) ) {
 					$sent_folder = $fallback;
 					break;
@@ -1301,9 +1355,9 @@ class EmailAbilities {
 			}
 		}
 
-		$auth = $this->getAuthProvider();
-		if ( $auth ) {
-			$from = $auth->getUser();
+		$credentials = $this->activeMailbox['credentials'] ?? null;
+		if ( is_array( $credentials ) ) {
+			$from = $credentials['imap_user'];
 		} else {
 			// Derive a sane fallback From address from the WordPress site itself
 			// rather than hardcoding any specific domain.
@@ -1327,6 +1381,9 @@ class EmailAbilities {
 		$message .= "Date: {$date}\r\n";
 
 		foreach ( $headers as $header ) {
+			if ( 0 === stripos( $header, 'From:' ) ) {
+				continue;
+			}
 			$message .= $header . "\r\n";
 		}
 
@@ -1336,9 +1393,9 @@ class EmailAbilities {
 
 		// phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
 		@imap_append( $connection, $this->buildMailboxString(
-			$auth->getHost(),
-			$auth->getPort(),
-			$auth->getEncryption(),
+			$credentials['imap_host'],
+			(int) ( $credentials['imap_port'] ?? 993 ),
+			$credentials['imap_encryption'] ?? 'ssl',
 			$sent_folder
 		), $message, '\\Seen' );
 
