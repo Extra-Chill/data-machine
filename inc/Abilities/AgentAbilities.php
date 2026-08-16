@@ -119,28 +119,28 @@ class AgentAbilities {
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(
-							'agent'       => array(
+							'agent'        => array(
 								'type'        => 'string',
 								'description' => 'Agent slug or ID to export. Slugs are preferred.',
 							),
-							'agent_slug'  => array(
+							'agent_slug'   => array(
 								'type'        => 'string',
 								'description' => 'Agent slug to export. Prefer agent for new callers.',
 							),
-							'agent_id'    => array(
+							'agent_id'     => array(
 								'type'        => 'integer',
 								'description' => 'Agent ID to export. Supported for compatibility; prefer agent slug.',
 							),
-							'profile'     => array(
+							'profile'      => array(
 								'type'        => 'string',
 								'enum'        => array( 'share', 'backup', 'fork' ),
 								'description' => 'Export profile. Defaults to share.',
 							),
-							'destination' => array(
+							'destination'  => array(
 								'type'        => 'string',
 								'description' => 'Destination directory or ZIP file path. Defaults to <agent-slug>-bundle.',
 							),
-							'format'      => array(
+							'format'       => array(
 								'type'        => 'string',
 								'enum'        => array( 'directory', 'zip' ),
 								'description' => 'Output format. Defaults to directory.',
@@ -476,11 +476,21 @@ class AgentAbilities {
 					'label'               => 'Project Agent Graph',
 					'description'         => 'Return the persisted coordinator graph, identity paths, and generic child runtime policy.',
 					'category'            => 'datamachine-agent',
-					'input_schema'        => array( 'type' => 'object', 'required' => array( 'slug' ), 'properties' => array( 'slug' => array( 'type' => 'string' ) ) ),
+					'input_schema'        => array(
+						'type'       => 'object',
+						'required'   => array( 'slug' ),
+						'properties' => array( 'slug' => array( 'type' => 'string' ) ),
+					),
 					'output_schema'       => array( 'type' => 'object' ),
 					'execute_callback'    => array( self::class, 'projectAgentGraph' ),
 					'permission_callback' => fn() => PermissionHelper::can( 'manage_agents' ),
-					'meta'                => array( 'show_in_rest' => true, 'annotations' => array( 'readonly' => true, 'idempotent' => true ) ),
+					'meta'                => array(
+						'show_in_rest' => true,
+						'annotations'  => array(
+							'readonly'   => true,
+							'idempotent' => true,
+						),
+					),
 				)
 			);
 
@@ -2703,7 +2713,7 @@ class AgentAbilities {
 			new \RecursiveDirectoryIterator( $bundle_dir, \RecursiveDirectoryIterator::SKIP_DOTS ),
 			\RecursiveIteratorIterator::SELF_FIRST
 		);
-		$items = iterator_to_array( $iterator, false );
+		$items    = iterator_to_array( $iterator, false );
 		usort( $items, static fn( \SplFileInfo $left, \SplFileInfo $right ): int => strcmp( $left->getPathname(), $right->getPathname() ) );
 		foreach ( $items as $item ) {
 			$relative_path = sanitize_title( $agent_slug ) . '/' . substr( $item->getPathname(), strlen( $bundle_dir ) + 1 );
