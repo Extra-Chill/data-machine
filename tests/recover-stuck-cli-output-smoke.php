@@ -35,7 +35,8 @@ assert_recover_stuck_cli_output_smoke( 'structured output includes truncation me
 
 echo "Case 2: recover-stuck separates actionable and guarded jobs\n";
 assert_recover_stuck_cli_output_smoke( 'summary helper exists', str_contains( $cli_source, 'private function summarize_recover_stuck_result' ) );
-assert_recover_stuck_cli_output_smoke( 'summary computes actionable total', str_contains( $cli_source, "'actionable'    => \$recovered + \$timed_out + \$stale_actions" ) );
+assert_recover_stuck_cli_output_smoke( 'summary computes actionable total', str_contains( $cli_source, "'actionable'    => \$pending_ai_terminalized + \$recovered + \$timed_out + \$stale_actions" ) );
+assert_recover_stuck_cli_output_smoke( 'summary explicitly includes expired pending AI terminalizations', str_contains( $cli_source, '$pending_ai_terminalized + $recovered' ) );
 assert_recover_stuck_cli_output_smoke( 'table headline reports guarded jobs separately', str_contains( $cli_source, 'Found %d recoverable jobs/actions and %d guarded jobs.' ) );
 assert_recover_stuck_cli_output_smoke( 'table output reports truncated details', str_contains( $cli_source, 'Output truncated; %d additional job/action details omitted.' ) );
 

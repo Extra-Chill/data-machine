@@ -27,8 +27,25 @@ class JobLivenessClassifier {
 				$actions,
 				static function ( array $action ) use ( $job, $engine_data ): bool {
 					$hook = (string) ( $action['hook'] ?? '' );
-					return ! in_array( $hook, array( 'datamachine_execute_step', 'datamachine_resume_ai_step' ), true )
-						|| ChildJobRecoveryPolicy::actionGenerationMatches( $job, $engine_data, $action );
+					if ( ! in_array( $hook, array( 'datamachine_execute_step', 'datamachine_resume_ai_step' ), true ) ) {
+						return true;
+					}
+					if ( ChildJobRecoveryPolicy::actionGenerationMatches( $job, $engine_data, $action ) ) {
+						return true;
+					}
+					if ( 'datamachine_resume_ai_step' !== $hook ) {
+						return false;
+					}
+
+					$throttle = is_array( $engine_data['ai_concurrency_throttle'] ?? null ) ? $engine_data['ai_concurrency_throttle'] : array();
+					$owner    = is_array( $engine_data['ai_concurrency_resume_ownership'] ?? null ) ? $engine_data['ai_concurrency_resume_ownership'] : array();
+					$args     = is_array( $action['decoded_args'] ?? null ) ? $action['decoded_args'] : array();
+					return empty( $owner )
+						&& ! isset( $throttle['resume_generation'] )
+						&& (int) ( $throttle['action_id'] ?? 0 ) > 0
+						&& (int) ( $throttle['action_id'] ?? 0 ) === (int) ( $action['action_id'] ?? 0 )
+						&& (string) ( $throttle['flow_step_id'] ?? '' ) === (string) ( $args['flow_step_id'] ?? '' )
+						&& ChildJobRecoveryPolicy::actionBelongsToJob( $args, (int) ( $job['job_id'] ?? 0 ) );
 				}
 			)
 		);
@@ -55,6 +72,15 @@ class JobLivenessClassifier {
 		$total_children  = (int) ( $child_counts['total'] ?? 0 );
 		$batch_total     = (int) ( $engine_data['batch_total'] ?? 0 );
 		$throttle        = is_array( $engine_data['ai_concurrency_throttle'] ?? null ) ? $engine_data['ai_concurrency_throttle'] : array();
+		$contention_actions = array_values(
+			array_filter(
+				$owner_actions,
+				static fn( array $action ): bool => 'datamachine_resume_ai_step' === (string) ( $action['hook'] ?? '' )
+			)
+		);
+		$contention_owned = ! empty( $throttle )
+			&& 'deferred' === ( $throttle['state'] ?? 'deferred' )
+			&& ! empty( $contention_actions );
 		$first_deferred  = strtotime( (string) ( $throttle['first_deferred_at'] ?? '' ) );
 		$defer_age       = false === $first_deferred ? (int) ( $throttle['defer_age_seconds'] ?? 0 ) : max( 0, $now - $first_deferred );
 
@@ -89,7 +115,7 @@ class JobLivenessClassifier {
 			'last_activity_at'        => is_string( $last_activity ) ? $last_activity : '',
 			'defer_count'             => max( 0, (int) ( $throttle['attempts'] ?? 0 ) ),
 			'defer_age_seconds'       => $defer_age,
-			'contention_active'       => ! empty( $throttle ) && 'deferred' === ( $throttle['state'] ?? 'deferred' ),
+			'contention_active'       => $contention_owned,
 			'contention_provider'     => (string) ( $throttle['provider'] ?? '' ),
 			'pending_actions'         => count( $pending ),
 			'in_progress_actions'     => count( $in_progress ),
