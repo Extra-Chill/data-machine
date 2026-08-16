@@ -225,6 +225,7 @@ class InternalLinkingTask extends SystemTask {
 			'type'           => 'post_meta_set',
 			'target'         => array(
 				'post_id'  => $post_id,
+				// phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key -- Undo-effect target metadata; not a database query.
 				'meta_key' => '_datamachine_internal_links',
 			),
 			'previous_value' => ! empty( $existing_meta ) ? $existing_meta : null,

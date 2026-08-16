@@ -124,6 +124,7 @@ class AltTextTask extends SystemTask {
 				'type'           => 'post_meta_set',
 				'target'         => array(
 					'post_id'  => $attachment_id,
+					// phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key -- Undo-effect target metadata; not a database query.
 					'meta_key' => '_wp_attachment_image_alt',
 				),
 				'previous_value' => ! empty( $current_alt ) ? $current_alt : null,
