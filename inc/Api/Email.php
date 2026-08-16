@@ -30,7 +30,7 @@ class Email {
 			array(
 				'methods'             => 'POST',
 				'callback'            => array( self::class, 'handle_send' ),
-				'permission_callback' => array( self::class, 'check_permission' ),
+				'permission_callback' => self::ability_permission( 'datamachine/send-email' ),
 				'args'                => array(
 					...self::mailbox_args(),
 					'to'           => array(
@@ -84,7 +84,7 @@ class Email {
 			array(
 				'methods'             => 'GET',
 				'callback'            => array( self::class, 'handle_fetch' ),
-				'permission_callback' => array( self::class, 'check_permission' ),
+				'permission_callback' => self::ability_permission( 'datamachine/fetch-email' ),
 				'args'                => array(
 					...self::mailbox_args(),
 					'folder'               => array(
@@ -126,7 +126,7 @@ class Email {
 			array(
 				'methods'             => 'GET',
 				'callback'            => array( self::class, 'handle_read' ),
-				'permission_callback' => array( self::class, 'check_permission' ),
+				'permission_callback' => self::ability_permission( 'datamachine/fetch-email' ),
 				'args'                => array(
 					...self::mailbox_args(),
 					'uid'    => array(
@@ -148,7 +148,7 @@ class Email {
 			array(
 				'methods'             => 'POST',
 				'callback'            => array( self::class, 'handle_reply' ),
-				'permission_callback' => array( self::class, 'check_permission' ),
+				'permission_callback' => self::ability_permission( 'datamachine/email-reply' ),
 				'args'                => array(
 					...self::mailbox_args(),
 					'to'           => array(
@@ -190,7 +190,7 @@ class Email {
 			array(
 				'methods'             => 'DELETE',
 				'callback'            => array( self::class, 'handle_delete' ),
-				'permission_callback' => array( self::class, 'check_permission' ),
+				'permission_callback' => self::ability_permission( 'datamachine/email-delete' ),
 				'args'                => array(
 					...self::mailbox_args(),
 					'uid'    => array(
@@ -212,7 +212,7 @@ class Email {
 			array(
 				'methods'             => 'POST',
 				'callback'            => array( self::class, 'handle_move' ),
-				'permission_callback' => array( self::class, 'check_permission' ),
+				'permission_callback' => self::ability_permission( 'datamachine/email-move' ),
 				'args'                => array(
 					...self::mailbox_args(),
 					'uid'         => array(
@@ -238,7 +238,7 @@ class Email {
 			array(
 				'methods'             => 'POST',
 				'callback'            => array( self::class, 'handle_flag' ),
-				'permission_callback' => array( self::class, 'check_permission' ),
+				'permission_callback' => self::ability_permission( 'datamachine/email-flag' ),
 				'args'                => array(
 					...self::mailbox_args(),
 					'uid'    => array(
@@ -268,7 +268,7 @@ class Email {
 			array(
 				'methods'             => 'POST',
 				'callback'            => array( self::class, 'handle_batch_move' ),
-				'permission_callback' => array( self::class, 'check_permission' ),
+				'permission_callback' => self::ability_permission( 'datamachine/email-batch-move' ),
 				'args'                => array(
 					...self::mailbox_args(),
 					'search'      => array(
@@ -298,7 +298,7 @@ class Email {
 			array(
 				'methods'             => 'POST',
 				'callback'            => array( self::class, 'handle_batch_flag' ),
-				'permission_callback' => array( self::class, 'check_permission' ),
+				'permission_callback' => self::ability_permission( 'datamachine/email-batch-flag' ),
 				'args'                => array(
 					...self::mailbox_args(),
 					'search' => array(
@@ -332,7 +332,7 @@ class Email {
 			array(
 				'methods'             => 'POST',
 				'callback'            => array( self::class, 'handle_batch_delete' ),
-				'permission_callback' => array( self::class, 'check_permission' ),
+				'permission_callback' => self::ability_permission( 'datamachine/email-batch-delete' ),
 				'args'                => array(
 					...self::mailbox_args(),
 					'search' => array(
@@ -358,7 +358,7 @@ class Email {
 			array(
 				'methods'             => 'POST',
 				'callback'            => array( self::class, 'handle_unsubscribe' ),
-				'permission_callback' => array( self::class, 'check_permission' ),
+				'permission_callback' => self::ability_permission( 'datamachine/email-unsubscribe' ),
 				'args'                => array(
 					...self::mailbox_args(),
 					'uid'    => array(
@@ -380,7 +380,7 @@ class Email {
 			array(
 				'methods'             => 'POST',
 				'callback'            => array( self::class, 'handle_batch_unsubscribe' ),
-				'permission_callback' => array( self::class, 'check_permission' ),
+				'permission_callback' => self::ability_permission( 'datamachine/email-batch-unsubscribe' ),
 				'args'                => array(
 					...self::mailbox_args(),
 					'search' => array(
@@ -406,15 +406,25 @@ class Email {
 			array(
 				'methods'             => 'POST',
 				'callback'            => array( self::class, 'handle_test_connection' ),
-				'permission_callback' => array( self::class, 'check_permission' ),
+				'permission_callback' => self::ability_permission( 'datamachine/email-test-connection' ),
 				'args'                => self::mailbox_args(),
 			)
 		);
 	}
 
+	private static function ability_permission( string $ability_name ): callable {
+		return static fn( \WP_REST_Request $request ): bool => self::check_ability_permission( $request, $ability_name );
+	}
+
 	// phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found -- REST permission callbacks receive the request by contract.
-	public static function check_permission( \WP_REST_Request $request ): bool {
-		return PermissionHelper::can( 'use_tools' ) || PermissionHelper::can_manage();
+	private static function check_ability_permission( \WP_REST_Request $request, string $ability_name ): bool {
+		if ( ! PermissionHelper::can( 'use_tools' ) && ! PermissionHelper::can_manage() ) {
+			return false;
+		}
+
+		$ability  = wp_get_ability( $ability_name );
+		$category = is_object( $ability ) && method_exists( $ability, 'get_category' ) ? (string) $ability->get_category() : '';
+		return PermissionHelper::can_use_ability( $ability_name, $category );
 	}
 
 	public static function handle_send( \WP_REST_Request $request ): \WP_REST_Response|\WP_Error {
