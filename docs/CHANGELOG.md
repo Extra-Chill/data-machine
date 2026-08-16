@@ -2,6 +2,13 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.174.2] - 2026-08-16
+
+### Fixed
+- resolve Plugin Check slow-query findings
+- resolve Plugin Check hook findings
+- resolve packaged Plugin Check errors
+
 ## [0.174.1] - 2026-08-16
 
 ### Fixed
