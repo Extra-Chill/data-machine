@@ -100,6 +100,7 @@ if ( ! function_exists( 'update_site_option' ) ) {
 require_once __DIR__ . '/../inc/Engine/Bundle/BundleValidationException.php';
 require_once __DIR__ . '/../inc/Engine/Bundle/AuthRef.php';
 require_once __DIR__ . '/../inc/Core/OAuth/BaseAuthProvider.php';
+require_once __DIR__ . '/../inc/Abilities/AbilityRegistration.php';
 require_once __DIR__ . '/../inc/Abilities/HandlerAbilities.php';
 require_once __DIR__ . '/../inc/Abilities/AuthAbilities.php';
 require_once __DIR__ . '/../inc/Engine/Bundle/AuthRefHandlerConfig.php';
@@ -182,7 +183,7 @@ $assert( 'export returns array', is_array( $rewritten ) );
 $assert( 'export inserts canonical auth_ref', 'email_imap:default' === ( $rewritten['auth_ref'] ?? null ) );
 $assert( 'export preserves non-secret handler fields', 'INBOX' === ( $rewritten['folder'] ?? null ) && 7 === ( $rewritten['max_messages'] ?? null ) );
 $assert( 'export strips password', ! array_key_exists( 'imap_password', $rewritten ) );
-$assert( 'export strips host/user credential fields that include no secret words only when provider marks them by encrypted field absence', array_key_exists( 'imap_host', $rewritten ) );
+$assert( 'export strips the complete IMAP connection identity', ! array_key_exists( 'imap_host', $rewritten ) && ! array_key_exists( 'imap_user', $rewritten ) );
 $assert( 'export output does not contain secret value', ! str_contains( wp_json_encode( $rewritten ), 'super-secret-app-password' ) );
 
 echo "\n[2] Import/runtime resolution restores local config while preserving static fields\n";
@@ -198,8 +199,8 @@ $resolved = apply_filters(
 );
 
 $assert( 'resolve returns array', is_array( $resolved ) );
-$assert( 'resolve removes auth_ref marker', ! array_key_exists( 'auth_ref', $resolved ) );
-$assert( 'resolve restores local secret only at runtime/import boundary', 'super-secret-app-password' === ( $resolved['imap_password'] ?? null ) );
+$assert( 'resolve preserves the non-secret auth_ref marker', 'email_imap:default' === ( $resolved['auth_ref'] ?? null ) );
+$assert( 'resolve never materializes credentials into flow config', ! array_key_exists( 'imap_password', $resolved ) );
 $assert( 'resolve preserves handler static fields', 'Support' === ( $resolved['folder'] ?? null ) && 3 === ( $resolved['max_messages'] ?? null ) );
 
 echo "\n[3] Unresolved and mismatched refs fail clearly without secret leakage\n";
@@ -222,7 +223,7 @@ $bootstrap       = (string) file_get_contents( $root . '/data-machine.php' );
 $assert( 'fetch step resolves auth_ref before handler execution', str_contains( $fetch_step, 'AuthRefHandlerConfig::resolve_runtime_config' ) );
 $assert( 'publish handler resolves auth_ref before execution', str_contains( $publish_handler, 'AuthRefHandlerConfig::resolve_runtime_config' ) );
 $assert( 'upsert handler resolves auth_ref before execution', str_contains( $upsert_handler, 'AuthRefHandlerConfig::resolve_runtime_config' ) );
-$assert( 'plugin bootstrap registers auth_ref filters after handlers load', str_contains( $bootstrap, 'AuthRefHandlerConfig::register();' ) );
+$assert( 'plugin bootstrap delegates auth_ref registration to the runtime service provider', str_contains( $bootstrap, 'RuntimeServiceProvider: AuthRefHandlerConfig::register()' ) );
 
 echo "\n=== Results ===\n";
 echo "Passed: {$passes}\n";

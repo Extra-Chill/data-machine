@@ -19,6 +19,7 @@
 namespace DataMachine\Abilities\Fetch;
 
 use DataMachine\Abilities\PermissionHelper;
+use DataMachine\Core\Steps\Fetch\Handlers\Email\EmailAuth;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -45,29 +46,12 @@ class FetchEmailAbility {
 					'category'            => 'datamachine-fetch',
 					'input_schema'        => array(
 						'type'       => 'object',
-						'required'   => array( 'imap_host', 'imap_user', 'imap_password' ),
+						'required'   => array(),
 						'properties' => array(
-							'imap_host'            => array(
+							'auth_ref'             => array(
 								'type'        => 'string',
-								'description' => __( 'IMAP server hostname (e.g., imap.gmail.com)', 'data-machine' ),
-							),
-							'imap_port'            => array(
-								'type'        => 'integer',
-								'default'     => 993,
-								'description' => __( 'IMAP server port', 'data-machine' ),
-							),
-							'imap_encryption'      => array(
-								'type'        => 'string',
-								'default'     => 'ssl',
-								'description' => __( 'Connection encryption: ssl, tls, or none', 'data-machine' ),
-							),
-							'imap_user'            => array(
-								'type'        => 'string',
-								'description' => __( 'IMAP username (usually your email address)', 'data-machine' ),
-							),
-							'imap_password'        => array(
-								'type'        => 'string',
-								'description' => __( 'IMAP app password (not your account password)', 'data-machine' ),
+								'default'     => 'email_imap:default',
+								'description' => __( 'Non-secret mailbox auth ref', 'data-machine' ),
 							),
 							'folder'               => array(
 								'type'        => 'string',
@@ -145,7 +129,7 @@ class FetchEmailAbility {
 	 * @return bool True if user has permission.
 	 */
 	public function checkPermission(): bool {
-		return PermissionHelper::can_manage();
+		return PermissionHelper::can( 'use_tools' ) || PermissionHelper::can_manage();
 	}
 
 	/**
@@ -160,6 +144,10 @@ class FetchEmailAbility {
 	 * @return array|\WP_Error Result with items or an error.
 	 */
 	public function execute( array $input ): array|\WP_Error {
+		return $this->executeWithContext( $input, array() );
+	}
+
+	public function executeWithContext( array $input, array $context ): array|\WP_Error {
 		$logs = array();
 
 		if ( ! function_exists( 'imap_open' ) ) {
@@ -170,7 +158,25 @@ class FetchEmailAbility {
 			return new \WP_Error( 'email_imap_unavailable', 'PHP IMAP extension is required but not installed. Install php-imap and restart your web server.', array( 'status' => 400 ) );
 		}
 
-		$config = $this->normalizeConfig( $input );
+		$config     = $this->normalizeConfig( $input );
+		$operations = array( 'read' );
+		if ( empty( $config['uid'] ) && ! empty( $config['search_criteria'] ) ) {
+			$operations[] = 'search';
+		}
+		if ( $config['mark_as_read'] ) {
+			$operations[] = 'organize';
+		}
+		$auth = $this->getAuthProvider();
+		if ( ! $auth ) {
+			return new \WP_Error( 'email_imap_not_configured', 'Email IMAP provider is not registered.', array( 'status' => 400 ) );
+		}
+		$resolved = empty( $context )
+			? $auth->resolve_mailbox( $config['auth_ref'], $operations )
+			: $auth->resolve_mailbox_for_principal( $config['auth_ref'], $operations, $context );
+		if ( is_wp_error( $resolved ) ) {
+			return $resolved;
+		}
+		$config = array_merge( $config, $resolved['credentials'] );
 
 		$mailbox = $this->buildMailboxString(
 			$config['imap_host'],
@@ -689,11 +695,7 @@ class FetchEmailAbility {
 	 */
 	private function normalizeConfig( array $input ): array {
 		$defaults = array(
-			'imap_host'            => '',
-			'imap_port'            => 993,
-			'imap_user'            => '',
-			'imap_password'        => '',
-			'imap_encryption'      => 'ssl',
+			'auth_ref'             => 'email_imap:default',
 			'folder'               => 'INBOX',
 			'search_criteria'      => 'UNSEEN',
 			'max_messages'         => 10,
@@ -705,5 +707,11 @@ class FetchEmailAbility {
 		);
 
 		return array_merge( $defaults, $input );
+	}
+
+	private function getAuthProvider(): ?EmailAuth {
+		$providers = apply_filters( 'datamachine_auth_providers', array() );
+		$auth      = $providers['email_imap'] ?? null;
+		return $auth instanceof EmailAuth ? $auth : null;
 	}
 }

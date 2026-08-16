@@ -112,6 +112,10 @@ class SendEmailAbility {
 					// continue to work unchanged.
 					'required'   => array( 'to', 'subject' ),
 					'properties' => array(
+						'auth_ref'     => array(
+							'type'        => 'string',
+							'description' => __( 'Optional non-secret mailbox auth ref authorizing the sender identity', 'data-machine' ),
+						),
 						'to'           => array(
 							'type'        => 'string',
 							'description' => __( 'Comma-separated recipient email addresses', 'data-machine' ),
@@ -202,7 +206,7 @@ class SendEmailAbility {
 	 * @return bool True if user has permission.
 	 */
 	public function checkPermission(): bool {
-		return PermissionHelper::can_manage();
+		return PermissionHelper::can( 'use_tools' ) || PermissionHelper::can_manage();
 	}
 
 	/**
@@ -214,6 +218,22 @@ class SendEmailAbility {
 	public function execute( array $input ): array|\WP_Error {
 		$logs   = array();
 		$config = $this->normalizeConfig( $input );
+		if ( ! empty( $config['auth_ref'] ) ) {
+			$providers = apply_filters( 'datamachine_auth_providers', array() );
+			$auth      = $providers['email_imap'] ?? null;
+			if ( ! $auth || ! method_exists( $auth, 'resolve_mailbox' ) ) {
+				return new \WP_Error( 'email_imap_not_configured', 'Email IMAP provider is not registered.', array( 'status' => 400 ) );
+			}
+			$context = $this->verifiedMailboxContext( $config );
+			$resolved = null === $context
+				? $auth->resolve_mailbox( $config['auth_ref'], 'send' )
+				: $auth->resolve_mailbox_for_principal( $config['auth_ref'], 'send', $context );
+			if ( is_wp_error( $resolved ) ) {
+				return $resolved;
+			}
+			$config['from_email'] = $resolved['credentials']['imap_user'];
+			$config['reply_to']   = $resolved['credentials']['imap_user'];
+		}
 
 		// 1. Parse and validate recipients.
 		$to = array_map( 'trim', explode( ',', $config['to'] ) );
@@ -457,6 +477,7 @@ class SendEmailAbility {
 	 */
 	private function normalizeConfig( array $input ): array {
 		$defaults = array(
+			'auth_ref'     => '',
 			'to'           => '',
 			'cc'           => '',
 			'bcc'          => '',
@@ -473,6 +494,24 @@ class SendEmailAbility {
 		);
 
 		return array_merge( $defaults, $input );
+	}
+
+	private function verifiedMailboxContext( array $config ): ?array {
+		$grant = $config['_mailbox_grant'] ?? null;
+		if ( ! is_array( $grant ) || empty( $grant['signature'] ) ) {
+			return null;
+		}
+		$user_id  = absint( $grant['user_id'] ?? 0 );
+		$agent_id = absint( $grant['agent_id'] ?? 0 );
+		$payload  = (string) $config['auth_ref'] . '|' . $user_id . '|' . $agent_id;
+		$expected = hash_hmac( 'sha256', $payload, wp_salt( 'auth' ) );
+		if ( ! hash_equals( $expected, (string) $grant['signature'] ) ) {
+			return null;
+		}
+		return array(
+			'user_id'  => $user_id,
+			'agent_id' => $agent_id,
+		);
 	}
 
 	/**

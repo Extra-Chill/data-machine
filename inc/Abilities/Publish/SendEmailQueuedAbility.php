@@ -133,6 +133,10 @@ class SendEmailQueuedAbility {
 					// underlying ability runs.
 					'required'   => array( 'to', 'subject' ),
 					'properties' => array(
+						'auth_ref'     => array(
+							'type'        => 'string',
+							'description' => __( 'Optional non-secret mailbox auth ref authorizing the sender identity', 'data-machine' ),
+						),
 						'to'           => array(
 							'type'        => 'string',
 							'description' => __( 'Comma-separated recipient email addresses', 'data-machine' ),
@@ -254,7 +258,7 @@ class SendEmailQueuedAbility {
 	 * @return bool True if user has permission.
 	 */
 	public function checkPermission(): bool {
-		return PermissionHelper::can_manage();
+		return PermissionHelper::can( 'use_tools' ) || PermissionHelper::can_manage();
 	}
 
 	/**
@@ -265,6 +269,23 @@ class SendEmailQueuedAbility {
 	 */
 	public function execute( array $input ): array {
 		$logs = array();
+		if ( ! empty( $input['auth_ref'] ) ) {
+			$providers = apply_filters( 'datamachine_auth_providers', array() );
+			$auth      = $providers['email_imap'] ?? null;
+			$context   = array(
+				'user_id'  => PermissionHelper::acting_user_id(),
+				'agent_id' => absint( PermissionHelper::get_acting_agent_id() ),
+			);
+			if ( ! $auth || ! method_exists( $auth, 'resolve_mailbox' ) || is_wp_error( $auth->resolve_mailbox( $input['auth_ref'], 'send', $context ) ) ) {
+				return array( 'success' => false, 'error' => 'Mailbox send authorization failed.', 'logs' => $logs );
+			}
+			$payload = (string) $input['auth_ref'] . '|' . $context['user_id'] . '|' . $context['agent_id'];
+			$input['_mailbox_grant'] = array(
+				'user_id'   => $context['user_id'],
+				'agent_id'  => $context['agent_id'],
+				'signature' => hash_hmac( 'sha256', $payload, wp_salt( 'auth' ) ),
+			);
+		}
 
 		// Validate the bare minimum here. The underlying ability re-validates
 		// the full payload when the worker runs.

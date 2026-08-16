@@ -23,6 +23,12 @@ class EmailFetchSettings extends FetchHandlerSettings {
 	 */
 	public static function get_fields(): array {
 		$fields = array(
+			'auth_ref'             => array(
+				'type'        => 'text',
+				'label'       => __( 'Mailbox Auth Ref', 'data-machine' ),
+				'default'     => 'email_imap:default',
+				'description' => __( 'Named mailbox connection, for example email_imap:event-submissions.', 'data-machine' ),
+			),
 			'folder'               => array(
 				'type'        => 'text',
 				'label'       => __( 'Mail Folder', 'data-machine' ),

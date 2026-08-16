@@ -52,24 +52,12 @@ class Email extends FetchHandler {
 	 * @return array Array with 'items' key containing fetched messages.
 	 */
 	protected function executeFetch( array $config, ExecutionContext $context ): array {
-		// Resolve IMAP credentials from auth provider.
-		$auth = $this->getAuthProvider( 'email_imap' );
-
-		if ( ! $auth || ! $auth->is_authenticated() ) {
-			$context->log( 'error', 'Email Fetch: IMAP credentials not configured. Set up authentication in handler settings.' );
-			return array();
-		}
-
 		// Build search criteria from config.
 		$search_criteria = $this->buildSearchCriteria( $config );
 
 		// Build ability input.
 		$ability_input = array(
-			'imap_host'            => $auth->getHost(),
-			'imap_port'            => $auth->getPort(),
-			'imap_encryption'      => $auth->getEncryption(),
-			'imap_user'            => $auth->getUser(),
-			'imap_password'        => $auth->getPassword(),
+			'auth_ref'             => $config['auth_ref'] ?? 'email_imap:default',
 			'folder'               => $config['folder'] ?? 'INBOX',
 			'search_criteria'      => $search_criteria,
 			'max_messages'         => (int) ( $config['max_messages'] ?? 10 ),
@@ -79,7 +67,16 @@ class Email extends FetchHandler {
 
 		// Delegate to ability.
 		$ability = new FetchEmailAbility();
-		$result  = $ability->execute( $ability_input );
+		$trusted_context = array(
+			'user_id'          => get_current_user_id(),
+			'agent_id'         => $context->getAgentId(),
+			'flow_id'          => $context->getFlowId(),
+			'pipeline_id'      => $context->getPipelineId(),
+			'flow_step_id'     => $context->getFlowStepId(),
+			'job_id'           => $context->getJobId(),
+			'_legacy_default'  => ! isset( $config['auth_ref'] ),
+		);
+		$result = $ability->executeWithContext( $ability_input, $trusted_context );
 
 		if ( is_wp_error( $result ) ) {
 			$context->log( 'error', 'Email fetch failed: ' . $result->get_error_message() );
