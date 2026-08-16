@@ -101,6 +101,7 @@ final class PersistedAgentGraphProjector {
 		BundleRelativePath::validate( $relative, $label );
 		$root_real = realpath( $root );
 		if ( false === $root_real || ! is_dir( $root_real ) ) {
+			// phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- Validation exception data is returned to callers, never rendered here.
 			throw new BundleValidationException( sprintf( 'Graph %s root is missing: %s', $label, $root ) );
 		}
 		$path = BundleRelativePath::contained_join( $root_real, $relative, $label );
@@ -108,18 +109,22 @@ final class PersistedAgentGraphProjector {
 		foreach ( explode( '/', $relative ) as $segment ) {
 			$cursor .= '/' . $segment;
 			if ( is_link( $cursor ) ) {
+				// phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- Validation exception data is returned to callers, never rendered here.
 				throw new BundleValidationException( sprintf( 'Graph %s source is a symlink: %s', $label, $relative ) );
 			}
 		}
 		$real = realpath( $path );
 		if ( false === $real || ! is_file( $real ) || ! str_starts_with( $real, $root_real . DIRECTORY_SEPARATOR ) ) {
+			// phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- Validation exception data is returned to callers, never rendered here.
 			throw new BundleValidationException( sprintf( 'Graph %s source is missing or escapes its root: %s', $label, $relative ) );
 		}
 		$contents = file_get_contents( $real );
 		if ( ! is_string( $contents ) ) {
+			// phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- Validation exception data is returned to callers, never rendered here.
 			throw new BundleValidationException( sprintf( 'Graph %s source is unreadable: %s', $label, $relative ) );
 		}
 		if ( null !== $sha256 && ! hash_equals( $sha256, hash( 'sha256', $contents ) ) ) {
+			// phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- Validation exception data is returned to callers, never rendered here.
 			throw new BundleValidationException( sprintf( 'Graph %s source hash does not match: %s', $label, $relative ) );
 		}
 		return $real;

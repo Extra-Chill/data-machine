@@ -1,4 +1,9 @@
 <?php
+
+namespace DataMachine\Abilities\Engine;
+
+defined( 'ABSPATH' ) || exit;
+
 /**
  * Parallel-map fan-out adapter.
  *
@@ -60,10 +65,6 @@
  * @package DataMachine\Abilities\Engine
  * @since 0.159.0
  */
-
-namespace DataMachine\Abilities\Engine;
-
-defined( 'ABSPATH' ) || exit;
 
 class ParallelMapFanoutAdapter {
 

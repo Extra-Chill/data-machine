@@ -192,6 +192,7 @@ final class AgentBundleMemoryArtifact {
 			? $memory->replace_all( (string) ( $snapshot['content'] ?? '' ) )
 			: $memory->delete();
 		if ( empty( $result['success'] ) ) {
+			// phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- Restore failure is an internal exception, not rendered output.
 			throw new \RuntimeException( sprintf( 'Failed to restore agent memory file "%s".', $filename ) );
 		}
 	}
