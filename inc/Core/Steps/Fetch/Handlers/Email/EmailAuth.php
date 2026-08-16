@@ -126,6 +126,12 @@ class EmailAuth extends BaseAuthProvider {
 	 */
 	public function resolve_auth_ref( string $account, string $handler_slug = '', array $context = array() ): array|\WP_Error {
 		unset( $handler_slug );
+		if ( empty( $context['runtime'] ) ) {
+			$exists = 'default' === $account ? $this->is_authenticated() : ! empty( $this->find_named_accounts( $account ) );
+			return $exists
+				? array( 'auth_ref' => 'email_imap:' . $account )
+				: new \WP_Error( 'auth_ref_unresolved', __( 'Email mailbox ref is not configured on this install.', 'data-machine' ) );
+		}
 		if ( ! empty( $context['runtime'] ) ) {
 			$context['_trusted_execution'] = true;
 		}
@@ -135,14 +141,10 @@ class EmailAuth extends BaseAuthProvider {
 			return $resolved;
 		}
 
-		if ( ! empty( $context['runtime'] ) ) {
-			return array(
-				'auth_ref'       => $resolved['ref'],
-				'legacy_default' => false,
-			);
-		}
-
-		return array( 'auth_ref' => $resolved['ref'] );
+		return array(
+			'auth_ref'       => $resolved['ref'],
+			'legacy_default' => false,
+		);
 	}
 
 	public function resolve_mailbox_for_principal( string $account, string|array $operations, array $context ): array|\WP_Error {
@@ -171,7 +173,7 @@ class EmailAuth extends BaseAuthProvider {
 		}
 
 		if ( 'default' === $account ) {
-			if ( $agent_id > 0 && empty( $context['_legacy_default'] ) ) {
+			if ( ! $this->can_use_legacy_default( $context, $agent_id, $user_id ) ) {
 				return $this->audit_error( 'email_mailbox_forbidden', $ref, $operations, $context, $agent_id, $user_id );
 			}
 			$credentials = $this->get_config();
@@ -204,6 +206,19 @@ class EmailAuth extends BaseAuthProvider {
 		);
 		$this->audit( $resolved, $operations, $context, $agent_id, $user_id, 'allowed' );
 		return $resolved;
+	}
+
+	private function can_use_legacy_default( array $context, int $agent_id, int $user_id ): bool {
+		if ( $agent_id > 0 ) {
+			return false;
+		}
+		if ( ! empty( $context['principal_less_system'] ) && ! empty( $context['_trusted_execution'] ) ) {
+			return true;
+		}
+		if ( defined( 'WP_CLI' ) && WP_CLI ) {
+			return class_exists( PermissionHelper::class ) && PermissionHelper::can_manage();
+		}
+		return $this->user_has_management_capability( $user_id );
 	}
 
 	public function grant_agent( string $account, string $owner_type, int $owner_id, int $agent_id, array $operations ): bool {
@@ -283,7 +298,7 @@ class EmailAuth extends BaseAuthProvider {
 		if ( 0 === $agent_id && self::AUTH_SCOPE_USER === $match['owner_type'] && $user_id === $match['owner_id'] ) {
 			return true;
 		}
-		if ( 0 === $agent_id && self::AUTH_SCOPE_SITE === $match['owner_type'] && ( ! class_exists( PermissionHelper::class ) || PermissionHelper::can_manage() ) ) {
+		if ( 0 === $agent_id && self::AUTH_SCOPE_SITE === $match['owner_type'] && $this->has_management_principal( $user_id ) ) {
 			return true;
 		}
 		if ( $agent_id <= 0 ) {
@@ -293,6 +308,23 @@ class EmailAuth extends BaseAuthProvider {
 		$owner_key  = $match['owner_type'] . ':' . $match['owner_id'];
 		$grant      = $data['email_imap']['delegations'][ $owner_key ][ $match['account_name'] ][ 'agent:' . $agent_id ] ?? null;
 		return is_array( $grant ) && empty( array_diff( $operations, (array) ( $grant['operations'] ?? array() ) ) );
+	}
+
+	private function has_management_principal( int $user_id ): bool {
+		return ( defined( 'WP_CLI' ) && WP_CLI && class_exists( PermissionHelper::class ) && PermissionHelper::can_manage() )
+			|| $this->user_has_management_capability( $user_id );
+	}
+
+	private function user_has_management_capability( int $user_id ): bool {
+		if ( $user_id <= 0 || ! function_exists( 'user_can' ) ) {
+			return false;
+		}
+		foreach ( array( 'manage_options', 'datamachine_manage_agents', 'datamachine_manage_flows', 'datamachine_manage_settings' ) as $capability ) {
+			if ( user_can( $user_id, $capability ) ) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	private function valid_credentials( array $credentials ): bool {

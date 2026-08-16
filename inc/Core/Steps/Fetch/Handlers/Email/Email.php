@@ -74,7 +74,7 @@ class Email extends FetchHandler {
 			'pipeline_id'      => $context->getPipelineId(),
 			'flow_step_id'     => $context->getFlowStepId(),
 			'job_id'           => $context->getJobId(),
-			'_legacy_default'  => ! isset( $config['auth_ref'] ),
+			'principal_less_system' => null === $context->getAgentId() && 0 === get_current_user_id(),
 		);
 		$result = $ability->executeWithContext( $ability_input, $trusted_context );
 

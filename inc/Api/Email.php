@@ -32,6 +32,7 @@ class Email {
 				'callback'            => array( self::class, 'handle_send' ),
 				'permission_callback' => array( self::class, 'check_permission' ),
 				'args'                => array(
+					...self::mailbox_args(),
 					'to'           => array(
 						'type'     => 'string',
 						'required' => true,
@@ -85,6 +86,7 @@ class Email {
 				'callback'            => array( self::class, 'handle_fetch' ),
 				'permission_callback' => array( self::class, 'check_permission' ),
 				'args'                => array(
+					...self::mailbox_args(),
 					'folder'               => array(
 						'type'    => 'string',
 						'default' => 'INBOX',
@@ -126,6 +128,7 @@ class Email {
 				'callback'            => array( self::class, 'handle_read' ),
 				'permission_callback' => array( self::class, 'check_permission' ),
 				'args'                => array(
+					...self::mailbox_args(),
 					'uid'    => array(
 						'type'     => 'integer',
 						'required' => true,
@@ -147,6 +150,7 @@ class Email {
 				'callback'            => array( self::class, 'handle_reply' ),
 				'permission_callback' => array( self::class, 'check_permission' ),
 				'args'                => array(
+					...self::mailbox_args(),
 					'to'           => array(
 						'type'     => 'string',
 						'required' => true,
@@ -188,6 +192,7 @@ class Email {
 				'callback'            => array( self::class, 'handle_delete' ),
 				'permission_callback' => array( self::class, 'check_permission' ),
 				'args'                => array(
+					...self::mailbox_args(),
 					'uid'    => array(
 						'type'     => 'integer',
 						'required' => true,
@@ -209,6 +214,7 @@ class Email {
 				'callback'            => array( self::class, 'handle_move' ),
 				'permission_callback' => array( self::class, 'check_permission' ),
 				'args'                => array(
+					...self::mailbox_args(),
 					'uid'         => array(
 						'type'     => 'integer',
 						'required' => true,
@@ -234,6 +240,7 @@ class Email {
 				'callback'            => array( self::class, 'handle_flag' ),
 				'permission_callback' => array( self::class, 'check_permission' ),
 				'args'                => array(
+					...self::mailbox_args(),
 					'uid'    => array(
 						'type'     => 'integer',
 						'required' => true,
@@ -263,6 +270,7 @@ class Email {
 				'callback'            => array( self::class, 'handle_batch_move' ),
 				'permission_callback' => array( self::class, 'check_permission' ),
 				'args'                => array(
+					...self::mailbox_args(),
 					'search'      => array(
 						'type'     => 'string',
 						'required' => true,
@@ -292,6 +300,7 @@ class Email {
 				'callback'            => array( self::class, 'handle_batch_flag' ),
 				'permission_callback' => array( self::class, 'check_permission' ),
 				'args'                => array(
+					...self::mailbox_args(),
 					'search' => array(
 						'type'     => 'string',
 						'required' => true,
@@ -325,6 +334,7 @@ class Email {
 				'callback'            => array( self::class, 'handle_batch_delete' ),
 				'permission_callback' => array( self::class, 'check_permission' ),
 				'args'                => array(
+					...self::mailbox_args(),
 					'search' => array(
 						'type'     => 'string',
 						'required' => true,
@@ -350,6 +360,7 @@ class Email {
 				'callback'            => array( self::class, 'handle_unsubscribe' ),
 				'permission_callback' => array( self::class, 'check_permission' ),
 				'args'                => array(
+					...self::mailbox_args(),
 					'uid'    => array(
 						'type'     => 'integer',
 						'required' => true,
@@ -371,6 +382,7 @@ class Email {
 				'callback'            => array( self::class, 'handle_batch_unsubscribe' ),
 				'permission_callback' => array( self::class, 'check_permission' ),
 				'args'                => array(
+					...self::mailbox_args(),
 					'search' => array(
 						'type'     => 'string',
 						'required' => true,
@@ -395,6 +407,7 @@ class Email {
 				'methods'             => 'POST',
 				'callback'            => array( self::class, 'handle_test_connection' ),
 				'permission_callback' => array( self::class, 'check_permission' ),
+				'args'                => self::mailbox_args(),
 			)
 		);
 	}
@@ -639,5 +652,18 @@ class Email {
 			$ref     = '' !== $mailbox ? 'email_imap:' . $mailbox : '';
 		}
 		return '' !== $ref ? $ref : ( $default ? 'email_imap:default' : '' );
+	}
+
+	private static function mailbox_args(): array {
+		return array(
+			'auth_ref' => array(
+				'type'        => 'string',
+				'description' => 'Non-secret mailbox auth ref, for example email_imap:event-submissions.',
+			),
+			'mailbox'  => array(
+				'type'        => 'string',
+				'description' => 'Mailbox account name shorthand for email_imap:<name>.',
+			),
+		);
 	}
 }

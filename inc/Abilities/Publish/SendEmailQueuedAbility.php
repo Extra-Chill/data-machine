@@ -269,22 +269,18 @@ class SendEmailQueuedAbility {
 	 */
 	public function execute( array $input ): array {
 		$logs = array();
+		$context = array(
+			'user_id'  => PermissionHelper::acting_user_id(),
+			'agent_id' => absint( PermissionHelper::get_acting_agent_id() ),
+		);
 		if ( ! empty( $input['auth_ref'] ) ) {
 			$providers = apply_filters( 'datamachine_auth_providers', array() );
 			$auth      = $providers['email_imap'] ?? null;
-			$context   = array(
-				'user_id'  => PermissionHelper::acting_user_id(),
-				'agent_id' => absint( PermissionHelper::get_acting_agent_id() ),
-			);
-			if ( ! $auth || ! method_exists( $auth, 'resolve_mailbox' ) || is_wp_error( $auth->resolve_mailbox( $input['auth_ref'], 'send', $context ) ) ) {
+			if ( ! $auth || ! method_exists( $auth, 'resolve_mailbox' ) || is_wp_error( $auth->resolve_mailbox( $input['auth_ref'], 'send' ) ) ) {
 				return array( 'success' => false, 'error' => 'Mailbox send authorization failed.', 'logs' => $logs );
 			}
-			$payload = (string) $input['auth_ref'] . '|' . $context['user_id'] . '|' . $context['agent_id'];
-			$input['_mailbox_grant'] = array(
-				'user_id'   => $context['user_id'],
-				'agent_id'  => $context['agent_id'],
-				'signature' => hash_hmac( 'sha256', $payload, wp_salt( 'auth' ) ),
-			);
+		} elseif ( ! $this->canUseLegacySender() ) {
+			return array( 'success' => false, 'error' => 'An authorized mailbox ref is required to queue email.', 'logs' => $logs );
 		}
 
 		// Validate the bare minimum here. The underlying ability re-validates
@@ -304,6 +300,7 @@ class SendEmailQueuedAbility {
 		// Strip control fields from payload before scheduling.
 		$priority = isset( $input['priority'] ) ? (int) $input['priority'] : 10;
 		unset( $input['priority'] );
+		$input['_mailbox_grant'] = $this->createMailboxGrant( $input, $context );
 
 		// Initialize the attempt counter. `_attempt` is internal — not part of
 		// the public input schema.
@@ -384,6 +381,10 @@ class SendEmailQueuedAbility {
 		}
 
 		$attempt = isset( $payload['_attempt'] ) ? max( 1, (int) $payload['_attempt'] ) : 1;
+		if ( is_wp_error( $this->verifyMailboxGrant( $payload ) ) ) {
+			do_action( 'datamachine_log', 'error', 'Email worker: queued authorization denied', array( 'attempt' => $attempt ) );
+			return;
+		}
 
 		$ability = wp_get_ability( 'datamachine/send-email' );
 		if ( ! $ability ) {
@@ -452,6 +453,65 @@ class SendEmailQueuedAbility {
 				'error'           => $error_msg,
 			)
 		);
+	}
+
+	private function createMailboxGrant( array $input, array $context ): array {
+		$issued_at = time();
+		$nonce     = wp_generate_uuid4();
+		$grant     = array(
+			'user_id'      => (int) $context['user_id'],
+			'agent_id'     => (int) $context['agent_id'],
+			'issued_at'    => $issued_at,
+			'nonce'        => $nonce,
+			'legacy_sender'=> empty( $input['auth_ref'] ),
+		);
+		$grant['signature'] = hash_hmac( 'sha256', $this->mailboxGrantPayload( $input, $grant ), wp_salt( 'auth' ) );
+		return $grant;
+	}
+
+	private function verifyMailboxGrant( array $payload ): true|\WP_Error {
+		$grant = $payload['_mailbox_grant'] ?? null;
+		if ( ! is_array( $grant ) || empty( $grant['signature'] ) ) {
+			return new \WP_Error( 'email_queue_grant_missing', 'Queued email authorization is missing.' );
+		}
+		$expected = hash_hmac( 'sha256', $this->mailboxGrantPayload( $payload, $grant ), wp_salt( 'auth' ) );
+		if ( ! hash_equals( $expected, (string) $grant['signature'] ) ) {
+			return new \WP_Error( 'email_queue_grant_invalid', 'Queued email authorization is invalid.' );
+		}
+		return true;
+	}
+
+	private function mailboxGrantPayload( array $input, array $grant ): string {
+		$payload = $input;
+		unset( $payload['_attempt'], $payload['_mailbox_grant'] );
+		$payload = $this->canonicalizeGrantValue( $payload );
+		return implode( '|', array(
+			hash( 'sha256', serialize( $payload ) ),
+			(string) absint( $grant['user_id'] ?? 0 ),
+			(string) absint( $grant['agent_id'] ?? 0 ),
+			(string) absint( $grant['issued_at'] ?? 0 ),
+			(string) ( $grant['nonce'] ?? '' ),
+			! empty( $grant['legacy_sender'] ) ? '1' : '0',
+		) );
+	}
+
+	private function canonicalizeGrantValue( array $value ): array {
+		if ( ! array_is_list( $value ) ) {
+			ksort( $value, SORT_STRING );
+		}
+		foreach ( $value as $key => $item ) {
+			if ( is_array( $item ) ) {
+				$value[ $key ] = $this->canonicalizeGrantValue( $item );
+			}
+		}
+		return $value;
+	}
+
+	private function canUseLegacySender(): bool {
+		if ( defined( 'WP_CLI' ) && WP_CLI ) {
+			return PermissionHelper::can_manage();
+		}
+		return PermissionHelper::acting_user_id() > 0 && PermissionHelper::can_manage();
 	}
 
 	/**

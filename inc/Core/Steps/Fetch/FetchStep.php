@@ -165,6 +165,7 @@ class FetchStep extends Step {
 				'job_id'       => $this->job_id,
 				'user_id'      => $owner_user_id,
 				'agent_id'     => $agent_id,
+				'principal_less_system' => 0 === $owner_user_id && 0 === $agent_id,
 			)
 		);
 

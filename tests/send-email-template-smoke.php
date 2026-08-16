@@ -209,14 +209,14 @@ if ( ! function_exists( '__' ) ) {
  * -------------------------------------------------------------------------*/
 
 if ( ! class_exists( '\\DataMachine\\Abilities\\PermissionHelper' ) ) {
-	eval( 'namespace DataMachine\\Abilities; class PermissionHelper { public static function can_manage(): bool { return true; } }' );
+	eval( 'namespace DataMachine\\Abilities; class PermissionHelper { public static bool $manage = true; public static int $user_id = 1; public static int $agent_id = 0; public static function can_manage(): bool { return self::$manage; } public static function can( string $action ): bool { return self::$manage; } public static function acting_user_id(): int { return self::$user_id; } public static function get_acting_agent_id(): ?int { return self::$agent_id ?: null; } }' );
 }
 
 if ( ! class_exists( 'WP_Error' ) ) {
 	class WP_Error {
 		private string $code;
 		private string $message;
-		public function __construct( string $code = '', string $message = '' ) {
+		public function __construct( string $code = '', string $message = '', array $data = array() ) {
 			$this->code    = $code;
 			$this->message = $message;
 		}
@@ -235,10 +235,29 @@ if ( ! function_exists( 'is_wp_error' ) ) {
     }
 }
 
+if ( ! function_exists( 'absint' ) ) {
+	function absint( $value ): int {
+		return abs( (int) $value );
+	}
+}
+
+if ( ! function_exists( 'wp_salt' ) ) {
+	function wp_salt( string $scheme = 'auth' ): string {
+		return 'send-email-smoke-' . $scheme;
+	}
+}
+
+if ( ! function_exists( 'wp_generate_uuid4' ) ) {
+	function wp_generate_uuid4(): string {
+		return sprintf( '00000000-0000-4000-8000-%012d', ++$GLOBALS['ec_action_id_seq'] );
+	}
+}
+
 /* ---------------------------------------------------------------------------
  * Load the abilities under test.
  * -------------------------------------------------------------------------*/
 
+require_once __DIR__ . '/../inc/Abilities/AbilityRegistration.php';
 require_once __DIR__ . '/../inc/Abilities/Publish/SendEmailAbility.php';
 require_once __DIR__ . '/../inc/Abilities/Publish/SendEmailQueuedAbility.php';
 
@@ -270,6 +289,22 @@ ec_assert( 'raw body wp_mail called once', count( $GLOBALS['ec_wp_mail_calls'] )
 ec_assert( 'raw body subject placeholders resolved', false !== strpos( $GLOBALS['ec_wp_mail_calls'][0]['subject'], 'Test Site' ) );
 ec_assert( 'raw body content placeholders resolved', false !== strpos( $GLOBALS['ec_wp_mail_calls'][0]['body'], gmdate( 'Y' ) ) );
 ec_assert( 'raw body no switch_to_blog', count( $GLOBALS['ec_switch_history'] ) === 0 );
+
+echo "\nCase 1b: tool-only sender spoofing denied\n";
+\DataMachine\Abilities\PermissionHelper::$manage  = false;
+\DataMachine\Abilities\PermissionHelper::$user_id = 2;
+$GLOBALS['ec_wp_mail_calls'] = array();
+$res = $send->execute( array(
+	'to'         => 'user@example.com',
+	'subject'    => 'Spoof',
+	'body'       => 'body',
+	'from_email' => 'spoof@example.com',
+	'reply_to'   => 'spoof@example.com',
+) );
+ec_assert( 'tool-only immediate send requires auth_ref', is_wp_error( $res ) && 'email_auth_ref_required' === $res->get_error_code() );
+ec_assert( 'tool-only immediate spoof never calls wp_mail', 0 === count( $GLOBALS['ec_wp_mail_calls'] ) );
+\DataMachine\Abilities\PermissionHelper::$manage  = true;
+\DataMachine\Abilities\PermissionHelper::$user_id = 1;
 
 /* ---------------------------------------------------------------------------
  * Case 2 — template render + placeholder replacement after template.
@@ -306,8 +341,8 @@ $res = $send->execute( array(
 	'template' => 'does-not-exist',
 ) );
 
-ec_assert( 'unknown template fails', false === ( $res['success'] ?? true ) );
-ec_assert( 'unknown template error mentions id', isset( $res['error'] ) && false !== strpos( $res['error'], 'does-not-exist' ) );
+ec_assert( 'unknown template fails', is_wp_error( $res ) );
+ec_assert( 'unknown template error mentions id', is_wp_error( $res ) && false !== strpos( $res->get_error_message(), 'does-not-exist' ) );
 
 /* ---------------------------------------------------------------------------
  * Case 4 — mail_site_id wraps wp_mail in switch_to_blog/restore.
@@ -342,7 +377,7 @@ $res = $send->execute( array(
 	'mail_site_id' => 999,
 ) );
 
-ec_assert( 'invalid mail_site_id fails', false === ( $res['success'] ?? true ) );
+ec_assert( 'invalid mail_site_id fails', is_wp_error( $res ) );
 ec_assert( 'no switch_to_blog on invalid id', count( $GLOBALS['ec_switch_history'] ) === 0 );
 
 /* ---------------------------------------------------------------------------
@@ -364,6 +399,22 @@ ec_assert( 'queued async returned action_id > 0', ( $res['action_id'] ?? 0 ) > 0
 $first = reset( $GLOBALS['ec_scheduled'] );
 ec_assert( 'queued async used async action', ( $first['kind'] ?? '' ) === 'async' );
 ec_assert( 'queued async hook is worker', ( $first['hook'] ?? '' ) === 'datamachine_send_email_worker' );
+$legacy_payload = $first['args'][0] ?? array();
+
+\DataMachine\Abilities\PermissionHelper::$manage  = false;
+\DataMachine\Abilities\PermissionHelper::$user_id = 2;
+$GLOBALS['ec_scheduled'] = array();
+$res = $queued->execute( array(
+	'to'         => 'user@example.com',
+	'subject'    => 'Spoof',
+	'body'       => 'body',
+	'from_email' => 'spoof@example.com',
+	'reply_to'   => 'spoof@example.com',
+) );
+ec_assert( 'tool-only queued spoof requires auth_ref', false === ( $res['success'] ?? true ) );
+ec_assert( 'tool-only queued spoof is not scheduled', 0 === count( $GLOBALS['ec_scheduled'] ) );
+\DataMachine\Abilities\PermissionHelper::$manage  = true;
+\DataMachine\Abilities\PermissionHelper::$user_id = 1;
 
 /* ---------------------------------------------------------------------------
  * Case 7 — queued ability schedules single action when send_at is ISO 8601.
@@ -408,12 +459,8 @@ $GLOBALS['ec_wp_mail_result'] = false;
 $GLOBALS['ec_scheduled'] = array();
 
 $worker = new \DataMachine\Abilities\Publish\SendEmailQueuedAbility();
-$worker->runWorker( array(
-	'to'        => 'user@example.com',
-	'subject'   => 'Subject',
-	'body'      => 'body',
-	'_attempt'  => 1,
-) );
+$legacy_payload['_attempt'] = 1;
+$worker->runWorker( $legacy_payload );
 
 ec_assert( 'worker scheduled a retry on first failure', count( $GLOBALS['ec_scheduled'] ) === 1 );
 $retry = reset( $GLOBALS['ec_scheduled'] );
@@ -424,27 +471,78 @@ ec_assert( 'retry scheduled ~5 min out', abs( ( $retry['timestamp'] ?? 0 ) - ( t
 
 // Third attempt (max): should NOT re-enqueue.
 $GLOBALS['ec_scheduled'] = array();
-$worker->runWorker( array(
-	'to'        => 'user@example.com',
-	'subject'   => 'Subject',
-	'body'      => 'body',
-	'_attempt'  => 3,
-) );
+$legacy_payload['_attempt'] = 3;
+$worker->runWorker( $legacy_payload );
 ec_assert( 'worker gives up at MAX_ATTEMPTS', count( $GLOBALS['ec_scheduled'] ) === 0 );
 
 // Restore wp_mail success and verify worker succeeds and does NOT re-enqueue.
 $GLOBALS['ec_wp_mail_result'] = true;
 $GLOBALS['ec_scheduled']      = array();
 $GLOBALS['ec_wp_mail_calls']  = array();
-$worker->runWorker( array(
-	'to'        => 'user@example.com',
-	'subject'   => 'Subject',
-	'body'      => 'body',
-	'_attempt'  => 1,
-) );
+$legacy_payload['_attempt'] = 1;
+$worker->runWorker( $legacy_payload );
 ec_assert( 'worker success: no retry', count( $GLOBALS['ec_scheduled'] ) === 0 );
 ec_assert( 'worker success: wp_mail invoked', count( $GLOBALS['ec_wp_mail_calls'] ) === 1 );
 ec_assert( 'worker strips _attempt before forwarding', ! isset( $GLOBALS['ec_wp_mail_calls'][0]['_attempt'] ) );
+
+$GLOBALS['ec_wp_mail_calls'] = array();
+$worker->runWorker( array( 'to' => 'user@example.com', 'subject' => 'Ambient bypass', 'body' => 'body' ) );
+ec_assert( 'worker denies missing signed grant despite ambient scheduler access', 0 === count( $GLOBALS['ec_wp_mail_calls'] ) );
+
+$tampered = $legacy_payload;
+$tampered['from_email'] = 'tampered@example.com';
+$GLOBALS['ec_wp_mail_calls'] = array();
+$worker->runWorker( $tampered );
+ec_assert( 'worker denies tampered sender payload', 0 === count( $GLOBALS['ec_wp_mail_calls'] ) );
+
+$tampered = $legacy_payload;
+$tampered['to']   = 'redirected@example.com';
+$tampered['body'] = 'replacement body';
+$GLOBALS['ec_wp_mail_calls'] = array();
+$worker->runWorker( $tampered );
+ec_assert( 'worker denies tampered recipient and body payload', 0 === count( $GLOBALS['ec_wp_mail_calls'] ) );
+
+$GLOBALS['ec_mailbox_revoked'] = false;
+$fake_mailbox_auth = new class() {
+	public function resolve_mailbox( string $ref, string $operation ): array|WP_Error {
+		return $this->resolve( $ref );
+	}
+	public function resolve_mailbox_for_principal( string $ref, string $operation, array $context ): array|WP_Error {
+		return $this->resolve( $ref );
+	}
+	private function resolve( string $ref ): array|WP_Error {
+		if ( $GLOBALS['ec_mailbox_revoked'] ) {
+			return new WP_Error( 'email_mailbox_forbidden', 'Mailbox grant revoked.' );
+		}
+		return array(
+			'ref'         => $ref,
+			'credentials' => array( 'imap_user' => 'authorized@example.com' ),
+		);
+	}
+};
+add_filter( 'datamachine_auth_providers', static function ( array $providers ) use ( $fake_mailbox_auth ): array {
+	$providers['email_imap'] = $fake_mailbox_auth;
+	return $providers;
+} );
+\DataMachine\Abilities\PermissionHelper::$manage   = false;
+\DataMachine\Abilities\PermissionHelper::$user_id  = 42;
+\DataMachine\Abilities\PermissionHelper::$agent_id = 303;
+$GLOBALS['ec_scheduled'] = array();
+$queued->execute( array(
+	'auth_ref' => 'email_imap:delegated',
+	'to'       => 'user@example.com',
+	'subject'  => 'Revocation',
+	'body'     => 'body',
+) );
+$scheduled = reset( $GLOBALS['ec_scheduled'] );
+$revoked_payload = $scheduled['args'][0] ?? array();
+$GLOBALS['ec_mailbox_revoked'] = true;
+$GLOBALS['ec_wp_mail_calls']    = array();
+$worker->runWorker( $revoked_payload );
+ec_assert( 'worker rechecks and denies revoked mailbox grant', 0 === count( $GLOBALS['ec_wp_mail_calls'] ) );
+\DataMachine\Abilities\PermissionHelper::$manage   = true;
+\DataMachine\Abilities\PermissionHelper::$user_id  = 1;
+\DataMachine\Abilities\PermissionHelper::$agent_id = 0;
 
 /* ---------------------------------------------------------------------------
  * Summary

@@ -24,6 +24,12 @@ class EmailCommand extends BaseCommand {
 	 *
 	 * ## OPTIONS
 	 *
+	 * [--auth-ref=<ref>]
+	 * : Authorized mailbox ref. Required for non-management callers.
+	 *
+	 * [--mailbox=<name>]
+	 * : Mailbox name shorthand for email_imap:<name>.
+	 *
 	 * --to=<emails>
 	 * : Comma-separated recipient email addresses.
 	 *
@@ -109,6 +115,12 @@ class EmailCommand extends BaseCommand {
 	 * invokes `datamachine/send-email` under the hood.
 	 *
 	 * ## OPTIONS
+	 *
+	 * [--auth-ref=<ref>]
+	 * : Authorized mailbox ref. Required for non-management callers.
+	 *
+	 * [--mailbox=<name>]
+	 * : Mailbox name shorthand for email_imap:<name>.
 	 *
 	 * --to=<emails>
 	 * : Comma-separated recipient email addresses.
@@ -226,6 +238,12 @@ class EmailCommand extends BaseCommand {
 	 * Fetch emails from IMAP inbox.
 	 *
 	 * ## OPTIONS
+	 *
+	 * [--auth-ref=<ref>]
+	 * : Authorized mailbox ref.
+	 *
+	 * [--mailbox=<name>]
+	 * : Mailbox name shorthand for email_imap:<name>.
 	 *
 	 * [--folder=<folder>]
 	 * : Mail folder to fetch from.
@@ -368,6 +386,12 @@ class EmailCommand extends BaseCommand {
 	 *
 	 * ## OPTIONS
 	 *
+	 * [--auth-ref=<ref>]
+	 * : Authorized mailbox ref.
+	 *
+	 * [--mailbox=<name>]
+	 * : Mailbox name shorthand for email_imap:<name>.
+	 *
 	 * <uid>
 	 * : Message UID to read.
 	 *
@@ -454,6 +478,12 @@ class EmailCommand extends BaseCommand {
 	 *
 	 * ## OPTIONS
 	 *
+	 * [--auth-ref=<ref>]
+	 * : Authorized mailbox ref.
+	 *
+	 * [--mailbox=<name>]
+	 * : Mailbox name shorthand for email_imap:<name>.
+	 *
 	 * --to=<email>
 	 * : Recipient email address.
 	 *
@@ -519,6 +549,12 @@ class EmailCommand extends BaseCommand {
 	 *
 	 * ## OPTIONS
 	 *
+	 * [--auth-ref=<ref>]
+	 * : Authorized mailbox ref.
+	 *
+	 * [--mailbox=<name>]
+	 * : Mailbox name shorthand for email_imap:<name>.
+	 *
 	 * <uid>
 	 * : Message UID to delete.
 	 *
@@ -575,6 +611,12 @@ class EmailCommand extends BaseCommand {
 	 *
 	 * ## OPTIONS
 	 *
+	 * [--auth-ref=<ref>]
+	 * : Authorized mailbox ref.
+	 *
+	 * [--mailbox=<name>]
+	 * : Mailbox name shorthand for email_imap:<name>.
+	 *
 	 * <uid>
 	 * : Message UID to move.
 	 *
@@ -629,6 +671,12 @@ class EmailCommand extends BaseCommand {
 	 * Set or clear a flag on an email.
 	 *
 	 * ## OPTIONS
+	 *
+	 * [--auth-ref=<ref>]
+	 * : Authorized mailbox ref.
+	 *
+	 * [--mailbox=<name>]
+	 * : Mailbox name shorthand for email_imap:<name>.
 	 *
 	 * <uid>
 	 * : Message UID.
@@ -694,6 +742,12 @@ class EmailCommand extends BaseCommand {
 	 * Move all emails matching a search to a folder.
 	 *
 	 * ## OPTIONS
+	 *
+	 * [--auth-ref=<ref>]
+	 * : Authorized mailbox ref.
+	 *
+	 * [--mailbox=<name>]
+	 * : Mailbox name shorthand for email_imap:<name>.
 	 *
 	 * --search=<criteria>
 	 * : IMAP search criteria (e.g., FROM "github.com", SUBJECT "newsletter").
@@ -764,6 +818,12 @@ class EmailCommand extends BaseCommand {
 	 * Set or clear a flag on all emails matching a search.
 	 *
 	 * ## OPTIONS
+	 *
+	 * [--auth-ref=<ref>]
+	 * : Authorized mailbox ref.
+	 *
+	 * [--mailbox=<name>]
+	 * : Mailbox name shorthand for email_imap:<name>.
 	 *
 	 * --search=<criteria>
 	 * : IMAP search criteria.
@@ -846,6 +906,12 @@ class EmailCommand extends BaseCommand {
 	 *
 	 * ## OPTIONS
 	 *
+	 * [--auth-ref=<ref>]
+	 * : Authorized mailbox ref.
+	 *
+	 * [--mailbox=<name>]
+	 * : Mailbox name shorthand for email_imap:<name>.
+	 *
 	 * --search=<criteria>
 	 * : IMAP search criteria.
 	 *
@@ -912,6 +978,12 @@ class EmailCommand extends BaseCommand {
 	 *
 	 * ## OPTIONS
 	 *
+	 * [--auth-ref=<ref>]
+	 * : Authorized mailbox ref.
+	 *
+	 * [--mailbox=<name>]
+	 * : Mailbox name shorthand for email_imap:<name>.
+	 *
 	 * <uid>
 	 * : Message UID to unsubscribe from.
 	 *
@@ -962,6 +1034,12 @@ class EmailCommand extends BaseCommand {
 	 * From address using the most recent message's headers.
 	 *
 	 * ## OPTIONS
+	 *
+	 * [--auth-ref=<ref>]
+	 * : Authorized mailbox ref.
+	 *
+	 * [--mailbox=<name>]
+	 * : Mailbox name shorthand for email_imap:<name>.
 	 *
 	 * --search=<criteria>
 	 * : IMAP search criteria.
@@ -1036,6 +1114,14 @@ class EmailCommand extends BaseCommand {
 
 	/**
 	 * Test the IMAP connection.
+	 *
+	 * ## OPTIONS
+	 *
+	 * [--auth-ref=<ref>]
+	 * : Authorized mailbox ref.
+	 *
+	 * [--mailbox=<name>]
+	 * : Mailbox name shorthand for email_imap:<name>.
 	 *
 	 * ## EXAMPLES
 	 *

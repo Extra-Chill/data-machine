@@ -1042,7 +1042,14 @@ class EmailAbilities {
 			$subject = 'unsubscribe';
 		}
 
-		$sent = wp_mail( $address, $subject, 'unsubscribe' );
+		$headers     = array();
+		$credentials = $this->activeMailbox['credentials'] ?? array();
+		$identity    = (string) ( $credentials['imap_user'] ?? '' );
+		if ( is_email( $identity ) ) {
+			$headers[] = 'From: ' . $identity;
+			$headers[] = 'Reply-To: ' . $identity;
+		}
+		$sent = wp_mail( $address, $subject, 'unsubscribe', $headers );
 
 		if ( $sent ) {
 			return array(
@@ -1062,7 +1069,7 @@ class EmailAbilities {
 	 * Batch move: search → move all matches to destination.
 	 */
 	public function executeBatchMove( array $input ): array|\WP_Error {
-		$connection = $this->connect( $input, array( 'organize', 'delete' ) );
+		$connection = $this->connect( $input, array( 'organize', 'delete', 'search' ) );
 		if ( is_wp_error( $connection ) ) {
 			return $connection;
 		}
@@ -1115,7 +1122,7 @@ class EmailAbilities {
 	 */
 	public function executeBatchFlag( array $input ): array|\WP_Error {
 		$operation  = 'deleted' === strtolower( (string) ( $input['flag'] ?? '' ) ) ? 'delete' : 'organize';
-		$connection = $this->connect( $input, $operation );
+		$connection = $this->connect( $input, array( $operation, 'search' ) );
 		if ( is_wp_error( $connection ) ) {
 			return $connection;
 		}
@@ -1172,7 +1179,7 @@ class EmailAbilities {
 	 * Batch delete: search → delete all matches.
 	 */
 	public function executeBatchDelete( array $input ): array|\WP_Error {
-		$connection = $this->connect( $input, 'delete' );
+		$connection = $this->connect( $input, array( 'delete', 'search' ) );
 		if ( is_wp_error( $connection ) ) {
 			return $connection;
 		}
@@ -1374,6 +1381,9 @@ class EmailAbilities {
 		$message .= "Date: {$date}\r\n";
 
 		foreach ( $headers as $header ) {
+			if ( 0 === stripos( $header, 'From:' ) ) {
+				continue;
+			}
 			$message .= $header . "\r\n";
 		}
 

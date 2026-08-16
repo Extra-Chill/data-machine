@@ -403,7 +403,7 @@ class FetchEmailAbility {
 		}
 
 		// Fetch body.
-		$body = $this->fetchBody( $connection, $uid );
+		$body = $this->fetchBody( $connection, $uid, ! $config['mark_as_read'] );
 
 		// Check for attachments.
 		$structure        = imap_fetchstructure( $connection, $uid, FT_UID );
@@ -417,7 +417,7 @@ class FetchEmailAbility {
 
 			if ( $config['download_attachments'] && ! empty( $attachments ) ) {
 				foreach ( $attachments as $attachment ) {
-					$file_info = $this->downloadAttachment( $connection, $uid, $attachment );
+					$file_info = $this->downloadAttachment( $connection, $uid, $attachment, ! $config['mark_as_read'] );
 					if ( null === $file_info ) {
 						++$skipped_count;
 						do_action(
@@ -485,7 +485,8 @@ class FetchEmailAbility {
 	 * @param int      $uid        Message UID.
 	 * @return string Message body text.
 	 */
-	private function fetchBody( $connection, int $uid ): string {
+	private function fetchBody( $connection, int $uid, bool $peek ): string {
+		$fetch_flags = FT_UID | ( $peek ? FT_PEEK : 0 );
 		$structure = imap_fetchstructure( $connection, $uid, FT_UID );
 		if ( ! $structure ) {
 			return '';
@@ -493,7 +494,7 @@ class FetchEmailAbility {
 
 		// Simple single-part message.
 		if ( empty( $structure->parts ) ) {
-			$body = imap_fetchbody( $connection, $uid, '1', FT_UID );
+			$body = imap_fetchbody( $connection, $uid, '1', $fetch_flags );
 			return $this->decodeBody( $body, $structure->encoding ?? 0 );
 		}
 
@@ -506,7 +507,7 @@ class FetchEmailAbility {
 
 			if ( 0 === ( $part->type ?? -1 ) ) {
 				$subtype = strtolower( $part->subtype ?? '' );
-				$body    = imap_fetchbody( $connection, $uid, $part_number, FT_UID );
+				$body    = imap_fetchbody( $connection, $uid, $part_number, $fetch_flags );
 				$decoded = $this->decodeBody( $body, $part->encoding ?? 0 );
 
 				if ( 'plain' === $subtype && empty( $plain_body ) ) {
@@ -523,7 +524,7 @@ class FetchEmailAbility {
 
 					if ( 0 === ( $sub_part->type ?? -1 ) ) {
 						$subtype = strtolower( $sub_part->subtype ?? '' );
-						$body    = imap_fetchbody( $connection, $uid, $sub_number, FT_UID );
+						$body    = imap_fetchbody( $connection, $uid, $sub_number, $fetch_flags );
 						$decoded = $this->decodeBody( $body, $sub_part->encoding ?? 0 );
 
 						if ( 'plain' === $subtype && empty( $plain_body ) ) {
@@ -620,8 +621,9 @@ class FetchEmailAbility {
 	/**
 	 * Download an attachment to temp storage.
 	 */
-	private function downloadAttachment( $connection, int $uid, array $attachment_info ): ?array {
-		$body = imap_fetchbody( $connection, $uid, $attachment_info['part_number'], FT_UID );
+	private function downloadAttachment( $connection, int $uid, array $attachment_info, bool $peek ): ?array {
+		$flags = FT_UID | ( $peek ? FT_PEEK : 0 );
+		$body  = imap_fetchbody( $connection, $uid, $attachment_info['part_number'], $flags );
 		if ( empty( $body ) ) {
 			return null;
 		}
