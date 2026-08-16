@@ -275,6 +275,7 @@ final class AgentConfigArtifactProjector {
 			return $value;
 		}
 
+		// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.DynamicHooknameFound -- policies() supplies the single explicit Data Machine projection-policy hook.
 		return \apply_filters( $hook, $value );
 	}
 

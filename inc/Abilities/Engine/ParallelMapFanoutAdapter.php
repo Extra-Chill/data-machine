@@ -1,4 +1,9 @@
 <?php
+
+namespace DataMachine\Abilities\Engine;
+
+defined( 'ABSPATH' ) || exit;
+
 /**
  * Parallel-map fan-out adapter.
  *
@@ -60,10 +65,6 @@
  * @package DataMachine\Abilities\Engine
  * @since 0.159.0
  */
-
-namespace DataMachine\Abilities\Engine;
-
-defined( 'ABSPATH' ) || exit;
 
 class ParallelMapFanoutAdapter {
 
@@ -154,6 +155,7 @@ class ParallelMapFanoutAdapter {
 		 * @param array $step    The `parallel`-map step spec.
 		 * @param array $context Caller context.
 		 */
+		// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.DynamicHooknameFound -- The constant is the canonical external Agents API contract hook.
 		return (bool) apply_filters( self::FANOUT_GATE_FILTER, true, $step, $context );
 	}
 

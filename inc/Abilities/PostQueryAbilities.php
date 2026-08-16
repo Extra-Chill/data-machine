@@ -25,10 +25,12 @@ class PostQueryAbilities {
 	private static function get_filter_types(): array {
 		return array(
 			'handler'  => array(
+				// phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key -- Filter configuration metadata; not a database query.
 				'meta_key'   => PostTracking::HANDLER_META_KEY,
 				'value_type' => 'string',
 			),
 			'flow'     => array(
+				// phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key -- Filter configuration metadata; not a database query.
 				'meta_key'   => PostTracking::FLOW_ID_META_KEY,
 				'value_type' => 'integer',
 			),
@@ -36,6 +38,7 @@ class PostQueryAbilities {
 			// than a direct meta match, because pipeline_id is no longer
 			// stored on posts (#1091). See build_pipeline_meta_query().
 			'pipeline' => array(
+				// phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key -- Filter configuration metadata; not a database query.
 				'meta_key'   => PostTracking::FLOW_ID_META_KEY,
 				'value_type' => 'integer',
 				'resolver'   => 'pipeline',
@@ -274,6 +277,7 @@ class PostQueryAbilities {
 			'offset'         => $offset,
 			'orderby'        => 'date',
 			'order'          => 'DESC',
+			// phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query -- Lists managed posts by the canonical handler marker; wp_postmeta index ownership is outside this plugin.
 			'meta_query'     => array(
 				array(
 					'key'     => PostTracking::HANDLER_META_KEY,
@@ -386,6 +390,7 @@ class PostQueryAbilities {
 			'offset'         => $offset,
 			'orderby'        => $orderby,
 			'order'          => $order,
+			// phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query -- Filters canonical tracking meta; pipeline IDs resolve from owned flows, while wp_postmeta index ownership is outside this plugin.
 			'meta_query'     => $meta_query,
 		);
 
@@ -474,6 +479,7 @@ class PostQueryAbilities {
 			'offset'         => $offset,
 			'orderby'        => 'date',
 			'order'          => 'DESC',
+			// phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query -- Filters canonical tracking meta; wp_postmeta index ownership is outside this plugin.
 			'meta_query'     => array( $meta_clause ),
 		);
 

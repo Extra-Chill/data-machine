@@ -108,7 +108,9 @@ class PostIdentityReservations extends BaseRepository {
 
 		return array(
 			'post_type'       => $post_type,
+			// phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key -- Normalized identity data; not a database query.
 			'meta_key'        => $meta_key,
+			// phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_value -- Normalized identity data; not a database query.
 			'meta_value'      => $meta_value,
 			'identity_hash'   => hash( 'sha256', $canonical ),
 			'post_type_hash'  => hash( 'sha256', $post_type ),

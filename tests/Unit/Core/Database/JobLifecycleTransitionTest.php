@@ -145,6 +145,99 @@ class JobLifecycleTransitionTest extends WP_UnitTestCase {
 		$this->assertCount( 3, $processing );
 	}
 
+	public function test_active_pending_ai_deferral_is_guarded(): void {
+		$job_id    = $this->db_jobs->create_job( array( 'label' => 'Active pending AI deferral' ) );
+		$generation = 1;
+		$action_id = as_schedule_single_action(
+			time() + HOUR_IN_SECONDS,
+			AIConcurrencyBackpressure::RESUME_HOOK,
+			array( 'job_id' => $job_id, 'flow_step_id' => 'ai-step', 'ai_resume_generation' => $generation ),
+			'data-machine-ai-resume-test',
+			true
+		);
+		$this->storePendingAIDeferral( $job_id, (int) $action_id, $generation );
+
+		$result = ( new RecoverStuckJobsAbility() )->execute( array( 'dry_run' => true, 'job_id' => $job_id, 'limit' => 1 ) );
+		$this->assertSame( 0, $result['pending_ai_terminalized'] );
+		$this->assertSame( 1, $result['pending_ai_guarded'] );
+		$this->assertSame( 'recorded_scheduler_action_exists', $result['jobs'][0]['reason'] );
+		$this->assertSame( JobStatus::PENDING, $this->db_jobs->get_job( $job_id )['status'] );
+	}
+
+	public function test_expired_pending_ai_deferral_dry_run_and_apply_are_coherent(): void {
+		$job_id = $this->db_jobs->create_job( array( 'label' => 'Expired pending AI deferral' ) );
+		$this->storePendingAIDeferral( $job_id, 900000001, 4 );
+
+		$dry_run = ( new RecoverStuckJobsAbility() )->execute( array( 'dry_run' => true, 'job_id' => $job_id, 'limit' => 1 ) );
+		$this->assertSame( 1, $dry_run['pending_ai_terminalized'] );
+		$this->assertSame( 0, $dry_run['mutations'] );
+		$this->assertSame( 0, $dry_run['touched'] );
+		$this->assertSame( 'would_terminalize_expired_ai_deferral', $dry_run['jobs'][0]['status'] );
+
+		$applied = ( new RecoverStuckJobsAbility() )->execute( array( 'job_id' => $job_id, 'limit' => 1 ) );
+		$this->assertSame( $dry_run['pending_ai_terminalized'], $applied['pending_ai_terminalized'] );
+		$this->assertSame( 1, $applied['mutations'] );
+		$this->assertSame( 1, $applied['touched'] );
+		$this->assertSame( 'terminalized_expired_ai_deferral', $applied['jobs'][0]['status'] );
+		$job = $this->db_jobs->get_job( $job_id );
+		$this->assertSame( JobStatus::CANCELLED, $job['status'] );
+		$this->assertArrayNotHasKey( 'ai_concurrency_throttle', $job['engine_data'] );
+		$this->assertSame( 'scheduler_action_missing', $job['engine_data']['ai_concurrency_history'][0]['reason'] );
+	}
+
+	public function test_legacy_expired_pending_ai_deferral_without_generation_is_recoverable(): void {
+		$job_id = $this->db_jobs->create_job( array( 'label' => 'Legacy expired pending AI deferral' ) );
+		$this->storePendingAIDeferral( $job_id, 900000002, 0, true );
+
+		$dry_run = ( new RecoverStuckJobsAbility() )->execute( array( 'dry_run' => true, 'job_id' => $job_id, 'limit' => 1 ) );
+		$this->assertSame( 1, $dry_run['pending_ai_terminalized'] );
+		$this->assertSame( 0, $dry_run['jobs'][0]['generation'] );
+
+		$applied = ( new RecoverStuckJobsAbility() )->execute( array( 'job_id' => $job_id, 'limit' => 1 ) );
+		$this->assertSame( 1, $applied['pending_ai_terminalized'] );
+		$this->assertSame( JobStatus::CANCELLED, $this->db_jobs->get_job( $job_id )['status'] );
+	}
+
+	public function test_pending_ai_recovery_honors_exact_scope_and_limit(): void {
+		$job_ids = array();
+		foreach ( array( 900000011, 900000012, 900000013 ) as $index => $action_id ) {
+			$job_id = $this->db_jobs->create_job( array( 'label' => 'Bounded pending AI deferral ' . $index ) );
+			$this->storePendingAIDeferral( $job_id, $action_id, 2 );
+			$job_ids[] = $job_id;
+		}
+
+		$exact = ( new RecoverStuckJobsAbility() )->execute( array( 'dry_run' => true, 'job_id' => $job_ids[1], 'limit' => 3 ) );
+		$this->assertSame( 1, $exact['pending_ai_terminalized'] );
+		$this->assertSame( $job_ids[1], $exact['jobs'][0]['job_id'] );
+
+		$dry_run = ( new RecoverStuckJobsAbility() )->execute( array( 'dry_run' => true, 'limit' => 2 ) );
+		$applied = ( new RecoverStuckJobsAbility() )->execute( array( 'limit' => 2 ) );
+		$this->assertSame( 2, $dry_run['pending_ai_terminalized'] );
+		$this->assertSame( $dry_run['pending_ai_terminalized'], $applied['pending_ai_terminalized'] );
+		$this->assertSame( 2, $applied['touched'] );
+		$this->assertCount( 1, array_filter( $job_ids, fn( int $id ): bool => JobStatus::PENDING === $this->db_jobs->get_job( $id )['status'] ) );
+	}
+
+	private function storePendingAIDeferral( int $job_id, int $action_id, int $generation, bool $legacy = false ): void {
+		$engine = datamachine_get_engine_data( $job_id );
+		$engine['ai_concurrency_throttle'] = array(
+			'flow_step_id'      => 'ai-step',
+			'next_retry_at'     => gmdate( 'c', time() - HOUR_IN_SECONDS ),
+			'action_id'         => $action_id,
+		);
+		if ( ! $legacy ) {
+			$engine['ai_concurrency_throttle']['state']             = 'deferred';
+			$engine['ai_concurrency_throttle']['resume_generation'] = $generation;
+			$engine['ai_concurrency_resume_ownership'] = array(
+				'status'       => 'scheduled',
+				'flow_step_id' => 'ai-step',
+				'action_id'    => $action_id,
+				'generation'   => $generation,
+			);
+		}
+		$this->assertTrue( datamachine_set_engine_data( $job_id, $engine ) );
+	}
+
 	public function test_action_history_overfetches_past_numeric_prefix_collisions(): void {
 		$exact_id = as_schedule_single_action( time(), 'datamachine_execute_step', array( 'job_id' => 42, 'flow_step_id' => 'exact' ), 'data-machine' );
 		for ( $index = 0; $index < 75; ++$index ) {

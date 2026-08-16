@@ -356,6 +356,7 @@ final class SignPendingActionResolutionAbility {
 
 		$html = '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>' . esc_html( $title ) . '</title></head><body><main><h1>' . esc_html( $title ) . '</h1><p>' . esc_html( $message ) . '</p></main></body></html>';
 
+		// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.DynamicHooknameFound -- The constant is the canonical Data Machine HTML response hook.
 		return (string) apply_filters( self::HTML_RESPONSE_FILTER, $html, $result, $status );
 	}
 

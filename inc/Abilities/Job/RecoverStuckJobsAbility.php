@@ -3,7 +3,7 @@
 /**
  * Recover Stuck Jobs Ability
  *
- * Recovers jobs stuck in processing state: jobs with status override in engine_data, and jobs exceeding timeout threshold.
+ * Recovers stuck processing jobs and expired pending AI deferrals whose exact scheduler action is absent.
  *
  * @package DataMachine\Abilities\Job
  * @since 0.17.0
@@ -56,7 +56,7 @@ class RecoverStuckJobsAbility {
 				'datamachine/recover-stuck-jobs',
 				array(
 					'label'               => __( 'Recover Stuck Jobs', 'data-machine' ),
-					'description'         => __( 'Recover jobs stuck in processing state: jobs with status override in engine_data, and jobs exceeding timeout threshold.', 'data-machine' ),
+					'description'         => __( 'Recover stuck processing jobs and expired pending AI deferrals whose exact scheduler action is absent.', 'data-machine' ),
 					'category'            => 'datamachine-jobs',
 					'input_schema'        => array(
 						'type'       => 'object',
@@ -112,6 +112,8 @@ class RecoverStuckJobsAbility {
 							'pathless_requeued' => array( 'type' => 'integer' ),
 							'claimed_elsewhere' => array( 'type' => 'integer' ),
 							'pathless_policy_skipped' => array( 'type' => 'integer' ),
+							'pending_ai_terminalized' => array( 'type' => 'integer' ),
+							'pending_ai_guarded' => array( 'type' => 'integer' ),
 							'mutations'     => array( 'type' => 'integer' ),
 							'attempted'     => array( 'type' => 'integer' ),
 							'touched'       => array( 'type' => 'integer' ),
@@ -168,6 +170,112 @@ class RecoverStuckJobsAbility {
 		$touched        = 0;
 		$mutated        = 0;
 		$limit_reached  = false;
+		$pending_ai_terminalized = 0;
+		$pending_ai_guarded      = 0;
+		$recovery_trigger = isset( $input['recovery_trigger'] ) ? sanitize_key( (string) $input['recovery_trigger'] ) : 'operator';
+
+		// Pending AI recovery is intentionally first so dry-run and apply inspect the
+		// same bounded candidate set before processing-only recovery consumes touches.
+		$pending_ai_jobs = $this->getExpiredPendingAIDeferrals( $flow_id, $job_id_scope, $apply_limit );
+		if ( count( $pending_ai_jobs ) > $apply_limit ) {
+			$limit_reached  = true;
+			$pending_ai_jobs = array_slice( $pending_ai_jobs, 0, $apply_limit );
+		}
+		foreach ( $pending_ai_jobs as $job ) {
+			$job_id      = (int) $job['job_id'];
+			$job_flow_id = (int) $job['flow_id'];
+			$engine_data = is_array( $job['engine_data'] ) ? $job['engine_data'] : array();
+			$throttle    = is_array( $engine_data['ai_concurrency_throttle'] ?? null ) ? $engine_data['ai_concurrency_throttle'] : array();
+			$resume      = is_array( $engine_data['ai_concurrency_resume_ownership'] ?? null ) ? $engine_data['ai_concurrency_resume_ownership'] : array();
+			$ownership   = array(
+				'action_id'     => (int) ( $throttle['action_id'] ?? 0 ),
+				'generation'    => (int) ( $throttle['resume_generation'] ?? 0 ),
+				'flow_step_id'  => (string) ( $throttle['flow_step_id'] ?? '' ),
+				'next_retry_at' => (string) ( $throttle['next_retry_at'] ?? '' ),
+			);
+			$retry_time = strtotime( $ownership['next_retry_at'] );
+			$legacy_receipt = empty( $resume ) && 0 === $ownership['generation'];
+			$modern_receipt = $ownership['generation'] > 0
+				&& 'scheduled' === (string) ( $resume['status'] ?? '' )
+				&& $ownership['action_id'] === (int) ( $resume['action_id'] ?? 0 )
+				&& $ownership['generation'] === (int) ( $resume['generation'] ?? 0 )
+				&& $ownership['flow_step_id'] === (string) ( $resume['flow_step_id'] ?? '' );
+			$valid_receipt = $ownership['action_id'] > 0
+				&& '' !== $ownership['flow_step_id']
+				&& false !== $retry_time
+				&& $retry_time < time()
+				&& ( $modern_receipt || $legacy_receipt );
+			$ownership['legacy'] = $legacy_receipt;
+			$action_evidence = $valid_receipt ? $this->getRecordedActionEvidence( $ownership['action_id'] ) : array( 'complete' => true, 'exists' => false, 'status' => '' );
+
+			if ( ! $valid_receipt || empty( $action_evidence['complete'] ) || ! empty( $action_evidence['exists'] ) ) {
+				++$skipped;
+				++$pending_ai_guarded;
+				$this->appendJobDetail(
+					$jobs,
+					$jobs_omitted,
+					array(
+						'job_id'       => $job_id,
+						'flow_id'      => $job_flow_id,
+						'scope'        => 'pending_ai_deferral',
+						'status'       => 'skipped',
+						'reason'       => ! $valid_receipt ? 'incomplete_ai_resume_ownership' : ( empty( $action_evidence['complete'] ) ? 'scheduler_evidence_incomplete' : 'recorded_scheduler_action_exists' ),
+						'action_id'    => $ownership['action_id'],
+						'action_status' => (string) ( $action_evidence['status'] ?? '' ),
+						'generation'   => $ownership['generation'],
+						'next_retry_at' => $ownership['next_retry_at'],
+					)
+				);
+				continue;
+			}
+
+			if ( $dry_run ) {
+				++$pending_ai_terminalized;
+				$this->appendJobDetail( $jobs, $jobs_omitted, array(
+					'job_id'       => $job_id,
+					'flow_id'      => $job_flow_id,
+					'scope'        => 'pending_ai_deferral',
+					'status'       => 'would_terminalize_expired_ai_deferral',
+					'target_status' => 'cancelled - ai_concurrency_stranded',
+					'reason'       => 'expired_retry_action_missing',
+					'action_id'    => $ownership['action_id'],
+					'generation'   => $ownership['generation'],
+					'next_retry_at' => $ownership['next_retry_at'],
+				) );
+				continue;
+			}
+
+			if ( ! $this->consumeTouchBudget( $attempted, $touched, $apply_limit ) ) {
+				$limit_reached = true;
+				break;
+			}
+			$result = $this->db_jobs->transition_expired_ai_deferral( $job_id, 'cancelled - ai_concurrency_stranded', $ownership, $recovery_trigger );
+			if ( ! empty( $result['success'] ) && ! empty( $result['changed'] ) ) {
+				++$pending_ai_terminalized;
+				++$mutations;
+				++$mutated;
+				$this->appendJobDetail( $jobs, $jobs_omitted, array(
+					'job_id'       => $job_id,
+					'flow_id'      => $job_flow_id,
+					'scope'        => 'pending_ai_deferral',
+					'status'       => 'terminalized_expired_ai_deferral',
+					'target_status' => 'cancelled - ai_concurrency_stranded',
+					'reason'       => 'expired_retry_action_missing',
+					'action_id'    => $ownership['action_id'],
+					'generation'   => $ownership['generation'],
+				) );
+			} else {
+				++$skipped;
+				++$pending_ai_guarded;
+				$this->appendJobDetail( $jobs, $jobs_omitted, array(
+					'job_id'  => $job_id,
+					'flow_id' => $job_flow_id,
+					'scope'   => 'pending_ai_deferral',
+					'status'  => 'skipped',
+					'reason'  => 'pending_ai_ownership_changed',
+				) );
+			}
+		}
 
 		$last_job_id = 0;
 		while ( true ) {
@@ -268,7 +376,6 @@ class RecoverStuckJobsAbility {
 		$pathless_requeued = 0;
 		$claimed_elsewhere = 0;
 		$pathless_policy_skipped = 0;
-		$recovery_trigger = isset( $input['recovery_trigger'] ) ? sanitize_key( (string) $input['recovery_trigger'] ) : 'operator';
 
 		$last_job_id = 0;
 		while ( true ) {
@@ -675,8 +782,8 @@ class RecoverStuckJobsAbility {
 		$jobs_truncated = $jobs_omitted > 0;
 
 		$message = $dry_run
-			? sprintf( 'Dry run complete. Would recover %d jobs, timeout %d jobs, requeue %d pathless children, terminalize %d pathless children, reconcile %d terminal-backed actions, and guard %d pathless children requiring explicit authorization.', $recovered, $timed_out, $pathless_requeued, $pathless_terminal, $stale_actions, $pathless_policy_skipped )
-			: sprintf( 'Recovery complete. Attempted/touched/mutated: %d/%d/%d (limit %d), outcomes: %d, recovered: %d, timed out: %d, pathless requeued: %d, pathless terminal: %d, reconciled actions: %d, policy-skipped: %d', $attempted, $touched, $mutated, $apply_limit, $mutations, $recovered, $timed_out, $pathless_requeued, $pathless_terminal, $stale_actions, $pathless_policy_skipped );
+			? sprintf( 'Dry run complete. Would terminalize %d expired pending AI deferrals, recover %d jobs, timeout %d jobs, requeue %d pathless children, terminalize %d pathless children, reconcile %d terminal-backed actions, guard %d pending AI deferrals, and guard %d pathless children requiring explicit authorization.', $pending_ai_terminalized, $recovered, $timed_out, $pathless_requeued, $pathless_terminal, $stale_actions, $pending_ai_guarded, $pathless_policy_skipped )
+			: sprintf( 'Recovery complete. Attempted/touched/mutated: %d/%d/%d (limit %d), outcomes: %d, pending AI terminalized: %d, recovered: %d, timed out: %d, pathless requeued: %d, pathless terminal: %d, reconciled actions: %d, pending AI guarded: %d, policy-skipped: %d', $attempted, $touched, $mutated, $apply_limit, $mutations, $pending_ai_terminalized, $recovered, $timed_out, $pathless_requeued, $pathless_terminal, $stale_actions, $pending_ai_guarded, $pathless_policy_skipped );
 
 		if ( ! $dry_run && ( $mutations > 0 || $claimed_elsewhere > 0 || $pathless_policy_skipped > 0 ) ) {
 			do_action(
@@ -692,6 +799,8 @@ class RecoverStuckJobsAbility {
 					'pathless_terminal' => $pathless_terminal,
 					'claimed_elsewhere' => $claimed_elsewhere,
 					'pathless_policy_skipped' => $pathless_policy_skipped,
+					'pending_ai_terminalized' => $pending_ai_terminalized,
+					'pending_ai_guarded' => $pending_ai_guarded,
 					'mutations'     => $mutations,
 					'attempted'     => $attempted,
 					'touched'       => $touched,
@@ -715,6 +824,8 @@ class RecoverStuckJobsAbility {
 			'pathless_requeued' => $pathless_requeued,
 			'claimed_elsewhere' => $claimed_elsewhere,
 			'pathless_policy_skipped' => $pathless_policy_skipped,
+			'pending_ai_terminalized' => $pending_ai_terminalized,
+			'pending_ai_guarded' => $pending_ai_guarded,
 			'mutations'      => $mutations,
 			'attempted'      => $attempted,
 			'touched'        => $touched,
@@ -724,8 +835,9 @@ class RecoverStuckJobsAbility {
 			'scope'          => array(
 				'job_id'                    => $job_id_scope,
 				'flow_id'                   => $flow_id,
-				'statuses'                  => array( 'processing' ),
-				'includes_pending_ai'       => false,
+				'statuses'                  => array( 'processing', 'pending' ),
+				'includes_pending_ai'       => true,
+				'pending_ai_requirement'    => 'expired deferred throttle with exact absent action receipt',
 				'recover_pathless_children' => $recover_pathless_children,
 			),
 			'dry_run'        => $dry_run,
@@ -761,6 +873,54 @@ class RecoverStuckJobsAbility {
 		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Dynamic WHERE clause is prepared above.
 		return (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table} {$where}" );
 		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+	}
+
+	/** Fetch one bounded review set of expired pending AI deferrals. */
+	private function getExpiredPendingAIDeferrals( ?int $flow_id, ?int $job_id, int $limit ): array {
+		global $wpdb;
+		$table = $wpdb->prefix . 'datamachine_jobs';
+		$where = $wpdb->prepare(
+			"WHERE status = 'pending'
+			 AND COALESCE(JSON_UNQUOTE(JSON_EXTRACT(engine_data, '$.ai_concurrency_throttle.state')), 'deferred') = 'deferred'
+			 AND JSON_UNQUOTE(JSON_EXTRACT(engine_data, '$.ai_concurrency_throttle.next_retry_at')) < %s",
+			gmdate( 'c' )
+		);
+		if ( $flow_id ) {
+			$where .= $wpdb->prepare( ' AND flow_id = %d', $flow_id );
+		}
+		if ( $job_id ) {
+			$where .= $wpdb->prepare( ' AND job_id = %d', $job_id );
+		}
+
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQL.NotPrepared -- Dynamic WHERE is prepared above and the limit is clamped by the ability schema.
+		$rows = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT job_id, flow_id FROM {$table} {$where} ORDER BY job_id ASC LIMIT %d",
+				max( 1, min( self::MAX_APPLY_LIMIT, $limit ) ) + 1
+			),
+			ARRAY_A
+		);
+		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQL.NotPrepared
+
+		foreach ( $rows as &$row ) {
+			$row['engine_data'] = $this->getJobEngineData( (int) $row['job_id'] );
+		}
+		unset( $row );
+		return $rows;
+	}
+
+	/** Read an exact Action Scheduler receipt and fail closed on query errors. */
+	private function getRecordedActionEvidence( int $action_id ): array {
+		global $wpdb;
+		$actions_table   = $wpdb->prefix . 'actionscheduler_actions';
+		$wpdb->last_error = '';
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Exact action receipt is required ownership evidence.
+		$row = $wpdb->get_row( $wpdb->prepare( "SELECT action_id, status FROM {$actions_table} WHERE action_id = %d LIMIT 1", $action_id ), ARRAY_A );
+		return array(
+			'complete' => '' === (string) $wpdb->last_error,
+			'exists'   => is_array( $row ),
+			'status'   => is_array( $row ) ? (string) ( $row['status'] ?? '' ) : '',
+		);
 	}
 
 	/** @return array<int,array<string,mixed>> */
