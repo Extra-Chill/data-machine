@@ -1301,6 +1301,10 @@ class AgentsCommand extends AgentBundleCommand {
 	 * : Output path. For zip, a file path. For directory, a directory path.
 	 *   Defaults to current directory with auto-generated filename.
 	 *
+	 * [--reproducible]
+	 * : Use stable metadata and ZIP entry timestamps so unchanged agent state
+	 *   produces byte-identical exports. Intended for automated drift harvesting.
+	 *
 	 * ## EXAMPLES
 	 *
 	 *     # Export as directory (default)
@@ -1315,10 +1319,11 @@ class AgentsCommand extends AgentBundleCommand {
 	 * @subcommand export
 	 */
 	public function export( array $args, array $assoc_args ): void {
-		$identifier  = (string) ( $args[0] ?? '' );
-		$format      = (string) ( $assoc_args['format'] ?? 'directory' );
-		$destination = (string) ( $assoc_args['destination'] ?? ( $assoc_args['output'] ?? '' ) );
-		$profile     = (string) ( $assoc_args['profile'] ?? 'share' );
+		$identifier   = (string) ( $args[0] ?? '' );
+		$format       = (string) ( $assoc_args['format'] ?? 'directory' );
+		$destination  = (string) ( $assoc_args['destination'] ?? ( $assoc_args['output'] ?? '' ) );
+		$profile      = (string) ( $assoc_args['profile'] ?? 'share' );
+		$reproducible = \WP_CLI\Utils\get_flag_value( $assoc_args, 'reproducible', false );
 
 		if ( '' === trim( $identifier ) ) {
 			WP_CLI::error( 'Agent ID or slug is required.' );
@@ -1336,9 +1341,10 @@ class AgentsCommand extends AgentBundleCommand {
 		}
 
 		$input = array(
-			'agent_id' => (int) $agent['agent_id'],
-			'profile'  => $profile,
-			'format'   => $format,
+			'agent_id'     => (int) $agent['agent_id'],
+			'profile'      => $profile,
+			'format'       => $format,
+			'reproducible' => $reproducible,
 		);
 		if ( '' !== trim( $destination ) ) {
 			$input['destination'] = $destination;

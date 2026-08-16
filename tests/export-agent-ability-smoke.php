@@ -35,6 +35,18 @@ if ( ! function_exists( 'is_wp_error' ) ) {
 	}
 }
 
+if ( ! function_exists( 'wp_mkdir_p' ) ) {
+	function wp_mkdir_p( $path ) {
+		return is_dir( $path ) || mkdir( $path, 0775, true );
+	}
+}
+
+if ( ! function_exists( 'wp_delete_file' ) ) {
+	function wp_delete_file( $path ) {
+		return unlink( $path );
+	}
+}
+
 if ( ! function_exists( 'apply_filters' ) ) {
 	$GLOBALS['export_agent_smoke_filters'] = array();
 	if ( ! function_exists( 'add_filter' ) ) {
@@ -66,15 +78,19 @@ class WP_Error {
 require_once __DIR__ . '/../inc/Engine/Bundle/BundleValidationException.php';
 require_once __DIR__ . '/../inc/Engine/Bundle/PortableSlug.php';
 require_once __DIR__ . '/../inc/Engine/Bundle/BundleSchema.php';
+require_once __DIR__ . '/../inc/Engine/Agents/AgentSubagentGraph.php';
 require_once __DIR__ . '/../inc/Engine/Bundle/AgentBundleSlugTrait.php';
 require_once __DIR__ . '/../inc/Engine/Bundle/AgentBundleManifest.php';
 require_once __DIR__ . '/../inc/Engine/Bundle/AgentBundlePipelineFile.php';
 require_once __DIR__ . '/../inc/Engine/Bundle/AgentBundleFlowFile.php';
 require_once __DIR__ . '/../inc/Engine/Bundle/AgentBundleArtifactExtensions.php';
 require_once __DIR__ . '/../inc/Engine/Bundle/AgentBundleArtifactDefinitions.php';
+require_once __DIR__ . '/../inc/Engine/Bundle/BundleRelativePath.php';
 require_once __DIR__ . '/../inc/Engine/Bundle/AgentBundleDirectory.php';
 require_once __DIR__ . '/../inc/Core/Agents/AgentBundler.php';
+require_once __DIR__ . '/../inc/Abilities/AgentAbilities.php';
 
+use DataMachine\Abilities\AgentAbilities;
 use DataMachine\Core\Agents\AgentBundler;
 use DataMachine\Engine\Bundle\AgentBundleDirectory;
 use DataMachine\Engine\Bundle\AgentBundleFlowFile;
@@ -96,6 +112,11 @@ $assert = function ( string $label, bool $condition ) use ( &$assertions, &$fail
 
 function export_agent_private( string $method, array $args = array() ) {
 	$reflection = new ReflectionMethod( AgentBundler::class, $method );
+	return $reflection->invokeArgs( null, $args );
+}
+
+function export_agent_ability_private( string $method, array $args = array() ) {
+	$reflection = new ReflectionMethod( AgentAbilities::class, $method );
 	return $reflection->invokeArgs( null, $args );
 }
 
@@ -178,7 +199,24 @@ $assert( 'manifest export is byte-identical across writes', $manifest_a === $man
 $assert( 'pipeline export is byte-identical across writes', file_get_contents( $dir_a . '/pipelines/pipeline-a.json' ) === file_get_contents( $dir_b . '/pipelines/pipeline-a.json' ) );
 $assert( 'manifest JSON sorts object keys', false !== strpos( (string) $manifest_a, "\"a\": 1,\n            \"b\": 2" ) );
 
-echo "\n[4] Ability and CLI route through value-object exporter\n";
+echo "\n[4] Reproducible export metadata and archives\n";
+$default_exported_at      = export_agent_private( 'exported_at_for_context', array( array() ) );
+$reproducible_exported_at = export_agent_private( 'exported_at_for_context', array( array( 'reproducible' => true ) ) );
+$assert( 'default export retains wall-clock metadata', '1970-01-01T00:00:00+00:00' !== $default_exported_at );
+$assert( 'reproducible export uses canonical metadata', '1970-01-01T00:00:00+00:00' === $reproducible_exported_at );
+
+if ( class_exists( 'ZipArchive' ) && method_exists( 'ZipArchive', 'setMtimeName' ) ) {
+	$zip_a = $tmp_base . '/a.zip';
+	$zip_b = $tmp_base . '/b.zip';
+	export_agent_ability_private( 'writeBundleZip', array( $directory, $zip_a, 'agent-test', true ) );
+	sleep( 2 );
+	export_agent_ability_private( 'writeBundleZip', array( $directory, $zip_b, 'agent-test', true ) );
+	$assert( 'reproducible ZIP exports are byte-identical', hash_file( 'sha256', $zip_a ) === hash_file( 'sha256', $zip_b ) );
+} else {
+	$assert( 'reproducible ZIP test skipped without timestamp support', true );
+}
+
+echo "\n[5] Ability and CLI route through value-object exporter\n";
 $ability_source = file_get_contents( __DIR__ . '/../inc/Abilities/AgentAbilities.php' ) ?: '';
 $cli_source     = file_get_contents( __DIR__ . '/../inc/Cli/Commands/AgentsCommand.php' ) ?: '';
 $bundler_source = file_get_contents( __DIR__ . '/../inc/Core/Agents/AgentBundler.php' ) ?: '';
@@ -186,6 +224,8 @@ $assert( 'ability registers datamachine/export-agent', str_contains( $ability_so
 $assert( 'ability calls AgentBundler export_directory_object', str_contains( $ability_source, 'export_directory_object' ) );
 $assert( 'ability writes AgentBundleDirectory directly', str_contains( $ability_source, '$directory->write( $destination )' ) );
 $assert( 'CLI export calls generic ability', str_contains( $cli_source, 'AgentAbilities::exportAgent' ) );
+$assert( 'ability exposes reproducible export input', str_contains( $ability_source, "'reproducible'" ) );
+$assert( 'CLI exposes reproducible export flag', str_contains( $cli_source, '[--reproducible]' ) );
 $assert( 'bundler applies datamachine_agent_export_manifest once', 1 === substr_count( $bundler_source, 'datamachine_agent_export_manifest' ) );
 
 echo "\nAssertions: {$assertions}\n";

@@ -119,45 +119,50 @@ class AgentAbilities {
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(
-							'agent'       => array(
+							'agent'        => array(
 								'type'        => 'string',
 								'description' => 'Agent slug or ID to export. Slugs are preferred.',
 							),
-							'agent_slug'  => array(
+							'agent_slug'   => array(
 								'type'        => 'string',
 								'description' => 'Agent slug to export. Prefer agent for new callers.',
 							),
-							'agent_id'    => array(
+							'agent_id'     => array(
 								'type'        => 'integer',
 								'description' => 'Agent ID to export. Supported for compatibility; prefer agent slug.',
 							),
-							'profile'     => array(
+							'profile'      => array(
 								'type'        => 'string',
 								'enum'        => array( 'share', 'backup', 'fork' ),
 								'description' => 'Export profile. Defaults to share.',
 							),
-							'destination' => array(
+							'destination'  => array(
 								'type'        => 'string',
 								'description' => 'Destination directory or ZIP file path. Defaults to <agent-slug>-bundle.',
 							),
-							'format'      => array(
+							'format'       => array(
 								'type'        => 'string',
 								'enum'        => array( 'directory', 'zip' ),
 								'description' => 'Output format. Defaults to directory.',
+							),
+							'reproducible' => array(
+								'type'        => 'boolean',
+								'description' => 'Use stable export metadata and archive entry timestamps so unchanged state produces identical output.',
 							),
 						),
 					),
 					'output_schema'       => array(
 						'type'       => 'object',
 						'properties' => array(
-							'success'    => array( 'type' => 'boolean' ),
-							'path'       => array( 'type' => 'string' ),
-							'format'     => array( 'type' => 'string' ),
-							'profile'    => array( 'type' => 'string' ),
-							'manifest'   => array( 'type' => 'object' ),
-							'agent_id'   => array( 'type' => 'integer' ),
-							'agent_slug' => array( 'type' => 'string' ),
-							'error'      => array( 'type' => 'string' ),
+							'success'      => array( 'type' => 'boolean' ),
+							'path'         => array( 'type' => 'string' ),
+							'format'       => array( 'type' => 'string' ),
+							'profile'      => array( 'type' => 'string' ),
+							'manifest'     => array( 'type' => 'object' ),
+							'agent_id'     => array( 'type' => 'integer' ),
+							'agent_slug'   => array( 'type' => 'string' ),
+							'reproducible' => array( 'type' => 'boolean' ),
+							'error'        => array( 'type' => 'string' ),
 						),
 					),
 					'execute_callback'    => array( self::class, 'exportAgent' ),
@@ -471,11 +476,21 @@ class AgentAbilities {
 					'label'               => 'Project Agent Graph',
 					'description'         => 'Return the persisted coordinator graph, identity paths, and generic child runtime policy.',
 					'category'            => 'datamachine-agent',
-					'input_schema'        => array( 'type' => 'object', 'required' => array( 'slug' ), 'properties' => array( 'slug' => array( 'type' => 'string' ) ) ),
+					'input_schema'        => array(
+						'type'       => 'object',
+						'required'   => array( 'slug' ),
+						'properties' => array( 'slug' => array( 'type' => 'string' ) ),
+					),
 					'output_schema'       => array( 'type' => 'object' ),
 					'execute_callback'    => array( self::class, 'projectAgentGraph' ),
 					'permission_callback' => fn() => PermissionHelper::can( 'manage_agents' ),
-					'meta'                => array( 'show_in_rest' => true, 'annotations' => array( 'readonly' => true, 'idempotent' => true ) ),
+					'meta'                => array(
+						'show_in_rest' => true,
+						'annotations'  => array(
+							'readonly'   => true,
+							'idempotent' => true,
+						),
+					),
 				)
 			);
 
@@ -2633,8 +2648,15 @@ class AgentAbilities {
 		$agent_slug   = (string) $agent['agent_slug'];
 		$destination  = trim( (string) ( $input['destination'] ?? '' ) );
 		$destination  = '' !== $destination ? $destination : $agent_slug . '-bundle' . ( 'zip' === $format ? '.zip' : '' );
+		$reproducible = ! empty( $input['reproducible'] );
 		$bundler      = new AgentBundler();
-		$export       = $bundler->export_directory_object( $agent_slug, array( 'profile' => $profile ) );
+		$export       = $bundler->export_directory_object(
+			$agent_slug,
+			array(
+				'profile'      => $profile,
+				'reproducible' => $reproducible,
+			)
+		);
 		$directory    = $export['directory'] ?? null;
 		$manifest     = $directory instanceof AgentBundleDirectory ? $directory->manifest()->to_array() : array();
 		$written_path = $destination;
@@ -2650,7 +2672,7 @@ class AgentAbilities {
 			if ( 'directory' === $format ) {
 				$directory->write( $destination );
 			} else {
-				$written_path = self::writeBundleZip( $directory, $destination, $agent_slug );
+				$written_path = self::writeBundleZip( $directory, $destination, $agent_slug, $reproducible );
 			}
 		} catch ( \Throwable $e ) {
 			return array(
@@ -2660,17 +2682,18 @@ class AgentAbilities {
 		}
 
 		return array(
-			'success'    => true,
-			'agent_id'   => $agent_id,
-			'agent_slug' => $agent_slug,
-			'profile'    => $profile,
-			'format'     => $format,
-			'path'       => $written_path,
-			'manifest'   => $manifest,
+			'success'      => true,
+			'agent_id'     => $agent_id,
+			'agent_slug'   => $agent_slug,
+			'profile'      => $profile,
+			'format'       => $format,
+			'reproducible' => $reproducible,
+			'path'         => $written_path,
+			'manifest'     => $manifest,
 		);
 	}
 
-	private static function writeBundleZip( AgentBundleDirectory $directory, string $zip_path, string $agent_slug ): string {
+	private static function writeBundleZip( AgentBundleDirectory $directory, string $zip_path, string $agent_slug, bool $reproducible = false ): string {
 		if ( ! class_exists( '\ZipArchive' ) ) {
 			throw new BundleValidationException( 'ZipArchive is not available.' );
 		}
@@ -2690,12 +2713,21 @@ class AgentAbilities {
 			new \RecursiveDirectoryIterator( $bundle_dir, \RecursiveDirectoryIterator::SKIP_DOTS ),
 			\RecursiveIteratorIterator::SELF_FIRST
 		);
-		foreach ( $iterator as $item ) {
+		$items    = iterator_to_array( $iterator, false );
+		usort( $items, static fn( \SplFileInfo $left, \SplFileInfo $right ): int => strcmp( $left->getPathname(), $right->getPathname() ) );
+		foreach ( $items as $item ) {
 			$relative_path = sanitize_title( $agent_slug ) . '/' . substr( $item->getPathname(), strlen( $bundle_dir ) + 1 );
 			if ( $item->isDir() ) {
 				$zip->addEmptyDir( $relative_path );
+				$archive_path = rtrim( $relative_path, '/' ) . '/';
 			} else {
 				$zip->addFile( $item->getPathname(), $relative_path );
+				$archive_path = $relative_path;
+			}
+			if ( $reproducible && ( ! method_exists( $zip, 'setMtimeName' ) || ! $zip->setMtimeName( $archive_path, 315532800 ) ) ) {
+				$zip->close();
+				self::removeDirectory( $temp_dir );
+				throw new BundleValidationException( 'Reproducible ZIP exports require ZipArchive::setMtimeName().' );
 			}
 		}
 		$zip->close();
