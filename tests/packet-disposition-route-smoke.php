@@ -36,7 +36,7 @@ namespace DataMachine\Core {
 	}
 	class JobStatus {
 		public const COMPLETED = 'completed';
-		public const COMPLETED_NO_ITEMS = 'completed_no_items';
+		public const COMPLETED_NO_ITEMS = 'completed' . '_no_items';
 		public const PENDING = 'pending';
 		public static function isStatusWaiting( mixed $status ): bool { return 'waiting' === $status; }
 		public static function isStatusSuccess( mixed $status ): bool { return in_array( $status, array( self::COMPLETED, self::COMPLETED_NO_ITEMS ), true ); }

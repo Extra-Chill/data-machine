@@ -889,15 +889,7 @@ class ExecuteStepAbility {
 				$routed_packets = $transition_route['packets'];
 				$packet_count   = count( $routed_packets );
 
-				// Inline continuation: when a step produces 0-1 DataPackets,
-				// schedule the next step directly on the same job instead of
-				// creating child jobs. This eliminates recursive fan-out where
-				// children spawn grandchildren (e.g., AI step → upsert step).
-				//
-				// Fan-out is only meaningful when a step produces MULTIPLE
-				// packets that need parallel processing (e.g., fetch step
-				// producing one packet per event). A single packet is just
-				// the same job continuing to the next step.
+				// Keep a single logical result on the current job.
 				if ( 'inline' === $transition_route['mode'] || $packet_count <= 1 ) {
 					if ( ! $this->recoveryGenerationStillOwned( $job_id, $recovery_generation, $recovery_claim_token ) ) {
 						return $this->staleRecoveryGeneration( $job_id, $recovery_generation, 'was superseded before inline lifecycle routing' );
@@ -926,15 +918,7 @@ class ExecuteStepAbility {
 					);
 				}
 
-				// Express the packet fan-out as the generic Agents API
-				// `parallel`-map step contract (Automattic/agents-api#389) and
-				// dispatch through the single ParallelMapFanoutAdapter surface.
-				// The adapter owns the entire decision: it applies the one
-				// `wp_agent_workflow_should_fanout` gate and either fans the
-				// routed packets into child jobs (shape:'map', backed by the
-				// Action-Scheduler PipelineBatchScheduler) or, when the gate
-				// declines, reports shape:'inline' so the packets continue on
-				// this job. There is no second fan-out decision path here.
+				// Dispatch multiple packets through the generic parallel-map adapter.
 				$parallel_step = array(
 					'id'    => $next_flow_step_id,
 					'type'  => ParallelMapFanoutAdapter::STEP_TYPE,
