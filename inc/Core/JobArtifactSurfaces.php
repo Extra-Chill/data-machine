@@ -237,6 +237,7 @@ class JobArtifactSurfaces {
 			return $value;
 		}
 
+		// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.DynamicHooknameFound -- Callers select only the three explicit datamachine_job_artifact_* hooks above.
 		return function_exists( 'apply_filters' ) ? apply_filters( $hook, $value ) : $value;
 	}
 
