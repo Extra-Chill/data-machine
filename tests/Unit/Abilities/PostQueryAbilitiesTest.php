@@ -196,6 +196,61 @@ class PostQueryAbilitiesTest extends WP_UnitTestCase {
 		$this->assertArrayNotHasKey( 'error', $result );
 	}
 
+	public function test_recent_posts_only_returns_tracked_posts(): void {
+		$tracked_post_id = self::factory()->post->create(
+			array(
+				'post_type'   => 'post',
+				'post_status' => 'publish',
+				'post_title'  => 'Tracked Recent Post',
+			)
+		);
+		self::factory()->post->create(
+			array(
+				'post_type'   => 'post',
+				'post_status' => 'publish',
+				'post_title'  => 'Untracked Recent Post',
+			)
+		);
+		update_post_meta( $tracked_post_id, '_datamachine_post_handler', 'rss' );
+
+		$result = $this->post_query_abilities->executeQueryRecentPosts(
+			array(
+				'post_type'   => 'post',
+				'post_status' => 'publish',
+				'per_page'    => 20,
+			)
+		);
+
+		$this->assertSame( array( $tracked_post_id ), wp_list_pluck( $result['posts'], 'id' ) );
+		$this->assertSame( 1, $result['total'] );
+	}
+
+	public function test_list_posts_combines_handler_and_flow_filters(): void {
+		$matching_post_id = self::factory()->post->create( array( 'post_status' => 'publish' ) );
+		$other_flow_id    = self::factory()->post->create( array( 'post_status' => 'publish' ) );
+		$other_handler_id = self::factory()->post->create( array( 'post_status' => 'publish' ) );
+
+		update_post_meta( $matching_post_id, '_datamachine_post_handler', 'rss' );
+		update_post_meta( $matching_post_id, '_datamachine_post_flow_id', 123 );
+		update_post_meta( $other_flow_id, '_datamachine_post_handler', 'rss' );
+		update_post_meta( $other_flow_id, '_datamachine_post_flow_id', 456 );
+		update_post_meta( $other_handler_id, '_datamachine_post_handler', 'web' );
+		update_post_meta( $other_handler_id, '_datamachine_post_flow_id', 123 );
+
+		$result = $this->post_query_abilities->executeQueryPostsList(
+			array(
+				'handler'     => 'rss',
+				'flow_id'     => 123,
+				'post_type'   => 'post',
+				'post_status' => 'publish',
+				'per_page'    => 20,
+			)
+		);
+
+		$this->assertSame( array( $matching_post_id ), wp_list_pluck( $result['posts'], 'id' ) );
+		$this->assertSame( 1, $result['total'] );
+	}
+
 	public function test_format_post_result_pipeline_id_is_zero_without_flow(): void {
 		// A tracked post whose flow_id is missing (either never set or whose
 		// flow row has been deleted) has no resolvable pipeline. The resolver

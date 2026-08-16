@@ -78,6 +78,7 @@ class MetaDescriptionCommand extends BaseCommand {
 				\wp_json_encode(
 					array(
 						'post_type'     => $result['post_type'] ?? $post_type,
+						// phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key -- CLI response field; not a database query.
 						'meta_key'      => $result['meta_key'] ?? '',
 						'total_posts'   => $total,
 						'has_count'     => $has,

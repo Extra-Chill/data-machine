@@ -77,6 +77,7 @@ class QueryWordPressPostsAbility {
 								'default'     => 10,
 								'description' => __( 'Number of posts to query', 'data-machine' ),
 							),
+							// phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_tax_query -- Ability input-schema property; not a database query.
 							'tax_query'         => array(
 								'type'        => 'array',
 								'default'     => array(),
@@ -335,6 +336,7 @@ class QueryWordPressPostsAbility {
 			'exclude_keywords'  => '',
 			'randomize'         => false,
 			'posts_per_page'    => 10,
+			// phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_tax_query -- Configuration default; not a database query.
 			'tax_query'         => array(),
 			'processed_items'   => array(),
 			'include_file_info' => true,
@@ -342,5 +344,4 @@ class QueryWordPressPostsAbility {
 
 		return array_merge( $defaults, $input );
 	}
-
 }

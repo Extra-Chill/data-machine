@@ -844,6 +844,7 @@ abstract class SystemTask {
 			'status'   => 'reverted',
 			'type'     => 'post_meta_set',
 			'post_id'  => $post_id,
+			// phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key -- Undo result payload; not a database query.
 			'meta_key' => $meta_key,
 		);
 	}

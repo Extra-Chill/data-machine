@@ -851,6 +851,7 @@ class UpsertPostAbility {
 			$args = array(
 				'post_type'      => $post_type,
 				'post_status'    => 'any',
+				// phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query -- Legacy direct-execute fallback; valid identities use the indexed post-identity-reservations table.
 				'meta_query'     => array(
 					array(
 						'key'   => $meta_key,
