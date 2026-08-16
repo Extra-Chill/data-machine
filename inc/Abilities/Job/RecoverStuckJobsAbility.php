@@ -1123,11 +1123,8 @@ class RecoverStuckJobsAbility {
 
 		$job_ids          = array_values( array_unique( array_column( $action_jobs, 'job_id' ) ) );
 		$job_placeholders = implode( ',', array_fill( 0, count( $job_ids ), '%d' ) );
-		$query_args       = $job_ids;
-
-		$sql = "SELECT job_id, flow_id, status
-			 FROM {$jobs_table}
-			 WHERE job_id IN ({$job_placeholders})";
+		$query_args       = array_merge( array( $jobs_table ), $job_ids );
+		$sql              = "SELECT job_id, flow_id, status FROM %i WHERE job_id IN ({$job_placeholders})";
 		if ( $flow_id ) {
 			$sql         .= ' AND flow_id = %d';
 			$query_args[] = $flow_id;
@@ -1137,16 +1134,9 @@ class RecoverStuckJobsAbility {
 			$query_args[] = $job_id_scope;
 		}
 
-		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQL.NotPrepared -- Dynamic placeholder list is prepared below.
-		$terminal_jobs = $wpdb->get_results(
-			$wpdb->prepare(
-				// phpcs:ignore WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare -- The dynamic SQL contains only generated placeholders; values are supplied in matching order.
-				$sql,
-				$query_args
-			),
-			ARRAY_A
-		);
-		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQL.NotPrepared
+		// The identifier and every generated integer placeholder are prepared at this boundary.
+		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Fixed fragments and generated placeholders are passed immediately to prepare().
+		$terminal_jobs = $wpdb->get_results( $wpdb->prepare( $sql, ...$query_args ), ARRAY_A );
 
 		if ( empty( $terminal_jobs ) ) {
 			return array();
@@ -1248,14 +1238,14 @@ class RecoverStuckJobsAbility {
 		$actions_table = $wpdb->prefix . 'actionscheduler_actions';
 		$like_job_id   = '%"job_id":' . $wpdb->esc_like( (string) $job_id ) . '%';
 
-		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name is generated from the WP prefix.
 		$actions = $wpdb->get_results(
 			$wpdb->prepare(
-				"SELECT action_id, args, status, scheduled_date_gmt, last_attempt_gmt
-				 FROM {$actions_table}
+				'SELECT action_id, args, status, scheduled_date_gmt, last_attempt_gmt
+				 FROM %i
 				 WHERE hook IN ( %s, %s )
 				 AND status IN ( %s, %s )
-				 AND args LIKE %s",
+				 AND args LIKE %s',
+				$actions_table,
 				'datamachine_execute_step',
 				'datamachine_resume_ai_step',
 				'pending',
@@ -1263,7 +1253,6 @@ class RecoverStuckJobsAbility {
 				$like_job_id
 			)
 		);
-		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 
 		$timeout_seconds = max( 1, $timeout_hours ) * HOUR_IN_SECONDS;
 		$now_gmt         = strtotime( current_time( 'mysql', true ) );
@@ -1401,11 +1390,10 @@ class RecoverStuckJobsAbility {
 		$now_gmt       = current_time( 'mysql', true );
 		$now_local     = current_time( 'mysql', false );
 
-		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table names are generated from the WP prefix.
 		$result = $wpdb->query(
 			$wpdb->prepare(
-				"UPDATE {$actions_table} a
-				 LEFT JOIN {$claims_table} c ON c.claim_id = a.claim_id
+				'UPDATE %i a
+				 LEFT JOIN %i c ON c.claim_id = a.claim_id
 				 SET a.status = %s,
 					 a.claim_id = 0,
 					 a.last_attempt_gmt = %s,
@@ -1413,7 +1401,9 @@ class RecoverStuckJobsAbility {
 				 WHERE a.action_id = %d
 					 AND a.hook = %s
 					 AND a.status = %s
-					 AND (a.claim_id = 0 OR c.claim_id IS NULL)",
+					 AND (a.claim_id = 0 OR c.claim_id IS NULL)',
+				$actions_table,
+				$claims_table,
 				'complete',
 				$now_gmt,
 				$now_local,
@@ -1422,7 +1412,6 @@ class RecoverStuckJobsAbility {
 				'in-progress'
 			)
 		);
-		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 
 		if ( false === $result || 0 === (int) $result ) {
 			return false;

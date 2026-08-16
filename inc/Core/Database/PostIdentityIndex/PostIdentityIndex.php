@@ -119,16 +119,15 @@ class PostIdentityIndex extends BaseRepository {
 		}
 
 		// Build REPLACE INTO for atomic upsert.
-		$columns      = implode( ', ', array_keys( $data ) );
+		$columns      = implode( ', ', array_fill( 0, count( $data ), '%i' ) );
 		$placeholders = implode( ', ', $formats );
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		// phpcs:disable WordPress.DB.PreparedSQL, WordPress.DB.PreparedSQLPlaceholders -- Table name from $wpdb->prefix, not user input.
 		$result = $this->wpdb->query(
-			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 			$this->wpdb->prepare(
-				"REPLACE INTO {$this->table_name} ({$columns}) VALUES ({$placeholders})",
-				...array_values( $data )
+				'RePLACE INTO %i (' . $columns . ') VALUES (' . $placeholders . ')',
+				...array_merge( array( $this->table_name ), array_keys( $data ), array_values( $data ) )
 			)
 		);
 		// phpcs:enable WordPress.DB.PreparedSQL, WordPress.DB.PreparedSQLPlaceholders
@@ -186,7 +185,8 @@ class PostIdentityIndex extends BaseRepository {
 			// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 			$rows = $this->wpdb->get_results(
 				$this->wpdb->prepare(
-					"SELECT * FROM {$this->table_name} WHERE event_date = %s AND venue_term_id = %d LIMIT %d",
+					'SELECT * FROM %i WHERE event_date = %s AND venue_term_id = %d LIMIT %d',
+					$this->table_name,
 					$event_date,
 					$venue_term_id,
 					$limit
@@ -202,7 +202,8 @@ class PostIdentityIndex extends BaseRepository {
 		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 		$rows = $this->wpdb->get_results(
 			$this->wpdb->prepare(
-				"SELECT * FROM {$this->table_name} WHERE event_date = %s LIMIT %d",
+				'SELECT * FROM %i WHERE event_date = %s LIMIT %d',
+				$this->table_name,
 				$event_date,
 				$limit
 			),
@@ -231,7 +232,8 @@ class PostIdentityIndex extends BaseRepository {
 		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 		$row = $this->wpdb->get_row(
 			$this->wpdb->prepare(
-				"SELECT * FROM {$this->table_name} WHERE event_date = %s AND title_hash = %s LIMIT 1",
+				'SELECT * FROM %i WHERE event_date = %s AND title_hash = %s LIMIT 1',
+				$this->table_name,
 				$event_date,
 				$title_hash
 			),
@@ -261,7 +263,8 @@ class PostIdentityIndex extends BaseRepository {
 		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 		$row = $this->wpdb->get_row(
 			$this->wpdb->prepare(
-				"SELECT * FROM {$this->table_name} WHERE ticket_url = %s AND event_date = %s LIMIT 1",
+				'SELECT * FROM %i WHERE ticket_url = %s AND event_date = %s LIMIT 1',
+				$this->table_name,
 				$ticket_url,
 				$event_date
 			),
@@ -289,7 +292,8 @@ class PostIdentityIndex extends BaseRepository {
 		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 		$row = $this->wpdb->get_row(
 			$this->wpdb->prepare(
-				"SELECT * FROM {$this->table_name} WHERE source_url = %s LIMIT 1",
+				'SELECT * FROM %i WHERE source_url = %s LIMIT 1',
+				$this->table_name,
 				$source_url
 			),
 			ARRAY_A
@@ -317,7 +321,8 @@ class PostIdentityIndex extends BaseRepository {
 		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 		$rows = $this->wpdb->get_results(
 			$this->wpdb->prepare(
-				"SELECT * FROM {$this->table_name} WHERE event_date = %s AND ticket_url IS NOT NULL AND ticket_url != '' LIMIT %d",
+				"SELECT * FROM %i WHERE event_date = %s AND ticket_url IS NOT NULL AND ticket_url != '' LIMIT %d",
+				$this->table_name,
 				$event_date,
 				$limit
 			),
@@ -346,7 +351,8 @@ class PostIdentityIndex extends BaseRepository {
 		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 		$rows = $this->wpdb->get_results(
 			$this->wpdb->prepare(
-				"SELECT * FROM {$this->table_name} WHERE event_date = %s LIMIT %d",
+				'SELECT * FROM %i WHERE event_date = %s LIMIT %d',
+				$this->table_name,
 				$event_date,
 				$limit
 			),
@@ -391,13 +397,15 @@ class PostIdentityIndex extends BaseRepository {
 		$results = $wpdb->get_col(
 			$wpdb->prepare(
 				// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
-				"SELECT p.ID FROM {$wpdb->posts} p
-				LEFT JOIN {$this->table_name} idx ON p.ID = idx.post_id
+				"SELECT p.ID FROM %i p
+				LEFT JOIN %i idx ON p.ID = idx.post_id
 				WHERE p.post_type = %s
 				AND p.post_status IN ('publish', 'draft', 'pending')
 				AND idx.post_id IS NULL
 				ORDER BY p.ID ASC
 				LIMIT %d OFFSET %d",
+				$wpdb->posts,
+				$this->table_name,
 				$post_type,
 				$limit,
 				$offset
@@ -419,7 +427,8 @@ class PostIdentityIndex extends BaseRepository {
 		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 		$result = $this->wpdb->query(
 			$this->wpdb->prepare(
-				"DELETE FROM {$this->table_name} WHERE post_type = %s",
+				'DELETE FROM %i WHERE post_type = %s',
+				$this->table_name,
 				$post_type
 			)
 		);

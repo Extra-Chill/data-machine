@@ -680,7 +680,6 @@ class TaskScheduler {
 		// Count child jobs by status via parent_job_id column.
 		global $wpdb;
 		$table = $wpdb->prefix . 'datamachine_jobs';
-		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 		$child_stats = $wpdb->get_row(
 			$wpdb->prepare(
 				"SELECT
@@ -689,14 +688,14 @@ class TaskScheduler {
 					SUM(CASE WHEN status LIKE %s THEN 1 ELSE 0 END) as failed,
 					SUM(CASE WHEN status = 'processing' THEN 1 ELSE 0 END) as processing,
 					SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending
-				FROM {$table}
+				FROM %i
 				WHERE parent_job_id = %d",
+				$table,
 				'failed%',
 				$batchJobId
 			),
 			ARRAY_A
 		);
-		// phpcs:enable WordPress.DB.PreparedSQL
 
 		$total = (int) ( $engine_data['batch_total'] ?? 0 );
 
@@ -763,15 +762,16 @@ class TaskScheduler {
 		global $wpdb;
 		$table = $wpdb->prefix . 'datamachine_jobs';
 
-		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 		$results = $wpdb->get_results(
-			"SELECT * FROM {$table}
-			WHERE source = 'batch'
-			ORDER BY created_at DESC
-			LIMIT 50",
+			$wpdb->prepare(
+				"SELECT * FROM %i
+				WHERE source = 'batch'
+				ORDER BY created_at DESC
+				LIMIT 50",
+				$table
+			),
 			ARRAY_A
 		);
-		// phpcs:enable WordPress.DB.PreparedSQL
 
 		if ( ! $results ) {
 			return array();

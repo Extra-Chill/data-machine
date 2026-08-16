@@ -184,15 +184,13 @@ class LogRepository extends BaseRepository {
 			// phpcs:disable WordPress.DB.PreparedSQLPlaceholders -- Dynamic query construction with safe values.
 			$total = (int) $this->wpdb->get_var(
 				$this->wpdb->prepare(
-					"SELECT COUNT(*) FROM {$this->table_name} WHERE {$where_sql}",
-					...$params
+					'SELECT COUNT(*) FROM %i WHERE ' . $where_sql,
+					...array_merge( array( $this->table_name ), $params )
 				)
 			);
 			// phpcs:enable WordPress.DB.PreparedSQLPlaceholders
 		} else {
-			$total = (int) $this->wpdb->get_var(
-				"SELECT COUNT(*) FROM {$this->table_name} WHERE {$where_sql}"
-			);
+			$total = (int) $this->wpdb->get_var( $this->wpdb->prepare( 'SELECT COUNT(*) FROM %i WHERE ' . $where_sql, $this->table_name ) );
 		}
 
 		// Fetch items.
@@ -200,8 +198,8 @@ class LogRepository extends BaseRepository {
 		// phpcs:disable WordPress.DB.PreparedSQLPlaceholders -- Dynamic query construction with safe values.
 		$items = $this->wpdb->get_results(
 			$this->wpdb->prepare(
-				"SELECT * FROM {$this->table_name} WHERE {$where_sql} ORDER BY created_at DESC, id DESC LIMIT %d OFFSET %d",
-				...$query_params
+				'SELECT * FROM %i WHERE ' . $where_sql . ' ORDER BY created_at DESC, id DESC LIMIT %d OFFSET %d',
+				...array_merge( array( $this->table_name ), $query_params )
 			),
 			ARRAY_A
 		);
@@ -240,7 +238,8 @@ class LogRepository extends BaseRepository {
 		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 		return $this->wpdb->query(
 			$this->wpdb->prepare(
-				"DELETE FROM {$this->table_name} WHERE created_at < %s",
+				'DELETE FROM %i WHERE created_at < %s',
+				$this->table_name,
 				$before_datetime
 			)
 		);
@@ -270,7 +269,7 @@ class LogRepository extends BaseRepository {
 	public function clear_all() {
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
 		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
-		return $this->wpdb->query( "TRUNCATE TABLE {$this->table_name}" );
+		return $this->wpdb->query( $this->wpdb->prepare( 'TRUNCATE TABLE %i', $this->table_name ) );
 		// phpcs:enable WordPress.DB.PreparedSQL
 	}
 

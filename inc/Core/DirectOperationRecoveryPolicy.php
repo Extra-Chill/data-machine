@@ -45,9 +45,8 @@ class DirectOperationRecoveryPolicy {
 	public static function recordedActionExists( int $action_id ): bool {
 		global $wpdb;
 		$actions_table = $wpdb->prefix . 'actionscheduler_actions';
-		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name is generated from the WP prefix.
-		$found = $wpdb->get_var( $wpdb->prepare( "SELECT action_id FROM {$actions_table} WHERE action_id = %d", $action_id ) );
-		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- Recovery must read the current durable Action Scheduler receipt.
+		$found = $wpdb->get_var( $wpdb->prepare( 'SELECT action_id FROM %i WHERE action_id = %d', $actions_table, $action_id ) );
 		return null !== $found;
 	}
 
@@ -55,16 +54,16 @@ class DirectOperationRecoveryPolicy {
 	public static function getProcessingSystemTaskChildren( int $parent_job_id ): array {
 		global $wpdb;
 		$table = $wpdb->prefix . Jobs::TABLE_NAME;
-		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name is generated from the WP prefix.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- Recovery must read current processing children before terminalizing them.
 		$ids = $wpdb->get_col(
 			$wpdb->prepare(
-				"SELECT job_id FROM {$table} WHERE parent_job_id = %d AND source = %s AND status = %s ORDER BY job_id ASC",
+				'SELECT job_id FROM %i WHERE parent_job_id = %d AND source = %s AND status = %s ORDER BY job_id ASC',
+				$table,
 				$parent_job_id,
 				'pipeline_system_task',
 				JobStatus::PROCESSING
 			)
 		);
-		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 		return array_map( 'intval', $ids );
 	}
 

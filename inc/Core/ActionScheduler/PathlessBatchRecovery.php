@@ -117,12 +117,12 @@ class PathlessBatchRecovery {
 		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber -- Table name and placeholder clauses are generated above; values remain prepared.
 		$actions = $wpdb->get_results(
 			$wpdb->prepare(
-				"SELECT action_id, args, status, scheduled_date_gmt, last_attempt_gmt
-				 FROM {$actions_table}
+				'SELECT action_id, args, status, scheduled_date_gmt, last_attempt_gmt
+				 FROM %i
 				 WHERE hook IN ( %s, %s )
 				 AND status IN ( %s, %s )
-				 AND (" . implode( ' OR ', $clauses ) . ') ORDER BY action_id DESC LIMIT %d',
-				$query_args
+				 AND (' . implode( ' OR ', $clauses ) . ') ORDER BY action_id DESC LIMIT %d',
+				array_merge( array( $actions_table ), $query_args )
 			),
 			ARRAY_A
 		);
@@ -268,7 +268,8 @@ class PathlessBatchRecovery {
 		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name is generated from the WordPress prefix.
 		$actions = $wpdb->get_results(
 			$wpdb->prepare(
-				"SELECT args, status, scheduled_date_gmt, last_attempt_gmt FROM {$actions_table} WHERE args = %s AND hook = %s AND status IN ( %s, %s ) ORDER BY action_id DESC LIMIT %d",
+				'SELECT args, status, scheduled_date_gmt, last_attempt_gmt FROM %i WHERE args = %s AND hook = %s AND status IN ( %s, %s ) ORDER BY action_id DESC LIMIT %d',
+				$actions_table,
 				$canonical,
 				'datamachine_pipeline_batch_chunk',
 				'pending',
@@ -289,7 +290,8 @@ class PathlessBatchRecovery {
 			// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name is generated from the WordPress prefix.
 			$actions = $wpdb->get_results(
 				$wpdb->prepare(
-					"SELECT args, status, scheduled_date_gmt, last_attempt_gmt FROM {$actions_table} WHERE hook = %s AND status = %s ORDER BY scheduled_date_gmt DESC LIMIT %d",
+					'SELECT args, status, scheduled_date_gmt, last_attempt_gmt FROM %i WHERE hook = %s AND status = %s ORDER BY scheduled_date_gmt DESC LIMIT %d',
+					$actions_table,
 					'datamachine_pipeline_batch_chunk',
 					$status,
 					$query_limit

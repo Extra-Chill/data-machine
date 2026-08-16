@@ -646,7 +646,8 @@ class RetentionCleanup {
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		return (int) $wpdb->get_var(
 			$wpdb->prepare(
-				"SELECT COUNT(*) FROM {$table} WHERE created_at < %s", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				'SELECT COUNT(*) FROM %i WHERE created_at < %s',
+				$table,
 				$cutoff
 			)
 		);
@@ -1132,19 +1133,29 @@ class RetentionCleanup {
 						$remaining
 					)
 				);
-			} else {
-				$last_attempt_sql = $require_last_attempt ? ' AND last_attempt_gmt < %s' : '';
-				$params           = array( $actions_table, $hook, $status, $cutoff );
-				if ( $require_last_attempt ) {
-					$params[] = $cutoff;
-				}
-				$params[] = $remaining;
+			} elseif ( $require_last_attempt ) {
 				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 				$ids = $wpdb->get_col(
-					// phpcs:ignore WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
 					$wpdb->prepare(
-						"SELECT action_id FROM %i FORCE INDEX (hook_status_scheduled_date_gmt) WHERE hook = %s AND status = %s AND scheduled_date_gmt < %s{$last_attempt_sql} ORDER BY scheduled_date_gmt ASC LIMIT %d", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
-						$params
+						'SELECT action_id FROM %i FORCE INDEX (hook_status_scheduled_date_gmt) WHERE hook = %s AND status = %s AND scheduled_date_gmt < %s AND last_attempt_gmt < %s ORDER BY scheduled_date_gmt ASC LIMIT %d',
+						$actions_table,
+						$hook,
+						$status,
+						$cutoff,
+						$cutoff,
+						$remaining
+					)
+				);
+			} else {
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+				$ids = $wpdb->get_col(
+					$wpdb->prepare(
+						'SELECT action_id FROM %i FORCE INDEX (hook_status_scheduled_date_gmt) WHERE hook = %s AND status = %s AND scheduled_date_gmt < %s ORDER BY scheduled_date_gmt ASC LIMIT %d',
+						$actions_table,
+						$hook,
+						$status,
+						$cutoff,
+						$remaining
 					)
 				);
 			}
@@ -1214,7 +1225,8 @@ class RetentionCleanup {
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		return (int) $wpdb->get_var(
 			$wpdb->prepare(
-				"SELECT COUNT(*) FROM {$table} WHERE date_created_gmt < %s", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				'SELECT COUNT(*) FROM %i WHERE date_created_gmt < %s',
+				$table,
 				$cutoff
 			)
 		);
@@ -1230,7 +1242,8 @@ class RetentionCleanup {
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		$deleted = $wpdb->query(
 			$wpdb->prepare(
-				"DELETE FROM {$table} WHERE date_created_gmt < %s", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				'DELETE FROM %i WHERE date_created_gmt < %s',
+				$table,
 				$cutoff_datetime
 			)
 		);

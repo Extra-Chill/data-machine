@@ -533,16 +533,16 @@ class PendingActionStore {
 		$limit  = isset( $filters['limit'] ) ? max( 1, min( 200, (int) $filters['limit'] ) ) : 50;
 		$offset = isset( $filters['offset'] ) ? max( 0, (int) $filters['offset'] ) : 0;
 
-		$sql = sprintf(
-			'SELECT * FROM %%i WHERE %s ORDER BY created_at DESC LIMIT %%d OFFSET %%d',
-			implode( ' AND ', $where )
-		);
-
 		$prepare_args = array_merge( array( self::get_table_name() ), $args, array( $limit, $offset ) );
 
-		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.PreparedSQL.NotPrepared
-		$rows = $wpdb->get_results( $wpdb->prepare( $sql, ...$prepare_args ), ARRAY_A );
-		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+		$rows = $wpdb->get_results(
+			$wpdb->prepare(
+				sprintf( 'SELECT * FROM %%i WHERE %s ORDER BY created_at DESC LIMIT %%d OFFSET %%d', implode( ' AND ', $where ) ),
+				...$prepare_args
+			),
+			ARRAY_A
+		);
 
 		return array_values( array_filter( array_map( array( self::class, 'row_to_payload' ), (array) $rows ) ) );
 	}
@@ -612,16 +612,16 @@ class PendingActionStore {
 			$args[]  = gmdate( 'Y-m-d H:i:s', self::normalize_timestamp( $filters['created_before'] ) );
 		}
 
-		$sql = sprintf(
-			'SELECT status, kind, agent_id, context FROM %%i WHERE %s',
-			implode( ' AND ', $where )
-		);
-
 		$prepare_args = array_merge( array( self::get_table_name() ), $args );
 
-		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.PreparedSQL.NotPrepared
-		$rows = $wpdb->get_results( $wpdb->prepare( $sql, ...$prepare_args ), ARRAY_A );
-		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+		$rows = $wpdb->get_results(
+			$wpdb->prepare(
+				sprintf( 'SELECT status, kind, agent_id, context FROM %%i WHERE %s', implode( ' AND ', $where ) ),
+				...$prepare_args
+			),
+			ARRAY_A
+		);
 
 		$context_limit = self::normalize_context_summary_limit( $filters );
 

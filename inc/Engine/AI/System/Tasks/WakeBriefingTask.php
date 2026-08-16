@@ -354,22 +354,21 @@ class WakeBriefingTask extends SystemTask {
 		global $wpdb;
 		$table = $wpdb->prefix . 'datamachine_jobs';
 
-		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix.
 		$rows = $wpdb->get_results(
 			$wpdb->prepare(
 				"SELECT COALESCE(NULLIF(task_type, ''), 'unknown') AS task_type, COUNT(*) AS n
-				 FROM {$table}
+				 FROM %i
 				 WHERE created_at >= %s AND status LIKE %s
 				 GROUP BY task_type
 				 HAVING n >= %d
 				 ORDER BY n DESC",
+				$table,
 				$since,
 				'failed%',
 				self::REPEATED_FAILURE_THRESHOLD
 			),
 			ARRAY_A
 		);
-		// phpcs:enable WordPress.DB.PreparedSQL
 
 		if ( empty( $rows ) ) {
 			return '';
@@ -397,16 +396,15 @@ class WakeBriefingTask extends SystemTask {
 		global $wpdb;
 		$table = $wpdb->prefix . 'datamachine_jobs';
 
-		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix.
 		$count = (int) $wpdb->get_var(
 			$wpdb->prepare(
-				"SELECT COUNT(*) FROM {$table}
+				"SELECT COUNT(*) FROM %i
 				 WHERE created_at >= %s AND status = %s",
+				$table,
 				$since,
 				'processing'
 			)
 		);
-		// phpcs:enable WordPress.DB.PreparedSQL
 
 		if ( $count < 1 ) {
 			return '';
@@ -426,21 +424,20 @@ class WakeBriefingTask extends SystemTask {
 		global $wpdb;
 		$table = $wpdb->prefix . 'datamachine_logs';
 
-		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix.
 		$rows = $wpdb->get_results(
 			$wpdb->prepare(
 				"SELECT message, COUNT(*) AS n
-				 FROM {$table}
+				 FROM %i
 				 WHERE created_at >= %s AND level = %s
 				 GROUP BY message
 				 ORDER BY n DESC
 				 LIMIT 3",
+				$table,
 				$since,
 				'ERROR'
 			),
 			ARRAY_A
 		);
-		// phpcs:enable WordPress.DB.PreparedSQL
 
 		if ( empty( $rows ) ) {
 			return '';

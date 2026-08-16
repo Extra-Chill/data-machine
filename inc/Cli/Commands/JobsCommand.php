@@ -428,25 +428,21 @@ class JobsCommand extends BaseCommand {
 		$format          = $assoc_args['format'] ?? 'table';
 
 		$jobs_table = $wpdb->prefix . 'datamachine_jobs';
-		$where      = "WHERE (status = 'processing' OR (status = 'pending' AND JSON_EXTRACT(engine_data, '$.ai_concurrency_throttle') IS NOT NULL))";
-		$values     = array();
-
-		if ( $flow_id ) {
-			$where   .= ' AND flow_id = %d';
-			$values[] = $flow_id;
-		}
-
-		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table and WHERE are composed from trusted fragments above.
-		$sql = "SELECT job_id, flow_id, pipeline_id, agent_id, status, created_at, completed_at, engine_data
-			FROM {$jobs_table}
-			{$where}
-			ORDER BY created_at ASC
-			LIMIT %d";
-		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-		$values[] = $limit;
-
-		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Dynamic SQL is prepared with accumulated placeholders.
-		$jobs = $wpdb->get_results( $wpdb->prepare( $sql, $values ), ARRAY_A );
+		$jobs = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT job_id, flow_id, pipeline_id, agent_id, status, created_at, completed_at, engine_data
+				FROM %i
+				WHERE (status = 'processing' OR (status = 'pending' AND JSON_EXTRACT(engine_data, '$.ai_concurrency_throttle') IS NOT NULL))
+				AND ( %d = 0 OR flow_id = %d )
+				ORDER BY created_at ASC
+				LIMIT %d",
+				$jobs_table,
+				(int) $flow_id,
+				(int) $flow_id,
+				$limit
+			),
+			ARRAY_A
+		);
 
 		$items   = array();
 		$summary = array(
@@ -552,15 +548,15 @@ class JobsCommand extends BaseCommand {
 		$jobs_table = $wpdb->prefix . 'datamachine_jobs';
 		$jobs_db    = new Jobs();
 
-		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name is from $wpdb->prefix.
 		$rows = $wpdb->get_results(
 			$wpdb->prepare(
 				"SELECT job_id, flow_id, pipeline_id, parent_job_id, status, engine_data
-				FROM {$jobs_table}
+				FROM %i
 				WHERE status IN ('pending', 'processing')
 				AND (engine_data LIKE %s OR engine_data LIKE %s OR engine_data LIKE %s)
 				ORDER BY job_id ASC
 				LIMIT %d",
+				$jobs_table,
 				'%' . $wpdb->esc_like( '"config_patch_queue"' ) . '%',
 				'%' . $wpdb->esc_like( '"prompt_queue"' ) . '%',
 				'%' . $wpdb->esc_like( '"_queue_consume_revision"' ) . '%',
@@ -568,7 +564,6 @@ class JobsCommand extends BaseCommand {
 			),
 			ARRAY_A
 		);
-		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 
 		$items   = array();
 		$summary = array(
@@ -684,11 +679,10 @@ class JobsCommand extends BaseCommand {
 		$agent_skipped_like           = $wpdb->esc_like( 'agent_skipped' ) . '%';
 		$historical_contention_status = LegacyAIConcurrencyReconciler::SOURCE_STATUS;
 
-		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name is from $wpdb->prefix.
 		$rows = $wpdb->get_results(
 			$wpdb->prepare(
 				"SELECT job_id, flow_id, parent_job_id, status, label, engine_data
-				FROM {$jobs_table}
+				FROM %i
 				WHERE ((status LIKE %s OR status = 'processing')
 				AND (
 					engine_data LIKE %s
@@ -699,6 +693,7 @@ class JobsCommand extends BaseCommand {
 				)) OR status = %s
 				ORDER BY COALESCE(completed_at, created_at) DESC
 				LIMIT %d",
+				$jobs_table,
 				$failed_like,
 				'%Updated wiki article:%',
 				'%Source rejected:%',
@@ -708,7 +703,6 @@ class JobsCommand extends BaseCommand {
 			),
 			ARRAY_A
 		);
-		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 
 		$items   = array();
 		$updated = 0;
@@ -1003,22 +997,21 @@ class JobsCommand extends BaseCommand {
 		$jobs_db     = new Jobs();
 		$failed_like = $wpdb->esc_like( 'failed' ) . '%';
 
-		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name is from $wpdb->prefix.
 		$parents = $wpdb->get_results(
 			$wpdb->prepare(
 				"SELECT job_id, flow_id, status, label, engine_data
-				FROM {$jobs_table}
+				FROM %i
 				WHERE (status LIKE %s OR status = 'processing')
 				AND parent_job_id IS NULL
 				AND JSON_UNQUOTE(JSON_EXTRACT(engine_data, '$.run_metrics.context.batch_completion_strategy')) = 'children_complete'
 				ORDER BY completed_at DESC
 				LIMIT %d",
+				$jobs_table,
 				$failed_like,
 				$limit
 			),
 			ARRAY_A
 		);
-		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 
 		$items = array();
 
@@ -1127,7 +1120,6 @@ class JobsCommand extends BaseCommand {
 		$agent_skipped_like      = $wpdb->esc_like( 'agent_skipped' ) . '%';
 		$completed_no_items_like = $wpdb->esc_like( 'completed_no_items' ) . '%';
 		$failed_like             = $wpdb->esc_like( 'failed' ) . '%';
-		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name is from $wpdb->prefix.
 		$row = $wpdb->get_row(
 			$wpdb->prepare(
 				"SELECT
@@ -1136,8 +1128,9 @@ class JobsCommand extends BaseCommand {
 					SUM(CASE WHEN status LIKE %s OR status LIKE %s THEN 1 ELSE 0 END) AS skipped,
 					SUM(CASE WHEN status LIKE %s THEN 1 ELSE 0 END) AS failed,
 					SUM(CASE WHEN status IN ('pending', 'processing') THEN 1 ELSE 0 END) AS active
-				FROM {$jobs_table}
+				FROM %i
 				WHERE parent_job_id = %d",
+				$jobs_table,
 				$agent_skipped_like,
 				$completed_no_items_like,
 				$failed_like,
@@ -1145,7 +1138,6 @@ class JobsCommand extends BaseCommand {
 			),
 			ARRAY_A
 		);
-		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 
 		return array(
 			'total'     => (int) ( $row['total'] ?? 0 ),
@@ -1195,14 +1187,14 @@ class JobsCommand extends BaseCommand {
 		$like_job_id        = '%"job_id":' . $wpdb->esc_like( (string) $job_id ) . '%';
 		$like_parent_job_id = '%"parent_job_id":' . $wpdb->esc_like( (string) $job_id ) . '%';
 
-		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name is generated from the WP prefix.
 		$rows = $wpdb->get_results(
 			$wpdb->prepare(
 				"SELECT action_id, hook, status, scheduled_date_gmt, last_attempt_gmt, attempts, args
-				 FROM {$actions_table}
+				 FROM %i
 				 WHERE hook IN (%s, %s, %s)
 				 AND (args LIKE %s OR args LIKE %s)
 				 ORDER BY action_id ASC",
+				$actions_table,
 				'datamachine_execute_step',
 				'datamachine_resume_ai_step',
 				PipelineBatchScheduler::BATCH_HOOK,
@@ -1211,7 +1203,6 @@ class JobsCommand extends BaseCommand {
 			),
 			ARRAY_A
 		);
-		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 
 		foreach ( $rows as &$row ) {
 			$args = json_decode( (string) ( $row['args'] ?? '' ), true );
@@ -3005,18 +2996,17 @@ class JobsCommand extends BaseCommand {
 		$table = $wpdb->prefix . 'datamachine_jobs';
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 		$rows = $wpdb->get_results(
 			$wpdb->prepare(
-				"SELECT job_id FROM {$table}
+				"SELECT job_id FROM %i
 				WHERE status LIKE %s
 				AND engine_data LIKE %s
 				ORDER BY job_id DESC",
+				$table,
 				'completed%',
 				'%"task_type":"' . $wpdb->esc_like( $task_type ) . '"%'
 			)
 		);
-		// phpcs:enable WordPress.DB.PreparedSQL
 
 		if ( empty( $rows ) ) {
 			return array();

@@ -1,5 +1,4 @@
 <?php
-// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange -- Data Machine owns the datamachine_processed_items custom table; duplicate/claim checks require fresh state and schema methods perform one-time table maintenance.
 /**
  * ProcessedItems database service - prevents duplicate processing at flow step level.
  *
@@ -1217,27 +1216,23 @@ class ProcessedItems extends BaseRepository {
 	private static function ensure_unique_index( string $table_name ): void {
 		global $wpdb;
 
-		// Check if the index already exists.
-		// phpcs:disable WordPress.DB.PreparedSQL -- table name is code-defined ($wpdb->prefix), not user input.
-		$index = $wpdb->get_row( "SHOW INDEX FROM {$table_name} WHERE Key_name = 'flow_source_item'" );
-		// phpcs:enable WordPress.DB.PreparedSQL
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- Migration must inspect the current custom-table index state.
+		$index = $wpdb->get_row( $wpdb->prepare( 'SHOW INDEX FROM %i WHERE Key_name = %s', $table_name, 'flow_source_item' ) );
 
 		if ( $index ) {
 			return;
 		}
 
 		// Remove duplicate rows, keeping the earliest (lowest id) for each combo.
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange -- Migration must deduplicate the current custom table before adding its unique index.
 		$deleted = $wpdb->query(
-			"DELETE t1 FROM {$table_name} t1
-			 INNER JOIN {$table_name} t2
+			$wpdb->prepare( 'DELETE t1 FROM %i t1
+			 INNER JOIN %i t2
 			 WHERE t1.id > t2.id
 			   AND t1.flow_step_id = t2.flow_step_id
 			   AND t1.source_type = t2.source_type
-			   AND t1.item_identifier = t2.item_identifier"
+			   AND t1.item_identifier = t2.item_identifier', $table_name, $table_name )
 		);
-		// phpcs:enable WordPress.DB.PreparedSQL
 
 		if ( $deleted > 0 ) {
 			do_action(
@@ -1252,13 +1247,10 @@ class ProcessedItems extends BaseRepository {
 		}
 
 		// Add the UNIQUE index.
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange -- Migration adds the required custom-table unique index.
 		$wpdb->query(
-			"ALTER TABLE {$table_name}
-			 ADD UNIQUE KEY `flow_source_item` (flow_step_id, source_type, item_identifier(191))"
+			$wpdb->prepare( 'ALTER TABLE %i ADD UNIQUE KEY `flow_source_item` (flow_step_id, source_type, item_identifier(191))', $table_name )
 		);
-		// phpcs:enable WordPress.DB.PreparedSQL
 
 		do_action(
 			'datamachine_log',
@@ -1283,15 +1275,14 @@ class ProcessedItems extends BaseRepository {
 	private static function ensure_flow_source_ts_index( string $table_name ): void {
 		global $wpdb;
 
-		// phpcs:disable WordPress.DB.PreparedSQL -- table name is code-defined ($wpdb->prefix), not user input.
-		$index = $wpdb->get_row( "SHOW INDEX FROM {$table_name} WHERE Key_name = 'flow_source_ts'" );
-		// phpcs:enable WordPress.DB.PreparedSQL
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- Migration must inspect the current custom-table index state.
+		$index = $wpdb->get_row( $wpdb->prepare( 'SHOW INDEX FROM %i WHERE Key_name = %s', $table_name, 'flow_source_ts' ) );
 
 		if ( $index ) {
 			return;
 		}
 
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange -- Migration adds the required custom-table index.
 		$wpdb->query(
 			// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- uses %i identifier placeholder; WPCS does not recognize %i (false positive).
 			$wpdb->prepare(

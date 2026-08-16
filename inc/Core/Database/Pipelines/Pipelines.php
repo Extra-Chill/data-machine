@@ -1,5 +1,4 @@
 <?php
-// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange -- Data Machine owns the datamachine_pipelines custom table; repository reads require fresh workflow state and schema methods perform one-time table maintenance.
 /**
  * Pipeline Database Operations
  *
@@ -272,7 +271,7 @@ class Pipelines extends BaseRepository {
 		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber,WordPress.DB.PreparedSQL.NotPrepared
 		$results = $this->wpdb->get_results(
 			$this->wpdb->prepare(
-				"SELECT * FROM %i{$where} ORDER BY updated_at DESC{$limit_clause}",
+				'SELECT * FROM %i' . $where . ' ORDER BY updated_at DESC' . $limit_clause,
 				array_merge( array( $this->table_name ), $where_values, $limit_values )
 			),
 			ARRAY_A
@@ -337,9 +336,7 @@ class Pipelines extends BaseRepository {
 		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber,WordPress.DB.PreparedSQL.NotPrepared
 		$results = $this->wpdb->get_results(
 			$this->wpdb->prepare(
-				"SELECT pipeline_id, pipeline_name, user_id, agent_id, portable_slug, created_at, updated_at
-				FROM %i{$where}
-				ORDER BY updated_at DESC{$limit_clause}",
+				'SELECT pipeline_id, pipeline_name, user_id, agent_id, portable_slug, created_at, updated_at FROM %i' . $where . ' ORDER BY updated_at DESC' . $limit_clause,
 				array_merge( array( $this->table_name ), $where_values, $limit_values )
 			),
 			ARRAY_A
@@ -370,7 +367,7 @@ class Pipelines extends BaseRepository {
 		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber,WordPress.DB.PreparedSQL.NotPrepared
 		$results = $this->wpdb->get_results(
 			$this->wpdb->prepare(
-				"SELECT pipeline_id, pipeline_name FROM %i{$where} ORDER BY pipeline_name ASC",
+				'SELECT pipeline_id, pipeline_name FROM %i' . $where . ' ORDER BY pipeline_name ASC',
 				array_merge( array( $this->table_name ), $where_values )
 			),
 			ARRAY_A
@@ -627,7 +624,7 @@ class Pipelines extends BaseRepository {
 		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber,WordPress.DB.PreparedSQL.NotPrepared
 		$count = $this->wpdb->get_var(
 			$this->wpdb->prepare(
-				"SELECT COUNT(pipeline_id) FROM %i{$where}",
+				'SELECT COUNT(pipeline_id) FROM %i' . $where,
 				array_merge( array( $this->table_name ), $where_values )
 			)
 		);

@@ -1,5 +1,4 @@
 <?php
-// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange,WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Data Machine owns this operational worklist table; claims require transactional fresh reads and bounded dynamic placeholder lists.
 /**
  * Durable work items for batch fan-out.
  *
@@ -148,10 +147,14 @@ class BatchItems extends BaseRepository {
 			$placeholders[] = '(%d, %d, %s, %s, %s, %s, %s, %s, %s)';
 			array_push( $args, $batch_job_id, $index, $row['payload'], $row['checksum'], $row['cleanup'], self::STATE_READY, $token, $now, $now );
 		}
-		$sql = 'INSERT INTO %i (batch_job_id, item_index, payload, payload_checksum, cleanup_context, state, worklist_token, created_at, updated_at) VALUES '
-			. implode( ', ', $placeholders )
-			. ' ON DUPLICATE KEY UPDATE batch_job_id = batch_job_id';
-		return $this->wpdb->query( $this->wpdb->prepare( $sql, ...$args ) );
+		return $this->wpdb->query(
+			$this->wpdb->prepare(
+				'INSERT INTO %i (batch_job_id, item_index, payload, payload_checksum, cleanup_context, state, worklist_token, created_at, updated_at) VALUES '
+				. implode( ', ', $placeholders )
+				. ' ON DUPLICATE KEY UPDATE batch_job_id = batch_job_id',
+				...$args
+			)
+		);
 	}
 
 	/** Verify one bounded index range without hydrating payload LONGTEXT. */

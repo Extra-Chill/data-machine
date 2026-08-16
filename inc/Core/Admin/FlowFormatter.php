@@ -221,22 +221,22 @@ class FlowFormatter {
 			return $result;
 		}
 
-		$where_args = implode( ' OR ', $conditions );
-
-		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber,WordPress.DB.PreparedSQL.NotPrepared
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
 		$rows = $wpdb->get_results(
 			$wpdb->prepare(
-				"SELECT args, MIN(scheduled_date_gmt) as next_run
-				FROM %i
+				sprintf(
+					"SELECT args, MIN(scheduled_date_gmt) as next_run
+				FROM %%i
 				WHERE hook = 'datamachine_run_flow_now'
 				AND status = 'pending'
-				AND ({$where_args})
+				AND (%s)
 				GROUP BY args",
+					implode( ' OR ', $conditions )
+				),
 				$values
 			),
 			ARRAY_A
 		);
-		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber,WordPress.DB.PreparedSQL.NotPrepared
 
 		if ( ! $rows ) {
 			return $result;

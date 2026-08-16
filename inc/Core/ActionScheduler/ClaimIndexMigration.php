@@ -217,7 +217,8 @@ class ClaimIndexMigration {
 
 			// Explicit clauses prevent the server from silently falling back to a copying or blocking alter.
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
-			if ( false === $this->wpdb->query( $inspection['ddl'] ) ) {
+			$ddl = $this->buildDdl( (string) $inspection['table'] );
+			if ( false === $this->wpdb->query( $ddl ) ) {
 				throw new \RuntimeException( 'Online index creation failed: ' . $this->wpdb->last_error );
 			}
 		} finally {

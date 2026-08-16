@@ -23,8 +23,8 @@ function datamachine_migrate_legacy_email_flow_auth(): void {
 	$table      = $wpdb->prefix . 'datamachine_flows';
 	$repository = new \DataMachine\Core\Database\Flows\Flows();
 
-	// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- Trusted table name; one-time migration.
-	$flows = $wpdb->get_results( "SELECT flow_id, agent_id FROM {$table} WHERE agent_id > 0", ARRAY_A );
+	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- One-time migration.
+	$flows = $wpdb->get_results( $wpdb->prepare( 'SELECT flow_id, agent_id FROM %i WHERE agent_id > 0', $table ), ARRAY_A );
 	if ( ! is_array( $flows ) ) {
 		return;
 	}

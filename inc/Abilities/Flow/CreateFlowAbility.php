@@ -464,8 +464,8 @@ class CreateFlowAbility {
 
 		if ( 'savepoint' === $scope['type'] ) {
 			$name = $scope['name'];
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-			return false !== $wpdb->query( "RELEASE SAVEPOINT {$name}" );
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- This transaction needs to release its own fresh savepoint.
+			return false !== $wpdb->query( $wpdb->prepare( 'RELEASE SAVEPOINT %i', $name ) );
 		}
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
@@ -482,10 +482,10 @@ class CreateFlowAbility {
 
 		if ( 'savepoint' === $scope['type'] ) {
 			$name = $scope['name'];
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-			$wpdb->query( "ROLLBACK TO SAVEPOINT {$name}" );
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-			$wpdb->query( "RELEASE SAVEPOINT {$name}" );
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- This transaction needs to roll back its own fresh savepoint.
+			$wpdb->query( $wpdb->prepare( 'ROLLBACK TO SAVEPOINT %i', $name ) );
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- This transaction needs to release its own fresh savepoint.
+			$wpdb->query( $wpdb->prepare( 'RELEASE SAVEPOINT %i', $name ) );
 			return;
 		}
 

@@ -477,29 +477,27 @@ class SystemAbilities {
 
 		$actions_table = $wpdb->prefix . 'actionscheduler_actions';
 		$groups_table  = $wpdb->prefix . 'actionscheduler_groups';
-		$where         = array( 'a.status = %s' );
-		$values        = array( (string) ( $args['status'] ?? 'pending' ) );
+		$status        = (string) ( $args['status'] ?? 'pending' );
+		$group         = (string) ( $args['group'] ?? '' );
+		$hook          = (string) ( $args['hook'] ?? '' );
+		$due_date      = ! empty( $args['due_only'] ) ? gmdate( 'Y-m-d H:i:s' ) : '';
 
-		if ( ! empty( $args['group'] ) ) {
-			$where[]  = 'g.slug = %s';
-			$values[] = (string) $args['group'];
-		}
-
-		if ( ! empty( $args['hook'] ) ) {
-			$where[]  = 'a.hook = %s';
-			$values[] = (string) $args['hook'];
-		}
-
-		if ( ! empty( $args['due_only'] ) ) {
-			$where[]  = 'a.scheduled_date_gmt <= %s';
-			$values[] = gmdate( 'Y-m-d H:i:s' );
-		}
-
-		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table names are derived from $wpdb->prefix.
-		$sql = "SELECT COUNT(*) AS count, MIN(a.scheduled_date_gmt) AS oldest_gmt, MAX(a.scheduled_date_gmt) AS newest_gmt, MAX(a.last_attempt_gmt) AS last_attempt_gmt FROM {$actions_table} a INNER JOIN {$groups_table} g ON g.group_id = a.group_id WHERE " . implode( ' AND ', $where );
-
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared -- SQL uses prepared placeholders assembled from fixed fragments.
-		$row = $wpdb->get_row( $wpdb->prepare( $sql, $values ), ARRAY_A );
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- Scheduler diagnostics require current aggregate state.
+		$row = $wpdb->get_row(
+			$wpdb->prepare(
+				'SELECT COUNT(*) AS count, MIN(a.scheduled_date_gmt) AS oldest_gmt, MAX(a.scheduled_date_gmt) AS newest_gmt, MAX(a.last_attempt_gmt) AS last_attempt_gmt FROM %i a INNER JOIN %i g ON g.group_id = a.group_id WHERE a.status = %s AND ( %s = \'\' OR g.slug = %s ) AND ( %s = \'\' OR a.hook = %s ) AND ( %s = \'\' OR a.scheduled_date_gmt <= %s )',
+				$actions_table,
+				$groups_table,
+				$status,
+				$group,
+				$group,
+				$hook,
+				$hook,
+				$due_date,
+				$due_date
+			),
+			ARRAY_A
+		);
 		if ( ! is_array( $row ) ) {
 			return $default;
 		}
