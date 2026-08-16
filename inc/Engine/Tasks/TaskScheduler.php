@@ -679,7 +679,7 @@ class TaskScheduler {
 
 		// Count child jobs by status via parent_job_id column.
 		global $wpdb;
-		$table = $wpdb->prefix . 'datamachine_jobs';
+		$table       = $wpdb->prefix . 'datamachine_jobs';
 		$child_stats = $wpdb->get_row(
 			$wpdb->prepare(
 				"SELECT

@@ -1189,11 +1189,11 @@ class JobsCommand extends BaseCommand {
 
 		$rows = $wpdb->get_results(
 			$wpdb->prepare(
-				"SELECT action_id, hook, status, scheduled_date_gmt, last_attempt_gmt, attempts, args
+				'SELECT action_id, hook, status, scheduled_date_gmt, last_attempt_gmt, attempts, args
 				 FROM %i
 				 WHERE hook IN (%s, %s, %s)
 				 AND (args LIKE %s OR args LIKE %s)
-				 ORDER BY action_id ASC",
+				 ORDER BY action_id ASC',
 				$actions_table,
 				'datamachine_execute_step',
 				'datamachine_resume_ai_step',
@@ -2998,10 +2998,10 @@ class JobsCommand extends BaseCommand {
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		$rows = $wpdb->get_results(
 			$wpdb->prepare(
-				"SELECT job_id FROM %i
+				'SELECT job_id FROM %i
 				WHERE status LIKE %s
 				AND engine_data LIKE %s
-				ORDER BY job_id DESC",
+				ORDER BY job_id DESC',
 				$table,
 				'completed%',
 				'%"task_type":"' . $wpdb->esc_like( $task_type ) . '"%'

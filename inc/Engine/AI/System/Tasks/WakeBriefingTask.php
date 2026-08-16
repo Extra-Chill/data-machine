@@ -398,8 +398,8 @@ class WakeBriefingTask extends SystemTask {
 
 		$count = (int) $wpdb->get_var(
 			$wpdb->prepare(
-				"SELECT COUNT(*) FROM %i
-				 WHERE created_at >= %s AND status = %s",
+				'SELECT COUNT(*) FROM %i
+				 WHERE created_at >= %s AND status = %s',
 				$table,
 				$since,
 				'processing'
@@ -426,12 +426,12 @@ class WakeBriefingTask extends SystemTask {
 
 		$rows = $wpdb->get_results(
 			$wpdb->prepare(
-				"SELECT message, COUNT(*) AS n
+				'SELECT message, COUNT(*) AS n
 				 FROM %i
 				 WHERE created_at >= %s AND level = %s
 				 GROUP BY message
 				 ORDER BY n DESC
-				 LIMIT 3",
+				 LIMIT 3',
 				$table,
 				$since,
 				'ERROR'

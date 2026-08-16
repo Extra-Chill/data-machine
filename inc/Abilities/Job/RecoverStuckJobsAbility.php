@@ -1135,8 +1135,9 @@ class RecoverStuckJobsAbility {
 		}
 
 		// The identifier and every generated integer placeholder are prepared at this boundary.
-		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Fixed fragments and generated placeholders are passed immediately to prepare().
+		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared -- The query contains fixed clauses and generated integer placeholders only.
 		$terminal_jobs = $wpdb->get_results( $wpdb->prepare( $sql, ...$query_args ), ARRAY_A );
+		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
 
 		if ( empty( $terminal_jobs ) ) {
 			return array();

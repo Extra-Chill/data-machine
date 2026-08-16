@@ -221,7 +221,7 @@ class FlowFormatter {
 			return $result;
 		}
 
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber -- The generated condition list contains %s placeholders paired with $values.
 		$rows = $wpdb->get_results(
 			$wpdb->prepare(
 				sprintf(
@@ -237,6 +237,7 @@ class FlowFormatter {
 			),
 			ARRAY_A
 		);
+		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
 
 		if ( ! $rows ) {
 			return $result;

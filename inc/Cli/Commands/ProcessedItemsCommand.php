@@ -97,7 +97,7 @@ class ProcessedItemsCommand extends BaseCommand {
 		$where_sql = ! empty( $where_clauses ) ? 'WHERE ' . implode( ' AND ', $where_clauses ) : '';
 
 		// Fixed predicates and their values are constructed together before preparation.
-		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Fixed fragments are passed immediately to prepare().
+		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- The generated WHERE clause contains fixed predicates with matching prepared values.
 		$results = $wpdb->get_results(
 			$wpdb->prepare(
 				"SELECT
@@ -114,6 +114,7 @@ class ProcessedItemsCommand extends BaseCommand {
 			),
 			ARRAY_A
 		);
+		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 
 		if ( empty( $results ) ) {
 			WP_CLI::log( 'No processed items found.' );
@@ -376,8 +377,9 @@ class ProcessedItemsCommand extends BaseCommand {
 
 		// Count first.
 		// Fixed predicates and their values are constructed together before preparation.
-		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Fixed fragments are passed immediately to prepare().
+		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- The generated WHERE clause contains fixed predicates with matching prepared values.
 		$count = (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM %i {$where_sql}", ...$values ) );
+		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 
 		if ( 0 === $count ) {
 			WP_CLI::log( 'No processed items match the criteria.' );
@@ -419,8 +421,9 @@ class ProcessedItemsCommand extends BaseCommand {
 		}
 
 		// Delete.
-		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Fixed fragments are passed immediately to prepare().
+		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- The generated WHERE clause contains fixed predicates with matching prepared values.
 		$deleted = $wpdb->query( $wpdb->prepare( "DELETE FROM %i {$where_sql}", ...$values ) );
+		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 
 		if ( false === $deleted ) {
 			WP_CLI::error( 'Database error during deletion: ' . $wpdb->last_error );
@@ -486,8 +489,9 @@ class ProcessedItemsCommand extends BaseCommand {
 		}
 
 		// Count orphans.
-		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- The optional flow predicate is a fixed fragment prepared with its value.
+		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber -- The optional flow predicate is fixed and paired with its prepared value.
 		$count = (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM %i pi LEFT JOIN %i j ON pi.job_id = j.job_id WHERE j.job_id IS NULL{$where_extra}", ...$values ) );
+		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
 
 		if ( 0 === $count ) {
 			WP_CLI::success( 'No orphaned processed items found.' );
@@ -508,8 +512,9 @@ class ProcessedItemsCommand extends BaseCommand {
 		}
 
 		// Delete orphans.
-		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- The optional flow predicate is a fixed fragment prepared with its value.
+		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber -- The optional flow predicate is fixed and paired with its prepared value.
 		$deleted = $wpdb->query( $wpdb->prepare( "DELETE pi FROM %i pi LEFT JOIN %i j ON pi.job_id = j.job_id WHERE j.job_id IS NULL{$where_extra}", ...$values ) );
+		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
 
 		if ( false === $deleted ) {
 			WP_CLI::error( 'Database error during deletion: ' . $wpdb->last_error );
@@ -581,8 +586,9 @@ class ProcessedItemsCommand extends BaseCommand {
 		$query_parts     = $this->build_source_rejected_query_parts( $assoc_args, $processed_table, $jobs_table );
 
 		$count_sql = "SELECT COUNT(*) FROM %i pi INNER JOIN %i j ON pi.job_id = j.job_id {$query_parts['where_sql']}";
-		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- The query helper returns fixed predicates with matching prepared values.
 		$count = (int) $wpdb->get_var( $wpdb->prepare( $count_sql, ...$query_parts['values'] ) );
+		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 
 		if ( 0 === $count ) {
 			WP_CLI::log( 'No source-rejected processed items match the criteria.' );
@@ -607,8 +613,9 @@ class ProcessedItemsCommand extends BaseCommand {
 			LIMIT %d";
 
 		$row_values = array_merge( $query_parts['values'], array( $limit ) );
-		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- The query helper returns fixed predicates with matching prepared values.
 		$rows = $wpdb->get_results( $wpdb->prepare( $rows_sql, ...$row_values ), ARRAY_A );
+		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 
 		WP_CLI::log( sprintf( 'Matched %s source-rejected processed item(s). Showing %d example(s).', number_format( $count ), count( $rows ) ) );
 
@@ -689,8 +696,9 @@ class ProcessedItemsCommand extends BaseCommand {
 			INNER JOIN %i j ON pi.job_id = j.job_id
 			{$query_parts['where_sql']}
 			ORDER BY pi.processed_timestamp DESC, pi.id DESC";
-		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- The query helper returns fixed predicates with matching prepared values.
 		$matches = $wpdb->get_results( $wpdb->prepare( $ids_sql, ...$query_parts['values'] ), ARRAY_A );
+		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 
 		if ( empty( $matches ) ) {
 			WP_CLI::log( 'No source-rejected processed items match the criteria.' );
@@ -721,8 +729,9 @@ class ProcessedItemsCommand extends BaseCommand {
 			$sql          = sprintf( 'DELETE FROM %%i WHERE id IN (%s)', $placeholders );
 			/** @var literal-string $sql */
 			$values = array_merge( array( $processed_table ), $chunk );
-			// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- The bounded fragment contains integer placeholders only.
 			$result = $wpdb->query( $wpdb->prepare( $sql, ...$values ) );
+			// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 			if ( false === $result ) {
 				WP_CLI::error( 'Database error during deletion: ' . $wpdb->last_error );
 				return;

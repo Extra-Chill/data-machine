@@ -195,8 +195,8 @@ class PathlessBatchRecovery {
 
 		return array(
 			'total_children'    => count( $children ),
-			'active_job_ids'   => $active_job_ids,
-			'stale_job_ids'    => $stale_job_ids,
+			'active_job_ids'    => $active_job_ids,
+			'stale_job_ids'     => $stale_job_ids,
 			'active_action_ids' => array_values( array_filter( array_unique( $active_action_ids ) ) ),
 			'evidence_complete' => $evidence_complete,
 		);

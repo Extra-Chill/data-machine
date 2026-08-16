@@ -30,7 +30,7 @@ function datamachine_migrate_legacy_email_flow_auth(): void {
 	}
 
 	foreach ( $flows as $flow ) {
-		$flow_id = absint( $flow['flow_id'] ?? 0 );
+		$flow_id  = absint( $flow['flow_id'] ?? 0 );
 		$agent_id = absint( $flow['agent_id'] ?? 0 );
 		if ( $flow_id <= 0 || $agent_id <= 0 ) {
 			continue;

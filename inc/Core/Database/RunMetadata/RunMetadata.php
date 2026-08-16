@@ -191,7 +191,7 @@ final class RunMetadata extends BaseRepository {
 		$where_sql = implode( ' OR ', $where_parts );
 		$needed    = count( $filters );
 
-		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQL.NotPrepared
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber -- Each generated predicate contributes two matching values.
 		$count = $this->wpdb->get_var( $this->wpdb->prepare(
 			"SELECT COUNT(*) FROM (
 				SELECT job_id
@@ -202,7 +202,7 @@ final class RunMetadata extends BaseRepository {
 			) matches",
 			array_merge( array( $this->table_name ), $where_values, array( $needed ) )
 		) );
-		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQL.NotPrepared
+		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
 
 		return (int) $count;
 	}

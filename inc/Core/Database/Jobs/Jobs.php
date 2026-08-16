@@ -1064,7 +1064,7 @@ class Jobs extends BaseRepository {
 				WHEN j.status LIKE 'waiting - %' OR j.status LIKE 'waiting:%' THEN 'waiting'
 				WHEN j.status LIKE 'pending - %' OR j.status LIKE 'pending:%' THEN 'pending'
 				ELSE j.status END";
-		$rows = $this->wpdb->get_results( $this->wpdb->prepare(
+		$rows              = $this->wpdb->get_results( $this->wpdb->prepare(
 			"SELECT {$status_expression} AS status,
 				COUNT(*) AS count
 			 FROM %i j
@@ -1781,11 +1781,11 @@ class Jobs extends BaseRepository {
 		$age_column      = 'cancelled' === $status_pattern ? 'completed_at' : 'created_at';
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
+		// phpcs:disable WordPress.DB.PreparedSQL,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber -- Status clauses are fixed and append matching values.
 		$values     = array();
 		$status_sql = $this->status_match_sql( $match, $values );
-		$result = $this->wpdb->query( $this->wpdb->prepare( "DELETE FROM %i WHERE {$status_sql} AND {$age_column} < %s", ...array_merge( array( $this->table_name ), $values, array( $cutoff_datetime ) ) ) );
-		// phpcs:enable WordPress.DB.PreparedSQL
+		$result     = $this->wpdb->query( $this->wpdb->prepare( "DELETE FROM %i WHERE {$status_sql} AND {$age_column} < %s", ...array_merge( array( $this->table_name ), $values, array( $cutoff_datetime ) ) ) );
+		// phpcs:enable WordPress.DB.PreparedSQL,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
 
 		do_action(
 			'datamachine_log',
@@ -1822,11 +1822,11 @@ class Jobs extends BaseRepository {
 		$age_column      = 'cancelled' === $status_pattern ? 'completed_at' : 'created_at';
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
+		// phpcs:disable WordPress.DB.PreparedSQL,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber -- Status clauses are fixed and append matching values.
 		$values     = array();
 		$status_sql = $this->status_match_sql( $match, $values );
-		$count = $this->wpdb->get_var( $this->wpdb->prepare( "SELECT COUNT(*) FROM %i WHERE {$status_sql} AND {$age_column} < %s", ...array_merge( array( $this->table_name ), $values, array( $cutoff_datetime ) ) ) );
-		// phpcs:enable WordPress.DB.PreparedSQL
+		$count      = $this->wpdb->get_var( $this->wpdb->prepare( "SELECT COUNT(*) FROM %i WHERE {$status_sql} AND {$age_column} < %s", ...array_merge( array( $this->table_name ), $values, array( $cutoff_datetime ) ) ) );
+		// phpcs:enable WordPress.DB.PreparedSQL,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
 
 		return (int) $count;
 	}
@@ -3651,7 +3651,7 @@ class Jobs extends BaseRepository {
 			// Backfill existing rows.
             // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
 			// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
-			$wpdb->query( $wpdb->prepare( "UPDATE %i SET source = %s WHERE pipeline_id = %s", $table_name, 'direct', 'direct' ) );
+			$wpdb->query( $wpdb->prepare( 'UPDATE %i SET source = %s WHERE pipeline_id = %s', $table_name, 'direct', 'direct' ) );
 			// phpcs:enable WordPress.DB.PreparedSQL
 
 			do_action(
@@ -3885,12 +3885,12 @@ class Jobs extends BaseRepository {
 			// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 			$rows = $wpdb->get_results(
 				$wpdb->prepare(
-					"SELECT job_id, engine_data
+					'SELECT job_id, engine_data
 					 FROM %i
 					 WHERE job_id > %d AND job_id <= %d
 					 AND engine_data IS NOT NULL
 					 AND engine_data LIKE %s
-					 AND handler_slug IS NULL",
+					 AND handler_slug IS NULL',
 					$table_name,
 					$start,
 					$end,

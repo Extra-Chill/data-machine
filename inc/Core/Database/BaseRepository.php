@@ -77,11 +77,11 @@ abstract class BaseRepository {
 	 * @return array|null Row as associative array or null.
 	 */
 	protected function find_by_id( string $id_column, $id ): ?array {
-		$format = is_int( $id ) ? '%d' : '%s';
+		$wpdb = $this->wpdb;
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- Repository reads need the current custom-table row.
 		$row = $this->wpdb->get_row(
-			$this->wpdb->prepare(
+			$wpdb->prepare(
 				'SELECT * FROM %i WHERE %i = %s',
 				$this->table_name,
 				$id_column,

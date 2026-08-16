@@ -1140,11 +1140,11 @@ class DailyMemoryTask extends SystemTask {
 
 		$jobs = $wpdb->get_results(
 			$wpdb->prepare(
-				"SELECT job_id, pipeline_id, flow_id, source, label, status,
+				'SELECT job_id, pipeline_id, flow_id, source, label, status,
 						created_at, completed_at
 				 FROM %i
 				 WHERE DATE(created_at) = %s
-				 ORDER BY job_id ASC",
+				 ORDER BY job_id ASC',
 				$table,
 				$date
 			),
