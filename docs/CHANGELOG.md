@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.174.3] - 2026-08-17
+
+### Fixed
+- prepare custom-table queries for Plugin Check
+
 ## [0.174.2] - 2026-08-16
 
 ### Fixed
