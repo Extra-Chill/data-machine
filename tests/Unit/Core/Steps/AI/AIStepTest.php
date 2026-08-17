@@ -18,9 +18,45 @@ use function DataMachine\Engine\AI\datamachine_with_conversation_metadata;
 
 class AIStepTest extends TestCase {
 
+	private static ?array $filter_baseline = null;
+
 	protected function setUp(): void {
 		parent::setUp();
 		datamachine_test_prepare_site();
+		self::$filter_baseline ??= self::capture_filter_ids();
+	}
+
+	protected function tearDown(): void {
+		self::remove_test_filters();
+		parent::tearDown();
+	}
+
+	private static function capture_filter_ids(): array {
+		global $wp_filter;
+		$hook = 'datamachine_ai_project_data_packet';
+		$ids = array();
+		if ( isset( $wp_filter[ $hook ] ) ) {
+			foreach ( $wp_filter[ $hook ]->callbacks as $priority => $callbacks ) {
+				$ids[ $priority ] = array_keys( $callbacks );
+			}
+		}
+		return $ids;
+	}
+
+	private static function remove_test_filters(): void {
+		global $wp_filter;
+		$hook = 'datamachine_ai_project_data_packet';
+		if ( null === self::$filter_baseline || ! isset( $wp_filter[ $hook ] ) ) {
+			return;
+		}
+		foreach ( $wp_filter[ $hook ]->callbacks as $priority => $callbacks ) {
+			$known = self::$filter_baseline[ $priority ] ?? array();
+			foreach ( $callbacks as $id => $callback ) {
+				if ( ! in_array( $id, $known, true ) ) {
+					remove_filter( $hook, $callback['function'], $priority );
+				}
+			}
+		}
 	}
 
 	public function test_sanitize_data_packets_for_ai_removes_file_path_but_keeps_other_file_info(): void {

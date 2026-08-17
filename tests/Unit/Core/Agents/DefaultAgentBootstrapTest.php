@@ -27,11 +27,18 @@ class DefaultAgentBootstrapTest extends WP_UnitTestCase {
 		$this->default_user_id = DirectoryManager::get_default_agent_user_id();
 		$this->clear_agents();
 		delete_user_meta( $this->default_user_id, AgentBundler::ACTIVE_AGENT_META_KEY );
+		$directory_manager = new DirectoryManager();
+		wp_delete_file( trailingslashit( $directory_manager->get_user_directory( $this->default_user_id ) ) . 'USER.md' );
+		wp_delete_file( trailingslashit( $directory_manager->get_shared_directory() ) . 'RULES.md' );
 	}
 
 	public function tear_down(): void {
 		$this->clear_agents();
 		delete_user_meta( $this->default_user_id, AgentBundler::ACTIVE_AGENT_META_KEY );
+		$directory_manager = new DirectoryManager();
+		wp_delete_file( trailingslashit( $directory_manager->get_user_directory( $this->default_user_id ) ) . 'USER.md' );
+		wp_delete_file( trailingslashit( $directory_manager->get_shared_directory() ) . 'RULES.md' );
+		DirectoryManager::reset_ensure_flag();
 		parent::tear_down();
 	}
 

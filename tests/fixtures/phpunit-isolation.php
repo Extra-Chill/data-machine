@@ -11,6 +11,8 @@ if ( ! function_exists( 'datamachine_test_prepare_site' ) ) {
 	 * Re-establish the plugin contract required by an isolated integration file.
 	 */
 	function datamachine_test_prepare_site(): void {
+		static $activated = false;
+
 		if ( class_exists( '\DataMachine\Core\FilesRepository\DirectoryManager' ) ) {
 			\DataMachine\Core\FilesRepository\DirectoryManager::reset_ensure_flag();
 		}
@@ -18,7 +20,10 @@ if ( ! function_exists( 'datamachine_test_prepare_site' ) ) {
 		$wpdb->query( 'ROLLBACK' );
 		delete_option( 'datamachine_settings' );
 		delete_option( 'datamachine_db_version' );
-		datamachine_activate_for_site();
+		if ( ! $activated ) {
+			datamachine_activate_for_site();
+			$activated = true;
+		}
 		datamachine_ensure_all_tables();
 		datamachine_test_clear_runtime_rows();
 		datamachine_test_reset_scheduler();

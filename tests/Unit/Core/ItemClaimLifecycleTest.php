@@ -76,7 +76,11 @@ class ItemClaimLifecycleTest extends WP_UnitTestCase {
 		if ( null !== $this->reconciliation_persist_filter ) {
 			remove_filter( 'datamachine_packet_reconciliation_engine_persist', $this->reconciliation_persist_filter );
 		}
+		if ( function_exists( 'as_unschedule_all_actions' ) ) {
+			as_unschedule_all_actions( 'test_batch_hook' );
+		}
 		$this->deleteTestRows();
+		wp_set_current_user( 0 );
 		parent::tear_down();
 	}
 

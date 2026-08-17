@@ -36,6 +36,9 @@ class AgentPruneResurrectionTest extends WP_UnitTestCase {
 	public function set_up(): void {
 		parent::set_up();
 		datamachine_test_prepare_site();
+		if ( class_exists( 'WP_Agents_Registry' ) && method_exists( 'WP_Agents_Registry', 'reset_for_tests' ) ) {
+			\WP_Agents_Registry::reset_for_tests();
+		}
 
 		$this->admin_id = self::factory()->user->create( array( 'role' => 'administrator' ) );
 		$this->owner_id = self::factory()->user->create( array( 'role' => 'author' ) );

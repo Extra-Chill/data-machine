@@ -26,6 +26,9 @@ class BatchItemsTest extends WP_UnitTestCase {
 
 	public function tear_down(): void {
 		$this->repository->delete_batch( $this->batch_job_id );
+		if ( function_exists( 'as_unschedule_all_actions' ) ) {
+			as_unschedule_all_actions( 'test_batch_hook' );
+		}
 		parent::tear_down();
 	}
 

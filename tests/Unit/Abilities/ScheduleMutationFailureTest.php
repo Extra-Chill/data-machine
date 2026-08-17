@@ -80,6 +80,11 @@ class ScheduleMutationFailureTest extends WP_UnitTestCase {
 	public function tear_down(): void {
 		foreach ( $this->managed_flow_ids as $flow_id ) {
 			$this->releaseScheduleLock( $flow_id );
+			$options = $this->scheduleOptionNames( $flow_id );
+			delete_option( $options['generation'] );
+			if ( function_exists( 'as_unschedule_all_actions' ) ) {
+				as_unschedule_all_actions( self::FLOW_HOOK );
+			}
 			RecurringScheduler::ensureSchedule(
 				self::FLOW_HOOK,
 				array( $flow_id ),

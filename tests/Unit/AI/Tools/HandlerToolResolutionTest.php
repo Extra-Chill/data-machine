@@ -23,9 +23,11 @@ use WP_UnitTestCase;
 class HandlerToolResolutionTest extends WP_UnitTestCase {
 
 	private ToolManager $tool_manager;
+	private static ?array $filter_baseline = null;
 
 	public function set_up(): void {
 		parent::set_up();
+		self::$filter_baseline ??= self::capture_filter_ids();
 		datamachine_register_capabilities();
 
 		$user_id = self::factory()->user->create( array( 'role' => 'administrator' ) );
@@ -36,8 +38,44 @@ class HandlerToolResolutionTest extends WP_UnitTestCase {
 	}
 
 	public function tear_down(): void {
+		self::remove_test_filters();
 		ToolManager::clearCache();
 		parent::tear_down();
+	}
+
+	private static function capture_filter_ids(): array {
+		global $wp_filter;
+		$ids = array();
+		foreach ( array( 'datamachine_handlers', 'datamachine_tools' ) as $hook ) {
+			$ids[ $hook ] = array();
+			if ( ! isset( $wp_filter[ $hook ] ) ) {
+				continue;
+			}
+			foreach ( $wp_filter[ $hook ]->callbacks as $priority => $callbacks ) {
+				$ids[ $hook ][ $priority ] = array_keys( $callbacks );
+			}
+		}
+		return $ids;
+	}
+
+	private static function remove_test_filters(): void {
+		global $wp_filter;
+		if ( null === self::$filter_baseline ) {
+			return;
+		}
+		foreach ( self::$filter_baseline as $hook => $baseline ) {
+			if ( ! isset( $wp_filter[ $hook ] ) ) {
+				continue;
+			}
+			foreach ( $wp_filter[ $hook ]->callbacks as $priority => $callbacks ) {
+				$known = $baseline[ $priority ] ?? array();
+				foreach ( $callbacks as $id => $callback ) {
+					if ( ! in_array( $id, $known, true ) ) {
+						remove_filter( $hook, $callback['function'], $priority );
+					}
+				}
+			}
+		}
 	}
 
 	// ============================================

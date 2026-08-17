@@ -55,6 +55,9 @@ class PipelineBatchSchedulerTest extends WP_UnitTestCase {
 	}
 
 	public function tear_down(): void {
+		if ( function_exists( 'as_unschedule_all_actions' ) ) {
+			as_unschedule_all_actions( PipelineBatchScheduler::BATCH_HOOK );
+		}
 		wp_set_current_user( 0 );
 		parent::tear_down();
 	}

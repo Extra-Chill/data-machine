@@ -33,6 +33,11 @@ class SchedulingDelegationTest extends WP_UnitTestCase {
 		);
 	}
 
+	public function tear_down(): void {
+		wp_set_current_user( 0 );
+		parent::tear_down();
+	}
+
 	public function test_create_flow_resolves_every_six_hours_through_ability(): void {
 		$result = ( new CreateFlow() )->handle_tool_call(
 			array(

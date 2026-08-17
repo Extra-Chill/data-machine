@@ -43,6 +43,9 @@ class RunFlowAbilityLifecycleTest extends WP_UnitTestCase {
 
 	public function tear_down(): void {
 		remove_action( 'datamachine_schedule_next_step', $this->schedule_capture, 1 );
+		if ( function_exists( 'as_unschedule_all_actions' ) ) {
+			as_unschedule_all_actions( 'datamachine_run_flow_now' );
+		}
 		wp_set_current_user( 0 );
 
 		parent::tear_down();

@@ -18,6 +18,7 @@ class PostIdentityReservationsTest extends WP_UnitTestCase {
 		parent::set_up();
 		datamachine_test_prepare_site();
 		global $wpdb;
+		$wpdb->query( 'ROLLBACK' );
 		$wpdb->query( $wpdb->prepare( 'DROP TABLE IF EXISTS %i', $wpdb->prefix . PostIdentityReservations::TABLE_NAME ) );
 		PostIdentityReservations::create_table();
 		$this->repository = new PostIdentityReservations();
@@ -30,6 +31,7 @@ class PostIdentityReservationsTest extends WP_UnitTestCase {
 		if ( isset( $this->repository ) ) {
 			$wpdb->query( $wpdb->prepare( 'DELETE FROM %i', $this->repository->get_table_name() ) );
 		}
+		$wpdb->query( 'ROLLBACK' );
 		parent::tear_down();
 	}
 
