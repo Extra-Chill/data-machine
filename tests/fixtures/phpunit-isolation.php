@@ -11,9 +11,6 @@ if ( ! function_exists( 'datamachine_test_prepare_site' ) ) {
 	 * Re-establish the plugin contract required by an isolated integration file.
 	 */
 	function datamachine_test_prepare_site(): void {
-		if ( class_exists( 'WP_Abilities_Registry' ) && method_exists( 'WP_Abilities_Registry', 'reset' ) ) {
-			\WP_Abilities_Registry::reset();
-		}
 		if ( class_exists( '\DataMachine\Core\FilesRepository\DirectoryManager' ) ) {
 			\DataMachine\Core\FilesRepository\DirectoryManager::reset_ensure_flag();
 		}
@@ -22,9 +19,6 @@ if ( ! function_exists( 'datamachine_test_prepare_site' ) ) {
 		delete_option( 'datamachine_settings' );
 		delete_option( 'datamachine_db_version' );
 		datamachine_activate_for_site();
-		if ( did_action( 'wp_abilities_api_init' ) && has_action( 'wp_abilities_api_init' ) ) {
-			do_action( 'wp_abilities_api_init' );
-		}
 		datamachine_ensure_all_tables();
 		datamachine_test_clear_runtime_rows();
 		datamachine_test_reset_scheduler();
