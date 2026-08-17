@@ -33,7 +33,8 @@
 			"DataMachine\\Tests\\": "tests/"
 		},
 		"files": [
-			"tests/fixtures/identity-store-doubles.php"
+			"tests/fixtures/identity-store-doubles.php",
+			"tests/fixtures/engine-data.php"
 		]
 	},
 	"scripts": {

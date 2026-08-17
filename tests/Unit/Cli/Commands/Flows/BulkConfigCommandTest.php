@@ -55,6 +55,7 @@ class BulkConfigCommandTest extends WP_UnitTestCase {
 
 	public function set_up(): void {
 		parent::set_up();
+		datamachine_activate_for_site();
 
 		$this->pipelines = new Pipelines();
 		$this->flows     = new Flows();

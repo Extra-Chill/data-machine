@@ -27,6 +27,9 @@ $check( false !== $source && str_contains( $source, 'final class DuplicateLoserA
 $composer = json_decode( (string) file_get_contents( $root . '/composer.json' ), true );
 $dev_files = $composer['autoload-dev']['files'] ?? array();
 $check( in_array( 'tests/fixtures/identity-store-doubles.php', $dev_files, true ), 'identity-store doubles must be explicitly autoloaded' );
+$check( in_array( 'tests/fixtures/engine-data.php', $dev_files, true ), 'EngineData compatibility fixture must be explicitly autoloaded' );
+$engine_fixture = file_get_contents( $root . '/tests/fixtures/engine-data.php' );
+$check( false !== $engine_fixture && str_contains( $engine_fixture, 'class_alias' ), 'EngineData compatibility must remain fixture-owned' );
 
 $clusters = array(
 	'agent context'       => 'tests/Unit/Abilities/AgentContextPropagationTest.php',
@@ -40,6 +43,11 @@ $clusters = array(
 	'default bootstrap'   => 'tests/Unit/Core/Agents/DefaultAgentBootstrapTest.php',
 	'batch scheduler'     => 'tests/Unit/Abilities/Engine/PipelineBatchSchedulerTest.php',
 	'publish opt-in'      => 'tests/Unit/Engine/AI/Tools/PipelinePublishOptInTest.php',
+	'flow atomicity'      => 'tests/Unit/Abilities/FlowCreationAtomicityTest.php',
+	'fail job'            => 'tests/Unit/Abilities/Job/FailJobAbilityTest.php',
+	'item claim'          => 'tests/Unit/Core/ItemClaimLifecycleTest.php',
+	'schedule failure'    => 'tests/Unit/Abilities/ScheduleMutationFailureTest.php',
+	'pipeline config'     => 'tests/Unit/Abilities/PipelineConfigurationAbilitiesTest.php',
 );
 
 foreach ( $clusters as $name => $relative_path ) {
@@ -54,6 +62,7 @@ foreach ( $clusters as $name => $relative_path ) {
 	$check( ! str_contains( $data, 'class FailingProvisionAdapter' ), sprintf( '%s file must not own shared doubles', $name ) );
 	$check( ! str_contains( $data, 'class CountingProvisionAdapter' ), sprintf( '%s file must not own shared doubles', $name ) );
 	$check( ! str_contains( $data, 'class DuplicateLoserAgents' ), sprintf( '%s file must not own shared doubles', $name ) );
+	$check( str_contains( $data, 'datamachine_activate_for_site()' ), sprintf( '%s cluster must activate its own tables', $name ) );
 }
 
 if ( $failures ) {

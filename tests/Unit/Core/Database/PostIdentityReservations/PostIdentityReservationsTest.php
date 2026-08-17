@@ -16,6 +16,7 @@ class PostIdentityReservationsTest extends WP_UnitTestCase {
 
 	public function set_up(): void {
 		parent::set_up();
+		datamachine_activate_for_site();
 		PostIdentityReservations::create_table();
 		$this->repository = new PostIdentityReservations();
 

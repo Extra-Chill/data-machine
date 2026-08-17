@@ -18,8 +18,14 @@ class FailJobAbilityTest extends WP_UnitTestCase {
 
 	public function set_up(): void {
 		parent::set_up();
+		datamachine_activate_for_site();
 		$this->admin_id = self::factory()->user->create( array( 'role' => 'administrator' ) );
 		wp_set_current_user( $this->admin_id );
+	}
+
+	public function tear_down(): void {
+		wp_set_current_user( 0 );
+		parent::tear_down();
 	}
 
 	public function test_fail_job_allows_pending_jobs(): void {
