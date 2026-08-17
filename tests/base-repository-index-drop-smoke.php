@@ -9,12 +9,12 @@ $mode = $argv[1] ?? null;
 $wordpress_runtime = defined( 'ABSPATH' ) && function_exists( 'esc_html' );
 
 if ( null === $mode && $wordpress_runtime ) {
-	$mode = defined( 'DATABASE_TYPE' ) && 'sqlite' === DATABASE_TYPE ? 'sqlite' : 'mysql';
+	$mode = BaseRepository::is_sqlite() ? 'database-type-sqlite' : 'mysql';
 }
 
 if ( null === $mode ) {
 	$failures = array();
-	foreach ( array( 'mysql', 'sqlite' ) as $child_mode ) {
+	foreach ( array( 'mysql', 'database-type-sqlite', 'db-engine-sqlite' ) as $child_mode ) {
 		$command = escapeshellarg( PHP_BINARY ) . ' ' . escapeshellarg( __FILE__ ) . ' ' . escapeshellarg( $child_mode );
 		$output  = array();
 		exec( $command, $output, $status );
@@ -28,17 +28,20 @@ if ( null === $mode ) {
 		exit( 1 );
 	}
 
-	echo "BaseRepository index drop smoke complete: MySQL and SQLite child processes passed.\n";
+	echo "BaseRepository index drop smoke complete: MySQL and both SQLite driver contracts passed.\n";
 	exit( 0 );
 }
 
-if ( ! in_array( $mode, array( 'mysql', 'sqlite' ), true ) ) {
-	echo "FAIL: expected mysql or sqlite mode.\n";
+if ( ! in_array( $mode, array( 'mysql', 'database-type-sqlite', 'db-engine-sqlite' ), true ) ) {
+	echo "FAIL: expected mysql or a supported sqlite mode.\n";
 	exit( 1 );
 }
 
-if ( 'sqlite' === $mode && ! defined( 'DATABASE_TYPE' ) ) {
+if ( 'database-type-sqlite' === $mode && ! defined( 'DATABASE_TYPE' ) ) {
 	define( 'DATABASE_TYPE', 'sqlite' );
+}
+if ( 'db-engine-sqlite' === $mode && ! defined( 'DB_ENGINE' ) ) {
+	define( 'DB_ENGINE', 'sqlite' );
 }
 if ( ! defined( 'ABSPATH' ) ) {
 	define( 'ABSPATH', __DIR__ . '/' );
@@ -91,7 +94,7 @@ class IndexDropSmokeWpdb extends wpdb {
 			$this->last_error = 'driver drop failed';
 			return false;
 		}
-		if ( defined( 'DATABASE_TYPE' ) && 'sqlite' === DATABASE_TYPE && str_contains( $query, 'ALTER TABLE' ) && str_contains( $query, 'DROP INDEX' ) ) {
+		if ( BaseRepository::is_sqlite() && str_contains( $query, 'ALTER TABLE' ) && str_contains( $query, 'DROP INDEX' ) ) {
 			$this->last_error = 'SQLite ALTER parser was used';
 			return false;
 		}

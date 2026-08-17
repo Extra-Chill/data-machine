@@ -134,16 +134,16 @@ abstract class BaseRepository {
 	/**
 	 * Check whether WordPress is running on SQLite (e.g. WordPress Studio).
 	 *
-	 * The SQLite Database Integration plugin defines this constant in its
-	 * db.php drop-in. Checking it is the canonical way to detect SQLite at
-	 * runtime — no autoload, no option lookup, no file sniffing required.
+	 * SQLite integrations identify the active driver through DB_ENGINE or the
+	 * legacy DATABASE_TYPE constant.
 	 *
 	 * @since 0.45.0
 	 *
 	 * @return bool True when the active database driver is SQLite.
 	 */
 	public static function is_sqlite(): bool {
-		return defined( 'DATABASE_TYPE' ) && 'sqlite' === DATABASE_TYPE;
+		return ( defined( 'DB_ENGINE' ) && 'sqlite' === DB_ENGINE )
+			|| ( defined( 'DATABASE_TYPE' ) && 'sqlite' === DATABASE_TYPE );
 	}
 
 	/**
