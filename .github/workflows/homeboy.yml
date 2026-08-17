@@ -43,6 +43,8 @@ jobs:
     if: ${{ github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'release:') }}
     uses: Extra-Chill/homeboy-action/.github/workflows/ci.yml@v2
     with:
+      # v2.14.2 keeps raw candidate evidence neutral; this reconciled Test gate
+      # alone decides whether the full-suite candidate regresses from main.
       commands: 'review test'
       expected-commands: 'review test'
       scope: full
