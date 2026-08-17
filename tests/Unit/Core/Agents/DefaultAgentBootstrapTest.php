@@ -20,6 +20,7 @@ class DefaultAgentBootstrapTest extends WP_UnitTestCase {
 	public function set_up(): void {
 		parent::set_up();
 		datamachine_test_prepare_site();
+		datamachine_test_prepare_uploads();
 
 		AgentsRepository::create_table();
 		$this->agents_repo    = new AgentsRepository();

@@ -17,10 +17,11 @@ class PostIdentityReservationsTest extends WP_UnitTestCase {
 	public function set_up(): void {
 		parent::set_up();
 		datamachine_test_prepare_site();
+		global $wpdb;
+		$wpdb->query( $wpdb->prepare( 'DROP TABLE IF EXISTS %i', $wpdb->prefix . PostIdentityReservations::TABLE_NAME ) );
 		PostIdentityReservations::create_table();
 		$this->repository = new PostIdentityReservations();
 
-		global $wpdb;
 		$wpdb->query( $wpdb->prepare( 'DELETE FROM %i', $this->repository->get_table_name() ) );
 	}
 
