@@ -167,7 +167,7 @@ class Agents extends BaseRepository {
 
 	private static function query_or_throw( \wpdb $wpdb, string $sql, string $operation ): void {
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
-		if ( false === $wpdb->query( $wpdb->prepare( $sql ) ) ) {
+		if ( false === $wpdb->query( $sql ) ) {
 			throw new \RuntimeException( sprintf( 'Failed to %s: %s', esc_html( $operation ), esc_html( (string) $wpdb->last_error ) ) );
 		}
 	}
