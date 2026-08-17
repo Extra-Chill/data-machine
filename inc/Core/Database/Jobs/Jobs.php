@@ -1,5 +1,4 @@
 <?php
-// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange -- Data Machine owns the datamachine_jobs custom table; job lifecycle reads require fresh queue state and schema methods perform one-time table maintenance.
 /**
  * Jobs Database Repository
  *
@@ -864,14 +863,13 @@ class Jobs extends BaseRepository {
 		}
 
 		// phpcs:disable WordPress.DB.PreparedSQL,WordPress.DB.PreparedSQLPlaceholders -- Dynamic clauses are fixed repository fragments; every value is passed to prepare().
-		$query = $this->wpdb->prepare(
+		$count = $this->wpdb->get_var( $this->wpdb->prepare(
 			"SELECT COUNT(job_id) FROM %i {$where_sql}",
 			array_merge( array( $this->table_name ), $where_values )
-		);
+		) );
 		// phpcs:enable WordPress.DB.PreparedSQL,WordPress.DB.PreparedSQLPlaceholders
 
 		// phpcs:disable WordPress.DB.PreparedSQL -- The query variable is fully prepared immediately above.
-		$count = $this->wpdb->get_var( $query );
 		// phpcs:enable WordPress.DB.PreparedSQL
 		if ( null === $count && $fail_on_error ) {
 			$error = (string) $this->wpdb->last_error;
@@ -919,14 +917,13 @@ class Jobs extends BaseRepository {
 		$where_values = $where_parts['values'];
 		$query_args   = array_merge( array( $this->table_name ), $where_values, array( self::TERMINAL_ACCOUNTING_COMPLETE ) );
 		// phpcs:disable WordPress.DB.PreparedSQL,WordPress.DB.PreparedSQLPlaceholders -- The repository builds the WHERE fragment from fixed clauses and passes every value through prepare().
-		$query = $this->wpdb->prepare(
+		$count = $this->wpdb->get_var( $this->wpdb->prepare(
 			"SELECT COUNT(j.job_id) FROM %i j {$where_sql} j.terminal_accounting_state IS NOT NULL AND j.terminal_accounting_state < %d",
 			...$query_args
-		);
+		) );
 		// phpcs:enable WordPress.DB.PreparedSQL,WordPress.DB.PreparedSQLPlaceholders
 
 		// phpcs:disable WordPress.DB.PreparedSQL -- The dynamic WHERE query is fully prepared immediately above.
-		$count = $this->wpdb->get_var( $query );
 		// phpcs:enable WordPress.DB.PreparedSQL
 		return (int) $count;
 	}
@@ -1067,7 +1064,7 @@ class Jobs extends BaseRepository {
 				WHEN j.status LIKE 'waiting - %' OR j.status LIKE 'waiting:%' THEN 'waiting'
 				WHEN j.status LIKE 'pending - %' OR j.status LIKE 'pending:%' THEN 'pending'
 				ELSE j.status END";
-		$query             = $this->wpdb->prepare(
+		$rows              = $this->wpdb->get_results( $this->wpdb->prepare(
 			"SELECT {$status_expression} AS status,
 				COUNT(*) AS count
 			 FROM %i j
@@ -1075,11 +1072,10 @@ class Jobs extends BaseRepository {
 			 GROUP BY 1
 			 ORDER BY count DESC",
 			array_merge( array( $this->table_name ), $where_values )
-		);
+		), ARRAY_A );
 		// phpcs:enable WordPress.DB.PreparedSQL,WordPress.DB.PreparedSQLPlaceholders
 
 		// phpcs:disable WordPress.DB.PreparedSQL -- The dynamic summary query is fully prepared immediately above.
-		$rows = $this->wpdb->get_results( $query, ARRAY_A );
 		// phpcs:enable WordPress.DB.PreparedSQL
 
 		return $this->normalize_summary_rows( $rows ? $rows : array(), array( 'status' ) );
@@ -1092,7 +1088,7 @@ class Jobs extends BaseRepository {
 		$pipelines_table = $this->wpdb->prefix . 'datamachine_pipelines';
 
 		// phpcs:disable WordPress.DB.PreparedSQL,WordPress.DB.PreparedSQLPlaceholders -- Dynamic clauses are fixed repository fragments; every value is passed to prepare().
-		$query = $this->wpdb->prepare(
+		$rows = $this->wpdb->get_results( $this->wpdb->prepare(
 			"SELECT j.pipeline_id, p.pipeline_name, COUNT(*) AS count
 			 FROM %i j
 			 LEFT JOIN %i p ON j.pipeline_id = p.pipeline_id
@@ -1100,11 +1096,10 @@ class Jobs extends BaseRepository {
 			 GROUP BY j.pipeline_id, p.pipeline_name
 			 ORDER BY count DESC",
 			array_merge( array( $this->table_name, $pipelines_table ), $where_values )
-		);
+		), ARRAY_A );
 		// phpcs:enable WordPress.DB.PreparedSQL,WordPress.DB.PreparedSQLPlaceholders
 
 		// phpcs:disable WordPress.DB.PreparedSQL -- The dynamic summary query is fully prepared immediately above.
-		$rows = $this->wpdb->get_results( $query, ARRAY_A );
 		// phpcs:enable WordPress.DB.PreparedSQL
 
 		return $this->normalize_summary_rows( $rows ? $rows : array(), array( 'pipeline_id', 'pipeline_name' ) );
@@ -1117,7 +1112,7 @@ class Jobs extends BaseRepository {
 		$flows_table = $this->wpdb->prefix . 'datamachine_flows';
 
 		// phpcs:disable WordPress.DB.PreparedSQL,WordPress.DB.PreparedSQLPlaceholders -- Dynamic clauses are fixed repository fragments; every value is passed to prepare().
-		$query = $this->wpdb->prepare(
+		$rows = $this->wpdb->get_results( $this->wpdb->prepare(
 			"SELECT j.flow_id, f.flow_name, j.pipeline_id, COUNT(*) AS count
 			 FROM %i j
 			 LEFT JOIN %i f ON j.flow_id = f.flow_id
@@ -1125,11 +1120,10 @@ class Jobs extends BaseRepository {
 			 GROUP BY j.flow_id, f.flow_name, j.pipeline_id
 			 ORDER BY count DESC",
 			array_merge( array( $this->table_name, $flows_table ), $where_values )
-		);
+		), ARRAY_A );
 		// phpcs:enable WordPress.DB.PreparedSQL,WordPress.DB.PreparedSQLPlaceholders
 
 		// phpcs:disable WordPress.DB.PreparedSQL -- The dynamic summary query is fully prepared immediately above.
-		$rows = $this->wpdb->get_results( $query, ARRAY_A );
 		// phpcs:enable WordPress.DB.PreparedSQL
 
 		return $this->normalize_summary_rows( $rows ? $rows : array(), array( 'flow_id', 'flow_name', 'pipeline_id' ) );
@@ -1157,18 +1151,17 @@ class Jobs extends BaseRepository {
 			: $where_sql . " AND j.handler_slug IS NOT NULL AND j.handler_slug != ''";
 
 		// phpcs:disable WordPress.DB.PreparedSQL,WordPress.DB.PreparedSQLPlaceholders -- Dynamic clauses are fixed repository fragments; every value is passed to prepare().
-		$query = $this->wpdb->prepare(
+		$rows = $this->wpdb->get_results( $this->wpdb->prepare(
 			"SELECT j.handler_slug AS handler_slug, COUNT(*) AS count
 			 FROM %i j
 			 {$handler_where}
 			 GROUP BY j.handler_slug
 			 ORDER BY count DESC",
 			array_merge( array( $this->table_name ), $where_values )
-		);
+		), ARRAY_A );
 		// phpcs:enable WordPress.DB.PreparedSQL,WordPress.DB.PreparedSQLPlaceholders
 
 		// phpcs:disable WordPress.DB.PreparedSQL -- The dynamic summary query is fully prepared immediately above.
-		$rows = $this->wpdb->get_results( $query, ARRAY_A );
 		// phpcs:enable WordPress.DB.PreparedSQL
 
 		return $this->normalize_summary_rows( $rows ? $rows : array(), array( 'handler_slug' ) );
@@ -1186,14 +1179,13 @@ class Jobs extends BaseRepository {
 		$where_values         = array_merge( $where_parts['values'], array( gmdate( 'Y-m-d H:i:s', time() - $stuck_seconds ) ) );
 
 		// phpcs:disable WordPress.DB.PreparedSQL,WordPress.DB.PreparedSQLPlaceholders -- Dynamic clauses are fixed repository fragments; every value is passed to prepare().
-		$query = $this->wpdb->prepare(
+		$count = $this->wpdb->get_var( $this->wpdb->prepare(
 			"SELECT COUNT(j.job_id) FROM %i j {$where_sql}",
 			array_merge( array( $this->table_name ), $where_values )
-		);
+		) );
 		// phpcs:enable WordPress.DB.PreparedSQL,WordPress.DB.PreparedSQLPlaceholders
 
 		// phpcs:disable WordPress.DB.PreparedSQL -- The dynamic summary query is fully prepared immediately above.
-		$count = $this->wpdb->get_var( $query );
 		// phpcs:enable WordPress.DB.PreparedSQL
 		return (int) $count;
 	}
@@ -1401,7 +1393,7 @@ class Jobs extends BaseRepository {
 		// JOIN uses j.pipeline_id (varchar) directly against CAST of p.pipeline_id (int) to varchar
 		// for index-friendly matching on the jobs table side.
 		// phpcs:disable WordPress.DB.PreparedSQL,WordPress.DB.PreparedSQLPlaceholders -- Select and order fragments are allowlisted repository values; every scalar filter is prepared.
-		$query = $this->wpdb->prepare(
+		$results = $this->wpdb->get_results( $this->wpdb->prepare(
 			"SELECT {$select_fields}{$child_count_select}
 			 FROM %i j
 			 LEFT JOIN %i p ON j.pipeline_id = p.pipeline_id
@@ -1414,11 +1406,10 @@ class Jobs extends BaseRepository {
 				$where_values,
 				array( $per_page, $offset )
 			)
-		);
+		), ARRAY_A );
 		// phpcs:enable WordPress.DB.PreparedSQL,WordPress.DB.PreparedSQLPlaceholders
 
 		// phpcs:disable WordPress.DB.PreparedSQL -- The dynamic listing query is fully prepared immediately above.
-		$results = $this->wpdb->get_results( $query, ARRAY_A );
 		// phpcs:enable WordPress.DB.PreparedSQL
 		if ( $results && $decode_engine_data ) {
 			foreach ( $results as &$result ) {
@@ -1790,12 +1781,11 @@ class Jobs extends BaseRepository {
 		$age_column      = 'cancelled' === $status_pattern ? 'completed_at' : 'created_at';
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
+		// phpcs:disable WordPress.DB.PreparedSQL,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber -- Status clauses are fixed and append matching values.
 		$values     = array();
 		$status_sql = $this->status_match_sql( $match, $values );
-		$args       = array_merge( array( "DELETE FROM %i WHERE {$status_sql} AND {$age_column} < %s", $this->table_name ), $values, array( $cutoff_datetime ) );
-		$result     = $this->wpdb->query( $this->wpdb->prepare( ...$args ) );
-		// phpcs:enable WordPress.DB.PreparedSQL
+		$result     = $this->wpdb->query( $this->wpdb->prepare( "DELETE FROM %i WHERE {$status_sql} AND {$age_column} < %s", ...array_merge( array( $this->table_name ), $values, array( $cutoff_datetime ) ) ) );
+		// phpcs:enable WordPress.DB.PreparedSQL,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
 
 		do_action(
 			'datamachine_log',
@@ -1832,12 +1822,11 @@ class Jobs extends BaseRepository {
 		$age_column      = 'cancelled' === $status_pattern ? 'completed_at' : 'created_at';
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
+		// phpcs:disable WordPress.DB.PreparedSQL,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber -- Status clauses are fixed and append matching values.
 		$values     = array();
 		$status_sql = $this->status_match_sql( $match, $values );
-		$args       = array_merge( array( "SELECT COUNT(*) FROM %i WHERE {$status_sql} AND {$age_column} < %s", $this->table_name ), $values, array( $cutoff_datetime ) );
-		$count      = $this->wpdb->get_var( $this->wpdb->prepare( ...$args ) );
-		// phpcs:enable WordPress.DB.PreparedSQL
+		$count      = $this->wpdb->get_var( $this->wpdb->prepare( "SELECT COUNT(*) FROM %i WHERE {$status_sql} AND {$age_column} < %s", ...array_merge( array( $this->table_name ), $values, array( $cutoff_datetime ) ) ) );
+		// phpcs:enable WordPress.DB.PreparedSQL,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
 
 		return (int) $count;
 	}
@@ -3288,23 +3277,23 @@ class Jobs extends BaseRepository {
 		$retry_at   = (string) ( $owner['next_retry_at'] ?? '' );
 		$retry_time = strtotime( $retry_at );
 
-		$throttle_state = (string) ( $throttle['state'] ?? 'deferred' );
+		$throttle_state       = (string) ( $throttle['state'] ?? 'deferred' );
 		$modern_owner_matches = ! $legacy
-			&& $generation > 0
-			&& $generation === (int) ( $throttle['resume_generation'] ?? 0 )
+			&& 0 < $generation
+			&& (int) ( $throttle['resume_generation'] ?? 0 ) === $generation
 			&& 'scheduled' === (string) ( $resume['status'] ?? '' )
-			&& $action_id === (int) ( $resume['action_id'] ?? 0 )
-			&& $generation === (int) ( $resume['generation'] ?? 0 )
-			&& $flow_step === (string) ( $resume['flow_step_id'] ?? '' );
+			&& (int) ( $resume['action_id'] ?? 0 ) === $action_id
+			&& (int) ( $resume['generation'] ?? 0 ) === $generation
+			&& (string) ( $resume['flow_step_id'] ?? '' ) === $flow_step;
 		$legacy_owner_matches = $legacy
 			&& empty( $resume )
 			&& ! isset( $throttle['resume_generation'] );
 
 		if ( 'deferred' !== $throttle_state
-			|| $action_id <= 0
-			|| $action_id !== (int) ( $throttle['action_id'] ?? 0 )
-			|| $flow_step !== (string) ( $throttle['flow_step_id'] ?? '' )
-			|| $retry_at !== (string) ( $throttle['next_retry_at'] ?? '' )
+			|| 0 >= $action_id
+			|| (int) ( $throttle['action_id'] ?? 0 ) !== $action_id
+			|| (string) ( $throttle['flow_step_id'] ?? '' ) !== $flow_step
+			|| (string) ( $throttle['next_retry_at'] ?? '' ) !== $retry_at
 			|| false === $retry_time
 			|| $retry_time >= time()
 			|| ( ! $modern_owner_matches && ! $legacy_owner_matches )
@@ -3312,10 +3301,10 @@ class Jobs extends BaseRepository {
 			return false;
 		}
 
-		$actions_table = $this->wpdb->prefix . 'actionscheduler_actions';
+		$actions_table          = $this->wpdb->prefix . 'actionscheduler_actions';
 		$this->wpdb->last_error = '';
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Exact receipt absence is the recovery ownership fence.
-		$exists = $this->wpdb->get_var( $this->wpdb->prepare( "SELECT action_id FROM {$actions_table} WHERE action_id = %d LIMIT 1", $action_id ) );
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared -- Exact receipt absence is the recovery ownership fence.
+		$exists = $this->wpdb->get_var( $this->wpdb->prepare( 'SELECT action_id FROM %i WHERE action_id = %d LIMIT 1', $actions_table, $action_id ) );
 		return '' === (string) $this->wpdb->last_error && null === $exists;
 	}
 
@@ -3669,7 +3658,7 @@ class Jobs extends BaseRepository {
 			if ( isset( $columns['status'] ) && (int) $columns['status']->CHARACTER_MAXIMUM_LENGTH < 255 ) {
 				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.SchemaChange
 				// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
-				$wpdb->query( "ALTER TABLE {$table_name} MODIFY status varchar(255) NOT NULL" );
+				$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i MODIFY status varchar(255) NOT NULL', $table_name ) );
 				// phpcs:enable WordPress.DB.PreparedSQL
 				do_action(
 					'datamachine_log',
@@ -3686,7 +3675,7 @@ class Jobs extends BaseRepository {
 			if ( isset( $columns['pipeline_id'] ) && 'bigint' === $columns['pipeline_id']->DATA_TYPE ) {
 				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.SchemaChange
 				// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
-				$wpdb->query( "ALTER TABLE {$table_name} MODIFY pipeline_id varchar(20) NULL DEFAULT NULL" );
+				$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i MODIFY pipeline_id varchar(20) NULL DEFAULT NULL', $table_name ) );
 				// phpcs:enable WordPress.DB.PreparedSQL
 				do_action(
 					'datamachine_log',
@@ -3702,7 +3691,7 @@ class Jobs extends BaseRepository {
 			if ( isset( $columns['flow_id'] ) && 'bigint' === $columns['flow_id']->DATA_TYPE ) {
 				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.SchemaChange
 				// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
-				$wpdb->query( "ALTER TABLE {$table_name} MODIFY flow_id varchar(20) NULL DEFAULT NULL" );
+				$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i MODIFY flow_id varchar(20) NULL DEFAULT NULL', $table_name ) );
 				// phpcs:enable WordPress.DB.PreparedSQL
 				do_action(
 					'datamachine_log',
@@ -3719,13 +3708,13 @@ class Jobs extends BaseRepository {
 			if ( isset( $columns['pipeline_id'] ) && 'varchar' === $columns['pipeline_id']->DATA_TYPE && 'NO' === $columns['pipeline_id']->IS_NULLABLE ) {
 				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.SchemaChange
 				// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
-				$wpdb->query( "ALTER TABLE {$table_name} MODIFY pipeline_id varchar(20) NULL DEFAULT NULL" );
+				$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i MODIFY pipeline_id varchar(20) NULL DEFAULT NULL', $table_name ) );
 				// phpcs:enable WordPress.DB.PreparedSQL
 			}
 			if ( isset( $columns['flow_id'] ) && 'varchar' === $columns['flow_id']->DATA_TYPE && 'NO' === $columns['flow_id']->IS_NULLABLE ) {
 				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.SchemaChange
 				// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
-				$wpdb->query( "ALTER TABLE {$table_name} MODIFY flow_id varchar(20) NULL DEFAULT NULL" );
+				$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i MODIFY flow_id varchar(20) NULL DEFAULT NULL', $table_name ) );
 				// phpcs:enable WordPress.DB.PreparedSQL
 			}
 		}
@@ -3737,10 +3726,13 @@ class Jobs extends BaseRepository {
 			// `AFTER <col>` is MySQL-only; SQLite (Studio) rejects it. Column position
 			// is cosmetic — both engines accept the bare ADD COLUMN form.
 			$result = $wpdb->query(
-				"ALTER TABLE {$table_name}
+				$wpdb->prepare(
+					"ALTER TABLE %i
 				 ADD COLUMN source varchar(50) NOT NULL DEFAULT 'pipeline',
 				 ADD COLUMN label varchar(255) NULL DEFAULT NULL,
-				 ADD KEY source (source)"
+				 ADD KEY source (source)",
+				$table_name
+				)
 			);
 			// phpcs:enable WordPress.DB.PreparedSQL
 
@@ -3760,7 +3752,7 @@ class Jobs extends BaseRepository {
 			// Backfill existing rows.
             // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
 			// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
-			$wpdb->query( "UPDATE {$table_name} SET source = 'direct' WHERE pipeline_id = 'direct'" );
+			$wpdb->query( $wpdb->prepare( 'UPDATE %i SET source = %s WHERE pipeline_id = %s', $table_name, 'direct', 'direct' ) );
 			// phpcs:enable WordPress.DB.PreparedSQL
 
 			do_action(
@@ -3777,9 +3769,12 @@ class Jobs extends BaseRepository {
 			// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 			// `AFTER <col>` is MySQL-only; SQLite (Studio) rejects it.
 			$result = $wpdb->query(
-				"ALTER TABLE {$table_name}
+				$wpdb->prepare(
+					'ALTER TABLE %i
 				 ADD COLUMN parent_job_id bigint(20) unsigned NULL DEFAULT NULL,
-				 ADD KEY parent_job_id (parent_job_id)"
+				 ADD KEY parent_job_id (parent_job_id)',
+				$table_name
+				)
 			);
 			// phpcs:enable WordPress.DB.PreparedSQL
 
@@ -3799,9 +3794,12 @@ class Jobs extends BaseRepository {
 			// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 			// `AFTER <col>` is MySQL-only; SQLite (Studio) rejects it.
 			$result = $wpdb->query(
-				"ALTER TABLE {$table_name}
+				$wpdb->prepare(
+					'ALTER TABLE %i
 				 ADD COLUMN user_id bigint(20) unsigned NOT NULL DEFAULT 0,
-				 ADD KEY user_id (user_id)"
+				 ADD KEY user_id (user_id)',
+				$table_name
+				)
 			);
 			// phpcs:enable WordPress.DB.PreparedSQL
 
@@ -3821,9 +3819,12 @@ class Jobs extends BaseRepository {
 			// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 			// `AFTER <col>` is MySQL-only; SQLite (Studio) rejects it.
 			$result = $wpdb->query(
-				"ALTER TABLE {$table_name}
+				$wpdb->prepare(
+					'ALTER TABLE %i
 				 ADD COLUMN agent_id bigint(20) unsigned DEFAULT NULL,
-				 ADD KEY agent_id (agent_id)"
+				 ADD KEY agent_id (agent_id)',
+				$table_name
+				)
 			);
 			// phpcs:enable WordPress.DB.PreparedSQL
 
@@ -3861,9 +3862,12 @@ class Jobs extends BaseRepository {
 		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 		// `AFTER <col>` is MySQL-only; SQLite (Studio) rejects it.
 		$result = $wpdb->query(
-			"ALTER TABLE {$table_name}
+			$wpdb->prepare(
+				'ALTER TABLE %i
 			 ADD COLUMN task_type varchar(100) NULL DEFAULT NULL,
-			 ADD KEY idx_task_type (task_type, source)"
+			 ADD KEY idx_task_type (task_type, source)',
+			$table_name
+			)
 		);
 		// phpcs:enable WordPress.DB.PreparedSQL
 
@@ -3884,11 +3888,14 @@ class Jobs extends BaseRepository {
 		// Uses PHP json_decode instead of MySQL JSON_UNQUOTE for SQLite compatibility.
 		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 		$backfill_rows = $wpdb->get_results(
-			"SELECT job_id, engine_data
-			 FROM {$table_name}
-			 WHERE source IN ('system', 'pipeline_system_task')
-			 AND engine_data IS NOT NULL
-			 AND task_type IS NULL"
+			$wpdb->prepare(
+				"SELECT job_id, engine_data
+				 FROM %i
+				 WHERE source IN ('system', 'pipeline_system_task')
+				 AND engine_data IS NOT NULL
+				 AND task_type IS NULL",
+				$table_name
+			)
 		);
 		// phpcs:enable WordPress.DB.PreparedSQL
 
@@ -3943,9 +3950,12 @@ class Jobs extends BaseRepository {
 		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 		// `AFTER <col>` is MySQL-only; SQLite (Studio) rejects it.
 		$result = $wpdb->query(
-			"ALTER TABLE {$table_name}
+			$wpdb->prepare(
+				'ALTER TABLE %i
 			 ADD COLUMN handler_slug varchar(100) NULL DEFAULT NULL,
-			 ADD KEY idx_handler_slug (handler_slug)"
+			 ADD KEY idx_handler_slug (handler_slug)',
+			$table_name
+			)
 		);
 		// phpcs:enable WordPress.DB.PreparedSQL
 
@@ -3966,7 +3976,7 @@ class Jobs extends BaseRepository {
 		// Uses PHP regex (not MySQL REGEXP) for SQLite compatibility, and walks
 		// job_id ranges so memory stays flat regardless of table size.
 		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
-		$max_id     = (int) $wpdb->get_var( "SELECT MAX(job_id) FROM {$table_name}" );
+		$max_id     = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT MAX(job_id) FROM %i', $table_name ) );
 		$chunk_size = 5000;
 		// phpcs:enable WordPress.DB.PreparedSQL
 
@@ -3976,12 +3986,13 @@ class Jobs extends BaseRepository {
 			// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 			$rows = $wpdb->get_results(
 				$wpdb->prepare(
-					"SELECT job_id, engine_data
-					 FROM {$table_name}
+					'SELECT job_id, engine_data
+					 FROM %i
 					 WHERE job_id > %d AND job_id <= %d
 					 AND engine_data IS NOT NULL
 					 AND engine_data LIKE %s
-					 AND handler_slug IS NULL",
+					 AND handler_slug IS NULL',
+					$table_name,
 					$start,
 					$end,
 					'%' . $wpdb->esc_like( '"handler_slug"' ) . '%'
@@ -4029,8 +4040,11 @@ class Jobs extends BaseRepository {
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.SchemaChange
 			// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 			$result = $wpdb->query(
-				"ALTER TABLE {$table_name}
-				 ADD COLUMN idempotency_key varchar(191) NULL DEFAULT NULL"
+				$wpdb->prepare(
+					'ALTER TABLE %i
+				 ADD COLUMN idempotency_key varchar(191) NULL DEFAULT NULL',
+				$table_name
+				)
 			);
 			// phpcs:enable WordPress.DB.PreparedSQL
 
@@ -4078,7 +4092,7 @@ class Jobs extends BaseRepository {
 			}
 
 			// phpcs:disable WordPress.DB.PreparedSQL -- The migration map contains only fixed plugin-owned identifiers and definitions.
-			$wpdb->query( "ALTER TABLE {$table_name} ADD COLUMN {$column} {$definition}" );
+			$wpdb->query( $wpdb->prepare( "ALTER TABLE %i ADD COLUMN %i {$definition}", $table_name, $column ) );
 			// phpcs:enable WordPress.DB.PreparedSQL
 		}
 		self::ensure_jobs_index( $table_name, 'idx_operation_ref_hash', 'UNIQUE INDEX', '(operation_ref_hash)' );
@@ -4099,7 +4113,7 @@ class Jobs extends BaseRepository {
 				continue;
 			}
 			// phpcs:disable WordPress.DB.PreparedSQL -- The migration map contains only fixed plugin-owned identifiers and definitions.
-			$wpdb->query( "ALTER TABLE {$table_name} ADD COLUMN {$column} {$definition}" );
+			$wpdb->query( $wpdb->prepare( "ALTER TABLE %i ADD COLUMN %i {$definition}", $table_name, $column ) );
 			// phpcs:enable WordPress.DB.PreparedSQL
 		}
 
@@ -4122,7 +4136,7 @@ class Jobs extends BaseRepository {
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
 		// phpcs:disable WordPress.DB.PreparedSQL -- Table/index names from plugin constants, not user input.
-		$existing = $wpdb->get_row( "SHOW INDEX FROM {$table_name} WHERE Key_name = '{$index_name}'" );
+		$existing = $wpdb->get_row( $wpdb->prepare( 'SHOW INDEX FROM %i WHERE Key_name = %s', $table_name, $index_name ) );
 		// phpcs:enable WordPress.DB.PreparedSQL
 
 		if ( $existing ) {
@@ -4131,7 +4145,7 @@ class Jobs extends BaseRepository {
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.SchemaChange
 		// phpcs:disable WordPress.DB.PreparedSQL -- Table/index names from plugin constants, not user input.
-		$result = $wpdb->query( "ALTER TABLE {$table_name} ADD {$index_type} {$index_name} {$index_def}" );
+		$result = $wpdb->query( $wpdb->prepare( "ALTER TABLE %i ADD {$index_type} %i {$index_def}", $table_name, $index_name ) );
 		// phpcs:enable WordPress.DB.PreparedSQL
 
 		return false !== $result;
@@ -4155,7 +4169,7 @@ class Jobs extends BaseRepository {
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
 		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
-		$existing = $wpdb->get_results( "SHOW INDEX FROM {$table_name}", ARRAY_A );
+		$existing = $wpdb->get_results( $wpdb->prepare( 'SHOW INDEX FROM %i', $table_name ), ARRAY_A );
 		// phpcs:enable WordPress.DB.PreparedSQL
 
 		if ( empty( $existing ) ) {
@@ -4182,7 +4196,7 @@ class Jobs extends BaseRepository {
 
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.SchemaChange
 			// phpcs:disable WordPress.DB.PreparedSQL -- Table/index names from plugin constants, not user input.
-			$result = $wpdb->query( "ALTER TABLE {$table_name} ADD INDEX {$index_name} {$index_def}" );
+			$result = $wpdb->query( $wpdb->prepare( "ALTER TABLE %i ADD INDEX %i {$index_def}", $table_name, $index_name ) );
 			// phpcs:enable WordPress.DB.PreparedSQL
 
 			if ( false !== $result ) {

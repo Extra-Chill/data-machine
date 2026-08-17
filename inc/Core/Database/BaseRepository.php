@@ -77,19 +77,18 @@ abstract class BaseRepository {
 	 * @return array|null Row as associative array or null.
 	 */
 	protected function find_by_id( string $id_column, $id ): ?array {
-		$format = is_int( $id ) ? '%d' : '%s';
+		$wpdb = $this->wpdb;
 
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-		// phpcs:disable WordPress.DB.PreparedSQL, WordPress.DB.PreparedSQLPlaceholders -- Table name from $wpdb->prefix, not user input.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- Repository reads need the current custom-table row.
 		$row = $this->wpdb->get_row(
-			$this->wpdb->prepare(
-				// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-				"SELECT * FROM {$this->table_name} WHERE {$id_column} = {$format}",
+			$wpdb->prepare(
+				'SELECT * FROM %i WHERE %i = %s',
+				$this->table_name,
+				$id_column,
 				$id
 			),
 			ARRAY_A
 		);
-		// phpcs:enable WordPress.DB.PreparedSQL, WordPress.DB.PreparedSQLPlaceholders
 
 		return $row ? $row : null;
 	}
@@ -243,14 +242,14 @@ abstract class BaseRepository {
 		}
 
 		if ( ! self::is_sqlite() ) {
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange -- This explicit migration removes an obsolete custom-table index.
 			if ( false === $wpdb->query( $wpdb->prepare( 'ALTER TABLE %i DROP INDEX %i', $table_name, $index_name ) ) ) {
 				throw new \RuntimeException( sprintf( 'Failed to drop index %s: %s', esc_html( $index_name ), esc_html( (string) $wpdb->last_error ) ) );
 			}
 			return true;
 		}
 
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange -- This explicit migration removes an obsolete SQLite custom-table index.
 		if ( false === $wpdb->query( $wpdb->prepare( 'DROP INDEX %i ON %i', $index_name, $table_name ) ) ) {
 			throw new \RuntimeException( sprintf( 'Failed to drop SQLite index %s: %s', esc_html( $index_name ), esc_html( (string) $wpdb->last_error ) ) );
 		}

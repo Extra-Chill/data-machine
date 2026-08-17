@@ -1,5 +1,4 @@
 <?php
-// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange,WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Data Machine owns this operational worklist table; claims require transactional fresh reads and bounded dynamic placeholder lists.
 /**
  * Durable work items for batch fan-out.
  *
@@ -33,6 +32,8 @@ class BatchItems extends BaseRepository {
 	 * @return array{success:bool,created:bool,existing:bool,ownership_token:string}
 	 */
 	public function insert_batch( int $batch_job_id, array $items, array $cleanup_contexts ): array {
+		$wpdb = $this->wpdb;
+
 		if ( $batch_job_id <= 0 ) {
 			return $this->insert_result( false );
 		}
@@ -43,7 +44,7 @@ class BatchItems extends BaseRepository {
 			return $this->insert_result( false );
 		}
 		$preexisting_token = $this->wpdb->get_var(
-			$this->wpdb->prepare(
+			$wpdb->prepare(
 				'SELECT worklist_token FROM %i WHERE batch_job_id = %d AND item_index = 0',
 				$this->table_name,
 				$batch_job_id
@@ -68,7 +69,7 @@ class BatchItems extends BaseRepository {
 		}
 
 		$owner_token = (string) $this->wpdb->get_var(
-			$this->wpdb->prepare(
+			$wpdb->prepare(
 				'SELECT worklist_token FROM %i WHERE batch_job_id = %d AND item_index = 0',
 				$this->table_name,
 				$batch_job_id
@@ -108,7 +109,7 @@ class BatchItems extends BaseRepository {
 		}
 
 		$count = (int) $this->wpdb->get_var(
-			$this->wpdb->prepare( 'SELECT COUNT(*) FROM %i WHERE batch_job_id = %d', $this->table_name, $batch_job_id )
+			$wpdb->prepare( 'SELECT COUNT(*) FROM %i WHERE batch_job_id = %d', $this->table_name, $batch_job_id )
 		);
 		if ( $count !== $total ) {
 			$this->wpdb->query( 'ROLLBACK' );
@@ -138,6 +139,8 @@ class BatchItems extends BaseRepository {
 
 	/** Insert at most INSERT_CHUNK_SIZE encoded rows in one typed statement. */
 	private function insert_encoded_rows( int $batch_job_id, array $rows, string $token ): int|false {
+		$wpdb = $this->wpdb;
+
 		if ( empty( $rows ) || count( $rows ) > self::INSERT_CHUNK_SIZE ) {
 			return false;
 		}
@@ -148,18 +151,25 @@ class BatchItems extends BaseRepository {
 			$placeholders[] = '(%d, %d, %s, %s, %s, %s, %s, %s, %s)';
 			array_push( $args, $batch_job_id, $index, $row['payload'], $row['checksum'], $row['cleanup'], self::STATE_READY, $token, $now, $now );
 		}
-		$sql = 'INSERT INTO %i (batch_job_id, item_index, payload, payload_checksum, cleanup_context, state, worklist_token, created_at, updated_at) VALUES '
-			. implode( ', ', $placeholders )
-			. ' ON DUPLICATE KEY UPDATE batch_job_id = batch_job_id';
-		return $this->wpdb->query( $this->wpdb->prepare( $sql, ...$args ) );
+		return $this->wpdb->query(
+			$wpdb->prepare(
+				'INSERT INTO %i (batch_job_id, item_index, payload, payload_checksum, cleanup_context, state, worklist_token, created_at, updated_at) VALUES '
+				// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- The bounded fragment contains placeholders only; all row values are supplied to prepare().
+				. implode( ', ', $placeholders )
+				. ' ON DUPLICATE KEY UPDATE batch_job_id = batch_job_id',
+				...$args
+			)
+		);
 	}
 
 	/** Verify one bounded index range without hydrating payload LONGTEXT. */
 	private function verify_encoded_rows( int $batch_job_id, array $expected, string $token ): bool {
+		$wpdb         = $this->wpdb;
 		$indexes      = array_keys( $expected );
 		$placeholders = implode( ', ', array_fill( 0, count( $indexes ), '%d' ) );
 		$sql          = "SELECT item_index, payload_checksum, cleanup_context, worklist_token FROM %i WHERE batch_job_id = %d AND item_index IN ({$placeholders})";
-		$rows         = $this->wpdb->get_results( $this->wpdb->prepare( $sql, $this->table_name, $batch_job_id, ...$indexes ), ARRAY_A );
+		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- $sql contains generated %d placeholders only; every identifier and value is supplied here.
+		$rows = $this->wpdb->get_results( $wpdb->prepare( $sql, $this->table_name, $batch_job_id, ...$indexes ), ARRAY_A );
 		if ( count( (array) $rows ) !== count( $expected ) ) {
 			return false;
 		}
@@ -193,6 +203,8 @@ class BatchItems extends BaseRepository {
 	 * establish an external recovery path before the lease becomes durable.
 	 */
 	public function claim_chunk( int $batch_job_id, int $offset, int $limit, int $lease_seconds = self::DEFAULT_LEASE_SECONDS, ?callable $owner = null ): array {
+		$wpdb = $this->wpdb;
+
 		if ( $batch_job_id <= 0 || $limit < 1 || false === $this->wpdb->query( 'START TRANSACTION' ) ) {
 			return array();
 		}
@@ -200,7 +212,7 @@ class BatchItems extends BaseRepository {
 		$end  = $offset + $limit;
 		$now  = current_time( 'mysql', true );
 		$rows = $this->wpdb->get_results(
-			$this->wpdb->prepare(
+			$wpdb->prepare(
 				'SELECT * FROM %i WHERE batch_job_id = %d AND item_index >= %d AND item_index < %d ORDER BY item_index ASC FOR UPDATE',
 				$this->table_name,
 				$batch_job_id,
@@ -362,6 +374,8 @@ class BatchItems extends BaseRepository {
 
 	/** Mark all non-terminal rows discarded and return their cleanup payloads. */
 	public function discard_outstanding( int $batch_job_id ): array {
+		$wpdb = $this->wpdb;
+
 		if ( false === $this->wpdb->query( 'START TRANSACTION' ) ) {
 			return array(
 				'success' => false,
@@ -369,7 +383,7 @@ class BatchItems extends BaseRepository {
 			);
 		}
 		$rows    = $this->wpdb->get_results(
-			$this->wpdb->prepare(
+			$wpdb->prepare(
 				'SELECT item_index, payload, payload_checksum, cleanup_context, state FROM %i WHERE batch_job_id = %d AND state IN (%s, %s, %s) ORDER BY item_index ASC LIMIT %d FOR UPDATE',
 				$this->table_name,
 				$batch_job_id,
@@ -405,6 +419,8 @@ class BatchItems extends BaseRepository {
 	 * cleanup after observing the parent cancellation flag.
 	 */
 	public function request_cancellation( int $batch_job_id ): array {
+		$wpdb = $this->wpdb;
+
 		if ( false === $this->wpdb->query( 'START TRANSACTION' ) ) {
 			return array(
 				'success'   => false,
@@ -413,7 +429,7 @@ class BatchItems extends BaseRepository {
 			);
 		}
 		$rows            = $this->wpdb->get_results(
-			$this->wpdb->prepare(
+			$wpdb->prepare(
 				'SELECT item_index, payload, payload_checksum, cleanup_context, state FROM %i WHERE batch_job_id = %d AND state IN (%s, %s) ORDER BY item_index ASC LIMIT %d FOR UPDATE',
 				$this->table_name,
 				$batch_job_id,
@@ -452,7 +468,7 @@ class BatchItems extends BaseRepository {
 			)
 		);
 		$remaining    = (int) $this->wpdb->get_var(
-			$this->wpdb->prepare(
+			$wpdb->prepare(
 				'SELECT COUNT(*) FROM %i WHERE batch_job_id = %d AND state IN (%s, %s)',
 				$this->table_name,
 				$batch_job_id,
@@ -470,18 +486,23 @@ class BatchItems extends BaseRepository {
 
 	/** Fence callbacks by state while preserving the current lease generation. */
 	private function transition_claims_to_cancel_pending( int $batch_job_id, array $indexes ): int|false {
+		$wpdb = $this->wpdb;
+
 		if ( empty( $indexes ) ) {
 			return 0;
 		}
 		$placeholders = implode( ', ', array_fill( 0, count( $indexes ), '%d' ) );
 		$sql          = "UPDATE %i SET state = %s, updated_at = %s WHERE batch_job_id = %d AND state = %s AND item_index IN ({$placeholders})";
 		return $this->wpdb->query(
-			$this->wpdb->prepare( $sql, $this->table_name, self::STATE_CANCEL_PENDING, current_time( 'mysql', true ), $batch_job_id, self::STATE_CLAIMED, ...$indexes )
+			// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- $sql contains generated %d placeholders only; every identifier and value is supplied here.
+			$wpdb->prepare( $sql, $this->table_name, self::STATE_CANCEL_PENDING, current_time( 'mysql', true ), $batch_job_id, self::STATE_CLAIMED, ...$indexes )
 		);
 	}
 
 	/** Discard only rows created by one insertion owner. */
 	public function discard_owned( int $batch_job_id, string $token ): array {
+		$wpdb = $this->wpdb;
+
 		if ( '' === $token || false === $this->wpdb->query( 'START TRANSACTION' ) ) {
 			return array(
 				'success' => false,
@@ -489,7 +510,7 @@ class BatchItems extends BaseRepository {
 			);
 		}
 		$rows    = $this->wpdb->get_results(
-			$this->wpdb->prepare(
+			$wpdb->prepare(
 				'SELECT item_index, payload, payload_checksum, cleanup_context FROM %i WHERE batch_job_id = %d AND worklist_token = %s AND state <> %s ORDER BY item_index ASC LIMIT %d FOR UPDATE',
 				$this->table_name,
 				$batch_job_id,
@@ -509,7 +530,7 @@ class BatchItems extends BaseRepository {
 			);
 		}
 		$remaining = (int) $this->wpdb->get_var(
-			$this->wpdb->prepare( 'SELECT COUNT(*) FROM %i WHERE batch_job_id = %d AND worklist_token = %s AND state <> %s', $this->table_name, $batch_job_id, $token, self::STATE_DISCARDED )
+			$wpdb->prepare( 'SELECT COUNT(*) FROM %i WHERE batch_job_id = %d AND worklist_token = %s AND state <> %s', $this->table_name, $batch_job_id, $token, self::STATE_DISCARDED )
 		) > 0;
 		return array(
 			'success'   => true,
@@ -525,20 +546,25 @@ class BatchItems extends BaseRepository {
 
 	/** Transition one bounded, locked index set and clear lease ownership. */
 	private function transition_indexes( int $batch_job_id, array $indexes, string $state ): int|false {
+		$wpdb = $this->wpdb;
+
 		if ( empty( $indexes ) ) {
 			return 0;
 		}
 		$placeholders = implode( ', ', array_fill( 0, count( $indexes ), '%d' ) );
 		$sql          = "UPDATE %i SET state = %s, lease_token = NULL, lease_expires_at = NULL, updated_at = %s WHERE batch_job_id = %d AND item_index IN ({$placeholders})";
 		return $this->wpdb->query(
-			$this->wpdb->prepare( $sql, $this->table_name, $state, current_time( 'mysql', true ), $batch_job_id, ...$indexes )
+			// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- $sql contains generated %d placeholders only; every identifier and value is supplied here.
+			$wpdb->prepare( $sql, $this->table_name, $state, current_time( 'mysql', true ), $batch_job_id, ...$indexes )
 		);
 	}
 
 	/** Discard rows that have not yet been handed to a worker. */
 	public function first_outstanding_index( int $batch_job_id ): ?int {
+		$wpdb = $this->wpdb;
+
 		$value = $this->wpdb->get_var(
-			$this->wpdb->prepare(
+			$wpdb->prepare(
 				'SELECT MIN(item_index) FROM %i WHERE batch_job_id = %d AND state IN (%s, %s, %s)',
 				$this->table_name,
 				$batch_job_id,
@@ -551,8 +577,10 @@ class BatchItems extends BaseRepository {
 	}
 
 	public function count_completed( int $batch_job_id ): int {
+		$wpdb = $this->wpdb;
+
 		return (int) $this->wpdb->get_var(
-			$this->wpdb->prepare(
+			$wpdb->prepare(
 				'SELECT COUNT(*) FROM %i WHERE batch_job_id = %d AND state = %s',
 				$this->table_name,
 				$batch_job_id,

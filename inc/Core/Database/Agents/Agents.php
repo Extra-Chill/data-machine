@@ -1,5 +1,4 @@
 <?php
-// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange -- Data Machine owns custom operational tables and these paths require fresh runtime state or one-time schema mutation.
 /**
  * Agents Repository
  *
@@ -549,12 +548,10 @@ class Agents extends BaseRepository {
 		}
 
 		if ( ! empty( $where ) ) {
-			$sql = 'SELECT * FROM %i WHERE ' . implode( ' AND ', $where ) . ' ORDER BY agent_id ASC';
-
 			// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 			$rows = $this->wpdb->get_results(
 				$this->wpdb->prepare(
-					$sql,
+					'SELECT * FROM %i WHERE ' . implode( ' AND ', $where ) . ' ORDER BY agent_id ASC',
 					array_merge( array( $this->table_name ), $where_values )
 				),
 				ARRAY_A

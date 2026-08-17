@@ -550,25 +550,28 @@ class PipelineBatchScheduler {
 
 		// Count child statuses.
 		global $wpdb;
-		$table = $wpdb->prefix . 'datamachine_jobs';
+		$table           = $wpdb->prefix . 'datamachine_jobs';
+		$failed_pattern  = $wpdb->esc_like( 'failed' ) . '%';
+		$skipped_pattern = $wpdb->esc_like( 'agent_skipped' ) . '%';
 
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-		// phpcs:disable WordPress.DB.PreparedSQLPlaceholders, WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- Batch completion requires current custom-table child state.
 		$counts = $wpdb->get_row(
 			$wpdb->prepare(
 				"SELECT
 					COUNT(*) as total,
 					SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed,
-					SUM(CASE WHEN status LIKE 'failed%%' THEN 1 ELSE 0 END) as failed,
-					SUM(CASE WHEN status LIKE 'agent_skipped%%' OR status = 'completed_no_items' THEN 1 ELSE 0 END) as skipped,
+					SUM(CASE WHEN status LIKE %s THEN 1 ELSE 0 END) as failed,
+					SUM(CASE WHEN status LIKE %s OR status = 'completed_no_items' THEN 1 ELSE 0 END) as skipped,
 					SUM(CASE WHEN status = 'processing' OR status = 'pending' THEN 1 ELSE 0 END) as active
-				FROM {$table}
+				FROM %i
 				WHERE parent_job_id = %d",
+				$failed_pattern,
+				$skipped_pattern,
+				$table,
 				$parent_job_id
 			),
 			ARRAY_A
 		);
-		// phpcs:enable WordPress.DB.PreparedSQLPlaceholders, WordPress.DB.PreparedSQL
 
 		if ( ! $counts ) {
 			return false;
@@ -685,15 +688,14 @@ class PipelineBatchScheduler {
 		global $wpdb;
 		$table = $wpdb->prefix . 'datamachine_jobs';
 
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- Batch completion requires the current custom-table child count.
 		$count = (int) $wpdb->get_var(
 			$wpdb->prepare(
-				"SELECT COUNT(*) FROM {$table} WHERE parent_job_id = %d",
+				'SELECT COUNT(*) FROM %i WHERE parent_job_id = %d',
+				$table,
 				$parent_job_id
 			)
 		);
-		// phpcs:enable WordPress.DB.PreparedSQL
 
 		return $count;
 	}

@@ -1138,19 +1138,18 @@ class DailyMemoryTask extends SystemTask {
 		global $wpdb;
 		$table = $wpdb->prefix . 'datamachine_jobs';
 
-		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 		$jobs = $wpdb->get_results(
 			$wpdb->prepare(
-				"SELECT job_id, pipeline_id, flow_id, source, label, status,
+				'SELECT job_id, pipeline_id, flow_id, source, label, status,
 						created_at, completed_at
-				 FROM {$table}
+				 FROM %i
 				 WHERE DATE(created_at) = %s
-				 ORDER BY job_id ASC",
+				 ORDER BY job_id ASC',
+				$table,
 				$date
 			),
 			ARRAY_A
 		);
-		// phpcs:enable WordPress.DB.PreparedSQL
 
 		if ( empty( $jobs ) ) {
 			return '';

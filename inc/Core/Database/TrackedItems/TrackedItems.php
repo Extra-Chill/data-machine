@@ -143,12 +143,11 @@ class TrackedItems extends BaseRepository {
 		$parts  = $this->where_parts( $filters );
 		$limit  = max( 1, min( 500, (int) ( $filters['limit'] ?? 100 ) ) );
 		$offset = max( 0, (int) ( $filters['offset'] ?? 0 ) );
-		$sql    = "SELECT * FROM %i {$parts['where']} ORDER BY updated_at DESC, id DESC LIMIT %d OFFSET %d";
 		$args   = array_merge( array( $this->table_name ), $parts['values'], array( $limit, $offset ) );
 
-		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
-		$rows = $this->wpdb->get_results( $this->wpdb->prepare( $sql, ...$args ), ARRAY_A );
-		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber,WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- where_parts() returns fixed predicates with matching values.
+		$rows = $this->wpdb->get_results( $this->wpdb->prepare( "SELECT * FROM %i {$parts['where']} ORDER BY updated_at DESC, id DESC LIMIT %d OFFSET %d", ...$args ), ARRAY_A );
+		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber,WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 
 		return array_values( array_map( array( self::class, 'normalize_row' ), is_array( $rows ) ? $rows : array() ) );
 	}
@@ -161,12 +160,11 @@ class TrackedItems extends BaseRepository {
 	 */
 	public function summary( array $filters = array() ): array {
 		$parts = $this->where_parts( $filters );
-		$sql   = "SELECT item_type, state, COUNT(*) AS total FROM %i {$parts['where']} GROUP BY item_type, state ORDER BY item_type ASC, state ASC";
 		$args  = array_merge( array( $this->table_name ), $parts['values'] );
 
-		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
-		$rows = $this->wpdb->get_results( $this->wpdb->prepare( $sql, ...$args ), ARRAY_A );
-		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- where_parts() returns fixed predicates with matching values.
+		$rows = $this->wpdb->get_results( $this->wpdb->prepare( "SELECT item_type, state, COUNT(*) AS total FROM %i {$parts['where']} GROUP BY item_type, state ORDER BY item_type ASC, state ASC", ...$args ), ARRAY_A );
+		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 
 		$total    = 0;
 		$by_type  = array();

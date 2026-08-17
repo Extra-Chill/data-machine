@@ -1,5 +1,4 @@
 <?php
-// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange -- Data Machine owns this custom operational index table.
 /**
  * Indexed run metadata repository.
  *
@@ -149,17 +148,16 @@ final class RunMetadata extends BaseRepository {
 		$needed    = count( $filters );
 
 		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
-		$query = $this->wpdb->prepare(
+		$rows = $this->wpdb->get_col( $this->wpdb->prepare(
 			"SELECT job_id
-			 FROM {$this->table_name}
+			 FROM %i
 			 WHERE {$where_sql}
 			 GROUP BY job_id
 			 HAVING COUNT(DISTINCT metadata_path) = %d
 			 ORDER BY job_id DESC
 			 LIMIT %d OFFSET %d",
-			array_merge( $where_values, array( $needed, $limit, $offset ) )
-		);
-		$rows  = $this->wpdb->get_col( $query );
+			array_merge( array( $this->table_name ), $where_values, array( $needed, $limit, $offset ) )
+		) );
 		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
 
 		return array_map( 'intval', is_array( $rows ) ? $rows : array() );
@@ -193,19 +191,18 @@ final class RunMetadata extends BaseRepository {
 		$where_sql = implode( ' OR ', $where_parts );
 		$needed    = count( $filters );
 
-		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQL.NotPrepared
-		$query = $this->wpdb->prepare(
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber -- Each generated predicate contributes two matching values.
+		$count = $this->wpdb->get_var( $this->wpdb->prepare(
 			"SELECT COUNT(*) FROM (
 				SELECT job_id
-				FROM {$this->table_name}
+				FROM %i
 				WHERE {$where_sql}
 				GROUP BY job_id
 				HAVING COUNT(DISTINCT metadata_path) = %d
 			) matches",
-			array_merge( $where_values, array( $needed ) )
-		);
-		$count = $this->wpdb->get_var( $query );
-		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQL.NotPrepared
+			array_merge( array( $this->table_name ), $where_values, array( $needed ) )
+		) );
+		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
 
 		return (int) $count;
 	}

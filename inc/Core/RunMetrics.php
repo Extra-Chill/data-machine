@@ -676,15 +676,15 @@ class RunMetrics {
 		}
 
 		$table = $wpdb->prefix . 'datamachine_jobs';
-		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQLPlaceholders, WordPress.DB.PreparedSQL -- Data Machine owns the jobs table and needs fresh job state for durable result envelopes.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- Durable result envelopes require current custom-table job state.
 		$job = $wpdb->get_row(
 			$wpdb->prepare(
-				"SELECT * FROM {$table} WHERE job_id = %d LIMIT 1",
+				'SELECT * FROM %i WHERE job_id = %d LIMIT 1',
+				$table,
 				$job_id
 			),
 			ARRAY_A
 		);
-		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQLPlaceholders, WordPress.DB.PreparedSQL
 
 		if ( ! is_array( $job ) ) {
 			$job = is_array( $engine['job'] ?? null ) ? $engine['job'] : array( 'job_id' => $job_id );

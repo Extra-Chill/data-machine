@@ -256,15 +256,16 @@ class RunResult {
 		}
 
 		$table = $wpdb->prefix . 'datamachine_jobs';
-		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQLPlaceholders, WordPress.DB.PreparedSQL -- Data Machine owns the jobs table and needs fresh child state for terminal envelopes.
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Data Machine owns the jobs table and needs fresh child state for terminal envelopes.
 		$rows = $wpdb->get_results(
 			$wpdb->prepare(
-				"SELECT job_id FROM {$table} WHERE parent_job_id = %d ORDER BY job_id ASC",
+				'SELECT job_id FROM %i WHERE parent_job_id = %d ORDER BY job_id ASC',
+				$table,
 				$job_id
 			),
 			ARRAY_A
 		);
-		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQLPlaceholders, WordPress.DB.PreparedSQL
+		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 
 		$jobs = new Jobs();
 		$out  = array();

@@ -535,15 +535,16 @@ class System {
 		$results = array();
 
 		foreach ( $task_types as $task_type ) {
-			// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- The system dashboard requires current job-run state.
 			$row = $wpdb->get_row(
 				$wpdb->prepare(
 					"SELECT job_id, status, created_at, completed_at
-					 FROM {$table}
+					 FROM %i
 					 WHERE source IN ('system', 'pipeline_system_task')
 					 AND task_type = %s
 					 ORDER BY job_id DESC
 					 LIMIT 1",
+					$table,
 					$task_type
 				),
 				ARRAY_A
@@ -552,13 +553,13 @@ class System {
 			$count = $wpdb->get_var(
 				$wpdb->prepare(
 					"SELECT COUNT(*)
-					 FROM {$table}
+					 FROM %i
 					 WHERE source IN ('system', 'pipeline_system_task')
 					 AND task_type = %s",
+					$table,
 					$task_type
 				)
 			);
-			// phpcs:enable WordPress.DB.PreparedSQL
 
 			if ( $row ) {
 				$row['run_count']      = (int) $count;

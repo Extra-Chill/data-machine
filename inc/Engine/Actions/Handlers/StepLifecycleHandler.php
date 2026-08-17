@@ -184,7 +184,7 @@ class StepLifecycleHandler {
 		global $wpdb;
 		$jobs       = new Jobs();
 		$jobs_table = $jobs->get_table_name();
-		if ( false === $wpdb->query( 'START TRANSACTION' ) ) {
+		if ( ! self::beginTransaction() ) {
 			$result['success']    = false;
 			$result['_retryable'] = $jobs->has_retryable_transaction_error();
 			return $result;
@@ -193,7 +193,7 @@ class StepLifecycleHandler {
 		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Identifier and job ID are prepared.
 		$job_row = $wpdb->get_row( $wpdb->prepare( 'SELECT job_id, engine_data FROM %i WHERE job_id = %d FOR UPDATE', $jobs_table, $job_id ), ARRAY_A );
 		if ( ! is_array( $job_row ) ) {
-			$wpdb->query( 'ROLLBACK' );
+			self::rollbackTransaction();
 			$result['success'] = false;
 			return $result;
 		}
@@ -201,7 +201,7 @@ class StepLifecycleHandler {
 		$engine  = is_string( $encoded ) ? json_decode( $encoded, true ) : $encoded;
 		$engine  = is_array( $engine ) ? $engine : array();
 		if ( $recovery_generation > 0 && ! ChildJobRecoveryPolicy::recoveryExecutionMatches( $engine, $recovery_generation, $recovery_claim_token ) ) {
-			$wpdb->query( 'ROLLBACK' );
+			self::rollbackTransaction();
 			$result['success'] = false;
 			$result['stale']   = true;
 			return $result;
@@ -234,7 +234,7 @@ class StepLifecycleHandler {
 			}
 			$allowed = apply_filters( 'datamachine_packet_reconciliation_claim_mutation', true, $index, $disposition_id, $disposition, $job_id );
 			if ( ! $allowed ) {
-				$wpdb->query( 'ROLLBACK' );
+				self::rollbackTransaction();
 				wp_cache_delete( $job_id, 'datamachine_engine_data' );
 				$result['success']    = false;
 				$result['_retryable'] = false;
@@ -275,7 +275,7 @@ class StepLifecycleHandler {
 			$retryable = $persist && $jobs->has_retryable_transaction_error();
 			return self::rollbackReconciliationFailure( $jobs, $job_id, $result, $retryable );
 		}
-		if ( false === $wpdb->query( 'COMMIT' ) ) {
+		if ( ! self::commitTransaction() ) {
 			return self::rollbackReconciliationFailure( $jobs, $job_id, $result );
 		}
 		$jobs->publish_committed_engine_data( $job_id, $engine );
@@ -293,7 +293,7 @@ class StepLifecycleHandler {
 	private static function rollbackReconciliationFailure( Jobs $jobs, int $job_id, array $result, ?bool $retryable = null ): array {
 		global $wpdb;
 		$retryable ??= $jobs->has_retryable_transaction_error();
-		$wpdb->query( 'ROLLBACK' );
+		self::rollbackTransaction();
 		wp_cache_delete( $job_id, 'datamachine_engine_data' );
 		$result['success']    = false;
 		$result['_retryable'] = $retryable;
@@ -310,30 +310,30 @@ class StepLifecycleHandler {
 		);
 		$jobs       = new Jobs();
 		$jobs_table = $jobs->get_table_name();
-		if ( $job_id <= 0 || false === $wpdb->query( 'START TRANSACTION' ) ) {
+		if ( $job_id <= 0 || ! self::beginTransaction() ) {
 			return $result;
 		}
 
 		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Identifier and job ID are prepared.
 		$job = $wpdb->get_row( $wpdb->prepare( 'SELECT status, engine_data FROM %i WHERE job_id = %d FOR UPDATE', $jobs_table, $job_id ), ARRAY_A );
 		if ( ! is_array( $job ) ) {
-			$wpdb->query( 'ROLLBACK' );
+			self::rollbackTransaction();
 			return $result;
 		}
 		$encoded = $job['engine_data'] ?? null;
 		$engine  = is_string( $encoded ) ? json_decode( $encoded, true ) : $encoded;
 		$engine  = is_array( $engine ) ? $engine : array();
 		if ( JobStatus::isStatusFinal( (string) ( $job['status'] ?? '' ) ) ) {
-			$wpdb->query( 'ROLLBACK' );
+			self::rollbackTransaction();
 			return $result;
 		}
 		if ( $recovery_generation > 0 && ! ChildJobRecoveryPolicy::recoveryExecutionMatches( $engine, $recovery_generation, $recovery_claim_token ) ) {
-			$wpdb->query( 'ROLLBACK' );
+			self::rollbackTransaction();
 			$result['stale'] = true;
 			return $result;
 		}
 		if ( ProcessedItems::has_claim_metadata( $engine ) && ! ProcessedItems::has_valid_claim_metadata( $engine ) ) {
-			$wpdb->query( 'ROLLBACK' );
+			self::rollbackTransaction();
 			return $result;
 		}
 
@@ -342,13 +342,13 @@ class StepLifecycleHandler {
 		$processed = new ProcessedItems();
 		foreach ( $claims as $claim ) {
 			if ( ! $processed->renew_owned_claim_in_transaction( $claim, $job_id ) ) {
-				$wpdb->query( 'ROLLBACK' );
+				self::rollbackTransaction();
 				return $result;
 			}
 			++$result['renewed'];
 		}
-		if ( false === $wpdb->query( 'COMMIT' ) ) {
-			$wpdb->query( 'ROLLBACK' );
+		if ( ! self::commitTransaction() ) {
+			self::rollbackTransaction();
 			$result['renewed'] = 0;
 			return $result;
 		}
@@ -477,25 +477,25 @@ class StepLifecycleHandler {
 		);
 		$jobs       = new Jobs();
 		$jobs_table = $jobs->get_table_name();
-		if ( $job_id <= 0 || false === $wpdb->query( 'START TRANSACTION' ) ) {
+		if ( $job_id <= 0 || ! self::beginTransaction() ) {
 			return $result;
 		}
 
 		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Identifier and job ID are prepared.
 		$job = $wpdb->get_row( $wpdb->prepare( 'SELECT status, engine_data FROM %i WHERE job_id = %d FOR UPDATE', $jobs_table, $job_id ), ARRAY_A );
 		if ( ! is_array( $job ) ) {
-			$wpdb->query( 'ROLLBACK' );
+			self::rollbackTransaction();
 			return $result;
 		}
 		$encoded = $job['engine_data'] ?? null;
 		$engine  = is_string( $encoded ) ? json_decode( $encoded, true ) : $encoded;
 		$engine  = is_array( $engine ) ? $engine : array();
 		if ( JobStatus::isStatusFinal( (string) ( $job['status'] ?? '' ) ) ) {
-			$wpdb->query( 'ROLLBACK' );
+			self::rollbackTransaction();
 			return $result;
 		}
 		if ( $recovery_generation > 0 && ! ChildJobRecoveryPolicy::recoveryExecutionMatches( $engine, $recovery_generation, $recovery_claim_token ) ) {
-			$wpdb->query( 'ROLLBACK' );
+			self::rollbackTransaction();
 			$result['stale'] = true;
 			return $result;
 		}
@@ -503,12 +503,12 @@ class StepLifecycleHandler {
 		$transfer   = is_array( $engine['packet_fanout_transfer'] ?? null ) ? $engine['packet_fanout_transfer'] : array();
 		$current_id = (string) ( $transfer['transfer_id'] ?? '' );
 		if ( '' === $current_id ) {
-			$wpdb->query( 'ROLLBACK' );
+			self::rollbackTransaction();
 			$result['success'] = 'recover' === $action;
 			return $result;
 		}
 		if ( '' !== $transfer_id && ! hash_equals( $transfer_id, $current_id ) ) {
-			$wpdb->query( 'ROLLBACK' );
+			self::rollbackTransaction();
 			return $result;
 		}
 		$result['handled'] = true;
@@ -517,7 +517,7 @@ class StepLifecycleHandler {
 
 		if ( 'adopt' === $effective_action ) {
 			if ( ! $durably_adopted ) {
-				$wpdb->query( 'ROLLBACK' );
+				self::rollbackTransaction();
 				return $result;
 			}
 			$engine['packet_fanout_transfer']['state']      = 'adopted';
@@ -525,26 +525,26 @@ class StepLifecycleHandler {
 			$result['adopted']                              = true;
 		} elseif ( 'finalize' === $effective_action ) {
 			if ( ! $durably_adopted ) {
-				$wpdb->query( 'ROLLBACK' );
+				self::rollbackTransaction();
 				return $result;
 			}
 			unset( $engine['packet_fanout_transfer'] );
 			$result['adopted'] = true;
 		} elseif ( 'restore' === $effective_action ) {
 			if ( 'prepared' !== (string) ( $transfer['state'] ?? '' ) || $durably_adopted ) {
-				$wpdb->query( 'ROLLBACK' );
+				self::rollbackTransaction();
 				return $result;
 			}
 			$claims = is_array( $transfer['claims'] ?? null ) ? $transfer['claims'] : array();
 			if ( empty( $claims ) ) {
-				$wpdb->query( 'ROLLBACK' );
+				self::rollbackTransaction();
 				return $result;
 			}
 			ksort( $claims, SORT_STRING );
 			$processed = new ProcessedItems();
 			foreach ( $claims as $claim ) {
 				if ( ! is_array( $claim ) || ! $processed->renew_owned_claim_in_transaction( $claim, $job_id ) ) {
-					$wpdb->query( 'ROLLBACK' );
+					self::rollbackTransaction();
 					return $result;
 				}
 			}
@@ -554,18 +554,39 @@ class StepLifecycleHandler {
 			$engine[ ProcessedItems::CLAIMS_METADATA_KEY ] = array_values( $current );
 			$result['restored']                            = true;
 		} else {
-			$wpdb->query( 'ROLLBACK' );
+			self::rollbackTransaction();
 			return $result;
 		}
 
-		if ( ! $jobs->store_engine_data_in_transaction( $job_id, $engine ) || false === $wpdb->query( 'COMMIT' ) ) {
-			$wpdb->query( 'ROLLBACK' );
+		if ( ! $jobs->store_engine_data_in_transaction( $job_id, $engine ) || ! self::commitTransaction() ) {
+			self::rollbackTransaction();
 			wp_cache_delete( $job_id, 'datamachine_engine_data' );
 			return array_merge( $result, array( 'success' => false ) );
 		}
 		$jobs->publish_committed_engine_data( $job_id, $engine );
 		$result['success'] = true;
 		return $result;
+	}
+
+	/** Transaction commands require an uncached connection-level database boundary. */
+	private static function beginTransaction(): bool {
+		global $wpdb;
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- Reconciliation requires an atomic, current-state transaction boundary.
+		return false !== $wpdb->query( 'START TRANSACTION' );
+	}
+
+	/** Commit the reconciliation transaction at its connection-level boundary. */
+	private static function commitTransaction(): bool {
+		global $wpdb;
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- Reconciliation must atomically publish its current-state claim changes.
+		return false !== $wpdb->query( 'COMMIT' );
+	}
+
+	/** Roll back the reconciliation transaction at its connection-level boundary. */
+	private static function rollbackTransaction(): void {
+		global $wpdb;
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- Reconciliation must discard uncommitted current-state claim changes.
+		$wpdb->query( 'ROLLBACK' );
 	}
 
 	/** Build bounded structured evidence containing safe identities only. */

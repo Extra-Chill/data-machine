@@ -426,7 +426,7 @@ class Flows extends BaseRepository {
 		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber,WordPress.DB.PreparedSQL.NotPrepared
 		$flows = $this->wpdb->get_results(
 			$this->wpdb->prepare(
-				"SELECT * FROM %i{$where} ORDER BY pipeline_id ASC, flow_id ASC",
+				'SELECT * FROM %i' . $where . ' ORDER BY pipeline_id ASC, flow_id ASC',
 				array_merge( array( $this->table_name ), $where_values )
 			),
 			ARRAY_A
@@ -640,7 +640,7 @@ class Flows extends BaseRepository {
 		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber,WordPress.DB.PreparedSQL.NotPrepared
 		$flows = $this->wpdb->get_results(
 			$this->wpdb->prepare(
-				"SELECT * FROM %i{$where} ORDER BY pipeline_id ASC, flow_id ASC LIMIT %d OFFSET %d",
+				'SELECT * FROM %i' . $where . ' ORDER BY pipeline_id ASC, flow_id ASC LIMIT %d OFFSET %d',
 				array_merge( array( $this->table_name ), $where_values, array( $per_page, $offset ) )
 			),
 			ARRAY_A
@@ -683,7 +683,7 @@ class Flows extends BaseRepository {
 		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber,WordPress.DB.PreparedSQL.NotPrepared
 		$count = $this->wpdb->get_var(
 			$this->wpdb->prepare(
-				"SELECT COUNT(*) FROM %i{$where}",
+				'SELECT COUNT(*) FROM %i' . $where,
 				array_merge( array( $this->table_name ), $where_values )
 			)
 		);
@@ -722,7 +722,7 @@ class Flows extends BaseRepository {
 		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber,WordPress.DB.PreparedSQL.NotPrepared
 		$flows = $this->wpdb->get_results(
 			$this->wpdb->prepare(
-				"SELECT flow_id, flow_name, pipeline_id, scheduling_config, user_id, agent_id FROM %i{$where} ORDER BY pipeline_id ASC, flow_id ASC LIMIT %d OFFSET %d",
+				'SELECT flow_id, flow_name, pipeline_id, scheduling_config, user_id, agent_id FROM %i' . $where . ' ORDER BY pipeline_id ASC, flow_id ASC LIMIT %d OFFSET %d',
 				array_merge( array( $this->table_name ), $where_values, array( $per_page, $offset ) )
 			),
 			ARRAY_A
