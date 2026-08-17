@@ -36,6 +36,11 @@ class JobLifecycleTransitionTest extends WP_UnitTestCase {
 		$this->db_jobs = new Jobs();
 	}
 
+	public function tear_down(): void {
+		wp_set_current_user( 0 );
+		parent::tear_down();
+	}
+
 	public function test_terminal_status_cannot_be_overwritten_by_start_job(): void {
 		$job_id = $this->db_jobs->create_job( array( 'label' => 'Terminal immutability' ) );
 		$this->assertIsInt( $job_id );

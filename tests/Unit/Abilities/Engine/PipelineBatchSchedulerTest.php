@@ -53,6 +53,11 @@ class PipelineBatchSchedulerTest extends WP_UnitTestCase {
 		$this->test_flow_id = $flow['flow_id'];
 	}
 
+	public function tear_down(): void {
+		wp_set_current_user( 0 );
+		parent::tear_down();
+	}
+
 	/**
 	 * Build a minimal engine snapshot for testing.
 	 */

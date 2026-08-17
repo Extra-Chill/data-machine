@@ -31,7 +31,10 @@
 	"autoload-dev": {
 		"psr-4": {
 			"DataMachine\\Tests\\": "tests/"
-		}
+		},
+		"files": [
+			"tests/fixtures/identity-store-doubles.php"
+		]
 	},
 	"scripts": {
 		"lint": "phpcs",

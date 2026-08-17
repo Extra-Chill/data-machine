@@ -13,44 +13,10 @@ use DataMachine\Core\Database\Agents\AgentAccess;
 use DataMachine\Core\Database\Agents\Agents;
 use DataMachine\Core\FilesRepository\DirectoryManager;
 use DataMachine\Core\Identity\AgentIdentityStoreAdapter;
+use DataMachine\Tests\Fixtures\CountingProvisionAdapter;
+use DataMachine\Tests\Fixtures\DuplicateLoserAgents;
+use DataMachine\Tests\Fixtures\FailingProvisionAdapter;
 use WP_UnitTestCase;
-
-class FailingProvisionAdapter extends AgentIdentityStoreAdapter {
-	public bool $failed = false;
-
-	protected function provision_identity( int $agent_id, WP_Agent_Identity_Scope $scope, array $meta ): void {
-		unset( $agent_id, $scope, $meta );
-		$this->failed = true;
-		throw new \RuntimeException( 'Injected provisioning failure.' );
-	}
-}
-
-class CountingProvisionAdapter extends AgentIdentityStoreAdapter {
-	public int $provision_count = 0;
-
-	protected function provision_identity( int $agent_id, WP_Agent_Identity_Scope $scope, array $meta ): void {
-		++$this->provision_count;
-		parent::provision_identity( $agent_id, $scope, $meta );
-	}
-}
-
-class DuplicateLoserAgents extends Agents {
-	public bool $duplicate_loser_exercised = false;
-
-	protected function insert_identity_row( array $data, array $formats ): int|false {
-		unset( $formats );
-		$this->duplicate_loser_exercised = true;
-		$config = json_decode( (string) $data['agent_config'], true );
-		( new Agents() )->create_identity_if_missing(
-			(string) $data['agent_slug'],
-			(string) $data['agent_name'],
-			(int) $data['owner_id'],
-			(string) $data['instance_key'],
-			is_array( $config ) ? $config : array()
-		);
-		return false;
-	}
-}
 
 class AgentIdentityStoreAdapterTest extends WP_UnitTestCase {
 

@@ -23,6 +23,14 @@ class PostIdentityReservationsTest extends WP_UnitTestCase {
 		$wpdb->query( $wpdb->prepare( 'DELETE FROM %i', $this->repository->get_table_name() ) );
 	}
 
+	public function tear_down(): void {
+		global $wpdb;
+		if ( isset( $this->repository ) ) {
+			$wpdb->query( $wpdb->prepare( 'DELETE FROM %i', $this->repository->get_table_name() ) );
+		}
+		parent::tear_down();
+	}
+
 	public function test_schema_is_site_scoped_minimal_and_innodb(): void {
 		global $wpdb;
 

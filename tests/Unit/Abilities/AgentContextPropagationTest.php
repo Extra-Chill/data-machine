@@ -54,6 +54,11 @@ class AgentContextPropagationTest extends WP_UnitTestCase {
 		$this->agent_id = $agent_result['agent_id'];
 	}
 
+	public function tear_down(): void {
+		wp_set_current_user( 0 );
+		parent::tear_down();
+	}
+
 	// =========================================================================
 	// CreatePipelineAbility — agent_id in schema and execution
 	// =========================================================================
