@@ -19,14 +19,6 @@ class RunFlowAbilityLifecycleTest extends WP_UnitTestCase {
 	private $schedule_capture;
 	private array $scheduled_steps = array();
 
-	public static function set_up_before_class(): void {
-		parent::set_up_before_class();
-
-		if ( function_exists( 'datamachine_activate_for_site' ) ) {
-			datamachine_activate_for_site();
-		}
-	}
-
 	public function set_up(): void {
 		parent::set_up();
 		datamachine_test_prepare_site();

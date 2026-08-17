@@ -18,15 +18,9 @@ class EngineDataPersistenceTest extends WP_UnitTestCase {
 	private array $queries = array();
 	private $query_capture;
 
-	public static function set_up_before_class(): void {
-		parent::set_up_before_class();
-		if ( function_exists( 'datamachine_activate_for_site' ) ) {
-			datamachine_activate_for_site();
-		}
-	}
-
 	public function set_up(): void {
 		parent::set_up();
+		datamachine_test_prepare_site();
 		$this->budget_filter = static fn(): int => 8192;
 		$this->log_capture   = function ( string $level, string $message, array $context = array() ): void {
 			$this->logs[] = compact( 'level', 'message', 'context' );

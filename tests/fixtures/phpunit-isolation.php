@@ -16,15 +16,12 @@ if ( ! function_exists( 'datamachine_test_prepare_site' ) ) {
 		if ( class_exists( '\DataMachine\Core\FilesRepository\DirectoryManager' ) ) {
 			\DataMachine\Core\FilesRepository\DirectoryManager::reset_ensure_flag();
 		}
-		global $wpdb;
-		$wpdb->query( 'ROLLBACK' );
 		delete_option( 'datamachine_settings' );
-		delete_option( 'datamachine_db_version' );
 		if ( ! $activated ) {
+			delete_option( 'datamachine_db_version' );
 			datamachine_activate_for_site();
 			$activated = true;
 		}
-		datamachine_ensure_all_tables();
 		datamachine_test_clear_runtime_rows();
 		datamachine_test_reset_scheduler();
 		datamachine_register_capabilities();

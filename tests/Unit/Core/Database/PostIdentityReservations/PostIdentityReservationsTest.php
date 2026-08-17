@@ -18,9 +18,6 @@ class PostIdentityReservationsTest extends WP_UnitTestCase {
 		parent::set_up();
 		datamachine_test_prepare_site();
 		global $wpdb;
-		$wpdb->query( 'ROLLBACK' );
-		$wpdb->query( $wpdb->prepare( 'DROP TABLE IF EXISTS %i', $wpdb->prefix . PostIdentityReservations::TABLE_NAME ) );
-		PostIdentityReservations::create_table();
 		$this->repository = new PostIdentityReservations();
 
 		$wpdb->query( $wpdb->prepare( 'DELETE FROM %i', $this->repository->get_table_name() ) );
@@ -31,7 +28,6 @@ class PostIdentityReservationsTest extends WP_UnitTestCase {
 		if ( isset( $this->repository ) ) {
 			$wpdb->query( $wpdb->prepare( 'DELETE FROM %i', $this->repository->get_table_name() ) );
 		}
-		$wpdb->query( 'ROLLBACK' );
 		parent::tear_down();
 	}
 
@@ -101,13 +97,17 @@ class PostIdentityReservationsTest extends WP_UnitTestCase {
 		global $wpdb;
 
 		$wpdb->query( $wpdb->prepare( 'DROP TABLE %i', $this->repository->get_table_name() ) );
-		$validation = $this->repository->validate_schema();
-		$result = $this->repository->reserve_and_resolve( 'post', array( 'key' => '_source', 'value' => 'no-table' ) );
+		try {
+			$validation = $this->repository->validate_schema();
+			$result     = $this->repository->reserve_and_resolve( 'post', array( 'key' => '_source', 'value' => 'no-table' ) );
 
-		$this->assertWPError( $validation );
-		$this->assertSame( 'identity_schema_missing', $validation->get_error_code() );
-		$this->assertWPError( $result );
-		$this->assertSame( 'identity_schema_missing', $result->get_error_code() );
+			$this->assertWPError( $validation );
+			$this->assertSame( 'identity_schema_missing', $validation->get_error_code() );
+			$this->assertWPError( $result );
+			$this->assertSame( 'identity_schema_missing', $result->get_error_code() );
+		} finally {
+			PostIdentityReservations::create_table();
+		}
 	}
 
 	public function test_nontransactional_reservation_table_fails_closed(): void {
@@ -148,20 +148,28 @@ class PostIdentityReservationsTest extends WP_UnitTestCase {
 		global $wpdb;
 
 		$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i DROP COLUMN completed_at', $this->repository->get_table_name() ) );
-		$validation = $this->repository->validate_schema();
+		try {
+			$validation = $this->repository->validate_schema();
 
-		$this->assertWPError( $validation );
-		$this->assertSame( 'identity_schema_columns', $validation->get_error_code() );
+			$this->assertWPError( $validation );
+			$this->assertSame( 'identity_schema_columns', $validation->get_error_code() );
+		} finally {
+			PostIdentityReservations::create_table();
+		}
 	}
 
 	public function test_schema_validation_requires_nonunique_post_id_index(): void {
 		global $wpdb;
 
 		$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i DROP INDEX post_id', $this->repository->get_table_name() ) );
-		$validation = $this->repository->validate_schema();
+		try {
+			$validation = $this->repository->validate_schema();
 
-		$this->assertWPError( $validation );
-		$this->assertSame( 'identity_schema_post_index', $validation->get_error_code() );
+			$this->assertWPError( $validation );
+			$this->assertSame( 'identity_schema_post_index', $validation->get_error_code() );
+		} finally {
+			PostIdentityReservations::create_table();
+		}
 	}
 
 	public function test_schema_validation_rejects_unique_post_id_index(): void {
