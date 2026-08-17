@@ -28,16 +28,26 @@ jobs:
       - name: Audit WordPress identifier prefixes
         run: php tests/prefix-policy-audit.php
 
-  homeboy:
-    if: ${{ github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'release:') }}
+  homeboy-quality:
+    if: ${{ github.event_name != 'push' }}
     uses: Extra-Chill/homeboy-action/.github/workflows/ci.yml@v2
     with:
       # Autofix on PRs is expressed by adding `refactor lint` to the commands
       # list — ci.yml@v2 has no `autofix`/`autofix-commands` inputs, and passing
       # undeclared inputs to a reusable workflow is a hard startup_failure.
-      commands: ${{ github.event_name == 'pull_request' && 'review audit,review lint,review test,refactor lint' || github.event_name == 'workflow_dispatch' && 'review audit,review lint,review test' || 'review test' }}
-      expected-commands: ${{ github.event_name == 'pull_request' && 'review audit,review lint,review test' || github.event_name == 'workflow_dispatch' && 'review audit,review lint,review test' || 'review test' }}
+      commands: ${{ github.event_name == 'pull_request' && 'review audit,review lint,refactor lint' || 'review audit,review lint' }}
+      expected-commands: 'review audit,review lint'
+    secrets: inherit
+
+  homeboy-test:
+    if: ${{ github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'release:') }}
+    uses: Extra-Chill/homeboy-action/.github/workflows/ci.yml@v2
+    with:
+      commands: 'review test'
+      expected-commands: 'review test'
       scope: full
+      differential-gating: ${{ github.event_name == 'pull_request' && 'true' || 'false' }}
+      baseline-commands: ${{ github.event_name == 'pull_request' && 'review test' || 'none' }}
       execution-timeout-seconds: '3600'
       test-timeout-seconds: '3300'
       test-shards: '1'
