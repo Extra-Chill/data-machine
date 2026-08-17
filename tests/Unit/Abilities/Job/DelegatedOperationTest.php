@@ -36,7 +36,7 @@ final class DelegatedOperationTest extends WP_UnitTestCase {
 
 	public function set_up(): void {
 		parent::set_up();
-		datamachine_activate_for_site();
+		datamachine_test_prepare_site();
 		datamachine_register_capabilities();
 		$this->first_actor     = self::factory()->user->create( array( 'role' => 'subscriber' ) );
 		$this->second_actor    = self::factory()->user->create( array( 'role' => 'subscriber' ) );

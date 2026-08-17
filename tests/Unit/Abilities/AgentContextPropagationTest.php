@@ -17,6 +17,7 @@ use DataMachine\Abilities\AgentAbilities;
 use DataMachine\Abilities\AgentMemoryAbilities;
 use DataMachine\Abilities\Pipeline\CreatePipelineAbility;
 use DataMachine\Abilities\Pipeline\DuplicatePipelineAbility;
+use DataMachine\Core\Database\Agents\Agents;
 use DataMachine\Core\Database\Pipelines\Pipelines;
 use DataMachine\Core\Database\Flows\Flows;
 use WP_UnitTestCase;
@@ -36,7 +37,7 @@ class AgentContextPropagationTest extends WP_UnitTestCase {
 	 */
 	public function set_up(): void {
 		parent::set_up();
-		datamachine_activate_for_site();
+		datamachine_test_prepare_site();
 
 		$this->admin_id = self::factory()->user->create( array( 'role' => 'administrator' ) );
 		wp_set_current_user( $this->admin_id );
@@ -45,14 +46,12 @@ class AgentContextPropagationTest extends WP_UnitTestCase {
 		$this->duplicate_pipeline_ability = new DuplicatePipelineAbility();
 
 		// Create a test agent via the abilities layer.
-		$agent_result = AgentAbilities::createAgent(
-			array(
-				'agent_slug' => 'test-propagation-agent',
-				'agent_name' => 'Test Propagation Agent',
-				'owner_id'   => $this->admin_id,
-			)
+		$this->agent_id = ( new Agents() )->create_if_missing(
+			'test-propagation-agent',
+			'Test Propagation Agent',
+			$this->admin_id
 		);
-		$this->agent_id = $agent_result['agent_id'];
+		$this->assertGreaterThan( 0, $this->agent_id );
 	}
 
 	public function tear_down(): void {

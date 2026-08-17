@@ -18,6 +18,11 @@ use function DataMachine\Engine\AI\datamachine_with_conversation_metadata;
 
 class AIStepTest extends TestCase {
 
+	protected function setUp(): void {
+		parent::setUp();
+		datamachine_test_prepare_site();
+	}
+
 	public function test_sanitize_data_packets_for_ai_removes_file_path_but_keeps_other_file_info(): void {
 		$data_packets = array(
 			array(

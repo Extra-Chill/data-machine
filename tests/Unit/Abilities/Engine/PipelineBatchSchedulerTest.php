@@ -34,7 +34,7 @@ class PipelineBatchSchedulerTest extends WP_UnitTestCase {
 
 	public function set_up(): void {
 		parent::set_up();
-		datamachine_activate_for_site();
+		datamachine_test_prepare_site();
 
 		$user_id = self::factory()->user->create( array( 'role' => 'administrator' ) );
 		wp_set_current_user( $user_id );

@@ -62,7 +62,10 @@ foreach ( $clusters as $name => $relative_path ) {
 	$check( ! str_contains( $data, 'class FailingProvisionAdapter' ), sprintf( '%s file must not own shared doubles', $name ) );
 	$check( ! str_contains( $data, 'class CountingProvisionAdapter' ), sprintf( '%s file must not own shared doubles', $name ) );
 	$check( ! str_contains( $data, 'class DuplicateLoserAgents' ), sprintf( '%s file must not own shared doubles', $name ) );
-	$check( str_contains( $data, 'datamachine_activate_for_site()' ), sprintf( '%s cluster must activate its own tables', $name ) );
+	$check(
+		str_contains( $data, 'datamachine_activate_for_site()' ) || str_contains( $data, 'datamachine_test_prepare_site()' ),
+		sprintf( '%s cluster must activate its own tables', $name )
+	);
 }
 
 if ( $failures ) {

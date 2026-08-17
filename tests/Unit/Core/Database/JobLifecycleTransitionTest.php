@@ -33,7 +33,7 @@ class JobLifecycleTransitionTest extends WP_UnitTestCase {
 
 	public function set_up(): void {
 		parent::set_up();
-		datamachine_activate_for_site();
+		datamachine_test_prepare_site();
 		$this->db_jobs = new Jobs();
 	}
 

@@ -28,7 +28,7 @@ class AgentIdentityStoreAdapterTest extends WP_UnitTestCase {
 
 	public function set_up(): void {
 		parent::set_up();
-		datamachine_activate_for_site();
+		datamachine_test_prepare_site();
 		Agents::ensure_identity_scope_schema();
 		global $wpdb;
 		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared

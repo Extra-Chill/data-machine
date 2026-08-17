@@ -44,7 +44,7 @@ class ItemClaimLifecycleTest extends WP_UnitTestCase {
 
 	public function set_up(): void {
 		parent::set_up();
-		datamachine_activate_for_site();
+		datamachine_test_prepare_site();
 		$this->processed = new ProcessedItems();
 		$this->tracked   = new TrackedItems();
 		$this->jobs      = new Jobs();
