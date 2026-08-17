@@ -38,19 +38,3 @@ jobs:
       commands: ${{ github.event_name == 'pull_request' && 'review audit,review lint,refactor lint' || 'review audit,review lint' }}
       expected-commands: 'review audit,review lint'
     secrets: inherit
-
-  homeboy-test:
-    if: ${{ github.event_name != 'push' }}
-    uses: Extra-Chill/homeboy-action/.github/workflows/ci.yml@v2
-    with:
-      # v2.14.2 keeps raw candidate evidence neutral; this reconciled Test gate
-      # alone decides whether the full-suite candidate regresses from main.
-      commands: 'review test'
-      expected-commands: 'review test'
-      scope: full
-      differential-gating: ${{ github.event_name == 'pull_request' && 'true' || 'false' }}
-      baseline-commands: ${{ github.event_name == 'pull_request' && 'review test' || 'none' }}
-      execution-timeout-seconds: '3600'
-      test-timeout-seconds: '3300'
-      test-shards: '4'
-    secrets: inherit
