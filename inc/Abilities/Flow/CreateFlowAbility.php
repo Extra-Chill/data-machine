@@ -426,10 +426,21 @@ class CreateFlowAbility {
 
 		static $savepoint_sequence = 0;
 
-		$in_transaction = false;
-		if ( ! BaseRepository::is_sqlite() ) {
+		$in_transaction = BaseRepository::is_sqlite();
+		if ( ! $in_transaction ) {
+			// WordPress's test transaction and callers that disable autocommit need
+			// no server-specific transaction variable.
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
-			$in_transaction = 1 === (int) $wpdb->get_var( 'SELECT @@in_transaction' );
+			$in_transaction = 0 === (int) $wpdb->get_var( 'SELECT @@autocommit' );
+
+			// MySQL exposes active transaction state directly, but compatible
+			// services do not always implement that optional variable.
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
+			$has_transaction_variable = $wpdb->get_var( "SHOW VARIABLES LIKE 'in_transaction'" );
+			if ( ! $in_transaction && 'in_transaction' === strtolower( (string) $has_transaction_variable ) ) {
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
+				$in_transaction = 1 === (int) $wpdb->get_var( 'SELECT @@in_transaction' );
+			}
 		}
 
 		if ( $in_transaction || BaseRepository::is_sqlite() ) {

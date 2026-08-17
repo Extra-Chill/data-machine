@@ -56,6 +56,9 @@ if ( ! function_exists( 'datamachine_test_clear_runtime_rows' ) ) {
 		);
 
 		foreach ( $tables as $table ) {
+			if ( ! \DataMachine\Core\Database\BaseRepository::database_table_exists( $table, $wpdb ) ) {
+				continue;
+			}
 			$wpdb->query( $wpdb->prepare( 'DELETE FROM %i', $table ) );
 		}
 	}
