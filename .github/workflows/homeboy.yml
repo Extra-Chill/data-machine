@@ -37,6 +37,7 @@ jobs:
       # undeclared inputs to a reusable workflow is a hard startup_failure.
       commands: ${{ github.event_name == 'pull_request' && 'review audit,review lint,review test,refactor lint' || github.event_name == 'workflow_dispatch' && 'review audit,review lint,review test' || 'review test' }}
       expected-commands: ${{ github.event_name == 'pull_request' && 'review audit,review lint,review test' || github.event_name == 'workflow_dispatch' && 'review audit,review lint,review test' || 'review test' }}
+      scope: full
       execution-timeout-seconds: '3600'
       test-timeout-seconds: '3300'
       test-shards: '1'
