@@ -81,9 +81,11 @@ if ( ! file_exists( $helper_path ) ) {
 
 require_once $helper_path;
 require_once $root . '/inc/Abilities/PageSpeed/PageSpeedAbility.php';
+require_once $root . '/inc/Abilities/Analytics/GoogleAnalyticsAbilities.php';
 
 $registered = array();
 new \DataMachineBusiness\Abilities\PageSpeed\PageSpeedAbility();
+new \DataMachineBusiness\Abilities\Analytics\GoogleAnalyticsAbilities();
 assert_ability_registration(
 	empty( $registered ) && isset( $actions['wp_abilities_api_init'][0] ),
 	'construction before wp_abilities_api_init defers registration',
@@ -98,9 +100,18 @@ assert_ability_registration(
 	$failures,
 	$passes
 );
+assert_ability_registration(
+	isset( $registered['datamachine/google-analytics'] )
+		&& ! isset( $registered['datamachine/google-analytics']['input_schema']['oneOf'][0]['additionalProperties'] )
+		&& false === $registered['datamachine/google-analytics']['input_schema']['oneOf'][1]['additionalProperties']
+		&& \DataMachineBusiness\Abilities\Analytics\GoogleAnalyticsAbilities::AGGREGATE_MAX_ROWS === $registered['datamachine/google-analytics']['input_schema']['oneOf'][1]['properties']['limit']['maximum'],
+	'Google Analytics registered schema preserves legacy extras and closes aggregate input at 100 rows',
+	$failures,
+	$passes
+);
 
 $reflection = new ReflectionProperty( \DataMachineBusiness\Abilities\PageSpeed\PageSpeedAbility::class, 'registered' );
-$reflection->setValue( false );
+$reflection->setValue( null, false );
 $actions    = array();
 $registered = array();
 

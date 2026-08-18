@@ -91,6 +91,14 @@ class GoogleAnalyticsAbilities {
 	 */
 	const MAX_LIMIT = 10000;
 
+	const AGGREGATE_MAX_DATE_RANGE_DAYS = 400;
+	const AGGREGATE_MAX_ROWS = 100;
+	const AGGREGATE_MAX_RESPONSE_BYTES = 4194304;
+	const AGGREGATE_BATCH_RESPONSE_KIND = 'analyticsData#batchRunReports';
+	const AGGREGATE_REPORT_RESPONSE_KIND = 'analyticsData#runReport';
+	const AGGREGATE_DIMENSIONS = array( 'browser', 'country', 'date', 'deviceCategory', 'eventName', 'firstUserDefaultChannelGroup', 'firstUserMedium', 'firstUserSource', 'hostName', 'landingPage', 'month', 'newVsReturning', 'operatingSystem', 'pagePath', 'pageTitle', 'region', 'sessionCampaignName', 'sessionDefaultChannelGroup', 'sessionMedium', 'sessionSource', 'week' );
+	const AGGREGATE_METRICS = array( 'activeUsers', 'averageSessionDuration', 'bounceRate', 'engagedSessions', 'engagementRate', 'eventCount', 'eventsPerSession', 'keyEvents', 'newUsers', 'screenPageViews', 'screenPageViewsPerSession', 'sessionKeyEventRate', 'sessions', 'sessionsPerUser', 'totalUsers', 'userKeyEventRate' );
+
 	/**
 	 * Share at which unknown landing-page coverage is material to analysis.
 	 *
@@ -179,7 +187,7 @@ class GoogleAnalyticsAbilities {
 
 	private function registerAbilities(): void {
 		$register_callback = function () {
-			$valid_actions = array_merge( array_keys( self::ACTION_REPORTS ), array( 'realtime', 'path_sequence' ) );
+			$valid_actions = array_merge( array_keys( self::ACTION_REPORTS ), array( 'realtime', 'path_sequence', 'aggregate_report' ) );
 
 			wp_register_ability(
 				'datamachine/google-analytics',
@@ -187,56 +195,7 @@ class GoogleAnalyticsAbilities {
 					'label'               => 'Google Analytics',
 					'description'         => 'Fetch visitor analytics data from Google Analytics (GA4) Data API',
 					'category'            => 'datamachine-analytics',
-					'input_schema'        => array(
-						'type'       => 'object',
-						'required'   => array( 'action' ),
-						'properties' => array(
-							'action'      => array(
-								'type'        => 'string',
-								'enum'        => $valid_actions,
-								'description' => 'Action to perform. Acquisition reports are bounded presets: landing_page_acquisition groups session-entry landingPage by session source/medium; page_acquisition groups touched pagePath by session source/medium; page_audience groups touched pagePath by country/device. Other actions: page_stats, traffic_sources, date_stats, realtime, top_events, user_demographics, landing_pages, engagement, new_vs_returning, network_density (referrer proxy), path_sequence (ordered v1alpha funnel report).',
-							),
-							'property_id' => array(
-								'type'        => 'string',
-								'description' => 'GA4 property ID (numeric). Defaults to configured property ID.',
-							),
-							'start_date'  => array(
-								'type'        => 'string',
-								'description' => 'Start date in YYYY-MM-DD format (defaults to 28 days ago). Not used for realtime.',
-							),
-							'end_date'    => array(
-								'type'        => 'string',
-								'description' => 'End date in YYYY-MM-DD format (defaults to yesterday). Not used for realtime.',
-							),
-							'limit'       => array(
-								'type'        => 'integer',
-								'minimum'     => 1,
-								'maximum'     => self::MAX_LIMIT,
-								'description' => 'Row limit (default: 25, max: 10000). For path_sequence this instead selects how many top hosts (by sessions) to pair, default 6, clamped to 12 — fan-out grows ~N*(N-1) funnel calls.',
-							),
-							'page_filter' => array(
-								'type'        => 'string',
-								'description' => 'Filter results to pages with paths containing this string.',
-							),
-							'hostname'    => array(
-								'type'        => 'string',
-								'description' => 'Filter to pages on this hostname (for multisite GA4 properties).',
-							),
-							'sort_by'     => array(
-								'type'        => 'string',
-								'description' => 'Sort results by this metric or dimension field name.',
-							),
-							'order'       => array(
-								'type'        => 'string',
-								'enum'        => array( 'asc', 'desc' ),
-								'description' => 'Sort direction: asc or desc (default: desc).',
-							),
-							'compare'     => array(
-								'type'        => 'boolean',
-								'description' => 'Compare against the previous period of equal length. Adds delta columns.',
-							),
-						),
-					),
+					'input_schema'        => self::inputSchema( $valid_actions ),
 					'output_schema'       => self::outputSchema(),
 					'execute_callback'    => array( self::class, 'fetchStats' ),
 					'permission_callback' => fn() => PermissionHelper::can_manage(),
@@ -299,8 +258,329 @@ class GoogleAnalyticsAbilities {
 					),
 				),
 				'error'                      => array( 'type' => 'string' ),
+				'reports'                    => array( 'type' => 'array', 'maxItems' => 2, 'items' => self::aggregateReportOutputSchema() ),
+				'dimensions'                 => array( 'type' => 'array', 'items' => array( 'type' => 'string', 'enum' => self::AGGREGATE_DIMENSIONS ) ),
+				'metrics'                    => array( 'type' => 'array', 'items' => array( 'type' => 'string', 'enum' => self::AGGREGATE_METRICS ) ),
+				'filters'                    => array( 'type' => 'array', 'items' => self::aggregateFilterSchema() ),
 			),
 		);
+	}
+
+	public static function aggregateInputSchema(): array {
+		return array(
+			'type'                 => 'object',
+			'additionalProperties' => false,
+			'required'             => array( 'action', 'date_range', 'metrics' ),
+			'properties'           => array(
+				'action'                => array( 'type' => 'string', 'enum' => array( 'aggregate_report' ) ),
+				'property_id'           => array( 'type' => 'string', 'pattern' => '^\\d{6,20}$' ),
+				'date_range'            => self::aggregateDateRangeSchema(),
+				'comparison_date_range' => self::aggregateDateRangeSchema(),
+				'dimensions'            => array( 'type' => 'array', 'items' => array( 'type' => 'string', 'enum' => self::AGGREGATE_DIMENSIONS ), 'maxItems' => 3, 'uniqueItems' => true ),
+				'metrics'               => array( 'type' => 'array', 'items' => array( 'type' => 'string', 'enum' => self::AGGREGATE_METRICS ), 'minItems' => 1, 'maxItems' => 8, 'uniqueItems' => true ),
+				'filters'               => array( 'type' => 'array', 'maxItems' => 4, 'items' => self::aggregateFilterSchema() ),
+				'order_by'              => array( 'type' => 'array', 'maxItems' => 2, 'items' => self::aggregateOrderSchema() ),
+				'limit'                 => array( 'type' => 'integer', 'minimum' => 1, 'maximum' => self::AGGREGATE_MAX_ROWS ),
+			),
+		);
+	}
+
+	/** Closed action-specific schemas keep aggregate bounds visible to consumers. */
+	public static function inputSchema( array $valid_actions = array() ): array {
+		$legacy_actions  = array_diff( $valid_actions ?: array_merge( array_keys( self::ACTION_REPORTS ), array( 'realtime', 'path_sequence' ) ), array( 'aggregate_report' ) );
+		$aggregate       = self::aggregateInputSchema();
+		$legacy_fields   = array(
+			'action'      => array( 'type' => 'string', 'enum' => array_values( $legacy_actions ) ),
+			'property_id' => array( 'type' => 'string' ),
+			'start_date'  => array( 'type' => 'string' ),
+			'end_date'    => array( 'type' => 'string' ),
+			'limit'       => array( 'type' => 'integer', 'minimum' => 1, 'maximum' => self::MAX_LIMIT ),
+			'page_filter' => array( 'type' => 'string' ),
+			'hostname'    => array( 'type' => 'string' ),
+			'sort_by'     => array( 'type' => 'string' ),
+			'order'       => array( 'type' => 'string', 'enum' => array( 'asc', 'desc' ) ),
+			'compare'     => array( 'type' => 'boolean' ),
+		);
+		return array(
+			'oneOf' => array(
+				array(
+					'type'                 => 'object',
+					'required'             => array( 'action' ),
+					'properties'           => $legacy_fields,
+				),
+				$aggregate,
+			),
+		);
+	}
+
+	public static function aggregateDateRangeSchema(): array {
+		return array(
+			'type'                 => 'object',
+			'additionalProperties' => false,
+			'required'             => array( 'start_date', 'end_date' ),
+			'properties'           => array(
+				'start_date' => array( 'type' => 'string', 'pattern' => '^\\d{4}-\\d{2}-\\d{2}$' ),
+				'end_date'   => array( 'type' => 'string', 'pattern' => '^\\d{4}-\\d{2}-\\d{2}$' ),
+			),
+		);
+	}
+
+	public static function aggregateFilterSchema(): array {
+		return array(
+			'type'                 => 'object',
+			'additionalProperties' => false,
+			'required'             => array( 'field_name', 'match_type', 'value' ),
+			'properties'           => array(
+				'field_name'     => array( 'type' => 'string', 'enum' => self::AGGREGATE_DIMENSIONS ),
+				'match_type'     => array( 'type' => 'string', 'enum' => array( 'EXACT', 'CONTAINS', 'BEGINS_WITH', 'ENDS_WITH' ) ),
+				'value'          => array( 'type' => 'string', 'minLength' => 1, 'maxLength' => 200 ),
+				'case_sensitive' => array( 'type' => 'boolean' ),
+				'exclude'        => array( 'type' => 'boolean' ),
+			),
+		);
+	}
+
+	public static function aggregateOrderSchema(): array {
+		return array(
+			'type'                 => 'object',
+			'additionalProperties' => false,
+			'required'             => array( 'type', 'name' ),
+			'properties'           => array(
+				'type'       => array( 'type' => 'string', 'enum' => array( 'dimension', 'metric' ) ),
+				'name'       => array( 'type' => 'string' ),
+				'descending' => array( 'type' => 'boolean' ),
+			),
+		);
+	}
+
+	private static function aggregateReportOutputSchema(): array {
+		return array(
+			'type'                 => 'object',
+			'additionalProperties' => false,
+			'required'             => array( 'label', 'date_range', 'rows', 'totals', 'returned_row_count', 'row_count', 'quota_remaining', 'coverage_limits' ),
+			'properties'           => array(
+				'label'              => array( 'type' => 'string', 'enum' => array( 'primary', 'comparison' ) ),
+				'date_range'         => self::aggregateDateRangeSchema(),
+				'rows'               => array( 'type' => 'array', 'maxItems' => self::AGGREGATE_MAX_ROWS, 'items' => array( 'type' => 'object', 'additionalProperties' => false, 'required' => array( 'dimensions', 'metrics' ), 'properties' => array( 'dimensions' => self::aggregateOutputRecordSchema( self::AGGREGATE_DIMENSIONS, 3, 2000 ), 'metrics' => self::aggregateOutputRecordSchema( self::AGGREGATE_METRICS, 8, 200 ) ) ) ),
+				'totals'             => self::aggregateOutputRecordSchema( self::AGGREGATE_METRICS, 8, 200 ),
+				'returned_row_count' => array( 'type' => 'integer' ),
+				'row_count'          => array( 'type' => 'integer' ),
+				'quota_remaining'    => array( 'type' => 'object', 'maxProperties' => 10, 'additionalProperties' => array( 'type' => 'integer', 'minimum' => 0 ) ),
+				'coverage_limits'    => array( 'type' => 'array', 'maxItems' => 10, 'items' => array( 'type' => 'string', 'maxLength' => 300 ) ),
+				'time_zone'          => array( 'type' => 'string', 'maxLength' => 100 ),
+				'currency_code'      => array( 'type' => 'string', 'maxLength' => 20 ),
+			),
+		);
+	}
+
+	private static function aggregateOutputRecordSchema( array $names, int $max_items, int $max_length ): array {
+		$properties = array();
+		foreach ( $names as $name ) {
+			$properties[ $name ] = array( 'type' => 'string', 'maxLength' => $max_length );
+		}
+		return array( 'type' => 'object', 'additionalProperties' => false, 'maxProperties' => $max_items, 'properties' => $properties );
+	}
+
+	/** Build one bounded batchRunReports request body or return an error message. */
+	public static function buildAggregateReportRequestBody( array $input ) {
+		$error = self::validateAggregateInput( $input );
+		if ( null !== $error ) {
+			return new \WP_Error( 'invalid_ga_aggregate_request', $error );
+		}
+
+		$build_expression = static function ( array $filter ): array {
+			$expression = array( 'filter' => array( 'fieldName' => $filter['field_name'], 'stringFilter' => array( 'matchType' => $filter['match_type'], 'value' => $filter['value'], 'caseSensitive' => ! empty( $filter['case_sensitive'] ) ) ) );
+			return ! empty( $filter['exclude'] ) ? array( 'notExpression' => $expression ) : $expression;
+		};
+		$body = array(
+			'dateRanges'           => array( array( 'startDate' => $input['date_range']['start_date'], 'endDate' => $input['date_range']['end_date'] ) ),
+			'dimensions'           => array_map( static fn( string $name ): array => array( 'name' => $name ), $input['dimensions'] ?? array() ),
+			'metrics'              => array_map( static fn( string $name ): array => array( 'name' => $name ), $input['metrics'] ),
+			'limit'                => (int) ( $input['limit'] ?? 25 ),
+			'keepEmptyRows'        => false,
+			'metricAggregations'   => array( 'TOTAL' ),
+			'returnPropertyQuota'  => true,
+		);
+		if ( ! empty( $input['filters'] ) ) {
+			$body['dimensionFilter'] = array( 'andGroup' => array( 'expressions' => array_map( $build_expression, $input['filters'] ) ) );
+		}
+		if ( ! empty( $input['order_by'] ) ) {
+			$body['orderBys'] = array_map(
+				static fn( array $order ): array => array_merge( 'metric' === $order['type'] ? array( 'metric' => array( 'metricName' => $order['name'] ) ) : array( 'dimension' => array( 'dimensionName' => $order['name'] ) ), array( 'desc' => ! array_key_exists( 'descending', $order ) || $order['descending'] ) ),
+				$input['order_by']
+			);
+		}
+		return $body;
+	}
+
+	private static function validateAggregateInput( array $input ): ?string {
+		$allowed = array( 'action', 'property_id', 'date_range', 'comparison_date_range', 'dimensions', 'metrics', 'filters', 'order_by', 'limit' );
+		if ( array_diff( array_keys( $input ), $allowed ) ) { return 'aggregate_report accepts only its documented fields.'; }
+		foreach ( array( 'date_range', 'metrics' ) as $required ) { if ( ! array_key_exists( $required, $input ) ) { return "aggregate_report requires {$required}."; } }
+		foreach ( array( 'date_range', 'comparison_date_range' ) as $key ) {
+			if ( ! isset( $input[ $key ] ) ) { continue; }
+			$range = $input[ $key ];
+			if ( ! is_array( $range ) || array_diff( array_keys( $range ), array( 'start_date', 'end_date' ) ) || ! isset( $range['start_date'], $range['end_date'] ) || ! self::isValidAggregateDate( $range['start_date'] ) || ! self::isValidAggregateDate( $range['end_date'] ) ) { return "{$key} must contain exact start_date and end_date values in YYYY-MM-DD format."; }
+			$days = (int) ( ( strtotime( $range['end_date'] . ' UTC' ) - strtotime( $range['start_date'] . ' UTC' ) ) / DAY_IN_SECONDS ) + 1;
+			if ( $days < 1 || $days > self::AGGREGATE_MAX_DATE_RANGE_DAYS ) { return "{$key} must be between 1 and " . self::AGGREGATE_MAX_DATE_RANGE_DAYS . ' inclusive days.'; }
+		}
+		$dimensions = $input['dimensions'] ?? array(); $metrics = $input['metrics'];
+		if ( ! is_array( $dimensions ) || count( $dimensions ) > 3 || count( $dimensions ) !== count( array_filter( $dimensions, 'is_string' ) ) || count( $dimensions ) !== count( array_unique( $dimensions ) ) || array_diff( $dimensions, self::AGGREGATE_DIMENSIONS ) ) { return 'dimensions must contain up to three unique approved dimensions.'; }
+		if ( ! is_array( $metrics ) || count( $metrics ) < 1 || count( $metrics ) > 8 || count( $metrics ) !== count( array_filter( $metrics, 'is_string' ) ) || count( $metrics ) !== count( array_unique( $metrics ) ) || array_diff( $metrics, self::AGGREGATE_METRICS ) ) { return 'metrics must contain one to eight unique approved metrics.'; }
+		if ( ! isset( $input['limit'] ) ) { $input['limit'] = 25; }
+		if ( ! is_int( $input['limit'] ) && ! ctype_digit( (string) $input['limit'] ) || (int) $input['limit'] < 1 || (int) $input['limit'] > self::AGGREGATE_MAX_ROWS ) { return 'limit must be an integer from 1 to 100.'; }
+		if ( ! is_array( $input['filters'] ?? array() ) || count( $input['filters'] ?? array() ) > 4 ) { return 'filters supports at most four entries.'; }
+		foreach ( $input['filters'] ?? array() as $filter ) {
+			if ( ! is_array( $filter ) || array_diff( array_keys( $filter ), array( 'field_name', 'match_type', 'value', 'case_sensitive', 'exclude' ) ) || ! in_array( $filter['field_name'] ?? '', self::AGGREGATE_DIMENSIONS, true ) || ! in_array( $filter['match_type'] ?? '', array( 'EXACT', 'CONTAINS', 'BEGINS_WITH', 'ENDS_WITH' ), true ) || ! is_string( $filter['value'] ?? null ) || '' === $filter['value'] || strlen( $filter['value'] ) > 200 || ( isset( $filter['case_sensitive'] ) && ! is_bool( $filter['case_sensitive'] ) ) || ( isset( $filter['exclude'] ) && ! is_bool( $filter['exclude'] ) ) ) { return 'filters must contain approved bounded string dimension filters.'; }
+		}
+		if ( ! is_array( $input['order_by'] ?? array() ) || count( $input['order_by'] ?? array() ) > 2 ) { return 'order_by supports at most two entries.'; }
+		foreach ( $input['order_by'] ?? array() as $order ) {
+			if ( ! is_array( $order ) || array_diff( array_keys( $order ), array( 'type', 'name', 'descending' ) ) || ! in_array( $order['type'] ?? '', array( 'dimension', 'metric' ), true ) || ! in_array( $order['name'] ?? '', 'dimension' === ( $order['type'] ?? '' ) ? $dimensions : $metrics, true ) || ( isset( $order['descending'] ) && ! is_bool( $order['descending'] ) ) ) { return 'Each ordering must select a requested dimension or metric.'; }
+		}
+		return null;
+	}
+
+	private static function isValidAggregateDate( $date ): bool {
+		return is_string( $date ) && preg_match( '/^\d{4}-\d{2}-\d{2}$/', $date ) && gmdate( 'Y-m-d', strtotime( $date . ' UTC' ) ) === $date;
+	}
+
+	/** Resolve the configured default or an explicit aggregate property ID. */
+	public static function resolveAggregatePropertyId( array $input, array $config ) {
+		$property_id = ! empty( $input['property_id'] ) ? sanitize_text_field( $input['property_id'] ) : ( $config['property_id'] ?? '' );
+		if ( ! is_string( $property_id ) || ! preg_match( '/^\d{6,20}$/', $property_id ) ) {
+			return new \WP_Error( 'invalid_ga_aggregate_property', 'GA4 property ID must be numeric.' );
+		}
+		return $property_id;
+	}
+
+	private static function fetchAggregateReport( array $input, string $access_token, string $property_id ): array {
+		$batch = self::buildAggregateBatchRequest( $input, $property_id, $access_token );
+		if ( is_wp_error( $batch ) ) { return array( 'success' => false, 'error' => $batch->get_error_message() ); }
+		$result = HttpClient::post( $batch['url'], $batch['options'] );
+		if ( ! $result['success'] ) { return array( 'success' => false, 'error' => self::formatAggregateHttpError( $result ) ); }
+		$data = json_decode( $result['data'], true );
+		if ( json_last_error() !== JSON_ERROR_NONE || ! is_array( $data ) ) { return array( 'success' => false, 'error' => 'Google Analytics returned an unexpected aggregate report response.' ); }
+		if ( array_key_exists( 'error', $data ) ) {
+			$error = self::formatAggregateApiError( $data['error'] );
+			return array( 'success' => false, 'error' => $error ?? 'Google Analytics returned an unexpected aggregate report response.' );
+		}
+		if ( array_diff( array_keys( $data ), array( 'reports', 'kind' ) ) || ! isset( $data['kind'] ) || self::AGGREGATE_BATCH_RESPONSE_KIND !== $data['kind'] || ! isset( $data['reports'] ) || ! is_array( $data['reports'] ) || ! array_is_list( $data['reports'] ) || count( $data['reports'] ) !== count( $batch['ranges'] ) ) { return array( 'success' => false, 'error' => 'Google Analytics returned an unexpected aggregate report response.' ); }
+		$reports = array();
+		foreach ( $data['reports'] as $index => $report ) {
+			$normalized = self::normalizeAggregateReport( $report, $batch['ranges'][ $index ], $input['dimensions'] ?? array(), $input['metrics'] );
+			if ( is_wp_error( $normalized ) ) { return array( 'success' => false, 'error' => $normalized->get_error_message() ); }
+			$normalized['label'] = 0 === $index ? 'primary' : 'comparison';
+			$reports[] = $normalized;
+		}
+		return array( 'success' => true, 'action' => 'aggregate_report', 'dimensions' => $input['dimensions'] ?? array(), 'metrics' => $input['metrics'], 'filters' => $input['filters'] ?? array(), 'reports' => $reports );
+	}
+
+	/** Return a canonical GA4 error without exposing a provider response body. */
+	private static function formatAggregateHttpError( array $result ): string {
+		$status_code = $result['status_code'] ?? 0;
+		$body        = $result['data'] ?? '';
+		if ( is_int( $status_code ) && is_string( $body ) && strlen( $body ) <= self::AGGREGATE_MAX_RESPONSE_BYTES ) {
+			$data = json_decode( $body, true );
+			if ( JSON_ERROR_NONE === json_last_error() && is_array( $data ) && array_keys( $data ) === array( 'error' ) ) {
+				$error = self::formatAggregateApiError( $data['error'], $status_code );
+				if ( null !== $error ) {
+					return $error;
+				}
+			}
+		}
+
+		return is_int( $status_code ) && $status_code >= 100 && $status_code <= 599
+			? "GA4 request failed with HTTP {$status_code}."
+			: 'GA4 request failed before a response was received.';
+	}
+
+	/** Validate the bounded Google error envelope and return its safe canonical message. */
+	private static function formatAggregateApiError( $error, ?int $http_status = null ): ?string {
+		if ( ! is_array( $error ) || array_diff( array_keys( $error ), array( 'code', 'message', 'status', 'details' ) ) || ! isset( $error['code'], $error['message'], $error['status'] ) || ! is_int( $error['code'] ) || ! is_string( $error['message'] ) || '' === $error['message'] || strlen( $error['message'] ) > 1000 || ! is_string( $error['status'] ) || ! preg_match( '/^[A-Z_]{3,64}$/', $error['status'] ) || ( null !== $http_status && $error['code'] !== $http_status ) ) {
+			return null;
+		}
+
+		$messages = array(
+			'PERMISSION_DENIED' => 'Permission denied.',
+			'UNAUTHENTICATED'    => 'Authentication failed.',
+			'INVALID_ARGUMENT'   => 'The aggregate report request was rejected.',
+			'NOT_FOUND'          => 'The requested GA4 property was not found.',
+			'RESOURCE_EXHAUSTED' => 'GA4 quota is exhausted.',
+			'FAILED_PRECONDITION' => 'The GA4 property is not ready for this request.',
+			'UNAVAILABLE'        => 'GA4 is temporarily unavailable.',
+			'INTERNAL'           => 'GA4 encountered an internal error.',
+		);
+		return 'GA4 API error (' . $error['code'] . ' ' . $error['status'] . '): ' . ( $messages[ $error['status'] ] ?? 'The GA4 request failed.' );
+	}
+
+	/** Build the single bounded HTTP batch request without exposing credentials. */
+	public static function buildAggregateBatchRequest( array $input, string $property_id, string $access_token ) {
+		$primary = self::buildAggregateReportRequestBody( $input );
+		if ( is_wp_error( $primary ) ) { return $primary; }
+		$requests = array( $primary );
+		$ranges   = array( $input['date_range'] );
+		if ( isset( $input['comparison_date_range'] ) ) {
+			$comparison = $input;
+			$comparison['date_range'] = $input['comparison_date_range'];
+			unset( $comparison['comparison_date_range'] );
+			$requests[] = self::buildAggregateReportRequestBody( $comparison );
+			if ( is_wp_error( $requests[1] ) ) { return $requests[1]; }
+			$ranges[] = $input['comparison_date_range'];
+		}
+		return array(
+			'url'     => self::API_BASE . $property_id . ':batchRunReports',
+			'options' => array( 'timeout' => 30, 'limit_response_size' => self::AGGREGATE_MAX_RESPONSE_BYTES, 'log_response_body_preview' => false, 'headers' => array( 'Authorization' => 'Bearer ' . $access_token, 'Content-Type' => 'application/json' ), 'body' => wp_json_encode( array( 'requests' => $requests ) ), 'context' => 'Google Analytics Data API aggregate report' ),
+			'ranges'  => $ranges,
+		);
+	}
+
+	/** Normalize a single batch report without inventing coverage guarantees. */
+	public static function normalizeAggregateReport( array $report, array $date_range, array $expected_dimensions = array(), array $expected_metrics = array() ) {
+		$invalid = static fn(): \WP_Error => new \WP_Error( 'invalid_ga_aggregate_response', 'Google Analytics returned a malformed aggregate report.' );
+		if ( ! isset( $report['kind'] ) || self::AGGREGATE_REPORT_RESPONSE_KIND !== $report['kind'] ) { return $invalid(); }
+		unset( $report['kind'] );
+		$dimension_headers = $report['dimensionHeaders'] ?? array();
+		$metric_headers    = $report['metricHeaders'] ?? array();
+		$raw_rows          = $report['rows'] ?? array();
+		$raw_totals        = $report['totals'] ?? array();
+		if ( ! is_array( $dimension_headers ) || ! is_array( $metric_headers ) || ! is_array( $raw_rows ) || ! is_array( $raw_totals ) || ! array_is_list( $dimension_headers ) || ! array_is_list( $metric_headers ) || ! array_is_list( $raw_rows ) || ! array_is_list( $raw_totals ) || count( $raw_rows ) > self::AGGREGATE_MAX_ROWS ) { return $invalid(); }
+		$headers = static function ( array $items ) { $names = array(); foreach ( $items as $item ) { if ( ! is_array( $item ) || array_diff( array_keys( $item ), array( 'name', 'type' ) ) || ! isset( $item['name'] ) || ! is_string( $item['name'] ) || '' === $item['name'] || strlen( $item['name'] ) > 100 || ( isset( $item['type'] ) && ( ! is_string( $item['type'] ) || strlen( $item['type'] ) > 100 ) ) ) { return false; } $names[] = $item['name']; } return $names; };
+		$dimensions = $headers( $dimension_headers ); $metrics = $headers( $metric_headers );
+		if ( false === $dimensions || false === $metrics || ( ! empty( $raw_rows ) && ( $dimensions !== $expected_dimensions || $metrics !== $expected_metrics ) ) || ( ! empty( $raw_totals ) && $metrics !== $expected_metrics ) || ( empty( $raw_rows ) && empty( $raw_totals ) && ( ! empty( $dimensions ) && $dimensions !== $expected_dimensions || ! empty( $metrics ) && $metrics !== $expected_metrics ) ) ) { return $invalid(); }
+		$dimensions = empty( $dimensions ) ? $expected_dimensions : $dimensions;
+		$metrics    = empty( $metrics ) ? $expected_metrics : $metrics;
+		$record = static function ( array $headers, array $values, int $max_length ) { if ( ! array_is_list( $values ) || count( $values ) !== count( $headers ) ) { return false; } $out = array(); foreach ( $headers as $index => $name ) { $value = $values[ $index ] ?? null; if ( ! is_array( $value ) || array_keys( $value ) !== array( 'value' ) || ! is_string( $value['value'] ) || strlen( $value['value'] ) > $max_length ) { return false; } $out[ $name ] = $value['value']; } return $out; };
+		$rows = array();
+		foreach ( $raw_rows as $row ) {
+			if ( ! is_array( $row ) || array_diff( array_keys( $row ), array( 'dimensionValues', 'metricValues' ) ) || ! isset( $row['dimensionValues'], $row['metricValues'] ) ) { return $invalid(); }
+			$dimension_values = $record( $dimensions, $row['dimensionValues'], 2000 ); $metric_values = $record( $metrics, $row['metricValues'], 200 );
+			if ( false === $dimension_values || false === $metric_values ) { return $invalid(); }
+			$rows[] = array( 'dimensions' => $dimension_values, 'metrics' => $metric_values );
+		}
+		$limits = array(); $metadata = $report['metadata'] ?? array();
+		if ( ! is_array( $metadata ) || array_diff( array_keys( $metadata ), array( 'dataLossFromOtherRow', 'subjectToThresholding', 'samplingMetadatas', 'timeZone', 'currencyCode', 'emptyReason', 'schemaRestrictionResponse' ) ) || ( isset( $metadata['dataLossFromOtherRow'] ) && ! is_bool( $metadata['dataLossFromOtherRow'] ) ) || ( isset( $metadata['subjectToThresholding'] ) && ! is_bool( $metadata['subjectToThresholding'] ) ) || ( isset( $metadata['timeZone'] ) && ( ! is_string( $metadata['timeZone'] ) || strlen( $metadata['timeZone'] ) > 100 ) ) || ( isset( $metadata['currencyCode'] ) && ( ! is_string( $metadata['currencyCode'] ) || strlen( $metadata['currencyCode'] ) > 20 ) ) || ( isset( $metadata['emptyReason'] ) && ( ! is_string( $metadata['emptyReason'] ) || '' === $metadata['emptyReason'] || strlen( $metadata['emptyReason'] ) > 100 ) ) ) { return $invalid(); }
+		if ( ! empty( $metadata['dataLossFromOtherRow'] ) ) { $limits[] = 'Some dimension values were grouped into an other row, so the returned breakdown is incomplete.'; }
+		if ( ! empty( $metadata['subjectToThresholding'] ) ) { $limits[] = 'Google Analytics applied a privacy threshold to this report.'; }
+		if ( isset( $metadata['emptyReason'] ) ) { $limits[] = 'Google Analytics reported an empty result for this report.'; }
+		if ( isset( $metadata['schemaRestrictionResponse'] ) ) {
+			$restriction = $metadata['schemaRestrictionResponse'];
+			if ( ! is_array( $restriction ) || array_keys( $restriction ) !== array( 'activeMetricRestrictions' ) || ! is_array( $restriction['activeMetricRestrictions'] ) || ! array_is_list( $restriction['activeMetricRestrictions'] ) || count( $restriction['activeMetricRestrictions'] ) > count( $expected_metrics ) ) { return $invalid(); }
+			foreach ( $restriction['activeMetricRestrictions'] as $metric_restriction ) {
+				if ( ! is_array( $metric_restriction ) || count( $metric_restriction ) !== 2 || array_diff( array_keys( $metric_restriction ), array( 'metricName', 'restrictedMetricTypes' ) ) || ! isset( $metric_restriction['metricName'], $metric_restriction['restrictedMetricTypes'] ) || ! is_string( $metric_restriction['metricName'] ) || '' === $metric_restriction['metricName'] || strlen( $metric_restriction['metricName'] ) > 100 || ! in_array( $metric_restriction['metricName'], $expected_metrics, true ) || ! is_array( $metric_restriction['restrictedMetricTypes'] ) || ! array_is_list( $metric_restriction['restrictedMetricTypes'] ) || count( $metric_restriction['restrictedMetricTypes'] ) < 1 || count( $metric_restriction['restrictedMetricTypes'] ) > 2 || count( $metric_restriction['restrictedMetricTypes'] ) !== count( array_unique( $metric_restriction['restrictedMetricTypes'] ) ) || array_diff( $metric_restriction['restrictedMetricTypes'], array( 'RESTRICTED_METRIC_TYPE_UNSPECIFIED', 'COST_DATA', 'REVENUE_DATA' ) ) ) { return $invalid(); }
+			}
+			if ( ! empty( $restriction['activeMetricRestrictions'] ) ) { $limits[] = 'Google Analytics restricted one or more requested metrics.'; }
+		}
+		if ( isset( $metadata['samplingMetadatas'] ) && ( ! is_array( $metadata['samplingMetadatas'] ) || ! array_is_list( $metadata['samplingMetadatas'] ) || count( $metadata['samplingMetadatas'] ) > 5 ) ) { return $invalid(); }
+		foreach ( $metadata['samplingMetadatas'] ?? array() as $sampling ) { if ( ! is_array( $sampling ) || array_diff( array_keys( $sampling ), array( 'samplesReadCount', 'samplingSpaceSize' ) ) || ( isset( $sampling['samplesReadCount'] ) && ( ! is_string( $sampling['samplesReadCount'] ) || ! ctype_digit( $sampling['samplesReadCount'] ) ) ) || ( isset( $sampling['samplingSpaceSize'] ) && ( ! is_string( $sampling['samplingSpaceSize'] ) || ! ctype_digit( $sampling['samplingSpaceSize'] ) ) ) ) { return $invalid(); } $limits[] = 'Google Analytics sampled ' . ( $sampling['samplesReadCount'] ?? 'an unknown number of' ) . ' records from ' . ( $sampling['samplingSpaceSize'] ?? 'an unknown sampling space' ) . '.'; }
+		if ( isset( $report['rowCount'] ) && ( ! is_int( $report['rowCount'] ) || $report['rowCount'] < 0 ) ) { return $invalid(); }
+		$row_count = $report['rowCount'] ?? count( $rows );
+		if ( $row_count > count( $rows ) ) { $limits[] = 'The result is truncated to ' . count( $rows ) . ' of ' . $row_count . ' matching rows.'; }
+		if ( empty( $rows ) ) { $limits[] = 'No rows matched the requested report.'; }
+		if ( count( $raw_totals ) > 1 || ( 1 === count( $raw_totals ) && ( ! is_array( $raw_totals[0] ) || array_keys( $raw_totals[0] ) !== array( 'metricValues' ) ) ) ) { return $invalid(); }
+		$totals = empty( $raw_totals ) ? array_fill_keys( $metrics, '' ) : $record( $metrics, $raw_totals[0]['metricValues'], 200 );
+		if ( false === $totals || ( isset( $report['propertyQuota'] ) && ! is_array( $report['propertyQuota'] ) ) ) { return $invalid(); }
+		$quota = array(); foreach ( $report['propertyQuota'] ?? array() as $name => $value ) { if ( ! is_string( $name ) || ! is_array( $value ) || array_diff( array_keys( $value ), array( 'consumed', 'remaining' ) ) || ( isset( $value['consumed'] ) && ( ! is_int( $value['consumed'] ) || $value['consumed'] < 0 ) ) || ( isset( $value['remaining'] ) && ( ! is_int( $value['remaining'] ) || $value['remaining'] < 0 ) ) ) { return $invalid(); } if ( isset( $value['remaining'] ) ) { $quota[ $name ] = $value['remaining']; } }
+		return array( 'date_range' => $date_range, 'rows' => $rows, 'totals' => $totals, 'returned_row_count' => count( $rows ), 'row_count' => $row_count, 'time_zone' => $metadata['timeZone'] ?? '', 'currency_code' => $metadata['currencyCode'] ?? '', 'quota_remaining' => $quota, 'coverage_limits' => $limits );
 	}
 
 	/**
@@ -312,7 +592,7 @@ class GoogleAnalyticsAbilities {
 	public static function fetchStats( array $input ): array {
 		$action = sanitize_text_field( $input['action'] ?? '' );
 
-		$valid_actions = array_merge( array_keys( self::ACTION_REPORTS ), array( 'realtime', 'path_sequence' ) );
+		$valid_actions = array_merge( array_keys( self::ACTION_REPORTS ), array( 'realtime', 'path_sequence', 'aggregate_report' ) );
 		if ( empty( $action ) || ! in_array( $action, $valid_actions, true ) ) {
 			return array(
 				'success' => false,
@@ -354,6 +634,13 @@ class GoogleAnalyticsAbilities {
 				'success' => false,
 				'error'   => 'No GA4 property ID configured or provided.',
 			);
+		}
+		if ( 'aggregate_report' === $action ) {
+			$aggregate_property_id = self::resolveAggregatePropertyId( $input, $config );
+			if ( is_wp_error( $aggregate_property_id ) ) {
+				return array( 'success' => false, 'error' => $aggregate_property_id->get_error_message() );
+			}
+			return self::fetchAggregateReport( $input, $access_token, $aggregate_property_id );
 		}
 
 		// Route to realtime handler.

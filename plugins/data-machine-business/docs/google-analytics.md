@@ -36,6 +36,21 @@ Existing GA4 installations do not need a migration step. Data Machine Business u
 - `new_vs_returning`
 - `network_density`
 - `path_sequence`
+- `aggregate_report`
+
+### `aggregate_report`
+
+`aggregate_report` is the composable, bounded GA4 Data API surface. It accepts exact `date_range` and optional `comparison_date_range` objects (`start_date` and `end_date`), each limited to 400 inclusive days; up to three approved dimensions, eight approved metrics, four AND-combined string filters, two orderings, and 100 rows. It uses one `batchRunReports` call for one or two periods, requests `TOTAL` metric aggregations and property quota, and returns per-period rows, totals, counts, timezone/currency, quota remaining, and explicit sampling, thresholding, other-row, truncation, and empty-result limitations. The upstream batch response must have `kind: "analyticsData#batchRunReports"`, and every upstream report must have `kind: "analyticsData#runReport"`; both values are validated before normalization and omitted from the normalized result.
+
+This action requires Data Machine's HTTP client contracts from issues #3177 and #3231 or later: `HttpClient::post()` must forward the standard `limit_response_size` option to WordPress HTTP requests and honor `log_response_body_preview: false` for non-2xx log contexts. Data Machine Business supplies both bounded options and does not implement or wrap the HTTP client.
+
+Approved dimensions are `browser`, `country`, `date`, `deviceCategory`, `eventName`, `firstUserDefaultChannelGroup`, `firstUserMedium`, `firstUserSource`, `hostName`, `landingPage`, `month`, `newVsReturning`, `operatingSystem`, `pagePath`, `pageTitle`, `region`, `sessionCampaignName`, `sessionDefaultChannelGroup`, `sessionMedium`, `sessionSource`, and `week`. Approved metrics are `activeUsers`, `averageSessionDuration`, `bounceRate`, `engagedSessions`, `engagementRate`, `eventCount`, `eventsPerSession`, `keyEvents`, `newUsers`, `screenPageViews`, `screenPageViewsPerSession`, `sessionKeyEventRate`, `sessions`, `sessionsPerUser`, `totalUsers`, and `userKeyEventRate`.
+
+Ordering fields must be in the matching selected dimensions or metrics list. Filter objects use `field_name`, `match_type` (`EXACT`, `CONTAINS`, `BEGINS_WITH`, or `ENDS_WITH`), `value`, and optional `case_sensitive` or `exclude` booleans. The configured numeric property ID is used unless `property_id` is explicitly supplied under the existing permission gate. WP-CLI supports the same request with `--property-id=<numeric-id>` plus JSON `--date-range`, `--comparison-date-range`, `--dimensions`, `--metrics`, `--filters`, and `--order-by` flags.
+
+```bash
+wp datamachine analytics ga aggregate_report --date-range='{"start_date":"2026-01-01","end_date":"2026-01-31"}' --dimensions='["country"]' --metrics='["sessions","activeUsers"]' --order-by='[{"type":"metric","name":"sessions","descending":true}]' --format=json
+```
 
 ### Bounded page breakdowns
 

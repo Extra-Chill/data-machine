@@ -66,62 +66,31 @@ class GoogleAnalytics extends BaseTool {
 	 * @return array Tool definition array.
 	 */
 	public function getToolDefinition(): array {
-		$valid_actions = array_merge( array_keys( GoogleAnalyticsAbilities::ACTION_REPORTS ), array( 'realtime', 'path_sequence' ) );
+		$valid_actions = array_merge( array_keys( GoogleAnalyticsAbilities::ACTION_REPORTS ), array( 'realtime', 'path_sequence', 'aggregate_report' ) );
+		$legacy_actions = array_values( array_diff( $valid_actions, array( 'aggregate_report' ) ) );
+		$legacy_properties = array(
+			'action'      => array( 'type' => 'string', 'enum' => $legacy_actions, 'description' => 'Choose a bounded preset report. landing_page_acquisition uses session-entry landingPage x session source/medium and discloses material `(not set)` coverage without filtering it. page_acquisition uses touched pagePath x session source/medium. page_audience uses touched pagePath x country/device.' ),
+			'property_id' => array( 'type' => 'string', 'description' => 'GA4 property ID (numeric). Defaults to the configured property ID.' ),
+			'start_date'  => array( 'type' => 'string', 'description' => 'Start date in YYYY-MM-DD format (defaults to 28 days ago). Not used for realtime action.' ),
+			'end_date'    => array( 'type' => 'string', 'description' => 'End date in YYYY-MM-DD format (defaults to yesterday). Not used for realtime action.' ),
+			'limit'       => array( 'type' => 'integer', 'minimum' => 1, 'maximum' => GoogleAnalyticsAbilities::MAX_LIMIT, 'description' => 'Row limit (default: 25, max: 10000).' ),
+			'page_filter' => array( 'type' => 'string', 'description' => 'Filter results to pages with paths containing this string.' ),
+			'hostname'    => array( 'type' => 'string', 'description' => 'Filter to pages on this hostname (for multisite GA4 properties).' ),
+			'sort_by'     => array( 'type' => 'string', 'description' => 'Sort results by this metric or dimension field name (e.g. bounceRate, sessions, engagementRate).' ),
+			'order'       => array( 'type' => 'string', 'enum' => array( 'asc', 'desc' ), 'description' => 'Sort direction: asc or desc (default: desc).' ),
+			'compare'     => array( 'type' => 'boolean', 'description' => 'Compare against the previous period of equal length. Adds delta percentage columns.' ),
+		);
 
 		return array(
 			'class'           => __CLASS__,
 			'method'          => 'handle_tool_call',
-			'description'     => 'Fetch visitor analytics from Google Analytics (GA4), including fixed landing-page acquisition, touched-page acquisition, and page audience breakdowns. Landing-page acquisition preserves `(not set)` rows and reports unknown-dimension coverage metadata. Supports sorting, hostname and page filtering, and period-over-period comparison without arbitrary dimension selection.',
+			'description'     => 'Fetch visitor analytics from Google Analytics (GA4). Fixed actions retain their existing presets. aggregate_report is a bounded, read-only aggregate query with exact dates, reviewed fields, totals, quota, and explicit coverage limitations.',
 			'requires_config' => true,
 			'parameters'      => array(
-				'type'       => 'object',
-				'properties' => array(
-					'action'      => array(
-						'type'        => 'string',
-						'enum'        => $valid_actions,
-						'description' => 'Choose a bounded report. landing_page_acquisition uses session-entry landingPage x session source/medium and discloses material `(not set)` coverage without filtering it. page_acquisition uses touched pagePath x session source/medium. page_audience uses touched pagePath x country/device.',
-					),
-					'property_id' => array(
-					'type'        => 'string',
-					'description' => 'GA4 property ID (numeric). Defaults to the configured property ID.',
+				'oneOf' => array(
+					array( 'type' => 'object', 'required' => array( 'action' ), 'properties' => $legacy_properties ),
+					GoogleAnalyticsAbilities::aggregateInputSchema(),
 				),
-					'start_date'  => array(
-					'type'        => 'string',
-					'description' => 'Start date in YYYY-MM-DD format (defaults to 28 days ago). Not used for realtime action.',
-				),
-					'end_date'    => array(
-					'type'        => 'string',
-					'description' => 'End date in YYYY-MM-DD format (defaults to yesterday). Not used for realtime action.',
-				),
-					'limit'       => array(
-					'type'        => 'integer',
-					'minimum'     => 1,
-					'maximum'     => GoogleAnalyticsAbilities::MAX_LIMIT,
-					'description' => 'Row limit (default: 25, max: 10000).',
-				),
-					'page_filter' => array(
-					'type'        => 'string',
-					'description' => 'Filter results to pages with paths containing this string.',
-				),
-					'hostname'    => array(
-					'type'        => 'string',
-					'description' => 'Filter to pages on this hostname (for multisite GA4 properties).',
-				),
-					'sort_by'     => array(
-					'type'        => 'string',
-					'description' => 'Sort results by this metric or dimension field name (e.g. bounceRate, sessions, engagementRate).',
-				),
-					'order'       => array(
-					'type'        => 'string',
-					'enum'        => array( 'asc', 'desc' ),
-					'description' => 'Sort direction: asc or desc (default: desc).',
-				),
-					'compare'     => array(
-					'type'        => 'boolean',
-					'description' => 'Compare against the previous period of equal length. Adds delta percentage columns.',
-				),
-				),
-				'required'   => array( 'action' ),
 			),
 		);
 	}

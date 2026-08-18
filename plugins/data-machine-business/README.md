@@ -139,8 +139,9 @@ Actions:
 - `new_vs_returning`
 - `network_density`
 - `path_sequence`
+- `aggregate_report`
 
-Common options include `--start-date`, `--end-date`, `--limit`, `--page-filter`, `--hostname`, `--sort-by`, `--order`, `--compare`, and `--format`.
+Common options include `--start-date`, `--end-date`, `--limit`, `--page-filter`, `--hostname`, `--sort-by`, `--order`, `--compare`, and `--format`. `aggregate_report` accepts bounded JSON flags: `--date-range`, `--comparison-date-range`, `--dimensions`, `--metrics`, `--filters`, and `--order-by`.
 
 ```bash
 wp datamachine analytics ga page_stats --hostname=example.com --compare

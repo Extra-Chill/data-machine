@@ -230,14 +230,18 @@ class GoogleAnalyticsAbilitiesTest extends WP_UnitTestCase {
 		$reflection = new \ReflectionClass( GoogleAnalytics::class );
 		$tool       = $reflection->newInstanceWithoutConstructor();
 		$definition = $tool->getToolDefinition();
-		$parameters = $definition['parameters']['properties'];
+		$legacy_parameters = $definition['parameters']['oneOf'][0]['properties'];
+		$aggregate_parameters = $definition['parameters']['oneOf'][1]['properties'];
 
-		$this->assertContains( 'landing_page_acquisition', $parameters['action']['enum'] );
-		$this->assertContains( 'page_acquisition', $parameters['action']['enum'] );
-		$this->assertContains( 'page_audience', $parameters['action']['enum'] );
-		$this->assertSame( array( 'asc', 'desc' ), $parameters['order']['enum'] );
-		$this->assertSame( 1, $parameters['limit']['minimum'] );
-		$this->assertSame( GoogleAnalyticsAbilities::MAX_LIMIT, $parameters['limit']['maximum'] );
+		$this->assertContains( 'landing_page_acquisition', $legacy_parameters['action']['enum'] );
+		$this->assertContains( 'page_acquisition', $legacy_parameters['action']['enum'] );
+		$this->assertContains( 'page_audience', $legacy_parameters['action']['enum'] );
+		$this->assertNotContains( 'aggregate_report', $legacy_parameters['action']['enum'] );
+		$this->assertSame( array( 'asc', 'desc' ), $legacy_parameters['order']['enum'] );
+		$this->assertSame( 1, $legacy_parameters['limit']['minimum'] );
+		$this->assertSame( GoogleAnalyticsAbilities::MAX_LIMIT, $legacy_parameters['limit']['maximum'] );
+		$this->assertSame( array( 'aggregate_report' ), $aggregate_parameters['action']['enum'] );
+		$this->assertSame( GoogleAnalyticsAbilities::AGGREGATE_MAX_ROWS, $aggregate_parameters['limit']['maximum'] );
 	}
 
 	public function test_report_rows_keep_dimensions_and_cast_numeric_metrics(): void {
@@ -802,6 +806,158 @@ class GoogleAnalyticsAbilitiesTest extends WP_UnitTestCase {
 		);
 
 		$this->assertSame( GoogleAnalyticsAbilities::MAX_LIMIT, $body['limit'] );
+	}
+
+	public function test_aggregate_request_is_bounded_and_uses_total_quota_batch_shape(): void {
+		$body = GoogleAnalyticsAbilities::buildAggregateReportRequestBody( array(
+			'action' => 'aggregate_report',
+			'date_range' => array( 'start_date' => '2026-01-01', 'end_date' => '2026-01-31' ),
+			'dimensions' => array( 'country' ), 'metrics' => array( 'sessions', 'activeUsers' ), 'limit' => 100,
+			'filters' => array( array( 'field_name' => 'hostName', 'match_type' => 'EXACT', 'value' => 'example.com' ) ),
+			'order_by' => array( array( 'type' => 'metric', 'name' => 'sessions', 'descending' => true ) ),
+		) );
+		$this->assertNotWPError( $body );
+		$this->assertSame( array( 'TOTAL' ), $body['metricAggregations'] );
+		$this->assertTrue( $body['returnPropertyQuota'] );
+		$this->assertSame( 'example.com', $body['dimensionFilter']['andGroup']['expressions'][0]['filter']['stringFilter']['value'] );
+		$this->assertSame( 'sessions', $body['orderBys'][0]['metric']['metricName'] );
+	}
+
+	/** @dataProvider invalid_aggregate_inputs */
+	public function test_aggregate_request_rejects_invalid_bounds_and_fields( array $input ): void {
+		$this->assertWPError( GoogleAnalyticsAbilities::buildAggregateReportRequestBody( $input ) );
+	}
+
+	public function test_aggregate_normalization_discloses_all_coverage_limits(): void {
+		$report = GoogleAnalyticsAbilities::normalizeAggregateReport( array(
+			'kind' => GoogleAnalyticsAbilities::AGGREGATE_REPORT_RESPONSE_KIND,
+			'dimensionHeaders' => array( array( 'name' => 'country' ) ), 'metricHeaders' => array( array( 'name' => 'sessions' ) ),
+			'rows' => array( array( 'dimensionValues' => array( array( 'value' => 'US' ) ), 'metricValues' => array( array( 'value' => '5' ) ) ) ),
+			'totals' => array( array( 'metricValues' => array( array( 'value' => '9' ) ) ) ), 'rowCount' => 9,
+			'metadata' => array( 'dataLossFromOtherRow' => true, 'subjectToThresholding' => true, 'samplingMetadatas' => array( array( 'samplesReadCount' => '10', 'samplingSpaceSize' => '100' ) ), 'timeZone' => 'UTC', 'currencyCode' => 'USD' ),
+			'propertyQuota' => array( 'tokensPerDay' => array( 'remaining' => 42 ) ),
+		), array( 'start_date' => '2026-01-01', 'end_date' => '2026-01-31' ), array( 'country' ), array( 'sessions' ) );
+		$this->assertNotWPError( $report );
+		$this->assertSame( '5', $report['rows'][0]['metrics']['sessions'] );
+		$this->assertSame( '9', $report['totals']['sessions'] );
+		$this->assertSame( 42, $report['quota_remaining']['tokensPerDay'] );
+		$this->assertCount( 4, $report['coverage_limits'] );
+	}
+
+	public function test_aggregate_normalization_rejects_malformed_rows_and_preserves_old_action_builder(): void {
+		$this->assertWPError( GoogleAnalyticsAbilities::normalizeAggregateReport( array( 'kind' => GoogleAnalyticsAbilities::AGGREGATE_REPORT_RESPONSE_KIND, 'dimensionHeaders' => array(), 'metricHeaders' => array(), 'rows' => array( array() ), 'totals' => array() ), array() ) );
+		$this->assertSame( array( 'date' ), wp_list_pluck( GoogleAnalyticsAbilities::buildReportRequestBody( array(), 'date_stats' )['dimensions'], 'name' ) );
+	}
+
+	public function test_aggregate_batch_request_uses_one_http_envelope_for_primary_and_comparison(): void {
+		$input = array( 'action' => 'aggregate_report', 'date_range' => array( 'start_date' => '2026-01-01', 'end_date' => '2026-01-31' ), 'comparison_date_range' => array( 'start_date' => '2025-01-01', 'end_date' => '2025-01-31' ), 'metrics' => array( 'sessions' ) );
+		$batch = GoogleAnalyticsAbilities::buildAggregateBatchRequest( $input, '123456789', 'secret-token' );
+		$this->assertNotWPError( $batch );
+		$this->assertSame( 'https://analyticsdata.googleapis.com/v1beta/properties/123456789:batchRunReports', $batch['url'] );
+		$this->assertSame( GoogleAnalyticsAbilities::AGGREGATE_MAX_RESPONSE_BYTES, $batch['options']['limit_response_size'] );
+		$this->assertCount( 2, json_decode( $batch['options']['body'], true )['requests'] );
+		$this->assertSame( $input['date_range'], $batch['ranges'][0] );
+		$this->assertSame( $input['comparison_date_range'], $batch['ranges'][1] );
+	}
+
+	public function test_aggregate_schema_is_closed_and_does_not_expose_property_id_in_output(): void {
+		$input_schema = GoogleAnalyticsAbilities::aggregateInputSchema();
+		$this->assertFalse( $input_schema['additionalProperties'] );
+		$this->assertFalse( $input_schema['properties']['filters']['items']['additionalProperties'] );
+		$this->assertFalse( $input_schema['properties']['order_by']['items']['additionalProperties'] );
+		$output_schema = GoogleAnalyticsAbilities::outputSchema();
+		$this->assertArrayNotHasKey( 'property_id', $output_schema['properties'] );
+		$response = array( 'success' => true, 'action' => 'aggregate_report', 'dimensions' => array(), 'metrics' => array( 'sessions' ), 'filters' => array(), 'reports' => array( array( 'label' => 'primary', 'date_range' => array( 'start_date' => '2026-01-01', 'end_date' => '2026-01-31' ), 'rows' => array(), 'totals' => array( 'sessions' => '0' ), 'returned_row_count' => 0, 'row_count' => 0, 'quota_remaining' => array(), 'coverage_limits' => array( 'No rows matched the requested report.' ), 'time_zone' => '', 'currency_code' => '' ) ) );
+		$validated = rest_validate_value_from_schema( $response, $output_schema, 'output' );
+		$this->assertTrue( $validated, is_wp_error( $validated ) ? $validated->get_error_message() : '' );
+	}
+
+	public function test_aggregate_exact_400_day_boundary_and_malformed_nested_values(): void {
+		$valid = GoogleAnalyticsAbilities::buildAggregateReportRequestBody( array( 'action' => 'aggregate_report', 'date_range' => array( 'start_date' => '2025-01-01', 'end_date' => '2026-02-04' ), 'metrics' => array( 'sessions' ) ) );
+		$this->assertNotWPError( $valid );
+		$malformed = array( 'kind' => GoogleAnalyticsAbilities::AGGREGATE_REPORT_RESPONSE_KIND, 'dimensionHeaders' => array( array( 'name' => 'country' ) ), 'metricHeaders' => array( array( 'name' => 'sessions', 'type' => 'TYPE_INTEGER' ) ), 'rows' => array( array( 'dimensionValues' => array( array( 'value' => 'US' ) ), 'metricValues' => array( array( 'value' => 1 ) ) ) ), 'totals' => array() );
+		$this->assertWPError( GoogleAnalyticsAbilities::normalizeAggregateReport( $malformed, array() ) );
+		$malformed['rows'][0]['metricValues'][0]['value'] = '1';
+		$malformed['rowCount'] = 1.5;
+		$this->assertWPError( GoogleAnalyticsAbilities::normalizeAggregateReport( $malformed, array() ) );
+	}
+
+	public function test_aggregate_normalizes_bounded_empty_and_schema_restriction_metadata(): void {
+		$report = array(
+			'kind' => GoogleAnalyticsAbilities::AGGREGATE_REPORT_RESPONSE_KIND,
+			'dimensionHeaders' => array(), 'metricHeaders' => array( array( 'name' => 'sessions', 'type' => 'TYPE_INTEGER' ) ),
+			'rows' => array(), 'totals' => array( array( 'metricValues' => array( array( 'value' => '0' ) ) ) ),
+			'metadata' => array( 'emptyReason' => 'NO_DATA', 'schemaRestrictionResponse' => array( 'activeMetricRestrictions' => array( array( 'restrictedMetricTypes' => array( 'COST_DATA', 'REVENUE_DATA' ), 'metricName' => 'sessions' ) ) ) ),
+		);
+		$normalized = GoogleAnalyticsAbilities::normalizeAggregateReport( $report, array(), array(), array( 'sessions' ) );
+		$this->assertNotWPError( $normalized );
+		$this->assertContains( 'Google Analytics reported an empty result for this report.', $normalized['coverage_limits'] );
+		$this->assertContains( 'Google Analytics restricted one or more requested metrics.', $normalized['coverage_limits'] );
+		$this->assertNotContains( 'NO_DATA', $normalized['coverage_limits'] );
+		$report['metadata']['schemaRestrictionResponse']['activeMetricRestrictions'][0] = array( 'metricName' => 'sessions', 'restrictedMetricType' => 'COST_DATA' );
+		$this->assertWPError( GoogleAnalyticsAbilities::normalizeAggregateReport( $report, array(), array(), array( 'sessions' ) ) );
+	}
+
+	public function test_aggregate_rejects_zero_dimension_header_or_value_mismatches(): void {
+		$base = array( 'kind' => GoogleAnalyticsAbilities::AGGREGATE_REPORT_RESPONSE_KIND, 'dimensionHeaders' => array(), 'metricHeaders' => array( array( 'name' => 'sessions' ) ), 'rows' => array(), 'totals' => array() );
+		$with_header = $base;
+		$with_header['dimensionHeaders'][] = array( 'name' => 'country' );
+		$this->assertWPError( GoogleAnalyticsAbilities::normalizeAggregateReport( $with_header, array(), array(), array( 'sessions' ) ) );
+		$with_value = $base;
+		$with_value['rows'][] = array( 'dimensionValues' => array( array( 'value' => 'US' ) ), 'metricValues' => array( array( 'value' => '1' ) ) );
+		$this->assertWPError( GoogleAnalyticsAbilities::normalizeAggregateReport( $with_value, array(), array(), array( 'sessions' ) ) );
+	}
+
+	public function test_aggregate_accepts_omitted_repeated_fields_for_empty_and_total_only_reports(): void {
+		$empty = GoogleAnalyticsAbilities::normalizeAggregateReport( array( 'kind' => GoogleAnalyticsAbilities::AGGREGATE_REPORT_RESPONSE_KIND ), array(), array( 'country' ), array( 'sessions' ) );
+		$this->assertNotWPError( $empty );
+		$this->assertSame( array( 'sessions' => '' ), $empty['totals'] );
+		$this->assertContains( 'No rows matched the requested report.', $empty['coverage_limits'] );
+		$total_only = GoogleAnalyticsAbilities::normalizeAggregateReport( array( 'kind' => GoogleAnalyticsAbilities::AGGREGATE_REPORT_RESPONSE_KIND, 'metricHeaders' => array( array( 'name' => 'sessions' ) ), 'totals' => array( array( 'metricValues' => array( array( 'value' => '12' ) ) ) ) ), array(), array( 'country' ), array( 'sessions' ) );
+		$this->assertNotWPError( $total_only );
+		$this->assertSame( '12', $total_only['totals']['sessions'] );
+	}
+
+	public function test_aggregate_output_schema_bounds_closed_rows_and_coverage(): void {
+		$report = GoogleAnalyticsAbilities::outputSchema()['properties']['reports'];
+		$row = $report['items']['properties']['rows'];
+		$this->assertSame( 2, $report['maxItems'] );
+		$this->assertSame( GoogleAnalyticsAbilities::AGGREGATE_MAX_ROWS, $row['maxItems'] );
+		$this->assertFalse( $row['items']['additionalProperties'] );
+		$this->assertSame( 10, $report['items']['properties']['coverage_limits']['maxItems'] );
+	}
+
+	public function test_cli_maps_explicit_property_id_and_fixed_action_builder_remains_compatible(): void {
+		$command = ( new \ReflectionClass( GoogleAnalyticsCommand::class ) )->newInstanceWithoutConstructor();
+		$method = new \ReflectionMethod( GoogleAnalyticsCommand::class, 'map_optional' );
+		$method->setAccessible( true );
+		$input = array();
+		$method->invokeArgs( $command, array( &$input, array( 'property-id' => '123456789' ), array( 'property-id' => 'property_id' ) ) );
+		$this->assertSame( '123456789', $input['property_id'] );
+		$this->assertSame( array( 'sessions', 'activeUsers', 'screenPageViews', 'bounceRate' ), wp_list_pluck( GoogleAnalyticsAbilities::buildReportRequestBody( array(), 'traffic_sources' )['metrics'], 'name' ) );
+	}
+
+	public function test_aggregate_errors_return_canonical_messages_without_provider_content(): void {
+		$method = new \ReflectionMethod( GoogleAnalyticsAbilities::class, 'formatAggregateApiError' );
+		$method->setAccessible( true );
+		$error = $method->invoke( null, array( 'code' => 403, 'status' => 'PERMISSION_DENIED', 'message' => 'Filter secret-token was rejected.' ), 403 );
+		$this->assertSame( 'GA4 API error (403 PERMISSION_DENIED): Permission denied.', $error );
+	}
+
+	public function test_aggregate_property_resolution_uses_configured_or_explicit_id_without_output_field(): void {
+		$this->assertSame( '123456789', GoogleAnalyticsAbilities::resolveAggregatePropertyId( array(), array( 'property_id' => '123456789' ) ) );
+		$this->assertSame( '987654321', GoogleAnalyticsAbilities::resolveAggregatePropertyId( array( 'property_id' => '987654321' ), array( 'property_id' => '123456789' ) ) );
+		$this->assertWPError( GoogleAnalyticsAbilities::resolveAggregatePropertyId( array( 'property_id' => 'not-numeric' ), array() ) );
+	}
+
+	public static function invalid_aggregate_inputs(): array {
+		$base = array( 'action' => 'aggregate_report', 'date_range' => array( 'start_date' => '2026-01-01', 'end_date' => '2026-01-31' ), 'metrics' => array( 'sessions' ) );
+		return array(
+			'too many days' => array( array_merge( $base, array( 'date_range' => array( 'start_date' => '2025-01-01', 'end_date' => '2026-02-05' ) ) ) ),
+			'arbitrary metric' => array( array_merge( $base, array( 'metrics' => array( 'evilMetric' ) ) ) ),
+			'unselected ordering' => array( array_merge( $base, array( 'order_by' => array( array( 'type' => 'dimension', 'name' => 'country' ) ) ) ) ),
+			'too many filters' => array( array_merge( $base, array( 'filters' => array_fill( 0, 5, array( 'field_name' => 'country', 'match_type' => 'EXACT', 'value' => 'US' ) ) ) ) ),
+		);
 	}
 
 	private function format_comparison_rows( array $data, int $limit ): array {

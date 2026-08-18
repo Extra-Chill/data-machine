@@ -47,6 +47,7 @@ class GoogleAnalyticsCommand extends BaseCommand {
 			'new_vs_returning'         => 'New vs returning user split',
 			'network_density'          => 'Cross-site journey density via referrer host',
 			'path_sequence'            => 'Ordered cross-host path sequences (funnel report)',
+			'aggregate_report'         => 'Bounded aggregate report from JSON query options',
 		);
 	}
 
@@ -56,7 +57,7 @@ class GoogleAnalyticsCommand extends BaseCommand {
 	 * ## OPTIONS
 	 *
 	 * <action>
-	 * : Action to perform: page_stats, traffic_sources, date_stats, realtime, top_events, user_demographics, landing_pages, landing_page_acquisition, page_acquisition, page_audience, engagement, new_vs_returning, network_density, path_sequence.
+	 * : Action to perform: page_stats, traffic_sources, date_stats, realtime, top_events, user_demographics, landing_pages, landing_page_acquisition, page_acquisition, page_audience, engagement, new_vs_returning, network_density, path_sequence, aggregate_report.
 	 *
 	 * [--start-date=<date>]
 	 * : Start date in YYYY-MM-DD format (default: 28 days ago). Not used for realtime.
@@ -65,7 +66,10 @@ class GoogleAnalyticsCommand extends BaseCommand {
 	 * : End date in YYYY-MM-DD format (default: yesterday). Not used for realtime.
 	 *
 	 * [--limit=<number>]
-	 * : Row limit (default: 25, max: 10000).
+	 * : Row limit (default: 25). aggregate_report max: 100; legacy actions max: 10000.
+	 *
+	 * [--property-id=<id>]
+	 * : GA4 property ID. Defaults to the configured property; aggregate_report requires a numeric ID.
 	 *
 	 * [--page-filter=<string>]
 	 * : Filter results to pages with paths containing this string.
@@ -81,6 +85,24 @@ class GoogleAnalyticsCommand extends BaseCommand {
 	 *
 	 * [--compare]
 	 * : Compare against the previous period of equal length. Adds delta columns.
+	 *
+	 * [--date-range=<json>]
+	 * : aggregate_report primary range JSON: {"start_date":"YYYY-MM-DD","end_date":"YYYY-MM-DD"}.
+	 *
+	 * [--comparison-date-range=<json>]
+	 * : Optional aggregate_report comparison range JSON.
+	 *
+	 * [--dimensions=<json>]
+	 * : aggregate_report dimensions JSON array (up to 3 approved names).
+	 *
+	 * [--metrics=<json>]
+	 * : aggregate_report metrics JSON array (1-8 approved names).
+	 *
+	 * [--filters=<json>]
+	 * : aggregate_report filters JSON array (up to 4 AND string filters).
+	 *
+	 * [--order-by=<json>]
+	 * : aggregate_report ordering JSON array (up to 2 selected fields).
 	 *
 	 * [--format=<format>]
 	 * : Output format.
@@ -130,6 +152,9 @@ class GoogleAnalyticsCommand extends BaseCommand {
 	 *     # Ordered cross-host journeys (true network density)
 	 *     wp datamachine analytics ga path_sequence
 	 *
+	 *     # Bounded aggregate report (use --format=json for nested output)
+	 *     wp datamachine analytics ga aggregate_report --date-range='{"start_date":"2026-01-01","end_date":"2026-01-31"}' --dimensions='["country"]' --metrics='["sessions"]' --format=json
+	 *
 	 *     # Filter by hostname for multisite
 	 *     wp datamachine analytics ga page_stats --hostname=events.example.com
 	 *
@@ -148,6 +173,7 @@ class GoogleAnalyticsCommand extends BaseCommand {
 			$input,
 			$assoc_args,
 			array(
+				'property-id' => 'property_id',
 				'start-date'  => 'start_date',
 				'end-date'    => 'end_date',
 				'limit'       => 'limit',
@@ -157,6 +183,11 @@ class GoogleAnalyticsCommand extends BaseCommand {
 				'order'       => 'order',
 			)
 		);
+		foreach ( array( 'date-range' => 'date_range', 'comparison-date-range' => 'comparison_date_range', 'dimensions' => 'dimensions', 'metrics' => 'metrics', 'filters' => 'filters', 'order-by' => 'order_by' ) as $flag => $key ) {
+			if ( isset( $assoc_args[ $flag ] ) ) {
+				$input[ $key ] = json_decode( $assoc_args[ $flag ], true );
+			}
+		}
 
 		// --compare is a boolean flag (no value).
 		if ( isset( $assoc_args['compare'] ) ) {
