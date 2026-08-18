@@ -488,7 +488,14 @@ class CreateFlowAbility {
 		}
 
 		if ( ! empty( $validation_errors ) ) {
-			return new \WP_Error( 'invalid_flows', 'Validation failed for ' . count( $validation_errors ) . ' flow(s)', array( 'status' => 400, 'errors' => $validation_errors ) );
+			return new \WP_Error(
+				'invalid_flows',
+				'Validation failed for ' . count( $validation_errors ) . ' flow(s)',
+				array(
+					'status' => 400,
+					'errors' => $validation_errors,
+				)
+			);
 		}
 
 		$preview = array();

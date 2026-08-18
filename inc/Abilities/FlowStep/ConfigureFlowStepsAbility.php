@@ -510,7 +510,7 @@ class ConfigureFlowStepsAbility {
 		$data = is_array( $result ) ? $result : array();
 		unset( $data['success'] );
 		$operational_failure = str_starts_with( $message, 'No steps were updated' ) || str_starts_with( $message, 'Failed to' );
-		$data['status']       = ( 'pipeline_not_found' === $code || 'handler_not_found' === $code || 'not_found' === ( $result['error_type'] ?? '' ) ) ? 404 : ( $operational_failure ? 500 : 400 );
+		$data['status']      = ( 'pipeline_not_found' === $code || 'handler_not_found' === $code || 'not_found' === ( $result['error_type'] ?? '' ) ) ? 404 : ( $operational_failure ? 500 : 400 );
 		return new \WP_Error( $error->get_error_code(), $error->get_error_message(), $data );
 	}
 

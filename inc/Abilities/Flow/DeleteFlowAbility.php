@@ -106,7 +106,17 @@ class DeleteFlowAbility {
 			}
 		);
 		if ( is_wp_error( $schedule_result ) ) {
-			return new \WP_Error( $schedule_result->get_error_code(), $schedule_result->get_error_message(), array_merge( array( 'status' => 500, 'desired_state_committed' => null === $this->db_flows->get_flow( $flow_id ) ), \DataMachine\Engine\Tasks\RecurringScheduler::errorMetadata( $schedule_result ) ) );
+			return new \WP_Error(
+				$schedule_result->get_error_code(),
+				$schedule_result->get_error_message(),
+				array_merge(
+					array(
+						'status'                  => 500,
+						'desired_state_committed' => null === $this->db_flows->get_flow( $flow_id ),
+					),
+					\DataMachine\Engine\Tasks\RecurringScheduler::errorMetadata( $schedule_result )
+				)
+			);
 		}
 
 		do_action(

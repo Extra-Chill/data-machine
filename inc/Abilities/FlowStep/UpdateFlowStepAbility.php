@@ -160,7 +160,15 @@ class UpdateFlowStepAbility {
 			if ( ! empty( $handler_config ) ) {
 				$validation_result = $this->validateHandlerConfig( $effective_slug, $handler_config );
 				if ( true !== $validation_result ) {
-					return new \WP_Error( 'invalid_handler_config', $validation_result['error'], array( 'status' => 400, 'unknown_fields' => $validation_result['unknown_fields'], 'field_specs' => $validation_result['field_specs'] ) );
+					return new \WP_Error(
+						'invalid_handler_config',
+						$validation_result['error'],
+						array(
+							'status'         => 400,
+							'unknown_fields' => $validation_result['unknown_fields'],
+							'field_specs'    => $validation_result['field_specs'],
+						)
+					);
 				}
 			}
 
@@ -189,7 +197,15 @@ class UpdateFlowStepAbility {
 			if ( ! empty( $add_handler_config ) ) {
 				$validation_result = $this->validateHandlerConfig( $add_handler, $add_handler_config );
 				if ( true !== $validation_result ) {
-					return new \WP_Error( 'invalid_handler_config', $validation_result['error'], array( 'status' => 400, 'unknown_fields' => $validation_result['unknown_fields'], 'field_specs' => $validation_result['field_specs'] ) );
+					return new \WP_Error(
+						'invalid_handler_config',
+						$validation_result['error'],
+						array(
+							'status'         => 400,
+							'unknown_fields' => $validation_result['unknown_fields'],
+							'field_specs'    => $validation_result['field_specs'],
+						)
+					);
 				}
 			}
 

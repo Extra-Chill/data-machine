@@ -270,30 +270,58 @@ class SendEmailQueuedAbility {
 	 * @return array Result with success flag, action_id, scheduled_for.
 	 */
 	public function execute( array $input ): array|\WP_Error {
-		$logs = array();
+		$logs    = array();
 		$context = array(
-			'user_id'   => PermissionHelper::acting_user_id(),
-			'agent_id'  => absint( PermissionHelper::get_acting_agent_id() ),
-			'token_id'  => absint( PermissionHelper::get_acting_token_id() ),
+			'user_id'  => PermissionHelper::acting_user_id(),
+			'agent_id' => absint( PermissionHelper::get_acting_agent_id() ),
+			'token_id' => absint( PermissionHelper::get_acting_token_id() ),
 		);
 		if ( $context['user_id'] <= 0 ) {
-			return new \WP_Error( 'email_queue_issuer_required', 'An identified issuer is required to queue email.', array( 'status' => 403, 'logs' => $logs ) );
+			return new \WP_Error(
+				'email_queue_issuer_required',
+				'An identified issuer is required to queue email.',
+				array(
+					'status' => 403,
+					'logs'   => $logs,
+				)
+			);
 		}
 		if ( ! empty( $input['auth_ref'] ) ) {
 			$providers = apply_filters( 'datamachine_auth_providers', array() );
 			$auth      = $providers['email_imap'] ?? null;
 			if ( ! $auth || ! method_exists( $auth, 'resolve_mailbox' ) || is_wp_error( $auth->resolve_mailbox( $input['auth_ref'], 'send' ) ) ) {
-				return new \WP_Error( 'email_queue_authorization_failed', 'Mailbox send authorization failed.', array( 'status' => 403, 'logs' => $logs ) );
+				return new \WP_Error(
+					'email_queue_authorization_failed',
+					'Mailbox send authorization failed.',
+					array(
+						'status' => 403,
+						'logs'   => $logs,
+					)
+				);
 			}
 		} elseif ( ! $this->canUseLegacySender() ) {
-			return new \WP_Error( 'email_queue_mailbox_required', 'An authorized mailbox ref is required to queue email.', array( 'status' => 403, 'logs' => $logs ) );
+			return new \WP_Error(
+				'email_queue_mailbox_required',
+				'An authorized mailbox ref is required to queue email.',
+				array(
+					'status' => 403,
+					'logs'   => $logs,
+				)
+			);
 		}
 
 		// Validate the bare minimum here. The underlying ability re-validates
 		// the full payload when the worker runs.
 		$to = isset( $input['to'] ) ? (string) $input['to'] : '';
 		if ( '' === trim( $to ) ) {
-			return new \WP_Error( 'invalid_email_recipient', 'Recipient (to) is required.', array( 'status' => 400, 'logs' => $logs ) );
+			return new \WP_Error(
+				'invalid_email_recipient',
+				'Recipient (to) is required.',
+				array(
+					'status' => 400,
+					'logs'   => $logs,
+				)
+			);
 		}
 
 		$send_at_raw = $input['send_at'] ?? '';
@@ -333,7 +361,14 @@ class SendEmailQueuedAbility {
 				'level'   => 'error',
 				'message' => 'Email queue: Action Scheduler did not return an action id',
 			);
-			return new \WP_Error( 'email_queue_failed', 'Failed to schedule email action.', array( 'status' => 500, 'logs' => $logs ) );
+			return new \WP_Error(
+				'email_queue_failed',
+				'Failed to schedule email action.',
+				array(
+					'status' => 500,
+					'logs'   => $logs,
+				)
+			);
 		}
 
 		$logs[] = array(
@@ -375,7 +410,7 @@ class SendEmailQueuedAbility {
 		}
 
 		$attempt = isset( $payload['_attempt'] ) ? max( 1, (int) $payload['_attempt'] ) : 1;
-		$grant = $this->verifyMailboxGrant( $payload );
+		$grant   = $this->verifyMailboxGrant( $payload );
 		if ( is_wp_error( $grant ) || ! $this->currentIssuerAuthorized( $grant ) ) {
 			do_action( 'datamachine_log', 'error', 'Email worker: queued authorization denied', array( 'attempt' => $attempt ) );
 			return;
@@ -454,14 +489,15 @@ class SendEmailQueuedAbility {
 		$issued_at = time();
 		$nonce     = wp_generate_uuid4();
 		$grant     = array(
-			'user_id'      => (int) $context['user_id'],
-			'agent_id'     => (int) $context['agent_id'],
-			'token_id'     => (int) $context['token_id'],
-			'issuer_type'  => (int) $context['agent_id'] > 0 ? ( (int) $context['token_id'] > 0 ? 'agent_token' : 'agent' ) : 'user',
-			'issued_at'    => $issued_at,
-			'nonce'        => $nonce,
+			'user_id'       => (int) $context['user_id'],
+			'agent_id'      => (int) $context['agent_id'],
+			'token_id'      => (int) $context['token_id'],
+			'issuer_type'   => (int) $context['agent_id'] > 0 ? ( (int) $context['token_id'] > 0 ? 'agent_token' : 'agent' ) : 'user',
+			'issued_at'     => $issued_at,
+			'nonce'         => $nonce,
 			'legacy_sender' => empty( $input['auth_ref'] ),
 		);
+
 		$grant['signature'] = hash_hmac( 'sha256', $this->mailboxGrantPayload( $input, $grant ), wp_salt( 'auth' ) );
 		return $grant;
 	}
@@ -483,6 +519,7 @@ class SendEmailQueuedAbility {
 		unset( $payload['_attempt'], $payload['_mailbox_grant'] );
 		$payload = $this->canonicalizeGrantValue( $payload );
 		return implode( '|', array(
+			// phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.serialize_serialize -- Existing queued grants depend on this signature payload.
 			hash( 'sha256', serialize( $payload ) ),
 			(string) absint( $grant['user_id'] ?? 0 ),
 			(string) absint( $grant['agent_id'] ?? 0 ),

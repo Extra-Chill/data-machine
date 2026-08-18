@@ -109,11 +109,25 @@ class ValidateFlowStepsConfigAbility {
 		$pipeline    = $this->db_pipelines->get_pipeline( $pipeline_id );
 
 		if ( ! $pipeline ) {
-			return new \WP_Error( 'pipeline_not_found', 'Pipeline not found', array( 'status' => 404, 'remediation' => 'Use list_pipelines (api_query) to find valid pipeline IDs.' ) );
+			return new \WP_Error(
+				'pipeline_not_found',
+				'Pipeline not found',
+				array(
+					'status'      => 404,
+					'remediation' => 'Use list_pipelines (api_query) to find valid pipeline IDs.',
+				)
+			);
 		}
 
 		if ( ! empty( $target_handler_slug ) && ! $this->handler_abilities->handlerExists( $target_handler_slug ) ) {
-			return new \WP_Error( 'handler_not_found', "Target handler '{$target_handler_slug}' not found", array( 'status' => 404, 'remediation' => 'Use list_handlers (api_query) to find valid handler slugs.' ) );
+			return new \WP_Error(
+				'handler_not_found',
+				"Target handler '{$target_handler_slug}' not found",
+				array(
+					'status'      => 404,
+					'remediation' => 'Use list_handlers (api_query) to find valid handler slugs.',
+				)
+			);
 		}
 
 		$flows = $this->db_flows->get_flows_for_pipeline( $pipeline_id );
@@ -121,7 +135,18 @@ class ValidateFlowStepsConfigAbility {
 		if ( empty( $flows ) ) {
 			$pipeline_config = $pipeline['pipeline_config'] ?? array();
 
-			return new \WP_Error( 'pipeline_has_no_flows', 'Pipeline has no flows yet', array( 'status' => 400, 'diagnostic' => array( 'pipeline_name' => $pipeline['pipeline_name'] ?? '', 'step_count' => count( $pipeline_config ) ), 'remediation' => 'Create a flow first using create_flow tool.' ) );
+			return new \WP_Error(
+				'pipeline_has_no_flows',
+				'Pipeline has no flows yet',
+				array(
+					'status'      => 400,
+					'diagnostic'  => array(
+						'pipeline_name' => $pipeline['pipeline_name'] ?? '',
+						'step_count'    => count( $pipeline_config ),
+					),
+					'remediation' => 'Create a flow first using create_flow tool.',
+				)
+			);
 		}
 
 		$flow_configs_by_id = array();
@@ -243,7 +268,15 @@ class ValidateFlowStepsConfigAbility {
 		);
 
 		if ( ! empty( $validation_errors ) ) {
-			return new \WP_Error( 'invalid_flow_step_configuration', 'Flow step configuration validation failed', array( 'status' => 400, 'validation_errors' => $validation_errors, 'pipeline_id' => $pipeline_id ) );
+			return new \WP_Error(
+				'invalid_flow_step_configuration',
+				'Flow step configuration validation failed',
+				array(
+					'status'            => 400,
+					'validation_errors' => $validation_errors,
+					'pipeline_id'       => $pipeline_id,
+				)
+			);
 		}
 
 		if ( ! empty( $warnings ) ) {

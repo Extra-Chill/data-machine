@@ -132,7 +132,15 @@ class DeletePipelineAbility {
 			static fn(array $failure): bool => empty( $failure['desired_state_committed'] )
 		);
 		if ( ! empty( $commit_failures ) ) {
-			return new \WP_Error( 'pipeline_flow_deletion_incomplete', 'Pipeline deletion did not commit every flow deletion.', array( 'status' => 500, 'schedule_failures' => $schedule_failures, 'deleted_flows' => $deleted_flows ) );
+			return new \WP_Error(
+				'pipeline_flow_deletion_incomplete',
+				'Pipeline deletion did not commit every flow deletion.',
+				array(
+					'status'            => 500,
+					'schedule_failures' => $schedule_failures,
+					'deleted_flows'     => $deleted_flows,
+				)
+			);
 		}
 
 		$cleanup            = new FileCleanup();

@@ -341,7 +341,14 @@ class CreatePipelineAbility {
 
 			$handler_validation = $this->validateHandlerSlugs( $template_workflow['steps'] );
 			if ( true !== $handler_validation ) {
-				return new \WP_Error( 'invalid_handler_slug', $handler_validation['error'] ?? 'Invalid handler slug', array( 'status' => 400, 'remediation' => $handler_validation['remediation'] ?? '' ) );
+				return new \WP_Error(
+					'invalid_handler_slug',
+					$handler_validation['error'] ?? 'Invalid handler slug',
+					array(
+						'status'      => 400,
+						'remediation' => $handler_validation['remediation'] ?? '',
+					)
+				);
 			}
 		} elseif ( ! empty( $template_steps ) ) {
 			$validation = $this->validateSteps( $template_steps );
@@ -351,7 +358,14 @@ class CreatePipelineAbility {
 
 			$handler_validation = $this->validateHandlerSlugs( $template_steps );
 			if ( true !== $handler_validation ) {
-				return new \WP_Error( 'invalid_handler_slug', $handler_validation['error'] ?? 'Invalid handler slug', array( 'status' => 400, 'remediation' => $handler_validation['remediation'] ?? '' ) );
+				return new \WP_Error(
+					'invalid_handler_slug',
+					$handler_validation['error'] ?? 'Invalid handler slug',
+					array(
+						'status'      => 400,
+						'remediation' => $handler_validation['remediation'] ?? '',
+					)
+				);
 			}
 		}
 
@@ -542,7 +556,16 @@ class CreatePipelineAbility {
 		);
 
 		if ( 0 === $created_count ) {
-			return new \WP_Error( 'pipeline_bulk_creation_failed', 'All pipeline creations failed', array( 'status' => 500, 'created_count' => 0, 'failed_count' => $failed_count, 'errors' => $errors ) );
+			return new \WP_Error(
+				'pipeline_bulk_creation_failed',
+				'All pipeline creations failed',
+				array(
+					'status'        => 500,
+					'created_count' => 0,
+					'failed_count'  => $failed_count,
+					'errors'        => $errors,
+				)
+			);
 		}
 
 		$message = sprintf( 'Created %d pipeline(s).', $created_count );

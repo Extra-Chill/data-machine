@@ -18,7 +18,7 @@ defined( 'ABSPATH' ) || exit;
 
 class PipelineConfigurationAbilities {
 
-	private const SCHEMA_VERSION = 'datamachine.pipeline_configuration.v1';
+	private const SCHEMA_VERSION    = 'datamachine.pipeline_configuration.v1';
 	private static bool $registered = false;
 
 	private Pipelines $pipelines;
