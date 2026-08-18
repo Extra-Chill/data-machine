@@ -277,51 +277,23 @@ class SendEmailQueuedAbility {
 			'token_id' => absint( PermissionHelper::get_acting_token_id() ),
 		);
 		if ( $context['user_id'] <= 0 ) {
-			return new \WP_Error(
-				'email_queue_issuer_required',
-				'An identified issuer is required to queue email.',
-				array(
-					'status' => 403,
-					'logs'   => $logs,
-				)
-			);
+			return $this->queueError( 'email_queue_issuer_required', 'An identified issuer is required to queue email.', 403, $logs );
 		}
 		if ( ! empty( $input['auth_ref'] ) ) {
 			$providers = apply_filters( 'datamachine_auth_providers', array() );
 			$auth      = $providers['email_imap'] ?? null;
 			if ( ! $auth || ! method_exists( $auth, 'resolve_mailbox' ) || is_wp_error( $auth->resolve_mailbox( $input['auth_ref'], 'send' ) ) ) {
-				return new \WP_Error(
-					'email_queue_authorization_failed',
-					'Mailbox send authorization failed.',
-					array(
-						'status' => 403,
-						'logs'   => $logs,
-					)
-				);
+				return $this->queueError( 'email_queue_authorization_failed', 'Mailbox send authorization failed.', 403, $logs );
 			}
 		} elseif ( ! $this->canUseLegacySender() ) {
-			return new \WP_Error(
-				'email_queue_mailbox_required',
-				'An authorized mailbox ref is required to queue email.',
-				array(
-					'status' => 403,
-					'logs'   => $logs,
-				)
-			);
+			return $this->queueError( 'email_queue_mailbox_required', 'An authorized mailbox ref is required to queue email.', 403, $logs );
 		}
 
 		// Validate the bare minimum here. The underlying ability re-validates
 		// the full payload when the worker runs.
 		$to = isset( $input['to'] ) ? (string) $input['to'] : '';
 		if ( '' === trim( $to ) ) {
-			return new \WP_Error(
-				'invalid_email_recipient',
-				'Recipient (to) is required.',
-				array(
-					'status' => 400,
-					'logs'   => $logs,
-				)
-			);
+			return $this->queueError( 'invalid_email_recipient', 'Recipient (to) is required.', 400, $logs );
 		}
 
 		$send_at_raw = $input['send_at'] ?? '';
@@ -361,14 +333,7 @@ class SendEmailQueuedAbility {
 				'level'   => 'error',
 				'message' => 'Email queue: Action Scheduler did not return an action id',
 			);
-			return new \WP_Error(
-				'email_queue_failed',
-				'Failed to schedule email action.',
-				array(
-					'status' => 500,
-					'logs'   => $logs,
-				)
-			);
+			return $this->queueError( 'email_queue_failed', 'Failed to schedule email action.', 500, $logs );
 		}
 
 		$logs[] = array(
@@ -500,6 +465,17 @@ class SendEmailQueuedAbility {
 
 		$grant['signature'] = hash_hmac( 'sha256', $this->mailboxGrantPayload( $input, $grant ), wp_salt( 'auth' ) );
 		return $grant;
+	}
+
+	private function queueError( string $code, string $message, int $status, array $logs ): \WP_Error {
+		return new \WP_Error(
+			$code,
+			$message,
+			array(
+				'status' => $status,
+				'logs'   => $logs,
+			)
+		);
 	}
 
 	private function verifyMailboxGrant( array $payload ): array|\WP_Error {
