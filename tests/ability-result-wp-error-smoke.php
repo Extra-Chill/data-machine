@@ -305,6 +305,9 @@ $rest_spec_error = RestResultSpec::item(
 );
 $assert( 'REST result spec applies failure status callback', 404 === ( $rest_spec_error->get_error_data()['status'] ?? null ) );
 
+$native_spec_error = new WP_Error( 'native_queue_denied', 'Queue access denied.', array( 'status' => 403 ) );
+$assert( 'REST result spec preserves native WP_Error unchanged', $native_spec_error === RestResultSpec::item()->response( $native_spec_error ) );
+
 $GLOBALS['datamachine_test_abilities']['datamachine/test-rest'] = new class() {
 	public function execute( array $input ): array {
 		return array(

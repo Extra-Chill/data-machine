@@ -18,7 +18,7 @@ defined( 'ABSPATH' ) || exit;
 
 class PipelineConfigurationAbilities {
 
-	private const SCHEMA_VERSION = 'datamachine.pipeline_configuration.v1';
+	private const SCHEMA_VERSION    = 'datamachine.pipeline_configuration.v1';
 	private static bool $registered = false;
 
 	private Pipelines $pipelines;
@@ -144,22 +144,22 @@ class PipelineConfigurationAbilities {
 		return PermissionHelper::can( 'manage_flows' );
 	}
 
-	public function executeGet( array $input ): array {
+	public function executeGet( array $input ): array|\WP_Error {
 		$resolved = $this->resolvePipeline( $input );
-		if ( isset( $resolved['error'] ) ) {
+		if ( is_wp_error( $resolved ) ) {
 			return $resolved;
 		}
 
 		$pipeline = $resolved['pipeline'];
 		$snapshot = $this->pipelineSnapshot( (int) $pipeline['pipeline_id'] );
-		if ( isset( $snapshot['error'] ) ) {
+		if ( is_wp_error( $snapshot ) ) {
 			return $snapshot;
 		}
 
 		$flows = array();
 		foreach ( $this->flows->get_flows_for_pipeline( (int) $pipeline['pipeline_id'] ) as $flow ) {
 			$flow_snapshot = $this->flowSnapshot( (int) $flow['flow_id'] );
-			if ( isset( $flow_snapshot['error'] ) ) {
+			if ( is_wp_error( $flow_snapshot ) ) {
 				return $flow_snapshot;
 			}
 			$flows[] = array(
@@ -183,7 +183,7 @@ class PipelineConfigurationAbilities {
 		);
 	}
 
-	public function executeUpdate( array $input ): array {
+	public function executeUpdate( array $input ): array|\WP_Error {
 		$unknown = array_diff( array_keys( $input ), array( 'target', 'pipeline_id', 'pipeline_name', 'flow_id', 'step_id', 'step_type', 'expected_revision', 'configuration' ) );
 		if ( ! empty( $unknown ) ) {
 			return $this->error( 'unknown_field', 'Unknown input fields: ' . implode( ', ', $unknown ), 400 );
@@ -201,15 +201,15 @@ class PipelineConfigurationAbilities {
 			: $this->updateFlowStep( $input, $expected, $config );
 	}
 
-	private function updatePipelineStep( array $input, string $expected, array $patch ): array {
+	private function updatePipelineStep( array $input, string $expected, array $patch ): array|\WP_Error {
 		$resolved = $this->resolvePipeline( $input );
-		if ( isset( $resolved['error'] ) ) {
+		if ( is_wp_error( $resolved ) ) {
 			return $resolved;
 		}
 
 		$pipeline_id = (int) $resolved['pipeline']['pipeline_id'];
 		$snapshot    = $this->pipelineSnapshot( $pipeline_id );
-		if ( isset( $snapshot['error'] ) ) {
+		if ( is_wp_error( $snapshot ) ) {
 			return $snapshot;
 		}
 		if ( ! hash_equals( $snapshot['revision'], $expected ) ) {
@@ -226,7 +226,7 @@ class PipelineConfigurationAbilities {
 		}
 
 		$step_id = $this->resolveStepId( $snapshot['config'], $input, 'pipeline_step_id' );
-		if ( is_array( $step_id ) ) {
+		if ( is_wp_error( $step_id ) ) {
 			return $step_id;
 		}
 		$step = $snapshot['config'][ $step_id ];
@@ -260,7 +260,7 @@ class PipelineConfigurationAbilities {
 		return $this->updated( 'pipeline', $step_id, $this->pipelines->get_pipeline_config_json( $pipeline_id ) );
 	}
 
-	private function updateFlowStep( array $input, string $expected, array $patch ): array {
+	private function updateFlowStep( array $input, string $expected, array $patch ): array|\WP_Error {
 		$flow_id = isset( $input['flow_id'] ) ? (int) $input['flow_id'] : 0;
 		$flow    = $flow_id > 0 ? $this->flows->get_flow( $flow_id ) : null;
 		if ( ! $flow ) {
@@ -268,7 +268,7 @@ class PipelineConfigurationAbilities {
 		}
 
 		$snapshot = $this->flowSnapshot( $flow_id );
-		if ( isset( $snapshot['error'] ) ) {
+		if ( is_wp_error( $snapshot ) ) {
 			return $snapshot;
 		}
 		if ( ! hash_equals( $snapshot['revision'], $expected ) ) {
@@ -285,7 +285,7 @@ class PipelineConfigurationAbilities {
 		}
 
 		$step_id = $this->resolveStepId( $snapshot['config'], $input, 'flow_step_id' );
-		if ( is_array( $step_id ) ) {
+		if ( is_wp_error( $step_id ) ) {
 			return $step_id;
 		}
 		$step = $snapshot['config'][ $step_id ];
@@ -316,7 +316,7 @@ class PipelineConfigurationAbilities {
 		}
 
 		$handler_result = $this->applyHandlerPatch( $step, $patch );
-		if ( isset( $handler_result['error'] ) ) {
+		if ( is_wp_error( $handler_result ) ) {
 			return $handler_result;
 		}
 		$step = $handler_result['step'];
@@ -329,7 +329,7 @@ class PipelineConfigurationAbilities {
 		return $this->updated( 'flow', $step_id, $this->flows->get_flow_config_json( $flow_id ) );
 	}
 
-	private function applyHandlerPatch( array $step, array $patch ): array {
+	private function applyHandlerPatch( array $step, array $patch ): array|\WP_Error {
 		$has_handler_fields = array_intersect( array_keys( $patch ), array( 'handler_slug', 'handler_config', 'handler_configs', 'flow_step_settings' ) );
 		if ( empty( $has_handler_fields ) ) {
 			return array( 'step' => $step );
@@ -349,7 +349,7 @@ class PipelineConfigurationAbilities {
 			}
 			$slug       = (string) ( $step['step_type'] ?? '' );
 			$validation = $this->validateHandlerConfig( $slug, $patch['flow_step_settings'] );
-			if ( isset( $validation['error'] ) ) {
+			if ( is_wp_error( $validation ) ) {
 				return $validation;
 			}
 			$existing                   = is_array( $step['flow_step_settings'] ?? null ) ? $step['flow_step_settings'] : array();
@@ -383,7 +383,7 @@ class PipelineConfigurationAbilities {
 				return $this->error( 'invalid_configuration', "Handler '{$handler_slug}' is unavailable or has invalid configuration", 400 );
 			}
 			$validation = $this->validateHandlerConfig( $handler_slug, $handler_config );
-			if ( isset( $validation['error'] ) ) {
+			if ( is_wp_error( $validation ) ) {
 				return $validation;
 			}
 			$existing                        = is_array( $stored_configs[ $handler_slug ] ?? null ) ? $stored_configs[ $handler_slug ] : array();
@@ -401,7 +401,7 @@ class PipelineConfigurationAbilities {
 		return array( 'step' => $step );
 	}
 
-	private function validateHandlerConfig( string $slug, array $config ): array {
+	private function validateHandlerConfig( string $slug, array $config ): array|\WP_Error {
 		$fields  = $this->handlers->getConfigFields( $slug );
 		$unknown = array_diff( array_keys( $config ), array_keys( $fields ) );
 		if ( ! empty( $fields ) && ! empty( $unknown ) ) {
@@ -415,7 +415,7 @@ class PipelineConfigurationAbilities {
 		return $class && method_exists( $class, 'sanitize' ) ? $class->sanitize( $config ) : $config;
 	}
 
-	private function resolvePipeline( array $input ): array {
+	private function resolvePipeline( array $input ): array|\WP_Error {
 		$has_id   = isset( $input['pipeline_id'] );
 		$has_name = isset( $input['pipeline_name'] ) && '' !== trim( (string) $input['pipeline_name'] );
 		if ( $has_id === $has_name ) {
@@ -437,17 +437,17 @@ class PipelineConfigurationAbilities {
 		return array( 'pipeline' => $matches[0] );
 	}
 
-	private function pipelineSnapshot( int $pipeline_id ): array {
+	private function pipelineSnapshot( int $pipeline_id ): array|\WP_Error {
 		$raw = $this->pipelines->get_pipeline_config_json( $pipeline_id );
 		return $this->snapshot( $raw, 'pipeline_configuration_unavailable', 'Pipeline configuration is unavailable' );
 	}
 
-	private function flowSnapshot( int $flow_id ): array {
+	private function flowSnapshot( int $flow_id ): array|\WP_Error {
 		$raw = $this->flows->get_flow_config_json( $flow_id );
 		return $this->snapshot( $raw, 'flow_configuration_unavailable', 'Flow configuration is unavailable' );
 	}
 
-	private function snapshot( ?string $raw, string $code, string $message ): array {
+	private function snapshot( ?string $raw, string $code, string $message ): array|\WP_Error {
 		if ( null === $raw ) {
 			return $this->error( $code, $message, 503 );
 		}
@@ -475,7 +475,7 @@ class PipelineConfigurationAbilities {
 		return $steps;
 	}
 
-	private function resolveStepId( array $config, array $input, string $id_field ): string|array {
+	private function resolveStepId( array $config, array $input, string $id_field ): string|\WP_Error {
 		$step_id   = isset( $input['step_id'] ) ? (string) $input['step_id'] : '';
 		$step_type = isset( $input['step_type'] ) ? (string) $input['step_type'] : '';
 		if ( ( '' === $step_id ) === ( '' === $step_type ) ) {
@@ -500,7 +500,7 @@ class PipelineConfigurationAbilities {
 		return $matches[0];
 	}
 
-	private function updated( string $target, string $step_id, ?string $raw ): array {
+	private function updated( string $target, string $step_id, ?string $raw ): array|\WP_Error {
 		if ( null === $raw ) {
 			return $this->error( $target . '_configuration_unavailable', ucfirst( $target ) . ' configuration is unavailable', 503 );
 		}
@@ -520,13 +520,8 @@ class PipelineConfigurationAbilities {
 		return 'sha256:' . hash( 'sha256', $raw );
 	}
 
-	private function error( string $code, string $message, int $status ): array {
-		return array(
-			'success'    => false,
-			'error_code' => $code,
-			'error'      => $message,
-			'status'     => $status,
-		);
+	private function error( string $code, string $message, int $status ): \WP_Error {
+		return new \WP_Error( $code, $message, array( 'status' => $status ) );
 	}
 
 	private function deepMerge( array $existing, array $patch ): array {

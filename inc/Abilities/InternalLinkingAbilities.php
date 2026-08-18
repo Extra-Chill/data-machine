@@ -1333,9 +1333,9 @@ class InternalLinkingAbilities {
 	 * @since 0.43.0
 	 *
 	 * @param array $input Ability input.
-	 * @return array Ability response.
+	 * @return array|\WP_Error Ability response.
 	 */
-	public static function getLinkOpportunities( array $input = array() ): array {
+	public static function getLinkOpportunities( array $input = array() ): array|\WP_Error {
 		$limit      = absint( $input['limit'] ?? 20 );
 		$category   = sanitize_text_field( $input['category'] ?? '' );
 		$min_clicks = absint( $input['min_clicks'] ?? 5 );
@@ -1347,10 +1347,7 @@ class InternalLinkingAbilities {
 		if ( false === $graph || ! is_array( $graph ) ) {
 			$graph = self::buildLinkGraph( 'post', '', array() );
 			if ( isset( $graph['error'] ) ) {
-				return array(
-					'success' => false,
-					'error'   => 'Failed to build link graph: ' . $graph['error'],
-				);
+				return new \WP_Error( 'link_graph_failed', 'Failed to build link graph: ' . $graph['error'], array( 'status' => 500 ) );
 			}
 			set_transient( self::GRAPH_TRANSIENT_KEY, $graph, self::GRAPH_CACHE_TTL );
 		}
@@ -1409,10 +1406,7 @@ class InternalLinkingAbilities {
 		$gsc_ability = wp_get_ability( 'datamachine/google-search-console' );
 
 		if ( ! $gsc_ability ) {
-			return array(
-				'success' => false,
-				'error'   => 'Google Search Console ability not available. Ensure Data Machine Business is active and Search Console is configured.',
-			);
+			return new \WP_Error( 'gsc_ability_unavailable', 'Google Search Console ability not available. Ensure Data Machine Business is active and Search Console is configured.', array( 'status' => 503 ) );
 		}
 
 		$start_date = gmdate( 'Y-m-d', time() - ( $days * DAY_IN_SECONDS ) );
@@ -1427,11 +1421,12 @@ class InternalLinkingAbilities {
 			)
 		);
 
+		if ( is_wp_error( $gsc_result ) ) {
+			return $gsc_result;
+		}
+
 		if ( empty( $gsc_result['success'] ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'Failed to fetch GSC data: ' . ( $gsc_result['error'] ?? 'Unknown error' ),
-			);
+			return new \WP_Error( 'gsc_query_failed', 'Failed to fetch GSC data: ' . ( $gsc_result['error'] ?? 'Unknown error' ), array( 'status' => 502 ) );
 		}
 
 		$gsc_rows = $gsc_result['results'] ?? array();
@@ -1441,10 +1436,7 @@ class InternalLinkingAbilities {
 		if ( ! empty( $category ) ) {
 			$term = get_term_by( 'slug', $category, 'category' );
 			if ( ! $term ) {
-				return array(
-					'success' => false,
-					'error'   => "Category '{$category}' not found.",
-				);
+				return new \WP_Error( 'category_not_found', "Category '{$category}' not found.", array( 'status' => 404 ) );
 			}
 			$cat_posts         = get_posts(
 				array(

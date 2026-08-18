@@ -68,6 +68,11 @@ class RestResultSpec {
 	 * @return \WP_REST_Response|\WP_Error
 	 */
 	public function response( $result ) {
+		// Native errors already carry the callback's machine code and status.
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+
 		$normalized = AbilityResult::normalize( $result );
 
 		if ( is_array( $normalized ) && isset( $normalized['success'] ) && ! $normalized['success'] && ! isset( $normalized['status'] ) && $this->failure_status_callback ) {

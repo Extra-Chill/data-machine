@@ -93,7 +93,7 @@ class ValidateFlowStepsConfigAbility {
 	 * @param array $input Input parameters.
 	 * @return array Validation result with would_update and validation_errors.
 	 */
-	public function execute( array $input ): array {
+	public function execute( array $input ): array|\WP_Error {
 		$pipeline_id         = $input['pipeline_id'] ?? null;
 		$step_type           = $input['step_type'] ?? null;
 		$handler_slug        = $input['handler_slug'] ?? null;
@@ -102,43 +102,31 @@ class ValidateFlowStepsConfigAbility {
 		$flow_configs        = $input['flow_configs'] ?? array();
 
 		if ( ! is_numeric( $pipeline_id ) || (int) $pipeline_id <= 0 ) {
-			return array(
-				'valid'             => false,
-				'validation_errors' => array(
-					array(
-						'field' => 'pipeline_id',
-						'error' => 'pipeline_id is required and must be a positive integer',
-					),
-				),
-			);
+			return new \WP_Error( 'invalid_pipeline_id', 'pipeline_id is required and must be a positive integer', array( 'status' => 400 ) );
 		}
 
 		$pipeline_id = (int) $pipeline_id;
 		$pipeline    = $this->db_pipelines->get_pipeline( $pipeline_id );
 
 		if ( ! $pipeline ) {
-			return array(
-				'valid'             => false,
-				'validation_errors' => array(
-					array(
-						'field'       => 'pipeline_id',
-						'error'       => 'Pipeline not found',
-						'remediation' => 'Use list_pipelines (api_query) to find valid pipeline IDs.',
-					),
-				),
+			return new \WP_Error(
+				'pipeline_not_found',
+				'Pipeline not found',
+				array(
+					'status'      => 404,
+					'remediation' => 'Use list_pipelines (api_query) to find valid pipeline IDs.',
+				)
 			);
 		}
 
 		if ( ! empty( $target_handler_slug ) && ! $this->handler_abilities->handlerExists( $target_handler_slug ) ) {
-			return array(
-				'valid'             => false,
-				'validation_errors' => array(
-					array(
-						'field'       => 'target_handler_slug',
-						'error'       => "Target handler '{$target_handler_slug}' not found",
-						'remediation' => 'Use list_handlers (api_query) to find valid handler slugs.',
-					),
-				),
+			return new \WP_Error(
+				'handler_not_found',
+				"Target handler '{$target_handler_slug}' not found",
+				array(
+					'status'      => 404,
+					'remediation' => 'Use list_handlers (api_query) to find valid handler slugs.',
+				)
 			);
 		}
 
@@ -147,22 +135,17 @@ class ValidateFlowStepsConfigAbility {
 		if ( empty( $flows ) ) {
 			$pipeline_config = $pipeline['pipeline_config'] ?? array();
 
-			return array(
-				'valid'             => false,
-				'flow_count'        => 0,
-				'matching_steps'    => 0,
-				'would_update'      => array(),
-				'validation_errors' => array(
-					array(
-						'field'       => 'pipeline_id',
-						'error'       => 'Pipeline has no flows yet',
-						'diagnostic'  => array(
-							'pipeline_name' => $pipeline['pipeline_name'] ?? '',
-							'step_count'    => count( $pipeline_config ),
-						),
-						'remediation' => 'Create a flow first using create_flow tool.',
+			return new \WP_Error(
+				'pipeline_has_no_flows',
+				'Pipeline has no flows yet',
+				array(
+					'status'      => 400,
+					'diagnostic'  => array(
+						'pipeline_name' => $pipeline['pipeline_name'] ?? '',
+						'step_count'    => count( $pipeline_config ),
 					),
-				),
+					'remediation' => 'Create a flow first using create_flow tool.',
+				)
 			);
 		}
 
@@ -285,7 +268,15 @@ class ValidateFlowStepsConfigAbility {
 		);
 
 		if ( ! empty( $validation_errors ) ) {
-			$response['validation_errors'] = $validation_errors;
+			return new \WP_Error(
+				'invalid_flow_step_configuration',
+				'Flow step configuration validation failed',
+				array(
+					'status'            => 400,
+					'validation_errors' => $validation_errors,
+					'pipeline_id'       => $pipeline_id,
+				)
+			);
 		}
 
 		if ( ! empty( $warnings ) ) {

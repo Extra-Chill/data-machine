@@ -74,35 +74,24 @@ class UpdatePipelineAbility {
 	 * @param array $input Input parameters.
 	 * @return array Result with update status.
 	 */
-	public function execute( array $input ): array {
+	public function execute( array $input ): array|\WP_Error {
 		$pipeline_id   = $input['pipeline_id'] ?? null;
 		$pipeline_name = $input['pipeline_name'] ?? null;
 		$agent_id      = $input['agent_id'] ?? null;
 
 		if ( ! is_numeric( $pipeline_id ) || (int) $pipeline_id <= 0 ) {
-			return array(
-				'success' => false,
-				'error'   => 'pipeline_id is required and must be a positive integer',
-			);
+			return new \WP_Error( 'invalid_pipeline_id', 'pipeline_id is required and must be a positive integer', array( 'status' => 400 ) );
 		}
 
 		$pipeline_id = (int) $pipeline_id;
 
 		if ( null === $pipeline_name && null === $agent_id ) {
-			return array(
-				'success' => false,
-				'error'   => 'Must provide pipeline_name or agent_id to update',
-			);
+			return new \WP_Error( 'invalid_pipeline_update', 'Must provide pipeline_name or agent_id to update', array( 'status' => 400 ) );
 		}
 
 		$pipeline = $this->db_pipelines->get_pipeline( $pipeline_id );
 		if ( ! $pipeline ) {
-			return array(
-				'success'    => false,
-				'error'      => 'Pipeline not found',
-				'error_code' => 'pipeline_not_found',
-				'status'     => 404,
-			);
+			return new \WP_Error( 'pipeline_not_found', 'Pipeline not found', array( 'status' => 404 ) );
 		}
 
 		$update_data = array();
@@ -110,10 +99,7 @@ class UpdatePipelineAbility {
 		if ( null !== $pipeline_name ) {
 			$pipeline_name = sanitize_text_field( wp_unslash( $pipeline_name ) );
 			if ( empty( trim( $pipeline_name ) ) ) {
-				return array(
-					'success' => false,
-					'error'   => 'Pipeline name cannot be empty',
-				);
+				return new \WP_Error( 'invalid_pipeline_name', 'Pipeline name cannot be empty', array( 'status' => 400 ) );
 			}
 			$update_data['pipeline_name'] = $pipeline_name;
 		}
@@ -128,10 +114,7 @@ class UpdatePipelineAbility {
 		);
 
 		if ( ! $success ) {
-			return array(
-				'success' => false,
-				'error'   => 'Failed to update pipeline',
-			);
+			return new \WP_Error( 'pipeline_update_failed', 'Failed to update pipeline', array( 'status' => 500 ) );
 		}
 
 		$updated_pipeline = $this->db_pipelines->get_pipeline( $pipeline_id );

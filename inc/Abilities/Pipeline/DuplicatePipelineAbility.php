@@ -76,14 +76,11 @@ class DuplicatePipelineAbility {
 	 * @param array $input Input parameters.
 	 * @return array Result with duplicated pipeline data.
 	 */
-	public function execute( array $input ): array {
+	public function execute( array $input ): array|\WP_Error {
 		$pipeline_id = $input['pipeline_id'] ?? null;
 
 		if ( ! is_numeric( $pipeline_id ) || (int) $pipeline_id <= 0 ) {
-			return array(
-				'success' => false,
-				'error'   => 'pipeline_id is required and must be a positive integer',
-			);
+			return new \WP_Error( 'invalid_pipeline_id', 'pipeline_id is required and must be a positive integer', array( 'status' => 400 ) );
 		}
 
 		$pipeline_id     = (int) $pipeline_id;
@@ -91,10 +88,7 @@ class DuplicatePipelineAbility {
 
 		if ( ! $source_pipeline ) {
 			do_action( 'datamachine_log', 'error', 'Source pipeline not found for duplication', array( 'pipeline_id' => $pipeline_id ) );
-			return array(
-				'success' => false,
-				'error'   => 'Source pipeline not found',
-			);
+			return new \WP_Error( 'pipeline_not_found', 'Source pipeline not found', array( 'status' => 404 ) );
 		}
 
 		$source_name = $source_pipeline['pipeline_name'];
@@ -120,10 +114,7 @@ class DuplicatePipelineAbility {
 		$new_pipeline_id = $this->db_pipelines->create_pipeline( $pipeline_data );
 
 		if ( ! $new_pipeline_id ) {
-			return array(
-				'success' => false,
-				'error'   => 'Failed to create new pipeline',
-			);
+			return new \WP_Error( 'pipeline_duplication_failed', 'Failed to create new pipeline', array( 'status' => 500 ) );
 		}
 
 		$source_config   = $source_pipeline['pipeline_config'] ?? array();
@@ -175,7 +166,7 @@ class DuplicatePipelineAbility {
 				$flow_result = $create_flow_ability->execute( $flow_input );
 			}
 
-			if ( $flow_result && $flow_result['success'] ) {
+			if ( is_array( $flow_result ) && ! empty( $flow_result['success'] ) ) {
 				++$flows_created;
 
 				$source_flow_config = $source_flow['flow_config'] ?? array();

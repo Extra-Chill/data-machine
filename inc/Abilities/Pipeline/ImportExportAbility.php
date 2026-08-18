@@ -116,24 +116,18 @@ class ImportExportAbility {
 	 * @param array $input Input parameters with CSV data.
 	 * @return array Result with import summary.
 	 */
-	public function executeImport( array $input ): array {
+	public function executeImport( array $input ): array|\WP_Error {
 		$data = $input['data'] ?? null;
 
 		if ( empty( $data ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'data is required',
-			);
+			return new \WP_Error( 'invalid_import_data', 'data is required', array( 'status' => 400 ) );
 		}
 
 		$import_export = new ImportExport();
 		$result        = $import_export->handle_import( 'pipelines', $data );
 
 		if ( false === $result ) {
-			return array(
-				'success' => false,
-				'error'   => 'Import failed',
-			);
+			return new \WP_Error( 'pipeline_import_failed', 'Import failed', array( 'status' => 500 ) );
 		}
 
 		$imported = $result['imported'] ?? array();

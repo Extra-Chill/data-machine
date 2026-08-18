@@ -23,6 +23,7 @@ use DataMachine\Cli\AgentResolver;
 use DataMachine\Cli\JsonInput;
 use DataMachine\Cli\UserResolver;
 use DataMachine\Cli\Commands\DrainCommand;
+use DataMachine\Core\AbilityResult;
 use DataMachine\Core\Database\Flows\FlowConfigEscaping;
 use DataMachine\Core\Steps\FlowStepConfig;
 use DataMachine\Engine\Debug\SyncRunner;
@@ -1092,7 +1093,7 @@ class FlowsCommand extends BaseCommand {
 		}
 
 		$ability = wp_get_ability( 'datamachine/create-flow' );
-		$result  = $ability->execute( $input );
+		$result  = AbilityResult::normalize( $ability->execute( $input ) );
 
 		if ( ! $result['success'] ) {
 			WP_CLI::error( $result['error'] ?? 'Failed to create flow' );
@@ -1253,7 +1254,7 @@ class FlowsCommand extends BaseCommand {
 		}
 
 		$ability = wp_get_ability( 'datamachine/delete-flow' );
-		$result  = $ability->execute( array( 'flow_id' => $flow_id ) );
+		$result  = AbilityResult::normalize( $ability->execute( array( 'flow_id' => $flow_id ) ) );
 
 		if ( ! $result['success'] ) {
 			WP_CLI::error( $result['error'] ?? 'Failed to delete flow' );
@@ -1439,12 +1440,12 @@ class FlowsCommand extends BaseCommand {
 				WP_CLI::log( sprintf( '[dry-run] would update user_message for step %s (%d chars); no changes written', $message_step, mb_strlen( $user_message ) ) );
 			} else {
 				$step_ability = new \DataMachine\Abilities\FlowStep\UpdateFlowStepAbility();
-				$step_result  = $step_ability->execute(
+				$step_result  = AbilityResult::normalize( $step_ability->execute(
 					array(
 						'flow_step_id' => $message_step,
 						'user_message' => $user_message,
 					)
-				);
+				) );
 
 				if ( ! $step_result['success'] ) {
 					WP_CLI::error( $step_result['error'] ?? 'Failed to update user_message' );
@@ -1497,7 +1498,7 @@ class FlowsCommand extends BaseCommand {
 				WP_CLI::log( sprintf( '[dry-run] would update handler_config for step %s: %s; no changes written', $handler_step, $updated_keys ) );
 			} else {
 				$step_ability = new \DataMachine\Abilities\FlowStep\UpdateFlowStepAbility();
-				$step_result  = $step_ability->execute( $step_input );
+				$step_result  = AbilityResult::normalize( $step_ability->execute( $step_input ) );
 
 				if ( ! $step_result['success'] ) {
 					WP_CLI::error( $step_result['error'] ?? 'Failed to update handler config' );
@@ -1947,7 +1948,7 @@ class FlowsCommand extends BaseCommand {
 			$input['add_handler_config'] = $handler_config;
 		}
 
-		$result = ( new \DataMachine\Abilities\FlowStep\UpdateFlowStepAbility() )->execute( $input );
+		$result = AbilityResult::normalize( ( new \DataMachine\Abilities\FlowStep\UpdateFlowStepAbility() )->execute( $input ) );
 
 		if ( ! $result['success'] ) {
 			WP_CLI::error( $result['error'] ?? 'Failed to add handler' );
@@ -1981,12 +1982,12 @@ class FlowsCommand extends BaseCommand {
 			$step_id = $resolved['step_id'];
 		}
 
-		$result = ( new \DataMachine\Abilities\FlowStep\UpdateFlowStepAbility() )->execute(
+		$result = AbilityResult::normalize( ( new \DataMachine\Abilities\FlowStep\UpdateFlowStepAbility() )->execute(
 			array(
 				'flow_step_id'   => $step_id,
 				'remove_handler' => $handler_slug,
 			)
-		);
+		) );
 
 		if ( ! $result['success'] ) {
 			WP_CLI::error( $result['error'] ?? 'Failed to remove handler' );
@@ -2244,7 +2245,7 @@ class FlowsCommand extends BaseCommand {
 		}
 
 		$ability = wp_get_ability( 'datamachine/pause-flow' );
-		$result  = $ability->execute( $input );
+		$result  = AbilityResult::normalize( $ability->execute( $input ) );
 
 		if ( ! $result['success'] ) {
 			WP_CLI::error( $result['error'] ?? 'Failed to pause flows' );
@@ -2284,7 +2285,7 @@ class FlowsCommand extends BaseCommand {
 		}
 
 		$ability = wp_get_ability( 'datamachine/resume-flow' );
-		$result  = $ability->execute( $input );
+		$result  = AbilityResult::normalize( $ability->execute( $input ) );
 
 		if ( ! $result['success'] ) {
 			WP_CLI::error( $result['error'] ?? 'Failed to resume flows' );

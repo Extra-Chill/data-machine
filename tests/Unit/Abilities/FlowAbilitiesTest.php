@@ -427,9 +427,8 @@ class FlowAbilitiesTest extends WP_UnitTestCase {
 			'flow_id' => 999999
 		]);
 
-		$this->assertFalse($result['success']);
-		$this->assertArrayHasKey('error', $result);
-		$this->assertStringContainsString('not found', $result['error']);
+		$this->assertWPError($result);
+		$this->assertStringContainsString('not found', $result->get_error_message());
 	}
 
 	public function test_delete_flow_with_zero_id_returns_error(): void {
@@ -437,9 +436,8 @@ class FlowAbilitiesTest extends WP_UnitTestCase {
 			'flow_id' => 0
 		]);
 
-		$this->assertFalse($result['success']);
-		$this->assertArrayHasKey('error', $result);
-		$this->assertStringContainsString('positive integer', $result['error']);
+		$this->assertWPError($result);
+		$this->assertStringContainsString('positive integer', $result->get_error_message());
 	}
 
 	public function test_create_flow_ability_registered(): void {
@@ -469,9 +467,9 @@ class FlowAbilitiesTest extends WP_UnitTestCase {
 			'flow_name' => 'Should Not Exist'
 		]);
 
-		$this->assertFalse($result['success']);
-		$this->assertArrayHasKey('error', $result);
-		$this->assertStringContainsString('not found', $result['error']);
+		$this->assertWPError($result);
+		$this->assertSame('pipeline_not_found', $result->get_error_code());
+		$this->assertSame(404, $result->get_error_data()['status']);
 	}
 
 	public function test_create_flow_defaults_name_to_flow(): void {
@@ -580,9 +578,8 @@ class FlowAbilitiesTest extends WP_UnitTestCase {
 			'source_flow_id' => 999999
 		]);
 
-		$this->assertFalse($result['success']);
-		$this->assertArrayHasKey('error', $result);
-		$this->assertStringContainsString('not found', $result['error']);
+		$this->assertWPError($result);
+		$this->assertStringContainsString('not found', $result->get_error_message());
 	}
 
 	public function test_duplicate_flow_with_invalid_target_pipeline_returns_error(): void {
@@ -591,8 +588,7 @@ class FlowAbilitiesTest extends WP_UnitTestCase {
 			'target_pipeline_id' => 999999
 		]);
 
-		$this->assertFalse($result['success']);
-		$this->assertArrayHasKey('error', $result);
-		$this->assertStringContainsString('not found', $result['error']);
+		$this->assertWPError($result);
+		$this->assertStringContainsString('not found', $result->get_error_message());
 	}
 }

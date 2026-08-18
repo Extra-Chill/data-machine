@@ -241,15 +241,20 @@ if ( ! class_exists( 'WP_Error' ) ) {
 	class WP_Error {
 		private string $code;
 		private string $message;
+		private array $data;
 		public function __construct( string $code = '', string $message = '', array $data = array() ) {
 			$this->code    = $code;
 			$this->message = $message;
+			$this->data    = $data;
 		}
 		public function get_error_message(): string {
 			return $this->message;
 		}
 		public function get_error_code(): string {
 			return $this->code;
+		}
+		public function get_error_data(): array {
+			return $this->data;
 		}
 	}
 }
@@ -416,7 +421,7 @@ $queued = wp_get_ability( 'datamachine/send-email-queued' );
 \DataMachine\Abilities\PermissionHelper::$user_id = 0;
 $GLOBALS['ec_scheduled'] = array();
 $res = $queued->execute( array( 'to' => 'user@example.com', 'subject' => 'No issuer', 'body' => 'body' ) );
-ec_assert( 'queued email rejects principal-less ambient execution', false === ( $res['success'] ?? true ) && 0 === count( $GLOBALS['ec_scheduled'] ) );
+ec_assert( 'queued email rejects principal-less ambient execution', is_wp_error( $res ) && 0 === count( $GLOBALS['ec_scheduled'] ) );
 \DataMachine\Abilities\PermissionHelper::$user_id = 1;
 
 $res = $queued->execute( array(
@@ -449,7 +454,7 @@ $res = $queued->execute( array(
 	'from_email' => 'spoof@example.com',
 	'reply_to'   => 'spoof@example.com',
 ) );
-ec_assert( 'tool-only queued spoof requires auth_ref', false === ( $res['success'] ?? true ) );
+ec_assert( 'tool-only queued spoof requires auth_ref', is_wp_error( $res ) );
 ec_assert( 'tool-only queued spoof is not scheduled', 0 === count( $GLOBALS['ec_scheduled'] ) );
 \DataMachine\Abilities\PermissionHelper::$manage  = true;
 \DataMachine\Abilities\PermissionHelper::$user_id = 1;
@@ -483,7 +488,7 @@ $res = $queued->execute( array(
 	'body'    => 'body',
 	'send_at' => 'not-a-date',
 ) );
-ec_assert( 'invalid send_at fails', false === ( $res['success'] ?? true ) );
+ec_assert( 'invalid send_at fails', is_wp_error( $res ) );
 
 /* ---------------------------------------------------------------------------
  * Case 9 — worker invokes underlying ability and re-enqueues on failure

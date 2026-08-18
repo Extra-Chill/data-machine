@@ -290,11 +290,7 @@ class ConfigureFlowSteps extends BaseTool {
 		$result = $ability->execute( $input );
 
 		if ( is_wp_error( $result ) ) {
-			return array(
-				'success'   => false,
-				'error'     => $result->get_error_message(),
-				'tool_name' => 'configure_flow_steps',
-			);
+			return $this->abilityErrorResult( $result );
 		}
 
 		$result['tool_name'] = 'configure_flow_steps';
@@ -460,11 +456,7 @@ class ConfigureFlowSteps extends BaseTool {
 		$result = $ability->execute( $input );
 
 		if ( is_wp_error( $result ) ) {
-			return array(
-				'success'   => false,
-				'error'     => $result->get_error_message(),
-				'tool_name' => 'configure_flow_steps',
-			);
+			return $this->abilityErrorResult( $result );
 		}
 
 		$result['tool_name'] = 'configure_flow_steps';
@@ -555,11 +547,7 @@ class ConfigureFlowSteps extends BaseTool {
 		$result = $ability->execute( $input );
 
 		if ( is_wp_error( $result ) ) {
-			return array(
-				'success'   => false,
-				'error'     => $result->get_error_message(),
-				'tool_name' => 'configure_flow_steps',
-			);
+			return $this->abilityErrorResult( $result );
 		}
 
 		$result['tool_name'] = 'configure_flow_steps';
@@ -629,7 +617,20 @@ class ConfigureFlowSteps extends BaseTool {
 			$input['flow_configs'] = $flow_configs;
 		}
 
-		$result              = $ability->execute( $input );
+		$result = $ability->execute( $input );
+		if ( is_wp_error( $result ) ) {
+			$data   = $result->get_error_data();
+			$result = array(
+				'success'           => false,
+				'valid'             => false,
+				'error'             => $result->get_error_message(),
+				'error_code'        => $result->get_error_code(),
+				'validation_errors' => is_array( $data ) ? ( $data['validation_errors'] ?? $data['errors'] ?? array() ) : array(),
+				'flow_count'        => is_array( $data ) ? (int) ( $data['flow_count'] ?? 0 ) : 0,
+				'matching_steps'    => is_array( $data ) ? (int) ( $data['matching_steps'] ?? 0 ) : 0,
+				'would_update'      => is_array( $data ) ? ( $data['would_update'] ?? array() ) : array(),
+			);
+		}
 		$result['tool_name'] = 'configure_flow_steps';
 		$result['mode']      = 'validate_only';
 
@@ -694,5 +695,18 @@ class ConfigureFlowSteps extends BaseTool {
 		}
 
 		return $result;
+	}
+
+	private function abilityErrorResult( \WP_Error $error ): array {
+		$data = $error->get_error_data();
+		return array_merge(
+			is_array( $data ) ? $data : array(),
+			array(
+				'success'    => false,
+				'error'      => $error->get_error_message(),
+				'error_code' => $error->get_error_code(),
+				'tool_name'  => 'configure_flow_steps',
+			)
+		);
 	}
 }

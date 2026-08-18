@@ -13,6 +13,7 @@ namespace DataMachine\Abilities\FlowStep;
 
 use DataMachine\Core\Steps\FlowStepConfig;
 use DataMachine\Core\Steps\FlowStepTargetResolver;
+use DataMachine\Core\AbilityResult;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -141,7 +142,11 @@ class ConfigureFlowStepsAbility {
 	 * @param array $input Input parameters.
 	 * @return array Result with configuration status.
 	 */
-	public function execute( array $input ): array {
+	public function execute( array $input ): array|\WP_Error {
+		return $this->callbackResult( $this->executeLegacy( $input ) );
+	}
+
+	private function executeLegacy( array $input ): array {
 		// Check for cross-pipeline mode
 		if ( ! empty( $input['updates'] ) && is_array( $input['updates'] ) ) {
 			return $this->executeCrossPipeline( $input );
@@ -479,6 +484,34 @@ class ConfigureFlowStepsAbility {
 		}
 
 		return $response;
+	}
+
+	/**
+	 * Convert a legacy configure failure at the registered callback boundary.
+	 *
+	 * @param mixed $result Legacy callback result.
+	 * @return array|\WP_Error
+	 */
+	private function callbackResult( $result ): array|\WP_Error {
+		$message = is_array( $result ) ? (string) ( $result['error'] ?? '' ) : '';
+		$code    = 'configure_flow_steps_failed';
+		if ( str_contains( $message, 'pipeline_id' ) ) {
+			$code = 'invalid_pipeline_id';
+		} elseif ( str_contains( $message, 'Pipeline not found' ) ) {
+			$code = 'pipeline_not_found';
+		} elseif ( str_contains( $message, 'handler' ) && str_contains( $message, 'not found' ) ) {
+			$code = 'handler_not_found';
+		}
+		$error = AbilityResult::legacy_failure_to_wp_error( $result, $code, 'Flow step configuration failed.' );
+		if ( ! $error ) {
+			return $result;
+		}
+
+		$data = is_array( $result ) ? $result : array();
+		unset( $data['success'] );
+		$operational_failure = str_starts_with( $message, 'No steps were updated' ) || str_starts_with( $message, 'Failed to' );
+		$data['status']      = ( 'pipeline_not_found' === $code || 'handler_not_found' === $code || 'not_found' === ( $result['error_type'] ?? '' ) ) ? 404 : ( $operational_failure ? 500 : 400 );
+		return new \WP_Error( $error->get_error_code(), $error->get_error_message(), $data );
 	}
 
 	/**
