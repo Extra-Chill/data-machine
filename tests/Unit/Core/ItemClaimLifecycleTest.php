@@ -48,6 +48,8 @@ class ItemClaimLifecycleTest extends WP_UnitTestCase {
 		$this->processed = new ProcessedItems();
 		$this->tracked   = new TrackedItems();
 		$this->jobs      = new Jobs();
+		Jobs::create_table();
+		BatchItems::create_table();
 		$this->processed->create_table();
 		$this->tracked->create_table();
 		$this->tracked_handler_filter = static fn( array $handlers ): array => TrackedItems::registerClaimCompletionHandler( $handlers );
@@ -470,9 +472,9 @@ class ItemClaimLifecycleTest extends WP_UnitTestCase {
 	}
 
 	public function test_gated_inline_continuation_completes_every_claim(): void {
-		$first  = $this->claim( 'inline-success-a', 211, 'revision-a' );
-		$second = $this->claim( 'inline-success-b', 211, 'revision-b' );
 		$job_id = $this->createJobWithClaim( array(), true );
+		$first  = $this->claim( 'inline-success-a', $job_id, 'revision-a' );
+		$second = $this->claim( 'inline-success-b', $job_id, 'revision-b' );
 
 		StepLifecycleHandler::handleInlineContinuation(
 			$job_id,
@@ -488,9 +490,9 @@ class ItemClaimLifecycleTest extends WP_UnitTestCase {
 	}
 
 	public function test_gated_inline_continuation_failure_releases_every_claim(): void {
-		$first  = $this->claim( 'inline-failure-a', 212, 'revision-a' );
-		$second = $this->claim( 'inline-failure-b', 212, 'revision-b' );
 		$job_id = $this->createJobWithClaim( array(), true );
+		$first  = $this->claim( 'inline-failure-a', $job_id, 'revision-a' );
+		$second = $this->claim( 'inline-failure-b', $job_id, 'revision-b' );
 
 		StepLifecycleHandler::handleInlineContinuation(
 			$job_id,
@@ -504,8 +506,9 @@ class ItemClaimLifecycleTest extends WP_UnitTestCase {
 	}
 
 	public function test_successful_terminal_completion_persists_tracked_revision(): void {
-		$claim  = $this->claim( 'success-id', 301, 'success-revision' );
-		$job_id = $this->createJobWithClaim( $claim, true );
+		$job_id = $this->createJobWithClaim( array(), true );
+		$claim  = $this->claim( 'success-id', $job_id, 'success-revision' );
+		datamachine_set_engine_data( $job_id, array( ProcessedItems::CLAIM_METADATA_KEY => $claim ) );
 
 		$this->assertTrue( $this->jobs->complete_job( $job_id, JobStatus::COMPLETED ) );
 		$this->assertSame( 'success-revision', $this->tracked->get( self::NAMESPACE, 'success-id' )['source_revision'] );
@@ -514,8 +517,9 @@ class ItemClaimLifecycleTest extends WP_UnitTestCase {
 	}
 
 	public function test_ordinary_terminal_failure_releases_claim(): void {
-		$claim  = $this->claim( 'retry-id', 401, 'retry-revision' );
-		$job_id = $this->createJobWithClaim( $claim, true );
+		$job_id = $this->createJobWithClaim( array(), true );
+		$claim  = $this->claim( 'retry-id', $job_id, 'retry-revision' );
+		datamachine_set_engine_data( $job_id, array( ProcessedItems::CLAIM_METADATA_KEY => $claim ) );
 
 		$this->assertTrue( $this->jobs->complete_job( $job_id, JobStatus::failed( 'retry-exhausted' )->toString() ) );
 		$this->assertFalse( $this->processed->has_active_claim( self::SCOPE, self::SOURCE, 'retry-id' ) );
@@ -523,8 +527,9 @@ class ItemClaimLifecycleTest extends WP_UnitTestCase {
 	}
 
 	public function test_retry_exhaustion_releases_claim(): void {
-		$claim  = $this->claim( 'exhausted-id', 402, 'exhausted-revision' );
-		$job_id = $this->createJobWithClaim( $claim, true );
+		$job_id = $this->createJobWithClaim( array(), true );
+		$claim  = $this->claim( 'exhausted-id', $job_id, 'exhausted-revision' );
+		datamachine_set_engine_data( $job_id, array( ProcessedItems::CLAIM_METADATA_KEY => $claim ) );
 		$retryable = static fn() => true;
 		$policy    = static function ( array $resolved ): array {
 			$resolved['max_attempts'] = 1;
@@ -545,8 +550,9 @@ class ItemClaimLifecycleTest extends WP_UnitTestCase {
 	}
 
 	public function test_manual_fail_releases_claim(): void {
-		$claim  = $this->claim( 'manual-id', 501, 'manual-revision' );
-		$job_id = $this->createJobWithClaim( $claim );
+		$job_id = $this->createJobWithClaim( array() );
+		$claim  = $this->claim( 'manual-id', $job_id, 'manual-revision' );
+		datamachine_set_engine_data( $job_id, array( ProcessedItems::CLAIM_METADATA_KEY => $claim ) );
 
 		$result = ( new FailJobAbility() )->execute( array( 'job_id' => $job_id, 'reason' => 'manual test' ) );
 
@@ -555,8 +561,9 @@ class ItemClaimLifecycleTest extends WP_UnitTestCase {
 	}
 
 	public function test_stale_recovery_releases_claim(): void {
-		$claim  = $this->claim( 'stale-id', 601, 'stale-revision' );
-		$job_id = $this->createJobWithClaim( $claim, true );
+		$job_id = $this->createJobWithClaim( array(), true );
+		$claim  = $this->claim( 'stale-id', $job_id, 'stale-revision' );
+		datamachine_set_engine_data( $job_id, array( ProcessedItems::CLAIM_METADATA_KEY => $claim ) );
 		datamachine_merge_engine_data( $job_id, array( 'job_status' => JobStatus::failed( 'stale' )->toString() ) );
 
 		$result = ( new RecoverStuckJobsAbility() )->execute(
@@ -571,8 +578,8 @@ class ItemClaimLifecycleTest extends WP_UnitTestCase {
 	}
 
 	public function test_initial_batch_scheduling_failure_releases_all_claims(): void {
-		$claim                         = $this->claim( 'schedule-id', 701, 'schedule-revision' );
 		$parent_id                     = $this->createJobWithClaim( array(), true );
+		$claim                         = $this->claim( 'schedule-id', $parent_id, 'schedule-revision' );
 		$this->schedule_failure_filter = static fn() => 0;
 		add_filter( 'pre_as_schedule_single_action', $this->schedule_failure_filter );
 
@@ -583,8 +590,8 @@ class ItemClaimLifecycleTest extends WP_UnitTestCase {
 	}
 
 	public function test_child_creation_failure_preserves_item_claim_for_retry(): void {
-		$claim     = $this->claim( 'child-id', 801, 'child-revision' );
 		$parent_id = $this->createJobWithClaim( array(), true );
+		$claim     = $this->claim( 'child-id', $parent_id, 'child-revision' );
 		BatchScheduler::start( $parent_id, 'test_batch_hook', array( $this->packet( $claim ) ), array(), 'pipeline' );
 		$this->unscheduleTestBatch( $parent_id );
 
@@ -595,8 +602,8 @@ class ItemClaimLifecycleTest extends WP_UnitTestCase {
 	}
 
 	public function test_batch_cancellation_releases_unscheduled_claims(): void {
-		$claim     = $this->claim( 'cancel-id', 901, 'cancel-revision' );
 		$parent_id = $this->createJobWithClaim( array(), true );
+		$claim     = $this->claim( 'cancel-id', $parent_id, 'cancel-revision' );
 		BatchScheduler::start( $parent_id, 'test_batch_hook', array( $this->packet( $claim ) ), array(), 'pipeline' );
 		$this->unscheduleTestBatch( $parent_id );
 
@@ -605,11 +612,11 @@ class ItemClaimLifecycleTest extends WP_UnitTestCase {
 	}
 
 	public function test_batch_cancellation_during_active_chunk_preserves_created_child_claim(): void {
-		$first     = $this->claim( 'cancel-race-a', 9011, 'revision-a' );
-		$second    = $this->claim( 'cancel-race-b', 9011, 'revision-b' );
-		$third     = $this->claim( 'cancel-race-c', 9011, 'revision-c' );
-		$fourth    = $this->claim( 'cancel-race-d', 9011, 'revision-d' );
 		$parent_id = $this->createJobWithClaim( array(), true );
+		$first     = $this->claim( 'cancel-race-a', $parent_id, 'revision-a' );
+		$second    = $this->claim( 'cancel-race-b', $parent_id, 'revision-b' );
+		$third     = $this->claim( 'cancel-race-c', $parent_id, 'revision-c' );
+		$fourth    = $this->claim( 'cancel-race-d', $parent_id, 'revision-d' );
 		$this->chunk_size_filter = static fn() => 2;
 		add_filter( 'datamachine_batch_chunk_size', $this->chunk_size_filter );
 		BatchScheduler::start(
@@ -642,8 +649,8 @@ class ItemClaimLifecycleTest extends WP_UnitTestCase {
 	}
 
 	public function test_batch_cancellation_preserves_ambiguous_active_claim_for_expiry_or_child_completion(): void {
-		$claim      = $this->claim( 'cancel-active', 9012, 'active-revision' );
 		$parent_id  = $this->createJobWithClaim( array(), true );
+		$claim      = $this->claim( 'cancel-active', $parent_id, 'active-revision' );
 		$repository = new BatchItems();
 		BatchScheduler::start( $parent_id, 'test_batch_hook', array( $this->packet( $claim ) ), array(), 'pipeline' );
 		$this->unscheduleTestBatch( $parent_id );
@@ -663,9 +670,9 @@ class ItemClaimLifecycleTest extends WP_UnitTestCase {
 	}
 
 	public function test_later_chunk_scheduling_failure_releases_remaining_claims(): void {
-		$first     = $this->claim( 'later-a', 902, 'revision-a' );
-		$second    = $this->claim( 'later-b', 902, 'revision-b' );
 		$parent_id = $this->createJobWithClaim( array(), true );
+		$first     = $this->claim( 'later-a', $parent_id, 'revision-a' );
+		$second    = $this->claim( 'later-b', $parent_id, 'revision-b' );
 		$calls     = 0;
 		$this->chunk_size_filter       = static fn() => 1;
 		$this->schedule_failure_filter = static function ( $pre ) use ( &$calls ) {
@@ -686,8 +693,8 @@ class ItemClaimLifecycleTest extends WP_UnitTestCase {
 	}
 
 	public function test_content_addressed_hydration_failure_releases_sidecar_claim(): void {
-		$claim     = $this->claim( 'hydrate-id', 903, 'hydrate-revision' );
 		$parent_id = $this->createJobWithClaim( array(), true );
+		$claim     = $this->claim( 'hydrate-id', $parent_id, 'hydrate-revision' );
 		$item      = array( 'data_packets' => array( $this->packet( $claim ) ) );
 		BatchScheduler::start( $parent_id, 'test_batch_hook', array( $item ), array(), 'task' );
 		$this->unscheduleTestBatch( $parent_id );
@@ -875,6 +882,9 @@ class ItemClaimLifecycleTest extends WP_UnitTestCase {
 	}
 
 	public function test_mysql_reconciliation_lock_order_serializes_job_then_claim_rows(): void {
+		if ( \DataMachine\Core\Database\BaseRepository::is_sqlite() ) {
+			$this->markTestSkipped( 'MySQL lock ordering requires a second MySQL session.' );
+		}
 		if ( ! class_exists( '\mysqli' ) || ! defined( 'MYSQLI_ASYNC' ) ) {
 			$this->markTestSkipped( 'MySQLi async support is unavailable.' );
 		}
@@ -931,8 +941,8 @@ class ItemClaimLifecycleTest extends WP_UnitTestCase {
 	}
 
 	public function test_corrupt_batch_payload_is_discarded_without_callback(): void {
-		$claim     = $this->claim( 'corrupt-id', 904, 'corrupt-revision' );
 		$parent_id = $this->createJobWithClaim( array(), true );
+		$claim     = $this->claim( 'corrupt-id', $parent_id, 'corrupt-revision' );
 		BatchScheduler::start( $parent_id, 'test_batch_hook', array( $this->packet( $claim ) ), array(), 'pipeline' );
 		$this->unscheduleTestBatch( $parent_id );
 
@@ -1042,8 +1052,8 @@ class ItemClaimLifecycleTest extends WP_UnitTestCase {
 	}
 
 	public function test_malformed_content_addressed_ref_releases_sidecar_claim(): void {
-		$claim     = $this->claim( 'malformed-ref', 904, 'malformed-revision' );
 		$parent_id = $this->createJobWithClaim( array(), true );
+		$claim     = $this->claim( 'malformed-ref', $parent_id, 'malformed-revision' );
 		$item      = array( 'data_packets' => array( $this->packet( $claim ) ) );
 		BatchScheduler::start( $parent_id, 'test_batch_hook', array( $item ), array(), 'task' );
 		$this->unscheduleTestBatch( $parent_id );
