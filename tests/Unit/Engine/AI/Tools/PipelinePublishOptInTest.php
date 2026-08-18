@@ -29,10 +29,13 @@ class PipelinePublishOptInTest extends WP_UnitTestCase {
 	public function set_up(): void {
 		parent::set_up();
 
-		datamachine_register_capabilities();
+		datamachine_test_prepare_site();
 		$registry = \WP_Abilities_Registry::get_instance();
+		if ( $registry->is_registered( 'datamachine/test-publish' ) ) {
+			$registry->unregister( 'datamachine/test-publish' );
+		}
 		if ( ! $registry->is_registered( 'datamachine/test-publish' ) ) {
-			wp_register_ability(
+			$registry->register(
 				'datamachine/test-publish',
 				array(
 					'label'               => 'Test Publish',

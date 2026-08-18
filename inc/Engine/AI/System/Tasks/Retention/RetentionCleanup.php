@@ -593,21 +593,39 @@ class RetentionCleanup {
 			}
 			++$iterations;
 
-			// Bound each UPDATE by selecting a batch of eligible ids and
-			// updating by primary key — reliable and index-fast, never a
-			// single unbounded UPDATE across the whole table.
+			// Select first so MySQL never has to update through a self-subquery.
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-			$affected = $wpdb->query(
+			$job_ids = $wpdb->get_col(
 				$wpdb->prepare(
-					"UPDATE %i SET engine_data = NULL WHERE job_id IN ( SELECT job_id FROM ( SELECT job_id FROM %i WHERE completed_at IS NOT NULL AND completed_at < %s AND engine_data IS NOT NULL AND engine_data != '' LIMIT %d ) AS tmp )",
-					$table,
+					"SELECT job_id FROM %i WHERE completed_at IS NOT NULL AND completed_at < %s AND engine_data IS NOT NULL AND engine_data != '' ORDER BY job_id ASC LIMIT %d",
 					$table,
 					$cutoff,
 					$batch_size
 				)
 			);
+			$job_ids = array_map( 'intval', $job_ids );
+			if ( empty( $job_ids ) ) {
+				$affected = 0;
+				break;
+			}
 
-			$affected = false !== $affected ? (int) $affected : 0;
+			$placeholders = implode( ', ', array_fill( 0, count( $job_ids ), '%d' ) );
+			$query        = "UPDATE %i SET engine_data = NULL WHERE job_id IN ({$placeholders})";
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Placeholders are generated above.
+			$affected = $wpdb->query( $wpdb->prepare( $query, array_merge( array( $table ), $job_ids ) ) );
+			if ( false === $affected ) {
+				self::log(
+					'Scheduled cleanup failed to shed engine_data',
+					array( 'database_error' => $wpdb->last_error )
+				);
+				$affected = 0;
+				break;
+			}
+			foreach ( $job_ids as $job_id ) {
+				wp_cache_delete( $job_id, 'datamachine_engine_data' );
+			}
+
+			$affected = (int) $affected;
 			$updated += $affected;
 		} while ( $affected > 0 );
 

@@ -39,7 +39,7 @@ class DirectJobOwnershipTest extends WP_UnitTestCase {
 	public function set_up(): void {
 		parent::set_up();
 
-		datamachine_register_capabilities();
+		datamachine_test_prepare_site();
 		$this->owner_id      = self::factory()->user->create( array( 'role' => 'subscriber' ) );
 		$this->other_user_id = self::factory()->user->create( array( 'role' => 'subscriber' ) );
 		$this->admin_id      = self::factory()->user->create( array( 'role' => 'administrator' ) );

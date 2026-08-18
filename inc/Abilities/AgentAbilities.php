@@ -1303,10 +1303,10 @@ class AgentAbilities {
 	}
 
 	/**
-	 * Read persisted active agent slug for a user, validating it still exists.
+	 * Read the persisted active agent slug for a user.
 	 *
-	 * If the stored slug no longer resolves to a real agent row, the stale meta
-	 * entry is deleted and an empty string is returned.
+	 * Existence and access are validated by resolve_active_agent_for_user(),
+	 * which also clears stale metadata while retaining its diagnostic source.
 	 *
 	 * @param int $user_id User ID.
 	 * @return string
@@ -1315,12 +1315,6 @@ class AgentAbilities {
 		$stored = get_user_meta( $user_id, self::ACTIVE_AGENT_META_KEY, true );
 		$slug   = is_string( $stored ) ? sanitize_title( $stored ) : '';
 		if ( '' === $slug ) {
-			return '';
-		}
-
-		$agents_repo = new Agents();
-		if ( ! $agents_repo->get_by_slug( $slug ) ) {
-			self::clear_active_agent_slug_for_user( $user_id );
 			return '';
 		}
 

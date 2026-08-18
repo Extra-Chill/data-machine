@@ -16,6 +16,7 @@ namespace DataMachine\Tests\Unit\Abilities;
 
 use DataMachine\Abilities\AgentAbilities;
 use DataMachine\Core\Database\Agents\AgentAccess;
+use DataMachine\Core\Database\Agents\Agents;
 use DataMachine\Core\Identity\AgentIdentityStoreAdapter;
 use WP_UnitTestCase;
 
@@ -35,6 +36,10 @@ class AgentPruneResurrectionTest extends WP_UnitTestCase {
 
 	public function set_up(): void {
 		parent::set_up();
+		datamachine_test_prepare_site();
+		if ( class_exists( 'WP_Agents_Registry' ) && method_exists( 'WP_Agents_Registry', 'reset_for_tests' ) ) {
+			\WP_Agents_Registry::reset_for_tests();
+		}
 
 		$this->admin_id = self::factory()->user->create( array( 'role' => 'administrator' ) );
 		$this->owner_id = self::factory()->user->create( array( 'role' => 'author' ) );
@@ -94,27 +99,15 @@ class AgentPruneResurrectionTest extends WP_UnitTestCase {
 
 	public function test_pruneAgents_clears_owner_active_agent_meta(): void {
 		$agent_slug = 'prune-me-' . wp_generate_uuid4();
-		$created = AgentAbilities::createAgent(
-			array(
-				'agent_slug' => $agent_slug,
-				'owner_id'   => $this->owner_id,
-			)
-		);
-		$this->assertTrue( $created['success'] );
+		$agent_id   = ( new Agents() )->create_if_missing( $agent_slug, 'Prune Me', $this->owner_id, array() );
+		$this->assertIsInt( $agent_id );
+		update_user_meta( $this->owner_id, self::ACTIVE_AGENT_META_KEY, $agent_slug );
 
-		AgentAbilities::setActiveAgent(
-			array(
-				'user_id' => $this->owner_id,
-				'agent'   => $created['agent_slug'],
-			)
-		);
-
-		// No references => prune candidate.
 		$pruned = AgentAbilities::pruneAgents( array( 'dry_run' => false ) );
 		$this->assertTrue( $pruned['success'] );
 
 		$deleted_ids = array_column( $pruned['deleted'], 'agent_id' );
-		$this->assertContains( $created['agent_id'], $deleted_ids );
+		$this->assertContains( $agent_id, $deleted_ids );
 
 		// The owner's active-agent pointer must have been deleted network-wide.
 		$this->assertSame( '', get_user_meta( $this->owner_id, self::ACTIVE_AGENT_META_KEY, true ) );

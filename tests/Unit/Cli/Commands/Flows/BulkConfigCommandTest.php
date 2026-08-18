@@ -55,6 +55,7 @@ class BulkConfigCommandTest extends WP_UnitTestCase {
 
 	public function set_up(): void {
 		parent::set_up();
+		datamachine_test_prepare_site();
 
 		$this->pipelines = new Pipelines();
 		$this->flows     = new Flows();
@@ -130,6 +131,11 @@ class BulkConfigCommandTest extends WP_UnitTestCase {
 				),
 			),
 		) );
+	}
+
+	public function tear_down(): void {
+		wp_set_current_user( 0 );
+		parent::tear_down();
 	}
 
 	public function test_bulk_config_command_class_exists(): void {

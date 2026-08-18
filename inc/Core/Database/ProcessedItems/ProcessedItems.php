@@ -13,6 +13,7 @@
 namespace DataMachine\Core\Database\ProcessedItems;
 
 use DataMachine\Core\Database\BaseRepository;
+use DataMachine\Core\Database\TransactionScope;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit; // Exit if accessed directly.
@@ -523,8 +524,8 @@ class ProcessedItems extends BaseRepository {
 		// Insert-or-lock avoids duplicate-key errors under contention. The no-op
 		// duplicate update acquires the existing row lock on both MySQL and MariaDB;
 		// the locked read below then decides whether this generation may take over.
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-		if ( false === $this->wpdb->query( 'START TRANSACTION' ) ) {
+		$scope = TransactionScope::begin( $this->wpdb );
+		if ( null === $scope ) {
 			return false;
 		}
 
@@ -548,7 +549,7 @@ class ProcessedItems extends BaseRepository {
 		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
 		if ( false === $upserted ) {
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-			$this->wpdb->query( 'ROLLBACK' );
+			$scope->rollback();
 			return false;
 		}
 
@@ -568,7 +569,7 @@ class ProcessedItems extends BaseRepository {
 		if ( ! is_array( $row ) ) {
 			// A different full identifier may share the 191-character unique-key prefix.
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-			$this->wpdb->query( 'ROLLBACK' );
+			$scope->rollback();
 			return false;
 		}
 
@@ -581,7 +582,7 @@ class ProcessedItems extends BaseRepository {
 
 		if ( ! $inserted && ! $available ) {
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-			$this->wpdb->query( 'ROLLBACK' );
+			$scope->rollback();
 			return false;
 		}
 
@@ -601,13 +602,13 @@ class ProcessedItems extends BaseRepository {
 			);
 			if ( false === $updated || 1 > $updated ) {
 				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-				$this->wpdb->query( 'ROLLBACK' );
+				$scope->rollback();
 				return false;
 			}
 		}
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-		return false !== $this->wpdb->query( 'COMMIT' ) ? $claim_token : false;
+		return $scope->commit() ? $claim_token : false;
 	}
 
 	/** Validate that one persisted descriptor is still actively owned by a job. */
@@ -751,9 +752,8 @@ class ProcessedItems extends BaseRepository {
 			return false;
 		}
 
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-		$transaction_started = $this->wpdb->query( 'START TRANSACTION' );
-		if ( false === $transaction_started ) {
+		$scope = TransactionScope::begin( $this->wpdb );
+		if ( null === $scope ) {
 			return false;
 		}
 		$completed = $this->complete_owned_claim_in_transaction(
@@ -767,15 +767,15 @@ class ProcessedItems extends BaseRepository {
 		);
 		if ( ! $completed ) {
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-			$this->wpdb->query( 'ROLLBACK' );
+			$scope->rollback();
 			return false;
 		}
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-		$committed = false !== $this->wpdb->query( 'COMMIT' );
+		$committed = $scope->commit();
 		if ( ! $committed ) {
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-			$this->wpdb->query( 'ROLLBACK' );
+			$scope->rollback();
 		}
 		return $committed;
 	}

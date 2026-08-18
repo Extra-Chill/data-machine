@@ -8,6 +8,7 @@
 
 namespace DataMachine\Core\Database\Jobs;
 
+use DataMachine\Core\Database\TransactionScope;
 use DataMachine\Core\RunLifecycleStore;
 
 defined( 'ABSPATH' ) || exit;
@@ -29,7 +30,8 @@ class LegacyAIConcurrencyReconciler {
 			'source_status' => self::SOURCE_STATUS,
 			'target_status' => self::TARGET_STATUS,
 		);
-		if ( $job_id <= 0 || false === $wpdb->query( 'START TRANSACTION' ) ) {
+		$scope = TransactionScope::begin( $wpdb );
+		if ( $job_id <= 0 || null === $scope ) {
 			return $this->result( false, false, null, self::TARGET_STATUS, $audit );
 		}
 
@@ -38,7 +40,7 @@ class LegacyAIConcurrencyReconciler {
 		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Query is fully prepared above, including the table identifier.
 		$job = $wpdb->get_row( $query, ARRAY_A );
 		if ( ! is_array( $job ) ) {
-			$wpdb->query( 'ROLLBACK' );
+			$scope->rollback();
 			return $this->result( false, false, null, self::TARGET_STATUS, $audit );
 		}
 
@@ -46,12 +48,12 @@ class LegacyAIConcurrencyReconciler {
 		$engine_data    = json_decode( (string) ( $job['engine_data'] ?? '' ), true );
 		$engine_data    = is_array( $engine_data ) ? $engine_data : array();
 		if ( self::TARGET_STATUS === $current_status ) {
-			$wpdb->query( 'ROLLBACK' );
+			$scope->rollback();
 			$existing_audit = is_array( $engine_data['status_reconciliation'] ?? null ) ? $engine_data['status_reconciliation'] : $audit;
 			return $this->result( true, false, $current_status, $current_status, $existing_audit );
 		}
 		if ( self::SOURCE_STATUS !== $current_status ) {
-			$wpdb->query( 'ROLLBACK' );
+			$scope->rollback();
 			return $this->result( false, false, $current_status, $current_status, $audit );
 		}
 
@@ -85,8 +87,8 @@ class LegacyAIConcurrencyReconciler {
 			array( '%s', '%s' ),
 			array( '%d', '%s' )
 		);
-		if ( 1 !== $updated || false === $wpdb->query( 'COMMIT' ) ) {
-			$wpdb->query( 'ROLLBACK' );
+		if ( 1 !== $updated || ! $scope->commit() ) {
+			$scope->rollback();
 			wp_cache_delete( $job_id, 'datamachine_engine_data' );
 			$winner        = ( new Jobs() )->get_job( $job_id );
 			$winner_status = is_array( $winner ) && is_string( $winner['status'] ?? null ) ? $winner['status'] : $current_status;

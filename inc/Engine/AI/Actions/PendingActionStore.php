@@ -49,7 +49,7 @@ class PendingActionStore {
 	/**
 	 * Database table name without WordPress prefix.
 	 */
-	private const TABLE_NAME = 'datamachine_pending_actions';
+	public const TABLE_NAME = 'datamachine_pending_actions';
 
 	/**
 	 * Default TTL for unattended exception queues.

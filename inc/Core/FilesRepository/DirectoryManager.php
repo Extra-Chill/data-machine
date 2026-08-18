@@ -28,7 +28,8 @@ class DirectoryManager {
 	 *
 	 * @var bool
 	 */
-	private static bool $agent_files_ensured = false;
+	private static bool $agent_files_ensured     = false;
+	private static ?int $default_agent_user_id   = null;
 
 	/**
 	 * Ensure default memory files exist across layers (SOUL.md + MEMORY.md in agent, USER.md in user).
@@ -64,6 +65,11 @@ class DirectoryManager {
 	 */
 	public static function reset_ensure_flag(): void {
 		self::$agent_files_ensured = false;
+	}
+
+	/** Reset the request-local default owner lookup. */
+	public static function reset_default_agent_user_id_cache(): void {
+		self::$default_agent_user_id = null;
 	}
 
 	/**
@@ -407,10 +413,8 @@ class DirectoryManager {
 			return absint( DATAMACHINE_DEFAULT_AGENT_USER );
 		}
 
-		// Cache in a static to avoid repeated DB queries.
-		static $default_id = null;
-		if ( null !== $default_id ) {
-			return $default_id;
+		if ( null !== self::$default_agent_user_id ) {
+			return self::$default_agent_user_id;
 		}
 		// Activation can run before the users table exists in WP-PHPUnit/Playground bootstraps.
 		try {
@@ -425,8 +429,8 @@ class DirectoryManager {
 			$admins = array();
 		}
 
-		$default_id = ! empty( $admins ) ? absint( $admins[0] ) : 1;
-		return $default_id;
+		self::$default_agent_user_id = ! empty( $admins ) ? absint( $admins[0] ) : 1;
+		return self::$default_agent_user_id;
 	}
 
 

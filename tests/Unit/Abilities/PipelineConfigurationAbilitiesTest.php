@@ -20,6 +20,7 @@ class PipelineConfigurationAbilitiesTest extends WP_UnitTestCase {
 
 	public function set_up(): void {
 		parent::set_up();
+		datamachine_test_prepare_site();
 
 		wp_set_current_user( self::factory()->user->create( array( 'role' => 'administrator' ) ) );
 		$this->abilities = new PipelineConfigurationAbilities();
@@ -44,6 +45,11 @@ class PipelineConfigurationAbilitiesTest extends WP_UnitTestCase {
 			)
 		);
 		$this->flow_id = (int) $flow['flow_id'];
+	}
+
+	public function tear_down(): void {
+		wp_set_current_user( 0 );
+		parent::tear_down();
 	}
 
 	public function test_contract_abilities_are_registered_with_strict_schemas(): void {

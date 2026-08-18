@@ -24,6 +24,8 @@ class DrainJobAbilityTest extends WP_UnitTestCase
     {
         parent::set_up();
 
+        datamachine_test_prepare_site();
+
         datamachine_register_capabilities();
 
         $user_id = self::factory()->user->create(array('role' => 'administrator'));
@@ -46,6 +48,10 @@ class DrainJobAbilityTest extends WP_UnitTestCase
     public function tear_down(): void
     {
         remove_filter('datamachine_handlers', $this->handler_filter, 10);
+        if (function_exists('as_unschedule_all_actions')) {
+            as_unschedule_all_actions('datamachine_run_flow_now');
+            as_unschedule_all_actions('datamachine_execute_step');
+        }
         wp_set_current_user(0);
 
         parent::tear_down();

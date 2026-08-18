@@ -31,6 +31,7 @@ class ImageGenerationPromptRefinementTest extends WP_UnitTestCase {
 		delete_option( 'datamachine_settings' );
 		PluginSettings::clearCache();
 		WpAiClientTestDouble::reset();
+		wp_set_current_user( 0 );
 		parent::tear_down();
 	}
 

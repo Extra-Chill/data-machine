@@ -7,6 +7,7 @@
 
 namespace DataMachine\Core\Database\Jobs;
 
+use DataMachine\Core\Database\TransactionScope;
 // phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- Explicit operator migration reads and updates the plugin-owned jobs table in bounded batches.
 
 use DataMachine\Core\JobStatus;
@@ -165,7 +166,8 @@ class JobStatusMigration {
 	}
 
 	private function normalizeRow( int $job_id, string $expected_status ): string {
-		if ( false === $this->wpdb->query( 'START TRANSACTION' ) ) {
+		$scope = TransactionScope::begin( $this->wpdb );
+		if ( null === $scope ) {
 			return 'error';
 		}
 
@@ -173,20 +175,20 @@ class JobStatusMigration {
 		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- The query is prepared immediately above with typed identifier and integer placeholders.
 		$row = $this->wpdb->get_row( $query, ARRAY_A );
 		if ( ! is_array( $row ) || (string) $row['status'] !== $expected_status ) {
-			$this->wpdb->query( 'ROLLBACK' );
+			$scope->rollback();
 			return 'conflict';
 		}
 
 		$parsed = JobStatus::fromString( $expected_status );
 		if ( ! $parsed->isCanonical() ) {
-			$this->wpdb->query( 'ROLLBACK' );
+			$scope->rollback();
 			return 'conflict';
 		}
 
 		$stored_engine = $row['engine_data'] ?? null;
 		$engine        = null === $stored_engine || '' === $stored_engine ? array() : json_decode( (string) $stored_engine, true );
 		if ( ! is_array( $engine ) ) {
-			$this->wpdb->query( 'ROLLBACK' );
+			$scope->rollback();
 			return 'error';
 		}
 		if ( $parsed->hasReason() ) {
@@ -194,7 +196,7 @@ class JobStatusMigration {
 		}
 		$encoded = wp_json_encode( $engine );
 		if ( ! is_string( $encoded ) ) {
-			$this->wpdb->query( 'ROLLBACK' );
+			$scope->rollback();
 			return 'error';
 		}
 		$updated = $this->wpdb->update(
@@ -210,8 +212,8 @@ class JobStatusMigration {
 			array( '%s', '%s' ),
 			array( '%d', '%s' )
 		);
-		if ( 1 !== (int) $updated || false === $this->wpdb->query( 'COMMIT' ) ) {
-			$this->wpdb->query( 'ROLLBACK' );
+		if ( 1 !== (int) $updated || ! $scope->commit() ) {
+			$scope->rollback();
 			return false === $updated ? 'error' : 'conflict';
 		}
 		wp_cache_delete( $job_id, 'datamachine_engine_data' );

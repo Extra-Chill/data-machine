@@ -20,6 +20,7 @@ class SchedulingDelegationTest extends WP_UnitTestCase {
 
 	public function set_up(): void {
 		parent::set_up();
+		datamachine_test_prepare_site();
 
 		$user_id = self::factory()->user->create( array( 'role' => 'administrator' ) );
 		wp_set_current_user( $user_id );
@@ -30,6 +31,11 @@ class SchedulingDelegationTest extends WP_UnitTestCase {
 				'pipeline_config' => array(),
 			)
 		);
+	}
+
+	public function tear_down(): void {
+		wp_set_current_user( 0 );
+		parent::tear_down();
 	}
 
 	public function test_create_flow_resolves_every_six_hours_through_ability(): void {
@@ -92,7 +98,7 @@ class SchedulingDelegationTest extends WP_UnitTestCase {
 				),
 				'cron',
 			),
-			'cron expression' => array( array( 'interval' => '0 9 * * 1-5' ), '0 9 * * 1-5' ),
+			'cron expression' => array( array( 'interval' => '0 9 * * 1-5' ), 'cron' ),
 		);
 	}
 

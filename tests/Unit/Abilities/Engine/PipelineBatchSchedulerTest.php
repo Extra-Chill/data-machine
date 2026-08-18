@@ -23,17 +23,9 @@ class PipelineBatchSchedulerTest extends WP_UnitTestCase {
 	private int $test_pipeline_id;
 	private int $test_flow_id;
 
-	public static function set_up_before_class(): void {
-		parent::set_up_before_class();
-
-		// Ensure Data Machine tables exist (activation hook doesn't fire in tests).
-		if ( function_exists( 'datamachine_activate_for_site' ) ) {
-			datamachine_activate_for_site();
-		}
-	}
-
 	public function set_up(): void {
 		parent::set_up();
+		datamachine_test_prepare_site();
 
 		$user_id = self::factory()->user->create( array( 'role' => 'administrator' ) );
 		wp_set_current_user( $user_id );
@@ -51,6 +43,14 @@ class PipelineBatchSchedulerTest extends WP_UnitTestCase {
 			'flow_name'   => 'Batch Test Flow',
 		) );
 		$this->test_flow_id = $flow['flow_id'];
+	}
+
+	public function tear_down(): void {
+		if ( function_exists( 'as_unschedule_all_actions' ) ) {
+			as_unschedule_all_actions( PipelineBatchScheduler::BATCH_HOOK );
+		}
+		wp_set_current_user( 0 );
+		parent::tear_down();
 	}
 
 	/**
@@ -257,8 +257,10 @@ class PipelineBatchSchedulerTest extends WP_UnitTestCase {
 	public function test_duplicate_completed_chunk_does_not_perpetuate_recovery_actions(): void {
 		global $wpdb;
 		$parent_id = $this->create_parent_job();
+		$engine    = $this->make_engine_snapshot( $parent_id );
+		$this->assertTrue( datamachine_set_engine_data( $parent_id, $engine ) );
 		$scheduler = new PipelineBatchScheduler();
-		$scheduler->fanOut( $parent_id, 'step_a', array( $this->make_data_packet( 'Event A' ) ), $this->make_engine_snapshot( $parent_id ) );
+		$scheduler->fanOut( $parent_id, 'step_a', array( $this->make_data_packet( 'Event A' ) ), $engine );
 		$scheduler->processChunk( $parent_id, 0 );
 		$before = (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$wpdb->prefix}actionscheduler_actions WHERE hook = %s AND args = %s AND status = 'pending'", PipelineBatchScheduler::BATCH_HOOK, wp_json_encode( array( 'parent_job_id' => $parent_id, 'offset' => 0 ) ) ) );
 
@@ -477,8 +479,8 @@ class PipelineBatchSchedulerTest extends WP_UnitTestCase {
 		$scheduler->processChunk( $parent_id );
 
 		$parent_job = $this->jobs_db->get_job( $parent_id );
-		$this->assertStringContainsString( 'failed', $parent_job['status'] );
-		$this->assertStringContainsString( 'batch_state_missing', $parent_job['status'] );
+		$this->assertSame( JobStatus::FAILED, $parent_job['status'] );
+		$this->assertSame( 'batch_state_missing', $parent_job['engine_data']['job_status_reason'] );
 	}
 
 	public function test_v2_missing_state_fails_parent_and_cleans_orphan_worklist(): void {
@@ -495,7 +497,9 @@ class PipelineBatchSchedulerTest extends WP_UnitTestCase {
 
 		( new PipelineBatchScheduler() )->processChunk( $parent_id, 0 );
 
-		$this->assertStringContainsString( 'batch_state_missing', $this->jobs_db->get_job( $parent_id )['status'] );
+		$parent_job = $this->jobs_db->get_job( $parent_id );
+		$this->assertSame( JobStatus::FAILED, $parent_job['status'] );
+		$this->assertSame( 'batch_state_missing', $parent_job['engine_data']['job_status_reason'] );
 		$this->assertNull( $worklist->first_outstanding_index( $parent_id ) );
 	}
 
@@ -527,8 +531,8 @@ class PipelineBatchSchedulerTest extends WP_UnitTestCase {
 		$scheduler->processChunk( $parent_id );
 
 		$parent_job = $this->jobs_db->get_job( $parent_id );
-		$this->assertStringContainsString( 'failed', $parent_job['status'] );
-		$this->assertStringContainsString( 'batch_no_children_scheduled', $parent_job['status'] );
+		$this->assertSame( JobStatus::FAILED, $parent_job['status'] );
+		$this->assertSame( 'batch_no_children_scheduled', $parent_job['engine_data']['job_status_reason'] );
 	}
 
 	public function test_child_labels_use_packet_titles(): void {
@@ -810,6 +814,7 @@ class PipelineBatchSchedulerTest extends WP_UnitTestCase {
 		$engine['job']['user_id']  = 456;
 		$engine['flow_config']     = array( 'original' => 'flow-config' );
 		$engine['pipeline_config'] = array( 'original' => 'pipeline-config' );
+		$this->assertTrue( datamachine_set_engine_data( $parent_id, $engine ) );
 
 		$packet = $this->make_data_packet( 'Reserved Context Attempt' );
 		$packet['metadata']['_engine_data'] = array(

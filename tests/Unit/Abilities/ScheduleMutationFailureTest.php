@@ -40,6 +40,7 @@ class ScheduleMutationFailureTest extends WP_UnitTestCase {
 
 	public function set_up(): void {
 		parent::set_up();
+		datamachine_test_prepare_site();
 
 		$user_id = self::factory()->user->create( array( 'role' => 'administrator' ) );
 		wp_set_current_user( $user_id );
@@ -79,6 +80,11 @@ class ScheduleMutationFailureTest extends WP_UnitTestCase {
 	public function tear_down(): void {
 		foreach ( $this->managed_flow_ids as $flow_id ) {
 			$this->releaseScheduleLock( $flow_id );
+			$options = $this->scheduleOptionNames( $flow_id );
+			delete_option( $options['generation'] );
+			if ( function_exists( 'as_unschedule_all_actions' ) ) {
+				as_unschedule_all_actions( self::FLOW_HOOK );
+			}
 			RecurringScheduler::ensureSchedule(
 				self::FLOW_HOOK,
 				array( $flow_id ),
@@ -336,7 +342,7 @@ class ScheduleMutationFailureTest extends WP_UnitTestCase {
 		$this->assertTrue( RecurringScheduler::hasLogicalCoverage( self::FLOW_HOOK, array( $blocked_flow_id ) ) );
 	}
 
-	public function test_creation_rollback_records_failed_schedule_compensation(): void {
+	public function test_creation_rollback_discards_transactional_schedule_lock(): void {
 		$ability = new CreateFlowAbility();
 		$scope   = ( new ReflectionMethod( $ability, 'beginCreationTransactionScope' ) )->invoke( $ability );
 		$flow_id = (int) $this->flows->create_flow(
@@ -362,8 +368,7 @@ class ScheduleMutationFailureTest extends WP_UnitTestCase {
 		$result = ( new ReflectionMethod( $ability, 'rollbackCreation' ) )->invoke( $ability, $scope, $flow_id, 'Forced rollback' );
 
 		$this->assertFalse( $result['success'] );
-		$this->assertSame( 'schedule_lock_timeout', $result['schedule_cleanup']['error_code'] );
-		$this->assertTrue( $result['schedule_cleanup']['retryable'] );
+		$this->assertArrayNotHasKey( 'schedule_cleanup', $result );
 		$this->assertNull( $this->flows->get_flow( $flow_id ) );
 	}
 

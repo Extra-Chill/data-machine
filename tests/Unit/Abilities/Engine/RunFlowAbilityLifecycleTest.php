@@ -11,6 +11,7 @@ use DataMachine\Abilities\Engine\RunFlowAbility;
 use DataMachine\Core\Database\Flows\Flows;
 use DataMachine\Core\Database\Jobs\Jobs;
 use DataMachine\Core\Database\Pipelines\Pipelines;
+use DataMachine\Api\Flows\FlowScheduling;
 use DataMachine\Core\JobStatus;
 use WP_UnitTestCase;
 
@@ -19,16 +20,9 @@ class RunFlowAbilityLifecycleTest extends WP_UnitTestCase {
 	private $schedule_capture;
 	private array $scheduled_steps = array();
 
-	public static function set_up_before_class(): void {
-		parent::set_up_before_class();
-
-		if ( function_exists( 'datamachine_activate_for_site' ) ) {
-			datamachine_activate_for_site();
-		}
-	}
-
 	public function set_up(): void {
 		parent::set_up();
+		datamachine_test_prepare_site();
 
 		$user_id = self::factory()->user->create( array( 'role' => 'administrator' ) );
 		wp_set_current_user( $user_id );
@@ -42,6 +36,9 @@ class RunFlowAbilityLifecycleTest extends WP_UnitTestCase {
 
 	public function tear_down(): void {
 		remove_action( 'datamachine_schedule_next_step', $this->schedule_capture, 1 );
+		if ( function_exists( 'as_unschedule_all_actions' ) ) {
+			as_unschedule_all_actions( FlowScheduling::FLOW_HOOK );
+		}
 		wp_set_current_user( 0 );
 
 		parent::tear_down();
@@ -77,7 +74,8 @@ class RunFlowAbilityLifecycleTest extends WP_UnitTestCase {
 
 		$job = ( new Jobs() )->get_job( (int) $result['job_id'] );
 		$this->assertNotEmpty( $job );
-		$this->assertSame( JobStatus::failed( 'no_first_step' )->toString(), $job['status'] ?? '' );
+		$this->assertSame( JobStatus::FAILED, $job['status'] ?? '' );
+		$this->assertSame( 'no_first_step', $job['engine_data']['job_status_reason'] ?? '' );
 	}
 
 	public function test_scheduler_run_is_deferred_when_active_jobs_exceed_ceiling(): void {

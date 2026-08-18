@@ -220,8 +220,9 @@ class PathlessBatchRecovery {
 		$claim = EngineData::mutate(
 			$parent_job_id,
 			static function ( array $current ) use ( $token ): ?array {
-				$owner      = is_array( $current['batch_recovery_owner'] ?? null ) ? $current['batch_recovery_owner'] : array();
-				$claimed_at = strtotime( (string) ( $owner['claimed_at'] ?? '' ) . ' UTC' );
+				$owner            = is_array( $current['batch_recovery_owner'] ?? null ) ? $current['batch_recovery_owner'] : array();
+				$claimed_at_value = (string) ( $owner['claimed_at'] ?? '' );
+				$claimed_at       = '' !== $claimed_at_value ? strtotime( $claimed_at_value . ' UTC' ) : false;
 				if ( false !== $claimed_at && ( time() - $claimed_at ) < self::CLAIM_TTL ) {
 					return null;
 				}
