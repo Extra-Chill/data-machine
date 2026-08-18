@@ -44,17 +44,6 @@ final class AgentBundleCompatibility {
 			$capabilities = array();
 		}
 
-		$normalized = array();
-		foreach ( $capabilities as $capability ) {
-			$capability = trim( strtolower( (string) $capability ) );
-			if ( '' !== $capability ) {
-				$normalized[] = $capability;
-			}
-		}
-
-		$normalized = array_values( array_unique( $normalized ) );
-		sort( $normalized, SORT_STRING );
-
-		return $normalized;
+		return AgentPackageProjection::normalize_capabilities( $capabilities );
 	}
 }

@@ -25,6 +25,7 @@ use DataMachine\Engine\Bundle\AgentBundleManifest;
 use DataMachine\Engine\Bundle\AgentBundlePipelineFile;
 use DataMachine\Engine\Bundle\AgentPackageProjection;
 use DataMachine\Engine\Bundle\BundleSchema;
+use DataMachine\Engine\Agents\AgentSubagentGraph;
 
 function datamachine_bundle_validate_smoke_reset_registry(): void {
 	do_action( 'init' );
@@ -154,7 +155,7 @@ $graph_directory = new AgentBundleDirectory(
 $graph_package = AgentPackageProjection::from_directory( $graph_directory )->to_array();
 agents_api_smoke_assert_equals( array( 'writer' ), $graph_package['agent']['subagents'] ?? null, 'package inspection preserves coordinator edges', $failures, $passes );
 agents_api_smoke_assert_equals( 'allow', $graph_package['agent']['default_config']['tool_policy']['mode'] ?? null, 'package inspection projects enforceable root policy', $failures, $passes );
-agents_api_smoke_assert_equals( true, in_array( 'datamachine/subagent-graph', $graph_package['capabilities'] ?? array(), true ), 'graph packages automatically require graph-capable hosts', $failures, $passes );
+agents_api_smoke_assert_equals( true, in_array( AgentSubagentGraph::CAPABILITY, $graph_package['capabilities'] ?? array(), true ), 'graph packages automatically require graph-capable hosts', $failures, $passes );
 
 echo "\n[2] Projected extension artifact requirements are reported as unsupported:\n";
 add_filter(

@@ -47,6 +47,7 @@ use DataMachine\Engine\Bundle\AgentBundleInstalledArtifact;
 use DataMachine\Engine\Bundle\AgentBundleManifest;
 use DataMachine\Engine\Bundle\BundleSchema;
 use DataMachine\Engine\Agents\PersistedAgentGraphProjector;
+use DataMachine\Engine\Agents\AgentSubagentGraph;
 use WP_UnitTestCase;
 
 final class DailyMemoryImportFakeStore implements WP_Agent_Memory_Store {
@@ -1033,7 +1034,7 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 				'memory' => array(), 'tool_policy' => array(), 'skills' => array(), 'references' => array(), 'subagents' => array(),
 			),
 		);
-		$remove_graph_capability = static fn( array $capabilities ): array => array_values( array_diff( $capabilities, array( 'datamachine/subagent-graph' ) ) );
+		$remove_graph_capability = static fn( array $capabilities ): array => array_values( array_diff( $capabilities, array( AgentSubagentGraph::CAPABILITY ) ) );
 		add_filter( 'datamachine_agent_bundle_host_capabilities', $remove_graph_capability );
 
 		try {
@@ -1044,7 +1045,7 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 
 		$this->assertFalse( (bool) $result['success'] );
 		$this->assertSame( 'install_unsupported_capabilities', $result['error_code'] ?? null );
-		$this->assertSame( array( 'datamachine/subagent-graph' ), $result['compatibility']['unsupported_capabilities'] ?? null );
+		$this->assertSame( array( AgentSubagentGraph::CAPABILITY ), $result['compatibility']['unsupported_capabilities'] ?? null );
 		$this->assertNull( $this->agents_repo->get_by_slug( 'unsupported-coordinator' ), 'Compatibility rejection creates no coordinator row.' );
 		$this->assertNull( $this->agents_repo->get_by_slug( 'unsupported-writer' ), 'Compatibility rejection creates no child row.' );
 	}

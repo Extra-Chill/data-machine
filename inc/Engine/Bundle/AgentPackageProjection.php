@@ -29,7 +29,7 @@ final class AgentPackageProjection {
 				'slug'         => (string) $manifest['bundle_slug'],
 				'version'      => (string) $manifest['bundle_version'],
 				'agent'        => self::agent_from_manifest( $manifest ),
-				'capabilities' => self::string_list( is_array( $manifest['capabilities'] ?? null ) ? $manifest['capabilities'] : array() ),
+				'capabilities' => self::normalize_capabilities( is_array( $manifest['capabilities'] ?? null ) ? $manifest['capabilities'] : array() ),
 				'artifacts'    => self::artifacts_from_directory( $directory ),
 				'meta'         => self::meta_from_manifest( $manifest ),
 			)
@@ -170,7 +170,7 @@ final class AgentPackageProjection {
 					'extension_artifact_type' => $artifact_type,
 					'payload_kind'            => 'json',
 				),
-				self::string_list( is_array( $artifact['requires'] ?? null ) ? $artifact['requires'] : array() ),
+				self::normalize_capabilities( is_array( $artifact['requires'] ?? null ) ? $artifact['requires'] : array() ),
 				$artifact['payload'] ?? null
 			);
 		}
@@ -211,7 +211,7 @@ final class AgentPackageProjection {
 		);
 
 		if ( ! empty( $requires ) ) {
-			$artifact['requires'] = self::string_list( $requires );
+			$artifact['requires'] = self::normalize_capabilities( $requires );
 		}
 
 		if ( null !== $payload ) {
@@ -227,7 +227,7 @@ final class AgentPackageProjection {
 	 * @param array<int,mixed> $values Raw capability values.
 	 * @return array<int,string>
 	 */
-	private static function string_list( array $values ): array {
+	public static function normalize_capabilities( array $values ): array {
 		$normalized = array();
 		foreach ( $values as $value ) {
 			$value = trim( strtolower( (string) $value ) );
