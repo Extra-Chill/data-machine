@@ -323,7 +323,6 @@ class PostIdentityReservationsTest extends WP_UnitTestCase {
 		$this->assertNotFalse( $wpdb->query( 'COMMIT' ), 'The direct-connection fixture must be visible outside the PHPUnit connection.' );
 		$table   = $this->repository->get_table_name();
 		$hash    = $first_connection->real_escape_string( $identity['identity_hash'] );
-		$wpdb->query( 'COMMIT' );
 
 		try {
 			$this->assertTrue( $first_connection->query( 'START TRANSACTION' ) );
