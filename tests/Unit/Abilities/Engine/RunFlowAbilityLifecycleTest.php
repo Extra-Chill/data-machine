@@ -11,6 +11,7 @@ use DataMachine\Abilities\Engine\RunFlowAbility;
 use DataMachine\Core\Database\Flows\Flows;
 use DataMachine\Core\Database\Jobs\Jobs;
 use DataMachine\Core\Database\Pipelines\Pipelines;
+use DataMachine\Api\Flows\FlowScheduling;
 use DataMachine\Core\JobStatus;
 use WP_UnitTestCase;
 
@@ -36,7 +37,7 @@ class RunFlowAbilityLifecycleTest extends WP_UnitTestCase {
 	public function tear_down(): void {
 		remove_action( 'datamachine_schedule_next_step', $this->schedule_capture, 1 );
 		if ( function_exists( 'as_unschedule_all_actions' ) ) {
-			as_unschedule_all_actions( 'datamachine_run_flow_now' );
+			as_unschedule_all_actions( FlowScheduling::FLOW_HOOK );
 		}
 		wp_set_current_user( 0 );
 

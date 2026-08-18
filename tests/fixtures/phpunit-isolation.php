@@ -35,10 +35,11 @@ if ( ! function_exists( 'datamachine_test_clear_runtime_rows' ) ) {
 	 */
 	function datamachine_test_clear_runtime_rows(): void {
 		global $wpdb;
+		$agent_access_table = $wpdb->base_prefix . \DataMachine\Core\Database\Agents\AgentAccess::TABLE_NAME;
 
 		$tables = array(
-			$wpdb->prefix . 'datamachine_agents',
-			$wpdb->prefix . 'datamachine_agent_access',
+			$wpdb->base_prefix . \DataMachine\Core\Database\Agents\Agents::TABLE_NAME,
+			$agent_access_table,
 			$wpdb->prefix . 'datamachine_agent_tokens',
 			$wpdb->prefix . 'datamachine_pipelines',
 			$wpdb->prefix . 'datamachine_flows',
@@ -71,6 +72,12 @@ if ( ! function_exists( 'datamachine_test_reset_scheduler' ) ) {
 		}
 
 		$hooks = array(
+			\DataMachine\Api\Flows\FlowScheduling::FLOW_HOOK,
+			\DataMachine\Core\DirectJobEnqueuer::HOOK,
+			\DataMachine\Abilities\Engine\PipelineBatchScheduler::BATCH_HOOK,
+			\DataMachine\Engine\Tasks\TaskScheduler::BATCH_HOOK,
+			'datamachine_task_retry',
+			\DataMachine\Engine\AI\AIConcurrencyBackpressure::RESUME_HOOK,
 			'datamachine_cleanup_stale_claims',
 			'datamachine_cleanup_failed_jobs',
 			'datamachine_cleanup_completed_jobs',

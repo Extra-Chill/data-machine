@@ -30,6 +30,12 @@ class PostIdentityReservationsTest extends WP_UnitTestCase {
 		$wpdb->query( $wpdb->prepare( 'DELETE FROM %i', $this->repository->get_table_name() ) );
 	}
 
+	private function require_mysql(): void {
+		if ( BaseRepository::is_sqlite() ) {
+			$this->markTestSkipped( 'This schema contract requires MySQL metadata or DDL.' );
+		}
+	}
+
 	public function tear_down(): void {
 		global $wpdb;
 		if ( isset( $this->repository ) ) {
@@ -40,6 +46,7 @@ class PostIdentityReservationsTest extends WP_UnitTestCase {
 	}
 
 	public function test_schema_is_site_scoped_minimal_and_innodb(): void {
+		$this->require_mysql();
 		global $wpdb;
 
 		$this->assertSame( $wpdb->prefix . PostIdentityReservations::TABLE_NAME, $this->repository->get_table_name() );
@@ -102,6 +109,7 @@ class PostIdentityReservationsTest extends WP_UnitTestCase {
 	}
 
 	public function test_missing_table_fails_identity_write_closed(): void {
+		$this->require_mysql();
 		global $wpdb;
 
 		$wpdb->query( $wpdb->prepare( 'DROP TABLE %i', $this->repository->get_table_name() ) );
@@ -119,6 +127,7 @@ class PostIdentityReservationsTest extends WP_UnitTestCase {
 	}
 
 	public function test_nontransactional_reservation_table_fails_closed(): void {
+		$this->require_mysql();
 		global $wpdb;
 
 		$changed = $wpdb->query( $wpdb->prepare( 'ALTER TABLE %i ENGINE=MyISAM', $this->repository->get_table_name() ) );
@@ -136,6 +145,7 @@ class PostIdentityReservationsTest extends WP_UnitTestCase {
 	}
 
 	public function test_create_table_repairs_myisam_to_innodb(): void {
+		$this->require_mysql();
 		global $wpdb;
 
 		$this->assertNotFalse( $wpdb->query( $wpdb->prepare( 'ALTER TABLE %i ENGINE=MyISAM', $this->repository->get_table_name() ) ) );
@@ -153,6 +163,7 @@ class PostIdentityReservationsTest extends WP_UnitTestCase {
 	}
 
 	public function test_schema_validation_rejects_partial_table(): void {
+		$this->require_mysql();
 		global $wpdb;
 
 		$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i DROP COLUMN completed_at', $this->repository->get_table_name() ) );
@@ -167,6 +178,7 @@ class PostIdentityReservationsTest extends WP_UnitTestCase {
 	}
 
 	public function test_schema_validation_requires_nonunique_post_id_index(): void {
+		$this->require_mysql();
 		global $wpdb;
 
 		$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i DROP INDEX post_id', $this->repository->get_table_name() ) );
@@ -181,6 +193,7 @@ class PostIdentityReservationsTest extends WP_UnitTestCase {
 	}
 
 	public function test_schema_validation_rejects_unique_post_id_index(): void {
+		$this->require_mysql();
 		global $wpdb;
 
 		$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i DROP INDEX post_id, ADD UNIQUE KEY post_id_unique (post_id)', $this->repository->get_table_name() ) );
@@ -195,6 +208,7 @@ class PostIdentityReservationsTest extends WP_UnitTestCase {
 	}
 
 	public function test_schema_validation_rejects_malformed_column_contract_and_create_table_repairs_it(): void {
+		$this->require_mysql();
 		global $wpdb;
 
 		$wpdb->query(
@@ -218,6 +232,7 @@ class PostIdentityReservationsTest extends WP_UnitTestCase {
 	}
 
 	public function test_create_table_repairs_exact_unique_post_id_index_only(): void {
+		$this->require_mysql();
 		global $wpdb;
 
 		$wpdb->query(
@@ -278,6 +293,9 @@ class PostIdentityReservationsTest extends WP_UnitTestCase {
 	}
 
 	public function test_two_connections_serialize_on_the_reservation_row(): void {
+		if ( BaseRepository::is_sqlite() ) {
+			$this->markTestSkipped( 'Independent MySQL sessions are unavailable under SQLite.' );
+		}
 		if ( ! class_exists( '\mysqli' ) || ! defined( 'MYSQLI_ASYNC' ) ) {
 			$this->markTestSkipped( 'MySQLi async support is unavailable.' );
 		}
@@ -344,6 +362,9 @@ class PostIdentityReservationsTest extends WP_UnitTestCase {
 	}
 
 	public function test_advisory_lock_fences_an_independent_connection_and_releases(): void {
+		if ( BaseRepository::is_sqlite() ) {
+			$this->markTestSkipped( 'Independent MySQL sessions are unavailable under SQLite.' );
+		}
 		$connection = $this->open_mysql_connection();
 		if ( ! $connection instanceof \mysqli ) {
 			$this->markTestSkipped( 'A direct test database connection is unavailable.' );
@@ -368,6 +389,9 @@ class PostIdentityReservationsTest extends WP_UnitTestCase {
 	}
 
 	public function test_unavailable_advisory_lock_returns_retryable_error(): void {
+		if ( BaseRepository::is_sqlite() ) {
+			$this->markTestSkipped( 'Independent MySQL sessions are unavailable under SQLite.' );
+		}
 		$connection = $this->open_mysql_connection();
 		if ( ! $connection instanceof \mysqli ) {
 			$this->markTestSkipped( 'A direct test database connection is unavailable.' );

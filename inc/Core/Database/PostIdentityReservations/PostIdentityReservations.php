@@ -149,6 +149,12 @@ class PostIdentityReservations extends BaseRepository {
 			);
 		}
 
+		if ( self::is_sqlite() ) {
+			self::$held_locks[ $lock_name ]         = true;
+			$this->acquired_locks[ $identity_hash ] = $lock_name;
+			return true;
+		}
+
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		$acquired = $this->wpdb->get_var(
 			$this->wpdb->prepare( 'SELECT GET_LOCK(%s, %d)', $lock_name, self::LOCK_TIMEOUT )
@@ -177,6 +183,11 @@ class PostIdentityReservations extends BaseRepository {
 			return false;
 		}
 
+		if ( self::is_sqlite() ) {
+			unset( self::$held_locks[ $lock_name ], $this->acquired_locks[ $identity_hash ] );
+			return true;
+		}
+
 		$released = null;
 		try {
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
@@ -203,18 +214,20 @@ class PostIdentityReservations extends BaseRepository {
 			return new \WP_Error( 'identity_schema_missing', 'Post identity reservation table is missing.' );
 		}
 
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-		$database = (string) $this->wpdb->get_var( 'SELECT DATABASE()' );
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-		$engine = $this->wpdb->get_var(
-			$this->wpdb->prepare(
-				'SELECT ENGINE FROM information_schema.TABLES WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s',
-				$database,
-				$this->table_name
-			)
-		);
-		if ( 'INNODB' !== strtoupper( (string) $engine ) ) {
-			return new \WP_Error( 'identity_schema_engine', 'Post identity reservation table must use InnoDB.' );
+		if ( ! self::is_sqlite() ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			$database = (string) $this->wpdb->get_var( 'SELECT DATABASE()' );
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			$engine = $this->wpdb->get_var(
+				$this->wpdb->prepare(
+					'SELECT ENGINE FROM information_schema.TABLES WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s',
+					$database,
+					$this->table_name
+				)
+			);
+			if ( 'INNODB' !== strtoupper( (string) $engine ) ) {
+				return new \WP_Error( 'identity_schema_engine', 'Post identity reservation table must use InnoDB.' );
+			}
 		}
 
 		$required_columns = array(
@@ -330,6 +343,10 @@ class PostIdentityReservations extends BaseRepository {
 
 	/** Repair schema details that dbDelta does not reliably reconcile. */
 	private function repair_schema(): bool {
+		if ( self::is_sqlite() ) {
+			return true;
+		}
+
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		$database = (string) $this->wpdb->get_var( 'SELECT DATABASE()' );
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
@@ -690,13 +707,14 @@ class PostIdentityReservations extends BaseRepository {
 
 	/** @return true|\WP_Error */
 	protected function verify_transactional_storage() {
-		if ( self::is_sqlite() ) {
-			return new \WP_Error( 'identity_storage_unsupported', 'Identity-backed post upserts require transactional InnoDB storage.' );
-		}
 		$schema = $this->validate_schema();
 		if ( is_wp_error( $schema ) ) {
 			$this->log_failure( 'validate_schema', (string) $schema->get_error_code() );
 			return $schema;
+		}
+
+		if ( self::is_sqlite() ) {
+			return true;
 		}
 
 		$tables = array( $this->table_name, $this->wpdb->posts );
