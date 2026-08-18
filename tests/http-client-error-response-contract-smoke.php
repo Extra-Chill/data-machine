@@ -97,7 +97,7 @@ function http_client_error_contract_assert( string $label, bool $condition ): vo
 
 $normal_response = array(
 	'headers'  => array( 'Content-Type' => 'application/json' ),
-	'body'     => '{"message":"Invalid request"}',
+	'body'     => '{"message":"Invalid request","detail":"' . str_repeat( 'a', 250 ) . '"}',
 	'response' => array( 'code' => 400, 'message' => 'Bad Request' ),
 );
 
@@ -112,12 +112,23 @@ $rate_limit_response = array(
 
 $GLOBALS['datamachine_http_client_responses'] = array(
 	$normal_response,
+	$normal_response,
 	$rate_limit_response,
 	new WP_Error( 'http_request_failed', 'Connection timed out' ),
 );
 $GLOBALS['datamachine_http_client_logs'] = array();
 
-echo "\n[1] Received non-2xx response\n";
+echo "\n[1] Invalid response-body preview options\n";
+$responses_before_invalid_options = count( $GLOBALS['datamachine_http_client_responses'] );
+$string_option_result            = HttpClient::get( 'https://example.test/invalid-option', array( 'log_response_body_preview' => 'false' ) );
+$array_option_result             = HttpClient::get( 'https://example.test/invalid-option', array( 'log_response_body_preview' => array( false ) ) );
+
+http_client_error_contract_assert( 'string response-body preview option is rejected', 'Invalid log_response_body_preview option; expected bool' === ( $string_option_result['error'] ?? null ) );
+http_client_error_contract_assert( 'array response-body preview option is rejected', 'Invalid log_response_body_preview option; expected bool' === ( $array_option_result['error'] ?? null ) );
+http_client_error_contract_assert( 'invalid response-body preview options do not dispatch requests', $responses_before_invalid_options === count( $GLOBALS['datamachine_http_client_responses'] ) );
+http_client_error_contract_assert( 'invalid response-body preview options do not log', array() === $GLOBALS['datamachine_http_client_logs'] );
+
+echo "\n[2] Received non-2xx response\n";
 $normal_result = HttpClient::get( 'https://example.test/invalid', array( 'context' => 'Contract Test' ) );
 
 http_client_error_contract_assert( 'non-2xx response fails', false === $normal_result['success'] );
@@ -126,15 +137,42 @@ http_client_error_contract_assert( 'non-2xx response preserves headers', 'applic
 http_client_error_contract_assert( 'non-2xx response preserves body as data', $normal_response['body'] === $normal_result['data'] );
 http_client_error_contract_assert( 'non-2xx response preserves raw response', $normal_response === $normal_result['response'] );
 http_client_error_contract_assert( 'non-2xx response retains normalized error', str_contains( $normal_result['error'], 'Invalid request' ) );
+$normal_log_context = $GLOBALS['datamachine_http_client_logs'][0][2] ?? array();
+http_client_error_contract_assert( 'default error log includes a bounded body preview', substr( $normal_response['body'], 0, 200 ) === ( $normal_log_context['body_preview'] ?? null ) );
 
-echo "\n[2] Rate limit metadata\n";
-$rate_limit_result = HttpClient::get( 'https://example.test/limited', array( 'context' => 'Contract Test' ) );
+echo "\n[3] Explicit response body preview\n";
+$explicit_preview_result = HttpClient::get(
+	'https://example.test/explicit-preview',
+	array(
+		'context'                   => 'Contract Test',
+		'log_response_body_preview' => true,
+	)
+);
+
+http_client_error_contract_assert( 'explicit true response-body preview option preserves the response failure', false === $explicit_preview_result['success'] );
+$explicit_preview_log_context = $GLOBALS['datamachine_http_client_logs'][1][2] ?? array();
+http_client_error_contract_assert( 'explicit true response-body preview option includes a bounded preview', substr( $normal_response['body'], 0, 200 ) === ( $explicit_preview_log_context['body_preview'] ?? null ) );
+
+echo "\n[4] Suppressed error body preview\n";
+$rate_limit_result = HttpClient::get(
+	'https://example.test/limited',
+	array(
+		'context'                   => 'Contract Test',
+		'log_response_body_preview' => false,
+	)
+);
 
 http_client_error_contract_assert( '429 response preserves status code', 429 === $rate_limit_result['status_code'] );
 http_client_error_contract_assert( '429 response preserves Retry-After', '120' === ( $rate_limit_result['headers']['Retry-After'] ?? null ) );
 http_client_error_contract_assert( 'response headers are not copied into logs', ! str_contains( serialize( $GLOBALS['datamachine_http_client_logs'] ), 'session=secret' ) );
+$suppressed_log_context = $GLOBALS['datamachine_http_client_logs'][2][2] ?? array();
+http_client_error_contract_assert( 'suppressed error log omits body preview', ! array_key_exists( 'body_preview', $suppressed_log_context ) );
+http_client_error_contract_assert( 'suppressed error log preserves context', 'Contract Test' === ( $suppressed_log_context['context'] ?? null ) );
+http_client_error_contract_assert( 'suppressed error log preserves URL', 'https://example.test/limited' === ( $suppressed_log_context['url'] ?? null ) );
+http_client_error_contract_assert( 'suppressed error log preserves method', 'GET' === ( $suppressed_log_context['method'] ?? null ) );
+http_client_error_contract_assert( 'suppressed error log preserves status', 429 === ( $suppressed_log_context['status_code'] ?? null ) );
 
-echo "\n[3] Transport failure distinction\n";
+echo "\n[5] Transport failure distinction\n";
 $transport_result = HttpClient::get( 'https://example.test/unreachable', array( 'context' => 'Contract Test' ) );
 
 http_client_error_contract_assert( 'transport failure fails', false === $transport_result['success'] );
