@@ -330,15 +330,23 @@ class PostIdentityReservationsTest extends WP_UnitTestCase {
 
 			$second_connection->query( 'SET SESSION innodb_lock_wait_timeout = 5' );
 			$second_connection->query( 'START TRANSACTION' );
-			$second_connection->query( "SELECT post_id, state FROM `{$table}` WHERE identity_hash = '{$hash}' FOR UPDATE", MYSQLI_ASYNC );
+			$this->assertTrue( $second_connection->query( "SELECT post_id, state FROM `{$table}` WHERE identity_hash = '{$hash}' FOR UPDATE", MYSQLI_ASYNC ) );
 			$read   = array( $second_connection );
 			$error  = array();
 			$reject = array();
 			$this->assertSame( 0, \mysqli_poll( $read, $error, $reject, 0, 100000 ), 'Second allocator must wait for the row lock.' );
 
 			$this->assertTrue( $first_connection->query( 'COMMIT' ) );
+			$ready = 0;
+			for ( $attempt = 0; $attempt < 50 && 0 === $ready; ++$attempt ) {
+				$read   = array( $second_connection );
+				$error  = array();
+				$reject = array();
+				$ready  = \mysqli_poll( $read, $error, $reject, 0, 100000 );
+			}
+			$this->assertSame( 1, $ready, 'Second allocator should resume after commit.' );
 			$result = $second_connection->reap_async_query();
-			$this->assertInstanceOf( \mysqli_result::class, $result );
+			$this->assertInstanceOf( \mysqli_result::class, $result, $second_connection->error );
 			$row = $result->fetch_assoc();
 			$this->assertSame( (string) $post_id, (string) $row['post_id'] );
 			$this->assertSame( 'linked', $row['state'] );
