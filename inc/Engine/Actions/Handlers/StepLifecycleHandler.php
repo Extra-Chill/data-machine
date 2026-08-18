@@ -185,7 +185,7 @@ class StepLifecycleHandler {
 		global $wpdb;
 		$jobs       = new Jobs();
 		$jobs_table = $jobs->get_table_name();
-		$scope = self::beginTransaction();
+		$scope      = self::beginTransaction();
 		if ( null === $scope ) {
 			$result['success']    = false;
 			$result['_retryable'] = $jobs->has_retryable_transaction_error();
@@ -312,7 +312,7 @@ class StepLifecycleHandler {
 		);
 		$jobs       = new Jobs();
 		$jobs_table = $jobs->get_table_name();
-		$scope = $job_id > 0 ? self::beginTransaction() : null;
+		$scope      = $job_id > 0 ? self::beginTransaction() : null;
 		if ( null === $scope ) {
 			return $result;
 		}
@@ -480,7 +480,7 @@ class StepLifecycleHandler {
 		);
 		$jobs       = new Jobs();
 		$jobs_table = $jobs->get_table_name();
-		$scope = $job_id > 0 ? self::beginTransaction() : null;
+		$scope      = $job_id > 0 ? self::beginTransaction() : null;
 		if ( null === $scope ) {
 			return $result;
 		}

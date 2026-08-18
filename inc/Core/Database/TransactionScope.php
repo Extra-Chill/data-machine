@@ -35,7 +35,7 @@ final class TransactionScope {
 		}
 
 		if ( $in_transaction || BaseRepository::is_sqlite() ) {
-			$name = 'datamachine_transaction_' . ++self::$savepoint_sequence;
+			$name = 'datamachine_transaction_' . ( ++self::$savepoint_sequence );
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 			if ( false === $wpdb->query( "SAVEPOINT {$name}" ) ) {
 				return null;
@@ -53,8 +53,9 @@ final class TransactionScope {
 	/** Commit only this scope. */
 	public function commit(): bool {
 		if ( 'savepoint' === $this->type ) {
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-			return false !== $this->wpdb->query( $this->wpdb->prepare( 'RELEASE SAVEPOINT %i', $this->name ) );
+			$query = $this->wpdb->prepare( 'RELEASE SAVEPOINT %i', $this->name );
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared -- Savepoint identifier is prepared above.
+			return false !== $this->wpdb->query( $query );
 		}
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
 		return false !== $this->wpdb->query( 'COMMIT' );
@@ -63,10 +64,12 @@ final class TransactionScope {
 	/** Roll back only this scope. */
 	public function rollback(): void {
 		if ( 'savepoint' === $this->type ) {
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-			$this->wpdb->query( $this->wpdb->prepare( 'ROLLBACK TO SAVEPOINT %i', $this->name ) );
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-			$this->wpdb->query( $this->wpdb->prepare( 'RELEASE SAVEPOINT %i', $this->name ) );
+			$rollback_query = $this->wpdb->prepare( 'ROLLBACK TO SAVEPOINT %i', $this->name );
+			$release_query  = $this->wpdb->prepare( 'RELEASE SAVEPOINT %i', $this->name );
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared -- Savepoint identifier is prepared above.
+			$this->wpdb->query( $rollback_query );
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared -- Savepoint identifier is prepared above.
+			$this->wpdb->query( $release_query );
 			return;
 		}
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared

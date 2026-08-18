@@ -30,7 +30,8 @@ class LegacyAIConcurrencyReconciler {
 			'source_status' => self::SOURCE_STATUS,
 			'target_status' => self::TARGET_STATUS,
 		);
-		if ( $job_id <= 0 || null === ( $scope = TransactionScope::begin( $wpdb ) ) ) {
+		$scope = TransactionScope::begin( $wpdb );
+		if ( $job_id <= 0 || null === $scope ) {
 			return $this->result( false, false, null, self::TARGET_STATUS, $audit );
 		}
 

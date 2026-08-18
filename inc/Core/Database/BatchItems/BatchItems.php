@@ -52,7 +52,7 @@ class BatchItems extends BaseRepository {
 			)
 		);
 		$preexisting       = is_string( $preexisting_token ) && '' !== $preexisting_token;
-		$scope = TransactionScope::begin( $this->wpdb );
+		$scope             = TransactionScope::begin( $this->wpdb );
 		if ( null === $scope ) {
 			return $this->insert_result( false, false, $preexisting || '' !== (string) $this->wpdb->last_error );
 		}
@@ -207,7 +207,8 @@ class BatchItems extends BaseRepository {
 	public function claim_chunk( int $batch_job_id, int $offset, int $limit, int $lease_seconds = self::DEFAULT_LEASE_SECONDS, ?callable $owner = null ): array {
 		$wpdb = $this->wpdb;
 
-		if ( $batch_job_id <= 0 || $limit < 1 || null === ( $scope = TransactionScope::begin( $this->wpdb ) ) ) {
+		$scope = TransactionScope::begin( $this->wpdb );
+		if ( $batch_job_id <= 0 || $limit < 1 || null === $scope ) {
 			return array();
 		}
 
@@ -507,7 +508,8 @@ class BatchItems extends BaseRepository {
 	public function discard_owned( int $batch_job_id, string $token ): array {
 		$wpdb = $this->wpdb;
 
-		if ( '' === $token || null === ( $scope = TransactionScope::begin( $this->wpdb ) ) ) {
+		$scope = TransactionScope::begin( $this->wpdb );
+		if ( '' === $token || null === $scope ) {
 			return array(
 				'success' => false,
 				'rows'    => array(),

@@ -43,7 +43,7 @@ if ( ! function_exists( 'datamachine_test_clear_runtime_rows' ) ) {
 		$tables = array(
 			$wpdb->base_prefix . \DataMachine\Core\Database\Agents\Agents::TABLE_NAME,
 			$agent_access_table,
-			$wpdb->prefix . 'datamachine_agent_tokens',
+			$wpdb->base_prefix . \DataMachine\Core\Database\Agents\AgentTokens::TABLE_NAME,
 			$wpdb->prefix . 'datamachine_pipelines',
 			$wpdb->prefix . 'datamachine_flows',
 			$wpdb->prefix . 'datamachine_jobs',
