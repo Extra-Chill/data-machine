@@ -50,15 +50,15 @@ if ( ! function_exists( 'datamachine_test_clear_runtime_rows' ) ) {
 			$wpdb->base_prefix . \DataMachine\Core\Database\Agents\AgentAccess::PRINCIPAL_TABLE_NAME,
 			$wpdb->base_prefix . \DataMachine\Core\Database\Agents\AgentTokens::TABLE_NAME,
 			$wpdb->base_prefix . \DataMachine\Core\Database\Chat\Chat::TABLE_NAME,
-			$wpdb->prefix . 'datamachine_pipelines',
+			$wpdb->prefix . \DataMachine\Core\Database\Pipelines\Pipelines::TABLE_NAME,
 			$wpdb->prefix . \DataMachine\Core\Database\Flows\Flows::TABLE_NAME,
-			$wpdb->prefix . 'datamachine_jobs',
-			$wpdb->prefix . 'datamachine_processed_items',
-			$wpdb->prefix . 'datamachine_batch_items',
-			$wpdb->prefix . 'datamachine_tracked_items',
-			$wpdb->prefix . 'datamachine_post_identity_index',
-			$wpdb->prefix . 'datamachine_post_identity_reservations',
-			$wpdb->prefix . 'datamachine_pending_actions',
+			$wpdb->prefix . \DataMachine\Core\Database\Jobs\Jobs::TABLE_NAME,
+			$wpdb->prefix . \DataMachine\Core\Database\ProcessedItems\ProcessedItems::TABLE_NAME,
+			$wpdb->prefix . \DataMachine\Core\Database\BatchItems\BatchItems::TABLE_NAME,
+			$wpdb->prefix . \DataMachine\Core\Database\TrackedItems\TrackedItems::TABLE_NAME,
+			$wpdb->prefix . \DataMachine\Core\Database\PostIdentityIndex\PostIdentityIndex::TABLE_NAME,
+			$wpdb->prefix . \DataMachine\Core\Database\PostIdentityReservations\PostIdentityReservations::TABLE_NAME,
+			$wpdb->prefix . \DataMachine\Engine\AI\Actions\PendingActionStore::TABLE_NAME,
 		);
 
 		foreach ( $tables as $table ) {

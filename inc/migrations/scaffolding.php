@@ -238,10 +238,12 @@ function datamachine_ensure_default_memory_files(): bool {
 	}
 
 	$scaffold_context = array(
-		'user_id'    => $default_user_id,
-		'agent_slug' => $agent_slug,
-		'agent_id'   => $agent_id,
+		'user_id'  => $default_user_id,
+		'agent_id' => $agent_id,
 	);
+	if ( null !== $agent_slug ) {
+		$scaffold_context['agent_slug'] = $agent_slug;
+	}
 
 	$ability = \DataMachine\Abilities\File\ScaffoldAbilities::get_ability();
 	if ( ! $ability ) {
