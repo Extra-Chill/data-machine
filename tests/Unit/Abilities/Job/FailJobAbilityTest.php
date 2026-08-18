@@ -42,7 +42,9 @@ class FailJobAbilityTest extends WP_UnitTestCase {
 		$this->assertTrue( $result['success'] ?? false );
 		$this->assertSame( JobStatus::PENDING, $result['previous_status'] ?? '' );
 		$this->assertSame( 'failed - manual cancellation', $result['new_status'] ?? '' );
-		$this->assertSame( 'failed - manual cancellation', $jobs_db->get_job( $job_id )['status'] ?? '' );
+		$job = $jobs_db->get_job( $job_id );
+		$this->assertSame( JobStatus::FAILED, $job['status'] ?? '' );
+		$this->assertSame( 'manual cancellation', $job['engine_data']['job_status_reason'] ?? '' );
 	}
 
 	public function test_execute_step_does_not_restart_terminal_jobs(): void {
@@ -59,9 +61,11 @@ class FailJobAbilityTest extends WP_UnitTestCase {
 		);
 
 		$this->assertFalse( $result['success'] ?? true );
-		$this->assertSame( 'failed - manual cancellation', $result['terminal_state'] ?? '' );
+		$this->assertSame( JobStatus::FAILED, $result['terminal_state'] ?? '' );
 		$this->assertStringContainsString( 'terminal status', $result['error'] ?? '' );
-		$this->assertSame( 'failed - manual cancellation', $jobs_db->get_job( $job_id )['status'] ?? '' );
+		$job = $jobs_db->get_job( $job_id );
+		$this->assertSame( JobStatus::FAILED, $job['status'] ?? '' );
+		$this->assertSame( 'manual cancellation', $job['engine_data']['job_status_reason'] ?? '' );
 	}
 
 	private function createDirectJob( Jobs $jobs_db ): int {

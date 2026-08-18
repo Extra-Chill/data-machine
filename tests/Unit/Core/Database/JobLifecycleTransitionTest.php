@@ -303,7 +303,9 @@ class JobLifecycleTransitionTest extends WP_UnitTestCase {
 		$this->assertSame( 2, $result['touched'] );
 		$this->assertSame( 2, $result['mutated'] );
 		$this->assertSame( 1, $result['pathless_terminal'] );
-		$this->assertSame( JobStatus::failed( 'scheduler_path_lost' )->toString(), $this->db_jobs->get_job( $child_id )['status'] );
+		$job = $this->db_jobs->get_job( $child_id );
+		$this->assertSame( JobStatus::FAILED, $job['status'] );
+		$this->assertSame( 'scheduler_path_lost', $job['engine_data']['job_status_reason'] );
 	}
 
 	public function test_long_running_recovery_takeover_blocks_terminal_callbacks(): void {
@@ -700,7 +702,17 @@ class JobLifecycleTransitionTest extends WP_UnitTestCase {
 	public function test_exact_legacy_ai_contention_failure_can_be_audited_and_reclassified(): void {
 		$job_id = $this->db_jobs->create_job( array( 'label' => 'Legacy AI contention' ) );
 		$this->assertIsInt( $job_id );
-		$this->assertTrue( $this->db_jobs->complete_job( $job_id, LegacyAIConcurrencyReconciler::SOURCE_STATUS ) );
+		global $wpdb;
+		$this->assertSame(
+			1,
+			$wpdb->update(
+				$wpdb->prefix . 'datamachine_jobs',
+				array( 'status' => LegacyAIConcurrencyReconciler::SOURCE_STATUS ),
+				array( 'job_id' => $job_id ),
+				array( '%s' ),
+				array( '%d' )
+			)
+		);
 
 		$generic_rewrite = $this->db_jobs->transition_job_status_result( $job_id, LegacyAIConcurrencyReconciler::TARGET_STATUS, true );
 		$this->assertFalse( $generic_rewrite['success'] );
@@ -751,7 +763,8 @@ class JobLifecycleTransitionTest extends WP_UnitTestCase {
 		$this->assertFalse( $reconciled['changed'] );
 
 		$job = $this->db_jobs->get_job( $job_id );
-		$this->assertSame( 'failed - handler_failure', $job['status'] );
+		$this->assertSame( JobStatus::FAILED, $job['status'] );
+		$this->assertSame( 'handler_failure', $job['engine_data']['job_status_reason'] );
 		$this->assertArrayNotHasKey( 'status_reconciliation', $job['engine_data'] );
 	}
 

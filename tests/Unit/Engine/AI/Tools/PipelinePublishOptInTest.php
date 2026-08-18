@@ -35,7 +35,7 @@ class PipelinePublishOptInTest extends WP_UnitTestCase {
 			$registry->unregister( 'datamachine/test-publish' );
 		}
 		if ( ! $registry->is_registered( 'datamachine/test-publish' ) ) {
-			wp_register_ability(
+			$registry->register(
 				'datamachine/test-publish',
 				array(
 					'label'               => 'Test Publish',
