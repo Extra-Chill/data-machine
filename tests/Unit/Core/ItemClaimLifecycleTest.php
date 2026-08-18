@@ -178,7 +178,8 @@ class ItemClaimLifecycleTest extends WP_UnitTestCase {
 		$job = $this->jobs->get_job( $job_id );
 		$this->assertIsArray( $job );
 		$this->assertFalse( JobStatus::isStatusSuccess( (string) $job['status'] ) );
-		$this->assertStringContainsString( 'item_claim_completion_failed', (string) $job['status'] );
+		$this->assertSame( JobStatus::FAILED, $job['status'] );
+		$this->assertSame( 'item_claim_completion_failed', $job['engine_data']['job_status_reason'] );
 		$this->assertNull( $this->tracked->get( self::NAMESPACE, 'terminal-rollback-id' ) );
 		$this->assertFalse( $this->processed->has_active_claim( self::SCOPE, self::SOURCE, 'terminal-rollback-id' ) );
 		$this->assertIsArray( $this->context( 'retry-flow-step', $job_id + 1000 )->claimItemOwnership( self::SCOPE, 'terminal-rollback-id' ) );
@@ -206,7 +207,8 @@ class ItemClaimLifecycleTest extends WP_UnitTestCase {
 
 		$job = $this->jobs->get_job( $job_id );
 		$this->assertIsArray( $job );
-		$this->assertStringContainsString( 'item_claim_completion_failed', (string) $job['status'] );
+		$this->assertSame( JobStatus::FAILED, $job['status'] );
+		$this->assertSame( 'item_claim_completion_failed', $job['engine_data']['job_status_reason'] );
 		$this->assertNull( $this->tracked->get( self::NAMESPACE, 'multi-rollback-first' ) );
 		$this->assertFalse( $this->processed->has_active_claim( self::SCOPE, self::SOURCE, 'multi-rollback-first' ) );
 		$this->assertFalse( $this->processed->has_active_claim( self::SCOPE, self::SOURCE, 'multi-rollback-second' ) );
@@ -234,7 +236,8 @@ class ItemClaimLifecycleTest extends WP_UnitTestCase {
 
 		$job = $this->jobs->get_job( $job_id );
 		$this->assertIsArray( $job );
-		$this->assertStringContainsString( 'terminal_preparation_exception', (string) $job['status'] );
+		$this->assertSame( JobStatus::FAILED, $job['status'] );
+		$this->assertSame( 'terminal_preparation_exception', $job['engine_data']['job_status_reason'] );
 		$this->assertNull( $this->tracked->get( self::NAMESPACE, 'crash-boundary-id' ) );
 		$this->assertFalse( $this->processed->has_active_claim( self::SCOPE, self::SOURCE, 'crash-boundary-id' ) );
 		$this->assertIsArray( $this->context( 'crash-retry-step', $job_id + 2000 )->claimItemOwnership( self::SCOPE, 'crash-boundary-id' ) );

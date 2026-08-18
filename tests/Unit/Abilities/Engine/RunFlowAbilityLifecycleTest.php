@@ -74,7 +74,8 @@ class RunFlowAbilityLifecycleTest extends WP_UnitTestCase {
 
 		$job = ( new Jobs() )->get_job( (int) $result['job_id'] );
 		$this->assertNotEmpty( $job );
-		$this->assertSame( JobStatus::failed( 'no_first_step' )->toString(), $job['status'] ?? '' );
+		$this->assertSame( JobStatus::FAILED, $job['status'] ?? '' );
+		$this->assertSame( 'no_first_step', $job['engine_data']['job_status_reason'] ?? '' );
 	}
 
 	public function test_scheduler_run_is_deferred_when_active_jobs_exceed_ceiling(): void {
