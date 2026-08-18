@@ -320,6 +320,7 @@ class PostIdentityReservationsTest extends WP_UnitTestCase {
 			)
 		);
 		$post_id = self::factory()->post->create( array( 'post_type' => 'post' ) );
+		$this->assertNotFalse( $wpdb->query( 'COMMIT' ), 'The direct-connection fixture must be visible outside the PHPUnit connection.' );
 		$table   = $this->repository->get_table_name();
 		$hash    = $first_connection->real_escape_string( $identity['identity_hash'] );
 
@@ -355,6 +356,9 @@ class PostIdentityReservationsTest extends WP_UnitTestCase {
 			$second_connection->query( 'ROLLBACK' );
 			$first_connection->close();
 			$second_connection->close();
+			$wpdb->delete( $table, array( 'identity_hash' => $identity['identity_hash'] ), array( '%s' ) );
+			wp_delete_post( $post_id, true );
+			$wpdb->query( 'COMMIT' );
 		}
 	}
 
