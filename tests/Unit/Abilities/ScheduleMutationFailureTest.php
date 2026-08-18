@@ -342,7 +342,7 @@ class ScheduleMutationFailureTest extends WP_UnitTestCase {
 		$this->assertTrue( RecurringScheduler::hasLogicalCoverage( self::FLOW_HOOK, array( $blocked_flow_id ) ) );
 	}
 
-	public function test_creation_rollback_records_failed_schedule_compensation(): void {
+	public function test_creation_rollback_discards_transactional_schedule_lock(): void {
 		$ability = new CreateFlowAbility();
 		$scope   = ( new ReflectionMethod( $ability, 'beginCreationTransactionScope' ) )->invoke( $ability );
 		$flow_id = (int) $this->flows->create_flow(
@@ -368,8 +368,7 @@ class ScheduleMutationFailureTest extends WP_UnitTestCase {
 		$result = ( new ReflectionMethod( $ability, 'rollbackCreation' ) )->invoke( $ability, $scope, $flow_id, 'Forced rollback' );
 
 		$this->assertFalse( $result['success'] );
-		$this->assertSame( 'schedule_lock_timeout', $result['schedule_cleanup']['error_code'] );
-		$this->assertTrue( $result['schedule_cleanup']['retryable'] );
+		$this->assertArrayNotHasKey( 'schedule_cleanup', $result );
 		$this->assertNull( $this->flows->get_flow( $flow_id ) );
 	}
 

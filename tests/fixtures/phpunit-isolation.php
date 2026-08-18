@@ -15,6 +15,7 @@ if ( ! function_exists( 'datamachine_test_prepare_site' ) ) {
 
 		if ( class_exists( '\DataMachine\Core\FilesRepository\DirectoryManager' ) ) {
 			\DataMachine\Core\FilesRepository\DirectoryManager::reset_ensure_flag();
+			\DataMachine\Core\FilesRepository\DirectoryManager::reset_default_agent_user_id_cache();
 		}
 		delete_option( 'datamachine_settings' );
 		if ( ! $activated ) {

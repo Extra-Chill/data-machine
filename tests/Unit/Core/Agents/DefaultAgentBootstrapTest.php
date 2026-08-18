@@ -23,6 +23,8 @@ class DefaultAgentBootstrapTest extends WP_UnitTestCase {
 		datamachine_test_prepare_uploads();
 
 		AgentsRepository::create_table();
+		self::factory()->user->create( array( 'role' => 'administrator' ) );
+		DirectoryManager::reset_default_agent_user_id_cache();
 		$this->agents_repo    = new AgentsRepository();
 		$this->default_user_id = DirectoryManager::get_default_agent_user_id();
 		$this->clear_agents();
