@@ -2,6 +2,17 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.175.0] - 2026-08-18
+
+### Added
+- support agent-scoped OAuth connections
+
+### Changed
+- skip known-red suite on main pushes
+
+### Fixed
+- control HTTP error body logging
+
 ## [0.174.3] - 2026-08-17
 
 ### Fixed
