@@ -12,6 +12,8 @@
 
 namespace DataMachine\Abilities\Flow;
 
+use DataMachine\Core\AbilityResult;
+
 defined( 'ABSPATH' ) || exit;
 
 /**
@@ -374,7 +376,11 @@ class WebhookTriggerAbility {
 	 * @param array $input
 	 * @return array
 	 */
-	public function executeEnable( array $input ): array {
+	public function executeEnable( array $input ): array|\WP_Error {
+		return $this->callbackResult( $this->executeEnableLegacy( $input ), 'webhook_enable_failed' );
+	}
+
+	private function executeEnableLegacy( array $input ): array {
 		$flow_id = (int) ( $input['flow_id'] ?? 0 );
 		if ( $flow_id <= 0 ) {
 			return array(
@@ -589,7 +595,11 @@ class WebhookTriggerAbility {
 	 * @param array $input flow_id, secret|generate, optional secret_id.
 	 * @return array
 	 */
-	public function executeSetSecret( array $input ): array {
+	public function executeSetSecret( array $input ): array|\WP_Error {
+		return $this->callbackResult( $this->executeSetSecretLegacy( $input ), 'webhook_set_secret_failed' );
+	}
+
+	private function executeSetSecretLegacy( array $input ): array {
 		$flow_id = (int) ( $input['flow_id'] ?? 0 );
 		if ( $flow_id <= 0 ) {
 			return array(
@@ -679,7 +689,11 @@ class WebhookTriggerAbility {
 	 * @param array $input Input with flow_id.
 	 * @return array Result with success status.
 	 */
-	public function executeDisable( array $input ): array {
+	public function executeDisable( array $input ): array|\WP_Error {
+		return $this->callbackResult( $this->executeDisableLegacy( $input ), 'webhook_disable_failed' );
+	}
+
+	private function executeDisableLegacy( array $input ): array {
 		$flow_id = (int) ( $input['flow_id'] ?? 0 );
 
 		if ( $flow_id <= 0 ) {
@@ -739,7 +753,11 @@ class WebhookTriggerAbility {
 	 * @param array $input Input with flow_id.
 	 * @return array Result with new token and webhook URL.
 	 */
-	public function executeRegenerate( array $input ): array {
+	public function executeRegenerate( array $input ): array|\WP_Error {
+		return $this->callbackResult( $this->executeRegenerateLegacy( $input ), 'webhook_regenerate_failed' );
+	}
+
+	private function executeRegenerateLegacy( array $input ): array {
 		$flow_id = (int) ( $input['flow_id'] ?? 0 );
 
 		if ( $flow_id <= 0 ) {
@@ -815,7 +833,11 @@ class WebhookTriggerAbility {
 	 * @param array $input Input with flow_id, max, window.
 	 * @return array Result with updated rate limit config.
 	 */
-	public function executeSetRateLimit( array $input ): array {
+	public function executeSetRateLimit( array $input ): array|\WP_Error {
+		return $this->callbackResult( $this->executeSetRateLimitLegacy( $input ), 'webhook_rate_limit_failed' );
+	}
+
+	private function executeSetRateLimitLegacy( array $input ): array {
 		$flow_id = (int) ( $input['flow_id'] ?? 0 );
 
 		if ( $flow_id <= 0 ) {
@@ -917,7 +939,11 @@ class WebhookTriggerAbility {
 	 * @param array $input Input with flow_id.
 	 * @return array Result with webhook status including rate limit config.
 	 */
-	public function executeStatus( array $input ): array {
+	public function executeStatus( array $input ): array|\WP_Error {
+		return $this->callbackResult( $this->executeStatusLegacy( $input ), 'webhook_status_failed' );
+	}
+
+	private function executeStatusLegacy( array $input ): array {
 		$flow_id = (int) ( $input['flow_id'] ?? 0 );
 
 		if ( $flow_id <= 0 ) {
@@ -971,6 +997,36 @@ class WebhookTriggerAbility {
 	}
 
 	/**
+	 * Convert a legacy webhook failure at the registered callback boundary.
+	 *
+	 * @param mixed  $result Legacy callback result.
+	 * @param string $default_code Stable fallback error code.
+	 * @return array|\WP_Error
+	 */
+	private function callbackResult( $result, string $default_code ): array|\WP_Error {
+		$message = is_array( $result ) ? (string) ( $result['error'] ?? '' ) : '';
+		$code    = $default_code;
+		if ( str_contains( $message, 'flow_id' ) ) {
+			$code = 'invalid_flow_id';
+		} elseif ( str_contains( $message, 'not found' ) ) {
+			$code = 'flow_not_found';
+		} elseif ( str_contains( $message, 'not enabled' ) ) {
+			$code = 'webhook_not_enabled';
+		} elseif ( str_starts_with( $message, 'Failed to update' ) ) {
+			$code = 'webhook_update_failed';
+		}
+		$error = AbilityResult::legacy_failure_to_wp_error( $result, $code, 'Webhook operation failed.' );
+		if ( ! $error ) {
+			return $result;
+		}
+
+		$data = is_array( $result ) ? $result : array();
+		unset( $data['success'] );
+		$data['status'] = ( 'flow_not_found' === $code || ( isset( $result['error_type'] ) && 'not_found' === $result['error_type'] ) ) ? 404 : ( 'webhook_update_failed' === $code ? 500 : 400 );
+		return new \WP_Error( $error->get_error_code(), $error->get_error_message(), $data );
+	}
+
+	/**
 	 * Generate a cryptographically secure webhook token.
 	 *
 	 * @return string 64-character hex token.
@@ -1008,7 +1064,11 @@ class WebhookTriggerAbility {
 	 * @param array $input flow_id, optional secret|generate|previous_ttl_seconds.
 	 * @return array
 	 */
-	public function executeRotateSecret( array $input ): array {
+	public function executeRotateSecret( array $input ): array|\WP_Error {
+		return $this->callbackResult( $this->executeRotateSecretLegacy( $input ), 'webhook_rotate_secret_failed' );
+	}
+
+	private function executeRotateSecretLegacy( array $input ): array {
 		$flow_id = (int) ( $input['flow_id'] ?? 0 );
 		if ( $flow_id <= 0 ) {
 			return array(
@@ -1120,7 +1180,11 @@ class WebhookTriggerAbility {
 	 * @param array $input flow_id, secret_id.
 	 * @return array
 	 */
-	public function executeForgetSecret( array $input ): array {
+	public function executeForgetSecret( array $input ): array|\WP_Error {
+		return $this->callbackResult( $this->executeForgetSecretLegacy( $input ), 'webhook_forget_secret_failed' );
+	}
+
+	private function executeForgetSecretLegacy( array $input ): array {
 		$flow_id   = (int) ( $input['flow_id'] ?? 0 );
 		$secret_id = isset( $input['secret_id'] ) ? (string) $input['secret_id'] : '';
 

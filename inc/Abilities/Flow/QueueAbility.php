@@ -38,6 +38,7 @@ use DataMachine\Core\Database\Pipelines\Pipelines as DB_Pipelines;
 use DataMachine\Abilities\DuplicateCheck\DuplicateCheckAbility;
 use DataMachine\Core\Steps\FlowStepConfig;
 use DataMachine\Engine\ExecutionPlan;
+use DataMachine\Core\AbilityResult;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -753,7 +754,11 @@ class QueueAbility {
 	 * @param array $input Input with flow_id, flow_step_id, prompt.
 	 * @return array Result.
 	 */
-	public function executeQueueAdd( array $input ): array {
+	public function executeQueueAdd( array $input ): array|\WP_Error {
+		return $this->callbackResult( $this->executeQueueAddLegacy( $input ), 'queue_add_failed' );
+	}
+
+	private function executeQueueAddLegacy( array $input ): array {
 		$flow_id      = $input['flow_id'] ?? null;
 		$flow_step_id = $input['flow_step_id'] ?? null;
 		$prompt       = $input['prompt'] ?? null;
@@ -859,8 +864,8 @@ class QueueAbility {
 	 * @param array $input Input with flow_id, flow_step_id.
 	 * @return array Result.
 	 */
-	public function executeQueueList( array $input ): array {
-		return $this->listQueueSlot( $input, self::SLOT_PROMPT_QUEUE );
+	public function executeQueueList( array $input ): array|\WP_Error {
+		return $this->callbackResult( $this->listQueueSlot( $input, self::SLOT_PROMPT_QUEUE ), 'queue_list_failed' );
 	}
 
 	/**
@@ -869,8 +874,8 @@ class QueueAbility {
 	 * @param array $input Input with flow_id, flow_step_id.
 	 * @return array Result.
 	 */
-	public function executeQueueClear( array $input ): array {
-		return $this->clearQueueSlot( $input, self::SLOT_PROMPT_QUEUE );
+	public function executeQueueClear( array $input ): array|\WP_Error {
+		return $this->callbackResult( $this->clearQueueSlot( $input, self::SLOT_PROMPT_QUEUE ), 'queue_clear_failed' );
 	}
 
 	/**
@@ -879,8 +884,8 @@ class QueueAbility {
 	 * @param array $input Input with flow_id, flow_step_id, index.
 	 * @return array Result.
 	 */
-	public function executeQueueRemove( array $input ): array {
-		return $this->removeQueueSlot( $input, self::SLOT_PROMPT_QUEUE, self::FIELD_PROMPT );
+	public function executeQueueRemove( array $input ): array|\WP_Error {
+		return $this->callbackResult( $this->removeQueueSlot( $input, self::SLOT_PROMPT_QUEUE, self::FIELD_PROMPT ), 'queue_remove_failed' );
 	}
 
 	/**
@@ -891,7 +896,11 @@ class QueueAbility {
 	 * @param array $input Input with flow_id, flow_step_id, index, prompt.
 	 * @return array Result.
 	 */
-	public function executeQueueUpdate( array $input ): array {
+	public function executeQueueUpdate( array $input ): array|\WP_Error {
+		return $this->callbackResult( $this->executeQueueUpdateLegacy( $input ), 'queue_update_failed' );
+	}
+
+	private function executeQueueUpdateLegacy( array $input ): array {
 		$value = $input['prompt'] ?? null;
 		if ( ! is_string( $value ) ) {
 			return array(
@@ -910,8 +919,8 @@ class QueueAbility {
 	 * @param array $input Input with flow_id, flow_step_id, from_index, to_index.
 	 * @return array Result.
 	 */
-	public function executeQueueMove( array $input ): array {
-		return $this->moveQueueSlot( $input, self::SLOT_PROMPT_QUEUE );
+	public function executeQueueMove( array $input ): array|\WP_Error {
+		return $this->callbackResult( $this->moveQueueSlot( $input, self::SLOT_PROMPT_QUEUE ), 'queue_move_failed' );
 	}
 
 	/**
@@ -920,7 +929,11 @@ class QueueAbility {
 	 * @param array $input Input with flow_id, flow_step_id, patch.
 	 * @return array Result.
 	 */
-	public function executeConfigPatchAdd( array $input ): array {
+	public function executeConfigPatchAdd( array $input ): array|\WP_Error {
+		return $this->callbackResult( $this->executeConfigPatchAddLegacy( $input ), 'config_patch_add_failed' );
+	}
+
+	private function executeConfigPatchAddLegacy( array $input ): array {
 		$flow_id      = $input['flow_id'] ?? null;
 		$flow_step_id = $input['flow_step_id'] ?? null;
 		$patch        = $input['patch'] ?? null;
@@ -998,28 +1011,32 @@ class QueueAbility {
 	/**
 	 * List all config patches in the fetch queue.
 	 */
-	public function executeConfigPatchList( array $input ): array {
-		return $this->listQueueSlot( $input, self::SLOT_CONFIG_PATCH_QUEUE );
+	public function executeConfigPatchList( array $input ): array|\WP_Error {
+		return $this->callbackResult( $this->listQueueSlot( $input, self::SLOT_CONFIG_PATCH_QUEUE ), 'config_patch_list_failed' );
 	}
 
 	/**
 	 * Clear all config patches from the fetch queue.
 	 */
-	public function executeConfigPatchClear( array $input ): array {
-		return $this->clearQueueSlot( $input, self::SLOT_CONFIG_PATCH_QUEUE );
+	public function executeConfigPatchClear( array $input ): array|\WP_Error {
+		return $this->callbackResult( $this->clearQueueSlot( $input, self::SLOT_CONFIG_PATCH_QUEUE ), 'config_patch_clear_failed' );
 	}
 
 	/**
 	 * Remove a specific config patch from the queue by index.
 	 */
-	public function executeConfigPatchRemove( array $input ): array {
-		return $this->removeQueueSlot( $input, self::SLOT_CONFIG_PATCH_QUEUE, self::FIELD_PATCH );
+	public function executeConfigPatchRemove( array $input ): array|\WP_Error {
+		return $this->callbackResult( $this->removeQueueSlot( $input, self::SLOT_CONFIG_PATCH_QUEUE, self::FIELD_PATCH ), 'config_patch_remove_failed' );
 	}
 
 	/**
 	 * Update a config patch at a specific index in the queue.
 	 */
-	public function executeConfigPatchUpdate( array $input ): array {
+	public function executeConfigPatchUpdate( array $input ): array|\WP_Error {
+		return $this->callbackResult( $this->executeConfigPatchUpdateLegacy( $input ), 'config_patch_update_failed' );
+	}
+
+	private function executeConfigPatchUpdateLegacy( array $input ): array {
 		$value = $input['patch'] ?? null;
 		if ( ! is_array( $value ) ) {
 			return array(
@@ -1040,8 +1057,8 @@ class QueueAbility {
 	/**
 	 * Move a config patch from one position to another in the queue.
 	 */
-	public function executeConfigPatchMove( array $input ): array {
-		return $this->moveQueueSlot( $input, self::SLOT_CONFIG_PATCH_QUEUE );
+	public function executeConfigPatchMove( array $input ): array|\WP_Error {
+		return $this->callbackResult( $this->moveQueueSlot( $input, self::SLOT_CONFIG_PATCH_QUEUE ), 'config_patch_move_failed' );
 	}
 
 	/**
@@ -1055,7 +1072,11 @@ class QueueAbility {
 	 * @param array $input Input with flow_id, flow_step_id, and mode.
 	 * @return array Result.
 	 */
-	public function executeQueueMode( array $input ): array {
+	public function executeQueueMode( array $input ): array|\WP_Error {
+		return $this->callbackResult( $this->executeQueueModeLegacy( $input ), 'queue_mode_failed' );
+	}
+
+	private function executeQueueModeLegacy( array $input ): array {
 		$flow_id      = $input['flow_id'] ?? null;
 		$flow_step_id = $input['flow_step_id'] ?? null;
 		$mode         = $input['mode'] ?? null;
@@ -1530,6 +1551,37 @@ class QueueAbility {
 			'queue_length' => $queue_length,
 			'message'      => sprintf( 'Moved item from index %d to %d.', $from_index, $to_index ),
 		);
+	}
+
+	/**
+	 * Convert a legacy queue failure at the registered callback boundary.
+	 *
+	 * Queue storage and consumption helpers intentionally continue to use their
+	 * domain arrays; only registered ability executors expose WP_Error.
+	 *
+	 * @param mixed  $result Result from a queue helper.
+	 * @param string $default_code Stable fallback error code.
+	 * @return array|\WP_Error
+	 */
+	private function callbackResult( $result, string $default_code ): array|\WP_Error {
+		$message = is_array( $result ) ? (string) ( $result['error'] ?? '' ) : '';
+		$code    = $default_code;
+		if ( str_contains( $message, 'flow_id' ) ) {
+			$code = 'invalid_flow_id';
+		} elseif ( str_contains( $message, 'not found' ) ) {
+			$code = str_contains( $message, 'Flow step' ) ? 'flow_step_not_found' : 'flow_not_found';
+		} elseif ( str_contains( $message, 'Flow step' ) || str_contains( $message, 'flow_step_id' ) ) {
+			$code = 'invalid_flow_step_id';
+		}
+		$error = AbilityResult::legacy_failure_to_wp_error( $result, $code, 'Queue operation failed.' );
+		if ( ! $error ) {
+			return $result;
+		}
+
+		$data = is_array( $result ) ? $result : array();
+		unset( $data['success'] );
+		$data['status'] = ( in_array( $code, array( 'flow_not_found', 'flow_step_not_found' ), true ) || ( isset( $result['error_type'] ) && 'not_found' === $result['error_type'] ) ) ? 404 : ( str_ends_with( $code, '_failed' ) ? 500 : 400 );
+		return new \WP_Error( $error->get_error_code(), $error->get_error_message(), $data );
 	}
 
 	/**

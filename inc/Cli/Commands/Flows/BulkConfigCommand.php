@@ -16,6 +16,7 @@ use WP_CLI;
 use DataMachine\Cli\JsonInput;
 use DataMachine\Cli\BaseCommand;
 use DataMachine\Abilities\FlowStep\ConfigureFlowStepsAbility;
+use DataMachine\Core\AbilityResult;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -226,7 +227,7 @@ class BulkConfigCommand extends BaseCommand {
 		}
 
 		$ability = new ConfigureFlowStepsAbility();
-		$result  = $ability->execute( $input );
+		$result  = AbilityResult::normalize( $ability->execute( $input ) );
 
 		if ( 'json' === $format ) {
 			WP_CLI::line( wp_json_encode( $result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );

@@ -207,8 +207,9 @@ class BulkConfigCommandTest extends WP_UnitTestCase {
 				'validate_only'  => $validate_only,
 			) );
 
-			$this->assertFalse( $result['success'] );
-			$this->assertStringContainsString( 'Validation failed', $result['error'] );
+			$this->assertInstanceOf( \WP_Error::class, $result );
+			$this->assertSame( 'configure_flow_steps_failed', $result->get_error_code() );
+			$this->assertStringContainsString( 'Validation failed', $result->get_error_message() );
 			$this->assertSame( array(), $ability->handler_updates );
 		}
 	}
@@ -236,8 +237,9 @@ class BulkConfigCommandTest extends WP_UnitTestCase {
 			'handler_config' => array( 'max_items' => 10 ),
 		) );
 
-		$this->assertFalse( $result['success'] );
-		$this->assertStringContainsString( 'No matching steps', $result['error'] );
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'configure_flow_steps_failed', $result->get_error_code() );
+		$this->assertStringContainsString( 'No matching steps', $result->get_error_message() );
 	}
 
 	public function test_global_scope_dry_run(): void {
@@ -317,8 +319,9 @@ class BulkConfigCommandTest extends WP_UnitTestCase {
 			'handler_config' => array( 'max_items' => 10 ),
 		) );
 
-		$this->assertFalse( $result['success'] );
-		$this->assertStringContainsString( 'not found', $result['error'] );
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'handler_not_found', $result->get_error_code() );
+		$this->assertStringContainsString( 'not found', $result->get_error_message() );
 	}
 
 	public function test_per_flow_override_in_pipeline_scope(): void {
@@ -358,7 +361,8 @@ class BulkConfigCommandTest extends WP_UnitTestCase {
 		) );
 
 		// No AI steps with rss handler — should find no matches.
-		$this->assertFalse( $result['success'] );
-		$this->assertStringContainsString( 'No matching steps', $result['error'] );
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'configure_flow_steps_failed', $result->get_error_code() );
+		$this->assertStringContainsString( 'No matching steps', $result->get_error_message() );
 	}
 }

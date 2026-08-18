@@ -65,8 +65,9 @@ class WebhookTriggerTest extends WP_UnitTestCase {
 			'flow_id'   => $this->flow_id,
 			'auth_mode' => 'hmac',
 		) );
-		$this->assertFalse( $result['success'] );
-		$this->assertStringContainsString( 'preset', $result['error'] );
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'webhook_enable_failed', $result->get_error_code() );
+		$this->assertStringContainsString( 'preset', $result->get_error_message() );
 	}
 
 	public function test_enable_hmac_with_unknown_preset_errors(): void {
@@ -74,8 +75,9 @@ class WebhookTriggerTest extends WP_UnitTestCase {
 			'flow_id' => $this->flow_id,
 			'preset'  => 'does-not-exist',
 		) );
-		$this->assertFalse( $result['success'] );
-		$this->assertStringContainsString( 'Unknown preset', $result['error'] );
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'webhook_enable_failed', $result->get_error_code() );
+		$this->assertStringContainsString( 'Unknown preset', $result->get_error_message() );
 	}
 
 	public function test_enable_hmac_with_preset_generates_secret(): void {
@@ -159,8 +161,9 @@ class WebhookTriggerTest extends WP_UnitTestCase {
 			'flow_id'  => $this->flow_id,
 			'generate' => true,
 		) );
-		$this->assertFalse( $result['success'] );
-		$this->assertStringContainsString( 'template', $result['error'] );
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'webhook_set_secret_failed', $result->get_error_code() );
+		$this->assertStringContainsString( 'template', $result->get_error_message() );
 	}
 
 	public function test_rotate_keeps_previous_secret_verifying(): void {

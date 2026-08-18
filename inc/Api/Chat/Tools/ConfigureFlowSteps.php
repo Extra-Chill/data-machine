@@ -290,11 +290,7 @@ class ConfigureFlowSteps extends BaseTool {
 		$result = $ability->execute( $input );
 
 		if ( is_wp_error( $result ) ) {
-			return array(
-				'success'   => false,
-				'error'     => $result->get_error_message(),
-				'tool_name' => 'configure_flow_steps',
-			);
+			return $this->abilityErrorResult( $result );
 		}
 
 		$result['tool_name'] = 'configure_flow_steps';
@@ -460,11 +456,7 @@ class ConfigureFlowSteps extends BaseTool {
 		$result = $ability->execute( $input );
 
 		if ( is_wp_error( $result ) ) {
-			return array(
-				'success'   => false,
-				'error'     => $result->get_error_message(),
-				'tool_name' => 'configure_flow_steps',
-			);
+			return $this->abilityErrorResult( $result );
 		}
 
 		$result['tool_name'] = 'configure_flow_steps';
@@ -555,11 +547,7 @@ class ConfigureFlowSteps extends BaseTool {
 		$result = $ability->execute( $input );
 
 		if ( is_wp_error( $result ) ) {
-			return array(
-				'success'   => false,
-				'error'     => $result->get_error_message(),
-				'tool_name' => 'configure_flow_steps',
-			);
+			return $this->abilityErrorResult( $result );
 		}
 
 		$result['tool_name'] = 'configure_flow_steps';
@@ -707,5 +695,18 @@ class ConfigureFlowSteps extends BaseTool {
 		}
 
 		return $result;
+	}
+
+	private function abilityErrorResult( \WP_Error $error ): array {
+		$data = $error->get_error_data();
+		return array_merge(
+			is_array( $data ) ? $data : array(),
+			array(
+				'success'    => false,
+				'error'      => $error->get_error_message(),
+				'error_code' => $error->get_error_code(),
+				'tool_name'  => 'configure_flow_steps',
+			)
+		);
 	}
 }
