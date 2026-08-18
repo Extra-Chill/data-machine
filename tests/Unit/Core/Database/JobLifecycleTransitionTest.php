@@ -702,6 +702,17 @@ class JobLifecycleTransitionTest extends WP_UnitTestCase {
 	public function test_exact_legacy_ai_contention_failure_can_be_audited_and_reclassified(): void {
 		$job_id = $this->db_jobs->create_job( array( 'label' => 'Legacy AI contention' ) );
 		$this->assertIsInt( $job_id );
+		$this->assertTrue(
+			datamachine_merge_engine_data(
+				$job_id,
+				array(
+					'run_metrics' => array(
+						'terminal_status' => LegacyAIConcurrencyReconciler::SOURCE_STATUS,
+						'counts'          => array( 'failed' => 1 ),
+					),
+				)
+			)
+		);
 		global $wpdb;
 		$this->assertSame(
 			1,

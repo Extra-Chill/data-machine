@@ -477,8 +477,8 @@ class PipelineBatchSchedulerTest extends WP_UnitTestCase {
 		$scheduler->processChunk( $parent_id );
 
 		$parent_job = $this->jobs_db->get_job( $parent_id );
-		$this->assertStringContainsString( 'failed', $parent_job['status'] );
-		$this->assertStringContainsString( 'batch_state_missing', $parent_job['status'] );
+		$this->assertSame( JobStatus::FAILED, $parent_job['status'] );
+		$this->assertSame( 'batch_state_missing', $parent_job['engine_data']['job_status_reason'] );
 	}
 
 	public function test_v2_missing_state_fails_parent_and_cleans_orphan_worklist(): void {
@@ -495,7 +495,9 @@ class PipelineBatchSchedulerTest extends WP_UnitTestCase {
 
 		( new PipelineBatchScheduler() )->processChunk( $parent_id, 0 );
 
-		$this->assertStringContainsString( 'batch_state_missing', $this->jobs_db->get_job( $parent_id )['status'] );
+		$parent_job = $this->jobs_db->get_job( $parent_id );
+		$this->assertSame( JobStatus::FAILED, $parent_job['status'] );
+		$this->assertSame( 'batch_state_missing', $parent_job['engine_data']['job_status_reason'] );
 		$this->assertNull( $worklist->first_outstanding_index( $parent_id ) );
 	}
 
@@ -527,8 +529,8 @@ class PipelineBatchSchedulerTest extends WP_UnitTestCase {
 		$scheduler->processChunk( $parent_id );
 
 		$parent_job = $this->jobs_db->get_job( $parent_id );
-		$this->assertStringContainsString( 'failed', $parent_job['status'] );
-		$this->assertStringContainsString( 'batch_no_children_scheduled', $parent_job['status'] );
+		$this->assertSame( JobStatus::FAILED, $parent_job['status'] );
+		$this->assertSame( 'batch_no_children_scheduled', $parent_job['engine_data']['job_status_reason'] );
 	}
 
 	public function test_child_labels_use_packet_titles(): void {

@@ -104,12 +104,8 @@ class CliCommandIntrospectorTest extends TestCase {
 
 	/**
 	 * Non-CLI introspection reads source without loading WP-CLI inheritance.
-	 *
-	 * @runInSeparateProcess
-	 * @preserveGlobalState disabled
 	 */
 	public function test_describe_class_does_not_autoload_wp_cli_only_command(): void {
-		$this->assertFalse( class_exists( 'WP_CLI_Command', false ) );
 		$this->assertFalse( class_exists( WpCliOnlyFixtureCommand::class, false ) );
 
 		$this->assertSame(

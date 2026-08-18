@@ -7,6 +7,7 @@
 
 namespace DataMachine\Tests\Unit\Core\Database\PostIdentityReservations;
 
+use DataMachine\Core\Database\BaseRepository;
 use DataMachine\Core\Database\PostIdentityReservations\PostIdentityReservations;
 use WP_UnitTestCase;
 
@@ -16,6 +17,9 @@ class PostIdentityReservationsTest extends WP_UnitTestCase {
 
 	public function set_up(): void {
 		parent::set_up();
+		if ( BaseRepository::is_sqlite() ) {
+			$this->markTestSkipped( 'Post identity reservation integration tests require MySQL/InnoDB.' );
+		}
 		datamachine_test_prepare_site();
 		global $wpdb;
 		$wpdb->query( 'ROLLBACK' );

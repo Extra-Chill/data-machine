@@ -154,7 +154,7 @@ class FlowCreationAtomicityTest extends WP_UnitTestCase {
 		$step_types = array_column( $flow['flow_config'], null, 'step_type' );
 		$this->assertSame( array( 'ticketmaster' ), $step_types['event_import']['handler_slugs'] );
 		$this->assertSame( 'ticketmaster', $step_types['event_import']['handler_configs']['ticketmaster']['source'] );
-		$this->assertSame( array( 'Import upcoming events.' ), $step_types['ai'][ QueueAbility::SLOT_PROMPT_QUEUE ] );
+		$this->assertSame( 'Import upcoming events.', $step_types['ai'][ QueueAbility::SLOT_PROMPT_QUEUE ][0]['prompt'] );
 		$this->assertSame( array( 'upsert_event' ), $step_types['upsert']['handler_slugs'] );
 		$this->assertSame( 'event', $step_types['upsert']['handler_configs']['upsert_event']['post_type'] );
 	}

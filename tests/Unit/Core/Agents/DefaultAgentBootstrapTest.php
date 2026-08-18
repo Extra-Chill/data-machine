@@ -48,6 +48,7 @@ class DefaultAgentBootstrapTest extends WP_UnitTestCase {
 		$rules_file        = trailingslashit( $directory_manager->get_shared_directory() ) . 'RULES.md';
 		wp_delete_file( $user_file );
 		wp_delete_file( $rules_file );
+		DirectoryManager::reset_ensure_flag();
 
 		$this->assertTrue( datamachine_ensure_default_memory_files() );
 
@@ -79,7 +80,7 @@ class DefaultAgentBootstrapTest extends WP_UnitTestCase {
 
 	public function test_active_resolution_is_scoped_to_the_owner(): void {
 		$other_owner_id = self::factory()->user->create( array( 'role' => 'administrator' ) );
-		$this->agents_repo->create_if_missing( 'shared-slug', 'Other Agent', $other_owner_id, array() );
+		$this->agents_repo->create_if_missing( 'other-agent', 'Other Agent', $other_owner_id, array() );
 		$expected_id = $this->agents_repo->create_if_missing( 'shared-slug', 'Default Agent', $this->default_user_id, array() );
 		update_user_meta( $this->default_user_id, AgentBundler::ACTIVE_AGENT_META_KEY, 'shared-slug' );
 

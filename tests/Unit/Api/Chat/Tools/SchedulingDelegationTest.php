@@ -98,7 +98,7 @@ class SchedulingDelegationTest extends WP_UnitTestCase {
 				),
 				'cron',
 			),
-			'cron expression' => array( array( 'interval' => '0 9 * * 1-5' ), '0 9 * * 1-5' ),
+			'cron expression' => array( array( 'interval' => '0 9 * * 1-5' ), 'cron' ),
 		);
 	}
 
