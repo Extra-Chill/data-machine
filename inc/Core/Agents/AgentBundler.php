@@ -816,7 +816,7 @@ class AgentBundler {
 				$this->detect_locally_modified_subagent_artifacts( $slug, $kind, $files, is_array( $existing_root_metadata[ $kind ] ?? null ) ? $existing_root_metadata[ $kind ] : array(), $artifact_file_conflicts );
 			}
 			if ( ! empty( $root_artifacts ) || array_key_exists( 'skill_policy', $agent_data ) || array_key_exists( 'tool_policy', $agent_data ) ) {
-				if ( array_key_exists( 'tool_policy', $agent_data ) ) {
+				if ( ! empty( $agent_data['tool_policy'] ) ) {
 					$incoming_config['tool_policy'] = AgentSubagentGraph::normalize_tool_policy( $agent_data['tool_policy'], sprintf( 'Agent %s', $slug ) );
 				}
 				$incoming_config['datamachine_subagent'] = array_merge(
