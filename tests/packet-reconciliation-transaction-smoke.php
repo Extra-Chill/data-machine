@@ -59,7 +59,8 @@ namespace {
 			return array();
 		}
 		public function get_var( string $query ): string|false {
-			unset( $query );
+			if ( 'SELECT @@autocommit' === $query ) { return '1'; }
+			if ( "SHOW VARIABLES LIKE 'in_transaction'" === $query ) { return false; }
 			if ( $this->deadlock_once ) {
 				$this->deadlock_once = false;
 				$this->last_error = 'Deadlock found when trying to get lock; try restarting transaction';
@@ -139,6 +140,7 @@ namespace {
 	function datamachine_get_engine_data( int $job_id ): array { unset( $job_id ); return $GLOBALS['wpdb']->engine; }
 
 	require_once __DIR__ . '/../inc/Core/Database/BaseRepository.php';
+	require_once __DIR__ . '/../inc/Core/Database/TransactionScope.php';
 	require_once __DIR__ . '/../inc/Core/Database/ProcessedItems/ProcessedItems.php';
 	require_once __DIR__ . '/../inc/Engine/Actions/Handlers/StepLifecycleHandler.php';
 

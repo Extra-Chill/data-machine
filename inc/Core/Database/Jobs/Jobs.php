@@ -16,6 +16,7 @@
 namespace DataMachine\Core\Database\Jobs;
 
 use DataMachine\Core\Database\BaseRepository;
+use DataMachine\Core\Database\TransactionScope;
 use DataMachine\Core\Database\LifecycleStateTransition;
 use DataMachine\Core\Database\RunMetadata\RunMetadata;
 use DataMachine\Core\ExecutionQuery;
@@ -508,15 +509,15 @@ class Jobs extends BaseRepository {
 			return $result;
 		}
 
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-		if ( false === $this->wpdb->query( 'START TRANSACTION' ) ) {
+		$scope = TransactionScope::begin( $this->wpdb );
+		if ( null === $scope ) {
 			$result['reason'] = 'transaction_start_failed';
 			return $result;
 		}
 
 		$job = $this->get_job_for_update( $job_id );
 		if ( ! $this->missing_direct_operation_owner_matches( $job, $action_id, $generation, $token ) || ! empty( $job['operation_effects_begun_at'] ) ) {
-			$this->wpdb->query( 'ROLLBACK' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			$scope->rollback();
 			$result['reason'] = ! empty( $job['operation_effects_begun_at'] ) ? 'operation_effects_begun' : 'operation_not_owned';
 			return $result;
 		}
@@ -526,17 +527,17 @@ class Jobs extends BaseRepository {
 		try {
 			$new_action_id = (int) $schedule( $new_generation, $new_token );
 		} catch ( \Throwable ) {
-			$this->wpdb->query( 'ROLLBACK' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			$scope->rollback();
 			$result['reason'] = 'scheduler_exception';
 			return $result;
 		}
 		if ( $new_action_id <= 0 ) {
-			$this->wpdb->query( 'ROLLBACK' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			$scope->rollback();
 			$result['reason'] = 'schedule_failed';
 			return $result;
 		}
 		if ( ! DirectOperationRecoveryPolicy::recordedActionExists( $new_action_id ) ) {
-			$this->wpdb->query( 'ROLLBACK' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			$scope->rollback();
 			$result['reason'] = 'action_receipt_missing';
 			return $result;
 		}
@@ -576,8 +577,8 @@ class Jobs extends BaseRepository {
 			array( '%s', '%s', null, '%s', '%d', '%d', '%s' ),
 			array( '%d', '%s' )
 		);
-		if ( 1 !== (int) $updated || false === $this->wpdb->query( 'COMMIT' ) ) {
-			$this->wpdb->query( 'ROLLBACK' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		if ( 1 !== (int) $updated || ! $scope->commit() ) {
+			$scope->rollback();
 			$result['reason'] = 'receipt_commit_failed';
 			return $result;
 		}
@@ -2467,7 +2468,8 @@ class Jobs extends BaseRepository {
 		}
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-		if ( false === $this->wpdb->query( 'START TRANSACTION' ) ) {
+		$scope = TransactionScope::begin( $this->wpdb );
+		if ( null === $scope ) {
 			return false;
 		}
 
@@ -2478,7 +2480,7 @@ class Jobs extends BaseRepository {
 			'mode'       => 'execution',
 		);
 		if ( ! is_array( $job ) || JobStatus::PROCESSING !== ( $job['status'] ?? '' ) || ! $this->terminal_recovery_owner_matches( $job, $owner ) ) {
-			$this->wpdb->query( 'ROLLBACK' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			$scope->rollback();
 			return false;
 		}
 
@@ -2500,12 +2502,12 @@ class Jobs extends BaseRepository {
 			array( '%d', '%s' )
 		);
 		if ( 1 !== (int) $updated ) {
-			$this->wpdb->query( 'ROLLBACK' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			$scope->rollback();
 			return false;
 		}
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-		$committed = false !== $this->wpdb->query( 'COMMIT' );
+		$committed = $scope->commit();
 		if ( function_exists( 'wp_cache_delete' ) ) {
 			wp_cache_delete( $job_id, 'datamachine_engine_data' );
 		}
@@ -2529,14 +2531,15 @@ class Jobs extends BaseRepository {
 		);
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-		if ( false === $this->wpdb->query( 'START TRANSACTION' ) ) {
+		$scope = TransactionScope::begin( $this->wpdb );
+		if ( null === $scope ) {
 			$result['reason'] = 'transaction_start_failed';
 			return $result;
 		}
 
 		$job = $this->get_job_for_update( $job_id );
 		if ( JobStatus::PROCESSING !== ( $job['status'] ?? '' ) || (int) ( $job['parent_job_id'] ?? 0 ) <= 0 || ! $this->renew_recovery_owner_on_locked_job( $job, $token, $generation ) ) {
-			$this->wpdb->query( 'ROLLBACK' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			$scope->rollback();
 			return $result;
 		}
 
@@ -2544,7 +2547,7 @@ class Jobs extends BaseRepository {
 		unset( $engine['job_status_reason'] );
 		$receipt = is_array( $engine['scheduler_recovery']['receipt'] ?? null ) ? $engine['scheduler_recovery']['receipt'] : array();
 		if ( (int) ( $receipt['generation'] ?? 0 ) === $generation && (int) ( $receipt['action_id'] ?? 0 ) > 0 ) {
-			$this->wpdb->query( 'ROLLBACK' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			$scope->rollback();
 			return array(
 				'success'   => true,
 				'action_id' => (int) $receipt['action_id'],
@@ -2555,17 +2558,17 @@ class Jobs extends BaseRepository {
 		try {
 			$action_id = (int) $schedule();
 		} catch ( \Throwable ) {
-			$this->wpdb->query( 'ROLLBACK' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			$scope->rollback();
 			$result['reason'] = 'scheduler_exception';
 			return $result;
 		}
 		if ( $action_id <= 0 ) {
-			$this->wpdb->query( 'ROLLBACK' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			$scope->rollback();
 			$result['reason'] = 'schedule_failed';
 			return $result;
 		}
 		if ( ! $this->recovery_owner_matches( $job, $token, $generation ) ) {
-			$this->wpdb->query( 'ROLLBACK' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			$scope->rollback();
 			$result['reason'] = 'lease_expired_after_schedule';
 			return $result;
 		}
@@ -2602,14 +2605,14 @@ class Jobs extends BaseRepository {
 			array( '%d', '%s' )
 		);
 		if ( 1 !== (int) $updated ) {
-			$this->wpdb->query( 'ROLLBACK' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			$scope->rollback();
 			$result['reason'] = 'receipt_commit_failed';
 			return $result;
 		}
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-		if ( false === $this->wpdb->query( 'COMMIT' ) ) {
-			$this->wpdb->query( 'ROLLBACK' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		if ( ! $scope->commit() ) {
+			$scope->rollback();
 			$result['reason'] = 'transaction_commit_failed';
 			return $result;
 		}
@@ -2663,12 +2666,13 @@ class Jobs extends BaseRepository {
 			return $this->transition_terminal_job_status_result( $job_id, $status );
 		}
 
-		if ( false === $this->wpdb->query( 'START TRANSACTION' ) ) {
+		$scope = TransactionScope::begin( $this->wpdb );
+		if ( null === $scope ) {
 			return $this->status_transition_result( false, false, null, $status );
 		}
 		$job = $this->get_job_for_update( $job_id );
 		if ( ! is_array( $job ) ) {
-			$this->wpdb->query( 'ROLLBACK' );
+			$scope->rollback();
 			return $this->status_transition_result( false, false, null, $status );
 		}
 
@@ -2677,12 +2681,12 @@ class Jobs extends BaseRepository {
 		$current_engine = is_array( $job['engine_data'] ?? null ) ? $job['engine_data'] : array();
 		$current_reason = is_string( $current_engine['job_status_reason'] ?? null ) ? $current_engine['job_status_reason'] : null;
 		if ( $current_status === $status && $current_reason === $job_status->getReason() ) {
-			$this->wpdb->query( 'ROLLBACK' );
+			$scope->rollback();
 			return $this->status_transition_result( true, false, $current_status, $status );
 		}
 
 		if ( JobStatus::isStatusFinal( $current_status ) ) {
-			$this->wpdb->query( 'ROLLBACK' );
+			$scope->rollback();
 			return $this->status_transition_result( false, false, $current_status, $status );
 		}
 
@@ -2701,8 +2705,8 @@ class Jobs extends BaseRepository {
 			array( '%d', '%s' )
 		);
 
-		if ( 1 !== (int) $updated || false === $this->wpdb->query( 'COMMIT' ) ) {
-			$this->wpdb->query( 'ROLLBACK' );
+		if ( 1 !== (int) $updated || ! $scope->commit() ) {
+			$scope->rollback();
 			return $this->status_transition_result( false, false, $current_status, $status );
 		}
 
@@ -2742,33 +2746,34 @@ class Jobs extends BaseRepository {
 
 		self::$terminalizing_job = $job_id;
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-		if ( false === $this->wpdb->query( 'START TRANSACTION' ) ) {
+		$scope = TransactionScope::begin( $this->wpdb );
+		if ( null === $scope ) {
 			self::$terminalizing_job = null;
 			return $this->status_transition_result( false, false, null, $requested_status );
 		}
 
 		$job = $this->get_job_for_update( $job_id );
 		if ( ! is_array( $job ) ) {
-			$this->rollback_terminal_transition( $job_id );
+			$this->rollback_terminal_transition( $job_id, $scope );
 			return $this->status_transition_result( false, false, null, $requested_status );
 		}
 		if ( is_array( $recovery_owner ) && ! $this->terminal_recovery_owner_matches( $job, $recovery_owner ) ) {
-			$this->rollback_terminal_transition( $job_id );
+			$this->rollback_terminal_transition( $job_id, $scope );
 			return $this->status_transition_result( false, false, (string) ( $job['status'] ?? '' ), $requested_status );
 		}
 
 		$current_status = is_string( $job['status'] ?? null ) ? $job['status'] : '';
 		if ( $pending_direct_cancel && ( 'direct' !== (string) ( $job['flow_id'] ?? '' ) || JobStatus::PENDING !== $current_status || ! empty( $job['operation_effects_begun_at'] ) ) ) {
-			$this->rollback_terminal_transition( $job_id );
+			$this->rollback_terminal_transition( $job_id, $scope );
 			return $this->status_transition_result( false, false, $current_status, $current_status );
 		}
 		if ( $current_status === $requested_job_status->getBaseStatus() ) {
-			$this->rollback_terminal_transition( $job_id );
+			$this->rollback_terminal_transition( $job_id, $scope );
 			$this->reconcile_terminal_accounting( $job_id );
 			return $this->status_transition_result( true, false, $current_status, $current_status );
 		}
 		if ( JobStatus::isStatusFinal( $current_status ) ) {
-			$this->rollback_terminal_transition( $job_id );
+			$this->rollback_terminal_transition( $job_id, $scope );
 			$this->reconcile_terminal_accounting( $job_id );
 			return $this->status_transition_result( false, false, $current_status, $current_status );
 		}
@@ -2795,7 +2800,7 @@ class Jobs extends BaseRepository {
 		}
 
 		if ( is_wp_error( $prepared_status ) ) {
-			$this->rollback_terminal_transition( $job_id );
+			$this->rollback_terminal_transition( $job_id, $scope );
 			if ( ! $requested_success ) {
 				return $this->status_transition_result( false, false, $current_status, $current_status );
 			}
@@ -2808,24 +2813,24 @@ class Jobs extends BaseRepository {
 
 		$status = is_string( $prepared_status ) ? $prepared_status : '';
 		if ( $requested_success && ! JobStatus::isStatusSuccess( $status ) ) {
-			$this->rollback_terminal_transition( $job_id );
+			$this->rollback_terminal_transition( $job_id, $scope );
 			$failure_status = JobStatus::isStatusFinal( $status )
 				? $status
 				: JobStatus::failed( 'terminal_preparation_failed' )->toString();
 			return $this->transition_job_status_result( $job_id, $failure_status, true );
 		}
 		if ( ! $requested_success && JobStatus::isStatusSuccess( $status ) ) {
-			$this->rollback_terminal_transition( $job_id );
+			$this->rollback_terminal_transition( $job_id, $scope );
 			return $this->status_transition_result( false, false, $current_status, $current_status );
 		}
 
 		if ( ! JobStatus::isStatusFinal( $status ) ) {
-			$this->rollback_terminal_transition( $job_id );
+			$this->rollback_terminal_transition( $job_id, $scope );
 			return $this->status_transition_result( false, false, $current_status, $current_status );
 		}
 		$prepared_job_status = JobStatus::fromString( $status );
 		if ( ! $prepared_job_status->isCanonical() ) {
-			$this->rollback_terminal_transition( $job_id );
+			$this->rollback_terminal_transition( $job_id, $scope );
 			return $this->status_transition_result( false, false, $current_status, $current_status );
 		}
 		$status = $prepared_job_status->getBaseStatus();
@@ -2833,7 +2838,7 @@ class Jobs extends BaseRepository {
 		try {
 			$accounting_context = apply_filters( 'datamachine_job_terminal_accounting_context', array(), $job_id, $status );
 		} catch ( \Throwable ) {
-			$this->rollback_terminal_transition( $job_id );
+			$this->rollback_terminal_transition( $job_id, $scope );
 			return $this->status_transition_result( false, false, $current_status, $current_status );
 		}
 		$processed_claim_count = is_array( $accounting_context ) ? max( 0, (int) ( $accounting_context['processed_claim_count'] ?? 0 ) ) : 0;
@@ -2844,7 +2849,7 @@ class Jobs extends BaseRepository {
 				? $this->renew_recovery_owner_on_locked_job( $latest_job, (string) ( $recovery_owner['token'] ?? '' ), (int) ( $recovery_owner['generation'] ?? 0 ) )
 				: $this->terminal_recovery_owner_matches( $latest_job, $recovery_owner );
 			if ( ! $owner_valid ) {
-				$this->rollback_terminal_transition( $job_id );
+				$this->rollback_terminal_transition( $job_id, $scope );
 				return $this->status_transition_result( false, false, $current_status, $current_status );
 			}
 			$job = $latest_job;
@@ -2934,18 +2939,18 @@ class Jobs extends BaseRepository {
 			array( '%d', '%s' )
 		);
 		if ( 1 !== $updated ) {
-			$this->rollback_terminal_transition( $job_id );
+			$this->rollback_terminal_transition( $job_id, $scope );
 			$winner        = $this->get_job( $job_id );
 			$winner_status = is_array( $winner ) && is_string( $winner['status'] ?? null ) ? $winner['status'] : $current_status;
 			return $this->status_transition_result( false, false, $winner_status, $winner_status );
 		}
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-		$committed = false !== $this->wpdb->query( 'COMMIT' );
+		$committed = $scope->commit();
 
 		self::$terminalizing_job = null;
 		if ( ! $committed ) {
-			$this->rollback_terminal_transition( $job_id );
+			$this->rollback_terminal_transition( $job_id, $scope );
 			$winner        = $this->get_job( $job_id );
 			$winner_status = is_array( $winner ) && is_string( $winner['status'] ?? null ) ? $winner['status'] : $current_status;
 			return $this->status_transition_result( $status === $winner_status, false, $winner_status, $winner_status );
@@ -3354,9 +3359,9 @@ class Jobs extends BaseRepository {
 	}
 
 	/** Roll back a terminal ownership boundary and clear request-shared state. */
-	private function rollback_terminal_transition( int $job_id ): void {
+	private function rollback_terminal_transition( int $job_id, TransactionScope $scope ): void {
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-		$this->wpdb->query( 'ROLLBACK' );
+		$scope->rollback();
 		wp_cache_delete( $job_id, 'datamachine_engine_data' );
 		self::$terminalizing_job = null;
 		do_action( 'datamachine_job_terminal_rolled_back', $job_id );

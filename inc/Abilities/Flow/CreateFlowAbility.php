@@ -12,7 +12,7 @@ namespace DataMachine\Abilities\Flow;
 
 use DataMachine\Abilities\AbilityRegistration;
 use DataMachine\Api\Flows\FlowScheduling;
-use DataMachine\Core\Database\BaseRepository;
+use DataMachine\Core\Database\TransactionScope;
 use DataMachine\Engine\Tasks\RecurringScheduler;
 
 defined( 'ABSPATH' ) || exit;
@@ -419,89 +419,29 @@ class CreateFlowAbility {
 	/**
 	 * Begin an owned transaction scope without committing a caller transaction.
 	 *
-	 * @return array{type:string,name?:string}|null Scope metadata, or null on failure.
+	 * @return TransactionScope|null Scope, or null on failure.
 	 */
-	private function beginCreationTransactionScope(): ?array {
+	private function beginCreationTransactionScope(): ?TransactionScope {
 		global $wpdb;
-
-		static $savepoint_sequence = 0;
-
-		$in_transaction = BaseRepository::is_sqlite();
-		if ( ! $in_transaction ) {
-			// WordPress's test transaction and callers that disable autocommit need
-			// no server-specific transaction variable.
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
-			$in_transaction = 0 === (int) $wpdb->get_var( 'SELECT @@autocommit' );
-
-			// MySQL exposes active transaction state directly, but compatible
-			// services do not always implement that optional variable.
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
-			$has_transaction_variable = $wpdb->get_var( "SHOW VARIABLES LIKE 'in_transaction'" );
-			if ( ! $in_transaction && 'in_transaction' === strtolower( (string) $has_transaction_variable ) ) {
-				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
-				$in_transaction = 1 === (int) $wpdb->get_var( 'SELECT @@in_transaction' );
-			}
-		}
-
-		if ( $in_transaction || BaseRepository::is_sqlite() ) {
-			++$savepoint_sequence;
-			$name = 'datamachine_create_flow_' . $savepoint_sequence;
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-			if ( false === $wpdb->query( "SAVEPOINT {$name}" ) ) {
-				return null;
-			}
-
-			return array(
-				'type' => 'savepoint',
-				'name' => $name,
-			);
-		}
-
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
-		if ( false === $wpdb->query( 'START TRANSACTION' ) ) {
-			return null;
-		}
-
-		return array( 'type' => 'transaction' );
+		return TransactionScope::begin( $wpdb );
 	}
 
 	/**
 	 * Commit only the transaction scope opened by this ability call.
 	 *
-	 * @param array{type:string,name?:string} $scope Transaction scope metadata.
+	 * @param TransactionScope $scope Transaction scope.
 	 */
-	private function commitCreationTransactionScope( array $scope ): bool {
-		global $wpdb;
-
-		if ( 'savepoint' === $scope['type'] ) {
-			$name = $scope['name'];
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- This transaction needs to release its own fresh savepoint.
-			return false !== $wpdb->query( $wpdb->prepare( 'RELEASE SAVEPOINT %i', $name ) );
-		}
-
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
-		return false !== $wpdb->query( 'COMMIT' );
+	private function commitCreationTransactionScope( TransactionScope $scope ): bool {
+		return $scope->commit();
 	}
 
 	/**
 	 * Roll back only the transaction scope opened by this ability call.
 	 *
-	 * @param array{type:string,name?:string} $scope Transaction scope metadata.
+	 * @param TransactionScope $scope Transaction scope.
 	 */
-	private function rollbackCreationTransactionScope( array $scope ): void {
-		global $wpdb;
-
-		if ( 'savepoint' === $scope['type'] ) {
-			$name = $scope['name'];
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- This transaction needs to roll back its own fresh savepoint.
-			$wpdb->query( $wpdb->prepare( 'ROLLBACK TO SAVEPOINT %i', $name ) );
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- This transaction needs to release its own fresh savepoint.
-			$wpdb->query( $wpdb->prepare( 'RELEASE SAVEPOINT %i', $name ) );
-			return;
-		}
-
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
-		$wpdb->query( 'ROLLBACK' );
+	private function rollbackCreationTransactionScope( TransactionScope $scope ): void {
+		$scope->rollback();
 	}
 
 	/**

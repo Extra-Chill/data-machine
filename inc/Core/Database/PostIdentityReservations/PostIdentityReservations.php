@@ -8,6 +8,7 @@
 namespace DataMachine\Core\Database\PostIdentityReservations;
 
 use DataMachine\Core\Database\BaseRepository;
+use DataMachine\Core\Database\TransactionScope;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -26,6 +27,8 @@ class PostIdentityReservations extends BaseRepository {
 
 	/** @var array<string,string> Exact lock names acquired by this repository. */
 	private array $acquired_locks = array();
+
+	private ?TransactionScope $transaction_scope = null;
 
 	public static function create_table(): void {
 		global $wpdb;
@@ -830,18 +833,26 @@ class PostIdentityReservations extends BaseRepository {
 	}
 
 	protected function start_transaction(): bool {
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-		return false !== $this->wpdb->query( 'START TRANSACTION' );
+		$this->transaction_scope = TransactionScope::begin( $this->wpdb );
+		return null !== $this->transaction_scope;
 	}
 
 	protected function commit_transaction(): bool {
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-		return false !== $this->wpdb->query( 'COMMIT' );
+		if ( null === $this->transaction_scope ) {
+			return false;
+		}
+		$committed = $this->transaction_scope->commit();
+		if ( $committed ) {
+			$this->transaction_scope = null;
+		}
+		return $committed;
 	}
 
 	protected function rollback_transaction(): void {
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-		$this->wpdb->query( 'ROLLBACK' );
+		if ( null !== $this->transaction_scope ) {
+			$this->transaction_scope->rollback();
+			$this->transaction_scope = null;
+		}
 	}
 
 	private function commit_uncertain_error(): \WP_Error {

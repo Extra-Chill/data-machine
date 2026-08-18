@@ -8,6 +8,7 @@
 namespace DataMachine\Core\Database\BatchItems;
 
 use DataMachine\Core\Database\BaseRepository;
+use DataMachine\Core\Database\TransactionScope;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -51,20 +52,21 @@ class BatchItems extends BaseRepository {
 			)
 		);
 		$preexisting       = is_string( $preexisting_token ) && '' !== $preexisting_token;
-		if ( false === $this->wpdb->query( 'START TRANSACTION' ) ) {
+		$scope = TransactionScope::begin( $this->wpdb );
+		if ( null === $scope ) {
 			return $this->insert_result( false, false, $preexisting || '' !== (string) $this->wpdb->last_error );
 		}
 
 		$token = bin2hex( random_bytes( 16 ) );
 		$first = $this->encode_item( $items[0], $cleanup_contexts[0] ?? array() );
 		if ( null === $first ) {
-			$this->wpdb->query( 'ROLLBACK' );
+			$scope->rollback();
 			return $this->insert_result( false, false, $preexisting );
 		}
 
 		$inserted = $this->insert_encoded_rows( $batch_job_id, array( 0 => $first ), $token );
 		if ( false === $inserted ) {
-			$this->wpdb->query( 'ROLLBACK' );
+			$scope->rollback();
 			return $this->insert_result( false, false, true );
 		}
 
@@ -77,7 +79,7 @@ class BatchItems extends BaseRepository {
 		);
 		$created     = '' !== $owner_token && hash_equals( $token, $owner_token );
 		if ( '' === $owner_token ) {
-			$this->wpdb->query( 'ROLLBACK' );
+			$scope->rollback();
 			return $this->insert_result( false, false, true );
 		}
 
@@ -88,7 +90,7 @@ class BatchItems extends BaseRepository {
 				$index = $start + $relative_index;
 				$row   = 0 === $index ? $first : $this->encode_item( $item, $cleanup_contexts[ $index ] ?? array() );
 				if ( null === $row ) {
-					$this->wpdb->query( 'ROLLBACK' );
+					$scope->rollback();
 					return $this->insert_result( false, false, ! $created );
 				}
 				$encoded[ $index ] = $row;
@@ -98,12 +100,12 @@ class BatchItems extends BaseRepository {
 				$to_insert = $encoded;
 				unset( $to_insert[0] );
 				if ( $to_insert && false === $this->insert_encoded_rows( $batch_job_id, $to_insert, $token ) ) {
-					$this->wpdb->query( 'ROLLBACK' );
+					$scope->rollback();
 					return $this->insert_result( false );
 				}
 			}
 			if ( ! $this->verify_encoded_rows( $batch_job_id, $encoded, $owner_token ) ) {
-				$this->wpdb->query( 'ROLLBACK' );
+				$scope->rollback();
 				return $this->insert_result( false, false, ! $created );
 			}
 		}
@@ -112,11 +114,11 @@ class BatchItems extends BaseRepository {
 			$wpdb->prepare( 'SELECT COUNT(*) FROM %i WHERE batch_job_id = %d', $this->table_name, $batch_job_id )
 		);
 		if ( $count !== $total ) {
-			$this->wpdb->query( 'ROLLBACK' );
+			$scope->rollback();
 			return $this->insert_result( false, false, ! $created );
 		}
-		if ( false === $this->wpdb->query( 'COMMIT' ) ) {
-			$this->wpdb->query( 'ROLLBACK' );
+		if ( ! $scope->commit() ) {
+			$scope->rollback();
 			return $this->insert_result( false, false, ! $created );
 		}
 
@@ -205,7 +207,7 @@ class BatchItems extends BaseRepository {
 	public function claim_chunk( int $batch_job_id, int $offset, int $limit, int $lease_seconds = self::DEFAULT_LEASE_SECONDS, ?callable $owner = null ): array {
 		$wpdb = $this->wpdb;
 
-		if ( $batch_job_id <= 0 || $limit < 1 || false === $this->wpdb->query( 'START TRANSACTION' ) ) {
+		if ( $batch_job_id <= 0 || $limit < 1 || null === ( $scope = TransactionScope::begin( $this->wpdb ) ) ) {
 			return array();
 		}
 
@@ -248,7 +250,7 @@ class BatchItems extends BaseRepository {
 				array( '%d', '%d' )
 			);
 			if ( 1 !== $updated ) {
-				$this->wpdb->query( 'ROLLBACK' );
+				$scope->rollback();
 				return array();
 			}
 
@@ -258,12 +260,12 @@ class BatchItems extends BaseRepository {
 		}
 
 		if ( $claimed && null !== $owner && ! $owner() ) {
-			$this->wpdb->query( 'ROLLBACK' );
+			$scope->rollback();
 			return array();
 		}
 
-		if ( false === $this->wpdb->query( 'COMMIT' ) ) {
-			$this->wpdb->query( 'ROLLBACK' );
+		if ( ! $scope->commit() ) {
+			$scope->rollback();
 			return array();
 		}
 		return $claimed;
@@ -376,7 +378,8 @@ class BatchItems extends BaseRepository {
 	public function discard_outstanding( int $batch_job_id ): array {
 		$wpdb = $this->wpdb;
 
-		if ( false === $this->wpdb->query( 'START TRANSACTION' ) ) {
+		$scope = TransactionScope::begin( $this->wpdb );
+		if ( null === $scope ) {
 			return array(
 				'success' => false,
 				'rows'    => array(),
@@ -396,8 +399,8 @@ class BatchItems extends BaseRepository {
 		);
 		$indexes = array_map( static fn( array $row ): int => (int) $row['item_index'], (array) $rows );
 		$updated = $this->discard_indexes( $batch_job_id, $indexes );
-		if ( false === $updated || false === $this->wpdb->query( 'COMMIT' ) ) {
-			$this->wpdb->query( 'ROLLBACK' );
+		if ( false === $updated || ! $scope->commit() ) {
+			$scope->rollback();
 			return array(
 				'success' => false,
 				'rows'    => array(),
@@ -421,7 +424,8 @@ class BatchItems extends BaseRepository {
 	public function request_cancellation( int $batch_job_id ): array {
 		$wpdb = $this->wpdb;
 
-		if ( false === $this->wpdb->query( 'START TRANSACTION' ) ) {
+		$scope = TransactionScope::begin( $this->wpdb );
+		if ( null === $scope ) {
 			return array(
 				'success'   => false,
 				'rows'      => array(),
@@ -451,8 +455,8 @@ class BatchItems extends BaseRepository {
 
 		$ready_updated = $this->discard_indexes( $batch_job_id, $ready_indexes );
 		$claim_updated = $this->transition_claims_to_cancel_pending( $batch_job_id, $claimed_indexes );
-		if ( false === $ready_updated || false === $claim_updated || false === $this->wpdb->query( 'COMMIT' ) ) {
-			$this->wpdb->query( 'ROLLBACK' );
+		if ( false === $ready_updated || false === $claim_updated || ! $scope->commit() ) {
+			$scope->rollback();
 			return array(
 				'success'   => false,
 				'rows'      => array(),
@@ -503,7 +507,7 @@ class BatchItems extends BaseRepository {
 	public function discard_owned( int $batch_job_id, string $token ): array {
 		$wpdb = $this->wpdb;
 
-		if ( '' === $token || false === $this->wpdb->query( 'START TRANSACTION' ) ) {
+		if ( '' === $token || null === ( $scope = TransactionScope::begin( $this->wpdb ) ) ) {
 			return array(
 				'success' => false,
 				'rows'    => array(),
@@ -522,8 +526,8 @@ class BatchItems extends BaseRepository {
 		);
 		$indexes = array_map( static fn( array $row ): int => (int) $row['item_index'], (array) $rows );
 		$updated = $this->discard_indexes( $batch_job_id, $indexes );
-		if ( false === $updated || false === $this->wpdb->query( 'COMMIT' ) ) {
-			$this->wpdb->query( 'ROLLBACK' );
+		if ( false === $updated || ! $scope->commit() ) {
+			$scope->rollback();
 			return array(
 				'success' => false,
 				'rows'    => array(),

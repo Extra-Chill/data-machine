@@ -51,7 +51,7 @@ $terminal     = DirectOperationRecoveryPolicy::evidence( $post_effects, $missing
 $assert( 'post-effects evidence prohibits replay and accounts for child cleanup', true === $terminal['operation_effects_begun'] && 1 === $terminal['system_children_terminalized'] );
 
 $jobs_source = file_get_contents( __DIR__ . '/../inc/Core/Database/Jobs/Jobs.php' ) ?: '';
-$assert( 'requeue schedules and receipts while holding the jobs-row transaction', str_contains( $jobs_source, 'commit_missing_direct_operation_requeue' ) && str_contains( $jobs_source, "query( 'START TRANSACTION' )" ) && str_contains( $jobs_source, '$schedule( $new_generation, $new_token )' ) );
+$assert( 'requeue schedules and receipts while holding the jobs-row transaction', str_contains( $jobs_source, 'commit_missing_direct_operation_requeue' ) && str_contains( $jobs_source, 'TransactionScope::begin( $this->wpdb )' ) && str_contains( $jobs_source, '$schedule( $new_generation, $new_token )' ) );
 $assert( 'requeue advances generation and restores pending lifecycle', str_contains( $jobs_source, '$new_generation = $generation + 1' ) && str_contains( $jobs_source, "\$run_lifecycle['status']" ) && str_contains( $jobs_source, 'JobStatus::PENDING' ) );
 $assert( 'terminal recovery fences the exact recorded action owner', str_contains( $jobs_source, 'missing_direct_operation_owner_matches' ) && str_contains( $jobs_source, "'operation' === \$mode" ) );
 
