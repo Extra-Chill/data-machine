@@ -300,10 +300,10 @@ class CreateFlow extends BaseTool {
 					)
 				);
 
-				if ( ! $result['success'] ) {
+				if ( is_wp_error( $result ) || ! $result['success'] ) {
 					$errors[] = array(
 						'pipeline_step_id' => $pipeline_step_id,
-						'error'            => $result['error'] ?? 'Failed to update handler',
+						'error'            => is_wp_error( $result ) ? $result->get_error_message() : ( $result['error'] ?? 'Failed to update handler' ),
 					);
 					continue;
 				}
@@ -318,10 +318,10 @@ class CreateFlow extends BaseTool {
 					)
 				);
 
-				if ( ! $result['success'] ) {
+				if ( is_wp_error( $result ) || ! $result['success'] ) {
 					$errors[] = array(
 						'pipeline_step_id' => $pipeline_step_id,
-						'error'            => $result['error'] ?? 'Failed to update user_message',
+						'error'            => is_wp_error( $result ) ? $result->get_error_message() : ( $result['error'] ?? 'Failed to update user_message' ),
 					);
 					continue;
 				}

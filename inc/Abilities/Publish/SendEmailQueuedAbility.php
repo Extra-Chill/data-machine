@@ -269,7 +269,7 @@ class SendEmailQueuedAbility {
 	 * @param array $input Send-email payload + send_at/priority.
 	 * @return array Result with success flag, action_id, scheduled_for.
 	 */
-	public function execute( array $input ): array {
+	public function execute( array $input ): array|\WP_Error {
 		$logs = array();
 		$context = array(
 			'user_id'   => PermissionHelper::acting_user_id(),
@@ -277,39 +277,23 @@ class SendEmailQueuedAbility {
 			'token_id'  => absint( PermissionHelper::get_acting_token_id() ),
 		);
 		if ( $context['user_id'] <= 0 ) {
-			return array(
-				'success' => false,
-				'error'   => 'An identified issuer is required to queue email.',
-				'logs'    => $logs,
-			);
+			return new \WP_Error( 'email_queue_issuer_required', 'An identified issuer is required to queue email.', array( 'status' => 403, 'logs' => $logs ) );
 		}
 		if ( ! empty( $input['auth_ref'] ) ) {
 			$providers = apply_filters( 'datamachine_auth_providers', array() );
 			$auth      = $providers['email_imap'] ?? null;
 			if ( ! $auth || ! method_exists( $auth, 'resolve_mailbox' ) || is_wp_error( $auth->resolve_mailbox( $input['auth_ref'], 'send' ) ) ) {
-				return array(
-					'success' => false,
-					'error'   => 'Mailbox send authorization failed.',
-					'logs'    => $logs,
-				);
+				return new \WP_Error( 'email_queue_authorization_failed', 'Mailbox send authorization failed.', array( 'status' => 403, 'logs' => $logs ) );
 			}
 		} elseif ( ! $this->canUseLegacySender() ) {
-			return array(
-				'success' => false,
-				'error'   => 'An authorized mailbox ref is required to queue email.',
-				'logs'    => $logs,
-			);
+			return new \WP_Error( 'email_queue_mailbox_required', 'An authorized mailbox ref is required to queue email.', array( 'status' => 403, 'logs' => $logs ) );
 		}
 
 		// Validate the bare minimum here. The underlying ability re-validates
 		// the full payload when the worker runs.
 		$to = isset( $input['to'] ) ? (string) $input['to'] : '';
 		if ( '' === trim( $to ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'Recipient (to) is required.',
-				'logs'    => $logs,
-			);
+			return new \WP_Error( 'invalid_email_recipient', 'Recipient (to) is required.', array( 'status' => 400, 'logs' => $logs ) );
 		}
 
 		$send_at_raw = $input['send_at'] ?? '';
@@ -329,11 +313,7 @@ class SendEmailQueuedAbility {
 		$timestamp = $this->parseSendAt( $send_at_raw );
 
 		if ( $timestamp instanceof \WP_Error ) {
-			return array(
-				'success' => false,
-				'error'   => $timestamp->get_error_message(),
-				'logs'    => $logs,
-			);
+			return new \WP_Error( $timestamp->get_error_code(), $timestamp->get_error_message(), array_merge( array( 'status' => 400 ), is_array( $timestamp->get_error_data() ) ? $timestamp->get_error_data() : array(), array( 'logs' => $logs ) ) );
 		}
 
 		// Action Scheduler payload — wrap in an indexed array so the hook
@@ -353,11 +333,7 @@ class SendEmailQueuedAbility {
 				'level'   => 'error',
 				'message' => 'Email queue: Action Scheduler did not return an action id',
 			);
-			return array(
-				'success' => false,
-				'error'   => 'Failed to schedule email action.',
-				'logs'    => $logs,
-			);
+			return new \WP_Error( 'email_queue_failed', 'Failed to schedule email action.', array( 'status' => 500, 'logs' => $logs ) );
 		}
 
 		$logs[] = array(
@@ -438,7 +414,7 @@ class SendEmailQueuedAbility {
 			return;
 		}
 
-		$error_msg = is_wp_error( $result ) ? $result->get_error_message() : 'invalid result';
+		$error_msg = is_wp_error( $result ) ? $result->get_error_message() : ( $result['error'] ?? 'invalid result' );
 
 		if ( $attempt >= self::MAX_ATTEMPTS ) {
 			do_action(

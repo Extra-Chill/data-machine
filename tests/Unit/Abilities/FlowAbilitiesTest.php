@@ -469,9 +469,9 @@ class FlowAbilitiesTest extends WP_UnitTestCase {
 			'flow_name' => 'Should Not Exist'
 		]);
 
-		$this->assertFalse($result['success']);
-		$this->assertArrayHasKey('error', $result);
-		$this->assertStringContainsString('not found', $result['error']);
+		$this->assertWPError($result);
+		$this->assertSame('pipeline_not_found', $result->get_error_code());
+		$this->assertSame(404, $result->get_error_data()['status']);
 	}
 
 	public function test_create_flow_defaults_name_to_flow(): void {

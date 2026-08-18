@@ -185,8 +185,9 @@ class FlowCreationAtomicityTest extends WP_UnitTestCase {
 
 			$result = wp_get_ability( 'datamachine/create-flow' )->execute( $input );
 
-			$this->assertFalse( $result['success'] );
-			$this->assertStringContainsString( $alias, $result['error'] );
+			$this->assertWPError( $result );
+			$this->assertSame( 'invalid_step_configs', $result->get_error_code() );
+			$this->assertStringContainsString( $alias, $result->get_error_message() );
 			$this->assertSame( $before, $this->flowCount() );
 		}
 	}
@@ -206,8 +207,9 @@ class FlowCreationAtomicityTest extends WP_UnitTestCase {
 
 		$result = wp_get_ability( 'datamachine/create-flow' )->execute( $input );
 
-		$this->assertFalse( $result['success'] );
-		$this->assertStringContainsString( 'Unknown handler_config fields', $result['error'] );
+		$this->assertWPError( $result );
+		$this->assertSame( 'flow_creation_failed', $result->get_error_code() );
+		$this->assertStringContainsString( 'Unknown handler_config fields', $result->get_error_message() );
 		$this->assertSame( $before, $this->flowCount() );
 	}
 
@@ -259,7 +261,7 @@ class FlowCreationAtomicityTest extends WP_UnitTestCase {
 
 		$result = wp_get_ability( 'datamachine/create-flow' )->execute( $input );
 
-		$this->assertFalse( $result['success'] );
+		$this->assertWPError( $result );
 		$this->assertSame( $before, $this->scheduledFlowActionCount() );
 	}
 
@@ -271,8 +273,9 @@ class FlowCreationAtomicityTest extends WP_UnitTestCase {
 
 		$result = wp_get_ability( 'datamachine/create-flow' )->execute( $input );
 
-		$this->assertFalse( $result['success'] );
-		$this->assertStringContainsString( 'Timestamp required', $result['error'] );
+		$this->assertWPError( $result );
+		$this->assertSame( 'invalid_schedule', $result->get_error_code() );
+		$this->assertStringContainsString( 'Timestamp required', $result->get_error_message() );
 		$this->assertSame( $flow_count, $this->flowCount() );
 		$this->assertSame( $action_count, $this->scheduledFlowActionCount() );
 	}
@@ -297,8 +300,9 @@ class FlowCreationAtomicityTest extends WP_UnitTestCase {
 		$result = wp_get_ability( 'datamachine/create-flow' )->execute( $this->validInput( 'Default Failure Flow' ) );
 
 		remove_filter( 'datamachine_flow_config_pre_save', $reject_default );
-		$this->assertFalse( $result['success'] );
-		$this->assertStringContainsString( 'Failed to update handler configuration', $result['error'] );
+		$this->assertWPError( $result );
+		$this->assertSame( 'flow_creation_failed', $result->get_error_code() );
+		$this->assertStringContainsString( 'Failed to update handler configuration', $result->get_error_message() );
 		$this->assertSame( $before, $this->flowCount() );
 	}
 
@@ -314,7 +318,7 @@ class FlowCreationAtomicityTest extends WP_UnitTestCase {
 			)
 		);
 
-		$this->assertFalse( $result['success'] );
+		$this->assertWPError( $result );
 		$this->assertSame( $before, $this->flowCount() );
 	}
 

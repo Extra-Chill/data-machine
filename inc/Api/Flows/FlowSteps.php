@@ -343,6 +343,9 @@ class FlowSteps {
 					'handler_config' => $handler_settings,
 				)
 			);
+			if ( is_wp_error( $result ) ) {
+				return $result;
+			}
 
 			if ( ! $result['success'] ) {
 				return new \WP_Error(

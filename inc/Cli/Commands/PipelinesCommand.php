@@ -19,6 +19,7 @@ use DataMachine\Abilities\Pipeline\CreatePipelineAbility;
 use DataMachine\Abilities\Pipeline\DeletePipelineAbility;
 use DataMachine\Abilities\Pipeline\GetPipelinesAbility;
 use DataMachine\Abilities\Pipeline\UpdatePipelineAbility;
+use DataMachine\Core\AbilityResult;
 use DataMachine\Core\Steps\FlowStepConfig;
 use DataMachine\Engine\Debug\SyncRunner;
 
@@ -625,7 +626,7 @@ class PipelinesCommand extends BaseCommand {
 			);
 		}
 
-		$result = ( new CreatePipelineAbility() )->execute( $input );
+		$result = AbilityResult::normalize( ( new CreatePipelineAbility() )->execute( $input ) );
 
 		if ( ! $result['success'] ) {
 			WP_CLI::error( $result['error'] ?? 'Failed to create pipeline' );

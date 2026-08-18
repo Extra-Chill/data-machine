@@ -367,8 +367,8 @@ class ScheduleMutationFailureTest extends WP_UnitTestCase {
 
 		$result = ( new ReflectionMethod( $ability, 'rollbackCreation' ) )->invoke( $ability, $scope, $flow_id, 'Forced rollback' );
 
-		$this->assertFalse( $result['success'] );
-		$this->assertArrayNotHasKey( 'schedule_cleanup', $result );
+		$this->assertWPError( $result );
+		$this->assertArrayNotHasKey( 'schedule_cleanup', $result->get_error_data() );
 		$this->assertNull( $this->flows->get_flow( $flow_id ) );
 	}
 

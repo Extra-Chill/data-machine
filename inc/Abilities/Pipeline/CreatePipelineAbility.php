@@ -110,7 +110,7 @@ class CreatePipelineAbility {
 	 * @param array $input Input parameters.
 	 * @return array Result with created pipeline data.
 	 */
-	public function execute( array $input ): array {
+	public function execute( array $input ): array|\WP_Error {
 		// Check for bulk mode
 		if ( ! empty( $input['pipelines'] ) && is_array( $input['pipelines'] ) ) {
 			return $this->executeBulk( $input );
@@ -125,22 +125,16 @@ class CreatePipelineAbility {
 	 * @param array $input Input parameters.
 	 * @return array Result with created pipeline data.
 	 */
-	private function executeSingle( array $input ): array {
+	private function executeSingle( array $input ): array|\WP_Error {
 		$pipeline_name = $input['pipeline_name'] ?? null;
 
 		if ( empty( $pipeline_name ) || ! is_string( $pipeline_name ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'pipeline_name is required and must be a non-empty string',
-			);
+			return new \WP_Error( 'invalid_pipeline_name', 'pipeline_name is required and must be a non-empty string', array( 'status' => 400 ) );
 		}
 
 		$pipeline_name = sanitize_text_field( wp_unslash( $pipeline_name ) );
 		if ( empty( trim( $pipeline_name ) ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'pipeline_name cannot be empty',
-			);
+			return new \WP_Error( 'invalid_pipeline_name', 'pipeline_name cannot be empty', array( 'status' => 400 ) );
 		}
 
 		$agent_id    = isset( $input['agent_id'] ) ? (int) $input['agent_id'] : null;
@@ -151,10 +145,7 @@ class CreatePipelineAbility {
 			$scheduling_config     = $flow_config['scheduling_config'] ?? array( 'interval' => 'manual' );
 			$scheduling_validation = datamachine_validate_interval( $scheduling_config['interval'] ?? 'manual', $scheduling_config );
 			if ( ! $scheduling_validation['valid'] ) {
-				return array(
-					'success' => false,
-					'error'   => $scheduling_validation['error'],
-				);
+				return new \WP_Error( 'invalid_pipeline_schedule', $scheduling_validation['error'], array( 'status' => 400 ) );
 			}
 			$flow_config['scheduling_config']['interval'] = $scheduling_validation['resolved'];
 		}
@@ -178,18 +169,12 @@ class CreatePipelineAbility {
 		if ( $has_workflow ) {
 			$validation = $this->validateWorkflow( $workflow );
 			if ( true !== $validation ) {
-				return array(
-					'success' => false,
-					'error'   => $validation,
-				);
+				return new \WP_Error( 'invalid_pipeline_workflow', (string) $validation, array( 'status' => 400 ) );
 			}
 		} elseif ( $has_steps ) {
 			$validation = $this->validateSteps( $steps );
 			if ( true !== $validation ) {
-				return array(
-					'success' => false,
-					'error'   => $validation,
-				);
+				return new \WP_Error( 'invalid_pipeline_steps', (string) $validation, array( 'status' => 400 ) );
 			}
 		}
 
@@ -206,10 +191,7 @@ class CreatePipelineAbility {
 
 		if ( ! $pipeline_id ) {
 			do_action( 'datamachine_log', 'error', 'Failed to create pipeline', array( 'pipeline_name' => $pipeline_name ) );
-			return array(
-				'success' => false,
-				'error'   => 'Failed to create pipeline',
-			);
+			return new \WP_Error( 'pipeline_creation_failed', 'Failed to create pipeline', array( 'status' => 500 ) );
 		}
 
 		$pipeline_config = array();
@@ -283,11 +265,11 @@ class CreatePipelineAbility {
 				$flow_result = $create_flow_ability->execute( $flow_input );
 			}
 
-			if ( ! $flow_result || ! $flow_result['success'] ) {
+			if ( ! $flow_result || is_wp_error( $flow_result ) || empty( $flow_result['success'] ) ) {
 				do_action( 'datamachine_log', 'error', "Failed to create flow for pipeline {$pipeline_id}" );
 			}
 
-			if ( $flow_result && $flow_result['success'] && $has_workflow ) {
+			if ( is_array( $flow_result ) && ! empty( $flow_result['success'] ) && $has_workflow ) {
 				$persistent_flow_config = WorkflowConfigFactory::buildPersistentFlowConfig(
 					$workflow,
 					$pipeline_id,
@@ -301,7 +283,7 @@ class CreatePipelineAbility {
 				$flow_result['flow_data']['flow_config'] = $persistent_flow_config;
 			}
 
-			if ( $flow_result && $flow_result['success'] && ! empty( $flow_result['flow_data']['flow_config'] ) ) {
+			if ( is_array( $flow_result ) && ! empty( $flow_result['success'] ) && ! empty( $flow_result['flow_data']['flow_config'] ) ) {
 				$flow_step_ids = array_keys( $flow_result['flow_data']['flow_config'] );
 			}
 		}
@@ -336,7 +318,7 @@ class CreatePipelineAbility {
 	 * @param array $input Input parameters including pipelines array and optional template.
 	 * @return array Result with created pipelines data and error tracking.
 	 */
-	private function executeBulk( array $input ): array {
+	private function executeBulk( array $input ): array|\WP_Error {
 		$pipelines     = $input['pipelines'];
 		$template      = $input['template'] ?? array();
 		$validate_only = ! empty( $input['validate_only'] );
@@ -347,38 +329,29 @@ class CreatePipelineAbility {
 		if ( isset( $template['scheduling_config'] ) ) {
 			$scheduling_validation = datamachine_validate_interval( $template['scheduling_config']['interval'] ?? 'manual', $template['scheduling_config'] );
 			if ( ! $scheduling_validation['valid'] ) {
-				return array(
-					'success' => false,
-					'error'   => 'Template scheduling validation failed: ' . $scheduling_validation['error'],
-				);
+				return new \WP_Error( 'invalid_pipeline_schedule', 'Template scheduling validation failed: ' . $scheduling_validation['error'], array( 'status' => 400 ) );
 			}
 			$template['scheduling_config']['interval'] = $scheduling_validation['resolved'];
 		}
 		if ( ! empty( $template_workflow ) ) {
 			$validation = $this->validateWorkflow( $template_workflow );
 			if ( true !== $validation ) {
-				return array(
-					'success' => false,
-					'error'   => 'Template workflow validation failed: ' . $validation,
-				);
+				return new \WP_Error( 'invalid_pipeline_workflow', 'Template workflow validation failed: ' . $validation, array( 'status' => 400 ) );
 			}
 
 			$handler_validation = $this->validateHandlerSlugs( $template_workflow['steps'] );
 			if ( true !== $handler_validation ) {
-				return $handler_validation;
+				return new \WP_Error( 'invalid_handler_slug', $handler_validation['error'] ?? 'Invalid handler slug', array( 'status' => 400, 'remediation' => $handler_validation['remediation'] ?? '' ) );
 			}
 		} elseif ( ! empty( $template_steps ) ) {
 			$validation = $this->validateSteps( $template_steps );
 			if ( true !== $validation ) {
-				return array(
-					'success' => false,
-					'error'   => 'Template steps validation failed: ' . $validation,
-				);
+				return new \WP_Error( 'invalid_pipeline_steps', 'Template steps validation failed: ' . $validation, array( 'status' => 400 ) );
 			}
 
 			$handler_validation = $this->validateHandlerSlugs( $template_steps );
 			if ( true !== $handler_validation ) {
-				return $handler_validation;
+				return new \WP_Error( 'invalid_handler_slug', $handler_validation['error'] ?? 'Invalid handler slug', array( 'status' => 400, 'remediation' => $handler_validation['remediation'] ?? '' ) );
 			}
 		}
 
@@ -457,10 +430,13 @@ class CreatePipelineAbility {
 		}
 
 		if ( ! empty( $validation_errors ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'Validation failed for ' . count( $validation_errors ) . ' pipeline(s)',
-				'errors'  => $validation_errors,
+			return new \WP_Error(
+				'invalid_pipelines',
+				'Validation failed for ' . count( $validation_errors ) . ' pipeline(s)',
+				array(
+					'status' => 400,
+					'errors' => $validation_errors,
+				)
 			);
 		}
 
@@ -531,7 +507,7 @@ class CreatePipelineAbility {
 
 			$single_result = $this->executeSingle( $single_input );
 
-			if ( $single_result['success'] ) {
+			if ( is_array( $single_result ) && ! empty( $single_result['success'] ) ) {
 				++$created_count;
 				$created[] = array(
 					'pipeline_id'   => $single_result['pipeline_id'],
@@ -546,7 +522,7 @@ class CreatePipelineAbility {
 				$errors[] = array(
 					'index'       => $index,
 					'name'        => $entry['name'],
-					'error'       => $single_result['error'],
+					'error'       => is_wp_error( $single_result ) ? $single_result->get_error_message() : ( $single_result['error'] ?? 'Pipeline creation failed' ),
 					'remediation' => 'Check the error message and fix the pipeline configuration',
 				);
 			}
@@ -566,13 +542,7 @@ class CreatePipelineAbility {
 		);
 
 		if ( 0 === $created_count ) {
-			return array(
-				'success'       => false,
-				'error'         => 'All pipeline creations failed',
-				'created_count' => 0,
-				'failed_count'  => $failed_count,
-				'errors'        => $errors,
-			);
+			return new \WP_Error( 'pipeline_bulk_creation_failed', 'All pipeline creations failed', array( 'status' => 500, 'created_count' => 0, 'failed_count' => $failed_count, 'errors' => $errors ) );
 		}
 
 		$message = sprintf( 'Created %d pipeline(s).', $created_count );

@@ -528,7 +528,16 @@ trait FlowHelpers {
 
 			$result = $update_flow_step_ability->execute( $update_input );
 
-			if ( $result['success'] ) {
+			if ( is_wp_error( $result ) ) {
+				$errors[] = array(
+					'step_type'    => $step_type,
+					'flow_step_id' => $flow_step_id,
+					'error'        => $result->get_error_message(),
+				);
+				continue;
+			}
+
+			if ( ! empty( $result['success'] ) ) {
 				$applied[] = $flow_step_id;
 			} else {
 				$errors[] = array(
@@ -667,7 +676,17 @@ trait FlowHelpers {
 				)
 			);
 
-			if ( $result['success'] ) {
+			if ( is_wp_error( $result ) ) {
+				$errors[] = array(
+					'flow_step_id' => $flow_step_id,
+					'step_type'    => $step_type,
+					'handler'      => $default_handler_slug,
+					'error'        => $result->get_error_message(),
+				);
+				continue;
+			}
+
+			if ( ! empty( $result['success'] ) ) {
 				$applied[] = $flow_step_id;
 			} else {
 				$errors[] = array(

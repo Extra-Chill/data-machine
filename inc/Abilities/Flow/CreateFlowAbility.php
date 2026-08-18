@@ -121,7 +121,7 @@ class CreateFlowAbility {
 	 * @param array $input Input parameters.
 	 * @return array Result with flow data on success.
 	 */
-	public function execute( array $input ): array {
+	public function execute( array $input ): array|\WP_Error {
 		if ( ! empty( $input['flows'] ) && is_array( $input['flows'] ) ) {
 			return $this->executeBulk( $input );
 		}
@@ -135,14 +135,11 @@ class CreateFlowAbility {
 	 * @param array $input Input parameters.
 	 * @return array Result with flow data.
 	 */
-	private function executeSingle( array $input ): array {
+	private function executeSingle( array $input ): array|\WP_Error {
 		$pipeline_id = $input['pipeline_id'] ?? null;
 
 		if ( ! is_numeric( $pipeline_id ) || (int) $pipeline_id <= 0 ) {
-			return array(
-				'success' => false,
-				'error'   => 'pipeline_id is required and must be a positive integer',
-			);
+			return new \WP_Error( 'invalid_pipeline_id', 'pipeline_id is required and must be a positive integer', array( 'status' => 400 ) );
 		}
 
 		$pipeline_id = (int) $pipeline_id;
@@ -150,12 +147,7 @@ class CreateFlowAbility {
 
 		if ( ! $pipeline ) {
 			do_action( 'datamachine_log', 'error', 'Pipeline not found for flow creation', array( 'pipeline_id' => $pipeline_id ) );
-			return array(
-				'success'    => false,
-				'error'      => 'Pipeline not found',
-				'error_code' => 'pipeline_not_found',
-				'status'     => 404,
-			);
+			return new \WP_Error( 'pipeline_not_found', 'Pipeline not found', array( 'status' => 404 ) );
 		}
 
 		$flow_name = sanitize_text_field( wp_unslash( $input['flow_name'] ?? 'Flow' ) );
@@ -170,32 +162,20 @@ class CreateFlowAbility {
 		$validate_only     = ! empty( $input['validate_only'] );
 
 		if ( ! is_array( $scheduling_config ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'scheduling_config must be an object',
-			);
+			return new \WP_Error( 'invalid_scheduling_config', 'scheduling_config must be an object', array( 'status' => 400 ) );
 		}
 
 		if ( ! is_array( $flow_config ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'flow_config must be an object',
-			);
+			return new \WP_Error( 'invalid_flow_config', 'flow_config must be an object', array( 'status' => 400 ) );
 		}
 
 		if ( ! is_array( $step_configs ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'step_configs must be an object',
-			);
+			return new \WP_Error( 'invalid_step_configs', 'step_configs must be an object', array( 'status' => 400 ) );
 		}
 
 		$step_config_validation = $this->validateCreateStepConfigs( $step_configs );
 		if ( true !== $step_config_validation ) {
-			return array(
-				'success' => false,
-				'error'   => $step_config_validation,
-			);
+			return new \WP_Error( 'invalid_step_configs', (string) $step_config_validation, array( 'status' => 400 ) );
 		}
 
 		// Resolve the owning agent when the caller did not supply one. Agent-first
@@ -218,10 +198,7 @@ class CreateFlowAbility {
 		// Validate and resolve interval aliases before storing.
 		$validation = datamachine_validate_interval( $scheduling_config['interval'] ?? 'manual', $scheduling_config );
 		if ( ! $validation['valid'] ) {
-			return array(
-				'success' => false,
-				'error'   => $validation['error'],
-			);
+			return new \WP_Error( 'invalid_schedule', $validation['error'], array( 'status' => 400 ) );
 		}
 		$scheduling_config['interval'] = $validation['resolved'];
 
@@ -241,10 +218,7 @@ class CreateFlowAbility {
 
 		$transaction_scope = $this->beginCreationTransactionScope();
 		if ( null === $transaction_scope ) {
-			return array(
-				'success' => false,
-				'error'   => 'Unable to start flow creation transaction',
-			);
+			return new \WP_Error( 'flow_creation_transaction_failed', 'Unable to start flow creation transaction', array( 'status' => 500 ) );
 		}
 
 		$flow_id = $this->db_flows->create_flow( $flow_data );
@@ -259,10 +233,7 @@ class CreateFlowAbility {
 					'flow_name'   => $flow_name,
 				)
 			);
-			return array(
-				'success' => false,
-				'error'   => 'Failed to create flow',
-			);
+			return new \WP_Error( 'flow_creation_failed', 'Failed to create flow', array( 'status' => 500 ) );
 		}
 
 		$pipeline_config = $pipeline['pipeline_config'] ?? array();
@@ -332,10 +303,7 @@ class CreateFlowAbility {
 			RecurringScheduler::invalidateGenerationCache( FlowScheduling::FLOW_HOOK, array( $flow_id ) );
 			$schedule_error = $this->compensateFlowSchedule( $flow_id );
 			if ( $schedule_error ) {
-				return array_merge(
-					array( 'success' => false ),
-					RecurringScheduler::errorMetadata( $schedule_error )
-				);
+				return new \WP_Error( 'flow_schedule_cleanup_failed', $schedule_error->get_error_message(), array( 'status' => 500 ) + RecurringScheduler::errorMetadata( $schedule_error ) );
 			}
 
 			return array(
@@ -396,24 +364,20 @@ class CreateFlowAbility {
 	 * @param array  $configuration_errors Optional structured configuration errors.
 	 * @return array Failure result.
 	 */
-	private function rollbackCreation( TransactionScope $transaction_scope, int $flow_id, string $error, array $configuration_errors = array() ): array {
+	private function rollbackCreation( TransactionScope $transaction_scope, int $flow_id, string $error, array $configuration_errors = array() ): \WP_Error {
 		$this->rollbackCreationTransactionScope( $transaction_scope );
 		RecurringScheduler::invalidateGenerationCache( FlowScheduling::FLOW_HOOK, array( $flow_id ) );
 		$schedule_error = $this->compensateFlowSchedule( $flow_id );
 
-		$result = array(
-			'success' => false,
-			'error'   => $error,
-		);
-
+		$data = array( 'status' => 500 );
 		if ( ! empty( $configuration_errors ) ) {
-			$result['configuration_errors'] = $configuration_errors;
+			$data['configuration_errors'] = $configuration_errors;
 		}
 		if ( $schedule_error ) {
-			$result['schedule_cleanup'] = RecurringScheduler::errorMetadata( $schedule_error );
+			$data['schedule_cleanup'] = RecurringScheduler::errorMetadata( $schedule_error );
 		}
 
-		return $result;
+		return new \WP_Error( 'flow_creation_failed', $error, $data );
 	}
 
 	/**
@@ -465,16 +429,13 @@ class CreateFlowAbility {
 	 * @param array $input Input parameters including flows array and optional shared_step_config.
 	 * @return array Result with created flows data and error tracking.
 	 */
-	private function executeBulk( array $input ): array {
+	private function executeBulk( array $input ): array|\WP_Error {
 		$flows              = $input['flows'];
 		$shared_step_config = $input['shared_step_config'] ?? array();
 		$validate_only      = ! empty( $input['validate_only'] );
 
 		if ( ! is_array( $shared_step_config ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'shared_step_config must be an object',
-			);
+			return new \WP_Error( 'invalid_shared_step_config', 'shared_step_config must be an object', array( 'status' => 400 ) );
 		}
 
 		$validation_errors = array();
@@ -527,11 +488,7 @@ class CreateFlowAbility {
 		}
 
 		if ( ! empty( $validation_errors ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'Validation failed for ' . count( $validation_errors ) . ' flow(s)',
-				'errors'  => $validation_errors,
-			);
+			return new \WP_Error( 'invalid_flows', 'Validation failed for ' . count( $validation_errors ) . ' flow(s)', array( 'status' => 400, 'errors' => $validation_errors ) );
 		}
 
 		$preview = array();
@@ -541,10 +498,7 @@ class CreateFlowAbility {
 			$scheduling_config = $flow_config['scheduling_config'] ?? array( 'interval' => 'manual' );
 			$step_configs      = $flow_config['step_configs'] ?? array();
 			if ( ! is_array( $step_configs ) ) {
-				return array(
-					'success' => false,
-					'error'   => sprintf( 'Validation failed for flow %d: step_configs must be an object', $index ),
-				);
+				return new \WP_Error( 'invalid_step_configs', sprintf( 'Validation failed for flow %d: step_configs must be an object', $index ), array( 'status' => 400 ) );
 			}
 
 			$single_input = array(
@@ -561,12 +515,11 @@ class CreateFlowAbility {
 			}
 
 			$single_result = $this->executeSingle( $single_input );
-			if ( ! $single_result['success'] ) {
-				return array(
-					'success' => false,
-					'error'   => sprintf( 'Validation failed for flow %d: %s', $index, $single_result['error'] ?? 'unknown error' ),
-					'errors'  => $single_result['configuration_errors'] ?? array(),
-				);
+			if ( is_wp_error( $single_result ) ) {
+				return $single_result;
+			}
+			if ( empty( $single_result['success'] ) ) {
+				return new \WP_Error( 'invalid_flows', sprintf( 'Validation failed for flow %d', $index ), array( 'status' => 400 ) );
 			}
 
 			$preview[] = $single_result['would_create'][0];
@@ -608,13 +561,13 @@ class CreateFlowAbility {
 				)
 			);
 
-			if ( ! $single_result['success'] ) {
+			if ( ! is_array( $single_result ) || empty( $single_result['success'] ) ) {
 				++$failed_count;
 				$errors[] = array(
 					'index'       => $index,
 					'pipeline_id' => $pipeline_id,
 					'flow_name'   => $flow_name,
-					'error'       => $single_result['error'],
+					'error'       => is_wp_error( $single_result ) ? $single_result->get_error_message() : ( $single_result['error'] ?? 'Flow creation failed' ),
 					'remediation' => 'Check the error message and fix the flow configuration',
 				);
 				continue;
@@ -653,12 +606,15 @@ class CreateFlowAbility {
 		);
 
 		if ( 0 === $created_count ) {
-			return array(
-				'success'       => false,
-				'error'         => 'All flow creations failed',
-				'created_count' => 0,
-				'failed_count'  => $failed_count,
-				'errors'        => $errors,
+			return new \WP_Error(
+				'flow_creation_failed',
+				'All flow creations failed',
+				array(
+					'status'        => 500,
+					'created_count' => 0,
+					'failed_count'  => $failed_count,
+					'errors'        => $errors,
+				)
 			);
 		}
 
