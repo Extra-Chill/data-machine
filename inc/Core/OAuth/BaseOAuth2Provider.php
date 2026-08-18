@@ -34,6 +34,16 @@ abstract class BaseOAuth2Provider extends BaseAuthProvider {
 	protected $oauth2;
 
 	/**
+	 * Agent state nonce created during the current authorization URL invocation.
+	 *
+	 * This is intentionally request-local: CLI uses it to reject subclasses that
+	 * bypass build_auth_url_params() while generating an agent-scoped URL.
+	 *
+	 * @var string|null
+	 */
+	private ?string $agent_state_nonce = null;
+
+	/**
 	 * Constructor
 	 *
 	 * @param string $provider_slug Provider identifier
@@ -590,7 +600,21 @@ abstract class BaseOAuth2Provider extends BaseAuthProvider {
 	 * @return array Query parameters for the authorization URL.
 	 */
 	protected function build_auth_url_params( array $state_payload = array() ): array {
+		// State survives the browser redirect, where the initiating CLI context is
+		// unavailable. Preserve the exact principal for callback account storage.
+		if ( class_exists( '\\DataMachine\\Abilities\\PermissionHelper' ) ) {
+			$agent_id = absint( \DataMachine\Abilities\PermissionHelper::get_acting_agent_id() );
+			$user_id  = absint( \DataMachine\Abilities\PermissionHelper::acting_user_id() );
+			if ( $agent_id > 0 && $user_id > 0 ) {
+				$state_payload['agent_id'] = $agent_id;
+				$state_payload['user_id']  = $user_id;
+			}
+		}
+
 		$state  = $this->oauth2->create_state( $this->provider_slug, $state_payload );
+		if ( isset( $state_payload['agent_id'], $state_payload['user_id'] ) ) {
+			$this->agent_state_nonce = $state;
+		}
 		$params = array(
 			'response_type' => $this->get_oauth_response_type(),
 			'redirect_uri'  => $this->get_callback_url(),
@@ -604,6 +628,93 @@ abstract class BaseOAuth2Provider extends BaseAuthProvider {
 		}
 
 		return $params;
+	}
+
+	/**
+	 * Begin an agent-scoped authorization URL invocation.
+	 *
+	 * @return void
+	 */
+	public function begin_agent_scoped_authorization(): void {
+		$this->agent_state_nonce = null;
+	}
+
+	/**
+	 * Whether the current authorization URL invocation created agent-bound state.
+	 *
+	 * @return bool
+	 */
+	public function has_agent_scoped_authorization_state(): bool {
+		return null !== $this->agent_state_nonce;
+	}
+
+	/**
+	 * Return central callback configuration for agent-scoped OAuth, or null.
+	 *
+	 * The final agent callback dispatcher owns state verification, consumption,
+	 * principal installation, and account storage. Providers supply only token
+	 * exchange and account-normalization details through this hook.
+	 *
+	 * @return array{token_url:string,token_params:array,account_details:callable,token_transform?:callable}|null
+	 */
+	protected function get_agent_scoped_oauth_callback_config(): ?array {
+		return null;
+	}
+
+	/**
+	 * Whether this provider can use the final agent-scoped callback dispatcher.
+	 *
+	 * @return bool Whether a central callback configuration is available.
+	 */
+	final public function supports_agent_scoped_oauth_callback(): bool {
+		$config = $this->get_agent_scoped_oauth_callback_config();
+		return is_array( $config ) && isset( $config['account_details'] ) && is_callable( $config['account_details'] ) && ( 'token' === $this->get_oauth_response_type() || ! empty( $config['token_url'] ) );
+	}
+
+	/**
+	 * Execute the non-overridable agent-scoped OAuth callback path.
+	 *
+	 * @return void
+	 */
+	final public function handle_agent_scoped_oauth_callback(): void {
+		$config = $this->get_agent_scoped_oauth_callback_config();
+		if ( ! is_array( $config ) || ! isset( $config['account_details'] ) || ! is_callable( $config['account_details'] ) ) {
+			wp_die( esc_html__( 'This OAuth provider does not support agent-scoped callbacks.', 'data-machine' ), esc_html__( 'Authentication Failed', 'data-machine' ), array( 'response' => 400 ) );
+		}
+
+		$storage_callback = fn( array $account ): bool => $this->store_agent_scoped_callback_account( $account );
+		if ( 'token' === $this->get_oauth_response_type() ) {
+			$this->dispatch_implicit_callback( $config['account_details'], $storage_callback );
+			return;
+		}
+
+		$this->oauth2->handle_callback(
+			$this->provider_slug,
+			(string) ( $config['token_url'] ?? '' ),
+			is_array( $config['token_params'] ?? null ) ? $config['token_params'] : array(),
+			$config['account_details'],
+			isset( $config['token_transform'] ) && is_callable( $config['token_transform'] ) ? $config['token_transform'] : null,
+			$storage_callback
+		);
+	}
+
+	/**
+	 * Persist a centrally verified agent callback account in its exact slot.
+	 *
+	 * @param array $account Account data from the provider.
+	 * @return bool Whether storage succeeded.
+	 */
+	private function store_agent_scoped_callback_account( array $account ): bool {
+		$agent_id = class_exists( '\\DataMachine\\Abilities\\PermissionHelper' ) ? absint( \DataMachine\Abilities\PermissionHelper::get_acting_agent_id() ) : 0;
+		$user_id  = class_exists( '\\DataMachine\\Abilities\\PermissionHelper' ) ? absint( \DataMachine\Abilities\PermissionHelper::acting_user_id() ) : 0;
+		if ( $agent_id > 0 ) {
+			return $this->save_account_for_agent( $agent_id, $account );
+		}
+		if ( $user_id > 0 ) {
+			return $this->save_account_for_user( $user_id, $account );
+		}
+
+		return false;
 	}
 
 	/**

@@ -13,8 +13,11 @@ namespace DataMachine\Cli\Commands;
 
 use WP_CLI;
 use DataMachine\Cli\BaseCommand;
+use DataMachine\Cli\AgentResolver;
 use DataMachine\Abilities\AuthAbilities;
+use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Core\OAuth\BaseOAuth2Provider;
+use DataMachine\Core\Database\Agents\AgentAccess;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -94,10 +97,16 @@ class AuthCommand extends BaseCommand {
 	 * [--<field>=<value>]
 	 * : Credential fields for non-OAuth handlers (e.g. --handle=user --app-password=xyz).
 	 *
+	 * [--agent=<slug-or-id>]
+	 * : Bind an OAuth connection to this agent. The current CLI user must own the agent, be an agent admin, or be a site administrator.
+	 *
 	 * ## EXAMPLES
 	 *
 	 *     # Start OAuth flow for Twitter
 	 *     wp datamachine auth connect twitter
+	 *
+	 *     # Connect OAuth for a specific agent (run as its owner, agent admin, or site admin)
+	 *     wp --user=42 datamachine auth connect twitter --agent=writer
 	 *
 	 *     # Connect a non-OAuth handler with credentials
 	 *     wp datamachine auth connect bluesky --handle=user.bsky.social --app-password=xyz
@@ -132,7 +141,11 @@ class AuthCommand extends BaseCommand {
 		$is_oauth = method_exists( $provider, 'get_authorization_url' );
 
 		if ( $is_oauth ) {
-			$this->connectOAuth( $handler_slug, $provider );
+			$agent_context = $this->resolveOAuthAgentContext( $assoc_args );
+			if ( null !== $agent_context && ( ! $provider instanceof BaseOAuth2Provider || ! $provider->supports_agent_scoped_oauth_callback() ) ) {
+				WP_CLI::error( sprintf( '%s does not support agent-scoped OAuth callbacks.', ucfirst( $handler_slug ) ) );
+			}
+			$this->connectOAuth( $handler_slug, $provider, $agent_context );
 		} else {
 			$this->connectDirect( $handler_slug, $provider, $assoc_args );
 		}
@@ -760,7 +773,7 @@ class AuthCommand extends BaseCommand {
 	 * @param string $handler_slug Handler slug.
 	 * @param object $provider     Auth provider instance.
 	 */
-	private function connectOAuth( string $handler_slug, object $provider ): void {
+	private function connectOAuth( string $handler_slug, object $provider, ?array $agent_context = null ): void {
 		// Check if configured first.
 		if ( method_exists( $provider, 'is_configured' ) && ! $provider->is_configured() ) {
 			WP_CLI::error( sprintf(
@@ -771,11 +784,26 @@ class AuthCommand extends BaseCommand {
 			return;
 		}
 
-		$result = $this->abilities->executeGetAuthStatus( array( 'handler_slug' => $handler_slug ) );
+		if ( null !== $agent_context && $provider instanceof BaseOAuth2Provider ) {
+			$provider->begin_agent_scoped_authorization();
+		}
+
+		$get_status = fn() => $this->abilities->executeGetAuthStatus( array( 'handler_slug' => $handler_slug ) );
+		$result     = null === $agent_context
+			? $get_status()
+			: PermissionHelper::run_as_agent_context( $agent_context['agent_id'], $agent_context['user_id'], $get_status );
 
 		if ( empty( $result['success'] ) ) {
 			WP_CLI::error( $result['error'] ?? 'Failed to get auth status.' );
 			return;
+		}
+
+		if ( null !== $agent_context && $provider instanceof BaseOAuth2Provider && ! $provider->has_agent_scoped_authorization_state() ) {
+			WP_CLI::error( sprintf( '%s did not create agent-bound OAuth state. Update the provider to use BaseOAuth2Provider::build_auth_url_params().', ucfirst( $handler_slug ) ) );
+		}
+
+		if ( null !== $agent_context ) {
+			WP_CLI::log( sprintf( 'OAuth principal: agent %s (ID %d), owner user %d.', $agent_context['agent_slug'], $agent_context['agent_id'], $agent_context['user_id'] ) );
 		}
 
 		if ( ! empty( $result['authenticated'] ) && ( $result['requires_auth'] ?? true ) === true ) {
@@ -789,11 +817,53 @@ class AuthCommand extends BaseCommand {
 		}
 
 		WP_CLI::log( '' );
+		if ( null !== $agent_context ) {
+			WP_CLI::log( 'The callback will store this connection in that agent slot.' );
+			WP_CLI::log( '' );
+		}
 		WP_CLI::log( sprintf( 'Authorize %s by visiting this URL:', ucfirst( $handler_slug ) ) );
 		WP_CLI::log( '' );
 		WP_CLI::log( $result['oauth_url'] );
 		WP_CLI::log( '' );
 		WP_CLI::log( 'After authorizing, you will be redirected back to your site to complete the connection.' );
+	}
+
+	/**
+	 * Resolve and authorize an explicitly requested OAuth agent principal.
+	 *
+	 * WP-CLI's broad ability permission bypass is intentionally not used here:
+	 * binding a browser identity must be authorized against the target agent.
+	 *
+	 * @param array $assoc_args Command arguments.
+	 * @return array{agent_id:int,user_id:int,agent_slug:string}|null
+	 */
+	private function resolveOAuthAgentContext( array $assoc_args ): ?array {
+		if ( ! array_key_exists( 'agent', $assoc_args ) || '' === $assoc_args['agent'] ) {
+			return null;
+		}
+
+		$context = AgentResolver::resolveEffectiveContext( array( 'agent' => $assoc_args['agent'] ) );
+		if ( empty( $context['agent_id'] ) || empty( $context['user_id'] ) || empty( $context['agent_slug'] ) ) {
+			WP_CLI::error( 'The requested agent could not be resolved to an owner.' );
+		}
+
+		$current_user_id = get_current_user_id();
+		if ( $current_user_id <= 0 ) {
+			WP_CLI::error( 'Agent-scoped OAuth connect requires a current WordPress CLI user. Use WP-CLI --user=<id>.' );
+		}
+
+		$is_owner       = $current_user_id === (int) $context['user_id'];
+		$is_site_admin  = current_user_can( 'manage_options' );
+		$has_admin_grant = ! $is_owner && ! $is_site_admin && ( new AgentAccess() )->user_can_access( (int) $context['agent_id'], $current_user_id, \WP_Agent_Access_Grant::ROLE_ADMIN );
+		if ( ! $is_owner && ! $has_admin_grant && ! $is_site_admin ) {
+			WP_CLI::error( sprintf( 'Current CLI user is not authorized to bind OAuth for agent "%s".', $context['agent_slug'] ) );
+		}
+
+		return array(
+			'agent_id'   => (int) $context['agent_id'],
+			'user_id'    => (int) $context['user_id'],
+			'agent_slug' => (string) $context['agent_slug'],
+		);
 	}
 
 	/**

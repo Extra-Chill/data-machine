@@ -119,6 +119,32 @@ class OAuth2Handler {
 	 * @return array|false Payload array on success (may be empty), false on failure.
 	 */
 	public function verify_state( string $provider_key, string $state ) {
+		return $this->validate_state( $provider_key, $state, true );
+	}
+
+	/**
+	 * Validate OAuth state without consuming it.
+	 *
+	 * Callback routing uses this before authorization so an owner or agent admin
+	 * can reach the central handler, which consumes the same state before storage.
+	 *
+	 * @param string $provider_key Provider identifier.
+	 * @param string $state        State nonce value to validate.
+	 * @return array|false Payload array on success, false on failure.
+	 */
+	public function peek_state( string $provider_key, string $state ) {
+		return $this->validate_state( $provider_key, $state, false );
+	}
+
+	/**
+	 * Validate OAuth state, optionally consuming its one-time transient.
+	 *
+	 * @param string $provider_key Provider identifier.
+	 * @param string $state        State nonce value to validate.
+	 * @param bool   $consume      Whether to consume the transient after validation.
+	 * @return array|false Payload array on success, false on failure.
+	 */
+	private function validate_state( string $provider_key, string $state, bool $consume ) {
 		if ( empty( $state ) ) {
 			$this->log_state_verification( $provider_key, false );
 			return false;
@@ -141,7 +167,9 @@ class OAuth2Handler {
 			return false;
 		}
 
-		delete_transient( $this->state_transient_key( $provider_key, $state ) );
+		if ( $consume ) {
+			delete_transient( $this->state_transient_key( $provider_key, $state ) );
+		}
 		$this->log_state_verification( $provider_key, true );
 
 		return $record['payload'] ?? array();
@@ -461,7 +489,10 @@ class OAuth2Handler {
 		// so providers can access caller-defined context without touching OAuth2Handler directly.
 		$stored = false;
 		if ( $storage_fn ) {
-			$stored = call_user_func( $storage_fn, $account_data, $state_payload );
+			$stored = $this->store_callback_account(
+				static fn() => call_user_func( $storage_fn, $account_data, $state_payload ),
+				$state_payload
+			);
 		} else {
 			do_action(
 				'datamachine_log',
@@ -528,7 +559,6 @@ class OAuth2Handler {
 	 */
 	public function render_implicit_callback_page( string $provider_key, string $callback_url ): void {
 		$nonce = wp_create_nonce( "datamachine_implicit_{$provider_key}" );
-
 		// Minimal HTML page — extracts fragment params and POSTs to server.
 		header( 'Content-Type: text/html; charset=utf-8' );
 		echo '<!DOCTYPE html><html><head><title>Authenticating…</title></head><body>';
@@ -539,12 +569,14 @@ class OAuth2Handler {
 		echo 'else {';
 		echo '  var params = new URLSearchParams(hash);';
 		echo '  var token = params.get("access_token");';
-		echo '  if (!token) { document.body.innerHTML = "<p>Authentication failed: no access token in response.</p>"; }';
+		echo '  var state = params.get("state");';
+		echo '  if (!token || !state) { document.body.innerHTML = "<p>Authentication failed: missing token or state.</p>"; }';
 		echo '  else {';
 		echo '    var data = new URLSearchParams();';
 		echo '    data.append("datamachine_implicit_flow", "1");';
 		echo '    data.append("_wpnonce", ' . wp_json_encode( $nonce ) . ');';
 		echo '    data.append("provider", ' . wp_json_encode( $provider_key ) . ');';
+		echo '    data.append("state", state);';
 		// Forward all fragment params (access_token, token_type, expires_in, site_id, etc.)
 		echo '    params.forEach(function(v, k) { data.append(k, v); });';
 		echo '    fetch(' . wp_json_encode( $callback_url ) . ', {';
@@ -612,6 +644,25 @@ class OAuth2Handler {
 			echo wp_json_encode( array(
 				'success' => false,
 				'error'   => 'Invalid nonce.',
+			) );
+			exit;
+		}
+
+		// The state is the CSRF proof and carries trusted callback principal data.
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- OAuth state is verified below.
+		$state = isset( $_POST['state'] ) ? sanitize_text_field( wp_unslash( $_POST['state'] ) ) : '';
+		$state_payload = $this->verify_state( $provider_key, $state );
+		if ( false === $state_payload ) {
+			do_action(
+				'datamachine_log',
+				'error',
+				'OAuth2: Implicit flow state verification failed',
+				array( 'provider' => $provider_key )
+			);
+
+			echo wp_json_encode( array(
+				'success' => false,
+				'error'   => 'Invalid OAuth state.',
 			) );
 			exit;
 		}
@@ -692,7 +743,10 @@ class OAuth2Handler {
 		// Store account data.
 		$stored = false;
 		if ( $storage_fn ) {
-			$stored = call_user_func( $storage_fn, $account_data );
+			$stored = $this->store_callback_account(
+				static fn() => call_user_func( $storage_fn, $account_data ),
+				$state_payload
+			);
 		}
 
 		if ( ! $stored ) {
@@ -735,6 +789,24 @@ class OAuth2Handler {
 			'redirect' => $redirect_url,
 		) );
 		exit;
+	}
+
+	/**
+	 * Store a callback account under the verified OAuth state principal.
+	 *
+	 * @param callable $storage_callback Callback that stores the account data.
+	 * @param array    $state_payload    Verified OAuth state payload.
+	 * @return bool Whether account storage succeeded.
+	 */
+	protected function store_callback_account( callable $storage_callback, array $state_payload ): bool {
+		$agent_id = absint( $state_payload['agent_id'] ?? 0 );
+		$user_id  = absint( $state_payload['user_id'] ?? 0 );
+
+		// OAuth callbacks are separate requests. Reinstall the trusted state
+		// principal so existing providers that use ambient scope save to its slot.
+		return $agent_id > 0 && $user_id > 0 && class_exists( '\\DataMachine\\Abilities\\PermissionHelper' )
+			? \DataMachine\Abilities\PermissionHelper::run_as_agent_context( $agent_id, $user_id, $storage_callback, \AgentsAPI\AI\WP_Agent_Execution_Principal::REQUEST_CONTEXT_REST )
+			: $storage_callback();
 	}
 
 	// -------------------------------------------------------------------------

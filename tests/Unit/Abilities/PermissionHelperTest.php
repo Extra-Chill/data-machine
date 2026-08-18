@@ -401,4 +401,66 @@ class PermissionHelperTest extends WP_UnitTestCase {
 		$this->assertNull( $principal->token_id );
 		$this->assertTrue( PermissionHelper::can( 'manage_agents' ) );
 	}
+
+	public function test_run_as_agent_context_restores_the_previous_context_after_success(): void {
+		$owner_id = self::factory()->user->create( array( 'role' => 'administrator' ) );
+		PermissionHelper::set_agent_context( 123, $owner_id );
+
+		$result = PermissionHelper::run_as_agent_context(
+			456,
+			$owner_id,
+			function (): string {
+				$this->assertSame( 456, PermissionHelper::get_acting_agent_id() );
+				$this->assertSame( $owner_id, PermissionHelper::acting_user_id() );
+				return 'stored';
+			}
+		);
+
+		$this->assertSame( 'stored', $result );
+		$this->assertSame( 123, PermissionHelper::get_acting_agent_id() );
+		$this->assertSame( $owner_id, PermissionHelper::acting_user_id() );
+	}
+
+	public function test_run_as_agent_context_restores_the_previous_context_after_exception(): void {
+		$owner_id = self::factory()->user->create( array( 'role' => 'administrator' ) );
+		PermissionHelper::set_agent_context( 123, $owner_id );
+
+		try {
+			PermissionHelper::run_as_agent_context(
+				456,
+				$owner_id,
+				function (): void {
+					$this->assertSame( 456, PermissionHelper::get_acting_agent_id() );
+					throw new \RuntimeException( 'expected callback failure' );
+				}
+			);
+			$this->fail( 'Expected the callback exception to be re-thrown.' );
+		} catch ( \RuntimeException $e ) {
+			$this->assertSame( 'expected callback failure', $e->getMessage() );
+		}
+
+		$this->assertSame( 123, PermissionHelper::get_acting_agent_id() );
+		$this->assertSame( $owner_id, PermissionHelper::acting_user_id() );
+	}
+
+	public function test_run_as_agent_context_restores_the_outer_context_when_nested(): void {
+		$owner_id = self::factory()->user->create( array( 'role' => 'administrator' ) );
+
+		PermissionHelper::run_as_agent_context(
+			123,
+			$owner_id,
+			function () use ( $owner_id ): void {
+				PermissionHelper::run_as_agent_context(
+					456,
+					$owner_id,
+					function (): void {
+						$this->assertSame( 456, PermissionHelper::get_acting_agent_id() );
+					}
+				);
+				$this->assertSame( 123, PermissionHelper::get_acting_agent_id() );
+			}
+		);
+
+		$this->assertNull( PermissionHelper::get_acting_agent_id() );
+	}
 }
