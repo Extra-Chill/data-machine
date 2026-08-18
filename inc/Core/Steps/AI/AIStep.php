@@ -1242,7 +1242,8 @@ class AIStep extends Step {
 
 		$input_source_type = $inputDataPackets[0]['metadata']['source_type'] ?? 'unknown';
 
-		foreach ( $tool_execution_results as $tool_execution_result ) {
+		// DataPacket::addTo() prepends, so reverse iteration preserves execution order.
+		foreach ( array_reverse( $tool_execution_results ) as $tool_execution_result ) {
 			$tool_name         = $tool_execution_result['tool_name'] ?? '';
 			$tool_result       = $tool_execution_result['result'] ?? array();
 			$tool_parameters   = $tool_execution_result['parameters'] ?? array();

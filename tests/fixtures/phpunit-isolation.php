@@ -44,7 +44,9 @@ if ( ! function_exists( 'datamachine_test_clear_runtime_rows' ) ) {
 		$tables = array(
 			$wpdb->base_prefix . \DataMachine\Core\Database\Agents\Agents::TABLE_NAME,
 			$agent_access_table,
+			$wpdb->base_prefix . \DataMachine\Core\Database\Agents\AgentAccess::PRINCIPAL_TABLE_NAME,
 			$wpdb->base_prefix . \DataMachine\Core\Database\Agents\AgentTokens::TABLE_NAME,
+			$wpdb->base_prefix . \DataMachine\Core\Database\Chat\Chat::TABLE_NAME,
 			$wpdb->prefix . 'datamachine_pipelines',
 			$wpdb->prefix . 'datamachine_flows',
 			$wpdb->prefix . 'datamachine_jobs',

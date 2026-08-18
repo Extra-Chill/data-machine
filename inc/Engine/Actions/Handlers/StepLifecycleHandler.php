@@ -8,6 +8,7 @@
 
 namespace DataMachine\Engine\Actions\Handlers;
 
+use DataMachine\Core\ActionScheduler\BatchScheduler;
 use DataMachine\Core\Database\ProcessedItems\ProcessedItems;
 use DataMachine\Core\Database\TransactionScope;
 use DataMachine\Core\DataPacketStore;
@@ -320,7 +321,7 @@ class StepLifecycleHandler {
 		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Identifier and job ID are prepared.
 		$job = $wpdb->get_row( $wpdb->prepare( 'SELECT status, engine_data FROM %i WHERE job_id = %d FOR UPDATE', $jobs_table, $job_id ), ARRAY_A );
 		if ( ! is_array( $job ) ) {
-		self::rollbackTransaction( $scope );
+			self::rollbackTransaction( $scope );
 			return $result;
 		}
 		$encoded = $job['engine_data'] ?? null;
@@ -709,6 +710,9 @@ class StepLifecycleHandler {
 					return false;
 				}
 			}
+		}
+		if ( ! empty( $engine_data['batch'] ) && BatchScheduler::STORAGE_VERSION === (int) ( $engine_data['batch_storage_version'] ?? 0 ) ) {
+			return true;
 		}
 
 		// Pre-descriptor and partially migrated jobs still own claims by job_id.

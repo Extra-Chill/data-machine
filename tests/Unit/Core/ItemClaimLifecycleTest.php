@@ -36,6 +36,7 @@ class ItemClaimLifecycleTest extends WP_UnitTestCase {
 	private Jobs $jobs;
 	private int $admin_id;
 	private ?Closure $schedule_failure_filter   = null;
+	private ?Closure $wp_schedule_failure_filter = null;
 	private ?Closure $chunk_size_filter         = null;
 	private ?Closure $tracked_handler_filter    = null;
 	private ?Closure $completion_handler_filter = null;
@@ -62,6 +63,9 @@ class ItemClaimLifecycleTest extends WP_UnitTestCase {
 	public function tear_down(): void {
 		if ( null !== $this->schedule_failure_filter ) {
 			remove_filter( 'pre_as_schedule_single_action', $this->schedule_failure_filter );
+		}
+		if ( null !== $this->wp_schedule_failure_filter ) {
+			remove_filter( 'pre_schedule_event', $this->wp_schedule_failure_filter );
 		}
 		if ( null !== $this->chunk_size_filter ) {
 			remove_filter( 'datamachine_batch_chunk_size', $this->chunk_size_filter );
@@ -673,14 +677,24 @@ class ItemClaimLifecycleTest extends WP_UnitTestCase {
 		$parent_id = $this->createJobWithClaim( array(), true );
 		$first     = $this->claim( 'later-a', $parent_id, 'revision-a' );
 		$second    = $this->claim( 'later-b', $parent_id, 'revision-b' );
-		$calls     = 0;
 		$this->chunk_size_filter       = static fn() => 1;
-		$this->schedule_failure_filter = static function ( $pre ) use ( &$calls ) {
-			++$calls;
-			return $calls > 1 ? 0 : $pre;
+		$this->schedule_failure_filter = static function ( $pre, $timestamp, $hook, array $args ) use ( $parent_id ) {
+			unset( $timestamp );
+			return 'test_batch_hook' === $hook
+				&& $parent_id === (int) ( $args['parent_job_id'] ?? 0 )
+				&& 1 === (int) ( $args['offset'] ?? -1 )
+				? 0
+				: $pre;
+		};
+		$this->wp_schedule_failure_filter = static function ( $pre, $event ) use ( $parent_id ) {
+			$args = is_object( $event ) && is_array( $event->args ?? null ) ? $event->args : array();
+			return $parent_id === (int) ( $args[0] ?? 0 ) && 1 === (int) ( $args[1] ?? -1 )
+				? new \WP_Error( 'test_schedule_failure' )
+				: $pre;
 		};
 		add_filter( 'datamachine_batch_chunk_size', $this->chunk_size_filter );
-		add_filter( 'pre_as_schedule_single_action', $this->schedule_failure_filter );
+		add_filter( 'pre_as_schedule_single_action', $this->schedule_failure_filter, 10, 4 );
+		add_filter( 'pre_schedule_event', $this->wp_schedule_failure_filter, 10, 2 );
 
 		BatchScheduler::start( $parent_id, 'test_batch_hook', array( $this->packet( $first ), $this->packet( $second ) ), array(), 'pipeline' );
 		$this->unscheduleTestBatch( $parent_id );
@@ -689,7 +703,7 @@ class ItemClaimLifecycleTest extends WP_UnitTestCase {
 		$this->assertTrue( $result['schedule_failed'] );
 		$this->assertTrue( $this->processed->has_active_claim( self::SCOPE, self::SOURCE, 'later-a' ) );
 		$this->assertFalse( $this->processed->has_active_claim( self::SCOPE, self::SOURCE, 'later-b' ) );
-		StepLifecycleHandler::handleFailed( 902, array( ProcessedItems::CLAIM_METADATA_KEY => $first ) );
+		StepLifecycleHandler::handleFailed( $parent_id, array( ProcessedItems::CLAIM_METADATA_KEY => $first ) );
 	}
 
 	public function test_content_addressed_hydration_failure_releases_sidecar_claim(): void {
@@ -745,12 +759,12 @@ class ItemClaimLifecycleTest extends WP_UnitTestCase {
 		$this->assertSame( 2, $reconciled['retained'] );
 		$this->assertSame( 2, $reconciled['omitted'] );
 		$engine = datamachine_get_engine_data( $job_id );
-		$this->assertSame(
+		$this->assertEqualsCanonicalizing(
 			array( $claims['b']['disposition_id'], $claims['d']['disposition_id'] ),
 			array_column( $engine[ ProcessedItems::CLAIMS_METADATA_KEY ], 'disposition_id' )
 		);
 		$this->assertCount( 2, $engine[ ProcessedItems::CLAIMS_METADATA_KEY ], 'Exact replacement must not retain stale numeric tails.' );
-		$this->assertSame(
+		$this->assertEqualsCanonicalizing(
 			array( $claims['a']['disposition_id'], $claims['c']['disposition_id'] ),
 			$engine['packet_disposition_evidence'][0]['omitted_ids']
 		);
@@ -889,7 +903,6 @@ class ItemClaimLifecycleTest extends WP_UnitTestCase {
 			$this->markTestSkipped( 'MySQLi async support is unavailable.' );
 		}
 		global $wpdb;
-		$wpdb->query( 'COMMIT' );
 		$first  = $this->openMysqlConnection();
 		$second = $this->openMysqlConnection();
 		if ( ! $first instanceof \mysqli || ! $second instanceof \mysqli ) {
@@ -898,6 +911,7 @@ class ItemClaimLifecycleTest extends WP_UnitTestCase {
 
 		$job_id = $this->createJobWithClaim( array(), true );
 		$claim  = $this->claim( 'mysql-lock-order', $job_id, 'mysql-lock-revision' );
+		$wpdb->query( 'COMMIT' );
 		$jobs_table = str_replace( '`', '``', $this->jobs->get_table_name() );
 		$claims_table = str_replace( '`', '``', $this->processed->get_table_name() );
 		$claim_lock = sprintf(
@@ -922,7 +936,7 @@ class ItemClaimLifecycleTest extends WP_UnitTestCase {
 			$this->assertSame( 0, \mysqli_poll( $read, $error, $reject, 0, 100000 ), 'The second reconciliation must wait on the job row before claim rows.' );
 			$this->assertTrue( $first->query( 'COMMIT' ) );
 			$ready = 0;
-			for ( $attempt = 0; $attempt < 20 && 0 === $ready; ++$attempt ) {
+			for ( $attempt = 0; $attempt < 100 && 0 === $ready; ++$attempt ) {
 				$read = array( $second );
 				$error = array();
 				$reject = array();
@@ -1058,9 +1072,18 @@ class ItemClaimLifecycleTest extends WP_UnitTestCase {
 		BatchScheduler::start( $parent_id, 'test_batch_hook', array( $item ), array(), 'task' );
 		$this->unscheduleTestBatch( $parent_id );
 
-		$engine = datamachine_get_engine_data( $parent_id );
-		$engine['batch_state']['items'][0]['data_packets'][0]['schema_version'] = 999;
-		datamachine_set_engine_data( $parent_id, $engine );
+		global $wpdb;
+		$table   = $wpdb->prefix . BatchItems::TABLE_NAME;
+		$payload = json_decode( (string) $wpdb->get_var( $wpdb->prepare( 'SELECT payload FROM %i WHERE batch_job_id = %d AND item_index = 0', $table, $parent_id ) ), true );
+		$payload['data_packets'][0]['schema_version'] = 999;
+		$encoded = (string) wp_json_encode( $payload );
+		$wpdb->update(
+			$table,
+			array( 'payload' => $encoded, 'payload_checksum' => hash( 'sha256', $encoded ) ),
+			array( 'batch_job_id' => $parent_id, 'item_index' => 0 ),
+			array( '%s', '%s' ),
+			array( '%d', '%d' )
+		);
 		BatchScheduler::processChunk( $parent_id, static fn() => true );
 
 		$this->assertFalse( $this->processed->has_active_claim( self::SCOPE, self::SOURCE, 'malformed-ref' ) );

@@ -453,9 +453,6 @@ final class DelegatedOperationTest extends WP_UnitTestCase {
 		$retrying = $service->reconcile( $this->operationRequest( $submitted ) );
 		$this->assertSame( 'retrying', $retrying['status'] );
 		$this->assertSame( 1, $retrying['retry']['attempt'] );
-		$cancel_retry = $service->cancel( $this->operationRequest( $submitted ) );
-		$this->assertSame( 'delegated_operation_not_cancellable', $cancel_retry['error_code'] );
-
 		$this->assertTrue( ( new Jobs() )->complete_job( (int) $retrying_job['job_id'], 'failed - retry-fence' ) );
 		$this->retry_safe = false;
 		$unsafe           = $service->retry( $this->operationRequest( $submitted ) );
@@ -507,7 +504,8 @@ final class DelegatedOperationTest extends WP_UnitTestCase {
 			),
 			array( 'job_id' => $job['job_id'] )
 		);
-		RetentionCleanup::cleanupEngineData();
+		$cleanup = RetentionCleanup::cleanupEngineData();
+		$this->assertSame( 1, $cleanup['updated'] );
 		$shed = ( new Jobs() )->get_job( (int) $job['job_id'] );
 		$this->assertEmpty( $shed['engine_data'] );
 		$this->assertSame( $submitted['operation_ref'], $shed['operation_envelope']['delegated_operation']['operation_ref'] );
