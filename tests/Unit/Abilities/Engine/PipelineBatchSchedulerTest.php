@@ -414,6 +414,69 @@ class PipelineBatchSchedulerTest extends WP_UnitTestCase {
 		$this->assertArrayNotHasKey( ProcessedItems::CLAIMS_METADATA_KEY, $child_engine );
 	}
 
+	public function test_process_chunk_keeps_packet_claim_collections_with_their_child(): void {
+		$parent_id = $this->create_parent_job();
+		$engine    = $this->make_engine_snapshot( $parent_id );
+		$claims    = array();
+		foreach ( array( 'item-a', 'item-b' ) as $item_identifier ) {
+			$claim = array(
+				'identity_scope'  => 'shared:source',
+				'source_type'     => 'source',
+				'item_identifier' => $item_identifier,
+				'ownership_token' => 'opaque-token-' . $item_identifier,
+			);
+			$claim['disposition_id'] = ProcessedItems::disposition_identity( $claim['identity_scope'], $claim['source_type'], $claim['item_identifier'] );
+			$claims[]                 = $claim;
+		}
+		$packet = $this->make_data_packet( 'Claim Collection' );
+		$packet['metadata'][ ProcessedItems::CLAIMS_METADATA_KEY ] = $claims;
+
+		$scheduler = new PipelineBatchScheduler();
+		$scheduler->fanOut( $parent_id, 'step_abc_123', array( $packet ), $engine );
+		$scheduler->processChunk( $parent_id );
+
+		global $wpdb;
+		$child_id     = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT job_id FROM %i WHERE parent_job_id = %d', $wpdb->prefix . 'datamachine_jobs', $parent_id ) );
+		$child_engine = datamachine_get_engine_data( $child_id );
+		$this->assertArrayNotHasKey( ProcessedItems::CLAIM_METADATA_KEY, $child_engine );
+		$this->assertSame( $claims, $child_engine[ ProcessedItems::CLAIMS_METADATA_KEY ] );
+	}
+
+	public function test_process_chunk_keeps_distinct_packet_claims_with_distinct_children(): void {
+		$parent_id = $this->create_parent_job();
+		$engine    = $this->make_engine_snapshot( $parent_id );
+		$packets   = array();
+		$claims    = array();
+		foreach ( array( 'item-a' => 'Claim A', 'item-b' => 'Claim B' ) as $item_identifier => $title ) {
+			$claim = array(
+				'identity_scope'  => 'shared:source',
+				'source_type'     => 'source',
+				'item_identifier' => $item_identifier,
+				'ownership_token' => 'opaque-token-' . $item_identifier,
+			);
+			$claim['disposition_id'] = ProcessedItems::disposition_identity( $claim['identity_scope'], $claim['source_type'], $claim['item_identifier'] );
+			$claims[ $title ]         = $claim;
+			$packet                    = $this->make_data_packet( $title );
+			$packet['metadata'][ ProcessedItems::CLAIM_METADATA_KEY ] = $claim;
+			$packets[] = $packet;
+		}
+
+		$scheduler = new PipelineBatchScheduler();
+		$scheduler->fanOut( $parent_id, 'step_abc_123', $packets, $engine );
+		$scheduler->processChunk( $parent_id );
+
+		global $wpdb;
+		$children = $wpdb->get_results(
+			$wpdb->prepare( 'SELECT job_id, label FROM %i WHERE parent_job_id = %d', $wpdb->prefix . 'datamachine_jobs', $parent_id ),
+			ARRAY_A
+		);
+		$this->assertCount( 2, $children );
+		foreach ( $children as $child ) {
+			$child_engine = datamachine_get_engine_data( (int) $child['job_id'] );
+			$this->assertSame( $claims[ $child['label'] ], $child_engine[ ProcessedItems::CLAIM_METADATA_KEY ] );
+		}
+	}
+
 	public function test_process_chunk_respects_cancellation(): void {
 		$parent_id = $this->create_parent_job();
 		$engine    = $this->make_engine_snapshot( $parent_id );

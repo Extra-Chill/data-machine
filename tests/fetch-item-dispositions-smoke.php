@@ -342,7 +342,29 @@ namespace {
 	assert_fetch_disposition_smoke( 'CAS loser returns idempotent success', true === ( $contention['success'] ?? false ) && true === ( $contention['already_dispositioned'] ?? false ) );
 	assert_fetch_disposition_smoke( 'CAS loser cannot overwrite first disposition', 'defer_item' === ( $contention['disposition'] ?? '' ) && 'competing-winner' === ( $contention['reason'] ?? '' ) );
 
-	echo "Case 2e: disposition tools declare terminal completion signal (#2609)\n";
+	echo "Case 2e: explicit identities resolve distinct claims in a collection\n";
+	$second_claim                    = $claim;
+	$second_claim['item_identifier'] = 'source-789';
+	$second_claim['disposition_id']  = DataMachine\Core\Database\ProcessedItems\ProcessedItems::disposition_identity( $second_claim['identity_scope'], $second_claim['source_type'], $second_claim['item_identifier'] );
+	$collection_engine = new FetchDispositionSmokeEngine(
+		array(
+			'flow_config' => array( 'fetch-step_7' => array( 'step_type' => 'fetch' ) ),
+			DataMachine\Core\Database\ProcessedItems\ProcessedItems::CLAIMS_METADATA_KEY => array( $claim, $second_claim ),
+		)
+	);
+	$collection_reject = $tool->handle_tool_call(
+		array( 'job_id' => 1817, 'engine' => $collection_engine, 'reason' => 'first claim', 'disposition_id' => $claim['disposition_id'] ),
+		array( 'disposition' => 'reject_source' )
+	);
+	$collection_defer = $tool->handle_tool_call(
+		array( 'job_id' => 1817, 'engine' => $collection_engine, 'reason' => 'second claim', 'disposition_id' => $second_claim['disposition_id'] ),
+		array( 'disposition' => 'defer_item' )
+	);
+	assert_fetch_disposition_smoke( 'reject_source resolves the explicitly selected collection claim', true === ( $collection_reject['success'] ?? false ) && $claim['disposition_id'] === ( $collection_reject['disposition_id'] ?? '' ) );
+	assert_fetch_disposition_smoke( 'defer_item resolves the explicitly selected collection claim', true === ( $collection_defer['success'] ?? false ) && $second_claim['disposition_id'] === ( $collection_defer['disposition_id'] ?? '' ) );
+	assert_fetch_disposition_smoke( 'collection dispositions remain separate first-write records', 2 === count( $GLOBALS['fetch_disposition_smoke_engine'][1817]['packet_dispositions'] ?? array() ) );
+
+	echo "Case 2f: disposition tools declare terminal completion signal (#2609)\n";
 	$fetch_handler_src = file_get_contents( __DIR__ . '/../inc/Core/Steps/Fetch/Handlers/FetchHandler.php' );
 	assert_fetch_disposition_smoke( 'both disposition tool definitions declare runtime completion_signal terminal', 2 === substr_count( $fetch_handler_src, "'completion_signal' => 'terminal'" ) );
 

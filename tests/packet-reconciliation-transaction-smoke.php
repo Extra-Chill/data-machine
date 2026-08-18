@@ -253,6 +253,14 @@ namespace {
 	$assert( $cleaned['success'] && ! isset( $GLOBALS['wpdb']->engine['packet_dispositions'], $GLOBALS['wpdb']->engine['packet_tool_executions'], $GLOBALS['wpdb']->engine['successful_packet_tool_executions'] ), 'resolved claims compact disposition and reservation state' );
 
 	$claims = $reset();
+	$transfer = StepLifecycleHandler::transferClaimsToFanout(
+		9,
+		array( array( 'metadata' => array( ProcessedItems::CLAIMS_METADATA_KEY => $claims ) ) )
+	);
+	$transferred_claims = $GLOBALS['wpdb']->engine['packet_fanout_transfer']['claims'] ?? array();
+	$assert( $transfer['success'] && 3 === count( $transferred_claims ) && ! isset( $GLOBALS['wpdb']->engine[ ProcessedItems::CLAIMS_METADATA_KEY ] ), 'fanout transfers every validated claim collection without leaving parent ownership' );
+
+	$claims = $reset();
 	$transfer_id = 'prepared-transfer';
 	$GLOBALS['wpdb']->engine = array(
 		'packet_fanout_transfer' => array( 'transfer_id' => $transfer_id, 'state' => 'prepared', 'claims' => array_column( $claims, null, 'disposition_id' ) ),
