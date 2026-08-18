@@ -24,6 +24,9 @@ if ( ! function_exists( 'datamachine_test_prepare_site' ) ) {
 		}
 		datamachine_test_clear_runtime_rows();
 		datamachine_test_reset_scheduler();
+		if ( function_exists( 'datamachine_register_scaffold_generators' ) ) {
+			datamachine_register_scaffold_generators();
+		}
 		datamachine_register_capabilities();
 	}
 }

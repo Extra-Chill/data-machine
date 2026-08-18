@@ -113,7 +113,14 @@ class AgentPruneResurrectionTest extends WP_UnitTestCase {
 			)
 		);
 
-		// No references => prune candidate.
+		// Model an orphaned historical row by removing its automatic owner grant.
+		global $wpdb;
+		$wpdb->delete(
+			$wpdb->base_prefix . AgentAccess::TABLE_NAME,
+			array( 'agent_id' => $created['agent_id'] ),
+			array( '%d' )
+		);
+
 		$pruned = AgentAbilities::pruneAgents( array( 'dry_run' => false ) );
 		$this->assertTrue( $pruned['success'] );
 
