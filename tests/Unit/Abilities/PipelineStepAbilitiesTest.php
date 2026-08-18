@@ -137,9 +137,7 @@ class PipelineStepAbilitiesTest extends WP_UnitTestCase {
 			array( 'pipeline_id' => 999999 )
 		);
 
-		$this->assertFalse( $result['success'] );
-		$this->assertArrayHasKey( 'error', $result );
-		$this->assertStringContainsString( 'not found', $result['error'] );
+		$this->assertAbilityError( $result, 'not found' );
 	}
 
 	public function test_get_pipeline_steps_invalid_id(): void {
@@ -147,9 +145,7 @@ class PipelineStepAbilitiesTest extends WP_UnitTestCase {
 			array( 'pipeline_id' => 0 )
 		);
 
-		$this->assertFalse( $result['success'] );
-		$this->assertArrayHasKey( 'error', $result );
-		$this->assertStringContainsString( 'positive integer', $result['error'] );
+		$this->assertAbilityError( $result, 'positive integer' );
 	}
 
 	public function test_add_pipeline_step(): void {
@@ -304,9 +300,7 @@ class PipelineStepAbilitiesTest extends WP_UnitTestCase {
 			)
 		);
 
-		$this->assertFalse( $result['success'] );
-		$this->assertArrayHasKey( 'error', $result );
-		$this->assertStringContainsString( 'Invalid step_type', $result['error'] );
+		$this->assertAbilityError( $result, 'Invalid step_type' );
 	}
 
 	public function test_add_pipeline_step_missing_pipeline_id(): void {
@@ -314,9 +308,7 @@ class PipelineStepAbilitiesTest extends WP_UnitTestCase {
 			array( 'step_type' => 'fetch' )
 		);
 
-		$this->assertFalse( $result['success'] );
-		$this->assertArrayHasKey( 'error', $result );
-		$this->assertStringContainsString( 'pipeline_id', $result['error'] );
+		$this->assertAbilityError( $result, 'pipeline_id' );
 	}
 
 	public function test_add_pipeline_step_missing_step_type(): void {
@@ -324,9 +316,7 @@ class PipelineStepAbilitiesTest extends WP_UnitTestCase {
 			array( 'pipeline_id' => $this->test_pipeline_id )
 		);
 
-		$this->assertFalse( $result['success'] );
-		$this->assertArrayHasKey( 'error', $result );
-		$this->assertStringContainsString( 'step_type', $result['error'] );
+		$this->assertAbilityError( $result, 'step_type' );
 	}
 
 	public function test_get_pipeline_steps_with_step_id_returns_single_step(): void {
@@ -365,9 +355,7 @@ class PipelineStepAbilitiesTest extends WP_UnitTestCase {
 			array( 'pipeline_step_id' => '' )
 		);
 
-		$this->assertFalse( $result['success'] );
-		$this->assertArrayHasKey( 'error', $result );
-		$this->assertStringContainsString( 'non-empty', $result['error'] );
+		$this->assertAbilityError( $result, 'non-empty' );
 	}
 
 	public function test_update_pipeline_step_system_prompt(): void {
@@ -435,8 +423,7 @@ class PipelineStepAbilitiesTest extends WP_UnitTestCase {
 				'disabled_tools'   => 'test_disabled_tool',
 			)
 		);
-		$this->assertFalse( $non_array_result['success'] );
-		$this->assertStringContainsString( 'disabled_tools must be an array of strings', $non_array_result['error'] );
+		$this->assertAbilityError( $non_array_result, 'disabled_tools must be an array of strings' );
 
 		$non_string_result = $this->step_abilities->executeUpdatePipelineStep(
 			array(
@@ -444,8 +431,7 @@ class PipelineStepAbilitiesTest extends WP_UnitTestCase {
 				'tool_categories'  => array( 'datamachine-test', 123 ),
 			)
 		);
-		$this->assertFalse( $non_string_result['success'] );
-		$this->assertStringContainsString( 'tool_categories must contain only strings', $non_string_result['error'] );
+		$this->assertAbilityError( $non_string_result, 'tool_categories must contain only strings' );
 	}
 
 	public function test_rest_pipeline_step_config_schema_exposes_tool_policy_fields(): void {
@@ -527,8 +513,7 @@ class PipelineStepAbilitiesTest extends WP_UnitTestCase {
 			)
 		);
 
-		$this->assertFalse( $result['success'] );
-		$this->assertStringContainsString( 'system_prompt, agent_modes, disabled_tools, or tool_categories', $result['error'] );
+		$this->assertAbilityError( $result, 'system_prompt, agent_modes, disabled_tools, or tool_categories' );
 	}
 
 	public function test_update_pipeline_step_no_fields(): void {
@@ -544,9 +529,7 @@ class PipelineStepAbilitiesTest extends WP_UnitTestCase {
 			array( 'pipeline_step_id' => $pipeline_step_id )
 		);
 
-		$this->assertFalse( $result['success'] );
-		$this->assertArrayHasKey( 'error', $result );
-		$this->assertStringContainsString( 'At least one', $result['error'] );
+		$this->assertAbilityError( $result, 'At least one' );
 	}
 
 	public function test_update_pipeline_step_not_found(): void {
@@ -557,9 +540,7 @@ class PipelineStepAbilitiesTest extends WP_UnitTestCase {
 			)
 		);
 
-		$this->assertFalse( $result['success'] );
-		$this->assertArrayHasKey( 'error', $result );
-		$this->assertStringContainsString( 'not found', $result['error'] );
+		$this->assertAbilityError( $result, 'not found' );
 	}
 
 	public function test_delete_pipeline_step(): void {
@@ -598,8 +579,7 @@ class PipelineStepAbilitiesTest extends WP_UnitTestCase {
 			)
 		);
 
-		$this->assertFalse( $result['success'] );
-		$this->assertArrayHasKey( 'error', $result );
+		$this->assertAbilityError( $result );
 	}
 
 	public function test_delete_pipeline_step_missing_pipeline_id(): void {
@@ -607,9 +587,7 @@ class PipelineStepAbilitiesTest extends WP_UnitTestCase {
 			array( 'pipeline_step_id' => 'some-step-id' )
 		);
 
-		$this->assertFalse( $result['success'] );
-		$this->assertArrayHasKey( 'error', $result );
-		$this->assertStringContainsString( 'pipeline_id', $result['error'] );
+		$this->assertAbilityError( $result, 'pipeline_id' );
 	}
 
 	public function test_delete_pipeline_step_missing_step_id(): void {
@@ -617,9 +595,7 @@ class PipelineStepAbilitiesTest extends WP_UnitTestCase {
 			array( 'pipeline_id' => $this->test_pipeline_id )
 		);
 
-		$this->assertFalse( $result['success'] );
-		$this->assertArrayHasKey( 'error', $result );
-		$this->assertStringContainsString( 'pipeline_step_id', $result['error'] );
+		$this->assertAbilityError( $result, 'pipeline_step_id' );
 	}
 
 	public function test_reorder_pipeline_steps(): void {
@@ -811,8 +787,7 @@ class PipelineStepAbilitiesTest extends WP_UnitTestCase {
 			)
 		);
 
-		$this->assertFalse( $result['success'] );
-		$this->assertStringContainsString( 'appears more than once', $result['error'] );
+		$this->assertAbilityError( $result, 'appears more than once' );
 	}
 
 	public function test_reorder_pipeline_steps_invalid_format(): void {
@@ -823,9 +798,7 @@ class PipelineStepAbilitiesTest extends WP_UnitTestCase {
 			)
 		);
 
-		$this->assertFalse( $result['success'] );
-		$this->assertArrayHasKey( 'error', $result );
-		$this->assertStringContainsString( 'object', $result['error'] );
+		$this->assertAbilityError( $result, 'object' );
 	}
 
 	public function test_reorder_pipeline_steps_missing_fields(): void {
@@ -838,9 +811,7 @@ class PipelineStepAbilitiesTest extends WP_UnitTestCase {
 			)
 		);
 
-		$this->assertFalse( $result['success'] );
-		$this->assertArrayHasKey( 'error', $result );
-		$this->assertStringContainsString( 'execution_order', $result['error'] );
+		$this->assertAbilityError( $result, 'execution_order' );
 	}
 
 	public function test_reorder_pipeline_steps_empty_array(): void {
@@ -851,9 +822,7 @@ class PipelineStepAbilitiesTest extends WP_UnitTestCase {
 			)
 		);
 
-		$this->assertFalse( $result['success'] );
-		$this->assertArrayHasKey( 'error', $result );
-		$this->assertStringContainsString( 'required', $result['error'] );
+		$this->assertAbilityError( $result, 'required' );
 	}
 
 	public function test_permission_callback(): void {
@@ -872,6 +841,13 @@ class PipelineStepAbilitiesTest extends WP_UnitTestCase {
 
 		$user_id = self::factory()->user->create( array( 'role' => 'administrator' ) );
 		wp_set_current_user( $user_id );
+	}
+
+	private function assertAbilityError( $result, string $message_contains = '' ): void {
+		$this->assertWPError( $result );
+		if ( '' !== $message_contains ) {
+			$this->assertStringContainsString( $message_contains, $result->get_error_message() );
+		}
 	}
 
 	public function test_multiple_steps_execution_order(): void {

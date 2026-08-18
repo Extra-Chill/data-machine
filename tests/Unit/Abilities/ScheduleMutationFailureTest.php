@@ -103,9 +103,9 @@ class ScheduleMutationFailureTest extends WP_UnitTestCase {
 
 		$result = wp_get_ability( 'datamachine/delete-flow' )->execute( array( 'flow_id' => $this->flow_id ) );
 
-		$this->assertFalse( $result['success'] );
-		$this->assertSame( 'schedule_lock_timeout', $result['error_code'] );
-		$this->assertTrue( $result['retryable'] );
+		$this->assertWPError( $result );
+		$this->assertSame( 'schedule_lock_timeout', $result->get_error_code() );
+		$this->assertTrue( $result->get_error_data()['retryable'] );
 		$this->assertNotNull( $this->flows->get_flow( $this->flow_id ) );
 		$this->assertTrue( RecurringScheduler::hasLogicalCoverage( self::FLOW_HOOK, array( $this->flow_id ) ) );
 	}
@@ -286,9 +286,9 @@ class ScheduleMutationFailureTest extends WP_UnitTestCase {
 		$result = wp_get_ability( 'datamachine/pause-flow' )->execute( array( 'flow_id' => $this->flow_id ) );
 		$flow   = $this->flows->get_flow( $this->flow_id );
 
-		$this->assertFalse( $result['success'] );
-		$this->assertSame( 1, $result['errors'] );
-		$this->assertSame( 'pause_error', $result['flows'][0]['status'] );
+		$this->assertWPError( $result );
+		$this->assertSame( 1, $result->get_error_data()['errors'] );
+		$this->assertSame( 'pause_error', $result->get_error_data()['flows'][0]['status'] );
 		$this->assertTrue( $flow['scheduling_config']['enabled'] );
 		$this->assertTrue( RecurringScheduler::hasLogicalCoverage( self::FLOW_HOOK, array( $this->flow_id ) ) );
 	}
@@ -331,10 +331,10 @@ class ScheduleMutationFailureTest extends WP_UnitTestCase {
 
 		$result = wp_get_ability( 'datamachine/delete-pipeline' )->execute( array( 'pipeline_id' => $this->pipeline_id ) );
 
-		$this->assertFalse( $result['success'] );
-		$this->assertSame( 'pipeline_flow_deletion_incomplete', $result['error_code'] );
-		$this->assertSame( 1, $result['deleted_flows'] );
-		$this->assertSame( 'schedule_lock_timeout', $result['schedule_failures'][ $blocked_flow_id ]['error_code'] );
+		$this->assertWPError( $result );
+		$this->assertSame( 'pipeline_flow_deletion_incomplete', $result->get_error_code() );
+		$this->assertSame( 1, $result->get_error_data()['deleted_flows'] );
+		$this->assertSame( 'schedule_lock_timeout', $result->get_error_data()['schedule_failures'][ $blocked_flow_id ]['error_code'] );
 		$this->assertNotNull( $this->pipelines->get_pipeline( $this->pipeline_id ) );
 		$this->assertNull( $this->flows->get_flow( $this->flow_id ) );
 		$this->assertNotNull( $this->flows->get_flow( $blocked_flow_id ) );

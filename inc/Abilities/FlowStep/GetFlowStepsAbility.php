@@ -69,17 +69,14 @@ class GetFlowStepsAbility {
 	 * @param array $input Input parameters.
 	 * @return array Result with steps data.
 	 */
-	public function execute( array $input ): array {
+	public function execute( array $input ): array|\WP_Error {
 		$flow_id      = $input['flow_id'] ?? null;
 		$flow_step_id = $input['flow_step_id'] ?? null;
 
 		// Direct step lookup by ID - bypasses flow_id requirement.
 		if ( null !== $flow_step_id ) {
 			if ( ! is_string( $flow_step_id ) || empty( $flow_step_id ) ) {
-				return array(
-					'success' => false,
-					'error'   => 'flow_step_id must be a non-empty string',
-				);
+				return new \WP_Error( 'invalid_flow_step_id', 'flow_step_id must be a non-empty string', array( 'status' => 400 ) );
 			}
 
 			$step_config = $this->db_flows->get_flow_step_config( $flow_step_id );
@@ -102,20 +99,14 @@ class GetFlowStepsAbility {
 		}
 
 		if ( ! is_numeric( $flow_id ) || (int) $flow_id <= 0 ) {
-			return array(
-				'success' => false,
-				'error'   => 'flow_id is required and must be a positive integer',
-			);
+			return new \WP_Error( 'invalid_flow_id', 'flow_id is required and must be a positive integer', array( 'status' => 400 ) );
 		}
 
 		$flow_id = (int) $flow_id;
 		$flow    = $this->db_flows->get_flow( $flow_id );
 
 		if ( ! $flow ) {
-			return array(
-				'success' => false,
-				'error'   => 'Flow not found',
-			);
+			return new \WP_Error( 'flow_not_found', 'Flow not found', array( 'status' => 404 ) );
 		}
 
 		$flow_config = $flow['flow_config'] ?? array();

@@ -88,14 +88,11 @@ class DuplicateFlowAbility {
 	 * @param array $input Input parameters with source_flow_id, optional target_pipeline_id, flow_name, etc.
 	 * @return array Result with duplicated flow data.
 	 */
-	public function execute( array $input ): array {
+	public function execute( array $input ): array|\WP_Error {
 		$source_flow_id = $input['source_flow_id'] ?? null;
 
 		if ( ! is_numeric( $source_flow_id ) || (int) $source_flow_id <= 0 ) {
-			return array(
-				'success' => false,
-				'error'   => 'source_flow_id is required and must be a positive integer',
-			);
+			return new \WP_Error( 'invalid_source_flow_id', 'source_flow_id is required and must be a positive integer', array( 'status' => 400 ) );
 		}
 
 		$source_flow_id = (int) $source_flow_id;
@@ -103,12 +100,7 @@ class DuplicateFlowAbility {
 
 		if ( ! $source_flow ) {
 			do_action( 'datamachine_log', 'error', 'Source flow not found for copy', array( 'source_flow_id' => $source_flow_id ) );
-			return array(
-				'success'    => false,
-				'error'      => 'Source flow not found',
-				'error_code' => 'flow_not_found',
-				'status'     => 404,
-			);
+			return new \WP_Error( 'flow_not_found', 'Source flow not found', array( 'status' => 404 ) );
 		}
 
 		$source_pipeline_id = (int) $source_flow['pipeline_id'];
@@ -117,22 +109,12 @@ class DuplicateFlowAbility {
 
 		$source_pipeline = $this->db_pipelines->get_pipeline( $source_pipeline_id );
 		if ( ! $source_pipeline ) {
-			return array(
-				'success'    => false,
-				'error'      => 'Source pipeline not found',
-				'error_code' => 'pipeline_not_found',
-				'status'     => 404,
-			);
+			return new \WP_Error( 'pipeline_not_found', 'Source pipeline not found', array( 'status' => 404 ) );
 		}
 
 		$target_pipeline = $this->db_pipelines->get_pipeline( $target_pipeline_id );
 		if ( ! $target_pipeline ) {
-			return array(
-				'success'    => false,
-				'error'      => 'Target pipeline not found',
-				'error_code' => 'pipeline_not_found',
-				'status'     => 404,
-			);
+			return new \WP_Error( 'pipeline_not_found', 'Target pipeline not found', array( 'status' => 404 ) );
 		}
 
 		if ( $is_cross_pipeline ) {
@@ -151,10 +133,7 @@ class DuplicateFlowAbility {
 						'error'              => $compatibility['error'],
 					)
 				);
-				return array(
-					'success' => false,
-					'error'   => $compatibility['error'],
-				);
+				return new \WP_Error( 'incompatible_pipelines', $compatibility['error'], array( 'status' => 400 ) );
 			}
 		}
 
@@ -191,10 +170,7 @@ class DuplicateFlowAbility {
 					'target_pipeline_id' => $target_pipeline_id,
 				)
 			);
-			return array(
-				'success' => false,
-				'error'   => 'Failed to create new flow',
-			);
+			return new \WP_Error( 'flow_duplication_failed', 'Failed to create new flow', array( 'status' => 500 ) );
 		}
 
 		$new_flow_config = $this->buildCopiedFlowConfig(

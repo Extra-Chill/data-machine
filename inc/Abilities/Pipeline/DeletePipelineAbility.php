@@ -69,14 +69,11 @@ class DeletePipelineAbility {
 	 * @param array $input Input parameters with pipeline_id.
 	 * @return array Result with deletion status.
 	 */
-	public function execute( array $input ): array {
+	public function execute( array $input ): array|\WP_Error {
 		$pipeline_id = $input['pipeline_id'] ?? null;
 
 		if ( ! is_numeric( $pipeline_id ) || (int) $pipeline_id <= 0 ) {
-			return array(
-				'success' => false,
-				'error'   => 'pipeline_id is required and must be a positive integer',
-			);
+			return new \WP_Error( 'invalid_pipeline_id', 'pipeline_id is required and must be a positive integer', array( 'status' => 400 ) );
 		}
 
 		$pipeline_id = (int) $pipeline_id;
@@ -84,12 +81,7 @@ class DeletePipelineAbility {
 
 		if ( ! $pipeline ) {
 			do_action( 'datamachine_log', 'error', 'Pipeline not found for deletion', array( 'pipeline_id' => $pipeline_id ) );
-			return array(
-				'success'    => false,
-				'error'      => 'Pipeline not found',
-				'error_code' => 'pipeline_not_found',
-				'status'     => 404,
-			);
+			return new \WP_Error( 'pipeline_not_found', 'Pipeline not found', array( 'status' => 404 ) );
 		}
 
 		$pipeline_name  = $pipeline['pipeline_name'];
@@ -140,13 +132,7 @@ class DeletePipelineAbility {
 			static fn(array $failure): bool => empty( $failure['desired_state_committed'] )
 		);
 		if ( ! empty( $commit_failures ) ) {
-			return array(
-				'success'           => false,
-				'error'             => 'Pipeline deletion did not commit every flow deletion.',
-				'error_code'        => 'pipeline_flow_deletion_incomplete',
-				'schedule_failures' => $schedule_failures,
-				'deleted_flows'     => $deleted_flows,
-			);
+			return new \WP_Error( 'pipeline_flow_deletion_incomplete', 'Pipeline deletion did not commit every flow deletion.', array( 'status' => 500, 'schedule_failures' => $schedule_failures, 'deleted_flows' => $deleted_flows ) );
 		}
 
 		$cleanup            = new FileCleanup();
@@ -165,10 +151,7 @@ class DeletePipelineAbility {
 
 		if ( ! $success ) {
 			do_action( 'datamachine_log', 'error', 'Failed to delete pipeline', array( 'pipeline_id' => $pipeline_id ) );
-			return array(
-				'success' => false,
-				'error'   => 'Failed to delete pipeline',
-			);
+			return new \WP_Error( 'pipeline_deletion_failed', 'Failed to delete pipeline', array( 'status' => 500 ) );
 		}
 
 		do_action(

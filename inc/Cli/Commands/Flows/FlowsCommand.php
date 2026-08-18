@@ -1254,7 +1254,7 @@ class FlowsCommand extends BaseCommand {
 		}
 
 		$ability = wp_get_ability( 'datamachine/delete-flow' );
-		$result  = $ability->execute( array( 'flow_id' => $flow_id ) );
+		$result  = AbilityResult::normalize( $ability->execute( array( 'flow_id' => $flow_id ) ) );
 
 		if ( ! $result['success'] ) {
 			WP_CLI::error( $result['error'] ?? 'Failed to delete flow' );
@@ -2245,7 +2245,7 @@ class FlowsCommand extends BaseCommand {
 		}
 
 		$ability = wp_get_ability( 'datamachine/pause-flow' );
-		$result  = $ability->execute( $input );
+		$result  = AbilityResult::normalize( $ability->execute( $input ) );
 
 		if ( ! $result['success'] ) {
 			WP_CLI::error( $result['error'] ?? 'Failed to pause flows' );
@@ -2285,7 +2285,7 @@ class FlowsCommand extends BaseCommand {
 		}
 
 		$ability = wp_get_ability( 'datamachine/resume-flow' );
-		$result  = $ability->execute( $input );
+		$result  = AbilityResult::normalize( $ability->execute( $input ) );
 
 		if ( ! $result['success'] ) {
 			WP_CLI::error( $result['error'] ?? 'Failed to resume flows' );

@@ -82,25 +82,19 @@ class ResumeFlowAbility {
 	 * @param array $input Input with flow_id, pipeline_id, or agent_id.
 	 * @return array Result with resume counts and affected flow IDs.
 	 */
-	public function execute( array $input ): array {
+	public function execute( array $input ): array|\WP_Error {
 		$flow_id     = isset( $input['flow_id'] ) ? (int) $input['flow_id'] : null;
 		$pipeline_id = isset( $input['pipeline_id'] ) ? (int) $input['pipeline_id'] : null;
 		$agent_id    = isset( $input['agent_id'] ) ? (int) $input['agent_id'] : null;
 
 		if ( null === $flow_id && null === $pipeline_id && null === $agent_id ) {
-			return array(
-				'success' => false,
-				'error'   => 'Must provide flow_id, pipeline_id, or agent_id.',
-			);
+			return new \WP_Error( 'invalid_flow_scope', 'Must provide flow_id, pipeline_id, or agent_id.', array( 'status' => 400 ) );
 		}
 
 		$flows = $this->resolveFlows( $flow_id, $pipeline_id, $agent_id );
 
 		if ( empty( $flows ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'No flows found matching the specified criteria.',
-			);
+			return new \WP_Error( 'flows_not_found', 'No flows found matching the specified criteria.', array( 'status' => 404 ) );
 		}
 
 		$resumed = 0;
@@ -157,14 +151,19 @@ class ResumeFlowAbility {
 			)
 		);
 
-		return array(
+		$result = array(
 			'success' => true,
 			'resumed' => $resumed,
 			'skipped' => $skipped,
 			'errors'  => $errors,
+			'partial' => $resumed > 0 && $errors > 0,
 			'flows'   => $details,
 			'message' => sprintf( 'Resumed %d flow(s), skipped %d (not paused), %d error(s).', $resumed, $skipped, $errors ),
 		);
+		if ( $errors > 0 && 0 === $resumed ) {
+			return new \WP_Error( 'flow_resume_failed', 'Failed to resume the requested flows.', array( 'status' => 500 ) + $result );
+		}
+		return $result;
 	}
 
 	/**

@@ -125,8 +125,8 @@ class PipelineConfigurationAbilitiesTest extends WP_UnitTestCase {
 			)
 		);
 
-		$this->assertFalse( $result['success'] );
-		$this->assertSame( 'unknown_field', $result['error_code'] );
+		$this->assertWPError( $result );
+		$this->assertSame( 'unknown_field', $result->get_error_code() );
 		$after = $this->abilities->executeGet( array( 'pipeline_id' => $this->pipeline_id ) );
 		$this->assertSame( $current['pipeline']['revision'], $after['pipeline']['revision'] );
 	}
@@ -149,18 +149,18 @@ class PipelineConfigurationAbilitiesTest extends WP_UnitTestCase {
 			)
 		);
 
-		$this->assertFalse( $result['success'] );
-		$this->assertSame( 'configuration_conflict', $result['error_code'] );
-		$this->assertSame( 409, $result['status'] );
+		$this->assertWPError( $result );
+		$this->assertSame( 'configuration_conflict', $result->get_error_code() );
+		$this->assertSame( 409, $result->get_error_data()['status'] );
 		$this->assertSame( 'Concurrent value', $repository->get_pipeline_config( $this->pipeline_id )[ $step_id ]['system_prompt'] );
 	}
 
 	public function test_missing_pipeline_returns_explicit_not_found_error(): void {
 		$result = $this->abilities->executeGet( array( 'pipeline_id' => 999999 ) );
 
-		$this->assertFalse( $result['success'] );
-		$this->assertSame( 'pipeline_not_found', $result['error_code'] );
-		$this->assertSame( 404, $result['status'] );
+		$this->assertWPError( $result );
+		$this->assertSame( 'pipeline_not_found', $result->get_error_code() );
+		$this->assertSame( 404, $result->get_error_data()['status'] );
 	}
 
 	public function test_ability_enforces_manage_flows_authorization(): void {

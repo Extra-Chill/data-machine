@@ -239,6 +239,9 @@ class PipelineSteps {
 				'step_type'   => $step_type,
 			)
 		);
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
 
 		if ( ! $result['success'] ) {
 			return new \WP_Error(
@@ -294,6 +297,9 @@ class PipelineSteps {
 				'pipeline_step_id' => $step_id,
 			)
 		);
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
 
 		if ( ! $result['success'] ) {
 			return new \WP_Error(
@@ -368,6 +374,9 @@ class PipelineSteps {
 				'step_order'  => $step_order,
 			)
 		);
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
 
 		if ( ! $result['success'] ) {
 			return new \WP_Error(
@@ -402,6 +411,9 @@ class PipelineSteps {
 				'system_prompt'    => $system_prompt,
 			)
 		);
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
 
 		if ( ! $result['success'] ) {
 			return new \WP_Error(

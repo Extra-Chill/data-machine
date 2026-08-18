@@ -66,14 +66,11 @@ class DeleteFlowAbility {
 	 * @param array $input Input parameters with flow_id.
 	 * @return array Result with success status.
 	 */
-	public function execute( array $input ): array {
+	public function execute( array $input ): array|\WP_Error {
 		$flow_id = $input['flow_id'] ?? null;
 
 		if ( ! is_numeric( $flow_id ) || (int) $flow_id <= 0 ) {
-			return array(
-				'success' => false,
-				'error'   => 'flow_id is required and must be a positive integer',
-			);
+			return new \WP_Error( 'invalid_flow_id', 'flow_id is required and must be a positive integer', array( 'status' => 400 ) );
 		}
 
 		$flow_id = (int) $flow_id;
@@ -81,12 +78,7 @@ class DeleteFlowAbility {
 
 		if ( ! $flow ) {
 			do_action( 'datamachine_log', 'error', 'Flow not found for deletion', array( 'flow_id' => $flow_id ) );
-			return array(
-				'success'    => false,
-				'error'      => 'Flow not found',
-				'error_code' => 'flow_not_found',
-				'status'     => 404,
-			);
+			return new \WP_Error( 'flow_not_found', 'Flow not found', array( 'status' => 404 ) );
 		}
 
 		$pipeline_id = (int) ( $flow['pipeline_id'] ?? 0 );
@@ -114,13 +106,7 @@ class DeleteFlowAbility {
 			}
 		);
 		if ( is_wp_error( $schedule_result ) ) {
-			return array_merge(
-				array(
-					'success'                 => false,
-					'desired_state_committed' => null === $this->db_flows->get_flow( $flow_id ),
-				),
-				\DataMachine\Engine\Tasks\RecurringScheduler::errorMetadata( $schedule_result )
-			);
+			return new \WP_Error( $schedule_result->get_error_code(), $schedule_result->get_error_message(), array_merge( array( 'status' => 500, 'desired_state_committed' => null === $this->db_flows->get_flow( $flow_id ) ), \DataMachine\Engine\Tasks\RecurringScheduler::errorMetadata( $schedule_result ) ) );
 		}
 
 		do_action(

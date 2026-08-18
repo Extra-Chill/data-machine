@@ -730,12 +730,12 @@ class PipelinesCommand extends BaseCommand {
 
 		// Update name if provided.
 		if ( $has_name ) {
-			$result = ( new UpdatePipelineAbility() )->execute(
+			$result = AbilityResult::normalize( ( new UpdatePipelineAbility() )->execute(
 				array(
 					'pipeline_id'   => $pipeline_id,
 					'pipeline_name' => $assoc_args['name'],
 				)
-			);
+			) );
 
 			if ( ! $result['success'] ) {
 				WP_CLI::error( $result['error'] ?? 'Failed to update pipeline name' );
@@ -793,7 +793,7 @@ class PipelinesCommand extends BaseCommand {
 					continue;
 				}
 
-				$step_result = $step_ability->executeUpdatePipelineStep( $step_input );
+				$step_result = AbilityResult::normalize( $step_ability->executeUpdatePipelineStep( $step_input ) );
 
 				if ( ! $step_result['success'] ) {
 					WP_CLI::warning( "Failed to update step {$step_id}: " . ( $step_result['error'] ?? 'Unknown error' ) );
@@ -821,13 +821,13 @@ class PipelinesCommand extends BaseCommand {
 			}
 
 			$step_ability  = new \DataMachine\Abilities\PipelineStepAbilities();
-			$prompt_result = $step_ability->executeUpdatePipelineStep(
+			$prompt_result = AbilityResult::normalize( $step_ability->executeUpdatePipelineStep(
 				array(
 					'pipeline_id'      => $pipeline_id,
 					'pipeline_step_id' => $step_id,
 					'system_prompt'    => $system_prompt,
 				)
-			);
+			) );
 
 			if ( ! $prompt_result['success'] ) {
 				WP_CLI::warning( 'Failed to update system prompt: ' . ( $prompt_result['error'] ?? 'Unknown error' ) );
@@ -1051,7 +1051,7 @@ class PipelinesCommand extends BaseCommand {
 			) );
 		}
 
-		$result = ( new DeletePipelineAbility() )->execute( array( 'pipeline_id' => $pipeline_id ) );
+		$result = AbilityResult::normalize( ( new DeletePipelineAbility() )->execute( array( 'pipeline_id' => $pipeline_id ) ) );
 
 		if ( ! $result['success'] ) {
 			WP_CLI::error( $result['error'] ?? 'Failed to delete pipeline' );

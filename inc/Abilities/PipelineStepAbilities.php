@@ -293,17 +293,14 @@ class PipelineStepAbilities {
 	 * @param array $input Input parameters.
 	 * @return array Result with steps data.
 	 */
-	public function executeGetPipelineSteps( array $input ): array {
+	public function executeGetPipelineSteps( array $input ): array|\WP_Error {
 		$pipeline_id      = $input['pipeline_id'] ?? null;
 		$pipeline_step_id = $input['pipeline_step_id'] ?? null;
 
 		// Direct step lookup by ID - bypasses pipeline_id requirement.
 		if ( null !== $pipeline_step_id ) {
 			if ( ! is_string( $pipeline_step_id ) || empty( $pipeline_step_id ) ) {
-				return array(
-					'success' => false,
-					'error'   => 'pipeline_step_id must be a non-empty string',
-				);
+				return new \WP_Error( 'invalid_pipeline_step_id', 'pipeline_step_id must be a non-empty string', array( 'status' => 400 ) );
 			}
 
 			$step_config = $this->db_pipelines->get_pipeline_step_config( $pipeline_step_id );
@@ -326,20 +323,14 @@ class PipelineStepAbilities {
 		}
 
 		if ( ! is_numeric( $pipeline_id ) || (int) $pipeline_id <= 0 ) {
-			return array(
-				'success' => false,
-				'error'   => 'pipeline_id is required and must be a positive integer',
-			);
+			return new \WP_Error( 'invalid_pipeline_id', 'pipeline_id is required and must be a positive integer', array( 'status' => 400 ) );
 		}
 
 		$pipeline_id = (int) $pipeline_id;
 		$pipeline    = $this->db_pipelines->get_pipeline( $pipeline_id );
 
 		if ( ! $pipeline ) {
-			return array(
-				'success' => false,
-				'error'   => 'Pipeline not found',
-			);
+			return new \WP_Error( 'pipeline_not_found', 'Pipeline not found', array( 'status' => 404 ) );
 		}
 
 		$steps = array_values( $this->db_pipelines->get_pipeline_config( $pipeline_id ) );
@@ -358,32 +349,23 @@ class PipelineStepAbilities {
 	 * @param array $input Input parameters.
 	 * @return array Result with created step data.
 	 */
-	public function executeAddPipelineStep( array $input ): array {
+	public function executeAddPipelineStep( array $input ): array|\WP_Error {
 		$pipeline_id = $input['pipeline_id'] ?? null;
 		$step_type   = $input['step_type'] ?? null;
 
 		if ( ! is_numeric( $pipeline_id ) || (int) $pipeline_id <= 0 ) {
-			return array(
-				'success' => false,
-				'error'   => 'pipeline_id is required and must be a positive integer',
-			);
+			return new \WP_Error( 'invalid_pipeline_id', 'pipeline_id is required and must be a positive integer', array( 'status' => 400 ) );
 		}
 
 		if ( empty( $step_type ) || ! is_string( $step_type ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'step_type is required and must be a string',
-			);
+			return new \WP_Error( 'invalid_step_type', 'step_type is required and must be a string', array( 'status' => 400 ) );
 		}
 
 		$step_type_abilities = new StepTypeAbilities();
 		$valid_types         = array_keys( $step_type_abilities->getAllStepTypes() );
 
 		if ( ! in_array( $step_type, $valid_types, true ) ) {
-			return array(
-				'success' => false,
-				'error'   => "Invalid step_type '{$step_type}'. Must be one of: " . implode( ', ', $valid_types ),
-			);
+			return new \WP_Error( 'invalid_step_type', "Invalid step_type '{$step_type}'. Must be one of: " . implode( ', ', $valid_types ), array( 'status' => 400 ) );
 		}
 
 		$pipeline_id = (int) $pipeline_id;
@@ -392,10 +374,7 @@ class PipelineStepAbilities {
 		$step_type_config = $step_type_abilities->getStepType( $step_type );
 		if ( ! $step_type_config ) {
 			do_action( 'datamachine_log', 'error', 'Invalid step type for step creation', array( 'step_type' => $step_type ) );
-			return array(
-				'success' => false,
-				'error'   => 'Invalid step type configuration',
-			);
+			return new \WP_Error( 'invalid_step_type', 'Invalid step type configuration', array( 'status' => 400 ) );
 		}
 
 		$current_steps        = $this->db_pipelines->get_pipeline_config( $pipeline_id );
@@ -457,10 +436,7 @@ class PipelineStepAbilities {
 					'step_type'   => $step_type,
 				)
 			);
-			return array(
-				'success' => false,
-				'error'   => 'Failed to add step. Verify the pipeline_id exists and you have sufficient permissions.',
-			);
+			return new \WP_Error( 'pipeline_step_creation_failed', 'Failed to add step. Verify the pipeline_id exists and you have sufficient permissions.', array( 'status' => 500 ) );
 		}
 
 		$pipeline_step_id = $new_step['pipeline_step_id'];
@@ -513,22 +489,16 @@ class PipelineStepAbilities {
 	 * @param array $input Input parameters.
 	 * @return array Result with update status.
 	 */
-	public function executeUpdatePipelineStep( array $input ): array {
+	public function executeUpdatePipelineStep( array $input ): array|\WP_Error {
 		$pipeline_step_id = $input['pipeline_step_id'] ?? null;
 
 		if ( empty( $pipeline_step_id ) || ! is_string( $pipeline_step_id ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'pipeline_step_id is required and must be a string',
-			);
+			return new \WP_Error( 'invalid_pipeline_step_id', 'pipeline_step_id is required and must be a string', array( 'status' => 400 ) );
 		}
 
 		// Reject handler fields — handlers are flow-scoped, not pipeline-scoped.
 		if ( isset( $input['handler_slug'] ) || isset( $input['handler_slugs'] ) || isset( $input['handler_config'] ) || isset( $input['handler_configs'] ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'handler_slug(s) and handler_config(s) are flow-scoped. Use datamachine/update-flow-step ability instead.',
-			);
+			return new \WP_Error( 'invalid_pipeline_step_fields', 'handler_slug(s) and handler_config(s) are flow-scoped. Use datamachine/update-flow-step ability instead.', array( 'status' => 400 ) );
 		}
 
 		$system_prompt = $input['system_prompt'] ?? null;
@@ -547,29 +517,20 @@ class PipelineStepAbilities {
 		}
 
 		if ( null === $system_prompt && null === $agent_modes && ! $has_policy_field ) {
-			return array(
-				'success' => false,
-				'error'   => 'At least one of system_prompt, agent_modes, disabled_tools, or tool_categories is required',
-			);
+			return new \WP_Error( 'invalid_pipeline_step_update', 'At least one of system_prompt, agent_modes, disabled_tools, or tool_categories is required', array( 'status' => 400 ) );
 		}
 
 		$step_config = $this->db_pipelines->get_pipeline_step_config( $pipeline_step_id );
 
 		if ( empty( $step_config ) || empty( $step_config['pipeline_id'] ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'Pipeline step not found',
-			);
+			return new \WP_Error( 'pipeline_step_not_found', 'Pipeline step not found', array( 'status' => 404 ) );
 		}
 
 		$pipeline_id = $step_config['pipeline_id'];
 		$pipeline    = $this->db_pipelines->get_pipeline( $pipeline_id );
 
 		if ( ! $pipeline ) {
-			return array(
-				'success' => false,
-				'error'   => 'Pipeline not found',
-			);
+			return new \WP_Error( 'pipeline_not_found', 'Pipeline not found', array( 'status' => 404 ) );
 		}
 
 		$pipeline_config = $pipeline['pipeline_config'] ?? array();
@@ -586,10 +547,7 @@ class PipelineStepAbilities {
 		if ( null !== $agent_modes ) {
 			$sanitized_modes = self::sanitizeStringListField( $agent_modes, 'agent_modes' );
 			if ( is_wp_error( $sanitized_modes ) ) {
-				return array(
-					'success' => false,
-					'error'   => $sanitized_modes->get_error_message(),
-				);
+				return new \WP_Error( $sanitized_modes->get_error_code(), $sanitized_modes->get_error_message(), array( 'status' => 400 ) );
 			}
 			$step_config_data['agent_modes'] = $sanitized_modes;
 			$updated_fields[]                = 'agent_modes';
@@ -602,10 +560,7 @@ class PipelineStepAbilities {
 
 			$sanitized_values = self::sanitizeStringListField( $input[ $field ], $field );
 			if ( is_wp_error( $sanitized_values ) ) {
-				return array(
-					'success' => false,
-					'error'   => $sanitized_values->get_error_message(),
-				);
+				return new \WP_Error( $sanitized_values->get_error_code(), $sanitized_values->get_error_message(), array( 'status' => 400 ) );
 			}
 
 			if ( 'disabled_tools' === $field ) {
@@ -625,10 +580,7 @@ class PipelineStepAbilities {
 		);
 
 		if ( ! $success ) {
-			return array(
-				'success' => false,
-				'error'   => 'Failed to update pipeline step configuration',
-			);
+			return new \WP_Error( 'pipeline_step_update_failed', 'Failed to update pipeline step configuration', array( 'status' => 500 ) );
 		}
 
 		do_action(
@@ -687,22 +639,16 @@ class PipelineStepAbilities {
 	 * @param array $input Input parameters.
 	 * @return array Result with deletion status.
 	 */
-	public function executeDeletePipelineStep( array $input ): array {
+	public function executeDeletePipelineStep( array $input ): array|\WP_Error {
 		$pipeline_id      = $input['pipeline_id'] ?? null;
 		$pipeline_step_id = $input['pipeline_step_id'] ?? null;
 
 		if ( ! is_numeric( $pipeline_id ) || (int) $pipeline_id <= 0 ) {
-			return array(
-				'success' => false,
-				'error'   => 'pipeline_id is required and must be a positive integer',
-			);
+			return new \WP_Error( 'invalid_pipeline_id', 'pipeline_id is required and must be a positive integer', array( 'status' => 400 ) );
 		}
 
 		if ( empty( $pipeline_step_id ) || ! is_string( $pipeline_step_id ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'pipeline_step_id is required and must be a string',
-			);
+			return new \WP_Error( 'invalid_pipeline_step_id', 'pipeline_step_id is required and must be a string', array( 'status' => 400 ) );
 		}
 
 		$pipeline_id      = absint( $pipeline_id );
@@ -710,10 +656,7 @@ class PipelineStepAbilities {
 
 		$pipeline = $this->db_pipelines->get_pipeline( $pipeline_id );
 		if ( ! $pipeline ) {
-			return array(
-				'success' => false,
-				'error'   => __( 'Pipeline not found.', 'data-machine' ),
-			);
+			return new \WP_Error( 'pipeline_not_found', __( 'Pipeline not found.', 'data-machine' ), array( 'status' => 404 ) );
 		}
 
 		if ( ! isset( $pipeline['pipeline_name'] ) || empty( trim( $pipeline['pipeline_name'] ) ) ) {
@@ -726,10 +669,7 @@ class PipelineStepAbilities {
 					'pipeline_step_id' => $pipeline_step_id,
 				)
 			);
-			return array(
-				'success' => false,
-				'error'   => __( 'Pipeline data is corrupted - missing name.', 'data-machine' ),
-			);
+			return new \WP_Error( 'pipeline_data_invalid', __( 'Pipeline data is corrupted - missing name.', 'data-machine' ), array( 'status' => 500 ) );
 		}
 
 		$pipeline_name  = $pipeline['pipeline_name'];
@@ -749,10 +689,7 @@ class PipelineStepAbilities {
 		}
 
 		if ( ! $step_found ) {
-			return array(
-				'success' => false,
-				'error'   => __( 'Step not found in pipeline.', 'data-machine' ),
-			);
+			return new \WP_Error( 'pipeline_step_not_found', __( 'Step not found in pipeline.', 'data-machine' ), array( 'status' => 404 ) );
 		}
 
 		$updated_steps = array();
@@ -770,10 +707,7 @@ class PipelineStepAbilities {
 		);
 
 		if ( ! $success ) {
-			return array(
-				'success' => false,
-				'error'   => __( 'Failed to delete step from pipeline.', 'data-machine' ),
-			);
+			return new \WP_Error( 'pipeline_step_deletion_failed', __( 'Failed to delete step from pipeline.', 'data-machine' ), array( 'status' => 500 ) );
 		}
 
 		// Sync deletions to flows
@@ -830,44 +764,29 @@ class PipelineStepAbilities {
 	 * @param array $input Input parameters.
 	 * @return array Result with reorder status.
 	 */
-	public function executeReorderPipelineSteps( array $input ): array {
+	public function executeReorderPipelineSteps( array $input ): array|\WP_Error {
 		$pipeline_id = $input['pipeline_id'] ?? null;
 		$step_order  = $input['step_order'] ?? null;
 
 		if ( ! is_numeric( $pipeline_id ) || (int) $pipeline_id <= 0 ) {
-			return array(
-				'success' => false,
-				'error'   => 'pipeline_id is required and must be a positive integer',
-			);
+			return new \WP_Error( 'invalid_pipeline_id', 'pipeline_id is required and must be a positive integer', array( 'status' => 400 ) );
 		}
 
 		if ( empty( $step_order ) || ! is_array( $step_order ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'step_order is required and must be an array',
-			);
+			return new \WP_Error( 'invalid_step_order', 'step_order is required and must be an array', array( 'status' => 400 ) );
 		}
 
 		foreach ( $step_order as $index => $item ) {
 			if ( ! is_array( $item ) ) {
-				return array(
-					'success' => false,
-					'error'   => "Step order item at index {$index} must be an object",
-				);
+				return new \WP_Error( 'invalid_step_order', "Step order item at index {$index} must be an object", array( 'status' => 400 ) );
 			}
 
 			if ( ! isset( $item['pipeline_step_id'] ) || ! isset( $item['execution_order'] ) ) {
-				return array(
-					'success' => false,
-					'error'   => 'Each step order item must have pipeline_step_id and execution_order',
-				);
+				return new \WP_Error( 'invalid_step_order', 'Each step order item must have pipeline_step_id and execution_order', array( 'status' => 400 ) );
 			}
 
 			if ( ! is_string( $item['pipeline_step_id'] ) || ! is_numeric( $item['execution_order'] ) ) {
-				return array(
-					'success' => false,
-					'error'   => 'pipeline_step_id must be string and execution_order must be numeric',
-				);
+				return new \WP_Error( 'invalid_step_order', 'pipeline_step_id must be string and execution_order must be numeric', array( 'status' => 400 ) );
 			}
 		}
 
@@ -875,10 +794,7 @@ class PipelineStepAbilities {
 		$pipeline_steps = $this->db_pipelines->get_pipeline_config( $pipeline_id );
 
 		if ( empty( $pipeline_steps ) ) {
-			return array(
-				'success' => false,
-				'error'   => __( 'Pipeline not found', 'data-machine' ),
-			);
+			return new \WP_Error( 'pipeline_not_found', __( 'Pipeline not found', 'data-machine' ), array( 'status' => 404 ) );
 		}
 
 		$steps_by_id = array();
@@ -894,26 +810,20 @@ class PipelineStepAbilities {
 			$pipeline_step_id = sanitize_text_field( $item['pipeline_step_id'] );
 
 			if ( isset( $seen_steps[ $pipeline_step_id ] ) ) {
-				return array(
-					'success' => false,
-					'error'   => sprintf(
+				return new \WP_Error( 'duplicate_step_order', sprintf(
 						/* translators: %s: pipeline step ID */
 						__( 'Step %s appears more than once in reorder input', 'data-machine' ),
 						$pipeline_step_id
-					),
-				);
+				), array( 'status' => 400 ) );
 			}
 			$seen_steps[ $pipeline_step_id ] = true;
 
 			if ( ! isset( $steps_by_id[ $pipeline_step_id ] ) ) {
-				return array(
-					'success' => false,
-					'error'   => sprintf(
+				return new \WP_Error( 'pipeline_step_not_found', sprintf(
 						/* translators: %s: pipeline step ID */
 						__( 'Step %s not found in pipeline', 'data-machine' ),
 						$pipeline_step_id
-					),
-				);
+				), array( 'status' => 404 ) );
 			}
 
 			$step                               = $steps_by_id[ $pipeline_step_id ];
@@ -922,10 +832,7 @@ class PipelineStepAbilities {
 		}
 
 		if ( count( $updated_steps ) !== count( $pipeline_steps ) ) {
-			return array(
-				'success' => false,
-				'error'   => __( 'Step count mismatch during reorder', 'data-machine' ),
-			);
+			return new \WP_Error( 'step_order_mismatch', __( 'Step count mismatch during reorder', 'data-machine' ), array( 'status' => 400 ) );
 		}
 
 		$success = $this->db_pipelines->update_pipeline(
@@ -936,10 +843,7 @@ class PipelineStepAbilities {
 		);
 
 		if ( ! $success ) {
-			return array(
-				'success' => false,
-				'error'   => __( 'Failed to save step order', 'data-machine' ),
-			);
+			return new \WP_Error( 'pipeline_step_reorder_failed', __( 'Failed to save step order', 'data-machine' ), array( 'status' => 500 ) );
 		}
 
 		$updated_orders = $this->buildExecutionOrderMap( $updated_steps );
