@@ -323,11 +323,12 @@ class PostIdentityReservationsTest extends WP_UnitTestCase {
 		$this->assertNotFalse( $wpdb->query( 'COMMIT' ), 'The direct-connection fixture must be visible outside the PHPUnit connection.' );
 		$table   = $this->repository->get_table_name();
 		$hash    = $first_connection->real_escape_string( $identity['identity_hash'] );
+		$wpdb->query( 'COMMIT' );
 
 		try {
-			$first_connection->query( 'START TRANSACTION' );
-			$first_connection->query( "SELECT identity_hash FROM `{$table}` WHERE identity_hash = '{$hash}' FOR UPDATE" );
-			$first_connection->query( "UPDATE `{$table}` SET post_id = {$post_id}, state = 'linked' WHERE identity_hash = '{$hash}'" );
+			$this->assertTrue( $first_connection->query( 'START TRANSACTION' ) );
+			$this->assertInstanceOf( \mysqli_result::class, $first_connection->query( "SELECT identity_hash FROM `{$table}` WHERE identity_hash = '{$hash}' FOR UPDATE" ) );
+			$this->assertTrue( $first_connection->query( "UPDATE `{$table}` SET post_id = {$post_id}, state = 'linked' WHERE identity_hash = '{$hash}'" ) );
 
 			$second_connection->query( 'SET SESSION innodb_lock_wait_timeout = 5' );
 			$second_connection->query( 'START TRANSACTION' );
