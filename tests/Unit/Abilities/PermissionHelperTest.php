@@ -409,7 +409,7 @@ class PermissionHelperTest extends WP_UnitTestCase {
 		$result = PermissionHelper::run_as_agent_context(
 			456,
 			$owner_id,
-			function (): string {
+			function () use ( $owner_id ): string {
 				$this->assertSame( 456, PermissionHelper::get_acting_agent_id() );
 				$this->assertSame( $owner_id, PermissionHelper::acting_user_id() );
 				return 'stored';
