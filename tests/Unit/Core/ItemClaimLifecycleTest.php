@@ -875,6 +875,8 @@ class ItemClaimLifecycleTest extends WP_UnitTestCase {
 		if ( ! class_exists( '\mysqli' ) || ! defined( 'MYSQLI_ASYNC' ) ) {
 			$this->markTestSkipped( 'MySQLi async support is unavailable.' );
 		}
+		global $wpdb;
+		$wpdb->query( 'COMMIT' );
 		$first  = $this->openMysqlConnection();
 		$second = $this->openMysqlConnection();
 		if ( ! $first instanceof \mysqli || ! $second instanceof \mysqli ) {

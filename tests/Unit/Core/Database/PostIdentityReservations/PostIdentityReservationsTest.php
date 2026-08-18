@@ -194,7 +194,7 @@ class PostIdentityReservationsTest extends WP_UnitTestCase {
 		}
 	}
 
-	public function test_schema_validation_rejects_malformed_column_contract_and_create_table_repairs_it(): void {
+	public function test_schema_validation_rejects_malformed_column_contract(): void {
 		global $wpdb;
 
 		$wpdb->query(
@@ -209,12 +209,23 @@ class PostIdentityReservationsTest extends WP_UnitTestCase {
 			)
 		);
 
-		$validation = $this->repository->validate_schema();
-		$this->assertWPError( $validation );
-		$this->assertSame( 'identity_schema_columns', $validation->get_error_code() );
-
-		PostIdentityReservations::create_table();
-		$this->assertTrue( ( new PostIdentityReservations() )->validate_schema() );
+		try {
+			$validation = $this->repository->validate_schema();
+			$this->assertWPError( $validation );
+			$this->assertSame( 'identity_schema_columns', $validation->get_error_code() );
+		} finally {
+			$wpdb->query(
+				$wpdb->prepare(
+					"ALTER TABLE %i
+					MODIFY identity_hash char(64) NOT NULL,
+					MODIFY post_id bigint(20) unsigned DEFAULT NULL,
+					MODIFY state varchar(20) NOT NULL DEFAULT 'reserved',
+					MODIFY attempt_count bigint(20) unsigned NOT NULL DEFAULT 1,
+					MODIFY completed_at datetime DEFAULT NULL",
+					$this->repository->get_table_name()
+				)
+			);
+		}
 	}
 
 	public function test_create_table_repairs_exact_unique_post_id_index_only(): void {

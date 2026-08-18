@@ -390,13 +390,13 @@ class CreateFlowAbility {
 	/**
 	 * Roll back all writes made while creating a flow.
 	 *
-	 * @param array  $transaction_scope Transaction or savepoint owned by this call.
+	 * @param TransactionScope $transaction_scope Transaction or savepoint owned by this call.
 	 * @param int    $flow_id Flow ID allocated in the transaction.
 	 * @param string $error Error message.
 	 * @param array  $configuration_errors Optional structured configuration errors.
 	 * @return array Failure result.
 	 */
-	private function rollbackCreation( array $transaction_scope, int $flow_id, string $error, array $configuration_errors = array() ): array {
+	private function rollbackCreation( TransactionScope $transaction_scope, int $flow_id, string $error, array $configuration_errors = array() ): array {
 		$this->rollbackCreationTransactionScope( $transaction_scope );
 		RecurringScheduler::invalidateGenerationCache( FlowScheduling::FLOW_HOOK, array( $flow_id ) );
 		$schedule_error = $this->compensateFlowSchedule( $flow_id );
