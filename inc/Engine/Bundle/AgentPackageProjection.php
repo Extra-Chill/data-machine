@@ -53,13 +53,21 @@ final class AgentPackageProjection {
 	 * @return array<string,mixed>
 	 */
 	private static function agent_from_manifest( array $manifest ): array {
-		$agent = is_array( $manifest['agent'] ?? null ) ? $manifest['agent'] : array();
+		$agent          = is_array( $manifest['agent'] ?? null ) ? $manifest['agent'] : array();
+		$default_config = is_array( $agent['agent_config'] ?? null ) ? $agent['agent_config'] : array();
+		if ( isset( $agent['tool_policy'] ) && is_array( $agent['tool_policy'] ) ) {
+			$default_config['tool_policy'] = $agent['tool_policy'];
+		}
+		if ( isset( $agent['subagents'] ) && is_array( $agent['subagents'] ) ) {
+			$default_config['subagents'] = $agent['subagents'];
+		}
 
 		return array(
 			'slug'           => (string) ( $agent['slug'] ?? '' ),
 			'label'          => (string) ( $agent['label'] ?? ( $agent['slug'] ?? '' ) ),
 			'description'    => (string) ( $agent['description'] ?? '' ),
-			'default_config' => is_array( $agent['agent_config'] ?? null ) ? $agent['agent_config'] : array(),
+			'default_config' => $default_config,
+			'subagents'      => is_array( $agent['subagents'] ?? null ) ? $agent['subagents'] : array(),
 			'meta'           => array(
 				'package_source' => 'data-machine',
 			),

@@ -14,6 +14,8 @@ defined( 'ABSPATH' ) || exit;
 
 final class AgentSubagentGraph {
 
+	public const CAPABILITY = 'datamachine/subagent-graph';
+
 	/** @return string[] */
 	public static function edges_from_config( mixed $edges, string $slug = '' ): array {
 		if ( ! is_array( $edges ) || ! array_is_list( $edges ) ) {
@@ -101,7 +103,7 @@ final class AgentSubagentGraph {
 				'description'  => (string) $child['description'],
 				'agent_config' => $child['agent_config'],
 				'memory'       => $memory,
-				'tool_policy'  => $child['tool_policy'],
+				'tool_policy'  => self::normalize_tool_policy( $child['tool_policy'], sprintf( 'Subagent %s', $slug ) ),
 				'skill_policy' => is_array( $child['skill_policy'] ?? null ) ? $child['skill_policy'] : array(),
 				'skills'       => self::normalize_file_map( $child['skills'], $slug, 'skill' ),
 				'references'   => self::normalize_file_map( $child['references'], $slug, 'reference' ),
@@ -118,6 +120,57 @@ final class AgentSubagentGraph {
 		}
 		self::assert_acyclic( $nodes );
 		return array_values( $nodes );
+	}
+
+	/** @return array<string,mixed> */
+	public static function normalize_tool_policy( mixed $policy, string $label = 'Agent' ): array {
+		if ( ! is_array( $policy ) || ( array() !== $policy && array_is_list( $policy ) ) ) {
+			throw new BundleValidationException( sprintf( '%s tool policy must be an object.', esc_html( $label ) ) );
+		}
+		if ( array() === $policy ) {
+			return array();
+		}
+		if ( array_key_exists( 'allow', $policy ) || array_key_exists( 'default', $policy ) ) {
+			$legacy_unknown = array_diff( array_keys( $policy ), array( 'allow', 'default' ) );
+			if ( ! empty( $legacy_unknown ) || ( array_key_exists( 'default', $policy ) && 'deny' !== $policy['default'] ) ) {
+				throw new BundleValidationException( sprintf( '%s legacy tool policy must be an allowlist with a deny default.', esc_html( $label ) ) );
+			}
+			$policy = array(
+				'mode'  => 'allow',
+				'tools' => $policy['allow'] ?? array(),
+			);
+		}
+
+		$unknown = array_diff( array_keys( $policy ), array( 'mode', 'tools', 'categories' ) );
+		if ( ! empty( $unknown ) ) {
+			throw new BundleValidationException( sprintf( '%s tool policy has unsupported fields: %s.', esc_html( $label ), esc_html( implode( ', ', $unknown ) ) ) );
+		}
+
+		$mode = is_string( $policy['mode'] ?? null ) ? $policy['mode'] : '';
+		if ( ! in_array( $mode, array( 'allow', 'deny' ), true ) ) {
+			throw new BundleValidationException( sprintf( '%s tool policy mode must be allow or deny.', esc_html( $label ) ) );
+		}
+
+		$normalized = array( 'mode' => $mode );
+		foreach ( array( 'tools', 'categories' ) as $field ) {
+			$values = $policy[ $field ] ?? array();
+			if ( ! is_array( $values ) || ! array_is_list( $values ) ) {
+				throw new BundleValidationException( sprintf( '%s tool policy %s must be a list.', esc_html( $label ), esc_html( $field ) ) );
+			}
+			$values = array_map( static fn( $value ): string => is_string( $value ) ? trim( $value ) : '', $values );
+			if ( in_array( '', $values, true ) ) {
+				throw new BundleValidationException( sprintf( '%s tool policy %s must contain non-empty strings.', esc_html( $label ), esc_html( $field ) ) );
+			}
+			$values = array_values( array_unique( $values ) );
+			sort( $values, SORT_STRING );
+			$normalized[ $field ] = $values;
+		}
+
+		if ( 'deny' === $mode && empty( $normalized['tools'] ) && empty( $normalized['categories'] ) ) {
+			throw new BundleValidationException( sprintf( '%s deny tool policy must name at least one tool or category.', esc_html( $label ) ) );
+		}
+
+		return $normalized;
 	}
 
 	/** @param string[] $edges @param array<int,array<string,mixed>> $children @return string[] */

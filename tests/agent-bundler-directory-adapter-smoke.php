@@ -354,7 +354,7 @@ assert_adapter_equals( 'reference bytes survive directory package read', "\0refe
 assert_adapter_equals( 'root skill bytes survive directory package read', "root \0\xFF", $graph_round_trip['agent']['skills']['root.md'] ?? null );
 assert_adapter_equals( 'root reference bytes survive directory package read', "root reference \xC3\xA9", $graph_round_trip['agent']['references']['root-ref.md'] ?? null );
 assert_adapter_equals( 'root skill policy survives directory package read', array( 'mode' => 'explicit' ), $graph_round_trip['agent']['skill_policy'] ?? null );
-assert_adapter_equals( 'root tool policy survives directory package read', array( 'allow' => array( 'datamachine/read-file' ) ), $graph_round_trip['agent']['tool_policy'] ?? null );
+assert_adapter_equals( 'legacy root tool policy migrates during directory package read', array( 'mode' => 'allow', 'tools' => array( 'datamachine/read-file' ), 'categories' => array() ), $graph_round_trip['agent']['tool_policy'] ?? null );
 $child_skill_policy = $graph_round_trip['subagents'][0]['skill_policy'] ?? array();
 assert_adapter(
 	'child skill policy survives directory package read',

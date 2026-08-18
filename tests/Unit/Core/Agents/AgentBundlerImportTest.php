@@ -38,6 +38,7 @@ use DataMachine\Core\Database\Jobs\Jobs as JobsRepository;
 use DataMachine\Core\Database\Pipelines\Pipelines as PipelinesRepository;
 use DataMachine\Abilities\Engine\RunFlowAbility;
 use DataMachine\Engine\AI\Tools\Global\AgentDailyMemory;
+use DataMachine\Engine\AI\Tools\Policy\DataMachineAgentToolPolicyProvider;
 use DataMachine\Engine\Bundle\AgentBundleArrayAdapter;
 use DataMachine\Engine\Tasks\RecurringScheduler;
 use DataMachine\Engine\Bundle\AgentBundleArtifactState;
@@ -986,6 +987,7 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 	public function test_subagent_skill_policy_survives_persisted_graph_projection(): void {
 		$bundle                              = $this->fixture_bundle( 'policy-coordinator' );
 		$bundle['agent']['subagents']        = array( 'policy-writer' );
+		$bundle['agent']['tool_policy']      = array( 'mode' => 'allow', 'tools' => array( 'datamachine/search' ) );
 		$bundle['subagents']                 = array(
 			array(
 				'slug'         => 'policy-writer',
@@ -993,7 +995,7 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 				'description'  => 'Writes with an explicit skill policy.',
 				'agent_config' => array(),
 				'memory'       => array( 'SOUL.md' => "# Policy Writer\n" ),
-				'tool_policy'  => array(),
+				'tool_policy'  => array( 'mode' => 'allow', 'tools' => array( 'datamachine/read' ) ),
 				'skill_policy' => array( 'mode' => 'explicit', 'allowed' => array( 'write.md' ) ),
 				'skills'       => array( 'write.md' => "# Write\n" ),
 				'references'   => array(),
@@ -1008,11 +1010,43 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 		$projection = PersistedAgentGraphProjector::project( 'policy-coordinator' );
 		$this->assertTrue( (bool) $projection['success'] );
 		$nodes = array_column( $projection['nodes'] ?? array(), null, 'slug' );
+		$root  = $this->agents_repo->get_by_slug( 'policy-coordinator' );
+		$child = $this->agents_repo->get_by_slug( 'policy-writer' );
+		$this->assertSame( array( 'mode' => 'allow', 'tools' => array( 'datamachine/search' ), 'categories' => array() ), $root['agent_config']['tool_policy'] ?? null, 'Root policy is persisted where runtime enforcement reads it.' );
+		$this->assertSame( array( 'mode' => 'allow', 'tools' => array( 'datamachine/read' ), 'categories' => array() ), $child['agent_config']['tool_policy'] ?? null, 'Child policy is persisted where runtime enforcement reads it.' );
+		$policy_provider = new DataMachineAgentToolPolicyProvider();
+		$this->assertSame( $root['agent_config']['tool_policy'], $policy_provider->getForAgent( (int) $root['agent_id'] ), 'Runtime policy provider resolves the imported root policy.' );
+		$this->assertSame( $child['agent_config']['tool_policy'], $policy_provider->getForAgent( (int) $child['agent_id'] ), 'Runtime policy provider resolves the imported child policy.' );
 		$this->assertSame(
 			array( 'mode' => 'explicit', 'allowed' => array( 'write.md' ), 'paths' => array( 'write.md' ) ),
 			$nodes['policy-writer']['skill_policy'] ?? null,
 			'Persisted graph projection retains the child policy and installed skill paths.'
 		);
+	}
+
+	public function test_subagent_graph_import_fails_before_mutation_on_unsupported_host(): void {
+		$bundle                       = $this->fixture_bundle( 'unsupported-coordinator' );
+		$bundle['agent']['subagents'] = array( 'unsupported-writer' );
+		$bundle['subagents']          = array(
+			array(
+				'slug' => 'unsupported-writer', 'label' => 'Writer', 'description' => '', 'agent_config' => array(),
+				'memory' => array(), 'tool_policy' => array(), 'skills' => array(), 'references' => array(), 'subagents' => array(),
+			),
+		);
+		$remove_graph_capability = static fn( array $capabilities ): array => array_values( array_diff( $capabilities, array( 'datamachine/subagent-graph' ) ) );
+		add_filter( 'datamachine_agent_bundle_host_capabilities', $remove_graph_capability );
+
+		try {
+			$result = $this->bundler->import( $bundle, null, $this->owner_id );
+		} finally {
+			remove_filter( 'datamachine_agent_bundle_host_capabilities', $remove_graph_capability );
+		}
+
+		$this->assertFalse( (bool) $result['success'] );
+		$this->assertSame( 'install_unsupported_capabilities', $result['error_code'] ?? null );
+		$this->assertSame( array( 'datamachine/subagent-graph' ), $result['compatibility']['unsupported_capabilities'] ?? null );
+		$this->assertNull( $this->agents_repo->get_by_slug( 'unsupported-coordinator' ), 'Compatibility rejection creates no coordinator row.' );
+		$this->assertNull( $this->agents_repo->get_by_slug( 'unsupported-writer' ), 'Compatibility rejection creates no child row.' );
 	}
 
 	/**
