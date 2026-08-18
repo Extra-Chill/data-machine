@@ -147,14 +147,6 @@ class Jobs extends BaseRepository {
 
 		$existing = $this->get_job_by_idempotency_key( $idempotency_key );
 		if ( null !== $existing ) {
-			( new RunLifecycleStore( $this ) )->mark_job_created(
-				(int) $existing['job_id'],
-				array(
-					'run_type' => $existing['source'] ?? 'job',
-					'status'   => $existing['status'] ?? JobStatus::PENDING,
-				)
-			);
-
 			return array(
 				'job_id'         => (int) $existing['job_id'],
 				'created'        => false,
@@ -682,14 +674,6 @@ class Jobs extends BaseRepository {
 
 	/** Build the canonical response for a competing idempotent insert winner. */
 	private function existing_idempotent_job_result( array $existing ): array {
-		( new RunLifecycleStore( $this ) )->mark_job_created(
-			(int) $existing['job_id'],
-			array(
-				'run_type' => $existing['source'] ?? 'job',
-				'status'   => $existing['status'] ?? JobStatus::PENDING,
-			)
-		);
-
 		return array(
 			'job_id'         => (int) $existing['job_id'],
 			'created'        => false,

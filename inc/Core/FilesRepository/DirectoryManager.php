@@ -28,8 +28,8 @@ class DirectoryManager {
 	 *
 	 * @var bool
 	 */
-	private static bool $agent_files_ensured = false;
-	private static ?int $default_agent_user_id = null;
+	private static bool $agent_files_ensured     = false;
+	private static ?int $default_agent_user_id   = null;
 
 	/**
 	 * Ensure default memory files exist across layers (SOUL.md + MEMORY.md in agent, USER.md in user).

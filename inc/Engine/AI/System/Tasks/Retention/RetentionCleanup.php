@@ -611,7 +611,7 @@ class RetentionCleanup {
 
 			$placeholders = implode( ', ', array_fill( 0, count( $job_ids ), '%d' ) );
 			$query        = "UPDATE %i SET engine_data = NULL WHERE job_id IN ({$placeholders})";
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Placeholders are generated above.
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Placeholders are generated above.
 			$affected = $wpdb->query( $wpdb->prepare( $query, array_merge( array( $table ), $job_ids ) ) );
 			if ( false === $affected ) {
 				self::log(

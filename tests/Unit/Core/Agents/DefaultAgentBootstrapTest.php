@@ -27,6 +27,7 @@ class DefaultAgentBootstrapTest extends WP_UnitTestCase {
 		DirectoryManager::reset_default_agent_user_id_cache();
 		$this->agents_repo    = new AgentsRepository();
 		$this->default_user_id = DirectoryManager::get_default_agent_user_id();
+		wp_set_current_user( $this->default_user_id );
 		$this->clear_agents();
 		delete_user_meta( $this->default_user_id, AgentBundler::ACTIVE_AGENT_META_KEY );
 		$directory_manager = new DirectoryManager();
@@ -41,6 +42,7 @@ class DefaultAgentBootstrapTest extends WP_UnitTestCase {
 		wp_delete_file( trailingslashit( $directory_manager->get_user_directory( $this->default_user_id ) ) . 'USER.md' );
 		wp_delete_file( trailingslashit( $directory_manager->get_shared_directory() ) . 'RULES.md' );
 		DirectoryManager::reset_ensure_flag();
+		wp_set_current_user( 0 );
 		parent::tear_down();
 	}
 

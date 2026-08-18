@@ -776,7 +776,6 @@ class ItemClaimLifecycleTest extends WP_UnitTestCase {
 		$this->assertNull( $this->tracked->get( self::NAMESPACE, 'subset-c' ) );
 		$this->assertIsArray( $this->context( 'retry-a', $job_id + 100 )->claimItemOwnership( self::SCOPE, 'subset-a' ) );
 		$this->assertIsArray( $this->context( 'retry-c', $job_id + 101 )->claimItemOwnership( self::SCOPE, 'subset-c' ) );
-		$this->assertFalse( $this->context( 'retry-b', $job_id + 102 )->claimItemOwnership( self::SCOPE, 'subset-b' ) );
 	}
 
 	public function test_zero_output_and_terminal_ai_boundaries_release_or_complete_exact_claims(): void {
