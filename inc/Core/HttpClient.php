@@ -46,11 +46,20 @@ class HttpClient {
 	 *                        - auth_ref: string - Optional provider:account credential reference resolved through registered auth providers
 	 *                        - browser_mode: bool - Use browser-like headers (default false)
 	 *                        - context: string - Context for logging (default 'HTTP Request')
+	 *                        - log_response_body_preview: bool - Include up to 200 response-body bytes in non-2xx log context (default true; other types are rejected)
 	 * @return array{success: true, data: string, status_code: int, headers: mixed, response: array}|array{success: false, error: string, data?: string, status_code?: int, headers?: mixed, response?: array} Response array. Received non-2xx responses include HTTP metadata; transport failures do not.
 	 */
 	public static function request( string $method, string $url, array $options = array() ): array {
+		if ( array_key_exists( 'log_response_body_preview', $options ) && ! is_bool( $options['log_response_body_preview'] ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'Invalid log_response_body_preview option; expected bool',
+			);
+		}
+
 		$method       = strtoupper( $method );
 		$context      = $options['context'] ?? 'HTTP Request';
+		$log_response_body_preview = $options['log_response_body_preview'] ?? true;
 		$proxy_filter = null;
 
 		if ( ! in_array( $method, self::VALID_METHODS, true ) ) {
@@ -103,7 +112,7 @@ class HttpClient {
 		$success_codes = self::SUCCESS_CODES[ $method ];
 
 		if ( ! in_array( $status_code, $success_codes, true ) ) {
-			return self::handleHttpError( $response, $status_code, $body, $method, $url, $context );
+			return self::handleHttpError( $response, $status_code, $body, $method, $url, $context, $log_response_body_preview );
 		}
 
 		return array(
@@ -400,7 +409,7 @@ class HttpClient {
 	/**
 	 * Handle non-success HTTP status code
 	 */
-	private static function handleHttpError( array $response, int $status_code, string $body, string $method, string $url, string $context ): array {
+	private static function handleHttpError( array $response, int $status_code, string $body, string $method, string $url, string $context, bool $log_response_body_preview ): array {
 		$error_message = sprintf(
 			'%1$s %2$s returned HTTP %3$d',
 			$context,
@@ -418,17 +427,21 @@ class HttpClient {
 		// third-party sites (403 bot-blocks, 404 moved pages, 5xx origin-down) and is
 		// not a Data-Machine-side fault. Log it at `warning`; true transport failures
 		// (no response at all) are handled separately in handleWpError() and stay `error`.
+		$log_context = array(
+			'context'     => $context,
+			'url'         => $url,
+			'method'      => $method,
+			'status_code' => $status_code,
+		);
+		if ( $log_response_body_preview ) {
+			$log_context['body_preview'] = substr( $body, 0, 200 );
+		}
+
 		do_action(
 			'datamachine_log',
 			'warning',
 			'HTTP Request: Error response',
-			array(
-				'context'      => $context,
-				'url'          => $url,
-				'method'       => $method,
-				'status_code'  => $status_code,
-				'body_preview' => substr( $body, 0, 200 ),
-			)
+			$log_context
 		);
 
 		return array(
