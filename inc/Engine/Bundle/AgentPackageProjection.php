@@ -29,7 +29,7 @@ final class AgentPackageProjection {
 				'slug'         => (string) $manifest['bundle_slug'],
 				'version'      => (string) $manifest['bundle_version'],
 				'agent'        => self::agent_from_manifest( $manifest ),
-				'capabilities' => self::string_list( is_array( $manifest['capabilities'] ?? null ) ? $manifest['capabilities'] : array() ),
+				'capabilities' => self::normalize_capabilities( is_array( $manifest['capabilities'] ?? null ) ? $manifest['capabilities'] : array() ),
 				'artifacts'    => self::artifacts_from_directory( $directory ),
 				'meta'         => self::meta_from_manifest( $manifest ),
 			)
@@ -53,13 +53,21 @@ final class AgentPackageProjection {
 	 * @return array<string,mixed>
 	 */
 	private static function agent_from_manifest( array $manifest ): array {
-		$agent = is_array( $manifest['agent'] ?? null ) ? $manifest['agent'] : array();
+		$agent          = is_array( $manifest['agent'] ?? null ) ? $manifest['agent'] : array();
+		$default_config = is_array( $agent['agent_config'] ?? null ) ? $agent['agent_config'] : array();
+		if ( isset( $agent['tool_policy'] ) && is_array( $agent['tool_policy'] ) ) {
+			$default_config['tool_policy'] = $agent['tool_policy'];
+		}
+		if ( isset( $agent['subagents'] ) && is_array( $agent['subagents'] ) ) {
+			$default_config['subagents'] = $agent['subagents'];
+		}
 
 		return array(
 			'slug'           => (string) ( $agent['slug'] ?? '' ),
 			'label'          => (string) ( $agent['label'] ?? ( $agent['slug'] ?? '' ) ),
 			'description'    => (string) ( $agent['description'] ?? '' ),
-			'default_config' => is_array( $agent['agent_config'] ?? null ) ? $agent['agent_config'] : array(),
+			'default_config' => $default_config,
+			'subagents'      => is_array( $agent['subagents'] ?? null ) ? $agent['subagents'] : array(),
 			'meta'           => array(
 				'package_source' => 'data-machine',
 			),
@@ -162,7 +170,7 @@ final class AgentPackageProjection {
 					'extension_artifact_type' => $artifact_type,
 					'payload_kind'            => 'json',
 				),
-				self::string_list( is_array( $artifact['requires'] ?? null ) ? $artifact['requires'] : array() ),
+				self::normalize_capabilities( is_array( $artifact['requires'] ?? null ) ? $artifact['requires'] : array() ),
 				$artifact['payload'] ?? null
 			);
 		}
@@ -203,7 +211,7 @@ final class AgentPackageProjection {
 		);
 
 		if ( ! empty( $requires ) ) {
-			$artifact['requires'] = self::string_list( $requires );
+			$artifact['requires'] = self::normalize_capabilities( $requires );
 		}
 
 		if ( null !== $payload ) {
@@ -219,7 +227,7 @@ final class AgentPackageProjection {
 	 * @param array<int,mixed> $values Raw capability values.
 	 * @return array<int,string>
 	 */
-	private static function string_list( array $values ): array {
+	public static function normalize_capabilities( array $values ): array {
 		$normalized = array();
 		foreach ( $values as $value ) {
 			$value = trim( strtolower( (string) $value ) );

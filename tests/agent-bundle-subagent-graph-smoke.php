@@ -32,7 +32,7 @@ function subagent_graph_node( string $slug, array $edges = array() ): array {
 		'slug' => $slug, 'label' => ucfirst( $slug ), 'description' => $slug,
 		'agent_config' => array( 'default_model' => 'generic-model' ),
 		'memory' => array( 'SOUL.md' => "# {$slug}\n", 'MEMORY.md' => '' ),
-		'tool_policy' => array( 'allow' => array( 'generic/tool' ) ),
+		'tool_policy' => array( 'mode' => 'allow', 'tools' => array( 'generic/tool' ) ),
 		'skill_policy' => array( 'mode' => 'explicit' ),
 		'skills' => array( 'skill.md' => "generic-skill\n" ), 'references' => array( 'reference.md' => "generic-ref\n" ), 'subagents' => $edges,
 	);
@@ -48,6 +48,7 @@ subagent_graph_assert( array( 'researcher' ) === $nodes[2]['subagents'], 'child 
 subagent_graph_assert( '# writer' . "\n" === $nodes[2]['memory']['SOUL.md'], 'identity bytes round-trip' );
 subagent_graph_assert( "generic-skill\n" === $nodes[2]['skills']['skill.md'] && "generic-ref\n" === $nodes[2]['references']['reference.md'], 'generic skills and references round-trip as bytes' );
 subagent_graph_assert( array( 'mode' => 'explicit' ) === $nodes[2]['skill_policy'], 'child skill policy round-trips' );
+subagent_graph_assert( array( 'mode' => 'allow', 'tools' => array( 'generic/tool' ), 'categories' => array() ) === $nodes[2]['tool_policy'], 'child tool policy is canonicalized for runtime enforcement' );
 subagent_graph_assert( array( 'writer' ) === AgentSubagentGraph::coordinator_edges( array( 'writer' ), $nodes, 'coordinator' ), 'coordinator edges resolve within bundled children' );
 
 foreach ( array(
@@ -92,6 +93,19 @@ try {
 	AgentSubagentGraph::normalize( array( $invalid ), 'coordinator' );
 } catch ( BundleValidationException $e ) { $rejected = true; }
 subagent_graph_assert( $rejected, 'traversal skill artifact paths are rejected before package path construction' );
+
+$legacy                = subagent_graph_node( 'writer' );
+$legacy['tool_policy'] = array( 'default' => 'deny', 'allow' => array( 'generic/tool' ) );
+$legacy_nodes          = AgentSubagentGraph::normalize( array( $legacy ), 'coordinator' );
+subagent_graph_assert( array( 'mode' => 'allow', 'tools' => array( 'generic/tool' ), 'categories' => array() ) === $legacy_nodes[0]['tool_policy'], 'shipped legacy allowlists migrate to the enforceable policy shape' );
+
+$rejected = false;
+try {
+	$invalid                = subagent_graph_node( 'writer' );
+	$invalid['tool_policy'] = array( 'default' => null, 'allow' => array( 'generic/tool' ) );
+	AgentSubagentGraph::normalize( array( $invalid ), 'coordinator' );
+} catch ( BundleValidationException $e ) { $rejected = true; }
+subagent_graph_assert( $rejected, 'present legacy defaults must be exactly deny' );
 
 if ( $failures ) {
 	exit( 1 );

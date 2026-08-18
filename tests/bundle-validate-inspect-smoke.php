@@ -18,12 +18,14 @@ agents_api_smoke_require_module();
 require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/register-agent-package-artifacts.php';
 
 use DataMachine\Engine\Bundle\AgentBundleAbilityService;
+use DataMachine\Engine\Bundle\AgentBundleCompatibility;
 use DataMachine\Engine\Bundle\AgentBundleDirectory;
 use DataMachine\Engine\Bundle\AgentBundleFlowFile;
 use DataMachine\Engine\Bundle\AgentBundleManifest;
 use DataMachine\Engine\Bundle\AgentBundlePipelineFile;
 use DataMachine\Engine\Bundle\AgentPackageProjection;
 use DataMachine\Engine\Bundle\BundleSchema;
+use DataMachine\Engine\Agents\AgentSubagentGraph;
 
 function datamachine_bundle_validate_smoke_reset_registry(): void {
 	do_action( 'init' );
@@ -117,6 +119,44 @@ agents_api_smoke_assert_equals( $report, $repeated_report, 'repeated inspection 
 agents_api_smoke_assert_equals( $artifact_types, $repeated_artifacts, 'repeated inspection preserves registered artifact definitions', $failures, $passes );
 agents_api_smoke_assert_equals( array(), $GLOBALS['__agents_api_smoke_wrong'], 'repeated inspection emits no incorrect-usage notices', $failures, $passes );
 
+$graph_directory = new AgentBundleDirectory(
+	new AgentBundleManifest(
+		'2026-08-18T00:00:00Z',
+		'data-machine/test',
+		'Graph Package',
+		'1.0.0',
+		'',
+		'',
+		array(
+			'slug'         => 'coordinator',
+			'label'        => 'Coordinator',
+			'description'  => '',
+			'agent_config' => array(),
+			'subagents'    => array( 'writer' ),
+			'tool_policy'  => array( 'mode' => 'allow', 'tools' => array( 'datamachine/search' ) ),
+		),
+		array(
+			'memory' => array(), 'pipelines' => array(), 'flows' => array(), 'prompts' => array(),
+			'rubrics' => array(), 'tool_policies' => array(), 'auth_refs' => array(), 'seed_queues' => array(),
+			'extensions' => array(), 'handler_auth' => 'refs',
+		),
+		array(),
+		array( 'datamachine/agent-bundle' ),
+		array(
+			array(
+				'slug' => 'writer', 'label' => 'Writer', 'description' => '', 'agent_config' => array(),
+				'memory' => array(), 'tool_policy' => array( 'mode' => 'allow', 'tools' => array() ),
+				'skills' => array(), 'references' => array(), 'subagents' => array(),
+			),
+		)
+	),
+	array(), array(), array()
+);
+$graph_package = AgentPackageProjection::from_directory( $graph_directory )->to_array();
+agents_api_smoke_assert_equals( array( 'writer' ), $graph_package['agent']['subagents'] ?? null, 'package inspection preserves coordinator edges', $failures, $passes );
+agents_api_smoke_assert_equals( 'allow', $graph_package['agent']['default_config']['tool_policy']['mode'] ?? null, 'package inspection projects enforceable root policy', $failures, $passes );
+agents_api_smoke_assert_equals( true, in_array( AgentSubagentGraph::CAPABILITY, $graph_package['capabilities'] ?? array(), true ), 'graph packages automatically require graph-capable hosts', $failures, $passes );
+
 echo "\n[2] Projected extension artifact requirements are reported as unsupported:\n";
 add_filter(
 	'datamachine_agent_bundle_artifact_types',
@@ -197,7 +237,7 @@ $unsupported_package = WP_Agent_Package::from_array(
 		),
 	)
 );
-$unsupported_report = WP_Agent_Package_Capability_Checker::check( $unsupported_package, AgentBundleAbilityService::host_capabilities() )->to_array();
+$unsupported_report = WP_Agent_Package_Capability_Checker::check( $unsupported_package, AgentBundleCompatibility::host_capabilities() )->to_array();
 agents_api_smoke_assert_equals( false, $unsupported_report['compatible'] ?? true, 'unsupported package is incompatible', $failures, $passes );
 agents_api_smoke_assert_equals( array( 'intelligence/wiki-brain', 'unknown/runtime' ), $unsupported_report['unsupported_capabilities'] ?? null, 'unsupported capabilities include package and artifact requirements', $failures, $passes );
 agents_api_smoke_assert_equals( array( 'unknown/vendor-artifact' ), $unsupported_report['unknown_artifact_types'] ?? null, 'unknown artifact type is reported', $failures, $passes );

@@ -25,6 +25,7 @@ use DataMachine\Engine\Bundle\AgentBundleArtifactDefinitions;
 use DataMachine\Engine\Bundle\AgentBundleArtifactExtensions;
 use DataMachine\Engine\Bundle\AgentBundleArtifactState;
 use DataMachine\Engine\Bundle\AgentBundleAgentConfig;
+use DataMachine\Engine\Bundle\AgentBundleCompatibility;
 use DataMachine\Engine\Bundle\AgentBundleArtifactStatus;
 use DataMachine\Engine\Bundle\AgentBundleMemoryArtifact;
 use DataMachine\Engine\Bundle\BundleStepIdRemapper;
@@ -624,6 +625,19 @@ class AgentBundler {
 			);
 		}
 
+		try {
+			$compatibility = AgentBundleCompatibility::report( AgentPackageProjection::from_array_bundle( $bundle ) )->to_array();
+		} catch ( BundleValidationException $e ) {
+			return array(
+				'success'    => false,
+				'error_code' => 'install_invalid_bundle',
+				'error'      => $e->getMessage(),
+			);
+		}
+		if ( empty( $compatibility['compatible'] ) ) {
+			return self::unsupported_capabilities_result( $compatibility );
+		}
+
 		if ( (string) ( $bundle['bundle_schema_version'] ?? '' ) === (string) BundleSchema::VERSION ) {
 			try {
 				$directory = AgentBundleArrayAdapter::from_array_bundle( $bundle );
@@ -635,21 +649,14 @@ class AgentBundler {
 				);
 			}
 
-			$payload                       = AgentBundleArrayAdapter::to_import_payload( $directory );
-			$payload['abilities_manifest'] = is_array( $bundle['abilities_manifest'] ?? null ) ? $bundle['abilities_manifest'] : array();
-			try {
-				$this->validate_import_file_maps( $payload );
-			} catch ( BundleValidationException $e ) {
-				return array(
-					'success'    => false,
-					'error_code' => 'install_invalid_bundle',
-					'error'      => $e->getMessage(),
-				);
-			}
-			if ( ! empty( $payload['subagents'] ) && empty( $options['_graph_node'] ) ) {
-				return $this->import_subagent_graph( $payload, $new_slug, $owner_id, $dry_run, $options );
-			}
-			return $this->materialize_import_bundle( $payload, $new_slug, $owner_id, $dry_run, $options );
+			return $this->import_directory_materialization(
+				$directory,
+				$new_slug,
+				$owner_id,
+				$dry_run,
+				$options,
+				is_array( $bundle['abilities_manifest'] ?? null ) ? $bundle['abilities_manifest'] : array()
+			);
 		}
 
 		try {
@@ -809,6 +816,9 @@ class AgentBundler {
 				$this->detect_locally_modified_subagent_artifacts( $slug, $kind, $files, is_array( $existing_root_metadata[ $kind ] ?? null ) ? $existing_root_metadata[ $kind ] : array(), $artifact_file_conflicts );
 			}
 			if ( ! empty( $root_artifacts ) || array_key_exists( 'skill_policy', $agent_data ) || array_key_exists( 'tool_policy', $agent_data ) ) {
+				if ( ! empty( $agent_data['tool_policy'] ) ) {
+					$incoming_config['tool_policy'] = AgentSubagentGraph::normalize_tool_policy( $agent_data['tool_policy'], sprintf( 'Agent %s', $slug ) );
+				}
 				$incoming_config['datamachine_subagent'] = array_merge(
 					is_array( $incoming_config['datamachine_subagent'] ?? null ) ? $incoming_config['datamachine_subagent'] : array(),
 					array_filter(
@@ -1504,6 +1514,11 @@ class AgentBundler {
 	 * @return array{success: bool, message?: string, error?: string, error_code?: string, summary?: array}
 	 */
 	private function import_directory_materialization( AgentBundleDirectory $directory, ?string $new_slug, int $owner_id, bool $dry_run, array $options, array $abilities_manifest = array() ): array {
+		$compatibility = AgentBundleCompatibility::report( AgentPackageProjection::from_directory( $directory ) )->to_array();
+		if ( empty( $compatibility['compatible'] ) ) {
+			return self::unsupported_capabilities_result( $compatibility );
+		}
+
 		$payload = AgentBundleArrayAdapter::to_import_payload( $directory );
 		try {
 			$this->validate_import_file_maps( $payload );
@@ -1523,6 +1538,16 @@ class AgentBundler {
 		}
 
 		return $this->materialize_import_bundle( $payload, $new_slug, $owner_id, $dry_run, $options );
+	}
+
+	/** @return array<string,mixed> */
+	private static function unsupported_capabilities_result( array $compatibility ): array {
+		return array(
+			'success'       => false,
+			'error_code'    => 'install_unsupported_capabilities',
+			'error'         => 'Agent bundle requires capabilities that are not available on this host.',
+			'compatibility' => $compatibility,
+		);
 	}
 
 	/** Validate every raw legacy file map before an import can mutate the filesystem. */
@@ -1641,6 +1666,7 @@ class AgentBundler {
 							array(
 								'description'          => $child['description'],
 								'subagents'            => $child['subagents'],
+								'tool_policy'          => $child['tool_policy'],
 								'datamachine_subagent' => array(
 									'tool_policy'  => $child['tool_policy'],
 									'skill_policy' => $child['skill_policy'],
