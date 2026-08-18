@@ -279,9 +279,10 @@ class PermissionHelper {
 	 * @param int        $agent_id     Agent ID.
 	 * @param int        $owner_id     Agent owner's WordPress user ID.
 	 * @param array|null $capabilities Token capability restrictions (null = unrestricted).
-	 * @param int|null   $token_id     Token ID for login-level runtime scoping.
+	 * @param int|null   $token_id        Token ID for login-level runtime scoping.
+	 * @param string     $request_context Agents API request context for the execution principal.
 	 */
-	public static function set_agent_context( int $agent_id, int $owner_id, ?array $capabilities = null, ?int $token_id = null ): void {
+	public static function set_agent_context( int $agent_id, int $owner_id, ?array $capabilities = null, ?int $token_id = null, string $request_context = WP_Agent_Execution_Principal::REQUEST_CONTEXT_REST ): void {
 		$scope = AgentTokens::normalize_capability_payload( $capabilities );
 
 		self::$acting_agent_id     = $agent_id;
@@ -302,7 +303,7 @@ class PermissionHelper {
 				$owner_id,
 				(string) $agent_id,
 				$token_id,
-				WP_Agent_Execution_Principal::REQUEST_CONTEXT_REST,
+				$request_context,
 				array(),
 				null,
 				null,
@@ -311,12 +312,57 @@ class PermissionHelper {
 			: WP_Agent_Execution_Principal::user_session(
 				$owner_id,
 				(string) $agent_id,
-				WP_Agent_Execution_Principal::REQUEST_CONTEXT_REST,
+				$request_context,
 				array(),
 				null,
 				null,
 				self::$capability_ceiling
 			);
+	}
+
+	/**
+	 * Execute a callback in a temporary agent principal context.
+	 *
+	 * This is for trusted operator paths which need agent-scoped storage without
+	 * requiring an agent bearer token. The full prior runtime context is restored
+	 * even when the callback throws.
+	 *
+	 * @param int      $agent_id        Agent ID.
+	 * @param int      $owner_id        Agent owner's WordPress user ID.
+	 * @param callable $callback        Work to execute in the agent context.
+	 * @param string   $request_context Agents API request context for the principal.
+	 * @return mixed Callback return value.
+	 *
+	 * @throws \Throwable Re-throws callback exceptions after restoring context.
+	 */
+	public static function run_as_agent_context( int $agent_id, int $owner_id, callable $callback, string $request_context = WP_Agent_Execution_Principal::REQUEST_CONTEXT_CLI ) {
+		$previous = array(
+			'authenticated_context' => self::$authenticated_context,
+			'authenticated_user_id' => self::$authenticated_user_id,
+			'acting_agent_id'       => self::$acting_agent_id,
+			'acting_token_id'       => self::$acting_token_id,
+			'agent_owner_id'        => self::$agent_owner_id,
+			'capability_ceiling'    => self::$capability_ceiling,
+			'agent_token_scope'     => self::$agent_token_scope,
+			'execution_principal'   => self::$execution_principal,
+			'caller_context'        => self::$caller_context,
+		);
+
+		self::set_agent_context( $agent_id, $owner_id, null, null, $request_context );
+
+		try {
+			return $callback();
+		} finally {
+			self::$authenticated_context = $previous['authenticated_context'];
+			self::$authenticated_user_id = $previous['authenticated_user_id'];
+			self::$acting_agent_id       = $previous['acting_agent_id'];
+			self::$acting_token_id       = $previous['acting_token_id'];
+			self::$agent_owner_id        = $previous['agent_owner_id'];
+			self::$capability_ceiling    = $previous['capability_ceiling'];
+			self::$agent_token_scope     = $previous['agent_token_scope'];
+			self::$execution_principal   = $previous['execution_principal'];
+			self::$caller_context        = $previous['caller_context'];
+		}
 	}
 
 	/**

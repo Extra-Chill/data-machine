@@ -12,6 +12,8 @@
 namespace DataMachine\Tests\Unit\Core\OAuth;
 
 use DataMachine\Core\OAuth\BaseOAuth2Provider;
+use DataMachine\Core\OAuth\OAuth2Handler;
+use DataMachine\Abilities\PermissionHelper;
 use WP_UnitTestCase;
 
 /**
@@ -60,6 +62,10 @@ class TestOAuth2Provider extends BaseOAuth2Provider {
 		return 'https://example.com/oauth/authorize';
 	}
 
+	public function get_authorization_params(): array {
+		return $this->build_auth_url_params();
+	}
+
 	public function handle_oauth_callback() {
 		// No-op for tests.
 	}
@@ -79,6 +85,13 @@ class TestOAuth2Provider extends BaseOAuth2Provider {
 			'access_token' => $this->refreshed_token,
 			'expires_at'   => time() + $this->refreshed_expires_in,
 		);
+	}
+}
+
+class TestCallbackOAuth2Handler extends OAuth2Handler {
+
+	public function store_callback_account_for_test( callable $storage_callback, array $state_payload ): bool {
+		return $this->store_callback_account( $storage_callback, $state_payload );
 	}
 }
 
@@ -103,9 +116,73 @@ class BaseOAuth2ProviderTest extends WP_UnitTestCase {
 	}
 
 	public function tear_down(): void {
+		PermissionHelper::clear_agent_context();
 		wp_clear_scheduled_hook( $this->provider->get_cron_hook_name() );
 		delete_site_option( 'datamachine_auth_data' );
 		parent::tear_down();
+	}
+
+	public function test_authorization_state_binds_the_active_agent_and_owner(): void {
+		$owner_id = self::factory()->user->create( array( 'role' => 'administrator' ) );
+		PermissionHelper::set_agent_context( 303, $owner_id );
+
+		$params  = $this->provider->get_authorization_params();
+		$payload = ( new OAuth2Handler() )->verify_state( 'test_oauth2', $params['state'] );
+
+		$this->assertSame(
+			array(
+				'agent_id' => 303,
+				'user_id'  => $owner_id,
+			),
+			$payload
+		);
+	}
+
+	public function test_unscoped_authorization_state_remains_empty(): void {
+		$params  = $this->provider->get_authorization_params();
+		$payload = ( new OAuth2Handler() )->verify_state( 'test_oauth2', $params['state'] );
+
+		$this->assertSame( array(), $payload );
+	}
+
+	public function test_agent_state_marker_requires_the_base_url_helper_for_each_invocation(): void {
+		$owner_id = self::factory()->user->create( array( 'role' => 'administrator' ) );
+		PermissionHelper::set_agent_context( 303, $owner_id );
+
+		$this->provider->begin_agent_scoped_authorization();
+		$this->assertFalse( $this->provider->has_agent_scoped_authorization_state() );
+		$this->provider->get_authorization_params();
+		$this->assertTrue( $this->provider->has_agent_scoped_authorization_state() );
+
+		$this->provider->begin_agent_scoped_authorization();
+		$this->assertFalse( $this->provider->has_agent_scoped_authorization_state() );
+	}
+
+	public function test_callback_storage_uses_the_verified_agent_slot_and_restores_context(): void {
+		$owner_id = self::factory()->user->create( array( 'role' => 'administrator' ) );
+		add_filter(
+			'datamachine_auth_scope_policy',
+			static fn( string $policy, string $provider_slug ): string => 'test_oauth2' === $provider_slug ? BaseOAuth2Provider::AUTH_SCOPE_PRINCIPAL : $policy,
+			10,
+			2
+		);
+
+		PermissionHelper::set_agent_context( 111, $owner_id );
+		$handler = new TestCallbackOAuth2Handler();
+		$stored  = $handler->store_callback_account_for_test(
+			fn(): bool => $this->provider->save_account( array( 'access_token' => 'agent-callback-token' ) ),
+			array(
+				'agent_id' => 303,
+				'user_id'  => $owner_id,
+			)
+		);
+
+		$this->assertTrue( $stored );
+		$this->assertSame( 'agent-callback-token', $this->provider->get_account_for_agent( 303 )['access_token'] );
+		$this->assertNull( $this->provider->get_account_for_user( $owner_id ) );
+		$this->assertNull( $this->provider->get_site_account() );
+		$this->assertSame( 111, PermissionHelper::get_acting_agent_id() );
+		remove_all_filters( 'datamachine_auth_scope_policy' );
 	}
 
 	// -------------------------------------------------------------------------

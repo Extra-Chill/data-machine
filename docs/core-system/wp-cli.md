@@ -531,6 +531,10 @@ wp datamachine auth status wordpress-api
 # Connect (OAuth shows URL; direct accepts credentials)
 wp datamachine auth connect google --client_id=xxx --client_secret=xxx
 
+# Bind an OAuth connection to an agent. The CLI user must be the agent owner,
+# an agent admin, or a site administrator.
+wp --user=42 datamachine auth connect google --agent=writer
+
 # Revoke site-wide credentials
 wp datamachine auth revoke google --yes
 

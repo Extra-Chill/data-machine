@@ -228,6 +228,24 @@ public function execute_my_handler( array $input, array $context = array() ) {
 }
 ```
 
+#### Agent-Scoped OAuth Callbacks
+
+`wp datamachine auth connect <handler> --agent=<slug-or-id>` is available only
+to `BaseOAuth2Provider` implementations that provide
+`get_agent_scoped_oauth_callback_config()`. Data Machine's final callback
+dispatcher then owns state verification, consumption, principal installation,
+and exact agent-slot storage; providers supply token-exchange and
+account-normalization callbacks only. OAuth1 and custom callback
+implementations remain site-scoped.
+
+Data Machine core currently has no production `BaseOAuth2Provider` subclass;
+integrations adopt this narrow hook when they need agent-scoped OAuth. Existing
+custom providers keep their unscoped `handle_oauth_callback()` behavior.
+
+For an agent-bound callback, the browser session must be the agent owner or an
+agent admin. The route validates state before resolving that principal; legacy
+unscoped callbacks retain the site-administrator requirement.
+
 #### Revocation
 
 ```bash
