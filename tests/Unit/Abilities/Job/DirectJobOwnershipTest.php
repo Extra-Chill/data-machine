@@ -206,6 +206,34 @@ class DirectJobOwnershipTest extends WP_UnitTestCase {
 		$this->assertArrayNotHasKey( 'jobs', $operator_summary['summary'] );
 	}
 
+	public function test_compact_summary_reports_authoritative_stuck_count(): void {
+		global $wpdb;
+
+		wp_set_current_user( $this->admin_id );
+		$jobs   = new Jobs();
+		$job_id = $jobs->create_job(
+			array(
+				'pipeline_id' => 'direct',
+				'flow_id'     => 'direct',
+			)
+		);
+		$wpdb->update(
+			$wpdb->prefix . 'datamachine_jobs',
+			array(
+				'status'     => 'processing',
+				'created_at' => gmdate( 'Y-m-d H:i:s', time() - 3 * HOUR_IN_SECONDS ),
+			),
+			array( 'job_id' => $job_id )
+		);
+
+		$compact = ( new JobsSummaryAbility() )->execute( array( 'compact' => true ) );
+		$full    = ( new JobsSummaryAbility() )->execute( array() );
+
+		$this->assertTrue( $compact['success'] );
+		$this->assertGreaterThanOrEqual( 1, $compact['summary']['stuck_processing_count'] );
+		$this->assertSame( $full['summary']['stuck_processing_count'], $compact['summary']['stuck_processing_count'] );
+	}
+
 	public function test_query_validation_and_not_found_use_native_errors(): void {
 		wp_set_current_user( $this->admin_id );
 
