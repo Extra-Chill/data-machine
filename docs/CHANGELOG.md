@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.175.4] - 2026-08-19
+
+### Fixed
+- avoid missing ability registration probe
+
 ## [0.175.3] - 2026-08-19
 
 ### Changed
