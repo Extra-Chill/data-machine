@@ -372,12 +372,6 @@ class StepLifecycleHandler {
 				);
 			}
 			$packet_claims = ProcessedItems::disposition_claims( $metadata );
-			if ( count( $packet_claims ) > 1 ) {
-				return array(
-					'success' => false,
-					'stale'   => false,
-				);
-			}
 			$claims = array_replace( $claims, $packet_claims );
 		}
 		if ( empty( $claims ) ) {

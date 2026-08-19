@@ -298,10 +298,6 @@ class PipelineBatchScheduler {
 			return false;
 		}
 		$packet_claims = ProcessedItems::disposition_claims( $packet_metadata );
-		if ( count( $packet_claims ) > 1 ) {
-			return false;
-		}
-		$item_claim = 1 === count( $packet_claims ) ? reset( $packet_claims ) : null;
 
 		// Normalize: 0 → null when no pipeline/flow context.
 		$pipeline_id = ( empty( $pipeline_id ) && ! is_string( $pipeline_id ) ) ? null : $pipeline_id;
@@ -395,8 +391,10 @@ class PipelineBatchScheduler {
 		if ( ! empty( $source_type ) ) {
 			$child_engine['source_type'] = $source_type;
 		}
-		if ( is_array( $item_claim ) ) {
-			$child_engine[ ProcessedItems::CLAIM_METADATA_KEY ] = $item_claim;
+		if ( 1 === count( $packet_claims ) ) {
+			$child_engine[ ProcessedItems::CLAIM_METADATA_KEY ] = reset( $packet_claims );
+		} elseif ( ! empty( $packet_claims ) ) {
+			$child_engine[ ProcessedItems::CLAIMS_METADATA_KEY ] = array_values( $packet_claims );
 		}
 
 		$existing_engine = datamachine_get_engine_data( $child_job_id );
