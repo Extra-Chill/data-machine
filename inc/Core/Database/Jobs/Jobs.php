@@ -1154,8 +1154,11 @@ class Jobs extends BaseRepository {
 
 	/**
 	 * Count processing jobs older than the dashboard stuck threshold.
+	 *
+	 * @param array<string,mixed> $args Job filters.
+	 * @return int Stuck processing job count.
 	 */
-	private function get_stuck_processing_count( array $args ): int {
+	public function get_stuck_processing_count( array $args ): int {
 		$stuck_args           = $args;
 		$stuck_args['status'] = 'processing';
 		$where_parts          = $this->build_jobs_summary_where( $stuck_args, 'j' );

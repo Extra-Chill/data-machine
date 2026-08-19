@@ -132,7 +132,7 @@ class JobsSummaryAbility {
 		return array(
 			'total'                                => $this->db_jobs->get_jobs_count( $filters ),
 			'failed_count'                         => $this->db_jobs->get_jobs_count( array_merge( $filters, array( 'status' => 'failed' ) ) ),
-			'stuck_processing_count'               => 0,
+			'stuck_processing_count'               => $this->db_jobs->get_stuck_processing_count( $filters ),
 			'incomplete_terminal_accounting_count' => $this->db_jobs->count_incomplete_terminal_accounting( $filters ),
 			'status'                               => array(
 				array(

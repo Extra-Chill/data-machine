@@ -136,6 +136,8 @@ $summary_ability = file_get_contents( __DIR__ . '/../inc/Abilities/Job/JobsSumma
 $assert( 'jobs summary accepts compact input', str_contains( $summary_ability, "'compact'" ) );
 $assert( 'jobs summary has compact helper', str_contains( $summary_ability, 'getCompactSummary' ) );
 $assert( 'compact summary skips database breakdown helpers', ! str_contains( $summary_ability, 'get_pipeline_summary_rows' ) && ! str_contains( $summary_ability, 'get_flow_summary_rows' ) );
+$assert( 'compact summary queries authoritative stuck count', str_contains( $summary_ability, 'get_stuck_processing_count( $filters )' ) );
+$assert( 'compact summary does not fabricate zero stuck jobs', ! str_contains( $summary_ability, "'stuck_processing_count'               => 0" ) );
 
 echo "\n[6] job status transitions use one terminal primitive\n";
 $recover_ability = file_get_contents( __DIR__ . '/../inc/Abilities/Job/RecoverStuckJobsAbility.php' );
