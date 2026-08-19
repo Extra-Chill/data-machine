@@ -110,6 +110,9 @@ class JobsSummaryAbility {
 		$filters = array_merge( $filters, $ownership_scope );
 
 		$summary     = empty( $input['compact'] ) ? $this->db_jobs->get_jobs_summary( $filters ) : $this->getCompactSummary( $filters );
+		if ( is_wp_error( $summary ) ) {
+			return $summary;
+		}
 		$query_error = $this->jobQueryFailed();
 		if ( $query_error ) {
 			return $query_error;
@@ -126,26 +129,56 @@ class JobsSummaryAbility {
 	 * Get lightweight status counts for polling surfaces.
 	 *
 	 * @param array<string,mixed> $filters Job filters.
-	 * @return array<string,mixed> Compact summary payload.
+	 * @return array<string,mixed>|\WP_Error Compact summary payload or query failure.
 	 */
-	private function getCompactSummary( array $filters ): array {
+	private function getCompactSummary( array $filters ): array|\WP_Error {
+		$total = $this->queryCompactCount( fn() => $this->db_jobs->get_jobs_count( $filters ) );
+		if ( is_wp_error( $total ) ) {
+			return $total;
+		}
+
+		$failed = $this->queryCompactCount( fn() => $this->db_jobs->get_jobs_count( array_merge( $filters, array( 'status' => 'failed' ) ) ) );
+		if ( is_wp_error( $failed ) ) {
+			return $failed;
+		}
+
+		$stuck = $this->queryCompactCount( fn() => $this->db_jobs->get_stuck_processing_count( $filters ) );
+		if ( is_wp_error( $stuck ) ) {
+			return $stuck;
+		}
+
+		$incomplete = $this->queryCompactCount( fn() => $this->db_jobs->count_incomplete_terminal_accounting( $filters ) );
+		if ( is_wp_error( $incomplete ) ) {
+			return $incomplete;
+		}
+
+		$processing = $this->queryCompactCount( fn() => $this->db_jobs->get_jobs_count( array_merge( $filters, array( 'status' => 'processing' ) ) ) );
+		if ( is_wp_error( $processing ) ) {
+			return $processing;
+		}
+
+		$pending = $this->queryCompactCount( fn() => $this->db_jobs->get_jobs_count( array_merge( $filters, array( 'status' => 'pending' ) ) ) );
+		if ( is_wp_error( $pending ) ) {
+			return $pending;
+		}
+
 		return array(
-			'total'                                => $this->db_jobs->get_jobs_count( $filters ),
-			'failed_count'                         => $this->db_jobs->get_jobs_count( array_merge( $filters, array( 'status' => 'failed' ) ) ),
-			'stuck_processing_count'               => $this->db_jobs->get_stuck_processing_count( $filters ),
-			'incomplete_terminal_accounting_count' => $this->db_jobs->count_incomplete_terminal_accounting( $filters ),
+			'total'                                => $total,
+			'failed_count'                         => $failed,
+			'stuck_processing_count'               => $stuck,
+			'incomplete_terminal_accounting_count' => $incomplete,
 			'status'                               => array(
 				array(
 					'status' => 'processing',
-					'count'  => $this->db_jobs->get_jobs_count( array_merge( $filters, array( 'status' => 'processing' ) ) ),
+					'count'  => $processing,
 				),
 				array(
 					'status' => 'pending',
-					'count'  => $this->db_jobs->get_jobs_count( array_merge( $filters, array( 'status' => 'pending' ) ) ),
+					'count'  => $pending,
 				),
 				array(
 					'status' => 'failed',
-					'count'  => $this->db_jobs->get_jobs_count( array_merge( $filters, array( 'status' => 'failed' ) ) ),
+					'count'  => $failed,
 				),
 			),
 			'pipeline'                             => array(),
@@ -153,5 +186,13 @@ class JobsSummaryAbility {
 			'handler'                              => array(),
 			'filters'                              => $filters,
 		);
+	}
+
+	/** Execute one compact count without allowing a later query to erase its error. */
+	private function queryCompactCount( callable $query ): int|\WP_Error {
+		$count       = (int) $query();
+		$query_error = $this->jobQueryFailed();
+
+		return $query_error ?: $count;
 	}
 }
