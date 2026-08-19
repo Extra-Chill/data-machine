@@ -2,6 +2,12 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.55.5] - 2026-08-19
+
+### Fixed
+- attach Ticketmaster claim descriptors
+- serve event map runtime locally
+
 ## [0.55.4] - 2026-08-14
 
 ### Fixed
