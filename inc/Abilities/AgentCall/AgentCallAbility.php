@@ -110,16 +110,16 @@ class AgentCallAbility {
 	 * @param array $input Canonical target/input/delivery payload.
 	 * @return array Agent-call result envelope.
 	 */
-	public function execute( array $input ): array {
+	public function execute( array $input ): array|\WP_Error {
 		$target   = is_array( $input['target'] ?? null ) ? $input['target'] : array();
 		$delivery = is_array( $input['delivery'] ?? null ) ? $input['delivery'] : array();
 
 		if ( 'webhook' !== ( $target['type'] ?? '' ) ) {
-			return $this->failure( 'Unsupported agent_call target type: ' . (string) ( $target['type'] ?? '' ) );
+			return $this->failure( 'invalid_agent_call_target', 'Unsupported agent_call target type: ' . (string) ( $target['type'] ?? '' ), array(), 400 );
 		}
 
 		if ( 'fire_and_forget' !== ( $delivery['mode'] ?? '' ) ) {
-			return $this->failure( 'Unsupported agent_call delivery mode: ' . (string) ( $delivery['mode'] ?? '' ) );
+			return $this->failure( 'invalid_agent_call_delivery', 'Unsupported agent_call delivery mode: ' . (string) ( $delivery['mode'] ?? '' ), array(), 400 );
 		}
 
 		return $this->executeWebhookFireAndForget( $input );
@@ -131,14 +131,14 @@ class AgentCallAbility {
 	 * @param array $input Canonical call input.
 	 * @return array Agent-call result envelope.
 	 */
-	private function executeWebhookFireAndForget( array $input ): array {
+	private function executeWebhookFireAndForget( array $input ): array|\WP_Error {
 		$target   = $input['target'];
 		$call     = is_array( $input['input'] ?? null ) ? $input['input'] : array();
 		$delivery = $input['delivery'];
 
 		$webhook_urls = $this->normalizeWebhookUrls( $target['id'] ?? '' );
 		if ( empty( $webhook_urls ) ) {
-			return $this->failure( 'target.id is required for webhook agent_call targets' );
+			return $this->failure( 'invalid_agent_call_target', 'target.id is required for webhook agent_call targets', array(), 400 );
 		}
 
 		$context          = is_array( $call['context'] ?? null ) ? $call['context'] : array();
@@ -176,7 +176,7 @@ class AgentCallAbility {
 			);
 		}
 
-		return $this->failure( implode( '; ', $errors ), array( 'results' => $results ) );
+		return $this->failure( 'agent_call_delivery_failed', implode( '; ', $errors ), array( 'results' => $results ), 500 );
 	}
 
 	/**
@@ -366,14 +366,17 @@ class AgentCallAbility {
 		return $base . implode( '/', $segments );
 	}
 
-	private function failure( string $error, array $output = array() ): array {
-		return array(
-			'status'        => 'failed',
-			'output'        => $output,
-			'messages'      => array(),
-			'remote_run_id' => '',
-			'resume_token'  => '',
-			'error'         => $error,
+	private function failure( string $code, string $message, array $output = array(), int $status = 500 ): \WP_Error {
+		return new \WP_Error(
+			$code,
+			$message,
+			array(
+				'status'        => $status,
+				'output'        => $output,
+				'messages'      => array(),
+				'remote_run_id' => '',
+				'resume_token'  => '',
+			)
 		);
 	}
 }

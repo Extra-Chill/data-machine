@@ -300,14 +300,18 @@ class DailyMemoryAbilities {
 	 * @param array $input Input parameters.
 	 * @return array Result.
 	 */
-	public static function readDaily( array $input ): array {
+	public static function readDaily( array $input ): array|\WP_Error {
 		$date = $input['date'] ?? gmdate( 'Y-m-d' );
 
 		$parts = DailyMemory::parse_date( $date );
 		if ( ! $parts ) {
-			return array(
-				'success' => false,
-				'message' => sprintf( 'Invalid date format: %s. Use YYYY-MM-DD.', $date ),
+			return new \WP_Error(
+				'invalid_memory_date',
+				sprintf( 'Invalid date format: %s. Use YYYY-MM-DD.', $date ),
+				array(
+					'status' => 400,
+					'date'   => $date,
+				)
 			);
 		}
 
@@ -315,7 +319,7 @@ class DailyMemoryAbilities {
 		$agent_id = (int) ( $input['agent_id'] ?? 0 );
 		$storage  = self::resolveStorage( $user_id, $agent_id );
 
-		return $storage->read( $parts['year'], $parts['month'], $parts['day'] );
+		return self::dailyResult( $storage->read( $parts['year'], $parts['month'], $parts['day'] ), 'daily_memory_read_failed', $date );
 	}
 
 	/**
@@ -324,12 +328,9 @@ class DailyMemoryAbilities {
 	 * @param array $input Input parameters.
 	 * @return array Result.
 	 */
-	public static function writeDaily( array $input ): array {
+	public static function writeDaily( array $input ): array|\WP_Error {
 		if ( ! PluginSettings::get( 'daily_memory_enabled', false ) ) {
-			return array(
-				'success' => false,
-				'message' => 'Daily memory is disabled. Enable it in Agent > Configuration.',
-			);
+			return new \WP_Error( 'daily_memory_disabled', 'Daily memory is disabled. Enable it in Agent > Configuration.', array( 'status' => 403 ) );
 		}
 
 		$date    = $input['date'] ?? gmdate( 'Y-m-d' );
@@ -338,9 +339,13 @@ class DailyMemoryAbilities {
 
 		$parts = DailyMemory::parse_date( $date );
 		if ( ! $parts ) {
-			return array(
-				'success' => false,
-				'message' => sprintf( 'Invalid date format: %s. Use YYYY-MM-DD.', $date ),
+			return new \WP_Error(
+				'invalid_memory_date',
+				sprintf( 'Invalid date format: %s. Use YYYY-MM-DD.', $date ),
+				array(
+					'status' => 400,
+					'date'   => $date,
+				)
 			);
 		}
 
@@ -349,10 +354,10 @@ class DailyMemoryAbilities {
 		$storage  = self::resolveStorage( $user_id, $agent_id );
 
 		if ( 'write' === $mode ) {
-			return $storage->write( $parts['year'], $parts['month'], $parts['day'], $content );
+			return self::dailyResult( $storage->write( $parts['year'], $parts['month'], $parts['day'], $content ), 'daily_memory_write_failed', $date );
 		}
 
-		return $storage->append( $parts['year'], $parts['month'], $parts['day'], $content );
+		return self::dailyResult( $storage->append( $parts['year'], $parts['month'], $parts['day'], $content ), 'daily_memory_write_failed', $date );
 	}
 
 	/**
@@ -361,12 +366,12 @@ class DailyMemoryAbilities {
 	 * @param array $input Input parameters.
 	 * @return array Result.
 	 */
-	public static function listDaily( array $input ): array {
+	public static function listDaily( array $input ): array|\WP_Error {
 		$user_id  = (int) ( $input['user_id'] ?? 0 );
 		$agent_id = (int) ( $input['agent_id'] ?? 0 );
 		$storage  = self::resolveStorage( $user_id, $agent_id );
 
-		return $storage->list_all();
+		return self::dailyResult( $storage->list_all(), 'daily_memory_list_failed' );
 	}
 
 	/**
@@ -375,7 +380,7 @@ class DailyMemoryAbilities {
 	 * @param array $input Input parameters with 'query', optional 'from' and 'to'.
 	 * @return array Search results.
 	 */
-	public static function searchDaily( array $input ): array {
+	public static function searchDaily( array $input ): array|\WP_Error {
 		$user_id  = (int) ( $input['user_id'] ?? 0 );
 		$agent_id = (int) ( $input['agent_id'] ?? 0 );
 		$storage  = self::resolveStorage( $user_id, $agent_id );
@@ -384,7 +389,7 @@ class DailyMemoryAbilities {
 		$from  = $input['from'] ?? null;
 		$to    = $input['to'] ?? null;
 
-		return $storage->search( $query, $from, $to );
+		return self::dailyResult( $storage->search( $query, $from, $to ), 'daily_memory_search_failed' );
 	}
 
 	/**
@@ -395,21 +400,22 @@ class DailyMemoryAbilities {
 	 * @param array $input Input parameters.
 	 * @return array Result.
 	 */
-	public static function deleteDaily( array $input ): array {
+	public static function deleteDaily( array $input ): array|\WP_Error {
 		if ( ! PluginSettings::get( 'daily_memory_enabled', false ) ) {
-			return array(
-				'success' => false,
-				'message' => 'Daily memory is disabled. Enable it in Agent > Configuration.',
-			);
+			return new \WP_Error( 'daily_memory_disabled', 'Daily memory is disabled. Enable it in Agent > Configuration.', array( 'status' => 403 ) );
 		}
 
 		$date = $input['date'] ?? gmdate( 'Y-m-d' );
 
 		$parts = DailyMemory::parse_date( $date );
 		if ( ! $parts ) {
-			return array(
-				'success' => false,
-				'message' => sprintf( 'Invalid date format: %s. Use YYYY-MM-DD.', $date ),
+			return new \WP_Error(
+				'invalid_memory_date',
+				sprintf( 'Invalid date format: %s. Use YYYY-MM-DD.', $date ),
+				array(
+					'status' => 400,
+					'date'   => $date,
+				)
 			);
 		}
 
@@ -417,6 +423,22 @@ class DailyMemoryAbilities {
 		$agent_id = (int) ( $input['agent_id'] ?? 0 );
 		$storage  = self::resolveStorage( $user_id, $agent_id );
 
-		return $storage->delete( $parts['year'], $parts['month'], $parts['day'] );
+		return self::dailyResult( $storage->delete( $parts['year'], $parts['month'], $parts['day'] ), 'daily_memory_delete_failed', $date );
+	}
+
+	/** Convert the legacy daily-memory service result at the registered callback boundary. */
+	private static function dailyResult( array $result, string $code, string $date = '' ): array|\WP_Error {
+		if ( ! empty( $result['success'] ) ) {
+			return $result;
+		}
+
+		$message = (string) ( $result['message'] ?? 'Daily memory operation failed.' );
+		$status  = str_contains( strtolower( $message ), 'no daily memory' ) ? 404 : 500;
+
+		$data = array_merge( $result, array( 'status' => $status ) );
+		if ( '' !== $date ) {
+			$data['date'] = $date;
+		}
+		return new \WP_Error( $code, $message, $data );
 	}
 }

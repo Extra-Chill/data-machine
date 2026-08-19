@@ -116,9 +116,9 @@ class SelfServiceAgentCreationTest extends WP_UnitTestCase {
 		$this->assertTrue( $first['success'] );
 
 		$second = AgentAbilities::createAgent( array( 'agent_slug' => 'second-bot' ) );
-		$this->assertFalse( $second['success'] );
-		$this->assertStringContainsString( 'already have an agent', $second['error'] );
-		$this->assertStringContainsString( 'first-bot', $second['error'] );
+		$this->assertInstanceOf( \WP_Error::class, $second );
+		$this->assertStringContainsString( 'already have an agent', $second->get_error_message() );
+		$this->assertStringContainsString( 'first-bot', $second->get_error_message() );
 	}
 
 	/**
@@ -139,8 +139,8 @@ class SelfServiceAgentCreationTest extends WP_UnitTestCase {
 		$this->assertTrue( $a['success'] );
 		$this->assertTrue( $b['success'] );
 		$this->assertTrue( $c['success'] );
-		$this->assertFalse( $d['success'], 'The 4th creation must be rejected with limit=3' );
-		$this->assertStringContainsString( '3', $d['error'] );
+		$this->assertInstanceOf( \WP_Error::class, $d, 'The 4th creation must be rejected with limit=3' );
+		$this->assertStringContainsString( '3', $d->get_error_message() );
 	}
 
 	/**
@@ -257,7 +257,8 @@ class SelfServiceAgentCreationTest extends WP_UnitTestCase {
 		// Missing slug → failure path.
 		$result = AgentAbilities::createAgent( array( 'agent_slug' => '' ) );
 
-		$this->assertFalse( $result['success'] );
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 400, $result->get_error_data()['status'] );
 		$this->assertSame( 0, $fired, 'Hook must not fire when creation fails' );
 	}
 

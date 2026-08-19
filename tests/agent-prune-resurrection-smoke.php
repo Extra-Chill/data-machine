@@ -72,7 +72,7 @@ if ( function_exists( 'wp_get_ability' ) ) {
 			$assert( 'stale active-agent meta is cleared', '' === get_user_meta( $owner_id, $meta_key, true ) );
 
 			$lookup = \DataMachine\Abilities\AgentAbilities::getAgent( array( 'agent_slug' => $created['agent_slug'] ) );
-			$assert( 'pruned agent row stays deleted', empty( $lookup['success'] ) );
+			$assert( 'pruned agent row stays deleted', is_wp_error( $lookup ) );
 
 			$access_repo = new \DataMachine\Core\Database\Agents\AgentAccess();
 			$grants      = $access_repo->get_users_for_agent( (string) $created['agent_id'] );

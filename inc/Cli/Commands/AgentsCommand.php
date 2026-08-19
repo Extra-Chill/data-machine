@@ -77,6 +77,23 @@ class AgentsCommand extends AgentBundleCommand {
 
 		if ( 'get' === $action ) {
 			$result = AgentAbilities::getActiveAgent( $input );
+		} else {
+			$agent = isset( $args[1] ) ? (string) $args[1] : '';
+			if ( '' === $agent ) {
+				WP_CLI::error( 'Agent is required. Usage: wp datamachine agent active set <agent>' );
+				return;
+			}
+
+			$input['agent'] = $agent;
+			$result         = AgentAbilities::setActiveAgent( $input );
+		}
+
+		if ( is_wp_error( $result ) ) {
+			WP_CLI::error( $result->get_error_message() );
+			return;
+		}
+
+		if ( 'get' === $action ) {
 			if ( empty( $result['success'] ) ) {
 				WP_CLI::error( $result['error'] ?? 'Failed to get active agent.' );
 				return;
@@ -97,14 +114,6 @@ class AgentsCommand extends AgentBundleCommand {
 			return;
 		}
 
-		$agent = isset( $args[1] ) ? (string) $args[1] : '';
-		if ( '' === $agent ) {
-			WP_CLI::error( 'Agent is required. Usage: wp datamachine agent active set <agent>' );
-			return;
-		}
-
-		$input['agent'] = $agent;
-		$result         = AgentAbilities::setActiveAgent( $input );
 		if ( empty( $result['success'] ) ) {
 			WP_CLI::error( $result['error'] ?? 'Failed to set active agent.' );
 			return;
@@ -176,6 +185,11 @@ class AgentsCommand extends AgentBundleCommand {
 		}
 
 		$result = AgentAbilities::listAgents( $input );
+
+		if ( is_wp_error( $result ) ) {
+			WP_CLI::error( $result->get_error_message() );
+			return;
+		}
 
 		if ( empty( $result['success'] ) ) {
 			WP_CLI::error( $result['error'] ?? 'Failed to list agents.' );
@@ -272,6 +286,11 @@ class AgentsCommand extends AgentBundleCommand {
 			)
 		);
 
+		if ( is_wp_error( $result ) ) {
+			WP_CLI::error( $result->get_error_message() );
+			return;
+		}
+
 		if ( $result['success'] ) {
 			WP_CLI::success( $result['message'] );
 		} else {
@@ -355,6 +374,11 @@ class AgentsCommand extends AgentBundleCommand {
 			)
 		);
 
+		if ( is_wp_error( $result ) ) {
+			WP_CLI::error( $result->get_error_message() );
+			return;
+		}
+
 		if ( ! $result['success'] ) {
 			WP_CLI::error( $result['error'] ?? 'Failed to create agent.' );
 			return;
@@ -406,6 +430,11 @@ class AgentsCommand extends AgentBundleCommand {
 			: array( 'agent_slug' => $identifier );
 
 		$result = AgentAbilities::getAgent( $input );
+
+		if ( is_wp_error( $result ) ) {
+			WP_CLI::error( $result->get_error_message() );
+			return;
+		}
 
 		if ( ! $result['success'] ) {
 			WP_CLI::error( $result['error'] ?? 'Agent not found.' );
@@ -487,6 +516,10 @@ class AgentsCommand extends AgentBundleCommand {
 
 		// Get agent info for confirmation.
 		$info = AgentAbilities::getAgent( $input );
+		if ( is_wp_error( $info ) ) {
+			WP_CLI::error( $info->get_error_message() );
+			return;
+		}
 		if ( ! $info['success'] ) {
 			WP_CLI::error( $info['error'] ?? 'Agent not found.' );
 			return;
@@ -508,6 +541,11 @@ class AgentsCommand extends AgentBundleCommand {
 
 		$input['delete_files'] = $delete_files;
 		$result                = AgentAbilities::deleteAgent( $input );
+
+		if ( is_wp_error( $result ) ) {
+			WP_CLI::error( $result->get_error_message() );
+			return;
+		}
 
 		if ( ! $result['success'] ) {
 			WP_CLI::error( $result['error'] ?? 'Failed to delete agent.' );
@@ -939,6 +977,11 @@ class AgentsCommand extends AgentBundleCommand {
 			)
 		);
 
+		if ( is_wp_error( $result ) ) {
+			WP_CLI::error( $result->get_error_message() );
+			return;
+		}
+
 		if ( ! $result['success'] ) {
 			WP_CLI::error( $result['error'] ?? 'Failed to create token.' );
 			return;
@@ -975,6 +1018,11 @@ class AgentsCommand extends AgentBundleCommand {
 	 */
 	private function tokenList( $abilities, int $agent_id, array $assoc_args ): void {
 		$result = $abilities->executeListTokens( array( 'agent_id' => $agent_id ) );
+
+		if ( is_wp_error( $result ) ) {
+			WP_CLI::error( $result->get_error_message() );
+			return;
+		}
 
 		if ( ! $result['success'] ) {
 			WP_CLI::error( $result['error'] ?? 'Failed to list tokens.' );
@@ -1030,6 +1078,11 @@ class AgentsCommand extends AgentBundleCommand {
 				'token_id' => $token_id,
 			)
 		);
+
+		if ( is_wp_error( $result ) ) {
+			WP_CLI::error( $result->get_error_message() );
+			return;
+		}
 
 		if ( ! $result['success'] ) {
 			WP_CLI::error( $result['error'] ?? 'Failed to revoke token.' );
@@ -1352,6 +1405,10 @@ class AgentsCommand extends AgentBundleCommand {
 
 		WP_CLI::log( sprintf( 'Exporting agent "%s"...', $agent['agent_slug'] ) );
 		$result = AgentAbilities::exportAgent( $input );
+		if ( is_wp_error( $result ) ) {
+			WP_CLI::error( $result->get_error_message() );
+			return;
+		}
 		if ( empty( $result['success'] ) ) {
 			WP_CLI::error( (string) ( $result['error'] ?? 'Failed to export agent.' ) );
 			return;
@@ -1483,6 +1540,11 @@ class AgentsCommand extends AgentBundleCommand {
 		}
 
 		$result = $ability->execute( $ability_input );
+
+		if ( is_wp_error( $result ) ) {
+			WP_CLI::error( $result->get_error_message() );
+			return;
+		}
 
 		if ( ! $result['success'] ) {
 			WP_CLI::error( $result['error'] ?? 'Failed to import agent bundle.' );

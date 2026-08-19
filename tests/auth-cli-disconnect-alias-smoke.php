@@ -57,6 +57,12 @@ namespace {
 		}
 	}
 
+	if ( ! function_exists( 'is_wp_error' ) ) {
+		function is_wp_error( $value ): bool {
+			return $value instanceof WP_Error;
+		}
+	}
+
 	class WP_CLI {
 		public static array $warnings = array();
 		public static array $successes = array();

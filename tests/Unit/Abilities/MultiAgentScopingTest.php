@@ -15,6 +15,7 @@
 namespace DataMachine\Tests\Unit\Abilities;
 
 use DataMachine\Abilities\AgentMemoryAbilities;
+use DataMachine\Abilities\DailyMemoryAbilities;
 use DataMachine\Abilities\File\AgentFileAbilities;
 use DataMachine\Abilities\Job\GetJobsAbility;
 use DataMachine\Abilities\Pipeline\GetPipelinesAbility;
@@ -22,6 +23,7 @@ use DataMachine\Core\Database\Pipelines\Pipelines;
 use DataMachine\Core\Database\Flows\Flows;
 use DataMachine\Core\Database\Jobs\Jobs;
 use DataMachine\Core\FilesRepository\DirectoryManager;
+use DataMachine\Engine\AI\Tools\Global\AgentMemory as AgentMemoryTool;
 use WP_UnitTestCase;
 
 /**
@@ -153,6 +155,57 @@ class MultiAgentScopingTest extends WP_UnitTestCase {
 		$explicit_result = AgentMemoryAbilities::getMemory( array( 'user_id' => 0 ) );
 
 		$this->assertSame( $default_result['success'], $explicit_result['success'] );
+	}
+
+	public function test_memory_callback_converts_not_found_result_with_diagnostics(): void {
+		$result = AgentMemoryAbilities::getMemory(
+			array(
+				'user_id' => $this->agent_a_id,
+				'file'    => 'MISSING.md',
+			)
+		);
+
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 404, $result->get_error_data()['status'] );
+		$this->assertFalse( $result->get_error_data()['success'] );
+	}
+
+	public function test_self_memory_callback_converts_policy_denial(): void {
+		$result = AgentMemoryAbilities::writeSelfMemory(
+			array(
+				'section' => 'Notes',
+				'content' => 'Test',
+			)
+		);
+
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'missing_agent_context', $result->get_error_code() );
+		$this->assertSame( 403, $result->get_error_data()['status'] );
+		$this->assertSame( 'missing_agent_context', $result->get_error_data()['error_code'] );
+	}
+
+	public function test_daily_memory_callback_validation_status(): void {
+		$result = DailyMemoryAbilities::readDaily( array( 'date' => 'not-a-date' ) );
+
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 400, $result->get_error_data()['status'] );
+	}
+
+	public function test_agent_memory_tool_preserves_wp_error_data(): void {
+		$error = new \WP_Error(
+			'memory_consent_denied',
+			'Memory write consent denied.',
+			array(
+				'status'           => 403,
+				'consent_decision' => array( 'reason' => 'opt_out' ),
+			)
+		);
+		$method = new \ReflectionMethod( AgentMemoryTool::class, 'memoryErrorResponse' );
+		$result = $method->invoke( new AgentMemoryTool(), $error );
+
+		$this->assertFalse( $result['success'] );
+		$this->assertSame( 'memory_consent_denied', $result['error_code'] );
+		$this->assertSame( 'opt_out', $result['error_data']['consent_decision']['reason'] );
 	}
 
 	// =========================================================================

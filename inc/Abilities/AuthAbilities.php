@@ -485,12 +485,15 @@ class AuthAbilities {
 		}
 
 		// Sort: authenticated first, then alphabetically by label.
-		usort( $data, function ( $a, $b ) {
-			if ( $a['is_authenticated'] !== $b['is_authenticated'] ) {
-				return $a['is_authenticated'] ? -1 : 1;
+		usort(
+			$data,
+			function ( $a, $b ) {
+				if ( $a['is_authenticated'] !== $b['is_authenticated'] ) {
+					return $a['is_authenticated'] ? -1 : 1;
+				}
+				return strcasecmp( $a['label'], $b['label'] );
 			}
-			return strcasecmp( $a['label'], $b['label'] );
-		} );
+		);
 
 		return array(
 			'success'   => true,
@@ -498,15 +501,17 @@ class AuthAbilities {
 		);
 	}
 
-	public function executeGetAuthStatus( array $input ): array {
+	public function executeGetAuthStatus( array $input ): array|\WP_Error {
 		$handler_slug = sanitize_text_field( $input['handler_slug'] ?? '' );
 
 		if ( empty( $handler_slug ) ) {
-			return array(
-				'success' => false,
-				'error'   => __( 'Handler slug is required', 'data-machine' ),
-			);
+			return new \WP_Error( 'invalid_handler_slug', __( 'Handler slug is required', 'data-machine' ), array( 'status' => 400 ) );
 		}
+
+		$bad_request_data = array(
+			'status'       => 400,
+			'handler_slug' => $handler_slug,
+		);
 
 		$handler_info = $this->handler_abilities->getHandler( $handler_slug );
 		if ( $handler_info && ( $handler_info['requires_auth'] ?? false ) === false ) {
@@ -522,23 +527,29 @@ class AuthAbilities {
 		$auth_instance = $this->getProviderForHandler( $handler_slug );
 
 		if ( ! $auth_instance ) {
-			return array(
-				'success' => false,
-				'error'   => __( 'Authentication provider not found', 'data-machine' ),
+			return new \WP_Error(
+				'auth_provider_not_found',
+				__( 'Authentication provider not found', 'data-machine' ),
+				array(
+					'status'       => 404,
+					'handler_slug' => $handler_slug,
+				)
 			);
 		}
 
 		if ( ! method_exists( $auth_instance, 'get_authorization_url' ) ) {
-			return array(
-				'success' => false,
-				'error'   => __( 'This handler does not support OAuth authorization', 'data-machine' ),
+			return new \WP_Error(
+				'auth_authorization_unsupported',
+				__( 'This handler does not support OAuth authorization', 'data-machine' ),
+				$bad_request_data
 			);
 		}
 
 		if ( method_exists( $auth_instance, 'is_configured' ) && ! $auth_instance->is_configured() ) {
-			return array(
-				'success' => false,
-				'error'   => __( 'OAuth credentials not configured. Please provide client ID and secret first.', 'data-machine' ),
+			return new \WP_Error(
+				'auth_provider_not_configured',
+				__( 'OAuth credentials not configured. Please provide client ID and secret first.', 'data-machine' ),
+				$bad_request_data
 			);
 		}
 
@@ -553,44 +564,56 @@ class AuthAbilities {
 				'instructions'  => __( 'Visit this URL to authorize your account. You will be redirected back to Data Machine upon completion.', 'data-machine' ),
 			);
 		} catch ( \Exception $e ) {
-			return array(
-				'success' => false,
-				'error'   => $e->getMessage(),
+			return new \WP_Error(
+				'auth_authorization_failed',
+				$e->getMessage(),
+				array(
+					'status'       => 500,
+					'handler_slug' => $handler_slug,
+				)
 			);
 		}
 	}
 
-	public function executeDisconnectAuth( array $input ): array {
+	public function executeDisconnectAuth( array $input ): array|\WP_Error {
 		$handler_slug = sanitize_text_field( $input['handler_slug'] ?? '' );
 
 		if ( empty( $handler_slug ) ) {
-			return array(
-				'success' => false,
-				'error'   => __( 'Handler slug is required', 'data-machine' ),
-			);
+			return new \WP_Error( 'invalid_handler_slug', __( 'Handler slug is required', 'data-machine' ), array( 'status' => 400 ) );
 		}
+
+		$bad_request_data = array(
+			'status'       => 400,
+			'handler_slug' => $handler_slug,
+		);
 
 		$handler_info = $this->handler_abilities->getHandler( $handler_slug );
 		if ( $handler_info && ( $handler_info['requires_auth'] ?? false ) === false ) {
-			return array(
-				'success' => false,
-				'error'   => __( 'Authentication is not required for this handler', 'data-machine' ),
+			return new \WP_Error(
+				'auth_not_required',
+				__( 'Authentication is not required for this handler', 'data-machine' ),
+				$bad_request_data
 			);
 		}
 
 		$auth_instance = $this->getProviderForHandler( $handler_slug );
 
 		if ( ! $auth_instance ) {
-			return array(
-				'success' => false,
-				'error'   => __( 'Authentication provider not found', 'data-machine' ),
+			return new \WP_Error(
+				'auth_provider_not_found',
+				__( 'Authentication provider not found', 'data-machine' ),
+				array(
+					'status'       => 404,
+					'handler_slug' => $handler_slug,
+				)
 			);
 		}
 
 		if ( ! method_exists( $auth_instance, 'clear_account' ) ) {
-			return array(
-				'success' => false,
-				'error'   => __( 'This handler does not support account disconnection', 'data-machine' ),
+			return new \WP_Error(
+				'auth_disconnect_unsupported',
+				__( 'This handler does not support account disconnection', 'data-machine' ),
+				$bad_request_data
 			);
 		}
 
@@ -604,9 +627,13 @@ class AuthAbilities {
 			);
 		}
 
-		return array(
-			'success' => false,
-			'error'   => __( 'Failed to disconnect account', 'data-machine' ),
+		return new \WP_Error(
+			'auth_disconnect_failed',
+			__( 'Failed to disconnect account', 'data-machine' ),
+			array(
+				'status'       => 500,
+				'handler_slug' => $handler_slug,
+			)
 		);
 	}
 
@@ -625,36 +652,38 @@ class AuthAbilities {
 	 * @param array $input { handler_slug, user_id }.
 	 * @return array Standard ability response.
 	 */
-	public function executeRevokeAuthForUser( array $input ): array {
+	public function executeRevokeAuthForUser( array $input ): array|\WP_Error {
 		$handler_slug = sanitize_text_field( $input['handler_slug'] ?? '' );
 		$user_id      = absint( $input['user_id'] ?? 0 );
 
 		if ( '' === $handler_slug ) {
-			return array(
-				'success' => false,
-				'error'   => __( 'Handler slug is required', 'data-machine' ),
-			);
+			return new \WP_Error( 'invalid_handler_slug', __( 'Handler slug is required', 'data-machine' ), array( 'status' => 400 ) );
 		}
 
 		if ( $user_id <= 0 ) {
-			return array(
-				'success' => false,
-				'error'   => __( 'A positive user_id is required', 'data-machine' ),
-			);
+			return new \WP_Error( 'invalid_user_id', __( 'A positive user_id is required', 'data-machine' ), array( 'status' => 400 ) );
 		}
 
 		$auth_instance = $this->getProviderForHandler( $handler_slug );
 		if ( ! $auth_instance ) {
-			return array(
-				'success' => false,
-				'error'   => __( 'Authentication provider not found', 'data-machine' ),
+			return new \WP_Error(
+				'auth_provider_not_found',
+				__( 'Authentication provider not found', 'data-machine' ),
+				array(
+					'status'       => 404,
+					'handler_slug' => $handler_slug,
+				)
 			);
 		}
 
 		if ( ! method_exists( $auth_instance, 'delete_account_for_user' ) ) {
-			return array(
-				'success' => false,
-				'error'   => __( 'This handler does not support per-user revocation', 'data-machine' ),
+			return new \WP_Error(
+				'auth_revoke_unsupported',
+				__( 'This handler does not support per-user revocation', 'data-machine' ),
+				array(
+					'status'       => 400,
+					'handler_slug' => $handler_slug,
+				)
 			);
 		}
 
@@ -712,10 +741,15 @@ class AuthAbilities {
 		);
 
 		if ( ! $deleted ) {
-			return array(
-				'success'          => false,
-				'error'            => __( 'Failed to delete per-user credentials', 'data-machine' ),
-				'upstream_revoked' => (bool) $upstream_revoked,
+			return new \WP_Error(
+				'auth_revoke_failed',
+				__( 'Failed to delete per-user credentials', 'data-machine' ),
+				array(
+					'status'           => 500,
+					'handler_slug'     => $handler_slug,
+					'user_id'          => $user_id,
+					'upstream_revoked' => (bool) $upstream_revoked,
+				)
 			);
 		}
 
@@ -731,32 +765,37 @@ class AuthAbilities {
 		);
 	}
 
-	public function executeSaveAuthConfig( array $input ): array {
+	public function executeSaveAuthConfig( array $input ): array|\WP_Error {
 		$handler_slug      = sanitize_text_field( $input['handler_slug'] ?? '' );
 		$config_input      = $input['config'] ?? array();
 		$principal_context = $this->getPrincipalContext( $input );
 
 		if ( empty( $handler_slug ) ) {
-			return array(
-				'success' => false,
-				'error'   => __( 'Handler slug is required', 'data-machine' ),
-			);
+			return new \WP_Error( 'invalid_handler_slug', __( 'Handler slug is required', 'data-machine' ), array( 'status' => 400 ) );
 		}
 
 		$handler_info = $this->handler_abilities->getHandler( $handler_slug );
 		if ( $handler_info && ( $handler_info['requires_auth'] ?? false ) === false ) {
-			return array(
-				'success' => false,
-				'error'   => __( 'Authentication is not required for this handler', 'data-machine' ),
+			return new \WP_Error(
+				'auth_not_required',
+				__( 'Authentication is not required for this handler', 'data-machine' ),
+				array(
+					'status'       => 400,
+					'handler_slug' => $handler_slug,
+				)
 			);
 		}
 
 		$auth_instance = $this->getProviderForHandler( $handler_slug );
 
 		if ( ! $auth_instance || ! method_exists( $auth_instance, 'get_config_fields' ) ) {
-			return array(
-				'success' => false,
-				'error'   => __( 'Auth provider not found or invalid', 'data-machine' ),
+			return new \WP_Error(
+				'auth_provider_not_found',
+				__( 'Auth provider not found or invalid', 'data-machine' ),
+				array(
+					'status'       => 404,
+					'handler_slug' => $handler_slug,
+				)
 			);
 		}
 
@@ -771,9 +810,13 @@ class AuthAbilities {
 		} elseif ( method_exists( $auth_instance, 'get_account' ) ) {
 			$existing_config = $auth_instance->get_account();
 		} else {
-			return array(
-				'success' => false,
-				'error'   => __( 'Could not retrieve existing configuration', 'data-machine' ),
+			return new \WP_Error(
+				'auth_config_unavailable',
+				__( 'Could not retrieve existing configuration', 'data-machine' ),
+				array(
+					'status'       => 500,
+					'handler_slug' => $handler_slug,
+				)
 			);
 		}
 
@@ -781,10 +824,15 @@ class AuthAbilities {
 			$value = self::sanitizeConfigValue( $config_input[ $field_name ] ?? '', $field_config );
 
 			if ( ( $field_config['required'] ?? false ) && empty( $value ) && empty( $existing_config[ $field_name ] ?? '' ) ) {
-				return array(
-					'success' => false,
-					/* translators: %s: Field label (e.g., API Key, Client ID) */
-					'error'   => sprintf( __( '%s is required', 'data-machine' ), $field_config['label'] ),
+				return new \WP_Error(
+					'invalid_auth_config',
+					/* translators: %s: authentication configuration field label. */
+					sprintf( __( '%s is required', 'data-machine' ), $field_config['label'] ),
+					array(
+						'status'       => 400,
+						'handler_slug' => $handler_slug,
+						'field'        => $field_name,
+					)
 				);
 			}
 
@@ -818,9 +866,13 @@ class AuthAbilities {
 			if ( method_exists( $auth_instance, 'save_config' ) ) {
 				$saved = $auth_instance->save_config( $config_data );
 			} else {
-				return array(
-					'success' => false,
-					'error'   => __( 'Handler does not support saving config', 'data-machine' ),
+				return new \WP_Error(
+					'auth_config_unsupported',
+					__( 'Handler does not support saving config', 'data-machine' ),
+					array(
+						'status'       => 400,
+						'handler_slug' => $handler_slug,
+					)
 				);
 			}
 		} elseif ( method_exists( $auth_instance, 'save_config' ) ) {
@@ -828,9 +880,13 @@ class AuthAbilities {
 		} else {
 			$saved = $this->saveAuthAccountForContext( $auth_instance, $config_data, $principal_context );
 			if ( null === $saved ) {
-				return array(
-					'success' => false,
-					'error'   => __( 'Handler does not support saving account', 'data-machine' ),
+				return new \WP_Error(
+					'auth_account_save_unsupported',
+					__( 'Handler does not support saving account', 'data-machine' ),
+					array(
+						'status'       => 400,
+						'handler_slug' => $handler_slug,
+					)
 				);
 			}
 		}
@@ -842,9 +898,13 @@ class AuthAbilities {
 			);
 		}
 
-		return array(
-			'success' => false,
-			'error'   => __( 'Failed to save configuration', 'data-machine' ),
+		return new \WP_Error(
+			'auth_config_save_failed',
+			__( 'Failed to save configuration', 'data-machine' ),
+			array(
+				'status'       => 500,
+				'handler_slug' => $handler_slug,
+			)
 		);
 	}
 
@@ -911,45 +971,44 @@ class AuthAbilities {
 	 * @param array $input Input with handler_slug and account_data.
 	 * @return array Result.
 	 */
-	public function executeSetAuthToken( array $input ): array {
+	public function executeSetAuthToken( array $input ): array|\WP_Error {
 		$handler_slug      = sanitize_text_field( $input['handler_slug'] ?? '' );
 		$account_data      = $input['account_data'] ?? array();
 		$principal_context = $this->getPrincipalContext( $input );
 
 		if ( empty( $handler_slug ) ) {
-			return array(
-				'success' => false,
-				'error'   => __( 'Handler slug is required', 'data-machine' ),
-			);
+			return new \WP_Error( 'invalid_handler_slug', __( 'Handler slug is required', 'data-machine' ), array( 'status' => 400 ) );
 		}
 
 		if ( empty( $account_data ) || ! is_array( $account_data ) ) {
-			return array(
-				'success' => false,
-				'error'   => __( 'Account data is required and must be an object', 'data-machine' ),
-			);
+			return new \WP_Error( 'invalid_account_data', __( 'Account data is required and must be an object', 'data-machine' ), array( 'status' => 400 ) );
 		}
 
 		if ( empty( $account_data['access_token'] ) ) {
-			return array(
-				'success' => false,
-				'error'   => __( 'access_token is required in account_data', 'data-machine' ),
-			);
+			return new \WP_Error( 'invalid_access_token', __( 'access_token is required in account_data', 'data-machine' ), array( 'status' => 400 ) );
 		}
 
 		$auth_instance = $this->getProviderForHandler( $handler_slug );
 
 		if ( ! $auth_instance ) {
-			return array(
-				'success' => false,
-				'error'   => __( 'Authentication provider not found', 'data-machine' ),
+			return new \WP_Error(
+				'auth_provider_not_found',
+				__( 'Authentication provider not found', 'data-machine' ),
+				array(
+					'status'       => 404,
+					'handler_slug' => $handler_slug,
+				)
 			);
 		}
 
 		if ( ! $this->supportsAuthAccountSaveForContext( $auth_instance, $principal_context ) ) {
-			return array(
-				'success' => false,
-				'error'   => __( 'This handler does not support saving account data', 'data-machine' ),
+			return new \WP_Error(
+				'auth_account_save_unsupported',
+				__( 'This handler does not support saving account data', 'data-machine' ),
+				array(
+					'status'       => 400,
+					'handler_slug' => $handler_slug,
+				)
 			);
 		}
 
@@ -990,9 +1049,13 @@ class AuthAbilities {
 			);
 		}
 
-		return array(
-			'success' => false,
-			'error'   => __( 'Failed to save account data', 'data-machine' ),
+		return new \WP_Error(
+			'auth_account_save_failed',
+			__( 'Failed to save account data', 'data-machine' ),
+			array(
+				'status'       => 500,
+				'handler_slug' => $handler_slug,
+			)
 		);
 	}
 
@@ -1007,40 +1070,49 @@ class AuthAbilities {
 	 * @param array $input Input with handler_slug.
 	 * @return array Result with new expiry if available.
 	 */
-	public function executeRefreshAuth( array $input ): array {
+	public function executeRefreshAuth( array $input ): array|\WP_Error {
 		$handler_slug = sanitize_text_field( $input['handler_slug'] ?? '' );
 
 		if ( empty( $handler_slug ) ) {
-			return array(
-				'success' => false,
-				'error'   => __( 'Handler slug is required', 'data-machine' ),
-			);
+			return new \WP_Error( 'invalid_handler_slug', __( 'Handler slug is required', 'data-machine' ), array( 'status' => 400 ) );
 		}
 
 		$auth_instance = $this->getProviderForHandler( $handler_slug );
 
 		if ( ! $auth_instance ) {
-			return array(
-				'success' => false,
-				'error'   => __( 'Authentication provider not found', 'data-machine' ),
+			return new \WP_Error(
+				'auth_provider_not_found',
+				__( 'Authentication provider not found', 'data-machine' ),
+				array(
+					'status'       => 404,
+					'handler_slug' => $handler_slug,
+				)
 			);
 		}
 
 		if ( ! method_exists( $auth_instance, 'is_authenticated' ) || ! $auth_instance->is_authenticated() ) {
-			return array(
-				'success' => false,
-				'error'   => sprintf(
+			return new \WP_Error(
+				'auth_not_authenticated',
+				sprintf(
 					/* translators: %s: Service name (e.g., Twitter, Facebook) */
 					__( '%s is not currently authenticated. Connect first before refreshing.', 'data-machine' ),
 					ucfirst( $handler_slug )
 				),
+				array(
+					'status'       => 409,
+					'handler_slug' => $handler_slug,
+				)
 			);
 		}
 
 		if ( ! method_exists( $auth_instance, 'get_valid_access_token' ) ) {
-			return array(
-				'success' => false,
-				'error'   => __( 'This handler does not support token refresh', 'data-machine' ),
+			return new \WP_Error(
+				'auth_refresh_unsupported',
+				__( 'This handler does not support token refresh', 'data-machine' ),
+				array(
+					'status'       => 400,
+					'handler_slug' => $handler_slug,
+				)
 			);
 		}
 
@@ -1048,13 +1120,17 @@ class AuthAbilities {
 		$new_token = $auth_instance->get_valid_access_token();
 
 		if ( null === $new_token ) {
-			return array(
-				'success' => false,
-				'error'   => sprintf(
+			return new \WP_Error(
+				'auth_refresh_failed',
+				sprintf(
 					/* translators: %s: Service name (e.g., Twitter, Facebook) */
 					__( 'Token refresh failed for %s. Re-authorization may be required.', 'data-machine' ),
 					ucfirst( $handler_slug )
 				),
+				array(
+					'status'       => 500,
+					'handler_slug' => $handler_slug,
+				)
 			);
 		}
 

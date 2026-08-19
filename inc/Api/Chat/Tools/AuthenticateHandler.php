@@ -126,6 +126,9 @@ ACTIONS:
 		}
 
 		$handlers_result = $handlers_ability->execute( array() );
+		if ( is_wp_error( $handlers_result ) ) {
+			return $this->error( $handlers_result->get_error_message() );
+		}
 		if ( ! ( $handlers_result['success'] ?? false ) ) {
 			return $this->error( $handlers_result['error'] ?? 'Failed to get handlers' );
 		}
@@ -145,7 +148,7 @@ ACTIONS:
 
 			if ( $auth_status_ability ) {
 				$status_result = $auth_status_ability->execute( array( 'handler_slug' => $slug ) );
-				if ( $status_result['success'] ?? false ) {
+				if ( ! is_wp_error( $status_result ) && ( $status_result['success'] ?? false ) ) {
 					$is_authenticated = ! empty( $status_result['oauth_url'] ) || ( $status_result['authenticated'] ?? false );
 					$auth_type        = ! empty( $status_result['oauth_url'] ) ? 'oauth' : 'simple';
 				}

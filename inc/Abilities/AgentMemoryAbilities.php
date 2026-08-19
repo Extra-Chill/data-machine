@@ -315,15 +315,15 @@ class AgentMemoryAbilities {
 	 * @param array $input Input parameters.
 	 * @return array Result.
 	 */
-	public static function getMemory( array $input ): array {
+	public static function getMemory( array $input ): array|\WP_Error {
 		$memory  = self::resolveMemory( $input );
 		$section = $input['section'] ?? null;
 
 		if ( null === $section || '' === $section ) {
-			return $memory->get_all();
+			return self::memoryResult( $memory->get_all(), 'agent_memory_read_failed' );
 		}
 
-		return $memory->get_section( $section );
+		return self::memoryResult( $memory->get_section( $section ), 'agent_memory_read_failed' );
 	}
 
 	/**
@@ -332,7 +332,7 @@ class AgentMemoryAbilities {
 	 * @param array $input Input parameters.
 	 * @return array Result.
 	 */
-	public static function updateMemory( array $input ): array {
+	public static function updateMemory( array $input ): array|\WP_Error {
 		$consent_decision = DataMachineAgentConsentPolicy::get()->can_store_memory(
 			array(
 				'mode'               => 'ability',
@@ -343,10 +343,15 @@ class AgentMemoryAbilities {
 			)
 		);
 		if ( ! $consent_decision->is_allowed() ) {
-			return array(
-				'success'          => false,
-				'message'          => 'Memory write consent denied.',
-				'consent_decision' => $consent_decision->to_array(),
+			return new \WP_Error(
+				'memory_consent_denied',
+				'Memory write consent denied.',
+				array(
+					'status'           => 403,
+					'consent_decision' => $consent_decision->to_array(),
+					'agent_id'         => (int) ( $input['agent_id'] ?? 0 ),
+					'user_id'          => (int) ( $input['user_id'] ?? 0 ),
+				)
 			);
 		}
 
@@ -362,27 +367,36 @@ class AgentMemoryAbilities {
 			if ( ! $editable ) {
 				$edit_cap = \DataMachine\Engine\AI\MemoryFileRegistry::get_edit_capability( $filename );
 				if ( is_string( $edit_cap ) ) {
-					return array(
-						'success' => false,
-						'message' => sprintf(
+					return new \WP_Error(
+						'memory_file_not_editable',
+						sprintf(
 							'File %s requires capability \'%s\' to edit. Pass --user=<admin-id> or run as an authenticated admin.',
 							$filename,
 							$edit_cap
 						),
+						array(
+							'status'              => 403,
+							'file'                => $filename,
+							'required_capability' => $edit_cap,
+						)
 					);
 				}
-				return array(
-					'success' => false,
-					'message' => sprintf( 'File %s is read-only and cannot be edited via section write.', $filename ),
+				return new \WP_Error(
+					'memory_file_read_only',
+					sprintf( 'File %s is read-only and cannot be edited via section write.', $filename ),
+					array(
+						'status' => 403,
+						'file'   => $filename,
+					)
 				);
 			}
 		}
 
 		if ( 'append' === $mode ) {
-			return $memory->append_to_section( $section, $content );
+			return self::memoryResult( $memory->append_to_section( $section, $content ), 'agent_memory_write_failed' );
 		}
 
-		return $memory->set_section( $section, $content );
+		return self::memoryResult( $memory->set_section( $section, $content ), 'agent_memory_write_failed' );
 	}
 
 	/**
@@ -391,7 +405,7 @@ class AgentMemoryAbilities {
 	 * @param array $input Input parameters.
 	 * @return array Result.
 	 */
-	public static function deleteMemorySection( array $input ): array {
+	public static function deleteMemorySection( array $input ): array|\WP_Error {
 		$consent_decision = DataMachineAgentConsentPolicy::get()->can_store_memory(
 			array(
 				'mode'               => 'ability',
@@ -402,23 +416,32 @@ class AgentMemoryAbilities {
 			)
 		);
 		if ( ! $consent_decision->is_allowed() ) {
-			return array(
-				'success'          => false,
-				'message'          => 'Memory delete consent denied.',
-				'consent_decision' => $consent_decision->to_array(),
+			return new \WP_Error(
+				'memory_consent_denied',
+				'Memory delete consent denied.',
+				array(
+					'status'           => 403,
+					'consent_decision' => $consent_decision->to_array(),
+					'agent_id'         => (int) ( $input['agent_id'] ?? 0 ),
+					'user_id'          => (int) ( $input['user_id'] ?? 0 ),
+				)
 			);
 		}
 
 		$filename = $input['file'] ?? 'MEMORY.md';
 		if ( 'MEMORY.md' !== $filename && ! \DataMachine\Engine\AI\MemoryFileRegistry::is_editable( $filename ) ) {
-			return array(
-				'success' => false,
-				'message' => sprintf( 'File %s is read-only and cannot be edited via section delete.', $filename ),
+			return new \WP_Error(
+				'memory_file_read_only',
+				sprintf( 'File %s is read-only and cannot be edited via section delete.', $filename ),
+				array(
+					'status' => 403,
+					'file'   => $filename,
+				)
 			);
 		}
 
 		$memory = self::resolveMemory( $input );
-		return $memory->delete_section( (string) $input['section'] );
+		return self::memoryResult( $memory->delete_section( (string) $input['section'] ), 'agent_memory_delete_failed' );
 	}
 
 	/**
@@ -427,8 +450,23 @@ class AgentMemoryAbilities {
 	 * @param array $input Input parameters.
 	 * @return array Result.
 	 */
-	public static function writeSelfMemory( array $input ): array {
-		return SelfMemoryWritePolicy::execute( $input );
+	public static function writeSelfMemory( array $input ): array|\WP_Error {
+		$result = SelfMemoryWritePolicy::execute( $input );
+		if ( ! empty( $result['success'] ) ) {
+			return $result;
+		}
+
+		$code   = sanitize_key( (string) ( $result['error_code'] ?? 'self_memory_write_failed' ) );
+		$status = 'missing_required_input' === $code ? 400 : 403;
+		if ( ! str_ends_with( $code, '_denied' ) && ! in_array( $code, array( 'missing_agent_context', 'cross_agent_denied', 'missing_required_input' ), true ) ) {
+			$status = 500;
+		}
+
+		return new \WP_Error(
+			$code,
+			(string) ( $result['error'] ?? $result['message'] ?? 'Self-memory write failed.' ),
+			array_merge( $result, array( 'status' => $status ) )
+		);
 	}
 
 	/**
@@ -437,12 +475,12 @@ class AgentMemoryAbilities {
 	 * @param array $input Input parameters with 'query' and optional 'section'.
 	 * @return array Search results.
 	 */
-	public static function searchMemory( array $input ): array {
+	public static function searchMemory( array $input ): array|\WP_Error {
 		$memory  = self::resolveMemory( $input );
 		$query   = $input['query'];
 		$section = $input['section'] ?? null;
 
-		return $memory->search( $query, $section );
+		return self::memoryResult( $memory->search( $query, $section ), 'agent_memory_search_failed' );
 	}
 
 	/**
@@ -451,9 +489,21 @@ class AgentMemoryAbilities {
 	 * @param array $input Input parameters.
 	 * @return array Result.
 	 */
-	public static function listSections( array $input ): array {
+	public static function listSections( array $input ): array|\WP_Error {
 		$memory = self::resolveMemory( $input );
-		return $memory->get_sections();
+		return self::memoryResult( $memory->get_sections(), 'agent_memory_list_sections_failed' );
+	}
+
+	/** Convert the legacy memory service result at the registered callback boundary. */
+	private static function memoryResult( array $result, string $code ): array|\WP_Error {
+		if ( ! empty( $result['success'] ) ) {
+			return $result;
+		}
+
+		$message = (string) ( $result['message'] ?? 'Agent memory operation failed.' );
+		$status  = str_contains( strtolower( $message ), 'not found' ) || str_contains( strtolower( $message ), 'does not exist' ) ? 404 : 500;
+
+		return new \WP_Error( $code, $message, array_merge( $result, array( 'status' => $status ) ) );
 	}
 
 	/**

@@ -61,6 +61,13 @@ class RestResultSpec {
 		return new self( $data_callback, $extra_callback, $default_code, $default_message, $default_status, $failure_status_callback );
 	}
 
+	/** Preserve a legacy REST code while retaining native ability diagnostics. */
+	public static function legacy_error( \WP_Error $error, string $rest_code ): \WP_Error {
+		$data                       = is_array( $error->get_error_data() ) ? $error->get_error_data() : array();
+		$data['ability_error_code'] = $error->get_error_code();
+		return new \WP_Error( $rest_code, $error->get_error_message(), $data );
+	}
+
 	/**
 	 * Convert an ability result to a REST response or error.
 	 *

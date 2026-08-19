@@ -164,17 +164,14 @@ class AgentTokenAbilities {
 	 * @param array $input Input with agent_id, optional label, capabilities, expires_in.
 	 * @return array Result with raw_token (only returned once).
 	 */
-	public function executeCreateToken( array $input ): array {
+	public function executeCreateToken( array $input ): array|\WP_Error {
 		$agent_id     = intval( $input['agent_id'] ?? 0 );
 		$label        = sanitize_text_field( $input['label'] ?? '' );
 		$capabilities = $input['capabilities'] ?? null;
 		$expires_in   = $input['expires_in'] ?? null;
 
 		if ( $agent_id <= 0 ) {
-			return array(
-				'success' => false,
-				'error'   => __( 'agent_id is required', 'data-machine' ),
-			);
+			return new \WP_Error( 'invalid_agent_id', __( 'agent_id is required', 'data-machine' ), array( 'status' => 400 ) );
 		}
 
 		// Verify agent exists and is active.
@@ -182,17 +179,26 @@ class AgentTokenAbilities {
 		$agent       = $agents_repo->get_agent( $agent_id );
 
 		if ( ! $agent ) {
-			return array(
-				'success' => false,
-				'error'   => __( 'Agent not found', 'data-machine' ),
+			return new \WP_Error(
+				'agent_not_found',
+				__( 'Agent not found', 'data-machine' ),
+				array(
+					'status'   => 404,
+					'agent_id' => $agent_id,
+				)
 			);
 		}
 
 		// Check access — caller must have admin access to the agent.
 		if ( ! PermissionHelper::can_access_agent( $agent_id, 'admin' ) ) {
-			return array(
-				'success' => false,
-				'error'   => __( 'You do not have admin access to this agent', 'data-machine' ),
+			return new \WP_Error(
+				'agent_access_denied',
+				__( 'You do not have admin access to this agent', 'data-machine' ),
+				array(
+					'status'     => 403,
+					'agent_id'   => $agent_id,
+					'agent_slug' => $agent['agent_slug'],
+				)
 			);
 		}
 
@@ -212,9 +218,13 @@ class AgentTokenAbilities {
 		);
 
 		if ( ! $result ) {
-			return array(
-				'success' => false,
-				'error'   => __( 'Failed to create token', 'data-machine' ),
+			return new \WP_Error(
+				'agent_token_creation_failed',
+				__( 'Failed to create token', 'data-machine' ),
+				array(
+					'status'   => 500,
+					'agent_id' => $agent_id,
+				)
 			);
 		}
 
@@ -247,21 +257,22 @@ class AgentTokenAbilities {
 	 * @param array $input Input with agent_id and token_id.
 	 * @return array Result.
 	 */
-	public function executeRevokeToken( array $input ): array {
+	public function executeRevokeToken( array $input ): array|\WP_Error {
 		$agent_id = intval( $input['agent_id'] ?? 0 );
 		$token_id = intval( $input['token_id'] ?? 0 );
 
 		if ( $agent_id <= 0 || $token_id <= 0 ) {
-			return array(
-				'success' => false,
-				'error'   => __( 'agent_id and token_id are required', 'data-machine' ),
-			);
+			return new \WP_Error( 'invalid_agent_token_input', __( 'agent_id and token_id are required', 'data-machine' ), array( 'status' => 400 ) );
 		}
 
 		if ( ! PermissionHelper::can_access_agent( $agent_id, 'admin' ) ) {
-			return array(
-				'success' => false,
-				'error'   => __( 'You do not have admin access to this agent', 'data-machine' ),
+			return new \WP_Error(
+				'agent_access_denied',
+				__( 'You do not have admin access to this agent', 'data-machine' ),
+				array(
+					'status'   => 403,
+					'agent_id' => $agent_id,
+				)
 			);
 		}
 
@@ -269,9 +280,14 @@ class AgentTokenAbilities {
 		$revoked     = $tokens_repo->revoke_token( $token_id, $agent_id );
 
 		if ( ! $revoked ) {
-			return array(
-				'success' => false,
-				'error'   => __( 'Token not found or does not belong to this agent', 'data-machine' ),
+			return new \WP_Error(
+				'agent_token_not_found',
+				__( 'Token not found or does not belong to this agent', 'data-machine' ),
+				array(
+					'status'   => 404,
+					'agent_id' => $agent_id,
+					'token_id' => $token_id,
+				)
 			);
 		}
 
@@ -297,20 +313,21 @@ class AgentTokenAbilities {
 	 * @param array $input Input with agent_id.
 	 * @return array Result with tokens array.
 	 */
-	public function executeListTokens( array $input ): array {
+	public function executeListTokens( array $input ): array|\WP_Error {
 		$agent_id = intval( $input['agent_id'] ?? 0 );
 
 		if ( $agent_id <= 0 ) {
-			return array(
-				'success' => false,
-				'error'   => __( 'agent_id is required', 'data-machine' ),
-			);
+			return new \WP_Error( 'invalid_agent_id', __( 'agent_id is required', 'data-machine' ), array( 'status' => 400 ) );
 		}
 
 		if ( ! PermissionHelper::can_access_agent( $agent_id, 'operator' ) ) {
-			return array(
-				'success' => false,
-				'error'   => __( 'You do not have access to this agent', 'data-machine' ),
+			return new \WP_Error(
+				'agent_access_denied',
+				__( 'You do not have access to this agent', 'data-machine' ),
+				array(
+					'status'   => 403,
+					'agent_id' => $agent_id,
+				)
 			);
 		}
 

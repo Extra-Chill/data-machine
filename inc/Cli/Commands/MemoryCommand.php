@@ -97,6 +97,16 @@ class MemoryCommand extends BaseCommand {
 
 		$result = AgentMemoryAbilities::getMemory( $input );
 
+		if ( is_wp_error( $result ) ) {
+			$message = $result->get_error_message();
+			$data    = $result->get_error_data();
+			if ( is_array( $data ) && ! empty( $data['available_sections'] ) ) {
+				$message .= "\nAvailable sections: " . implode( ', ', $data['available_sections'] );
+			}
+			WP_CLI::error( $message );
+			return;
+		}
+
 		if ( ! $result['success'] ) {
 			$message = $result['message'] ?? 'Failed to read file.';
 			if ( ! empty( $result['available_sections'] ) ) {
@@ -156,6 +166,11 @@ class MemoryCommand extends BaseCommand {
 		}
 
 		$result = AgentMemoryAbilities::listSections( $scoping );
+
+		if ( is_wp_error( $result ) ) {
+			WP_CLI::error( $result->get_error_message() );
+			return;
+		}
 
 		if ( ! $result['success'] ) {
 			WP_CLI::error( $result['message'] ?? 'Failed to list sections.' );
@@ -354,6 +369,11 @@ class MemoryCommand extends BaseCommand {
 
 		$result = AgentMemoryAbilities::updateMemory( $input );
 
+		if ( is_wp_error( $result ) ) {
+			WP_CLI::error( $result->get_error_message() );
+			return;
+		}
+
 		if ( ! $result['success'] ) {
 			WP_CLI::error( $result['message'] ?? 'Failed to write.' );
 			return;
@@ -401,6 +421,10 @@ class MemoryCommand extends BaseCommand {
 		}
 
 		$result = AgentMemoryAbilities::deleteMemorySection( $input );
+		if ( is_wp_error( $result ) ) {
+			WP_CLI::error( $result->get_error_message() );
+			return;
+		}
 		if ( ! $result['success'] ) {
 			WP_CLI::error( $result['message'] ?? 'Failed to delete section.' );
 			return;
@@ -479,6 +503,11 @@ class MemoryCommand extends BaseCommand {
 		}
 
 		$result = AgentMemoryAbilities::searchMemory( $input );
+
+		if ( is_wp_error( $result ) ) {
+			WP_CLI::error( $result->get_error_message() );
+			return;
+		}
 
 		if ( ! $result['success'] ) {
 			WP_CLI::error( $result['message'] ?? 'Search failed.' );

@@ -94,7 +94,7 @@ class AgentPruneResurrectionTest extends WP_UnitTestCase {
 
 		// The agent row must stay deleted.
 		$lookup = AgentAbilities::getAgent( array( 'agent_slug' => 'stale-meta-bot' ) );
-		$this->assertFalse( $lookup['success'] );
+		$this->assertInstanceOf( \WP_Error::class, $lookup );
 	}
 
 	public function test_pruneAgents_clears_owner_active_agent_meta(): void {
