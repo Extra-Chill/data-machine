@@ -7,6 +7,8 @@
 
 namespace DataMachineEvents\Steps\EventImport\Handlers\Ticketmaster;
 
+use DataMachine\Core\Database\ProcessedItems\ProcessedItems;
+use DataMachine\Core\Database\TrackedItems\TrackedItems;
 use DataMachine\Core\ExecutionContext;
 use DataMachineEvents\Steps\EventImport\Handlers\EventImportHandler;
 use DataMachineEvents\Steps\EventImport\JunkPayloadFilter;
@@ -74,7 +76,6 @@ class Ticketmaster extends EventImportHandler {
 
 	public function __construct() {
 		parent::__construct( 'ticketmaster' );
-		TicketmasterSourceIdentity::register();
 
 		self::registerHandler(
 			'ticketmaster',
@@ -291,11 +292,6 @@ class Ticketmaster extends EventImportHandler {
 				$engine_data                    = $this->buildEventEngineData( $standardized_event, $venue_metadata );
 				$engine_data['item_identifier'] = $item_identifier;
 				$engine_data['source_type']     = 'ticketmaster';
-				$engine_data[ TicketmasterSourceIdentity::ENGINE_KEY ] = array(
-					'item_id'    => $item_identifier,
-					'revision'   => $source_revision,
-					'source_ref' => $standardized_event['ticketUrl'] ?? '',
-				);
 				$this->stripVenueMetadataFromEvent( $standardized_event );
 
 				$eligible_items[] = array(
@@ -338,21 +334,67 @@ class Ticketmaster extends EventImportHandler {
 		$claimed_items  = array();
 
 		foreach ( $eligible_items as $item ) {
-			$item_id  = (string) ( $item['metadata']['source_item_id'] ?? '' );
-			$revision = (string) ( $item['metadata']['source_revision'] ?? '' );
-			$claim    = TicketmasterSourceIdentity::claim( $item_id, $revision, $context );
+			$item_id    = (string) ( $item['metadata']['source_item_id'] ?? '' );
+			$revision   = (string) ( $item['metadata']['source_revision'] ?? '' );
+			$source_ref = (string) ( $item['metadata']['_engine_data']['ticketUrl'] ?? '' );
+			$claim      = $context->claimItemOwnership(
+				TicketmasterSourceIdentity::CLAIM_SCOPE,
+				$item_id,
+				TicketmasterSourceIdentity::CLAIM_TTL,
+				array(
+					'handler'          => 'tracked_item',
+					'retain_processed' => false,
+					'payload'          => array(
+						'item' => array(
+							'namespace'       => TicketmasterSourceIdentity::TRACK_NAMESPACE,
+							'item_id'         => $item_id,
+							'item_type'       => 'event',
+							'state'           => TrackedItems::STATE_GENERATED,
+							'source_ref'      => $source_ref,
+							'source_revision' => $revision,
+						),
+					),
+				)
+			);
 
-			if ( 'claimed' === $claim || 'direct' === $claim ) {
-				$claimed_items[] = $item;
+			if ( false === $claim ) {
+				++$pre_fanout_deduped;
+				++$contended_count;
 				continue;
 			}
 
-			++$pre_fanout_deduped;
-			if ( 'unchanged' === $claim ) {
+			// Recheck under ownership because another city may have committed the
+			// revision after the pre-cap check but before this claim was acquired.
+			if ( TicketmasterSourceIdentity::shouldSkip( $item_id, $revision, $context ) ) {
+				if ( false !== ( $claim['persisted'] ?? true ) ) {
+					$released = ( new ProcessedItems() )->release_owned_claim(
+						$claim['identity_scope'],
+						$claim['source_type'],
+						$claim['item_identifier'],
+						$claim['ownership_token']
+					);
+					if ( 1 !== $released ) {
+						$context->log(
+							'error',
+							'Ticketmaster: Exact unchanged-revision claim release failed',
+							array(
+								'item_identifier' => $claim['item_identifier'],
+								'disposition_id'  => $claim['disposition_id'],
+							)
+						);
+						throw new \RuntimeException( 'Ticketmaster could not release the exact unchanged-revision claim.' );
+					}
+				}
+				++$pre_fanout_deduped;
 				++$unchanged_count;
-			} else {
-				++$contended_count;
+				continue;
 			}
+
+			$item['metadata'][ ProcessedItems::CLAIM_METADATA_KEY ] = $claim;
+			if ( isset( $claim['disposition_id'] ) ) {
+				$item['metadata'][ ProcessedItems::DISPOSITION_ID_METADATA_KEY ] = $claim['disposition_id'];
+			}
+			$claimed_items[] = $item;
 		}
 
 		$eligible_items = $claimed_items;
