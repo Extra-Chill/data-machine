@@ -9,13 +9,17 @@
 
 namespace {
 	if ( function_exists( 'wp_register_ability' ) ) {
-		require_once dirname( __DIR__ ) . '/vendor/autoload.php';
-		require_once dirname( __DIR__ ) . '/inc/Abilities/AbilityCategories.php';
+		if ( ! class_exists( \DataMachine\Abilities\FlowStep\ConfigureFlowStepsAbility::class ) ) {
+			require_once dirname( __DIR__ ) . '/vendor/autoload.php';
+		}
+		if ( ! class_exists( \DataMachine\Abilities\AbilityCategories::class ) ) {
+			require_once dirname( __DIR__ ) . '/inc/Abilities/AbilityCategories.php';
+		}
 		\DataMachine\Abilities\AbilityCategories::ensure_registered();
 
 		$notices = 0;
 		$watch   = static function ( string $function_name, string $message ) use ( &$notices ): void {
-			if ( 'WP_Abilities_Registry::register' === $function_name && str_contains( $message, 'datamachine/' ) ) {
+			if ( str_starts_with( $function_name, 'WP_Abilities_Registry::' ) && str_contains( $message, 'datamachine/' ) ) {
 				++$notices;
 			}
 		};
@@ -24,6 +28,7 @@ namespace {
 		$bootstrap = static function (): void {
 			new \DataMachine\Abilities\Engine\ScheduleNextStepAbility();
 			new \DataMachine\Abilities\Taxonomy\ResolveTermAbility();
+			new \DataMachine\Abilities\FlowStep\ConfigureFlowStepsAbility();
 		};
 
 		$bootstrap();
@@ -31,12 +36,18 @@ namespace {
 		$abilities = array(
 			wp_get_ability( 'datamachine/resolve-term' ),
 			wp_get_ability( 'datamachine/schedule-next-step' ),
+			wp_get_ability( 'datamachine/configure-flow-steps' ),
 		);
 		$bootstrap();
 		$bootstrap();
 		remove_action( 'doing_it_wrong_run', $watch, 10 );
+		$registered = wp_get_abilities();
 
-		if ( in_array( null, $abilities, true ) || 0 !== $notices ) {
+		if (
+			in_array( null, $abilities, true )
+			|| 0 !== $notices
+			|| ( $registered['datamachine/configure-flow-steps'] ?? null ) !== $abilities[2]
+		) {
 			fwrite( STDERR, "FAIL: repeated WordPress bootstrap duplicated or missed affected abilities\n" );
 			exit( 1 );
 		}
@@ -86,6 +97,24 @@ namespace {
 		}
 	}
 
+	if ( ! function_exists( 'wp_has_ability' ) ) {
+		function wp_has_ability( string $name ): bool {
+			return isset( $GLOBALS['datamachine_3066_state']->registrations[ $name ] );
+		}
+	}
+
+	if ( ! function_exists( 'wp_get_ability' ) ) {
+		function wp_get_ability( string $name ): ?object {
+			$state = $GLOBALS['datamachine_3066_state'];
+			if ( ! isset( $state->registrations[ $name ] ) ) {
+				++$state->notices;
+				return null;
+			}
+
+			return new \stdClass();
+		}
+	}
+
 	if ( ! function_exists( '__' ) ) {
 		function __( string $text, string $domain = 'default' ): string {
 			unset( $domain );
@@ -118,22 +147,31 @@ namespace DataMachine\Core\Database\ProcessedItems {
 	}
 }
 
+namespace DataMachine\Abilities {
+	if ( ! class_exists( HandlerAbilities::class ) ) {
+		class HandlerAbilities {}
+	}
+}
+
 namespace {
 	require_once dirname( __DIR__ ) . '/inc/Abilities/AbilityRegistration.php';
 	require_once dirname( __DIR__ ) . '/inc/Abilities/Engine/EngineHelpers.php';
 	require_once dirname( __DIR__ ) . '/inc/Abilities/Engine/ScheduleNextStepAbility.php';
 	require_once dirname( __DIR__ ) . '/inc/Abilities/Taxonomy/ResolveTermAbility.php';
+	require_once dirname( __DIR__ ) . '/inc/Abilities/FlowStep/FlowStepHelpers.php';
+	require_once dirname( __DIR__ ) . '/inc/Abilities/FlowStep/ConfigureFlowStepsAbility.php';
 
 	$bootstrap = static function (): void {
 		new \DataMachine\Abilities\Engine\ScheduleNextStepAbility();
 		new \DataMachine\Abilities\Taxonomy\ResolveTermAbility();
+		new \DataMachine\Abilities\FlowStep\ConfigureFlowStepsAbility();
 	};
 
 	$bootstrap();
 	$bootstrap();
 
 	$state = $GLOBALS['datamachine_3066_state'];
-	if ( 2 !== count( $state->actions['wp_abilities_api_init'] ?? array() ) ) {
+	if ( 3 !== count( $state->actions['wp_abilities_api_init'] ?? array() ) ) {
 		fwrite( STDERR, "FAIL: repeated bootstrap attached duplicate provider callbacks\n" );
 		exit( 1 );
 	}
@@ -148,7 +186,7 @@ namespace {
 	$bootstrap();
 	$bootstrap();
 
-	foreach ( array( 'datamachine/resolve-term', 'datamachine/schedule-next-step' ) as $name ) {
+	foreach ( array( 'datamachine/resolve-term', 'datamachine/schedule-next-step', 'datamachine/configure-flow-steps' ) as $name ) {
 		if ( 1 !== ( $state->registrations[ $name ] ?? 0 ) ) {
 			fwrite( STDERR, "FAIL: {$name} did not register exactly once\n" );
 			exit( 1 );

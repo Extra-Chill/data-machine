@@ -29,7 +29,7 @@ class ConfigureFlowStepsAbility {
 
 	private function registerAbility(): void {
 		$register_callback = function () {
-			if ( null !== wp_get_ability( 'datamachine/configure-flow-steps' ) ) {
+			if ( wp_has_ability( 'datamachine/configure-flow-steps' ) ) {
 				return;
 			}
 
