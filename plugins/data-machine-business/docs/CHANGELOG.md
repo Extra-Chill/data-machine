@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 Homeboy maintains this file from conventional commits at release time —
 do not edit by hand.
 
+## [0.17.0] - 2026-08-19
+
+### Added
+- add bounded GA4 aggregate reports
+- own image diagnostics and optimization
+- own IndexNow provider integration
+- expose credential-free Sendy campaign abilities
+
+### Changed
+- isolate business provider bootstrap failures
+
+### Fixed
+- Fix release quality gates for v0.17.0
+- protect appended media derivatives from orphan scans
+
 ## [0.16.3] - 2026-07-27
 
 ### Changed
