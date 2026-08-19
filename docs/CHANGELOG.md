@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.175.2] - 2026-08-19
+
+### Fixed
+- adopt exact claims in scheduled fanout
+
 ## [0.175.1] - 2026-08-19
 
 ### Changed
