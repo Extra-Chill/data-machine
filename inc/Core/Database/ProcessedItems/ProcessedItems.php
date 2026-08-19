@@ -640,6 +640,113 @@ class ProcessedItems extends BaseRepository {
 		return is_string( $owned ) && hash_equals( $token, $owned );
 	}
 
+	/** Return active token-owned claim descriptors for one job. */
+	public function active_claims_for_job( int $job_id ): array {
+		if ( $job_id <= 0 ) {
+			return array();
+		}
+
+		$query = $this->wpdb->prepare(
+			'SELECT flow_step_id, source_type, item_identifier, claim_token FROM %i WHERE job_id = %d AND status = %s AND claim_token IS NOT NULL AND claim_token != %s AND claim_expires_at > %s',
+			$this->table_name,
+			$job_id,
+			self::STATUS_CLAIMED,
+			'',
+			current_time( 'mysql', true )
+		);
+		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared -- Query is fully prepared above with an escaped identifier and typed values.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- Exact lifecycle ownership lookup.
+		$rows = $this->wpdb->get_results( $query, ARRAY_A );
+		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
+
+		$claims = array();
+		foreach ( is_array( $rows ) ? $rows : array() as $row ) {
+			$claim = array(
+				'identity_scope'  => (string) ( $row['flow_step_id'] ?? '' ),
+				'source_type'     => (string) ( $row['source_type'] ?? '' ),
+				'item_identifier' => (string) ( $row['item_identifier'] ?? '' ),
+				'ownership_token' => (string) ( $row['claim_token'] ?? '' ),
+			);
+			$claim['disposition_id'] = self::disposition_identity( $claim['identity_scope'], $claim['source_type'], $claim['item_identifier'] );
+			$claims[]                 = $claim;
+		}
+
+		return $claims;
+	}
+
+	/** Atomically move exact token-owned claims from a fanout parent to its child. */
+	public function adopt_owned_claims( array $claims, int $parent_job_id, int $child_job_id ): bool {
+		if ( $parent_job_id <= 0 || $child_job_id <= 0 ) {
+			return false;
+		}
+		if ( empty( $claims ) ) {
+			return true;
+		}
+
+		$scope = TransactionScope::begin( $this->wpdb );
+		if ( null === $scope ) {
+			return false;
+		}
+
+		foreach ( $claims as $claim ) {
+			$identity_scope  = (string) ( $claim['identity_scope'] ?? '' );
+			$source_type     = (string) ( $claim['source_type'] ?? '' );
+			$item_identifier = (string) ( $claim['item_identifier'] ?? '' );
+			$token           = (string) ( $claim['ownership_token'] ?? '' );
+			if ( '' === $identity_scope || '' === $source_type || '' === $item_identifier || '' === $token ) {
+				$scope->rollback();
+				return false;
+			}
+
+			$query = $this->wpdb->prepare(
+				'SELECT job_id, claim_token FROM %i WHERE flow_step_id = %s AND source_type = %s AND item_identifier = %s AND status = %s FOR UPDATE',
+				$this->table_name,
+				$identity_scope,
+				$source_type,
+				$item_identifier,
+				self::STATUS_CLAIMED
+			);
+			// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared -- Query is fully prepared above with an escaped identifier and typed values.
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- Transactional exact ownership transfer.
+			$row = $this->wpdb->get_row( $query, ARRAY_A );
+			// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
+			if ( ! is_array( $row ) || ! hash_equals( $token, (string) ( $row['claim_token'] ?? '' ) ) ) {
+				$scope->rollback();
+				return false;
+			}
+
+			$current_job_id = (int) ( $row['job_id'] ?? 0 );
+			if ( $child_job_id === $current_job_id ) {
+				continue;
+			}
+			if ( $parent_job_id !== $current_job_id ) {
+				$scope->rollback();
+				return false;
+			}
+
+			$updated = $this->wpdb->update(
+				$this->table_name,
+				array( 'job_id' => $child_job_id ),
+				array(
+					'flow_step_id'    => $identity_scope,
+					'source_type'     => $source_type,
+					'item_identifier' => $item_identifier,
+					'claim_token'     => $token,
+					'job_id'          => $parent_job_id,
+					'status'          => self::STATUS_CLAIMED,
+				),
+				array( '%d' ),
+				array( '%s', '%s', '%s', '%s', '%d', '%s' )
+			);
+			if ( 1 !== $updated ) {
+				$scope->rollback();
+				return false;
+			}
+		}
+
+		return $scope->commit();
+	}
+
 	/** Lock and validate one token-owned claim inside a caller-managed transaction. */
 	public function lock_owned_claim_in_transaction( array $claim ): bool {
 		$identity_scope  = (string) ( $claim['identity_scope'] ?? '' );

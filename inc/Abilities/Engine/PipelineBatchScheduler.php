@@ -401,6 +401,12 @@ class PipelineBatchScheduler {
 		if ( empty( $existing_engine['job']['job_id'] ) && ! datamachine_set_engine_data( $child_job_id, $child_engine ) ) {
 			return false;
 		}
+		$existing_terminal = is_array( $creation )
+			&& ! empty( $creation['already_exists'] )
+			&& JobStatus::isStatusFinal( (string) ( $creation['job']['status'] ?? '' ) );
+		if ( ! $existing_terminal && ! ( new ProcessedItems() )->adopt_owned_claims( array_values( $packet_claims ), $parent_job_id, $child_job_id ) ) {
+			return false;
+		}
 
 		// Child job stays 'pending' until Action Scheduler actually picks it up.
 		// ExecuteStepAbility transitions to 'processing' at execution time,
