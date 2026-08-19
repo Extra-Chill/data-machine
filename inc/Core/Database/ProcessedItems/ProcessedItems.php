@@ -665,7 +665,7 @@ class ProcessedItems extends BaseRepository {
 			return 'resolved';
 		}
 		if ( self::STATUS_CLAIMED === (string) ( $row['status'] ?? '' )
-			&& $job_id === (int) ( $row['job_id'] ?? 0 )
+			&& (int) ( $row['job_id'] ?? 0 ) === $job_id
 			&& hash_equals( $token, (string) ( $row['claim_token'] ?? '' ) ) ) {
 			return 'owned';
 		}
@@ -694,14 +694,14 @@ class ProcessedItems extends BaseRepository {
 
 		$claims = array();
 		foreach ( is_array( $rows ) ? $rows : array() as $row ) {
-			$claim = array(
+			$claim                   = array(
 				'identity_scope'  => (string) ( $row['flow_step_id'] ?? '' ),
 				'source_type'     => (string) ( $row['source_type'] ?? '' ),
 				'item_identifier' => (string) ( $row['item_identifier'] ?? '' ),
 				'ownership_token' => (string) ( $row['claim_token'] ?? '' ),
 			);
 			$claim['disposition_id'] = self::disposition_identity( $claim['identity_scope'], $claim['source_type'], $claim['item_identifier'] );
-			$claims[]                 = $claim;
+			$claims[]                = $claim;
 		}
 
 		return $claims;

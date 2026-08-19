@@ -449,7 +449,7 @@ class StepLifecycleHandler {
 		$owned = array_merge( $owned, array_values( ProcessedItems::disposition_claims( \datamachine_get_engine_data( $job_id ) ) ) );
 		$index = array();
 		foreach ( $owned as $claim ) {
-			$key                                      = (string) $claim['source_type'] . "\0" . (string) $claim['item_identifier'];
+			$key                                       = (string) $claim['source_type'] . "\0" . (string) $claim['item_identifier'];
 			$index[ $key ][ $claim['disposition_id'] ] = $claim;
 		}
 
@@ -467,7 +467,7 @@ class StepLifecycleHandler {
 				static fn( string $source_type ): bool => '' !== $source_type
 			);
 			$source_types = array_values( array_unique( $source_types ) );
-			$identifiers = array_filter(
+			$identifiers  = array_filter(
 				array(
 					trim( (string) ( $metadata['item_identifier'] ?? '' ) ),
 					trim( (string) ( $metadata['source_item_id'] ?? '' ) ),
@@ -475,7 +475,7 @@ class StepLifecycleHandler {
 				),
 				static fn( string $identifier ): bool => '' !== $identifier
 			);
-			$identifiers = array_values( array_unique( $identifiers ) );
+			$identifiers  = array_values( array_unique( $identifiers ) );
 			if ( count( $source_types ) > 1 || count( $identifiers ) > 1 ) {
 				return false;
 			}

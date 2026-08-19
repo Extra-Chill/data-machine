@@ -436,7 +436,7 @@ class PipelineBatchScheduler {
 			if ( 'owned' !== $claim_state ) {
 				return false;
 			}
-			$engine = array( ProcessedItems::CLAIM_METADATA_KEY => $claim );
+			$engine  = array( ProcessedItems::CLAIM_METADATA_KEY => $claim );
 			$settled = JobStatus::isStatusSuccess( $status )
 				? StepLifecycleHandler::handleCompleted( $child_job_id, $engine )
 				: StepLifecycleHandler::handleFailed( $child_job_id, $engine );
