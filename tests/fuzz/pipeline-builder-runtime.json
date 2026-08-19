@@ -1,0 +1,120 @@
+{
+  "schema": "wp-codebox/fuzz-suite/v1",
+  "id": "data-machine-pipeline-builder-runtime",
+  "version": "1.0.0",
+  "target": { "kind": "runtime", "id": "wordpress.run-workload", "entrypoint": "wordpress.run-workload" },
+  "metadata": {
+    "issue": 3219,
+    "seed": 3219,
+    "owner": "data-machine",
+    "isolation": "Each case is a disposable recipe runtime with an explicit checkpoint workflow.",
+    "runtime_requirements": {
+      "extra_plugins": [{ "slug": "data-machine", "source": "../..", "path": "../..", "loadAs": "plugin", "activate": true }],
+      "component_contracts": [{ "slug": "data-machine", "path": "../..", "loadAs": "plugin", "activate": true }]
+    },
+    "requiredRunnerCapabilities": {
+      "capabilities": ["runtime", "disposable-runtime", "runtime-isolation", "artifact-export"],
+      "targetKinds": ["runtime"],
+      "commands": ["wordpress.browser-actions", "wordpress.rest-request", "wordpress.run-php", "wp-codebox.checkpoint-create", "wp-codebox.checkpoint-restore"]
+    }
+  },
+  "cases": [
+    {
+      "id": "clean-load-desktop",
+      "description": "A clean Data Machine activation loads the Pipeline Builder without browser, page, or PHP errors.",
+      "metadata": { "seed": 321901, "dimensions": ["clean-load", "desktop", "console-page-php-cleanliness"] },
+      "phases": {
+        "setup": [
+          { "command": "wordpress.ensure-plugin-active", "args": ["plugin=data-machine/data-machine.php"] },
+          { "command": "wp-codebox.checkpoint-create", "args": ["name=clean-load-desktop"] }
+        ],
+        "action": [
+          { "command": "wordpress.browser-actions", "args": ["auth=wordpress-admin", "viewport=1440x960", "steps-json=[{\"kind\":\"navigate\",\"url\":\"/wp-admin/admin.php?page=datamachine-pipelines\",\"waitFor\":\"domcontentloaded\"},{\"kind\":\"waitFor\",\"selector\":\"#datamachine-react-root\"},{\"kind\":\"expect\",\"selector\":\".datamachine-pipelines-layout\",\"state\":\"visible\"},{\"kind\":\"screenshot\",\"name\":\"pipeline-builder-clean-load-desktop\"},{\"kind\":\"assertObservation\",\"assertion\":\"no-console-errors\"},{\"kind\":\"assertObservation\",\"assertion\":\"no-page-errors\"}]", "capture=steps,console,errors,html,network,screenshot,dom-snapshot"] }
+        ],
+        "assert": [{ "command": "wordpress.run-php", "args": ["code=wp_set_current_user( 1 ); datamachine_activate_full_runtime( 'fuzz-rest' ); do_action( 'rest_api_init' ); $response = rest_do_request( new WP_REST_Request( 'GET', '/datamachine/v1/step-types' ) ); if ( 200 !== $response->get_status() ) { throw new RuntimeException( 'Step types returned HTTP ' . $response->get_status() ); }"] }],
+        "teardown": [{ "command": "wp-codebox.checkpoint-restore", "args": ["name=clean-load-desktop"] }]
+      }
+    },
+    {
+      "id": "pipeline-create-rename-select-delete",
+      "description": "A case-local pipeline is created, renamed, selected after reload, and deleted through the builder controls.",
+      "metadata": { "seed": 321902, "dimensions": ["create", "rename", "select", "delete", "persistence"] },
+      "phases": {
+        "setup": [
+          { "command": "wordpress.ensure-plugin-active", "args": ["plugin=data-machine/data-machine.php"] },
+          { "command": "wp-codebox.checkpoint-create", "args": ["name=pipeline-create-rename-select-delete"] },
+          { "command": "wordpress.browser-actions", "args": ["auth=wordpress-admin", "step-timeout=30s", "steps-json=[{\"kind\":\"navigate\",\"url\":\"/wp-admin/admin.php?page=datamachine-pipelines\"},{\"kind\":\"waitFor\",\"selector\":\".datamachine-pipelines-layout\"},{\"kind\":\"click\",\"text\":\"Add New Pipeline\"},{\"kind\":\"waitFor\",\"selector\":\"input[placeholder=\\\"Pipeline name\\\"]\"}]", "capture=steps,console,errors,network"] }
+        ],
+        "action": [
+          { "command": "wordpress.browser-actions", "args": ["auth=wordpress-admin", "step-timeout=30s", "steps-json=[{\"kind\":\"navigate\",\"url\":\"/wp-admin/admin.php?page=datamachine-pipelines\"},{\"kind\":\"waitFor\",\"selector\":\"input[placeholder=\\\"Pipeline name\\\"]\"},{\"kind\":\"fill\",\"selector\":\"input[placeholder=\\\"Pipeline name\\\"]\",\"value\":\"Fuzz 3219 renamed pipeline\"},{\"kind\":\"waitFor\",\"waitFor\":\"duration\",\"duration\":\"1s\"},{\"kind\":\"navigate\",\"url\":\"/wp-admin/admin.php?page=datamachine-pipelines\",\"waitFor\":\"networkidle\"},{\"kind\":\"expect\",\"selector\":\"input[placeholder=\\\"Pipeline name\\\"]\",\"state\":\"visible\"},{\"kind\":\"evaluate\",\"expression\":\"window.confirm = () => true\"},{\"kind\":\"click\",\"selector\":\"button[aria-label=\\\"Delete Pipeline\\\"]\"},{\"kind\":\"waitFor\",\"selector\":\".datamachine-empty-state\"},{\"kind\":\"assertObservation\",\"assertion\":\"no-console-errors\"},{\"kind\":\"assertObservation\",\"assertion\":\"no-page-errors\"}]", "capture=steps,console,errors,network"] }
+        ],
+        "teardown": [{ "command": "wp-codebox.checkpoint-restore", "args": ["name=pipeline-create-rename-select-delete"] }]
+      }
+    },
+    {
+      "id": "step-type-add-remove-and-cancel",
+      "description": "A case-local pipeline discovers step types through REST, adds a real modal card, removes it, and cancels a second modal.",
+      "metadata": { "seed": 321903, "dimensions": ["step-type-discovery", "step-add", "step-remove", "modal-cancellation"] },
+      "phases": {
+        "setup": [
+          { "command": "wordpress.ensure-plugin-active", "args": ["plugin=data-machine/data-machine.php"] },
+          { "command": "wp-codebox.checkpoint-create", "args": ["name=step-type-add-remove-and-cancel"] },
+          { "command": "wordpress.browser-actions", "args": ["auth=wordpress-admin", "step-timeout=30s", "steps-json=[{\"kind\":\"navigate\",\"url\":\"/wp-admin/admin.php?page=datamachine-pipelines\"},{\"kind\":\"waitFor\",\"selector\":\".datamachine-pipelines-layout\"},{\"kind\":\"click\",\"text\":\"Add New Pipeline\"},{\"kind\":\"waitFor\",\"selector\":\".datamachine-step-card--empty button\"}]", "capture=steps,console,errors"] }
+        ],
+        "action": [
+          { "command": "wordpress.run-php", "args": ["code=wp_set_current_user( 1 ); datamachine_activate_full_runtime( 'fuzz-rest' ); do_action( 'rest_api_init' ); $response = rest_do_request( new WP_REST_Request( 'GET', '/datamachine/v1/step-types' ) ); if ( 200 !== $response->get_status() ) { throw new RuntimeException( 'Step types returned HTTP ' . $response->get_status() ); }"] },
+          { "command": "wordpress.browser-actions", "args": ["auth=wordpress-admin", "step-timeout=30s", "steps-json=[{\"kind\":\"navigate\",\"url\":\"/wp-admin/admin.php?page=datamachine-pipelines\"},{\"kind\":\"waitFor\",\"selector\":\".datamachine-step-card--empty button\"},{\"kind\":\"click\",\"selector\":\".datamachine-step-card--empty button\"},{\"kind\":\"waitFor\",\"selector\":\".datamachine-step-selection-modal\"},{\"kind\":\"click\",\"selector\":\"button.datamachine-modal-card:first-of-type\"},{\"kind\":\"waitFor\",\"selector\":\".datamachine-pipeline-step-card\"},{\"kind\":\"evaluate\",\"expression\":\"window.confirm = () => true\"},{\"kind\":\"click\",\"text\":\"Delete\"},{\"kind\":\"click\",\"selector\":\".datamachine-step-card--empty button\"},{\"kind\":\"waitFor\",\"selector\":\".datamachine-step-selection-modal\"},{\"kind\":\"click\",\"text\":\"Cancel\"},{\"kind\":\"expect\",\"selector\":\".datamachine-step-selection-modal\",\"state\":\"detached\"},{\"kind\":\"assertObservation\",\"assertion\":\"no-console-errors\"},{\"kind\":\"assertObservation\",\"assertion\":\"no-page-errors\"}]", "capture=steps,console,errors,network"] }
+        ],
+        "teardown": [{ "command": "wp-codebox.checkpoint-restore", "args": ["name=step-type-add-remove-and-cancel"] }]
+      }
+    },
+    {
+      "id": "flow-sibling-preservation",
+      "description": "A case-local pipeline creates two sibling flows and preserves their list after reload, replaying the current flow creation failure.",
+      "metadata": { "seed": 321904, "issue": 3254, "dimensions": ["flow-create", "flow-sibling-preservation", "reload", "known-product-defect-replay"] },
+      "phases": {
+        "setup": [
+          { "command": "wordpress.ensure-plugin-active", "args": ["plugin=data-machine/data-machine.php"] },
+          { "command": "wp-codebox.checkpoint-create", "args": ["name=flow-sibling-preservation"] },
+          { "command": "wordpress.browser-actions", "args": ["auth=wordpress-admin", "step-timeout=30s", "steps-json=[{\"kind\":\"navigate\",\"url\":\"/wp-admin/admin.php?page=datamachine-pipelines\"},{\"kind\":\"waitFor\",\"selector\":\".datamachine-pipelines-layout\"},{\"kind\":\"click\",\"text\":\"Add New Pipeline\"},{\"kind\":\"waitFor\",\"selector\":\".datamachine-flow-card--empty button\"}]", "capture=steps,console,errors"] }
+        ],
+        "action": [{ "command": "wordpress.browser-actions", "args": ["auth=wordpress-admin", "step-timeout=30s", "steps-json=[{\"kind\":\"navigate\",\"url\":\"/wp-admin/admin.php?page=datamachine-pipelines\"},{\"kind\":\"waitFor\",\"selector\":\".datamachine-flow-card--empty button\"},{\"kind\":\"click\",\"selector\":\".datamachine-flow-card--empty button\"},{\"kind\":\"waitFor\",\"waitFor\":\"duration\",\"duration\":\"500ms\"},{\"kind\":\"click\",\"selector\":\".datamachine-flow-card--empty button\"},{\"kind\":\"navigate\",\"url\":\"/wp-admin/admin.php?page=datamachine-pipelines\",\"waitFor\":\"networkidle\"},{\"kind\":\"expect\",\"selector\":\".datamachine-flows-list\",\"state\":\"visible\"},{\"kind\":\"assertObservation\",\"assertion\":\"no-console-errors\"},{\"kind\":\"assertObservation\",\"assertion\":\"no-page-errors\"}]", "capture=steps,console,errors,network,screenshot"] }],
+        "teardown": [{ "command": "wp-codebox.checkpoint-restore", "args": ["name=flow-sibling-preservation"] }]
+      }
+    },
+    {
+      "id": "rest-malformed-oversized-repeated-saves",
+      "description": "A case-local REST pipeline prerequisite is followed by malformed import, bounded oversized title, and repeated saves.",
+      "metadata": { "seed": 321905, "dimensions": ["rest", "malformed-save", "oversized-save", "repeated-save", "persistence"] },
+      "phases": {
+        "setup": [{ "command": "wordpress.ensure-plugin-active", "args": ["plugin=data-machine/data-machine.php"] }, { "command": "wp-codebox.checkpoint-create", "args": ["name=rest-malformed-oversized-repeated-saves"] }, { "command": "wordpress.run-php", "args": ["code=wp_set_current_user( 1 ); datamachine_activate_full_runtime( 'fuzz-rest' ); do_action( 'rest_api_init' ); $request = new WP_REST_Request( 'POST', '/datamachine/v1/pipelines' ); $request->set_header( 'content-type', 'application/json' ); $request->set_body( wp_json_encode( array( 'pipeline_name' => 'Fuzz 3219 REST prerequisite' ) ) ); $response = rest_do_request( $request ); if ( 200 !== $response->get_status() ) { throw new RuntimeException( 'Prerequisite pipeline returned HTTP ' . $response->get_status() ); }"] }],
+        "action": [
+          { "command": "wordpress.run-php", "args": ["code=wp_set_current_user( 1 ); datamachine_activate_full_runtime( 'fuzz-rest' ); do_action( 'rest_api_init' ); $request = new WP_REST_Request( 'POST', '/datamachine/v1/pipelines' ); $request->set_header( 'content-type', 'application/json' ); $request->set_body( wp_json_encode( array( 'batch_import' => true, 'format' => 'csv', 'data' => \"not,a,pipeline,csv\\n\\\"unterminated\" ) ) ); $response = rest_do_request( $request ); if ( 400 !== $response->get_status() ) { throw new RuntimeException( 'Malformed CSV returned HTTP ' . $response->get_status() ); }"] },
+          { "command": "wordpress.run-php", "args": ["code=wp_set_current_user( 1 ); datamachine_activate_full_runtime( 'fuzz-rest' ); do_action( 'rest_api_init' ); $request = new WP_REST_Request( 'POST', '/datamachine/v1/pipelines' ); $request->set_header( 'content-type', 'application/json' ); $request->set_body( wp_json_encode( array( 'pipeline_name' => str_repeat( 'Fuzz 3219 bounded oversized title ', 8 ) ) ) ); $response = rest_do_request( $request ); if ( 200 !== $response->get_status() ) { throw new RuntimeException( 'Oversized title returned HTTP ' . $response->get_status() ); }"] },
+          { "command": "wordpress.run-php", "args": ["code=wp_set_current_user( 1 ); datamachine_activate_full_runtime( 'fuzz-rest' ); do_action( 'rest_api_init' ); foreach ( array( 1, 2 ) as $attempt ) { $request = new WP_REST_Request( 'POST', '/datamachine/v1/pipelines' ); $request->set_header( 'content-type', 'application/json' ); $request->set_body( wp_json_encode( array( 'pipeline_name' => 'Fuzz 3219 repeat save' ) ) ); $response = rest_do_request( $request ); if ( 200 !== $response->get_status() ) { throw new RuntimeException( 'Repeated save ' . $attempt . ' returned HTTP ' . $response->get_status() ); } }"] }
+        ],
+        "teardown": [{ "command": "wp-codebox.checkpoint-restore", "args": ["name=rest-malformed-oversized-repeated-saves"] }]
+      }
+    },
+    {
+      "id": "stale-selection-reload-and-import-export-narrow",
+      "description": "A case-local pipeline survives stale selection recovery and exposes the import/export modal at a narrow viewport.",
+      "metadata": { "seed": 321906, "dimensions": ["stale-selection", "reload", "import-export", "narrow-viewport", "modal-cancellation"] },
+      "phases": {
+        "setup": [{ "command": "wordpress.ensure-plugin-active", "args": ["plugin=data-machine/data-machine.php"] }, { "command": "wp-codebox.checkpoint-create", "args": ["name=stale-selection-reload-and-import-export-narrow"] }, { "command": "wordpress.browser-actions", "args": ["auth=wordpress-admin", "step-timeout=30s", "steps-json=[{\"kind\":\"navigate\",\"url\":\"/wp-admin/admin.php?page=datamachine-pipelines\"},{\"kind\":\"waitFor\",\"selector\":\".datamachine-pipelines-layout\"},{\"kind\":\"click\",\"text\":\"Add New Pipeline\"},{\"kind\":\"waitFor\",\"selector\":\"input[placeholder=\\\"Pipeline name\\\"]\"}]", "capture=steps,console,errors"] }],
+        "action": [{ "command": "wordpress.browser-actions", "args": ["auth=wordpress-admin", "step-timeout=30s", "viewport=390x844", "is-mobile=true", "steps-json=[{\"kind\":\"navigate\",\"url\":\"/wp-admin/admin.php?page=datamachine-pipelines\"},{\"kind\":\"waitFor\",\"waitFor\":\"networkidle\"},{\"kind\":\"evaluate\",\"expression\":\"return (() => { localStorage.setItem(['datamachine','ui','store'].join('-'), JSON.stringify({state:{selectedPipelineId:'stale-3219'},version:2})); location.reload(); })();\"},{\"kind\":\"waitFor\",\"selector\":\"#datamachine-react-root\"},{\"kind\":\"click\",\"text\":\"Import / Export\"},{\"kind\":\"waitFor\",\"selector\":\".datamachine-import-export-modal\"},{\"kind\":\"click\",\"selector\":\"button[role=\\\"tab\\\"][id$=\\\"-import\\\"]\"},{\"kind\":\"expect\",\"selector\":\"input[type=\\\"file\\\"][accept=\\\".csv,text/csv\\\"]\",\"state\":\"attached\"},{\"kind\":\"click\",\"text\":\"Cancel\"},{\"kind\":\"expect\",\"selector\":\".datamachine-import-export-modal\",\"state\":\"detached\"},{\"kind\":\"assertObservation\",\"assertion\":\"no-console-errors\"},{\"kind\":\"assertObservation\",\"assertion\":\"no-page-errors\"}]", "capture=steps,console,errors,network,screenshot,dom-snapshot"] }],
+        "teardown": [{ "command": "wp-codebox.checkpoint-restore", "args": ["name=stale-selection-reload-and-import-export-narrow"] }]
+      }
+    },
+    {
+      "id": "import-valid-csv-must-succeed",
+      "description": "A case-local prerequisite precedes a replayable failing CSV import contract assertion.",
+      "metadata": { "seed": 321907, "issue": 3255, "dimensions": ["import", "rest", "known-product-defect-replay"] },
+      "phases": {
+        "setup": [{ "command": "wordpress.ensure-plugin-active", "args": ["plugin=data-machine/data-machine.php"] }, { "command": "wp-codebox.checkpoint-create", "args": ["name=import-valid-csv-must-succeed"] }, { "command": "wordpress.run-php", "args": ["code=wp_set_current_user( 1 ); datamachine_activate_full_runtime( 'fuzz-rest' ); do_action( 'rest_api_init' ); $request = new WP_REST_Request( 'POST', '/datamachine/v1/pipelines' ); $request->set_header( 'content-type', 'application/json' ); $request->set_body( wp_json_encode( array( 'pipeline_name' => 'Fuzz 3219 import prerequisite' ) ) ); $response = rest_do_request( $request ); if ( 200 !== $response->get_status() ) { throw new RuntimeException( 'Import prerequisite returned HTTP ' . $response->get_status() ); }"] }],
+        "action": [{ "command": "wordpress.run-php", "args": ["code=wp_set_current_user( 1 ); datamachine_activate_full_runtime( 'fuzz-rest' ); do_action( 'rest_api_init' ); $request = new WP_REST_Request( 'POST', '/datamachine/v1/pipelines' ); $request->set_header( 'content-type', 'application/json' ); $request->set_body( wp_json_encode( array( 'batch_import' => true, 'format' => 'csv', 'data' => \"pipeline_name\\nFuzz 3219 import\\n\" ) ) ); $response = rest_do_request( $request ); if ( 200 !== $response->get_status() ) { throw new RuntimeException( 'CSV import returned HTTP ' . $response->get_status() . ': ' . wp_json_encode( $response->get_data() ) ); }"] }],
+        "teardown": [{ "command": "wp-codebox.checkpoint-restore", "args": ["name=import-valid-csv-must-succeed"] }]
+      }
+    }
+  ]
+}
