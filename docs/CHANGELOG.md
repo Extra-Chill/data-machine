@@ -2,6 +2,16 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.175.1] - 2026-08-19
+
+### Changed
+- migrate flow and pipeline failures to WP_Error
+- Enforce portable subagent bundle tool policies
+- make canonical PHPUnit suite file-isolated
+
+### Fixed
+- propagate fanout disposition claims
+
 ## [0.175.0] - 2026-08-18
 
 ### Added
