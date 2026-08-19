@@ -168,8 +168,9 @@ class BrokenImageReferenceAbilities {
 				$current_blog_id = get_current_blog_id();
 
 				foreach ( $posts as $post ) {
+					/** @var \WP_Post $post */
 					++$posts_total;
-					$content = is_object( $post ) ? (string) $post->post_content : '';
+					$content = (string) $post->post_content;
 					if ( '' === $content ) {
 						continue;
 					}
@@ -204,8 +205,8 @@ class BrokenImageReferenceAbilities {
 						if ( ! $file_checker( $path ) ) {
 							$broken[] = array(
 								'blog_id'    => (int) $current_blog_id,
-								'post_id'    => (int) ( is_object( $post ) ? $post->ID : 0 ),
-								'post_title' => is_object( $post ) ? (string) $post->post_title : '',
+								'post_id'    => (int) $post->ID,
+								'post_title' => (string) $post->post_title,
 								'url'        => $normalized,
 								'attribute'  => $ref['attribute'],
 								'host_blog'  => isset( $resolved['blog_id'] ) ? (int) $resolved['blog_id'] : 0,
@@ -258,7 +259,7 @@ class BrokenImageReferenceAbilities {
 				get_sites(
 					array(
 						'fields' => 'ids',
-						'number' => '',
+						'number' => 0,
 					)
 				)
 			);
@@ -535,7 +536,7 @@ class BrokenImageReferenceAbilities {
 			}
 			// A descriptor is a trailing token like "480w" or "2x" preceded by space.
 			$parts = preg_split( '/\s+/', $candidate );
-			if ( ! is_array( $parts ) || empty( $parts ) ) {
+			if ( ! is_array( $parts ) ) {
 				continue;
 			}
 			$url = trim( $parts[0] );
@@ -661,7 +662,7 @@ class BrokenImageReferenceAbilities {
 		$best_blog_id = null;
 		$best_baseurl = '';
 		foreach ( $blog_uploads as $blog_id => $uploads ) {
-			$baseurl = $uploads['baseurl'] ?? '';
+			$baseurl = $uploads['baseurl'];
 			if ( '' === $baseurl ) {
 				continue;
 			}
@@ -698,7 +699,7 @@ class BrokenImageReferenceAbilities {
 			);
 		}
 
-		$basedir  = $blog_uploads[ $best_blog_id ]['basedir'] ?? '';
+		$basedir  = $blog_uploads[ $best_blog_id ]['basedir'];
 		$relative = substr( $url, strlen( $best_baseurl ) );
 		$fs_path  = self::build_contained_upload_path( $basedir, $relative );
 
@@ -795,7 +796,7 @@ class BrokenImageReferenceAbilities {
 	 */
 	private static function host_is_network_host( string $host, array $blog_uploads ): bool {
 		foreach ( $blog_uploads as $uploads ) {
-			$baseurl_host = strtolower( (string) wp_parse_url( $uploads['baseurl'] ?? '', PHP_URL_HOST ) );
+			$baseurl_host = strtolower( (string) wp_parse_url( $uploads['baseurl'], PHP_URL_HOST ) );
 			if ( $host === $baseurl_host ) {
 				return true;
 			}

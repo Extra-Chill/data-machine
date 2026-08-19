@@ -1,0 +1,25 @@
+{
+  "schema": "homeboy/test-manifest/v1",
+  "tests": {
+    "tests/ability-registration-lifecycle-smoke.php": { "environment": "standalone-php" },
+    "tests/amazon-affiliate-tool-smoke.php": { "environment": "standalone-php" },
+    "tests/bing-webmaster-ability-smoke.php": { "environment": "standalone-php" },
+    "tests/data-machine-http-client-contract-smoke.php": { "environment": "wordpress" },
+    "tests/google-analytics-aggregate-http-smoke.php": { "environment": "standalone-php" },
+    "tests/google-analytics-aggregate-schema-smoke.php": { "environment": "wordpress" },
+    "tests/google-search-tool-smoke.php": { "environment": "standalone-php" },
+    "tests/gsc-business-registration-smoke.php": { "environment": "standalone-php" },
+    "tests/gsc-site-url-guard-smoke.php": { "environment": "standalone-php" },
+    "tests/image-broken-reference-multisite-smoke.php": { "environment": "standalone-php" },
+    "tests/image-diagnostics-ownership-smoke.php": { "environment": "standalone-php" },
+    "tests/image-optimization-pagination-smoke.php": { "environment": "standalone-php" },
+    "tests/image-optimization-scheduling-context-smoke.php": { "environment": "standalone-php" },
+    "tests/indexnow-ownership-smoke.php": { "environment": "standalone-php" },
+    "tests/indexnow-registration-smoke.php": { "environment": "standalone-php" },
+    "tests/mediavine-dimensional-smoke.php": { "environment": "standalone-php" },
+    "tests/pagespeed-ownership-smoke.php": { "environment": "standalone-php" },
+    "tests/provider-bootstrap-smoke.php": { "environment": "standalone-php" },
+    "tests/sendy-campaign-abilities-smoke.php": { "environment": "standalone-php" },
+    "tests/test-manifest-contract-smoke.php": { "environment": "standalone-php" }
+  }
+}

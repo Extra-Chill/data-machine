@@ -183,7 +183,17 @@ class GoogleAnalyticsCommand extends BaseCommand {
 				'order'       => 'order',
 			)
 		);
-		foreach ( array( 'date-range' => 'date_range', 'comparison-date-range' => 'comparison_date_range', 'dimensions' => 'dimensions', 'metrics' => 'metrics', 'filters' => 'filters', 'order-by' => 'order_by' ) as $flag => $key ) {
+		foreach (
+			array(
+				'date-range'            => 'date_range',
+				'comparison-date-range' => 'comparison_date_range',
+				'dimensions'            => 'dimensions',
+				'metrics'               => 'metrics',
+				'filters'               => 'filters',
+				'order-by'              => 'order_by',
+			)
+			as $flag => $key
+		) {
 			if ( isset( $assoc_args[ $flag ] ) ) {
 				$input[ $key ] = json_decode( $assoc_args[ $flag ], true );
 			}
@@ -248,7 +258,7 @@ class GoogleAnalyticsCommand extends BaseCommand {
 
 		// JSON output: dump the whole result.
 		if ( 'json' === $format ) {
-			WP_CLI::line( wp_json_encode( $result, JSON_PRETTY_PRINT ) );
+			WP_CLI::line( (string) wp_json_encode( $result, JSON_PRETTY_PRINT ) );
 			return;
 		}
 

@@ -166,6 +166,7 @@ class ImageOptimizationTask extends SystemTask {
 		if ( is_wp_error( $editor ) ) {
 			return array(
 				'success' => false,
+				'new_size' => 0,
 				'error'   => 'Image editor not available: ' . $editor->get_error_message(),
 			);
 		}
@@ -176,6 +177,7 @@ class ImageOptimizationTask extends SystemTask {
 		if ( is_wp_error( $saved ) ) {
 			return array(
 				'success' => false,
+				'new_size' => 0,
 				'error'   => 'Compression failed: ' . $saved->get_error_message(),
 			);
 		}
@@ -183,7 +185,8 @@ class ImageOptimizationTask extends SystemTask {
 		clearstatcache( true, $file_path );
 		return array(
 			'success'  => true,
-			'new_size' => filesize( $file_path ),
+			'new_size' => (int) filesize( $file_path ),
+			'error'    => '',
 		);
 	}
 
@@ -194,13 +197,14 @@ class ImageOptimizationTask extends SystemTask {
 	 * @return array{success: bool, webp_path: string, webp_size: int, error: string}
 	 */
 	private function generateWebP( string $file_path, int $quality, int $attachment_id ): array {
-		$webp_path = preg_replace( '/\.(jpe?g|png)$/i', '.webp', $file_path );
+		$webp_path = (string) preg_replace( '/\.(jpe?g|png)$/i', '.webp', $file_path );
 
 		if ( file_exists( $webp_path ) ) {
 			return array(
 				'success'   => true,
 				'webp_path' => $webp_path,
-				'webp_size' => filesize( $webp_path ),
+				'webp_size' => (int) filesize( $webp_path ),
+				'error'     => '',
 			);
 		}
 
@@ -208,6 +212,8 @@ class ImageOptimizationTask extends SystemTask {
 		if ( is_wp_error( $editor ) ) {
 			return array(
 				'success' => false,
+				'webp_path' => '',
+				'webp_size' => 0,
 				'error'   => 'Image editor not available: ' . $editor->get_error_message(),
 			);
 		}
@@ -218,14 +224,17 @@ class ImageOptimizationTask extends SystemTask {
 		if ( is_wp_error( $saved ) ) {
 			return array(
 				'success' => false,
+				'webp_path' => '',
+				'webp_size' => 0,
 				'error'   => 'WebP generation failed: ' . $saved->get_error_message(),
 			);
 		}
 
 		return array(
 			'success'   => true,
-			'webp_path' => $saved['path'],
-			'webp_size' => filesize( $saved['path'] ),
+			'webp_path' => (string) $saved['path'],
+			'webp_size' => (int) filesize( $saved['path'] ),
+			'error'     => '',
 		);
 	}
 }

@@ -231,7 +231,7 @@ class ImageOptimizationAbilities {
 					'attachment_id' => $attachment_id,
 					'title'         => get_the_title( $attachment_id ),
 					'file_size'     => $file_size,
-					'file_size_hr'  => size_format( $file_size ),
+					'file_size_hr'  => size_format( (int) $file_size ),
 					'dimensions'    => $width . 'x' . $height,
 					'mime_type'     => $mime_type,
 					'has_webp'      => $has_webp,
@@ -356,7 +356,7 @@ class ImageOptimizationAbilities {
 				$preview[] = array(
 					'attachment_id' => $id,
 					'title'         => get_the_title( $id ),
-					'file_size'     => size_format( $file_size ),
+					'file_size'     => size_format( (int) $file_size ),
 					'mime_type'     => get_post_mime_type( $id ),
 				);
 			}
@@ -381,18 +381,15 @@ class ImageOptimizationAbilities {
 			);
 		}
 
-		$acting             = datamachine_resolve_system_agent_context();
-		$user_id            = $acting['user_id'];
-		$agent_id           = $acting['agent_id'];
-		$triggering_user_id = $acting['triggering_user_id'];
+		$acting = \datamachine_resolve_system_agent_context();
 
 		$batch = TaskScheduler::scheduleBatch(
 			'image_optimization',
 			$item_params,
 			array(
-				'user_id'            => $user_id,
-				'agent_id'           => $agent_id,
-				'triggering_user_id' => $triggering_user_id,
+				'user_id'            => isset( $acting['user_id'] ) ? (int) $acting['user_id'] : 0,
+				'agent_id'           => isset( $acting['agent_id'] ) ? (int) $acting['agent_id'] : 0,
+				'triggering_user_id' => isset( $acting['triggering_user_id'] ) ? (int) $acting['triggering_user_id'] : 0,
 			)
 		);
 
@@ -408,7 +405,7 @@ class ImageOptimizationAbilities {
 		return array_merge( array(
 			'success'      => true,
 			'queued_count' => count( $attachment_ids ),
-			'batch_id'     => $batch['batch_id'] ?? null,
+			'batch_id'     => $batch['batch_id'],
 			'message'      => sprintf(
 				'Image optimization scheduled for %d image(s).',
 				count( $attachment_ids )

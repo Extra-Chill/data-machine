@@ -66,7 +66,7 @@ assert_business_gsc(
 );
 
 assert_business_gsc(
-	business_gsc_file_contains( 'data-machine-business.php', "datamachine analytics gsc" ),
+	business_gsc_file_contains( 'inc/Cli/CommandRegistry.php', "'datamachine analytics gsc'" ),
 	'business registers the GSC WP-CLI command',
 	$failures,
 	$passes

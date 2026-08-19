@@ -16,7 +16,7 @@ defined( 'ABSPATH' ) || exit;
 
 class IndexNowAbilities {
 
-	public const API_ENDPOINT = 'https://api.indexnow.org/indexnow';
+	public const API_ENDPOINT   = 'https://api.indexnow.org/indexnow';
 	public const MAX_BATCH_SIZE = 10000;
 
 	private static bool $registered = false;
@@ -90,16 +90,25 @@ class IndexNowAbilities {
 
 	public static function submit_urls( array $urls ): array {
 		if ( empty( $urls ) ) {
-			return array( 'success' => false, 'error' => 'No URLs provided' );
+			return array(
+				'success' => false,
+				'error'   => 'No URLs provided',
+			);
 		}
 
 		$key = self::get_or_generate_key();
 		if ( empty( $key ) ) {
-			return array( 'success' => false, 'error' => 'Could not generate IndexNow API key' );
+			return array(
+				'success' => false,
+				'error'   => 'Could not generate IndexNow API key',
+			);
 		}
 
-		$urls = array_slice( array_values( array_unique( array_filter( $urls ) ) ), 0, self::MAX_BATCH_SIZE );
-		$host = wp_parse_url( $urls[0], PHP_URL_HOST ) ?: wp_parse_url( home_url(), PHP_URL_HOST );
+		$urls   = array_slice( array_values( array_unique( array_filter( $urls ) ) ), 0, self::MAX_BATCH_SIZE );
+		$host   = wp_parse_url( $urls[0], PHP_URL_HOST );
+		if ( ! $host ) {
+			$host = wp_parse_url( home_url(), PHP_URL_HOST );
+		}
 		$result = HttpClient::post(
 			self::API_ENDPOINT,
 			array(
@@ -154,13 +163,14 @@ class IndexNowAbilities {
 	}
 
 	public static function get_or_generate_key(): string {
-		return self::get_api_key() ?: self::generate_key();
+		$key = self::get_api_key();
+		return $key ? $key : self::generate_key();
 	}
 
 	public static function generate_key(): string {
-		$key                              = str_replace( '-', '', wp_generate_uuid4() );
-		$settings                         = get_option( 'datamachine_settings', array() );
-		$settings['indexnow_api_key']     = $key;
+		$key                          = str_replace( '-', '', wp_generate_uuid4() );
+		$settings                     = get_option( 'datamachine_settings', array() );
+		$settings['indexnow_api_key'] = $key;
 		update_option( 'datamachine_settings', $settings );
 		PluginSettings::clearCache();
 		do_action( 'datamachine_log', 'info', 'IndexNow: Generated new API key', array( 'key_preview' => substr( $key, 0, 8 ) . '...' ) );
@@ -170,20 +180,38 @@ class IndexNowAbilities {
 	public static function verify_key_file(): array {
 		$key = self::get_api_key();
 		if ( empty( $key ) ) {
-			return array( 'success' => false, 'error' => 'No API key configured. Generate one first.' );
+			return array(
+				'success' => false,
+				'error'   => 'No API key configured. Generate one first.',
+			);
 		}
 
 		$url    = home_url( '/' . $key . '.txt' );
-		$result = HttpClient::get( $url, array( 'timeout' => 10, 'context' => 'IndexNow Key Verification' ) );
+		$result = HttpClient::get( $url, array(
+			'timeout' => 10,
+			'context' => 'IndexNow Key Verification',
+		) );
 		if ( ! $result['success'] ) {
-			return array( 'success' => false, 'url' => $url, 'error' => 'Key file not accessible: ' . ( $result['error'] ?? 'unknown error' ) );
+			return array(
+				'success' => false,
+				'url'     => $url,
+				'error'   => 'Key file not accessible: ' . ( $result['error'] ?? 'unknown error' ),
+			);
 		}
 
 		if ( trim( $result['data'] ?? '' ) !== $key ) {
-			return array( 'success' => false, 'url' => $url, 'error' => 'Key file content does not match API key' );
+			return array(
+				'success' => false,
+				'url'     => $url,
+				'error'   => 'Key file content does not match API key',
+			);
 		}
 
-		return array( 'success' => true, 'url' => $url, 'message' => 'Key file verified successfully' );
+		return array(
+			'success' => true,
+			'url'     => $url,
+			'message' => 'Key file verified successfully',
+		);
 	}
 
 	public static function get_status(): array {
@@ -215,8 +243,27 @@ class IndexNowAbilities {
 				'label'               => __( 'IndexNow Submit', 'data-machine-business' ),
 				'description'         => __( 'Submit one or more URLs to IndexNow for instant search engine indexing.', 'data-machine-business' ),
 				'category'            => 'datamachine-seo',
-				'input_schema'        => array( 'type' => 'object', 'required' => array( 'urls' ), 'properties' => array( 'urls' => array( 'type' => 'array', 'description' => __( 'Array of full URLs to submit', 'data-machine-business' ), 'items' => array( 'type' => 'string' ) ) ) ),
-				'output_schema'       => array( 'type' => 'object', 'properties' => array( 'success' => array( 'type' => 'boolean' ), 'message' => array( 'type' => 'string' ), 'url_count' => array( 'type' => 'integer' ), 'status_code' => array( 'type' => 'integer' ), 'error' => array( 'type' => 'string' ) ) ),
+				'input_schema'        => array(
+					'type'       => 'object',
+					'required'   => array( 'urls' ),
+					'properties' => array(
+						'urls' => array(
+							'type'        => 'array',
+							'description' => __( 'Array of full URLs to submit', 'data-machine-business' ),
+							'items'       => array( 'type' => 'string' ),
+						),
+					),
+				),
+				'output_schema'       => array(
+					'type'       => 'object',
+					'properties' => array(
+						'success'     => array( 'type' => 'boolean' ),
+						'message'     => array( 'type' => 'string' ),
+						'url_count'   => array( 'type' => 'integer' ),
+						'status_code' => array( 'type' => 'integer' ),
+						'error'       => array( 'type' => 'string' ),
+					),
+				),
 				'execute_callback'    => array( $this, 'execute_submit' ),
 				'permission_callback' => fn() => PermissionHelper::can_manage(),
 				'meta'                => array( 'show_in_rest' => true ),
@@ -231,8 +278,21 @@ class IndexNowAbilities {
 				'label'               => __( 'IndexNow Status', 'data-machine-business' ),
 				'description'         => __( 'Get IndexNow integration status including enabled state and API key.', 'data-machine-business' ),
 				'category'            => 'datamachine-seo',
-				'input_schema'        => array( 'type' => 'object', 'properties' => array() ),
-				'output_schema'       => array( 'type' => 'object', 'properties' => array( 'success' => array( 'type' => 'boolean' ), 'enabled' => array( 'type' => 'boolean' ), 'has_key' => array( 'type' => 'boolean' ), 'key_preview' => array( 'type' => 'string' ), 'key_file_url' => array( 'type' => 'string' ), 'endpoint' => array( 'type' => 'string' ) ) ),
+				'input_schema'        => array(
+					'type'       => 'object',
+					'properties' => array(),
+				),
+				'output_schema'       => array(
+					'type'       => 'object',
+					'properties' => array(
+						'success'      => array( 'type' => 'boolean' ),
+						'enabled'      => array( 'type' => 'boolean' ),
+						'has_key'      => array( 'type' => 'boolean' ),
+						'key_preview'  => array( 'type' => 'string' ),
+						'key_file_url' => array( 'type' => 'string' ),
+						'endpoint'     => array( 'type' => 'string' ),
+					),
+				),
 				'execute_callback'    => array( $this, 'execute_status' ),
 				'permission_callback' => fn() => PermissionHelper::can_manage(),
 				'meta'                => array( 'show_in_rest' => true ),
@@ -247,8 +307,19 @@ class IndexNowAbilities {
 				'label'               => __( 'IndexNow Generate Key', 'data-machine-business' ),
 				'description'         => __( 'Generate a new IndexNow API key and save it to settings.', 'data-machine-business' ),
 				'category'            => 'datamachine-seo',
-				'input_schema'        => array( 'type' => 'object', 'properties' => array() ),
-				'output_schema'       => array( 'type' => 'object', 'properties' => array( 'success' => array( 'type' => 'boolean' ), 'key_preview' => array( 'type' => 'string' ), 'key_file_url' => array( 'type' => 'string' ), 'message' => array( 'type' => 'string' ) ) ),
+				'input_schema'        => array(
+					'type'       => 'object',
+					'properties' => array(),
+				),
+				'output_schema'       => array(
+					'type'       => 'object',
+					'properties' => array(
+						'success'      => array( 'type' => 'boolean' ),
+						'key_preview'  => array( 'type' => 'string' ),
+						'key_file_url' => array( 'type' => 'string' ),
+						'message'      => array( 'type' => 'string' ),
+					),
+				),
 				'execute_callback'    => array( $this, 'execute_generate_key' ),
 				'permission_callback' => fn() => PermissionHelper::can_manage(),
 				'meta'                => array( 'show_in_rest' => true ),
@@ -263,8 +334,19 @@ class IndexNowAbilities {
 				'label'               => __( 'IndexNow Verify Key', 'data-machine-business' ),
 				'description'         => __( 'Verify that the IndexNow key file is accessible and correct.', 'data-machine-business' ),
 				'category'            => 'datamachine-seo',
-				'input_schema'        => array( 'type' => 'object', 'properties' => array() ),
-				'output_schema'       => array( 'type' => 'object', 'properties' => array( 'success' => array( 'type' => 'boolean' ), 'url' => array( 'type' => 'string' ), 'message' => array( 'type' => 'string' ), 'error' => array( 'type' => 'string' ) ) ),
+				'input_schema'        => array(
+					'type'       => 'object',
+					'properties' => array(),
+				),
+				'output_schema'       => array(
+					'type'       => 'object',
+					'properties' => array(
+						'success' => array( 'type' => 'boolean' ),
+						'url'     => array( 'type' => 'string' ),
+						'message' => array( 'type' => 'string' ),
+						'error'   => array( 'type' => 'string' ),
+					),
+				),
 				'execute_callback'    => array( $this, 'execute_verify_key' ),
 				'permission_callback' => fn() => PermissionHelper::can_manage(),
 				'meta'                => array( 'show_in_rest' => true ),
@@ -275,25 +357,39 @@ class IndexNowAbilities {
 	public function execute_submit( array $input ): array {
 		$urls = $input['urls'] ?? array();
 		if ( empty( $urls ) || ! is_array( $urls ) ) {
-			return array( 'success' => false, 'error' => 'urls parameter is required and must be a non-empty array' );
+			return array(
+				'success' => false,
+				'error'   => 'urls parameter is required and must be a non-empty array',
+			);
 		}
 
 		$urls = array_filter( array_map( 'esc_url_raw', $urls ) );
-		return empty( $urls ) ? array( 'success' => false, 'error' => 'No valid URLs after sanitization' ) : self::submit_urls( $urls );
+		return empty( $urls ) ? array(
+			'success' => false,
+			'error'   => 'No valid URLs after sanitization',
+		) : self::submit_urls( $urls );
 	}
 
 	public function execute_status( array $input ): array {
+		unset( $input );
 		$status            = self::get_status();
 		$status['success'] = true;
 		return $status;
 	}
 
 	public function execute_generate_key( array $input ): array {
+		unset( $input );
 		$key = self::generate_key();
-		return array( 'success' => true, 'key_preview' => substr( $key, 0, 8 ) . '...', 'key_file_url' => home_url( '/' . $key . '.txt' ), 'message' => 'New IndexNow API key generated' );
+		return array(
+			'success'      => true,
+			'key_preview'  => substr( $key, 0, 8 ) . '...',
+			'key_file_url' => home_url( '/' . $key . '.txt' ),
+			'message'      => 'New IndexNow API key generated',
+		);
 	}
 
 	public function execute_verify_key( array $input ): array {
+		unset( $input );
 		return self::verify_key_file();
 	}
 }

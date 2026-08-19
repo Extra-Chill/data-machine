@@ -48,7 +48,14 @@ class IndexNowCommand extends BaseCommand {
 			}
 			$urls[] = $url;
 		} elseif ( $post_type ) {
-			$posts = get_posts( array( 'post_type' => $post_type, 'post_status' => 'publish', 'posts_per_page' => min( $limit, IndexNowAbilities::MAX_BATCH_SIZE ), 'fields' => 'ids' ) );
+			$posts = get_posts(
+				array(
+					'post_type'      => $post_type,
+					'post_status'    => 'publish',
+					'posts_per_page' => min( $limit, IndexNowAbilities::MAX_BATCH_SIZE ),
+					'fields'         => 'ids',
+				)
+			);
 			if ( empty( $posts ) ) {
 				WP_CLI::error( "No published posts found for post type '{$post_type}'" );
 			}

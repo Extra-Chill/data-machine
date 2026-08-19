@@ -146,8 +146,6 @@ class GoogleAnalytics extends BaseTool {
 	/**
 	 * Save configuration from settings page.
 	 *
-	 * @param string $tool_id     Tool identifier.
-	 * @param array  $config_data Configuration data.
 	 */
 	protected function get_config_option_name(): string {
 		return GoogleAnalyticsAbilities::CONFIG_OPTION;

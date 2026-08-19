@@ -121,13 +121,12 @@ class MediaHygieneAbility {
 				return self::delete_orphans( $limit, $apply );
 			case 'delete-unused':
 				return self::delete_unused( $limit, $apply );
+			default:
+				return array(
+					'success' => false,
+					'error'   => 'Unhandled action.',
+				);
 		}
-
-		// Unreachable — guarded by VALID_ACTIONS check above.
-		return array(
-			'success' => false,
-			'error'   => 'Unhandled action.',
-		);
 	}
 
 	/**
@@ -356,7 +355,7 @@ class MediaHygieneAbility {
 			return array();
 		}
 
-		$attached = array_flip( array_map( 'strval', MediaHygieneScanner::attached_file_index() ) );
+		$attached = array_fill_keys( array_map( 'strval', MediaHygieneScanner::attached_file_index() ), true );
 		$variants = MediaHygieneScanner::appended_variant_index(
 			$attached + MediaHygieneScanner::variant_index()
 		);

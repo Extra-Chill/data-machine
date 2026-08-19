@@ -46,7 +46,7 @@ class GoogleSearchConsoleBusinessTest extends \PHPUnit\Framework\TestCase {
 
 		$this->assertStringContainsString(
 			'datamachine analytics gsc',
-			$this->read_file( 'data-machine-business.php' )
+			$this->read_file( 'inc/Cli/CommandRegistry.php' )
 		);
 	}
 
