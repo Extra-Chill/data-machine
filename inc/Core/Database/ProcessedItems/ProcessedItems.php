@@ -640,6 +640,39 @@ class ProcessedItems extends BaseRepository {
 		return is_string( $owned ) && hash_equals( $token, $owned );
 	}
 
+	/** Classify exact terminal ownership without treating lease expiry as resolution. */
+	public function terminal_claim_state( array $claim, int $job_id ): string {
+		$identity_scope  = (string) ( $claim['identity_scope'] ?? '' );
+		$source_type     = (string) ( $claim['source_type'] ?? '' );
+		$item_identifier = (string) ( $claim['item_identifier'] ?? '' );
+		$token           = (string) ( $claim['ownership_token'] ?? '' );
+		if ( $job_id <= 0 || '' === $identity_scope || '' === $source_type || '' === $item_identifier || '' === $token ) {
+			return 'conflict';
+		}
+
+		$query = $this->wpdb->prepare(
+			'SELECT job_id, status, claim_token FROM %i WHERE flow_step_id = %s AND source_type = %s AND item_identifier = %s LIMIT 1',
+			$this->table_name,
+			$identity_scope,
+			$source_type,
+			$item_identifier
+		);
+		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared -- Query is fully prepared above with an escaped identifier and typed values.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- Exact terminal ownership evidence.
+		$row = $this->wpdb->get_row( $query, ARRAY_A );
+		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
+		if ( ! is_array( $row ) || self::STATUS_PROCESSED === (string) ( $row['status'] ?? '' ) ) {
+			return 'resolved';
+		}
+		if ( self::STATUS_CLAIMED === (string) ( $row['status'] ?? '' )
+			&& $job_id === (int) ( $row['job_id'] ?? 0 )
+			&& hash_equals( $token, (string) ( $row['claim_token'] ?? '' ) ) ) {
+			return 'owned';
+		}
+
+		return 'conflict';
+	}
+
 	/** Return active token-owned claim descriptors for one job. */
 	public function active_claims_for_job( int $job_id ): array {
 		if ( $job_id <= 0 ) {

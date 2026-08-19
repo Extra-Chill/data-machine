@@ -429,8 +429,12 @@ class PipelineBatchScheduler {
 	private function reconcileTerminalClaims( int $child_job_id, string $status, array $claims ): bool {
 		$processed = new ProcessedItems();
 		foreach ( $claims as $claim ) {
-			if ( ! $processed->owns_active_claim( $claim, $child_job_id ) ) {
+			$claim_state = $processed->terminal_claim_state( $claim, $child_job_id );
+			if ( 'resolved' === $claim_state ) {
 				continue;
+			}
+			if ( 'owned' !== $claim_state ) {
+				return false;
 			}
 			$engine = array( ProcessedItems::CLAIM_METADATA_KEY => $claim );
 			$settled = JobStatus::isStatusSuccess( $status )

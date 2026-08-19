@@ -686,14 +686,18 @@ class PipelineBatchSchedulerTest extends WP_UnitTestCase {
 		);
 		$wpdb->update(
 			$wpdb->prefix . 'datamachine_processed_items',
-			array( 'job_id' => $parent_id ),
+			array(
+				'job_id'           => $parent_id,
+				'claim_expires_at' => '2000-01-01 00:00:00',
+			),
 			array( 'claim_token' => $claim['ownership_token'] ),
-			array( '%d' ),
+			array( '%d', '%s' ),
 			array( '%s' )
 		);
 
 		$replayed = $scheduler->createChildJobFromBatch( $packet, array( 'next_flow_step_id' => 'ai-step' ), $parent_id, 0, 'terminal-checksum' );
 		$this->assertSame( $child_id, $replayed );
+		$this->assertSame( $child_id, $scheduler->createChildJobFromBatch( $packet, array( 'next_flow_step_id' => 'ai-step' ), $parent_id, 0, 'terminal-checksum' ) );
 		$this->assertFalse( ( new ProcessedItems() )->has_active_claim( $claim['identity_scope'], $claim['source_type'], $claim['item_identifier'] ) );
 		$this->assertIsArray( $this->claim_for_parent( $parent_id + 1000, 'terminal-replay' ) );
 	}
@@ -734,6 +738,16 @@ class PipelineBatchSchedulerTest extends WP_UnitTestCase {
 	public function test_successful_terminal_child_replay_completes_exact_parent_claim(): void {
 		$parent_id = $this->create_parent_job();
 		$claim     = $this->claim_for_parent( $parent_id, 'terminal-success' );
+		$callback_count = 0;
+		$completion_filter = static function ( array $handlers ) use ( &$callback_count ): array {
+			$handlers['terminal_replay_count'] = static function () use ( &$callback_count ): bool {
+				++$callback_count;
+				return true;
+			};
+			return $handlers;
+		};
+		add_filter( 'datamachine_item_claim_completion_handlers', $completion_filter );
+		$claim['completion'] = array( 'handler' => 'terminal_replay_count' );
 		$packet    = $this->make_data_packet( 'Terminal Success' );
 		$packet['metadata'][ ProcessedItems::CLAIM_METADATA_KEY ] = $claim;
 		$scheduler = new PipelineBatchScheduler();
@@ -750,15 +764,54 @@ class PipelineBatchSchedulerTest extends WP_UnitTestCase {
 		);
 		$wpdb->update(
 			$wpdb->prefix . 'datamachine_processed_items',
-			array( 'job_id' => $parent_id ),
+			array(
+				'job_id'           => $parent_id,
+				'claim_expires_at' => '2000-01-01 00:00:00',
+			),
 			array( 'claim_token' => $claim['ownership_token'] ),
-			array( '%d' ),
+			array( '%d', '%s' ),
 			array( '%s' )
 		);
 
 		$replayed = $scheduler->createChildJobFromBatch( $packet, array( 'next_flow_step_id' => 'ai-step' ), $parent_id, 0, 'terminal-success-checksum' );
 		$this->assertSame( $child_id, $replayed );
+		$this->assertSame( $child_id, $scheduler->createChildJobFromBatch( $packet, array( 'next_flow_step_id' => 'ai-step' ), $parent_id, 0, 'terminal-success-checksum' ) );
 		$this->assertTrue( ( new ProcessedItems() )->has_item_been_processed( $claim['identity_scope'], $claim['source_type'], $claim['item_identifier'] ) );
+		$this->assertSame( 1, $callback_count );
+		remove_filter( 'datamachine_item_claim_completion_handlers', $completion_filter );
+	}
+
+	public function test_expired_terminal_replay_rejects_competing_replacement_token(): void {
+		$parent_id = $this->create_parent_job();
+		$claim     = $this->claim_for_parent( $parent_id, 'terminal-replacement' );
+		$packet    = $this->make_data_packet( 'Terminal Replacement' );
+		$packet['metadata'][ ProcessedItems::CLAIM_METADATA_KEY ] = $claim;
+		$scheduler = new PipelineBatchScheduler();
+		$child_id = $scheduler->createChildJobFromBatch( $packet, array( 'next_flow_step_id' => 'ai-step' ), $parent_id, 0, 'terminal-replacement-checksum' );
+		$this->assertIsInt( $child_id );
+
+		global $wpdb;
+		$wpdb->update(
+			$wpdb->prefix . 'datamachine_jobs',
+			array( 'status' => JobStatus::COMPLETED ),
+			array( 'job_id' => $child_id ),
+			array( '%s' ),
+			array( '%d' )
+		);
+		$wpdb->update(
+			$wpdb->prefix . 'datamachine_processed_items',
+			array(
+				'job_id'           => $parent_id,
+				'claim_expires_at' => '2000-01-01 00:00:00',
+			),
+			array( 'claim_token' => $claim['ownership_token'] ),
+			array( '%d', '%s' ),
+			array( '%s' )
+		);
+		$replacement = $this->claim_for_parent( $parent_id + 1000, 'terminal-replacement' );
+
+		$this->assertFalse( $scheduler->createChildJobFromBatch( $packet, array( 'next_flow_step_id' => 'ai-step' ), $parent_id, 0, 'terminal-replacement-checksum' ) );
+		$this->assertTrue( ( new ProcessedItems() )->owns_active_claim( $replacement, $parent_id + 1000 ) );
 	}
 
 	public function test_process_chunk_respects_cancellation(): void {
