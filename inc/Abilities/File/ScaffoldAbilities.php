@@ -303,6 +303,7 @@ class ScaffoldAbilities {
 			MemoryFileRegistry::LAYER_SHARED,
 			MemoryFileRegistry::LAYER_AGENT,
 			MemoryFileRegistry::LAYER_USER,
+			MemoryFileRegistry::LAYER_PRINCIPAL,
 			MemoryFileRegistry::LAYER_NETWORK,
 		);
 
@@ -391,6 +392,14 @@ class ScaffoldAbilities {
 					return null;
 				}
 				return $dm->get_user_directory( $user_id );
+
+			case MemoryFileRegistry::LAYER_PRINCIPAL:
+				$user_id  = (int) ( $context['user_id'] ?? 0 );
+				$agent_id = (int) ( $context['agent_id'] ?? 0 );
+				if ( $user_id <= 0 || $agent_id <= 0 ) {
+					return null;
+				}
+				return $dm->get_principal_directory( $user_id, $agent_id );
 
 			case MemoryFileRegistry::LAYER_AGENT:
 				if ( ! empty( $context['agent_slug'] ) || (int) ( $context['agent_id'] ?? 0 ) > 0 ) {

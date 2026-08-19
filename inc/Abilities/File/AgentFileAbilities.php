@@ -321,6 +321,7 @@ class AgentFileAbilities {
 		$layer_order = array(
 			MemoryFileRegistry::LAYER_SHARED,
 			MemoryFileRegistry::LAYER_AGENT,
+			MemoryFileRegistry::LAYER_PRINCIPAL,
 			MemoryFileRegistry::LAYER_USER,
 		);
 
@@ -640,7 +641,7 @@ class AgentFileAbilities {
 		}
 
 		// Fallback: check remaining layers (agent → user → shared) without dupes.
-		foreach ( array( MemoryFileRegistry::LAYER_AGENT, MemoryFileRegistry::LAYER_USER, MemoryFileRegistry::LAYER_SHARED ) as $layer ) {
+		foreach ( array( MemoryFileRegistry::LAYER_AGENT, MemoryFileRegistry::LAYER_PRINCIPAL, MemoryFileRegistry::LAYER_USER, MemoryFileRegistry::LAYER_SHARED ) as $layer ) {
 			if ( ! in_array( $layer, $layer_order, true ) ) {
 				$layer_order[] = $layer;
 			}

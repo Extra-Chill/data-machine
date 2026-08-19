@@ -66,6 +66,9 @@ class MemoryFilesReader {
 			MemoryFileRegistry::LAYER_USER    => $directory_manager->get_user_directory( $user_id ),
 			MemoryFileRegistry::LAYER_NETWORK => $directory_manager->get_network_directory(),
 		);
+		if ( $user_id > 0 && $agent_id > 0 ) {
+			$layer_dirs[ MemoryFileRegistry::LAYER_PRINCIPAL ] = $directory_manager->get_principal_directory( $user_id, $agent_id );
+		}
 
 		$outputs = array();
 
@@ -74,7 +77,10 @@ class MemoryFilesReader {
 
 			// Resolve directory from registry layer, fall back to agent dir.
 			$layer = MemoryFileRegistry::get_layer( $safe_filename );
-			$dir   = $layer_dirs[ $layer ?? MemoryFileRegistry::LAYER_AGENT ];
+			$dir   = $layer_dirs[ $layer ?? MemoryFileRegistry::LAYER_AGENT ] ?? null;
+			if ( null === $dir ) {
+				continue;
+			}
 
 			// Convention-path files (e.g. AGENTS.md) live at ABSPATH, not the layer directory.
 			$filepath = MemoryFileRegistry::resolve_filepath( $safe_filename, $dir )

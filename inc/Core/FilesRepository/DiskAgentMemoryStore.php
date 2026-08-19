@@ -284,6 +284,8 @@ class DiskAgentMemoryStore implements WP_Agent_Memory_Store {
 				return $this->directory_manager->get_shared_directory();
 			case MemoryFileRegistry::LAYER_USER:
 				return $this->directory_manager->get_user_directory( $scope->user_id );
+			case MemoryFileRegistry::LAYER_PRINCIPAL:
+				return $this->directory_manager->get_principal_directory( $scope->user_id, $scope->agent_id );
 			case MemoryFileRegistry::LAYER_NETWORK:
 				return $this->directory_manager->get_network_directory();
 			case MemoryFileRegistry::LAYER_AGENT:

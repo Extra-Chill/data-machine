@@ -64,6 +64,15 @@ class CoreMemoryFilesDirective implements DirectiveInterface {
 					'user_id' => $user_id,
 				)
 			);
+			if ( $agent_id > 0 ) {
+				$scaffold_ability->execute(
+					array(
+						'layer'    => MemoryFileRegistry::LAYER_PRINCIPAL,
+						'user_id'  => $user_id,
+						'agent_id' => $agent_id,
+					)
+				);
+			}
 		}
 
 		$items = array();

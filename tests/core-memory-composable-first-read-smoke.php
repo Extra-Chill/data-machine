@@ -57,9 +57,10 @@ namespace DataMachine\Core\FilesRepository {
 			$content = $GLOBALS['__core_memory_composable_files'][ $this->filename ] ?? null;
 
 			return (object) array(
-				'exists'  => null !== $content,
-				'content' => (string) $content,
-				'bytes'   => strlen( (string) $content ),
+				'exists'     => null !== $content,
+				'content'    => (string) $content,
+				'bytes'      => strlen( (string) $content ),
+				'updated_at' => null,
 			);
 		}
 	}
