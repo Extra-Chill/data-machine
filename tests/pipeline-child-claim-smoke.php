@@ -9,6 +9,30 @@ namespace DataMachine\Core\Database\Jobs {
 	}
 }
 
+namespace DataMachine\Core\Database\ProcessedItems {
+	class ProcessedItems {
+		public const CLAIM_METADATA_KEY = '_datamachine_item_claim';
+		public const CLAIMS_METADATA_KEY = '_datamachine_item_claims';
+		public const DISPOSITION_ID_METADATA_KEY = '_datamachine_packet_disposition_id';
+		public static function disposition_identity( string $scope, string $source, string $item ): string { return hash( 'sha256', $scope . "\0" . $source . "\0" . $item ); }
+		public static function has_claim_metadata( array $container ): bool { return isset( $container[ self::CLAIM_METADATA_KEY ] ) || isset( $container[ self::CLAIMS_METADATA_KEY ] ); }
+		public static function has_valid_claim_metadata( array $container ): bool { return self::has_claim_metadata( $container ); }
+		public static function disposition_claims( array $container ): array {
+			$claims = array();
+			foreach ( array_merge( isset( $container[ self::CLAIM_METADATA_KEY ] ) ? array( $container[ self::CLAIM_METADATA_KEY ] ) : array(), $container[ self::CLAIMS_METADATA_KEY ] ?? array() ) as $claim ) {
+				if ( is_array( $claim ) ) {
+					$id            = $claim['disposition_id'] ?? self::disposition_identity( $claim['identity_scope'], $claim['source_type'], $claim['item_identifier'] );
+					$claims[ $id ] = $claim;
+				}
+			}
+			return $claims;
+		}
+	}
+	class FanoutClaimOwnership {
+		public function adopt_owned_claims( array $claims, int $parent_job_id, int $child_job_id, bool $allow_resolved = false ): bool { unset( $claims, $parent_job_id, $child_job_id, $allow_resolved ); return true; }
+	}
+}
+
 namespace {
 	define( 'ABSPATH', __DIR__ . '/' );
 	$GLOBALS['pipeline_child_engines'] = array();
@@ -17,8 +41,6 @@ namespace {
 	function datamachine_get_engine_data( int $job_id ): array { return $GLOBALS['pipeline_child_engines'][ $job_id ] ?? array(); }
 	function datamachine_set_engine_data( int $job_id, array $engine ): bool { $GLOBALS['pipeline_child_engines'][ $job_id ] = $engine; return true; }
 
-	require_once __DIR__ . '/../inc/Core/Database/BaseRepository.php';
-	require_once __DIR__ . '/../inc/Core/Database/ProcessedItems/ProcessedItems.php';
 	require_once __DIR__ . '/../inc/Core/EngineData.php';
 	require_once __DIR__ . '/../inc/Core/PacketEngineData.php';
 	require_once __DIR__ . '/../inc/Abilities/Engine/PipelineBatchScheduler.php';

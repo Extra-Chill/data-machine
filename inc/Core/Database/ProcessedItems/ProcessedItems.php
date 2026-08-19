@@ -799,7 +799,13 @@ class ProcessedItems extends BaseRepository {
 		if ( '' === $claim_token ) {
 			return false;
 		}
-		$now = current_time( 'mysql', true );
+		$now            = current_time( 'mysql', true );
+		$claim_identity = array(
+			'identity_scope'  => $identity_scope,
+			'source_type'     => $source_type,
+			'item_identifier' => $item_identifier,
+			'claim_token'     => $claim_token,
+		);
 		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Table identifier uses %i; all values use typed placeholders.
 		$ownership_query = $this->wpdb->prepare(
 			'SELECT claim_token FROM %i WHERE flow_step_id = %s AND source_type = %s AND item_identifier = %s AND claim_token = %s AND status = %s FOR UPDATE',
@@ -829,43 +835,47 @@ class ProcessedItems extends BaseRepository {
 		}
 
 		if ( $retain_processed ) {
+			$transition_query = $this->prepare_owned_claim_transition_query( $claim_identity, $job_id, $now );
+		} else {
 			// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Table identifier uses %i; all values use typed placeholders.
 			$transition_query = $this->wpdb->prepare(
-				'UPDATE %i SET status = %s, job_id = %d, processed_timestamp = %s, claim_expires_at = NULL WHERE flow_step_id = %s AND source_type = %s AND item_identifier = %s AND claim_token = %s AND status = %s',
+				'DELETE FROM %i WHERE flow_step_id = %s AND source_type = %s AND item_identifier = %s AND claim_token = %s AND status = %s',
 				$this->table_name,
-				self::STATUS_PROCESSED,
-				$job_id,
-				$now,
 				$identity_scope,
 				$source_type,
 				$item_identifier,
 				$claim_token,
 				self::STATUS_CLAIMED
 			);
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-			// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared -- Dynamic identifier is prepared with %i; every value uses a typed placeholder.
-			$transitioned = $this->wpdb->query( $transition_query );
-			// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
-		} else {
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-			$transitioned = $this->wpdb->delete(
-				$this->table_name,
-				array(
-					'flow_step_id'    => $identity_scope,
-					'source_type'     => $source_type,
-					'item_identifier' => $item_identifier,
-					'claim_token'     => $claim_token,
-					'status'          => self::STATUS_CLAIMED,
-				),
-				array( '%s', '%s', '%s', '%s', '%s' )
-			);
 		}
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared -- Dynamic identifier is prepared with %i; every value uses a typed placeholder.
+		$transitioned = $this->wpdb->query( $transition_query );
+		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
 
 		if ( false === $transitioned || 1 > $transitioned ) {
 			return false;
 		}
 
 		return true;
+	}
+
+	/** Prepare the processed transition for one exact token-owned identity. */
+	private function prepare_owned_claim_transition_query( array $claim, int $job_id, string $now ): string {
+		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Table identifier uses %i; all values use typed placeholders.
+		return $this->wpdb->prepare(
+			'UPDATE %i SET status = %s, job_id = %d, processed_timestamp = %s, claim_expires_at = NULL WHERE flow_step_id = %s AND source_type = %s AND item_identifier = %s AND claim_token = %s AND status = %s',
+			$this->table_name,
+			self::STATUS_PROCESSED,
+			$job_id,
+			$now,
+			$claim['identity_scope'],
+			$claim['source_type'],
+			$claim['item_identifier'],
+			$claim['claim_token'],
+			self::STATUS_CLAIMED
+		);
 	}
 
 	/**

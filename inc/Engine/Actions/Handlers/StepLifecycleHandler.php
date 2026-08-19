@@ -9,6 +9,7 @@
 namespace DataMachine\Engine\Actions\Handlers;
 
 use DataMachine\Core\ActionScheduler\BatchScheduler;
+use DataMachine\Core\Database\ProcessedItems\FanoutClaimOwnership;
 use DataMachine\Core\Database\ProcessedItems\ProcessedItems;
 use DataMachine\Core\Database\TransactionScope;
 use DataMachine\Core\DataPacketStore;
@@ -362,7 +363,15 @@ class StepLifecycleHandler {
 
 	/** Remove claims transferred to fanout packets from parent terminal ownership. */
 	public static function transferClaimsToFanout( int $job_id, array $packets, int $recovery_generation = 0, string $recovery_claim_token = '' ): array {
+		$packets = self::bindOwnedClaimsToPackets( $job_id, $packets );
+		if ( false === $packets ) {
+			return array(
+				'success' => false,
+				'stale'   => false,
+			);
+		}
 		$claims = array();
+		$seen   = array();
 		foreach ( $packets as $packet ) {
 			$metadata = is_array( $packet['metadata'] ?? null ) ? $packet['metadata'] : array();
 			if ( ProcessedItems::has_claim_metadata( $metadata ) && ! ProcessedItems::has_valid_claim_metadata( $metadata ) ) {
@@ -372,12 +381,22 @@ class StepLifecycleHandler {
 				);
 			}
 			$packet_claims = ProcessedItems::disposition_claims( $metadata );
+			foreach ( array_keys( $packet_claims ) as $disposition_id ) {
+				if ( isset( $seen[ $disposition_id ] ) ) {
+					return array(
+						'success' => false,
+						'stale'   => false,
+					);
+				}
+				$seen[ $disposition_id ] = true;
+			}
 			$claims = array_replace( $claims, $packet_claims );
 		}
 		if ( empty( $claims ) ) {
 			return array(
 				'success' => true,
 				'stale'   => false,
+				'packets' => $packets,
 			);
 		}
 		$transfer_id           = bin2hex( random_bytes( 16 ) );
@@ -409,7 +428,75 @@ class StepLifecycleHandler {
 			$recovery_claim_token
 		);
 		$result['transfer_id'] = $transfer_id;
+		$result['packets']     = $packets;
 		return $result;
+	}
+
+	/** Bind descriptor-less legacy claims only through an unambiguous exact packet identity. */
+	private static function bindOwnedClaimsToPackets( int $job_id, array $packets ): array|false {
+		$needs_binding = false;
+		foreach ( $packets as $packet ) {
+			$metadata = is_array( $packet['metadata'] ?? null ) ? $packet['metadata'] : array();
+			if ( ! ProcessedItems::has_claim_metadata( $metadata ) ) {
+				$needs_binding = true;
+				break;
+			}
+		}
+		if ( ! $needs_binding ) {
+			return $packets;
+		}
+
+		$owned = ( new FanoutClaimOwnership() )->active_claims_for_job( $job_id );
+		$owned = array_merge( $owned, array_values( ProcessedItems::disposition_claims( \datamachine_get_engine_data( $job_id ) ) ) );
+		$index = array();
+		foreach ( $owned as $claim ) {
+			$key                                       = (string) $claim['source_type'] . "\0" . (string) $claim['item_identifier'];
+			$index[ $key ][ $claim['disposition_id'] ] = $claim;
+		}
+
+		foreach ( $packets as &$packet ) {
+			$metadata = is_array( $packet['metadata'] ?? null ) ? $packet['metadata'] : array();
+			if ( ProcessedItems::has_claim_metadata( $metadata ) ) {
+				continue;
+			}
+
+			$source_types = array_filter(
+				array(
+					trim( (string) ( $metadata['source_type'] ?? '' ) ),
+					trim( (string) ( $metadata['_engine_data']['source_type'] ?? '' ) ),
+				),
+				static fn( string $source_type ): bool => '' !== $source_type
+			);
+			$source_types = array_values( array_unique( $source_types ) );
+			$identifiers  = array_filter(
+				array(
+					trim( (string) ( $metadata['item_identifier'] ?? '' ) ),
+					trim( (string) ( $metadata['source_item_id'] ?? '' ) ),
+					trim( (string) ( $metadata['_engine_data']['item_identifier'] ?? '' ) ),
+				),
+				static fn( string $identifier ): bool => '' !== $identifier
+			);
+			$identifiers  = array_values( array_unique( $identifiers ) );
+			if ( count( $source_types ) > 1 || count( $identifiers ) > 1 ) {
+				return false;
+			}
+			if ( 1 !== count( $source_types ) || 1 !== count( $identifiers ) ) {
+				continue;
+			}
+
+			$matches = array_values( $index[ $source_types[0] . "\0" . $identifiers[0] ] ?? array() );
+			if ( count( $matches ) > 1 ) {
+				return false;
+			}
+			if ( empty( $matches ) ) {
+				continue;
+			}
+			$packet['metadata'][ ProcessedItems::CLAIM_METADATA_KEY ]          = $matches[0];
+			$packet['metadata'][ ProcessedItems::DISPOSITION_ID_METADATA_KEY ] = $matches[0]['disposition_id'];
+		}
+		unset( $packet );
+
+		return $packets;
 	}
 
 	/** Mark a prepared transfer adopted only after BatchItems and batch state are durable. */

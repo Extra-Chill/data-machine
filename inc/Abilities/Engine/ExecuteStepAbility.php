@@ -951,6 +951,10 @@ class ExecuteStepAbility {
 						? $this->staleRecoveryGeneration( $job_id, $recovery_generation, 'lost ownership during fanout claim transfer' )
 						: $this->claimReconciliationFailure( $job_id, $flow_step_id, $step_type );
 				}
+				if ( $should_fanout && is_array( $fanout_transfer['packets'] ?? null ) ) {
+					$routed_packets         = $fanout_transfer['packets'];
+					$parallel_step['items'] = $routed_packets;
+				}
 				if ( ! $this->recoveryGenerationStillOwned( $job_id, $recovery_generation, $recovery_claim_token ) ) {
 					$transfer_id = (string) ( $fanout_transfer['transfer_id'] ?? '' );
 					$restored    = '' === $transfer_id || StepLifecycleHandler::restorePreparedFanoutTransfer( $job_id, $transfer_id, $recovery_generation, $recovery_claim_token );

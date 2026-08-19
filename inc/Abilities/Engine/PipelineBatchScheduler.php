@@ -31,8 +31,10 @@ use DataMachine\Core\EngineData;
 use DataMachine\Core\ActionScheduler\BatchScheduler;
 use DataMachine\Core\ActionScheduler\GroupRegistrar;
 use DataMachine\Core\Database\Jobs\Jobs;
+use DataMachine\Core\Database\ProcessedItems\FanoutClaimOwnership;
 use DataMachine\Core\Database\ProcessedItems\ProcessedItems;
 use DataMachine\Core\JobStatus;
+use DataMachine\Engine\Actions\Handlers\StepLifecycleHandler;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -401,6 +403,15 @@ class PipelineBatchScheduler {
 		if ( empty( $existing_engine['job']['job_id'] ) && ! datamachine_set_engine_data( $child_job_id, $child_engine ) ) {
 			return false;
 		}
+		$existing_terminal = is_array( $creation )
+			&& ! empty( $creation['already_exists'] )
+			&& JobStatus::isStatusFinal( (string) ( $creation['job']['status'] ?? '' ) );
+		if ( ! ( new FanoutClaimOwnership() )->adopt_owned_claims( array_values( $packet_claims ), $parent_job_id, $child_job_id, $existing_terminal ) ) {
+			return false;
+		}
+		if ( $existing_terminal && ! $this->reconcileTerminalClaims( $child_job_id, (string) $creation['job']['status'], $packet_claims ) ) {
+			return false;
+		}
 
 		// Child job stays 'pending' until Action Scheduler actually picks it up.
 		// ExecuteStepAbility transitions to 'processing' at execution time,
@@ -413,6 +424,29 @@ class PipelineBatchScheduler {
 		}
 
 		return $child_job_id;
+	}
+
+	/** Finish exact claims discovered after their deterministic child already terminalized. */
+	private function reconcileTerminalClaims( int $child_job_id, string $status, array $claims ): bool {
+		$ownership = new FanoutClaimOwnership();
+		foreach ( $claims as $claim ) {
+			$claim_state = $ownership->terminal_claim_state( $claim, $child_job_id );
+			if ( 'resolved' === $claim_state ) {
+				continue;
+			}
+			if ( 'owned' !== $claim_state ) {
+				return false;
+			}
+			$engine  = array( ProcessedItems::CLAIM_METADATA_KEY => $claim );
+			$settled = JobStatus::isStatusSuccess( $status )
+				? StepLifecycleHandler::handleCompleted( $child_job_id, $engine )
+				: StepLifecycleHandler::handleFailed( $child_job_id, $engine );
+			if ( ! $settled ) {
+				return false;
+			}
+		}
+
+		return true;
 	}
 
 	private function stripBatchRuntimeState( array $engine_snapshot ): array {
