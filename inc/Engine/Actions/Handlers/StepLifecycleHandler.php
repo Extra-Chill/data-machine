@@ -9,6 +9,7 @@
 namespace DataMachine\Engine\Actions\Handlers;
 
 use DataMachine\Core\ActionScheduler\BatchScheduler;
+use DataMachine\Core\Database\ProcessedItems\FanoutClaimOwnership;
 use DataMachine\Core\Database\ProcessedItems\ProcessedItems;
 use DataMachine\Core\Database\TransactionScope;
 use DataMachine\Core\DataPacketStore;
@@ -445,7 +446,7 @@ class StepLifecycleHandler {
 			return $packets;
 		}
 
-		$owned = ( new ProcessedItems() )->active_claims_for_job( $job_id );
+		$owned = ( new FanoutClaimOwnership() )->active_claims_for_job( $job_id );
 		$owned = array_merge( $owned, array_values( ProcessedItems::disposition_claims( \datamachine_get_engine_data( $job_id ) ) ) );
 		$index = array();
 		foreach ( $owned as $claim ) {

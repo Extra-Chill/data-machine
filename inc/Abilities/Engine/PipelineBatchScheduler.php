@@ -31,6 +31,7 @@ use DataMachine\Core\EngineData;
 use DataMachine\Core\ActionScheduler\BatchScheduler;
 use DataMachine\Core\ActionScheduler\GroupRegistrar;
 use DataMachine\Core\Database\Jobs\Jobs;
+use DataMachine\Core\Database\ProcessedItems\FanoutClaimOwnership;
 use DataMachine\Core\Database\ProcessedItems\ProcessedItems;
 use DataMachine\Core\JobStatus;
 use DataMachine\Engine\Actions\Handlers\StepLifecycleHandler;
@@ -405,7 +406,7 @@ class PipelineBatchScheduler {
 		$existing_terminal = is_array( $creation )
 			&& ! empty( $creation['already_exists'] )
 			&& JobStatus::isStatusFinal( (string) ( $creation['job']['status'] ?? '' ) );
-		if ( ! ( new ProcessedItems() )->adopt_owned_claims( array_values( $packet_claims ), $parent_job_id, $child_job_id, $existing_terminal ) ) {
+		if ( ! ( new FanoutClaimOwnership() )->adopt_owned_claims( array_values( $packet_claims ), $parent_job_id, $child_job_id, $existing_terminal ) ) {
 			return false;
 		}
 		if ( $existing_terminal && ! $this->reconcileTerminalClaims( $child_job_id, (string) $creation['job']['status'], $packet_claims ) ) {
@@ -427,9 +428,9 @@ class PipelineBatchScheduler {
 
 	/** Finish exact claims discovered after their deterministic child already terminalized. */
 	private function reconcileTerminalClaims( int $child_job_id, string $status, array $claims ): bool {
-		$processed = new ProcessedItems();
+		$ownership = new FanoutClaimOwnership();
 		foreach ( $claims as $claim ) {
-			$claim_state = $processed->terminal_claim_state( $claim, $child_job_id );
+			$claim_state = $ownership->terminal_claim_state( $claim, $child_job_id );
 			if ( 'resolved' === $claim_state ) {
 				continue;
 			}

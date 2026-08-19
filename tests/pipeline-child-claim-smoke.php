@@ -27,6 +27,8 @@ namespace DataMachine\Core\Database\ProcessedItems {
 			}
 			return $claims;
 		}
+	}
+	class FanoutClaimOwnership {
 		public function adopt_owned_claims( array $claims, int $parent_job_id, int $child_job_id, bool $allow_resolved = false ): bool { unset( $claims, $parent_job_id, $child_job_id, $allow_resolved ); return true; }
 	}
 }
