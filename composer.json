@@ -5,7 +5,7 @@
 	"license": "GPL-2.0-or-later",
 	"require": {
 		"php": ">=8.2",
-		"wordpress/agents-api": "dev-feat/503-principal-memory-layer#fc5204afc411920631f8941483f0eed71536e155",
+		"wordpress/agents-api": "dev-main",
 		"woocommerce/action-scheduler": "^3.9",
 		"automattic/blocks-engine-php-transformer": "0.1.0"
 	},

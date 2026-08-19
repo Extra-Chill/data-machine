@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "a46f0c7dfd863e9de8fe9978663e045f",
+    "content-hash": "1bb4b776947f4826fe0c862339e8a92b",
     "packages": [
         {
             "name": "automattic/blocks-engine-php-transformer",
@@ -790,16 +790,16 @@
         },
         {
             "name": "wordpress/agents-api",
-            "version": "dev-feat/503-principal-memory-layer",
+            "version": "dev-main",
             "source": {
                 "type": "git",
                 "url": "https://github.com/Automattic/agents-api.git",
-                "reference": "fc5204afc411920631f8941483f0eed71536e155"
+                "reference": "78906489fb430083800e7afdd19bf2641ea452ea"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/Automattic/agents-api/zipball/fc5204afc411920631f8941483f0eed71536e155",
-                "reference": "fc5204afc411920631f8941483f0eed71536e155",
+                "url": "https://api.github.com/repos/Automattic/agents-api/zipball/78906489fb430083800e7afdd19bf2641ea452ea",
+                "reference": "78906489fb430083800e7afdd19bf2641ea452ea",
                 "shasum": ""
             },
             "require": {
@@ -815,6 +815,7 @@
             "suggest": {
                 "woocommerce/action-scheduler": "Required to actually run cron-triggered workflows. The substrate detects Action Scheduler at runtime and no-ops cleanly when absent; install this package (or any plugin that ships it, like WooCommerce) to enable scheduled workflow runs."
             },
+            "default-branch": true,
             "type": "wordpress-plugin",
             "autoload": {
                 "files": [
@@ -963,7 +964,7 @@
                 "issues": "https://github.com/Automattic/agents-api/issues",
                 "source": "https://github.com/Automattic/agents-api"
             },
-            "time": "2026-08-19T16:47:56+00:00"
+            "time": "2026-08-15T00:32:13+00:00"
         }
     ],
     "packages-dev": [
