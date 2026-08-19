@@ -109,7 +109,7 @@ class JobsSummaryAbility {
 		}
 		$filters = array_merge( $filters, $ownership_scope );
 
-		$summary     = empty( $input['compact'] ) ? $this->db_jobs->get_jobs_summary( $filters ) : $this->getCompactSummary( $filters );
+		$summary = empty( $input['compact'] ) ? $this->db_jobs->get_jobs_summary( $filters ) : $this->getCompactSummary( $filters );
 		if ( is_wp_error( $summary ) ) {
 			return $summary;
 		}
@@ -193,6 +193,6 @@ class JobsSummaryAbility {
 		$count       = (int) $query();
 		$query_error = $this->jobQueryFailed();
 
-		return $query_error ?: $count;
+		return $query_error ? $query_error : $count;
 	}
 }
