@@ -2,6 +2,15 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.175.3] - 2026-08-19
+
+### Changed
+- migrate agent auth and memory ability failures
+
+### Fixed
+- clear compact summary release lint
+- compute compact stuck job count
+
 ## [0.175.2] - 2026-08-19
 
 ### Fixed
