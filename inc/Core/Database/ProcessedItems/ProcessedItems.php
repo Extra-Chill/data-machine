@@ -675,7 +675,7 @@ class ProcessedItems extends BaseRepository {
 	}
 
 	/** Atomically move exact token-owned claims from a fanout parent to its child. */
-	public function adopt_owned_claims( array $claims, int $parent_job_id, int $child_job_id ): bool {
+	public function adopt_owned_claims( array $claims, int $parent_job_id, int $child_job_id, bool $allow_resolved = false ): bool {
 		if ( $parent_job_id <= 0 || $child_job_id <= 0 ) {
 			return false;
 		}
@@ -699,18 +699,28 @@ class ProcessedItems extends BaseRepository {
 			}
 
 			$query = $this->wpdb->prepare(
-				'SELECT job_id, claim_token FROM %i WHERE flow_step_id = %s AND source_type = %s AND item_identifier = %s AND status = %s FOR UPDATE',
+				'SELECT job_id, status, claim_token FROM %i WHERE flow_step_id = %s AND source_type = %s AND item_identifier = %s FOR UPDATE',
 				$this->table_name,
 				$identity_scope,
 				$source_type,
-				$item_identifier,
-				self::STATUS_CLAIMED
+				$item_identifier
 			);
 			// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared -- Query is fully prepared above with an escaped identifier and typed values.
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- Transactional exact ownership transfer.
 			$row = $this->wpdb->get_row( $query, ARRAY_A );
 			// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
-			if ( ! is_array( $row ) || ! hash_equals( $token, (string) ( $row['claim_token'] ?? '' ) ) ) {
+			if ( ! is_array( $row ) ) {
+				if ( $allow_resolved ) {
+					continue;
+				}
+				$scope->rollback();
+				return false;
+			}
+			$status = (string) ( $row['status'] ?? '' );
+			if ( self::STATUS_PROCESSED === $status && $allow_resolved ) {
+				continue;
+			}
+			if ( self::STATUS_CLAIMED !== $status || ! hash_equals( $token, (string) ( $row['claim_token'] ?? '' ) ) ) {
 				$scope->rollback();
 				return false;
 			}

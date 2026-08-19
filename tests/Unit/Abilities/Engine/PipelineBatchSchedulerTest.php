@@ -8,12 +8,14 @@
 
 namespace DataMachine\Tests\Unit\Abilities\Engine;
 
+use DataMachine\Abilities\Engine\ExecuteStepAbility;
 use DataMachine\Abilities\Engine\PipelineBatchScheduler;
 use DataMachine\Core\ActionScheduler\BatchScheduler;
 use DataMachine\Core\ActionScheduler\PathlessBatchRecovery;
 use DataMachine\Core\Database\BatchItems\BatchItems;
 use DataMachine\Core\Database\Jobs\Jobs;
 use DataMachine\Core\Database\ProcessedItems\ProcessedItems;
+use DataMachine\Core\EngineData;
 use DataMachine\Core\JobStatus;
 use DataMachine\Core\Steps\Fetch\Tools\FetchItemDispositionTool;
 use DataMachine\Engine\Actions\Handlers\StepLifecycleHandler;
@@ -479,7 +481,17 @@ class PipelineBatchSchedulerTest extends WP_UnitTestCase {
 		$parent_id = $this->create_parent_job();
 		$engine    = $this->make_engine_snapshot( $parent_id );
 		$source_step_id = 'source-step';
-		$engine['flow_config'][ $source_step_id ] = array( 'step_type' => 'event_import' );
+		$engine['flow_config'] = array(
+			$source_step_id => array(
+				'step_type'       => 'event_import',
+				'execution_order' => 0,
+				'pipeline_id'     => $this->test_pipeline_id,
+			),
+			'ai-step'       => array(
+				'step_type'       => 'ai',
+				'execution_order' => 1,
+			),
+		);
 		datamachine_set_engine_data( $parent_id, $engine );
 
 		$packets = array();
@@ -495,19 +507,43 @@ class PipelineBatchSchedulerTest extends WP_UnitTestCase {
 			$packets[] = $packet;
 		}
 
-		$transfer = StepLifecycleHandler::transferClaimsToFanout( $parent_id, $packets );
-		$this->assertTrue( $transfer['success'] );
-		$this->assertCount( 2, $transfer['packets'] );
-		foreach ( $transfer['packets'] as $packet ) {
-			$this->assertArrayHasKey( ProcessedItems::CLAIM_METADATA_KEY, $packet['metadata'] );
-			$this->assertArrayHasKey( ProcessedItems::DISPOSITION_ID_METADATA_KEY, $packet['metadata'] );
+		$route = new \ReflectionMethod( ExecuteStepAbility::class, 'routeAfterExecution' );
+		$result = $route->invoke(
+			new ExecuteStepAbility(),
+			$parent_id,
+			$source_step_id,
+			$this->test_flow_id,
+			$engine['flow_config'][ $source_step_id ],
+			'event_import',
+			'',
+			$packets,
+			array(
+				'job_id' => $parent_id,
+				'engine' => new EngineData( $engine, $parent_id ),
+			),
+			true,
+			null
+		);
+		$this->assertTrue( $result['success'] );
+		$this->assertSame( 'batch_scheduled', $result['outcome'] );
+
+		global $wpdb;
+		$worklist = $wpdb->get_results(
+			$wpdb->prepare( 'SELECT payload FROM %i WHERE batch_job_id = %d ORDER BY item_index', $wpdb->prefix . 'datamachine_batch_items', $parent_id ),
+			ARRAY_A
+		);
+		$this->assertCount( 2, $worklist );
+		foreach ( $worklist as $index => $row ) {
+			$stored = json_decode( $row['payload'], true );
+			$this->assertArrayHasKey( ProcessedItems::CLAIM_METADATA_KEY, $stored['metadata'] );
+			$this->assertArrayHasKey( ProcessedItems::DISPOSITION_ID_METADATA_KEY, $stored['metadata'] );
+			$item_identifier = 'Reject Event' === $stored['data']['title'] ? 'reject-id' : 'defer-id';
+			$this->assertTrue( ( new ProcessedItems() )->owns_active_claim( $claims[ $item_identifier ], $parent_id ), 'Worklist adoption must precede child ownership transfer at index ' . $index );
 		}
 
 		$scheduler = new PipelineBatchScheduler();
-		$scheduler->fanOut( $parent_id, 'ai-step', $transfer['packets'], $engine );
 		$scheduler->processChunk( $parent_id );
 
-		global $wpdb;
 		$children = $wpdb->get_results(
 			$wpdb->prepare( 'SELECT job_id, label FROM %i WHERE parent_job_id = %d', $wpdb->prefix . 'datamachine_jobs', $parent_id ),
 			ARRAY_A
@@ -565,10 +601,164 @@ class PipelineBatchSchedulerTest extends WP_UnitTestCase {
 		$conflicting['metadata']['_engine_data']['item_identifier'] = 'different-id';
 
 		$transfer = StepLifecycleHandler::transferClaimsToFanout( $parent_id, array( $ambiguous, $conflicting ) );
-		$this->assertTrue( $transfer['success'] );
-		$this->assertArrayNotHasKey( ProcessedItems::CLAIM_METADATA_KEY, $transfer['packets'][0]['metadata'] );
-		$this->assertArrayNotHasKey( ProcessedItems::CLAIM_METADATA_KEY, $transfer['packets'][1]['metadata'] );
-		$this->assertArrayNotHasKey( 'transfer_id', $transfer );
+		$this->assertFalse( $transfer['success'] );
+
+		$source_parent = $this->create_parent_job();
+		$this->claim_for_parent( $source_parent, 'source-conflict' );
+		$source_conflict = $this->make_data_packet( 'Source Conflict' );
+		$source_conflict['metadata']['source_item_id'] = 'source-conflict';
+		$source_conflict['metadata']['_engine_data']   = array(
+			'item_identifier' => 'source-conflict',
+			'source_type'     => 'other-source',
+		);
+		$source_transfer = StepLifecycleHandler::transferClaimsToFanout( $source_parent, array( $source_conflict ) );
+		$this->assertFalse( $source_transfer['success'] );
+	}
+
+	public function test_duplicate_exact_packet_identity_fails_before_batch_adoption(): void {
+		$parent_id = $this->create_parent_job();
+		$engine    = $this->make_engine_snapshot( $parent_id );
+		$engine['flow_config'] = array(
+			'source-step' => array(
+				'step_type'       => 'event_import',
+				'execution_order' => 0,
+				'pipeline_id'     => $this->test_pipeline_id,
+			),
+			'ai-step'     => array(
+				'step_type'       => 'ai',
+				'execution_order' => 1,
+			),
+		);
+		datamachine_set_engine_data( $parent_id, $engine );
+		$this->claim_for_parent( $parent_id, 'duplicate-id' );
+		$packet = $this->make_data_packet( 'Duplicate Event' );
+		$packet['metadata']['source_item_id'] = 'duplicate-id';
+		$packet['metadata']['_engine_data']   = array(
+			'item_identifier' => 'duplicate-id',
+			'source_type'     => 'ticketmaster',
+		);
+
+		$route = new \ReflectionMethod( ExecuteStepAbility::class, 'routeAfterExecution' );
+		$result = $route->invoke(
+			new ExecuteStepAbility(),
+			$parent_id,
+			'source-step',
+			$this->test_flow_id,
+			$engine['flow_config']['source-step'],
+			'event_import',
+			'',
+			array( $packet, $packet ),
+			array(
+				'job_id' => $parent_id,
+				'engine' => new EngineData( $engine, $parent_id ),
+			),
+			true,
+			null
+		);
+		$this->assertFalse( $result['success'] );
+		$this->assertSame( 'claim_reconciliation_failed', $result['outcome'] );
+		$this->assertArrayNotHasKey( 'batch_state', datamachine_get_engine_data( $parent_id ) );
+
+		global $wpdb;
+		$this->assertSame(
+			0,
+			(int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i WHERE parent_job_id = %d', $wpdb->prefix . 'datamachine_jobs', $parent_id ) )
+		);
+	}
+
+	public function test_terminal_child_replay_reconciles_exact_parent_ownership(): void {
+		$parent_id = $this->create_parent_job();
+		$claim     = $this->claim_for_parent( $parent_id, 'terminal-replay' );
+		$packet    = $this->make_data_packet( 'Terminal Replay' );
+		$packet['metadata'][ ProcessedItems::CLAIM_METADATA_KEY ] = $claim;
+
+		$scheduler = new PipelineBatchScheduler();
+		$child_id = $scheduler->createChildJobFromBatch( $packet, array( 'next_flow_step_id' => 'ai-step' ), $parent_id, 0, 'terminal-checksum' );
+		$this->assertIsInt( $child_id );
+
+		global $wpdb;
+		$wpdb->update(
+			$wpdb->prefix . 'datamachine_jobs',
+			array( 'status' => JobStatus::FAILED ),
+			array( 'job_id' => $child_id ),
+			array( '%s' ),
+			array( '%d' )
+		);
+		$wpdb->update(
+			$wpdb->prefix . 'datamachine_processed_items',
+			array( 'job_id' => $parent_id ),
+			array( 'claim_token' => $claim['ownership_token'] ),
+			array( '%d' ),
+			array( '%s' )
+		);
+
+		$replayed = $scheduler->createChildJobFromBatch( $packet, array( 'next_flow_step_id' => 'ai-step' ), $parent_id, 0, 'terminal-checksum' );
+		$this->assertSame( $child_id, $replayed );
+		$this->assertFalse( ( new ProcessedItems() )->has_active_claim( $claim['identity_scope'], $claim['source_type'], $claim['item_identifier'] ) );
+		$this->assertIsArray( $this->claim_for_parent( $parent_id + 1000, 'terminal-replay' ) );
+	}
+
+	public function test_adoption_failure_after_child_persistence_retries_same_child(): void {
+		$parent_id = $this->create_parent_job();
+		$claim     = $this->claim_for_parent( $parent_id, 'adoption-retry' );
+		$packet    = $this->make_data_packet( 'Adoption Retry' );
+		$packet['metadata'][ ProcessedItems::CLAIM_METADATA_KEY ] = $claim;
+
+		global $wpdb;
+		$wpdb->update(
+			$wpdb->prefix . 'datamachine_processed_items',
+			array( 'job_id' => $parent_id + 1000 ),
+			array( 'claim_token' => $claim['ownership_token'] ),
+			array( '%d' ),
+			array( '%s' )
+		);
+		$scheduler = new PipelineBatchScheduler();
+		$this->assertFalse( $scheduler->createChildJobFromBatch( $packet, array( 'next_flow_step_id' => 'ai-step' ), $parent_id, 0, 'retry-checksum' ) );
+		$children = $wpdb->get_col( $wpdb->prepare( 'SELECT job_id FROM %i WHERE parent_job_id = %d', $wpdb->prefix . 'datamachine_jobs', $parent_id ) );
+		$this->assertCount( 1, $children );
+		$this->assertSame( 'pending', $this->jobs_db->get_job( (int) $children[0] )['status'] );
+
+		$wpdb->update(
+			$wpdb->prefix . 'datamachine_processed_items',
+			array( 'job_id' => $parent_id ),
+			array( 'claim_token' => $claim['ownership_token'] ),
+			array( '%d' ),
+			array( '%s' )
+		);
+		$retried = $scheduler->createChildJobFromBatch( $packet, array( 'next_flow_step_id' => 'ai-step' ), $parent_id, 0, 'retry-checksum' );
+		$this->assertSame( (int) $children[0], $retried );
+		$this->assertTrue( ( new ProcessedItems() )->owns_active_claim( $claim, (int) $retried ) );
+		$this->assertCount( 1, $wpdb->get_col( $wpdb->prepare( 'SELECT job_id FROM %i WHERE parent_job_id = %d', $wpdb->prefix . 'datamachine_jobs', $parent_id ) ) );
+	}
+
+	public function test_successful_terminal_child_replay_completes_exact_parent_claim(): void {
+		$parent_id = $this->create_parent_job();
+		$claim     = $this->claim_for_parent( $parent_id, 'terminal-success' );
+		$packet    = $this->make_data_packet( 'Terminal Success' );
+		$packet['metadata'][ ProcessedItems::CLAIM_METADATA_KEY ] = $claim;
+		$scheduler = new PipelineBatchScheduler();
+		$child_id = $scheduler->createChildJobFromBatch( $packet, array( 'next_flow_step_id' => 'ai-step' ), $parent_id, 0, 'terminal-success-checksum' );
+		$this->assertIsInt( $child_id );
+
+		global $wpdb;
+		$wpdb->update(
+			$wpdb->prefix . 'datamachine_jobs',
+			array( 'status' => JobStatus::COMPLETED ),
+			array( 'job_id' => $child_id ),
+			array( '%s' ),
+			array( '%d' )
+		);
+		$wpdb->update(
+			$wpdb->prefix . 'datamachine_processed_items',
+			array( 'job_id' => $parent_id ),
+			array( 'claim_token' => $claim['ownership_token'] ),
+			array( '%d' ),
+			array( '%s' )
+		);
+
+		$replayed = $scheduler->createChildJobFromBatch( $packet, array( 'next_flow_step_id' => 'ai-step' ), $parent_id, 0, 'terminal-success-checksum' );
+		$this->assertSame( $child_id, $replayed );
+		$this->assertTrue( ( new ProcessedItems() )->has_item_been_processed( $claim['identity_scope'], $claim['source_type'], $claim['item_identifier'] ) );
 	}
 
 	public function test_process_chunk_respects_cancellation(): void {

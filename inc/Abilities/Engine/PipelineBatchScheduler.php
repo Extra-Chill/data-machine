@@ -33,6 +33,7 @@ use DataMachine\Core\ActionScheduler\GroupRegistrar;
 use DataMachine\Core\Database\Jobs\Jobs;
 use DataMachine\Core\Database\ProcessedItems\ProcessedItems;
 use DataMachine\Core\JobStatus;
+use DataMachine\Engine\Actions\Handlers\StepLifecycleHandler;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -404,7 +405,10 @@ class PipelineBatchScheduler {
 		$existing_terminal = is_array( $creation )
 			&& ! empty( $creation['already_exists'] )
 			&& JobStatus::isStatusFinal( (string) ( $creation['job']['status'] ?? '' ) );
-		if ( ! $existing_terminal && ! ( new ProcessedItems() )->adopt_owned_claims( array_values( $packet_claims ), $parent_job_id, $child_job_id ) ) {
+		if ( ! ( new ProcessedItems() )->adopt_owned_claims( array_values( $packet_claims ), $parent_job_id, $child_job_id, $existing_terminal ) ) {
+			return false;
+		}
+		if ( $existing_terminal && ! $this->reconcileTerminalClaims( $child_job_id, (string) $creation['job']['status'], $packet_claims ) ) {
 			return false;
 		}
 
@@ -419,6 +423,25 @@ class PipelineBatchScheduler {
 		}
 
 		return $child_job_id;
+	}
+
+	/** Finish exact claims discovered after their deterministic child already terminalized. */
+	private function reconcileTerminalClaims( int $child_job_id, string $status, array $claims ): bool {
+		$processed = new ProcessedItems();
+		foreach ( $claims as $claim ) {
+			if ( ! $processed->owns_active_claim( $claim, $child_job_id ) ) {
+				continue;
+			}
+			$engine = array( ProcessedItems::CLAIM_METADATA_KEY => $claim );
+			$settled = JobStatus::isStatusSuccess( $status )
+				? StepLifecycleHandler::handleCompleted( $child_job_id, $engine )
+				: StepLifecycleHandler::handleFailed( $child_job_id, $engine );
+			if ( ! $settled ) {
+				return false;
+			}
+		}
+
+		return true;
 	}
 
 	private function stripBatchRuntimeState( array $engine_snapshot ): array {

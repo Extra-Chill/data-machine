@@ -363,7 +363,14 @@ class StepLifecycleHandler {
 	/** Remove claims transferred to fanout packets from parent terminal ownership. */
 	public static function transferClaimsToFanout( int $job_id, array $packets, int $recovery_generation = 0, string $recovery_claim_token = '' ): array {
 		$packets = self::bindOwnedClaimsToPackets( $job_id, $packets );
+		if ( false === $packets ) {
+			return array(
+				'success' => false,
+				'stale'   => false,
+			);
+		}
 		$claims = array();
+		$seen   = array();
 		foreach ( $packets as $packet ) {
 			$metadata = is_array( $packet['metadata'] ?? null ) ? $packet['metadata'] : array();
 			if ( ProcessedItems::has_claim_metadata( $metadata ) && ! ProcessedItems::has_valid_claim_metadata( $metadata ) ) {
@@ -373,6 +380,15 @@ class StepLifecycleHandler {
 				);
 			}
 			$packet_claims = ProcessedItems::disposition_claims( $metadata );
+			foreach ( array_keys( $packet_claims ) as $disposition_id ) {
+				if ( isset( $seen[ $disposition_id ] ) ) {
+					return array(
+						'success' => false,
+						'stale'   => false,
+					);
+				}
+				$seen[ $disposition_id ] = true;
+			}
 			$claims = array_replace( $claims, $packet_claims );
 		}
 		if ( empty( $claims ) ) {
@@ -416,7 +432,7 @@ class StepLifecycleHandler {
 	}
 
 	/** Bind descriptor-less legacy claims only through an unambiguous exact packet identity. */
-	private static function bindOwnedClaimsToPackets( int $job_id, array $packets ): array {
+	private static function bindOwnedClaimsToPackets( int $job_id, array $packets ): array|false {
 		$needs_binding = false;
 		foreach ( $packets as $packet ) {
 			$metadata = is_array( $packet['metadata'] ?? null ) ? $packet['metadata'] : array();
@@ -443,7 +459,14 @@ class StepLifecycleHandler {
 				continue;
 			}
 
-			$source_type = trim( (string) ( $metadata['source_type'] ?? '' ) );
+			$source_types = array_filter(
+				array(
+					trim( (string) ( $metadata['source_type'] ?? '' ) ),
+					trim( (string) ( $metadata['_engine_data']['source_type'] ?? '' ) ),
+				),
+				static fn( string $source_type ): bool => '' !== $source_type
+			);
+			$source_types = array_values( array_unique( $source_types ) );
 			$identifiers = array_filter(
 				array(
 					trim( (string) ( $metadata['item_identifier'] ?? '' ) ),
@@ -453,12 +476,18 @@ class StepLifecycleHandler {
 				static fn( string $identifier ): bool => '' !== $identifier
 			);
 			$identifiers = array_values( array_unique( $identifiers ) );
-			if ( '' === $source_type || 1 !== count( $identifiers ) ) {
+			if ( count( $source_types ) > 1 || count( $identifiers ) > 1 ) {
+				return false;
+			}
+			if ( 1 !== count( $source_types ) || 1 !== count( $identifiers ) ) {
 				continue;
 			}
 
-			$matches = array_values( $index[ $source_type . "\0" . $identifiers[0] ] ?? array() );
-			if ( 1 !== count( $matches ) ) {
+			$matches = array_values( $index[ $source_types[0] . "\0" . $identifiers[0] ] ?? array() );
+			if ( count( $matches ) > 1 ) {
+				return false;
+			}
+			if ( empty( $matches ) ) {
 				continue;
 			}
 			$packet['metadata'][ ProcessedItems::CLAIM_METADATA_KEY ]          = $matches[0];
