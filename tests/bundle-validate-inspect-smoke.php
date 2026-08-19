@@ -10,6 +10,14 @@
 $failures = array();
 $passes   = 0;
 
+$GLOBALS['datamachine_bundle_validate_smoke_abilities'] = array(
+	'example/registered-report' => new stdClass(),
+);
+
+function wp_get_abilities(): array {
+	return $GLOBALS['datamachine_bundle_validate_smoke_abilities'];
+}
+
 echo "bundle-validate-inspect-smoke\n";
 
 require_once __DIR__ . '/agents-api-smoke-helpers.php';
@@ -225,7 +233,7 @@ $unsupported_package = WP_Agent_Package::from_array(
 			'description'    => '',
 			'default_config' => array(),
 		),
-		'capabilities' => array( 'datamachine/agent-bundle', 'intelligence/wiki-brain' ),
+		'capabilities' => array( 'datamachine/agent-bundle', 'example/registered-report', 'intelligence/wiki-brain' ),
 		'artifacts'    => array(
 			array(
 				'type'     => 'unknown/vendor-artifact',
@@ -239,6 +247,7 @@ $unsupported_package = WP_Agent_Package::from_array(
 );
 $unsupported_report = WP_Agent_Package_Capability_Checker::check( $unsupported_package, AgentBundleCompatibility::host_capabilities() )->to_array();
 agents_api_smoke_assert_equals( false, $unsupported_report['compatible'] ?? true, 'unsupported package is incompatible', $failures, $passes );
+agents_api_smoke_assert_equals( true, in_array( 'example/registered-report', AgentBundleCompatibility::host_capabilities(), true ), 'registered WordPress ability is a host capability', $failures, $passes );
 agents_api_smoke_assert_equals( array( 'intelligence/wiki-brain', 'unknown/runtime' ), $unsupported_report['unsupported_capabilities'] ?? null, 'unsupported capabilities include package and artifact requirements', $failures, $passes );
 agents_api_smoke_assert_equals( array( 'unknown/vendor-artifact' ), $unsupported_report['unknown_artifact_types'] ?? null, 'unknown artifact type is reported', $failures, $passes );
 agents_api_smoke_assert_equals( 'unknown/vendor-artifact:opaque-seed', $unsupported_report['unsupported_artifacts'][0]['artifact_key'] ?? '', 'unsupported artifact carries stable key', $failures, $passes );
