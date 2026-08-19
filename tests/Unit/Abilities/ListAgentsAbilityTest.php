@@ -135,8 +135,9 @@ class ListAgentsAbilityTest extends WP_UnitTestCase {
 		wp_set_current_user( $this->granted_user );
 		$result = AgentAbilities::listAgents( array( 'scope' => 'all' ) );
 
-		$this->assertFalse( $result['success'] );
-		$this->assertStringContainsString( 'admin', strtolower( $result['error'] ) );
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 403, $result->get_error_data()['status'] );
+		$this->assertStringContainsString( 'admin', strtolower( $result->get_error_message() ) );
 	}
 
 	public function test_scope_all_returns_all_agents_for_admin(): void {
@@ -185,7 +186,8 @@ class ListAgentsAbilityTest extends WP_UnitTestCase {
 		wp_set_current_user( $this->granted_user );
 		$result = AgentAbilities::listAgents( array( 'user_id' => $this->owner_user ) );
 
-		$this->assertFalse( $result['success'] );
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 403, $result->get_error_data()['status'] );
 	}
 
 	public function test_non_admin_can_explicitly_query_self(): void {
@@ -283,7 +285,8 @@ class ListAgentsAbilityTest extends WP_UnitTestCase {
 		wp_set_current_user( $this->owner_user );
 		$result = AgentAbilities::listAgents( array( 'scope' => 'garbage' ) );
 
-		$this->assertFalse( $result['success'] );
-		$this->assertStringContainsString( 'scope', strtolower( $result['error'] ) );
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 400, $result->get_error_data()['status'] );
+		$this->assertStringContainsString( 'scope', strtolower( $result->get_error_message() ) );
 	}
 }

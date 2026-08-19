@@ -115,6 +115,12 @@ namespace {
 		define( 'ABSPATH', dirname( __DIR__ ) . '/' );
 	}
 
+	if ( ! function_exists( 'is_wp_error' ) ) {
+		function is_wp_error( $value ): bool {
+			return $value instanceof WP_Error;
+		}
+	}
+
 	function sanitize_text_field( $value ): string { return trim( (string) $value ); }
 	function get_current_user_id(): int { return (int) $GLOBALS['auth_cli_user_id']; }
 	function current_user_can( string $capability ): bool { return (bool) $GLOBALS['auth_cli_site_admin']; }

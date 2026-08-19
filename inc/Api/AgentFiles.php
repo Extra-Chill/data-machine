@@ -418,6 +418,10 @@ class AgentFiles {
 
 		$result = DailyMemoryAbilities::readDaily( $input );
 
+		if ( is_wp_error( $result ) ) {
+			return RestResultSpec::legacy_error( $result, 'daily_file_not_found' );
+		}
+
 		if ( ! $result['success'] ) {
 			return new WP_Error( 'daily_file_not_found', $result['message'], array( 'status' => 404 ) );
 		}
@@ -454,6 +458,10 @@ class AgentFiles {
 
 		$result = DailyMemoryAbilities::writeDaily( $input );
 
+		if ( is_wp_error( $result ) ) {
+			return RestResultSpec::legacy_error( $result, 'daily_file_write_error' );
+		}
+
 		if ( ! $result['success'] ) {
 			$status = false !== strpos( $result['message'] ?? '', 'disabled' ) ? 403 : 500;
 			return new WP_Error( 'daily_file_write_error', $result['message'], array( 'status' => $status ) );
@@ -480,6 +488,10 @@ class AgentFiles {
 
 		$result = DailyMemoryAbilities::deleteDaily( $input );
 
+		if ( is_wp_error( $result ) ) {
+			return RestResultSpec::legacy_error( $result, 'daily_file_delete_error' );
+		}
+
 		if ( ! $result['success'] ) {
 			$status = false !== strpos( $result['message'] ?? '', 'disabled' ) ? 403 : 404;
 			return new WP_Error( 'daily_file_delete_error', $result['message'], array( 'status' => $status ) );
@@ -490,8 +502,6 @@ class AgentFiles {
 			'message' => $result['message'],
 		) );
 	}
-
-
 
 	/**
 	 * Get file context array from flow ID.

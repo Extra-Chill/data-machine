@@ -452,6 +452,10 @@ class Agents {
 
 		$result = AgentAbilities::listAgents( $input );
 
+		if ( is_wp_error( $result ) ) {
+			return RestResultSpec::legacy_error( $result, 'list_agents_failed' );
+		}
+
 		if ( empty( $result['success'] ) ) {
 			return new WP_Error(
 				'list_agents_failed',
@@ -510,6 +514,10 @@ class Agents {
 			)
 		);
 
+		if ( is_wp_error( $result ) ) {
+			return RestResultSpec::legacy_error( $result, 'agent_create_failed' );
+		}
+
 		if ( empty( $result['success'] ) ) {
 			return new WP_Error(
 				'agent_create_failed',
@@ -541,6 +549,10 @@ class Agents {
 		$result = AgentAbilities::getAgent(
 			array( 'agent_id' => $agent_id )
 		);
+
+		if ( is_wp_error( $result ) ) {
+			return RestResultSpec::legacy_error( $result, 'agent_not_found' );
+		}
 
 		if ( empty( $result['success'] ) ) {
 			return new WP_Error(
@@ -584,6 +596,10 @@ class Agents {
 
 		$result = AgentAbilities::updateAgent( $input );
 
+		if ( is_wp_error( $result ) ) {
+			return RestResultSpec::legacy_error( $result, 'agent_update_failed' );
+		}
+
 		if ( empty( $result['success'] ) ) {
 			$status = 400;
 			if ( isset( $result['error'] ) && str_contains( $result['error'], 'not found' ) ) {
@@ -623,6 +639,10 @@ class Agents {
 				'delete_files' => (bool) $request->get_param( 'delete_files' ),
 			)
 		);
+
+		if ( is_wp_error( $result ) ) {
+			return RestResultSpec::legacy_error( $result, 'agent_delete_failed' );
+		}
 
 		if ( empty( $result['success'] ) ) {
 			return new WP_Error(
@@ -837,6 +857,10 @@ class Agents {
 			array( 'agent_id' => $agent_id )
 		);
 
+		if ( is_wp_error( $result ) ) {
+			return RestResultSpec::legacy_error( $result, 'list_tokens_failed' );
+		}
+
 		if ( empty( $result['success'] ) ) {
 			return new WP_Error( 'list_tokens_failed', $result['error'] ?? 'Failed', array( 'status' => 400 ) );
 		}
@@ -866,6 +890,10 @@ class Agents {
 			)
 		);
 
+		if ( is_wp_error( $result ) ) {
+			return RestResultSpec::legacy_error( $result, 'create_token_failed' );
+		}
+
 		if ( empty( $result['success'] ) ) {
 			$status = str_contains( $result['error'] ?? '', 'not found' ) ? 404 : 400;
 			return new WP_Error( 'create_token_failed', $result['error'] ?? 'Failed', array( 'status' => $status ) );
@@ -893,6 +921,10 @@ class Agents {
 				'token_id' => (int) $request->get_param( 'token_id' ),
 			)
 		);
+
+		if ( is_wp_error( $result ) ) {
+			return RestResultSpec::legacy_error( $result, 'revoke_token_failed' );
+		}
 
 		if ( empty( $result['success'] ) ) {
 			$status = str_contains( $result['error'] ?? '', 'not found' ) ? 404 : 400;

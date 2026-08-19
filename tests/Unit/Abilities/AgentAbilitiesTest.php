@@ -50,8 +50,8 @@ class AgentAbilitiesTest extends WP_UnitTestCase {
 			)
 		);
 
-		$this->assertFalse( $result['success'] );
-		$this->assertStringContainsString( 'slug', $result['error'] );
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertStringContainsString( 'slug', $result->get_error_message() );
 	}
 
 	public function test_createAgent_requires_owner(): void {
@@ -61,8 +61,8 @@ class AgentAbilitiesTest extends WP_UnitTestCase {
 			)
 		);
 
-		$this->assertFalse( $result['success'] );
-		$this->assertStringContainsString( 'Owner', $result['error'] );
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertStringContainsString( 'Owner', $result->get_error_message() );
 	}
 
 	public function test_createAgent_rejects_duplicate_slug(): void {
@@ -82,8 +82,8 @@ class AgentAbilitiesTest extends WP_UnitTestCase {
 			)
 		);
 
-		$this->assertFalse( $result['success'] );
-		$this->assertStringContainsString( 'already exists', $result['error'] );
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertStringContainsString( 'already exists', $result->get_error_message() );
 	}
 
 	public function test_createAgent_rejects_invalid_owner(): void {
@@ -94,8 +94,8 @@ class AgentAbilitiesTest extends WP_UnitTestCase {
 			)
 		);
 
-		$this->assertFalse( $result['success'] );
-		$this->assertStringContainsString( 'not found', $result['error'] );
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertStringContainsString( 'not found', $result->get_error_message() );
 	}
 
 	public function test_getAgent_by_slug(): void {
@@ -148,8 +148,8 @@ class AgentAbilitiesTest extends WP_UnitTestCase {
 	public function test_getAgent_not_found(): void {
 		$result = AgentAbilities::getAgent( array( 'agent_slug' => 'nonexistent-bot' ) );
 
-		$this->assertFalse( $result['success'] );
-		$this->assertStringContainsString( 'not found', $result['error'] );
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertStringContainsString( 'not found', $result->get_error_message() );
 	}
 
 	public function test_deleteAgent_success(): void {
@@ -167,14 +167,14 @@ class AgentAbilitiesTest extends WP_UnitTestCase {
 
 		// Verify it's gone.
 		$lookup = AgentAbilities::getAgent( array( 'agent_slug' => 'delete-me-bot' ) );
-		$this->assertFalse( $lookup['success'] );
+		$this->assertInstanceOf( \WP_Error::class, $lookup );
 	}
 
 	public function test_deleteAgent_not_found(): void {
 		$result = AgentAbilities::deleteAgent( array( 'agent_slug' => 'ghost-bot' ) );
 
-		$this->assertFalse( $result['success'] );
-		$this->assertStringContainsString( 'not found', $result['error'] );
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertStringContainsString( 'not found', $result->get_error_message() );
 	}
 
 	public function test_createAgent_bootstraps_owner_access(): void {
@@ -313,8 +313,8 @@ class AgentAbilitiesTest extends WP_UnitTestCase {
 	public function test_updateAgent_requires_agent_identity(): void {
 		$result = AgentAbilities::updateAgent( array( 'agent_name' => 'Orphan' ) );
 
-		$this->assertFalse( $result['success'] );
-		$this->assertStringContainsString( 'Agent identity', $result['error'] );
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertStringContainsString( 'Agent identity', $result->get_error_message() );
 	}
 
 	public function test_exportAgent_accepts_agent_slug_alias(): void {
@@ -344,8 +344,8 @@ class AgentAbilitiesTest extends WP_UnitTestCase {
 			)
 		);
 
-		$this->assertFalse( $result['success'] );
-		$this->assertStringContainsString( 'not found', $result['error'] );
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertStringContainsString( 'not found', $result->get_error_message() );
 	}
 
 	public function test_updateAgent_rejects_empty_name(): void {
@@ -363,8 +363,8 @@ class AgentAbilitiesTest extends WP_UnitTestCase {
 			)
 		);
 
-		$this->assertFalse( $result['success'] );
-		$this->assertStringContainsString( 'empty', $result['error'] );
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertStringContainsString( 'empty', $result->get_error_message() );
 	}
 
 	public function test_updateAgent_rejects_no_fields(): void {
@@ -379,7 +379,7 @@ class AgentAbilitiesTest extends WP_UnitTestCase {
 			array( 'agent_id' => $created['agent_id'] )
 		);
 
-		$this->assertFalse( $result['success'] );
-		$this->assertStringContainsString( 'No fields', $result['error'] );
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertStringContainsString( 'No fields', $result->get_error_message() );
 	}
 }

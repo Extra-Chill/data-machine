@@ -62,6 +62,11 @@ class AICommand extends BaseCommand {
 			)
 		);
 
+		if ( is_wp_error( $result ) ) {
+			WP_CLI::error( $result->get_error_message() );
+			return;
+		}
+
 		if ( empty( $result['success'] ) ) {
 			WP_CLI::error( $result['error'] ?? 'Request inspection failed.' );
 			return;

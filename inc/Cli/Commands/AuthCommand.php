@@ -126,7 +126,7 @@ class AuthCommand extends BaseCommand {
 			// Provider not registered — check if handler exists but doesn't require auth.
 			$result = $this->abilities->executeGetAuthStatus( array( 'handler_slug' => $handler_slug ) );
 
-			if ( ! empty( $result['success'] ) && ( $result['requires_auth'] ?? true ) === false ) {
+			if ( ! is_wp_error( $result ) && ! empty( $result['success'] ) && ( $result['requires_auth'] ?? true ) === false ) {
 				WP_CLI::success( sprintf( '%s does not require authentication.', ucfirst( $handler_slug ) ) );
 				return;
 			}
@@ -232,6 +232,7 @@ class AuthCommand extends BaseCommand {
 		}
 
 		$user_id = isset( $assoc_args['user'] ) ? absint( $assoc_args['user'] ) : 0;
+		$message = '';
 
 		// Per-user revoke path.
 		if ( $user_id > 0 ) {
@@ -252,38 +253,38 @@ class AuthCommand extends BaseCommand {
 				)
 			);
 
-			if ( ! empty( $result['success'] ) ) {
-				$msg = $result['message'] ?? sprintf( '%s credentials revoked for user %d.', ucfirst( $handler_slug ), $user_id );
-				if ( array_key_exists( 'upstream_revoked', $result ) ) {
-					$msg .= $result['upstream_revoked']
-						? ' (upstream revoke succeeded)'
-						: ' (upstream revoke skipped or failed; local delete completed)';
-				}
-				WP_CLI::success( $msg );
+			$message = sprintf( '%s credentials revoked for user %d.', ucfirst( $handler_slug ), $user_id );
+		} else {
+			// Site-wide revoke path (delegates to the existing disconnect ability).
+			$auth_status = $this->abilities->getAuthStatus( $handler_slug );
+			if ( ! $auth_status['authenticated'] ) {
+				WP_CLI::warning( sprintf( '%s is not currently authenticated at site scope.', ucfirst( $handler_slug ) ) );
 				return;
 			}
 
-			WP_CLI::error( $result['error'] ?? 'Failed to revoke per-user credentials.' );
+			if ( ! isset( $assoc_args['yes'] ) ) {
+				WP_CLI::confirm( sprintf( 'Revoke site-wide %s credentials? This will clear stored account data.', ucfirst( $handler_slug ) ) );
+			}
+
+			$result  = $this->abilities->executeDisconnectAuth( array( 'handler_slug' => $handler_slug ) );
+			$message = sprintf( '%s site-wide credentials revoked.', ucfirst( $handler_slug ) );
+		}
+
+		if ( is_wp_error( $result ) ) {
+			WP_CLI::error( $result->get_error_message() );
 			return;
 		}
-
-		// Site-wide revoke path (delegates to the existing disconnect ability).
-		$auth_status = $this->abilities->getAuthStatus( $handler_slug );
-		if ( ! $auth_status['authenticated'] ) {
-			WP_CLI::warning( sprintf( '%s is not currently authenticated at site scope.', ucfirst( $handler_slug ) ) );
-			return;
-		}
-
-		if ( ! isset( $assoc_args['yes'] ) ) {
-			WP_CLI::confirm( sprintf( 'Revoke site-wide %s credentials? This will clear stored account data.', ucfirst( $handler_slug ) ) );
-		}
-
-		$result = $this->abilities->executeDisconnectAuth( array( 'handler_slug' => $handler_slug ) );
 
 		if ( ! empty( $result['success'] ) ) {
-			WP_CLI::success( $result['message'] ?? sprintf( '%s site-wide credentials revoked.', ucfirst( $handler_slug ) ) );
+			$message = $result['message'] ?? $message;
+			if ( $user_id > 0 && array_key_exists( 'upstream_revoked', $result ) ) {
+				$message .= $result['upstream_revoked']
+					? ' (upstream revoke succeeded)'
+					: ' (upstream revoke skipped or failed; local delete completed)';
+			}
+			WP_CLI::success( $message );
 		} else {
-			WP_CLI::error( $result['error'] ?? 'Failed to revoke.' );
+			WP_CLI::error( $result['error'] ?? ( $user_id > 0 ? 'Failed to revoke per-user credentials.' : 'Failed to revoke.' ) );
 		}
 	}
 
@@ -464,6 +465,11 @@ class AuthCommand extends BaseCommand {
 			)
 		);
 
+		if ( is_wp_error( $result ) ) {
+			WP_CLI::error( $result->get_error_message() );
+			return;
+		}
+
 		if ( ! empty( $result['success'] ) ) {
 			WP_CLI::success( $result['message'] ?? sprintf( '%s token set.', ucfirst( $handler_slug ) ) );
 
@@ -518,6 +524,11 @@ class AuthCommand extends BaseCommand {
 			array( 'handler_slug' => $handler_slug )
 		);
 
+		if ( is_wp_error( $result ) ) {
+			WP_CLI::error( $result->get_error_message() );
+			return;
+		}
+
 		if ( ! empty( $result['success'] ) ) {
 			WP_CLI::success( $result['message'] ?? sprintf( '%s token refreshed.', ucfirst( $handler_slug ) ) );
 
@@ -567,7 +578,10 @@ class AuthCommand extends BaseCommand {
 
 			$result = $this->abilities->executeRefreshAuth( array( 'handler_slug' => $key ) );
 
-			if ( ! empty( $result['success'] ) ) {
+			if ( is_wp_error( $result ) ) {
+				WP_CLI::log( sprintf( '  %s: FAILED — %s', $key, $result->get_error_message() ) );
+				++$failed;
+			} elseif ( ! empty( $result['success'] ) ) {
 				$expiry_info = ! empty( $result['expires_at'] ) ? " (expires: {$result['expires_at']})" : '';
 				WP_CLI::log( sprintf( '  %s: refreshed%s', $key, $expiry_info ) );
 				++$refreshed;
@@ -776,11 +790,13 @@ class AuthCommand extends BaseCommand {
 	private function connectOAuth( string $handler_slug, object $provider, ?array $agent_context = null ): void {
 		// Check if configured first.
 		if ( method_exists( $provider, 'is_configured' ) && ! $provider->is_configured() ) {
-			WP_CLI::error( sprintf(
-				'%s OAuth credentials not configured. Run "wp datamachine auth config %s --client_id=... --client_secret=..." first.',
-				ucfirst( $handler_slug ),
-				$handler_slug
-			) );
+			WP_CLI::error(
+				sprintf(
+					'%s OAuth credentials not configured. Run "wp datamachine auth config %s --client_id=... --client_secret=..." first.',
+					ucfirst( $handler_slug ),
+					$handler_slug
+				)
+			);
 			return;
 		}
 
@@ -792,6 +808,11 @@ class AuthCommand extends BaseCommand {
 		$result     = null === $agent_context
 			? $get_status()
 			: PermissionHelper::run_as_agent_context( $agent_context['agent_id'], $agent_context['user_id'], $get_status );
+
+		if ( is_wp_error( $result ) ) {
+			WP_CLI::error( $result->get_error_message() );
+			return;
+		}
 
 		if ( empty( $result['success'] ) ) {
 			WP_CLI::error( $result['error'] ?? 'Failed to get auth status.' );
@@ -852,8 +873,8 @@ class AuthCommand extends BaseCommand {
 			WP_CLI::error( 'Agent-scoped OAuth connect requires a current WordPress CLI user. Use WP-CLI --user=<id>.' );
 		}
 
-		$is_owner       = $current_user_id === (int) $context['user_id'];
-		$is_site_admin  = current_user_can( 'manage_options' );
+		$is_owner        = $current_user_id === (int) $context['user_id'];
+		$is_site_admin   = current_user_can( 'manage_options' );
 		$has_admin_grant = ! $is_owner && ! $is_site_admin && ( new AgentAccess() )->user_can_access( (int) $context['agent_id'], $current_user_id, \WP_Agent_Access_Grant::ROLE_ADMIN );
 		if ( ! $is_owner && ! $has_admin_grant && ! $is_site_admin ) {
 			WP_CLI::error( sprintf( 'Current CLI user is not authorized to bind OAuth for agent "%s".', $context['agent_slug'] ) );
@@ -903,10 +924,12 @@ class AuthCommand extends BaseCommand {
 		}
 
 		if ( ! empty( $missing ) ) {
-			WP_CLI::error( sprintf(
-				'Missing required fields: %s',
-				implode( ', ', $missing )
-			) );
+			WP_CLI::error(
+				sprintf(
+					'Missing required fields: %s',
+					implode( ', ', $missing )
+				)
+			);
 			return;
 		}
 
@@ -917,6 +940,11 @@ class AuthCommand extends BaseCommand {
 				'config'       => $config_data,
 			)
 		);
+
+		if ( is_wp_error( $result ) ) {
+			WP_CLI::error( $result->get_error_message() );
+			return;
+		}
 
 		if ( ! empty( $result['success'] ) ) {
 			WP_CLI::success( $result['message'] ?? sprintf( '%s credentials saved.', ucfirst( $handler_slug ) ) );
@@ -967,11 +995,13 @@ class AuthCommand extends BaseCommand {
 
 		WP_CLI::log( '' );
 		$cli_key_example = str_replace( '_', '-', array_key_first( $config_fields ) );
-		WP_CLI::log( sprintf(
-			'To update: wp datamachine auth config %s --%s=<value>',
-			$handler_slug,
-			$cli_key_example
-		) );
+		WP_CLI::log(
+			sprintf(
+				'To update: wp datamachine auth config %s --%s=<value>',
+				$handler_slug,
+				$cli_key_example
+			)
+		);
 	}
 
 	/**
@@ -994,6 +1024,11 @@ class AuthCommand extends BaseCommand {
 				'config'       => $config,
 			)
 		);
+
+		if ( is_wp_error( $result ) ) {
+			WP_CLI::error( $result->get_error_message() );
+			return;
+		}
 
 		if ( ! empty( $result['success'] ) ) {
 			WP_CLI::success( $result['message'] ?? sprintf( '%s configuration saved.', ucfirst( $handler_slug ) ) );

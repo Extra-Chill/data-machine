@@ -167,7 +167,7 @@ class Auth {
 			array( 'handler_slug' => $handler_slug )
 		);
 
-		if ( ! $result['success'] ) {
+		if ( is_wp_error( $result ) || empty( $result['success'] ) ) {
 			return self::ability_to_response( $result, 'get_auth_status_error' );
 		}
 
@@ -268,11 +268,17 @@ class Auth {
 	 * Success results are returned as 200 with the ability's data.
 	 * Failure results are returned as WP_Error with an inferred HTTP status.
 	 *
-	 * @param array  $result     Ability result array.
+	 * @param array|\WP_Error $result     Ability result.
 	 * @param string $error_code WP_Error code for failures.
 	 * @return \WP_REST_Response|\WP_Error
 	 */
-	private static function ability_to_response( array $result, string $error_code ) {
+	private static function ability_to_response( array|\WP_Error $result, string $error_code ) {
+		if ( is_wp_error( $result ) ) {
+			$data                       = is_array( $result->get_error_data() ) ? $result->get_error_data() : array();
+			$data['ability_error_code'] = $result->get_error_code();
+			return new \WP_Error( $error_code, $result->get_error_message(), $data );
+		}
+
 		if ( ! empty( $result['success'] ) ) {
 			return rest_ensure_response( $result );
 		}

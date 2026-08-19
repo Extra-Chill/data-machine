@@ -77,7 +77,7 @@ class AgentMemory extends BaseTool {
 		$result = $ability->execute( $input );
 
 		if ( is_wp_error( $result ) ) {
-			return $this->buildErrorResponse( $result->get_error_message(), 'agent_memory' );
+			return $this->memoryErrorResponse( $result );
 		}
 
 		if ( ! $this->isAbilitySuccess( $result ) ) {
@@ -145,7 +145,7 @@ class AgentMemory extends BaseTool {
 		$result = $ability->execute( $input );
 
 		if ( is_wp_error( $result ) ) {
-			return $this->buildErrorResponse( $result->get_error_message(), 'agent_memory' );
+			return $this->memoryErrorResponse( $result );
 		}
 
 		if ( ! $this->isAbilitySuccess( $result ) ) {
@@ -191,7 +191,7 @@ class AgentMemory extends BaseTool {
 		$result = $ability->execute( $input );
 
 		if ( is_wp_error( $result ) ) {
-			return $this->buildErrorResponse( $result->get_error_message(), 'agent_memory' );
+			return $this->memoryErrorResponse( $result );
 		}
 
 		if ( ! $this->isAbilitySuccess( $result ) ) {
@@ -288,6 +288,14 @@ class AgentMemory extends BaseTool {
 			'user_id'  => $user_id,
 			'agent_id' => $agent_id,
 		);
+	}
+
+	/** Preserve structured ability diagnostics in the curated tool failure envelope. */
+	private function memoryErrorResponse( \WP_Error $error ): array {
+		$response               = $this->buildErrorResponse( $error->get_error_message(), 'agent_memory' );
+		$response['error_code'] = $error->get_error_code();
+		$response['error_data'] = $error->get_error_data();
+		return $response;
 	}
 
 	/**

@@ -33,10 +33,12 @@ namespace {
 	class WP_Error {
 		private string $code;
 		private string $message;
+		private mixed $data;
 
-		public function __construct( string $code, string $message ) {
+		public function __construct( string $code, string $message, mixed $data = null ) {
 			$this->code    = $code;
 			$this->message = $message;
+			$this->data    = $data;
 		}
 
 		public function get_error_code(): string {
@@ -45,6 +47,10 @@ namespace {
 
 		public function get_error_message(): string {
 			return $this->message;
+		}
+
+		public function get_error_data(): mixed {
+			return $this->data;
 		}
 	}
 
@@ -74,6 +80,12 @@ namespace {
 			$title = strtolower( trim( $title ) );
 			$title = preg_replace( '/[^a-z0-9]+/', '-', $title ) ?? '';
 			return trim( $title, '-' );
+		}
+	}
+
+	if ( ! function_exists( 'sanitize_key' ) ) {
+		function sanitize_key( string $key ): string {
+			return strtolower( preg_replace( '/[^a-z0-9_\-]/', '', $key ) ?? '' );
 		}
 	}
 
@@ -128,6 +140,7 @@ namespace {
 			public static int $from_directory_calls = 0;
 			public static int $from_zip_calls = 0;
 			public static int $from_json_calls = 0;
+			public static ?array $next_result = null;
 
 			public function from_directory( string $source ): ?array {
 				++self::$from_directory_calls;
@@ -147,6 +160,11 @@ namespace {
 
 			public function import( array $bundle, ?string $new_slug = null, int $owner_id = 0, bool $dry_run = false, array $options = array() ): array {
 				self::$last_import = compact( 'bundle', 'new_slug', 'owner_id', 'dry_run', 'options' );
+				if ( null !== self::$next_result ) {
+					$result            = self::$next_result;
+					self::$next_result = null;
+					return $result;
+				}
 
 				return array(
 					'success' => true,
@@ -277,6 +295,7 @@ namespace {
 		AgentBundler::$from_directory_calls          = 0;
 		AgentBundler::$from_zip_calls                = 0;
 		AgentBundler::$from_json_calls               = 0;
+		AgentBundler::$next_result                   = null;
 		// @phpstan-ignore-next-line smoke-test stub property shadows production class.
 		Agents::$by_slug                             = array();
 		WP_Ability::$last_execute                    = array();
@@ -303,7 +322,7 @@ namespace {
 			'on_conflict' => 'error',
 		)
 	);
-	$assert( 'conflict error fails', false === $result['success'] );
+	$assert( 'conflict error returns WP_Error', is_wp_error( $result ) && 'agent_slug_conflict' === $result->get_error_code() );
 	// @phpstan-ignore-next-line smoke-test stub property shadows production class.
 	$assert( 'conflict error happens before import writes', array() === AgentBundler::$last_import );
 
@@ -324,8 +343,8 @@ namespace {
 			'on_conflict' => 'overwrite',
 		)
 	);
-	$assert( 'unsupported overwrite policy is rejected', false === $result['success'] );
-	$assert( 'overwrite policy is not claimed', str_contains( $result['error'], 'error, skip, upgrade' ) );
+	$assert( 'unsupported overwrite policy is rejected', is_wp_error( $result ) );
+	$assert( 'overwrite policy is not claimed', str_contains( $result->get_error_message(), 'error, skip, upgrade' ) );
 
 	$result = AgentAbilities::importAgent(
 		array(
@@ -364,11 +383,12 @@ namespace {
 	$reset();
 	$missing_source = sys_get_temp_dir() . '/datamachine-missing-runtime-bundle-' . uniqid() . '.json';
 	$result         = AgentAbilities::importAgent( array( 'source' => $missing_source ) );
-	$assert( 'missing source import fails', false === $result['success'] );
-	$assert( 'missing source diagnostic reports attempted source', $missing_source === ( $result['diagnostics']['source'] ?? '' ) );
-	$assert( 'missing source diagnostic reports cwd', isset( $result['diagnostics']['cwd'] ) && is_string( $result['diagnostics']['cwd'] ) );
-	$assert( 'missing source diagnostic reports context', 'local_path' === ( $result['diagnostics']['context'] ?? '' ) );
-	$assert( 'missing source diagnostic reports expected shape', 'Readable local directory, .zip, or JSON file, or remote .zip/.json URL containing a Data Machine agent bundle.' === ( $result['diagnostics']['expected_shape'] ?? '' ) );
+	$assert( 'missing source import fails', is_wp_error( $result ) );
+	$error_data = $result->get_error_data();
+	$assert( 'missing source diagnostic reports attempted source', $missing_source === ( $error_data['diagnostics']['source'] ?? '' ) );
+	$assert( 'missing source diagnostic reports cwd', isset( $error_data['diagnostics']['cwd'] ) && is_string( $error_data['diagnostics']['cwd'] ) );
+	$assert( 'missing source diagnostic reports context', 'local_path' === ( $error_data['diagnostics']['context'] ?? '' ) );
+	$assert( 'missing source diagnostic reports expected shape', 'Readable local directory, .zip, or JSON file, or remote .zip/.json URL containing a Data Machine agent bundle.' === ( $error_data['diagnostics']['expected_shape'] ?? '' ) );
 
 	$reset();
 	$invalid_json_temp = tempnam( sys_get_temp_dir(), 'datamachine-invalid-runtime-bundle-' );
@@ -376,10 +396,24 @@ namespace {
 	rename( $invalid_json_temp, $invalid_json_path );
 	file_put_contents( $invalid_json_path, '{not valid json' );
 	$result = AgentAbilities::importAgent( array( 'source' => $invalid_json_path ) );
-	$assert( 'invalid source import fails', false === $result['success'] );
-	$assert( 'invalid source diagnostic reports attempted source', $invalid_json_path === ( $result['diagnostics']['source'] ?? '' ) );
-	$assert( 'invalid source diagnostic reports expected shape', 'Readable local directory, .zip, or JSON file, or remote .zip/.json URL containing a Data Machine agent bundle.' === ( $result['diagnostics']['expected_shape'] ?? '' ) );
+	$assert( 'invalid source import fails', is_wp_error( $result ) );
+	$error_data = $result->get_error_data();
+	$assert( 'invalid source diagnostic reports attempted source', $invalid_json_path === ( $error_data['diagnostics']['source'] ?? '' ) );
+	$assert( 'invalid source diagnostic reports expected shape', 'Readable local directory, .zip, or JSON file, or remote .zip/.json URL containing a Data Machine agent bundle.' === ( $error_data['diagnostics']['expected_shape'] ?? '' ) );
 	@unlink( $invalid_json_path );
+
+	$reset();
+	AgentBundler::$next_result = array(
+		'success'       => false,
+		'error_code'    => 'install_unsupported_capabilities',
+		'error'         => 'Required capabilities are unavailable.',
+		'compatibility' => array( 'missing' => array( 'example/capability' ) ),
+	);
+	$result                    = AgentAbilities::importAgent( array( 'bundle' => $base_bundle(), 'owner_id' => 99 ) );
+	$assert( 'bundler failure is converted at callback boundary', is_wp_error( $result ) && 'install_unsupported_capabilities' === $result->get_error_code() );
+	$error_data = $result->get_error_data();
+	$assert( 'bundler diagnostics survive callback conversion', array( 'example/capability' ) === ( $error_data['compatibility']['missing'] ?? array() ) );
+	$assert( 'bundler validation failure has status 400', 400 === ( $error_data['status'] ?? 0 ) );
 
 	echo "\n[3] Inline bundle import path\n";
 	$reset();

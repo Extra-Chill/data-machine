@@ -61,12 +61,16 @@ class InspectRequestAbility {
 		return PermissionHelper::can( 'view_logs' ) || PermissionHelper::can_manage();
 	}
 
-	public function execute( array $input ): array {
+	public function execute( array $input ): array|\WP_Error {
 		$job_id = (int) ( $input['job_id'] ?? 0 );
 		if ( $job_id <= 0 ) {
-			return array(
-				'success' => false,
-				'error'   => 'Missing or invalid job_id.',
+			return new \WP_Error(
+				'invalid_job_id',
+				'Missing or invalid job_id.',
+				array(
+					'status' => 400,
+					'job_id' => $job_id,
+				)
 			);
 		}
 
@@ -74,6 +78,27 @@ class InspectRequestAbility {
 			? (string) $input['flow_step_id']
 			: null;
 
-		return ( new RequestInspector() )->inspectPipelineJob( $job_id, $flow_step_id );
+		$result = ( new RequestInspector() )->inspectPipelineJob( $job_id, $flow_step_id );
+		if ( ! empty( $result['success'] ) ) {
+			return $result;
+		}
+
+		$message = (string) ( $result['error'] ?? 'AI request inspection failed.' );
+		$code    = 'request_inspection_failed';
+		$status  = 400;
+		if ( str_contains( $message, 'Job ' ) && str_contains( $message, ' not found' ) ) {
+			$code   = 'job_not_found';
+			$status = 404;
+		} elseif ( str_contains( $message, 'not found in job engine snapshot' ) ) {
+			$code   = 'flow_step_not_found';
+			$status = 404;
+		} elseif ( ! empty( $result['missing_required_handler_slugs'] ) ) {
+			$code   = 'required_handler_tools_unavailable';
+			$status = 409;
+		}
+		$data = $result;
+		unset( $data['success'], $data['error'] );
+		$data['status'] = $status;
+		return new \WP_Error( $code, $message, $data );
 	}
 }

@@ -893,22 +893,24 @@ class AgentAbilities {
 	 * @param array $input Input parameters with old_slug and new_slug.
 	 * @return array Result.
 	 */
-	public static function renameAgent( array $input ): array {
+	public static function renameAgent( array $input ): array|\WP_Error {
 		$old_slug = sanitize_title( $input['old_slug'] );
 		$new_slug = sanitize_title( $input['new_slug'] );
 
 		if ( $old_slug === $new_slug ) {
-			return array(
-				'success' => false,
-				'message' => 'Old and new slugs are identical.',
+			return new \WP_Error(
+				'invalid_agent_slug',
+				'Old and new slugs are identical.',
+				array(
+					'status'   => 400,
+					'old_slug' => $old_slug,
+					'new_slug' => $new_slug,
+				)
 			);
 		}
 
 		if ( empty( $new_slug ) ) {
-			return array(
-				'success' => false,
-				'message' => 'New slug cannot be empty.',
-			);
+			return new \WP_Error( 'invalid_agent_slug', 'New slug cannot be empty.', array( 'status' => 400 ) );
 		}
 
 		$agents_repo = new Agents();
@@ -917,9 +919,13 @@ class AgentAbilities {
 		$existing = $agents_repo->get_by_slug( $old_slug );
 
 		if ( ! $existing ) {
-			return array(
-				'success' => false,
-				'message' => sprintf( 'Agent with slug "%s" not found.', $old_slug ),
+			return new \WP_Error(
+				'agent_not_found',
+				sprintf( 'Agent with slug "%s" not found.', $old_slug ),
+				array(
+					'status'   => 404,
+					'old_slug' => $old_slug,
+				)
 			);
 		}
 
@@ -927,9 +933,13 @@ class AgentAbilities {
 		$conflict = $agents_repo->get_by_slug( $new_slug );
 
 		if ( $conflict ) {
-			return array(
-				'success' => false,
-				'message' => sprintf( 'An agent with slug "%s" already exists.', $new_slug ),
+			return new \WP_Error(
+				'agent_slug_conflict',
+				sprintf( 'An agent with slug "%s" already exists.', $new_slug ),
+				array(
+					'status'   => 409,
+					'new_slug' => $new_slug,
+				)
 			);
 		}
 
@@ -943,13 +953,16 @@ class AgentAbilities {
 
 		if ( is_dir( $old_path ) ) {
 			if ( is_dir( $new_path ) ) {
-				return array(
-					'success'  => false,
-					'message'  => sprintf( 'Target directory "%s" already exists.', $new_path ),
-					'old_slug' => $old_slug,
-					'new_slug' => $new_slug,
-					'old_path' => $old_path,
-					'new_path' => $new_path,
+				return new \WP_Error(
+					'agent_directory_conflict',
+					sprintf( 'Target directory "%s" already exists.', $new_path ),
+					array(
+						'status'   => 409,
+						'old_slug' => $old_slug,
+						'new_slug' => $new_slug,
+						'old_path' => $old_path,
+						'new_path' => $new_path,
+					)
 				);
 			}
 
@@ -957,13 +970,16 @@ class AgentAbilities {
 			$dir_moved = rename( $old_path, $new_path );
 
 			if ( ! $dir_moved ) {
-				return array(
-					'success'  => false,
-					'message'  => sprintf( 'Failed to move directory from "%s" to "%s".', $old_path, $new_path ),
-					'old_slug' => $old_slug,
-					'new_slug' => $new_slug,
-					'old_path' => $old_path,
-					'new_path' => $new_path,
+				return new \WP_Error(
+					'agent_directory_move_failed',
+					sprintf( 'Failed to move directory from "%s" to "%s".', $old_path, $new_path ),
+					array(
+						'status'   => 500,
+						'old_slug' => $old_slug,
+						'new_slug' => $new_slug,
+						'old_path' => $old_path,
+						'new_path' => $new_path,
+					)
 				);
 			}
 		}
@@ -978,13 +994,16 @@ class AgentAbilities {
 				rename( $new_path, $old_path );
 			}
 
-			return array(
-				'success'  => false,
-				'message'  => 'Database update failed. Directory change reverted.',
-				'old_slug' => $old_slug,
-				'new_slug' => $new_slug,
-				'old_path' => $old_path,
-				'new_path' => $new_path,
+			return new \WP_Error(
+				'agent_rename_failed',
+				'Database update failed. Directory change reverted.',
+				array(
+					'status'   => 500,
+					'old_slug' => $old_slug,
+					'new_slug' => $new_slug,
+					'old_path' => $old_path,
+					'new_path' => $new_path,
+				)
 			);
 		}
 
@@ -1016,7 +1035,7 @@ class AgentAbilities {
 	 * @param array $input Input parameters (unused).
 	 * @return array Result.
 	 */
-	public static function listAgents( array $input ): array {
+	public static function listAgents( array $input ): array|\WP_Error {
 		// ---- Parameter resolution ----------------------------------------
 		$scope             = isset( $input['scope'] ) ? (string) $input['scope'] : 'mine';
 		$requested_user_id = isset( $input['user_id'] ) ? (int) $input['user_id'] : 0;
@@ -1024,9 +1043,13 @@ class AgentAbilities {
 		$include_role      = ! empty( $input['include_role'] );
 
 		if ( ! in_array( $scope, array( 'mine', 'all' ), true ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'Invalid scope. Allowed values: "mine", "all".',
+			return new \WP_Error(
+				'invalid_agent_scope',
+				'Invalid scope. Allowed values: "mine", "all".',
+				array(
+					'status' => 400,
+					'scope'  => $scope,
+				)
 			);
 		}
 
@@ -1035,18 +1058,26 @@ class AgentAbilities {
 
 		// ---- Escalation checks -------------------------------------------
 		if ( 'all' === $scope && ! $is_admin ) {
-			return array(
-				'success' => false,
-				'error'   => 'scope=all requires admin privileges.',
+			return new \WP_Error(
+				'agent_scope_forbidden',
+				'scope=all requires admin privileges.',
+				array(
+					'status' => 403,
+					'scope'  => $scope,
+				)
 			);
 		}
 
 		// Non-admins are always forced to self. Admin omitting user_id also
 		// defaults to self (the intuitive "show me MY accessible agents").
 		if ( $requested_user_id > 0 && $requested_user_id !== $caller_id && ! $is_admin ) {
-			return array(
-				'success' => false,
-				'error'   => 'Querying another user\'s agents requires admin privileges.',
+			return new \WP_Error(
+				'agent_user_scope_forbidden',
+				'Querying another user\'s agents requires admin privileges.',
+				array(
+					'status'  => 403,
+					'user_id' => $requested_user_id,
+				)
 			);
 		}
 
@@ -1161,13 +1192,10 @@ class AgentAbilities {
 	 * @param array $input Ability input.
 	 * @return array<string,mixed>
 	 */
-	public static function getActiveAgent( array $input ): array {
+	public static function getActiveAgent( array $input ): array|\WP_Error {
 		$target_user_id = self::resolve_active_agent_user_id( isset( $input['user_id'] ) ? (int) $input['user_id'] : 0 );
 		if ( is_wp_error( $target_user_id ) ) {
-			return array(
-				'success' => false,
-				'error'   => $target_user_id->get_error_message(),
-			);
+			return $target_user_id;
 		}
 
 		$active = self::resolve_active_agent_for_user( $target_user_id );
@@ -1187,36 +1215,40 @@ class AgentAbilities {
 	 * @param array $input Ability input.
 	 * @return array<string,mixed>
 	 */
-	public static function setActiveAgent( array $input ): array {
+	public static function setActiveAgent( array $input ): array|\WP_Error {
 		$target_user_id = self::resolve_active_agent_user_id( isset( $input['user_id'] ) ? (int) $input['user_id'] : 0 );
 		if ( is_wp_error( $target_user_id ) ) {
-			return array(
-				'success' => false,
-				'error'   => $target_user_id->get_error_message(),
-			);
+			return $target_user_id;
 		}
 
 		$agent_id = self::resolve_agent_input_id( array( 'agent' => (string) ( $input['agent'] ?? '' ) ) );
 		if ( is_wp_error( $agent_id ) ) {
-			return array(
-				'success' => false,
-				'error'   => $agent_id->get_error_message(),
-			);
+			return $agent_id;
 		}
 
 		$agents_repo = new Agents();
 		$agent       = $agents_repo->get_agent( $agent_id );
 		if ( ! $agent ) {
-			return array(
-				'success' => false,
-				'error'   => 'Agent not found.',
+			return new \WP_Error(
+				'agent_not_found',
+				'Agent not found.',
+				array(
+					'status'   => 404,
+					'agent_id' => $agent_id,
+				)
 			);
 		}
 
 		if ( ! self::user_can_access_agent_row( $target_user_id, $agent ) ) {
-			return array(
-				'success' => false,
-				'error'   => sprintf( 'User %d cannot access agent "%s".', $target_user_id, (string) $agent['agent_slug'] ),
+			return new \WP_Error(
+				'agent_access_denied',
+				sprintf( 'User %d cannot access agent "%s".', $target_user_id, (string) $agent['agent_slug'] ),
+				array(
+					'status'     => 403,
+					'user_id'    => $target_user_id,
+					'agent_id'   => $agent_id,
+					'agent_slug' => (string) $agent['agent_slug'],
+				)
 			);
 		}
 
@@ -1241,12 +1273,19 @@ class AgentAbilities {
 		$is_admin  = PermissionHelper::can_manage();
 
 		if ( $requested_user_id > 0 && $requested_user_id !== $caller_id && ! $is_admin ) {
-			return new \WP_Error( 'forbidden_user', 'Changing another user\'s active agent requires admin privileges.' );
+			return new \WP_Error(
+				'forbidden_user',
+				'Changing another user\'s active agent requires admin privileges.',
+				array(
+					'status'  => 403,
+					'user_id' => $requested_user_id,
+				)
+			);
 		}
 
 		$target_user_id = $requested_user_id > 0 ? $requested_user_id : $caller_id;
 		if ( $target_user_id <= 0 ) {
-			return new \WP_Error( 'missing_user', 'Could not determine acting user.' );
+			return new \WP_Error( 'missing_user', 'Could not determine acting user.', array( 'status' => 403 ) );
 		}
 
 		return $target_user_id;
@@ -1406,14 +1445,18 @@ class AgentAbilities {
 	 * @param array $input Import parameters.
 	 * @return array<string,mixed>
 	 */
-	public static function importAgent( array $input ): array {
+	public static function importAgent( array $input ): array|\WP_Error {
 		$has_inline_bundle = isset( $input['bundle'] ) && is_array( $input['bundle'] );
 		$source            = trim( (string) ( $input['source'] ?? '' ) );
 		if ( ! $has_inline_bundle && '' === $source ) {
-			return array(
-				'success'     => false,
-				'error'       => 'Bundle source or inline bundle is required.',
-				'diagnostics' => self::bundle_source_import_diagnostics( $source ),
+			return new \WP_Error(
+				'invalid_agent_bundle_source',
+				'Bundle source or inline bundle is required.',
+				array(
+					'status'      => 400,
+					'source'      => $source,
+					'diagnostics' => self::bundle_source_import_diagnostics( $source ),
+				)
 			);
 		}
 
@@ -1424,10 +1467,17 @@ class AgentAbilities {
 			$context  = self::build_resolve_context( $input );
 			$resolved = BundleSource::resolve( $source, $context );
 			if ( is_wp_error( $resolved ) ) {
-				return array(
-					'success'     => false,
-					'error'       => $resolved->get_error_message(),
-					'diagnostics' => self::bundle_source_import_diagnostics( $source ),
+				return new \WP_Error(
+					$resolved->get_error_code(),
+					$resolved->get_error_message(),
+					array_merge(
+						array(
+							'status'      => 400,
+							'source'      => $source,
+							'diagnostics' => self::bundle_source_import_diagnostics( $source ),
+						),
+						is_array( $resolved->get_error_data() ) ? $resolved->get_error_data() : array()
+					)
 				);
 			}
 
@@ -1441,9 +1491,13 @@ class AgentAbilities {
 			if ( null !== $resolved ) {
 				BundleSource::cleanup( $resolved, $source );
 			}
-			return array(
-				'success' => false,
-				'error'   => 'on_conflict must be one of: error, skip, upgrade.',
+			return new \WP_Error(
+				'invalid_agent_conflict_mode',
+				'on_conflict must be one of: error, skip, upgrade.',
+				array(
+					'status'      => 400,
+					'on_conflict' => $on_conflict,
+				)
 			);
 		}
 
@@ -1452,9 +1506,13 @@ class AgentAbilities {
 			if ( null !== $resolved ) {
 				BundleSource::cleanup( $resolved, $source );
 			}
-			return array(
-				'success' => false,
-				'error'   => 'Unable to resolve import owner. Pass owner_id, authenticate as a user, or set datamachine_default_owner_id.',
+			return new \WP_Error(
+				'agent_owner_unresolved',
+				'Unable to resolve import owner. Pass owner_id, authenticate as a user, or set datamachine_default_owner_id.',
+				array(
+					'status'   => 403,
+					'owner_id' => $owner_id,
+				)
 			);
 		}
 
@@ -1469,10 +1527,14 @@ class AgentAbilities {
 		}
 
 		if ( ! is_array( $bundle ) ) {
-			return array(
-				'success'     => false,
-				'error'       => 'Failed to parse bundle. Use a bundle directory, .json file, or .zip archive.',
-				'diagnostics' => $has_inline_bundle ? array() : self::bundle_source_import_diagnostics( $source ),
+			return new \WP_Error(
+				'agent_bundle_parse_failed',
+				'Failed to parse bundle. Use a bundle directory, .json file, or .zip archive.',
+				array(
+					'status'      => 400,
+					'source'      => $source,
+					'diagnostics' => $has_inline_bundle ? array() : self::bundle_source_import_diagnostics( $source ),
+				)
 			);
 		}
 
@@ -1511,11 +1573,14 @@ class AgentAbilities {
 		}
 
 		if ( $existing && 'upgrade' !== $on_conflict ) {
-			return array(
-				'success'    => false,
-				'agent_id'   => (int) $existing['agent_id'],
-				'agent_slug' => $slug,
-				'error'      => sprintf( 'Agent slug "%s" already exists. Use on_conflict=skip to no-op, on_conflict=upgrade to reconcile bundle artifacts, or import with a new slug.', $slug ),
+			return new \WP_Error(
+				'agent_slug_conflict',
+				sprintf( 'Agent slug "%s" already exists. Use on_conflict=skip to no-op, on_conflict=upgrade to reconcile bundle artifacts, or import with a new slug.', $slug ),
+				array(
+					'status'     => 409,
+					'agent_id'   => (int) $existing['agent_id'],
+					'agent_slug' => $slug,
+				)
 			);
 		}
 
@@ -1531,7 +1596,19 @@ class AgentAbilities {
 		);
 		if ( empty( $result['success'] ) ) {
 			$result['auth_warnings'] = $auth_warnings;
-			return $result;
+			$code                    = sanitize_key( (string) ( $result['error_code'] ?? 'agent_import_failed' ) );
+			$status                  = 500;
+			if ( str_contains( $code, 'invalid' ) || 'install_unsupported_capabilities' === $code ) {
+				$status = 400;
+			} elseif ( str_contains( $code, 'collision' ) || str_contains( $code, 'mismatch' ) || str_contains( $code, 'local_modified' ) ) {
+				$status = 409;
+			}
+
+			return new \WP_Error(
+				$code,
+				(string) ( $result['error'] ?? 'Failed to import agent bundle.' ),
+				array_merge( $result, array( 'status' => $status ) )
+			);
 		}
 
 		$summary  = is_array( $result['summary'] ?? null ) ? $result['summary'] : array();
@@ -2120,7 +2197,7 @@ class AgentAbilities {
 	 * @param array $input { agent_slug, agent_name, owner_id, config? }.
 	 * @return array Result with agent_id on success.
 	 */
-	public static function createAgent( array $input ): array {
+	public static function createAgent( array $input ): array|\WP_Error {
 		$slug     = sanitize_title( $input['agent_slug'] ?? '' );
 		$name     = sanitize_text_field( $input['agent_name'] ?? '' );
 		$owner_id = (int) ( $input['owner_id'] ?? 0 );
@@ -2142,10 +2219,7 @@ class AgentAbilities {
 		}
 
 		if ( empty( $slug ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'Agent slug is required.',
-			);
+			return new \WP_Error( 'invalid_agent_slug', 'Agent slug is required.', array( 'status' => 400 ) );
 		}
 
 		if ( empty( $name ) ) {
@@ -2160,10 +2234,7 @@ class AgentAbilities {
 			$owner_id = PermissionHelper::acting_user_id();
 
 			if ( $owner_id <= 0 ) {
-				return array(
-					'success' => false,
-					'error'   => 'Could not determine acting user for self-service agent creation.',
-				);
+				return new \WP_Error( 'agent_owner_unresolved', 'Could not determine acting user for self-service agent creation.', array( 'status' => 403 ) );
 			}
 
 			// Enforce per-user agent limit for non-admins.
@@ -2181,13 +2252,18 @@ class AgentAbilities {
 			$max_agents = (int) apply_filters( 'datamachine_max_agents_per_user', 1, $owner_id );
 
 			if ( $existing && $max_agents <= 1 ) {
-				return array(
-					'success' => false,
-					'error'   => sprintf(
+				return new \WP_Error(
+					'agent_limit_reached',
+					sprintf(
 						'You already have an agent ("%s"). Non-admin users are limited to %d agent.',
 						$existing['agent_name'],
 						$max_agents
 					),
+					array(
+						'status'   => 409,
+						'owner_id' => $owner_id,
+						'limit'    => $max_agents,
+					)
 				);
 			}
 
@@ -2196,30 +2272,36 @@ class AgentAbilities {
 				$owned = $agents_repo->get_all_by_owner_id( $owner_id );
 
 				if ( count( $owned ) >= $max_agents ) {
-					return array(
-						'success' => false,
-						'error'   => sprintf(
+					return new \WP_Error(
+						'agent_limit_reached',
+						sprintf(
 							'You already have %d agent(s). Non-admin users are limited to %d.',
 							count( $owned ),
 							$max_agents
 						),
+						array(
+							'status'   => 409,
+							'owner_id' => $owner_id,
+							'limit'    => $max_agents,
+						)
 					);
 				}
 			}
 		}
 
 		if ( $owner_id <= 0 ) {
-			return array(
-				'success' => false,
-				'error'   => 'Owner user ID is required (--owner=<user_id>).',
-			);
+			return new \WP_Error( 'invalid_agent_owner', 'Owner user ID is required (--owner=<user_id>).', array( 'status' => 400 ) );
 		}
 
 		$user = get_user_by( 'id', $owner_id );
 		if ( ! $user ) {
-			return array(
-				'success' => false,
-				'error'   => sprintf( 'Owner user ID %d not found.', $owner_id ),
+			return new \WP_Error(
+				'agent_owner_not_found',
+				sprintf( 'Owner user ID %d not found.', $owner_id ),
+				array(
+					'status'   => 404,
+					'owner_id' => $owner_id,
+				)
 			);
 		}
 
@@ -2228,18 +2310,28 @@ class AgentAbilities {
 		// Check for conflict.
 		$existing = $agents_repo->get_by_slug( $slug );
 		if ( $existing ) {
-			return array(
-				'success' => false,
-				'error'   => sprintf( 'Agent with slug "%s" already exists (ID: %d).', $slug, $existing['agent_id'] ),
+			return new \WP_Error(
+				'agent_slug_conflict',
+				sprintf( 'Agent with slug "%s" already exists (ID: %d).', $slug, $existing['agent_id'] ),
+				array(
+					'status'     => 409,
+					'agent_slug' => $slug,
+					'agent_id'   => (int) $existing['agent_id'],
+				)
 			);
 		}
 
 		$agent_id = $agents_repo->create_if_missing( $slug, $name, $owner_id, $config, $site_scope );
 
 		if ( ! $agent_id ) {
-			return array(
-				'success' => false,
-				'error'   => 'Failed to create agent in database.',
+			return new \WP_Error(
+				'agent_creation_failed',
+				'Failed to create agent in database.',
+				array(
+					'status'     => 500,
+					'agent_slug' => $slug,
+					'owner_id'   => $owner_id,
+				)
 			);
 		}
 
@@ -2255,11 +2347,13 @@ class AgentAbilities {
 		// Scaffold agent-layer memory files (SOUL.md, MEMORY.md) with identity context.
 		$scaffold_ability = \DataMachine\Abilities\File\ScaffoldAbilities::get_ability();
 		if ( $scaffold_ability ) {
-			$scaffold_ability->execute( array(
-				'layer'      => 'agent',
-				'agent_slug' => $slug,
-				'agent_id'   => $agent_id,
-			) );
+			$scaffold_ability->execute(
+				array(
+					'layer'      => 'agent',
+					'agent_slug' => $slug,
+					'agent_id'   => $agent_id,
+				)
+			);
 		}
 
 		/**
@@ -2316,14 +2410,14 @@ class AgentAbilities {
 				$context['agent_id']   = $context['agent_id'] ?? $identity->agent_id;
 				$context['agent_slug'] = $context['agent_slug'] ?? $identity->agent_slug;
 			} catch ( \InvalidArgumentException $e ) {
-				return new \WP_Error( 'agent_not_found', $e->getMessage() );
+				return new \WP_Error( 'agent_not_found', $e->getMessage(), array( 'status' => 404 ) );
 			}
 		}
 
 		try {
 			return ( new AgentIdentityResolver() )->resolve_agent_identity( $context )->agent_id;
 		} catch ( \InvalidArgumentException $e ) {
-			return new \WP_Error( 'agent_not_found', $e->getMessage() );
+			return new \WP_Error( 'agent_not_found', $e->getMessage(), array( 'status' => 404 ) );
 		}
 	}
 
@@ -2333,22 +2427,23 @@ class AgentAbilities {
 	 * @param array $input { agent_slug or agent_id }.
 	 * @return array Agent data or error.
 	 */
-	public static function getAgent( array $input ): array {
+	public static function getAgent( array $input ): array|\WP_Error {
 		$agent_id = self::resolve_agent_input_id( $input );
 		if ( is_wp_error( $agent_id ) ) {
-			return array(
-				'success' => false,
-				'error'   => $agent_id->get_error_message(),
-			);
+			return $agent_id;
 		}
 
 		$agents_repo = new Agents();
 		$agent       = $agents_repo->get_agent( $agent_id );
 
 		if ( ! $agent ) {
-			return array(
-				'success' => false,
-				'error'   => 'Agent not found.',
+			return new \WP_Error(
+				'agent_not_found',
+				'Agent not found.',
+				array(
+					'status'   => 404,
+					'agent_id' => $agent_id,
+				)
 			);
 		}
 
@@ -2390,13 +2485,10 @@ class AgentAbilities {
 	 * @param array $input Ability input.
 	 * @return array Result.
 	 */
-	public static function grantAgentAudienceAccess( array $input ): array {
+	public static function grantAgentAudienceAccess( array $input ): array|\WP_Error {
 		$agent_id = self::resolve_agent_input_id( $input );
 		if ( is_wp_error( $agent_id ) ) {
-			return array(
-				'success' => false,
-				'error'   => $agent_id->get_error_message(),
-			);
+			return $agent_id;
 		}
 
 		$principal_type = sanitize_key( (string) ( $input['principal_type'] ?? 'audience' ) );
@@ -2404,18 +2496,29 @@ class AgentAbilities {
 		$role           = (string) ( $input['role'] ?? \WP_Agent_Access_Grant::ROLE_OPERATOR );
 
 		if ( '' === $principal_type || '' === $principal_id || 'user' === $principal_type ) {
-			return array(
-				'success' => false,
-				'error'   => 'A non-user principal_type and principal_id are required.',
+			return new \WP_Error(
+				'invalid_agent_principal',
+				'A non-user principal_type and principal_id are required.',
+				array(
+					'status'         => 400,
+					'principal_type' => $principal_type,
+					'principal_id'   => $principal_id,
+				)
 			);
 		}
 
 		try {
 			$grant = ( new AgentAccess() )->grant_principal_access( (string) $agent_id, $principal_type, $principal_id, $role );
 		} catch ( \Throwable $e ) {
-			return array(
-				'success' => false,
-				'error'   => $e->getMessage(),
+			return new \WP_Error(
+				'agent_access_grant_failed',
+				$e->getMessage(),
+				array(
+					'status'         => 500,
+					'agent_id'       => $agent_id,
+					'principal_type' => $principal_type,
+					'principal_id'   => $principal_id,
+				)
 			);
 		}
 
@@ -2431,22 +2534,23 @@ class AgentAbilities {
 	 * @param array $input { agent_id, agent_name?, agent_config? }.
 	 * @return array Result with updated agent data.
 	 */
-	public static function updateAgent( array $input ): array {
+	public static function updateAgent( array $input ): array|\WP_Error {
 		$agent_id = self::resolve_agent_input_id( $input );
 		if ( is_wp_error( $agent_id ) ) {
-			return array(
-				'success' => false,
-				'error'   => $agent_id->get_error_message(),
-			);
+			return $agent_id;
 		}
 
 		$agents_repo = new Agents();
 		$agent       = $agents_repo->get_agent( $agent_id );
 
 		if ( ! $agent ) {
-			return array(
-				'success' => false,
-				'error'   => sprintf( 'Agent ID %d not found.', $agent_id ),
+			return new \WP_Error(
+				'agent_not_found',
+				sprintf( 'Agent ID %d not found.', $agent_id ),
+				array(
+					'status'   => 404,
+					'agent_id' => $agent_id,
+				)
 			);
 		}
 
@@ -2456,9 +2560,13 @@ class AgentAbilities {
 		if ( isset( $input['agent_name'] ) ) {
 			$name = sanitize_text_field( $input['agent_name'] );
 			if ( empty( $name ) ) {
-				return array(
-					'success' => false,
-					'error'   => 'Agent name cannot be empty.',
+				return new \WP_Error(
+					'invalid_agent_name',
+					'Agent name cannot be empty.',
+					array(
+						'status'   => 400,
+						'agent_id' => $agent_id,
+					)
 				);
 			}
 			$update['agent_name'] = $name;
@@ -2469,9 +2577,13 @@ class AgentAbilities {
 		}
 
 		if ( empty( $update ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'No fields to update. Provide agent_name or agent_config.',
+			return new \WP_Error(
+				'invalid_agent_update',
+				'No fields to update. Provide agent_name or agent_config.',
+				array(
+					'status'   => 400,
+					'agent_id' => $agent_id,
+				)
 			);
 		}
 
@@ -2481,9 +2593,13 @@ class AgentAbilities {
 		$ok = $agents_repo->update_agent( $agent_id, $update );
 
 		if ( ! $ok ) {
-			return array(
-				'success' => false,
-				'error'   => 'Database update failed.',
+			return new \WP_Error(
+				'agent_update_failed',
+				'Database update failed.',
+				array(
+					'status'   => 500,
+					'agent_id' => $agent_id,
+				)
 			);
 		}
 
@@ -2602,21 +2718,22 @@ class AgentAbilities {
 	 * @param array $input Export input.
 	 * @return array Result.
 	 */
-	public static function exportAgent( array $input ): array {
+	public static function exportAgent( array $input ): array|\WP_Error {
 		$agent_id = self::resolve_agent_input_id( $input );
 		if ( is_wp_error( $agent_id ) ) {
-			return array(
-				'success' => false,
-				'error'   => $agent_id->get_error_message(),
-			);
+			return $agent_id;
 		}
 
 		$agents_repo = new Agents();
 		$agent       = $agents_repo->get_agent( $agent_id );
 		if ( ! $agent ) {
-			return array(
-				'success' => false,
-				'error'   => sprintf( 'Agent ID %d not found.', $agent_id ),
+			return new \WP_Error(
+				'agent_not_found',
+				sprintf( 'Agent ID %d not found.', $agent_id ),
+				array(
+					'status'   => 404,
+					'agent_id' => $agent_id,
+				)
 			);
 		}
 
@@ -2625,17 +2742,27 @@ class AgentAbilities {
 			$format = 'directory';
 		}
 		if ( ! in_array( $format, array( 'directory', 'zip' ), true ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'format must be directory or zip.',
+			return new \WP_Error(
+				'invalid_agent_export_format',
+				'format must be directory or zip.',
+				array(
+					'status'   => 400,
+					'agent_id' => $agent_id,
+					'format'   => $format,
+				)
 			);
 		}
 
 		$profile = (string) ( $input['profile'] ?? 'share' );
 		if ( ! in_array( $profile, array( 'share', 'backup', 'fork' ), true ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'profile must be share, backup, or fork.',
+			return new \WP_Error(
+				'invalid_agent_export_profile',
+				'profile must be share, backup, or fork.',
+				array(
+					'status'   => 400,
+					'agent_id' => $agent_id,
+					'profile'  => $profile,
+				)
 			);
 		}
 
@@ -2656,9 +2783,14 @@ class AgentAbilities {
 		$written_path = $destination;
 
 		if ( empty( $export['success'] ) || ! $directory instanceof AgentBundleDirectory ) {
-			return array(
-				'success' => false,
-				'error'   => (string) ( $export['error'] ?? 'Failed to build export bundle.' ),
+			return new \WP_Error(
+				'agent_export_failed',
+				(string) ( $export['error'] ?? 'Failed to build export bundle.' ),
+				array(
+					'status'     => 500,
+					'agent_id'   => $agent_id,
+					'agent_slug' => $agent_slug,
+				)
 			);
 		}
 
@@ -2669,9 +2801,14 @@ class AgentAbilities {
 				$written_path = self::writeBundleZip( $directory, $destination, $agent_slug, $reproducible );
 			}
 		} catch ( \Throwable $e ) {
-			return array(
-				'success' => false,
-				'error'   => $e->getMessage(),
+			return new \WP_Error(
+				'agent_export_failed',
+				$e->getMessage(),
+				array(
+					'status'     => 500,
+					'agent_id'   => $agent_id,
+					'agent_slug' => $agent_slug,
+				)
 			);
 		}
 
@@ -2790,15 +2927,35 @@ class AgentAbilities {
 			);
 		}
 
-		$deleted = array();
+		$deleted       = array();
+		$delete_errors = array();
 		if ( ! $dry_run ) {
 			foreach ( $candidates as $candidate ) {
 				$result = self::deleteAgent( array( 'agent_id' => $candidate['agent_id'] ) );
-				if ( ! empty( $result['success'] ) ) {
+				if ( is_wp_error( $result ) ) {
+					$delete_errors[] = array(
+						'agent_id' => $candidate['agent_id'],
+						'code'     => $result->get_error_code(),
+						'message'  => $result->get_error_message(),
+						'data'     => $result->get_error_data(),
+					);
+				} elseif ( ! empty( $result['success'] ) ) {
 					self::clear_active_agent_meta_for_owner( (int) $candidate['owner_id'] );
 					$deleted[] = $candidate;
 				}
 			}
+		}
+		if ( ! empty( $delete_errors ) ) {
+			return new \WP_Error(
+				'agent_prune_failed',
+				'One or more orphaned agents could not be pruned.',
+				array(
+					'status'     => 500,
+					'candidates' => $candidates,
+					'deleted'    => $deleted,
+					'errors'     => $delete_errors,
+				)
+			);
 		}
 
 		return array(
@@ -2965,22 +3122,23 @@ class AgentAbilities {
 	 * @param array $input { agent_slug or agent_id, delete_files? }.
 	 * @return array Result.
 	 */
-	public static function deleteAgent( array $input ): array {
+	public static function deleteAgent( array $input ): array|\WP_Error {
 		$agent_id = self::resolve_agent_input_id( $input );
 		if ( is_wp_error( $agent_id ) ) {
-			return array(
-				'success' => false,
-				'error'   => $agent_id->get_error_message(),
-			);
+			return $agent_id;
 		}
 
 		$agents_repo = new Agents();
 		$agent       = $agents_repo->get_agent( $agent_id );
 
 		if ( ! $agent ) {
-			return array(
-				'success' => false,
-				'error'   => 'Agent not found.',
+			return new \WP_Error(
+				'agent_not_found',
+				'Agent not found.',
+				array(
+					'status'   => 404,
+					'agent_id' => $agent_id,
+				)
 			);
 		}
 
@@ -2999,9 +3157,14 @@ class AgentAbilities {
 		$deleted = $wpdb->delete( $agents_table, array( 'agent_id' => $agent_id ) );
 
 		if ( false === $deleted ) {
-			return array(
-				'success' => false,
-				'error'   => 'Failed to delete agent from database.',
+			return new \WP_Error(
+				'agent_deletion_failed',
+				'Failed to delete agent from database.',
+				array(
+					'status'     => 500,
+					'agent_id'   => $agent_id,
+					'agent_slug' => $slug,
+				)
 			);
 		}
 
@@ -3065,7 +3228,8 @@ class AgentAbilities {
 		if ( ! $ability instanceof \WP_Ability ) {
 			return new \WP_Error(
 				'datamachine_import_agent_unavailable',
-				__( 'The Data Machine import-agent ability is not available inside the runtime site.', 'data-machine' )
+				__( 'The Data Machine import-agent ability is not available inside the runtime site.', 'data-machine' ),
+				array( 'status' => 500 )
 			);
 		}
 
@@ -3146,7 +3310,7 @@ class AgentAbilities {
 		$agent_id        = (int) ( $principal['agent_id'] ?? 1 );
 		$current_user_id = get_current_user_id();
 		if ( $agent_id <= 0 ) {
-			return new \WP_Error( 'datamachine_browser_bundle_import_principal_missing_agent', __( 'Agent bundle import principals require a positive agent_id.', 'data-machine' ) );
+			return new \WP_Error( 'datamachine_browser_bundle_import_principal_missing_agent', __( 'Agent bundle import principals require a positive agent_id.', 'data-machine' ), array( 'status' => 400 ) );
 		}
 
 		$capabilities = array_values( array_filter( array_map( 'strval', is_array( $principal['capabilities'] ?? null ) ? $principal['capabilities'] : array() ) ) );

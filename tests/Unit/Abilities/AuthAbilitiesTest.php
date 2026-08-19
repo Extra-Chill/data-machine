@@ -102,9 +102,9 @@ class AuthAbilitiesTest extends WP_UnitTestCase {
 			array( 'handler_slug' => '' )
 		);
 
-		$this->assertFalse( $result['success'] );
-		$this->assertArrayHasKey( 'error', $result );
-		$this->assertStringContainsString( 'required', $result['error'] );
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'invalid_handler_slug', $result->get_error_code() );
+		$this->assertStringContainsString( 'required', $result->get_error_message() );
 	}
 
 	public function test_get_auth_status_returns_error_for_unknown_handler(): void {
@@ -112,8 +112,8 @@ class AuthAbilitiesTest extends WP_UnitTestCase {
 			array( 'handler_slug' => 'nonexistent_handler' )
 		);
 
-		$this->assertFalse( $result['success'] );
-		$this->assertArrayHasKey( 'error', $result );
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'auth_provider_not_found', $result->get_error_code() );
 	}
 
 	public function test_disconnect_auth_returns_error_for_missing_handler_slug(): void {
@@ -121,9 +121,9 @@ class AuthAbilitiesTest extends WP_UnitTestCase {
 			array( 'handler_slug' => '' )
 		);
 
-		$this->assertFalse( $result['success'] );
-		$this->assertArrayHasKey( 'error', $result );
-		$this->assertStringContainsString( 'required', $result['error'] );
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'invalid_handler_slug', $result->get_error_code() );
+		$this->assertStringContainsString( 'required', $result->get_error_message() );
 	}
 
 	public function test_disconnect_auth_returns_error_for_unknown_handler(): void {
@@ -131,8 +131,8 @@ class AuthAbilitiesTest extends WP_UnitTestCase {
 			array( 'handler_slug' => 'nonexistent_handler' )
 		);
 
-		$this->assertFalse( $result['success'] );
-		$this->assertArrayHasKey( 'error', $result );
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'auth_provider_not_found', $result->get_error_code() );
 	}
 
 	public function test_save_auth_config_returns_error_for_missing_handler_slug(): void {
@@ -143,9 +143,9 @@ class AuthAbilitiesTest extends WP_UnitTestCase {
 			)
 		);
 
-		$this->assertFalse( $result['success'] );
-		$this->assertArrayHasKey( 'error', $result );
-		$this->assertStringContainsString( 'required', $result['error'] );
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'invalid_handler_slug', $result->get_error_code() );
+		$this->assertStringContainsString( 'required', $result->get_error_message() );
 	}
 
 	public function test_save_auth_config_returns_error_for_unknown_handler(): void {
@@ -156,8 +156,8 @@ class AuthAbilitiesTest extends WP_UnitTestCase {
 			)
 		);
 
-		$this->assertFalse( $result['success'] );
-		$this->assertArrayHasKey( 'error', $result );
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'auth_provider_not_found', $result->get_error_code() );
 	}
 
 	public function test_save_auth_config_preserves_opaque_credential_fields(): void {
@@ -213,6 +213,17 @@ class AuthAbilitiesTest extends WP_UnitTestCase {
 
 		$this->assertTrue( $result['success'] );
 		$this->assertSame( $token, $provider->get_account_for_user( get_current_user_id() )['access_token'] );
+	}
+
+	public function test_refresh_unauthenticated_provider_returns_conflict(): void {
+		$provider = new AuthAbilitiesAccountScopeProvider( 'scope_provider' );
+		$this->registerAccountScopeProvider( $provider );
+
+		$result = $this->auth_abilities->executeRefreshAuth( array( 'handler_slug' => 'scope_handler' ) );
+
+		$this->assertWPError( $result );
+		$this->assertSame( 'auth_not_authenticated', $result->get_error_code() );
+		$this->assertSame( 409, $result->get_error_data()['status'] );
 	}
 
 	public function test_set_auth_token_saves_user_account_without_site_fallback(): void {
