@@ -89,6 +89,7 @@ class MemoryFileRegistryTest extends TestCase {
 		MemoryFileRegistry::register( 'SITE.md',    10, array( 'layer' => MemoryFileRegistry::LAYER_SHARED ) );
 		MemoryFileRegistry::register( 'NETWORK.md', 10, array( 'layer' => MemoryFileRegistry::LAYER_NETWORK ) );
 		MemoryFileRegistry::register( 'USER.md',    10, array( 'layer' => MemoryFileRegistry::LAYER_USER ) );
+		MemoryFileRegistry::register( 'USER_MEMORY.md', 10, array( 'layer' => MemoryFileRegistry::LAYER_PRINCIPAL ) );
 		MemoryFileRegistry::register( 'SOUL.md',    10, array( 'layer' => MemoryFileRegistry::LAYER_AGENT ) );
 		MemoryFileRegistry::register( 'MEMORY.md',  10, array( 'layer' => MemoryFileRegistry::LAYER_AGENT ) );
 
@@ -96,8 +97,26 @@ class MemoryFileRegistryTest extends TestCase {
 		$this->assertSame( 'workspace_shared', $all['SITE.md']['authority_tier'] );
 		$this->assertSame( 'workspace_shared', $all['NETWORK.md']['authority_tier'] );
 		$this->assertSame( 'user_global',      $all['USER.md']['authority_tier'] );
+		$this->assertSame( 'user_workspace_private', $all['USER_MEMORY.md']['authority_tier'] );
 		$this->assertSame( 'agent_identity',   $all['SOUL.md']['authority_tier'] );
 		$this->assertSame( 'agent_memory',     $all['MEMORY.md']['authority_tier'] );
+	}
+
+	public function test_default_files_keep_profile_and_learned_user_memory_separate(): void {
+		datamachine_register_default_memory_files();
+
+		$profile = MemoryFileRegistry::get( 'USER.md' );
+		$memory  = MemoryFileRegistry::get( 'USER_MEMORY.md' );
+
+		$this->assertSame( MemoryFileRegistry::LAYER_USER, $profile['layer'] );
+		$this->assertSame( array( MemoryFileRegistry::INJECTION_USER_PROFILE ), $profile['injection_contexts'] );
+		$this->assertSame( MemoryFileRegistry::LAYER_PRINCIPAL, $memory['layer'] );
+		$this->assertSame( array( MemoryFileRegistry::INJECTION_AGENT_MEMORY ), $memory['injection_contexts'] );
+		$this->assertStringContainsString(
+			'Durable observations',
+			datamachine_scaffold_user_memory_content( '', 'USER_MEMORY.md', array( 'user_id' => 7, 'agent_id' => 42 ) )
+		);
+		$this->assertSame( '', datamachine_scaffold_user_memory_content( '', 'USER_MEMORY.md', array( 'user_id' => 0, 'agent_id' => 42 ) ) );
 	}
 
 	/**

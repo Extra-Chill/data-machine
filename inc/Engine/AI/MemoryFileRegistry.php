@@ -32,10 +32,11 @@ class MemoryFileRegistry {
 	/**
 	 * Valid layer identifiers.
 	 */
-	const LAYER_SHARED  = 'shared';
-	const LAYER_AGENT   = 'agent';
-	const LAYER_USER    = 'user';
-	const LAYER_NETWORK = 'network';
+	const LAYER_SHARED    = 'shared';
+	const LAYER_AGENT     = 'agent';
+	const LAYER_USER      = 'user';
+	const LAYER_PRINCIPAL = 'principal';
+	const LAYER_NETWORK   = 'network';
 
 	/**
 	 * Special context value meaning "inject in all contexts."
@@ -83,7 +84,7 @@ class MemoryFileRegistry {
 	 * @param array  $args     {
 	 *  Optional. Registration arguments.
 	 *
-	 *     @type string      $layer           One of 'shared', 'agent', 'user', 'network'. Default 'agent'.
+	 *     @type string      $layer           One of 'shared', 'agent', 'user', 'principal', 'network'. Default 'agent'.
 	 *     @type bool        $protected       Whether the file is protected from deletion. Default false.
 	 *     @type string      $label           Human-readable display label. Default derived from filename.
 	 *     @type string      $description     Optional description of the file's purpose.
@@ -697,6 +698,10 @@ class MemoryFileRegistry {
 
 		if ( self::LAYER_USER === $layer ) {
 			return 'user_global';
+		}
+
+		if ( self::LAYER_PRINCIPAL === $layer ) {
+			return 'user_workspace_private';
 		}
 
 		if ( 'SOUL.md' === $filename ) {
