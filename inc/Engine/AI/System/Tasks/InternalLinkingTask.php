@@ -17,7 +17,6 @@ defined( 'ABSPATH' ) || exit;
 
 use DataMachine\Abilities\Content\GetPostBlocksAbility;
 use DataMachine\Abilities\Content\ReplacePostBlocksAbility;
-use DataMachine\Core\AbilityResult;
 use DataMachine\Core\PluginSettings;
 use DataMachine\Engine\AI\RequestBuilder;
 
@@ -76,12 +75,12 @@ class InternalLinkingTask extends SystemTask {
 			return;
 		}
 
-		$blocks_result = AbilityResult::normalize( GetPostBlocksAbility::execute( array(
+		$blocks_result = GetPostBlocksAbility::execute( array(
 			'post_id'     => $post_id,
 			'block_types' => array( 'core/paragraph' ),
-		) ) );
+		) );
 
-		if ( empty( $blocks_result['success'] ) || empty( $blocks_result['blocks'] ) ) {
+		if ( is_wp_error( $blocks_result ) || empty( $blocks_result['success'] ) || empty( $blocks_result['blocks'] ) ) {
 			$this->completeJob( $jobId, array(
 				'skipped' => true,
 				'post_id' => $post_id,
@@ -194,10 +193,15 @@ class InternalLinkingTask extends SystemTask {
 
 		$revision_id = wp_save_post_revision( $post_id );
 
-		$replace_result = AbilityResult::normalize( ReplacePostBlocksAbility::execute( array(
+		$replace_result = ReplacePostBlocksAbility::execute( array(
 			'post_id'      => $post_id,
 			'replacements' => $replacements,
-		) ) );
+		) );
+
+		if ( is_wp_error( $replace_result ) ) {
+			$this->failJob( $jobId, 'Failed to save block replacements: ' . $replace_result->get_error_message() );
+			return;
+		}
 
 		if ( empty( $replace_result['success'] ) ) {
 			$this->failJob( $jobId, 'Failed to save block replacements: ' . ( $replace_result['error'] ?? 'Unknown error' ) );

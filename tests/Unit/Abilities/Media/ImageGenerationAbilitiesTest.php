@@ -53,17 +53,17 @@ class ImageGenerationAbilitiesTest extends WP_UnitTestCase {
 	}
 
 	public function test_generate_image_missing_prompt(): void {
-		$result = ImageGenerationAbilities::generateImage( array() );
+		$result = wp_get_ability( 'datamachine/generate-image' )->execute( array() );
 
-		$this->assertFalse( $result['success'] );
-		$this->assertStringContainsString( 'requires a prompt', $result['error'] );
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'image_prompt_required', $result->get_error_code() );
 	}
 
 	public function test_generate_image_empty_prompt(): void {
 		$result = ImageGenerationAbilities::generateImage( array( 'prompt' => '' ) );
 
-		$this->assertFalse( $result['success'] );
-		$this->assertStringContainsString( 'requires a prompt', $result['error'] );
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'image_prompt_required', $result->get_error_code() );
 	}
 
 	public function test_generate_image_missing_provider(): void {
@@ -71,15 +71,15 @@ class ImageGenerationAbilitiesTest extends WP_UnitTestCase {
 
 		$result = ImageGenerationAbilities::generateImage( array( 'prompt' => 'Test prompt' ) );
 
-		$this->assertFalse( $result['success'] );
-		$this->assertStringContainsString( 'not configured', $result['error'] );
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'image_generation_not_configured', $result->get_error_code() );
 	}
 
 	public function test_generate_image_missing_config_requires_explicit_provider_and_model(): void {
 		$result = ImageGenerationAbilities::generateImage( array( 'prompt' => 'Test prompt' ) );
 
-		$this->assertFalse( $result['success'] );
-		$this->assertStringContainsString( 'not configured', $result['error'] );
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'image_generation_not_configured', $result->get_error_code() );
 	}
 
 	public function test_generate_image_uses_explicit_config(): void {
@@ -127,8 +127,8 @@ class ImageGenerationAbilitiesTest extends WP_UnitTestCase {
 
 		$result = ImageGenerationAbilities::generateImage( array( 'prompt' => 'Test prompt' ) );
 
-		$this->assertFalse( $result['success'] );
-		$this->assertStringContainsString( 'not registered', $result['error'] );
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertStringContainsString( 'not registered', $result->get_error_message() );
 	}
 
 	public function test_generate_image_support_check_failure(): void {
@@ -139,8 +139,8 @@ class ImageGenerationAbilitiesTest extends WP_UnitTestCase {
 
 		$result = ImageGenerationAbilities::generateImage( array( 'prompt' => 'Test prompt' ) );
 
-		$this->assertFalse( $result['success'] );
-		$this->assertStringContainsString( 'does not support image generation', $result['error'] );
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertStringContainsString( 'does not support image generation', $result->get_error_message() );
 	}
 
 	public function test_generate_image_provider_error(): void {
@@ -151,9 +151,8 @@ class ImageGenerationAbilitiesTest extends WP_UnitTestCase {
 
 		$result = ImageGenerationAbilities::generateImage( array( 'prompt' => 'Test prompt' ) );
 
-		$this->assertFalse( $result['success'] );
-		$this->assertStringContainsString( 'Failed to generate image', $result['error'] );
-		$this->assertStringContainsString( 'Provider unavailable', $result['error'] );
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertStringContainsString( 'Provider unavailable', $result->get_error_message() );
 	}
 
 	public function test_generate_image_success_schedules_job(): void {

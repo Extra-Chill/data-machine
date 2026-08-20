@@ -12,6 +12,21 @@ namespace {
 		define( 'ABSPATH', __DIR__ );
 	}
 
+	if ( ! class_exists( 'WP_Error' ) ) {
+		class WP_Error {
+			public function __construct( private string $code, private string $message, private mixed $data = null ) {}
+			public function get_error_code(): string { return $this->code; }
+			public function get_error_message(): string { return $this->message; }
+			public function get_error_data(): mixed { return $this->data; }
+		}
+	}
+
+	if ( ! function_exists( 'is_wp_error' ) ) {
+		function is_wp_error( $value ): bool {
+			return $value instanceof WP_Error;
+		}
+	}
+
 	$GLOBALS['source_inventory_filters']              = array();
 	$GLOBALS['source_inventory_registered_abilities'] = array();
 
@@ -101,6 +116,7 @@ namespace {
 	require_once __DIR__ . '/../inc/Core/SourceAggregation/SourceInventoryProfiler.php';
 	require_once __DIR__ . '/../inc/Core/Database/BaseRepository.php';
 	require_once __DIR__ . '/../inc/Core/Database/TrackedItems/TrackedItems.php';
+	require_once __DIR__ . '/../inc/Abilities/AbilityRegistration.php';
 	require_once __DIR__ . '/../inc/Abilities/SourceInventoryAbility.php';
 
 	use DataMachine\Abilities\SourceInventoryAbility;
@@ -293,7 +309,7 @@ namespace {
 			'scan'   => true,
 		)
 	);
-	assert_source_inventory( 'unsupported scan fails inside scan result only', true === ( $unsupported['success'] ?? false ) && false === ( $unsupported['scan']['success'] ?? true ) );
+	assert_source_inventory( 'unsupported scan returns native executor error', is_wp_error( $unsupported ) && 'source_inventory_executor_missing' === $unsupported->get_error_code() );
 
 	if ( source_inventory_failed_count() > 0 ) {
 		echo "\nsource-inventory-smoke failed: {$failed}/{$total} assertions failed.\n";

@@ -307,6 +307,10 @@ class LogsCommand extends BaseCommand {
 		}
 
 		$result = LogAbilities::clear( $input );
+		if ( is_wp_error( $result ) ) {
+			WP_CLI::error( $result->get_error_message() );
+			return;
+		}
 
 		if ( ! $result['success'] ) {
 			WP_CLI::error( $result['error'] ?? 'Failed to clear logs' );

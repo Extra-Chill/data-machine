@@ -9,6 +9,7 @@
 
 namespace DataMachine\Tests\Unit\Abilities;
 
+use DataMachine\Api\Settings as SettingsApi;
 use DataMachine\Abilities\SettingsAbilities;
 use WP_UnitTestCase;
 
@@ -306,9 +307,8 @@ class SettingsAbilitiesTest extends WP_UnitTestCase {
 			array( 'tool_id' => '' )
 		);
 
-		$this->assertFalse( $result['success'] );
-		$this->assertArrayHasKey( 'error', $result );
-		$this->assertStringContainsString( 'required', $result['error'] );
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'tool_id_required', $result->get_error_code() );
 	}
 
 	public function test_get_tool_config_returns_error_for_unknown_tool(): void {
@@ -316,9 +316,19 @@ class SettingsAbilitiesTest extends WP_UnitTestCase {
 			array( 'tool_id' => 'nonexistent_tool' )
 		);
 
-		$this->assertFalse( $result['success'] );
-		$this->assertArrayHasKey( 'error', $result );
-		$this->assertStringContainsString( 'Unknown tool', $result['error'] );
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'tool_not_found', $result->get_error_code() );
+	}
+
+	public function test_get_tool_config_rest_boundary_preserves_wp_error(): void {
+		$request = new \WP_REST_Request( 'GET', '/datamachine/v1/settings/tools/nonexistent_tool' );
+		$request->set_param( 'tool_id', 'nonexistent_tool' );
+
+		$result = SettingsApi::handle_get_tool_config( $request );
+
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'tool_not_found', $result->get_error_code() );
+		$this->assertSame( 404, $result->get_error_data()['status'] );
 	}
 
 	public function test_get_handler_defaults_returns_grouped_defaults(): void {
@@ -337,9 +347,8 @@ class SettingsAbilitiesTest extends WP_UnitTestCase {
 			)
 		);
 
-		$this->assertFalse( $result['success'] );
-		$this->assertArrayHasKey( 'error', $result );
-		$this->assertStringContainsString( 'required', $result['error'] );
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'handler_slug_required', $result->get_error_code() );
 	}
 
 	public function test_update_handler_defaults_returns_error_for_unknown_handler(): void {
@@ -350,9 +359,8 @@ class SettingsAbilitiesTest extends WP_UnitTestCase {
 			)
 		);
 
-		$this->assertFalse( $result['success'] );
-		$this->assertArrayHasKey( 'error', $result );
-		$this->assertStringContainsString( 'not found', $result['error'] );
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'handler_not_found', $result->get_error_code() );
 	}
 
 	public function test_github_pat_reported_as_unhandled(): void {

@@ -257,18 +257,14 @@ class LogAbilities {
 	 * @param array $input { level, message, context }.
 	 * @return array Result.
 	 */
-	public static function write( array $input ): array {
+	public static function write( array $input ): array|\WP_Error {
 		$level   = $input['level'];
 		$message = $input['message'];
 		$context = $input['context'] ?? array();
 
 		$valid_levels = datamachine_get_valid_log_levels();
 		if ( ! in_array( $level, $valid_levels, true ) ) {
-			return array(
-				'success'    => false,
-				'error_code' => 'invalid_level',
-				'error'      => 'Invalid log level: ' . $level,
-			);
+			return new \WP_Error( 'invalid_level', 'Invalid log level: ' . $level, array( 'status' => 400 ) );
 		}
 
 		$function_name = 'datamachine_log_' . $level;
@@ -280,10 +276,7 @@ class LogAbilities {
 			);
 		}
 
-		return array(
-			'success' => false,
-			'error'   => 'Failed to write log entry',
-		);
+		return new \WP_Error( 'log_write_failed', 'Failed to write log entry.', array( 'status' => 500 ) );
 	}
 
 	/**
@@ -292,7 +285,7 @@ class LogAbilities {
 	 * @param array $input { agent_id (optional) }.
 	 * @return array Result.
 	 */
-	public static function clear( array $input ): array {
+	public static function clear( array $input ): array|\WP_Error {
 		$repo     = new LogRepository();
 		$agent_id = $input['agent_id'] ?? null;
 
@@ -303,10 +296,7 @@ class LogAbilities {
 		}
 
 		if ( false === $deleted ) {
-			return array(
-				'success' => false,
-				'error'   => 'Failed to clear logs',
-			);
+			return new \WP_Error( 'log_clear_failed', 'Failed to clear logs.', array( 'status' => 500 ) );
 		}
 
 		// Log the clear operation.
@@ -387,24 +377,30 @@ class LogAbilities {
 	 * @param array $input { lines, level, since, search, context }.
 	 * @return array Structured log entries.
 	 */
-	public static function readDebugLog( array $input ): array {
+	public static function readDebugLog( array $input ): array|\WP_Error {
 		$log_file = WP_CONTENT_DIR . '/debug.log';
 
 		// Check if debug.log exists.
 		if ( ! file_exists( $log_file ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'debug.log not found at ' . $log_file,
-				'file'    => $log_file,
+			return new \WP_Error(
+				'debug_log_not_found',
+				'debug.log not found at ' . $log_file,
+				array(
+					'status' => 404,
+					'file'   => $log_file,
+				)
 			);
 		}
 
 		// Check if readable.
 		if ( ! is_readable( $log_file ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'debug.log is not readable',
-				'file'    => $log_file,
+			return new \WP_Error(
+				'debug_log_not_readable',
+				'debug.log is not readable.',
+				array(
+					'status' => 403,
+					'file'   => $log_file,
+				)
 			);
 		}
 

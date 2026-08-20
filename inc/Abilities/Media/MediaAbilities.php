@@ -214,25 +214,24 @@ class MediaAbilities {
 	 * @param array $input Ability input.
 	 * @return array Ability response.
 	 */
-	public function executeUploadMedia( array $input ): array {
+	public function executeUploadMedia( array $input ): array|\WP_Error {
 		$url       = $input['url'] ?? '';
 		$file_path = $input['file_path'] ?? '';
 		$filename  = $input['filename'] ?? '';
 
 		if ( empty( $url ) && empty( $file_path ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'Either url or file_path is required.',
-			);
+			return new \WP_Error( 'media_source_required', 'Either url or file_path is required.', array( 'status' => 400 ) );
 		}
 
 		// Remote URL: download first, then validate.
 		if ( ! empty( $url ) ) {
-			return $this->uploadFromUrl( $url, $filename, $input );
+			$result = $this->uploadFromUrl( $url, $filename, $input );
+			return ! empty( $result['success'] ) ? $result : new \WP_Error( 'media_upload_failed', $result['error'] ?? 'Media upload failed.', array( 'status' => 422 ) );
 		}
 
 		// Local file path: validate and return reference.
-		return $this->uploadFromPath( $file_path, $input );
+		$result = $this->uploadFromPath( $file_path, $input );
+		return ! empty( $result['success'] ) ? $result : new \WP_Error( 'media_upload_failed', $result['error'] ?? 'Media upload failed.', array( 'status' => 422 ) );
 	}
 
 	/**
@@ -241,17 +240,13 @@ class MediaAbilities {
 	 * @param array $input Ability input.
 	 * @return array Validation result.
 	 */
-	public function executeValidateMedia( array $input ): array {
+	public function executeValidateMedia( array $input ): array|\WP_Error {
 		$path        = $input['path'] ?? '';
 		$constraints = $input['constraints'] ?? array();
 		$media_type  = $input['media_type'] ?? '';
 
 		if ( empty( $path ) ) {
-			return array(
-				'success' => false,
-				'valid'   => false,
-				'errors'  => array( 'path is required' ),
-			);
+			return new \WP_Error( 'media_path_required', 'path is required.', array( 'status' => 400 ) );
 		}
 
 		$validator = $this->resolveValidator( $path, $media_type );
@@ -292,18 +287,19 @@ class MediaAbilities {
 	 * @param array $input Ability input.
 	 * @return array Metadata result.
 	 */
-	public function executeVideoMetadata( array $input ): array {
+	public function executeVideoMetadata( array $input ): array|\WP_Error {
 		$path = $input['path'] ?? '';
 
 		if ( empty( $path ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'path is required',
-			);
+			return new \WP_Error( 'media_path_required', 'path is required.', array( 'status' => 400 ) );
 		}
 
 		$metadata            = VideoMetadata::extract( $path );
 		$metadata['success'] = empty( $metadata['error'] ) || $metadata['ffprobe'];
+		if ( ! $metadata['success'] ) {
+			$status = 'File not found' === $metadata['error'] ? 404 : ( 'File not readable' === $metadata['error'] ? 403 : 503 );
+			return new \WP_Error( 'video_metadata_failed', $metadata['error'], array( 'status' => $status ) );
+		}
 
 		return $metadata;
 	}

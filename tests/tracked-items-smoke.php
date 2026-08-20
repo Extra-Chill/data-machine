@@ -74,6 +74,7 @@ namespace DataMachine\Abilities {
 namespace {
 	require_once __DIR__ . '/../inc/Core/Database/BaseRepository.php';
 	require_once __DIR__ . '/../inc/Core/Database/TrackedItems/TrackedItems.php';
+	require_once __DIR__ . '/../inc/Abilities/AbilityRegistration.php';
 	require_once __DIR__ . '/../inc/Abilities/TrackedItemsAbilities.php';
 
 	use DataMachine\Abilities\TrackedItemsAbilities;

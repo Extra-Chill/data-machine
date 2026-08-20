@@ -58,6 +58,10 @@ class SourceInventoryTask extends SystemTask {
 		}
 
 		$result = ( new SourceInventoryAbility() )->execute( $input );
+		if ( is_wp_error( $result ) ) {
+			$this->failJob( $jobId, $result->get_error_message() );
+			return;
+		}
 		if ( empty( $result['success'] ) ) {
 			$this->failJob( $jobId, (string) ( $result['error'] ?? 'Source inventory failed.' ) );
 			return;

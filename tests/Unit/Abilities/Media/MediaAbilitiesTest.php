@@ -44,8 +44,8 @@ class MediaAbilitiesTest extends WP_UnitTestCase {
 	public function test_upload_media_missing_input(): void {
 		$result = $this->abilities->executeUploadMedia( array() );
 
-		$this->assertFalse( $result['success'] );
-		$this->assertStringContainsString( 'url or file_path is required', $result['error'] );
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'media_source_required', $result->get_error_code() );
 	}
 
 	/**
@@ -56,8 +56,8 @@ class MediaAbilitiesTest extends WP_UnitTestCase {
 			'file_path' => '/nonexistent/video.mp4',
 		) );
 
-		$this->assertFalse( $result['success'] );
-		$this->assertStringContainsString( 'not a valid', $result['error'] );
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertStringContainsString( 'not a valid', $result->get_error_message() );
 	}
 
 	/**
@@ -69,8 +69,8 @@ class MediaAbilitiesTest extends WP_UnitTestCase {
 		) );
 
 		// Will fail validation (file doesn't exist), but error message should say "video".
-		$this->assertFalse( $result['success'] );
-		$this->assertStringContainsString( 'video', strtolower( $result['error'] ) );
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertStringContainsString( 'video', strtolower( $result->get_error_message() ) );
 	}
 
 	/**
@@ -82,8 +82,8 @@ class MediaAbilitiesTest extends WP_UnitTestCase {
 		) );
 
 		// Will fail validation (file doesn't exist), but error message should say "image".
-		$this->assertFalse( $result['success'] );
-		$this->assertStringContainsString( 'image', strtolower( $result['error'] ) );
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertStringContainsString( 'image', strtolower( $result->get_error_message() ) );
 	}
 
 	// ── Validate Media ────────────────────────────────────────────────
@@ -94,8 +94,8 @@ class MediaAbilitiesTest extends WP_UnitTestCase {
 	public function test_validate_media_missing_path(): void {
 		$result = $this->abilities->executeValidateMedia( array() );
 
-		$this->assertFalse( $result['success'] );
-		$this->assertContains( 'path is required', $result['errors'] );
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'media_path_required', $result->get_error_code() );
 	}
 
 	/**
@@ -143,8 +143,8 @@ class MediaAbilitiesTest extends WP_UnitTestCase {
 	public function test_video_metadata_missing_path(): void {
 		$result = $this->abilities->executeVideoMetadata( array() );
 
-		$this->assertFalse( $result['success'] );
-		$this->assertStringContainsString( 'path is required', $result['error'] );
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'media_path_required', $result->get_error_code() );
 	}
 
 	/**
@@ -155,8 +155,9 @@ class MediaAbilitiesTest extends WP_UnitTestCase {
 			'path' => '/nonexistent/video.mp4',
 		) );
 
-		$this->assertFalse( $result['success'] );
-		$this->assertSame( 'File not found', $result['error'] );
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'video_metadata_failed', $result->get_error_code() );
+		$this->assertSame( 'File not found', $result->get_error_message() );
 	}
 
 	/**
@@ -175,6 +176,12 @@ class MediaAbilitiesTest extends WP_UnitTestCase {
 		$result = $this->abilities->executeVideoMetadata( array(
 			'path' => $temp_file,
 		) );
+
+		if ( is_wp_error( $result ) ) {
+			$this->assertSame( 'video_metadata_failed', $result->get_error_code() );
+			wp_delete_file( $temp_file );
+			return;
+		}
 
 		$this->assertArrayHasKey( 'duration', $result );
 		$this->assertArrayHasKey( 'width', $result );

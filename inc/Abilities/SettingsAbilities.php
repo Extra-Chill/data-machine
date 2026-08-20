@@ -703,14 +703,11 @@ class SettingsAbilities {
 		);
 	}
 
-	public function executeGetToolConfig( array $input ): array {
+	public function executeGetToolConfig( array $input ): array|\WP_Error {
 		$tool_id = $input['tool_id'] ?? '';
 
 		if ( empty( $tool_id ) ) {
-			return array(
-				'success' => false,
-				'error'   => __( 'Tool ID is required.', 'data-machine' ),
-			);
+			return new \WP_Error( 'tool_id_required', __( 'Tool ID is required.', 'data-machine' ), array( 'status' => 400 ) );
 		}
 
 		$tool_manager    = new \DataMachine\Engine\AI\Tools\ToolManager();
@@ -718,14 +715,11 @@ class SettingsAbilities {
 		$tool_definition = $global_tools[ $tool_id ] ?? null;
 
 		if ( empty( $tool_definition ) || ! is_array( $tool_definition ) ) {
-			return array(
-				'success' => false,
-				'error'   => sprintf(
+			return new \WP_Error( 'tool_not_found', sprintf(
 					/* translators: %s: tool ID */
 					__( 'Unknown tool: %s', 'data-machine' ),
 					$tool_id
-				),
-			);
+			), array( 'status' => 404 ) );
 		}
 
 		$requires_configuration = $tool_manager->requires_configuration( $tool_id );
@@ -774,22 +768,16 @@ class SettingsAbilities {
 		);
 	}
 
-	public function executeSaveToolConfig( array $input ): array {
+	public function executeSaveToolConfig( array $input ): array|\WP_Error {
 		$tool_id     = $input['tool_id'] ?? '';
 		$config_data = $input['config_data'] ?? array();
 
 		if ( empty( $tool_id ) ) {
-			return array(
-				'success' => false,
-				'error'   => __( 'Tool ID is required.', 'data-machine' ),
-			);
+			return new \WP_Error( 'tool_id_required', __( 'Tool ID is required.', 'data-machine' ), array( 'status' => 400 ) );
 		}
 
 		if ( empty( $config_data ) || ! is_array( $config_data ) ) {
-			return array(
-				'success' => false,
-				'error'   => __( 'Valid configuration data is required.', 'data-machine' ),
-			);
+			return new \WP_Error( 'tool_config_required', __( 'Valid configuration data is required.', 'data-machine' ), array( 'status' => 400 ) );
 		}
 
 		$tool_manager    = new \DataMachine\Engine\AI\Tools\ToolManager();
@@ -797,14 +785,11 @@ class SettingsAbilities {
 		$tool_definition = $global_tools[ $tool_id ] ?? null;
 
 		if ( empty( $tool_definition ) ) {
-			return array(
-				'success' => false,
-				'error'   => sprintf(
+			return new \WP_Error( 'tool_not_found', sprintf(
 					/* translators: %s: tool ID */
 					__( 'Unknown tool: %s', 'data-machine' ),
 					$tool_id
-				),
-			);
+			), array( 'status' => 404 ) );
 		}
 
 		$sanitized_config = array();
@@ -819,33 +804,37 @@ class SettingsAbilities {
 		 * Save tool configuration via registered handlers.
 		 *
 		 * Tools hook into this filter via BaseTool::registerConfigurationHandlers().
-		 * Each handler checks if it owns the tool_id and returns a result array
-		 * with 'success' and 'message' or 'error' keys. Handlers that don't own
+		 * Each handler checks if it owns the tool_id and returns a success array
+		 * or WP_Error. Handlers that don't own
 		 * the tool_id pass through the $result unchanged.
 		 *
 		 * @since 0.36.0
 		 *
-		 * @param array|null $result         Result from a previous handler, or null if none handled it yet.
+		 * @param array|\WP_Error|null $result Result from a previous handler, or null if none handled it yet.
 		 * @param string     $tool_id        Tool identifier.
 		 * @param array      $sanitized_config Sanitized configuration data.
 		 */
 		$result = apply_filters( 'datamachine_save_tool_config', null, $tool_id, $sanitized_config );
 
-		if ( is_array( $result ) && isset( $result['success'] ) ) {
-			if ( $result['success'] ) {
-				$result['tool_id'] = $tool_id;
-			}
+		if ( is_wp_error( $result ) ) {
 			return $result;
 		}
 
-		return array(
-			'success' => false,
-			'error'   => sprintf(
+		if ( is_array( $result ) && isset( $result['success'] ) ) {
+			if ( $result['success'] ) {
+				$result['tool_id'] = $tool_id;
+				return $result;
+			}
+
+			// Third-party handlers may still use the pre-WP_Error filter contract.
+			return new \WP_Error( 'tool_config_save_failed', $result['error'] ?? __( 'Failed to save tool configuration', 'data-machine' ), array( 'status' => 500 ) );
+		}
+
+		return new \WP_Error( 'tool_config_handler_missing', sprintf(
 				/* translators: %s: tool ID */
 				__( 'No configuration handler found for tool: %s', 'data-machine' ),
 				$tool_id
-			),
-		);
+		), array( 'status' => 503 ) );
 	}
 
 	public function executeGetHandlerDefaults( array $input ): array {
@@ -898,29 +887,23 @@ class SettingsAbilities {
 		);
 	}
 
-	public function executeUpdateHandlerDefaults( array $input ): array {
+	public function executeUpdateHandlerDefaults( array $input ): array|\WP_Error {
 		$handler_slug = $input['handler_slug'] ?? '';
 		$new_defaults = $input['defaults'] ?? array();
 
 		if ( empty( $handler_slug ) ) {
-			return array(
-				'success' => false,
-				'error'   => __( 'Handler slug is required.', 'data-machine' ),
-			);
+			return new \WP_Error( 'handler_slug_required', __( 'Handler slug is required.', 'data-machine' ), array( 'status' => 400 ) );
 		}
 
 		$handler_abilities = new HandlerAbilities();
 		$handler_info      = $handler_abilities->getHandler( $handler_slug );
 
 		if ( ! $handler_info ) {
-			return array(
-				'success' => false,
-				'error'   => sprintf(
+			return new \WP_Error( 'handler_not_found', sprintf(
 					/* translators: %s: handler slug */
 					__( 'Handler "%s" not found.', 'data-machine' ),
 					$handler_slug
-				),
-			);
+			), array( 'status' => 404 ) );
 		}
 
 		$all_defaults = get_option( self::HANDLER_DEFAULTS_OPTION, array() );
@@ -931,10 +914,7 @@ class SettingsAbilities {
 		$updated = update_option( self::HANDLER_DEFAULTS_OPTION, $all_defaults );
 
 		if ( ! $updated && get_option( self::HANDLER_DEFAULTS_OPTION ) !== $all_defaults ) {
-			return array(
-				'success' => false,
-				'error'   => __( 'Failed to update handler defaults.', 'data-machine' ),
-			);
+			return new \WP_Error( 'handler_defaults_update_failed', __( 'Failed to update handler defaults.', 'data-machine' ), array( 'status' => 500 ) );
 		}
 
 		return array(

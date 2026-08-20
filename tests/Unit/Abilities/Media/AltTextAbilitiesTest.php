@@ -74,11 +74,9 @@ class AltTextAbilitiesTest extends WP_UnitTestCase {
 			'attachment_id' => $this->test_image_id
 		] );
 
-		$this->assertFalse( $result['success'] );
-		$this->assertSame( 0, $result['queued_count'] );
-		$this->assertSame( [], $result['attachment_ids'] );
-		$this->assertStringContainsString( 'No default AI provider', $result['message'] );
-		$this->assertStringContainsString( 'Configure default_provider', $result['error'] );
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'alt_text_ai_not_configured', $result->get_error_code() );
+		$this->assertStringContainsString( 'Configure default_provider', $result->get_error_message() );
 
 		remove_filter( 'pre_option_datamachine_settings', $settings_filter, 10 );
 	}
@@ -98,9 +96,8 @@ class AltTextAbilitiesTest extends WP_UnitTestCase {
 
 		$result = AltTextAbilities::generateAltText( [] );
 
-		$this->assertFalse( $result['success'] );
-		$this->assertSame( 0, $result['queued_count'] );
-		$this->assertStringContainsString( 'No attachment_id or post_id provided', $result['message'] );
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'alt_text_target_required', $result->get_error_code() );
 
 		remove_filter( 'pre_option_datamachine_settings', $settings_filter, 10 );
 	}
@@ -236,9 +233,8 @@ class AltTextAbilitiesTest extends WP_UnitTestCase {
 			'post_id' => 99999
 		] );
 
-		$this->assertFalse( $result['success'] );
-		$this->assertSame( 0, $result['queued_count'] );
-		$this->assertStringContainsString( 'No attachments found', $result['message'] );
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'alt_text_attachments_missing', $result->get_error_code() );
 
 		remove_filter( 'pre_option_datamachine_settings', $settings_filter, 10 );
 	}

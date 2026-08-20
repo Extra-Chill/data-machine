@@ -233,6 +233,9 @@ class Logs {
 		}
 
 		$result = LogAbilities::clear( $input );
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
 
 		if ( ! $result['success'] ) {
 			return new \WP_Error(

@@ -128,7 +128,7 @@ class MetaDescriptionAbilities {
 	 * @param array $input Ability input.
 	 * @return array Ability response.
 	 */
-	public static function generateMetaDescriptions( array $input ): array {
+	public static function generateMetaDescriptions( array $input ): array|\WP_Error {
 		$post_id   = absint( $input['post_id'] ?? 0 );
 		$post_type = isset( $input['post_type'] ) ? sanitize_key( $input['post_type'] ) : '';
 		$limit     = absint( $input['limit'] ?? 50 );
@@ -143,25 +143,14 @@ class MetaDescriptionAbilities {
 		$model              = $system_defaults['model'];
 
 		if ( empty( $provider ) || empty( $model ) ) {
-			return array(
-				'success'      => false,
-				'queued_count' => 0,
-				'post_ids'     => array(),
-				'message'      => 'No default AI provider/model configured.',
-				'error'        => 'Configure default_provider and default_model in Data Machine settings.',
-			);
+			return new \WP_Error( 'meta_description_ai_not_configured', 'Configure default_provider and default_model in Data Machine settings.', array( 'status' => 503 ) );
 		}
 
 		// Single post mode.
 		if ( $post_id > 0 ) {
 			$post = get_post( $post_id );
 			if ( ! $post ) {
-				return array(
-					'success'      => false,
-					'queued_count' => 0,
-					'post_ids'     => array(),
-					'error'        => "Post #{$post_id} not found.",
-				);
+				return new \WP_Error( 'post_not_found', "Post #{$post_id} not found.", array( 'status' => 404 ) );
 			}
 
 			if ( ! $force && ! self::isExcerptMissing( $post ) ) {
@@ -214,12 +203,7 @@ class MetaDescriptionAbilities {
 		);
 
 		if ( false === $batch ) {
-			return array(
-				'success'      => false,
-				'queued_count' => 0,
-				'post_ids'     => array(),
-				'error'        => 'Task batch scheduling failed.',
-			);
+			return new \WP_Error( 'meta_description_batch_schedule_failed', 'Task batch scheduling failed.', array( 'status' => 500 ) );
 		}
 
 		return array(

@@ -54,9 +54,9 @@ class SourceInventoryAbility {
 	 * Execute source inventory profiling.
 	 *
 	 * @param array $input Ability input.
-	 * @return array<string,mixed>
+	 * @return array<string,mixed>|\WP_Error
 	 */
-	public function execute( array $input ): array {
+	public function execute( array $input ): array|\WP_Error {
 		$source  = is_array( $input['source'] ?? null ) ? $input['source'] : array();
 		$profile = ( new SourceInventoryProfiler() )->profile( $source );
 		$result  = array(
@@ -67,15 +67,15 @@ class SourceInventoryAbility {
 		if ( ! empty( $input['scan'] ) ) {
 			$page_callback = $this->resolvePageCallback( $source, $input );
 			if ( ! is_callable( $page_callback ) ) {
-				$result['scan'] = array(
-					'success'     => false,
-					'error'       => 'No source inventory page executor is available for this source.',
-					'diagnostics' => array(
+				return new \WP_Error(
+					'source_inventory_executor_missing',
+					'No source inventory page executor is available for this source.',
+					array(
+						'status'      => 503,
 						'source_kind' => (string) ( $source['kind'] ?? '' ),
-					),
+						'profile'     => $profile,
+					)
 				);
-
-				return $result;
 			}
 
 			$aggregator        = new PageableSourceAggregator();
@@ -86,7 +86,39 @@ class SourceInventoryAbility {
 				$config['item_callback'] = $tracking_callback;
 			}
 
-			$scan = $aggregator->aggregate( $page_callback, $config );
+			$scan_error            = null;
+			$guarded_page_callback = static function ( array $params, array $state ) use ( $page_callback, &$scan_error ): array {
+				$page = $page_callback( $params, $state );
+				if ( is_wp_error( $page ) ) {
+					$scan_error = $page;
+					return array();
+				}
+
+				return is_array( $page ) ? $page : array();
+			};
+
+			try {
+				$scan = $aggregator->aggregate( $guarded_page_callback, $config );
+			} catch ( \Throwable ) {
+				$scan_error = new \WP_Error( 'source_inventory_scan_exception', 'Source inventory scan execution failed.' );
+			}
+			if ( isset( $scan ) && is_wp_error( $scan ) ) {
+				$scan_error = $scan;
+			}
+
+			if ( is_wp_error( $scan_error ) ) {
+				return new \WP_Error(
+					'source_inventory_scan_failed',
+					'Source inventory scan failed.',
+					array(
+						'status'          => 502,
+						'source_kind'     => (string) ( $source['kind'] ?? '' ),
+						'profile'         => $profile,
+						'scan_error_code' => $scan_error->get_error_code(),
+					)
+				);
+			}
+
 			if ( isset( $scan['item_callback'] ) ) {
 				$scan['tracked_items'] = $scan['item_callback'];
 				unset( $scan['item_callback'] );

@@ -142,10 +142,8 @@ class LogAbilitiesTest extends WP_UnitTestCase {
 		$ability = wp_get_ability('datamachine/read-debug-log');
 		$result = $ability->execute([]);
 
-		// Either the file exists and we get entries, or it doesn't and we get an error.
-		// Both are valid outcomes.
-		$this->assertIsArray($result);
-		$this->assertArrayHasKey('success', $result);
+		// Either the file exists and succeeds, or the callback reports a native error.
+		$this->assertTrue( is_wp_error( $result ) || ( is_array( $result ) && ! empty( $result['success'] ) ) );
 	}
 
 	public function testParseDebugLogLine_parsesStandardFormat(): void {

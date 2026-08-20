@@ -215,6 +215,9 @@ class Settings {
 		$result = self::getAbilities()->executeGetToolConfig(
 			array( 'tool_id' => $tool_id )
 		);
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
 
 		if ( ! $result['success'] ) {
 			$status = 400;
@@ -420,6 +423,9 @@ class Settings {
 				'defaults'     => $new_defaults,
 			)
 		);
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
 
 		if ( ! $result['success'] ) {
 			$status = 400;

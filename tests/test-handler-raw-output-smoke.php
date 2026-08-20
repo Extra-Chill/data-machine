@@ -5,10 +5,17 @@
  * Run with: php tests/test-handler-raw-output-smoke.php
  */
 
+$wordpress_root = getenv( 'WP_ROOT' ) ?: '/var/www/extrachill.com';
 if ( ! defined( 'ABSPATH' ) ) {
-	define( 'ABSPATH', dirname( __DIR__ ) . '/' );
+	define( 'ABSPATH', rtrim( $wordpress_root, '/\\' ) . '/' );
 }
 
+if ( ! function_exists( 'do_action' ) ) {
+	function do_action(): void {
+	}
+}
+
+require_once ABSPATH . 'wp-includes/class-wp-error.php';
 require_once __DIR__ . '/fixtures/test-handler-wp-fn-stubs.php';
 require_once dirname( __DIR__ ) . '/inc/Abilities/AbilityRegistration.php';
 require_once dirname( __DIR__ ) . '/inc/Abilities/HandlerAbilities.php';
@@ -304,12 +311,15 @@ $failure = $ability->execute(
 		'output_mode'  => 'raw',
 	)
 );
+$failure_data = $failure instanceof WP_Error ? $failure->get_error_data() : array();
 assert_test_handler_raw( 'handler receives real production credentials required for execution', 'failure-imap-secret' === TestHandlerRawFailureStub::$received_config['imap_password'] && 'failure-api-secret' === TestHandlerRawFailureStub::$received_config['api_secret'] && 'failure-access-token' === TestHandlerRawFailureStub::$received_config['access_token_v2'] );
 assert_test_handler_raw( 'handler receives real singular and plural cookies required for execution', 'failure-cookie' === TestHandlerRawFailureStub::$received_config['cookie'] && 'failure-cookies' === TestHandlerRawFailureStub::$received_config['cookies'] );
 assert_test_handler_raw( 'raw execution bounds handler materialization through max_items', 5 === TestHandlerRawFailureStub::$received_config['max_items'] );
-assert_test_handler_raw( 'failure config compound credentials are sanitized before output is built', '[redacted]' === $failure['config_used']['imap_password'] && '[redacted]' === $failure['config_used']['api_secret'] && '[redacted]' === $failure['config_used']['access_token_v2'] );
-assert_test_handler_raw( 'failure config redacts singular and plural cookies', '[redacted]' === $failure['config_used']['cookie'] && '[redacted]' === $failure['config_used']['cookies'] );
-assert_test_handler_raw( 'failure message cannot echo applied credentials', 'Handler execution failed.' === $failure['error'] && ! str_contains( json_encode( $failure ), 'failure-imap-secret' ) && ! str_contains( json_encode( $failure ), 'failure-api-secret' ) && ! str_contains( json_encode( $failure ), 'failure-access-token' ) && ! str_contains( json_encode( $failure ), 'failure-cookie' ) && ! str_contains( json_encode( $failure ), 'failure-cookies' ) );
+assert_test_handler_raw( 'handler execution failure returns native WP_Error', $failure instanceof WP_Error && 'handler_execution_failed' === $failure->get_error_code() && 'Handler execution failed.' === $failure->get_error_message() );
+assert_test_handler_raw( 'failure preserves bounded handler diagnostics', 'failure-stub' === $failure_data['handler_slug'] && 'Failure Stub' === $failure_data['handler_label'] && is_float( $failure_data['execution_time_ms'] ) );
+assert_test_handler_raw( 'failure config compound credentials are sanitized before output is built', '[redacted]' === $failure_data['config_used']['imap_password'] && '[redacted]' === $failure_data['config_used']['api_secret'] && '[redacted]' === $failure_data['config_used']['access_token_v2'] );
+assert_test_handler_raw( 'failure config redacts singular and plural cookies', '[redacted]' === $failure_data['config_used']['cookie'] && '[redacted]' === $failure_data['config_used']['cookies'] );
+assert_test_handler_raw( 'failure diagnostics cannot echo applied credentials', ! str_contains( json_encode( $failure_data ), 'failure-imap-secret' ) && ! str_contains( json_encode( $failure_data ), 'failure-api-secret' ) && ! str_contains( json_encode( $failure_data ), 'failure-access-token' ) && ! str_contains( json_encode( $failure_data ), 'failure-cookie' ) && ! str_contains( json_encode( $failure_data ), 'failure-cookies' ) );
 
 $bounded_failure = $ability->execute(
 	array(
@@ -322,8 +332,9 @@ $bounded_failure = $ability->execute(
 		'byte_limit'   => 4096,
 	)
 );
-assert_test_handler_raw( 'oversized failure config is replaced before handler execution returns', 'byte_limit' === $bounded_failure['config_used']['_omitted'] );
-assert_test_handler_raw( 'failure stays credential-safe when a secret follows oversized config', 'Handler execution failed.' === $bounded_failure['error'] && ! str_contains( json_encode( $bounded_failure ), 'later-credential' ) );
+$bounded_failure_data = $bounded_failure instanceof WP_Error ? $bounded_failure->get_error_data() : array();
+assert_test_handler_raw( 'oversized failure config is replaced before handler execution returns', 'byte_limit' === $bounded_failure_data['config_used']['_omitted'] );
+assert_test_handler_raw( 'failure stays credential-safe when a secret follows oversized config', 'Handler execution failed.' === $bounded_failure->get_error_message() && ! str_contains( json_encode( $bounded_failure_data ), 'later-credential' ) );
 
 if ( function_exists( 'remove_filter' ) ) {
 	remove_filter( 'datamachine_handlers', $failure_handler_filter, 10 );

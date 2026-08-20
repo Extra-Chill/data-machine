@@ -52,19 +52,20 @@ class SourceAggregateAbility {
 	 * callback through `datamachine_source_aggregate_page_callback`.
 	 *
 	 * @param array $input Ability input.
-	 * @return array Ability result.
+	 * @return array|\WP_Error Ability result or failure.
 	 */
-	public function execute( array $input ): array {
+	public function execute( array $input ): array|\WP_Error {
 		$source = is_array( $input['source'] ?? null ) ? $input['source'] : array();
 
 		$page_callback = $this->resolvePageCallback( $source, $input );
 		if ( ! is_callable( $page_callback ) ) {
-			return array(
-				'success'     => false,
-				'error'       => 'No source aggregation page executor is available for this source.',
-				'diagnostics' => array(
+			return new \WP_Error(
+				'source_aggregate_executor_missing',
+				'No source aggregation page executor is available for this source.',
+				array(
+					'status'      => 503,
 					'source_kind' => (string) ( $source['kind'] ?? '' ),
-				),
+				)
 			);
 		}
 
@@ -73,6 +74,9 @@ class SourceAggregateAbility {
 
 		$aggregator = new PageableSourceAggregator();
 		$result     = $aggregator->aggregate( $page_callback, $config );
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
 
 		return array_merge( array( 'success' => true ), $result );
 	}

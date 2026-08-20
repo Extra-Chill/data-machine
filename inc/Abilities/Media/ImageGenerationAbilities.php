@@ -138,14 +138,11 @@ class ImageGenerationAbilities {
 	 * @param array $input Ability input.
 	 * @return array Ability response.
 	 */
-	public static function generateImage( array $input ): array {
+	public static function generateImage( array $input ): array|\WP_Error {
 		$prompt = sanitize_text_field( $input['prompt'] ?? '' );
 
 		if ( empty( $prompt ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'Image generation requires a prompt.',
-			);
+			return new \WP_Error( 'image_prompt_required', 'Image generation requires a prompt.', array( 'status' => 400 ) );
 		}
 
 		$config   = self::get_config();
@@ -153,18 +150,12 @@ class ImageGenerationAbilities {
 		$model    = ! empty( $input['model'] ) ? sanitize_text_field( $input['model'] ) : ( $config['default_model'] ?? '' );
 
 		if ( empty( $provider ) || empty( $model ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'Image generation not configured. Select a wp-ai-client provider and model in Settings.',
-			);
+			return new \WP_Error( 'image_generation_not_configured', 'Image generation not configured. Select a wp-ai-client provider and model in Settings.', array( 'status' => 503 ) );
 		}
 
 		$unavailable_reason = RequestBuilder::wpAiClientUnavailableReason( $provider );
 		if ( null !== $unavailable_reason ) {
-			return array(
-				'success' => false,
-				'error'   => $unavailable_reason,
-			);
+			return new \WP_Error( 'image_generation_unavailable', $unavailable_reason, array( 'status' => 503 ) );
 		}
 
 		$original_prompt = $prompt;
@@ -243,20 +234,18 @@ class ImageGenerationAbilities {
 		}
 
 		if ( $image_file instanceof \WP_Error || ! is_object( $image_file ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'Failed to generate image: ' . ( $image_file instanceof \WP_Error ? $image_file->get_error_message() : 'wp-ai-client returned no image file.' ),
-			);
+			if ( $image_file instanceof \WP_Error ) {
+				return $image_file;
+			}
+
+			return new \WP_Error( 'image_generation_failed', 'Failed to generate image: wp-ai-client returned no image file.', array( 'status' => 502 ) );
 		}
 
 		$image_url      = is_callable( array( $image_file, 'getUrl' ) ) ? (string) call_user_func( array( $image_file, 'getUrl' ) ) : '';
 		$image_data_uri = is_callable( array( $image_file, 'getDataUri' ) ) ? (string) call_user_func( array( $image_file, 'getDataUri' ) ) : '';
 
 		if ( '' === $image_url && '' === $image_data_uri ) {
-			return array(
-				'success' => false,
-				'error'   => 'wp-ai-client image generation returned no usable image.',
-			);
+			return new \WP_Error( 'image_generation_empty', 'wp-ai-client image generation returned no usable image.', array( 'status' => 502 ) );
 		}
 
 		// Hand off to System Agent for async media handling and post mutation.
@@ -296,10 +285,7 @@ class ImageGenerationAbilities {
 		);
 
 		if ( ! $jobId ) {
-			return array(
-				'success' => false,
-				'error'   => 'Failed to schedule image generation task.',
-			);
+			return new \WP_Error( 'image_generation_schedule_failed', 'Failed to schedule image generation task.', array( 'status' => 500 ) );
 		}
 
 		return array(

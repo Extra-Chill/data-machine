@@ -66,6 +66,10 @@ class HandlersCommand extends BaseCommand {
 				'handler_slug' => $handler_slug,
 			)
 		);
+		if ( is_wp_error( $result ) ) {
+			WP_CLI::error( $result->get_error_message() );
+			return;
+		}
 
 		if ( $handler_slug ) {
 			$settings_class = $ability->getSettingsClass( $handler_slug );
@@ -191,6 +195,10 @@ class HandlersCommand extends BaseCommand {
 				'handler_slug' => $slug,
 			)
 		);
+		if ( is_wp_error( $result ) ) {
+			WP_CLI::error( $result->get_error_message() );
+			return;
+		}
 
 		if ( ! $result['success'] ) {
 			WP_CLI::error( $result['error'] ?? 'Failed to get config fields.' );

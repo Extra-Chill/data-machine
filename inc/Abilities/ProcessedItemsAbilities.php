@@ -339,29 +339,20 @@ class ProcessedItemsAbilities {
 	 * @param array $input Input parameters.
 	 * @return array Result with deletion count.
 	 */
-	public function executeClearProcessedItems( array $input ): array {
+	public function executeClearProcessedItems( array $input ): array|\WP_Error {
 		$clear_type = $input['clear_type'] ?? null;
 		$target_id  = $input['target_id'] ?? null;
 
 		if ( empty( $clear_type ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'clear_type is required',
-			);
+			return new \WP_Error( 'clear_type_required', 'clear_type is required', array( 'status' => 400 ) );
 		}
 
 		if ( ! in_array( $clear_type, array( 'pipeline', 'flow' ), true ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'clear_type must be either "pipeline" or "flow"',
-			);
+			return new \WP_Error( 'clear_type_invalid', 'clear_type must be either "pipeline" or "flow"', array( 'status' => 400 ) );
 		}
 
 		if ( empty( $target_id ) || ! is_numeric( $target_id ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'target_id is required and must be an integer',
-			);
+			return new \WP_Error( 'target_id_invalid', 'target_id is required and must be an integer', array( 'status' => 400 ) );
 		}
 
 		$target_id = (int) $target_id;
@@ -374,10 +365,7 @@ class ProcessedItemsAbilities {
 
 		if ( false === $result ) {
 			do_action( 'datamachine_log', 'error', 'Processed items deletion failed', array( 'criteria' => $criteria ) );
-			return array(
-				'success' => false,
-				'error'   => 'Failed to delete processed items',
-			);
+			return new \WP_Error( 'processed_items_delete_failed', 'Failed to delete processed items.', array( 'status' => 500 ) );
 		}
 
 		$scope_label = 'pipeline' === $clear_type ? "pipeline {$target_id}" : "flow {$target_id}";
@@ -406,30 +394,21 @@ class ProcessedItemsAbilities {
 	 * @param array $input Input parameters.
 	 * @return array Result with is_processed flag.
 	 */
-	public function executeCheckProcessedItem( array $input ): array {
+	public function executeCheckProcessedItem( array $input ): array|\WP_Error {
 		$flow_step_id    = $input['flow_step_id'] ?? null;
 		$source_type     = $input['source_type'] ?? null;
 		$item_identifier = $input['item_identifier'] ?? null;
 
 		if ( empty( $flow_step_id ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'flow_step_id is required',
-			);
+			return new \WP_Error( 'flow_step_id_required', 'flow_step_id is required', array( 'status' => 400 ) );
 		}
 
 		if ( empty( $source_type ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'source_type is required',
-			);
+			return new \WP_Error( 'source_type_required', 'source_type is required', array( 'status' => 400 ) );
 		}
 
 		if ( empty( $item_identifier ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'item_identifier is required',
-			);
+			return new \WP_Error( 'item_identifier_required', 'item_identifier is required', array( 'status' => 400 ) );
 		}
 
 		$flow_step_id    = sanitize_text_field( $flow_step_id );
@@ -454,14 +433,11 @@ class ProcessedItemsAbilities {
 	 * @param array $input Input parameters.
 	 * @return array Result with has_history flag.
 	 */
-	public function executeHasProcessedHistory( array $input ): array {
+	public function executeHasProcessedHistory( array $input ): array|\WP_Error {
 		$flow_step_id = $input['flow_step_id'] ?? null;
 
 		if ( empty( $flow_step_id ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'flow_step_id is required',
-			);
+			return new \WP_Error( 'flow_step_id_required', 'flow_step_id is required', array( 'status' => 400 ) );
 		}
 
 		$flow_step_id = sanitize_text_field( $flow_step_id );
@@ -480,30 +456,21 @@ class ProcessedItemsAbilities {
 	 * @param array $input Input parameters.
 	 * @return array Result with processed_at timestamp (or null).
 	 */
-	public function executeGetProcessedAt( array $input ): array {
+	public function executeGetProcessedAt( array $input ): array|\WP_Error {
 		$flow_step_id    = $input['flow_step_id'] ?? null;
 		$source_type     = $input['source_type'] ?? null;
 		$item_identifier = $input['item_identifier'] ?? null;
 
 		if ( empty( $flow_step_id ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'flow_step_id is required',
-			);
+			return new \WP_Error( 'flow_step_id_required', 'flow_step_id is required', array( 'status' => 400 ) );
 		}
 
 		if ( empty( $source_type ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'source_type is required',
-			);
+			return new \WP_Error( 'source_type_required', 'source_type is required', array( 'status' => 400 ) );
 		}
 
 		if ( empty( $item_identifier ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'item_identifier is required',
-			);
+			return new \WP_Error( 'item_identifier_required', 'item_identifier is required', array( 'status' => 400 ) );
 		}
 
 		$flow_step_id    = sanitize_text_field( $flow_step_id );
@@ -528,7 +495,7 @@ class ProcessedItemsAbilities {
 	 * @param array $input Input parameters.
 	 * @return array Result with stale_ids array.
 	 */
-	public function executeFindStale( array $input ): array {
+	public function executeFindStale( array $input ): array|\WP_Error {
 		$flow_step_id = $input['flow_step_id'] ?? null;
 		$source_type  = $input['source_type'] ?? null;
 		$candidates   = $input['candidate_identifiers'] ?? null;
@@ -536,31 +503,19 @@ class ProcessedItemsAbilities {
 		$limit        = $input['limit'] ?? 100;
 
 		if ( empty( $flow_step_id ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'flow_step_id is required',
-			);
+			return new \WP_Error( 'flow_step_id_required', 'flow_step_id is required', array( 'status' => 400 ) );
 		}
 
 		if ( empty( $source_type ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'source_type is required',
-			);
+			return new \WP_Error( 'source_type_required', 'source_type is required', array( 'status' => 400 ) );
 		}
 
 		if ( ! is_array( $candidates ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'candidate_identifiers must be an array',
-			);
+			return new \WP_Error( 'candidate_identifiers_invalid', 'candidate_identifiers must be an array', array( 'status' => 400 ) );
 		}
 
 		if ( ! is_numeric( $max_age_days ) || (int) $max_age_days < 1 ) {
-			return array(
-				'success' => false,
-				'error'   => 'max_age_days must be an integer >= 1',
-			);
+			return new \WP_Error( 'max_age_days_invalid', 'max_age_days must be an integer >= 1', array( 'status' => 400 ) );
 		}
 
 		$flow_step_id = sanitize_text_field( $flow_step_id );
@@ -588,31 +543,22 @@ class ProcessedItemsAbilities {
 	 * @param array $input Input parameters.
 	 * @return array Result with never_processed array.
 	 */
-	public function executeFindNeverProcessed( array $input ): array {
+	public function executeFindNeverProcessed( array $input ): array|\WP_Error {
 		$flow_step_id = $input['flow_step_id'] ?? null;
 		$source_type  = $input['source_type'] ?? null;
 		$candidates   = $input['candidate_identifiers'] ?? null;
 		$limit        = $input['limit'] ?? 100;
 
 		if ( empty( $flow_step_id ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'flow_step_id is required',
-			);
+			return new \WP_Error( 'flow_step_id_required', 'flow_step_id is required', array( 'status' => 400 ) );
 		}
 
 		if ( empty( $source_type ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'source_type is required',
-			);
+			return new \WP_Error( 'source_type_required', 'source_type is required', array( 'status' => 400 ) );
 		}
 
 		if ( ! is_array( $candidates ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'candidate_identifiers must be an array',
-			);
+			return new \WP_Error( 'candidate_identifiers_invalid', 'candidate_identifiers must be an array', array( 'status' => 400 ) );
 		}
 
 		$flow_step_id = sanitize_text_field( $flow_step_id );
