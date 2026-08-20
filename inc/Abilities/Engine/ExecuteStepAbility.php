@@ -124,7 +124,7 @@ class ExecuteStepAbility {
 	 * @param array $input Input with job_id and flow_step_id.
 	 * @return array Result with step execution outcome.
 	 */
-	public function execute( array $input ): array {
+	public function execute( array $input ): array|\WP_Error {
 		$job_id                = (int) ( $input['job_id'] ?? 0 );
 		$flow_step_id          = (string) ( $input['flow_step_id'] ?? '' );
 		$operation_generation  = max( 0, (int) ( $input['operation_generation'] ?? 0 ) );
@@ -135,9 +135,14 @@ class ExecuteStepAbility {
 		$job                   = $this->db_jobs->get_job( $job_id );
 
 		if ( ! $job ) {
-			return array(
-				'success' => false,
-				'error'   => sprintf( 'Job %d not found.', $job_id ),
+			return new \WP_Error(
+				'job_not_found',
+				sprintf( 'Job %d not found.', $job_id ),
+				array(
+					'status'    => 404,
+					'job_id'    => $job_id,
+					'retryable' => false,
+				)
 			);
 		}
 		if ( $recovery_generation > 0 && ! $this->recoveryGenerationAdmission( $job, $recovery_generation, $recovery_claim_token ) ) {

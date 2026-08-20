@@ -89,9 +89,12 @@ class ScheduleFlowAbility {
 	 * @param array $input Input with flow_id and interval_or_timestamp.
 	 * @return array Result with scheduling details.
 	 */
-	public function execute( array $input ): array {
+	public function execute( array $input ): array|\WP_Error {
 		$flow_id               = (int) ( $input['flow_id'] ?? 0 );
 		$interval_or_timestamp = $input['interval_or_timestamp'] ?? null;
+		if ( $flow_id <= 0 ) {
+			return new \WP_Error( 'invalid_flow_id', 'flow_id must be a positive integer.', array( 'status' => 400 ) );
+		}
 
 		if ( 'manual' === $interval_or_timestamp ) {
 			return $this->clearSchedule( $flow_id );
@@ -117,7 +120,7 @@ class ScheduleFlowAbility {
 	 * @param int $flow_id Flow ID.
 	 * @return array Result.
 	 */
-	private function clearSchedule( int $flow_id ): array {
+	private function clearSchedule( int $flow_id ): array|\WP_Error {
 		$result = \DataMachine\Api\Flows\FlowScheduling::handle_scheduling_update(
 			$flow_id,
 			array( 'interval' => 'manual' ),
@@ -147,7 +150,7 @@ class ScheduleFlowAbility {
 	 * @param int $timestamp Unix timestamp for execution.
 	 * @return array Result.
 	 */
-	private function scheduleOneTime( int $flow_id, int $timestamp ): array {
+	private function scheduleOneTime( int $flow_id, int $timestamp ): array|\WP_Error {
 		$result = \DataMachine\Api\Flows\FlowScheduling::handle_scheduling_update(
 			$flow_id,
 			array(
@@ -193,7 +196,7 @@ class ScheduleFlowAbility {
 	 * @param string $cron_expression Cron expression string (e.g. "0 9 * * 1-5").
 	 * @return array Result.
 	 */
-	private function scheduleCron( int $flow_id, string $cron_expression ): array {
+	private function scheduleCron( int $flow_id, string $cron_expression ): array|\WP_Error {
 		$result = \DataMachine\Api\Flows\FlowScheduling::handle_scheduling_update(
 			$flow_id,
 			array(
@@ -231,7 +234,7 @@ class ScheduleFlowAbility {
 	 * @param string $interval Interval key from datamachine_scheduler_intervals filter.
 	 * @return array Result.
 	 */
-	private function scheduleRecurring( int $flow_id, string $interval ): array {
+	private function scheduleRecurring( int $flow_id, string $interval ): array|\WP_Error {
 		$result = \DataMachine\Api\Flows\FlowScheduling::handle_scheduling_update(
 			$flow_id,
 			array( 'interval' => $interval )
@@ -258,10 +261,12 @@ class ScheduleFlowAbility {
 	/**
 	 * Preserve scheduler retry/status metadata at the ability boundary.
 	 */
-	private function scheduleError( \WP_Error $error ): array {
-		return array_merge(
-			array( 'success' => false ),
-			\DataMachine\Engine\Tasks\RecurringScheduler::errorMetadata( $error )
+	private function scheduleError( \WP_Error $error ): \WP_Error {
+		$data = $error->get_error_data();
+		return new \WP_Error(
+			$error->get_error_code(),
+			$error->get_error_message(),
+			is_array( $data ) ? $data : array( 'status' => 500 )
 		);
 	}
 }

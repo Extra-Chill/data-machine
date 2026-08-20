@@ -2460,7 +2460,7 @@ class JobsCommand extends BaseCommand {
 			return;
 		}
 
-		$result = ( new RunMetricsAbility() )->execute( array( 'job_id' => (int) $args[0] ) );
+		$result = AbilityResult::normalize( ( new RunMetricsAbility() )->execute( array( 'job_id' => (int) $args[0] ) ) );
 		if ( ! $result['success'] ) {
 			WP_CLI::error( $result['error'] ?? 'Unknown error occurred' );
 			return;
@@ -2543,12 +2543,12 @@ class JobsCommand extends BaseCommand {
 			return;
 		}
 
-		$result = ( new FailJobAbility() )->execute(
+		$result = AbilityResult::normalize( ( new FailJobAbility() )->execute(
 			array(
 				'job_id' => (int) $args[0],
 				'reason' => $assoc_args['reason'] ?? 'manual',
 			)
-		);
+		) );
 
 		if ( ! $result['success'] ) {
 			WP_CLI::error( $result['error'] ?? 'Unknown error occurred' );
@@ -2588,12 +2588,12 @@ class JobsCommand extends BaseCommand {
 			return;
 		}
 
-		$result = ( new RetryJobAbility() )->execute(
+		$result = AbilityResult::normalize( ( new RetryJobAbility() )->execute(
 			array(
 				'job_id' => (int) $args[0],
 				'force'  => isset( $assoc_args['force'] ),
 			)
-		);
+		) );
 
 		if ( ! $result['success'] ) {
 			WP_CLI::error( $result['error'] ?? 'Unknown error occurred' );

@@ -88,6 +88,10 @@ class DeleteJobsAbility {
 
 		$result = $this->deleteJobs( $criteria, $cleanup_processed );
 
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+
 		if ( ! $result['success'] ) {
 			return new \WP_Error( 'delete_failed', 'Failed to delete jobs', array( 'status' => 500 ) );
 		}

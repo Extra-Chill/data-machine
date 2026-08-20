@@ -1163,12 +1163,12 @@ class FlowsCommand extends BaseCommand {
 				return;
 			}
 
-			$result = $ability->execute(
+			$result = AbilityResult::normalize( $ability->execute(
 				array(
 					'flow_id'               => $flow_id,
 					'interval_or_timestamp' => $timestamp,
 				)
-			);
+			) );
 
 			if ( ! ( $result['success'] ?? false ) ) {
 				WP_CLI::error( $result['error'] ?? 'Failed to schedule flow' );
@@ -1189,7 +1189,7 @@ class FlowsCommand extends BaseCommand {
 		$job_ids = array();
 
 		for ( $i = 0; $i < $count; $i++ ) {
-			$result = $ability->execute( array( 'flow_id' => $flow_id ) );
+			$result = AbilityResult::normalize( $ability->execute( array( 'flow_id' => $flow_id ) ) );
 
 			if ( ! ( $result['success'] ?? false ) ) {
 				if ( empty( $job_ids ) ) {

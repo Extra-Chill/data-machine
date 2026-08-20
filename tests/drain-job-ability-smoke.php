@@ -37,7 +37,7 @@ assert_drain_job_contains( 'DEFAULT_STEP_BUDGET = 50', $ability_source, 'sane de
 assert_drain_job_contains( 'DEFAULT_TIME_BUDGET_MS = 300000', $ability_source, 'sane default wall-clock budget is declared' );
 assert_drain_job_contains( "'step_budget'", $ability_source, 'step budget is exposed in input schema' );
 assert_drain_job_contains( "'time_budget_ms'", $ability_source, 'wall-clock budget is exposed in input schema' );
-assert_drain_job_contains( "'error_type' => 'action_scheduler_unavailable'", $ability_source, 'AS unavailability returns a typed error' );
+assert_drain_job_true( 1 === preg_match( "/'error_type'\s*=>\s*'action_scheduler_unavailable'/", $ability_source ), 'AS unavailability returns a typed error' );
 assert_drain_job_contains( '( new ScopedDrainService() )->drain(', $ability_source, 'ability delegates to the shared scoped drain service' );
 assert_drain_job_contains( "'job_ids'                  => array( $" . 'job_id )', $ability_source, 'drain is scoped to one job_id' );
 assert_drain_job_contains( 'ScopedDrainService::HOOK_EXECUTE_STEP', $ability_source, 'drain includes execute-step actions' );

@@ -11,6 +11,7 @@ use DataMachine\Abilities\Job\ExecuteWorkflowAbility;
 use DataMachine\Abilities\Engine\DrainJobAbility;
 use DataMachine\Core\Agents\AgentBundler;
 use DataMachine\Core\Agents\AgentIdentityResolver;
+use DataMachine\Core\AbilityResult;
 use DataMachine\Core\Database\Jobs\Jobs;
 use DataMachine\Core\DataPath;
 use DataMachine\Core\JobStatus;
@@ -121,11 +122,13 @@ final class AgentBundleRunner {
 		$response = $this->with_runtime_controls(
 			$input,
 			function () use ( $workflow, $initial_data, $input ): array {
-				$result = ( new ExecuteWorkflowAbility() )->execute(
-					array(
-						'workflow'     => $workflow,
-						'initial_data' => $initial_data,
-						'timestamp'    => $input['timestamp'] ?? null,
+				$result = $this->normalize_ability_result(
+					( new ExecuteWorkflowAbility() )->execute(
+						array(
+							'workflow'     => $workflow,
+							'initial_data' => $initial_data,
+							'timestamp'    => $input['timestamp'] ?? null,
+						)
 					)
 				);
 
@@ -630,13 +633,13 @@ final class AgentBundleRunner {
 			return $response;
 		}
 
-		$drain_result = ( new DrainJobAbility() )->execute(
+		$drain_result = $this->normalize_ability_result( ( new DrainJobAbility() )->execute(
 			array(
 				'job_id'         => $job_id,
 				'step_budget'    => max( 1, (int) ( $input['step_budget'] ?? 50 ) ),
 				'time_budget_ms' => max( 1, (int) ( $input['time_budget_ms'] ?? 300000 ) ),
 			)
-		);
+		) );
 
 		$job         = ( new Jobs() )->get_job( $job_id );
 		$job_status  = is_array( $job ) ? (string) ( $job['status'] ?? '' ) : '';
@@ -648,6 +651,22 @@ final class AgentBundleRunner {
 		$response['engine_data']         = $engine_data;
 
 		return $response;
+	}
+
+	/** Preserve durable native-error metadata in the public bundle envelope. */
+	private function normalize_ability_result( $result ): array {
+		$normalized = AbilityResult::normalize( $result );
+		if ( ! is_wp_error( $result ) ) {
+			return $normalized;
+		}
+
+		$error_data = $result->get_error_data();
+		if ( ! is_array( $error_data ) ) {
+			return $normalized;
+		}
+
+		unset( $error_data['status'] );
+		return array_merge( $error_data, $normalized );
 	}
 
 	/** @return array<string,mixed> */
@@ -729,11 +748,11 @@ final class AgentBundleRunner {
 		}
 
 		$owner_id = $this->runtime_import_owner_id( $input );
-		$options = array(
+		$options  = array(
 			'is_upgrade'        => true,
 			'reconcile_runtime' => true,
 		);
-		$result  = empty( $bundle )
+		$result   = empty( $bundle )
 			? $this->bundler->import_directory_object( $directory, null, $owner_id, false, $options )
 			: $this->bundler->import( $bundle, null, $owner_id, false, $options );
 		if ( empty( $result['success'] ) ) {
@@ -856,7 +875,7 @@ final class AgentBundleRunner {
 			);
 		}
 
-		$revision = BundleSource::is_remote( $source ) ? BundleSource::last_resolved_revision() : null;
+		$revision  = BundleSource::is_remote( $source ) ? BundleSource::last_resolved_revision() : null;
 		$bundle    = null;
 		$directory = null;
 		try {
