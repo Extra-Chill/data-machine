@@ -379,12 +379,15 @@ class BatchScheduler {
 	 *   has been lost; consumer must fail the parent in that case.
 	 */
 	public static function processChunk( int $parent_job_id, callable $createItem, ?int $expected_offset = null ): array {
-		$parent_engine = datamachine_get_engine_data( $parent_job_id );
+		// A scheduled chunk starts in a separate request. Read through the jobs
+		// table so stale persistent-cache state cannot hide a committed worklist.
+		$parent_job    = ( new Jobs() )->get_job( $parent_job_id );
+		$parent_engine = is_array( $parent_job['engine_data'] ?? null ) ? $parent_job['engine_data'] : array();
 		if ( self::STORAGE_VERSION === (int) ( $parent_engine['batch_storage_version'] ?? 0 ) ) {
 			return self::processV2Chunk( $parent_job_id, $createItem, $expected_offset, $parent_engine );
 		}
 
-		return self::processLegacyChunk( $parent_job_id, $createItem, $expected_offset );
+		return self::processLegacyChunk( $parent_job_id, $createItem, $expected_offset, $parent_engine );
 	}
 
 	/** Process a durable v2 worklist chunk. */
@@ -721,9 +724,8 @@ class BatchScheduler {
 	}
 
 	/** Existing engine_data worklist processor for persisted v1 batches. */
-	private static function processLegacyChunk( int $parent_job_id, callable $createItem, ?int $expected_offset = null ): array {
-		$parent_engine = datamachine_get_engine_data( $parent_job_id );
-		$batch_state   = $parent_engine['batch_state'] ?? null;
+	private static function processLegacyChunk( int $parent_job_id, callable $createItem, ?int $expected_offset, array $parent_engine ): array {
+		$batch_state = $parent_engine['batch_state'] ?? null;
 
 		if ( ! is_array( $batch_state ) ) {
 			if ( null !== $expected_offset && ! empty( $parent_engine['batch'] ) ) {
