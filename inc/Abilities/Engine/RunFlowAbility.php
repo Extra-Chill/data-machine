@@ -112,16 +112,20 @@ class RunFlowAbility {
 	 * @param array $input Input with flow_id, optional job_id, initial_data, and respect_paused.
 	 * @return array Result with success status and execution details.
 	 */
-	public function execute( array $input ): array {
+	public function execute( array $input ): array|\WP_Error {
 		$flow_id = (int) ( $input['flow_id'] ?? 0 );
 		$job_id  = $input['job_id'] ?? null;
 
 		$flow = $this->db_flows->get_flow( $flow_id );
 		if ( ! $flow ) {
 			do_action( 'datamachine_log', 'error', 'Flow execution failed - flow not found', array( 'flow_id' => $flow_id ) );
-			return array(
-				'success' => false,
-				'error'   => sprintf( 'Flow %d not found.', $flow_id ),
+			return new \WP_Error(
+				'flow_not_found',
+				sprintf( 'Flow %d not found.', $flow_id ),
+				array(
+					'status'  => 404,
+					'flow_id' => $flow_id,
+				)
 			);
 		}
 
@@ -137,9 +141,14 @@ class RunFlowAbility {
 				'Flow execution skipped - flow is paused',
 				array( 'flow_id' => $flow_id )
 			);
-			return array(
-				'success' => false,
-				'error'   => sprintf( 'Flow %d is paused.', $flow_id ),
+			return new \WP_Error(
+				'flow_paused',
+				sprintf( 'Flow %d is paused.', $flow_id ),
+				array(
+					'status'    => 409,
+					'retryable' => true,
+					'flow_id'   => $flow_id,
+				)
 			);
 		}
 
@@ -225,9 +234,14 @@ class RunFlowAbility {
 						'pipeline_id' => $pipeline_id,
 					)
 				);
-				return array(
-					'success' => false,
-					'error'   => 'Job creation failed - database insert failed.',
+				return new \WP_Error(
+					'job_creation_failed',
+					'Job creation failed - database insert failed.',
+					array(
+						'status'    => 500,
+						'retryable' => true,
+						'flow_id'   => $flow_id,
+					)
 				);
 			}
 			do_action(
@@ -340,11 +354,15 @@ class RunFlowAbility {
 					'error'       => $e->getMessage(),
 				)
 			);
-			return array(
-				'success' => false,
-				'job_id'  => $job_id,
-				'reason'  => 'invalid_execution_plan',
-				'error'   => $e->getMessage(),
+			return new \WP_Error(
+				'invalid_execution_plan',
+				$e->getMessage(),
+				array(
+					'status'    => 400,
+					'job_id'    => $job_id,
+					'flow_id'   => $flow_id,
+					'retryable' => false,
+				)
 			);
 		}
 
@@ -361,11 +379,15 @@ class RunFlowAbility {
 					'flow_id'     => $flow_id,
 				)
 			);
-			return array(
-				'success' => false,
-				'job_id'  => $job_id,
-				'reason'  => 'no_first_step',
-				'error'   => 'Flow execution failed - no first step found.',
+			return new \WP_Error(
+				'no_first_step',
+				'Flow execution failed - no first step found.',
+				array(
+					'status'    => 400,
+					'job_id'    => $job_id,
+					'flow_id'   => $flow_id,
+					'retryable' => false,
+				)
 			);
 		}
 

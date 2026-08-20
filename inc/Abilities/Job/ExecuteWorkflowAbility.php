@@ -108,7 +108,7 @@ class ExecuteWorkflowAbility {
 	 * @param array $input Input parameters with workflow, optional timestamp, initial_data, dry_run.
 	 * @return array Result with job_id and execution info.
 	 */
-	public function execute( array $input ): array {
+	public function execute( array $input ): array|\WP_Error {
 		return $this->executeWithAuthority( $input, false );
 	}
 
@@ -118,7 +118,7 @@ class ExecuteWorkflowAbility {
 	 * @param array $input Workflow input.
 	 * @return array
 	 */
-	public function executeInternal( array $input ): array {
+	public function executeInternal( array $input ): array|\WP_Error {
 		return $this->executeWithAuthority( $input, true );
 	}
 
@@ -129,18 +129,23 @@ class ExecuteWorkflowAbility {
 	 * @param bool  $system_context Trusted internal system execution.
 	 * @return array
 	 */
-	private function executeWithAuthority( array $input, bool $system_context ): array {
-		$workflow      = $input['workflow'] ?? null;
-		$timestamp     = $input['timestamp'] ?? null;
-		$initial_data  = is_array( $input['initial_data'] ?? null ) ? $input['initial_data'] : array();
-		$operation_key = is_string( $input['operation_key'] ?? null ) ? trim( $input['operation_key'] ) : '';
+	private function executeWithAuthority( array $input, bool $system_context ): array|\WP_Error {
+		$workflow         = $input['workflow'] ?? null;
+		$timestamp        = $input['timestamp'] ?? null;
+		$initial_data     = is_array( $input['initial_data'] ?? null ) ? $input['initial_data'] : array();
+		$operation_key    = is_string( $input['operation_key'] ?? null ) ? trim( $input['operation_key'] ) : '';
+		$input_error_data = array(
+			'status'    => 400,
+			'retryable' => false,
+		);
 
 		// Validate workflow structure
 		$validation = WorkflowSpecValidator::validate( $workflow );
 		if ( ! $validation['valid'] ) {
-			return array(
-				'success' => false,
-				'error'   => $validation['error'],
+			return new \WP_Error(
+				'invalid_workflow',
+				$validation['error'],
+				$input_error_data
 			);
 		}
 
@@ -149,24 +154,31 @@ class ExecuteWorkflowAbility {
 		try {
 			$first_step_id = ExecutionPlan::from_flow_config( $configs['flow_config'] )->first_step_id();
 		} catch ( \InvalidArgumentException $e ) {
-			return array(
-				'success' => false,
-				'error'   => $e->getMessage(),
+			return new \WP_Error(
+				'invalid_execution_plan',
+				$e->getMessage(),
+				$input_error_data
 			);
 		}
 
 		if ( ! $first_step_id ) {
-			return array(
-				'success' => false,
-				'error'   => 'Could not determine first step in workflow',
+			return new \WP_Error(
+				'no_first_step',
+				'Could not determine first step in workflow',
+				$input_error_data
 			);
 		}
 
 		$ownership = $this->resolveOwnership( $initial_data, $system_context );
 		if ( isset( $ownership['error'] ) ) {
-			return array(
-				'success' => false,
-				'error'   => $ownership['error'],
+			return new \WP_Error(
+				'workflow_ownership_denied',
+				$ownership['error'],
+				array(
+					'status'    => 403,
+					'retryable' => false,
+					'ownership' => 'caller',
+				)
 			);
 		}
 
@@ -248,27 +260,41 @@ class ExecuteWorkflowAbility {
 		$job_id                     = is_array( $creation ) ? (int) ( $creation['job_id'] ?? 0 ) : (int) $creation;
 
 		if ( $job_id <= 0 ) {
-			return array(
-				'success' => false,
-				'error'   => 'Failed to create job record',
+			return new \WP_Error(
+				'job_creation_failed',
+				'Failed to create job record',
+				array(
+					'status'    => 500,
+					'retryable' => true,
+				)
 			);
 		}
 
 		if ( is_array( $creation ) && ! empty( $creation['already_exists'] ) ) {
 			$existing_fingerprint = (string) ( $creation['job']['request_fingerprint'] ?? '' );
 			if ( '' === $existing_fingerprint || ! hash_equals( $existing_fingerprint, $request_fingerprint ) ) {
-				return array(
-					'success' => false,
-					'error'   => 'operation_key has already been used with different workflow input.',
+				return new \WP_Error(
+					'operation_key_conflict',
+					'operation_key has already been used with different workflow input.',
+					array(
+						'status'    => 409,
+						'retryable' => false,
+						'ownership' => 'operation',
+					)
 				);
 			}
 		}
 
 		$job = $this->db_jobs->get_job( $job_id );
 		if ( ! is_array( $job ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'Failed to load job record after creation',
+			return new \WP_Error(
+				'job_load_failed',
+				'Failed to load job record after creation',
+				array(
+					'status'    => 500,
+					'retryable' => true,
+					'job_id'    => $job_id,
+				)
 			);
 		}
 
@@ -281,9 +307,15 @@ class ExecuteWorkflowAbility {
 		$existing_engine_data['job']           = is_array( $existing_engine_data['job'] ?? null ) ? $existing_engine_data['job'] : array();
 		$existing_engine_data['job']['job_id'] = $job_id;
 		if ( ! $this->db_jobs->store_engine_data( $job_id, $existing_engine_data ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'Failed to persist job execution data; replay may retry the operation.',
+			return new \WP_Error(
+				'engine_data_persist_failed',
+				'Failed to persist job execution data; replay may retry the operation.',
+				array(
+					'status'    => 500,
+					'retryable' => true,
+					'job_id'    => $job_id,
+					'recovery'  => 'replay',
+				)
 			);
 		}
 
@@ -293,11 +325,16 @@ class ExecuteWorkflowAbility {
 			is_numeric( $timestamp ) ? (int) $timestamp : null
 		);
 		if ( empty( $enqueue['success'] ) ) {
-			return array(
-				'success'       => false,
-				'error'         => (string) ( $enqueue['error'] ?? 'enqueue_failed' ),
-				'retryable'     => ! empty( $enqueue['retryable'] ),
-				'enqueue_state' => (string) ( $enqueue['state'] ?? 'enqueue_failed' ),
+			return new \WP_Error(
+				(string) ( $enqueue['error_code'] ?? 'enqueue_failed' ),
+				(string) ( $enqueue['error'] ?? 'enqueue_failed' ),
+				array(
+					'status'        => 503,
+					'retryable'     => ! empty( $enqueue['retryable'] ),
+					'enqueue_state' => (string) ( $enqueue['state'] ?? 'enqueue_failed' ),
+					'job_id'        => $job_id,
+					'ownership'     => 'scheduler',
+				)
 			);
 		}
 

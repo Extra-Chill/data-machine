@@ -226,11 +226,7 @@ class WebhookTrigger {
 				)
 			);
 
-			return new \WP_Error(
-				'execution_failed',
-				$result->get_error_message(),
-				array( 'status' => 500 )
-			);
+			return $result;
 		}
 
 		if ( ! ( $result['success'] ?? false ) ) {

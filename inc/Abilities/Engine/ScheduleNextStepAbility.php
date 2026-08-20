@@ -91,10 +91,13 @@ class ScheduleNextStepAbility {
 	 * @param array $input Input with job_id, flow_step_id, and optional data_packets.
 	 * @return array Result with success status and action_id.
 	 */
-	public function execute( array $input ): array {
+	public function execute( array $input ): array|\WP_Error {
 		$job_id       = (int) ( $input['job_id'] ?? 0 );
 		$flow_step_id = $input['flow_step_id'] ?? '';
 		$dataPackets  = $input['data_packets'] ?? array();
+		if ( $job_id <= 0 || '' === (string) $flow_step_id ) {
+			return new \WP_Error( 'invalid_next_step_input', 'job_id and flow_step_id are required.', array( 'status' => 400 ) );
+		}
 
 		// Store data by job_id (if present).
 		if ( ! empty( $dataPackets ) ) {
@@ -132,9 +135,15 @@ class ScheduleNextStepAbility {
 						'missing_flow_id_during_data_storage',
 						array( 'packet_count' => count( $dataPackets ) )
 					);
-					return array(
-						'success' => false,
-						'error'   => 'Flow ID missing during data storage.',
+					return new \WP_Error(
+						'missing_flow_id',
+						'Flow ID missing during data storage.',
+						array(
+							'status'       => 500,
+							'retryable'    => true,
+							'job_id'       => $job_id,
+							'flow_step_id' => $flow_step_id,
+						)
 					);
 				}
 
@@ -209,6 +218,21 @@ class ScheduleNextStepAbility {
 						'exception_message' => null !== $schedule_exception ? $schedule_exception->getMessage() : null,
 					),
 					static fn ( $value ): bool => null !== $value
+				)
+			);
+		}
+
+		if ( ! is_numeric( $action_id ) || (int) $action_id <= 0 ) {
+			return new \WP_Error(
+				null !== $schedule_exception ? 'next_step_schedule_exception' : 'next_step_schedule_failed',
+				null !== $schedule_exception ? $schedule_exception->getMessage() : 'Unable to schedule the next workflow step.',
+				array(
+					'status'       => 503,
+					'retryable'    => true,
+					'job_id'       => $job_id,
+					'flow_step_id' => $flow_step_id,
+					'ownership'    => 'scheduler',
+					'diagnostics'  => array( 'packet_count' => count( $dataPackets ) ),
 				)
 			);
 		}

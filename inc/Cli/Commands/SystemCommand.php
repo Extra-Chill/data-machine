@@ -16,6 +16,7 @@ use DataMachine\Abilities\Engine\DrainJobAbility;
 use DataMachine\Abilities\SystemAbilities;
 use DataMachine\Core\ActionScheduler\ClaimIndexMigration;
 use DataMachine\Core\ActionScheduler\ActionInsertReadiness;
+use DataMachine\Core\AbilityResult;
 use DataMachine\Core\Bootstrap\DependencyChecker;
 use DataMachine\Engine\Tasks\TaskRegistry;
 use DataMachine\Engine\AI\System\Tasks\SystemTask;
@@ -490,13 +491,13 @@ class SystemCommand extends BaseCommand {
 			$step_budget    = isset( $assoc_args['step-budget'] ) ? max( 1, (int) $assoc_args['step-budget'] ) : 50;
 			$time_budget_ms = isset( $assoc_args['time-budget-ms'] ) ? max( 1, (int) $assoc_args['time-budget-ms'] ) : 300000;
 
-			$result['drain'] = ( new DrainJobAbility() )->execute(
+			$result['drain'] = AbilityResult::normalize( ( new DrainJobAbility() )->execute(
 				array(
 					'job_id'         => (int) ( $result['job_id'] ?? 0 ),
 					'step_budget'    => $step_budget,
 					'time_budget_ms' => $time_budget_ms,
 				)
-			);
+			) );
 		}
 
 		if ( 'json' === $format ) {

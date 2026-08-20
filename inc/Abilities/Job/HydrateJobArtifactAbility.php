@@ -67,27 +67,21 @@ class HydrateJobArtifactAbility {
 	 * @param array<string,mixed> $input Ability input.
 	 * @return array<string,mixed>
 	 */
-	public function execute( array $input ): array {
+	public function execute( array $input ): array|\WP_Error {
 		$artifact_ref = trim( (string) ( $input['artifact_ref'] ?? '' ) );
 		if ( '' === $artifact_ref ) {
-			return array(
-				'success' => false,
-				'error'   => 'artifact_ref is required.',
-			);
+			return new \WP_Error( 'invalid_artifact_ref', 'artifact_ref is required.', array( 'status' => 400 ) );
 		}
 
 		$artifacts = new JobArtifacts();
 		$job_id    = $artifacts->job_id_from_artifact_ref( $artifact_ref );
 		$job       = $job_id > 0 ? $this->db_jobs->get_job( $job_id ) : null;
 		if ( ! is_array( $job ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'artifact_ref is not associated with an existing job.',
-			);
+			return new \WP_Error( 'job_not_found', 'artifact_ref is not associated with an existing job.', array( 'status' => 404 ) );
 		}
 
 		if ( ! $this->canAccessJob( $job ) ) {
-			return $this->jobAccessDenied();
+			return $this->jobAccessDeniedError();
 		}
 
 		$result = $artifacts->hydrate_artifact_ref( $artifact_ref, is_array( $job['engine_data'] ?? null ) ? $job['engine_data'] : array() );

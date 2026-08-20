@@ -345,6 +345,7 @@ class PermissionHelperTest extends WP_UnitTestCase {
 
 		$this->assertWPError( $result );
 		$this->assertSame( 'ability_invalid_permissions', $result->get_error_code() );
+		$this->assertStringContainsString( 'does not have necessary permission', $result->get_error_message() );
 	}
 
 	public function test_view_analytics_granted_to_manage_flows_holder(): void {

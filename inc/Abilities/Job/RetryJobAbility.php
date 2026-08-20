@@ -84,12 +84,9 @@ class RetryJobAbility {
 	 * @param array $input Input parameters with job_id and optional force.
 	 * @return array Result with job_id, previous_status, and prompt_requeued flag.
 	 */
-	public function execute( array $input ): array {
+	public function execute( array $input ): array|\WP_Error {
 		if ( empty( $input['job_id'] ) || ! is_numeric( $input['job_id'] ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'job_id is required and must be a positive integer.',
-			);
+			return new \WP_Error( 'invalid_job_id', 'job_id is required and must be a positive integer.', array( 'status' => 400 ) );
 		}
 
 		$job_id = (int) $input['job_id'];
@@ -98,23 +95,32 @@ class RetryJobAbility {
 		$job = $this->db_jobs->get_job( $job_id );
 
 		if ( ! $job ) {
-			return array(
-				'success' => false,
-				'error'   => sprintf( 'Job %d not found.', $job_id ),
+			return new \WP_Error(
+				'job_not_found',
+				sprintf( 'Job %d not found.', $job_id ),
+				array(
+					'status' => 404,
+					'job_id' => $job_id,
+				)
 			);
 		}
 
 		if ( ! $this->canAccessJob( $job ) ) {
-			return $this->jobAccessDenied();
+			return $this->jobAccessDeniedError();
 		}
 
 		$previous_status = $job['status'] ?? '';
 
 		// Unless forced, only allow retrying failed or processing jobs.
 		if ( ! $force && ! str_starts_with( $previous_status, 'failed' ) && 'processing' !== $previous_status ) {
-			return array(
-				'success' => false,
-				'error'   => sprintf( 'Job %d has status "%s" — use --force to retry non-failed jobs.', $job_id, $previous_status ),
+			return new \WP_Error(
+				'invalid_job_status',
+				sprintf( 'Job %d has status "%s" — use --force to retry non-failed jobs.', $job_id, $previous_status ),
+				array(
+					'status'    => 409,
+					'job_id'    => $job_id,
+					'retryable' => true,
+				)
 			);
 		}
 
@@ -123,17 +129,27 @@ class RetryJobAbility {
 
 		if ( 'direct' === (string) ( $job['flow_id'] ?? '' ) ) {
 			if ( empty( $engine_data['flow_config'] ) ) {
-				return array(
-					'success' => false,
-					'error'   => 'Direct workflow execution data is no longer available for retry.',
+				return new \WP_Error(
+					'retry_data_unavailable',
+					'Direct workflow execution data is no longer available for retry.',
+					array(
+						'status'    => 409,
+						'retryable' => false,
+						'job_id'    => $job_id,
+					)
 				);
 			}
 
 			$flow_step_id = JobRetryPolicy::resolveDirectResumeStepId( $engine_data );
 			if ( '' === $flow_step_id ) {
-				return array(
-					'success' => false,
-					'error'   => 'Direct workflow has no safe resume step.',
+				return new \WP_Error(
+					'retry_resume_unavailable',
+					'Direct workflow has no safe resume step.',
+					array(
+						'status'    => 409,
+						'retryable' => false,
+						'job_id'    => $job_id,
+					)
 				);
 			}
 
@@ -143,13 +159,16 @@ class RetryJobAbility {
 				$enqueuer       = new DirectJobEnqueuer( $this->db_jobs );
 				$live_execution = $generation > 0 && '' !== $token ? $enqueuer->liveGenerationExecution( $job_id, $generation, $token ) : 'none';
 				if ( 'none' !== $live_execution ) {
-					return array(
-						'success'         => false,
-						'job_id'          => $job_id,
-						'previous_status' => $previous_status,
-						'retryable'       => true,
-						'error_code'      => 'job_execution_in_progress',
-						'error'           => sprintf( 'Job %d still has live execution for generation %d; retry after it exits or is recovered.', $job_id, $generation ),
+					return new \WP_Error(
+						'job_execution_in_progress',
+						sprintf( 'Job %d still has live execution for generation %d; retry after it exits or is recovered.', $job_id, $generation ),
+						array(
+							'status'     => 409,
+							'retryable'  => true,
+							'job_id'     => $job_id,
+							'generation' => $generation,
+							'ownership'  => 'operation',
+						)
 					);
 				}
 
@@ -160,13 +179,16 @@ class RetryJobAbility {
 				);
 				if ( is_array( $missing_action ) ) {
 					if ( ! empty( $job['operation_effects_begun_at'] ) ) {
-						return array(
-							'success'         => false,
-							'job_id'          => $job_id,
-							'previous_status' => $previous_status,
-							'retryable'       => false,
-							'error_code'      => 'job_effects_begun',
-							'error'           => sprintf( 'Job %d may have begun operation effects and cannot be safely retried.', $job_id ),
+						return new \WP_Error(
+							'job_effects_begun',
+							sprintf( 'Job %d may have begun operation effects and cannot be safely retried.', $job_id ),
+							array(
+								'status'     => 409,
+								'retryable'  => false,
+								'job_id'     => $job_id,
+								'generation' => $generation,
+								'ownership'  => 'operation',
+							)
 						);
 					}
 
@@ -190,13 +212,16 @@ class RetryJobAbility {
 						)
 					);
 					if ( empty( $requeue['success'] ) ) {
-						return array(
-							'success'         => false,
-							'job_id'          => $job_id,
-							'previous_status' => $previous_status,
-							'retryable'       => true,
-							'error_code'      => (string) ( $requeue['reason'] ?? 'retry_enqueue_failed' ),
-							'error'           => sprintf( 'Job %d retry could not establish durable scheduler ownership.', $job_id ),
+						return new \WP_Error(
+							(string) ( $requeue['reason'] ?? 'retry_enqueue_failed' ),
+							sprintf( 'Job %d retry could not establish durable scheduler ownership.', $job_id ),
+							array(
+								'status'     => 503,
+								'retryable'  => true,
+								'job_id'     => $job_id,
+								'generation' => $missing_action['generation'] ?? 0,
+								'ownership'  => 'scheduler',
+							)
 						);
 					}
 
@@ -213,18 +238,28 @@ class RetryJobAbility {
 				$this->db_jobs->complete_job( $job_id, 'failed - manual_retry' );
 			}
 			if ( ! $this->db_jobs->reopen_failed_job( $job_id ) ) {
-				return array(
-					'success' => false,
-					'error'   => sprintf( 'Job %d could not be reopened for retry.', $job_id ),
+				return new \WP_Error(
+					'job_reopen_failed',
+					sprintf( 'Job %d could not be reopened for retry.', $job_id ),
+					array(
+						'status'    => 500,
+						'retryable' => true,
+						'job_id'    => $job_id,
+					)
 				);
 			}
 
 			$enqueue = ( new DirectJobEnqueuer( $this->db_jobs ) )->enqueue( $job_id, $flow_step_id );
 			if ( empty( $enqueue['success'] ) ) {
 				$this->db_jobs->complete_job( $job_id, 'failed - retry_enqueue_failed' );
-				return array(
-					'success' => false,
-					'error'   => sprintf( 'Job %d retry could not be enqueued.', $job_id ),
+				return new \WP_Error(
+					'retry_enqueue_failed',
+					sprintf( 'Job %d retry could not be enqueued.', $job_id ),
+					array(
+						'status'    => 503,
+						'retryable' => true,
+						'job_id'    => $job_id,
+					)
 				);
 			}
 

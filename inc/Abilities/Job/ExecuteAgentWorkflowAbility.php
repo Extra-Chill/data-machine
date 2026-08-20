@@ -91,26 +91,40 @@ class ExecuteAgentWorkflowAbility {
 	 * Execute a simple Agents API workflow spec and record it as a Data Machine job.
 	 *
 	 * @param array $input Ability input.
-	 * @return array
+	 * @return array|WP_Error
 	 */
-	public function execute( array $input ): array {
+	public function execute( array $input ): array|WP_Error {
 		$spec_array = $input['spec'] ?? null;
 		if ( ! is_array( $spec_array ) ) {
-			return $this->error_response( 'invalid_spec', 'spec must be an object.' );
+			return new WP_Error(
+				'invalid_spec',
+				'spec must be an object.',
+				array(
+					'status'    => 400,
+					'retryable' => false,
+				)
+			);
 		}
 
 		$unsupported = $this->validateBridgeableSpec( $spec_array );
 		if ( is_wp_error( $unsupported ) ) {
-			return $this->error_response( $unsupported->get_error_code(), $unsupported->get_error_message(), $unsupported->get_error_data() );
+			return new WP_Error( $unsupported->get_error_code(), $unsupported->get_error_message(), array_merge( array( 'status' => 400 ), is_array( $unsupported->get_error_data() ) ? $unsupported->get_error_data() : array() ) );
 		}
 
 		if ( ! class_exists( WP_Agent_Workflow_Spec::class ) || ! class_exists( WP_Agent_Workflow_Runner::class ) ) {
-			return $this->error_response( 'agents_api_workflows_unavailable', 'Agents API workflow classes are unavailable.' );
+			return new WP_Error(
+				'agents_api_workflows_unavailable',
+				'Agents API workflow classes are unavailable.',
+				array(
+					'status'    => 503,
+					'retryable' => true,
+				)
+			);
 		}
 
 		$spec = WP_Agent_Workflow_Spec::from_array( $spec_array );
 		if ( is_wp_error( $spec ) ) {
-			return $this->error_response( $spec->get_error_code(), $spec->get_error_message(), $spec->get_error_data() );
+			return new WP_Error( $spec->get_error_code(), $spec->get_error_message(), array_merge( array( 'status' => 400 ), is_array( $spec->get_error_data() ) ? $spec->get_error_data() : array() ) );
 		}
 
 		$recorder = new AgentsApiWorkflowJobRecorder(
@@ -136,6 +150,29 @@ class ExecuteAgentWorkflowAbility {
 			is_array( $input['inputs'] ?? null ) ? $input['inputs'] : array(),
 			$options
 		);
+
+		if ( ! $result->is_succeeded() ) {
+			$error = $result->get_error();
+			return new WP_Error(
+				is_array( $error ) ? (string) ( $error['code'] ?? 'agents_api_workflow_failed' ) : 'agents_api_workflow_failed',
+				is_array( $error ) ? (string) ( $error['message'] ?? 'Agents API workflow failed.' ) : 'Agents API workflow failed.',
+				array(
+					'status'          => 500,
+					'retryable'       => false,
+					'job_id'          => $recorder->get_job_id(),
+					'run_id'          => $result->get_run_id(),
+					'workflow_id'     => $result->get_workflow_id(),
+					'workflow_status' => $result->get_status(),
+					'steps'           => $result->get_steps(),
+					'output'          => $result->get_output(),
+					'error'           => $error,
+					'diagnostics'     => array(
+						'workflow_id' => $result->get_workflow_id(),
+						'run_id'      => $result->get_run_id(),
+					),
+				)
+			);
+		}
 
 		return array(
 			'success'     => $result->is_succeeded(),

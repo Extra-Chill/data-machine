@@ -67,12 +67,17 @@ class RunFlowAbilityLifecycleTest extends WP_UnitTestCase {
 
 		$result = ( new RunFlowAbility() )->execute( array( 'flow_id' => $flow_id ) );
 
-		$this->assertFalse( $result['success'] ?? true );
-		$this->assertSame( 'no_first_step', $result['reason'] ?? '' );
-		$this->assertIsInt( $result['job_id'] ?? null );
+		$this->assertWPError( $result );
+		$this->assertSame( 'no_first_step', $result->get_error_code() );
+		$this->assertSame( 'Flow execution failed - no first step found.', $result->get_error_message() );
+		$error_data = $result->get_error_data();
+		$this->assertSame( 400, $error_data['status'] );
+		$this->assertFalse( $error_data['retryable'] );
+		$this->assertSame( $flow_id, $error_data['flow_id'] );
+		$this->assertIsInt( $error_data['job_id'] );
 		$this->assertSame( array(), $this->scheduled_steps );
 
-		$job = ( new Jobs() )->get_job( (int) $result['job_id'] );
+		$job = ( new Jobs() )->get_job( $error_data['job_id'] );
 		$this->assertNotEmpty( $job );
 		$this->assertSame( JobStatus::FAILED, $job['status'] ?? '' );
 		$this->assertSame( 'no_first_step', $job['engine_data']['job_status_reason'] ?? '' );
@@ -171,8 +176,12 @@ class RunFlowAbilityLifecycleTest extends WP_UnitTestCase {
 
 		remove_filter( 'datamachine_max_active_jobs', $cap );
 
-		$this->assertNotSame( 'queue_backpressure', $result['reason'] ?? '' );
-		$this->assertIsInt( $result['job_id'] ?? null );
+		$this->assertWPError( $result );
+		$this->assertSame( 'no_first_step', $result->get_error_code() );
+		$error_data = $result->get_error_data();
+		$this->assertSame( 400, $error_data['status'] );
+		$this->assertFalse( $error_data['retryable'] );
+		$this->assertIsInt( $error_data['job_id'] );
 	}
 
 	public function test_completed_parent_run_result_includes_available_child_envelopes(): void {

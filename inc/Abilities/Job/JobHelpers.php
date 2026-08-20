@@ -87,6 +87,20 @@ trait JobHelpers {
 		);
 	}
 
+	/** Native failure for registered job callbacks. */
+	protected function jobAccessDeniedError(): \WP_Error {
+		return new \WP_Error(
+			'job_access_denied',
+			'You do not have permission to access this job.',
+			array(
+				'status'      => 403,
+				'retryable'   => false,
+				'ownership'   => 'caller',
+				'diagnostics' => array( 'resource' => 'job' ),
+			)
+		);
+	}
+
 	/** Return the native failure used by read-only job query abilities. */
 	protected function jobQueryAccessDenied( string $message = 'You do not have permission to access this job.' ): \WP_Error {
 		return new \WP_Error( 'job_access_denied', $message, array( 'status' => 403 ) );

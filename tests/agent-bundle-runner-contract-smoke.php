@@ -13,6 +13,19 @@ $passes   = 0;
 
 defined( 'ABSPATH' ) || define( 'ABSPATH', $root . '/' );
 
+if ( ! class_exists( 'WP_Error' ) ) {
+	class WP_Error {
+		public function __construct( private string $code, private string $message, private $data = null ) {}
+		public function get_error_code(): string { return $this->code; }
+		public function get_error_message(): string { return $this->message; }
+		public function get_error_data() { return $this->data; }
+	}
+}
+
+if ( ! function_exists( 'is_wp_error' ) ) {
+	function is_wp_error( $value ): bool { return $value instanceof WP_Error; }
+}
+
 if ( ! function_exists( 'sanitize_key' ) ) {
 	function sanitize_key( string $key ): string {
 		return preg_replace( '/[^a-z0-9_\-]/', '', strtolower( $key ) ) ?? '';
@@ -57,6 +70,7 @@ echo "agent-bundle-runner-contract-smoke\n";
 echo "\n[3] Runner exposes semantic outputs while preserving raw engine data\n";
 require_once $root . '/inc/Core/JobStatus.php';
 require_once $root . '/inc/Core/DataPath.php';
+require_once $root . '/inc/Core/AbilityResult.php';
 require_once $root . '/inc/Engine/AI/Tools/HostToolPolicy.php';
 require_once $root . '/inc/Engine/Bundle/AgentBundleRunner.php';
 require_once $root . '/inc/Abilities/Flow/FlowHelpers.php';
@@ -66,6 +80,32 @@ require_once $root . '/inc/Core/Steps/FlowStepConfigFactory.php';
 require_once $root . '/inc/Core/Steps/WorkflowConfigFactory.php';
 $runner_reflection = new ReflectionClass( DataMachine\Engine\Bundle\AgentBundleRunner::class );
 $runner_instance   = $runner_reflection->newInstanceWithoutConstructor();
+
+$normalize_ability_result = $runner_reflection->getMethod( 'normalize_ability_result' );
+$native_failure           = $normalize_ability_result->invoke(
+	$runner_instance,
+	new WP_Error(
+		'enqueue_failed',
+		'Could not enqueue workflow.',
+		array(
+			'status'        => 503,
+			'job_id'        => 77,
+			'retryable'     => true,
+			'enqueue_state' => 'insert_failed',
+			'ownership'     => 'scheduler',
+			'recovery'      => 'replay',
+			'diagnostics'   => array( 'action_id' => 91 ),
+		)
+	)
+);
+datamachine_bundle_runner_assert( false === $native_failure['success'], 'native workflow failure normalizes to bundle envelope', $failures, $passes );
+datamachine_bundle_runner_assert( 77 === $native_failure['job_id'], 'bundle failure keeps job id top-level', $failures, $passes );
+datamachine_bundle_runner_assert( true === $native_failure['retryable'], 'bundle failure keeps retryability top-level', $failures, $passes );
+datamachine_bundle_runner_assert( 'insert_failed' === $native_failure['enqueue_state'], 'bundle failure keeps enqueue state top-level', $failures, $passes );
+datamachine_bundle_runner_assert( 'scheduler' === $native_failure['ownership'], 'bundle failure keeps ownership top-level', $failures, $passes );
+datamachine_bundle_runner_assert( 'replay' === $native_failure['recovery'], 'bundle failure keeps recovery top-level', $failures, $passes );
+datamachine_bundle_runner_assert( 91 === $native_failure['diagnostics']['action_id'], 'bundle failure keeps diagnostics top-level', $failures, $passes );
+datamachine_bundle_runner_assert( 503 === $native_failure['wp_error_data']['status'], 'bundle failure retains complete native error data', $failures, $passes );
 
 echo "\n[2a] Runner accepts direct workflow overrides\n";
 $workflow_override = $runner_reflection->getMethod( 'workflow_override_from_input' );
