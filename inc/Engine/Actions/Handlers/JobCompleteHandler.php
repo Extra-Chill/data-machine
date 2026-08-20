@@ -38,13 +38,14 @@ class JobCompleteHandler {
 	private static function cleanup_one_time_flow( $job_id ) {
 		$db_jobs = new \DataMachine\Core\Database\Jobs\Jobs();
 		$job     = $db_jobs->get_job( $job_id );
+		$flow_id = (int) ( $job['flow_id'] ?? 0 );
 
-		if ( ! $job || empty( $job->flow_id ) ) {
+		if ( ! $job || 0 === $flow_id ) {
 			return;
 		}
 
 		$db_flows = new \DataMachine\Core\Database\Flows\Flows();
-		$flow     = $db_flows->get_flow( $job->flow_id );
+		$flow     = $db_flows->get_flow( $flow_id );
 
 		if ( ! $flow ) {
 			return;
@@ -57,7 +58,7 @@ class JobCompleteHandler {
 
 		if ( ( $scheduling['interval'] ?? '' ) === 'one_time' ) {
 			$result = \DataMachine\Api\Flows\FlowScheduling::handle_scheduling_update(
-				(int) $job->flow_id,
+				$flow_id,
 				array( 'interval' => 'manual' ),
 				true
 			);
@@ -67,7 +68,7 @@ class JobCompleteHandler {
 					'error',
 					'One-time flow completion left schedule reconciliation drift',
 					array_merge(
-						array( 'flow_id' => (int) $job->flow_id ),
+						array( 'flow_id' => $flow_id ),
 						\DataMachine\Engine\Tasks\RecurringScheduler::errorMetadata( $result )
 					)
 				);

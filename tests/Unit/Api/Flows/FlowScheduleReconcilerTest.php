@@ -11,6 +11,8 @@ use DataMachine\Api\Flows\FlowScheduleReconciler;
 use DataMachine\Api\Flows\FlowScheduleReconciliationLock;
 use DataMachine\Api\Flows\FlowScheduling;
 use DataMachine\Core\Database\Flows\Flows;
+use DataMachine\Core\Database\Jobs\Jobs;
+use DataMachine\Engine\Actions\Handlers\JobCompleteHandler;
 use DataMachine\Engine\Tasks\RecurringScheduler;
 use WP_UnitTestCase;
 
@@ -362,6 +364,69 @@ class FlowScheduleReconcilerTest extends WP_UnitTestCase {
 		$this->assertSame( 'flow_schedule_reconciliation_locked', $result['code'] );
 
 		$this->assertTrue( FlowScheduleReconciliationLock::release( $token ) );
+	}
+
+	public function test_completed_one_time_job_reverts_flow_to_manual_idempotently(): void {
+		global $wpdb;
+
+		$flow_id = $this->create_flow(
+			'One-time completion cleanup',
+			array(
+				'interval'  => 'one_time',
+				'timestamp' => time() + HOUR_IN_SECONDS,
+			)
+		);
+		$job_id = (int) ( new Jobs() )->create_job(
+			array(
+				'pipeline_id' => $this->pipeline_id,
+				'flow_id'     => $flow_id,
+				'source'      => 'pipeline',
+			)
+		);
+		$this->assertIsInt( $job_id );
+
+		$transition_updates = 0;
+		$flows_table        = $wpdb->prefix . Flows::TABLE_NAME;
+		$capture_transition = static function ( string $query ) use ( &$transition_updates, $flow_id, $flows_table ): string {
+			$pattern = '/^UPDATE `?' . preg_quote( $flows_table, '/' ) . '`? SET `?scheduling_config`? = .* WHERE `?flow_id`? = ' . $flow_id . '$/';
+			if ( str_contains( $query, '"interval":"manual"' ) && preg_match( $pattern, trim( $query ) ) ) {
+				++$transition_updates;
+			}
+			return $query;
+		};
+		add_filter( 'query', $capture_transition );
+
+		try {
+			JobCompleteHandler::handle( $job_id, 'completed' );
+
+			$flow = ( new Flows() )->get_flow( $flow_id );
+			$this->assertNotNull( $flow );
+			$this->assertIsArray( $flow['scheduling_config'] );
+			$this->assertSame( 'manual', $flow['scheduling_config']['interval'] ?? null );
+			$this->assertSame( 1, $transition_updates );
+
+			// Terminal accounting may replay completion after a crash; the second pass is a no-op.
+			JobCompleteHandler::handle( $job_id, 'completed' );
+			$this->assertSame( 1, $transition_updates );
+
+			JobCompleteHandler::handle( PHP_INT_MAX, 'completed' );
+			$this->assertSame( 1, $transition_updates );
+
+			$deleted_flow_id = $this->create_flow( 'Deleted one-time flow', array( 'interval' => 'one_time' ) );
+			$deleted_job_id  = (int) ( new Jobs() )->create_job(
+				array(
+					'pipeline_id' => $this->pipeline_id,
+					'flow_id'     => $deleted_flow_id,
+					'source'      => 'pipeline',
+				)
+			);
+			$this->assertTrue( $this->flows->delete_flow( $deleted_flow_id ) );
+
+			JobCompleteHandler::handle( $deleted_job_id, 'completed' );
+			$this->assertSame( 1, $transition_updates );
+		} finally {
+			remove_filter( 'query', $capture_transition );
+		}
 	}
 
 	private function create_flow( string $name, array $scheduling ): int {
