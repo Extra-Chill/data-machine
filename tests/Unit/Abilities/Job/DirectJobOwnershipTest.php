@@ -94,8 +94,12 @@ class DirectJobOwnershipTest extends WP_UnitTestCase {
 
 		$result = $this->execute( 'missing-caller' );
 
-		$this->assertFalse( $result['success'] );
-		$this->assertStringContainsString( 'authenticated acting caller', $result['error'] );
+		$this->assertWPError( $result );
+		$this->assertSame( 'workflow_ownership_denied', $result->get_error_code() );
+		$this->assertStringContainsString( 'authenticated acting caller', $result->get_error_message() );
+		$this->assertSame( 403, $result->get_error_data()['status'] );
+		$this->assertFalse( $result->get_error_data()['retryable'] );
+		$this->assertSame( 'caller', $result->get_error_data()['ownership'] );
 	}
 
 	public function test_forged_system_context_input_does_not_grant_internal_authority(): void {
@@ -109,8 +113,10 @@ class DirectJobOwnershipTest extends WP_UnitTestCase {
 			)
 		);
 
-		$this->assertFalse( $result['success'] );
-		$this->assertStringContainsString( 'authenticated acting caller', $result['error'] );
+		$this->assertWPError( $result );
+		$this->assertSame( 'workflow_ownership_denied', $result->get_error_code() );
+		$this->assertStringContainsString( 'authenticated acting caller', $result->get_error_message() );
+		$this->assertSame( 'caller', $result->get_error_data()['ownership'] );
 
 		$internal = ( new ExecuteWorkflowAbility( false ) )->executeInternal(
 			array(
@@ -158,9 +164,15 @@ class DirectJobOwnershipTest extends WP_UnitTestCase {
 		$denied = ( new GetJobsAbility() )->execute( array( 'job_id' => $job_id ) );
 		$this->assertWPError( $denied );
 		$this->assertSame( 'job_access_denied', $denied->get_error_code() );
-		$this->assertSame( 'job_access_denied', ( new RunMetricsAbility() )->execute( array( 'job_id' => $job_id ) )['error_code'] );
-		$this->assertFalse( ( new FailJobAbility() )->execute( array( 'job_id' => $job_id ) )['success'] );
-		$this->assertSame( 'job_access_denied', ( new RetryJobAbility() )->execute( array( 'job_id' => $job_id ) )['error_code'] );
+		$metrics_denied = ( new RunMetricsAbility() )->execute( array( 'job_id' => $job_id ) );
+		$this->assertWPError( $metrics_denied );
+		$this->assertSame( 'job_access_denied', $metrics_denied->get_error_code() );
+		$fail_denied = ( new FailJobAbility() )->execute( array( 'job_id' => $job_id ) );
+		$this->assertWPError( $fail_denied );
+		$this->assertSame( 'job_access_denied', $fail_denied->get_error_code() );
+		$retry_denied = ( new RetryJobAbility() )->execute( array( 'job_id' => $job_id ) );
+		$this->assertWPError( $retry_denied );
+		$this->assertSame( 'job_access_denied', $retry_denied->get_error_code() );
 
 		wp_set_current_user( $this->admin_id );
 		$this->assertTrue( ( new GetJobsAbility() )->execute( array( 'job_id' => $job_id ) )['success'] );
@@ -323,7 +335,9 @@ class DirectJobOwnershipTest extends WP_UnitTestCase {
 
 		wp_set_current_user( $this->other_user_id );
 		$denied = ( new HydrateJobArtifactAbility() )->execute( array( 'artifact_ref' => $artifact_ref ) );
-		$this->assertSame( 'job_access_denied', $denied['error_code'] );
+		$this->assertWPError( $denied );
+		$this->assertSame( 'job_access_denied', $denied->get_error_code() );
+		$this->assertSame( 403, $denied->get_error_data()['status'] );
 		$this->assertSame( 0, $hydrate_count );
 
 		wp_set_current_user( $this->owner_id );
@@ -350,8 +364,12 @@ class DirectJobOwnershipTest extends WP_UnitTestCase {
 		$this->assertSame( (int) ( new Jobs() )->get_job( (int) $first['job_id'] )['operation_action_id'], (int) ( new Jobs() )->get_job( (int) $replay['job_id'] )['operation_action_id'] );
 
 		$conflict = $this->execute( 'stable-operation', 'different input' );
-		$this->assertFalse( $conflict['success'] );
-		$this->assertStringContainsString( 'different workflow input', $conflict['error'] );
+		$this->assertWPError( $conflict );
+		$this->assertSame( 'operation_key_conflict', $conflict->get_error_code() );
+		$this->assertStringContainsString( 'different workflow input', $conflict->get_error_message() );
+		$this->assertSame( 409, $conflict->get_error_data()['status'] );
+		$this->assertFalse( $conflict->get_error_data()['retryable'] );
+		$this->assertSame( 'operation', $conflict->get_error_data()['ownership'] );
 
 		$distinct = $this->execute( 'distinct-operation' );
 		$this->assertTrue( $distinct['success'] );
@@ -367,7 +385,10 @@ class DirectJobOwnershipTest extends WP_UnitTestCase {
 			)
 		);
 
-		$this->assertFalse( $invalid['success'] );
+		$this->assertWPError( $invalid );
+		$this->assertSame( 'invalid_workflow', $invalid->get_error_code() );
+		$this->assertSame( 400, $invalid->get_error_data()['status'] );
+		$this->assertFalse( $invalid->get_error_data()['retryable'] );
 		$this->assertTrue( $this->execute( 'validation-before-claim' )['success'] );
 	}
 
@@ -641,9 +662,13 @@ class DirectJobOwnershipTest extends WP_UnitTestCase {
 		$retry = ( new RetryJobAbility() )->execute( array( 'job_id' => $created['job_id'] ) );
 		$job   = $jobs->get_job( (int) $created['job_id'] );
 
-		$this->assertFalse( $retry['success'] );
-		$this->assertTrue( $retry['retryable'] );
-		$this->assertSame( 'job_execution_in_progress', $retry['error_code'] );
+		$this->assertWPError( $retry );
+		$this->assertSame( 'job_execution_in_progress', $retry->get_error_code() );
+		$this->assertSame( 409, $retry->get_error_data()['status'] );
+		$this->assertTrue( $retry->get_error_data()['retryable'] );
+		$this->assertSame( (int) $created['job_id'], $retry->get_error_data()['job_id'] );
+		$this->assertSame( $original_generation, $retry->get_error_data()['generation'] );
+		$this->assertSame( 'operation', $retry->get_error_data()['ownership'] );
 		$this->assertSame( 'processing', $job['status'] );
 		$this->assertSame( 'enqueued', $job['operation_state'] );
 		$this->assertSame( $original_action_id, (int) $job['operation_action_id'] );
@@ -677,7 +702,9 @@ class DirectJobOwnershipTest extends WP_UnitTestCase {
 		$this->assertNull( $after['terminal_accounting_state'] );
 
 		$duplicate = ( new RetryJobAbility() )->execute( array( 'job_id' => $job_id, 'force' => true ) );
-		$this->assertFalse( $duplicate['success'] );
+		$this->assertWPError( $duplicate );
+		$this->assertSame( 'job_execution_in_progress', $duplicate->get_error_code() );
+		$this->assertTrue( $duplicate->get_error_data()['retryable'] );
 		$this->assertSame( $job_count, $jobs->get_jobs_count() );
 	}
 
@@ -724,8 +751,12 @@ class DirectJobOwnershipTest extends WP_UnitTestCase {
 
 		$retry = ( new RetryJobAbility() )->execute( array( 'job_id' => $job_id ) );
 
-		$this->assertFalse( $retry['success'] );
-		$this->assertSame( 'job_effects_begun', $retry['error_code'] );
+		$this->assertWPError( $retry );
+		$this->assertSame( 'job_effects_begun', $retry->get_error_code() );
+		$this->assertSame( 409, $retry->get_error_data()['status'] );
+		$this->assertFalse( $retry->get_error_data()['retryable'] );
+		$this->assertSame( $job_id, $retry->get_error_data()['job_id'] );
+		$this->assertSame( 'operation', $retry->get_error_data()['ownership'] );
 		$this->assertSame( JobStatus::PROCESSING, $jobs->get_job( $job_id )['status'] );
 	}
 
@@ -748,8 +779,12 @@ class DirectJobOwnershipTest extends WP_UnitTestCase {
 
 		$retry = ( new RetryJobAbility() )->execute( array( 'job_id' => $job_id ) );
 
-		$this->assertFalse( $retry['success'] );
-		$this->assertSame( 'job_execution_in_progress', $retry['error_code'] );
+		$this->assertWPError( $retry );
+		$this->assertSame( 'job_execution_in_progress', $retry->get_error_code() );
+		$this->assertSame( 409, $retry->get_error_data()['status'] );
+		$this->assertTrue( $retry->get_error_data()['retryable'] );
+		$this->assertSame( $job_id, $retry->get_error_data()['job_id'] );
+		$this->assertSame( 'operation', $retry->get_error_data()['ownership'] );
 		$this->assertSame( 'processing', $jobs->get_job( $job_id )['status'] );
 	}
 
@@ -889,7 +924,7 @@ class DirectJobOwnershipTest extends WP_UnitTestCase {
 		$this->assertTrue( ( new GetJobsAbility() )->execute( array( 'job_id' => $job_id ) )['success'] );
 	}
 
-	private function execute( string $operation_key, string $prompt = 'input' ): array {
+	private function execute( string $operation_key, string $prompt = 'input' ): array|\WP_Error {
 		return ( new ExecuteWorkflowAbility() )->execute(
 			array(
 				'workflow'      => $this->workflow( $prompt ),
