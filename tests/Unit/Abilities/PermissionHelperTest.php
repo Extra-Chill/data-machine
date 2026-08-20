@@ -340,6 +340,7 @@ class PermissionHelperTest extends WP_UnitTestCase {
 			456
 		);
 
+		$this->setExpectedIncorrectUsage( 'WP_Ability::execute' );
 		$result = $ability->execute( array() );
 
 		$this->assertWPError( $result );
