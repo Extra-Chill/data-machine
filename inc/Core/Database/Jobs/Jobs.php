@@ -400,7 +400,7 @@ class Jobs extends BaseRepository {
 			return false;
 		}
 
-		$job = $this->get_job( $job_id );
+		$job = $this->get_job_metadata( $job_id );
 		if ( ! is_array( $job ) || ! hash_equals( $claim_token, (string) ( $job['operation_claim_token'] ?? '' ) ) ) {
 			return false;
 		}
@@ -415,7 +415,7 @@ class Jobs extends BaseRepository {
 	 * Check whether an enqueue claim still owns the active generation.
 	 */
 	public function owns_operation_enqueue_claim( int $job_id, string $token, int $generation ): bool {
-		$job = $this->get_job( $job_id );
+		$job = $this->get_job_metadata( $job_id );
 
 		return is_array( $job )
 			&& 'enqueuing' === ( $job['operation_state'] ?? '' )
@@ -643,7 +643,7 @@ class Jobs extends BaseRepository {
 		if ( 1 === (int) $updated ) {
 			return true;
 		}
-		$job = false !== $updated ? $this->get_job( $job_id ) : null;
+		$job = false !== $updated ? $this->get_job_metadata( $job_id ) : null;
 		return is_array( $job )
 			&& 'enqueued' === (string) ( $job['operation_state'] ?? '' )
 			&& (int) ( $job['operation_generation'] ?? 0 ) === $generation
@@ -757,6 +757,20 @@ class Jobs extends BaseRepository {
 		$job = $this->decode_job_json( $job );
 
 		return $job;
+	}
+
+	/** Fetch job metadata without selecting or decoding JSON envelopes. */
+	public function get_job_metadata( int $job_id ): ?array {
+		if ( empty( $job_id ) ) {
+			return null;
+		}
+
+		$fields = 'job_id, user_id, agent_id, pipeline_id, flow_id, parent_job_id, source, label, status, created_at, completed_at, handler_slug, terminal_accounting_state, terminal_accounting_owner, terminal_accounting_claimed_at, terminal_accounting_processed_count, operation_state, operation_action_id, operation_claimed_at, operation_claim_token, operation_generation, operation_effects_begun_at, operation_step_id, operation_ref_hash, request_fingerprint';
+		// phpcs:disable WordPress.DB.PreparedSQL -- The nested prepare binds the plugin table identifier and job ID.
+		$job = $this->wpdb->get_row( $this->wpdb->prepare( "SELECT {$fields} FROM %i WHERE job_id = %d", $this->table_name, $job_id ), ARRAY_A );
+		// phpcs:enable WordPress.DB.PreparedSQL
+
+		return is_array( $job ) ? $job : null;
 	}
 
 	/** Decode JSON-backed columns returned by direct row reads. */

@@ -47,7 +47,7 @@ class DirectJobEnqueuer {
 			return $this->failure( 'invalid_enqueue_target' );
 		}
 
-		$job                 = $this->jobs->get_job( $job_id );
+		$job                 = $this->jobs->get_job_metadata( $job_id );
 		$generation          = max( 0, (int) ( $job['operation_generation'] ?? 0 ) );
 		$token               = (string) ( $job['operation_claim_token'] ?? '' );
 		$args                = $this->actionArgs( $job_id, $flow_step_id, $generation, $token );
@@ -64,7 +64,7 @@ class DirectJobEnqueuer {
 
 		$claim = $this->jobs->claim_operation_enqueue( $job_id );
 		if ( false === $claim ) {
-			$job                 = $this->jobs->get_job( $job_id );
+			$job                 = $this->jobs->get_job_metadata( $job_id );
 			$current_generation  = max( 0, (int) ( $job['operation_generation'] ?? 0 ) );
 			$current_token       = (string) ( $job['operation_claim_token'] ?? '' );
 			$current_action_args = $this->actionArgs( $job_id, $flow_step_id, $current_generation, $current_token );
@@ -84,7 +84,7 @@ class DirectJobEnqueuer {
 		// recorded success. Reconcile that action before creating another one.
 		$scheduled_action_id = $this->scheduledActionId( $args );
 		if ( $scheduled_action_id > 0 ) {
-			return $this->reconcileScheduledAction( $job_id, $this->jobs->get_job( $job_id ), $scheduled_action_id, $generation, $token );
+			return $this->reconcileScheduledAction( $job_id, $this->jobs->get_job_metadata( $job_id ), $scheduled_action_id, $generation, $token );
 		}
 
 		if ( ! $this->jobs->owns_operation_enqueue_claim( $job_id, $token, $generation ) ) {
@@ -234,7 +234,7 @@ class DirectJobEnqueuer {
 			return $this->success( $action_id, $generation );
 		}
 
-		$reloaded = $this->jobs->get_job( $job_id );
+		$reloaded = $this->jobs->get_job_metadata( $job_id );
 		if ( is_array( $reloaded )
 			&& 'enqueued' === ( $reloaded['operation_state'] ?? '' )
 			&& (int) ( $reloaded['operation_generation'] ?? 0 ) === $generation

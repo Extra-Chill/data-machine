@@ -27,6 +27,10 @@ final class DirectJobGenerationFakeJobs extends Jobs {
 		return 42 === $job_id ? $this->job : null;
 	}
 
+	public function get_job_metadata( int $job_id ): ?array {
+		return $this->get_job( $job_id );
+	}
+
 	public function claim_operation_enqueue( int $job_id, int $lease_seconds = 30 ): array|false {
 		$lease_seconds;
 		if ( 42 !== $job_id || $this->claim_blocked ) {

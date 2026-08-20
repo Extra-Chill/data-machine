@@ -96,7 +96,7 @@ class WebhookGateStep extends Step {
 
 				// Only fail the job if it's still waiting.
 				$db_jobs = new \DataMachine\Core\Database\Jobs\Jobs();
-				$job     = $db_jobs->get_job( $job_id );
+				$job     = $db_jobs->get_job_metadata( $job_id );
 
 				if ( ! $job || 'waiting' !== ( $job['status'] ?? '' ) ) {
 					return; // Job already resumed or failed.
@@ -298,7 +298,7 @@ class WebhookGateStep extends Step {
 
 		// Verify job is actually in waiting status.
 		$db_jobs = new \DataMachine\Core\Database\Jobs\Jobs();
-		$job     = $db_jobs->get_job( $job_id );
+		$job     = $db_jobs->get_job_metadata( $job_id );
 
 		if ( ! $job || 'waiting' !== ( $job['status'] ?? '' ) ) {
 			return new \WP_Error(
