@@ -33,25 +33,12 @@ class FetchWordPressApiAbilityTest extends WP_UnitTestCase {
 	}
 
 	public function test_invalid_upstream_json_returns_specific_bad_gateway_error(): void {
-		$intercept = static function () {
-			return array(
-				'headers'  => array(),
-				'body'     => '{invalid',
-				'response' => array(
-					'code'    => 200,
-					'message' => 'OK',
-				),
-				'cookies'  => array(),
-			);
-		};
-		add_filter( 'pre_http_request', $intercept );
-		try {
-			$result = ( new FetchWordPressApiAbility() )->execute(
-				array( 'endpoint_url' => 'https://example.test/wp-json/wp/v2/posts' )
-			);
-		} finally {
-			remove_filter( 'pre_http_request', $intercept );
-		}
+		$result = $this->execute_with_response(
+			'{invalid',
+			200,
+			'OK',
+			'https://example.test/wp-json/wp/v2/posts'
+		);
 
 		$this->assertWPError( $result );
 		$this->assertSame( 'wordpress_api_invalid_response', $result->get_error_code() );
@@ -61,25 +48,12 @@ class FetchWordPressApiAbilityTest extends WP_UnitTestCase {
 	}
 
 	public function test_upstream_http_error_preserves_code_status_and_data(): void {
-		$intercept = static function () {
-			return array(
-				'headers'  => array(),
-				'body'     => 'Missing upstream resource.',
-				'response' => array(
-					'code'    => 404,
-					'message' => 'Not Found',
-				),
-				'cookies'  => array(),
-			);
-		};
-		add_filter( 'pre_http_request', $intercept );
-		try {
-			$result = ( new FetchWordPressApiAbility() )->execute(
-				array( 'endpoint_url' => 'https://example.test/wp-json/wp/v2/posts/404' )
-			);
-		} finally {
-			remove_filter( 'pre_http_request', $intercept );
-		}
+		$result = $this->execute_with_response(
+			'Missing upstream resource.',
+			404,
+			'Not Found',
+			'https://example.test/wp-json/wp/v2/posts/404'
+		);
 
 		$this->assertWPError( $result );
 		$this->assertSame( 'fetch_http_status', $result->get_error_code() );
@@ -87,5 +61,31 @@ class FetchWordPressApiAbilityTest extends WP_UnitTestCase {
 		$this->assertSame( 404, $result->get_error_data()['status_code'] );
 		$this->assertSame( 'Missing upstream resource.', $result->get_error_data()['body'] );
 		$this->assertArrayHasKey( 'logs', $result->get_error_data() );
+	}
+
+	private function execute_with_response( string $body, int $code, string $message, string $endpoint_url ) {
+		$intercept = static function () use ( $body, $code, $message ) {
+			return self::http_response( $body, $code, $message );
+		};
+		add_filter( 'pre_http_request', $intercept );
+		try {
+			return ( new FetchWordPressApiAbility() )->execute(
+				array( 'endpoint_url' => $endpoint_url )
+			);
+		} finally {
+			remove_filter( 'pre_http_request', $intercept );
+		}
+	}
+
+	private static function http_response( string $body, int $code, string $message ): array {
+		return array(
+			'headers'  => array(),
+			'body'     => $body,
+			'response' => array(
+				'code'    => $code,
+				'message' => $message,
+			),
+			'cookies'  => array(),
+		);
 	}
 }
