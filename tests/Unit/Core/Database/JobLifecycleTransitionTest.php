@@ -49,6 +49,41 @@ class JobLifecycleTransitionTest extends WP_UnitTestCase {
 		$this->assertSame( JobStatus::FAILED, $job['status'] );
 	}
 
+	public function test_metadata_read_does_not_materialize_large_json_envelopes(): void {
+		$large_value        = str_repeat( 'packet-', 128 );
+		$engine_data        = array( 'batch' => true, 'references' => array_fill( 0, 2000, $large_value ) );
+		$operation_envelope = array( 'steps' => array_fill( 0, 2000, $large_value ) );
+		$job_id             = $this->db_jobs->create_job(
+			array(
+				'label'              => 'Bounded metadata',
+				'engine_data'        => $engine_data,
+				'operation_envelope' => $operation_envelope,
+			)
+		);
+		$this->assertIsInt( $job_id );
+		unset( $large_value, $engine_data, $operation_envelope );
+		gc_collect_cycles();
+
+		$queries_before = get_num_queries();
+		$memory_before  = memory_get_usage();
+		$metadata       = $this->db_jobs->get_job_metadata( $job_id );
+		$memory_delta = memory_get_usage() - $memory_before;
+		$this->assertIsArray( $metadata );
+		$this->assertSame( JobStatus::PENDING, $metadata['status'] );
+		$this->assertArrayNotHasKey( 'engine_data', $metadata );
+		$this->assertArrayNotHasKey( 'operation_envelope', $metadata );
+		$this->assertSame( 1, get_num_queries() - $queries_before );
+		$this->assertStringNotContainsString( 'engine_data', strtolower( (string) $GLOBALS['wpdb']->last_query ) );
+		$this->assertStringNotContainsString( 'operation_envelope', strtolower( (string) $GLOBALS['wpdb']->last_query ) );
+		$this->assertLessThan( 1024 * 1024, $memory_delta, 'Metadata projection should not materialize either multi-megabyte JSON envelope.' );
+
+		$full = $this->db_jobs->get_job( $job_id );
+		$this->assertIsArray( $full['engine_data'] );
+		$this->assertCount( 2000, $full['engine_data']['references'] );
+		$this->assertIsArray( $full['operation_envelope'] );
+		$this->assertCount( 2000, $full['operation_envelope']['steps'] );
+	}
+
 	public function test_concurrent_pathless_child_recovery_has_one_owner(): void {
 		$parent_id = $this->db_jobs->create_job( array( 'label' => 'Recovery parent' ) );
 		$child_id  = $this->db_jobs->create_job( array( 'label' => 'Recovery child', 'parent_job_id' => $parent_id ) );

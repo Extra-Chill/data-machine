@@ -677,7 +677,7 @@ class BatchScheduler {
 	 */
 	public static function finalize( int $parent_job_id ): bool {
 		$current = EngineData::retrieve( $parent_job_id );
-		$job     = ( new Jobs() )->get_job( $parent_job_id );
+		$job     = ( new Jobs() )->get_job_metadata( $parent_job_id );
 		if ( ! is_array( $job ) ) {
 			global $wpdb;
 			if ( '' !== (string) $wpdb->last_error ) {
