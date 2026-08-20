@@ -111,7 +111,16 @@ class FetchWordPressApiAbility {
 	 * @param array $input Input parameters.
 	 * @return array Result with fetched data or error.
 	 */
-	public function execute( array $input ): array {
+	public function execute( array $input ): array|\WP_Error {
+		$result = $this->execute_legacy( $input );
+		if ( is_wp_error( $result ) || ! empty( $result['success'] ) ) {
+			return $result;
+		}
+		$error_data = is_array( $result['error_data'] ?? null ) ? $result['error_data'] : array();
+		return new \WP_Error( $result['error_code'] ?? 'wordpress_api_fetch_failed', $result['error'] ?? 'WordPress API fetch failed.', array_merge( array( 'status' => 500 ), $error_data, $result ) );
+	}
+
+	private function execute_legacy( array $input ): array|\WP_Error {
 		$logs   = array();
 		$config = $this->normalizeConfig( $input );
 
@@ -129,9 +138,11 @@ class FetchWordPressApiAbility {
 				'message' => 'WordPressAPI: Endpoint URL is required.',
 			);
 			return array(
-				'success' => false,
-				'error'   => 'Endpoint URL is required',
-				'logs'    => $logs,
+				'success'    => false,
+				'error_code' => 'wordpress_api_endpoint_required',
+				'error'      => 'Endpoint URL is required',
+				'status'     => 400,
+				'logs'       => $logs,
 			);
 		}
 
@@ -142,9 +153,12 @@ class FetchWordPressApiAbility {
 				'data'    => array( 'endpoint_url' => $endpoint_url ),
 			);
 			return array(
-				'success' => false,
-				'error'   => 'Invalid endpoint URL format',
-				'logs'    => $logs,
+				'success'      => false,
+				'error_code'   => 'wordpress_api_endpoint_invalid',
+				'error'        => 'Invalid endpoint URL format',
+				'status'       => 400,
+				'endpoint_url' => $endpoint_url,
+				'logs'         => $logs,
 			);
 		}
 
@@ -163,6 +177,16 @@ class FetchWordPressApiAbility {
 		}
 
 		$result = $this->httpGet( $modified_url, array( 'context' => 'REST API' ) );
+		if ( is_wp_error( $result ) ) {
+			return new \WP_Error(
+				$result->get_error_code(),
+				$result->get_error_message(),
+				array_merge(
+					is_array( $result->get_error_data() ) ? $result->get_error_data() : array(),
+					array( 'logs' => $logs )
+				)
+			);
+		}
 
 		if ( ! $result['success'] ) {
 			$logs[] = array(
@@ -174,9 +198,12 @@ class FetchWordPressApiAbility {
 				),
 			);
 			return array(
-				'success' => false,
-				'error'   => $result['error'],
-				'logs'    => $logs,
+				'success'    => false,
+				'error_code' => $result['error_code'] ?? 'wordpress_api_upstream_failed',
+				'error'      => $result['error'],
+				'status'     => $result['status'] ?? 502,
+				'error_data' => is_array( $result['error_data'] ?? null ) ? $result['error_data'] : array(),
+				'logs'       => $logs,
 			);
 		}
 
@@ -188,9 +215,12 @@ class FetchWordPressApiAbility {
 				'data'    => array( 'endpoint_url' => $modified_url ),
 			);
 			return array(
-				'success' => false,
-				'error'   => 'Empty response from endpoint',
-				'logs'    => $logs,
+				'success'      => false,
+				'error_code'   => 'wordpress_api_empty_response',
+				'error'        => 'Empty response from endpoint',
+				'status'       => 502,
+				'endpoint_url' => $modified_url,
+				'logs'         => $logs,
 			);
 		}
 
@@ -206,9 +236,13 @@ class FetchWordPressApiAbility {
 				),
 			);
 			return array(
-				'success' => false,
-				'error'   => 'Invalid JSON response: ' . json_last_error_msg(),
-				'logs'    => $logs,
+				'success'      => false,
+				'error_code'   => 'wordpress_api_invalid_response',
+				'error'        => 'Invalid JSON response: ' . json_last_error_msg(),
+				'status'       => 502,
+				'endpoint_url' => $modified_url,
+				'json_error'   => json_last_error_msg(),
+				'logs'         => $logs,
 			);
 		}
 
@@ -602,5 +636,4 @@ class FetchWordPressApiAbility {
 
 		return $item_timestamp >= $cutoff;
 	}
-
 }

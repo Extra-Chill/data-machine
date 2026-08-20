@@ -686,8 +686,8 @@ namespace {
 			'content'   => "# Missing Declaration\n\nThis is markdown, not serialized blocks.",
 		)
 	);
-	assert_content_ability( 'raw-upsert-omitted-format-treats-markdown-as-blocks', false === $raw_markdown_without_format['success'] );
-	assert_content_ability( 'raw-upsert-omitted-markdown-fails-loudly', 'datamachine_content_format_blocks_missing_comments' === ( $raw_markdown_without_format['error_code'] ?? '' ) );
+	assert_content_ability( 'raw-upsert-omitted-format-treats-markdown-as-blocks', is_wp_error( $raw_markdown_without_format ) );
+	assert_content_ability( 'raw-upsert-omitted-markdown-fails-loudly', 'datamachine_content_format_blocks_missing_comments' === $raw_markdown_without_format->get_error_code() );
 	assert_content_ability( 'raw-upsert-omitted-markdown-does-not-write-post', $posts_before_raw_markdown_default === content_ability_post_count() );
 	assert_content_ability( 'internal-upsert-execute-callers-are-explicitly-audited', array() === content_ability_raw_upsert_execute_callers() );
 
@@ -724,8 +724,8 @@ namespace {
 			'content_format' => 'blocks',
 		)
 	);
-	assert_content_ability( 'malformed-blocks-source-fails', false === $malformed_blocks['success'] );
-	assert_content_ability( 'malformed-blocks-source-preserves-transformer-error-code', 'datamachine_content_format_blocks_unclosed_comment' === ( $malformed_blocks['error_code'] ?? '' ) );
+	assert_content_ability( 'malformed-blocks-source-fails', is_wp_error( $malformed_blocks ) );
+	assert_content_ability( 'malformed-blocks-source-preserves-transformer-error-code', 'datamachine_content_format_blocks_unclosed_comment' === $malformed_blocks->get_error_code() );
 	assert_content_ability( 'malformed-blocks-source-does-not-write-post', $posts_before_malformed === content_ability_post_count() );
 
 	$conversion_error = DataMachine\Abilities\Content\UpsertPostAbility::execute(
@@ -736,8 +736,8 @@ namespace {
 			'content_format' => 'markdown',
 		)
 	);
-	assert_content_ability( 'blocks-engine-conversion-error-fails', false === $conversion_error['success'] );
-	assert_content_ability( 'blocks-engine-conversion-error-code-is-distinct-from-missing-transformer', 'datamachine_content_format_blocks_engine_conversion_failed' === ( $conversion_error['error_code'] ?? '' ) );
+	assert_content_ability( 'blocks-engine-conversion-error-fails', is_wp_error( $conversion_error ) );
+	assert_content_ability( 'blocks-engine-conversion-error-code-is-distinct-from-missing-transformer', 'datamachine_content_format_blocks_engine_conversion_failed' === $conversion_error->get_error_code() );
 
 	$tool = DataMachine\Abilities\Content\UpsertPostAbility::getChatTool();
 	assert_content_ability( 'chat-tool-content-format-is-optional', ! in_array( 'content_format', $tool['required'] ?? array(), true ) );

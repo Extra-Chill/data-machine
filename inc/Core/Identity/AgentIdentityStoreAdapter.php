@@ -171,6 +171,9 @@ class AgentIdentityStoreAdapter implements WP_Agent_Identity_Store {
 					'instance_key'  => $scope->instance_key,
 				)
 			);
+			if ( function_exists( 'is_wp_error' ) && is_wp_error( $result ) ) {
+				throw new \RuntimeException( 'Failed to provision materialized agent scaffold: ' . esc_html( $result->get_error_message() ) );
+			}
 			if ( is_array( $result ) && empty( $result['success'] ) ) {
 				throw new \RuntimeException( 'Failed to provision materialized agent scaffold.' );
 			}

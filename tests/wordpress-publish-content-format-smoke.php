@@ -18,6 +18,12 @@ namespace DataMachine\Core {
 }
 
 namespace {
+    if ( ! function_exists( 'wp_register_ability' ) ) {
+        function wp_register_ability( string $name, array $args ): void {
+            $GLOBALS['__publish_format_abilities'][ $name ] = $args;
+        }
+    }
+
     if ( ! defined( 'ABSPATH' ) ) {
         define( 'ABSPATH', __DIR__ . '/' );
     }
@@ -41,11 +47,12 @@ namespace {
 
             private string $code;
             private string $message;
+            private $data;
 
             public function __construct( string $code = '', string $message = '', $data = null ) {
-                unset( $data );
                 $this->code    = $code;
                 $this->message = $message;
+                $this->data    = $data;
             }
 
             public function get_error_code(): string {
@@ -57,7 +64,7 @@ namespace {
             }
 
             public function get_error_data() {
-                return null;
+                return $this->data;
             }
         }
     }
@@ -67,6 +74,7 @@ namespace {
     $GLOBALS['__publish_format_meta']        = array();
     $GLOBALS['__publish_format_next_id']     = 100;
     $GLOBALS['__publish_format_conversions'] = array();
+    $GLOBALS['__publish_format_taxonomy_failure'] = '';
 
     if ( ! function_exists( 'doing_action' ) ) {
         function doing_action( string $hook ): bool {
@@ -198,6 +206,33 @@ namespace {
         }
     }
 
+    if ( ! function_exists( 'get_term_by' ) ) {
+        function get_term_by( string $field, $value, string $taxonomy ) {
+            unset( $field, $value, $taxonomy );
+            return false;
+        }
+    }
+
+    if ( ! function_exists( 'wp_insert_term' ) ) {
+        function wp_insert_term( $term, string $taxonomy ) {
+            unset( $taxonomy );
+            if ( 'insert' === $GLOBALS['__publish_format_taxonomy_failure'] ) {
+                return new WP_Error( 'term_insert_failed', 'Term creation failed.' );
+            }
+            return array( 'term_id' => crc32( (string) $term ) );
+        }
+    }
+
+    if ( ! function_exists( 'wp_set_object_terms' ) ) {
+        function wp_set_object_terms( int $post_id, array $term_ids, string $taxonomy ) {
+            unset( $post_id, $taxonomy );
+            if ( 'assign' === $GLOBALS['__publish_format_taxonomy_failure'] ) {
+                return new WP_Error( 'term_assignment_failed', 'Term assignment failed.' );
+            }
+            return $term_ids;
+        }
+    }
+
     if ( ! function_exists( 'update_post_meta' ) ) {
         function update_post_meta( int $post_id, string $key, $value ): void {
             $GLOBALS['__publish_format_meta'][ $post_id ][ $key ] = $value;
@@ -292,6 +327,11 @@ namespace {
 
     $ability = new \DataMachine\Abilities\Publish\PublishWordPressAbility();
 
+    $invalid_result = $ability->execute( array( 'title' => '', 'content' => '', 'post_type' => 'post' ) );
+    assert_publish_format( 'invalid-publish-returns-native-error', is_wp_error( $invalid_result ) );
+    assert_publish_format( 'invalid-publish-error-has-stable-code', 'publish_parameters_required' === $invalid_result->get_error_code() );
+    assert_publish_format( 'invalid-publish-error-has-http-status', 400 === ( $invalid_result->get_error_data()['status'] ?? 0 ) );
+
     $html_result = $ability->execute(
         array(
             'title'      => 'HTML post',
@@ -358,6 +398,22 @@ namespace {
     assert_publish_format( 'markdown-backed-post-type-publish-succeeds', true === ( $wiki_result['success'] ?? false ) );
     assert_publish_format( 'markdown-backed-post-type-stores-markdown', false === strpos( $wiki_content, '<!-- wp:' ) );
     assert_publish_format( 'markdown-backed-attribution-stays-markdown', false !== strpos( $wiki_content, '**Source:** [https://example.test/wiki](https://example.test/wiki)' ) );
+
+    $posts_before_taxonomy_failure = count( $GLOBALS['__publish_format_posts'] );
+    $GLOBALS['__publish_format_taxonomy_failure'] = 'insert';
+    $partial_taxonomy_result = $ability->execute(
+        array(
+            'title'      => 'Partial taxonomy post',
+            'content'    => '<p>Persist this post.</p>',
+            'post_type'  => 'post',
+            'taxonomies' => array( 'category' => array( 'Broken term' ) ),
+        )
+    );
+    $GLOBALS['__publish_format_taxonomy_failure'] = '';
+    assert_publish_format( 'taxonomy-failure-does-not-report-total-publish-failure', true === ( $partial_taxonomy_result['success'] ?? false ) );
+    assert_publish_format( 'taxonomy-failure-leaves-created-post-observable', $posts_before_taxonomy_failure + 1 === count( $GLOBALS['__publish_format_posts'] ) );
+    assert_publish_format( 'taxonomy-failure-is-returned-in-structured-diagnostics', 'term_insert_failed' === ( $partial_taxonomy_result['taxonomy_results']['category']['errors'][0]['code'] ?? '' ) );
+    assert_publish_format( 'taxonomy-failure-is-logged-as-warning', in_array( 'warning', array_column( $partial_taxonomy_result['logs'], 'level' ), true ) );
 
     $ability_source = file_get_contents( dirname( __DIR__ ) . '/inc/Abilities/Publish/PublishWordPressAbility.php' );
     $handler_source = file_get_contents( dirname( __DIR__ ) . '/inc/Core/Steps/Publish/Handlers/WordPress/WordPress.php' );

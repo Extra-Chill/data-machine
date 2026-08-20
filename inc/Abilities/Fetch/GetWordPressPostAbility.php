@@ -92,7 +92,16 @@ class GetWordPressPostAbility {
 	 * @param array $input Input parameters.
 	 * @return array Result with post data or error.
 	 */
-	public function execute( array $input ): array {
+	public function execute( array $input ): array|\WP_Error {
+		$result = $this->execute_legacy( $input );
+		if ( is_wp_error( $result ) || ! empty( $result['success'] ) ) {
+			return $result;
+		}
+		$error_data = is_array( $result['error_data'] ?? null ) ? $result['error_data'] : array();
+		return new \WP_Error( $result['error_code'] ?? 'wordpress_post_fetch_failed', $result['error'] ?? 'WordPress post fetch failed.', array_merge( array( 'status' => 500 ), $error_data, $result ) );
+	}
+
+	private function execute_legacy( array $input ): array {
 		$logs   = array();
 		$config = $this->normalizeConfig( $input );
 
@@ -111,9 +120,12 @@ class GetWordPressPostAbility {
 					'data'    => array( 'source_url' => $source_url ),
 				);
 				return array(
-					'success' => false,
-					'error'   => sprintf( 'Could not extract valid WordPress post ID from URL: %s', $source_url ),
-					'logs'    => $logs,
+					'success'    => false,
+					'error_code' => 'wordpress_post_source_url_invalid',
+					'error'      => sprintf( 'Could not extract valid WordPress post ID from URL: %s', $source_url ),
+					'status'     => 400,
+					'source_url' => $source_url,
+					'logs'       => $logs,
 				);
 			}
 		}
@@ -124,9 +136,11 @@ class GetWordPressPostAbility {
 				'message' => 'Either post_id or source_url is required',
 			);
 			return array(
-				'success' => false,
-				'error'   => 'Either post_id or source_url is required',
-				'logs'    => $logs,
+				'success'    => false,
+				'error_code' => 'wordpress_post_identifier_required',
+				'error'      => 'Either post_id or source_url is required',
+				'status'     => 400,
+				'logs'       => $logs,
 			);
 		}
 
@@ -139,9 +153,12 @@ class GetWordPressPostAbility {
 				'data'    => array( 'post_id' => $post_id ),
 			);
 			return array(
-				'success' => false,
-				'error'   => sprintf( 'Post (ID: %d) not found or is trashed', $post_id ),
-				'logs'    => $logs,
+				'success'    => false,
+				'error_code' => 'wordpress_post_not_found',
+				'error'      => sprintf( 'Post (ID: %d) not found or is trashed', $post_id ),
+				'status'     => 404,
+				'post_id'    => $post_id,
+				'logs'       => $logs,
 			);
 		}
 

@@ -157,7 +157,17 @@ class InsertContentAbility {
 	public static function handleChatToolCall( array $params, array $tool_def = array() ): array {
 		unset( $tool_def );
 
-		return self::execute( $params );
+		$result = self::execute( $params );
+		if ( is_wp_error( $result ) ) {
+			return array(
+				'success'    => false,
+				'error'      => $result->get_error_message(),
+				'error_code' => $result->get_error_code(),
+				'error_data' => $result->get_error_data(),
+				'tool_name'  => 'insert_content',
+			);
+		}
+		return $result;
 	}
 
 	/**
@@ -166,7 +176,7 @@ class InsertContentAbility {
 	 * @param array $input Input parameters.
 	 * @return array Result with canonical diff preview data.
 	 */
-	public static function execute( array $input ): array {
+	public static function execute( array $input ): array|\WP_Error {
 		// Resolve the target blog. On multisite the post may live on another
 		// site than the one this request landed on; switch to it so the read,
 		// the edit_post capability check, and the eventual apply target the
@@ -179,10 +189,7 @@ class InsertContentAbility {
 		// BlogContext::run_on_origin() in the preview branch.
 		$ctx = BlogContext::enter( $input );
 		if ( is_wp_error( $ctx ) ) {
-			return array(
-				'success' => false,
-				'error'   => $ctx->get_error_message(),
-			);
+			return $ctx;
 		}
 
 		try {
@@ -199,7 +206,7 @@ class InsertContentAbility {
 	 * @param array|\WP_Error $ctx   Blog context token from BlogContext::enter().
 	 * @return array Result with canonical diff preview data.
 	 */
-	private static function execute_in_context( array $input, $ctx ): array {
+	private static function execute_in_context( array $input, $ctx ): array|\WP_Error {
 		$post_id               = absint( $input['post_id'] ?? 0 );
 		$blog_id               = absint( $input['blog_id'] ?? 0 );
 		$content               = $input['content'] ?? '';
@@ -208,32 +215,20 @@ class InsertContentAbility {
 		$preview               = ! array_key_exists( 'preview', $input ) || ! empty( $input['preview'] );
 
 		if ( $post_id <= 0 || '' === $content ) {
-			return array(
-				'success' => false,
-				'error'   => 'post_id and content are required.',
-			);
+			return new \WP_Error( 'invalid_insert_content', 'post_id and content are required.', array( 'status' => 400 ) );
 		}
 
 		if ( 'after_paragraph' === $position && '' === $target_paragraph_text ) {
-			return array(
-				'success' => false,
-				'error'   => 'target_paragraph_text is required when position is "after_paragraph".',
-			);
+			return new \WP_Error( 'invalid_insert_target', 'target_paragraph_text is required when position is "after_paragraph".', array( 'status' => 400 ) );
 		}
 
 		$post = get_post( $post_id );
 		if ( ! $post ) {
-			return array(
-				'success' => false,
-				'error'   => sprintf( 'Post #%d not found.', $post_id ),
-			);
+			return new \WP_Error( 'insert_post_not_found', sprintf( 'Post #%d not found.', $post_id ), array( 'status' => 404 ) );
 		}
 
 		if ( ! current_user_can( 'edit_post', $post_id ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'You do not have permission to edit this post.',
-			);
+			return new \WP_Error( 'insert_post_forbidden', 'You do not have permission to edit this post.', array( 'status' => 403 ) );
 		}
 
 		$current_content = $post->post_content;
@@ -261,17 +256,26 @@ class InsertContentAbility {
 			case 'after_paragraph':
 				$result = self::insert_after_paragraph( $current_content, $block_content, $target_paragraph_text );
 				if ( ! $result['success'] ) {
-					return $result;
+					return new \WP_Error(
+						'insert_target_not_found',
+						$result['error'] ?? 'Target paragraph not found.',
+						array(
+							'status'               => 404,
+							'available_paragraphs' => $result['available_paragraphs'] ?? array(),
+							'suggestion'           => $result['suggestion'] ?? '',
+						)
+					);
 				}
-					$new_content     = $result['content'];
-					$insertion_point = $result['insertion_point'];
-					$block_index     = (int) ( $result['block_index'] ?? count( $current_blocks ) );
+				$new_content     = $result['content'];
+				$insertion_point = $result['insertion_point'];
+				$block_index     = (int) ( $result['block_index'] ?? count( $current_blocks ) );
 				break;
 
 			default:
-				return array(
-					'success' => false,
-					'error'   => "Invalid position: {$position}. Must be beginning, end, or after_paragraph.",
+				return new \WP_Error(
+					'invalid_insert_position',
+					"Invalid position: {$position}. Must be beginning, end, or after_paragraph.",
+					array( 'status' => 400 )
 				);
 		}
 
@@ -285,10 +289,14 @@ class InsertContentAbility {
 			);
 
 			if ( is_wp_error( $update ) ) {
-				return array(
-					'success' => false,
-					'post_id' => $post_id,
-					'error'   => 'Failed to save: ' . $update->get_error_message(),
+				return new \WP_Error(
+					'insert_post_update_failed',
+					'Failed to save: ' . $update->get_error_message(),
+					array(
+						'status'        => 500,
+						'post_id'       => $post_id,
+						'wp_error_code' => $update->get_error_code(),
+					)
 				);
 			}
 
@@ -361,10 +369,13 @@ class InsertContentAbility {
 		);
 
 		if ( empty( $envelope['staged'] ) ) {
-			return array(
-				'success' => false,
-				'post_id' => $post_id,
-				'error'   => $envelope['error'] ?? 'Failed to stage preview.',
+			return new \WP_Error(
+				'insert_preview_stage_failed',
+				$envelope['error'] ?? 'Failed to stage preview.',
+				array(
+					'status'  => 500,
+					'post_id' => $post_id,
+				)
 			);
 		}
 

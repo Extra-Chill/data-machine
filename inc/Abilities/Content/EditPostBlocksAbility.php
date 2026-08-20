@@ -171,6 +171,15 @@ class EditPostBlocksAbility {
 	public static function handleChatToolCall( array $parameters, array $tool_def = array() ): array {
 		$tool_def;
 		$result = self::execute( $parameters );
+		if ( is_wp_error( $result ) ) {
+			return array(
+				'success'    => false,
+				'error'      => $result->get_error_message(),
+				'error_code' => $result->get_error_code(),
+				'error_data' => $result->get_error_data(),
+				'tool_name'  => 'edit_post_blocks',
+			);
+		}
 
 		return array(
 			'success'   => $result['success'],
@@ -185,7 +194,7 @@ class EditPostBlocksAbility {
 	 * @param array $input Ability input.
 	 * @return array
 	 */
-	public static function execute( array $input ): array {
+	public static function execute( array $input ): array|\WP_Error {
 		// Resolve the target blog. On multisite the post may live on another
 		// site than the one this request landed on; switch to it so the post
 		// read and the eventual apply target the right post. blog_id rides
@@ -198,10 +207,7 @@ class EditPostBlocksAbility {
 		// BlogContext::run_on_origin() in the preview branch.
 		$ctx = BlogContext::enter( $input );
 		if ( is_wp_error( $ctx ) ) {
-			return array(
-				'success' => false,
-				'error'   => $ctx->get_error_message(),
-			);
+			return $ctx;
 		}
 
 		try {
@@ -218,41 +224,28 @@ class EditPostBlocksAbility {
 	 * @param array|\WP_Error $ctx   Blog context token from BlogContext::enter().
 	 * @return array
 	 */
-	private static function execute_in_context( array $input, $ctx ): array {
+	private static function execute_in_context( array $input, $ctx ): array|\WP_Error {
 		$post_id = absint( $input['post_id'] ?? 0 );
 		$blog_id = absint( $input['blog_id'] ?? 0 );
 		$edits   = $input['edits'] ?? array();
 		$preview = ! empty( $input['preview'] );
 
 		if ( $post_id <= 0 ) {
-			return array(
-				'success' => false,
-				'error'   => 'Valid post_id is required',
-			);
+			return new \WP_Error( 'invalid_edit_post_id', 'Valid post_id is required', array( 'status' => 400 ) );
 		}
 
 		if ( empty( $edits ) || ! is_array( $edits ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'At least one edit operation is required',
-			);
+			return new \WP_Error( 'invalid_edit_operations', 'At least one edit operation is required', array( 'status' => 400 ) );
 		}
 
 		$post = get_post( $post_id );
 		if ( ! $post ) {
-			return array(
-				'success' => false,
-				'error'   => sprintf( 'Post #%d does not exist', $post_id ),
-			);
+			return new \WP_Error( 'edit_post_not_found', sprintf( 'Post #%d does not exist', $post_id ), array( 'status' => 404 ) );
 		}
 
 		$block_content = ContentFormat::storedToBlocks( (string) $post->post_content, (string) $post->post_type );
 		if ( is_wp_error( $block_content ) ) {
-			return array(
-				'success' => false,
-				'post_id' => $post_id,
-				'error'   => $block_content->get_error_message(),
-			);
+			return self::content_format_error( $block_content, $post_id );
 		}
 
 		$blocks       = parse_blocks( $block_content );
@@ -325,22 +318,13 @@ class EditPostBlocksAbility {
 		$successful = array_filter( $changes, fn( $c ) => ! empty( $c['success'] ) );
 
 		if ( empty( $successful ) ) {
-			return array(
-				'success'         => false,
-				'post_id'         => $post_id,
-				'changes_applied' => $changes,
-				'error'           => 'No edits were applied — all operations failed',
-			);
+			return self::operations_failed_error( $post_id, $changes );
 		}
 
 		$new_content    = BlockSanitizer::sanitizeAndSerialize( $blocks );
 		$stored_content = ContentFormat::blocksToStored( $new_content, (string) $post->post_type );
 		if ( is_wp_error( $stored_content ) ) {
-			return array(
-				'success' => false,
-				'post_id' => $post_id,
-				'error'   => $stored_content->get_error_message(),
-			);
+			return self::content_format_error( $stored_content, $post_id );
 		}
 
 		// --- Preview mode: stage pending action, return preview envelope ---
@@ -399,10 +383,13 @@ class EditPostBlocksAbility {
 			);
 
 			if ( empty( $envelope['staged'] ) ) {
-				return array(
-					'success' => false,
-					'post_id' => $post_id,
-					'error'   => $envelope['error'] ?? 'Failed to stage preview.',
+				return new \WP_Error(
+					'edit_preview_stage_failed',
+					$envelope['error'] ?? 'Failed to stage preview.',
+					array(
+						'status'  => 500,
+						'post_id' => $post_id,
+					)
 				);
 			}
 
@@ -429,10 +416,14 @@ class EditPostBlocksAbility {
 		);
 
 		if ( is_wp_error( $result ) ) {
-			return array(
-				'success' => false,
-				'post_id' => $post_id,
-				'error'   => 'Failed to save: ' . $result->get_error_message(),
+			return new \WP_Error(
+				'edit_post_update_failed',
+				'Failed to save: ' . $result->get_error_message(),
+				array(
+					'status'        => 500,
+					'post_id'       => $post_id,
+					'wp_error_code' => $result->get_error_code(),
+				)
 			);
 		}
 
@@ -452,6 +443,32 @@ class EditPostBlocksAbility {
 			'post_id'         => $post_id,
 			'post_url'        => get_permalink( $post_id ),
 			'changes_applied' => $changes,
+		);
+	}
+
+	private static function content_format_error( \WP_Error $error, int $post_id ): \WP_Error {
+		return new \WP_Error(
+			$error->get_error_code(),
+			$error->get_error_message(),
+			array_merge(
+				array(
+					'status'  => 500,
+					'post_id' => $post_id,
+				),
+				is_array( $error->get_error_data() ) ? $error->get_error_data() : array()
+			)
+		);
+	}
+
+	private static function operations_failed_error( int $post_id, array $changes ): \WP_Error {
+		return new \WP_Error(
+			'edit_operations_failed',
+			'No edits were applied — all operations failed',
+			array(
+				'status'          => 422,
+				'post_id'         => $post_id,
+				'changes_applied' => $changes,
+			)
 		);
 	}
 

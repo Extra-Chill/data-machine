@@ -291,7 +291,7 @@ class AgentFileAbilities {
 		// Convention-path files (e.g. AGENTS.md at site root) live outside
 		// the layer directories but should still appear in the file list.
 		foreach ( MemoryFileRegistry::get_all() as $filename => $registry_meta ) {
-			$layer  = $registry_meta['layer'] ?? MemoryFileRegistry::LAYER_AGENT;
+			$layer = $registry_meta['layer'] ?? MemoryFileRegistry::LAYER_AGENT;
 			if ( MemoryFileRegistry::LAYER_PRINCIPAL === $layer && ( $user_id <= 0 || $agent_id <= 0 ) ) {
 				continue;
 			}
@@ -385,7 +385,7 @@ class AgentFileAbilities {
 	 * @param array $input Input parameters.
 	 * @return array Result with file data.
 	 */
-	public function executeGetAgentFile( array $input ): array {
+	public function executeGetAgentFile( array $input ): array|\WP_Error {
 		DirectoryManager::ensure_agent_files();
 
 		$filename = sanitize_file_name( $input['filename'] ?? '' );
@@ -396,9 +396,13 @@ class AgentFileAbilities {
 		$located = $this->locateMemory( $filename, $user_id, $agent_id );
 
 		if ( null === $located ) {
-			return array(
-				'success' => false,
-				'error'   => sprintf( 'File %s not found in any layer', $filename ),
+			return new \WP_Error(
+				'agent_file_not_found',
+				sprintf( 'File %s not found in any layer', $filename ),
+				array(
+					'status'   => 404,
+					'filename' => $filename,
+				)
 			);
 		}
 
@@ -429,7 +433,7 @@ class AgentFileAbilities {
 	 * @param array $input Input parameters.
 	 * @return array Result with write status.
 	 */
-	public function executeWriteAgentFile( array $input ): array {
+	public function executeWriteAgentFile( array $input ): array|\WP_Error {
 		$filename = sanitize_file_name( $input['filename'] ?? '' );
 		$content  = $input['content'] ?? '';
 
@@ -442,21 +446,34 @@ class AgentFileAbilities {
 		if ( ! MemoryFileRegistry::is_editable( $filename, $user_id_for_edit ) ) {
 			$edit_cap = MemoryFileRegistry::get_edit_capability( $filename );
 			if ( false === $edit_cap ) {
-				return array(
-					'success' => false,
-					'error'   => sprintf( 'File %s is read-only and cannot be edited.', $filename ),
+				return new \WP_Error(
+					'agent_file_read_only',
+					sprintf( 'File %s is read-only and cannot be edited.', $filename ),
+					array(
+						'status'   => 403,
+						'filename' => $filename,
+					)
 				);
 			}
-			return array(
-				'success' => false,
-				'error'   => sprintf( 'You do not have permission to edit %s. Required capability: %s', $filename, $edit_cap ),
+			return new \WP_Error(
+				'agent_file_forbidden',
+				sprintf( 'You do not have permission to edit %s. Required capability: %s', $filename, $edit_cap ),
+				array(
+					'status'     => 403,
+					'filename'   => $filename,
+					'capability' => $edit_cap,
+				)
 			);
 		}
 
 		if ( MemoryFileRegistry::is_protected( $filename ) && '' === trim( $content ) ) {
-			return array(
-				'success' => false,
-				'error'   => sprintf( 'Cannot write empty content to protected file: %s', $filename ),
+			return new \WP_Error(
+				'agent_file_empty',
+				sprintf( 'Cannot write empty content to protected file: %s', $filename ),
+				array(
+					'status'   => 400,
+					'filename' => $filename,
+				)
 			);
 		}
 
@@ -473,9 +490,13 @@ class AgentFileAbilities {
 		$result = $memory->replace_all( $content );
 
 		if ( empty( $result['success'] ) ) {
-			return array(
-				'success' => false,
-				'error'   => $result['message'] ?? 'Failed to write file',
+			return new \WP_Error(
+				'agent_file_write_failed',
+				$result['message'] ?? 'Failed to write file',
+				array(
+					'status'   => 500,
+					'filename' => $filename,
+				)
 			);
 		}
 
@@ -502,13 +523,17 @@ class AgentFileAbilities {
 	 * @param array $input Input parameters.
 	 * @return array Result with deletion status.
 	 */
-	public function executeDeleteAgentFile( array $input ): array {
+	public function executeDeleteAgentFile( array $input ): array|\WP_Error {
 		$filename = sanitize_file_name( $input['filename'] ?? '' );
 
 		if ( MemoryFileRegistry::is_protected( $filename ) ) {
-			return array(
-				'success' => false,
-				'error'   => sprintf( 'Cannot delete protected file: %s', $filename ),
+			return new \WP_Error(
+				'agent_file_protected',
+				sprintf( 'Cannot delete protected file: %s', $filename ),
+				array(
+					'status'   => 403,
+					'filename' => $filename,
+				)
 			);
 		}
 
@@ -518,9 +543,13 @@ class AgentFileAbilities {
 		$located  = $this->locateMemory( $filename, $user_id, $agent_id );
 
 		if ( null === $located ) {
-			return array(
-				'success' => false,
-				'error'   => sprintf( 'File %s not found in any layer', $filename ),
+			return new \WP_Error(
+				'agent_file_not_found',
+				sprintf( 'File %s not found in any layer', $filename ),
+				array(
+					'status'   => 404,
+					'filename' => $filename,
+				)
 			);
 		}
 
@@ -530,9 +559,13 @@ class AgentFileAbilities {
 		$delete = $memory->delete();
 
 		if ( empty( $delete['success'] ) ) {
-			return array(
-				'success' => false,
-				'error'   => $delete['message'] ?? 'Failed to delete file',
+			return new \WP_Error(
+				'agent_file_delete_failed',
+				$delete['message'] ?? 'Failed to delete file',
+				array(
+					'status'   => 500,
+					'filename' => $filename,
+				)
 			);
 		}
 
@@ -563,14 +596,11 @@ class AgentFileAbilities {
 	 * @param array $input Input parameters.
 	 * @return array Result with updated file list.
 	 */
-	public function executeUploadAgentFile( array $input ): array {
+	public function executeUploadAgentFile( array $input ): array|\WP_Error {
 		$file = $input['file_data'] ?? null;
 
 		if ( ! $file || empty( $file['tmp_name'] ) || empty( $file['name'] ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'No file data provided',
-			);
+			return new \WP_Error( 'agent_file_upload_missing', 'No file data provided', array( 'status' => 400 ) );
 		}
 
 		$dm           = new DirectoryManager();
@@ -584,26 +614,31 @@ class AgentFileAbilities {
 		// hand bytes off to the store, which decides where they land.
 		$fs = FilesystemHelper::get();
 		if ( ! $fs ) {
-			return array(
-				'success' => false,
-				'error'   => 'Filesystem not available',
-			);
+			return new \WP_Error( 'agent_file_filesystem_unavailable', 'Filesystem not available', array( 'status' => 500 ) );
 		}
 
 		$content = $fs->get_contents( $file['tmp_name'] );
 		if ( false === $content ) {
-			return array(
-				'success' => false,
-				'error'   => 'Failed to read uploaded file',
+			return new \WP_Error(
+				'agent_file_upload_read_failed',
+				'Failed to read uploaded file',
+				array(
+					'status'   => 400,
+					'filename' => $filename,
+				)
 			);
 		}
 
 		$memory = new AgentMemory( $user_id, $agent_id, $filename, $target_layer );
 		$write  = $memory->replace_all( (string) $content );
 		if ( empty( $write['success'] ) ) {
-			return array(
-				'success' => false,
-				'error'   => $write['message'] ?? 'Failed to store file',
+			return new \WP_Error(
+				'agent_file_upload_write_failed',
+				$write['message'] ?? 'Failed to store file',
+				array(
+					'status'   => 500,
+					'filename' => $filename,
+				)
 			);
 		}
 

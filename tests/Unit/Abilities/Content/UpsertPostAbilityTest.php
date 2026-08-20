@@ -83,7 +83,7 @@ class UpsertPostAbilityTest extends WP_UnitTestCase {
 		$failed = UpsertPostAbility::execute( $this->input( 'write-failure', 'Will retry' ) );
 		remove_filter( 'wp_insert_post_empty_content', $fail );
 
-		$this->assertFalse( $failed['success'] );
+		$this->assertWPError( $failed );
 		$identity = PostIdentityReservations::normalize_identity( 'post', array( 'key' => '_source', 'value' => 'write-failure' ) );
 		$row      = $this->repository->get_reservation( $identity['identity_hash'] );
 		$this->assertSame( 'linked', $row['state'] );
@@ -267,7 +267,8 @@ class UpsertPostAbilityTest extends WP_UnitTestCase {
 
 		$result = UpsertPostAbility::execute( $input );
 
-		$this->assertFalse( $result['success'] );
+		$this->assertWPError( $result );
+		$this->assertSame( 'not_found', $result->get_error_code() );
 		$identity = PostIdentityReservations::normalize_identity( 'post', $input['identity_meta'] );
 		$this->assertNull( $this->repository->get_reservation( $identity['identity_hash'] ) );
 	}
@@ -355,8 +356,8 @@ class UpsertPostAbilityTest extends WP_UnitTestCase {
 
 		$result = UpsertPostAbility::execute( $input );
 
-		$this->assertFalse( $result['success'] );
-		$this->assertSame( 'identity_meta_sanitizer_unstable', $result['error_code'] );
+		$this->assertWPError( $result );
+		$this->assertSame( 'identity_meta_sanitizer_unstable', $result->get_error_code() );
 	}
 
 	public function test_advisory_fence_spans_population_and_releases_on_success(): void {
@@ -386,10 +387,10 @@ class UpsertPostAbilityTest extends WP_UnitTestCase {
 		$result = UpsertPostAbility::execute( $this->input( 'fenced-exception', 'Exception' ) );
 		remove_action( 'datamachine_upsert_post_identity_before_population', $throw );
 
-		$this->assertFalse( $result['success'] );
-		$this->assertSame( 'identity_population_exception', $result['error_code'] );
-		$this->assertTrue( $result['error_data']['retryable'] );
-		$this->assertStringNotContainsString( 'Injected population exception', $result['error'] );
+		$this->assertWPError( $result );
+		$this->assertSame( 'identity_population_exception', $result->get_error_code() );
+		$this->assertTrue( $result->get_error_data()['retryable'] );
+		$this->assertStringNotContainsString( 'Injected population exception', $result->get_error_message() );
 		$this->assertIdentityLockIsFree( 'fenced-exception' );
 	}
 
@@ -413,9 +414,9 @@ class UpsertPostAbilityTest extends WP_UnitTestCase {
 			remove_action( 'datamachine_upsert_post_identity_before_population', $throw_population );
 		}
 
-		$this->assertFalse( $result['success'] );
-		$this->assertSame( 'identity_population_exception', $result['error_code'] );
-		$this->assertTrue( $result['error_data']['retryable'] );
+		$this->assertWPError( $result );
+		$this->assertSame( 'identity_population_exception', $result->get_error_code() );
+		$this->assertTrue( $result->get_error_data()['retryable'] );
 		$this->assertIdentityLockIsFree( 'diagnostic-exception' );
 	}
 
@@ -429,9 +430,9 @@ class UpsertPostAbilityTest extends WP_UnitTestCase {
 		remove_action( 'datamachine_upsert_post_identity_before_population', $callback );
 
 		$this->assertTrue( $outer['success'] );
-		$this->assertFalse( $recursive_result['success'] );
-		$this->assertSame( 'identity_lock_reentrant', $recursive_result['error_code'] );
-		$this->assertTrue( $recursive_result['error_data']['retryable'] );
+		$this->assertWPError( $recursive_result );
+		$this->assertSame( 'identity_lock_reentrant', $recursive_result->get_error_code() );
+		$this->assertTrue( $recursive_result->get_error_data()['retryable'] );
 		$this->assertIdentityLockIsFree( 'recursive-identity' );
 	}
 
@@ -446,9 +447,9 @@ class UpsertPostAbilityTest extends WP_UnitTestCase {
 		$result = UpsertPostAbility::execute( $this->input( 'release-lost', 'Release lost' ) );
 		remove_action( 'datamachine_upsert_post_identity_before_population', $release );
 
-		$this->assertFalse( $result['success'] );
-		$this->assertSame( 'identity_lock_release_uncertain', $result['error_code'] );
-		$this->assertTrue( $result['error_data']['retryable'] );
+		$this->assertWPError( $result );
+		$this->assertSame( 'identity_lock_release_uncertain', $result->get_error_code() );
+		$this->assertTrue( $result->get_error_data()['retryable'] );
 		$this->assertIdentityLockIsFree( 'release-lost' );
 	}
 
@@ -463,9 +464,9 @@ class UpsertPostAbilityTest extends WP_UnitTestCase {
 		$connection->query( "SELECT GET_LOCK('{$lock_name}', 0)" );
 		try {
 			$result = UpsertPostAbility::execute( $this->input( 'fenced-busy', 'Busy' ) );
-			$this->assertFalse( $result['success'] );
-			$this->assertSame( 'identity_lock_unavailable', $result['error_code'] );
-			$this->assertTrue( $result['error_data']['retryable'] );
+			$this->assertWPError( $result );
+			$this->assertSame( 'identity_lock_unavailable', $result->get_error_code() );
+			$this->assertTrue( $result->get_error_data()['retryable'] );
 		} finally {
 			$connection->query( "SELECT RELEASE_LOCK('{$lock_name}')" );
 			$connection->close();

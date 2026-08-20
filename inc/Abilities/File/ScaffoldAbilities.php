@@ -131,30 +131,34 @@ class ScaffoldAbilities {
 	 * @param array $input Ability input.
 	 * @return array Result with success, message, filename(s), created count.
 	 */
-	public static function execute( array $input ): array {
+	public static function execute( array $input ): array|\WP_Error {
 		$layer = $input['layer'] ?? '';
 
 		// Mode 3: scaffold all registered files in a layer.
 		if ( ! empty( $layer ) ) {
-			return self::scaffold_layer( $layer, $input );
+			return self::callback_result( self::scaffold_layer( $layer, $input ) );
 		}
 
 		$filename = $input['filename'] ?? '';
 		if ( empty( $filename ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'Either filename or layer is required.',
-			);
+			return new \WP_Error( 'scaffold_target_required', 'Either filename or layer is required.', array( 'status' => 400 ) );
 		}
 
 		// Mode 2: explicit filepath for dynamic files.
 		$explicit_path = $input['filepath'] ?? '';
 		if ( ! empty( $explicit_path ) ) {
-			return self::scaffold_at_path( $explicit_path, $filename, $input );
+			return self::callback_result( self::scaffold_at_path( $explicit_path, $filename, $input ) );
 		}
 
 		// Mode 1: registered file.
-		return self::scaffold_registered( $filename, $input );
+		return self::callback_result( self::scaffold_registered( $filename, $input ) );
+	}
+
+	private static function callback_result( array $result ): array|\WP_Error {
+		if ( ! empty( $result['success'] ) ) {
+			return $result;
+		}
+		return new \WP_Error( $result['error_code'] ?? 'scaffold_failed', $result['error'] ?? 'Scaffold failed.', array_merge( array( 'status' => 500 ), $result ) );
 	}
 
 	// =========================================================================
@@ -314,18 +318,37 @@ class ScaffoldAbilities {
 			);
 		}
 
-		$files   = MemoryFileRegistry::get_by_layer( $layer );
-		$results = array();
-		$created = 0;
+		$files    = MemoryFileRegistry::get_by_layer( $layer );
+		$results  = array();
+		$created  = 0;
+		$failures = array();
 
 		foreach ( $files as $filename => $meta ) {
 			$input['filename'] = $filename;
 			$result            = self::scaffold_registered( $filename, $input );
-			$results[]         = $result;
+			if ( empty( $result['success'] ) ) {
+				$result['filename'] = $filename;
+				$failures[]         = $result;
+			}
+			$results[] = $result;
 
 			if ( ! empty( $result['created'] ) ) {
 				++$created;
 			}
+		}
+
+		if ( ! empty( $failures ) ) {
+			return array(
+				'success'    => false,
+				'error_code' => 'scaffold_layer_failed',
+				'error'      => sprintf( 'Failed to scaffold %d of %d %s-layer file(s).', count( $failures ), count( $files ), $layer ),
+				'layer'      => $layer,
+				'created'    => $created,
+				'failed'     => count( $failures ),
+				'total'      => count( $files ),
+				'files'      => $results,
+				'failures'   => $failures,
+			);
 		}
 
 		return array(

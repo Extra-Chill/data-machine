@@ -260,6 +260,10 @@ class AgentFiles {
 			);
 		}
 
+		if ( is_wp_error( $result ) ) {
+			return RestResultSpec::legacy_error( $result, 'list_agent_files_error' );
+		}
+
 		if ( ! $result['success'] ) {
 			return new \WP_Error( 'list_agent_files_error', $result['error'], array( 'status' => 500 ) );
 		}
@@ -289,6 +293,10 @@ class AgentFiles {
 				$e->getMessage(),
 				array( 'status' => 500 )
 			);
+		}
+
+		if ( is_wp_error( $result ) ) {
+			return RestResultSpec::legacy_error( $result, 'get_agent_file_error' );
 		}
 
 		if ( ! $result['success'] ) {
@@ -333,6 +341,10 @@ class AgentFiles {
 
 		$result = self::getAbilities()->executeWriteAgentFile( $input );
 
+		if ( is_wp_error( $result ) ) {
+			return RestResultSpec::legacy_error( $result, 'put_agent_file_error' );
+		}
+
 		if ( ! $result['success'] ) {
 			$status = 400;
 			if ( false !== strpos( $result['error'] ?? '', 'Filesystem' ) || false !== strpos( $result['error'] ?? '', 'Failed' ) ) {
@@ -370,6 +382,9 @@ class AgentFiles {
 		}
 
 		$result = self::getAbilities()->executeDeleteAgentFile( $input );
+		if ( is_wp_error( $result ) ) {
+			return RestResultSpec::legacy_error( $result, 'delete_agent_file_error' );
+		}
 
 		if ( ! $result['success'] ) {
 			$status = false !== strpos( $result['error'] ?? '', 'not found' ) ? 404 : 400;

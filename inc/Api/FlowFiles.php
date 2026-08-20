@@ -134,6 +134,10 @@ class FlowFiles {
 			'flow_step_id' => sanitize_text_field( $flow_step_id ),
 		) );
 
+		if ( is_wp_error( $result ) ) {
+			return RestResultSpec::legacy_error( $result, 'list_files_error' );
+		}
+
 		if ( ! $result['success'] ) {
 			$status = false !== strpos( $result['error'] ?? '', 'not found' ) ? 404 : 400;
 			return new WP_Error( 'list_files_error', $result['error'], array( 'status' => $status ) );
@@ -174,6 +178,10 @@ class FlowFiles {
 
 		$result = self::getAbilities()->executeUploadFlowFile( $input );
 
+		if ( is_wp_error( $result ) ) {
+			return RestResultSpec::legacy_error( $result, 'upload_file_error' );
+		}
+
 		if ( ! $result['success'] ) {
 			$status = 400;
 			if ( false !== strpos( $result['error'] ?? '', 'not found' ) ) {
@@ -205,6 +213,10 @@ class FlowFiles {
 			'filename'     => $filename,
 			'flow_step_id' => sanitize_text_field( $flow_step_id ),
 		) );
+
+		if ( is_wp_error( $result ) ) {
+			return RestResultSpec::legacy_error( $result, 'delete_file_error' );
+		}
 
 		if ( ! $result['success'] ) {
 			$status = false !== strpos( $result['error'] ?? '', 'not found' ) ? 404 : 400;

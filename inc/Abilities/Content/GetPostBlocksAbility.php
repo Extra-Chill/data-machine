@@ -161,6 +161,15 @@ class GetPostBlocksAbility {
 	public static function handleChatToolCall( array $parameters, array $tool_def = array() ): array {
 		$tool_def;
 		$result = self::execute( $parameters );
+		if ( is_wp_error( $result ) ) {
+			return array(
+				'success'    => false,
+				'error'      => $result->get_error_message(),
+				'error_code' => $result->get_error_code(),
+				'error_data' => $result->get_error_data(),
+				'tool_name'  => 'get_post_blocks',
+			);
+		}
 
 		return array(
 			'success'   => $result['success'],
@@ -175,7 +184,7 @@ class GetPostBlocksAbility {
 	 * @param array $input Ability input.
 	 * @return array
 	 */
-	public static function execute( array $input ): array {
+	public static function execute( array $input ): array|\WP_Error {
 		// prefer_autosave defaults true: proofread the freshest authored content (in-flight autosave).
 		$post_id         = absint( $input['post_id'] ?? 0 );
 		$block_types     = $input['block_types'] ?? array();
@@ -183,29 +192,20 @@ class GetPostBlocksAbility {
 		$prefer_autosave = ! array_key_exists( 'prefer_autosave', $input ) || ! empty( $input['prefer_autosave'] );
 
 		if ( $post_id <= 0 ) {
-			return array(
-				'success' => false,
-				'error'   => 'Valid post_id is required',
-			);
+			return new \WP_Error( 'invalid_get_post_id', 'Valid post_id is required', array( 'status' => 400 ) );
 		}
 
 		// Resolve the target blog. On multisite the post may live on another
 		// site than the one this request landed on; switch to it for the read.
 		$ctx = BlogContext::enter( $input );
 		if ( is_wp_error( $ctx ) ) {
-			return array(
-				'success' => false,
-				'error'   => $ctx->get_error_message(),
-			);
+			return $ctx;
 		}
 
 		try {
 			$post = get_post( $post_id );
 			if ( ! $post ) {
-				return array(
-					'success' => false,
-					'error'   => sprintf( 'Post #%d does not exist', $post_id ),
-				);
+				return new \WP_Error( 'get_post_not_found', sprintf( 'Post #%d does not exist', $post_id ), array( 'status' => 404 ) );
 			}
 
 			// Prefer the calling user's in-flight autosave when it is newer than
@@ -215,9 +215,16 @@ class GetPostBlocksAbility {
 
 			$block_content = ContentFormat::storedToBlocks( $source_content, (string) $post->post_type );
 			if ( is_wp_error( $block_content ) ) {
-				return array(
-					'success' => false,
-					'error'   => $block_content->get_error_message(),
+				return new \WP_Error(
+					$block_content->get_error_code(),
+					$block_content->get_error_message(),
+					array_merge(
+						array(
+							'status'  => 500,
+							'post_id' => $post_id,
+						),
+						is_array( $block_content->get_error_data() ) ? $block_content->get_error_data() : array()
+					)
 				);
 			}
 

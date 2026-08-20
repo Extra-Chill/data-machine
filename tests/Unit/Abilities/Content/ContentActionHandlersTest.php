@@ -53,6 +53,26 @@ class ContentActionHandlersTest extends WP_UnitTestCase {
 		}
 	}
 
+	public function test_direct_callbacks_return_stable_native_errors(): void {
+		$edit = EditPostBlocksAbility::execute( array() );
+		$this->assertWPError( $edit );
+		$this->assertSame( 'invalid_edit_post_id', $edit->get_error_code() );
+
+		$replace = ReplacePostBlocksAbility::execute( array() );
+		$this->assertWPError( $replace );
+		$this->assertSame( 'invalid_replace_post_id', $replace->get_error_code() );
+
+		$insert = InsertContentAbility::execute(
+			array(
+				'post_id'  => $this->post_id,
+				'content'  => 'Content',
+				'position' => 'sideways',
+			)
+		);
+		$this->assertWPError( $insert );
+		$this->assertSame( 'invalid_insert_position', $insert->get_error_code() );
+	}
+
 	public function test_edit_post_blocks_preview_stages_and_resolves(): void {
 		$result = EditPostBlocksAbility::execute(
 			array(

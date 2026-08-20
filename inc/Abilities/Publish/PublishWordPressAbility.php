@@ -147,7 +147,7 @@ class PublishWordPressAbility {
 	 * @param array $input Input parameters.
 	 * @return array Result with post data or error.
 	 */
-	public function execute( array $input ): array {
+	public function execute( array $input ): array|\WP_Error {
 		$logs   = array();
 		$config = $this->normalizeConfig( $input );
 
@@ -174,10 +174,14 @@ class PublishWordPressAbility {
 					'required_parameters' => array( 'title', 'content' ),
 				),
 			);
-			return array(
-				'success' => false,
-				'error'   => 'Missing required parameters: title and content',
-				'logs'    => $logs,
+			return new \WP_Error(
+				'publish_parameters_required',
+				'Missing required parameters: title and content',
+				array(
+					'status'              => 400,
+					'logs'                => $logs,
+					'provided_parameters' => array_keys( $input ),
+				)
 			);
 		}
 
@@ -186,10 +190,13 @@ class PublishWordPressAbility {
 				'level'   => 'error',
 				'message' => 'WordPress: Post type is required',
 			);
-			return array(
-				'success' => false,
-				'error'   => 'Post type is required',
-				'logs'    => $logs,
+			return new \WP_Error(
+				'publish_post_type_required',
+				'Post type is required',
+				array(
+					'status' => 400,
+					'logs'   => $logs,
+				)
 			);
 		}
 
@@ -204,10 +211,13 @@ class PublishWordPressAbility {
 					'sanitized_content_length' => strlen( $content ),
 				),
 			);
-			return array(
-				'success' => false,
-				'error'   => 'Content was empty after sanitization',
-				'logs'    => $logs,
+			return new \WP_Error(
+				'publish_content_empty',
+				'Content was empty after sanitization',
+				array(
+					'status' => 422,
+					'logs'   => $logs,
+				)
 			);
 		}
 
@@ -233,12 +243,16 @@ class PublishWordPressAbility {
 					'error'          => $stored_content->get_error_message(),
 				),
 			);
-			return array(
-				'success'    => false,
-				'error'      => $stored_content->get_error_message(),
-				'error_code' => $stored_content->get_error_code(),
-				'error_data' => $stored_content->get_error_data(),
-				'logs'       => $logs,
+			return new \WP_Error(
+				$stored_content->get_error_code(),
+				$stored_content->get_error_message(),
+				array_merge(
+					array(
+						'status' => 422,
+						'logs'   => $logs,
+					),
+					is_array( $stored_content->get_error_data() ) ? $stored_content->get_error_data() : array()
+				)
 			);
 		}
 
@@ -293,10 +307,15 @@ class PublishWordPressAbility {
 					'post_data' => $post_data,
 				),
 			);
-			return array(
-				'success' => false,
-				'error'   => 'Post creation failed: ' . $post_id->get_error_message(),
-				'logs'    => $logs,
+			return new \WP_Error(
+				'publish_post_creation_failed',
+				'Post creation failed: ' . $post_id->get_error_message(),
+				array(
+					'status'        => 500,
+					'logs'          => $logs,
+					'wp_error_code' => $post_id->get_error_code(),
+					'post_data'     => $post_data,
+				)
 			);
 		}
 
@@ -314,6 +333,7 @@ class PublishWordPressAbility {
 				}
 
 				$term_ids = array();
+				$errors   = array();
 				foreach ( $terms as $term ) {
 					if ( is_numeric( $term ) ) {
 						$term_ids[] = intval( $term );
@@ -326,18 +346,44 @@ class PublishWordPressAbility {
 							$term_ids[] = $term_obj->term_id;
 						} else {
 							$result = wp_insert_term( $term, $taxonomy );
-							if ( ! is_wp_error( $result ) ) {
-								$term_ids[] = $result['term_id'];
+							if ( is_wp_error( $result ) ) {
+								$errors[] = array(
+									'code'    => $result->get_error_code(),
+									'message' => $result->get_error_message(),
+									'term'    => $term,
+								);
+								continue;
 							}
+							$term_ids[] = $result['term_id'];
 						}
 					}
 				}
 
 				if ( ! empty( $term_ids ) ) {
-					$set_result                    = wp_set_object_terms( $post_id, $term_ids, $taxonomy );
-					$taxonomy_results[ $taxonomy ] = array(
-						'success'  => ! is_wp_error( $set_result ),
-						'term_ids' => $term_ids,
+					$set_result = wp_set_object_terms( $post_id, $term_ids, $taxonomy );
+					if ( is_wp_error( $set_result ) ) {
+						$errors[] = array(
+							'code'     => $set_result->get_error_code(),
+							'message'  => $set_result->get_error_message(),
+							'term_ids' => $term_ids,
+						);
+					}
+				}
+
+				$taxonomy_results[ $taxonomy ] = array(
+					'success'  => empty( $errors ),
+					'term_ids' => $term_ids,
+				);
+				if ( ! empty( $errors ) ) {
+					$taxonomy_results[ $taxonomy ]['errors'] = $errors;
+
+					$logs[] = array(
+						'level'   => 'warning',
+						'message' => 'WordPress: Taxonomy assignment completed with errors',
+						'data'    => array(
+							'taxonomy' => $taxonomy,
+							'errors'   => $errors,
+						),
 					);
 				}
 			}
@@ -346,7 +392,7 @@ class PublishWordPressAbility {
 		if ( ! empty( $taxonomy_results ) ) {
 			$logs[] = array(
 				'level'   => 'debug',
-				'message' => 'WordPress: Taxonomies assigned',
+				'message' => 'WordPress: Taxonomies processed',
 				'data'    => $taxonomy_results,
 			);
 		}

@@ -13,6 +13,7 @@ use DataMachine\Core\Database\Agents\AgentAccess;
 use DataMachine\Core\Database\Agents\Agents;
 use DataMachine\Core\FilesRepository\DirectoryManager;
 use DataMachine\Core\Identity\AgentIdentityStoreAdapter;
+use DataMachine\Engine\AI\MemoryFileRegistry;
 use DataMachine\Tests\Fixtures\CountingProvisionAdapter;
 use DataMachine\Tests\Fixtures\DuplicateLoserAgents;
 use DataMachine\Tests\Fixtures\FailingProvisionAdapter;
@@ -143,6 +144,27 @@ class AgentIdentityStoreAdapterTest extends WP_UnitTestCase {
 		$identity = $this->store->materialize( $scope );
 		$this->assertSame( $identity->id, $this->store->resolve( $scope )->id );
 		$this->assertNotEmpty( $this->repository->get_agent( $identity->id )['provisioned_at'] );
+	}
+
+	public function test_native_scaffold_error_does_not_complete_provisioning(): void {
+		$this->register_agent( 'scaffold-error-agent' );
+		$scope    = new WP_Agent_Identity_Scope( 'scaffold-error-agent', $this->owner_a, 'scaffold-error' );
+		$filename = 'SCAFFOLD-FAILURE.md';
+		MemoryFileRegistry::register( $filename, 999, array( 'layer' => MemoryFileRegistry::LAYER_AGENT ) );
+
+		try {
+			$this->store->materialize( $scope );
+			$this->fail( 'A native scaffold WP_Error must abort provisioning.' );
+		} catch ( \RuntimeException $exception ) {
+			$this->assertStringContainsString( 'Failed to scaffold', $exception->getMessage() );
+		} finally {
+			MemoryFileRegistry::deregister( $filename );
+		}
+
+		$row = $this->repository->get_by_identity_scope( 'scaffold-error-agent', $this->owner_a, 'scaffold-error' );
+		$this->assertSame( '', (string) $row['provisioning_token'] );
+		$this->assertEmpty( $row['provisioned_at'] );
+		$this->assertNull( $this->store->resolve( $scope ) );
 	}
 
 	public function test_duplicate_key_loser_reconciles_pending_winner(): void {
