@@ -19,12 +19,7 @@ class ScaffoldAbilitiesTest extends WP_UnitTestCase {
 		$target = $directory . '/TEST.md';
 		$this->assertNotFalse( file_put_contents( $target, "existing\n" ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents -- Test fixture setup.
 
-		$existing = ScaffoldAbilities::execute(
-			array(
-				'filename' => 'TEST.md',
-				'filepath' => $target,
-			)
-		);
+		$existing = self::scaffold_test_file( $target );
 		$this->assertIsArray( $existing );
 		$this->assertTrue( $existing['success'] );
 		$this->assertFalse( $existing['created'] );
@@ -68,12 +63,7 @@ class ScaffoldAbilitiesTest extends WP_UnitTestCase {
 		add_action( 'datamachine_log', $logger, 999, 2 );
 
 		try {
-			$failed = ScaffoldAbilities::execute(
-				array(
-					'filename' => 'TEST.md',
-					'filepath' => $target,
-				)
-			);
+			$failed = self::scaffold_test_file( $target );
 			$this->assertWPError( $failed );
 			$this->assertSame( 'scaffold_failed', $failed->get_error_code() );
 			$this->assertStringContainsString( 'Failed to write TEST.md', $failed->get_error_message() );
@@ -165,5 +155,14 @@ class ScaffoldAbilitiesTest extends WP_UnitTestCase {
 		$this->assertSame( $data['failed'], count( $data['failures'] ) );
 		$this->assertSame( 'USER_MEMORY.md', $data['failures'][0]['filename'] );
 		$this->assertStringContainsString( 'Could not resolve directory', $data['failures'][0]['error'] );
+	}
+
+	private static function scaffold_test_file( string $target ): array|\WP_Error {
+		return ScaffoldAbilities::execute(
+			array(
+				'filename' => 'TEST.md',
+				'filepath' => $target,
+			)
+		);
 	}
 }
