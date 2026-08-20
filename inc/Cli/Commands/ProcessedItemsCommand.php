@@ -39,7 +39,7 @@ class ProcessedItemsCommand extends BaseCommand {
 	 * ## OPTIONS
 	 *
 	 * [--handler=<handler_type>]
-	 * : Filter to a specific handler type (e.g., "ticketmaster", "dice_fm", "universal_web_scraper").
+	 * : Filter to a specific handler type (e.g., "source_api", "catalog_import", "web_scraper").
 	 *
 	 * [--pipeline=<pipeline_id>]
 	 * : Filter to a specific pipeline.
@@ -60,7 +60,7 @@ class ProcessedItemsCommand extends BaseCommand {
 	 * ## EXAMPLES
 	 *
 	 *     wp datamachine processed-items audit
-	 *     wp datamachine processed-items audit --handler=ticketmaster
+	 *     wp datamachine processed-items audit --handler=source_api
 	 *     wp datamachine processed-items audit --pipeline=3 --min-waste=0
 	 *
 	 * @subcommand audit
@@ -222,7 +222,7 @@ class ProcessedItemsCommand extends BaseCommand {
 	 * : Clear all processed items for this flow ID.
 	 *
 	 * [--handler=<handler_type>]
-	 * : Clear all processed items for this handler type (e.g., "ticketmaster", "dice_fm").
+	 * : Clear all processed items for this handler type (e.g., "source_api", "catalog_import").
 	 *
 	 * [--after=<date>]
 	 * : Only clear items processed after this date (YYYY-MM-DD or datetime).
@@ -243,10 +243,10 @@ class ProcessedItemsCommand extends BaseCommand {
 	 *
 	 *     wp datamachine processed-items clear --pipeline=12
 	 *     wp datamachine processed-items clear --flow=42
-	 *     wp datamachine processed-items clear --handler=ticketmaster --yes
-	 *     wp datamachine processed-items clear --handler=ticketmaster --after=2025-01-01
+	 *     wp datamachine processed-items clear --handler=source_api --yes
+	 *     wp datamachine processed-items clear --handler=source_api --after=2025-01-01
 	 *     wp datamachine processed-items clear --all --yes
-	 *     wp datamachine processed-items clear --handler=dice_fm --dry-run
+	 *     wp datamachine processed-items clear --handler=catalog_import --dry-run
 	 *
 	 * @subcommand clear
 	 */

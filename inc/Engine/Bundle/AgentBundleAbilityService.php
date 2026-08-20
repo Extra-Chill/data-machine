@@ -403,13 +403,13 @@ final class AgentBundleAbilityService {
 
 			// Pipeline-scoped handler fallback (primary): the unique-slug pass
 			// above misses for live-origin source flows because the bundle's slug
-			// was deduped at export ("dice-fm-101") and its `name` was renamed to
-			// "<Source> — <City>" (event-bundles#5), while the live row still
-			// carries the bare source label ("Dice.fm"). Neither editable label
+			// was deduped at export ("catalog-import-101") and its `name` was
+			// renamed to a contextual label, while the live row still carries the
+			// bare source label ("Catalog Import"). Neither editable label
 			// can meet the live row. The flow's import HANDLER, however, is
 			// rename-proof: within this already-matched parent pipeline a given
-			// source ("dice_fm", "ticketmaster") appears once — per-venue scrapers
-			// share `universal_web_scraper` but already resolved on the unique
+			// source ("catalog_import", "source_api") appears once; shared handlers
+			// already resolved on the unique
 			// slug pass before reaching here. So re-key BOTH sides on the
 			// normalized handler identity (bundle `steps[]` vs live `flow_config`).
 			// A unique match is unambiguous; a genuine in-pipeline handler

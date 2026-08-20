@@ -33,7 +33,7 @@ final class AgentBundleSlugMatcher {
 	 * Index a set of existing rows by their effective normalized slug.
 	 *
 	 * When two or more rows resolve to the SAME normalized slug (e.g. four live
-	 * flows all named "Ticketmaster"), the slug is ambiguous: no single row can
+	 * flows all named "Catalog Import"), the slug is ambiguous: no single row can
 	 * be bound to the incoming bundle artifact without guessing. Ambiguous slugs
 	 * are omitted from the returned `matched` map and surfaced in `ambiguous`
 	 * so callers can refuse to guess.
@@ -87,8 +87,8 @@ final class AgentBundleSlugMatcher {
 	 * normalized display name and ignores `portable_slug` entirely. It exists
 	 * for the pipeline-scoped flow fallback in adopt: a live-origin flow row has
 	 * no slug column, so its only stable identity WITHIN an already-matched
-	 * parent pipeline is its source label (`flow_name` = "Ticketmaster",
-	 * "Dice.fm"). Within one city pipeline that label is unique, so keying on it
+	 * parent pipeline is its source label (`flow_name` = "Source API",
+	 * "Catalog Import"). Within one pipeline that label is unique, so keying on it
 	 * is unambiguous; across the whole agent it is not, which is why callers must
 	 * only ever hand this the live rows of a SINGLE matched pipeline.
 	 *
@@ -148,7 +148,7 @@ final class AgentBundleSlugMatcher {
 	 *
 	 * Unlike {@see self::bundle_slug()} (which prefers the artifact's UNIQUE
 	 * `slug`/`portable_slug`), this keys purely on the display name — the source
-	 * label ("Ticketmaster", "Dice.fm"). It is the bundle-side counterpart to
+	 * label ("Source API", "Catalog Import"). It is the bundle-side counterpart to
 	 * {@see self::index_existing_by_name()} and is used only for the
 	 * pipeline-scoped flow fallback: within a single matched pipeline the source
 	 * label uniquely identifies the flow, and the live row carries no slug to key
@@ -169,16 +169,15 @@ final class AgentBundleSlugMatcher {
 	/**
 	 * Compute the normalized HANDLER-identity key for a bundle flow.
 	 *
-	 * The display name is mutable: extrachill-event-bundles#5 renamed every
-	 * colliding bundle flow `name` from the bare source label ("Dice.fm") to
-	 * "<Source> — <City>" ("Dice.fm — Austin"), and the export-time global
-	 * dedupe appends a numeric suffix to the slug ("dice-fm-101"). Neither the
-	 * renamed name nor the deduped slug can meet the unchanged live `flow_name`
-	 * ("Dice.fm"). The flow's SOURCE handler, however, is rename-proof: the first
-	 * non-AI/non-output step's handler slug ("dice_fm", "ticketmaster",
-	 * "bandsintown") is the stable per-source identity that survives every UI
-	 * rename. Within a single city pipeline a given import source appears once
-	 * (per-venue scrapers all share `universal_web_scraper`, but those resolve on
+	 * The display name is mutable: a consumer may rename a bundle flow from the
+	 * bare source label ("Catalog Import") to a contextual label such as
+	 * "Catalog Import Primary", while export-time deduplication appends a numeric
+	 * suffix to the slug ("catalog-import-101"). Neither the renamed name nor the
+	 * deduped slug can meet the unchanged live `flow_name` ("Catalog Import"). The
+	 * flow's SOURCE handler, however, is rename-proof: the first non-AI/non-output
+	 * step's handler slug ("catalog_import", "source_api") is the stable
+	 * per-source identity that survives every UI rename. Within a single pipeline
+	 * a given import source appears once (shared handlers resolve on
 	 * the unique slug pass BEFORE this fallback is reached), so the handler key is
 	 * unambiguous there. This is the bundle-side counterpart to
 	 * {@see self::index_existing_by_handler()}.
@@ -407,9 +406,9 @@ final class AgentBundleSlugMatcher {
 	 *
 	 * Precedence: `portable_slug` -> `slug` -> display name. The bundle flow /
 	 * pipeline file carries a UNIQUE `slug` (the portable identity, e.g.
-	 * `ticketmaster`, `ticketmaster-4`) that the upgrade planner already keys
+	 * `catalog-import`, `catalog-import-4`) that the upgrade planner already keys
 	 * the ledger on. The display name is a NON-UNIQUE label — for flows it is
-	 * the source/handler ("Ticketmaster", "Dice.fm"), shared by hundreds of
+	 * the source/handler ("Source API", "Catalog Import"), shared by many
 	 * rows — so keying on it collapses distinct artifacts into one slug and
 	 * makes adopt refuse them as ambiguous. Preferring the artifact's own
 	 * `slug` before the display name keeps the bundle side keyed on the same

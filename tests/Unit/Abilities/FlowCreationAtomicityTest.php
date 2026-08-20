@@ -67,9 +67,9 @@ class FlowCreationAtomicityTest extends WP_UnitTestCase {
 
 		$this->handlers_filter = static function ( array $handlers, ?string $step_type ): array {
 			if ( null === $step_type || 'event_import' === $step_type ) {
-				$handlers['ticketmaster'] = array(
+				$handlers['source_api'] = array(
 					'type'  => 'event_import',
-					'label' => 'Ticketmaster',
+					'label' => 'Source API',
 				);
 			}
 			if ( null === $step_type || 'upsert' === $step_type ) {
@@ -94,8 +94,8 @@ class FlowCreationAtomicityTest extends WP_UnitTestCase {
 			2
 		);
 		$this->settings_filter = static function ( array $settings, ?string $handler_slug ): array {
-			if ( null === $handler_slug || 'ticketmaster' === $handler_slug ) {
-				$settings['ticketmaster'] = new AtomicEventImportSettings();
+			if ( null === $handler_slug || 'source_api' === $handler_slug ) {
+				$settings['source_api'] = new AtomicEventImportSettings();
 			}
 			if ( null === $handler_slug || 'upsert_event' === $handler_slug ) {
 				$settings['upsert_event'] = new AtomicUpsertSettings();
@@ -152,8 +152,8 @@ class FlowCreationAtomicityTest extends WP_UnitTestCase {
 
 		$flow       = ( new Flows() )->get_flow( (int) $result['flow_id'] );
 		$step_types = array_column( $flow['flow_config'], null, 'step_type' );
-		$this->assertSame( array( 'ticketmaster' ), $step_types['event_import']['handler_slugs'] );
-		$this->assertSame( 'ticketmaster', $step_types['event_import']['handler_configs']['ticketmaster']['source'] );
+		$this->assertSame( array( 'source_api' ), $step_types['event_import']['handler_slugs'] );
+		$this->assertSame( 'source_api', $step_types['event_import']['handler_configs']['source_api']['source'] );
 		$this->assertSame( 'Import upcoming events.', $step_types['ai'][ QueueAbility::SLOT_PROMPT_QUEUE ][0]['prompt'] );
 		$this->assertSame( array( 'upsert_event' ), $step_types['upsert']['handler_slugs'] );
 		$this->assertSame( 'event', $step_types['upsert']['handler_configs']['upsert_event']['post_type'] );
@@ -178,7 +178,7 @@ class FlowCreationAtomicityTest extends WP_UnitTestCase {
 		foreach ( array( false, true ) as $validate_only ) {
 			$input = $this->validInput( 'Malformed Alias Flow' );
 			$input['step_configs']['event_import'] = array(
-				$alias => array( 'ticketmaster' ),
+				$alias => array( 'source_api' ),
 			);
 			$input['validate_only'] = $validate_only;
 			$before = $this->flowCount();
@@ -403,8 +403,8 @@ class FlowCreationAtomicityTest extends WP_UnitTestCase {
 			'flow_name'    => $flow_name,
 			'step_configs' => array(
 				'event_import' => array(
-					'handler_slug'   => 'ticketmaster',
-					'handler_config' => array( 'source' => 'ticketmaster' ),
+					'handler_slug'   => 'source_api',
+					'handler_config' => array( 'source' => 'source_api' ),
 				),
 				'ai'           => array(
 					'user_message' => 'Import upcoming events.',

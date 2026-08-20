@@ -689,12 +689,12 @@ Processed items (deduplication). **Alias**: `processed-item`. **Since**: 0.41.0
 ```bash
 # Audit processed-item rows by flow/handler
 wp datamachine processed-items audit
-wp datamachine processed-items audit --handler=ticketmaster --min-waste=0
+wp datamachine processed-items audit --handler=source_api --min-waste=0
 
 # Clear processed items for a pipeline or flow
 wp datamachine processed-items clear --pipeline=5 --yes
 wp datamachine processed-items clear --flow=10 --yes
-wp datamachine processed-items clear --handler=ticketmaster --after=2025-01-01 --dry-run
+wp datamachine processed-items clear --handler=source_api --after=2025-01-01 --dry-run
 wp datamachine processed-items clear --all --yes
 
 # Clean dedupe rows whose jobs have been purged

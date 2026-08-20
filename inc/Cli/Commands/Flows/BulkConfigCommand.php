@@ -69,11 +69,11 @@ class BulkConfigCommand extends BaseCommand {
 	 *
 	 * ## EXAMPLES
 	 *
-	 *     # Preview: ramp max_items for all ticketmaster flows globally
-	 *     wp datamachine flows bulk-config --handler=ticketmaster --config='{"max_items":5}' --scope=global --dry-run
+	 *     # Preview: ramp max_items for all source_api flows globally
+	 *     wp datamachine flows bulk-config --handler=source_api --config='{"max_items":5}' --scope=global --dry-run
 	 *
-	 *     # Execute: update all dice_fm flows in pipeline 10
-	 *     wp datamachine flows bulk-config --handler=dice_fm --config='{"max_items":10}' --scope=pipeline --pipeline_id=10 --execute
+	 *     # Execute: update all catalog_import flows in pipeline 10
+	 *     wp datamachine flows bulk-config --handler=catalog_import --config='{"max_items":10}' --scope=pipeline --pipeline_id=10 --execute
 	 *
 	 *     # Execute: update a single flow
 	 *     wp datamachine flows bulk-config --handler=rss --config='{"max_items":3}' --scope=flow --flow_id=25 --execute

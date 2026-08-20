@@ -66,7 +66,7 @@ class FetchHandlerDataPacketTest extends TestCase {
 	}
 
 	public function test_multiple_items_creates_multiple_packets(): void {
-		$handler = $this->createStubHandler( 'ticketmaster', array() );
+		$handler = $this->createStubHandler( 'source_api', array() );
 		$method  = $this->getToDataPackets();
 
 		$items = array(

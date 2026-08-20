@@ -27,17 +27,17 @@ defined( 'ABSPATH' ) || exit;
  *     wp datamachine test --list
  *
  *     # Show config schema for a handler
- *     wp datamachine test ticketmaster --describe
+ *     wp datamachine test source_api --describe
  *
  *     # Test a handler with config
- *     wp datamachine test ticketmaster --config='{"lat":32.7,"lng":-79.9,"radius":50}'
- *     wp datamachine fetch test --handler=ticketmaster --config='{"lat":32.7,"lng":-79.9,"radius":50}'
+ *     wp datamachine test source_api --config='{"query":"example"}'
+ *     wp datamachine fetch test --handler=source_api --config='{"query":"example"}'
  *
  *     # Test using an existing flow's config
  *     wp datamachine test --flow=42
  *
  *     # Limit output and get JSON
- *     wp datamachine test ticketmaster --config='...' --limit=3 --format=json
+ *     wp datamachine test source_api --config='...' --limit=3 --format=json
  *
  * @since 0.55.3
  */
@@ -92,13 +92,13 @@ class TestCommand extends BaseCommand {
 	 * ## EXAMPLES
 	 *
 	 *     wp datamachine test --list
-	 *     wp datamachine test ticketmaster --describe
-	 *     wp datamachine test ticketmaster --config='{"lat":32.7,"lng":-79.9,"radius":50}'
-	 *     wp datamachine fetch test --handler=ticketmaster --config='{"lat":32.7,"lng":-79.9,"radius":50}'
+	 *     wp datamachine test source_api --describe
+	 *     wp datamachine test source_api --config='{"query":"example"}'
+	 *     wp datamachine fetch test --handler=source_api --config='{"query":"example"}'
 	 *     wp datamachine test rss --config='{"feed_url":"https://example.com/feed"}'
 	 *     wp datamachine test --flow=42
-	 *     wp datamachine test ticketmaster --config='...' --limit=3 --format=json
-	 *     wp datamachine test ticketmaster --config='...' --raw --byte-limit=1048576 --format=json
+	 *     wp datamachine test source_api --config='...' --limit=3 --format=json
+	 *     wp datamachine test source_api --config='...' --raw --byte-limit=1048576 --format=json
 	 *
 	 * @when after_wp_load
 	 */
