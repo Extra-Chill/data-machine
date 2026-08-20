@@ -1256,8 +1256,11 @@ class AIStep extends Step {
 
 			$tool_def = $available_tools[ $tool_name ] ?? null;
 
-			$disposition_id = (string) ( $tool_result['disposition_id'] ?? $tool_parameters['disposition_id'] ?? '' );
-			$matched_claim  = '' !== $disposition_id && class_exists( ProcessedItems::class ) ? ProcessedItems::resolve_disposition_claim( $engine_data, $disposition_id, false ) : null;
+			$execution_parameters = is_array( $tool_result['metadata']['datamachine']['parameters'] ?? null )
+				? $tool_result['metadata']['datamachine']['parameters']
+				: array();
+			$disposition_id       = (string) ( $tool_result['disposition_id'] ?? $execution_parameters['disposition_id'] ?? $tool_parameters['disposition_id'] ?? '' );
+			$matched_claim        = '' !== $disposition_id && class_exists( ProcessedItems::class ) ? ProcessedItems::resolve_disposition_claim( $engine_data, $disposition_id, false ) : null;
 			if ( $is_handler_tool && ! empty( $active_claims ) && null === $matched_claim ) {
 				$tool_result = array(
 					'success'   => false,

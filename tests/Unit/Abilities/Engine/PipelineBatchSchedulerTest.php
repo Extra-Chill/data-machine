@@ -17,6 +17,7 @@ use DataMachine\Core\Database\Jobs\Jobs;
 use DataMachine\Core\Database\ProcessedItems\ProcessedItems;
 use DataMachine\Core\EngineData;
 use DataMachine\Core\JobStatus;
+use DataMachine\Core\Steps\AI\AIStep;
 use DataMachine\Core\Steps\Fetch\Tools\FetchItemDispositionTool;
 use DataMachine\Engine\Actions\Handlers\StepLifecycleHandler;
 use WP_UnitTestCase;
@@ -584,6 +585,76 @@ class PipelineBatchSchedulerTest extends WP_UnitTestCase {
 			$replayed   = StepLifecycleHandler::reconcileStepOutput( $child_id, array( 'step_type' => 'ai' ), array( $result_packet ), true );
 			$this->assertTrue( $reconciled['success'] );
 			$this->assertTrue( $replayed['success'] );
+			$this->assertFalse( ( new ProcessedItems() )->has_active_claim( $claim['identity_scope'], $claim['source_type'], $claim['item_identifier'] ) );
+		}
+	}
+
+	public function test_scheduled_fanout_reconciles_handler_identity_from_normalized_execution_parameters(): void {
+		$parent_id = $this->create_parent_job();
+		$packets   = array();
+		$claims    = array();
+		foreach ( array( 'event-a' => 'Event A', 'event-b' => 'Event B' ) as $item_identifier => $title ) {
+			$claim                    = $this->claim_for_parent( $parent_id, $item_identifier );
+			$claims[ $title ]         = $claim;
+			$packet                   = $this->make_data_packet( $title );
+			$packet['metadata'][ ProcessedItems::CLAIM_METADATA_KEY ] = $claim;
+			$packets[] = $packet;
+		}
+
+		$scheduler = new PipelineBatchScheduler();
+		$children  = array();
+		foreach ( $packets as $index => $packet ) {
+			$child_id = $scheduler->createChildJobFromBatch( $packet, array( 'next_flow_step_id' => 'ai-step' ), $parent_id, $index, 'packet-' . $index );
+			$this->assertIsInt( $child_id );
+			$children[] = array(
+				'job_id' => $child_id,
+				'label'  => $packet['data']['title'],
+			);
+		}
+		$this->assertCount( 2, $children );
+
+		$process_results = new \ReflectionMethod( AIStep::class, 'processLoopResults' );
+		foreach ( $children as $child ) {
+			$child_id = (int) $child['job_id'];
+			$claim    = $claims[ $child['label'] ];
+			$this->assertTrue( ( new ProcessedItems() )->owns_active_claim( $claim, $child_id ) );
+
+			$output = $process_results->invoke(
+				null,
+				array(
+					'messages'               => array(),
+					'tool_execution_results' => array(
+						array(
+							'tool_name'       => 'upsert_event',
+							'parameters'      => array( 'title' => $child['label'] ),
+							'is_handler_tool' => true,
+							'result'          => array(
+								'success'  => true,
+								'metadata' => array(
+									'datamachine' => array(
+										'parameters' => array(
+											'title'          => $child['label'],
+											'disposition_id' => $claim['disposition_id'],
+										),
+									),
+								),
+							),
+						),
+					),
+				),
+				array( $this->make_data_packet( $child['label'] ) ),
+				array(
+					'flow_step_id' => 'ai-step',
+					'engine_data'  => datamachine_get_engine_data( $child_id ),
+				),
+				array( 'upsert_event' => array( 'handler' => 'upsert_event', 'handler_config' => array() ) )
+			);
+
+			$this->assertCount( 1, $output );
+			$this->assertSame( 'ai_handler_complete', $output[0]['type'] );
+			$this->assertSame( $claim['disposition_id'], $output[0]['metadata']['disposition_id'] );
+			$reconciled = StepLifecycleHandler::reconcileStepOutput( $child_id, array( 'step_type' => 'ai' ), $output, true );
+			$this->assertTrue( $reconciled['success'] );
 			$this->assertFalse( ( new ProcessedItems() )->has_active_claim( $claim['identity_scope'], $claim['source_type'], $claim['item_identifier'] ) );
 		}
 	}

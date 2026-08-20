@@ -71,6 +71,8 @@ if ( ! function_exists( 'wp_json_encode' ) ) {
 
 require_once __DIR__ . '/../inc/Core/DataPacket.php';
 require_once __DIR__ . '/../inc/Core/PluginSettings.php';
+require_once __DIR__ . '/../inc/Core/Database/BaseRepository.php';
+require_once __DIR__ . '/../inc/Core/Database/ProcessedItems/ProcessedItems.php';
 require_once __DIR__ . '/../inc/Core/Steps/Step.php';
 require_once __DIR__ . '/../inc/Core/Steps/StepTypeRegistrationTrait.php';
 require_once __DIR__ . '/../inc/Core/Steps/QueueableTrait.php';
@@ -97,6 +99,7 @@ require_once __DIR__ . '/../inc/Engine/AI/conversation-loop.php';
 require_once __DIR__ . '/../inc/Core/Steps/AI/AIStep.php';
 
 use DataMachine\Core\Steps\AI\AIStep;
+use DataMachine\Core\Database\ProcessedItems\ProcessedItems;
 use DataMachine\Engine\AI\Tools\ToolPolicyResolver;
 use DataMachine\Engine\AI\Tools\ToolResultFinder;
 
@@ -206,6 +209,43 @@ $packets = $method->invoke(
 assert_handoff_equals( 1, count( $packets ), 'AI step emitted one downstream packet', $failures, $passes );
 assert_handoff_equals( 'ai_handler_complete', $packets[0]['type'] ?? null, 'AI step emitted handler-complete packet', $failures, $passes );
 assert_handoff_equals( 'wiki_upsert', $packets[0]['metadata']['handler_tool'] ?? null, 'packet carries required handler slug', $failures, $passes );
+
+$claim = array(
+	'identity_scope'  => 'ticketmaster-fetch',
+	'source_type'     => 'ticketmaster',
+	'item_identifier' => 'Z7r9jZ1A7-sr_',
+	'ownership_token' => 'scheduled-child-token',
+);
+$claim['disposition_id'] = ProcessedItems::disposition_identity( $claim['identity_scope'], $claim['source_type'], $claim['item_identifier'] );
+$claimed_packets         = $method->invoke(
+	null,
+	array(
+		'messages'               => array(),
+		'tool_execution_results' => array(
+			array(
+				'tool_name'       => 'wiki_upsert',
+				'parameters'      => array( 'title' => 'Scheduled Ticketmaster Event' ),
+				'is_handler_tool' => true,
+				'result'          => array(
+					'success'  => true,
+					'metadata' => array(
+						'datamachine' => array(
+							'parameters' => array( 'disposition_id' => $claim['disposition_id'] ),
+						),
+					),
+				),
+			),
+		),
+	),
+	array( array( 'metadata' => array( 'source_type' => 'ticketmaster' ) ) ),
+	array(
+		'flow_step_id' => 'ai_step',
+		'engine_data'  => array( ProcessedItems::CLAIM_METADATA_KEY => $claim ),
+	),
+	$available_tools
+);
+assert_handoff_equals( 'ai_handler_complete', $claimed_packets[0]['type'] ?? null, 'normalized execution parameters preserve successful handler output', $failures, $passes );
+assert_handoff_equals( $claim['disposition_id'], $claimed_packets[0]['metadata']['disposition_id'] ?? null, 'normalized execution parameters identify the exact active claim', $failures, $passes );
 
 $found = ToolResultFinder::findHandlerResult( $packets, 'wiki_upsert', 'upsert_step', false );
 assert_handoff_equals( $packets[0], $found, 'ToolResultFinder finds packet by required handler slug', $failures, $passes );
