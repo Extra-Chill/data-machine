@@ -290,7 +290,13 @@ defined( 'ABSPATH' ) || define( 'ABSPATH', __DIR__ . '/' );
 		)
 	);
 
-	assert_agent_workflow_bridge_equals( false, $missing_input['success'], 'missing input workflow fails', $failures, $passes );
+	assert_agent_workflow_bridge_equals( true, is_wp_error( $missing_input ), 'missing input workflow returns a native error', $failures, $passes );
+	$missing_input_data = $missing_input->get_error_data();
+	assert_agent_workflow_bridge_equals( 102, $missing_input_data['job_id'], 'failed workflow error preserves job id', $failures, $passes );
+	assert_agent_workflow_bridge_equals( 'failed', $missing_input_data['workflow_status'], 'failed workflow error preserves runner status', $failures, $passes );
+	assert_agent_workflow_bridge_equals( array(), $missing_input_data['steps'], 'failed workflow error preserves completed steps', $failures, $passes );
+	assert_agent_workflow_bridge_equals( array(), $missing_input_data['output'], 'failed workflow error preserves partial output', $failures, $passes );
+	assert_agent_workflow_bridge_equals( 'missing_required_input', $missing_input_data['error']['code'], 'failed workflow error preserves full runner error', $failures, $passes );
 	assert_agent_workflow_bridge_equals( 'failed - missing_required_input', $jobs->jobs[102]['status'], 'failed workflow maps to failed job reason', $failures, $passes );
 	assert_agent_workflow_bridge_equals( 'failed', $recorder->find( 'run-missing-input' )?->get_status(), 'recorder find reconstructs failed status', $failures, $passes );
 
@@ -312,8 +318,8 @@ defined( 'ABSPATH' ) || define( 'ABSPATH', __DIR__ . '/' );
 		)
 	);
 
-	assert_agent_workflow_bridge_equals( false, $unsupported['success'], 'unsupported foreach workflow fails clearly', $failures, $passes );
-	assert_agent_workflow_bridge_equals( 'agents_api_workflow_step_unsupported', $unsupported['error']['code'], 'unsupported step error is typed', $failures, $passes );
+	assert_agent_workflow_bridge_equals( true, is_wp_error( $unsupported ), 'unsupported foreach workflow fails clearly', $failures, $passes );
+	assert_agent_workflow_bridge_equals( 'agents_api_workflow_step_unsupported', $unsupported->get_error_code(), 'unsupported step error is typed', $failures, $passes );
 
 	$trigger_unsupported = $bridge->execute(
 		array(
@@ -325,8 +331,8 @@ defined( 'ABSPATH' ) || define( 'ABSPATH', __DIR__ . '/' );
 		)
 	);
 
-	assert_agent_workflow_bridge_equals( false, $trigger_unsupported['success'], 'unsupported trigger workflow fails clearly', $failures, $passes );
-	assert_agent_workflow_bridge_equals( 'agents_api_workflow_trigger_unsupported', $trigger_unsupported['error']['code'], 'unsupported trigger error is typed', $failures, $passes );
+	assert_agent_workflow_bridge_equals( true, is_wp_error( $trigger_unsupported ), 'unsupported trigger workflow fails clearly', $failures, $passes );
+	assert_agent_workflow_bridge_equals( 'agents_api_workflow_trigger_unsupported', $trigger_unsupported->get_error_code(), 'unsupported trigger error is typed', $failures, $passes );
 
 	if ( $failures ) {
 		echo "\nFAILED: " . count( $failures ) . " agents-api workflow bridge assertions failed.\n";

@@ -81,9 +81,9 @@ class GetRunArtifactsAbility {
 	 * Retrieve a job's public run artifact contract.
 	 *
 	 * @param array<string,mixed> $input Ability input.
-	 * @return array<string,mixed>
+	 * @return array<string,mixed>|\WP_Error
 	 */
-	public function execute( array $input ): array {
+	public function execute( array $input ): array|\WP_Error {
 		$job_id = (int) ( $input['job_id'] ?? 0 );
 		if ( $job_id <= 0 ) {
 			return $this->error( 'invalid_job_id', 'job_id must be a positive integer.', 400 );
@@ -95,7 +95,7 @@ class GetRunArtifactsAbility {
 		}
 
 		if ( ! $this->canAccessJob( $job ) ) {
-			return $this->jobAccessDenied();
+			return $this->jobAccessDeniedError();
 		}
 
 		$artifact_result = ( new JobArtifacts() )->get( $job_id );
@@ -158,12 +158,14 @@ class GetRunArtifactsAbility {
 	}
 
 	/** @return array{success:false,error_code:string,error:string,status:int} */
-	private function error( string $code, string $message, int $status ): array {
-		return array(
-			'success'    => false,
-			'error_code' => $code,
-			'error'      => $message,
-			'status'     => $status,
+	private function error( string $code, string $message, int $status ): \WP_Error {
+		return new \WP_Error(
+			$code,
+			$message,
+			array(
+				'status'    => $status,
+				'retryable' => $status >= 500,
+			)
 		);
 	}
 }

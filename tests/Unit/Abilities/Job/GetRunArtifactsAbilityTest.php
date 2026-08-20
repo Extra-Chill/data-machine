@@ -43,9 +43,11 @@ class GetRunArtifactsAbilityTest extends WP_UnitTestCase {
 		wp_set_current_user( $this->owner_id );
 		$result = ( new GetRunArtifactsAbility() )->execute( array( 'job_id' => PHP_INT_MAX ) );
 
-		$this->assertFalse( $result['success'] );
-		$this->assertSame( 'job_not_found', $result['error_code'] );
-		$this->assertSame( 404, $result['status'] );
+		$this->assertWPError( $result );
+		$this->assertSame( 'job_not_found', $result->get_error_code() );
+		$this->assertSame( sprintf( 'Job %d was not found.', PHP_INT_MAX ), $result->get_error_message() );
+		$this->assertSame( 404, $result->get_error_data()['status'] );
+		$this->assertFalse( $result->get_error_data()['retryable'] );
 	}
 
 	public function test_unauthorized_run_is_denied_before_artifact_projection(): void {
@@ -54,9 +56,10 @@ class GetRunArtifactsAbilityTest extends WP_UnitTestCase {
 
 		$result = ( new GetRunArtifactsAbility() )->execute( array( 'job_id' => $job_id ) );
 
-		$this->assertFalse( $result['success'] );
-		$this->assertSame( 'job_access_denied', $result['error_code'] );
-		$this->assertArrayNotHasKey( 'artifacts', $result );
+		$this->assertWPError( $result );
+		$this->assertSame( 'job_access_denied', $result->get_error_code() );
+		$this->assertSame( 403, $result->get_error_data()['status'] );
+		$this->assertFalse( $result->get_error_data()['retryable'] );
 	}
 
 	public function test_valid_empty_artifacts_and_absent_policy_are_distinct_from_failure(): void {

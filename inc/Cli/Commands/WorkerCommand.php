@@ -13,6 +13,7 @@ use DataMachine\Abilities\Job\RecoverStuckJobsAbility;
 use DataMachine\Cli\BaseCommand;
 use DataMachine\Cli\WorkerHealth;
 use DataMachine\Cli\WorkerLock;
+use DataMachine\Core\AbilityResult;
 use DataMachine\Core\Database\Jobs\Jobs;
 use DataMachine\Engine\AI\Actions\PendingActionStore;
 use WP_CLI;
@@ -284,7 +285,7 @@ class WorkerCommand extends BaseCommand {
 
 				if ( $recover_stuck && ! $recovery_ran ) {
 					$recovery_ran = true;
-					$recovery = ( new RecoverStuckJobsAbility() )->execute(
+					$recovery = AbilityResult::normalize( ( new RecoverStuckJobsAbility() )->execute(
 						array(
 							'dry_run'       => false,
 							'timeout_hours' => $stuck_timeout,
@@ -292,7 +293,7 @@ class WorkerCommand extends BaseCommand {
 							'limit'         => 5,
 							'recover_pathless_children' => false,
 						)
-					);
+					) );
 
 					if ( empty( $recovery['success'] ) ) {
 						++$warnings;
@@ -446,7 +447,7 @@ class WorkerCommand extends BaseCommand {
 
 			if ( $recover_stuck && ! $recovery_ran ) {
 				$recovery_ran = true;
-				$recovery = ( new RecoverStuckJobsAbility() )->execute(
+				$recovery = AbilityResult::normalize( ( new RecoverStuckJobsAbility() )->execute(
 					array(
 						'dry_run'       => false,
 						'timeout_hours' => $stuck_timeout,
@@ -454,7 +455,7 @@ class WorkerCommand extends BaseCommand {
 						'limit'         => 5,
 						'recover_pathless_children' => false,
 					)
-				);
+				) );
 
 				if ( empty( $recovery['success'] ) ) {
 					++$warnings;
@@ -500,13 +501,13 @@ class WorkerCommand extends BaseCommand {
 			++$job_claims;
 			try {
 				$remaining_seconds = $time_limit > 0 ? max( 1, $time_limit - $stop_before_timeout - ( time() - $started_at ) ) : $drain_time_limit;
-				$result            = $drain_job->execute(
+				$result            = AbilityResult::normalize( $drain_job->execute(
 					array(
 						'job_id'         => $claim['job_id'],
 						'step_budget'    => $job_step_budget,
 						'time_budget_ms' => min( $drain_time_limit, $remaining_seconds ) * 1000,
 					)
-				);
+				) );
 
 				$actions += (int) ( $result['actions_drained'] ?? 0 );
 				if ( ! empty( $result['success'] ) ) {

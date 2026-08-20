@@ -79,12 +79,9 @@ class FailJobAbility {
 	 * @param array $input Input parameters with job_id and optional reason.
 	 * @return array Result with job_id, previous_status, and new_status.
 	 */
-	public function execute( array $input ): array {
+	public function execute( array $input ): array|\WP_Error {
 		if ( empty( $input['job_id'] ) || ! is_numeric( $input['job_id'] ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'job_id is required and must be a positive integer.',
-			);
+			return new \WP_Error( 'invalid_job_id', 'job_id is required and must be a positive integer.', array( 'status' => 400 ) );
 		}
 
 		$job_id = (int) $input['job_id'];
@@ -93,14 +90,18 @@ class FailJobAbility {
 		$job = $this->db_jobs->get_job( $job_id );
 
 		if ( ! $job ) {
-			return array(
-				'success' => false,
-				'error'   => sprintf( 'Job %d not found.', $job_id ),
+			return new \WP_Error(
+				'job_not_found',
+				sprintf( 'Job %d not found.', $job_id ),
+				array(
+					'status' => 404,
+					'job_id' => $job_id,
+				)
 			);
 		}
 
 		if ( ! $this->canAccessJob( $job ) ) {
-			return $this->jobAccessDenied();
+			return $this->jobAccessDeniedError();
 		}
 
 		$previous_status = $job['status'] ?? '';
@@ -118,9 +119,14 @@ class FailJobAbility {
 
 		// Pending jobs are queued but not yet running; cancellation is safest before they start.
 		if ( ! in_array( $previous_status, array( JobStatus::PENDING, JobStatus::PROCESSING ), true ) ) {
-			return array(
-				'success' => false,
-				'error'   => sprintf( 'Job %d has status "%s" — only pending or processing jobs can be failed.', $job_id, $previous_status ),
+			return new \WP_Error(
+				'invalid_job_status',
+				sprintf( 'Job %d has status "%s" — only pending or processing jobs can be failed.', $job_id, $previous_status ),
+				array(
+					'status'    => 409,
+					'job_id'    => $job_id,
+					'retryable' => false,
+				)
 			);
 		}
 

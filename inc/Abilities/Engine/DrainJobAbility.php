@@ -101,7 +101,7 @@ class DrainJobAbility {
 	 * @param array $input Input with job_id and optional budgets.
 	 * @return array Result with terminal status and drain stats.
 	 */
-	public function execute( array $input ): array {
+	public function execute( array $input ): array|\WP_Error {
 		$job_id         = (int) ( $input['job_id'] ?? 0 );
 		$step_budget    = max( 1, (int) ( $input['step_budget'] ?? self::DEFAULT_STEP_BUDGET ) );
 		$time_budget_ms = max( 1, (int) ( $input['time_budget_ms'] ?? self::DEFAULT_TIME_BUDGET_MS ) );
@@ -109,28 +109,33 @@ class DrainJobAbility {
 		$last_error     = null;
 
 		if ( $job_id <= 0 ) {
-			return array(
-				'success' => false,
-				'error'   => 'A valid job_id is required.',
-			);
+			return new \WP_Error( 'invalid_job_id', 'A valid job_id is required.', array( 'status' => 400 ) );
 		}
 
 		$job = $this->db_jobs->get_job( $job_id );
 		if ( ! $job ) {
-			return array(
-				'success' => false,
-				'job_id'  => $job_id,
-				'error'   => sprintf( 'Job %d not found.', $job_id ),
+			return new \WP_Error(
+				'job_not_found',
+				sprintf( 'Job %d not found.', $job_id ),
+				array(
+					'status' => 404,
+					'job_id' => $job_id,
+				)
 			);
 		}
 
 		$guard_error = $this->getActionSchedulerGuardError();
 		if ( null !== $guard_error ) {
-			return array(
-				'success'    => false,
-				'job_id'     => $job_id,
-				'error'      => $guard_error,
-				'error_type' => 'action_scheduler_unavailable',
+			return new \WP_Error(
+				'action_scheduler_unavailable',
+				$guard_error,
+				array(
+					'status'      => 503,
+					'retryable'   => true,
+					'job_id'      => $job_id,
+					'error_type'  => 'action_scheduler_unavailable',
+					'diagnostics' => array( 'boundary' => 'drain' ),
+				)
 			);
 		}
 

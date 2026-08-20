@@ -239,6 +239,43 @@ class WebhookTriggerTest extends WP_UnitTestCase {
 		$this->assert_is_unauthorized( $res );
 	}
 
+	public function test_native_run_flow_error_preserves_code_status_and_retry_metadata(): void {
+		$enable   = $this->ability->executeEnable( array( 'flow_id' => $this->flow_id ) );
+		$registry = \WP_Abilities_Registry::get_instance();
+		$property = ( new \ReflectionClass( $registry ) )->getProperty( 'registered_abilities' );
+		$abilities = $property->getValue( $registry );
+		$original  = $abilities['datamachine/run-flow'];
+		$abilities['datamachine/run-flow'] = new class() extends \WP_Ability {
+			public function __construct() {}
+			public function execute( $input = null ) {
+				unset( $input );
+				return new \WP_Error(
+					'run_flow_busy',
+					'Run flow is temporarily unavailable.',
+					array(
+						'status'        => 503,
+						'retryable'     => true,
+						'enqueue_state' => 'capacity_wait',
+					)
+				);
+			}
+		};
+		$property->setValue( $registry, $abilities );
+
+		try {
+			$result = WebhookTrigger::handle_trigger( $this->make_request( '', array( 'authorization' => 'Bearer ' . $enable['token'] ) ) );
+		} finally {
+			$abilities['datamachine/run-flow'] = $original;
+			$property->setValue( $registry, $abilities );
+		}
+
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'run_flow_busy', $result->get_error_code() );
+		$this->assertSame( 503, $result->get_error_data()['status'] );
+		$this->assertTrue( $result->get_error_data()['retryable'] );
+		$this->assertSame( 'capacity_wait', $result->get_error_data()['enqueue_state'] );
+	}
+
 	public function test_hmac_valid_signature_passes(): void {
 		$this->register_example_preset();
 		$enable = $this->ability->executeEnable( array(

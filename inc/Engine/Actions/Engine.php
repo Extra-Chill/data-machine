@@ -77,6 +77,14 @@ function datamachine_execute_step_action( $job_id, string $flow_step_id, $operat
 				'recovery_claim_token'  => is_string( $recovery_claim_token ) ? $recovery_claim_token : '',
 			)
 		);
+		if ( is_wp_error( $result ) ) {
+			$error_data = $result->get_error_data();
+			if ( is_array( $error_data ) && ! empty( $error_data['retryable'] ) ) {
+				// phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- Internal scheduler control flow, not rendered output.
+				throw new \RuntimeException( $result->get_error_message() );
+			}
+			return;
+		}
 		if ( in_array( (string) ( $result['outcome'] ?? '' ), array( 'claim_completion_failed', 'terminal_transition_failed' ), true ) ) {
 			throw new \RuntimeException( 'Data Machine terminal transition failed.' );
 		}

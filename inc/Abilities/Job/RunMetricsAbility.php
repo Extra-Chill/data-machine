@@ -57,25 +57,26 @@ class RunMetricsAbility {
 		\DataMachine\Abilities\AbilityRegistration::on_abilities_api_init( $register_callback );
 	}
 
-	public function execute( array $input ): array {
+	public function execute( array $input ): array|\WP_Error {
 		$job_id = (int) ( $input['job_id'] ?? 0 );
 		if ( $job_id <= 0 ) {
-			return array(
-				'success' => false,
-				'error'   => 'job_id must be a positive integer.',
-			);
+			return new \WP_Error( 'invalid_job_id', 'job_id must be a positive integer.', array( 'status' => 400 ) );
 		}
 
 		$job = $this->db_jobs->get_job( $job_id );
 		if ( ! $job ) {
-			return array(
-				'success' => false,
-				'error'   => sprintf( 'Job %d not found.', $job_id ),
+			return new \WP_Error(
+				'job_not_found',
+				sprintf( 'Job %d not found.', $job_id ),
+				array(
+					'status' => 404,
+					'job_id' => $job_id,
+				)
 			);
 		}
 
 		if ( ! $this->canAccessJob( $job ) ) {
-			return $this->jobAccessDenied();
+			return $this->jobAccessDeniedError();
 		}
 
 		$jobs = $this->enrichJobNames( array( $job ) );

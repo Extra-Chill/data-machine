@@ -512,7 +512,7 @@ class PipelineBatchScheduler {
 					'data_packets' => array( $single_packet ),
 				)
 			);
-			$action_id = ! empty( $result['success'] ) ? (int) ( $result['action_id'] ?? 0 ) : 0;
+			$action_id = ! is_wp_error( $result ) && ! empty( $result['success'] ) ? (int) ( $result['action_id'] ?? 0 ) : 0;
 		}
 
 		$state = $action_id > 0 ? 'enqueued' : 'enqueue_failed';

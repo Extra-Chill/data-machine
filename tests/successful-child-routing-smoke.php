@@ -17,6 +17,19 @@ if ( ! defined( 'WPINC' ) ) {
 $datamachine_successful_child_logs = array();
 $datamachine_execute_step_result   = array();
 
+if ( ! class_exists( 'WP_Error' ) ) {
+	class WP_Error {
+		public function __construct( private string $code, private string $message, private $data = null ) {}
+		public function get_error_code(): string { return $this->code; }
+		public function get_error_message(): string { return $this->message; }
+		public function get_error_data() { return $this->data; }
+	}
+}
+
+if ( ! function_exists( 'is_wp_error' ) ) {
+	function is_wp_error( $value ): bool { return $value instanceof WP_Error; }
+}
+
 if ( ! function_exists( 'do_action' ) ) {
 	function do_action( string $hook, ...$args ): void {
 		$GLOBALS['datamachine_successful_child_logs'][] = array(
@@ -43,7 +56,7 @@ if ( ! function_exists( 'wp_get_ability' ) ) {
 	function wp_get_ability( string $name ): object {
 		unset( $name );
 		return new class() {
-			public function execute( array $input ): array {
+			public function execute( array $input ) {
 				unset( $input );
 				return $GLOBALS['datamachine_execute_step_result'];
 			}
@@ -55,9 +68,11 @@ require_once __DIR__ . '/../inc/Core/JobStatus.php';
 require_once __DIR__ . '/../inc/Core/StepExecutionResult.php';
 require_once __DIR__ . '/../inc/Core/Database/BaseRepository.php';
 require_once __DIR__ . '/../inc/Core/Database/Jobs/Jobs.php';
+require_once __DIR__ . '/../inc/Core/Database/ProcessedItems/ProcessedItems.php';
 require_once __DIR__ . '/../inc/Engine/ExecutionPlan.php';
 require_once __DIR__ . '/../inc/Engine/StepNavigator.php';
 require_once __DIR__ . '/../inc/Engine/Actions/Engine.php';
+require_once __DIR__ . '/../inc/Engine/Actions/Handlers/StepLifecycleHandler.php';
 require_once __DIR__ . '/../inc/Abilities/Engine/EngineHelpers.php';
 require_once __DIR__ . '/../inc/Abilities/Engine/ExecuteStepAbility.php';
 
@@ -69,6 +84,13 @@ class DataMachine_Successful_Child_Jobs extends Jobs {
 	public array $transitions = array();
 
 	public function __construct() {}
+
+	public function get_job( int $job_id ): ?array {
+		return array(
+			'job_id' => $job_id,
+			'status' => JobStatus::PROCESSING,
+		);
+	}
 
 	public function transition_job_status_result( int $job_id, string $status, bool $require_final = false ): array {
 		$this->transitions[] = array( $job_id, $status, $require_final );
@@ -158,6 +180,24 @@ try {
 	$stale_generation_noop = false;
 }
 $assert( 'stale generation remains a non-failing scheduler no-op', $stale_generation_noop );
+
+$GLOBALS['datamachine_execute_step_result'] = new WP_Error( 'job_not_found', 'Job not found.', array( 'retryable' => false ) );
+$non_retryable_noop                          = true;
+try {
+	datamachine_execute_step_action( 2930, 'handler_step' );
+} catch ( RuntimeException ) {
+	$non_retryable_noop = false;
+}
+$assert( 'native non-retryable failure remains a completed scheduler action', $non_retryable_noop );
+
+$GLOBALS['datamachine_execute_step_result'] = new WP_Error( 'scheduler_unavailable', 'Scheduler unavailable.', array( 'retryable' => true ) );
+$retryable_failure_surfaced                  = false;
+try {
+	datamachine_execute_step_action( 2930, 'handler_step' );
+} catch ( RuntimeException $exception ) {
+	$retryable_failure_surfaced = 'Scheduler unavailable.' === $exception->getMessage();
+}
+$assert( 'native retryable failure keeps the scheduler action failed', $retryable_failure_surfaced );
 
 echo "\nSuccessful child routing smoke complete: {$failures} failures.\n";
 exit( $failures > 0 ? 1 : 0 );

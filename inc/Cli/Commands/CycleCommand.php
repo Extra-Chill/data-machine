@@ -8,6 +8,7 @@
 namespace DataMachine\Cli\Commands;
 
 use DataMachine\Cli\BaseCommand;
+use DataMachine\Core\AbilityResult;
 use DataMachine\Core\Database\Flows\Flows;
 use DataMachine\Core\Flows\CycleFlowSelector;
 use WP_CLI;
@@ -98,7 +99,7 @@ class CycleCommand extends BaseCommand {
 			}
 
 			foreach ( $rows as &$row ) {
-				$result = $ability->execute( array( 'flow_id' => (int) $row['flow_id'] ) );
+				$result = AbilityResult::normalize( $ability->execute( array( 'flow_id' => (int) $row['flow_id'] ) ) );
 				if ( ! ( $result['success'] ?? false ) ) {
 					$row['status'] = 'failed_to_start';
 					$row['error']  = (string) ( $result['error'] ?? 'Failed to run flow' );
