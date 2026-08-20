@@ -41,26 +41,26 @@ echo "agent-bundle-slug-matcher-smoke\n";
 
 // ---- 1. NULL portable_slug rows resolve via the display-name fallback. -----
 $live_pipelines = array(
-	array( 'pipeline_id' => 101, 'pipeline_name' => 'Ticketmaster Columbus', 'portable_slug' => null ),
-	array( 'pipeline_id' => 102, 'pipeline_name' => 'Dice FM Austin', 'portable_slug' => '' ),
+	array( 'pipeline_id' => 101, 'pipeline_name' => 'Source API Primary', 'portable_slug' => null ),
+	array( 'pipeline_id' => 102, 'pipeline_name' => 'Catalog Import Secondary', 'portable_slug' => '' ),
 );
 
 $index = AgentBundleSlugMatcher::index_existing( $live_pipelines, 'pipeline_name', 'pipeline' );
 
 agent_bundle_slug_matcher_assert(
-	isset( $index['matched']['ticketmaster-columbus'] ),
+	isset( $index['matched']['source-api-primary'] ),
 	'NULL portable_slug pipeline resolves by normalized name',
 	$failures,
 	$passes
 );
 agent_bundle_slug_matcher_assert(
-	101 === ( $index['matched']['ticketmaster-columbus']['pipeline_id'] ?? 0 ),
+	101 === ( $index['matched']['source-api-primary']['pipeline_id'] ?? 0 ),
 	'matched row is the correct live pipeline',
 	$failures,
 	$passes
 );
 agent_bundle_slug_matcher_assert(
-	isset( $index['matched']['dice-fm-austin'] ),
+	isset( $index['matched']['catalog-import-secondary'] ),
 	'empty-string portable_slug pipeline resolves by normalized name',
 	$failures,
 	$passes
@@ -73,11 +73,11 @@ agent_bundle_slug_matcher_assert(
 );
 
 // ---- 2. Bundle side computes the SAME key the existing side does. ----------
-$bundle_pipeline = array( 'original_id' => 9, 'pipeline_name' => 'Ticketmaster Columbus', 'portable_slug' => null );
+$bundle_pipeline = array( 'original_id' => 9, 'pipeline_name' => 'Source API Primary', 'portable_slug' => null );
 $bundle_key      = AgentBundleSlugMatcher::bundle_slug( $bundle_pipeline, 'pipeline_name', 'pipeline' );
 
 agent_bundle_slug_matcher_assert(
-	'ticketmaster-columbus' === $bundle_key,
+	'source-api-primary' === $bundle_key,
 	'bundle-side slug matches existing-side slug (symmetric)',
 	$failures,
 	$passes
@@ -103,28 +103,28 @@ agent_bundle_slug_matcher_assert(
 
 // ---- 4. Duplicate names surface as ambiguous, never silently mismatched. ---
 $dupes = array(
-	array( 'flow_id' => 1, 'flow_name' => 'Ticketmaster', 'portable_slug' => null ),
-	array( 'flow_id' => 2, 'flow_name' => 'Ticketmaster', 'portable_slug' => null ),
-	array( 'flow_id' => 3, 'flow_name' => 'Ticketmaster', 'portable_slug' => null ),
-	array( 'flow_id' => 4, 'flow_name' => 'Ticketmaster', 'portable_slug' => null ),
+	array( 'flow_id' => 1, 'flow_name' => 'Catalog Import', 'portable_slug' => null ),
+	array( 'flow_id' => 2, 'flow_name' => 'Catalog Import', 'portable_slug' => null ),
+	array( 'flow_id' => 3, 'flow_name' => 'Catalog Import', 'portable_slug' => null ),
+	array( 'flow_id' => 4, 'flow_name' => 'Catalog Import', 'portable_slug' => null ),
 	array( 'flow_id' => 5, 'flow_name' => 'Unique Flow', 'portable_slug' => null ),
 );
 $flow_index = AgentBundleSlugMatcher::index_existing( $dupes, 'flow_name', 'flow' );
 
 agent_bundle_slug_matcher_assert(
-	isset( $flow_index['ambiguous']['ticketmaster'] ),
-	'four flows named "Ticketmaster" surface as ambiguous',
+	isset( $flow_index['ambiguous']['catalog-import'] ),
+	'four flows named "Catalog Import" surface as ambiguous',
 	$failures,
 	$passes
 );
 agent_bundle_slug_matcher_assert(
-	4 === count( $flow_index['ambiguous']['ticketmaster'] ),
+	4 === count( $flow_index['ambiguous']['catalog-import'] ),
 	'all four colliding rows are recorded for the ambiguous slug',
 	$failures,
 	$passes
 );
 agent_bundle_slug_matcher_assert(
-	! isset( $flow_index['matched']['ticketmaster'] ),
+	! isset( $flow_index['matched']['catalog-import'] ),
 	'ambiguous slug is NOT placed in the matched map (no guessing)',
 	$failures,
 	$passes
@@ -150,19 +150,19 @@ agent_bundle_slug_matcher_assert(
 );
 
 // ---- 6. Acceptance: an all-NULL-portable_slug agent yields 0 would-create. --
-// Mirrors the adopt() matching loop on a fixture that reproduces the events-bot
+// Mirrors the adopt() matching loop on a fixture that reproduces a consumer
 // shape (every live row portable_slug NULL). Before the fix, the existing map
 // keyed by '' and EVERY bundle artifact was classified new_artifact (would
 // INSERT a duplicate). After the fix, all resolve to matched / 0 unmatched.
 $live_all_null = array(
-	array( 'pipeline_id' => 11, 'pipeline_name' => 'Ticketmaster Columbus', 'portable_slug' => null ),
-	array( 'pipeline_id' => 12, 'pipeline_name' => 'Dice FM Austin', 'portable_slug' => null ),
-	array( 'pipeline_id' => 13, 'pipeline_name' => 'Bandsintown Nashville', 'portable_slug' => null ),
+	array( 'pipeline_id' => 11, 'pipeline_name' => 'Source API Primary', 'portable_slug' => null ),
+	array( 'pipeline_id' => 12, 'pipeline_name' => 'Catalog Import Secondary', 'portable_slug' => null ),
+	array( 'pipeline_id' => 13, 'pipeline_name' => 'Partner Feed Tertiary', 'portable_slug' => null ),
 );
 $bundle_pipelines = array(
-	array( 'original_id' => 1, 'pipeline_name' => 'Ticketmaster Columbus', 'portable_slug' => null ),
-	array( 'original_id' => 2, 'pipeline_name' => 'Dice FM Austin', 'portable_slug' => null ),
-	array( 'original_id' => 3, 'pipeline_name' => 'Bandsintown Nashville', 'portable_slug' => null ),
+	array( 'original_id' => 1, 'pipeline_name' => 'Source API Primary', 'portable_slug' => null ),
+	array( 'original_id' => 2, 'pipeline_name' => 'Catalog Import Secondary', 'portable_slug' => null ),
+	array( 'original_id' => 3, 'pipeline_name' => 'Partner Feed Tertiary', 'portable_slug' => null ),
 );
 
 $accept_index = AgentBundleSlugMatcher::index_existing( $live_all_null, 'pipeline_name', 'pipeline' );
@@ -191,16 +191,16 @@ agent_bundle_slug_matcher_assert(
 );
 
 // ---- 7. bundle_slug() prefers the artifact's UNIQUE slug over display name. -
-// Mirrors events-bot: hundreds of flows share the display name "Ticketmaster"
+// Mirrors a consumer agent: many flows share the display name "Catalog Import"
 // but each bundle flow artifact carries a DISTINCT unique `slug`
-// (ticketmaster, ticketmaster-4, ...). Keying on the unique slug instead of the
+// (catalog-import, catalog-import-4, ...). Keying on the unique slug instead of the
 // non-unique name means they resolve to distinct keys → 0 ambiguous, all match.
 $same_name_flows = array(
-	array( 'original_id' => 1, 'flow_name' => 'Ticketmaster', 'slug' => 'ticketmaster' ),
-	array( 'original_id' => 2, 'flow_name' => 'Ticketmaster', 'slug' => 'ticketmaster-4' ),
-	array( 'original_id' => 3, 'flow_name' => 'Ticketmaster', 'slug' => 'ticketmaster-9' ),
-	array( 'original_id' => 4, 'flow_name' => 'Dice.fm', 'slug' => 'dice-fm' ),
-	array( 'original_id' => 5, 'flow_name' => 'Dice.fm', 'slug' => 'dice-fm-2' ),
+	array( 'original_id' => 1, 'flow_name' => 'Catalog Import', 'slug' => 'catalog-import' ),
+	array( 'original_id' => 2, 'flow_name' => 'Catalog Import', 'slug' => 'catalog-import-4' ),
+	array( 'original_id' => 3, 'flow_name' => 'Catalog Import', 'slug' => 'catalog-import-9' ),
+	array( 'original_id' => 4, 'flow_name' => 'Source API', 'slug' => 'source-api' ),
+	array( 'original_id' => 5, 'flow_name' => 'Source API', 'slug' => 'source-api-2' ),
 );
 
 $bundle_slugs = array();
@@ -209,7 +209,7 @@ foreach ( $same_name_flows as $bundle_flow ) {
 }
 
 agent_bundle_slug_matcher_assert(
-	array( 'ticketmaster', 'ticketmaster-4', 'ticketmaster-9', 'dice-fm', 'dice-fm-2' ) === $bundle_slugs,
+	array( 'catalog-import', 'catalog-import-4', 'catalog-import-9', 'source-api', 'source-api-2' ) === $bundle_slugs,
 	'same-named flows with distinct slugs resolve to distinct bundle slugs',
 	$failures,
 	$passes
@@ -243,35 +243,35 @@ foreach ( $bundle_slugs as $key ) {
 }
 agent_bundle_slug_matcher_assert(
 	5 === $matched_all && 0 === $ambiguous_ct,
-	'events-bot shape: all 5 same-named flows match their unique slug, 0 ambiguous',
+	'consumer shape: all 5 same-named flows match their unique slug, 0 ambiguous',
 	$failures,
 	$passes
 );
 
 // ---- 8. Degenerate fallback: NO slug + duplicate names still refuses. -------
-// Preserves #2668's four-"Ticketmaster" guarantee for the genuinely slug-less
+// Preserves #2668's four-same-name guarantee for the genuinely slug-less
 // case — when there is nothing unique to key on, adopt must still refuse.
 $slugless_dupes = array(
-	array( 'flow_id' => 1, 'flow_name' => 'Ticketmaster', 'portable_slug' => null ),
-	array( 'flow_id' => 2, 'flow_name' => 'Ticketmaster', 'portable_slug' => null ),
-	array( 'flow_id' => 3, 'flow_name' => 'Ticketmaster', 'portable_slug' => null ),
-	array( 'flow_id' => 4, 'flow_name' => 'Ticketmaster', 'portable_slug' => null ),
+	array( 'flow_id' => 1, 'flow_name' => 'Catalog Import', 'portable_slug' => null ),
+	array( 'flow_id' => 2, 'flow_name' => 'Catalog Import', 'portable_slug' => null ),
+	array( 'flow_id' => 3, 'flow_name' => 'Catalog Import', 'portable_slug' => null ),
+	array( 'flow_id' => 4, 'flow_name' => 'Catalog Import', 'portable_slug' => null ),
 );
 $slugless_index = AgentBundleSlugMatcher::index_existing( $slugless_dupes, 'flow_name', 'flow' );
 agent_bundle_slug_matcher_assert(
-	isset( $slugless_index['ambiguous']['ticketmaster'] ) && ! isset( $slugless_index['matched']['ticketmaster'] ),
+	isset( $slugless_index['ambiguous']['catalog-import'] ) && ! isset( $slugless_index['matched']['catalog-import'] ),
 	'degenerate (no slug + duplicate names) still refuses as ambiguous',
 	$failures,
 	$passes
 );
 // And the slug-less bundle artifact (no portable_slug, no slug) keys on name.
 $slugless_artifact = AgentBundleSlugMatcher::bundle_slug(
-	array( 'flow_name' => 'Ticketmaster' ),
+	array( 'flow_name' => 'Catalog Import' ),
 	'flow_name',
 	'flow'
 );
 agent_bundle_slug_matcher_assert(
-	'ticketmaster' === $slugless_artifact,
+	'catalog-import' === $slugless_artifact,
 	'slug-less bundle artifact falls back to the normalized display name',
 	$failures,
 	$passes
@@ -313,10 +313,10 @@ agent_bundle_slug_matcher_assert(
 );
 
 // ---- 10. Pipeline-scoped fallback: source label is unique within a pipeline.
-// Reproduces the events-bot live-origin shape end to end: N city pipelines,
-// each with a same-named "Ticketmaster" AND "Dice.fm" live flow (portable_slug
+// Reproduces a live-origin shape end to end: N pipelines, each with same-named
+// "Catalog Import" and "Source API" live flows (portable_slug
 // NULL, flow_name the bare source label). The bundle flow carries the UNIQUE
-// slug ("ticketmaster-63"), which the global slug pass can never match against a
+// slug ("catalog-import-63"), which the global slug pass cannot match against a
 // slugless live row. The pipeline-scoped fallback re-keys both sides on the
 // normalized source label WITHIN the bounded pipeline, where it is unique.
 //
@@ -325,16 +325,16 @@ agent_bundle_slug_matcher_assert(
 // the name-key fallback resolves it.
 $scoped_pipelines = array(
 	101 => array(
-		array( 'flow_id' => 1, 'pipeline_id' => 101, 'flow_name' => 'Ticketmaster', 'portable_slug' => null ),
-		array( 'flow_id' => 2, 'pipeline_id' => 101, 'flow_name' => 'Dice.fm', 'portable_slug' => null ),
+		array( 'flow_id' => 1, 'pipeline_id' => 101, 'flow_name' => 'Catalog Import', 'portable_slug' => null ),
+		array( 'flow_id' => 2, 'pipeline_id' => 101, 'flow_name' => 'Source API', 'portable_slug' => null ),
 	),
 	102 => array(
-		array( 'flow_id' => 3, 'pipeline_id' => 102, 'flow_name' => 'Ticketmaster', 'portable_slug' => null ),
-		array( 'flow_id' => 4, 'pipeline_id' => 102, 'flow_name' => 'Dice.fm', 'portable_slug' => null ),
+		array( 'flow_id' => 3, 'pipeline_id' => 102, 'flow_name' => 'Catalog Import', 'portable_slug' => null ),
+		array( 'flow_id' => 4, 'pipeline_id' => 102, 'flow_name' => 'Source API', 'portable_slug' => null ),
 	),
 	103 => array(
-		array( 'flow_id' => 5, 'pipeline_id' => 103, 'flow_name' => 'Ticketmaster', 'portable_slug' => null ),
-		array( 'flow_id' => 6, 'pipeline_id' => 103, 'flow_name' => 'Dice.fm', 'portable_slug' => null ),
+		array( 'flow_id' => 5, 'pipeline_id' => 103, 'flow_name' => 'Catalog Import', 'portable_slug' => null ),
+		array( 'flow_id' => 6, 'pipeline_id' => 103, 'flow_name' => 'Source API', 'portable_slug' => null ),
 	),
 );
 
@@ -342,12 +342,12 @@ $scoped_pipelines = array(
 // what AgentBundleArrayAdapter writes) and the bare source label in flow_name.
 // original_pipeline_id maps to a matched live pipeline (id == live id here).
 $scoped_bundle_flows = array(
-	array( 'original_pipeline_id' => 101, 'flow_name' => 'Ticketmaster', 'portable_slug' => 'ticketmaster' ),
-	array( 'original_pipeline_id' => 101, 'flow_name' => 'Dice.fm', 'portable_slug' => 'dice-fm' ),
-	array( 'original_pipeline_id' => 102, 'flow_name' => 'Ticketmaster', 'portable_slug' => 'ticketmaster-2' ),
-	array( 'original_pipeline_id' => 102, 'flow_name' => 'Dice.fm', 'portable_slug' => 'dice-fm-2' ),
-	array( 'original_pipeline_id' => 103, 'flow_name' => 'Ticketmaster', 'portable_slug' => 'ticketmaster-3' ),
-	array( 'original_pipeline_id' => 103, 'flow_name' => 'Dice.fm', 'portable_slug' => 'dice-fm-3' ),
+	array( 'original_pipeline_id' => 101, 'flow_name' => 'Catalog Import', 'portable_slug' => 'catalog-import' ),
+	array( 'original_pipeline_id' => 101, 'flow_name' => 'Source API', 'portable_slug' => 'source-api' ),
+	array( 'original_pipeline_id' => 102, 'flow_name' => 'Catalog Import', 'portable_slug' => 'catalog-import-2' ),
+	array( 'original_pipeline_id' => 102, 'flow_name' => 'Source API', 'portable_slug' => 'source-api-2' ),
+	array( 'original_pipeline_id' => 103, 'flow_name' => 'Catalog Import', 'portable_slug' => 'catalog-import-3' ),
+	array( 'original_pipeline_id' => 103, 'flow_name' => 'Source API', 'portable_slug' => 'source-api-3' ),
 );
 
 $scoped_matched   = 0;
@@ -390,18 +390,18 @@ agent_bundle_slug_matcher_assert(
 	$passes
 );
 agent_bundle_slug_matcher_assert(
-	1 === ( $matched_flow_ids['ticketmaster'] ?? 0 )
-		&& 3 === ( $matched_flow_ids['ticketmaster-2'] ?? 0 )
-		&& 5 === ( $matched_flow_ids['ticketmaster-3'] ?? 0 ),
-	'pipeline-scoped: each Ticketmaster slug binds to the row in its OWN pipeline',
+	1 === ( $matched_flow_ids['catalog-import'] ?? 0 )
+		&& 3 === ( $matched_flow_ids['catalog-import-2'] ?? 0 )
+		&& 5 === ( $matched_flow_ids['catalog-import-3'] ?? 0 ),
+	'pipeline-scoped: each catalog import slug binds to the row in its OWN pipeline',
 	$failures,
 	$passes
 );
 agent_bundle_slug_matcher_assert(
-	2 === ( $matched_flow_ids['dice-fm'] ?? 0 )
-		&& 4 === ( $matched_flow_ids['dice-fm-2'] ?? 0 )
-		&& 6 === ( $matched_flow_ids['dice-fm-3'] ?? 0 ),
-	'pipeline-scoped: each Dice.fm slug binds to the row in its OWN pipeline',
+	2 === ( $matched_flow_ids['source-api'] ?? 0 )
+		&& 4 === ( $matched_flow_ids['source-api-2'] ?? 0 )
+		&& 6 === ( $matched_flow_ids['source-api-3'] ?? 0 ),
+	'pipeline-scoped: each source API slug binds to the row in its OWN pipeline',
 	$failures,
 	$passes
 );
@@ -411,10 +411,10 @@ agent_bundle_slug_matcher_assert(
 // there is no unique signal, so the name fallback must surface ambiguous and
 // NEVER guess — preserving the #2668 guarantee at the per-pipeline scope.
 $tie_rows = array(
-	array( 'flow_id' => 11, 'pipeline_id' => 200, 'flow_name' => 'Ticketmaster', 'portable_slug' => null ),
-	array( 'flow_id' => 12, 'pipeline_id' => 200, 'flow_name' => 'Ticketmaster', 'portable_slug' => null ),
+	array( 'flow_id' => 11, 'pipeline_id' => 200, 'flow_name' => 'Catalog Import', 'portable_slug' => null ),
+	array( 'flow_id' => 12, 'pipeline_id' => 200, 'flow_name' => 'Catalog Import', 'portable_slug' => null ),
 );
-$tie_bundle = array( 'original_pipeline_id' => 200, 'flow_name' => 'Ticketmaster', 'portable_slug' => 'ticketmaster-77' );
+$tie_bundle = array( 'original_pipeline_id' => 200, 'flow_name' => 'Catalog Import', 'portable_slug' => 'catalog-import-77' );
 
 $tie_slug_key   = AgentBundleSlugMatcher::bundle_slug( $tie_bundle, 'flow_name', 'flow' );
 $tie_slug_index = AgentBundleSlugMatcher::index_existing( $tie_rows, 'flow_name', 'flow' );
@@ -439,16 +439,16 @@ agent_bundle_slug_matcher_assert(
 // stable cross-side signal is the source label.
 $name_only = AgentBundleSlugMatcher::index_existing_by_name(
 	array(
-		array( 'flow_id' => 1, 'flow_name' => 'Ticketmaster', 'portable_slug' => 'some-stored-slug' ),
-		array( 'flow_id' => 2, 'flow_name' => 'Dice.fm', 'portable_slug' => null ),
+		array( 'flow_id' => 1, 'flow_name' => 'Catalog Import', 'portable_slug' => 'some-stored-slug' ),
+		array( 'flow_id' => 2, 'flow_name' => 'Source API', 'portable_slug' => null ),
 	),
 	'flow_name',
 	'flow'
 );
 agent_bundle_slug_matcher_assert(
-	isset( $name_only['matched']['ticketmaster'] )
-		&& 1 === ( $name_only['matched']['ticketmaster']['flow_id'] ?? 0 )
-		&& isset( $name_only['matched']['dice-fm'] ),
+	isset( $name_only['matched']['catalog-import'] )
+		&& 1 === ( $name_only['matched']['catalog-import']['flow_id'] ?? 0 )
+		&& isset( $name_only['matched']['source-api'] ),
 	'index_existing_by_name keys on normalized name regardless of portable_slug',
 	$failures,
 	$passes
@@ -456,35 +456,35 @@ agent_bundle_slug_matcher_assert(
 
 // ---- 13. bundle_name_key keys on the source label, never the unique slug. ---
 $label_key = AgentBundleSlugMatcher::bundle_name_key(
-	array( 'flow_name' => 'Ticketmaster', 'portable_slug' => 'ticketmaster-63', 'slug' => 'ticketmaster-63' ),
+	array( 'flow_name' => 'Catalog Import', 'portable_slug' => 'catalog-import-63', 'slug' => 'catalog-import-63' ),
 	'flow_name',
 	'flow'
 );
 agent_bundle_slug_matcher_assert(
-	'ticketmaster' === $label_key,
+	'catalog-import' === $label_key,
 	'bundle_name_key resolves the source label, ignoring the unique slug',
 	$failures,
 	$passes
 );
 
 // ---- 14. Handler-identity fallback: rename-proof in-pipeline match. ---------
-// Reproduces the events-bot live-origin bundle shape that the slug AND name
+// Reproduces a consumer live-origin bundle shape that the slug AND name
 // fallbacks both miss (#2683). The in-memory bundle adopt loads carries each
 // flow's steps in `flow_config` (keyed by step id), its `flow_name` RENAMED to
-// "<Source> — <City>" (event-bundles#5) and its `portable_slug` deduped
-// ("dice-fm-101") — so neither the unique-slug pass nor the name fallback can
+// to a contextual label and its `portable_slug` deduped
+// ("catalog-import-101") — so neither the unique-slug pass nor the name fallback can
 // meet the live row, whose `flow_name` is still the bare source label
-// ("Dice.fm"). The import HANDLER is the only rename-proof identity, present on
+// ("Catalog Import"). The import HANDLER is the only rename-proof identity, present on
 // BOTH sides as `flow_config[<step>].handler_slugs[0]`.
 $handler_live_rows = array(
-	// Pipeline 9 (Austin): one Dice.fm source flow + one Ticketmaster source flow.
+	// Pipeline 9: one catalog import flow and one source API flow.
 	array(
 		'flow_id'       => 26,
 		'pipeline_id'   => 9,
-		'flow_name'     => 'Dice.fm',
+		'flow_name'     => 'Catalog Import',
 		'portable_slug' => null,
 		'flow_config'   => array(
-			'9_a_26' => array( 'step_type' => 'event_import', 'execution_order' => 0, 'handler_slugs' => array( 'dice_fm' ) ),
+			'9_a_26' => array( 'step_type' => 'fetch', 'execution_order' => 0, 'handler_slugs' => array( 'catalog_import' ) ),
 			'9_b_26' => array( 'step_type' => 'ai', 'execution_order' => 1 ),
 			'9_c_26' => array( 'step_type' => 'upsert', 'execution_order' => 2, 'handler_slugs' => array( 'upsert_event' ) ),
 		),
@@ -492,10 +492,10 @@ $handler_live_rows = array(
 	array(
 		'flow_id'       => 27,
 		'pipeline_id'   => 9,
-		'flow_name'     => 'Ticketmaster',
+		'flow_name'     => 'Source API',
 		'portable_slug' => null,
 		'flow_config'   => array(
-			'9_d_27' => array( 'step_type' => 'event_import', 'execution_order' => 0, 'handler_slugs' => array( 'ticketmaster' ) ),
+			'9_d_27' => array( 'step_type' => 'fetch', 'execution_order' => 0, 'handler_slugs' => array( 'source_api' ) ),
 			'9_e_27' => array( 'step_type' => 'ai', 'execution_order' => 1 ),
 		),
 	),
@@ -505,10 +505,10 @@ $handler_live_rows = array(
 // handler lives in `flow_config` exactly like the live row.
 $handler_bundle_flow = array(
 	'original_pipeline_id' => 9,
-	'flow_name'            => 'Dice.fm — Austin',
-	'portable_slug'        => 'dice-fm-101',
+	'flow_name'            => 'Catalog Import Primary',
+	'portable_slug'        => 'catalog-import-101',
 	'flow_config'          => array(
-		'1_bundle_step_0_70' => array( 'step_type' => 'event_import', 'execution_order' => 0, 'handler_slugs' => array( 'dice_fm' ) ),
+		'1_bundle_step_0_70' => array( 'step_type' => 'fetch', 'execution_order' => 0, 'handler_slugs' => array( 'catalog_import' ) ),
 		'1_bundle_step_1_70' => array( 'step_type' => 'ai', 'execution_order' => 1 ),
 		'1_bundle_step_2_70' => array( 'step_type' => 'upsert', 'execution_order' => 2, 'handler_slugs' => array( 'upsert_event' ) ),
 	),
@@ -519,41 +519,41 @@ $h_name_key = AgentBundleSlugMatcher::bundle_name_key( $handler_bundle_flow, 'fl
 $h_handler  = AgentBundleSlugMatcher::bundle_handler_key( $handler_bundle_flow, 'flow' );
 
 agent_bundle_slug_matcher_assert(
-	'dice-fm-101' === $h_slug_key && 'dice-fm-austin' === $h_name_key && 'dice-fm' === $h_handler,
-	'events-bot shape: slug=dice-fm-101, name=dice-fm-austin, handler=dice-fm (rename-proof)',
+	'catalog-import-101' === $h_slug_key && 'catalog-import-primary' === $h_name_key && 'catalog-import' === $h_handler,
+	'consumer shape: slug=catalog-import-101, name=catalog-import-primary, handler=catalog-import (rename-proof)',
 	$failures,
 	$passes
 );
 
-// Slug pass misses (live row has NULL slug -> keyed on "dice-fm").
+// Slug pass misses (live row has NULL slug -> keyed on "catalog-import").
 $h_slug_index = AgentBundleSlugMatcher::index_existing( $handler_live_rows, 'flow_name', 'flow' );
 agent_bundle_slug_matcher_assert(
 	! isset( $h_slug_index['matched'][ $h_slug_key ] ),
-	'events-bot shape: deduped slug "dice-fm-101" misses the slug pass (live keyed on "dice-fm")',
+	'consumer shape: deduped slug "catalog-import-101" misses the slug pass (live keyed on "catalog-import")',
 	$failures,
 	$passes
 );
-// Name pass misses (bundle name "dice-fm-austin" vs live "dice-fm").
+// Name pass misses (bundle name "catalog-import-primary" vs live "catalog-import").
 $h_name_index = AgentBundleSlugMatcher::index_existing_by_name( $handler_live_rows, 'flow_name', 'flow' );
 agent_bundle_slug_matcher_assert(
 	! isset( $h_name_index['matched'][ $h_name_key ] ),
-	'events-bot shape: renamed name "dice-fm-austin" misses the name pass (live "dice-fm")',
+	'consumer shape: renamed name "catalog-import-primary" misses the name pass (live "catalog-import")',
 	$failures,
 	$passes
 );
 // Handler pass matches the correct row, unambiguously.
 $h_index = AgentBundleSlugMatcher::index_existing_by_handler( $handler_live_rows, 'flow' );
 agent_bundle_slug_matcher_assert(
-	isset( $h_index['matched']['dice-fm'] )
-		&& 26 === ( $h_index['matched']['dice-fm']['flow_id'] ?? 0 )
+	isset( $h_index['matched']['catalog-import'] )
+		&& 26 === ( $h_index['matched']['catalog-import']['flow_id'] ?? 0 )
 		&& empty( $h_index['ambiguous'] ),
-	'events-bot shape: handler fallback binds "dice-fm" to its live row (flow_id 26), 0 ambiguous',
+	'consumer shape: handler fallback binds "catalog-import" to its live row (flow_id 26), 0 ambiguous',
 	$failures,
 	$passes
 );
 agent_bundle_slug_matcher_assert(
-	isset( $h_index['matched']['ticketmaster'] ) && 27 === ( $h_index['matched']['ticketmaster']['flow_id'] ?? 0 ),
-	'events-bot shape: the sibling Ticketmaster source flow binds to flow_id 27 by handler',
+	isset( $h_index['matched']['source-api'] ) && 27 === ( $h_index['matched']['source-api']['flow_id'] ?? 0 ),
+	'consumer shape: the sibling source API flow binds to flow_id 27 by handler',
 	$failures,
 	$passes
 );
@@ -579,26 +579,26 @@ agent_bundle_slug_matcher_assert(
 // shape (flow_config map) must derive the SAME key from the same flow.
 $doc_shape = array(
 	'steps' => array(
-		array( 'step_type' => 'event_import', 'step_position' => 0, 'handler_slugs' => array( 'dice_fm' ) ),
+		array( 'step_type' => 'fetch', 'step_position' => 0, 'handler_slugs' => array( 'catalog_import' ) ),
 		array( 'step_type' => 'ai', 'step_position' => 1 ),
 	),
 );
 $array_shape = array(
 	'flow_config' => array(
 		'x1' => array( 'step_type' => 'ai', 'execution_order' => 1 ),
-		'x0' => array( 'step_type' => 'event_import', 'execution_order' => 0, 'handler_slugs' => array( 'dice_fm' ) ),
+		'x0' => array( 'step_type' => 'fetch', 'execution_order' => 0, 'handler_slugs' => array( 'catalog_import' ) ),
 	),
 );
 agent_bundle_slug_matcher_assert(
-	'dice-fm' === AgentBundleSlugMatcher::bundle_handler_key( $doc_shape, 'flow' )
-		&& 'dice-fm' === AgentBundleSlugMatcher::bundle_handler_key( $array_shape, 'flow' ),
+	'catalog-import' === AgentBundleSlugMatcher::bundle_handler_key( $doc_shape, 'flow' )
+		&& 'catalog-import' === AgentBundleSlugMatcher::bundle_handler_key( $array_shape, 'flow' ),
 	'handler key is identical for steps[] (document) and flow_config (array-bundle) shapes',
 	$failures,
 	$passes
 );
 agent_bundle_slug_matcher_assert(
-	'dice-fm' === AgentBundleSlugMatcher::bundle_handler_key(
-		array( 'flow_config' => array( 'x' => array( 'step_type' => 'event_import', 'handler_configs' => array( 'dice_fm' => array() ) ) ) ),
+	'catalog-import' === AgentBundleSlugMatcher::bundle_handler_key(
+		array( 'flow_config' => array( 'x' => array( 'step_type' => 'fetch', 'handler_configs' => array( 'catalog_import' => array() ) ) ) ),
 		'flow'
 	),
 	'handler key falls back to the handler_configs map key when handler_slugs is absent',
@@ -607,7 +607,7 @@ agent_bundle_slug_matcher_assert(
 );
 
 // ---- 17. Handler fallback STILL refuses a genuine in-pipeline source tie. ---
-// Two flows with the SAME source handler in ONE pipeline (e.g. two Dice.fm
+// Two flows with the SAME source handler in ONE pipeline (e.g. two catalog
 // searches) and no slug/name signal to split them: the handler pass must
 // surface ambiguous and NEVER guess — preserving #2668 at the source-identity
 // scope.
@@ -615,21 +615,21 @@ $handler_tie_rows = array(
 	array(
 		'flow_id'       => 51,
 		'pipeline_id'   => 200,
-		'flow_name'     => 'Dice.fm Rock',
+		'flow_name'     => 'Catalog Import Alpha',
 		'portable_slug' => null,
-		'flow_config'   => array( 's' => array( 'step_type' => 'event_import', 'execution_order' => 0, 'handler_slugs' => array( 'dice_fm' ) ) ),
+		'flow_config'   => array( 's' => array( 'step_type' => 'fetch', 'execution_order' => 0, 'handler_slugs' => array( 'catalog_import' ) ) ),
 	),
 	array(
 		'flow_id'       => 52,
 		'pipeline_id'   => 200,
-		'flow_name'     => 'Dice.fm Jazz',
+		'flow_name'     => 'Catalog Import Beta',
 		'portable_slug' => null,
-		'flow_config'   => array( 's' => array( 'step_type' => 'event_import', 'execution_order' => 0, 'handler_slugs' => array( 'dice_fm' ) ) ),
+		'flow_config'   => array( 's' => array( 'step_type' => 'fetch', 'execution_order' => 0, 'handler_slugs' => array( 'catalog_import' ) ) ),
 	),
 );
 $tie_handler_index = AgentBundleSlugMatcher::index_existing_by_handler( $handler_tie_rows, 'flow' );
 agent_bundle_slug_matcher_assert(
-	isset( $tie_handler_index['ambiguous']['dice-fm'] ) && ! isset( $tie_handler_index['matched']['dice-fm'] ),
+	isset( $tie_handler_index['ambiguous']['catalog-import'] ) && ! isset( $tie_handler_index['matched']['catalog-import'] ),
 	'handler fallback: two same-source flows in ONE pipeline stay ambiguous (no guess)',
 	$failures,
 	$passes

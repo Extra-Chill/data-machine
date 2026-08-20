@@ -263,7 +263,7 @@ $terminal_signal_policy   = new DataMachineHandlerCompletionPolicy( array( 'upse
 $terminal_signal_decision = $terminal_signal_policy->recordToolResult(
 	'reject_source',
 	array(
-		'handler' => 'ticketmaster',
+		'handler' => 'source_api',
 		'runtime' => array( 'completion_signal' => 'terminal' ),
 	),
 	array( 'success' => true ),
@@ -285,7 +285,7 @@ $terminal_failed_policy   = new DataMachineHandlerCompletionPolicy( array( 'upse
 $terminal_failed_decision = $terminal_failed_policy->recordToolResult(
 	'reject_source',
 	array(
-		'handler' => 'ticketmaster',
+		'handler' => 'source_api',
 		'runtime' => array( 'completion_signal' => 'terminal' ),
 	),
 	array( 'success' => false ),
@@ -297,7 +297,7 @@ assert_runtime_policy( ! $terminal_failed_decision->isComplete(), 'failed termin
 $terminal_result_policy   = new DataMachineHandlerCompletionPolicy( array( 'upsert_event' ) );
 $terminal_result_decision = $terminal_result_policy->recordToolResult(
 	'defer_item',
-	array( 'handler' => 'ticketmaster' ),
+	array( 'handler' => 'source_api' ),
 	array(
 		'success' => true,
 		'runtime' => array( 'completion_signal' => 'terminal' ),

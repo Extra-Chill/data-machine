@@ -1428,7 +1428,7 @@ class ExecuteStepAbility {
 	 * The DataPacket structure stores the packet kind in the top-level 'type'
 	 * key (set by DataPacket::__construct's third argument).
 	 * 'metadata.source_type' carries the ORIGINAL input source_type (e.g.
-	 * 'ticketmaster', 'web_scraper') — never 'ai_handler_complete'. The
+	 * 'source_api', 'web_scraper') — never 'ai_handler_complete'. The
 	 * pre-#1096 implementation filtered on metadata.source_type, which was a
 	 * silent no-op that let every packet fan out into doomed child jobs.
 	 *

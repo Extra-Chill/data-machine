@@ -97,7 +97,7 @@ class PipelineBatchSchedulerTest extends WP_UnitTestCase {
 				'body'  => wp_json_encode( array( 'event' => array( 'title' => $title ) ) ),
 			),
 			'metadata'  => array(
-				'source_type'      => 'ticketmaster',
+				'source_type'      => 'source_api',
 				'event_identifier' => md5( $title ),
 				'success'          => true,
 			),
@@ -124,7 +124,7 @@ class PipelineBatchSchedulerTest extends WP_UnitTestCase {
 		return (int) $job_id;
 	}
 
-	private function claim_for_parent( int $parent_id, string $item_identifier, string $source_type = 'ticketmaster' ): array {
+	private function claim_for_parent( int $parent_id, string $item_identifier, string $source_type = 'source_api' ): array {
 		$identity_scope = 'event_import:' . $source_type;
 		$token          = ( new ProcessedItems() )->claim_item_owned( $identity_scope, $source_type, $item_identifier, $parent_id );
 		$this->assertIsString( $token );
@@ -314,7 +314,7 @@ class PipelineBatchSchedulerTest extends WP_UnitTestCase {
 	 * Regression for #2762: a concurrent RunMetrics write must not clobber
 	 * batch_state written by fan-out.
 	 *
-	 * Reproduces the lost-update race where the Ticketmaster fan-out flow
+	 * Reproduces the lost-update race where a source API fan-out flow
 	 * fails children with batch_state_missing: fan-out writes batch_state, but
 	 * a RunMetrics persist that started from a pre-fan-out baseline overwrites
 	 * the whole engine_data column with a snapshot that has no batch key. The
@@ -523,7 +523,7 @@ class PipelineBatchSchedulerTest extends WP_UnitTestCase {
 			$packet['metadata']['source_item_id'] = $item_identifier;
 			$packet['metadata']['_engine_data']   = array(
 				'item_identifier' => $item_identifier,
-				'source_type'     => 'ticketmaster',
+				'source_type'     => 'source_api',
 			);
 			$packets[] = $packet;
 		}
@@ -687,8 +687,8 @@ class PipelineBatchSchedulerTest extends WP_UnitTestCase {
 	public function test_scheduled_fanout_does_not_bind_ambiguous_or_conflicting_identity(): void {
 		$parent_id = $this->create_parent_job();
 		$processed = new ProcessedItems();
-		$this->assertIsString( $processed->claim_item_owned( 'scope-a', 'ticketmaster', 'shared-id', $parent_id ) );
-		$this->assertIsString( $processed->claim_item_owned( 'scope-b', 'ticketmaster', 'shared-id', $parent_id ) );
+		$this->assertIsString( $processed->claim_item_owned( 'scope-a', 'source_api', 'shared-id', $parent_id ) );
+		$this->assertIsString( $processed->claim_item_owned( 'scope-b', 'source_api', 'shared-id', $parent_id ) );
 
 		$ambiguous = $this->make_data_packet( 'Ambiguous Event' );
 		$ambiguous['metadata']['source_item_id'] = 'shared-id';
@@ -731,7 +731,7 @@ class PipelineBatchSchedulerTest extends WP_UnitTestCase {
 		$packet['metadata']['source_item_id'] = 'duplicate-id';
 		$packet['metadata']['_engine_data']   = array(
 			'item_identifier' => 'duplicate-id',
-			'source_type'     => 'ticketmaster',
+			'source_type'     => 'source_api',
 		);
 
 		$route = new \ReflectionMethod( ExecuteStepAbility::class, 'routeAfterExecution' );

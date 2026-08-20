@@ -233,7 +233,7 @@ class BulkConfigCommandTest extends WP_UnitTestCase {
 		$ability = new ConfigureFlowStepsAbility();
 		$result  = $ability->execute( array(
 			'pipeline_id'    => $this->pipeline_id,
-			'handler_slug'   => 'ticketmaster',
+			'handler_slug'   => 'source_api',
 			'handler_config' => array( 'max_items' => 10 ),
 		) );
 

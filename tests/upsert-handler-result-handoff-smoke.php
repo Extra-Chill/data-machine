@@ -211,9 +211,9 @@ assert_handoff_equals( 'ai_handler_complete', $packets[0]['type'] ?? null, 'AI s
 assert_handoff_equals( 'wiki_upsert', $packets[0]['metadata']['handler_tool'] ?? null, 'packet carries required handler slug', $failures, $passes );
 
 $claim = array(
-	'identity_scope'  => 'ticketmaster-fetch',
-	'source_type'     => 'ticketmaster',
-	'item_identifier' => 'Z7r9jZ1A7-sr_',
+	'identity_scope'  => 'source-api-fetch',
+	'source_type'     => 'source_api',
+	'item_identifier' => 'catalog-item-42',
 	'ownership_token' => 'scheduled-child-token',
 );
 $claim['disposition_id'] = ProcessedItems::disposition_identity( $claim['identity_scope'], $claim['source_type'], $claim['item_identifier'] );
@@ -224,7 +224,7 @@ $claimed_packets         = $method->invoke(
 		'tool_execution_results' => array(
 			array(
 				'tool_name'       => 'wiki_upsert',
-				'parameters'      => array( 'title' => 'Scheduled Ticketmaster Event' ),
+				'parameters'      => array( 'title' => 'Scheduled Catalog Item' ),
 				'is_handler_tool' => true,
 				'result'          => array(
 					'success'  => true,
@@ -237,7 +237,7 @@ $claimed_packets         = $method->invoke(
 			),
 		),
 	),
-	array( array( 'metadata' => array( 'source_type' => 'ticketmaster' ) ) ),
+	array( array( 'metadata' => array( 'source_type' => 'source_api' ) ) ),
 	array(
 		'flow_step_id' => 'ai_step',
 		'engine_data'  => array( ProcessedItems::CLAIM_METADATA_KEY => $claim ),

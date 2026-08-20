@@ -39,15 +39,15 @@ class ExecuteStepFanOutFilterTest extends WP_UnitTestCase {
 		$packets = array(
 			$this->make_packet(
 				'ai_handler_complete',
-				array( 'handler_tool' => 'upsert_event', 'source_type' => 'ticketmaster' )
+				array( 'handler_tool' => 'upsert_event', 'source_type' => 'source_api' )
 			),
 			$this->make_packet(
 				'tool_result',
-				array( 'tool_name' => 'daily_memory', 'source_type' => 'ticketmaster' )
+				array( 'tool_name' => 'daily_memory', 'source_type' => 'source_api' )
 			),
 			$this->make_packet(
 				'ai_response',
-				array( 'source_type' => 'ticketmaster' )
+				array( 'source_type' => 'source_api' )
 			),
 		);
 
@@ -114,7 +114,7 @@ class ExecuteStepFanOutFilterTest extends WP_UnitTestCase {
 
 	/**
 	 * Regression guard: the pre-#1096 implementation filtered on
-	 * metadata.source_type. The original input source_type is 'ticketmaster',
+	 * metadata.source_type. The original input source_type is 'source_api',
 	 * 'web_scraper', etc. — NEVER 'ai_handler_complete'. If the filter
 	 * accidentally reverts to checking metadata.source_type, this test will
 	 * fail because tool_result and ai_response packets will leak through.
@@ -123,7 +123,7 @@ class ExecuteStepFanOutFilterTest extends WP_UnitTestCase {
 		$packets = array(
 			$this->make_packet(
 				'ai_handler_complete',
-				array( 'handler_tool' => 'upsert_event', 'source_type' => 'ticketmaster' )
+				array( 'handler_tool' => 'upsert_event', 'source_type' => 'source_api' )
 			),
 			// Craft a malicious-looking tool_result whose metadata.source_type
 			// is literally 'ai_handler_complete' — must still be filtered out.

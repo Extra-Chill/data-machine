@@ -217,7 +217,7 @@ class SourcePolicyToolManager extends ToolManager {
 			);
 		}
 
-		if ( 'ticketmaster_fetch' === $handler_slug ) {
+		if ( 'source_api_fetch' === $handler_slug ) {
 			return array(
 				'adjacent_fetch' => array( 'handler' => $handler_slug, 'origin' => 'adjacent' ),
 			);
@@ -293,8 +293,8 @@ $tools   = resolve_source_tools(
 		'previous_step_config' => array(
 			'flow_step_id'    => 'fetch_step',
 			'step_type'       => 'fetch',
-			'handler_slugs'   => array( 'ticketmaster_fetch' ),
-			'handler_configs' => array( 'ticketmaster_fetch' => array( 'marker' => 'previous' ) ),
+			'handler_slugs'   => array( 'source_api_fetch' ),
+			'handler_configs' => array( 'source_api_fetch' => array( 'marker' => 'previous' ) ),
 		),
 		'next_step_config'     => array(
 			'flow_step_id'     => 'publish_step',
@@ -308,7 +308,7 @@ $tools   = resolve_source_tools(
 assert_source_equals( array( 'adjacent_fetch', 'collision_tool', 'adjacent_publish', 'static_pipeline_tool' ), array_keys( $tools ), 'pipeline source order is deterministic', $failures, $passes );
 assert_source_equals( 'adjacent', $tools['collision_tool']['origin'] ?? '', 'adjacent handler tool wins static name collision', $failures, $passes );
 assert_source_equals( false, isset( $tools['handler_wrapper'] ), 'pipeline static source skips handler wrappers', $failures, $passes );
-assert_source_equals( array( 'ticketmaster_fetch:previous:fetch_step', 'publish_to_wordpress:next:publish_step' ), $manager->handler_calls, 'adjacent handler source receives configs and cache scopes', $failures, $passes );
+assert_source_equals( array( 'source_api_fetch:previous:fetch_step', 'publish_to_wordpress:next:publish_step' ), $manager->handler_calls, 'adjacent handler source receives configs and cache scopes', $failures, $passes );
 
 echo "\n[2] non-pipeline modes use static registry only:\n";
 $manager = new SourcePolicyToolManager();

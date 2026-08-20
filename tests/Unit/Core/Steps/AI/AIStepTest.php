@@ -413,7 +413,7 @@ class AIStepTest extends TestCase {
 			array(
 				'type'     => 'fetch',
 				'data'     => array( 'title' => 'Test' ),
-				'metadata' => array( 'source_type' => 'ticketmaster' ),
+				'metadata' => array( 'source_type' => 'source_api' ),
 			),
 		);
 
@@ -438,7 +438,7 @@ class AIStepTest extends TestCase {
 			array( 'upsert_event' => array( 'handler' => 'upsert_event', 'handler_config' => array() ) )
 		);
 
-		$this->assertSame( 'ticketmaster', $result[0]['metadata']['source_type'] );
+		$this->assertSame( 'source_api', $result[0]['metadata']['source_type'] );
 	}
 
 	public function test_process_loop_results_correlates_non_contiguous_outputs_by_disposition_id(): void {

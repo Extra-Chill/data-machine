@@ -442,10 +442,7 @@ public function refresh_token(): bool; // Token refresh implementation
 
 **Providers Using BaseOAuth2Provider**:
 
-Core data-machine ships only `EmailAuth` (`inc/Core/Steps/Fetch/Handlers/Email/EmailAuth.php`). Concrete OAuth2 social/event providers live in extension plugins:
-
-- `data-machine-socials` — `RedditAuth`, `FacebookAuth`, `ThreadsAuth`, etc.
-- `data-machine-events` — `DiceFmAuth`, `TicketmasterAuth`, etc.
+Core data-machine ships only `EmailAuth` (`inc/Core/Steps/Fetch/Handlers/Email/EmailAuth.php`). Concrete OAuth2 providers live next to their handlers in extension plugins.
 
 **Example Implementation**:
 
@@ -675,8 +672,7 @@ Concrete OAuth providers self-register via the `datamachine_auth_providers` filt
 
 **In extension plugins:**
 
-- `data-machine-socials` — Bluesky, Twitter, Reddit, Facebook, Threads, etc.
-- `data-machine-events` — Dice.fm, Ticketmaster, etc.
+Concrete providers live next to their handlers and self-register through the provider filter.
 
 **Reusable provider pattern**:
 
