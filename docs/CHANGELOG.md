@@ -2,6 +2,19 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.175.5] - 2026-08-20
+
+### Changed
+- migrate content and fetch ability failures
+- migrate engine and job ability failures
+- Align direct ability permission test with WordPress
+- add runtime-backed Pipeline Builder fuzz suite
+- Add principal-scoped agent memory
+
+### Fixed
+- reconcile scheduled packet claims
+- preserve scheduled batch state
+
 ## [0.175.4] - 2026-08-19
 
 ### Fixed

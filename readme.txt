@@ -4,7 +4,7 @@ Tags: ai, automation, workflow, agents, pipelines
 Requires at least: 7.0
 Tested up to: 7.0
 Requires PHP: 8.2
-Stable tag: 0.175.4
+Stable tag: 0.175.5
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
