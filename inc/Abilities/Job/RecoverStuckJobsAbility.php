@@ -80,7 +80,7 @@ class RecoverStuckJobsAbility {
 								'minimum'     => 1,
 								'maximum'     => self::MAX_APPLY_LIMIT,
 								'default'     => self::DEFAULT_APPLY_LIMIT,
-								'description' => __( 'Hard maximum attempted storage touches in one invocation', 'data-machine' ),
+								'description' => __( 'Broad mode logical-touch cap. With job_id, the effective request is one target and the input is retained for diagnostics; exact compound recovery may consume up to MAX_APPLY_LIMIT=100 logical touches even with limit=1.', 'data-machine' ),
 							),
 							'recover_pathless_children' => array(
 								'type'        => 'boolean',
@@ -115,10 +115,43 @@ class RecoverStuckJobsAbility {
 							'pending_ai_terminalized' => array( 'type' => 'integer' ),
 							'pending_ai_guarded' => array( 'type' => 'integer' ),
 							'mutations'     => array( 'type' => 'integer' ),
-							'attempted'     => array( 'type' => 'integer' ),
-							'touched'       => array( 'type' => 'integer' ),
-							'mutated'       => array( 'type' => 'integer' ),
-							'apply_limit'   => array( 'type' => 'integer' ),
+							'attempted'     => array(
+								'type'        => 'integer',
+								'description' => __( 'Compatibility alias for logical_touches', 'data-machine' ),
+							),
+							'touched'       => array(
+								'type'        => 'integer',
+								'description' => __( 'Compatibility alias for logical_touches', 'data-machine' ),
+							),
+							'mutated'       => array(
+								'type'        => 'integer',
+								'description' => __( 'Compatibility alias for logical_mutations', 'data-machine' ),
+							),
+							'target_attempts' => array(
+								'type'        => 'integer',
+								'description' => __( 'Exact recovery targets admitted for logical operations', 'data-machine' ),
+							),
+							'logical_touches' => array( 'type' => 'integer' ),
+							'logical_mutations' => array( 'type' => 'integer' ),
+							'input_limit'   => array(
+								'type'        => 'integer',
+								'description' => __( 'Clamped limit input, including the default when omitted', 'data-machine' ),
+							),
+							'requested_limit' => array(
+								'type'        => 'integer',
+								'description' => __( 'Effective request in limit_unit: one target in exact mode or input_limit logical touches in broad mode', 'data-machine' ),
+							),
+							'apply_limit'   => array(
+								'type'        => 'integer',
+								'description' => __( 'Effective logical-touch safety cap; exact compound recovery may consume up to MAX_APPLY_LIMIT=100 logical touches even when input_limit is 1', 'data-machine' ),
+							),
+							'limit_mode'    => array( 'type' => 'string' ),
+							'limit_value'   => array( 'type' => 'integer' ),
+							'limit_unit'    => array( 'type' => 'string' ),
+							'logical_touch_limit' => array(
+								'type'        => 'integer',
+								'description' => __( 'Compatibility alias for apply_limit', 'data-machine' ),
+							),
 							'limit_reached' => array( 'type' => 'boolean' ),
 							'scope'         => array( 'type' => 'object' ),
 							'dry_run'       => array( 'type' => 'boolean' ),
@@ -157,7 +190,9 @@ class RecoverStuckJobsAbility {
 		$flow_id       = isset( $input['flow_id'] ) && is_numeric( $input['flow_id'] ) ? (int) $input['flow_id'] : null;
 		$job_id_scope  = is_int( $requested_job_id ) ? $requested_job_id : null;
 		$timeout_hours = isset( $input['timeout_hours'] ) && is_numeric( $input['timeout_hours'] ) ? max( 1, (int) $input['timeout_hours'] ) : 2;
-		$apply_limit   = isset( $input['limit'] ) && is_numeric( $input['limit'] ) ? max( 1, min( self::MAX_APPLY_LIMIT, (int) $input['limit'] ) ) : self::DEFAULT_APPLY_LIMIT;
+		$input_limit     = isset( $input['limit'] ) && is_numeric( $input['limit'] ) ? max( 1, min( self::MAX_APPLY_LIMIT, (int) $input['limit'] ) ) : self::DEFAULT_APPLY_LIMIT;
+		$requested_limit = null === $job_id_scope ? $input_limit : 1;
+		$apply_limit     = null === $job_id_scope ? $requested_limit : self::MAX_APPLY_LIMIT;
 		$recover_pathless_children = ! empty( $input['recover_pathless_children'] );
 
 		$recovered      = 0;
@@ -169,17 +204,20 @@ class RecoverStuckJobsAbility {
 		$attempted      = 0;
 		$touched        = 0;
 		$mutated        = 0;
+		$target_attempts = 0;
 		$limit_reached  = false;
+		$exact_target_admitted = false;
 		$pending_ai_terminalized = 0;
 		$pending_ai_guarded      = 0;
 		$recovery_trigger = isset( $input['recovery_trigger'] ) ? sanitize_key( (string) $input['recovery_trigger'] ) : 'operator';
 
 		// Pending AI recovery is intentionally first so dry-run and apply inspect the
 		// same bounded candidate set before processing-only recovery consumes touches.
-		$pending_ai_jobs = $this->getExpiredPendingAIDeferrals( $flow_id, $job_id_scope, $apply_limit );
-		if ( count( $pending_ai_jobs ) > $apply_limit ) {
+		$pending_ai_candidate_limit = null === $job_id_scope ? $apply_limit : 1;
+		$pending_ai_jobs = $this->getExpiredPendingAIDeferrals( $flow_id, $job_id_scope, $pending_ai_candidate_limit );
+		if ( count( $pending_ai_jobs ) > $pending_ai_candidate_limit ) {
 			$limit_reached  = true;
-			$pending_ai_jobs = array_slice( $pending_ai_jobs, 0, $apply_limit );
+			$pending_ai_jobs = array_slice( $pending_ai_jobs, 0, $pending_ai_candidate_limit );
 		}
 		foreach ( $pending_ai_jobs as $job ) {
 			$job_id      = (int) $job['job_id'];
@@ -249,7 +287,7 @@ class RecoverStuckJobsAbility {
 				continue;
 			}
 
-			if ( ! $this->consumeTouchBudget( $attempted, $touched, $apply_limit ) ) {
+			if ( ! $this->consumeTouchBudget( $attempted, $touched, $target_attempts, $apply_limit, null !== $job_id_scope, $exact_target_admitted ) ) {
 				$limit_reached = true;
 				break;
 			}
@@ -288,11 +326,15 @@ class RecoverStuckJobsAbility {
 				$last_job_id,
 				'%"job_status"%'
 			);
+			if ( $job_id_scope ) {
+				$where_clause = $wpdb->prepare(
+					"WHERE status = 'processing' AND job_id = %d AND engine_data LIKE %s",
+					$job_id_scope,
+					'%"job_status"%'
+				);
+			}
 			if ( $flow_id ) {
 				$where_clause .= $wpdb->prepare( ' AND flow_id = %d', $flow_id );
-			}
-			if ( $job_id_scope ) {
-				$where_clause .= $wpdb->prepare( ' AND job_id = %d', $job_id_scope );
 			}
 
 			// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQL.NotPrepared -- Dynamic WHERE clause is prepared above; limit is an internal constant.
@@ -310,7 +352,7 @@ class RecoverStuckJobsAbility {
 			}
 
 			foreach ( $stuck_jobs as $job ) {
-				if ( ! $dry_run && $touched >= $apply_limit ) {
+				if ( ! $dry_run && null === $job_id_scope && $touched >= $apply_limit ) {
 					$limit_reached = true;
 					break 2;
 				}
@@ -343,7 +385,7 @@ class RecoverStuckJobsAbility {
 						'target_status' => $status,
 					) );
 				} else {
-					if ( ! $this->consumeTouchBudget( $attempted, $touched, $apply_limit ) ) {
+					if ( ! $this->consumeTouchBudget( $attempted, $touched, $target_attempts, $apply_limit, null !== $job_id_scope, $exact_target_admitted ) ) {
 						$limit_reached = true;
 						break 2;
 					}
@@ -370,6 +412,9 @@ class RecoverStuckJobsAbility {
 					}
 				}
 			}
+			if ( $job_id_scope ) {
+				break;
+			}
 		}
 
 		// Second recovery pass: timed-out jobs (processing without job_status override, older than timeout).
@@ -389,11 +434,16 @@ class RecoverStuckJobsAbility {
 				'%"job_status"%',
 				$timeout_hours
 			);
+			if ( $job_id_scope ) {
+				$timeout_where = $wpdb->prepare(
+					"WHERE status = 'processing' AND job_id = %d AND engine_data NOT LIKE %s AND created_at < DATE_SUB(NOW(), INTERVAL %d HOUR)",
+					$job_id_scope,
+					'%"job_status"%',
+					$timeout_hours
+				);
+			}
 			if ( $flow_id ) {
 				$timeout_where .= $wpdb->prepare( ' AND flow_id = %d', $flow_id );
-			}
-			if ( $job_id_scope ) {
-				$timeout_where .= $wpdb->prepare( ' AND job_id = %d', $job_id_scope );
 			}
 
 			// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQL.NotPrepared -- Dynamic WHERE clause is prepared above; limit is an internal constant.
@@ -411,7 +461,7 @@ class RecoverStuckJobsAbility {
 			}
 
 			foreach ( $timed_out_jobs as $job ) {
-				if ( ! $dry_run && $touched >= $apply_limit ) {
+				if ( ! $dry_run && null === $job_id_scope && $touched >= $apply_limit ) {
 					$limit_reached = true;
 					break 2;
 				}
@@ -458,7 +508,7 @@ class RecoverStuckJobsAbility {
 					}
 
 					$required_touches = 1 + count( $children );
-					if ( ! $this->hasTouchCapacity( $touched, $apply_limit, $required_touches ) || ! $this->consumeTouchBudget( $attempted, $touched, $apply_limit ) ) {
+					if ( ! $this->hasTouchCapacity( $touched, $apply_limit, $required_touches ) || ! $this->consumeTouchBudget( $attempted, $touched, $target_attempts, $apply_limit, null !== $job_id_scope, $exact_target_admitted ) ) {
 						$limit_reached = true;
 						break 2;
 					}
@@ -522,7 +572,7 @@ class RecoverStuckJobsAbility {
 					++$mutated;
 					$children_terminalized = 0;
 					foreach ( $children as $child_id ) {
-						$this->consumeTouchBudget( $attempted, $touched, $apply_limit );
+						$this->consumeTouchBudget( $attempted, $touched, $target_attempts, $apply_limit, null !== $job_id_scope, $exact_target_admitted, false );
 						if ( $this->db_jobs->complete_job( $child_id, $status ) ) {
 							++$children_terminalized;
 							++$mutated;
@@ -558,7 +608,7 @@ class RecoverStuckJobsAbility {
 					}
 					// Diagnosis can change after claiming, so reserve claim + rollback/requeue + finish/terminal.
 					$required_touches = 3;
-					if ( ! $this->hasTouchCapacity( $touched, $apply_limit, $required_touches ) || ! $this->consumeTouchBudget( $attempted, $touched, $apply_limit ) ) {
+					if ( ! $this->hasTouchCapacity( $touched, $apply_limit, $required_touches ) || ! $this->consumeTouchBudget( $attempted, $touched, $target_attempts, $apply_limit, null !== $job_id_scope, $exact_target_admitted ) ) {
 						$limit_reached = true;
 						break 2;
 					}
@@ -578,7 +628,7 @@ class RecoverStuckJobsAbility {
 					$child_diagnosis = ChildJobRecoveryPolicy::diagnose( $claimed_job, $engine_data, $this->getStepActionHistory( $job_id ), $timeout_hours * HOUR_IN_SECONDS, time() );
 					if ( ! empty( $child_diagnosis['has_active_path'] ) ) {
 						++$skipped;
-						$this->consumeTouchBudget( $attempted, $touched, $apply_limit );
+						$this->consumeTouchBudget( $attempted, $touched, $target_attempts, $apply_limit, null !== $job_id_scope, $exact_target_admitted, false );
 						if ( $this->finishPathlessChildRecovery( $job_id, (string) $claim['token'], (int) $claim['generation'], 'scheduler_path_observed', array() ) ) {
 							++$mutated;
 						}
@@ -587,7 +637,7 @@ class RecoverStuckJobsAbility {
 					}
 
 					if ( ! empty( $child_diagnosis['retry_eligible'] ) ) {
-						$this->consumeTouchBudget( $attempted, $touched, $apply_limit );
+						$this->consumeTouchBudget( $attempted, $touched, $target_attempts, $apply_limit, null !== $job_id_scope, $exact_target_admitted, false );
 						$retry_args = array_merge(
 							$child_diagnosis['retry_args'],
 							array(
@@ -615,7 +665,7 @@ class RecoverStuckJobsAbility {
 						$race_diagnosis = ChildJobRecoveryPolicy::diagnose( $race_job, $this->getJobEngineData( $job_id ), $this->getStepActionHistory( $job_id ), $timeout_hours * HOUR_IN_SECONDS, time() );
 						if ( ! empty( $race_diagnosis['has_active_path'] ) ) {
 							++$skipped;
-							$this->consumeTouchBudget( $attempted, $touched, $apply_limit );
+							$this->consumeTouchBudget( $attempted, $touched, $target_attempts, $apply_limit, null !== $job_id_scope, $exact_target_admitted, false );
 							if ( $this->finishPathlessChildRecovery( $job_id, (string) $claim['token'], (int) $claim['generation'], 'scheduler_path_observed', array() ) ) {
 								++$mutated;
 							}
@@ -624,7 +674,7 @@ class RecoverStuckJobsAbility {
 						}
 					}
 
-					$this->consumeTouchBudget( $attempted, $touched, $apply_limit );
+					$this->consumeTouchBudget( $attempted, $touched, $target_attempts, $apply_limit, null !== $job_id_scope, $exact_target_admitted, false );
 					$result = $this->db_jobs->transition_recovery_owned_child( $job_id, JobStatus::failed( 'scheduler_path_lost' )->toString(), (string) $claim['token'], (int) $claim['generation'] );
 					if ( ! empty( $result['success'] ) ) {
 						++$pathless_terminal;
@@ -664,7 +714,7 @@ class RecoverStuckJobsAbility {
 						) );
 						continue;
 					}
-					if ( ! $this->consumeTouchBudget( $attempted, $touched, $apply_limit ) ) {
+					if ( ! $this->consumeTouchBudget( $attempted, $touched, $target_attempts, $apply_limit, null !== $job_id_scope, $exact_target_admitted ) ) {
 						$limit_reached = true;
 						break 2;
 					}
@@ -693,7 +743,7 @@ class RecoverStuckJobsAbility {
 				} else {
 					$backup = $engine_data['queued_prompt_backup'] ?? array();
 					$required_touches = empty( $backup ) ? 1 : 2;
-					if ( ! $this->hasTouchCapacity( $touched, $apply_limit, $required_touches ) || ! $this->consumeTouchBudget( $attempted, $touched, $apply_limit ) ) {
+					if ( ! $this->hasTouchCapacity( $touched, $apply_limit, $required_touches ) || ! $this->consumeTouchBudget( $attempted, $touched, $target_attempts, $apply_limit, null !== $job_id_scope, $exact_target_admitted ) ) {
 						$limit_reached = true;
 						break 2;
 					}
@@ -710,7 +760,7 @@ class RecoverStuckJobsAbility {
 						) );
 						// Restore drain-mode queued_prompt_backup if the prior run removed an entry.
 						if ( ! empty( $backup ) ) {
-							$this->consumeTouchBudget( $attempted, $touched, $apply_limit );
+							$this->consumeTouchBudget( $attempted, $touched, $target_attempts, $apply_limit, null !== $job_id_scope, $exact_target_admitted, false );
 							if ( $this->restoreQueuedPromptBackup( $job_flow_id, $backup ) ) {
 								++$requeued;
 								++$mutations;
@@ -727,15 +777,18 @@ class RecoverStuckJobsAbility {
 					}
 				}
 			}
+			if ( $job_id_scope ) {
+				break;
+			}
 		}
 
 		$terminal_actions = $this->getTerminalBackedInProgressActions( $flow_id, $job_id_scope );
 		foreach ( $terminal_actions as $action ) {
-			if ( ! $dry_run && $touched >= $apply_limit ) {
+			if ( ! $dry_run && null === $job_id_scope && $touched >= $apply_limit ) {
 				$limit_reached = true;
 				break;
 			}
-			if ( ! $dry_run && ! $this->consumeTouchBudget( $attempted, $touched, $apply_limit ) ) {
+			if ( ! $dry_run && ! $this->consumeTouchBudget( $attempted, $touched, $target_attempts, $apply_limit, null !== $job_id_scope, $exact_target_admitted ) ) {
 				$limit_reached = true;
 				break;
 			}
@@ -785,9 +838,13 @@ class RecoverStuckJobsAbility {
 
 		$jobs_truncated = $jobs_omitted > 0;
 
+		$limit_mode          = null === $job_id_scope ? 'broad_touch_cap' : 'exact_target';
+		$limit_value         = $requested_limit;
+		$limit_unit          = null === $job_id_scope ? 'logical_touch' : 'target';
+		$logical_touch_limit = $apply_limit;
 		$message = $dry_run
 			? sprintf( 'Dry run complete. Would terminalize %d expired pending AI deferrals, recover %d jobs, timeout %d jobs, requeue %d pathless children, terminalize %d pathless children, reconcile %d terminal-backed actions, guard %d pending AI deferrals, and guard %d pathless children requiring explicit authorization.', $pending_ai_terminalized, $recovered, $timed_out, $pathless_requeued, $pathless_terminal, $stale_actions, $pending_ai_guarded, $pathless_policy_skipped )
-			: sprintf( 'Recovery complete. Attempted/touched/mutated: %d/%d/%d (limit %d), outcomes: %d, pending AI terminalized: %d, recovered: %d, timed out: %d, pathless requeued: %d, pathless terminal: %d, reconciled actions: %d, pending AI guarded: %d, policy-skipped: %d', $attempted, $touched, $mutated, $apply_limit, $mutations, $pending_ai_terminalized, $recovered, $timed_out, $pathless_requeued, $pathless_terminal, $stale_actions, $pending_ai_guarded, $pathless_policy_skipped );
+			: sprintf( 'Recovery complete. Target attempts/logical touches/logical mutations: %d/%d/%d (%s input limit %d; requested limit %d %s; logical-touch safety cap %d), outcomes: %d, pending AI terminalized: %d, recovered: %d, timed out: %d, pathless requeued: %d, pathless terminal: %d, reconciled actions: %d, pending AI guarded: %d, policy-skipped: %d', $target_attempts, $touched, $mutated, $limit_mode, $input_limit, $limit_value, $limit_unit, $logical_touch_limit, $mutations, $pending_ai_terminalized, $recovered, $timed_out, $pathless_requeued, $pathless_terminal, $stale_actions, $pending_ai_guarded, $pathless_policy_skipped );
 
 		if ( ! $dry_run && ( $mutations > 0 || $claimed_elsewhere > 0 || $pathless_policy_skipped > 0 ) ) {
 			do_action(
@@ -809,7 +866,16 @@ class RecoverStuckJobsAbility {
 					'attempted'     => $attempted,
 					'touched'       => $touched,
 					'mutated'       => $mutated,
+					'target_attempts' => $target_attempts,
+					'logical_touches' => $touched,
+					'logical_mutations' => $mutated,
+					'input_limit'    => $input_limit,
+					'requested_limit' => $requested_limit,
 					'apply_limit'   => $apply_limit,
+					'limit_mode'    => $limit_mode,
+					'limit_value'   => $limit_value,
+					'limit_unit'    => $limit_unit,
+					'logical_touch_limit' => $logical_touch_limit,
 					'limit_reached' => $limit_reached,
 					'job_id'        => $job_id_scope,
 					'flow_id'       => $flow_id,
@@ -834,7 +900,16 @@ class RecoverStuckJobsAbility {
 			'attempted'      => $attempted,
 			'touched'        => $touched,
 			'mutated'        => $mutated,
+			'target_attempts' => $target_attempts,
+			'logical_touches' => $touched,
+			'logical_mutations' => $mutated,
+			'input_limit'     => $input_limit,
+			'requested_limit' => $requested_limit,
 			'apply_limit'    => $apply_limit,
+			'limit_mode'     => $limit_mode,
+			'limit_value'    => $limit_value,
+			'limit_unit'     => $limit_unit,
+			'logical_touch_limit' => $logical_touch_limit,
 			'limit_reached'  => $limit_reached,
 			'scope'          => array(
 				'job_id'                    => $job_id_scope,
@@ -1218,13 +1293,17 @@ class RecoverStuckJobsAbility {
 		++$jobs_omitted;
 	}
 
-	/** Reserve one attempted storage touch before invoking it. */
-	private function consumeTouchBudget( int &$attempted, int &$touched, int $limit ): bool {
+	/** Admit an operator target and record one logical recovery touch. */
+	private function consumeTouchBudget( int &$attempted, int &$touched, int &$target_attempts, int $limit, bool $exact_scope, bool &$exact_target_admitted, bool $new_target = true ): bool {
 		if ( $touched >= $limit ) {
 			return false;
 		}
 
+		if ( $new_target && ( ! $exact_scope || ! $exact_target_admitted ) ) {
+			++$target_attempts;
+		}
 		++$attempted;
+		$exact_target_admitted = $exact_scope || $exact_target_admitted;
 		++$touched;
 		return true;
 	}
