@@ -325,7 +325,17 @@ class ScaffoldAbilities {
 
 		foreach ( $files as $filename => $meta ) {
 			$input['filename'] = $filename;
-			$result            = self::scaffold_registered( $filename, $input );
+			if ( false === $meta['editable'] && empty( $meta['composable'] ) ) {
+				$result = array(
+					'success'  => true,
+					'message'  => sprintf( '%s is managed by its owning process.', $filename ),
+					'filename' => $filename,
+					'created'  => false,
+					'skipped'  => true,
+				);
+			} else {
+				$result = self::scaffold_registered( $filename, $input );
+			}
 			if ( empty( $result['success'] ) ) {
 				$result['filename'] = $filename;
 				$failures[]         = $result;
