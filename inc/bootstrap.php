@@ -134,6 +134,13 @@ function datamachine_register_default_memory_files(): void {
 		'label'              => 'User Profile',
 		'description'        => 'Information about the human the agent works with. Injected when the mode activates user profile memory.',
 	) );
+	MemoryFileRegistry::register( 'USER_MEMORY.md', 28, array(
+		'layer'              => MemoryFileRegistry::LAYER_PRINCIPAL,
+		'protected'          => true,
+		'injection_contexts' => array( 'agent_memory' ),
+		'label'              => 'User Memory',
+		'description'        => 'Learned context private to the authenticated user and effective agent.',
+	) );
 
 	// Network layer — multisite topology.
 	if ( is_multisite() ) {

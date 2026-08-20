@@ -292,6 +292,9 @@ class AgentFileAbilities {
 		// the layer directories but should still appear in the file list.
 		foreach ( MemoryFileRegistry::get_all() as $filename => $registry_meta ) {
 			$layer  = $registry_meta['layer'] ?? MemoryFileRegistry::LAYER_AGENT;
+			if ( MemoryFileRegistry::LAYER_PRINCIPAL === $layer && ( $user_id <= 0 || $agent_id <= 0 ) ) {
+				continue;
+			}
 			$memory = new AgentMemory( $user_id, $agent_id, $filename, $layer );
 			$read   = $memory->read();
 
@@ -323,6 +326,9 @@ class AgentFileAbilities {
 			MemoryFileRegistry::LAYER_AGENT,
 			MemoryFileRegistry::LAYER_USER,
 		);
+		if ( $user_id > 0 && $agent_id > 0 ) {
+			$layer_order[] = MemoryFileRegistry::LAYER_PRINCIPAL;
+		}
 
 		foreach ( $layer_order as $layer ) {
 			foreach ( AgentMemory::list_layer( $layer, $user_id, $agent_id ) as $entry ) {
@@ -635,12 +641,15 @@ class AgentFileAbilities {
 
 		// If file is registered, check its canonical layer first.
 		$registered_layer = MemoryFileRegistry::get_layer( $filename );
-		if ( $registered_layer ) {
+		if ( $registered_layer && ( MemoryFileRegistry::LAYER_PRINCIPAL !== $registered_layer || ( $user_id > 0 && $agent_id > 0 ) ) ) {
 			$layer_order[] = $registered_layer;
 		}
 
 		// Fallback: check remaining layers (agent → user → shared) without dupes.
-		foreach ( array( MemoryFileRegistry::LAYER_AGENT, MemoryFileRegistry::LAYER_USER, MemoryFileRegistry::LAYER_SHARED ) as $layer ) {
+		foreach ( array( MemoryFileRegistry::LAYER_AGENT, MemoryFileRegistry::LAYER_PRINCIPAL, MemoryFileRegistry::LAYER_USER, MemoryFileRegistry::LAYER_SHARED ) as $layer ) {
+			if ( MemoryFileRegistry::LAYER_PRINCIPAL === $layer && ( $user_id <= 0 || $agent_id <= 0 ) ) {
+				continue;
+			}
 			if ( ! in_array( $layer, $layer_order, true ) ) {
 				$layer_order[] = $layer;
 			}

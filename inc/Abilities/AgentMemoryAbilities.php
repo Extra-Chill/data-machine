@@ -14,6 +14,7 @@ namespace DataMachine\Abilities;
 
 use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Core\FilesRepository\AgentMemory;
+use DataMachine\Core\Database\Agents\Agents;
 use DataMachine\Engine\AI\DataMachineAgentConsentPolicy;
 use DataMachine\Engine\AI\Memory\MemorySectionPendingAction;
 use DataMachine\Engine\AI\Memory\SelfMemoryWritePolicy;
@@ -317,6 +318,9 @@ class AgentMemoryAbilities {
 	 */
 	public static function getMemory( array $input ): array|\WP_Error {
 		$memory  = self::resolveMemory( $input );
+		if ( is_wp_error( $memory ) ) {
+			return $memory;
+		}
 		$section = $input['section'] ?? null;
 
 		if ( null === $section || '' === $section ) {
@@ -333,13 +337,19 @@ class AgentMemoryAbilities {
 	 * @return array Result.
 	 */
 	public static function updateMemory( array $input ): array|\WP_Error {
+		$memory = self::resolveMemory( $input );
+		if ( is_wp_error( $memory ) ) {
+			return $memory;
+		}
+		$scope = $memory->get_scope();
+
 		$consent_decision = DataMachineAgentConsentPolicy::get()->can_store_memory(
 			array(
 				'mode'               => 'ability',
 				'interactive'        => true,
 				'permission_granted' => PermissionHelper::can_manage(),
-				'agent_id'           => (int) ( $input['agent_id'] ?? 0 ),
-				'user_id'            => (int) ( $input['user_id'] ?? 0 ),
+				'agent_id'           => $scope->agent_id,
+				'user_id'            => $scope->user_id,
 			)
 		);
 		if ( ! $consent_decision->is_allowed() ) {
@@ -349,13 +359,12 @@ class AgentMemoryAbilities {
 				array(
 					'status'           => 403,
 					'consent_decision' => $consent_decision->to_array(),
-					'agent_id'         => (int) ( $input['agent_id'] ?? 0 ),
-					'user_id'          => (int) ( $input['user_id'] ?? 0 ),
+					'agent_id'         => $scope->agent_id,
+					'user_id'          => $scope->user_id,
 				)
 			);
 		}
 
-		$memory  = self::resolveMemory( $input );
 		$section = $input['section'];
 		$content = $input['content'];
 		$mode    = $input['mode'];
@@ -406,13 +415,19 @@ class AgentMemoryAbilities {
 	 * @return array Result.
 	 */
 	public static function deleteMemorySection( array $input ): array|\WP_Error {
+		$memory = self::resolveMemory( $input );
+		if ( is_wp_error( $memory ) ) {
+			return $memory;
+		}
+		$scope = $memory->get_scope();
+
 		$consent_decision = DataMachineAgentConsentPolicy::get()->can_store_memory(
 			array(
 				'mode'               => 'ability',
 				'interactive'        => true,
 				'permission_granted' => PermissionHelper::can_manage(),
-				'agent_id'           => (int) ( $input['agent_id'] ?? 0 ),
-				'user_id'            => (int) ( $input['user_id'] ?? 0 ),
+				'agent_id'           => $scope->agent_id,
+				'user_id'            => $scope->user_id,
 			)
 		);
 		if ( ! $consent_decision->is_allowed() ) {
@@ -422,8 +437,8 @@ class AgentMemoryAbilities {
 				array(
 					'status'           => 403,
 					'consent_decision' => $consent_decision->to_array(),
-					'agent_id'         => (int) ( $input['agent_id'] ?? 0 ),
-					'user_id'          => (int) ( $input['user_id'] ?? 0 ),
+					'agent_id'         => $scope->agent_id,
+					'user_id'          => $scope->user_id,
 				)
 			);
 		}
@@ -440,7 +455,6 @@ class AgentMemoryAbilities {
 			);
 		}
 
-		$memory = self::resolveMemory( $input );
 		return self::memoryResult( $memory->delete_section( (string) $input['section'] ), 'agent_memory_delete_failed' );
 	}
 
@@ -477,6 +491,9 @@ class AgentMemoryAbilities {
 	 */
 	public static function searchMemory( array $input ): array|\WP_Error {
 		$memory  = self::resolveMemory( $input );
+		if ( is_wp_error( $memory ) ) {
+			return $memory;
+		}
 		$query   = $input['query'];
 		$section = $input['section'] ?? null;
 
@@ -491,6 +508,9 @@ class AgentMemoryAbilities {
 	 */
 	public static function listSections( array $input ): array|\WP_Error {
 		$memory = self::resolveMemory( $input );
+		if ( is_wp_error( $memory ) ) {
+			return $memory;
+		}
 		return self::memoryResult( $memory->get_sections(), 'agent_memory_list_sections_failed' );
 	}
 
@@ -511,13 +531,45 @@ class AgentMemoryAbilities {
 	 *
 	 * @since 0.45.0
 	 * @param array $input Input parameters with optional user_id, agent_id, file.
-	 * @return AgentMemory
+	 * @return AgentMemory|\WP_Error
 	 */
-	private static function resolveMemory( array $input ): AgentMemory {
+	private static function resolveMemory( array $input ): AgentMemory|\WP_Error {
 		$user_id  = (int) ( $input['user_id'] ?? 0 );
 		$agent_id = (int) ( $input['agent_id'] ?? 0 );
 		$filename = $input['file'] ?? 'MEMORY.md';
+		$principal = PermissionHelper::get_execution_principal();
+
+		if ( null !== $principal ) {
+			$user_id  = $principal->acting_user_id;
+			$agent_id = self::resolvePrincipalAgentId( $principal->effective_agent_id );
+		}
+
+		if ( \DataMachine\Engine\AI\MemoryFileRegistry::LAYER_PRINCIPAL === AgentMemory::resolve_layer_for( $filename ) && ( $user_id <= 0 || $agent_id <= 0 ) ) {
+			return new \WP_Error(
+				'principal_memory_scope_unavailable',
+				'Principal memory requires an authenticated user and effective agent.',
+				array( 'status' => 403 )
+			);
+		}
 
 		return new AgentMemory( $user_id, $agent_id, $filename );
+	}
+
+	/** Resolve the numeric Data Machine agent represented by an Agents API principal. */
+	private static function resolvePrincipalAgentId( string $effective_agent_id ): int {
+		if ( str_starts_with( $effective_agent_id, 'agent:' ) ) {
+			$effective_agent_id = substr( $effective_agent_id, 6 );
+		}
+
+		if ( ctype_digit( $effective_agent_id ) ) {
+			return (int) $effective_agent_id;
+		}
+
+		$agent = ( new Agents() )->get_by_slug( sanitize_title( $effective_agent_id ) );
+		if ( null !== $agent ) {
+			return (int) $agent['agent_id'];
+		}
+
+		return (int) ( PermissionHelper::get_acting_agent_id() ?? 0 );
 	}
 }

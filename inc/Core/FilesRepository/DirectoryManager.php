@@ -219,6 +219,25 @@ class DirectoryManager {
 	}
 
 	/**
+	 * Get learned-memory storage private to one user of one agent.
+	 *
+	 * @param int $user_id  Authenticated WordPress user ID.
+	 * @param int $agent_id Effective agent ID.
+	 * @return string Full principal memory directory path.
+	 */
+	public function get_principal_directory( int $user_id, int $agent_id ): string {
+		$user_id = absint( $user_id );
+		$agent_id = absint( $agent_id );
+		if ( 0 === $user_id || 0 === $agent_id ) {
+			throw new \InvalidArgumentException( 'Principal memory requires a positive user ID and agent ID.' );
+		}
+
+		$agent = $this->resolve_agent_directory( array( 'agent_id' => $agent_id ) );
+
+		return "{$agent}/users/{$user_id}";
+	}
+
+	/**
 	 * Get network-level directory path.
 	 *
 	 * Returns the network/ subdirectory under the network-global base.

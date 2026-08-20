@@ -857,6 +857,8 @@ class AgentMemory {
 				return $this->directory_manager->get_shared_directory();
 			case MemoryFileRegistry::LAYER_USER:
 				return $this->directory_manager->get_user_directory( $this->scope->user_id );
+			case MemoryFileRegistry::LAYER_PRINCIPAL:
+				return $this->directory_manager->get_principal_directory( $this->scope->user_id, $this->scope->agent_id );
 			case MemoryFileRegistry::LAYER_NETWORK:
 				return $this->directory_manager->get_network_directory();
 			case MemoryFileRegistry::LAYER_AGENT:

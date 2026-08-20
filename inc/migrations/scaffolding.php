@@ -325,10 +325,24 @@ function datamachine_resolve_agent_name_from_context( array $context ): string {
  */
 function datamachine_register_scaffold_generators(): void {
 	add_filter( 'datamachine_scaffold_content', 'datamachine_scaffold_user_content', 10, 3 );
+	add_filter( 'datamachine_scaffold_content', 'datamachine_scaffold_user_memory_content', 10, 3 );
 	add_filter( 'datamachine_scaffold_content', 'datamachine_scaffold_soul_content', 10, 3 );
 	add_filter( 'datamachine_scaffold_content', 'datamachine_scaffold_memory_content', 10, 3 );
 	add_filter( 'datamachine_scaffold_content', 'datamachine_scaffold_daily_content', 10, 3 );
 	add_filter( 'datamachine_scaffold_content', 'datamachine_scaffold_rules_content', 10, 3 );
+}
+
+/** Generate an empty learned-memory document for one authenticated user and agent. */
+function datamachine_scaffold_user_memory_content( string $content, string $filename, array $context ): string {
+	if ( 'USER_MEMORY.md' !== $filename || '' !== $content ) {
+		return $content;
+	}
+
+	if ( (int) ( $context['user_id'] ?? 0 ) <= 0 || (int) ( $context['agent_id'] ?? 0 ) <= 0 ) {
+		return $content;
+	}
+
+	return "# User Memory\n\nDurable observations and preferences learned by this agent for the authenticated user.\n";
 }
 add_action( 'plugins_loaded', 'datamachine_register_scaffold_generators', 5 );
 
