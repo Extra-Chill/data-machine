@@ -177,6 +177,16 @@ class InsertContentAbility {
 	 * @return array Result with canonical diff preview data.
 	 */
 	public static function execute( array $input ): array|\WP_Error {
+		return self::execute_with_pending_authorization( $input );
+	}
+
+	/** Execute only from the pending-action dispatcher with a one-time receipt. */
+	public static function apply_pending_action( array $input, array $payload, array $receipt ): array|\WP_Error {
+		$input['preview'] = false;
+		return self::execute_with_pending_authorization( $input, $payload, $receipt );
+	}
+
+	private static function execute_with_pending_authorization( array $input, ?array $payload = null, ?array $receipt = null ): array|\WP_Error {
 		// Resolve the target blog. On multisite the post may live on another
 		// site than the one this request landed on; switch to it so the read,
 		// the edit_post capability check, and the eventual apply target the
@@ -193,7 +203,7 @@ class InsertContentAbility {
 		}
 
 		try {
-			return self::execute_in_context( $input, $ctx );
+			return self::execute_in_context( $input, $ctx, $payload, $receipt );
 		} finally {
 			BlogContext::leave( $ctx );
 		}
@@ -206,7 +216,7 @@ class InsertContentAbility {
 	 * @param array|\WP_Error $ctx   Blog context token from BlogContext::enter().
 	 * @return array Result with canonical diff preview data.
 	 */
-	private static function execute_in_context( array $input, $ctx ): array|\WP_Error {
+	private static function execute_in_context( array $input, $ctx, ?array $payload = null, ?array $receipt = null ): array|\WP_Error {
 		$post_id               = absint( $input['post_id'] ?? 0 );
 		$blog_id               = absint( $input['blog_id'] ?? 0 );
 		$content               = $input['content'] ?? '';
@@ -280,6 +290,14 @@ class InsertContentAbility {
 		}
 
 		if ( ! $preview ) {
+			if ( null !== $payload ) {
+				$receipt_input = $input;
+				unset( $receipt_input['preview'] );
+				$authorized = ContentActionHandlers::consume_receipt( 'insert_content', $receipt_input, $payload, $receipt ?? array() );
+				if ( is_wp_error( $authorized ) ) {
+					return $authorized;
+				}
+			}
 			$update = wp_update_post(
 				array(
 					'ID'           => $post_id,

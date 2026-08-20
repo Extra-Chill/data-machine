@@ -64,7 +64,9 @@ class PendingActionStore {
 	/**
 	 * Transient fallback key prefix for pure-PHP smoke tests and pre-table boot.
 	 */
-	private const TRANSIENT_PREFIX = 'datamachine_pending_action_';
+	private const TRANSIENT_PREFIX     = 'datamachine_pending_action_';
+	private const CLAIM_FENCE_PREFIX   = 'datamachine_pa_claim_';
+	private const CONSUME_FENCE_PREFIX = 'datamachine_pa_consume_';
 
 	/**
 	 * Agents API store contract singleton.
@@ -108,6 +110,9 @@ class PendingActionStore {
 			resolution_error text NULL,
 			resolution_metadata longtext NULL,
 			receipt_nonce varchar(64) NULL,
+			receipt_consumed_at datetime NULL,
+			receipt_operation varchar(191) NULL,
+			receipt_evidence longtext NULL,
 			PRIMARY KEY  (action_id),
 			KEY workspace (workspace_type, workspace_id),
 			KEY status (status),
@@ -153,6 +158,21 @@ class PendingActionStore {
 		if ( ! self::column_exists( $table_name, 'receipt_nonce' ) ) {
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
 			$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i ADD COLUMN receipt_nonce varchar(64) NULL', $table_name ) );
+		}
+
+		if ( ! self::column_exists( $table_name, 'receipt_consumed_at' ) ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
+			$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i ADD COLUMN receipt_consumed_at datetime NULL', $table_name ) );
+		}
+
+		if ( ! self::column_exists( $table_name, 'receipt_operation' ) ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
+			$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i ADD COLUMN receipt_operation varchar(191) NULL', $table_name ) );
+		}
+
+		if ( ! self::column_exists( $table_name, 'receipt_evidence' ) ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
+			$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i ADD COLUMN receipt_evidence longtext NULL', $table_name ) );
 		}
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
@@ -267,9 +287,12 @@ class PendingActionStore {
 			'resolution_error'    => null,
 			'resolution_metadata' => null,
 			'receipt_nonce'       => null,
+			'receipt_consumed_at' => null,
+			'receipt_operation'   => null,
+			'receipt_evidence'    => null,
 		);
 
-		$formats = array( '%s', '%s', '%s', '%s', '%s', '%d', '%s', '%s', '%s', '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%s', '%s', '%s', '%s', '%s' );
+		$formats = array( '%s', '%s', '%s', '%s', '%s', '%d', '%s', '%s', '%s', '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s' );
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
 		$stored = $wpdb->replace( self::get_table_name(), $row, $formats );
@@ -343,7 +366,10 @@ class PendingActionStore {
 				return false;
 			}
 
-			return delete_transient( self::TRANSIENT_PREFIX . $action_id );
+			$payload = get_transient( self::TRANSIENT_PREFIX . $action_id );
+			$deleted = delete_transient( self::TRANSIENT_PREFIX . $action_id );
+			self::release_transient_fences( $action_id, is_array( $payload ) ? (string) ( $payload['receipt_nonce'] ?? '' ) : '' );
+			return $deleted;
 		}
 
 		return self::record_resolution( $action_id, WP_Agent_Pending_Action_Status::DELETED, null, 'Pending action deleted.', self::current_resolver() );
@@ -370,6 +396,7 @@ class PendingActionStore {
 			$payload = get_transient( self::TRANSIENT_PREFIX . $action_id );
 			$action  = is_array( $payload ) ? self::action_from_payload( $payload ) : null;
 			$deleted = delete_transient( self::TRANSIENT_PREFIX . $action_id );
+			self::release_transient_fences( $action_id, is_array( $payload ) ? (string) ( $payload['receipt_nonce'] ?? '' ) : '' );
 			if ( $deleted && null !== $action ) {
 				self::dispatch_resolution( $action, $decision, $resolver ?? self::current_resolver() );
 			}
@@ -426,10 +453,16 @@ class PendingActionStore {
 			if ( ! is_array( $payload ) || WP_Agent_Pending_Action_Status::PENDING !== ( $payload['status'] ?? null ) || (int) ( $payload['expires_at'] ?? 0 ) <= time() ) {
 				return null;
 			}
+			if ( ! self::acquire_transient_fence( self::transient_fence_key( self::CLAIM_FENCE_PREFIX, $action_id ), $nonce, (int) $payload['expires_at'] ) ) {
+				return null;
+			}
 			$payload['status']        = 'applying';
 			$payload['receipt_nonce'] = $nonce;
 			$payload['resolver']      = self::nullable_string( $resolver ?? self::current_resolver() );
-			set_transient( self::TRANSIENT_PREFIX . $action_id, $payload, self::resolve_ttl( $payload ) );
+			if ( ! set_transient( self::TRANSIENT_PREFIX . $action_id, $payload, self::resolve_ttl( $payload ) ) ) {
+				self::release_transient_fence( self::transient_fence_key( self::CLAIM_FENCE_PREFIX, $action_id ), $nonce );
+				return null;
+			}
 			return $payload;
 		}
 
@@ -443,6 +476,62 @@ class PendingActionStore {
 		return self::get( $action_id, true );
 	}
 
+	/**
+	 * Atomically consume an applying action's exact authorization receipt.
+	 *
+	 * Consumption happens before side effects and is intentionally at-most-once.
+	 * A crash after this succeeds leaves an applying, consumed row for operator
+	 * reconciliation; automatic retry is forbidden because the side effect may
+	 * already have happened.
+	 *
+	 * @param array<string,mixed> $claims Signed receipt claims.
+	 * @return true|\WP_Error
+	 */
+	public static function consume_authorization_receipt( array $claims ): true|\WP_Error {
+		$action_id = (string) ( $claims['action_id'] ?? '' );
+		$nonce     = (string) ( $claims['nonce'] ?? '' );
+		$operation = (string) ( $claims['operation'] ?? '' );
+
+		if ( '' === $action_id || '' === $nonce || '' === $operation ) {
+			return new \WP_Error( 'invalid_authorization_receipt', 'Authorization receipt is missing its action, nonce, or operation claim.' );
+		}
+
+		if ( ! self::has_database() ) {
+			if ( ! self::allows_transient_fallback() ) {
+				self::warn_database_unavailable( 'consume_authorization_receipt' );
+				return new \WP_Error( 'authorization_receipt_store_unavailable', 'Authorization receipt storage is unavailable.' );
+			}
+
+			return self::consume_transient_authorization_receipt( $action_id, $claims );
+		}
+
+		$payload = self::get( $action_id, true );
+		$valid   = self::validate_authorization_claims( $payload, $claims );
+		if ( is_wp_error( $valid ) ) {
+			return $valid;
+		}
+
+		global $wpdb;
+		$evidence = self::authorization_evidence( $claims );
+		// The status, nonce, expiry, and NULL marker form the one-time CAS fence.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
+		$updated = $wpdb->query(
+			$wpdb->prepare(
+				'UPDATE %i SET receipt_consumed_at = UTC_TIMESTAMP(), receipt_operation = %s, receipt_evidence = %s WHERE action_id = %s AND status = %s AND receipt_nonce = %s AND receipt_consumed_at IS NULL AND ( expires_at IS NULL OR expires_at > UTC_TIMESTAMP() )',
+				self::get_table_name(),
+				$operation,
+				self::encode_json( $evidence ),
+				$action_id,
+				'applying',
+				$nonce
+			)
+		);
+
+		return 1 === $updated
+			? true
+			: new \WP_Error( 'authorization_receipt_consumed', 'Authorization receipt has already been consumed or no longer owns the applying action.' );
+	}
+
 	/** Complete a claim only when its receipt nonce still owns the applying row. */
 	public static function complete_claim( string $action_id, string $nonce, string $status, $result = null, ?string $error = null, ?string $resolver = null, array $metadata = array() ): bool {
 		if ( ! in_array( $status, array( WP_Agent_Pending_Action_Status::ACCEPTED, WP_Agent_Pending_Action_Status::REJECTED, 'failed' ), true ) ) {
@@ -450,7 +539,7 @@ class PendingActionStore {
 		}
 		if ( ! self::has_database() ) {
 			$payload = get_transient( self::TRANSIENT_PREFIX . $action_id );
-			if ( ! is_array( $payload ) || 'applying' !== ( $payload['status'] ?? null ) || ! hash_equals( (string) ( $payload['receipt_nonce'] ?? '' ), $nonce ) ) {
+			if ( ! is_array( $payload ) || 'applying' !== ( $payload['status'] ?? null ) || ! hash_equals( (string) ( $payload['receipt_nonce'] ?? '' ), $nonce ) || ( WP_Agent_Pending_Action_Status::ACCEPTED === $status && empty( $payload['receipt_consumed_at'] ) ) ) {
 				return false;
 			}
 			$resolved_at                    = time();
@@ -463,6 +552,9 @@ class PendingActionStore {
 			$payload['resolution_error']    = $error;
 			$payload['resolution_metadata'] = $metadata;
 			$completed                      = set_transient( self::TRANSIENT_PREFIX . $action_id, $payload, self::resolve_ttl( $payload ) );
+			if ( $completed ) {
+				self::release_transient_fences( $action_id, $nonce );
+			}
 			if ( $completed && in_array( $status, array( WP_Agent_Pending_Action_Status::ACCEPTED, WP_Agent_Pending_Action_Status::REJECTED ), true ) ) {
 				$action = self::action_from_payload( $payload );
 				if ( null !== $action ) {
@@ -472,7 +564,18 @@ class PendingActionStore {
 			return $completed;
 		}
 		global $wpdb;
+		if ( WP_Agent_Pending_Action_Status::ACCEPTED === $status ) {
+			$row = self::get_row( $action_id );
+			if ( empty( $row['receipt_consumed_at'] ) ) {
+				return false;
+			}
+		}
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
+		$where   = array(
+			'action_id'     => $action_id,
+			'status'        => 'applying',
+			'receipt_nonce' => $nonce,
+		);
 		$updated = $wpdb->update( self::get_table_name(), array(
 			'status'              => $status,
 			'resolved_at'         => current_time( 'mysql', true ),
@@ -481,11 +584,7 @@ class PendingActionStore {
 			'resolution_result'   => self::encode_json( $result ),
 			'resolution_error'    => $error,
 			'resolution_metadata' => self::encode_json( $metadata ),
-		), array(
-			'action_id'     => $action_id,
-			'status'        => 'applying',
-			'receipt_nonce' => $nonce,
-		), array( '%s', '%s', '%d', '%s', '%s', '%s', '%s' ), array( '%s', '%s', '%s' ) );
+		), $where, array( '%s', '%s', '%d', '%s', '%s', '%s', '%s' ), array( '%s', '%s', '%s' ) );
 		if ( 1 === $updated && in_array( $status, array( WP_Agent_Pending_Action_Status::ACCEPTED, WP_Agent_Pending_Action_Status::REJECTED ), true ) ) {
 			$action = self::get_action( $action_id, true );
 			if ( null !== $action ) {
@@ -877,6 +976,146 @@ class PendingActionStore {
 			'resolution_error'    => isset( $row['resolution_error'] ) ? (string) $row['resolution_error'] : null,
 			'resolution_metadata' => self::decode_json( $row['resolution_metadata'] ?? null ),
 			'receipt_nonce'       => isset( $row['receipt_nonce'] ) ? (string) $row['receipt_nonce'] : '',
+			'receipt_consumed_at' => self::mysql_to_timestamp( (string) ( $row['receipt_consumed_at'] ?? '' ) ),
+			'receipt_operation'   => isset( $row['receipt_operation'] ) ? (string) $row['receipt_operation'] : '',
+			'receipt_evidence'    => self::decode_json( $row['receipt_evidence'] ?? null ),
+		);
+	}
+
+	/** @return true|\WP_Error */
+	private static function validate_authorization_claims( ?array $action, array $claims ): true|\WP_Error {
+		if ( null === $action ) {
+			return new \WP_Error( 'authorization_receipt_absent', 'The pending action for this authorization receipt does not exist.' );
+		}
+		if ( (int) ( $claims['expires_at'] ?? 0 ) <= time() || (int) ( $action['expires_at'] ?? 0 ) <= time() ) {
+			return new \WP_Error( 'authorization_receipt_expired', 'Authorization receipt has expired.' );
+		}
+		if ( ! empty( $action['receipt_consumed_at'] ) ) {
+			return new \WP_Error( 'authorization_receipt_consumed', 'Authorization receipt has already been consumed.' );
+		}
+
+		$authorization = PendingActionAuthorizationReceipt::authorization( $action );
+		$subject       = (string) ( $action['agent'] ?? $action['creator'] ?? '' );
+		$matches       = 'applying' === (string) ( $action['status'] ?? '' )
+			&& hash_equals( (string) ( $action['receipt_nonce'] ?? '' ), (string) ( $claims['nonce'] ?? '' ) )
+			&& (string) ( $action['action_id'] ?? '' ) === (string) ( $claims['action_id'] ?? '' )
+			&& (string) ( $action['kind'] ?? '' ) === (string) ( $claims['kind'] ?? '' )
+			&& (string) ( $action['resolver'] ?? '' ) === (string) ( $claims['resolver'] ?? '' )
+			&& (string) ( $claims['operation'] ?? '' ) === (string) $authorization['operation']
+			&& PendingActionAuthorizationReceipt::digest( $authorization['target'] ) === (string) ( $claims['target_digest'] ?? '' )
+			&& PendingActionAuthorizationReceipt::digest( $action['apply_input'] ?? array() ) === (string) ( $claims['input_digest'] ?? '' )
+			&& (string) ( $claims['subject'] ?? '' ) === $subject
+			&& PendingActionAuthorizationReceipt::digest( $action['workspace'] ?? null ) === PendingActionAuthorizationReceipt::digest( $claims['workspace'] ?? null );
+
+		return $matches
+			? true
+			: new \WP_Error( 'authorization_receipt_mismatch', 'Authorization receipt does not match the applying action claim.' );
+	}
+
+	/** @return true|\WP_Error */
+	private static function consume_transient_authorization_receipt( string $action_id, array $claims ): true|\WP_Error {
+		$payload = get_transient( self::TRANSIENT_PREFIX . $action_id );
+		$valid   = self::validate_authorization_claims( is_array( $payload ) ? $payload : null, $claims );
+		if ( is_wp_error( $valid ) ) {
+			return $valid;
+		}
+
+		$nonce     = (string) $claims['nonce'];
+		$fence_key = self::transient_fence_key( self::CONSUME_FENCE_PREFIX, $action_id );
+		$fence_expires_at = min( (int) $payload['expires_at'], (int) $claims['expires_at'] );
+		if ( ! self::acquire_transient_fence( $fence_key, $nonce, $fence_expires_at ) ) {
+			return new \WP_Error( 'authorization_receipt_consumed', 'Authorization receipt is already being consumed or has been consumed.' );
+		}
+
+		$payload['receipt_consumed_at'] = time();
+		$payload['receipt_operation']   = (string) $claims['operation'];
+		$payload['receipt_evidence']    = self::authorization_evidence( $claims );
+		if ( ! set_transient( self::TRANSIENT_PREFIX . $action_id, $payload, self::resolve_ttl( $payload ) ) ) {
+			// Keep the durable fence: persistence failed after ownership was won,
+			// so replay would violate at-most-once crash semantics.
+			return new \WP_Error( 'authorization_receipt_consume_failed', 'Authorization receipt consumption could not be persisted; replay is blocked.' );
+		}
+
+		return true;
+	}
+
+	private static function transient_fence_key( string $prefix, string $action_id ): string {
+		return $prefix . hash( 'sha256', $action_id );
+	}
+
+	private static function acquire_transient_fence( string $key, string $owner, int $expires_at ): bool {
+		$fence = array(
+			'owner'      => $owner,
+			'expires_at' => max( time() + 1, $expires_at ),
+		);
+
+		if ( add_option( $key, $fence, '', false ) ) {
+			return true;
+		}
+
+		$current = get_option( $key, null );
+		if ( ! self::is_expired_transient_fence( $current ) || ! self::delete_transient_fence_value( $key, $current ) ) {
+			return false;
+		}
+
+		return add_option( $key, $fence, '', false );
+	}
+
+	private static function release_transient_fences( string $action_id, string $nonce = '' ): void {
+		self::release_transient_fence( self::transient_fence_key( self::CLAIM_FENCE_PREFIX, $action_id ), $nonce );
+		self::release_transient_fence( self::transient_fence_key( self::CONSUME_FENCE_PREFIX, $action_id ), $nonce );
+	}
+
+	private static function release_transient_fence( string $key, string $nonce ): void {
+		$value = get_option( $key, null );
+		$owner = is_array( $value ) ? (string) ( $value['owner'] ?? '' ) : ( is_string( $value ) ? $value : '' );
+		if ( ( '' !== $nonce && '' !== $owner && hash_equals( $nonce, $owner ) ) || self::is_expired_transient_fence( $value ) ) {
+			self::delete_transient_fence_value( $key, $value );
+		}
+	}
+
+	private static function is_expired_transient_fence( mixed $value ): bool {
+		return is_array( $value ) && isset( $value['owner'], $value['expires_at'] ) && (int) $value['expires_at'] <= time();
+	}
+
+	/** Delete only the exact fence value that was observed. */
+	private static function delete_transient_fence_value( string $key, mixed $value ): bool {
+		global $wpdb;
+
+		if ( is_object( $wpdb ) && isset( $wpdb->options ) && method_exists( $wpdb, 'delete' ) && function_exists( 'maybe_serialize' ) ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			$deleted = $wpdb->delete(
+				$wpdb->options,
+				array(
+					'option_name'  => $key,
+					'option_value' => maybe_serialize( $value ),
+				),
+				array( '%s', '%s' )
+			);
+			if ( 1 === $deleted && function_exists( 'wp_cache_delete' ) ) {
+				wp_cache_delete( $key, 'options' );
+			}
+			return 1 === $deleted;
+		}
+
+		if ( get_option( $key, null ) !== $value ) {
+			return false;
+		}
+
+		return delete_option( $key );
+	}
+
+	/** @return array<string,mixed> */
+	private static function authorization_evidence( array $claims ): array {
+		return array(
+			'action_id'     => (string) ( $claims['action_id'] ?? '' ),
+			'kind'          => (string) ( $claims['kind'] ?? '' ),
+			'operation'     => (string) ( $claims['operation'] ?? '' ),
+			'resolver'      => (string) ( $claims['resolver'] ?? '' ),
+			'subject'       => (string) ( $claims['subject'] ?? '' ),
+			'target_digest' => (string) ( $claims['target_digest'] ?? '' ),
+			'input_digest'  => (string) ( $claims['input_digest'] ?? '' ),
+			'consumed_at'   => gmdate( 'c' ),
 		);
 	}
 

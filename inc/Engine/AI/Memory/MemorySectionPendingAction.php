@@ -9,6 +9,7 @@ namespace DataMachine\Engine\AI\Memory;
 
 use DataMachine\Core\FilesRepository\AgentMemory;
 use DataMachine\Engine\AI\Actions\PendingActionHelper;
+use DataMachine\Engine\AI\Actions\PendingActionAuthorizationReceipt;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -78,12 +79,17 @@ final class MemorySectionPendingAction {
 		);
 	}
 
-	public static function apply( array $input ): array {
-		$memory  = new AgentMemory( absint( $input['user_id'] ?? 0 ), absint( $input['agent_id'] ?? 0 ), (string) ( $input['file'] ?? 'MEMORY.md' ) );
+	public static function apply( array $input, array $payload, array $receipt ): array|\WP_Error {
+		$subject    = (string) ( $payload['agent'] ?? $payload['creator'] ?? '' );
+		$workspace  = isset( $payload['workspace'] ) && is_array( $payload['workspace'] ) ? $payload['workspace'] : array();
+		$authorized = PendingActionAuthorizationReceipt::consume( $receipt, self::KIND, self::KIND, $input, $input, $subject, $workspace );
+		if ( is_wp_error( $authorized ) ) {
+			return $authorized;
+		}
+
 		$section = (string) ( $input['section'] ?? '' );
 		$content = (string) ( $input['content'] ?? '' );
 		$mode    = self::mode( (string) ( $input['mode'] ?? 'append' ) );
-
 		if ( '' === trim( $section ) ) {
 			return array(
 				'success' => false,
@@ -91,6 +97,7 @@ final class MemorySectionPendingAction {
 			);
 		}
 
+		$memory = new AgentMemory( absint( $input['user_id'] ?? 0 ), absint( $input['agent_id'] ?? 0 ), (string) ( $input['file'] ?? 'MEMORY.md' ) );
 		$result = 'set' === $mode ? $memory->set_section( $section, $content ) : $memory->append_to_section( $section, $content );
 
 		return array(

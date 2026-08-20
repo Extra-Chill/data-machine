@@ -21,8 +21,8 @@ add_filter(
 		}
 
 		$handlers[ AgentBundleUpgradePendingAction::KIND ] = array(
-			'apply'       => static function ( array $apply_input ) {
-				return AgentBundleUpgradePendingAction::apply( $apply_input );
+			'apply'       => static function ( array $apply_input, array $payload, array $receipt ) {
+				return AgentBundleUpgradePendingAction::apply( $apply_input, $payload, $receipt );
 			},
 			'can_resolve' => static function () {
 				return current_user_can( 'manage_options' );

@@ -8,6 +8,7 @@
 namespace DataMachine\Engine\Bundle;
 
 use DataMachine\Engine\AI\Actions\PendingActionHelper;
+use DataMachine\Engine\AI\Actions\PendingActionAuthorizationReceipt;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -67,7 +68,19 @@ final class AgentBundleUpgradePendingAction {
 	 * @param array<string,mixed> $apply_input Stored PendingAction apply input.
 	 * @return array<string,mixed>
 	 */
-	public static function apply( array $apply_input ): array {
+	public static function apply( array $apply_input, array $payload, array $receipt ): array|\WP_Error {
+		$subject    = (string) ( $payload['agent'] ?? $payload['creator'] ?? '' );
+		$workspace  = isset( $payload['workspace'] ) && is_array( $payload['workspace'] ) ? $payload['workspace'] : array();
+		$authorized = PendingActionAuthorizationReceipt::consume( $receipt, self::KIND, self::KIND, $apply_input, $apply_input, $subject, $workspace );
+		if ( is_wp_error( $authorized ) ) {
+			return $authorized;
+		}
+
+		return self::apply_authorized( $apply_input );
+	}
+
+	/** Apply after the public pending-action boundary consumed authorization. */
+	private static function apply_authorized( array $apply_input ): array {
 		$approved = isset( $apply_input['approved_artifacts'] ) && is_array( $apply_input['approved_artifacts'] )
 			? array_values( array_map( 'strval', $apply_input['approved_artifacts'] ) )
 			: array();

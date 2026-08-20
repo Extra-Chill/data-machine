@@ -17,6 +17,7 @@ if ( ! defined( 'DATAMACHINE_PENDING_ACTION_TRANSIENT_FALLBACK' ) ) {
 
 $GLOBALS['__resolver_filters']     = array();
 $GLOBALS['__resolver_transients']  = array();
+$GLOBALS['__resolver_options']      = array();
 $GLOBALS['__resolver_current_blog'] = 1;
 $GLOBALS['__resolver_blog_stack']   = array();
 $GLOBALS['__resolver_switches']     = array();
@@ -54,6 +55,35 @@ if ( ! function_exists( 'absint' ) ) {
 if ( ! function_exists( 'get_current_blog_id' ) ) {
 	function get_current_blog_id() {
 		return $GLOBALS['__resolver_current_blog'];
+	}
+}
+if ( ! function_exists( 'get_option' ) ) {
+	function get_option( $key, $default = false ) {
+		return $GLOBALS['__resolver_options'][ get_current_blog_id() ][ $key ] ?? $default;
+	}
+}
+if ( ! function_exists( 'update_option' ) ) {
+	function update_option( $key, $value, $autoload = null ) {
+		unset( $autoload );
+		$GLOBALS['__resolver_options'][ get_current_blog_id() ][ $key ] = $value;
+		return true;
+	}
+}
+if ( ! function_exists( 'add_option' ) ) {
+	function add_option( $key, $value = '', $deprecated = '', $autoload = 'yes' ) {
+		unset( $deprecated, $autoload );
+		$blog_id = get_current_blog_id();
+		if ( array_key_exists( $key, $GLOBALS['__resolver_options'][ $blog_id ] ?? array() ) ) {
+			return false;
+		}
+		$GLOBALS['__resolver_options'][ $blog_id ][ $key ] = $value;
+		return true;
+	}
+}
+if ( ! function_exists( 'delete_option' ) ) {
+	function delete_option( $key ) {
+		unset( $GLOBALS['__resolver_options'][ get_current_blog_id() ][ $key ] );
+		return true;
 	}
 }
 if ( ! function_exists( 'get_site' ) ) {
@@ -201,6 +231,22 @@ echo "pending-action-resolver-contract-smoke\n";
 $adapter = ResolvePendingActionAbility::adapter();
 resolver_smoke_assert( $adapter instanceof WP_Agent_Pending_Action_Resolver, 'resolver adapter implements Agents API resolver contract', $failures, $passes );
 
+function resolver_smoke_consume_receipt( array $input, array $payload, array $receipt ) {
+	$authorization = \DataMachine\Engine\AI\Actions\PendingActionAuthorizationReceipt::authorization( $payload );
+	$subject       = (string) ( $payload['agent'] ?? $payload['creator'] ?? '' );
+	$workspace     = is_array( $payload['workspace'] ?? null ) ? $payload['workspace'] : array();
+
+	return \DataMachine\Engine\AI\Actions\PendingActionAuthorizationReceipt::consume(
+		$receipt,
+		(string) $payload['kind'],
+		(string) $authorization['operation'],
+		$authorization['target'],
+		$input,
+		$subject,
+		$workspace
+	);
+}
+
 add_filter(
 	'wp_agent_pending_action_resolver',
 	static function () use ( $adapter ) {
@@ -227,6 +273,11 @@ $handler         = new class( $handler_calls ) implements WP_Agent_Pending_Actio
 	}
 
 	public function handle_pending_action( WP_Agent_Pending_Action $action, WP_Agent_Approval_Decision $decision, array $payload = array(), array $context = array() ): mixed {
+		$stored = $context['pending_action'] ?? array();
+		$authorized = resolver_smoke_consume_receipt( $action->get_apply_input(), $stored, $context['authorization_receipt'] ?? array() );
+		if ( is_wp_error( $authorized ) ) {
+			return $authorized;
+		}
 		$this->handler_calls[] = array(
 			'action_id' => $action->get_action_id(),
 			'decision' => $decision->value(),
@@ -294,6 +345,32 @@ resolver_smoke_assert( 'looks-good' === ( $handler_calls[1]['payload']['reason']
 resolver_smoke_assert( 'reviewer' === ( $handler_calls[1]['context']['actor'] ?? null ), 'contract handler receives resolver context', $failures, $passes );
 resolver_smoke_assert( empty( $permission_seen ), 'legacy can_resolve is not duplicated for Agents API handler objects', $failures, $passes );
 
+$ignored_receipt_calls = 0;
+add_filter(
+	'datamachine_pending_action_handlers',
+	static function ( array $handlers ) use ( &$ignored_receipt_calls ): array {
+		$handlers['ignored_receipt_kind'] = array(
+			'apply' => static function ( array $input, array $payload ) use ( &$ignored_receipt_calls ): array {
+				unset( $input, $payload );
+				++$ignored_receipt_calls;
+				return array( 'success' => true );
+			},
+		);
+		return $handlers;
+	}
+);
+PendingActionStore::store(
+	'act_ignored_receipt',
+	array(
+		'kind'        => 'ignored_receipt_kind',
+		'summary'     => 'Reject callback that cannot receive a receipt.',
+		'apply_input' => array( 'target' => 'must-not-apply' ),
+	)
+);
+$ignored_receipt = ResolvePendingActionAbility::execute( array( 'action_id' => 'act_ignored_receipt', 'decision' => 'accepted' ) );
+resolver_smoke_assert( false === ( $ignored_receipt['success'] ?? true ), 'two-argument mutation callback is rejected before dispatch', $failures, $passes );
+resolver_smoke_assert( 0 === $ignored_receipt_calls, 'callback that could ignore the receipt has zero side effects', $failures, $passes );
+
 PendingActionStore::store(
 	'act_canonical_accept',
 	array(
@@ -350,8 +427,11 @@ add_filter(
 	'datamachine_pending_action_handlers',
 	static function ( array $handlers ) use ( &$legacy_apply_calls, &$legacy_permission_seen ) {
 		$handlers['legacy_kind'] = array(
-			'apply'       => static function ( array $apply_input, array $payload ) use ( &$legacy_apply_calls ) {
-				unset( $apply_input, $payload );
+			'apply'       => static function ( array $apply_input, array $payload, array $receipt ) use ( &$legacy_apply_calls ) {
+				$authorized = resolver_smoke_consume_receipt( $apply_input, $payload, $receipt );
+				if ( is_wp_error( $authorized ) ) {
+					return $authorized;
+				}
 				++$legacy_apply_calls;
 				return array( 'success' => true );
 			},
@@ -544,7 +624,8 @@ add_filter(
 	'datamachine_pending_action_handlers',
 	static function ( array $handlers ) use ( &$scoped_out_apply_calls ) {
 		$handlers['scoped_out_kind'] = array(
-			'apply' => static function () use ( &$scoped_out_apply_calls ) {
+			'apply' => static function ( array $input, array $payload, array $receipt ) use ( &$scoped_out_apply_calls ) {
+				unset( $input, $payload, $receipt );
 				++$scoped_out_apply_calls;
 				return array( 'success' => true );
 			},
@@ -596,7 +677,11 @@ add_filter(
 	'datamachine_pending_action_handlers',
 	static function ( array $handlers ) use ( &$origin_handler_blogs ) {
 		$handlers['origin_kind'] = array(
-			'apply' => static function () use ( &$origin_handler_blogs ) {
+			'apply' => static function ( array $input, array $payload, array $receipt ) use ( &$origin_handler_blogs ) {
+				$authorized = resolver_smoke_consume_receipt( $input, $payload, $receipt );
+				if ( is_wp_error( $authorized ) ) {
+					return $authorized;
+				}
 				$origin_handler_blogs[] = get_current_blog_id();
 				return array( 'success' => true );
 			},
