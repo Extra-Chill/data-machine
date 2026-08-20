@@ -702,10 +702,13 @@ class DirectJobOwnershipTest extends WP_UnitTestCase {
 		$this->assertNull( $after['terminal_accounting_state'] );
 
 		$duplicate = ( new RetryJobAbility() )->execute( array( 'job_id' => $job_id, 'force' => true ) );
+		$after_duplicate = $jobs->get_job( $job_id );
 		$this->assertWPError( $duplicate );
-		$this->assertSame( 'job_execution_in_progress', $duplicate->get_error_code() );
+		$this->assertSame( 'job_reopen_failed', $duplicate->get_error_code() );
 		$this->assertTrue( $duplicate->get_error_data()['retryable'] );
 		$this->assertSame( $job_count, $jobs->get_jobs_count() );
+		$this->assertSame( (int) $after['operation_action_id'], (int) $after_duplicate['operation_action_id'] );
+		$this->assertSame( (int) $after['operation_generation'], (int) $after_duplicate['operation_generation'] );
 	}
 
 	public function test_missing_direct_action_requeue_rolls_back_unusable_receipt(): void {
