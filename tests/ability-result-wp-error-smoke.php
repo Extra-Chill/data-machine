@@ -111,6 +111,15 @@ $assert( 'WP_Error message is preserved', 'Permission denied.' === $wp_error_res
 $assert( 'WP_Error code is preserved', 'rest_forbidden' === $wp_error_result['wp_error_code'] );
 $assert( 'WP_Error data is preserved', 403 === ( $wp_error_result['wp_error_data']['status'] ?? null ) );
 
+$caller_error = AbilityResult::normalize( new WP_Error( 'edit_operations_failed', 'No edits were applied.', array( 'status' => 422 ) ) );
+$assert( 'legacy callers receive the native error message', 'No edits were applied.' === $caller_error['error'] );
+$assert( 'legacy callers receive the native error code', 'edit_operations_failed' === $caller_error['wp_error_code'] );
+
+$blocks_command_source = file_get_contents( __DIR__ . '/../inc/Cli/Commands/BlocksCommand.php' );
+$internal_task_source  = file_get_contents( __DIR__ . '/../inc/Engine/AI/System/Tasks/InternalLinkingTask.php' );
+$assert( 'blocks CLI normalizes every direct content ability result', 4 === substr_count( $blocks_command_source, 'AbilityResult::normalize(' ) );
+$assert( 'internal linking normalizes both direct content ability results', 2 === substr_count( $internal_task_source, 'AbilityResult::normalize(' ) );
+
 $array_result = array(
 	'success' => false,
 	'error'   => 'Legacy failure.',
@@ -307,6 +316,14 @@ $assert( 'REST result spec applies failure status callback', 404 === ( $rest_spe
 
 $native_spec_error = new WP_Error( 'native_queue_denied', 'Queue access denied.', array( 'status' => 403 ) );
 $assert( 'REST result spec preserves native WP_Error unchanged', $native_spec_error === RestResultSpec::item()->response( $native_spec_error ) );
+
+$legacy_file_error = RestResultSpec::legacy_error(
+	new WP_Error( 'agent_file_not_found', 'File not found.', array( 'status' => 404, 'filename' => 'missing.txt' ) ),
+	'get_agent_file_error'
+);
+$assert( 'legacy file adapter preserves public REST error code', 'get_agent_file_error' === $legacy_file_error->get_error_code() );
+$assert( 'legacy file adapter preserves native ability error code', 'agent_file_not_found' === ( $legacy_file_error->get_error_data()['ability_error_code'] ?? '' ) );
+$assert( 'legacy file adapter preserves native status and diagnostics', 404 === ( $legacy_file_error->get_error_data()['status'] ?? 0 ) && 'missing.txt' === ( $legacy_file_error->get_error_data()['filename'] ?? '' ) );
 
 $GLOBALS['datamachine_test_abilities']['datamachine/test-rest'] = new class() {
 	public function execute( array $input ): array {

@@ -16,6 +16,7 @@ use DataMachine\Cli\BaseCommand;
 use DataMachine\Abilities\Content\GetPostBlocksAbility;
 use DataMachine\Abilities\Content\EditPostBlocksAbility;
 use DataMachine\Abilities\Content\ReplacePostBlocksAbility;
+use DataMachine\Core\AbilityResult;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -63,11 +64,11 @@ class BlocksCommand extends BaseCommand {
 			$block_types = array( $assoc_args['type'] );
 		}
 
-		$result = GetPostBlocksAbility::execute( array(
+		$result = AbilityResult::normalize( GetPostBlocksAbility::execute( array(
 			'post_id'     => $post_id,
 			'block_types' => $block_types,
 			'search'      => $search,
-		) );
+		) ) );
 
 		if ( empty( $result['success'] ) ) {
 			WP_CLI::error( $result['error'] ?? 'Failed to parse blocks' );
@@ -146,7 +147,7 @@ class BlocksCommand extends BaseCommand {
 
 		if ( $dry_run ) {
 			// Preview: use get-post-blocks to show what would change.
-			$blocks_result = GetPostBlocksAbility::execute( array( 'post_id' => $post_id ) );
+			$blocks_result = AbilityResult::normalize( GetPostBlocksAbility::execute( array( 'post_id' => $post_id ) ) );
 			if ( empty( $blocks_result['success'] ) ) {
 				WP_CLI::error( $blocks_result['error'] ?? 'Failed to parse blocks' );
 			}
@@ -175,7 +176,7 @@ class BlocksCommand extends BaseCommand {
 			return;
 		}
 
-		$result = EditPostBlocksAbility::execute( array(
+		$result = AbilityResult::normalize( EditPostBlocksAbility::execute( array(
 			'post_id' => $post_id,
 			'edits'   => array(
 				array(
@@ -184,7 +185,7 @@ class BlocksCommand extends BaseCommand {
 					'replace'     => $replace,
 				),
 			),
-		) );
+		) ) );
 
 		if ( empty( $result['success'] ) ) {
 			WP_CLI::error( $result['error'] ?? 'Edit failed' );
@@ -235,7 +236,7 @@ class BlocksCommand extends BaseCommand {
 			WP_CLI::error( '--content is required' );
 		}
 
-		$result = ReplacePostBlocksAbility::execute( array(
+		$result = AbilityResult::normalize( ReplacePostBlocksAbility::execute( array(
 			'post_id'      => $post_id,
 			'replacements' => array(
 				array(
@@ -243,7 +244,7 @@ class BlocksCommand extends BaseCommand {
 					'new_content' => $content,
 				),
 			),
-		) );
+		) ) );
 
 		if ( empty( $result['success'] ) ) {
 			WP_CLI::error( $result['error'] ?? 'Replace failed' );

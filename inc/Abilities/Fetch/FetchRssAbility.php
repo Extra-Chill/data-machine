@@ -110,7 +110,17 @@ class FetchRssAbility {
 	 * @param array $input Input parameters.
 	 * @return array Result with fetched data or error.
 	 */
-	public function execute( array $input ): array {
+	public function execute( array $input ): array|\WP_Error {
+		return $this->execute_legacy( $input );
+	}
+
+	/**
+	 * Execute the existing RSS fetch implementation.
+	 *
+	 * @param array $input Input parameters.
+	 * @return array|\WP_Error Result with fetched data or error.
+	 */
+	private function execute_legacy( array $input ): array|\WP_Error {
 		$logs   = array();
 		$config = $this->normalizeConfig( $input );
 
@@ -122,20 +132,27 @@ class FetchRssAbility {
 		$download_images  = $config['download_images'];
 
 		$result = $this->httpGet( $feed_url, array( 'context' => 'RSS Feed' ) );
-
-		if ( ! $result['success'] ) {
+		if ( is_wp_error( $result ) ) {
 			$logs[] = array(
 				'level'   => 'error',
 				'message' => 'Rss: Failed to fetch RSS feed.',
 				'data'    => array(
-					'error'    => $result['error'],
 					'feed_url' => $feed_url,
+					'error'    => $result->get_error_message(),
 				),
 			);
-			return array(
-				'success' => false,
-				'error'   => $result['error'],
-				'logs'    => $logs,
+			return new \WP_Error(
+				'rss_fetch_failed',
+				$result->get_error_message(),
+				array_merge(
+					array(
+						'status'         => 502,
+						'feed_url'       => $feed_url,
+						'transport_code' => $result->get_error_code(),
+						'logs'           => $logs,
+					),
+					is_array( $result->get_error_data() ) ? $result->get_error_data() : array()
+				)
 			);
 		}
 
@@ -146,10 +163,14 @@ class FetchRssAbility {
 				'message' => 'Rss: RSS feed content is empty.',
 				'data'    => array( 'feed_url' => $feed_url ),
 			);
-			return array(
-				'success' => false,
-				'error'   => 'RSS feed content is empty',
-				'logs'    => $logs,
+			return new \WP_Error(
+				'rss_empty',
+				'RSS feed content is empty',
+				array(
+					'status'   => 422,
+					'feed_url' => $feed_url,
+					'logs'     => $logs,
+				)
 			);
 		}
 
@@ -172,10 +193,15 @@ class FetchRssAbility {
 					'xml_errors' => implode( ', ', $error_messages ),
 				),
 			);
-			return array(
-				'success' => false,
-				'error'   => 'Failed to parse RSS feed XML: ' . implode( ', ', $error_messages ),
-				'logs'    => $logs,
+			return new \WP_Error(
+				'rss_parse_failed',
+				'Failed to parse RSS feed XML: ' . implode( ', ', $error_messages ),
+				array(
+					'status'     => 422,
+					'feed_url'   => $feed_url,
+					'xml_errors' => $error_messages,
+					'logs'       => $logs,
+				)
 			);
 		}
 
@@ -193,10 +219,14 @@ class FetchRssAbility {
 				'message' => 'Rss: Unsupported feed format or no items found in feed.',
 				'data'    => array( 'feed_url' => $feed_url ),
 			);
-			return array(
-				'success' => false,
-				'error'   => 'Unsupported feed format or no items found',
-				'logs'    => $logs,
+			return new \WP_Error(
+				'rss_items_missing',
+				'Unsupported feed format or no items found',
+				array(
+					'status'   => 422,
+					'feed_url' => $feed_url,
+					'logs'     => $logs,
+				)
 			);
 		}
 
@@ -529,5 +559,4 @@ class FetchRssAbility {
 
 		return $item_timestamp >= $cutoff;
 	}
-
 }

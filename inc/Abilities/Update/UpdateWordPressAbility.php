@@ -129,7 +129,7 @@ class UpdateWordPressAbility {
 	 * @param array $input Input parameters.
 	 * @return array Result with update data or error.
 	 */
-	public function execute( array $input ): array {
+	public function execute( array $input ): array|\WP_Error {
 		$logs   = array();
 		$config = $this->normalizeConfig( $input );
 
@@ -146,10 +146,13 @@ class UpdateWordPressAbility {
 				'level'   => 'error',
 				'message' => 'WordPress Update: source_url is required',
 			);
-			return array(
-				'success' => false,
-				'error'   => 'source_url parameter is required for WordPress Update',
-				'logs'    => $logs,
+			return new \WP_Error(
+				'wordpress_update_source_url_required',
+				'source_url parameter is required for WordPress Update',
+				array(
+					'status' => 400,
+					'logs'   => $logs,
+				)
 			);
 		}
 
@@ -160,10 +163,14 @@ class UpdateWordPressAbility {
 				'message' => 'WordPress Update: Could not extract post ID from URL',
 				'data'    => array( 'source_url' => $source_url ),
 			);
-			return array(
-				'success' => false,
-				'error'   => "Could not extract valid WordPress post ID from URL: {$source_url}",
-				'logs'    => $logs,
+			return new \WP_Error(
+				'wordpress_update_source_url_invalid',
+				"Could not extract valid WordPress post ID from URL: {$source_url}",
+				array(
+					'status'     => 400,
+					'source_url' => $source_url,
+					'logs'       => $logs,
+				)
 			);
 		}
 
@@ -174,10 +181,34 @@ class UpdateWordPressAbility {
 				'message' => 'WordPress Update: Post does not exist',
 				'data'    => array( 'post_id' => $post_id ),
 			);
-			return array(
-				'success' => false,
-				'error'   => "WordPress post with ID {$post_id} does not exist",
-				'logs'    => $logs,
+			return new \WP_Error(
+				'wordpress_update_post_not_found',
+				"WordPress post with ID {$post_id} does not exist",
+				array(
+					'status'  => 404,
+					'post_id' => $post_id,
+					'logs'    => $logs,
+				)
+			);
+		}
+
+		$block_companion_modes = array_filter(
+			array(
+				'title'      => ! empty( $title ),
+				'content'    => ! empty( $content ),
+				'updates'    => ! empty( $updates ),
+				'taxonomies' => ! empty( $taxonomies ),
+			)
+		);
+		if ( ! empty( $block_updates ) && ! empty( $block_companion_modes ) ) {
+			return new \WP_Error(
+				'wordpress_update_mixed_mutation_modes',
+				'block_updates cannot be combined with other post mutations in one request.',
+				array(
+					'status'         => 400,
+					'post_id'        => $post_id,
+					'conflicts_with' => array_keys( $block_companion_modes ),
+				)
 			);
 		}
 
@@ -214,6 +245,9 @@ class UpdateWordPressAbility {
 				)
 			);
 
+			if ( is_wp_error( $block_result ) ) {
+				return $block_result;
+			}
 			$all_changes['block_updates'] = $block_result['changes_applied'] ?? array();
 
 			if ( ! $block_result['success'] ) {
@@ -221,6 +255,18 @@ class UpdateWordPressAbility {
 					'level'   => 'warning',
 					'message' => 'WordPress Update: Block updates failed',
 					'data'    => array( 'error' => $block_result['error'] ?? 'Unknown' ),
+				);
+				return new \WP_Error(
+					$block_result['error_code'] ?? 'wordpress_update_block_updates_failed',
+					$block_result['error'] ?? 'WordPress block updates failed.',
+					array_merge(
+						array(
+							'status'  => 422,
+							'post_id' => $post_id,
+							'logs'    => $logs,
+						),
+						is_array( $block_result['error_data'] ?? null ) ? $block_result['error_data'] : array()
+					)
 				);
 			} else {
 				$logs[] = array(
@@ -272,10 +318,16 @@ class UpdateWordPressAbility {
 					'message' => 'WordPress Update: wp_update_post failed',
 					'data'    => array( 'error' => $result->get_error_message() ),
 				);
-				return array(
-					'success' => false,
-					'error'   => 'WordPress post update failed: ' . $result->get_error_message(),
-					'logs'    => $logs,
+				return new \WP_Error(
+					'wordpress_post_update_failed',
+					'WordPress post update failed: ' . $result->get_error_message(),
+					array(
+						'status'        => 500,
+						'post_id'       => $post_id,
+						'wp_error_code' => $result->get_error_code(),
+						'wp_error_data' => $result->get_error_data(),
+						'logs'          => $logs,
+					)
 				);
 			}
 
@@ -284,10 +336,14 @@ class UpdateWordPressAbility {
 					'level'   => 'error',
 					'message' => 'WordPress Update: wp_update_post returned 0',
 				);
-				return array(
-					'success' => false,
-					'error'   => 'WordPress post update failed: wp_update_post returned 0',
-					'logs'    => $logs,
+				return new \WP_Error(
+					'wordpress_post_update_invalid_result',
+					'WordPress post update failed: wp_update_post returned 0',
+					array(
+						'status'  => 500,
+						'post_id' => $post_id,
+						'logs'    => $logs,
+					)
 				);
 			}
 		}

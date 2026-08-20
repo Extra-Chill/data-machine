@@ -130,7 +130,15 @@ class QueryWordPressPostsAbility {
 	 * @param array $input Input parameters.
 	 * @return array Result with post data or error.
 	 */
-	public function execute( array $input ): array {
+	public function execute( array $input ): array|\WP_Error {
+		$result = $this->execute_legacy( $input );
+		if ( is_wp_error( $result ) || ! empty( $result['success'] ) ) {
+			return $result;
+		}
+		return new \WP_Error( $result['error_code'] ?? 'wordpress_posts_query_failed', $result['error'] ?? 'WordPress posts query failed.', array_merge( array( 'status' => 500 ), is_array( $result ) ? $result : array() ) );
+	}
+
+	private function execute_legacy( array $input ): array {
 		$logs   = array();
 		$config = $this->normalizeConfig( $input );
 

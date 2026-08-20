@@ -287,6 +287,15 @@ class UpsertPostAbility {
 		}
 
 		$result = self::execute( $params );
+		if ( is_wp_error( $result ) ) {
+			return array(
+				'success'    => false,
+				'error'      => $result->get_error_message(),
+				'error_code' => $result->get_error_code(),
+				'error_data' => $result->get_error_data(),
+				'tool_name'  => 'upsert_post',
+			);
+		}
 		return array(
 			'success'   => ! empty( $result['success'] ),
 			'data'      => $result,
@@ -300,7 +309,7 @@ class UpsertPostAbility {
 	 * @param array $input Input parameters.
 	 * @return array Result with action: created|updated|no_change.
 	 */
-	public static function execute( array $input ): array {
+	public static function execute( array $input ): array|\WP_Error {
 		$post_type         = sanitize_key( $input['post_type'] ?? '' );
 		$title             = trim( $input['title'] ?? '' );
 		$content           = $input['content'] ?? '';
@@ -325,10 +334,7 @@ class UpsertPostAbility {
 		$create_stubs = ! empty( $input['create_stubs'] );
 
 		if ( '' === $post_type || '' === $title ) {
-			return array(
-				'success' => false,
-				'error'   => 'post_type and title are required.',
-			);
+			return new \WP_Error( 'invalid_upsert_input', 'post_type and title are required.', array( 'status' => 400 ) );
 		}
 
 		if ( $add_source_attribution && '' !== $source_url ) {
@@ -359,12 +365,7 @@ class UpsertPostAbility {
 
 		$stored_content = ContentFormat::sourceToStored( (string) $content, $content_format, $post_type );
 		if ( is_wp_error( $stored_content ) ) {
-			return array(
-				'success'    => false,
-				'error'      => $stored_content->get_error_message(),
-				'error_code' => $stored_content->get_error_code(),
-				'error_data' => $stored_content->get_error_data(),
-			);
+			return new \WP_Error( $stored_content->get_error_code(), $stored_content->get_error_message(), array_merge( array( 'status' => 400 ), is_array( $stored_content->get_error_data() ) ? $stored_content->get_error_data() : array() ) );
 		}
 
 		// Resolve parent_path if provided.
@@ -380,10 +381,7 @@ class UpsertPostAbility {
 			}
 
 			if ( is_wp_error( $resolved ) ) {
-				return array(
-					'success' => false,
-					'error'   => $resolved->get_error_message(),
-				);
+				return new \WP_Error( $resolved->get_error_code(), $resolved->get_error_message(), array_merge( array( 'status' => 404 ), is_array( $resolved->get_error_data() ) ? $resolved->get_error_data() : array() ) );
 			}
 
 			$parent_id = (int) $resolved;
@@ -409,13 +407,14 @@ class UpsertPostAbility {
 		if ( $post_id > 0 ) {
 			$existing_id = self::resolve_existing_post( $post_id, $slug, $parent_id, is_array( $identity_meta ) ? $identity_meta : array(), $post_type );
 			if ( is_wp_error( $existing_id ) ) {
-				return array(
-					'success' => false,
-					'error'   => $existing_id->get_error_message(),
+				return new \WP_Error(
+					$existing_id->get_error_code(),
+					$existing_id->get_error_message(),
+					array_merge( array( 'status' => 404 ), is_array( $existing_id->get_error_data() ) ? $existing_id->get_error_data() : array() )
 				);
 			}
 
-			return self::execute_resolved_write( $write_context, (int) $existing_id );
+			return self::callback_result( self::execute_resolved_write( $write_context, (int) $existing_id ) );
 		}
 
 		if ( self::has_usable_identity_meta( $identity_meta ) ) {
@@ -438,13 +437,10 @@ class UpsertPostAbility {
 		);
 
 		if ( is_wp_error( $existing_id ) ) {
-			return array(
-				'success' => false,
-				'error'   => $existing_id->get_error_message(),
-			);
+			return new \WP_Error( $existing_id->get_error_code(), $existing_id->get_error_message(), array_merge( array( 'status' => 404 ), is_array( $existing_id->get_error_data() ) ? $existing_id->get_error_data() : array() ) );
 		}
 
-		return self::execute_resolved_write( $write_context, (int) $existing_id );
+		return self::callback_result( self::execute_resolved_write( $write_context, (int) $existing_id ) );
 	}
 
 	/**
@@ -454,36 +450,37 @@ class UpsertPostAbility {
 	 * @param array $identity_meta Identity meta input.
 	 * @param string $slug         Slug fallback.
 	 * @param int   $parent_id     Slug parent scope.
-	 * @return array
+	 * @return array|\WP_Error
 	 */
 	private static function execute_identity_backed(
 		array $context,
 		array $identity_meta,
 		string $slug,
 		int $parent_id
-	): array {
+	): array|\WP_Error {
 		$post_type = $context['post_type'];
 
 		$slug_fallback_id = 0;
 		if ( '' !== $slug ) {
 			$slug_fallback_id = self::resolve_existing_post( 0, $slug, $parent_id, array(), $post_type );
 			if ( is_wp_error( $slug_fallback_id ) ) {
-				return array(
+				return self::callback_result( array(
 					'success'    => false,
 					'error'      => $slug_fallback_id->get_error_message(),
 					'error_code' => $slug_fallback_id->get_error_code(),
-				);
+					'error_data' => $slug_fallback_id->get_error_data(),
+				) );
 			}
 		}
 
 		$identity = PostIdentityReservations::normalize_identity( $post_type, $identity_meta );
 		if ( is_wp_error( $identity ) ) {
-			return array(
+			return self::callback_result( array(
 				'success'    => false,
 				'error'      => $identity->get_error_message(),
 				'error_code' => $identity->get_error_code(),
 				'error_data' => $identity->get_error_data(),
-			);
+			) );
 		}
 
 		$shell = array(
@@ -498,12 +495,12 @@ class UpsertPostAbility {
 		$reservations = new PostIdentityReservations();
 		$locked       = $reservations->acquire_lock( $identity['identity_hash'] );
 		if ( is_wp_error( $locked ) ) {
-			return array(
+			return self::callback_result( array(
 				'success'    => false,
 				'error'      => $locked->get_error_message(),
 				'error_code' => $locked->get_error_code(),
 				'error_data' => $locked->get_error_data(),
-			);
+			) );
 		}
 
 		$result   = array();
@@ -550,15 +547,38 @@ class UpsertPostAbility {
 		}
 
 		if ( ! $released ) {
-			return array(
+			return self::callback_result( array(
 				'success'    => false,
 				'error'      => 'Post identity lock release is uncertain; retry is required.',
 				'error_code' => 'identity_lock_release_uncertain',
 				'error_data' => array( 'retryable' => true ),
-			);
+			) );
 		}
 
-		return $result;
+		return self::callback_result( $result );
+	}
+
+	/** Convert legacy private write failures at the registered callback boundary. */
+	private static function callback_result( $result ): array|\WP_Error {
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+		if ( ! is_array( $result ) ) {
+			return new \WP_Error( 'upsert_post_invalid_result', 'Upsert post returned an invalid result.', array( 'status' => 500 ) );
+		}
+		if ( ! empty( $result['success'] ) ) {
+			return $result;
+		}
+
+		$data           = is_array( $result['error_data'] ?? null ) ? $result['error_data'] : array();
+		$data['status'] = $data['status'] ?? 500;
+		foreach ( $result as $key => $value ) {
+			if ( ! in_array( $key, array( 'success', 'error', 'message', 'error_code', 'error_data' ), true ) ) {
+				$data[ $key ] = $value;
+			}
+		}
+
+		return new \WP_Error( (string) ( $result['error_code'] ?? 'upsert_post_failed' ), (string) ( $result['error'] ?? 'Upsert post failed.' ), $data );
 	}
 
 	/**

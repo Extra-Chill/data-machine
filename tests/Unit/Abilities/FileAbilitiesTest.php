@@ -91,9 +91,9 @@ class FileAbilitiesTest extends WP_UnitTestCase {
 	public function test_list_flow_files_requires_flow_step_id(): void {
 		$result = $this->flow_file_abilities->executeListFlowFiles( array() );
 
-		$this->assertFalse( $result['success'] );
-		$this->assertArrayHasKey( 'error', $result );
-		$this->assertStringContainsString( 'flow_step_id is required', $result['error'] );
+		$this->assertWPError( $result );
+		$this->assertSame( 'flow_file_step_required', $result->get_error_code() );
+		$this->assertStringContainsString( 'flow_step_id is required', $result->get_error_message() );
 	}
 
 	// =========================================================================
@@ -108,8 +108,7 @@ class FileAbilitiesTest extends WP_UnitTestCase {
 			)
 		);
 
-		$this->assertFalse( $result['success'] );
-		$this->assertArrayHasKey( 'error', $result );
+		$this->assertWPError( $result );
 	}
 
 	public function test_get_flow_file_requires_flow_step_id(): void {
@@ -119,9 +118,8 @@ class FileAbilitiesTest extends WP_UnitTestCase {
 			)
 		);
 
-		$this->assertFalse( $result['success'] );
-		$this->assertArrayHasKey( 'error', $result );
-		$this->assertStringContainsString( 'flow_step_id is required', $result['error'] );
+		$this->assertWPError( $result );
+		$this->assertStringContainsString( 'flow_step_id is required', $result->get_error_message() );
 	}
 
 	// =========================================================================
@@ -135,8 +133,7 @@ class FileAbilitiesTest extends WP_UnitTestCase {
 			)
 		);
 
-		$this->assertFalse( $result['success'] );
-		$this->assertArrayHasKey( 'error', $result );
+		$this->assertWPError( $result );
 	}
 
 	public function test_delete_flow_file_requires_flow_step_id(): void {
@@ -146,9 +143,8 @@ class FileAbilitiesTest extends WP_UnitTestCase {
 			)
 		);
 
-		$this->assertFalse( $result['success'] );
-		$this->assertArrayHasKey( 'error', $result );
-		$this->assertStringContainsString( 'flow_step_id is required', $result['error'] );
+		$this->assertWPError( $result );
+		$this->assertStringContainsString( 'flow_step_id is required', $result->get_error_message() );
 	}
 
 	// =========================================================================
@@ -158,9 +154,8 @@ class FileAbilitiesTest extends WP_UnitTestCase {
 	public function test_cleanup_flow_files_requires_scope(): void {
 		$result = $this->flow_file_abilities->executeCleanupFlowFiles( array() );
 
-		$this->assertFalse( $result['success'] );
-		$this->assertArrayHasKey( 'error', $result );
-		$this->assertStringContainsString( 'Must provide either', $result['error'] );
+		$this->assertWPError( $result );
+		$this->assertStringContainsString( 'Must provide either', $result->get_error_message() );
 	}
 
 	public function test_cleanup_flow_files_job_requires_flow(): void {
@@ -170,9 +165,8 @@ class FileAbilitiesTest extends WP_UnitTestCase {
 			)
 		);
 
-		$this->assertFalse( $result['success'] );
-		$this->assertArrayHasKey( 'error', $result );
-		$this->assertStringContainsString( 'flow_id is required', $result['error'] );
+		$this->assertWPError( $result );
+		$this->assertStringContainsString( 'flow_id is required', $result->get_error_message() );
 	}
 
 	public function test_cleanup_flow_files_with_invalid_flow_id(): void {
@@ -182,9 +176,9 @@ class FileAbilitiesTest extends WP_UnitTestCase {
 			)
 		);
 
-		$this->assertFalse( $result['success'] );
-		$this->assertArrayHasKey( 'error', $result );
-		$this->assertStringContainsString( 'not found', $result['error'] );
+		$this->assertWPError( $result );
+		$this->assertSame( 'flow_not_found', $result->get_error_code() );
+		$this->assertStringContainsString( 'not found', $result->get_error_message() );
 	}
 
 	public function test_cleanup_flow_files_with_valid_flow(): void {

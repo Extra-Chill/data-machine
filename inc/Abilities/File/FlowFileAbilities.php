@@ -257,19 +257,16 @@ class FlowFileAbilities {
 	 * @param array $input Input parameters.
 	 * @return array Result with files list.
 	 */
-	public function executeListFlowFiles( array $input ): array {
+	public function executeListFlowFiles( array $input ): array|\WP_Error {
 		$flow_step_id = $input['flow_step_id'] ?? null;
 
 		if ( ! $flow_step_id ) {
-			return array(
-				'success' => false,
-				'error'   => 'flow_step_id is required',
-			);
+			return new \WP_Error( 'flow_file_step_required', 'flow_step_id is required', array( 'status' => 400 ) );
 		}
 
 		$context = $this->resolveFlowContext( $flow_step_id );
 		if ( isset( $context['error'] ) ) {
-			return $context;
+			return new \WP_Error( $context['error_code'] ?? 'flow_file_context_failed', $context['error'], array( 'status' => 404 ) );
 		}
 
 		$files = $this->file_storage->get_all_files( $context );
@@ -284,20 +281,17 @@ class FlowFileAbilities {
 	 * @param array $input Input parameters.
 	 * @return array Result with file metadata.
 	 */
-	public function executeGetFlowFile( array $input ): array {
+	public function executeGetFlowFile( array $input ): array|\WP_Error {
 		$filename     = sanitize_file_name( $input['filename'] ?? '' );
 		$flow_step_id = $input['flow_step_id'] ?? null;
 
 		if ( ! $flow_step_id ) {
-			return array(
-				'success' => false,
-				'error'   => 'flow_step_id is required',
-			);
+			return new \WP_Error( 'flow_file_step_required', 'flow_step_id is required', array( 'status' => 400 ) );
 		}
 
 		$context = $this->resolveFlowContext( $flow_step_id );
 		if ( isset( $context['error'] ) ) {
-			return $context;
+			return new \WP_Error( $context['error_code'] ?? 'flow_file_context_failed', $context['error'], array( 'status' => 404 ) );
 		}
 
 		$files = $this->file_storage->get_all_files( $context );
@@ -311,9 +305,13 @@ class FlowFileAbilities {
 			}
 		}
 
-		return array(
-			'success' => false,
-			'error'   => sprintf( 'File %s not found in flow step %s', $filename, $flow_step_id ),
+		return new \WP_Error(
+			'flow_file_not_found',
+			sprintf( 'File %s not found in flow step %s', $filename, $flow_step_id ),
+			array(
+				'status'   => 404,
+				'filename' => $filename,
+			)
 		);
 	}
 
@@ -321,28 +319,29 @@ class FlowFileAbilities {
 	 * @param array $input Input parameters.
 	 * @return array Result with deletion status.
 	 */
-	public function executeDeleteFlowFile( array $input ): array {
+	public function executeDeleteFlowFile( array $input ): array|\WP_Error {
 		$filename     = sanitize_file_name( $input['filename'] ?? '' );
 		$flow_step_id = $input['flow_step_id'] ?? null;
 
 		if ( ! $flow_step_id ) {
-			return array(
-				'success' => false,
-				'error'   => 'flow_step_id is required',
-			);
+			return new \WP_Error( 'flow_file_step_required', 'flow_step_id is required', array( 'status' => 400 ) );
 		}
 
 		$context = $this->resolveFlowContext( $flow_step_id );
 		if ( isset( $context['error'] ) ) {
-			return $context;
+			return new \WP_Error( $context['error_code'] ?? 'flow_file_context_failed', $context['error'], array( 'status' => 404 ) );
 		}
 
 		$deleted = $this->file_storage->delete_file( $filename, $context );
 
 		if ( ! $deleted ) {
-			return array(
-				'success' => false,
-				'error'   => sprintf( 'File %s not found or could not be deleted', $filename ),
+			return new \WP_Error(
+				'flow_file_delete_failed',
+				sprintf( 'File %s not found or could not be deleted', $filename ),
+				array(
+					'status'   => 404,
+					'filename' => $filename,
+				)
 			);
 		}
 
@@ -366,58 +365,40 @@ class FlowFileAbilities {
 	 * @param array $input Input parameters.
 	 * @return array Result with files list.
 	 */
-	public function executeUploadFlowFile( array $input ): array {
+	public function executeUploadFlowFile( array $input ): array|\WP_Error {
 		$file         = $input['file_data'] ?? null;
 		$flow_step_id = $input['flow_step_id'] ?? null;
 
 		if ( ! $file || empty( $file['tmp_name'] ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'No file data provided',
-			);
+			return new \WP_Error( 'flow_file_upload_missing', 'No file data provided', array( 'status' => 400 ) );
 		}
 
 		if ( ! $flow_step_id ) {
-			return array(
-				'success' => false,
-				'error'   => 'flow_step_id is required',
-			);
+			return new \WP_Error( 'flow_file_step_required', 'flow_step_id is required', array( 'status' => 400 ) );
 		}
 
 		// Validate uploaded file.
 		$validation_error = $this->validateFileWithWordPress( $file );
 		if ( $validation_error ) {
-			return array(
-				'success' => false,
-				'error'   => $validation_error,
-			);
+			return new \WP_Error( 'flow_file_upload_invalid', $validation_error, array( 'status' => 400 ) );
 		}
 
 		$parts = apply_filters( 'datamachine_split_flow_step_id', null, $flow_step_id );
 
 		if ( ! $parts || empty( $parts['flow_id'] ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'Invalid flow step ID format',
-			);
+			return new \WP_Error( 'flow_file_step_invalid', 'Invalid flow step ID format', array( 'status' => 400 ) );
 		}
 
 		$flow_id = (int) $parts['flow_id'];
 		$flow    = $this->db_flows->get_flow( $flow_id );
 
 		if ( ! $flow ) {
-			return array(
-				'success' => false,
-				'error'   => sprintf( 'Flow %d not found', $flow_id ),
-			);
+			return new \WP_Error( 'flow_not_found', sprintf( 'Flow %d not found', $flow_id ), array( 'status' => 404 ) );
 		}
 
 		$pipeline_id = $flow['pipeline_id'] ?? null;
 		if ( ! $pipeline_id ) {
-			return array(
-				'success' => false,
-				'error'   => 'Flow does not have a valid pipeline_id',
-			);
+			return new \WP_Error( 'flow_pipeline_missing', 'Flow does not have a valid pipeline_id', array( 'status' => 500 ) );
 		}
 
 		$context = array(
@@ -428,10 +409,7 @@ class FlowFileAbilities {
 		$stored = $this->file_storage->store_file( $file['tmp_name'], $file['name'], $context );
 
 		if ( ! $stored ) {
-			return array(
-				'success' => false,
-				'error'   => 'Failed to store file',
-			);
+			return new \WP_Error( 'flow_file_store_failed', 'Failed to store file', array( 'status' => 500 ) );
 		}
 
 		$files = $this->file_storage->get_all_files( $context );
@@ -446,39 +424,27 @@ class FlowFileAbilities {
 	 * @param array $input Input parameters.
 	 * @return array Result with cleanup status.
 	 */
-	public function executeCleanupFlowFiles( array $input ): array {
+	public function executeCleanupFlowFiles( array $input ): array|\WP_Error {
 		$job_id  = isset( $input['job_id'] ) ? (int) $input['job_id'] : null;
 		$flow_id = isset( $input['flow_id'] ) ? (int) $input['flow_id'] : null;
 
 		if ( ! $job_id && ! $flow_id ) {
-			return array(
-				'success' => false,
-				'error'   => 'Must provide either job_id or flow_id for cleanup',
-			);
+			return new \WP_Error( 'flow_cleanup_target_required', 'Must provide either job_id or flow_id for cleanup', array( 'status' => 400 ) );
 		}
 
 		if ( $job_id && ! $flow_id ) {
-			return array(
-				'success' => false,
-				'error'   => 'flow_id is required when cleaning up by job_id',
-			);
+			return new \WP_Error( 'flow_cleanup_flow_required', 'flow_id is required when cleaning up by job_id', array( 'status' => 400 ) );
 		}
 
 		// At this point $flow_id is always set (guards above handle the null cases).
 		$flow = $this->db_flows->get_flow( $flow_id );
 		if ( ! $flow ) {
-			return array(
-				'success' => false,
-				'error'   => sprintf( 'Flow %d not found', $flow_id ),
-			);
+			return new \WP_Error( 'flow_not_found', sprintf( 'Flow %d not found', $flow_id ), array( 'status' => 404 ) );
 		}
 
 		$pipeline_id = $flow['pipeline_id'] ?? null;
 		if ( ! $pipeline_id ) {
-			return array(
-				'success' => false,
-				'error'   => 'Flow does not have a valid pipeline_id',
-			);
+			return new \WP_Error( 'flow_pipeline_missing', 'Flow does not have a valid pipeline_id', array( 'status' => 500 ) );
 		}
 
 		$deleted_count = 0;

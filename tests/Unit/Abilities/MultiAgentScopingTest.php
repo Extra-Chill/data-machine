@@ -316,7 +316,8 @@ class MultiAgentScopingTest extends WP_UnitTestCase {
 				'user_id'  => $this->agent_b_id,
 			)
 		);
-		$this->assertFalse( $result_b['success'] );
+		$this->assertWPError( $result_b );
+		$this->assertSame( 'agent_file_not_found', $result_b->get_error_code() );
 
 		// Delete from agent A — should succeed.
 		$result_a = $fa->executeDeleteAgentFile(
