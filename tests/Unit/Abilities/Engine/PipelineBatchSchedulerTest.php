@@ -655,6 +655,8 @@ class PipelineBatchSchedulerTest extends WP_UnitTestCase {
 			$this->assertSame( $claim['disposition_id'], $output[0]['metadata']['disposition_id'] );
 			$reconciled = StepLifecycleHandler::reconcileStepOutput( $child_id, array( 'step_type' => 'ai' ), $output, true );
 			$this->assertTrue( $reconciled['success'] );
+			$this->assertSame( 1, $reconciled['retained'] );
+			$this->assertTrue( StepLifecycleHandler::handleCompleted( $child_id ) );
 			$this->assertFalse( ( new ProcessedItems() )->has_active_claim( $claim['identity_scope'], $claim['source_type'], $claim['item_identifier'] ) );
 		}
 	}
