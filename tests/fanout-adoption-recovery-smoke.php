@@ -60,7 +60,13 @@ namespace DataMachine\Core\Database\BatchItems {
 }
 
 namespace DataMachine\Core\Database\Jobs {
-	class Jobs {}
+	class Jobs {
+		public static array $engines = array();
+		public function get_job( int $job_id ): ?array {
+			$engine = self::$engines[ $job_id ] ?? \DataMachine\Core\EngineData::$engines[ $job_id ] ?? array();
+			return array( 'engine_data' => $engine );
+		}
+	}
 }
 
 namespace DataMachine\Core {
@@ -91,6 +97,7 @@ namespace DataMachine\Core {
 namespace {
 	use DataMachine\Core\ActionScheduler\BatchScheduler;
 	use DataMachine\Core\Database\BatchItems\BatchItems;
+	use DataMachine\Core\Database\Jobs\Jobs;
 	use DataMachine\Core\Database\ProcessedItems\ProcessedItems;
 	use DataMachine\Core\EngineData;
 
@@ -175,6 +182,14 @@ namespace {
 	BatchScheduler::processChunk( 20, $create_child, 0 );
 	BatchScheduler::processChunk( 20, $create_child, 0 );
 	$assert( 1 === $children, 'duplicate recovered chunk delivery creates exactly one child' );
+
+	EngineData::$engines[30] = array();
+	BatchScheduler::start( 30, 'fanout_hook', array( $item ), array(), 'pipeline', BatchScheduler::COMPLETION_STRATEGY_CHILDREN_COMPLETE );
+	Jobs::$engines[30]       = EngineData::$engines[30];
+	EngineData::$engines[30] = array();
+	$scheduled_children      = 0;
+	BatchScheduler::processChunk( 30, static function () use ( &$scheduled_children ): int { return ++$scheduled_children; }, 0 );
+	$assert( 1 === $scheduled_children, 'scheduled chunk reads durable batch state when the persistent cache is stale' );
 
 	echo "fanout-adoption-recovery-smoke: {$passes} passed, {$failures} failed\n";
 	exit( $failures > 0 ? 1 : 0 );

@@ -400,6 +400,26 @@ class PipelineBatchSchedulerTest extends WP_UnitTestCase {
 		$this->assertEquals( 2, $parent_engine['batch_scheduled'] );
 	}
 
+	public function test_scheduled_chunk_reads_persisted_batch_state_when_cache_is_stale(): void {
+		$parent_id = $this->create_parent_job();
+		$engine    = $this->make_engine_snapshot( $parent_id );
+		$stale     = datamachine_get_engine_data( $parent_id );
+		$packets   = array(
+			$this->make_data_packet( 'Event A' ),
+			$this->make_data_packet( 'Event B' ),
+		);
+
+		$scheduler = new PipelineBatchScheduler();
+		$scheduler->fanOut( $parent_id, 'step_abc_123', $packets, $engine );
+
+		wp_cache_set( $parent_id, $stale, 'datamachine_engine_data' );
+		$scheduler->processChunk( $parent_id, 0 );
+
+		$parent_job = $this->jobs_db->get_job( $parent_id );
+		$this->assertStringNotContainsString( 'batch_state_missing', (string) $parent_job['status'] );
+		$this->assertCount( 2, $this->jobs_db->get_children( $parent_id ) );
+	}
+
 	public function test_process_chunk_propagates_claim_ownership_to_children(): void {
 		$parent_id = $this->create_parent_job();
 		$engine    = $this->make_engine_snapshot( $parent_id );
@@ -541,8 +561,11 @@ class PipelineBatchSchedulerTest extends WP_UnitTestCase {
 			$this->assertTrue( ( new ProcessedItems() )->owns_active_claim( $claims[ $item_identifier ], $parent_id ), 'Worklist adoption must precede child ownership transfer at index ' . $index );
 		}
 
+		wp_cache_delete( $parent_id, 'datamachine_engine_data' );
+		$this->assertArrayHasKey( 'batch_state', datamachine_get_engine_data( $parent_id ) );
+
 		$scheduler = new PipelineBatchScheduler();
-		$scheduler->processChunk( $parent_id );
+		$scheduler->processChunk( $parent_id, 0 );
 
 		$children = $wpdb->get_results(
 			$wpdb->prepare( 'SELECT job_id, label FROM %i WHERE parent_job_id = %d', $wpdb->prefix . 'datamachine_jobs', $parent_id ),
