@@ -1020,8 +1020,8 @@ class PendingActionStore {
 			return $valid;
 		}
 
-		$nonce     = (string) $claims['nonce'];
-		$fence_key = self::transient_fence_key( self::CONSUME_FENCE_PREFIX, $action_id );
+		$nonce            = (string) $claims['nonce'];
+		$fence_key        = self::transient_fence_key( self::CONSUME_FENCE_PREFIX, $action_id );
 		$fence_expires_at = min( (int) $payload['expires_at'], (int) $claims['expires_at'] );
 		if ( ! self::acquire_transient_fence( $fence_key, $nonce, $fence_expires_at ) ) {
 			return new \WP_Error( 'authorization_receipt_consumed', 'Authorization receipt is already being consumed or has been consumed.' );
