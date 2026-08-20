@@ -40,30 +40,102 @@ function datamachine_get_queue_tuning_defaults(): array {
  */
 add_action(
 	'action_scheduler_init',
-	function () {
-		$defaults = datamachine_get_queue_tuning_defaults();
-		$tuning   = \DataMachine\Core\PluginSettings::get( 'queue_tuning', array() );
-
-		$concurrent = isset( $tuning['concurrent_batches'] ) ? absint( $tuning['concurrent_batches'] ) : $defaults['concurrent_batches'];
-		$batch_size = isset( $tuning['batch_size'] ) ? absint( $tuning['batch_size'] ) : $defaults['batch_size'];
-		$time_limit = isset( $tuning['time_limit'] ) ? absint( $tuning['time_limit'] ) : $defaults['time_limit'];
-
-		add_filter( 'action_scheduler_queue_runner_concurrent_batches', function () use ( $concurrent ) {
-			return $concurrent;
-		} );
-
-		add_filter( 'action_scheduler_queue_runner_batch_size', function () use ( $batch_size ) {
-			return $batch_size;
-		} );
-
-		add_filter( 'action_scheduler_queue_runner_time_limit', function () use ( $time_limit ) {
-			return $time_limit;
-		} );
-
-		datamachine_enable_cron_async_dispatch();
-		datamachine_install_deadlock_resilient_runner();
-	}
+	__NAMESPACE__ . '\\datamachine_initialize_queue_tuning'
 );
+
+/**
+ * Reconcile queue tuning and dispatch callbacks for the current blog.
+ */
+function datamachine_initialize_queue_tuning(): void {
+	datamachine_remove_queue_tuning_filters();
+	datamachine_disable_async_dispatch();
+	datamachine_disable_queue_runner();
+
+	if ( ! GroupRegistrar::tablesExist() ) {
+		return;
+	}
+
+	$defaults = datamachine_get_queue_tuning_defaults();
+	$tuning   = PluginSettings::get( 'queue_tuning', array() );
+
+	datamachine_queue_tuning_for_blog(
+		array(
+			'concurrent_batches' => isset( $tuning['concurrent_batches'] ) ? absint( $tuning['concurrent_batches'] ) : $defaults['concurrent_batches'],
+			'batch_size'         => isset( $tuning['batch_size'] ) ? absint( $tuning['batch_size'] ) : $defaults['batch_size'],
+			'time_limit'         => isset( $tuning['time_limit'] ) ? absint( $tuning['time_limit'] ) : $defaults['time_limit'],
+		)
+	);
+
+	add_filter( 'action_scheduler_queue_runner_concurrent_batches', __NAMESPACE__ . '\\datamachine_filter_concurrent_batches' );
+	add_filter( 'action_scheduler_queue_runner_batch_size', __NAMESPACE__ . '\\datamachine_filter_batch_size' );
+	add_filter( 'action_scheduler_queue_runner_time_limit', __NAMESPACE__ . '\\datamachine_filter_time_limit' );
+
+	datamachine_enable_cron_async_dispatch();
+	datamachine_install_deadlock_resilient_runner();
+}
+
+/**
+ * Store or retrieve queue tuning for the current blog.
+ *
+ * @param array|null $tuning Tuning values to store, or null to retrieve them.
+ * @return array Current blog's tuning values.
+ */
+function datamachine_queue_tuning_for_blog( ?array $tuning = null ): array {
+	static $tuning_by_blog = array();
+
+	$blog_id = function_exists( 'get_current_blog_id' ) ? get_current_blog_id() : 0;
+
+	if ( null !== $tuning ) {
+		$tuning_by_blog[ $blog_id ] = $tuning;
+	}
+
+	return $tuning_by_blog[ $blog_id ] ?? datamachine_get_queue_tuning_defaults();
+}
+
+/**
+ * Remove Data Machine's queue tuning filters.
+ */
+function datamachine_remove_queue_tuning_filters(): void {
+	remove_filter( 'action_scheduler_queue_runner_concurrent_batches', __NAMESPACE__ . '\\datamachine_filter_concurrent_batches' );
+	remove_filter( 'action_scheduler_queue_runner_batch_size', __NAMESPACE__ . '\\datamachine_filter_batch_size' );
+	remove_filter( 'action_scheduler_queue_runner_time_limit', __NAMESPACE__ . '\\datamachine_filter_time_limit' );
+}
+
+function datamachine_filter_concurrent_batches(): int {
+	return datamachine_queue_tuning_for_blog()['concurrent_batches'];
+}
+
+function datamachine_filter_batch_size(): int {
+	return datamachine_queue_tuning_for_blog()['batch_size'];
+}
+
+function datamachine_filter_time_limit(): int {
+	return datamachine_queue_tuning_for_blog()['time_limit'];
+}
+
+/**
+ * Prevent Action Scheduler from querying an incomplete custom-table schema on shutdown.
+ */
+function datamachine_disable_async_dispatch(): void {
+	$runner = \ActionScheduler::runner();
+	remove_action( 'shutdown', __NAMESPACE__ . '\\datamachine_dispatch_async_request' );
+
+	if ( method_exists( $runner, 'unhook_dispatch_async_request' ) ) {
+		$runner->unhook_dispatch_async_request();
+	}
+
+	remove_action( 'shutdown', array( $runner, 'maybe_dispatch_async_request' ) );
+}
+
+/**
+ * Prevent Action Scheduler from running against an incomplete custom-table schema.
+ */
+function datamachine_disable_queue_runner(): void {
+	$runner = \ActionScheduler::runner();
+
+	remove_action( 'action_scheduler_run_queue', array( $runner, 'run' ) );
+	remove_action( 'action_scheduler_run_queue', __NAMESPACE__ . '\\datamachine_run_queue_with_deadlock_retries' );
+}
 
 /**
  * Make the Action Scheduler queue runner resilient to transient claim deadlocks.
@@ -92,11 +164,8 @@ add_action(
  *
  *  1. Idempotency. `action_scheduler_init` can fire more than once in a request
  *     (notably on multisite, where AS may initialize across switch_to_blog()
- *     contexts). Without a guard, each fire would stack another wrapper closure on
- *     `action_scheduler_run_queue` — the queue would then run two-plus times per
- *     dispatch, multiplying the concurrent claim_actions() pressure that causes the
- *     deadlock in the first place. A static guard makes the swap happen once per
- *     request.
+ *     contexts). A named callback makes each registration replace the same hook
+ *     entry instead of stacking wrapper closures that run the queue multiple times.
  *
  *  2. Sufficient retry budget. Under concurrent batches (default 3) the same hot
  *     rows can deadlock several times in quick succession, so a 3-attempt /
@@ -108,49 +177,36 @@ add_action(
  * @since 0.153.6
  */
 function datamachine_install_deadlock_resilient_runner(): void {
-	static $installed = false;
-
-	// `action_scheduler_init` can fire multiple times per request; only swap once.
-	if ( $installed ) {
-		return;
-	}
-	$installed = true;
-
-	$runner = \ActionScheduler::runner();
-
 	// Swap AS's default `run` callback for a deadlock-resilient wrapper.
-	remove_action( 'action_scheduler_run_queue', array( $runner, 'run' ) );
+	datamachine_disable_queue_runner();
+	add_action( 'action_scheduler_run_queue', __NAMESPACE__ . '\\datamachine_run_queue_with_deadlock_retries', 10, 1 );
+}
 
-	add_action(
-		'action_scheduler_run_queue',
-		function ( $context = '' ) use ( $runner ) {
-			$max_attempts = 5;
-			$attempt      = 0;
+/**
+ * Run the current blog's queue with retries for transient database deadlocks.
+ *
+ * @param string $context Queue runner context.
+ * @return mixed Queue runner result.
+ */
+function datamachine_run_queue_with_deadlock_retries( $context = '' ) {
+	$runner       = \ActionScheduler::runner();
+	$max_attempts = 5;
+	$attempt      = 0;
 
-			while ( true ) {
-				$attempt++;
+	while ( true ) {
+		++$attempt;
 
-				try {
-					return $runner->run( $context );
-				} catch ( \RuntimeException $e ) {
-					if ( ! datamachine_is_transient_deadlock( $e ) || $attempt >= $max_attempts ) {
-						// Not retryable, or we're out of attempts — let it surface.
-						throw $e;
-					}
-
-					// Transient deadlock: back off with exponential, jittered delay,
-					// then retry. 50/100/200/400ms (+ up to 50ms jitter) caps total
-					// backoff under ~1s — comfortably inside the batch time limit —
-					// while giving the competing transaction time to commit and
-					// release its locks.
-					$backoff_us = ( 50000 * ( 2 ** ( $attempt - 1 ) ) ) + random_int( 0, 50000 );
-					usleep( $backoff_us );
-				}
+		try {
+			return $runner->run( $context );
+		} catch ( \RuntimeException $e ) {
+			if ( ! datamachine_is_transient_deadlock( $e ) || $attempt >= $max_attempts ) {
+				throw $e;
 			}
-		},
-		10,
-		1
-	);
+
+			$backoff_us = ( 50000 * ( 2 ** ( $attempt - 1 ) ) ) + random_int( 0, 50000 );
+			usleep( $backoff_us );
+		}
+	}
 }
 
 /**
@@ -186,25 +242,21 @@ function datamachine_is_transient_deadlock( \Throwable $e ): bool {
  * @since 0.41.0
  */
 function datamachine_enable_cron_async_dispatch(): void {
-	$runner = \ActionScheduler::runner();
+	datamachine_disable_async_dispatch();
+	add_action( 'shutdown', __NAMESPACE__ . '\\datamachine_dispatch_async_request' );
+}
 
-	// Remove the original gated shutdown callback.
-	remove_action( 'shutdown', array( $runner, 'maybe_dispatch_async_request' ) );
-
-	// Add our own that skips the is_admin() check.
-	add_action(
-		'shutdown',
-		function () use ( $runner ) {
-			// The OptionLock already throttles to once per 60 seconds — this is the
-			// same guard AS uses, minus the is_admin() gate that blocks cron contexts.
-			if (
-				! \ActionScheduler::lock()->is_locked( 'async-request-runner' )
-				&& \ActionScheduler::lock()->set( 'async-request-runner' )
-			) {
-				$ref           = new \ReflectionProperty( get_class( $runner ), 'async_request' );
-				$async_request = $ref->getValue( $runner );
-				$async_request->maybe_dispatch();
-			}
-		}
-	);
+/**
+ * Dispatch an async queue request without Action Scheduler's admin-only gate.
+ */
+function datamachine_dispatch_async_request(): void {
+	if (
+		! \ActionScheduler::lock()->is_locked( 'async-request-runner' )
+		&& \ActionScheduler::lock()->set( 'async-request-runner' )
+	) {
+		$runner        = \ActionScheduler::runner();
+		$ref           = new \ReflectionProperty( get_class( $runner ), 'async_request' );
+		$async_request = $ref->getValue( $runner );
+		$async_request->maybe_dispatch();
+	}
 }
