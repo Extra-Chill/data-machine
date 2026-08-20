@@ -470,15 +470,19 @@ class ScaffoldAbilities {
 			return false;
 		}
 
-		$fs->put_contents( $filepath, $content . "\n", FS_CHMOD_FILE );
-		FilesystemHelper::make_group_writable( $filepath );
-
 		// Protect directory from listing.
 		$index_path = trailingslashit( $directory ) . 'index.php';
 		if ( ! file_exists( $index_path ) ) {
-			$fs->put_contents( $index_path, "<?php\n// Silence is golden.\n", FS_CHMOD_FILE );
+			if ( ! $fs->put_contents( $index_path, "<?php\n// Silence is golden.\n", FS_CHMOD_FILE ) ) {
+				return false;
+			}
 			FilesystemHelper::make_group_writable( $index_path );
 		}
+
+		if ( ! $fs->put_contents( $filepath, $content . "\n", FS_CHMOD_FILE ) ) {
+			return false;
+		}
+		FilesystemHelper::make_group_writable( $filepath );
 
 		// Log only meaningful context keys.
 		$log_context = array_filter(
