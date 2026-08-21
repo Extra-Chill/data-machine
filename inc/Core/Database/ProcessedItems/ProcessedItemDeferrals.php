@@ -200,14 +200,13 @@ trait ProcessedItemDeferrals {
 		}
 
 		if ( ! self::validate_deferral_index( $table_name ) ) {
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared -- Schema inspection.
-			$index = $wpdb->get_row( $wpdb->prepare( 'SHOW INDEX FROM %i WHERE Key_name = %s', $table_name, 'status_deferred_at' ) );
-			if ( $index ) {
-				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange,WordPress.DB.PreparedSQL.NotPrepared -- Malformed same-name index must be replaced.
-				$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i DROP INDEX `status_deferred_at`', $table_name ) );
-			}
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange,WordPress.DB.PreparedSQL.NotPrepared -- Required operational index.
-			$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i ADD KEY `status_deferred_at` (status, deferred_at)', $table_name ) );
+			$operation = empty( self::deferral_index_metadata( $table_name ) )
+				? 'ADD KEY `status_deferred_at` (`status`, `deferred_at`)'
+				: 'DROP INDEX `status_deferred_at`, ADD KEY `status_deferred_at` (`status`, `deferred_at`)';
+			// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Operation is selected from the two fixed definitions above.
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange,WordPress.DB.PreparedSQL.NotPrepared -- Required operational index repair.
+			$wpdb->query( $wpdb->prepare( "ALTER TABLE %i {$operation}", $table_name ) );
+			// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 		}
 	}
 
@@ -262,9 +261,7 @@ trait ProcessedItemDeferrals {
 
 	/** Verify the exact non-unique, unprefixed BTREE operational index. */
 	private static function validate_deferral_index( string $table_name ): bool {
-		global $wpdb;
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared -- Schema validation.
-		$rows = $wpdb->get_results( $wpdb->prepare( 'SHOW INDEX FROM %i WHERE Key_name = %s ORDER BY Seq_in_index ASC', $table_name, 'status_deferred_at' ), ARRAY_A );
+		$rows = self::deferral_index_metadata( $table_name );
 		if ( 2 !== count( (array) $rows ) || array( 'status', 'deferred_at' ) !== array_column( $rows, 'Column_name' ) ) {
 			return false;
 		}
@@ -277,5 +274,15 @@ trait ProcessedItemDeferrals {
 			}
 		}
 		return true;
+	}
+
+	/** Read operational index metadata in sequence order. */
+	private static function deferral_index_metadata( string $table_name ): array {
+		global $wpdb;
+		// SHOW INDEX has no ORDER BY clause; normalize its rows after retrieval.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared -- Schema validation.
+		$rows = (array) $wpdb->get_results( $wpdb->prepare( 'SHOW INDEX FROM %i WHERE Key_name = %s', $table_name, 'status_deferred_at' ), ARRAY_A );
+		usort( $rows, static fn( array $left, array $right ): int => (int) $left['Seq_in_index'] <=> (int) $right['Seq_in_index'] );
+		return $rows;
 	}
 }

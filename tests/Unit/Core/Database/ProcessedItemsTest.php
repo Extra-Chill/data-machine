@@ -422,14 +422,17 @@ class ProcessedItemsTest extends WP_UnitTestCase {
 		global $wpdb;
 		$table = $this->db->get_table_name();
 		try {
+			$this->db->add_processed_item( $this->flow_step_id, $this->source_type, 'schema-repair-row', 901 );
+			$rows_before = $this->schema_repair_rows();
 			$wpdb->query( "ALTER TABLE {$table} MODIFY COLUMN `last_seen_at` VARCHAR(30) NOT NULL DEFAULT 'bad'" );
 			$wpdb->query( "ALTER TABLE {$table} DROP INDEX `status_deferred_at`, ADD KEY `status_deferred_at` (`deferred_at`, `status`)" );
 			$this->assertFalse( ProcessedItems::validate_deferral_schema( $table ) );
 
 			ProcessedItems::ensure_deferral_schema( $table );
 			$this->assertTrue( ProcessedItems::validate_deferral_schema( $table ) );
-			$index = $wpdb->get_results( "SHOW INDEX FROM {$table} WHERE Key_name = 'status_deferred_at' ORDER BY Seq_in_index ASC", ARRAY_A );
-			$this->assertSame( array( 'status', 'deferred_at' ), array_column( $index, 'Column_name' ) );
+			$this->assert_deferral_column_metadata();
+			$this->assert_deferral_index_metadata();
+			$this->assertSame( $rows_before, $this->schema_repair_rows() );
 		} finally {
 			ProcessedItems::ensure_deferral_schema( $table );
 		}
@@ -439,15 +442,16 @@ class ProcessedItemsTest extends WP_UnitTestCase {
 		global $wpdb;
 		$table = $this->db->get_table_name();
 		try {
-			$wpdb->query( "ALTER TABLE {$table} DROP INDEX `status_deferred_at`, ADD UNIQUE KEY `status_deferred_at` (`status`, `deferred_at`)" );
-			$this->assertFalse( ProcessedItems::validate_deferral_schema( $table ) );
-			ProcessedItems::ensure_deferral_schema( $table );
-			$this->assertTrue( ProcessedItems::validate_deferral_schema( $table ) );
-
-			$wpdb->query( "ALTER TABLE {$table} DROP INDEX `status_deferred_at`, ADD KEY `status_deferred_at` (`status`(8), `deferred_at`)" );
-			$this->assertFalse( ProcessedItems::validate_deferral_schema( $table ) );
-			ProcessedItems::ensure_deferral_schema( $table );
-			$this->assertTrue( ProcessedItems::validate_deferral_schema( $table ) );
+			$this->db->add_processed_item( $this->flow_step_id, $this->source_type, 'index-repair-row', 902 );
+			$rows_before = $this->schema_repair_rows();
+			$this->assert_index_repair(
+				"ALTER TABLE {$table} DROP INDEX `status_deferred_at`, ADD UNIQUE KEY `status_deferred_at` (`status`, `deferred_at`)",
+				$rows_before
+			);
+			$this->assert_index_repair(
+				"ALTER TABLE {$table} DROP INDEX `status_deferred_at`, ADD KEY `status_deferred_at` (`status`(8), `deferred_at`)",
+				$rows_before
+			);
 		} finally {
 			ProcessedItems::ensure_deferral_schema( $table );
 		}
@@ -509,5 +513,59 @@ class ProcessedItemsTest extends WP_UnitTestCase {
 			),
 			ARRAY_A
 		) ?: null;
+	}
+
+	/** Assert canonical durable-deferral column definitions. */
+	private function assert_deferral_column_metadata(): void {
+		global $wpdb;
+		$expected = array(
+			'deferral_count'       => array( '/^int(?:\(\d+\))? unsigned$/', 'NO', '0' ),
+			'last_deferral_job_id' => array( '/^bigint(?:\(\d+\))? unsigned$/', 'YES', null ),
+			'deferred_at'          => array( '/^datetime$/', 'YES', null ),
+			'last_seen_at'         => array( '/^datetime$/', 'YES', null ),
+		);
+		foreach ( $expected as $column => [ $type, $nullable, $default ] ) {
+			$actual = $wpdb->get_row( $wpdb->prepare( 'SHOW FULL COLUMNS FROM %i LIKE %s', $this->db->get_table_name(), $column ), ARRAY_A );
+			$this->assertIsArray( $actual );
+			$this->assertMatchesRegularExpression( $type, strtolower( $actual['Type'] ) );
+			$this->assertSame( $nullable, $actual['Null'] );
+			$this->assertSame( $default, $actual['Default'] );
+		}
+	}
+
+	/** Assert exact operational index shape and attributes. */
+	private function assert_deferral_index_metadata(): void {
+		global $wpdb;
+		$rows = $wpdb->get_results( $wpdb->prepare( 'SHOW INDEX FROM %i WHERE Key_name = %s', $this->db->get_table_name(), 'status_deferred_at' ), ARRAY_A );
+		usort( $rows, static fn( array $left, array $right ): int => (int) $left['Seq_in_index'] <=> (int) $right['Seq_in_index'] );
+		$this->assertSame( array( 'status', 'deferred_at' ), array_column( $rows, 'Column_name' ) );
+		$this->assertSame( array( 1, 2 ), array_map( 'intval', array_column( $rows, 'Seq_in_index' ) ) );
+		$this->assertSame( array( 1, 1 ), array_map( 'intval', array_column( $rows, 'Non_unique' ) ) );
+		$this->assertSame( array( null, null ), array_column( $rows, 'Sub_part' ) );
+		$this->assertSame( array( 'BTREE', 'BTREE' ), array_map( 'strtoupper', array_column( $rows, 'Index_type' ) ) );
+	}
+
+	/** Malform, repair, and verify one operational index shape. */
+	private function assert_index_repair( string $alter_query, array $rows_before ): void {
+		global $wpdb;
+		$wpdb->query( $alter_query );
+		$table = $this->db->get_table_name();
+		$this->assertFalse( ProcessedItems::validate_deferral_schema( $table ) );
+		ProcessedItems::ensure_deferral_schema( $table );
+		$this->assertTrue( ProcessedItems::validate_deferral_schema( $table ) );
+		$this->assert_deferral_index_metadata();
+		$this->assertSame( $rows_before, $this->schema_repair_rows() );
+	}
+
+	/** Snapshot row identity and lifecycle data unaffected by schema repair. */
+	private function schema_repair_rows(): array {
+		global $wpdb;
+		return $wpdb->get_results(
+			$wpdb->prepare(
+				'SELECT id, flow_step_id, source_type, item_identifier, job_id, status FROM %i ORDER BY id ASC',
+				$this->db->get_table_name()
+			),
+			ARRAY_A
+		);
 	}
 }
