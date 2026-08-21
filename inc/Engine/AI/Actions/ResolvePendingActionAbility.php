@@ -11,17 +11,20 @@
  * filter:
  *
  *   add_filter( 'datamachine_pending_action_handlers', function ( $handlers ) {
- *       $handlers['socials_publish_instagram'] = array(
- *           'apply'       => array( InstagramPublishAbility::class, 'execute_publish' ),
- *           'can_resolve' => array( __CLASS__, 'canResolveInstagram' ), // optional
+ *       $handlers['content_change'] = array(
+ *           'apply'       => function ( array $input, array $payload, array $receipt ) {
+ *               return ContentMutator::apply_pending_action( $input, $payload, $receipt );
+ *           },
+ *           'can_resolve' => array( __CLASS__, 'canResolveContentChange' ), // optional
  *       );
  *       return $handlers;
  *   } );
  *
  * Each handler entry:
  *
- *   - apply       (callable, required): invoked with the stored apply_input
- *                 array on 'accepted'. Return value is included in the
+ *   - apply       (callable, required): invoked with the stored apply_input,
+ *                 canonical payload, and required one-time receipt on
+ *                 'accepted'. Return value is included in the
  *                 response. Return a WP_Error or an array with `success=>false`
  *                 to surface failure.
  *   - can_resolve (callable, optional): invoked with ($payload, $decision, $user_id, $context)
@@ -258,7 +261,7 @@ class ResolvePendingActionAbility {
 			);
 		}
 
-		$origin_blog_id = self::originBlogIdFromInput( $input );
+		$origin_blog_id  = self::originBlogIdFromInput( $input );
 		$current_blog_id = function_exists( 'get_current_blog_id' ) ? (int) get_current_blog_id() : 0;
 		if ( empty( $input['_origin_routed'] ) && $origin_blog_id > 0 && $origin_blog_id !== $current_blog_id ) {
 			return self::resolveAtOrigin( $input, $origin_blog_id );
@@ -420,7 +423,13 @@ class ResolvePendingActionAbility {
 			return self::claimed_elsewhere_response( $action_id, $kind );
 		}
 		$receipt          = PendingActionAuthorizationReceipt::issue( $claimed, $resolver );
-		$resolver_context = array_merge( $resolver_context, array( 'authorization_receipt' => $receipt, 'pending_action' => $claimed ) );
+		$resolver_context = array_merge(
+			$resolver_context,
+			array(
+				'authorization_receipt' => $receipt,
+				'pending_action'        => $claimed,
+			)
+		);
 
 		// Accepted: invoke the apply handler with the stored input.
 		$result = self::applyHandler( $handler, $decision, $apply_input, $payload, $resolver_payload, $resolver_context, $pending_action, $receipt );
@@ -448,7 +457,15 @@ class ResolvePendingActionAbility {
 			);
 		}
 
-		PendingActionStore::complete_claim( $action_id, (string) $claimed['receipt_nonce'], WP_Agent_Pending_Action_Status::ACCEPTED, $result, null, $resolver );
+		if ( ! PendingActionStore::complete_claim( $action_id, (string) $claimed['receipt_nonce'], WP_Agent_Pending_Action_Status::ACCEPTED, $result, null, $resolver ) ) {
+			return array(
+				'success'   => false,
+				'decision'  => 'accepted',
+				'action_id' => $action_id,
+				'kind'      => $kind,
+				'error'     => 'The mutation may have completed, but its consumed authorization claim could not be finalized. Automatic replay is blocked.',
+			);
+		}
 
 		return array(
 			'success'   => true,
@@ -516,7 +533,7 @@ class ResolvePendingActionAbility {
 	private static function payloadMatchesOrigin( array $payload, int $origin_blog_id ): bool {
 		$context   = is_array( $payload['context'] ?? null ) ? $payload['context'] : array();
 		$wordpress = is_array( $context['wordpress'] ?? null ) ? $context['wordpress'] : array();
-		return $origin_blog_id === absint( $wordpress['blog_id'] ?? 0 );
+		return absint( $wordpress['blog_id'] ?? 0 ) === $origin_blog_id;
 	}
 
 	/**
@@ -531,7 +548,7 @@ class ResolvePendingActionAbility {
 		 * Handlers should return:
 		 *
 		 *   array(
-		 *       'apply'       => callable ( array $apply_input, array $payload ): mixed,
+		 *       'apply'       => callable ( array $apply_input, array $payload, array $receipt ): mixed,
 		 *       'can_resolve' => callable ( array $payload, string $decision, int $user_id, array $context ): bool|WP_Error,
 		 *   )
 		 *
@@ -546,20 +563,17 @@ class ResolvePendingActionAbility {
 	/**
 	 * Apply a pending-action handler.
 	 *
-	 * The Data Machine handler map remains the product extension surface today.
-	 * When Agents API PR #51's handler contract is installed, object handlers can
-	 * implement it and be placed under the same `apply` key without introducing a
-	 * parallel Data Machine primitive.
-	 *
 	 * @param array            $handler          Handler configuration.
-	 * @param WP_Agent_Approval_Decision $decision         Accepted/rejected decision.
+	 * @param WP_Agent_Approval_Decision $decision         Accepted decision.
 	 * @param array            $apply_input      Stored apply input.
 	 * @param array            $payload          Stored pending action payload.
-	 * @param array            $resolver_payload Fresh resolver payload.
-	 * @param array            $resolver_context Optional resolver context.
+	 * @param array            $resolver_payload Resolver-supplied payload.
+	 * @param array            $resolver_context Resolver context carrying the receipt.
+	 * @param WP_Agent_Pending_Action|null $pending_action Canonical action object.
+	 * @param array            $receipt          One-time authorization receipt.
 	 * @return mixed
 	 */
-	private static function applyHandler( array $handler, WP_Agent_Approval_Decision $decision, array $apply_input, array $payload, array $resolver_payload = array(), array $resolver_context = array(), ?WP_Agent_Pending_Action $pending_action = null, array $receipt = array() ) {
+	private static function applyHandler( array $handler, WP_Agent_Approval_Decision $decision, array $apply_input, array $payload, array $resolver_payload, array $resolver_context, ?WP_Agent_Pending_Action $pending_action, array $receipt ) {
 		$apply = $handler['apply'];
 		if ( $apply instanceof WP_Agent_Pending_Action_Handler ) {
 			if ( null === $pending_action ) {
@@ -569,12 +583,16 @@ class ResolvePendingActionAbility {
 			return $apply->handle_pending_action( $pending_action, $decision, $resolver_payload, $resolver_context );
 		}
 
-		// The third argument is additive: legacy two-argument handlers remain valid.
 		return call_user_func( $apply, $apply_input, $payload, $receipt );
 	}
 
 	private static function claimed_elsewhere_response( string $action_id, string $kind ): array {
-		return array( 'success' => false, 'error' => 'Pending action has already been claimed or resolved.', 'action_id' => $action_id, 'kind' => $kind );
+		return array(
+			'success'   => false,
+			'error'     => 'Pending action has already been claimed or resolved.',
+			'action_id' => $action_id,
+			'kind'      => $kind,
+		);
 	}
 
 	/**
@@ -584,15 +602,23 @@ class ResolvePendingActionAbility {
 	 * @return bool
 	 */
 	private static function isApplyHandler( $apply ): bool {
-		if ( is_callable( $apply ) ) {
+		if ( $apply instanceof WP_Agent_Pending_Action_Handler ) {
 			return true;
 		}
+		if ( ! is_callable( $apply ) ) {
+			return false;
+		}
 
-		return $apply instanceof WP_Agent_Pending_Action_Handler;
+		try {
+			$reflection = new \ReflectionFunction( \Closure::fromCallable( $apply ) );
+			return $reflection->isVariadic() || $reflection->getNumberOfParameters() >= 3;
+		} catch ( \ReflectionException $error ) {
+			return false;
+		}
 	}
 
 	/**
-	 * Run the Agents API handler-level permission contract when present.
+	 * Run the canonical Agents API handler permission contract when present.
 	 *
 	 * @return bool|\WP_Error|null Null means no contract handler was provided.
 	 */
@@ -601,7 +627,6 @@ class ResolvePendingActionAbility {
 		if ( ! $apply instanceof WP_Agent_Pending_Action_Handler ) {
 			return null;
 		}
-
 		if ( null === $pending_action ) {
 			return new \WP_Error( 'invalid_pending_action', 'Stored pending action could not be normalized.' );
 		}

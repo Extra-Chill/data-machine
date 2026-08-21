@@ -12,6 +12,12 @@ namespace {
 if ( ! defined( 'ABSPATH' ) ) {
 	define( 'ABSPATH', dirname( __DIR__ ) . '/' );
 }
+if ( ! defined( 'DATAMACHINE_PENDING_ACTION_TRANSIENT_FALLBACK' ) ) {
+	define( 'DATAMACHINE_PENDING_ACTION_TRANSIENT_FALLBACK', true );
+}
+
+$GLOBALS['__pa_rebase_options'] = array();
+$GLOBALS['__pa_rebase_transients'] = array();
 
 require_once __DIR__ . '/agents-api-smoke-helpers.php';
 require_once dirname( __DIR__ ) . '/vendor/autoload.php';
@@ -41,6 +47,51 @@ if ( ! function_exists( 'is_wp_error' ) ) {
 		return $value instanceof WP_Error;
 	}
 }
+if ( ! function_exists( 'get_current_user_id' ) ) {
+	function get_current_user_id(): int {
+		return 0;
+	}
+}
+if ( ! function_exists( 'get_option' ) ) {
+	function get_option( $key, $default = false ) {
+		return $GLOBALS['__pa_rebase_options'][ $key ] ?? $default;
+	}
+}
+if ( ! function_exists( 'update_option' ) ) {
+	function update_option( $key, $value, $autoload = null ): bool {
+		unset( $autoload );
+		$GLOBALS['__pa_rebase_options'][ $key ] = $value;
+		return true;
+	}
+}
+if ( ! function_exists( 'add_option' ) ) {
+	function add_option( $key, $value = '', $deprecated = '', $autoload = 'yes' ): bool {
+		unset( $deprecated, $autoload );
+		if ( array_key_exists( $key, $GLOBALS['__pa_rebase_options'] ) ) {
+			return false;
+		}
+		$GLOBALS['__pa_rebase_options'][ $key ] = $value;
+		return true;
+	}
+}
+if ( ! function_exists( 'delete_option' ) ) {
+	function delete_option( $key ): bool {
+		unset( $GLOBALS['__pa_rebase_options'][ $key ] );
+		return true;
+	}
+}
+if ( ! function_exists( 'get_transient' ) ) {
+	function get_transient( $key ) {
+		return $GLOBALS['__pa_rebase_transients'][ $key ] ?? false;
+	}
+}
+if ( ! function_exists( 'set_transient' ) ) {
+	function set_transient( $key, $value, $expiration = 0 ): bool {
+		unset( $expiration );
+		$GLOBALS['__pa_rebase_transients'][ $key ] = $value;
+		return true;
+	}
+}
 
 require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/BundleSchema.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/AgentBundleArtifactExtensions.php';
@@ -56,6 +107,8 @@ do_action( 'init' );
 
 use DataMachine\Engine\Bundle\AgentBundleArtifactRebase;
 use DataMachine\Engine\Bundle\AgentBundleUpgradePendingAction;
+use DataMachine\Engine\AI\Actions\PendingActionAuthorizationReceipt;
+use DataMachine\Engine\AI\Actions\PendingActionStore;
 
 $failures = 0;
 $total    = 0;
@@ -78,6 +131,24 @@ function pa_rebase_assert_equals( string $label, $expected, $actual ): void {
 		echo "    expected: " . var_export( $expected, true ) . "\n";
 		echo "    actual:   " . var_export( $actual, true ) . "\n";
 	}
+}
+
+function pa_rebase_apply_authorized( array $input ): array {
+	static $sequence = 0;
+	$action_id = 'act_rebase_' . ++$sequence;
+	$GLOBALS['__pa_rebase_transients'][ 'datamachine_pending_action_' . $action_id ] = array(
+		'action_id'   => $action_id,
+		'kind'        => AgentBundleUpgradePendingAction::KIND,
+		'apply_input' => $input,
+		'workspace'   => array(),
+		'creator'     => '',
+		'metadata'    => array(),
+		'status'      => 'pending',
+		'created_at'  => time(),
+		'expires_at'  => time() + 3600,
+	);
+	$claimed = PendingActionStore::claim_for_resolution( $action_id, 'rebase-smoke' );
+	return AgentBundleUpgradePendingAction::apply( $input, $claimed, PendingActionAuthorizationReceipt::issue( $claimed, 'rebase-smoke' ) );
 }
 
 echo "=== Agent Bundle PendingAction Rebase Apply Smoke (#1832) ===\n";
@@ -150,7 +221,7 @@ $apply_input = array(
 	'rebased_artifacts'  => array( $rebase ),
 );
 
-$result = AgentBundleUpgradePendingAction::apply( $apply_input );
+$result = pa_rebase_apply_authorized( $apply_input );
 
 pa_rebase_assert( 'apply success', true === ( $result['success'] ?? false ) );
 pa_rebase_assert_equals( 'apply count', 1, count( $result['applied'] ?? array() ) );
@@ -180,7 +251,7 @@ pa_rebase_assert_equals(
 
 // Sanity: with no rebased entry, apply receives the raw target (legacy path).
 $captured_payloads = array();
-$result_legacy     = AgentBundleUpgradePendingAction::apply(
+$result_legacy     = pa_rebase_apply_authorized(
 	array(
 		'agent'              => array( 'agent_id' => 7 ),
 		'approved_artifacts' => array( 'flow:demo' ),
@@ -208,7 +279,7 @@ $ambiguous_rebase = AgentBundleArtifactRebase::rebase(
 pa_rebase_assert( 'tricky case is ambiguous', true === $ambiguous_rebase['requires_approval'] );
 
 $captured_payloads = array();
-$tricky_apply      = AgentBundleUpgradePendingAction::apply(
+$tricky_apply      = pa_rebase_apply_authorized(
 	array(
 		'agent'              => array( 'agent_id' => 7 ),
 		'approved_artifacts' => array( 'flow:tricky' ),
@@ -229,7 +300,7 @@ pa_rebase_assert(
 );
 
 $captured_payloads = array();
-$empty_apply       = AgentBundleUpgradePendingAction::apply(
+$empty_apply       = pa_rebase_apply_authorized(
 	array(
 		'agent'              => array( 'agent_id' => 7 ),
 		'approved_artifacts' => array(),

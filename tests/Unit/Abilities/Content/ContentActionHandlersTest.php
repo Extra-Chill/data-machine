@@ -17,6 +17,7 @@ use DataMachine\Abilities\Content\EditPostBlocksAbility;
 use DataMachine\Abilities\Content\InsertContentAbility;
 use DataMachine\Abilities\Content\ReplacePostBlocksAbility;
 use DataMachine\Engine\AI\Actions\PendingActionStore;
+use DataMachine\Engine\AI\Actions\PendingActionAuthorizationReceipt;
 use DataMachine\Engine\AI\Actions\ResolvePendingActionAbility;
 use WP_UnitTestCase;
 
@@ -211,6 +212,119 @@ class ContentActionHandlersTest extends WP_UnitTestCase {
 
 		$this->assertTrue( $resolution['success'] );
 		$this->assertStringContainsString( 'Fresh insertion.', get_post( $this->post_id )->post_content );
+	}
+
+	public function test_content_pending_mutators_require_exact_one_time_receipts_before_side_effects(): void {
+		$handlers = apply_filters( 'datamachine_pending_action_handlers', array() );
+		$original = "<!-- wp:paragraph -->\n<p>Hello world.</p>\n<!-- /wp:paragraph -->";
+
+		foreach ( array( 'edit_post_blocks', 'replace_post_blocks', 'insert_content' ) as $kind ) {
+			wp_update_post( array( 'ID' => $this->post_id, 'post_content' => $original ) );
+			$apply = $handlers[ $kind ]['apply'];
+			list( $input, $payload, $receipt ) = $this->claimed_content_action( $kind );
+
+			$absent = $apply( $input, array( 'kind' => $kind, 'workspace' => array() ), array() );
+			$this->assertWPError( $absent, "{$kind} rejects an absent receipt" );
+			$this->assertSame( $original, get_post( $this->post_id )->post_content, "{$kind} absent receipt has zero post side effects" );
+
+			$mismatched = $input;
+			if ( 'edit_post_blocks' === $kind ) {
+				$mismatched['edits'][0]['replace'] = 'Mismatched edit.';
+			} elseif ( 'replace_post_blocks' === $kind ) {
+				$mismatched['replacements'][0]['new_content'] = 'Mismatched replacement.';
+			} else {
+				$mismatched['content'] = 'Mismatched insertion.';
+			}
+			$mismatch_result = $apply( $mismatched, $payload, $receipt );
+			$this->assertWPError( $mismatch_result, "{$kind} rejects mismatched input" );
+			$this->assertSame( 'authorization_receipt_mismatch', $mismatch_result->get_error_code() );
+			$this->assertSame( $original, get_post( $this->post_id )->post_content, "{$kind} mismatch has zero post side effects" );
+
+			$expired_claims               = $receipt['claims'];
+			$expired_claims['expires_at'] = time() - 1;
+			$expired_result = $apply( $input, $payload, $this->sign_receipt_claims( $expired_claims ) );
+			$this->assertWPError( $expired_result, "{$kind} rejects an expired receipt" );
+			$this->assertSame( 'authorization_receipt_expired', $expired_result->get_error_code() );
+			$this->assertSame( $original, get_post( $this->post_id )->post_content, "{$kind} expiry has zero post side effects" );
+
+			$success = $apply( $input, $payload, $receipt );
+			$this->assertTrue( $success['success'], "{$kind} applies once" );
+			$after_success = get_post( $this->post_id )->post_content;
+			$this->assertNotSame( $original, $after_success );
+
+			$replay = $apply( $input, $payload, $receipt );
+			$this->assertWPError( $replay, "{$kind} rejects replay" );
+			$this->assertSame( 'authorization_receipt_consumed', $replay->get_error_code() );
+			$this->assertSame( $after_success, get_post( $this->post_id )->post_content, "{$kind} replay has zero duplicate post side effects" );
+		}
+	}
+
+	public function test_consumed_receipt_crash_policy_blocks_mutator_retry(): void {
+		$handlers = apply_filters( 'datamachine_pending_action_handlers', array() );
+		$apply    = $handlers['insert_content']['apply'];
+		$original = get_post( $this->post_id )->post_content;
+		list( $input, $payload, $receipt ) = $this->claimed_content_action( 'insert_content' );
+		$subject   = (string) ( $payload['agent'] ?? $payload['creator'] ?? '' );
+		$workspace = is_array( $payload['workspace'] ?? null ) ? $payload['workspace'] : array();
+
+		$consumed = PendingActionAuthorizationReceipt::consume( $receipt, 'insert_content', 'insert_content', $input, $input, $subject, $workspace );
+		$this->assertTrue( $consumed );
+		$inspected = PendingActionStore::inspect( (string) $payload['action_id'] );
+		$this->assertSame( 'applying', $inspected['status'] );
+		$this->assertGreaterThan( 0, $inspected['receipt_consumed_at'] );
+
+		$retry = $apply( $input, $payload, $receipt );
+		$this->assertWPError( $retry );
+		$this->assertSame( 'authorization_receipt_consumed', $retry->get_error_code() );
+		$this->assertSame( $original, get_post( $this->post_id )->post_content );
+		$this->assertNull( PendingActionStore::claim_for_resolution( (string) $payload['action_id'], 'user:' . $this->admin_id ), 'An ambiguous consumed claim cannot be acquired for automatic retry.' );
+	}
+
+	/** @return array{0:array<string,mixed>,1:array<string,mixed>,2:array<string,mixed>} */
+	private function claimed_content_action( string $kind ): array {
+		if ( 'edit_post_blocks' === $kind ) {
+			$preview = EditPostBlocksAbility::execute(
+				array(
+					'post_id' => $this->post_id,
+					'edits'   => array( array( 'block_index' => 0, 'find' => 'Hello world.', 'replace' => 'Authorized edit.' ) ),
+					'preview' => true,
+				)
+			);
+		} elseif ( 'replace_post_blocks' === $kind ) {
+			$preview = ReplacePostBlocksAbility::execute(
+				array(
+					'post_id'      => $this->post_id,
+					'replacements' => array( array( 'block_index' => 0, 'new_content' => 'Authorized replacement.' ) ),
+					'preview'      => true,
+				)
+			);
+		} else {
+			$preview = InsertContentAbility::execute(
+				array(
+					'post_id'  => $this->post_id,
+					'content'  => 'Authorized insertion.',
+					'position' => 'end',
+					'preview'  => true,
+				)
+			);
+		}
+		$payload = PendingActionStore::claim_for_resolution( (string) $preview['action_id'], 'user:' . $this->admin_id );
+		$this->assertIsArray( $payload );
+
+		return array(
+			$payload['apply_input'],
+			$payload,
+			PendingActionAuthorizationReceipt::issue( $payload, 'user:' . $this->admin_id ),
+		);
+	}
+
+	/** @param array<string,mixed> $claims */
+	private function sign_receipt_claims( array $claims ): array {
+		$encoded = rtrim( strtr( base64_encode( wp_json_encode( $claims ) ), '+/', '-_' ), '=' );
+		$secret  = (string) get_option( PendingActionAuthorizationReceipt::OPTION_SECRET, '' );
+		$signature = rtrim( strtr( base64_encode( hash_hmac( 'sha256', $encoded, $secret, true ) ), '+/', '-_' ), '=' );
+
+		return array( 'token' => $encoded . '.' . $signature, 'claims' => $claims );
 	}
 
 	public function test_can_resolve_denies_unauthorized_user(): void {

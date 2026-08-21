@@ -19,6 +19,8 @@
 
 namespace DataMachine\Abilities\Content;
 
+use DataMachine\Engine\AI\Actions\PendingActionAuthorizationReceipt;
+
 defined( 'ABSPATH' ) || exit;
 
 add_filter(
@@ -29,9 +31,8 @@ add_filter(
 		}
 
 		$handlers['edit_post_blocks'] = array(
-			'apply'       => static function ( array $apply_input ) {
-				unset( $apply_input['preview'] );
-				return EditPostBlocksAbility::execute( $apply_input );
+			'apply'       => static function ( array $apply_input, array $payload, array $receipt ) {
+				return EditPostBlocksAbility::apply_pending_action( $apply_input, $payload, $receipt );
 			},
 			'can_resolve' => static function ( array $payload, string $decision, int $user_id ) {
 				return ContentActionHandlers::can_resolve_post_edit( $payload, $user_id );
@@ -39,9 +40,8 @@ add_filter(
 		);
 
 		$handlers['replace_post_blocks'] = array(
-			'apply'       => static function ( array $apply_input ) {
-				unset( $apply_input['preview'] );
-				return ReplacePostBlocksAbility::execute( $apply_input );
+			'apply'       => static function ( array $apply_input, array $payload, array $receipt ) {
+				return ReplacePostBlocksAbility::apply_pending_action( $apply_input, $payload, $receipt );
 			},
 			'can_resolve' => static function ( array $payload, string $decision, int $user_id ) {
 				return ContentActionHandlers::can_resolve_post_edit( $payload, $user_id );
@@ -49,9 +49,8 @@ add_filter(
 		);
 
 		$handlers['insert_content'] = array(
-			'apply'       => static function ( array $apply_input ) {
-				$apply_input['preview'] = false;
-				return InsertContentAbility::execute( $apply_input );
+			'apply'       => static function ( array $apply_input, array $payload, array $receipt ) {
+				return InsertContentAbility::apply_pending_action( $apply_input, $payload, $receipt );
 			},
 			'can_resolve' => static function ( array $payload, string $decision, int $user_id ) {
 				return ContentActionHandlers::can_resolve_post_edit( $payload, $user_id );
@@ -69,6 +68,14 @@ add_filter(
  * same: the resolving user must have `edit_post` on the target post.
  */
 class ContentActionHandlers {
+
+	/** Consume the exact pending-action receipt at a content mutator boundary. */
+	public static function consume_receipt( string $kind, array $input, array $payload, array $receipt ): true|\WP_Error {
+		$subject   = (string) ( $payload['agent'] ?? $payload['creator'] ?? '' );
+		$workspace = isset( $payload['workspace'] ) && is_array( $payload['workspace'] ) ? $payload['workspace'] : array();
+
+		return PendingActionAuthorizationReceipt::consume( $receipt, $kind, $kind, $input, $input, $subject, $workspace );
+	}
 
 	/**
 	 * Gate resolution of a content-edit pending action.

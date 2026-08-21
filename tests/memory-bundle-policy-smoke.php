@@ -29,6 +29,7 @@ if ( ! defined( 'STDERR' ) ) {
 $GLOBALS['datamachine_memory_policy_filters']    = array();
 $GLOBALS['datamachine_memory_policy_actions']    = array();
 $GLOBALS['datamachine_memory_policy_transients'] = array();
+$GLOBALS['datamachine_memory_policy_options']    = array();
 
 if ( ! function_exists( 'absint' ) ) {
 	function absint( $value ): int {
@@ -75,6 +76,38 @@ if ( ! function_exists( 'esc_html' ) ) {
 if ( ! function_exists( 'get_current_user_id' ) ) {
 	function get_current_user_id(): int {
 		return 7;
+	}
+}
+
+if ( ! function_exists( 'get_option' ) ) {
+	function get_option( string $option, $default = false ) {
+		return $GLOBALS['datamachine_memory_policy_options'][ $option ] ?? $default;
+	}
+}
+
+if ( ! function_exists( 'update_option' ) ) {
+	function update_option( string $option, $value, $autoload = null ): bool {
+		unset( $autoload );
+		$GLOBALS['datamachine_memory_policy_options'][ $option ] = $value;
+		return true;
+	}
+}
+
+if ( ! function_exists( 'add_option' ) ) {
+	function add_option( string $option, $value = '', $deprecated = '', $autoload = 'yes' ): bool {
+		unset( $deprecated, $autoload );
+		if ( array_key_exists( $option, $GLOBALS['datamachine_memory_policy_options'] ) ) {
+			return false;
+		}
+		$GLOBALS['datamachine_memory_policy_options'][ $option ] = $value;
+		return true;
+	}
+}
+
+if ( ! function_exists( 'delete_option' ) ) {
+	function delete_option( string $option ): bool {
+		unset( $GLOBALS['datamachine_memory_policy_options'][ $option ] );
+		return true;
 	}
 }
 
@@ -238,6 +271,7 @@ use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_Store_Capabilities;
 use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_Store;
 use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_Write_Result;
 use DataMachine\Core\FilesRepository\AgentMemory;
+use DataMachine\Engine\AI\Actions\PendingActionAuthorizationReceipt;
 use DataMachine\Engine\AI\Actions\PendingActionStore;
 use DataMachine\Engine\AI\Actions\ResolvePendingActionAbility;
 use DataMachine\Engine\AI\Memory\MemorySectionArtifact;
@@ -303,11 +337,20 @@ function memory_policy_assert( bool $condition, string $message ): void {
 	echo "ok {$assertions} - {$message}\n";
 }
 
+function memory_policy_sign_receipt( array $claims ): array {
+	$encoded = rtrim( strtr( base64_encode( wp_json_encode( $claims ) ), '+/', '-_' ), '=' );
+	$secret = (string) get_option( PendingActionAuthorizationReceipt::OPTION_SECRET, '' );
+	$signature = rtrim( strtr( base64_encode( hash_hmac( 'sha256', $encoded, $secret, true ) ), '+/', '-_' ), '=' );
+	return array( 'token' => $encoded . '.' . $signature, 'claims' => $claims );
+}
+
 $store = new MemoryPolicyFakeStore();
+$memory_store_resolutions = 0;
 add_filter(
 	'wp_agent_memory_store',
-	static function ( $_default, array $_context ) use ( $store ) {
+	static function ( $_default, array $_context ) use ( $store, &$memory_store_resolutions ) {
 		unset( $_default, $_context );
+		++$memory_store_resolutions;
 		return $store;
 	},
 	10,
@@ -438,7 +481,47 @@ memory_policy_assert( ! str_contains( $staged_preview['diff'] ?? '', 'super-secr
 $payload = PendingActionStore::get( $staged['action_id'] );
 memory_policy_assert( is_array( $payload ) && MemorySectionPendingAction::KIND === $payload['kind'], 'pending action stores memory section kind' );
 
-echo "\n[4] PendingAction accept applies only the approved section; reject leaves memory untouched\n";
+echo "\n[4] Memory apply authorizes before constructing AgentMemory or touching its store\n";
+$security_staged = SelfMemoryWritePolicy::execute(
+	array(
+		'section'      => 'Source quirks',
+		'section_type' => 'source_quirk',
+		'content'      => 'Receipt-protected memory content.',
+		'mode'         => 'set',
+	)
+);
+$security_claim = PendingActionStore::claim_for_resolution( $security_staged['action_id'], 'memory-security-smoke' );
+$security_input = $security_claim['apply_input'];
+$security_receipt = PendingActionAuthorizationReceipt::issue( $security_claim, 'memory-security-smoke' );
+$before_security_content = $store->files[ $scope_key ];
+$before_security_resolutions = $memory_store_resolutions;
+
+$memory_absent = MemorySectionPendingAction::apply( $security_input, $security_claim, array() );
+memory_policy_assert( is_wp_error( $memory_absent ), 'memory apply rejects an absent receipt' );
+memory_policy_assert( $before_security_content === $store->files[ $scope_key ] && $before_security_resolutions === $memory_store_resolutions, 'absent memory receipt has zero file, directory, or store-construction side effects' );
+
+$memory_mismatch_input = $security_input;
+$memory_mismatch_input['content'] = 'Mismatched memory content.';
+$memory_mismatch = MemorySectionPendingAction::apply( $memory_mismatch_input, $security_claim, $security_receipt );
+memory_policy_assert( is_wp_error( $memory_mismatch ), 'memory apply rejects mismatched input' );
+memory_policy_assert( $before_security_content === $store->files[ $scope_key ] && $before_security_resolutions === $memory_store_resolutions, 'mismatched memory receipt has zero file, directory, or store-construction side effects' );
+
+$expired_memory_claims = $security_receipt['claims'];
+$expired_memory_claims['expires_at'] = time() - 1;
+$memory_expired = MemorySectionPendingAction::apply( $security_input, $security_claim, memory_policy_sign_receipt( $expired_memory_claims ) );
+memory_policy_assert( is_wp_error( $memory_expired ), 'memory apply rejects an expired receipt' );
+memory_policy_assert( $before_security_content === $store->files[ $scope_key ] && $before_security_resolutions === $memory_store_resolutions, 'expired memory receipt has zero file, directory, or store-construction side effects' );
+
+$memory_success = MemorySectionPendingAction::apply( $security_input, $security_claim, $security_receipt );
+memory_policy_assert( true === ( $memory_success['success'] ?? false ), 'memory apply succeeds exactly once with a valid receipt' );
+$after_memory_success = $store->files[ $scope_key ];
+$after_memory_resolutions = $memory_store_resolutions;
+$memory_replay = MemorySectionPendingAction::apply( $security_input, $security_claim, $security_receipt );
+memory_policy_assert( is_wp_error( $memory_replay ), 'memory apply rejects a replayed receipt' );
+memory_policy_assert( $after_memory_success === $store->files[ $scope_key ] && $after_memory_resolutions === $memory_store_resolutions, 'memory replay has zero duplicate file, directory, or store-construction side effects' );
+PendingActionStore::complete_claim( $security_staged['action_id'], (string) $security_claim['receipt_nonce'], 'accepted', $memory_success, null, 'memory-security-smoke' );
+
+echo "\n[5] PendingAction accept applies only the approved section; reject leaves memory untouched\n";
 $accepted = ResolvePendingActionAbility::execute(
 	array(
 		'action_id' => $staged['action_id'],

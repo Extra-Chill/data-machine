@@ -177,6 +177,23 @@ class InsertContentAbility {
 	 * @return array Result with canonical diff preview data.
 	 */
 	public static function execute( array $input ): array|\WP_Error {
+		return self::execute_with_pending_authorization( $input );
+	}
+
+	/** Execute only from the pending-action dispatcher with a one-time receipt. */
+	public static function apply_pending_action( array $input, array $payload, array $receipt ): array|\WP_Error {
+		$input['preview'] = false;
+		$receipt_input = $input;
+		unset( $receipt_input['preview'] );
+		$authorized = ContentActionHandlers::consume_receipt( 'insert_content', $receipt_input, $payload, $receipt );
+		if ( is_wp_error( $authorized ) ) {
+			return $authorized;
+		}
+
+		return self::execute_with_pending_authorization( $input );
+	}
+
+	private static function execute_with_pending_authorization( array $input ): array|\WP_Error {
 		// Resolve the target blog. On multisite the post may live on another
 		// site than the one this request landed on; switch to it so the read,
 		// the edit_post capability check, and the eventual apply target the

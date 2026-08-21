@@ -10,6 +10,9 @@
 if ( ! defined( 'ABSPATH' ) ) {
 	define( 'ABSPATH', dirname( __DIR__ ) . '/' );
 }
+if ( ! defined( 'DATAMACHINE_PENDING_ACTION_TRANSIENT_FALLBACK' ) ) {
+	define( 'DATAMACHINE_PENDING_ACTION_TRANSIENT_FALLBACK', true );
+}
 
 if ( class_exists( 'PHPUnit\\Framework\\TestCase', false ) ) {
 	return;
@@ -17,6 +20,8 @@ if ( class_exists( 'PHPUnit\\Framework\\TestCase', false ) ) {
 
 $GLOBALS['__bundle_extension_filters'] = array();
 $GLOBALS['__bundle_extension_actions'] = array();
+$GLOBALS['__bundle_extension_options'] = array();
+$GLOBALS['__bundle_extension_transients'] = array();
 
 if ( ! function_exists( 'wp_json_encode' ) ) {
 	function wp_json_encode( $data, $options = 0, $depth = 512 ) {
@@ -47,6 +52,57 @@ if ( ! function_exists( 'sanitize_title' ) ) {
 if ( ! function_exists( 'is_wp_error' ) ) {
 	function is_wp_error( $value ) {
 		return $value instanceof WP_Error;
+	}
+}
+if ( ! function_exists( 'get_current_user_id' ) ) {
+	function get_current_user_id() {
+		return 0;
+	}
+}
+if ( ! function_exists( 'get_option' ) ) {
+	function get_option( $option, $default = false ) {
+		return $GLOBALS['__bundle_extension_options'][ $option ] ?? $default;
+	}
+}
+if ( ! function_exists( 'update_option' ) ) {
+	function update_option( $option, $value, $autoload = null ) {
+		unset( $autoload );
+		$GLOBALS['__bundle_extension_options'][ $option ] = $value;
+		return true;
+	}
+}
+if ( ! function_exists( 'add_option' ) ) {
+	function add_option( $option, $value = '', $deprecated = '', $autoload = 'yes' ) {
+		unset( $deprecated, $autoload );
+		if ( array_key_exists( $option, $GLOBALS['__bundle_extension_options'] ) ) {
+			return false;
+		}
+		$GLOBALS['__bundle_extension_options'][ $option ] = $value;
+		return true;
+	}
+}
+if ( ! function_exists( 'delete_option' ) ) {
+	function delete_option( $option ) {
+		unset( $GLOBALS['__bundle_extension_options'][ $option ] );
+		return true;
+	}
+}
+if ( ! function_exists( 'get_transient' ) ) {
+	function get_transient( $key ) {
+		return $GLOBALS['__bundle_extension_transients'][ $key ] ?? false;
+	}
+}
+if ( ! function_exists( 'set_transient' ) ) {
+	function set_transient( $key, $value, $expiration = 0 ) {
+		unset( $expiration );
+		$GLOBALS['__bundle_extension_transients'][ $key ] = $value;
+		return true;
+	}
+}
+if ( ! function_exists( 'delete_transient' ) ) {
+	function delete_transient( $key ) {
+		unset( $GLOBALS['__bundle_extension_transients'][ $key ] );
+		return true;
 	}
 }
 if ( ! class_exists( 'WP_Error' ) ) {
@@ -115,6 +171,8 @@ use DataMachine\Engine\Bundle\AgentBundleArrayAdapter;
 use DataMachine\Engine\Bundle\AgentBundleManifest;
 use DataMachine\Engine\Bundle\AgentBundleUpgradePendingAction;
 use DataMachine\Engine\Bundle\AgentBundleUpgradePlanner;
+use DataMachine\Engine\AI\Actions\PendingActionAuthorizationReceipt;
+use DataMachine\Engine\AI\Actions\PendingActionStore;
 
 $failures = 0;
 $total    = 0;
@@ -159,6 +217,43 @@ function extension_json_encode( array $value ): string {
 	return is_string( $encoded ) ? $encoded : '';
 }
 
+function extension_claim_bundle( array $input ): array {
+	static $sequence = 0;
+	$action_id = 'act_bundle_extension_' . ++$sequence;
+	$payload = array(
+		'action_id'   => $action_id,
+		'kind'        => AgentBundleUpgradePendingAction::KIND,
+		'summary'     => 'Apply extension bundle artifacts.',
+		'apply_input' => $input,
+		'workspace'   => array(),
+		'creator'     => '',
+		'metadata'    => array(),
+		'status'      => 'pending',
+		'created_at'  => time(),
+		'expires_at'  => time() + 3600,
+	);
+	$GLOBALS['__bundle_extension_transients'][ 'datamachine_pending_action_' . $action_id ] = $payload;
+	$claimed = PendingActionStore::claim_for_resolution( $action_id, 'bundle-extension-smoke' );
+	if ( ! is_array( $claimed ) ) {
+		throw new RuntimeException( 'Bundle smoke could not claim its pending action.' );
+	}
+	return array( $claimed, PendingActionAuthorizationReceipt::issue( $claimed, 'bundle-extension-smoke' ) );
+}
+
+function extension_apply_authorized_bundle( array $input ) {
+	list( $claimed, $receipt ) = extension_claim_bundle( $input );
+	$GLOBALS['__bundle_extension_last_claim'] = $claimed;
+	$GLOBALS['__bundle_extension_last_receipt'] = $receipt;
+	return AgentBundleUpgradePendingAction::apply( $input, $claimed, $receipt );
+}
+
+function extension_sign_receipt( array $claims ): array {
+	$encoded = rtrim( strtr( base64_encode( wp_json_encode( $claims ) ), '+/', '-_' ), '=' );
+	$secret = (string) get_option( PendingActionAuthorizationReceipt::OPTION_SECRET, '' );
+	$signature = rtrim( strtr( base64_encode( hash_hmac( 'sha256', $encoded, $secret, true ) ), '+/', '-_' ), '=' );
+	return array( 'token' => $encoded . '.' . $signature, 'claims' => $claims );
+}
+
 add_filter(
 	'datamachine_agent_bundle_artifact_types',
 	static function ( array $types ): array {
@@ -170,6 +265,18 @@ add_filter(
 	10,
 	1
 );
+add_filter(
+	'datamachine_agent_package_artifact_type_definitions',
+	static function ( array $definitions ): array {
+		$definitions['datamachine/fake-plugin-artifact'] = array(
+			'label'           => 'Fake plugin artifact',
+			'description'     => 'Receipt-aware extension artifact smoke type.',
+			'import_callback' => 'DataMachine\Engine\Bundle\import_datamachine_agent_package_artifact',
+		);
+		return $definitions;
+	}
+);
+do_action( 'wp_agent_package_artifacts_init' );
 
 $export_context = array();
 add_filter(
@@ -294,17 +401,33 @@ assert_extension_bundle_equals( 'locally modified plugin artifact needs approval
 assert_extension_bundle( 'raw local plugin secret is absent from plan', false === strpos( extension_json_encode( $modified_plan ), 'local-secret-token' ) );
 
 echo "\n[4] PendingAction apply routes approved plugin artifacts to plugin callback\n";
-$applied      = array();
-$apply_result = AgentBundleUpgradePendingAction::apply(
-	array(
-		'agent'              => $agent,
-		'approved_artifacts' => array( 'fake_plugin_artifact:seed' ),
-		'target_artifacts'   => array( $target_artifact, extension_artifact( 'unapproved', array( 'label' => 'Skip' ) ) ),
-	)
+$applied = array();
+$bundle_apply_input = array(
+	'agent'              => $agent,
+	'approved_artifacts' => array( 'fake_plugin_artifact:seed' ),
+	'target_artifacts'   => array( $target_artifact, extension_artifact( 'unapproved', array( 'label' => 'Skip' ) ) ),
 );
+$absent_result = AgentBundleUpgradePendingAction::apply( $bundle_apply_input, array(), array() );
+assert_extension_bundle( 'absent receipt is rejected before plugin callback', is_wp_error( $absent_result ) && array() === $applied );
+
+list( $mismatch_claim, $mismatch_receipt ) = extension_claim_bundle( $bundle_apply_input );
+$mismatched_input = $bundle_apply_input;
+$mismatched_input['approved_artifacts'] = array( 'fake_plugin_artifact:unapproved' );
+$mismatch_result = AgentBundleUpgradePendingAction::apply( $mismatched_input, $mismatch_claim, $mismatch_receipt );
+assert_extension_bundle( 'mismatched receipt is rejected before plugin callback', is_wp_error( $mismatch_result ) && array() === $applied );
+
+list( $expired_claim, $expired_receipt ) = extension_claim_bundle( $bundle_apply_input );
+$expired_claims = $expired_receipt['claims'];
+$expired_claims['expires_at'] = time() - 1;
+$expired_result = AgentBundleUpgradePendingAction::apply( $bundle_apply_input, $expired_claim, extension_sign_receipt( $expired_claims ) );
+assert_extension_bundle( 'expired receipt is rejected before plugin callback', is_wp_error( $expired_result ) && array() === $applied );
+
+$apply_result = extension_apply_authorized_bundle( $bundle_apply_input );
 assert_extension_bundle( 'apply succeeds through plugin callback', true === ( $apply_result['success'] ?? false ) );
 assert_extension_bundle_equals( 'plugin callback received approved artifact', array( array( 'id' => 'seed', 'agent' => 'bundle-agent' ) ), $applied );
 assert_extension_bundle_equals( 'unapproved plugin artifact is staged/skipped', 1, count( $apply_result['skipped'] ?? array() ) );
+$replay_result = AgentBundleUpgradePendingAction::apply( $bundle_apply_input, $GLOBALS['__bundle_extension_last_claim'], $GLOBALS['__bundle_extension_last_receipt'] );
+assert_extension_bundle( 'replayed receipt is rejected without a duplicate plugin callback', is_wp_error( $replay_result ) && 1 === count( $applied ) );
 
 extension_rm_tree( $tmp );
 

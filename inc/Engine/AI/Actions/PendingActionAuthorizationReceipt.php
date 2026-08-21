@@ -11,28 +11,31 @@ defined( 'ABSPATH' ) || exit;
 
 final class PendingActionAuthorizationReceipt {
 
-	private const OPTION_SECRET = 'datamachine_pending_action_receipt_secret';
+	public const OPTION_SECRET               = 'datamachine_pending_action_receipt_secret';
 	private static ?string $transient_secret = null;
 
 	/** Issue a signed receipt from an atomically claimed action payload. */
 	public static function issue( array $action, string $resolver ): array {
 		$authorization = self::authorization( $action );
 		$claims        = array(
-			'action_id'    => (string) $action['action_id'],
-			'kind'         => (string) $action['kind'],
-			'operation'    => $authorization['operation'],
-			'target_digest'=> self::digest( $authorization['target'] ),
-			'input_digest' => self::digest( $action['apply_input'] ?? array() ),
-			'subject'      => (string) ( $action['agent'] ?? $action['creator'] ?? '' ),
-			'workspace'    => $action['workspace'] ?? null,
-			'resolver'     => $resolver,
-			'issued_at'    => time(),
-			'expires_at'   => (int) ( $action['expires_at'] ?? 0 ),
-			'nonce'        => (string) ( $action['receipt_nonce'] ?? '' ),
+			'action_id'     => (string) $action['action_id'],
+			'kind'          => (string) $action['kind'],
+			'operation'     => $authorization['operation'],
+			'target_digest' => self::digest( $authorization['target'] ),
+			'input_digest'  => self::digest( $action['apply_input'] ?? array() ),
+			'subject'       => (string) ( $action['agent'] ?? $action['creator'] ?? '' ),
+			'workspace'     => is_array( $action['workspace'] ?? null ) ? $action['workspace'] : array(),
+			'resolver'      => $resolver,
+			'issued_at'     => time(),
+			'expires_at'    => (int) ( $action['expires_at'] ?? 0 ),
+			'nonce'         => (string) ( $action['receipt_nonce'] ?? '' ),
 		);
 
 		$encoded = self::base64url_encode( wp_json_encode( $claims ) );
-		return array( 'token' => $encoded . '.' . self::base64url_encode( hash_hmac( 'sha256', $encoded, self::secret(), true ) ), 'claims' => $claims );
+		return array(
+			'token'  => $encoded . '.' . self::base64url_encode( hash_hmac( 'sha256', $encoded, self::secret(), true ) ),
+			'claims' => $claims,
+		);
 	}
 
 	/**
@@ -42,6 +45,35 @@ final class PendingActionAuthorizationReceipt {
 	 * @return true|\WP_Error
 	 */
 	public static function validate( $receipt, string $kind, string $operation, $target, array $input, string $subject, array $workspace ): true|\WP_Error {
+		$claims = self::validated_claims( $receipt, $kind, $operation, $target, $input, $subject, $workspace );
+		if ( is_wp_error( $claims ) ) {
+			return $claims;
+		}
+
+		$action = PendingActionStore::inspect( (string) ( $claims['action_id'] ?? '' ) );
+		if ( null === $action || 'applying' !== (string) ( $action['status'] ?? '' ) || ! empty( $action['receipt_consumed_at'] ) || ! hash_equals( (string) ( $action['receipt_nonce'] ?? '' ), (string) ( $claims['nonce'] ?? '' ) ) ) {
+			return new \WP_Error( 'authorization_receipt_consumed', 'Authorization receipt has been consumed or is no longer valid.' );
+		}
+
+		return true;
+	}
+
+	/**
+	 * Validate and atomically consume a receipt immediately before mutation.
+	 *
+	 * @return true|\WP_Error
+	 */
+	public static function consume( $receipt, string $kind, string $operation, $target, array $input, string $subject, array $workspace ): true|\WP_Error {
+		$claims = self::validated_claims( $receipt, $kind, $operation, $target, $input, $subject, $workspace );
+		if ( is_wp_error( $claims ) ) {
+			return $claims;
+		}
+
+		return PendingActionStore::consume_authorization_receipt( $claims );
+	}
+
+	/** @return array<string,mixed>|\WP_Error */
+	private static function validated_claims( $receipt, string $kind, string $operation, $target, array $input, string $subject, array $workspace ): array|\WP_Error {
 		$token = is_array( $receipt ) ? (string) ( $receipt['token'] ?? '' ) : (string) $receipt;
 		$parts = explode( '.', $token, 2 );
 		if ( 2 !== count( $parts ) || ! hash_equals( self::base64url_encode( hash_hmac( 'sha256', $parts[0], self::secret(), true ) ), $parts[1] ) ) {
@@ -56,12 +88,7 @@ final class PendingActionAuthorizationReceipt {
 			return new \WP_Error( 'authorization_receipt_mismatch', 'Authorization receipt does not match this kind, operation, target, input, subject, or workspace.' );
 		}
 
-		$action = PendingActionStore::inspect( (string) ( $claims['action_id'] ?? '' ) );
-		if ( null === $action || 'applying' !== (string) ( $action['status'] ?? '' ) || ! hash_equals( (string) ( $action['receipt_nonce'] ?? '' ), (string) ( $claims['nonce'] ?? '' ) ) || (string) ( $action['kind'] ?? '' ) !== (string) ( $claims['kind'] ?? '' ) || (string) ( $action['resolver'] ?? '' ) !== (string) ( $claims['resolver'] ?? '' ) || self::digest( $action['workspace'] ?? null ) !== self::digest( $claims['workspace'] ?? null ) || (string) ( $action['agent'] ?? $action['creator'] ?? '' ) !== (string) ( $claims['subject'] ?? '' ) ) {
-			return new \WP_Error( 'authorization_receipt_consumed', 'Authorization receipt has been consumed or is no longer valid.' );
-		}
-
-		return true;
+		return $claims;
 	}
 
 	/** Normalize the generic authorization binding, including legacy rows. */
@@ -105,6 +132,13 @@ final class PendingActionAuthorizationReceipt {
 		return $secret;
 	}
 
-	private static function base64url_encode( string $value ): string { return rtrim( strtr( base64_encode( $value ), '+/', '-_' ), '=' ); }
-	private static function base64url_decode( string $value ): string { return (string) base64_decode( strtr( $value, '-_', '+/' ) ); }
+	private static function base64url_encode( string $value ): string {
+		// phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- JWT-style transport encoding, not code obfuscation.
+		return rtrim( strtr( base64_encode( $value ), '+/', '-_' ), '=' );
+	}
+
+	private static function base64url_decode( string $value ): string {
+		// phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_decode -- Decodes the signed receipt claim envelope.
+		return (string) base64_decode( strtr( $value, '-_', '+/' ) );
+	}
 }
