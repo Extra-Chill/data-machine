@@ -8,8 +8,16 @@
  * WordPress dependencies
  */
 import { useState, useCallback } from '@wordpress/element';
-import { Button, SelectControl, Notice } from '@wordpress/components';
+import {
+	Button,
+	SelectControl,
+	Notice,
+} from '@wordpress/components';
 import { __ } from '@wordpress/i18n';
+
+/**
+ * External dependencies
+ */
 /**
  * Internal dependencies
  */
@@ -18,12 +26,14 @@ import {
 	useFlowsForDropdown,
 	useClearProcessedItems,
 } from '../../queries/jobs';
+import ConfirmationModal from '@shared/components/ConfirmationModal';
 
 const ClearProcessedForm = () => {
 	const [ clearType, setClearType ] = useState( '' );
 	const [ pipelineId, setPipelineId ] = useState( '' );
 	const [ flowId, setFlowId ] = useState( '' );
 	const [ notice, setNotice ] = useState( null );
+	const [ pendingClear, setPendingClear ] = useState( null );
 
 	const { data: pipelines = [], isLoading: pipelinesLoading } =
 		usePipelinesForDropdown();
@@ -95,15 +105,22 @@ const ClearProcessedForm = () => {
 				);
 			}
 
-			if (
-				// eslint-disable-line no-alert
-				! window.confirm( confirmMessage )
-			) {
-				return;
-			}
+			setPendingClear( {
+				message: confirmMessage,
+				payload: { clearType, targetId: parseInt( targetId, 10 ) },
+			} );
+		},
+		[ clearType, pipelineId, flowId ]
+	);
 
-			clearMutation.mutate(
-				{ clearType, targetId: parseInt( targetId, 10 ) },
+	const handleConfirmClear = useCallback( () => {
+		if ( ! pendingClear ) {
+			return;
+		}
+		const { payload } = pendingClear;
+		setPendingClear( null );
+		clearMutation.mutate(
+				payload,
 				{
 					onSuccess: ( response ) => {
 						setNotice( {
@@ -124,8 +141,7 @@ const ClearProcessedForm = () => {
 					},
 				}
 			);
-		},
-		[ clearType, pipelineId, flowId, clearMutation ]
+	}, [ pendingClear, clearMutation ]
 	);
 
 	const pipelineOptions = [
@@ -240,6 +256,14 @@ const ClearProcessedForm = () => {
 					</Notice>
 				) }
 			</form>
+			{ pendingClear && (
+				<ConfirmationModal
+					onConfirm={ handleConfirmClear }
+					onCancel={ () => setPendingClear( null ) }
+				>
+					{ pendingClear.message }
+				</ConfirmationModal>
+			) }
 		</div>
 	);
 };

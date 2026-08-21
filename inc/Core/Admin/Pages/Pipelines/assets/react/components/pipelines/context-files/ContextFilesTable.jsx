@@ -29,7 +29,7 @@ export default function ContextFilesTable( {
 
 	/**
 	 * Format date for display
-	 * @param dateString
+	 * @param {string} dateString Date string.
 	 */
 	const formatDate = ( dateString ) => {
 		const date = new Date( dateString );
@@ -38,7 +38,7 @@ export default function ContextFilesTable( {
 
 	/**
 	 * Handle delete click
-	 * @param fileId
+	 * @param {number} fileId File ID.
 	 */
 	const handleDelete = async ( fileId ) => {
 		setDeletingId( fileId );

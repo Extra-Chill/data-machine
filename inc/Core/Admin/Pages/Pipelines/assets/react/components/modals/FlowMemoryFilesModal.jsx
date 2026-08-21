@@ -17,7 +17,7 @@ import FlowMemoryFiles from '../flows/FlowMemoryFiles';
 /**
  * Flow Memory Files Modal Component
  *
- * @param {Object}   props        - Component props
+ * @param {Object}   props         - Component props
  * @param {Function} props.onClose - Close handler
  * @param {number}   props.flowId  - Flow ID
  * @return {React.ReactElement} Flow memory files modal

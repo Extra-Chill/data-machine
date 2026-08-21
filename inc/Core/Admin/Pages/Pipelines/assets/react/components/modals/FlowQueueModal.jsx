@@ -54,8 +54,9 @@ const QUEUE_MODE_OPTIONS = [
  * @param {Function} props.onClose    - Close handler
  * @param {number}   props.flowId     - Flow ID
  * @param {string}   props.flowName   - Flow name
- * @param            props.flowStepId
- * @return {JSX.Element} Flow queue modal
+ * @param {string}   props.flowStepId - Flow step ID
+ * @param {number}   props.pipelineId - Pipeline ID
+ * @return {React.ReactElement} Flow queue modal
  */
 export default function FlowQueueModal( {
 	onClose,
@@ -118,7 +119,7 @@ export default function FlowQueueModal( {
 				},
 			}
 		);
-	}, [ flowId, flowStepId, newPrompt, addMutation ] );
+	}, [ flowId, flowStepId, pipelineId, newPrompt, addMutation ] );
 
 	/**
 	 * Handle removing a prompt
@@ -147,7 +148,7 @@ export default function FlowQueueModal( {
 				},
 			}
 		);
-	}, [ flowId, flowStepId, confirmClear, clearMutation ] );
+	}, [ flowId, flowStepId, pipelineId, confirmClear, clearMutation ] );
 
 	/**
 	 * Cancel clear confirmation

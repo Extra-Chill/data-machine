@@ -30,11 +30,9 @@ import { useStepTypes } from '../../queries/config';
  * @param {string}   props.flowStepId     - Flow step ID.
  * @param {Object}   props.flowStepConfig - Flow step configuration.
  * @param {Object}   props.pipelineStep   - Pipeline step data.
- * @param {Object}   props.pipelineConfig - Pipeline AI configuration (currently unused; retained
- *                                          for API stability while callers still pass it).
  * @param {Function} props.onConfigure    - Configure handler callback.
  * @param {Function} props.onQueueClick   - Queue button click handler (opens modal).
- * @return {JSX.Element} Flow step card.
+ * @return {React.ReactElement} Flow step card.
  */
 export default function FlowStepCard( {
 	flowId,
@@ -42,7 +40,6 @@ export default function FlowStepCard( {
 	flowStepId,
 	flowStepConfig,
 	pipelineStep,
-	pipelineConfig,
 	onConfigure,
 	onQueueClick,
 } ) {
@@ -52,17 +49,25 @@ export default function FlowStepCard( {
 	const isAiStep = pipelineStep.step_type === 'ai';
 	const usesHandler = stepTypeInfo.uses_handler !== false;
 	const isMultiHandlerStep = stepTypeInfo.multi_handler === true;
-	const handlerSlugs = isMultiHandlerStep
-		? flowStepConfig?.handler_slugs || []
-		: flowStepConfig?.handler_slug
-		? [ flowStepConfig.handler_slug ]
-		: [];
+	let handlerSlugs = [];
+	if ( isMultiHandlerStep ) {
+		handlerSlugs = flowStepConfig?.handler_slugs || [];
+	} else if ( flowStepConfig?.handler_slug ) {
+		handlerSlugs = [ flowStepConfig.handler_slug ];
+	}
 	const primarySlug = handlerSlugs[ 0 ] || '';
-	const primaryConfig = isMultiHandlerStep
-		? primarySlug && flowStepConfig?.handler_configs?.[ primarySlug ]
-		: flowStepConfig?.handler_config || {};
+	const primaryConfig = useMemo(
+		() =>
+			( isMultiHandlerStep
+				? primarySlug && flowStepConfig?.handler_configs?.[ primarySlug ]
+				: flowStepConfig?.handler_config ) || {},
+		[ flowStepConfig, isMultiHandlerStep, primarySlug ]
+	);
 
-	const promptQueue = flowStepConfig.prompt_queue || [];
+	const promptQueue = useMemo(
+		() => flowStepConfig.prompt_queue || [],
+		[ flowStepConfig.prompt_queue ]
+	);
 	const rawQueueMode = flowStepConfig.queue_mode;
 	const queueMode = [ 'drain', 'loop', 'static' ].includes( rawQueueMode )
 		? rawQueueMode
@@ -141,8 +146,7 @@ export default function FlowStepCard( {
 					);
 				}
 			} catch ( err ) {
-				// eslint-disable-next-line no-console
-				console.error( 'Prompt save error:', err );
+				window.console.error( 'Prompt save error:', err );
 				setError(
 					err.message || __( 'An error occurred', 'data-machine' )
 				);

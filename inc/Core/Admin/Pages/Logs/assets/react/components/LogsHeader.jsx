@@ -8,35 +8,35 @@
  * WordPress dependencies
  */
 import { Button } from '@wordpress/components';
+import { useState } from '@wordpress/element';
 import { __ } from '@wordpress/i18n';
 /**
  * External dependencies
  */
+/**
+ * Internal dependencies
+ */
 import { useClearLogs, useLogMetadata } from '../queries/logs';
+import ConfirmationModal from '@shared/components/ConfirmationModal';
 import { useAgentStore } from '@shared/stores/agentStore';
 
 const LogsHeader = () => {
 	const clearMutation = useClearLogs();
 	const selectedAgentId = useAgentStore( ( state ) => state.selectedAgentId );
 	const { data: metadata } = useLogMetadata( selectedAgentId ?? undefined );
+	const [ isClearConfirmOpen, setIsClearConfirmOpen ] = useState( false );
 
 	const totalEntries = metadata?.total_entries || 0;
 
 	const handleClearAll = () => {
-		const scopeLabel = selectedAgentId
-			? __( 'the selected agent', 'data-machine' )
-			: __( 'ALL agents', 'data-machine' );
-
-		if (
-			window.confirm( // eslint-disable-line no-alert
-				`${ __( 'Are you sure you want to clear logs for', 'data-machine' ) } ${ scopeLabel }? ${ __( 'This action cannot be undone.', 'data-machine' ) }`
-			)
-		) {
-			clearMutation.mutate(
-				selectedAgentId ? { agent_id: selectedAgentId } : {}
-			);
-		}
+		setIsClearConfirmOpen( false );
+		clearMutation.mutate(
+			selectedAgentId ? { agent_id: selectedAgentId } : {}
+		);
 	};
+	const scopeLabel = selectedAgentId
+		? __( 'the selected agent', 'data-machine' )
+		: __( 'ALL agents', 'data-machine' );
 
 	return (
 		<div className="datamachine-logs-header">
@@ -55,14 +55,22 @@ const LogsHeader = () => {
 				<Button
 					variant="secondary"
 					isDestructive
-					onClick={ handleClearAll }
+					onClick={ () => setIsClearConfirmOpen( true ) }
 					disabled={ clearMutation.isPending || totalEntries === 0 }
 				>
 					{ clearMutation.isPending
-						? __( 'Clearing...', 'data-machine' )
+						? __( 'Clearing…', 'data-machine' )
 						: __( 'Clear All Logs', 'data-machine' ) }
 				</Button>
 			</div>
+			{ isClearConfirmOpen && (
+				<ConfirmationModal
+					onConfirm={ handleClearAll }
+					onCancel={ () => setIsClearConfirmOpen( false ) }
+				>
+					{ `${ __( 'Are you sure you want to clear logs for', 'data-machine' ) } ${ scopeLabel }? ${ __( 'This action cannot be undone.', 'data-machine' ) }` }
+				</ConfirmationModal>
+			) }
 		</div>
 	);
 };

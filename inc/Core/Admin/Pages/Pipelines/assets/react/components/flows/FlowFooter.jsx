@@ -8,7 +8,7 @@
 /**
  * WordPress dependencies
  */
-import { __ } from '@wordpress/i18n';
+import { __, sprintf } from '@wordpress/i18n';
 
 /**
  * Get CSS class for job status.
@@ -53,31 +53,26 @@ const formatStatus = ( status ) => {
 /**
  * Flow Footer Component
  *
- * @param {Object}  props                             - Component props
- * @param {number}  props.flowId                      - Flow ID
- * @param {Object}  props.scheduling                  - Scheduling display data
- * @param {string}  props.scheduling.interval         - Schedule interval
- * @param {string}  props.scheduling.last_run_display - Pre-formatted last run display
- * @param {string}  props.scheduling.last_run_status  - Job status from last run
- * @param {boolean} props.scheduling.is_running       - Whether a job is currently running
- * @param {string}  props.scheduling.next_run_display - Pre-formatted next run display
+ * @param {Object} props            - Component props
+ * @param {number} props.flowId     - Flow ID
+ * @param {Object} props.scheduling - Scheduling display data
  * @return {React.ReactElement} Flow footer
  */
 export default function FlowFooter( { flowId, scheduling } ) {
-	const {
-		interval,
-		scheduled_time,
-		last_run_display,
-		last_run_status,
-		is_running,
-		next_run_display,
-	} = scheduling || {};
+	const interval = scheduling?.interval;
+	const scheduledTime = scheduling?.scheduled_time;
+	const lastRunDisplay = scheduling?.last_run_display;
+	const lastRunStatus = scheduling?.last_run_status;
+	const isRunning = scheduling?.is_running;
+	const nextRunDisplay = scheduling?.next_run_display;
 
 	let scheduleDisplay;
-	if ( interval === 'one_time' && scheduled_time ) {
-		scheduleDisplay =
-			__( 'One Time: ', 'data-machine' ) +
-			new Date( scheduled_time ).toLocaleString();
+	if ( interval === 'one_time' && scheduledTime ) {
+		scheduleDisplay = sprintf(
+			/* translators: %s: Scheduled date and time. */
+			__( 'One Time: %s', 'data-machine' ),
+			new Date( scheduledTime ).toLocaleString()
+		);
 	} else if ( interval && interval !== 'manual' ) {
 		scheduleDisplay = interval;
 	} else {
@@ -85,9 +80,9 @@ export default function FlowFooter( { flowId, scheduling } ) {
 	}
 
 	// When running, show "Running" status; otherwise format the job status
-	const displayStatus = is_running
+	const displayStatus = isRunning
 		? __( 'Running', 'data-machine' )
-		: formatStatus( last_run_status );
+		: formatStatus( lastRunStatus );
 
 	return (
 		<div className="datamachine-flow-footer">
@@ -103,12 +98,12 @@ export default function FlowFooter( { flowId, scheduling } ) {
 
 			<div className="datamachine-flow-meta-item">
 				<strong>{ __( 'Last Run:', 'data-machine' ) }</strong>{ ' ' }
-				{ last_run_display || __( 'Never', 'data-machine' ) }
+				{ lastRunDisplay || __( 'Never', 'data-machine' ) }
 				{ displayStatus && (
 					<span
 						className={ getStatusClass(
-							last_run_status,
-							is_running
+							lastRunStatus,
+							isRunning
 						) }
 					>
 						{ ' ' }
@@ -120,7 +115,7 @@ export default function FlowFooter( { flowId, scheduling } ) {
 			{ interval && interval !== 'manual' && (
 				<div className="datamachine-flow-meta-item">
 					<strong>{ __( 'Next Run:', 'data-machine' ) }</strong>{ ' ' }
-					{ next_run_display || __( 'Never', 'data-machine' ) }
+					{ nextRunDisplay || __( 'Never', 'data-machine' ) }
 				</div>
 			) }
 		</div>

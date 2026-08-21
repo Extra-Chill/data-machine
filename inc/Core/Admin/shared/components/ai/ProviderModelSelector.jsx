@@ -46,7 +46,10 @@ export default function ProviderModelSelector( {
 } ) {
 	const { data: providersData, isLoading } = useProviders();
 
-	const providers = providersData?.providers || {};
+	const providers = useMemo(
+		() => providersData?.providers || {},
+		[ providersData?.providers ]
+	);
 	const defaults = providersData?.defaults || {};
 
 	// Apply defaults when data loads and no values are set
@@ -131,10 +134,10 @@ export default function ProviderModelSelector( {
 				} );
 			} else if ( typeof providerData.models === 'object' ) {
 				Object.entries( providerData.models ).forEach(
-					( [ modelId, modelLabel ] ) => {
+					( [ modelId, modelName ] ) => {
 						options.push( {
 							value: modelId,
-							label: modelLabel || modelId,
+							label: modelName || modelId,
 						} );
 					}
 				);

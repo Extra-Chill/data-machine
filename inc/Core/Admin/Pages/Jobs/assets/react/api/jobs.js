@@ -4,8 +4,6 @@
  * REST API calls for job management operations.
  */
 
-/* eslint-disable jsdoc/check-line-alignment */
-
 /**
  * External dependencies
  */
@@ -14,10 +12,10 @@ import { client } from '@shared/utils/api';
 /**
  * Fetch jobs list with pagination
  *
- * @param {Object} params  Query parameters
- * @param {number} params.page  Current page (1-based)
- * @param {number} params.perPage Items per page
- * @param {string} params.status Optional status filter
+ * @param {Object}  params              Query parameters
+ * @param {number}  params.page         Current page (1-based)
+ * @param {number}  params.perPage      Items per page
+ * @param {string}  params.status       Optional status filter
  * @param {boolean} params.hideChildren Hide child jobs in the main list
  * @return {Promise<Object>} Jobs list response
  */
@@ -62,8 +60,8 @@ export const fetchChildJobs = ( parentJobId ) => {
 /**
  * Clear jobs
  *
- * @param {string} type  Job type to clear: 'all' or 'failed'
- * @param {boolean} cleanupProcessed  Also clear processed items
+ * @param {string}  type             Job type to clear: 'all' or 'failed'
+ * @param {boolean} cleanupProcessed Also clear processed items
  * @return {Promise<Object>}  Clear operation result
  */
 export const clearJobs = ( type, cleanupProcessed = false ) =>
@@ -75,7 +73,7 @@ export const clearJobs = ( type, cleanupProcessed = false ) =>
 /**
  * Clear processed items
  *
- * @param {string} clearType  Clear type: 'pipeline' or 'flow'
+ * @param {string} clearType Clear type: 'pipeline' or 'flow'
  * @param {number} targetId  Pipeline ID or Flow ID
  * @return {Promise<Object>}  Clear operation result
  */

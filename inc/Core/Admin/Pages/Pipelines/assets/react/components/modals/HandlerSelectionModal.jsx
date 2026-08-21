@@ -2,7 +2,7 @@
  * Handler Selection Modal Component
  *
  * Modal for selecting handler type before configuring settings.
- * @pattern Presentational - Receives handlers data as props
+ * Presentational component that receives handlers data as props.
  */
 
 /**
@@ -19,11 +19,12 @@ import { useHandlerContext } from '../../context/HandlerProvider';
 /**
  * Handler Selection Modal Component
  *
- * @param {Object}   props                 - Component props
- * @param {Function} props.onClose         - Close handler
- * @param {string}   props.stepType        - Step type (fetch, publish, upsert)
- * @param {Function} props.onSelectHandler - Handler selection callback
- * @param {Object}   props.handlers        - All available handlers
+ * @param {Object}   props                      - Component props
+ * @param {Function} props.onClose              - Close handler
+ * @param {string}   props.stepType             - Step type (fetch, publish, upsert)
+ * @param {Function} props.onSelectHandler      - Handler selection callback
+ * @param {Object}   props.handlers             - All available handlers
+ * @param {Array}    props.existingHandlerSlugs - Existing handler slugs
  * @return {React.ReactElement|null} Handler selection modal
  */
 export default function HandlerSelectionModal( {
@@ -49,7 +50,7 @@ export default function HandlerSelectionModal( {
 
 	/**
 	 * Handle handler selection
-	 * @param handlerSlug
+	 * @param {string} handlerSlug Handler slug.
 	 */
 	const handleSelect = async ( handlerSlug ) => {
 		if ( onSelectHandler ) {
@@ -57,8 +58,7 @@ export default function HandlerSelectionModal( {
 			try {
 				await onSelectHandler( handlerSlug );
 			} catch ( err ) {
-				// eslint-disable-next-line no-console
-				console.error( 'Handler selection error:', err );
+				window.console.error( 'Handler selection error:', err );
 				setError(
 					err?.message ||
 						'An error occurred while assigning the handler.'

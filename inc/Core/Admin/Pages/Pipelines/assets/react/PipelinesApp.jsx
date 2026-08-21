@@ -210,8 +210,7 @@ export default function PipelinesApp() {
 		try {
 			await createPipelineMutation.mutateAsync( 'New Pipeline' );
 		} catch ( error ) {
-			// eslint-disable-next-line no-console
-			console.error( 'Error creating pipeline:', error );
+			window.console.error( 'Error creating pipeline:', error );
 		} finally {
 			setIsCreatingPipeline( false );
 		}

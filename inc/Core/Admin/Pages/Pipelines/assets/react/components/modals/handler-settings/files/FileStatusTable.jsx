@@ -19,7 +19,7 @@ import { __ } from '@wordpress/i18n';
 export default function FileStatusTable( { files = [] } ) {
 	/**
 	 * Get status badge
-	 * @param status
+	 * @param {string} status File status.
 	 */
 	const getStatusBadge = ( status ) => {
 		const statusConfig = {

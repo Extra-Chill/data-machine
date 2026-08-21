@@ -8,8 +8,7 @@
  * WordPress dependencies
  */
 import { useState, useRef } from '@wordpress/element';
-import { Button } from '@wordpress/components';
-import { __ } from '@wordpress/i18n';
+import { __, sprintf } from '@wordpress/i18n';
 
 /**
  * File Upload Dropzone Component
@@ -49,7 +48,7 @@ export default function FileUploadDropzone( {
 
 	/**
 	 * Validate and process file
-	 * @param file
+	 * @param {File} file Uploaded file.
 	 */
 	const processFile = ( file ) => {
 		// Get file extension
@@ -58,9 +57,10 @@ export default function FileUploadDropzone( {
 		// Validate file type
 		if ( ! allowedTypes.includes( extension ) ) {
 			setError(
-				__(
-					`Please select a valid file. Allowed types: ${ formatAllowedTypes() }`,
-					'data-machine'
+				sprintf(
+					/* translators: %s: Comma-separated allowed file extensions. */
+					__( 'Please select a valid file. Allowed types: %s', 'data-machine' ),
+					formatAllowedTypes()
 				)
 			);
 			return;
@@ -70,9 +70,10 @@ export default function FileUploadDropzone( {
 		const maxSizeBytes = maxSizeMB * 1024 * 1024;
 		if ( file.size > maxSizeBytes ) {
 			setError(
-				__(
-					`File size exceeds ${ maxSizeMB }MB limit.`,
-					'data-machine'
+				sprintf(
+					/* translators: %d: Maximum upload size in megabytes. */
+					__( 'File size exceeds %dMB limit.', 'data-machine' ),
+					maxSizeMB
 				)
 			);
 			return;
@@ -87,7 +88,7 @@ export default function FileUploadDropzone( {
 
 	/**
 	 * Handle drag events
-	 * @param e
+	 * @param {Event} e Drag event.
 	 */
 	const handleDragEnter = ( e ) => {
 		e.preventDefault();
@@ -125,7 +126,7 @@ export default function FileUploadDropzone( {
 
 	/**
 	 * Handle file input change
-	 * @param e
+	 * @param {Event} e Input event.
 	 */
 	const handleFileInputChange = ( e ) => {
 		const files = e.target.files;
@@ -134,9 +135,7 @@ export default function FileUploadDropzone( {
 		}
 	};
 
-	/**
-	 * Trigger file input click
-	 */
+	/** Trigger the hidden file input from the sole activation control. */
 	const handleBrowseClick = () => {
 		if ( fileInputRef.current ) {
 			fileInputRef.current.click();
@@ -147,50 +146,52 @@ export default function FileUploadDropzone( {
 
 	return (
 		<div>
-			<div
+			<button
+				type="button"
 				onDragEnter={ handleDragEnter }
 				onDragLeave={ handleDragLeave }
 				onDragOver={ handleDragOver }
 				onDrop={ handleDrop }
+				onClick={ handleBrowseClick }
 				className={ `datamachine-dropzone ${
 					isDragging ? 'datamachine-dropzone--dragging' : ''
-				}` }
-				onClick={ ! disabled ? handleBrowseClick : undefined }
+				} ${ disabled ? 'datamachine-dropzone--disabled' : '' }` }
+				disabled={ disabled }
 			>
-				<div className="datamachine-dropzone-icon"></div>
+				<span className="datamachine-dropzone-icon"></span>
 
-				<p className="datamachine-dropzone-title">
+				<span className="datamachine-dropzone-title">
 					{ uploadText || defaultUploadText }
-				</p>
+				</span>
 
-				<p className="datamachine-dropzone-helper">
-					{ __(
-						`Allowed: ${ formatAllowedTypes() } (max ${ maxSizeMB }MB)`,
-						'data-machine'
-					) }
-				</p>
+				<span className="datamachine-dropzone-helper">
+					{
+						sprintf(
+							/* translators: 1: Allowed file extensions, 2: Maximum size in megabytes. */
+							__( 'Allowed: %1$s (max %2$dMB)', 'data-machine' ),
+							formatAllowedTypes(),
+							maxSizeMB
+						)
+					}
+				</span>
 
-				<p className="datamachine-dropzone-or">
+				<span className="datamachine-dropzone-or">
 					{ __( 'or', 'data-machine' ) }
-				</p>
+				</span>
 
-				<Button
-					variant="secondary"
-					onClick={ handleBrowseClick }
-					disabled={ disabled }
-				>
+				<span className="datamachine-dropzone-browse">
 					{ __( 'Browse Files', 'data-machine' ) }
-				</Button>
+				</span>
+			</button>
 
-				<input
-					ref={ fileInputRef }
-					type="file"
-					accept={ getAcceptAttribute() }
-					onChange={ handleFileInputChange }
-					className="datamachine-hidden"
-					disabled={ disabled }
-				/>
-			</div>
+			<input
+				ref={ fileInputRef }
+				type="file"
+				accept={ getAcceptAttribute() }
+				onChange={ handleFileInputChange }
+				className="datamachine-hidden"
+				disabled={ disabled }
+			/>
 
 			{ error && (
 				<div className="datamachine-dropzone-error">{ error }</div>

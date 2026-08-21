@@ -7,8 +7,12 @@
 /**
  * WordPress dependencies
  */
-import { useState, useEffect, useCallback } from '@wordpress/element';
-import { Modal, Button, Notice } from '@wordpress/components';
+import { useState, useEffect, useCallback, useRef } from '@wordpress/element';
+import {
+	Modal,
+	Button,
+	Notice,
+} from '@wordpress/components';
 import { __, sprintf } from '@wordpress/i18n';
 /**
  * Internal dependencies
@@ -21,6 +25,12 @@ import OAuthPopupHandler from './oauth/OAuthPopupHandler';
 import RedirectUrlDisplay from './oauth/RedirectUrlDisplay';
 
 /**
+ * External dependencies
+ */
+import ConfirmationModal from '@shared/components/ConfirmationModal';
+import { client } from '@shared/utils/api';
+
+/**
  * OAuth Authentication Modal Component
  *
  * @param {Object}   props                  - Component props
@@ -28,7 +38,7 @@ import RedirectUrlDisplay from './oauth/RedirectUrlDisplay';
  * @param {string}   props.handlerSlug      - Handler slug
  * @param {Object}   props.handlerInfo      - Handler metadata
  * @param {Function} props.onSuccess        - Success callback
- * @param            props.onBackToSettings
+ * @param {Function} props.onBackToSettings - Return-to-settings callback
  * @return {React.ReactElement|null} OAuth authentication modal
  */
 export default function OAuthAuthenticationModal( {
@@ -48,9 +58,76 @@ export default function OAuthAuthenticationModal( {
 	const [ success, setSuccess ] = useState( null );
 	const [ isStatusLoading, setIsStatusLoading ] = useState( false );
 	const [ showConfigForm, setShowConfigForm ] = useState( false );
+	const [ isDisconnectConfirmOpen, setIsDisconnectConfirmOpen ] = useState( false );
+	const configDirtyRef = useRef( false );
+	const configSavingRef = useRef( false );
+	const statusGenerationRef = useRef( 0 );
+	const activeStatusRequestsRef = useRef( 0 );
 
 	// Determine auth type from handler metadata
 	const authType = handlerInfo.auth_type || 'oauth2'; // oauth2, oauth1, or simple
+
+	const apiConfigForm = useFormState( {
+		initialData: {},
+		onSubmit: async ( config ) => {
+			configSavingRef.current = true;
+			try {
+				const response = await wp.apiFetch( {
+					path: `/datamachine/v1/auth/${ handlerSlug }`,
+					method: 'PUT',
+					data: config,
+				} );
+				configSavingRef.current = false;
+				configDirtyRef.current = false;
+				if ( response?.config_status ) {
+					resetApiConfig( response.config_status );
+				}
+				if ( authType === 'simple' ) {
+					setConnected( true );
+					setAccountData( response?.config_status || null );
+					setSuccess(
+						__( 'Connected successfully!', 'data-machine' )
+					);
+					try {
+						await fetchConnectionStatus( { silent: true } );
+					} catch {
+						// Status refresh is best-effort; the next open retries it.
+					}
+					if ( onSuccess ) {
+						onSuccess();
+					}
+				} else {
+					setSuccess(
+						__(
+							'Configuration saved! You can now connect your account.',
+							'data-machine'
+						)
+					);
+				}
+			} catch ( saveError ) {
+				throw new Error(
+					saveError.message ||
+						__( 'Failed to save configuration.', 'data-machine' )
+				);
+			} finally {
+				configSavingRef.current = false;
+			}
+		},
+	} );
+	const {
+		reset: resetApiConfig,
+		updateData: updateApiConfig,
+	} = apiConfigForm;
+	const handleApiConfigChange = useCallback(
+		( config ) => {
+			if ( configSavingRef.current ) {
+				return;
+			}
+			configDirtyRef.current = true;
+			updateApiConfig( config );
+		},
+		[ updateApiConfig ]
+	);
 
 	const fetchConnectionStatus = useCallback(
 		async ( { silent = false } = {} ) => {
@@ -58,12 +135,12 @@ export default function OAuthAuthenticationModal( {
 				return null;
 			}
 
+			const generation = ++statusGenerationRef.current;
+			activeStatusRequestsRef.current += 1;
 			setIsStatusLoading( true );
 
 			try {
-				const response = await wp.apiFetch( {
-					path: `/datamachine/v1/auth/${ handlerSlug }/status`,
-				} );
+				const response = await client.get( `/auth/${ handlerSlug }/status` );
 
 				if ( ! response?.success ) {
 					throw new Error(
@@ -77,13 +154,20 @@ export default function OAuthAuthenticationModal( {
 
 				const statusData = response.data || {};
 				const isAuthenticated = !! statusData.authenticated;
+				if ( generation !== statusGenerationRef.current ) {
+					return statusData;
+				}
 
 				setConnected( isAuthenticated );
 				setAccountData( statusData.account_details || null );
 
 				// Update form with masked config if available and not already edited
-				if ( statusData.config_status && ! apiConfigForm.isDirty ) {
-					apiConfigForm.reset( statusData.config_status );
+				if (
+					statusData.config_status &&
+					! configDirtyRef.current &&
+					! configSavingRef.current
+				) {
+					resetApiConfig( statusData.config_status );
 				}
 
 				if ( statusData.error ) {
@@ -100,7 +184,7 @@ export default function OAuthAuthenticationModal( {
 
 				return statusData;
 			} catch ( statusError ) {
-				if ( ! silent ) {
+				if ( generation === statusGenerationRef.current && ! silent ) {
 					setError(
 						statusError?.message ||
 							__(
@@ -111,57 +195,17 @@ export default function OAuthAuthenticationModal( {
 				}
 				throw statusError;
 			} finally {
-				setIsStatusLoading( false );
-			}
-		},
-		[ handlerSlug ]
-	);
-
-	const apiConfigForm = useFormState( {
-		initialData: {},
-		onSubmit: async ( config ) => {
-			try {
-				await wp.apiFetch( {
-					path: `/datamachine/v1/auth/${ handlerSlug }`,
-					method: 'PUT',
-					data: config,
-				} );
-
-				if ( authType === 'simple' ) {
-					setConnected( true );
-					setAccountData( { ...config } );
-					setSuccess(
-						__( 'Connected successfully!', 'data-machine' )
-					);
-					try {
-						await fetchConnectionStatus( { silent: true } );
-					} catch ( statusError ) {
-						// Status refresh is best-effort; network failures shouldn't break the save flow.
-						// eslint-disable-next-line no-console
-						console.warn(
-							'Auth status refresh failed:',
-							statusError
-						);
-					}
-					if ( onSuccess ) {
-						onSuccess();
-					}
-				} else {
-					setSuccess(
-						__(
-							'Configuration saved! You can now connect your account.',
-							'data-machine'
-						)
-					);
-				}
-			} catch ( error ) {
-				throw new Error(
-					error.message ||
-						__( 'Failed to save configuration.', 'data-machine' )
+				activeStatusRequestsRef.current = Math.max(
+					0,
+					activeStatusRequestsRef.current - 1
 				);
+				if ( activeStatusRequestsRef.current === 0 ) {
+					setIsStatusLoading( false );
+				}
 			}
 		},
-	} );
+		[ handlerSlug, resetApiConfig ]
+	);
 
 	const disconnectOperation = useAsyncOperation();
 
@@ -177,33 +221,24 @@ export default function OAuthAuthenticationModal( {
 	 * Fetch latest connection status when modal mounts to keep UI accurate.
 	 */
 	useEffect( () => {
-		let isMounted = true;
-
 		const refreshStatus = async () => {
 			try {
 				await fetchConnectionStatus( { silent: true } );
-			} catch ( statusError ) {
-				// Avoid noisy console errors when modal unmounts mid-request.
-				if ( isMounted ) {
-					// eslint-disable-next-line no-console
-					console.warn(
-						'Unable to refresh auth status:',
-						statusError
-					);
-				}
+			} catch {
+				// The status request already reports a bounded diagnostic centrally.
 			}
 		};
 
 		refreshStatus();
 
 		return () => {
-			isMounted = false;
+			statusGenerationRef.current += 1;
 		};
 	}, [ handlerSlug, fetchConnectionStatus ] );
 
 	/**
 	 * Handle OAuth success
-	 * @param account
+	 * @param {Object} account Account details.
 	 */
 	const handleOAuthSuccess = ( account ) => {
 		setConnected( true );
@@ -224,7 +259,7 @@ export default function OAuthAuthenticationModal( {
 
 	/**
 	 * Handle OAuth error
-	 * @param errorMessage
+	 * @param {string} errorMessage Error message.
 	 */
 	const handleOAuthError = ( errorMessage ) => {
 		setError( errorMessage );
@@ -242,17 +277,7 @@ export default function OAuthAuthenticationModal( {
 	 * Handle disconnect
 	 */
 	const handleDisconnect = () => {
-		if (
-			! confirm(
-				__(
-					'Are you sure you want to disconnect this account? This will remove the access token but keep your API configuration.',
-					'data-machine'
-				)
-			)
-		) {
-			return;
-		}
-
+		setIsDisconnectConfirmOpen( false );
 		disconnectOperation.execute( async () => {
 			const response = await wp.apiFetch( {
 				path: `/datamachine/v1/auth/${ handlerSlug }`,
@@ -275,9 +300,8 @@ export default function OAuthAuthenticationModal( {
 
 			try {
 				await fetchConnectionStatus( { silent: true } );
-			} catch ( statusError ) {
-				// eslint-disable-next-line no-console
-				console.warn( 'Auth status refresh failed:', statusError );
+			} catch {
+				// The status request already reports a bounded diagnostic centrally.
 			}
 
 			if ( onSuccess ) {
@@ -295,12 +319,19 @@ export default function OAuthAuthenticationModal( {
 	// 3. Simple auth (always needs form visible to edit)
 	const isConfigFormVisible =
 		showConfigForm || ! connected || authType === 'simple';
+	let saveButtonLabel = __( 'Save Configuration', 'data-machine' );
+	if ( apiConfigForm.isSubmitting ) {
+		saveButtonLabel = __( 'Saving…', 'data-machine' );
+	} else if ( authType === 'simple' ) {
+		saveButtonLabel = __( 'Save Credentials', 'data-machine' );
+	}
 
 	return (
 		<Modal
 			title={
 				handlerInfo.label
 					? sprintf(
+							/* translators: %s: Handler label. */
 							__( 'Connect %s Account', 'data-machine' ),
 							handlerInfo.label
 					  )
@@ -388,8 +419,9 @@ export default function OAuthAuthenticationModal( {
 							<>
 								<APIConfigForm
 									config={ apiConfigForm.data }
-									onChange={ apiConfigForm.updateData }
+									onChange={ handleApiConfigChange }
 									fields={ handlerInfo.auth_fields }
+									disabled={ apiConfigForm.isSubmitting }
 								/>
 								<div className="datamachine-modal-spacing--mt-16">
 									<Button
@@ -402,17 +434,7 @@ export default function OAuthAuthenticationModal( {
 										disabled={ apiConfigForm.isSubmitting }
 										isBusy={ apiConfigForm.isSubmitting }
 									>
-										{ apiConfigForm.isSubmitting
-											? __( 'Saving…', 'data-machine' )
-											: authType === 'simple'
-											? __(
-													'Save Credentials',
-													'data-machine'
-											  )
-											: __(
-													'Save Configuration',
-													'data-machine'
-											  ) }
+										{ saveButtonLabel }
 									</Button>
 
 									{ /* Cancel button to hide form if we are already connected */ }
@@ -463,7 +485,7 @@ export default function OAuthAuthenticationModal( {
 						>
 							<Button
 								variant="secondary"
-								onClick={ handleDisconnect }
+								onClick={ () => setIsDisconnectConfirmOpen( true ) }
 								disabled={ disconnectOperation.isLoading }
 								isBusy={ disconnectOperation.isLoading }
 								className="datamachine-button--destructive"
@@ -517,6 +539,17 @@ export default function OAuthAuthenticationModal( {
 						{ __( 'Close', 'data-machine' ) }
 					</Button>
 				</div>
+				{ isDisconnectConfirmOpen && (
+					<ConfirmationModal
+						onConfirm={ handleDisconnect }
+						onCancel={ () => setIsDisconnectConfirmOpen( false ) }
+					>
+						{ __(
+							'Are you sure you want to disconnect this account? This will remove the access token but keep your API configuration.',
+							'data-machine'
+						) }
+					</ConfirmationModal>
+				) }
 			</div>
 		</Modal>
 	);

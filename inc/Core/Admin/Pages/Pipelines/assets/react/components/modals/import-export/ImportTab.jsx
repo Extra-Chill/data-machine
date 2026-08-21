@@ -9,7 +9,7 @@
  */
 import { useState } from '@wordpress/element';
 import { Button, Notice } from '@wordpress/components';
-import { __ } from '@wordpress/i18n';
+import { __, sprintf } from '@wordpress/i18n';
 /**
  * Internal dependencies
  */
@@ -33,8 +33,8 @@ export default function ImportTab( { onSuccess, onClose } ) {
 
 	/**
 	 * Handle file selection
-	 * @param content
-	 * @param name
+	 * @param {string} content File content.
+	 * @param {string} name    File name.
 	 */
 	const handleFileSelected = ( content, name ) => {
 		setCsvContent( content );
@@ -59,13 +59,13 @@ export default function ImportTab( { onSuccess, onClose } ) {
 
 			if ( response.success ) {
 				const count = response.data.created_count || 0;
-				const message =
-					count > 0
-						? __(
-								`Successfully imported ${ count } pipeline(s)!`,
-								'data-machine'
-						  )
-						: __( 'Import completed!', 'data-machine' );
+				const message = count > 0
+					? sprintf(
+							/* translators: %d: Number of imported pipelines. */
+							__( 'Successfully imported %d pipeline(s)!', 'data-machine' ),
+							count
+					  )
+					: __( 'Import completed!', 'data-machine' );
 
 				// Clear file after successful import
 				setCsvContent( null );

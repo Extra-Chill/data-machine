@@ -14,6 +14,9 @@ import { Spinner } from '@wordpress/components';
 /**
  * Internal dependencies
  */
+/**
+ * External dependencies
+ */
 import SettingsSaveBar, {
 	useSaveStatus,
 } from '@shared/components/SettingsSaveBar';
@@ -29,6 +32,9 @@ import {
 /**
  * Core file editor — uses existing agent file API.
  * Renders read-only for non-editable files (e.g. SITE.md, NETWORK.md).
+ * @param {Object}  root0          Component props.
+ * @param {string}  root0.filename File name.
+ * @param {boolean} root0.editable Whether the file can be edited.
  */
 const CoreFileEditor = ( { filename, editable = true } ) => {
 	const { data: file, isLoading, error } = useAgentFile( filename );
@@ -117,6 +123,10 @@ const CoreFileEditor = ( { filename, editable = true } ) => {
 
 /**
  * Daily file editor — uses daily memory API routes.
+ * @param {Object} root0       Component props.
+ * @param {string} root0.year  Year.
+ * @param {string} root0.month Month.
+ * @param {string} root0.day   Day.
  */
 const DailyFileEditor = ( { year, month, day } ) => {
 	const { data: file, isLoading, error } = useDailyFile( year, month, day );
@@ -203,6 +213,8 @@ const DailyFileEditor = ( { year, month, day } ) => {
 
 /**
  * Context file editor — uses context memory API routes.
+ * @param {Object} root0      Component props.
+ * @param {string} root0.slug Context slug.
  */
 const ContextFileEditor = ( { slug } ) => {
 	const { data: file, isLoading, error } = useContextFile( slug );
@@ -287,6 +299,8 @@ const ContextFileEditor = ( { slug } ) => {
 
 /**
  * Router component — dispatches to core, daily, or context editor.
+ * @param {Object} root0              Component props.
+ * @param {Object} root0.selectedFile Selected file metadata.
  */
 const AgentFileEditor = ( { selectedFile } ) => {
 	if ( ! selectedFile ) {

@@ -16,23 +16,27 @@ import { __ } from '@wordpress/i18n';
  * Internal dependencies
  */
 import { useUpdateQueueItem, useAddToQueue } from '../../queries/queue';
+/**
+ * External dependencies
+ */
 import useDebouncedAutosave from '@shared/hooks/useDebouncedAutosave';
 
 /**
  * QueueablePromptField Component.
  *
- * @param {Object}   props                - Component props.
- * @param {number}   props.flowId         - Flow ID.
- * @param {string}   props.flowStepId     - Flow step ID.
- * @param {string}   props.prompt         - Current prompt value (from handler_config or prompt_queue head).
- * @param {Array}    props.promptQueue    - Prompt queue array.
- * @param {string}   props.queueMode      - Queue access mode: "drain" | "loop" | "static".
- * @param {string}   props.placeholder    - Placeholder text.
- * @param {string}   props.label          - Field label override.
- * @param {Function} props.onSave         - Save callback for non-queue saves (receives prompt string).
- * @param {Function} props.onQueueClick   - Queue management button handler.
- * @param {Function} props.onError        - Error callback.
- * @return {JSX.Element} Prompt field with queue integration.
+ * @param {Object}   props              - Component props.
+ * @param {number}   props.flowId       - Flow ID.
+ * @param {string}   props.flowStepId   - Flow step ID.
+ * @param {string}   props.prompt       - Current prompt value (from handler_config or prompt_queue head).
+ * @param {Array}    props.promptQueue  - Prompt queue array.
+ * @param {string}   props.queueMode    - Queue access mode: "drain" | "loop" | "static".
+ * @param {string}   props.placeholder  - Placeholder text.
+ * @param {string}   props.label        - Field label override.
+ * @param {Function} props.onSave       - Save callback for non-queue saves (receives prompt string).
+ * @param {Function} props.onQueueClick - Queue management button handler.
+ * @param {Function} props.onError      - Error callback.
+ * @param {number}   props.pipelineId   - Pipeline ID.
+ * @return {React.ReactElement} Prompt field with queue integration.
  */
 export default function QueueablePromptField( {
 	flowId,
@@ -115,8 +119,7 @@ export default function QueueablePromptField( {
 					setLocalValue( currentMessage );
 				}
 			} catch ( err ) {
-				// eslint-disable-next-line no-console
-				console.error( 'Queue save error:', err );
+				window.console.error( 'Queue save error:', err );
 				if ( onError ) {
 					onError(
 						err.message ||
@@ -131,6 +134,7 @@ export default function QueueablePromptField( {
 		[
 			flowId,
 			flowStepId,
+			pipelineId,
 			firstQueuePrompt,
 			queueHasItems,
 			shouldUseQueue,

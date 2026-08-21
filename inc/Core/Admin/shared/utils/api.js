@@ -54,6 +54,21 @@ const getInterceptedParams = () => {
 };
 
 /**
+ * Emit a bounded API diagnostic without request data or response payloads.
+ *
+ * @param {string} method  Request method.
+ * @param {string} path    Request path.
+ * @param {string} message Failure message.
+ */
+const reportApiFailure = ( method, path, message ) => {
+	window.console.error( 'Data Machine API request failed', {
+		method,
+		path,
+		message: message || 'Unknown error',
+	} );
+};
+
+/**
  * Core API Request Handler
  *
  * @param {string} path         - Endpoint path (relative to namespace)
@@ -87,14 +102,18 @@ const request = async (
 			...extraOptions,
 		} );
 
-		return {
+		const result = {
 			success: response.success,
 			data: response.data,
 			message: response.message || '',
 			...response, // Include any additional fields from response
 		};
+		if ( result.success === false ) {
+			reportApiFailure( method, path, result.message );
+		}
+		return result;
 	} catch ( error ) {
-		console.error( `API Request Error [${ method } ${ path }]:`, error );
+		reportApiFailure( method, path, error?.message );
 
 		return {
 			success: false,

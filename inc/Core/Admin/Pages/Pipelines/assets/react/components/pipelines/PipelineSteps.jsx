@@ -20,12 +20,11 @@ import { reorderPipelineSteps } from '../../utils/api';
 /**
  * Pipeline Steps Container Component
  *
- * @param {Object}   props                  - Component props
- * @param {number}   props.pipelineId       - Pipeline ID
- * @param {Object}   props.pipelineConfig   - Pipeline configuration keyed by pipeline_step_id
- * @param {Function} props.onStepAdded      - Add step handler
- * @param {Function} props.onStepRemoved    - Remove step handler
- * @param {Function} props.onStepConfigured - Configure step handler
+ * @param {Object}   props                - Component props
+ * @param {number}   props.pipelineId     - Pipeline ID
+ * @param {Object}   props.pipelineConfig - Pipeline configuration keyed by pipeline_step_id
+ * @param {Function} props.onStepAdded    - Add step handler
+ * @param {Function} props.onStepRemoved  - Remove step handler
  * @return {React.ReactElement} Pipeline steps container
  */
 export default function PipelineSteps( {
@@ -33,7 +32,6 @@ export default function PipelineSteps( {
 	pipelineConfig,
 	onStepAdded,
 	onStepRemoved,
-	onStepConfigured,
 } ) {
 	/**
 	 * Sort steps by execution order
@@ -59,7 +57,7 @@ export default function PipelineSteps( {
 
 	/**
 	 * Handle step drop to reorder
-	 * @param dropIndex
+	 * @param {number} dropIndex Drop index.
 	 */
 	const handleDrop = async ( dropIndex ) => {
 		if ( draggedIndex === null || draggedIndex === dropIndex ) {
@@ -76,7 +74,7 @@ export default function PipelineSteps( {
 		try {
 			await reorderPipelineSteps( pipelineId, newSteps );
 		} catch ( error ) {
-			console.error( 'Failed to reorder steps:', error );
+			window.console.error( 'Failed to reorder steps:', error );
 		}
 
 		setDraggedIndex( null );

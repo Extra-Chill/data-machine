@@ -27,7 +27,7 @@ export default function FileUploadInterface( { onFileUploaded } ) {
 
 	/**
 	 * Handle file selection
-	 * @param file
+	 * @param {File} file Uploaded file.
 	 */
 	const handleFileSelected = ( file ) => {
 		fileUpload.upload( async () => {

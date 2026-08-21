@@ -14,7 +14,6 @@ import { useState } from '@wordpress/element';
 import HandlerDefaultsForm from './HandlerDefaultsForm';
 
 const StepTypeAccordion = ( {
-	stepTypeSlug,
 	stepTypeData,
 	expandedHandler,
 	setExpandedHandler,
@@ -22,7 +21,7 @@ const StepTypeAccordion = ( {
 	savingHandler,
 } ) => {
 	const [ isExpanded, setIsExpanded ] = useState( false );
-	const { label, uses_handler, handlers } = stepTypeData;
+	const { label, uses_handler: usesHandler, handlers } = stepTypeData;
 	const handlerCount = Object.keys( handlers || {} ).length;
 
 	const toggleExpanded = () => {
@@ -52,21 +51,23 @@ const StepTypeAccordion = ( {
 					{ label } Handlers
 				</span>
 				<span className="datamachine-step-type-count">
-					{ uses_handler ? `(${ handlerCount })` : '' }
+					{ usesHandler ? `(${ handlerCount })` : '' }
 				</span>
 			</button>
 
 			{ isExpanded && (
 				<div className="datamachine-step-type-content">
-					{ ! uses_handler ? (
+					{ ! usesHandler && (
 						<p className="datamachine-step-type-note">
 							This step type does not use handlers.
 						</p>
-					) : handlerCount === 0 ? (
+					) }
+					{ usesHandler && handlerCount === 0 && (
 						<p className="datamachine-step-type-note">
 							No handlers registered for this step type.
 						</p>
-					) : (
+					) }
+					{ usesHandler && handlerCount > 0 && (
 						<div className="datamachine-handlers-list">
 							{ Object.entries( handlers || {} ).map(
 								( [ handlerSlug, handlerData ] ) => (

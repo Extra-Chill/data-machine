@@ -9,7 +9,7 @@ import { useCallback, useState, useRef, useEffect } from '@wordpress/element';
 /**
  * External dependencies
  */
-import { Card, CardBody, CardDivider } from '@wordpress/components';
+import { Card, CardBody, CardDivider, Notice } from '@wordpress/components';
 import { __ } from '@wordpress/i18n';
 /**
  * Internal dependencies
@@ -56,6 +56,7 @@ function FlowCardContent( props ) {
 
 	// Run success state for temporary button feedback
 	const [ runSuccess, setRunSuccess ] = useState( false );
+	const [ actionError, setActionError ] = useState( null );
 	const successTimeout = useRef( null );
 
 	// Cleanup timeout on unmount
@@ -83,6 +84,7 @@ function FlowCardContent( props ) {
 	 */
 	const handleDelete = useCallback(
 		async ( flowId ) => {
+			setActionError( null );
 			try {
 				await deleteFlowMutation.mutateAsync( {
 					flowId,
@@ -93,10 +95,8 @@ function FlowCardContent( props ) {
 					onFlowDeleted( flowId );
 				}
 			} catch ( error ) {
-				// eslint-disable-next-line no-console
-				console.error( 'Flow deletion error:', error );
-				// eslint-disable-next-line no-alert, no-undef
-				alert(
+				window.console.error( 'Flow deletion error:', error );
+				setActionError(
 					__(
 						'An error occurred while deleting the flow',
 						'data-machine'
@@ -112,6 +112,7 @@ function FlowCardContent( props ) {
 	 */
 	const handleDuplicate = useCallback(
 		async ( flowId ) => {
+			setActionError( null );
 			try {
 				await duplicateFlowMutation.mutateAsync( {
 					flowId,
@@ -122,10 +123,8 @@ function FlowCardContent( props ) {
 					onFlowDuplicated( flowId );
 				}
 			} catch ( error ) {
-				// eslint-disable-next-line no-console
-				console.error( 'Flow duplication error:', error );
-				// eslint-disable-next-line no-alert, no-undef
-				alert(
+				window.console.error( 'Flow duplication error:', error );
+				setActionError(
 					__(
 						'An error occurred while duplicating the flow',
 						'data-machine'
@@ -141,6 +140,7 @@ function FlowCardContent( props ) {
 	 */
 	const handleRun = useCallback(
 		async ( flowId ) => {
+			setActionError( null );
 			try {
 				await runFlowMutation.mutateAsync( flowId );
 				setRunSuccess( true );
@@ -154,10 +154,8 @@ function FlowCardContent( props ) {
 					baselineLastRun: currentFlowData.last_run,
 				} );
 			} catch ( error ) {
-				// eslint-disable-next-line no-console
-				console.error( 'Flow execution error:', error );
-				// eslint-disable-next-line no-alert, no-undef
-				alert(
+				window.console.error( 'Flow execution error:', error );
+				setActionError(
 					__(
 						'An error occurred while running the flow',
 						'data-machine'
@@ -202,7 +200,7 @@ function FlowCardContent( props ) {
 				flowName: currentFlowData.flow_name,
 			} );
 		},
-		[ currentFlowData.flow_id, currentFlowData.flow_name, openModal ]
+		[ currentFlowData.flow_name, openModal ]
 	);
 
 	/**
@@ -224,7 +222,7 @@ function FlowCardContent( props ) {
 	 * Handle step configuration.
 	 *
 	 * @param {string}      flowStepId      Flow step ID.
-	 * @param {string|null} specificHandler  Handler slug to configure, or null.
+	 * @param {string|null} specificHandler Handler slug to configure, or null.
 	 * @param {boolean}     addMode         When true, opens selection modal to add another handler.
 	 */
 	const handleStepConfigured = useCallback(
@@ -238,10 +236,22 @@ function FlowCardContent( props ) {
 
 			const stepType = pipelineStep?.step_type || flowStepConfig.step_type;
 			const isMultiHandlerStep = stepTypes[ stepType ]?.multi_handler === true;
-			const handlerSlugs = isMultiHandlerStep
-				? ( flowStepConfig.handler_slugs || [] )
-				: ( flowStepConfig.handler_slug ? [ flowStepConfig.handler_slug ] : [] );
-			const primarySlug = handlerSlugs[0] || '';
+			let handlerSlugs = [];
+			if ( isMultiHandlerStep ) {
+				handlerSlugs = flowStepConfig.handler_slugs || [];
+			} else if ( flowStepConfig.handler_slug ) {
+				handlerSlugs = [ flowStepConfig.handler_slug ];
+			}
+			const primarySlug = handlerSlugs[ 0 ] || '';
+			let currentSettings = flowStepConfig.handler_config || {};
+			if ( isMultiHandlerStep ) {
+				currentSettings =
+					flowStepConfig.handler_configs?.[ primarySlug ] || {};
+			}
+			if ( specificHandler ) {
+				currentSettings =
+					flowStepConfig.handler_configs?.[ specificHandler ] || {};
+			}
 
 			// Build data for handler modals
 			const data = {
@@ -251,9 +261,7 @@ function FlowCardContent( props ) {
 				stepType,
 				pipelineId: currentFlowData.pipeline_id,
 				flowId: currentFlowData.flow_id,
-				currentSettings: specificHandler
-					? ( flowStepConfig.handler_configs?.[ specificHandler ] || {} )
-					: ( isMultiHandlerStep ? ( flowStepConfig.handler_configs?.[ primarySlug ] || {} ) : ( flowStepConfig.handler_config || {} ) ),
+				currentSettings,
 				addMode,
 			};
 
@@ -295,6 +303,11 @@ function FlowCardContent( props ) {
 			size="large"
 		>
 			<CardBody>
+				{ actionError && (
+					<Notice status="error" onRemove={ () => setActionError( null ) }>
+						{ actionError }
+					</Notice>
+				) }
 				<FlowHeader
 					flowId={ currentFlowData.flow_id }
 					flowName={ currentFlowData.flow_name }

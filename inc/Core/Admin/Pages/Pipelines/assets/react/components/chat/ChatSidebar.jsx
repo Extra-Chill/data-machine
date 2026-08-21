@@ -42,7 +42,7 @@ const ReactMarkdown = lazy( () => import( 'react-markdown' ) );
  * Custom markdown renderer for @extrachill/chat messages.
  *
  * @param {string} content - Message content (markdown)
- * @return {JSX.Element} Rendered content
+ * @return {React.ReactElement} Rendered content
  */
 function renderMarkdown( content ) {
 	return (

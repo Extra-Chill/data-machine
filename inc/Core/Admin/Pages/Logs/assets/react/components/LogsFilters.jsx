@@ -58,7 +58,7 @@ const LogsFilters = ( { filters, onFiltersChange } ) => {
 					value={ filters.search }
 					onChange={ setSearch }
 					placeholder={ __(
-						'Search messages...',
+						'Search messages…',
 						'data-machine'
 					) }
 					__nextHasNoMarginBottom

@@ -44,7 +44,7 @@ export default function StepSelectionModal( {
 
 	/**
 	 * Count handlers for each step type
-	 * @param stepType
+	 * @param {string} stepType Step type.
 	 */
 	const getHandlerCount = ( stepType ) => {
 		return Object.values( handlers ).filter(
@@ -54,7 +54,7 @@ export default function StepSelectionModal( {
 
 	/**
 	 * Handle step type selection
-	 * @param stepType
+	 * @param {string} stepType Step type.
 	 */
 	const handleSelectStep = ( stepType ) => {
 		addStepOperation.execute( async () => {

@@ -5,9 +5,9 @@
 /**
  * WordPress dependencies
  */
-import { useCallback } from '@wordpress/element';
+import { useCallback, useState } from '@wordpress/element';
 import { __ } from '@wordpress/i18n';
-import { Spinner } from '@wordpress/components';
+import { Notice, Spinner } from '@wordpress/components';
 /**
  * Internal dependencies
  */
@@ -30,6 +30,7 @@ export default function FlowsSection( {
 } ) {
 	// Use mutations
 	const createFlowMutation = useCreateFlow();
+	const [ createError, setCreateError ] = useState( null );
 	const flowItems = Array.isArray( flows ) ? flows : flows?.items ?? [];
 	const isLoading = ! Array.isArray( flows ) && flows?.isLoading === true;
 	const hasFlows = flowItems.length > 0;
@@ -39,15 +40,15 @@ export default function FlowsSection( {
 	 */
 	const handleAddFlow = useCallback(
 		async ( pipelineIdParam ) => {
+			setCreateError( null );
 			try {
 				const defaultName = __( 'New Flow', 'data-machine' );
 				await createFlowMutation.mutateAsync( {
 					pipelineId: pipelineIdParam,
 					flowName: defaultName,
 				} );
-			} catch ( error ) {
-				// eslint-disable-next-line no-alert, no-undef
-				alert(
+			} catch {
+				setCreateError(
 					__(
 						'An error occurred while creating the flow',
 						'data-machine'
@@ -114,6 +115,11 @@ export default function FlowsSection( {
 	 */
 	return (
 		<div className="datamachine-flows-section">
+			{ createError && (
+				<Notice status="error" onRemove={ () => setCreateError( null ) }>
+					{ createError }
+				</Notice>
+			) }
 			<div className="datamachine-flows-section__header">
 				<h3 className="datamachine-flows-section__title">
 					{ __( 'Flows', 'data-machine' ) }{ ' ' }

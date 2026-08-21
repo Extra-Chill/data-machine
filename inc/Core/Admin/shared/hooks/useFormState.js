@@ -20,6 +20,7 @@ const formReducer = ( state, action ) => {
 		case 'UPDATE_FIELD':
 			return {
 				...state,
+				isDirty: true,
 				data: {
 					...state.data,
 					[ action.field ]: action.value,
@@ -30,6 +31,7 @@ const formReducer = ( state, action ) => {
 		case 'UPDATE_DATA':
 			return {
 				...state,
+				isDirty: true,
 				data: {
 					...state.data,
 					...action.payload,
@@ -41,6 +43,7 @@ const formReducer = ( state, action ) => {
 			return {
 				...state,
 				data: action.payload,
+				isDirty: false,
 				error: null,
 				success: null,
 			};
@@ -63,9 +66,16 @@ const formReducer = ( state, action ) => {
 				success: action.payload,
 			};
 
+		case 'MARK_CLEAN':
+			return {
+				...state,
+				isDirty: false,
+			};
+
 		case 'RESET_ALL':
 			return {
 				data: action.payload || {},
+				isDirty: false,
 				isSubmitting: false,
 				error: null,
 				success: null,
@@ -92,6 +102,7 @@ export const useFormState = ( {
 } = {} ) => {
 	const [ state, dispatch ] = useReducer( formReducer, {
 		data: initialData,
+		isDirty: false,
 		isSubmitting: false,
 		error: null,
 		success: null,
@@ -146,6 +157,7 @@ export const useFormState = ( {
 
 		try {
 			const result = await onSubmitRef.current( state.data );
+			dispatch( { type: 'MARK_CLEAN' } );
 			dispatch( { type: 'SET_SUCCESS', payload: result || true } );
 			return result;
 		} catch ( err ) {
@@ -161,6 +173,7 @@ export const useFormState = ( {
 
 	return {
 		data: state.data,
+		isDirty: state.isDirty,
 		isSubmitting: state.isSubmitting,
 		error: state.error,
 		success: state.success,

@@ -14,7 +14,7 @@
  */
 import { useState, useEffect } from '@wordpress/element';
 import { CheckboxControl, Button, Notice, Spinner } from '@wordpress/components';
-import { __ } from '@wordpress/i18n';
+import { __, sprintf } from '@wordpress/i18n';
 /**
  * Internal dependencies
  */
@@ -31,11 +31,11 @@ import { useAgentFiles } from '../../queries/pipelines';
 /**
  * Memory Files Selector Component
  *
- * @param {Object}   props                  - Component props
- * @param {string}   props.scopeLabel       - Label for the scope (e.g. 'pipeline', 'flow')
- * @param {Array}    props.selectedFiles    - Currently selected filenames
- * @param {boolean}  props.isLoading        - Whether selected files are loading
- * @param {Object}   props.updateMutation   - TanStack mutation for saving
+ * @param {Object}  props                - Component props
+ * @param {string}  props.scopeLabel     - Label for the scope (e.g. 'pipeline', 'flow')
+ * @param {Array}   props.selectedFiles  - Currently selected filenames
+ * @param {boolean} props.isLoading      - Whether selected files are loading
+ * @param {Object}  props.updateMutation - TanStack mutation for saving
  * @return {React.ReactElement} Memory files selector
  */
 export default function MemoryFilesSelector( {
@@ -83,8 +83,7 @@ export default function MemoryFilesSelector( {
 				__( 'Memory files updated successfully!', 'data-machine' )
 			);
 		} catch ( err ) {
-			// eslint-disable-next-line no-console
-			console.error( 'Memory files save error:', err );
+			window.console.error( 'Memory files save error:', err );
 		}
 	};
 
@@ -110,9 +109,13 @@ export default function MemoryFilesSelector( {
 					fontSize: '13px',
 				} }
 			>
-				{ __(
-					`Select agent memory files to include as AI context for this ${ scopeLabel }.`,
-					'data-machine'
+				{ sprintf(
+					/* translators: %s: Memory scope label. */
+					__(
+						'Select agent memory files to include as AI context for this %s.',
+						'data-machine'
+					),
+					scopeLabel
 				) }
 			</p>
 

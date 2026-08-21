@@ -8,28 +8,35 @@
  * WordPress dependencies
  */
 import { useState, useEffect, useCallback } from '@wordpress/element';
-import { TextControl, Button } from '@wordpress/components';
+import {
+	TextControl,
+	Button,
+} from '@wordpress/components';
 import { __ } from '@wordpress/i18n';
 /**
  * Internal dependencies
  */
 import { useUpdateFlowTitle } from '../../queries/flows';
+/**
+ * External dependencies
+ */
 import useDebouncedAutosave from '@shared/hooks/useDebouncedAutosave';
+import ConfirmationModal from '@shared/components/ConfirmationModal';
 
 /**
  * Flow Header Component.
  *
- * @param {Object}   props              - Component props.
- * @param {number}   props.flowId       - Flow ID.
- * @param {string}   props.flowName     - Flow name.
- * @param {Function} props.onNameChange - Name change handler.
- * @param {Function} props.onDelete     - Delete handler.
- * @param {Function} props.onDuplicate  - Duplicate handler.
- * @param {Function} props.onRun        - Run handler.
+ * @param {Object}   props               - Component props.
+ * @param {number}   props.flowId        - Flow ID.
+ * @param {string}   props.flowName      - Flow name.
+ * @param {Function} props.onNameChange  - Name change handler.
+ * @param {Function} props.onDelete      - Delete handler.
+ * @param {Function} props.onDuplicate   - Duplicate handler.
+ * @param {Function} props.onRun         - Run handler.
  * @param {Function} props.onSchedule    - Schedule handler.
  * @param {Function} props.onMemoryFiles - Memory files handler.
  * @param {boolean}  props.runSuccess    - Whether run was just successful.
- * @return {JSX.Element} Flow header.
+ * @return {React.ReactElement} Flow header.
  */
 export default function FlowHeader( {
 	flowId,
@@ -43,6 +50,7 @@ export default function FlowHeader( {
 	runSuccess = false,
 } ) {
 	const [ localName, setLocalName ] = useState( flowName );
+	const [ isDeleteConfirmOpen, setIsDeleteConfirmOpen ] = useState( false );
 	const updateFlowTitleMutation = useUpdateFlowTitle();
 
 	/**
@@ -71,8 +79,7 @@ export default function FlowHeader( {
 					onNameChange( flowId, name );
 				}
 			} catch ( err ) {
-				// eslint-disable-next-line no-console
-				console.error( 'Flow title save failed:', err );
+				window.console.error( 'Flow title save failed:', err );
 			}
 		},
 		[ flowId, flowName, onNameChange, updateFlowTitleMutation ]
@@ -94,12 +101,8 @@ export default function FlowHeader( {
 	 * Handle delete with confirmation
 	 */
 	const handleDelete = useCallback( () => {
-		// eslint-disable-next-line no-alert
-		const confirmed = window.confirm(
-			__( 'Are you sure you want to delete this flow?', 'data-machine' )
-		);
-
-		if ( confirmed && onDelete ) {
+		setIsDeleteConfirmOpen( false );
+		if ( onDelete ) {
 			onDelete( flowId );
 		}
 	}, [ flowId, onDelete ] );
@@ -152,10 +155,18 @@ export default function FlowHeader( {
 				<Button
 					variant="secondary"
 					isDestructive
-					onClick={ handleDelete }
+					onClick={ () => setIsDeleteConfirmOpen( true ) }
 					icon="trash"
 				/>
 			</div>
+			{ isDeleteConfirmOpen && (
+				<ConfirmationModal
+					onConfirm={ handleDelete }
+					onCancel={ () => setIsDeleteConfirmOpen( false ) }
+				>
+					{ __( 'Are you sure you want to delete this flow?', 'data-machine' ) }
+				</ConfirmationModal>
+			) }
 		</div>
 	);
 }

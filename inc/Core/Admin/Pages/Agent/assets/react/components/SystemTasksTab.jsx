@@ -7,11 +7,20 @@
  * @since 0.42.0
  */
 
+/**
+ * WordPress dependencies
+ */
 import { useState, useMemo } from '@wordpress/element';
+/**
+ * External dependencies
+ */
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { client } from '@shared/utils/api';
 import { useUpdateSettings } from '@shared/queries/settings';
 import PromptField from '@shared/components/PromptField';
+/**
+ * Internal dependencies
+ */
 import {
 	useSystemTaskPrompts,
 	useSavePrompt,
@@ -97,6 +106,10 @@ const formatDate = ( datetime ) => {
 
 /**
  * PromptEditor — expandable section for a single prompt definition.
+ * @param {Object}   root0         Component props.
+ * @param {Object}   root0.prompt  Prompt definition.
+ * @param {Function} root0.onSave  Save callback.
+ * @param {Function} root0.onReset Reset callback.
  */
 const PromptEditor = ( { prompt, onSave, onReset } ) => {
 	const [ isResetting, setIsResetting ] = useState( false );
@@ -188,8 +201,9 @@ const TaskCard = ( {
 				<div className="datamachine-task-card-title">
 					<strong>{ task.label }</strong>
 					{ hasToggle && (
-						<label className="datamachine-task-toggle">
+						<label className="datamachine-task-toggle" htmlFor={ `task-${ task.task_type }` }>
 							<input
+								id={ `task-${ task.task_type }` }
 								type="checkbox"
 								checked={ task.enabled }
 								onChange={ () =>
@@ -322,8 +336,7 @@ const SystemTasksTab = () => {
 			} );
 			queryClient.invalidateQueries( { queryKey: SYSTEM_TASKS_KEY } );
 		} catch ( err ) {
-			// eslint-disable-next-line no-console
-			console.error( 'Failed to toggle system task:', err );
+			window.console.error( 'Failed to toggle system task:', err );
 		}
 	};
 
@@ -332,8 +345,7 @@ const SystemTasksTab = () => {
 		try {
 			await runMutation.mutateAsync( taskType );
 		} catch ( err ) {
-			// eslint-disable-next-line no-console
-			console.error( 'Failed to run task:', err );
+			window.console.error( 'Failed to run task:', err );
 		} finally {
 			setRunningTask( null );
 		}

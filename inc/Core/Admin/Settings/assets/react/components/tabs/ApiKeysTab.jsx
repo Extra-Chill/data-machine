@@ -11,6 +11,9 @@ import { useState, useEffect } from '@wordpress/element';
 /**
  * Internal dependencies
  */
+/**
+ * External dependencies
+ */
 import { useSettings, useUpdateSettings } from '@shared/queries/settings';
 /**
  * External dependencies
@@ -48,7 +51,7 @@ const ApiKeysTab = () => {
 			setSaveStatus( 'saved' );
 			setHasChanges( false );
 			setTimeout( () => setSaveStatus( null ), 2000 );
-		} catch ( err ) {
+		} catch {
 			setSaveStatus( 'error' );
 			setTimeout( () => setSaveStatus( null ), 3000 );
 		}

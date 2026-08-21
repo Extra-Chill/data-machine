@@ -17,17 +17,19 @@ import { __ } from '@wordpress/i18n';
  * @param {Object}        props.config   - Current API configuration
  * @param {Function}      props.onChange - Configuration change handler
  * @param {Array<Object>} props.fields   - Field definitions from handler
+ * @param {boolean}       props.disabled - Whether credential editing is disabled
  * @return {React.ReactElement} API config form
  */
 export default function APIConfigForm( {
 	config = {},
 	onChange,
 	fields = [],
+	disabled = false,
 } ) {
 	/**
 	 * Handle field change
-	 * @param fieldKey
-	 * @param value
+	 * @param {string} fieldKey Field key.
+	 * @param {*}      value    Field value.
 	 */
 	const handleFieldChange = ( fieldKey, value ) => {
 		if ( onChange ) {
@@ -82,6 +84,7 @@ export default function APIConfigForm( {
 					placeholder={ field.placeholder || '' }
 					help={ field.help || '' }
 					required={ field.required || false }
+					disabled={ disabled }
 				/>
 			) ) }
 		</div>

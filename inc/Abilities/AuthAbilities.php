@@ -321,9 +321,10 @@ class AuthAbilities {
 				'output_schema'       => array(
 					'type'       => 'object',
 					'properties' => array(
-						'success' => array( 'type' => 'boolean' ),
-						'message' => array( 'type' => 'string' ),
-						'error'   => array( 'type' => 'string' ),
+						'success'       => array( 'type' => 'boolean' ),
+						'message'       => array( 'type' => 'string' ),
+						'config_status' => array( 'type' => 'object' ),
+						'error'         => array( 'type' => 'string' ),
 					),
 				),
 				'execute_callback'    => array( $this, 'executeSaveAuthConfig' ),
@@ -821,7 +822,17 @@ class AuthAbilities {
 		}
 
 		foreach ( $config_fields as $field_name => $field_config ) {
-			$value = self::sanitizeConfigValue( $config_input[ $field_name ] ?? '', $field_config );
+			$input_value = $config_input[ $field_name ] ?? '';
+			if (
+				self::isSecretConfigField( $field_name, $field_config )
+				&& is_string( $input_value )
+				&& preg_match( '/^\*+$/', $input_value )
+				&& ! empty( $existing_config[ $field_name ] ?? '' )
+			) {
+				$input_value = $existing_config[ $field_name ];
+			}
+
+			$value = self::sanitizeConfigValue( $input_value, $field_config );
 
 			if ( ( $field_config['required'] ?? false ) && empty( $value ) && empty( $existing_config[ $field_name ] ?? '' ) ) {
 				return new \WP_Error(
@@ -856,8 +867,9 @@ class AuthAbilities {
 
 			if ( ! $data_changed ) {
 				return array(
-					'success' => true,
-					'message' => __( 'Configuration is already up to date - no changes detected', 'data-machine' ),
+					'success'       => true,
+					'message'       => __( 'Configuration is already up to date - no changes detected', 'data-machine' ),
+					'config_status' => self::maskConfigStatus( $config_data, $config_fields ),
 				);
 			}
 		}
@@ -893,8 +905,9 @@ class AuthAbilities {
 
 		if ( $saved ) {
 			return array(
-				'success' => true,
-				'message' => __( 'Configuration saved successfully', 'data-machine' ),
+				'success'       => true,
+				'message'       => __( 'Configuration saved successfully', 'data-machine' ),
+				'config_status' => self::maskConfigStatus( $config_data, $config_fields ),
 			);
 		}
 
@@ -1208,6 +1221,36 @@ class AuthAbilities {
 		}
 
 		return sanitize_text_field( $value );
+	}
+
+	/**
+	 * Prepare normalized configuration for safe display after a save.
+	 *
+	 * @param array $config Configuration values.
+	 * @param array $fields Provider field declarations.
+	 * @return array Display-safe configuration values.
+	 */
+	private static function maskConfigStatus( array $config, array $fields ): array {
+		foreach ( $config as $field_name => $value ) {
+			if ( ! empty( $value ) && self::isSecretConfigField( (string) $field_name, $fields[ $field_name ] ?? array() ) ) {
+				$config[ $field_name ] = '****************';
+			}
+		}
+
+		return $config;
+	}
+
+	/**
+	 * Determine whether a provider field contains credential material.
+	 *
+	 * @param string $field_name Field name.
+	 * @param array  $field_config Provider field declaration.
+	 * @return bool Whether the value must be masked.
+	 */
+	private static function isSecretConfigField( string $field_name, array $field_config ): bool {
+		$field_type = $field_config['type'] ?? '';
+		return in_array( $field_type, array( 'password', 'secret' ), true )
+			|| (bool) preg_match( '/(secret|token|password|credential|cookie|key)/i', $field_name );
 	}
 
 	/**

@@ -8,14 +8,26 @@
  * WordPress dependencies
  */
 import { useState, useEffect, useCallback } from '@wordpress/element';
-import { TextControl, Button } from '@wordpress/components';
+import {
+	TextControl,
+	Button,
+	Notice,
+} from '@wordpress/components';
 import { __ } from '@wordpress/i18n';
+
+/**
+ * External dependencies
+ */
 /**
  * Internal dependencies
  */
 import { updatePipelineTitle } from '../../utils/api';
 import { useDeletePipeline } from '../../queries/pipelines';
+/**
+ * External dependencies
+ */
 import useDebouncedAutosave from '@shared/hooks/useDebouncedAutosave';
+import ConfirmationModal from '@shared/components/ConfirmationModal';
 
 /**
  * Pipeline Header Component
@@ -38,6 +50,8 @@ export default function PipelineHeader( {
 	onOpenMemoryFiles,
 } ) {
 	const [ localName, setLocalName ] = useState( pipelineName );
+	const [ isDeleteConfirmOpen, setIsDeleteConfirmOpen ] = useState( false );
+	const [ deleteError, setDeleteError ] = useState( null );
 
 	// Use mutation hook for pipeline deletion
 	const deletePipelineMutation = useDeletePipeline();
@@ -65,7 +79,7 @@ export default function PipelineHeader( {
 					onNameChange( name );
 				}
 			} catch ( err ) {
-				console.error( 'Pipeline title save failed:', err );
+				window.console.error( 'Pipeline title save failed:', err );
 			}
 		},
 		[ pipelineId, pipelineName, onNameChange ]
@@ -87,17 +101,8 @@ export default function PipelineHeader( {
 	 * Handle pipeline deletion
 	 */
 	const handleDelete = useCallback( async () => {
-		const confirmed = window.confirm(
-			__(
-				'Are you sure you want to delete this pipeline? This action cannot be undone.',
-				'data-machine'
-			)
-		);
-
-		if ( ! confirmed ) {
-			return;
-		}
-
+		setIsDeleteConfirmOpen( false );
+		setDeleteError( null );
 		try {
 			await deletePipelineMutation.mutateAsync( pipelineId );
 
@@ -106,8 +111,8 @@ export default function PipelineHeader( {
 				onDelete( pipelineId );
 			}
 		} catch ( err ) {
-			console.error( 'Pipeline deletion error:', err );
-			alert(
+			window.console.error( 'Pipeline deletion error:', err );
+			setDeleteError(
 				__(
 					'An error occurred while deleting the pipeline',
 					'data-machine'
@@ -134,7 +139,7 @@ export default function PipelineHeader( {
 				<Button
 					isDestructive
 					variant="secondary"
-					onClick={ handleDelete }
+					onClick={ () => setIsDeleteConfirmOpen( true ) }
 					icon="trash"
 					label={ __( 'Delete Pipeline', 'data-machine' ) }
 				/>
@@ -146,6 +151,22 @@ export default function PipelineHeader( {
 				placeholder={ __( 'Pipeline name', 'data-machine' ) }
 				className="datamachine-pipeline-header__title-input"
 			/>
+			{ deleteError && (
+				<Notice status="error" onRemove={ () => setDeleteError( null ) }>
+					{ deleteError }
+				</Notice>
+			) }
+			{ isDeleteConfirmOpen && (
+				<ConfirmationModal
+					onConfirm={ handleDelete }
+					onCancel={ () => setIsDeleteConfirmOpen( false ) }
+				>
+					{ __(
+						'Are you sure you want to delete this pipeline? This action cannot be undone.',
+						'data-machine'
+					) }
+				</ConfirmationModal>
+			) }
 		</div>
 	);
 }

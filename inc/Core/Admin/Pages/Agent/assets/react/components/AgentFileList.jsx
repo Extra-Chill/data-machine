@@ -11,7 +11,7 @@
 /**
  * WordPress dependencies
  */
-import { useState, useCallback } from '@wordpress/element';
+import { useState, useCallback, useEffect, useRef } from '@wordpress/element';
 import { Button, Spinner } from '@wordpress/components';
 
 /**
@@ -146,6 +146,13 @@ const AgentFileList = ( { selectedFile, onSelectFile } ) => {
 	const [ addError, setAddError ] = useState( null );
 	const [ deleteConfirm, setDeleteConfirm ] = useState( null );
 	const [ expandedMonths, setExpandedMonths ] = useState( {} );
+	const addInputRef = useRef( null );
+
+	useEffect( () => {
+		if ( isAdding ) {
+			addInputRef.current?.focus();
+		}
+	}, [ isAdding ] );
 
 	const handleAddNew = useCallback( () => {
 		setIsAdding( true );
@@ -307,6 +314,7 @@ const AgentFileList = ( { selectedFile, onSelectFile } ) => {
 			{ isAdding && (
 				<div className="datamachine-agent-file-add">
 					<input
+						ref={ addInputRef }
 						type="text"
 						placeholder="filename.md"
 						value={ newFilename }
@@ -315,7 +323,6 @@ const AgentFileList = ( { selectedFile, onSelectFile } ) => {
 							setAddError( null );
 						} }
 						onKeyDown={ handleKeyDown }
-						autoFocus
 					/>
 					<div className="datamachine-agent-file-add-actions">
 						<Button
@@ -368,9 +375,6 @@ const AgentFileList = ( { selectedFile, onSelectFile } ) => {
 					{ section.files.map( ( file ) => {
 						const isContext =
 							section.layerKey === 'context';
-						const selectType = isContext
-							? 'context'
-							: 'core';
 						const selected = isContext
 							? selectedFile?.type === 'context' &&
 							  selectedFile?.contextSlug ===

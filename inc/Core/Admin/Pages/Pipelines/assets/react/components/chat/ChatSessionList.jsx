@@ -47,7 +47,7 @@ export default function ChatSessionList( {
 			}
 
 			refetch();
-		} catch ( error ) {
+		} catch {
 			// Error handled by mutation
 		} finally {
 			setDeletingId( null );
@@ -72,14 +72,15 @@ export default function ChatSessionList( {
 			</div>
 
 			<div className="datamachine-chat-session-list__content">
-				{ isLoading ? (
+				{ isLoading && (
 					<div className="datamachine-chat-session-list__loading">
 						<span className="spinner is-active"></span>
 						<span>
 							{ __( 'Loading conversations…', 'data-machine' ) }
 						</span>
 					</div>
-				) : sessions.length === 0 ? (
+				) }
+				{ ! isLoading && sessions.length === 0 && (
 					<div className="datamachine-chat-session-list__empty">
 						<p>{ __( 'No conversations yet.', 'data-machine' ) }</p>
 						<p>
@@ -89,7 +90,8 @@ export default function ChatSessionList( {
 							) }
 						</p>
 					</div>
-				) : (
+				) }
+				{ ! isLoading && sessions.length > 0 && (
 					<ul className="datamachine-chat-session-list__items">
 						{ sessions.map( ( session ) => (
 							<li
