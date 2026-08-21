@@ -10,10 +10,10 @@
  * 16k-char production flow message down to ~11 chars TWICE during verification.
  *
  * This test drives the REAL FlowsCommand::updateFlow() private method via
- * reflection against a SPY persistence layer (UpdateFlowStepAbility), pinning:
+ * reflection against a SPY UpdateFlowStepAbility, pinning:
  *
- *   1. With --dry-run, the persist ability is NEVER executed (zero DB writes),
- *      so the stored flow config is byte-identical before and after.
+ *   1. With --dry-run, the ability executes in validate_only mode but makes
+ *      zero DB writes, so stored flow config is byte-identical before/after.
  *   2. With --dry-run, the output reads like a preview ("[dry-run] would
  *      update ... no changes written"), NOT a "Handler config updated" success.
  *   3. WITHOUT --dry-run, the SAME command DOES execute the persist ability
@@ -67,7 +67,8 @@ function smoke_assert_equals( $expected, $actual, string $name ): void {
 
 // ─── Spy state (module-level so stubs can record into it) ─────────────
 
-$GLOBALS['__smoke_persist_calls']  = array(); // Records every UpdateFlowStepAbility::execute() input.
+$GLOBALS['__smoke_ability_calls']  = array(); // Records every UpdateFlowStepAbility::execute() input.
+$GLOBALS['__smoke_persist_calls']  = array(); // Records simulated writes only.
 $GLOBALS['__smoke_cli_lines']      = array(); // WP_CLI::log / line output.
 $GLOBALS['__smoke_cli_success']    = array(); // WP_CLI::success output.
 $GLOBALS['__smoke_cli_error']      = null;    // First WP_CLI::error message (throws to abort).
@@ -112,6 +113,12 @@ if ( ! function_exists( 'wp_unslash' ) ) {
 if ( ! function_exists( 'wp_kses_post' ) ) {
 	function wp_kses_post( $value ) {
 		return (string) $value;
+	}
+}
+
+if ( ! function_exists( 'wp_json_encode' ) ) {
+	function wp_json_encode( $value, $flags = 0 ) {
+		return json_encode( $value, $flags );
 	}
 }
 
@@ -208,6 +215,14 @@ namespace DataMachine\Engine\Debug {
 	}
 }
 
+namespace DataMachine\Core {
+	if ( ! class_exists( __NAMESPACE__ . '\\AbilityResult' ) ) {
+		class AbilityResult {
+			public static function normalize( $result ) { return $result; }
+		}
+	}
+}
+
 namespace DataMachine\Core\Steps {
 	if ( ! class_exists( __NAMESPACE__ . '\\FlowStepConfig' ) ) {
 		class FlowStepConfig {
@@ -240,13 +255,39 @@ namespace DataMachine\Abilities {
 }
 
 namespace DataMachine\Abilities\FlowStep {
-	// SPY: records every execute() call so the test can assert it is NEVER
-	// invoked during a dry-run and invoked exactly once otherwise.
+	// SPY: validate_only calls return the same effective preview shape as the
+	// real ability without recording a persistence call.
 	if ( ! class_exists( __NAMESPACE__ . '\\UpdateFlowStepAbility' ) ) {
 		class UpdateFlowStepAbility {
 			public function execute( $input ) {
+				$GLOBALS['__smoke_ability_calls'][] = $input;
+				$params = $input['handler_config']['params'] ?? array();
+				$result = array(
+					'success'                  => true,
+					'flow_step_id'             => $input['flow_step_id'] ?? '',
+					'message'                  => 'ok',
+					'effective_handler_config' => array(
+						'task'   => 'dispatch_message',
+						'params' => array(
+							'channel'      => 'extra-chill',
+							'recipient'    => 'chubes',
+							'message'      => $params['message'] ?? '',
+							'connection'   => $params['connection'] ?? array(),
+							'notes'        => str_repeat( 'N', 500 ),
+							'presentation' => (object) array(
+								'description' => str_repeat( 'O', 500 ),
+								'layout'      => 'compact',
+							),
+							'mode'         => 'chronological',
+						),
+					),
+				);
+				if ( ! empty( $input['validate_only'] ) ) {
+					$result['validate_only'] = true;
+					return $result;
+				}
 				$GLOBALS['__smoke_persist_calls'][] = $input;
-				return array( 'success' => true, 'flow_step_id' => $input['flow_step_id'] ?? '', 'message' => 'ok' );
+				return $result;
 			}
 		}
 	}
@@ -270,6 +311,8 @@ namespace DataMachine\Core\Database\Flows {
 
 namespace {
 
+	require_once dirname( __DIR__ ) . '/inc/Core/PluginSettings.php';
+	require_once dirname( __DIR__ ) . '/inc/Engine/AI/conversation-loop.php';
 	require_once dirname( __DIR__ ) . '/inc/Cli/JsonInput.php';
 	require_once dirname( __DIR__ ) . '/inc/Cli/Commands/Flows/FlowsCommand.php';
 
@@ -280,6 +323,7 @@ namespace {
 	 * a snapshot of recorded spy state.
 	 */
 	function smoke_run_update( array $assoc_args ): array {
+		$GLOBALS['__smoke_ability_calls'] = array();
 		$GLOBALS['__smoke_persist_calls'] = array();
 		$GLOBALS['__smoke_cli_lines']     = array();
 		$GLOBALS['__smoke_cli_success']   = array();
@@ -296,6 +340,7 @@ namespace {
 		}
 
 		return array(
+			'ability_calls' => $GLOBALS['__smoke_ability_calls'],
 			'persist_calls' => $GLOBALS['__smoke_persist_calls'],
 			'lines'         => $GLOBALS['__smoke_cli_lines'],
 			'success'       => $GLOBALS['__smoke_cli_success'],
@@ -314,16 +359,17 @@ namespace {
 	$dry = smoke_run_update(
 		array(
 			'step'           => 'step_abc',
-			'handler-config' => '{"params":{"message":"DRYRUN_SENTINEL_SHOULD_NOT_PERSIST"}}',
+			'handler-config' => '{"params":{"message":"DRYRUN_SENTINEL_SHOULD_NOT_PERSIST","connection":{"token":"NESTED_TOKEN_SENTINEL","password":"NESTED_PASSWORD_SENTINEL","cookie":"NESTED_COOKIE_SENTINEL"}}}',
 			'dry-run'        => true,
 		)
 	);
 
 	smoke_assert(
 		array() === $dry['persist_calls'],
-		'dry-run handler-config: persist ability NEVER executed',
+		'dry-run handler-config: no persistence occurs',
 		count( $dry['persist_calls'] ) . ' persist call(s) recorded'
 	);
+	smoke_assert_equals( true, $dry['ability_calls'][0]['validate_only'] ?? null, 'dry-run handler-config: ability executes in validate_only mode' );
 
 	$after = serialize( $GLOBALS['__smoke_stored_flow'] );
 	smoke_assert(
@@ -338,6 +384,31 @@ namespace {
 		$dry_text
 	);
 	smoke_assert(
+		false !== strpos( $dry_text, '"channel":"extra-chill"' ) && false !== strpos( $dry_text, '"recipient":"chubes"' ),
+		'dry-run handler-config: previews effective merged sibling values',
+		$dry_text
+	);
+	smoke_assert(
+		false === strpos( $dry_text, 'NESTED_TOKEN_SENTINEL' ) && false === strpos( $dry_text, 'NESTED_PASSWORD_SENTINEL' ) && false === strpos( $dry_text, 'NESTED_COOKIE_SENTINEL' ),
+		'dry-run handler-config: nested credentials never reach CLI output',
+		$dry_text
+	);
+	smoke_assert(
+		3 === substr_count( $dry_text, '"[redacted]"' ),
+		'dry-run handler-config: nested token, password, and cookie are redacted',
+		$dry_text
+	);
+	smoke_assert(
+		false === strpos( $dry_text, str_repeat( 'N', 500 ) ) && false !== strpos( $dry_text, '"mode":"chronological"' ),
+		'dry-run handler-config: oversized values are bounded without hiding useful siblings',
+		$dry_text
+	);
+	smoke_assert(
+		false === strpos( $dry_text, str_repeat( 'O', 500 ) ) && false !== strpos( $dry_text, '"layout":"compact"' ),
+		'dry-run handler-config: oversized nested object values are bounded without hiding object siblings',
+		$dry_text
+	);
+	smoke_assert(
 		array() === $dry['success'],
 		'dry-run handler-config: does NOT print a WP_CLI::success "updated" line',
 		implode( ' | ', $dry['success'] )
@@ -348,7 +419,7 @@ namespace {
 	$wet = smoke_run_update(
 		array(
 			'step'           => 'step_abc',
-			'handler-config' => '{"params":{"message":"REAL_WRITE"}}',
+			'handler-config' => '{"params":{"message":"DRYRUN_SENTINEL_SHOULD_NOT_PERSIST","connection":{"token":"NESTED_TOKEN_SENTINEL","password":"NESTED_PASSWORD_SENTINEL","cookie":"NESTED_COOKIE_SENTINEL"}}}',
 		)
 	);
 
@@ -361,6 +432,12 @@ namespace {
 		! empty( $wet['success'] ),
 		'non-dry-run handler-config: prints a success line'
 	);
+	$dry_ability_input = $dry['ability_calls'][0];
+	unset( $dry_ability_input['validate_only'] );
+	smoke_assert_equals( $dry_ability_input, $wet['ability_calls'][0], 'dry-run and apply send the same normalized handler update' );
+	smoke_assert_equals( 'NESTED_TOKEN_SENTINEL', $wet['ability_calls'][0]['handler_config']['params']['connection']['token'] ?? null, 'apply receives the unchanged nested token' );
+	smoke_assert_equals( 'NESTED_PASSWORD_SENTINEL', $wet['ability_calls'][0]['handler_config']['params']['connection']['password'] ?? null, 'apply receives the unchanged nested password' );
+	smoke_assert_equals( 'NESTED_COOKIE_SENTINEL', $wet['ability_calls'][0]['handler_config']['params']['connection']['cookie'] ?? null, 'apply receives the unchanged nested cookie' );
 
 	echo "\n[3] --set-user-message --dry-run makes ZERO writes:\n";
 

@@ -8,6 +8,7 @@
 namespace DataMachine\Abilities\Pipeline;
 
 use DataMachine\Abilities\HandlerAbilities;
+use DataMachine\Abilities\FlowStep\FlowStepHelpers;
 use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Abilities\PipelineStepAbilities;
 use DataMachine\Core\Database\Flows\Flows;
@@ -17,6 +18,7 @@ use DataMachine\Core\Steps\FlowStepConfig;
 defined( 'ABSPATH' ) || exit;
 
 class PipelineConfigurationAbilities {
+	use FlowStepHelpers;
 
 	private const SCHEMA_VERSION    = 'datamachine.pipeline_configuration.v1';
 	private static bool $registered = false;
@@ -26,9 +28,10 @@ class PipelineConfigurationAbilities {
 	private HandlerAbilities $handlers;
 
 	public function __construct() {
-		$this->pipelines = new Pipelines();
-		$this->flows     = new Flows();
-		$this->handlers  = new HandlerAbilities();
+		$this->initDatabases();
+		$this->pipelines = $this->db_pipelines;
+		$this->flows     = $this->db_flows;
+		$this->handlers  = $this->handler_abilities;
 		if ( self::$registered ) {
 			return;
 		}
@@ -347,13 +350,13 @@ class PipelineConfigurationAbilities {
 			if ( ! is_array( $patch['flow_step_settings'] ?? null ) ) {
 				return $this->error( 'invalid_configuration', 'flow_step_settings must be an object', 400 );
 			}
-			$slug       = (string) ( $step['step_type'] ?? '' );
-			$validation = $this->validateHandlerConfig( $slug, $patch['flow_step_settings'] );
-			if ( is_wp_error( $validation ) ) {
-				return $validation;
+			$slug     = (string) ( $step['step_type'] ?? '' );
+			$existing = is_array( $step['flow_step_settings'] ?? null ) ? $step['flow_step_settings'] : array();
+			$prepared = $this->prepareHandlerConfigPatch( $slug, $existing, $patch['flow_step_settings'] );
+			if ( ! $prepared['valid'] ) {
+				return $this->handlerConfigError( $prepared['error'] );
 			}
-			$existing                   = is_array( $step['flow_step_settings'] ?? null ) ? $step['flow_step_settings'] : array();
-			$step['flow_step_settings'] = $this->handlers->applyDefaults( $slug, $this->deepMerge( $existing, $this->sanitizeHandlerConfig( $slug, $patch['flow_step_settings'] ) ) );
+			$step['flow_step_settings'] = $prepared['config'];
 			return array( 'step' => $step );
 		}
 
@@ -382,12 +385,12 @@ class PipelineConfigurationAbilities {
 			if ( ! is_string( $handler_slug ) || ! is_array( $handler_config ) || ! $this->handlers->handlerExists( $handler_slug ) ) {
 				return $this->error( 'invalid_configuration', "Handler '{$handler_slug}' is unavailable or has invalid configuration", 400 );
 			}
-			$validation = $this->validateHandlerConfig( $handler_slug, $handler_config );
-			if ( is_wp_error( $validation ) ) {
-				return $validation;
+			$existing = is_array( $stored_configs[ $handler_slug ] ?? null ) ? $stored_configs[ $handler_slug ] : array();
+			$prepared = $this->prepareHandlerConfigPatch( $handler_slug, $existing, $handler_config );
+			if ( ! $prepared['valid'] ) {
+				return $this->handlerConfigError( $prepared['error'] );
 			}
-			$existing                        = is_array( $stored_configs[ $handler_slug ] ?? null ) ? $stored_configs[ $handler_slug ] : array();
-			$stored_configs[ $handler_slug ] = $this->handlers->applyDefaults( $handler_slug, $this->deepMerge( $existing, $this->sanitizeHandlerConfig( $handler_slug, $handler_config ) ) );
+			$stored_configs[ $handler_slug ] = $prepared['config'];
 			if ( ! in_array( $handler_slug, $stored_slugs, true ) ) {
 				$stored_slugs[] = $handler_slug;
 			}
@@ -401,18 +404,8 @@ class PipelineConfigurationAbilities {
 		return array( 'step' => $step );
 	}
 
-	private function validateHandlerConfig( string $slug, array $config ): array|\WP_Error {
-		$fields  = $this->handlers->getConfigFields( $slug );
-		$unknown = array_diff( array_keys( $config ), array_keys( $fields ) );
-		if ( ! empty( $fields ) && ! empty( $unknown ) ) {
-			return $this->error( 'unknown_field', "Unknown configuration fields for {$slug}: " . implode( ', ', $unknown ), 400 );
-		}
-		return array();
-	}
-
-	private function sanitizeHandlerConfig( string $slug, array $config ): array {
-		$class = $this->handlers->getSettingsClass( $slug );
-		return $class && method_exists( $class, 'sanitize' ) ? $class->sanitize( $config ) : $config;
+	private function handlerConfigError( array $error ): \WP_Error {
+		return $this->error( 'unknown_field', $error['error'] ?? 'Invalid handler configuration', 400 );
 	}
 
 	private function resolvePipeline( array $input ): array|\WP_Error {
@@ -522,16 +515,5 @@ class PipelineConfigurationAbilities {
 
 	private function error( string $code, string $message, int $status ): \WP_Error {
 		return new \WP_Error( $code, $message, array( 'status' => $status ) );
-	}
-
-	private function deepMerge( array $existing, array $patch ): array {
-		foreach ( $patch as $key => $value ) {
-			if ( is_string( $key ) && isset( $existing[ $key ] ) && is_array( $existing[ $key ] ) && is_array( $value ) && ! array_is_list( $existing[ $key ] ) && ! array_is_list( $value ) ) {
-				$existing[ $key ] = $this->deepMerge( $existing[ $key ], $value );
-				continue;
-			}
-			$existing[ $key ] = $value;
-		}
-		return $existing;
 	}
 }

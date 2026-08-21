@@ -7,10 +7,38 @@
 
 namespace DataMachine\Tests\Unit\Abilities;
 
+use DataMachine\Abilities\FlowStep\UpdateFlowStepAbility;
+use DataMachine\Abilities\HandlerAbilities;
 use DataMachine\Abilities\Pipeline\PipelineConfigurationAbilities;
 use DataMachine\Core\Database\Flows\Flows;
+use DataMachine\Core\Database\Logs\LogRepository;
 use DataMachine\Core\Database\Pipelines\Pipelines;
 use WP_UnitTestCase;
+
+class TicketmasterLikeConfigurationSettings {
+
+	public static function get_fields(): array {
+		return array_fill_keys(
+			array( 'classification_type', 'location', 'radius', 'genre', 'venue_id', 'search', 'exclude_keywords', 'max_items', 'include_parking', 'params' ),
+			array()
+		);
+	}
+
+	public static function sanitize( array $raw ): array {
+		return array(
+			'classification_type' => (string) ( $raw['classification_type'] ?? '' ),
+			'location'            => (string) ( $raw['location'] ?? '' ),
+			'radius'              => (string) ( $raw['radius'] ?? '50' ),
+			'genre'               => (string) ( $raw['genre'] ?? '' ),
+			'venue_id'            => (string) ( $raw['venue_id'] ?? '' ),
+			'search'              => (string) ( $raw['search'] ?? '' ),
+			'exclude_keywords'    => (string) ( $raw['exclude_keywords'] ?? '' ),
+			'max_items'           => (int) ( $raw['max_items'] ?? 100 ),
+			'include_parking'     => (bool) ( $raw['include_parking'] ?? false ),
+			'params'              => is_array( $raw['params'] ?? null ) ? $raw['params'] : array(),
+		);
+	}
+}
 
 class PipelineConfigurationAbilitiesTest extends WP_UnitTestCase {
 
@@ -172,5 +200,241 @@ class PipelineConfigurationAbilitiesTest extends WP_UnitTestCase {
 
 		$this->assertWPError( $result );
 		$this->assertSame( 'ability_invalid_permissions', $result->get_error_code() );
+	}
+
+	public function test_handler_patch_parity_uses_real_abilities_without_dry_run_persistence(): void {
+		$handler_filter = static function ( array $handlers, ?string $step_type ): array {
+			if ( null === $step_type || 'fetch' === $step_type ) {
+				$handlers['ticketmaster_like'] = array(
+					'type'  => 'fetch',
+					'label' => 'Ticketmaster Like',
+				);
+			}
+			return $handlers;
+		};
+		$settings_filter = static function ( array $settings, ?string $handler_slug ): array {
+			if ( null === $handler_slug || 'ticketmaster_like' === $handler_slug ) {
+				$settings['ticketmaster_like'] = new TicketmasterLikeConfigurationSettings();
+			}
+			return $settings;
+		};
+
+		add_filter( 'datamachine_handlers', $handler_filter, 10, 2 );
+		add_filter( 'datamachine_handler_settings', $settings_filter, 10, 2 );
+		HandlerAbilities::clearCache();
+
+		try {
+			$flows        = new Flows();
+			$flow_id      = (int) $flows->create_flow(
+				array(
+					'pipeline_id'      => $this->pipeline_id,
+					'flow_name'        => 'Handler Configuration Parity',
+					'flow_config'      => array(),
+					'scheduling_config' => array(),
+				)
+			);
+			$flow_step_id = $this->pipeline_id . '_ticketmaster_' . $flow_id;
+			$stored       = array(
+				'classification_type' => 'music',
+				'location'            => '51.5074,-0.1278',
+				'radius'              => 15,
+				'genre'               => 'rock',
+				'venue_id'            => 'KovZpZA6tFlA',
+				'search'              => 'live',
+				'exclude_keywords'    => 'tribute',
+				'max_items'           => 100,
+				'include_parking'     => true,
+				'params'              => array(
+					'filters' => array(
+						'city'    => 'London',
+						'keyword' => 'original',
+					),
+					'mode'    => 'strict',
+				),
+			);
+			$flow_config = array(
+				$flow_step_id => array(
+					'flow_step_id'     => $flow_step_id,
+					'pipeline_step_id' => $this->pipeline_id . '_ticketmaster',
+					'pipeline_id'      => $this->pipeline_id,
+					'flow_id'          => $flow_id,
+					'step_type'        => 'fetch',
+					'handler_slugs'    => array( 'ticketmaster_like' ),
+					'handler_configs'  => array( 'ticketmaster_like' => $stored ),
+				),
+			);
+			$flows->update_flow( $flow_id, array( 'flow_config' => $flow_config ) );
+
+			$patch = array(
+				'max_items' => 1,
+				'params'    => array( 'filters' => array( 'keyword' => 'updated' ) ),
+			);
+			$expected = $stored;
+			$expected['max_items'] = 1;
+			$expected['params']['filters']['keyword'] = 'updated';
+
+			$update     = new UpdateFlowStepAbility();
+			$logs       = new LogRepository();
+			$logs_before = $logs->get_logs()['total'];
+			$raw_before  = $flows->get_flow_config_json( $flow_id );
+			$preview     = $update->execute(
+				array(
+					'flow_step_id'   => $flow_step_id,
+					'handler_config' => $patch,
+					'validate_only'  => true,
+				)
+			);
+
+			$this->assertTrue( $preview['success'] );
+			$this->assertSame( $expected, $preview['effective_handler_config'] );
+			$this->assertSame( $raw_before, $flows->get_flow_config_json( $flow_id ) );
+			$this->assertSame( $logs_before, $logs->get_logs()['total'], 'Dry-run must not persist database logs.' );
+
+			$applied = $update->execute(
+				array(
+					'flow_step_id'   => $flow_step_id,
+					'handler_config' => $patch,
+				)
+			);
+			$this->assertTrue( $applied['success'] );
+			$stored_after_apply = $this->storedHandlerConfig( $flows, $flow_id, $flow_step_id );
+			$this->assertSame( $expected, $stored_after_apply );
+			$this->assertSame( 15, $stored_after_apply['radius'], 'Omitted scalar type must remain unchanged.' );
+			$this->assertTrue( $stored_after_apply['include_parking'], 'Omitted boolean sibling must remain unchanged.' );
+
+			$flows->update_flow( $flow_id, array( 'flow_config' => $flow_config ) );
+			$current       = $this->abilities->executeGet( array( 'pipeline_id' => $this->pipeline_id ) );
+			$flow_snapshot = $this->configurationFlowSnapshot( $current['flows'], $flow_id );
+			$owner_result  = $this->abilities->executeUpdate(
+				array(
+					'target'            => 'flow',
+					'flow_id'           => $flow_id,
+					'step_id'           => $flow_step_id,
+					'expected_revision' => $flow_snapshot['revision'],
+					'configuration'     => array( 'handler_config' => $patch ),
+				)
+			);
+			$this->assertTrue( $owner_result['success'] );
+			$this->assertSame( $expected, $this->storedHandlerConfig( $flows, $flow_id, $flow_step_id ) );
+
+			$full = array(
+				'classification_type' => 'sports',
+				'location'            => '40.7128,-74.0060',
+				'radius'              => 25,
+				'genre'               => '',
+				'venue_id'            => '',
+				'search'              => 'finals',
+				'exclude_keywords'    => '',
+				'max_items'           => 50,
+				'include_parking'     => false,
+				'params'              => array(
+					'filters' => array( 'city' => 'New York', 'keyword' => 'finals' ),
+					'mode'    => 'broad',
+				),
+			);
+			$sanitized_full = TicketmasterLikeConfigurationSettings::sanitize( $full );
+			$flows->update_flow( $flow_id, array( 'flow_config' => $flow_config ) );
+			$this->assertTrue(
+				$update->execute( array( 'flow_step_id' => $flow_step_id, 'handler_config' => $full ) )['success']
+			);
+			$this->assertSame( $sanitized_full, $this->storedHandlerConfig( $flows, $flow_id, $flow_step_id ) );
+
+			$flows->update_flow( $flow_id, array( 'flow_config' => $flow_config ) );
+			$current       = $this->abilities->executeGet( array( 'pipeline_id' => $this->pipeline_id ) );
+			$flow_snapshot = $this->configurationFlowSnapshot( $current['flows'], $flow_id );
+			$this->assertTrue(
+				$this->abilities->executeUpdate(
+					array(
+						'target'            => 'flow',
+						'flow_id'           => $flow_id,
+						'step_id'           => $flow_step_id,
+						'expected_revision' => $flow_snapshot['revision'],
+						'configuration'     => array( 'handler_config' => $full ),
+					)
+				)['success']
+			);
+			$this->assertSame( $sanitized_full, $this->storedHandlerConfig( $flows, $flow_id, $flow_step_id ) );
+		} finally {
+			remove_filter( 'datamachine_handlers', $handler_filter, 10 );
+			remove_filter( 'datamachine_handler_settings', $settings_filter, 10 );
+			HandlerAbilities::clearCache();
+		}
+	}
+
+	public function test_system_task_params_patch_preserves_task_and_nested_siblings(): void {
+		$flows        = new Flows();
+		$flow_id      = (int) $flows->create_flow(
+			array(
+				'pipeline_id'      => $this->pipeline_id,
+				'flow_name'        => 'System Task Configuration Parity',
+				'flow_config'      => array(),
+				'scheduling_config' => array(),
+			)
+		);
+		$flow_step_id = $this->pipeline_id . '_system_task_' . $flow_id;
+		$stored       = array(
+			'task_type' => 'dispatch_message',
+			'params'    => array(
+				'channel'   => 'extra-chill',
+				'recipient' => 'chubes',
+				'message'   => 'original',
+			),
+		);
+		$flow_config  = array(
+			$flow_step_id => array(
+				'flow_step_id'      => $flow_step_id,
+				'pipeline_step_id'  => $this->pipeline_id . '_system_task',
+				'pipeline_id'       => $this->pipeline_id,
+				'flow_id'           => $flow_id,
+				'step_type'         => 'system_task',
+				'flow_step_settings' => $stored,
+			),
+		);
+		$flows->update_flow( $flow_id, array( 'flow_config' => $flow_config ) );
+
+		$patch    = array( 'params' => array( 'message' => 'updated' ) );
+		$expected = $stored;
+		$expected['params']['message'] = 'updated';
+		$update   = new UpdateFlowStepAbility();
+		$preview  = $update->execute(
+			array(
+				'flow_step_id'       => $flow_step_id,
+				'flow_step_settings' => $patch,
+				'validate_only'      => true,
+			)
+		);
+
+		$this->assertTrue( $preview['success'] );
+		$this->assertSame( $expected, $preview['effective_handler_config'] );
+		$this->assertSame( $stored, $flows->get_flow( $flow_id )['flow_config'][ $flow_step_id ]['flow_step_settings'] );
+
+		$current       = $this->abilities->executeGet( array( 'pipeline_id' => $this->pipeline_id ) );
+		$flow_snapshot = $this->configurationFlowSnapshot( $current['flows'], $flow_id );
+		$result        = $this->abilities->executeUpdate(
+			array(
+				'target'            => 'flow',
+				'flow_id'           => $flow_id,
+				'step_id'           => $flow_step_id,
+				'expected_revision' => $flow_snapshot['revision'],
+				'configuration'     => array( 'flow_step_settings' => $patch ),
+			)
+		);
+
+		$this->assertTrue( $result['success'] );
+		$this->assertSame( $expected, $flows->get_flow( $flow_id )['flow_config'][ $flow_step_id ]['flow_step_settings'] );
+	}
+
+	private function storedHandlerConfig( Flows $flows, int $flow_id, string $flow_step_id ): array {
+		$flow = $flows->get_flow( $flow_id );
+		return $flow['flow_config'][ $flow_step_id ]['handler_configs']['ticketmaster_like'];
+	}
+
+	private function configurationFlowSnapshot( array $flows, int $flow_id ): array {
+		foreach ( $flows as $flow ) {
+			if ( $flow_id === $flow['flow_id'] ) {
+				return $flow;
+			}
+		}
+		$this->fail( "Flow {$flow_id} is missing from the configuration snapshot." );
 	}
 }

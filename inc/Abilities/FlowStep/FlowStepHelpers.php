@@ -139,9 +139,10 @@ trait FlowStepHelpers {
 	 * @since 0.38.0
 	 * @param string $handler_slug Handler slug.
 	 * @param array  $handler_config Raw configuration values to sanitize.
+	 * @param bool   $log_errors Whether sanitizer failures may be logged.
 	 * @return array Sanitized configuration values.
 	 */
-	protected function sanitizeHandlerConfig( string $handler_slug, array $handler_config ): array {
+	protected function sanitizeHandlerConfig( string $handler_slug, array $handler_config, bool $log_errors = true ): array {
 		$settings_class = $this->handler_abilities->getSettingsClass( $handler_slug );
 
 		if ( ! $settings_class || ! method_exists( $settings_class, 'sanitize' ) ) {
@@ -151,17 +152,51 @@ trait FlowStepHelpers {
 		try {
 			return $settings_class->sanitize( $handler_config );
 		} catch ( \Exception $e ) {
-			do_action(
-				'datamachine_log',
-				'warning',
-				'Handler config sanitization failed, using raw values',
-				array(
-					'handler_slug' => $handler_slug,
-					'error'        => $e->getMessage(),
-				)
-			);
+			if ( $log_errors ) {
+				do_action(
+					'datamachine_log',
+					'warning',
+					'Handler config sanitization failed, using raw values',
+					array(
+						'handler_slug' => $handler_slug,
+						'error'        => $e->getMessage(),
+					)
+				);
+			}
 			return $handler_config;
 		}
+	}
+
+	/**
+	 * Validate and merge a sparse handler configuration patch.
+	 *
+	 * Sanitizers commonly return complete objects containing defaults. Only
+	 * explicitly patched top-level fields are merged so omitted stored values
+	 * retain their value and type.
+	 *
+	 * @param string $handler_slug Handler slug.
+	 * @param array  $existing_config Stored configuration.
+	 * @param array  $handler_patch Sparse configuration patch.
+	 * @param bool   $log_errors Whether sanitizer failures may be logged.
+	 * @return array{valid: bool, config?: array, error?: array}
+	 */
+	protected function prepareHandlerConfigPatch( string $handler_slug, array $existing_config, array $handler_patch, bool $log_errors = true ): array {
+		$validation = $this->validateHandlerConfig( $handler_slug, $handler_patch );
+		if ( true !== $validation ) {
+			return array(
+				'valid' => false,
+				'error' => $validation,
+			);
+		}
+
+		$sanitized = $this->sanitizeHandlerConfig( $handler_slug, $handler_patch, $log_errors );
+		$sanitized = array_intersect_key( $sanitized, $handler_patch );
+		$merged    = self::deepMergeConfig( $existing_config, $sanitized );
+
+		return array(
+			'valid'  => true,
+			'config' => $this->handler_abilities->applyDefaults( $handler_slug, $merged ),
+		);
 	}
 
 	/**
@@ -256,27 +291,32 @@ trait FlowStepHelpers {
 	 * @param string $flow_step_id Flow step ID (format: pipeline_step_id_flow_id).
 	 * @param string $handler_slug Handler slug to set (uses existing if empty).
 	 * @param array  $handler_settings Handler configuration settings.
-	 * @return bool Success status.
+	 * @param bool   $validate_only Build and return the effective config without persisting.
+	 * @return bool|array Success status, or the effective update during validation.
 	 */
-	protected function updateHandler( string $flow_step_id, string $handler_slug = '', array $handler_settings = array() ): bool {
+	protected function updateHandler( string $flow_step_id, string $handler_slug = '', array $handler_settings = array(), bool $validate_only = false ): bool|array {
 		$parts = apply_filters( 'datamachine_split_flow_step_id', null, $flow_step_id );
 		if ( ! $parts ) {
-			do_action( 'datamachine_log', 'error', 'Invalid flow_step_id format for handler update', array( 'flow_step_id' => $flow_step_id ) );
+			if ( ! $validate_only ) {
+				do_action( 'datamachine_log', 'error', 'Invalid flow_step_id format for handler update', array( 'flow_step_id' => $flow_step_id ) );
+			}
 			return false;
 		}
 		$flow_id = $parts['flow_id'];
 
 		$flow = $this->db_flows->get_flow( $flow_id );
 		if ( ! $flow ) {
-			do_action(
-				'datamachine_log',
-				'error',
-				'Flow handler update failed - flow not found',
-				array(
-					'flow_id'      => $flow_id,
-					'flow_step_id' => $flow_step_id,
-				)
-			);
+			if ( ! $validate_only ) {
+				do_action(
+					'datamachine_log',
+					'error',
+					'Flow handler update failed - flow not found',
+					array(
+						'flow_id'      => $flow_id,
+						'flow_step_id' => $flow_step_id,
+					)
+				);
+			}
 			return false;
 		}
 
@@ -284,15 +324,17 @@ trait FlowStepHelpers {
 
 		if ( ! isset( $flow_config[ $flow_step_id ] ) ) {
 			if ( ! isset( $parts['pipeline_step_id'] ) || empty( $parts['pipeline_step_id'] ) ) {
-				do_action(
-					'datamachine_log',
-					'error',
-					'Pipeline step ID is required for flow handler update',
-					array(
-						'flow_step_id' => $flow_step_id,
-						'parts'        => $parts,
-					)
-				);
+				if ( ! $validate_only ) {
+					do_action(
+						'datamachine_log',
+						'error',
+						'Pipeline step ID is required for flow handler update',
+						array(
+							'flow_step_id' => $flow_step_id,
+							'parts'        => $parts,
+						)
+					);
+				}
 				return false;
 			}
 			$pipeline_step_id             = $parts['pipeline_step_id'];
@@ -312,7 +354,9 @@ trait FlowStepHelpers {
 			: ( $step['step_type'] ?? '' );
 
 		if ( empty( $effective_slug ) ) {
-			do_action( 'datamachine_log', 'error', 'No handler slug or step_type available for flow step update', array( 'flow_step_id' => $flow_step_id ) );
+			if ( ! $validate_only ) {
+				do_action( 'datamachine_log', 'error', 'No handler slug or step_type available for flow step update', array( 'flow_step_id' => $flow_step_id ) );
+			}
 			unset( $step );
 			return false;
 		}
@@ -331,19 +375,11 @@ trait FlowStepHelpers {
 			}
 		}
 
-		// Sanitize incoming values via handler's settings class before merge.
-		$handler_settings = $this->sanitizeHandlerConfig( $effective_slug, $handler_settings );
-
-		// Deep-merge so a partial update of a nested config object (e.g. a
-		// system_task step's `params` map) cannot silently drop the sibling
-		// keys it didn't mention. A shallow array_merge() replaces the whole
-		// `params` array, which is exactly how a `{"params":{"message":"..."}}`
-		// edit truncated a flow's stored message: channel/recipient vanished
-		// because they weren't restated. Recursive merge keeps unmentioned
-		// nested keys intact (#2673). Numeric-keyed lists are still replaced
-		// wholesale — partial list patching has no well-defined semantics.
-		$merged_config = self::deepMergeConfig( $existing_handler_config, $handler_settings );
-		$stored_config = $this->handler_abilities->applyDefaults( $effective_slug, $merged_config );
+		$prepared = $this->prepareHandlerConfigPatch( $effective_slug, $existing_handler_config, $handler_settings, ! $validate_only );
+		if ( ! $prepared['valid'] ) {
+			return false;
+		}
+		$stored_config = $prepared['config'];
 
 		if ( ! $uses_handler ) {
 			$step['flow_step_settings'] = $stored_config;
@@ -366,6 +402,13 @@ trait FlowStepHelpers {
 
 		$step['enabled'] = true;
 		unset( $step );
+
+		if ( $validate_only ) {
+			return array(
+				'handler_slug'   => $effective_slug,
+				'handler_config' => $stored_config,
+			);
+		}
 
 		$success = $this->db_flows->update_flow(
 			$flow_id,

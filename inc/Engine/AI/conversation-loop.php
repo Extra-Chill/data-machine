@@ -2968,10 +2968,40 @@ function datamachine_build_tool_trace( string $tool_name, array $tool_call, arra
 /**
  * Keep non-secret scalar tool arguments visible when full arguments are large.
  *
- * @param mixed $value Redacted trace value.
+ * @param mixed                   $value Redacted trace value.
+ * @param \SplObjectStorage|null $seen  Objects visited in the current branch.
+ * @param int                     $depth Current recursion depth.
  * @return mixed Bounded trace value.
  */
-function datamachine_bound_tool_trace_value( mixed $value ): mixed {
+function datamachine_bound_tool_trace_value( mixed $value, ?\SplObjectStorage $seen = null, int $depth = 0 ): mixed {
+	if ( $depth >= 32 ) {
+		return '[truncated]';
+	}
+
+	$seen ??= new \SplObjectStorage();
+
+	if ( is_object( $value ) ) {
+		if ( $seen->contains( $value ) ) {
+			return '[truncated]';
+		}
+
+		$seen->attach( $value );
+		$bounded = new \stdClass();
+		$count   = 0;
+		foreach ( get_object_vars( $value ) as $key => $child ) {
+			if ( $count >= 20 ) {
+				$bounded->__truncated__ = true;
+				break;
+			}
+
+			$bounded->{$key} = datamachine_bound_tool_trace_value( $child, $seen, $depth + 1 );
+			++$count;
+		}
+		$seen->detach( $value );
+
+		return $bounded;
+	}
+
 	if ( is_array( $value ) ) {
 		$bounded = array();
 		$count   = 0;
@@ -2981,7 +3011,7 @@ function datamachine_bound_tool_trace_value( mixed $value ): mixed {
 				break;
 			}
 
-			$bounded[ $key ] = datamachine_bound_tool_trace_value( $child );
+			$bounded[ $key ] = datamachine_bound_tool_trace_value( $child, $seen, $depth + 1 );
 			++$count;
 		}
 

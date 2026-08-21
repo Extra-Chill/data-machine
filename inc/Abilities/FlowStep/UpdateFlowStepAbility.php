@@ -72,15 +72,22 @@ class UpdateFlowStepAbility {
 								'type'        => 'string',
 								'description' => __( 'Remove a handler from this step (multi-handler mode). Provide handler slug to remove.', 'data-machine' ),
 							),
+							'validate_only'      => array(
+								'type'        => 'boolean',
+								'description' => __( 'Validate and return the effective update without persisting.', 'data-machine' ),
+								'default'     => false,
+							),
 						),
 					),
 					'output_schema'       => array(
 						'type'       => 'object',
 						'properties' => array(
-							'success'      => array( 'type' => 'boolean' ),
-							'flow_step_id' => array( 'type' => 'string' ),
-							'message'      => array( 'type' => 'string' ),
-							'error'        => array( 'type' => 'string' ),
+							'success'                  => array( 'type' => 'boolean' ),
+							'flow_step_id'             => array( 'type' => 'string' ),
+							'message'                  => array( 'type' => 'string' ),
+							'error'                    => array( 'type' => 'string' ),
+							'validate_only'            => array( 'type' => 'boolean' ),
+							'effective_handler_config' => array( 'type' => 'object' ),
 						),
 					),
 					'execute_callback'    => array( $this, 'execute' ),
@@ -106,6 +113,7 @@ class UpdateFlowStepAbility {
 		$flow_step_settings = is_array( $input['flow_step_settings'] ?? null ) ? $input['flow_step_settings'] : array();
 		$handler_config     = $input['handler_config'] ?? array();
 		$user_message       = $input['user_message'] ?? null;
+		$validate_only      = ! empty( $input['validate_only'] );
 
 		if ( empty( $flow_step_id ) || ! is_string( $flow_step_id ) ) {
 			return new \WP_Error( 'invalid_flow_step_id', 'flow_step_id is required and must be a string', array( 'status' => 400 ) );
@@ -123,6 +131,10 @@ class UpdateFlowStepAbility {
 		$has_message_update = null !== $user_message;
 		$has_add_handler    = ! empty( $input['add_handler'] );
 		$has_remove_handler = ! empty( $input['remove_handler'] );
+
+		if ( $validate_only && ( $has_message_update || $has_add_handler || $has_remove_handler ) ) {
+			return new \WP_Error( 'invalid_validate_only_update', 'validate_only currently supports handler configuration updates only', array( 'status' => 400 ) );
+		}
 
 		if ( ! $has_handler_update && ! $has_message_update && ! $has_add_handler && ! $has_remove_handler ) {
 			return new \WP_Error( 'invalid_flow_step_update', 'At least one of handler_slug, handler_config, user_message, add_handler, or remove_handler is required', array( 'status' => 400 ) );
@@ -148,7 +160,8 @@ class UpdateFlowStepAbility {
 
 		$existing_step = is_array( $validation['step_config'] ?? null ) ? $validation['step_config'] : array();
 
-		$updated_fields = array();
+		$updated_fields           = array();
+		$effective_handler_config = null;
 
 		if ( $has_handler_update ) {
 			$effective_slug = FlowStepConfig::getEffectiveSlug( $existing_step, $handler_slug ?? '' );
@@ -172,10 +185,14 @@ class UpdateFlowStepAbility {
 				}
 			}
 
-			$success = $this->updateHandler( $flow_step_id, $effective_slug, $handler_config );
+			$handler_update = $this->updateHandler( $flow_step_id, $effective_slug, $handler_config, $validate_only );
 
-			if ( ! $success ) {
+			if ( ! $handler_update ) {
 				return new \WP_Error( 'flow_step_update_failed', 'Failed to update handler configuration', array( 'status' => 500 ) );
+			}
+
+			if ( $validate_only && is_array( $handler_update ) ) {
+				$effective_handler_config = $handler_update['handler_config'] ?? array();
 			}
 
 			if ( ! empty( $handler_slug ) ) {
@@ -236,20 +253,31 @@ class UpdateFlowStepAbility {
 			$updated_fields[] = 'user_message';
 		}
 
-		do_action(
-			'datamachine_log',
-			'info',
-			'Flow step updated via ability',
-			array(
-				'flow_step_id'   => $flow_step_id,
-				'updated_fields' => $updated_fields,
-			)
-		);
+		if ( ! $validate_only ) {
+			do_action(
+				'datamachine_log',
+				'info',
+				'Flow step updated via ability',
+				array(
+					'flow_step_id'   => $flow_step_id,
+					'updated_fields' => $updated_fields,
+				)
+			);
+		}
 
-		return array(
+		$result = array(
 			'success'      => true,
 			'flow_step_id' => $flow_step_id,
-			'message'      => 'Flow step updated successfully. Fields updated: ' . implode( ', ', $updated_fields ),
+			'message'      => ( $validate_only ? 'Flow step update validated. Fields: ' : 'Flow step updated successfully. Fields updated: ' ) . implode( ', ', $updated_fields ),
 		);
+
+		if ( $validate_only ) {
+			$result['validate_only'] = true;
+			if ( null !== $effective_handler_config ) {
+				$result['effective_handler_config'] = $effective_handler_config;
+			}
+		}
+
+		return $result;
 	}
 }
