@@ -121,22 +121,23 @@ class TrackedItemsAbilities {
 	}
 
 	/** @param array<string,mixed> $input Input. */
-	public function executeUpsertTrackedItem( array $input ): array {
+	public function executeUpsertTrackedItem( array $input ): array|\WP_Error {
 		$item = $this->tracked_items->upsert( $input );
 		return $item ? array(
 			'success' => true,
 			'item'    => $item,
-		) : array(
-			'success' => false,
-			'error'   => 'Could not upsert tracked item.',
-		);
+		) : new \WP_Error( 'tracked_item_upsert_failed', 'Could not upsert tracked item.', array( 'status' => 500 ) );
 	}
 
 	/** @param array<string,mixed> $input Input. */
-	public function executeGetTrackedItem( array $input ): array {
+	public function executeGetTrackedItem( array $input ): array|\WP_Error {
 		$item = $this->tracked_items->get( (string) ( $input['namespace'] ?? '' ), (string) ( $input['item_id'] ?? '' ) );
+		if ( null === $item ) {
+			return new \WP_Error( 'tracked_item_not_found', 'Tracked item was not found.', array( 'status' => 404 ) );
+		}
+
 		return array(
-			'success' => null !== $item,
+			'success' => true,
 			'item'    => $item,
 		);
 	}

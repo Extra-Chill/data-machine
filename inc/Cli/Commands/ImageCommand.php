@@ -120,6 +120,10 @@ class ImageCommand extends BaseCommand {
 		WP_CLI::log( 'Starting image generation...' );
 
 		$result = ImageGenerationAbilities::generateImage( $input );
+		if ( is_wp_error( $result ) ) {
+			WP_CLI::error( $result->get_error_message() );
+			return;
+		}
 
 		if ( empty( $result['success'] ) ) {
 			WP_CLI::error( $result['error'] ?? 'Failed to start image generation.' );
@@ -231,6 +235,10 @@ class ImageCommand extends BaseCommand {
 		WP_CLI::log( "Rendering template \"{$template_id}\"..." );
 
 		$result = ImageTemplateAbilities::renderTemplate( $input );
+		if ( is_wp_error( $result ) ) {
+			WP_CLI::error( $result->get_error_message() );
+			return;
+		}
 
 		if ( empty( $result['success'] ) ) {
 			WP_CLI::error( $result['message'] ?? 'Template rendering failed.' );

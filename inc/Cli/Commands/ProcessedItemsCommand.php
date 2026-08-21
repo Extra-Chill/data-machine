@@ -298,6 +298,10 @@ class ProcessedItemsCommand extends BaseCommand {
 				'target_id'  => $target_id,
 			)
 		);
+		if ( is_wp_error( $result ) ) {
+			WP_CLI::error( $result->get_error_message() );
+			return;
+		}
 
 		if ( ! $result['success'] ) {
 			WP_CLI::error( $result['error'] ?? 'Failed to clear processed items.' );
@@ -872,6 +876,10 @@ class ProcessedItemsCommand extends BaseCommand {
 				'item_identifier' => $item_identifier,
 			)
 		);
+		if ( is_wp_error( $result ) ) {
+			WP_CLI::error( $result->get_error_message() );
+			return;
+		}
 
 		if ( ! $result['success'] ) {
 			WP_CLI::error( $result['error'] ?? 'Failed to check processed item.' );
@@ -915,6 +923,10 @@ class ProcessedItemsCommand extends BaseCommand {
 				'flow_step_id' => $flow_step_id,
 			)
 		);
+		if ( is_wp_error( $result ) ) {
+			WP_CLI::error( $result->get_error_message() );
+			return;
+		}
 
 		if ( ! $result['success'] ) {
 			WP_CLI::error( $result['error'] ?? 'Failed to check processing history.' );
@@ -978,6 +990,10 @@ class ProcessedItemsCommand extends BaseCommand {
 				'item_identifier' => $item_identifier,
 			)
 		);
+		if ( is_wp_error( $result ) ) {
+			WP_CLI::error( $result->get_error_message() );
+			return;
+		}
 
 		if ( ! $result['success'] ) {
 			WP_CLI::error( $result['error'] ?? 'Failed to get processed-at timestamp.' );
@@ -1079,6 +1095,10 @@ class ProcessedItemsCommand extends BaseCommand {
 				'limit'                 => $limit,
 			)
 		);
+		if ( is_wp_error( $result ) ) {
+			WP_CLI::error( $result->get_error_message() );
+			return;
+		}
 
 		if ( ! $result['success'] ) {
 			WP_CLI::error( $result['error'] ?? 'Failed to find stale items.' );
@@ -1171,6 +1191,10 @@ class ProcessedItemsCommand extends BaseCommand {
 				'limit'                 => $limit,
 			)
 		);
+		if ( is_wp_error( $result ) ) {
+			WP_CLI::error( $result->get_error_message() );
+			return;
+		}
 
 		if ( ! $result['success'] ) {
 			WP_CLI::error( $result['error'] ?? 'Failed to find never-processed items.' );

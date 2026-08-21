@@ -132,7 +132,7 @@ class AltTextAbilities {
 	 * @param array $input Ability input.
 	 * @return array Ability response.
 	 */
-	public static function generateAltText( array $input ): array {
+	public static function generateAltText( array $input ): array|\WP_Error {
 		$attachment_id = absint( $input['attachment_id'] ?? 0 );
 		$post_id       = absint( $input['post_id'] ?? 0 );
 		$force         = ! empty( $input['force'] );
@@ -146,23 +146,11 @@ class AltTextAbilities {
 		$model              = $system_defaults['model'];
 
 		if ( empty( $provider ) || empty( $model ) ) {
-			return array(
-				'success'        => false,
-				'queued_count'   => 0,
-				'attachment_ids' => array(),
-				'message'        => 'No default AI provider/model configured.',
-				'error'          => 'Configure default_provider and default_model in Data Machine settings before generating alt text.',
-			);
+			return new \WP_Error( 'alt_text_ai_not_configured', 'Configure default_provider and default_model in Data Machine settings before generating alt text.', array( 'status' => 503 ) );
 		}
 
 		if ( 0 === $attachment_id && 0 === $post_id ) {
-			return array(
-				'success'        => false,
-				'queued_count'   => 0,
-				'attachment_ids' => array(),
-				'message'        => 'No attachment_id or post_id provided.',
-				'error'          => 'Missing required parameter: attachment_id or post_id',
-			);
+			return new \WP_Error( 'alt_text_target_required', 'Missing required parameter: attachment_id or post_id', array( 'status' => 400 ) );
 		}
 
 		$attachment_ids = array();
@@ -196,13 +184,7 @@ class AltTextAbilities {
 		$attachment_ids = array_values( array_unique( array_filter( $attachment_ids ) ) );
 
 		if ( empty( $attachment_ids ) ) {
-			return array(
-				'success'        => false,
-				'queued_count'   => 0,
-				'attachment_ids' => array(),
-				'message'        => 'No attachments found to process.',
-				'error'          => 'No eligible attachments found',
-			);
+			return new \WP_Error( 'alt_text_attachments_missing', 'No eligible attachments found', array( 'status' => 404 ) );
 		}
 
 		// Filter to eligible images.
@@ -249,13 +231,7 @@ class AltTextAbilities {
 		);
 
 		if ( false === $batch ) {
-			return array(
-				'success'        => false,
-				'queued_count'   => 0,
-				'attachment_ids' => array(),
-				'message'        => 'Failed to schedule batch.',
-				'error'          => 'Task batch scheduling failed.',
-			);
+			return new \WP_Error( 'alt_text_batch_schedule_failed', 'Task batch scheduling failed.', array( 'status' => 500 ) );
 		}
 
 		return array(

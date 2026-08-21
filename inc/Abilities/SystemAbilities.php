@@ -199,10 +199,39 @@ class SystemAbilities {
 				continue;
 			}
 
-			$check_options       = $options[ $type_id ] ?? $options;
+			$check_options = $options[ $type_id ] ?? $options;
+
+			try {
+				$check_result = call_user_func( $check['callback'], $check_options );
+			} catch ( \Throwable $throwable ) {
+				$check_result = array(
+					'success'     => false,
+					'check_type'  => $type_id,
+					'error'       => $throwable->getMessage(),
+					'error_code'  => 'health_check_callback_exception',
+					'status'      => 500,
+					'diagnostics' => array(
+						'exception' => get_class( $throwable ),
+					),
+				);
+			}
+
+			if ( is_wp_error( $check_result ) ) {
+				$error_data   = $check_result->get_error_data();
+				$check_result = array(
+					'success'     => false,
+					'check_type'  => $type_id,
+					'error'       => $check_result->get_error_message(),
+					'error_code'  => $check_result->get_error_code(),
+					'status'      => is_array( $error_data ) && isset( $error_data['status'] ) ? (int) $error_data['status'] : 500,
+					'diagnostics' => is_array( $error_data ) && isset( $error_data['diagnostics'] ) ? $error_data['diagnostics'] : array(),
+					'error_data'  => $error_data,
+				);
+			}
+
 			$results[ $type_id ] = array(
 				'label'  => $check['label'],
-				'result' => call_user_func( $check['callback'], $check_options ),
+				'result' => $check_result,
 			);
 		}
 
@@ -640,45 +669,36 @@ class SystemAbilities {
 	 * @return array Result with success, job_id, message.
 	 * @since 0.42.0
 	 */
-	public static function runTask( array $input ): array {
+	public static function runTask( array $input ): array|\WP_Error {
 		$task_type   = $input['task_type'] ?? '';
 		$task_params = is_array( $input['task_params'] ?? null ) ? $input['task_params'] : array();
 
 		if ( empty( $task_type ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'task_type is required.',
-				'message' => 'Specify which task to run.',
-			);
+			return new \WP_Error( 'task_type_required', 'task_type is required. Specify which task to run.', array( 'status' => 400 ) );
 		}
 
 		if ( ! TaskRegistry::isRegistered( $task_type ) ) {
-			return array(
-				'success' => false,
-				'error'   => "Unknown task type: {$task_type}",
-				'message' => 'Task type is not registered.',
-			);
+			return new \WP_Error( 'task_type_not_found', "Unknown task type: {$task_type}", array( 'status' => 404 ) );
 		}
 
 		$registry = TaskRegistry::getRegistry();
 		$meta     = $registry[ $task_type ] ?? array();
 
 		if ( empty( $meta['supports_run'] ) ) {
-			return array(
-				'success' => false,
-				'error'   => "Task '{$task_type}' does not support manual execution.",
-				'message' => 'This task can only be triggered by its configured event or schedule.',
-			);
+			return new \WP_Error( 'task_manual_run_unsupported', "Task '{$task_type}' does not support manual execution.", array( 'status' => 422 ) );
 		}
 
 		$task_context = self::extractRunTaskContext( $task_params );
 
 		$validation = self::validateRunTaskParams( $task_type, $meta, $task_params );
 		if ( ! $validation['success'] ) {
-			return array(
-				'success' => false,
-				'error'   => $validation['error'],
-				'message' => $validation['message'],
+			return new \WP_Error(
+				'task_params_invalid',
+				$validation['error'],
+				array(
+					'status'  => 400,
+					'message' => $validation['message'],
+				)
 			);
 		}
 
@@ -692,17 +712,23 @@ class SystemAbilities {
 		if ( ! $job_id ) {
 			$scheduler_error = TaskScheduler::getLastScheduleError();
 			if ( is_array( $scheduler_error ) && ! empty( $scheduler_error['message'] ) ) {
-				return array(
-					'success' => false,
-					'error'   => $scheduler_error['error'],
-					'message' => $scheduler_error['message'],
+				return new \WP_Error(
+					'task_schedule_failed',
+					$scheduler_error['error'],
+					array(
+						'status'  => 500,
+						'message' => $scheduler_error['message'],
+					)
 				);
 			}
 
-			return array(
-				'success' => false,
-				'error'   => 'Failed to schedule task.',
-				'message' => 'TaskScheduler returned false — check logs for details.',
+			return new \WP_Error(
+				'task_schedule_failed',
+				'Failed to schedule task.',
+				array(
+					'status'  => 500,
+					'message' => 'TaskScheduler returned false — check logs for details.',
+				)
 			);
 		}
 
@@ -853,7 +879,7 @@ class SystemAbilities {
 		return array_key_exists( $key, $params ) && null !== $params[ $key ] && '' !== $params[ $key ];
 	}
 
-	public static function generateSessionTitle( array $input ): array {
+	public static function generateSessionTitle( array $input ): array|\WP_Error {
 		$session_id = $input['session_id'];
 		$force      = $input['force'] ?? false;
 
@@ -861,10 +887,13 @@ class SystemAbilities {
 		$session = $chat_db->get_session($session_id);
 
 		if ( ! $session ) {
-			return array(
-				'success' => false,
-				'error'   => 'Session not found',
-				'message' => 'Unable to find chat session',
+			return new \WP_Error(
+				'session_not_found',
+				'Session not found',
+				array(
+					'status'  => 404,
+					'message' => 'Unable to find chat session',
+				)
 			);
 		}
 
@@ -880,10 +909,13 @@ class SystemAbilities {
 
 		$messages = $session['messages'] ?? array();
 		if ( empty($messages) ) {
-			return array(
-				'success' => false,
-				'error'   => 'No messages found',
-				'message' => 'Session has no conversation messages',
+			return new \WP_Error(
+				'session_messages_missing',
+				'No messages found',
+				array(
+					'status'  => 422,
+					'message' => 'Session has no conversation messages',
+				)
 			);
 		}
 
@@ -909,10 +941,13 @@ class SystemAbilities {
 		}
 
 		if ( null === $first_user_message ) {
-			return array(
-				'success' => false,
-				'error'   => 'No user message found',
-				'message' => 'Session has no user messages to generate title from',
+			return new \WP_Error(
+				'session_user_message_missing',
+				'No user message found',
+				array(
+					'status'  => 422,
+					'message' => 'Session has no user messages to generate title from',
+				)
 			);
 		}
 
@@ -922,12 +957,15 @@ class SystemAbilities {
 		if ( ! $ai_titles_enabled ) {
 			$title   = self::generateTruncatedTitle($first_user_message);
 			$success = $chat_db->update_title($session_id, $title);
+			if ( ! $success ) {
+				return new \WP_Error( 'session_title_update_failed', 'Failed to update session title', array( 'status' => 500 ) );
+			}
 
 			return array(
-				'success' => $success,
+				'success' => true,
 				'title'   => $title,
 				'method'  => 'fallback',
-				'message' => $success ? 'Title generated using fallback method' : 'Failed to update session title',
+				'message' => 'Title generated using fallback method',
 			);
 		}
 
@@ -942,9 +980,11 @@ class SystemAbilities {
 		}
 
 		$success = $chat_db->update_title($session_id, $title);
+		if ( ! $success ) {
+			return new \WP_Error( 'session_title_update_failed', 'Failed to update session title', array( 'status' => 500 ) );
+		}
 
-		if ( $success ) {
-			do_action(
+		do_action(
 				'datamachine_log',
 				'debug',
 				'Session title generated',
@@ -954,14 +994,13 @@ class SystemAbilities {
 					'method'     => $method,
 					'context'    => 'system',
 				)
-			);
-		}
+		);
 
 		return array(
-			'success' => $success,
+			'success' => true,
 			'title'   => $title,
 			'method'  => $method,
-			'message' => $success ? 'Title generated successfully' : 'Failed to update session title',
+			'message' => 'Title generated successfully',
 		);
 	}
 

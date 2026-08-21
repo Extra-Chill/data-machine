@@ -272,17 +272,14 @@ class HandlerAbilities {
 	 * @param array $input Input parameters.
 	 * @return array Result with handlers data.
 	 */
-	public function executeGetHandlers( array $input ): array {
+	public function executeGetHandlers( array $input ): array|\WP_Error {
 		$handler_slug = $input['handler_slug'] ?? null;
 		$step_type    = $input['step_type'] ?? null;
 
 		// Direct handler lookup by slug - bypasses step_type filter.
 		if ( $handler_slug ) {
 			if ( ! is_string( $handler_slug ) || empty( $handler_slug ) ) {
-				return array(
-					'success' => false,
-					'error'   => 'handler_slug must be a non-empty string',
-				);
+				return new \WP_Error( 'handler_slug_invalid', 'handler_slug must be a non-empty string', array( 'status' => 400 ) );
 			}
 
 			$handler = $this->getHandler( $handler_slug );
@@ -368,14 +365,11 @@ class HandlerAbilities {
 	 * @param array $input Input parameters.
 	 * @return array Result with field definitions.
 	 */
-	public function executeGetHandlerConfigFields( array $input ): array {
+	public function executeGetHandlerConfigFields( array $input ): array|\WP_Error {
 		$handler_slug = $input['handler_slug'] ?? null;
 
 		if ( empty( $handler_slug ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'handler_slug is required',
-			);
+			return new \WP_Error( 'handler_slug_required', 'handler_slug is required', array( 'status' => 400 ) );
 		}
 
 		$fields = $this->getConfigFields( $handler_slug );
@@ -393,15 +387,12 @@ class HandlerAbilities {
 	 * @param array $input Input parameters.
 	 * @return array Result with complete configuration.
 	 */
-	public function executeApplyHandlerDefaults( array $input ): array {
+	public function executeApplyHandlerDefaults( array $input ): array|\WP_Error {
 		$handler_slug = $input['handler_slug'] ?? null;
 		$config       = $input['config'] ?? array();
 
 		if ( empty( $handler_slug ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'handler_slug is required',
-			);
+			return new \WP_Error( 'handler_slug_required', 'handler_slug is required', array( 'status' => 400 ) );
 		}
 
 		$complete_config = $this->applyDefaults( $handler_slug, $config );

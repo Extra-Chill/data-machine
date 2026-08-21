@@ -134,7 +134,12 @@ class TrackedItemsCommand extends BaseCommand {
 		return $input;
 	}
 
-	private function output_result( array $result, string $format ): void {
+	private function output_result( array|\WP_Error $result, string $format ): void {
+		if ( is_wp_error( $result ) ) {
+			WP_CLI::error( $result->get_error_message() );
+			return;
+		}
+
 		if ( 'json' === $format ) {
 			WP_CLI::print_value( $result, array( 'format' => 'json' ) );
 			return;

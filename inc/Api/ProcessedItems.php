@@ -100,6 +100,9 @@ class ProcessedItems {
 				'target_id'  => $target_id,
 			)
 		);
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
 
 		if ( ! $result['success'] ) {
 			return new \WP_Error(

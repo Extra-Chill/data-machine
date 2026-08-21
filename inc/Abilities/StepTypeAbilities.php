@@ -129,18 +129,15 @@ class StepTypeAbilities {
 	 * Execute get step types ability.
 	 *
 	 * @param array $input Input parameters.
-	 * @return array Result with step types data.
+	 * @return array|\WP_Error Result with step types data or failure.
 	 */
-	public function executeGetStepTypes( array $input ): array {
+	public function executeGetStepTypes( array $input ): array|\WP_Error {
 		$step_type_slug = $input['step_type_slug'] ?? null;
 
 		// Direct step type lookup by slug.
 		if ( $step_type_slug ) {
 			if ( ! is_string( $step_type_slug ) || empty( $step_type_slug ) ) {
-				return array(
-					'success' => false,
-					'error'   => 'step_type_slug must be a non-empty string',
-				);
+				return new \WP_Error( 'step_type_slug_invalid', 'step_type_slug must be a non-empty string', array( 'status' => 400 ) );
 			}
 
 			$step_type = $this->getStepType( $step_type_slug );
@@ -173,9 +170,9 @@ class StepTypeAbilities {
 	 * Execute validate step type ability.
 	 *
 	 * @param array $input Input parameters.
-	 * @return array Result with validation status.
+	 * @return array|\WP_Error Result with validation status or failure.
 	 */
-	public function executeValidateStepType( array $input ): array {
+	public function executeValidateStepType( array $input ): array|\WP_Error {
 		$slug = $input['step_type'] ?? null;
 
 		if ( empty( $slug ) ) {

@@ -68,11 +68,19 @@ class ProcessedItemsAbilitiesTest extends WP_UnitTestCase {
 	}
 
 	public function test_clear_requires_clear_type(): void {
+		$result = wp_get_ability( 'datamachine/clear-processed-items' )->execute( array() );
+
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'ability_invalid_input', $result->get_error_code() );
+		$this->assertNull( $result->get_error_data() );
+	}
+
+	public function test_clear_callback_requires_clear_type(): void {
 		$result = $this->abilities->executeClearProcessedItems( array() );
 
-		$this->assertFalse( $result['success'] );
-		$this->assertArrayHasKey( 'error', $result );
-		$this->assertStringContainsString( 'clear_type is required', $result['error'] );
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'clear_type_required', $result->get_error_code() );
+		$this->assertSame( 400, $result->get_error_data()['status'] );
 	}
 
 	public function test_clear_requires_valid_clear_type(): void {
@@ -83,9 +91,8 @@ class ProcessedItemsAbilitiesTest extends WP_UnitTestCase {
 			)
 		);
 
-		$this->assertFalse( $result['success'] );
-		$this->assertArrayHasKey( 'error', $result );
-		$this->assertStringContainsString( 'must be either', $result['error'] );
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'clear_type_invalid', $result->get_error_code() );
 	}
 
 	public function test_clear_requires_target_id(): void {
@@ -95,9 +102,8 @@ class ProcessedItemsAbilitiesTest extends WP_UnitTestCase {
 			)
 		);
 
-		$this->assertFalse( $result['success'] );
-		$this->assertArrayHasKey( 'error', $result );
-		$this->assertStringContainsString( 'target_id is required', $result['error'] );
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'target_id_invalid', $result->get_error_code() );
 	}
 
 	public function test_clear_for_flow(): void {
@@ -137,9 +143,8 @@ class ProcessedItemsAbilitiesTest extends WP_UnitTestCase {
 	public function test_check_requires_flow_step_id(): void {
 		$result = $this->abilities->executeCheckProcessedItem( array() );
 
-		$this->assertFalse( $result['success'] );
-		$this->assertArrayHasKey( 'error', $result );
-		$this->assertStringContainsString( 'flow_step_id is required', $result['error'] );
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'flow_step_id_required', $result->get_error_code() );
 	}
 
 	public function test_check_requires_source_type(): void {
@@ -149,9 +154,8 @@ class ProcessedItemsAbilitiesTest extends WP_UnitTestCase {
 			)
 		);
 
-		$this->assertFalse( $result['success'] );
-		$this->assertArrayHasKey( 'error', $result );
-		$this->assertStringContainsString( 'source_type is required', $result['error'] );
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'source_type_required', $result->get_error_code() );
 	}
 
 	public function test_check_requires_item_identifier(): void {
@@ -162,9 +166,8 @@ class ProcessedItemsAbilitiesTest extends WP_UnitTestCase {
 			)
 		);
 
-		$this->assertFalse( $result['success'] );
-		$this->assertArrayHasKey( 'error', $result );
-		$this->assertStringContainsString( 'item_identifier is required', $result['error'] );
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'item_identifier_required', $result->get_error_code() );
 	}
 
 	public function test_check_unprocessed_item(): void {
@@ -200,9 +203,8 @@ class ProcessedItemsAbilitiesTest extends WP_UnitTestCase {
 	public function test_has_history_requires_flow_step_id(): void {
 		$result = $this->abilities->executeHasProcessedHistory( array() );
 
-		$this->assertFalse( $result['success'] );
-		$this->assertArrayHasKey( 'error', $result );
-		$this->assertStringContainsString( 'flow_step_id is required', $result['error'] );
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'flow_step_id_required', $result->get_error_code() );
 	}
 
 	public function test_has_history_returns_false_for_new_flow(): void {
@@ -314,8 +316,8 @@ class ProcessedItemsAbilitiesTest extends WP_UnitTestCase {
 
 	public function test_get_processed_at_requires_fields(): void {
 		$result = $this->abilities->executeGetProcessedAt( array() );
-		$this->assertFalse( $result['success'] );
-		$this->assertStringContainsString( 'flow_step_id', $result['error'] );
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'flow_step_id_required', $result->get_error_code() );
 	}
 
 	// -----------------------------------------------------------------
@@ -339,8 +341,8 @@ class ProcessedItemsAbilitiesTest extends WP_UnitTestCase {
 			)
 		);
 
-		$this->assertFalse( $result['success'] );
-		$this->assertStringContainsString( 'candidate_identifiers', $result['error'] );
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'candidate_identifiers_invalid', $result->get_error_code() );
 	}
 
 	public function test_find_stale_requires_valid_max_age_days(): void {
@@ -353,8 +355,8 @@ class ProcessedItemsAbilitiesTest extends WP_UnitTestCase {
 			)
 		);
 
-		$this->assertFalse( $result['success'] );
-		$this->assertStringContainsString( 'max_age_days', $result['error'] );
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'max_age_days_invalid', $result->get_error_code() );
 	}
 
 	public function test_find_stale_returns_empty_for_fresh_candidates(): void {
@@ -394,8 +396,8 @@ class ProcessedItemsAbilitiesTest extends WP_UnitTestCase {
 			)
 		);
 
-		$this->assertFalse( $result['success'] );
-		$this->assertStringContainsString( 'candidate_identifiers', $result['error'] );
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'candidate_identifiers_invalid', $result->get_error_code() );
 	}
 
 	public function test_find_never_processed_returns_unseen_subset(): void {

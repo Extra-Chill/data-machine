@@ -371,12 +371,12 @@ class SystemCommand extends BaseCommand {
 			return;
 		}
 
-		$result = SystemAbilities::generateSessionTitle(
+		$result = AbilityResult::normalize( SystemAbilities::generateSessionTitle(
 			array(
 				'session_id' => $session_id,
 				'force'      => $force,
 			)
-		);
+		) );
 
 		if ( ! $result['success'] ) {
 			WP_CLI::error( $result['error'] ?? $result['message'] ?? 'Title generation failed.' );
@@ -470,12 +470,12 @@ class SystemCommand extends BaseCommand {
 			return;
 		}
 
-		$result = SystemAbilities::runTask(
+		$result = AbilityResult::normalize( SystemAbilities::runTask(
 			array(
 				'task_type'   => $task_type,
 				'task_params' => $params,
 			)
-		);
+		) );
 
 		if ( ! $result['success'] ) {
 			if ( 'json' === $format ) {

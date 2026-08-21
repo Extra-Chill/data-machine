@@ -252,9 +252,9 @@ class TestHandlerAbility {
 	 * Execute the test handler ability.
 	 *
 	 * @param array $input Input parameters.
-	 * @return array Result with packet summaries.
+	 * @return array|\WP_Error Result with packet summaries or an execution error.
 	 */
-	public function execute( array $input ): array {
+	public function execute( array $input ): array|\WP_Error {
 		$handler_slug = $input['handler_slug'] ?? null;
 		$config       = $input['config'] ?? array();
 		$flow_id      = isset( $input['flow_id'] ) ? (int) $input['flow_id'] : null;
@@ -270,7 +270,7 @@ class TestHandlerAbility {
 			$resolved = $this->resolveFromFlow( $flow_id );
 
 			if ( ! $resolved['success'] ) {
-				return $resolved;
+				return new \WP_Error( 'handler_flow_invalid', $resolved['error'] ?? 'Unable to resolve handler from flow.', array( 'status' => 422 ) );
 			}
 
 			$handler_slug = $resolved['handler_slug'];
@@ -280,30 +280,21 @@ class TestHandlerAbility {
 		}
 
 		if ( empty( $handler_slug ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'handler_slug is required (provide it directly or via --flow)',
-			);
+			return new \WP_Error( 'handler_slug_required', 'handler_slug is required (provide it directly or via --flow)', array( 'status' => 400 ) );
 		}
 
 		$abilities = new HandlerAbilities();
 		$info      = $abilities->getHandler( $handler_slug );
 
 		if ( ! $info ) {
-			return array(
-				'success' => false,
-				'error'   => sprintf( 'Handler "%s" not found. Use --list to see available handlers.', $handler_slug ),
-			);
+			return new \WP_Error( 'handler_not_found', sprintf( 'Handler "%s" not found. Use --list to see available handlers.', $handler_slug ), array( 'status' => 404 ) );
 		}
 
 		$handler_label = $info['label'] ?? $handler_slug;
 		$handler_class = $info['class'] ?? null;
 
 		if ( ! $handler_class || ! class_exists( $handler_class ) ) {
-			return array(
-				'success' => false,
-				'error'   => sprintf( 'Handler class for "%s" not found or not loaded.', $handler_slug ),
-			);
+			return new \WP_Error( 'handler_class_not_found', sprintf( 'Handler class for "%s" not found or not loaded.', $handler_slug ), array( 'status' => 500 ) );
 		}
 
 		// Apply defaults to fill in missing config values.
@@ -340,14 +331,17 @@ class TestHandlerAbility {
 		try {
 			$handler = new $handler_class();
 			$packets = $handler->get_fetch_data( 'direct', $config, null );
-		} catch ( \Throwable $e ) {
-			return array(
-				'success'           => false,
-				'handler_slug'      => $this->boundOutputString( (string) $handler_slug, 256 ),
-				'handler_label'     => $this->boundOutputString( (string) $handler_label, 256 ),
-				'config_used'       => $config_used,
-				'error'             => 'Handler execution failed.',
-				'execution_time_ms' => round( ( microtime( true ) - $start_ms ) * 1000, 1 ),
+		} catch ( \Throwable ) {
+			return new \WP_Error(
+				'handler_execution_failed',
+				'Handler execution failed.',
+				array(
+					'status'            => 500,
+					'handler_slug'      => $this->boundOutputString( (string) $handler_slug, 256 ),
+					'handler_label'     => $this->boundOutputString( (string) $handler_label, 256 ),
+					'config_used'       => $config_used,
+					'execution_time_ms' => round( ( microtime( true ) - $start_ms ) * 1000, 1 ),
+				)
 			);
 		}
 

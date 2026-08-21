@@ -116,9 +116,7 @@ $assert( 'legacy callers receive the native error message', 'No edits were appli
 $assert( 'legacy callers receive the native error code', 'edit_operations_failed' === $caller_error['wp_error_code'] );
 
 $blocks_command_source = file_get_contents( __DIR__ . '/../inc/Cli/Commands/BlocksCommand.php' );
-$internal_task_source  = file_get_contents( __DIR__ . '/../inc/Engine/AI/System/Tasks/InternalLinkingTask.php' );
 $assert( 'blocks CLI normalizes every direct content ability result', 4 === substr_count( $blocks_command_source, 'AbilityResult::normalize(' ) );
-$assert( 'internal linking normalizes both direct content ability results', 2 === substr_count( $internal_task_source, 'AbilityResult::normalize(' ) );
 
 $array_result = array(
 	'success' => false,

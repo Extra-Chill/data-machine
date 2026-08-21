@@ -10,16 +10,20 @@ namespace DataMachine\Core;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Normalizes core WP_Ability results at legacy caller boundaries.
+ * Presents core WP_Ability results at transport and legacy extension boundaries.
+ *
+ * Native callbacks must return WP_Error directly. Conversion remains only for
+ * CLI/REST/AI-tool presentation and for documented extension filters whose
+ * third-party callbacks may still return the historical failure array.
  */
 class AbilityResult {
 
 	/**
 	 * Convert a WP_Ability::execute() result into Data Machine's legacy array shape.
 	 *
-	 * Core returns WP_Error for validation, permission, and callback failures. Many
-	 * Data Machine callers still expect arrays with a success flag; this keeps
-	 * those callers safe while callbacks migrate to returning WP_Error directly.
+	 * Core returns WP_Error for validation, permission, and callback failures. This
+	 * array conversion is reserved for CLI presentation plus the scheduler and
+	 * bundle runners that still expose the historical result envelope externally.
 	 *
 	 * @param mixed $result Ability execution result.
 	 * @return array Normalized result array.
@@ -116,7 +120,10 @@ class AbilityResult {
 	}
 
 	/**
-	 * Convert a legacy failed ability result array into WP_Error.
+	 * Convert a legacy failed extension result array into WP_Error.
+	 *
+	 * The remaining callers are extension boundaries: queue and flow-step filters,
+	 * and webhook operations whose downstream callbacks are not all first-party.
 	 *
 	 * @param mixed  $result          Ability execution result.
 	 * @param string $default_code    Error code to use when the result has no error code.

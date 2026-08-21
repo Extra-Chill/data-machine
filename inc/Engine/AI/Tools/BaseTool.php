@@ -139,10 +139,10 @@ abstract class BaseTool {
 	 *
 	 * Tools that need fully custom save logic can override this method directly.
 	 *
-	 * @param array|null $result      Result from a previous handler, or null.
+	 * @param array|\WP_Error|null $result Result from a previous handler, or null.
 	 * @param string     $tool_id     Tool identifier.
 	 * @param array      $config_data Sanitized configuration data.
-	 * @return array|null Result array with success/error, or passthrough null.
+	 * @return array|\WP_Error|null Success result, failure, or passthrough null.
 	 */
 	public function save_configuration( $result, $tool_id, $config_data ) {
 		if ( $this->config_tool_id !== $tool_id ) {
@@ -157,10 +157,7 @@ abstract class BaseTool {
 		$validated = $this->validate_and_build_config( $config_data );
 
 		if ( isset( $validated['error'] ) ) {
-			return array(
-				'success' => false,
-				'error'   => $validated['error'],
-			);
+			return new \WP_Error( 'tool_config_invalid', $validated['error'], array( 'status' => 400 ) );
 		}
 
 		$this->before_config_save( $config_data );
@@ -172,10 +169,7 @@ abstract class BaseTool {
 			);
 		}
 
-		return array(
-			'success' => false,
-			'error'   => __( 'Failed to save configuration', 'data-machine' ),
-		);
+		return new \WP_Error( 'tool_config_save_failed', __( 'Failed to save configuration', 'data-machine' ), array( 'status' => 500 ) );
 	}
 
 	/**

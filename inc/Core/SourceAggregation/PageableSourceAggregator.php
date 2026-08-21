@@ -16,9 +16,9 @@ class PageableSourceAggregator {
 	 *
 	 * @param callable $page_callback Callback receiving page params and state.
 	 * @param array    $config        Aggregation config.
-	 * @return array Aggregation result.
+	 * @return array|\WP_Error Aggregation result or page callback failure.
 	 */
-	public function aggregate( callable $page_callback, array $config ): array {
+	public function aggregate( callable $page_callback, array $config ): array|\WP_Error {
 		$pagination  = is_array( $config['pagination'] ?? null ) ? $config['pagination'] : array();
 		$base_params = is_array( $config['params'] ?? null ) ? $config['params'] : array();
 
@@ -68,6 +68,10 @@ class PageableSourceAggregator {
 			);
 
 			++$page_count;
+
+			if ( is_wp_error( $page ) ) {
+				return $page;
+			}
 
 			if ( ! is_array( $page ) ) {
 				$diagnostics['stop_reason'] = 'invalid_page';

@@ -12,6 +12,21 @@ namespace {
 		define( 'ABSPATH', __DIR__ );
 	}
 
+	if ( ! class_exists( 'WP_Error' ) ) {
+		class WP_Error {
+			public function __construct( private string $code, private string $message, private mixed $data = null ) {}
+			public function get_error_code(): string { return $this->code; }
+			public function get_error_message(): string { return $this->message; }
+			public function get_error_data(): mixed { return $this->data; }
+		}
+	}
+
+	if ( ! function_exists( 'is_wp_error' ) ) {
+		function is_wp_error( $value ): bool {
+			return $value instanceof WP_Error;
+		}
+	}
+
 	if ( ! function_exists( 'wp_json_encode' ) ) {
 		function wp_json_encode( $data, $flags = 0, $depth = 512 ) {
 			return json_encode( $data, $flags, $depth );
@@ -42,6 +57,9 @@ namespace {
 
 	if ( ! function_exists( 'apply_filters' ) ) {
 		function apply_filters( $hook, $value ) {
+			if ( 'datamachine_source_aggregate_page_callback' === $hook && isset( $GLOBALS['source_aggregate_page_callback'] ) ) {
+				return $GLOBALS['source_aggregate_page_callback'];
+			}
 			return $value;
 		}
 	}
@@ -66,6 +84,7 @@ namespace DataMachine\Abilities {
 
 namespace {
 	require_once __DIR__ . '/../inc/Core/SourceAggregation/PageableSourceAggregator.php';
+	require_once __DIR__ . '/../inc/Abilities/AbilityRegistration.php';
 	require_once __DIR__ . '/../inc/Abilities/SourceAggregateAbility.php';
 
 	use DataMachine\Abilities\SourceAggregateAbility;
@@ -176,6 +195,27 @@ namespace {
 
 	assert_source_aggregate( 'ability executes static page source', true === ( $ability_result['success'] ?? false ) && 5 === ( $ability_result['processed'] ?? 0 ) );
 
+	$page_error = new WP_Error(
+		'upstream_page_failed',
+		'Upstream page failed.',
+		array(
+			'status'      => 429,
+			'diagnostics' => array( 'request_id' => 'aggregate-smoke' ),
+		)
+	);
+	$GLOBALS['source_aggregate_page_callback'] = static fn(): WP_Error => $page_error;
+	$failed_aggregate = $ability->execute(
+		array(
+			'source'     => array( 'kind' => 'remote' ),
+			'pagination' => array( 'limit' => 2, 'item_path' => 'tickets' ),
+		)
+	);
+	unset( $GLOBALS['source_aggregate_page_callback'] );
+
+	assert_source_aggregate( 'ability returns page callback WP_Error unchanged', $page_error === $failed_aggregate );
+	assert_source_aggregate( 'page callback error preserves code and status', 'upstream_page_failed' === $failed_aggregate->get_error_code() && 429 === ( $failed_aggregate->get_error_data()['status'] ?? null ) );
+	assert_source_aggregate( 'page callback error does not become invalid_page success', is_wp_error( $failed_aggregate ) );
+
 	$unsupported = $ability->execute(
 		array(
 			'source'     => array( 'kind' => 'mcp', 'provider' => 'trac' ),
@@ -183,7 +223,7 @@ namespace {
 		)
 	);
 
-	assert_source_aggregate( 'unsupported live source fails clearly', false === ( $unsupported['success'] ?? true ) && str_contains( $unsupported['error'] ?? '', 'No source aggregation page executor' ) );
+	assert_source_aggregate( 'unsupported live source fails clearly', is_wp_error( $unsupported ) && 'source_aggregate_executor_missing' === $unsupported->get_error_code() );
 
 	if ( source_aggregate_failed_count() > 0 ) {
 		echo "\nsource-aggregate-smoke failed: {$failed}/{$total} assertions failed.\n";

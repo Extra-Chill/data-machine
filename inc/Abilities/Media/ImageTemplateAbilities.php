@@ -201,7 +201,7 @@ class ImageTemplateAbilities {
 	 * @param array $input Input parameters.
 	 * @return array Result with success flag and file paths.
 	 */
-	public static function renderTemplate( array $input ): array {
+	public static function renderTemplate( array $input ): array|\WP_Error {
 		$template_id = $input['template_id'] ?? '';
 		$data        = $input['data'] ?? array();
 		$preset      = $input['preset'] ?? '';
@@ -211,23 +211,17 @@ class ImageTemplateAbilities {
 		$cache_opts  = $input['cache'] ?? array();
 
 		if ( empty( $template_id ) ) {
-			return array(
-				'success' => false,
-				'message' => 'template_id is required',
-			);
+			return new \WP_Error( 'template_id_required', 'template_id is required.', array( 'status' => 400 ) );
 		}
 
 		$template = TemplateRegistry::get( $template_id );
 		if ( ! $template ) {
 			$available = implode( ', ', array_keys( TemplateRegistry::all() ) );
-			return array(
-				'success' => false,
-				'message' => sprintf(
+			return new \WP_Error( 'template_not_found', sprintf(
 					'Template "%s" not found. Available templates: %s',
 					$template_id,
 					$available ? $available : 'none registered'
-				),
-			);
+			), array( 'status' => 404 ) );
 		}
 
 		// Validate required fields for single-item mode.
@@ -250,14 +244,11 @@ class ImageTemplateAbilities {
 			}
 
 			if ( ! empty( $missing ) ) {
-				return array(
-					'success' => false,
-					'message' => sprintf(
+				return new \WP_Error( 'template_fields_missing', sprintf(
 						'Missing required fields for template "%s": %s',
 						$template_id,
 						implode( ', ', $missing )
-					),
-				);
+				), array( 'status' => 400 ) );
 			}
 		}
 
@@ -277,10 +268,7 @@ class ImageTemplateAbilities {
 		$file_paths = $template->render( $data, $renderer, $options );
 
 		if ( empty( $file_paths ) ) {
-			return array(
-				'success' => false,
-				'message' => sprintf( 'Template "%s" rendered but produced no output', $template_id ),
-			);
+			return new \WP_Error( 'template_render_empty', sprintf( 'Template "%s" rendered but produced no output', $template_id ), array( 'status' => 500 ) );
 		}
 
 		// Default output mode — return file paths as-is.
@@ -295,10 +283,14 @@ class ImageTemplateAbilities {
 
 		// Cached file output — copy each rendered file under uploads/<bucket>/<key>.<ext>.
 		$cached_result = self::copyFilesToCachedLocation( $file_paths, $template_id, $cache_opts );
+		if ( empty( $cached_result['cached_urls'] ) ) {
+			$status = empty( $cache_opts['bucket'] ) || empty( $cache_opts['key'] ) ? 400 : 500;
+			return new \WP_Error( 'template_cache_failed', $cached_result['message'] ?? 'Failed to cache rendered template output.', array( 'status' => $status ) );
+		}
 
 		return array_merge(
 			array(
-				'success'     => ! empty( $cached_result['cached_urls'] ),
+				'success'     => true,
 				'template_id' => $template_id,
 			),
 			$cached_result
