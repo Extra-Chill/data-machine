@@ -124,7 +124,10 @@ class FailJobHandler {
 			return false;
 		}
 
-		$db_processed_items->delete_processed_items( array( 'job_id' => $job_id ) );
+		$claims_released = $db_processed_items->release_claims_for_job( $job_id );
+		if ( false === $claims_released ) {
+			return false;
+		}
 
 		$cleanup_files = \DataMachine\Core\PluginSettings::get( 'cleanup_job_data_on_failure', true );
 		$files_cleaned = false;
@@ -150,14 +153,14 @@ class FailJobHandler {
 			'error',
 			'Job marked as failed',
 			array(
-				'job_id'                  => $job_id,
-				'failure_reason'          => $reason,
-				'triggered_by'            => 'datamachine_fail_job',
-				'context_data'            => $context_data,
-				'processed_items_cleaned' => true,
-				'files_cleanup_enabled'   => $cleanup_files,
-				'files_cleaned'           => $files_cleaned,
-				'retry_pending'           => $retry_pending,
+				'job_id'                   => $job_id,
+				'failure_reason'           => $reason,
+				'triggered_by'             => 'datamachine_fail_job',
+				'context_data'             => $context_data,
+				'processed_items_released' => $claims_released,
+				'files_cleanup_enabled'    => $cleanup_files,
+				'files_cleaned'            => $files_cleaned,
+				'retry_pending'            => $retry_pending,
 			)
 		);
 

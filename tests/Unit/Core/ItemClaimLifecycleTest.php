@@ -392,6 +392,115 @@ class ItemClaimLifecycleTest extends WP_UnitTestCase {
 		$this->assertIsArray( $this->context( 'deferred-retry-step', $job_id + 3000 )->claimItemOwnership( self::SCOPE, 'deferred-by-agent' ) );
 	}
 
+	public function test_defer_item_third_reappearance_terminalizes_and_marks_processed(): void {
+		$item_identifier = 'deferred-until-cap';
+		for ( $attempt = 1; $attempt <= ProcessedItems::MAX_DEFERRAL_ATTEMPTS; ++$attempt ) {
+			$job_id = $this->createJobWithClaim( array(), true );
+			$claim  = $this->claim( $item_identifier, $job_id, "deferred-revision-{$attempt}" );
+			datamachine_set_engine_data( $job_id, array( ProcessedItems::CLAIM_METADATA_KEY => $claim ) );
+			$tool_result = ( new FetchItemDispositionTool() )->handle_tool_call(
+				array( 'job_id' => $job_id, 'reason' => 'temporary source ambiguity' ),
+				array( 'disposition' => 'defer_item' )
+			);
+			$reconciled = StepLifecycleHandler::reconcileStepOutput(
+				$job_id,
+				array( 'step_type' => 'ai', 'flow_step_id' => 'ai-defer-cap' ),
+				array( $this->dispositionPacket( $claim, $tool_result['disposition'] ) ),
+				true
+			);
+
+			$this->assertTrue( $reconciled['success'] );
+			$this->assertSame( $attempt, $tool_result['deferral_attempts'] );
+			if ( $attempt < ProcessedItems::MAX_DEFERRAL_ATTEMPTS ) {
+				$this->assertSame( 1, $reconciled['released'] );
+				$this->assertFalse( $this->processed->has_item_been_processed( self::SCOPE, self::SOURCE, $item_identifier ) );
+				continue;
+			}
+
+			$this->assertSame( 'defer_exhausted', $tool_result['disposition'] );
+			$this->assertSame( 1, $reconciled['exhausted'] );
+			$terminal_status = JobStatus::agentSkipped( 'defer-exhausted' )->toString();
+			$this->assertArrayNotHasKey( 'job_status', datamachine_get_engine_data( $job_id ) );
+			$this->assertTrue( $this->jobs->complete_job( $job_id, $terminal_status ) );
+			$this->assertSame( JobStatus::AGENT_SKIPPED, $this->jobs->get_job( $job_id )['status'] );
+			$this->assertSame( 'defer-exhausted', datamachine_get_engine_data( $job_id )['job_status_reason'] );
+			$this->assertTrue( $this->processed->has_item_been_processed( self::SCOPE, self::SOURCE, $item_identifier ) );
+			$this->assertSame( 'deferred-revision-3', $this->tracked->get( self::NAMESPACE, $item_identifier )['source_revision'] );
+		}
+	}
+
+	public function test_failed_third_deferral_release_reappearance_terminalizes_without_fourth_ai_pass(): void {
+		global $wpdb;
+		$item_identifier = 'failed-third-deferral';
+		foreach ( array( 1, 2 ) as $attempt ) {
+			$job_id = $this->createJobWithClaim( array(), true );
+			$claim  = $this->claim( $item_identifier, $job_id, "failed-third-revision-{$attempt}" );
+			datamachine_set_engine_data( $job_id, array( ProcessedItems::CLAIM_METADATA_KEY => $claim ) );
+			$tool_result = ( new FetchItemDispositionTool() )->handle_tool_call(
+				array( 'job_id' => $job_id, 'reason' => 'temporary source ambiguity' ),
+				array( 'disposition' => 'defer_item' )
+			);
+			$this->assertTrue( StepLifecycleHandler::reconcileStepOutput(
+				$job_id,
+				array( 'step_type' => 'ai' ),
+				array( $this->dispositionPacket( $claim, $tool_result['disposition'] ) ),
+				true
+			)['success'] );
+			$this->assertSame( $attempt, $tool_result['deferral_attempts'] );
+		}
+
+		$failed_job   = $this->createJobWithClaim( array(), true );
+		$failed_claim = $this->claim( $item_identifier, $failed_job, 'failed-third-revision-3' );
+		datamachine_set_engine_data( $failed_job, array( ProcessedItems::CLAIM_METADATA_KEY => $failed_claim ) );
+		$third = ( new FetchItemDispositionTool() )->handle_tool_call(
+			array( 'job_id' => $failed_job, 'reason' => 'third temporary failure' ),
+			array( 'disposition' => 'defer_item' )
+		);
+		$this->assertSame( 3, $third['deferral_attempts'] );
+		$this->assertTrue( $this->jobs->complete_job( $failed_job, JobStatus::failed( 'failed-after-third-deferral' )->toString() ) );
+
+		$row = $wpdb->get_row(
+			$wpdb->prepare(
+				'SELECT status, deferral_count FROM %i WHERE flow_step_id = %s AND source_type = %s AND item_identifier = %s',
+				$this->processed->get_table_name(),
+				self::SCOPE,
+				self::SOURCE,
+				$item_identifier
+			),
+			ARRAY_A
+		);
+		$this->assertSame( ProcessedItems::STATUS_DEFERRED, $row['status'] );
+		$this->assertSame( '3', $row['deferral_count'] );
+
+		$reappearance_job   = $this->createJobWithClaim( array(), true );
+		$reappearance_claim = $this->claim( $item_identifier, $reappearance_job, 'reappearance-terminal-revision' );
+		$this->assertSame(
+			'3',
+			$wpdb->get_var(
+				$wpdb->prepare(
+					'SELECT deferral_count FROM %i WHERE flow_step_id = %s AND source_type = %s AND item_identifier = %s',
+					$this->processed->get_table_name(),
+					self::SCOPE,
+					self::SOURCE,
+					$item_identifier
+				)
+			)
+		);
+		$reconciled         = StepLifecycleHandler::reconcileStepOutput(
+			$reappearance_job,
+			array( 'step_type' => 'fetch', 'flow_step_id' => 'actual-flow-step' ),
+			array( $this->packet( $reappearance_claim ) ),
+			true
+		);
+
+		$this->assertTrue( $reconciled['success'] );
+		$this->assertSame( 1, $reconciled['exhausted'] );
+		$this->assertSame( array( 0 ), $reconciled['routing']['exhausted_packet_indexes'] );
+		$this->assertSame( array(), $reconciled['routing']['routable_packet_indexes'] );
+		$this->assertTrue( $this->processed->has_item_been_processed( self::SCOPE, self::SOURCE, $item_identifier ) );
+		$this->assertSame( 'reappearance-terminal-revision', $this->tracked->get( self::NAMESPACE, $item_identifier )['source_revision'] );
+	}
+
 	public function test_interleaved_status_write_before_terminal_cas_rolls_back_and_recovers(): void {
 		global $wpdb;
 		$job_id     = $this->createProcessingJobWithTrackedClaim( 'process-death-id', 'recovered-revision' );

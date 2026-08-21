@@ -20,11 +20,14 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 class ProcessedItems extends BaseRepository {
+	use ProcessedItemDeferrals;
 
 	const TABLE_NAME                  = 'datamachine_processed_items';
 	const STATUS_CLAIMED              = 'claimed';
+	const STATUS_DEFERRED             = 'deferred';
 	const STATUS_PROCESSED            = 'processed';
 	const DEFAULT_CLAIM_TTL_SECONDS   = 3600;
+	const MAX_DEFERRAL_ATTEMPTS       = 3;
 	const CLAIM_METADATA_KEY          = '_datamachine_item_claim';
 	const CLAIMS_METADATA_KEY         = '_datamachine_item_claims';
 	const DISPOSITION_ID_METADATA_KEY = '_datamachine_packet_disposition_id';
@@ -85,6 +88,40 @@ class ProcessedItems extends BaseRepository {
 		}
 
 		return $infer_single && 1 === count( $claims ) ? reset( $claims ) : null;
+	}
+
+	/** Replace packet claim metadata with an exact, canonical claim set. */
+	public static function replace_disposition_claims( array $container, array $claims ): array {
+		unset(
+			$container[ self::CLAIM_METADATA_KEY ],
+			$container[ self::CLAIMS_METADATA_KEY ],
+			$container[ self::DISPOSITION_ID_METADATA_KEY ],
+			$container['disposition_id']
+		);
+
+		$claims = self::disposition_claims( array( self::CLAIMS_METADATA_KEY => array_values( $claims ) ) );
+		if ( 1 === count( $claims ) ) {
+			$claim                                 = reset( $claims );
+			$container[ self::CLAIM_METADATA_KEY ] = $claim;
+			$container[ self::DISPOSITION_ID_METADATA_KEY ] = $claim['disposition_id'];
+			$container['disposition_id']                    = $claim['disposition_id'];
+			$container['source_type']                       = $claim['source_type'];
+			$container['item_identifier']                   = $claim['item_identifier'];
+			if ( is_array( $container['_engine_data'] ?? null ) ) {
+				$container['_engine_data']['source_type']     = $claim['source_type'];
+				$container['_engine_data']['item_identifier'] = $claim['item_identifier'];
+			}
+		} else {
+			if ( ! empty( $claims ) ) {
+				$container[ self::CLAIMS_METADATA_KEY ] = array_values( $claims );
+			}
+			unset( $container['item_identifier'], $container['source_item_id'], $container['source_type'] );
+			if ( is_array( $container['_engine_data'] ?? null ) ) {
+				unset( $container['_engine_data']['item_identifier'], $container['_engine_data']['source_type'] );
+			}
+		}
+
+		return $container;
 	}
 
 	/** Whether a container explicitly carries singular or collection claim metadata. */
@@ -531,8 +568,8 @@ class ProcessedItems extends BaseRepository {
 
 		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Table identifier uses %i; all values use typed placeholders.
 		$upsert_query = $this->wpdb->prepare(
-			'INSERT INTO %i (flow_step_id, source_type, item_identifier, job_id, status, claim_expires_at, claim_token)
-				VALUES (%s, %s, %s, %d, %s, %s, %s)
+			'INSERT INTO %i (flow_step_id, source_type, item_identifier, job_id, status, claim_expires_at, claim_token, last_seen_at)
+				VALUES (%s, %s, %s, %d, %s, %s, %s, %s)
 				ON DUPLICATE KEY UPDATE id = id',
 			$this->table_name,
 			$identity_scope,
@@ -541,7 +578,8 @@ class ProcessedItems extends BaseRepository {
 			$job_id,
 			self::STATUS_CLAIMED,
 			$expires_at,
-			$claim_token
+			$claim_token,
+			$now
 		);
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared -- Dynamic identifier is prepared with %i; every value uses a typed placeholder.
@@ -578,7 +616,7 @@ class ProcessedItems extends BaseRepository {
 		$expired     = self::STATUS_CLAIMED === ( $row['status'] ?? '' )
 			&& ! empty( $row['claim_expires_at'] )
 			&& $now >= $row['claim_expires_at'];
-		$available   = self::STATUS_PROCESSED === ( $row['status'] ?? '' ) || $expired;
+		$available   = in_array( $row['status'] ?? '', array( self::STATUS_PROCESSED, self::STATUS_DEFERRED ), true ) || $expired;
 
 		if ( ! $inserted && ! $available ) {
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
@@ -595,9 +633,10 @@ class ProcessedItems extends BaseRepository {
 					'status'           => self::STATUS_CLAIMED,
 					'claim_expires_at' => $expires_at,
 					'claim_token'      => $claim_token,
+					'last_seen_at'     => $now,
 				),
 				array( 'id' => (int) $row['id'] ),
-				array( '%d', '%s', '%s', '%s' ),
+				array( '%d', '%s', '%s', '%s', '%s' ),
 				array( '%d' )
 			);
 			if ( false === $updated || 1 > $updated ) {
@@ -610,7 +649,6 @@ class ProcessedItems extends BaseRepository {
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		return $scope->commit() ? $claim_token : false;
 	}
-
 	/** Validate that one persisted descriptor is still actively owned by a job. */
 	public function owns_active_claim( array $claim, int $job_id ): bool {
 		$identity_scope  = (string) ( $claim['identity_scope'] ?? '' );
@@ -893,18 +931,46 @@ class ProcessedItems extends BaseRepository {
 			return 0;
 		}
 
+		$where = array(
+			'flow_step_id'    => $identity_scope,
+			'source_type'     => $source_type,
+			'item_identifier' => $item_identifier,
+			'claim_token'     => $claim_token,
+			'status'          => $completed ? self::STATUS_PROCESSED : self::STATUS_CLAIMED,
+		);
+		if ( $completed ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			return $this->wpdb->delete( $this->table_name, $where, array( '%s', '%s', '%s', '%s', '%s' ) );
+		}
+
+		return $this->release_claimed_rows( $where, array( '%s', '%s', '%s', '%s', '%s' ) );
+	}
+
+	/** Release claimed rows while retaining any durable deferral history. */
+	private function release_claimed_rows( array $where, array $where_format ): int|false {
+		$fresh_where                   = $where;
+		$fresh_where['deferral_count'] = 0;
+		$where_format[]                = '%d';
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-		return $this->wpdb->delete(
+		$deleted = $this->wpdb->delete( $this->table_name, $fresh_where, $where_format );
+		if ( false === $deleted ) {
+			return false;
+		}
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$redeferred = $this->wpdb->update(
 			$this->table_name,
 			array(
-				'flow_step_id'    => $identity_scope,
-				'source_type'     => $source_type,
-				'item_identifier' => $item_identifier,
-				'claim_token'     => $claim_token,
-				'status'          => $completed ? self::STATUS_PROCESSED : self::STATUS_CLAIMED,
+				'status'           => self::STATUS_DEFERRED,
+				'deferred_at'      => current_time( 'mysql', true ),
+				'claim_expires_at' => null,
+				'claim_token'      => null,
 			),
-			array( '%s', '%s', '%s', '%s', '%s' )
+			$where,
+			array( '%s', '%s', '%s', '%s' ),
+			array_slice( $where_format, 0, -1 )
 		);
+		return false === $redeferred ? false : (int) $redeferred + (int) $deleted;
 	}
 
 	/**
@@ -916,9 +982,7 @@ class ProcessedItems extends BaseRepository {
 	 * @return int|false Number of rows released, or false on error.
 	 */
 	public function release_claim( string $flow_step_id, string $source_type, string $item_identifier ): int|false {
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-		return $this->wpdb->delete(
-			$this->table_name,
+		return $this->release_claimed_rows(
 			array(
 				'flow_step_id'    => $flow_step_id,
 				'source_type'     => $source_type,
@@ -936,9 +1000,7 @@ class ProcessedItems extends BaseRepository {
 	 * @return int|false Number of rows released, or false on error.
 	 */
 	public function release_claims_for_job( int $job_id ): int|false {
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-		return $this->wpdb->delete(
-			$this->table_name,
+		return $this->release_claimed_rows(
 			array(
 				'job_id' => $job_id,
 				'status' => self::STATUS_CLAIMED,
@@ -1181,6 +1243,10 @@ class ProcessedItems extends BaseRepository {
 			status VARCHAR(20) NOT NULL DEFAULT 'processed',
 			claim_expires_at DATETIME NULL,
 			claim_token VARCHAR(64) NULL,
+			deferral_count INT UNSIGNED NOT NULL DEFAULT 0,
+			last_deferral_job_id BIGINT(20) UNSIGNED NULL,
+			deferred_at DATETIME NULL,
+			last_seen_at DATETIME NULL,
             processed_timestamp DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
             PRIMARY KEY  (id),
             UNIQUE KEY `flow_source_item` (flow_step_id, source_type, item_identifier(191)),
@@ -1188,6 +1254,7 @@ class ProcessedItems extends BaseRepository {
             KEY `source_type` (source_type),
             KEY `job_id` (job_id),
 			KEY `status_claim_expires` (status, claim_expires_at),
+			KEY `status_deferred_at` (status, deferred_at),
             KEY `flow_source_ts` (flow_step_id, source_type, processed_timestamp)
         ) $charset_collate;";
 
@@ -1200,6 +1267,7 @@ class ProcessedItems extends BaseRepository {
 		// dbDelta is also unreliable at adding regular indexes to existing tables.
 		self::ensure_flow_source_ts_index( $this->table_name );
 		self::ensure_claim_columns( $this->table_name );
+		self::ensure_deferral_schema( $this->table_name );
 
 		// Log table creation
 		do_action(

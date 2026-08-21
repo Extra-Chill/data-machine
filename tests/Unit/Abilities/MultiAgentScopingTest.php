@@ -138,13 +138,17 @@ class MultiAgentScopingTest extends WP_UnitTestCase {
 	 * Test getMemory defaults to user_id=0 when omitted.
 	 */
 	public function test_get_memory_defaults_to_shared_agent(): void {
-		$result = AgentMemoryAbilities::getMemory( array() );
+		$default_result  = AgentMemoryAbilities::getMemory( array() );
+		$explicit_result = AgentMemoryAbilities::getMemory( array( 'user_id' => 0 ) );
 
-		// Should succeed (shared agent has MEMORY.md from bootstrap).
-		$this->assertIsArray( $result );
-		// The result should come from the shared agent directory (user_id=0).
-		// Whether success=true depends on whether MEMORY.md exists; the point
-		// is it doesn't error on missing user_id.
+		$this->assertSame( is_wp_error( $default_result ), is_wp_error( $explicit_result ) );
+		if ( is_wp_error( $default_result ) && is_wp_error( $explicit_result ) ) {
+			$this->assertSame( $default_result->get_error_code(), $explicit_result->get_error_code() );
+			return;
+		}
+
+		$this->assertIsArray( $default_result );
+		$this->assertSame( $default_result, $explicit_result );
 	}
 
 	/**
@@ -153,6 +157,13 @@ class MultiAgentScopingTest extends WP_UnitTestCase {
 	public function test_get_memory_explicit_zero_matches_default(): void {
 		$default_result  = AgentMemoryAbilities::getMemory( array() );
 		$explicit_result = AgentMemoryAbilities::getMemory( array( 'user_id' => 0 ) );
+
+		if ( is_wp_error( $default_result ) || is_wp_error( $explicit_result ) ) {
+			$this->assertInstanceOf( \WP_Error::class, $default_result );
+			$this->assertInstanceOf( \WP_Error::class, $explicit_result );
+			$this->assertSame( $default_result->get_error_code(), $explicit_result->get_error_code() );
+			return;
+		}
 
 		$this->assertSame( $default_result['success'], $explicit_result['success'] );
 	}

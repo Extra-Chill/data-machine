@@ -53,7 +53,7 @@ class StepLifecycleHandler {
 	/**
 	 * Reconcile engine-owned claims against exact packet dispositions.
 	 *
-	 * @return array{success:bool,handled:bool,retained:int,completed:int,released:int,omitted:int,explicit:int}
+	 * @return array{success:bool,handled:bool,retained:int,completed:int,released:int,omitted:int,explicit:int,routing:array}
 	 */
 	public static function reconcileStepOutput( int $job_id, array $flow_step_config, array $packets, bool $step_success, int $recovery_generation = 0, string $recovery_claim_token = '' ): array {
 		$result = array(
@@ -62,9 +62,16 @@ class StepLifecycleHandler {
 			'retained'  => 0,
 			'completed' => 0,
 			'released'  => 0,
+			'exhausted' => 0,
 			'omitted'   => 0,
 			'explicit'  => 0,
 			'stale'     => false,
+			'routing'   => array(
+				'packet_disposition_ids'            => array(),
+				'routable_packet_indexes'           => array(),
+				'exhausted_packet_indexes'          => array(),
+				'disposition_result_packet_indexes' => array(),
+			),
 		);
 		if ( $job_id <= 0 ) {
 			return $result;
@@ -72,15 +79,18 @@ class StepLifecycleHandler {
 
 		$step_type = (string) ( $flow_step_config['step_type'] ?? '' );
 		if ( self::isSourceIngestionStep( $step_type ) ) {
-			$current   = array();
-			$seed_data = array();
-			foreach ( $packets as $packet ) {
+			$current                = array();
+			$seed_data              = array();
+			$packet_disposition_ids = array();
+			foreach ( $packets as $packet_index => $packet ) {
 				$metadata = is_array( $packet['metadata'] ?? null ) ? $packet['metadata'] : array();
 				if ( ProcessedItems::has_claim_metadata( $metadata ) && ! ProcessedItems::has_valid_claim_metadata( $metadata ) ) {
 					$result['success'] = false;
 					return $result;
 				}
-				$current = array_replace( $current, ProcessedItems::disposition_claims( $metadata ) );
+				$packet_claims                           = ProcessedItems::disposition_claims( $metadata );
+				$packet_disposition_ids[ $packet_index ] = array_keys( $packet_claims );
+				$current                                 = array_replace( $current, $packet_claims );
 				if ( empty( $seed_data ) && is_array( $metadata['_engine_data'] ?? null ) ) {
 					$seed_data = PacketEngineData::sanitize( $metadata['_engine_data'], $job_id );
 				}
@@ -96,7 +106,8 @@ class StepLifecycleHandler {
 			}
 			$result['handled']  = true;
 			$result['retained'] = count( $current );
-			return self::commitReconciliation( $job_id, $flow_step_config, $current, array(), $seed_data, $result, $recovery_generation, $recovery_claim_token );
+			$result             = self::commitReconciliation( $job_id, $flow_step_config, $current, array(), $seed_data, $result, $recovery_generation, $recovery_claim_token );
+			return self::withPacketRoutingEvidence( $result, $packet_disposition_ids );
 		}
 
 		$engine_data = \datamachine_get_engine_data( $job_id );
@@ -111,7 +122,8 @@ class StepLifecycleHandler {
 		$result['handled'] = true;
 		$resolved          = array();
 		if ( $step_success ) {
-			foreach ( $packets as $packet ) {
+			$disposition_result_packet_indexes = array();
+			foreach ( $packets as $packet_index => $packet ) {
 				$metadata = is_array( $packet['metadata'] ?? null ) ? $packet['metadata'] : array();
 				if ( ProcessedItems::has_claim_metadata( $metadata ) && ! ProcessedItems::has_valid_claim_metadata( $metadata ) ) {
 					$result['success'] = false;
@@ -135,6 +147,9 @@ class StepLifecycleHandler {
 				if ( ! isset( $resolved[ $disposition_id ] ) || 'succeeded' !== $resolved[ $disposition_id ] ) {
 					$resolved[ $disposition_id ] = $disposition;
 				}
+				if ( self::isDispositionResultPacket( $packet, $disposition ) ) {
+					$disposition_result_packet_indexes[] = $packet_index;
+				}
 			}
 		}
 
@@ -142,6 +157,8 @@ class StepLifecycleHandler {
 		if ( ! $result['success'] ) {
 			return $result;
 		}
+		$result['routing']['disposition_result_packet_indexes'] = $disposition_result_packet_indexes ?? array();
+		$result['routing']['routable_packet_indexes']           = array_values( array_diff( array_keys( $packets ), $result['routing']['disposition_result_packet_indexes'] ) );
 		$evidence = $result['evidence'];
 		$omitted  = $evidence['omitted_ids'];
 		if ( ! empty( $omitted ) ) {
@@ -161,7 +178,48 @@ class StepLifecycleHandler {
 			);
 		}
 
-		unset( $result['evidence'] );
+		return $result;
+	}
+
+	/** Whether a packet is the terminal result of an explicit AI disposition tool. */
+	private static function isDispositionResultPacket( array $packet, string $disposition ): bool {
+		if ( ! in_array( (string) ( $packet['type'] ?? '' ), array( 'ai_handler_complete', 'tool_result' ), true ) ) {
+			return false;
+		}
+
+		$metadata    = is_array( $packet['metadata'] ?? null ) ? $packet['metadata'] : array();
+		$tool_result = is_array( $metadata['tool_result_envelope'] ?? null ) ? $metadata['tool_result_envelope'] : array();
+		$returned    = (string) ( $tool_result['disposition'] ?? '' );
+
+		return true === ( $tool_result['success'] ?? false )
+			&& in_array( $returned, array( 'reject_source', 'defer_item', 'defer_exhausted' ), true )
+			&& $returned === $disposition;
+	}
+
+	/** Attach exact packet indexes to the claim disposition evidence. */
+	private static function withPacketRoutingEvidence( array $result, array $packet_disposition_ids ): array {
+		$exhausted = array_fill_keys( (array) ( $result['evidence']['exhausted_ids'] ?? array() ), true );
+		$routable  = array();
+		$excluded  = array();
+		foreach ( $packet_disposition_ids as $packet_index => $disposition_ids ) {
+			$has_live = false;
+			foreach ( $disposition_ids as $disposition_id ) {
+				if ( ! isset( $exhausted[ $disposition_id ] ) ) {
+					$has_live = true;
+					break;
+				}
+			}
+			if ( ! empty( $disposition_ids ) && ! $has_live ) {
+				$excluded[] = $packet_index;
+			} else {
+				$routable[] = $packet_index;
+			}
+		}
+		$result['routing'] = array(
+			'packet_disposition_ids'   => $packet_disposition_ids,
+			'routable_packet_indexes'  => $routable,
+			'exhausted_packet_indexes' => $excluded,
+		);
 		return $result;
 	}
 
@@ -222,11 +280,21 @@ class StepLifecycleHandler {
 		$retained    = array();
 		$completed   = array();
 		$released    = array();
+		$exhausted   = array();
 		$omitted     = array();
 		$index       = 0;
 		$is_transfer = in_array( 'transferred', $resolved, true );
 		foreach ( $current as $disposition_id => $claim ) {
-			$default     = ( empty( $resolved ) && ! empty( $source_claims ) ) || $is_transfer ? 'succeeded' : '';
+			$default = ( empty( $resolved ) && ! empty( $source_claims ) ) || $is_transfer ? 'succeeded' : '';
+			if ( ! empty( $source_claims ) ) {
+				$deferral_state = $processed->owned_deferral_state_in_transaction( $claim );
+				if ( false === $deferral_state ) {
+					return self::rollbackReconciliationFailure( $scope, $jobs, $job_id, $result );
+				}
+				if ( $deferral_state['exhausted'] ) {
+					$default = 'defer_exhausted';
+				}
+			}
 			$disposition = $resolved[ $disposition_id ] ?? $default;
 			if ( 'succeeded' === $disposition ) {
 				$retained[ $disposition_id ] = $claim;
@@ -252,6 +320,19 @@ class StepLifecycleHandler {
 				$completed[] = $disposition_id;
 				continue;
 			}
+			if ( in_array( $disposition, array( 'defer_item', 'defer_exhausted' ), true ) ) {
+				$deferred = $processed->finalize_owned_deferral_in_transaction( $claim, $job_id, self::completionCallback( $claim, $job_id ) );
+				if ( false === $deferred || ( 'defer_exhausted' === $disposition ) !== $deferred['exhausted'] ) {
+					return self::rollbackReconciliationFailure( $scope, $jobs, $job_id, $result );
+				}
+				if ( $deferred['exhausted'] ) {
+					$completed[] = $disposition_id;
+					$exhausted[] = $disposition_id;
+				} else {
+					$released[] = $disposition_id;
+				}
+				continue;
+			}
 			if ( 1 !== self::releaseClaim( $claim ) ) {
 				return self::rollbackReconciliationFailure( $scope, $jobs, $job_id, $result );
 			}
@@ -261,15 +342,12 @@ class StepLifecycleHandler {
 			}
 		}
 
-		$evidence = self::claimEvidence( $flow_step_config, array_keys( $retained ), $completed, $released, $omitted );
+		$evidence = self::claimEvidence( $flow_step_config, array_keys( $retained ), $completed, $released, $omitted, $exhausted );
 		$engine   = array_replace_recursive( $engine, $seed_data );
 		if ( isset( $seed_data['packet_fanout_transfer'] ) ) {
 			$engine['packet_fanout_transfer'] = $seed_data['packet_fanout_transfer'];
 		}
-		unset( $engine[ ProcessedItems::CLAIM_METADATA_KEY ], $engine[ ProcessedItems::CLAIMS_METADATA_KEY ] );
-		if ( ! empty( $retained ) ) {
-			$engine[ ProcessedItems::CLAIMS_METADATA_KEY ] = array_values( $retained );
-		}
+		$engine                                = ProcessedItems::replace_disposition_claims( $engine, $retained );
 		$history                               = is_array( $engine['packet_disposition_evidence'] ?? null ) ? $engine['packet_disposition_evidence'] : array();
 		$history[]                             = $evidence;
 		$engine['packet_disposition_evidence'] = array_slice( $history, -20 );
@@ -286,6 +364,7 @@ class StepLifecycleHandler {
 		$result['retained']   = count( $retained );
 		$result['completed']  = count( $completed );
 		$result['released']   = count( $released );
+		$result['exhausted']  = count( $exhausted );
 		$result['omitted']    = count( $omitted );
 		$result['explicit']   = count( $resolved );
 		$result['evidence']   = $evidence;
@@ -671,7 +750,7 @@ class StepLifecycleHandler {
 	}
 
 	/** Build bounded structured evidence containing safe identities only. */
-	private static function claimEvidence( array $flow_step_config, array $retained, array $completed, array $released, array $omitted ): array {
+	private static function claimEvidence( array $flow_step_config, array $retained, array $completed, array $released, array $omitted, array $exhausted = array() ): array {
 		return array(
 			'schema_version' => 'datamachine.packet_disposition.v1',
 			'flow_step_id'   => (string) ( $flow_step_config['flow_step_id'] ?? $flow_step_config['step_id'] ?? '' ),
@@ -680,6 +759,7 @@ class StepLifecycleHandler {
 			'completed_ids'  => array_values( $completed ),
 			'released_ids'   => array_values( $released ),
 			'omitted_ids'    => array_values( $omitted ),
+			'exhausted_ids'  => array_values( $exhausted ),
 		);
 	}
 
@@ -913,18 +993,9 @@ class StepLifecycleHandler {
 	private static function completeClaim( array $claim, int $job_id, bool $within_transaction = false ): bool {
 		$processed  = new ProcessedItems();
 		$completion = is_array( $claim['completion'] ?? null ) ? $claim['completion'] : array();
-		$handler_id = is_string( $completion['handler'] ?? null ) ? $completion['handler'] : '';
-		$payload    = is_array( $completion['payload'] ?? null ) ? $completion['payload'] : array();
-		$callback   = null;
-
-		if ( '' !== $handler_id ) {
-			$handlers = apply_filters( 'datamachine_item_claim_completion_handlers', array() );
-			$handler  = $handlers[ $handler_id ] ?? null;
-			if ( ! is_callable( $handler ) ) {
-				return false;
-			}
-
-			$callback = static fn(): bool => true === call_user_func( $handler, $payload, $job_id, $claim );
+		$callback   = self::completionCallback( $claim, $job_id );
+		if ( false === $callback ) {
+			return false;
 		}
 
 		$retain_processed = true;
@@ -945,6 +1016,22 @@ class StepLifecycleHandler {
 			return false;
 		}
 		return true;
+	}
+
+	/** Resolve a claim's optional completion callback without executing it. */
+	private static function completionCallback( array $claim, int $job_id ): callable|null|false {
+		$completion = is_array( $claim['completion'] ?? null ) ? $claim['completion'] : array();
+		$handler_id = is_string( $completion['handler'] ?? null ) ? $completion['handler'] : '';
+		if ( '' === $handler_id ) {
+			return null;
+		}
+		$handlers = apply_filters( 'datamachine_item_claim_completion_handlers', array() );
+		$handler  = $handlers[ $handler_id ] ?? null;
+		if ( ! is_callable( $handler ) ) {
+			return false;
+		}
+		$payload = is_array( $completion['payload'] ?? null ) ? $completion['payload'] : array();
+		return static fn(): bool => true === call_user_func( $handler, $payload, $job_id, $claim );
 	}
 
 	/**

@@ -67,6 +67,19 @@ class ProcessedItemsAbilitiesTest extends WP_UnitTestCase {
 		$this->assertSame( 'datamachine/has-processed-history', $ability->get_name() );
 	}
 
+	public function test_stale_deferral_report_exposes_bounded_cursor_contract(): void {
+		$ability = wp_get_ability( 'datamachine/report-stale-deferrals' );
+		$this->assertNotNull( $ability );
+		$this->assertArrayHasKey( 'after_id', $ability->get_input_schema()['properties'] );
+		$this->assertArrayHasKey( 'has_more', $ability->get_output_schema()['properties'] );
+		$this->assertArrayHasKey( 'next_after_id', $ability->get_output_schema()['properties'] );
+
+		$result = $this->abilities->executeReportStaleDeferrals( array( 'limit' => 1, 'after_id' => 0 ) );
+		$this->assertSame( count( $result['items'] ), $result['count'] );
+		$this->assertIsBool( $result['has_more'] );
+		$this->assertIsInt( $result['next_after_id'] );
+	}
+
 	public function test_clear_requires_clear_type(): void {
 		$result = wp_get_ability( 'datamachine/clear-processed-items' )->execute( array() );
 

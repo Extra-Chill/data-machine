@@ -87,7 +87,7 @@ namespace {
 						return 0;
 					}
 				}
-				$this->rows[] = array( 'id' => count( $this->rows ) + 1, 'flow_step_id' => $args[1], 'source_type' => $args[2], 'item_identifier' => $args[3], 'job_id' => $args[4], 'status' => $args[5], 'claim_expires_at' => $args[6], 'claim_token' => $args[7] );
+				$this->rows[] = array( 'id' => count( $this->rows ) + 1, 'flow_step_id' => $args[1], 'source_type' => $args[2], 'item_identifier' => $args[3], 'job_id' => $args[4], 'status' => $args[5], 'claim_expires_at' => $args[6], 'claim_token' => $args[7], 'deferral_count' => 0 );
 				return 1;
 			}
 			if ( str_starts_with( $query, 'UPDATE ' ) ) {
@@ -141,6 +141,7 @@ namespace {
 
 	require_once __DIR__ . '/../inc/Core/Database/BaseRepository.php';
 	require_once __DIR__ . '/../inc/Core/Database/TransactionScope.php';
+	require_once __DIR__ . '/../inc/Core/Database/ProcessedItems/ProcessedItemDeferrals.php';
 	require_once __DIR__ . '/../inc/Core/Database/ProcessedItems/ProcessedItems.php';
 	require_once __DIR__ . '/../inc/Engine/Actions/Handlers/StepLifecycleHandler.php';
 
@@ -161,7 +162,7 @@ namespace {
 		$claims = array( $claim( 'first' ), $claim( 'second' ), $claim( 'third' ) );
 		$GLOBALS['wpdb']->engine = array( ProcessedItems::CLAIMS_METADATA_KEY => $claims );
 		$GLOBALS['wpdb']->rows = array_map(
-			static fn( array $item ): array => array( 'flow_step_id' => $item['identity_scope'], 'source_type' => $item['source_type'], 'item_identifier' => $item['item_identifier'], 'claim_token' => $item['ownership_token'], 'status' => 'claimed' ),
+			static fn( array $item ): array => array( 'flow_step_id' => $item['identity_scope'], 'source_type' => $item['source_type'], 'item_identifier' => $item['item_identifier'], 'claim_token' => $item['ownership_token'], 'status' => 'claimed', 'deferral_count' => 0 ),
 			$claims
 		);
 		return $claims;
@@ -183,8 +184,8 @@ namespace {
 
 	$GLOBALS['transaction_smoke_persist'] = true;
 	$result = StepLifecycleHandler::reconcileStepOutput( 9, array( 'step_type' => 'ai' ), array( $packet( $claims[1] ) ), true );
-	$retained = $GLOBALS['wpdb']->engine[ ProcessedItems::CLAIMS_METADATA_KEY ] ?? array();
-	$assert( $result['success'] && 1 === count( $retained ) && $claims[1]['disposition_id'] === $retained[0]['disposition_id'] && 1 === count( $GLOBALS['wpdb']->rows ), 'retry completes exact replacement after rollback' );
+	$retained = ProcessedItems::disposition_claims( $GLOBALS['wpdb']->engine );
+	$assert( $result['success'] && array( $claims[1]['disposition_id'] ) === array_keys( $retained ) && 'second' === $GLOBALS['wpdb']->engine['item_identifier'] && 'source' === $GLOBALS['wpdb']->engine['source_type'] && 1 === count( $GLOBALS['wpdb']->rows ), 'retry completes exact replacement after rollback' );
 
 	$claims = $reset();
 	$GLOBALS['transaction_smoke_events'] = array();
@@ -218,7 +219,7 @@ namespace {
 	foreach ( range( 1, 52 ) as $index ) { $all_claims[] = $claim( 'full-' . $index ); }
 	$GLOBALS['wpdb']->engine = array( ProcessedItems::CLAIMS_METADATA_KEY => $all_claims );
 	$GLOBALS['wpdb']->rows = array_map(
-		static fn( array $item, int $index ): array => array( 'id' => $index + 1, 'flow_step_id' => $item['identity_scope'], 'source_type' => $item['source_type'], 'item_identifier' => $item['item_identifier'], 'job_id' => 9, 'claim_token' => $item['ownership_token'], 'status' => 'claimed' ),
+		static fn( array $item, int $index ): array => array( 'id' => $index + 1, 'flow_step_id' => $item['identity_scope'], 'source_type' => $item['source_type'], 'item_identifier' => $item['item_identifier'], 'job_id' => 9, 'claim_token' => $item['ownership_token'], 'status' => 'claimed', 'deferral_count' => 0 ),
 		$all_claims,
 		array_keys( $all_claims )
 	);
@@ -248,7 +249,7 @@ namespace {
 		'packet_tool_executions' => array( 'handler' => array( $cleanup_id => array( 'state' => 'failed' ) ) ),
 		'successful_packet_tool_executions' => array( 'handler' => array( $cleanup_id => 'now' ) ),
 	);
-	$GLOBALS['wpdb']->rows = array( array( 'flow_step_id' => 'scope', 'source_type' => 'source', 'item_identifier' => 'cleanup-state', 'claim_token' => $cleanup_claim['ownership_token'], 'status' => 'claimed' ) );
+	$GLOBALS['wpdb']->rows = array( array( 'flow_step_id' => 'scope', 'source_type' => 'source', 'item_identifier' => 'cleanup-state', 'claim_token' => $cleanup_claim['ownership_token'], 'status' => 'claimed', 'deferral_count' => 0 ) );
 	$cleaned = StepLifecycleHandler::reconcileStepOutput( 9, array( 'step_type' => 'ai' ), array(), false );
 	$assert( $cleaned['success'] && ! isset( $GLOBALS['wpdb']->engine['packet_dispositions'], $GLOBALS['wpdb']->engine['packet_tool_executions'], $GLOBALS['wpdb']->engine['successful_packet_tool_executions'] ), 'resolved claims compact disposition and reservation state' );
 

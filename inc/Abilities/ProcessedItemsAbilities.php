@@ -43,9 +43,60 @@ class ProcessedItemsAbilities {
 			$this->registerGetProcessedAt();
 			$this->registerFindStale();
 			$this->registerFindNeverProcessed();
+			$this->registerReportStaleDeferrals();
 		};
 
 		\DataMachine\Abilities\AbilityRegistration::on_abilities_api_init( $register_callback );
+	}
+
+	/** Register the bounded operational report for deferred identities not seen again. */
+	private function registerReportStaleDeferrals(): void {
+		wp_register_ability(
+			'datamachine/report-stale-deferrals',
+			array(
+				'label'               => __( 'Report Stale Source Deferrals', 'data-machine' ),
+				'description'         => __( 'Report source identities deferred but not presented again within a bounded scheduling window.', 'data-machine' ),
+				'category'            => 'datamachine-agent',
+				'input_schema'        => array(
+					'type'       => 'object',
+					'properties' => array(
+						'max_age_hours' => array(
+							'type'    => 'integer',
+							'minimum' => 1,
+							'default' => 48,
+						),
+						'limit'         => array(
+							'type'    => 'integer',
+							'minimum' => 1,
+							'maximum' => 500,
+							'default' => 100,
+						),
+						'after_id'      => array(
+							'type'    => 'integer',
+							'minimum' => 0,
+							'default' => 0,
+						),
+					),
+				),
+				'output_schema'       => array(
+					'type'       => 'object',
+					'properties' => array(
+						'success'       => array( 'type' => 'boolean' ),
+						'count'         => array( 'type' => 'integer' ),
+						'items'         => array(
+							'type'  => 'array',
+							'items' => array( 'type' => 'object' ),
+						),
+						'max_age_hours' => array( 'type' => 'integer' ),
+						'has_more'      => array( 'type' => 'boolean' ),
+						'next_after_id' => array( 'type' => 'integer' ),
+					),
+				),
+				'execute_callback'    => array( $this, 'executeReportStaleDeferrals' ),
+				'permission_callback' => array( $this, 'checkPermission' ),
+				'meta'                => array( 'show_in_rest' => true ),
+			)
+		);
 	}
 
 	/**
@@ -331,6 +382,37 @@ class ProcessedItemsAbilities {
 	 */
 	public function checkPermission(): bool {
 		return PermissionHelper::can_manage();
+	}
+
+	/** Execute the stale deferred-identity operational report. */
+	public function executeReportStaleDeferrals( array $input ): array {
+		$max_age_hours = max( 1, (int) ( $input['max_age_hours'] ?? 48 ) );
+		$limit         = min( 500, max( 1, (int) ( $input['limit'] ?? 100 ) ) );
+		$after_id      = max( 0, (int) ( $input['after_id'] ?? 0 ) );
+		$page          = $this->db_processed_items->find_stale_deferrals( $max_age_hours, $limit, $after_id );
+		$items         = $page['items'];
+
+		if ( ! empty( $items ) ) {
+			do_action(
+				'datamachine_log',
+				'warning',
+				'Deferred source identities were not presented again within the scheduling window.',
+				array(
+					'max_age_hours' => $max_age_hours,
+					'count'         => count( $items ),
+					'limit'         => $limit,
+				)
+			);
+		}
+
+		return array(
+			'success'       => true,
+			'count'         => count( $items ),
+			'items'         => $items,
+			'max_age_hours' => $max_age_hours,
+			'has_more'      => $page['has_more'],
+			'next_after_id' => $page['next_after_id'],
+		);
 	}
 
 	/**
