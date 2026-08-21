@@ -25,6 +25,20 @@ class GroupRegistrar {
 	}
 
 	/**
+	 * Check whether the custom-table store can safely answer queue queries.
+	 */
+	public static function tablesExist(): bool {
+		if ( ! class_exists( '\ActionScheduler_StoreSchema' ) || ! class_exists( '\ActionScheduler_LoggerSchema' ) ) {
+			return false;
+		}
+
+		$store_schema  = new \ActionScheduler_StoreSchema();
+		$logger_schema = new \ActionScheduler_LoggerSchema();
+
+		return $store_schema->tables_exist() && $logger_schema->tables_exist();
+	}
+
+	/**
 	 * Ensure the custom-table data store has the group row.
 	 */
 	private static function ensureCustomTableGroup( string $group ): void {

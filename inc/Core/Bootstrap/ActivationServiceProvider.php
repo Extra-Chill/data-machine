@@ -119,6 +119,7 @@ final class ActivationServiceProvider {
 	 * Run setup for one site.
 	 */
 	public static function activate_for_site(): void {
+		self::ensure_action_scheduler_tables();
 		self::register_capabilities();
 		self::ensure_all_tables();
 		datamachine_migrate_legacy_email_flow_auth();
@@ -130,6 +131,44 @@ final class ActivationServiceProvider {
 		\DataMachine\Engine\AI\ComposableFileGenerator::regenerate_all();
 		datamachine_mark_flow_schedule_reconciliation();
 		update_option( 'datamachine_db_version', DATAMACHINE_VERSION, true );
+	}
+
+	/**
+	 * Initialize Action Scheduler's custom tables for the current site.
+	 *
+	 * Action Scheduler stores these tables using the current site's prefix, so
+	 * network activation must run its schema registration inside each site.
+	 */
+	public static function ensure_action_scheduler_tables(): void {
+		if ( ! class_exists( '\ActionScheduler_StoreSchema' ) || ! class_exists( '\ActionScheduler_LoggerSchema' ) ) {
+			return;
+		}
+
+		global $wpdb;
+
+		$store_schema  = new \ActionScheduler_StoreSchema();
+		$logger_schema = new \ActionScheduler_LoggerSchema();
+		$table_names   = array(
+			\ActionScheduler_StoreSchema::ACTIONS_TABLE,
+			\ActionScheduler_StoreSchema::CLAIMS_TABLE,
+			\ActionScheduler_StoreSchema::GROUPS_TABLE,
+			\ActionScheduler_LoggerSchema::LOG_TABLE,
+		);
+
+		// AS registers the same suffixes on every blog. Remove prior entries so a
+		// network activation leaves one registration per table, not one per site.
+		$wpdb->tables = array_values( array_diff( $wpdb->tables, $table_names ) );
+
+		$store_schema->init();
+		$logger_schema->init();
+
+		try {
+			$store_schema->register_tables( ! $store_schema->tables_exist() );
+			$logger_schema->register_tables( ! $logger_schema->tables_exist() );
+		} finally {
+			remove_action( 'action_scheduler_before_schema_update', array( $store_schema, 'update_schema_5_0' ), 10 );
+			remove_action( 'action_scheduler_before_schema_update', array( $logger_schema, 'update_schema_3_0' ), 10 );
+		}
 	}
 
 	/**
