@@ -33,6 +33,12 @@ final class AgentBundleCompatibility {
 			'datamachine/auth-ref',
 			'datamachine/queue-seed',
 		);
+		if ( function_exists( 'wp_get_abilities' ) ) {
+			$abilities = wp_get_abilities();
+			if ( is_array( $abilities ) ) {
+				$capabilities = array_merge( $capabilities, array_keys( $abilities ) );
+			}
+		}
 
 		/**
 		 * Extend host capability strings used for bundle compatibility checks.
