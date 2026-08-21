@@ -388,8 +388,12 @@ class FlowScheduleReconcilerTest extends WP_UnitTestCase {
 		$transition_updates = 0;
 		$flows_table        = $wpdb->prefix . Flows::TABLE_NAME;
 		$capture_transition = static function ( string $query ) use ( &$transition_updates, $flow_id, $flows_table ): string {
-			$pattern = '/^UPDATE `?' . preg_quote( $flows_table, '/' ) . '`? SET `?scheduling_config`? = .* WHERE `?flow_id`? = ' . $flow_id . '$/';
-			if ( str_contains( $query, '"interval":"manual"' ) && preg_match( $pattern, trim( $query ) ) ) {
+			$update_pattern = '/^\s*UPDATE\s+`?'
+				. preg_quote( $flows_table, '/' )
+				. '`?\s+SET\s+`?scheduling_config`?\s*=.+?\s+WHERE\s*\(?\s*`?flow_id`?\s*=\s*'
+				. '(?:[\'\"]' . $flow_id . '[\'\"]|' . $flow_id . ')\s*\)?\s*;?\s*$/is';
+			$manual_pattern = '/(?:\\\\)?"interval(?:\\\\)?"\s*:\s*(?:\\\\)?"manual(?:\\\\)?"/';
+			if ( preg_match( $manual_pattern, $query ) && preg_match( $update_pattern, $query ) ) {
 				++$transition_updates;
 			}
 			return $query;
