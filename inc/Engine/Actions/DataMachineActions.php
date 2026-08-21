@@ -122,8 +122,6 @@ function datamachine_register_core_actions() {
 		3
 	);
 
-	\DataMachine\Engine\Actions\ImportExport::register();
-
 	// Pipeline batch fan-out: process chunks and track child completion.
 	add_action(
 		PipelineBatchScheduler::BATCH_HOOK,

@@ -37,7 +37,7 @@ defined( 'ABSPATH' ) || exit;
  *
  * This class is intentionally not registered as a top-level command. Its
  * public lifecycle methods are inherited by AgentsCommand so operators use
- * `wp datamachine agent ...` as the canonical surface.
+ * `wp datamachine agents ...` as the canonical surface.
  */
 class AgentBundleCommand extends BaseCommand {
 
@@ -259,7 +259,7 @@ class AgentBundleCommand extends BaseCommand {
 				) );
 			}
 
-			WP_CLI::log( 'Run `wp datamachine agent diff <slug>` for the full upgrade plan.' );
+			WP_CLI::log( 'Run `wp datamachine agents diff <slug>` for the full upgrade plan.' );
 		}
 
 		$row          = $status;

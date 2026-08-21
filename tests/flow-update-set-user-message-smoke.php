@@ -4,7 +4,7 @@
  *
  * Run with: php tests/flow-update-set-user-message-smoke.php
  *
- * #1289 was the original bug: `wp datamachine flow update <id> --set-prompt`
+ * #1289 was the original bug: `wp datamachine flows update <id> --set-prompt`
  * silently wrote to handler_configs.ai.prompt, which AIStep never reads.
  * The fix renamed the flag to --set-user-message and routed the write
  * through UpdateFlowStepAbility's `user_message` input.

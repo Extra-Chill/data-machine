@@ -236,13 +236,14 @@ $captured = $captured_payloads['flow:demo'] ?? array();
 pa_rebase_assert_equals(
 	'apply handler received merged payload (max_items kept local)',
 	1,
-	$captured['flow_config']['1_step_1']['handler_config']['max_items'] ?? null
+	$captured['flow_config']['1_step_1']['handler_configs']['github-a8c']['max_items'] ?? null
 );
 pa_rebase_assert_equals(
 	'apply handler received merged payload (owner from remote)',
 	'Automattic',
-	$captured['flow_config']['1_step_1']['handler_config']['owner'] ?? null
+	$captured['flow_config']['1_step_1']['handler_configs']['github-a8c']['owner'] ?? null
 );
+pa_rebase_assert( 'apply handler receives canonical plural config shape', ! isset( $captured['flow_config']['1_step_1']['handler_config'] ) );
 pa_rebase_assert_equals(
 	'apply handler received merged payload (handler from remote)',
 	'github-a8c',
@@ -277,6 +278,8 @@ $ambiguous_rebase = AgentBundleArtifactRebase::rebase(
 	AgentBundleArtifactRebase::POLICY_BURN_IN_SAFE
 );
 pa_rebase_assert( 'tricky case is ambiguous', true === $ambiguous_rebase['requires_approval'] );
+pa_rebase_assert_equals( 'tricky rebase preserves slugless local handler config', 'local', $ambiguous_rebase['merged']['flow_config']['1_a_1']['handler_config']['tool'] ?? null );
+pa_rebase_assert( 'tricky rebase marks slugless handler config path ambiguous', in_array( 'flow_config.1_a_1.handler_config', $ambiguous_rebase['ambiguous'], true ) );
 
 $captured_payloads = array();
 $tricky_apply      = pa_rebase_apply_authorized(

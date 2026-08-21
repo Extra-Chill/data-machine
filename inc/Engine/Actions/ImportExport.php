@@ -23,16 +23,7 @@ if ( ! defined( 'WPINC' ) ) {
 class ImportExport {
 
 	/**
-	 * Register import/export action hooks
-	 */
-	public static function register() {
-		$instance = new self();
-		add_action( 'datamachine_import', array( $instance, 'handle_import' ), 10, 2 );
-		add_action( 'datamachine_export', array( $instance, 'handle_export' ), 10, 2 );
-	}
-
-	/**
-	 * Handle datamachine_import action.
+	 * Import canonical pipeline CSV.
 	 *
 	 * Two-pass CSV import:
 	 *   Pass 1 — pipeline-structure rows (flow_id empty): create pipelines and add steps
@@ -56,7 +47,12 @@ class ImportExport {
 			return false;
 		}
 
-		$parsed_rows = $this->parse_csv_rows( $data );
+		try {
+			$parsed_rows = $this->parse_csv_rows( $data );
+		} catch ( \InvalidArgumentException $e ) {
+			do_action( 'datamachine_log', 'error', 'Import: ' . $e->getMessage() );
+			return false;
+		}
 
 		$imported_pipelines = array();
 		// pipeline_name => imported pipeline_id.
@@ -150,12 +146,6 @@ class ImportExport {
 		}
 
 		$result = array( 'imported' => array_unique( $imported_pipelines ) );
-		add_filter(
-			'datamachine_import_result',
-			function () use ( $result ) {
-				return $result;
-			}
-		);
 
 		do_action( 'datamachine_log', 'debug', 'Pipeline import completed', array( 'count' => count( $result['imported'] ) ) );
 		return $result;
@@ -167,12 +157,17 @@ class ImportExport {
 	 * @param string $data Raw CSV content.
 	 * @return array<int, array{
 	 *     pipeline_name:string, step_position:int, step_type:string, step_config:array,
-	 *     flow_id:string, flow_name:string, handler:string, settings:array
+	 *     flow_id:string, flow_name:string, settings:array
 	 * }>
 	 */
 	private function parse_csv_rows( string $data ): array {
-		$rows   = str_getcsv( $data, "\n" );
-		$parsed = array();
+		$rows            = str_getcsv( $data, "\n" );
+		$parsed          = array();
+		$header          = isset( $rows[0] ) ? str_getcsv( $rows[0] ) : array();
+		$expected_header = array( 'pipeline_id', 'pipeline_name', 'step_position', 'step_type', 'step_config', 'flow_id', 'flow_name', 'settings' );
+		if ( $expected_header !== $header ) {
+			throw new \InvalidArgumentException( 'CSV header does not match the Data Machine 1.0 pipeline format.' );
+		}
 
 		foreach ( $rows as $index => $row ) {
 			if ( 0 === $index ) {
@@ -180,7 +175,7 @@ class ImportExport {
 			}
 
 			$cols = str_getcsv( $row );
-			if ( count( $cols ) < 5 ) {
+			if ( count( $cols ) < 8 ) {
 				continue;
 			}
 
@@ -189,7 +184,7 @@ class ImportExport {
 				$step_config = array();
 			}
 
-			$settings_raw = $cols[8] ?? '';
+			$settings_raw = $cols[7] ?? '';
 			$settings     = json_decode( $settings_raw, true );
 			if ( ! is_array( $settings ) ) {
 				$settings = array();
@@ -202,7 +197,6 @@ class ImportExport {
 				'step_config'   => $step_config,
 				'flow_id'       => (string) ( $cols[5] ?? '' ),
 				'flow_name'     => (string) ( $cols[6] ?? '' ),
-				'handler'       => (string) ( $cols[7] ?? '' ),
 				'settings'      => $settings,
 			);
 		}
@@ -377,7 +371,7 @@ class ImportExport {
 	}
 
 	/**
-	 * Handle datamachine_export action
+	 * Export canonical pipeline CSV.
 	 */
 	public function handle_export( $type, $ids ) {
 		// Capability check
@@ -397,7 +391,7 @@ class ImportExport {
 
 		// Build CSV using WordPress-compliant string approach
 		$csv_rows   = array();
-		$csv_rows[] = array( 'pipeline_id', 'pipeline_name', 'step_position', 'step_type', 'step_config', 'flow_id', 'flow_name', 'handler', 'settings' );
+		$csv_rows[] = array( 'pipeline_id', 'pipeline_name', 'step_position', 'step_type', 'step_config', 'flow_id', 'flow_name', 'settings' );
 
 		foreach ( $ids as $pipeline_id ) {
 			$pipeline = $db_pipelines->get_pipeline( $pipeline_id );
@@ -445,8 +439,7 @@ class ImportExport {
 					$flow_step_id = apply_filters( 'datamachine_generate_flow_step_id', '', $step['pipeline_step_id'], $flow['flow_id'] );
 					$flow_step    = $flow_config[ $flow_step_id ] ?? array();
 
-					$settings        = $this->export_flow_step_settings( $flow_step );
-					$primary_handler = FlowStepConfig::getPrimaryHandlerSlug( $flow_step ) ?? '';
+					$settings = $this->export_flow_step_settings( $flow_step );
 
 					if ( ! empty( $settings ) ) {
 						$csv_rows[] = array(
@@ -457,7 +450,6 @@ class ImportExport {
 							wp_json_encode( $step ),
 							$flow['flow_id'],
 							$flow['flow_name'],
-							$primary_handler,
 							wp_json_encode( $settings ),
 						);
 					}
@@ -467,14 +459,6 @@ class ImportExport {
 
 		// Convert rows to CSV string
 		$csv = $this->array_to_csv( $csv_rows );
-
-		// Store result for filter access
-		add_filter(
-			'datamachine_export_result',
-			function () use ( $csv ) {
-				return $csv;
-			}
-		);
 
 		do_action( 'datamachine_log', 'debug', 'Pipeline export completed', array( 'count' => count( $ids ) ) );
 		return $csv;

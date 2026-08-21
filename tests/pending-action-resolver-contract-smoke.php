@@ -177,16 +177,21 @@ if ( ! function_exists( 'is_wp_error' ) ) {
 }
 if ( ! class_exists( 'WP_Error' ) ) {
 	class WP_Error {
+		private string $code;
 		private string $message;
+		private $data;
 
-		public function __construct( string $code = '', string $message = '' ) {
-			unset( $code );
+		public function __construct( string $code = '', string $message = '', $data = null ) {
+			$this->code = $code;
 			$this->message = $message;
+			$this->data = $data;
 		}
 
+		public function get_error_code() { return $this->code; }
 		public function get_error_message() {
 			return $this->message;
 		}
+		public function get_error_data() { return $this->data; }
 	}
 }
 
@@ -368,7 +373,7 @@ PendingActionStore::store(
 	)
 );
 $ignored_receipt = ResolvePendingActionAbility::execute( array( 'action_id' => 'act_ignored_receipt', 'decision' => 'accepted' ) );
-resolver_smoke_assert( false === ( $ignored_receipt['success'] ?? true ), 'two-argument mutation callback is rejected before dispatch', $failures, $passes );
+resolver_smoke_assert( is_wp_error( $ignored_receipt ), 'two-argument mutation callback failure crosses the ability boundary as WP_Error', $failures, $passes );
 resolver_smoke_assert( 0 === $ignored_receipt_calls, 'callback that could ignore the receipt has zero side effects', $failures, $passes );
 
 PendingActionStore::store(
@@ -466,7 +471,7 @@ $ungranted_agent_accept = ResolvePendingActionAbility::execute(
 	)
 );
 
-resolver_smoke_assert( false === ( $ungranted_agent_accept['success'] ?? true ), 'ungranted agent acceptance fails closed', $failures, $passes );
+resolver_smoke_assert( is_wp_error( $ungranted_agent_accept ), 'ungranted agent acceptance fails as WP_Error', $failures, $passes );
 resolver_smoke_assert( 0 === $legacy_apply_calls, 'ungranted agent acceptance does not invoke apply handler', $failures, $passes );
 
 PendingActionStore::store(
@@ -527,7 +532,7 @@ $rejection_only_accept = ResolvePendingActionAbility::execute(
 	)
 );
 
-resolver_smoke_assert( false === ( $rejection_only_accept['success'] ?? true ), 'rejection-only system resolver cannot accept', $failures, $passes );
+resolver_smoke_assert( is_wp_error( $rejection_only_accept ), 'rejection-only system resolver cannot accept', $failures, $passes );
 resolver_smoke_assert( 1 === $legacy_apply_calls, 'rejection-only accept denial does not invoke apply handler', $failures, $passes );
 
 PendingActionStore::store(
@@ -608,7 +613,7 @@ $denied = ResolvePendingActionAbility::execute(
 	)
 );
 
-resolver_smoke_assert( false === ( $denied['success'] ?? true ), 'contract handler permission denial fails resolution', $failures, $passes );
+resolver_smoke_assert( is_wp_error( $denied ), 'contract handler permission denial fails as WP_Error', $failures, $passes );
 resolver_smoke_assert( 0 === $denied_apply_calls, 'permission denial does not invoke contract apply handler', $failures, $passes );
 
 $invalid = ResolvePendingActionAbility::execute(
@@ -617,7 +622,15 @@ $invalid = ResolvePendingActionAbility::execute(
 		'decision'  => 'approved',
 	)
 );
-resolver_smoke_assert( false === ( $invalid['success'] ?? true ), 'unknown Agents API approval decision is rejected', $failures, $passes );
+resolver_smoke_assert( is_wp_error( $invalid ), 'unknown Agents API approval decision returns WP_Error', $failures, $passes );
+$legacy_alias_invalid = ResolvePendingActionAbility::execute_legacy_alias(
+	array(
+		'action_id' => 'act_missing',
+		'decision'  => 'approved',
+	)
+);
+resolver_smoke_assert( false === ( $legacy_alias_invalid['success'] ?? true ), 'bounded Intelligence alias presents canonical WP_Error as success=false', $failures, $passes );
+resolver_smoke_assert( 'agents_pending_action_invalid_decision' === ( $legacy_alias_invalid['code'] ?? '' ), 'bounded Intelligence alias preserves the canonical error code', $failures, $passes );
 
 $scoped_out_apply_calls = 0;
 add_filter(
@@ -654,7 +667,7 @@ $scoped_out = ResolvePendingActionAbility::execute(
 		'decision'  => 'accepted',
 	)
 );
-resolver_smoke_assert( false === ( $scoped_out['success'] ?? true ), 'resolver rejects actions outside caller owner scope', $failures, $passes );
+resolver_smoke_assert( is_wp_error( $scoped_out ), 'resolver rejects actions outside caller owner scope with WP_Error', $failures, $passes );
 resolver_smoke_assert( 0 === $scoped_out_apply_calls, 'scope denial happens before handler execution', $failures, $passes );
 
 $origin_handler_blogs = array();
@@ -734,7 +747,9 @@ $forged_result = $adapter->resolve_pending_action(
 	array(),
 	array( 'wordpress' => array( 'blog_id' => 1 ) )
 );
-resolver_smoke_assert( false === ( $forged_result['success'] ?? true ), 'forged origin metadata is denied', $failures, $passes );
+resolver_smoke_assert( is_wp_error( $forged_result ), 'forged origin metadata is denied as WP_Error at the adapter boundary', $failures, $passes );
+resolver_smoke_assert( 'pending_action_resolution_failed' === $forged_result->get_error_code(), 'adapter failure uses a stable transport error code', $failures, $passes );
+resolver_smoke_assert( 400 === ( $forged_result->get_error_data()['status'] ?? null ), 'adapter failure carries REST/tool transport status', $failures, $passes );
 resolver_smoke_assert( array( 7 ) === $origin_handler_blogs, 'forged origin does not execute the handler', $failures, $passes );
 resolver_smoke_assert( 2 === get_current_blog_id(), 'forged origin denial also restores the caller blog', $failures, $passes );
 

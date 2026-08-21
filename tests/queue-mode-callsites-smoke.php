@@ -27,7 +27,6 @@
  *      post-migration) and didn't copy prompt_queue / config_patch_queue
  *      / queue_mode. Duplicated flows lost their queue state.
  *
- *   3. `inc/migrations/user-message-queue-mode.php` "both populated"
  *      branch — when both `queue_enabled=true` AND non-empty
  *      `prompt_queue` AND non-empty `user_message`, the migration
  *      forced `queue_mode=static`. Pre-#1291 behaviour with

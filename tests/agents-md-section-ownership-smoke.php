@@ -41,7 +41,7 @@ namespace {
 		return false;
 	}
 
-	require_once dirname( __DIR__ ) . '/inc/migrations/agents-md.php';
+	require_once dirname( __DIR__ ) . '/inc/setup/agents-md.php';
 
 	datamachine_register_agents_md_sections();
 	$sections = \DataMachine\Engine\AI\SectionRegistry::$sections;

@@ -853,19 +853,6 @@ class AIStep extends Step {
 	}
 
 	/**
-	 * Project data packets before serializing them to AI.
-	 *
-	 * Kept as a compatibility wrapper for older tests/call sites. Canonical
-	 * packets remain unchanged for runtime and storage use.
-	 *
-	 * @param array $data_packets Original data packets.
-	 * @return array Projected copy safe for AI serialization.
-	 */
-	public static function sanitizeDataPacketsForAi( array $data_packets ): array {
-		return DataPacketPromptProjector::project( $data_packets );
-	}
-
-	/**
 	 * Add runtime-package caller input to the AI-visible packet list.
 	 *
 	 * Runtime-package workflows can start with caller-provided artifacts without a

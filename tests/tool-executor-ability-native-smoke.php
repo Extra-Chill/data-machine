@@ -111,13 +111,10 @@ namespace {
 
 namespace DataMachine\Engine\AI\Actions {
 	class ActionPolicyResolver {
-		public const MODE_CHAT        = 'chat';
-		public const POLICY_DIRECT    = 'direct';
-		public const POLICY_PREVIEW   = 'preview';
-		public const POLICY_FORBIDDEN = 'forbidden';
+		public const MODE_CHAT = 'chat';
 
 		public function resolveForTool( array $args ): string {
-			return $args['tool_def']['action_policy'] ?? self::POLICY_DIRECT;
+			return $args['tool_def']['action_policy'] ?? 'direct';
 		}
 	}
 
@@ -459,7 +456,7 @@ namespace DataMachine\Tests\ToolExecutorAbilityNativeSmoke {
 		array(
 			'ability'           => 'datamachine/preview-ability',
 			'execution_ability' => 'datamachine/preview-ability',
-			'action_policy'     => ActionPolicyResolver::POLICY_PREVIEW,
+			'action_policy'     => 'preview',
 			'action_kind'       => 'preview_kind',
 			'parameters'        => array(
 				'message' => array(
@@ -488,7 +485,7 @@ namespace DataMachine\Tests\ToolExecutorAbilityNativeSmoke {
 		array(
 			'ability'           => 'datamachine/missing-metadata-ability',
 			'execution_ability' => 'datamachine/missing-metadata-ability',
-			'action_policy'     => ActionPolicyResolver::POLICY_PREVIEW,
+			'action_policy'     => 'preview',
 			'parameters'        => array(
 				'message' => array(
 					'type'     => 'string',

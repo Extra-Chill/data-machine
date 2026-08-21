@@ -10,6 +10,8 @@
 
 namespace DataMachine\Abilities\Chat;
 
+use DataMachine\Core\Workspace\WordPressWorkspaceScope;
+
 defined( 'ABSPATH' ) || exit;
 
 class DeleteChatSessionAbility {
@@ -103,7 +105,7 @@ class DeleteChatSessionAbility {
 			return $session;
 		}
 
-		$deleted = $this->chat_db->delete_session( $session_id );
+		$deleted = $this->chat_db->delete_session_for_transcript_owner( WordPressWorkspaceScope::current(), $user_id, $owner, $session_id );
 
 		if ( ! $deleted ) {
 			return new \WP_Error( 'chat_session_delete_failed', __( 'Failed to delete session.', 'data-machine' ), array( 'status' => 500 ) );

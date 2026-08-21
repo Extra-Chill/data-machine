@@ -339,7 +339,7 @@ function datamachine_activate_for_site() {
  * @return void
  */
 function datamachine_ensure_all_tables() {
-	\DataMachine\Core\Bootstrap\ActivationServiceProvider::ensure_all_tables();
+	return \DataMachine\Core\Bootstrap\ActivationServiceProvider::ensure_all_tables();
 }
 
 /**
@@ -492,5 +492,10 @@ function datamachine_on_new_site( \WP_Site $new_site ) {
 
 \DataMachine\Core\Bootstrap\ActivationServiceProvider::register_new_site_hook();
 
-// Migrations, scaffolding, and activation helpers.
-require_once __DIR__ . '/inc/migrations/load.php';
+// Canonical schema and site setup.
+require_once __DIR__ . '/inc/setup/scaffolding.php';
+require_once __DIR__ . '/inc/setup/site-md.php';
+require_once __DIR__ . '/inc/setup/agents-md.php';
+require_once __DIR__ . '/inc/setup/flow-schedules.php';
+require_once __DIR__ . '/inc/setup/chat-sessions-network.php';
+require_once __DIR__ . '/inc/setup/schema.php';

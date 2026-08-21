@@ -12,6 +12,8 @@
 
 namespace DataMachine\Core\Database\Chat;
 
+use AgentsAPI\Core\Workspace\WP_Agent_Workspace_Scope;
+
 defined( 'ABSPATH' ) || exit;
 
 interface ConversationSessionIndexInterface {
@@ -51,4 +53,16 @@ interface ConversationSessionIndexInterface {
 	 * @return int
 	 */
 	public function get_user_session_count( int $user_id, ?string $context = null, ?int $agent_id = null ): int;
+
+	/** List sessions through the ability-facing workspace and owner boundary. */
+	public function get_user_sessions_for_workspace( WP_Agent_Workspace_Scope $workspace, int $user_id, int $limit = 20, int $offset = 0, ?string $context = null, ?int $agent_id = null, ?array $transcript_owner = null ): array;
+
+	/** Count sessions through the ability-facing workspace and owner boundary. */
+	public function get_user_session_count_for_workspace( WP_Agent_Workspace_Scope $workspace, int $user_id, ?string $context = null, ?int $agent_id = null, ?array $transcript_owner = null ): int;
+
+	/** Read a session through the ability-facing workspace and owner boundary. */
+	public function get_session_for_transcript_owner( WP_Agent_Workspace_Scope $workspace, int $user_id, array $owner, string $session_id ): ?array;
+
+	/** Delete a session through the ability-facing workspace and owner boundary. */
+	public function delete_session_for_transcript_owner( WP_Agent_Workspace_Scope $workspace, int $user_id, array $owner, string $session_id ): bool;
 }

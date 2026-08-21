@@ -10,6 +10,8 @@
 
 namespace DataMachine\Abilities\Chat;
 
+use DataMachine\Core\Workspace\WordPressWorkspaceScope;
+
 defined( 'ABSPATH' ) || exit;
 
 class ListChatSessionsAbility {
@@ -119,8 +121,9 @@ class ListChatSessionsAbility {
 		$mode     = ! empty( $input['mode'] ) ? sanitize_text_field( $input['mode'] ) : null;
 		$agent_id = isset( $input['agent_id'] ) && is_numeric( $input['agent_id'] ) ? (int) $input['agent_id'] : null;
 
-		$sessions = $this->chat_db->get_user_sessions( $user_id, $limit, $offset, $mode, $agent_id, $owner );
-		$total    = $this->chat_db->get_user_session_count( $user_id, $mode, $agent_id, $owner );
+		$workspace = WordPressWorkspaceScope::current();
+		$sessions  = $this->chat_db->get_user_sessions_for_workspace( $workspace, $user_id, $limit, $offset, $mode, $agent_id, $owner );
+		$total     = $this->chat_db->get_user_session_count_for_workspace( $workspace, $user_id, $mode, $agent_id, $owner );
 
 		return array(
 			'success'  => true,

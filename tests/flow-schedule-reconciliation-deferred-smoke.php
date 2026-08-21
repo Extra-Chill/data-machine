@@ -54,7 +54,7 @@ namespace {
 		unset( $hook, $args );
 	}
 
-	require_once __DIR__ . '/../inc/migrations/flows.php';
+	require_once __DIR__ . '/../inc/setup/flow-schedules.php';
 
 	use DataMachine\Api\Flows\FlowScheduleReconciler;
 

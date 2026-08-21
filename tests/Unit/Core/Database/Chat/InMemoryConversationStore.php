@@ -133,6 +133,15 @@ class InMemoryConversationStore implements ConversationStoreInterface {
 		return $session;
 	}
 
+	public function get_session_for_transcript_owner( WP_Agent_Workspace_Scope $workspace, int $user_id, array $owner, string $session_id ): ?array {
+		$session = $this->get_session( $session_id );
+		if ( ! is_array( $session ) || $session['workspace_type'] !== $workspace->workspace_type || $session['workspace_id'] !== $workspace->workspace_id || (int) $session['user_id'] !== $user_id ) {
+			return null;
+		}
+		$stored_owner = is_array( $session['metadata']['transcript_owner'] ?? null ) ? $session['metadata']['transcript_owner'] : array();
+		return ( $stored_owner['owner_type'] ?? 'user' ) === ( $owner['owner_type'] ?? '' ) && ( $stored_owner['owner_key_hash'] ?? hash( 'sha256', 'user:' . $user_id ) ) === ( $owner['owner_key_hash'] ?? '' ) ? $session : null;
+	}
+
 	public function list_sessions( WP_Agent_Workspace_Scope $workspace, int $user_id, array $args = array() ): array {
 		$include_messages = (bool) ( $args['include_messages'] ?? true );
 		$limit            = max( 1, min( 100, (int) ( $args['limit'] ?? 20 ) ) );
@@ -219,6 +228,13 @@ class InMemoryConversationStore implements ConversationStoreInterface {
 		return true;
 	}
 
+	public function delete_session_for_transcript_owner( WP_Agent_Workspace_Scope $workspace, int $user_id, array $owner, string $session_id ): bool {
+		if ( null === $this->get_session_for_transcript_owner( $workspace, $user_id, $owner, $session_id ) ) {
+			return false;
+		}
+		return $this->delete_session( $session_id );
+	}
+
 	public function get_user_sessions( int $user_id, int $limit = 20, int $offset = 0, ?string $context = null, ?int $agent_id = null ): array {
 		$rows = array();
 
@@ -244,6 +260,8 @@ class InMemoryConversationStore implements ConversationStoreInterface {
 
 			$rows[] = array(
 				'session_id'    => $session['session_id'],
+				'workspace_type' => $session['workspace_type'],
+				'workspace_id'   => $session['workspace_id'],
 				'title'         => $session['title'],
 				'context'       => $session['context'],
 				'first_message' => is_string( $first_message ) ? mb_substr( $first_message, 0, 100 ) : '',
@@ -278,6 +296,18 @@ class InMemoryConversationStore implements ConversationStoreInterface {
 			++$count;
 		}
 		return $count;
+	}
+
+	public function get_user_sessions_for_workspace( WP_Agent_Workspace_Scope $workspace, int $user_id, int $limit = 20, int $offset = 0, ?string $context = null, ?int $agent_id = null, ?array $transcript_owner = null ): array {
+		$rows = array_filter(
+			$this->get_user_sessions( $user_id, 100, 0, $context, $agent_id ),
+			static fn( array $row ): bool => ( $row['workspace_type'] ?? '' ) === $workspace->workspace_type && ( $row['workspace_id'] ?? '' ) === $workspace->workspace_id
+		);
+		return array_slice( array_values( $rows ), $offset, $limit );
+	}
+
+	public function get_user_session_count_for_workspace( WP_Agent_Workspace_Scope $workspace, int $user_id, ?string $context = null, ?int $agent_id = null, ?array $transcript_owner = null ): int {
+		return count( $this->get_user_sessions_for_workspace( $workspace, $user_id, 100, 0, $context, $agent_id, $transcript_owner ) );
 	}
 
 	public function get_recent_pending_session( ...$args ): ?array {
@@ -350,6 +380,13 @@ class InMemoryConversationStore implements ConversationStoreInterface {
 		$now = gmdate( 'Y-m-d H:i:s' );
 		$this->sessions[ $session_id ]['last_read_at'] = $now;
 		return $now;
+	}
+
+	public function mark_session_read_for_workspace( WP_Agent_Workspace_Scope $workspace, string $session_id, int $user_id, array $transcript_owner ) {
+		if ( null === $this->get_session_for_transcript_owner( $workspace, $user_id, $transcript_owner, $session_id ) ) {
+			return false;
+		}
+		return $this->mark_session_read( $session_id, $user_id );
 	}
 
 	public function cleanup_expired_sessions(): int {

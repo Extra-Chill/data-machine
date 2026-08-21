@@ -206,37 +206,36 @@ Agent executes → Agent queues next task → Loop continues
 ## WP-CLI
 
 ```bash
-wp datamachine agent|agents      # Agent CRUD, access, tokens, bundles, installed state
+wp datamachine agents            # Agent CRUD, access, tokens, bundles, installed state
 wp datamachine ai                # AI/provider diagnostics
 wp datamachine analytics         # Analytics reporting
 wp datamachine alt-text          # AI alt text generation
 wp datamachine auth              # OAuth/provider auth management
 wp datamachine batch             # Batch operations
-wp datamachine block|blocks      # Gutenberg block operations
+wp datamachine blocks            # Gutenberg block operations
 wp datamachine chat              # Chat agent interface
-wp datamachine cycle|cycles      # Run one bounded scheduler/engine cycle
+wp datamachine cycle             # Run one bounded scheduler/engine cycle
 wp datamachine drain             # Drain due work until empty or budgeted
 wp datamachine email             # Site email read/send/reply operations
 wp datamachine external          # Remote agent/site calls and auth helpers
-wp datamachine fetch test        # Fetch-handler test harness
-wp datamachine flow|flows        # Flow CRUD, queue, webhook, scheduling, run
-wp datamachine handler|handlers  # List registered handlers
+wp datamachine test              # Fetch-handler test harness
+wp datamachine flows             # Flow CRUD, queue, webhook, scheduling, run
+wp datamachine handlers          # List registered handlers
 wp datamachine image             # Image generation
-wp datamachine job|jobs          # Job management, monitoring, undo, summary
-wp datamachine link|links        # Internal linking
-wp datamachine log|logs          # Log operations
+wp datamachine jobs              # Job management, monitoring, undo, summary
+wp datamachine links             # Internal linking
+wp datamachine logs              # Log operations
 wp datamachine memory            # Agent memory and daily memory read/write/search
 wp datamachine meta-description  # SEO meta descriptions
 wp datamachine pending-actions   # Inspect/resolve approval-gated actions
-wp datamachine pipeline|pipelines # Pipeline CRUD and memory-file links
-wp datamachine post|posts        # Query/update Data Machine-created posts
+wp datamachine pipelines         # Pipeline CRUD and memory-file links
+wp datamachine posts             # Query/update Data Machine-created posts
 wp datamachine processed-items   # Dedupe/processed item management
 wp datamachine retention         # Retention cleanup tasks
-wp datamachine setting|settings  # Plugin settings
-wp datamachine step-type|step-types # List registered step types
+wp datamachine settings          # Plugin settings
+wp datamachine step-types        # List registered step types
 wp datamachine system            # System health, tasks, prompts, runs
 wp datamachine taxonomy          # Taxonomy operations
-wp datamachine test              # Diagnostic command surface
 wp datamachine worker            # Long-running worker wrapper
 ```
 
@@ -336,6 +335,8 @@ See [`docs/development/hooks/core-filters.md`](docs/development/hooks/core-filte
 - Action Scheduler (bundled)
 
 ## Development
+
+Data Machine 1.0 starts from a single canonical schema and runtime contract. See the [1.0 baseline and pre-1.0 upgrade boundary](docs/development/1-0-baseline.md) before testing upgrades.
 
 ```bash
 homeboy review data-machine test    # PHP smoke tests

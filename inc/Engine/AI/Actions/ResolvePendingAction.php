@@ -16,6 +16,7 @@
 
 namespace DataMachine\Engine\AI\Actions;
 
+use AgentsAPI\AI\Tools\WP_Agent_Action_Policy;
 use DataMachine\Engine\AI\Tools\BaseTool;
 
 defined( 'ABSPATH' ) || exit;
@@ -55,7 +56,7 @@ class ResolvePendingAction extends BaseTool {
 				),
 			),
 			// Resolving is always direct — this IS the confirmation step.
-			'action_policy' => ActionPolicyResolver::POLICY_DIRECT,
+			'action_policy' => WP_Agent_Action_Policy::DIRECT,
 		);
 	}
 

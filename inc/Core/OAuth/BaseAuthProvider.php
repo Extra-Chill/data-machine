@@ -223,7 +223,7 @@ abstract class BaseAuthProvider {
 	/**
 	 * Get the site-wide OAuth account for this provider.
 	 *
-	 * Unlike `get_account( array $context )`, this method never consults auth
+	 * This method reads only the explicitly requested account scope.
 	 * scope policy and never resolves to a user or agent principal. It only reads
 	 * the provider's top-level account slot.
 	 *
@@ -403,9 +403,9 @@ abstract class BaseAuthProvider {
 		if ( isset( $provider_data['accounts'][ $account_name ] ) && is_array( $provider_data['accounts'][ $account_name ] ) ) {
 			$matches[] = array(
 				'account_name' => $account_name,
-				'owner_type' => self::AUTH_SCOPE_SITE,
-				'owner_id'   => 0,
-				'account'    => $this->decrypt_fields( $provider_data['accounts'][ $account_name ] ),
+				'owner_type'   => self::AUTH_SCOPE_SITE,
+				'owner_id'     => 0,
+				'account'      => $this->decrypt_fields( $provider_data['accounts'][ $account_name ] ),
 			);
 		}
 
@@ -418,9 +418,9 @@ abstract class BaseAuthProvider {
 			}
 			$matches[] = array(
 				'account_name' => $account_name,
-				'owner_type' => $parts[1],
-				'owner_id'   => (int) $parts[2],
-				'account'    => $this->decrypt_fields( $principal_data['accounts'][ $account_name ] ),
+				'owner_type'   => $parts[1],
+				'owner_id'     => (int) $parts[2],
+				'account'      => $this->decrypt_fields( $principal_data['accounts'][ $account_name ] ),
 			);
 		}
 
@@ -448,66 +448,16 @@ abstract class BaseAuthProvider {
 	/**
 	 * Get OAuth account data directly from options.
 	 *
-	 * Automatically decrypts any encrypted fields. Principal-scoped credentials
-	 * are preferred when a user or agent context is available; legacy site-level
-	 * credentials remain readable as a fallback for existing installs.
+	 * Automatically decrypts any encrypted fields from the site account.
 	 *
-	 * @param array $context Optional principal context, e.g. user_id or agent_id.
 	 * @return array Account data or empty array
 	 */
-	public function get_account( array $context = array() ): array {
-		if ( ! empty( $context ) ) {
-			if ( function_exists( '_deprecated_function' ) ) {
-				_deprecated_function(
-					__METHOD__ . ' with a context argument',
-					'0.131.0',
-					'BaseAuthProvider::get_account_for_policy_context()'
-				);
-			}
-
-			return $this->get_account_for_policy_context( $context ) ?? array();
-		}
-
+	public function get_account(): array {
 		$all_auth_data = get_site_option( 'datamachine_auth_data', array() );
 		$provider_data = $all_auth_data[ $this->provider_slug ] ?? array();
-		$scope         = $this->get_principal_scope( $context, 'account' );
-
-		if ( null !== $scope ) {
-			$scoped_account = $provider_data['principals'][ $scope ]['account'] ?? array();
-			if ( ! empty( $scoped_account ) && is_array( $scoped_account ) ) {
-				return $this->decrypt_fields( $scoped_account );
-			}
-		}
 
 		$account = $provider_data['account'] ?? array();
 		return $this->decrypt_fields( $account );
-	}
-
-	/**
-	 * Get the OAuth account that applies to an execution context.
-	 *
-	 * Deprecated compatibility wrapper for the explicit policy-fallback lookup.
-	 * New callers must choose a named scope API (`get_site_account()`,
-	 * `get_account_for_user()`, `get_account_for_agent()`) or intentionally opt
-	 * into policy resolution plus site fallback via
-	 * `get_account_for_policy_context()`.
-	 *
-	 * @since 0.130.0
-	 * @deprecated 0.136.0 Use get_account_for_policy_context() when fallback is intended.
-	 *
-	 * @param array $context Optional principal context, e.g. user_id or agent_id.
-	 * @return array|null Decrypted account data, or null if no account resolves.
-	 */
-	public function get_account_for_context( array $context = array() ): ?array {
-		if ( function_exists( '_deprecated_function' ) ) {
-			_deprecated_function(
-				__METHOD__,
-				'0.136.0',
-				'BaseAuthProvider::get_account_for_policy_context()'
-			);
-		}
-
-		return $this->get_account_for_policy_context( $context );
 	}
 
 	/**
@@ -569,32 +519,21 @@ abstract class BaseAuthProvider {
 	/**
 	 * Store OAuth account data directly in options.
 	 *
-	 * Sensitive fields are automatically encrypted before storage. Writes with a
-	 * resolvable user or agent context are stored under that principal; writes
-	 * without context preserve legacy site-level storage.
+	 * Sensitive fields are automatically encrypted before storage.
 	 *
 	 * @param array $data Account data to store
-	 * @param array $context Optional principal context, e.g. user_id or agent_id.
 	 * @return bool True on success
 	 */
-	public function save_account( array $data, array $context = array() ): bool {
-		if ( ! empty( $context ) && function_exists( '_deprecated_function' ) ) {
-			_deprecated_function(
-				__METHOD__ . ' with a context argument',
-				'0.132.0',
-				'BaseAuthProvider::save_site_account(), BaseAuthProvider::save_account_for_user(), or BaseAuthProvider::save_account_for_agent()'
-			);
-		}
-
-		return $this->store_account_for_scope( $data, $this->get_principal_scope( $context, 'account' ) );
+	public function save_account( array $data ): bool {
+		return $this->store_account_for_scope( $data, null );
 	}
 
 	/**
 	 * Merge partial account data into the policy-resolved OAuth account slot.
 	 *
-	 * This method preserves omitted fields. It writes to the same site/user/agent
-	 * slot that `save_account()` would target for the supplied context, but reads
-	 * only that exact slot before merging so a missing scoped account does not pull
+	 * This method preserves omitted fields. It writes to the site/user/agent slot
+	 * selected by the supplied context, but reads only that exact slot before
+	 * merging so a missing scoped account does not pull
 	 * values from the legacy site fallback.
 	 *
 	 * Use `save_account()` for full replacement, especially initial authorization
@@ -645,28 +584,10 @@ abstract class BaseAuthProvider {
 	/**
 	 * Clear OAuth account data from options.
 	 *
-	 * @param array $context Optional principal context, e.g. user_id or agent_id.
 	 * @return bool True on success
 	 */
-	public function clear_account( array $context = array() ): bool {
-		if ( ! empty( $context ) && function_exists( '_deprecated_function' ) ) {
-			_deprecated_function(
-				__METHOD__ . ' with a context argument',
-				'0.132.0',
-				'BaseAuthProvider::delete_site_account(), BaseAuthProvider::delete_account_for_user(), or BaseAuthProvider::delete_account_for_agent()'
-			);
-		}
-
+	public function clear_account(): bool {
 		$all_auth_data = get_site_option( 'datamachine_auth_data', array() );
-		$scope         = $this->get_principal_scope( $context, 'account' );
-
-		if ( null !== $scope ) {
-			if ( isset( $all_auth_data[ $this->provider_slug ]['principals'][ $scope ] ) ) {
-				unset( $all_auth_data[ $this->provider_slug ]['principals'][ $scope ] );
-				return update_site_option( 'datamachine_auth_data', $all_auth_data );
-			}
-			return true;
-		}
 
 		if ( isset( $all_auth_data[ $this->provider_slug ]['account'] ) ) {
 			unset( $all_auth_data[ $this->provider_slug ]['account'] );
@@ -678,8 +599,8 @@ abstract class BaseAuthProvider {
 	/**
 	 * Read the exact stored account slot for merge updates.
 	 *
-	 * Unlike `get_account_for_context()`, this does not fall back from a scoped
-	 * principal slot to the legacy site account. Partial updates must not copy site
+	 * This does not fall back from a scoped principal slot to the site account.
+	 * Partial updates must not copy site
 	 * credentials into a user or agent slot just because the scoped slot is empty.
 	 *
 	 * @since 0.132.0
@@ -733,7 +654,7 @@ abstract class BaseAuthProvider {
 	// (`principals[user:<id>][account]`) so an account written via either
 	// surface is readable through the other.
 	//
-	// Unlike `get_account( array $context )`, these methods never consult the
+	// These methods never consult the
 	// provider's scope policy and never fall back to site-wide storage when
 	// no per-user account exists. A missing per-user account always returns
 	// `null`.

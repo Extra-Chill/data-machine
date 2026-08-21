@@ -158,7 +158,7 @@ Last registration wins at the registry level. Because reconciliation is create-i
 | Agent row exists, seeded file doesn't | ✅ Partially — `label`/`description` are ignored (DB-owned), but the next scaffold cycle picks up your `memory_seeds` for any still-missing files |
 | Agent row exists and seeded files exist | ❌ No — registration changes don't propagate to existing DB rows, and scaffold never overwrites existing files |
 
-To reseed SOUL.md on an existing install, delete the file and let the scaffold ability regenerate it. To change `agent_name` or `agent_config`, go through the DB (`wp datamachine pipeline update`, admin UI, or direct `Agents::update_agent()` call) — those are DB-owned, user-editable fields.
+To reseed SOUL.md on an existing install, delete the file and let the scaffold ability regenerate it. To change `agent_name` or `agent_config`, use `wp datamachine agents config`, the admin UI, or `Agents::update_agent()`; those are DB-owned, user-editable fields.
 
 ### 2. Suppress a default registration entirely
 
@@ -190,4 +190,4 @@ Registry-level overrides are the right tool for declaring defaults; content-leve
 - `docs/core-system/multi-agent-architecture.md` — agents table schema, access control, filesystem layout
 - `docs/core-filters.md` — the `wp_agents_api_init` action, `datamachine_registered_agent_reconciled` action, `datamachine_scaffold_content` filter
 - `inc/Abilities/File/ScaffoldAbilities.php` — scaffold ability that honors registered `memory_seeds` content
-- `inc/migrations/scaffolding.php` — default `datamachine_scaffold_content` generators
+- `inc/setup/scaffolding.php` — default `datamachine_scaffold_content` generators

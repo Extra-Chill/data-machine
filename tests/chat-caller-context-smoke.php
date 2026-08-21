@@ -84,6 +84,8 @@ namespace DataMachine\Core\Database\Chat {
 	class CallerContextStore {
 		public array $session = array(
 			'session_id' => 'caller-context-session',
+			'workspace_type' => 'site',
+			'workspace_id' => 'https://example.test',
 			'user_id'    => 700,
 			'agent_id'   => 9,
 			'agent_slug' => 'agent-9',
@@ -136,10 +138,17 @@ namespace DataMachine\Core\Database\Chat {
 	}
 }
 
+namespace AgentsAPI\Core\Workspace {
+	class WP_Agent_Workspace_Scope {
+		public function __construct( public string $workspace_type, public string $workspace_id ) {}
+		public static function from_parts( string $type, string $id ): self { return new self( $type, $id ); }
+	}
+}
+
 namespace DataMachine\Core\Workspace {
 	class WordPressWorkspaceScope {
-		public static function current(): string {
-			return 'site:test';
+		public static function current(): \AgentsAPI\Core\Workspace\WP_Agent_Workspace_Scope {
+			return \AgentsAPI\Core\Workspace\WP_Agent_Workspace_Scope::from_parts( 'site', 'https://example.test' );
 		}
 	}
 }

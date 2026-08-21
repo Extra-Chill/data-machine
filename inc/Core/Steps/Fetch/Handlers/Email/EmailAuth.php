@@ -141,10 +141,7 @@ class EmailAuth extends BaseAuthProvider {
 			return $resolved;
 		}
 
-		return array(
-			'auth_ref'       => $resolved['ref'],
-			'legacy_default' => false,
-		);
+		return array( 'auth_ref' => $resolved['ref'] );
 	}
 
 	public function resolve_mailbox_for_principal( string $account, string|array $operations, array $context ): array|\WP_Error {
@@ -161,9 +158,9 @@ class EmailAuth extends BaseAuthProvider {
 	 * @return array|\WP_Error Resolved internal mailbox envelope.
 	 */
 	public function resolve_mailbox( string $account, string|array $operations = 'read', array $context = array() ): array|\WP_Error {
-		$account = str_starts_with( $account, 'email_imap:' ) ? substr( $account, 11 ) : $account;
-		$account = strtolower( trim( $account ) );
-		$ref     = 'email_imap:' . $account;
+		$account  = str_starts_with( $account, 'email_imap:' ) ? substr( $account, 11 ) : $account;
+		$account  = strtolower( trim( $account ) );
+		$ref      = 'email_imap:' . $account;
 		$trusted  = ! empty( $context['_trusted_execution'] );
 		$agent_id = $trusted && isset( $context['agent_id'] ) ? absint( $context['agent_id'] ) : ( class_exists( PermissionHelper::class ) ? absint( PermissionHelper::get_acting_agent_id() ) : 0 );
 		$user_id  = $trusted && isset( $context['user_id'] ) ? absint( $context['user_id'] ) : ( class_exists( PermissionHelper::class ) ? absint( PermissionHelper::acting_user_id() ) : 0 );
@@ -173,7 +170,7 @@ class EmailAuth extends BaseAuthProvider {
 		}
 
 		if ( 'default' === $account ) {
-			if ( ! $this->can_use_legacy_default( $context, $agent_id, $user_id ) ) {
+			if ( ! $this->can_use_default( $context, $agent_id, $user_id ) ) {
 				return $this->audit_error( 'email_mailbox_forbidden', $ref, $operations, $context, $agent_id, $user_id );
 			}
 			$credentials = $this->get_config();
@@ -193,7 +190,7 @@ class EmailAuth extends BaseAuthProvider {
 		}
 
 		$matches = $this->find_named_accounts( $account );
-		$allowed = array_values( array_filter( $matches, fn ( array $match ): bool => $this->can_access( $match, $operations, $agent_id, $user_id ) ) );
+		$allowed = array_values( array_filter( $matches, fn ( array $account_match ): bool => $this->can_access( $account_match, $operations, $agent_id, $user_id ) ) );
 		if ( 1 !== count( $allowed ) || ! $this->valid_credentials( $allowed[0]['account'] ) ) {
 			$code = empty( $matches ) ? 'auth_ref_unresolved' : 'email_mailbox_forbidden';
 			if ( count( $allowed ) > 1 ) {
@@ -214,15 +211,9 @@ class EmailAuth extends BaseAuthProvider {
 		return $resolved;
 	}
 
-	private function can_use_legacy_default( array $context, int $agent_id, int $user_id ): bool {
+	private function can_use_default( array $context, int $agent_id, int $user_id ): bool {
 		if ( $agent_id > 0 ) {
-			$expected = self::legacy_default_marker(
-				absint( $context['flow_id'] ?? 0 ),
-				(string) ( $context['flow_step_id'] ?? '' ),
-				$agent_id
-			);
-			$provided = (string) ( $context['legacy_default_auth'] ?? '' );
-			return ! empty( $context['_trusted_execution'] ) && '' !== $provided && hash_equals( $expected, $provided );
+			return false;
 		}
 		if ( ! empty( $context['principal_less_system'] ) && ! empty( $context['_trusted_execution'] ) ) {
 			return true;
@@ -231,11 +222,6 @@ class EmailAuth extends BaseAuthProvider {
 			return class_exists( PermissionHelper::class ) && PermissionHelper::can_manage();
 		}
 		return $this->user_has_management_capability( $user_id );
-	}
-
-	public static function legacy_default_marker( int $flow_id, string $flow_step_id, int $agent_id ): string {
-		$payload = implode( '|', array( 'email-default-v1', (string) $flow_id, $flow_step_id, (string) $agent_id ) );
-		return hash_hmac( 'sha256', $payload, wp_salt( 'auth' ) );
 	}
 
 	public function grant_agent( string $account, string $owner_type, int $owner_id, int $agent_id, array $operations ): bool {
@@ -307,10 +293,10 @@ class EmailAuth extends BaseAuthProvider {
 			return false;
 		}
 
-		$data       = get_site_option( 'datamachine_auth_data', array() );
-		$owner_id   = self::AUTH_SCOPE_SITE === $owner_type ? 0 : $owner_id;
-		$owner_key  = $owner_type . ':' . $owner_id;
-		$has_grants = isset( $data['email_imap']['delegations'][ $owner_key ][ $account_name ] );
+		$data        = get_site_option( 'datamachine_auth_data', array() );
+		$owner_id    = self::AUTH_SCOPE_SITE === $owner_type ? 0 : $owner_id;
+		$owner_key   = $owner_type . ':' . $owner_id;
+		$has_grants  = isset( $data['email_imap']['delegations'][ $owner_key ][ $account_name ] );
 		$has_account = null === $scope
 			? isset( $data['email_imap']['accounts'][ $account_name ] )
 			: isset( $data['email_imap']['principals'][ $scope ]['accounts'][ $account_name ] );
@@ -342,23 +328,23 @@ class EmailAuth extends BaseAuthProvider {
 		return is_array( $agent ) && (int) ( $agent['owner_id'] ?? 0 ) === $user_id;
 	}
 
-	private function can_access( array $match, string|array $operations, int $agent_id, int $user_id ): bool {
+	private function can_access( array $account_match, string|array $operations, int $agent_id, int $user_id ): bool {
 		$operations = (array) $operations;
-		if ( $agent_id > 0 && self::AUTH_SCOPE_AGENT === $match['owner_type'] && $agent_id === $match['owner_id'] ) {
+		if ( $agent_id > 0 && self::AUTH_SCOPE_AGENT === $account_match['owner_type'] && $agent_id === $account_match['owner_id'] ) {
 			return true;
 		}
-		if ( 0 === $agent_id && self::AUTH_SCOPE_USER === $match['owner_type'] && $user_id === $match['owner_id'] ) {
+		if ( 0 === $agent_id && self::AUTH_SCOPE_USER === $account_match['owner_type'] && $user_id === $account_match['owner_id'] ) {
 			return true;
 		}
-		if ( 0 === $agent_id && self::AUTH_SCOPE_SITE === $match['owner_type'] && $this->has_management_principal( $user_id ) ) {
+		if ( 0 === $agent_id && self::AUTH_SCOPE_SITE === $account_match['owner_type'] && $this->has_management_principal( $user_id ) ) {
 			return true;
 		}
 		if ( $agent_id <= 0 ) {
 			return false;
 		}
-		$data       = get_site_option( 'datamachine_auth_data', array() );
-		$owner_key  = $match['owner_type'] . ':' . $match['owner_id'];
-		$grant      = $data['email_imap']['delegations'][ $owner_key ][ $match['account_name'] ][ 'agent:' . $agent_id ] ?? null;
+		$data      = get_site_option( 'datamachine_auth_data', array() );
+		$owner_key = $account_match['owner_type'] . ':' . $account_match['owner_id'];
+		$grant     = $data['email_imap']['delegations'][ $owner_key ][ $account_match['account_name'] ][ 'agent:' . $agent_id ] ?? null;
 		return is_array( $grant ) && empty( array_diff( $operations, (array) ( $grant['operations'] ?? array() ) ) );
 	}
 
@@ -416,12 +402,12 @@ class EmailAuth extends BaseAuthProvider {
 				'type' => 'user',
 				'id'   => $user_id,
 			);
-		$metadata = array(
-			'mailbox_ref'     => $mailbox['ref'],
-			'owner_principal' => $mailbox['owner'],
+		$metadata         = array(
+			'mailbox_ref'      => $mailbox['ref'],
+			'owner_principal'  => $mailbox['owner'],
 			'acting_principal' => $acting_principal,
-			'operation'       => array_values( (array) $operations ),
-			'result'          => $result,
+			'operation'        => array_values( (array) $operations ),
+			'result'           => $result,
 		);
 		foreach ( array( 'flow_id', 'pipeline_id', 'flow_step_id', 'job_id' ) as $key ) {
 			if ( isset( $context[ $key ] ) ) {

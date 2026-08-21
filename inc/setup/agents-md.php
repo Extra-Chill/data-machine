@@ -1,6 +1,6 @@
 <?php
 /**
- * Data Machine — AGENTS.md composition (gated).
+ * Data Machine - AGENTS.md composition (gated).
  *
  * AGENTS.md is the agent-instruction file that lives at the WordPress install
  * root. Unlike SITE.md / NETWORK.md (always composed), AGENTS.md composition is
@@ -30,6 +30,9 @@
 
 defined( 'ABSPATH' ) || exit;
 
+require_once dirname( __DIR__ ) . '/Core/ActionScheduler/GroupRegistrar.php';
+
+use DataMachine\Core\ActionScheduler\GroupRegistrar;
 use DataMachine\Engine\AI\MemoryFileRegistry;
 use DataMachine\Engine\AI\SectionRegistry;
 
@@ -97,7 +100,7 @@ function datamachine_register_agents_md_sections(): void {
 	$wp = datamachine_agents_md_wp_cli_cmd();
 
 	$core_meta = array(
-		'owner'      => 'data-machine',
+		'owner'      => GroupRegistrar::GROUP,
 		'freshness'  => 'static',
 		'conditions' => 'Registered when DATAMACHINE_COMPOSE_AGENTS_MD is enabled.',
 	);
@@ -121,7 +124,7 @@ function datamachine_register_agents_md_sections(): void {
 		10,
 		'datamachine_agents_md_render_datamachine_section',
 		array(
-			'owner'      => 'data-machine',
+			'owner'      => GroupRegistrar::GROUP,
 			'freshness'  => 'static',
 			'conditions' => 'Registered when DATAMACHINE_COMPOSE_AGENTS_MD is enabled.',
 		)
@@ -165,7 +168,7 @@ function datamachine_agents_md_render_datamachine_section(): string {
 		. "- Job and worker state: `{$wp} datamachine jobs --help` and `{$wp} datamachine worker --help`\n"
 		. "- Content and media operations: `{$wp} datamachine posts --help`, `{$wp} datamachine blocks --help`, or `{$wp} datamachine image --help`\n"
 		. "- Communication and approval queues: `{$wp} datamachine email --help` and `{$wp} datamachine pending-actions --help`\n"
-		. "- Agent and system configuration: `{$wp} datamachine agent --help` and `{$wp} datamachine system --help`\n\n"
+		. "- Agent and system configuration: `{$wp} datamachine agents --help` and `{$wp} datamachine system --help`\n\n"
 		. "**Discovery**\n"
 		. "Use `{$wp} datamachine --help` for the live command map and `{$wp} datamachine <command> --help` for the current options and subcommands.";
 }

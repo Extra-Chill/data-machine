@@ -3,7 +3,7 @@
  * Command Registry
  *
  * Single source of truth declaring canonical `wp datamachine ...` commands,
- * their compatibility aliases, and implementing command classes. The WP-CLI
+ * their implementing command classes. The WP-CLI
  * bootstrap calls WP_CLI::add_command for each flattened map entry. Generated
  * agent guidance advertises a bounded set of routing entrypoints and tests
  * those roots against this map; live `--help` remains authoritative for the
@@ -25,90 +25,49 @@ class CommandRegistry {
 	/**
 	 * Canonical command declarations.
 	 *
-	 * Keys are canonical command strings. Compatibility spellings are declared
-	 * beside the implementation rather than as independent commands.
+	 * Singular aliases are retained only where the deployed Intelligence plugin
+	 * invokes them directly: its brain CLI dispatches `datamachine flow run`, and
+	 * its bundle install guidance invokes `datamachine agent install`.
 	 *
-	 * @return array<string, array{class: class-string, aliases?: string[]}>
+	 * @return array<string, array{class:class-string,aliases?:string[]}>
 	 */
 	public static function declarations(): array {
 		return array(
-			'datamachine settings'         => array(
-				'class'   => Commands\SettingsCommand::class,
-				'aliases' => array( 'datamachine setting' ),
-			),
+			'datamachine settings'         => array( 'class' => Commands\SettingsCommand::class ),
 			'datamachine flows'            => array(
 				'class'   => Commands\Flows\FlowsCommand::class,
 				'aliases' => array( 'datamachine flow' ),
 			),
 			'datamachine alt-text'         => array( 'class' => Commands\AltTextCommand::class ),
-			'datamachine jobs'             => array(
-				'class'   => Commands\JobsCommand::class,
-				'aliases' => array( 'datamachine job' ),
-			),
-			'datamachine cycle'            => array(
-				'class'   => Commands\CycleCommand::class,
-				'aliases' => array( 'datamachine cycles' ),
-			),
+			'datamachine jobs'             => array( 'class' => Commands\JobsCommand::class ),
+			'datamachine cycle'            => array( 'class' => Commands\CycleCommand::class ),
 			'datamachine drain'            => array( 'class' => Commands\DrainCommand::class ),
 			'datamachine worker'           => array( 'class' => Commands\WorkerCommand::class ),
 			'datamachine ai'               => array( 'class' => Commands\AICommand::class ),
-			'datamachine pipelines'        => array(
-				'class'   => Commands\PipelinesCommand::class,
-				'aliases' => array( 'datamachine pipeline' ),
-			),
-			'datamachine posts'            => array(
-				'class'   => Commands\PostsCommand::class,
-				'aliases' => array( 'datamachine post' ),
-			),
-			'datamachine logs'             => array(
-				'class'   => Commands\LogsCommand::class,
-				'aliases' => array( 'datamachine log' ),
-			),
+			'datamachine pipelines'        => array( 'class' => Commands\PipelinesCommand::class ),
+			'datamachine posts'            => array( 'class' => Commands\PostsCommand::class ),
+			'datamachine logs'             => array( 'class' => Commands\LogsCommand::class ),
 			'datamachine agents'           => array(
 				'class'   => Commands\AgentsCommand::class,
 				'aliases' => array( 'datamachine agent' ),
 			),
-			'datamachine pending-actions'  => array(
-				'class'   => Commands\PendingActionsCommand::class,
-				'aliases' => array( 'datamachine pending-action' ),
-			),
+			'datamachine pending-actions'  => array( 'class' => Commands\PendingActionsCommand::class ),
 			'datamachine memory'           => array( 'class' => Commands\MemoryCommand::class ),
 			'datamachine batch'            => array( 'class' => Commands\BatchCommand::class ),
 			'datamachine image'            => array( 'class' => Commands\ImageCommand::class ),
 			'datamachine auth'             => array( 'class' => Commands\AuthCommand::class ),
 			'datamachine email'            => array( 'class' => Commands\EmailCommand::class ),
 			'datamachine system'           => array( 'class' => Commands\SystemCommand::class ),
-			'datamachine handlers'         => array(
-				'class'   => Commands\HandlersCommand::class,
-				'aliases' => array( 'datamachine handler' ),
-			),
+			'datamachine handlers'         => array( 'class' => Commands\HandlersCommand::class ),
 			'datamachine taxonomy'         => array( 'class' => Commands\TaxonomyCommand::class ),
-			'datamachine step-types'       => array(
-				'class'   => Commands\StepTypesCommand::class,
-				'aliases' => array( 'datamachine step-type' ),
-			),
-			'datamachine processed-items'  => array(
-				'class'   => Commands\ProcessedItemsCommand::class,
-				'aliases' => array( 'datamachine processed-item' ),
-			),
-			'datamachine tracked-items'    => array(
-				'class'   => Commands\TrackedItemsCommand::class,
-				'aliases' => array( 'datamachine tracked-item' ),
-			),
+			'datamachine step-types'       => array( 'class' => Commands\StepTypesCommand::class ),
+			'datamachine processed-items'  => array( 'class' => Commands\ProcessedItemsCommand::class ),
+			'datamachine tracked-items'    => array( 'class' => Commands\TrackedItemsCommand::class ),
 			'datamachine retention'        => array( 'class' => Commands\RetentionCommand::class ),
-			'datamachine test'             => array(
-				'class'   => Commands\TestCommand::class,
-				'aliases' => array( 'datamachine fetch test' ),
-			),
+			'datamachine test'             => array( 'class' => Commands\TestCommand::class ),
 			'datamachine external'         => array( 'class' => Commands\ExternalCommand::class ),
-			'datamachine links'            => array(
-				'class'   => Commands\LinksCommand::class,
-				'aliases' => array( 'datamachine link' ),
-			),
-			'datamachine blocks'           => array(
-				'class'   => Commands\BlocksCommand::class,
-				'aliases' => array( 'datamachine block' ),
-			),
+			'datamachine links'            => array( 'class' => Commands\LinksCommand::class ),
+			'datamachine blocks'           => array( 'class' => Commands\BlocksCommand::class ),
 			'datamachine meta-description' => array( 'class' => Commands\MetaDescriptionCommand::class ),
 			'datamachine chat'             => array( 'class' => Commands\ChatCommand::class ),
 		);
@@ -121,10 +80,8 @@ class CommandRegistry {
 	 */
 	public static function map(): array {
 		$map = array();
-
 		foreach ( self::declarations() as $command => $declaration ) {
 			$map[ $command ] = $declaration['class'];
-
 			foreach ( $declaration['aliases'] ?? array() as $alias ) {
 				$map[ $alias ] = $declaration['class'];
 			}

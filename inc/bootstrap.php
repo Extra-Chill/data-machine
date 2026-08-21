@@ -72,7 +72,7 @@ use DataMachine\Engine\AI\MemoryFileRegistry;
 function datamachine_register_default_memory_files(): void {
 	// Shared layer — site-wide context, visible to all agents.
 	// Composable: content assembled from sections registered against SectionRegistry
-	// (see inc/migrations/site-md.php). `editable` is forced to false by composable=true.
+	// (see inc/setup/site-md.php). `editable` is forced to false by composable=true.
 	MemoryFileRegistry::register( 'SITE.md', 10, array(
 		'layer'       => MemoryFileRegistry::LAYER_SHARED,
 		'protected'   => true,
@@ -158,7 +158,7 @@ function datamachine_register_default_memory_files(): void {
 	// AGENTS.md — gated default-OFF behind DATAMACHINE_COMPOSE_AGENTS_MD.
 	// Registration is a no-op when the constant is unset/false, so installs
 	// with no coding agent keep zero AGENTS.md footprint. Defined in
-	// inc/migrations/agents-md.php (required via inc/migrations/load.php).
+	// inc/setup/agents-md.php.
 	if ( function_exists( 'datamachine_register_agents_md_file' ) ) {
 		datamachine_register_agents_md_file();
 	}

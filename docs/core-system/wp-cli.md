@@ -1,6 +1,8 @@
 # WP-CLI Commands
 
-Data Machine provides a broad WP-CLI surface for managing pipelines, flows, jobs, agents, memory, system tasks, and more from the command line. Commands and their singular/plural aliases are registered under the `datamachine` namespace via `inc/Cli/Bootstrap.php`; use `wp help datamachine` for the authoritative list in a running install.
+Data Machine provides a broad WP-CLI surface for managing pipelines, flows, jobs, agents, memory, system tasks, and more from the command line. Canonical commands are registered under the `datamachine` namespace via `inc/Cli/Bootstrap.php`; use `wp help datamachine` for the authoritative list in a running install.
+
+Only two non-canonical root aliases remain: `wp datamachine flow` and `wp datamachine agent`. The deployed Intelligence plugin invokes those exact roots for brain flow dispatch and bundle installation; all other commands use the canonical spellings documented below.
 
 > **Note:** The `wp datamachine workspace` and `wp datamachine github` commands have been moved to the `data-machine-code` extension plugin.
 
@@ -12,13 +14,13 @@ Data Machine provides a broad WP-CLI surface for managing pipelines, flows, jobs
 - **Handlers** are integrations selected by handler-backed step types. Only step types with `uses_handler=yes` accept handlers.
 - **System tasks** are named operational jobs. Use them for bounded tasks such as alt text, retention, internal links, and memory maintenance. Use pipelines/flows for reusable multi-step workflows instead of hiding workflow composition inside one system task.
 
-Workflow JSON uses the same canonical fields across entry points: `step_type`, `handler_slugs`, `handler_configs`, and `flow_step_settings`. The `type` field is accepted only as a compatibility alias for older ephemeral workflow specs; new workflows, pipelines, flows, and system tasks should use `step_type`. Legacy handler aliases such as `handler`, `handler_slug`, and `handler_config` are rejected on normal workflow paths.
+Workflow JSON uses the same canonical fields across entry points: `step_type`, `handler_slugs`, `handler_configs`, and `flow_step_settings`. Alternate fields such as `type`, `handler`, `handler_slug`, and `handler_config` are rejected.
 
 ## Available Commands
 
 ### datamachine pipelines
 
-Manage pipelines. **Alias**: `pipeline`
+Manage pipelines.
 
 ```bash
 # List all pipelines
@@ -52,7 +54,7 @@ wp datamachine pipelines memory-files 5 --remove=strategy.md
 
 ### datamachine flows
 
-Manage flows. **Alias**: `flow`
+Manage flows.
 
 ```bash
 # List all flows (optionally filter by pipeline)
@@ -200,7 +202,7 @@ wp datamachine flows bulk-config --handler=wordpress --config='{"post_status":"d
 
 ### datamachine jobs
 
-Manage jobs. **Alias**: `job`. **Since**: 0.14.6
+Manage jobs. **Since**: 0.14.6
 
 ```bash
 # List jobs with filters
@@ -238,12 +240,12 @@ wp datamachine jobs undo 42 --task-type=alt_text --force
 
 ### datamachine agents
 
-Manage agent identities. **Aliases**: `agent`. **Since**: 0.37.0
+Manage agent identities. **Since**: 0.37.0
 
 ```bash
 # List all agents
 wp datamachine agents list
-wp datamachine agent list  # alias
+wp datamachine agents list
 
 # Show agent details (config, access grants, directory info)
 wp datamachine agents show my-agent
@@ -286,13 +288,13 @@ wp datamachine agents rebase /tmp/my-agent-bundle --slug=my-agent --artifact=flo
 wp datamachine agents apply act_123
 ```
 
-Use `agent` or `agents` for agent identities, access, tokens, config, import/export, and bundle lifecycle. Memory files live under the separate `memory` namespace.
+Use `agents` for agent identities, access, tokens, config, import/export, and bundle lifecycle. Memory files live under the separate `memory` namespace.
 
 ### datamachine memory
 
 Agent memory-file operations. **Since**: 0.30.0
 
-`memory` reads and writes layered markdown files and sections. It is not an alias for agent identity management; use `agent` or `agents` for CRUD, access grants, tokens, and bundles.
+`memory` reads and writes layered markdown files and sections. It is not agent identity management; use `agents` for CRUD, access grants, tokens, and bundles.
 
 ```bash
 # Read full MEMORY.md
@@ -427,14 +429,13 @@ wp datamachine drain --limit=500 --time-limit=300 --format=json
 
 **Options**: `--limit`, `--batch-size`, `--time-limit`, `--stop-before-timeout`, `--job-id`, `--format=table|json`
 
-### datamachine cycle / cycles
+### datamachine cycle
 
 Run flows that are due during an external cycle. Manual flows participate only when their scheduling config sets `cycle_policy: every_cycle`.
 
 ```bash
 # Run due flows for a named cycle, then drain Data Machine actions
 wp datamachine cycle run world-of-wordpress
-wp datamachine cycles run world-of-wordpress
 
 # Preview selected flows without starting jobs
 wp datamachine cycle run world-of-wordpress --dry-run --format=json
@@ -447,7 +448,7 @@ wp datamachine cycle run world-of-wordpress --no-drain
 
 ### datamachine pending-actions
 
-Inspect durable pending approval actions. **Alias**: `pending-action`
+Inspect durable pending approval actions.
 
 ```bash
 # List approval actions
@@ -538,9 +539,6 @@ wp --user=42 datamachine auth connect google --agent=writer
 # Revoke site-wide credentials
 wp datamachine auth revoke google --yes
 
-# Deprecated alias for site-wide revoke
-wp datamachine auth disconnect google --yes
-
 # View or save API config
 wp datamachine auth config google --show-secrets
 wp datamachine auth config reddit --client_id=xxx --client_secret=xxx
@@ -569,7 +567,7 @@ wp datamachine chat title abc-123 --force
 
 ### datamachine posts
 
-Query Data Machine posts. **Alias**: `post`
+Query Data Machine posts.
 
 ```bash
 # List all DM-managed posts
@@ -589,7 +587,7 @@ wp datamachine posts recent --limit=20
 
 ### datamachine logs
 
-Manage logs. **Alias**: `log`. **Since**: 0.15.2
+Manage logs. **Since**: 0.15.2
 
 ```bash
 # Read logs with filters
@@ -610,7 +608,7 @@ wp datamachine logs clear --agent=pipeline --before="7 days ago" --yes
 
 ### datamachine settings
 
-Manage plugin settings. **Alias**: `setting`. **Since**: 0.11.0
+Manage plugin settings. **Since**: 0.11.0
 
 ```bash
 # List all settings
@@ -628,7 +626,7 @@ wp datamachine settings set model claude-sonnet-4-20250514
 
 ### datamachine handlers
 
-Handler discovery. **Alias**: `handler`. **Since**: 0.41.0
+Handler discovery. **Since**: 0.41.0
 
 ```bash
 # List all handlers
@@ -669,7 +667,7 @@ wp datamachine taxonomy resolve "news" --taxonomy=category --create
 
 ### datamachine step-types
 
-Step type discovery. **Alias**: `step-type`. **Since**: 0.41.0
+Step type discovery. **Since**: 0.41.0
 
 ```bash
 # List all step types
@@ -684,7 +682,7 @@ wp datamachine step-types validate ai
 
 ### datamachine processed-items
 
-Processed items (deduplication). **Alias**: `processed-item`. **Since**: 0.41.0
+Processed items (deduplication). **Since**: 0.41.0
 
 ```bash
 # Audit processed-item rows by flow/handler
@@ -732,7 +730,7 @@ wp datamachine processed-items find-never-processed \
 
 ### datamachine links
 
-Internal linking. **Alias**: `link`. **Since**: 0.24.0
+Internal linking. **Since**: 0.24.0
 
 ```bash
 # AI-powered cross-linking
@@ -758,7 +756,7 @@ wp datamachine links inject-category --category=news --links-per-post=3 --orphan
 
 ### datamachine blocks
 
-Gutenberg block management. **Alias**: `block`. **Since**: 0.28.0
+Gutenberg block management. **Since**: 0.28.0
 
 These commands are storage-format aware: Data Machine converts the post type's
 canonical stored format to blocks for the edit, then writes back in the canonical
@@ -883,7 +881,7 @@ wp datamachine test rss --config='{"feed_url":"https://example.com/feed"}' --lim
 wp datamachine test --flow=42 --format=json
 
 # Alias useful when the handler is passed by flag
-wp datamachine fetch test --handler=rss --config='{"feed_url":"https://example.com/feed"}'
+wp datamachine test rss --config='{"feed_url":"https://example.com/feed"}'
 ```
 
 ### Other registered commands
@@ -900,26 +898,6 @@ Most commands support these output options:
 | `--fields=<comma-separated>` | Limit output to specific fields |
 | `--format=ids` | Output only IDs (space-separated) |
 | `--format=count` | Output only the count |
-
-## Aliases
-
-Most commands have singular and plural forms:
-
-- `wp datamachine pipeline` / `wp datamachine pipelines`
-- `wp datamachine flow` / `wp datamachine flows`
-- `wp datamachine job` / `wp datamachine jobs`
-- `wp datamachine post` / `wp datamachine posts`
-- `wp datamachine log` / `wp datamachine logs`
-- `wp datamachine link` / `wp datamachine links`
-- `wp datamachine block` / `wp datamachine blocks`
-- `wp datamachine handler` / `wp datamachine handlers`
-- `wp datamachine step-type` / `wp datamachine step-types`
-- `wp datamachine processed-item` / `wp datamachine processed-items`
-- `wp datamachine pending-action` / `wp datamachine pending-actions`
-- `wp datamachine setting` / `wp datamachine settings`
-- `wp datamachine agent` / `wp datamachine agents` (agent management)
-- `wp datamachine cycle` / `wp datamachine cycles`
-- `wp datamachine memory` (agent memory-file operations; no singular/plural agent alias)
 
 ## Examples
 

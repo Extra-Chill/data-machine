@@ -152,39 +152,6 @@ class AuthCommand extends BaseCommand {
 	}
 
 	/**
-	 * Disconnect authentication for a handler.
-	 *
-	 * Deprecated alias for `revoke` at site scope. Kept so existing scripts do
-	 * not break during the CLI verb transition.
-	 *
-	 * Clears stored account data (tokens, credentials). Does not remove
-	 * API configuration (client ID, client secret).
-	 *
-	 * ## OPTIONS
-	 *
-	 * <handler_slug>
-	 * : Handler to disconnect (e.g., twitter, facebook).
-	 *
-	 * [--yes]
-	 * : Skip confirmation prompt.
-	 *
-	 * ## EXAMPLES
-	 *
-	 *     # Deprecated: use `wp datamachine auth revoke twitter` instead.
-	 *     wp datamachine auth disconnect twitter
-	 *
-	 *     # Disconnect without confirmation
-	 *     wp datamachine auth disconnect twitter --yes
-	 *
-	 * @subcommand disconnect
-	 */
-	public function disconnect( array $args, array $assoc_args ): void {
-		WP_CLI::warning( '`disconnect` is deprecated; use `revoke` instead.' );
-		unset( $assoc_args['user'] );
-		$this->revoke( $args, $assoc_args );
-	}
-
-	/**
 	 * Revoke authentication for a handler at site or per-user scope.
 	 *
 	 * Without --user, behaves like `disconnect` — clears the shared

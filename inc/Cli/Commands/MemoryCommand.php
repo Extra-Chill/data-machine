@@ -1,18 +1,16 @@
 <?php
 /**
- * WP-CLI Agent Command
+ * WP-CLI Memory Command
  *
  * Provides CLI access to the agent Memory Library — core memory files
  * across layers (SOUL.md + MEMORY.md in agent layer, USER.md in user layer),
  * MEMORY.md section operations, and daily memory (YYYY/MM/DD.md).
  *
- * Primary command: `wp datamachine agent`.
- * Backwards-compatible alias: `wp datamachine memory`.
- *
+ * Canonical command: `wp datamachine memory`.
  * @package DataMachine\Cli\Commands
  * @since 0.30.0 Originally as AgentCommand.
  * @since 0.32.0 Renamed to MemoryCommand, registered as `wp datamachine memory`.
- * @since 0.33.0 Primary namespace changed to `wp datamachine agent`, `memory` kept as alias.
+ * @since 0.33.0 Registered under the `wp datamachine memory` namespace.
  */
 
 namespace DataMachine\Cli\Commands;

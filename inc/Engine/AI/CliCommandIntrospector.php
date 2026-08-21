@@ -376,7 +376,7 @@ class CliCommandIntrospector {
 	 * like:
 	 *
 	 *     wp datamachine memory paths|read|write|search|compose
-	 *     wp datamachine flow create|run|list
+	 *     wp datamachine flows create|run|list
 	 *
 	 * The map is supplied by the section generator (which owns the canonical
 	 * mapping from its WP-CLI bootstrap) so this helper never needs the live

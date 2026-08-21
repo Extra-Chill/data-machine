@@ -8,6 +8,7 @@
 namespace {
 
 	define( 'ABSPATH', __DIR__ . '/wordpress/' );
+	define( 'ARRAY_A', 'ARRAY_A' );
 	define( 'HOUR_IN_SECONDS', 3600 );
 	define( 'DATAMACHINE_VERSION', 'test-version' );
 
@@ -39,6 +40,7 @@ namespace {
 		public string $prefix = 'wp_';
 		public array $tables = array();
 		public array $existing_tables = array();
+		public array $schema_requirements = array();
 
 		public function set_blog_id( int $blog_id ): void {
 			$this->prefix = 1 === $blog_id ? 'wp_' : "wp_{$blog_id}_";
@@ -65,6 +67,21 @@ namespace {
 				return isset( $this->existing_tables[ $matches[1] ] ) ? array( $matches[1] ) : array();
 			}
 
+			return array();
+		}
+
+		public function get_results( $query, $format = null ): array {
+			unset( $format );
+			if ( ! is_array( $query ) ) {
+				return array();
+			}
+			$table = (string) ( $query['args'][0] ?? '' );
+			if ( false !== strpos( $query['query'], 'SHOW COLUMNS FROM' ) ) {
+				return array_map( static fn( string $column ): array => array( 'Field' => $column ), $this->schema_requirements[ $table ]['columns'] ?? array() );
+			}
+			if ( false !== strpos( $query['query'], 'SHOW INDEX FROM' ) ) {
+				return array_map( static fn( string $index ): array => array( 'Key_name' => $index ), $this->schema_requirements[ $table ]['indexes'] ?? array() );
+			}
 			return array();
 		}
 
@@ -185,6 +202,9 @@ namespace {
 		$GLOBALS['datamachine_test_blog_stack'][] = $GLOBALS['datamachine_test_blog_id'];
 		$GLOBALS['datamachine_test_blog_id']       = $blog_id;
 		$GLOBALS['wpdb']->set_blog_id( $blog_id );
+		if ( function_exists( 'datamachine_test_seed_current_schema' ) ) {
+			datamachine_test_seed_current_schema();
+		}
 		return true;
 	}
 
@@ -218,7 +238,6 @@ namespace {
 		return true;
 	}
 
-	function datamachine_migrate_legacy_email_flow_auth(): void {}
 	function datamachine_ensure_default_memory_files(): bool {
 		return true;
 	}
@@ -244,6 +263,15 @@ namespace DataMachine\Core {
 		public static function get( string $key, array $default ): array {
 			unset( $key );
 			return $GLOBALS['datamachine_test_queue_tuning'][ $GLOBALS['datamachine_test_blog_id'] ] ?? $default;
+		}
+	}
+}
+
+namespace DataMachine\Core\Database {
+	abstract class BaseRepository extends \DataMachineTestRepository {
+		public static function database_table_exists( string $table, $wpdb = null ): bool {
+			$wpdb = $wpdb ?? $GLOBALS['wpdb'];
+			return isset( $wpdb->existing_tables[ $table ] );
 		}
 	}
 }
@@ -317,6 +345,16 @@ namespace {
 	require_once $root . '/vendor/woocommerce/action-scheduler/classes/schema/ActionScheduler_LoggerSchema.php';
 	require_once $root . '/inc/Core/Bootstrap/ActivationServiceProvider.php';
 	require_once $root . '/inc/Core/ActionScheduler/GroupRegistrar.php';
+
+	function datamachine_test_seed_current_schema(): void {
+		global $wpdb;
+		$requirements = \DataMachine\Core\Bootstrap\ActivationServiceProvider::current_schema_requirements();
+		foreach ( $requirements as $table => $requirement ) {
+			$wpdb->existing_tables[ $table ]    = true;
+			$wpdb->schema_requirements[ $table ] = $requirement;
+		}
+	}
+	datamachine_test_seed_current_schema();
 
 	class DataMachineTestQueueRunner {
 		public int $dispatches = 0;

@@ -34,6 +34,9 @@ if ( ! defined( 'ABSPATH' ) ) {
  * instantiating this class directly.
  */
 class Chat extends BaseRepository implements ConversationStoreInterface {
+	private const MIGRATION_BATCH_SIZE            = 100;
+	private const MIGRATION_COLLISION_PROBE_LIMIT = 100;
+	private const MIGRATION_NUMERIC_COLUMNS       = array( 'user_id', 'agent_id' );
 
 	/**
 	 * Table name (without prefix)
@@ -106,146 +109,508 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 	}
 
 	/**
-	 * Migrate legacy per-site chat session tables into the network table.
+	 * Converge legacy per-site chat session tables into the network table.
 	 *
-	 * Chat sessions used to live in per-site tables (`<prefix>_<N>_datamachine_chat_sessions`)
-	 * because the repository defaulted to `$wpdb->prefix`. Now that the table is
-	 * network-scoped (`base_prefix`), a user's chat history must follow them across
-	 * every subsite. This one-time migration unions every legacy per-site table into
-	 * the single network table.
+	 * Source tables remain intact. Re-running recovers sessions stranded by a
+	 * failed or interrupted earlier copy. Legacy rows are normalized into the
+	 * canonical workspace/owner shape, and completion requires scoped parity.
 	 *
-	 * Idempotent and re-runnable:
-	 * - Rows are de-duped on the `session_id` primary key via `INSERT IGNORE`.
-	 * - The source site whose prefix equals the network base prefix IS the network
-	 *   table, so it is skipped.
-	 * - Single-site installs have nothing to union and return early.
-	 *
-	 * @return int Number of rows copied into the network table.
+	 * @return array{success:bool,copied:int,missing:int,error:string} Convergence result.
 	 */
-	public static function migrate_per_site_tables_to_network(): int {
+	public static function migrate_per_site_tables_to_network(): array {
 		global $wpdb;
 
-		// Single-site installs already store sessions in the (base == site) table.
+		$convergence = array(
+			'success' => true,
+			'copied'  => 0,
+			'missing' => 0,
+			'error'   => '',
+		);
+
 		if ( ! function_exists( 'is_multisite' ) || ! is_multisite() || ! function_exists( 'get_sites' ) ) {
-			return 0;
+			return $convergence;
 		}
 
-		// The network table must exist before we can union into it.
 		if ( ! self::table_exists() ) {
-			return 0;
+			$convergence['success'] = false;
+			$convergence['error']   = 'The network chat sessions table does not exist.';
+			return $convergence;
 		}
 
 		$network_table = self::get_prefixed_table_name();
-		$base_prefix   = $wpdb->base_prefix;
-		$copied        = 0;
-
-		$blog_ids = get_sites(
+		$blog_ids      = get_sites(
 			array(
-				'fields'   => 'ids',
-				'archived' => 0,
-				'deleted'  => 0,
-				'number'   => 0,
+				'fields' => 'ids',
+				'number' => 0,
 			)
 		);
+
+		$target_columns  = self::migration_table_columns( $network_table );
+		$required_target = array( 'session_id', 'workspace_type', 'workspace_id', 'user_id', 'owner_type', 'owner_key_hash', 'messages', 'metadata', 'mode' );
+		if ( array_diff( $required_target, $target_columns ) ) {
+			$convergence['success'] = false;
+			$convergence['error']   = 'The network chat sessions table lacks canonical scope columns.';
+			return $convergence;
+		}
 
 		foreach ( $blog_ids as $blog_id ) {
 			$site_prefix = $wpdb->get_blog_prefix( (int) $blog_id );
 			$site_table  = self::sanitize_table_name( $site_prefix . self::TABLE_NAME );
-
-			// Skip the network table itself (the site whose prefix == base prefix).
 			if ( $site_table === $network_table ) {
 				continue;
 			}
 
-			// Skip sites that never created a per-site sessions table.
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
 			$exists = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $site_table ) );
 			if ( $exists !== $site_table ) {
 				continue;
 			}
 
-			// Copy every legacy row into the network table. INSERT IGNORE makes this
-			// idempotent: rows whose session_id already lives in the network table are
-			// skipped, so re-running never duplicates or overwrites migrated history.
-			// Columns are listed explicitly so the copy is resilient to column-order
-			// drift between the two tables.
-			$columns     = 'session_id, workspace_type, workspace_id, user_id, owner_type, owner_key_hash, owner_label, agent_id, title, messages, metadata, provider, model, provider_response_id, mode, created_at, updated_at, last_read_at, expires_at, transcript_lock_token, transcript_lock_expires_at';
-			$column_list = self::intersect_migration_columns( $site_table, $network_table, $columns );
-			if ( '' === $column_list ) {
-				continue;
+			$source_columns = self::migration_table_columns( $site_table );
+			if ( array_diff( array( 'session_id', 'user_id', 'messages' ), $source_columns ) ) {
+				$convergence['success'] = false;
+				$convergence['error']   = sprintf( 'Chat session source table %s lacks required legacy columns.', $site_table );
+				return $convergence;
 			}
 
-			// $column_list is built solely from a fixed allowlist of column names
-			// intersected against the live table columns (see
-			// intersect_migration_columns), never from user input — so interpolating
-			// it into the column list is safe. Table names use %i placeholders.
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
-			$result = $wpdb->query(
-				$wpdb->prepare(
-					// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-					"INSERT IGNORE INTO %i ({$column_list}) SELECT {$column_list} FROM %i",
-					$network_table,
-					$site_table
-				)
-			);
+			$cursor = '';
+			do {
+				// The source table is immutable during convergence, so a source-key
+				// cursor cannot be disturbed by writes to the network target.
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+				$rows = $wpdb->get_results( $wpdb->prepare( 'SELECT * FROM %i WHERE session_id > %s ORDER BY session_id ASC LIMIT %d', $site_table, $cursor, self::MIGRATION_BATCH_SIZE ), ARRAY_A );
+				if ( ! is_array( $rows ) ) {
+					$convergence['success'] = false;
+					$convergence['error']   = sprintf( 'Failed reading chat sessions from %s: %s', $site_table, (string) $wpdb->last_error );
+					return $convergence;
+				}
+				$row_count = count( $rows );
 
-			$rows    = false !== $result ? (int) $result : 0;
-			$copied += $rows;
+				foreach ( $rows as $row ) {
+					$cursor    = (string) ( $row['session_id'] ?? '' );
+					$canonical = self::canonicalize_migration_row( $row, (int) $blog_id, $target_columns );
+					if ( null === $canonical ) {
+						$convergence['success'] = false;
+						$convergence['error']   = sprintf( 'Chat session %s in %s cannot be mapped to a canonical workspace and owner.', (string) ( $row['session_id'] ?? '' ), $site_table );
+						return $convergence;
+					}
 
-			if ( $rows > 0 ) {
-				do_action(
-					'datamachine_log',
-					'info',
-					'Migrated per-site chat sessions into network table',
-					array(
-						'blog_id'       => (int) $blog_id,
-						'source_table'  => $site_table,
-						'network_table' => $network_table,
-						'rows_copied'   => $rows,
-					)
-				);
-			}
+					$source_session_id = $canonical['session_id'];
+					$canonical         = self::converge_migration_row( $network_table, $canonical, (int) $blog_id, $source_session_id, $target_columns, $convergence['copied'] );
+					if ( null === $canonical ) {
+						$convergence['success'] = false;
+						$convergence['error']   = sprintf( 'Failed converging chat session %s from %s: %s', $source_session_id, $site_table, (string) $wpdb->last_error );
+						return $convergence;
+					}
+
+					$verified = self::migration_target_row( $network_table, $canonical['session_id'] );
+					if ( ! is_array( $verified ) || ! self::migration_rows_match( $verified, $canonical ) || ! self::migration_has_provenance( $verified, (int) $blog_id, $source_session_id ) ) {
+						++$convergence['missing'];
+					}
+				}
+			} while ( self::MIGRATION_BATCH_SIZE === $row_count );
 		}
 
-		return $copied;
+		if ( 0 === $convergence['missing'] && ! self::claim_unscoped_network_rows_for_main_site( $network_table, $target_columns, $convergence ) ) {
+			return $convergence;
+		}
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$unscoped = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i WHERE workspace_type IS NULL OR workspace_type = %s OR workspace_id IS NULL OR workspace_id = %s', $network_table, '', '' ) );
+		if ( $unscoped > 0 ) {
+			$convergence['success'] = false;
+			$convergence['missing'] = $unscoped;
+			$convergence['error']   = sprintf( '%d canonical chat sessions remain unscoped.', $unscoped );
+			return $convergence;
+		}
+
+		if ( $convergence['missing'] > 0 ) {
+			$convergence['success'] = false;
+			$convergence['error']   = sprintf( '%d per-site chat sessions are still absent from the network table.', $convergence['missing'] );
+		}
+
+		return $convergence;
 	}
 
 	/**
-	 * Build the column list shared by both the legacy and network tables.
+	 * Read a table's column names for bounded migration normalization.
 	 *
-	 * Different installs created the chat table at different schema versions, so a
-	 * legacy per-site table may be missing columns the network table has (or vice
-	 * versa). Copying only the intersection keeps the INSERT…SELECT valid on every
-	 * install without assuming a single column set.
+	 * Different installs created the chat table at different schema versions, so
+	 * migration normalization first inventories each live shape.
 	 *
-	 * @param string $source_table Legacy per-site table name (prefixed).
-	 * @param string $target_table Network table name (prefixed).
-	 * @param string $columns      Comma-separated candidate column list.
-	 * @return string Comma-separated intersection, or '' when session_id is absent.
+	 * @return string[] Column names.
 	 */
-	private static function intersect_migration_columns( string $source_table, string $target_table, string $columns ): string {
+	private static function migration_table_columns( string $table_name ): array {
 		global $wpdb;
 
-		$candidates = array_map( 'trim', explode( ',', $columns ) );
-		$shared     = array();
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$columns = $wpdb->get_results( $wpdb->prepare( 'SHOW COLUMNS FROM %i', $table_name ), ARRAY_A );
+		return array_values( array_filter( array_map( static fn( array $column ): string => (string) ( $column['Field'] ?? $column['field'] ?? '' ), is_array( $columns ) ? $columns : array() ) ) );
+	}
 
-		foreach ( $candidates as $column ) {
-			if ( '' === $column ) {
+	/**
+	 * Read one candidate target row during convergence.
+	 *
+	 * @return array<string,mixed>|null
+	 */
+	private static function migration_target_row( string $table_name, string $session_id ): ?array {
+		global $wpdb;
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$row = $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM %i WHERE session_id = %s', $table_name, $session_id ), ARRAY_A );
+		return is_array( $row ) ? $row : null;
+	}
+
+	/**
+	 * Converge one immutable source snapshot without overwriting a changed target.
+	 *
+	 * @param int $copied Updated when this call inserts a canonical row.
+	 * @return array<string,mixed>|null Persisted canonical candidate, or null on failure.
+	 */
+	private static function converge_migration_row( string $table_name, array $source, int $blog_id, string $source_session_id, array $target_columns, int &$copied ): ?array {
+		global $wpdb;
+
+		for ( $retry = 0; $retry < 3; ++$retry ) {
+			$canonical = $source;
+			$existing  = self::migration_target_row( $table_name, $source_session_id );
+			$observed  = $existing;
+
+			if ( is_array( $existing ) && self::migration_row_is_unscoped( $existing ) ) {
+				$normalized_existing = self::canonicalize_migration_row( $existing, $blog_id, $target_columns );
+				if ( is_array( $normalized_existing ) && self::migration_rows_match( $normalized_existing, $canonical ) ) {
+					$existing = $normalized_existing;
+				}
+			}
+
+			if ( is_array( $existing ) && ! self::migration_rows_match( $existing, $canonical ) ) {
+				$preferred_version = self::migration_preferred_logical_session_version( $existing, $canonical );
+				if ( 'target' === $preferred_version ) {
+					$canonical = self::canonicalize_migration_row( $existing, $blog_id, $target_columns );
+				}
+
+				if ( '' === $preferred_version ) {
+					$collision_available = false;
+					for ( $collision_attempt = 0; $collision_attempt < self::MIGRATION_COLLISION_PROBE_LIMIT; ++$collision_attempt ) {
+						$canonical['session_id'] = self::migration_collision_session_id( $canonical, $blog_id, $source_session_id, $collision_attempt );
+						$existing                = self::migration_target_row( $table_name, $canonical['session_id'] );
+						if ( ! is_array( $existing ) || self::migration_rows_match( $existing, $canonical ) ) {
+							$collision_available = true;
+							break;
+						}
+					}
+					if ( ! $collision_available ) {
+						$wpdb->last_error = sprintf( 'Exhausted %d deterministic collision IDs for chat session %s.', self::MIGRATION_COLLISION_PROBE_LIMIT, $source_session_id );
+						return null;
+					}
+					$observed = $existing;
+				}
+			}
+
+			if ( null === $existing ) {
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+				if ( false !== $wpdb->insert( $table_name, $canonical ) ) {
+					++$copied;
+					return $canonical;
+				}
+
+				// A competing insert is safe to re-evaluate; a missing row is a real SQL failure.
+				if ( null === self::migration_target_row( $table_name, (string) $canonical['session_id'] ) ) {
+					return null;
+				}
 				continue;
 			}
 
-			if ( self::column_exists( $source_table, $column, $wpdb ) && self::column_exists( $target_table, $column, $wpdb ) ) {
-				$shared[] = $column;
+			$updated = self::update_migration_target( $table_name, $canonical, $observed );
+			if ( false === $updated ) {
+				return null;
+			}
+
+			$persisted = self::migration_target_row( $table_name, (string) $canonical['session_id'] );
+			if ( is_array( $persisted ) && self::migration_rows_match( $persisted, $canonical ) && self::migration_has_provenance( $persisted, $blog_id, $source_session_id ) ) {
+				return $canonical;
 			}
 		}
 
-		// session_id is the primary key and the de-dupe anchor — without it the
-		// migration is meaningless, so bail rather than copy an unkeyed subset.
-		if ( ! in_array( 'session_id', $shared, true ) ) {
+		return null;
+	}
+
+	/** Update a target only when its complete observed version remains unchanged. */
+	private static function update_migration_target( string $table_name, array $canonical, array $observed ) {
+		global $wpdb;
+
+		$set        = array();
+		$predicates = array();
+		$arguments  = array( $table_name );
+		foreach ( $canonical as $column => $value ) {
+			if ( null === $value ) {
+				$set[]       = '%i = NULL';
+				$arguments[] = $column;
+			} elseif ( in_array( $column, self::MIGRATION_NUMERIC_COLUMNS, true ) ) {
+				$set[]       = '%i = %d';
+				$arguments[] = $column;
+				$arguments[] = (int) $value;
+			} else {
+				$set[]       = '%i = %s';
+				$arguments[] = $column;
+				$arguments[] = (string) $value;
+			}
+		}
+
+		foreach ( $observed as $column => $value ) {
+			if ( null === $value ) {
+				$predicates[] = '%i IS NULL';
+				$arguments[]  = $column;
+			} elseif ( in_array( $column, self::MIGRATION_NUMERIC_COLUMNS, true ) ) {
+				$predicates[] = '%i = %d';
+				$arguments[]  = $column;
+				$arguments[]  = (int) $value;
+			} else {
+				$predicates[] = 'BINARY %i = BINARY %s';
+				$arguments[]  = $column;
+				$arguments[]  = (string) $value;
+			}
+		}
+
+		$sql = 'UPDATE %i SET ' . implode( ', ', $set ) . ' WHERE ' . implode( ' AND ', $predicates );
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
+		return $wpdb->query( $wpdb->prepare( $sql, ...$arguments ) );
+	}
+
+	private static function migration_row_is_unscoped( array $row ): bool {
+		return '' === trim( (string) ( $row['workspace_type'] ?? '' ) ) || '' === trim( (string) ( $row['workspace_id'] ?? '' ) );
+	}
+
+	private static function migration_has_provenance( array $row, int $blog_id, string $session_id ): bool {
+		$metadata = json_decode( (string) ( $row['metadata'] ?? '' ), true );
+		$source   = is_array( $metadata ) && is_array( $metadata['migration_source'] ?? null ) ? $metadata['migration_source'] : array();
+		return (int) ( $source['blog_id'] ?? 0 ) === $blog_id && (string) ( $source['session_id'] ?? '' ) === $session_id;
+	}
+
+	/** Compare persisted payload while treating migration provenance as enrichment. */
+	private static function migration_rows_match( array $stored, array $canonical ): bool {
+		foreach ( $canonical as $column => $value ) {
+			$stored_value = $stored[ $column ] ?? null;
+			if ( in_array( $column, array( 'messages', 'metadata' ), true ) ) {
+				$stored_json    = json_decode( (string) $stored_value, true );
+				$canonical_json = json_decode( (string) $value, true );
+				if ( is_array( $stored_json ) && is_array( $canonical_json ) ) {
+					if ( 'metadata' === $column ) {
+						unset( $stored_json['migration_source'], $canonical_json['migration_source'] );
+					}
+					if ( $stored_json !== $canonical_json ) {
+						return false;
+					}
+					continue;
+				}
+			}
+
+			if ( (string) $stored_value !== (string) $value ) {
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+	/**
+	 * Select a newer snapshot only when both rows prove the same logical session.
+	 *
+	 * @return string "source", "target", or an empty string when precedence is unknown.
+	 */
+	private static function migration_preferred_logical_session_version( array $target, array $source ): string {
+		foreach ( array( 'session_id', 'workspace_type', 'workspace_id', 'owner_type', 'owner_key_hash' ) as $identity_column ) {
+			if ( (string) ( $target[ $identity_column ] ?? '' ) !== (string) ( $source[ $identity_column ] ?? '' ) ) {
+				return '';
+			}
+		}
+
+		$target_created = self::migration_reliable_timestamp( $target['created_at'] ?? null );
+		$source_created = self::migration_reliable_timestamp( $source['created_at'] ?? null );
+		if ( null === $target_created || $target_created !== $source_created ) {
 			return '';
 		}
 
-		return implode( ', ', $shared );
+		$target_updated = self::migration_reliable_timestamp( $target['updated_at'] ?? null );
+		$source_updated = self::migration_reliable_timestamp( $source['updated_at'] ?? null );
+		if ( null === $target_updated || null === $source_updated || $target_updated === $source_updated ) {
+			return '';
+		}
+
+		return $target_updated > $source_updated ? 'target' : 'source';
+	}
+
+	/** Return a normalized database timestamp only when its value is trustworthy. */
+	private static function migration_reliable_timestamp( $value ): ?string {
+		$value = trim( (string) $value );
+		if ( 1 !== preg_match( '/^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/', $value, $parts ) ) {
+			return null;
+		}
+
+		if ( ! checkdate( (int) $parts[2], (int) $parts[3], (int) $parts[1] ) || (int) $parts[4] > 23 || (int) $parts[5] > 59 || (int) $parts[6] > 59 ) {
+			return null;
+		}
+
+		return $value;
+	}
+
+	/** Build a stable, VARCHAR(50)-safe ID for a conflicting legacy session. */
+	private static function migration_collision_session_id( array $canonical, int $blog_id, string $source_session_id, int $attempt = 0 ): string {
+		$payload = $canonical;
+		unset( $payload['session_id'] );
+
+		return 'dm-' . substr( hash( 'sha256', $blog_id . "\n" . $source_session_id . "\n" . $attempt . "\n" . wp_json_encode( $payload ) ), 0, 47 );
+	}
+
+	/** Assign rows left unclaimed by non-main sources to the main-site workspace. */
+	private static function claim_unscoped_network_rows_for_main_site( string $network_table, array $target_columns, array &$convergence ): bool {
+		global $wpdb;
+
+		$main_blog_id = function_exists( 'get_main_site_id' ) ? (int) get_main_site_id() : 1;
+		$cursor       = '';
+		do {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			$rows = $wpdb->get_results( $wpdb->prepare( 'SELECT * FROM %i WHERE session_id > %s AND (workspace_type IS NULL OR workspace_type = %s OR workspace_id IS NULL OR workspace_id = %s) ORDER BY session_id ASC LIMIT %d', $network_table, $cursor, '', '', self::MIGRATION_BATCH_SIZE ), ARRAY_A );
+			if ( ! is_array( $rows ) ) {
+				$convergence['success'] = false;
+				$convergence['error']   = sprintf( 'Failed reading unscoped network chat sessions: %s', (string) $wpdb->last_error );
+				return false;
+			}
+
+			foreach ( $rows as $row ) {
+				$cursor  = (string) ( $row['session_id'] ?? '' );
+				$claimed = false;
+				for ( $retry = 0; $retry < 3; ++$retry ) {
+					$observed = self::migration_target_row( $network_table, $cursor );
+					if ( ! is_array( $observed ) || ! self::migration_row_is_unscoped( $observed ) ) {
+						$claimed = is_array( $observed );
+						break;
+					}
+
+					$canonical = self::canonicalize_migration_row( $observed, $main_blog_id, $target_columns );
+					if ( null === $canonical ) {
+						break;
+					}
+
+					$updated   = self::update_migration_target( $network_table, $canonical, $observed );
+					$persisted = self::migration_target_row( $network_table, $cursor );
+					if ( false === $updated ) {
+						break;
+					}
+					if ( is_array( $persisted ) && ! self::migration_row_is_unscoped( $persisted ) ) {
+						$claimed = true;
+						break;
+					}
+				}
+
+				if ( ! $claimed ) {
+					$convergence['success'] = false;
+					$convergence['error']   = sprintf( 'Failed assigning network chat session %s to the main workspace: %s', $cursor, (string) $wpdb->last_error );
+					return false;
+				}
+			}
+			$row_count = count( $rows );
+		} while ( self::MIGRATION_BATCH_SIZE === $row_count );
+
+		return true;
+	}
+
+	/**
+	 * Convert one legacy site row into the canonical network-table shape.
+	 *
+	 * @param array    $row            Legacy row.
+	 * @param int      $blog_id        Source site ID.
+	 * @param string[] $target_columns Canonical table columns.
+	 * @return array|null Canonical insert row, or null when scope cannot be proven.
+	 */
+	private static function canonicalize_migration_row( array $row, int $blog_id, array $target_columns ): ?array {
+		$session_id = trim( (string) ( $row['session_id'] ?? '' ) );
+		if ( '' === $session_id || ! array_key_exists( 'user_id', $row ) || ! array_key_exists( 'messages', $row ) ) {
+			return null;
+		}
+
+		$metadata       = json_decode( (string) ( $row['metadata'] ?? '' ), true );
+		$metadata       = is_array( $metadata ) ? $metadata : array();
+		$meta_workspace = is_array( $metadata['workspace'] ?? null ) ? $metadata['workspace'] : array();
+		$workspace_type = trim( (string) ( $row['workspace_type'] ?? '' ) );
+		if ( '' === $workspace_type ) {
+			$workspace_type = trim( (string) ( $meta_workspace['workspace_type'] ?? '' ) );
+		}
+		if ( '' === $workspace_type ) {
+			$workspace_type = trim( (string) ( $metadata['workspace_type'] ?? '' ) );
+		}
+
+		$workspace_id = trim( (string) ( $row['workspace_id'] ?? '' ) );
+		if ( '' === $workspace_id ) {
+			$workspace_id = trim( (string) ( $meta_workspace['workspace_id'] ?? '' ) );
+		}
+		if ( '' === $workspace_id ) {
+			$workspace_id = trim( (string) ( $metadata['workspace_id'] ?? '' ) );
+		}
+		if ( '' === $workspace_type || '' === $workspace_id ) {
+			$workspace_type = 'site';
+			$workspace_id   = function_exists( 'get_home_url' ) ? untrailingslashit( (string) get_home_url( $blog_id, '/' ) ) : '';
+		}
+		if ( '' === $workspace_type || '' === $workspace_id ) {
+			return null;
+		}
+
+		$user_id     = absint( $row['user_id'] );
+		$owner_type  = sanitize_key( (string) ( $row['owner_type'] ?? '' ) );
+		$owner_hash  = strtolower( (string) ( $row['owner_key_hash'] ?? '' ) );
+		$owner_label = sanitize_text_field( (string) ( $row['owner_label'] ?? '' ) );
+		$meta_owner  = is_array( $metadata['transcript_owner'] ?? null ) ? $metadata['transcript_owner'] : array();
+		if ( '' === $owner_type || 1 !== preg_match( '/^[a-f0-9]{64}$/', $owner_hash ) ) {
+			$owner_type = sanitize_key( (string) ( $meta_owner['owner_type'] ?? '' ) );
+			$owner_hash = strtolower( (string) ( $meta_owner['owner_key_hash'] ?? '' ) );
+			if ( 1 !== preg_match( '/^[a-f0-9]{64}$/', $owner_hash ) && ! empty( $meta_owner['owner_key'] ) ) {
+				$owner_hash = ChatTranscriptOwner::hash_owner_key( (string) $meta_owner['owner_key'] );
+			}
+			$owner_label = sanitize_text_field( (string) ( $meta_owner['owner_label'] ?? '' ) );
+		}
+		if ( '' === $owner_type || 1 !== preg_match( '/^[a-f0-9]{64}$/', $owner_hash ) ) {
+			$owner       = ChatTranscriptOwner::user_owner( $user_id );
+			$owner_type  = $owner['owner_type'];
+			$owner_hash  = $owner['owner_key_hash'];
+			$owner_label = $owner['owner_label'];
+		}
+
+		$metadata['workspace']        = array(
+			'workspace_type' => $workspace_type,
+			'workspace_id'   => $workspace_id,
+		);
+		$metadata['workspace_type']   = $workspace_type;
+		$metadata['workspace_id']     = $workspace_id;
+		$metadata['transcript_owner'] = array(
+			'owner_type'     => $owner_type,
+			'owner_key_hash' => $owner_hash,
+			'owner_label'    => $owner_label,
+		);
+		$metadata['migration_source'] = array(
+			'blog_id'    => $blog_id,
+			'session_id' => $session_id,
+		);
+
+		$mode      = trim( (string) ( $row['mode'] ?? $row['context'] ?? 'chat' ) );
+		$canonical = array(
+			'session_id'     => $session_id,
+			'workspace_type' => $workspace_type,
+			'workspace_id'   => $workspace_id,
+			'user_id'        => $user_id,
+			'owner_type'     => $owner_type,
+			'owner_key_hash' => $owner_hash,
+			'owner_label'    => $owner_label,
+			'messages'       => (string) $row['messages'],
+			'metadata'       => wp_json_encode( $metadata ),
+			'mode'           => '' !== $mode ? $mode : 'chat',
+		);
+
+		foreach ( array( 'agent_id', 'title', 'provider', 'model', 'provider_response_id', 'created_at', 'updated_at', 'last_read_at', 'expires_at', 'transcript_lock_token', 'transcript_lock_expires_at' ) as $column ) {
+			if ( in_array( $column, $target_columns, true ) && array_key_exists( $column, $row ) ) {
+				$canonical[ $column ] = $row[ $column ];
+			}
+		}
+
+		return array_intersect_key( $canonical, array_flip( $target_columns ) );
 	}
 
 	/**
@@ -327,6 +692,12 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 		if ( ! self::column_exists( $table_name, 'workspace_id', $wpdb ) ) {
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
 			$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i ADD COLUMN workspace_id VARCHAR(191) NULL', $table_name ) );
+		}
+
+		// Multisite rows can only be scoped after legacy per-site sources have had
+		// the opportunity to claim old INSERT IGNORE copies in the network table.
+		if ( function_exists( 'is_multisite' ) && is_multisite() ) {
+			return;
 		}
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
@@ -929,6 +1300,41 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 		return $session;
 	}
 
+	/** Read one ability-facing session within both workspace and transcript-owner scope. */
+	public function get_session_for_transcript_owner( WP_Agent_Workspace_Scope $workspace, int $user_id, array $owner, string $session_id ): ?array {
+		$session = $this->get_session( $session_id );
+		if ( ! is_array( $session )
+			|| (string) ( $session['workspace_type'] ?? '' ) !== $workspace->workspace_type
+			|| (string) ( $session['workspace_id'] ?? '' ) !== $workspace->workspace_id
+			|| (int) ( $session['user_id'] ?? 0 ) !== $user_id
+			|| ! self::session_matches_owner( $session, $owner ) ) {
+			return null;
+		}
+
+		return $session;
+	}
+
+	/** Delete one ability-facing session within workspace and transcript-owner scope. */
+	public function delete_session_for_transcript_owner( WP_Agent_Workspace_Scope $workspace, int $user_id, array $owner, string $session_id ): bool {
+		global $wpdb;
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$result = $wpdb->delete(
+			self::get_prefixed_table_name(),
+			array(
+				'session_id'     => $session_id,
+				'workspace_type' => $workspace->workspace_type,
+				'workspace_id'   => $workspace->workspace_id,
+				'user_id'        => $user_id,
+				'owner_type'     => sanitize_key( (string) ( $owner['owner_type'] ?? '' ) ),
+				'owner_key_hash' => (string) ( $owner['owner_key_hash'] ?? '' ),
+			),
+			array( '%s', '%s', '%s', '%d', '%s', '%s' )
+		);
+
+		return 1 === (int) $result;
+	}
+
 	/**
 	 * Resolve the generic transcript agent slug from a stored session row.
 	 *
@@ -1215,13 +1621,20 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 		int $offset = 0,
 		?string $mode = null,
 		?int $agent_id = null,
-		?array $transcript_owner = null
+		?array $transcript_owner = null,
+		?WP_Agent_Workspace_Scope $workspace = null
 	): array {
 		global $wpdb;
 
 		$table_name = self::get_prefixed_table_name();
 		$where      = array( 'user_id = %d' );
 		$params     = array( $table_name, $user_id );
+		if ( null !== $workspace ) {
+			$where[]  = 'workspace_type = %s';
+			$where[]  = 'workspace_id = %s';
+			$params[] = $workspace->workspace_type;
+			$params[] = $workspace->workspace_id;
+		}
 
 		if ( null !== $mode && '' !== $mode ) {
 			$where[]  = 'mode = %s';
@@ -1280,21 +1693,36 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 			$agent_row        = $session_agent_id > 0 ? ( $agents_by_id[ $session_agent_id ] ?? null ) : null;
 
 			$result[] = array(
-				'session_id'    => $session['session_id'],
-				'title'         => $session['title'] ?? null,
-				'mode'          => $session['mode'] ?? 'chat',
-				'first_message' => mb_substr( $first_message, 0, 100 ),
-				'message_count' => count( $messages ),
-				'unread_count'  => $this->count_unread( $messages, $last_read_at ),
-				'agent_id'      => $session_agent_id > 0 ? $session_agent_id : null,
-				'agent_slug'    => $agent_row ? (string) $agent_row['agent_slug'] : null,
-				'agent_name'    => $agent_row ? (string) $agent_row['agent_name'] : null,
-				'created_at'    => DateFormatter::format_for_api( $session['created_at'] ?? null ),
-				'updated_at'    => DateFormatter::format_for_api( $session['updated_at'] ?? $session['created_at'] ?? null ),
+				'session_id'     => $session['session_id'],
+				'workspace_type' => (string) ( $session['workspace_type'] ?? '' ),
+				'workspace_id'   => (string) ( $session['workspace_id'] ?? '' ),
+				'title'          => $session['title'] ?? null,
+				'mode'           => $session['mode'] ?? 'chat',
+				'first_message'  => mb_substr( $first_message, 0, 100 ),
+				'message_count'  => count( $messages ),
+				'unread_count'   => $this->count_unread( $messages, $last_read_at ),
+				'agent_id'       => $session_agent_id > 0 ? $session_agent_id : null,
+				'agent_slug'     => $agent_row ? (string) $agent_row['agent_slug'] : null,
+				'agent_name'     => $agent_row ? (string) $agent_row['agent_name'] : null,
+				'created_at'     => DateFormatter::format_for_api( $session['created_at'] ?? null ),
+				'updated_at'     => DateFormatter::format_for_api( $session['updated_at'] ?? $session['created_at'] ?? null ),
 			);
 		}
 
 		return $result;
+	}
+
+	/** List ability-facing session summaries within workspace and owner scope. */
+	public function get_user_sessions_for_workspace(
+		WP_Agent_Workspace_Scope $workspace,
+		int $user_id,
+		int $limit = 20,
+		int $offset = 0,
+		?string $mode = null,
+		?int $agent_id = null,
+		?array $transcript_owner = null
+	): array {
+		return $this->get_user_sessions( $user_id, $limit, $offset, $mode, $agent_id, $transcript_owner, $workspace );
 	}
 
 	/**
@@ -1335,6 +1763,33 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 		$count = $wpdb->get_var( $wpdb->prepare( $sql, ...$params ) );
 
 		return (int) $count;
+	}
+
+	/** Count ability-facing sessions within workspace and owner scope. */
+	public function get_user_session_count_for_workspace(
+		WP_Agent_Workspace_Scope $workspace,
+		int $user_id,
+		?string $mode = null,
+		?int $agent_id = null,
+		?array $transcript_owner = null
+	): int {
+		global $wpdb;
+
+		$table_name = self::get_prefixed_table_name();
+		$where      = array( 'workspace_type = %s', 'workspace_id = %s', 'user_id = %d' );
+		$params     = array( $table_name, $workspace->workspace_type, $workspace->workspace_id, $user_id );
+		if ( null !== $mode && '' !== $mode ) {
+			$where[]  = 'mode = %s';
+			$params[] = $mode;
+		}
+		if ( null !== $agent_id ) {
+			$where[]  = 'agent_id = %d';
+			$params[] = $agent_id;
+		}
+		self::append_owner_where( $where, $params, $transcript_owner );
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
+		return (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i WHERE ' . implode( ' AND ', $where ), ...$params ) );
 	}
 
 	/**
@@ -1627,6 +2082,54 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 				)
 			);
 			return false;
+		}
+
+		return $last_read_at;
+	}
+
+	/** Mark an ability-facing session read within workspace and owner scope. */
+	public function mark_session_read_for_workspace( WP_Agent_Workspace_Scope $workspace, string $session_id, int $user_id, array $transcript_owner ) {
+		global $wpdb;
+
+		$last_read_at = (string) current_time( 'mysql', true );
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$result = $wpdb->update(
+			self::get_prefixed_table_name(),
+			array( 'last_read_at' => $last_read_at ),
+			array(
+				'session_id'     => $session_id,
+				'workspace_type' => $workspace->workspace_type,
+				'workspace_id'   => $workspace->workspace_id,
+				'user_id'        => $user_id,
+				'owner_type'     => sanitize_key( (string) ( $transcript_owner['owner_type'] ?? '' ) ),
+				'owner_key_hash' => (string) ( $transcript_owner['owner_key_hash'] ?? '' ),
+			),
+			array( '%s' ),
+			array( '%s', '%s', '%s', '%d', '%s', '%s' )
+		);
+
+		if ( false === $result ) {
+			return false;
+		}
+		if ( 0 === (int) $result ) {
+			// A repeated mark in the same database-second is an idempotent success,
+			// but only after re-verifying the complete ability-facing scope.
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			$owned_session = $wpdb->get_var(
+				$wpdb->prepare(
+					'SELECT session_id FROM %i WHERE session_id = %s AND workspace_type = %s AND workspace_id = %s AND user_id = %d AND owner_type = %s AND owner_key_hash = %s',
+					self::get_prefixed_table_name(),
+					$session_id,
+					$workspace->workspace_type,
+					$workspace->workspace_id,
+					$user_id,
+					sanitize_key( (string) ( $transcript_owner['owner_type'] ?? '' ) ),
+					(string) ( $transcript_owner['owner_key_hash'] ?? '' )
+				)
+			);
+			if ( $session_id !== $owned_session ) {
+				return false;
+			}
 		}
 
 		return $last_read_at;

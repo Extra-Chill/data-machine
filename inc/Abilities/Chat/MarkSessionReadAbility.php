@@ -11,6 +11,7 @@
 namespace DataMachine\Abilities\Chat;
 
 use DataMachine\Core\Admin\DateFormatter;
+use DataMachine\Core\Workspace\WordPressWorkspaceScope;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -102,7 +103,7 @@ class MarkSessionReadAbility {
 			return $session;
 		}
 
-		$last_read_at = $this->chat_db->mark_session_read( $session_id, $user_id, $owner );
+		$last_read_at = $this->chat_db->mark_session_read_for_workspace( WordPressWorkspaceScope::current(), $session_id, $user_id, $owner );
 
 		if ( false === $last_read_at ) {
 			return new \WP_Error( 'chat_session_mark_read_failed', __( 'Failed to mark session as read.', 'data-machine' ), array( 'status' => 500 ) );

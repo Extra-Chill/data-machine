@@ -79,7 +79,7 @@ namespace {
 	);
 
 	$auth = new EmailAuth();
-	$auth->save_config( $credentials( 'legacy@example.test' ) );
+	$auth->save_config( $credentials( 'site@example.test' ) );
 	$auth->save_named_account( 'personal', $credentials( 'personal@example.test' ), BaseAuthProvider::AUTH_SCOPE_USER, 42 );
 	$auth->save_named_account( 'events', $credentials( 'events@example.test' ), BaseAuthProvider::AUTH_SCOPE_AGENT, 707 );
 	$auth->save_named_account( 'archive', $credentials( 'archive@example.test' ), BaseAuthProvider::AUTH_SCOPE_USER, 42 );
@@ -94,16 +94,14 @@ namespace {
 	$assert( is_wp_error( $auth->resolve_mailbox_for_principal( 'personal', 'send', array( 'agent_id' => 303 ) ) ), 'undelegated send is denied' );
 	$assert( is_wp_error( $auth->resolve_mailbox_for_principal( 'personal', 'delete', array( 'agent_id' => 303 ) ) ), 'undelegated delete is denied' );
 	$assert( is_wp_error( $auth->resolve_mailbox_for_principal( 'personal', 'read', array( 'agent_id' => 404 ) ) ), 'undelegated agent is denied' );
-	$assert( is_wp_error( $auth->resolve_mailbox_for_principal( 'default', 'read', array( 'agent_id' => 404 ) ) ), 'agent denial never falls back to legacy default' );
-	$legacy_marker = EmailAuth::legacy_default_marker( 91, 'step-email', 303 );
-	$assert( ! is_wp_error( $auth->resolve_mailbox_for_principal( 'default', 'read', array( 'agent_id' => 303, 'flow_id' => 91, 'flow_step_id' => 'step-email', 'legacy_default_auth' => $legacy_marker ) ) ), 'migrated legacy agent flow retains default mailbox access' );
-	$assert( is_wp_error( $auth->resolve_mailbox_for_principal( 'default', 'read', array( 'agent_id' => 303, 'flow_id' => 92, 'flow_step_id' => 'step-email', 'legacy_default_auth' => $legacy_marker ) ) ), 'legacy marker cannot be copied to a newly created flow' );
-	$assert( ! is_wp_error( $auth->resolve_mailbox( 'default', 'read' ) ), 'legacy default remains compatible for administrators' );
+	$assert( is_wp_error( $auth->resolve_mailbox_for_principal( 'default', 'read', array( 'agent_id' => 404 ) ) ), 'agent denial never falls back to the site default' );
+	$assert( is_wp_error( $auth->resolve_mailbox_for_principal( 'default', 'read', array( 'agent_id' => 303 ) ) ), 'agent flows require an explicit named mailbox grant' );
+	$assert( ! is_wp_error( $auth->resolve_mailbox( 'default', 'read' ) ), 'site default remains available to administrators' );
 	PermissionHelper::$user_id = 2;
-	$assert( is_wp_error( $auth->resolve_mailbox( 'default', 'read' ) ), 'lower-privilege user cannot resolve legacy default' );
+	$assert( is_wp_error( $auth->resolve_mailbox( 'default', 'read' ) ), 'lower-privilege user cannot resolve the site default' );
 	PermissionHelper::$user_id = 0;
-	$assert( is_wp_error( $auth->resolve_mailbox( 'default', 'read' ) ), 'principal-less pre-auth context cannot resolve legacy default' );
-	$assert( is_wp_error( $auth->resolve_mailbox_for_principal( 'default', 'read', array( 'agent_id' => 303, 'principal_less_system' => true ) ) ), 'new agent flow omission cannot opt into legacy default' );
+	$assert( is_wp_error( $auth->resolve_mailbox( 'default', 'read' ) ), 'principal-less pre-auth context cannot resolve the site default' );
+	$assert( is_wp_error( $auth->resolve_mailbox_for_principal( 'default', 'read', array( 'agent_id' => 303, 'principal_less_system' => true ) ) ), 'agent flow omission cannot opt into the site default' );
 	PermissionHelper::$user_id = 1;
 	$assert( $auth->grant_agent( 'archive', BaseAuthProvider::AUTH_SCOPE_USER, 42, 303, array( 'read' ) ), 'mixed-case revoke fixture is delegated' );
 	$assert( $auth->revoke_agent( '  ArChIvE  ', BaseAuthProvider::AUTH_SCOPE_USER, 42, 303 ), 'revoke normalizes mailbox name identically to grant' );

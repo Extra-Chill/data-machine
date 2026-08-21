@@ -33,7 +33,7 @@ Core should expose behavior through abilities, hooks, REST, CLI, handlers, and b
 - **Pipeline Execution Axes**: Queue, fan-out, per-step iteration, and scheduled runs as separate dimensions ([architecture/pipeline-execution-axes.md](architecture/pipeline-execution-axes.md)).
 - **Troubleshooting Problem Flows**: Automated monitoring of consecutive failures/no-items and how to resolve them ([core-system/troubleshooting-problem-flows.md](core-system/troubleshooting-problem-flows.md)).
 - **Abilities API**: Current `datamachine/*` domain inventory, permission model, and registration contract ([core-system/abilities-api.md](core-system/abilities-api.md)).
-- **WP-CLI**: Current command surface including cycle, drain, worker, pending actions, retention, bundles, and aliases ([core-system/wp-cli.md](core-system/wp-cli.md)).
+- **WP-CLI**: Current command surface including cycle, drain, worker, pending actions, retention, and bundles ([core-system/wp-cli.md](core-system/wp-cli.md)).
 
 ### Architecture Deep Dives
 - **AI Runtime Boundary**: Current Data Machine adapter ownership around Agents API and wp-ai-client ([../inc/Engine/AI/README.md](../inc/Engine/AI/README.md)).
@@ -112,7 +112,7 @@ docs/
 │   ├── http-client.md                 # Centralized HTTP client architecture
 │   ├── import-export.md               # Pipeline import/export functionality
 │   ├── memory-policy.md               # Memory section policy and pending writes
-│   ├── wp-cli.md                      # Command reference and aliases
+│   ├── wp-cli.md                      # Command reference
 │   └── [other core system docs...]
 ├── handlers/                          # Fetch, publish, and update handler specifics
 ├── ai-tools/                          # AI agent tools, workflows, and tool usage
@@ -135,7 +135,7 @@ docs/
 
 Use these source files as authoritative anchors when docs and code disagree:
 
-- `inc/Cli/Bootstrap.php` registers the WP-CLI command tree and aliases.
+- `inc/Cli/Bootstrap.php` registers the canonical WP-CLI command tree.
 - `inc/Api/` registers the Data Machine REST product API.
 - `inc/Engine/AI/conversation-loop.php` shows the Data Machine turn runner and Agents API loop boundary.
 - `inc/Engine/AI/Tools/` contains tool sources, execution, and policy resolution.

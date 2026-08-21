@@ -388,6 +388,56 @@ rebase_assert_equals( 'multi: rss feed from remote (local unchanged)', 'https://
 rebase_assert( 'multi: no ambiguous fields', empty( $multi_result['ambiguous'] ) );
 
 // ---------------------------------------------------------------------------
+// [5b] Installed singular overlays normalize against canonical remote shape.
+// ---------------------------------------------------------------------------
+echo "\n[5b] Installed singular handler_config overlay remains rebase-safe\n";
+$singular_to_canonical = AgentBundleArtifactRebase::rebase(
+	array(
+		'artifact_type' => 'flow',
+		'artifact_id'   => 'installed-singular',
+		'base'          => array( 'flow_config' => array( 'fetch' => array( 'handler_slugs' => array( 'rss' ), 'handler_config' => array( 'max_items' => 20, 'source' => 'base' ) ) ) ),
+		'local'         => array( 'flow_config' => array( 'fetch' => array( 'handler_slugs' => array( 'rss' ), 'handler_config' => array( 'max_items' => 2, 'source' => 'local' ) ) ) ),
+		'remote'        => array( 'flow_config' => array( 'fetch' => array( 'handler_slugs' => array( 'rss' ), 'handler_configs' => array( 'rss' => array( 'max_items' => 50, 'source' => 'remote' ) ) ) ) ),
+	),
+	AgentBundleArtifactRebase::POLICY_BURN_IN_SAFE
+);
+$singular_config = $singular_to_canonical['merged']['flow_config']['fetch']['handler_configs']['rss'] ?? array();
+rebase_assert_equals( 'singular installed artifact preserves local max_items', 2, $singular_config['max_items'] ?? null );
+rebase_assert( 'singular local output is canonical plural shape', ! isset( $singular_to_canonical['merged']['flow_config']['fetch']['handler_config'] ) );
+rebase_assert( 'singular-to-canonical max_items divergence remains ambiguous', in_array( 'flow_config.fetch.handler_configs.rss.max_items', $singular_to_canonical['ambiguous'], true ) );
+rebase_assert( 'singular-to-canonical source divergence remains ambiguous', in_array( 'flow_config.fetch.handler_configs.rss.source', $singular_to_canonical['ambiguous'], true ) );
+rebase_assert( 'singular installed artifact requires approval on overlap', true === $singular_to_canonical['requires_approval'] );
+
+$canonical_to_singular = AgentBundleArtifactRebase::rebase(
+	array(
+		'artifact_type' => 'flow',
+		'artifact_id'   => 'remote-singular',
+		'base'          => array( 'flow_config' => array( 'fetch' => array( 'handler_configs' => array( 'rss' => array( 'max_items' => 20, 'source' => 'base' ) ) ) ) ),
+		'local'         => array( 'flow_config' => array( 'fetch' => array( 'handler_configs' => array( 'rss' => array( 'max_items' => 3, 'source' => 'local' ) ) ) ) ),
+		'remote'        => array( 'flow_config' => array( 'fetch' => array( 'handler_slug' => 'rss', 'handler_config' => array( 'max_items' => 40, 'source' => 'remote' ) ) ) ),
+	),
+	AgentBundleArtifactRebase::POLICY_BURN_IN_SAFE
+);
+$remote_singular_config = $canonical_to_singular['merged']['flow_config']['fetch']['handler_configs']['rss'] ?? array();
+rebase_assert_equals( 'canonical local throttle survives singular remote shape', 3, $remote_singular_config['max_items'] ?? null );
+rebase_assert( 'canonical-to-singular output remains canonical', ! isset( $canonical_to_singular['merged']['flow_config']['fetch']['handler_config'] ) );
+rebase_assert( 'canonical-to-singular overlap requires approval', true === $canonical_to_singular['requires_approval'] );
+
+$slugless_singular = AgentBundleArtifactRebase::rebase(
+	array(
+		'artifact_type' => 'flow',
+		'artifact_id'   => 'slugless-singular',
+		'base'          => array( 'flow_config' => array( 'fetch' => array( 'handler_config' => array( 'source' => 'base' ) ) ) ),
+		'local'         => array( 'flow_config' => array( 'fetch' => array( 'handler_config' => array( 'source' => 'local' ) ) ) ),
+		'remote'        => array( 'flow_config' => array( 'fetch' => array( 'handler_config' => array( 'source' => 'remote' ) ) ) ),
+	),
+	AgentBundleArtifactRebase::POLICY_BURN_IN_SAFE
+);
+rebase_assert_equals( 'slugless singular config preserves local persisted value', 'local', $slugless_singular['merged']['flow_config']['fetch']['handler_config']['source'] ?? null );
+rebase_assert( 'slugless singular config is approval-required', true === $slugless_singular['requires_approval'] );
+rebase_assert( 'slugless singular ambiguity identifies unrepresentable path', in_array( 'flow_config.fetch.handler_config', $slugless_singular['ambiguous'], true ) );
+
+// ---------------------------------------------------------------------------
 // [6] Hashes are recomputed for the merged payload.
 // ---------------------------------------------------------------------------
 echo "\n[6] Rebase output carries reproducible hashes\n";

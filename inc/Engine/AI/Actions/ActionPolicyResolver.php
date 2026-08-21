@@ -48,16 +48,6 @@ class ActionPolicyResolver {
 	public const MODE_CHAT     = 'chat';
 	public const MODE_SYSTEM   = 'system';
 
-	/**
-	 * Valid policy values. Returned by resolveForTool().
-	 *
-	 * Keep the legacy Data Machine constant names as public aliases while the
-	 * generic vocabulary lives in Agents API.
-	 */
-	public const POLICY_DIRECT    = WP_Agent_Action_Policy::DIRECT;
-	public const POLICY_PREVIEW   = WP_Agent_Action_Policy::PREVIEW;
-	public const POLICY_FORBIDDEN = WP_Agent_Action_Policy::FORBIDDEN;
-
 	private \WP_Agent_Action_Policy_Resolver $resolver;
 
 	/**
@@ -87,8 +77,8 @@ class ActionPolicyResolver {
 	 */
 	public function resolveForTool( array $context ): string {
 		$context['input'] = is_array( $context['input'] ?? null ) ? $context['input'] : array();
-		$context = $this->withAgentConfig( $context );
-		$policy  = $this->resolver->resolve_for_tool( $context );
+		$context          = $this->withAgentConfig( $context );
+		$policy           = $this->resolver->resolve_for_tool( $context );
 
 		return $this->applyDataMachineFilter( $policy, (string) ( $context['tool_name'] ?? '' ), (string) ( $context['mode'] ?? self::MODE_CHAT ), $context );
 	}

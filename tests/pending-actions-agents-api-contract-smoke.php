@@ -51,7 +51,8 @@ $inspection_source  = datamachine_pending_actions_source( 'inc/Engine/AI/Actions
 $cli_bootstrap      = datamachine_pending_actions_source( 'inc/Cli/CommandRegistry.php' );
 $cli_command_source = datamachine_pending_actions_source( 'inc/Cli/Commands/PendingActionsCommand.php' );
 $plugin_source      = datamachine_pending_actions_source( 'data-machine.php' );
-$runtime_source     = datamachine_pending_actions_source( 'inc/migrations/runtime.php' );
+$schema_source      = datamachine_pending_actions_source( 'inc/setup/schema.php' );
+$activation_source  = datamachine_pending_actions_source( 'inc/Core/Bootstrap/ActivationServiceProvider.php' );
 $action_policy      = datamachine_pending_actions_source( 'inc/Engine/AI/Actions/ActionPolicyResolver.php' );
 
 $expected_agents_api_approval_primitives = array(
@@ -100,7 +101,7 @@ datamachine_pending_actions_assert( str_contains( $adapter_source, 'implements W
 datamachine_pending_actions_assert( str_contains( $adapter_source, 'store( WP_Agent_Pending_Action $action )' ), 'store adapter accepts Agents API WP_Agent_Pending_Action records', $failures, $passes );
 datamachine_pending_actions_assert( str_contains( $adapter_source, 'record_resolution( string $action_id, WP_Agent_Approval_Decision $decision, string $resolver' ), 'store adapter records Agents API resolution audit metadata', $failures, $passes );
 datamachine_pending_actions_assert( str_contains( $resolver_adapter, 'implements WP_Agent_Pending_Action_Resolver' ), 'resolver adapter implements Agents API WP_Agent_Pending_Action_Resolver', $failures, $passes );
-datamachine_pending_actions_assert( str_contains( $resolver_adapter, 'resolve_with_datamachine_handlers' ), 'resolver adapter targets Data Machine concrete handler implementation without calling the deprecated alias', $failures, $passes );
+datamachine_pending_actions_assert( str_contains( $resolver_adapter, 'resolve_with_datamachine_handlers' ), 'resolver adapter targets the Data Machine concrete handler implementation', $failures, $passes );
 datamachine_pending_actions_assert( str_contains( $action_policy, 'use AgentsAPI\\AI\\Tools\\WP_Agent_Action_Policy;' ) && str_contains( $action_policy, 'WP_Agent_Action_Policy::normalize' ), 'ActionPolicyResolver consumes Agents API WP_Agent_Action_Policy vocabulary', $failures, $passes );
 datamachine_pending_actions_assert( str_contains( $resolver_adapter, 'WP_Agent_Approval_Decision' ), 'resolver adapter consumes Agents API WP_Agent_Approval_Decision vocabulary', $failures, $passes );
 datamachine_pending_actions_assert( str_contains( $observers_source, 'WP_Agent_Pending_Action_Observer' ), 'observer registry consumes Agents API WP_Agent_Pending_Action_Observer contract', $failures, $passes );
@@ -138,17 +139,19 @@ datamachine_pending_actions_assert( str_contains( $store_source, 'SELECT status,
 echo "\n[4] Existing resolver and Agents API handler contracts remain the canonical resolution path:\n";
 datamachine_pending_actions_assert( str_contains( $resolver_source, 'datamachine_pending_action_handlers' ), 'legacy pending action handler filter remains in resolver', $failures, $passes );
 datamachine_pending_actions_assert( str_contains( $resolver_source, 'can_resolve_pending_action' ) && str_contains( $resolver_source, 'handle_pending_action( $pending_action, $decision' ), 'Agents API handler permission and apply contracts are used through the existing handler filter', $failures, $passes );
-datamachine_pending_actions_assert( str_contains( $resolver_source, 'Deprecated compatibility alias for agents/resolve-pending-action' ) && str_contains( $resolver_source, 'agents_resolve_pending_action' ), 'Data Machine resolve ability is a deprecated alias for canonical Agents API resolution', $failures, $passes );
-datamachine_pending_actions_assert( str_contains( $plugin_source, 'new \\DataMachine\\Engine\\AI\\Actions\\ResolvePendingActionAbility();' ), 'existing resolve alias remains registered for compatibility', $failures, $passes );
-datamachine_pending_actions_assert( str_contains( $plugin_source, 'new \\DataMachine\\Engine\\AI\\Actions\\ResolvePendingAction();' ), 'existing chat resolver tool remains registered', $failures, $passes );
-datamachine_pending_actions_assert( str_contains( $resolver_source, "'replacement' => 'agents/resolve-pending-action'" ), 'deprecated alias metadata names the canonical replacement', $failures, $passes );
-datamachine_pending_actions_assert( str_contains( $plugin_source, 'agents_pending_action_permission' ) || str_contains( $runtime_source, 'agents_pending_action_permission' ) || str_contains( datamachine_pending_actions_source( 'inc/bootstrap.php' ), 'agents_pending_action_permission' ), 'Data Machine grants canonical pending-action abilities through its chat permission policy', $failures, $passes );
+datamachine_pending_actions_assert( str_contains( $resolver_source, "'datamachine/resolve-pending-action'" ) && str_contains( $resolver_source, 'agents_resolve_pending_action' ), 'bounded Data Machine alias delegates through canonical Agents API resolution', $failures, $passes );
+datamachine_pending_actions_assert( str_contains( $resolver_source, 'installed Intelligence consumers' ) && str_contains( $resolver_source, "'replacement' => 'agents/resolve-pending-action'" ), 'deprecated alias documents its active consumer and canonical replacement', $failures, $passes );
+datamachine_pending_actions_assert( str_contains( $resolver_source, "'execute_callback'    => array( self::class, 'execute_legacy_alias' )" ) && str_contains( $resolver_source, 'Intelligence\\Wiki\\Intelligence_Wiki_Review_Items' ), 'only the named Intelligence alias converts WP_Error to legacy success=false presentation', $failures, $passes );
+datamachine_pending_actions_assert( str_contains( $plugin_source, 'ResolvePendingActionAbility()' ), 'Data Machine alias and REST resolver adapter remain registered', $failures, $passes );
+datamachine_pending_actions_assert( str_contains( $resolver_adapter, "'pending_action_resolution_failed'" ) && str_contains( $resolver_adapter, 'new \\WP_Error' ), 'Data Machine domain failure arrays become WP_Error only at the Agents API resolver boundary', $failures, $passes );
+datamachine_pending_actions_assert( str_contains( $plugin_source, 'ResolvePendingAction()' ), 'existing chat resolver tool remains registered', $failures, $passes );
+datamachine_pending_actions_assert( str_contains( $plugin_source, 'agents_pending_action_permission' ) || str_contains( datamachine_pending_actions_source( 'inc/bootstrap.php' ), 'agents_pending_action_permission' ), 'Data Machine grants canonical pending-action abilities through its chat permission policy', $failures, $passes );
 datamachine_pending_actions_assert( str_contains( $plugin_source, 'PendingActionObservers::register' ) && str_contains( $plugin_source, 'WordPressActionDispatchObserver' ), 'default WordPress pending-action observer is registered during bootstrap', $failures, $passes );
 datamachine_pending_actions_assert( str_contains( $plugin_source, 'vendor/wordpress/agents-api/agents-api.php' ), 'default WordPress pending-action observer registers after Agents API dependency loading', $failures, $passes );
-datamachine_pending_actions_assert( str_contains( $plugin_source, 'new \\DataMachine\\Engine\\AI\\Actions\\SignPendingActionResolutionAbility();' ), 'signed pending-action resolution ability is registered', $failures, $passes );
+datamachine_pending_actions_assert( str_contains( $plugin_source, 'SignPendingActionResolutionAbility()' ), 'signed pending-action resolution ability is registered', $failures, $passes );
 datamachine_pending_actions_assert( str_contains( $signer_source, 'datamachine/sign-pending-action-resolution' ) && str_contains( $signer_source, '/actions/resolve-by-token' ), 'signed pending-action resolution exposes ability and public token route', $failures, $passes );
 datamachine_pending_actions_assert( str_contains( $signer_source, 'hash_hmac' ) && str_contains( $signer_source, 'datamachine_pending_action_resolution_secret' ), 'signed pending-action resolution uses a stored HMAC secret', $failures, $passes );
-datamachine_pending_actions_assert( str_contains( $runtime_source, 'datamachine_migrate_pending_actions_table' ), 'upgrade path creates pending-action table on deployed installs', $failures, $passes );
+datamachine_pending_actions_assert( str_contains( $schema_source, 'datamachine_ensure_current_schema' ) && str_contains( $activation_source, 'PendingActionStore::create_table()' ), 'canonical schema bootstrap creates the pending-action table on deployed installs', $failures, $passes );
 
 echo "\n[5] Store contract adapter uses the explicit test transient fallback seam:\n";
 
@@ -160,6 +163,27 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 $GLOBALS['datamachine_pending_actions_transients'] = array();
+$GLOBALS['datamachine_pending_actions_options']    = array();
+
+if ( ! function_exists( 'get_option' ) ) {
+	function get_option( string $key, $default = false ) {
+		return $GLOBALS['datamachine_pending_actions_options'][ $key ] ?? $default;
+	}
+}
+
+if ( ! function_exists( 'update_option' ) ) {
+	function update_option( string $key, $value ): bool {
+		$GLOBALS['datamachine_pending_actions_options'][ $key ] = $value;
+		return true;
+	}
+}
+
+if ( ! function_exists( 'delete_option' ) ) {
+	function delete_option( string $key ): bool {
+		unset( $GLOBALS['datamachine_pending_actions_options'][ $key ] );
+		return true;
+	}
+}
 
 if ( ! function_exists( 'set_transient' ) ) {
 	function set_transient( string $key, $value, int $expiration = 0 ): bool {

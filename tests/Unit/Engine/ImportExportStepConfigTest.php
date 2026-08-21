@@ -132,9 +132,9 @@ class ImportExportStepConfigTest extends WP_UnitTestCase {
 			)
 		);
 
-		$csv  = "pipeline_id,pipeline_name,step_position,step_type,step_config,flow_id,flow_name,handler,settings\n";
-		$csv .= '999,"Flow Row Guard Test",0,fetch,' . $this->csv_field( $step_config_json ) . ',,,,' . "\n";
-		$csv .= '999,"Flow Row Guard Test",0,fetch,' . $this->csv_field( $step_config_json ) . ',42,"Default Flow",rss,' . $this->csv_field( $settings_json ) . "\n";
+		$csv  = "pipeline_id,pipeline_name,step_position,step_type,step_config,flow_id,flow_name,settings\n";
+		$csv .= '999,"Flow Row Guard Test",0,fetch,' . $this->csv_field( $step_config_json ) . ',,,' . "\n";
+		$csv .= '999,"Flow Row Guard Test",0,fetch,' . $this->csv_field( $step_config_json ) . ',42,"Default Flow",' . $this->csv_field( $settings_json ) . "\n";
 
 		$result = $this->import_export->handle_import( 'pipelines', $csv );
 		$this->assertIsArray( $result );

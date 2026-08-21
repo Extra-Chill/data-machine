@@ -66,18 +66,17 @@ class Email extends FetchHandler {
 		);
 
 		// Delegate to ability.
-		$ability = new FetchEmailAbility();
+		$ability         = new FetchEmailAbility();
 		$trusted_context = array(
-			'user_id'          => get_current_user_id(),
-			'agent_id'         => $context->getAgentId(),
-			'flow_id'          => $context->getFlowId(),
-			'pipeline_id'      => $context->getPipelineId(),
-			'flow_step_id'     => $context->getFlowStepId(),
-			'job_id'           => $context->getJobId(),
+			'user_id'               => get_current_user_id(),
+			'agent_id'              => $context->getAgentId(),
+			'flow_id'               => $context->getFlowId(),
+			'pipeline_id'           => $context->getPipelineId(),
+			'flow_step_id'          => $context->getFlowStepId(),
+			'job_id'                => $context->getJobId(),
 			'principal_less_system' => null === $context->getAgentId() && 0 === get_current_user_id(),
-			'legacy_default_auth' => (string) ( $config['_legacy_default_auth'] ?? '' ),
 		);
-		$result = $ability->executeWithContext( $ability_input, $trusted_context );
+		$result          = $ability->executeWithContext( $ability_input, $trusted_context );
 
 		if ( is_wp_error( $result ) ) {
 			$context->log( 'error', 'Email fetch failed: ' . $result->get_error_message() );

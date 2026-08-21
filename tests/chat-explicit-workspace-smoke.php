@@ -106,6 +106,34 @@ final class ExplicitWorkspaceChatStore extends PrincipalChat {
 	public function get_session( string $session_id ): ?array {
 		return $this->sessions[ $session_id ] ?? null;
 	}
+
+	public function get_session_for_transcript_owner( WP_Agent_Workspace_Scope $workspace, int $user_id, array $owner, string $session_id ): ?array {
+		$session = $this->sessions[ $session_id ] ?? null;
+		return is_array( $session ) && $session['workspace_type'] === $workspace->workspace_type && $session['workspace_id'] === $workspace->workspace_id && $session['user_id'] === $user_id && $session['owner_type'] === ( $owner['owner_type'] ?? '' ) && $session['owner_key_hash'] === ( $owner['owner_key_hash'] ?? '' ) ? $session : null;
+	}
+
+	public function delete_session_for_transcript_owner( WP_Agent_Workspace_Scope $workspace, int $user_id, array $owner, string $session_id ): bool {
+		if ( null === $this->get_session_for_transcript_owner( $workspace, $user_id, $owner, $session_id ) ) { return false; }
+		unset( $this->sessions[ $session_id ] );
+		return true;
+	}
+
+	public function get_user_sessions_for_workspace( WP_Agent_Workspace_Scope $workspace, int $user_id, int $limit = 20, int $offset = 0, ?string $context = null, ?int $agent_id = null, ?array $transcript_owner = null ): array {
+		unset( $context, $agent_id );
+		$rows = array_filter(
+			$this->sessions,
+			static fn( array $session ): bool => $session['workspace_type'] === $workspace->workspace_type && $session['workspace_id'] === $workspace->workspace_id && $session['user_id'] === $user_id && $session['owner_type'] === ( $transcript_owner['owner_type'] ?? '' ) && $session['owner_key_hash'] === ( $transcript_owner['owner_key_hash'] ?? '' )
+		);
+		return array_slice( array_values( $rows ), $offset, $limit );
+	}
+
+	public function get_user_session_count_for_workspace( WP_Agent_Workspace_Scope $workspace, int $user_id, ?string $context = null, ?int $agent_id = null, ?array $transcript_owner = null ): int {
+		return count( $this->get_user_sessions_for_workspace( $workspace, $user_id, 20, 0, $context, $agent_id, $transcript_owner ) );
+	}
+
+	public function mark_session_read_for_workspace( WP_Agent_Workspace_Scope $workspace, string $session_id, int $user_id, array $transcript_owner ) {
+		return null === $this->get_session_for_transcript_owner( $workspace, $user_id, $transcript_owner, $session_id ) ? false : '2026-01-01 00:00:00';
+	}
 }
 
 $failures = array();
@@ -134,6 +162,13 @@ $assert( array() === $store->list_sessions_for_owner( $site_workspace, $owner ),
 $assert( null !== $store->get_session_for_owner( $network_workspace, $owner, $session_id ), 'same owner and workspace can read the session' );
 $assert( null === $store->get_session_for_owner( $site_workspace, $owner, $session_id ), 'single-session reads verify workspace ownership' );
 $assert( null === $store->get_session_for_owner( $network_workspace, array( 'type' => 'audience', 'key' => 'forged' ), $session_id ), 'single-session reads preserve principal owner isolation' );
+$transcript_owner = ChatTranscriptOwner::resolve_for_request( array( 'transcript_owner' => $owner ), 0 );
+$assert( array() === $store->get_user_sessions_for_workspace( $site_workspace, 0, 20, 0, null, null, $transcript_owner ), 'ability list helper denies cross-workspace access' );
+$assert( 0 === $store->get_user_session_count_for_workspace( $site_workspace, 0, null, null, $transcript_owner ), 'ability count helper denies cross-workspace access' );
+$assert( null === $store->get_session_for_transcript_owner( $site_workspace, 0, $transcript_owner, $session_id ), 'ability read helper denies cross-workspace access' );
+$assert( false === $store->mark_session_read_for_workspace( $site_workspace, $session_id, 0, $transcript_owner ), 'ability mark-read helper denies cross-workspace access' );
+$assert( ! $store->delete_session_for_transcript_owner( $site_workspace, 0, $transcript_owner, $session_id ), 'ability delete helper denies cross-workspace access' );
+$assert( null !== $store->get_session_for_transcript_owner( $network_workspace, 0, $transcript_owner, $session_id ), 'denied cross-workspace delete preserves the transcript' );
 
 if ( $failures ) {
 	echo "\nFAILED: " . count( $failures ) . " explicit workspace assertions failed.\n";

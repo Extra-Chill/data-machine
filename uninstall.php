@@ -184,7 +184,6 @@ function datamachine_uninstall_network_options() {
 		'datamachine_search_config',
 		'datamachine_auth_data',
 		\DataMachine\Core\NetworkSettings::OPTION_NAME,
-		'datamachine_chat_sessions_network_migrated',
 	);
 
 	foreach ( $datamachine_network_options as $datamachine_option ) {

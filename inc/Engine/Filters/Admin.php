@@ -16,12 +16,6 @@ if ( ! defined( 'WPINC' ) ) {
  */
 function datamachine_register_admin_filters() {
 
-	// One-time cleanup of deprecated options
-	if ( get_option( 'datamachine_page_hook_suffixes' ) ) {
-		delete_option( 'datamachine_page_hook_suffixes' );
-		delete_option( 'datamachine_page_configs' );
-	}
-
 	// Template rendering with dynamic discovery
 	add_filter(
 		'datamachine_render_template',

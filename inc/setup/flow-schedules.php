@@ -1,6 +1,6 @@
 <?php
 /**
- * Data Machine flow schedule repair lifecycle.
+ * Data Machine flow schedule reconciliation lifecycle.
  *
  * Activation and deploy-time migrations only mark the current site. The repair
  * runs after Action Scheduler initializes so datastore reads and writes are safe.

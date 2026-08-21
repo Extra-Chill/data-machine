@@ -50,6 +50,7 @@ if ( ! function_exists( 'esc_html' ) ) {
 
 require_once __DIR__ . '/../inc/Core/Steps/FlowStepConfig.php';
 require_once __DIR__ . '/../inc/Core/Steps/FlowStepConfigFactory.php';
+require_once __DIR__ . '/../inc/Engine/PortableFlowStepFields.php';
 require_once __DIR__ . '/../inc/Engine/Actions/ImportExport.php';
 
 use DataMachine\Engine\Actions\ImportExport;
@@ -79,6 +80,24 @@ function call_import_export_private( ImportExport $import_export, string $method
 echo "import-export-portable-flow-settings-smoke\n";
 
 $import_export = new ImportExport();
+
+$parse_csv = new ReflectionMethod( ImportExport::class, 'parse_csv_rows' );
+$canonical_rows = $parse_csv->invoke(
+	$import_export,
+	"pipeline_id,pipeline_name,step_position,step_type,step_config,flow_id,flow_name,settings\n1,Example,0,fetch,{},,,{}"
+);
+assert_csv_equals( 1, count( $canonical_rows ), 'canonical 1.0 CSV header is accepted', $failures, $passes );
+
+$old_header_rejected = false;
+try {
+	$parse_csv->invoke(
+		$import_export,
+		"pipeline_id,pipeline_name,step_position,step_type,step_config,flow_id,flow_name,handler,settings\n1,Example,0,fetch,{},,,rss,{}"
+	);
+} catch ( InvalidArgumentException $e ) {
+	$old_header_rejected = true;
+}
+assert_csv_equals( true, $old_header_rejected, 'pre-1.0 CSV header is rejected', $failures, $passes );
 
 $ai_settings = call_import_export_private(
 	$import_export,
