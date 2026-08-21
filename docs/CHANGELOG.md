@@ -2,6 +2,17 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.175.7] - 2026-08-21
+
+### Changed
+- complete native ability failure migration
+
+### Fixed
+- bound deferred item lifecycle
+- enforce pending action authorization receipts
+- unify handler config previews and updates
+- restore one-time flow cleanup
+
 ## [0.175.6] - 2026-08-21
 
 ### Changed
