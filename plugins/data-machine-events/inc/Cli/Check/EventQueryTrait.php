@@ -17,10 +17,11 @@ trait EventQueryTrait {
 	 * Query events by scope.
 	 *
 	 * @param string $scope      'upcoming', 'past', or 'all'.
-	 * @param int    $days_ahead Days to look ahead for upcoming scope.
+	 * @param int    $days_ahead      Days to look ahead for upcoming scope.
+	 * @param int    $location_term_id Optional location term ID.
 	 * @return \WP_Post[] Array of post objects.
 	 */
-	private function query_events( string $scope, int $days_ahead = 90 ): array {
+	private function query_events( string $scope, int $days_ahead = 90, int $location_term_id = 0 ): array {
 		$input = array(
 			'scope' => $scope,
 			'order' => 'past' === $scope ? 'DESC' : 'ASC',
@@ -28,6 +29,10 @@ trait EventQueryTrait {
 
 		if ( 'upcoming' === $scope && $days_ahead > 0 ) {
 			$input['days_ahead'] = $days_ahead;
+		}
+
+		if ( $location_term_id > 0 ) {
+			$input['tax_filters'] = array( 'location' => array( $location_term_id ) );
 		}
 
 		$ability = new \DataMachineEvents\Abilities\EventDateQueryAbilities();
