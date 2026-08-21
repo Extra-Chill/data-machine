@@ -147,7 +147,7 @@ class JobsCommand extends BaseCommand {
 	 * : Scope recovery to one exact job ID.
 	 *
 	 * [--limit=<limit>]
-	 * : Hard attempted storage-touch limit for this invocation (maximum 100).
+	 * : Broad mode logical-touch cap (maximum 100). With --job-id, the effective request is one target; exact compound recovery may consume up to MAX_APPLY_LIMIT=100 logical touches even with --limit=1. The input limit is retained separately for diagnostics.
 	 * ---
 	 * default: 3
 	 * ---
@@ -160,11 +160,11 @@ class JobsCommand extends BaseCommand {
 	 *     # Preview stuck jobs recovery
 	 *     wp datamachine jobs recover-stuck --dry-run
 	 *
-	 *     # Recover up to the default mutation limit (pathless children remain guarded)
+	 *     # Recover within the default logical-touch limit (pathless children remain guarded)
 	 *     wp datamachine jobs recover-stuck
 	 *
 	 *     # Recover one reviewed pathless child
-	 *     wp datamachine jobs recover-stuck --job-id=123 --recover-pathless-children --limit=3
+	 *     wp datamachine jobs recover-stuck --job-id=123 --recover-pathless-children --limit=1
 	 *
 	 *     # Recover stuck jobs for a specific flow
 	 *     wp datamachine jobs recover-stuck --flow=98
@@ -224,16 +224,24 @@ class JobsCommand extends BaseCommand {
 					'jobs_truncated' => ! empty( $result['jobs_truncated'] ),
 					'message'        => $result['message'] ?? '',
 					'scope'          => $result['scope'] ?? array(),
+					'limit'          => array(
+						'mode'                 => $summary['limit_mode'],
+						'input_limit'          => $summary['input_limit'],
+						'requested_limit'      => $summary['requested_limit'],
+						'unit'                 => $summary['limit_unit'],
+						'apply_limit'          => $summary['apply_limit'],
+						'apply_unit'           => 'logical_touch',
+					),
+					'metrics'        => array(
+						'target_attempts'  => $summary['target_attempts'],
+						'logical_touches'  => $summary['logical_touches'],
+						'logical_mutations' => $summary['logical_mutations'],
+					),
 				),
 				array(
 					'format' => $format,
 				)
 			);
-			return;
-		}
-
-		if ( empty( $jobs ) ) {
-			WP_CLI::success( 'No stuck jobs found.' );
 			return;
 		}
 
@@ -246,13 +254,30 @@ class JobsCommand extends BaseCommand {
 		);
 		WP_CLI::log(
 			sprintf(
-				'Recovery scope: processing jobs plus expired pending AI deferrals with absent exact action receipts; job=%s flow=%s touch-limit=%d pathless-apply=%s.',
+				'Recovery scope: processing jobs plus expired pending AI deferrals with absent exact action receipts; job=%s flow=%s limit-mode=%s input-limit=%d requested-limit=%d %s apply-limit=%d logical_touch pathless-apply=%s.',
 				$job_id ? (string) $job_id : 'all',
 				$flow_id ? (string) $flow_id : 'all',
-				$limit,
+				$summary['limit_mode'],
+				$summary['input_limit'],
+				$summary['limit_value'],
+				$summary['limit_unit'],
+				$summary['apply_limit'],
 				$recover_pathless_children ? 'enabled' : 'disabled'
 			)
 		);
+		WP_CLI::log(
+			sprintf(
+				'Recovery metrics: target-attempts=%d logical-touches=%d logical-mutations=%d.',
+				$summary['target_attempts'],
+				$summary['logical_touches'],
+				$summary['logical_mutations']
+			)
+		);
+
+		if ( empty( $jobs ) ) {
+			WP_CLI::success( 'No stuck jobs found.' );
+			return;
+		}
 
 		if ( $dry_run ) {
 			WP_CLI::log( 'Dry run - no changes will be made.' );
@@ -340,7 +365,7 @@ class JobsCommand extends BaseCommand {
 	 * Summarize recover-stuck ability output for operator-facing CLI reporting.
 	 *
 	 * @param array $result Recovery ability result.
-	 * @return array<string,int>
+	 * @return array<string,int|string>
 	 */
 	private function summarize_recover_stuck_result( array $result ): array {
 		$recovered     = (int) ( $result['recovered'] ?? 0 );
@@ -357,6 +382,9 @@ class JobsCommand extends BaseCommand {
 		$attempted         = (int) ( $result['attempted'] ?? 0 );
 		$touched           = (int) ( $result['touched'] ?? 0 );
 		$mutated           = (int) ( $result['mutated'] ?? 0 );
+		$target_attempts    = (int) ( $result['target_attempts'] ?? $attempted );
+		$logical_touches    = (int) ( $result['logical_touches'] ?? $touched );
+		$logical_mutations  = (int) ( $result['logical_mutations'] ?? $mutated );
 
 		return array(
 			'recovered'     => $recovered,
@@ -373,7 +401,16 @@ class JobsCommand extends BaseCommand {
 			'attempted'     => $attempted,
 			'touched'       => $touched,
 			'mutated'       => $mutated,
+			'target_attempts' => $target_attempts,
+			'logical_touches' => $logical_touches,
+			'logical_mutations' => $logical_mutations,
+			'input_limit'     => (int) ( $result['input_limit'] ?? $result['requested_limit'] ?? $result['limit_value'] ?? 0 ),
+			'requested_limit' => (int) ( $result['requested_limit'] ?? $result['limit_value'] ?? 0 ),
 			'apply_limit'   => (int) ( $result['apply_limit'] ?? 0 ),
+			'limit_mode'    => (string) ( $result['limit_mode'] ?? 'broad_touch_cap' ),
+			'limit_value'   => (int) ( $result['limit_value'] ?? $result['apply_limit'] ?? 0 ),
+			'limit_unit'    => (string) ( $result['limit_unit'] ?? 'logical_touch' ),
+			'logical_touch_limit' => (int) ( $result['logical_touch_limit'] ?? $result['apply_limit'] ?? 0 ),
 			'limit_reached' => ! empty( $result['limit_reached'] ) ? 1 : 0,
 			'actionable'    => $pending_ai_terminalized + $recovered + $timed_out + $stale_actions + $pathless_requeued + $pathless_terminal,
 			'total'         => $pending_ai_terminalized + $recovered + $timed_out + $stale_actions + $pathless_requeued + $pathless_terminal + $skipped,

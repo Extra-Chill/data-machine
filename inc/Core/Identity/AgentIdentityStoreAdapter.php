@@ -160,9 +160,10 @@ class AgentIdentityStoreAdapter implements WP_Agent_Identity_Store {
 			}
 		}
 
-		$scaffold = ScaffoldAbilities::get_ability();
-		if ( $scaffold ) {
-			$result = $scaffold->execute(
+		if ( ScaffoldAbilities::get_ability() ) {
+			// Identity materialization is trusted domain work. Calling the public
+			// ability runner here would require a logged-in user during bootstrap.
+			$result = ScaffoldAbilities::execute(
 				array(
 					'layer'         => 'agent',
 					'agent_slug'    => $scope->agent_slug,
