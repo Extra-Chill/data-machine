@@ -71,7 +71,16 @@ class ProcessedItemsAbilitiesTest extends WP_UnitTestCase {
 		$result = wp_get_ability( 'datamachine/clear-processed-items' )->execute( array() );
 
 		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'ability_invalid_input', $result->get_error_code() );
+		$this->assertNull( $result->get_error_data() );
+	}
+
+	public function test_clear_callback_requires_clear_type(): void {
+		$result = $this->abilities->executeClearProcessedItems( array() );
+
+		$this->assertInstanceOf( \WP_Error::class, $result );
 		$this->assertSame( 'clear_type_required', $result->get_error_code() );
+		$this->assertSame( 400, $result->get_error_data()['status'] );
 	}
 
 	public function test_clear_requires_valid_clear_type(): void {

@@ -56,7 +56,8 @@ class ImageGenerationAbilitiesTest extends WP_UnitTestCase {
 		$result = wp_get_ability( 'datamachine/generate-image' )->execute( array() );
 
 		$this->assertInstanceOf( \WP_Error::class, $result );
-		$this->assertSame( 'image_prompt_required', $result->get_error_code() );
+		$this->assertSame( 'ability_invalid_input', $result->get_error_code() );
+		$this->assertNull( $result->get_error_data() );
 	}
 
 	public function test_generate_image_empty_prompt(): void {
@@ -64,6 +65,7 @@ class ImageGenerationAbilitiesTest extends WP_UnitTestCase {
 
 		$this->assertInstanceOf( \WP_Error::class, $result );
 		$this->assertSame( 'image_prompt_required', $result->get_error_code() );
+		$this->assertSame( 400, $result->get_error_data()['status'] );
 	}
 
 	public function test_generate_image_missing_provider(): void {
