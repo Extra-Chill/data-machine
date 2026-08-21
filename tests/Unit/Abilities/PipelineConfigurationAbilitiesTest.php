@@ -302,20 +302,7 @@ class PipelineConfigurationAbilitiesTest extends WP_UnitTestCase {
 			$this->assertSame( 15, $stored_after_apply['radius'], 'Omitted scalar type must remain unchanged.' );
 			$this->assertTrue( $stored_after_apply['include_parking'], 'Omitted boolean sibling must remain unchanged.' );
 
-			$flows->update_flow( $flow_id, array( 'flow_config' => $flow_config ) );
-			$current       = $this->abilities->executeGet( array( 'pipeline_id' => $this->pipeline_id ) );
-			$flow_snapshot = $this->configurationFlowSnapshot( $current['flows'], $flow_id );
-			$owner_result  = $this->abilities->executeUpdate(
-				array(
-					'target'            => 'flow',
-					'flow_id'           => $flow_id,
-					'step_id'           => $flow_step_id,
-					'expected_revision' => $flow_snapshot['revision'],
-					'configuration'     => array( 'handler_config' => $patch ),
-				)
-			);
-			$this->assertTrue( $owner_result['success'] );
-			$this->assertSame( $expected, $this->storedHandlerConfig( $flows, $flow_id, $flow_step_id ) );
+			$this->assertOwnerHandlerUpdatePersistsExpectedConfig( $flows, $flow_id, $flow_step_id, $flow_config, $patch, $expected );
 
 			$full = array(
 				'classification_type' => 'sports',
@@ -339,21 +326,7 @@ class PipelineConfigurationAbilitiesTest extends WP_UnitTestCase {
 			);
 			$this->assertSame( $sanitized_full, $this->storedHandlerConfig( $flows, $flow_id, $flow_step_id ) );
 
-			$flows->update_flow( $flow_id, array( 'flow_config' => $flow_config ) );
-			$current       = $this->abilities->executeGet( array( 'pipeline_id' => $this->pipeline_id ) );
-			$flow_snapshot = $this->configurationFlowSnapshot( $current['flows'], $flow_id );
-			$this->assertTrue(
-				$this->abilities->executeUpdate(
-					array(
-						'target'            => 'flow',
-						'flow_id'           => $flow_id,
-						'step_id'           => $flow_step_id,
-						'expected_revision' => $flow_snapshot['revision'],
-						'configuration'     => array( 'handler_config' => $full ),
-					)
-				)['success']
-			);
-			$this->assertSame( $sanitized_full, $this->storedHandlerConfig( $flows, $flow_id, $flow_step_id ) );
+			$this->assertOwnerHandlerUpdatePersistsExpectedConfig( $flows, $flow_id, $flow_step_id, $flow_config, $full, $sanitized_full );
 		} finally {
 			remove_filter( 'datamachine_handlers', $handler_filter, 10 );
 			remove_filter( 'datamachine_handler_settings', $settings_filter, 10 );
@@ -427,6 +400,24 @@ class PipelineConfigurationAbilitiesTest extends WP_UnitTestCase {
 	private function storedHandlerConfig( Flows $flows, int $flow_id, string $flow_step_id ): array {
 		$flow = $flows->get_flow( $flow_id );
 		return $flow['flow_config'][ $flow_step_id ]['handler_configs']['ticketmaster_like'];
+	}
+
+	private function assertOwnerHandlerUpdatePersistsExpectedConfig( Flows $flows, int $flow_id, string $flow_step_id, array $flow_config, array $patch, array $expected ): void {
+		$flows->update_flow( $flow_id, array( 'flow_config' => $flow_config ) );
+		$current       = $this->abilities->executeGet( array( 'pipeline_id' => $this->pipeline_id ) );
+		$flow_snapshot = $this->configurationFlowSnapshot( $current['flows'], $flow_id );
+		$result        = $this->abilities->executeUpdate(
+			array(
+				'target'            => 'flow',
+				'flow_id'           => $flow_id,
+				'step_id'           => $flow_step_id,
+				'expected_revision' => $flow_snapshot['revision'],
+				'configuration'     => array( 'handler_config' => $patch ),
+			)
+		);
+
+		$this->assertTrue( $result['success'] );
+		$this->assertSame( $expected, $this->storedHandlerConfig( $flows, $flow_id, $flow_step_id ) );
 	}
 
 	private function configurationFlowSnapshot( array $flows, int $flow_id ): array {

@@ -297,45 +297,34 @@ trait FlowStepHelpers {
 	protected function updateHandler( string $flow_step_id, string $handler_slug = '', array $handler_settings = array(), bool $validate_only = false ): bool|array {
 		$parts = apply_filters( 'datamachine_split_flow_step_id', null, $flow_step_id );
 		if ( ! $parts ) {
-			if ( ! $validate_only ) {
-				do_action( 'datamachine_log', 'error', 'Invalid flow_step_id format for handler update', array( 'flow_step_id' => $flow_step_id ) );
-			}
-			return false;
+			return $this->handlerUpdateError( $validate_only, 'Invalid flow_step_id format for handler update', array( 'flow_step_id' => $flow_step_id ) );
 		}
 		$flow_id = $parts['flow_id'];
 
 		$flow = $this->db_flows->get_flow( $flow_id );
 		if ( ! $flow ) {
-			if ( ! $validate_only ) {
-				do_action(
-					'datamachine_log',
-					'error',
-					'Flow handler update failed - flow not found',
-					array(
-						'flow_id'      => $flow_id,
-						'flow_step_id' => $flow_step_id,
-					)
-				);
-			}
-			return false;
+			return $this->handlerUpdateError(
+				$validate_only,
+				'Flow handler update failed - flow not found',
+				array(
+					'flow_id'      => $flow_id,
+					'flow_step_id' => $flow_step_id,
+				)
+			);
 		}
 
 		$flow_config = $flow['flow_config'] ?? array();
 
 		if ( ! isset( $flow_config[ $flow_step_id ] ) ) {
 			if ( ! isset( $parts['pipeline_step_id'] ) || empty( $parts['pipeline_step_id'] ) ) {
-				if ( ! $validate_only ) {
-					do_action(
-						'datamachine_log',
-						'error',
-						'Pipeline step ID is required for flow handler update',
-						array(
-							'flow_step_id' => $flow_step_id,
-							'parts'        => $parts,
-						)
-					);
-				}
-				return false;
+				return $this->handlerUpdateError(
+					$validate_only,
+					'Pipeline step ID is required for flow handler update',
+					array(
+						'flow_step_id' => $flow_step_id,
+						'parts'        => $parts,
+					)
+				);
 			}
 			$pipeline_step_id             = $parts['pipeline_step_id'];
 			$flow_config[ $flow_step_id ] = array(
@@ -354,11 +343,8 @@ trait FlowStepHelpers {
 			: ( $step['step_type'] ?? '' );
 
 		if ( empty( $effective_slug ) ) {
-			if ( ! $validate_only ) {
-				do_action( 'datamachine_log', 'error', 'No handler slug or step_type available for flow step update', array( 'flow_step_id' => $flow_step_id ) );
-			}
 			unset( $step );
-			return false;
+			return $this->handlerUpdateError( $validate_only, 'No handler slug or step_type available for flow step update', array( 'flow_step_id' => $flow_step_id ) );
 		}
 
 		// Get existing config for this handler/settings slug.
@@ -432,6 +418,22 @@ trait FlowStepHelpers {
 		}
 
 		return true;
+	}
+
+	/**
+	 * Return an update failure without writing preview-mode logs.
+	 *
+	 * @param bool   $validate_only Whether the update is a non-persisting preview.
+	 * @param string $message Log message.
+	 * @param array  $context Log context.
+	 * @return false
+	 */
+	private function handlerUpdateError( bool $validate_only, string $message, array $context ): false {
+		if ( ! $validate_only ) {
+			do_action( 'datamachine_log', 'error', $message, $context );
+		}
+
+		return false;
 	}
 
 	/**
