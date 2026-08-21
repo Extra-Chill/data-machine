@@ -52,6 +52,19 @@ class UpcomingCountAbilitiesTest extends WP_UnitTestCase {
 		} else {
 			register_taxonomy_for_object_type( 'artist', 'data_machine_events' );
 		}
+		if ( ! taxonomy_exists( 'location' ) ) {
+			register_taxonomy(
+				'location',
+				array( 'data_machine_events' ),
+				array(
+					'public'       => true,
+					'hierarchical' => true,
+					'rewrite'      => array( 'slug' => 'location' ),
+				)
+			);
+		} else {
+			register_taxonomy_for_object_type( 'location', 'data_machine_events' );
+		}
 
 		if ( ! EventDatesTable::table_exists() ) {
 			EventDatesTable::create_table();
@@ -62,18 +75,19 @@ class UpcomingCountAbilitiesTest extends WP_UnitTestCase {
 
 	/**
 	 * Insert a published event, attach it to venue + (optional) artist terms,
-	 * and seed the event_dates table with a future datetime so it counts as
-	 * "upcoming".
+	 * and seed the event_dates table.
 	 *
 	 * @param int      $venue_term_id  Venue term ID to attach.
 	 * @param int|null $artist_term_id Artist term ID to attach (optional).
 	 * @param string   $start_datetime MySQL datetime; defaults to far-future.
+	 * @param string|null $end_datetime MySQL datetime; defaults to null.
 	 * @return int Inserted post ID.
 	 */
 	private function seed_upcoming_event(
 		int $venue_term_id,
 		?int $artist_term_id = null,
-		string $start_datetime = '2099-01-01 20:00:00'
+		string $start_datetime = '2099-01-01 20:00:00',
+		?string $end_datetime = null
 	): int {
 		$post_id = wp_insert_post(
 			array(
@@ -89,7 +103,7 @@ class UpcomingCountAbilitiesTest extends WP_UnitTestCase {
 			wp_set_object_terms( $post_id, array( $artist_term_id ), 'artist' );
 		}
 
-		EventDatesTable::upsert( $post_id, $start_datetime, null, 'publish' );
+		EventDatesTable::upsert( $post_id, $start_datetime, $end_datetime, 'publish' );
 
 		return $post_id;
 	}
@@ -104,6 +118,86 @@ class UpcomingCountAbilitiesTest extends WP_UnitTestCase {
 		$term = wp_insert_term( $name . ' ' . uniqid(), 'artist' );
 		$this->assertNotWPError( $term );
 		return (int) $term['term_id'];
+	}
+
+	private function make_location( string $name, int $parent = 0 ): int {
+		$term = wp_insert_term(
+			$name . ' ' . uniqid(),
+			'location',
+			array( 'parent' => $parent )
+		);
+		$this->assertNotWPError( $term );
+		return (int) $term['term_id'];
+	}
+
+	public function test_direct_counts_include_ongoing_and_exclude_completed_events_in_site_timezone(): void {
+		$old_timezone = get_option( 'timezone_string' );
+		update_option( 'timezone_string', 'Pacific/Kiritimati' );
+
+		try {
+			$now             = current_datetime();
+			$ongoing_venue   = $this->make_venue( 'Ongoing Venue' );
+			$completed_venue = $this->make_venue( 'Completed Venue' );
+
+			$this->seed_upcoming_event(
+				$ongoing_venue,
+				null,
+				$now->modify( '-2 days' )->format( 'Y-m-d H:i:s' ),
+				$now->modify( '+1 hour' )->format( 'Y-m-d H:i:s' )
+			);
+			$this->seed_upcoming_event(
+				$completed_venue,
+				null,
+				$now->setTime( 0, 0 )->format( 'Y-m-d H:i:s' ),
+				$now->modify( '-1 minute' )->format( 'Y-m-d H:i:s' )
+			);
+
+			$result = $this->abilities->executeGetUpcomingCounts( array( 'taxonomy' => 'venue' ) );
+			$by_id  = array_column( $result['terms'], 'count', 'term_id' );
+
+			$this->assertArrayHasKey( $ongoing_venue, $by_id );
+			$this->assertSame( 1, $by_id[ $ongoing_venue ] );
+			$this->assertArrayNotHasKey( $completed_venue, $by_id );
+		} finally {
+			update_option( 'timezone_string', $old_timezone );
+		}
+	}
+
+	public function test_rollup_counts_include_ongoing_and_exclude_completed_events(): void {
+		$now              = current_datetime();
+		$venue            = $this->make_venue( 'Rollup Venue' );
+		$ongoing_parent   = $this->make_location( 'Ongoing Parent' );
+		$ongoing_child    = $this->make_location( 'Ongoing Child', $ongoing_parent );
+		$completed_parent = $this->make_location( 'Completed Parent' );
+		$completed_child  = $this->make_location( 'Completed Child', $completed_parent );
+
+		$ongoing = $this->seed_upcoming_event(
+			$venue,
+			null,
+			$now->modify( '-2 days' )->format( 'Y-m-d H:i:s' ),
+			$now->modify( '+1 hour' )->format( 'Y-m-d H:i:s' )
+		);
+		$completed = $this->seed_upcoming_event(
+			$venue,
+			null,
+			$now->modify( '-2 days' )->format( 'Y-m-d H:i:s' ),
+			$now->modify( '-1 minute' )->format( 'Y-m-d H:i:s' )
+		);
+		wp_set_object_terms( $ongoing, array( $ongoing_child ), 'location' );
+		wp_set_object_terms( $completed, array( $completed_child ), 'location' );
+
+		$result = $this->abilities->executeGetUpcomingCounts(
+			array(
+				'taxonomy'      => 'location',
+				'rollup'        => true,
+				'exclude_roots' => false,
+			)
+		);
+		$by_id  = array_column( $result['terms'], 'count', 'term_id' );
+
+		$this->assertArrayHasKey( $ongoing_parent, $by_id );
+		$this->assertSame( 1, $by_id[ $ongoing_parent ] );
+		$this->assertArrayNotHasKey( $completed_parent, $by_id );
 	}
 
 	/**

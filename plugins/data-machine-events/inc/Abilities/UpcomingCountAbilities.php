@@ -7,14 +7,16 @@
  * Counts upcoming events grouped by taxonomy term. This is the raw data
  * primitive powering homepage badges, cross-site links, and market reports.
  *
- * The query joins event_dates (start_datetime >= today, post_status = 'publish')
- * to filter only future published events, then GROUP BY term for counts.
+ * The query joins event_dates using the canonical upcoming predicate and
+ * published status filter, then GROUP BY term for counts.
  * Skips the posts table entirely via denormalized post_status column.
  *
  * @package DataMachineEvents\Abilities
  */
 
 namespace DataMachineEvents\Abilities;
+
+use DataMachineEvents\Blocks\Calendar\Query\UpcomingFilter;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -107,8 +109,8 @@ class UpcomingCountAbilities {
 	 * Execute get-upcoming-counts ability.
 	 *
 	 * Single SQL query: counts upcoming events per term using GROUP BY.
-	 * Filters to published data_machine_events with start_datetime >= today
-	 * (via the datamachine_event_dates table).
+	 * Filters to published upcoming data_machine_events via the canonical
+	 * event date predicate.
 	 *
 	 * @param array $input Input parameters.
 	 * @return array|\WP_Error Term counts sorted by event count descending.
@@ -169,8 +171,10 @@ class UpcomingCountAbilities {
 
 		global $wpdb;
 
-		$today    = gmdate( 'Y-m-d 00:00:00' );
-		$ed_table = \DataMachineEvents\Core\EventDatesTable::table_name();
+		$now            = current_time( 'mysql' );
+		$upcoming_sql   = UpcomingFilter::upcoming_sql( true, 'tr.object_id' );
+		$upcoming_join  = $upcoming_sql['joins'];
+		$upcoming_where = $upcoming_sql['where'];
 
 		$parent_clause = $exclude_roots ? 'AND tt.parent != 0' : '';
 		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table names and optional clauses are internally constructed; request values remain prepared.
@@ -186,19 +190,19 @@ class UpcomingCountAbilities {
 					FROM {$wpdb->term_relationships} tr
 					INNER JOIN {$wpdb->term_taxonomy} tt ON tr.term_taxonomy_id = tt.term_taxonomy_id
 					INNER JOIN {$wpdb->terms} t ON tt.term_id = t.term_id
-					INNER JOIN {$ed_table} ed ON tr.object_id = ed.post_id
+					{$upcoming_join}
 					INNER JOIN {$wpdb->term_relationships} f_tr ON f_tr.object_id = tr.object_id
 					INNER JOIN {$wpdb->term_taxonomy} f_tt ON f_tr.term_taxonomy_id = f_tt.term_taxonomy_id
 					WHERE tt.taxonomy = %s
-					AND ed.post_status = 'publish'
-					AND ed.start_datetime >= %s
+					AND {$upcoming_where}
 					AND f_tt.taxonomy = %s
 					AND f_tt.term_id = %d
 					{$parent_clause}
 					GROUP BY t.term_id
 					ORDER BY event_count DESC",
 					$taxonomy,
-					$today,
+					$now,
+					$now,
 					$filter_taxonomy,
 					$filter_term_id
 				)
@@ -212,15 +216,15 @@ class UpcomingCountAbilities {
 					FROM {$wpdb->term_relationships} tr
 					INNER JOIN {$wpdb->term_taxonomy} tt ON tr.term_taxonomy_id = tt.term_taxonomy_id
 					INNER JOIN {$wpdb->terms} t ON tt.term_id = t.term_id
-					INNER JOIN {$ed_table} ed ON tr.object_id = ed.post_id
+					{$upcoming_join}
 					WHERE tt.taxonomy = %s
-					AND ed.post_status = 'publish'
-					AND ed.start_datetime >= %s
+					AND {$upcoming_where}
 					{$parent_clause}
 					GROUP BY t.term_id
 					ORDER BY event_count DESC",
 					$taxonomy,
-					$today
+					$now,
+					$now
 				)
 			);
 		}
@@ -281,8 +285,10 @@ class UpcomingCountAbilities {
 	private function executeRollupCounts( string $taxonomy, bool $exclude_roots, bool $has_filter, ?string $filter_taxonomy, int $filter_term_id ): array|\WP_Error {
 		global $wpdb;
 
-		$today    = gmdate( 'Y-m-d 00:00:00' );
-		$ed_table = \DataMachineEvents\Core\EventDatesTable::table_name();
+		$now            = current_time( 'mysql' );
+		$upcoming_sql   = UpcomingFilter::upcoming_sql( true, 'tr.object_id' );
+		$upcoming_join  = $upcoming_sql['joins'];
+		$upcoming_where = $upcoming_sql['where'];
 
 		// Pull every (term_id, object_id) pair for upcoming published events
 		// in this taxonomy. One pass; deduped per-ancestor in PHP below.
@@ -294,16 +300,16 @@ class UpcomingCountAbilities {
 					"SELECT tt.term_id AS term_id, tr.object_id AS object_id
 					FROM {$wpdb->term_relationships} tr
 					INNER JOIN {$wpdb->term_taxonomy} tt ON tr.term_taxonomy_id = tt.term_taxonomy_id
-					INNER JOIN {$ed_table} ed ON tr.object_id = ed.post_id
+					{$upcoming_join}
 					INNER JOIN {$wpdb->term_relationships} f_tr ON f_tr.object_id = tr.object_id
 					INNER JOIN {$wpdb->term_taxonomy} f_tt ON f_tr.term_taxonomy_id = f_tt.term_taxonomy_id
 					WHERE tt.taxonomy = %s
-					AND ed.post_status = 'publish'
-					AND ed.start_datetime >= %s
+					AND {$upcoming_where}
 					AND f_tt.taxonomy = %s
 					AND f_tt.term_id = %d",
 					$taxonomy,
-					$today,
+					$now,
+					$now,
 					$filter_taxonomy,
 					$filter_term_id
 				)
@@ -315,12 +321,12 @@ class UpcomingCountAbilities {
 					"SELECT tt.term_id AS term_id, tr.object_id AS object_id
 					FROM {$wpdb->term_relationships} tr
 					INNER JOIN {$wpdb->term_taxonomy} tt ON tr.term_taxonomy_id = tt.term_taxonomy_id
-					INNER JOIN {$ed_table} ed ON tr.object_id = ed.post_id
+					{$upcoming_join}
 					WHERE tt.taxonomy = %s
-					AND ed.post_status = 'publish'
-					AND ed.start_datetime >= %s",
+					AND {$upcoming_where}",
 					$taxonomy,
-					$today
+					$now,
+					$now
 				)
 			);
 		}
