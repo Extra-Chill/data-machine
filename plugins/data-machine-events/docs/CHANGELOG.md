@@ -2,6 +2,12 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.55.6] - 2026-08-21
+
+### Fixed
+- align upcoming term count semantics
+- handle scraper CLI ability errors
+
 ## [0.55.5] - 2026-08-19
 
 ### Fixed
