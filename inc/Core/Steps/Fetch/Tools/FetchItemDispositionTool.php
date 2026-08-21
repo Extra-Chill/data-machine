@@ -258,16 +258,17 @@ class FetchItemDispositionTool {
 		);
 
 		return array(
-			'success'         => true,
-			'message'         => $attempt['exhausted'] ? "Item deferral limit reached: {$reason}" : "Item deferred for retry: {$reason}",
-			'item_identifier' => $item_identifier,
-			'tool_name'       => $tool_name,
-			'disposition'     => $attempt['exhausted'] ? self::DISPOSITION_DEFER_EXHAUSTED : self::DISPOSITION_DEFER_ITEM,
-			'disposition_id'  => $disposition_id,
-			'reason'          => $reason,
-			'deferral_attempts' => $attempt['attempts'],
-			'deferral_cap'      => ProcessedItems::MAX_DEFERRAL_ATTEMPTS,
-			'exhausted'         => $attempt['exhausted'],
+			'success'               => true,
+			'message'               => $attempt['exhausted'] ? "Item deferral limit reached: {$reason}" : "Item deferred for retry: {$reason}",
+			'item_identifier'       => $item_identifier,
+			'tool_name'             => $tool_name,
+			'disposition'           => $attempt['exhausted'] ? self::DISPOSITION_DEFER_EXHAUSTED : self::DISPOSITION_DEFER_ITEM,
+			'disposition_id'        => $disposition_id,
+			'reason'                => $reason,
+			'deferral_attempts'     => $attempt['attempts'],
+			'deferral_cap'          => ProcessedItems::MAX_DEFERRAL_ATTEMPTS,
+			'exhausted'             => $attempt['exhausted'],
+			'already_dispositioned' => empty( $persisted['created'] ),
 		);
 	}
 

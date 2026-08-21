@@ -422,7 +422,8 @@ class ItemClaimLifecycleTest extends WP_UnitTestCase {
 			$terminal_status = JobStatus::agentSkipped( 'defer-exhausted' )->toString();
 			$this->assertArrayNotHasKey( 'job_status', datamachine_get_engine_data( $job_id ) );
 			$this->assertTrue( $this->jobs->complete_job( $job_id, $terminal_status ) );
-			$this->assertSame( $terminal_status, $this->jobs->get_job( $job_id )['status'] );
+			$this->assertSame( JobStatus::AGENT_SKIPPED, $this->jobs->get_job( $job_id )['status'] );
+			$this->assertSame( 'defer-exhausted', datamachine_get_engine_data( $job_id )['job_status_reason'] );
 			$this->assertTrue( $this->processed->has_item_been_processed( self::SCOPE, self::SOURCE, $item_identifier ) );
 			$this->assertSame( 'deferred-revision-3', $this->tracked->get( self::NAMESPACE, $item_identifier )['source_revision'] );
 		}

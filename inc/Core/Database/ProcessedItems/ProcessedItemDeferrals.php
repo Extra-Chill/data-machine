@@ -251,9 +251,13 @@ trait ProcessedItemDeferrals {
 			return false;
 		}
 		[ $type_pattern, $nullable, $default ] = $rules[ $column ];
+		$actual_default                        = $actual['Default'] ?? null;
+		$default_matches                       = null === $default
+			? null === $actual_default
+			: (string) $actual_default === $default;
 		return 1 === preg_match( $type_pattern, $type )
 			&& ( $actual['Null'] ?? null ) === $nullable
-			&& ( $actual['Default'] ?? null ) === $default;
+			&& $default_matches;
 	}
 
 	/** Verify the exact non-unique, unprefixed BTREE operational index. */

@@ -43,6 +43,10 @@ class ExecuteStepMixedClaimRoutingTest extends WP_UnitTestCase {
 				'class'        => MixedClaimAIStep::class,
 				'uses_handler' => false,
 			);
+			$types['passthrough'] = array(
+				'class'        => MixedClaimFetchStep::class,
+				'uses_handler' => false,
+			);
 			return $types;
 		};
 		add_filter( 'datamachine_step_types', $this->step_types_filter, PHP_INT_MAX );
@@ -191,7 +195,8 @@ class ExecuteStepMixedClaimRoutingTest extends WP_UnitTestCase {
 
 		$this->assertTrue( $result['success'] );
 		$this->assertSame( 'packets_dispositioned', $result['outcome'] );
-		$this->assertSame( JobStatus::agentSkipped( 'defer-exhausted' )->toString(), $this->jobs->get_job( $job_id )['status'] );
+		$this->assertSame( JobStatus::AGENT_SKIPPED, $this->jobs->get_job( $job_id )['status'] );
+		$this->assertSame( 'defer-exhausted', datamachine_get_engine_data( $job_id )['job_status_reason'] );
 		$this->assertSame( array(), $this->scheduled );
 		$this->assertCount( 1, $this->terminal_transitions );
 		$this->assertSame( JobStatus::agentSkipped( 'defer-exhausted' )->toString(), $this->terminal_transitions[0]['status'] );
@@ -241,8 +246,9 @@ class ExecuteStepMixedClaimRoutingTest extends WP_UnitTestCase {
 
 		$this->assertTrue( $result['success'] );
 		$this->assertSame( 'packets_dispositioned', $result['outcome'] );
-		$this->assertSame( JobStatus::agentSkipped( 'defer-exhausted' )->toString(), $result['status'] );
-		$this->assertSame( JobStatus::agentSkipped( 'defer-exhausted' )->toString(), $this->jobs->get_job( $job_id )['status'] );
+		$this->assertSame( JobStatus::AGENT_SKIPPED, $result['status'] );
+		$this->assertSame( JobStatus::AGENT_SKIPPED, $this->jobs->get_job( $job_id )['status'] );
+		$this->assertSame( 'defer-exhausted', datamachine_get_engine_data( $job_id )['job_status_reason'] );
 		$this->assertSame( array(), $this->scheduled );
 	}
 
@@ -358,7 +364,7 @@ class ExecuteStepMixedClaimRoutingTest extends WP_UnitTestCase {
 						),
 						'sink'   => array(
 							'flow_step_id'    => 'sink',
-							'step_type'       => 'transform',
+							'step_type'       => 'passthrough',
 							'execution_order' => 1,
 							'pipeline_id'     => 'direct',
 							'flow_id'         => 'direct',
