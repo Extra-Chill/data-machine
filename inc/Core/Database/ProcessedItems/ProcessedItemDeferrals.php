@@ -182,4 +182,96 @@ trait ProcessedItemDeferrals {
 			'next_after_id' => $has_more ? (int) ( $last_item['id'] ?? 0 ) : 0,
 		);
 	}
+
+	/** Ensure durable deferral columns and the operational index exist. */
+	public static function ensure_deferral_schema( string $table_name ): void {
+		global $wpdb;
+		foreach ( self::deferral_column_definitions() as $column => $definition ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared -- Schema inspection.
+			$actual = $wpdb->get_row( $wpdb->prepare( 'SHOW FULL COLUMNS FROM %i LIKE %s', $table_name, $column ), ARRAY_A );
+			if ( self::valid_deferral_column( $column, $actual ) ) {
+				continue;
+			}
+			$operation = is_array( $actual ) ? 'MODIFY COLUMN' : 'ADD COLUMN';
+			// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Column names and definitions come from the fixed map above.
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange,WordPress.DB.PreparedSQL.NotPrepared -- Fixed migration definition and prepared table identifier.
+			$wpdb->query( $wpdb->prepare( "ALTER TABLE %i {$operation} `{$column}` {$definition}", $table_name ) );
+			// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		}
+
+		if ( ! self::validate_deferral_index( $table_name ) ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared -- Schema inspection.
+			$index = $wpdb->get_row( $wpdb->prepare( 'SHOW INDEX FROM %i WHERE Key_name = %s', $table_name, 'status_deferred_at' ) );
+			if ( $index ) {
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange,WordPress.DB.PreparedSQL.NotPrepared -- Malformed same-name index must be replaced.
+				$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i DROP INDEX `status_deferred_at`', $table_name ) );
+			}
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange,WordPress.DB.PreparedSQL.NotPrepared -- Required operational index.
+			$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i ADD KEY `status_deferred_at` (status, deferred_at)', $table_name ) );
+		}
+	}
+
+	/** Verify the complete durable-deferral schema before migration completion. */
+	public static function validate_deferral_schema( string $table_name ): bool {
+		global $wpdb;
+		foreach ( self::deferral_column_definitions() as $column => $definition ) {
+			unset( $definition );
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared -- Schema validation.
+			$actual = $wpdb->get_row( $wpdb->prepare( 'SHOW FULL COLUMNS FROM %i LIKE %s', $table_name, $column ), ARRAY_A );
+			if ( ! self::valid_deferral_column( $column, $actual ) ) {
+				return false;
+			}
+		}
+		return self::validate_deferral_index( $table_name );
+	}
+
+	/** Canonical SQL definitions for durable deferral columns. */
+	private static function deferral_column_definitions(): array {
+		return array(
+			'deferral_count'       => 'INT UNSIGNED NOT NULL DEFAULT 0',
+			'last_deferral_job_id' => 'BIGINT(20) UNSIGNED NULL',
+			'deferred_at'          => 'DATETIME NULL',
+			'last_seen_at'         => 'DATETIME NULL',
+		);
+	}
+
+	/** Validate one column's semantic type, nullability, and default. */
+	private static function valid_deferral_column( string $column, mixed $actual ): bool {
+		if ( ! is_array( $actual ) || ( $actual['Field'] ?? null ) !== $column ) {
+			return false;
+		}
+		$type  = strtolower( (string) ( $actual['Type'] ?? '' ) );
+		$rules = array(
+			'deferral_count'       => array( '/^int(?:\(\d+\))? unsigned$/', 'NO', '0' ),
+			'last_deferral_job_id' => array( '/^bigint(?:\(\d+\))? unsigned$/', 'YES', null ),
+			'deferred_at'          => array( '/^datetime$/', 'YES', null ),
+			'last_seen_at'         => array( '/^datetime$/', 'YES', null ),
+		);
+		if ( ! isset( $rules[ $column ] ) ) {
+			return false;
+		}
+		[ $type_pattern, $nullable, $default ] = $rules[ $column ];
+		return 1 === preg_match( $type_pattern, $type )
+			&& ( $actual['Null'] ?? null ) === $nullable
+			&& ( $actual['Default'] ?? null ) === $default;
+	}
+
+	/** Verify the exact non-unique, unprefixed BTREE operational index. */
+	private static function validate_deferral_index( string $table_name ): bool {
+		global $wpdb;
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared -- Schema validation.
+		$rows = $wpdb->get_results( $wpdb->prepare( 'SHOW INDEX FROM %i WHERE Key_name = %s ORDER BY Seq_in_index ASC', $table_name, 'status_deferred_at' ), ARRAY_A );
+		if ( 2 !== count( (array) $rows ) || array( 'status', 'deferred_at' ) !== array_column( $rows, 'Column_name' ) ) {
+			return false;
+		}
+		foreach ( $rows as $offset => $row ) {
+			if ( 1 !== (int) ( $row['Non_unique'] ?? 0 )
+				|| (int) ( $row['Seq_in_index'] ?? 0 ) !== $offset + 1
+				|| 'BTREE' !== strtoupper( (string) ( $row['Index_type'] ?? '' ) )
+				|| null !== ( $row['Sub_part'] ?? null ) ) {
+				return false;
+			}
+		}
+		return true;
+	}
 }
