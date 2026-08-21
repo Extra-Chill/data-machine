@@ -33,7 +33,7 @@ $assert( str_contains( $email, "0 === stripos( \$header, 'From:' )" ), 'syntheti
 $assert( substr_count( $api, '...self::mailbox_args()' ) >= 12 && str_contains( $api, "'args'                => self::mailbox_args()" ), 'all email REST routes advertise mailbox selectors' );
 $assert( str_contains( $api, "'auth_ref' => array(" ) && str_contains( $api, "'mailbox'  => array(" ), 'REST schema declares auth_ref and mailbox' );
 $assert( substr_count( $cli, '[--auth-ref=<ref>]' ) >= 14 && substr_count( $cli, '[--mailbox=<name>]' ) >= 14, 'all email CLI commands document both mailbox selectors' );
-$assert( ! str_contains( $handler, '_legacy_default_auth' ), 'email handler accepts only explicit canonical mailbox authorization' );
+$assert( str_contains( $handler, "'legacy_default_auth'   => (string) ( \$config['_legacy_default_auth'] ?? '' )" ), 'email handler forwards only the persisted legacy marker into trusted execution context' );
 $assert( strpos( $queue, 'verifyMailboxGrant( $payload )' ) < strpos( $queue, "wp_get_ability( 'datamachine/send-email' )" ), 'queue worker verifies signed authorization before ability execution' );
 $assert( strpos( $queue, 'currentIssuerAuthorized( $grant )' ) < strpos( $queue, "wp_get_ability( 'datamachine/send-email' )" ), 'queue worker revalidates explicit issuer authority before ability execution' );
 $assert( str_contains( $queue, "'token_id'" ) && str_contains( $queue, "(int) \$context['token_id']" ) && str_contains( $queue, "'issuer_type'" ), 'signed queue envelope captures stable non-secret issuer identity' );

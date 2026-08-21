@@ -13,6 +13,7 @@ namespace DataMachine\Core\Steps\Fetch\Handlers\Email;
 
 use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Core\Database\Agents\Agents;
+use DataMachine\Core\Database\Flows\Flows;
 use DataMachine\Core\OAuth\BaseAuthProvider;
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -213,7 +214,7 @@ class EmailAuth extends BaseAuthProvider {
 
 	private function can_use_default( array $context, int $agent_id, int $user_id ): bool {
 		if ( $agent_id > 0 ) {
-			return false;
+			return $this->can_use_migrated_legacy_default( $context, $agent_id );
 		}
 		if ( ! empty( $context['principal_less_system'] ) && ! empty( $context['_trusted_execution'] ) ) {
 			return true;
@@ -222,6 +223,39 @@ class EmailAuth extends BaseAuthProvider {
 			return class_exists( PermissionHelper::class ) && PermissionHelper::can_manage();
 		}
 		return $this->user_has_management_capability( $user_id );
+	}
+
+	/**
+	 * Preserve the signed default-mailbox grant written by the final pre-1.0 migration.
+	 */
+	private function can_use_migrated_legacy_default( array $context, int $agent_id ): bool {
+		$flow_id      = absint( $context['flow_id'] ?? 0 );
+		$flow_step_id = (string) ( $context['flow_step_id'] ?? '' );
+		$provided     = (string) ( $context['legacy_default_auth'] ?? '' );
+		if ( empty( $context['_trusted_execution'] ) || $flow_id <= 0 || '' === $flow_step_id || 64 !== strlen( $provided ) || ! ctype_xdigit( $provided ) ) {
+			return false;
+		}
+
+		$expected = self::legacy_default_marker( $flow_id, $flow_step_id, $agent_id );
+		if ( ! hash_equals( $expected, strtolower( $provided ) ) ) {
+			return false;
+		}
+
+		$flow = ( new Flows() )->get_flow( $flow_id );
+		if ( ! is_array( $flow ) || $agent_id !== absint( $flow['agent_id'] ?? 0 ) ) {
+			return false;
+		}
+
+		$persisted = $flow['flow_config'][ $flow_step_id ]['handler_configs']['email']['_legacy_default_auth'] ?? null;
+		return is_string( $persisted ) && hash_equals( $expected, strtolower( $persisted ) );
+	}
+
+	/**
+	 * Reproduce the marker format shipped by the final pre-1.0 migration.
+	 */
+	public static function legacy_default_marker( int $flow_id, string $flow_step_id, int $agent_id ): string {
+		$payload = implode( '|', array( 'email-default-v1', (string) $flow_id, $flow_step_id, (string) $agent_id ) );
+		return hash_hmac( 'sha256', $payload, wp_salt( 'auth' ) );
 	}
 
 	public function grant_agent( string $account, string $owner_type, int $owner_id, int $agent_id, array $operations ): bool {
