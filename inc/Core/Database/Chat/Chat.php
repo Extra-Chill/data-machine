@@ -34,9 +34,9 @@ if ( ! defined( 'ABSPATH' ) ) {
  * instantiating this class directly.
  */
 class Chat extends BaseRepository implements ConversationStoreInterface {
-	private const MIGRATION_BATCH_SIZE = 100;
+	private const MIGRATION_BATCH_SIZE            = 100;
 	private const MIGRATION_COLLISION_PROBE_LIMIT = 100;
-	private const MIGRATION_NUMERIC_COLUMNS = array( 'user_id', 'agent_id' );
+	private const MIGRATION_NUMERIC_COLUMNS       = array( 'user_id', 'agent_id' );
 
 	/**
 	 * Table name (without prefix)
@@ -145,7 +145,7 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 			)
 		);
 
-		$target_columns = self::migration_table_columns( $network_table );
+		$target_columns  = self::migration_table_columns( $network_table );
 		$required_target = array( 'session_id', 'workspace_type', 'workspace_id', 'user_id', 'owner_type', 'owner_key_hash', 'messages', 'metadata', 'mode' );
 		if ( array_diff( $required_target, $target_columns ) ) {
 			$convergence['success'] = false;
@@ -184,6 +184,7 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 					$convergence['error']   = sprintf( 'Failed reading chat sessions from %s: %s', $site_table, (string) $wpdb->last_error );
 					return $convergence;
 				}
+				$row_count = count( $rows );
 
 				foreach ( $rows as $row ) {
 					$cursor    = (string) ( $row['session_id'] ?? '' );
@@ -207,7 +208,7 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 						++$convergence['missing'];
 					}
 				}
-			} while ( count( $rows ) === self::MIGRATION_BATCH_SIZE );
+			} while ( self::MIGRATION_BATCH_SIZE === $row_count );
 		}
 
 		if ( 0 === $convergence['missing'] && ! self::claim_unscoped_network_rows_for_main_site( $network_table, $target_columns, $convergence ) ) {
@@ -382,7 +383,7 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 	private static function migration_has_provenance( array $row, int $blog_id, string $session_id ): bool {
 		$metadata = json_decode( (string) ( $row['metadata'] ?? '' ), true );
 		$source   = is_array( $metadata ) && is_array( $metadata['migration_source'] ?? null ) ? $metadata['migration_source'] : array();
-		return $blog_id === (int) ( $source['blog_id'] ?? 0 ) && $session_id === (string) ( $source['session_id'] ?? '' );
+		return (int) ( $source['blog_id'] ?? 0 ) === $blog_id && (string) ( $source['session_id'] ?? '' ) === $session_id;
 	}
 
 	/** Compare persisted payload while treating migration provenance as enrichment. */
@@ -396,7 +397,7 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 					if ( 'metadata' === $column ) {
 						unset( $stored_json['migration_source'], $canonical_json['migration_source'] );
 					}
-					if ( $stored_json != $canonical_json ) {
+					if ( $stored_json !== $canonical_json ) {
 						return false;
 					}
 					continue;
@@ -476,7 +477,7 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 			}
 
 			foreach ( $rows as $row ) {
-				$cursor = (string) ( $row['session_id'] ?? '' );
+				$cursor  = (string) ( $row['session_id'] ?? '' );
 				$claimed = false;
 				for ( $retry = 0; $retry < 3; ++$retry ) {
 					$observed = self::migration_target_row( $network_table, $cursor );
@@ -507,7 +508,8 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 					return false;
 				}
 			}
-		} while ( count( $rows ) === self::MIGRATION_BATCH_SIZE );
+			$row_count = count( $rows );
+		} while ( self::MIGRATION_BATCH_SIZE === $row_count );
 
 		return true;
 	}
@@ -552,9 +554,9 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 			return null;
 		}
 
-		$user_id    = absint( $row['user_id'] );
-		$owner_type = sanitize_key( (string) ( $row['owner_type'] ?? '' ) );
-		$owner_hash = strtolower( (string) ( $row['owner_key_hash'] ?? '' ) );
+		$user_id     = absint( $row['user_id'] );
+		$owner_type  = sanitize_key( (string) ( $row['owner_type'] ?? '' ) );
+		$owner_hash  = strtolower( (string) ( $row['owner_key_hash'] ?? '' ) );
 		$owner_label = sanitize_text_field( (string) ( $row['owner_label'] ?? '' ) );
 		$meta_owner  = is_array( $metadata['transcript_owner'] ?? null ) ? $metadata['transcript_owner'] : array();
 		if ( '' === $owner_type || 1 !== preg_match( '/^[a-f0-9]{64}$/', $owner_hash ) ) {
@@ -572,12 +574,12 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 			$owner_label = $owner['owner_label'];
 		}
 
-		$metadata['workspace'] = array(
+		$metadata['workspace']        = array(
 			'workspace_type' => $workspace_type,
 			'workspace_id'   => $workspace_id,
 		);
-		$metadata['workspace_type']  = $workspace_type;
-		$metadata['workspace_id']    = $workspace_id;
+		$metadata['workspace_type']   = $workspace_type;
+		$metadata['workspace_id']     = $workspace_id;
 		$metadata['transcript_owner'] = array(
 			'owner_type'     => $owner_type,
 			'owner_key_hash' => $owner_hash,
@@ -588,6 +590,7 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 			'session_id' => $session_id,
 		);
 
+		$mode      = trim( (string) ( $row['mode'] ?? $row['context'] ?? 'chat' ) );
 		$canonical = array(
 			'session_id'     => $session_id,
 			'workspace_type' => $workspace_type,
@@ -598,7 +601,7 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 			'owner_label'    => $owner_label,
 			'messages'       => (string) $row['messages'],
 			'metadata'       => wp_json_encode( $metadata ),
-			'mode'           => trim( (string) ( $row['mode'] ?? $row['context'] ?? 'chat' ) ) ?: 'chat',
+			'mode'           => '' !== $mode ? $mode : 'chat',
 		);
 
 		foreach ( array( 'agent_id', 'title', 'provider', 'model', 'provider_response_id', 'created_at', 'updated_at', 'last_read_at', 'expires_at', 'transcript_lock_token', 'transcript_lock_expires_at' ) as $column ) {
@@ -1690,19 +1693,19 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 			$agent_row        = $session_agent_id > 0 ? ( $agents_by_id[ $session_agent_id ] ?? null ) : null;
 
 			$result[] = array(
-				'session_id'    => $session['session_id'],
+				'session_id'     => $session['session_id'],
 				'workspace_type' => (string) ( $session['workspace_type'] ?? '' ),
 				'workspace_id'   => (string) ( $session['workspace_id'] ?? '' ),
-				'title'         => $session['title'] ?? null,
-				'mode'          => $session['mode'] ?? 'chat',
-				'first_message' => mb_substr( $first_message, 0, 100 ),
-				'message_count' => count( $messages ),
-				'unread_count'  => $this->count_unread( $messages, $last_read_at ),
-				'agent_id'      => $session_agent_id > 0 ? $session_agent_id : null,
-				'agent_slug'    => $agent_row ? (string) $agent_row['agent_slug'] : null,
-				'agent_name'    => $agent_row ? (string) $agent_row['agent_name'] : null,
-				'created_at'    => DateFormatter::format_for_api( $session['created_at'] ?? null ),
-				'updated_at'    => DateFormatter::format_for_api( $session['updated_at'] ?? $session['created_at'] ?? null ),
+				'title'          => $session['title'] ?? null,
+				'mode'           => $session['mode'] ?? 'chat',
+				'first_message'  => mb_substr( $first_message, 0, 100 ),
+				'message_count'  => count( $messages ),
+				'unread_count'   => $this->count_unread( $messages, $last_read_at ),
+				'agent_id'       => $session_agent_id > 0 ? $session_agent_id : null,
+				'agent_slug'     => $agent_row ? (string) $agent_row['agent_slug'] : null,
+				'agent_name'     => $agent_row ? (string) $agent_row['agent_name'] : null,
+				'created_at'     => DateFormatter::format_for_api( $session['created_at'] ?? null ),
+				'updated_at'     => DateFormatter::format_for_api( $session['updated_at'] ?? $session['created_at'] ?? null ),
 			);
 		}
 

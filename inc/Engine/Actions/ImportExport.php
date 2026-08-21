@@ -161,9 +161,9 @@ class ImportExport {
 	 * }>
 	 */
 	private function parse_csv_rows( string $data ): array {
-		$rows   = str_getcsv( $data, "\n" );
-		$parsed = array();
-		$header = isset( $rows[0] ) ? str_getcsv( $rows[0] ) : array();
+		$rows            = str_getcsv( $data, "\n" );
+		$parsed          = array();
+		$header          = isset( $rows[0] ) ? str_getcsv( $rows[0] ) : array();
 		$expected_header = array( 'pipeline_id', 'pipeline_name', 'step_position', 'step_type', 'step_config', 'flow_id', 'flow_name', 'settings' );
 		if ( $expected_header !== $header ) {
 			throw new \InvalidArgumentException( 'CSV header does not match the Data Machine 1.0 pipeline format.' );

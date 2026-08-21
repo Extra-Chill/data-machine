@@ -403,9 +403,9 @@ abstract class BaseAuthProvider {
 		if ( isset( $provider_data['accounts'][ $account_name ] ) && is_array( $provider_data['accounts'][ $account_name ] ) ) {
 			$matches[] = array(
 				'account_name' => $account_name,
-				'owner_type' => self::AUTH_SCOPE_SITE,
-				'owner_id'   => 0,
-				'account'    => $this->decrypt_fields( $provider_data['accounts'][ $account_name ] ),
+				'owner_type'   => self::AUTH_SCOPE_SITE,
+				'owner_id'     => 0,
+				'account'      => $this->decrypt_fields( $provider_data['accounts'][ $account_name ] ),
 			);
 		}
 
@@ -418,9 +418,9 @@ abstract class BaseAuthProvider {
 			}
 			$matches[] = array(
 				'account_name' => $account_name,
-				'owner_type' => $parts[1],
-				'owner_id'   => (int) $parts[2],
-				'account'    => $this->decrypt_fields( $principal_data['accounts'][ $account_name ] ),
+				'owner_type'   => $parts[1],
+				'owner_id'     => (int) $parts[2],
+				'account'      => $this->decrypt_fields( $principal_data['accounts'][ $account_name ] ),
 			);
 		}
 

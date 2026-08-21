@@ -234,13 +234,16 @@ final class AgentBundleArtifactRebase {
 		);
 
 		foreach ( $step_ids as $step_id ) {
-			$base_step   = is_array( $base_steps[ $step_id ] ?? null ) ? $base_steps[ $step_id ] : array();
-			$local_step  = is_array( $local_steps[ $step_id ] ?? null ) ? $local_steps[ $step_id ] : array();
-			$remote_step = is_array( $remote_steps[ $step_id ] ?? null ) ? $remote_steps[ $step_id ] : array();
-			$fallback_slug = self::single_handler_slug( $base_step, $local_step, $remote_step );
-			$base_step     = self::canonicalize_installed_handler_config( $base_step, self::step_handler_slug( $base_step ) ?: $fallback_slug );
-			$local_step    = self::canonicalize_installed_handler_config( $local_step, self::step_handler_slug( $local_step ) ?: $fallback_slug );
-			$remote_step   = self::canonicalize_installed_handler_config( $remote_step, self::step_handler_slug( $remote_step ) ?: $fallback_slug );
+			$base_step                 = is_array( $base_steps[ $step_id ] ?? null ) ? $base_steps[ $step_id ] : array();
+			$local_step                = is_array( $local_steps[ $step_id ] ?? null ) ? $local_steps[ $step_id ] : array();
+			$remote_step               = is_array( $remote_steps[ $step_id ] ?? null ) ? $remote_steps[ $step_id ] : array();
+			$fallback_slug             = self::single_handler_slug( $base_step, $local_step, $remote_step );
+			$base_handler_slug         = self::step_handler_slug( $base_step );
+			$local_handler_slug        = self::step_handler_slug( $local_step );
+			$remote_handler_slug       = self::step_handler_slug( $remote_step );
+			$base_step                 = self::canonicalize_installed_handler_config( $base_step, '' !== $base_handler_slug ? $base_handler_slug : $fallback_slug );
+			$local_step                = self::canonicalize_installed_handler_config( $local_step, '' !== $local_handler_slug ? $local_handler_slug : $fallback_slug );
+			$remote_step               = self::canonicalize_installed_handler_config( $remote_step, '' !== $remote_handler_slug ? $remote_handler_slug : $fallback_slug );
 			$unresolved_handler_config = '' === $fallback_slug && (
 				is_array( $base_step['handler_config'] ?? null )
 				|| is_array( $local_step['handler_config'] ?? null )
@@ -269,7 +272,7 @@ final class AgentBundleArtifactRebase {
 					'source' => 'ambiguous',
 					'reason' => 'handler_slug_cannot_be_inferred',
 				);
-				$ambiguous[] = $path;
+				$ambiguous[]        = $path;
 			}
 
 			// Preserve per-step runtime queue fields from local.

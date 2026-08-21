@@ -611,7 +611,7 @@ abstract class BaseOAuth2Provider extends BaseAuthProvider {
 			}
 		}
 
-		$state  = $this->oauth2->create_state( $this->provider_slug, $state_payload );
+		$state = $this->oauth2->create_state( $this->provider_slug, $state_payload );
 		if ( isset( $state_payload['agent_id'], $state_payload['user_id'] ) ) {
 			$this->agent_state_nonce = $state;
 		}

@@ -485,5 +485,4 @@ class FlowQueue {
 			)
 		);
 	}
-
 }

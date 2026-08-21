@@ -37,7 +37,7 @@ function datamachine_converge_chat_sessions_to_network(): bool {
 		'rows_copied' => (int) ( $result['copied'] ?? 0 ),
 	);
 	update_site_option( 'datamachine_chat_sessions_network_migrated', $marker );
-	if ( $marker !== get_site_option( 'datamachine_chat_sessions_network_migrated' ) ) {
+	if ( get_site_option( 'datamachine_chat_sessions_network_migrated' ) !== $marker ) {
 		return false;
 	}
 

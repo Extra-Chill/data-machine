@@ -517,5 +517,4 @@ class AgentFiles {
 			'message' => $result['message'],
 		) );
 	}
-
 }

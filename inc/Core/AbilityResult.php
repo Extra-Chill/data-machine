@@ -132,6 +132,7 @@ class AbilityResult {
 	 * @param int    $default_status  Default HTTP status.
 	 * @return \WP_REST_Response|\WP_Error REST response or error.
 	 */
+	// phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.FoundAfterLastUsed -- Preserve the public presentation API's legacy error defaults.
 	public static function rest_collection_response( $result, string $items_key, array $options = array(), string $default_code = 'ability_failed', string $default_message = 'Ability execution failed.', int $default_status = 500 ) {
 		if ( is_wp_error( $result ) ) {
 			return $result;
@@ -170,6 +171,7 @@ class AbilityResult {
 	 * @param int    $default_status  Default HTTP status.
 	 * @return \WP_REST_Response|\WP_Error REST response or error.
 	 */
+	// phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.FoundAfterLastUsed -- Preserve the public presentation API's legacy error defaults.
 	public static function rest_item_response( $result, $data = null, array $extra = array(), string $default_code = 'ability_failed', string $default_message = 'Ability execution failed.', int $default_status = 500 ) {
 		if ( is_wp_error( $result ) ) {
 			return $result;

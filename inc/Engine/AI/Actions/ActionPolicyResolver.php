@@ -77,8 +77,8 @@ class ActionPolicyResolver {
 	 */
 	public function resolveForTool( array $context ): string {
 		$context['input'] = is_array( $context['input'] ?? null ) ? $context['input'] : array();
-		$context = $this->withAgentConfig( $context );
-		$policy  = $this->resolver->resolve_for_tool( $context );
+		$context          = $this->withAgentConfig( $context );
+		$policy           = $this->resolver->resolve_for_tool( $context );
 
 		return $this->applyDataMachineFilter( $policy, (string) ( $context['tool_name'] ?? '' ), (string) ( $context['mode'] ?? self::MODE_CHAT ), $context );
 	}

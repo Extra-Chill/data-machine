@@ -34,11 +34,11 @@ class RestResultSpec {
 	 * @param int           $default_status          Default HTTP status.
 	 */
 	public function __construct( $data_callback = null, $extra_callback = null, string $default_code = 'ability_failed', string $default_message = 'Ability execution failed.', int $default_status = 500 ) {
-		$this->data_callback           = $data_callback;
-		$this->extra_callback          = $extra_callback;
-		$this->default_code            = $default_code;
-		$this->default_message         = $default_message;
-		$this->default_status          = $default_status;
+		$this->data_callback   = $data_callback;
+		$this->extra_callback  = $extra_callback;
+		$this->default_code    = $default_code;
+		$this->default_message = $default_message;
+		$this->default_status  = $default_status;
 	}
 
 	/**

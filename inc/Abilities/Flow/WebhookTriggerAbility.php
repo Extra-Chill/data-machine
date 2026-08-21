@@ -12,7 +12,6 @@
 
 namespace DataMachine\Abilities\Flow;
 
-
 defined( 'ABSPATH' ) || exit;
 
 /**
