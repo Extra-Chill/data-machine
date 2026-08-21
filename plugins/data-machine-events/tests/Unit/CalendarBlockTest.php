@@ -38,6 +38,12 @@ class CalendarBlockTest extends WP_UnitTestCase {
 		$this->assertNotNull( $block->render_callback, 'Block should have render callback' );
 	}
 
+	public function test_server_rendered_calendar_disables_generic_page_caching(): void {
+		$this->render_calendar();
+
+		$this->assertTrue( defined( 'DONOTCACHEPAGE' ) && DONOTCACHEPAGE );
+	}
+
 	public function test_pagination_exposes_sanitized_public_arguments(): void {
 		$original_get = $_GET;
 		$_GET         = array(

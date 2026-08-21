@@ -24,6 +24,13 @@ if ( wp_is_json_request() || ( defined( 'REST_REQUEST' ) && REST_REQUEST ) ) {
 	return '';
 }
 
+// Upcoming eligibility changes as event start/end boundaries pass. A generic
+// full-page cache cannot know those boundaries, while the calendar's own
+// response and bucket caches can expire precisely at the next transition.
+if ( ! defined( 'DONOTCACHEPAGE' ) ) {
+	define( 'DONOTCACHEPAGE', true );
+}
+
 $show_search = $attributes['showSearch'] ?? true;
 
 // Resolve archive term context first so the value object can pick it up.

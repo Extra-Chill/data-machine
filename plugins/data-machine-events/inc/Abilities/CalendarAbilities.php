@@ -595,7 +595,10 @@ class CalendarAbilities {
 
 		$result = self::compute_unique_event_dates( $params );
 
-		CalendarCache::set( $cache_key, $result, CalendarCache::TTL_DATES );
+		$ttl = empty( $params['show_past'] ) && empty( $params['user_date_range'] )
+			? CalendarCache::ttl_for_upcoming_transition( CalendarCache::TTL_DATES )
+			: CalendarCache::TTL_DATES;
+		CalendarCache::set( $cache_key, $result, $ttl );
 
 		return $result;
 	}

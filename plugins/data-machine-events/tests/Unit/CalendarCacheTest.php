@@ -17,6 +17,7 @@ use WP_REST_Server;
 use DataMachineEvents\Blocks\Calendar\Cache\CalendarCache;
 use DataMachineEvents\Blocks\Calendar\Cache\CacheInvalidator;
 use DataMachineEvents\Core\Event_Post_Type;
+use DataMachineEvents\Core\EventDatesTable;
 use DataMachineEvents\Core\Venue_Taxonomy;
 
 class CalendarCacheTest extends WP_UnitTestCase {
@@ -35,6 +36,9 @@ class CalendarCacheTest extends WP_UnitTestCase {
 		}
 		if ( ! taxonomy_exists( 'venue' ) ) {
 			Venue_Taxonomy::register();
+		}
+		if ( ! EventDatesTable::table_exists() ) {
+			EventDatesTable::create_table();
 		}
 		CacheInvalidator::init();
 	}
@@ -255,6 +259,52 @@ class CalendarCacheTest extends WP_UnitTestCase {
 			CalendarCache::TTL_FULL_PAST,
 			'past TTL must be longer than upcoming TTL'
 		);
+	}
+
+	public function test_cached_unfiltered_and_title_search_expire_together_at_event_end(): void {
+		$venue = wp_insert_term( 'Cache transition venue ' . uniqid(), 'venue' );
+		$this->assertNotWPError( $venue );
+
+		$now     = current_datetime();
+		$title   = 'Flow Tribe + J & The Causeways';
+		$post_id = self::factory()->post->create(
+			array(
+				'post_title'  => $title,
+				'post_type'   => Event_Post_Type::POST_TYPE,
+				'post_status' => 'publish',
+			)
+		);
+		EventDatesTable::upsert(
+			$post_id,
+			$now->modify( '-1 hour' )->format( 'Y-m-d H:i:s' ),
+			$now->modify( '+5 seconds' )->format( 'Y-m-d H:i:s' ),
+			'publish'
+		);
+		wp_set_object_terms( $post_id, array( (int) $venue['term_id'] ), 'venue' );
+		CalendarCache::invalidate();
+		wp_set_current_user( 0 );
+
+		$unfiltered = new WP_REST_Request( 'GET', '/datamachine/v1/events/calendar' );
+		$unfiltered->set_param( 'archive_taxonomy', 'venue' );
+		$unfiltered->set_param( 'archive_term_id', (int) $venue['term_id'] );
+		$searched = clone $unfiltered;
+		$searched->set_param( 'event_search', 'flow tribe' );
+
+		$before_unfiltered = $this->server->dispatch( $unfiltered )->get_data();
+		$before_searched   = $this->server->dispatch( $searched )->get_data();
+		$this->assertStringContainsString( 'Flow Tribe', $before_unfiltered['html'] );
+		$this->assertStringContainsString( 'Flow Tribe', $before_searched['html'] );
+
+		$ttl = CalendarCache::ttl_for_envelope( array( 'past' => false ) );
+		$this->assertLessThanOrEqual( 6, $ttl );
+		sleep( $ttl + 1 );
+
+		$after_unfiltered = $this->server->dispatch( $unfiltered )->get_data();
+		$after_searched   = $this->server->dispatch( $searched )->get_data();
+		$this->assertStringNotContainsString( 'Flow Tribe', $after_unfiltered['html'] );
+		$this->assertStringNotContainsString( 'Flow Tribe', $after_searched['html'] );
+		$this->assertSame( 0, $after_unfiltered['pagination']['total_events'] );
+		$this->assertSame( 0, $after_searched['pagination']['total_events'] );
 	}
 
 	/**
