@@ -9,6 +9,7 @@ namespace DataMachine\Tests\Unit\Core\Identity;
 
 use AgentsAPI\Core\Identity\WP_Agent_Identity_Scope;
 use AgentsAPI\Core\Identity\WP_Agent_Materialized_Identity;
+use DataMachine\Abilities\File\ScaffoldAbilities;
 use DataMachine\Core\Database\Agents\AgentAccess;
 use DataMachine\Core\Database\Agents\Agents;
 use DataMachine\Core\FilesRepository\DirectoryManager;
@@ -165,6 +166,34 @@ class AgentIdentityStoreAdapterTest extends WP_UnitTestCase {
 		$this->assertSame( '', (string) $row['provisioning_token'] );
 		$this->assertEmpty( $row['provisioned_at'] );
 		$this->assertNull( $this->store->resolve( $scope ) );
+	}
+
+	public function test_bootstrap_materializes_without_authenticated_user_while_public_ability_remains_denied(): void {
+		$slug = 'unauthenticated-bootstrap-agent';
+		$this->register_agent( $slug );
+		wp_set_current_user( 0 );
+
+		$identity  = $this->store->materialize( new WP_Agent_Identity_Scope( $slug, $this->owner_a ) );
+		$directory = ( new DirectoryManager() )->resolve_agent_directory( array( 'agent_id' => $identity->id ) );
+
+		$this->assertSame( $identity->id, $this->store->resolve( $identity->scope )->id );
+		$this->assertFileExists( trailingslashit( $directory ) . 'SOUL.md' );
+		$this->assertFileExists( trailingslashit( $directory ) . 'MEMORY.md' );
+
+		$ability = ScaffoldAbilities::get_ability();
+		$this->assertNotNull( $ability );
+		$result = $ability->execute(
+			array(
+				'layer'         => 'agent',
+				'agent_slug'    => $slug,
+				'agent_id'      => $identity->id,
+				'owner_user_id' => $this->owner_a,
+				'instance_key'  => 'default',
+			)
+		);
+
+		$this->assertWPError( $result );
+		$this->assertSame( 'ability_invalid_permissions', $result->get_error_code() );
 	}
 
 	public function test_duplicate_key_loser_reconciles_pending_winner(): void {

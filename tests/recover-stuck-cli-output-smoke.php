@@ -32,6 +32,7 @@ assert_recover_stuck_cli_output_smoke( 'recover-stuck supports json examples', s
 assert_recover_stuck_cli_output_smoke( 'non-table output uses WP_CLI print_value', str_contains( $cli_source, "if ( 'table' !== \$format )" ) && str_contains( $cli_source, 'WP_CLI::print_value' ) );
 assert_recover_stuck_cli_output_smoke( 'structured output includes summary and jobs', str_contains( $cli_source, "'summary'        => \$summary" ) && str_contains( $cli_source, "'jobs'           => \$jobs" ) );
 assert_recover_stuck_cli_output_smoke( 'structured output includes truncation metadata', str_contains( $cli_source, "'jobs_omitted'" ) && str_contains( $cli_source, "'jobs_truncated'" ) );
+assert_recover_stuck_cli_output_smoke( 'structured output separates input, requested, and effective limits from logical metrics', str_contains( $cli_source, "'limit'          => array(" ) && str_contains( $cli_source, "'input_limit'          => \$summary['input_limit']" ) && str_contains( $cli_source, "'requested_limit'      => \$summary['requested_limit']" ) && str_contains( $cli_source, "'apply_limit'          => \$summary['apply_limit']" ) && str_contains( $cli_source, "'metrics'        => array(" ) && str_contains( $cli_source, "'target_attempts'" ) && str_contains( $cli_source, "'logical_touches'" ) && str_contains( $cli_source, "'logical_mutations'" ) );
 
 echo "Case 2: recover-stuck separates actionable and guarded jobs\n";
 assert_recover_stuck_cli_output_smoke( 'summary helper exists', str_contains( $cli_source, 'private function summarize_recover_stuck_result' ) );
@@ -39,6 +40,8 @@ assert_recover_stuck_cli_output_smoke( 'summary computes actionable total', str_
 assert_recover_stuck_cli_output_smoke( 'summary explicitly includes expired pending AI terminalizations', str_contains( $cli_source, '$pending_ai_terminalized + $recovered' ) );
 assert_recover_stuck_cli_output_smoke( 'table headline reports guarded jobs separately', str_contains( $cli_source, 'Found %d recoverable jobs/actions and %d guarded jobs.' ) );
 assert_recover_stuck_cli_output_smoke( 'table output reports truncated details', str_contains( $cli_source, 'Output truncated; %d additional job/action details omitted.' ) );
+assert_recover_stuck_cli_output_smoke( 'table output names input, requested, and effective limits plus logical metrics', str_contains( $cli_source, 'limit-mode=%s input-limit=%d requested-limit=%d %s apply-limit=%d logical_touch' ) && str_contains( $cli_source, 'target-attempts=%d logical-touches=%d logical-mutations=%d' ) );
+assert_recover_stuck_cli_output_smoke( 'help states exact mode target and compound touch contracts', str_contains( $cli_source, 'effective request is one target' ) && str_contains( $cli_source, 'exact compound recovery may consume up to MAX_APPLY_LIMIT=100 logical touches even with --limit=1' ) );
 
 $pathless_branch = strstr( $ability_source, 'if ( is_array( $child_diagnosis ) ) {' ) ?: '';
 $pathless_branch = strstr( $pathless_branch, '// Diagnosis can change after claiming', true ) ?: '';

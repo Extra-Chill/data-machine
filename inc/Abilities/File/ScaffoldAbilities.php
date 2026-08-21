@@ -6,8 +6,10 @@
  * creating missing memory files lives here — directory resolution,
  * content generation, file writing, permission checks.
  *
- * Every caller uses the ability directly:
+ * External callers use the ability directly:
  *   wp_get_ability( 'datamachine/scaffold-memory-file' )->execute( $input )
+ * Trusted domain bootstrap may invoke execute() without re-entering the public
+ * permission boundary.
  *
  * Content generators register on the `datamachine_scaffold_content`
  * filter, keyed by filename. The ability never overwrites existing files.

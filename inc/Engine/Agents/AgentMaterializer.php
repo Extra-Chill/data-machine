@@ -24,7 +24,7 @@ class AgentMaterializer {
 	 * For each registered slug:
 	 *   - Row already exists -> leave it alone (mutable fields are DB-owned)
 	 *   - Row missing        -> resolve owner, create row, bootstrap access,
-	 *                          ensure agent directory, trigger scaffold ability
+	 *                          ensure agent directory, scaffold memory files
 	 *
 	 * Idempotent: safe to call multiple times per request. Returns a
 	 * summary of what happened for logging / testing.
