@@ -2,6 +2,17 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.175.6] - 2026-08-21
+
+### Changed
+- remove vendor names from generic layer
+- add bounded job metadata reads
+
+### Fixed
+- allow trusted agent scaffold bootstrap
+- recover exact stuck job within target limit
+- initialize scheduler schema across multisite
+
 ## [0.175.5] - 2026-08-20
 
 ### Changed
