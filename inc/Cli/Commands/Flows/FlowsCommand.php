@@ -25,6 +25,7 @@ use DataMachine\Cli\UserResolver;
 use DataMachine\Cli\Commands\DrainCommand;
 use DataMachine\Core\AbilityResult;
 use DataMachine\Core\Database\Flows\FlowConfigEscaping;
+use DataMachine\Core\PluginSettings;
 use DataMachine\Core\Steps\FlowStepConfig;
 use DataMachine\Engine\Debug\SyncRunner;
 
@@ -1493,18 +1494,31 @@ class FlowsCommand extends BaseCommand {
 			}
 
 			$updated_keys = implode( ', ', array_keys( $unwrapped_config ) );
+			$step_ability = new \DataMachine\Abilities\FlowStep\UpdateFlowStepAbility();
 
 			if ( $dry_run ) {
-				WP_CLI::log( sprintf( '[dry-run] would update handler_config for step %s: %s; no changes written', $handler_step, $updated_keys ) );
+				$step_input['validate_only'] = true;
+			}
+
+			$step_result = AbilityResult::normalize( $step_ability->execute( $step_input ) );
+
+			if ( ! $step_result['success'] ) {
+				WP_CLI::error( $step_result['error'] ?? 'Failed to update handler config' );
+				return;
+			}
+
+			if ( $dry_run ) {
+				$effective_config = PluginSettings::redactForDisplay( '', $step_result['effective_handler_config'] ?? array() );
+				$effective_config = \DataMachine\Engine\AI\datamachine_bound_tool_trace_value( $effective_config );
+				WP_CLI::log(
+					sprintf(
+						'[dry-run] would update handler_config for step %s: %s; effective config: %s; no changes written',
+						$handler_step,
+						$updated_keys,
+						(string) wp_json_encode( $effective_config, JSON_UNESCAPED_SLASHES )
+					)
+				);
 			} else {
-				$step_ability = new \DataMachine\Abilities\FlowStep\UpdateFlowStepAbility();
-				$step_result  = AbilityResult::normalize( $step_ability->execute( $step_input ) );
-
-				if ( ! $step_result['success'] ) {
-					WP_CLI::error( $step_result['error'] ?? 'Failed to update handler config' );
-					return;
-				}
-
 				WP_CLI::success( sprintf( 'Handler config updated for step %s: %s', $handler_step, $updated_keys ) );
 			}
 		}

@@ -1,151 +1,234 @@
 <?php
 /**
- * Pure-PHP smoke test for atomic deep-merge of handler/settings config
- * (#2673).
+ * Behavioral smoke for handler-config partial update parity (#3024).
  *
  * Run with: php tests/flow-update-handler-config-deep-merge-smoke.php
- *
- * Pins the data-integrity fix for the CLI write path that nearly corrupted
- * a live flow: a partial `--handler-config '{"params":{"message":"..."}}'`
- * update used to be applied with a shallow array_merge(), which replaced the
- * entire `params` array and silently dropped the sibling keys (channel,
- * recipient) that weren't restated. The stored message was truncated rather
- * than left untouched.
- *
- * FlowStepHelpers::deepMergeConfig() recursively merges nested associative
- * arrays so a partial nested patch keeps the existing sibling keys. This
- * smoke pins:
- *
- *   1. A partial `params` patch preserves unmentioned sibling keys.
- *   2. A mentioned nested key is overwritten with the new value.
- *   3. Top-level scalar keys still behave like array_merge() (overwrite).
- *   4. Numeric-keyed (list) arrays are replaced wholesale, not index-merged.
- *   5. An empty incoming patch object does not clobber an existing nested map.
  *
  * @package DataMachine\Tests
  */
 
-if ( ! defined( 'ABSPATH' ) ) {
-	define( 'ABSPATH', __DIR__ . '/' );
-}
+namespace {
+	if ( ! defined( 'ABSPATH' ) ) {
+		define( 'ABSPATH', __DIR__ . '/' );
+	}
 
-require_once dirname( __DIR__ ) . '/inc/Abilities/FlowStep/FlowStepHelpers.php';
+	$GLOBALS['handler_config_smoke_flow']   = array();
+	$GLOBALS['handler_config_smoke_logs']   = array();
+	$GLOBALS['handler_config_smoke_writes'] = array();
 
-/**
- * Minimal host that exposes the trait's protected static deepMergeConfig()
- * for direct assertion without a full WordPress bootstrap.
- */
-class DeepMergeConfigSmokeHost {
-	use \DataMachine\Abilities\FlowStep\FlowStepHelpers;
+	class WP_Error {}
 
-	public static function merge( array $existing, array $patch ): array {
-		return self::deepMergeConfig( $existing, $patch );
+	function apply_filters( $hook, $value, ...$args ) {
+		if ( 'datamachine_split_flow_step_id' === $hook ) {
+			return array(
+				'pipeline_step_id' => 'fetch_1',
+				'flow_id'          => 806,
+			);
+		}
+		return $value;
+	}
+
+	function do_action( $hook, ...$args ): void {
+		if ( 'datamachine_log' === $hook ) {
+			$GLOBALS['handler_config_smoke_logs'][] = $args;
+		}
 	}
 }
 
-// ─── Test harness ─────────────────────────────────────────────────────
+namespace DataMachine\Core\Database\Flows {
+	class Flows {
+		public function get_flow( $flow_id ) {
+			return $GLOBALS['handler_config_smoke_flow'];
+		}
 
-$failures = array();
-$passes   = 0;
-
-function smoke_assert_equals( $expected, $actual, string $name ): void {
-	global $failures, $passes;
-	if ( $expected === $actual ) {
-		++$passes;
-		echo "  ✓ {$name}\n";
-		return;
+		public function update_flow( $flow_id, $data ) {
+			$GLOBALS['handler_config_smoke_writes'][] = $data;
+			$GLOBALS['handler_config_smoke_flow']['flow_config'] = $data['flow_config'];
+			return true;
+		}
 	}
-
-	$failures[] = $name;
-	echo "  ✗ {$name}\n";
-	echo '    expected: ' . var_export( $expected, true ) . "\n";
-	echo '    actual:   ' . var_export( $actual, true ) . "\n";
 }
 
-echo "flow update --handler-config deep-merge atomicity smoke (#2673)\n";
-echo "----------------------------------------------------------------\n";
+namespace DataMachine\Core\Database\Pipelines {
+	class Pipelines {}
+}
 
-echo "\n[1] partial params patch preserves unmentioned sibling keys:\n";
+namespace DataMachine\Abilities {
+	class AbilityRegistration {
+		public static function on_abilities_api_init( callable $callback ): void {}
+	}
 
-$existing = array(
-	'task_type' => 'dispatch_message',
-	'params'    => array(
-		'channel'   => 'example-channel',
-		'recipient' => 'example-recipient',
-		'message'   => 'original long message body',
-	),
-);
+	class TicketmasterLikeSettings {
+		public static function sanitize( array $raw ): array {
+			return array(
+				'classification_type' => (string) ( $raw['classification_type'] ?? '' ),
+				'location'            => (string) ( $raw['location'] ?? '' ),
+				'radius'              => (string) ( $raw['radius'] ?? '50' ),
+				'genre'               => (string) ( $raw['genre'] ?? '' ),
+				'venue_id'            => (string) ( $raw['venue_id'] ?? '' ),
+				'search'              => (string) ( $raw['search'] ?? '' ),
+				'exclude_keywords'    => (string) ( $raw['exclude_keywords'] ?? '' ),
+				'max_items'           => (int) ( $raw['max_items'] ?? 100 ),
+				'params'              => is_array( $raw['params'] ?? null ) ? $raw['params'] : array(),
+			);
+		}
+	}
 
-$patch  = array( 'params' => array( 'message' => 'NEW message body' ) );
-$merged = DeepMergeConfigSmokeHost::merge( $existing, $patch );
+	class HandlerAbilities {
+		public function getSettingsClass( $slug ) {
+			return new TicketmasterLikeSettings();
+		}
 
-smoke_assert_equals(
-	array(
-		'task_type' => 'dispatch_message',
-		'params'    => array(
-			'channel'   => 'example-channel',
-			'recipient' => 'example-recipient',
-			'message'   => 'NEW message body',
+		public function getConfigFields( $slug ): array {
+			return array_fill_keys(
+				array( 'classification_type', 'location', 'radius', 'genre', 'venue_id', 'search', 'exclude_keywords', 'max_items', 'params' ),
+				array()
+			);
+		}
+
+		public function applyDefaults( $slug, array $config ): array {
+			return $config;
+		}
+	}
+
+	class PermissionHelper {}
+}
+
+namespace DataMachine\Core\Steps {
+	class FlowStepConfig {
+		public static function usesHandler( array $step ): bool {
+			return true;
+		}
+
+		public static function getEffectiveSlug( array $step, string $fallback = '' ): string {
+			return '' !== $fallback ? $fallback : ( $step['handler_slugs'][0] ?? '' );
+		}
+
+		public static function getHandlerConfigForSlug( array $step, string $slug ): array {
+			return $step['handler_configs'][ $slug ] ?? array();
+		}
+
+		public static function getPrimaryHandlerSlug( array $step ): ?string {
+			return $step['handler_slugs'][0] ?? null;
+		}
+
+		public static function getHandlerSlugs( array $step ): array {
+			return $step['handler_slugs'] ?? array();
+		}
+
+		public static function getHandlerConfigs( array $step ): array {
+			return $step['handler_configs'] ?? array();
+		}
+	}
+}
+
+namespace {
+	require_once dirname( __DIR__ ) . '/inc/Abilities/FlowStep/FlowStepHelpers.php';
+	require_once dirname( __DIR__ ) . '/inc/Abilities/FlowStep/UpdateFlowStepAbility.php';
+
+	$failures = array();
+	$passes   = 0;
+
+	function parity_assert_same( $expected, $actual, string $name ): void {
+		global $failures, $passes;
+		if ( $expected === $actual ) {
+			++$passes;
+			return;
+		}
+		$failures[] = $name;
+		fwrite( STDERR, "FAIL: {$name}\nExpected: " . var_export( $expected, true ) . "\nActual: " . var_export( $actual, true ) . "\n" );
+	}
+
+	$stored = array(
+		'classification_type' => 'music',
+		'location'            => '51.5074,-0.1278',
+		'radius'              => '15',
+		'genre'               => 'rock',
+		'venue_id'            => 'KovZpZA6tFlA',
+		'search'              => 'live',
+		'exclude_keywords'    => 'tribute',
+		'max_items'           => 100,
+		'params'              => array(
+			'filters' => array(
+				'city'    => 'London',
+				'keyword' => 'original',
+			),
+			'mode'    => 'strict',
 		),
-	),
-	$merged,
-	'partial params message update keeps channel/recipient and task_type'
-);
+	);
 
-echo "\n[2] a mentioned nested key is overwritten:\n";
+	$GLOBALS['handler_config_smoke_flow'] = array(
+		'flow_id'     => 806,
+		'pipeline_id' => 208,
+		'flow_config' => array(
+			'fetch_1_806' => array(
+				'step_type'       => 'fetch',
+				'handler_slugs'    => array( 'ticketmaster' ),
+				'handler_configs'  => array( 'ticketmaster' => $stored ),
+			),
+		),
+	);
 
-smoke_assert_equals(
-	'NEW message body',
-	$merged['params']['message'],
-	'message reflects the patch value, not the original'
-);
+	$patch = array(
+		'max_items' => 1,
+		'params'    => array( 'filters' => array( 'keyword' => 'updated' ) ),
+	);
+	$expected = $stored;
+	$expected['max_items'] = 1;
+	$expected['params']['filters']['keyword'] = 'updated';
 
-echo "\n[3] top-level scalar keys overwrite (array_merge parity):\n";
+	$ability = new \DataMachine\Abilities\FlowStep\UpdateFlowStepAbility();
+	$before  = serialize( $GLOBALS['handler_config_smoke_flow'] );
+	$preview = $ability->execute(
+		array(
+			'flow_step_id'   => 'fetch_1_806',
+			'handler_config' => $patch,
+			'validate_only'  => true,
+		)
+	);
 
-$merged_scalar = DeepMergeConfigSmokeHost::merge(
-	array( 'task_type' => 'dispatch_message', 'params' => array( 'message' => 'x' ) ),
-	array( 'task_type' => 'send_email' )
-);
+	parity_assert_same( array(), $GLOBALS['handler_config_smoke_writes'], 'dry-run performs no persistence' );
+	parity_assert_same( array(), $GLOBALS['handler_config_smoke_logs'], 'dry-run writes no database-backed logs' );
+	parity_assert_same( $before, serialize( $GLOBALS['handler_config_smoke_flow'] ), 'dry-run leaves storage byte-identical' );
+	parity_assert_same( $expected, $preview['effective_handler_config'] ?? null, 'dry-run returns effective deep-merged config' );
 
-smoke_assert_equals( 'send_email', $merged_scalar['task_type'], 'top-level task_type overwrites' );
-smoke_assert_equals( array( 'message' => 'x' ), $merged_scalar['params'], 'untouched params survives a top-level overwrite' );
+	$applied_result = $ability->execute(
+		array(
+			'flow_step_id'   => 'fetch_1_806',
+			'handler_config' => $patch,
+		)
+	);
+	parity_assert_same( true, $applied_result['success'] ?? false, 'apply succeeds' );
+	$applied = $GLOBALS['handler_config_smoke_flow']['flow_config']['fetch_1_806']['handler_configs']['ticketmaster'];
+	parity_assert_same( $preview['effective_handler_config'], $applied, 'apply exactly matches dry-run preview' );
+	parity_assert_same( '51.5074,-0.1278', $applied['location'], 'omitted non-default location is preserved exactly' );
+	parity_assert_same( '15', $applied['radius'], 'omitted non-default radius type and value are preserved exactly' );
+	parity_assert_same( 'London', $applied['params']['filters']['city'], 'omitted nested params sibling is preserved' );
+	parity_assert_same( 'strict', $applied['params']['mode'], 'omitted params sibling is preserved' );
 
-echo "\n[4] numeric-keyed list arrays are replaced wholesale:\n";
+	$full = array(
+		'classification_type' => 'sports',
+		'location'            => '40.7128,-74.0060',
+		'radius'              => '25',
+		'genre'               => '',
+		'venue_id'            => '',
+		'search'              => 'finals',
+		'exclude_keywords'    => '',
+		'max_items'           => 50,
+		'params'              => array( 'filters' => array( 'city' => 'New York', 'keyword' => 'finals' ), 'mode' => 'broad' ),
+	);
+	$full_result = $ability->execute(
+		array(
+			'flow_step_id'   => 'fetch_1_806',
+			'handler_config' => $full,
+		)
+	);
+	parity_assert_same( true, $full_result['success'] ?? false, 'full-object update succeeds' );
+	parity_assert_same( $full, $GLOBALS['handler_config_smoke_flow']['flow_config']['fetch_1_806']['handler_configs']['ticketmaster'], 'full-object update remains exact' );
 
-$merged_list = DeepMergeConfigSmokeHost::merge(
-	array( 'params' => array( 'attachments' => array( 'a', 'b', 'c' ) ) ),
-	array( 'params' => array( 'attachments' => array( 'z' ) ) )
-);
-
-smoke_assert_equals(
-	array( 'z' ),
-	$merged_list['params']['attachments'],
-	'list value is replaced, not index-merged into [z,b,c]'
-);
-
-echo "\n[5] empty incoming patch object does not clobber an existing nested map:\n";
-
-$merged_empty = DeepMergeConfigSmokeHost::merge(
-	array( 'params' => array( 'message' => 'keep me', 'channel' => 'c1' ) ),
-	array( 'params' => array() )
-);
-
-smoke_assert_equals(
-	array( 'message' => 'keep me', 'channel' => 'c1' ),
-	$merged_empty['params'],
-	'empty params patch leaves the existing params map intact'
-);
-
-echo "\n----------------------------------------------------------------\n";
-$total = $passes + count( $failures );
-echo "{$passes} / {$total} passed\n";
-
-if ( ! empty( $failures ) ) {
-	echo "\nFailures:\n";
-	foreach ( $failures as $failure ) {
-		echo " - {$failure}\n";
+	if ( ! empty( $failures ) ) {
+		exit( 1 );
 	}
-	exit( 1 );
-}
 
-echo "\nAll assertions passed.\n";
+	echo "{$passes} handler-config parity assertions passed.\n";
+}

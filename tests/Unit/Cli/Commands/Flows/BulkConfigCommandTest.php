@@ -32,7 +32,7 @@ class BulkConfigCommandTest extends WP_UnitTestCase {
 			public array $handler_updates = array();
 			public array $message_updates = array();
 
-			protected function updateHandler( string $flow_step_id, string $handler_slug = '', array $handler_settings = array() ): bool {
+			protected function updateHandler( string $flow_step_id, string $handler_slug = '', array $handler_settings = array(), bool $validate_only = false ): bool|array {
 				$this->handler_updates[] = array(
 					'flow_step_id'    => $flow_step_id,
 					'handler_slug'    => $handler_slug,
