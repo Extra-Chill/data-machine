@@ -48,6 +48,7 @@ namespace {
 	$results = '$results';
 	assert_retention_reporting( 'restricted information_schema returns unavailable allocation', str_contains( $cleanup_source, "if ( ! is_array( $results ) )" ) );
 	assert_retention_reporting( 'show total uses unique physical allocation', str_contains( $command_source, "\$sizes['_unique']" ) );
+	assert_retention_reporting( 'show total preserves separately measured chat storage', str_contains( $command_source, "\$sizes['_unique']['Chat sessions']" ) );
 	assert_retention_reporting( 'operator optimizer accepts selected tables only', str_contains( $command_source, 'RetentionCleanup::optimizeOwnedTables' ) );
 
 	require_once $root . '/inc/Engine/AI/System/Tasks/Retention/RetentionCleanup.php';

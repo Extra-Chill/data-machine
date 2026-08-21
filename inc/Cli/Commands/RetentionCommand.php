@@ -503,7 +503,8 @@ class RetentionCommand extends BaseCommand {
 		// table or bow out by returning null.
 		$chat_metrics = ConversationStoreFactory::get()->get_storage_metrics();
 		if ( null !== $chat_metrics ) {
-			$sizes['Chat sessions'] = $chat_metrics;
+			$sizes['Chat sessions']            = $chat_metrics;
+			$sizes['_unique']['Chat sessions'] = $chat_metrics;
 		}
 
 		return $sizes;
