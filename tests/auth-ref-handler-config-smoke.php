@@ -186,6 +186,41 @@ $assert( 'export strips password', ! array_key_exists( 'imap_password', $rewritt
 $assert( 'export strips the complete IMAP connection identity', ! array_key_exists( 'imap_host', $rewritten ) && ! array_key_exists( 'imap_user', $rewritten ) );
 $assert( 'export output does not contain secret value', ! str_contains( wp_json_encode( $rewritten ), 'super-secret-app-password' ) );
 
+echo "\n[1b] Shared export projector applies refs and strict recursive fallback\n";
+$projected = AuthRefHandlerConfig::project_for_export(
+	array(
+		'email'   => array(
+			'imap_host'     => 'imap.example.test',
+			'imap_user'     => 'reader@example.test',
+			'imap_password' => 'provider-password',
+			'folder'        => 'Archive',
+		),
+		'unknown' => array(
+			'api_key'     => 'direct-api-key',
+			'auth_ref'    => 'custom:default',
+			'endpoint'    => 'https://api.example.test',
+			'credentials' => array(
+				'access_token' => 'nested-access-token',
+				'password'     => 'nested-password',
+			),
+			'headers'     => array(
+				'authorization' => 'Bearer nested-bearer-secret',
+				'accept'        => 'application/json',
+			),
+		),
+	),
+	array( 'flow_id' => 12 )
+);
+
+$projected_json = wp_json_encode( $projected );
+$assert( 'projector inserts provider-owned auth_ref', 'email_imap:default' === ( $projected['email']['auth_ref'] ?? null ) );
+$assert( 'projector preserves provider ordinary settings', 'Archive' === ( $projected['email']['folder'] ?? null ) );
+$assert( 'projector preserves existing auth_ref without provider resolution', 'custom:default' === ( $projected['unknown']['auth_ref'] ?? null ) );
+$assert( 'projector preserves unknown-handler ordinary settings', 'https://api.example.test' === ( $projected['unknown']['endpoint'] ?? null ) );
+$assert( 'projector preserves nested non-secret settings', 'application/json' === ( $projected['unknown']['headers']['accept'] ?? null ) );
+$assert( 'projector strips direct and nested credentials', ! str_contains( $projected_json, 'direct-api-key' ) && ! str_contains( $projected_json, 'nested-access-token' ) && ! str_contains( $projected_json, 'nested-password' ) );
+$assert( 'projector strips bearer authorization', ! str_contains( $projected_json, 'nested-bearer-secret' ) );
+
 echo "\n[2] Import/runtime resolution restores local config while preserving static fields\n";
 $resolved = apply_filters(
 	'datamachine_auth_ref_to_handler_config',

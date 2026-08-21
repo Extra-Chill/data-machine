@@ -35,6 +35,7 @@ use DataMachine\Engine\Bundle\AgentBundleArrayAdapter;
 use DataMachine\Engine\Bundle\AgentBundleManifest;
 use DataMachine\Engine\Bundle\AgentBundleRuntimeDrift;
 use DataMachine\Engine\Bundle\AgentBundlePipelineFile;
+use DataMachine\Engine\Bundle\AuthRefHandlerConfig;
 use DataMachine\Engine\Bundle\AgentConfigArtifactProjector;
 use DataMachine\Engine\Bundle\AgentTemplateMetadata;
 use DataMachine\Engine\Bundle\AgentPackageProjection;
@@ -493,20 +494,7 @@ class AgentBundler {
 			return $configs;
 		}
 
-		$rewritten = array();
-		foreach ( $configs as $handler_slug => $handler_config ) {
-			if ( ! is_array( $handler_config ) ) {
-				continue;
-			}
-			$config = apply_filters( 'datamachine_handler_config_to_auth_ref', $handler_config, (string) $handler_slug, $context );
-			if ( is_wp_error( $config ) || ! is_array( $config ) ) {
-				$config = array();
-			}
-			$rewritten[ (string) $handler_slug ] = self::strip_secret_like_values( $config );
-		}
-
-		ksort( $rewritten, SORT_STRING );
-		return $rewritten;
+		return AuthRefHandlerConfig::project_for_export( $configs, $context );
 	}
 
 	private static function resolve_export_manifest( int $agent_id, array $context ): array {
@@ -585,22 +573,6 @@ class AgentBundler {
 		}
 
 		return \DataMachine\Engine\Bundle\BundleSchema::normalize_agent_site_scope( $stored_scope );
-	}
-
-	private static function strip_secret_like_values( array $value ): array {
-		$secret_keys = array( 'access_token', 'refresh_token', 'token', 'secret', 'client_secret', 'password', 'api_key', 'apikey', 'key' );
-		foreach ( $value as $key => $child ) {
-			$key_string = strtolower( (string) $key );
-			if ( in_array( $key_string, $secret_keys, true ) || str_contains( $key_string, 'secret' ) || str_contains( $key_string, 'token' ) || str_contains( $key_string, 'password' ) ) {
-				unset( $value[ $key ] );
-				continue;
-			}
-			if ( is_array( $child ) ) {
-				$value[ $key ] = self::strip_secret_like_values( $child );
-			}
-		}
-		ksort( $value, SORT_STRING );
-		return $value;
 	}
 
 	/**

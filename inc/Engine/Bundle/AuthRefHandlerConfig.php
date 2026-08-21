@@ -73,6 +73,33 @@ final class AuthRefHandlerConfig {
 	}
 
 	/**
+	 * Project handler configs into a deterministic, credential-free export map.
+	 *
+	 * @param array<string,mixed> $handler_configs Handler configs keyed by handler slug.
+	 * @param array               $context Export context.
+	 * @return array<string,array<string,mixed>>
+	 */
+	public static function project_for_export( array $handler_configs, array $context = array() ): array {
+		$projected = array();
+
+		foreach ( $handler_configs as $handler_slug => $handler_config ) {
+			if ( ! is_array( $handler_config ) ) {
+				continue;
+			}
+
+			$config = apply_filters( 'datamachine_handler_config_to_auth_ref', $handler_config, (string) $handler_slug, $context );
+			if ( is_wp_error( $config ) || ! is_array( $config ) ) {
+				$config = array();
+			}
+
+			$projected[ (string) $handler_slug ] = self::strip_secret_like_values( $config );
+		}
+
+		ksort( $projected, SORT_STRING );
+		return $projected;
+	}
+
+	/**
 	 * Resolve auth_ref form to local handler config for import/runtime.
 	 *
 	 * @param array|\WP_Error $handler_config Handler config or previous error.
@@ -170,6 +197,22 @@ final class AuthRefHandlerConfig {
 		} catch ( BundleValidationException $e ) {
 			return new \WP_Error( 'auth_ref_invalid', $e->getMessage() );
 		}
+	}
+
+	private static function strip_secret_like_values( array $value ): array {
+		$secret_keys = array( 'access_token', 'refresh_token', 'token', 'secret', 'client_secret', 'password', 'api_key', 'apikey', 'key', 'authorization' );
+		foreach ( $value as $key => $child ) {
+			$key_string = strtolower( (string) $key );
+			if ( in_array( $key_string, $secret_keys, true ) || str_contains( $key_string, 'secret' ) || str_contains( $key_string, 'token' ) || str_contains( $key_string, 'password' ) || str_contains( $key_string, 'credential' ) || str_contains( $key_string, 'bearer' ) ) {
+				unset( $value[ $key ] );
+				continue;
+			}
+			if ( is_array( $child ) ) {
+				$value[ $key ] = self::strip_secret_like_values( $child );
+			}
+		}
+		ksort( $value, SORT_STRING );
+		return $value;
 	}
 
 	private static function redact_error( \WP_Error $error, AuthRef $ref ): \WP_Error {

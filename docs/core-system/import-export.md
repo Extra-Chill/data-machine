@@ -10,7 +10,7 @@ The import/export system handles pipeline structures including steps, configurat
 
 ### Export Process
 
-Pipeline export generates a CSV file containing complete pipeline and flow configuration data:
+Pipeline export generates a CSV file containing portable pipeline and flow configuration data. Handler credentials are excluded by default: provider-backed credentials become `auth_ref` values when available, and credential-shaped fields are otherwise removed recursively.
 
 ```csv
 pipeline_id,pipeline_name,step_position,step_type,step_config,flow_id,flow_name,settings
@@ -37,6 +37,8 @@ Pipeline import processes CSV data to recreate pipeline structures and flow conf
 3. Adds pipeline steps with proper execution ordering
 4. Maintains flow-specific handler configurations
 
+Imported `auth_ref` values resolve against authorization configured on the destination installation. Configure the corresponding destination provider/account before running the imported flow; exports do not carry API keys, access or refresh tokens, bearer credentials, passwords, or other inline secrets.
+
 Import through `POST /wp-json/wp-abilities/v1/abilities/datamachine/import-pipelines/run`. Successful ability payloads include the imported pipeline IDs. The curated `datamachine/v1/pipelines` controller does not provide CSV import.
 
 ### Import Behavior
@@ -48,12 +50,12 @@ Import through `POST /wp-json/wp-abilities/v1/abilities/datamachine/import-pipel
 
 ## Security & Permissions
 
-All import/export operations require `manage_options` capability, ensuring only administrators can perform these actions.
+All import/export operations require `manage_options` capability, ensuring only administrators can perform these actions. CSV exports are always credential-free even for administrators and do not provide a full-secret backup mode.
 
 ## Use Cases
 
 ### Backup & Restore
-Regularly export pipeline configurations for backup purposes, enabling quick restoration after updates or migrations.
+Regularly export portable pipeline configurations for backup purposes. Restore or configure destination authorization separately.
 
 ### Migration
 Export pipelines from development environments and import into production systems.

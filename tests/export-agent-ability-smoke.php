@@ -87,6 +87,7 @@ require_once __DIR__ . '/../inc/Engine/Bundle/AgentBundleArtifactExtensions.php'
 require_once __DIR__ . '/../inc/Engine/Bundle/AgentBundleArtifactDefinitions.php';
 require_once __DIR__ . '/../inc/Engine/Bundle/BundleRelativePath.php';
 require_once __DIR__ . '/../inc/Engine/Bundle/AgentBundleDirectory.php';
+require_once __DIR__ . '/../inc/Engine/Bundle/AuthRefHandlerConfig.php';
 require_once __DIR__ . '/../inc/Core/Agents/AgentBundler.php';
 require_once __DIR__ . '/../inc/Abilities/AgentAbilities.php';
 
