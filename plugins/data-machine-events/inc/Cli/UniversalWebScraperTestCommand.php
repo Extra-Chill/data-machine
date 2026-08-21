@@ -38,10 +38,15 @@ class UniversalWebScraperTestCommand {
 		}
 
 		$result = $this->callAbility( $target_url );
+		if ( is_wp_error( $result ) ) {
+			\WP_CLI::error( $result->get_error_code() . ': ' . $result->get_error_message() );
+			return;
+		}
+
 		$this->outputResult( $result );
 	}
 
-	private function callAbility( string $target_url ): array {
+	private function callAbility( string $target_url ): array|\WP_Error {
 		$tester = new EventScraperTest();
 		return $tester->test( $target_url );
 	}
