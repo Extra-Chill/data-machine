@@ -35,7 +35,7 @@ trait ProcessedItemDeferrals {
 		$attempts = min( self::MAX_DEFERRAL_ATTEMPTS, max( 0, (int) ( $row['deferral_count'] ?? 0 ) ) );
 		if ( (int) ( $row['last_deferral_job_id'] ?? 0 ) !== $job_id ) {
 			$attempts = min( self::MAX_DEFERRAL_ATTEMPTS, $attempts + 1 );
-			$updated = $this->wpdb->update(
+			$updated  = $this->wpdb->update(
 				$this->table_name,
 				array(
 					'deferral_count'       => $attempts,

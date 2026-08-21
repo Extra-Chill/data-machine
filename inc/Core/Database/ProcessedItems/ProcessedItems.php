@@ -101,8 +101,8 @@ class ProcessedItems extends BaseRepository {
 
 		$claims = self::disposition_claims( array( self::CLAIMS_METADATA_KEY => array_values( $claims ) ) );
 		if ( 1 === count( $claims ) ) {
-			$claim                                         = reset( $claims );
-			$container[ self::CLAIM_METADATA_KEY ]          = $claim;
+			$claim                                 = reset( $claims );
+			$container[ self::CLAIM_METADATA_KEY ] = $claim;
 			$container[ self::DISPOSITION_ID_METADATA_KEY ] = $claim['disposition_id'];
 			$container['disposition_id']                    = $claim['disposition_id'];
 			$container['source_type']                       = $claim['source_type'];
@@ -1429,5 +1429,4 @@ class ProcessedItems extends BaseRepository {
 			);
 		}
 	}
-
 }

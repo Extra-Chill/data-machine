@@ -1344,7 +1344,7 @@ class ExecuteStepAbility {
 
 	/** Remove terminal disposition results and exhausted identities while preserving live packets. */
 	private static function filterReconciledPacketsForRouting( array $packets, array $reconciliation ): array {
-		$exhausted          = array_fill_keys( (array) ( $reconciliation['evidence']['exhausted_ids'] ?? array() ), true );
+		$exhausted           = array_fill_keys( (array) ( $reconciliation['evidence']['exhausted_ids'] ?? array() ), true );
 		$disposition_results = array_fill_keys( (array) ( $reconciliation['routing']['disposition_result_packet_indexes'] ?? array() ), true );
 		if ( empty( $exhausted ) && empty( $disposition_results ) ) {
 			return $packets;
@@ -1372,7 +1372,7 @@ class ExecuteStepAbility {
 				foreach ( $live as $claim ) {
 					$normalized             = $packet;
 					$normalized['metadata'] = ProcessedItems::replace_disposition_claims( $metadata, array( $claim ) );
-					$routable[]              = $normalized;
+					$routable[]             = $normalized;
 				}
 				continue;
 			}

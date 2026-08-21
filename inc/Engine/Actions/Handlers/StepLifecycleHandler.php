@@ -67,9 +67,9 @@ class StepLifecycleHandler {
 			'explicit'  => 0,
 			'stale'     => false,
 			'routing'   => array(
-				'packet_disposition_ids'   => array(),
-				'routable_packet_indexes'  => array(),
-				'exhausted_packet_indexes' => array(),
+				'packet_disposition_ids'            => array(),
+				'routable_packet_indexes'           => array(),
+				'exhausted_packet_indexes'          => array(),
 				'disposition_result_packet_indexes' => array(),
 			),
 		);
@@ -158,7 +158,7 @@ class StepLifecycleHandler {
 			return $result;
 		}
 		$result['routing']['disposition_result_packet_indexes'] = $disposition_result_packet_indexes ?? array();
-		$result['routing']['routable_packet_indexes'] = array_values( array_diff( array_keys( $packets ), $result['routing']['disposition_result_packet_indexes'] ) );
+		$result['routing']['routable_packet_indexes']           = array_values( array_diff( array_keys( $packets ), $result['routing']['disposition_result_packet_indexes'] ) );
 		$evidence = $result['evidence'];
 		$omitted  = $evidence['omitted_ids'];
 		if ( ! empty( $omitted ) ) {
@@ -347,7 +347,7 @@ class StepLifecycleHandler {
 		if ( isset( $seed_data['packet_fanout_transfer'] ) ) {
 			$engine['packet_fanout_transfer'] = $seed_data['packet_fanout_transfer'];
 		}
-		$engine = ProcessedItems::replace_disposition_claims( $engine, $retained );
+		$engine                                = ProcessedItems::replace_disposition_claims( $engine, $retained );
 		$history                               = is_array( $engine['packet_disposition_evidence'] ?? null ) ? $engine['packet_disposition_evidence'] : array();
 		$history[]                             = $evidence;
 		$engine['packet_disposition_evidence'] = array_slice( $history, -20 );
