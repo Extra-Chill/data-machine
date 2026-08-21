@@ -15,6 +15,7 @@ function wp_json_encode( mixed $value, int $flags = 0 ): string|false { return j
 function sanitize_key( string $value ): string { return preg_replace( '/[^a-z0-9_\-]/', '', strtolower( $value ) ); }
 
 require_once __DIR__ . '/../inc/Core/Database/BaseRepository.php';
+require_once __DIR__ . '/../inc/Core/Database/ProcessedItems/ProcessedItemDeferrals.php';
 require_once __DIR__ . '/../inc/Core/Database/ProcessedItems/ProcessedItems.php';
 require_once __DIR__ . '/../inc/Engine/AI/DataPacketPromptProjector.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/ToolExecutor.php';

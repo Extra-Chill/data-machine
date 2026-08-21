@@ -721,8 +721,10 @@ class ExecuteStepAbility {
 			'released'  => 0,
 			'omitted'   => 0,
 			'explicit'  => 0,
+			'exhausted' => 0,
+			'routing'   => array(),
 		);
-		if ( ! $retry_owns_work && ! in_array( $step_type, array( 'fetch', 'event_import' ), true ) ) {
+		if ( ! $retry_owns_work ) {
 			$reconciled = StepLifecycleHandler::reconcileStepOutput(
 				$job_id,
 				array_merge( $flow_step_config, array( 'flow_step_id' => $flow_step_id ) ),
@@ -753,11 +755,16 @@ class ExecuteStepAbility {
 				'reason'       => 'packet_claim_reconciliation_failed',
 			);
 		}
+		if ( in_array( $step_type, array( 'fetch', 'event_import', 'ai' ), true ) ) {
+			$dataPackets     = self::filterReconciledPacketsForRouting( $dataPackets, $reconciled );
+			$payload['data'] = $dataPackets;
+		}
 
 		$explicitly_dispositioned = $step_success
 			&& $reconciled['handled']
 			&& 0 === $reconciled['retained']
-			&& 0 < $reconciled['explicit'];
+			&& empty( $dataPackets )
+			&& ( 0 < $reconciled['explicit'] || 0 < $reconciled['exhausted'] );
 
 		// Only terminal overrides may short-circuit normal continuation routing.
 		// A stale processing/pending marker must not consume the current action
@@ -842,8 +849,11 @@ class ExecuteStepAbility {
 		}
 
 		if ( $explicitly_dispositioned ) {
-			$transition       = $this->transitionTerminalWithRecoveryFence( $job_id, JobStatus::COMPLETED_NO_ITEMS, $recovery_generation, $recovery_claim_token );
-			$stale_transition = $this->staleRejectedTerminalTransition( $job_id, $recovery_generation, $recovery_claim_token, $transition );
+			$disposition_status = 0 < $reconciled['exhausted']
+				? JobStatus::agentSkipped( 'defer-exhausted' )->toString()
+				: JobStatus::COMPLETED_NO_ITEMS;
+			$transition         = $this->transitionTerminalWithRecoveryFence( $job_id, $disposition_status, $recovery_generation, $recovery_claim_token );
+			$stale_transition   = $this->staleRejectedTerminalTransition( $job_id, $recovery_generation, $recovery_claim_token, $transition );
 			if ( null !== $stale_transition ) {
 				return $stale_transition;
 			}
@@ -899,7 +909,7 @@ class ExecuteStepAbility {
 					if ( ! $this->recoveryGenerationStillOwned( $job_id, $recovery_generation, $recovery_claim_token ) ) {
 						return $this->staleRecoveryGeneration( $job_id, $recovery_generation, 'was superseded before inline lifecycle routing' );
 					}
-					$inline_reconciliation = $this->handleStepLifecycleInlineContinuation( $job_id, $flow_step_config, $routed_packets, $recovery_generation, $recovery_claim_token );
+					$inline_reconciliation = $this->handleStepLifecycleInlineContinuation( $job_id, $flow_step_config, $routed_packets );
 					if ( ! $inline_reconciliation['success'] ) {
 						return ! empty( $inline_reconciliation['stale'] )
 							? $this->staleRecoveryGeneration( $job_id, $recovery_generation, 'lost ownership during inline claim reconciliation' )
@@ -1009,7 +1019,7 @@ class ExecuteStepAbility {
 					if ( ! $this->recoveryGenerationStillOwned( $job_id, $recovery_generation, $recovery_claim_token ) ) {
 						return $this->staleRecoveryGeneration( $job_id, $recovery_generation, 'was superseded before gated inline lifecycle routing' );
 					}
-					$inline_reconciliation = $this->handleStepLifecycleInlineContinuation( $job_id, $flow_step_config, $routed_packets, $recovery_generation, $recovery_claim_token );
+					$inline_reconciliation = $this->handleStepLifecycleInlineContinuation( $job_id, $flow_step_config, $routed_packets );
 					if ( ! $inline_reconciliation['success'] ) {
 						return ! empty( $inline_reconciliation['stale'] )
 							? $this->staleRecoveryGeneration( $job_id, $recovery_generation, 'lost ownership during gated inline claim reconciliation' )
@@ -1045,27 +1055,6 @@ class ExecuteStepAbility {
 
 			if ( ! $this->recoveryGenerationStillOwned( $job_id, $recovery_generation, $recovery_claim_token ) ) {
 				return $this->staleRecoveryGeneration( $job_id, $recovery_generation, 'was superseded before successful terminal routing' );
-			}
-			if ( in_array( $step_type, array( 'fetch', 'event_import' ), true ) ) {
-				$source_reconciliation = StepLifecycleHandler::reconcileStepOutput(
-					$job_id,
-					array_merge( $flow_step_config, array( 'flow_step_id' => $flow_step_id ) ),
-					$dataPackets,
-					true,
-					$recovery_generation,
-					$recovery_claim_token
-				);
-				if ( ! $source_reconciliation['success'] ) {
-					if ( ! empty( $source_reconciliation['stale'] ) ) {
-						return $this->staleRecoveryGeneration( $job_id, $recovery_generation, 'lost ownership during terminal source claim reconciliation' );
-					}
-					return array(
-						'success'      => false,
-						'step_success' => false,
-						'outcome'      => 'claim_reconciliation_failed',
-						'reason'       => 'packet_claim_reconciliation_failed',
-					);
-				}
 			}
 			$transition       = $this->transitionTerminalWithRecoveryFence( $job_id, JobStatus::COMPLETED, $recovery_generation, $recovery_claim_token );
 			$stale_transition = $this->staleRejectedTerminalTransition( $job_id, $recovery_generation, $recovery_claim_token, $transition );
@@ -1345,18 +1334,53 @@ class ExecuteStepAbility {
 	 * @param array $flow_step_config Current flow step configuration.
 	 * @param array $routed_packets   Packets routed to the next step.
 	 */
-	private function handleStepLifecycleInlineContinuation( int $job_id, array $flow_step_config, array $routed_packets, int $recovery_generation = 0, string $recovery_claim_token = '' ): array {
-		if ( in_array( (string) ( $flow_step_config['step_type'] ?? '' ), array( 'fetch', 'event_import' ), true ) ) {
-			$result = StepLifecycleHandler::reconcileStepOutput( $job_id, $flow_step_config, $routed_packets, true, $recovery_generation, $recovery_claim_token );
-			if ( ! $result['success'] ) {
-				return $result;
-			}
-		}
+	private function handleStepLifecycleInlineContinuation( int $job_id, array $flow_step_config, array $routed_packets ): array {
 		do_action( 'datamachine_step_lifecycle_inline_continuation', $job_id, $flow_step_config, $routed_packets );
 		return array(
 			'success' => true,
 			'stale'   => false,
 		);
+	}
+
+	/** Remove terminal disposition results and exhausted identities while preserving live packets. */
+	private static function filterReconciledPacketsForRouting( array $packets, array $reconciliation ): array {
+		$exhausted          = array_fill_keys( (array) ( $reconciliation['evidence']['exhausted_ids'] ?? array() ), true );
+		$disposition_results = array_fill_keys( (array) ( $reconciliation['routing']['disposition_result_packet_indexes'] ?? array() ), true );
+		if ( empty( $exhausted ) && empty( $disposition_results ) ) {
+			return $packets;
+		}
+
+		$routable = array();
+		foreach ( $packets as $packet_index => $packet ) {
+			if ( isset( $disposition_results[ $packet_index ] ) ) {
+				continue;
+			}
+			$metadata = is_array( $packet['metadata'] ?? null ) ? $packet['metadata'] : array();
+			$claims   = ProcessedItems::disposition_claims( $metadata );
+			if ( empty( $claims ) || empty( array_intersect_key( $claims, $exhausted ) ) ) {
+				$routable[] = $packet;
+				continue;
+			}
+
+			$live = array_diff_key( $claims, $exhausted );
+			if ( empty( $live ) ) {
+				continue;
+			}
+
+			$identity_specific = '' !== (string) ( $metadata[ ProcessedItems::DISPOSITION_ID_METADATA_KEY ] ?? $metadata['disposition_id'] ?? '' );
+			if ( $identity_specific && 1 < count( $claims ) ) {
+				foreach ( $live as $claim ) {
+					$normalized             = $packet;
+					$normalized['metadata'] = ProcessedItems::replace_disposition_claims( $metadata, array( $claim ) );
+					$routable[]              = $normalized;
+				}
+				continue;
+			}
+
+			$packet['metadata'] = ProcessedItems::replace_disposition_claims( $metadata, $live );
+			$routable[]         = $packet;
+		}
+		return $routable;
 	}
 
 	private function claimReconciliationFailure( int $job_id, string $flow_step_id, string $step_type ): array {

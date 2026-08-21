@@ -138,14 +138,14 @@ assert_claims_smoke( 'repository has atomic claim method', str_contains( $proces
 assert_claims_smoke( 'repository returns ownership tokens', str_contains( $processed_items, 'function claim_item_owned' ) && str_contains( $processed_items, 'claim_token' ) );
 assert_claims_smoke( 'repository conditionally completes owned claims', str_contains( $processed_items, 'function complete_owned_claim' ) );
 assert_claims_smoke( 'repository conditionally releases owned claims', str_contains( $processed_items, 'function release_owned_claim' ) );
-assert_claims_smoke( 'completion side effects share the claim transaction', str_contains( $processed_items, "'START TRANSACTION'" ) && str_contains( $processed_items, "'COMMIT'" ) && str_contains( $processed_items, "'ROLLBACK'" ) );
+assert_claims_smoke( 'completion side effects share the claim transaction', str_contains( $processed_items, 'TransactionScope::begin' ) && str_contains( $processed_items, 'complete_owned_claim_in_transaction' ) );
 assert_claims_smoke( 'claim acquisition handles duplicate contention without bare insert', str_contains( $processed_items, 'ON DUPLICATE KEY UPDATE' ) );
 assert_claims_smoke( 'repository ensures claim columns', str_contains( $processed_items, 'function ensure_claim_columns' ) );
 assert_claims_smoke( 'fetch filters active claims through bulk classification', str_contains( $fetch_handler, 'classifySourceItems' ) && str_contains( $processed_items, "'actively_claimed'" ) );
 assert_claims_smoke( 'fetch claims after max_items', strpos( $fetch_handler, 'array_slice' ) < strpos( $fetch_handler, 'claimItems' ) );
 assert_claims_smoke( 'all terminal statuses register one replayable core lifecycle callback', str_contains( $actions, "\$callbacks['step_lifecycle'] = array( StepLifecycleHandler::class, 'handleTerminal' )" ) );
 assert_claims_smoke( 'lifecycle uses owner-conditional completion and release', str_contains( $lifecycle, 'complete_owned_claim' ) && str_contains( $lifecycle, 'release_owned_claim' ) );
-assert_claims_smoke( 'terminal callers reject lost transitions before reporting success', 3 === substr_count( $execute_step, "! \$transition['success'] || ! JobStatus::isStatusSuccess( \$transition['status'] )" ) );
+assert_claims_smoke( 'terminal callers reject lost transitions before reporting success', 2 <= substr_count( $execute_step, "! \$transition['success'] || ! JobStatus::isStatusSuccess( \$transition['status'] )" ) && str_contains( $execute_step, "'success'      => \$transition['success'] && JobStatus::isStatusSuccess( \$transition['status'] )" ) );
 assert_claims_smoke( 'lifecycle preserves multiple inline claims', str_contains( $lifecycle, 'CLAIMS_METADATA_KEY' ) && str_contains( $lifecycle, 'uniqueClaims' ) );
 assert_claims_smoke( 'completion consumers register outside generic lifecycle', str_contains( $actions, 'datamachine_item_claim_completion_handlers' ) && ! str_contains( $lifecycle, 'TrackedItems' ) );
 assert_claims_smoke( 'legacy jobs retain terminal job-id cleanup', str_contains( $lifecycle, 'release_claims_for_job' ) );

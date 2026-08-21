@@ -25,6 +25,7 @@ class FetchItemDispositionTool {
 
 	private const DISPOSITION_REJECT_SOURCE = 'reject_source';
 	private const DISPOSITION_DEFER_ITEM    = 'defer_item';
+	private const DISPOSITION_DEFER_EXHAUSTED = 'defer_exhausted';
 	private const MAX_DIAGNOSTIC_CHARS      = 1200;
 
 	/**
@@ -213,8 +214,16 @@ class FetchItemDispositionTool {
 		if ( empty( $persisted['success'] ) ) {
 			return array( 'success' => false, 'error' => 'packet deferral could not be persisted', 'tool_name' => $tool_name, 'disposition_id' => $disposition_id );
 		}
-		if ( empty( $persisted['created'] ) ) {
+		if ( empty( $persisted['created'] ) && self::DISPOSITION_DEFER_ITEM !== ( $persisted['record']['disposition'] ?? '' ) ) {
 			return $this->alreadyDispositionedResult( $tool_name, $persisted['record'], $job_id, (string) $disposition_id );
+		}
+
+		$attempt = ( new ProcessedItems() )->record_owned_deferral_attempt( $target, $job_id );
+		if ( false === $attempt ) {
+			return array( 'success' => false, 'error' => 'packet deferral attempt could not be persisted', 'tool_name' => $tool_name, 'disposition_id' => $disposition_id );
+		}
+		if ( $attempt['exhausted'] && ! $this->persistDeferralExhaustion( $job_id, (string) $disposition_id, $attempt['attempts'] ) ) {
+			return array( 'success' => false, 'error' => 'packet deferral exhaustion could not be persisted', 'tool_name' => $tool_name, 'disposition_id' => $disposition_id );
 		}
 
 		if ( $flow_step_id && class_exists( RunMetrics::class ) ) {
@@ -223,9 +232,9 @@ class FetchItemDispositionTool {
 				(string) $flow_step_id,
 				array(
 					'step_type'       => 'fetch',
-					'result'          => 'item_deferred',
+					'result'          => $attempt['exhausted'] ? 'defer_exhausted' : 'item_deferred',
 					'packet_count'    => 0,
-					'reason'          => 'item-deferred',
+					'reason'          => $attempt['exhausted'] ? 'defer-exhausted' : 'item-deferred',
 					'source_type'     => $source_type,
 					'item_identifier' => $item_identifier,
 				)
@@ -242,18 +251,48 @@ class FetchItemDispositionTool {
 				'item_identifier' => $item_identifier,
 				'source_type'     => $source_type,
 				'reason'          => $reason,
+				'deferral_attempts' => $attempt['attempts'],
+				'deferral_cap'      => ProcessedItems::MAX_DEFERRAL_ATTEMPTS,
+				'exhausted'         => $attempt['exhausted'],
 			)
 		);
 
 		return array(
 			'success'         => true,
-			'message'         => "Item deferred for retry: {$reason}",
+			'message'         => $attempt['exhausted'] ? "Item deferral limit reached: {$reason}" : "Item deferred for retry: {$reason}",
 			'item_identifier' => $item_identifier,
 			'tool_name'       => $tool_name,
-			'disposition'     => self::DISPOSITION_DEFER_ITEM,
+			'disposition'     => $attempt['exhausted'] ? self::DISPOSITION_DEFER_EXHAUSTED : self::DISPOSITION_DEFER_ITEM,
 			'disposition_id'  => $disposition_id,
 			'reason'          => $reason,
+			'deferral_attempts' => $attempt['attempts'],
+			'deferral_cap'      => ProcessedItems::MAX_DEFERRAL_ATTEMPTS,
+			'exhausted'         => $attempt['exhausted'],
 		);
+	}
+
+	/** Refine a won defer disposition to terminal exhaustion without allowing another disposition to replace it. */
+	private function persistDeferralExhaustion( int $job_id, string $disposition_id, int $attempts ): bool {
+		$result = EngineData::mutate(
+			$job_id,
+			static function ( array $engine ) use ( $disposition_id, $attempts ): array {
+				$record = is_array( $engine['packet_dispositions'][ $disposition_id ] ?? null ) ? $engine['packet_dispositions'][ $disposition_id ] : array();
+				if ( self::DISPOSITION_DEFER_ITEM !== ( $record['disposition'] ?? '' ) && self::DISPOSITION_DEFER_EXHAUSTED !== ( $record['disposition'] ?? '' ) ) {
+					return $engine;
+				}
+				$record['disposition']      = self::DISPOSITION_DEFER_EXHAUSTED;
+				$record['deferral_attempts'] = $attempts;
+				if ( is_array( $record['diagnostic'] ?? null ) ) {
+					$record['diagnostic']['disposition']      = self::DISPOSITION_DEFER_EXHAUSTED;
+					$record['diagnostic']['deferral_attempts'] = $attempts;
+				}
+				$engine['packet_dispositions'][ $disposition_id ] = $record;
+				return $engine;
+			},
+			'packet_deferral_exhausted'
+		);
+
+		return ! empty( $result['success'] );
 	}
 
 	/**
@@ -304,7 +343,11 @@ class FetchItemDispositionTool {
 	 * @return array Tool result.
 	 */
 	private function alreadyDispositionedResult( string $tool_name, array $existing, int $job_id, string $disposition_id ): array {
-		$label = self::DISPOSITION_DEFER_ITEM === $existing['disposition'] ? 'item-deferred' : 'source-rejected';
+		$label = match ( $existing['disposition'] ) {
+			self::DISPOSITION_DEFER_ITEM => 'item-deferred',
+			self::DISPOSITION_DEFER_EXHAUSTED => 'defer-exhausted',
+			default => 'source-rejected',
+		};
 
 		do_action(
 			'datamachine_log',

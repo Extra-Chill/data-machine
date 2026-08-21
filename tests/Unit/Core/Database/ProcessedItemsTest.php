@@ -281,6 +281,120 @@ class ProcessedItemsTest extends WP_UnitTestCase {
 		$this->assertFalse( $this->db->claim_item( $this->flow_step_id, $this->source_type, 'active-claim', 11 ) );
 	}
 
+	public function test_deferral_count_persists_across_source_reappearance_and_same_job_is_idempotent(): void {
+		$claim = $this->owned_claim( 'defer-persistent', 501 );
+		$first = $this->db->record_owned_deferral_attempt( $claim, 501 );
+		$again = $this->db->record_owned_deferral_attempt( $claim, 501 );
+
+		$this->assertSame( 1, $first['attempts'] );
+		$this->assertSame( $first, $again );
+		$this->assertSame( array( 'attempts' => 1, 'exhausted' => false ), $this->db->finalize_owned_deferral_in_transaction( $claim, 501 ) );
+
+		$reappeared = $this->owned_claim( 'defer-persistent', 502 );
+		$this->assertSame( 2, $this->db->record_owned_deferral_attempt( $reappeared, 502 )['attempts'] );
+	}
+
+	public function test_reappearance_release_redefers_history_but_fresh_release_deletes(): void {
+		$claim = $this->owned_claim( 'release-history', 511 );
+		$this->db->record_owned_deferral_attempt( $claim, 511 );
+		$this->db->finalize_owned_deferral_in_transaction( $claim, 511 );
+
+		$reappeared = $this->owned_claim( 'release-history', 512 );
+		$this->assertSame(
+			1,
+			$this->db->release_owned_claim( $this->flow_step_id, $this->source_type, 'release-history', $reappeared['ownership_token'] )
+		);
+		$row = $this->row( 'release-history' );
+		$this->assertSame( ProcessedItems::STATUS_DEFERRED, $row['status'] );
+		$this->assertSame( '1', $row['deferral_count'] );
+		$this->assertNull( $row['claim_token'] );
+
+		$fresh = $this->owned_claim( 'release-fresh', 513 );
+		$this->assertSame( 1, $this->db->release_owned_claim( $this->flow_step_id, $this->source_type, 'release-fresh', $fresh['ownership_token'] ) );
+		$this->assertNull( $this->row( 'release-fresh' ) );
+	}
+
+	public function test_release_by_job_redefers_history_and_is_idempotent_under_stale_ownership(): void {
+		$claim = $this->owned_claim( 'job-release-history', 521 );
+		$this->db->record_owned_deferral_attempt( $claim, 521 );
+		$this->db->finalize_owned_deferral_in_transaction( $claim, 521 );
+		$reappeared = $this->owned_claim( 'job-release-history', 522 );
+
+		$this->assertSame( 0, $this->db->release_owned_claim( $this->flow_step_id, $this->source_type, 'job-release-history', $claim['ownership_token'] ) );
+		$this->assertTrue( $this->db->owns_active_claim( $reappeared, 522 ) );
+		$this->assertSame( 1, $this->db->release_claims_for_job( 522 ) );
+		$this->assertSame( 0, $this->db->release_claims_for_job( 522 ) );
+		$this->assertSame( ProcessedItems::STATUS_DEFERRED, $this->row( 'job-release-history' )['status'] );
+	}
+
+	public function test_third_deferral_terminalizes_as_processed(): void {
+		for ( $attempt = 1; $attempt <= ProcessedItems::MAX_DEFERRAL_ATTEMPTS; ++$attempt ) {
+			$job_id = 600 + $attempt;
+			$claim  = $this->owned_claim( 'defer-cap', $job_id );
+			$state  = $this->db->record_owned_deferral_attempt( $claim, $job_id );
+			$this->assertSame( $attempt, $state['attempts'] );
+			$this->assertSame( $attempt === ProcessedItems::MAX_DEFERRAL_ATTEMPTS, $state['exhausted'] );
+			$this->assertSame( $state, $this->db->finalize_owned_deferral_in_transaction( $claim, $job_id ) );
+		}
+
+		$this->assertTrue( $this->db->has_item_been_processed( $this->flow_step_id, $this->source_type, 'defer-cap' ) );
+	}
+
+	public function test_stale_deferral_report_only_returns_unseen_rows_outside_window(): void {
+		$stale = $this->owned_claim( 'stale-defer', 801 );
+		$fresh = $this->owned_claim( 'fresh-defer', 802 );
+		$this->db->record_owned_deferral_attempt( $stale, 801 );
+		$this->db->finalize_owned_deferral_in_transaction( $stale, 801 );
+		$this->db->record_owned_deferral_attempt( $fresh, 802 );
+		$this->db->finalize_owned_deferral_in_transaction( $fresh, 802 );
+
+		global $wpdb;
+		$wpdb->update(
+			$this->db->get_table_name(),
+			array( 'deferred_at' => gmdate( 'Y-m-d H:i:s', time() - ( 72 * HOUR_IN_SECONDS ) ) ),
+			array( 'flow_step_id' => $this->flow_step_id, 'source_type' => $this->source_type, 'item_identifier' => 'stale-defer' ),
+			array( '%s' ),
+			array( '%s', '%s', '%s' )
+		);
+
+		$page = $this->db->find_stale_deferrals( 48, 10 );
+		$this->assertSame( array( 'stale-defer' ), array_column( $page['items'], 'item_identifier' ) );
+		$this->assertFalse( $page['has_more'] );
+
+		$reappeared = $this->owned_claim( 'stale-defer', 803 );
+		$this->assertNotEmpty( $reappeared );
+		$this->assertSame( array(), $this->db->find_stale_deferrals( 48, 10 )['items'] );
+	}
+
+	public function test_stale_deferral_cursor_reaches_every_row_without_lying_about_count(): void {
+		$identifiers = array( 'cursor-a', 'cursor-b', 'cursor-c' );
+		foreach ( $identifiers as $offset => $identifier ) {
+			$job_id = 820 + $offset;
+			$claim  = $this->owned_claim( $identifier, $job_id );
+			$this->db->record_owned_deferral_attempt( $claim, $job_id );
+			$this->db->finalize_owned_deferral_in_transaction( $claim, $job_id );
+		}
+		global $wpdb;
+		$wpdb->query(
+			$wpdb->prepare(
+				'UPDATE %i SET deferred_at = %s WHERE flow_step_id = %s AND item_identifier IN (%s, %s, %s)',
+				$this->db->get_table_name(),
+				gmdate( 'Y-m-d H:i:s', time() - ( 72 * HOUR_IN_SECONDS ) ),
+				$this->flow_step_id,
+				...$identifiers
+			)
+		);
+
+		$first  = $this->db->find_stale_deferrals( 48, 2 );
+		$second = $this->db->find_stale_deferrals( 48, 2, $first['next_after_id'] );
+		$this->assertCount( 2, $first['items'] );
+		$this->assertTrue( $first['has_more'] );
+		$this->assertCount( 1, $second['items'] );
+		$this->assertFalse( $second['has_more'] );
+		$this->assertSame( 0, $second['next_after_id'] );
+		$this->assertSame( $identifiers, array_column( array_merge( $first['items'], $second['items'] ), 'item_identifier' ) );
+	}
+
 	// -----------------------------------------------------------------
 	// Index / schema
 	// -----------------------------------------------------------------
@@ -294,6 +408,49 @@ class ProcessedItemsTest extends WP_UnitTestCase {
 		$rows = $wpdb->get_results( "SHOW INDEX FROM {$table} WHERE Key_name = 'flow_source_ts'" );
 
 		$this->assertNotEmpty( $rows, 'Composite index flow_source_ts should exist after table creation.' );
+	}
+
+	public function test_deferred_status_timestamp_index_exists(): void {
+		global $wpdb;
+		$table = $this->db->get_table_name();
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$rows = $wpdb->get_results( "SHOW INDEX FROM {$table} WHERE Key_name = 'status_deferred_at'" );
+		$this->assertNotEmpty( $rows, 'Deferred identity reporting requires its bounded status/timestamp index.' );
+	}
+
+	public function test_deferral_schema_repairs_malformed_same_name_column_and_index(): void {
+		global $wpdb;
+		$table = $this->db->get_table_name();
+		try {
+			$wpdb->query( "ALTER TABLE {$table} MODIFY COLUMN `last_seen_at` VARCHAR(30) NOT NULL DEFAULT 'bad'" );
+			$wpdb->query( "ALTER TABLE {$table} DROP INDEX `status_deferred_at`, ADD KEY `status_deferred_at` (`deferred_at`, `status`)" );
+			$this->assertFalse( ProcessedItems::validate_deferral_schema( $table ) );
+
+			ProcessedItems::ensure_deferral_schema( $table );
+			$this->assertTrue( ProcessedItems::validate_deferral_schema( $table ) );
+			$index = $wpdb->get_results( "SHOW INDEX FROM {$table} WHERE Key_name = 'status_deferred_at' ORDER BY Seq_in_index ASC", ARRAY_A );
+			$this->assertSame( array( 'status', 'deferred_at' ), array_column( $index, 'Column_name' ) );
+		} finally {
+			ProcessedItems::ensure_deferral_schema( $table );
+		}
+	}
+
+	public function test_deferral_schema_repairs_unique_and_prefix_indexes(): void {
+		global $wpdb;
+		$table = $this->db->get_table_name();
+		try {
+			$wpdb->query( "ALTER TABLE {$table} DROP INDEX `status_deferred_at`, ADD UNIQUE KEY `status_deferred_at` (`status`, `deferred_at`)" );
+			$this->assertFalse( ProcessedItems::validate_deferral_schema( $table ) );
+			ProcessedItems::ensure_deferral_schema( $table );
+			$this->assertTrue( ProcessedItems::validate_deferral_schema( $table ) );
+
+			$wpdb->query( "ALTER TABLE {$table} DROP INDEX `status_deferred_at`, ADD KEY `status_deferred_at` (`status`(8), `deferred_at`)" );
+			$this->assertFalse( ProcessedItems::validate_deferral_schema( $table ) );
+			ProcessedItems::ensure_deferral_schema( $table );
+			$this->assertTrue( ProcessedItems::validate_deferral_schema( $table ) );
+		} finally {
+			ProcessedItems::ensure_deferral_schema( $table );
+		}
 	}
 
 	// -----------------------------------------------------------------
@@ -325,5 +482,32 @@ class ProcessedItemsTest extends WP_UnitTestCase {
 				)
 			);
 		}
+	}
+
+	/** Claim an exact test identity and return its lifecycle descriptor. */
+	private function owned_claim( string $item_identifier, int $job_id ): array {
+		$token = $this->db->claim_item_owned( $this->flow_step_id, $this->source_type, $item_identifier, $job_id );
+		$this->assertIsString( $token );
+		return array(
+			'identity_scope'  => $this->flow_step_id,
+			'source_type'     => $this->source_type,
+			'item_identifier' => $item_identifier,
+			'ownership_token' => $token,
+		);
+	}
+
+	/** Read one test ledger row. */
+	private function row( string $item_identifier ): ?array {
+		global $wpdb;
+		return $wpdb->get_row(
+			$wpdb->prepare(
+				'SELECT * FROM %i WHERE flow_step_id = %s AND source_type = %s AND item_identifier = %s',
+				$this->db->get_table_name(),
+				$this->flow_step_id,
+				$this->source_type,
+				$item_identifier
+			),
+			ARRAY_A
+		) ?: null;
 	}
 }

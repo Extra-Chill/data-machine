@@ -612,6 +612,71 @@ class PipelineBatchSchedulerTest extends WP_UnitTestCase {
 		}
 	}
 
+	public function test_execute_step_fanout_excludes_exhausted_identity_and_routes_siblings(): void {
+		$parent_id      = $this->create_parent_job();
+		$engine         = $this->make_engine_snapshot( $parent_id );
+		$source_step_id = 'source-step';
+		$engine['flow_config'] = array(
+			$source_step_id => array(
+				'step_type'       => 'event_import',
+				'execution_order' => 0,
+				'pipeline_id'     => $this->test_pipeline_id,
+			),
+			'ai-step'       => array(
+				'step_type'       => 'ai',
+				'execution_order' => 1,
+			),
+		);
+		datamachine_set_engine_data( $parent_id, $engine );
+
+		$packets = array();
+		foreach ( array( 'exhausted', 'sibling-a', 'sibling-b' ) as $item_identifier ) {
+			$claim  = $this->claim_for_parent( $parent_id, $item_identifier );
+			$packet = $this->make_data_packet( $item_identifier );
+			$packet['metadata'][ ProcessedItems::CLAIM_METADATA_KEY ] = $claim;
+			$packets[] = $packet;
+		}
+
+		global $wpdb;
+		$this->assertSame( 1, $wpdb->update(
+			( new ProcessedItems() )->get_table_name(),
+			array( 'deferral_count' => ProcessedItems::MAX_DEFERRAL_ATTEMPTS ),
+			array(
+				'flow_step_id'   => 'event_import:source_api',
+				'source_type'    => 'source_api',
+				'item_identifier' => 'exhausted',
+			),
+			array( '%d' ),
+			array( '%s', '%s', '%s' )
+		) );
+
+		$route  = new \ReflectionMethod( ExecuteStepAbility::class, 'routeAfterExecution' );
+		$result = $route->invoke(
+			new ExecuteStepAbility(),
+			$parent_id,
+			$source_step_id,
+			$this->test_flow_id,
+			$engine['flow_config'][ $source_step_id ],
+			'event_import',
+			'',
+			$packets,
+			array(
+				'job_id' => $parent_id,
+				'engine' => new EngineData( $engine, $parent_id ),
+			),
+			true,
+			null
+		);
+
+		$this->assertTrue( $result['success'] );
+		$this->assertSame( 'batch_scheduled', $result['outcome'] );
+		$worklist = $wpdb->get_col( $wpdb->prepare( 'SELECT payload FROM %i WHERE batch_job_id = %d ORDER BY item_index', $wpdb->prefix . 'datamachine_batch_items', $parent_id ) );
+		$this->assertCount( 2, $worklist );
+		$titles = array_map( static fn( string $payload ): string => (string) json_decode( $payload, true )['data']['title'], $worklist );
+		$this->assertSame( array( 'sibling-a', 'sibling-b' ), $titles );
+		$this->assertTrue( ( new ProcessedItems() )->has_item_been_processed( 'event_import:source_api', 'source_api', 'exhausted' ) );
+	}
+
 	public function test_scheduled_fanout_reconciles_handler_identity_from_normalized_execution_parameters(): void {
 		$parent_id = $this->create_parent_job();
 		$packets   = array();

@@ -140,6 +140,7 @@ namespace {
 	}
 
 	require_once __DIR__ . '/../inc/Core/Database/BaseRepository.php';
+	require_once __DIR__ . '/../inc/Core/Database/ProcessedItems/ProcessedItemDeferrals.php';
 	require_once __DIR__ . '/../inc/Core/Database/ProcessedItems/ProcessedItems.php';
 	require_once __DIR__ . '/../inc/Engine/Actions/Handlers/StepLifecycleHandler.php';
 	require_once __DIR__ . '/../inc/Core/ActionScheduler/GroupRegistrar.php';

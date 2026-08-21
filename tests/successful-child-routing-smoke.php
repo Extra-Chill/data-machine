@@ -68,6 +68,7 @@ require_once __DIR__ . '/../inc/Core/JobStatus.php';
 require_once __DIR__ . '/../inc/Core/StepExecutionResult.php';
 require_once __DIR__ . '/../inc/Core/Database/BaseRepository.php';
 require_once __DIR__ . '/../inc/Core/Database/Jobs/Jobs.php';
+require_once __DIR__ . '/../inc/Core/Database/ProcessedItems/ProcessedItemDeferrals.php';
 require_once __DIR__ . '/../inc/Core/Database/ProcessedItems/ProcessedItems.php';
 require_once __DIR__ . '/../inc/Engine/ExecutionPlan.php';
 require_once __DIR__ . '/../inc/Engine/StepNavigator.php';

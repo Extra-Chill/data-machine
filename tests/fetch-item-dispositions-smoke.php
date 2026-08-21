@@ -129,6 +129,7 @@ namespace DataMachine\Core\Database\ProcessedItems {
 		public const CLAIM_METADATA_KEY          = '_datamachine_item_claim';
 		public const CLAIMS_METADATA_KEY         = '_datamachine_item_claims';
 		public const DISPOSITION_ID_METADATA_KEY = '_datamachine_packet_disposition_id';
+		public const MAX_DEFERRAL_ATTEMPTS       = 3;
 
 		public static function disposition_identity( string $scope, string $source, string $item ): string {
 			return hash( 'sha256', implode( "\0", array( $scope, $source, $item ) ) );
@@ -160,6 +161,17 @@ namespace DataMachine\Core\Database\ProcessedItems {
 		public function release_claim( string $flow_step_id, string $source_type, string $item_identifier ): int|false {
 			$GLOBALS['fetch_disposition_smoke_released'][] = array( $flow_step_id, $source_type, $item_identifier );
 			return 1;
+		}
+
+		public function record_owned_deferral_attempt( array $claim, int $job_id ): array|false {
+			$key = $claim['identity_scope'] . "\0" . $claim['item_identifier'];
+			$current = $GLOBALS['fetch_disposition_smoke_deferrals'][ $key ] ?? array( 'attempts' => 0, 'job_id' => 0 );
+			if ( $job_id !== $current['job_id'] ) {
+				++$current['attempts'];
+				$current['job_id'] = $job_id;
+			}
+			$GLOBALS['fetch_disposition_smoke_deferrals'][ $key ] = $current;
+			return array( 'attempts' => $current['attempts'], 'exhausted' => $current['attempts'] >= self::MAX_DEFERRAL_ATTEMPTS );
 		}
 	}
 }
@@ -261,6 +273,16 @@ namespace {
 	assert_fetch_disposition_smoke( 'tool-error deferral remains packet scoped', ! isset( $GLOBALS['fetch_disposition_smoke_engine'][1815]['job_status'] ) );
 	$defer_diagnostic = $GLOBALS['fetch_disposition_smoke_engine'][1815]['packet_dispositions'][ $claim['disposition_id'] ]['diagnostic'] ?? array();
 	assert_fetch_disposition_smoke( 'defer_item persists disposition diagnostic', 'defer_item' === ( $defer_diagnostic['disposition'] ?? '' ) && 'tool-error' === ( $defer_diagnostic['reason'] ?? '' ) );
+	assert_fetch_disposition_smoke( 'first defer records bounded attempt state', 1 === ( $defer['deferral_attempts'] ?? 0 ) && false === ( $defer['exhausted'] ?? true ) );
+
+	echo "Case 2a: third exact-identity deferral exhausts and remains idempotent\n";
+	$tool->handle_tool_call( array( 'job_id' => 1818, 'engine' => $engine, 'reason' => 'still unavailable' ), array( 'disposition' => 'defer_item' ) );
+	$exhausted = $tool->handle_tool_call( array( 'job_id' => 1819, 'engine' => $engine, 'reason' => 'still unavailable' ), array( 'disposition' => 'defer_item' ) );
+	$repeat    = $tool->handle_tool_call( array( 'job_id' => 1819, 'engine' => $engine, 'reason' => 'repeat call' ), array( 'disposition' => 'defer_item' ) );
+	assert_fetch_disposition_smoke( 'third defer returns terminal disposition', true === ( $exhausted['success'] ?? false ) && 'defer_exhausted' === ( $exhausted['disposition'] ?? '' ) && 3 === ( $exhausted['deferral_attempts'] ?? 0 ) );
+	$exhausted_record = $GLOBALS['fetch_disposition_smoke_engine'][1819]['packet_dispositions'][ $claim['disposition_id'] ] ?? array();
+	assert_fetch_disposition_smoke( 'cap persists exact identity exhaustion without a job override', 'defer_exhausted' === ( $exhausted_record['disposition'] ?? '' ) && ! isset( $GLOBALS['fetch_disposition_smoke_engine'][1819]['job_status'], $GLOBALS['fetch_disposition_smoke_engine'][1819]['job_status_reason'] ) );
+	assert_fetch_disposition_smoke( 'same-job repeat does not increase count', true === ( $repeat['already_dispositioned'] ?? false ) && 3 === ( $GLOBALS['fetch_disposition_smoke_deferrals']["fetch-step_7\0source-123"]['attempts'] ?? 0 ) );
 
 	echo "Case 2b: reject_source hydrates engine data from job_id when runtime engine is absent\n";
 	$GLOBALS['fetch_disposition_smoke_processed']               = array();
