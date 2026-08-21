@@ -30,6 +30,9 @@
 
 defined( 'ABSPATH' ) || exit;
 
+require_once dirname( __DIR__ ) . '/Core/ActionScheduler/GroupRegistrar.php';
+
+use DataMachine\Core\ActionScheduler\GroupRegistrar;
 use DataMachine\Engine\AI\MemoryFileRegistry;
 use DataMachine\Engine\AI\SectionRegistry;
 
@@ -97,7 +100,7 @@ function datamachine_register_agents_md_sections(): void {
 	$wp = datamachine_agents_md_wp_cli_cmd();
 
 	$core_meta = array(
-		'owner'      => 'data-machine',
+		'owner'      => GroupRegistrar::GROUP,
 		'freshness'  => 'static',
 		'conditions' => 'Registered when DATAMACHINE_COMPOSE_AGENTS_MD is enabled.',
 	);
@@ -121,7 +124,7 @@ function datamachine_register_agents_md_sections(): void {
 		10,
 		'datamachine_agents_md_render_datamachine_section',
 		array(
-			'owner'      => 'data-machine',
+			'owner'      => GroupRegistrar::GROUP,
 			'freshness'  => 'static',
 			'conditions' => 'Registered when DATAMACHINE_COMPOSE_AGENTS_MD is enabled.',
 		)

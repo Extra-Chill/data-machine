@@ -28,6 +28,7 @@ use DataMachine\Core\Database\Chat\ConversationRetentionInterface;
 use DataMachine\Core\Database\Chat\ConversationSessionIndexInterface;
 use DataMachine\Core\Database\Chat\ConversationStoreFactory;
 use DataMachine\Core\Database\Chat\ConversationStoreInterface;
+use DataMachine\Core\Workspace\WordPressWorkspaceScope;
 use AgentsAPI\AI\WP_Agent_Execution_Principal;
 use AgentsAPI\Core\Database\Chat\WP_Agent_Conversation_Lock;
 use AgentsAPI\Core\Database\Chat\WP_Agent_Conversation_Store;
@@ -421,7 +422,7 @@ class ConversationStoreFactoryTest extends WP_UnitTestCase {
 		wp_set_current_user( $user_id );
 
 		// Seed the in-memory store with a session under the target user.
-		$session_id = $memory_store->create_session( $this->workspace(), $user_id, 0, array(), 'chat' );
+		$session_id = $memory_store->create_session( WordPressWorkspaceScope::current(), $user_id, 0, array(), 'chat' );
 		$memory_store->update_session(
 			$session_id,
 			array(

@@ -382,7 +382,7 @@ class BaseAuthProviderTest extends WP_UnitTestCase {
 		$this->provider->save_account_for_user( get_current_user_id(), array( 'access_token' => 'tok_user' ) );
 
 		$this->assertSame( 'tok_site', $this->provider->get_site_account()['access_token'] );
-		$this->assertSame( 'tok_user', $this->provider->get_account()['access_token'] );
+		$this->assertSame( 'tok_site', $this->provider->get_account()['access_token'] );
 
 		remove_all_filters( 'datamachine_auth_scope_policy' );
 		wp_set_current_user( 0 );

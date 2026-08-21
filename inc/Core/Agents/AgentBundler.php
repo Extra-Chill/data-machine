@@ -580,6 +580,9 @@ class AgentBundler {
 		if ( null === $stored_scope ) {
 			return null;
 		}
+		if ( is_string( $stored_scope ) && ctype_digit( $stored_scope ) ) {
+			$stored_scope = (int) $stored_scope;
+		}
 
 		return \DataMachine\Engine\Bundle\BundleSchema::normalize_agent_site_scope( $stored_scope );
 	}

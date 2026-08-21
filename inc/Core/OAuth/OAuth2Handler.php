@@ -650,7 +650,7 @@ class OAuth2Handler {
 
 		// The state is the CSRF proof and carries trusted callback principal data.
 		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- OAuth state is verified below.
-		$state = isset( $_POST['state'] ) ? sanitize_text_field( wp_unslash( $_POST['state'] ) ) : '';
+		$state         = isset( $_POST['state'] ) ? sanitize_text_field( wp_unslash( $_POST['state'] ) ) : '';
 		$state_payload = $this->verify_state( $provider_key, $state );
 		if ( false === $state_payload ) {
 			do_action(
@@ -803,7 +803,7 @@ class OAuth2Handler {
 		$user_id  = absint( $state_payload['user_id'] ?? 0 );
 
 		// OAuth callbacks are separate requests. Reinstall the trusted state
-		// principal so existing providers that use ambient scope save to its slot.
+		// principal so the storage callback can select its explicit principal slot.
 		return $agent_id > 0 && $user_id > 0 && class_exists( '\\DataMachine\\Abilities\\PermissionHelper' )
 			? \DataMachine\Abilities\PermissionHelper::run_as_agent_context( $agent_id, $user_id, $storage_callback, \AgentsAPI\AI\WP_Agent_Execution_Principal::REQUEST_CONTEXT_REST )
 			: $storage_callback();

@@ -170,7 +170,7 @@ class BaseOAuth2ProviderTest extends WP_UnitTestCase {
 		PermissionHelper::set_agent_context( 111, $owner_id );
 		$handler = new TestCallbackOAuth2Handler();
 		$stored  = $handler->store_callback_account_for_test(
-			fn(): bool => $this->provider->save_account( array( 'access_token' => 'agent-callback-token' ) ),
+			fn(): bool => $this->provider->save_account_for_agent( PermissionHelper::get_acting_agent_id(), array( 'access_token' => 'agent-callback-token' ) ),
 			array(
 				'agent_id' => 303,
 				'user_id'  => $owner_id,

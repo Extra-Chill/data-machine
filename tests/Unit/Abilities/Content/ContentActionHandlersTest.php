@@ -355,8 +355,8 @@ class ContentActionHandlersTest extends WP_UnitTestCase {
 			)
 		);
 
-		$this->assertFalse( $resolution['success'] );
-		$this->assertStringContainsString( 'permission', strtolower( $resolution['error'] ) );
+		$this->assertInstanceOf( \WP_Error::class, $resolution );
+		$this->assertStringContainsString( 'permission', strtolower( $resolution->get_error_message() ) );
 
 		// Post untouched because the apply never ran.
 		wp_set_current_user( $this->admin_id );
