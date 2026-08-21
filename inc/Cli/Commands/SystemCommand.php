@@ -167,6 +167,20 @@ class SystemCommand extends BaseCommand {
 			if ( isset( $check_result['message'] ) ) {
 				WP_CLI::log( sprintf( '  Message:        %s', $check_result['message'] ) );
 			}
+			if ( ! empty( $check_result['warnings'] ) ) {
+				foreach ( $check_result['warnings'] as $warning ) {
+					WP_CLI::warning(
+						sprintf(
+							'%s: live %s bytes, reclaimable %s bytes (%s%%). Run %s',
+							$warning['table'],
+							number_format_i18n( (int) $warning['live_bytes'] ),
+							number_format_i18n( (int) $warning['reclaimable_bytes'] ),
+							number_format_i18n( 100 * (float) $warning['reclaim_ratio'], 1 ),
+							$warning['command']
+						)
+					);
+				}
+			}
 			if ( isset( $check_result[ DependencyChecker::CHECK_ACTION_SCHEDULER ] ) && is_array( $check_result[ DependencyChecker::CHECK_ACTION_SCHEDULER ] ) ) {
 				$action_scheduler = $check_result[ DependencyChecker::CHECK_ACTION_SCHEDULER ];
 				WP_CLI::log( sprintf( '  Pending:        %d', (int) ( $action_scheduler['pending_count'] ?? 0 ) ) );

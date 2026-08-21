@@ -25,6 +25,7 @@ use DataMachine\Engine\Tasks\RecurringRejectionTracker;
 use DataMachine\Engine\Tasks\RecurringScheduler;
 use DataMachine\Engine\Tasks\TaskScheduler;
 use DataMachine\Engine\Tasks\TaskRegistry;
+use DataMachine\Engine\AI\System\Tasks\Retention\RetentionCleanup;
 
 defined('ABSPATH') || exit;
 
@@ -165,6 +166,11 @@ class SystemAbilities {
 			'ownership' => array(
 				'label'    => __( 'Agent Ownership', 'data-machine' ),
 				'callback' => array( $this, 'runOwnershipDiagnostics' ),
+				'default'  => true,
+			),
+			'retention' => array(
+				'label'    => __( 'Retention Storage', 'data-machine' ),
+				'callback' => array( RetentionCleanup::class, 'tableBloatHealth' ),
 				'default'  => true,
 			),
 		);

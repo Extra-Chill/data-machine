@@ -274,6 +274,174 @@ class RetentionCleanup {
 	}
 
 	/**
+	 * Owned physical tables that may be inspected or rebuilt by retention.
+	 *
+	 * @return array<string, string> Logical suffix to prefixed table name.
+	 */
+	public static function ownedTableNames(): array {
+		global $wpdb;
+
+		return array(
+			'datamachine_jobs'              => $wpdb->prefix . 'datamachine_jobs',
+			'datamachine_logs'              => $wpdb->prefix . 'datamachine_logs',
+			'datamachine_processed_items'   => $wpdb->prefix . 'datamachine_processed_items',
+			'actionscheduler_actions'       => $wpdb->prefix . 'actionscheduler_actions',
+			'actionscheduler_logs'          => $wpdb->prefix . 'actionscheduler_logs',
+			'actionscheduler_claims'        => $wpdb->prefix . 'actionscheduler_claims',
+		);
+	}
+
+	public static function tableFreeBytesThreshold(): int {
+		return max( 0, (int) apply_filters( 'datamachine_table_free_bytes_threshold', 1024 * 1024 * 1024 ) );
+	}
+
+	public static function tableFreeRatioThreshold(): float {
+		return max( 0.0, (float) apply_filters( 'datamachine_table_free_ratio_threshold', 0.5 ) );
+	}
+
+	/**
+	 * Report physical allocation for tables owned by Data Machine.
+	 *
+	 * @return array<string, array<string, mixed>>
+	 */
+	public static function ownedTableAllocations(): array {
+		global $wpdb;
+		$tables = self::ownedTableNames();
+		$report = array();
+
+		foreach ( $tables as $suffix => $table ) {
+			$report[ $table ] = array(
+				'table'                 => $table,
+				'logical_name'          => $suffix,
+				'rows'                  => 0,
+				'live_bytes'            => null,
+				'allocated_free_bytes'  => null,
+				'allocation_bytes'      => null,
+				'reclaim_ratio'        => null,
+				'engine'               => null,
+				'available'             => false,
+			);
+		}
+
+		if ( class_exists( BaseRepository::class ) && BaseRepository::is_sqlite() ) {
+			foreach ( $report as $table => &$row ) {
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+				$row['rows'] = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i', $table ) );
+			}
+			unset( $row );
+			return $report;
+		}
+
+		$names        = array_keys( $report );
+		$placeholders = implode( ',', array_fill( 0, count( $names ), '%s' ) );
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$results = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT TABLE_NAME, ENGINE, TABLE_ROWS, DATA_LENGTH, INDEX_LENGTH, DATA_FREE FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ({$placeholders})",
+				...$names
+			)
+		);
+		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+
+		if ( ! is_array( $results ) ) {
+			return $report;
+		}
+
+		foreach ( $results as $result ) {
+			$table = (string) ( $result->TABLE_NAME ?? '' );
+			if ( ! isset( $report[ $table ] ) ) {
+				continue;
+			}
+			$live = (int) ( $result->DATA_LENGTH ?? 0 ) + (int) ( $result->INDEX_LENGTH ?? 0 );
+			$free = max( 0, (int) ( $result->DATA_FREE ?? 0 ) );
+			$report[ $table ]['rows']                 = (int) ( $result->TABLE_ROWS ?? 0 );
+			$report[ $table ]['live_bytes']           = $live;
+			$report[ $table ]['allocated_free_bytes'] = $free;
+			$report[ $table ]['allocation_bytes']     = $live + $free;
+			$report[ $table ]['reclaim_ratio']        = $live + $free > 0 ? $free / ( $live + $free ) : 0.0;
+			$report[ $table ]['engine']                = (string) ( $result->ENGINE ?? '' );
+			$report[ $table ]['available']             = true;
+		}
+
+		return $report;
+	}
+
+	/**
+	 * Rebuild explicitly selected owned InnoDB tables after validating metadata.
+	 *
+	 * @param array<int, string> $selected Physical or unprefixed table names.
+	 * @return array{optimized: array<int, string>, rejected: array<string, string>}
+	 */
+	public static function optimizeOwnedTables( array $selected ): array {
+		$owned    = self::ownedTableNames();
+		$allowed  = array_combine( array_values( $owned ), array_values( $owned ) );
+		foreach ( $owned as $suffix => $table ) {
+			$allowed[ $suffix ] = $table;
+		}
+		$report    = self::ownedTableAllocations();
+		$optimized = array();
+		$rejected  = array();
+
+		if ( class_exists( BaseRepository::class ) && BaseRepository::is_sqlite() ) {
+			foreach ( $selected as $table ) {
+				$rejected[ (string) $table ] = 'SQLite does not support InnoDB table allocation';
+			}
+			return array( 'optimized' => $optimized, 'rejected' => $rejected );
+		}
+
+		global $wpdb;
+		foreach ( $selected as $requested ) {
+			$key = (string) $requested;
+			if ( ! isset( $allowed[ $key ] ) ) {
+				$rejected[ $key ] = 'table is not owned by Data Machine';
+				continue;
+			}
+			$table = $allowed[ $key ];
+			if ( empty( $report[ $table ]['available'] ) || 'innodb' !== strtolower( (string) $report[ $table ]['engine'] ) ) {
+				$rejected[ $table ] = 'InnoDB metadata is unavailable or table is not InnoDB';
+				continue;
+			}
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange
+			if ( false !== $wpdb->query( $wpdb->prepare( 'OPTIMIZE TABLE %i', $table ) ) ) {
+				$optimized[] = $table;
+			}
+		}
+
+		return array( 'optimized' => $optimized, 'rejected' => $rejected );
+	}
+
+	/**
+	 * Return actionable DATA_FREE warnings for the health surface.
+	 *
+	 * @return array{status: string, warnings: array<int, array<string, mixed>>, thresholds: array<string, mixed>}
+	 */
+	public static function tableBloatHealth(): array {
+		$absolute = self::tableFreeBytesThreshold();
+		$ratio    = self::tableFreeRatioThreshold();
+		$warnings = array();
+		foreach ( self::ownedTableAllocations() as $table => $data ) {
+			$free = $data['allocated_free_bytes'];
+			$share = $data['reclaim_ratio'];
+			if ( null === $free || null === $share || ( $free < $absolute && $share < $ratio ) ) {
+				continue;
+			}
+			$warnings[] = array(
+				'table'              => $table,
+				'live_bytes'         => $data['live_bytes'],
+				'reclaimable_bytes'  => $free,
+				'reclaim_ratio'      => $share,
+				'command'            => 'wp datamachine retention optimize --tables=' . $table . ' --yes',
+			);
+		}
+
+		return array(
+			'status'     => empty( $warnings ) ? 'ok' : 'warning',
+			'warnings'   => $warnings,
+			'thresholds' => array( 'free_bytes' => $absolute, 'free_ratio' => $ratio ),
+		);
+	}
+
+	/**
 	 * Read-only row estimates for the Action Scheduler tables.
 	 *
 	 * Pure read with no side effects — safe for health/diagnostic surfaces.
@@ -1210,9 +1378,10 @@ class RetentionCleanup {
 
 		$threshold = self::actionSchedulerOptimizeThreshold();
 		$optimized = array();
+		$owned    = array_values( self::ownedTableNames() );
 
 		foreach ( $tables_affected as $table => $affected ) {
-			if ( (int) $affected < $threshold ) {
+			if ( ! in_array( $table, $owned, true ) || (int) $affected < $threshold ) {
 				continue;
 			}
 

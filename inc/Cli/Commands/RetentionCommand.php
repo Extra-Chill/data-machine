@@ -13,7 +13,6 @@ namespace DataMachine\Cli\Commands;
 
 use WP_CLI;
 use DataMachine\Cli\BaseCommand;
-use DataMachine\Core\Database\BaseRepository;
 use DataMachine\Core\Database\Chat\ConversationStoreFactory;
 use DataMachine\Engine\AI\System\Tasks\Retention\RetentionCleanup;
 use DataMachine\Engine\Tasks\TaskScheduler;
@@ -80,23 +79,61 @@ class RetentionCommand extends BaseCommand {
 				'filter'    => $policy['filter'],
 				'rows'      => $size_info['rows'] ?? 'N/A',
 				'size_mb'   => $size_info['size_mb'] ?? 'N/A',
+				'free_mb'   => $size_info['free_mb'] ?? 'N/A',
+				'reclaim'   => $size_info['reclaim_ratio'] ?? 'N/A',
 			);
 		}
 
 		$this->format_items(
 			$policy_items,
-			array( 'domain', 'retention', 'rows', 'size_mb', 'filter' ),
+			array( 'domain', 'retention', 'rows', 'size_mb', 'free_mb', 'reclaim', 'filter' ),
 			$assoc_args
 		);
 
 		// Show total.
 		$total_mb = 0;
-		foreach ( $sizes as $size_info ) {
+		foreach ( $sizes['_unique'] ?? array() as $size_info ) {
 			$total_mb += (float) $size_info['size_mb'];
 		}
 
 		WP_CLI::log( '' );
 		WP_CLI::log( sprintf( 'Total tracked table size: %.1f MB', $total_mb ) );
+	}
+
+	/**
+	 * Rebuild selected owned InnoDB tables after explicit confirmation.
+	 *
+	 * [--tables=<tables>]
+	 * : Comma-separated physical or unprefixed owned table names.
+	 *
+	 * [--yes]
+	 * : Confirm the table rebuild. Without this flag the command is a dry run.
+	 *
+	 * @param array $args       Positional arguments.
+	 * @param array $assoc_args Associative arguments.
+	 */
+	public function optimize( array $args, array $assoc_args ): void {
+		$raw = (string) ( $assoc_args['tables'] ?? '' );
+		$selected = array_values( array_filter( array_map( 'trim', explode( ',', $raw ) ) ) );
+		if ( empty( $selected ) ) {
+			WP_CLI::error( 'Provide --tables with one or more owned table names.' );
+			return;
+		}
+
+		if ( ! isset( $assoc_args['yes'] ) ) {
+			WP_CLI::log( 'Dry run. Pass --yes to rebuild selected tables: ' . implode( ', ', $selected ) );
+			return;
+		}
+
+		$result = RetentionCleanup::optimizeOwnedTables( $selected );
+		foreach ( $result['rejected'] as $table => $reason ) {
+			WP_CLI::warning( sprintf( '%s: %s', $table, $reason ) );
+		}
+		if ( empty( $result['optimized'] ) ) {
+			WP_CLI::error( 'No selected table was optimized.' );
+			return;
+		}
+		WP_CLI::success( 'Optimized: ' . implode( ', ', $result['optimized'] ) );
 	}
 
 	/**
@@ -434,7 +471,6 @@ class RetentionCommand extends BaseCommand {
 	private function get_table_sizes(): array {
 		global $wpdb;
 
-		$sizes  = array();
 		$tables = array(
 			'Completed jobs'  => $wpdb->prefix . 'datamachine_jobs',
 			'Failed jobs'     => $wpdb->prefix . 'datamachine_jobs',
@@ -443,49 +479,15 @@ class RetentionCommand extends BaseCommand {
 			'AS actions'      => $wpdb->prefix . 'actionscheduler_actions',
 			'Stale claims'    => $wpdb->prefix . 'actionscheduler_claims',
 		);
-
-		// Deduplicate tables for the query (jobs appears twice).
-		$unique_tables = array_unique( array_values( $tables ) );
-
-		$table_data = array();
-
-		if ( BaseRepository::is_sqlite() ) {
-			// SQLite: no information_schema. Count rows per table; size is unavailable.
-			foreach ( $unique_tables as $tbl ) {
-				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-				$count              = (int) $wpdb->get_var(
-					$wpdb->prepare( 'SELECT COUNT(*) FROM %i', $tbl )
-				);
-				$table_data[ $tbl ] = array(
-					'rows'    => $count,
-					'size_mb' => '0.0',
-				);
-			}
-		} else {
-			$placeholders = implode( ',', array_fill( 0, count( $unique_tables ), '%s' ) );
-
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-			$results = $wpdb->get_results(
-				// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare -- Placeholder list is generated from table count and values are still prepared.
-				$wpdb->prepare(
-					"SELECT table_name, table_rows,
-						ROUND((data_length + index_length) / 1024 / 1024, 1) AS size_mb
-					FROM information_schema.tables
-					WHERE table_schema = DATABASE()
-					AND table_name IN ({$placeholders})",
-					...$unique_tables
-				)
-				// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare
+		$allocations = RetentionCleanup::ownedTableAllocations();
+		$table_data  = array();
+		foreach ( $allocations as $table => $data ) {
+			$table_data[ $table ] = array(
+				'rows'    => $data['rows'],
+				'size_mb' => null === $data['live_bytes'] ? 'N/A' : number_format( $data['live_bytes'] / 1024 / 1024, 1 ),
+				'free_mb' => null === $data['allocated_free_bytes'] ? 'N/A' : number_format( $data['allocated_free_bytes'] / 1024 / 1024, 1 ),
+				'reclaim_ratio' => null === $data['reclaim_ratio'] ? 'N/A' : number_format( 100 * $data['reclaim_ratio'], 1 ) . '%',
 			);
-
-			if ( $results ) {
-				foreach ( $results as $row ) {
-					$table_data[ $row->table_name ] = array(
-						'rows'    => (int) $row->table_rows,
-						'size_mb' => $row->size_mb,
-					);
-				}
-			}
 		}
 
 		foreach ( $tables as $domain => $table_name ) {
@@ -494,13 +496,15 @@ class RetentionCommand extends BaseCommand {
 				'size_mb' => '0.0',
 			);
 		}
+		$sizes['_unique'] = $table_data;
 
 		// Chat sessions routes through the conversation store so swapped
 		// backends (e.g. AI Framework adapters) can opt into the metrics
 		// table or bow out by returning null.
 		$chat_metrics = ConversationStoreFactory::get()->get_storage_metrics();
 		if ( null !== $chat_metrics ) {
-			$sizes['Chat sessions'] = $chat_metrics;
+			$sizes['Chat sessions']            = $chat_metrics;
+			$sizes['_unique']['Chat sessions'] = $chat_metrics;
 		}
 
 		return $sizes;
