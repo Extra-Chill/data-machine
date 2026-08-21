@@ -2,15 +2,19 @@
  * Pipeline Card Component
  *
  * Presentational component that displays pipeline data and renders child components.
- * @pattern Presentational - Receives pipeline and flows data as props
+ * Presentational component that receives pipeline and flows data as props.
  */
 
 /**
  * WordPress dependencies
  */
-import { useCallback } from '@wordpress/element';
-import { Card, CardBody, CardDivider } from '@wordpress/components';
+import { useCallback, useState } from '@wordpress/element';
+import { Card, CardBody, CardDivider, Notice } from '@wordpress/components';
 import { __ } from '@wordpress/i18n';
+
+/**
+ * External dependencies
+ */
 /**
  * Internal dependencies
  */
@@ -44,11 +48,12 @@ export default function PipelineCard( {
 	// Use mutations
 	const deleteStepMutation = useDeletePipelineStep();
 	const { openModal } = useUIStore();
+	const [ stepDeleteError, setStepDeleteError ] = useState( null );
 
 	/**
 	 * Handle pipeline name change
 	 */
-	const handleNameChange = useCallback( ( newName ) => {
+	const handleNameChange = useCallback( () => {
 		// Name change already saved by PipelineHeader
 		// Queries will automatically refetch
 	}, [] );
@@ -56,7 +61,7 @@ export default function PipelineCard( {
 	/**
 	 * Handle pipeline deletion
 	 */
-	const handleDelete = useCallback( ( pipelineId ) => {
+	const handleDelete = useCallback( () => {
 		// Deletion already complete - queries will automatically refetch
 	}, [] );
 
@@ -79,14 +84,15 @@ export default function PipelineCard( {
 	 */
 	const handleStepRemoved = useCallback(
 		async ( stepId ) => {
+			setStepDeleteError( null );
 			try {
 				await deleteStepMutation.mutateAsync( {
 					pipelineId: pipeline?.pipeline_id,
 					stepId,
 				} );
 			} catch ( error ) {
-				console.error( 'Step deletion error:', error );
-				alert(
+				window.console.error( 'Step deletion error:', error );
+				setStepDeleteError(
 					__(
 						'An error occurred while deleting the step',
 						'data-machine'
@@ -122,6 +128,14 @@ export default function PipelineCard( {
 	return (
 		<Card className="datamachine-pipeline-card" size="large">
 			<CardBody>
+				{ stepDeleteError && (
+					<Notice
+						status="error"
+						onRemove={ () => setStepDeleteError( null ) }
+					>
+						{ stepDeleteError }
+					</Notice>
+				) }
 				<PipelineHeader
 					pipelineId={ pipeline.pipeline_id }
 					pipelineName={ pipeline.pipeline_name }

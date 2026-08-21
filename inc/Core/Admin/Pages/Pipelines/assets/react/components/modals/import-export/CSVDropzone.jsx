@@ -8,8 +8,7 @@
  * WordPress dependencies
  */
 import { useRef } from '@wordpress/element';
-import { Button } from '@wordpress/components';
-import { __ } from '@wordpress/i18n';
+import { __, sprintf } from '@wordpress/i18n';
 /**
  * Internal dependencies
  */
@@ -35,7 +34,7 @@ export default function CSVDropzone( {
 
 	/**
 	 * Validate and read CSV file
-	 * @param file
+	 * @param {File} file CSV file.
 	 */
 	const processFile = ( file ) => {
 		// Validate file type
@@ -51,16 +50,17 @@ export default function CSVDropzone( {
 		if ( file.size > maxSize ) {
 			const maxSizeMB = Math.round( maxSize / ( 1024 * 1024 ) );
 			dragDrop.setError(
-				__(
-					`File size exceeds ${ maxSizeMB }MB limit.`,
-					'data-machine'
+				sprintf(
+					/* translators: %d: Maximum upload size in megabytes. */
+					__( 'File size exceeds %dMB limit.', 'data-machine' ),
+					maxSizeMB
 				)
 			);
 			return;
 		}
 
 		// Read file content
-		const reader = new FileReader();
+		const reader = new window.FileReader();
 		reader.onload = ( e ) => {
 			const content = e.target.result;
 			if ( onFileSelected ) {
@@ -76,7 +76,7 @@ export default function CSVDropzone( {
 
 	/**
 	 * Handle file drop
-	 * @param files
+	 * @param {FileList|Array<File>} files Dropped files.
 	 */
 	const handleDrop = ( files ) => {
 		if ( files.length > 0 ) {
@@ -86,7 +86,7 @@ export default function CSVDropzone( {
 
 	/**
 	 * Handle file input change
-	 * @param e
+	 * @param {Event} e Drag event.
 	 */
 	const handleFileInputChange = ( e ) => {
 		const files = e.target.files;
@@ -114,43 +114,41 @@ export default function CSVDropzone( {
 
 	return (
 		<div>
-			<div
+			<button
+				type="button"
 				className={ dropzoneClass }
+				onClick={ handleBrowseClick }
 				onDragEnter={ dragDrop.handleDragEnter }
 				onDragLeave={ dragDrop.handleDragLeave }
 				onDragOver={ dragDrop.handleDragOver }
 				onDrop={ dragDrop.handleDrop.bind( null, handleDrop ) }
-				onClick={ ! disabled ? handleBrowseClick : undefined }
+				disabled={ disabled }
 			>
-				<div className="datamachine-csv-dropzone__icon"></div>
+				<span className="datamachine-csv-dropzone__icon"></span>
 
-				<p className="datamachine-csv-dropzone__title">
+				<span className="datamachine-csv-dropzone__title">
 					{ fileName
 						? __( 'File selected', 'data-machine' )
 						: __( 'Drag and drop CSV file here', 'data-machine' ) }
-				</p>
+				</span>
 
-				<p className="datamachine-csv-dropzone__divider">
+				<span className="datamachine-csv-dropzone__divider">
 					{ __( 'or', 'data-machine' ) }
-				</p>
+				</span>
 
-				<Button
-					variant="secondary"
-					onClick={ handleBrowseClick }
-					disabled={ disabled }
-				>
+				<span className="datamachine-csv-dropzone__browse">
 					{ __( 'Browse Files', 'data-machine' ) }
-				</Button>
+				</span>
+			</button>
 
-				<input
-					ref={ fileInputRef }
-					type="file"
-					accept=".csv,text/csv"
-					onChange={ handleFileInputChange }
-					className="datamachine-hidden"
-					disabled={ disabled }
-				/>
-			</div>
+			<input
+				ref={ fileInputRef }
+				type="file"
+				accept=".csv,text/csv"
+				onChange={ handleFileInputChange }
+				className="datamachine-hidden"
+				disabled={ disabled }
+			/>
 
 			{ dragDrop.error && (
 				<div className="datamachine-csv-dropzone__error">

@@ -17,7 +17,7 @@ import { queryClient } from '@shared/lib/queryClient';
 /**
  * Shared boot — registers param interceptors (agent scoping, etc.)
  */
-import '@shared/boot/agentInterceptor'; // eslint-disable-line no-unused-expressions
+import '@shared/boot/agentInterceptor';
 /**
  * Internal dependencies
  */
@@ -31,13 +31,13 @@ domReady( () => {
 	const rootElement = document.getElementById( 'datamachine-react-root' );
 
 	if ( ! rootElement ) {
-		console.error( 'Data Machine: React root element not found' );
+		window.console.error( 'Data Machine: React root element not found' );
 		return;
 	}
 
 	// Verify WordPress globals are available
 	if ( ! window.dataMachineConfig ) {
-		console.error( 'Data Machine: Configuration not found' );
+		window.console.error( 'Data Machine: Configuration not found' );
 		return;
 	}
 

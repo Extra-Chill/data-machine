@@ -14,7 +14,6 @@ import {
 	Button,
 	Notice,
 	Spinner,
-	__experimentalConfirmDialog as ConfirmDialog,
 } from '@wordpress/components';
 import { __ } from '@wordpress/i18n';
 
@@ -25,7 +24,11 @@ import {
 	useManageAgents,
 	useDeleteAgent,
 } from '../queries/agents';
+/**
+ * External dependencies
+ */
 import CreateAgentModal from '@shared/components/CreateAgentModal';
+import ConfirmationModal from '@shared/components/ConfirmationModal';
 import { useAgentStore } from '@shared/stores/agentStore';
 
 /**
@@ -53,7 +56,7 @@ const formatDate = ( dateStr ) => {
 /**
  * AgentListTab — main export
  *
- * @param {Object}   props              Component props.
+ * @param {Object}   props               Component props.
  * @param {Function} props.onSelectAgent Callback when an agent row is clicked for editing.
  */
 const AgentListTab = ( { onSelectAgent } ) => {
@@ -194,21 +197,22 @@ const AgentListTab = ( { onSelectAgent } ) => {
 			) }
 
 			{ deleteTarget && (
-				<ConfirmDialog
+				<ConfirmationModal
 					onConfirm={ handleDelete }
 					onCancel={ () => setDeleteTarget( null ) }
+					isBusy={ deleteMutation.isPending }
 				>
 					{ __(
 						'Are you sure you want to delete agent',
 						'data-machine'
 					) }{ ' ' }
-					<strong>"{ deleteTarget.agent_name || deleteTarget.agent_slug }"</strong>
-					?
+					<strong>&ldquo;{ deleteTarget.agent_name || deleteTarget.agent_slug }&rdquo;</strong>
+					?{ ' ' }
 					{ __(
-						' This will remove the agent record and access grants. Filesystem files will not be deleted.',
+						'This will remove the agent record and access grants. Filesystem files will not be deleted.',
 						'data-machine'
 					) }
-				</ConfirmDialog>
+				</ConfirmationModal>
 			) }
 		</div>
 	);

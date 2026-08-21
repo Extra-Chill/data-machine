@@ -69,7 +69,7 @@ export default function ModalSwitch( { activeModal, baseProps } ) {
 			return <FlowMemoryFilesModal { ...baseProps } />;
 
 		default:
-			console.warn( `Unknown modal type: ${ activeModal }` );
+			window.console.warn( `Unknown modal type: ${ activeModal }` );
 			return null;
 	}
 }

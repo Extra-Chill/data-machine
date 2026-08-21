@@ -19,7 +19,12 @@ import { useState, useCallback, useRef, useEffect, useMemo } from '@wordpress/el
 import HandlerSettingField from '../modals/handler-settings/HandlerSettingField';
 import { useHandlerDetails } from '../../queries/handlers';
 import { useUpdateFlowStepConfig } from '../../queries/flows';
+/**
+ * External dependencies
+ */
 import useDebouncedAutosave from '@shared/hooks/useDebouncedAutosave';
+
+const EMPTY_EXCLUDED_FIELDS = [];
 
 /**
  * InlineStepConfig Component.
@@ -32,25 +37,27 @@ import useDebouncedAutosave from '@shared/hooks/useDebouncedAutosave';
  * @param {Function} props.onError       - Error callback.
  * @param {number}   props.pipelineId    - Pipeline ID (for cache invalidation).
  * @param {number}   props.flowId        - Flow ID (for cache invalidation).
- * @return {JSX.Element|null} Inline config fields.
+ * @return {React.ReactElement|null} Inline config fields.
  */
 export default function InlineStepConfig( {
 	flowStepId,
 	handlerConfig = {},
 	handlerSlug,
-	excludeFields = [],
+	excludeFields = EMPTY_EXCLUDED_FIELDS,
 	onError,
 	pipelineId,
 	flowId,
 } ) {
 	// Fetch full field schema from handler details API.
 	const { data: handlerDetails } = useHandlerDetails( handlerSlug );
-	const fieldSchema = handlerDetails?.settings || {};
-
 	// Filter out excluded fields and fields with type 'info'.
-	const fieldEntries = Object.entries( fieldSchema ).filter(
-		( [ key, config ] ) =>
-			! excludeFields.includes( key ) && config.type !== 'info'
+	const fieldEntries = useMemo(
+		() =>
+			Object.entries( handlerDetails?.settings || {} ).filter(
+				( [ key, config ] ) =>
+					! excludeFields.includes( key ) && config.type !== 'info'
+			),
+		[ handlerDetails?.settings, excludeFields ]
 	);
 
 	// Derive initial values from handlerConfig + field schema.
@@ -65,8 +72,7 @@ export default function InlineStepConfig( {
 				handlerConfig[ key ] ?? config.current_value ?? config.default ?? '';
 		} );
 		return values;
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [ handlerSlug, fieldEntries.length, JSON.stringify( handlerConfig ) ] );
+	}, [ fieldEntries, handlerConfig ] );
 
 	// Local state for controlled inputs, initialized from derived values.
 	const [ localValues, setLocalValues ] = useState( initialValues );
@@ -103,8 +109,7 @@ export default function InlineStepConfig( {
 					onError( response?.message || 'Failed to save settings' );
 				}
 			} catch ( err ) {
-				// eslint-disable-next-line no-console
-				console.error( 'Inline config save error:', err );
+				window.console.error( 'Inline config save error:', err );
 				if ( onError ) {
 					onError( err.message || 'An error occurred' );
 				}

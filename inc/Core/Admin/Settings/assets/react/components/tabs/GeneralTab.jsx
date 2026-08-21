@@ -8,7 +8,7 @@
 /**
  * WordPress dependencies
  */
-import { useEffect } from '@wordpress/element';
+import { useEffect, useMemo } from '@wordpress/element';
 
 /**
  * External dependencies
@@ -68,23 +68,23 @@ const AI_CONCURRENCY_LIMITS = {
 const GeneralTab = () => {
 	const { data, isLoading, error } = useSettings();
 	const updateMutation = useUpdateSettings();
-	const queueDefaults = data?.defaults?.queue_tuning ?? {
+	const queueDefaults = useMemo( () => data?.defaults?.queue_tuning ?? ( {
 		concurrent_batches: 3,
 		batch_size: 25,
 		time_limit: 60,
 		chunk_size: 10,
 		chunk_delay: 30,
-	};
-	const transportDefaults = {
+	} ), [ data ] );
+	const transportDefaults = useMemo( () => ( {
 		connectTimeout: data?.defaults?.wp_ai_client_connect_timeout ?? 15,
 		requestTimeout: data?.defaults?.wp_ai_client_request_timeout ?? 300,
-	};
-	const aiConcurrencyDefaults = {
+	} ), [ data ] );
+	const aiConcurrencyDefaults = useMemo( () => ( {
 		limit: data?.defaults?.pipeline_ai_concurrency_limit ?? 3,
 		providerLimits:
 			data?.defaults?.pipeline_ai_provider_concurrency_limits ?? {},
 		throttleDelay: data?.defaults?.pipeline_ai_throttle_delay ?? 10,
-	};
+	} ), [ data ] );
 
 	const form = useFormState( {
 		initialData: EMPTY_FORM,
@@ -94,11 +94,13 @@ const GeneralTab = () => {
 	const save = useSaveStatus( {
 		onSave: () => form.submit(),
 	} );
+	const { reset } = form;
+	const { setHasChanges } = save;
 
 	// Sync server data → form state
 	useEffect( () => {
 		if ( data?.settings ) {
-			form.reset( {
+			reset( {
 				cleanup_job_data_on_failure:
 					data.settings.cleanup_job_data_on_failure ?? EMPTY_FORM.cleanup_job_data_on_failure,
 				file_retention_days:
@@ -124,9 +126,16 @@ const GeneralTab = () => {
 				queue_tuning:
 					data.settings.queue_tuning ?? queueDefaults,
 			} );
-			save.setHasChanges( false );
+			setHasChanges( false );
 		}
-	}, [ data, queueDefaults ] ); // eslint-disable-line react-hooks/exhaustive-deps
+	}, [
+		data,
+		queueDefaults,
+		transportDefaults,
+		aiConcurrencyDefaults,
+		reset,
+		setHasChanges,
+	] );
 
 	/**
 	 * Update a field and mark the form as changed.

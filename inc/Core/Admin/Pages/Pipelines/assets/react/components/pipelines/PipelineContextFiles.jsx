@@ -69,8 +69,7 @@ export default function PipelineContextFiles( { pipelineId } ) {
 				);
 			}
 		} catch ( err ) {
-			// eslint-disable-next-line no-console
-			console.error( 'Upload error:', err );
+			window.console.error( 'Upload error:', err );
 			setError(
 				err.message ||
 					__( 'An error occurred during upload', 'data-machine' )
@@ -101,8 +100,7 @@ export default function PipelineContextFiles( { pipelineId } ) {
 				);
 			}
 		} catch ( err ) {
-			// eslint-disable-next-line no-console
-			console.error( 'Delete error:', err );
+			window.console.error( 'Delete error:', err );
 			setError(
 				err.message ||
 					__( 'An error occurred during deletion', 'data-machine' )

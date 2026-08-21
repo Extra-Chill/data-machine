@@ -3,7 +3,7 @@
  */
 import { Button, TextControl } from '@wordpress/components';
 import { plus, closeSmall } from '@wordpress/icons';
-import { __ } from '@wordpress/i18n';
+import { __, sprintf } from '@wordpress/i18n';
 
 /**
  * URL List field component - renders multiple URL inputs with add/remove buttons.
@@ -25,14 +25,15 @@ export default function UrlListField( {
 	const help = fieldConfig.description || '';
 
 	// Normalize value to array
-	const urls = Array.isArray( value )
-		? value
-		: typeof value === 'string' && value.trim()
-		? value
-				.split( /[\r\n]+/ )
-				.map( ( u ) => u.trim() )
-				.filter( Boolean )
-		: [ '' ];
+	let urls = [ '' ];
+	if ( Array.isArray( value ) ) {
+		urls = value;
+	} else if ( typeof value === 'string' && value.trim() ) {
+		urls = value
+			.split( /[\r\n]+/ )
+			.map( ( url ) => url.trim() )
+			.filter( Boolean );
+	}
 
 	const handleUrlChange = ( index, newUrl ) => {
 		const newUrls = [ ...urls ];
@@ -52,11 +53,18 @@ export default function UrlListField( {
 
 	return (
 		<div className="datamachine-handler-field datamachine-url-list-field">
-			<label className="components-base-control__label">{ label }</label>
+			<span className="components-base-control__label">{ label }</span>
 
 			{ urls.map( ( url, index ) => (
 				<div key={ index } className="datamachine-url-list-field__row">
 					<TextControl
+						label={ sprintf(
+							/* translators: 1: Field label, 2: URL number. */
+							__( '%1$s URL %2$d', 'data-machine' ),
+							label,
+							index + 1
+						) }
+						hideLabelFromVision
 						value={ url }
 						onChange={ ( newUrl ) =>
 							handleUrlChange( index, newUrl )

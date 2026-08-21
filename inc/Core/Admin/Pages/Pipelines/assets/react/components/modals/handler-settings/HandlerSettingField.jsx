@@ -39,7 +39,7 @@ const formatJsonValue = ( value ) => {
  * @param {Function} props.onChange      Change handler for single field
  * @param {Function} props.onBatchChange Change handler for multiple fields at once
  * @param {string}   props.handlerSlug   Current handler slug
- * @param            props.value
+ * @param {*}        props.value         Field value
  * @return {React.ReactElement} Field control
  */
 export default function HandlerSettingField( {

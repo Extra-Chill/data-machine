@@ -44,7 +44,7 @@ const TABS = [
  * Empty state when no agent is selected.
  *
  * @param {string} message Message to display.
- * @return {React.ReactElement}
+ * @return {React.ReactElement} Agent administration application.
  */
 const NoAgentSelectedMessage = ( { message } ) => (
 	<div className="datamachine-agent-tab-empty">

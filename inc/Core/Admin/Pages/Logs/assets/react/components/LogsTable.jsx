@@ -14,6 +14,9 @@ import { __ } from '@wordpress/i18n';
  * Internal dependencies
  */
 import { useLogs } from '../queries/logs';
+/**
+ * External dependencies
+ */
 import { useAgentStore } from '@shared/stores/agentStore';
 
 /**
@@ -54,7 +57,7 @@ const LogsTable = ( { filters = {} } ) => {
 		return (
 			<div className="datamachine-logs-table-loading">
 				<Spinner />
-				<span>{ __( 'Loading logs...', 'data-machine' ) }</span>
+				<span>{ __( 'Loading logs…', 'data-machine' ) }</span>
 			</div>
 		);
 	}

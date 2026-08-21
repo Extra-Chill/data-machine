@@ -15,15 +15,21 @@ import {
 	Notice,
 } from '@wordpress/components';
 import { __ } from '@wordpress/i18n';
+
+/**
+ * External dependencies
+ */
 /**
  * Internal dependencies
  */
 import { useClearJobs } from '../../queries/jobs';
+import ConfirmationModal from '@shared/components/ConfirmationModal';
 
 const ClearJobsForm = () => {
 	const [ clearType, setClearType ] = useState( '' );
 	const [ cleanupProcessed, setCleanupProcessed ] = useState( false );
 	const [ notice, setNotice ] = useState( null );
+	const [ pendingClear, setPendingClear ] = useState( null );
 
 	const clearMutation = useClearJobs();
 
@@ -72,15 +78,22 @@ const ClearJobsForm = () => {
 				}
 			}
 
-			if (
-				// eslint-disable-line no-alert
-				! window.confirm( confirmMessage )
-			) {
-				return;
-			}
+			setPendingClear( {
+				message: confirmMessage,
+				payload: { type: clearType, cleanupProcessed },
+			} );
+		},
+		[ clearType, cleanupProcessed ]
+	);
 
-			clearMutation.mutate(
-				{ type: clearType, cleanupProcessed },
+	const handleConfirmClear = useCallback( () => {
+		if ( ! pendingClear ) {
+			return;
+		}
+		const { payload } = pendingClear;
+		setPendingClear( null );
+		clearMutation.mutate(
+				payload,
 				{
 					onSuccess: ( response ) => {
 						setNotice( {
@@ -100,8 +113,7 @@ const ClearJobsForm = () => {
 					},
 				}
 			);
-		},
-		[ clearType, cleanupProcessed, clearMutation ]
+	}, [ pendingClear, clearMutation ]
 	);
 
 	const radioOptions = [
@@ -176,6 +188,14 @@ const ClearJobsForm = () => {
 					</Notice>
 				) }
 			</form>
+			{ pendingClear && (
+				<ConfirmationModal
+					onConfirm={ handleConfirmClear }
+					onCancel={ () => setPendingClear( null ) }
+				>
+					{ pendingClear.message }
+				</ConfirmationModal>
+			) }
 		</div>
 	);
 };

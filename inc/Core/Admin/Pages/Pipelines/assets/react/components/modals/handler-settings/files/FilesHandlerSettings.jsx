@@ -47,7 +47,7 @@ export default function FilesHandlerSettings( {
 
 	/**
 	 * Handle file upload
-	 * @param fileData
+	 * @param {Object} fileData File data.
 	 */
 	const handleFileUploaded = ( fileData ) => {
 		setFiles( ( prevFiles ) => [ ...prevFiles, fileData ] );
@@ -55,7 +55,7 @@ export default function FilesHandlerSettings( {
 
 	/**
 	 * Handle auto cleanup toggle
-	 * @param checked
+	 * @param {boolean} checked Whether cleanup is enabled.
 	 */
 	const handleAutoCleanupChange = ( checked ) => {
 		setAutoCleanup( checked );

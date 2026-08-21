@@ -47,6 +47,7 @@ const formatStatus = ( status ) => {
 
 /**
  * Extract the base status (before " - " detail separator).
+ * @param {string} status Job status.
  */
 const getBaseStatus = ( status ) => {
 	if ( ! status ) {
@@ -57,6 +58,7 @@ const getBaseStatus = ( status ) => {
 
 /**
  * Get the detail portion of a compound status (after " - ").
+ * @param {string} status Job status.
  */
 const getStatusDetail = ( status ) => {
 	if ( ! status || ! status.includes( ' - ' ) ) {
@@ -68,6 +70,7 @@ const getStatusDetail = ( status ) => {
 /**
  * Determine if a job has child jobs (batch parent or any parent).
  * Uses child_count from the DB query, falls back to engine_data batch flag.
+ * @param {Object} job Job data.
  */
 const hasChildren = ( job ) => {
 	// Prefer the child_count from the SQL subquery (most reliable).
@@ -87,6 +90,7 @@ const hasChildren = ( job ) => {
 
 /**
  * Extract batch results from a parent job's engine_data.
+ * @param {Object} job Job data.
  */
 const getBatchResults = ( job ) => {
 	if ( ! job.engine_data ) {
@@ -101,6 +105,7 @@ const getBatchResults = ( job ) => {
 
 /**
  * Extract batch total (scheduled count) from engine_data.
+ * @param {Object} job Job data.
  */
 const getBatchTotal = ( job ) => {
 	if ( ! job.engine_data ) {
@@ -115,6 +120,8 @@ const getBatchTotal = ( job ) => {
 
 /**
  * Batch progress badge for parent jobs.
+ * @param {Object} root0     Component props.
+ * @param {Object} root0.job Job data.
  */
 const BatchBadge = ( { job } ) => {
 	const results = getBatchResults( job );
@@ -177,6 +184,8 @@ const BatchBadge = ( { job } ) => {
 
 /**
  * Expandable child rows for a batch parent.
+ * @param {Object} root0             Component props.
+ * @param {number} root0.parentJobId Parent job ID.
  */
 const ChildRows = ( { parentJobId } ) => {
 	const { data: children, isLoading, isError } = useChildJobs( parentJobId );
@@ -261,6 +270,7 @@ const ChildRows = ( { parentJobId } ) => {
 /**
  * Format pipeline display value.
  * Shows name for DB pipelines, "Direct" for direct execution, em dash for null.
+ * @param {Object} job Job data.
  */
 const formatPipeline = ( job ) => {
 	if ( job.pipeline_name ) {
@@ -275,6 +285,7 @@ const formatPipeline = ( job ) => {
 /**
  * Format flow display value.
  * Shows name for DB flows, "Direct" for direct execution, em dash for null.
+ * @param {Object} job Job data.
  */
 const formatFlow = ( job ) => {
 	if ( job.flow_name ) {

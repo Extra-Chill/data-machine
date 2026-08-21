@@ -8,13 +8,25 @@
 /**
  * WordPress dependencies
  */
-import { useCallback } from '@wordpress/element';
-import { Card, CardBody, Button } from '@wordpress/components';
+import { useCallback, useState } from '@wordpress/element';
+import {
+	Card,
+	CardBody,
+	Button,
+} from '@wordpress/components';
 import { __ } from '@wordpress/i18n';
+
+/**
+ * External dependencies
+ */
 /**
  * Internal dependencies
  */
+/**
+ * External dependencies
+ */
 import PromptField from '@shared/components/PromptField';
+import ConfirmationModal from '@shared/components/ConfirmationModal';
 import { updateSystemPrompt } from '../../utils/api';
 import { useStepTypes } from '../../queries/config';
 
@@ -84,6 +96,7 @@ export default function PipelineStepCard( {
 } ) {
 	// Use TanStack Query for data
 	const { data: stepTypes = {} } = useStepTypes();
+	const [ isDeleteConfirmOpen, setIsDeleteConfirmOpen ] = useState( false );
 	const isAiStep = step.step_type === 'ai';
 	const isSystemTask = step.step_type === 'system_task';
 
@@ -137,7 +150,7 @@ export default function PipelineStepCard( {
 
 				return { success: true };
 			} catch ( err ) {
-				console.error( 'Prompt update error:', err );
+				window.console.error( 'Prompt update error:', err );
 				return {
 					success: false,
 					message:
@@ -153,11 +166,8 @@ export default function PipelineStepCard( {
 	 * Handle step deletion
 	 */
 	const handleDelete = useCallback( () => {
-		const confirmed = window.confirm(
-			__( 'Are you sure you want to remove this step?', 'data-machine' )
-		);
-
-		if ( confirmed && onDelete ) {
+		setIsDeleteConfirmOpen( false );
+		if ( onDelete ) {
 			onDelete( step.pipeline_step_id );
 		}
 	}, [ step.pipeline_step_id, onDelete ] );
@@ -222,16 +232,24 @@ export default function PipelineStepCard( {
 
 				{ /* Action Buttons */ }
 				<div className="datamachine-step-card-actions">
-					<Button
+				<Button
 						variant="secondary"
 						size="small"
 						isDestructive
-						onClick={ handleDelete }
+					onClick={ () => setIsDeleteConfirmOpen( true ) }
 					>
 						{ __( 'Delete', 'data-machine' ) }
 					</Button>
 				</div>
 			</CardBody>
+			{ isDeleteConfirmOpen && (
+				<ConfirmationModal
+					onConfirm={ handleDelete }
+					onCancel={ () => setIsDeleteConfirmOpen( false ) }
+				>
+					{ __( 'Are you sure you want to remove this step?', 'data-machine' ) }
+				</ConfirmationModal>
+			) }
 		</Card>
 	);
 }

@@ -18,6 +18,9 @@ import { __ } from '@wordpress/i18n';
 /**
  * Internal dependencies
  */
+/**
+ * External dependencies
+ */
 import useDebouncedAutosave from '@shared/hooks/useDebouncedAutosave';
 
 /**
@@ -89,8 +92,7 @@ export default function PromptField( {
 					lastSavedValue.current = newValue;
 				}
 			} catch ( err ) {
-				// eslint-disable-next-line no-console
-				console.error( 'PromptField save error:', err );
+				window.console.error( 'PromptField save error:', err );
 				setError(
 					err.message || __( 'An error occurred', 'data-machine' )
 				);

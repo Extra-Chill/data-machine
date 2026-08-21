@@ -31,7 +31,6 @@ import useHandlerModel from '../../hooks/useHandlerModel';
  * @param {string}   props.handlerSlug     - Handler slug
  * @param {string}   props.stepType        - Step type
  * @param {number}   props.pipelineId      - Pipeline ID
- * @param {number}   props.flowId          - Flow ID
  * @param {Object}   props.currentSettings - Current handler settings
  * @param {Function} props.onSuccess       - Success callback
  * @param {Function} props.onChangeHandler - Change handler callback
@@ -49,7 +48,6 @@ export default function HandlerSettingsModal( {
 	handlerSlugs,
 	stepType,
 	pipelineId,
-	flowId,
 	currentSettings,
 	onSuccess,
 	onChangeHandler,
@@ -100,6 +98,7 @@ export default function HandlerSettingsModal( {
 			onClose();
 		},
 	} );
+	const { reset: resetForm, updateData, updateField } = formState;
 
 	// Update settings fields when handler details load
 	useEffect( () => {
@@ -143,7 +142,7 @@ export default function HandlerSettingsModal( {
 				// Mark enrichment complete for these settings
 				enrichmentCompleteRef.current = settingsKey;
 			} catch ( error ) {
-				console.error( 'Handler settings enrichment failed:', error );
+				window.console.error( 'Handler settings enrichment failed:', error );
 			}
 
 			setIsEnrichingSettings( false );
@@ -153,14 +152,14 @@ export default function HandlerSettingsModal( {
 					settings,
 					handlerDetails?.settings || {}
 				);
-				formState.reset( normalized );
+				resetForm( normalized );
 			} else {
-				formState.reset( settings );
+				resetForm( settings );
 			}
 		};
 
 		initializeForm();
-	}, [ currentSettings, handlerModel, handlerDetails ] );
+	}, [ currentSettings, handlerModel, handlerDetails, handlerSlug, resetForm ] );
 
 	/**
 	 * Get handler info from props
@@ -171,11 +170,11 @@ export default function HandlerSettingsModal( {
 	 * Handle setting change with plugin hook support.
 	 * Applies 'datamachine.handlerSettings.fieldChange' filter to allow plugins
 	 * to react to field changes (e.g., loading venue data when dropdown changes).
-	 * @param key
-	 * @param value
+	 * @param {string} key   Setting key.
+	 * @param {*}      value Setting value.
 	 */
 	const handleSettingChange = async ( key, value ) => {
-		formState.updateField( key, value );
+		updateField( key, value );
 
 		try {
 			const enrichedData = await applyFilters(
@@ -188,10 +187,10 @@ export default function HandlerSettingsModal( {
 			);
 
 			if ( enrichedData && Object.keys( enrichedData ).length > 0 ) {
-				formState.updateData( enrichedData );
+				updateData( enrichedData );
 			}
 		} catch ( error ) {
-			console.error(
+			window.console.error(
 				'Handler settings field change enrichment failed:',
 				error
 			);
@@ -203,6 +202,7 @@ export default function HandlerSettingsModal( {
 			title={
 				handlerInfo.label
 					? sprintf(
+							/* translators: %s: Handler label. */
 							__( 'Configure %s Settings', 'data-machine' ),
 							handlerInfo.label
 					  )
@@ -252,8 +252,9 @@ export default function HandlerSettingsModal( {
 									<span className="dashicons dashicons-yes-alt"></span>
 									<span>
 										{ handlerInfo.account_details?.username
-											? sprintf(
-													__(
+										? sprintf(
+												/* translators: %s: Connected account username. */
+												__(
 														'Connected as %s',
 														'data-machine'
 													),

@@ -22,10 +22,10 @@ import { usePipelines } from '../../queries/pipelines';
  * Fetches the shared lightweight pipelines list (no flows embedded, flow_count
  * exposed per row) so the Export tab shows the same set the admin page sees.
  *
- * @param {Object}   props           - Component props
- * @param {Function} props.onClose   - Close handler
+ * @param {Object}   props             - Component props
+ * @param {Function} props.onClose     - Close handler
  * @param {Array}    [props.pipelines] - Optional preloaded pipelines (falls back to the list query)
- * @param {Function} props.onSuccess - Success callback
+ * @param {Function} props.onSuccess   - Success callback
  * @return {React.ReactElement|null} Import/export modal
  */
 export default function ImportExportModal( {

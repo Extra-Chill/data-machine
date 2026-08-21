@@ -20,14 +20,14 @@ const Pagination = ( {
 } ) => {
 	const totalPages = Math.ceil( total / perPage );
 	const startItem = total > 0 ? ( page - 1 ) * perPage + 1 : 0;
-	const endItem = Math.min( page * perPage, total );
-
 	const hasPrevious = page > 1;
 	const hasNext = page < totalPages;
 
 	if ( total <= perPage ) {
 		return null;
 	}
+
+	const endItem = Math.min( page * perPage, total );
 
 	return (
 		<div className="datamachine-pagination">

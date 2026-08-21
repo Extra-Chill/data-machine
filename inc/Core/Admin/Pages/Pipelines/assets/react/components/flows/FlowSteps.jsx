@@ -26,7 +26,7 @@ import { isSameId } from '../../utils/ids';
  * @param {Object}   props.pipelineConfig   - Pipeline configuration (keyed by pipeline_step_id).
  * @param {Function} props.onStepConfigured - Configure step handler.
  * @param {Function} props.onQueueClick     - Queue button click handler (opens modal).
- * @return {JSX.Element} Flow steps container.
+ * @return {React.ReactElement} Flow steps container.
  */
 export default function FlowSteps( {
 	flowId,

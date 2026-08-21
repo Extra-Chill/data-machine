@@ -51,6 +51,8 @@ const AgentSettings = () => {
 	const save = useSaveStatus( {
 		onSave: () => form.submit(),
 	} );
+	const { reset } = form;
+	const { setHasChanges } = save;
 
 	useEffect( () => {
 		if ( data?.settings?.chat_ping_secret ) {
@@ -95,7 +97,7 @@ const AgentSettings = () => {
 
 	useEffect( () => {
 		if ( data?.settings ) {
-			form.reset( {
+			reset( {
 				default_provider: data.settings.default_provider || '',
 				default_model: data.settings.default_model || '',
 				mode_models: data.settings.mode_models || {},
@@ -103,9 +105,9 @@ const AgentSettings = () => {
 					data.settings.site_context_enabled ?? false,
 				max_turns: data.settings.max_turns ?? maxTurnsDefault,
 			} );
-			save.setHasChanges( false );
+			setHasChanges( false );
 		}
-	}, [ data, maxTurnsDefault ] ); // eslint-disable-line react-hooks/exhaustive-deps
+	}, [ data, maxTurnsDefault, reset, setHasChanges ] );
 
 	const updateField = ( field, value ) => {
 		form.updateField( field, value );

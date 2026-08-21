@@ -180,6 +180,41 @@ class AuthAbilitiesTest extends WP_UnitTestCase {
 		$this->assertSame( $cookie, $provider->get_config()['cookie_jar'] );
 	}
 
+	public function test_save_auth_config_returns_masked_status_without_replacing_secrets(): void {
+		$provider = new AuthAbilitiesConfigProvider( 'config_provider' );
+		$this->registerConfigProvider( $provider );
+		$cookie = 'secret-cookie-value';
+
+		$first_result = $this->auth_abilities->executeSaveAuthConfig(
+			array(
+				'handler_slug' => 'config_handler',
+				'config'       => array(
+					'session_cookie' => $cookie,
+					'cookie_jar'     => $cookie,
+					'label'          => 'First',
+				),
+			)
+		);
+
+		$this->assertSame( '****************', $first_result['config_status']['session_cookie'] );
+		$this->assertSame( '****************', $first_result['config_status']['cookie_jar'] );
+
+		$second_result = $this->auth_abilities->executeSaveAuthConfig(
+			array(
+				'handler_slug' => 'config_handler',
+				'config'       => array_merge(
+					$first_result['config_status'],
+					array( 'label' => 'Second' )
+				),
+			)
+		);
+
+		$this->assertTrue( $second_result['success'] );
+		$this->assertSame( $cookie, $provider->get_config()['session_cookie'] );
+		$this->assertSame( $cookie, $provider->get_config()['cookie_jar'] );
+		$this->assertSame( 'Second', $provider->get_config()['label'] );
+	}
+
 	public function test_save_auth_config_sanitizes_text_fields(): void {
 		$provider = new AuthAbilitiesConfigProvider( 'config_provider' );
 		$this->registerConfigProvider( $provider );

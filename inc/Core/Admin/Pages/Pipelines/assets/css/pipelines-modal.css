@@ -473,11 +473,15 @@
 
 /* CSV Dropzone */
 .datamachine-csv-dropzone {
+    display: block;
+    width: 100%;
     border: 2px dashed var(--datamachine-border-1);
     border-radius: var(--datamachine-border-radius);
     padding: 40px 20px;
     text-align: center;
     background: #f9f9f9;
+    color: inherit;
+    font: inherit;
     transition: all 0.2s;
     cursor: pointer;
 }
@@ -493,21 +497,36 @@
 }
 
 .datamachine-csv-dropzone__icon {
+    display: block;
     margin-bottom: 16px;
     font-size: 48px;
     color: #757575;
 }
 
 .datamachine-csv-dropzone__title {
+    display: block;
     margin: 0 0 12px 0;
     font-size: 16px;
     font-weight: 500;
 }
 
 .datamachine-csv-dropzone__divider {
+    display: block;
     margin: 0 0 16px 0;
     color: #757575;
     font-size: 14px;
+}
+
+.datamachine-csv-dropzone__browse,
+.datamachine-dropzone-browse {
+    display: inline-flex;
+    align-items: center;
+    min-height: 36px;
+    padding: 0 12px;
+    border: 1px solid #2c3338;
+    border-radius: 2px;
+    background: #fff;
+    color: #2c3338;
 }
 
 .datamachine-csv-dropzone__error {
@@ -815,11 +834,15 @@
 
 /* ===== FILE UPLOAD DROPZONE ===== */
 .datamachine-dropzone {
+    display: block;
+    width: 100%;
     border: 2px dashed #ddd;
     border-radius: var(--datamachine-border-radius);
     padding: 40px;
     text-align: center;
     background: #fafafa;
+    color: inherit;
+    font: inherit;
     transition: all 0.2s ease;
     cursor: pointer;
 }
@@ -830,25 +853,34 @@
     opacity: 0.8;
 }
 
+.datamachine-dropzone--disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
 .datamachine-dropzone-icon {
+    display: block;
     margin-bottom: 16px;
     font-size: 48px;
     color: #757575;
 }
 
 .datamachine-dropzone-title {
+    display: block;
     margin: 0 0 8px 0;
     font-size: 16px;
     font-weight: 500;
 }
 
 .datamachine-dropzone-helper {
+    display: block;
     margin: 0 0 12px 0;
     color: #757575;
     font-size: 12px;
 }
 
 .datamachine-dropzone-or {
+    display: block;
     margin: 0 0 16px 0;
     color: #757575;
     font-size: 14px;

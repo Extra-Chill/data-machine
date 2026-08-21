@@ -228,9 +228,8 @@ export default function AgentBundlesTab() {
 					) }
 
 					<h4>{ __( 'Tracked Artifacts', 'data-machine' ) }</h4>
-					{ statusQuery.isLoading ? (
-						<Spinner />
-					) : artifacts.length > 0 ? (
+					{ statusQuery.isLoading && <Spinner /> }
+					{ ! statusQuery.isLoading && artifacts.length > 0 && (
 						<ul>
 							{ artifacts.map( ( artifact, index ) => (
 								<li key={ `${ artifactLabel( artifact ) }-${ index }` }>
@@ -239,7 +238,8 @@ export default function AgentBundlesTab() {
 								</li>
 							) ) }
 						</ul>
-					) : (
+					) }
+					{ ! statusQuery.isLoading && artifacts.length === 0 && (
 						<pre>{ JSON.stringify( statusQuery.data || {}, null, 2 ) }</pre>
 					) }
 

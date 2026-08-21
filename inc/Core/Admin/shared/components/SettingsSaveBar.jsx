@@ -14,8 +14,8 @@ import { useState, useCallback } from '@wordpress/element';
  * Hook to manage save status state with auto-clear timers.
  *
  * @param {Object}   options
- * @param {Function} options.onSave   Async save function
- * @param {Function} options.onSaved  Optional callback after successful save
+ * @param {Function} options.onSave  Async save function
+ * @param {Function} options.onSaved Optional callback after successful save
  * @return {Object} Save state and handler
  */
 export const useSaveStatus = ( { onSave, onSaved } = {} ) => {
@@ -36,7 +36,7 @@ export const useSaveStatus = ( { onSave, onSaved } = {} ) => {
 				onSaved();
 			}
 			setTimeout( () => setSaveStatus( null ), 2000 );
-		} catch ( err ) {
+		} catch {
 			setSaveStatus( 'error' );
 			setTimeout( () => setSaveStatus( null ), 3000 );
 		}

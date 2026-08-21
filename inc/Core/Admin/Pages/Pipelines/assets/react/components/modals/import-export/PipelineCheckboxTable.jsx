@@ -30,7 +30,7 @@ export default function PipelineCheckboxTable( {
 } ) {
 	/**
 	 * Toggle individual pipeline selection
-	 * @param pipelineId
+	 * @param {number} pipelineId Pipeline ID.
 	 */
 	const togglePipeline = ( pipelineId ) => {
 		const normalizedId = normalizeId( pipelineId );

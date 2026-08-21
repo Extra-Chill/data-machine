@@ -4,8 +4,14 @@
  * Dedicated tab for global tool configuration and enable/disable controls.
  */
 
+/**
+ * WordPress dependencies
+ */
 import { useEffect, useState } from '@wordpress/element';
 import { Button } from '@wordpress/components';
+/**
+ * External dependencies
+ */
 import { useSettings, useUpdateSettings } from '@shared/queries/settings';
 import ToolConfigModal from '@shared/components/ToolConfigModal';
 import { useFormState } from '@shared/hooks/useFormState';
@@ -30,15 +36,17 @@ const AgentToolsTab = () => {
 	const save = useSaveStatus( {
 		onSave: () => form.submit(),
 	} );
+	const { reset } = form;
+	const { setHasChanges } = save;
 
 	useEffect( () => {
 		if ( data?.settings ) {
-			form.reset( {
+			reset( {
 				disabled_tools: data.settings.disabled_tools || {},
 			} );
-			save.setHasChanges( false );
+			setHasChanges( false );
 		}
-	}, [ data ] ); // eslint-disable-line react-hooks/exhaustive-deps
+	}, [ data, reset, setHasChanges ] );
 
 	const handleToolToggle = ( toolName, enabled ) => {
 		const newTools = { ...form.data.disabled_tools };
@@ -137,8 +145,9 @@ const AgentToolsTab = () => {
 														) }
 
 														{ isConfigured ? (
-															<label className="datamachine-tool-enabled-toggle">
-																<input
+												<label className="datamachine-tool-enabled-toggle" htmlFor={ `tool-${ toolName }` }>
+													<input
+														id={ `tool-${ toolName }` }
 																	type="checkbox"
 																	checked={ isEnabled }
 																	onChange={ ( e ) =>
@@ -151,8 +160,8 @@ const AgentToolsTab = () => {
 																Enable for agents
 															</label>
 														) : (
-															<label className="datamachine-tool-enabled-toggle datamachine-tool-disabled">
-																<input type="checkbox" disabled />
+												<label className="datamachine-tool-enabled-toggle datamachine-tool-disabled" htmlFor={ `tool-${ toolName }-disabled` }>
+													<input id={ `tool-${ toolName }-disabled` } type="checkbox" disabled />
 																<span className="description">
 																	Configure to enable
 																</span>

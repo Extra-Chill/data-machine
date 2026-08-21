@@ -11,8 +11,11 @@
 /**
  * WordPress dependencies
  */
-import { useState, useCallback, useEffect } from '@wordpress/element';
-import { Button, Notice } from '@wordpress/components';
+import { useState, useCallback, useEffect, useMemo } from '@wordpress/element';
+import {
+	Button,
+	Notice,
+} from '@wordpress/components';
 import { __ } from '@wordpress/i18n';
 
 /**
@@ -24,6 +27,11 @@ import {
 	useDisconnectAuth,
 } from '../../queries/authProviders';
 
+/**
+ * External dependencies
+ */
+import ConfirmationModal from '@shared/components/ConfirmationModal';
+
 const AUTH_TYPE_LABELS = {
 	oauth2: 'OAuth 2.0',
 	oauth1: 'OAuth 1.0a',
@@ -32,6 +40,9 @@ const AUTH_TYPE_LABELS = {
 
 /**
  * Inline connection status badge.
+ * @param {Object}  root0            Component props.
+ * @param {boolean} root0.connected  Whether the provider is connected.
+ * @param {boolean} root0.configured Whether the provider is configured.
  */
 const StatusBadge = ( { connected, configured } ) => {
 	if ( connected ) {
@@ -57,6 +68,8 @@ const StatusBadge = ( { connected, configured } ) => {
 
 /**
  * Display connected account details inline.
+ * @param {Object} root0         Component props.
+ * @param {Object} root0.account Account details.
  */
 const InlineAccountDetails = ( { account } ) => {
 	if ( ! account || Object.keys( account ).length === 0 ) {
@@ -108,29 +121,40 @@ const InlineAccountDetails = ( { account } ) => {
 
 /**
  * Config form for a single provider (API keys, credentials).
+ * @param {Object}   root0          Component props.
+ * @param {Object}   root0.provider Provider metadata.
+ * @param {Function} root0.onSave   Save callback.
+ * @param {boolean}  root0.isSaving Whether a save is in progress.
  */
 const ConfigForm = ( { provider, onSave, isSaving } ) => {
-	const fields = provider.auth_fields || {};
-	const fieldEntries = Object.entries( fields );
-	const savedConfig = provider.config_values || {};
+	const fields = provider.auth_fields;
+	const fieldEntries = useMemo(
+		() => Object.entries( fields || {} ),
+		[ fields ]
+	);
+	const savedConfig = provider.config_values;
+	const [ isDirty, setIsDirty ] = useState( false );
 
 	const [ values, setValues ] = useState( () => {
 		const initial = {};
 		fieldEntries.forEach( ( [ key, field ] ) => {
 			// Use saved config value, fall back to field default or empty string.
-			initial[ key ] = savedConfig[ key ] ?? field.default ?? '';
+			initial[ key ] = savedConfig?.[ key ] ?? field.default ?? '';
 		} );
 		return initial;
 	} );
 
 	// Sync values when savedConfig changes (e.g., after save/refetch).
 	useEffect( () => {
+		if ( isDirty || isSaving ) {
+			return;
+		}
 		const updated = {};
 		fieldEntries.forEach( ( [ key, field ] ) => {
-			updated[ key ] = savedConfig[ key ] ?? field.default ?? '';
+			updated[ key ] = savedConfig?.[ key ] ?? field.default ?? '';
 		} );
 		setValues( updated );
-	}, [ savedConfig, fieldEntries ] );
+	}, [ savedConfig, fieldEntries, isDirty, isSaving ] );
 
 	if ( fieldEntries.length === 0 ) {
 		return (
@@ -144,6 +168,10 @@ const ConfigForm = ( { provider, onSave, isSaving } ) => {
 	}
 
 	const handleChange = ( key, value ) => {
+		if ( isSaving ) {
+			return;
+		}
+		setIsDirty( true );
 		setValues( ( prev ) => ( { ...prev, [ key ]: value } ) );
 	};
 
@@ -166,6 +194,7 @@ const ConfigForm = ( { provider, onSave, isSaving } ) => {
 						<select
 							id={ `auth-${ provider.provider_key }-${ key }` }
 							value={ values[ key ] || '' }
+							disabled={ isSaving }
 							onChange={ ( e ) =>
 								handleChange( key, e.target.value )
 							}
@@ -183,6 +212,7 @@ const ConfigForm = ( { provider, onSave, isSaving } ) => {
 							id={ `auth-${ provider.provider_key }-${ key }` }
 							type={ field.type === 'password' ? 'password' : 'text' }
 							value={ values[ key ] || '' }
+							disabled={ isSaving }
 							onChange={ ( e ) =>
 								handleChange( key, e.target.value )
 							}
@@ -214,6 +244,8 @@ const ConfigForm = ( { provider, onSave, isSaving } ) => {
 
 /**
  * Callback URL display for OAuth providers.
+ * @param {Object} root0     Component props.
+ * @param {string} root0.url Callback URL.
  */
 const CallbackUrlDisplay = ( { url } ) => {
 	const [ copied, setCopied ] = useState( false );
@@ -250,6 +282,12 @@ const CallbackUrlDisplay = ( { url } ) => {
 
 /**
  * Single provider card.
+ * @param {Object}   root0                 Component props.
+ * @param {Object}   root0.provider        Provider metadata.
+ * @param {Function} root0.onSave          Save callback.
+ * @param {Function} root0.onDisconnect    Disconnect callback.
+ * @param {boolean}  root0.isSaving        Whether a save is in progress.
+ * @param {boolean}  root0.isDisconnecting Whether a disconnect is in progress.
  */
 const ProviderCard = ( {
 	provider,
@@ -260,6 +298,13 @@ const ProviderCard = ( {
 } ) => {
 	const [ showConfig, setShowConfig ] = useState( false );
 	const [ feedback, setFeedback ] = useState( null );
+	const [ isDisconnectConfirmOpen, setIsDisconnectConfirmOpen ] = useState( false );
+	let configButtonLabel = __( 'Configure', 'data-machine' );
+	if ( showConfig ) {
+		configButtonLabel = __( 'Hide Config', 'data-machine' );
+	} else if ( provider.is_authenticated ) {
+		configButtonLabel = __( 'Edit Config', 'data-machine' );
+	}
 
 	const handleSave = useCallback(
 		async ( providerKey, config ) => {
@@ -283,16 +328,7 @@ const ProviderCard = ( {
 	);
 
 	const handleDisconnect = useCallback( async () => {
-		if (
-			! confirm(
-				__(
-					'Are you sure you want to disconnect this account? This will remove the access token but keep your API configuration.',
-					'data-machine'
-				)
-			)
-		) {
-			return;
-		}
+		setIsDisconnectConfirmOpen( false );
 		try {
 			await onDisconnect( provider.provider_key );
 			setFeedback( {
@@ -351,7 +387,7 @@ const ProviderCard = ( {
 					<Button
 						variant="secondary"
 						isDestructive
-						onClick={ handleDisconnect }
+						onClick={ () => setIsDisconnectConfirmOpen( true ) }
 						isBusy={ isDisconnecting }
 						disabled={ isDisconnecting }
 						className="button-small"
@@ -368,11 +404,7 @@ const ProviderCard = ( {
 						onClick={ () => setShowConfig( ! showConfig ) }
 						className="button-small"
 					>
-						{ showConfig
-							? __( 'Hide Config', 'data-machine' )
-							: provider.is_authenticated
-							? __( 'Edit Config', 'data-machine' )
-							: __( 'Configure', 'data-machine' ) }
+						{ configButtonLabel }
 					</Button>
 				) }
 			</div>
@@ -386,6 +418,17 @@ const ProviderCard = ( {
 						isSaving={ isSaving }
 					/>
 				</div>
+			) }
+			{ isDisconnectConfirmOpen && (
+				<ConfirmationModal
+					onConfirm={ handleDisconnect }
+					onCancel={ () => setIsDisconnectConfirmOpen( false ) }
+				>
+					{ __(
+						'Are you sure you want to disconnect this account? This will remove the access token but keep your API configuration.',
+						'data-machine'
+					) }
+				</ConfirmationModal>
 			) }
 		</div>
 	);

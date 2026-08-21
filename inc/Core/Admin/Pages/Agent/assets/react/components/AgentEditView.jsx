@@ -227,9 +227,9 @@ const AccessPanel = ( { agentId, ownerId } ) => {
 /**
  * AgentEditView — main export
  *
- * @param {Object}   props          Component props.
- * @param {number}   props.agentId  Agent ID to edit.
- * @param {Function} props.onBack   Callback to return to the list.
+ * @param {Object}   props         Component props.
+ * @param {number}   props.agentId Agent ID to edit.
+ * @param {Function} props.onBack  Callback to return to the list.
  */
 const AgentEditView = ( { agentId, onBack } ) => {
 	const { data: agent, isLoading, error } = useAgent( agentId );
