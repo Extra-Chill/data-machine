@@ -620,10 +620,11 @@ class CalendarAbilities {
 	private static function compute_unique_event_dates( array $params ): array {
 		global $wpdb;
 
-		$show_past_param = $params['show_past'] ?? false;
-		$current_date    = current_time( 'Y-m-d' );
-		$current_time    = current_time( 'mysql' );
-		$ed_table        = EventDatesTable::table_name();
+		$show_past_param    = $params['show_past'] ?? false;
+		$include_past_dates = $show_past_param || ! empty( $params['user_date_range'] );
+		$current_date       = current_time( 'Y-m-d' );
+		$current_time       = current_time( 'mysql' );
+		$ed_table           = EventDatesTable::table_name();
 
 		$archive_taxonomy = $params['archive_taxonomy'] ?? '';
 		$archive_term_id  = $params['archive_term_id'] ?? 0;
@@ -631,6 +632,27 @@ class CalendarAbilities {
 
 		$has_tax_filter = ( $archive_taxonomy && $archive_term_id )
 			|| self::has_active_tax_filter( $tax_filters );
+
+		$temporal_where_clauses = array();
+		if ( ! empty( $params['user_date_range'] ) ) {
+			if ( ! empty( $params['date_start'] ) ) {
+				$start_dt                 = ! empty( $params['time_start'] )
+					? $params['date_start'] . ' ' . $params['time_start']
+					: $params['date_start'] . ' 00:00:00';
+				$temporal_where_clauses[] = UpcomingFilter::range_start_where( $start_dt );
+			}
+
+			if ( ! empty( $params['date_end'] ) ) {
+				$end_dt                   = ! empty( $params['time_end'] )
+					? $params['date_end'] . ' ' . $params['time_end']
+					: $params['date_end'] . ' 23:59:59';
+				$temporal_where_clauses[] = $wpdb->prepare( 'ed.start_datetime <= %s', $end_dt );
+			}
+		} elseif ( $show_past_param ) {
+			$temporal_where_clauses[] = UpcomingFilter::past_where( $current_time );
+		} else {
+			$temporal_where_clauses[] = UpcomingFilter::upcoming_where( $current_time );
+		}
 
 		// SQL fragment that buckets start_datetime by display date (with
 		// late-night cutoff applied). Identical semantics to
@@ -646,7 +668,7 @@ class CalendarAbilities {
 			$matching_sql = $event_query->buildMatchingPostIdsSql( self::build_event_query_input( $params ) );
 
 			if ( '' === $matching_sql ) {
-				return self::expand_date_buckets( array(), $show_past_param, $current_date );
+				return self::expand_date_buckets( array(), $show_past_param, $include_past_dates, $current_date );
 			}
 
 			$boundary_start_bucket_sql = LateNightCutoff::sql_display_date_expression( 'boundary_ed.start_datetime' );
@@ -659,23 +681,15 @@ class CalendarAbilities {
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQL.NotPrepared
 			$rows = $wpdb->get_results( $sql );
 
-			return self::expand_date_buckets( $rows, $show_past_param, $current_date );
+			return self::expand_date_buckets( $rows, $show_past_param, $include_past_dates, $current_date );
 		}
 
 		// Fast path: no taxonomy constraint → skip posts/term joins entirely.
 		// event_dates already carries post_status, so we can aggregate against
 		// the single table + its status_start composite index.
 		if ( ! $has_tax_filter ) {
-			$where_clauses = array( "ed.post_status = 'publish'" );
+			$where_clauses = array_merge( array( "ed.post_status = 'publish'" ), $temporal_where_clauses );
 			$query_values  = array();
-
-			if ( $show_past_param ) {
-				// Keep page buckets aligned with the canonical completed-event
-				// scope used by EventDateQueryAbilities.
-				$where_clauses[] = UpcomingFilter::past_where( $current_time );
-			} else {
-				$where_clauses[] = UpcomingFilter::upcoming_where( $current_time );
-			}
 
 			$where = implode( ' AND ', $where_clauses );
 			$sql   = "SELECT {$start_bucket_sql} AS start_date, DATE(ed.end_datetime) AS end_date, COUNT(*) AS bucket_count
@@ -690,23 +704,20 @@ class CalendarAbilities {
 				// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 				: $wpdb->get_results( $wpdb->prepare( $sql, ...$query_values ) );
 
-			return self::expand_date_buckets( $rows, $show_past_param, $current_date );
+			return self::expand_date_buckets( $rows, $show_past_param, $include_past_dates, $current_date );
 		}
 
 		// Slow path: taxonomy constraints require joining posts + term tables.
 		// Still aggregates via GROUP BY to keep the result set bounded.
-		$where_clauses = array(
-			"p.post_type = 'data_machine_events'",
-			"p.post_status = 'publish'",
+		$where_clauses = array_merge(
+			array(
+				"p.post_type = 'data_machine_events'",
+				"p.post_status = 'publish'",
+			),
+			$temporal_where_clauses
 		);
 		$join_clauses  = array();
 		$query_values  = array();
-
-		if ( $show_past_param ) {
-			$where_clauses[] = UpcomingFilter::past_where( $current_time );
-		} else {
-			$where_clauses[] = UpcomingFilter::upcoming_where( $current_time );
-		}
 
 		if ( $archive_taxonomy && $archive_term_id ) {
 			$join_clauses[]  = "INNER JOIN {$wpdb->term_relationships} tr_archive ON p.ID = tr_archive.object_id";
@@ -756,7 +767,7 @@ class CalendarAbilities {
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQL.NotPrepared
 		$rows = $wpdb->get_results( $wpdb->prepare( $sql, ...$query_values ) );
 
-		return self::expand_date_buckets( $rows, $show_past_param, $current_date );
+		return self::expand_date_buckets( $rows, $show_past_param, $include_past_dates, $current_date );
 	}
 
 	/**
@@ -866,13 +877,13 @@ class CalendarAbilities {
 	 * (start_date, end_date) pair. Multi-day events contribute to every
 	 * spanned date after their start.
 	 *
-	 * @param array  $rows            Rows with start_date, end_date, bucket_count.
-	 * @param bool   $show_past_param When true, sort result DESC; also skip the
-	 *                                "drop past dates" filter during expansion.
-	 * @param string $current_date    Today (Y-m-d) for past-date filtering.
+	 * @param array  $rows              Rows with start_date, end_date, bucket_count.
+	 * @param bool   $show_past_param   Whether to sort result descending.
+	 * @param bool   $include_past_dates Whether an explicit or past scope retains dates before today.
+	 * @param string $current_date      Today (Y-m-d) for past-date filtering.
 	 * @return array { dates, total_events, events_per_date }
 	 */
-	private static function expand_date_buckets( array $rows, bool $show_past_param, string $current_date ): array {
+	private static function expand_date_buckets( array $rows, bool $show_past_param, bool $include_past_dates, string $current_date ): array {
 		$total_events    = 0;
 		$events_per_date = array();
 
@@ -883,7 +894,7 @@ class CalendarAbilities {
 			}
 			$total_events += $count;
 
-			if ( $show_past_param || $row->start_date >= $current_date ) {
+			if ( $include_past_dates || $row->start_date >= $current_date ) {
 				$events_per_date[ $row->start_date ] = ( $events_per_date[ $row->start_date ] ?? 0 ) + $count;
 			}
 
@@ -896,7 +907,7 @@ class CalendarAbilities {
 				while ( $current <= $end_dt ) {
 					$date = $current->format( 'Y-m-d' );
 
-					if ( ! $show_past_param && $date < $current_date ) {
+					if ( ! $include_past_dates && $date < $current_date ) {
 						$current->modify( '+1 day' );
 						continue;
 					}
