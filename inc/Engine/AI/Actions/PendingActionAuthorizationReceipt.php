@@ -24,7 +24,7 @@ final class PendingActionAuthorizationReceipt {
 			'target_digest' => self::digest( $authorization['target'] ),
 			'input_digest'  => self::digest( $action['apply_input'] ?? array() ),
 			'subject'       => (string) ( $action['agent'] ?? $action['creator'] ?? '' ),
-			'workspace'     => $action['workspace'] ?? null,
+			'workspace'     => is_array( $action['workspace'] ?? null ) ? $action['workspace'] : array(),
 			'resolver'      => $resolver,
 			'issued_at'     => time(),
 			'expires_at'    => (int) ( $action['expires_at'] ?? 0 ),

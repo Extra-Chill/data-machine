@@ -1005,7 +1005,7 @@ class PendingActionStore {
 			&& PendingActionAuthorizationReceipt::digest( $authorization['target'] ) === (string) ( $claims['target_digest'] ?? '' )
 			&& PendingActionAuthorizationReceipt::digest( $action['apply_input'] ?? array() ) === (string) ( $claims['input_digest'] ?? '' )
 			&& (string) ( $claims['subject'] ?? '' ) === $subject
-			&& PendingActionAuthorizationReceipt::digest( $action['workspace'] ?? null ) === PendingActionAuthorizationReceipt::digest( $claims['workspace'] ?? null );
+			&& PendingActionAuthorizationReceipt::digest( is_array( $action['workspace'] ?? null ) ? $action['workspace'] : array() ) === PendingActionAuthorizationReceipt::digest( $claims['workspace'] ?? array() );
 
 		return $matches
 			? true
