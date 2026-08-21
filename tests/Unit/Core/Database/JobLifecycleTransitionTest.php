@@ -175,6 +175,15 @@ class JobLifecycleTransitionTest extends WP_UnitTestCase {
 		$this->assertSame( 52, $result['attempted'] );
 		$this->assertSame( 52, $result['touched'] );
 		$this->assertSame( 52, $result['mutated'] );
+		$this->assertSame( 'broad_touch_cap', $result['limit_mode'] );
+		$this->assertSame( 52, $result['limit_value'] );
+		$this->assertSame( 'logical_touch', $result['limit_unit'] );
+		$this->assertSame( 52, $result['input_limit'] );
+		$this->assertSame( 52, $result['requested_limit'] );
+		$this->assertSame( 52, $result['logical_touch_limit'] );
+		$this->assertSame( 52, $result['target_attempts'] );
+		$this->assertSame( 52, $result['logical_touches'] );
+		$this->assertSame( 52, $result['logical_mutations'] );
 		$this->assertSame( 52, $result['recovered'] );
 		$this->assertTrue( $result['limit_reached'] );
 
@@ -246,6 +255,10 @@ class JobLifecycleTransitionTest extends WP_UnitTestCase {
 		$exact = ( new RecoverStuckJobsAbility() )->execute( array( 'dry_run' => true, 'job_id' => $job_ids[1], 'limit' => 3 ) );
 		$this->assertSame( 1, $exact['pending_ai_terminalized'] );
 		$this->assertSame( $job_ids[1], $exact['jobs'][0]['job_id'] );
+		$this->assertSame( 3, $exact['input_limit'] );
+		$this->assertSame( 1, $exact['requested_limit'] );
+		$this->assertSame( 'target', $exact['limit_unit'] );
+		$this->assertSame( 100, $exact['logical_touch_limit'] );
 
 		$dry_run = ( new RecoverStuckJobsAbility() )->execute( array( 'dry_run' => true, 'limit' => 2 ) );
 		$applied = ( new RecoverStuckJobsAbility() )->execute( array( 'limit' => 2 ) );
@@ -296,6 +309,74 @@ class JobLifecycleTransitionTest extends WP_UnitTestCase {
 		$this->assertSame( 500, $result->get_error_data()['status'] );
 	}
 
+	public function test_exact_pathless_recovery_with_limit_one_attempts_only_target_and_is_idempotent(): void {
+		global $wpdb;
+		$unrelated_parent = $this->db_jobs->create_job( array( 'label' => 'Unrelated recovery parent' ) );
+		$unrelated_child  = $this->db_jobs->create_job( array( 'label' => 'Unrelated recovery child', 'parent_job_id' => $unrelated_parent ) );
+		$parent_id        = $this->db_jobs->create_job( array( 'label' => 'Exact recovery parent' ) );
+		$child_id         = $this->db_jobs->create_job( array( 'label' => 'Exact recovery child', 'parent_job_id' => $parent_id ) );
+		$this->assertTrue( $this->db_jobs->start_job( $unrelated_child ) );
+		$this->assertTrue( $this->db_jobs->start_job( $child_id ) );
+		$wpdb->update(
+			$wpdb->prefix . 'datamachine_jobs',
+			array( 'created_at' => gmdate( 'Y-m-d H:i:s', time() - 3 * HOUR_IN_SECONDS ) ),
+			array( 'job_id' => $unrelated_child ),
+			array( '%s' ),
+			array( '%d' )
+		);
+		$wpdb->update(
+			$wpdb->prefix . 'datamachine_jobs',
+			array( 'created_at' => gmdate( 'Y-m-d H:i:s', time() - 3 * HOUR_IN_SECONDS ) ),
+			array( 'job_id' => $child_id ),
+			array( '%s' ),
+			array( '%d' )
+		);
+		$unrelated_parent_before = $this->db_jobs->get_job( $unrelated_parent );
+		$unrelated_child_before  = $this->db_jobs->get_job( $unrelated_child );
+
+		$input = array( 'job_id' => $child_id, 'limit' => 1, 'timeout_hours' => 1, 'recover_pathless_children' => true );
+		$dry_run = ( new RecoverStuckJobsAbility() )->execute( array( 'dry_run' => true ) + $input );
+		$this->assertSame( $child_id, $dry_run['jobs'][0]['job_id'] );
+		$this->assertSame( 'would_transition_pathless_child', $dry_run['jobs'][0]['status'] );
+
+		$applied = ( new RecoverStuckJobsAbility() )->execute( $input );
+		$this->assertSame( 1, $applied['pathless_terminal'] );
+		$this->assertSame( 2, $applied['attempted'] );
+		$this->assertSame( 2, $applied['touched'] );
+		$this->assertSame( 2, $applied['mutated'] );
+		$this->assertSame( 1, $applied['input_limit'] );
+		$this->assertSame( 1, $applied['requested_limit'] );
+		$this->assertSame( 100, $applied['apply_limit'] );
+		$this->assertSame( 'exact_target', $applied['limit_mode'] );
+		$this->assertSame( 1, $applied['limit_value'] );
+		$this->assertSame( 'target', $applied['limit_unit'] );
+		$this->assertSame( 1, $applied['target_attempts'] );
+		$this->assertSame( 2, $applied['logical_touches'] );
+		$this->assertSame( 2, $applied['logical_mutations'] );
+		$this->assertSame( 100, $applied['logical_touch_limit'] );
+		$this->assertSame( $applied['attempted'], $applied['touched'] );
+		$this->assertFalse( $applied['limit_reached'] );
+		$this->assertSame( $child_id, $applied['jobs'][0]['job_id'] );
+		$this->assertSame( 'transitioned_pathless_child', $applied['jobs'][0]['status'] );
+		$this->assertSame( $unrelated_parent_before, $this->db_jobs->get_job( $unrelated_parent ) );
+		$this->assertSame( $unrelated_child_before, $this->db_jobs->get_job( $unrelated_child ) );
+		$this->assertSame( JobStatus::FAILED, $this->db_jobs->get_job( $child_id )['status'] );
+
+		$second_apply = ( new RecoverStuckJobsAbility() )->execute( $input );
+		$this->assertSame( 0, $second_apply['pathless_terminal'] );
+		$this->assertSame( 0, $second_apply['attempted'] );
+		$this->assertSame( 0, $second_apply['touched'] );
+		$this->assertSame( 0, $second_apply['mutated'] );
+		$this->assertSame( 0, $second_apply['target_attempts'] );
+		$this->assertSame( 0, $second_apply['logical_touches'] );
+		$this->assertSame( 0, $second_apply['logical_mutations'] );
+		$this->assertSame( 'exact_target', $second_apply['limit_mode'] );
+		$this->assertFalse( $second_apply['limit_reached'] );
+		$this->assertSame( JobStatus::FAILED, $this->db_jobs->get_job( $child_id )['status'] );
+		$this->assertSame( $unrelated_parent_before, $this->db_jobs->get_job( $unrelated_parent ) );
+		$this->assertSame( $unrelated_child_before, $this->db_jobs->get_job( $unrelated_child ) );
+	}
+
 	public function test_touch_limit_stops_before_partial_pathless_claim(): void {
 		global $wpdb;
 		$parent_id = $this->db_jobs->create_job( array( 'label' => 'Touch-bound parent' ) );
@@ -311,7 +392,6 @@ class JobLifecycleTransitionTest extends WP_UnitTestCase {
 
 		$result = ( new RecoverStuckJobsAbility() )->execute(
 			array(
-				'job_id'                    => $child_id,
 				'limit'                     => 2,
 				'timeout_hours'             => 1,
 				'recover_pathless_children' => true,
@@ -326,7 +406,6 @@ class JobLifecycleTransitionTest extends WP_UnitTestCase {
 
 		$result = ( new RecoverStuckJobsAbility() )->execute(
 			array(
-				'job_id'                    => $child_id,
 				'limit'                     => 3,
 				'timeout_hours'             => 1,
 				'recover_pathless_children' => true,
@@ -337,6 +416,10 @@ class JobLifecycleTransitionTest extends WP_UnitTestCase {
 		$this->assertSame( 2, $result['attempted'] );
 		$this->assertSame( 2, $result['touched'] );
 		$this->assertSame( 2, $result['mutated'] );
+		$this->assertSame( 1, $result['target_attempts'] );
+		$this->assertSame( 2, $result['logical_touches'] );
+		$this->assertSame( 2, $result['logical_mutations'] );
+		$this->assertSame( 'broad_touch_cap', $result['limit_mode'] );
 		$this->assertSame( 1, $result['pathless_terminal'] );
 		$job = $this->db_jobs->get_job( $child_id );
 		$this->assertSame( JobStatus::FAILED, $job['status'] );
