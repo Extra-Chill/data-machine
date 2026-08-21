@@ -2,6 +2,13 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.55.7] - 2026-08-21
+
+### Fixed
+- preserve explicit past calendar boundaries
+- expire calendars at event boundaries
+- converge repeated Ticketmaster imports
+
 ## [0.55.6] - 2026-08-21
 
 ### Fixed
