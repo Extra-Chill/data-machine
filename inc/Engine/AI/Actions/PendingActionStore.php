@@ -5,7 +5,7 @@
  *
  * When a tool runs in preview mode (see ActionPolicyResolver), the pending
  * invocation is stored here instead of being applied immediately. The
- * datamachine/resolve-pending-action ability later retrieves the stored
+ * agents/resolve-pending-action ability later retrieves the stored
  * payload and either replays it (`accepted`) or discards it (`rejected`).
  *
  * The store is kind-agnostic: any tool that opts into the preview/approve

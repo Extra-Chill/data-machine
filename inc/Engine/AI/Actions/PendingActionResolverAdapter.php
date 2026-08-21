@@ -29,7 +29,7 @@ final class PendingActionResolverAdapter implements WP_Agent_Pending_Action_Reso
 	 * @return mixed
 	 */
 	public function resolve_pending_action( string $pending_action_id, WP_Agent_Approval_Decision $decision, string $resolver, array $payload = array(), array $context = array() ): mixed {
-		return ResolvePendingActionAbility::resolve_with_datamachine_handlers(
+		$result = ResolvePendingActionAbility::resolve_with_datamachine_handlers(
 			array(
 				'action_id' => $pending_action_id,
 				'decision'  => $decision->value(),
@@ -38,5 +38,24 @@ final class PendingActionResolverAdapter implements WP_Agent_Pending_Action_Reso
 				'context'   => $context,
 			)
 		);
+
+		if ( is_array( $result ) && array_key_exists( 'success', $result ) && false === $result['success'] ) {
+			$data = array_filter(
+				array(
+					'status'    => 400,
+					'action_id' => $result['action_id'] ?? $pending_action_id,
+					'kind'      => $result['kind'] ?? null,
+				),
+				static fn( $value ): bool => null !== $value
+			);
+
+			return new \WP_Error(
+				'pending_action_resolution_failed',
+				(string) ( $result['error'] ?? 'Pending action resolution failed.' ),
+				$data
+			);
+		}
+
+		return $result;
 	}
 }

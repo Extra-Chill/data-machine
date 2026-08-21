@@ -636,4 +636,4 @@ All major tables carry `user_id` and `agent_id` columns for resource isolation:
 | v0.36.1 | `Chat::ensure_agent_id_column()` | Added `agent_id`, `title`, `context` to chat_sessions |
 | v0.36.1 | `datamachine_backfill_agent_ids()` | Backfilled agent_id on existing resources |
 
-Migrations run automatically via `datamachine_maybe_run_migrations()` on `init` (priority 5) whenever code version exceeds stored DB version.
+The canonical schema is checked by `datamachine_maybe_ensure_current_schema()` on `plugins_loaded` at priority 5. It runs the idempotent current-schema bootstrap whenever the stored database version or live schema is not current.

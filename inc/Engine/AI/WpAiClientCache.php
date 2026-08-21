@@ -9,7 +9,7 @@ namespace DataMachine\Engine\AI;
 
 defined( 'ABSPATH' ) || exit;
 
-require_once __DIR__ . '/WpAiClientTransientCache.php';
+require_once __DIR__ . '/WpAiClientTransientCacheBase.php';
 
 /**
  * Installs a WordPress-backed PSR-16 cache for wp-ai-client.
@@ -27,7 +27,8 @@ class WpAiClientCache {
 			return;
 		}
 
-		if ( ! class_exists( WpAiClientTransientCache::class ) ) {
+		$cache_class = self::cache_class();
+		if ( null === $cache_class ) {
 			return;
 		}
 
@@ -42,9 +43,24 @@ class WpAiClientCache {
 		}
 
 		try {
-			$ai_client_class::setCache( new WpAiClientTransientCache() );
+			$ai_client_class::setCache( new $cache_class() );
 		} catch ( \Throwable $e ) {
 			unset( $e );
 		}
+	}
+
+	/** Return the cache implementation matching wp-ai-client's PSR namespace. */
+	private static function cache_class(): ?string {
+		if ( interface_exists( '\WordPress\AiClientDependencies\Psr\SimpleCache\CacheInterface' ) ) {
+			require_once __DIR__ . '/ScopedWpAiClientTransientCache.php';
+			return ScopedWpAiClientTransientCache::class;
+		}
+
+		if ( interface_exists( '\Psr\SimpleCache\CacheInterface' ) ) {
+			require_once __DIR__ . '/PsrWpAiClientTransientCache.php';
+			return PsrWpAiClientTransientCache::class;
+		}
+
+		return null;
 	}
 }

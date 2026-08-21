@@ -107,6 +107,7 @@ class ToolPolicyResolver {
 	 *     @type array       $categories            If set, only tools whose linked ability belongs to one
 	 *                                              of these categories are included. Empty = no filtering.
 	 *     @type string|null $cache_scope           Scope key for tool cache (e.g. flow_step_id).
+	 *     @type array       $runtime_tool_declarations Current pipeline delegation declarations.
 	 * }
 	 * @return array Resolved tools array keyed by tool name.
 	 */

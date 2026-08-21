@@ -62,28 +62,23 @@ final class RuntimeToolSource {
 	 * Extract declarations from explicit resolver args.
 	 *
 	 * Runtime adapters can add transport-specific declaration sets through the
-	 * `datamachine_runtime_tool_declaration_sets` filter. Data Machine core only
-	 * reads explicit resolver arguments and the namespaced `client_context.runtime_tools`
-	 * envelope.
+	 * `datamachine_runtime_tool_declaration_sets` filter. The top-level
+	 * `runtime_tool_declarations` argument remains a named current delegation
+	 * edge for pipeline policy consumers alongside the namespaced client envelope.
 	 *
 	 * @param array $args Full resolution arguments.
 	 * @return array<int,array{key:string, declaration:mixed}> Runtime declarations.
 	 */
 	private function declarationsFromContext( array $args ): array {
-		$sets = array_filter(
-			array(
-				$args['runtime_tool_declarations'] ?? null,
-				$args['runtime_tools'] ?? null,
-			),
-			'is_array'
-		);
+		$sets = array();
+		if ( is_array( $args['runtime_tool_declarations'] ?? null ) ) {
+			$sets[] = $args['runtime_tool_declarations'];
+		}
 
 		$client_context = is_array( $args['client_context'] ?? null ) ? $args['client_context'] : array();
 		$runtime_tools  = is_array( $client_context['runtime_tools'] ?? null ) ? $client_context['runtime_tools'] : array();
 		if ( is_array( $runtime_tools['declarations'] ?? null ) ) {
 			$sets[] = $runtime_tools['declarations'];
-		} elseif ( ! empty( $runtime_tools ) && $this->looksLikeDeclarationSet( $runtime_tools ) ) {
-			$sets[] = $runtime_tools;
 		}
 
 		if ( function_exists( 'apply_filters' ) ) {
@@ -109,22 +104,6 @@ final class RuntimeToolSource {
 		}
 
 		return $declarations;
-	}
-
-	/**
-	 * Heuristically detect the legacy compact map shape under runtime_tools.
-	 *
-	 * @param array<mixed> $set Candidate declaration set.
-	 * @return bool Whether the set appears to contain declarations.
-	 */
-	private function looksLikeDeclarationSet( array $set ): bool {
-		foreach ( $set as $entry ) {
-			if ( is_array( $entry ) && ( isset( $entry['description'] ) || isset( $entry['parameters'] ) || isset( $entry['input_schema'] ) ) ) {
-				return true;
-			}
-		}
-
-		return false;
 	}
 
 	/**

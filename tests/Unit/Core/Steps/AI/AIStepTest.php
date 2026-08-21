@@ -77,7 +77,7 @@ class AIStepTest extends TestCase {
 			),
 		);
 
-		$sanitized = AIStep::sanitizeDataPacketsForAi( $data_packets );
+		$sanitized = DataPacketPromptProjector::project( $data_packets );
 
 		$this->assertArrayNotHasKey( 'file_path', $sanitized[0]['data']['file_info'] );
 		$this->assertSame( 'test.jpg', $sanitized[0]['data']['file_info']['file_name'] );
@@ -104,7 +104,7 @@ class AIStepTest extends TestCase {
 			),
 		);
 
-		$sanitized = AIStep::sanitizeDataPacketsForAi( $data_packets );
+		$sanitized = DataPacketPromptProjector::project( $data_packets );
 
 		$this->assertArrayNotHasKey( 'file_info', $sanitized[0]['data'] );
 	}
@@ -121,7 +121,7 @@ class AIStepTest extends TestCase {
 			),
 		);
 
-		$this->assertSame( $data_packets, AIStep::sanitizeDataPacketsForAi( $data_packets ) );
+		$this->assertSame( $data_packets, DataPacketPromptProjector::project( $data_packets ) );
 	}
 
 	public function test_merge_completion_assertions_preserves_minimum_successful_tool_counts(): void {

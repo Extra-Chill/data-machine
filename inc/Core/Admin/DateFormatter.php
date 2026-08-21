@@ -40,7 +40,6 @@ class DateFormatter {
 	 * Returns only the formatted timestamp - status display is handled by frontend.
 	 *
 	 * @param string|null $mysql_datetime MySQL datetime string (Y-m-d H:i:s)
-	 * @param string|null $status Unused, kept for backward compatibility
 	 * @return string Formatted datetime string
 	 */
 	public static function format_for_display( ?string $mysql_datetime): string {

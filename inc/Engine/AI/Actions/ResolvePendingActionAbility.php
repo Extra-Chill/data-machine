@@ -32,7 +32,7 @@
  *                 to deny. Defaults to "anyone with access to the ability".
  *
  * REST surface: POST /datamachine/v1/actions/resolve
- * Ability slug: datamachine/resolve-pending-action
+ * Ability slug: agents/resolve-pending-action
  * Chat tool:    resolve_pending_action (registered separately by ResolvePendingAction BaseTool)
  *
  * @package DataMachine\Engine\AI\Actions
@@ -53,7 +53,7 @@ defined( 'ABSPATH' ) || exit;
 class ResolvePendingActionAbility {
 
 	/**
-	 * Ensure the ability registers exactly once.
+	 * Ensure the adapter registers exactly once.
 	 *
 	 * @var bool
 	 */
@@ -82,64 +82,73 @@ class ResolvePendingActionAbility {
 			return;
 		}
 
-		$this->register_ability();
+		$this->register_ability_alias();
 		$this->register_rest_route();
 		self::$registered = true;
 	}
 
 	/**
-	 * Register the WordPress ability.
+	 * Register the bounded alias consumed by installed Intelligence releases.
+	 *
+	 * The Agents API ability is canonical. This alias remains an active external
+	 * edge until Intelligence migrates its persisted tool reference.
 	 */
-	private function register_ability(): void {
-		$register = function () {
-			wp_register_ability(
-				'datamachine/resolve-pending-action',
-				array(
-					'label'               => __( 'Resolve Pending Action (Data Machine Alias)', 'data-machine' ),
-					'description'         => __( 'Deprecated compatibility alias for agents/resolve-pending-action.', 'data-machine' ),
-					'category'            => 'datamachine-actions',
-					'input_schema'        => array(
-						'type'       => 'object',
-						'required'   => array( 'action_id', 'decision' ),
-						'properties' => array(
-							'action_id' => array(
-								'type'        => 'string',
-								'description' => __( 'The pending action identifier.', 'data-machine' ),
-							),
-							'decision'  => array(
-								'type'        => 'string',
-								'enum'        => array( 'accepted', 'rejected' ),
-								'description' => __( 'Whether to apply or discard the pending action.', 'data-machine' ),
+	private function register_ability_alias(): void {
+		AbilityRegistration::on_abilities_api_init(
+			function () {
+				wp_register_ability(
+					'datamachine/resolve-pending-action',
+					array(
+						'label'               => __( 'Resolve Pending Action (Deprecated Alias)', 'data-machine' ),
+						'description'         => __( 'Deprecated compatibility alias for agents/resolve-pending-action retained for installed Intelligence consumers.', 'data-machine' ),
+						'category'            => 'datamachine-actions',
+						'input_schema'        => array(
+							'type'       => 'object',
+							'required'   => array( 'action_id', 'decision' ),
+							'properties' => array(
+								'action_id' => array( 'type' => 'string' ),
+								'decision'  => array(
+									'type' => 'string',
+									'enum' => array( 'accepted', 'rejected' ),
+								),
 							),
 						),
-					),
-					'output_schema'       => array(
-						'type'       => 'object',
-						'properties' => array(
-							'success'   => array( 'type' => 'boolean' ),
-							'decision'  => array( 'type' => 'string' ),
-							'action_id' => array( 'type' => 'string' ),
-							'kind'      => array( 'type' => 'string' ),
-							'result'    => array( 'type' => 'object' ),
-							'error'     => array( 'type' => 'string' ),
+						'output_schema'       => array( 'type' => 'object' ),
+						'execute_callback'    => array( self::class, 'execute_legacy_alias' ),
+						'permission_callback' => fn() => PermissionHelper::can( 'chat' ),
+						'meta'                => array(
+							'show_in_rest' => true,
+							'annotations'  => array(
+								'deprecated'  => true,
+								'replacement' => 'agents/resolve-pending-action',
+								'destructive' => true,
+								'idempotent'  => false,
+							),
 						),
-					),
-					'execute_callback'    => array( self::class, 'execute' ),
-					'permission_callback' => fn() => PermissionHelper::can( 'chat' ),
-					'meta'                => array(
-						'show_in_rest' => true,
-						'annotations'  => array(
-							'deprecated'  => true,
-							'replacement' => 'agents/resolve-pending-action',
-							'destructive' => true,
-							'idempotent'  => false,
-						),
-					),
-				)
-			);
-		};
+					)
+				);
+			}
+		);
+	}
 
-		AbilityRegistration::on_abilities_api_init( $register );
+	/**
+	 * Preserve Intelligence's legacy presentation contract at the named alias only.
+	 *
+	 * Canonical Agents API ability, REST, and resolver-tool callers continue to
+	 * receive WP_Error failures. Intelligence\Wiki\Intelligence_Wiki_Review_Items
+	 * still consumes this alias and expects an object with success=false.
+	 */
+	public static function execute_legacy_alias( array $input ): array {
+		$result = self::execute( $input );
+		if ( ! is_wp_error( $result ) ) {
+			return $result;
+		}
+
+		return array(
+			'success' => false,
+			'error'   => $result->get_error_message(),
+			'code'    => $result->get_error_code(),
+		);
 	}
 
 	/**
@@ -179,9 +188,9 @@ class ResolvePendingActionAbility {
 	 * REST handler — delegates to execute().
 	 *
 	 * @param \WP_REST_Request $request REST request.
-	 * @return \WP_REST_Response
+	 * @return \WP_REST_Response|\WP_Error
 	 */
-	public static function handle_rest( \WP_REST_Request $request ): \WP_REST_Response {
+	public static function handle_rest( \WP_REST_Request $request ) {
 		$result = self::execute(
 			array(
 				'action_id' => $request->get_param( 'action_id' ),
@@ -189,25 +198,22 @@ class ResolvePendingActionAbility {
 			)
 		);
 
-		return new \WP_REST_Response( $result, ! empty( $result['success'] ) ? 200 : 400 );
+		return is_wp_error( $result ) ? $result : new \WP_REST_Response( $result, 200 );
 	}
 
 	/**
-	 * Execute the deprecated Data Machine alias via the canonical Agents API ability.
+	 * Resolve through the canonical Agents API ability.
 	 *
 	 * @param array $input { action_id, decision }.
-	 * @return array
+	 * @return array|\WP_Error
 	 */
-	public static function execute( array $input ): array {
+	public static function execute( array $input ): array|\WP_Error {
 		$action_id      = isset( $input['action_id'] ) ? sanitize_text_field( $input['action_id'] ) : '';
 		$decision_value = isset( $input['decision'] ) ? sanitize_text_field( $input['decision'] ) : '';
 		$resolver       = isset( $input['resolver'] ) ? sanitize_text_field( (string) $input['resolver'] ) : self::resolverFromCurrentUser();
 
 		if ( '' === $action_id || '' === $decision_value || '' === $resolver ) {
-			return array(
-				'success' => false,
-				'error'   => 'action_id, decision, and resolver are required.',
-			);
+			return new \WP_Error( 'pending_action_input_required', 'action_id, decision, and resolver are required.', array( 'status' => 400 ) );
 		}
 
 		$result = \AgentsAPI\AI\Approvals\agents_resolve_pending_action(
@@ -221,24 +227,10 @@ class ResolvePendingActionAbility {
 		);
 
 		if ( is_wp_error( $result ) ) {
-			return array(
-				'success'   => false,
-				'error'     => $result->get_error_message(),
-				'action_id' => $action_id,
-			);
+			return $result;
 		}
 
-		$compat_result = is_array( $result['result'] ?? null ) ? $result['result'] : array();
-		if ( ! empty( $compat_result ) ) {
-			return $compat_result;
-		}
-
-		return array(
-			'success'   => true,
-			'action_id' => $action_id,
-			'decision'  => (string) ( $result['decision'] ?? $decision_value ),
-			'result'    => $result['result'] ?? null,
-		);
+		return $result['result'];
 	}
 
 	/**
@@ -695,13 +687,8 @@ class ResolvePendingActionAbility {
 		$datamachine_metadata = isset( $metadata['datamachine'] ) && is_array( $metadata['datamachine'] ) ? $metadata['datamachine'] : array();
 		$grants               = isset( $payload['resolver_grants'] ) && is_array( $payload['resolver_grants'] ) ? $payload['resolver_grants'] : array();
 		$metadata_grants      = isset( $datamachine_metadata['resolver_grants'] ) && is_array( $datamachine_metadata['resolver_grants'] ) ? $datamachine_metadata['resolver_grants'] : array();
-		$legacy               = isset( $payload['allowed_resolvers'] ) && is_array( $payload['allowed_resolvers'] ) ? $payload['allowed_resolvers'] : array();
 
 		$grants = array_merge( $grants, $metadata_grants );
-
-		foreach ( $legacy as $resolver ) {
-			$grants[] = array( 'resolver' => $resolver );
-		}
 
 		if ( ! empty( $payload['agent_resolvable'] ) ) {
 			$grants[] = array( 'type' => 'agent' );

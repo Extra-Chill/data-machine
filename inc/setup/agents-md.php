@@ -1,6 +1,6 @@
 <?php
 /**
- * Data Machine — AGENTS.md composition (gated).
+ * Data Machine - AGENTS.md composition (gated).
  *
  * AGENTS.md is the agent-instruction file that lives at the WordPress install
  * root. Unlike SITE.md / NETWORK.md (always composed), AGENTS.md composition is
@@ -165,7 +165,7 @@ function datamachine_agents_md_render_datamachine_section(): string {
 		. "- Job and worker state: `{$wp} datamachine jobs --help` and `{$wp} datamachine worker --help`\n"
 		. "- Content and media operations: `{$wp} datamachine posts --help`, `{$wp} datamachine blocks --help`, or `{$wp} datamachine image --help`\n"
 		. "- Communication and approval queues: `{$wp} datamachine email --help` and `{$wp} datamachine pending-actions --help`\n"
-		. "- Agent and system configuration: `{$wp} datamachine agent --help` and `{$wp} datamachine system --help`\n\n"
+		. "- Agent and system configuration: `{$wp} datamachine agents --help` and `{$wp} datamachine system --help`\n\n"
 		. "**Discovery**\n"
 		. "Use `{$wp} datamachine --help` for the live command map and `{$wp} datamachine <command> --help` for the current options and subcommands.";
 }

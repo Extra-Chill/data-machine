@@ -117,7 +117,7 @@ Consumer plugins coordinate corpus and Markdown/frontmatter profile semantics ou
 
 The graph is persisted in the existing `agent_config.subagents` field, avoiding a
 schema migration. Runtime adapters read it through the access-controlled
-`datamachine/project-agent-graph` ability or `wp datamachine agent graph <slug>`.
+`datamachine/project-agent-graph` ability or `wp datamachine agents graph <slug>`.
 
 `handler_auth` is one of:
 
@@ -277,7 +277,7 @@ Plugins can extend the host capability list with the `datamachine_agent_bundle_h
 
 ## CLI
 
-Agent package operations live under `wp datamachine agent`:
+Agent package operations live under `wp datamachine agents`:
 
 - `install <path|url>` imports a local bundle path (`.zip`, `.json`, or directory) or a remote URL.
 - `import <path|url>` imports a portable agent export and creates a new agent.
@@ -316,7 +316,7 @@ CLI token flags are resolved into the bundle-source context for that one import/
 
 ```bash
 export DATAMACHINE_GITHUB_TOKEN=ghp_xxx
-wp datamachine agent install https://github.com/private-org/private-repo/archive/refs/heads/main.zip --yes
+wp datamachine agents install https://github.com/private-org/private-repo/archive/refs/heads/main.zip --yes
 ```
 
 A 401/403/404 response surfaces as `WP_Error( 'datamachine_bundle_source_auth_required', ... )` with a hint about the configured token slots.
@@ -336,7 +336,7 @@ define( 'DATAMACHINE_A8C_GHE_TOKEN', 'ghp_yyy' );
 ```
 
 ```bash
-wp datamachine agent install https://github.a8c.com/team/brain/archive/refs/heads/main.zip --yes
+wp datamachine agents install https://github.a8c.com/team/brain/archive/refs/heads/main.zip --yes
 ```
 
 ### Example 3 — Custom secret store via filter callback

@@ -1,6 +1,6 @@
 <?php
 /**
- * Data Machine — Scaffolding helpers.
+ * Data Machine - scaffolding helpers.
  *
  * Scaffold defaults, context files, generator registration, and content
  * builders for agent memory files (SOUL.md, USER.md, MEMORY.md, RULES.md,

@@ -164,10 +164,15 @@ class RequestMetadataSmokeStore implements ConversationStoreInterface {
 	public function release_session_lock( string $session_id, string $lock_token ): bool { return true; }
 	public function get_user_sessions( int $user_id, int $limit = 20, int $offset = 0, ?string $context = null, ?int $agent_id = null ): array { return array(); }
 	public function get_user_session_count( int $user_id, ?string $context = null, ?int $agent_id = null ): int { return 0; }
+	public function get_user_sessions_for_workspace( WP_Agent_Workspace_Scope $workspace, int $user_id, int $limit = 20, int $offset = 0, ?string $context = null, ?int $agent_id = null, ?array $transcript_owner = null ): array { return array(); }
+	public function get_user_session_count_for_workspace( WP_Agent_Workspace_Scope $workspace, int $user_id, ?string $context = null, ?int $agent_id = null, ?array $transcript_owner = null ): int { return 0; }
+	public function get_session_for_transcript_owner( WP_Agent_Workspace_Scope $workspace, int $user_id, array $owner, string $session_id ): ?array { return null; }
+	public function delete_session_for_transcript_owner( WP_Agent_Workspace_Scope $workspace, int $user_id, array $owner, string $session_id ): bool { return false; }
 	public function get_recent_pending_session( WP_Agent_Workspace_Scope $workspace, int $user_id, int $seconds = 600, string $context = 'chat', ?int $token_id = null ): ?array { return null; }
 	public function update_title( string $session_id, string $title ): bool { return true; }
 	public function count_unread( array $messages, ?string $last_read_at ): int { return 0; }
 	public function mark_session_read( string $session_id, int $user_id ) { return gmdate( 'Y-m-d H:i:s' ); }
+	public function mark_session_read_for_workspace( WP_Agent_Workspace_Scope $workspace, string $session_id, int $user_id, array $transcript_owner ) { return false; }
 	public function cleanup_expired_sessions(): int { return 0; }
 	public function count_old_sessions( int $retention_days, bool $exclude_pipeline_transcripts = false ): int { return 0; }
 	public function cleanup_old_sessions( int $retention_days ): int { return 0; }

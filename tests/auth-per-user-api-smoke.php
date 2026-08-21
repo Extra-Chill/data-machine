@@ -168,7 +168,7 @@ $GLOBALS['datamachine_auth_per_user_options']['datamachine_auth_data']['sample']
 );
 $missing = $provider->get_account_for_user( 999 );
 smoke_assert( 'unknown user returns null', null === $missing );
-smoke_assert( 'site account still readable via legacy path', 'site-token' === $provider->get_account()['access_token'] );
+smoke_assert( 'site account remains readable through the canonical site API', 'site-token' === $provider->get_account()['access_token'] );
 
 echo "\n[3] two users do not see each other's accounts\n";
 $provider->save_account_for_user( 202, array( 'access_token' => 'tok-bob' ) );

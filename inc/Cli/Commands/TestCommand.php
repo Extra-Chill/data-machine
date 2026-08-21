@@ -31,7 +31,7 @@ defined( 'ABSPATH' ) || exit;
  *
  *     # Test a handler with config
  *     wp datamachine test source_api --config='{"query":"example"}'
- *     wp datamachine fetch test --handler=source_api --config='{"query":"example"}'
+ *     wp datamachine test source_api --config='{"query":"example"}'
  *
  *     # Test using an existing flow's config
  *     wp datamachine test --flow=42
@@ -52,7 +52,7 @@ class TestCommand extends BaseCommand {
 	 * : Handler slug to test.
 	 *
 	 * [--handler=<slug>]
-	 * : Handler slug to test. Useful for the `wp datamachine fetch test` alias.
+	 * : Handler slug to test as an alternative to the positional argument.
 	 *
 	 * [--config=<json>]
 	 * : Handler config as JSON string.
@@ -94,7 +94,7 @@ class TestCommand extends BaseCommand {
 	 *     wp datamachine test --list
 	 *     wp datamachine test source_api --describe
 	 *     wp datamachine test source_api --config='{"query":"example"}'
-	 *     wp datamachine fetch test --handler=source_api --config='{"query":"example"}'
+	 *     wp datamachine test source_api --config='{"query":"example"}'
 	 *     wp datamachine test rss --config='{"feed_url":"https://example.com/feed"}'
 	 *     wp datamachine test --flow=42
 	 *     wp datamachine test source_api --config='...' --limit=3 --format=json

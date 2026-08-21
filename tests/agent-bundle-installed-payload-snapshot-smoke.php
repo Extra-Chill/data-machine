@@ -46,9 +46,10 @@ if ( ! function_exists( 'sanitize_title' ) ) {
 	}
 }
 
-require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/BundleSchema.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/BundleValidationException.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/PortableSlug.php';
+require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/BundleEgressTargetRegistry.php';
+require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/BundleSchema.php';
 require_once dirname( __DIR__ ) . '/vendor/wordpress/agents-api/src/Packages/class-wp-agent-package-artifact.php';
 require_once dirname( __DIR__ ) . '/vendor/wordpress/agents-api/src/Packages/class-wp-agent-package-artifact-hasher.php';
 require_once dirname( __DIR__ ) . '/vendor/wordpress/agents-api/src/Packages/class-wp-agent-package-artifact-status.php';
@@ -58,6 +59,7 @@ require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/AgentBundleArtifactDefinit
 require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/AgentBundleArtifactExtensions.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/AgentBundleArtifactHasher.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/AgentBundleArtifactStatus.php';
+require_once dirname( __DIR__ ) . '/inc/Engine/Agents/AgentSubagentGraph.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/AgentBundleManifest.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/AgentBundleInstalledArtifact.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/AgentBundleArtifactRebase.php';
@@ -227,13 +229,12 @@ snap_assert( 'no approval required with base', false === $rebase_with_base['requ
 
 $step = $rebase_with_base['merged']['flow_config']['10_fetch_1'] ?? array();
 snap_assert_equals( 'remote handler taken', 'github-a8c', $step['handler'] ?? null );
-snap_assert_equals( 'remote owner taken', 'Automattic', $step['handler_config']['owner'] ?? null );
-snap_assert_equals( 'local throttle preserved (max_items)', 1, $step['handler_config']['max_items'] ?? null );
+snap_assert_equals( 'remote owner taken', 'Automattic', $step['handler_configs']['github-a8c']['owner'] ?? null );
+snap_assert_equals( 'local throttle preserved (max_items)', 1, $step['handler_configs']['github-a8c']['max_items'] ?? null );
+snap_assert( 'rebased handler shape is canonical plural', ! isset( $step['handler_config'] ) );
 
-// Demonstrate the regression we are fixing: without base, the merge is noisier.
-// max_items moves from "burn-in throttle preserved" (clean) to a state where
-// the policy can still keep local but does so without confidence that local
-// represented intent vs. inherited default.
+// Even without a base snapshot, the concrete local throttle remains safe to
+// carry across an unambiguous handler slug rename.
 $rebase_without_base = AgentBundleArtifactRebase::rebase(
 	array(
 		'artifact_type' => 'flow',
@@ -245,22 +246,9 @@ $rebase_without_base = AgentBundleArtifactRebase::rebase(
 	AgentBundleArtifactRebase::POLICY_BURN_IN_SAFE
 );
 
-// Without base, the policy sees local==remote on max_items? No: local=1, remote=25,
-// both diverge from "base=null" → policy sees both changed → ambiguous.
 $step_no_base   = $rebase_without_base['merged']['flow_config']['10_fetch_1'] ?? array();
-$has_throttle_ambiguity = in_array(
-	'flow_config.10_fetch_1.handler_config.max_items',
-	$rebase_without_base['ambiguous'],
-	true
-);
-snap_assert(
-	'baseline regression: without installed_payload, max_items is ambiguous',
-	$has_throttle_ambiguity
-);
-snap_assert(
-	'baseline regression: without installed_payload, requires approval',
-	true === $rebase_without_base['requires_approval']
-);
+snap_assert_equals( 'without installed_payload, local throttle still crosses the known slug rename', 1, $step_no_base['handler_configs']['github-a8c']['max_items'] ?? null );
+snap_assert( 'without installed_payload, the known slug rename remains approval-free', false === $rebase_without_base['requires_approval'] );
 snap_assert(
 	'with installed_payload: clean merge (this PR\'s improvement)',
 	false === $rebase_with_base['requires_approval']

@@ -12,6 +12,8 @@
 
 namespace DataMachine\Core\Database\Chat;
 
+use AgentsAPI\Core\Workspace\WP_Agent_Workspace_Scope;
+
 defined( 'ABSPATH' ) || exit;
 
 interface ConversationReadStateInterface {
@@ -37,4 +39,7 @@ interface ConversationReadStateInterface {
 	 * @return string|false New last_read_at MySQL datetime, or false on failure.
 	 */
 	public function mark_session_read( string $session_id, int $user_id );
+
+	/** Mark a session read through the ability-facing workspace and owner boundary. */
+	public function mark_session_read_for_workspace( WP_Agent_Workspace_Scope $workspace, string $session_id, int $user_id, array $transcript_owner );
 }

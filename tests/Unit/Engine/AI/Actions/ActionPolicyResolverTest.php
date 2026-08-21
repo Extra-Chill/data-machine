@@ -50,13 +50,7 @@ class ActionPolicyResolverTest extends WP_UnitTestCase {
 			)
 		);
 
-		$this->assertSame( ActionPolicyResolver::POLICY_DIRECT, $policy );
-	}
-
-	public function test_legacy_policy_constants_alias_agents_api_vocabulary(): void {
-		$this->assertSame( WP_Agent_Action_Policy::DIRECT, ActionPolicyResolver::POLICY_DIRECT );
-		$this->assertSame( WP_Agent_Action_Policy::PREVIEW, ActionPolicyResolver::POLICY_PREVIEW );
-		$this->assertSame( WP_Agent_Action_Policy::FORBIDDEN, ActionPolicyResolver::POLICY_FORBIDDEN );
+		$this->assertSame( WP_Agent_Action_Policy::DIRECT, $policy );
 	}
 
 	public function test_tool_declared_default_overrides_global_default(): void {
@@ -68,7 +62,7 @@ class ActionPolicyResolverTest extends WP_UnitTestCase {
 			)
 		);
 
-		$this->assertSame( ActionPolicyResolver::POLICY_PREVIEW, $policy );
+		$this->assertSame( WP_Agent_Action_Policy::PREVIEW, $policy );
 	}
 
 	public function test_mode_preset_upgrades_direct_tool_to_preview_in_chat(): void {
@@ -83,7 +77,7 @@ class ActionPolicyResolverTest extends WP_UnitTestCase {
 			)
 		);
 
-		$this->assertSame( ActionPolicyResolver::POLICY_PREVIEW, $policy );
+		$this->assertSame( WP_Agent_Action_Policy::PREVIEW, $policy );
 	}
 
 	public function test_mode_preset_does_not_affect_pipeline(): void {
@@ -98,7 +92,7 @@ class ActionPolicyResolverTest extends WP_UnitTestCase {
 			)
 		);
 
-		$this->assertSame( ActionPolicyResolver::POLICY_DIRECT, $policy );
+		$this->assertSame( WP_Agent_Action_Policy::DIRECT, $policy );
 	}
 
 	public function test_context_deny_always_wins(): void {
@@ -111,7 +105,7 @@ class ActionPolicyResolverTest extends WP_UnitTestCase {
 			)
 		);
 
-		$this->assertSame( ActionPolicyResolver::POLICY_FORBIDDEN, $policy );
+		$this->assertSame( WP_Agent_Action_Policy::FORBIDDEN, $policy );
 	}
 
 	public function test_agent_tool_override_beats_tool_default(): void {
@@ -130,7 +124,7 @@ class ActionPolicyResolverTest extends WP_UnitTestCase {
 			)
 		);
 
-		$this->assertSame( ActionPolicyResolver::POLICY_FORBIDDEN, $policy );
+		$this->assertSame( WP_Agent_Action_Policy::FORBIDDEN, $policy );
 	}
 
 	public function test_agent_tool_override_can_downgrade_preview_to_direct(): void {
@@ -149,7 +143,7 @@ class ActionPolicyResolverTest extends WP_UnitTestCase {
 			)
 		);
 
-		$this->assertSame( ActionPolicyResolver::POLICY_DIRECT, $policy );
+		$this->assertSame( WP_Agent_Action_Policy::DIRECT, $policy );
 	}
 
 	public function test_invalid_agent_policy_values_are_dropped(): void {
@@ -169,7 +163,7 @@ class ActionPolicyResolverTest extends WP_UnitTestCase {
 		);
 
 		// Bogus value dropped → falls through to tool-declared default.
-		$this->assertSame( ActionPolicyResolver::POLICY_PREVIEW, $policy );
+		$this->assertSame( WP_Agent_Action_Policy::PREVIEW, $policy );
 	}
 
 	public function test_filter_can_override_any_layer(): void {
@@ -190,7 +184,7 @@ class ActionPolicyResolverTest extends WP_UnitTestCase {
 			)
 		);
 
-		$this->assertSame( ActionPolicyResolver::POLICY_FORBIDDEN, $policy );
+		$this->assertSame( WP_Agent_Action_Policy::FORBIDDEN, $policy );
 	}
 
 	public function test_filter_can_resolve_policy_from_normalized_input(): void {
@@ -218,8 +212,8 @@ class ActionPolicyResolverTest extends WP_UnitTestCase {
 			)
 		);
 
-		$this->assertSame( ActionPolicyResolver::POLICY_DIRECT, $read_policy );
-		$this->assertSame( ActionPolicyResolver::POLICY_PREVIEW, $write_policy );
+		$this->assertSame( WP_Agent_Action_Policy::DIRECT, $read_policy );
+		$this->assertSame( WP_Agent_Action_Policy::PREVIEW, $write_policy );
 	}
 
 	public function test_absent_and_invalid_input_are_normalized_to_empty_array(): void {
@@ -265,7 +259,7 @@ class ActionPolicyResolverTest extends WP_UnitTestCase {
 			)
 		);
 
-		$this->assertSame( ActionPolicyResolver::POLICY_PREVIEW, $policy );
+		$this->assertSame( WP_Agent_Action_Policy::PREVIEW, $policy );
 	}
 
 	public function test_no_policy_returns_null_for_missing_agent(): void {

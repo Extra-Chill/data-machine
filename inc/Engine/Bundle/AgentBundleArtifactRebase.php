@@ -237,6 +237,15 @@ final class AgentBundleArtifactRebase {
 			$base_step   = is_array( $base_steps[ $step_id ] ?? null ) ? $base_steps[ $step_id ] : array();
 			$local_step  = is_array( $local_steps[ $step_id ] ?? null ) ? $local_steps[ $step_id ] : array();
 			$remote_step = is_array( $remote_steps[ $step_id ] ?? null ) ? $remote_steps[ $step_id ] : array();
+			$fallback_slug = self::single_handler_slug( $base_step, $local_step, $remote_step );
+			$base_step     = self::canonicalize_installed_handler_config( $base_step, self::step_handler_slug( $base_step ) ?: $fallback_slug );
+			$local_step    = self::canonicalize_installed_handler_config( $local_step, self::step_handler_slug( $local_step ) ?: $fallback_slug );
+			$remote_step   = self::canonicalize_installed_handler_config( $remote_step, self::step_handler_slug( $remote_step ) ?: $fallback_slug );
+			$unresolved_handler_config = '' === $fallback_slug && (
+				is_array( $base_step['handler_config'] ?? null )
+				|| is_array( $local_step['handler_config'] ?? null )
+				|| is_array( $remote_step['handler_config'] ?? null )
+			);
 
 			if ( empty( $remote_step ) && ! empty( $local_step ) ) {
 				// Remote dropped this step; without explicit policy, keep local
@@ -251,6 +260,17 @@ final class AgentBundleArtifactRebase {
 			}
 
 			$merged_step = $remote_step;
+			if ( $unresolved_handler_config ) {
+				$path = "flow_config.{$step_id}.handler_config";
+				if ( is_array( $local_step['handler_config'] ?? null ) ) {
+					$merged_step['handler_config'] = $local_step['handler_config'];
+				}
+				$decisions[ $path ] = array(
+					'source' => 'ambiguous',
+					'reason' => 'handler_slug_cannot_be_inferred',
+				);
+				$ambiguous[] = $path;
+			}
 
 			// Preserve per-step runtime queue fields from local.
 			foreach ( array( 'prompt_queue', 'config_patch_queue', 'queue_mode', '_queue_consume_revision' ) as $rt_field ) {
@@ -269,21 +289,6 @@ final class AgentBundleArtifactRebase {
 			$base_hcs   = is_array( $base_step['handler_configs'] ?? null ) ? $base_step['handler_configs'] : array();
 			$local_hcs  = is_array( $local_step['handler_configs'] ?? null ) ? $local_step['handler_configs'] : array();
 			$remote_hcs = is_array( $remote_step['handler_configs'] ?? null ) ? $remote_step['handler_configs'] : array();
-
-			// Legacy/single-handler flow shapes still carry `handler_config` directly on
-			// the step. Apply the same burn-in-safe ownership rules there so template
-			// upgrades cannot silently reset local throttles before the config is
-			// normalized into keyed `handler_configs`.
-			if ( empty( $local_hcs ) && empty( $remote_hcs ) && ( is_array( $local_step['handler_config'] ?? null ) || is_array( $remote_step['handler_config'] ?? null ) ) ) {
-				$merged_step['handler_config'] = self::merge_handler_config(
-					is_array( $base_step['handler_config'] ?? null ) ? $base_step['handler_config'] : array(),
-					is_array( $local_step['handler_config'] ?? null ) ? $local_step['handler_config'] : array(),
-					is_array( $remote_step['handler_config'] ?? null ) ? $remote_step['handler_config'] : array(),
-					"flow_config.{$step_id}.handler_config",
-					$decisions,
-					$ambiguous
-				);
-			}
 
 			if ( ! empty( $local_hcs ) || ! empty( $remote_hcs ) ) {
 				$merged_hcs = array();
@@ -383,6 +388,61 @@ final class AgentBundleArtifactRebase {
 			'decisions' => $decisions,
 			'ambiguous' => $ambiguous,
 		);
+	}
+
+	/** Resolve the sole canonical handler slug available across a three-way step. */
+	private static function single_handler_slug( array ...$steps ): string {
+		$slugs = array();
+		foreach ( $steps as $step ) {
+			foreach ( array_keys( is_array( $step['handler_configs'] ?? null ) ? $step['handler_configs'] : array() ) as $slug ) {
+				if ( '' !== (string) $slug ) {
+					$slugs[] = (string) $slug;
+				}
+			}
+			foreach ( is_array( $step['handler_slugs'] ?? null ) ? $step['handler_slugs'] : array() as $slug ) {
+				if ( '' !== (string) $slug ) {
+					$slugs[] = (string) $slug;
+				}
+			}
+			foreach ( array( 'handler_slug', 'handler' ) as $field ) {
+				if ( '' !== trim( (string) ( $step[ $field ] ?? '' ) ) ) {
+					$slugs[] = trim( (string) $step[ $field ] );
+				}
+			}
+		}
+
+		$slugs = array_values( array_unique( $slugs ) );
+		return 1 === count( $slugs ) ? $slugs[0] : '';
+	}
+
+	/** Resolve one step's own singular handler identity when unambiguous. */
+	private static function step_handler_slug( array $step ): string {
+		$slugs = array_keys( is_array( $step['handler_configs'] ?? null ) ? $step['handler_configs'] : array() );
+		$slugs = array_merge( $slugs, is_array( $step['handler_slugs'] ?? null ) ? $step['handler_slugs'] : array() );
+		foreach ( array( 'handler_slug', 'handler' ) as $field ) {
+			if ( '' !== trim( (string) ( $step[ $field ] ?? '' ) ) ) {
+				$slugs[] = trim( (string) $step[ $field ] );
+			}
+		}
+
+		$slugs = array_values( array_unique( array_filter( array_map( 'strval', $slugs ) ) ) );
+		return 1 === count( $slugs ) ? $slugs[0] : '';
+	}
+
+	/** Normalize a shipped singular runtime overlay before canonical rebasing. */
+	private static function canonicalize_installed_handler_config( array $step, string $handler_slug ): array {
+		if ( '' === $handler_slug || ! is_array( $step['handler_config'] ?? null ) ) {
+			return $step;
+		}
+
+		$configs = is_array( $step['handler_configs'] ?? null ) ? $step['handler_configs'] : array();
+		if ( ! isset( $configs[ $handler_slug ] ) ) {
+			$configs[ $handler_slug ] = $step['handler_config'];
+		}
+		$step['handler_configs'] = $configs;
+		unset( $step['handler_config'] );
+
+		return $step;
 	}
 
 	/**

@@ -2,8 +2,7 @@
 /**
  * Engine data snapshot helpers.
  *
- * Thin wrappers around \DataMachine\Core\EngineData static methods.
- * Kept for backward compatibility.
+ * Procedural engine primitives used throughout the current runtime.
  *
  * @package DataMachine\Engine
  */

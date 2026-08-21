@@ -66,7 +66,7 @@ final class AgentBundleRunner {
 		if ( ! $directory instanceof AgentBundleDirectory ) {
 			$directory = AgentBundleArrayAdapter::from_array_bundle( $bundle );
 		}
-		$selection = $this->select_flow( $directory, (string) ( $input['flow'] ?? $input['flow_slug'] ?? '' ) );
+		$selection = $this->select_flow( $directory, (string) ( $input['flow'] ?? '' ) );
 		if ( empty( $selection['success'] ) ) {
 			return $this->response( $selection, $input, $runtime_imports );
 		}
@@ -141,7 +141,7 @@ final class AgentBundleRunner {
 					$result
 				);
 
-				if ( ! empty( $input['wait_for_completion'] ) || ! empty( $input['wait'] ) ) {
+				if ( ! empty( $input['wait_for_completion'] ) ) {
 					$response = $this->wait_for_completion( $response, $input );
 				}
 
@@ -160,7 +160,7 @@ final class AgentBundleRunner {
 	 */
 	private function initial_data_from_workflow_input( array $input ): array {
 		$workflow_input = is_array( $input['input'] ?? null ) ? $input['input'] : array();
-		foreach ( array( 'wait_for_completion', 'wait', 'step_budget', 'time_budget_ms', 'required_outputs', 'required_artifacts', 'engine_data_outputs', 'runtime_tools', 'ability_tools', 'tools', 'disable_directives' ) as $control_field ) {
+		foreach ( array( 'wait_for_completion', 'step_budget', 'time_budget_ms', 'required_outputs', 'required_artifacts', 'engine_data_outputs', 'runtime_tools', 'ability_tools', 'disable_directives' ) as $control_field ) {
 			unset( $workflow_input[ $control_field ] );
 		}
 
@@ -494,7 +494,7 @@ final class AgentBundleRunner {
 			return false;
 		}
 
-		if ( ! empty( $response['wait_for_completion'] ) || ! empty( $input['wait_for_completion'] ) || ! empty( $input['wait'] ) ) {
+		if ( ! empty( $response['wait_for_completion'] ) || ! empty( $input['wait_for_completion'] ) ) {
 			return true;
 		}
 
@@ -717,7 +717,7 @@ final class AgentBundleRunner {
 
 	/** @return array<int,array<string,mixed>> */
 	private function runtime_bundle_specs( array $input ): array {
-		$specs = $input['runtime_bundles'] ?? $input['agent_bundles'] ?? array();
+		$specs = $input['runtime_bundles'] ?? array();
 		if ( is_array( $input['runtime_bundle'] ?? null ) ) {
 			$specs = array( $input['runtime_bundle'] );
 		}
@@ -827,7 +827,7 @@ final class AgentBundleRunner {
 	private function with_runtime_controls( array $input, callable $callback ): array {
 		$filters = array();
 
-		if ( ! empty( $input['disable_datamachine_directives'] ) || ! empty( $input['disable_directives'] ) ) {
+		if ( ! empty( $input['disable_directives'] ) ) {
 			$disable_directives = static function ( $value = null, $context = null, $input = null ): bool {
 				unset( $value, $context, $input );
 				return false;
@@ -836,7 +836,7 @@ final class AgentBundleRunner {
 			add_filter( 'datamachine_directives_enabled', $disable_directives, 100, 3 );
 		}
 
-		$runtime_tools = is_array( $input['runtime_tools'] ?? null ) ? $input['runtime_tools'] : ( is_array( $input['tools'] ?? null ) ? $input['tools'] : array() );
+		$runtime_tools = is_array( $input['runtime_tools'] ?? null ) ? $input['runtime_tools'] : array();
 		if ( ! empty( $runtime_tools ) ) {
 			$tool_filter = static function ( array $tools ) use ( $runtime_tools ): array {
 				foreach ( $runtime_tools as $name => $definition ) {

@@ -172,34 +172,6 @@ do_action('datamachine_cleanup_old_files');
 - Cleans up orphaned files
 - Runs via Action Scheduler
 
-## Import/Export Actions
-
-### `datamachine_import`
-
-**Purpose**: Import pipeline or flow data
-
-**Parameters**:
-- `$type` (string) - Import type ('pipelines', 'flows')
-- `$data` (array) - Import data
-
-**Usage**:
-```php
-do_action('datamachine_import', 'pipelines', $csv_data);
-```
-
-### `datamachine_export`
-
-**Purpose**: Export pipeline or flow data
-
-**Parameters**:
-- `$type` (string) - Export type ('pipelines', 'flows')
-- `$ids` (array) - IDs to export
-
-**Usage**:
-```php
-do_action('datamachine_export', 'pipelines', [$pipeline_id]);
-```
-
 ### `datamachine_bundle_install_succeeded`
 
 **Purpose**: Notify consumers that an agent bundle install/upgrade succeeded and the transaction has committed. The full extras payload is included so consumers do not need to re-read the bundle from disk.

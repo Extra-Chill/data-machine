@@ -256,8 +256,7 @@ class FlowQueue {
 				null,
 				'queue_list_failed',
 				__( 'Failed to list queue.', 'data-machine' ),
-				400,
-				array( self::class, 'queue_failure_status' )
+				400
 			)
 		);
 	}
@@ -323,17 +322,8 @@ class FlowQueue {
 				continue;
 			}
 
-			if ( $result['success'] ) {
-				++$added_count;
-				$queue_length = $result['queue_length'];
-				// If first one fails with flow not found, return error
-			} elseif ( 0 === $added_count && false !== strpos( $result['error'] ?? '', 'not found' ) ) {
-				return new \WP_Error(
-					'flow_not_found',
-					$result['error'],
-					array( 'status' => 404 )
-				);
-			}
+			++$added_count;
+			$queue_length = $result['queue_length'];
 		}
 
 		return RestResultSpec::item(
@@ -386,8 +376,7 @@ class FlowQueue {
 				},
 				'queue_clear_failed',
 				__( 'Failed to clear queue.', 'data-machine' ),
-				400,
-				array( self::class, 'queue_failure_status' )
+				400
 			)
 		);
 	}
@@ -422,8 +411,7 @@ class FlowQueue {
 				},
 				'queue_remove_failed',
 				__( 'Failed to remove from queue.', 'data-machine' ),
-				400,
-				array( self::class, 'queue_failure_status' )
+				400
 			)
 		);
 	}
@@ -459,8 +447,7 @@ class FlowQueue {
 				},
 				'queue_update_failed',
 				__( 'Failed to update queue item.', 'data-machine' ),
-				400,
-				array( self::class, 'queue_failure_status' )
+				400
 			)
 		);
 	}
@@ -494,16 +481,9 @@ class FlowQueue {
 				},
 				'queue_mode_failed',
 				__( 'Failed to update queue mode.', 'data-machine' ),
-				400,
-				array( self::class, 'queue_failure_status' )
+				400
 			)
 		);
 	}
 
-	/**
-	 * Preserve queue endpoints' historical not-found status mapping.
-	 */
-	public static function queue_failure_status( array $result ): int {
-		return false !== strpos( $result['error'] ?? '', 'not found' ) ? 404 : 400;
-	}
 }

@@ -13,6 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	define( 'ABSPATH', __DIR__ . '/' );
 }
 
+require_once __DIR__ . '/../inc/Engine/Bundle/BundleEgressTargetRegistry.php';
 require_once __DIR__ . '/../inc/Engine/Bundle/BundleSchema.php';
 require_once __DIR__ . '/../inc/Engine/Bundle/AgentBundleRuntimeDrift.php';
 

@@ -15,31 +15,6 @@ if ( ! defined( 'WPINC' ) ) {
 }
 
 /**
- * Register import/export filters for Data Machine.
- *
- * Registers filters for importer service discovery and initialization.
- *
- * @since 0.1.0
- */
-function datamachine_register_importexport_filters() {
-
-	add_filter(
-		'datamachine_importer',
-		function ( $service ) {
-			if ( null === $service ) {
-				require_once DATAMACHINE_PATH . 'inc/Engine/Actions/ImportExport.php';
-				return new \DataMachine\Engine\Actions\ImportExport();
-			}
-			return $service;
-		},
-		10,
-		1
-	);
-}
-
-datamachine_register_importexport_filters();
-
-/**
  * Register backend processing filters for engine operations.
  *
  * Registers filters for service discovery, scheduling,

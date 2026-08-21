@@ -1815,7 +1815,7 @@ class AgentAbilities {
 				$bundle_input['workflow'] = $workflow['spec'];
 			}
 
-			foreach ( array( 'provider', 'model', 'wait_for_completion', 'wait', 'step_budget', 'time_budget_ms', 'required_outputs', 'required_artifacts', 'engine_data_outputs', 'runtime_tools', 'ability_tools', 'tools', 'disable_directives' ) as $key ) {
+			foreach ( array( 'provider', 'model', 'wait_for_completion', 'step_budget', 'time_budget_ms', 'required_outputs', 'required_artifacts', 'engine_data_outputs', 'runtime_tools', 'ability_tools', 'disable_directives' ) as $key ) {
 				if ( array_key_exists( $key, $options ) ) {
 					$bundle_input[ $key ] = $options[ $key ];
 				} elseif ( array_key_exists( $key, $input ) ) {
@@ -1865,10 +1865,6 @@ class AgentAbilities {
 					'type'        => 'string',
 					'description' => 'Optional bundle flow slug. Defaults to the first flow in the bundle.',
 				),
-				'flow_slug'           => array(
-					'type'        => 'string',
-					'description' => 'Alias for flow.',
-				),
 				'initial_data'        => array(
 					'type'        => 'object',
 					'description' => 'Initial engine data merged into the ephemeral workflow job.',
@@ -1905,10 +1901,6 @@ class AgentAbilities {
 					'type'        => 'boolean',
 					'description' => 'Synchronously drain the created job and include terminal job_status plus engine_data in the response.',
 				),
-				'wait'                => array(
-					'type'        => 'boolean',
-					'description' => 'Alias for wait_for_completion.',
-				),
 				'step_budget'         => array(
 					'type'        => 'integer',
 					'description' => 'Maximum number of scheduled job actions to drain when wait_for_completion is true.',
@@ -1934,11 +1926,6 @@ class AgentAbilities {
 					'description' => 'Generic runtime bundle specs to import before running. Uses wp_agent_import_runtime_bundles/wp_agent_runtime_import_bundle internally.',
 					'items'       => array( 'type' => 'object' ),
 				),
-				'agent_bundles'       => array(
-					'type'        => 'array',
-					'description' => 'Alias for runtime_bundles used by runtime host task payloads.',
-					'items'       => array( 'type' => 'object' ),
-				),
 				'runtime_import'      => array(
 					'type'        => 'object',
 					'description' => 'Defaults passed to the generic runtime bundle import seam, such as owner_id.',
@@ -1950,10 +1937,6 @@ class AgentAbilities {
 				'ability_tools'       => array(
 					'anyOf'       => array( array( 'type' => 'object' ), array( 'type' => 'array' ) ),
 					'description' => 'Runtime-scoped generic ability-backed tools. Accepts a keyed map or list entries with name and ability, e.g. [{"name":"my_tool","ability":"plugin/ability"}].',
-				),
-				'tools'               => array(
-					'anyOf'       => array( array( 'type' => 'object' ), array( 'type' => 'array' ) ),
-					'description' => 'Alias for runtime_tools; accepts keyed tool definitions or a list with name/tool fields.',
 				),
 				'disable_directives'  => array(
 					'type'        => 'boolean',

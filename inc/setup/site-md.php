@@ -1,6 +1,6 @@
 <?php
 /**
- * Data Machine — SITE.md and NETWORK.md section registration.
+ * Data Machine - SITE.md and NETWORK.md section registration.
  *
  * SITE.md and NETWORK.md are composable memory files. Their content is
  * assembled from sections registered against the SectionRegistry, the same
@@ -272,7 +272,7 @@ function datamachine_site_section_taxonomies(): string {
 
 /**
  * User roles list. Returns empty string when no custom roles exist
- * (matches legacy behavior — the section was conditional on custom roles).
+ * The section is omitted when no custom roles exist.
  *
  * @since x.y.z
  * @return string

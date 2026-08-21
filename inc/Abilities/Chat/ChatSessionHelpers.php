@@ -14,6 +14,7 @@ namespace DataMachine\Abilities\Chat;
 use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Core\Database\Chat\ConversationStoreFactory;
 use DataMachine\Core\Database\Chat\ConversationStoreInterface;
+use DataMachine\Core\Workspace\WordPressWorkspaceScope;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -69,18 +70,10 @@ trait ChatSessionHelpers {
 	 * @return array|\WP_Error Session data on success, or an error on failure.
 	 */
 	protected function verifySessionOwnership( string $session_id, int $user_id, ?array $transcript_owner = null ): array|\WP_Error {
-		$session = $this->chat_db->get_session( $session_id );
+		$session = $this->chat_db->get_session_for_transcript_owner( WordPressWorkspaceScope::current(), $user_id, $transcript_owner ?? array(), $session_id );
 
 		if ( ! $session ) {
 			return new \WP_Error( 'session_not_found', __( 'Chat session not found.', 'data-machine' ), array( 'status' => 404 ) );
-		}
-
-		$owns_session = null !== $transcript_owner && method_exists( $this->chat_db, 'session_matches_owner' )
-			? $this->chat_db->session_matches_owner( $session, $transcript_owner )
-			: ( (int) $session['user_id'] === $user_id );
-
-		if ( ! $owns_session ) {
-			return new \WP_Error( 'session_access_denied', __( 'You do not have access to this chat session.', 'data-machine' ), array( 'status' => 403 ) );
 		}
 
 		return $session;

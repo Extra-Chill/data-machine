@@ -39,7 +39,7 @@ final class AgentPackageProjection {
 	/**
 	 * Build a package from a bundle array.
 	 *
-	 * @param array<string,mixed> $bundle Legacy bundle array.
+	 * @param array<string,mixed> $bundle Canonical bundle document.
 	 * @return object
 	 */
 	public static function from_array_bundle( array $bundle ): object {

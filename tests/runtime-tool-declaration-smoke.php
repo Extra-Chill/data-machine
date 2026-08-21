@@ -151,11 +151,18 @@ datamachine_runtime_tool_assert(
 );
 ++$assertions;
 
-$bad_name = $valid;
-$bad_name['name'] = 'select_block';
+$client_name         = $valid;
+$client_name['name'] = 'select_block';
 datamachine_runtime_tool_assert(
-	array( 'name', 'source' ) === WP_Agent_Tool_Declaration::validate( $bad_name ),
-	'Runtime tool names must be source/tool namespaced.'
+	array() === WP_Agent_Tool_Declaration::validate( $client_name ),
+	'Unnamespaced client tool names should remain valid.'
+);
+++$assertions;
+
+$normalized_client_name = WP_Agent_Tool_Declaration::normalize( $client_name );
+datamachine_runtime_tool_assert(
+	'client' === $normalized_client_name['source'],
+	'Unnamespaced client tool names should normalize to the client source.'
 );
 ++$assertions;
 

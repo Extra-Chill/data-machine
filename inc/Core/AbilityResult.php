@@ -10,20 +10,18 @@ namespace DataMachine\Core;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Presents core WP_Ability results at transport and legacy extension boundaries.
+ * Presents core WP_Ability results at transport boundaries.
  *
- * Native callbacks must return WP_Error directly. Conversion remains only for
- * CLI/REST/AI-tool presentation and for documented extension filters whose
- * third-party callbacks may still return the historical failure array.
+ * Native callbacks return WP_Error directly. Array shaping remains only for
+ * CLI, REST, and AI-tool presentation.
  */
 class AbilityResult {
 
 	/**
-	 * Convert a WP_Ability::execute() result into Data Machine's legacy array shape.
+	 * Convert a WP_Ability::execute() result into the CLI result shape.
 	 *
 	 * Core returns WP_Error for validation, permission, and callback failures. This
-	 * array conversion is reserved for CLI presentation plus the scheduler and
-	 * bundle runners that still expose the historical result envelope externally.
+	 * array conversion is reserved for presentation by CLI and external runners.
 	 *
 	 * @param mixed $result Ability execution result.
 	 * @return array Normalized result array.
@@ -45,46 +43,6 @@ class AbilityResult {
 		return array(
 			'success' => true,
 			'data'    => $result,
-		);
-	}
-
-	/**
-	 * Convert a WP_Ability::execute() result into Data Machine's tool result shape.
-	 *
-	 * AI tools use the Agents API execution envelope. The payload key is `result`;
-	 * `data` remains an ability/REST presentation concern, not a mirrored tool
-	 * result field.
-	 *
-	 * @param mixed  $result       Ability execution result.
-	 * @param string $tool_name    Tool name.
-	 * @param string $ability_slug Ability slug.
-	 * @return array Normalized tool execution result.
-	 */
-	public static function normalize_tool_result( $result, string $tool_name, string $ability_slug ): array {
-		if ( is_wp_error( $result ) ) {
-			return array(
-				'success'       => false,
-				'error'         => $result->get_error_message(),
-				'tool_name'     => $tool_name,
-				'ability'       => $ability_slug,
-				'wp_error_code' => $result->get_error_code(),
-				'wp_error_data' => self::wp_error_data( $result ),
-			);
-		}
-
-		if ( is_array( $result ) ) {
-			if ( array_key_exists( 'data', $result ) && ! array_key_exists( 'result', $result ) ) {
-				$result['result'] = $result['data'];
-			}
-
-			return $result;
-		}
-
-		return array(
-			'success'   => true,
-			'tool_name' => $tool_name,
-			'ability'   => $ability_slug,
-			'result'    => $result,
 		);
 	}
 
@@ -117,44 +75,6 @@ class AbilityResult {
 		}
 
 		return $result;
-	}
-
-	/**
-	 * Convert a legacy failed extension result array into WP_Error.
-	 *
-	 * The remaining callers are extension boundaries: queue and flow-step filters,
-	 * and webhook operations whose downstream callbacks are not all first-party.
-	 *
-	 * @param mixed  $result          Ability execution result.
-	 * @param string $default_code    Error code to use when the result has no error code.
-	 * @param string $default_message Error message to use when the result has no message.
-	 * @param array  $status_map      Optional map of error code to HTTP status.
-	 * @param int    $default_status  Default HTTP status.
-	 * @param bool   $use_error_as_code Use the legacy error string as the WP_Error code when error_code is absent.
-	 * @return \WP_Error|null WP_Error for failed legacy arrays, null otherwise.
-	 */
-	public static function legacy_failure_to_wp_error( $result, string $default_code = 'ability_failed', string $default_message = 'Ability execution failed.', array $status_map = array(), int $default_status = 500, bool $use_error_as_code = false ): ?\WP_Error {
-		if ( ! is_array( $result ) || ! isset( $result['success'] ) || $result['success'] ) {
-			return null;
-		}
-
-		$error_code = (string) ( $result['error_code'] ?? ( $use_error_as_code ? ( $result['error'] ?? $default_code ) : $default_code ) );
-		if ( '' === $error_code ) {
-			$error_code = $default_code;
-		}
-
-		$message = (string) ( $result['message'] ?? $result['error'] ?? $default_message );
-		if ( '' === $message ) {
-			$message = $default_message;
-		}
-
-		$status = isset( $result['status'] ) ? (int) $result['status'] : ( $status_map[ $error_code ] ?? $default_status );
-
-		return new \WP_Error(
-			$error_code,
-			$message,
-			array( 'status' => $status )
-		);
 	}
 
 	/**
@@ -202,7 +122,7 @@ class AbilityResult {
 	}
 
 	/**
-	 * Present an ability collection as a REST response, normalizing failures first.
+	 * Present a successful ability collection as a REST response.
 	 *
 	 * @param mixed  $result          Ability execution result.
 	 * @param string $items_key       Key containing collection items in the ability result.
@@ -215,11 +135,6 @@ class AbilityResult {
 	public static function rest_collection_response( $result, string $items_key, array $options = array(), string $default_code = 'ability_failed', string $default_message = 'Ability execution failed.', int $default_status = 500 ) {
 		if ( is_wp_error( $result ) ) {
 			return $result;
-		}
-
-		$error = self::legacy_failure_to_wp_error( $result, $default_code, $default_message, array(), $default_status );
-		if ( $error ) {
-			return $error;
 		}
 
 		return rest_ensure_response( self::collection_envelope( self::normalize( $result ), $items_key, $options ) );
@@ -260,11 +175,6 @@ class AbilityResult {
 			return $result;
 		}
 
-		$error = self::legacy_failure_to_wp_error( $result, $default_code, $default_message, array(), $default_status );
-		if ( $error ) {
-			return $error;
-		}
-
 		$normalized = self::normalize( $result );
 		if ( null === $data ) {
 			$data = $normalized;
@@ -282,7 +192,7 @@ class AbilityResult {
 	}
 
 	/**
-	 * Return WP_Error data as an array for legacy result payloads.
+	 * Return WP_Error data as an array for presentation payloads.
 	 *
 	 * @param \WP_Error $error Error object.
 	 * @return array

@@ -48,16 +48,6 @@ class ActionPolicyResolver {
 	public const MODE_CHAT     = 'chat';
 	public const MODE_SYSTEM   = 'system';
 
-	/**
-	 * Valid policy values. Returned by resolveForTool().
-	 *
-	 * Keep the legacy Data Machine constant names as public aliases while the
-	 * generic vocabulary lives in Agents API.
-	 */
-	public const POLICY_DIRECT    = WP_Agent_Action_Policy::DIRECT;
-	public const POLICY_PREVIEW   = WP_Agent_Action_Policy::PREVIEW;
-	public const POLICY_FORBIDDEN = WP_Agent_Action_Policy::FORBIDDEN;
-
 	private \WP_Agent_Action_Policy_Resolver $resolver;
 
 	/**

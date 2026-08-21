@@ -515,13 +515,13 @@ abstract class BaseOAuth2Provider extends BaseAuthProvider {
 	 * @since 0.31.1
 	 * @return bool True on success
 	 */
-	public function clear_account( array $context = array() ): bool {
+	public function clear_account(): bool {
 		$this->clear_proactive_refresh();
-		return parent::clear_account( $context );
+		return parent::clear_account();
 	}
 
 	// -------------------------------------------------------------------------
-	// Legacy / Display
+	// Display
 	// -------------------------------------------------------------------------
 
 	/**

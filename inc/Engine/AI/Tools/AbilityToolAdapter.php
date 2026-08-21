@@ -9,7 +9,6 @@ namespace DataMachine\Engine\AI\Tools;
 
 use AgentsAPI\AI\Tools\WP_Agent_Tool_Declaration;
 use AgentsAPI\AI\Tools\WP_Agent_Tool_Result;
-use DataMachine\Core\AbilityResult;
 use DataMachine\Engine\AI\ToolSchemaNormalizer;
 
 defined( 'ABSPATH' ) || exit;
@@ -173,12 +172,20 @@ final class AbilityToolAdapter {
 			);
 		}
 
-		$result = AbilityResult::normalize_tool_result( $ability->execute( $input ), $tool_name, $ability_slug );
-		if ( ! is_array( $result ) || empty( $result['success'] ) ) {
-			return AbilityResult::normalize_tool_envelope( $result, $tool_name, array( 'ability' => $ability_slug ) );
+		$result = $ability->execute( $input );
+		if ( is_wp_error( $result ) ) {
+			return WP_Agent_Tool_Result::error(
+				$tool_name,
+				$result->get_error_message(),
+				array(
+					'ability'       => $ability_slug,
+					'wp_error_code' => $result->get_error_code(),
+					'wp_error_data' => is_array( $result->get_error_data() ) ? $result->get_error_data() : array(),
+				)
+			);
 		}
 
-		$payload = array_key_exists( 'result', $result ) ? $result['result'] : ( $result['data'] ?? $result );
+		$payload = $result;
 		if ( ! empty( $tool_definition['strip_internal_result_keys'] ) && is_array( $payload ) ) {
 			$payload = array_filter(
 				$payload,

@@ -518,15 +518,4 @@ class AgentFiles {
 		) );
 	}
 
-	/**
-	 * Get file context array from flow ID.
-	 *
-	 * Kept here for backward compat — other code may reference Files::get_file_context().
-	 *
-	 * @param int|string $flow_id Flow ID or 'direct' for ephemeral workflows.
-	 * @return array Context array with pipeline_id and flow_id.
-	 */
-	public static function get_file_context( int|string $flow_id ): array {
-		return FlowFiles::get_file_context( $flow_id );
-	}
 }

@@ -27,7 +27,7 @@ function datamachine_uninstall_assert( bool $condition, string $message ): void 
 	fwrite( STDERR, "FAIL: {$message}\n" );
 }
 
-preg_match( '/public static function ensure_all_tables\(\): void \{(?<body>.*?)\n\t\}/s', $activation, $ensure_match );
+preg_match( '/public static function ensure_all_tables\(\): bool \{(?<body>.*?)\n\t\}/s', $activation, $ensure_match );
 $ensure_body = $ensure_match['body'] ?? '';
 
 $site_tables = array(

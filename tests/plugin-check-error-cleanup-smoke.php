@@ -46,7 +46,7 @@ agents_api_smoke_assert_equals( false, str_contains( $fetch_disposition_source, 
 $memory_store_source = datamachine_plugin_check_source( 'inc/Core/FilesRepository/GuidelineAgentMemoryStore.php' );
 agents_api_smoke_assert_equals( false, str_contains( $memory_store_source, "'suppress_filters'" ), 'memory store relies on get_posts default suppress_filters behavior', $failures, $passes );
 
-$scaffolding_source = datamachine_plugin_check_source( 'inc/migrations/scaffolding.php' );
+$scaffolding_source = datamachine_plugin_check_source( 'inc/setup/scaffolding.php' );
 agents_api_smoke_assert_equals( false, datamachine_plugin_check_has_heredoc( $scaffolding_source ), 'scaffolding source avoids heredoc syntax', $failures, $passes );
 
 agents_api_smoke_finish( 'Plugin Check error cleanup', $failures, $passes );

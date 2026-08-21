@@ -1275,7 +1275,7 @@ add_filter(
 );
 ```
 
-With this filter and a `DATAMACHINE_A8C_GHE_TOKEN` env var (or PHP constant) configured, `wp datamachine agent install https://github.a8c.com/team/brain/archive/refs/heads/main.zip` succeeds without any per-call flag. See [Agent Bundles → Authenticated Bundle Sources](../../core-system/agent-bundles.md#authenticated-bundle-sources) for end-to-end examples.
+With this filter and a `DATAMACHINE_A8C_GHE_TOKEN` env var (or PHP constant) configured, `wp datamachine agents install https://github.a8c.com/team/brain/archive/refs/heads/main.zip` succeeds without any per-call flag. See [Agent Bundles → Authenticated Bundle Sources](../../core-system/agent-bundles.md#authenticated-bundle-sources) for end-to-end examples.
 
 ### `datamachine_agent_export_manifest`
 

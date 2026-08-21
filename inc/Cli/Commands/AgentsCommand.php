@@ -56,16 +56,16 @@ class AgentsCommand extends AgentBundleCommand {
 	 *
 	 * ## EXAMPLES
 	 *
-	 *     wp datamachine agent active get
-	 *     wp datamachine agent active set intelligence-chubes4
-	 *     wp datamachine agent active set wordpress-com-wiki --user_id=1
+	 *     wp datamachine agents active get
+	 *     wp datamachine agents active set intelligence-chubes4
+	 *     wp datamachine agents active set wordpress-com-wiki --user_id=1
 	 *
 	 * @subcommand active
 	 */
 	public function active( array $args, array $assoc_args ): void {
 		$action = isset( $args[0] ) ? (string) $args[0] : '';
 		if ( ! in_array( $action, array( 'get', 'set' ), true ) ) {
-			WP_CLI::error( 'Usage: wp datamachine agent active <get|set> [agent] [--user_id=<id>]' );
+			WP_CLI::error( 'Usage: wp datamachine agents active <get|set> [agent] [--user_id=<id>]' );
 			return;
 		}
 
@@ -80,7 +80,7 @@ class AgentsCommand extends AgentBundleCommand {
 		} else {
 			$agent = isset( $args[1] ) ? (string) $args[1] : '';
 			if ( '' === $agent ) {
-				WP_CLI::error( 'Agent is required. Usage: wp datamachine agent active set <agent>' );
+				WP_CLI::error( 'Agent is required. Usage: wp datamachine agents active set <agent>' );
 				return;
 			}
 
@@ -583,10 +583,10 @@ class AgentsCommand extends AgentBundleCommand {
 	 * ## EXAMPLES
 	 *
 	 *     # Preview candidates (default)
-	 *     wp datamachine agent prune
+	 *     wp datamachine agents prune
 	 *
 	 *     # Delete candidates
-	 *     wp datamachine agent prune --yes
+	 *     wp datamachine agents prune --yes
 	 *
 	 * @subcommand prune
 	 */

@@ -56,7 +56,7 @@ function datamachine_assert( bool $cond, string $message, array &$failures ): vo
 // Load the CommandRegistry (pure map, no WP_CLI dependency) and the gated
 // composition helpers.
 require_once dirname( __DIR__ ) . '/inc/Cli/CommandRegistry.php';
-require_once dirname( __DIR__ ) . '/inc/migrations/agents-md.php';
+require_once dirname( __DIR__ ) . '/inc/setup/agents-md.php';
 
 // --- 1. Gate is constant-only and default-OFF. -----------------------------
 
@@ -89,7 +89,7 @@ datamachine_assert( ! str_contains( $rendered, 'artifact-content|artifacts|clean
 
 $map = \DataMachine\Cli\CommandRegistry::map();
 
-foreach ( array( 'memory', 'flows', 'pipelines', 'jobs', 'worker', 'posts', 'blocks', 'image', 'email', 'pending-actions', 'agent', 'system' ) as $advertised_root ) {
+foreach ( array( 'memory', 'flows', 'pipelines', 'jobs', 'worker', 'posts', 'blocks', 'image', 'email', 'pending-actions', 'agents', 'system' ) as $advertised_root ) {
 	datamachine_assert(
 		isset( $map[ 'datamachine ' . $advertised_root ] ),
 		"Advertised routing root `datamachine {$advertised_root}` is registered",

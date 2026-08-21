@@ -13,6 +13,12 @@ $GLOBALS['datamachine_runtime_policy_filters'] = array();
 $GLOBALS['datamachine_runtime_policy_logs']    = array();
 $GLOBALS['datamachine_runtime_engine_merges']  = array();
 
+if ( ! function_exists( 'get_current_user_id' ) ) {
+	function get_current_user_id(): int {
+		return 0;
+	}
+}
+
 if ( ! function_exists( 'add_filter' ) ) {
 	function add_filter( string $hook, callable $callback, int $priority = 10, int $accepted_args = 1 ): void {
 		$GLOBALS['datamachine_runtime_policy_filters'][ $hook ][ $priority ][] = array( $callback, $accepted_args );

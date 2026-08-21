@@ -141,10 +141,7 @@ class EmailAuth extends BaseAuthProvider {
 			return $resolved;
 		}
 
-		return array(
-			'auth_ref'       => $resolved['ref'],
-			'legacy_default' => false,
-		);
+		return array( 'auth_ref' => $resolved['ref'] );
 	}
 
 	public function resolve_mailbox_for_principal( string $account, string|array $operations, array $context ): array|\WP_Error {
@@ -173,7 +170,7 @@ class EmailAuth extends BaseAuthProvider {
 		}
 
 		if ( 'default' === $account ) {
-			if ( ! $this->can_use_legacy_default( $context, $agent_id, $user_id ) ) {
+			if ( ! $this->can_use_default( $context, $agent_id, $user_id ) ) {
 				return $this->audit_error( 'email_mailbox_forbidden', $ref, $operations, $context, $agent_id, $user_id );
 			}
 			$credentials = $this->get_config();
@@ -214,15 +211,9 @@ class EmailAuth extends BaseAuthProvider {
 		return $resolved;
 	}
 
-	private function can_use_legacy_default( array $context, int $agent_id, int $user_id ): bool {
+	private function can_use_default( array $context, int $agent_id, int $user_id ): bool {
 		if ( $agent_id > 0 ) {
-			$expected = self::legacy_default_marker(
-				absint( $context['flow_id'] ?? 0 ),
-				(string) ( $context['flow_step_id'] ?? '' ),
-				$agent_id
-			);
-			$provided = (string) ( $context['legacy_default_auth'] ?? '' );
-			return ! empty( $context['_trusted_execution'] ) && '' !== $provided && hash_equals( $expected, $provided );
+			return false;
 		}
 		if ( ! empty( $context['principal_less_system'] ) && ! empty( $context['_trusted_execution'] ) ) {
 			return true;
@@ -231,11 +222,6 @@ class EmailAuth extends BaseAuthProvider {
 			return class_exists( PermissionHelper::class ) && PermissionHelper::can_manage();
 		}
 		return $this->user_has_management_capability( $user_id );
-	}
-
-	public static function legacy_default_marker( int $flow_id, string $flow_step_id, int $agent_id ): string {
-		$payload = implode( '|', array( 'email-default-v1', (string) $flow_id, $flow_step_id, (string) $agent_id ) );
-		return hash_hmac( 'sha256', $payload, wp_salt( 'auth' ) );
 	}
 
 	public function grant_agent( string $account, string $owner_type, int $owner_id, int $agent_id, array $operations ): bool {
