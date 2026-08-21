@@ -242,7 +242,7 @@ class EmailAuth extends BaseAuthProvider {
 		}
 
 		$flow = ( new Flows() )->get_flow( $flow_id );
-		if ( ! is_array( $flow ) || $agent_id !== absint( $flow['agent_id'] ?? 0 ) ) {
+		if ( ! is_array( $flow ) || absint( $flow['agent_id'] ?? 0 ) !== $agent_id ) {
 			return false;
 		}
 
