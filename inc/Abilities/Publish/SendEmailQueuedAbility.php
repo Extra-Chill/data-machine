@@ -275,8 +275,9 @@ class SendEmailQueuedAbility {
 			'user_id'  => PermissionHelper::acting_user_id(),
 			'agent_id' => absint( PermissionHelper::get_acting_agent_id() ),
 			'token_id' => absint( PermissionHelper::get_acting_token_id() ),
+			'system'   => method_exists( PermissionHelper::class, 'is_authenticated_context' ) && PermissionHelper::is_authenticated_context(),
 		);
-		if ( $context['user_id'] <= 0 ) {
+		if ( $context['user_id'] <= 0 && ! $context['system'] ) {
 			return $this->queueError( 'email_queue_issuer_required', 'An identified issuer is required to queue email.', 403, $logs );
 		}
 		if ( ! empty( $input['auth_ref'] ) ) {
@@ -453,11 +454,12 @@ class SendEmailQueuedAbility {
 	private function createMailboxGrant( array $input, array $context ): array {
 		$issued_at = time();
 		$nonce     = wp_generate_uuid4();
+		$system    = ! empty( $context['system'] ) && (int) $context['user_id'] <= 0;
 		$grant     = array(
 			'user_id'       => (int) $context['user_id'],
 			'agent_id'      => (int) $context['agent_id'],
 			'token_id'      => (int) $context['token_id'],
-			'issuer_type'   => (int) $context['agent_id'] > 0 ? ( (int) $context['token_id'] > 0 ? 'agent_token' : 'agent' ) : 'user',
+			'issuer_type'   => $system ? 'system' : ( (int) $context['agent_id'] > 0 ? ( (int) $context['token_id'] > 0 ? 'agent_token' : 'agent' ) : 'user' ),
 			'issued_at'     => $issued_at,
 			'nonce'         => $nonce,
 			'legacy_sender' => empty( $input['auth_ref'] ),
@@ -512,6 +514,9 @@ class SendEmailQueuedAbility {
 		$agent_id    = absint( $grant['agent_id'] ?? 0 );
 		$token_id    = absint( $grant['token_id'] ?? 0 );
 		$issuer_type = (string) ( $grant['issuer_type'] ?? '' );
+		if ( 'system' === $issuer_type ) {
+			return 0 === $user_id && 0 === $agent_id && 0 === $token_id;
+		}
 		if ( $user_id <= 0 || ! get_user_by( 'id', $user_id ) ) {
 			return false;
 		}

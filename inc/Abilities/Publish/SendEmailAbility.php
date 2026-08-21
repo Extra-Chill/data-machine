@@ -256,7 +256,7 @@ class SendEmailAbility {
 			$config['from_name']  = (string) ( $resolved['credentials']['display_name'] ?? '' );
 		} else {
 			$legacy_sender_allowed = is_array( $queued_context )
-				? ! empty( $queued_context['legacy_sender'] ) && $this->userCanManageLegacySender( absint( $queued_context['user_id'] ?? 0 ) )
+				? ! empty( $queued_context['legacy_sender'] ) && ( 'system' === ( $queued_context['issuer_type'] ?? '' ) || $this->userCanManageLegacySender( absint( $queued_context['user_id'] ?? 0 ) ) )
 				: $this->canUseLegacySender();
 			if ( ! $legacy_sender_allowed ) {
 				return new \WP_Error( 'email_auth_ref_required', 'An authorized mailbox ref is required to send email.', array( 'status' => 403 ) );

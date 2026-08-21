@@ -422,6 +422,23 @@ $queued = wp_get_ability( 'datamachine/send-email-queued' );
 $GLOBALS['ec_scheduled'] = array();
 $res = $queued->execute( array( 'to' => 'user@example.com', 'subject' => 'No issuer', 'body' => 'body' ) );
 ec_assert( 'queued email rejects principal-less ambient execution', is_wp_error( $res ) && 0 === count( $GLOBALS['ec_scheduled'] ) );
+
+$system_input = array( 'to' => 'user@example.com', 'subject' => 'System issuer', 'body' => 'body' );
+$grant_method = new ReflectionMethod( \DataMachine\Abilities\Publish\SendEmailQueuedAbility::class, 'createMailboxGrant' );
+$grant_method->setAccessible( true );
+$system_input['_mailbox_grant'] = $grant_method->invoke(
+	new \DataMachine\Abilities\Publish\SendEmailQueuedAbility(),
+	$system_input,
+	array( 'user_id' => 0, 'agent_id' => 0, 'token_id' => 0, 'system' => true )
+);
+$system_input['_attempt'] = 1;
+ec_assert( 'system grant records no user identity', 'system' === $system_input['_mailbox_grant']['issuer_type'] && 0 === $system_input['_mailbox_grant']['user_id'] );
+$GLOBALS['ec_wp_mail_calls'] = array();
+$system_worker = new \DataMachine\Abilities\Publish\SendEmailQueuedAbility();
+$system_worker->runWorker( $system_input );
+ec_assert( 'worker accepts signed system issuer grant', 1 === count( $GLOBALS['ec_wp_mail_calls'] ) );
+$GLOBALS['ec_scheduled'] = array();
+
 \DataMachine\Abilities\PermissionHelper::$user_id = 1;
 
 $res = $queued->execute( array(
