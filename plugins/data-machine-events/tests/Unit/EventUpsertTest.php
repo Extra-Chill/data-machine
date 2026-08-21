@@ -743,6 +743,72 @@ class EventUpsertTest extends WP_UnitTestCase {
 		$this->assertNotSame( $early['data']['post_id'] ?? 0, $late['data']['post_id'] ?? 0 );
 	}
 
+	public function test_workflow_source_id_replays_update_one_canonical_event(): void {
+		$source_id = 'ticketmaster-' . uniqid();
+		$first     = $this->invoke_upsert(
+			array(
+				'title'           => 'Stable Source Original ' . uniqid(),
+				'venue'           => 'Stable Source Venue ' . uniqid(),
+				'startDate'       => '2026-11-18',
+				'startTime'       => '19:00',
+				'source_type'     => 'ticketmaster',
+				'item_identifier' => $source_id,
+			)
+		);
+		$second    = $this->invoke_upsert(
+			array(
+				'title'           => 'Stable Source Revised ' . uniqid(),
+				'venue'           => 'Stable Source Revised Venue ' . uniqid(),
+				'startDate'       => '2026-11-19',
+				'startTime'       => '20:30',
+				'source_type'     => 'ticketmaster',
+				'item_identifier' => $source_id,
+			)
+		);
+
+		$this->assertTrue( $first['success'] ?? false, wp_json_encode( $first ) );
+		$this->assertTrue( $second['success'] ?? false, wp_json_encode( $second ) );
+		$this->assertSame( $first['data']['post_id'], $second['data']['post_id'] );
+		$this->assertSame( 'updated', $second['data']['action'] );
+		$this->assertSame(
+			hash( 'sha256', 'ticketmaster' . "\0" . $source_id ),
+			get_post_meta( $first['data']['post_id'], EventUpsert::SOURCE_IDENTITY_META_KEY, true )
+		);
+		$this->assertSame( 'ticketmaster', get_post_meta( $first['data']['post_id'], EventUpsert::SOURCE_NAME_META_KEY, true ) );
+		$this->assertSame( $source_id, get_post_meta( $first['data']['post_id'], EventUpsert::SOURCE_ID_META_KEY, true ) );
+	}
+
+	public function test_different_source_ids_preserve_same_title_multiple_showtimes(): void {
+		$title = 'Multiple Showtime ' . uniqid();
+		$venue = 'Multiple Showtime Venue ' . uniqid();
+		$early = $this->invoke_upsert(
+			array(
+				'title'           => $title,
+				'venue'           => $venue,
+				'startDate'       => '2026-11-20',
+				'startTime'       => '19:00',
+				'source_type'     => 'ticketmaster',
+				'item_identifier' => 'early-' . uniqid(),
+			)
+		);
+		$late  = $this->invoke_upsert(
+			array(
+				'title'           => $title,
+				'venue'           => $venue,
+				'startDate'       => '2026-11-20',
+				'startTime'       => '21:30',
+				'source_type'     => 'ticketmaster',
+				'item_identifier' => 'late-' . uniqid(),
+			)
+		);
+
+		$this->assertTrue( $early['success'] ?? false, wp_json_encode( $early ) );
+		$this->assertTrue( $late['success'] ?? false, wp_json_encode( $late ) );
+		$this->assertSame( 'created', $early['data']['action'] );
+		$this->assertSame( 'created', $late['data']['action'] );
+		$this->assertNotSame( $early['data']['post_id'], $late['data']['post_id'] );
+	}
+
 	/**
 	 * Invoke the protected upsert entry point with normal engine context.
 	 *

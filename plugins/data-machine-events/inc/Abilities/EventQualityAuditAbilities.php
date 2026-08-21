@@ -156,7 +156,7 @@ class EventQualityAuditAbilities {
 				$this->incrementFlowCount( $culprit_flow_counts, $flow_id, $info['flow_name'] );
 			}
 
-			$duplicate_key = $this->buildDuplicateClusterKey( $event->post_title, $venue_name, $info['startDate'] );
+			$duplicate_key = $this->buildDuplicateClusterKey( $event->post_title, $venue_name, $info['startDate'], $info['startTime'] );
 			if ( ! empty( $duplicate_key ) ) {
 				$by_duplicate_key[ $duplicate_key ][] = $info;
 			}
@@ -321,7 +321,7 @@ class EventQualityAuditAbilities {
 		return is_string( $name ) ? $name : '';
 	}
 
-	private function buildDuplicateClusterKey( string $title, string $venue, string $start_date ): string {
+	private function buildDuplicateClusterKey( string $title, string $venue, string $start_date, string $start_time ): string {
 		if ( '' === $start_date || '' === $venue ) {
 			return '';
 		}
@@ -330,7 +330,9 @@ class EventQualityAuditAbilities {
 			return '';
 		}
 
-		return md5( strtolower( $start_date ) . '|' . strtolower( $venue ) . '|' . strtolower( trim( wp_strip_all_tags( $title ) ) ) );
+		$start = EventIdentifierGenerator::normalizeStartDateTime( $start_date, $start_time );
+
+		return md5( strtolower( $start ) . '|' . strtolower( $venue ) . '|' . strtolower( trim( wp_strip_all_tags( $title ) ) ) );
 	}
 
 	private function incrementFlowCount( array &$counts, int $flow_id, string $flow_name ): void {

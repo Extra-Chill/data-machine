@@ -114,6 +114,20 @@ class EventUpsert extends UpsertHandler {
 			$engine          = new EngineData( $engine_snapshot, $job_id );
 		}
 
+		// Workflow imports carry source context in engine data, while direct
+		// ability callers provide these canonical fields explicitly. Normalize
+		// both paths before locking and matching so stable upstream IDs own the
+		// event across revisions instead of falling back to fuzzy identity.
+		$source    = trim( (string) ( $parameters['source'] ?? $engine->get( 'source_type' ) ?? '' ) );
+		$source_id = trim( (string) ( $parameters['source_id'] ?? $engine->get( 'item_identifier' ) ?? '' ) );
+		if ( '' !== $source && '' !== $source_id ) {
+			$parameters['source']    = $source;
+			$parameters['source_id'] = $source_id;
+			if ( empty( $parameters['source_identity'] ) ) {
+				$parameters['source_identity'] = hash( 'sha256', $source . "\0" . $source_id );
+			}
+		}
+
 		// Extract event identity fields (AI title takes precedence, engine data fallback for other fields)
 		$title     = sanitize_text_field( $parameters['title'] ?? $engine->get( 'title' ) ?? '' );
 		$venue     = $engine->get( 'venue' ) ?? $parameters['venue'] ?? '';

@@ -29,7 +29,7 @@ class CleanDuplicatesCommand {
 	/**
 	 * Clean duplicate events by trashing the newer copy.
 	 *
-	 * Scans for duplicate events using fuzzy title + venue matching, keeps
+	 * Scans for duplicate events using fuzzy title + exact time + venue matching, keeps
 	 * the older post (more link equity), and trashes the newer one. If the
 	 * trashed post has a ticket URL that the kept post lacks, it is copied over.
 	 *
@@ -52,16 +52,19 @@ class CleanDuplicatesCommand {
 	 * ---
 	 *
 	 * [--dry-run]
-	 * : Show what would be cleaned without actually trashing.
+	 * : Show what would be cleaned without actually trashing. This is the default.
+	 *
+	 * [--apply]
+	 * : Trash the reviewed duplicates. Without this flag no changes are made.
 	 *
 	 * [--yes]
 	 * : Skip confirmation prompt.
 	 *
 	 * ## EXAMPLES
 	 *
-	 *     wp data-machine-events check clean-duplicates --dry-run
-	 *     wp data-machine-events check clean-duplicates --scope=upcoming --yes
-	 *     wp data-machine-events check clean-duplicates --scope=all --yes
+	 *     wp data-machine-events check clean-duplicates
+	 *     wp data-machine-events check clean-duplicates --scope=upcoming --apply --yes
+	 *     wp data-machine-events check clean-duplicates --scope=all --apply --yes
 	 *
 	 * @param array $args       Positional arguments.
 	 * @param array $assoc_args Named arguments.
@@ -69,7 +72,7 @@ class CleanDuplicatesCommand {
 	public function __invoke( array $args, array $assoc_args ): void {
 		$scope        = $assoc_args['scope'] ?? 'all';
 		$days_ahead   = (int) ( $assoc_args['days-ahead'] ?? 90 );
-		$dry_run      = isset( $assoc_args['dry-run'] );
+		$dry_run      = ! isset( $assoc_args['apply'] ) || isset( $assoc_args['dry-run'] );
 		$skip_confirm = isset( $assoc_args['yes'] );
 
 		$events = $this->query_events( $scope, $days_ahead );
@@ -177,7 +180,8 @@ class CleanDuplicatesCommand {
 	 * @return array Duplicate groups.
 	 */
 	private function find_duplicates( array $events ): array {
-		$by_date = array();
+		$by_date     = array();
+		$start_cache = array();
 		foreach ( $events as $event ) {
 			$dates      = \DataMachineEvents\Core\EventDatesTable::get( $event->ID );
 			$start_meta = $dates ? $dates->start_datetime : '';
@@ -187,7 +191,8 @@ class CleanDuplicatesCommand {
 				continue;
 			}
 
-			$by_date[ $date ][] = $event;
+			$by_date[ $date ][]        = $event;
+			$start_cache[ $event->ID ] = EventIdentifierGenerator::normalizeStartDateTime( $start_meta );
 		}
 
 		$duplicate_groups = array();
@@ -214,6 +219,10 @@ class CleanDuplicatesCommand {
 					}
 
 					if ( ! EventIdentifierGenerator::titlesMatch( $event_a->post_title, $event_b->post_title ) ) {
+						continue;
+					}
+
+					if ( ( $start_cache[ $event_a->ID ] ?? '' ) !== ( $start_cache[ $event_b->ID ] ?? '' ) ) {
 						continue;
 					}
 

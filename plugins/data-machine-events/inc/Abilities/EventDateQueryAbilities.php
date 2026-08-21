@@ -549,6 +549,10 @@ class EventDateQueryAbilities {
 				$clauses['join'] .= " INNER JOIN {$table} AS ed ON {$wpdb->posts}.ID = ed.post_id";
 			}
 
+			// Taxonomy and consumer joins may match more than one relationship for
+			// a post. Calendar rows represent canonical events, never join rows.
+			$clauses['distinct'] = 'DISTINCT';
+
 			$now = current_time( 'mysql' );
 
 			// Exact date match takes priority (dedup queries). Use a half-open
