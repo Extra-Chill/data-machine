@@ -2,6 +2,17 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.175.8] - 2026-08-21
+
+### Changed
+- Include registered abilities in bundle capabilities
+
+### Fixed
+- preserve chat storage in totals
+- surface InnoDB table bloat
+- update vulnerable Composer dependencies
+- enforce ESLint across admin sources
+
 ## [0.175.7] - 2026-08-21
 
 ### Changed
