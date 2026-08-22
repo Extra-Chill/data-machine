@@ -224,9 +224,13 @@ class ExecuteStepAbility {
 			$flow_id = $flow_step_config['flow_id'];
 
 			/** @var array $context */
-			$context     = datamachine_get_file_context( $flow_id );
-			$retrieval   = new FileRetrieval();
-			$dataPackets = $retrieval->retrieve_data_by_job_id( $job_id, $context );
+			$context            = datamachine_get_file_context( $flow_id );
+			$retrieval          = new FileRetrieval();
+			$dataPackets        = $retrieval->retrieve_data_by_job_id( $job_id, $context );
+			$step_input_packets = is_array( $engine_snapshot['step_input_packets'][ $flow_step_id ] ?? null ) ? $engine_snapshot['step_input_packets'][ $flow_step_id ] : array();
+			if ( ! empty( $step_input_packets ) ) {
+				$dataPackets = array_merge( $step_input_packets, $dataPackets );
+			}
 			if ( empty( $dataPackets ) && 'direct' === $flow_id ) {
 				$direct_step_data_packets = is_array( $engine_snapshot['direct_step_data_packets'][ $flow_step_id ] ?? null ) ? $engine_snapshot['direct_step_data_packets'][ $flow_step_id ] : array();
 				if ( ! empty( $direct_step_data_packets ) ) {

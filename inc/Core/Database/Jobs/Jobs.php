@@ -2379,6 +2379,158 @@ class Jobs extends BaseRepository {
 	}
 
 	/**
+	 * Claim one exact waiting webhook gate and hand off its next step atomically.
+	 *
+	 * The scheduler callback must insert through this repository's wpdb connection.
+	 * Its write, the durable input packet, and the receipt then share one transaction.
+	 *
+	 * @param array                    $data_packets Durable input for the resumed step.
+	 * @param callable(int,string):int $schedule Scheduler callback returning an action ID.
+	 * @return array{success:bool,owned:bool,already_resumed:bool,reason:string,job_id:int,next_flow_step_id:string,flow_step_id:string,action_id:int}
+	 */
+	public function claim_webhook_gate_resume( int $job_id, string $token, string $received_at, array $data_packets, callable $schedule ): array {
+		$result = array(
+			'success'           => false,
+			'owned'             => false,
+			'already_resumed'   => false,
+			'reason'            => 'invalid_claim',
+			'job_id'            => $job_id,
+			'next_flow_step_id' => '',
+			'flow_step_id'      => '',
+			'action_id'         => 0,
+		);
+		if ( $job_id <= 0 || 1 !== preg_match( '/^[a-f0-9]{64}$/', $token ) || '' === $received_at ) {
+			return $result;
+		}
+
+		$scope = TransactionScope::begin( $this->wpdb );
+		if ( null === $scope ) {
+			$result['reason'] = 'transaction_start_failed';
+			return $result;
+		}
+
+		$job = $this->get_job_for_update( $job_id );
+		if ( ! is_array( $job ) ) {
+			$scope->rollback();
+			$result['reason'] = 'job_not_found';
+			return $result;
+		}
+		if ( ! is_array( $job['engine_data'] ?? null ) ) {
+			$scope->rollback();
+			$result['reason'] = 'malformed_engine_data';
+			return $result;
+		}
+
+		$engine = $job['engine_data'];
+		$gate   = $engine['webhook_gate'] ?? null;
+		if ( ! is_array( $gate ) ) {
+			$scope->rollback();
+			$result['reason'] = 'gate_not_found';
+			return $result;
+		}
+		if ( ! is_string( $gate['token'] ?? null ) || ! hash_equals( $gate['token'], $token ) ) {
+			$scope->rollback();
+			$result['reason'] = 'token_mismatch';
+			return $result;
+		}
+
+		$result['next_flow_step_id'] = is_string( $gate['next_flow_step_id'] ?? null ) ? $gate['next_flow_step_id'] : '';
+		$result['flow_step_id']      = is_string( $gate['flow_step_id'] ?? null ) ? $gate['flow_step_id'] : '';
+		if ( '' === $result['next_flow_step_id'] ) {
+			$scope->rollback();
+			$result['reason'] = 'next_step_missing';
+			return $result;
+		}
+		if ( 'received' === (string) ( $gate['status'] ?? '' ) ) {
+			$scope->rollback();
+			$action_id = (int) ( $gate['action_id'] ?? 0 );
+			$packets   = $engine['step_input_packets'][ $result['next_flow_step_id'] ] ?? null;
+			if ( $action_id <= 0 || ! is_array( $packets ) ) {
+				$result['reason'] = 'malformed_gate_receipt';
+				return $result;
+			}
+			$result['success']         = true;
+			$result['already_resumed'] = true;
+			$result['reason']          = 'already_resumed';
+			$result['action_id']       = $action_id;
+			return $result;
+		}
+		if ( JobStatus::WAITING !== (string) ( $job['status'] ?? '' ) || 'waiting' !== (string) ( $gate['status'] ?? '' ) ) {
+			$scope->rollback();
+			$result['reason'] = 'gate_not_waiting';
+			return $result;
+		}
+		$gate['status']      = 'received';
+		$gate['received_at'] = $received_at;
+		foreach ( $data_packets as &$packet ) {
+			if ( is_array( $packet ) ) {
+				$packet['metadata']                 = is_array( $packet['metadata'] ?? null ) ? $packet['metadata'] : array();
+				$packet['metadata']['flow_step_id'] = $result['flow_step_id'];
+			}
+		}
+		unset( $packet );
+		$engine['step_input_packets'][ $result['next_flow_step_id'] ] = $data_packets;
+		$engine['webhook_gate']                                       = $gate;
+		unset( $engine['job_status'] );
+
+		if ( ! $this->store_engine_data_in_transaction( $job_id, $engine ) ) {
+			$scope->rollback();
+			$result['reason'] = 'payload_persistence_failed';
+			return $result;
+		}
+
+		try {
+			$action_id = (int) $schedule( $job_id, $result['next_flow_step_id'] );
+		} catch ( \Throwable ) {
+			$scope->rollback();
+			$result['reason'] = 'scheduler_exception';
+			return $result;
+		}
+		if ( $action_id <= 0 ) {
+			$scope->rollback();
+			$result['reason'] = 'schedule_failed';
+			return $result;
+		}
+
+		$engine['webhook_gate']['action_id'] = $action_id;
+		if ( ! $this->store_engine_data_in_transaction( $job_id, $engine ) ) {
+			$scope->rollback();
+			$result['reason'] = 'receipt_persistence_failed';
+			return $result;
+		}
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- The locked jobs row is the ownership boundary.
+		$updated = $this->wpdb->update(
+			$this->table_name,
+			array( 'status' => JobStatus::PROCESSING ),
+			array(
+				'job_id' => $job_id,
+				'status' => JobStatus::WAITING,
+			),
+			array( '%s' ),
+			array( '%d', '%s' )
+		);
+		if ( 1 !== (int) $updated ) {
+			$scope->rollback();
+			$result['reason'] = 'status_persistence_failed';
+			return $result;
+		}
+		if ( ! $scope->commit() ) {
+			$scope->rollback();
+			$result['reason'] = 'transaction_commit_failed';
+			return $result;
+		}
+
+		$this->publish_committed_engine_data( $job_id, $engine );
+		( new RunLifecycleStore( $this ) )->mark_job_status( $job_id, JobStatus::PROCESSING );
+		$result['success']   = true;
+		$result['owned']     = true;
+		$result['reason']    = 'claimed';
+		$result['action_id'] = $action_id;
+		return $result;
+	}
+
+	/**
 	 * Commit a pathless-child terminal transition while its recovery lease owns the locked row.
 	 *
 	 * @return array{success:bool,changed:bool,current_status:?string,status:string}

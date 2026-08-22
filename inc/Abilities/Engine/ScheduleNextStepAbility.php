@@ -168,25 +168,9 @@ class ScheduleNextStepAbility {
 			}
 		}
 
-		// Action Scheduler only receives IDs.
-		$action_args = array(
-			'job_id'       => $job_id,
-			'flow_step_id' => $flow_step_id,
-		);
-		$job         = $this->db_jobs->get_job( $job_id );
-		if ( 'direct' === (string) ( $job['flow_id'] ?? '' ) && (int) ( $job['operation_generation'] ?? 0 ) > 0 ) {
-			$action_args['operation_generation']  = (int) $job['operation_generation'];
-			$action_args['operation_claim_token'] = (string) ( $job['operation_claim_token'] ?? '' );
-		}
-
 		$schedule_exception = null;
 		try {
-			$action_id = as_schedule_single_action(
-				time(),
-				'datamachine_execute_step',
-				$action_args,
-				'data-machine'
-			);
+			$action_id = $this->scheduleAction( $job_id, $flow_step_id );
 		} catch ( \Throwable $error ) {
 			$action_id          = 0;
 			$schedule_exception = $error;
@@ -240,6 +224,31 @@ class ScheduleNextStepAbility {
 		return array(
 			'success'   => is_numeric( $action_id ) && (int) $action_id > 0,
 			'action_id' => $action_id,
+		);
+	}
+
+	/**
+	 * Insert one execute-step action and return its durable identifier.
+	 *
+	 * This intentionally performs no packet persistence so callers that own a
+	 * database transaction can include the Action Scheduler row in that boundary.
+	 */
+	public function scheduleAction( int $job_id, string $flow_step_id ): int {
+		$action_args = array(
+			'job_id'       => $job_id,
+			'flow_step_id' => $flow_step_id,
+		);
+		$job         = $this->db_jobs->get_job( $job_id );
+		if ( 'direct' === (string) ( $job['flow_id'] ?? '' ) && (int) ( $job['operation_generation'] ?? 0 ) > 0 ) {
+			$action_args['operation_generation']  = (int) $job['operation_generation'];
+			$action_args['operation_claim_token'] = (string) ( $job['operation_claim_token'] ?? '' );
+		}
+
+		return (int) as_schedule_single_action(
+			time(),
+			'datamachine_execute_step',
+			$action_args,
+			'data-machine'
 		);
 	}
 
