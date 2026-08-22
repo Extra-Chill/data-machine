@@ -132,9 +132,10 @@ class ImportExportStepConfigTest extends WP_UnitTestCase {
 			)
 		);
 
-		$csv  = "pipeline_id,pipeline_name,step_position,step_type,step_config,flow_id,flow_name,settings\n";
-		$csv .= '999,"Flow Row Guard Test",0,fetch,' . $this->csv_field( $step_config_json ) . ',,,' . "\n";
-		$csv .= '999,"Flow Row Guard Test",0,fetch,' . $this->csv_field( $step_config_json ) . ',42,"Default Flow",' . $this->csv_field( $settings_json ) . "\n";
+		$csv  = "format_version,row_type,pipeline_id,pipeline_name,step_position,step_type,step_config,flow_id,flow_name,settings\n";
+		$csv .= '1.0,pipeline_step,999,"Flow Row Guard Test",0,fetch,' . $this->csv_field( $step_config_json ) . ',,,' . "\n";
+		$csv .= '1.0,flow,999,"Flow Row Guard Test",,,,42,"Default Flow",' . $this->csv_field( wp_json_encode( array( 'scheduling_config' => array( 'interval' => 'manual' ), 'portable_slug' => 'default-flow' ) ) ) . "\n";
+		$csv .= '1.0,flow_step,999,"Flow Row Guard Test",0,fetch,' . $this->csv_field( $step_config_json ) . ',42,"Default Flow",' . $this->csv_field( $settings_json ) . "\n";
 
 		$result = $this->import_export->handle_import( 'pipelines', $csv );
 		$this->assertIsArray( $result );
@@ -180,7 +181,9 @@ class ImportExportStepConfigTest extends WP_UnitTestCase {
 				'max_items' => 25,
 			),
 		);
-		$flow_config[ $source_flow_step ]['enabled'] = true;
+		$flow_config[ $source_flow_step ]['completion_assertions'] = array( 'required_tool_names' => array( 'publish_result' ) );
+		$flow_config[ $source_flow_step ]['tool_runtime_rules']    = array( array( 'id' => 'publish-result', 'max_calls' => 1 ) );
+		$flow_config[ $source_flow_step ]['enabled']               = false;
 		$this->db_flows->update_flow( (int) $source_flow_id, array( 'flow_config' => $flow_config ) );
 
 		// Export.
@@ -234,37 +237,154 @@ class ImportExportStepConfigTest extends WP_UnitTestCase {
 			),
 			FlowStepConfig::getPrimaryHandlerConfig( $imported_step )
 		);
-		$this->assertTrue( $imported_step['enabled'] );
+		$this->assertFalse( $imported_step['enabled'] );
+		$this->assertSame( array( 'required_tool_names' => array( 'publish_result' ) ), $imported_step['completion_assertions'] );
+		$this->assertSame( array( array( 'id' => 'publish-result', 'max_calls' => 1 ) ), $imported_step['tool_runtime_rules'] );
 	}
 
-	public function test_import_without_flow_rows_creates_default_flow_fallback(): void {
-		// Pipeline with only an AI step and no handler-bearing flow — export emits no flow
-		// rows, so import should still leave the pipeline with at least one flow.
+	public function test_round_trip_preserves_handler_free_flows_schedules_and_is_idempotent(): void {
 		$created            = $this->create_pipeline_ability->execute(
-			array( 'pipeline_name' => 'Empty Flow Source' )
+			array( 'pipeline_name' => 'Lossless Flow Source' )
 		);
 		$source_pipeline_id = $created['pipeline_id'];
-		$this->step_abilities->executeAddPipelineStep(
+		$add_result         = $this->step_abilities->executeAddPipelineStep(
 			array(
 				'pipeline_id' => $source_pipeline_id,
 				'step_type'   => 'ai',
 			)
 		);
+		$source_step_id = $add_result['pipeline_step_id'];
 
-		// Delete any auto-created flows on the source so the export has no flow rows.
-		foreach ( $this->db_flows->get_flows_for_pipeline( $source_pipeline_id ) as $flow ) {
-			$this->db_flows->delete_flow( (int) $flow['flow_id'] );
-		}
+		$create_flow = wp_get_ability( 'datamachine/create-flow' );
+		$this->assertNotNull( $create_flow );
+
+		$paused_schedule = array(
+			'interval'           => 'manual',
+			'enabled'            => false,
+			'webhook_enabled'    => true,
+			'webhook_auth_mode'  => 'hmac',
+			'webhook_rate_limit' => array( 'requests' => 12, 'window' => 60 ),
+			'run_artifacts'      => array( 'completion_assertions' => array( 'egress' => array( 'artifact' ) ) ),
+		);
+		$recurring_schedule = array(
+			'interval'      => 'qtrdaily',
+			'enabled'       => true,
+			'run_artifacts' => array( 'completion_assertions' => array( 'egress' => array( 'artifact', 'bundle-file' ) ) ),
+		);
+
+		$paused_result = $create_flow->execute(
+			array(
+				'pipeline_id'       => $source_pipeline_id,
+				'flow_name'         => 'Paused Webhook Flow',
+				'scheduling_config' => $paused_schedule,
+			)
+		);
+		$recurring_result = $create_flow->execute(
+			array(
+				'pipeline_id'       => $source_pipeline_id,
+				'flow_name'         => 'Recurring Artifact Flow',
+				'scheduling_config' => $recurring_schedule,
+			)
+		);
+		$this->assertNotWPError( $paused_result );
+		$this->assertNotWPError( $recurring_result );
+
+		$paused_flow_id = (int) $paused_result['flow_id'];
+		$this->db_flows->update_flow( $paused_flow_id, array( 'portable_slug' => 'paused-webhook' ) );
+		$paused_flow         = $this->db_flows->get_flow( $paused_flow_id );
+		$paused_flow_step_id = apply_filters( 'datamachine_generate_flow_step_id', '', $source_step_id, $paused_flow_id );
+		$paused_flow['flow_config'][ $paused_flow_step_id ]['completion_assertions'] = array( 'required_tool_names' => array( 'publish_result' ) );
+		$paused_flow['flow_config'][ $paused_flow_step_id ]['tool_runtime_rules']    = array( array( 'id' => 'publish-result', 'max_calls' => 1 ) );
+		$paused_flow['flow_config'][ $paused_flow_step_id ]['enabled']               = false;
+		$this->db_flows->update_flow( $paused_flow_id, array( 'flow_config' => $paused_flow['flow_config'] ) );
 
 		$csv         = $this->import_export->handle_export( 'pipelines', array( $source_pipeline_id ) );
-		$csv_renamed = str_replace( 'Empty Flow Source', 'Empty Flow Target', $csv );
+		$csv_renamed = str_replace( 'Lossless Flow Source', 'Lossless Flow Target', $csv );
+		$this->assertSame( 2, substr_count( $csv_renamed, ',flow,' ), 'Every flow must have exactly one durable metadata row.' );
 
 		$result = $this->import_export->handle_import( 'pipelines', $csv_renamed );
 		$this->assertCount( 1, $result['imported'] );
+		$imported_pipeline_id = (int) $result['imported'][0];
 
-		$imported_flows = $this->db_flows->get_flows_for_pipeline( (int) $result['imported'][0] );
-		$this->assertCount( 1, $imported_flows, 'Exports with no flow rows should still produce one default flow on import.' );
-		$this->assertSame( 'Default Flow', $imported_flows[0]['flow_name'] );
+		$imported_flows = $this->db_flows->get_flows_for_pipeline( $imported_pipeline_id );
+		$this->assertCount( 2, $imported_flows );
+		$this->assertSame( array( 'Paused Webhook Flow', 'Recurring Artifact Flow' ), array_column( $imported_flows, 'flow_name' ) );
+
+		$imported_paused = $imported_flows[0];
+		$this->assertSame( 'paused-webhook', $imported_paused['portable_slug'] );
+		foreach ( $paused_schedule as $key => $value ) {
+			$this->assertSame( $value, $imported_paused['scheduling_config'][ $key ] ?? null, "Paused schedule field {$key} must round-trip." );
+		}
+		foreach ( $recurring_schedule as $key => $value ) {
+			$this->assertSame( $value, $imported_flows[1]['scheduling_config'][ $key ] ?? null, "Recurring schedule field {$key} must round-trip." );
+		}
+
+		$steps_result     = $this->step_abilities->executeGetPipelineSteps( array( 'pipeline_id' => $imported_pipeline_id ) );
+		$imported_step_id = $steps_result['steps'][0]['pipeline_step_id'];
+		$imported_flow_step_id = apply_filters( 'datamachine_generate_flow_step_id', '', $imported_step_id, (int) $imported_paused['flow_id'] );
+		$imported_step = $imported_paused['flow_config'][ $imported_flow_step_id ];
+		$this->assertFalse( $imported_step['enabled'] );
+		$this->assertSame( array( 'required_tool_names' => array( 'publish_result' ) ), $imported_step['completion_assertions'] );
+		$this->assertSame( array( array( 'id' => 'publish-result', 'max_calls' => 1 ) ), $imported_step['tool_runtime_rules'] );
+
+		$flow_ids_before = array_map( 'intval', array_column( $imported_flows, 'flow_id' ) );
+		$second_result   = $this->import_export->handle_import( 'pipelines', $csv_renamed );
+		$this->assertSame( array( $imported_pipeline_id ), array_values( $second_result['imported'] ) );
+		$flows_after = $this->db_flows->get_flows_for_pipeline( $imported_pipeline_id );
+		$this->assertSame( $flow_ids_before, array_map( 'intval', array_column( $flows_after, 'flow_id' ) ) );
+		$steps_after = $this->step_abilities->executeGetPipelineSteps( array( 'pipeline_id' => $imported_pipeline_id ) );
+		$this->assertCount( 1, $steps_after['steps'], 'Repeated import must not duplicate pipeline steps.' );
+	}
+
+	public function test_round_trip_keeps_distinct_zero_step_flows_with_the_same_name(): void {
+		$created            = $this->create_pipeline_ability->execute( array( 'pipeline_name' => 'Duplicate Flow Source' ) );
+		$source_pipeline_id = (int) $created['pipeline_id'];
+		$create_flow        = wp_get_ability( 'datamachine/create-flow' );
+
+		foreach ( array( false, true ) as $enabled ) {
+			$result = $create_flow->execute(
+				array(
+					'pipeline_id'       => $source_pipeline_id,
+					'flow_name'         => 'Shared Name',
+					'scheduling_config' => array(
+						'interval' => 'manual',
+						'enabled'  => $enabled,
+					),
+				)
+			);
+			$this->assertNotWPError( $result );
+		}
+
+		$csv = $this->import_export->handle_export( 'pipelines', array( $source_pipeline_id ) );
+		$csv = str_replace( 'Duplicate Flow Source', 'Duplicate Flow Target', $csv );
+
+		$first_import = $this->import_export->handle_import( 'pipelines', $csv );
+		$pipeline_id  = (int) $first_import['imported'][0];
+		$flows        = $this->db_flows->get_flows_for_pipeline( $pipeline_id );
+		$this->assertCount( 2, $flows );
+		$this->assertSame( array( 'Shared Name', 'Shared Name' ), array_column( $flows, 'flow_name' ) );
+		$this->assertCount( 2, array_unique( array_column( $flows, 'portable_slug' ) ) );
+		$this->assertSame( array( false, true ), array_column( array_column( $flows, 'scheduling_config' ), 'enabled' ) );
+
+		$this->import_export->handle_import( 'pipelines', $csv );
+		$this->assertCount( 2, $this->db_flows->get_flows_for_pipeline( $pipeline_id ), 'Repeated import must not collapse or duplicate same-name flows.' );
+	}
+
+	public function test_import_rejects_malformed_flow_metadata_before_writes(): void {
+		$csv  = "format_version,row_type,pipeline_id,pipeline_name,step_position,step_type,step_config,flow_id,flow_name,settings\n";
+		$csv .= '1.0,flow,77,"Malformed Metadata",,,,42,"Named Flow",{}' . "\n";
+
+		$this->assertFalse( $this->import_export->handle_import( 'pipelines', $csv ) );
+		$this->assertNull( $this->find_pipeline_id( 'Malformed Metadata' ) );
+	}
+
+	private function find_pipeline_id( string $name ): ?int {
+		foreach ( $this->db_pipelines->get_all_pipelines() as $pipeline ) {
+			if ( $name === $pipeline['pipeline_name'] ) {
+				return (int) $pipeline['pipeline_id'];
+			}
+		}
+		return null;
 	}
 
 	/**
