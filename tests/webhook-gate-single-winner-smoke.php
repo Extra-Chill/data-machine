@@ -6,16 +6,6 @@
  */
 
 namespace DataMachine\Core {
-	class RunLifecycleStore {
-		public function __construct( $jobs ) {
-			unset( $jobs );
-		}
-
-		public function mark_job_status( int $job_id, string $status ): bool {
-			unset( $job_id, $status );
-			return true;
-		}
-	}
 }
 
 namespace DataMachine\Core\Database\RunMetadata {
@@ -36,8 +26,13 @@ namespace {
 	}
 
 	function wp_cache_delete( int $key, string $group ): bool {
-		unset( $key, $group );
+		$GLOBALS['cache_deletes'][] = array( $key, $group );
 		return true;
+	}
+
+	function current_time( string $type, bool $gmt ): string {
+		unset( $type, $gmt );
+		return '2026-08-21 12:00:00';
 	}
 
 	function apply_filters( string $hook, mixed $value, mixed ...$args ): mixed {
@@ -51,6 +46,7 @@ namespace {
 		public array $row;
 		public array $actions = array();
 		public bool $fail_update = false;
+		public bool $fail_lifecycle_update = false;
 		private ?array $snapshot = null;
 		private ?array $action_snapshot = null;
 
@@ -125,6 +121,10 @@ namespace {
 				$this->last_error = 'forced update failure';
 				return false;
 			}
+			if ( $this->fail_lifecycle_update && isset( $data['engine_data'] ) && str_contains( (string) $data['engine_data'], 'run_lifecycle' ) ) {
+				$this->last_error = 'forced lifecycle update failure';
+				return false;
+			}
 			if ( (int) $where['job_id'] !== (int) $this->row['job_id'] || ( isset( $where['status'] ) && (string) $where['status'] !== (string) $this->row['status'] ) ) {
 				return 0;
 			}
@@ -140,6 +140,7 @@ namespace {
 
 	require_once __DIR__ . '/../inc/Core/Database/BaseRepository.php';
 	require_once __DIR__ . '/../inc/Core/Database/TransactionScope.php';
+	require_once __DIR__ . '/../inc/Core/DataPacketStore.php';
 	require_once __DIR__ . '/../inc/Core/JobStatus.php';
 	require_once __DIR__ . '/../inc/Core/Database/Jobs/Jobs.php';
 
@@ -169,6 +170,14 @@ namespace {
 	$assert( 'gate-step' === $engine['step_input_packets']['next-step'][0]['metadata']['flow_step_id'], 'winner binds payload to the gate step' );
 	$assert( array( 1 ) === $GLOBALS['wpdb']->actions, 'exactly one scheduler action commits' );
 	$assert( ! array_key_exists( 'job_status', $engine ), 'winner clears waiting override' );
+	$assert( 'processing' === $engine['run_lifecycle']['status'], 'winner commits the processing lifecycle projection' );
+	$assert(
+		array(
+			array( 42, 'datamachine_engine_data' ),
+			array( 42, 'datamachine_engine_data' ),
+		) === $GLOBALS['cache_deletes'],
+		'winner invalidates engine cache before and after commit'
+	);
 
 	$GLOBALS['wpdb'] = new WebhookGateFakeWpdb( $token );
 	$wrong_token     = ( new \DataMachine\Core\Database\Jobs\Jobs() )->claim_webhook_gate_resume( 42, str_repeat( 'b', 64 ), '2026-08-21T12:00:00Z', $packet, $schedule );
@@ -182,10 +191,18 @@ namespace {
 		return 1;
 	} );
 	$rollback_engine              = json_decode( $GLOBALS['wpdb']->row['engine_data'], true );
-	$assert( ! $rolled_back['success'] && 'receipt_persistence_failed' === $rolled_back['reason'], 'failed receipt write reports persistence failure' );
+	$assert( ! $rolled_back['success'] && 'lifecycle_persistence_failed' === $rolled_back['reason'], 'failed lifecycle write reports persistence failure' );
 	$assert( 'waiting' === $GLOBALS['wpdb']->row['status'], 'failed transaction preserves waiting status' );
 	$assert( 'waiting' === $rollback_engine['webhook_gate']['status'], 'failed transaction preserves waiting gate' );
 	$assert( array() === $GLOBALS['wpdb']->actions, 'failed transaction rolls back scheduler action' );
+
+	$GLOBALS['wpdb']                        = new WebhookGateFakeWpdb( $token );
+	$GLOBALS['wpdb']->fail_lifecycle_update = true;
+	$lifecycle_failure                     = ( new \DataMachine\Core\Database\Jobs\Jobs() )->claim_webhook_gate_resume( 42, $token, '2026-08-21T12:00:00Z', $packet, $schedule );
+	$lifecycle_engine                      = json_decode( $GLOBALS['wpdb']->row['engine_data'], true );
+	$assert( ! $lifecycle_failure['success'] && 'lifecycle_persistence_failed' === $lifecycle_failure['reason'], 'lifecycle projection failure fails the claim' );
+	$assert( 'waiting' === $GLOBALS['wpdb']->row['status'] && 'waiting' === $lifecycle_engine['webhook_gate']['status'], 'lifecycle failure rolls back payload, receipt, and status' );
+	$assert( array() === $GLOBALS['wpdb']->actions, 'lifecycle failure rolls back scheduler action' );
 
 	$GLOBALS['wpdb']                     = new WebhookGateFakeWpdb( $token );
 	$GLOBALS['wpdb']->row['engine_data'] = '{invalid';

@@ -16,6 +16,7 @@ namespace DataMachine\Core\Steps\WebhookGate;
 
 use DataMachine\Abilities\Engine\ScheduleNextStepAbility;
 use DataMachine\Core\DataPacket;
+use DataMachine\Core\DataPacketStore;
 use DataMachine\Core\JobStatus;
 use DataMachine\Core\Steps\Step;
 use DataMachine\Core\Steps\StepTypeRegistrationTrait;
@@ -94,28 +95,14 @@ class WebhookGateStep extends Step {
 			'datamachine_webhook_gate_timeout',
 			function ( $job_id, $token ) {
 				$job_id = (int) $job_id;
-
-				// Only fail the job if it's still waiting.
 				$db_jobs = new \DataMachine\Core\Database\Jobs\Jobs();
-				$job     = $db_jobs->get_job_metadata( $job_id );
+				$result  = $db_jobs->timeout_webhook_gate( $job_id, (string) $token );
 
-				if ( ! $job || 'waiting' !== ( $job['status'] ?? '' ) ) {
-					return; // Job already resumed or failed.
+				if ( empty( $result['success'] ) || empty( $result['changed'] ) ) {
+					return;
 				}
 
-				// Clean up the transient.
 				delete_transient( 'datamachine_webhook_gate_' . $token );
-
-				// Fail the job.
-				do_action(
-					'datamachine_fail_job',
-					$job_id,
-					'webhook_gate_timeout',
-					array(
-						'flow_step_id'  => '',
-						'error_message' => 'Webhook gate timed out waiting for inbound webhook.',
-					)
-				);
 
 				do_action(
 					'datamachine_log',
@@ -297,37 +284,50 @@ class WebhookGateStep extends Step {
 
 		$job_id = (int) $job_id;
 
-		// Build webhook payload before entering the row-lock transaction.
-		$webhook_body = $request->get_json_params();
-		if ( empty( $webhook_body ) ) {
-			$webhook_body = $request->get_body_params();
-		}
-		if ( empty( $webhook_body ) ) {
-			$webhook_body = array();
-		}
+		$engine_snapshot = datamachine_get_engine_data( $job_id );
+		$gate_snapshot   = is_array( $engine_snapshot['webhook_gate'] ?? null ) ? $engine_snapshot['webhook_gate'] : array();
 
-		$received_at    = gmdate( 'Y-m-d\TH:i:s\Z' );
-		$webhook_packet = new DataPacket(
-			array(
-				'title' => 'Webhook Payload',
-				'body'  => $webhook_body,
-			),
-			array(
-				'source_type' => 'webhook_gate_inbound',
-				'received_at' => $received_at,
-				'remote_ip'   => sanitize_text_field( wp_unslash( $request->get_header( 'x-forwarded-for' ) ?? $_SERVER['REMOTE_ADDR'] ?? '' ) ),
-			),
-			'webhook_payload'
-		);
-		$data_packets   = $webhook_packet->addTo( array() );
-		$scheduler      = new ScheduleNextStepAbility( false );
-		$db_jobs        = new \DataMachine\Core\Database\Jobs\Jobs();
-		$claim          = $db_jobs->claim_webhook_gate_resume(
+		$received_at  = gmdate( 'Y-m-d\TH:i:s\Z' );
+		$data_packets = array();
+		if ( 'received' !== (string) ( $gate_snapshot['status'] ?? '' ) ) {
+			$webhook_body = $request->get_json_params();
+			if ( empty( $webhook_body ) ) {
+				$webhook_body = $request->get_body_params();
+			}
+			if ( empty( $webhook_body ) ) {
+				$webhook_body = array();
+			}
+
+			$webhook_packet    = new DataPacket(
+				array(
+					'title' => 'Webhook Payload',
+					'body'  => $webhook_body,
+				),
+				array(
+					'source_type'  => 'webhook_gate_inbound',
+					'flow_step_id' => is_string( $gate_snapshot['flow_step_id'] ?? null ) ? $gate_snapshot['flow_step_id'] : '',
+					'received_at'  => $received_at,
+					'remote_ip'    => sanitize_text_field( wp_unslash( $request->get_header( 'x-forwarded-for' ) ?? $_SERVER['REMOTE_ADDR'] ?? '' ) ),
+				),
+				'webhook_payload'
+			);
+			$data_packets      = $webhook_packet->addTo( array() );
+			if ( ! is_string( wp_json_encode( $data_packets ) ) ) {
+				return new \WP_Error(
+					'webhook_payload_persistence_failed',
+					'Webhook payload could not be persisted.',
+					array( 'status' => 500 )
+				);
+			}
+		}
+		$scheduler = new ScheduleNextStepAbility( false );
+		$db_jobs   = new \DataMachine\Core\Database\Jobs\Jobs();
+		$claim     = $db_jobs->claim_webhook_gate_resume(
 			$job_id,
 			$token,
 			$received_at,
 			$data_packets,
-			static fn( int $scheduled_job_id, string $step_id ): int => $scheduler->scheduleAction( $scheduled_job_id, $step_id )
+			static fn( int $scheduled_job_id, string $step_id ): int => $scheduler->scheduleActionAtomically( $scheduled_job_id, $step_id )
 		);
 		if ( ! empty( $claim['already_resumed'] ) ) {
 			return new \WP_REST_Response(

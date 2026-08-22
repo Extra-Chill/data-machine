@@ -15,14 +15,15 @@
 namespace DataMachine\Abilities\Engine;
 
 use DataMachine\Abilities\StepTypeAbilities;
-use DataMachine\Core\EngineData;
 use DataMachine\Core\ChildJobRecoveryPolicy;
+use DataMachine\Core\DataPacketStore;
+use DataMachine\Core\Database\ProcessedItems\ProcessedItems;
+use DataMachine\Core\EngineData;
 use DataMachine\Core\FilesRepository\FileCleanup;
 use DataMachine\Core\FilesRepository\FileRetrieval;
 use DataMachine\Core\JobStatus;
-use DataMachine\Core\RunMetrics;
 use DataMachine\Core\RecoveryExecutionFence;
-use DataMachine\Core\Database\ProcessedItems\ProcessedItems;
+use DataMachine\Core\RunMetrics;
 use DataMachine\Core\StepExecutionResult;
 use DataMachine\Core\Steps\FlowStepConfig;
 use DataMachine\Core\Steps\Step;
@@ -227,7 +228,7 @@ class ExecuteStepAbility {
 			$context            = datamachine_get_file_context( $flow_id );
 			$retrieval          = new FileRetrieval();
 			$dataPackets        = $retrieval->retrieve_data_by_job_id( $job_id, $context );
-			$step_input_packets = is_array( $engine_snapshot['step_input_packets'][ $flow_step_id ] ?? null ) ? $engine_snapshot['step_input_packets'][ $flow_step_id ] : array();
+			$step_input_packets = is_array( $engine_snapshot['step_input_packets'][ $flow_step_id ] ?? null ) ? DataPacketStore::hydrate_many( $engine_snapshot['step_input_packets'][ $flow_step_id ] ) : array();
 			if ( ! empty( $step_input_packets ) ) {
 				$dataPackets = array_merge( $step_input_packets, $dataPackets );
 			}

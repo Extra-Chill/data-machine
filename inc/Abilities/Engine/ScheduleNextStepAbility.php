@@ -234,6 +234,72 @@ class ScheduleNextStepAbility {
 	 * database transaction can include the Action Scheduler row in that boundary.
 	 */
 	public function scheduleAction( int $job_id, string $flow_step_id ): int {
+		return (int) as_schedule_single_action(
+			time(),
+			'datamachine_execute_step',
+			$this->actionArgs( $job_id, $flow_step_id ),
+			'data-machine'
+		);
+	}
+
+	/**
+	 * Insert and verify an action on the current wpdb transaction.
+	 *
+	 * The public scheduling helpers permit filters to return existing or foreign
+	 * IDs. Saving the exact action through the canonical DB store gives this
+	 * caller provenance over the newly inserted row and keeps it in the wpdb
+	 * transaction that owns the webhook handoff.
+	 */
+	public function scheduleActionAtomically( int $job_id, string $flow_step_id ): int {
+		global $wpdb;
+
+		$store = \ActionScheduler::store();
+		if ( \ActionScheduler_DBStore::class !== get_class( $store ) ) {
+			throw new \RuntimeException( 'Action Scheduler DB store is required for an atomic handoff.' );
+		}
+
+		$actions_table = ! empty( $wpdb->actionscheduler_actions ) ? $wpdb->actionscheduler_actions : $wpdb->prefix . 'actionscheduler_actions';
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- The high-water mark proves the returned auto-increment ID did not predate this insertion attempt.
+		$previous_max_id = $wpdb->get_var(
+			$wpdb->prepare( 'SELECT COALESCE(MAX(action_id), 0) FROM %i', $actions_table )
+		);
+		if ( null === $previous_max_id ) {
+			throw new \RuntimeException( 'Unable to establish Action Scheduler insertion provenance.' );
+		}
+
+		$action_args = $this->actionArgs( $job_id, $flow_step_id );
+		$action = new \ActionScheduler_Action(
+			'datamachine_execute_step',
+			$action_args,
+			new \ActionScheduler_SimpleSchedule( as_get_datetime_object( time() ) ),
+			'data-machine'
+		);
+		$action_id = $this->saveAtomicAction( $store, $action );
+		if ( $action_id <= 0
+			|| $action_id <= (int) $previous_max_id
+			|| \ActionScheduler_Store::STATUS_PENDING !== $store->get_status( $action_id )
+		) {
+			throw new \RuntimeException( 'Action Scheduler did not durably insert the next-step action.' );
+		}
+
+		$stored_action = $store->fetch_action( $action_id );
+		if ( 'datamachine_execute_step' !== $stored_action->get_hook()
+			|| 'data-machine' !== $stored_action->get_group()
+			|| $action->get_args() !== $stored_action->get_args()
+		) {
+			throw new \RuntimeException( 'Action Scheduler inserted an unverifiable next-step action.' );
+		}
+
+		return $action_id;
+	}
+
+	/** Save through the verified DB store. Kept separate so returned-ID rejection can be tested. */
+	protected function saveAtomicAction( \ActionScheduler_DBStore $store, \ActionScheduler_Action $action ): int {
+		return (int) $store->save_action( $action );
+	}
+
+	/** Build the canonical execute-step arguments for both scheduling paths. */
+	private function actionArgs( int $job_id, string $flow_step_id ): array {
 		$action_args = array(
 			'job_id'       => $job_id,
 			'flow_step_id' => $flow_step_id,
@@ -244,12 +310,7 @@ class ScheduleNextStepAbility {
 			$action_args['operation_claim_token'] = (string) ( $job['operation_claim_token'] ?? '' );
 		}
 
-		return (int) as_schedule_single_action(
-			time(),
-			'datamachine_execute_step',
-			$action_args,
-			'data-machine'
-		);
+		return $action_args;
 	}
 
 	/**
