@@ -240,9 +240,9 @@ final class AuthRefHandlerConfig {
 
 	/** Whether a configuration key names credential material. */
 	private static function is_secret_key( string $key ): bool {
-		$key = str_replace( array( '-', ' ' ), '_', $key );
-		$key = (string) preg_replace( '/(?<=[a-z0-9])([A-Z])/', '_$1', $key );
-		$key = strtolower( $key );
+		$key       = str_replace( array( '-', ' ' ), '_', $key );
+		$key       = (string) preg_replace( '/(?<=[a-z0-9])([A-Z])/', '_$1', $key );
+		$key       = strtolower( $key );
 		$safe_keys = array( 'auth_ref', 'public_key', 'max_tokens', 'token_budget', 'token_type', 'token_count', 'token_limit' );
 		if ( in_array( $key, $safe_keys, true ) ) {
 			return false;

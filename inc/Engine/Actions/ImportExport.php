@@ -69,7 +69,7 @@ class ImportExport {
 		// [pipeline_name][(int) step_position] => imported pipeline_step_id.
 		$step_id_map = array();
 		// [pipeline_name][source_flow_id] => imported flow_id.
-		$flow_id_map = array();
+		$flow_id_map          = array();
 		$expected_step_counts = array();
 		foreach ( $parsed_rows as $row ) {
 			if ( 'pipeline_step' === $row['row_type'] ) {
@@ -302,7 +302,7 @@ class ImportExport {
 
 			$parsed[] = array(
 				'row_type'      => $row_type,
-				'pipeline_id'    => $source_pipeline_id,
+				'pipeline_id'   => $source_pipeline_id,
 				'pipeline_name' => $pipeline_name,
 				'step_position' => '' === $cols[4] ? -1 : (int) $cols[4],
 				'step_type'     => (string) $cols[5],
@@ -327,11 +327,12 @@ class ImportExport {
 		return new \InvalidArgumentException( $message );
 	}
 
+	// phpcs:disable WordPress.Security.EscapeOutput.ExceptionNotEscaped -- Validation exceptions are logged, never rendered.
 	/** Validate all row relationships before import performs its first write. */
 	private function validate_csv_relationships( array $rows ): void {
-		$steps           = array();
-		$flows           = array();
-		$flow_slugs      = array();
+		$steps            = array();
+		$flows            = array();
+		$flow_slugs       = array();
 		$pipeline_sources = array();
 		$source_names     = array();
 		$flow_steps       = array();
@@ -361,7 +362,7 @@ class ImportExport {
 				if ( isset( $flow_slugs[ $pipeline ][ $slug ] ) ) {
 					throw $this->csv_error( sprintf( 'CSV contains duplicate portable_slug %s for %s.', $slug, $pipeline ) );
 				}
-				$flows[ $pipeline ][ $flow_id ] = $row['flow_name'];
+				$flows[ $pipeline ][ $flow_id ]   = $row['flow_name'];
 				$flow_slugs[ $pipeline ][ $slug ] = true;
 			}
 			if ( 'flow_step' === $row['row_type'] ) {
@@ -420,13 +421,17 @@ class ImportExport {
 			$steps = array_values( $steps );
 			foreach ( $step_types as $position => $step_type ) {
 				if ( isset( $steps[ $position ] ) && (string) ( $steps[ $position ]['step_type'] ?? '' ) !== (string) $step_type ) {
-					do_action( 'datamachine_log', 'error', 'Import: existing pipeline step type does not match CSV', array( 'pipeline_id' => $pipeline_id, 'step_position' => $position ) );
+						do_action( 'datamachine_log', 'error', 'Import: existing pipeline step type does not match CSV', array(
+							'pipeline_id'   => $pipeline_id,
+							'step_position' => $position,
+						) );
 					return false;
 				}
 			}
 		}
 		return true;
 	}
+	// phpcs:enable WordPress.Security.EscapeOutput.ExceptionNotEscaped
 
 	/**
 	 * Ensure a pipeline with the given name exists; return its id.
@@ -684,7 +689,7 @@ class ImportExport {
 			$local_configs = FlowStepConfig::getHandlerConfigs( $existing_step );
 			foreach ( $settings['handler_configs'] as $handler_slug => $portable_config ) {
 				if ( is_array( $portable_config ) ) {
-					$local_config = is_array( $local_configs[ $handler_slug ] ?? null ) ? $local_configs[ $handler_slug ] : array();
+					$local_config                                 = is_array( $local_configs[ $handler_slug ] ?? null ) ? $local_configs[ $handler_slug ] : array();
 					$settings['handler_configs'][ $handler_slug ] = AuthRefHandlerConfig::preserve_local_secrets( $portable_config, $local_config );
 				}
 			}
@@ -738,12 +743,12 @@ class ImportExport {
 			$csv_rows[]      = array_merge(
 				$this->csv_row_prefix( 'pipeline', (string) $pipeline_id, (string) $pipeline['pipeline_name'] ),
 				array(
-				'',
-				'',
-				'',
-				'',
-				'',
-				'',
+					'',
+					'',
+					'',
+					'',
+					'',
+					'',
 				)
 			);
 
@@ -766,12 +771,12 @@ class ImportExport {
 				$csv_rows[]        = array_merge(
 					$this->csv_row_prefix( 'flow', (string) $pipeline_id, (string) $pipeline['pipeline_name'] ),
 					array(
-					'',
-					'',
-					'',
-					$flow['flow_id'],
-					$flow['flow_name'],
-					wp_json_encode( $metadata ),
+						'',
+						'',
+						'',
+						$flow['flow_id'],
+						$flow['flow_name'],
+						wp_json_encode( $metadata ),
 					)
 				);
 			}
