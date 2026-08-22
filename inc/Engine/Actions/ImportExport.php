@@ -735,17 +735,16 @@ class ImportExport {
 			: ( $pipeline['pipeline_config'] ?? array() );
 			$flows           = $db_flows->get_flows_for_pipeline( $pipeline_id );
 			$used_flow_slugs = array();
-			$csv_rows[]      = array(
-				self::CSV_FORMAT_VERSION,
-				'pipeline',
-				$pipeline_id,
-				$pipeline['pipeline_name'],
+			$csv_rows[]      = array_merge(
+				$this->csv_row_prefix( 'pipeline', (string) $pipeline_id, (string) $pipeline['pipeline_name'] ),
+				array(
 				'',
 				'',
 				'',
 				'',
 				'',
 				'',
+				)
 			);
 
 			foreach ( $flows as $flow ) {
@@ -764,17 +763,16 @@ class ImportExport {
 					'scheduling_config' => $this->export_scheduling_config( is_array( $flow['scheduling_config'] ?? null ) ? $flow['scheduling_config'] : array() ),
 					'portable_slug'     => $portable_slug,
 				);
-				$csv_rows[]        = array(
-					self::CSV_FORMAT_VERSION,
-					'flow',
-					$pipeline_id,
-					$pipeline['pipeline_name'],
+				$csv_rows[]        = array_merge(
+					$this->csv_row_prefix( 'flow', (string) $pipeline_id, (string) $pipeline['pipeline_name'] ),
+					array(
 					'',
 					'',
 					'',
 					$flow['flow_id'],
 					$flow['flow_name'],
 					wp_json_encode( $metadata ),
+					)
 				);
 			}
 
@@ -884,6 +882,11 @@ class ImportExport {
 	 */
 	private function export_scheduling_config( array $scheduling_config ): array {
 		return AuthRefHandlerConfig::strip_secrets_for_export( FlowScheduling::portable_desired_config( $scheduling_config ) );
+	}
+
+	/** Build the shared identity prefix for typed CSV rows. */
+	private function csv_row_prefix( string $row_type, string $pipeline_id, string $pipeline_name ): array {
+		return array( self::CSV_FORMAT_VERSION, $row_type, $pipeline_id, $pipeline_name );
 	}
 
 	/**
