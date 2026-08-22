@@ -34,8 +34,8 @@ class SourceDerivedBlockAttributeRepair {
 
 		$repairable = count( array_filter( $findings, static fn ( array $finding ): bool => 'repairable' === $finding['status'] ) );
 		$result     = array(
-			'content'         => $content,
-			'findings'        => $findings,
+			'content'          => $content,
+			'findings'         => $findings,
 			'repairable_count' => $repairable,
 			'skipped_count'    => count( $findings ) - $repairable,
 			'integrity_valid'  => true,
@@ -90,7 +90,7 @@ class SourceDerivedBlockAttributeRepair {
 		}
 
 		$updater ??= array( $this, 'updatePostAtomically' );
-		$updated    = $updater( $post_id, $result['content'], $content );
+		$updated   = $updater( $post_id, $result['content'], $content );
 		if ( is_wp_error( $updated ) ) {
 			$result['error_code'] = $updated->get_error_code();
 			$result['error']      = $updated->get_error_message();
@@ -288,13 +288,13 @@ class SourceDerivedBlockAttributeRepair {
 		$string     = is_string( $string ) ? $string : '';
 
 		return array(
-			'block_path'  => $path,
-			'block_name'  => $block_name,
-			'attribute'   => 'content',
-			'status'      => '' === $reason ? 'repairable' : 'skipped',
-			'reason'      => $reason,
-			'value_type'  => $value_type,
-			'value_bytes' => strlen( $string ),
+			'block_path'   => $path,
+			'block_name'   => $block_name,
+			'attribute'    => 'content',
+			'status'       => '' === $reason ? 'repairable' : 'skipped',
+			'reason'       => $reason,
+			'value_type'   => $value_type,
+			'value_bytes'  => strlen( $string ),
 			'value_sha256' => hash( 'sha256', $string ),
 		);
 	}
@@ -311,13 +311,13 @@ class SourceDerivedBlockAttributeRepair {
 	private function canonicalRootRichText( string $block_name, string $inner_html ): ?string {
 		$attributes = '(?:\s+[^\s"\'=<>`]+(?:\s*=\s*(?:"[^"]*"|\'[^\']*\'|[^\s"\'=<>`]+))?)*\s*';
 		if ( 'core/heading' === $block_name ) {
-			$pattern = '~\A<h([1-6])' . $attributes . '>(.*)</h\1>\z~s';
+			$pattern       = '~\A<h([1-6])' . $attributes . '>(.*)</h\1>\z~s';
 			$content_group = 2;
 		} elseif ( 'core/paragraph' === $block_name ) {
-			$pattern = '~\A<p' . $attributes . '>(.*)</p>\z~s';
+			$pattern       = '~\A<p' . $attributes . '>(.*)</p>\z~s';
 			$content_group = 1;
 		} elseif ( 'core/list-item' === $block_name ) {
-			$pattern = '~\A<li' . $attributes . '>(.*)</li>\z~s';
+			$pattern       = '~\A<li' . $attributes . '>(.*)</li>\z~s';
 			$content_group = 1;
 		} else {
 			return null;

@@ -330,7 +330,7 @@ class BlocksCommand extends BaseCommand {
 			if ( ! get_post( $post_id ) ) {
 				WP_CLI::error( sprintf( 'Post #%d does not exist on the selected site.', $post_id ) );
 			}
-			$post_ids = array( $post_id );
+			$post_ids   = array( $post_id );
 			$post_types = array( get_post_type( $post_id ) );
 		} else {
 			try {
@@ -350,11 +350,11 @@ class BlocksCommand extends BaseCommand {
 				WP_CLI::error( 'Bulk --apply requires an explicit --post_type that is not "any".' );
 			}
 
-			$query = new \WP_Query( self::bulkQueryArgs( $post_types, $assoc_args['post_status'] ?? 'any', $limit, $paged ) );
+			$query    = new \WP_Query( self::bulkQueryArgs( $post_types, $assoc_args['post_status'] ?? 'any', $limit, $paged ) );
 			$post_ids = array_map( 'intval', $query->posts );
 		}
 
-		$repair = new SourceDerivedBlockAttributeRepair();
+		$repair   = new SourceDerivedBlockAttributeRepair();
 		$findings = array();
 		foreach ( $post_ids as $candidate_id ) {
 			$post = get_post( $candidate_id );
@@ -387,22 +387,25 @@ class BlocksCommand extends BaseCommand {
 		}
 
 		$summary = array(
-			'mode'            => $apply ? 'apply' : 'dry-run',
-			'site_url'        => home_url( '/' ),
-			'post_types'      => array_values( array_filter( $post_types ) ),
-			'limit'           => $limit,
-			'paged'           => $paged,
-			'posts_inspected' => count( $post_ids ),
+			'mode'                => $apply ? 'apply' : 'dry-run',
+			'site_url'            => home_url( '/' ),
+			'post_types'          => array_values( array_filter( $post_types ) ),
+			'limit'               => $limit,
+			'paged'               => $paged,
+			'posts_inspected'     => count( $post_ids ),
 			'posts_with_findings' => count( array_unique( array_column( $findings, 'post_id' ) ) ),
-			'findings'        => count( $findings ),
-			'repairable'      => count( array_filter( $findings, static fn ( array $finding ): bool => in_array( $finding['status'], array( 'would_remove', 'removed' ), true ) ) ),
-			'skipped'         => count( array_filter( $findings, static fn ( array $finding ): bool => 'skipped' === $finding['status'] ) ),
-			'errors'          => count( array_filter( $findings, static fn ( array $finding ): bool => 'error' === $finding['status'] ) ),
+			'findings'            => count( $findings ),
+			'repairable'          => count( array_filter( $findings, static fn ( array $finding ): bool => in_array( $finding['status'], array( 'would_remove', 'removed' ), true ) ) ),
+			'skipped'             => count( array_filter( $findings, static fn ( array $finding ): bool => 'skipped' === $finding['status'] ) ),
+			'errors'              => count( array_filter( $findings, static fn ( array $finding ): bool => 'error' === $finding['status'] ) ),
 		);
 		$fields  = array( 'post_id', 'block_path', 'block_name', 'attribute', 'status', 'reason', 'value_type', 'value_bytes', 'value_sha256' );
 
 		if ( 'json' === $format ) {
-			WP_CLI::line( (string) wp_json_encode( array( 'findings' => $findings, 'summary' => $summary ), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+			WP_CLI::line( (string) wp_json_encode( array(
+				'findings' => $findings,
+				'summary'  => $summary,
+			), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
 		} else {
 			WP_CLI\Utils\format_items( $format, $findings, $fields );
 			if ( 'table' === $format ) {
@@ -438,6 +441,7 @@ class BlocksCommand extends BaseCommand {
 	private static function parsePositiveInteger( $value, string $option, int $maximum = PHP_INT_MAX ): int {
 		$raw = is_string( $value ) || is_int( $value ) ? (string) $value : '';
 		if ( ! preg_match( '/^[1-9][0-9]*$/', $raw ) || (string) (int) $raw !== $raw || (int) $raw > $maximum ) {
+			// phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- CLI-only validation uses trusted option labels and integers.
 			throw new \InvalidArgumentException( sprintf( '%s must be a positive canonical integer%s.', $option, PHP_INT_MAX === $maximum ? '' : sprintf( ' no greater than %d', $maximum ) ) );
 		}
 
@@ -469,9 +473,11 @@ class BlocksCommand extends BaseCommand {
 	 * @return array
 	 */
 	private static function bulkQueryArgs( array $post_types, $post_status, int $limit, int $paged ): array {
+		$normalized_post_status = sanitize_key( (string) $post_status );
+
 		return array(
 			'post_type'              => 1 === count( $post_types ) ? $post_types[0] : $post_types,
-			'post_status'            => sanitize_key( (string) $post_status ) ?: 'any',
+			'post_status'            => $normalized_post_status ? $normalized_post_status : 'any',
 			'fields'                 => 'ids',
 			'posts_per_page'         => $limit,
 			'paged'                  => $paged,

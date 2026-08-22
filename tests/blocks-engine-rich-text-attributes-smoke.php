@@ -23,9 +23,9 @@ if ( ! defined( 'ABSPATH' ) || ! function_exists( 'parse_blocks' ) ) {
 		'uses integrity round-trip guard'     => false !== strpos( $repair_source, 'datamachine_blocks_repair_integrity_failed' ),
 		'bulk query is bounded'               => false !== strpos( $command_source, "'posts_per_page'" ) && false !== strpos( $command_source, "'no_found_rows'" ),
 		'bulk query disables cache priming'   => false !== strpos( $command_source, "'cache_results'" ) && false !== strpos( $command_source, "'update_post_meta_cache'" ) && false !== strpos( $command_source, "'update_post_term_cache'" ),
-		'JSON emits one findings envelope'    => false !== strpos( $command_source, "array( 'findings' => \$findings, 'summary' => \$summary )" ),
+		'JSON emits one findings envelope'    => 1 === substr_count( $command_source, "'findings' => \$findings" ) && 1 === substr_count( $command_source, "'summary'  => \$summary" ),
 		'structured findings expose no preview' => false === strpos( $command_source, "'preview'" ) && false === strpos( $repair_source, "'preview'" ),
-		'apply errors halt after output'       => strpos( $command_source, 'WP_CLI::halt( 1 )' ) > strpos( $command_source, "array( 'findings' => \$findings, 'summary' => \$summary )" ),
+		'apply errors halt after output'       => strpos( $command_source, 'WP_CLI::halt( 1 )' ) > strpos( $command_source, 'WP_CLI::line' ),
 	);
 
 	foreach ( $checks as $name => $passed ) {
