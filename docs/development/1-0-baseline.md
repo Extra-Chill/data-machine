@@ -14,7 +14,7 @@ Data Machine 1.0 supports one current schema and one current runtime contract. F
 
 - Ability failures are `WP_Error`; successful callbacks return their documented payload.
 - REST, WP-CLI, and AI tools may shape native results at their presentation boundary, but internal code does not accept legacy failure arrays.
-- Pipeline CSV uses `pipeline_id,pipeline_name,step_position,step_type,step_config,flow_id,flow_name,settings`. `settings` contains canonical portable flow-step fields; the redundant scalar handler column is not accepted.
+- Pipeline CSV uses `format_version,row_type,pipeline_id,pipeline_name,step_position,step_type,step_config,flow_id,flow_name,settings`. Every row declares format version `1.0` and one of `pipeline_step`, `flow`, or `flow_step`. A durable `flow` metadata row carries canonical schedule desired state independently of step settings; `flow_step.settings` carries canonical portable flow-step fields. The lossy unversioned pre-1.0 header and redundant scalar handler column are not accepted.
 - Pending actions use the canonical `agents/resolve-pending-action` ability. The deprecated `datamachine/resolve-pending-action` alias remains a bounded active edge only because installed Intelligence releases consume it; it maps directly to the canonical ability.
 
 Compatibility is retained only for a named current external or persisted contract. New compatibility paths require that consumer or data requirement to be documented alongside the code.

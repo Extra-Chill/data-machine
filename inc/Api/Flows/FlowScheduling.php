@@ -35,45 +35,24 @@ class FlowScheduling {
 	 *
 	 * @param array       $current         Current scheduling_config from DB.
 	 * @param string|null $interval        Incoming interval key.
-	 * @param string|null $cron_expression Incoming cron expression.
 	 * @param array       $incoming        Full incoming scheduling_config.
 	 * @param int         $flow_id         Flow ID for AS action verification.
 	 * @return bool True if scheduling hasn't changed and can be skipped.
 	 */
-	private static function scheduling_unchanged( array $current, ?string $interval, ?string $cron_expression, array $incoming, int $flow_id = 0 ): bool {
-		$current_interval = $current['interval'] ?? null;
+	private static function scheduling_unchanged( array $current, ?string $interval, array $incoming, int $flow_id = 0 ): bool {
+		$current_desired  = self::portable_desired_config( $current );
+		$incoming_desired = self::portable_desired_config( $incoming );
 
-		// If current is empty/unset and incoming is non-manual, it's a change.
-		if ( empty( $current_interval ) && null !== $interval && 'manual' !== $interval ) {
+		$current_desired['interval']  = $current_desired['interval'] ?? 'manual';
+		$incoming_desired['interval'] = $interval ?? 'manual';
+
+		if ( $current_desired !== $incoming_desired ) {
 			return false;
 		}
 
-		// Both manual — only unchanged when no stale schedule still owns coverage.
-		if ( ( 'manual' === $current_interval || null === $current_interval )
-			&& ( 'manual' === $interval || null === $interval ) ) {
+		// Manual desired state is converged only when no stale action remains.
+		if ( 'manual' === $incoming_desired['interval'] || false === ( $incoming_desired['enabled'] ?? true ) ) {
 			return $flow_id <= 0 || ! RecurringScheduler::hasLogicalCoverage( self::FLOW_HOOK, array( $flow_id ) );
-		}
-
-		// Config matches — but verify the AS action actually exists.
-		$config_matches = false;
-
-		if ( $current_interval === $interval && 'cron' !== $interval && 'one_time' !== $interval ) {
-			$config_matches = true;
-		}
-
-		if ( 'cron' === $current_interval && 'cron' === $interval ) {
-			$current_cron   = $current['cron_expression'] ?? '';
-			$config_matches = ( $current_cron === $cron_expression );
-		}
-
-		if ( 'one_time' === $current_interval && 'one_time' === $interval ) {
-			$current_ts     = $current['timestamp'] ?? null;
-			$incoming_ts    = $incoming['timestamp'] ?? null;
-			$config_matches = ( $current_ts === $incoming_ts );
-		}
-
-		if ( ! $config_matches ) {
-			return false;
 		}
 
 		// Verify AS action is actually pending.
@@ -82,6 +61,17 @@ class FlowScheduling {
 		}
 
 		return true;
+	}
+
+	/**
+	 * Compare portable desired state without scheduler-owned observations.
+	 */
+	public static function portable_desired_config( array $config ): array {
+		foreach ( array( 'interval_seconds', 'first_run', 'scheduled_time', 'action_id', self::RECONCILIATION_KEY, 'datamachine_last_suppressed_run' ) as $runtime_key ) {
+			unset( $config[ $runtime_key ] );
+		}
+
+		return $config;
 	}
 
 	/**
@@ -121,7 +111,7 @@ class FlowScheduling {
 
 		// Skip re-scheduling if unchanged (prevents timer resets on flow updates).
 		if ( ! $force ) {
-			if ( self::scheduling_unchanged( $current_scheduling, $interval, $cron_expression, $scheduling_config, (int) $flow_id ) ) {
+			if ( self::scheduling_unchanged( $current_scheduling, $interval, $scheduling_config, (int) $flow_id ) ) {
 				return true;
 			}
 		}
