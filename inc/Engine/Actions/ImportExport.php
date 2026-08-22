@@ -59,6 +59,9 @@ class ImportExport {
 			do_action( 'datamachine_log', 'error', 'Import: ' . $e->getMessage() );
 			return false;
 		}
+		if ( ! $this->validate_destination_compatibility( $parsed_rows ) ) {
+			return false;
+		}
 
 		$imported_pipelines = array();
 		// pipeline_name => imported pipeline_id.
@@ -67,6 +70,12 @@ class ImportExport {
 		$step_id_map = array();
 		// [pipeline_name][source_flow_id] => imported flow_id.
 		$flow_id_map = array();
+		$expected_step_counts = array();
+		foreach ( $parsed_rows as $row ) {
+			if ( 'pipeline_step' === $row['row_type'] ) {
+				$expected_step_counts[ $row['pipeline_name'] ] = ( $expected_step_counts[ $row['pipeline_name'] ] ?? 0 ) + 1;
+			}
+		}
 
 		// Pass 1: pipelines + steps.
 		foreach ( $parsed_rows as $row ) {
@@ -79,6 +88,9 @@ class ImportExport {
 				}
 				$pipeline_ids_by_name[ $pipeline_name ] = $pipeline_id;
 				$imported_pipelines[]                   = $pipeline_id;
+				if ( ! $this->trim_pipeline_steps( $pipeline_id, (int) ( $expected_step_counts[ $pipeline_name ] ?? 0 ) ) ) {
+					return false;
+				}
 			}
 
 			if ( 'pipeline_step' !== $row['row_type'] ) {
@@ -197,7 +209,7 @@ class ImportExport {
 			}
 
 			$row_type = (string) $cols[1];
-			if ( ! in_array( $row_type, array( 'pipeline_step', 'flow', 'flow_step' ), true ) ) {
+			if ( ! in_array( $row_type, array( 'pipeline', 'pipeline_step', 'flow', 'flow_step' ), true ) ) {
 				throw $this->csv_error( sprintf( 'CSV row %d has invalid row_type.', $index + 1 ) );
 			}
 
@@ -205,11 +217,18 @@ class ImportExport {
 			if ( '' === trim( $pipeline_name ) ) {
 				throw $this->csv_error( sprintf( 'CSV row %d is missing pipeline_name.', $index + 1 ) );
 			}
+			$source_pipeline_id = (string) $cols[2];
+			if ( '' === $source_pipeline_id ) {
+				throw $this->csv_error( sprintf( 'CSV row %d is missing pipeline_id.', $index + 1 ) );
+			}
 
 			$step_config = array();
 			if ( 'pipeline_step' === $row_type ) {
+				if ( 1 !== preg_match( '/^(0|[1-9][0-9]*)$/', (string) $cols[4] ) ) {
+					throw $this->csv_error( sprintf( 'CSV pipeline_step row %d has invalid step_position.', $index + 1 ) );
+				}
 				$step_config = json_decode( $cols[6], true );
-				if ( ! is_array( $step_config ) ) {
+				if ( ! is_array( $step_config ) || ( ! empty( $step_config ) && array_is_list( $step_config ) ) ) {
 					throw $this->csv_error( sprintf( 'CSV pipeline_step row %d has malformed step_config.', $index + 1 ) );
 				}
 				if ( '' === (string) $cols[5] ) {
@@ -220,7 +239,7 @@ class ImportExport {
 			$settings = array();
 			if ( in_array( $row_type, array( 'flow', 'flow_step' ), true ) ) {
 				$settings = json_decode( $cols[9], true );
-				if ( ! is_array( $settings ) ) {
+				if ( ! is_array( $settings ) || ( ! empty( $settings ) && array_is_list( $settings ) ) ) {
 					throw $this->csv_error( sprintf( 'CSV %s row %d has malformed settings.', $row_type, $index + 1 ) );
 				}
 				if ( '' === (string) $cols[7] ) {
@@ -229,6 +248,24 @@ class ImportExport {
 				if ( 'flow_step' === $row_type && empty( $settings ) ) {
 					throw $this->csv_error( sprintf( 'CSV flow_step row %d must contain portable settings.', $index + 1 ) );
 				}
+				if ( 'flow_step' === $row_type ) {
+					if ( 1 !== preg_match( '/^(0|[1-9][0-9]*)$/', (string) $cols[4] ) ) {
+						throw $this->csv_error( sprintf( 'CSV flow_step row %d has invalid step_position.', $index + 1 ) );
+					}
+					foreach ( array( 'handler_configs', 'flow_step_settings' ) as $object_field ) {
+						if ( array_key_exists( $object_field, $settings ) && ( ! is_array( $settings[ $object_field ] ) || ( ! empty( $settings[ $object_field ] ) && array_is_list( $settings[ $object_field ] ) ) ) ) {
+							throw $this->csv_error( sprintf( 'CSV flow_step row %d field %s must be an object.', $index + 1, $object_field ) );
+						}
+					}
+					if ( isset( $settings['handler_configs'] ) ) {
+						foreach ( $settings['handler_configs'] as $handler_slug => $handler_config ) {
+							if ( ! is_string( $handler_slug ) || ! is_array( $handler_config ) || ( ! empty( $handler_config ) && array_is_list( $handler_config ) ) ) {
+								throw $this->csv_error( sprintf( 'CSV flow_step row %d handler_configs entries must be objects keyed by handler slug.', $index + 1 ) );
+							}
+						}
+					}
+					$this->normalize_portable_flow_step_settings( $settings );
+				}
 			}
 
 			$metadata = array();
@@ -236,21 +273,36 @@ class ImportExport {
 				if ( '' === trim( (string) $cols[8] ) ) {
 					throw $this->csv_error( sprintf( 'CSV flow row %d is missing flow_name.', $index + 1 ) );
 				}
-				if ( ! array_key_exists( 'scheduling_config', $settings ) || ! is_array( $settings['scheduling_config'] ) ) {
+				if ( ! array_key_exists( 'scheduling_config', $settings ) || ! is_array( $settings['scheduling_config'] ) || ( ! empty( $settings['scheduling_config'] ) && array_is_list( $settings['scheduling_config'] ) ) ) {
 					throw $this->csv_error( sprintf( 'CSV flow row %d must contain an object scheduling_config.', $index + 1 ) );
 				}
 				if ( empty( $settings['portable_slug'] ) || ! is_string( $settings['portable_slug'] ) ) {
 					throw $this->csv_error( sprintf( 'CSV flow row %d must contain a non-empty portable_slug.', $index + 1 ) );
 				}
+				$settings['portable_slug'] = sanitize_title( $settings['portable_slug'] );
+				if ( '' === $settings['portable_slug'] ) {
+					throw $this->csv_error( sprintf( 'CSV flow row %d portable_slug is invalid.', $index + 1 ) );
+				}
 				$unsupported_metadata = array_diff( array_keys( $settings ), array( 'scheduling_config', 'portable_slug' ) );
 				if ( ! empty( $unsupported_metadata ) ) {
 					throw $this->csv_error( sprintf( 'CSV flow row %d contains unsupported metadata: %s.', $index + 1, implode( ', ', $unsupported_metadata ) ) );
+				}
+				$schedule_validation = datamachine_validate_interval( (string) ( $settings['scheduling_config']['interval'] ?? 'manual' ), $settings['scheduling_config'] );
+				if ( empty( $schedule_validation['valid'] ) ) {
+					throw $this->csv_error( sprintf( 'CSV flow row %d has invalid scheduling_config: %s.', $index + 1, (string) ( $schedule_validation['error'] ?? 'invalid interval' ) ) );
+				}
+				$settings['scheduling_config']['interval'] = (string) $schedule_validation['resolved'];
+				foreach ( array( 'enabled', 'paused' ) as $boolean_field ) {
+					if ( array_key_exists( $boolean_field, $settings['scheduling_config'] ) && ! is_bool( $settings['scheduling_config'][ $boolean_field ] ) ) {
+						throw $this->csv_error( sprintf( 'CSV flow row %d scheduling_config field %s must be a boolean.', $index + 1, $boolean_field ) );
+					}
 				}
 				$metadata = $settings;
 			}
 
 			$parsed[] = array(
 				'row_type'      => $row_type,
+				'pipeline_id'    => $source_pipeline_id,
 				'pipeline_name' => $pipeline_name,
 				'step_position' => '' === $cols[4] ? -1 : (int) $cols[4],
 				'step_type'     => (string) $cols[5],
@@ -262,6 +314,7 @@ class ImportExport {
 			);
 		}
 
+		$this->validate_csv_relationships( $parsed );
 		return $parsed;
 	}
 	// phpcs:enable WordPress.Security.EscapeOutput.ExceptionNotEscaped
@@ -272,6 +325,107 @@ class ImportExport {
 	private function csv_error( string $message ): \InvalidArgumentException {
 		// phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- Exception text is logged, not rendered.
 		return new \InvalidArgumentException( $message );
+	}
+
+	/** Validate all row relationships before import performs its first write. */
+	private function validate_csv_relationships( array $rows ): void {
+		$steps           = array();
+		$flows           = array();
+		$flow_slugs      = array();
+		$pipeline_sources = array();
+		$source_names     = array();
+		$flow_steps       = array();
+		foreach ( $rows as $row ) {
+			$pipeline = $row['pipeline_name'];
+			if ( isset( $pipeline_sources[ $pipeline ] ) && $pipeline_sources[ $pipeline ] !== $row['pipeline_id'] ) {
+				throw $this->csv_error( sprintf( 'CSV pipeline_name %s maps to multiple source pipeline IDs.', $pipeline ) );
+			}
+			$pipeline_sources[ $pipeline ] = $row['pipeline_id'];
+			if ( isset( $source_names[ $row['pipeline_id'] ] ) && $source_names[ $row['pipeline_id'] ] !== $pipeline ) {
+				throw $this->csv_error( sprintf( 'CSV source pipeline ID %s maps to multiple pipeline names.', $row['pipeline_id'] ) );
+			}
+			$source_names[ $row['pipeline_id'] ] = $pipeline;
+			if ( 'pipeline_step' === $row['row_type'] ) {
+				$position = $row['step_position'];
+				if ( isset( $steps[ $pipeline ][ $position ] ) ) {
+					throw $this->csv_error( sprintf( 'CSV contains duplicate pipeline step position %d for %s.', $position, $pipeline ) );
+				}
+				$steps[ $pipeline ][ $position ] = $row['step_type'];
+			}
+			if ( 'flow' === $row['row_type'] ) {
+				$flow_id = $row['flow_id'];
+				$slug    = $row['metadata']['portable_slug'];
+				if ( isset( $flows[ $pipeline ][ $flow_id ] ) ) {
+					throw $this->csv_error( sprintf( 'CSV contains duplicate flow metadata for %s.', $flow_id ) );
+				}
+				if ( isset( $flow_slugs[ $pipeline ][ $slug ] ) ) {
+					throw $this->csv_error( sprintf( 'CSV contains duplicate portable_slug %s for %s.', $slug, $pipeline ) );
+				}
+				$flows[ $pipeline ][ $flow_id ] = $row['flow_name'];
+				$flow_slugs[ $pipeline ][ $slug ] = true;
+			}
+			if ( 'flow_step' === $row['row_type'] ) {
+				$identity = $row['flow_id'] . ':' . $row['step_position'];
+				if ( isset( $flow_steps[ $pipeline ][ $identity ] ) ) {
+					throw $this->csv_error( sprintf( 'CSV contains duplicate flow_step metadata for %s.', $identity ) );
+				}
+				$flow_steps[ $pipeline ][ $identity ] = true;
+			}
+		}
+
+		foreach ( $steps as $pipeline => $positions ) {
+			$actual = array_map( 'intval', array_keys( $positions ) );
+			sort( $actual, SORT_NUMERIC );
+			$expected = range( 0, count( $actual ) - 1 );
+			if ( $actual !== $expected ) {
+				throw $this->csv_error( sprintf( 'CSV pipeline step positions for %s must be contiguous from zero.', $pipeline ) );
+			}
+		}
+
+		foreach ( $rows as $row ) {
+			if ( 'flow_step' !== $row['row_type'] ) {
+				continue;
+			}
+			$pipeline = $row['pipeline_name'];
+			if ( empty( $flows[ $pipeline ][ $row['flow_id'] ] ) || ! isset( $steps[ $pipeline ][ $row['step_position'] ] ) ) {
+				throw $this->csv_error( sprintf( 'CSV flow_step row references missing flow or pipeline step metadata for %s.', $pipeline ) );
+			}
+			if ( (string) $steps[ $pipeline ][ $row['step_position'] ] !== (string) $row['step_type'] ) {
+				throw $this->csv_error( sprintf( 'CSV flow_step row step_type does not match pipeline step metadata for %s.', $pipeline ) );
+			}
+			if ( (string) $flows[ $pipeline ][ $row['flow_id'] ] !== (string) $row['flow_name'] ) {
+				throw $this->csv_error( sprintf( 'CSV flow_step row flow_name does not match flow metadata for %s.', $pipeline ) );
+			}
+		}
+	}
+
+	/** Prove existing positional step types are compatible before any trimming or writes. */
+	private function validate_destination_compatibility( array $rows ): bool {
+		$expected = array();
+		foreach ( $rows as $row ) {
+			if ( 'pipeline_step' === $row['row_type'] ) {
+				$expected[ $row['pipeline_name'] ][ $row['step_position'] ] = $row['step_type'];
+			}
+		}
+
+		$db_pipelines = new \DataMachine\Core\Database\Pipelines\Pipelines();
+		foreach ( $expected as $pipeline_name => $step_types ) {
+			$pipeline_id = $this->find_pipeline_by_name( $pipeline_name );
+			if ( ! $pipeline_id ) {
+				continue;
+			}
+			$pipeline = $db_pipelines->get_pipeline( $pipeline_id );
+			$steps    = is_array( $pipeline['pipeline_config'] ?? null ) ? $pipeline['pipeline_config'] : array();
+			uasort( $steps, static fn( $a, $b ) => ( $a['execution_order'] ?? 0 ) <=> ( $b['execution_order'] ?? 0 ) );
+			$steps = array_values( $steps );
+			foreach ( $step_types as $position => $step_type ) {
+				if ( isset( $steps[ $position ] ) && (string) ( $steps[ $position ]['step_type'] ?? '' ) !== (string) $step_type ) {
+					do_action( 'datamachine_log', 'error', 'Import: existing pipeline step type does not match CSV', array( 'pipeline_id' => $pipeline_id, 'step_position' => $position ) );
+					return false;
+				}
+			}
+		}
+		return true;
 	}
 
 	/**
@@ -335,7 +489,19 @@ class ImportExport {
 				);
 				return null;
 			}
-			return isset( $existing_step['pipeline_step_id'] ) ? (string) $existing_step['pipeline_step_id'] : null;
+			$pipeline_step_id = isset( $existing_step['pipeline_step_id'] ) ? (string) $existing_step['pipeline_step_id'] : '';
+			if ( '' === $pipeline_step_id ) {
+				return null;
+			}
+			$step_config['pipeline_step_id'] = $pipeline_step_id;
+			$step_config['pipeline_id']      = $pipeline_id;
+			$step_config['step_type']        = $step_type;
+			$step_config['execution_order']  = $existing_step['execution_order'] ?? $position;
+			$existing[ $pipeline_step_id ]   = $step_config;
+			if ( ! $db_pipelines->update_pipeline( $pipeline_id, array( 'pipeline_config' => $existing ) ) ) {
+				return null;
+			}
+			return $pipeline_step_id;
 		}
 
 		$ability = wp_get_ability( 'datamachine/add-pipeline-step' );
@@ -356,6 +522,34 @@ class ImportExport {
 		}
 
 		return (string) $result['pipeline_step_id'];
+	}
+
+	/** Remove destination-only trailing steps through the canonical deletion ability. */
+	private function trim_pipeline_steps( int $pipeline_id, int $expected_count ): bool {
+		$db_pipelines = new \DataMachine\Core\Database\Pipelines\Pipelines();
+		$steps        = $db_pipelines->get_pipeline_config( $pipeline_id );
+		uasort( $steps, static fn( $a, $b ) => ( $a['execution_order'] ?? 0 ) <=> ( $b['execution_order'] ?? 0 ) );
+		$steps = array_values( $steps );
+		if ( count( $steps ) <= $expected_count ) {
+			return true;
+		}
+
+		$delete_step = wp_get_ability( 'datamachine/delete-pipeline-step' );
+		if ( ! $delete_step ) {
+			return false;
+		}
+		for ( $index = count( $steps ) - 1; $index >= $expected_count; --$index ) {
+			$result = $delete_step->execute(
+				array(
+					'pipeline_id'      => $pipeline_id,
+					'pipeline_step_id' => (string) ( $steps[ $index ]['pipeline_step_id'] ?? '' ),
+				)
+			);
+			if ( is_wp_error( $result ) || empty( $result['success'] ) ) {
+				return false;
+			}
+		}
+		return true;
 	}
 
 	/**
@@ -415,7 +609,10 @@ class ImportExport {
 				do_action( 'datamachine_log', 'error', 'Import: update-flow ability not available' );
 				return null;
 			}
-			$result = $update_flow->execute(
+			$current_flow       = $db_flows->get_flow( $flow_id );
+			$current_scheduling = is_array( $current_flow['scheduling_config'] ?? null ) ? $current_flow['scheduling_config'] : array();
+			$scheduling_config  = AuthRefHandlerConfig::preserve_local_secrets( $scheduling_config, $current_scheduling );
+			$result             = $update_flow->execute(
 				array(
 					'flow_id'           => $flow_id,
 					'flow_name'         => $flow_name,
@@ -482,8 +679,18 @@ class ImportExport {
 		if ( empty( $flow_config[ $flow_step_id ]['step_type'] ) ) {
 			$flow_config[ $flow_step_id ]['step_type'] = $step_type;
 		}
+		$existing_step = $flow_config[ $flow_step_id ];
+		if ( isset( $settings['handler_configs'] ) && is_array( $settings['handler_configs'] ) ) {
+			$local_configs = FlowStepConfig::getHandlerConfigs( $existing_step );
+			foreach ( $settings['handler_configs'] as $handler_slug => $portable_config ) {
+				if ( is_array( $portable_config ) ) {
+					$local_config = is_array( $local_configs[ $handler_slug ] ?? null ) ? $local_configs[ $handler_slug ] : array();
+					$settings['handler_configs'][ $handler_slug ] = AuthRefHandlerConfig::preserve_local_secrets( $portable_config, $local_config );
+				}
+			}
+		}
 
-		$step = FlowStepConfigFactory::withHandlerFields( $flow_config[ $flow_step_id ], $settings );
+		$step = FlowStepConfigFactory::withHandlerFields( PortableFlowStepFields::clear_settings( $existing_step ), $settings );
 		$step = array_merge( $step, $this->normalize_portable_flow_step_settings( $settings ) );
 
 		$flow_config[ $flow_step_id ] = $step;
@@ -528,6 +735,18 @@ class ImportExport {
 			: ( $pipeline['pipeline_config'] ?? array() );
 			$flows           = $db_flows->get_flows_for_pipeline( $pipeline_id );
 			$used_flow_slugs = array();
+			$csv_rows[]      = array(
+				self::CSV_FORMAT_VERSION,
+				'pipeline',
+				$pipeline_id,
+				$pipeline['pipeline_name'],
+				'',
+				'',
+				'',
+				'',
+				'',
+				'',
+			);
 
 			foreach ( $flows as $flow ) {
 				$portable_slug = ! empty( $flow['portable_slug'] ) ? sanitize_title( (string) $flow['portable_slug'] ) : sanitize_title( (string) $flow['flow_name'] );
@@ -664,7 +883,7 @@ class ImportExport {
 	 * Remove scheduler-owned runtime observations from portable desired state.
 	 */
 	private function export_scheduling_config( array $scheduling_config ): array {
-		return FlowScheduling::portable_desired_config( $scheduling_config );
+		return AuthRefHandlerConfig::strip_secrets_for_export( FlowScheduling::portable_desired_config( $scheduling_config ) );
 	}
 
 	/**

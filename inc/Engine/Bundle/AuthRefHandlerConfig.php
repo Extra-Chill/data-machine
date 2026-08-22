@@ -92,11 +92,34 @@ final class AuthRefHandlerConfig {
 				$config = array();
 			}
 
-			$projected[ (string) $handler_slug ] = self::strip_secret_like_values( $config );
+			$projected[ (string) $handler_slug ] = self::strip_secrets_for_export( $config );
 		}
 
 		ksort( $projected, SORT_STRING );
 		return $projected;
+	}
+
+	/** Recursively remove credential-shaped values from any portable export payload. */
+	public static function strip_secrets_for_export( array $value ): array {
+		return self::strip_secret_like_values( $value );
+	}
+
+	/** Preserve destination-local credentials while applying portable settings. */
+	public static function preserve_local_secrets( array $portable, array $local ): array {
+		foreach ( $local as $key => $local_value ) {
+			if ( self::is_secret_key( (string) $key ) ) {
+				$portable[ $key ] = $local_value;
+				continue;
+			}
+			if ( is_array( $local_value ) ) {
+				$portable_child = is_array( $portable[ $key ] ?? null ) ? $portable[ $key ] : array();
+				$merged_child   = self::preserve_local_secrets( $portable_child, $local_value );
+				if ( ! empty( $merged_child ) || array_key_exists( $key, $portable ) ) {
+					$portable[ $key ] = $merged_child;
+				}
+			}
+		}
+		return $portable;
 	}
 
 	/**
@@ -200,10 +223,8 @@ final class AuthRefHandlerConfig {
 	}
 
 	private static function strip_secret_like_values( array $value ): array {
-		$secret_keys = array( 'access_token', 'refresh_token', 'token', 'secret', 'client_secret', 'password', 'api_key', 'apikey', 'key', 'authorization' );
 		foreach ( $value as $key => $child ) {
-			$key_string = strtolower( (string) $key );
-			if ( in_array( $key_string, $secret_keys, true ) || str_contains( $key_string, 'secret' ) || str_contains( $key_string, 'token' ) || str_contains( $key_string, 'password' ) || str_contains( $key_string, 'credential' ) || str_contains( $key_string, 'bearer' ) ) {
+			if ( self::is_secret_key( (string) $key ) ) {
 				unset( $value[ $key ] );
 				continue;
 			}
@@ -211,8 +232,36 @@ final class AuthRefHandlerConfig {
 				$value[ $key ] = self::strip_secret_like_values( $child );
 			}
 		}
-		ksort( $value, SORT_STRING );
+		if ( ! array_is_list( $value ) ) {
+			ksort( $value, SORT_STRING );
+		}
 		return $value;
+	}
+
+	/** Whether a configuration key names credential material. */
+	private static function is_secret_key( string $key ): bool {
+		$key = str_replace( array( '-', ' ' ), '_', $key );
+		$key = (string) preg_replace( '/(?<=[a-z0-9])([A-Z])/', '_$1', $key );
+		$key = strtolower( $key );
+		$safe_keys = array( 'auth_ref', 'public_key', 'max_tokens', 'token_budget', 'token_type', 'token_count', 'token_limit' );
+		if ( in_array( $key, $safe_keys, true ) ) {
+			return false;
+		}
+		$exact = array( 'access_token', 'refresh_token', 'id_token', 'token', 'secret', 'secrets', 'credential', 'credentials', 'client_secret', 'password', 'api_key', 'apikey', 'key', 'authorization', 'private_key', 'cookie', 'cookies' );
+		return in_array( $key, $exact, true )
+			|| str_ends_with( $key, '_secret' )
+			|| str_ends_with( $key, '_secrets' )
+			|| str_ends_with( $key, '_token' )
+			|| str_ends_with( $key, '_password' )
+			|| str_ends_with( $key, '_credential' )
+			|| str_ends_with( $key, '_credentials' )
+			|| str_contains( $key, 'api_key' )
+			|| str_contains( $key, 'bearer' )
+			|| str_contains( $key, 'authorization' )
+			|| str_contains( $key, 'private_key' )
+			|| str_contains( $key, 'cookie' )
+			|| str_contains( $key, 'hmac_key' )
+			|| str_contains( $key, 'signing_key' );
 	}
 
 	private static function redact_error( \WP_Error $error, AuthRef $ref ): \WP_Error {

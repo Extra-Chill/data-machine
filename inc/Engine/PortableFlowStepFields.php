@@ -44,8 +44,8 @@ final class PortableFlowStepFields {
 			$normalized[ self::CONFIG_PATCH_QUEUE ] = self::normalize_field( self::CONFIG_PATCH_QUEUE, $source[ self::CONFIG_PATCH_QUEUE ], $message_prefix );
 		}
 
-		if ( array_key_exists( 'queue_mode', $source ) && in_array( $source['queue_mode'], self::QUEUE_MODES, true ) ) {
-			$normalized['queue_mode'] = $source['queue_mode'];
+		if ( array_key_exists( 'queue_mode', $source ) ) {
+			$normalized['queue_mode'] = self::normalize_field( 'queue_mode', $source['queue_mode'], $message_prefix );
 		}
 
 		foreach ( array( 'completion_assertions', 'tool_runtime_rules', 'enabled' ) as $field ) {
@@ -68,7 +68,11 @@ final class PortableFlowStepFields {
 		}
 
 		if ( 'enabled' === $field ) {
-			return (bool) $value;
+			if ( ! is_bool( $value ) ) {
+				// phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- Exception text is not rendered directly.
+				throw new \InvalidArgumentException( self::message( 'enabled must be a boolean.', $message_prefix ) );
+			}
+			return $value;
 		}
 
 		if ( in_array( $field, array( 'flow_step_settings', 'completion_assertions' ), true ) ) {
@@ -108,6 +112,18 @@ final class PortableFlowStepFields {
 		}
 
 		return $value;
+	}
+
+	/** Remove all portable behavior before applying an authoritative import row. */
+	public static function clear_settings( array $step ): array {
+		$fields = array_merge(
+			self::STRING_LIST_FIELDS,
+			array( self::PROMPT_QUEUE, self::CONFIG_PATCH_QUEUE, 'queue_mode', 'completion_assertions', 'tool_runtime_rules', 'enabled', 'handler_slugs', 'handler_configs', 'flow_step_settings' )
+		);
+		foreach ( $fields as $field ) {
+			unset( $step[ $field ] );
+		}
+		return $step;
 	}
 
 	private static function normalize_string_list( string $field, $value, string $message_prefix ): array {
