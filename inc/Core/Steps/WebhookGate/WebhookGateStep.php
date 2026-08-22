@@ -14,7 +14,9 @@
 
 namespace DataMachine\Core\Steps\WebhookGate;
 
+use DataMachine\Abilities\Engine\ScheduleNextStepAbility;
 use DataMachine\Core\DataPacket;
+use DataMachine\Core\DataPacketStore;
 use DataMachine\Core\JobStatus;
 use DataMachine\Core\Steps\Step;
 use DataMachine\Core\Steps\StepTypeRegistrationTrait;
@@ -93,28 +95,14 @@ class WebhookGateStep extends Step {
 			'datamachine_webhook_gate_timeout',
 			function ( $job_id, $token ) {
 				$job_id = (int) $job_id;
-
-				// Only fail the job if it's still waiting.
 				$db_jobs = new \DataMachine\Core\Database\Jobs\Jobs();
-				$job     = $db_jobs->get_job_metadata( $job_id );
+				$result  = $db_jobs->timeout_webhook_gate( $job_id, (string) $token );
 
-				if ( ! $job || 'waiting' !== ( $job['status'] ?? '' ) ) {
-					return; // Job already resumed or failed.
+				if ( empty( $result['success'] ) || empty( $result['changed'] ) ) {
+					return;
 				}
 
-				// Clean up the transient.
 				delete_transient( 'datamachine_webhook_gate_' . $token );
-
-				// Fail the job.
-				do_action(
-					'datamachine_fail_job',
-					$job_id,
-					'webhook_gate_timeout',
-					array(
-						'flow_step_id'  => '',
-						'error_message' => 'Webhook gate timed out waiting for inbound webhook.',
-					)
-				);
 
 				do_action(
 					'datamachine_log',
@@ -283,7 +271,7 @@ class WebhookGateStep extends Step {
 	 * @return \WP_REST_Response|\WP_Error
 	 */
 	public static function handleInboundWebhook( \WP_REST_Request $request ) {
-		$token  = $request->get_param( 'token' );
+		$token  = (string) $request->get_param( 'token' );
 		$job_id = get_transient( 'datamachine_webhook_gate_' . $token );
 
 		if ( ! $job_id ) {
@@ -296,77 +284,76 @@ class WebhookGateStep extends Step {
 
 		$job_id = (int) $job_id;
 
-		// Verify job is actually in waiting status.
-		$db_jobs = new \DataMachine\Core\Database\Jobs\Jobs();
-		$job     = $db_jobs->get_job_metadata( $job_id );
+		$engine_snapshot = datamachine_get_engine_data( $job_id );
+		$gate_snapshot   = is_array( $engine_snapshot['webhook_gate'] ?? null ) ? $engine_snapshot['webhook_gate'] : array();
 
-		if ( ! $job || 'waiting' !== ( $job['status'] ?? '' ) ) {
-			return new \WP_Error(
-				'job_not_waiting',
-				'Job is not in waiting status.',
-				array( 'status' => 409 )
+		$received_at  = gmdate( 'Y-m-d\TH:i:s\Z' );
+		$data_packets = array();
+		if ( 'received' !== (string) ( $gate_snapshot['status'] ?? '' ) ) {
+			$webhook_body = $request->get_json_params();
+			if ( empty( $webhook_body ) ) {
+				$webhook_body = $request->get_body_params();
+			}
+			if ( empty( $webhook_body ) ) {
+				$webhook_body = array();
+			}
+
+			$webhook_packet    = new DataPacket(
+				array(
+					'title' => 'Webhook Payload',
+					'body'  => $webhook_body,
+				),
+				array(
+					'source_type'  => 'webhook_gate_inbound',
+					'flow_step_id' => is_string( $gate_snapshot['flow_step_id'] ?? null ) ? $gate_snapshot['flow_step_id'] : '',
+					'received_at'  => $received_at,
+					'remote_ip'    => sanitize_text_field( wp_unslash( $request->get_header( 'x-forwarded-for' ) ?? $_SERVER['REMOTE_ADDR'] ?? '' ) ),
+				),
+				'webhook_payload'
 			);
+			$data_packets      = $webhook_packet->addTo( array() );
+			if ( ! is_string( wp_json_encode( $data_packets ) ) ) {
+				return new \WP_Error(
+					'webhook_payload_persistence_failed',
+					'Webhook payload could not be persisted.',
+					array( 'status' => 500 )
+				);
+			}
 		}
-
-		// Get the webhook gate context from engine_data.
-		$engine_data = datamachine_get_engine_data( $job_id );
-		$gate_data   = $engine_data['webhook_gate'] ?? array();
-
-		if ( empty( $gate_data['next_flow_step_id'] ) ) {
-			return new \WP_Error(
-				'no_next_step',
-				'No next step configured for this webhook gate.',
-				array( 'status' => 500 )
-			);
-		}
-
-		$next_step_id = $gate_data['next_flow_step_id'];
-
-		// Build webhook payload as data packets.
-		$webhook_body = $request->get_json_params();
-		if ( empty( $webhook_body ) ) {
-			$webhook_body = $request->get_body_params();
-		}
-		if ( empty( $webhook_body ) ) {
-			$webhook_body = array();
-		}
-
-		$webhook_packet = new DataPacket(
-			array(
-				'title' => 'Webhook Payload',
-				'body'  => $webhook_body,
-			),
-			array(
-				'source_type'  => 'webhook_gate_inbound',
-				'flow_step_id' => $gate_data['flow_step_id'] ?? '',
-				'received_at'  => gmdate( 'Y-m-d\TH:i:s\Z' ),
-				'remote_ip'    => sanitize_text_field( wp_unslash( $request->get_header( 'x-forwarded-for' ) ?? $_SERVER['REMOTE_ADDR'] ?? '' ) ),
-			),
-			'webhook_payload'
-		);
-
-		$data_packets = $webhook_packet->addTo( array() );
-
-		// Update engine_data: clear webhook_gate status, remove job_status override.
-		datamachine_merge_engine_data(
+		$scheduler = new ScheduleNextStepAbility( false );
+		$db_jobs   = new \DataMachine\Core\Database\Jobs\Jobs();
+		$claim     = $db_jobs->claim_webhook_gate_resume(
 			$job_id,
-			array(
-				'webhook_gate' => array_merge( $gate_data, array(
-					'status'      => 'received',
-					'received_at' => gmdate( 'Y-m-d\TH:i:s\Z' ),
-				) ),
-				'job_status'   => null, // Clear the status override so engine proceeds normally.
-			)
+			$token,
+			$received_at,
+			$data_packets,
+			static fn( int $scheduled_job_id, string $step_id ): int => $scheduler->scheduleActionAtomically( $scheduled_job_id, $step_id )
 		);
+		if ( ! empty( $claim['already_resumed'] ) ) {
+			return new \WP_REST_Response(
+				array(
+					'success'         => true,
+					'already_resumed' => true,
+					'job_id'          => $job_id,
+					'next_step_id'    => $claim['next_flow_step_id'],
+					'message'         => 'Pipeline was already resumed.',
+				),
+				200
+			);
+		}
+		if ( empty( $claim['owned'] ) ) {
+			$status = 'token_mismatch' === $claim['reason'] ? 403 : ( 'next_step_missing' === $claim['reason'] ? 500 : 409 );
+			return new \WP_Error(
+				'webhook_gate_resume_failed',
+				'Webhook gate could not be resumed.',
+				array(
+					'status' => $status,
+					'reason' => $claim['reason'],
+				)
+			);
+		}
 
-		// Update job status back to processing.
-		$db_jobs->update_job_status( $job_id, JobStatus::PROCESSING );
-
-		// Clean up the transient.
-		delete_transient( 'datamachine_webhook_gate_' . $token );
-
-		// Resume the pipeline by scheduling the next step.
-		do_action( 'datamachine_schedule_next_step', $job_id, $next_step_id, $data_packets );
+		$next_step_id = $claim['next_flow_step_id'];
 
 		do_action(
 			'datamachine_log',

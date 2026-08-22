@@ -75,7 +75,12 @@ class EngineData {
 
 		$cached = wp_cache_get( $job_id, 'datamachine_engine_data' );
 		if ( false !== $cached ) {
-			return is_array( $cached ) ? $cached : array();
+			$cached = is_array( $cached ) ? $cached : array();
+			// A committed webhook resume can race a reader that republishes the
+			// prior waiting snapshot. Waiting gates always revalidate against DB.
+			if ( 'waiting' !== (string) ( $cached['webhook_gate']['status'] ?? '' ) ) {
+				return $cached;
+			}
 		}
 
 		$db_jobs     = new Jobs();
