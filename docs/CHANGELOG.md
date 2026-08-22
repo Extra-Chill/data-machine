@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.175.13] - 2026-08-22
+
+### Changed
+- Make pipeline CSV flow export lossless
+
 ## [0.175.12] - 2026-08-22
 
 ### Changed
