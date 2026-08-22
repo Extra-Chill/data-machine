@@ -773,10 +773,11 @@ function datamachine_build_pre_tool_mediator( array $tools, array $loop_payload,
 				$tool_result['metadata']['status'] = DataMachineConversationStatus::RUNTIME_TOOL_PENDING;
 			}
 
+			$is_pending = ! empty( $tool_result['pending'] );
 			return array(
-				'action'   => ! empty( $tool_result['pending'] ) ? 'pending' : 'replace_result',
+				'action'   => 'replace_result',
 				'result'   => $tool_result,
-				'complete' => ! empty( $tool_result['pending'] ),
+				'complete' => $is_pending,
 			);
 		}
 
