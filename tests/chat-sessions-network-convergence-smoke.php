@@ -216,6 +216,11 @@ namespace {
 		public string $last_error = '';
 		public bool $fail_insert = false;
 		public bool $force_update_zero = false;
+		public bool $errors_suppressed = false;
+		public int $leaked_errors = 0;
+		public array $deadlocks_remaining = array();
+		public array $migration_update_queries = array();
+		public function suppress_errors( bool $suppress = true ): bool { $previous = $this->errors_suppressed; $this->errors_suppressed = $suppress; return $previous; }
 		public function get_blog_prefix( int $blog_id ): string { return 1 === $blog_id ? 'wp_' : 'wp_' . $blog_id . '_'; }
 		public function prepare( string $query, ...$args ): string {
 			$prepared_query = $query;
@@ -307,11 +312,19 @@ namespace {
 			$GLOBALS['chat_tables'][ $table ][ $id ] = array_merge( $GLOBALS['chat_tables'][ $table ][ $id ], $data );
 			return empty( $changed ) ? 0 : 1;
 		}
-		public function query( string $query ): int {
+		public function query( string $query ): int|false {
 			if ( preg_match( "/^UPDATE '([^']+)' SET (.*) WHERE (.*)$/", $query, $matches ) && str_contains( $matches[3], 'BINARY ' ) ) {
 				$table = $matches[1];
 				preg_match( "/BINARY 'session_id' = BINARY ('(?:''|[^'])*')/", $matches[3], $id_match );
 				$id = isset( $id_match[1] ) ? $this->unquote( $id_match[1] ) : '';
+				$this->migration_update_queries[] = $query;
+				if ( 0 < ( $this->deadlocks_remaining[ $id ] ?? 0 ) ) {
+					--$this->deadlocks_remaining[ $id ];
+					$this->last_error = 'Deadlock found when trying to get lock; try restarting transaction';
+					if ( ! $this->errors_suppressed ) { ++$this->leaked_errors; }
+					return false;
+				}
+				$this->last_error = '';
 				if ( ! isset( $GLOBALS['chat_tables'][ $table ][ $id ] ) ) { return 0; }
 				if ( isset( $GLOBALS['chat_concurrent_updates'][ $id ] ) ) {
 					$GLOBALS['chat_tables'][ $table ][ $id ] = array_merge( $GLOBALS['chat_tables'][ $table ][ $id ], $GLOBALS['chat_concurrent_updates'][ $id ] );
@@ -383,6 +396,7 @@ namespace {
 	function delete_site_option( string $key ): bool { unset( $GLOBALS['chat_site_options'][ $key ] ); return true; }
 	function do_action( string $hook, ...$args ): void { $GLOBALS['chat_logs'][] = array( $hook, $args ); }
 
+	require_once dirname( __DIR__ ) . '/inc/Core/Database/LifecycleStateTransition.php';
 	require_once dirname( __DIR__ ) . '/inc/Core/Database/Chat/Chat.php';
 	require_once dirname( __DIR__ ) . '/inc/setup/chat-sessions-network.php';
 
@@ -462,6 +476,24 @@ namespace {
 	);
 	$assert( '2026-01-01 00:00:00' === $read_at, 'same-second scoped mark-read is an idempotent success after ownership verification' );
 	$GLOBALS['wpdb']->force_update_zero = false;
+
+	$update_target = new \ReflectionMethod( \DataMachine\Core\Database\Chat\Chat::class, 'update_migration_target' );
+	$observed      = $GLOBALS['chat_tables']['wp_datamachine_chat_sessions']['legacy-user'];
+	$query_offset  = count( $GLOBALS['wpdb']->migration_update_queries );
+	$GLOBALS['wpdb']->deadlocks_remaining['legacy-user'] = 2;
+	$updated = $update_target->invoke( null, 'wp_datamachine_chat_sessions', $observed, $observed );
+	$retry_queries = array_slice( $GLOBALS['wpdb']->migration_update_queries, $query_offset );
+	$assert( 0 === $updated && 3 === count( $retry_queries ), 'transient migration deadlocks retry until the exact CAS succeeds' );
+	$assert( 1 === count( array_unique( $retry_queries ) ), 'deadlock retries preserve the complete optimistic row-match predicate' );
+	$assert( 0 === $GLOBALS['wpdb']->leaked_errors && ! $GLOBALS['wpdb']->errors_suppressed, 'recovered deadlocks do not leak database output or alter caller suppression state' );
+
+	$query_offset = count( $GLOBALS['wpdb']->migration_update_queries );
+	$GLOBALS['wpdb']->deadlocks_remaining['legacy-user'] = 5;
+	$updated = $update_target->invoke( null, 'wp_datamachine_chat_sessions', $observed, $observed );
+	$retry_queries = array_slice( $GLOBALS['wpdb']->migration_update_queries, $query_offset );
+	$assert( false === $updated && 5 === count( $retry_queries ), 'persistent migration deadlocks stop after the bounded attempt budget' );
+	$assert( 1 === count( array_unique( $retry_queries ) ) && str_contains( $GLOBALS['wpdb']->last_error, 'Deadlock found' ), 'exhaustion retains the exact CAS and database error for convergence reporting' );
+	$assert( 0 === $GLOBALS['wpdb']->leaked_errors && ! $GLOBALS['wpdb']->errors_suppressed, 'exhausted retries remain contained and restore caller suppression state' );
 
 	$GLOBALS['chat_tables']['wp_7_datamachine_chat_sessions']['unmappable'] = array( 'session_id' => 'unmappable', 'user_id' => 1, 'messages' => '[]', 'metadata' => '{}', 'context' => 'chat' );
 	$GLOBALS['chat_home_urls'][7] = '';

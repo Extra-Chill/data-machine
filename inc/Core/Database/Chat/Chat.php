@@ -15,6 +15,7 @@ use DataMachine\Core\Admin\DateFormatter;
 use DataMachine\Abilities\Chat\ChatTranscriptOwner;
 use DataMachine\Core\Agents\AgentIdentityResolver;
 use DataMachine\Core\Database\BaseRepository;
+use DataMachine\Core\Database\LifecycleStateTransition;
 use AgentsAPI\AI\WP_Agent_Execution_Principal;
 use AgentsAPI\AI\WP_Agent_Message;
 use AgentsAPI\Core\Workspace\WP_Agent_Workspace_Scope;
@@ -36,6 +37,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 class Chat extends BaseRepository implements ConversationStoreInterface {
 	private const MIGRATION_BATCH_SIZE            = 100;
 	private const MIGRATION_COLLISION_PROBE_LIMIT = 100;
+	private const MIGRATION_DEADLOCK_ATTEMPTS     = 5;
+	private const MIGRATION_DEADLOCK_BACKOFF_US   = 20000;
 	private const MIGRATION_NUMERIC_COLUMNS       = array( 'user_id', 'agent_id' );
 
 	/**
@@ -372,8 +375,37 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 		}
 
 		$sql = 'UPDATE %i SET ' . implode( ', ', $set ) . ' WHERE ' . implode( ' AND ', $predicates );
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
-		return $wpdb->query( $wpdb->prepare( $sql, ...$arguments ) );
+		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		$prepared = $wpdb->prepare( $sql, ...$arguments );
+		for ( $attempt = 1; $attempt <= self::MIGRATION_DEADLOCK_ATTEMPTS; ++$attempt ) {
+			$previous_suppression = method_exists( $wpdb, 'suppress_errors' ) ? $wpdb->suppress_errors( true ) : null;
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
+			$updated  = $wpdb->query( $prepared );
+			$db_error = (string) $wpdb->last_error;
+			if ( null !== $previous_suppression ) {
+				$wpdb->suppress_errors( $previous_suppression );
+			}
+
+			if ( false !== $updated || ! LifecycleStateTransition::is_deadlock_error( $db_error ) || $attempt >= self::MIGRATION_DEADLOCK_ATTEMPTS ) {
+				return $updated;
+			}
+
+			do_action(
+				'datamachine_log',
+				'warning',
+				'Chat session migration update deadlocked; retrying',
+				array(
+					'session_id'   => (string) ( $canonical['session_id'] ?? '' ),
+					'attempt'      => $attempt,
+					'max_attempts' => self::MIGRATION_DEADLOCK_ATTEMPTS,
+					'db_error'     => $db_error,
+				)
+			);
+
+			usleep( self::MIGRATION_DEADLOCK_BACKOFF_US * $attempt + random_int( 0, self::MIGRATION_DEADLOCK_BACKOFF_US ) );
+		}
+
+		return false;
 	}
 
 	private static function migration_row_is_unscoped( array $row ): bool {

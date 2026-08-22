@@ -113,7 +113,7 @@ class LifecycleStateTransition {
 	 * @param string $error The wpdb last_error string.
 	 * @return bool True when the error is a deadlock or lock-wait timeout.
 	 */
-	private static function is_deadlock_error( string $error ): bool {
+	public static function is_deadlock_error( string $error ): bool {
 		if ( '' === $error ) {
 			return false;
 		}
