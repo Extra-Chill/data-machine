@@ -374,7 +374,8 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 			}
 		}
 
-		$sql      = 'UPDATE %i SET ' . implode( ', ', $set ) . ' WHERE ' . implode( ' AND ', $predicates );
+		$sql = 'UPDATE %i SET ' . implode( ', ', $set ) . ' WHERE ' . implode( ' AND ', $predicates );
+		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 		$prepared = $wpdb->prepare( $sql, ...$arguments );
 		for ( $attempt = 1; $attempt <= self::MIGRATION_DEADLOCK_ATTEMPTS; ++$attempt ) {
 			$previous_suppression = method_exists( $wpdb, 'suppress_errors' ) ? $wpdb->suppress_errors( true ) : null;
@@ -394,10 +395,10 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 				'warning',
 				'Chat session migration update deadlocked; retrying',
 				array(
-					'session_id'  => (string) ( $canonical['session_id'] ?? '' ),
-					'attempt'     => $attempt,
+					'session_id'   => (string) ( $canonical['session_id'] ?? '' ),
+					'attempt'      => $attempt,
 					'max_attempts' => self::MIGRATION_DEADLOCK_ATTEMPTS,
-					'db_error'    => $db_error,
+					'db_error'     => $db_error,
 				)
 			);
 
